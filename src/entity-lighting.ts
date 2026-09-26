@@ -16,6 +16,14 @@ const SPRITE_DIRS: { key: SpriteDir; dx: number; dy: number }[] = [
  * sprite, and how to paint it (in tile space, onto the given context). */
 type Caster = { x: number; y: number; key: string; draw: (c: CanvasRenderingContext2D) => void; hero?: boolean };
 type LitCaster = Caster & { light: Record<SpriteDir, number> };
+type LightMasks = Record<SpriteDir, HTMLCanvasElement>;
+/** The shadow torch `t` casts from a caster: the caster's offset from the
+ * swaying flame and its distance, the flicker, and the shadow's opacity. */
+type Shadow = { t: Torch; dx: number; dy: number; d: number; flicker: number; alpha: number };
+/** A silhouette stamped at a caster's tile. */
+type Stamp = { x: number; y: number; sil: HTMLCanvasElement };
+/** This frame's shadow layer (made on first use) and what was stamped on it. */
+type ShadowLayer = { layer: CanvasRenderingContext2D | null; stamps: Stamp[] };
 
 /** Torchlight on the things standing in it: the shadows items, enemies,
  * and the hero cast across the floor, and the warm light on their torch-
@@ -27,7 +35,7 @@ export class EntityLighting {
    * Rebaked after a short while so sprites that finish loading are picked up. */
   private silhouettes = new Map<string, { canvas: HTMLCanvasElement; at: number }>();
   /** Directional torchlight masks per silhouette (see spriteLightFor). */
-  private spriteLightMasks = new Map<string, { at: number; masks: Record<SpriteDir, HTMLCanvasElement> }>();
+  private spriteLightMasks = new Map<string, { at: number; masks: LightMasks }>();
   /** Items, enemies, and the hero in torchlight this frame, with how much
    * light reaches each side of them. */
   private lit: LitCaster[] = [];
@@ -53,31 +61,49 @@ export class EntityLighting {
     this.lit = [];
     this.castAny = false;
     if (!f.torches.length || typeof document === "undefined") return;
-    let layer: CanvasRenderingContext2D | null = null;
-    const casterSils: { x: number; y: number; sil: HTMLCanvasElement }[] = [];
+    const cast: ShadowLayer = { layer: null, stamps: [] };
     for (const caster of this.casters(f)) {
-      const light: Record<SpriteDir, number> = { e: 0, w: 0, n: 0, s: 0 };
-      let lit = false;
-      for (const t of f.torches) {
-        const shadow = this.lightCaster(f, caster, t, light);
-        if (!shadow) continue;
-        lit = true;
-        if (shadow.alpha < 0.02) continue;
-        const sil = this.silhouette(caster.key, caster.draw, f.now);
-        if (!sil) continue;
-        layer ??= this.shadowLayer(f.width);
-        if (!layer) return;
-        casterSils.push({ x: caster.x, y: caster.y, sil });
-        this.castShadow(f, layer, caster, t, shadow, sil);
-      }
-      if (lit) this.lit.push({ ...caster, hero: !!caster.hero, light });
+      const { light, shadows } = this.torchlightOn(f, caster);
+      for (const shadow of shadows) if (!this.stampShadow(f, cast, caster, shadow)) return;
+      if (shadows.length) this.lit.push({ ...caster, hero: !!caster.hero, light });
     }
-    if (!layer) return;
+    if (cast.layer) this.finishShadows(f, cast.layer, cast.stamps, wallMask);
+  }
+
+  /** The light every torch puts on each side of `caster`, and the shadows
+   * cast by the torches that reach it. */
+  private torchlightOn(f: FrameContext, caster: Caster) {
+    const light: Record<SpriteDir, number> = { e: 0, w: 0, n: 0, s: 0 };
+    const shadows: Shadow[] = [];
+    for (const t of f.torches) {
+      const shadow = this.lightCaster(f, caster, t, light);
+      if (shadow) shadows.push(shadow);
+    }
+    return { light, shadows };
+  }
+
+  /** Stamps one of `caster`'s shadows on this frame's layer (made on first
+   * use), unless it is too faint or the sprite has no silhouette yet.
+   * False when there is no layer to draw on. */
+  private stampShadow(f: FrameContext, cast: ShadowLayer, caster: Caster, shadow: Shadow) {
+    if (shadow.alpha < 0.02) return true;
+    const sil = this.silhouette(caster.key, caster.draw, f.now);
+    if (!sil) return true;
+    cast.layer ??= this.shadowLayer(f.width);
+    if (!cast.layer) return false;
+    const stamp = { x: caster.x, y: caster.y, sil };
+    cast.stamps.push(stamp);
+    this.castShadow(f, cast.layer, stamp, shadow);
+    return true;
+  }
+
+  /** Cuts the sprites and walls out of the stamped shadows and lays them on the board. */
+  private finishShadows(f: FrameContext, layer: CanvasRenderingContext2D, stamps: Stamp[], wallMask: () => HTMLCanvasElement | null) {
     // Shadows fall on the floor only: never over any sprite (its own or a
     // neighbour's; this layer also dims the darkness and glow passes)...
     layer.globalAlpha = 1;
     layer.globalCompositeOperation = "destination-out";
-    for (const c of casterSils) {
+    for (const c of stamps) {
       const o = tileOrigin(f, c.x, c.y);
       layer.setTransform(1, 0, 0, 1, o.x, o.y);
       layer.scale(f.s / 24, f.s / 24);
@@ -101,14 +127,7 @@ export class EntityLighting {
       if (!masks) continue;
       c.save();
       if (!hero) toTileSpace(c, f, lit.x, lit.y);
-      c.globalCompositeOperation = "lighter";
-      c.imageSmoothingEnabled = false;
-      for (const dir of SPRITE_DIRS) {
-        const a = lit.light[dir.key];
-        if (a < 0.01) continue;
-        c.globalAlpha = Math.min(1, a);
-        c.drawImage(masks[dir.key], 0, 0);
-      }
+      glaze(c, masks, lit.light);
       c.restore();
     }
   }
@@ -140,7 +159,7 @@ export class EntityLighting {
 
   /** Adds torch `t`'s light on each side of `caster` into `light`, and
    * returns the shadow it casts; null when the torch doesn't reach it. */
-  private lightCaster(f: FrameContext, caster: Caster, t: Torch, light: Record<SpriteDir, number>) {
+  private lightCaster(f: FrameContext, caster: Caster, t: Torch, light: Record<SpriteDir, number>): Shadow | null {
     const cfg = LIGHTING_CONFIG.shadow, sl = LIGHTING_CONFIG.spriteLight;
     // Shadows swing gently as the flame sways.
     const sway = getTorchSway(t, f.now, f.reduceMotion);
@@ -161,14 +180,13 @@ export class EntityLighting {
     // Shadows fade more gently than the light itself so they stay readable,
     // and deepen as the room gets darker.
     const alpha = Math.min(0.95, cfg.strength * Math.sqrt(falloff) * flicker * (1 + cfg.darkBoost * f.darkness));
-    return { dx, dy, d, flicker, alpha };
+    return { t, dx, dy, d, flicker, alpha };
   }
 
-  /** Stamps `caster`'s silhouette onto the shadow layer, sheared away from torch `t`. */
-  private castShadow(f: FrameContext, layer: CanvasRenderingContext2D, caster: Caster, t: Torch,
-    shadow: { dx: number; dy: number; d: number; flicker: number; alpha: number }, sil: HTMLCanvasElement) {
+  /** Stamps a caster's silhouette onto the shadow layer, sheared away from the shadow's torch. */
+  private castShadow(f: FrameContext, layer: CanvasRenderingContext2D, { x, y, sil }: Stamp, shadow: Shadow) {
     const cfg = LIGHTING_CONFIG.shadow;
-    const { dx, dy, d } = shadow;
+    const { t, dx, dy, d } = shadow;
     // Screen-space direction away from the torch (world y is up).
     const ux = dx / d, uy = -dy / d;
     const k = Math.min(cfg.maxLength, cfg.minLength + d * cfg.lengthPerTile) * shadow.flicker;
@@ -177,8 +195,8 @@ export class EntityLighting {
     // (up when the torch is below, down when above) plus a partial lean
     // for side light. No rotation, so nothing swings below the base.
     const lean = ux * cfg.lean;
-    const vert = this.verticalStretch(`${caster.x},${caster.y},${t.x},${t.y}`, uy);
-    const o = tileOrigin(f, caster.x, caster.y);
+    const vert = this.verticalStretch(`${x},${y},${t.x},${t.y}`, uy);
+    const o = tileOrigin(f, x, y);
     layer.setTransform(1, 0, 0, 1, o.x, o.y);
     layer.scale(f.s / 24, f.s / 24);
     // Sprite point (x, y), height h = 22 - y -> (x + h*k*lean, 22 + h*k*vert).
@@ -233,14 +251,7 @@ export class EntityLighting {
     if (!ctx) return null;
     draw(ctx);
     const img = ctx.getImageData(0, 0, 24, 24);
-    const [r, g, b] = LIGHTING_CONFIG.shadow.color;
-    for (let i = 0; i < img.data.length; i += 4) {
-      const solid = img.data[i + 3] > 140;
-      img.data[i] = r;
-      img.data[i + 1] = g;
-      img.data[i + 2] = b;
-      img.data[i + 3] = solid ? 255 : 0;
-    }
+    toShadow(img.data);
     ctx.putImageData(img, 0, 0);
     this.silhouettes.set(key, { canvas, at: now });
     return canvas;
@@ -254,21 +265,50 @@ export class EntityLighting {
     const silAt = this.silhouettes.get(key)?.at;
     if (!sil || silAt === undefined) return null;
     const cached = this.spriteLightMasks.get(key);
-    if (cached && cached.at === silAt) return cached.masks;
-    const src = sil.getContext("2d", { willReadFrequently: true })!.getImageData(0, 0, 24, 24).data;
-    const solid = (x: number, y: number) => x >= 0 && y >= 0 && x < 24 && y < 24 && src[(y * 24 + x) * 4 + 3] > 0;
-    const bounds = solidBounds(solid);
-    const masks = {} as Record<SpriteDir, HTMLCanvasElement>;
-    for (const dir of SPRITE_DIRS) {
-      const cv = cached?.masks[dir.key] ?? document.createElement("canvas");
-      cv.width = cv.height = 24;
-      const ctx = cv.getContext("2d")!;
-      ctx.putImageData(lightMask(ctx, solid, bounds, dir), 0, 0);
-      masks[dir.key] = cv;
-    }
+    if (cached?.at === silAt) return cached.masks;
+    const masks = lightMasks(sil, cached?.masks);
     this.spriteLightMasks.set(key, { at: silAt, masks });
     return masks;
   }
+}
+
+/** Adds each side's torchlight onto a sprite through its masks. */
+function glaze(c: CanvasRenderingContext2D, masks: LightMasks, light: Record<SpriteDir, number>) {
+  c.globalCompositeOperation = "lighter";
+  c.imageSmoothingEnabled = false;
+  for (const dir of SPRITE_DIRS) {
+    const a = light[dir.key];
+    if (a < 0.01) continue;
+    c.globalAlpha = Math.min(1, a);
+    c.drawImage(masks[dir.key], 0, 0);
+  }
+}
+
+/** Bakes the four light masks of a silhouette, reusing `reuse`'s canvases when given. */
+function lightMasks(sil: HTMLCanvasElement, reuse?: LightMasks): LightMasks {
+  const src = sil.getContext("2d", { willReadFrequently: true })!.getImageData(0, 0, 24, 24).data;
+  const solid = (x: number, y: number) => inTile(x, y) && src[(y * 24 + x) * 4 + 3] > 0;
+  const bounds = solidBounds(solid);
+  const masks = {} as LightMasks;
+  for (const dir of SPRITE_DIRS) {
+    const cv = reuse?.[dir.key] ?? document.createElement("canvas");
+    cv.width = cv.height = 24;
+    const ctx = cv.getContext("2d")!;
+    ctx.putImageData(lightMask(ctx, solid, bounds, dir), 0, 0);
+    masks[dir.key] = cv;
+  }
+  return masks;
+}
+
+/** Turns sprite pixels into shadow: solid where fairly opaque, clear elsewhere. */
+function toShadow(data: Uint8ClampedArray) {
+  const [r, g, b] = LIGHTING_CONFIG.shadow.color;
+  for (let i = 0; i < data.length; i += 4) data.set([r, g, b, data[i + 3] > 140 ? 255 : 0], i);
+}
+
+/** Whether (x, y) is a pixel of a 24x24 sprite. */
+function inTile(x: number, y: number) {
+  return Math.min(x, y) >= 0 && Math.max(x, y) < 24;
 }
 
 type Solid = (x: number, y: number) => boolean;
@@ -298,7 +338,7 @@ function lightMask(ctx: CanvasRenderingContext2D, solid: Solid, bounds: Bounds, 
     for (let x = 0; x < 24; x++) {
       if (!solid(x, y)) continue;
       const fill = cfg.fill * Math.pow(Math.max(0, towardLight(dir, bounds, x, y)), cfg.fillCurve);
-      const rim = solid(x + dir.dx, y + dir.dy) ? 0 : 1;
+      const rim = Number(!solid(x + dir.dx, y + dir.dy));
       const i = (y * 24 + x) * 4;
       img.data[i] = r; img.data[i + 1] = g; img.data[i + 2] = b;
       img.data[i + 3] = Math.round(Math.max(fill, rim) * 255);

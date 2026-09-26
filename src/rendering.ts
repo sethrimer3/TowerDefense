@@ -235,7 +235,9 @@ export class Renderer {
       if (this.decorOn) this.decor.drawGlow(c, this.decorView(f), f.now, f.darkness, f.reduceMotion);
       const region = this.occupiedRegion(f);
       if (region)
-        this.lighting.drawDarkened(f, dark.spriteDark, LIGHTING_CONFIG.objectGlow.spriteDarkness, (ctx) => this.drawEachContents(f, ctx), region);
+        this.lighting.drawDarkened(f, dark.spriteDark, {
+          amount: LIGHTING_CONFIG.objectGlow.spriteDarkness, draw: (ctx) => this.drawEachContents(f, ctx), region,
+        });
       this.lighting.drawDoorWash(f);
     } else this.drawEachContents(f, c);
     if (!f.outside) this.entities.drawSpriteLighting(f, c);
@@ -299,16 +301,24 @@ export class Renderer {
     const m = this.heroTransform(f), s = f.s;
     // Only the hero's surroundings need the darkening pass.
     const hero = tileOrigin(f, f.playerX, f.playerY);
-    this.lighting.drawDarkened(f, spriteDark, LIGHTING_CONFIG.objectGlow.heroDarkness, (ctx) => {
-      ctx.setTransform(m);
-      this.drawHero(f, ctx);
-    }, { x: hero.x - 0.7 * s, y: hero.y - 0.7 * s, w: 2.4 * s, h: 2.4 * s });
+    this.lighting.drawDarkened(f, spriteDark, {
+      amount: LIGHTING_CONFIG.objectGlow.heroDarkness,
+      draw: (ctx) => {
+        ctx.setTransform(m);
+        this.drawHero(f, ctx);
+      },
+      region: { x: hero.x - 0.7 * s, y: hero.y - 0.7 * s, w: 2.4 * s, h: 2.4 * s },
+    });
     // Skipped when there's no foreground this frame.
     const view = this.decorView(f), fg = this.decorOn ? this.decor.foregroundBounds(view, f.now, this.tileAt, f.reduceMotion) : null;
     if (fg)
-      this.lighting.drawDarkened(f, spriteDark, 1, (ctx) => this.decor.drawForeground(ctx, view, f.now, this.tileAt, f.reduceMotion), {
-        x: (fg.x0 / 24 - f.left) * s - 2, y: (fg.y0 / 24 + f.n - 1 + f.bottom) * s - 2,
-        w: ((fg.x1 - fg.x0) / 24) * s + 4, h: ((fg.y1 - fg.y0) / 24) * s + 4,
+      this.lighting.drawDarkened(f, spriteDark, {
+        amount: 1,
+        draw: (ctx) => this.decor.drawForeground(ctx, view, f.now, this.tileAt, f.reduceMotion),
+        region: {
+          x: (fg.x0 / 24 - f.left) * s - 2, y: (fg.y0 / 24 + f.n - 1 + f.bottom) * s - 2,
+          w: ((fg.x1 - fg.x0) / 24) * s + 4, h: ((fg.y1 - fg.y0) / 24) * s + 4,
+        },
       });
   }
   /** The hero between whatever grows behind and in front of it: forest

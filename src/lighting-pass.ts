@@ -44,8 +44,63 @@ const hexRgb = (hex: string) => {
   const full = h.length === 3 ? [...h].map((c) => c + c).join("") : h.slice(0, 6);
   return [0, 2, 4].map((i) => parseInt(full.slice(i, i + 2), 16));
 };
+/** A door's glow color: its lock color, magenta for heart doors, grey for steel. */
+function doorGlow(t: Tile) {
+  const id = doorId(t), door = LIGHTING_CONFIG.objectGlow.door;
+  if (id === "heart") return door.heart;
+  return id === "steel" ? door.steel : hexRgb(doorColor(t));
+}
+/** The glow a tile's contents give off (breathing by `breathe` for enemies
+ * and items), or null when they give off none. */
+function tileGlow(t: Tile, breathe: number): Omit<GlowSource, "x" | "y"> | null {
+  const og = LIGHTING_CONFIG.objectGlow, dk = LIGHTING_CONFIG.darkness;
+  if (t.kind === "enemy") return { rgb: og.enemy.color, radius: og.enemy.radius, strength: og.enemy.strength * breathe };
+  if (GLOW_ITEMS.has(t.kind)) return { rgb: og.item.color, radius: og.item.radius, strength: og.item.strength * breathe };
+  if (t.kind === "door") return { rgb: doorGlow(t), radius: og.door.radius, strength: og.door.strength, door: true };
+  if (t.kind === "stairs" || t.kind === "stairsDown")
+    return { rgb: [150, 160, 200], radius: dk.heroHaloRadius * og.stairsRadiusScale, strength: dk.heroHaloAlpha * og.stairsAlphaScale };
+  return null;
+}
 /** How far between its two baked sway positions a torch's light leans (0..1). */
 const leanOf = (sway: { x: number }) => Math.max(0, Math.min(1, 0.5 + sway.x / (2 * LIGHTING_CONFIG.flicker.swayX)));
+
+/** How a torch's light goes onto a layer: the composite operation and its strength. */
+type Blend = { op: GlobalCompositeOperation; alpha: number };
+/** Sprites for LightingPass.drawDarkened: how much of the darkness they
+ * take, how to paint them, and the part of the board (CSS pixels; one box,
+ * or several whose union is used) they cover, when known. */
+export type DarkenedSprites = { amount: number; draw: (c: CanvasRenderingContext2D) => void; region?: Rect | Rect[] };
+/** `region` (the whole canvas when absent) in whole device pixels, cut to
+ * the canvas, with empty boxes dropped. */
+function deviceBoxes(region: Rect | Rect[] | undefined, dpr: number, canvas: { width: number; height: number }): Rect[] {
+  const { width: w, height: h } = canvas;
+  const rects = region ? [region].flat() : [{ x: 0, y: 0, w: w / dpr, h: h / dpr }];
+  return rects
+    .map((r) => {
+      const x = Math.max(0, Math.floor(r.x * dpr)), y = Math.max(0, Math.floor(r.y * dpr));
+      return { x, y, w: Math.min(w, Math.ceil((r.x + r.w) * dpr)) - x, h: Math.min(h, Math.ceil((r.y + r.h) * dpr)) - y };
+    })
+    .filter((r) => r.w > 0 && r.h > 0);
+}
+/** The smallest box around all of `boxes`. */
+function unionOf(boxes: Rect[]): Rect {
+  const x = Math.min(...boxes.map((r) => r.x)), y = Math.min(...boxes.map((r) => r.y));
+  return { x, y, w: Math.max(...boxes.map((r) => r.x + r.w)) - x, h: Math.max(...boxes.map((r) => r.y + r.h)) - y };
+}
+function clipTo(c: CanvasRenderingContext2D, boxes: Rect[]) {
+  c.beginPath();
+  for (const b of boxes) c.rect(b.x, b.y, b.w, b.h);
+  c.clip();
+}
+/** Runs `step` in device pixels, clipped to `boxes` when there are several
+ * (a lone box is left to the step). */
+function clippedTo(c: CanvasRenderingContext2D, boxes: Rect[], step: () => void) {
+  c.save();
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  if (boxes.length > 1) clipTo(c, boxes);
+  step();
+  c.restore();
+}
 
 /** Darkens the relief's shaded side of the bricks and lights the other. */
 function blitRelief(f: FrameContext, b: BakedRelief, alpha: number) {
@@ -93,21 +148,12 @@ export class LightingPass {
 
   /** Doors, stairs, items, and enemies in view, with their glow settings. */
   glowSources(f: Pick<FrameContext, "game" | "n" | "left" | "bottom" | "now" | "reduceMotion">): GlowSource[] {
-    const og = LIGHTING_CONFIG.objectGlow, dk = LIGHTING_CONFIG.darkness;
-    const out: GlowSource[] = [];
+    const pulse = LIGHTING_CONFIG.objectGlow.pulse, out: GlowSource[] = [];
     forEachViewTile(f, (x, y) => {
-      const t = f.game.world.tile(x, y);
       // Slow, per-object breathing so a room of glows doesn't pulse in unison.
-      const breathe = f.reduceMotion ? 1 : 1 - og.pulse + og.pulse * Math.sin(f.now / 650 + x * 1.7 + y * 2.3);
-      if (t.kind === "enemy") out.push({ x, y, rgb: og.enemy.color, radius: og.enemy.radius, strength: og.enemy.strength * breathe });
-      else if (GLOW_ITEMS.has(t.kind)) out.push({ x, y, rgb: og.item.color, radius: og.item.radius, strength: og.item.strength * breathe });
-      else if (t.kind === "door") {
-        const id = doorId(t);
-        const rgb = id === "heart" ? og.door.heart : id === "steel" ? og.door.steel : hexRgb(doorColor(t));
-        out.push({ x, y, rgb, radius: og.door.radius, strength: og.door.strength, door: true });
-      }
-      else if (t.kind === "stairs" || t.kind === "stairsDown")
-        out.push({ x, y, rgb: [150, 160, 200], radius: dk.heroHaloRadius * og.stairsRadiusScale, strength: dk.heroHaloAlpha * og.stairsAlphaScale });
+      const breathe = f.reduceMotion ? 1 : 1 - pulse + pulse * Math.sin(f.now / 650 + x * 1.7 + y * 2.3);
+      const glow = tileGlow(f.game.world.tile(x, y), breathe);
+      if (glow) out.push({ x, y, ...glow });
     });
     return out;
   }
@@ -187,7 +233,7 @@ export class LightingPass {
     dc.globalAlpha = 1;
     dc.fillStyle = `rgb(${mix(0)}, ${mix(1)}, ${mix(2)})`;
     dc.fillRect(0, 0, size, size);
-    for (const t of f.torches) this.drawTorchLight(f, dc, t, "lighter", cfg.torchLift * k * t.baseIntensity);
+    for (const t of f.torches) this.drawTorchLight(f, dc, t, { op: "lighter", alpha: cfg.torchLift * k * t.baseIntensity });
     // A shadow is where the torch's light doesn't reach: cast shadows take
     // the torchlight back out of the darkness layer, so they read clearly.
     if (shadows) {
@@ -259,69 +305,49 @@ export class LightingPass {
   /** Draws tile contents (doors, stairs, items, enemies) on their own layer,
    * multiplies a softened copy of the darkness over just their pixels, then
    * lays them on the scene: they stay a little brighter than the stone.
-   * `draw` paints onto the context it's given (CSS-pixel transform). Work
-   * is limited to `region` (CSS pixels; one box, or several whose union is
-   * used) when given: every step is a full-canvas blit otherwise, which is
-   * costly when the sprites cover a small part of the board. */
-  drawDarkened(f: FrameContext, dark: HTMLCanvasElement, amount: number, draw: (c: CanvasRenderingContext2D) => void,
-    region?: Rect | Rect[]) {
-    const main = f.c, dpr = f.dpr, w = main.canvas.width, h = main.canvas.height;
-    const boxes = (region ? (Array.isArray(region) ? region : [region]) : [{ x: 0, y: 0, w: w / dpr, h: h / dpr }])
-      .map((r) => {
-        const x = Math.max(0, Math.floor(r.x * dpr)), y = Math.max(0, Math.floor(r.y * dpr));
-        return { x, y, w: Math.min(w, Math.ceil((r.x + r.w) * dpr)) - x, h: Math.min(h, Math.ceil((r.y + r.h) * dpr)) - y };
-      })
-      .filter((r) => r.w > 0 && r.h > 0);
+   * `sprites.draw` paints onto the context it's given (CSS-pixel
+   * transform). Work is limited to `sprites.region` when given: every step
+   * is a full-canvas blit otherwise, which is costly when the sprites cover
+   * a small part of the board. */
+  drawDarkened(f: FrameContext, dark: HTMLCanvasElement, { amount, draw, region }: DarkenedSprites) {
+    const main = f.c, w = main.canvas.width, h = main.canvas.height;
+    const boxes = deviceBoxes(region, f.dpr, main.canvas);
     if (!boxes.length) return;
-    const rx = Math.min(...boxes.map((r) => r.x)), ry = Math.min(...boxes.map((r) => r.y));
-    const rw = Math.max(...boxes.map((r) => r.x + r.w)) - rx, rh = Math.max(...boxes.map((r) => r.y + r.h)) - ry;
-    // Each step runs clipped to the union (multiply must not run twice
-    // where boxes overlap).
-    const clipped = (c: CanvasRenderingContext2D, step: () => void) => {
-      c.save();
-      c.setTransform(1, 0, 0, 1, 0, 0);
-      if (boxes.length > 1) {
-        c.beginPath();
-        for (const b of boxes) c.rect(b.x, b.y, b.w, b.h);
-        c.clip();
-      }
-      step();
-      c.restore();
-    };
     const contents = this.contentsCanvas = sized(this.contentsCanvas, w, h);
     const mask = this.contentsMaskCanvas = sized(this.contentsMaskCanvas, w, h);
     const cc = contents.getContext("2d"), mc = mask.getContext("2d");
     if (!cc || !mc) return draw(main);
+    // Each step runs clipped to the union (multiply must not run twice
+    // where boxes overlap).
+    const u = unionOf(boxes);
+    const clipped = (c: CanvasRenderingContext2D, step: () => void) => clippedTo(c, boxes, step);
+    const copy = (c: CanvasRenderingContext2D, from: HTMLCanvasElement) => c.drawImage(from, u.x, u.y, u.w, u.h, u.x, u.y, u.w, u.h);
     cc.globalCompositeOperation = "source-over";
     cc.globalAlpha = 1;
     clipped(cc, () => {
-      cc.clearRect(rx, ry, rw, rh);
-      if (boxes.length === 1) {
-        cc.beginPath();
-        cc.rect(rx, ry, rw, rh);
-        cc.clip();
-      }
-      cc.setTransform(dpr, 0, 0, dpr, 0, 0);
+      cc.clearRect(u.x, u.y, u.w, u.h);
+      if (boxes.length === 1) clipTo(cc, [u]);
+      cc.setTransform(f.dpr, 0, 0, f.dpr, 0, 0);
       draw(cc);
     });
     // Keep the sprites' shape: multiply paints into empty pixels too, so
     // the original coverage is restored afterwards.
     mc.globalCompositeOperation = "source-over";
     clipped(mc, () => {
-      mc.clearRect(rx, ry, rw, rh);
-      mc.drawImage(contents, rx, ry, rw, rh, rx, ry, rw, rh);
+      mc.clearRect(u.x, u.y, u.w, u.h);
+      copy(mc, contents);
     });
     const k = f.width / w;
     clipped(cc, () => {
       cc.globalCompositeOperation = "multiply";
       cc.globalAlpha = amount;
-      cc.drawImage(dark, rx * k, ry * k, rw * k, rh * k, rx, ry, rw, rh);
+      cc.drawImage(dark, u.x * k, u.y * k, u.w * k, u.h * k, u.x, u.y, u.w, u.h);
       cc.globalCompositeOperation = "destination-in";
       cc.globalAlpha = 1;
-      cc.drawImage(mask, rx, ry, rw, rh, rx, ry, rw, rh);
+      copy(cc, mask);
     });
     cc.globalCompositeOperation = "source-over";
-    clipped(main, () => main.drawImage(contents, rx, ry, rw, rh, rx, ry, rw, rh));
+    clipped(main, () => copy(main, contents));
   }
 
   /** Renders ambient darkness and baked torch light to an offscreen lightmap,
@@ -346,15 +372,11 @@ export class LightingPass {
   /** Creates or resizes an offscreen canvas for rendering the composite lightmap. */
   private ensureLightmap(viewportSize: number) {
     if (!this.lightmapCanvas) {
-      this.lightmapCanvas = typeof document !== "undefined" ? document.createElement("canvas") : null;
-      if (this.lightmapCanvas) {
-        this.lightmapCtx = this.lightmapCanvas.getContext("2d");
-      }
+      if (typeof document === "undefined") return null;
+      this.lightmapCanvas = document.createElement("canvas");
+      this.lightmapCtx = this.lightmapCanvas.getContext("2d");
     }
-    if (this.lightmapCanvas && (this.lightmapCanvas.width !== viewportSize || this.lightmapCanvas.height !== viewportSize)) {
-      this.lightmapCanvas.width = viewportSize;
-      this.lightmapCanvas.height = viewportSize;
-    }
+    sized(this.lightmapCanvas, viewportSize);
     return this.lightmapCtx;
   }
   private drawAmbientDarkness(f: FrameContext, lm: CanvasRenderingContext2D) {
@@ -385,7 +407,7 @@ export class LightingPass {
     if (walls) lm.drawImage(walls, 0, 0);
 
     // 4. Torchlight carves the darkness away where it falls...
-    for (const t of f.torches) this.drawTorchLight(f, lm, t, "destination-out", LIGHTING_CONFIG.glow.carve);
+    for (const t of f.torches) this.drawTorchLight(f, lm, t, { op: "destination-out", alpha: LIGHTING_CONFIG.glow.carve });
     lm.globalCompositeOperation = "source-over";
     lm.globalAlpha = 1;
 
@@ -409,7 +431,7 @@ export class LightingPass {
     }
     // The warm glow eases off a little as the Brightness setting goes up.
     const glowScale = 1 - glow.brightDim * (1 - f.darkness);
-    for (const t of f.torches) this.drawTorchLight(f, gl, t, "lighter", glow.strength * glowScale * t.baseIntensity);
+    for (const t of f.torches) this.drawTorchLight(f, gl, t, { op: "lighter", alpha: glow.strength * glowScale * t.baseIntensity });
     // Cast shadows block the warm glow too, or it would light them back up.
     if (shadows) {
       gl.globalCompositeOperation = "destination-out";
@@ -484,25 +506,15 @@ export class LightingPass {
     this.glowWallCanvas = sized(this.glowWallCanvas, f.width);
     const floor = this.glowCanvas.getContext("2d"), wall = this.glowWallCanvas.getContext("2d");
     const mask = this.wallMask(f);
-    if (!floor || !wall || !mask) return null;
-    const og = LIGHTING_CONFIG.objectGlow, s = f.s;
+    if (!floor || !wall) return null;
+    if (!mask) return null;
     for (const ctx of [floor, wall]) {
       ctx.globalCompositeOperation = "source-over";
       ctx.globalAlpha = 1;
       ctx.clearRect(0, 0, f.width, f.width);
       ctx.globalCompositeOperation = "lighter";
     }
-    for (const o of sources) {
-      const sprite = this.glowSprite(o.rgb);
-      const { x: cx, y: cy } = tileCenter(f, o.x, o.y);
-      const r = o.radius * s, rw = r * og.wallRadiusScale, rwx = rw * og.wallWiden;
-      floor.globalAlpha = Math.min(1, o.strength);
-      floor.drawImage(sprite, cx - r, cy - r, r * 2, r * 2);
-      // Wider than tall and nudged up: side and upper walls catch the most.
-      const wy = cy - og.wallLift * s;
-      wall.globalAlpha = Math.min(1, o.strength * og.wallBoost);
-      wall.drawImage(sprite, cx - rwx, wy - rw, rwx * 2, rw * 2);
-    }
+    for (const o of sources) this.stampGlow(f, { floor, wall }, o);
     floor.globalAlpha = 1;
     wall.globalAlpha = 1;
     floor.globalCompositeOperation = "destination-out";
@@ -513,6 +525,20 @@ export class LightingPass {
     floor.drawImage(this.glowWallCanvas, 0, 0);
     floor.globalCompositeOperation = "source-over";
     return this.glowCanvas;
+  }
+  /** One object's glow on the floor layer, and its brighter, shorter
+   * wash on the wall layer. */
+  private stampGlow(f: FrameContext, layers: Record<"floor" | "wall", CanvasRenderingContext2D>, o: GlowSource) {
+    const og = LIGHTING_CONFIG.objectGlow, s = f.s;
+    const sprite = this.glowSprite(o.rgb);
+    const { x: cx, y: cy } = tileCenter(f, o.x, o.y);
+    const r = o.radius * s, rw = r * og.wallRadiusScale, rwx = rw * og.wallWiden;
+    layers.floor.globalAlpha = Math.min(1, o.strength);
+    layers.floor.drawImage(sprite, cx - r, cy - r, r * 2, r * 2);
+    // Wider than tall and nudged up: side and upper walls catch the most.
+    const wy = cy - og.wallLift * s;
+    layers.wall.globalAlpha = Math.min(1, o.strength * og.wallBoost);
+    layers.wall.drawImage(sprite, cx - rwx, wy - rw, rwx * 2, rw * 2);
   }
 
   /** The torch's baked light field (see torch-light.ts), created on first use. */
@@ -531,10 +557,10 @@ export class LightingPass {
     return bake;
   }
 
-  /** Blits a torch's baked light, gently flickering in brightness and reach.
-   * The field is low-resolution and upscaled with smoothing, which keeps the
-   * falloff soft for free. */
-  private drawTorchLight(f: FrameContext, c: CanvasRenderingContext2D, t: Torch, op: GlobalCompositeOperation, alpha: number) {
+  /** Blits a torch's baked light with `blend`, gently flickering in
+   * brightness and reach. The field is low-resolution and upscaled with
+   * smoothing, which keeps the falloff soft for free. */
+  private drawTorchLight(f: FrameContext, c: CanvasRenderingContext2D, t: Torch, { op, alpha }: Blend) {
     const bake = this.torchBake(f, t);
     if (!bake) return;
     const flicker = getTorchFlicker(t, f.now, f.reduceMotion);

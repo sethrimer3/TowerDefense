@@ -227,22 +227,34 @@ export function getTorchSway(t: Pick<Torch, "x" | "y">, now: number, reduceMotio
  * light; the result is cached on the torch (see generation.ts) and only
  * recomputed when the torch or nearby geometry changes, never per frame. */
 type Segment = [Point, Point];
-function raySegmentDistance(
-  ox: number,
-  oy: number,
-  dx: number,
-  dy: number,
-  a: Point,
-  b: Point,
-): number | null {
+/** A ray from (ox, oy) along the unit direction (dx, dy). */
+type Ray = { ox: number; oy: number; dx: number; dy: number };
+/** Whether a hit at `u` along a segment (0 at one end, 1 at the other) lands on it. */
+const onSegment = (u: number) => u >= -1e-6 && u <= 1 + 1e-6;
+/** How far along the ray it meets the segment, or null when it misses. */
+function rayHit({ ox, oy, dx, dy }: Ray, [a, b]: Segment): number | null {
   const sx = b.x - a.x,
     sy = b.y - a.y;
   const denom = dx * sy - dy * sx;
   if (Math.abs(denom) < 1e-9) return null;
   const t = ((a.x - ox) * sy - (a.y - oy) * sx) / denom;
   const u = ((a.x - ox) * dy - (a.y - oy) * dx) / denom;
-  if (t < 0 || u < -1e-6 || u > 1 + 1e-6) return null;
-  return t;
+  return t >= 0 && onSegment(u) ? t : null;
+}
+/** The faces of wall tile (tx, ty) that border an open tile, north, south,
+ * east, then west. */
+function openFaces(tx: number, ty: number, isWall: (x: number, y: number) => boolean): Segment[] {
+  const l = tx,
+    r = tx + 1,
+    b = ty,
+    t = ty + 1;
+  const faces: [number, number, Segment][] = [
+    [0, 1, [{ x: l, y: t }, { x: r, y: t }]],
+    [0, -1, [{ x: l, y: b }, { x: r, y: b }]],
+    [1, 0, [{ x: r, y: b }, { x: r, y: t }]],
+    [-1, 0, [{ x: l, y: b }, { x: l, y: t }]],
+  ];
+  return faces.filter(([dx, dy]) => !isWall(tx + dx, ty + dy)).map(([, , face]) => face);
 }
 /** Builds the segments of every wall tile face that borders an open tile
  * within range of the torch (interior wall faces can never be seen, so
@@ -254,27 +266,9 @@ function collectSegments(
   isWall: (x: number, y: number) => boolean,
 ): Segment[] {
   const segments: Segment[] = [];
-  const x0 = Math.floor(ox - reach),
-    x1 = Math.ceil(ox + reach),
-    y0 = Math.floor(oy - reach),
-    y1 = Math.ceil(oy + reach);
-  for (let ty = y0; ty <= y1; ty++)
-    for (let tx = x0; tx <= x1; tx++) {
-      if (!isWall(tx, ty)) continue;
-      const openN = !isWall(tx, ty + 1),
-        openS = !isWall(tx, ty - 1),
-        openE = !isWall(tx + 1, ty),
-        openW = !isWall(tx - 1, ty);
-      if (!openN && !openS && !openE && !openW) continue;
-      const l = tx,
-        r = tx + 1,
-        b = ty,
-        t = ty + 1;
-      if (openN) segments.push([{ x: l, y: t }, { x: r, y: t }]);
-      if (openS) segments.push([{ x: l, y: b }, { x: r, y: b }]);
-      if (openE) segments.push([{ x: r, y: b }, { x: r, y: t }]);
-      if (openW) segments.push([{ x: l, y: b }, { x: l, y: t }]);
-    }
+  for (let ty = Math.floor(oy - reach); ty <= Math.ceil(oy + reach); ty++)
+    for (let tx = Math.floor(ox - reach); tx <= Math.ceil(ox + reach); tx++)
+      if (isWall(tx, ty)) segments.push(...openFaces(tx, ty, isWall));
   return segments;
 }
 export function computeVisibilityPolygon(
@@ -297,14 +291,10 @@ export function computeVisibilityPolygon(
   const rays = 40;
   for (let i = 0; i < rays; i++) angles.add((i / rays) * Math.PI * 2 - Math.PI);
   const castRay = (ang: number): Point => {
-    const dx = Math.cos(ang),
-      dy = Math.sin(ang);
+    const ray = { ox, oy, dx: Math.cos(ang), dy: Math.sin(ang) };
     let best = r;
-    for (const [a, b] of segments) {
-      const hit = raySegmentDistance(ox, oy, dx, dy, a, b);
-      if (hit !== null && hit < best) best = hit;
-    }
-    return { x: ox + dx * best, y: oy + dy * best };
+    for (const segment of segments) best = Math.min(best, rayHit(ray, segment) ?? best);
+    return { x: ox + ray.dx * best, y: oy + ray.dy * best };
   };
   return [...angles].sort((a, b) => a - b).map(castRay);
 }
