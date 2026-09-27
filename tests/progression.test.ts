@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import { Game } from '../src/state.ts';
 import { defaults, decode } from '../src/save.ts';
 import { RoomWorld } from '../src/tower/room-world.ts';
-import { World } from '../src/delve/world.ts';
 import { chooseStep } from '../src/automation.ts';
 /** How many clear chests stand on the board. */
 const chests = (g: Game) => Object.values(g.run.changes).filter(t => t.kind === 'reward').length;
@@ -75,8 +74,7 @@ test('delve approach movement does not award physical Y as progression', () => {
   g.switchMode('delve');
   // Keep the two northward cells deterministic instead of relying on a
   // Date.now-derived map that can occasionally place a wall in the route.
-  g.run.seed = 3;
-  g.world = new World(g.run);
+  g.newRun({ seed: 3 });
   assert.equal(g.run.player.y, 0);
   assert.equal(g.run.maxHeight, 0);
 

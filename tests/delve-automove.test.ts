@@ -4,7 +4,6 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { Game } from "../src/state.ts";
 import { defaults } from "../src/save.ts";
-import { World, LAYOUT_VERSION } from "../src/delve/world.ts";
 import { chooseDelveStep, decisions } from "../src/delve/automove.ts";
 
 // Characterization trace of Delve Automove: seeded runs where Automove takes
@@ -41,36 +40,23 @@ function mulberry32(seed: number) {
 
 function trace(seed: number, level: Level, who: typeof CHARACTERS.strong): string[] {
   const rng = mulberry32(seed);
-  const realRandom = Math.random;
-  const realValues = crypto.getRandomValues;
-  Math.random = rng;
-  (crypto as any).getRandomValues = (arr: Uint32Array) => {
-    for (let i = 0; i < arr.length; i++) arr[i] = Math.floor(rng() * 2 ** 32);
-    return arr;
-  };
-  try {
-    const g = new Game(defaults());
-    Object.assign(g.save.upgrades, { delve: 1, auto: 1 }, level);
-    g.switchMode("delve");
-    Object.assign(g.run, { seed, outside: false, layoutVersion: LAYOUT_VERSION, changes: {}, height: 0, milestone: 0, floor: 0 });
-    Object.assign(g.run.player, { x: 15, y: 0, hp: who.hp, maxHp: who.hp, attack: who.attack, defense: who.defense, keys: { yellow: who.keys, blue: 0, red: 0 } });
-    g.world = new World(g.delveRun);
-    const run = g.run, h = createHash("sha256"), out: string[] = [];
-    for (let i = 1; i <= STEPS; i++) {
-      const step = chooseDelveStep(g);
-      const moved = step ? g.move(step.dx, step.dy) : null;
-      h.update(JSON.stringify({ step, moved, decisions: decisions.get(g), player: run.player, milestone: run.milestone, height: run.height }));
-      if (i % CHECKPOINT === 0) out.push(h.copy().digest("hex").slice(0, 12));
-      if (!step || !moved || g.run !== run) {
-        out.push(`ended at ${i}: ${!step ? "stuck" : !moved ? "blocked" : g.summary?.dead ? "died" : "ended"} ${h.digest("hex").slice(0, 12)}`);
-        break;
-      }
+  const g = new Game(defaults(), rng);
+  Object.assign(g.save.upgrades, { delve: 1, auto: 1 }, level);
+  g.switchMode("delve");
+  g.newRun({ seed });
+  Object.assign(g.run.player, { hp: who.hp, maxHp: who.hp, attack: who.attack, defense: who.defense, keys: { yellow: who.keys, blue: 0, red: 0 } });
+  const run = g.run, h = createHash("sha256"), out: string[] = [];
+  for (let i = 1; i <= STEPS; i++) {
+    const step = chooseDelveStep(g);
+    const moved = step ? g.move(step.dx, step.dy) : null;
+    h.update(JSON.stringify({ step, moved, decisions: decisions.get(g), player: run.player, milestone: run.milestone, height: run.height }));
+    if (i % CHECKPOINT === 0) out.push(h.copy().digest("hex").slice(0, 12));
+    if (!step || !moved || g.run !== run) {
+      out.push(`ended at ${i}: ${!step ? "stuck" : !moved ? "blocked" : g.summary?.dead ? "died" : "ended"} ${h.digest("hex").slice(0, 12)}`);
+      break;
     }
-    return out;
-  } finally {
-    Math.random = realRandom;
-    (crypto as any).getRandomValues = realValues;
   }
+  return out;
 }
 
 function record() {

@@ -73,26 +73,19 @@ function strand(g: Game) {
 
 function trace(mode: Mode, seed: number, outside: boolean): string[] {
   const rng = mulberry32(seed);
-  const realRandom = Math.random;
-  const realValues = crypto.getRandomValues;
   const realNow = performance.now;
-  Math.random = rng;
-  (crypto as any).getRandomValues = (arr: Uint32Array) => {
-    for (let i = 0; i < arr.length; i++) arr[i] = Math.floor(rng() * 2 ** 32);
-    return arr;
-  };
   performance.now = () => 1000;
   try {
     const save = defaults();
     save.upgrades.delve = 1;
-    const g = new Game(save);
+    const g = new Game(save, rng);
     g.switchMode(mode);
-    g.newRun(outside);
+    g.newRun({ outside });
     const out: string[] = [];
     for (let i = 0; i < STEPS; i++) {
       if (g.summary) {
         g.summary = null;
-        g.newRun(rng() < 0.5);
+        g.newRun({ outside: rng() < 0.5 });
       }
       const roll = rng();
       if (roll < 0.08) reroll(g, rng);
@@ -113,8 +106,6 @@ function trace(mode: Mode, seed: number, outside: boolean): string[] {
     }
     return out;
   } finally {
-    Math.random = realRandom;
-    (crypto as any).getRandomValues = realValues;
     performance.now = realNow;
   }
 }

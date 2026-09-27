@@ -11,8 +11,8 @@ try {
   await page.goto("http://127.0.0.1:5173/");
   await page.evaluate(async () => {
     const { Game } = await import("/src/state.ts"), { defaults } = await import("/src/save.ts");
-    const g = new Game(defaults()); g.newRun(true); g.save.upgrades.delve = 1;
-    g.switchMode("delve"); g.newRun(true);
+    const g = new Game(defaults()); g.newRun({ outside: true }); g.save.upgrades.delve = 1;
+    g.switchMode("delve"); g.newRun({ outside: true });
     sessionStorage.setItem("outsideFixture", JSON.stringify(g.save));
   });
   await page.reload();
@@ -37,7 +37,7 @@ try {
     const { Game } = await import("/src/state.ts");
     const { defaults } = await import("/src/save.ts");
     const { Renderer } = await import("/src/rendering.ts");
-    const { OutsideWorld, outsideWeather } = await import("/src/outside.ts");
+    const { outsideWeather } = await import("/src/outside.ts");
     document.head.querySelectorAll('style,link[rel="stylesheet"]').forEach(e => e.remove());
     document.body.style.cssText = "margin:0;background:#101a1c;color:#d6dfca;font:14px sans-serif";
     const gallery = document.createElement("div");
@@ -49,8 +49,7 @@ try {
       const tile = document.createElement("div");
       tile.innerHTML = `<p style="margin:8px">${mode.toUpperCase()} · ${weather.toUpperCase()}</p><canvas style="width:320px;height:320px"></canvas>`;
       gallery.append(tile);
-      const g = new Game(defaults()); g.save.upgrades.delve = 1; g.switchMode(mode); g.newRun(true);
-      g.run.seed = seeds[weather]; g.world = new OutsideWorld(g.run.seed, mode);
+      const g = new Game(defaults()); g.save.upgrades.delve = 1; g.switchMode(mode); g.newRun({ outside: true, seed: seeds[weather] });
       const canvas = tile.querySelector("canvas"), renderer = new Renderer(canvas, g);
       renderer.draw(100);
       renderer.draw(116);

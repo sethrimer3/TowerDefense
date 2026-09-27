@@ -277,9 +277,8 @@ test("undo/re-kill the same physical enemy cannot duplicate its material drop", 
 
 test("Tower monster parts are guaranteed and cannot be duplicated with undo", () => {
   const g = new Game(defaults());
-  g.run.seed = 1;
+  g.newRun({ seed: 1 });
   g.run.changes["9,0"] = { kind: "enemy", enemy: { name: "Thief", hp: 1, attack: 0, defense: 0, tier: 1 } };
-  g.world = new RoomWorld(g.run.seed, 0, g.run.changes);
   g.run.player.x = 8; g.run.player.y = 0;
   const before = g.snapshot();
   assert.ok(g.move(1, 0));

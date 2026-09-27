@@ -56,7 +56,7 @@ const FIXTURES = await page.evaluate(async () => {
     edit?.(s);
     const g = new Game(s);
     g.switchMode("tower");
-    g.newRun(false);
+    g.newRun();
     for (let i = 0; i < rooms; i++) g.advanceTowerRoom();
     // One tile of every kind on this floor, so the inspect panel shows each.
     const targets = {};

@@ -54,6 +54,9 @@ import {
 } from "./crafting.ts";
 import type { EquipmentSlot } from "./equipment.ts";
 import type { MaterialStack, MetalId } from "./materials.ts";
+/** How a new run starts: out in the forest or at the entrance, and from
+ * which seed (rolled from the game's randomness when left out). */
+export type RunStart = { outside?: boolean; seed?: number };
 export type RouteEffects = {
   hp: [number, number];
   attack: [number, number];
@@ -82,7 +85,9 @@ export class Game {
     autoDeath?: boolean;
     record: boolean;
   } = null;
-  constructor(public save: Save) {
+  /** `rng` is the game's randomness: new run seeds, enemy drops and
+   * treasure loot all draw from it, so a seeded stream replays a game. */
+  constructor(public save: Save, private rng: () => number = Math.random) {
     this.loadMode();
   }
   get undoCapacity() {
@@ -305,7 +310,7 @@ export class Game {
   nextRun() {
     const dead = this.summary?.dead;
     this.summary = null;
-    if (!dead) this.newRun(true);
+    if (!dead) this.newRun({ outside: true });
     this.message = "Follow the forest path to the entrance.";
   }
   /** Erases all progress and starts again outside the Tower. */
@@ -313,7 +318,7 @@ export class Game {
     this.save = defaults();
     this.summary = null;
     this.mode = "tower";
-    this.newRun(true);
+    this.newRun({ outside: true });
   }
   routeStep() {
     const step = this.route.shift();
@@ -322,13 +327,14 @@ export class Game {
     if (!result) this.route = [];
     return result;
   }
-  newRun(outside = false) {
+  /** Starts a new run in this mode, rolling its seed unless `start` gives
+   * one. */
+  newRun({ outside = false, seed = Math.floor(this.rng() * 2 ** 32) }: RunStart = {}) {
     if (this.run) this.claimRewards();
     this.settleRevival();
     this.slice.history = [];
     this.route = [];
     this.summary = null;
-    const seed = crypto.getRandomValues(new Uint32Array(1))[0];
     const { attack, defense, maxHp, keys } = loadout(this.save);
     // Tower ascents begin at the first floor of the chosen section.
     const section = this.mode === "tower" ? this.startSection() : 0,
@@ -446,7 +452,7 @@ export class Game {
       autoDeath: dead && wasAuto,
       record,
     };
-    if (dead) this.newRun(true);
+    if (dead) this.newRun({ outside: true });
     else this.slice.run = null;
     if (allowRevive && dead && preFatalSnapshot && this.save.upgrades.revive)
       this.slice.revival = { snapshot: preFatalSnapshot };
@@ -602,7 +608,7 @@ export class Game {
       key = this.lootKey(x, y);
     if (slice.lootedTiles[key]) return "";
     slice.lootedTiles[key] = true;
-    const drops = this.rules.enemyDrops(enemy.name, Math.random);
+    const drops = this.rules.enemyDrops(enemy.name, this.rng);
     if (!drops.length) return "";
     creditMaterials(this.save, drops);
     return " · +" + drops.map(d => `${d.quantity} ${materialDef(d.id).name}${d.quantity > 1 ? "s" : ""}`).join(", +");
@@ -748,7 +754,7 @@ export class Game {
       if (!slice.lootedTiles[key]) {
         slice.lootedTiles[key] = true;
         const E = this.rules.equivalentFloor(this.rules.progressAt(this.run, y));
-        const loot = rollTreasureLoot(E, Math.random);
+        const loot = rollTreasureLoot(E, this.rng);
         this.save.gold += loot.gold;
         creditMaterials(this.save, loot.materials);
         const extra = loot.materials.map(m => `+${m.quantity} ${materialDef(m.id).name}${m.quantity > 1 ? "s" : ""}`);

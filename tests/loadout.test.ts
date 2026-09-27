@@ -102,7 +102,7 @@ test("changing gear mid-run keeps the ATK gathered and the provisions the run st
 
 test("a gear change reaches a run still outside, which starts at its new full HP", () => {
   const g = new Game(defaults());
-  g.newRun(true);
+  g.newRun({ outside: true });
   g.save.equipmentInventory.push(ring(3, 10));
   g.equipItem("r");
   assert.deepEqual([g.run.player.attack, g.run.player.maxHp, g.run.player.hp], [15, 130, 130]);

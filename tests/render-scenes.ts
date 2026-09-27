@@ -132,7 +132,7 @@ const BOARD_SCENES: Record<string, () => BoardScene> = {
   },
   outside: () => {
     const g = game("tower");
-    g.newRun(true);
+    g.newRun({ outside: true });
     return { g };
   },
   reducedNoDecor: () => {

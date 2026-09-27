@@ -70,52 +70,40 @@ function observe(g: Game, action: unknown, result: unknown, preview: unknown) {
 
 function trace(mode: Mode, seed: number, smartAi: boolean): string[] {
   const rng = mulberry32(seed);
-  const realRandom = Math.random;
-  const realValues = crypto.getRandomValues;
-  Math.random = rng;
-  (crypto as any).getRandomValues = (arr: Uint32Array) => {
-    for (let i = 0; i < arr.length; i++) arr[i] = Math.floor(rng() * 2 ** 32);
-    return arr;
-  };
-  try {
-    const save = defaults();
-    save.upgrades.delve = 1;
-    if (smartAi) Object.assign(save.upgrades, { aiMemory: 2, aiEvaluation: 4, aiLookahead: 2 });
-    const g = new Game(save);
-    g.switchMode(mode);
-    g.newRun();
-    const out: string[] = [];
-    for (let i = 0; i < STEPS; i++) {
-      if (g.summary) {
-        g.summary = null;
-        g.newRun();
-      }
-      if (!g.run.outside && rng() < 0.15) plant(g, rng);
-      const p = g.run.player;
-      // Real routes come from pathfinding and never cross walls.
-      const route = Array.from({ length: 2 + Math.floor(rng() * 6) }, () => ({
-        x: p.x + Math.floor(rng() * 7) - 3, y: p.y + Math.floor(rng() * 7) - 3,
-      })).filter((s) => g.world.tile(s.x, s.y).kind !== "wall");
-      const preview = g.previewRouteEffects(route);
-      let action: unknown, result: unknown;
-      const roll = rng();
-      if (roll < 0.6) {
-        const step = chooseStep(g);
-        action = step;
-        result = step ? g.move(step.dx, step.dy) : null;
-      } else {
-        const [dx, dy] = DIRS[Math.floor(rng() * 4)];
-        const force = roll > 0.8;
-        action = { dx, dy, force };
-        result = g.move(dx, dy, force);
-      }
-      out.push(createHash("sha256").update(observe(g, action, result, preview)).digest("hex").slice(0, 12));
+  const save = defaults();
+  save.upgrades.delve = 1;
+  if (smartAi) Object.assign(save.upgrades, { aiMemory: 2, aiEvaluation: 4, aiLookahead: 2 });
+  const g = new Game(save, rng);
+  g.switchMode(mode);
+  g.newRun();
+  const out: string[] = [];
+  for (let i = 0; i < STEPS; i++) {
+    if (g.summary) {
+      g.summary = null;
+      g.newRun();
     }
-    return out;
-  } finally {
-    Math.random = realRandom;
-    (crypto as any).getRandomValues = realValues;
+    if (!g.run.outside && rng() < 0.15) plant(g, rng);
+    const p = g.run.player;
+    // Real routes come from pathfinding and never cross walls.
+    const route = Array.from({ length: 2 + Math.floor(rng() * 6) }, () => ({
+      x: p.x + Math.floor(rng() * 7) - 3, y: p.y + Math.floor(rng() * 7) - 3,
+    })).filter((s) => g.world.tile(s.x, s.y).kind !== "wall");
+    const preview = g.previewRouteEffects(route);
+    let action: unknown, result: unknown;
+    const roll = rng();
+    if (roll < 0.6) {
+      const step = chooseStep(g);
+      action = step;
+      result = step ? g.move(step.dx, step.dy) : null;
+    } else {
+      const [dx, dy] = DIRS[Math.floor(rng() * 4)];
+      const force = roll > 0.8;
+      action = { dx, dy, force };
+      result = g.move(dx, dy, force);
+    }
+    out.push(createHash("sha256").update(observe(g, action, result, preview)).digest("hex").slice(0, 12));
   }
+  return out;
 }
 
 const SCENARIOS: [Mode, number, boolean][] = [

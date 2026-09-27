@@ -48,7 +48,7 @@ test("new ascents begin at the chosen unlocked section with its best HP", () => 
   const g = new Game(defaults());
   assert.equal(g.setStartSection(1), false);
   g.save.tower.sectionHp[1] = 77;
-  g.newRun(true);
+  g.newRun({ outside: true });
   assert.ok(g.setStartSection(1));
   // Still on the forest path, so the pending run moves at once.
   assert.equal(g.run.height, TOWER_SECTION);

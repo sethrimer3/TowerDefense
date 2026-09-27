@@ -209,8 +209,7 @@ test("old runs safely migrate topology while retaining earned stats and permanen
   g.switchMode("delve");
   // Migration expectations must not depend on the wall layout of a
   // Date.now-derived seed selected by the test runner.
-  g.run.seed = 3;
-  g.world = new World(g.run);
+  g.newRun({ seed: 3 });
   g.run.layoutVersion = undefined;
   g.run.player.y = 27;
   g.run.height = 29;
@@ -237,8 +236,7 @@ test("automation reliably makes forward progress, never taking a lethal fight, a
     const g = new Game(defaults());
     g.save.upgrades.delve = 1;
     g.switchMode("delve");
-    g.run.seed = seed;
-    g.world = new World(g.run);
+    g.newRun({ seed });
     for (let i = 0; i < 1400 && g.run.height < 15; i++) {
       const step = chooseStep(g);
       if (!step) break;

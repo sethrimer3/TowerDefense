@@ -26,7 +26,7 @@ for (const mode of ["tower", "delve"] as const) {
     assert.ok(g.undo());
     assert.deepEqual(g.run, before.run);
     assert.ok(!(g.world instanceof OutsideWorld));
-    g.newRun(true);
+    g.newRun({ outside: true });
     g.move(0, 1);
     const loaded = new Game(decode(JSON.stringify(g.save)));
     loaded.switchMode(mode);
@@ -50,7 +50,7 @@ for (const mode of ["tower", "delve"] as const) {
     assert.equal(loaded.run.outside, false);
   });
   test(`${mode}: automation finds the forest entrance without farming height`, () => {
-    const g = new Game(defaults()); g.save.upgrades.delve = 1; g.switchMode(mode); g.newRun(true);
+    const g = new Game(defaults()); g.save.upgrades.delve = 1; g.switchMode(mode); g.newRun({ outside: true });
     for (let i = 0; i < 25 && g.run.outside; i++) {
       const step = chooseStep(g); assert.ok(step); assert.ok(g.move(step.dx, step.dy, false));
       assert.equal(g.run.height, 0);

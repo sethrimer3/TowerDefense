@@ -96,20 +96,13 @@ function observe(g: Game, action: unknown, result: unknown) {
 
 function trace(mode: Mode, seed: number): string[] {
   const rng = mulberry32(seed);
-  const realRandom = Math.random;
-  const realValues = crypto.getRandomValues;
   const realNow = performance.now;
-  Math.random = rng;
-  (crypto as any).getRandomValues = (arr: Uint32Array) => {
-    for (let i = 0; i < arr.length; i++) arr[i] = Math.floor(rng() * 2 ** 32);
-    return arr;
-  };
   performance.now = () => 1000;
   try {
     const save = defaults();
     save.upgrades.delve = 1;
     save.upgrades.revive = 1;
-    const g = new Game(save);
+    const g = new Game(save, rng);
     g.switchMode(mode);
     g.newRun();
     const out: string[] = [];
@@ -166,8 +159,6 @@ function trace(mode: Mode, seed: number): string[] {
     }
     return out;
   } finally {
-    Math.random = realRandom;
-    (crypto as any).getRandomValues = realValues;
     performance.now = realNow;
   }
 }
