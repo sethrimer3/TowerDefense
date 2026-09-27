@@ -76,6 +76,16 @@ export function toTileSpace(ctx: CanvasRenderingContext2D, f: FrameContext, x: n
   ctx.scale(f.s / 24, f.s / 24);
 }
 
+/** The board context's transform for drawing in tile space at a tile. */
+export function tileTransform(f: FrameContext, x: number, y: number) {
+  const c = f.c;
+  c.save();
+  toTileSpace(c, f, x, y);
+  const m = c.getTransform();
+  c.restore();
+  return m;
+}
+
 /** Sizes an offscreen canvas to `w` x `h` (creating it if needed). */
 export function sized(cv: HTMLCanvasElement | null, w: number, h = w) {
   const c = cv ?? document.createElement("canvas");

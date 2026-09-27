@@ -7,17 +7,19 @@ import { RoomWorld, World, random } from "../src/generation.ts";
 import { LIGHTING_CONFIG, computeVisibilityPolygon, getTorchFlicker, getTorchSway } from "../src/lighting.ts";
 import { ATMOSPHERE_CONFIG, LightingPass } from "../src/lighting-pass.ts";
 import { EntityLighting } from "../src/entity-lighting.ts";
+import { DungeonLight, type Foreground, type LitBoard } from "../src/dungeon-light.ts";
 import { forEachViewTile, toTileSpace, type FrameContext, type Rect } from "../src/render-frame.ts";
 import { paintContents, paintHeroFallback } from "../src/tile-painters.ts";
 import type { Game } from "../src/state.ts";
 import type { Torch } from "../src/entities.ts";
 
-// Characterization hashes of the dungeon lighting: seeded frames of the
-// lighting pass and the torchlight on sprites, run in the renderer's order
-// (relief, cast shadows, darkness, glows, darkened sprites, sprite light,
-// lightmap and haze, vignette) over Tower rooms and Delve areas on a fake
-// DOM whose canvases record every call (and read back pixels derived from
-// what was drawn on them), plus visibility polygons, flicker and sway.
+// Characterization hashes of the dungeon lighting: seeded frames drawn by
+// DungeonLight (relief, cast shadows, darkness, glows, darkened sprites,
+// sprite light, lightmap and haze, the hero and what stands in front of it,
+// vignette) over Tower rooms and Delve areas on a fake DOM whose canvases
+// record every call (and read back pixels derived from what was drawn on
+// them), the darkening pass clipped to odd regions, visibility polygons,
+// flicker and sway.
 // Regenerate (only when a lighting change is intended) with UPDATE_GOLDEN=1.
 const GOLDEN = new URL("./fixtures/lighting-passes.golden.json", import.meta.url);
 
@@ -136,48 +138,45 @@ function delveScene(seed: number, y: number): Scene {
   return { game, torches: () => world.torches, center: { x: 15, y } };
 }
 
-/** The renderer's lighting steps for one frame, in its order. */
-function drawFrame(f: FrameContext, lighting: LightingPass, entities: EntityLighting, region: Rect | Rect[] | undefined) {
-  const out: unknown[] = [];
-  lighting.startFrame();
-  f.glows = lighting.glowSources(f);
-  out.push(digest(f.glows));
-  lighting.drawTorchRelief(f);
-  entities.drawShadows(f, () => lighting.wallMask(f));
-  out.push(!!entities.shadows);
-  const dark = lighting.buildDarkness(f, entities.shadows);
-  out.push(!!dark);
-  const contents = (ctx: CanvasRenderingContext2D) =>
-    forEachViewTile(f, (x, y) => {
-      const t = f.game.world.tile(x, y);
-      if (t.kind === "wall" || t.kind === "floor") return;
-      ctx.save();
-      toTileSpace(ctx, f, x, y);
-      paintContents(ctx, t, { x, y, time: f.now, spritesOff: f.spritesOff, reduceMotion: f.reduceMotion, area1: false });
-      ctx.restore();
-    });
-  if (dark) {
-    f.c.drawImage(dark.dark, 0, 0, f.width, f.width);
-    lighting.drawObjectBloom(f);
-    lighting.drawDarkened(f, dark.spriteDark, { amount: LIGHTING_CONFIG.objectGlow.spriteDarkness, draw: contents, region });
-    lighting.drawDoorWash(f);
-  }
-  entities.drawSpriteLighting(f, f.c);
-  lighting.drawLightmap(f, entities.shadows);
-  if (dark) {
-    const s = f.s, hx = (f.playerX - f.left) * s, hy = (f.n - 1 - (f.playerY - f.bottom)) * s;
-    lighting.drawDarkened(f, dark.spriteDark, {
-      amount: LIGHTING_CONFIG.objectGlow.heroDarkness,
-      draw: (ctx) => {
-        paintHeroFallback(ctx);
-        entities.drawSpriteLighting(f, ctx, true);
-      },
-      region: { x: hx - 0.7 * s, y: hy - 0.7 * s, w: 2.4 * s, h: 2.4 * s },
-    });
-  } else entities.drawSpriteLighting(f, f.c, true);
-  lighting.drawVignette(f);
-  return out;
+/** A board whose contents are the tiles' sprites and whose hero is the
+ * fallback figure; the rest of what a board draws between the light's
+ * steps is left out, as it doesn't touch the light. */
+function board(f: FrameContext, foreground: Foreground | null): LitBoard {
+  const none = () => {};
+  return {
+    floor: none, glow: none, torches: none, route: none, edge: none,
+    contents: (ctx) =>
+      forEachViewTile(f, (x, y) => {
+        const t = f.game.world.tile(x, y);
+        if (t.kind === "wall" || t.kind === "floor") return;
+        ctx.save();
+        toTileSpace(ctx, f, x, y);
+        paintContents(ctx, t, { x, y, time: f.now, spritesOff: f.spritesOff, reduceMotion: f.reduceMotion, area1: false });
+        ctx.restore();
+      }),
+    hero: paintHeroFallback,
+    foreground: () => foreground,
+  };
 }
+
+/** One frame of dungeon light; returns its glows. */
+function drawFrame(f: FrameContext, light: DungeonLight, b: LitBoard) {
+  f.glows = light.glows(f);
+  light.draw(f, b);
+  return digest(f.glows);
+}
+
+/** Things in front of the hero, in world pixels: none, over its feet, a
+ * wide swathe, and a box off the board. */
+const FOREGROUNDS = (f: Pick<FrameContext, "playerX" | "playerY">): (Foreground | null)[] => {
+  const x = f.playerX * 24, y = -f.playerY * 24, draw = paintHeroFallback;
+  return [
+    null,
+    { bounds: { x0: x - 4, y0: y, x1: x + 28, y1: y + 25 }, draw },
+    { bounds: { x0: x - 120, y0: y - 60, x1: x + 150, y1: y + 40 }, draw },
+    { bounds: { x0: x - 2000, y0: y - 2000, x1: x - 1900, y1: y - 1950 }, draw },
+  ];
+};
 
 const REGIONS = (w: number): (Rect | Rect[] | undefined)[] => [
   undefined,
@@ -197,7 +196,7 @@ const REGIONS = (w: number): (Rect | Rect[] | undefined)[] => [
 function sceneRun(scene: Scene, seed: number) {
   hash = createHash("sha256");
   const rnd = random(seed);
-  const lighting = new LightingPass(), entities = new EntityLighting();
+  const light = new DungeonLight();
   const frames: unknown[] = [];
   for (let i = 0; i < 24; i++) {
     const width = [408, 340, 255][Math.floor(rnd() * 3)], dpr = [1, 1.5, 2][Math.floor(rnd() * 3)];
@@ -210,8 +209,8 @@ function sceneRun(scene: Scene, seed: number) {
     const c = main.getContext()!;
     const now = 1000 + i * 413 + Math.floor(rnd() * 2000);
     const darkness = [0, 0, 0.25, 0.6, 1][Math.floor(rnd() * 5)];
-    if (i === 8) lighting.atmosphere = { ...ATMOSPHERE_CONFIG, ambientStrength: 0, torchHazeStrength: 0, vignetteStrength: 0 };
-    if (i === 16) lighting.atmosphere = { ...ATMOSPHERE_CONFIG, vignetteSoftness: 1.4, torchHazeRadius: 0 };
+    if (i === 8) light.atmosphere = { ...ATMOSPHERE_CONFIG, ambientStrength: 0, torchHazeStrength: 0, vignetteStrength: 0 };
+    if (i === 16) light.atmosphere = { ...ATMOSPHERE_CONFIG, vignetteSoftness: 1.4, torchHazeRadius: 0 };
     const walls: [number, number][] = [];
     forEachViewTile({ n, left, bottom }, (x, y) => { if (scene.game.world.tile(x, y)?.kind === "wall") walls.push([x, y]); });
     const torches = scene.torches().filter((t) => t.active && Math.abs(t.x - left - n / 2) < n / 2 + 8 && Math.abs(t.y - bottom - n / 2) < n / 2 + 8);
@@ -219,8 +218,8 @@ function sceneRun(scene: Scene, seed: number) {
       c, now, dt: 0.016, dpr, width, n, s, left, bottom, playerX, playerY, game: scene.game, outside: false,
       reduceMotion: rnd() < 0.2, spritesOff: rnd() < 0.25, look: {} as FrameContext["look"], darkness, torches, walls, glows: [],
     };
-    const regions = REGIONS(width);
-    const out = drawFrame(f, lighting, entities, regions[Math.floor(rnd() * regions.length)]);
+    const foregrounds = FOREGROUNDS(f);
+    const out = drawFrame(f, light, board(f, foregrounds[Math.floor(rnd() * foregrounds.length)]));
     frames.push([i, torches.length, out, hash.copy().digest("hex").slice(0, 12)]);
   }
   return { frames: digest(frames), canvas: hash.digest("hex").slice(0, 12) };
@@ -241,15 +240,17 @@ function degraded() {
   });
   noContexts = true;
   for (const darkness of [0, 0.7]) {
-    const lighting = new LightingPass(), entities = new EntityLighting();
     const f = frame(darkness);
-    out.push(drawFrame(f, lighting, entities, { x: 0, y: 0, w: 100, h: 100 }), lighting.wallMask(f));
+    // Sprites need canvases of their own, so this board has none.
+    const bare = { ...board(f, FOREGROUNDS(f)[1]), contents: () => {}, hero: () => {} };
+    out.push(drawFrame(f, new DungeonLight(), bare), new LightingPass().wallMask(f));
   }
   noContexts = false;
   // Silhouettes baked in one frame, then a frame whose shadow layer has no
   // context, and a darkening pass whose own layers have none.
   const warm = new EntityLighting(), lit = frame(0.7);
-  drawFrame(lit, new LightingPass(), warm, undefined);
+  warm.drawShadows(lit, () => null);
+  warm.drawSpriteLighting(lit, c);
   const later = { ...lit, now: lit.now + 100 };
   noContexts = true;
   warm.drawShadows(later, () => null);
@@ -270,6 +271,29 @@ function degraded() {
   }
   g.document = fakeDocument;
   return { out: digest(out), canvas: hash.digest("hex").slice(0, 12) };
+}
+
+/** The darkening pass on its own (an internal step of DungeonLight), with
+ * sprites clipped to odd regions: none, one box, overlapping boxes, boxes
+ * off or partly off the board, and empty lists. */
+function darkenedRegions() {
+  hash = createHash("sha256");
+  const scene = delveScene(7, 30);
+  for (const [width, dpr] of [[408, 1], [340, 1.5], [255, 2]]) {
+    const main = new FakeCanvas();
+    main.width = main.height = Math.round(width * dpr);
+    const n = 17, f: FrameContext = {
+      c: main.getContext()!, now: 3000, dt: 0.016, dpr, width, n, s: width / n, left: 7, bottom: 22, playerX: 15, playerY: 30,
+      game: scene.game, outside: false, reduceMotion: false, spritesOff: false, look: {} as FrameContext["look"], darkness: 0.6,
+      torches: scene.torches(), walls: [], glows: [],
+    };
+    const pass = new LightingPass();
+    pass.startFrame();
+    const dark = pass.buildDarkness(f, null)!;
+    for (const region of REGIONS(width))
+      pass.drawDarkened(f, dark.spriteDark, { amount: 0.4, draw: board(f, null).contents, region });
+  }
+  return hash.digest("hex").slice(0, 12);
 }
 
 function polygons(seed: number) {
@@ -301,6 +325,7 @@ test("dungeon lighting passes and visibility polygons match the golden", () => {
   for (const [seed, room] of [[1, 0], [7, 3], [42, 8], [5, 14], [99, 27]]) actual[`tower ${seed}/${room}`] = sceneRun(towerScene(seed, room), seed * 100 + room);
   for (const [seed, y] of [[1, 12], [7, 30], [42, 55], [500, 20]]) actual[`delve ${seed}/${y}`] = sceneRun(delveScene(seed, y), seed * 100 + y);
   actual.degraded = degraded();
+  actual["darkened regions"] = darkenedRegions();
   for (const seed of [1, 2, 3, 4, 5, 6]) actual[`polygons ${seed}`] = polygons(seed);
   actual.flicker = flicker();
 

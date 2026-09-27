@@ -6,13 +6,12 @@ import { DecorLayer, type DecorFrame, type DecorView, type ReflectionPainter } f
 import { OutsideGrass } from "./outside-grass.ts";
 import { TileLayerCache } from "./tile-cache.ts";
 import { OutdoorWeather } from "./weather.ts";
-import { LIGHTING_CONFIG } from "./lighting.ts";
 import { torchAnimationFrame } from "./game-sprites.ts";
 import { paintHero, paintHeroFallback, paintTile, paintTorch, type BoardLook } from "./tile-painters.ts";
-import { LightingPass, type AtmosphereConfig } from "./lighting-pass.ts";
-import { EntityLighting } from "./entity-lighting.ts";
+import type { AtmosphereConfig } from "./lighting-pass.ts";
+import { DungeonLight, type LitBoard } from "./dungeon-light.ts";
 import { RoutePath } from "./route-path.ts";
-import { darknessOf, forEachViewTile, tileOrigin, toTileSpace, type FrameContext, type Rect } from "./render-frame.ts";
+import { darknessOf, forEachViewTile, tileTransform, toTileSpace, type FrameContext } from "./render-frame.ts";
 
 export { ATMOSPHERE_CONFIG, type AtmosphereConfig } from "./lighting-pass.ts";
 
@@ -21,9 +20,9 @@ const CACHE_COLUMNS: [number, number] = [-64, 191];
 
 /** Draws the Tower/Delve board: owns the camera (which glides after the
  * hero), and runs each frame as an ordered list of passes over one
- * FrameContext. Tile art lives in tile-painters.ts, the dungeon's light in
- * lighting-pass.ts, torchlight on sprites in entity-lighting.ts, and the
- * golden route line in route-path.ts. */
+ * FrameContext. Tile art lives in tile-painters.ts, the golden route line
+ * in route-path.ts, and the dungeon's light in dungeon-light.ts, which runs
+ * the rest of a dungeon frame once the ground is down. */
 export class Renderer {
   ctx: CanvasRenderingContext2D;
   bottom = 0;
@@ -48,8 +47,7 @@ export class Renderer {
   decorCache = new TileLayerCache(2, 0);
   private worldIds = new WeakMap<object, number>();
   private nextWorldId = 1;
-  private lighting = new LightingPass();
-  private entities = new EntityLighting();
+  private light = new DungeonLight();
   private routePath = new RoutePath();
   /** A golden path to preview for a highlighted-but-unconfirmed destination.
    * Drawn via the same line as an in-progress walk whenever no walk is
@@ -61,10 +59,10 @@ export class Renderer {
   private reflectionSprites = new Map<string, { canvas: HTMLCanvasElement; at: number }>();
   /** The dungeon atmosphere (tint, vignette, torch haze), tunable per renderer. */
   get atmosphere(): AtmosphereConfig {
-    return this.lighting.atmosphere;
+    return this.light.atmosphere;
   }
   set atmosphere(config: AtmosphereConfig) {
-    this.lighting.atmosphere = config;
+    this.light.atmosphere = config;
   }
   get density() {
     if (this.game.run.outside) return OUTSIDE_SIZE;
@@ -110,21 +108,39 @@ export class Renderer {
   }
   draw(now: number) {
     const f = this.beginFrame(now);
-    // Ground first, then torch-cast shadows, then tile contents on top, so
-    // shadows fall across the floor but never over the things casting them.
+    // Ground first; in the dungeon the light then runs the frame (relief,
+    // decor, shadows, contents, torches, route, hero, frame) over it.
     this.drawGround(f);
-    if (!f.outside) this.drawFloorLight(f);
-    const spriteDark = this.drawContents(f);
-    if (f.outside) this.drawForestEntrance(f);
-    else this.drawTorches(f);
-    this.routePath.update(this.game.route, this.previewRoute, this.game.run.player, f.dt);
-    this.routePath.draw(f);
-    if (spriteDark) this.drawHeroInDarkness(f, spriteDark);
-    else this.drawHeroInLight(f);
-    if (f.outside) this.drawWeather(f);
-    else this.drawFrameEdge(f);
+    if (f.outside) this.drawOutside(f);
+    else this.light.draw(f, this.litBoard(f));
     this.drawBlockedMark(f);
     this.drawEffectText(f);
+  }
+  /** The forest clearing: its contents, the entrance, the route, the hero
+   * in its grass, and the weather. */
+  private drawOutside(f: FrameContext) {
+    this.drawEachContents(f, f.c);
+    this.drawForestEntrance(f);
+    this.drawRoute(f);
+    this.drawHeroOutside(f);
+    this.drawWeather(f);
+  }
+  /** What the dungeon board draws between the light's steps. */
+  private litBoard(f: FrameContext): LitBoard {
+    const decor = this.decorOn ? this.decorFrame(f) : null;
+    return {
+      floor: () => this.drawDecorGround(f),
+      glow: () => { if (decor) this.decor.drawGlow(f.c, decor, f.darkness); },
+      contents: (ctx) => this.drawEachContents(f, ctx),
+      torches: () => { for (const t of f.torches) this.drawTorchSprite(f.c, f, t); },
+      route: () => this.drawRoute(f),
+      hero: (ctx) => paintHero(ctx, f.spritesOff),
+      foreground: () => {
+        const bounds = decor && this.decor.foregroundBounds(decor);
+        return bounds ? { bounds, draw: (ctx) => this.decor.drawForeground(ctx, decor!) } : null;
+      },
+      edge: () => this.drawFrameEdge(f),
+    };
   }
 
   /** Sizes the canvas, moves the camera and hero toward their targets,
@@ -152,9 +168,8 @@ export class Renderer {
       darkness: darknessOf(g), torches: [], walls: [], glows: [],
     };
     f.torches = outside ? [] : this.visibleTorches();
-    this.lighting.startFrame();
     f.walls = outside ? [] : this.visibleWallTiles();
-    f.glows = outside ? [] : this.lighting.glowSources(f);
+    f.glows = outside ? [] : this.light.glows(f);
     if (!outside && this.decorOn) {
       this.decor.sync(g.world, g.run.seed);
       this.decor.update({ dt, now, hx: this.playerX, hy: this.playerY, tileAt: this.tileAt, reduceMotion: f.reduceMotion });
@@ -205,44 +220,18 @@ export class Renderer {
     this.groundCache.draw(f.c, this.decorView(f), f.dpr, groundKey, f.now, CACHE_COLUMNS,
       (ctx, x, y) => this.tile(ctx, f, g.world.tile(x, y), x, y, 0));
   }
-  /** Torch relief on the stone, then decor over it (so pools and crates hide
-   * the bricks beneath them), then the shadows things cast in torchlight. */
-  private drawFloorLight(f: FrameContext) {
-    this.lighting.drawTorchRelief(f);
-    if (this.decorOn && this.decor.key) {
-      const view = this.decorView(f);
-      this.decorCache.draw(f.c, view, f.dpr, this.decor.key, f.now, CACHE_COLUMNS, (ctx, x, y) => this.decor.bakeTile(ctx, x, y));
-      this.decor.drawGround(f.c, this.decorFrame(f), {
-        paint: (p) => this.paintReflections(p, f),
-        key: this.reflectionKey(f),
-      });
-    }
-    this.entities.drawShadows(f, () => this.lighting.wallMask(f));
+  /** Decor over the stone (so pools and crates hide the bricks beneath
+   * them), with its reflections. */
+  private drawDecorGround(f: FrameContext) {
+    if (!this.decorOn || !this.decor.key) return;
+    const view = this.decorView(f);
+    this.decorCache.draw(f.c, view, f.dpr, this.decor.key, f.now, CACHE_COLUMNS, (ctx, x, y) => this.decor.bakeTile(ctx, x, y));
+    this.decor.drawGround(f.c, this.decorFrame(f), {
+      paint: (p) => this.paintReflections(p, f),
+      key: this.reflectionKey(f),
+    });
   }
-  /** Doors, stairs, items, and enemies. Below the default brightness:
-   * darken the ground, lay the object glows on it, then draw the objects
-   * (less darkened) on top of their glows. Returns the sprite darkness
-   * layer when there is one, for the hero pass. */
-  private drawContents(f: FrameContext) {
-    const c = f.c;
-    const dark = f.outside ? null : this.lighting.buildDarkness(f, this.entities.shadows);
-    if (dark) {
-      c.save();
-      c.globalCompositeOperation = "multiply";
-      c.drawImage(dark.dark, 0, 0, f.width, f.width);
-      c.restore();
-      this.lighting.drawObjectBloom(f);
-      if (this.decorOn) this.decor.drawGlow(c, this.decorFrame(f), f.darkness);
-      const region = this.occupiedRegion(f);
-      if (region)
-        this.lighting.drawDarkened(f, dark.spriteDark, {
-          amount: LIGHTING_CONFIG.objectGlow.spriteDarkness, draw: (ctx) => this.drawEachContents(f, ctx), region,
-        });
-      this.lighting.drawDoorWash(f);
-    } else this.drawEachContents(f, c);
-    if (!f.outside) this.entities.drawSpriteLighting(f, c);
-    return dark?.spriteDark ?? null;
-  }
+  /** Doors, stairs, items, and enemies, drawn onto `ctx`. */
   private drawEachContents(f: FrameContext, ctx: CanvasRenderingContext2D) {
     forEachViewTile(f, (x, y) => {
       const t = this.game.world.tile(x, y);
@@ -253,20 +242,6 @@ export class Renderer {
       ctx.restore();
     });
   }
-  /** One box around every tile with something on it (plus room for
-   * outlines): clipping to many small boxes costs more than it saves. */
-  private occupiedRegion(f: FrameContext): Rect | null {
-    const occupied: Rect[] = [];
-    forEachViewTile(f, (x, y) => {
-      const kind = this.game.world.tile(x, y).kind;
-      if (kind === "wall" || kind === "floor") return;
-      occupied.push({ x: (x - f.left - 0.15) * f.s, y: (f.n - 1 - (y - f.bottom) - 0.15) * f.s, w: 1.3 * f.s, h: 1.3 * f.s });
-    });
-    if (!occupied.length) return null;
-    const x0 = Math.min(...occupied.map((r) => r.x)), y0 = Math.min(...occupied.map((r) => r.y));
-    const x1 = Math.max(...occupied.map((r) => r.x + r.w)), y1 = Math.max(...occupied.map((r) => r.y + r.h));
-    return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
-  }
   private drawForestEntrance(f: FrameContext) {
     const c = f.c, g = this.game;
     c.save();
@@ -275,80 +250,30 @@ export class Renderer {
     drawEntrance(c, g.mode, Math.floor(g.world.width / 2));
     c.restore();
   }
-  /** Torch sprites (after the darkness, so the flames themselves are never
-   * dimmed), then the torch lightmap. */
-  private drawTorches(f: FrameContext) {
-    for (const t of f.torches) this.drawTorchSprite(f.c, f, t);
-    this.lighting.drawLightmap(f, this.entities.shadows);
+  private drawRoute(f: FrameContext) {
+    this.routePath.update(this.game.route, this.previewRoute, this.game.run.player, f.dt);
+    this.routePath.draw(f);
   }
-  /** The context transform that draws the hero, in tile space. */
-  private heroTransform(f: FrameContext) {
-    const c = f.c;
-    c.save();
-    toTileSpace(c, f, f.playerX, f.playerY);
-    const m = c.getTransform();
-    c.restore();
-    return m;
-  }
-  private drawHero(f: FrameContext, c: CanvasRenderingContext2D) {
-    paintHero(c, f.spritesOff);
-    if (!f.outside) this.entities.drawSpriteLighting(f, c, true);
-  }
-  /** The hero takes only a light touch of the darkness, through the same
-   * masked layer as the other sprites; grass and water in front of it sit
-   * in the same darkness as the ground they grow from. */
-  private drawHeroInDarkness(f: FrameContext, spriteDark: HTMLCanvasElement) {
-    const m = this.heroTransform(f), s = f.s;
-    // Only the hero's surroundings need the darkening pass.
-    const hero = tileOrigin(f, f.playerX, f.playerY);
-    this.lighting.drawDarkened(f, spriteDark, {
-      amount: LIGHTING_CONFIG.objectGlow.heroDarkness,
-      draw: (ctx) => {
-        ctx.setTransform(m);
-        this.drawHero(f, ctx);
-      },
-      region: { x: hero.x - 0.7 * s, y: hero.y - 0.7 * s, w: 2.4 * s, h: 2.4 * s },
-    });
-    // Skipped when there's no foreground this frame.
-    const decor = this.decorFrame(f), fg = this.decorOn ? this.decor.foregroundBounds(decor) : null;
-    if (fg)
-      this.lighting.drawDarkened(f, spriteDark, {
-        amount: 1,
-        draw: (ctx) => this.decor.drawForeground(ctx, decor),
-        region: {
-          x: (fg.x0 / 24 - f.left) * s - 2, y: (fg.y0 / 24 + f.n - 1 + f.bottom) * s - 2,
-          w: ((fg.x1 - fg.x0) / 24) * s + 4, h: ((fg.y1 - fg.y0) / 24) * s + 4,
-        },
-      });
-  }
-  /** The hero between whatever grows behind and in front of it: forest
-   * grass outside, decor foreground in the dungeon. */
-  private drawHeroInLight(f: FrameContext) {
+  /** The hero between the forest grass behind it and the blades at its feet. */
+  private drawHeroOutside(f: FrameContext) {
     const c = f.c, g = this.game, view = this.decorView(f);
     const grass = (layer: "back" | "front") =>
       this.grass.draw(c, view, g.world, g.run.seed, Math.floor(g.world.width / 2), outsideWeather(g.run.seed), f.now, f.dt,
         this.playerX, this.playerY, f.reduceMotion, layer);
-    const m = this.heroTransform(f);
-    // Grass behind the hero goes under it; the blades at its feet over it.
-    if (f.outside && this.decorOn) grass("back");
+    const m = tileTransform(f, f.playerX, f.playerY);
+    if (this.decorOn) grass("back");
     c.save();
     c.setTransform(m);
-    this.drawHero(f, c);
+    paintHero(c, f.spritesOff);
     c.restore();
-    if (!this.decorOn) return;
-    if (f.outside) grass("front");
-    else this.drawDecorForeground(c, this.decorFrame(f));
-  }
-  /** Decor in front of the hero, when there is any this frame. */
-  private drawDecorForeground(c: CanvasRenderingContext2D, decor: DecorFrame) {
-    if (this.decor.foregroundBounds(decor)) this.decor.drawForeground(c, decor);
+    if (this.decorOn) grass("front");
   }
   private drawWeather(f: FrameContext) {
     const g = this.game;
     this.weather.draw(f.c, f.width, g.run.seed, { dt: f.dt, reduceMotion: g.save.settings.reduceMotion,
       active: !g.paused && !g.summary && !document.hidden, sound: g.save.settings.weatherSound !== false });
   }
-  /** The dungeon board's thin stone frame and vignette. */
+  /** The dungeon board's thin stone frame. */
   private drawFrameEdge(f: FrameContext) {
     const c = f.c, w = f.width;
     c.fillStyle = "#606b79";
@@ -356,7 +281,6 @@ export class Renderer {
     c.fillRect(0, w - 2, w, 2);
     c.fillRect(0, 0, 2, w);
     c.fillRect(w - 2, 0, 2, w);
-    this.lighting.drawVignette(f);
   }
   /** A fading red cross where a step was refused. */
   private drawBlockedMark(f: FrameContext) {
