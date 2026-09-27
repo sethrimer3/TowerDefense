@@ -335,7 +335,7 @@ export class Renderer {
     const g = this.game;
     return {
       mode: g.mode, height: g.run.height, seed: g.run.seed, outside: !!g.run.outside, entranceX: Math.floor(g.world.width / 2),
-      spritesOff: !!g.save.settings.spritesOff, reduceMotion: g.save.settings.reduceMotion, area1: isArea1(g.mode, g.run.height),
+      spritesOff: !!g.save.settings.spritesOff, reduceMotion: g.save.settings.reduceMotion, area1: !g.save.settings.spritesOff && isArea1(g.mode, g.run.height),
     };
   }
   /** Paints one tile in tile space (see paintTile); false while its ground

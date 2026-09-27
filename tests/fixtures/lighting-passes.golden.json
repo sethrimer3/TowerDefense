@@ -1,45 +1,45 @@
 {
   "tower 1/0": {
-    "frames": "11364c132028",
-    "canvas": "20e5b7846ee0"
+    "frames": "8bb0da12f7c3",
+    "canvas": "d775ff2aeb82"
   },
   "tower 7/3": {
-    "frames": "d16b049ffaff",
-    "canvas": "9506c91027ad"
+    "frames": "07c4c7bdd8f7",
+    "canvas": "43ce50b5b48b"
   },
   "tower 42/8": {
-    "frames": "213787126b76",
-    "canvas": "9ed3d68bc366"
+    "frames": "6c39aee70f05",
+    "canvas": "4f9eb68ddfe4"
   },
   "tower 5/14": {
-    "frames": "109f2187fb31",
-    "canvas": "968a673b289b"
+    "frames": "1dd5648bd579",
+    "canvas": "d96b6fdb17af"
   },
   "tower 99/27": {
-    "frames": "a84579e351a1",
-    "canvas": "a91ef53c1229"
+    "frames": "e99a9165a064",
+    "canvas": "9fe3541492d4"
   },
   "delve 1/12": {
-    "frames": "eeb0a2391c85",
-    "canvas": "ba81590620e4"
+    "frames": "3d29e1ff5589",
+    "canvas": "baeae8a10cca"
   },
   "delve 7/30": {
-    "frames": "6a6099b3a411",
-    "canvas": "dd044cf64715"
+    "frames": "a066a481b7a0",
+    "canvas": "7c9ed678a1a3"
   },
   "delve 42/55": {
-    "frames": "67e9f2aefa36",
-    "canvas": "3302b59728e5"
+    "frames": "d825f0930e99",
+    "canvas": "77e009d04723"
   },
   "delve 500/20": {
-    "frames": "89e2683218b9",
-    "canvas": "964184ddc28a"
+    "frames": "ccefe4bf7f6d",
+    "canvas": "7fb321cffad6"
   },
   "degraded": {
     "out": "92866a51572d",
-    "canvas": "e10731e7bfc6"
+    "canvas": "8ee1603af1a9"
   },
-  "darkened regions": "e799d8308390",
+  "darkened regions": "ef8e0f3c342f",
   "polygons 1": "62948ff9bb0e",
   "polygons 2": "f6e285cb9199",
   "polygons 3": "e0a338fc0aee",

@@ -154,7 +154,7 @@ function board(f: FrameContext, foreground: Foreground | null): LitBoard {
         if (t.kind === "wall" || t.kind === "floor") return;
         ctx.save();
         toTileSpace(ctx, f, x, y);
-        paintContents(ctx, t, { x, y, time: f.now, spritesOff: f.look.spritesOff, reduceMotion: f.look.reduceMotion, area1: false });
+        paintContents(ctx, t, { x, y, time: f.now, spritesOff: f.look.spritesOff, reduceMotion: f.look.reduceMotion, area1: f.look.area1 });
         ctx.restore();
       }),
     hero: paintHeroFallback,
@@ -220,7 +220,7 @@ function sceneRun(scene: Scene, seed: number) {
     const reduceMotion = rnd() < 0.2, spritesOff = rnd() < 0.25;
     const f: FrameContext = {
       c, now, dt: 0.016, dpr, width, n, s, left, bottom, playerX, playerY, world: scene.world,
-      look: { ...scene.look, reduceMotion, spritesOff }, darkness, torches, walls, glows: [],
+      look: { ...scene.look, reduceMotion, spritesOff, area1: scene.look.area1 && !spritesOff }, darkness, torches, walls, glows: [],
     };
     const foregrounds = FOREGROUNDS(f);
     const out = drawFrame(f, light, board(f, foregrounds[Math.floor(rnd() * foregrounds.length)]));

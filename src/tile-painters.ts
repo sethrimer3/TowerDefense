@@ -32,8 +32,9 @@ export type BoardLook = {
   entranceX: number;
   spritesOff: boolean;
   reduceMotion: boolean;
-  /** The first Tower section, which has its own hand-drawn doors, chests,
-   * floor and floor relief (see isArea1). */
+  /** Whether the first Tower section's hand-drawn art is showing: its own
+   * doors, chests, floor, and the torch relief on that floor. Never with
+   * sprites off, so shadows and relief always match what is drawn. */
   area1: boolean;
 };
 type TileWorld = { tile(x: number, y: number): Tile | undefined };
@@ -51,7 +52,7 @@ export function paintTile(c: CanvasRenderingContext2D, world: TileWorld, t: Tile
   if (look.outside) return layer !== 0 || drawForestTile(c, t, { x, y, seed: look.seed, center: look.entranceX }, !look.spritesOff);
   if (layer === 0) return paintGround(c, world, t, x, y, look);
   if (t.kind === "wall" || t.kind === "floor") return true;
-  paintContents(c, t, { x, y, time, spritesOff: look.spritesOff, reduceMotion: look.reduceMotion, area1: !look.spritesOff && look.area1 });
+  paintContents(c, t, { x, y, time, spritesOff: look.spritesOff, reduceMotion: look.reduceMotion, area1: look.area1 });
   return true;
 }
 
