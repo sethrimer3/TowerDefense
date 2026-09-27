@@ -3,10 +3,10 @@ import { tileRandom } from "./themes.ts";
 import { decorSourceFor, FLOWER_COLORS, TILE_PX, tileDecor, tileKey, waterAt, type DecorSource, type Flower, type Plant, type TileDecor } from "./decor.ts";
 import { DecorBaker } from "./decor-bake.ts";
 import { DecorEffects, type EffectFrame, type TileAt } from "./decor-effects.ts";
-import { WaterReflections, type ReflectionScene, type Reflections, type Wave } from "./decor-reflections.ts";
+import { WaterReflections, type MirroredSprites, type ReflectionScene, type Wave } from "./decor-reflections.ts";
 import { drawBlades, drawCrates, DRIP_FALL, dripNow, dripRings, PixelBatch, ring, type DripNow, type Sway } from "./decor-sprites.ts";
 
-export type { ReflectionPainter } from "./decor-reflections.ts";
+export type { MirroredSprites } from "./decor-reflections.ts";
 
 /** Draws the dungeon dressing planned in decor.ts. Static pixels come from
  * decor-bake.ts, which the renderer caches with the rest of the ground; the
@@ -154,7 +154,7 @@ export class DecorLayer {
   /** The live ground decor: reflections, glints, drips, ripples, crates,
    * and tall grass. (The static pixels come from bakeTile, which the
    * renderer caches with the rest of the ground.) */
-  drawGround(c: CanvasRenderingContext2D, f: DecorFrame, reflections?: Reflections) {
+  drawGround(c: CanvasRenderingContext2D, f: DecorFrame, sprites?: MirroredSprites) {
     const src = this.src;
     if (!src) return;
     c.save();
@@ -167,7 +167,7 @@ export class DecorLayer {
       if (!f.reduceMotion) surfaceSparkle(px, src, [x, y, d], t);
     });
     // Reflections sit on the water, under its glints and ripple rings.
-    this.reflections.draw(c, this.reflectionScene(f, reflections));
+    this.reflections.draw(c, this.reflectionScene(f, sprites));
     this.drawRipples(px, src, f.now);
     px.flush(c);
     for (const tile of standing.crates) this.drawCratesAt(c, tile);
@@ -176,7 +176,7 @@ export class DecorLayer {
     c.restore();
   }
 
-  private reflectionScene({ view, now, tileAt, reduceMotion }: DecorFrame, sprites?: Reflections): ReflectionScene {
+  private reflectionScene({ view, now, tileAt, reduceMotion }: DecorFrame, sprites?: MirroredSprites): ReflectionScene {
     const src = this.src!, pools: DecorTile[] = [];
     this.eachTile(view, (x, y, d) => {
       if (d.water && d.waterCount) pools.push([x, y, d]);

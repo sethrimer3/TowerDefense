@@ -2,31 +2,30 @@ import type { Tile } from "./entities.ts";
 import { TILE_PX, type TileDecor } from "./decor.ts";
 import { WATER_MID } from "./decor-bake.ts";
 
-/** Mirrors what stands on or beside the water into it. The renderer paints
- * the sprites upside down into a small buffer (24 pixels per tile). That
- * image is copied back onto the pools in 1-pixel-high strips, each shifted
- * by the ripple rings passing through it and a faint idle shimmer, then
- * tinted by the water and masked to it. All GPU copies: no per-frame pixel
- * readback. */
+/** Mirrors what stands on or beside the water into it: crates, walls, tile
+ * contents, torch flames, and the hero, painted upside down about their
+ * feet into a small buffer (24 pixels per tile). That image is copied back
+ * onto the pools in 1-pixel-high strips, each shifted by the ripple rings
+ * passing through it and a faint idle shimmer, then tinted by the water and
+ * masked to it. All GPU copies: no per-frame pixel readback. */
 
-/** Lets the renderer paint the sprites that show mirrored in the water. */
-export type ReflectionPainter = {
-  ctx: CanvasRenderingContext2D;
-  /** Sets `ctx` to world pixels mirrored about the line gy = base (the
-   * reflected thing's foot), so drawing it normally paints its reflection. */
-  flip(base: number): void;
-  /** Tiles standing on or just north of water, whose contents reflect. */
-  tiles: [number, number][];
-  /** Whether a thing at tile (x, y) would show in the water. */
-  near(x: number, y: number): boolean;
-  /** "static": walls and tile contents, painted only when they change;
-   * "moving": the hero and torch flames, painted every frame. */
-  phase: "static" | "moving";
+/** A sprite the board paints in 24-pixel tile space at the origin. */
+type Paint = (ctx: CanvasRenderingContext2D) => void;
+/** The board's sprites, as the water shows them. Each is painted in
+ * 24-pixel tile space at the origin. */
+export type MirroredSprites = {
+  /** Paints tile `t` at (x, y): its ground or wall (layer 0), or what
+   * stands on it (1). */
+  tile(ctx: CanvasRenderingContext2D, t: Tile, x: number, y: number, layer: 0 | 1): void;
+  /** Torches near the view, with their flame's animation frame (torches on
+   * the same frame look alike). */
+  torches: { x: number; y: number; frame: number; paint: Paint }[];
+  /** The hero at its drawn (possibly fractional) tile. */
+  hero: { x: number; y: number; paint: Paint };
 };
-/** What the renderer supplies for reflections: a painter for its sprites,
- * and a key that changes whenever any moving one (the hero, a torch flame)
- * would look different, so an unchanged picture can be reused. */
-export type Reflections = { paint: (p: ReflectionPainter) => void; key: string };
+/** Sets a context to world pixels mirrored about gy = base (a reflected
+ * thing's foot), so drawing it normally paints its reflection. */
+type Flip = (base: number) => void;
 /** Reflection tuning: opacity, how far the water tints them, and how far
  * (pixels) ripples and the idle shimmer push them around. */
 const REFLECTION = { alpha: 0.65, tint: 0.35, darken: 0.85, rippleShift: 2.2, rippleWidth: 4, shimmer: 0.7 };
@@ -50,7 +49,7 @@ export type ReflectionScene = {
   isBroken: (x: number, y: number) => boolean;
   /** Paints tile (x, y)'s crates, for their mirror image. */
   drawCrates: (c: CanvasRenderingContext2D, x: number, y: number, d: TileDecor) => void;
-  sprites?: Reflections;
+  sprites?: MirroredSprites;
 };
 
 type Canvas = { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D };
@@ -74,6 +73,10 @@ export class WaterReflections {
   private waterRows = new Uint8Array(0);
   /** When `out` was last redrawn. */
   private builtAt = -Infinity;
+  /** Moving sprites (hero, torch frames) snapshotted into small canvases,
+   * so their outline passes aren't redone every frame. Refreshed every few
+   * seconds so sprite art that loads late shows up. */
+  private snapshots = new Map<string, { canvas: HTMLCanvasElement; at: number }>();
 
   /** Draws the reflections onto `c`, which is already in world pixels. */
   draw(c: CanvasRenderingContext2D, scene: ReflectionScene) {
@@ -93,7 +96,7 @@ export class WaterReflections {
     // drawn on the surface itself still move every frame).
     const waves = scene.reduceMotion ? [] : scene.waves();
     const tick = scene.reduceMotion ? 0 : Math.floor(scene.now / 100);
-    const frameKey = `${stillKey}|${scene.sprites?.key ?? ""}|${tick}`;
+    const frameKey = `${stillKey}|${movingKey(scene.sprites)}|${tick}`;
     if (this.stale(frameKey, waves.length > 0, scene.now)) {
       this.frameKey = frameKey;
       this.builtAt = scene.now;
@@ -150,8 +153,8 @@ export class WaterReflections {
     ctx.putImageData(img, 0, 0);
   }
 
-  /** The mirrored crates, then the renderer's static sprites. */
-  private paintStill(key: string, scene: ReflectionScene, area: Area, view: Pick<ReflectionPainter, "tiles" | "near">) {
+  /** The mirrored crates, then the walls and tile contents. */
+  private paintStill(key: string, scene: ReflectionScene, area: Area, view: Mirrored) {
     this.stillKey = key;
     const { canvas, ctx: st } = this.still!;
     st.setTransform(1, 0, 0, 1, 0, 0);
@@ -163,20 +166,49 @@ export class WaterReflections {
       flip(-y * TILE_PX + Math.max(...d.crates.map((k) => k.y + k.h)));
       scene.drawCrates(st, x, y, d);
     }
-    scene.sprites?.paint({ ctx: st, flip, ...view, phase: "static" });
+    if (scene.sprites) mirrorTiles(st, flip, scene, scene.sprites, view.tiles);
     st.setTransform(1, 0, 0, 1, 0, 0);
   }
 
-  /** The still picture plus the renderer's moving sprites. */
-  private paintMirror(scene: ReflectionScene, area: Area, view: Pick<ReflectionPainter, "tiles" | "near">) {
+  /** The still picture plus the moving sprites. */
+  private paintMirror(scene: ReflectionScene, area: Area, view: Mirrored) {
     const sctx = this.mirror!.ctx;
     sctx.setTransform(1, 0, 0, 1, 0, 0);
     sctx.globalAlpha = 1;
     sctx.globalCompositeOperation = "source-over";
     sctx.clearRect(0, 0, area.W, area.H);
     sctx.drawImage(this.still!.canvas, 0, 0);
-    scene.sprites?.paint({ ctx: sctx, flip: mirrorAbout(sctx, area), ...view, phase: "moving" });
+    if (scene.sprites) this.mirrorMoving(sctx, mirrorAbout(sctx, area), scene, view.near);
     sctx.setTransform(1, 0, 0, 1, 0, 0);
+  }
+
+  /** Torch flames and the hero, from snapshotted sprites. */
+  private mirrorMoving(ctx: CanvasRenderingContext2D, flip: Flip, scene: ReflectionScene, near: Mirrored["near"]) {
+    const { torches, hero } = scene.sprites!;
+    for (const t of torches) {
+      if (!near(t.x, t.y)) continue;
+      const sprite = this.snapshot(`torch:${t.frame}`, scene.now, t.paint);
+      flip(-t.y * TILE_PX + 21);
+      if (sprite) ctx.drawImage(sprite, t.x * TILE_PX, -t.y * TILE_PX);
+    }
+    if (near(Math.round(hero.x), Math.round(hero.y))) {
+      const sprite = this.snapshot("hero", scene.now, hero.paint);
+      flip(-hero.y * TILE_PX + 23);
+      if (sprite) ctx.drawImage(sprite, hero.x * TILE_PX, -hero.y * TILE_PX);
+    }
+  }
+
+  private snapshot(key: string, now: number, paint: Paint) {
+    const cached = this.snapshots.get(key);
+    if (cached && now - cached.at < 4000) return cached.canvas;
+    const canvas = cached?.canvas ?? document.createElement("canvas");
+    canvas.width = canvas.height = TILE_PX;
+    const c = canvas.getContext("2d");
+    if (!c) return null;
+    c.imageSmoothingEnabled = false;
+    paint(c);
+    this.snapshots.set(key, { canvas, at: now });
+    return canvas;
   }
 
   /** Copies the mirror image back in strips: whole rows across the pools,
@@ -246,8 +278,11 @@ class Shimmer {
   }
 }
 
-/** Tiles standing on or just north of water, whose contents reflect. */
-function mirroredTiles(scene: ReflectionScene, area: Area) {
+/** Tiles standing on or just north of water, whose contents reflect, and
+ * whether a thing at a tile would show in the water. */
+type Mirrored = { tiles: [number, number][]; near: (x: number, y: number) => boolean };
+
+function mirroredTiles(scene: ReflectionScene, area: Area): Mirrored {
   const wet = (x: number, y: number) => (scene.plan(x, y)?.waterCount ?? 0) > 0;
   const near = (x: number, y: number) => wet(x, y) || wet(x, y - 1);
   const tiles: [number, number][] = [];
@@ -261,6 +296,32 @@ function poolArea(pools: [number, number, TileDecor][]): Area {
     x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y);
   }
   return { x0, y0, x1, y1, W: (x1 - x0 + 1) * TILE_PX, H: (y1 - y0 + 1) * TILE_PX, ox: x0 * TILE_PX, oy: -y1 * TILE_PX };
+}
+
+/** Walls and tile contents beside the water. A wall mirrors from its lower
+ * edge; things standing on a tile, from their feet. Stone mirrors faintly,
+ * so the pool still reads as water. */
+function mirrorTiles(ctx: CanvasRenderingContext2D, flip: Flip, scene: ReflectionScene, sprites: MirroredSprites, tiles: [number, number][]) {
+  for (const [x, y] of tiles) {
+    const t = scene.tileAt(x, y);
+    if (t.kind === "floor") continue;
+    const wall = t.kind === "wall";
+    flip(-y * TILE_PX + (wall ? 24 : 23));
+    ctx.translate(x * TILE_PX, -y * TILE_PX);
+    ctx.globalAlpha = wall ? 0.45 : 1;
+    sprites.tile(ctx, t, x, y, wall ? 0 : 1);
+    ctx.globalAlpha = 1;
+  }
+}
+
+/** Changes whenever a moving thing that shows in the water (the hero, a
+ * torch flame) would look different, so an unchanged picture is reused. */
+function movingKey(sprites?: MirroredSprites) {
+  if (!sprites) return "";
+  const { hero, torches } = sprites;
+  let key = `${Math.round(hero.x * TILE_PX)},${Math.round(hero.y * TILE_PX)}`;
+  for (const t of torches) key += `|${t.frame}`;
+  return key;
 }
 
 /** What stands on a tile, as far as its mirror image goes. */

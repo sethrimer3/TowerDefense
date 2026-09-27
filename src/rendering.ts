@@ -2,7 +2,7 @@ import { CHUNK, TOWER_HEIGHT, VIEWPORT_TILES } from "./config.ts";
 import type { Game } from "./state.ts";
 import type { Tile, Torch } from "./entities.ts";
 import { drawEntrance, OUTSIDE_SIZE, outsideWeather } from "./outside.ts";
-import { DecorLayer, type DecorFrame, type DecorView, type ReflectionPainter } from "./decor-render.ts";
+import { DecorLayer, type DecorFrame, type DecorView, type MirroredSprites } from "./decor-render.ts";
 import { OutsideGrass } from "./outside-grass.ts";
 import { TileLayerCache } from "./tile-cache.ts";
 import { OutdoorWeather } from "./weather.ts";
@@ -53,10 +53,6 @@ export class Renderer {
    * Drawn via the same line as an in-progress walk whenever no walk is
    * actually underway (game.route takes priority when both are set). */
   previewRoute: Array<{ x: number; y: number }> | null = null;
-  /** Moving sprites (hero, torch frames) for the reflections, snapshotted
-   * into small canvases so their outline passes aren't redone every frame.
-   * Refreshed every few seconds so sprite art that loads late shows up. */
-  private reflectionSprites = new Map<string, { canvas: HTMLCanvasElement; at: number }>();
   /** The dungeon atmosphere (tint, vignette, torch haze), tunable per renderer. */
   get atmosphere(): AtmosphereConfig {
     return this.light.atmosphere;
@@ -221,15 +217,28 @@ export class Renderer {
       (ctx, x, y) => this.tile(ctx, f, g.world.tile(x, y), x, y, 0));
   }
   /** Decor over the stone (so pools and crates hide the bricks beneath
-   * them), with its reflections. */
+   * them), with the board's sprites mirrored in its water. */
   private drawDecorGround(f: FrameContext) {
     if (!this.decorOn || !this.decor.key) return;
     const view = this.decorView(f);
     this.decorCache.draw(f.c, view, f.dpr, this.decor.key, f.now, CACHE_COLUMNS, (ctx, x, y) => this.decor.bakeTile(ctx, x, y));
-    this.decor.drawGround(f.c, this.decorFrame(f), {
-      paint: (p) => this.paintReflections(p, f),
-      key: this.reflectionKey(f),
-    });
+    this.decor.drawGround(f.c, this.decorFrame(f), this.mirroredSprites(f));
+  }
+  /** The tiles, torches and hero, for the water to mirror. */
+  private mirroredSprites(f: FrameContext): MirroredSprites {
+    const s = f.s, n = f.n;
+    return {
+      tile: (ctx, t, x, y, layer) => this.tile(ctx, f, t, x, y, layer),
+      torches: f.torches.map((t) => ({
+        x: t.x, y: t.y, frame: torchAnimationFrame(t.x, t.y, f.now, f.reduceMotion),
+        // The torch draws in screen space: map its tile back to 0..24.
+        paint: (c) => {
+          c.setTransform(24 / s, 0, 0, 24 / s, -(t.x - f.left) * 24, -(n - 1 - (t.y - f.bottom)) * 24);
+          this.drawTorchSprite(c, f, t);
+        },
+      })),
+      hero: { x: this.playerX, y: this.playerY, paint: (c) => paintHero(c, f.spritesOff) },
+    };
   }
   /** Doors, stairs, items, and enemies, drawn onto `ctx`. */
   private drawEachContents(f: FrameContext, ctx: CanvasRenderingContext2D) {
@@ -346,13 +355,6 @@ export class Renderer {
     c.restore();
   }
 
-  /** Changes whenever a moving thing that shows in the water (the hero, a
-   * torch flame) would look different, so an unchanged reflection is reused. */
-  private reflectionKey(f: FrameContext) {
-    let key = `${Math.round(this.playerX * 24)},${Math.round(this.playerY * 24)}`;
-    for (const t of f.torches) key += `|${torchAnimationFrame(t.x, t.y, f.now, f.reduceMotion)}`;
-    return key;
-  }
   /** True when nothing on the board is moving: the hero and camera have
    * settled, no route is being walked, no feedback is showing, and no decor
    * effect is playing. (Torches and grass still sway.) Used by Battery saver. */
@@ -362,60 +364,6 @@ export class Renderer {
       Math.abs(this.left - t.left) < eps && Math.abs(this.bottom - t.bottom) < eps &&
       !g.route.length && g.blocked.until <= now && g.effect.until <= now && !this.decor.busy;
   }
-  /** Paints, mirrored, everything that shows in the water: the wall faces
-   * above a pool, tile contents, torches, and the hero. Each is drawn by its
-   * usual routine into the decor layer's reflection buffer. */
-  private paintReflections(p: ReflectionPainter, f: FrameContext) {
-    if (p.phase === "static") this.reflectTiles(p, f);
-    if (p.phase === "moving") this.reflectMoving(p, f);
-  }
-  /** Walls and tile contents beside the water. */
-  private reflectTiles(p: ReflectionPainter, f: FrameContext) {
-    for (const [x, y] of p.tiles) {
-      const t = this.game.world.tile(x, y);
-      if (t.kind === "floor") continue;
-      // A wall mirrors from its lower edge; things standing on a tile, from their feet.
-      p.flip(-y * 24 + (t.kind === "wall" ? 24 : 23));
-      p.ctx.translate(x * 24, -y * 24);
-      // Stone mirrors faintly, so the pool still reads as water.
-      p.ctx.globalAlpha = t.kind === "wall" ? 0.45 : 1;
-      this.tile(p.ctx, f, t, x, y, t.kind === "wall" ? 0 : 1);
-      p.ctx.globalAlpha = 1;
-    }
-  }
-  /** Torch flames and the hero, from snapshotted sprites. */
-  private reflectMoving(p: ReflectionPainter, f: FrameContext) {
-    const s = f.s, n = f.n;
-    for (const t of f.torches) {
-      if (!p.near(t.x, t.y)) continue;
-      // The torch draws in screen space: map its tile back to 0..24.
-      const frame = torchAnimationFrame(t.x, t.y, f.now, f.reduceMotion);
-      const sprite = this.reflectionSprite(`torch:${frame}`, f.now, (c) => {
-        c.setTransform(24 / s, 0, 0, 24 / s, -(t.x - f.left) * 24, -(n - 1 - (t.y - f.bottom)) * 24);
-        this.drawTorchSprite(c, f, t);
-      });
-      p.flip(-t.y * 24 + 21);
-      if (sprite) p.ctx.drawImage(sprite, t.x * 24, -t.y * 24);
-    }
-    if (p.near(Math.round(this.playerX), Math.round(this.playerY))) {
-      const sprite = this.reflectionSprite("hero", f.now, (c) => paintHero(c, f.spritesOff));
-      p.flip(-this.playerY * 24 + 23);
-      if (sprite) p.ctx.drawImage(sprite, this.playerX * 24, -this.playerY * 24);
-    }
-  }
-  private reflectionSprite(key: string, now: number, draw: (c: CanvasRenderingContext2D) => void) {
-    const cached = this.reflectionSprites.get(key);
-    if (cached && now - cached.at < 4000) return cached.canvas;
-    const canvas = cached?.canvas ?? document.createElement("canvas");
-    canvas.width = canvas.height = 24;
-    const c = canvas.getContext("2d");
-    if (!c) return null;
-    c.imageSmoothingEnabled = false;
-    draw(c);
-    this.reflectionSprites.set(key, { canvas, at: now });
-    return canvas;
-  }
-
   /** Active torches roughly within the camera viewport, padded so a torch
    * whose center is just offscreen can still light visible ground. Cheap
    * per-frame culling; the expensive part (the visibility polygon) is

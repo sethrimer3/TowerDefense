@@ -5,7 +5,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { RoomWorld, World, type Board } from "../src/generation.ts";
 import { area1ItemId, floorVariant, wallAdjacencyMask } from "../src/area1-tileset.ts";
 import { TreeParticles } from "../src/tree-particles.ts";
-import { DecorLayer, type DecorFrame, type DecorView, type ReflectionPainter } from "../src/decor-render.ts";
+import { DecorLayer, type DecorFrame, type DecorView, type MirroredSprites } from "../src/decor-render.ts";
 import { decorSourceFor, tileDecor, type TileDecor } from "../src/decor.ts";
 import { TREES, type SkillNode } from "../src/skill-trees.ts";
 import type { KeyColor, Tile } from "../src/entities.ts";
@@ -242,6 +242,33 @@ function stops(s: DecorScene): [number, number][] {
   return out.filter((_, i) => i % Math.max(1, Math.floor(out.length / 7)) === 0).slice(0, 8);
 }
 
+/** The board's sprites for the water: tiles, two torches (one beside the
+ * stop `at`, one off to the side, on flame frame `n`) and the hero at
+ * (hx, hy), each a marked box. */
+function mirrored(hx: number, hy: number, at: [number, number], n: number): MirroredSprites {
+  const [tx, ty] = at;
+  return {
+    tile: (ctx, t, x, y, layer) => {
+      note(`mirror ${t.kind} ${x},${y} ${layer}`);
+      ctx.fillRect(2, 2, 20, 21);
+    },
+    torches: [[tx + 1, ty + 1, n], [tx - 4, ty, 0]].map(([x, y, k]) => ({
+      x, y, frame: k, paint: (ctx: CanvasRenderingContext2D) => ctx.fillRect(9 + k, 3, 6, 18),
+    })),
+    hero: { x: hx, y: hy, paint: (ctx) => ctx.fillRect(5, 1, 14, 22) },
+  };
+}
+
+/** A tile in view holding water, if any. */
+function poolTile(s: DecorScene): [number, number] | null {
+  const src = decorSourceFor(s.world, s.seed);
+  if (!src) return null;
+  const { left, bottom, n } = s.view;
+  for (let y = Math.max(0, Math.floor(bottom)); y < bottom + n; y++)
+    for (let x = Math.floor(left); x < left + n; x++) if (tileDecor(src, x, y).waterCount) return [x, y];
+  return null;
+}
+
 function decorRun(s: DecorScene): string {
   canvasIds = 0;
   const layer = new DecorLayer();
@@ -269,20 +296,20 @@ function decorRun(s: DecorScene): string {
       if (frame % 5 === 0)
         for (let y = Math.floor(v.bottom); y < v.bottom + 4; y++)
           for (let x = Math.floor(v.left); x < v.left + 5; x++) note(`bake ${x},${y} ${layer.bakeTile(bake, x, y)}`);
-      const reflections = frame % 3 === 1 ? undefined : {
-        key: `r${frame % 2}`,
-        paint: (p: ReflectionPainter) => {
-          note(`paint ${p.phase} ${JSON.stringify(p.tiles)} ${p.near(tx, ty)}`);
-          p.flip(-ty * 24);
-          p.ctx.fillRect(hx * 24, -hy * 24, 24, 24);
-        },
-      };
-      layer.drawGround(c, f, reflections);
+      layer.drawGround(c, f, frame % 3 === 1 ? undefined : mirrored(hx, hy, [tx, ty], frame % 2));
       layer.drawGlow(c, f, [0, 0.35, 1, -0.2][frame % 4]);
       note(`fg ${JSON.stringify(layer.foregroundBounds(f))}`);
       layer.drawForeground(c, f);
     }
   }
+  // Standing in a pool at one instant: the hero moving only northward must
+  // redraw the reflection rather than reuse it; seconds later the mirrored
+  // sprites are snapshotted afresh.
+  const pool = poolTile(s);
+  if (pool)
+    for (const [dy, later] of [[0, 0], [0.4, 0], [0.4, 5000]])
+      layer.drawGround(c, { view: s.view, now: now + later, tileAt, reduceMotion: false }, mirrored(pool[0], pool[1] + dy, pool, 0));
+  now += 5000;
   // Settle: the pieces land and the board stops being busy.
   for (let k = 0; k < 120; k++) layer.update({ dt: 0.016, now: (now += 16), hx, hy, tileAt, reduceMotion: false });
   note(`settled busy ${layer.busy} parts ${layer.particles.length}`);
