@@ -1,4 +1,3 @@
-import { chooseStep } from "./automation.ts";
 import type { Game } from "./state.ts";
 import type { Renderer } from "./rendering.ts";
 import { isBoard, type Tab } from "./ui/app.ts";
@@ -69,7 +68,8 @@ export class FrameLoop {
     }
     if (game.auto && this.due(time, this.lastAuto, 1000 / game.save.settings.speed)) {
       this.lastAuto = time;
-      this.autoStep();
+      game.autoTurn();
+      this.host.update();
     }
   }
 
@@ -88,15 +88,5 @@ export class FrameLoop {
   private canAct() {
     const { game, modal } = this.host;
     return !game.paused && !game.summary && !modal.open;
-  }
-
-  private autoStep() {
-    const game = this.host.game;
-    const step = chooseStep(game);
-    if (step) {
-      game.move(step.dx, step.dy, false);
-      game.message = step.label;
-    } else game.message = "Waiting · no safe route. Explore or retire this ascent.";
-    this.host.update();
   }
 }

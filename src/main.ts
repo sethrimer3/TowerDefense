@@ -34,7 +34,6 @@ let tab: Tab = "tower";
 const modal = el("modal") as HTMLDialogElement;
 const ctx: AppContext = {
   game,
-  renderer,
   modal,
   save,
   update,
@@ -96,7 +95,7 @@ function navigate(requested: string) {
   if (isBoard(id)) {
     game.switchMode(id);
     renderBoardHeading(game, overlay);
-  } else game.route = [];
+  } else game.cancelRoute();
   el("stats").toggleAttribute("hidden", !isBoard(id));
   el("currencies").toggleAttribute("hidden", id !== "upgrades");
   const page = isBoard(id) ? "board" : id;
@@ -139,9 +138,7 @@ el("auto").onclick = () => {
     navigate("upgrades");
     return;
   }
-  game.route = [];
-  game.auto = !game.auto;
-  game.message = game.auto ? "Wayfinder is searching for a route." : "Manual climbing";
+  game.toggleAuto();
   update();
 };
 el("undo").onclick = () => {

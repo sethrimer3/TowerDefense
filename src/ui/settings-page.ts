@@ -1,4 +1,3 @@
-import { defaults } from "../save.ts";
 import { SETTINGS, type SettingKey, type Settings } from "../settings.ts";
 import type { AppContext } from "./app.ts";
 import type { BoardOverlay } from "./board-overlay.ts";
@@ -15,10 +14,8 @@ type PageKey = (typeof PAGE)[number];
 /** What a change does once written, beyond saving. */
 const AFTER: Partial<Record<PageKey, (ctx: AppContext, overlay: BoardOverlay, s: Settings) => void>> = {
   showArrows: (ctx) => ctx.update(),
-  weatherSound: (ctx, _, s) => {
-    if (!s.weatherSound) ctx.renderer.weather.silence();
-    ctx.update();
-  },
+  // The board silences the weather itself once sound is off.
+  weatherSound: (ctx) => ctx.update(),
   infoDisplay: (ctx, overlay, s) => {
     if (s.infoDisplay === "status" || s.infoDisplay === "none") overlay.hideInspect();
     ctx.save();
@@ -110,10 +107,7 @@ function bindSettings(ctx: AppContext, overlay: BoardOverlay) {
       "All currencies, upgrades, records, and both current runs will be permanently erased.",
       "Erase everything",
       () => {
-        game.save = defaults();
-        game.summary = null;
-        game.mode = "tower";
-        game.newRun(true);
+        game.eraseAll();
         ctx.save();
         ctx.navigate("tower");
       },

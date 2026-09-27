@@ -9,9 +9,7 @@ export function bindInput(
 ) {
   const active = () => isTower() && !document.querySelector("dialog[open]");
   const manual = (dx: number, dy: number) => {
-    game.route = [];
-    game.auto = false;
-    game.move(dx, dy, true);
+    game.stepManually(dx, dy);
     changed();
   };
   const dirs: Record<string, number[]> = {

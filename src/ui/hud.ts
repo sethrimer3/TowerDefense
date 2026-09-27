@@ -8,7 +8,7 @@ import type { BoardOverlay } from "./board-overlay.ts";
 
 /** The stats cluster, action buttons and status line around the board. */
 
-export const devAmount = (game: Game, value: number) => game.save.settings.devMode ? "∞" : String(value);
+export const devAmount = (game: Pick<Game, "save">, value: number) => game.save.settings.devMode ? "∞" : String(value);
 
 /** Refreshes every HUD readout from game state. */
 export function renderHud(game: Game, renderer: Renderer, overlay: BoardOverlay) {

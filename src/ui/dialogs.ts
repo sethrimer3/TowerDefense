@@ -19,15 +19,10 @@ export function confirmAction(ctx: AppContext, { title, body, label }: ConfirmPr
   };
 }
 
-/** Starts the next run in the forest clearing, with the camera reset onto it. */
+/** Closes the summary for the next run, in the forest clearing. */
 function returnToForest(ctx: AppContext) {
-  const { game, renderer } = ctx;
-  game.summary = null;
-  renderer.bottom = 0;
-  renderer.playerX = game.run.player.x;
-  renderer.playerY = 0;
-  game.message = "Follow the forest path to the entrance.";
-  ctx.navigate(game.mode);
+  ctx.game.nextRun();
+  ctx.navigate(ctx.game.mode);
 }
 
 /** Watches for a finished run: fades in from black after a death, then shows
@@ -82,14 +77,7 @@ export class RunEnd {
       };
     el("again").onclick = () => {
       modal.close();
-      if (s.dead) return returnToForest(ctx);
-      game.summary = null;
-      game.newRun(true);
-      ctx.renderer.bottom = 0;
-      ctx.renderer.playerX = game.run.player.x;
-      ctx.renderer.playerY = 0;
-      game.message = "Follow the forest path to the entrance.";
-      ctx.navigate(game.mode);
+      returnToForest(ctx);
     };
   }
 }
