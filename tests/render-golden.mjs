@@ -4,10 +4,13 @@
 // board (building mode, a rainy battle, a night boss wave and a stormy night
 // zoomed in, from the replay test's cities) and its palette icons, are drawn
 // at fixed timestamps with seeded randomness, and each canvas's pixels are hashed
-// against tests/fixtures/render.golden.json. Pixels depend on the browser and
-// GPU, so the golden is only meaningful on the machine that made it:
-// regenerate it with UPDATE_GOLDEN=1 on the code *before* a refactor, then run
-// without it after. Baseline PNGs go to test-results/render-golden/ and
+// against tests/fixtures/render.golden.json. A scene is only hashed once every
+// image the app asked for has loaded and a capture asks for no more, and then
+// it must draw the same twice. Canvases are kept on the CPU (Chrome would
+// otherwise move them there partway through, after enough pixel reads), so
+// runs agree exactly; pixels can still differ between browsers and machines,
+// so regenerate it with UPDATE_GOLDEN=1 on the code *before* a refactor, then
+// run without it after. Baseline PNGs go to test-results/render-golden/ and
 // current ones to test-results/render/, with a pixel-difference count for any
 // mismatch.
 import { chromium } from "@playwright/test";
@@ -23,6 +26,25 @@ const browser = await chromium.launch({ headless: true, channel: process.env.PLA
 const page = await browser.newPage({ viewport: { width: 600, height: 900 }, deviceScaleFactor: 1 });
 const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
+// Every image the app asks for, so a capture can wait until all of them have
+// loaded (or failed) instead of guessing how long loading takes.
+await page.addInitScript(() => {
+  const Real = window.Image, images = (window.__images = []);
+  window.Image = function Image(...args) {
+    const img = new Real(...args);
+    images.push(img);
+    return img;
+  };
+  window.Image.prototype = Real.prototype;
+  // Chrome moves a canvas from the GPU to the CPU after enough pixel reads,
+  // and the two draw gradients and blends a little differently, so frames
+  // would change partway through a run. Keep every canvas on the CPU from
+  // the start: the same pixels every run, and less tied to the GPU.
+  const getContext = HTMLCanvasElement.prototype.getContext;
+  HTMLCanvasElement.prototype.getContext = function (type, options) {
+    return getContext.call(this, type, type === "2d" ? { ...options, willReadFrequently: true } : options);
+  };
+});
 await page.goto("http://127.0.0.1:5173/");
 await page.evaluate(() => document.fonts.ready);
 
@@ -350,22 +372,37 @@ const shots = await page.evaluate(async () => {
     ["defendIcons", () => captureIcons()],
   ];
 
+  /** Waits until every image asked for so far has loaded or failed. */
+  const settle = async () => {
+    for (let pending; (pending = window.__images.filter((img) => !img.complete)).length; )
+      await Promise.all(pending.map((img) => img.decode().catch(() => {})));
+  };
+  const hashShot = async (shot) => {
+    const hashes = {};
+    for (const [frame, { pixels }] of Object.entries(shot)) hashes[frame] = await hash(pixels);
+    return hashes;
+  };
+
   const results = {};
   let seed = 1;
   for (const [name, run] of JOBS) {
-    // Art loads asynchronously: repeat until two captures agree.
-    let previous = null, stable = null;
-    for (let attempt = 0; attempt < 30 && !stable; attempt++) {
-      const shot = run(seed);
-      const hashes = {};
-      for (const [frame, { pixels }] of Object.entries(shot)) hashes[frame] = await hash(pixels);
-      const key = JSON.stringify(hashes);
-      if (key === previous) stable = { hashes, shot };
-      previous = key;
-      await new Promise((resolve) => setTimeout(resolve, 150));
+    // Art loads asynchronously, and a scene may only ask for some of it
+    // partway through. A capture counts once every image was settled before
+    // it began and it asked for no new ones: then all its art was drawn.
+    let shot = null;
+    for (let attempt = 0; attempt < 10 && !shot; attempt++) {
+      await settle();
+      const asked = window.__images.length, candidate = run(seed);
+      if (window.__images.length === asked) shot = candidate;
     }
-    if (!stable) throw Error(`${name}: frames never became stable`);
-    for (const [frame, h] of Object.entries(stable.hashes)) results[`${name}.${frame}`] = { hash: h, png: stable.shot[frame].png };
+    if (!shot) throw Error(`${name}: kept asking for new art`);
+    const hashes = await hashShot(shot);
+    // With its art in place a scene draws the same every time; a difference
+    // here is a real nondeterminism bug, not loading.
+    const again = await hashShot(run(seed));
+    const drift = Object.keys(hashes).filter((frame) => hashes[frame] !== again[frame]);
+    if (drift.length) throw Error(`${name}: drew differently twice with all art loaded (${drift.join(", ")})`);
+    for (const [frame, h] of Object.entries(hashes)) results[`${name}.${frame}`] = { hash: h, png: shot[frame].png };
     seed++;
   }
   canvas.remove();
