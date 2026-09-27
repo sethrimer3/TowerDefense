@@ -30,6 +30,13 @@ const WORDS: Record<Stat, string> = {
 };
 
 type Granting = { grants?: Grants };
+
+/** The most undos a character can store, with every upgrade that adds one
+ * at its highest level. */
+const UNDO_CAP = UPGRADES.reduce(
+  (cap, u: Granting & { max: number }) => cap + (u.grants?.undos ?? 0) * u.max,
+  BASE.undos,
+);
 const grantsOf = (row: Granting): Grants => row.grants ?? {};
 
 /** Adds `ranks` of each row's grants to `total`. */
@@ -61,20 +68,20 @@ export function loadout(save: Save): Loadout {
 
 /** Text for a row's grants: "+2 starting attack", joined by "and". A row
  * may name a stat its own way. */
-export function describeGrants(grants: Grants, words: Partial<Record<Stat, string>> = {}, max = 0) {
+export function describeGrants(grants: Grants, words: Partial<Record<Stat, string>> = {}) {
   return (Object.entries(grants) as [Stat, number][])
     .map(([stat, n]) =>
       stat === "undos"
-        ? `Store ${n === 1 ? "one" : n} ${words.undos ?? WORDS.undos}${n === 1 ? "" : "s"} (up to ${BASE.undos + n * max})`
+        ? `Store ${n === 1 ? "one" : n} ${words.undos ?? WORDS.undos}${n === 1 ? "" : "s"} (up to ${UNDO_CAP})`
         : `+${n} ${words[stat] ?? WORDS[stat]}`)
     .join(" and ");
 }
 
 /** An upgrade's description, written from its grants when it has any. */
 export function upgradeText(id: UpgradeId) {
-  const u: { description?: string; grants?: Grants; words?: Partial<Record<Stat, string>>; max: number } =
+  const u: { description?: string; grants?: Grants; words?: Partial<Record<Stat, string>> } =
     UPGRADES.find((u) => u.id === id)!;
-  return u.description ?? describeGrants(u.grants!, u.words, u.max);
+  return u.description ?? describeGrants(u.grants!, u.words);
 }
 
 /** A provision's description, written from its grants. */

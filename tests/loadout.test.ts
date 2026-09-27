@@ -64,11 +64,11 @@ test("descriptions are written from the grants", () => {
       blue: "+1 starting azure key",
       red: "+1 starting crimson key",
       quality: "+2 weapon attack and +1 armor defense",
-      undos: "Store one additional undo (up to 5)",
+      undos: "Store one additional undo (up to 9)",
       inspirationHp: "+15 starting maximum HP",
       inspirationAttack: "+1 starting attack",
       inspirationDefense: "+1 starting defense",
-      inspirationUndos: "Store one additional undo (up to 5)",
+      inspirationUndos: "Store one additional undo (up to 9)",
       revive: "Undo a fatal move before moving in the new run",
     },
   );
