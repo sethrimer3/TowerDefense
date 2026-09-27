@@ -8,12 +8,14 @@ import { boardTitle, devAmount } from "./hud.ts";
 
 /** The modal dialogs opened from the HUD, all sharing `ctx.modal`. */
 
-export type ConfirmPrompt = { title: string; body: string; label: string };
+/** A confirm dialog's text: `label` names the confirm button and `cancel`
+ * the one that backs out. */
+export type ConfirmPrompt = { title: string; body: string; label: string; cancel: string };
 
-/** Asks the player to confirm `action`; `label` names the confirm button. */
-export function confirmAction(ctx: AppContext, { title, body, label }: ConfirmPrompt, action: () => void) {
+/** Asks the player to confirm `action`. */
+export function confirmAction(ctx: AppContext, { title, body, label, cancel }: ConfirmPrompt, action: () => void) {
   const modal = ctx.modal;
-  modal.innerHTML = `<small>${boardTitle(ctx.game)}</small><h2>${title}</h2><p>${body}</p><div class="dialog-actions"><button id="cancel">Keep climbing</button><button id="confirm">${label}</button></div>`;
+  modal.innerHTML = `<small>${boardTitle(ctx.game)}</small><h2>${title}</h2><p>${body}</p><div class="dialog-actions"><button id="cancel">${cancel}</button><button id="confirm">${label}</button></div>`;
   modal.showModal();
   el("cancel").onclick = () => modal.close();
   el("confirm").onclick = () => {

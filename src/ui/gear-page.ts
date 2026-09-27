@@ -135,9 +135,12 @@ export class GearPage {
   private confirmSalvage(item: CraftedEquipment) {
     const returns = getSalvageReturns(item);
     this.ctx.confirm(
-      "Salvage this item?",
-      returns.length ? `Returns ${stackList(returns, ", ")}. This cannot be undone.` : "Returns nothing. This cannot be undone.",
-      "Salvage",
+      {
+        title: "Salvage this item?",
+        body: returns.length ? `Returns ${stackList(returns, ", ")}. This cannot be undone.` : "Returns nothing. This cannot be undone.",
+        label: "Salvage",
+        cancel: "Keep it",
+      },
       () => { this.ctx.game.salvageEquipment(item.id); this.changed(); },
     );
   }

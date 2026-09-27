@@ -42,6 +42,8 @@ export type ModeProfile<R extends Run = Run> = {
     run: string;
     /** What a retired run is replaced with. */
     fresh: string;
+    /** Declines a prompt to end the run. */
+    keepGoing: string;
     /** The board's title in the forest outside, and inside. */
     outsideTitle: string;
     title: string;
@@ -79,6 +81,7 @@ export const MODES: { tower: ModeProfile<TowerRun>; delve: ModeProfile<DelveRun>
       progress: "height",
       run: "ascent",
       fresh: "tower",
+      keepGoing: "Keep climbing",
       outsideTitle: "THE TOWER APPROACH",
       title: "THE ASCENT TRIALS",
       subtitle: "ONE CHAMBER AT A TIME",
@@ -104,6 +107,7 @@ export const MODES: { tower: ModeProfile<TowerRun>; delve: ModeProfile<DelveRun>
       progress: "depth",
       run: "delve",
       fresh: "descent",
+      keepGoing: "Keep delving",
       outsideTitle: "THE MOUNTAIN HOLLOW",
       title: "THE HOLLOW SPIRE",
       subtitle: "HIGHER DANGERS · GREATER REWARDS",

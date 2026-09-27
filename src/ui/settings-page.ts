@@ -94,9 +94,12 @@ function bindSettings(ctx: AppContext, overlay: BoardOverlay) {
   }
   el("retire").onclick = () =>
     ctx.confirm(
-      "Leave your mark?",
-      `Retire at ${MODES[game.mode].words.progress} ${displayedProgress(game.run.height, !!game.run.outside)}. Milestone rewards are already yours. Uncollected clear chests will be claimed.`,
-      `Retire ${MODES[game.mode].words.run}`,
+      {
+        title: "Leave your mark?",
+        body: `Retire at ${MODES[game.mode].words.progress} ${displayedProgress(game.run.height, !!game.run.outside)}. Milestone rewards are already yours. Uncollected clear chests will be claimed.`,
+        label: `Retire ${MODES[game.mode].words.run}`,
+        cancel: MODES[game.mode].words.keepGoing,
+      },
       () => {
         game.finish(`${capitalized(MODES[game.mode].words.run)} retired`);
         ctx.update();
@@ -104,9 +107,12 @@ function bindSettings(ctx: AppContext, overlay: BoardOverlay) {
     );
   el("erase").onclick = () =>
     ctx.confirm(
-      "Erase your legacy?",
-      "All currencies, upgrades, records, and both current runs will be permanently erased.",
-      "Erase everything",
+      {
+        title: "Erase your legacy?",
+        body: "All currencies, upgrades, records, and both current runs will be permanently erased.",
+        label: "Erase everything",
+        cancel: "Keep everything",
+      },
       () => {
         game.eraseAll();
         ctx.save();

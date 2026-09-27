@@ -40,7 +40,7 @@ const ctx: AppContext = {
   update,
   renderPage,
   navigate,
-  confirm: (title, body, label, action) => confirmAction(ctx, { title, body, label }, action),
+  confirm: (prompt, action) => confirmAction(ctx, prompt, action),
 };
 const runEnd = new RunEnd(ctx);
 const overlay = new BoardOverlay(game, renderer);
@@ -120,9 +120,12 @@ el("log").onclick = () => showLog(ctx);
 el("section-pick").onclick = () => showSectionPicker(ctx);
 el("end-run").onclick = () =>
   ctx.confirm(
-    "End this run?",
-    `End the current ${MODES[game.mode].words.run} at ${MODES[game.mode].words.progress} ${displayedProgress(game.run.height, !!game.run.outside)}. Milestone rewards are already yours, and uncollected clear chests will be claimed.`,
-    "End run",
+    {
+      title: "End this run?",
+      body: `End the current ${MODES[game.mode].words.run} at ${MODES[game.mode].words.progress} ${displayedProgress(game.run.height, !!game.run.outside)}. Milestone rewards are already yours, and uncollected clear chests will be claimed.`,
+      label: "End run",
+      cancel: MODES[game.mode].words.keepGoing,
+    },
     () => {
       game.finish(`${capitalized(MODES[game.mode].words.run)} ended`);
       update();
