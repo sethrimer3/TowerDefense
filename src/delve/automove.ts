@@ -11,8 +11,13 @@ export function capabilities(game: Game): Capabilities {
 const dirs = [[0, 1], [-1, 0], [1, 0], [0, -1]];
 export type Decision = { x: number; y: number; utility: number; travel: number; damage: number; keys: number; reward: number; frontier: boolean; deadEnd: boolean };
 type Commitment = { run: Game['run']; from: string; route: string[]; target: string };
-const commitments = new WeakMap<Game, Commitment>();
-export const decisions = new WeakMap<Game, Decision[]>();
+/** What Automove carries between steps and never saves: the route it
+ * committed to (dropped once the run is replaced, as undo does) and the
+ * decision points it weighed last. A Game holds one. */
+export class DelvePlan {
+  commitment?: Commitment;
+  decisions?: Decision[];
+}
 /** Tiles walked through without any interaction. */
 const TRAVERSAL = ['floor', 'openedChest', 'oneway'];
 /** Search limits: nodes expanded and route length. */
@@ -23,20 +28,20 @@ const MAX_EXPANSIONS = 2400, MAX_TRAVEL = 180;
 export function chooseDelveStep(game: Game, override?: Capabilities) {
   const c = override ?? capabilities(game);
   const { canKnow, discovered } = observe(game, c);
-  const committed = commitments.get(game);
-  const current = committed?.run === game.run ? committed : undefined;
+  const plan = game.delvePlan;
+  const current = plan.commitment?.run === game.run ? plan.commitment : undefined;
   // A committed route is followed until it ends, an interaction happens, or
   // newly observed corridors warrant a fresh look (with a continuity bonus
   // for the old target, so small visibility changes cannot flip-flop it).
   const followed = current && !discovered ? follow(game, current, c) : undefined;
   if (followed) return followed;
-  commitments.delete(game);
-  const scan: Scan = { game, c, canKnow, visits: game.delveRun.visited ?? {}, previousTarget: current?.target ?? '', bestAt: new Map(), report: [], best: null, bestValue: -Infinity };
+  plan.commitment = undefined;
+  const scan: Scan = { game, c, canKnow, visits: game.save.delve.memory.visited, previousTarget: current?.target ?? '', bestAt: new Map(), report: [], best: null, bestValue: -Infinity };
   explore(scan);
-  decisions.set(game, scan.report.sort((a, b) => b.utility - a.utility).slice(0, 12));
+  plan.decisions = scan.report.sort((a, b) => b.utility - a.utility).slice(0, 12);
   const { best } = scan, p = game.run.player;
   if (!best) return null;
-  commitments.set(game, { run: game.run, from: point(p.x, p.y), route: [...best.path].slice(1), target: point(best.x, best.y) });
+  plan.commitment = { run: game.run, from: point(p.x, p.y), route: [...best.path].slice(1), target: point(best.x, best.y) };
   return { dx: best.first[0], dy: best.first[1], label: `Exploring Delve · ${c.lookahead}-tile scouting` };
 }
 
@@ -45,7 +50,7 @@ export function chooseDelveStep(game: Game, override?: Capabilities) {
  * available to the human player. `discovered` counts newly seen open tiles. */
 function observe(game: Game, c: Capabilities) {
   const p = game.run.player, world = game.world, r = c.lookahead;
-  const known = game.delveRun.known ??= {};
+  const { known, visited: visits } = game.save.delve.memory;
   const visible = new Set<string>();
   let discovered = 0;
   for (let y = Math.max(world.floor, p.y - r); y <= p.y + r; y++) for (let x = Math.max(0, p.x - r); x <= Math.min(world.width - 1, p.x + r); x++) {
@@ -56,7 +61,6 @@ function observe(game: Game, c: Capabilities) {
   }
   // Basic movement has short-term anti-oscillation but no retained map
   // routing. Memory upgrades use every previously observed corridor.
-  const visits = game.delveRun.visited ?? {};
   const canKnow = (x: number, y: number) => c.memory ? known[point(x, y)] : visible.has(point(x, y)) || !!visits[point(x, y)];
   return { canKnow, discovered };
 }
@@ -72,7 +76,7 @@ function follow(game: Game, route: Commitment, c: Capabilities) {
   const trial = { player: { ...p, keys: { ...p.keys } }, damage: 0, keyCost: 0, reward: 0 };
   const walkable = Math.abs(dx) + Math.abs(dy) === 1 && world.step(p.x, p.y, dx, dy) && tile.kind !== 'wall';
   if (!walkable || !apply(tile, trial, c)) return undefined;
-  if (!['floor', 'openedChest'].includes(tile.kind)) commitments.delete(game);
+  if (!['floor', 'openedChest'].includes(tile.kind)) game.delvePlan.commitment = undefined;
   return { dx, dy, label: 'Following the chosen Delve route' };
 }
 

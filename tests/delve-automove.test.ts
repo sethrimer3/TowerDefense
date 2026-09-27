@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { Game } from "../src/state.ts";
 import { defaults } from "../src/save.ts";
-import { chooseDelveStep, decisions } from "../src/delve/automove.ts";
+import { chooseDelveStep } from "../src/delve/automove.ts";
 
 // Characterization trace of Delve Automove: seeded runs where Automove takes
 // every step, at each combination of AI upgrades that changes its behaviour and
@@ -49,7 +49,7 @@ function trace(seed: number, level: Level, who: typeof CHARACTERS.strong): strin
   for (let i = 1; i <= STEPS; i++) {
     const step = chooseDelveStep(g);
     const moved = step ? g.move(step.dx, step.dy) : null;
-    h.update(JSON.stringify({ step, moved, decisions: decisions.get(g), player: run.player, milestone: run.milestone, height: run.height }));
+    h.update(JSON.stringify({ step, moved, decisions: g.delvePlan.decisions, player: run.player, milestone: run.milestone, height: run.height }));
     if (i % CHECKPOINT === 0) out.push(h.copy().digest("hex").slice(0, 12));
     if (!step || !moved || g.run !== run) {
       out.push(`ended at ${i}: ${!step ? "stuck" : !moved ? "blocked" : g.summary?.dead ? "died" : "ended"} ${h.digest("hex").slice(0, 12)}`);

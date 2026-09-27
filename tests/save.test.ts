@@ -22,7 +22,8 @@ const run = (over: object = {}) => ({
   rewards: [{ x: 3, y: 4, tier: "silver" }, { x: 30, y: 4, tier: "gold" }, { x: 1, y: 2, tier: "bronze" }],
   ...over,
 });
-// Each mode's run also carries the other mode's fields, which decoding drops.
+// Each mode's run also carries the other mode's fields, which decoding drops,
+// and the Delve run the Automove memory older saves kept in it.
 const towerRun = (over: object = {}) => run({
   floors: { "2": { "3,3": { kind: "floor" } } },
   damaged: false, keysSpent: true,
@@ -64,7 +65,7 @@ const v3 = () => ({
     sectionHp: { "1": 80.5, "2": 0, "0": 50, "x": 9 },
     startSection: 1,
   },
-  delve: { ...mode(delveRun), courage: 33 },
+  delve: { ...mode(delveRun), courage: 33, memory: { known: { "1,2": true, "4,5": true }, visited: { "1,2": 3 } } },
   materials: { ...defaults().materials },
   equipmentInventory: [{
     id: "e1", slot: "weapon", name: "Blade", metal: "steel",
@@ -116,7 +117,8 @@ const EDGES: [string, unknown[]][] = [
   ["tower.run.changes.9,9", [{ kind: "openedChest" }, { kind: "openedChest", tier: "wood" }, { kind: "enemy" }, { kind: "reward" }, { kind: "reward", tier: "bronze" }]],
   ["tower.log.3", [{ silver: "earned" }, { silver: "paid" }, []]],
   ["tower.run.floors.x", [{}]],
-  ["delve.run.visited.x", [1]],
+  ["delve.memory.visited.x", [1]],
+  ["delve.memory.known.6,7", [false]],
   ["tower.lootedTiles.5:6,7", [true]],
   ["tower.lootedTiles.5:6:7", [true]],
   ["tower.sectionHp.3", [1, 0.5]],
@@ -257,12 +259,13 @@ test("saves from before the currencies were renamed keep their Inspiration and C
   assert.deepEqual([d.tower.inspiration, d.delve.courage], [5, 6]);
 });
 
-test("each mode's run keeps only its own fields, on its own board's width", () => {
+test("each mode's run keeps only its own fields, on its own board's width, and Automove's memory sits beside the Delve run", () => {
   const d = decode(JSON.stringify(v3()));
   const tower = d.tower.run as any, delve = d.delve.run as any;
   assert.deepEqual([tower.damaged, tower.keysSpent, "floors" in tower, "milestone" in tower], [false, true, true, false]);
-  assert.deepEqual([delve.milestone, "known" in delve, "visited" in delve], [1, true, true]);
-  assert.deepEqual(["floors", "damaged", "keysSpent"].filter((k) => k in delve), []);
+  assert.deepEqual(["floors", "damaged", "keysSpent", "known", "visited"].filter((k) => k in delve), []);
+  assert.equal(delve.milestone, 1);
+  assert.deepEqual(d.delve.memory, { known: { "1,2": true, "4,5": true }, visited: { "1,2": 3 } });
   const wide = v3();
   wide.delve.run = delveRun({ player: player({ x: 29 }) });
   assert.equal(decode(JSON.stringify(wide)).delve.run?.player.x, 29);

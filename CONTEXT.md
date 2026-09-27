@@ -55,3 +55,9 @@ _Avoid_: shards
 **Courage**:
 The Delve's currency: one for each new equivalent floor reached, spent on upgrades in the skill trees.
 _Avoid_: essence
+
+### The Delve
+
+**Automove memory**:
+What Delve Automove has seen of the labyrinth during this run, and how often the player has stood on each tile. Undo and Revive leave it as it is, since what was seen stays seen; it is forgotten when a run enters the labyrinth, when a milestone gate seals behind the player, and when the layout changes.
+_Avoid_: known tiles, visit map

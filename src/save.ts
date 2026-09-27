@@ -1,5 +1,5 @@
 import { GOLD_SHOP, SAVE_KEY, TOWER_WIDTH, UPGRADES, WIDTH } from "./config.ts";
-import type { DelveRun, FloorRecord, ModeSave, MoveSnapshot, Revival, Run, Save, TowerRun } from "./entities.ts";
+import type { AutomoveMemory, DelveRun, FloorRecord, ModeSave, MoveSnapshot, Revival, Run, Save, TowerRun } from "./entities.ts";
 import { emptyMaterials, MATERIAL_IDS, type MaterialId } from "./materials.ts";
 import { EQUIPMENT_SLOTS, type CraftedEquipment, type EquipmentSlot } from "./equipment.ts";
 import { CONSUMABLES, type ConsumableId } from "./crafting.ts";
@@ -10,7 +10,7 @@ export function defaults(): Save {
   return {
     version: 3,
     tower: { run: null, history: [], revival: null, best: 0, reached: 0, inspiration: 0, log: {}, lootedTiles: {}, startSection: 0, sectionHp: {} },
-    delve: { run: null, history: [], revival: null, best: 0, reached: 0, courage: 0, lootedTiles: {} },
+    delve: { run: null, history: [], revival: null, best: 0, reached: 0, courage: 0, lootedTiles: {}, memory: { known: {}, visited: {} } },
     gold: 0,
     provisions: Object.fromEntries(
       GOLD_SHOP.map((g) => [g.id, 0]),
@@ -66,16 +66,14 @@ const validPlayer = (p: any, width: number) =>
 /** Checks every run passes, whatever its mode; `width` is the mode's board. */
 const validCore = (r: any, width: number) =>
   !!r && validOutside(r) && validCounters(r) && validPlayer(r.player, width) && validChanges(r.changes);
-const validDelveState = (r: any) =>
-  Number.isInteger(r.milestone) && finite(r.milestone) &&
-  (r.known === undefined || pointMap(r.known, (v) => v === true)) &&
-  (r.visited === undefined || pointMap(r.visited, (v) => finite(v)));
+const validDelveState = (r: any) => Number.isInteger(r.milestone) && finite(r.milestone);
 const TOWER_FIELDS = ["damaged", "keysSpent", "floors"];
-const DELVE_FIELDS = ["milestone", "known", "visited"];
+const DELVE_FIELDS = ["milestone"];
 /** Drops fields a run of this mode doesn't keep: the other mode's, and an
- * older run's clear chest list (clear chests stand in `changes` now). */
+ * older run's clear chest list and Automove memory (clear chests stand in
+ * `changes` now, and the memory beside the run). */
 function without<R>(r: any, fields: string[]): R {
-  for (const k of ["rewards", ...fields]) delete r[k];
+  for (const k of ["rewards", "known", "visited", ...fields]) delete r[k];
   return r;
 }
 /** Validate an untrusted Tower run; null unless it has the shape a
@@ -114,6 +112,13 @@ function decodeHistory<R extends Run>(raw: any, run: R, undoCapacity: number, de
 function decodeRevival<R extends Run>(raw: any, run: R, decodeRun: RunDecoder<R>): Revival<R> | null {
   const item = snapshot(raw?.snapshot, decodeRun);
   return item && item.run.layoutVersion === run.layoutVersion ? { snapshot: item } : null;
+}
+/** Automove's memory, each half kept only when every entry is well formed. */
+function decodeMemory(raw: any): AutomoveMemory {
+  return {
+    known: pointMap(raw?.known, (v) => v === true) ? raw.known : {},
+    visited: pointMap(raw?.visited, (v) => finite(v)) ? raw.visited : {},
+  };
 }
 function decodeLootedTiles(raw: any): Record<string, true> {
   const lootedTiles: Record<string, true> = {};
@@ -197,6 +202,7 @@ function decodeProgress(s: any, d: Save, undoCapacity: number) {
   d.delve.best = count(s.delve?.best, d.delve.best);
   applyMode(d.tower, decodeMode(s.tower, undoCapacity, decodeTowerRun));
   applyMode(d.delve, decodeMode(s.delve, undoCapacity, decodeDelveRun));
+  d.delve.memory = decodeMemory(s.delve?.memory);
 }
 /** Version 1 had a single run (the endless climb); it becomes the Delve slice. */
 function migrateV1(s: any, d: Save, undoCapacity: number) {

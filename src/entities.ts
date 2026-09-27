@@ -92,10 +92,11 @@ export type TowerRun = RunCore & {
 export type DelveRun = RunCore & {
   /** Milestone gates crossed: the area the labyrinth is sealed below. */
   milestone: number;
-  /** What Automove has seen, and how often it has stood on each tile. */
-  known?: Record<string, true>;
-  visited?: Record<string, number>;
 };
+/** What Delve Automove has seen of the descent in the labyrinth, and how
+ * often the player has stood on each tile. It is kept beside the run, not
+ * in it, so undo never copies or rewinds it. */
+export type AutomoveMemory = { known: Record<string, true>; visited: Record<string, number> };
 export type Run = TowerRun | DelveRun;
 export type MoveSnapshot<R extends Run = Run> = { run: R; best: number };
 export type Revival<R extends Run = Run> = { snapshot: MoveSnapshot<R> };
@@ -124,7 +125,7 @@ export type Save = {
      * starting HP and as the record of which sections are unlocked. */
     sectionHp: Record<string, number>;
   };
-  delve: ModeSave<DelveRun> & { courage: number };
+  delve: ModeSave<DelveRun> & { courage: number; memory: AutomoveMemory };
   gold: number;
   provisions: Record<GoldItemId, number>;
   xp: number;

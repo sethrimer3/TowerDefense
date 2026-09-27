@@ -1,6 +1,6 @@
 import { analyzeDelve } from "./delve/analyzer.ts";
 import { ownerAt, region, themeInfluence } from "./delve/labyrinth.ts";
-import { capabilities, decisions } from "./delve/automove.ts";
+import { capabilities } from "./delve/automove.ts";
 import { towerFloorReport } from "./tower/index.ts";
 import type { DefendPage } from "./defend/ui.ts";
 import type { Game } from "./state.ts";
@@ -34,14 +34,14 @@ export function installDebugHooks(game: Game, defendPage: DefendPage) {
 function delveReport(game: Game) {
   const milestone = game.delveRun.milestone, p = game.run.player, seed = game.run.seed;
   const influence = themeInfluence(seed, p.x, p.y), blend = influence - Math.floor(influence);
-  const seen = decisions.get(game) ?? [];
+  const seen = game.delvePlan.decisions ?? [];
   return {
     ...analyzeDelve(seed, milestone),
     progressionDepth: game.run.height, physicalY: p.y, physicalArea: ownerAt(seed, p.x, p.y),
     lastMilestone: milestone * 100, nextMilestone: (milestone + 1) * 100,
     transition: { gateId: `transition_${(milestone + 1) * 100}`, gate: region(seed, milestone).gate, crossed: false, previousSealed: milestone > 0 },
     themeBlend: { [`area${Math.floor(influence) + 1}`]: +(1 - blend).toFixed(2), [`area${Math.floor(influence) + 2}`]: +blend.toFixed(2) },
-    knownTiles: Object.keys(game.delveRun.known ?? {}).length,
+    knownTiles: Object.keys(game.save.delve.memory.known).length,
     branches: { frontiers: seen.filter(d => d.frontier).length, knownDeadEnds: seen.filter(d => d.deadEnd).length },
     capabilities: capabilities(game), decisions: seen,
   };

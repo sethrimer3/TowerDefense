@@ -1,6 +1,7 @@
 import { entrance, floorFor } from "./delve/labyrinth.ts";
 import { isDeadlocked } from "./analysis.ts";
 import { chooseStep } from "./automation.ts";
+import { DelvePlan } from "./delve/automove.ts";
 import { defaults } from "./save.ts";
 import { doorBlockedMessage, doorName, KEY_ORDER } from "./doors.ts";
 import { skillAvailable } from "./skill-trees.ts";
@@ -87,6 +88,8 @@ export class Game {
   } = null;
   /** `rng` is the game's randomness: new run seeds, enemy drops and
    * treasure loot all draw from it, so a seeded stream replays a game. */
+  /** Delve Automove's committed route and last weighed decisions. */
+  readonly delvePlan = new DelvePlan();
   constructor(public save: Save, private rng: () => number = Math.random) {
     this.loadMode();
   }
@@ -164,7 +167,7 @@ export class Game {
     run.milestone = Math.floor(run.height / 100);
     Object.assign(run.player, entrance(run.seed, run.milestone));
     run.floor = floorFor(run.seed, run.milestone);
-    run.visited = {};
+    this.forgetLabyrinth();
     this.message =
       "The tower has reshaped. Progress kept; returned to this section’s entrance.";
   }
@@ -370,7 +373,7 @@ export class Game {
       this.run.outside = true;
       this.world = new OutsideWorld(seed, this.mode);
       this.message = "Follow the forest path to the entrance.";
-    }
+    } else this.forgetLabyrinth();
     this.slice.run = this.run;
     this.auto = false;
     this.paused = false;
@@ -619,6 +622,7 @@ export class Game {
     p.x = this.rules.entranceX;
     p.y = 0;
     this.world = this.rules.board(this.run);
+    this.forgetLabyrinth();
     this.route = [];
     this.feedback(this.rules.words.enter);
   }
@@ -627,18 +631,23 @@ export class Game {
     if (t.kind === "treasure") this.run.changes[`${x},${y}`] = { kind: "openedChest" };
     else if (!PERMANENT_TILES.has(t.kind)) this.world.clear(x, y);
   }
+  /** Clears Automove's memory when the labyrinth behind it is gone: a Delve
+   * run entering it (a death sends the player to the forest first, so
+   * Revive keeps the memory), a sealed milestone gate, or a reshaped layout. */
+  private forgetLabyrinth() {
+    if (this.mode === "delve") this.save.delve.memory = { known: {}, visited: {} };
+  }
   private afterDelveStep(t: Tile, x: number, y: number) {
     const world = this.world;
     if (!(world instanceof World)) return;
     // The world keeps the run's milestone and floor itself.
     if (t.kind === "oneway" && world.cross(x, y)) {
-      this.delveRun.visited = {};
-      this.delveRun.known = {};
+      this.forgetLabyrinth();
       this.save.delve.history = []; // Milestone passages cannot be reversed with undo.
       this.route = [];
       this.feedback(`Depth ${world.milestone * 100} · the passage seals behind you.`);
     }
-    const visited = this.delveRun.visited ??= {};
+    const visited = this.save.delve.memory.visited;
     visited[`${x},${y}`] = (visited[`${x},${y}`] ?? 0) + 1;
     this.run.height = Math.max(this.run.height, world.depth(x, y));
     this.run.maxHeight = Math.max(this.run.maxHeight ?? 0, this.run.height);
