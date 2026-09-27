@@ -1,4 +1,5 @@
 import type { Board } from "./generation.ts";
+import type { BoardView } from "./render-frame.ts";
 import { tileRandom } from "./themes.ts";
 import { decorSourceFor, FLOWER_COLORS, TILE_PX, tileDecor, tileKey, waterAt, type DecorSource, type Flower, type Plant, type TileDecor } from "./decor.ts";
 import { DecorBaker } from "./decor-bake.ts";
@@ -17,10 +18,9 @@ export type { MirroredSprites } from "./decor-reflections.ts";
  * and the particles and hero reactions of decor-effects.ts. Planning is
  * budgeted per frame so entering a room never stalls. */
 
-export type DecorView = { left: number; bottom: number; n: number; s: number };
 /** One frame of the board as the decor passes see it: the view, the time in
  * ms, the board's tiles, and whether motion is reduced. */
-export type DecorFrame = { view: DecorView; now: number; tileAt: TileAt; reduceMotion: boolean };
+export type DecorFrame = { view: BoardView; now: number; tileAt: TileAt; reduceMotion: boolean };
 /** One step of the live effects: seconds since the last, the time in ms,
  * the hero's interpolated tile position, the board's tiles, and whether
  * motion is reduced. */
@@ -121,7 +121,7 @@ export class DecorLayer {
     return tileDecor(src, x, y);
   }
 
-  private visibleTiles(v: DecorView) {
+  private visibleTiles(v: BoardView) {
     const key = `${Math.floor(v.left)},${Math.floor(v.bottom)},${v.n}`;
     if (this.visible.key === key && this.visible.complete) return this.visible.tiles;
     const tiles: DecorTile[] = [];
@@ -139,12 +139,12 @@ export class DecorLayer {
     return tiles;
   }
 
-  private eachTile(v: DecorView, fn: (x: number, y: number, d: TileDecor) => void) {
+  private eachTile(v: BoardView, fn: (x: number, y: number, d: TileDecor) => void) {
     for (const [x, y, d] of this.visibleTiles(v)) fn(x, y, d);
   }
 
   /** Applies the world-pixel transform: tile (x, y) starts at (24x, -24y). */
-  private worldSpace(c: CanvasRenderingContext2D, v: DecorView) {
+  private worldSpace(c: CanvasRenderingContext2D, v: BoardView) {
     c.translate(-v.left * v.s, (v.n - 1 + v.bottom) * v.s);
     c.scale(v.s / TILE_PX, v.s / TILE_PX);
   }
@@ -192,7 +192,7 @@ export class DecorLayer {
 
   /** Rings spreading on the water right now: the hero's ripples and the
    * ceiling drips. */
-  private waves(v: DecorView, now: number) {
+  private waves(v: BoardView, now: number) {
     const out: Wave[] = this.effects.ripples.map((r) => ({ gx: r.gx, gy: r.gy, r: ((now - r.t0) / 1000) * r.speed, fade: 1 - (now - r.t0) / r.life }));
     const t = now / 1000;
     this.eachTile(v, (x, y, d) => {
@@ -230,7 +230,7 @@ export class DecorLayer {
   // ---------------------------------------------------------------- glow
 
   /** Glowing flowers and caps as light sources for the darkness pass. */
-  glows(v: DecorView): DecorGlow[] {
+  glows(v: BoardView): DecorGlow[] {
     this.visibleTiles(v);
     if (this.glowCache) return this.glowCache;
     const out: DecorGlow[] = (this.glowCache = []);

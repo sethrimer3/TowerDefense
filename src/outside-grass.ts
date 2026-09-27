@@ -1,4 +1,5 @@
 import type { Board } from "./generation.ts";
+import type { BoardView } from "./render-frame.ts";
 import { outsideSpriteKind, type Weather } from "./outside.ts";
 import { tileRandom } from "./themes.ts";
 
@@ -97,7 +98,7 @@ export class OutsideGrass {
 
   /** `hx`/`hy` are the hero's interpolated tile position. The "back" pass
    * also advances the grass's state, so call it once per frame first. */
-  draw(c: CanvasRenderingContext2D, view: { left: number; bottom: number; n: number; s: number }, world: Board,
+  draw(c: CanvasRenderingContext2D, view: BoardView, world: Board,
     seed: number, center: number, weather: Weather, now: number, dt: number, hx: number, hy: number, reduceMotion: boolean,
     layer: "back" | "front" = "back") {
     const key = `${seed}:${center}`;

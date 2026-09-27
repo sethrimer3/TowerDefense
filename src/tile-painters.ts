@@ -32,6 +32,9 @@ export type BoardLook = {
   entranceX: number;
   spritesOff: boolean;
   reduceMotion: boolean;
+  /** The first Tower section, which has its own hand-drawn doors, chests,
+   * floor and floor relief (see isArea1). */
+  area1: boolean;
 };
 type TileWorld = { tile(x: number, y: number): Tile | undefined };
 /** What a contents painter needs besides the tile: its position (for
@@ -39,7 +42,7 @@ type TileWorld = { tile(x: number, y: number): Tile | undefined };
 export type TileArt = { x: number; y: number; time: number; spritesOff: boolean; reduceMotion: boolean; area1: boolean };
 
 /** The first Tower section has its own hand-drawn doors, chests, and floor. */
-export const isArea1 = (look: Pick<BoardLook, "mode" | "height">) => look.mode === "tower" && look.height >= 0 && look.height < 10;
+export const isArea1 = (mode: Mode, height: number) => mode === "tower" && height >= 0 && height < 10;
 
 /** Paints one tile. Layer 0 is the ground (terrain), layer 1 whatever stands
  * on it (items, doors, enemies...). Returns false while ground art is still
@@ -48,7 +51,7 @@ export function paintTile(c: CanvasRenderingContext2D, world: TileWorld, t: Tile
   if (look.outside) return layer !== 0 || drawForestTile(c, t, { x, y, seed: look.seed, center: look.entranceX }, !look.spritesOff);
   if (layer === 0) return paintGround(c, world, t, x, y, look);
   if (t.kind === "wall" || t.kind === "floor") return true;
-  paintContents(c, t, { x, y, time, spritesOff: look.spritesOff, reduceMotion: look.reduceMotion, area1: !look.spritesOff && isArea1(look) });
+  paintContents(c, t, { x, y, time, spritesOff: look.spritesOff, reduceMotion: look.reduceMotion, area1: !look.spritesOff && look.area1 });
   return true;
 }
 

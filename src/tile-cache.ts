@@ -1,3 +1,5 @@
+import type { BoardView } from "./render-frame.ts";
+
 /** A layer of tiles that rarely change (stone, forest floor, baked decor),
  * painted once into an offscreen canvas at screen resolution and then drawn
  * each frame as a single image. The cache covers the view plus a margin of
@@ -7,8 +9,6 @@
  * different board, tile size, or setting), and, a few times a second, while
  * the last paint was incomplete (sprite art still loading, decor still
  * being planned). */
-export type CacheView = { left: number; bottom: number; n: number; s: number };
-
 export class TileLayerCache {
   private canvas: HTMLCanvasElement | null = null;
   private ctx: CanvasRenderingContext2D | null = null;
@@ -48,7 +48,7 @@ export class TileLayerCache {
    * `xRange` limits the columns that exist (inclusive); rows below 0 are
    * never painted.
    */
-  draw(c: CanvasRenderingContext2D, view: CacheView, dpr: number, key: string, now: number,
+  draw(c: CanvasRenderingContext2D, view: BoardView, dpr: number, key: string, now: number,
     xRange: [number, number], paint: (ctx: CanvasRenderingContext2D, x: number, y: number) => boolean) {
     if (typeof document === "undefined") return;
     const { left, bottom, n, s } = view;
@@ -70,7 +70,7 @@ export class TileLayerCache {
     c.restore();
   }
 
-  private build(view: CacheView, dpr: number, key: string, now: number, xRange: [number, number],
+  private build(view: BoardView, dpr: number, key: string, now: number, xRange: [number, number],
     paint: (ctx: CanvasRenderingContext2D, x: number, y: number) => boolean) {
     const { left, bottom, n, s } = view, m = this.margin;
     this.x0 = Math.max(xRange[0], Math.floor(left) - 1 - m);

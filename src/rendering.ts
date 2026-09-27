@@ -2,12 +2,12 @@ import { CHUNK, TOWER_HEIGHT, VIEWPORT_TILES } from "./config.ts";
 import type { Game } from "./state.ts";
 import type { Tile, Torch } from "./entities.ts";
 import { drawEntrance, OUTSIDE_SIZE, outsideWeather } from "./outside.ts";
-import { DecorLayer, type DecorFrame, type DecorView, type MirroredSprites } from "./decor-render.ts";
+import { DecorLayer, type DecorFrame, type MirroredSprites } from "./decor-render.ts";
 import { OutsideGrass } from "./outside-grass.ts";
 import { TileLayerCache } from "./tile-cache.ts";
 import { OutdoorWeather } from "./weather.ts";
 import { torchAnimationFrame } from "./game-sprites.ts";
-import { paintHero, paintHeroFallback, paintTile, paintTorch, type BoardLook } from "./tile-painters.ts";
+import { isArea1, paintHero, paintHeroFallback, paintTile, paintTorch, type BoardLook } from "./tile-painters.ts";
 import type { AtmosphereConfig } from "./lighting-pass.ts";
 import { DungeonLight, type LitBoard } from "./dungeon-light.ts";
 import { RoutePath } from "./route-path.ts";
@@ -107,7 +107,7 @@ export class Renderer {
     // Ground first; in the dungeon the light then runs the frame (relief,
     // decor, shadows, contents, torches, route, hero, frame) over it.
     this.drawGround(f);
-    if (f.outside) this.drawOutside(f);
+    if (f.look.outside) this.drawOutside(f);
     else this.light.draw(f, this.litBoard(f));
     this.drawBlockedMark(f);
     this.drawEffectText(f);
@@ -130,7 +130,7 @@ export class Renderer {
       contents: (ctx) => this.drawEachContents(f, ctx),
       torches: () => { for (const t of f.torches) this.drawTorchSprite(f.c, f, t); },
       route: () => this.drawRoute(f),
-      hero: (ctx) => paintHero(ctx, f.spritesOff),
+      hero: (ctx) => paintHero(ctx, f.look.spritesOff),
       foreground: () => {
         const bounds = decor && this.decor.foregroundBounds(decor);
         return bounds ? { bounds, draw: (ctx) => this.decor.drawForeground(ctx, decor!) } : null;
@@ -160,16 +160,15 @@ export class Renderer {
     c.fillRect(0, 0, box.width, box.width);
     const f: FrameContext = {
       c, now, dt, dpr, width: box.width, n, s, left: this.left, bottom: this.bottom, playerX: this.playerX, playerY: this.playerY,
-      game: g, outside, reduceMotion: settings.reduceMotion, spritesOff: !!settings.spritesOff, look: this.look(),
-      darkness: darknessOf(g), torches: [], walls: [], glows: [],
+      world: g.world, look: this.look(), darkness: darknessOf(g), torches: [], walls: [], glows: [],
     };
     f.torches = outside ? [] : this.visibleTorches();
     f.walls = outside ? [] : this.visibleWallTiles();
     f.glows = outside ? [] : this.light.glows(f);
     if (!outside && this.decorOn) {
       this.decor.sync(g.world, g.run.seed);
-      this.decor.update({ dt, now, hx: this.playerX, hy: this.playerY, tileAt: this.tileAt, reduceMotion: f.reduceMotion });
-      f.glows.push(...this.decor.glows(this.decorView(f)));
+      this.decor.update({ dt, now, hx: this.playerX, hy: this.playerY, tileAt: this.tileAt, reduceMotion: f.look.reduceMotion });
+      f.glows.push(...this.decor.glows(f));
     }
     return f;
   }
@@ -213,15 +212,14 @@ export class Renderer {
       // Without sprite art, floor under items is drawn differently, so edits matter.
       g.save.settings.spritesOff ? `off:${Object.keys(g.run.changes).length}` : "",
     ].join("|");
-    this.groundCache.draw(f.c, this.decorView(f), f.dpr, groundKey, f.now, CACHE_COLUMNS,
+    this.groundCache.draw(f.c, f, f.dpr, groundKey, f.now, CACHE_COLUMNS,
       (ctx, x, y) => this.tile(ctx, f, g.world.tile(x, y), x, y, 0));
   }
   /** Decor over the stone (so pools and crates hide the bricks beneath
    * them), with the board's sprites mirrored in its water. */
   private drawDecorGround(f: FrameContext) {
     if (!this.decorOn || !this.decor.key) return;
-    const view = this.decorView(f);
-    this.decorCache.draw(f.c, view, f.dpr, this.decor.key, f.now, CACHE_COLUMNS, (ctx, x, y) => this.decor.bakeTile(ctx, x, y));
+    this.decorCache.draw(f.c, f, f.dpr, this.decor.key, f.now, CACHE_COLUMNS, (ctx, x, y) => this.decor.bakeTile(ctx, x, y));
     this.decor.drawGround(f.c, this.decorFrame(f), this.mirroredSprites(f));
   }
   /** The tiles, torches and hero, for the water to mirror. */
@@ -230,14 +228,14 @@ export class Renderer {
     return {
       tile: (ctx, t, x, y, layer) => this.tile(ctx, f, t, x, y, layer),
       torches: f.torches.map((t) => ({
-        x: t.x, y: t.y, frame: torchAnimationFrame(t.x, t.y, f.now, f.reduceMotion),
+        x: t.x, y: t.y, frame: torchAnimationFrame(t.x, t.y, f.now, f.look.reduceMotion),
         // The torch draws in screen space: map its tile back to 0..24.
         paint: (c) => {
           c.setTransform(24 / s, 0, 0, 24 / s, -(t.x - f.left) * 24, -(n - 1 - (t.y - f.bottom)) * 24);
           this.drawTorchSprite(c, f, t);
         },
       })),
-      hero: { x: this.playerX, y: this.playerY, paint: (c) => paintHero(c, f.spritesOff) },
+      hero: { x: this.playerX, y: this.playerY, paint: (c) => paintHero(c, f.look.spritesOff) },
     };
   }
   /** Doors, stairs, items, and enemies, drawn onto `ctx`. */
@@ -265,15 +263,15 @@ export class Renderer {
   }
   /** The hero between the forest grass behind it and the blades at its feet. */
   private drawHeroOutside(f: FrameContext) {
-    const c = f.c, g = this.game, view = this.decorView(f);
+    const c = f.c, g = this.game;
     const grass = (layer: "back" | "front") =>
-      this.grass.draw(c, view, g.world, g.run.seed, Math.floor(g.world.width / 2), outsideWeather(g.run.seed), f.now, f.dt,
-        this.playerX, this.playerY, f.reduceMotion, layer);
+      this.grass.draw(c, f, g.world, g.run.seed, Math.floor(g.world.width / 2), outsideWeather(g.run.seed), f.now, f.dt,
+        this.playerX, this.playerY, f.look.reduceMotion, layer);
     const m = tileTransform(f, f.playerX, f.playerY);
     if (this.decorOn) grass("back");
     c.save();
     c.setTransform(m);
-    paintHero(c, f.spritesOff);
+    paintHero(c, f.look.spritesOff);
     c.restore();
     if (this.decorOn) grass("front");
   }
@@ -330,17 +328,14 @@ export class Renderer {
     return !this.game.save.settings.decorOff;
   }
   private tileAt = (x: number, y: number) => this.game.world.tile(x, y);
-  private decorView(f: FrameContext): DecorView {
-    return { left: f.left, bottom: f.bottom, n: f.n, s: f.s };
-  }
   private decorFrame(f: FrameContext): DecorFrame {
-    return { view: this.decorView(f), now: f.now, tileAt: this.tileAt, reduceMotion: f.reduceMotion };
+    return { view: f, now: f.now, tileAt: this.tileAt, reduceMotion: f.look.reduceMotion };
   }
   private look(): BoardLook {
     const g = this.game;
     return {
       mode: g.mode, height: g.run.height, seed: g.run.seed, outside: !!g.run.outside, entranceX: Math.floor(g.world.width / 2),
-      spritesOff: !!g.save.settings.spritesOff, reduceMotion: g.save.settings.reduceMotion,
+      spritesOff: !!g.save.settings.spritesOff, reduceMotion: g.save.settings.reduceMotion, area1: isArea1(g.mode, g.run.height),
     };
   }
   /** Paints one tile in tile space (see paintTile); false while its ground
@@ -351,7 +346,7 @@ export class Renderer {
   private drawTorchSprite(c: CanvasRenderingContext2D, f: FrameContext, t: Torch) {
     c.save();
     toTileSpace(c, f, t.x, t.y);
-    paintTorch(c, t, f.now, f.reduceMotion, f.spritesOff);
+    paintTorch(c, t, f.now, f.look.reduceMotion, f.look.spritesOff);
     c.restore();
   }
 

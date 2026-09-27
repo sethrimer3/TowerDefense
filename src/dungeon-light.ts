@@ -140,7 +140,7 @@ export class DungeonLight {
 function occupiedRegion(f: FrameContext): Rect | null {
   const occupied: Rect[] = [];
   forEachViewTile(f, (x, y) => {
-    const kind = f.game.world.tile(x, y).kind;
+    const kind = f.world.tile(x, y).kind;
     if (kind === "wall" || kind === "floor") return;
     occupied.push({ x: (x - f.left - 0.15) * f.s, y: (f.n - 1 - (y - f.bottom) - 0.15) * f.s, w: 1.3 * f.s, h: 1.3 * f.s });
   });

@@ -5,7 +5,8 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { RoomWorld, World, type Board } from "../src/generation.ts";
 import { area1ItemId, floorVariant, wallAdjacencyMask } from "../src/area1-tileset.ts";
 import { TreeParticles } from "../src/tree-particles.ts";
-import { DecorLayer, type DecorFrame, type DecorView, type MirroredSprites } from "../src/decor-render.ts";
+import { DecorLayer, type DecorFrame, type MirroredSprites } from "../src/decor-render.ts";
+import type { BoardView } from "../src/render-frame.ts";
 import { decorSourceFor, tileDecor, type TileDecor } from "../src/decor.ts";
 import { TREES, type SkillNode } from "../src/skill-trees.ts";
 import type { KeyColor, Tile } from "../src/entities.ts";
@@ -214,7 +215,7 @@ function fluidSteps(): string {
 
 /** A board to walk, and which tiles to walk to (by default, the ones in
  * view with crates, pools, tall grass, drips or blooms). */
-type DecorScene = { name: string; world: Board; seed: number; view: DecorView; start: [number, number]; want?: (d: TileDecor) => boolean };
+type DecorScene = { name: string; world: Board; seed: number; view: BoardView; start: [number, number]; want?: (d: TileDecor) => boolean };
 
 function towerDecor(seed: number, room: number): DecorScene {
   return { name: `tower ${seed}/${room}`, world: new RoomWorld(seed, room, {}), seed, view: { left: 0, bottom: 0, n: 17, s: 24 }, start: [8, 8] };

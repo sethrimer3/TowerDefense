@@ -5,7 +5,6 @@ import { bakeTorchRelief, type BakedRelief } from "./floor-relief.ts";
 import { bakeTorchLight, type BakedLight } from "./torch-light.ts";
 import { doorColor, doorId } from "./doors.ts";
 import type { Tile } from "./entities.ts";
-import { isArea1 } from "./tile-painters.ts";
 import {
   forEachViewTile, screenX, screenY, sized, tileCenter, type FrameContext, type GlowSource, type Rect,
 } from "./render-frame.ts";
@@ -147,12 +146,12 @@ export class LightingPass {
   }
 
   /** Doors, stairs, items, and enemies in view, with their glow settings. */
-  glowSources(f: Pick<FrameContext, "game" | "n" | "left" | "bottom" | "now" | "reduceMotion">): GlowSource[] {
+  glowSources(f: Pick<FrameContext, "world" | "n" | "left" | "bottom" | "now" | "look">): GlowSource[] {
     const pulse = LIGHTING_CONFIG.objectGlow.pulse, out: GlowSource[] = [];
     forEachViewTile(f, (x, y) => {
       // Slow, per-object breathing so a room of glows doesn't pulse in unison.
-      const breathe = f.reduceMotion ? 1 : 1 - pulse + pulse * Math.sin(f.now / 650 + x * 1.7 + y * 2.3);
-      const glow = tileGlow(f.game.world.tile(x, y), breathe);
+      const breathe = f.look.reduceMotion ? 1 : 1 - pulse + pulse * Math.sin(f.now / 650 + x * 1.7 + y * 2.3);
+      const glow = tileGlow(f.world.tile(x, y), breathe);
       if (glow) out.push({ x, y, ...glow });
     });
     return out;
@@ -161,7 +160,7 @@ export class LightingPass {
   /** Opaque squares over the wall tiles in view (see wallMaskCache). */
   wallMask(f: FrameContext) {
     const key = `${f.left},${f.bottom},${f.s},${f.width}`;
-    const world = f.game.world;
+    const world = f.world;
     if (this.wallMaskCache?.key === key && this.wallMaskCache.world === world) return this.wallMaskCache.canvas;
     const canvas = this.wallMaskCache?.canvas ?? document.createElement("canvas");
     canvas.width = canvas.height = f.width;
@@ -177,12 +176,11 @@ export class LightingPass {
   /** Torch bump lighting on area-one floor sprites (see floor-relief.ts):
    * each torch's relief is baked once, then blitted with its flicker. */
   drawTorchRelief(f: FrameContext) {
-    const g = f.game;
-    if (!isArea1({ mode: g.mode, height: g.run.height })) return;
+    if (!f.look.area1) return;
     const c = f.c;
     const cfg = LIGHTING_CONFIG.relief;
     const floorSprite = (x: number, y: number) =>
-      g.world.tile(x, y)?.kind === "wall" ? null : area1FloorSprite(x, y, g.run.seed) ?? undefined;
+      f.world.tile(x, y)?.kind === "wall" ? null : area1FloorSprite(x, y, f.look.seed) ?? undefined;
     c.save();
     c.imageSmoothingEnabled = false;
     for (const t of f.torches) {
@@ -190,8 +188,8 @@ export class LightingPass {
       if (!bake) continue;
       // Brightness follows the flicker, amplified so it reads on the floor;
       // the two nudged bakes cross-fade with the flame's lean.
-      const flicker = getTorchFlicker(t, f.now, f.reduceMotion);
-      const lean = leanOf(getTorchSway(t, f.now, f.reduceMotion));
+      const flicker = getTorchFlicker(t, f.now, f.look.reduceMotion);
+      const lean = leanOf(getTorchSway(t, f.now, f.look.reduceMotion));
       const alpha = Math.max(0, Math.min(1, cfg.flickerBase + (flicker - 1) * cfg.flickerGain));
       for (const [b, share] of [[bake.left, 1 - lean], [bake.right, lean]] as const)
         if (share >= 0.02) blitRelief(f, b, alpha * share);
@@ -547,7 +545,7 @@ export class LightingPass {
     if (bake === undefined) {
       if (this.bakeBudget <= 0) return null;
       this.bakeBudget--;
-      const world = f.game.world;
+      const world = f.world;
       const isWall = (x: number, y: number) => world.tile(x, y)?.kind === "wall";
       const offset = LIGHTING_CONFIG.glow.swayOffset;
       const left = bakeTorchLight(t, isWall, -offset), right = bakeTorchLight(t, isWall, offset);
@@ -563,10 +561,10 @@ export class LightingPass {
   private drawTorchLight(f: FrameContext, c: CanvasRenderingContext2D, t: Torch, { op, alpha }: Blend) {
     const bake = this.torchBake(f, t);
     if (!bake) return;
-    const flicker = getTorchFlicker(t, f.now, f.reduceMotion);
+    const flicker = getTorchFlicker(t, f.now, f.look.reduceMotion);
     // Both bakes sit on the tile grid (never moved or scaled), so the light's
     // edges stay flush with the walls; the lean only cross-fades between them.
-    const lean = leanOf(getTorchSway(t, f.now, f.reduceMotion));
+    const lean = leanOf(getTorchSway(t, f.now, f.look.reduceMotion));
     const field = bake.left.field;
     const x0 = screenX(f, field.left), y0 = screenY(f, field.top), size = field.tiles * f.s;
     c.globalCompositeOperation = op;
@@ -582,7 +580,7 @@ export class LightingPass {
    * Uses gentle additive blending with wide radial feathering. */
   private drawTorchHaze(f: FrameContext, c: CanvasRenderingContext2D, t: Torch) {
     const atm = this.atmosphere;
-    const flicker = getTorchFlicker(t, f.now, f.reduceMotion);
+    const flicker = getTorchFlicker(t, f.now, f.look.reduceMotion);
     // The haze isn't occluded, so it stays put (a moving circle would slide
     // across the walls); it only breathes with the flicker.
     const cx = screenX(f, t.x + 0.5),

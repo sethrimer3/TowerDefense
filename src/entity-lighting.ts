@@ -3,7 +3,7 @@ import { LIGHTING_CONFIG, getTorchFlicker, getTorchSway } from "./lighting.ts";
 import { torchReaches } from "./floor-relief.ts";
 import { lightFalloff } from "./torch-light.ts";
 import { drawGameSprite } from "./game-sprites.ts";
-import { isArea1, paintContents, paintHeroFallback } from "./tile-painters.ts";
+import { paintContents, paintHeroFallback } from "./tile-painters.ts";
 import { forEachViewTile, tileOrigin, toTileSpace, type FrameContext } from "./render-frame.ts";
 
 /** Tile kinds that stand up off the floor and so cast torch shadows. */
@@ -134,11 +134,10 @@ export class EntityLighting {
 
   /** Items and enemies in view, then the hero. */
   private casters(f: FrameContext): Caster[] {
-    const g = f.game, spritesOff = f.spritesOff, reduceMotion = f.reduceMotion;
-    const area1 = isArea1({ mode: g.mode, height: g.run.height });
+    const { spritesOff, reduceMotion, area1 } = f.look;
     const casters: Caster[] = [];
     forEachViewTile(f, (x, y) => {
-      const t = g.world.tile(x, y);
+      const t = f.world.tile(x, y);
       if (!SHADOW_CASTERS.has(t.kind)) return;
       casters.push({
         x, y,
@@ -162,12 +161,12 @@ export class EntityLighting {
   private lightCaster(f: FrameContext, caster: Caster, t: Torch, light: Record<SpriteDir, number>): Shadow | null {
     const cfg = LIGHTING_CONFIG.shadow, sl = LIGHTING_CONFIG.spriteLight;
     // Shadows swing gently as the flame sways.
-    const sway = getTorchSway(t, f.now, f.reduceMotion);
+    const sway = getTorchSway(t, f.now, f.look.reduceMotion);
     const dx = caster.x - t.x - sway.x, dy = caster.y - t.y - sway.y;
     const d = Math.hypot(dx, dy);
     if (d < 0.5 || d >= t.lightRadius) return null;
     if (!torchReaches(t, Math.round(caster.x), Math.round(caster.y))) return null;
-    const flicker = getTorchFlicker(t, f.now, f.reduceMotion);
+    const flicker = getTorchFlicker(t, f.now, f.look.reduceMotion);
     const falloff = lightFalloff(d, t.lightRadius);
     // Light on the caster: split over the sides facing the torch (screen
     // space, y down; the torch lies opposite the shadow direction).

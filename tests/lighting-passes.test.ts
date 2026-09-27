@@ -8,9 +8,9 @@ import { LIGHTING_CONFIG, computeVisibilityPolygon, getTorchFlicker, getTorchSwa
 import { ATMOSPHERE_CONFIG, LightingPass } from "../src/lighting-pass.ts";
 import { EntityLighting } from "../src/entity-lighting.ts";
 import { DungeonLight, type Foreground, type LitBoard } from "../src/dungeon-light.ts";
-import { forEachViewTile, toTileSpace, type FrameContext, type Rect } from "../src/render-frame.ts";
-import { paintContents, paintHeroFallback } from "../src/tile-painters.ts";
-import type { Game } from "../src/state.ts";
+import { forEachViewTile, toTileSpace, type BoardTiles, type FrameContext, type Rect } from "../src/render-frame.ts";
+import { isArea1, paintContents, paintHeroFallback, type BoardLook } from "../src/tile-painters.ts";
+import type { Mode } from "../src/entities.ts";
 import type { Torch } from "../src/entities.ts";
 
 // Characterization hashes of the dungeon lighting: seeded frames drawn by
@@ -124,18 +124,21 @@ const fakeDocument = { createElement: () => new FakeCanvas(), hidden: false };
 g.document = fakeDocument;
 g.Image = FakeImage;
 
-type Scene = { game: Game; torches: () => Torch[]; center: { x: number; y: number } };
+type Scene = { world: BoardTiles; look: BoardLook; torches: () => Torch[]; center: { x: number; y: number } };
+
+/** How a dungeon board at `height` looks, sprites on and motion full. */
+const lookOf = (mode: Mode, height: number, seed: number): BoardLook => ({
+  mode, height, seed, outside: false, entranceX: 15, spritesOff: false, reduceMotion: false, area1: isArea1(mode, height),
+});
 
 function towerScene(seed: number, room: number): Scene {
   const world = new RoomWorld(seed, room, {});
-  const game = { mode: "tower", run: { height: room, seed }, world } as unknown as Game;
-  return { game, torches: () => world.torches ?? [], center: { x: 8, y: 8 } };
+  return { world, look: lookOf("tower", room, seed), torches: () => world.torches ?? [], center: { x: 8, y: 8 } };
 }
 
 function delveScene(seed: number, y: number): Scene {
   const world = new World(seed, {});
-  const game = { mode: "delve", run: { height: y, seed }, world } as unknown as Game;
-  return { game, torches: () => world.torches, center: { x: 15, y } };
+  return { world, look: lookOf("delve", y, seed), torches: () => world.torches, center: { x: 15, y } };
 }
 
 /** A board whose contents are the tiles' sprites and whose hero is the
@@ -147,11 +150,11 @@ function board(f: FrameContext, foreground: Foreground | null): LitBoard {
     floor: none, glow: none, torches: none, route: none, edge: none,
     contents: (ctx) =>
       forEachViewTile(f, (x, y) => {
-        const t = f.game.world.tile(x, y);
+        const t = f.world.tile(x, y);
         if (t.kind === "wall" || t.kind === "floor") return;
         ctx.save();
         toTileSpace(ctx, f, x, y);
-        paintContents(ctx, t, { x, y, time: f.now, spritesOff: f.spritesOff, reduceMotion: f.reduceMotion, area1: false });
+        paintContents(ctx, t, { x, y, time: f.now, spritesOff: f.look.spritesOff, reduceMotion: f.look.reduceMotion, area1: false });
         ctx.restore();
       }),
     hero: paintHeroFallback,
@@ -212,11 +215,12 @@ function sceneRun(scene: Scene, seed: number) {
     if (i === 8) light.atmosphere = { ...ATMOSPHERE_CONFIG, ambientStrength: 0, torchHazeStrength: 0, vignetteStrength: 0 };
     if (i === 16) light.atmosphere = { ...ATMOSPHERE_CONFIG, vignetteSoftness: 1.4, torchHazeRadius: 0 };
     const walls: [number, number][] = [];
-    forEachViewTile({ n, left, bottom }, (x, y) => { if (scene.game.world.tile(x, y)?.kind === "wall") walls.push([x, y]); });
+    forEachViewTile({ n, left, bottom }, (x, y) => { if (scene.world.tile(x, y)?.kind === "wall") walls.push([x, y]); });
     const torches = scene.torches().filter((t) => t.active && Math.abs(t.x - left - n / 2) < n / 2 + 8 && Math.abs(t.y - bottom - n / 2) < n / 2 + 8);
+    const reduceMotion = rnd() < 0.2, spritesOff = rnd() < 0.25;
     const f: FrameContext = {
-      c, now, dt: 0.016, dpr, width, n, s, left, bottom, playerX, playerY, game: scene.game, outside: false,
-      reduceMotion: rnd() < 0.2, spritesOff: rnd() < 0.25, look: {} as FrameContext["look"], darkness, torches, walls, glows: [],
+      c, now, dt: 0.016, dpr, width, n, s, left, bottom, playerX, playerY, world: scene.world,
+      look: { ...scene.look, reduceMotion, spritesOff }, darkness, torches, walls, glows: [],
     };
     const foregrounds = FOREGROUNDS(f);
     const out = drawFrame(f, light, board(f, foregrounds[Math.floor(rnd() * foregrounds.length)]));
@@ -234,8 +238,8 @@ function degraded() {
   main.width = main.height = 408;
   const c = main.getContext()!;
   const frame = (darkness: number): FrameContext => ({
-    c, now: 5000, dt: 0.016, dpr: 1, width: 408, n: 17, s: 24, left: 7, bottom: 2, playerX: 15, playerY: 10, game: scene.game,
-    outside: false, reduceMotion: false, spritesOff: false, look: {} as FrameContext["look"], darkness,
+    c, now: 5000, dt: 0.016, dpr: 1, width: 408, n: 17, s: 24, left: 7, bottom: 2, playerX: 15, playerY: 10,
+    world: scene.world, look: scene.look, darkness,
     torches: scene.torches(), walls: [[0, 0], [1, 0]], glows: [],
   });
   noContexts = true;
@@ -284,7 +288,7 @@ function darkenedRegions() {
     main.width = main.height = Math.round(width * dpr);
     const n = 17, f: FrameContext = {
       c: main.getContext()!, now: 3000, dt: 0.016, dpr, width, n, s: width / n, left: 7, bottom: 22, playerX: 15, playerY: 30,
-      game: scene.game, outside: false, reduceMotion: false, spritesOff: false, look: {} as FrameContext["look"], darkness: 0.6,
+      world: scene.world, look: scene.look, darkness: 0.6,
       torches: scene.torches(), walls: [], glows: [],
     };
     const pass = new LightingPass();
