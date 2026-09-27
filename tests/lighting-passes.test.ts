@@ -27,6 +27,13 @@ const digest = (value: unknown) => createHash("sha256").update(JSON.stringify(va
 
 let hash: Hash = createHash("sha256");
 let canvasIds = 0;
+/** The first canvas id of the current scene (see FakeCanvas.name). */
+let sceneFirstId = 0;
+/** Starts a scene: resets the hash and numbers new canvases from zero. */
+function startScene() {
+  hash = createHash("sha256");
+  sceneFirstId = canvasIds;
+}
 /** When set, new canvases hand out no 2D context. */
 let noContexts = false;
 
@@ -46,14 +53,18 @@ class FakeCanvas {
   set width(v: number) { this.w = v; this.reset(); }
   get height() { return this.h; }
   set height(v: number) { this.h = v; this.reset(); }
-  toString() { return `cv${this.id}`; }
+  /** Canvases made in this scene are numbered in order from zero. One left
+   * over from an earlier scene (a module-level cache) is named by its size,
+   * so which scene made it, and in what order, doesn't shift later scenes. */
+  get name() { return this.id >= sceneFirstId ? `${this.id - sceneFirstId}` : `old${this.w}x${this.h}`; }
+  toString() { return `cv${this.name}`; }
   private reset() {
     this.log = `${this.w}x${this.h}`;
     this.pixels = null;
     this.note(`size ${this.w}x${this.h}`);
   }
   note(line: string) {
-    hash.update(`${this.id}:${line}\n`);
+    hash.update(`${this.name}:${line}\n`);
     this.log = createHash("sha256").update(this.log + line).digest("hex");
     this.pixels = null;
   }
@@ -83,7 +94,7 @@ function context(cv: FakeCanvas): CanvasRenderingContext2D {
   let gradients = 0;
   const special: Record<string, (...a: never[]) => unknown> = {
     createRadialGradient: (...a: number[]) => {
-      const name = `g${cv.id}.${gradients++}`;
+      const name = `g${cv.name}.${gradients++}`;
       cv.note(`${name}=radial(${a.join(",")})`);
       return { addColorStop: (o: number, c: string) => cv.note(`${name}.stop(${o},${c})`), toString: () => name };
     },
@@ -197,7 +208,7 @@ const REGIONS = (w: number): (Rect | Rect[] | undefined)[] => [
 ];
 
 function sceneRun(scene: Scene, seed: number) {
-  hash = createHash("sha256");
+  startScene();
   const rnd = random(seed);
   const light = new DungeonLight();
   const frames: unknown[] = [];
@@ -231,7 +242,7 @@ function sceneRun(scene: Scene, seed: number) {
 
 /** Frames where canvases have no context, and where there is no DOM. */
 function degraded() {
-  hash = createHash("sha256");
+  startScene();
   const scene = delveScene(3, 10);
   const out: unknown[] = [];
   const main = new FakeCanvas();
@@ -281,7 +292,7 @@ function degraded() {
  * sprites clipped to odd regions: none, one box, overlapping boxes, boxes
  * off or partly off the board, and empty lists. */
 function darkenedRegions() {
-  hash = createHash("sha256");
+  startScene();
   const scene = delveScene(7, 30);
   for (const [width, dpr] of [[408, 1], [340, 1.5], [255, 2]]) {
     const main = new FakeCanvas();
