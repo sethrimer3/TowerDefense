@@ -17,15 +17,16 @@ import {
   type PaletteItem,
   type Price,
 } from "./catalog.ts";
-import { CELLS_W, SUB, TILES_H, TILES_W } from "./grid.ts";
-import { fitLayout, removeCityTile, removeStructure, type Layout } from "./layout.ts";
+import { TILES_H, TILES_W } from "./grid.ts";
+import { fitLayout, type Layout } from "./layout.ts";
 import { generateCity, type CityMap } from "./citygen.ts";
 import { DefendSim } from "./sim.ts";
 import { DefendRenderer } from "./render.ts";
 import type { Overlay } from "./edit-overlay.ts";
 import { paintIcon, type IconItem } from "./structure-art.ts";
-import { BoardPointers, eventCell, type DragPointer, type DragSession } from "./board-pointers.ts";
-import { dropGhost, legalLayouts, liftsCityTile, refusal, type Drag } from "./drag-rules.ts";
+import { BoardPointers, eventCell } from "./board-pointers.ts";
+import type { Drag } from "./drag-rules.ts";
+import { EditSession, type Drop } from "./edit-session.ts";
 import { NIGHT_FADE_SECONDS, isBossWave, rollWeather, skyLabel, type Weather } from "./weather.ts";
 import { available, buyBomb, buyItem, buySpeed3, buyUpgrade, canAfford, type DefendSave, type Wallet } from "./progress.ts";
 
@@ -48,8 +49,6 @@ const ITEM_NAMES: Record<PaletteItem, string> = {
 };
 
 const plural = (name: string) => (name.endsWith("s") ? name : `${name}s`);
-/** Released off the board, or over the palette. */
-const offBoard = (p: DragPointer) => !p.overBoard || p.overPalette;
 
 export class DefendPage {
   private host: DefendHost;
@@ -63,7 +62,7 @@ export class DefendPage {
   private pointers = new BoardPointers({
     renderer: () => this.renderer,
     pickUp: (e) => this.pickUp(e),
-    drop: (session) => this.drop(session),
+    drop: (drop) => this.drop(drop),
   });
   private lastTime = 0;
   private message = "";
@@ -478,59 +477,41 @@ export class DefendPage {
 
   // ── Dragging ──────────────────────────────────────────────────────────
   private overlay(): Overlay | null {
-    const s = this.pointers.session;
-    if (!s || !s.moved) return null;
-    if (s.drag.from === "bomb")
-      return s.pointer.overBoard ? { legal: new Set(), hover: null, ghost: null, bomb: { x: s.pointer.cellX, y: s.pointer.cellY, r: BOMB_RADIUS } } : null;
-    const legal = new Set(s.legal.keys());
-    const hover = s.pointer.overBoard ? s.hover : null;
-    let ghost: Overlay["ghost"] = null;
-    if (hover && s.legal.has(hover)) ghost = dropGhost(s.drag, s.legal.get(hover)!, hover);
-    // Show the full-board highlight only while over the board.
-    return { legal, hover, ghost };
+    return this.pointers.session?.overlay() ?? null;
   }
 
   private beginDrag(d: Drag, e: PointerEvent) {
-    this.pointers.begin(d, d.from === "bomb" ? new Map() : legalLayouts(d, this.save.layout), e);
+    this.pointers.begin(new EditSession(d, this.save.layout), e);
   }
 
   /** Start dragging whatever buildable thing is under the pointer. Only the
    * build phase picks things up; in battle a press moves the view. */
   private pickUp(e: PointerEvent): boolean {
     if (this.phase !== "build") return false;
-    const map = this.currentMap();
     const { cx, cy, inside } = eventCell(this.renderer!, e);
-    if (!inside) return false;
-    const drag = this.liftable(map, cx, cy);
-    if (drag) this.beginDrag(drag, e);
-    return !!drag;
+    const edit = inside ? EditSession.lift(this.currentMap(), this.save.layout, cx, cy) : null;
+    if (edit) this.pointers.begin(edit, e);
+    return !!edit;
   }
 
-  /** What a press on cell (cx, cy) lifts: the keep, a structure, or an empty
-   * city tile. */
-  private liftable(map: CityMap, cx: number, cy: number): Drag | null {
-    const owner = map.owner[cy * CELLS_W + cx];
-    const b = owner >= 0 ? map.buildings[owner] : null;
-    const layout = this.save.layout;
-    if (b?.kind === "keep") return { from: "keep" };
-    const s = b?.structureUid ? layout.structures.find((p) => p.uid === b.structureUid) : undefined;
-    if (s) return { from: "structure", uid: s.uid, kind: s.kind };
-    const tile = { tx: Math.floor(cx / SUB), ty: Math.floor(cy / SUB) };
-    return liftsCityTile(layout, tile) ? { from: "cityTile", tile } : null;
-  }
-
-  /** A released drag: a bomb goes off where it lands; a city element takes
-   * the legal tile under it, or goes back to the palette off the board. */
-  private drop(session: DragSession) {
-    if (session.drag.from === "bomb") this.dropBomb(session.pointer);
-    else this.dropBuilding(session);
-  }
-
-  private dropBomb(at: DragPointer) {
+  /** A released drag: a bomb goes off where it lands, and a city element
+   * leaves its session's next layout. */
+  private drop(drop: Drop) {
+    if (drop.kind === "bomb") {
+      if (drop.at) this.dropBomb(drop.at);
+      return;
+    }
     const s = this.save;
-    if (!at.overBoard || !this.bombsLive()) return;
-    this.sim!.dropBomb(at.cellX, at.cellY);
-    s.bombs--;
+    s.layout = drop.layout;
+    if (drop.message) this.setMessage(drop.message);
+    if (s.layout !== this.mapLayout) this.host.persist();
+    this.renderPalette();
+  }
+
+  private dropBomb(at: { x: number; y: number }) {
+    if (!this.bombsLive()) return;
+    this.sim!.dropBomb(at.x, at.y);
+    this.save.bombs--;
     this.host.persist();
     this.renderPalette();
   }
@@ -538,31 +519,6 @@ export class DefendPage {
   /** Whether a bomb can go off: in battle, with one left. */
   private bombsLive() {
     return !!this.sim && this.phase === "sim" && this.save.bombs > 0;
-  }
-
-  private dropBuilding({ drag: d, legal, moved, pointer, hover }: DragSession) {
-    const s = this.save;
-    const at = pointer.overBoard ? hover : null;
-    const target = at ? legal.get(at) : undefined;
-    if (target) {
-      s.layout = target;
-    } else if (offBoard(pointer)) {
-      this.returnToPalette(d, moved);
-    } else if (moved && hover) {
-      this.setMessage(refusal(d, s.layout, hover));
-    }
-    if (s.layout !== this.mapLayout) this.host.persist();
-    this.renderPalette();
-  }
-
-  /** Dropped off the board: pick the element back up into the palette. */
-  private returnToPalette(d: Drag, moved: boolean) {
-    const s = this.save;
-    if (d.from === "structure") s.layout = removeStructure(s.layout, d.uid);
-    else if (d.from === "cityTile") {
-      const r = removeCityTile(s.layout, d.tile.tx, d.tile.ty);
-      if (r) s.layout = r.layout;
-    } else if (d.from === "keep" && moved) this.setMessage("The keep can be moved, but never removed.");
   }
 
   // ── Armory ────────────────────────────────────────────────────────────

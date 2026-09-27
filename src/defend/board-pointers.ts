@@ -7,35 +7,21 @@
  * A pointer landing on the board while a gesture is under way joins the view
  * gesture. It ends a building drag, but a bomb stays held, and while a drag
  * lasts every pointer steers it and the first one lifted drops it.
- * What a press picks up and what a drop does are the page's decisions. */
+ * What a press picks up and what a drop does are the page's and its
+ * `EditSession`'s decisions; this only turns pointers into cells. */
 import { dragIcon, type Drag } from "./drag-rules.ts";
-import { CELLS_W, SUB, TILES_H, tileKey } from "./grid.ts";
-import type { Layout } from "./layout.ts";
+import type { DragAt, Drop, EditSession } from "./edit-session.ts";
+import { CELLS_W, SUB, TILES_H } from "./grid.ts";
 import type { DefendRenderer } from "./render.ts";
 import { paintIcon } from "./structure-art.ts";
-
-/** Where a drag's pointer is: its client point, its board position in cells,
- * and whether it is over the board or the palette. */
-export type DragPointer = { x: number; y: number; cellX: number; cellY: number; overBoard: boolean; overPalette: boolean };
-
-/** A drag in progress: what is carried, the layouts it could make keyed by
- * tile, where its pointer is and the tile under it. */
-export type DragSession = {
-  drag: Drag;
-  legal: Map<string, Layout>;
-  moved: boolean;
-  pointer: DragPointer;
-  hover: string | null;
-  ghost: HTMLCanvasElement;
-};
 
 export type PointerHost = {
   renderer(): DefendRenderer | null;
   /** Starts a drag (through `begin`) for whatever a board press lands on,
    * returning false when the press should move the view instead. */
   pickUp(e: PointerEvent): boolean;
-  /** A drag was released where its pointer is. */
-  drop(session: DragSession): void;
+  /** A drag was released, doing `drop`. */
+  drop(drop: Drop): void;
 };
 
 type Point = { x: number; y: number };
@@ -43,8 +29,8 @@ type Point = { x: number; y: number };
 export class BoardPointers {
   /** Board pointers moving the view, at their last client points. */
   private touches = new Map<number, Point>();
-  /** The drag in progress, if any. */
-  session: DragSession | null = null;
+  /** The drag in progress, if any, and the icon following its pointer. */
+  private held: { edit: EditSession; ghost: HTMLCanvasElement } | null = null;
 
   constructor(private host: PointerHost) {
     window.addEventListener("pointermove", (e) => this.move(e));
@@ -52,54 +38,60 @@ export class BoardPointers {
     window.addEventListener("pointercancel", (e) => this.cancel(e));
   }
 
+  /** The drag in progress, if any. */
+  get session(): EditSession | null {
+    return this.held?.edit ?? null;
+  }
+
   /** A press on the board. */
   down(e: PointerEvent) {
     if (e.button !== 0) return;
-    if (this.touches.size || this.session) return this.join(e);
+    if (this.touches.size || this.held) return this.join(e);
     if (this.host.pickUp(e)) return;
     this.touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
   }
 
   /** A second pointer turns whatever was happening into a pinch. */
   private join(e: PointerEvent) {
-    if (this.session && this.session.drag.from !== "bomb") this.end();
+    if (this.held && this.held.edit.drag.from !== "bomb") this.end();
     this.touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
   }
 
-  /** Starts dragging `drag`, which could make the `legal` layouts. */
-  begin(drag: Drag, legal: Map<string, Layout>, e: PointerEvent) {
+  /** Starts dragging under `e` in the session `edit`. */
+  begin(edit: EditSession, e: PointerEvent) {
     e.preventDefault();
-    const pointer = { x: 0, y: 0, cellX: 0, cellY: 0, overBoard: false, overPalette: false };
-    this.session = { drag, legal, moved: false, pointer, hover: null, ghost: ghostIcon(drag) };
+    this.held = { edit, ghost: ghostIcon(edit.drag) };
     this.move(e);
   }
 
   private move(e: PointerEvent) {
-    const s = this.session;
-    if (!s && this.touches.has(e.pointerId)) return this.view(e);
+    const h = this.held;
+    if (!h && this.touches.has(e.pointerId)) return this.view(e);
+    const at = h && this.at(e);
+    if (at) h.edit.hover(at);
+  }
+
+  /** Where `e` is for the drag, moving its ghost there; null without a board. */
+  private at(e: PointerEvent): DragAt | null {
     const renderer = this.host.renderer();
-    if (!s || !renderer) return;
-    s.moved = true;
+    if (!this.held || !renderer) return null;
     const c = eventCell(renderer, e);
-    s.pointer = {
-      x: e.clientX,
-      y: e.clientY,
+    this.held.ghost.style.left = `${e.clientX}px`;
+    this.held.ghost.style.top = `${e.clientY}px`;
+    return {
       cellX: c.fx,
       cellY: c.fy,
       overBoard: c.inside,
       overPalette: !!(document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null)?.closest?.("#defend-palette"),
     };
-    s.hover = c.inside ? tileKey(Math.floor(c.cx / SUB), Math.floor(c.cy / SUB)) : null;
-    s.ghost.style.left = `${e.clientX}px`;
-    s.ghost.style.top = `${e.clientY}px`;
   }
 
   private up(e: PointerEvent) {
     this.touches.delete(e.pointerId);
-    const s = this.session;
-    if (!s) return;
-    this.move(e);
-    this.host.drop(s);
+    const h = this.held;
+    if (!h) return;
+    const at = this.at(e);
+    if (at) this.host.drop(h.edit.release(at));
     this.end();
   }
 
@@ -110,8 +102,8 @@ export class BoardPointers {
 
   /** Drops the drag in progress without placing it. */
   end() {
-    this.session?.ghost.remove();
-    this.session = null;
+    this.held?.ghost.remove();
+    this.held = null;
   }
 
   /** Board pointers: one drags the view, two pinch-zoom it. */
