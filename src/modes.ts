@@ -60,8 +60,8 @@ export function milestones(profile: ModeProfile, from: number, to: number) {
 
 export const MODES: Record<Mode, ModeProfile> = {
   tower: {
-    balance: (save) => save.tower.shards,
-    credit: (save, amount) => { save.tower.shards += amount; },
+    balance: (save) => save.tower.inspiration,
+    credit: (save, amount) => { save.tower.inspiration += amount; },
     equivalentFloor: (height) => height,
     progressAt: (run) => run.height,
     width: TOWER_WIDTH,
@@ -86,8 +86,8 @@ export const MODES: Record<Mode, ModeProfile> = {
     },
   },
   delve: {
-    balance: (save) => save.delve.essence,
-    credit: (save, amount) => { save.delve.essence += amount; },
+    balance: (save) => save.delve.courage,
+    credit: (save, amount) => { save.delve.courage += amount; },
     equivalentFloor: (depth) => Math.floor(depth / 10),
     progressAt: (_run, y) => y,
     width: WIDTH,

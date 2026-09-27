@@ -51,7 +51,7 @@ test("every enemy and door must go, and each tier is earned once", () => {
   assert.deepEqual(ledger.check(world, run), ["silver", "gold", "platinum"]);
   assert.deepEqual(ledger.check(world, run), []);
   assert.deepEqual(tower.log[0], { silver: "earned", gold: "earned", platinum: "earned" });
-  assert.equal(tower.shards, 0, "chests pay when opened, not when earned");
+  assert.equal(tower.inspiration, 0, "chests pay when opened, not when earned");
 });
 
 test("chests stand on the floor tiles closest to the stairs; a tier with no room is paid at once", () => {
@@ -65,7 +65,7 @@ test("chests stand on the floor tiles closest to the stairs; a tier with no room
   cramped.ledger.check(cramped.world, cramped.run);
   assert.deepEqual(chestsOn(cramped.world), ["silver 3,4"]);
   assert.deepEqual(cramped.tower.log[0], { silver: "earned", gold: "claimed", platinum: "claimed" });
-  assert.equal(cramped.tower.shards, 2);
+  assert.equal(cramped.tower.inspiration, 2);
 });
 
 test("a chest can stand where an enemy was beaten, and leaves floor behind", () => {
@@ -81,10 +81,10 @@ test("opening a chest pays its tier once", () => {
   const { ledger, world, run, tower } = floor();
   ledger.check(world, run);
   assert.equal(ledger.open("gold", run), 1);
-  assert.equal(tower.shards, 1);
+  assert.equal(tower.inspiration, 1);
   assert.deepEqual(tower.log[0], { silver: "earned", gold: "claimed", platinum: "earned" });
   assert.equal(ledger.open("gold", run), 0);
-  assert.equal(tower.shards, 1);
+  assert.equal(tower.inspiration, 1);
 });
 
 test("a chest undo brings back stands again but pays nothing", () => {
@@ -96,7 +96,7 @@ test("a chest undo brings back stands again but pays nothing", () => {
   ledger.settle(before);
   assert.equal(before.changes["4,3"].kind, "reward");
   assert.equal(ledger.open("gold", before), 0);
-  assert.equal(tower.shards, 1);
+  assert.equal(tower.inspiration, 1);
 });
 
 test("settling pays every earned tier whose chest is gone, and takes away chests never earned", () => {
@@ -105,7 +105,7 @@ test("settling pays every earned tier whose chest is gone, and takes away chests
   run.changes["4,3"] = { kind: "floor" };
   tower.log[5] = { silver: "earned" };
   ledger.settle(run);
-  assert.equal(tower.shards, 2, "gold on this floor and silver on floor 5");
+  assert.equal(tower.inspiration, 2, "gold on this floor and silver on floor 5");
   assert.deepEqual(chestsOn(world), ["platinum 2,4", "silver 3,4"]);
   assert.deepEqual(tower.log[5], { silver: "claimed" });
 
@@ -119,7 +119,7 @@ test("leaving pays every tier still owed and takes the chests away", () => {
   const { ledger, world, run, tower } = floor();
   ledger.check(world, run);
   assert.equal(ledger.claimAll(run), 3);
-  assert.equal(tower.shards, 3);
+  assert.equal(tower.inspiration, 3);
   assert.ok(!ClearLedger.hasChests(run));
   assert.deepEqual(chestsOn(world), []);
   assert.equal(ledger.claimAll(run), 0);

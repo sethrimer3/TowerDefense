@@ -17,14 +17,14 @@ function arena() {
 }
 test('milestones are immediate, incremental and cannot be farmed with undo or reruns', () => {
   const g = arena();
-  g.advanceTowerRoom(); assert.equal(g.save.tower.shards, 1);
-  g.advanceTowerRoom(); assert.equal(g.save.tower.shards, 2);
-  g.newRun(); g.advanceTowerRoom(); assert.equal(g.save.tower.shards, 2);
+  g.advanceTowerRoom(); assert.equal(g.save.tower.inspiration, 1);
+  g.advanceTowerRoom(); assert.equal(g.save.tower.inspiration, 2);
+  g.newRun(); g.advanceTowerRoom(); assert.equal(g.save.tower.inspiration, 2);
   g.save.upgrades.delve = 1; g.switchMode('delve');
   for (const [height, balance] of [[9,0],[10,1],[19,1],[20,2],[10,2],[30,3]]) {
-    g.run.height = height; g.recordProgress(); assert.equal(g.save.delve.essence, balance);
+    g.run.height = height; g.recordProgress(); assert.equal(g.save.delve.courage, balance);
   }
-  g.finish('test'); assert.equal(g.save.delve.essence, 3);
+  g.finish('test'); assert.equal(g.save.delve.courage, 3);
 });
 test('uncollected rewards survive reload, undo, departure, death and retirement exactly once', () => {
   for (const action of ['reload','undo','stairs','death','retire','mode']) {
@@ -33,7 +33,7 @@ test('uncollected rewards survive reload, undo, departure, death and retirement 
     if (action === 'reload') {
       const loaded = new Game(decode(JSON.stringify(g.save)));
       assert.equal(chests(loaded), 3); loaded.finish('test');
-      assert.equal(loaded.save.tower.shards, 3); continue;
+      assert.equal(loaded.save.tower.inspiration, 3); continue;
     }
     if (action === 'undo') g.restore(before);
     if (action === 'stairs') g.advanceTowerRoom();
@@ -44,7 +44,7 @@ test('uncollected rewards survive reload, undo, departure, death and retirement 
       (g.world as RoomWorld).cells.set('2,0', {kind:'enemy',enemy:{name:'doom',hp:99999,attack:999,defense:0,tier:3}});
       g.move(1,0);
     }
-    assert.equal(g.save.tower.shards, action === 'stairs' ? 4 : 3, action);
+    assert.equal(g.save.tower.inspiration, action === 'stairs' ? 4 : 3, action);
   }
 });
 test('automove walks to and collects every clear chest before the stairs', () => {
@@ -52,21 +52,21 @@ test('automove walks to and collects every clear chest before the stairs', () =>
   for (let n=0; n<50 && chests(g); n++) {
     const step = chooseStep(g); assert.ok(step); assert.ok(g.move(step.dx,step.dy));
   }
-  assert.equal(g.run.height,0); assert.equal(g.save.tower.shards,3); assert.equal(chests(g),0);
+  assert.equal(g.run.height,0); assert.equal(g.save.tower.inspiration,3); assert.equal(chests(g),0);
 });
 test('reward chests persist open, undo closed, and never repay after undo', () => {
   const g = arena(), w = g.world as RoomWorld;
   g.save.tower.log[0] = { silver: 'earned' };
   g.run.changes['1,0'] = { kind: 'reward', tier: 'silver' };
-  const before = g.save.tower.shards;
+  const before = g.save.tower.inspiration;
   assert.ok(g.move(1, 0));
   assert.equal(g.world.tile(1, 0).kind, 'openedChest');
-  assert.equal(g.save.tower.shards, before + 1);
+  assert.equal(g.save.tower.inspiration, before + 1);
   assert.ok(g.undo());
   assert.equal(g.world.tile(1, 0).kind, 'reward');
   assert.ok(g.move(1, 0));
   assert.equal(g.world.tile(1, 0).kind, 'openedChest');
-  assert.equal(g.save.tower.shards, before + 1);
+  assert.equal(g.save.tower.inspiration, before + 1);
 });
 test('delve approach movement does not award physical Y as progression', () => {
   const g = new Game(defaults());
@@ -94,8 +94,8 @@ test('delve approach movement does not award physical Y as progression', () => {
   assert.equal(g.run.maxHeight, 0); // Run best stays 2 even as current depth goes down to 1
 });
 test('legacy balances and records migrate without retroactive duplication', () => {
-  const old = defaults(); old.tower.best=8; old.tower.shards=4;
+  const old = defaults(); old.tower.best=8; old.tower.inspiration=4;
   delete (old.tower as any).reached; delete (old.tower as any).log;
   const g = new Game(decode(JSON.stringify(old))); g.run.height=8; g.recordProgress();
-  assert.equal(g.save.tower.shards,4); g.run.height=9; g.recordProgress(); assert.equal(g.save.tower.shards,5);
+  assert.equal(g.save.tower.inspiration,4); g.run.height=9; g.recordProgress(); assert.equal(g.save.tower.inspiration,5);
 });

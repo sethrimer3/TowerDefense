@@ -121,7 +121,7 @@ export function showLog(ctx: AppContext) {
     const floors = Array.from({ length: Math.min(LOG_PAGE, start + 1) }, (_, i) => start - i);
     modal.innerHTML = `<small>WAYFARER’S RECORD</small><h2>Adventure log</h2>
       <div class="summary-stats"><div><strong>${displayedProgress(highest)}</strong>HIGHEST FLOOR</div><div><strong>${displayedProgress(game.save.delve.reached)}</strong>DEEPEST DEPTH</div></div>
-      <p>${devAmount(game, game.save.tower.shards)} Inspiration · ${devAmount(game, game.save.delve.essence)} Courage</p>
+      <p>${devAmount(game, game.save.tower.inspiration)} Inspiration · ${devAmount(game, game.save.delve.courage)} Courage</p>
       <p class="hint">+1 Inspiration per new height. +1 Courage at each new 10-depth milestone. Revisits never pay again.</p>
       <div class="clear-legend"><p class="silver">${itemSprite("chest_silver", "log-sprite")} Silver · all doors opened and enemies defeated.</p><p class="gold">${itemSprite("chest_gold", "log-sprite")} Gold · Silver with no damage taken anywhere in the ascent.</p><p class="platinum">${itemSprite("chest_platinum", "log-sprite")} Platinum · Gold with no keys spent on that floor.</p><p class="diamond">Diamond · future challenge, not yet available.</p></div>
       <p class="hint">Each clear tier earns +1 Inspiration once per floor. Uncollected chests are claimed when you leave.</p>

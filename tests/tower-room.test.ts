@@ -62,7 +62,7 @@ test("reaching the stairs advances the Tower room and awards each new height imm
   assert.equal(g.run.player.x, TOWER_START_X);
   assert.equal(g.run.player.y, 0);
   assert.deepEqual(g.run.changes, {});
-  assert.equal(g.save.tower.shards, 1);
+  assert.equal(g.save.tower.inspiration, 1);
 });
 test("Shards and Essence only pay out on a new best, Gold and XP accrue regardless", () => {
   const g = new Game(defaults());
@@ -71,14 +71,14 @@ test("Shards and Essence only pay out on a new best, Gold and XP accrue regardle
   g.run.kills = 3;
   g.finish("test retire");
   assert.ok(g.summary!.record);
-  assert.ok(g.save.tower.shards > 0);
-  const shardsAfterFirst = g.save.tower.shards;
+  assert.ok(g.save.tower.inspiration > 0);
+  const inspirationAfterFirst = g.save.tower.inspiration;
   g.summary = null;
   g.newRun();
   g.run.height = 5;
   g.finish("test retire again");
   assert.equal(g.summary!.record, false);
-  assert.equal(g.save.tower.shards, shardsAfterFirst);
+  assert.equal(g.save.tower.inspiration, inspirationAfterFirst);
 });
 test("XP is earned from kills in both modes and grants a level", () => {
   const g = new Game(defaults());

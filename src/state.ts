@@ -104,8 +104,8 @@ export class Game {
     this.save.settings.devMode = on;
     if (!on) return;
     this.save.gold = 999_999_999;
-    this.save.tower.shards = 999_999_999;
-    this.save.delve.essence = 999_999_999;
+    this.save.tower.inspiration = 999_999_999;
+    this.save.delve.courage = 999_999_999;
     for (const material of MATERIALS) {
       if (material.category === "metal" || material.category.startsWith("monster-")) {
         this.save.materials[material.id] = 999_999_999;
@@ -797,10 +797,10 @@ export class Game {
     const n = this.save.upgrades[id],
       price = cost(id, n),
       balance =
-        u.currency === "essence" ? this.save.delve.essence : this.save.tower.shards;
+        u.currency === "courage" ? this.save.delve.courage : this.save.tower.inspiration;
     if (n >= u.max || price > balance) return false;
-    if (u.currency === "essence") this.save.delve.essence -= price;
-    else this.save.tower.shards -= price;
+    if (u.currency === "courage") this.save.delve.courage -= price;
+    else this.save.tower.inspiration -= price;
     this.save.upgrades[id]++;
     return true;
   }

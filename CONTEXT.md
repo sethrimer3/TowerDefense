@@ -27,3 +27,11 @@ _Avoid_: tower log, reward log
 **Equivalent floor**:
 The one scale both modes' progress maps onto: a Tower floor counts as itself, and every ten Delve depth count as one. Loot tables are gated on it, and each new equivalent floor reached pays one of the mode's currency.
 _Avoid_: effective floor, tier
+
+**Inspiration**:
+The Tower's currency: one for each new floor reached and each clear tier paid, spent on upgrades in the skill trees.
+_Avoid_: shards
+
+**Courage**:
+The Delve's currency: one for each new equivalent floor reached, spent on upgrades in the skill trees.
+_Avoid_: essence

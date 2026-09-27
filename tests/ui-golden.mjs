@@ -74,8 +74,8 @@ const FIXTURES = await page.evaluate(async () => {
   const rich = (s) => {
     quiet(s);
     Object.assign(s.upgrades, { delve: 1, auto: 1, legacy: 1, revive: 1, shardHp: 2, undos: 1, autoPersist: 1 });
-    s.delve.essence = 37;
-    s.tower.shards = 21;
+    s.delve.courage = 37;
+    s.tower.inspiration = 21;
     s.gold = 480;
     s.xp = 900;
     for (const k of Object.keys(s.materials)) s.materials[k] = 120;

@@ -133,12 +133,12 @@ h1 span {
   justify-content: center;
   margin: 0 0 16px;
 }
-.essence {
+.currency {
   color: var(--gold);
   text-align: center;
   font-size: 19px;
 }
-.essence small {
+.currency small {
   display: block;
   font-size: 7px;
   letter-spacing: 2px;
@@ -966,10 +966,10 @@ dialog p {
   .inspection {
     font-size: 9px;
   }
-  .essence {
+  .currency {
     font-size: 14px;
   }
-  .essence small {
+  .currency small {
     font-size: 6px;
     letter-spacing: 1px;
   }

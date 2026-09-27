@@ -96,7 +96,7 @@ export class SkillTreePage {
     const u = UPGRADES.find(u => u.id === id)!;
     const level = save.upgrades[id];
     const price = cost(id, level);
-    const balance = tree.currency === "shards" ? save.tower.shards : save.delve.essence;
+    const balance = tree.currency === "inspiration" ? save.tower.inspiration : save.delve.courage;
     const locked = this.locked(tree);
     const maxed = level >= u.max;
     const available = skillAvailable(id, save.upgrades);
@@ -130,7 +130,7 @@ export class SkillTreePage {
     const node = this.current().nodes.find(n => n.id === id)!;
     const { u, level, price, balance, locked, maxed, available, canBuy } = this.purchase(id);
     const requirements = node.requires.filter(rid => !this.ctx.game.save.upgrades[rid]).map(rid => UPGRADES.find(u => u.id === rid)!.name);
-    const currency = this.current().currency === "shards" ? "Inspiration" : "Courage";
+    const currency = this.current().currency === "inspiration" ? "Inspiration" : "Courage";
     let hint: string;
     if (locked) hint = "Unlock this tree to learn its skills.";
     else if (maxed) hint = "Mastered.";

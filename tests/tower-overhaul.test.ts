@@ -188,12 +188,12 @@ test("no viable actions on any visited floor, with no unexplored stair reachable
   const g = deadlockGame();
   g.save.upgrades.revive = 1;
   assert.ok(isDeadlocked(g.run));
-  const shardsBefore = g.save.tower.shards;
+  const inspirationBefore = g.save.tower.inspiration;
   g.checkDeadlock();
   assert.ok(g.summary);
   assert.equal(g.summary!.reason, "No viable moves remain");
   assert.equal(g.summary!.dead, false);
-  assert.ok(g.save.tower.shards >= shardsBefore, "legitimate run rewards are still awarded");
+  assert.ok(g.save.tower.inspiration >= inspirationBefore, "legitimate run rewards are still awarded");
   assert.equal(g.save.tower.revival, null, "a deadlock must never create a Revive opportunity");
 });
 
@@ -325,11 +325,11 @@ test("clear rewards are paid out exactly once across a fatal encounter", () => {
   g.move(0, 1); // arena has no enemies/doors, so the first step earns its chests
   assert.ok(Object.values(g.run.changes).some((t) => t.kind === "reward"));
   (g.world as RoomWorld).cells.set(point(1, 1), { kind: "enemy", enemy: LETHAL });
-  const shardsBefore = g.save.tower.shards;
+  const inspirationBefore = g.save.tower.inspiration;
   g.move(1, 0, true);
   assert.ok(g.summary?.dead);
-  const shardsAfterDeath = g.save.tower.shards;
-  assert.ok(shardsAfterDeath > shardsBefore);
+  const inspirationAfterDeath = g.save.tower.inspiration;
+  assert.ok(inspirationAfterDeath > inspirationBefore);
   // Nothing left to claim a second time.
   for (const entry of Object.values(g.save.tower.log)) assert.ok(!Object.values(entry).includes("earned"));
 });

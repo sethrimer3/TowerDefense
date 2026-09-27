@@ -83,7 +83,7 @@ export class ClearLedger {
   }
 
   /** The chest for `tier` on the run's floor was opened: pays it unless it
-   * was already paid. Returns the shards paid. */
+   * was already paid. Returns the Inspiration paid. */
   open(tier: ClearTier, run: Run) {
     const entry = this.tower.log[run.height];
     const paid = entry?.[tier] === "earned" ? (this.pay(entry, tier), 1) : 0;
@@ -92,7 +92,7 @@ export class ClearLedger {
   }
 
   /** Leaving the floor, the run or the mode: pays every tier still owed and
-   * takes the floor's chests away. Returns the shards paid. */
+   * takes the floor's chests away. Returns the Inspiration paid. */
   claimAll(run: Run) {
     let paid = 0;
     for (const entry of Object.values(this.tower.log))
@@ -120,6 +120,6 @@ export class ClearLedger {
 
   private pay(entry: NonNullable<Save["tower"]["log"][string]>, tier: ClearTier) {
     entry[tier] = "claimed";
-    this.tower.shards++;
+    this.tower.inspiration++;
   }
 }

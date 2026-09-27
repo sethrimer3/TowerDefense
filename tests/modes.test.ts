@@ -23,7 +23,7 @@ test("each new equivalent floor reached pays one of the mode's currency", () => 
   const save = defaults();
   tower.credit(save, 2);
   delve.credit(save, 5);
-  assert.deepEqual([save.tower.shards, save.delve.essence], [2, 5]);
+  assert.deepEqual([save.tower.inspiration, save.delve.courage], [2, 5]);
   assert.deepEqual([tower.balance(save), delve.balance(save)], [2, 5]);
 });
 

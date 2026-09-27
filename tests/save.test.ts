@@ -50,12 +50,12 @@ const v3 = () => ({
   upgrades: { ...defaults().upgrades, undos: 2, shardUndos: 1, delve: 1 },
   settings,
   tower: {
-    ...mode(), shards: 17,
+    ...mode(), inspiration: 17,
     log: { "3": { earned: ["silver", "gold", "bogus"], claimed: ["gold", "platinum"] }, "x": { earned: ["gold"] }, "4": { earned: "gold" }, "5": { silver: "claimed", gold: "bogus", platinum: "earned" } },
     sectionHp: { "1": 80.5, "2": 0, "0": 50, "x": 9 },
     startSection: 1,
   },
-  delve: { ...mode(), essence: 33 },
+  delve: { ...mode(), courage: 33 },
   materials: { ...defaults().materials },
   equipmentInventory: [{
     id: "e1", slot: "weapon", name: "Blade", metal: "steel",
@@ -77,7 +77,7 @@ const scope: Record<string, (p: string[]) => boolean> = {
   v2: (p) => p.length === 1,
   v1: (p) => !nested(p),
   outside: under("tower.run"),
-  preSkillTrees: under("upgrades", "delve.run", "delve.best", "delve.essence"),
+  preSkillTrees: under("upgrades", "delve.run", "delve.best", "delve.courage"),
 };
 const bases: Record<string, () => any> = {
   v3,
@@ -208,7 +208,7 @@ test("decode keeps a valid v3 save's progress and clamps settings", () => {
 test("decode migrates v1 saves into the Delve slice and legacy settings", () => {
   const d = decode(JSON.stringify(bases.v1()));
   assert.equal(d.delve.best, 12);
-  assert.equal(d.delve.essence, 8);
+  assert.equal(d.delve.courage, 8);
   assert.equal(d.delve.run?.seed, 1234);
   assert.equal(d.tower.run, null);
   assert.equal(d.settings.infoDisplay, "none");
@@ -240,4 +240,9 @@ test("decode rejects runs that break player invariants", () => {
   const outsideTooHigh = v3();
   outsideTooHigh.tower.run = run({ outside: true, height: 1, floor: 0 });
   assert.equal(decode(JSON.stringify(outsideTooHigh)).tower.run, null);
+});
+
+test("saves from before the currencies were renamed keep their Inspiration and Courage", () => {
+  const d = decode(JSON.stringify({ ...v3(), tower: { ...v3().tower, inspiration: undefined, shards: 5 }, delve: { ...v3().delve, courage: undefined, essence: 6 } }));
+  assert.deepEqual([d.tower.inspiration, d.delve.courage], [5, 6]);
 });

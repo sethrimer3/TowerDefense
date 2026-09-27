@@ -101,7 +101,7 @@ export type ModeSave = {
 export type Save = {
   version: 3;
   tower: ModeSave & {
-    shards: number;
+    inspiration: number;
     log: Record<string, FloorRecord>;
     /** Which 10-floor section new ascents begin in (0 = floors 1–10). */
     startSection: number;
@@ -110,7 +110,7 @@ export type Save = {
      * starting HP and as the record of which sections are unlocked. */
     sectionHp: Record<string, number>;
   };
-  delve: ModeSave & { essence: number };
+  delve: ModeSave & { courage: number };
   gold: number;
   provisions: Record<GoldItemId, number>;
   xp: number;

@@ -11,17 +11,17 @@ export const TOWER_SECTION = 10;
 export const SAVE_KEY = "towerincramental.v1";
 export const COLORS = { yellow: "#eac16b", blue: "#6dbdf1", red: "#df797e" };
 export type KeyColor = keyof typeof COLORS;
-export type Currency = "essence" | "shards";
+export type Currency = "courage" | "inspiration";
 export const UPGRADES = [
-  { id: "delve", name: "Into the depths", description: "Unlock Delve and the Courage skill tree", base: 3, max: 1, currency: "shards" },
-  { id: "legacy", name: "An enduring legacy", description: "Unlock the Legacy skill tree and unlock Defend", base: 8, max: 1, currency: "essence" },
+  { id: "delve", name: "Into the depths", description: "Unlock Delve and the Courage skill tree", base: 3, max: 1, currency: "inspiration" },
+  { id: "legacy", name: "An enduring legacy", description: "Unlock the Legacy skill tree and unlock Defend", base: 8, max: 1, currency: "courage" },
   {
     id: "revive",
     name: "Revive",
     description: "Undo a fatal move before moving in the new run",
     base: 12,
     max: 1,
-    currency: "essence",
+    currency: "courage",
   },
   {
     id: "undos",
@@ -29,7 +29,7 @@ export const UPGRADES = [
     description: "Store one additional undo (up to 5)",
     base: 5,
     max: 4,
-    currency: "essence",
+    currency: "courage",
   },
   {
     id: "hp",
@@ -37,7 +37,7 @@ export const UPGRADES = [
     description: "+20 starting maximum HP",
     base: 3,
     max: 50,
-    currency: "essence",
+    currency: "courage",
   },
   {
     id: "attack",
@@ -45,7 +45,7 @@ export const UPGRADES = [
     description: "+2 starting attack",
     base: 4,
     max: 50,
-    currency: "essence",
+    currency: "courage",
   },
   {
     id: "defense",
@@ -53,7 +53,7 @@ export const UPGRADES = [
     description: "+1 starting defense",
     base: 4,
     max: 50,
-    currency: "essence",
+    currency: "courage",
   },
   {
     id: "yellow",
@@ -61,7 +61,7 @@ export const UPGRADES = [
     description: "+1 starting amber key",
     base: 3,
     max: 10,
-    currency: "essence",
+    currency: "courage",
   },
   {
     id: "blue",
@@ -69,7 +69,7 @@ export const UPGRADES = [
     description: "+1 starting azure key",
     base: 5,
     max: 10,
-    currency: "essence",
+    currency: "courage",
   },
   {
     id: "red",
@@ -77,7 +77,7 @@ export const UPGRADES = [
     description: "+1 starting crimson key",
     base: 7,
     max: 10,
-    currency: "essence",
+    currency: "courage",
   },
   {
     id: "quality",
@@ -85,7 +85,7 @@ export const UPGRADES = [
     description: "+2 weapon attack and +1 armor defense",
     base: 6,
     max: 20,
-    currency: "essence",
+    currency: "courage",
   },
   {
     id: "auto",
@@ -93,16 +93,16 @@ export const UPGRADES = [
     description: "Unlock automatic movement in both Tower and Delve",
     base: 3,
     max: 1,
-    currency: "essence",
+    currency: "courage",
   },
   {
-    id: "aiMemory", name: "Route memory", description: "Delve: remember explored routes, then recognize dead ends", base: 3, max: 2, currency: "essence",
+    id: "aiMemory", name: "Route memory", description: "Delve: remember explored routes, then recognize dead ends", base: 3, max: 2, currency: "courage",
   },
   {
-    id: "aiEvaluation", name: "Resource judgment", description: "Delve: learn combat cost, key cost, contextual rewards, then scarcity", base: 4, max: 4, currency: "essence",
+    id: "aiEvaluation", name: "Resource judgment", description: "Delve: learn combat cost, key cost, contextual rewards, then scarcity", base: 4, max: 4, currency: "courage",
   },
   {
-    id: "aiLookahead", name: "Labyrinth scouting", description: "Delve: +4 scouting radius and +2 interactions of route lookahead", base: 5, max: 4, currency: "essence",
+    id: "aiLookahead", name: "Labyrinth scouting", description: "Delve: +4 scouting radius and +2 interactions of route lookahead", base: 5, max: 4, currency: "courage",
   },
   {
     id: "autoPersist",
@@ -110,7 +110,7 @@ export const UPGRADES = [
     description: "Choose whether Automove turns off when you fall in battle",
     base: 6,
     max: 1,
-    currency: "essence",
+    currency: "courage",
   },
   {
     id: "shardHp",
@@ -118,7 +118,7 @@ export const UPGRADES = [
     description: "+15 starting maximum HP",
     base: 4,
     max: 40,
-    currency: "shards",
+    currency: "inspiration",
   },
   {
     id: "shardAttack",
@@ -126,7 +126,7 @@ export const UPGRADES = [
     description: "+1 starting attack",
     base: 5,
     max: 40,
-    currency: "shards",
+    currency: "inspiration",
   },
   {
     id: "shardDefense",
@@ -134,7 +134,7 @@ export const UPGRADES = [
     description: "+1 starting defense",
     base: 5,
     max: 40,
-    currency: "shards",
+    currency: "inspiration",
   },
   {
     id: "shardUndos",
@@ -142,7 +142,7 @@ export const UPGRADES = [
     description: "Store one additional undo (up to 5)",
     base: 6,
     max: 4,
-    currency: "shards",
+    currency: "inspiration",
   },
   {
     id: "wisdomFocus",
@@ -150,7 +150,7 @@ export const UPGRADES = [
     description: "A placeholder Wisdom upgrade",
     base: 5,
     max: 5,
-    currency: "shards",
+    currency: "inspiration",
   },
   {
     id: "wisdomMemory",
@@ -158,7 +158,7 @@ export const UPGRADES = [
     description: "A placeholder Wisdom upgrade",
     base: 7,
     max: 5,
-    currency: "shards",
+    currency: "inspiration",
   },
   {
     id: "wisdomSight",
@@ -166,7 +166,7 @@ export const UPGRADES = [
     description: "A placeholder Wisdom upgrade",
     base: 9,
     max: 5,
-    currency: "shards",
+    currency: "inspiration",
   },
   {
     id: "renownBanner",
@@ -174,7 +174,7 @@ export const UPGRADES = [
     description: "A placeholder Renown upgrade",
     base: 6,
     max: 5,
-    currency: "essence",
+    currency: "courage",
   },
   {
     id: "renownOath",
@@ -182,7 +182,7 @@ export const UPGRADES = [
     description: "A placeholder Renown upgrade",
     base: 8,
     max: 5,
-    currency: "essence",
+    currency: "courage",
   },
   {
     id: "renownCrown",
@@ -190,7 +190,7 @@ export const UPGRADES = [
     description: "A placeholder Renown upgrade",
     base: 10,
     max: 5,
-    currency: "essence",
+    currency: "courage",
   },
 ] as const;
 export type UpgradeId = (typeof UPGRADES)[number]["id"];

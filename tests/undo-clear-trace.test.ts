@@ -86,7 +86,7 @@ function observe(g: Game, action: unknown, result: unknown) {
     action, result, message: g.message, summary: g.summary?.reason ?? null,
     player: r.player, height: r.height, floor: r.floor, outside: !!r.outside,
     damaged: r.damaged, keysSpent: r.keysSpent,
-    log: g.save.tower.log, shards: g.save.tower.shards, essence: g.save.delve.essence,
+    log: g.save.tower.log, shards: g.save.tower.inspiration, essence: g.save.delve.courage,
     gold: g.save.gold, reached: slice.reached, best: slice.best,
     history: slice.history.length, revival: !!slice.revival,
     changes: r.changes, floors: r.floors ?? null, route: g.route.length, auto: g.auto, paused: g.paused,

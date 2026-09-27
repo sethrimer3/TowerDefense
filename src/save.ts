@@ -8,8 +8,8 @@ import { decodeSettings, defaultSettings } from "./settings.ts";
 export function defaults(): Save {
   return {
     version: 3,
-    tower: { run: null, history: [], revival: null, best: 0, reached: 0, shards: 0, log: {}, lootedTiles: {}, startSection: 0, sectionHp: {} },
-    delve: { run: null, history: [], revival: null, best: 0, reached: 0, essence: 0, lootedTiles: {} },
+    tower: { run: null, history: [], revival: null, best: 0, reached: 0, inspiration: 0, log: {}, lootedTiles: {}, startSection: 0, sectionHp: {} },
+    delve: { run: null, history: [], revival: null, best: 0, reached: 0, courage: 0, lootedTiles: {} },
     gold: 0,
     provisions: Object.fromEntries(
       GOLD_SHOP.map((g) => [g.id, 0]),
@@ -182,9 +182,9 @@ function decodeProgress(s: any, d: Save, undoCapacity: number) {
   d.gold = count(s.gold, d.gold);
   for (const g of GOLD_SHOP) d.provisions[g.id] = count(s.provisions?.[g.id], d.provisions[g.id], 999);
   d.xp = count(s.xp, d.xp);
-  d.tower.shards = count(s.tower?.shards, d.tower.shards);
+  d.tower.inspiration = count(s.tower?.inspiration ?? s.tower?.shards, d.tower.inspiration);
   d.tower.best = count(s.tower?.best, d.tower.best);
-  d.delve.essence = count(s.delve?.essence, d.delve.essence);
+  d.delve.courage = count(s.delve?.courage ?? s.delve?.essence, d.delve.courage);
   d.delve.best = count(s.delve?.best, d.delve.best);
   applyMode(d.tower, decodeMode(s.tower, undoCapacity));
   applyMode(d.delve, decodeMode(s.delve, undoCapacity));
@@ -192,7 +192,7 @@ function decodeProgress(s: any, d: Save, undoCapacity: number) {
 /** Version 1 had a single run (the endless climb); it becomes the Delve slice. */
 function migrateV1(s: any, d: Save, undoCapacity: number) {
   d.delve.best = count(s.best, d.delve.best);
-  d.delve.essence = count(s.essence, d.delve.essence);
+  d.delve.courage = count(s.essence, d.delve.courage);
   applyMode(d.delve, decodeMode({ run: s.run, history: s.history, revival: s.revival }, undoCapacity));
 }
 /** Existing records are already rewarded; preserve old balances without double-paying. */
@@ -236,8 +236,8 @@ function decodeSections(tower: any, d: Save) {
   if (finite(start) && unlocked) d.tower.startSection = Math.floor(start);
 }
 const touchedDelve = (d: Save) =>
-  !!(d.delve.run || d.delve.best || d.delve.essence) ||
-  UPGRADES.some((u) => u.currency === "essence" && d.upgrades[u.id]);
+  !!(d.delve.run || d.delve.best || d.delve.courage) ||
+  UPGRADES.some((u) => u.currency === "courage" && d.upgrades[u.id]);
 /** Preserve access and purchases in saves made before skill trees existed. */
 function migratePreSkillTrees(upgrades: any, d: Save) {
   if (!upgrades || "delve" in upgrades) return;

@@ -18,8 +18,8 @@ export function renderHud(game: Game, renderer: Renderer, overlay: BoardOverlay)
   renderConsumables(game);
   renderProgress(game);
   renderModeActions(game);
-  text("essence", devAmount(game, game.save.delve.essence));
-  text("shards", devAmount(game, game.save.tower.shards));
+  text("courage", devAmount(game, game.save.delve.courage));
+  text("inspiration", devAmount(game, game.save.tower.inspiration));
   text("level", `LV ${levelForXp(game.save.xp)}`);
   renderStatus(game, overlay);
   el("health").style.width = `${(100 * game.run.player.hp) / game.run.player.maxHp}%`;

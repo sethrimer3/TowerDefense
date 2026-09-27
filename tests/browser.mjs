@@ -56,7 +56,7 @@ await page.locator("#retire").click();
 await page.locator("#confirm").click();
 await page.locator("#again").click();
 // Delve Courage is credited per 10 height as it's reached; retiring pays nothing extra.
-if ((await page.locator("#essence").textContent()) !== "0")
+if ((await page.locator("#courage").textContent()) !== "0")
   throw Error("Retire paid an unexpected reward");
 const overflow = await page.evaluate(
   () => document.documentElement.scrollWidth > innerWidth,
@@ -77,7 +77,7 @@ console.log(
       "retire confirmation",
       "summary",
       "new run",
-      "essence",
+      "courage",
     ],
   }),
 );
@@ -100,7 +100,7 @@ for (let i = 0; i < 2; i++) {
 // Earning Courage takes 10 height per point, so grant enough for Automove.
 await page.evaluate(() => {
   const save = JSON.parse(localStorage.getItem("towerincramental.v1"));
-  save.delve.essence = 3;
+  save.delve.courage = 3;
   sessionStorage.setItem("__treeFixture", JSON.stringify(save));
 });
 await page.reload();

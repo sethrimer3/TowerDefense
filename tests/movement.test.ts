@@ -85,7 +85,7 @@ test("fatal path resets to entrance, stops route, and cannot undo without Revive
   assert.equal(g.run.player.y, 0);
   assert.equal(g.save.delve.history.length, 0);
   assert.equal(g.undo(), false);
-  assert.equal(g.save.delve.essence, 0);
+  assert.equal(g.save.delve.courage, 0);
 });
 test("Revive restores pre-fatal state and rolls back pending rewards; next move forfeits it irreversibly", () => {
   const g = corridor();
@@ -96,21 +96,21 @@ test("Revive restores pre-fatal state and rolls back pending rewards; next move 
   const before = structuredClone(g.run);
   g.move(0, 1);
   assert.ok(g.save.delve.revival);
-  assert.equal(g.save.delve.essence, 0);
+  assert.equal(g.save.delve.courage, 0);
   assert.ok(g.undo());
   assert.deepEqual(g.run, before);
-  assert.equal(g.save.delve.essence, 0);
+  assert.equal(g.save.delve.courage, 0);
   g.move(0, 1);
   g.summary = null;
   g.move(0, -1);
   assert.ok(g.save.delve.revival, "Blocked move must not forfeit revival");
   g.move(0, 1);
   assert.equal(g.save.delve.revival, null);
-  assert.equal(g.save.delve.essence, 0);
+  assert.equal(g.save.delve.courage, 0);
   g.undo();
   assert.equal(g.run.player.y, 0);
   assert.equal(g.save.delve.revival, null);
-  assert.equal(g.save.delve.essence, 0);
+  assert.equal(g.save.delve.courage, 0);
 });
 test("undo and Revive persist safely across refresh", () => {
   const g = new Game(defaults());
@@ -131,7 +131,7 @@ test("undo and Revive persist safely across refresh", () => {
   loaded = new Game(saved);
   loaded.switchMode("delve");
   assert.ok(loaded.undo());
-  assert.equal(loaded.save.delve.essence, 0);
+  assert.equal(loaded.save.delve.courage, 0);
   const corrupt = JSON.parse(JSON.stringify(saved));
   corrupt.delve.history = [{ run: { player: {} }, best: 0 }];
   corrupt.delve.revival = { snapshot: null };

@@ -113,10 +113,10 @@ test("automation avoids lethal fights; manual death resets immediately and award
   assert.ok(g.summary);
   assert.equal(g.save.delve.run?.player.y, 0);
   assert.equal(g.undo(), false);
-  const earned = g.save.delve.essence;
+  const earned = g.save.delve.courage;
   g.finish("again");
-  assert.equal(g.save.delve.essence, earned);
-  g.save.delve.essence = 100;
+  assert.equal(g.save.delve.courage, earned);
+  g.save.delve.courage = 100;
   g.save.upgrades.auto = 1;
   assert.ok(g.buy("hp"));
   g.summary = null;
@@ -221,7 +221,7 @@ test("old runs safely migrate topology while retaining earned stats and permanen
   g.run.height = 29;
   g.run.player.attack = 40;
   g.run.changes["15,25"] = { kind: "floor" };
-  save.delve.essence = 19;
+  save.delve.courage = 19;
   save.delve.reached = 29; // isolate migration from unrelated milestone crediting
   save.upgrades.hp = 2;
   const migrated = new Game(decode(JSON.stringify(save)));
@@ -230,7 +230,7 @@ test("old runs safely migrate topology while retaining earned stats and permanen
   assert.equal(migrated.run.player.y, 0);
   assert.equal(migrated.run.player.attack, 40);
   assert.equal(migrated.run.height, 29);
-  assert.equal(migrated.save.delve.essence, 19);
+  assert.equal(migrated.save.delve.courage, 19);
   assert.equal(migrated.save.upgrades.hp, 2);
   assert.deepEqual(migrated.run.changes, {});
   // The old generator's chunk-local "stairs" coordinates no longer exist;
