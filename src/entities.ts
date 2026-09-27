@@ -76,8 +76,9 @@ export type Run = {
   treasures: number;
   changes: Record<string, Tile>;
   floor: number;
-  /** Tower only: each visited room's own changes, keyed by height, so
-   * descending and re-climbing preserves what was already done there. */
+  /** Tower only: each other visited floor's changes, keyed by height, so
+   * descending and re-climbing preserves what was already done there. The
+   * current floor's are `changes`; see TowerClimb. */
   floors?: Record<number, Record<string, Tile>>;
   /** Tower only: the ATK/DEF the run started with (base + gear +
    * provisions), restored whenever the climb crosses into a new section. */

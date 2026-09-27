@@ -22,6 +22,16 @@ _Avoid_: reward chest, clear reward
 The lifetime record, per floor, of which clear tiers were earned and which were paid, so a tier pays exactly once however the run is undone, revived, reloaded or replaced.
 _Avoid_: tower log, reward log
 
+### The climb
+
+**Visited floor**:
+A Tower floor the player has stood on during this run. It stays as it was left, and the stairs lead back to it, unless it lies below a section's first floor.
+_Avoid_: explored room, old floor
+
+**Section**:
+A run of ten Tower floors. Its first floor is sealed below, and the ATK/DEF gathered from items resets on entering it; each section remembers the best HP the player arrived with, and later ascents can start there.
+_Avoid_: stage, chapter
+
 ### Progress
 
 **Equivalent floor**:

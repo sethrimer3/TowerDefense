@@ -6,6 +6,13 @@ import { point } from "../src/entities.ts";
 import { TOWER_SECTION, TOWER_START_X } from "../src/config.ts";
 import { generateTowerFloor } from "../src/tower/index.ts";
 
+/** Stands on floor `height` of a fresh copy of the run's floors. */
+function standOn(g: Game, height: number) {
+  g.run.height = height;
+  g.run.changes = {};
+  g.run.floors = {};
+  g.loadMode();
+}
 function climb(g: Game) {
   g.run.changes[point(g.run.player.x, g.run.player.y + 1)] = { kind: "stairs" };
   g.move(0, 1, true);
@@ -19,8 +26,7 @@ test("each section's first room has no way down; other rooms do", () => {
 test("crossing into a new section resets ATK/DEF, records start HP, and blocks descent", () => {
   const g = new Game(defaults());
   const base = { attack: g.run.player.attack, defense: g.run.player.defense };
-  g.run.height = TOWER_SECTION - 1;
-  g.enterTowerFloor();
+  standOn(g, TOWER_SECTION - 1);
   g.run.player.attack += 6;
   g.run.player.defense += 3;
   g.run.player.hp = 90;
@@ -32,8 +38,7 @@ test("crossing into a new section resets ATK/DEF, records start HP, and blocks d
   g.descendTowerRoom();
   assert.equal(g.run.height, TOWER_SECTION);
   // A worse arrival never lowers the record.
-  g.run.height = TOWER_SECTION - 1;
-  g.enterTowerFloor();
+  standOn(g, TOWER_SECTION - 1);
   g.run.player.hp = 40;
   climb(g);
   assert.equal(g.save.tower.sectionHp[1], 90);

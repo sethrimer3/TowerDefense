@@ -39,6 +39,7 @@ import type { CombatPrediction } from "./combat.ts";
 import { ATTACK_SHARD, DEFENSE_SHARD, isLethal, resolveStep, type StepBlocked, type StepEffect } from "./step-effects.ts";
 import { OutsideWorld } from "./outside.ts";
 import { ClearLedger } from "./tower/clear-ledger.ts";
+import { TowerClimb } from "./tower/climb.ts";
 import { materialDef, MATERIALS } from "./materials.ts";
 import { rollTreasureLoot } from "./loot.ts";
 import { MODES, milestones } from "./modes.ts";
@@ -90,13 +91,6 @@ export class Game {
     const u = this.save.upgrades;
     return 1 + u.undos + u.shardUndos;
   }
-  /** Keep run.floors[height] pointed at the live run.changes object so
-   * existing code that mutates run.changes still edits the right room,
-   * while other visited rooms keep their own state to return to. */
-  private linkTowerFloor() {
-    this.run.floors ??= {};
-    this.run.floors[this.run.height] = this.run.changes;
-  }
   /** Grants unlimited currency, every Tower section, and every game mode.
    * Reversible: turning Dev Mode back off leaves the grants in place, since
    * there is no meaningful "undo" for progress the player has already seen. */
@@ -145,7 +139,6 @@ export class Game {
   private adoptRun(run: Run) {
     this.run = run;
     this.save[this.mode].run = run;
-    if (!run.outside && this.mode === "tower") this.linkTowerFloor();
     this.world = this.buildWorld();
   }
   /** The live run's board, regenerated from its seed and changes. */
@@ -368,10 +361,7 @@ export class Game {
       floor: 0,
       player,
     };
-    if (this.mode === "tower") {
-      this.run.baseStats = { attack, defense };
-      this.linkTowerFloor();
-    }
+    if (this.mode === "tower") this.run.baseStats = { attack, defense };
     this.world = this.rules.board(this.run);
     if (outside) {
       this.run.outside = true;
@@ -641,7 +631,6 @@ export class Game {
     this.run.outside = false;
     p.x = this.rules.entranceX;
     p.y = 0;
-    if (this.mode === "tower") this.linkTowerFloor();
     this.world = this.rules.board(this.run);
     this.route = [];
     this.feedback(this.rules.words.enter);
@@ -671,12 +660,9 @@ export class Game {
   }
   advanceTowerRoom() {
     this.claimRewards();
-    this.run.height++;
-    this.run.maxHeight = Math.max(this.run.maxHeight ?? 0, this.run.height);
-    this.enterTowerFloor();
-    this.run.player.x = TOWER_START_X;
-    this.run.player.y = 0;
-    if (this.run.height % TOWER_SECTION === 0) this.enterTowerSection();
+    const { board, sectionStart } = this.climb.up();
+    this.enterTowerFloor(board);
+    if (sectionStart) this.enterTowerSection();
     else this.feedback("A new chamber opens.");
   }
   /** Crossing into a new 10-floor section: the way down is sealed (its
@@ -700,36 +686,22 @@ export class Game {
    * to the previous room exactly as it was left: cleared tiles stay clear,
    * surviving enemies and unclaimed loot are still there to finish off. */
   descendTowerRoom() {
-    if (this.run.height % TOWER_SECTION === 0) return;
+    if (this.climb.sealedBelow) return;
     this.claimRewards();
-    this.run.height--;
-    this.enterTowerFloor();
-    const stairs = [...(this.world as RoomWorld).cells].find(
-      ([, t]) => t.kind === "stairs",
-    );
-    if (stairs) {
-      const [sx, sy] = stairs[0].split(",").map(Number);
-      this.run.player.x = sx;
-      this.run.player.y = sy;
-    } else {
-      this.run.player.x = TOWER_START_X;
-      this.run.player.y = 0;
-    }
+    this.enterTowerFloor(this.climb.down()!.board);
     this.feedback("You descend to the room below.");
   }
-  /** Enter a Tower room by height, reusing its persistent mutations when it
-   * was already visited (run.floors[height] IS run.changes for that floor —
-   * a live reference, not a copy — so every clear() written through
-   * RoomWorld.changes during that visit is already saved; nothing further
-   * needs to happen when leaving). Keys reset per visit; damage taken
-   * anywhere in the run keeps counting toward the whole-ascent Gold clear. */
-  enterTowerFloor() {
+  /** Stands on the floor the climb just reached, as it was left. Keys reset
+   * per visit; damage taken anywhere in the run keeps counting toward the
+   * whole-ascent Gold clear. */
+  private enterTowerFloor(board: RoomWorld) {
     this.run.keysSpent = false;
     this.recordProgress();
-    this.run.floors ??= {};
-    this.run.changes = this.run.floors[this.run.height] ??= {};
-    this.world = new RoomWorld(this.run.seed, this.run.height, this.run.changes);
+    this.world = board;
     this.syncRewards();
+  }
+  private get climb() {
+    return new TowerClimb(this.run);
   }
   recordProgress() {
     if (this.run.outside) return 0;
