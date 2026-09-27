@@ -32,21 +32,25 @@ export function renderHud(game: Game, renderer: Renderer, overlay: BoardOverlay)
   renderLockedTab("defend", !!game.save.upgrades.legacy, "Defend", "Unlock An enduring legacy in the Courage tree");
 }
 
+/** The board's heading: the forest's title outside, the mode's inside. */
+export function boardTitle(game: Pick<Game, "mode" | "run">) {
+  const words = MODES[game.mode].words;
+  return game.run.outside ? words.outsideTitle : words.title;
+}
+
 /** The board's title, subtitle and caption: the forest clearing outside, or
  * the Tower/Delve name inside. */
 export function renderBoardHeading(game: Game, overlay: BoardOverlay) {
   el("board").dataset.outside = String(!!game.run.outside);
   el("board").classList.toggle("mode-tower", game.mode === "tower");
   const words = MODES[game.mode].words;
+  text("board-title", boardTitle(game));
+  text("height-zone", boardTitle(game));
   if (game.run.outside) {
-    text("board-title", words.outsideTitle);
-    text("height-zone", words.outsideTitle);
     const labels = { cloudy: "CLOUDY", sunny: "SUNNY", rain: "RAINING", storm: "THUNDERSTORM" };
     text("board-subtitle", `FOREST CLEARING · ${labels[outsideWeather(game.run.seed)]}`);
     el("inspect").textContent = "Follow the forest path and step onto the entrance at the top to begin again.";
   } else {
-    text("board-title", words.title);
-    text("height-zone", words.title);
     text("board-subtitle", words.subtitle);
     el("inspect").textContent = "";
   }
