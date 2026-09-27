@@ -1,4 +1,4 @@
-import { random } from "./src/generation.ts";
+import { random } from "./src/random.ts";
 
 function generateOrganicRooms(width: number, height: number, seed: number) {
   const rng = random(seed);

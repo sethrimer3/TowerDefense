@@ -1,5 +1,6 @@
 import { themeInfluence } from "./delve/labyrinth.ts";
 import type { Mode } from "./entities.ts";
+import { tileRandom } from "./random.ts";
 
 // Presentation only: themes never consume the generation RNG or alter tiles.
 export const THEMES = [
@@ -45,12 +46,6 @@ export interface TileNeighbors {
   southWall?: boolean;
   westWall?: boolean;
   eastWall?: boolean;
-}
-
-export function tileRandom(x: number, y: number, seed: number) {
-  let h = Math.imul(x, 374761393) ^ Math.imul(y, 668265263) ^ seed;
-  h = Math.imul(h ^ (h >>> 13), 1274126177);
-  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 }
 
 // Smooth 2D value noise at two scales makes contiguous lobes and pockets.

@@ -1,4 +1,4 @@
-import { tileRandom } from "./themes.ts";
+import { tileRandom } from "./random.ts";
 import { FLOWER_COLORS, TILE_PX, tileKey, valueNoise, type DecorSource, type Flower, type Plant, type PlantKind, type TileDecor } from "./decor.ts";
 
 /** Bakes a tile's static decor (moss, water, vines, flowers, plants) into a

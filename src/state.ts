@@ -26,13 +26,9 @@ import {
   type Player,
   type ClearTier,
 } from "./entities.ts";
-import {
-  World,
-  RoomWorld,
-  LAYOUT_VERSION,
-  TOWER_LAYOUT_VERSION,
-  type Board,
-} from "./generation.ts";
+import { World, LAYOUT_VERSION } from "./delve/world.ts";
+import { RoomWorld, TOWER_LAYOUT_VERSION } from "./tower/room-world.ts";
+import type { Board } from "./board.ts";
 import type { CombatPrediction } from "./combat.ts";
 import { ATTACK_SHARD, DEFENSE_SHARD, isLethal, resolveStep, type StepBlocked, type StepEffect } from "./step-effects.ts";
 import { OutsideWorld } from "./outside.ts";
@@ -616,9 +612,10 @@ export class Game {
     else if (!PERMANENT_TILES.has(t.kind)) this.world.clear(x, y);
   }
   private afterDelveStep(t: Tile, x: number, y: number) {
-    const world = this.world as World;
+    const world = this.world;
+    if (!(world instanceof World)) return;
+    // The world keeps the run's milestone and floor itself.
     if (t.kind === "oneway" && world.cross(x, y)) {
-      this.run.delveMilestone = world.milestone;
       this.run.delveVisited = {};
       this.run.delveKnown = {};
       this.save.delve.history = []; // Milestone passages cannot be reversed with undo.
@@ -630,7 +627,6 @@ export class Game {
     this.run.height = Math.max(this.run.height, world.depth(x, y));
     this.run.maxHeight = Math.max(this.run.maxHeight ?? 0, this.run.height);
     world.maintain(y);
-    this.run.floor = world.floor;
     this.recordProgress();
   }
   advanceTowerRoom() {

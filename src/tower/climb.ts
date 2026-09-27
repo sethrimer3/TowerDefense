@@ -1,6 +1,6 @@
 import type { Run, Tile } from "../entities.ts";
 import { TOWER_SECTION, TOWER_START_X } from "../config.ts";
-import { RoomWorld } from "../generation.ts";
+import { RoomWorld } from "./room-world.ts";
 
 type Changes = Record<string, Tile>;
 

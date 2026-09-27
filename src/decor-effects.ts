@@ -1,4 +1,5 @@
 import type { Tile } from "./entities.ts";
+import { random } from "./random.ts";
 import { TILE_PX, waterAt, type Crate, type DecorSource, type TileDecor } from "./decor.ts";
 import { GRASS, PixelBatch, withAlpha, WOOD } from "./decor-sprites.ts";
 
@@ -133,7 +134,7 @@ export class DecorEffects {
 
   /** Pieces fly on, away from the hero's step (screen y is down). */
   private shatter(at: { x: number; y: number }, crates: Crate[], dir: { x: number; y: number }, now: number) {
-    const rng = mulberry(Math.floor(now) ^ (at.x * 73856093) ^ (at.y * 19349663));
+    const rng = random(Math.floor(now) ^ (at.x * 73856093) ^ (at.y * 19349663));
     const push = Math.hypot(dir.x, dir.y) || 1;
     const fling = { x: dir.x / push, y: -dir.y / push };
     for (const c of crates) {
@@ -146,7 +147,7 @@ export class DecorEffects {
   }
 
   private rustle(x: number, y: number) {
-    const rng = mulberry(x * 92821 + y * 68917 + this.particles.length);
+    const rng = random(x * 92821 + y * 68917 + this.particles.length);
     for (let k = 0; k < 4; k++)
       this.particles.push({
         gx: x * TILE_PX + 4 + rng() * 16, gy: -y * TILE_PX + 8 + rng() * 12, z: 5 + rng() * 4,
@@ -158,7 +159,7 @@ export class DecorEffects {
 
   private puff(x: number, y: number, d: TileDecor) {
     const glow = d.plants.some((p) => p.kind === "mushrooms" && p.glow);
-    const rng = mulberry(x * 1231 + y * 7717 + this.particles.length);
+    const rng = random(x * 1231 + y * 7717 + this.particles.length);
     for (const p of d.plants) {
       if (p.kind !== "mushrooms") continue;
       for (let k = 0; k < 7; k++)
@@ -173,7 +174,7 @@ export class DecorEffects {
   }
 
   private splash(gx: number, gy: number, now: number) {
-    const rng = mulberry(gx * 31 + gy * 17 + Math.floor(now));
+    const rng = random(gx * 31 + gy * 17 + Math.floor(now));
     for (let k = 0; k < 6; k++) {
       const a = rng() * Math.PI * 2;
       this.particles.push({
@@ -302,15 +303,4 @@ function drawParticle(px: PixelBatch, p: Particle, alpha: number) {
   const size = p.kind === "dust" ? Math.round(p.w + p.age * 4) : 0;
   if (size) px.add(col, gx - (size >> 1), gy - (size >> 1), size, size);
   else px.add(col, gx, gy, p.w, p.h);
-}
-
-function mulberry(seed: number) {
-  let n = seed >>> 0;
-  return () => {
-    n += 0x6d2b79f5;
-    let t = n;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
 }

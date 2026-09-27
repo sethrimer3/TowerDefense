@@ -6,7 +6,9 @@
 import { START_X, TOWER_START_X, TOWER_WIDTH, WIDTH, goldReward } from "./config.ts";
 import type { MaterialStack } from "./materials.ts";
 import type { Mode, Run, Save } from "./entities.ts";
-import { LAYOUT_VERSION, RoomWorld, TOWER_LAYOUT_VERSION, World, type Board } from "./generation.ts";
+import { LAYOUT_VERSION, World } from "./delve/world.ts";
+import { RoomWorld, TOWER_LAYOUT_VERSION } from "./tower/room-world.ts";
+import type { Board } from "./board.ts";
 import { rollEnemyDrops, towerEnemyDrops } from "./loot.ts";
 
 export type ModeProfile = {
@@ -93,7 +95,7 @@ export const MODES: Record<Mode, ModeProfile> = {
     width: WIDTH,
     entranceX: START_X,
     layoutVersion: LAYOUT_VERSION,
-    board: (run) => new World(run.seed, run.changes, run.floor, run.delveMilestone ?? 0),
+    board: (run) => new World(run),
     enemyDrops: (name, rng) => rollEnemyDrops(name, rng),
     endGold: (run) => goldReward(run.kills, run.treasures),
     lootKey: (run, x, y) => `${run.seed}:${x},${y}`,

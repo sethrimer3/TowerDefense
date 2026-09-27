@@ -1,6 +1,6 @@
-import type { Board } from "./generation.ts";
+import type { Board } from "./board.ts";
 import type { BoardView } from "./render-frame.ts";
-import { tileRandom } from "./themes.ts";
+import { tileRandom } from "./random.ts";
 import { decorSourceFor, FLOWER_COLORS, TILE_PX, tileDecor, tileKey, waterAt, type DecorSource, type Flower, type Plant, type TileDecor } from "./decor.ts";
 import { DecorBaker } from "./decor-bake.ts";
 import { DecorEffects, type EffectFrame, type TileAt } from "./decor-effects.ts";

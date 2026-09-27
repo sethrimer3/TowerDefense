@@ -1,6 +1,6 @@
 import { Game } from '../src/state.ts';
 import { defaults } from '../src/save.ts';
-import { World, LAYOUT_VERSION } from '../src/generation.ts';
+import { World, LAYOUT_VERSION } from '../src/delve/world.ts';
 import { chooseDelveStep, capabilities } from '../src/delve/automove.ts';
 import { region } from '../src/delve/labyrinth.ts';
 import { point } from '../src/entities.ts';
@@ -23,7 +23,7 @@ export function simulate(seed: number, level: AiLevel, opts: { steps?: number; h
   g.run.seed = seed; g.run.outside = false; g.run.layoutVersion = LAYOUT_VERSION;
   g.run.changes = {}; g.run.height = 0; g.run.delveMilestone = 0; g.run.floor = 0;
   Object.assign(g.run.player, { x: 15, y: 0, hp: opts.hp ?? 400, maxHp: opts.hp ?? 400, attack: opts.attack ?? 14, defense: opts.defense ?? 4, keys: { yellow: opts.keys ?? 1, blue: 0, red: 0 } });
-  g.world = new World(seed, g.run.changes);
+  g.world = new World(g.run);
   const run = g.run, caps = capabilities(g);
   const pockets = new Map<string, string>();
   const note = (a: number) => { for (const n of region(seed, a).nodes) if (n.pattern) pockets.set(point(n.x, n.y), n.pattern.quality); };

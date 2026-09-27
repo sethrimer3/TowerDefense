@@ -1,6 +1,7 @@
 import { point, type Point, type Tile } from '../entities.ts';
 import type { Gate } from '../tower/types.ts';
 import { choosePattern, FALSE_ASCENTS, type Pattern } from './patterns.ts';
+import { tileRandom } from '../random.ts';
 
 /** Delve is one continuous lattice of chambers (COLUMNS wide, endless rows).
  * Every lattice cell belongs to exactly one AREA. Area ownership is decided
@@ -25,12 +26,7 @@ const { columns: COLS, rowsPerArea: ROWS, pitch: PITCH } = DELVE_TUNING;
 const AREA_SPAN = ROWS * PITCH;
 const REACH = (DELVE_TUNING.tongue + 1) * PITCH + 4;
 
-export function hash(x: number, y: number, seed: number) {
-  let h = Math.imul(x, 374761393) ^ Math.imul(y, 668265263) ^ seed;
-  h = Math.imul(h ^ h >>> 13, 1274126177);
-  return ((h ^ h >>> 16) >>> 0) / 4294967296;
-}
-function rngFor(seed: number) { let n = 0; return () => hash(n++, 91, seed); }
+function rngFor(seed: number) { let n = 0; return () => tileRandom(n++, 91, seed); }
 
 /** A small per-column vertical warp: each lattice column's 6-tile slab is
  * shifted 0..3 tiles, neighbouring slabs by at most one. Horizontal corridors
@@ -40,8 +36,8 @@ const warps = new Map<number, number[]>();
 function warp(x: number, seed: number) {
   let w = warps.get(seed);
   if (!w) {
-    w = [Math.floor(hash(0, 1, seed) * 4)];
-    for (let i = 1; i < 6; i++) w.push(Math.max(0, Math.min(3, w[i - 1] + Math.floor(hash(i, 2, seed) * 3) - 1)));
+    w = [Math.floor(tileRandom(0, 1, seed) * 4)];
+    for (let i = 1; i < 6; i++) w.push(Math.max(0, Math.min(3, w[i - 1] + Math.floor(tileRandom(i, 2, seed) * 3) - 1)));
     warps.set(seed, w); if (warps.size > 8) warps.delete(warps.keys().next().value!);
   }
   return w[Math.max(0, Math.min(5, Math.floor(x / 6)))];
@@ -56,7 +52,7 @@ const boundaries = new Map<string, Boundary>();
 /** Boundary `b` (b >= 1) separates area b-1 below from area b above. */
 export function boundary(seed: number, b: number): Boundary {
   const key = `${seed}:${b}`, old = boundaries.get(key); if (old) return old;
-  const h = (i: number) => hash(b, 300 + i, seed);
+  const h = (i: number) => tileRandom(b, 300 + i, seed);
   const cols = [...Array(COLS).keys()];
   const take = (i: number) => cols.splice(Math.floor(h(i) * cols.length), 1)[0];
   // The gate avoids the outer columns so false branches can surround it.
@@ -281,7 +277,7 @@ function hops(nodes: Node[], from: number) {
  * like it without owning any of its progression. */
 function influence({ area, seed }: Lab, n: Node, { exitNear, entryNear, nextRow }: { exitNear: number; entryNear: number; nextRow: number }) {
   const climb = Math.max(0, Math.min(1, (n.row - nextRow + 2) / (DELVE_TUNING.tongue + 2)));
-  const bias = (hash(n.col, n.row, seed ^ 0x2b1d) - 0.5) * 0.16;
+  const bias = (tileRandom(n.col, n.row, seed ^ 0x2b1d) - 0.5) * 0.16;
   const future = Math.max(1 - exitNear / DELVE_TUNING.themeBand, climb * 0.9);
   const past = area ? 1 - entryNear / DELVE_TUNING.themeBand : 0;
   return Math.max(area - 0.49, Math.min(area + 0.49, area + 0.5 * Math.max(0, future) - 0.5 * Math.max(0, past) + bias));

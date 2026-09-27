@@ -5,7 +5,8 @@
  * `reward` tile in the floor's changes, so undo and Revive bring it back
  * with the rest of the board; opening a tier already paid pays nothing. */
 import type { ClearTier, Run, Save } from "../entities.ts";
-import { RoomWorld, type Board } from "../generation.ts";
+import { RoomWorld } from "./room-world.ts";
+import type { Board } from "../board.ts";
 
 export const CLEAR_TIERS: readonly ClearTier[] = ["silver", "gold", "platinum"];
 

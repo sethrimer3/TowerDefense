@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { torchLightField } from "../src/torch-light.ts";
-import { computeVisibilityPolygon } from "../src/lighting.ts";
-import { chooseTorchSpots, TORCH_PLACEMENT } from "../src/generation.ts";
+import { computeVisibilityPolygon } from "../src/torches.ts";
+import { chooseTorchSpots, TORCH_PLACEMENT } from "../src/torches.ts";
 import { point, type Tile } from "../src/entities.ts";
 
 /** Builds a tile map from rows drawn top (high y) to bottom (y = 0). */

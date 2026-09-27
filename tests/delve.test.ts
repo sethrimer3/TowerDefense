@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { analyzeDelve, flood } from '../src/delve/analyzer.ts';
 import { region, depthAt } from '../src/delve/labyrinth.ts';
-import { World, generate, LAYOUT_VERSION } from '../src/generation.ts';
+import { World, generate, LAYOUT_VERSION } from '../src/delve/world.ts';
 import { Game } from '../src/state.ts';
 import { defaults, decode } from '../src/save.ts';
 import { point } from '../src/entities.ts';
@@ -42,7 +42,7 @@ test('costs on terminal branches really separate rewards from the main labyrinth
 test('milestone crossing seals behind the player, persists, and prevents undo across the seal', () => {
   const g = new Game(defaults()); g.save.upgrades.delve = 1; g.switchMode('delve');
   g.run.seed = 42; g.run.outside = false; g.run.layoutVersion = LAYOUT_VERSION;
-  g.world = new World(42, g.run.changes);
+  g.world = new World(g.run);
   const gate = region(42, 0).gate;
   Object.assign(g.run.player, { x: gate.x, y: gate.y - 1 });
   assert.ok(g.move(0, 1)); assert.equal(g.run.height, 100); assert.equal(g.run.delveMilestone, 1);
@@ -68,7 +68,7 @@ test('Automove intelligence tiers are measurably better on identical labyrinths'
 });
 test('torches sit on plain floor, once, even where areas interlock', () => {
   for (let seed = 0; seed < 6; seed++) {
-    const w = new World(seed, {}, 0, 0), spots = w.torches.map(t => point(t.x, t.y));
+    const w = new World({ seed, changes: {}, floor: 0 }), spots = w.torches.map(t => point(t.x, t.y));
     assert.equal(new Set(spots).size, spots.length);
     for (const t of w.torches) assert.equal(w.tile(t.x, t.y).kind, 'floor', `torch at ${t.x},${t.y}`);
   }

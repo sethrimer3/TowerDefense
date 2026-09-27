@@ -1,6 +1,7 @@
-import { TOWER_SECTION, TOWER_START_X } from "../config.ts";
+import { TOWER_SECTION, TOWER_START_X, UNGUARDED_LOOT_CHANCE } from "../config.ts";
 import { point, type Tile } from "../entities.ts";
-import { random, reachable, rollUnguardedLoot } from "../generation.ts";
+import { random } from "../random.ts";
+import { reachable } from "../board.ts";
 import { analyzeFloor, formatFloorSummary, type FloorAnalysis } from "./analyzer.ts";
 import { embed, ENTRY, type Embedding } from "./embedder.ts";
 import { GraphBuilder, generateStrategicGraph } from "./strategic-graph.ts";
@@ -76,6 +77,15 @@ export function generateTowerFloor(seed: number, room: number): TowerFloor {
 }
 
 /** Human-readable generation report for one floor (debugging/tuning). */
+/** The rare loot on one unguarded floor tile, or null (most rolls). */
+export function rollUnguardedLoot(rng: () => number): Tile | null {
+  if (rng() >= UNGUARDED_LOOT_CHANCE) return null;
+  const choice = Math.floor(rng() * 6);
+  if (choice < 3)
+    return { kind: "key", color: (["yellow", "blue", "red"] as const)[choice] };
+  return { kind: (["attack", "defense", "treasure"] as const)[choice - 3] };
+}
+
 export function towerFloorReport(seed: number, room: number): { analysis: FloorAnalysis; text: string } {
   const floor = generateTowerFloor(seed, room);
   const analysis = analyzeFloor(floor.embedding);

@@ -57,7 +57,7 @@ async function swipe(dx, dy) {
 // the generator: find a seed whose first chunk has each one away from the
 // edges, then carve floor and walls around it so each route is fixed.
 const scene = await page.evaluate(async () => {
-  const { generate } = await import("/src/generation.ts");
+  const { generate } = await import("/src/delve/world.ts");
   const inner = (x, y, below, above) => x >= 2 && x <= 27 && y - below >= 0 && y + above < 20;
   for (let seed = 1; seed < 1000; seed++) {
     const cells = [...generate(seed, 0)].map(([k, t]) => { const [x, y] = k.split(",").map(Number); return { x, y, t }; });

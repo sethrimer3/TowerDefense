@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { generateTowerRoom, reachable, RoomWorld } from "../src/generation.ts";
+import { generateTowerRoom, RoomWorld } from "../src/tower/room-world.ts";
+import { reachable } from "../src/board.ts";
 import { point } from "../src/entities.ts";
 import { Game } from "../src/state.ts";
 import { defaults } from "../src/save.ts";

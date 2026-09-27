@@ -1,6 +1,6 @@
 import type { Mode, Tile } from "./entities.ts";
-import type { Board } from "./generation.ts";
-import { tileRandom } from "./themes.ts";
+import type { Board } from "./board.ts";
+import { tileRandom } from "./random.ts";
 import { MODES } from "./modes.ts";
 
 export const OUTSIDE_SIZE = 20;

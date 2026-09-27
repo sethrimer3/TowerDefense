@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { random } from "../src/generation.ts";
+import { random } from "../src/random.ts";
 import { generateTowerFloor } from "../src/tower/index.ts";
 import { embed } from "../src/tower/embedder.ts";
 import { generateStrategicGraph } from "../src/tower/strategic-graph.ts";

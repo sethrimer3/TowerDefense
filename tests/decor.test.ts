@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { point, type Tile, type Torch } from "../src/entities.ts";
-import type { Board } from "../src/generation.ts";
+import type { Board } from "../src/board.ts";
 import { clearDecorCache, decorSourceFor, TILE_PX, tileDecor, waterAt, type DecorSource } from "../src/decor.ts";
 import { DecorLayer } from "../src/decor-render.ts";
 import { OutsideGrass } from "../src/outside-grass.ts";

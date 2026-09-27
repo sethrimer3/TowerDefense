@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { ClearLedger } from "../src/tower/clear-ledger.ts";
 import { defaults } from "../src/save.ts";
-import { RoomWorld } from "../src/generation.ts";
+import { RoomWorld } from "../src/tower/room-world.ts";
 import { point, type Run, type Tile } from "../src/entities.ts";
 
 /** A 5x5 open floor with the stairs in the far corner, a fresh run on it,

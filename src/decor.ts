@@ -1,7 +1,9 @@
 import { CHUNK } from "./config.ts";
 import { point, type Tile } from "./entities.ts";
-import type { Board, RoomWorld, World } from "./generation.ts";
-import { tileRandom } from "./themes.ts";
+import type { Board } from "./board.ts";
+import type { RoomWorld } from "./tower/room-world.ts";
+import type { World } from "./delve/world.ts";
+import { random, tileRandom } from "./random.ts";
 
 /** Procedural dungeon dressing — moss, vines, glowing flowers, plants,
  * crates, pools — planned purely from the board and seed. Presentation only:
@@ -222,14 +224,7 @@ function waterField(src: DecorSource, fx: number, fy: number) {
 
 /** A small deterministic generator per (source, tile, salt). */
 function rngFor(src: DecorSource, x: number, y: number, salt: number) {
-  let n = (Math.floor(tileRandom(x * 31 + salt, y * 17 - salt, src.seed ^ 0x5eed) * 4294967296)) >>> 0;
-  return () => {
-    n += 0x6d2b79f5;
-    let t = n;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
+  return random(Math.floor(tileRandom(x * 31 + salt, y * 17 - salt, src.seed ^ 0x5eed) * 4294967296));
 }
 
 const DIRS = [

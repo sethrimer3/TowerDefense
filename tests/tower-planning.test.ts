@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { TOWER_HEIGHT, TOWER_WIDTH, type KeyColor } from "../src/config.ts";
 import { point, type Tile } from "../src/entities.ts";
-import { random } from "../src/generation.ts";
+import { random } from "../src/random.ts";
 import { generateTowerFloor } from "../src/tower/index.ts";
 import { analyzeFloor, asciiMap, formatFloorSummary, keyEconomy } from "../src/tower/analyzer.ts";
 import { generateStrategicGraph } from "../src/tower/strategic-graph.ts";

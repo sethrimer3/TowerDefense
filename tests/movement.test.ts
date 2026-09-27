@@ -3,7 +3,10 @@ import assert from "node:assert/strict";
 import { Game } from "../src/state.ts";
 import { defaults, decode } from "../src/save.ts";
 import { point, type Tile } from "../src/entities.ts";
-import { generate, generateDelveMap, reachable } from "../src/generation.ts";
+import { generate } from "../src/delve/world.ts";
+import { generateDelveMap } from "./delve-map.ts";
+import { reachable } from "../src/board.ts";
+import { WIDTH } from "../src/config.ts";
 function corridor() {
   const g = new Game(defaults());
   g.save.upgrades.delve = 1;
@@ -169,6 +172,6 @@ test("generated boundaries are closed and sparse region snapshots stay connected
       assert.equal(c.get(point(0, y))?.kind ?? 'wall', 'wall');
       assert.equal(c.get(point(29, y))?.kind ?? 'wall', 'wall');
     }
-    assert.equal(reachable(full, '15,0').size, [...full.values()].filter(t => t.kind !== 'wall').length);
+    assert.equal(reachable(full, '15,0', undefined, WIDTH).size, [...full.values()].filter(t => t.kind !== 'wall').length);
   }
 });

@@ -3,8 +3,11 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createHash, type Hash } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { RoomWorld, World, random } from "../src/generation.ts";
-import { LIGHTING_CONFIG, computeVisibilityPolygon, getTorchFlicker, getTorchSway } from "../src/lighting.ts";
+import { RoomWorld } from "../src/tower/room-world.ts";
+import { World } from "../src/delve/world.ts";
+import { random } from "../src/random.ts";
+import { LIGHTING_CONFIG, getTorchFlicker, getTorchSway } from "../src/lighting.ts";
+import { computeVisibilityPolygon } from "../src/torches.ts";
 import { ATMOSPHERE_CONFIG, LightingPass } from "../src/lighting-pass.ts";
 import { EntityLighting } from "../src/entity-lighting.ts";
 import { DungeonLight, type Foreground, type LitBoard } from "../src/dungeon-light.ts";
@@ -148,7 +151,7 @@ function towerScene(seed: number, room: number): Scene {
 }
 
 function delveScene(seed: number, y: number): Scene {
-  const world = new World(seed, {});
+  const world = new World({ seed, changes: {}, floor: 0 });
   return { world, look: lookOf("delve", y, seed), torches: () => world.torches, center: { x: 15, y } };
 }
 

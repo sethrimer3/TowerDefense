@@ -1,5 +1,6 @@
 import type { Mode } from "./entities.ts";
-import { themeAt, tileRandom } from "./themes.ts";
+import { themeAt } from "./themes.ts";
+import { tileRandom } from "./random.ts";
 import { wallAdjacencyMask } from "./area1-tileset.ts";
 
 export const THEMED_TILESET_NAMES = [

@@ -1,4 +1,4 @@
-import { random } from "../generation.ts";
+import { random } from "../random.ts";
 import {
   ARCHETYPES,
   TOWER_PATTERNS,

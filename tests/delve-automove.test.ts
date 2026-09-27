@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { Game } from "../src/state.ts";
 import { defaults } from "../src/save.ts";
-import { World, LAYOUT_VERSION } from "../src/generation.ts";
+import { World, LAYOUT_VERSION } from "../src/delve/world.ts";
 import { chooseDelveStep, decisions } from "../src/delve/automove.ts";
 
 // Characterization trace of Delve Automove: seeded runs where Automove takes
@@ -54,7 +54,7 @@ function trace(seed: number, level: Level, who: typeof CHARACTERS.strong): strin
     g.switchMode("delve");
     Object.assign(g.run, { seed, outside: false, layoutVersion: LAYOUT_VERSION, changes: {}, height: 0, delveMilestone: 0, floor: 0 });
     Object.assign(g.run.player, { x: 15, y: 0, hp: who.hp, maxHp: who.hp, attack: who.attack, defense: who.defense, keys: { yellow: who.keys, blue: 0, red: 0 } });
-    g.world = new World(seed, g.run.changes);
+    g.world = new World(g.run);
     const run = g.run, h = createHash("sha256"), out: string[] = [];
     for (let i = 1; i <= STEPS; i++) {
       const step = chooseDelveStep(g);

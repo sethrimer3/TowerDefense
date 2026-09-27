@@ -1,6 +1,6 @@
 import type { Run, Tile } from "./entities.ts";
 import { predict } from "./combat.ts";
-import type { RoomWorld } from "./generation.ts";
+import type { RoomWorld } from "./tower/room-world.ts";
 import { doorCost } from "./doors.ts";
 import { stairsOn, TowerClimb } from "./tower/climb.ts";
 

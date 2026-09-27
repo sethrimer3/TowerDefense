@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createHash, type Hash } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { random } from "../src/generation.ts";
+import { random } from "../src/random.ts";
 import { defaultLayout, fitLayout, placeCityTile, placeStructure, type Layout, type PlacedKind } from "../src/defend/layout.ts";
 import { generateCity, type CityMap } from "../src/defend/citygen.ts";
 import { Fences, parkFences } from "../src/defend/fences.ts";

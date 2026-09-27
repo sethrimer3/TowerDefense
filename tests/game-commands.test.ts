@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Game } from "../src/state.ts";
 import { defaults } from "../src/save.ts";
-import { RoomWorld } from "../src/generation.ts";
+import { RoomWorld } from "../src/tower/room-world.ts";
 import { chooseStep } from "../src/automation.ts";
 
 /** A Tower floor of open tiles with `size` columns and rows, the player in

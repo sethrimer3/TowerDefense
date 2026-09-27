@@ -2,7 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { defaults, decode } from "../src/save.ts";
 import { Game } from "../src/state.ts";
-import { RoomWorld, World } from "../src/generation.ts";
+import { RoomWorld } from "../src/tower/room-world.ts";
+import { World } from "../src/delve/world.ts";
 import {
   metalUnlocked,
   GEMS,
@@ -241,7 +242,7 @@ test("materials persist through death, undo, and new runs (never part of Run)", 
   g.save.upgrades.delve = 1;
   g.switchMode("delve");
   g.run.changes["15,1"] = { kind: "enemy", enemy: { name: "Cinder slime", hp: 1, attack: 0, defense: 0, tier: 0 } };
-  g.world = new World(g.run.seed, g.run.changes, g.run.floor);
+  g.world = new World(g.run);
   const before = g.snapshot();
   g.move(0, 1);
   const materialsAfterKill = { ...g.save.materials };
@@ -259,7 +260,7 @@ test("undo/re-kill the same physical enemy cannot duplicate its material drop", 
   g.switchMode("delve");
   // Force a guaranteed common drop and a low-HP enemy so we can kill it repeatedly.
   g.run.changes["15,1"] = { kind: "enemy", enemy: { name: "Cinder slime", hp: 1, attack: 0, defense: 0, tier: 0 } };
-  g.world = new World(g.run.seed, g.run.changes, g.run.floor);
+  g.world = new World(g.run);
   const before = g.snapshot();
   g.move(0, 1);
   const first = g.save.materials.cinderSlimeBlob ?? 0;

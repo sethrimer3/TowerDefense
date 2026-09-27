@@ -1,5 +1,6 @@
 import { CHUNK, COLORS } from "./config.ts";
-import { drawTerrain, tileRandom } from "./themes.ts";
+import { drawTerrain } from "./themes.ts";
+import { tileRandom } from "./random.ts";
 import type { Mode, Tile, Torch } from "./entities.ts";
 import { drawForestTile } from "./outside.ts";
 import { getTorchFlicker, getTorchSway } from "./lighting.ts";

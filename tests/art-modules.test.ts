@@ -2,7 +2,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createHash, type Hash } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { RoomWorld, World, type Board } from "../src/generation.ts";
+import { RoomWorld } from "../src/tower/room-world.ts";
+import { World } from "../src/delve/world.ts";
+import type { Board } from "../src/board.ts";
 import { area1ItemId, floorVariant, wallAdjacencyMask } from "../src/area1-tileset.ts";
 import { TreeParticles } from "../src/tree-particles.ts";
 import { DecorLayer, type DecorFrame, type MirroredSprites } from "../src/decor-render.ts";
@@ -222,7 +224,7 @@ function towerDecor(seed: number, room: number): DecorScene {
 }
 
 function delveDecor(seed: number, y: number): DecorScene {
-  return { name: `delve ${seed}/${y}`, world: new World(seed, {}), seed, view: { left: 6.4, bottom: y - 8.3, n: 17, s: 20 }, start: [15, y] };
+  return { name: `delve ${seed}/${y}`, world: new World({ seed, changes: {}, floor: 0 }), seed, view: { left: 6.4, bottom: y - 8.3, n: 17, s: 20 }, start: [15, y] };
 }
 
 const lively = (d: TileDecor) => !!(d.crates.length || d.water || d.thicket || d.drip || d.flowers.length);

@@ -4,19 +4,16 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { CHUNK, START_X, UNGUARDED_LOOT_CHANCE, WIDTH, type KeyColor } from "../src/config.ts";
 import { point, type Tile } from "../src/entities.ts";
-import {
-  RoomWorld,
-  World,
-  chooseTorchSpots,
-  generate,
-  generateDelveMap,
-  random,
-  reachable,
-  rollUnguardedLoot,
-} from "../src/generation.ts";
+import { RoomWorld } from "../src/tower/room-world.ts";
+import { World, generate } from "../src/delve/world.ts";
+import { chooseTorchSpots } from "../src/torches.ts";
+import { generateDelveMap } from "./delve-map.ts";
+import { random } from "../src/random.ts";
+import { reachable } from "../src/board.ts";
+import { rollUnguardedLoot } from "../src/tower/index.ts";
 import { region } from "../src/delve/labyrinth.ts";
 
-// Characterization hashes of the world boards in generation.ts: flood fills
+// Characterization hashes of the world boards: flood fills
 // on seeded synthetic chunks and real ones, torch spots, the Delve World's and Tower RoomWorld's tiles,
 // steps, crossings, upkeep and torch breaking, and the unguarded loot roll.
 // Regenerate (only when a change to them is intended) with UPDATE_GOLDEN=1.
@@ -74,11 +71,11 @@ function floodFills(group: number) {
   for (let i = 0; i < 80; i++) {
     const { cells, base } = syntheticChunk(group * 1000 + i);
     const blocked = new Set([...cells].filter(([, t]) => t.kind === "door").map(([k]) => k));
-    out.push(reachable(cells, point(START_X, base)).size, [...reachable(cells, point(START_X, base), blocked)]);
+    out.push(reachable(cells, point(START_X, base), undefined, WIDTH).size, [...reachable(cells, point(START_X, base), blocked, WIDTH)]);
   }
   for (let index = 0; index < 4; index++) {
     const cells = generate(group, index);
-    out.push(reachable(cells, point(START_X, index * CHUNK)).size);
+    out.push(reachable(cells, point(START_X, index * CHUNK), undefined, WIDTH).size);
   }
   return digest(out);
 }
@@ -120,7 +117,7 @@ function torchSpots(seed: number) {
  * window (walls, wrap, one-way gates), crossings, upkeep and torches. */
 function delveWorld(seed: number) {
   const changes: Record<string, Tile> = {};
-  const w = new World(seed, changes);
+  const w = new World({ seed, changes, floor: 0 });
   const out: unknown[] = [];
   const rnd = random(seed * 31);
   for (let m = 0; m < 3; m++) {

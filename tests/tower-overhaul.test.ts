@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Game } from "../src/state.ts";
 import { defaults, decode } from "../src/save.ts";
-import { RoomWorld, generateTowerRoom } from "../src/generation.ts";
+import { RoomWorld, generateTowerRoom } from "../src/tower/room-world.ts";
 import { predict } from "../src/combat.ts";
 import { isDeadlocked } from "../src/analysis.ts";
 import { getTowerEnemy, TOWER_CYCLE_MULTIPLIER, TOWER_ZONE_ENEMIES, towerZoneIndex } from "../src/scaling.ts";

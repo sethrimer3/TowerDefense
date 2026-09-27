@@ -1,4 +1,4 @@
-import { tileRandom } from "./themes.ts";
+import { tileRandom } from "./random.ts";
 import { doorId } from "./doors.ts";
 import type { Tile } from "./entities.ts";
 

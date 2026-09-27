@@ -1,30 +1,25 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import {
-  generate,
-  generateDelveMap,
-  generateTowerRoom,
-  random,
-  rollUnguardedLoot,
-  reachable,
-  World,
-  LAYOUT_VERSION,
-} from "../src/generation.ts";
-import { generateTowerFloor, geometryProblems, towerFloorReport } from "../src/tower/index.ts";
+import { generate, World, LAYOUT_VERSION } from "../src/delve/world.ts";
+import { generateDelveMap } from "./delve-map.ts";
+import { generateTowerRoom } from "../src/tower/room-world.ts";
+import { random } from "../src/random.ts";
+import { reachable } from "../src/board.ts";
+import { generateTowerFloor, geometryProblems, rollUnguardedLoot, towerFloorReport } from "../src/tower/index.ts";
 import { doorCost } from "../src/doors.ts";
 import { defaults, decode } from "../src/save.ts";
 import { Game } from "../src/state.ts";
 import { predict } from "../src/combat.ts";
 import { chooseStep } from "../src/automation.ts";
 import { point } from "../src/entities.ts";
-import { TOWER_START_X } from "../src/config.ts";
+import { TOWER_START_X, WIDTH } from "../src/config.ts";
 test("deterministic delve chunks are internally consistent and the whole map connects from the entrance", () => {
   for (let seed = 0; seed < 10; seed++) {
     for (let i = 0; i < 5; i++) assert.deepEqual(generate(seed, i), generate(seed, i));
     const full = generateDelveMap(seed);
     assert.notEqual(full.get(point(15, 0))?.kind, "wall");
     assert.equal(
-      reachable(full, point(15, 0)).size,
+      reachable(full, point(15, 0), undefined, WIDTH).size,
       [...full.values()].filter((t) => t.kind !== "wall").length,
       `Seed ${seed}: the whole delve map must be one connected component`,
     );
@@ -215,7 +210,7 @@ test("old runs safely migrate topology while retaining earned stats and permanen
   // Migration expectations must not depend on the wall layout of a
   // Date.now-derived seed selected by the test runner.
   g.run.seed = 3;
-  g.world = new World(3, g.run.changes);
+  g.world = new World(g.run);
   g.run.layoutVersion = undefined;
   g.run.player.y = 27;
   g.run.height = 29;
@@ -243,7 +238,7 @@ test("automation reliably makes forward progress, never taking a lethal fight, a
     g.save.upgrades.delve = 1;
     g.switchMode("delve");
     g.run.seed = seed;
-    g.world = new World(seed, g.run.changes);
+    g.world = new World(g.run);
     for (let i = 0; i < 1400 && g.run.height < 15; i++) {
       const step = chooseStep(g);
       if (!step) break;

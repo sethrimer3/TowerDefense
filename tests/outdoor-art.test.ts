@@ -2,11 +2,11 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createHash, type Hash } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { random } from "../src/generation.ts";
+import { random } from "../src/random.ts";
 import { OutdoorWeather } from "../src/weather.ts";
 import { OutsideWorld, OUTSIDE_SIZE, drawEntrance, drawForestTile, outsideSpriteKind, outsideWeather } from "../src/outside.ts";
 import { glowColor, torchLightField } from "../src/torch-light.ts";
-import { computeVisibilityPolygon } from "../src/lighting.ts";
+import { computeVisibilityPolygon } from "../src/torches.ts";
 import type { Tile } from "../src/entities.ts";
 
 // Characterization hashes of the outdoor art: seeded runs of OutdoorWeather
