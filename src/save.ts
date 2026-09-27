@@ -5,6 +5,7 @@ import { EQUIPMENT_SLOTS, type CraftedEquipment, type EquipmentSlot } from "./eq
 import { CONSUMABLES, type ConsumableId } from "./crafting.ts";
 import { decodeDefendSave, defaultDefendSave } from "./defend/progress.ts";
 import { decodeSettings, defaultSettings } from "./settings.ts";
+import { loadout } from "./loadout.ts";
 export function defaults(): Save {
   return {
     version: 3,
@@ -258,7 +259,7 @@ export function decode(raw: string | null): Save {
   try {
     const s = JSON.parse(raw ?? "null") ?? {};
     decodeUpgrades(s.upgrades, d);
-    const undoCapacity = 1 + d.upgrades.undos + d.upgrades.shardUndos;
+    const { undoCapacity } = loadout(d);
     d.settings = decodeSettings(s.settings);
     for (const step of VERSION_STEPS.get(s.version) ?? []) step(s, d, undoCapacity);
     decodeReached(s, d);

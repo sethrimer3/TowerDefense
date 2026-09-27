@@ -80,9 +80,9 @@ export type Run = {
    * descending and re-climbing preserves what was already done there. The
    * current floor's are `changes`; see TowerClimb. */
   floors?: Record<number, Record<string, Tile>>;
-  /** Tower only: the ATK/DEF the run started with (base + gear +
-   * provisions), restored whenever the climb crosses into a new section. */
-  baseStats?: { attack: number; defense: number };
+  /** Tower only: the ATK/DEF/max HP the run started with (its loadout),
+   * which ATK/DEF return to whenever the climb crosses into a new section. */
+  loadout?: { attack: number; defense: number; maxHp: number };
 };
 export type MoveSnapshot = { run: Run; best: number };
 export type Revival = { snapshot: MoveSnapshot };

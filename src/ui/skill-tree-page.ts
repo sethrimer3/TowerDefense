@@ -1,5 +1,6 @@
 import { UPGRADES, cost, type UpgradeId } from "../config.ts";
 import { TREES, skillAvailable, type TreeId } from "../skill-trees.ts";
+import { upgradeText } from "../loadout.ts";
 import { TreeParticles } from "../tree-particles.ts";
 import type { AppContext } from "./app.ts";
 import { clamp, el, skillSprite, uiSprite, type UiSprite } from "./dom.ts";
@@ -138,7 +139,7 @@ export class SkillTreePage {
     else if (!available) hint = "Locked.";
     else if (balance < price) hint = `Need ${price} ${currency} · have ${balance}.`;
     else hint = "Tap again to purchase.";
-    return `<b style="color:var(--tree-color)">${u.name}</b><div>${level} / ${u.max} ranks</div><div>${u.description}.</div><div class="${canBuy ? "safe" : ""}">${hint}</div>${!maxed && !locked ? `<div>Cost: ${price} ${currency}</div>` : ""}`;
+    return `<b style="color:var(--tree-color)">${u.name}</b><div>${level} / ${u.max} ranks</div><div>${upgradeText(u.id)}.</div><div class="${canBuy ? "safe" : ""}">${hint}</div>${!maxed && !locked ? `<div>Cost: ${price} ${currency}</div>` : ""}`;
   }
 
   /** Above the selected node, or below it when there is no room above. */

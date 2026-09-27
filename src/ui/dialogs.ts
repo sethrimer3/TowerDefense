@@ -1,6 +1,7 @@
 import { TOWER_SECTION } from "../config.ts";
 import { CLEAR_TIERS } from "../tower/clear-ledger.ts";
 import { MODES } from "../modes.ts";
+import { loadout } from "../loadout.ts";
 import type { AppContext } from "./app.ts";
 import { displayedProgress, el, itemSprite, uiSprite } from "./dom.ts";
 import { devAmount } from "./hud.ts";
@@ -140,7 +141,7 @@ export function showSectionPicker(ctx: AppContext) {
   if (game.mode !== "tower") return;
   const render = () => {
     const tower = game.save.tower,
-      maxHp = tower.run?.player.maxHp ?? game.combatStats().maxHp,
+      maxHp = tower.run?.player.maxHp ?? loadout(game.save).maxHp,
       current = game.startSection(),
       unlocked = Object.keys(tower.sectionHp).map(Number),
       // Every unlocked section, plus the next one as a locked goal.

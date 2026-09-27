@@ -12,6 +12,8 @@ export const SAVE_KEY = "towerincramental.v1";
 export const COLORS = { yellow: "#eac16b", blue: "#6dbdf1", red: "#df797e" };
 export type KeyColor = keyof typeof COLORS;
 export type Currency = "courage" | "inspiration";
+/** Upgrades that make the character stronger say so in `grants` (what one
+ * rank adds; see loadout.ts), which also writes their description. */
 export const UPGRADES = [
   { id: "delve", name: "Into the depths", description: "Unlock Delve and the Courage skill tree", base: 3, max: 1, currency: "inspiration" },
   { id: "legacy", name: "An enduring legacy", description: "Unlock the Legacy skill tree and unlock Defend", base: 8, max: 1, currency: "courage" },
@@ -26,7 +28,7 @@ export const UPGRADES = [
   {
     id: "undos",
     name: "Echoes of time",
-    description: "Store one additional undo (up to 5)",
+    grants: { undos: 1 },
     base: 5,
     max: 4,
     currency: "courage",
@@ -34,7 +36,7 @@ export const UPGRADES = [
   {
     id: "hp",
     name: "Vital ember",
-    description: "+20 starting maximum HP",
+    grants: { maxHp: 20 },
     base: 3,
     max: 50,
     currency: "courage",
@@ -42,7 +44,7 @@ export const UPGRADES = [
   {
     id: "attack",
     name: "Tempered edge",
-    description: "+2 starting attack",
+    grants: { attack: 2 },
     base: 4,
     max: 50,
     currency: "courage",
@@ -50,7 +52,7 @@ export const UPGRADES = [
   {
     id: "defense",
     name: "Stone skin",
-    description: "+1 starting defense",
+    grants: { defense: 1 },
     base: 4,
     max: 50,
     currency: "courage",
@@ -58,7 +60,7 @@ export const UPGRADES = [
   {
     id: "yellow",
     name: "Gilded passage",
-    description: "+1 starting amber key",
+    grants: { yellow: 1 },
     base: 3,
     max: 10,
     currency: "courage",
@@ -66,7 +68,7 @@ export const UPGRADES = [
   {
     id: "blue",
     name: "Azure passage",
-    description: "+1 starting azure key",
+    grants: { blue: 1 },
     base: 5,
     max: 10,
     currency: "courage",
@@ -74,7 +76,7 @@ export const UPGRADES = [
   {
     id: "red",
     name: "Crimson passage",
-    description: "+1 starting crimson key",
+    grants: { red: 1 },
     base: 7,
     max: 10,
     currency: "courage",
@@ -82,7 +84,8 @@ export const UPGRADES = [
   {
     id: "quality",
     name: "Heirloom steel",
-    description: "+2 weapon attack and +1 armor defense",
+    grants: { attack: 2, defense: 1 },
+    words: { attack: "weapon attack", defense: "armor defense" },
     base: 6,
     max: 20,
     currency: "courage",
@@ -115,7 +118,7 @@ export const UPGRADES = [
   {
     id: "shardHp",
     name: "Battle-tested",
-    description: "+15 starting maximum HP",
+    grants: { maxHp: 15 },
     base: 4,
     max: 40,
     currency: "inspiration",
@@ -123,7 +126,7 @@ export const UPGRADES = [
   {
     id: "shardAttack",
     name: "Keen instinct",
-    description: "+1 starting attack",
+    grants: { attack: 1 },
     base: 5,
     max: 40,
     currency: "inspiration",
@@ -131,7 +134,7 @@ export const UPGRADES = [
   {
     id: "shardDefense",
     name: "Iron resolve",
-    description: "+1 starting defense",
+    grants: { defense: 1 },
     base: 5,
     max: 40,
     currency: "inspiration",
@@ -139,7 +142,7 @@ export const UPGRADES = [
   {
     id: "shardUndos",
     name: "Rehearsed steps",
-    description: "Store one additional undo (up to 5)",
+    grants: { undos: 1 },
     base: 6,
     max: 4,
     currency: "inspiration",
@@ -211,19 +214,22 @@ export const GOLD_SHOP = [
   {
     id: "heal",
     name: "Traveler's elixir",
-    description: "+20 max HP next run",
+    grants: { maxHp: 20 },
+    words: { maxHp: "max HP next run" },
     cost: 6,
   },
   {
     id: "edge",
     name: "Whetstone",
-    description: "+3 attack next run",
+    grants: { attack: 3 },
+    words: { attack: "attack next run" },
     cost: 10,
   },
   {
     id: "guard",
     name: "Aegis charm",
-    description: "+3 defense next run",
+    grants: { defense: 3 },
+    words: { defense: "defense next run" },
     cost: 10,
   },
 ] as const;

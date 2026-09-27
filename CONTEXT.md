@@ -32,6 +32,16 @@ _Avoid_: explored room, old floor
 A run of ten Tower floors. Its first floor is sealed below, and the ATK/DEF gathered from items resets on entering it; each section remembers the best HP the player arrived with, and later ascents can start there.
 _Avoid_: stage, chapter
 
+### The character
+
+**Loadout**:
+What the character starts a run with: ATK, DEF, max HP, keys and how many undos it can store. It comes from the baseline, the upgrades bought, the character's level, the equipped gear and the provisions bought for that run.
+_Avoid_: base stats, starting stats
+
+**Provision**:
+A one-run boost bought with Gold; it adds to the next run's loadout and is spent when that run starts.
+_Avoid_: consumable (a crafted item used during a run), buff
+
 ### Progress
 
 **Equivalent floor**:

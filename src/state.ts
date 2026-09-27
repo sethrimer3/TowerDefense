@@ -9,8 +9,6 @@ import {
   TOWER_START_X,
   TOWER_SECTION,
   xpForKill,
-  levelForXp,
-  levelBonus,
   cost,
   UPGRADES,
   GOLD_SHOP,
@@ -43,9 +41,9 @@ import { TowerClimb } from "./tower/climb.ts";
 import { materialDef, MATERIALS } from "./materials.ts";
 import { rollTreasureLoot } from "./loot.ts";
 import { MODES, milestones } from "./modes.ts";
+import { loadout } from "./loadout.ts";
 import {
   creditMaterials,
-  getEquippedBonuses,
   craftEquipment as craftEquipmentItem,
   salvageEquipment as salvageEquipmentItem,
   equipItem as equipItemAction,
@@ -88,8 +86,7 @@ export class Game {
     this.loadMode();
   }
   get undoCapacity() {
-    const u = this.save.upgrades;
-    return 1 + u.undos + u.shardUndos;
+    return loadout(this.save).undoCapacity;
   }
   /** Grants unlimited currency, every Tower section, and every game mode.
    * Reversible: turning Dev Mode back off leaves the grants in place, since
@@ -331,10 +328,8 @@ export class Game {
     this.save[this.mode].history = [];
     this.route = [];
     this.summary = null;
-    const u = this.save.upgrades,
-      prov = this.save.provisions,
-      seed = crypto.getRandomValues(new Uint32Array(1))[0];
-    const { attack, defense, maxHp } = this.combatStats();
+    const seed = crypto.getRandomValues(new Uint32Array(1))[0];
+    const { attack, defense, maxHp, keys } = loadout(this.save);
     // Tower ascents begin at the first floor of the chosen section.
     const section = this.mode === "tower" ? this.startSection() : 0,
       height = section * TOWER_SECTION;
@@ -345,9 +340,10 @@ export class Game {
       maxHp,
       attack,
       defense,
-      keys: { yellow: u.yellow, blue: u.blue, red: u.red },
+      keys,
     };
-    for (const item of GOLD_SHOP) prov[item.id] = 0;
+    // The provisions bought for this run are spent on it.
+    for (const item of GOLD_SHOP) this.save.provisions[item.id] = 0;
     this.run = {
       damaged: false,
       keysSpent: false,
@@ -361,7 +357,7 @@ export class Game {
       floor: 0,
       player,
     };
-    if (this.mode === "tower") this.run.baseStats = { attack, defense };
+    if (this.mode === "tower") this.run.loadout = { attack, defense, maxHp };
     this.world = this.rules.board(this.run);
     if (outside) {
       this.run.outside = true;
@@ -371,27 +367,6 @@ export class Game {
     this.save[this.mode].run = this.run;
     this.auto = false;
     this.paused = false;
-  }
-  /** ATK/DEF/max HP from baseline + permanent upgrades + level bonus +
-   * equipped gear + this run's provisions. */
-  combatStats() {
-    const u = this.save.upgrades,
-      prov = this.save.provisions,
-      bonus = levelBonus(levelForXp(this.save.xp));
-    // "quality" (Heirloom steel) predates crafted equipment; its ranks are
-    // folded in here as the equivalent starter-gear bonus it used to grant
-    // via the old gear() helper, so existing investment stays meaningful.
-    const baseAttack = 10 + u.attack * 2 + u.shardAttack + bonus.attack + (2 + u.quality * 2);
-    const baseDefense = 4 + u.defense + u.shardDefense + bonus.defense + (1 + u.quality);
-    const baseMaxHp = 120 + u.hp * 20 + u.shardHp * 15 + bonus.hp;
-    // Equipped crafted gear: flat bonuses first, then percentage bonuses
-    // applied to the resulting total; temporary run provisions apply last.
-    const equip = getEquippedBonuses(this.save);
-    return {
-      attack: Math.round((baseAttack + equip.flatAttack) * (1 + equip.percentAttack)) + prov.edge * 3,
-      defense: Math.round((baseDefense + equip.flatDefense) * (1 + equip.percentDefense)) + prov.guard * 3,
-      maxHp: Math.round((baseMaxHp + equip.flatMaxHp) * (1 + equip.percentMaxHp)) + prov.heal * 20,
-    };
   }
   /** A Tower section can be started in once its first floor has been
    * reached (which records its starting HP); section 0 always can. */
@@ -672,7 +647,7 @@ export class Game {
   private enterTowerSection() {
     const section = this.run.height / TOWER_SECTION,
       p = this.run.player,
-      base = this.run.baseStats ?? this.combatStats(),
+      base = this.run.loadout ?? loadout(this.save),
       best = this.save.tower.sectionHp[section] ?? 0;
     p.attack = base.attack;
     p.defense = base.defense;
@@ -788,14 +763,14 @@ export class Game {
    * run history. Called after any equip/unequip so gear changes apply
    * immediately in an active run, in both modes at once. */
   private recomputeCombatStats() {
-    const { attack, defense, maxHp } = this.combatStats();
+    const { attack, defense, maxHp } = loadout(this.save);
     for (const mode of ["tower", "delve"] as const) {
       const run = this.save[mode].run;
       if (!run || run.outside) continue;
       run.player.attack = attack;
       run.player.defense = defense;
       run.player.maxHp = maxHp;
-      if (mode === "tower") run.baseStats = { attack, defense };
+      if (mode === "tower") run.loadout = { attack, defense, maxHp };
       run.player.hp = Math.max(1, Math.min(run.player.hp, maxHp));
     }
   }
