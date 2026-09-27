@@ -110,7 +110,7 @@ function renderModeActions(game: Game) {
 }
 
 function renderStatus(game: Game, overlay: BoardOverlay) {
-  el("status-row").hidden = (game.save.settings.infoDisplay ?? "both") === "popup";
+  el("status-row").hidden = game.save.settings.infoDisplay === "popup";
   text("message", game.paused ? "Paused · take a breath." : overlay.statusLine() ?? game.message);
 }
 

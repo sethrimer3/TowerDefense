@@ -1,50 +1,63 @@
 import { defaults } from "../save.ts";
-import type { Save } from "../entities.ts";
+import { SETTINGS, type SettingKey, type Settings } from "../settings.ts";
 import type { AppContext } from "./app.ts";
 import type { BoardOverlay } from "./board-overlay.ts";
 import { displayedProgress, el } from "./dom.ts";
 
-type Settings = Save["settings"];
-/** A checkbox setting: how it reads and writes the save, and whether a change
- * only needs saving or also a HUD refresh (which saves too). */
-type Toggle = {
-  id: string;
-  label: string;
-  read(s: Settings): boolean;
-  write(s: Settings, checked: boolean): void;
-  refresh?: "hud";
+/** The settings on the page, in order; each control comes from its row in
+ * SETTINGS. */
+const PAGE = [
+  "speed", "transition", "brightness", "spritesOff", "decorOff", "batterySaver", "showArrows", "reduceMotion", "weatherSound",
+  "infoDisplay", "oneTapMove", "devMode",
+] as const satisfies readonly SettingKey[];
+type PageKey = (typeof PAGE)[number];
+
+/** What a change does once written, beyond saving. */
+const AFTER: Partial<Record<PageKey, (ctx: AppContext, overlay: BoardOverlay, s: Settings) => void>> = {
+  showArrows: (ctx) => ctx.update(),
+  weatherSound: (ctx, _, s) => {
+    if (!s.weatherSound) ctx.renderer.weather.silence();
+    ctx.update();
+  },
+  infoDisplay: (ctx, overlay, s) => {
+    if (s.infoDisplay === "status" || s.infoDisplay === "none") overlay.hideInspect();
+    ctx.save();
+    ctx.update();
+  },
+  // Turning it on also grants everything it unlocks.
+  devMode: (ctx, _, s) => {
+    ctx.game.setDevMode(s.devMode);
+    ctx.save();
+    ctx.update();
+    ctx.renderPage();
+  },
 };
 
-const TOGGLES: Toggle[] = [
-  { id: "sprites-off", label: "Turn off Sprites", read: s => !!s.spritesOff, write: (s, on) => { s.spritesOff = on; } },
-  { id: "decor", label: "Environment decor", read: s => !s.decorOff, write: (s, on) => { s.decorOff = !on; } },
-  { id: "battery-saver", label: "Battery saver (30 fps while idle)", read: s => !!s.batterySaver, write: (s, on) => { s.batterySaver = on; } },
-  { id: "arrows", label: "Show directional buttons", read: s => !!s.showArrows, write: (s, on) => { s.showArrows = on; }, refresh: "hud" },
-  { id: "motion", label: "Reduce motion", read: s => !!s.reduceMotion, write: (s, on) => { s.reduceMotion = on; } },
-  { id: "weather-sound", label: "Weather sounds", read: s => s.weatherSound !== false, write: (s, on) => { s.weatherSound = on; }, refresh: "hud" },
-];
-const INFO_DISPLAYS = [["both", "Popup + status line"], ["popup", "Popup only"], ["status", "Status line only"], ["none", "Off"]] as const;
-const TRANSITIONS = [["smooth", "Smooth"], ["fast", "Fast"], ["instant", "Off (instant)"]] as const;
-
-const checkbox = (label: string, id: string, checked: boolean) =>
-  `<label class="setting">${label}<input type="checkbox" id="${id}" ${checked ? "checked" : ""}></label>`;
-const options = (choices: readonly (readonly [string, string])[], selected: string) =>
+const options = (choices: readonly (readonly [string | number, string])[], selected: string | number) =>
   choices.map(([value, label]) => `<option value="${value}" ${selected === value ? "selected" : ""}>${label}</option>`).join("");
+
+/** One setting's control, showing its current value. */
+function control(key: PageKey, s: Settings): string {
+  const row = SETTINGS[key], value = s[key];
+  switch (row.kind) {
+    case "toggle": {
+      const checked = "invert" in row.page ? !value : value;
+      return `<label class="setting">${row.page.label}<input type="checkbox" id="${row.page.id}" ${checked ? "checked" : ""}></label>`;
+    }
+    case "choice":
+      return `<label class="setting">${row.page.label}<select id="${row.page.id}">${options(row.choices, value as string | number)}</select></label>`;
+    case "range":
+      return `<label class="setting">${row.page.label}<span class="range-setting"><input type="range" id="${row.page.id}" min="${row.min}" max="${row.max}" step="${row.step}" value="${value}" aria-label="${row.page.aria}"><output id="${row.page.id}-value">${value}</output></span></label>`;
+  }
+}
 
 /** The Settings page: display and control options, retire, and erase. */
 export function renderSettingsPage(ctx: AppContext, overlay: BoardOverlay) {
   const { game } = ctx, s = game.save.settings;
-  const brightness = s.brightness ?? 100;
   const run = game.mode === "tower" ? "ascent" : "delve";
   el("settings").innerHTML =
     `<div class="page-title"><small>MAKE THE ASCENT YOUR OWN</small><h2>Settings</h2></div>` +
-    `<label class="setting">Automove speed<select id="speed">${[1, 3, 6, 10].map((n) => `<option ${s.speed === n ? "selected" : ""} value="${n}">${n} steps / sec</option>`).join("")}</select></label>` +
-    `<label class="setting">Movement transition<select id="transition">${options(TRANSITIONS, s.transition)}</select></label>` +
-    `<label class="setting">Brightness<span class="range-setting"><input type="range" id="brightness" min="20" max="100" step="5" value="${brightness}" aria-label="Dungeon brightness"><output id="brightness-value">${brightness}</output></span></label>` +
-    TOGGLES.map(t => checkbox(t.label, t.id, t.read(s))).join("") +
-    `<label class="setting">Tile info display<select id="info-display">${options(INFO_DISPLAYS, s.infoDisplay ?? "both")}</select></label>` +
-    checkbox("Move with one tap", "one-tap", !!s.oneTapMove) +
-    checkbox("Dev mode (unlimited currency, all floors &amp; modes unlocked)", "dev-mode", !!s.devMode) +
+    PAGE.map((key) => control(key, s)).join("") +
     `<p class="hint">Automation pauses outside the board tabs and while the browser is hidden. Progress saves after each action.</p><button class="wide" id="retire">Retire this ${run}</button><p class="hint">Keep your milestone rewards and enter a freshly generated ${game.mode === "tower" ? "tower" : "descent"}.</p><button class="wide danger" id="erase">Erase all progress</button><p class="seed">RUN SEED · ${game.run.seed}</p>`;
   bindSettings(ctx, overlay);
 }
@@ -53,45 +66,34 @@ function bindSettings(ctx: AppContext, overlay: BoardOverlay) {
   const { game } = ctx;
   // Read live: erasing progress replaces the whole save.
   const s = () => game.save.settings;
-  const input = (id: string) => el(id) as HTMLInputElement;
-  const select = (id: string) => el(id) as HTMLSelectElement;
-  for (const t of TOGGLES)
-    input(t.id).onchange = () => {
-      t.write(s(), input(t.id).checked);
-      if (t.id === "weather-sound" && !s().weatherSound) ctx.renderer.weather.silence();
-      if (t.refresh === "hud") ctx.update();
-      else ctx.save();
-    };
-  select("speed").onchange = () => {
-    s().speed = Number(select("speed").value);
-    ctx.save();
-  };
-  // Live preview while dragging; the renderer reads the setting each frame.
-  input("brightness").oninput = () => {
-    s().brightness = Number(input("brightness").value);
-    el("brightness-value").textContent = String(s().brightness);
-  };
-  input("brightness").onchange = () => ctx.save();
-  select("transition").onchange = () => {
-    s().transition = select("transition").value as Settings["transition"];
-    ctx.save();
-  };
-  select("info-display").onchange = () => {
-    s().infoDisplay = select("info-display").value as Settings["infoDisplay"];
-    if (s().infoDisplay === "status" || s().infoDisplay === "none") overlay.hideInspect();
-    ctx.save();
-    ctx.update();
-  };
-  input("one-tap").onchange = () => {
-    s().oneTapMove = input("one-tap").checked;
-    ctx.save();
-  };
-  input("dev-mode").onchange = () => {
-    game.setDevMode(input("dev-mode").checked);
-    ctx.save();
-    ctx.update();
-    ctx.renderPage();
-  };
+  for (const key of PAGE) {
+    const row = SETTINGS[key], input = el(row.page.id) as HTMLInputElement & HTMLSelectElement;
+    const changed = () => (AFTER[key] ?? (() => ctx.save()))(ctx, overlay, s());
+    const set = (value: unknown) => { (s() as Record<SettingKey, unknown>)[key] = value; };
+    switch (row.kind) {
+      case "toggle":
+        input.onchange = () => {
+          const on = "invert" in row.page ? !input.checked : input.checked;
+          set(on);
+          changed();
+        };
+        break;
+      case "choice":
+        input.onchange = () => {
+          set(row.choices.find(([c]) => String(c) === input.value)?.[0]);
+          changed();
+        };
+        break;
+      case "range":
+        // Live preview while dragging; the renderer reads the setting each frame.
+        input.oninput = () => {
+          set(Number(input.value));
+          el(`${row.page.id}-value`).textContent = String(s()[key]);
+        };
+        input.onchange = changed;
+        break;
+    }
+  }
   el("retire").onclick = () =>
     ctx.confirm(
       "Leave your mark?",

@@ -72,7 +72,7 @@ export class Renderer {
     this.playerX = game.run.player.x;
     this.playerY = game.run.player.y;
     const unlock = () => {
-      if (game.run.outside && game.save.settings.weatherSound !== false) this.weather.unlock();
+      if (game.run.outside && game.save.settings.weatherSound) this.weather.unlock();
     };
     if (typeof window !== "undefined") {
       window.addEventListener("pointerdown", unlock);
@@ -278,7 +278,7 @@ export class Renderer {
   private drawWeather(f: FrameContext) {
     const g = this.game;
     this.weather.draw(f.c, f.width, g.run.seed, { dt: f.dt, reduceMotion: g.save.settings.reduceMotion,
-      active: !g.paused && !g.summary && !document.hidden, sound: g.save.settings.weatherSound !== false });
+      active: !g.paused && !g.summary && !document.hidden, sound: g.save.settings.weatherSound });
   }
   /** The dungeon board's thin stone frame. */
   private drawFrameEdge(f: FrameContext) {
@@ -335,7 +335,7 @@ export class Renderer {
     const g = this.game;
     return {
       mode: g.mode, height: g.run.height, seed: g.run.seed, outside: !!g.run.outside, entranceX: Math.floor(g.world.width / 2),
-      spritesOff: !!g.save.settings.spritesOff, reduceMotion: g.save.settings.reduceMotion, area1: !g.save.settings.spritesOff && isArea1(g.mode, g.run.height),
+      spritesOff: g.save.settings.spritesOff, reduceMotion: g.save.settings.reduceMotion, area1: !g.save.settings.spritesOff && isArea1(g.mode, g.run.height),
     };
   }
   /** Paints one tile in tile space (see paintTile); false while its ground

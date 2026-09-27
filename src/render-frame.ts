@@ -45,7 +45,7 @@ export type FrameContext = BoardView & {
 /** 0 at the default brightness, 1 at the darkest setting (dungeon only). */
 export function darknessOf(game: Game) {
   if (game.run.outside) return 0;
-  return Math.max(0, Math.min(1, (100 - (game.save.settings.brightness ?? 100)) / 80));
+  return Math.max(0, Math.min(1, (100 - game.save.settings.brightness) / 80));
 }
 
 /** Screen x of a world column's left edge. */

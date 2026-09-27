@@ -56,7 +56,7 @@ const defendPage = new DefendPage(el("defend"), {
   },
   persist: save,
   reduceMotion: () => game.save.settings.reduceMotion,
-  devMode: () => game.save.settings.devMode === true,
+  devMode: () => game.save.settings.devMode,
 });
 
 function save() {

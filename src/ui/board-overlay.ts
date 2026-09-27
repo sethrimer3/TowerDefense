@@ -84,7 +84,7 @@ export class BoardOverlay {
 
   /** Whether the "Tile info display" setting includes the popup or the status line. */
   private shows(where: "popup" | "status") {
-    const infoDisplay = this.game.save.settings.infoDisplay ?? "both";
+    const infoDisplay = this.game.save.settings.infoDisplay;
     return infoDisplay === where || infoDisplay === "both";
   }
 

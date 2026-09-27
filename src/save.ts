@@ -1,9 +1,10 @@
 import { GOLD_SHOP, SAVE_KEY, UPGRADES } from "./config.ts";
-import type { ModeSave, MoveSnapshot, Revival, Run, Save, Settings } from "./entities.ts";
+import type { ModeSave, MoveSnapshot, Revival, Run, Save } from "./entities.ts";
 import { emptyMaterials, MATERIAL_IDS, type MaterialId } from "./materials.ts";
 import { EQUIPMENT_SLOTS, type CraftedEquipment, type EquipmentSlot } from "./equipment.ts";
 import { CONSUMABLES, type ConsumableId } from "./crafting.ts";
 import { decodeDefendSave, defaultDefendSave } from "./defend/progress.ts";
+import { decodeSettings, defaultSettings } from "./settings.ts";
 export function defaults(): Save {
   return {
     version: 3,
@@ -17,21 +18,7 @@ export function defaults(): Save {
     upgrades: Object.fromEntries(
       UPGRADES.map((u) => [u.id, 0]),
     ) as Save["upgrades"],
-    settings: {
-      spritesOff: false,
-      weatherSound: true,
-      decorOff: false,
-      batterySaver: false,
-      transition: "smooth",
-      showArrows: false,
-      speed: 3,
-      reduceMotion: false,
-      brightness: 100,
-      autoOffOnDeath: true,
-      oneTapMove: false,
-      infoDisplay: "both",
-      devMode: false,
-    },
+    settings: defaultSettings(),
     materials: emptyMaterials(),
     equipmentInventory: [],
     equipped: {},
@@ -42,8 +29,6 @@ export function defaults(): Save {
 const finite = (n: unknown, max = 1e9) =>
   typeof n === "number" && Number.isFinite(n) && n >= 0 && n <= max;
 const isRecord = (v: any) => !!v && typeof v === "object" && !Array.isArray(v);
-const oneOf = <T>(value: any, allowed: readonly T[], fallback: T): T =>
-  allowed.includes(value) ? value : fallback;
 /** A floored count from `raw` when it is a finite number within `max`. */
 const count = (raw: any, fallback: number, max?: number) =>
   finite(raw, max) ? Math.floor(raw) : fallback;
@@ -196,22 +181,6 @@ function decodeInventory(s: any, d: Save) {
 function decodeUpgrades(raw: any, d: Save) {
   for (const u of UPGRADES) d.upgrades[u.id] = count(raw?.[u.id], d.upgrades[u.id], u.max);
 }
-const OFF_BY_DEFAULT = ["showArrows", "spritesOff", "reduceMotion", "decorOff", "batterySaver", "oneTapMove", "devMode"] as const;
-const ON_BY_DEFAULT = ["weatherSound", "autoOffOnDeath"] as const;
-/** Brightness is clamped to 20–100 rather than rejected when out of range. */
-const brightness = (v: unknown) =>
-  typeof v === "number" && Number.isFinite(v) ? Math.round(Math.min(100, Math.max(20, v))) : 100;
-function decodeSettings(raw: any, settings: Settings) {
-  const s = raw ?? {};
-  settings.speed = oneOf(s.speed, [1, 3, 6, 10], settings.speed);
-  settings.transition = oneOf(s.transition, ["smooth", "fast", "instant"] as const, settings.transition);
-  for (const key of OFF_BY_DEFAULT) settings[key] = s[key] === true;
-  for (const key of ON_BY_DEFAULT) settings[key] = s[key] !== false;
-  settings.brightness = brightness(s.brightness);
-  // Older saves had a single showInfoBoxes toggle.
-  const legacyInfo = s.showInfoBoxes === false ? "none" : "both";
-  settings.infoDisplay = oneOf(s.infoDisplay, ["both", "popup", "status", "none"] as const, legacyInfo);
-}
 function decodeProgress(s: any, d: Save, undoCapacity: number) {
   d.gold = count(s.gold, d.gold);
   for (const g of GOLD_SHOP) d.provisions[g.id] = count(s.provisions?.[g.id], d.provisions[g.id], 999);
@@ -286,7 +255,7 @@ export function decode(raw: string | null): Save {
     const s = JSON.parse(raw ?? "null") ?? {};
     decodeUpgrades(s.upgrades, d);
     const undoCapacity = 1 + d.upgrades.undos + d.upgrades.shardUndos;
-    decodeSettings(s.settings, d.settings);
+    d.settings = decodeSettings(s.settings);
     for (const step of VERSION_STEPS.get(s.version) ?? []) step(s, d, undoCapacity);
     decodeReached(s, d);
     decodeSections(s.tower, d);

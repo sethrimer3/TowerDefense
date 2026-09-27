@@ -515,7 +515,7 @@ export class Game {
       dead &&
       wasAuto &&
       !!this.save.upgrades.autoPersist &&
-      this.save.settings.autoOffOnDeath === false;
+      !this.save.settings.autoOffOnDeath;
     const summary = {
       height: this.run.height,
       kills: this.run.kills,

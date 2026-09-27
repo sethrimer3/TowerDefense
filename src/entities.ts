@@ -3,6 +3,7 @@ import type { MaterialId } from "./materials.ts";
 import type { CraftedEquipment, EquipmentSlot } from "./equipment.ts";
 import type { ConsumableId } from "./crafting.ts";
 import type { DefendSave } from "./defend/progress.ts";
+import type { Settings } from "./settings.ts";
 export type Kind =
   | "wall"
   | "floor"
@@ -85,35 +86,6 @@ export type Run = {
 };
 export type MoveSnapshot = { run: Run; best: number };
 export type Revival = { snapshot: MoveSnapshot; earned: number };
-export type Settings = {
-  /** Use the original procedural renderers instead of bitmap art. */
-  spritesOff?: boolean;
-  weatherSound?: boolean;
-  /** Hide the procedural environment dressing: moss, vines, plants, crates,
-   * pools, and the forest's wind-blown grass. */
-  decorOff?: boolean;
-  /** Draw the board at 30 frames a second, instead of 60, whenever nothing
-   * on it is moving. */
-  batterySaver?: boolean;
-  transition: "smooth" | "fast" | "instant";
-  showArrows: boolean;
-  speed: number;
-  reduceMotion: boolean;
-  /** Dungeon brightness, 20 (very dark) to 100 (default look). */
-  brightness?: number;
-  /** Requires the autoPersist upgrade to configure; otherwise Automove
-   * always turns off on death. */
-  autoOffOnDeath?: boolean;
-  /** Delve: tapping a tile walks there immediately instead of requiring a
-   * second tap to confirm. The info box still appears either way. */
-  oneTapMove?: boolean;
-  /** Delve: which tile-inspection surfaces appear on tap. "none" makes a
-   * single tap always walk there directly, same as the old showInfoBoxes
-   * off state. */
-  infoDisplay?: "both" | "popup" | "status" | "none";
-  /** Unlimited currency, every floor section and game mode unlocked. */
-  devMode?: boolean;
-};
 export type Mode = "tower" | "delve";
 export type ModeSave = {
   history: MoveSnapshot[];
