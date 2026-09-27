@@ -78,7 +78,6 @@ export class Game {
   summary: null | {
     height: number;
     kills: number;
-    earned: number;
     reason: string;
     dead?: boolean;
     /** True when the fatal move happened while Automove was on — the
@@ -168,8 +167,6 @@ export class Game {
   /** Returns the player to their section's entrance on the new labyrinth. */
   private reshapeDelve(run: Run) {
     this.save.delve.history = [];
-    if (this.save.delve.revival)
-      this.save.delve.essence += this.save.delve.revival.earned;
     this.save.delve.revival = null;
     run.layoutVersion = LAYOUT_VERSION;
     run.changes = {};
@@ -189,24 +186,22 @@ export class Game {
     run.player.x = TOWER_START_X;
     run.player.y = 0;
   }
+  /** Revive is only offered until the next move. */
   private settleRevival() {
-    const slice = this.save[this.mode];
-    if (slice.revival) {
-      this.creditCurrency(slice.revival.earned);
-      slice.revival = null;
-    }
+    this.save[this.mode].revival = null;
   }
   private creditCurrency(earned: number) {
     if (this.mode === "delve") this.save.delve.essence += earned;
     else this.save.tower.shards += earned;
   }
-  private payout(): { earned: number; record: boolean } {
+  /** Pays what the run still owes; returns whether it set a new record. */
+  private payout(): boolean {
     const record = this.run.height > this.save[this.mode].reached;
     this.recordProgress();
     this.claimRewards();
     if (this.mode === "delve")
       this.save.gold += goldReward(this.run.kills, this.run.treasures);
-    return { earned: 0, record };
+    return record;
   }
   snapshot(): MoveSnapshot {
     return { run: structuredClone(this.run), best: this.save[this.mode].best };
@@ -491,7 +486,7 @@ export class Game {
     // Capture the dying run's own stats — height/kills/record — and pay out
     // rewards while `this.run` still refers to this run, before newRun()
     // (below) replaces it.
-    const { earned, record } = this.payout();
+    const record = this.payout();
     this.save[this.mode].history = [];
     this.route = [];
     // Automove keeps running through death only when the player has
@@ -505,7 +500,6 @@ export class Game {
     const summary = {
       height: this.run.height,
       kills: this.run.kills,
-      earned,
       reason,
       dead,
       autoDeath: dead && wasAuto,
@@ -514,8 +508,7 @@ export class Game {
     if (dead) this.newRun(true);
     else this.save[this.mode].run = null;
     if (allowRevive && dead && preFatalSnapshot && this.save.upgrades.revive)
-      this.save[this.mode].revival = { snapshot: preFatalSnapshot, earned };
-    else if (dead) this.creditCurrency(earned);
+      this.save[this.mode].revival = { snapshot: preFatalSnapshot };
     this.summary = summary;
     this.auto = keepAuto;
     if (dead)

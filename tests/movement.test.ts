@@ -124,7 +124,7 @@ test("undo and Revive persist safely across refresh", () => {
   assert.ok(loaded.undo());
   assert.equal(loaded.run.player.y, 0);
   const before = loaded.snapshot();
-  loaded.save.delve.revival = { snapshot: before, earned: 7 };
+  loaded.save.delve.revival = { snapshot: before };
   loaded.save.delve.history = [];
   const saved = decode(JSON.stringify(loaded.save));
   assert.ok(saved.delve.revival);
@@ -134,7 +134,7 @@ test("undo and Revive persist safely across refresh", () => {
   assert.equal(loaded.save.delve.essence, 0);
   const corrupt = JSON.parse(JSON.stringify(saved));
   corrupt.delve.history = [{ run: { player: {} }, best: 0 }];
-  corrupt.delve.revival = { snapshot: null, earned: 10 };
+  corrupt.delve.revival = { snapshot: null };
   assert.equal(decode(JSON.stringify(corrupt)).delve.history.length, 0);
   assert.equal(decode(JSON.stringify(corrupt)).delve.revival, null);
 });

@@ -61,7 +61,7 @@ test("after a retire the next run starts fresh in the forest; after a death it i
   assert.equal(g.message, "Follow the forest path to the entrance.");
 
   const afterDeath = g.run;
-  g.summary = { height: 3, kills: 1, earned: 0, reason: "Fallen", dead: true, record: false };
+  g.summary = { height: 3, kills: 1, reason: "Fallen", dead: true, record: false };
   g.nextRun();
   assert.equal(g.summary, null);
   assert.equal(g.run, afterDeath, "the run a death started is kept");

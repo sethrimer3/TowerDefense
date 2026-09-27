@@ -103,9 +103,8 @@ function decodeHistory(raw: any, run: Run, undoCapacity: number): MoveSnapshot[]
       !!item && item.run.seed === run.seed && item.run.layoutVersion === run.layoutVersion);
 }
 function decodeRevival(raw: any, run: Run): Revival | null {
-  if (!finite(raw?.earned)) return null;
-  const item = snapshot(raw.snapshot);
-  return item && item.run.layoutVersion === run.layoutVersion ? { snapshot: item, earned: raw.earned } : null;
+  const item = snapshot(raw?.snapshot);
+  return item && item.run.layoutVersion === run.layoutVersion ? { snapshot: item } : null;
 }
 function decodeLootedTiles(raw: any): Record<string, true> {
   const lootedTiles: Record<string, true> = {};

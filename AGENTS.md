@@ -61,7 +61,7 @@ npm run tiles:area1 / tiles:outside     # regenerate tile PNGs
 - `CONTEXT.md` is the domain glossary (terms only, no implementation). Use its words in code, comments and docs, and add a term there when a change names a new domain concept.
 
 - All text uses the bundled Cinzel font (`assets/fonts/Cinzel/`); no remote fonts (browser test checks this).
-- Undo, Revive, and pending death rewards have subtle invariants (Revive can't duplicate rewards; undo cancels queued routes; history persists across refreshes). The README's gameplay section is the spec for this player-facing behavior.
+- Undo and Revive have subtle invariants (Revive can't duplicate rewards; undo cancels queued routes; history persists across refreshes). The README's gameplay section is the spec for this player-facing behavior.
 - `test-gen.ts` at the root is a scratch experiment, not part of the build or tests.
 
 ### Golden tests: re-record them when visuals or content change on purpose

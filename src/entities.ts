@@ -84,7 +84,7 @@ export type Run = {
   baseStats?: { attack: number; defense: number };
 };
 export type MoveSnapshot = { run: Run; best: number };
-export type Revival = { snapshot: MoveSnapshot; earned: number };
+export type Revival = { snapshot: MoveSnapshot };
 export type Mode = "tower" | "delve";
 export type ModeSave = {
   history: MoveSnapshot[];
