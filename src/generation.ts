@@ -310,10 +310,11 @@ export class RoomWorld implements Board {
   }
   tile(x: number, y: number): Tile {
     if (!this.inside(x, y)) return { kind: "wall" };
-    const changed = this.changes[point(x, y)];
-    if (changed) return changed;
+    // A clear chest can stand where an enemy or pickup was consumed.
     const chest = this.rewards.find(c => c.x === x && c.y === y);
     if (chest) return { kind: "reward", tier: chest.tier };
+    const changed = this.changes[point(x, y)];
+    if (changed) return changed;
     return (
       this.cells.get(point(x, y)) ?? {
         kind: "wall",

@@ -63,6 +63,13 @@ test("chests stand on the floor tiles closest to the stairs; a tier with no room
   assert.equal(cramped.tower.shards, 2);
 });
 
+test("a chest can stand where an enemy or pickup was consumed", () => {
+  const { ledger, world, run } = floor();
+  world.clear(3, 4);
+  ledger.check(world, run);
+  assert.deepEqual(world.tile(3, 4), { kind: "reward", tier: "silver" });
+});
+
 test("opening a chest pays its tier once and takes it off the board", () => {
   const { ledger, world, run, tower } = floor();
   ledger.check(world, run);
