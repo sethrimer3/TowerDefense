@@ -1,5 +1,5 @@
 import { CHUNK, COLORS } from "./config.ts";
-import { drawTerrain } from "./themes.ts";
+import { drawCornerBricks, drawTerrain, type Corner } from "./themes.ts";
 import { tileRandom } from "./random.ts";
 import type { Mode, Tile, Torch } from "./entities.ts";
 import { drawForestTile } from "./outside.ts";
@@ -58,21 +58,38 @@ export function paintTile(c: CanvasRenderingContext2D, world: TileWorld, t: Tile
 }
 
 function paintGround(c: CanvasRenderingContext2D, world: TileWorld, t: Tile, x: number, y: number, look: BoardLook) {
+  const wallAt = (dx: number, dy: number) => world.tile(x + dx, y + dy)?.kind === "wall";
   const neighbors = {
-    northWall: world.tile(x, y + 1)?.kind === "wall",
-    southWall: world.tile(x, y - 1)?.kind === "wall",
-    westWall: world.tile(x - 1, y)?.kind === "wall",
-    eastWall: world.tile(x + 1, y)?.kind === "wall",
+    northWall: wallAt(0, 1),
+    southWall: wallAt(0, -1),
+    westWall: wallAt(-1, 0),
+    eastWall: wallAt(1, 0),
   };
+  const wall = t.kind === "wall";
+  const terrain = { mode: look.mode, height: look.height, seed: look.seed, x, y, wall, empty: t.kind === "floor", neighbors };
   // Every biome has a PNG floor/wall set. Images load asynchronously; until
   // ready (or if an asset fails), the procedural renderer remains a complete
   // fallback and the Sprites setting can still opt out of bitmap art.
-  const drewSprite = !look.spritesOff && drawThemedTile(
-    c, look.mode, look.height, t.kind === "wall", x, y, look.seed, neighbors,
-  );
-  if (drewSprite) return true;
-  drawTerrain(c, { mode: look.mode, height: look.height, seed: look.seed, x, y, wall: t.kind === "wall", empty: t.kind === "floor", neighbors });
-  return look.spritesOff;
+  const drewSprite = !look.spritesOff && drawThemedTile(c, look.mode, look.height, wall, x, y, look.seed, neighbors);
+  if (!drewSprite) drawTerrain(c, terrain);
+  if (wall) drawCornerBricks(c, terrain, roomCorners(world, x, y, neighbors), drewSprite);
+  return drewSprite || look.spritesOff;
+}
+
+/** The corners of a wall tile that touch a room's corner: the walls on both
+ * sides of that corner and an open tile diagonally across it. (North is +y
+ * in the world and the top of the tile.) */
+function roomCorners(world: TileWorld, x: number, y: number, n: { northWall: boolean; southWall: boolean; westWall: boolean; eastWall: boolean }) {
+  const open = (dx: number, dy: number) => {
+    const kind = world.tile(x + dx, y + dy)?.kind;
+    return kind !== undefined && kind !== "wall";
+  };
+  const corners: Corner[] = [];
+  if (n.northWall && n.westWall && open(-1, 1)) corners.push("nw");
+  if (n.northWall && n.eastWall && open(1, 1)) corners.push("ne");
+  if (n.southWall && n.westWall && open(-1, -1)) corners.push("sw");
+  if (n.southWall && n.eastWall && open(1, -1)) corners.push("se");
+  return corners;
 }
 
 type Painter = (c: CanvasRenderingContext2D, t: Tile, art: TileArt) => void;

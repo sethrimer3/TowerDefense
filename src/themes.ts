@@ -409,6 +409,44 @@ function paintDetail(p: Paint, type: DetailType) {
   c.restore();
 }
 
+/** A tile corner, named by compass direction (north is the top of the tile). */
+export type Corner = "nw" | "ne" | "sw" | "se";
+/** Larger than the 6px exposed rim the wall art runs along open edges, so
+ * the corner stone reads as a quoin rather than more rim. */
+const CORNER_BRICK_SIZE = 8;
+/** The area1 wall sprites' rim colours (tools/generate-area1-tiles.mjs). */
+const AREA1_RIM = { face: "#8fa0ad", light: "#c1c2b5", joint: "#607283", dark: "#344354" };
+
+/** Paints a quoin stone into each given corner of a wall tile: the corners
+ * that touch a room's corner, where the walls on both sides run their
+ * exposed rims up to this tile. The stone's two outer edges lie on the tile
+ * edges those rims meet, drawn as mortar joints; its inner edges take the
+ * walls' top-left light. On area1 art it uses that art's rim colours;
+ * elsewhere it is built from the theme's wall colours. */
+export function drawCornerBricks(c: CanvasRenderingContext2D, tile: TerrainTile, corners: readonly Corner[], spriteArt: boolean) {
+  if (!corners.length) return;
+  const { ink, theme } = inkAt(tile);
+  const rim = spriteArt && theme === 0 ? AREA1_RIM : {
+    face: brighten(ink.wall, 0.9), light: brighten(ink.wall, 1.3), joint: brighten(ink.seam, 0.6), dark: ink.seam,
+  };
+  const s = CORNER_BRICK_SIZE;
+  for (const corner of corners) {
+    const east = corner.endsWith("e"), south = corner.startsWith("s");
+    const x0 = east ? 24 - s : 0, y0 = south ? 24 - s : 0;
+    c.fillStyle = rim.face;
+    c.fillRect(x0, y0, s, s);
+    // Inner edges: lit on the top and left, shaded on the bottom and right.
+    c.fillStyle = south ? rim.light : rim.dark;
+    c.fillRect(x0, south ? y0 : y0 + s - 1, s, 1);
+    c.fillStyle = east ? rim.light : rim.dark;
+    c.fillRect(east ? x0 : x0 + s - 1, y0, 1, s);
+    // Outer edges: the joints where the neighbouring walls' rims butt up.
+    c.fillStyle = rim.joint;
+    c.fillRect(x0, south ? 23 : 0, s, 1);
+    c.fillRect(east ? 23 : 0, y0, 1, s);
+  }
+}
+
 /** Paints one tile of procedural terrain in 24×24 tile space: the wall or
  * floor in its blended theme colours, then (on a few walls and empty floors)
  * one restrained detail. */
