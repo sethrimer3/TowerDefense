@@ -3,6 +3,7 @@ import { predict } from "./combat.ts";
 import { point, type Tile } from "./entities.ts";
 import type { Game } from "./state.ts";
 import { doorCost } from "./doors.ts";
+import { ClearLedger } from "./tower/clear-ledger.ts";
 
 const BENEFIT: Partial<Record<Tile["kind"], number>> = {
   reward: 10000,
@@ -121,7 +122,7 @@ class Search {
 
   /** Tower stairs wait while the floor's clear chests are unopened. */
   private chestsWaiting() {
-    return this.game.mode === "tower" && !!this.game.run.rewards?.length;
+    return this.game.mode === "tower" && ClearLedger.hasChests(this.game.run);
   }
 
   private worth(t: Tile, next: Node, combat: Combat | null) {

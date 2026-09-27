@@ -319,15 +319,14 @@ test("the death summary reports the dying run's own height and kills, not the fr
 
 test("clear rewards are paid out exactly once across a fatal encounter", () => {
   const g = arena();
-  g.checkClear(); // arena has no enemies/doors, so this floor is immediately clear
+  g.move(0, 1); // arena has no enemies/doors, so the first step earns its chests
   assert.ok((g.run.rewards?.length ?? 0) > 0);
-  (g.world as RoomWorld).cells.set(point(1, 0), { kind: "enemy", enemy: LETHAL });
+  (g.world as RoomWorld).cells.set(point(1, 1), { kind: "enemy", enemy: LETHAL });
   const shardsBefore = g.save.tower.shards;
   g.move(1, 0, true);
   assert.ok(g.summary?.dead);
   const shardsAfterDeath = g.save.tower.shards;
   assert.ok(shardsAfterDeath > shardsBefore);
   // Nothing left to claim a second time.
-  assert.equal(g.claimRewards(), 0);
-  assert.equal(g.save.tower.shards, shardsAfterDeath);
+  for (const entry of Object.values(g.save.tower.log)) assert.deepEqual(entry.claimed, entry.earned);
 });

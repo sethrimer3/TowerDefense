@@ -30,8 +30,6 @@ import {
   type MoveSnapshot,
   type Player,
   type ClearTier,
-  type FloorRecord,
-  type RewardChest,
 } from "./entities.ts";
 import {
   World,
@@ -43,6 +41,7 @@ import {
 import type { CombatPrediction } from "./combat.ts";
 import { ATTACK_SHARD, DEFENSE_SHARD, isLethal, resolveStep, type StepBlocked, type StepEffect } from "./step-effects.ts";
 import { OutsideWorld } from "./outside.ts";
+import { ClearLedger } from "./tower/clear-ledger.ts";
 import { getEquivalentFloor, materialDef, MATERIALS } from "./materials.ts";
 import { rollEnemyDrops, rollTreasureLoot, towerEnemyDrops } from "./loot.ts";
 import {
@@ -66,43 +65,6 @@ export type RouteEffects = {
 };
 /** Tiles that stay on the board after being stepped on. */
 const PERMANENT_TILES = new Set<Tile["kind"]>(["floor", "stairs", "stairsDown", "oneway", "openedChest"]);
-/** A Tower floor is cleared once no enemy or door is left on it. */
-function roomCleared(world: RoomWorld) {
-  return ![...world.cells.keys()].some(k => {
-    const [x, y] = k.split(",").map(Number);
-    return ["enemy", "door"].includes(world.tile(x, y).kind);
-  });
-}
-/** Silver for any clear, gold without damage, platinum without keys as well. */
-function clearTiers(run: Run): ClearTier[] {
-  const tiers: ClearTier[] = ["silver"];
-  if (run.damaged === false) {
-    tiers.push("gold");
-    if (run.keysSpent === false) tiers.push("platinum");
-  }
-  return tiers;
-}
-/** Plain floor tiles reachable from the stairs, closest first, where clear
- * rewards go. */
-function rewardSpots(world: RoomWorld, stairs: string) {
-  const [sx, sy] = stairs.split(",").map(Number);
-  const queue = [{ x: sx, y: sy }], seen = new Set([stairs]);
-  const spots: { x: number; y: number }[] = [];
-  for (let i = 0; i < queue.length; i++) {
-    const n = queue[i];
-    if (world.tile(n.x, n.y).kind === "floor") spots.push(n);
-    const fresh = openNeighbours(world, n).filter(d => !seen.has(`${d.x},${d.y}`));
-    for (const d of fresh) seen.add(`${d.x},${d.y}`);
-    queue.push(...fresh);
-  }
-  return spots;
-}
-/** The non-wall tiles one step from `n`. */
-function openNeighbours(world: RoomWorld, n: { x: number; y: number }) {
-  return [[1, 0], [-1, 0], [0, 1], [0, -1]]
-    .map(([dx, dy]) => world.step(n.x, n.y, dx, dy))
-    .filter((d): d is { x: number; y: number } => !!d && world.tile(d.x, d.y).kind !== "wall");
-}
 export class Game {
   mode: Mode = "tower";
   world!: Board;
@@ -834,63 +796,24 @@ export class Game {
     this.creditCurrency(earned);
     return earned;
   }
+  /** Clear rewards live in the Tower's log, beside this run. */
+  private get ledger() {
+    return new ClearLedger(this.save.tower);
+  }
   private syncRewards() {
-    if (!(this.world instanceof RoomWorld)) return;
-    const record = this.save.tower.log[this.run.height];
-    const unopened = (c: RewardChest) => record?.earned.includes(c.tier) && !record.claimed.includes(c.tier);
-    this.run.rewards = (this.run.rewards ?? []).filter(unopened);
-    this.world.rewards = this.run.rewards;
-    // Earned rewards survive undo, reload, and replacement of an old run.
-    for (const [floor, entry] of Object.entries(this.save.tower.log)) {
-      for (const tier of entry.earned) {
-        if (!entry.claimed.includes(tier) && !this.chestStands(Number(floor), tier)) {
-          entry.claimed.push(tier);
-          this.save.tower.shards++;
-        }
-      }
-    }
+    this.ledger.settle(this.world, this.run);
   }
-  /** Whether a chest for `tier` still stands on `floor`, the current floor. */
-  private chestStands(floor: number, tier: ClearTier) {
-    return floor === this.run.height && this.run.rewards!.some(c => c.tier === tier);
-  }
-  claimRewards(tier?: ClearTier) {
+  private claimRewards(tier?: ClearTier) {
     if (this.mode !== "tower") return 0;
-    let earned = 0;
-    const wanted = (t: ClearTier) => !tier || tier === t;
-    for (const entry of Object.values(this.save.tower.log)) {
-      for (const t of entry.earned) if (wanted(t) && !entry.claimed.includes(t)) {
-        entry.claimed.push(t);
-        earned++;
-      }
-    }
-    this.save.tower.shards += earned;
-    this.syncRewards();
+    const earned = tier ? this.ledger.open(tier, this.world, this.run) : this.ledger.claimAll(this.world, this.run);
     if (earned) this.feedback(`+${earned} Inspiration · clear reward${earned > 1 ? "s" : ""}`);
     return earned;
   }
   /** Once a Tower floor has no enemies or doors left, earns its clear tiers
    * and sets their chests by the stairs. */
-  checkClear() {
-    if (this.run.outside || !(this.world instanceof RoomWorld)) return;
-    const world = this.world;
-    if (!roomCleared(world)) return;
-    const entry = this.save.tower.log[this.run.height] ??= { earned: [], claimed: [] };
-    const tiers = clearTiers(this.run);
-    const stairs = [...world.cells].find(([, t]) => t.kind === "stairs");
-    if (!stairs) return;
-    const spots = rewardSpots(world, stairs[0]);
-    this.run.rewards ??= [];
-    for (const tier of tiers) if (!entry.earned.includes(tier)) this.earnClear(entry, tier, spots.shift());
-    world.rewards = this.run.rewards;
-  }
-  /** Records a clear tier and sets its chest on `spot`, or pays it out
-   * straight away when the floor has no room left. */
-  private earnClear(entry: FloorRecord, tier: ClearTier, spot?: { x: number; y: number }) {
-    entry.earned.push(tier);
-    if (spot) this.run.rewards!.push({ ...spot, tier });
-    else { entry.claimed.push(tier); this.save.tower.shards++; }
-    this.feedback(`${tier[0].toUpperCase() + tier.slice(1)} clear · reward by the stairs`);
+  private checkClear() {
+    for (const tier of this.ledger.check(this.world, this.run))
+      this.feedback(`${tier[0].toUpperCase() + tier.slice(1)} clear · reward by the stairs`);
   }
   /** Pickup feedback and treasure payouts; stats were already applied. */
   private collect(t: Tile, x: number, y: number, outcome: StepEffect) {

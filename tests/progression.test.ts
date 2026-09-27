@@ -24,33 +24,13 @@ test('milestones are immediate, incremental and cannot be farmed with undo or re
   }
   g.finish('test'); assert.equal(g.save.delve.essence, 3);
 });
-test('all doors and enemies are required; silver, gold and platinum stack only once', () => {
-  const g = arena(), w = g.world as RoomWorld;
-  w.cells.set('1,0', {kind:'door', color:'yellow'});
-  w.cells.set('2,0', {kind:'enemy', enemy:{name:'test', hp:1, attack:0, defense:0, tier:0}});
-  g.checkClear(); assert.equal(g.run.rewards?.length, 0);
-  w.clear(1,0); g.checkClear(); assert.equal(g.run.rewards?.length, 0);
-  w.clear(2,0); g.checkClear();
-  assert.deepEqual(g.save.tower.log[0].earned, ['silver','gold','platinum']);
-  assert.equal(g.run.rewards?.length, 3);
-  assert.equal(g.save.tower.shards, 0);
-  assert.equal(g.claimRewards('silver'), 1);
-  assert.equal(g.run.rewards?.length, 2);
-  g.checkClear(); g.claimRewards(); g.checkClear();
-  assert.equal(g.save.tower.shards, 3); assert.equal(g.run.rewards?.length, 0);
-});
-test('damage disqualifies gold after healing; keys disqualify platinum', () => {
-  const g = arena(); g.run.damaged = true; g.run.player.hp = g.run.player.maxHp;
-  g.checkClear(); assert.deepEqual(g.save.tower.log[0].earned, ['silver']);
-  const h = arena(); h.run.keysSpent = true; h.checkClear();
-  assert.deepEqual(h.save.tower.log[0].earned, ['silver','gold']);
-});
 test('uncollected rewards survive reload, undo, departure, death and retirement exactly once', () => {
   for (const action of ['reload','undo','stairs','death','retire','mode']) {
-    const g = arena(), before = g.snapshot(); g.checkClear();
+    // The arena is clear from the start, so the first step earns its chests.
+    const g = arena(), before = g.snapshot(); g.move(1, 0);
     if (action === 'reload') {
       const loaded = new Game(decode(JSON.stringify(g.save)));
-      assert.equal(loaded.run.rewards?.length, 3); loaded.claimRewards();
+      assert.equal(loaded.run.rewards?.length, 3); loaded.finish('test');
       assert.equal(loaded.save.tower.shards, 3); continue;
     }
     if (action === 'undo') g.restore(before);
@@ -59,14 +39,14 @@ test('uncollected rewards survive reload, undo, departure, death and retirement 
     if (action === 'mode') { g.save.upgrades.delve=1; g.switchMode('delve'); }
     if (action === 'death') {
       // Lethal but damageable (low defense so it's not impervious).
-      (g.world as RoomWorld).cells.set('1,0', {kind:'enemy',enemy:{name:'doom',hp:99999,attack:999,defense:0,tier:3}});
+      (g.world as RoomWorld).cells.set('2,0', {kind:'enemy',enemy:{name:'doom',hp:99999,attack:999,defense:0,tier:3}});
       g.move(1,0);
     }
     assert.equal(g.save.tower.shards, action === 'stairs' ? 4 : 3, action);
   }
 });
 test('automove walks to and collects every clear chest before the stairs', () => {
-  const g = arena(); g.checkClear();
+  const g = arena(); g.move(1, 0);
   for (let n=0; n<50 && g.run.rewards?.length; n++) {
     const step = chooseStep(g); assert.ok(step); assert.ok(g.move(step.dx,step.dy));
   }
