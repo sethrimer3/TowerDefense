@@ -1,13 +1,8 @@
 export const UNGUARDED_LOOT_CHANCE = 1 / 1000;
 export const WIDTH = 30;
 export const CHUNK = 20;
-export const TOWER_CHUNK = 20;
-/** Legacy diagnostic extent only; runtime Delve has no depth cap. */
-export const DELVE_MAX_DEPTH = 5000;
 export const START_X = 15;
 export const VIEWPORT_TILES = 17;
-export const VIEWPORT_WIDTH = 17;
-export const VIEWPORT_HEIGHT = 17;
 export const TOWER_WIDTH = 17;
 export const TOWER_HEIGHT = 17;
 export const TOWER_START_X = 8;
@@ -201,20 +196,6 @@ export const UPGRADES = [
 export type UpgradeId = (typeof UPGRADES)[number]["id"];
 export const cost = (id: UpgradeId, level: number) =>
   Math.ceil(UPGRADES.find((u) => u.id === id)!.base * 1.65 ** level);
-export const essenceReward = (
-  depth: number,
-  kills: number,
-  treasures: number,
-) =>
-  Math.max(
-    1,
-    Math.floor(depth / 8) + Math.floor(kills / 5) + Math.min(5, treasures),
-  );
-export const shardReward = (rooms: number, kills: number, treasures: number) =>
-  Math.max(
-    1,
-    Math.floor(rooms / 2) + Math.floor(kills / 5) + Math.min(5, treasures),
-  );
 export const goldReward = (kills: number, treasures: number) =>
   Math.floor(kills / 3) + treasures;
 export const xpForKill = (tier: number, attack: number) =>

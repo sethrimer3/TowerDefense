@@ -33,7 +33,7 @@ export type FloorAnalysis = {
   notes: string[];
 };
 
-export function gateLabel(g: Gate): string {
+function gateLabel(g: Gate): string {
   if (g.kind === "open") return "open";
   if (g.kind === "enemy") return `${g.strength} enemy`;
   if (g.kind === "door") return `${g.color} door`;

@@ -43,7 +43,7 @@ export const GRAPH_TUNING = {
   hubPotionChance: 0.3,
 };
 
-export function mainGateTable(depth: number, doorBias: number): Weighted<Gate> {
+function mainGateTable(depth: number, doorBias: number): Weighted<Gate> {
   return [
     { w: 5, v: { kind: "enemy", strength: "normal" } },
     { w: 1.5 + Math.min(2, depth * 0.1), v: { kind: "enemy", strength: "strong" } },
@@ -57,7 +57,7 @@ export function mainGateTable(depth: number, doorBias: number): Weighted<Gate> {
 
 /** The staircase is an objective: sometimes open and visible, sometimes
  * behind a fight or a lock. */
-export function stairsGateTable(depth: number, doorBias: number): Weighted<Gate> {
+function stairsGateTable(depth: number, doorBias: number): Weighted<Gate> {
   return [
     { w: 3, v: { kind: "open" } },
     { w: 2.5, v: { kind: "enemy", strength: "strong" } },

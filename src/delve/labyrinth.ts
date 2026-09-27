@@ -22,7 +22,7 @@ export const DELVE_TUNING = {
 };
 const { columns: COLS, rowsPerArea: ROWS, pitch: PITCH } = DELVE_TUNING;
 /** Nominal world-Y span of one area; only used to find candidate areas. */
-export const AREA_SPAN = ROWS * PITCH;
+const AREA_SPAN = ROWS * PITCH;
 const REACH = (DELVE_TUNING.tongue + 1) * PITCH + 4;
 
 export function hash(x: number, y: number, seed: number) {
@@ -37,7 +37,7 @@ function rngFor(seed: number) { let n = 0; return () => hash(n++, 91, seed); }
  * therefore take a single one-tile step between columns (staying 1 wide and
  * 4-connected) and rows meander without any global tilt. */
 const warps = new Map<number, number[]>();
-export function warp(x: number, seed: number) {
+function warp(x: number, seed: number) {
   let w = warps.get(seed);
   if (!w) {
     w = [Math.floor(hash(0, 1, seed) * 4)];
@@ -49,7 +49,7 @@ export function warp(x: number, seed: number) {
 const colX = (col: number) => 3 + col * PITCH;
 const rowY = (row: number) => 3 + row * PITCH;
 export const physical = (x: number, y: number, seed: number): Point => ({ x, y: y + warp(x, seed) });
-export const cellPoint = (col: number, row: number, seed: number) => physical(colX(col), rowY(row), seed);
+const cellPoint = (col: number, row: number, seed: number) => physical(colX(col), rowY(row), seed);
 
 export type Boundary = { rows: number[]; gateCol: number; tongueCol: number; dipCol: number };
 const boundaries = new Map<string, Boundary>();
@@ -74,7 +74,7 @@ export function boundary(seed: number, b: number): Boundary {
 const lower = (seed: number, area: number, col: number) => area ? boundary(seed, area).rows[col] : 0;
 const upper = (seed: number, area: number, col: number) => boundary(seed, area + 1).rows[col];
 /** Which area owns lattice cell (col,row). */
-export function ownerOf(seed: number, col: number, row: number) {
+function ownerOf(seed: number, col: number, row: number) {
   if (row < 0) return 0;
   let a = Math.max(0, Math.floor(row / ROWS));
   while (a > 0 && row < lower(seed, a, col)) a--;

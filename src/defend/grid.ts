@@ -56,11 +56,6 @@ export function sideCells(r: Rect): number[] {
   }
   return out;
 }
-export const tileOfCell = (cx: number, cy: number): TilePos => ({
-  tx: Math.floor(cx / SUB),
-  ty: Math.floor(cy / SUB),
-});
-
 export const ORTHO: readonly [number, number][] = [
   [1, 0],
   [-1, 0],

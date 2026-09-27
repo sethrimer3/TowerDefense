@@ -52,7 +52,7 @@ export type Fit =
   | { ok: true; structures: FittedStructure[]; city: Uint8Array; wall: Uint8Array }
   | { ok: false; reason: string };
 
-export const KEEP_UID = 0;
+const KEEP_UID = 0;
 
 export function defaultLayout(): Layout {
   return {
@@ -76,8 +76,6 @@ export function cityTileSet(l: Layout): Set<string> {
   return new Set([tileKey(l.keep.tx, l.keep.ty), ...l.cityTiles]);
 }
 
-export const isCityTile = (l: Layout, tx: number, ty: number) => cityTileSet(l).has(tileKey(tx, ty));
-
 /** Whether a set of tiles is one orthogonally-connected blob containing `root`. */
 export function tilesConnected(tiles: Set<string>, root: TilePos): boolean {
   if (!tiles.has(tileKey(root.tx, root.ty))) return false;
@@ -97,7 +95,7 @@ export function tilesConnected(tiles: Set<string>, root: TilePos): boolean {
 }
 
 /** Cell mask of the city (1 = inside a city tile). */
-export function cityMask(l: Layout): Uint8Array {
+function cityMask(l: Layout): Uint8Array {
   const city = new Uint8Array(CELL_COUNT);
   for (const k of cityTileSet(l)) {
     const { tx, ty } = parseTileKey(k);

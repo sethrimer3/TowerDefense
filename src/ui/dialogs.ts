@@ -20,7 +20,7 @@ export function confirmAction(ctx: AppContext, { title, body, label }: ConfirmPr
 }
 
 /** Starts the next run in the forest clearing, with the camera reset onto it. */
-export function returnToForest(ctx: AppContext) {
+function returnToForest(ctx: AppContext) {
   const { game, renderer } = ctx;
   game.summary = null;
   renderer.bottom = 0;

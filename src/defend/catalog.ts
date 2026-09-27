@@ -138,7 +138,7 @@ export type UpgradeDef = {
 };
 
 /** At the top level of Patrol routes, swordsmen answer anywhere in the city. */
-export const SOLDIER_REACH_MAX = 4;
+const SOLDIER_REACH_MAX = 4;
 
 export const UPGRADES: UpgradeDef[] = [
   { id: "barracksCapacity", group: "Barracks", name: "Garrison", maxLevel: 4, describe: (l) => `${2 + l} troops per barracks (swordsmen and archers)` },

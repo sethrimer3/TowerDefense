@@ -15,9 +15,9 @@ import { LIGHTING_CONFIG } from "./lighting.ts";
  * Each torch then bakes the layers facing it onto every floor tile in reach,
  * weighted by direction, falloff, and grazing angle (see bakeTorchRelief). */
 
-export const RELIEF_SIZE = 24;
+const RELIEF_SIZE = 24;
 /** Direction toward the torch, in tile pixel space (y grows downward). */
-export const RELIEF_DIRS = [
+const RELIEF_DIRS = [
   { key: "e", dx: 1, dy: 0 },
   { key: "w", dx: -1, dy: 0 },
   { key: "n", dx: 0, dy: -1 },

@@ -6,7 +6,6 @@ import {
   generateTowerRoom,
   random,
   rollUnguardedLoot,
-  validate,
   reachable,
   World,
   LAYOUT_VERSION,
@@ -255,17 +254,6 @@ test("automation reliably makes forward progress, never taking a lethal fight, a
   }
 });
 
-test("validator rejects missing prerequisite keys and doors with bypass routes", () => {
-  const cells = new Map<string, import("../src/entities.ts").Tile>();
-  for (let y = 0; y < 20; y++) cells.set(point(15, y), { kind: "floor" });
-  cells.set("15,5", { kind: "door", color: "yellow" });
-  assert.equal(validate(cells, 0), false);
-  cells.set("15,2", { kind: "key", color: "yellow" });
-  assert.equal(validate(cells, 0), true);
-  for (let y = 4; y <= 6; y++) cells.set(point(14, y), { kind: "floor" });
-  assert.equal(validate(cells, 0), false);
-});
-
 test("hundreds of generated Tower floors are geometrically valid even when their economy is not", () => {
   let checked = 0;
   for (let seed = 0; seed < 40; seed++)
@@ -279,25 +267,6 @@ test("hundreds of generated Tower floors are geometrically valid even when their
       checked++;
     }
   assert.ok(checked > 200);
-});
-
-test("validator permits encounter gates but rejects physically isolated floor space", () => {
-  const cells = new Map<string, import("../src/entities.ts").Tile>();
-  for (let y = 0; y < 20; y++) cells.set(point(15, y), { kind: "floor" });
-  cells.set("15,5", { kind: "door", color: "yellow" });
-  cells.set("15,2", { kind: "key", color: "yellow" });
-  assert.ok(validate(cells, 0));
-  const foe = {
-    kind: "enemy" as const,
-    enemy: { name: "Blocker", hp: 999, attack: 999, defense: 999, tier: 3 },
-  };
-  cells.set("15,1", foe);
-  assert.equal(validate(cells, 0), true);
-  cells.set("15,1", { kind: "floor" });
-  cells.set("15,18", foe);
-  assert.equal(validate(cells, 0), true);
-  cells.set("3,3", { kind: "floor" });
-  assert.equal(validate(cells, 0), false);
 });
 
 test("unguarded loot uses one exact 1/1000 roll per space", () => {

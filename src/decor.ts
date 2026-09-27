@@ -103,7 +103,7 @@ export function valueNoise(x: number, y: number, seed: number) {
   return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
 }
 /** Three octaves of value noise, roughly 0..1 with mean 0.5. */
-export function fbm(x: number, y: number, seed: number) {
+function fbm(x: number, y: number, seed: number) {
   return valueNoise(x, y, seed) * 0.6 + valueNoise(x * 2.1, y * 2.1, seed ^ 0x51f) * 0.28 + valueNoise(x * 4.3, y * 4.3, seed ^ 0xa3d) * 0.12;
 }
 
@@ -202,7 +202,7 @@ function overgrowthBase(src: DecorSource, fx: number, fy: number, lush: number) 
 }
 
 /** Overgrowth (0 bare .. 1+ dense) at a tile-local pixel of a ground tile. */
-export function overgrowth(src: DecorSource, x: number, y: number, i: number, j: number, walls = wallNeighbors(src, x, y)) {
+function overgrowth(src: DecorSource, x: number, y: number, i: number, j: number, walls = wallNeighbors(src, x, y)) {
   const lush = src.lush(x, y);
   if (lush <= 0.02) return 0;
   const fx = x + (i + 0.5) / TILE_PX, fy = -y + (j + 0.5) / TILE_PX;

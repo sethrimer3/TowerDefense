@@ -75,7 +75,7 @@ export function towerZoneIndex(room: number) {
   return Math.floor(Math.max(0, room) / 10) % TOWER_ZONE_ENEMIES.length;
 }
 
-export function towerCycle(room: number) {
+function towerCycle(room: number) {
   return Math.floor(Math.max(0, room) / 100);
 }
 

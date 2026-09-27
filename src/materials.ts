@@ -154,7 +154,7 @@ export const GEMS: GemDef[] = [
   },
 ];
 
-export const ENEMY_SPECIES: Record<EnemySpeciesId, { name: string; common: MaterialId; rare: MaterialId }> = {
+const ENEMY_SPECIES: Record<EnemySpeciesId, { name: string; common: MaterialId; rare: MaterialId }> = {
   cinderSlime: { name: "Cinder slime", common: "cinderSlimeBlob", rare: "emberNucleus" },
   boneSentinel: { name: "Bone sentinel", common: "sentinelBone", rare: "gildedMarrow" },
   duskWing: { name: "Dusk wing", common: "duskFeather", rare: "eclipsePinion" },

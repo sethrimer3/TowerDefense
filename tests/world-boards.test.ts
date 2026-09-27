@@ -13,14 +13,11 @@ import {
   random,
   reachable,
   rollUnguardedLoot,
-  torchesForSeed,
-  validate,
 } from "../src/generation.ts";
 import { region } from "../src/delve/labyrinth.ts";
 
-// Characterization hashes of the world boards in generation.ts: the legacy
-// chunk validator on seeded synthetic chunks and real ones, flood fills,
-// torch spots and torches, the Delve World's and Tower RoomWorld's tiles,
+// Characterization hashes of the world boards in generation.ts: flood fills
+// on seeded synthetic chunks and real ones, torch spots, the Delve World's and Tower RoomWorld's tiles,
 // steps, crossings, upkeep and torch breaking, and the unguarded loot roll.
 // Regenerate (only when a change to them is intended) with UPDATE_GOLDEN=1.
 const GOLDEN = new URL("./fixtures/world-boards.golden.json", import.meta.url);
@@ -40,7 +37,7 @@ const DOORS: Tile[] = [
 
 /** A seeded chunk shaped like the old generator's: a spine up START_X with
  * side branches (some wrapping round the edge) behind doors, keys scattered
- * about, and now and then a flaw the validator should notice. */
+ * about, and now and then a cut-off floor or missing exit. */
 function syntheticChunk(seed: number) {
   const rnd = random(seed);
   const base = Math.floor(rnd() * 4) * CHUNK;
@@ -72,18 +69,16 @@ function syntheticChunk(seed: number) {
   return { cells, base };
 }
 
-function validation(group: number) {
+function floodFills(group: number) {
   const out: unknown[] = [];
   for (let i = 0; i < 80; i++) {
     const { cells, base } = syntheticChunk(group * 1000 + i);
     const blocked = new Set([...cells].filter(([, t]) => t.kind === "door").map(([k]) => k));
-    out.push(validate(cells, base), reachable(cells, point(START_X, base)).size, [...reachable(cells, point(START_X, base), blocked)]);
-    // The same chunk listed back to front, so inner doors come before outer ones.
-    out.push(validate(new Map([...cells].reverse()), base));
+    out.push(reachable(cells, point(START_X, base)).size, [...reachable(cells, point(START_X, base), blocked)]);
   }
   for (let index = 0; index < 4; index++) {
     const cells = generate(group, index);
-    out.push(validate(cells, index * CHUNK), reachable(cells, point(START_X, index * CHUNK)).size);
+    out.push(reachable(cells, point(START_X, index * CHUNK)).size);
   }
   return digest(out);
 }
@@ -118,7 +113,6 @@ function torchSpots(seed: number) {
     chooseTorchSpots(delve, { xMin: 1, xMax: WIDTH - 2, yMin: 0, yMax: 200, seed }),
     chooseTorchSpots(delve, { xMin: 3, xMax: 20, yMin: 10, yMax: 60, seed: seed ^ 5 }),
     chooseTorchSpots(tower, { xMin: 1, xMax: 15, yMin: 1, yMax: 15, seed }),
-    torchesForSeed(seed),
   ]);
 }
 
@@ -195,9 +189,9 @@ function loot() {
   return digest(out);
 }
 
-test("world boards, torches and the chunk validator match the golden", () => {
+test("world boards, flood fills and torches match the golden", () => {
   const actual: Record<string, unknown> = {};
-  for (let g = 1; g <= 8; g++) actual[`validate ${g}`] = validation(g);
+  for (let g = 1; g <= 8; g++) actual[`reachable ${g}`] = floodFills(g);
   for (const seed of [1, 7, 42]) actual[`torch spots ${seed}`] = torchSpots(seed);
   for (const seed of [1, 7, 42, 99, 500, 1234]) actual[`delve ${seed}`] = delveWorld(seed);
   for (const seed of [1, 7, 42]) actual[`tower ${seed}`] = towerRooms(seed);

@@ -29,7 +29,7 @@ export type ReflectionPainter = {
 export type Reflections = { paint: (p: ReflectionPainter) => void; key: string };
 /** Reflection tuning: opacity, how far the water tints them, and how far
  * (pixels) ripples and the idle shimmer push them around. */
-export const REFLECTION = { alpha: 0.65, tint: 0.35, darken: 0.85, rippleShift: 2.2, rippleWidth: 4, shimmer: 0.7 };
+const REFLECTION = { alpha: 0.65, tint: 0.35, darken: 0.85, rippleShift: 2.2, rippleWidth: 4, shimmer: 0.7 };
 
 /** A ring spreading on the water: center and radius (world pixels), and strength. */
 export type Wave = { gx: number; gy: number; r: number; fade: number };

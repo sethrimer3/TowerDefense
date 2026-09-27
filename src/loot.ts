@@ -46,7 +46,7 @@ export function rollMetal(E: number, rng: () => number): MaterialStack | null {
   return { id: metal.materialId, quantity };
 }
 
-export function rollGems(E: number, rng: () => number): MaterialStack[] {
+function rollGems(E: number, rng: () => number): MaterialStack[] {
   const results: MaterialStack[] = [];
   for (const gem of GEMS) {
     const chance = gem.chance(E);
@@ -55,7 +55,7 @@ export function rollGems(E: number, rng: () => number): MaterialStack[] {
   return results;
 }
 
-export function rollEmptyVial(rng: () => number): MaterialStack | null {
+function rollEmptyVial(rng: () => number): MaterialStack | null {
   if (rng() >= EMPTY_VIAL_CHANCE) return null;
   return { id: "emptyVial", quantity: 1 + Math.floor(rng() * 2) };
 }

@@ -104,7 +104,7 @@ function jobOpen(sim: DefendSim, cell: number, self?: Civilian): boolean {
 
 /** Rubble most worth rebuilding: structures, then walls, then houses —
  * nearest first, skipping anything with enemies close by. */
-export function pickJob(sim: DefendSim, from: Point, skip = -1): number {
+function pickJob(sim: DefendSim, from: Point, skip = -1): number {
   let best = -1,
     bestScore = Infinity;
   for (const { cell, tier } of openJobs(sim, skip)) {

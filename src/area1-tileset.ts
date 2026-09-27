@@ -2,7 +2,7 @@ import { tileRandom } from "./themes.ts";
 import { doorId } from "./doors.ts";
 import type { Tile } from "./entities.ts";
 
-export const AREA1_TILE_SIZE = 24;
+const AREA1_TILE_SIZE = 24;
 // Vite serves Pages builds beneath /TowerProject/. Root-absolute asset URLs
 // work on localhost but escape that project path in production, causing the
 // renderer to silently fall back to procedural tiles. BASE_URL is "./" in

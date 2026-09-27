@@ -8,9 +8,6 @@ export type DoorId = "a" | "b" | "c" | "ab" | "ac" | "bc" | "abc" | "steel" | "h
 export function doorRule(tile: Tile): DoorRule {
   return tile.door ?? { type: "keys", keys: [tile.color ?? "yellow"], mode: "all" };
 }
-export function requiredKeys(rule: DoorRule): KeyColor[] {
-  return rule.type === "keys" ? [...rule.keys] : [];
-}
 /** Returns the exact keys that would be consumed. Any-key steel locks use a
  * stable amber/azure/crimson priority so their behavior is predictable. */
 export function doorCost(tile: Tile, player: Pick<Player, "keys" | "hp" | "maxHp">): KeyColor[] | null {

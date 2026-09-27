@@ -7,11 +7,9 @@ import {
   TOWER_HEIGHT,
   TOWER_START_X,
   UNGUARDED_LOOT_CHANCE,
-  type KeyColor,
 } from "./config.ts";
 import { point, type Tile, type Torch } from "./entities.ts";
 import { computeVisibilityPolygon, LIGHTING_CONFIG } from "./lighting.ts";
-import { doorCost } from "./doors.ts";
 import { tileRandom } from "./themes.ts";
 import { generateTowerFloor } from "./tower/index.ts";
 export type Board = {
@@ -152,63 +150,6 @@ export function reachable(
   }
   return seen;
 }
-/** Validate all floor space, actual separating locks, and a consuming-key traversal.
- * No starting keys are assumed; enemies may gate otherwise connected spaces. Each child chamber gets its key in its parent. */
-export function validate(cells: Map<string, Tile>, base: number) {
-  const entrance = point(START_X, base);
-  const all = reachable(cells, entrance);
-  if (!all.has(point(START_X, base + CHUNK - 1))) return false;
-  if ([...cells].some(([k, t]) => t.kind !== "wall" && !all.has(k))) return false;
-  const locks = [...cells].filter(([, t]) => t.kind === "door");
-  // Removing any one door must disconnect floor beyond it, even with all others open.
-  if (locks.some(([key]) => reachable(cells, entrance, new Set([key])).size >= all.size - 1)) return false;
-  return unlocksInTurn(cells, entrance, locks, all.size);
-}
-
-/** Opens the doors one at a time with the keys found so far, each one that
- * the reachable area touches and the keys pay for; true when every door
- * opens and the whole chunk (`size` tiles) is reached. */
-function unlocksInTurn(cells: Map<string, Tile>, entrance: string, locks: [string, Tile][], size: number) {
-  const closed = new Set(locks.map(([k]) => k)), collected = new Set<string>();
-  const keys: Record<KeyColor, number> = { yellow: 0, blue: 0, red: 0 };
-  const cost = (t: Tile) => doorCost(t, { keys, hp: 1, maxHp: 1 });
-  for (let step = 0; step <= locks.length; step++) {
-    const area = reachable(cells, entrance, closed);
-    pickUpKeys(cells, area, collected, keys);
-    if (!closed.size) return area.size === size;
-    const next = locks.find(([k, t]) => closed.has(k) && cost(t) !== null && touches(area, k));
-    if (!next) return false;
-    for (const color of cost(next[1])!) keys[color]--;
-    closed.delete(next[0]);
-  }
-  return false;
-}
-
-/** Counts each key in `area` not collected before. */
-function pickUpKeys(cells: Map<string, Tile>, area: Set<string>, collected: Set<string>, keys: Record<KeyColor, number>) {
-  for (const k of area) {
-    const t = cells.get(k)!;
-    if (t.kind !== "key" || collected.has(k)) continue;
-    keys[t.color!]++;
-    collected.add(k);
-  }
-}
-
-/** Whether tile `k` borders `area`, wrapping round the Delve's sides. */
-function touches(area: Set<string>, k: string) {
-  const [x, y] = k.split(",").map(Number);
-  return directions.some(([dx, dy]) => area.has(point((x + dx + WIDTH) % WIDTH, y + dy)));
-}
-type Room = {
-  id: number;
-  col: number;
-  row: number;
-  x1: number;
-  x2: number;
-  y1: number;
-  y2: number;
-};
-
 /** Compatibility snapshot for diagnostics; runtime generation is lazy and endless. */
 export function generateDelveMap(seed: number, areas = 4): Map<string, Tile> {
   const cells = new Map<string, Tile>();
@@ -224,9 +165,6 @@ export function generate(seed: number, index: number): Map<string, Tile> {
       if (y >= min && y < max) cells.set(k, t);
     }
   return cells;
-}
-export function torchesForSeed(seed: number): Torch[] {
-  return placeTorches(generateDelveMap(seed, 1), { xMin: 1, xMax: WIDTH - 2, yMin: 0, yMax: 140, seed });
 }
 
 export function rollUnguardedLoot(rng: () => number): Tile | null {

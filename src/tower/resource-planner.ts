@@ -47,7 +47,7 @@ const SOURCE_TABLE: Record<KeyColor, Weighted<SourceKind>> = {
 };
 const LOWER: Record<KeyColor, KeyColor | null> = { yellow: null, blue: "yellow", red: "blue" };
 
-export function subtreeOf(nodes: StrategicNode[], id: number): Set<number> {
+function subtreeOf(nodes: StrategicNode[], id: number): Set<number> {
   const out = new Set<number>();
   const stack = [id];
   while (stack.length) {
@@ -58,7 +58,7 @@ export function subtreeOf(nodes: StrategicNode[], id: number): Set<number> {
   return out;
 }
 
-export function keysIn(node: StrategicNode, color: KeyColor): number {
+function keysIn(node: StrategicNode, color: KeyColor): number {
   const count = (r: Reward) => (r.kind === "key" && r.color === color ? 1 : 0);
   return node.rewards.reduce((s, r) => s + count(r), 0) + node.guarded.reduce((s, g) => s + count(g.reward), 0);
 }

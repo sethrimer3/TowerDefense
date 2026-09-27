@@ -33,7 +33,7 @@ const PROFILES_FOR: Record<Strength, TowerEnemyProfile[]> = {
   elite: ["defenseHeavy"],
 };
 
-export function enemyTile(strength: Strength, depth: number, rng: () => number): Tile {
+function enemyTile(strength: Strength, depth: number, rng: () => number): Tile {
   const profiles = PROFILES_FOR[strength];
   const profile = profiles[Math.floor(rng() * profiles.length)];
   return { kind: "enemy", enemy: getTowerEnemy(depth, rng, profile) };
@@ -49,7 +49,7 @@ export function gateTile(gate: Gate, depth: number, rng: () => number): Tile {
   }
 }
 
-export function rewardTile(r: Reward, rng: () => number): Tile {
+function rewardTile(r: Reward, rng: () => number): Tile {
   if (r.kind === "key") return { kind: "key", color: r.color };
   if (r.kind === "potion") return { kind: "potion", color: rng() < 0.5 ? "red" : "blue" };
   return { kind: r.kind };
