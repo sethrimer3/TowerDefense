@@ -1,7 +1,7 @@
-import { START_X, TOWER_START_X, TOWER_WIDTH, WIDTH } from "./config.ts";
 import type { Mode, Tile } from "./entities.ts";
 import type { Board } from "./generation.ts";
 import { tileRandom } from "./themes.ts";
+import { MODES } from "./modes.ts";
 
 export const OUTSIDE_SIZE = 20;
 export const ENTRANCE_Y = 12;
@@ -59,8 +59,8 @@ export class OutsideWorld implements Board {
   floor = 0;
   entranceX: number;
   constructor(public seed: number, public mode: Mode) {
-    this.width = mode === "tower" ? TOWER_WIDTH : WIDTH;
-    this.entranceX = mode === "tower" ? TOWER_START_X : START_X;
+    this.width = MODES[mode].width;
+    this.entranceX = MODES[mode].entranceX;
   }
   tile(x: number, y: number): Tile {
     if (!this.inside(x, y)) return { kind: "wall" };

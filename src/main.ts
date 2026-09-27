@@ -10,6 +10,7 @@ import { FrameLoop } from "./frame-loop.ts";
 import { installDebugHooks } from "./debug-hooks.ts";
 import { isBoard, type AppContext, type Tab } from "./ui/app.ts";
 import { displayedProgress, el } from "./ui/dom.ts";
+import { MODES } from "./modes.ts";
 import { buildShell } from "./ui/shell.ts";
 import { BoardOverlay } from "./ui/board-overlay.ts";
 import { boardHeadingStale, renderBoardHeading, renderHud } from "./ui/hud.ts";
@@ -120,10 +121,10 @@ el("section-pick").onclick = () => showSectionPicker(ctx);
 el("end-run").onclick = () =>
   ctx.confirm(
     "End this run?",
-    `End the current ${game.mode === "tower" ? "Tower run" : "Delve run"} at ${game.mode === "tower" ? "height" : "depth"} ${displayedProgress(game.run.height, !!game.run.outside)}. Milestone rewards are already yours, and uncollected clear chests will be claimed.`,
+    `End the current ${MODES[game.mode].words.run} at ${MODES[game.mode].words.progress} ${displayedProgress(game.run.height, !!game.run.outside)}. Milestone rewards are already yours, and uncollected clear chests will be claimed.`,
     "End run",
     () => {
-      game.finish(game.mode === "tower" ? "Tower run ended" : "Delve run ended");
+      game.finish(`${MODES[game.mode].words.run} ended`);
       update();
     },
   );

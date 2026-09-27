@@ -4,7 +4,6 @@ import { defaults, decode } from "../src/save.ts";
 import { Game } from "../src/state.ts";
 import { RoomWorld, World } from "../src/generation.ts";
 import {
-  getEquivalentFloor,
   metalUnlocked,
   GEMS,
   METALS,
@@ -30,12 +29,6 @@ const always = (values: number[]) => {
 };
 const constant = (v: number) => () => v;
 
-test("equivalent floor: Tower floor equals Delve depth / 10", () => {
-  assert.equal(getEquivalentFloor("tower", 70), 70);
-  assert.equal(getEquivalentFloor("delve", 700), 70);
-  assert.equal(getEquivalentFloor("delve", 705), 70);
-  assert.equal(getEquivalentFloor("delve", 709), 70);
-});
 
 test("metal availability follows documented unlock floors", () => {
   assert.equal(metalUnlocked("iron", 0), true);

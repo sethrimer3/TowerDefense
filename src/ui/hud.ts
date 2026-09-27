@@ -3,6 +3,7 @@ import type { Renderer } from "../rendering.ts";
 import { levelForXp } from "../config.ts";
 import { CONSUMABLES } from "../crafting.ts";
 import { outsideWeather } from "../outside.ts";
+import { MODES, milestones } from "../modes.ts";
 import { displayedProgress, el, text } from "./dom.ts";
 import type { BoardOverlay } from "./board-overlay.ts";
 
@@ -36,17 +37,17 @@ export function renderHud(game: Game, renderer: Renderer, overlay: BoardOverlay)
 export function renderBoardHeading(game: Game, overlay: BoardOverlay) {
   el("board").dataset.outside = String(!!game.run.outside);
   el("board").classList.toggle("mode-tower", game.mode === "tower");
-  const tower = game.mode === "tower";
+  const words = MODES[game.mode].words;
   if (game.run.outside) {
-    text("board-title", tower ? "THE TOWER APPROACH" : "THE MOUNTAIN HOLLOW");
-    text("height-zone", tower ? "THE TOWER APPROACH" : "THE MOUNTAIN HOLLOW");
+    text("board-title", words.outsideTitle);
+    text("height-zone", words.outsideTitle);
     const labels = { cloudy: "CLOUDY", sunny: "SUNNY", rain: "RAINING", storm: "THUNDERSTORM" };
     text("board-subtitle", `FOREST CLEARING · ${labels[outsideWeather(game.run.seed)]}`);
     el("inspect").textContent = "Follow the forest path and step onto the entrance at the top to begin again.";
   } else {
-    text("board-title", tower ? "THE ASCENT TRIALS" : "THE HOLLOW SPIRE");
-    text("height-zone", tower ? "THE ASCENT TRIALS" : "THE HOLLOW SPIRE");
-    text("board-subtitle", tower ? "ONE CHAMBER AT A TIME" : "HIGHER DANGERS · GREATER REWARDS");
+    text("board-title", words.title);
+    text("height-zone", words.title);
+    text("board-subtitle", words.subtitle);
     el("inspect").textContent = "";
   }
   overlay.hide();
@@ -80,8 +81,8 @@ function renderConsumables(game: Game) {
  * best would pay. */
 function renderProgress(game: Game) {
   const outside = !!game.run.outside,
-    delve = game.mode === "delve";
-  text("height-label", delve ? "DEPTH" : "HEIGHT");
+    rules = MODES[game.mode];
+  text("height-label", rules.words.progress.toUpperCase());
   const rawRunBest = game.run.maxHeight ?? game.run.height;
   const rawAllBest = game.save[game.mode].best;
   text("height", displayedProgress(game.run.height, outside));
@@ -90,9 +91,8 @@ function renderProgress(game: Game) {
   const rewardEl = el("best-reward");
   rewardEl.hidden = rawRunBest <= rawAllBest;
   if (rewardEl.hidden) return;
-  const divisor = delve ? 10 : 1;
-  text("best-reward-val", Math.floor(rawRunBest / divisor) - Math.floor(rawAllBest / divisor));
-  text("best-reward-type", delve ? "COURAGE" : "INSPIRATION");
+  text("best-reward-val", milestones(rules, rawAllBest, rawRunBest));
+  text("best-reward-type", rules.words.currency.toUpperCase());
 }
 
 /** Log and Floors act on the Tower; in the Delve they are placeholders. */

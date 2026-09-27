@@ -1,5 +1,6 @@
 import { TOWER_SECTION } from "../config.ts";
 import { CLEAR_TIERS } from "../tower/clear-ledger.ts";
+import { MODES } from "../modes.ts";
 import type { AppContext } from "./app.ts";
 import { displayedProgress, el, itemSprite, uiSprite } from "./dom.ts";
 import { devAmount } from "./hud.ts";
@@ -60,10 +61,11 @@ export class RunEnd {
   private showSummary() {
     const ctx = this.ctx, { game, modal } = ctx;
     const s = game.summary!,
-      currencyName = game.mode === "delve" ? "COURAGE" : "INSPIRATION",
-      heightName = game.mode === "tower" ? "ROOMS" : "HEIGHT";
+      rules = MODES[game.mode],
+      currencyName = rules.words.currency.toUpperCase(),
+      heightName = rules.words.summaryProgress.toUpperCase();
     if (modal.open) return;
-    const saved = devAmount(game, game.mode === "tower" ? game.save.tower.shards : game.save.delve.essence);
+    const saved = devAmount(game, rules.balance(game.save));
     const revive = game.save[game.mode].revival
       ? `<p>Revive is available until your next move.</p><button class="wide" id="revive-now">Revive</button>`
       : "";

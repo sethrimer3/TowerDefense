@@ -6,11 +6,8 @@ import { doorBlockedMessage, doorName, KEY_ORDER } from "./doors.ts";
 import { skillAvailable } from "./skill-trees.ts";
 import { routeTo, type Step } from "./pathfinding.ts";
 import {
-  CHUNK,
-  START_X,
   TOWER_START_X,
   TOWER_SECTION,
-  goldReward,
   xpForKill,
   levelForXp,
   levelBonus,
@@ -42,8 +39,9 @@ import type { CombatPrediction } from "./combat.ts";
 import { ATTACK_SHARD, DEFENSE_SHARD, isLethal, resolveStep, type StepBlocked, type StepEffect } from "./step-effects.ts";
 import { OutsideWorld } from "./outside.ts";
 import { ClearLedger } from "./tower/clear-ledger.ts";
-import { getEquivalentFloor, materialDef, MATERIALS } from "./materials.ts";
-import { rollEnemyDrops, rollTreasureLoot, towerEnemyDrops } from "./loot.ts";
+import { materialDef, MATERIALS } from "./materials.ts";
+import { rollTreasureLoot } from "./loot.ts";
+import { MODES, milestones } from "./modes.ts";
 import {
   creditMaterials,
   getEquippedBonuses,
@@ -153,16 +151,14 @@ export class Game {
   /** The live run's board, regenerated from its seed and changes. */
   private buildWorld(): Board {
     const r = this.run;
-    if (r.outside) return new OutsideWorld(r.seed, this.mode);
-    if (this.mode === "delve") return new World(r.seed, r.changes, r.floor, r.delveMilestone ?? 0);
-    return new RoomWorld(r.seed, r.height, r.changes);
+    return r.outside ? new OutsideWorld(r.seed, this.mode) : this.rules.board(r);
   }
   /** Map edits saved under an older layout can't be applied to the new one:
    * they are dropped, and progress, stats and inventory are kept. */
   private upgradeLayout(run: Run) {
-    if (this.mode === "delve") {
-      if (run.layoutVersion !== LAYOUT_VERSION) this.reshapeDelve(run);
-    } else if (run.layoutVersion !== TOWER_LAYOUT_VERSION) this.reshapeTower(run);
+    if (run.layoutVersion === this.rules.layoutVersion) return;
+    if (this.mode === "delve") this.reshapeDelve(run);
+    else this.reshapeTower(run);
   }
   /** Returns the player to their section's entrance on the new labyrinth. */
   private reshapeDelve(run: Run) {
@@ -190,17 +186,12 @@ export class Game {
   private settleRevival() {
     this.save[this.mode].revival = null;
   }
-  private creditCurrency(earned: number) {
-    if (this.mode === "delve") this.save.delve.essence += earned;
-    else this.save.tower.shards += earned;
-  }
   /** Pays what the run still owes; returns whether it set a new record. */
   private payout(): boolean {
     const record = this.run.height > this.save[this.mode].reached;
     this.recordProgress();
     this.claimRewards();
-    if (this.mode === "delve")
-      this.save.gold += goldReward(this.run.kills, this.run.treasures);
+    this.save.gold += this.rules.endGold(this.run);
     return record;
   }
   snapshot(): MoveSnapshot {
@@ -355,7 +346,7 @@ export class Game {
     const section = this.mode === "tower" ? this.startSection() : 0,
       height = section * TOWER_SECTION;
     const player = {
-      x: this.mode === "tower" ? TOWER_START_X : START_X,
+      x: this.rules.entranceX,
       y: 0,
       hp: this.sectionStartHp(section, maxHp),
       maxHp,
@@ -364,40 +355,24 @@ export class Game {
       keys: { yellow: u.yellow, blue: u.blue, red: u.red },
     };
     for (const item of GOLD_SHOP) prov[item.id] = 0;
-    if (this.mode === "delve") {
-      this.run = {
-        damaged: false,
-        keysSpent: false,
-        layoutVersion: LAYOUT_VERSION,
-        seed,
-        height: 0,
-        maxHeight: 0,
-        kills: 0,
-        treasures: 0,
-        changes: {},
-        floor: 0,
-        player,
-      };
-      this.world = new World(this.run.seed, this.run.changes);
-    } else {
-      this.run = {
-        damaged: false,
-        keysSpent: false,
-        layoutVersion: TOWER_LAYOUT_VERSION,
-        seed,
-        height,
-        maxHeight: height,
-        kills: 0,
-        treasures: 0,
-        changes: {},
-        floors: {},
-        floor: 0,
-        player,
-        baseStats: { attack, defense },
-      };
+    this.run = {
+      damaged: false,
+      keysSpent: false,
+      layoutVersion: this.rules.layoutVersion,
+      seed,
+      height,
+      maxHeight: height,
+      kills: 0,
+      treasures: 0,
+      changes: {},
+      floor: 0,
+      player,
+    };
+    if (this.mode === "tower") {
+      this.run.baseStats = { attack, defense };
       this.linkTowerFloor();
-      this.world = new RoomWorld(this.run.seed, height, this.run.changes);
     }
+    this.world = this.rules.board(this.run);
     if (outside) {
       this.run.outside = true;
       this.world = new OutsideWorld(seed, this.mode);
@@ -528,9 +503,7 @@ export class Game {
    * gated outside `run` — undoing a kill/chest reverts the tile, but never
    * re-grants the reward for the same physical kill/chest. */
   private lootKey(x: number, y: number): string {
-    return this.mode === "tower"
-      ? `${this.run.seed}:${this.run.height}:${x},${y}`
-      : `${this.run.seed}:${x},${y}`;
+    return this.rules.lootKey(this.run, x, y);
   }
   /** Inside a run that hasn't ended: not in the forest, no summary showing. */
   private get playing() {
@@ -658,7 +631,7 @@ export class Game {
       key = this.lootKey(x, y);
     if (slice.lootedTiles[key]) return "";
     slice.lootedTiles[key] = true;
-    const drops = this.mode === "tower" ? towerEnemyDrops(enemy.name) : rollEnemyDrops(enemy.name, Math.random);
+    const drops = this.rules.enemyDrops(enemy.name, Math.random);
     if (!drops.length) return "";
     creditMaterials(this.save, drops);
     return " · +" + drops.map(d => `${d.quantity} ${materialDef(d.id).name}${d.quantity > 1 ? "s" : ""}`).join(", +");
@@ -666,16 +639,12 @@ export class Game {
   private enterFromOutside() {
     const p = this.run.player;
     this.run.outside = false;
-    p.x = this.mode === "tower" ? TOWER_START_X : START_X;
+    p.x = this.rules.entranceX;
     p.y = 0;
-    if (this.mode === "tower") {
-      this.linkTowerFloor();
-      this.world = new RoomWorld(this.run.seed, this.run.height, this.run.changes);
-    } else {
-      this.world = new World(this.run.seed, this.run.changes);
-    }
+    if (this.mode === "tower") this.linkTowerFloor();
+    this.world = this.rules.board(this.run);
     this.route = [];
-    this.feedback(this.mode === "tower" ? "You enter the tower." : "You enter the mountain cave.");
+    this.feedback(this.rules.words.enter);
   }
   /** Removes what the step used up: chests stay behind opened, fixtures stay. */
   private consumeTile(t: Tile, x: number, y: number) {
@@ -766,12 +735,15 @@ export class Game {
     if (this.run.outside) return 0;
     const slice = this.save[this.mode];
     const reached = Math.max(slice.reached, this.run.height);
-    const divisor = this.mode === "tower" ? 1 : 10;
-    const earned = Math.floor(reached / divisor) - Math.floor(slice.reached / divisor);
+    const earned = milestones(this.rules, slice.reached, reached);
     slice.reached = reached;
     slice.best = Math.max(slice.best, reached);
-    this.creditCurrency(earned);
+    this.rules.credit(this.save, earned);
     return earned;
+  }
+  /** How the current mode differs from the other. */
+  private get rules() {
+    return MODES[this.mode];
   }
   /** Clear rewards live in the Tower's log, beside this run. */
   private get ledger() {
@@ -807,7 +779,7 @@ export class Game {
       const slice = this.save[this.mode];
       if (!slice.lootedTiles[key]) {
         slice.lootedTiles[key] = true;
-        const E = getEquivalentFloor(this.mode, this.mode === "tower" ? this.run.height : y);
+        const E = this.rules.equivalentFloor(this.rules.progressAt(this.run, y));
         const loot = rollTreasureLoot(E, Math.random);
         this.save.gold += loot.gold;
         creditMaterials(this.save, loot.materials);

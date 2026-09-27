@@ -3,6 +3,7 @@ import type { Game, RouteEffects } from "../state.ts";
 import { ATTACK_SHARD, DEFENSE_SHARD, resolveStep } from "../step-effects.ts";
 import { predict } from "../combat.ts";
 import { doorColor, doorCost, doorDescription, doorName, doorRule, KEY_NAMES } from "../doors.ts";
+import { MODES } from "../modes.ts";
 
 /** What the inspect panel says about one board tile. */
 export type TileInfo = { color: string; title: string; body: string };
@@ -26,7 +27,7 @@ const KIND_COLORS: Partial<Record<Kind, string>> = {
 
 const stairs: Describe = (t, _p, g) => {
   if (g.run.outside)
-    return { title: "Stairs", body: g.mode === "tower" ? "Begin the climb — Floor 1" : "Descend into the cave" };
+    return { title: "Stairs", body: MODES[g.mode].words.entrance };
   const target = t.kind === "stairs" ? g.run.height + 2 : g.run.height;
   return { title: t.kind === "stairs" ? "Stairs Up" : "Stairs Down", body: `Leads to Floor ${target}` };
 };
@@ -60,7 +61,7 @@ const DESCRIBE: Partial<Record<Kind, Describe>> = {
   },
   stairs,
   stairsDown: stairs,
-  floor: (_t, _p, g) => ({ title: "Floor", body: g.mode === "tower" ? "Well-worn stone floor." : "Ancient cavern floor." }),
+  floor: (_t, _p, g) => ({ title: "Floor", body: MODES[g.mode].words.floor }),
   attack: () => ({ title: "Attack Shard", body: `Raises ATK by ${ATTACK_SHARD} for this run.` }),
   defense: () => ({ title: "Defense Shard", body: `Raises DEF by ${DEFENSE_SHARD} for this run.` }),
   treasure: () => ({ title: "Treasure", body: "Contains gold and crafting materials." }),

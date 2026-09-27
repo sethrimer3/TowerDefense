@@ -1,6 +1,5 @@
 // Central data-driven tables for the persistent crafting-materials economy.
 // See docs/CRAFTING_AND_EQUIPMENT.md for the design source of truth.
-import type { Mode } from "./entities.ts";
 
 export type MetalId =
   | "iron"
@@ -73,12 +72,6 @@ export type MaterialDef = {
 };
 
 export type MaterialStack = { id: MaterialId; quantity: number };
-
-/** `equivalentFloor = towerFloor` in Tower, `floor(delveDepth / 10)` in Delve.
- * The single shared progression scale every loot table is gated on. */
-export function getEquivalentFloor(mode: Mode, height: number): number {
-  return mode === "tower" ? height : Math.floor(height / 10);
-}
 
 export const METALS: { id: MetalId; name: string; materialId: MaterialId; unlockFloor: number; power: number }[] = [
   { id: "iron", name: "Iron", materialId: "ironBar", unlockFloor: 0, power: 1.0 },

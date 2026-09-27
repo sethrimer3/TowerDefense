@@ -21,3 +21,9 @@ _Avoid_: reward chest, clear reward
 **Clear ledger**:
 The lifetime record, per floor, of which clear tiers were earned and which were paid, so a tier pays exactly once however the run is undone, revived, reloaded or replaced.
 _Avoid_: tower log, reward log
+
+### Progress
+
+**Equivalent floor**:
+The one scale both modes' progress maps onto: a Tower floor counts as itself, and every ten Delve depth count as one. Loot tables are gated on it, and each new equivalent floor reached pays one of the mode's currency.
+_Avoid_: effective floor, tier
