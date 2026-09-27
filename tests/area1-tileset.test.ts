@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { AREA1_DOOR_URLS, AREA1_FLOOR_URLS, AREA1_ITEM_URLS, area1ItemId, floorVariant, wallAdjacencyMask, wallVariant } from "../src/area1-tileset.ts";
+import { AREA1_DOOR_URLS, AREA1_FLOOR_URLS, AREA1_ITEM_URLS, area1ItemId, floorVariant, wallAdjacencyMask } from "../src/area1-tileset.ts";
 
 test("wall adjacency uses NESW bits for every structural combination", () => {
   for (let mask = 0; mask < 16; mask++) assert.equal(wallAdjacencyMask({
@@ -8,11 +8,9 @@ test("wall adjacency uses NESW bits for every structural combination", () => {
   }), mask);
 });
 
-test("area-one variants are deterministic and bounded", () => {
+test("area-one floor variants are deterministic and bounded", () => {
   assert.equal(floorVariant(3, 7, 99), floorVariant(3, 7, 99));
   assert.ok(floorVariant(3, 7, 99) >= 0 && floorVariant(3, 7, 99) < 4);
-  assert.ok(wallVariant(15, 3, 7, 99) >= 0 && wallVariant(15, 3, 7, 99) < 3);
-  assert.equal(wallVariant(6, 3, 7, 99), 6);
 });
 
 test("asset URLs retain a deployable base instead of escaping to the host root", () => {

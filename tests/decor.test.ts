@@ -158,12 +158,12 @@ test("stepping onto crates splinters them, and the pieces stay out of the walls"
   // Walk in from the open side, then stand on the crate tile.
   const [cx, cy] = at;
   const from = [[0, 1], [1, 0], [0, -1], [-1, 0]].map(([dx, dy]) => [cx + dx, cy + dy]).find(([x, y]) => board.tile(x, y).kind === "floor")!;
-  layer.update(0.016, now, from[0], from[1], tileAt, false);
-  for (let k = 0; k <= 10; k++) layer.update(0.016, (now += 16), from[0] + (cx - from[0]) * k / 10, from[1] + (cy - from[1]) * k / 10, tileAt, false);
+  layer.update({ dt: 0.016, now, hx: from[0], hy: from[1], tileAt, reduceMotion: false });
+  for (let k = 0; k <= 10; k++) layer.update({ dt: 0.016, now: (now += 16), hx: from[0] + (cx - from[0]) * k / 10, hy: from[1] + (cy - from[1]) * k / 10, tileAt, reduceMotion: false });
   assert.ok(layer.broken.has(`${layer.src!.key}:${cx},${cy}`), "crate should break underfoot");
   const splinters = () => layer.particles.filter((p) => p.kind === "splinter");
   assert.ok(splinters().length > 5, "breaking throws splinters");
-  for (let k = 0; k < 300; k++) layer.update(0.016, (now += 16), cx, cy, tileAt, false);
+  for (let k = 0; k < 300; k++) layer.update({ dt: 0.016, now: (now += 16), hx: cx, hy: cy, tileAt, reduceMotion: false });
   for (const p of splinters()) {
     const tx = Math.floor(p.gx / TILE_PX), ty = -Math.floor(p.gy / TILE_PX);
     assert.notEqual(board.tile(tx, ty).kind, "wall", `splinter came to rest inside a wall at ${tx},${ty}`);
@@ -172,7 +172,7 @@ test("stepping onto crates splinters them, and the pieces stay out of the walls"
   // Reduced motion still breaks the crate, without flying pieces.
   const calm = new DecorLayer();
   calm.sync(fakeRoom(room), 99);
-  calm.update(0.016, 1000, cx, cy, tileAt, true);
+  calm.update({ dt: 0.016, now: 1000, hx: cx, hy: cy, tileAt, reduceMotion: true });
   assert.ok(calm.broken.size === 1 && calm.particles.length === 0);
 });
 
@@ -188,7 +188,7 @@ test("wading through a pool makes ripples only on the water", () => {
   layer.sync(board, 99);
   const [x, y] = spot!;
   let now = 1000;
-  for (let k = 0; k < 20; k++) layer.update(0.016, (now += 16), x + (k % 2) * 0.05, y, (a, b) => board.tile(a, b), false);
+  for (let k = 0; k < 20; k++) layer.update({ dt: 0.016, now: (now += 16), hx: x + (k % 2) * 0.05, hy: y, tileAt: (a, b) => board.tile(a, b), reduceMotion: false });
   assert.ok(layer.ripples.length > 0, "moving in water ripples it");
   assert.ok(layer.ripples.every((r) => waterAt(src, r.gx, r.gy)));
 });
@@ -246,15 +246,15 @@ test("the foreground pass is skipped when it has nothing to draw, and busy track
     const d = tileDecor(src, x, y);
     if (!spot && board.tile(x, y).kind === "floor" && d.empty && !waterAt(src, x * TILE_PX + 12, -y * TILE_PX + 21) && Math.hypot(x - at[0], y - at[1]) > 3) spot = [x, y];
   });
-  for (let k = 0; k < 10; k++) layer.update(0.016, 1000 + k * 16, spot![0], spot![1], tileAt, true);
-  assert.equal(layer.foregroundBounds(view, 2000, tileAt, true), null);
+  for (let k = 0; k < 10; k++) layer.update({ dt: 0.016, now: 1000 + k * 16, hx: spot![0], hy: spot![1], tileAt, reduceMotion: true });
+  assert.equal(layer.foregroundBounds({ view, now: 2000, tileAt, reduceMotion: true }), null);
   assert.equal(layer.busy, false);
   // Breaking a crate throws pieces: now there is something to draw.
-  layer.update(0.016, 3000, at[0], at[1], tileAt, false);
-  const box = layer.foregroundBounds(view, 3000, tileAt, false);
+  layer.update({ dt: 0.016, now: 3000, hx: at[0], hy: at[1], tileAt, reduceMotion: false });
+  const box = layer.foregroundBounds({ view, now: 3000, tileAt, reduceMotion: false });
   assert.ok(box && box.x1 > box.x0 && box.y1 > box.y0);
   assert.equal(layer.busy, true);
-  for (let k = 0; k < 400; k++) layer.update(0.016, 3000 + k * 16, at[0], at[1], tileAt, false);
+  for (let k = 0; k < 400; k++) layer.update({ dt: 0.016, now: 3000 + k * 16, hx: at[0], hy: at[1], tileAt, reduceMotion: false });
   assert.equal(layer.busy, false, "settled splinters don't keep the board busy");
 });
 

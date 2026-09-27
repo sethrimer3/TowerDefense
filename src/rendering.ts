@@ -2,7 +2,7 @@ import { CHUNK, TOWER_HEIGHT, VIEWPORT_TILES } from "./config.ts";
 import type { Game } from "./state.ts";
 import type { Tile, Torch } from "./entities.ts";
 import { drawEntrance, OUTSIDE_SIZE, outsideWeather } from "./outside.ts";
-import { DecorLayer, type DecorView, type ReflectionPainter } from "./decor-render.ts";
+import { DecorLayer, type DecorFrame, type DecorView, type ReflectionPainter } from "./decor-render.ts";
 import { OutsideGrass } from "./outside-grass.ts";
 import { TileLayerCache } from "./tile-cache.ts";
 import { OutdoorWeather } from "./weather.ts";
@@ -157,7 +157,7 @@ export class Renderer {
     f.glows = outside ? [] : this.lighting.glowSources(f);
     if (!outside && this.decorOn) {
       this.decor.sync(g.world, g.run.seed);
-      this.decor.update(dt, now, this.playerX, this.playerY, this.tileAt, f.reduceMotion);
+      this.decor.update({ dt, now, hx: this.playerX, hy: this.playerY, tileAt: this.tileAt, reduceMotion: f.reduceMotion });
       f.glows.push(...this.decor.glows(this.decorView(f)));
     }
     return f;
@@ -212,7 +212,7 @@ export class Renderer {
     if (this.decorOn && this.decor.key) {
       const view = this.decorView(f);
       this.decorCache.draw(f.c, view, f.dpr, this.decor.key, f.now, CACHE_COLUMNS, (ctx, x, y) => this.decor.bakeTile(ctx, x, y));
-      this.decor.drawGround(f.c, view, f.now, this.tileAt, f.reduceMotion, {
+      this.decor.drawGround(f.c, this.decorFrame(f), {
         paint: (p) => this.paintReflections(p, f),
         key: this.reflectionKey(f),
       });
@@ -232,7 +232,7 @@ export class Renderer {
       c.drawImage(dark.dark, 0, 0, f.width, f.width);
       c.restore();
       this.lighting.drawObjectBloom(f);
-      if (this.decorOn) this.decor.drawGlow(c, this.decorView(f), f.now, f.darkness, f.reduceMotion);
+      if (this.decorOn) this.decor.drawGlow(c, this.decorFrame(f), f.darkness);
       const region = this.occupiedRegion(f);
       if (region)
         this.lighting.drawDarkened(f, dark.spriteDark, {
@@ -310,11 +310,11 @@ export class Renderer {
       region: { x: hero.x - 0.7 * s, y: hero.y - 0.7 * s, w: 2.4 * s, h: 2.4 * s },
     });
     // Skipped when there's no foreground this frame.
-    const view = this.decorView(f), fg = this.decorOn ? this.decor.foregroundBounds(view, f.now, this.tileAt, f.reduceMotion) : null;
+    const decor = this.decorFrame(f), fg = this.decorOn ? this.decor.foregroundBounds(decor) : null;
     if (fg)
       this.lighting.drawDarkened(f, spriteDark, {
         amount: 1,
-        draw: (ctx) => this.decor.drawForeground(ctx, view, f.now, this.tileAt, f.reduceMotion),
+        draw: (ctx) => this.decor.drawForeground(ctx, decor),
         region: {
           x: (fg.x0 / 24 - f.left) * s - 2, y: (fg.y0 / 24 + f.n - 1 + f.bottom) * s - 2,
           w: ((fg.x1 - fg.x0) / 24) * s + 4, h: ((fg.y1 - fg.y0) / 24) * s + 4,
@@ -335,9 +335,13 @@ export class Renderer {
     c.setTransform(m);
     this.drawHero(f, c);
     c.restore();
-    if (f.outside) { if (this.decorOn) grass("front"); }
-    else if (this.decorOn && this.decor.foregroundBounds(view, f.now, this.tileAt, f.reduceMotion))
-      this.decor.drawForeground(c, view, f.now, this.tileAt, f.reduceMotion);
+    if (!this.decorOn) return;
+    if (f.outside) grass("front");
+    else this.drawDecorForeground(c, this.decorFrame(f));
+  }
+  /** Decor in front of the hero, when there is any this frame. */
+  private drawDecorForeground(c: CanvasRenderingContext2D, decor: DecorFrame) {
+    if (this.decor.foregroundBounds(decor)) this.decor.drawForeground(c, decor);
   }
   private drawWeather(f: FrameContext) {
     const g = this.game;
@@ -395,6 +399,9 @@ export class Renderer {
   private tileAt = (x: number, y: number) => this.game.world.tile(x, y);
   private decorView(f: FrameContext): DecorView {
     return { left: f.left, bottom: f.bottom, n: f.n, s: f.s };
+  }
+  private decorFrame(f: FrameContext): DecorFrame {
+    return { view: this.decorView(f), now: f.now, tileAt: this.tileAt, reduceMotion: f.reduceMotion };
   }
   private look(): BoardLook {
     const g = this.game;

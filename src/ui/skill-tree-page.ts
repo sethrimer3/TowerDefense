@@ -65,7 +65,9 @@ export class SkillTreePage {
   drawParticles(time: number) {
     const canvas = document.querySelector<HTMLCanvasElement>(".tree-particles");
     const tree = this.current();
-    if (canvas) this.particles.draw(canvas, time, tree.id, tree.nodes, this.tooltipVisible ? this.skill : null, this.ctx.game.save.settings.reduceMotion);
+    if (canvas) this.particles.draw(canvas, time, {
+      tree: tree.id, nodes: tree.nodes, selected: this.tooltipVisible ? this.skill : null, reduced: this.ctx.game.save.settings.reduceMotion,
+    });
   }
 
   private current(): Tree {

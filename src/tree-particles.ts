@@ -1,7 +1,16 @@
 import type { SkillNode } from './skill-trees.ts';
 
 type Point = { x: number; y: number };
+/** A size in CSS pixels. */
+type Size = { w: number; h: number };
 type Particle = Point & { radius: number; alpha: number };
+type Pulse = Point & { age: number };
+type Edge = { from: SkillNode; to: SkillNode };
+/** What one frame shows: the tree (a new id reseeds the particles), its
+ * nodes, the node whose tooltip is open, and whether motion is reduced. */
+export type TreeScene = { tree: string; nodes: SkillNode[]; selected: string | null; reduced: boolean };
+/** What drives the fluid: the map's size, its nodes, and the selected one. */
+type Forcing = Size & { nodes: SkillNode[]; selected: string | null };
 
 // A small forced incompressible Euler approximation: advect velocity, apply
 // node/edge forces, then project out divergence. No explicit viscosity.
@@ -12,7 +21,7 @@ export class TreeParticles {
   private v = new Float32Array(1600);
   private pressure = new Float32Array(1600);
   private particles: Particle[] = [];
-  private pulses: (Point & { age: number })[] = [];
+  private pulses: Pulse[] = [];
   private tree = '';
   private last = 0;
   private elapsed = 0;
@@ -30,101 +39,166 @@ export class TreeParticles {
       + (field[(iy+1)*n+ix]*(1-fx)+field[(iy+1)*n+ix+1]*fx)*fy;
   }
 
-  draw(canvas: HTMLCanvasElement, time: number, tree: string, nodes: SkillNode[], selected: string | null, reduced: boolean) {
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    const w = canvas.clientWidth, h = canvas.clientHeight;
-    if (!w || !h) return;
-    const dpr = Math.min(devicePixelRatio || 1, 2);
-    if (canvas.width !== Math.round(w*dpr) || canvas.height !== Math.round(h*dpr)) {
-      canvas.width = Math.round(w*dpr); canvas.height = Math.round(h*dpr);
-    }
-    if (tree !== this.tree) {
-      this.tree = tree; this.u.fill(0); this.v.fill(0); this.pulses = [];
-      this.particles = Array.from({ length: Math.min(360, Math.max(150, Math.round(w*h/850))) }, () => ({
-        x: Math.random(), y: Math.random(), radius: .65 + Math.random()*.8, alpha: .2 + Math.random()*.35,
-      }));
-    }
-    const dt = this.last && time-this.last < 150 ? Math.min((time-this.last)/1000, 1/30) : 0;
-    this.last = time;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, w, h);
-    if (reduced) { this.pulses = []; return; }
-    // Limit fluid work to 30 Hz while drawing smoothly at the display rate.
-    this.elapsed += dt;
-    if (this.elapsed >= 1/30) {
-      this.step(Math.min(this.elapsed, 1/15), w, h, nodes, selected);
-      this.elapsed = 0;
-    }
-    for (const pulse of this.pulses) pulse.age += dt;
-    this.pulses = this.pulses.filter(p => p.age < 1.2);
+  draw(canvas: HTMLCanvasElement, time: number, scene: TreeScene) {
+    const view = fit(canvas);
+    if (!view) return;
+    const { ctx, size } = view;
+    if (scene.tree !== this.tree) this.reset(scene.tree, size);
+    const dt = this.frameTime(time);
+    ctx.clearRect(0, 0, size.w, size.h);
+    if (scene.reduced) { this.pulses = []; return; }
+    this.advance(dt, { ...size, nodes: scene.nodes, selected: scene.selected });
     for (const p of this.particles) {
-      let vx = this.sample(this.u, p.x*39, p.y*39), vy = this.sample(this.v, p.x*39, p.y*39);
-      // Purchase is a transient tracer impulse, separate from the solenoidal
-      // fluid: projecting a purely radial source would remove the burst.
-      for (const pulse of this.pulses) {
-        const dx = (p.x-pulse.x)*w, dy = (p.y-pulse.y)*h, r = Math.hypot(dx, dy);
-        const force = 170 * Math.exp(-pulse.age*3.5) * Math.exp(-r*r/22000);
-        if (r > 1) { vx += dx/r*force/w; vy += dy/r*force/h; }
-      }
-      p.x = (p.x+vx*dt+1)%1; p.y = (p.y+vy*dt+1)%1;
-      const edge = Math.min(1, p.x*30, (1-p.x)*30, p.y*30, (1-p.y)*30);
-      ctx.globalAlpha = p.alpha*edge;
-      ctx.shadowColor = '#edbe63'; ctx.shadowBlur = 5;
-      ctx.fillStyle = '#f3cf82';
-      ctx.beginPath(); ctx.arc(p.x*w, p.y*h, p.radius, 0, Math.PI*2); ctx.fill();
+      this.move(p, dt, size);
+      drawParticle(ctx, p, size);
     }
     ctx.globalAlpha = 1; ctx.shadowBlur = 0;
   }
 
-  private step(dt: number, w: number, h: number, nodes: SkillNode[], selected: string | null) {
-    const n = this.size, nextU = new Float32Array(n*n), nextV = new Float32Array(n*n);
-    const edges = nodes.flatMap(to => to.requires.flatMap(id => {
-      const from = nodes.find(node => node.id === id);
-      return from ? [{ from, to }] : [];
+  /** A still fluid and fresh particles for a new tree. */
+  private reset(tree: string, { w, h }: Size) {
+    this.tree = tree; this.u.fill(0); this.v.fill(0); this.pulses = [];
+    this.particles = Array.from({ length: Math.min(360, Math.max(150, Math.round(w*h/850))) }, () => ({
+      x: Math.random(), y: Math.random(), radius: .65 + Math.random()*.8, alpha: .2 + Math.random()*.35,
     }));
+  }
+
+  /** Seconds since the last frame, or 0 after a pause. */
+  private frameTime(time: number) {
+    const dt = this.last && time-this.last < 150 ? Math.min((time-this.last)/1000, 1/30) : 0;
+    this.last = time;
+    return dt;
+  }
+
+  /** Steps the fluid (at most 30 Hz) and ages the purchase pulses. */
+  private advance(dt: number, forcing: Forcing) {
+    // Limit fluid work to 30 Hz while drawing smoothly at the display rate.
+    this.elapsed += dt;
+    if (this.elapsed >= 1/30) {
+      this.step(Math.min(this.elapsed, 1/15), forcing);
+      this.elapsed = 0;
+    }
+    for (const pulse of this.pulses) pulse.age += dt;
+    this.pulses = this.pulses.filter(p => p.age < 1.2);
+  }
+
+  /** Carries a particle along the fluid and the purchase bursts, wrapping
+   * at the edges. */
+  private move(p: Particle, dt: number, size: Size) {
+    let vx = this.sample(this.u, p.x*39, p.y*39), vy = this.sample(this.v, p.x*39, p.y*39);
+    // Purchase is a transient tracer impulse, separate from the solenoidal
+    // fluid: projecting a purely radial source would remove the burst.
+    for (const pulse of this.pulses) {
+      const [px, py] = burst(p, pulse, size);
+      vx += px; vy += py;
+    }
+    p.x = (p.x+vx*dt+1)%1; p.y = (p.y+vy*dt+1)%1;
+  }
+
+  private step(dt: number, forcing: Forcing) {
+    const n = this.size, nextU = new Float32Array(n*n), nextV = new Float32Array(n*n);
+    const { w, h } = forcing, edges = edgesOf(forcing.nodes);
+    // Bounded forcing relaxes toward the current interactive field.
+    const blend = 1-Math.exp(-dt*2);
     for (let y=0; y<n; y++) for (let x=0; x<n; x++) {
-      const i=y*n+x, px=x/(n-1)*w, py=y/(n-1)*h;
-      let fx=0, fy=0;
-      for (const node of nodes) {
-        const dx=px-node.x/100*w, dy=py-node.y/100*h;
-        // Screen Y points down: positive rotation is clockwise.
-        const strength = node.id === selected ? .85 : -.12;
-        const falloff = Math.exp(-(dx*dx+dy*dy)/(2*65*65));
-        fx += -dy*strength*falloff; fy += dx*strength*falloff;
-      }
-      for (const {from,to} of edges) {
-        const ax=from.x/100*w, ay=from.y/100*h, dx=(to.x-from.x)/100*w, dy=(to.y-from.y)/100*h;
-        const len=Math.hypot(dx,dy);
-        if (!len) continue;
-        const t=Math.max(0,Math.min(1,((px-ax)*dx+(py-ay)*dy)/(len*len)));
-        const distance=Math.hypot(px-ax-t*dx, py-ay-t*dy);
-        const force=12*Math.exp(-distance*distance/(2*22*22));
-        fx+=dx/len*force; fy+=dy/len*force;
-      }
+      const i=y*n+x;
+      const [fx, fy] = forceAt({ x: x/(n-1)*w, y: y/(n-1)*h }, forcing, edges);
       const bx=x-this.u[i]*dt*(n-1), by=y-this.v[i]*dt*(n-1);
-      // Bounded forcing relaxes toward the current interactive field.
-      const blend=1-Math.exp(-dt*2);
       nextU[i]=this.sample(this.u,bx,by)*(1-blend)+fx/w*blend;
       nextV[i]=this.sample(this.v,bx,by)*(1-blend)+fy/h*blend;
     }
-    // Anisotropic pressure projection respects the actual map aspect ratio.
-    const hx=w/(n-1), hy=h/(n-1), a=1/(hx*hx), b=1/(hy*hy);
-    const div=new Float32Array(n*n);
-    this.pressure.fill(0);
-    for (let y=1;y<n-1;y++) for (let x=1;x<n-1;x++) {
-      const i=y*n+x;
-      div[i]=(nextU[i+1]-nextU[i-1])*w/(2*hx)+(nextV[i+n]-nextV[i-n])*h/(2*hy);
-    }
-    for (let k=0;k<32;k++) for (let y=1;y<n-1;y++) for (let x=1;x<n-1;x++) {
-      const i=y*n+x, p=this.pressure;
-      p[i]=((p[i-1]+p[i+1])*a+(p[i-n]+p[i+n])*b-div[i])/(2*(a+b));
-    }
-    for (let y=1;y<n-1;y++) for (let x=1;x<n-1;x++) {
-      const i=y*n+x;
-      nextU[i]-=(this.pressure[i+1]-this.pressure[i-1])/(2*hx*w);
-      nextV[i]-=(this.pressure[i+n]-this.pressure[i-n])/(2*hy*h);
-    }
+    this.project(nextU, nextV, w, h);
     this.u=nextU; this.v=nextV;
   }
+
+  /** Anisotropic pressure projection respects the actual map aspect ratio. */
+  private project(u: Float32Array, v: Float32Array, w: number, h: number) {
+    const n = this.size, hx=w/(n-1), hy=h/(n-1), p = this.pressure;
+    const div = new Float32Array(n*n);
+    p.fill(0);
+    eachInterior(n, (i) => {
+      div[i]=(u[i+1]-u[i-1])*w/(2*hx)+(v[i+n]-v[i-n])*h/(2*hy);
+    });
+    const a=1/(hx*hx), b=1/(hy*hy);
+    for (let k=0;k<32;k++) eachInterior(n, (i) => {
+      p[i]=((p[i-1]+p[i+1])*a+(p[i-n]+p[i+n])*b-div[i])/(2*(a+b));
+    });
+    eachInterior(n, (i) => {
+      u[i]-=(p[i+1]-p[i-1])/(2*hx*w);
+      v[i]-=(p[i+n]-p[i-n])/(2*hy*h);
+    });
+  }
+}
+
+/** The canvas's 2D context, sized to its CSS box at up to 2x pixel ratio
+ * and scaled to CSS pixels; null when it has no context or no size. */
+function fit(canvas: HTMLCanvasElement) {
+  const ctx = canvas.getContext('2d');
+  const size: Size = { w: canvas.clientWidth, h: canvas.clientHeight };
+  if (!ctx || !hasArea(size)) return null;
+  const dpr = Math.min(devicePixelRatio || 1, 2);
+  const width = Math.round(size.w*dpr), height = Math.round(size.h*dpr);
+  // Resizing clears the canvas, so only do it when the size changed.
+  if (canvas.width !== width) canvas.width = width;
+  if (canvas.height !== height) canvas.height = height;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { ctx, size };
+}
+
+const hasArea = ({ w, h }: Size) => Boolean(w && h);
+
+/** A glowing mote, fading out near the edges it wraps across. */
+function drawParticle(ctx: CanvasRenderingContext2D, p: Particle, { w, h }: Size) {
+  const edge = Math.min(1, p.x*30, (1-p.x)*30, p.y*30, (1-p.y)*30);
+  ctx.globalAlpha = p.alpha*edge;
+  ctx.shadowColor = '#edbe63'; ctx.shadowBlur = 5;
+  ctx.fillStyle = '#f3cf82';
+  ctx.beginPath(); ctx.arc(p.x*w, p.y*h, p.radius, 0, Math.PI*2); ctx.fill();
+}
+
+/** A purchase's outward push on a particle, in map units per second. */
+function burst(p: Point, pulse: Pulse, { w, h }: Size): [number, number] {
+  const dx = (p.x-pulse.x)*w, dy = (p.y-pulse.y)*h, r = Math.hypot(dx, dy);
+  const force = 170 * Math.exp(-pulse.age*3.5) * Math.exp(-r*r/22000);
+  return r > 1 ? [dx/r*force/w, dy/r*force/h] : [0, 0];
+}
+
+/** Each prerequisite link, from the prerequisite to the node needing it. */
+function edgesOf(nodes: SkillNode[]): Edge[] {
+  return nodes.flatMap(to => to.requires.flatMap(id => {
+    const from = nodes.find(node => node.id === id);
+    return from ? [{ from, to }] : [];
+  }));
+}
+
+/** The force at a point (CSS pixels): a swirl around every node, and a
+ * current along every link. */
+function forceAt(at: Point, f: Forcing, edges: Edge[]): [number, number] {
+  const force: [number, number] = [0, 0];
+  for (const node of f.nodes) swirl(force, at, node, f);
+  for (const edge of edges) current(force, at, edge, f);
+  return force;
+}
+
+function swirl(force: [number, number], { x: px, y: py }: Point, node: SkillNode, { w, h, selected }: Forcing) {
+  const dx=px-node.x/100*w, dy=py-node.y/100*h;
+  // Screen Y points down: positive rotation is clockwise.
+  const strength = node.id === selected ? .85 : -.12;
+  const falloff = Math.exp(-(dx*dx+dy*dy)/(2*65*65));
+  force[0] += -dy*strength*falloff; force[1] += dx*strength*falloff;
+}
+
+function current(force: [number, number], { x: px, y: py }: Point, { from, to }: Edge, { w, h }: Forcing) {
+  const ax=from.x/100*w, ay=from.y/100*h, dx=(to.x-from.x)/100*w, dy=(to.y-from.y)/100*h;
+  const len=Math.hypot(dx,dy);
+  if (!len) return;
+  const t=Math.max(0,Math.min(1,((px-ax)*dx+(py-ay)*dy)/(len*len)));
+  const distance=Math.hypot(px-ax-t*dx, py-ay-t*dy);
+  const strength=12*Math.exp(-distance*distance/(2*22*22));
+  force[0]+=dx/len*strength; force[1]+=dy/len*strength;
+}
+
+/** Visits every cell of an n-by-n grid but its border, row by row. */
+function eachInterior(n: number, fn: (i: number) => void) {
+  for (let y=1;y<n-1;y++) for (let x=1;x<n-1;x++) fn(y*n+x);
 }

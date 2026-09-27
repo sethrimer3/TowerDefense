@@ -2,7 +2,7 @@ import type { Board } from "./generation.ts";
 import { tileRandom } from "./themes.ts";
 import { decorSourceFor, FLOWER_COLORS, TILE_PX, tileDecor, tileKey, waterAt, type DecorSource, type Flower, type Plant, type TileDecor } from "./decor.ts";
 import { DecorBaker } from "./decor-bake.ts";
-import { DecorEffects, type TileAt } from "./decor-effects.ts";
+import { DecorEffects, type EffectFrame, type TileAt } from "./decor-effects.ts";
 import { WaterReflections, type ReflectionScene, type Reflections, type Wave } from "./decor-reflections.ts";
 import { drawBlades, drawCrates, DRIP_FALL, dripNow, dripRings, PixelBatch, ring, type DripNow, type Sway } from "./decor-sprites.ts";
 
@@ -18,9 +18,23 @@ export type { ReflectionPainter } from "./decor-reflections.ts";
  * budgeted per frame so entering a room never stalls. */
 
 export type DecorView = { left: number; bottom: number; n: number; s: number };
+/** One frame of the board as the decor passes see it: the view, the time in
+ * ms, the board's tiles, and whether motion is reduced. */
+export type DecorFrame = { view: DecorView; now: number; tileAt: TileAt; reduceMotion: boolean };
+/** One step of the live effects: seconds since the last, the time in ms,
+ * the hero's interpolated tile position, the board's tiles, and whether
+ * motion is reduced. */
+export type DecorStep = Omit<EffectFrame, "src">;
 export type DecorGlow = { x: number; y: number; rgb: readonly number[]; radius: number; strength: number };
 
 const GLOWCAP: readonly number[] = [140, 240, 170];
+
+/** A tile and its plan. */
+type DecorTile = [number, number, TileDecor];
+/** The crates and tall grass standing on floor in view. */
+type Standing = { crates: DecorTile[]; thickets: DecorTile[] };
+/** The hero sprite's top-left corner in world pixels. */
+type HeroPixels = { hgx: number; hgy: number };
 
 export class DecorLayer {
   src: DecorSource | null = null;
@@ -32,7 +46,7 @@ export class DecorLayer {
   private plannedTiles = new Set<number>();
   /** The decorated tiles in view, rebuilt only when the view moves a whole
    * tile (or while some are still waiting to be planned). */
-  private visible: { key: string; tiles: [number, number, TileDecor][]; complete: boolean } = { key: "", tiles: [], complete: false };
+  private visible: { key: string; tiles: DecorTile[]; complete: boolean } = { key: "", tiles: [], complete: false };
   private glowCache: DecorGlow[] | null = null;
   /** Tiles planned per frame at most, so entering a room never stalls. */
   planBudget = 60;
@@ -86,11 +100,10 @@ export class DecorLayer {
     return true;
   }
 
-  /** Advances live effects and reacts to the hero. `hx`/`hy` are the
-   * interpolated tile position. */
-  update(dt: number, now: number, hx: number, hy: number, tileAt: TileAt, reduceMotion: boolean) {
+  /** Advances live effects and reacts to the hero. */
+  update(step: DecorStep) {
     this.planned = 0;
-    if (this.src) this.effects.update({ src: this.src, dt, now, hx, hy, tileAt, reduceMotion });
+    if (this.src) this.effects.update({ src: this.src, ...step });
   }
 
   // ---------------------------------------------------------------- planning
@@ -111,7 +124,7 @@ export class DecorLayer {
   private visibleTiles(v: DecorView) {
     const key = `${Math.floor(v.left)},${Math.floor(v.bottom)},${v.n}`;
     if (this.visible.key === key && this.visible.complete) return this.visible.tiles;
-    const tiles: [number, number, TileDecor][] = [];
+    const tiles: DecorTile[] = [];
     let complete = true;
     for (let row = -1; row <= v.n; row++)
       for (let col = -1; col <= v.n; col++) {
@@ -141,41 +154,39 @@ export class DecorLayer {
   /** The live ground decor: reflections, glints, drips, ripples, crates,
    * and tall grass. (The static pixels come from bakeTile, which the
    * renderer caches with the rest of the ground.) */
-  drawGround(c: CanvasRenderingContext2D, v: DecorView, now: number, tileAt: TileAt, reduceMotion: boolean, reflections?: Reflections) {
-    if (!this.src) return;
+  drawGround(c: CanvasRenderingContext2D, f: DecorFrame, reflections?: Reflections) {
     const src = this.src;
+    if (!src) return;
     c.save();
-    this.worldSpace(c, v);
+    this.worldSpace(c, f.view);
     c.imageSmoothingEnabled = false;
-    const px = new PixelBatch(), t = now / 1000;
-    const crates: [number, number, TileDecor][] = [], thickets: [number, number, TileDecor][] = [];
-    this.eachTile(v, (x, y, d) => {
-      const floor = tileAt(x, y).kind === "floor";
-      if (d.crates.length && floor) crates.push([x, y, d]);
-      if (d.thicket && floor) thickets.push([x, y, d]);
-      if (!reduceMotion) surfaceSparkle(px, src, [x, y, d], t);
+    const px = new PixelBatch(), t = f.now / 1000;
+    const standing: Standing = { crates: [], thickets: [] };
+    this.eachTile(f.view, (x, y, d) => {
+      addStanding(standing, [x, y, d], f.tileAt);
+      if (!f.reduceMotion) surfaceSparkle(px, src, [x, y, d], t);
     });
     // Reflections sit on the water, under its glints and ripple rings.
-    this.reflections.draw(c, this.reflectionScene(v, now, tileAt, reduceMotion, reflections));
-    this.drawRipples(px, src, now);
+    this.reflections.draw(c, this.reflectionScene(f, reflections));
+    this.drawRipples(px, src, f.now);
     px.flush(c);
-    for (const [x, y, d] of crates) this.drawCratesAt(c, x, y, d);
-    for (const [x, y, d] of thickets) drawBlades(px, d.blades, this.sway(x, y, t, reduceMotion), null);
+    for (const tile of standing.crates) this.drawCratesAt(c, tile);
+    for (const [x, y, d] of standing.thickets) drawBlades(px, d.blades, this.sway(x, y, t, f.reduceMotion), null);
     px.flush(c);
     c.restore();
   }
 
-  private reflectionScene(v: DecorView, now: number, tileAt: TileAt, reduceMotion: boolean, sprites?: Reflections): ReflectionScene {
-    const src = this.src!, pools: [number, number, TileDecor][] = [];
-    this.eachTile(v, (x, y, d) => {
+  private reflectionScene({ view, now, tileAt, reduceMotion }: DecorFrame, sprites?: Reflections): ReflectionScene {
+    const src = this.src!, pools: DecorTile[] = [];
+    this.eachTile(view, (x, y, d) => {
       if (d.water && d.waterCount) pools.push([x, y, d]);
     });
     return {
       key: src.key, pools, now, reduceMotion, tileAt, sprites,
-      waves: () => this.waves(v, now),
+      waves: () => this.waves(view, now),
       plan: (x, y) => this.plan(x, y),
       isBroken: (x, y) => this.effects.isBroken(src.key, x, y),
-      drawCrates: (ctx, x, y, d) => this.drawCratesAt(ctx, x, y, d),
+      drawCrates: (ctx, x, y, d) => this.drawCratesAt(ctx, [x, y, d]),
     };
   }
 
@@ -201,7 +212,7 @@ export class DecorLayer {
     }
   }
 
-  private drawCratesAt(c: CanvasRenderingContext2D, x: number, y: number, d: TileDecor) {
+  private drawCratesAt(c: CanvasRenderingContext2D, [x, y, d]: DecorTile) {
     drawCrates(c, x, y, d.crates, this.effects.isBroken(this.src!.key, x, y));
   }
 
@@ -239,16 +250,15 @@ export class DecorLayer {
   /** Emitted light drawn over the darkness: bright bloom pixels on the
    * glowing flowers and caps, plus fireflies over lush spots. Stronger the
    * darker the dungeon (`k` = 0 at default brightness, 1 at darkest). */
-  drawGlow(c: CanvasRenderingContext2D, v: DecorView, now: number, k: number, reduceMotion: boolean) {
+  drawGlow(c: CanvasRenderingContext2D, f: Omit<DecorFrame, "tileAt">, k: number) {
     if (!this.src || k <= 0) return;
-    const glow: GlowFrame = { t: now / 1000, k, pulse: !reduceMotion }, px = new PixelBatch();
+    const glow: GlowFrame = { t: f.now / 1000, k, pulse: !f.reduceMotion }, px = new PixelBatch();
     c.save();
-    this.worldSpace(c, v);
+    this.worldSpace(c, f.view);
     c.globalCompositeOperation = "lighter";
-    this.eachTile(v, (x, y, d) => {
-      for (const f of d.flowers) flowerGlow(px, [x, y], f, glow);
-      for (const p of d.plants) if (p.kind === "mushrooms" && p.glow) capGlow(px, [x, y], p, glow);
-      if (!reduceMotion && this.hasFireflies(x, y, d)) firefly(px, [x, y], glow);
+    this.eachTile(f.view, (x, y, d) => {
+      bloom(px, [x, y, d], glow);
+      if (!f.reduceMotion && this.hasFireflies([x, y, d])) firefly(px, [x, y], glow);
     });
     this.effects.drawSporeGlow(px, k);
     px.flush(c);
@@ -256,7 +266,7 @@ export class DecorLayer {
   }
 
   /** Fireflies drift over some overgrown and flowering spots. */
-  private hasFireflies(x: number, y: number, d: TileDecor) {
+  private hasFireflies([x, y, d]: DecorTile) {
     return (d.thicket || d.flowers.length > 0) && tileRandom(x, y, this.src!.seed ^ 0xf1f) < 0.4;
   }
 
@@ -265,7 +275,7 @@ export class DecorLayer {
   /** World-pixel box around everything drawForeground would draw this
    * frame, or null when it would draw nothing, so the renderer can skip or
    * shrink its darkened foreground pass. */
-  foregroundBounds(v: DecorView, now: number, tileAt: TileAt, reduceMotion: boolean) {
+  foregroundBounds({ view, now, tileAt, reduceMotion }: DecorFrame) {
     const src = this.src;
     if (!src) return null;
     const box = new Bounds(), { hgx, hgy } = this.heroPixels();
@@ -273,7 +283,7 @@ export class DecorLayer {
     this.effects.particleBounds(box.add);
     if (!reduceMotion) {
       const t = now / 1000;
-      this.eachTile(v, (x, y, d) => {
+      this.eachTile(view, (x, y, d) => {
         const s = d.drip && dripNow(x, y, d.drip, t);
         if (s && s.local < DRIP_FALL) box.add(s.gx - 1, s.gy - 48, s.gx + 2, s.gy + 3);
       });
@@ -283,14 +293,14 @@ export class DecorLayer {
 
   /** Things in front of the hero: grass over its feet, the water line,
    * flying splinters and falling drips. */
-  drawForeground(c: CanvasRenderingContext2D, v: DecorView, now: number, tileAt: TileAt, reduceMotion: boolean) {
+  drawForeground(c: CanvasRenderingContext2D, { view, now, tileAt, reduceMotion }: DecorFrame) {
     const src = this.src;
     if (!src) return;
     const t = now / 1000, px = new PixelBatch();
     c.save();
-    this.worldSpace(c, v);
+    this.worldSpace(c, view);
     c.imageSmoothingEnabled = false;
-    const { hgx, hgy } = this.heroPixels();
+    const hero = this.heroPixels(), { hgx, hgy } = hero;
     // Only blades rooted at or below the hero's feet stand in front of it.
     const area = { gx0: hgx + 2, gx1: hgx + 22, gy0: hgy + 20, gy1: hgy + 24 };
     this.eachTileAroundHero((x, y) => {
@@ -298,8 +308,8 @@ export class DecorLayer {
       if (d?.thicket && tileAt(x, y).kind === "floor") drawBlades(px, d.blades, this.sway(x, y, t, reduceMotion), area);
       return false;
     });
-    wetFeet(px, src, hgx, hgy);
-    this.eachTile(v, (x, y, d) => {
+    wetFeet(px, src, hero);
+    this.eachTile(view, (x, y, d) => {
       if (d.drip && !reduceMotion) fallingDrop(px, dripNow(x, y, d.drip, t));
     });
     this.effects.drawParticles(px);
@@ -307,8 +317,7 @@ export class DecorLayer {
     c.restore();
   }
 
-  /** The hero sprite's top-left corner in world pixels. */
-  private heroPixels() {
+  private heroPixels(): HeroPixels {
     const hero = this.effects.hero;
     return { hgx: Math.round(hero.x * TILE_PX), hgy: Math.round(-hero.y * TILE_PX) };
   }
@@ -341,8 +350,16 @@ class Bounds {
   }
 }
 
+/** Files a tile's crates and tall grass, if it is floor. */
+function addStanding(standing: Standing, tile: DecorTile, tileAt: TileAt) {
+  const [x, y, d] = tile;
+  if (tileAt(x, y).kind !== "floor") return;
+  if (d.crates.length) standing.crates.push(tile);
+  if (d.thicket) standing.thickets.push(tile);
+}
+
 /** Glints catching the light on a pool, and a drip's rings. */
-function surfaceSparkle(px: PixelBatch, src: DecorSource, [x, y, d]: [number, number, TileDecor], t: number) {
+function surfaceSparkle(px: PixelBatch, src: DecorSource, [x, y, d]: DecorTile, t: number) {
   for (const [i, j] of d.glints) {
     const s = Math.sin(t * 1.4 + i * 0.9 + j * 1.7 + x * 3.1 + y * 1.3);
     if (s > 0.55) px.add(`rgba(196,228,238,${((s - 0.55) * 1.6).toFixed(2)})`, x * TILE_PX + i, -y * TILE_PX + j, 2, 1);
@@ -351,7 +368,7 @@ function surfaceSparkle(px: PixelBatch, src: DecorSource, [x, y, d]: [number, nu
 }
 
 /** The hero's feet sink below the surface of a pool. */
-function wetFeet(px: PixelBatch, src: DecorSource, hgx: number, hgy: number) {
+function wetFeet(px: PixelBatch, src: DecorSource, { hgx, hgy }: HeroPixels) {
   for (let j = 20; j < 24; j++)
     for (let i = 5; i < 20; i++)
       if (waterAt(src, hgx + i, hgy + j)) px.add(j === 20 ? "rgba(150,196,214,0.55)" : "rgba(34,70,92,0.6)", hgx + i, hgy + j);
@@ -367,6 +384,12 @@ function fallingDrop(px: PixelBatch, { gx, gy: landing, local }: DripNow) {
 
 /** Seconds, the glow strength (see drawGlow), and whether it pulses. */
 type GlowFrame = { t: number; k: number; pulse: boolean };
+
+/** The bloom on a tile's glowing flowers and caps. */
+function bloom(px: PixelBatch, [x, y, d]: DecorTile, glow: GlowFrame) {
+  for (const f of d.flowers) flowerGlow(px, [x, y], f, glow);
+  for (const p of d.plants) if (p.kind === "mushrooms" && p.glow) capGlow(px, [x, y], p, glow);
+}
 
 function flowerGlow(px: PixelBatch, [x, y]: [number, number], f: Flower, g: GlowFrame) {
   const ox = x * TILE_PX, oy = -y * TILE_PX;
