@@ -4,6 +4,7 @@ import { loadout, upgradeText, provisionText } from "../src/loadout.ts";
 import { defaults } from "../src/save.ts";
 import { GOLD_SHOP, UPGRADES } from "../src/config.ts";
 import type { CraftedEquipment } from "../src/equipment.ts";
+import { Game } from "../src/state.ts";
 
 test("a new character starts at 12 ATK, 5 DEF, 120 HP, no keys and one undo", () => {
   assert.deepEqual(loadout(defaults()), {
@@ -74,4 +75,35 @@ test("descriptions are written from the grants", () => {
   assert.deepEqual(GOLD_SHOP.map((g) => provisionText(g.id)), [
     "+20 max HP next run", "+3 attack next run", "+3 defense next run",
   ]);
+});
+
+const ring = (flatAttack: number, flatMaxHp: number): CraftedEquipment => ({
+  id: "r", slot: "ring", name: "Ring", metal: "iron",
+  flatAttack, flatDefense: 0, flatMaxHp, percentAttack: 0, percentDefense: 0, percentMaxHp: 0,
+  baseRecipe: [], enhancements: [], createdAt: 0,
+});
+
+test("changing gear mid-run keeps the ATK gathered and the provisions the run started with", () => {
+  const g = new Game(defaults()), s = g.save;
+  s.provisions.edge = 1;
+  g.newRun();
+  assert.equal(g.run.player.attack, 15);
+  g.run.player.attack += 2; // an attack shard picked up
+  s.equipmentInventory.push(ring(3, 10));
+  assert.ok(g.equipItem("r"));
+  assert.equal(g.run.player.attack, 20);
+  assert.equal(g.run.player.maxHp, 130);
+  assert.deepEqual(g.run.loadout, { attack: 18, defense: 5, maxHp: 130 });
+  g.unequipSlot("ring");
+  assert.equal(g.run.player.attack, 17);
+  assert.deepEqual(g.run.loadout, { attack: 15, defense: 5, maxHp: 120 });
+  assert.equal(g.run.player.hp, 120);
+});
+
+test("a gear change reaches a run still outside, which starts at its new full HP", () => {
+  const g = new Game(defaults());
+  g.newRun(true);
+  g.save.equipmentInventory.push(ring(3, 10));
+  g.equipItem("r");
+  assert.deepEqual([g.run.player.attack, g.run.player.maxHp, g.run.player.hp], [15, 130, 130]);
 });

@@ -357,7 +357,7 @@ export class Game {
       floor: 0,
       player,
     };
-    if (this.mode === "tower") this.run.loadout = { attack, defense, maxHp };
+    this.run.loadout = { attack, defense, maxHp };
     this.world = this.rules.board(this.run);
     if (outside) {
       this.run.outside = true;
@@ -758,21 +758,26 @@ export class Game {
     this.save.provisions[id]++;
     return true;
   }
-  /** Recomputes equip-derived combat stats for both Tower and Delve runs
-   * from scratch (base upgrades/level + equipped gear), without touching
-   * run history. Called after any equip/unequip so gear changes apply
-   * immediately in an active run, in both modes at once. */
-  private recomputeCombatStats() {
-    const { attack, defense, maxHp } = loadout(this.save);
+  /** A gear change applies at once to the runs of both modes: each gains
+   * or loses exactly what it changed in the loadout, so ATK/DEF gathered
+   * from items and the provisions a run started with are kept. A run still
+   * outside hasn't started, so it also starts with the HP it now would. */
+  private changeGear(change: () => boolean | void) {
+    const before = loadout(this.save);
+    if (change() === false) return false;
+    const after = loadout(this.save);
     for (const mode of ["tower", "delve"] as const) {
       const run = this.save[mode].run;
-      if (!run || run.outside) continue;
-      run.player.attack = attack;
-      run.player.defense = defense;
-      run.player.maxHp = maxHp;
-      if (mode === "tower") run.loadout = { attack, defense, maxHp };
-      run.player.hp = Math.max(1, Math.min(run.player.hp, maxHp));
+      if (!run) continue;
+      for (const stats of [run.player, run.loadout])
+        if (stats)
+          for (const stat of ["attack", "defense", "maxHp"] as const) stats[stat] += after[stat] - before[stat];
+      const p = run.player;
+      p.hp = run.outside
+        ? mode === "tower" ? this.sectionStartHp(run.height / TOWER_SECTION, p.maxHp) : p.maxHp
+        : Math.max(1, Math.min(p.hp, p.maxHp));
     }
+    return true;
   }
   craftEquipment(slot: EquipmentSlot, metal: MetalId, enhancements: MaterialStack[]) {
     return craftEquipmentItem(this.save, slot, metal, enhancements);
@@ -781,13 +786,10 @@ export class Game {
     return salvageEquipmentItem(this.save, itemId);
   }
   equipItem(itemId: string) {
-    const ok = equipItemAction(this.save, itemId);
-    if (ok) this.recomputeCombatStats();
-    return ok;
+    return this.changeGear(() => equipItemAction(this.save, itemId));
   }
   unequipSlot(slot: EquipmentSlot) {
-    unequipSlotAction(this.save, slot);
-    this.recomputeCombatStats();
+    this.changeGear(() => unequipSlotAction(this.save, slot));
   }
   craftConsumable(id: ConsumableId) {
     return craftConsumableItem(this.save, id);
