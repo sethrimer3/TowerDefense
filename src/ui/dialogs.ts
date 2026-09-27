@@ -63,13 +63,13 @@ export class RunEnd {
     const s = game.summary!,
       rules = MODES[game.mode],
       currencyName = rules.words.currency.toUpperCase(),
-      heightName = rules.words.summaryProgress.toUpperCase();
+      heightName = rules.words.progress.toUpperCase();
     if (modal.open) return;
     const saved = devAmount(game, rules.balance(game.save));
     const revive = game.save[game.mode].revival
       ? `<p>Revive is available until your next move.</p><button class="wide" id="revive-now">Revive</button>`
       : "";
-    modal.innerHTML = `<span class="summary-icon">${uiSprite("automove")}</span><small>${s.reason.toUpperCase()}</small><h2>The tower remembers.</h2><p>Your milestone and clear rewards are already saved.</p><div class="summary-stats"><div><strong>${displayedProgress(s.height)}</strong>${heightName}</div><div><strong>${s.kills}</strong>VICTORIES</div><div><strong>${saved}</strong>${currencyName} SAVED</div></div>${s.record ? "" : `<p class="hint">Milestone rewards were credited as you reached them. Clear rewards are kept.</p>`}${revive}<button class="wide" id="again">${s.dead ? `Return to the forest` : "Begin another ascent →"}</button>`;
+    modal.innerHTML = `<span class="summary-icon">${uiSprite("automove")}</span><small>${s.reason.toUpperCase()}</small><h2>The tower remembers.</h2><p>Your milestone and clear rewards are already saved.</p><div class="summary-stats"><div><strong>${displayedProgress(s.height)}</strong>${heightName}</div><div><strong>${s.kills}</strong>VICTORIES</div><div><strong>${saved}</strong>${currencyName} SAVED</div></div>${s.record ? "" : `<p class="hint">Milestone rewards were credited as you reached them. Clear rewards are kept.</p>`}${revive}<button class="wide" id="again">${s.dead ? `Return to the forest` : `Begin another ${rules.words.run} →`}</button>`;
     modal.showModal();
     const reviveButton = document.querySelector<HTMLButtonElement>("#revive-now");
     if (reviveButton)

@@ -9,7 +9,7 @@ import type { ConsumableId } from "./crafting.ts";
 import { FrameLoop } from "./frame-loop.ts";
 import { installDebugHooks } from "./debug-hooks.ts";
 import { isBoard, type AppContext, type Tab } from "./ui/app.ts";
-import { displayedProgress, el } from "./ui/dom.ts";
+import { capitalized, displayedProgress, el } from "./ui/dom.ts";
 import { MODES } from "./modes.ts";
 import { buildShell } from "./ui/shell.ts";
 import { BoardOverlay } from "./ui/board-overlay.ts";
@@ -124,7 +124,7 @@ el("end-run").onclick = () =>
     `End the current ${MODES[game.mode].words.run} at ${MODES[game.mode].words.progress} ${displayedProgress(game.run.height, !!game.run.outside)}. Milestone rewards are already yours, and uncollected clear chests will be claimed.`,
     "End run",
     () => {
-      game.finish(`${MODES[game.mode].words.run} ended`);
+      game.finish(`${capitalized(MODES[game.mode].words.run)} ended`);
       update();
     },
   );

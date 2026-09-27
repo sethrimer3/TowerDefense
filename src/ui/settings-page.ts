@@ -1,7 +1,7 @@
 import { SETTINGS, type SettingKey, type Settings } from "../settings.ts";
 import type { AppContext } from "./app.ts";
 import type { BoardOverlay } from "./board-overlay.ts";
-import { displayedProgress, el } from "./dom.ts";
+import { capitalized, displayedProgress, el } from "./dom.ts";
 import { MODES } from "../modes.ts";
 
 /** The settings on the page, in order; each control comes from its row in
@@ -56,7 +56,7 @@ export function renderSettingsPage(ctx: AppContext, overlay: BoardOverlay) {
   el("settings").innerHTML =
     `<div class="page-title"><small>MAKE THE ASCENT YOUR OWN</small><h2>Settings</h2></div>` +
     PAGE.map((key) => control(key, s)).join("") +
-    `<p class="hint">Automation pauses outside the board tabs and while the browser is hidden. Progress saves after each action.</p><button class="wide" id="retire">Retire this ${words.retire}</button><p class="hint">Keep your milestone rewards and enter a freshly generated ${words.fresh}.</p><button class="wide danger" id="erase">Erase all progress</button><p class="seed">RUN SEED · ${game.run.seed}</p>`;
+    `<p class="hint">Automation pauses outside the board tabs and while the browser is hidden. Progress saves after each action.</p><button class="wide" id="retire">Retire this ${words.run}</button><p class="hint">Keep your milestone rewards and enter a freshly generated ${words.fresh}.</p><button class="wide danger" id="erase">Erase all progress</button><p class="seed">RUN SEED · ${game.run.seed}</p>`;
   bindSettings(ctx, overlay);
 }
 
@@ -96,9 +96,9 @@ function bindSettings(ctx: AppContext, overlay: BoardOverlay) {
     ctx.confirm(
       "Leave your mark?",
       `Retire at ${MODES[game.mode].words.progress} ${displayedProgress(game.run.height, !!game.run.outside)}. Milestone rewards are already yours. Uncollected clear chests will be claimed.`,
-      "Retire ascent",
+      `Retire ${MODES[game.mode].words.run}`,
       () => {
-        game.finish("Ascent retired");
+        game.finish(`${capitalized(MODES[game.mode].words.run)} retired`);
         ctx.update();
       },
     );

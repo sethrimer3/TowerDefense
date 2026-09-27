@@ -36,12 +36,8 @@ export type ModeProfile = {
     currency: string;
     /** What the progress count measures. */
     progress: string;
-    /** The progress count's heading on the run-end summary. */
-    summaryProgress: string;
-    /** The run, in the retire dialog. */
+    /** A run in this mode. */
     run: string;
-    /** The run, on the Settings page's retire button. */
-    retire: string;
     /** What a retired run is replaced with. */
     fresh: string;
     /** The board's title in the forest outside, and inside. */
@@ -79,9 +75,7 @@ export const MODES: Record<Mode, ModeProfile> = {
     words: {
       currency: "Inspiration",
       progress: "height",
-      summaryProgress: "rooms",
-      run: "Tower run",
-      retire: "ascent",
+      run: "ascent",
       fresh: "tower",
       outsideTitle: "THE TOWER APPROACH",
       title: "THE ASCENT TRIALS",
@@ -106,9 +100,7 @@ export const MODES: Record<Mode, ModeProfile> = {
     words: {
       currency: "Courage",
       progress: "depth",
-      summaryProgress: "height",
-      run: "Delve run",
-      retire: "delve",
+      run: "delve",
       fresh: "descent",
       outsideTitle: "THE MOUNTAIN HOLLOW",
       title: "THE HOLLOW SPIRE",

@@ -15,6 +15,8 @@ export function clamp(n: number, min: number, max: number) {
 // starts at 1 once the entrance is crossed. The forest is the sole height /
 // depth 0 area.
 export const displayedProgress = (value: number, outside = false) => outside ? 0 : value + 1;
+/** `word` with its first letter in capitals. */
+export const capitalized = (word: string) => word[0].toUpperCase() + word.slice(1);
 
 export type UiSprite = "tower" | "delve" | "defend" | "gear" | "upgrades" | "settings" | "health" | "attack" | "defense" | "undo" | "automove" | "revive" | "log" | "arrow-up" | "arrow-down" | "arrow-left" | "arrow-right" | EquipmentSlot | "gold";
 const UI_ASSET_BASE = (import.meta as ImportMeta & { env?: { BASE_URL?: string } }).env?.BASE_URL ?? "/";
