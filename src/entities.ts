@@ -27,8 +27,8 @@ export type Enemy = {
   tier: number;
 };
 export type ClearTier = "silver" | "gold" | "platinum";
-export type RewardChest = { x: number; y: number; tier: ClearTier };
-export type FloorRecord = { earned: ClearTier[]; claimed: ClearTier[] };
+/** A floor's clear tiers: each one earned, and then claimed once paid. */
+export type FloorRecord = Partial<Record<ClearTier, "earned" | "claimed">>;
 /** Declarative lock rules. `color` remains on Tile for legacy single-key
  * doors and keys; new doors use this rule so every gameplay system shares
  * the same requirements and consumption behavior. */
@@ -63,7 +63,6 @@ export type Player = {
 export type Run = {
   damaged?: boolean;
   keysSpent?: boolean;
-  rewards?: RewardChest[];
   outside?: boolean;
   layoutVersion?: number;
   delveMilestone?: number;

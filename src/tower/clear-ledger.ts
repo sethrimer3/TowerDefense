@@ -1,9 +1,13 @@
 /** The Tower's clear rewards: when a floor counts as cleared, which clear
- * tiers it earned, where their chests stand, and when each tier's shard is
+ * tiers it earns, where their chests stand, and when each tier's shard is
  * paid. The log in `save.tower` is lifetime state, so a tier is paid once
- * however the run is undone, revived, reloaded or replaced. */
-import type { ClearTier, RewardChest, Run, Save } from "../entities.ts";
+ * however the run is undone, revived, reloaded or replaced. A chest is a
+ * `reward` tile in the floor's changes, so undo and Revive bring it back
+ * with the rest of the board; opening a tier already paid pays nothing. */
+import type { ClearTier, Run, Save } from "../entities.ts";
 import { RoomWorld, type Board } from "../generation.ts";
+
+export const CLEAR_TIERS: readonly ClearTier[] = ["silver", "gold", "platinum"];
 
 /** A Tower floor is cleared once no enemy or door is left on it. */
 function roomCleared(world: RoomWorld) {
@@ -42,13 +46,18 @@ function openNeighbours(world: RoomWorld, n: { x: number; y: number }) {
     .map(([dx, dy]) => world.step(n.x, n.y, dx, dy))
     .filter((d): d is { x: number; y: number } => !!d && world.tile(d.x, d.y).kind !== "wall");
 }
+/** The clear chests standing on the run's floor, by tile. A chest always
+ * stands on a floor tile, so taking one away leaves floor. */
+function chests(run: Run) {
+  return Object.entries(run.changes).filter(([, t]) => t.kind === "reward") as [string, { tier: ClearTier }][];
+}
 
 export class ClearLedger {
   constructor(private tower: Save["tower"]) {}
 
   /** Whether clear chests still stand on the run's floor. */
   static hasChests(run: Run) {
-    return !!run.rewards?.length;
+    return chests(run).length > 0;
   }
 
   /** If `world`, the run's floor, has no enemy or door left, earns the
@@ -57,62 +66,60 @@ export class ClearLedger {
    * Returns the tiers newly earned. */
   check(world: Board, run: Run): ClearTier[] {
     if (run.outside || !(world instanceof RoomWorld) || !roomCleared(world)) return [];
-    const entry = this.tower.log[run.height] ??= { earned: [], claimed: [] };
+    const entry = this.tower.log[run.height] ??= {};
     const stairs = [...world.cells].find(([, t]) => t.kind === "stairs");
     if (!stairs) return [];
     const spots = rewardSpots(world, stairs[0]);
-    const chests = run.rewards ??= [];
-    const earned = clearTiers(run).filter(tier => !entry.earned.includes(tier));
+    const earned = clearTiers(run).filter(tier => !entry[tier]);
     for (const tier of earned) {
-      entry.earned.push(tier);
       const spot = spots.shift();
-      if (spot) chests.push({ ...spot, tier });
-      else this.pay(entry.claimed, tier);
+      // The board reads the run's changes, so the chest shows at once.
+      if (spot) {
+        entry[tier] = "earned";
+        run.changes[`${spot.x},${spot.y}`] = { kind: "reward", tier };
+      } else this.pay(entry, tier);
     }
-    world.rewards = chests;
     return earned;
   }
 
-  /** The chest for `tier` was opened: pays it. Returns the shards paid. */
-  open(tier: ClearTier, world: Board, run: Run) {
-    return this.claim(world, run, tier);
-  }
-
-  /** Leaving the floor, the run or the mode: pays every tier still owed.
-   * Returns the shards paid. */
-  claimAll(world: Board, run: Run) {
-    return this.claim(world, run);
-  }
-
-  /** Keeps only the run's chests whose tier is earned and unpaid, and pays
-   * every earned tier whose chest no longer stands, so earned rewards
-   * survive undo, reload and replacement of an old run. */
-  settle(world: Board, run: Run) {
-    if (!(world instanceof RoomWorld)) return;
-    const record = this.tower.log[run.height];
-    const unopened = (c: RewardChest) => record?.earned.includes(c.tier) && !record.claimed.includes(c.tier);
-    const chests = run.rewards = (run.rewards ?? []).filter(unopened);
-    world.rewards = chests;
-    for (const [floor, entry] of Object.entries(this.tower.log))
-      for (const tier of entry.earned)
-        if (!entry.claimed.includes(tier) && !(Number(floor) === run.height && chests.some(c => c.tier === tier)))
-          this.pay(entry.claimed, tier);
-  }
-
-  private claim(world: Board, run: Run, tier?: ClearTier) {
-    let paid = 0;
-    for (const entry of Object.values(this.tower.log))
-      for (const t of entry.earned)
-        if ((!tier || tier === t) && !entry.claimed.includes(t)) {
-          this.pay(entry.claimed, t);
-          paid++;
-        }
-    this.settle(world, run);
+  /** The chest for `tier` on the run's floor was opened: pays it unless it
+   * was already paid. Returns the shards paid. */
+  open(tier: ClearTier, run: Run) {
+    const entry = this.tower.log[run.height];
+    const paid = entry?.[tier] === "earned" ? (this.pay(entry, tier), 1) : 0;
+    this.settle(run);
     return paid;
   }
 
-  private pay(claimed: ClearTier[], tier: ClearTier) {
-    claimed.push(tier);
+  /** Leaving the floor, the run or the mode: pays every tier still owed and
+   * takes the floor's chests away. Returns the shards paid. */
+  claimAll(run: Run) {
+    let paid = 0;
+    for (const entry of Object.values(this.tower.log))
+      for (const tier of CLEAR_TIERS)
+        if (entry[tier] === "earned") {
+          this.pay(entry, tier);
+          paid++;
+        }
+    for (const [k] of chests(run)) run.changes[k] = { kind: "floor" };
+    return paid;
+  }
+
+  /** After a load, a floor change or an undo: pays every earned tier whose
+   * chest no longer stands on the run's floor, and takes away any chest
+   * whose tier the log has never earned. */
+  settle(run: Run) {
+    const standing = chests(run);
+    const here = this.tower.log[run.height];
+    for (const [k, t] of standing) if (!here?.[t.tier]) run.changes[k] = { kind: "floor" };
+    for (const [floor, entry] of Object.entries(this.tower.log))
+      for (const tier of CLEAR_TIERS)
+        if (entry[tier] === "earned" && !(Number(floor) === run.height && standing.some(([, t]) => t.tier === tier)))
+          this.pay(entry, tier);
+  }
+
+  private pay(entry: NonNullable<Save["tower"]["log"][string]>, tier: ClearTier) {
+    entry[tier] = "claimed";
     this.tower.shards++;
   }
 }

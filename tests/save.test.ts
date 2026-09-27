@@ -17,9 +17,10 @@ const player = (over: object = {}) => ({
 const run = (over: object = {}) => ({
   seed: 1234, height: 3, floor: 2, kills: 5, treasures: 1, layoutVersion: 7,
   player: player(),
-  changes: { "3,4": { kind: "floor" }, "5,6": { kind: "openedChest", tier: "gold" }, "1,1": { kind: "wall" } },
+  changes: { "3,4": { kind: "floor" }, "5,6": { kind: "openedChest", tier: "gold" }, "1,1": { kind: "wall" }, "4,5": { kind: "reward", tier: "silver" } },
   floors: { "2": { "3,3": { kind: "floor" } } },
   damaged: false, keysSpent: true,
+  // Older runs listed their clear chests; they now stand in `changes`.
   rewards: [{ x: 3, y: 4, tier: "silver" }, { x: 30, y: 4, tier: "gold" }, { x: 1, y: 2, tier: "bronze" }],
   delveMilestone: 1, delveKnown: { "1,2": true }, delveVisited: { "1,2": 3 },
   ...over,
@@ -50,7 +51,7 @@ const v3 = () => ({
   settings,
   tower: {
     ...mode(), shards: 17,
-    log: { "3": { earned: ["silver", "gold", "bogus"], claimed: ["gold", "platinum"] }, "x": { earned: ["gold"] }, "4": { earned: "gold" } },
+    log: { "3": { earned: ["silver", "gold", "bogus"], claimed: ["gold", "platinum"] }, "x": { earned: ["gold"] }, "4": { earned: "gold" }, "5": { silver: "claimed", gold: "bogus", platinum: "earned" } },
     sectionHp: { "1": 80.5, "2": 0, "0": 50, "x": 9 },
     startSection: 1,
   },
@@ -102,9 +103,8 @@ const EDGES: [string, unknown[]][] = [
   ["tower.run.player.hp", [1, 50, 51]],
   ["tower.run.height", [1e9, 1e9 + 1]],
   ["tower.run.delveMilestone", [1.5]],
-  ["tower.run.rewards.0.x", [29, 30]],
-  ["tower.run.rewards.0.y", [19, 20]],
-  ["tower.run.changes.9,9", [{ kind: "openedChest" }, { kind: "openedChest", tier: "wood" }, { kind: "enemy" }]],
+  ["tower.run.changes.9,9", [{ kind: "openedChest" }, { kind: "openedChest", tier: "wood" }, { kind: "enemy" }, { kind: "reward" }, { kind: "reward", tier: "bronze" }]],
+  ["tower.log.3", [{ silver: "earned" }, { silver: "paid" }, []]],
   ["tower.run.floors.x", [{}]],
   ["tower.run.delveVisited.x", [1]],
   ["tower.lootedTiles.5:6,7", [true]],
@@ -197,10 +197,11 @@ test("decode keeps a valid v3 save's progress and clamps settings", () => {
   assert.equal(d.tower.history.length, 2);
   assert.ok(d.tower.revival);
   assert.deepEqual(Object.keys(d.tower.lootedTiles).sort(), ["-1:-2:-3,-4", "1234:2:3,4", "1234:3,4"]);
-  assert.deepEqual(d.tower.log, { "3": { earned: ["silver", "gold"], claimed: ["gold"] } });
+  assert.deepEqual(d.tower.log, { "3": { silver: "earned", gold: "claimed" }, "5": { silver: "claimed", platinum: "earned" } });
   assert.deepEqual(d.tower.sectionHp, { "1": 80 });
   assert.equal(d.tower.startSection, 1);
-  assert.deepEqual(d.tower.run?.rewards, [{ x: 3, y: 4, tier: "silver" }]);
+  assert.deepEqual(d.tower.run?.changes["4,5"], { kind: "reward", tier: "silver" });
+  assert.ok(!("rewards" in d.tower.run!));
   assert.deepEqual(d.equipped, { weapon: "e1" });
 });
 

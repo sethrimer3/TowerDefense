@@ -4,6 +4,8 @@ import { Game } from '../src/state.ts';
 import { defaults, decode } from '../src/save.ts';
 import { RoomWorld, World } from '../src/generation.ts';
 import { chooseStep } from '../src/automation.ts';
+/** How many clear chests stand on the board. */
+const chests = (g: Game) => Object.values(g.run.changes).filter(t => t.kind === 'reward').length;
 function arena() {
   const g = new Game(defaults());
   const w = g.world as RoomWorld;
@@ -30,7 +32,7 @@ test('uncollected rewards survive reload, undo, departure, death and retirement 
     const g = arena(), before = g.snapshot(); g.move(1, 0);
     if (action === 'reload') {
       const loaded = new Game(decode(JSON.stringify(g.save)));
-      assert.equal(loaded.run.rewards?.length, 3); loaded.finish('test');
+      assert.equal(chests(loaded), 3); loaded.finish('test');
       assert.equal(loaded.save.tower.shards, 3); continue;
     }
     if (action === 'undo') g.restore(before);
@@ -47,16 +49,15 @@ test('uncollected rewards survive reload, undo, departure, death and retirement 
 });
 test('automove walks to and collects every clear chest before the stairs', () => {
   const g = arena(); g.move(1, 0);
-  for (let n=0; n<50 && g.run.rewards?.length; n++) {
+  for (let n=0; n<50 && chests(g); n++) {
     const step = chooseStep(g); assert.ok(step); assert.ok(g.move(step.dx,step.dy));
   }
-  assert.equal(g.run.height,0); assert.equal(g.save.tower.shards,3); assert.equal(g.run.rewards?.length,0);
+  assert.equal(g.run.height,0); assert.equal(g.save.tower.shards,3); assert.equal(chests(g),0);
 });
 test('reward chests persist open, undo closed, and never repay after undo', () => {
   const g = arena(), w = g.world as RoomWorld;
-  g.save.tower.log[0] = { earned: ['silver'], claimed: [] };
-  g.run.rewards = [{ x: 1, y: 0, tier: 'silver' }];
-  w.rewards = g.run.rewards;
+  g.save.tower.log[0] = { silver: 'earned' };
+  g.run.changes['1,0'] = { kind: 'reward', tier: 'silver' };
   const before = g.save.tower.shards;
   assert.ok(g.move(1, 0));
   assert.equal(g.world.tile(1, 0).kind, 'openedChest');

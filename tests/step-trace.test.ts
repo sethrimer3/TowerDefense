@@ -62,7 +62,7 @@ function observe(g: Game, action: unknown, result: unknown, preview: unknown) {
   return canonical({
     action, result, preview, message: g.message, decisions: decisions.get(g), summary: g.summary?.reason ?? null,
     player: r.player, kills: r.kills, treasures: r.treasures, height: r.height, floor: r.floor,
-    outside: !!r.outside, damaged: r.damaged, keysSpent: r.keysSpent, rewards: r.rewards,
+    outside: !!r.outside, damaged: r.damaged, keysSpent: r.keysSpent,
     gold: g.save.gold, xp: g.save.xp, materials, looted: Object.keys(g.save[g.mode].lootedTiles).length,
     history: g.save[g.mode].history.length, changes: Object.keys(r.changes).length,
   });

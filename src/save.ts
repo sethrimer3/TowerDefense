@@ -1,5 +1,5 @@
 import { GOLD_SHOP, SAVE_KEY, UPGRADES } from "./config.ts";
-import type { ModeSave, MoveSnapshot, Revival, Run, Save } from "./entities.ts";
+import type { FloorRecord, ModeSave, MoveSnapshot, Revival, Run, Save } from "./entities.ts";
 import { emptyMaterials, MATERIAL_IDS, type MaterialId } from "./materials.ts";
 import { EQUIPMENT_SLOTS, type CraftedEquipment, type EquipmentSlot } from "./equipment.ts";
 import { CONSUMABLES, type ConsumableId } from "./crafting.ts";
@@ -42,7 +42,8 @@ const pointMap = (m: any, valid: (v: any) => boolean) =>
 // --- Runs ---
 const validChange = (v: any) =>
   v?.kind === "floor" || v?.kind === "wall" ||
-  (v?.kind === "openedChest" && (v.tier === undefined || CHEST_TIERS.includes(v.tier)));
+  (v?.kind === "openedChest" && (v.tier === undefined || CHEST_TIERS.includes(v.tier))) ||
+  (v?.kind === "reward" && CHEST_TIERS.includes(v.tier));
 const validChanges = (m: any) => pointMap(m, validChange);
 const validFloors = (m: any) =>
   m === undefined ||
@@ -65,10 +66,6 @@ const validDelveState = (r: any) =>
   (r.delveMilestone === undefined || (Number.isInteger(r.delveMilestone) && finite(r.delveMilestone))) &&
   (r.delveKnown === undefined || pointMap(r.delveKnown, (v) => v === true)) &&
   (r.delveVisited === undefined || pointMap(r.delveVisited, (v) => finite(v)));
-const validReward = (c: any) =>
-  Number.isInteger(c.x) && c.x >= 0 && c.x < 30 &&
-  Number.isInteger(c.y) && c.y >= 0 && c.y < 20 &&
-  CHEST_TIERS.includes(c.tier);
 /** Validate an untrusted run payload; returns null if it does not match the
  * shape this session's Run/Player invariants require. */
 const RUN_CHECKS: ((r: any) => boolean)[] = [
@@ -84,7 +81,8 @@ function validRun(r: any): Run | null {
   // Older runs have no damage/key history; do not assume a perfect attempt.
   r.damaged = r.damaged !== false;
   r.keysSpent = r.keysSpent !== false;
-  r.rewards = Array.isArray(r.rewards) ? r.rewards.filter(validReward) : [];
+  // Clear chests stand on the board now; an older run's chest list is dropped.
+  delete r.rewards;
   return r;
 }
 
@@ -209,10 +207,17 @@ function decodeTowerLog(raw: any): Save["tower"]["log"] {
   const log: Save["tower"]["log"] = {};
   if (!raw || typeof raw !== "object") return log;
   for (const [floor, record] of Object.entries(raw) as [string, any][]) {
-    if (!/^\d+$/.test(floor) || !finite(Number(floor)) || !Array.isArray(record?.earned)) continue;
-    const earned = CHEST_TIERS.filter((t) => record.earned.includes(t));
-    const claimed = earned.filter((t) => Array.isArray(record.claimed) && record.claimed.includes(t));
-    log[floor] = { earned, claimed };
+    if (!/^\d+$/.test(floor) || !finite(Number(floor)) || !record || typeof record !== "object") continue;
+    // Older saves list the tiers: { earned: [...], claimed: [...] }.
+    const listed = Array.isArray(record.earned);
+    const entry: FloorRecord = {};
+    for (const t of CHEST_TIERS) {
+      const state = listed
+        ? record.earned.includes(t) && (Array.isArray(record.claimed) && record.claimed.includes(t) ? "claimed" : "earned")
+        : record[t];
+      if (state === "earned" || state === "claimed") entry[t] = state;
+    }
+    if (Object.keys(entry).length) log[floor] = entry;
   }
   return log;
 }

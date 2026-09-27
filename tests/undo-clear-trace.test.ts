@@ -69,8 +69,8 @@ function tussle(g: Game, rng: () => number, [dx, dy]: readonly number[]) {
 /** Walks the route to the first clear chest on the floor, stopping early if a
  * step fails; returns how many steps were taken. */
 function toChest(g: Game) {
-  const chest = g.run.rewards?.[0];
-  const route = chest && g.previewRoute(chest.x, chest.y);
+  const chest = Object.keys(g.run.changes).find((k) => g.run.changes[k].kind === "reward");
+  const route = chest && g.previewRoute(...(chest.split(",").map(Number) as [number, number]));
   if (!route) return null;
   let taken = 0;
   for (const step of route) {
@@ -85,8 +85,7 @@ function observe(g: Game, action: unknown, result: unknown) {
   return canonical({
     action, result, message: g.message, summary: g.summary?.reason ?? null,
     player: r.player, height: r.height, floor: r.floor, outside: !!r.outside,
-    damaged: r.damaged, keysSpent: r.keysSpent, rewards: r.rewards,
-    worldRewards: g.world instanceof RoomWorld ? g.world.rewards : null,
+    damaged: r.damaged, keysSpent: r.keysSpent,
     log: g.save.tower.log, shards: g.save.tower.shards, essence: g.save.delve.essence,
     gold: g.save.gold, reached: slice.reached, best: slice.best,
     history: slice.history.length, revival: slice.revival?.earned ?? null,

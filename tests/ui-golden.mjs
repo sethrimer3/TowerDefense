@@ -85,9 +85,9 @@ const FIXTURES = await page.evaluate(async () => {
     s.delve.best = 57;
     s.tower.sectionHp = { 1: 260, 2: 340 };
     s.tower.log = {
-      0: { earned: ["silver", "gold"], claimed: ["silver"] },
-      4: { earned: ["silver"], claimed: ["silver"] },
-      30: { earned: ["silver", "gold", "platinum"], claimed: [] },
+      0: { silver: "claimed", gold: "earned" },
+      4: { silver: "claimed" },
+      30: { silver: "earned", gold: "earned", platinum: "earned" },
     };
     s.provisions.heal = 2;
   };

@@ -9,7 +9,7 @@ import { point, type Run, type Tile } from "../src/entities.ts";
  * and a ledger over a fresh save. `extra` places tiles on the floor. */
 function floor(extra: Record<string, Tile> = {}, run: Partial<Run> = {}) {
   const tower = defaults().tower;
-  const r = { seed: 1, height: 0, damaged: false, keysSpent: false, rewards: [], changes: {}, ...run } as unknown as Run;
+  const r = { seed: 1, height: 0, damaged: false, keysSpent: false, changes: {}, ...run } as unknown as Run;
   const world = new RoomWorld(r.seed, r.height, r.changes);
   world.cells = new Map();
   for (let y = 0; y < 5; y++) for (let x = 0; x < 5; x++) world.cells.set(point(x, y), { kind: "floor" });
@@ -17,8 +17,15 @@ function floor(extra: Record<string, Tile> = {}, run: Partial<Run> = {}) {
   for (const [k, t] of Object.entries(extra)) world.cells.set(k, t);
   return { tower, run: r, world, ledger: new ClearLedger(tower) };
 }
-const tiersAt = (world: RoomWorld, run: Run) =>
-  (run.rewards ?? []).map(c => [world.tile(c.x, c.y).kind, c.tier, point(c.x, c.y)]);
+/** The chests the board shows, as tier and tile. */
+function chestsOn(world: RoomWorld) {
+  const out: string[] = [];
+  for (const k of world.cells.keys()) {
+    const [x, y] = k.split(",").map(Number), t = world.tile(x, y);
+    if (t.kind === "reward") out.push(`${t.tier} ${k}`);
+  }
+  return out.sort();
+}
 
 /** The tiers clearing `floor(extra, run)` earns. */
 const earned = (extra?: Record<string, Tile>, run?: Partial<Run>) => {
@@ -43,65 +50,77 @@ test("every enemy and door must go, and each tier is earned once", () => {
   world.clear(2, 0);
   assert.deepEqual(ledger.check(world, run), ["silver", "gold", "platinum"]);
   assert.deepEqual(ledger.check(world, run), []);
-  assert.deepEqual(tower.log[0], { earned: ["silver", "gold", "platinum"], claimed: [] });
+  assert.deepEqual(tower.log[0], { silver: "earned", gold: "earned", platinum: "earned" });
   assert.equal(tower.shards, 0, "chests pay when opened, not when earned");
 });
 
 test("chests stand on the floor tiles closest to the stairs; a tier with no room is paid at once", () => {
   const roomy = floor();
   roomy.ledger.check(roomy.world, roomy.run);
-  assert.deepEqual(tiersAt(roomy.world, roomy.run), [
-    ["reward", "silver", "3,4"], ["reward", "gold", "4,3"], ["reward", "platinum", "2,4"],
-  ]);
+  assert.deepEqual(chestsOn(roomy.world), ["gold 4,3", "platinum 2,4", "silver 3,4"]);
   assert.ok(ClearLedger.hasChests(roomy.run));
 
   const walls = Object.fromEntries([...Array(25).keys()].map(i => [point(i % 5, Math.floor(i / 5)), { kind: "wall" } as Tile]));
   const cramped = floor({ ...walls, [point(4, 4)]: { kind: "stairs" }, [point(3, 4)]: { kind: "floor" } });
   cramped.ledger.check(cramped.world, cramped.run);
-  assert.deepEqual(tiersAt(cramped.world, cramped.run), [["reward", "silver", "3,4"]]);
-  assert.deepEqual(cramped.tower.log[0], { earned: ["silver", "gold", "platinum"], claimed: ["gold", "platinum"] });
+  assert.deepEqual(chestsOn(cramped.world), ["silver 3,4"]);
+  assert.deepEqual(cramped.tower.log[0], { silver: "earned", gold: "claimed", platinum: "claimed" });
   assert.equal(cramped.tower.shards, 2);
 });
 
-test("a chest can stand where an enemy or pickup was consumed", () => {
-  const { ledger, world, run } = floor();
+test("a chest can stand where an enemy was beaten, and leaves floor behind", () => {
+  const { ledger, world, run } = floor({ [point(3, 4)]: { kind: "enemy", enemy: { name: "rat", hp: 1, attack: 0, defense: 0, tier: 0 } } });
   world.clear(3, 4);
   ledger.check(world, run);
   assert.deepEqual(world.tile(3, 4), { kind: "reward", tier: "silver" });
+  ledger.claimAll(run);
+  assert.deepEqual(world.tile(3, 4), { kind: "floor" });
 });
 
-test("opening a chest pays its tier once and takes it off the board", () => {
+test("opening a chest pays its tier once", () => {
   const { ledger, world, run, tower } = floor();
   ledger.check(world, run);
-  assert.equal(ledger.open("gold", world, run), 1);
+  assert.equal(ledger.open("gold", run), 1);
   assert.equal(tower.shards, 1);
-  assert.deepEqual(run.rewards!.map(c => c.tier), ["silver", "platinum"]);
-  assert.equal(world.tile(4, 3).kind, "floor");
-  assert.equal(ledger.open("gold", world, run), 0);
+  assert.deepEqual(tower.log[0], { silver: "earned", gold: "claimed", platinum: "earned" });
+  assert.equal(ledger.open("gold", run), 0);
   assert.equal(tower.shards, 1);
 });
 
-test("settling keeps standing chests and pays every earned tier whose chest is gone", () => {
+test("a chest undo brings back stands again but pays nothing", () => {
   const { ledger, world, run, tower } = floor();
   ledger.check(world, run);
-  run.rewards = run.rewards!.filter(c => c.tier !== "gold");
-  tower.log[5] = { earned: ["silver"], claimed: [] };
-  ledger.settle(world, run);
+  const before = structuredClone(run);
+  run.changes["4,3"] = { kind: "openedChest", tier: "gold" };
+  ledger.open("gold", run);
+  ledger.settle(before);
+  assert.equal(before.changes["4,3"].kind, "reward");
+  assert.equal(ledger.open("gold", before), 0);
+  assert.equal(tower.shards, 1);
+});
+
+test("settling pays every earned tier whose chest is gone, and takes away chests never earned", () => {
+  const { ledger, world, run, tower } = floor();
+  ledger.check(world, run);
+  run.changes["4,3"] = { kind: "floor" };
+  tower.log[5] = { silver: "earned" };
+  ledger.settle(run);
   assert.equal(tower.shards, 2, "gold on this floor and silver on floor 5");
-  assert.deepEqual(run.rewards.map(c => c.tier), ["silver", "platinum"]);
-  assert.deepEqual(tower.log[5], { earned: ["silver"], claimed: ["silver"] });
+  assert.deepEqual(chestsOn(world), ["platinum 2,4", "silver 3,4"]);
+  assert.deepEqual(tower.log[5], { silver: "claimed" });
 
-  const stale = floor({}, { rewards: [{ x: 3, y: 4, tier: "silver" }] });
-  stale.ledger.settle(stale.world, stale.run);
-  assert.deepEqual(stale.run.rewards, [], "a chest with no earned tier behind it goes");
+  const stale = floor({}, { changes: { "3,4": { kind: "reward", tier: "silver" } } });
+  stale.ledger.settle(stale.run);
+  assert.deepEqual(chestsOn(stale.world), []);
   assert.equal(stale.world.tile(3, 4).kind, "floor");
 });
 
-test("leaving pays every tier still owed", () => {
+test("leaving pays every tier still owed and takes the chests away", () => {
   const { ledger, world, run, tower } = floor();
   ledger.check(world, run);
-  assert.equal(ledger.claimAll(world, run), 3);
+  assert.equal(ledger.claimAll(run), 3);
   assert.equal(tower.shards, 3);
   assert.ok(!ClearLedger.hasChests(run));
-  assert.equal(ledger.claimAll(world, run), 0);
+  assert.deepEqual(chestsOn(world), []);
+  assert.equal(ledger.claimAll(run), 0);
 });

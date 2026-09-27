@@ -98,7 +98,7 @@ function trace(mode: Mode, seed: number, outside: boolean): string[] {
       if (roll < 0.08) reroll(g, rng);
       else if (roll < 0.11) strip(g, PICKUPS);
       else if (roll < 0.13) strip(g, [...PICKUPS, "enemy", "door"]);
-      else if (roll < 0.15) delete g.run.rewards;
+      else if (roll < 0.15) strip(g, ["reward"]);
       else if (roll < 0.18) strand(g);
       else if (roll < 0.19) descend(g);
       const step = chooseStep(g);

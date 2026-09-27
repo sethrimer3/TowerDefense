@@ -188,7 +188,6 @@ export class Game {
     run.floors = {};
     run.player.x = TOWER_START_X;
     run.player.y = 0;
-    run.rewards = [];
   }
   private settleRevival() {
     const slice = this.save[this.mode];
@@ -214,8 +213,10 @@ export class Game {
   }
   restore(snapshot: MoveSnapshot) {
     this.claimRewards();
+    // The snapshot's board brings back any chest it had; one already paid
+    // pays nothing when opened again.
     this.adoptRun(this.rewound(snapshot.run));
-    this.restoreRewards();
+    this.syncRewards();
     // Lifetime achievements are never rolled back by movement undo.
     this.recordProgress();
     this.route = [];
@@ -234,20 +235,6 @@ export class Game {
     if (damaged) run.damaged = true;
     if (keysSpent) run.keysSpent = true;
     return run;
-  }
-  /** Settles the restored run's clear chests against the log. A movement undo
-   * restores the board snapshot even though the payout is lifetime state, so
-   * a chest the undo brings back stays; reopening it remains payout-gated. */
-  private restoreRewards() {
-    const undone = [...(this.run.rewards ?? [])];
-    this.syncRewards();
-    if (!(this.world instanceof RoomWorld)) return;
-    const rewards = this.run.rewards!;
-    for (const chest of undone) if (
-      !rewards.some(c => c.x === chest.x && c.y === chest.y && c.tier === chest.tier) &&
-      this.run.changes[`${chest.x},${chest.y}`]?.kind !== "openedChest"
-    ) rewards.push(chest);
-    this.world.rewards = rewards;
   }
   undo() {
     const slice = this.save[this.mode];
@@ -386,7 +373,6 @@ export class Game {
       this.run = {
         damaged: false,
         keysSpent: false,
-        rewards: [],
         layoutVersion: LAYOUT_VERSION,
         seed,
         height: 0,
@@ -402,7 +388,6 @@ export class Game {
       this.run = {
         damaged: false,
         keysSpent: false,
-        rewards: [],
         layoutVersion: TOWER_LAYOUT_VERSION,
         seed,
         height,
@@ -778,7 +763,6 @@ export class Game {
    * anywhere in the run keeps counting toward the whole-ascent Gold clear. */
   enterTowerFloor() {
     this.run.keysSpent = false;
-    this.run.rewards = [];
     this.recordProgress();
     this.run.floors ??= {};
     this.run.changes = this.run.floors[this.run.height] ??= {};
@@ -801,11 +785,11 @@ export class Game {
     return new ClearLedger(this.save.tower);
   }
   private syncRewards() {
-    this.ledger.settle(this.world, this.run);
+    if (this.world instanceof RoomWorld) this.ledger.settle(this.run);
   }
   private claimRewards(tier?: ClearTier) {
     if (this.mode !== "tower") return 0;
-    const earned = tier ? this.ledger.open(tier, this.world, this.run) : this.ledger.claimAll(this.world, this.run);
+    const earned = tier ? this.ledger.open(tier, this.run) : this.ledger.claimAll(this.run);
     if (earned) this.feedback(`+${earned} Inspiration · clear reward${earned > 1 ? "s" : ""}`);
     return earned;
   }

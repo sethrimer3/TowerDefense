@@ -1,4 +1,5 @@
 import { TOWER_SECTION } from "../config.ts";
+import { CLEAR_TIERS } from "../tower/clear-ledger.ts";
 import type { AppContext } from "./app.ts";
 import { displayedProgress, el, itemSprite, uiSprite } from "./dom.ts";
 import { devAmount } from "./hud.ts";
@@ -106,8 +107,9 @@ export function showLog(ctx: AppContext) {
   let page = 0;
   const floorRecord = (floor: number) => {
     const record = game.save.tower.log[floor];
-    const tiers = record?.earned.length
-      ? record.earned.map(t => `<span class="${t}">${itemSprite(`chest_${t}` as "chest_silver" | "chest_gold" | "chest_platinum", "log-sprite")}${t[0].toUpperCase() + t.slice(1)}${record.claimed.includes(t) ? " ✓" : " · chest"}</span>`).join(" · ")
+    const earned = CLEAR_TIERS.filter(t => record?.[t]);
+    const tiers = earned.length
+      ? earned.map(t => `<span class="${t}">${itemSprite(`chest_${t}` as "chest_silver" | "chest_gold" | "chest_platinum", "log-sprite")}${t[0].toUpperCase() + t.slice(1)}${record![t] === "claimed" ? " ✓" : " · chest"}</span>`).join(" · ")
       : "Reached";
     return `<div class="floor-record"><b>Floor ${displayedProgress(floor)}</b><span>${tiers}</span></div>`;
   };

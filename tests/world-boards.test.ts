@@ -163,9 +163,8 @@ function delveWorld(seed: number) {
 function towerRooms(seed: number) {
   const out: unknown[] = [];
   for (const room of [0, 3, 10, 27]) {
-    const changes: Record<string, Tile> = { "4,4": { kind: "potion" }, "9,2": { kind: "floor" } };
+    const changes: Record<string, Tile> = { "4,4": { kind: "reward", tier: "gold" }, "9,2": { kind: "floor" }, "5,5": { kind: "reward", tier: "bronze" as "gold" } };
     const w = new RoomWorld(seed, room, changes);
-    w.rewards = [{ x: 5, y: 5, tier: "bronze" }, { x: 4, y: 4, tier: "gold" }] as RoomWorld["rewards"];
     w.clear(8, 1);
     const tiles: unknown[] = [], steps: unknown[] = [];
     for (let y = -1; y <= 17; y++)
