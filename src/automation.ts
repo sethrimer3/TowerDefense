@@ -1,7 +1,8 @@
-import { chooseDelveStep } from "./delve/automove.ts";
+import { capabilities, chooseDelveStep } from "./delve/automove.ts";
 import { predict } from "./combat.ts";
 import { point, type Tile } from "./entities.ts";
 import type { Game } from "./state.ts";
+import type { Position } from "./board.ts";
 import { doorCost } from "./doors.ts";
 import { ClearLedger } from "./tower/clear-ledger.ts";
 
@@ -22,9 +23,16 @@ export function score(t: Tile, y: number, current: number, distance: number) {
   return benefit + Math.max(0, y - current) * 1.8 - distance * 0.18;
 }
 
+/** Automove's next step: Delve Automove inside the labyrinth, otherwise the
+ * Tower search (the Tower, and the forest outside either mode). */
 export function chooseStep(game: Game) {
-  if (game.mode === "delve" && !game.run.outside) return chooseDelveStep(game);
-  const best = new Search(game).run();
+  if (game.mode === "delve" && !game.run.outside)
+    return chooseDelveStep(game, { memory: game.save.delve.memory, plan: game.delvePlan, capabilities: capabilities(game.save.upgrades) });
+  const tower = game.mode === "tower";
+  const best = new Search(game, {
+    progress: tower ? game.run.player.y : game.run.height,
+    stairsWait: tower && ClearLedger.hasChests(game.towerRun),
+  }).run();
   if (!best) return null;
   const kind = game.world.tile(best.x, best.y).kind;
   return { dx: best.first[0], dy: best.first[1], label: `Seeking ${kind === "floor" ? "height " + best.y : kind}` };
@@ -50,6 +58,11 @@ type Combat = ReturnType<typeof predict>;
  * rather than treating it as a hard wall. */
 const lethal = (c: Combat) => !c.survivable && !c.impervious;
 
+/** What the search scores against: the run's progress mark (so
+ * backtracking isn't progress), and whether the stairs must wait (a Tower
+ * floor's clear chests still stand). */
+type SearchRules = { progress: number; stairsWait: boolean };
+
 /** Breadth-first search from the player for the best-scoring tile to head
  * for. It walks only through floor and stairs, so it stops at every
  * interaction and never assumes future keys or cumulative combat HP. */
@@ -58,14 +71,11 @@ class Search {
   private seen: Set<string>;
   private best: Node | null = null;
   private bestScore = 0.1;
-  /** The run's progress mark, scored against so backtracking isn't progress. */
-  private progress: number;
 
-  constructor(private game: Game) {
-    const p = game.run.player;
+  constructor(private at: Position, private rules: SearchRules) {
+    const p = at.run.player;
     this.queue = [{ x: p.x, y: p.y, first: [0, 0], d: 0 }];
     this.seen = new Set([point(p.x, p.y)]);
-    this.progress = game.mode === "tower" ? p.y : game.run.height;
   }
 
   run() {
@@ -80,10 +90,10 @@ class Search {
   private visit(n: Node, dx: number, dy: number) {
     const next = this.reach(n, dx, dy);
     if (!next) return;
-    const t = this.game.world.tile(next.x, next.y);
+    const t = this.at.world.tile(next.x, next.y);
     // Cache the one prediction per enemy tile instead of re-running combat
     // math for every check below.
-    const combat = t.kind === "enemy" ? predict(this.game.run.player, t.enemy!) : null;
+    const combat = t.kind === "enemy" ? predict(this.at.run.player, t.enemy!) : null;
     if (this.blocked(t, dy, combat)) return;
     const value = this.worth(t, next, combat);
     if (value > this.bestScore) {
@@ -96,7 +106,7 @@ class Search {
 
   /** The unseen tile one step from `n`, within reach of the player. */
   private reach(n: Node, dx: number, dy: number): Node | null {
-    const dest = this.game.world.step(n.x, n.y, dx, dy);
+    const dest = this.at.world.step(n.x, n.y, dx, dy);
     if (!dest) return null;
     const k = point(dest.x, dest.y);
     if (this.seen.has(k) || !this.inReach(dest.y)) return null;
@@ -105,8 +115,8 @@ class Search {
   }
 
   private inReach(y: number) {
-    const p = this.game.run.player;
-    return y >= Math.max(this.game.world.floor, p.y - REACH) && y <= p.y + REACH;
+    const p = this.at.run.player;
+    return y >= Math.max(this.at.world.floor, p.y - REACH) && y <= p.y + REACH;
   }
 
   /** Whether Automove won't step onto `t`, entered moving down by `dy`. */
@@ -115,20 +125,15 @@ class Search {
     // automove only climbs, never steps onto the stairs back down.
     if (t.kind === "wall" || t.kind === "stairsDown") return true;
     if (t.kind === "oneway") return dy !== 1;
-    if (t.kind === "door") return doorCost(t, this.game.run.player) === null;
+    if (t.kind === "door") return doorCost(t, this.at.run.player) === null;
     if (t.kind === "enemy") return lethal(combat!);
-    return t.kind === "stairs" && this.chestsWaiting();
-  }
-
-  /** Tower stairs wait while the floor's clear chests are unopened. */
-  private chestsWaiting() {
-    return this.game.mode === "tower" && ClearLedger.hasChests(this.game.towerRun);
+    return t.kind === "stairs" && this.rules.stairsWait;
   }
 
   private worth(t: Tile, next: Node, combat: Combat | null) {
-    const { run } = this.game;
+    const { run } = this.at;
     const p = run.player;
-    let value = run.outside ? (t.kind === "stairs" ? 100 : 0) - next.d * 0.18 : score(t, next.y, this.progress, next.d);
+    let value = run.outside ? (t.kind === "stairs" ? 100 : 0) - next.d * 0.18 : score(t, next.y, this.rules.progress, next.d);
     if (t.kind === "potion" && p.hp === p.maxHp) value -= 10;
     // Impervious enemies cost nothing in expected damage (they are never
     // actually fought — game.move() rejects the bump); a real fight's

@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { Game } from "../src/state.ts";
 import { defaults } from "../src/save.ts";
-import { chooseDelveStep } from "../src/delve/automove.ts";
+import { chooseStep } from "../src/automation.ts";
 
 // Characterization trace of Delve Automove: seeded runs where Automove takes
 // every step, at each combination of AI upgrades that changes its behaviour and
@@ -47,7 +47,7 @@ function trace(seed: number, level: Level, who: typeof CHARACTERS.strong): strin
   Object.assign(g.run.player, { hp: who.hp, maxHp: who.hp, attack: who.attack, defense: who.defense, keys: { yellow: who.keys, blue: 0, red: 0 } });
   const run = g.run, h = createHash("sha256"), out: string[] = [];
   for (let i = 1; i <= STEPS; i++) {
-    const step = chooseDelveStep(g);
+    const step = chooseStep(g);
     const moved = step ? g.move(step.dx, step.dy) : null;
     h.update(JSON.stringify({ step, moved, decisions: g.delvePlan.decisions, player: run.player, milestone: run.milestone, height: run.height }));
     if (i % CHECKPOINT === 0) out.push(h.copy().digest("hex").slice(0, 12));

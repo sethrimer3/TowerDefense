@@ -1,6 +1,6 @@
 import { Game } from '../src/state.ts';
 import { defaults } from '../src/save.ts';
-import { chooseDelveStep, capabilities } from '../src/delve/automove.ts';
+import { chooseStep } from '../src/automation.ts';
 import { region } from '../src/delve/labyrinth.ts';
 import { point } from '../src/entities.ts';
 
@@ -21,7 +21,7 @@ export function simulate(seed: number, level: AiLevel, opts: { steps?: number; h
   g.switchMode('delve');
   g.newRun({ seed });
   Object.assign(g.run.player, { hp: opts.hp ?? 400, maxHp: opts.hp ?? 400, attack: opts.attack ?? 14, defense: opts.defense ?? 4, keys: { yellow: opts.keys ?? 1, blue: 0, red: 0 } });
-  const run = g.delveRun, caps = capabilities(g);
+  const run = g.delveRun;
   const pockets = new Map<string, string>();
   const note = (a: number) => { for (const n of region(seed, a).nodes) if (n.pattern) pockets.set(point(n.x, n.y), n.pattern.quality); };
   note(0); note(1);
@@ -29,7 +29,7 @@ export function simulate(seed: number, level: AiLevel, opts: { steps?: number; h
   const seenPockets = new Set<string>();
   for (let i = 0; i < (opts.steps ?? 3000); i++) {
     const before = { ...run.player, keys: { ...run.player.keys } }, milestone = run.milestone;
-    const step = chooseDelveStep(g, caps);
+    const step = chooseStep(g);
     if (!step) { stats.ended = 'stuck'; break; }
     if (!g.move(step.dx, step.dy)) { stats.ended = 'blocked'; break; }
     if (g.run !== run) { stats.ended = g.summary?.dead ? 'died' : 'ended'; break; }

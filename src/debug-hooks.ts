@@ -43,6 +43,6 @@ function delveReport(game: Game) {
     themeBlend: { [`area${Math.floor(influence) + 1}`]: +(1 - blend).toFixed(2), [`area${Math.floor(influence) + 2}`]: +blend.toFixed(2) },
     knownTiles: Object.keys(game.save.delve.memory.known).length,
     branches: { frontiers: seen.filter(d => d.frontier).length, knownDeadEnds: seen.filter(d => d.deadEnd).length },
-    capabilities: capabilities(game), decisions: seen,
+    capabilities: capabilities(game.save.upgrades), decisions: seen,
   };
 }

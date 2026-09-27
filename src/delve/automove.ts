@@ -1,16 +1,16 @@
-import { point, type Player, type Tile } from '../entities.ts';
-import type { Game } from '../state.ts';
+import { point, type AutomoveMemory, type Player, type Run, type Save, type Tile } from '../entities.ts';
+import type { Position } from '../board.ts';
 import type { KeyColor } from '../config.ts';
 import { isLethal, resolveStep, type StepEffect } from '../step-effects.ts';
 
 export type Capabilities = { memory: boolean; deadEnds: boolean; combat: boolean; keys: boolean; contextual: boolean; scarcity: boolean; lookahead: number; interactions: number };
-export function capabilities(game: Game): Capabilities {
-  const u = game.save.upgrades;
+/** What Automove's upgrades let it do. */
+export function capabilities(u: Save['upgrades']): Capabilities {
   return { memory: u.aiMemory > 0, deadEnds: u.aiMemory > 1, combat: u.aiEvaluation > 0, keys: u.aiEvaluation > 1, contextual: u.aiEvaluation > 2, scarcity: u.aiEvaluation > 3, lookahead: 8 + u.aiLookahead * 4, interactions: 1 + u.aiLookahead * 2 };
 }
 const dirs = [[0, 1], [-1, 0], [1, 0], [0, -1]];
 export type Decision = { x: number; y: number; utility: number; travel: number; damage: number; keys: number; reward: number; frontier: boolean; deadEnd: boolean };
-type Commitment = { run: Game['run']; from: string; route: string[]; target: string };
+type Commitment = { run: Run; from: string; route: string[]; target: string };
 /** What Automove carries between steps and never saves: the route it
  * committed to (dropped once the run is replaced, as undo does) and the
  * decision points it weighed last. A Game holds one. */
@@ -23,34 +23,37 @@ const TRAVERSAL = ['floor', 'openedChest', 'oneway'];
 /** Search limits: nodes expanded and route length. */
 const MAX_EXPANSIONS = 2400, MAX_TRAVEL = 180;
 
-/** Deliberately uses observed tiles, never generation nodes, pattern IDs,
- * hidden route ownership, or the generator's true-continuation labels. */
-export function chooseDelveStep(game: Game, override?: Capabilities) {
-  const c = override ?? capabilities(game);
-  const { canKnow, discovered } = observe(game, c);
-  const plan = game.delvePlan;
-  const current = plan.commitment?.run === game.run ? plan.commitment : undefined;
+/** What Automove plans with besides the board: what it has seen, what it
+ * planned last step, and what its upgrades let it do. */
+export type DelveMind = { memory: AutomoveMemory; plan: DelvePlan; capabilities: Capabilities };
+
+/** Automove's next step from `at`. Marks what it can see in `memory` and
+ * updates `plan`. Deliberately uses observed tiles, never generation nodes,
+ * pattern IDs, hidden route ownership, or the generator's true-continuation
+ * labels. */
+export function chooseDelveStep(at: Position, { memory, plan, capabilities: c }: DelveMind) {
+  const { canKnow, discovered } = observe(at, memory, c);
+  const current = plan.commitment?.run === at.run ? plan.commitment : undefined;
   // A committed route is followed until it ends, an interaction happens, or
   // newly observed corridors warrant a fresh look (with a continuity bonus
   // for the old target, so small visibility changes cannot flip-flop it).
-  const followed = current && !discovered ? follow(game, current, c) : undefined;
+  const followed = current && !discovered ? follow(at, plan, current, c) : undefined;
   if (followed) return followed;
   plan.commitment = undefined;
-  const scan: Scan = { game, c, canKnow, visits: game.save.delve.memory.visited, previousTarget: current?.target ?? '', bestAt: new Map(), report: [], best: null, bestValue: -Infinity };
+  const scan: Scan = { at, c, canKnow, visits: memory.visited, previousTarget: current?.target ?? '', bestAt: new Map(), report: [], best: null, bestValue: -Infinity };
   explore(scan);
   plan.decisions = scan.report.sort((a, b) => b.utility - a.utility).slice(0, 12);
-  const { best } = scan, p = game.run.player;
+  const { best } = scan, p = at.run.player;
   if (!best) return null;
-  plan.commitment = { run: game.run, from: point(p.x, p.y), route: [...best.path].slice(1), target: point(best.x, best.y) };
+  plan.commitment = { run: at.run, from: point(p.x, p.y), route: [...best.path].slice(1), target: point(best.x, best.y) };
   return { dx: best.first[0], dy: best.first[1], label: `Exploring Delve · ${c.lookahead}-tile scouting` };
 }
 
 /** Marks what Automove can see now as known. Scouting upgrades expand
  * observation explicitly; the default radius is the same 17x17 neighbourhood
  * available to the human player. `discovered` counts newly seen open tiles. */
-function observe(game: Game, c: Capabilities) {
-  const p = game.run.player, world = game.world, r = c.lookahead;
-  const { known, visited: visits } = game.save.delve.memory;
+function observe({ run, world }: Position, { known, visited: visits }: AutomoveMemory, c: Capabilities) {
+  const p = run.player, r = c.lookahead;
   const visible = new Set<string>();
   let discovered = 0;
   for (let y = Math.max(world.floor, p.y - r); y <= p.y + r; y++) for (let x = Math.max(0, p.x - r); x <= Math.min(world.width - 1, p.x + r); x++) {
@@ -67,8 +70,8 @@ function observe(game: Game, c: Capabilities) {
 
 /** The next step of the committed route, if it is still one step away and
  * still safe to take. */
-function follow(game: Game, route: Commitment, c: Capabilities) {
-  const p = game.run.player, world = game.world;
+function follow({ run, world }: Position, plan: DelvePlan, route: Commitment, c: Capabilities) {
+  const p = run.player;
   const next = nextOnRoute(route, point(p.x, p.y));
   if (!next) return undefined;
   const [x, y] = next.split(',').map(Number);
@@ -76,7 +79,7 @@ function follow(game: Game, route: Commitment, c: Capabilities) {
   const trial = { player: { ...p, keys: { ...p.keys } }, damage: 0, keyCost: 0, reward: 0 };
   const walkable = Math.abs(dx) + Math.abs(dy) === 1 && world.step(p.x, p.y, dx, dy) && tile.kind !== 'wall';
   if (!walkable || !apply(tile, trial, c)) return undefined;
-  if (!['floor', 'openedChest'].includes(tile.kind)) game.delvePlan.commitment = undefined;
+  if (!['floor', 'openedChest'].includes(tile.kind)) plan.commitment = undefined;
   return { dx, dy, label: 'Following the chosen Delve route' };
 }
 
@@ -91,7 +94,7 @@ function nextOnRoute(route: Commitment, here: string): string | undefined {
 type Search = { x: number; y: number; first: number[]; d: number; player: Player; damage: number; keyCost: number; reward: number; interactions: number; path: Set<string> };
 /** The search's inputs and its running results. */
 type Scan = {
-  game: Game; c: Capabilities;
+  at: Position; c: Capabilities;
   canKnow: (x: number, y: number) => boolean;
   visits: Record<string, number>;
   previousTarget: string;
@@ -104,7 +107,7 @@ type Scan = {
 /** Breadth-first search over observed tiles from the player, scoring every
  * decision point it reaches. */
 function explore(scan: Scan) {
-  const p = scan.game.run.player;
+  const p = scan.at.run.player;
   const q: Search[] = [{ x: p.x, y: p.y, first: [0, 0], d: 0, player: { ...p, keys: { ...p.keys } }, damage: 0, keyCost: 0, reward: 0, interactions: 0, path: new Set([point(p.x, p.y)]) }];
   for (let i = 0; i < q.length && i < MAX_EXPANSIONS; i++) q.push(...successors(scan, q[i]));
 }
@@ -117,7 +120,7 @@ function successors(scan: Scan, n: Search) {
 /** Extends route `n` one tile in `dir`: scores the new tile, and returns the
  * extended route when it is worth searching on from. */
 function advance(scan: Scan, n: Search, [dx, dy]: number[]): Search | undefined {
-  const { game: { world }, c } = scan;
+  const { at: { world }, c } = scan;
   const dest = world.step(n.x, n.y, dx, dy); if (!dest || !scan.canKnow(dest.x, dest.y)) return undefined;
   const k = point(dest.x, dest.y); if (n.path.has(k)) return undefined;
   const tile = world.tile(dest.x, dest.y); if (tile.kind === 'wall') return undefined;
@@ -134,7 +137,7 @@ function advance(scan: Scan, n: Search, [dx, dy]: number[]): Search | undefined 
  * frontiers form the observed decision graph and are reported and ranked;
  * corridor interiors remain traversal edges. */
 function consider(scan: Scan, next: Search, dest: { x: number; y: number }, { tile, interaction }: { tile: Tile; interaction: boolean }) {
-  const { game: { world }, canKnow } = scan;
+  const { at: { world }, canKnow } = scan;
   const exits = dirs.map(([xx, yy]) => world.step(dest.x, dest.y, xx, yy)).filter((v): v is { x: number; y: number } => !!v);
   const frontier = exits.some(v => !canKnow(v.x, v.y));
   const open = exits.filter(v => canKnow(v.x, v.y) && world.tile(v.x, v.y).kind !== 'wall').length;
@@ -160,9 +163,9 @@ function utilityOf(scan: Scan, next: Search, place: Place) {
 
 /** What draws Automove to a place: novelty, height, the unknown, pickups and
  * the milestone gate. */
-function appeal({ c, game, visits }: Scan, next: Search, { tile, frontier, unvisited }: Place) {
+function appeal({ c, at, visits }: Scan, next: Search, { tile, frontier, unvisited }: Place) {
   const exploration = unvisited ? 14 : -visits[point(next.x, next.y)] * 3;
-  const upward = (next.y - game.run.player.y) * (c.deadEnds ? 0.12 : 0.65);
+  const upward = (next.y - at.run.player.y) * (c.deadEnds ? 0.12 : 0.65);
   return exploration + upward + (frontier ? 8 : 0) + next.reward + (tile.kind === 'oneway' ? 90 : 0);
 }
 

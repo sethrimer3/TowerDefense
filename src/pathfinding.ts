@@ -1,13 +1,13 @@
 import { CHUNK } from "./config.ts";
 import { point } from "./entities.ts";
-import type { Game } from "./state.ts";
+import type { Position } from "./board.ts";
 import { doorCost } from "./doors.ts";
 export type Step = { dx: number; dy: number; x: number; y: number };
 /** Find a structural route. Missing-key doors are expensive rather than
  * impassable, so a player can approach the first necessary locked door. */
-export function routeTo(game: Game, x: number, y: number): Step[] | null {
-  const p = game.run.player,
-    w = game.world;
+export function routeTo(at: Position, x: number, y: number): Step[] | null {
+  const p = at.run.player,
+    w = at.world;
   if (w.tile(x, y).kind === "wall") return null;
   const start = point(p.x, p.y),
     goal = point(x, y),

@@ -1,4 +1,4 @@
-import { point, type Tile, type Torch } from "./entities.ts";
+import { point, type Run, type Tile, type Torch } from "./entities.ts";
 
 /** A board the player walks: the Delve labyrinth, a Tower floor, or the
  * forest outside. */
@@ -20,6 +20,10 @@ export type Board = {
    * one was destroyed. Used for player-torch collision. */
   breakTorchAt?(x: number, y: number): boolean;
 };
+
+/** Where the planners (routes and Automove) start from: a board and the
+ * run standing on it. A Game is one; so is any hand-built pair. */
+export type Position = { world: Board; run: Run };
 
 const directions = [
   [1, 0],
