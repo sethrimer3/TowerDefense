@@ -72,7 +72,7 @@ test("undo restores combat, health, drops, equipment, door keys and score; histo
   for (let i = 0; i < 5; i++) assert.ok(g.move(0, 1));
   assert.equal(g.save.delve.history.length, 5);
   for (let i = 0; i < 5; i++) assert.ok(g.undo());
-  assert.deepEqual(g.run, { ...initial, damaged: g.run.damaged, keysSpent: g.run.keysSpent });
+  assert.deepEqual(g.run, initial);
   assert.equal(g.save.delve.best, (g.world as World).depth(15, 5));
   assert.equal(g.undo(), false);
   for (let i = 0; i < 6; i++) g.move(0, 1);

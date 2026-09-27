@@ -82,7 +82,7 @@ const place = (s, { seed, x, y, open = [], closed = [], stats = {}, revive = fal
   r.outside = false;
   r.floor = 0;
   r.height = 0;
-  r.delveMilestone = 0;
+  r.milestone = 0;
   r.changes = {};
   for (const [cx, cy] of open) r.changes[`${cx},${cy}`] = { kind: "floor" };
   for (const [cx, cy] of closed) r.changes[`${cx},${cy}`] = { kind: "wall" };

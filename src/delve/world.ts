@@ -1,6 +1,6 @@
 import { region, depthAt, areasBetween, floorFor, ownerAt } from "./labyrinth.ts";
 import { CHUNK, WIDTH, START_X } from "../config.ts";
-import { point, type Run, type Tile, type Torch } from "../entities.ts";
+import { point, type DelveRun, type Tile, type Torch } from "../entities.ts";
 import type { Board } from "../board.ts";
 import { breakTorch, placeTorches } from "../torches.ts";
 
@@ -23,7 +23,7 @@ const upward = (dx: number, dy: number) => dx === 0 && dy === 1;
 
 /** What of a run the Delve board keeps: its map edits, the floor below
  * which the labyrinth is sealed, and the milestones crossed. */
-export type DelveRun = Pick<Run, "seed" | "changes" | "floor" | "delveMilestone">;
+type WorldRun = Pick<DelveRun, "seed" | "changes" | "floor" | "milestone">;
 
 /** The endless Delve labyrinth of a run, generated chunk by chunk around
  * the player. It reads and writes the run's own changes, floor and
@@ -31,7 +31,7 @@ export type DelveRun = Pick<Run, "seed" | "changes" | "floor" | "delveMilestone"
 export class World implements Board {
   width = WIDTH;
   chunks = new Map<number, Map<string, Tile>>();
-  constructor(private run: DelveRun) {}
+  constructor(private run: WorldRun) {}
   get seed() {
     return this.run.seed;
   }
@@ -42,7 +42,7 @@ export class World implements Board {
     return this.run.floor;
   }
   get milestone() {
-    return this.run.delveMilestone ?? 0;
+    return this.run.milestone;
   }
   tile(x: number, y: number): Tile {
     if (!this.inside(x, y)) return { kind: "wall" };
@@ -79,7 +79,7 @@ export class World implements Board {
     const gate = region(this.seed, this.milestone).gate;
     if (x !== gate.x || y !== gate.y) return false;
     this.changes[point(x, y - 1)] = { kind: 'wall' };
-    this.run.delveMilestone = this.milestone + 1;
+    this.run.milestone++;
     return true;
   }
   depth(x: number, y: number) { return depthAt(this.seed, x, y, this.milestone); }

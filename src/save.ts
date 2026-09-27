@@ -1,5 +1,5 @@
-import { GOLD_SHOP, SAVE_KEY, UPGRADES } from "./config.ts";
-import type { FloorRecord, ModeSave, MoveSnapshot, Revival, Run, Save } from "./entities.ts";
+import { GOLD_SHOP, SAVE_KEY, TOWER_WIDTH, UPGRADES, WIDTH } from "./config.ts";
+import type { DelveRun, FloorRecord, ModeSave, MoveSnapshot, Revival, Run, Save, TowerRun } from "./entities.ts";
 import { emptyMaterials, MATERIAL_IDS, type MaterialId } from "./materials.ts";
 import { EQUIPMENT_SLOTS, type CraftedEquipment, type EquipmentSlot } from "./equipment.ts";
 import { CONSUMABLES, type ConsumableId } from "./crafting.ts";
@@ -56,55 +56,63 @@ const validOutside = (r: any) =>
 const validCounters = (r: any) =>
   Number.isInteger(r.seed) && finite(r.height) && finite(r.floor) && r.floor <= r.player?.y &&
   finite(r.kills) && finite(r.treasures);
-const validPlayer = (p: any) =>
+const validPlayer = (p: any, width: number) =>
   !!p &&
-  Number.isInteger(p.x) && p.x >= 0 && p.x < 30 &&
+  Number.isInteger(p.x) && p.x >= 0 && p.x < width &&
   Number.isInteger(p.y) && finite(p.y) &&
   finite(p.hp) && p.hp > 0 && finite(p.maxHp) && p.hp <= p.maxHp &&
   finite(p.attack) && finite(p.defense) &&
   KEY_COLORS.every((k) => finite(p.keys?.[k]));
+/** Checks every run passes, whatever its mode; `width` is the mode's board. */
+const validCore = (r: any, width: number) =>
+  !!r && validOutside(r) && validCounters(r) && validPlayer(r.player, width) && validChanges(r.changes);
 const validDelveState = (r: any) =>
-  (r.delveMilestone === undefined || (Number.isInteger(r.delveMilestone) && finite(r.delveMilestone))) &&
-  (r.delveKnown === undefined || pointMap(r.delveKnown, (v) => v === true)) &&
-  (r.delveVisited === undefined || pointMap(r.delveVisited, (v) => finite(v)));
-/** Validate an untrusted run payload; returns null if it does not match the
- * shape this session's Run/Player invariants require. */
-const RUN_CHECKS: ((r: any) => boolean)[] = [
-  validOutside,
-  validCounters,
-  (r) => validPlayer(r.player),
-  validDelveState,
-  (r) => validChanges(r.changes),
-  (r) => validFloors(r.floors),
-];
-function validRun(r: any): Run | null {
-  if (!r || !RUN_CHECKS.every((check) => check(r))) return null;
+  Number.isInteger(r.milestone) && finite(r.milestone) &&
+  (r.known === undefined || pointMap(r.known, (v) => v === true)) &&
+  (r.visited === undefined || pointMap(r.visited, (v) => finite(v)));
+const TOWER_FIELDS = ["damaged", "keysSpent", "floors"];
+const DELVE_FIELDS = ["milestone", "known", "visited"];
+/** Drops fields a run of this mode doesn't keep: the other mode's, and an
+ * older run's clear chest list (clear chests stand in `changes` now). */
+function without<R>(r: any, fields: string[]): R {
+  for (const k of ["rewards", ...fields]) delete r[k];
+  return r;
+}
+/** Validate an untrusted Tower run; null unless it has the shape a
+ * TowerRun needs. */
+function decodeTowerRun(r: any): TowerRun | null {
+  if (!validCore(r, TOWER_WIDTH) || !validFloors(r.floors)) return null;
   // Older runs have no damage/key history; do not assume a perfect attempt.
   r.damaged = r.damaged !== false;
   r.keysSpent = r.keysSpent !== false;
-  // Clear chests stand on the board now; an older run's chest list is dropped.
-  delete r.rewards;
-  return r;
+  return without(r, DELVE_FIELDS);
+}
+/** Validate an untrusted Delve run; null unless it has the shape a
+ * DelveRun needs. */
+function decodeDelveRun(r: any): DelveRun | null {
+  if (!validCore(r, WIDTH) || !validDelveState(r)) return null;
+  return without(r, TOWER_FIELDS);
 }
 
 // --- Mode slices ---
-type DecodedMode = Pick<ModeSave, "run" | "history" | "revival" | "lootedTiles">;
-function snapshot(value: any): MoveSnapshot | null {
+type DecodedMode<R extends Run> = Pick<ModeSave<R>, "run" | "history" | "revival" | "lootedTiles">;
+type RunDecoder<R extends Run> = (raw: any) => R | null;
+function snapshot<R extends Run>(value: any, decodeRun: RunDecoder<R>): MoveSnapshot<R> | null {
   if (!value || !finite(value.best)) return null;
-  const run = validRun(value.run);
+  const run = decodeRun(value.run);
   return run ? { run, best: value.best } : null;
 }
 /** Undo history only survives for the same seed and layout as the live run. */
-function decodeHistory(raw: any, run: Run, undoCapacity: number): MoveSnapshot[] {
+function decodeHistory<R extends Run>(raw: any, run: R, undoCapacity: number, decodeRun: RunDecoder<R>): MoveSnapshot<R>[] {
   if (!Array.isArray(raw)) return [];
   return raw
     .slice(-undoCapacity)
-    .map(snapshot)
-    .filter((item): item is MoveSnapshot =>
+    .map((item) => snapshot(item, decodeRun))
+    .filter((item): item is MoveSnapshot<R> =>
       !!item && item.run.seed === run.seed && item.run.layoutVersion === run.layoutVersion);
 }
-function decodeRevival(raw: any, run: Run): Revival | null {
-  const item = snapshot(raw?.snapshot);
+function decodeRevival<R extends Run>(raw: any, run: R, decodeRun: RunDecoder<R>): Revival<R> | null {
+  const item = snapshot(raw?.snapshot, decodeRun);
   return item && item.run.layoutVersion === run.layoutVersion ? { snapshot: item } : null;
 }
 function decodeLootedTiles(raw: any): Record<string, true> {
@@ -114,16 +122,16 @@ function decodeLootedTiles(raw: any): Record<string, true> {
       if (/^-?\d+:(-?\d+:)?-?\d+,-?\d+$/.test(key)) lootedTiles[key] = true;
   return lootedTiles;
 }
-function decodeMode(s: any, undoCapacity: number): DecodedMode {
-  const run = validRun(s?.run);
+function decodeMode<R extends Run>(s: any, undoCapacity: number, decodeRun: RunDecoder<R>): DecodedMode<R> {
+  const run = decodeRun(s?.run);
   return {
     run,
-    history: run ? decodeHistory(s.history, run, undoCapacity) : [],
-    revival: run ? decodeRevival(s.revival, run) : null,
+    history: run ? decodeHistory(s.history, run, undoCapacity, decodeRun) : [],
+    revival: run ? decodeRevival(s.revival, run, decodeRun) : null,
     lootedTiles: decodeLootedTiles(s?.lootedTiles),
   };
 }
-function applyMode(slice: ModeSave, decoded: DecodedMode) {
+function applyMode<R extends Run>(slice: ModeSave<R>, decoded: DecodedMode<R>) {
   slice.run = decoded.run;
   slice.history = decoded.history;
   slice.revival = decoded.revival;
@@ -187,14 +195,14 @@ function decodeProgress(s: any, d: Save, undoCapacity: number) {
   d.tower.best = count(s.tower?.best, d.tower.best);
   d.delve.courage = count(s.delve?.courage ?? s.delve?.essence, d.delve.courage);
   d.delve.best = count(s.delve?.best, d.delve.best);
-  applyMode(d.tower, decodeMode(s.tower, undoCapacity));
-  applyMode(d.delve, decodeMode(s.delve, undoCapacity));
+  applyMode(d.tower, decodeMode(s.tower, undoCapacity, decodeTowerRun));
+  applyMode(d.delve, decodeMode(s.delve, undoCapacity, decodeDelveRun));
 }
 /** Version 1 had a single run (the endless climb); it becomes the Delve slice. */
 function migrateV1(s: any, d: Save, undoCapacity: number) {
   d.delve.best = count(s.best, d.delve.best);
   d.delve.courage = count(s.essence, d.delve.courage);
-  applyMode(d.delve, decodeMode({ run: s.run, history: s.history, revival: s.revival }, undoCapacity));
+  applyMode(d.delve, decodeMode({ run: s.run, history: s.history, revival: s.revival }, undoCapacity, decodeDelveRun));
 }
 /** Existing records are already rewarded; preserve old balances without double-paying. */
 function decodeReached(s: any, d: Save) {

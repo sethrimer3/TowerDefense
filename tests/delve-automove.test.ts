@@ -52,14 +52,14 @@ function trace(seed: number, level: Level, who: typeof CHARACTERS.strong): strin
     const g = new Game(defaults());
     Object.assign(g.save.upgrades, { delve: 1, auto: 1 }, level);
     g.switchMode("delve");
-    Object.assign(g.run, { seed, outside: false, layoutVersion: LAYOUT_VERSION, changes: {}, height: 0, delveMilestone: 0, floor: 0 });
+    Object.assign(g.run, { seed, outside: false, layoutVersion: LAYOUT_VERSION, changes: {}, height: 0, milestone: 0, floor: 0 });
     Object.assign(g.run.player, { x: 15, y: 0, hp: who.hp, maxHp: who.hp, attack: who.attack, defense: who.defense, keys: { yellow: who.keys, blue: 0, red: 0 } });
-    g.world = new World(g.run);
+    g.world = new World(g.delveRun);
     const run = g.run, h = createHash("sha256"), out: string[] = [];
     for (let i = 1; i <= STEPS; i++) {
       const step = chooseDelveStep(g);
       const moved = step ? g.move(step.dx, step.dy) : null;
-      h.update(JSON.stringify({ step, moved, decisions: decisions.get(g), player: run.player, milestone: run.delveMilestone, height: run.height }));
+      h.update(JSON.stringify({ step, moved, decisions: decisions.get(g), player: run.player, milestone: run.milestone, height: run.height }));
       if (i % CHECKPOINT === 0) out.push(h.copy().digest("hex").slice(0, 12));
       if (!step || !moved || g.run !== run) {
         out.push(`ended at ${i}: ${!step ? "stuck" : !moved ? "blocked" : g.summary?.dead ? "died" : "ended"} ${h.digest("hex").slice(0, 12)}`);

@@ -31,7 +31,7 @@ export function chooseDelveStep(game: Game, override?: Capabilities) {
   const followed = current && !discovered ? follow(game, current, c) : undefined;
   if (followed) return followed;
   commitments.delete(game);
-  const scan: Scan = { game, c, canKnow, visits: game.run.delveVisited ?? {}, previousTarget: current?.target ?? '', bestAt: new Map(), report: [], best: null, bestValue: -Infinity };
+  const scan: Scan = { game, c, canKnow, visits: game.delveRun.visited ?? {}, previousTarget: current?.target ?? '', bestAt: new Map(), report: [], best: null, bestValue: -Infinity };
   explore(scan);
   decisions.set(game, scan.report.sort((a, b) => b.utility - a.utility).slice(0, 12));
   const { best } = scan, p = game.run.player;
@@ -45,7 +45,7 @@ export function chooseDelveStep(game: Game, override?: Capabilities) {
  * available to the human player. `discovered` counts newly seen open tiles. */
 function observe(game: Game, c: Capabilities) {
   const p = game.run.player, world = game.world, r = c.lookahead;
-  const known = game.run.delveKnown ??= {};
+  const known = game.delveRun.known ??= {};
   const visible = new Set<string>();
   let discovered = 0;
   for (let y = Math.max(world.floor, p.y - r); y <= p.y + r; y++) for (let x = Math.max(0, p.x - r); x <= Math.min(world.width - 1, p.x + r); x++) {
@@ -56,7 +56,7 @@ function observe(game: Game, c: Capabilities) {
   }
   // Basic movement has short-term anti-oscillation but no retained map
   // routing. Memory upgrades use every previously observed corridor.
-  const visits = game.run.delveVisited ?? {};
+  const visits = game.delveRun.visited ?? {};
   const canKnow = (x: number, y: number) => c.memory ? known[point(x, y)] : visible.has(point(x, y)) || !!visits[point(x, y)];
   return { canKnow, discovered };
 }

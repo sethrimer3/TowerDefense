@@ -224,7 +224,7 @@ function towerDecor(seed: number, room: number): DecorScene {
 }
 
 function delveDecor(seed: number, y: number): DecorScene {
-  return { name: `delve ${seed}/${y}`, world: new World({ seed, changes: {}, floor: 0 }), seed, view: { left: 6.4, bottom: y - 8.3, n: 17, s: 20 }, start: [15, y] };
+  return { name: `delve ${seed}/${y}`, world: new World({ seed, changes: {}, floor: 0, milestone: 0 }), seed, view: { left: 6.4, bottom: y - 8.3, n: 17, s: 20 }, start: [15, y] };
 }
 
 const lively = (d: TileDecor) => !!(d.crates.length || d.water || d.thicket || d.drip || d.flowers.length);

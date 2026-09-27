@@ -18,23 +18,32 @@ const run = (over: object = {}) => ({
   seed: 1234, height: 3, floor: 2, kills: 5, treasures: 1, layoutVersion: 7,
   player: player(),
   changes: { "3,4": { kind: "floor" }, "5,6": { kind: "openedChest", tier: "gold" }, "1,1": { kind: "wall" }, "4,5": { kind: "reward", tier: "silver" } },
-  floors: { "2": { "3,3": { kind: "floor" } } },
-  damaged: false, keysSpent: true,
   // Older runs listed their clear chests; they now stand in `changes`.
   rewards: [{ x: 3, y: 4, tier: "silver" }, { x: 30, y: 4, tier: "gold" }, { x: 1, y: 2, tier: "bronze" }],
-  delveMilestone: 1, delveKnown: { "1,2": true }, delveVisited: { "1,2": 3 },
   ...over,
 });
-const mode = (extra: object = {}) => ({
-  run: run(),
+// Each mode's run also carries the other mode's fields, which decoding drops.
+const towerRun = (over: object = {}) => run({
+  floors: { "2": { "3,3": { kind: "floor" } } },
+  damaged: false, keysSpent: true,
+  milestone: 1,
+  ...over,
+});
+const delveRun = (over: object = {}) => run({
+  milestone: 1, known: { "1,2": true }, visited: { "1,2": 3 },
+  floors: { "2": { "3,3": { kind: "floor" } } }, damaged: false,
+  ...over,
+});
+const mode = (make: (over?: object) => object, extra: object = {}) => ({
+  run: make(),
   history: [
-    { run: run({ kills: 4 }), best: 3 },
-    { run: run({ seed: 999 }), best: 3 },
-    { run: run({ layoutVersion: 6 }), best: 3 },
-    { run: run({ kills: 3 }), best: 2 },
-    { run: run({ kills: 2 }), best: 2 },
+    { run: make({ kills: 4 }), best: 3 },
+    { run: make({ seed: 999 }), best: 3 },
+    { run: make({ layoutVersion: 6 }), best: 3 },
+    { run: make({ kills: 3 }), best: 2 },
+    { run: make({ kills: 2 }), best: 2 },
   ],
-  revival: { earned: 2, snapshot: { run: run({ kills: 1 }), best: 2 } },
+  revival: { earned: 2, snapshot: { run: make({ kills: 1 }), best: 2 } },
   best: 9, reached: 7,
   lootedTiles: { "1234:3,4": true, "1234:2:3,4": true, "bad": true, "-1:-2:-3,-4": true },
   ...extra,
@@ -50,12 +59,12 @@ const v3 = () => ({
   upgrades: { ...defaults().upgrades, undos: 2, shardUndos: 1, delve: 1 },
   settings,
   tower: {
-    ...mode(), inspiration: 17,
+    ...mode(towerRun), inspiration: 17,
     log: { "3": { earned: ["silver", "gold", "bogus"], claimed: ["gold", "platinum"] }, "x": { earned: ["gold"] }, "4": { earned: "gold" }, "5": { silver: "claimed", gold: "bogus", platinum: "earned" } },
     sectionHp: { "1": 80.5, "2": 0, "0": 50, "x": 9 },
     startSection: 1,
   },
-  delve: { ...mode(), courage: 33 },
+  delve: { ...mode(delveRun), courage: 33 },
   materials: { ...defaults().materials },
   equipmentInventory: [{
     id: "e1", slot: "weapon", name: "Blade", metal: "steel",
@@ -82,8 +91,8 @@ const scope: Record<string, (p: string[]) => boolean> = {
 const bases: Record<string, () => any> = {
   v3,
   v2: () => ({ ...v3(), version: 2 }),
-  v1: () => ({ version: 1, ...mode(), best: 12, essence: 8, upgrades: { undos: 1 }, settings: { showInfoBoxes: false } }),
-  outside: () => ({ ...v3(), tower: { ...v3().tower, run: run({ outside: true, height: 0, floor: 0 }) } }),
+  v1: () => ({ version: 1, ...mode(delveRun), best: 12, essence: 8, upgrades: { undos: 1 }, settings: { showInfoBoxes: false } }),
+  outside: () => ({ ...v3(), tower: { ...v3().tower, run: towerRun({ outside: true, height: 0, floor: 0 }) } }),
   preSkillTrees: () => {
     const s = v3();
     delete (s.upgrades as any).delve;
@@ -98,15 +107,16 @@ const HOSTILE: [string, unknown][] = [
 // Values on either side of each limit decode() enforces, which generic hostile
 // values never land on.
 const EDGES: [string, unknown[]][] = [
-  ["tower.run.player.x", [29, 30]],
+  ["tower.run.player.x", [16, 17]],
+  ["delve.run.player.x", [29, 30]],
   ["tower.run.player.y", [1, 2, 11, 12]],
   ["tower.run.player.hp", [1, 50, 51]],
   ["tower.run.height", [1e9, 1e9 + 1]],
-  ["tower.run.delveMilestone", [1.5]],
+  ["delve.run.milestone", [1.5]],
   ["tower.run.changes.9,9", [{ kind: "openedChest" }, { kind: "openedChest", tier: "wood" }, { kind: "enemy" }, { kind: "reward" }, { kind: "reward", tier: "bronze" }]],
   ["tower.log.3", [{ silver: "earned" }, { silver: "paid" }, []]],
   ["tower.run.floors.x", [{}]],
-  ["tower.run.delveVisited.x", [1]],
+  ["delve.run.visited.x", [1]],
   ["tower.lootedTiles.5:6,7", [true]],
   ["tower.lootedTiles.5:6:7", [true]],
   ["tower.sectionHp.3", [1, 0.5]],
@@ -232,17 +242,31 @@ test("a malformed run.floors drops only that run, not the rest of the save", () 
 });
 
 test("decode rejects runs that break player invariants", () => {
-  for (const bad of [player({ hp: 0 }), player({ hp: 60 }), player({ x: 30 }), player({ keys: { yellow: 1 } })]) {
+  for (const bad of [player({ hp: 0 }), player({ hp: 60 }), player({ x: 17 }), player({ keys: { yellow: 1 } })]) {
     const s = v3();
-    s.tower.run = run({ player: bad });
+    s.tower.run = towerRun({ player: bad });
     assert.equal(decode(JSON.stringify(s)).tower.run, null);
   }
   const outsideTooHigh = v3();
-  outsideTooHigh.tower.run = run({ outside: true, height: 1, floor: 0 });
+  outsideTooHigh.tower.run = towerRun({ outside: true, height: 1, floor: 0 });
   assert.equal(decode(JSON.stringify(outsideTooHigh)).tower.run, null);
 });
 
 test("saves from before the currencies were renamed keep their Inspiration and Courage", () => {
   const d = decode(JSON.stringify({ ...v3(), tower: { ...v3().tower, inspiration: undefined, shards: 5 }, delve: { ...v3().delve, courage: undefined, essence: 6 } }));
   assert.deepEqual([d.tower.inspiration, d.delve.courage], [5, 6]);
+});
+
+test("each mode's run keeps only its own fields, on its own board's width", () => {
+  const d = decode(JSON.stringify(v3()));
+  const tower = d.tower.run as any, delve = d.delve.run as any;
+  assert.deepEqual([tower.damaged, tower.keysSpent, "floors" in tower, "milestone" in tower], [false, true, true, false]);
+  assert.deepEqual([delve.milestone, "known" in delve, "visited" in delve], [1, true, true]);
+  assert.deepEqual(["floors", "damaged", "keysSpent"].filter((k) => k in delve), []);
+  const wide = v3();
+  wide.delve.run = delveRun({ player: player({ x: 29 }) });
+  assert.equal(decode(JSON.stringify(wide)).delve.run?.player.x, 29);
+  const noMilestone = v3();
+  delete (noMilestone.delve.run as any).milestone;
+  assert.equal(decode(JSON.stringify(noMilestone)).delve.run, null);
 });

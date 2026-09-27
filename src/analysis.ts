@@ -1,4 +1,4 @@
-import type { Run, Tile } from "./entities.ts";
+import type { TowerRun, Tile } from "./entities.ts";
 import { predict } from "./combat.ts";
 import type { RoomWorld } from "./tower/room-world.ts";
 import { doorCost } from "./doors.ts";
@@ -13,7 +13,7 @@ type Spot = { h: number; x: number; y: number };
 /** Conservative deadlock check across every visited Tower floor plus one
  * step of unexplored space above the highest reached stairs. Each floor is
  * read through the climb, as the same board play shows. */
-export function isDeadlocked(run: Run): boolean {
+export function isDeadlocked(run: TowerRun): boolean {
   // Every reachable space across all visited floors (and the one step of
   // unexplored space above) explored with no items, no unlocked doors, no
   // survivable enemies, and no unexplored stairway found -> deadlocked.
@@ -28,7 +28,7 @@ class ActionSearch {
   private queue: Spot[] = [];
   private seen = new Set<string>();
 
-  constructor(private run: Run) {
+  constructor(private run: TowerRun) {
     this.climb = new TowerClimb(run);
   }
 

@@ -1,4 +1,4 @@
-import type { Run, Tile } from "../entities.ts";
+import type { TowerRun, Tile } from "../entities.ts";
 import { TOWER_SECTION, TOWER_START_X } from "../config.ts";
 import { RoomWorld } from "./room-world.ts";
 
@@ -13,7 +13,7 @@ type Changes = Record<string, Tile>;
  * An entry in `run.floors` for the current height is out of date and is
  * never read. */
 export class TowerClimb {
-  constructor(private run: Run) {}
+  constructor(private run: TowerRun) {}
 
   /** Whether the player has stood on floor `h` this run. */
   visited(h: number) {

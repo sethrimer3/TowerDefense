@@ -21,7 +21,7 @@ const plain = (d: TileDecor) => JSON.stringify(d, (_, v) => (v instanceof Uint8A
 function boards(): [string, Board, number, [number, number], [number, number]][] {
   return [
     ...TOWER.map(([seed, room]) => [`tower:${seed}:${room}`, new RoomWorld(seed, room, {}), seed, [-1, 17], [-1, 17]] as [string, Board, number, [number, number], [number, number]]),
-    ...DELVE.map((seed) => [`delve:${seed}`, new World({ seed, changes: {}, floor: 0 }), seed, [-1, 30], [0, 80]] as [string, Board, number, [number, number], [number, number]]),
+    ...DELVE.map((seed) => [`delve:${seed}`, new World({ seed, changes: {}, floor: 0, milestone: 0 }), seed, [-1, 30], [0, 80]] as [string, Board, number, [number, number], [number, number]]),
   ];
 }
 

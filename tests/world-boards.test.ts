@@ -117,7 +117,7 @@ function torchSpots(seed: number) {
  * window (walls, wrap, one-way gates), crossings, upkeep and torches. */
 function delveWorld(seed: number) {
   const changes: Record<string, Tile> = {};
-  const w = new World({ seed, changes, floor: 0 });
+  const w = new World({ seed, changes, floor: 0, milestone: 0 });
   const out: unknown[] = [];
   const rnd = random(seed * 31);
   for (let m = 0; m < 3; m++) {

@@ -4,7 +4,7 @@
  * however the run is undone, revived, reloaded or replaced. A chest is a
  * `reward` tile in the floor's changes, so undo and Revive bring it back
  * with the rest of the board; opening a tier already paid pays nothing. */
-import type { ClearTier, Run, Save } from "../entities.ts";
+import type { ClearTier, TowerRun, Save } from "../entities.ts";
 import { RoomWorld } from "./room-world.ts";
 import type { Board } from "../board.ts";
 
@@ -18,7 +18,7 @@ function roomCleared(world: RoomWorld) {
   });
 }
 /** Silver for any clear, gold without damage, platinum without keys as well. */
-function clearTiers(run: Run): ClearTier[] {
+function clearTiers(run: TowerRun): ClearTier[] {
   const tiers: ClearTier[] = ["silver"];
   if (run.damaged === false) {
     tiers.push("gold");
@@ -49,7 +49,7 @@ function openNeighbours(world: RoomWorld, n: { x: number; y: number }) {
 }
 /** The clear chests standing on the run's floor, by tile. A chest always
  * stands on a floor tile, so taking one away leaves floor. */
-function chests(run: Run) {
+function chests(run: TowerRun) {
   return Object.entries(run.changes).filter(([, t]) => t.kind === "reward") as [string, { tier: ClearTier }][];
 }
 
@@ -57,7 +57,7 @@ export class ClearLedger {
   constructor(private tower: Save["tower"]) {}
 
   /** Whether clear chests still stand on the run's floor. */
-  static hasChests(run: Run) {
+  static hasChests(run: TowerRun) {
     return chests(run).length > 0;
   }
 
@@ -65,7 +65,7 @@ export class ClearLedger {
    * tiers the run hasn't earned there yet and sets their chests by the
    * stairs, paying a tier straight away when no spot is left for it.
    * Returns the tiers newly earned. */
-  check(world: Board, run: Run): ClearTier[] {
+  check(world: Board, run: TowerRun): ClearTier[] {
     if (run.outside || !(world instanceof RoomWorld) || !roomCleared(world)) return [];
     const entry = this.tower.log[run.height] ??= {};
     const stairs = [...world.cells].find(([, t]) => t.kind === "stairs");
@@ -85,7 +85,7 @@ export class ClearLedger {
 
   /** The chest for `tier` on the run's floor was opened: pays it unless it
    * was already paid. Returns the Inspiration paid. */
-  open(tier: ClearTier, run: Run) {
+  open(tier: ClearTier, run: TowerRun) {
     const entry = this.tower.log[run.height];
     const paid = entry?.[tier] === "earned" ? (this.pay(entry, tier), 1) : 0;
     this.settle(run);
@@ -94,7 +94,7 @@ export class ClearLedger {
 
   /** Leaving the floor, the run or the mode: pays every tier still owed and
    * takes the floor's chests away. Returns the Inspiration paid. */
-  claimAll(run: Run) {
+  claimAll(run: TowerRun) {
     let paid = 0;
     for (const entry of Object.values(this.tower.log))
       for (const tier of CLEAR_TIERS)
@@ -109,7 +109,7 @@ export class ClearLedger {
   /** After a load, a floor change or an undo: pays every earned tier whose
    * chest no longer stands on the run's floor, and takes away any chest
    * whose tier the log has never earned. */
-  settle(run: Run) {
+  settle(run: TowerRun) {
     const standing = chests(run);
     const here = this.tower.log[run.height];
     for (const [k, t] of standing) if (!here?.[t.tier]) run.changes[k] = { kind: "floor" };

@@ -32,7 +32,7 @@ export function installDebugHooks(game: Game, defendPage: DefendPage) {
 }
 
 function delveReport(game: Game) {
-  const milestone = game.run.delveMilestone ?? 0, p = game.run.player, seed = game.run.seed;
+  const milestone = game.delveRun.milestone, p = game.run.player, seed = game.run.seed;
   const influence = themeInfluence(seed, p.x, p.y), blend = influence - Math.floor(influence);
   const seen = decisions.get(game) ?? [];
   return {
@@ -41,7 +41,7 @@ function delveReport(game: Game) {
     lastMilestone: milestone * 100, nextMilestone: (milestone + 1) * 100,
     transition: { gateId: `transition_${(milestone + 1) * 100}`, gate: region(seed, milestone).gate, crossed: false, previousSealed: milestone > 0 },
     themeBlend: { [`area${Math.floor(influence) + 1}`]: +(1 - blend).toFixed(2), [`area${Math.floor(influence) + 2}`]: +blend.toFixed(2) },
-    knownTiles: Object.keys(game.run.delveKnown ?? {}).length,
+    knownTiles: Object.keys(game.delveRun.known ?? {}).length,
     branches: { frontiers: seen.filter(d => d.frontier).length, knownDeadEnds: seen.filter(d => d.deadEnd).length },
     capabilities: capabilities(game), decisions: seen,
   };

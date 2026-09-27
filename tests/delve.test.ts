@@ -45,11 +45,11 @@ test('milestone crossing seals behind the player, persists, and prevents undo ac
   g.world = new World(g.run);
   const gate = region(42, 0).gate;
   Object.assign(g.run.player, { x: gate.x, y: gate.y - 1 });
-  assert.ok(g.move(0, 1)); assert.equal(g.run.height, 100); assert.equal(g.run.delveMilestone, 1);
+  assert.ok(g.move(0, 1)); assert.equal(g.run.height, 100); assert.equal(g.run.milestone, 1);
   assert.equal(g.world.tile(gate.x, gate.y - 1).kind, 'wall'); assert.equal(g.undo(), false);
   assert.ok(g.move(0, 1)); assert.equal(g.world.step(gate.x, gate.y + 1, 0, -1), null);
   const restored = new Game(decode(JSON.stringify(g.save))); restored.switchMode('delve');
-  assert.equal(restored.run.delveMilestone, 1);
+  assert.equal(restored.run.milestone, 1);
   assert.equal(restored.world.tile(gate.x, gate.y - 1).kind, 'wall');
   assert.notEqual(restored.world.tile(restored.run.player.x, restored.run.player.y).kind, 'wall');
 });
@@ -68,7 +68,7 @@ test('Automove intelligence tiers are measurably better on identical labyrinths'
 });
 test('torches sit on plain floor, once, even where areas interlock', () => {
   for (let seed = 0; seed < 6; seed++) {
-    const w = new World({ seed, changes: {}, floor: 0 }), spots = w.torches.map(t => point(t.x, t.y));
+    const w = new World({ seed, changes: {}, floor: 0, milestone: 0 }), spots = w.torches.map(t => point(t.x, t.y));
     assert.equal(new Set(spots).size, spots.length);
     for (const t of w.torches) assert.equal(w.tile(t.x, t.y).kind, 'floor', `torch at ${t.x},${t.y}`);
   }

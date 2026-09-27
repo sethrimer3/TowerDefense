@@ -31,7 +31,7 @@ test("each new equivalent floor reached pays one of the mode's currency", () => 
 test("each mode builds its own board from a run and enters it at its own column", () => {
   const t = tower.board(run());
   assert.ok(t instanceof RoomWorld && t.room === 12 && t.seed === 7);
-  const d = delve.board(run({ floor: 20, delveMilestone: 1 }));
+  const d = delve.board(run({ floor: 20, milestone: 1 }));
   assert.ok(d instanceof World && d.floor === 20 && d.milestone === 1);
   assert.deepEqual([tower.entranceX, delve.entranceX], [TOWER_START_X, START_X]);
 });

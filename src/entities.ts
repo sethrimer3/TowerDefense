@@ -60,14 +60,10 @@ export type Player = {
    * the corresponding item has actually been found. */
   skeletonKeys?: number;
 };
-export type Run = {
-  damaged?: boolean;
-  keysSpent?: boolean;
+/** What a run holds in either mode. */
+export type RunCore = {
   outside?: boolean;
   layoutVersion?: number;
-  delveMilestone?: number;
-  delveKnown?: Record<string, true>;
-  delveVisited?: Record<string, number>;
   seed: number;
   player: Player;
   height: number;
@@ -76,24 +72,40 @@ export type Run = {
   treasures: number;
   changes: Record<string, Tile>;
   floor: number;
-  /** Tower only: each other visited floor's changes, keyed by height, so
-   * descending and re-climbing preserves what was already done there. The
-   * current floor's are `changes`; see TowerClimb. */
-  floors?: Record<number, Record<string, Tile>>;
   /** The ATK/DEF/max HP the run started with (its loadout), shifted by any
    * gear change since. In the Tower, ATK/DEF return to it whenever the
    * climb crosses into a new section. */
   loadout?: { attack: number; defense: number; maxHp: number };
 };
-export type MoveSnapshot = { run: Run; best: number };
-export type Revival = { snapshot: MoveSnapshot };
+/** A Tower ascent. */
+export type TowerRun = RunCore & {
+  /** Whether the player has taken damage, or spent keys, on this floor:
+   * the clear tiers it can still earn. */
+  damaged: boolean;
+  keysSpent: boolean;
+  /** Each other visited floor's changes, keyed by height, so descending
+   * and re-climbing preserves what was already done there. The current
+   * floor's are `changes`; see TowerClimb. */
+  floors?: Record<number, Record<string, Tile>>;
+};
+/** A Delve descent. */
+export type DelveRun = RunCore & {
+  /** Milestone gates crossed: the area the labyrinth is sealed below. */
+  milestone: number;
+  /** What Automove has seen, and how often it has stood on each tile. */
+  known?: Record<string, true>;
+  visited?: Record<string, number>;
+};
+export type Run = TowerRun | DelveRun;
+export type MoveSnapshot<R extends Run = Run> = { run: R; best: number };
+export type Revival<R extends Run = Run> = { snapshot: MoveSnapshot<R> };
 export type Mode = "tower" | "delve";
-export type ModeSave = {
-  history: MoveSnapshot[];
-  revival: Revival | null;
+export type ModeSave<R extends Run = Run> = {
+  history: MoveSnapshot<R>[];
+  revival: Revival<R> | null;
   best: number;
   reached: number;
-  run: Run | null;
+  run: R | null;
   /** Keys of `${seed}:${x},${y}` (delve) or `${seed}:${height}:${x},${y}`
    * (tower) for every enemy kill / treasure chest that has already paid out
    * persistent rewards, kept outside `run` so it survives movement undo and
@@ -102,7 +114,7 @@ export type ModeSave = {
 };
 export type Save = {
   version: 3;
-  tower: ModeSave & {
+  tower: ModeSave<TowerRun> & {
     inspiration: number;
     log: Record<string, FloorRecord>;
     /** Which 10-floor section new ascents begin in (0 = floors 1–10). */
@@ -112,7 +124,7 @@ export type Save = {
      * starting HP and as the record of which sections are unlocked. */
     sectionHp: Record<string, number>;
   };
-  delve: ModeSave & { courage: number };
+  delve: ModeSave<DelveRun> & { courage: number };
   gold: number;
   provisions: Record<GoldItemId, number>;
   xp: number;

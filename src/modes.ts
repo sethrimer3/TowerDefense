@@ -5,13 +5,13 @@
  * than branching on the mode; features only the Tower has still test for it. */
 import { START_X, TOWER_START_X, TOWER_WIDTH, WIDTH, goldReward } from "./config.ts";
 import type { MaterialStack } from "./materials.ts";
-import type { Mode, Run, Save } from "./entities.ts";
+import type { DelveRun, Mode, Run, Save, TowerRun } from "./entities.ts";
 import { LAYOUT_VERSION, World } from "./delve/world.ts";
 import { RoomWorld, TOWER_LAYOUT_VERSION } from "./tower/room-world.ts";
 import type { Board } from "./board.ts";
 import { rollEnemyDrops, towerEnemyDrops } from "./loot.ts";
 
-export type ModeProfile = {
+export type ModeProfile<R extends Run = Run> = {
   /** The balance of the currency this mode pays, and paying it. */
   balance(save: Save): number;
   credit(save: Save, amount: number): void;
@@ -19,20 +19,20 @@ export type ModeProfile = {
    * is gated on, and each new one reached pays one currency. */
   equivalentFloor(progress: number): number;
   /** The progress loot at row `y` of the run's board is measured at. */
-  progressAt(run: Run, y: number): number;
+  progressAt(run: R, y: number): number;
   /** The board's width, and the column a run enters at from the forest. */
   width: number;
   entranceX: number;
   /** The generator version a run's saved map edits belong to. */
   layoutVersion: number;
   /** The board a run inside the mode plays on, regenerated from its seed. */
-  board(run: Run): Board;
+  board(run: R): Board;
   /** What a beaten enemy drops. */
   enemyDrops(name: string, rng: () => number): MaterialStack[];
   /** Gold paid when a run ends. */
-  endGold(run: Run): number;
+  endGold(run: R): number;
   /** Keys a kill or treasure so it pays out once, whatever undo does. */
-  lootKey(run: Run, x: number, y: number): string;
+  lootKey(run: R, x: number, y: number): string;
   words: {
     /** The currency, as the player sees it. */
     currency: string;
@@ -60,7 +60,7 @@ export function milestones(profile: ModeProfile, from: number, to: number) {
   return profile.equivalentFloor(to) - profile.equivalentFloor(from);
 }
 
-export const MODES: Record<Mode, ModeProfile> = {
+export const MODES: { tower: ModeProfile<TowerRun>; delve: ModeProfile<DelveRun> } = {
   tower: {
     balance: (save) => save.tower.inspiration,
     credit: (save, amount) => { save.tower.inspiration += amount; },

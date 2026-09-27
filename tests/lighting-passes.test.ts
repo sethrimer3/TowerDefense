@@ -151,7 +151,7 @@ function towerScene(seed: number, room: number): Scene {
 }
 
 function delveScene(seed: number, y: number): Scene {
-  const world = new World({ seed, changes: {}, floor: 0 });
+  const world = new World({ seed, changes: {}, floor: 0, milestone: 0 });
   return { world, look: lookOf("delve", y, seed), torches: () => world.torches, center: { x: 15, y } };
 }
 

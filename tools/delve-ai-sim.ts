@@ -21,17 +21,17 @@ export function simulate(seed: number, level: AiLevel, opts: { steps?: number; h
   Object.assign(g.save.upgrades, level);
   g.switchMode('delve');
   g.run.seed = seed; g.run.outside = false; g.run.layoutVersion = LAYOUT_VERSION;
-  g.run.changes = {}; g.run.height = 0; g.run.delveMilestone = 0; g.run.floor = 0;
+  g.run.changes = {}; g.run.height = 0; g.delveRun.milestone = 0; g.run.floor = 0;
   Object.assign(g.run.player, { x: 15, y: 0, hp: opts.hp ?? 400, maxHp: opts.hp ?? 400, attack: opts.attack ?? 14, defense: opts.defense ?? 4, keys: { yellow: opts.keys ?? 1, blue: 0, red: 0 } });
-  g.world = new World(g.run);
-  const run = g.run, caps = capabilities(g);
+  g.world = new World(g.delveRun);
+  const run = g.delveRun, caps = capabilities(g);
   const pockets = new Map<string, string>();
   const note = (a: number) => { for (const n of region(seed, a).nodes) if (n.pattern) pockets.set(point(n.x, n.y), n.pattern.quality); };
   note(0); note(1);
   const stats = { seed, steps: 0, depth: 0, hp: 0, kills: 0, keysSpent: 0, hpLost: 0, pockets: { good: 0, poor: 0, contextual: 0 } as Record<string, number>, ended: 'steps' };
   const seenPockets = new Set<string>();
   for (let i = 0; i < (opts.steps ?? 3000); i++) {
-    const before = { ...run.player, keys: { ...run.player.keys } }, milestone = run.delveMilestone ?? 0;
+    const before = { ...run.player, keys: { ...run.player.keys } }, milestone = run.milestone;
     const step = chooseDelveStep(g, caps);
     if (!step) { stats.ended = 'stuck'; break; }
     if (!g.move(step.dx, step.dy)) { stats.ended = 'blocked'; break; }
@@ -40,7 +40,7 @@ export function simulate(seed: number, level: AiLevel, opts: { steps?: number; h
     const p = run.player, k = point(p.x, p.y);
     stats.keysSpent += Math.max(0, before.keys.yellow - p.keys.yellow) + Math.max(0, before.keys.blue - p.keys.blue) * 2;
     stats.hpLost += Math.max(0, before.hp - p.hp);
-    if ((run.delveMilestone ?? 0) !== milestone) note((run.delveMilestone ?? 0) + 1);
+    if (run.milestone !== milestone) note(run.milestone + 1);
     const q = pockets.get(k); if (q && !seenPockets.has(k)) { seenPockets.add(k); stats.pockets[q]++; }
   }
   stats.depth = run.height; stats.hp = run.player.hp; stats.kills = run.kills;

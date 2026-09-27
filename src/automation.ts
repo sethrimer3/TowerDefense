@@ -122,7 +122,7 @@ class Search {
 
   /** Tower stairs wait while the floor's clear chests are unopened. */
   private chestsWaiting() {
-    return this.game.mode === "tower" && ClearLedger.hasChests(this.game.run);
+    return this.game.mode === "tower" && ClearLedger.hasChests(this.game.towerRun);
   }
 
   private worth(t: Tile, next: Node, combat: Combat | null) {
