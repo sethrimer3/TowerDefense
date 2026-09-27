@@ -6,7 +6,7 @@ import { RoomWorld, generateTowerRoom } from "../src/generation.ts";
 import { predict } from "../src/combat.ts";
 import { isDeadlocked } from "../src/analysis.ts";
 import { getTowerEnemy, TOWER_CYCLE_MULTIPLIER, TOWER_ZONE_ENEMIES, towerZoneIndex } from "../src/scaling.ts";
-import { TOWER_START_X } from "../src/config.ts";
+import { TOWER_HEIGHT, TOWER_START_X, TOWER_WIDTH } from "../src/config.ts";
 import { point, type Tile } from "../src/entities.ts";
 
 /** A tiny, fully controlled 5x5 room so each test can hand-place exactly
@@ -238,7 +238,11 @@ test("the deadlock search follows stairs into visited floors above and below", (
       floors[from][point(TOWER_START_X, 0)] = { kind: "floor" };
       floors[from][point(TOWER_START_X + 1, 0)] = { kind: up ? "stairs" : "stairsDown" };
       const [sx, sy] = find(g.run.seed, to, up ? "stairsDown" : "stairs");
-      if (stocked) floors[to][point(sx, sy + 1)] = { kind: "attack" };
+      // The stairs stand on the outer wall; stock the tile just inside it.
+      const [ix, iy] = [[0, 1], [0, -1], [1, 0], [-1, 0]]
+        .map(([dx, dy]) => [sx + dx, sy + dy])
+        .find(([x, y]) => x > 0 && x < TOWER_WIDTH - 1 && y > 0 && y < TOWER_HEIGHT - 1)!;
+      if (stocked) floors[to][point(ix, iy)] = { kind: "attack" };
       assert.equal(isDeadlocked(g.run), !stocked, `${up ? "up" : "down"}, ${stocked ? "stocked" : "bare"}`);
     }
 });
