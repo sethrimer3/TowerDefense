@@ -15,8 +15,8 @@ test("a new character starts at 12 ATK, 5 DEF, 120 HP, no keys and one undo", ()
 test("each rank of an upgrade adds its grant", () => {
   const s = defaults();
   Object.assign(s.upgrades, {
-    hp: 2, shardHp: 3, attack: 2, shardAttack: 3, defense: 2, shardDefense: 3, quality: 1,
-    yellow: 1, blue: 2, red: 3, undos: 2, shardUndos: 1,
+    hp: 2, inspirationHp: 3, attack: 2, inspirationAttack: 3, defense: 2, inspirationDefense: 3, quality: 1,
+    yellow: 1, blue: 2, red: 3, undos: 2, inspirationUndos: 1,
   });
   assert.deepEqual(loadout(s), {
     attack: 12 + 2 * 2 + 3 + 2,
@@ -54,8 +54,8 @@ test("descriptions are written from the grants", () => {
   const text = Object.fromEntries(UPGRADES.map((u) => [u.id, upgradeText(u.id)]));
   assert.deepEqual(
     { hp: text.hp, attack: text.attack, defense: text.defense, yellow: text.yellow, blue: text.blue, red: text.red,
-      quality: text.quality, undos: text.undos, shardHp: text.shardHp, shardAttack: text.shardAttack,
-      shardDefense: text.shardDefense, shardUndos: text.shardUndos, revive: text.revive },
+      quality: text.quality, undos: text.undos, inspirationHp: text.inspirationHp, inspirationAttack: text.inspirationAttack,
+      inspirationDefense: text.inspirationDefense, inspirationUndos: text.inspirationUndos, revive: text.revive },
     {
       hp: "+20 starting maximum HP",
       attack: "+2 starting attack",
@@ -65,10 +65,10 @@ test("descriptions are written from the grants", () => {
       red: "+1 starting crimson key",
       quality: "+2 weapon attack and +1 armor defense",
       undos: "Store one additional undo (up to 5)",
-      shardHp: "+15 starting maximum HP",
-      shardAttack: "+1 starting attack",
-      shardDefense: "+1 starting defense",
-      shardUndos: "Store one additional undo (up to 5)",
+      inspirationHp: "+15 starting maximum HP",
+      inspirationAttack: "+1 starting attack",
+      inspirationDefense: "+1 starting defense",
+      inspirationUndos: "Store one additional undo (up to 5)",
       revive: "Undo a fatal move before moving in the new run",
     },
   );

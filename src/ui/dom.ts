@@ -26,12 +26,12 @@ export const itemSprite = (name: keyof typeof AREA1_ITEM_URLS, className = "ui-s
   `<img class="${className}" src="${AREA1_ITEM_URLS[name]}" alt="" aria-hidden="true">`;
 
 const SKILL_ITEM_SPRITES: Partial<Record<UpgradeId, keyof typeof AREA1_ITEM_URLS>> = {
-  shardAttack: "upgrade_attack", attack: "upgrade_attack",
-  shardDefense: "upgrade_defense", defense: "upgrade_defense",
+  inspirationAttack: "upgrade_attack", attack: "upgrade_attack",
+  inspirationDefense: "upgrade_defense", defense: "upgrade_defense",
   yellow: "key_yellow", blue: "key_blue", red: "key_red",
 };
 const SKILL_UI_SPRITES: Partial<Record<UpgradeId, UiSprite>> = {
-  shardHp: "health", hp: "health", shardUndos: "undo", undos: "undo",
+  inspirationHp: "health", hp: "health", inspirationUndos: "undo", undos: "undo",
   delve: "delve", auto: "automove", autoPersist: "settings",
   revive: "revive", legacy: "tower", quality: "tower",
   wisdomFocus: "settings", wisdomMemory: "undo", wisdomSight: "upgrades",

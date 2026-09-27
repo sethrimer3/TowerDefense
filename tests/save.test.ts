@@ -56,7 +56,7 @@ const settings = {
 const v3 = () => ({
   version: 3,
   gold: 120.7, xp: 44, provisions: { ...defaults().provisions },
-  upgrades: { ...defaults().upgrades, undos: 2, shardUndos: 1, delve: 1 },
+  upgrades: { ...defaults().upgrades, undos: 2, inspirationUndos: 1, delve: 1 },
   settings,
   tower: {
     ...mode(towerRun), inspiration: 17,
@@ -203,7 +203,7 @@ test("decode keeps a valid v3 save's progress and clamps settings", () => {
   assert.equal(d.settings.brightness, 55);
   assert.equal(d.settings.infoDisplay, "popup");
   assert.equal(d.tower.run?.seed, 1234);
-  // Capacity is 1 + undos + shardUndos = 4; mismatched seed/layout snapshots drop out.
+  // Capacity is 1 + undos + inspirationUndos = 4; mismatched seed/layout snapshots drop out.
   assert.equal(d.tower.history.length, 2);
   assert.ok(d.tower.revival);
   assert.deepEqual(Object.keys(d.tower.lootedTiles).sort(), ["-1:-2:-3,-4", "1234:2:3,4", "1234:3,4"]);

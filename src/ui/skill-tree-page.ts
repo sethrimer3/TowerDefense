@@ -16,7 +16,7 @@ const TREE_ICONS: Record<string, UiSprite> = {
  * node to see its tooltip; tap it again to buy a rank. */
 export class SkillTreePage {
   private tree: TreeId = "inspiration";
-  private skill: UpgradeId = "shardHp";
+  private skill: UpgradeId = "inspirationHp";
   private tooltipVisible = false;
   private views: Partial<Record<TreeId, View>> = {};
   private particles = new TreeParticles();

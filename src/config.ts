@@ -116,7 +116,7 @@ export const UPGRADES = [
     currency: "courage",
   },
   {
-    id: "shardHp",
+    id: "inspirationHp",
     name: "Battle-tested",
     grants: { maxHp: 15 },
     base: 4,
@@ -124,7 +124,7 @@ export const UPGRADES = [
     currency: "inspiration",
   },
   {
-    id: "shardAttack",
+    id: "inspirationAttack",
     name: "Keen instinct",
     grants: { attack: 1 },
     base: 5,
@@ -132,7 +132,7 @@ export const UPGRADES = [
     currency: "inspiration",
   },
   {
-    id: "shardDefense",
+    id: "inspirationDefense",
     name: "Iron resolve",
     grants: { defense: 1 },
     base: 5,
@@ -140,7 +140,7 @@ export const UPGRADES = [
     currency: "inspiration",
   },
   {
-    id: "shardUndos",
+    id: "inspirationUndos",
     name: "Rehearsed steps",
     grants: { undos: 1 },
     base: 6,
