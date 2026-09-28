@@ -27,14 +27,15 @@ function clearTiers(run: TowerRun): ClearTier[] {
   return tiers;
 }
 /** Plain floor tiles reachable from the stairs, closest first, where clear
- * chests go. */
-function rewardSpots(world: RoomWorld, stairs: string) {
+ * chests go: never the tile the player stands on, which is often the last
+ * enemy's, just beaten in front of the stairs. */
+function rewardSpots(world: RoomWorld, stairs: string, player: { x: number; y: number }) {
   const [sx, sy] = stairs.split(",").map(Number);
   const queue = [{ x: sx, y: sy }], seen = new Set([stairs]);
   const spots: { x: number; y: number }[] = [];
   for (let i = 0; i < queue.length; i++) {
     const n = queue[i];
-    if (world.tile(n.x, n.y).kind === "floor") spots.push(n);
+    if (world.tile(n.x, n.y).kind === "floor" && !(n.x === player.x && n.y === player.y)) spots.push(n);
     const fresh = openNeighbours(world, n).filter(d => !seen.has(`${d.x},${d.y}`));
     for (const d of fresh) seen.add(`${d.x},${d.y}`);
     queue.push(...fresh);
@@ -70,7 +71,7 @@ export class ClearLedger {
     const entry = this.tower.log[run.height] ??= {};
     const stairs = [...world.cells].find(([, t]) => t.kind === "stairs");
     if (!stairs) return [];
-    const spots = rewardSpots(world, stairs[0]);
+    const spots = rewardSpots(world, stairs[0], run.player);
     const earned = clearTiers(run).filter(tier => !entry[tier]);
     for (const tier of earned) {
       const spot = spots.shift();

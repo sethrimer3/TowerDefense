@@ -5,11 +5,12 @@ import { defaults } from "../src/save.ts";
 import { RoomWorld } from "../src/tower/room-world.ts";
 import { point, type Run, type Tile } from "../src/entities.ts";
 
-/** A 5x5 open floor with the stairs in the far corner, a fresh run on it,
- * and a ledger over a fresh save. `extra` places tiles on the floor. */
+/** A 5x5 open floor with the stairs in the far corner, a fresh run on it
+ * with the player in the opposite corner, and a ledger over a fresh save.
+ * `extra` places tiles on the floor. */
 function floor(extra: Record<string, Tile> = {}, run: Partial<Run> = {}) {
   const tower = defaults().tower;
-  const r = { seed: 1, height: 0, damaged: false, keysSpent: false, changes: {}, ...run } as unknown as Run;
+  const r = { seed: 1, height: 0, damaged: false, keysSpent: false, changes: {}, player: { x: 0, y: 0 }, ...run } as unknown as Run;
   const world = new RoomWorld(r.seed, r.height, r.changes);
   world.cells = new Map();
   for (let y = 0; y < 5; y++) for (let x = 0; x < 5; x++) world.cells.set(point(x, y), { kind: "floor" });
@@ -66,6 +67,12 @@ test("chests stand on the floor tiles closest to the stairs; a tier with no room
   assert.deepEqual(chestsOn(cramped.world), ["silver 3,4"]);
   assert.deepEqual(cramped.tower.log[0], { silver: "earned", gold: "claimed", platinum: "claimed" });
   assert.equal(cramped.tower.inspiration, 2);
+});
+
+test("no chest appears under the player, who stands where the last enemy was beaten", () => {
+  const { ledger, world, run } = floor({}, { player: { x: 4, y: 3 } } as Partial<Run>);
+  ledger.check(world, run);
+  assert.deepEqual(chestsOn(world), ["gold 2,4", "platinum 3,3", "silver 3,4"]);
 });
 
 test("a chest can stand where an enemy was beaten, and leaves floor behind", () => {
