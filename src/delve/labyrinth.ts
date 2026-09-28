@@ -384,10 +384,11 @@ function gateTile({ rng }: Lab, g: LaneStep, n: Node): Tile {
   // Populations mix around transitions: influence is fractional there.
   const population = Math.max(0, Math.round(n.influence + (rng() - 0.5) * 0.8));
   const depth = n.depth;
+  // Doubled HP and ATK, matching the Tower's rosters: careless play can die early.
   return { kind: 'enemy', enemy: {
     name: DELVE_ENEMY_NAMES[population % DELVE_ENEMY_NAMES.length], tier: enemyTier(g.strength), strength: g.strength,
-    hp: Math.round((12 + depth * 0.6) * scale * shape.hp),
-    attack: Math.round((6 + depth / 16) * scale * shape.attack),
+    hp: Math.round((24 + depth * 1.2) * scale * shape.hp),
+    attack: Math.round((12 + depth / 8) * scale * shape.attack),
     defense: Math.floor(depth / 65) + tough + shape.defense,
   } };
 }
