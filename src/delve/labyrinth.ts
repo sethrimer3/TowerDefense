@@ -1,5 +1,7 @@
 import { point, type Point, type Tile } from '../entities.ts';
-import type { Gate } from '../tower/types.ts';
+import type { Fork, Gate, LaneStep, Strength } from '../tower/types.ts';
+import type { TowerEnemyProfile } from '../scaling.ts';
+import { FORK_TUNING, forkDepth, forksWorth, stepValue } from '../tower/forks.ts';
 import { choosePattern, FALSE_ASCENTS, type Pattern } from './patterns.ts';
 import { tileRandom } from '../random.ts';
 
@@ -20,6 +22,8 @@ export const DELVE_TUNING = {
   /** Graph/physical distance (tiles) over which two area themes blend. */
   themeBand: 26,
   junctionKeyChance: 0.32, cacheAreas: 16,
+  /** Most pockets per area whose throat becomes a fork. */
+  forksPerArea: 6,
 };
 const { columns: COLS, rowsPerArea: ROWS, pitch: PITCH } = DELVE_TUNING;
 /** Nominal world-Y span of one area; only used to find candidate areas. */
@@ -90,7 +94,10 @@ export function entrance(seed: number, area: number): Point {
   const b = boundary(seed, area); return cellPoint(b.gateCol, b.rows[b.gateCol], seed);
 }
 
-export type Node = Point & { id: number; col: number; row: number; links: number[]; depth: number; influence: number; pattern?: Pattern; main: boolean; falseAscent: boolean };
+export type Node = Point & { id: number; col: number; row: number; links: number[]; depth: number; influence: number; pattern?: Pattern; main: boolean; falseAscent: boolean;
+  /** A pocket whose throat is two parallel lanes instead of its pattern's
+   * gates, and each lane's tiles from the neighbour's side. */
+  fork?: Fork; lanes?: Point[][] };
 export type Edge = { a: number; b: number; path: Point[]; shortcut: boolean };
 export type Region = {
   area: number; nodes: Node[]; edges: Edge[]; cells: Map<string, Tile>; metadata: Map<string, { depth: number; area: number }>;
@@ -350,23 +357,62 @@ const widens = (n: Node, rng: () => number) => !n.pattern && n.col < COLS - 1 &&
 
 const ENEMY_NAMES =['Cinder slime', 'Bone sentinel', 'Dusk wing', 'Ash warden'];
 
-/** The tile standing in for one pattern cost at cell `n`. */
-function gateTile({ rng }: Lab, g: Gate, n: Node): Tile {
+/** How each gate strength scales a Delve enemy: HP and attack multiply, and
+ * defense rises by a flat bonus. */
+export const DELVE_ENEMY_STRENGTH: Record<Strength, { scale: number; defense: number }> = {
+  weak: { scale: 0.75, defense: 0 },
+  normal: { scale: 1, defense: 0 },
+  strong: { scale: 2, defense: 2 },
+  elite: { scale: 3, defense: 4 },
+};
+/** How a named profile reshapes one: attack-heavy enemies hit harder but
+ * fold sooner (hard on a low-DEF build), defense-heavy ones are armoured
+ * but weak (hard on a low-ATK build). */
+export const DELVE_ENEMY_PROFILE: Record<TowerEnemyProfile, { hp: number; attack: number; defense: number }> = {
+  attackHeavy: { hp: 0.85, attack: 1.4, defense: 0 },
+  balanced: { hp: 1, attack: 1, defense: 0 },
+  defenseHeavy: { hp: 1.1, attack: 0.7, defense: 2 },
+};
+
+/** The tile standing in for one pattern cost or fork lane step at cell `n`. */
+function gateTile({ rng }: Lab, g: LaneStep, n: Node): Tile {
+  if (g.kind === 'reward') return { ...g.reward };
   if (g.kind === 'door') return { kind: 'door', color: g.color };
+  if (g.kind === 'steel') return { kind: 'door', door: { type: 'keys', keys: ['yellow', 'blue', 'red'], mode: 'any' } };
+  if (g.kind === 'heart') return { kind: 'door', door: { type: 'fullHp' } };
   if (g.kind !== 'enemy') return { kind: 'floor' };
-  const strong = g.strength === 'strong' ? 2 : 1;
+  const { scale, defense: tough } = DELVE_ENEMY_STRENGTH[g.strength], shape = DELVE_ENEMY_PROFILE[g.profile ?? 'balanced'];
   // Populations mix around transitions: influence is fractional there.
   const population = Math.max(0, Math.round(n.influence + (rng() - 0.5) * 0.8));
   const tier = population % 4, depth = n.depth;
-  return { kind: 'enemy', enemy: { name: ENEMY_NAMES[tier], tier, hp: Math.round((12 + depth * 0.6) * strong), attack: Math.round((6 + depth / 16) * strong), defense: Math.floor(depth / 65) + (strong - 1) * 2 } };
+  return { kind: 'enemy', enemy: {
+    name: ENEMY_NAMES[tier], tier,
+    hp: Math.round((12 + depth * 0.6) * scale * shape.hp),
+    attack: Math.round((6 + depth / 16) * scale * shape.attack),
+    defense: Math.floor(depth / 65) + tough + shape.defense,
+  } };
 }
 
-/** Puts each pocket's costs in its throat and its rewards in its chamber. */
+/** Puts each pocket's costs in its throat and its rewards in its chamber.
+ * Some throats become forks instead: two parallel lanes priced like the
+ * pattern's own costs. */
 function placePatternCosts(lab: Lab, board: Board) {
+  let forks = 0;
   for (const n of lab.nodes) {
     if (!n.pattern) continue;
     const edge = lab.edges.find(e => e.a === n.id || e.b === n.id)!;
     const path = edge.b === n.id ? edge.path : [...edge.path].reverse();
+    const lanes = forks < DELVE_TUNING.forksPerArea ? forkLanes(lab, board, n, path) : null;
+    if (lanes && lab.rng() < FORK_TUNING.chance(n.depth / 10)) {
+      const value = n.pattern.gates.reduce((sum, g) => sum + stepValue(g), 0);
+      const [fork] = forksWorth(value, n.depth / 10, 'mixed', lab.rng, f => f.lanes.length === 2 && forkDepth(f) <= lanes[0].length);
+      if (fork) {
+        carveFork(lab, board, n, fork, lanes, path);
+        forks++;
+        placeRewards(lab, board, n);
+        continue;
+      }
+    }
     // Costs sit in the single-width throat, outside either chamber, so each
     // one is a cut tile between the pocket and the rest of the labyrinth.
     // Only verified cut tiles qualify: a corner tile touching a room can be
@@ -376,9 +422,49 @@ function placePatternCosts(lab: Lab, board: Board) {
     if (cuts.length < n.pattern.gates.length) n.pattern = choosePattern(lab.rng, lab.area, 0, cuts.length);
     const middle = Math.min(cuts.length - 1, Math.floor(cuts.length / 2) + n.pattern.gates.length - 1);
     n.pattern.gates.forEach((g, i) => board.put(cuts[middle - i], gateTile(lab, g, n), n.depth));
-    const rewards = [{ x: n.x, y: n.y }, physical(n.x - 1, rowY(n.row), lab.seed), physical(n.x + 1, rowY(n.row), lab.seed)];
-    n.pattern.rewards.forEach((r, i) => board.put(rewards[i], { ...r }, n.depth));
+    placeRewards(lab, board, n);
   }
+}
+
+function placeRewards(lab: Lab, board: Board, n: Node) {
+  const rewards = [{ x: n.x, y: n.y }, physical(n.x - 1, rowY(n.row), lab.seed), physical(n.x + 1, rowY(n.row), lab.seed)];
+  n.pattern!.rewards.forEach((r, i) => board.put(rewards[i], { ...r }, n.depth));
+}
+
+/** Where a fork's two lanes would run into pocket `n`: one tile either side
+ * of its throat, from the neighbouring chamber into the pocket's, or null
+ * when the pocket holds nothing worth reaching, has no costs to trade, or
+ * its throat isn't a straight run between two chambers with solid rock
+ * either side. Lanes are listed from the neighbour's side. */
+function forkLanes(lab: Lab, board: Board, n: Node, path: Point[]): Point[][] | null {
+  if (!n.pattern!.gates.length || !n.pattern!.rewards.length || n.falseAscent) return null;
+  const at = (p: Point) => point(p.x, p.y);
+  const throat = path.filter(p => !board.roomTiles.has(at(p)));
+  const first = path.indexOf(throat[0]);
+  if (!throat.length || first < 1 || path.indexOf(throat[throat.length - 1]) !== first + throat.length - 1) return null;
+  const dir = { x: throat[0].x - path[first - 1].x, y: throat[0].y - path[first - 1].y };
+  if (!throat.every((p, i) => p.x === throat[0].x + dir.x * i && p.y === throat[0].y + dir.y * i)) return null;
+  const side = { x: dir.y, y: dir.x };
+  const lanes = [-1, 1].map(o => throat.map(p => ({ x: p.x + side.x * o, y: p.y + side.y * o })));
+  const rock = (p: Point) => !board.cells.has(at(p));
+  const room = (p: Point) => board.roomTiles.has(at(p));
+  const fits = lanes.every((lane, i) => {
+    const o = i ? 1 : -1, last = lane[lane.length - 1];
+    return lane.every(p => rock(p) && rock({ x: p.x + side.x * o, y: p.y + side.y * o })) &&
+      room({ x: lane[0].x - dir.x, y: lane[0].y - dir.y }) && room({ x: last.x + dir.x, y: last.y + dir.y });
+  });
+  return fits ? lanes : null;
+}
+
+/** Fills the old throat back in and cuts the fork's lanes beside it. */
+function carveFork(lab: Lab, board: Board, n: Node, fork: Fork, lanes: Point[][], path: Point[]) {
+  for (const p of path) if (!board.roomTiles.has(point(p.x, p.y))) { board.cells.delete(point(p.x, p.y)); board.metadata.delete(point(p.x, p.y)); }
+  lanes.forEach((lane, i) => lane.forEach((p, k) => {
+    const step = fork.lanes[i][k];
+    board.put(p, step ? gateTile(lab, step, n) : { kind: 'floor' }, n.depth);
+  }));
+  n.fork = fork;
+  n.lanes = lanes;
 }
 
 /** Coherent key sources at strategic junctions; no blanket key-solvability fixup. */

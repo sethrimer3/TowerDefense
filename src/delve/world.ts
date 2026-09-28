@@ -4,7 +4,8 @@ import { point, type DelveRun, type Tile, type Torch } from "../entities.ts";
 import type { Board } from "../board.ts";
 import { breakTorch, placeTorches } from "../torches.ts";
 
-export const LAYOUT_VERSION = 7;
+// v8 turns some pocket throats into forks: two parallel lanes of costs.
+export const LAYOUT_VERSION = 8;
 
 /** The one 20-row chunk `index` of the labyrinth, as generated. */
 export function generate(seed: number, index: number): Map<string, Tile> {

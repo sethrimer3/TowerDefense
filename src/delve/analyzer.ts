@@ -49,6 +49,6 @@ export function analyzeDelve(seed: number, area: number) {
     pastAboveGate: r.nodes.some(n => n.y > r.gate.y),
     futureBelowGate: next.nodes.some(n => n.y < r.gate.y),
     seamRows: seamRows.length,
-    patterns: r.nodes.filter(n => n.pattern).map(n => ({ id: n.id, pattern: n.pattern!.id, x: n.x, y: n.y })),
+    patterns: r.nodes.filter(n => n.pattern).map(n => ({ id: n.id, pattern: n.pattern!.id, x: n.x, y: n.y, ...(n.fork ? { fork: n.fork.patternId } : {}) })),
   };
 }

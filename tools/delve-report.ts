@@ -4,7 +4,7 @@ import { region, ownerAt } from '../src/delve/labyrinth.ts';
 const args = process.argv.slice(2), [seed = 42, area = 0] = args.filter(a => !a.startsWith('--')).map(Number);
 const { patterns, ...summary } = analyzeDelve(seed, area);
 console.log(JSON.stringify(summary, null, 2));
-console.log(patterns.map(p => p.pattern).join(', '));
+console.log(patterns.map(p => p.fork ? `${p.pattern} (fork ${p.fork})` : p.pattern).join(', '));
 const r = region(seed, area);
 const glyph: Record<string, string> = { floor: '.', enemy: 'E', door: 'D', key: 'k', potion: 'p', attack: 'A', defense: 'S', treasure: '$', oneway: '^' };
 const cells = worldCells(seed, r.minY - 10, r.maxY + 10);

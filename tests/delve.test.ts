@@ -27,7 +27,7 @@ test('generation is deterministic, order independent and extends past the old de
 test('costs on terminal branches really separate rewards from the main labyrinth', () => {
   for (let seed = 0; seed < 40; seed++) for (const area of [0, 1, 3]) {
     const r = region(seed, area);
-    for (const n of r.nodes.filter(n => n.pattern?.gates.length)) {
+    for (const n of r.nodes.filter(n => n.pattern?.gates.length && !n.fork)) {
       const e = r.edges.find(e => e.a === n.id || e.b === n.id)!;
       const route = e.b === n.id ? e.path : [...e.path].reverse();
       const gates = route.filter(p => ['enemy', 'door'].includes(r.cells.get(point(p.x, p.y))?.kind ?? ''));
@@ -38,6 +38,32 @@ test('costs on terminal branches really separate rewards from the main labyrinth
       }
     }
   }
+});
+test('a forked pocket is reached by either lane and by nothing else', () => {
+  let forks = 0;
+  for (let seed = 0; seed < 40; seed++) for (const area of [0, 1, 3]) {
+    const r = region(seed, area), from = point(r.entry.x, r.entry.y);
+    for (const n of r.nodes.filter(n => n.fork)) {
+      forks++;
+      const [a, b] = n.lanes!.map(lane => lane.map(p => point(p.x, p.y)));
+      const pocket = point(n.x, n.y);
+      // Each lane alone leads in: block every tile of the other.
+      for (const [open, shut] of [[a, b], [b, a]]) {
+        const cells = new Map(r.cells);
+        for (const k of shut) cells.delete(k);
+        assert.ok(flood(cells, from).has(pocket), `seed ${seed} area ${area}: lane ${open} doesn't lead in`);
+      }
+      const cells = new Map(r.cells);
+      for (const k of [...a, ...b]) cells.delete(k);
+      assert.ok(!flood(cells, from).has(pocket), `seed ${seed} area ${area}: forked pocket has a bypass`);
+      // Its lanes hold what the fork asked for, from the neighbour's side.
+      n.fork!.lanes.forEach((lane, i) => lane.forEach((step, k) => {
+        const want = step.kind === 'reward' ? step.reward.kind : ['steel', 'heart'].includes(step.kind) ? 'door' : step.kind;
+        assert.equal(r.cells.get([a, b][i][k])?.kind, want);
+      }));
+    }
+  }
+  assert.ok(forks > 20, `only ${forks} forked pockets`);
 });
 test('milestone crossing seals behind the player, persists, and prevents undo across the seal', () => {
   const g = new Game(defaults()); g.save.upgrades.delve = 1; g.switchMode('delve');

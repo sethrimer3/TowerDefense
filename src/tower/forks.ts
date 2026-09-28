@@ -194,7 +194,6 @@ export const FORK_PATTERNS: ForkPattern[] = [
 /** The deepest lane decides how deep a fork's crossing must be. */
 export const forkDepth = (fork: Fork) => Math.max(...fork.lanes.map((l) => l.length));
 
-const gateValue = (g: Gate) => stepValue(g);
 const mean = (fork: Fork) => fork.lanes.reduce((s, l) => s + laneValue(l), 0) / fork.lanes.length;
 
 function forkWeight(p: ForkPattern, depth: number, archetype: Archetype) {
@@ -226,19 +225,21 @@ export function planForks(b: GraphBuilder, archetype: Archetype) {
     if (placed >= FORK_TUNING.maxPerFloor) break;
     if (node.parent === null || node.gate.kind === "open" || !worthReaching(b.nodes, node.id)) continue;
     if (rng() >= FORK_TUNING.chance(depth)) continue;
-    const forks = forksFor(node.gate, depth, archetype, rng);
+    const forks = forksWorth(stepValue(node.gate), depth, archetype, rng);
     if (!forks.length) continue;
     node.forks = forks;
     placed++;
   }
 }
 
-function forksFor(gate: Gate, depth: number, archetype: Archetype, rng: () => number): Fork[] {
-  const v = gateValue(gate);
+/** Forks priced near `v` for a floor `depth` deep (Delve passes its
+ * equivalent floor), best first, the rest shallower and narrower first.
+ * `fits` limits them to what the caller has room for. */
+export function forksWorth(v: number, depth: number, archetype: Archetype, rng: () => number, fits: (f: Fork) => boolean = () => true): Fork[] {
   let options = FORK_PATTERNS.map((p) => ({ p, w: forkWeight(p, depth, archetype) }))
     .filter(({ w }) => w > 0)
     .map(({ p, w }) => ({ w, v: build(p, rng) }))
-    .filter(({ v: fork }) => mean(fork) <= v * FORK_TUNING.valueBand && mean(fork) * FORK_TUNING.valueBand >= v);
+    .filter(({ v: fork }) => fits(fork) && mean(fork) <= v * FORK_TUNING.valueBand && mean(fork) * FORK_TUNING.valueBand >= v);
   const chosen: Fork[] = [];
   while (options.length && chosen.length < FORK_TUNING.fallbacks) {
     const fork = pick(options, rng);
