@@ -130,7 +130,10 @@ function patternHosts(b: GraphBuilder, pattern: TowerPattern, mainIds: number[])
   const needSlots = pattern.layout === "siblings" ? pattern.steps.length : 1;
   const hosts = (pattern.attach === "start" ? mainIds.slice(0, 1) : mainIds)
     .filter((id) => b.nodes[id].purpose !== "stairs" && b.freeSlots(id) >= needSlots);
-  return hosts.sort((a, c) => b.freeSlots(c) - b.freeSlots(a) || b.rng() - 0.5);
+  // Ties break at random, drawn before sorting: how often a sort compares is
+  // up to the engine, so a draw inside it would not replay.
+  const tie = new Map(hosts.map((id) => [id, b.rng()]));
+  return hosts.sort((a, c) => b.freeSlots(c) - b.freeSlots(a) || tie.get(a)! - tie.get(c)!);
 }
 
 /** Each step of a chain opens off the one before. */

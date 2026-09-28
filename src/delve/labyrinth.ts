@@ -242,7 +242,7 @@ function measure(lab: Lab) {
   while (at !== start) { at = nodes[at].links.find(id => fromStart.get(id)! === fromStart.get(at)! - 1)!; nodes[at].main = true; }
   const nextRow = Math.min(...lab.up.rows);
   // How near a cell is to a gate: along the labyrinth or through the rock.
-  const near = (n: Node, hopsTo: Map<number, number>, gate: Node) => Math.min(hopsTo.get(n.id)! * PITCH, Math.hypot(n.x - gate.x, n.y - gate.y) * 1.2);
+  const near = (n: Node, hopsTo: Map<number, number>, gate: Node) => Math.min(hopsTo.get(n.id)! * PITCH, Math.sqrt((n.x - gate.x) * (n.x - gate.x) + (n.y - gate.y) * (n.y - gate.y)) * 1.2);
   for (const n of nodes) {
     n.depth = area * 100 + Math.min(99, Math.floor(99 * dist.get(n.id)! / routeLength));
     n.influence = influence(lab, n, { exitNear: near(n, fromExit, nodes[exit]), entryNear: near(n, fromStart, nodes[start]), nextRow });

@@ -402,10 +402,17 @@ function buildHouse(t: Uint8Array, lots: Lots, i: number, seed: number) {
   } else t[i] = CellType.PARK;
 }
 
-/** House shapes in a weighted random order (Efraimidis–Spirakis keys). */
+/** House shapes in a weighted random order: each place drawn from the
+ * shapes left, in proportion to their weights. Only + * and comparisons, so
+ * every engine agrees (Math.pow's last bit may not). */
 function houseOrder(seed: number, i: number) {
-  const key = (sh: [number, number, number]) => Math.pow(hash01(seed, i, sh[0], sh[1]), 1 / sh[2]);
-  return [...HOUSE_SHAPES].sort((a, b) => key(b) - key(a));
+  const left = [...HOUSE_SHAPES], order: [number, number, number][] = [];
+  while (left.length) {
+    let pick = hash01(seed, i, order.length) * left.reduce((s, sh) => s + sh[2], 0), k = 0;
+    while (k < left.length - 1 && pick >= left[k][2]) pick -= left[k++][2];
+    order.push(...left.splice(k, 1));
+  }
+  return order;
 }
 
 /** Larger parks get a pond in their middle: every park cell whose eight

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { CELLS_W, CELL_COUNT, ORTHO, SUB, cellIndex, tileKey } from '../src/defend/grid.ts';
+import { CELLS_W, CELL_COUNT, ORTHO, SUB, cellIndex, cellX, cellY, tileKey } from '../src/defend/grid.ts';
 import {
   defaultLayout,
   fitLayout,
@@ -178,7 +178,11 @@ test('barracks keep their garrison topped up', () => {
 
 test('civilians rebuild ruins one section at a time', () => {
   const sim = new DefendSim(mapOf(squareCity()), zeroLevels(), 1);
-  const house = sim.map.buildings.find((b) => b.kind === 'house' && b.cells.length >= 2)!;
+  // The multi-cell house nearest the keep, where the civilians live.
+  const centre = (b: { cells: number[] }) => [0, 1].map((k) => b.cells.reduce((s, c) => s + (k ? cellY(c) : cellX(c)), 0) / b.cells.length);
+  const [kx, ky] = centre(sim.map.buildings.find((b) => b.kind === 'keep')!);
+  const away = (b: { cells: number[] }) => { const [x, y] = centre(b); return (x - kx) * (x - kx) + (y - ky) * (y - ky); };
+  const house = sim.map.buildings.filter((b) => b.kind === 'house' && b.cells.length >= 2).sort((a, b) => away(a) - away(b) || a.id - b.id)[0];
   sim.damageBuilding(house.id, 1e6);
   assert.equal(sim.intact(house), false);
   assert.ok(house.cells.every((c) => !sim.solid[c]), 'rubble is walkable');

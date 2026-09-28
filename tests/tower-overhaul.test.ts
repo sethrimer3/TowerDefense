@@ -152,27 +152,27 @@ test("an opened door stays open across a floor round-trip", () => {
 });
 
 test("multi-floor Tower state survives a save encode/decode round trip", () => {
-  const g = arena();
   // isDeadlocked() (run via checkDeadlock() after every non-floor move)
-  // never sees this fixture's synthetic cells — it independently re-derives
-  // each floor from generateTowerRoom(seed, height). arena()'s default
-  // random seed left this test's deadlock check at the mercy of whatever
-  // unrelated real room that seed happened to generate around (1, 0) and
-  // (TOWER_START_X + 1, 0), intermittently ending the run for reasons
-  // having nothing to do with the synthetic arena and desyncing
-  // save.tower.run (nulled by that end) from the still-live g.run this test
-  // keeps mutating. Pin a seed verified (see git history) to never trigger
-  // that false deadlock at either position this test visits, so the run
-  // never legitimately ends and the save/reload round trip is meaningful.
-  // (Re-pinned for fork gates, TOWER_LAYOUT_VERSION 5; still good at 6.)
-  g.run.seed = 2;
-  (g.world as RoomWorld).cells.set(point(1, 0), { kind: "enemy", enemy: SURVIVABLE });
-  assert.ok(g.move(1, 0, false));
-  g.advanceTowerRoom();
-  // advanceTowerRoom() re-centers the player on the new room's own entrance.
+  // never sees this fixture's synthetic cells: it re-derives each floor from
+  // generateTowerRoom(seed, height), and on most real floors nothing is left
+  // to do from where this test stands, so the run ends as deadlocked and the
+  // save/reload round trip would test nothing. Rather than pin a seed that
+  // breaks with every generation change, take the first seed on which the
+  // run survives both steps.
   const p1 = point(TOWER_START_X + 1, 0);
-  (g.world as RoomWorld).cells.set(p1, { kind: "attack" });
-  assert.ok(g.move(1, 0));
+  const play = (seed: number) => {
+    const g = arena();
+    g.run.seed = seed;
+    (g.world as RoomWorld).cells.set(point(1, 0), { kind: "enemy", enemy: SURVIVABLE });
+    if (!g.move(1, 0, false) || !g.save.tower.run) return null;
+    g.advanceTowerRoom();
+    // advanceTowerRoom() re-centers the player on the new room's own entrance.
+    (g.world as RoomWorld).cells.set(p1, { kind: "attack" });
+    return g.move(1, 0) && g.save.tower.run ? g : null;
+  };
+  let g: Game | null = null;
+  for (let seed = 1; seed <= 200 && !g; seed++) g = play(seed);
+  assert.ok(g, "some seed lets the run survive both steps");
   const reloaded = new Game(decode(JSON.stringify(g.save)));
   assert.equal(reloaded.run.height, 1);
   // Floor 0 was cleared, so its chests were paid on leaving and left floor.

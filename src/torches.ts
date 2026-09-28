@@ -66,7 +66,9 @@ function snugCorner(kind: KindAt, x: number, y: number) {
 /** The best `want` spots, taken greedily at least the minimum spacing apart. */
 function spaced(candidates: TorchSpot[], want: number) {
   const picked: [number, number][] = [];
-  const crowded = (c: TorchSpot) => picked.some(([px, py]) => Math.hypot(px - c.x, py - c.y) < TORCH_PLACEMENT.minSpacing);
+  const min = TORCH_PLACEMENT.minSpacing;
+  // Squared, so the comparison is exact in every engine (hypot need not be).
+  const crowded = (c: TorchSpot) => picked.some(([px, py]) => (px - c.x) * (px - c.x) + (py - c.y) * (py - c.y) < min * min);
   for (const c of candidates) {
     if (picked.length >= want) break;
     if (!crowded(c)) picked.push([c.x, c.y]);

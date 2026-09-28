@@ -14,7 +14,7 @@ import { paintIcon } from "../src/defend/structure-art.ts";
 import { defaultLayout, fitLayout, placeCityTile, placeStructure } from "../src/defend/layout.ts";
 import { generateCity } from "../src/defend/citygen.ts";
 import { DefendSim } from "../src/defend/sim.ts";
-import { UPGRADES, ENEMIES } from "../src/defend/catalog.ts";
+import { UPGRADES, ENEMIES, BOMB_RADIUS } from "../src/defend/catalog.ts";
 import { tileKey, SUB, TILES_W, TILES_H } from "../src/defend/grid.ts";
 
 type Point = { x: number; y: number };
@@ -217,18 +217,45 @@ const cityOf = (sc: Scenario) => generateCity(fitLayout(sc.layout()), sc.citySee
 const intactOf = (sim: DefendSim, kind: string) => sim.map.buildings.find((b) => b.kind === kind && sim.intact(b))!;
 /** Steps a scenario to `seconds`, then optionally drops a bomb on the
  * southernmost walking enemy so a fresh blast, scorch and dust are live. */
-function battle(sc: Scenario, seconds: number, bomb: boolean) {
+/** Where to drop a scene's bomb: on the lowest ground enemy, sparing the
+ * boss, bats and marked enemies (the scenes show those) and keeping the
+ * blast clear of the boss and the marks; with no such enemy, on open ground
+ * six cells from them. */
+function bombSpot(sim: DefendSim): Unit | undefined {
+  const reach = BOMB_RADIUS + 1;
+  const spared = sim.enemies.filter((m) => m.marked || ENEMIES[m.kind].boss);
+  const clear = (e: Unit) => !spared.some((m) => (m.x - e.x) * (m.x - e.x) + (m.y - e.y) * (m.y - e.y) < reach * reach);
+  const enemy = sim.enemies.filter((e) => !ENEMIES[e.kind].boss && !ENEMIES[e.kind].flying && clear(e)).sort((a, b) => b.y - a.y)[0];
+  if (enemy || !spared.length) return enemy;
+  const cx = spared.reduce((s, m) => s + m.x, 0) / spared.length, cy = spared.reduce((s, m) => s + m.y, 0) / spared.length;
+  const ring = [[0, 1], [1, 1], [1, 0], [1, -1], [0, -1], [-1, -1], [-1, 0], [-1, 1]].map(([dx, dy]) => ({ x: cx + dx * 6, y: cy + dy * 6 }));
+  return ring.find(clear);
+}
+
+/** A battle stepped `seconds` in, then on a second at a time (up to two
+ * more minutes) until what a scene shows is there: everything in `need`
+ * but the blast, and (when `bomb`) an enemy to bomb clear of what the scene
+ * shows. Then the bomb, and tenths of a second (up to two) until all of
+ * `need` holds, so a scene still finds what it shows when the city changes. */
+function battle(sc: Scenario, seconds: number, bomb: boolean, need: string[] = []) {
   const sim = new DefendSim(cityOf(sc), sc.levels() as never, sc.seed);
-  for (let t = 1; t <= seconds; t++) {
+  const before = need.filter((n) => n !== "boom" && n !== "scorch");
+  const holds = (list: string[]) => list.every((n) => has[n](sim));
+  let t = 1;
+  for (; t <= seconds + 120; t++) {
     for (let f = 0; f < 4; f++) sim.update(0.25);
     for (const [at, kind] of sc.smash) if (at === t) sim.damageBuilding(intactOf(sim, kind).id, 1e9);
+    if (t >= seconds && holds(before) && (!bomb || bombSpot(sim))) break;
   }
-  if (bomb) {
-    const e = sim.enemies.filter((e) => !ENEMIES[e.kind].boss && !ENEMIES[e.kind].flying).sort((a, b) => b.y - a.y)[0];
-    sim.dropBomb(e.x, e.y);
+  if (t > seconds + 120) throw Error(`${sc.seed}: the battle never showed ${before.filter((n) => !has[n](sim)).join(", ")}`);
+  if (!bomb) return sim;
+  const at = bombSpot(sim)!;
+  sim.dropBomb(at.x, at.y);
+  for (let k = 0; k < 20; k++) {
     sim.update(0.1);
+    if (holds(need)) return sim;
   }
-  return sim;
+  throw Error(`${sc.seed}: after the bomb the battle lacks ${need.filter((n) => !has[n](sim)).join(", ")}`);
 }
 const has: Record<string, (s: DefendSim) => boolean> = {
   boom: (s) => s.effects.some((e) => e.kind === "boom"), scorch: (s) => s.scorches.length > 0, shell: (s) => s.shells.length > 0,
@@ -274,10 +301,11 @@ const DEFEND_SCENES: Record<string, () => DefendScene> = {
   // The wave-10 boss at night and the fight at the wall, zoomed in (the
   // city layer repainted at 2×).
   defendNight: () => {
-    const sim = battle(FORTRESS, 400, true);
+    const need = ["boom", "scorch", "arrow", "boss", "marked", "rebuilt", "archer", "sword"];
+    const sim = battle(FORTRESS, 400, true, need);
     const boss = enemyWhere((d) => !!d.boss)(sim), marked = sim.enemies.find((e) => e.marked)!;
     const focus = () => ({ x: (boss.x + marked.x) / 2, y: (boss.y + marked.y) / 2 });
-    return { map: sim.map, sim, overlay: null, zoom: 1.5, focus, opts: { grid: false, weather: { rain: false }, night: 0.85, reduceMotion: false }, need: ["boom", "scorch", "arrow", "boss", "marked", "rebuilt", "archer", "sword"] };
+    return { map: sim.map, sim, overlay: null, zoom: 1.5, focus, opts: { grid: false, weather: { rain: false }, night: 0.85, reduceMotion: false }, need };
   },
   // A stormy night, reduced motion, zoomed right in (3×) on a bat.
   defendStorm: () => {

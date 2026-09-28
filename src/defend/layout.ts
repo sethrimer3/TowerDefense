@@ -205,7 +205,10 @@ function bestRect(p: Placement, space: FitSpace): Rect | null {
   for (const r of candidateRects(p)) {
     if (!rectUsable(r, space, p.inside)) continue;
     if (needsStreet && !openSides(r, space).length) continue;
-    const score = Math.hypot(r.x + r.w / 2 - target.x, r.y + r.h / 2 - target.y) + hash01(p.uid, r.x, r.y) * 0.25;
+    // sqrt, not hypot: a saved layout is refitted on load, so the fit must
+    // come out the same in every engine (hypot's last bit may not).
+    const dx = r.x + r.w / 2 - target.x, dy = r.y + r.h / 2 - target.y;
+    const score = Math.sqrt(dx * dx + dy * dy) + hash01(p.uid, r.x, r.y) * 0.25;
     if (score < bestScore) {
       bestScore = score;
       best = r;

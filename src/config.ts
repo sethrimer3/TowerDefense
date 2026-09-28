@@ -1,3 +1,4 @@
+import { intPow } from "./exact.ts";
 export const UNGUARDED_LOOT_CHANCE = 1 / 1000;
 export const WIDTH = 30;
 export const CHUNK = 20;
@@ -198,7 +199,7 @@ export const UPGRADES = [
 ] as const;
 export type UpgradeId = (typeof UPGRADES)[number]["id"];
 export const cost = (id: UpgradeId, level: number) =>
-  Math.ceil(UPGRADES.find((u) => u.id === id)!.base * 1.65 ** level);
+  Math.ceil(UPGRADES.find((u) => u.id === id)!.base * intPow(1.65, level));
 export const goldReward = (kills: number, treasures: number) =>
   Math.floor(kills / 3) + treasures;
 export const xpForKill = (tier: number, attack: number) =>

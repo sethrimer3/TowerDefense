@@ -1,5 +1,6 @@
 import type { MaterialId } from "./materials.ts";
 import type { EnemyStrength } from "./entities.ts";
+import { intPow } from "./exact.ts";
 
 export type TowerEnemyProfile = "attackHeavy" | "balanced" | "defenseHeavy";
 
@@ -89,7 +90,7 @@ export function getTowerEnemy(room: number, rng: () => number, forceProfile?: To
   const definition = forceProfile
     ? roster.find((enemy) => enemy.profile === forceProfile)!
     : roster[Math.floor(rng() * roster.length)];
-  const multiplier = TOWER_CYCLE_MULTIPLIER ** towerCycle(room);
+  const multiplier = intPow(TOWER_CYCLE_MULTIPLIER, towerCycle(room));
   return {
     name: definition.name,
     hp: definition.hp * multiplier,

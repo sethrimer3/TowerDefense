@@ -6,7 +6,7 @@ import { breakTorch, placeTorches } from "../torches.ts";
 
 // v8 turns some pocket throats into forks: two parallel lanes of costs.
 // v9 adds yellow-or-blue and blue-or-red door forks.
-export const LAYOUT_VERSION = 9;
+export const LAYOUT_VERSION = 10;
 
 /** The one 20-row chunk `index` of the labyrinth, as generated. */
 export function generate(seed: number, index: number): Map<string, Tile> {

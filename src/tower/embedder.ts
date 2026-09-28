@@ -91,12 +91,20 @@ function splitOffsets(len: number, rng: () => number) {
   return options;
 }
 
+/** The index of the smallest value (the first, on a tie). */
+function lowest(values: number[]) {
+  let best = 0;
+  for (let i = 1; i < values.length; i++) if (values[i] < values[best]) best = i;
+  return best;
+}
+
 function partition(n: number, rng: () => number): Rect[] | null {
   const leaves: Rect[] = [{ ...INTERIOR }];
   while (leaves.length < n) {
     const weights = leaves.map((r) => {
       const w = r.x2 - r.x1 + 1, h = r.y2 - r.y1 + 1;
-      return Math.max(w, h) >= MIN_SIDE * 2 + 1 ? area(r) ** 1.6 : 0;
+      // area^1.5 (sqrt is exact in every engine; ** is not).
+      return Math.max(w, h) >= MIN_SIDE * 2 + 1 ? area(r) * Math.sqrt(area(r)) : 0;
     });
     const total = weights.reduce((a, b) => a + b, 0);
     if (!total) return null;
@@ -365,10 +373,12 @@ class FloorBuilder {
     const options = this.doorwayOptions(a, b);
     if (!options.length) return null;
     const mid = options.reduce((s, c) => [s[0] + c.x / options.length, s[1] + c.y / options.length], [0, 0]);
-    const score = (c: Candidate) =>
+    // Each option draws its jitter once, before comparing: how often a sort
+    // compares is up to the engine, so a draw inside it would not replay.
+    const score = options.map((c) =>
       Math.abs(c.x - mid[0]) + Math.abs(c.y - mid[1]) + this.rng() * 1.5 +
-      (c.inA[0] === ENTRY[0] && c.inA[1] === ENTRY[1] ? 3 : 0) + (this.nearDoor(c, 2) ? 4 : 0);
-    return options.sort((p, q) => score(p) - score(q))[0];
+      (c.inA[0] === ENTRY[0] && c.inA[1] === ENTRY[1] ? 3 : 0) + (this.nearDoor(c, 2) ? 4 : 0));
+    return options[lowest(score)];
   }
 
   /** Wall tiles that can still join regions a and b: both sides inside
@@ -567,7 +577,9 @@ class FloorBuilder {
       ["x2", w, (x: number, y: number) => x === r.x2],
     ] as const).filter(([, len, on]) => len > MIN_SIDE && !anchors.some(([x, y]) => on(x, y)));
     if (!sides.length) return undefined;
-    return sides.sort((a, b) => b[1] - a[1] + (this.rng() - 0.5) * 0.1)[0];
+    // Longest side, jittered a little; drawn before comparing (see chooseDoorway).
+    const shorter = sides.map(([, len]) => -len + (this.rng() - 0.5) * 0.1);
+    return sides[lowest(shorter)];
   }
 
   private wallOff(r: Rect, [side, , on]: Edge) {
