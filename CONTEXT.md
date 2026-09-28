@@ -53,7 +53,7 @@ _Avoid_: tier (a tier is the XP a kill pays), rank, level
 ### Fights
 
 **Fight**:
-What stepping into an enemy costs: rounds in which the hero strikes first and the enemy strikes back, until one of them falls. How it ends is known before it starts, as the inspect panel shows.
+What stepping into an enemy costs: rounds in which the hero strikes first and the enemy strikes back, until one of them falls. After every round the enemy's ATK rises by 1% (at least 1), so no DEF holds it off forever. How it ends is known before it starts, as the inspect panel shows.
 _Avoid_: battle, combat round
 
 **Strike**:

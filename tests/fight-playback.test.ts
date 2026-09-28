@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { Game } from "../src/state.ts";
 import { defaults } from "../src/save.ts";
 import { RoomWorld } from "../src/tower/room-world.ts";
-import { bout, heroHpDuring, predict } from "../src/combat.ts";
+import { bout, heroHpDuring, predict, raisedAttack } from "../src/combat.ts";
 import { BoardPopups, lunges } from "../src/board-popups.ts";
 import type { Enemy, Player, Tile } from "../src/entities.ts";
 
@@ -31,16 +31,32 @@ function arena(east: Tile, animate = true) {
 }
 
 test("a bout plays the prediction's rounds out: the hero strikes first, each round quicker", () => {
-  const p = hero(), e = foe({ hp: 36 }); // 6 hits of 6; the enemy strikes 5 times for 5.
+  const p = hero(), e = foe({ hp: 36 }); // 6 hits of 6; the enemy strikes 5 times, from 5 up.
   const fight = bout(p, e), odds = predict(p, e);
   assert.deepEqual(fight.strikes.map((s) => s.by), ["hero", "enemy", "hero", "enemy", "hero", "enemy", "hero", "enemy", "hero", "enemy", "hero"]);
-  assert.deepEqual(fight.strikes.map((s) => s.damage), [6, 5, 6, 5, 6, 5, 6, 5, 6, 5, 6]);
+  assert.deepEqual(fight.strikes.map((s) => s.damage), [6, 5, 6, 6, 6, 7, 6, 8, 6, 9, 6]);
   const ms = fight.strikes.map((s) => s.end - s.start);
   assert.deepEqual(ms.slice(0, 4).map((d) => Math.round(d * 10) / 10), [250, 250, 225, 225]);
   assert.equal(fight.strikes.at(-1)!.hp, 0, "the enemy falls");
   assert.equal(heroHpDuring(fight, p.hp, fight.duration), p.hp - odds.damage);
   assert.equal(heroHpDuring(fight, p.hp, fight.strikes[1].at - 1), p.hp, "HP drops only as a strike lands");
   assert.equal(heroHpDuring(fight, p.hp, fight.strikes[1].at), p.hp - 5);
+});
+
+test("the enemy's ATK rises after every round by 1% (at least 1), so no DEF holds it off forever", () => {
+  assert.deepEqual([7, 99, 100, 250, 1000].map(raisedAttack), [8, 100, 101, 252, 1010]);
+  // DEF 50 over ATK 20: nothing gets through for 31 rounds, then more each round.
+  const p = hero({ attack: 11, defense: 50, hp: 1000 }), e = foe({ hp: 40, attack: 20, defense: 10 });
+  const fight = bout(p, e), odds = predict(p, e);
+  const struck = fight.strikes.filter((s) => s.by === "enemy").map((s) => s.damage);
+  assert.equal(struck.length, 39);
+  assert.deepEqual(struck.slice(29, 34), [0, 0, 1, 2, 3]);
+  assert.equal(odds.damage, struck.reduce((a, b) => a + b, 0));
+  assert.equal(heroHpDuring(fight, p.hp, fight.duration), p.hp - odds.damage);
+  // A fight a million rounds long is lethal, not free, and sums quickly.
+  const endless = predict(hero({ attack: 11, defense: 10_000 }), foe({ hp: 1_000_000, attack: 1, defense: 10 }));
+  assert.equal(endless.survivable, false);
+  assert.equal(endless.damage, Infinity);
 });
 
 test("strikes speed up by a tenth a round down to 50 ms, then hold", () => {

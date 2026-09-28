@@ -41,7 +41,7 @@ Some pockets are entered by a **fork** instead (see `src/tower/forks.ts`, shared
 | --- | --- |
 | none | upward bias, nearby unexplored, visible tiles plus visited tiles only |
 | `aiMemory` 1/2 | remembers every observed tile · dead-end recognition, weaker upward pull |
-| `aiEvaluation` 1–4 | HP cost of fights · key cost · contextual value (missing HP, key counts) · scarcity |
+| `aiEvaluation` 1–4 | HP cost of fights (as a share of the HP left) · key cost · contextual value (missing HP, key counts) · scarcity |
 | `aiLookahead` 1–4 | +4 scouting radius and +2 chained interactions per level |
 
 The evaluator never reads generator labels. It follows a committed route and replans on interactions or newly seen corridors, with a continuity bonus that prevents flip-flopping.

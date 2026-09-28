@@ -35,7 +35,7 @@ test("tap route collects items, fights enemies, consumes keys and reaches destin
   while (g.route.length) g.routeStep();
   assert.equal(g.run.player.y, 5);
   assert.equal(g.run.kills, 1);
-  assert.equal(g.run.player.hp, 114);
+  assert.equal(g.run.player.hp, 113); // strikes back for 3, then 4
   assert.equal(g.run.player.keys.red, 0);
 });
 test("missing key walks to door, stops, and places feedback on the door", () => {

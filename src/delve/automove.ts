@@ -22,6 +22,11 @@ export class DelvePlan {
 const TRAVERSAL = ['floor', 'openedChest', 'oneway'];
 /** Search limits: nodes expanded and route length. */
 const MAX_EXPANSIONS = 2400, MAX_TRAVEL = 180;
+/** What each HP lost (or healed) is worth: a share of the HP the player has,
+ * so a fight costing a fifth of it weighs the same at 400 HP as at 4000, and
+ * HP grows dearer as it runs low. At 400 HP one HP is worth 0.55. */
+const HP_WORTH = 220;
+const hpPrice = (p: Player) => HP_WORTH / Math.max(1, p.hp);
 
 /** What Automove plans with besides the board: what it has seen, what it
  * planned last step, and what its upgrades let it do. */
@@ -40,7 +45,7 @@ export function chooseDelveStep(at: Position, { memory, plan, capabilities: c }:
   const followed = current && !discovered ? follow(at, plan, current, c) : undefined;
   if (followed) return followed;
   plan.commitment = undefined;
-  const scan: Scan = { at, c, canKnow, visits: memory.visited, previousTarget: current?.target ?? '', bestAt: new Map(), report: [], best: null, bestValue: -Infinity };
+  const scan: Scan = { at, c, canKnow, hpPrice: hpPrice(at.run.player), visits: memory.visited, previousTarget: current?.target ?? '', bestAt: new Map(), report: [], best: null, bestValue: -Infinity };
   explore(scan);
   plan.decisions = scan.report.sort((a, b) => b.utility - a.utility).slice(0, 12);
   const { best } = scan, p = at.run.player;
@@ -78,7 +83,7 @@ function follow({ run, world }: Position, plan: DelvePlan, route: Commitment, c:
   const dx = x - p.x, dy = y - p.y, tile = world.tile(x, y);
   const trial = { player: { ...p, keys: { ...p.keys } }, damage: 0, keyCost: 0, reward: 0 };
   const walkable = Math.abs(dx) + Math.abs(dy) === 1 && world.step(p.x, p.y, dx, dy) && tile.kind !== 'wall';
-  if (!walkable || !apply(tile, trial, c)) return undefined;
+  if (!walkable || !apply(tile, trial, c, hpPrice(p))) return undefined;
   if (!['floor', 'openedChest'].includes(tile.kind)) plan.commitment = undefined;
   return { dx, dy, label: 'Following the chosen Delve route' };
 }
@@ -96,6 +101,8 @@ type Search = { x: number; y: number; first: number[]; d: number; player: Player
 type Scan = {
   at: Position; c: Capabilities;
   canKnow: (x: number, y: number) => boolean;
+  /** What one HP is worth this step (`hpPrice`). */
+  hpPrice: number;
   visits: Record<string, number>;
   previousTarget: string;
   /** Best merit seen per tile and resource state, to prune repeats. */
@@ -120,7 +127,7 @@ function successors(scan: Scan, n: Search) {
 /** Extends route `n` one tile in `dir`: scores the new tile, and returns the
  * extended route when it is worth searching on from. */
 function advance(scan: Scan, n: Search, [dx, dy]: number[]): Search | undefined {
-  const { at: { world }, c } = scan;
+  const { at: { world }, c, hpPrice } = scan;
   const dest = world.step(n.x, n.y, dx, dy); if (!dest || !scan.canKnow(dest.x, dest.y)) return undefined;
   const k = point(dest.x, dest.y); if (n.path.has(k)) return undefined;
   const tile = world.tile(dest.x, dest.y); if (tile.kind === 'wall') return undefined;
@@ -128,7 +135,7 @@ function advance(scan: Scan, n: Search, [dx, dy]: number[]): Search | undefined 
   next.path.add(k);
   const interaction = !TRAVERSAL.includes(tile.kind);
   if (interaction && next.interactions++ >= c.interactions) return undefined;
-  if (!apply(tile, next, c)) return undefined;
+  if (!apply(tile, next, c, hpPrice)) return undefined;
   consider(scan, next, dest, { tile, interaction });
   return improves(scan, next, k) ? next : undefined;
 }
@@ -156,7 +163,7 @@ type Place = { tile: Tile; frontier: boolean; deadEnd: boolean; unvisited: boole
 function utilityOf(scan: Scan, next: Search, place: Place) {
   // Summed in this exact order: reordering the float additions would shift
   // reported utilities and could flip near-ties.
-  const [travel, combat, keys, deadEnd] = routeCosts(scan.c, next, place.deadEnd);
+  const [travel, combat, keys, deadEnd] = routeCosts(scan, next, place.deadEnd);
   const continuity = point(next.x, next.y) === scan.previousTarget ? 6 : 0;
   return appeal(scan, next, place) - travel - combat - keys - deadEnd + continuity;
 }
@@ -171,10 +178,10 @@ function appeal({ c, at, visits }: Scan, next: Search, { tile, frontier, unvisit
 
 /** What the route there costs, as far as Automove's upgrades let it judge:
  * travel, damage taken, keys spent, and walking into a dead end. */
-function routeCosts(c: Capabilities, next: Search, deadEnd: boolean) {
+function routeCosts({ c, hpPrice }: Scan, next: Search, deadEnd: boolean) {
   return [
     next.d * (c.deadEnds ? 0.25 : 0.12),
-    c.combat ? next.damage * 0.55 : 0,
+    c.combat ? next.damage * hpPrice : 0,
     c.keys ? next.keyCost : 0,
     c.deadEnds && deadEnd ? 18 + next.d * 0.2 : 0,
   ];
@@ -184,10 +191,10 @@ function routeCosts(c: Capabilities, next: Search, deadEnd: boolean) {
  * on only if it beats every earlier route to the same tile with the same
  * keys, interactions and stats. A consumed item can never be credited twice
  * along a route (path membership above). */
-function improves({ bestAt }: Scan, next: Search, k: string) {
+function improves({ bestAt, hpPrice }: Scan, next: Search, k: string) {
   const { keys, attack, defense } = next.player;
   const label = `${k}:${keys.yellow},${keys.blue},${keys.red}:${next.interactions}:${attack}:${defense}`;
-  const merit = next.reward - next.damage * 0.55 - next.keyCost - next.d * 0.25;
+  const merit = next.reward - next.damage * hpPrice - next.keyCost - next.d * 0.25;
   if (merit <= (bestAt.get(label) ?? -Infinity)) return false;
   bestAt.set(label, merit);
   return true;
@@ -195,13 +202,13 @@ function improves({ bestAt }: Scan, next: Search, k: string) {
 type Planned = { player: Player; damage: number; keyCost: number; reward: number };
 /** Advances a planned route by one tile using the game's own step rules;
  * false when the step is blocked or the fight would be lethal. */
-function apply(tile: Tile, n: Planned, c: Capabilities) {
+function apply(tile: Tile, n: Planned, c: Capabilities, hpPrice: number) {
   const before = n.player, outcome = resolveStep(before, tile);
   if (outcome.blocked || isLethal(outcome)) return false;
   n.player = outcome.player;
   n.damage += outcome.combat?.damage ?? 0;
   n.keyCost += keyCost(outcome.keysSpent, before, c);
-  n.reward += reward(tile, before, outcome, c);
+  n.reward += reward(tile, before, outcome, c, hpPrice);
   return true;
 }
 const KEY_SPEND_COST: Record<KeyColor, number> = { yellow: 12, blue: 25, red: 45 };
@@ -219,14 +226,14 @@ function keyCost(spent: KeyColor[], before: Player, c: Capabilities) {
 }
 /** What a pickup is worth: a flat value, or with contextual evaluation one
  * weighed against what the player holds and would heal. */
-function reward(tile: Tile, before: Player, outcome: StepEffect, c: Capabilities) {
-  return c.contextual ? contextualReward(tile, before, outcome) : PLAIN_REWARD[tile.kind] ?? 0;
+function reward(tile: Tile, before: Player, outcome: StepEffect, c: Capabilities, hpPrice: number) {
+  return c.contextual ? contextualReward(tile, before, outcome, hpPrice) : PLAIN_REWARD[tile.kind] ?? 0;
 }
 const PLAIN_REWARD: Partial<Record<Tile['kind'], number>> = { key: 10, potion: 12, attack: 15, defense: 15, treasure: 16 };
-function contextualReward(tile: Tile, before: Player, outcome: StepEffect) {
+function contextualReward(tile: Tile, before: Player, outcome: StepEffect, hpPrice: number) {
   switch (tile.kind) {
     case 'key': return (KEY_FIND_VALUE[tile.color!] ?? 10) / (1 + before.keys[tile.color!] * 0.2);
-    case 'potion': return outcome.healed * 0.55;
+    case 'potion': return outcome.healed * hpPrice;
     case 'attack': case 'defense': return 32;
     case 'treasure': return 16;
     default: return 0;

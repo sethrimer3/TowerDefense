@@ -40,7 +40,7 @@ const DESCRIBE: Partial<Record<Kind, Describe>> = {
     const e = t.enemy!, r = predict(p, e);
     return {
       title: RANK[e.strength] + e.name,
-      body: `<span>HP ${e.hp} · ATK ${e.attack} · DEF ${e.defense}</span><br><strong class="${r.survivable ? "safe" : "danger"}">${r.damage} damage · ${r.survivable ? "Survivable" : "LETHAL"}</strong>`,
+      body: `<span>HP ${e.hp} · ATK ${e.attack} · DEF ${e.defense}</span><br><strong class="${r.survivable ? "safe" : "danger"}">${Number.isFinite(r.damage) ? r.damage : "∞"} damage · ${r.survivable ? "Survivable" : "LETHAL"}</strong>`,
     };
   },
   wall: () => ({ title: "Wall", body: "Ancient stone. Find a passage around it." }),
