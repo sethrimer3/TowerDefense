@@ -95,6 +95,9 @@ export class Game {
   playsFights = false;
   /** The fight being played out, if any; steps wait until it settles. */
   encounter: Encounter | null = null;
+  /** The last potion picked up: the HP it healed from and to, and a number
+   * that grows with each, so the HP bar can fill up to it. */
+  lastHeal: { from: number; to: number; id: number } | null = null;
   summary: null | {
     height: number;
     kills: number;
@@ -818,6 +821,10 @@ export class Game {
       : null;
     if (text) {
       this.gain(x, y, text, { tile: { ...t } });
+      if (t.kind === "potion" && outcome.healed > 0) {
+        const hp = this.run.player.hp;
+        this.lastHeal = { from: hp - outcome.healed, to: hp, id: (this.lastHeal?.id ?? 0) + 1 };
+      }
       this.message = text;
     }
     if (t.kind === "treasure") {

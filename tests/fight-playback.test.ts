@@ -153,3 +153,13 @@ test("the board shows rewards one after another and each strike's damage as it l
   assert.deepEqual(lunges(fight, mid, true).hero, { dx: 0, dy: 0 }, "not with motion reduced");
   assert.ok(lunges(fight, 5000 + fight.bout.strikes[1].at, false).enemy.dx < -0.29);
 });
+
+test("a potion records the HP it healed from and to, for the HP bar to fill up", () => {
+  const g = arena({ kind: "potion", amount: 30 });
+  g.run.player.hp = 50;
+  g.move(1, 0);
+  assert.deepEqual(g.lastHeal, { from: 50, to: 80, id: 1 });
+  const full = arena({ kind: "potion", amount: 30 });
+  full.move(1, 0);
+  assert.equal(full.lastHeal, null, "a potion at full HP heals nothing to show");
+});

@@ -64,6 +64,7 @@ export const boardHeadingStale = (game: Game) => el("board").dataset.outside !==
 export function renderVitals(game: Game) {
   const p = game.run.player, hp = game.shownHp(performance.now());
   text("hp", `${hp} / ${p.maxHp}`);
+  renderHealthGain(game);
   el("health").style.width = `${(100 * hp) / p.maxHp}%`;
   renderHealthLoss(game.encounter ? p.hp - hp : 0, p.maxHp);
   text("attack", p.attack);
@@ -72,6 +73,35 @@ export function renderVitals(game: Game) {
   const skeletonKeys = p.skeletonKeys ?? 0;
   text("skeleton", skeletonKeys);
   el("skeleton-key").hidden = skeletonKeys < 1;
+}
+
+/** The last heal the HP bar has filled up to. */
+let shownHeal = 0;
+/** A potion just picked up: the red fill starts at the HP before it with the
+ * HP it healed in light red beyond, and grows over the light red in a
+ * second. A fight starting, or the next potion, stops it where it is. */
+function renderHealthGain(game: Game) {
+  const heal = game.lastHeal, fill = el("health"), gain = el("health-gain");
+  const settle = () => {
+    fill.classList.remove("healing");
+    gain.classList.remove("healing");
+    gain.style.width = "0%";
+  };
+  if (game.encounter) settle();
+  if (!heal || heal.id === shownHeal) return;
+  shownHeal = heal.id;
+  // Only the heal the HUD is looking at now fills up; one from before a
+  // reload, a new run or an undo is simply there.
+  if (heal.to !== game.run.player.hp || game.encounter) return;
+  const max = game.run.player.maxHp;
+  settle();
+  fill.style.width = `${(100 * heal.from) / max}%`;
+  gain.style.width = `${(100 * (heal.to - heal.from)) / max}%`;
+  void fill.offsetWidth; // Lay out the starting widths before the transition.
+  fill.classList.add("healing");
+  gain.classList.add("healing");
+  gain.style.width = "0%";
+  fill.addEventListener("transitionend", settle, { once: true });
 }
 
 /** The HP the fight being played out has cost so far, shown in purple just

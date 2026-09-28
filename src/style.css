@@ -261,6 +261,17 @@ h1 span {
   background: repeating-linear-gradient(90deg, #974759 0 5px, #b95f6c 5px 10px, #dc8890 10px 15px);
   height: 100%;
 }
+/* The HP a potion just healed, just past the HP before it; the red fill
+ * grows over it as it shrinks. */
+#health-gain {
+  flex: none;
+  width: 0;
+  background: #e8a2a8;
+}
+#health.healing,
+#health-gain.healing {
+  transition: width 1s linear;
+}
 /* The HP a fight being played out has cost so far, just past what is left. */
 #health-loss {
   flex: none;
