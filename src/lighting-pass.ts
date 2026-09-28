@@ -53,7 +53,10 @@ function doorGlow(t: Tile) {
  * and items), or null when they give off none. */
 function tileGlow(t: Tile, breathe: number): Omit<GlowSource, "x" | "y"> | null {
   const og = LIGHTING_CONFIG.objectGlow, dk = LIGHTING_CONFIG.darkness;
-  if (t.kind === "enemy") return { rgb: og.enemy.color, radius: og.enemy.radius, strength: og.enemy.strength * breathe };
+  if (t.kind === "enemy") {
+    const glow = og.enemy[t.enemy!.strength];
+    return { rgb: glow.color, radius: glow.radius, strength: glow.strength * breathe };
+  }
   if (GLOW_ITEMS.has(t.kind)) return { rgb: og.item.color, radius: og.item.radius, strength: og.item.strength * breathe };
   if (t.kind === "door") return { rgb: doorGlow(t), radius: og.door.radius, strength: og.door.strength, door: true };
   if (t.kind === "stairs" || t.kind === "stairsDown")

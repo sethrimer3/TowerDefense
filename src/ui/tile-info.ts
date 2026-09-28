@@ -1,4 +1,4 @@
-import type { Kind, Player, Tile } from "../entities.ts";
+import type { EnemyStrength, Kind, Player, Tile } from "../entities.ts";
 import type { Game, RouteEffects } from "../state.ts";
 import { ATTACK_SHARD, DEFENSE_SHARD, resolveStep } from "../step-effects.ts";
 import { predict } from "../combat.ts";
@@ -32,11 +32,14 @@ const stairs: Describe = (t, _p, g) => {
   return { title: t.kind === "stairs" ? "Stairs Up" : "Stairs Down", body: `Leads to Floor ${target}` };
 };
 
+/** Strong and elite enemies say so in the inspect title. */
+const RANK: Record<EnemyStrength, string> = { weak: "", normal: "", strong: "Strong ", elite: "Elite " };
+
 const DESCRIBE: Partial<Record<Kind, Describe>> = {
   enemy: (t, p) => {
     const e = t.enemy!, r = predict(p, e);
     return {
-      title: e.name,
+      title: RANK[e.strength] + e.name,
       body: `<span>HP ${e.hp} · ATK ${e.attack} · DEF ${e.defense}</span><br><strong class="${r.survivable ? "safe" : "danger"}">${r.damage} damage · ${r.survivable ? "Survivable" : "LETHAL"}</strong>`,
     };
   },

@@ -19,12 +19,16 @@ export type Kind =
   | "stairs"
   | "stairsDown"
   | "oneway";
+/** How hard a generator asked an enemy to be. Strong and elite enemies wear
+ * a brighter glow and rank chevrons, so the player can tell them apart. */
+export type EnemyStrength = "weak" | "normal" | "strong" | "elite";
 export type Enemy = {
   name: string;
   hp: number;
   attack: number;
   defense: number;
   tier: number;
+  strength: EnemyStrength;
 };
 export type ClearTier = "silver" | "gold" | "platinum";
 /** A floor's clear tiers: each one earned, and then claimed once paid. */

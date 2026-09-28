@@ -1,22 +1,22 @@
 import { CHUNK, COLORS } from "./config.ts";
 import { drawCornerBricks, drawTerrain, themeAt, type Corner } from "./themes.ts";
 import { tileRandom } from "./random.ts";
-import type { Mode, Tile, Torch } from "./entities.ts";
+import type { Enemy, EnemyStrength, Mode, Tile, Torch } from "./entities.ts";
 import { drawForestTile } from "./outside.ts";
 import { getTorchFlicker, getTorchSway } from "./lighting.ts";
 import { drawArea1Door, drawArea1Item, drawArea1Quoins, wallAdjacencyMask } from "./area1-tileset.ts";
 import { drawThemedTile } from "./themed-tilesets.ts";
 import { doorColor } from "./doors.ts";
-import { drawEnemySprite } from "./enemy-sprites.ts";
+import { drawEnemySprite, enemySpriteReady } from "./enemy-sprites.ts";
 import { drawGameSprite, drawGameSpriteFrame, gameSprite, torchAnimationFrame, TORCH_FRAME_COUNT } from "./game-sprites.ts";
 
 // Everything here paints in 24x24 tile space: the caller translates and
 // scales the context to the tile first.
 
-/** Thin outline colors that mark ground items/treasure as interactable and
- * enemies as hostile, independent of each sprite's own fill colors. */
+/** Thin outline colors that mark ground items/treasure as interactable,
+ * independent of each sprite's own fill colors. Enemies have their own look
+ * (ENEMY_LOOK). */
 const DARK_GOLD = "#6e4c17";
-const DARK_RED = "#6e1c26";
 const DARK_ORANGE = "#7d3f14";
 const DARK_BLUE = "#1a3670";
 /** Outline thickness in sprite pixels (24x24 sprite space) — chunky pixel-art
@@ -367,16 +367,97 @@ const ENEMY_BODIES: ((c: CanvasRenderingContext2D) => void)[] = [
   },
 ];
 
+/** A band round an enemy's silhouette: every pixel within `r` sprite pixels
+ * of it, in `color` at `alpha`. */
+type Ring = { r: number; color: string; alpha: number };
+const RED = "#9c1f2e", BRIGHT_RED = "#ff3b2b", GOLD_RIM = "#f4c64e", CHEVRON = "#ffe6a8";
+/** How an enemy's strength shows: bands outside its black outline (the
+ * outermost first), and rank chevrons over the sprite. Normal is a dark red
+ * rim fading out, strong a bright red one with one chevron, elite a bright
+ * red band inside a gold rim with two. Only opaque bands cast torch shadows
+ * (see toShadow in entity-lighting.ts), so the faint outer glow never
+ * fattens one. */
+const ENEMY_LOOK: Record<EnemyStrength, { rings: Ring[]; chevrons: number }> = {
+  weak: { rings: [{ r: 3, color: RED, alpha: 0.3 }, { r: 2, color: RED, alpha: 1 }], chevrons: 0 },
+  normal: { rings: [{ r: 3, color: RED, alpha: 0.3 }, { r: 2, color: RED, alpha: 1 }], chevrons: 0 },
+  strong: { rings: [{ r: 3, color: BRIGHT_RED, alpha: 0.45 }, { r: 2, color: BRIGHT_RED, alpha: 1 }], chevrons: 1 },
+  elite: { rings: [{ r: 3, color: GOLD_RIM, alpha: 1 }, { r: 2, color: BRIGHT_RED, alpha: 1 }], chevrons: 2 },
+};
+/** The one-pixel black outline hugging every enemy, inside its glow.
+ * Cardinal only, so the silhouette's outer corners stay crisp. */
+const ENEMY_OUTLINE: Ring = { r: 1, color: "#0b0a0e", alpha: 1 };
+/** Room round a baked enemy for its outermost ring. */
+const ENEMY_MARGIN = 3;
+/** Baked enemies by name, tier, strength, and whether the sprite art drew. */
+const bakedEnemies = new Map<string, HTMLCanvasElement>();
+
 function paintEnemy(c: CanvasRenderingContext2D, t: Tile, art: TileArt) {
-  const tier = t.enemy!.tier;
+  const e = t.enemy!;
   groundShadow(c, 12, 21, 8, 2.6, 0.4);
-  withOutline(c, DARK_RED, (c) => {
-    if (!art.spritesOff && drawEnemySprite(c, t.enemy!.name)) return;
-    (ENEMY_BODIES[tier] ?? ENEMY_BODIES[3])(c);
-    c.fillStyle = tier === 1 ? "#17202a" : "#f5ca7d";
-    c.fillRect(9, 11, 2, 2);
-    c.fillRect(15, 11, 2, 2);
-  });
+  const sprite = !art.spritesOff && enemySpriteReady(e.name);
+  const key = `${e.name}|${e.tier}|${e.strength}|${sprite}`;
+  let baked = bakedEnemies.get(key);
+  if (!baked) bakedEnemies.set(key, (baked = bakeEnemy(e, sprite)));
+  c.drawImage(baked, -ENEMY_MARGIN, -ENEMY_MARGIN);
+}
+
+/** An enemy with its glow, outline, and chevrons, on a canvas ENEMY_MARGIN
+ * wider than the tile on every side. The rings go on from the outside in,
+ * each cutting out what lies inside it first, so every band keeps exactly
+ * its own opacity; the sprite goes on last. */
+function bakeEnemy(e: Enemy, sprite: boolean) {
+  const m = ENEMY_MARGIN, body = square(24), bc = body.getContext("2d")!;
+  if (!(sprite && drawEnemySprite(bc, e.name))) paintEnemyBody(bc, e.tier);
+  const out = square(24 + 2 * m), oc = out.getContext("2d")!;
+  const look = ENEMY_LOOK[e.strength];
+  for (const ring of [...look.rings, ENEMY_OUTLINE]) {
+    const band = dilated(body, ring, m);
+    oc.globalAlpha = 1;
+    oc.globalCompositeOperation = "destination-out";
+    oc.drawImage(band, 0, 0);
+    oc.globalCompositeOperation = "source-over";
+    oc.globalAlpha = ring.alpha;
+    oc.drawImage(band, 0, 0);
+  }
+  oc.globalAlpha = 1;
+  oc.drawImage(body, m, m);
+  for (let i = 0; i < look.chevrons; i++) chevron(oc, m + 1, m + 1 + i * 4);
+  return out;
+}
+
+/** `body`'s silhouette grown by `ring.r` pixels (a round disc of shifts, or
+ * the four cardinal ones at r = 1) in the ring's color, offset by margin `m`. */
+function dilated(body: HTMLCanvasElement, ring: Ring, m: number) {
+  const size = body.width + 2 * m, band = square(size), c = band.getContext("2d")!;
+  for (let dy = -ring.r; dy <= ring.r; dy++)
+    for (let dx = -ring.r; dx <= ring.r; dx++) if (dx * dx + dy * dy <= ring.r * ring.r) c.drawImage(body, m + dx, m + dy);
+  c.globalCompositeOperation = "source-in";
+  c.fillStyle = ring.color;
+  c.fillRect(0, 0, size, size);
+  return band;
+}
+
+/** One rank chevron: a small upward wedge, 5x3, on a black backing. */
+function chevron(c: CanvasRenderingContext2D, x: number, y: number) {
+  const rows = [[2, 1], [1, 3], [0, 5]] as const;
+  c.fillStyle = "#0b0a0e";
+  rows.forEach(([dx, w], i) => c.fillRect(x + dx - 1, y + i - 1, w + 2, 3));
+  c.fillStyle = CHEVRON;
+  rows.forEach(([dx, w], i) => c.fillRect(x + dx, y + i, w, 1));
+}
+
+/** The procedural body for a tier, for when sprite art is off or missing. */
+function paintEnemyBody(c: CanvasRenderingContext2D, tier: number) {
+  (ENEMY_BODIES[tier] ?? ENEMY_BODIES[3])(c);
+  c.fillStyle = tier === 1 ? "#17202a" : "#f5ca7d";
+  c.fillRect(9, 11, 2, 2);
+  c.fillRect(15, 11, 2, 2);
+}
+
+function square(size: number) {
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = size;
+  return canvas;
 }
 
 /** The hero with its grounding shadow and outline. */

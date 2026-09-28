@@ -309,13 +309,14 @@ test("strong gate enemies are hardened locals and elites come from the next zone
     for (const profile of ["attackHeavy", "balanced", "defenseHeavy"] as const) {
       const local = getTowerEnemy(room, () => 0, profile);
       for (const strength of ["weak", "normal"] as const)
-        assert.deepEqual(getTowerGateEnemy(room, strength, profile), local);
+        assert.deepEqual(getTowerGateEnemy(room, strength, profile), { ...local, strength });
       const strong = getTowerGateEnemy(room, "strong", profile);
       assert.equal(strong.name, local.name);
       assert.equal(strong.tier, 2);
+      assert.equal(strong.strength, "strong");
       for (const stat of ["hp", "attack", "defense"] as const) assert.equal(strong[stat], Math.round(local[stat] * 1.25));
       const elite = getTowerGateEnemy(room, "elite", profile);
-      assert.deepEqual(elite, { ...getTowerEnemy(room + 10, () => 0, profile), tier: 3 });
+      assert.deepEqual(elite, { ...getTowerEnemy(room + 10, () => 0, profile), tier: 3, strength: "elite" });
     }
   }
 });

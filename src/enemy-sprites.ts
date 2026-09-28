@@ -20,6 +20,12 @@ function image(name: string) {
   return sprite;
 }
 
+/** Whether the named enemy's sprite has loaded (and starts loading it). */
+export function enemySpriteReady(name: string) {
+  const sprite = image(name);
+  return sprite.complete && sprite.naturalWidth > 0;
+}
+
 /** Draws a complete 96px source sprite into one 24px game tile. Returns
  * false while loading or after an asset error so the procedural fallback
  * remains available. */

@@ -141,7 +141,7 @@ export class EntityLighting {
       if (!SHADOW_CASTERS.has(t.kind)) return;
       casters.push({
         x, y,
-        key: `${t.kind}|${t.color}|${t.tier}|${t.enemy?.name ?? ""}|${area1}`,
+        key: `${t.kind}|${t.color}|${t.tier}|${t.enemy?.name ?? ""}|${t.enemy?.tier}|${t.enemy?.strength}|${area1}`,
         draw: (c) => paintContents(c, t, { x, y, time: f.now, spritesOff, reduceMotion, area1 }),
       });
     });

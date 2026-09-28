@@ -272,7 +272,8 @@ await dialogsTour("floor");
 await load("rich");
 await boardTour("rich", "rich");
 await dialogsTour("rich");
-await tab("delve");
+// The rich save has no Delve run yet, so entering the Delve rolls one.
+await page.evaluate(() => { window.__reseed(778); document.querySelector('[data-tab="delve"]').click(); });
 await shot("rich.delve");
 await tab("defend");
 await shot("rich.defend");

@@ -97,7 +97,14 @@ export const LIGHTING_CONFIG = {
    * falloff; on wall tiles it is brighter but reaches only half as far,
    * so nearby stone catches a bright wash as if lit on its face. */
   objectGlow: {
-    enemy: { color: [235, 70, 60], radius: 1.2, strength: 1.05 },
+    /** Enemies glow by strength, wider and brighter as they get tougher,
+     * matching the glow painted round their sprites. */
+    enemy: {
+      weak: { color: [235, 70, 60], radius: 1.2, strength: 1.05 },
+      normal: { color: [235, 70, 60], radius: 1.2, strength: 1.05 },
+      strong: { color: [255, 60, 40], radius: 1.4, strength: 1.25 },
+      elite: { color: [255, 110, 50], radius: 1.6, strength: 1.4 },
+    },
     item: { color: [255, 200, 90], radius: 1.1, strength: 1 },
     /** Doors glow in their lock color; heart doors magenta, steel doors grey.
      * `onTop` is a faint wash of that color over the door sprite itself. */

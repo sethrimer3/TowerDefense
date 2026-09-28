@@ -386,7 +386,7 @@ function gateTile({ rng }: Lab, g: LaneStep, n: Node): Tile {
   const population = Math.max(0, Math.round(n.influence + (rng() - 0.5) * 0.8));
   const tier = population % 4, depth = n.depth;
   return { kind: 'enemy', enemy: {
-    name: ENEMY_NAMES[tier], tier,
+    name: ENEMY_NAMES[tier], tier, strength: g.strength,
     hp: Math.round((12 + depth * 0.6) * scale * shape.hp),
     attack: Math.round((6 + depth / 16) * scale * shape.attack),
     defense: Math.floor(depth / 65) + tough + shape.defense,

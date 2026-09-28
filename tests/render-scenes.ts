@@ -50,8 +50,8 @@ const PLANTS: Tile[] = [
   { kind: "potion" }, { kind: "potion", color: "red", amount: 60 }, { kind: "attack" }, { kind: "defense" },
   { kind: "treasure" }, { kind: "openedChest" }, { kind: "openedChest", tier: "gold" },
   { kind: "reward", tier: "silver" }, { kind: "reward", tier: "gold" }, { kind: "reward", tier: "platinum" },
-  ...[0, 1, 2, 3].map((tier): Tile => ({ kind: "enemy", enemy: { name: `Planted ${tier}`, hp: 20, attack: 5, defense: 1, tier } })),
-  { kind: "enemy", enemy: { name: "Slime", hp: 20, attack: 5, defense: 1, tier: 0 } },
+  ...(["weak", "normal", "strong", "elite"] as const).map((strength, tier): Tile => ({ kind: "enemy", enemy: { name: `Planted ${tier}`, hp: 20, attack: 5, defense: 1, tier, strength } })),
+  { kind: "enemy", enemy: { name: "Slime", hp: 20, attack: 5, defense: 1, tier: 0, strength: "elite" } },
   { kind: "stairs" }, { kind: "stairsDown" }, { kind: "oneway" },
 ];
 /** Fills plain floor near the player, nearest first, with every plant. */

@@ -198,7 +198,7 @@ Enemy power in both modes should derive from the shared equivalent-floor value `
 
 1. **One shared reference curve.** Tower floor `F` and Delve depth `10F` should target approximately the same player power.
 2. **Enemy identity may modify the curve.** Tanks, glass cannons, guardians, etc. can redistribute HP/Attack/Defense without changing the overall progression tier.
-3. **Bosses/elites may exceed the local budget.** Their multiplier should be explicit and data-driven. In the Tower this is `TOWER_ENEMY_STRENGTH` (`src/scaling.ts`): weak and normal enemies use their floor's zone roster as is, strong enemies use it with every stat ×1.25 (tier 2), and elite enemies come from the next zone's roster (tier 3). Tier raises the XP a kill pays.
+3. **Bosses/elites may exceed the local budget.** Their multiplier should be explicit and data-driven. In the Tower this is `TOWER_ENEMY_STRENGTH` (`src/scaling.ts`): weak and normal enemies use their floor's zone roster as is, strong enemies use it with every stat ×1.25 (tier 2), and elite enemies come from the next zone's roster (tier 3). Tier raises the XP a kill pays. Every enemy carries its `strength`, which the board shows: a dark red rim for normal, a bright red rim and one chevron for strong, bright red inside a gold rim and two chevrons for elite.
 4. **Do not balance only for first reach.** The curve must also leave room for research/equipment to convert previously difficult floors into Silver/Gold mastery content.
 5. **Persistent power should matter more than temporary floor pickups at checkpoint milestones.** See the checkpoint section below.
 

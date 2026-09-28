@@ -46,6 +46,10 @@ _Avoid_: split path, branch (a branch is an optional side room)
 One way through a fork: one to three tiles of gates walked in order, sometimes with an item between them (a treasure, or a key that pays for the door after it).
 _Avoid_: corridor, path
 
+**Enemy strength**:
+How hard the floor asked an enemy to be: weak, normal, strong or elite. Strong enemies are the zone's own made tougher, elite ones come from the next zone. The board shows it round the enemy (a dark red rim for normal, bright red with one chevron for strong, bright red inside a gold rim with two chevrons for elite) and the inspect title names strong and elite.
+_Avoid_: tier (a tier is the XP a kill pays), rank, level
+
 ### The character
 
 **Loadout**:

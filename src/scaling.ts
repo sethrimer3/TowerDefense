@@ -1,4 +1,5 @@
 import type { MaterialId } from "./materials.ts";
+import type { EnemyStrength } from "./entities.ts";
 
 export type TowerEnemyProfile = "attackHeavy" | "balanced" | "defenseHeavy";
 
@@ -99,7 +100,7 @@ export function getTowerEnemy(room: number, rng: () => number, forceProfile?: To
 }
 
 /** How hard a Tower floor's generator asks an enemy to be. */
-export type TowerEnemyStrength = "weak" | "normal" | "strong" | "elite";
+export type TowerEnemyStrength = EnemyStrength;
 
 /** How far each strength exceeds the floor's own zone: the roster it comes
  * from (zones ahead), a multiplier on every stat, and its tier (which sets
@@ -123,5 +124,6 @@ export function getTowerGateEnemy(room: number, strength: TowerEnemyStrength, pr
     attack: Math.round(base.attack * multiplier),
     defense: Math.round(base.defense * multiplier),
     tier,
+    strength,
   };
 }
