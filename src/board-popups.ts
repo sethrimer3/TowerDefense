@@ -107,7 +107,7 @@ export class BoardPopups {
     c.globalAlpha = alpha;
     toTileSpace(c, f, p.x, p.y + rise);
     if ("tile" in art)
-      paintContents(c, art.tile, { x: p.x, y: p.y, time: f.now, spritesOff: look.spritesOff, reduceMotion: look.reduceMotion, area1: look.area1 });
+      paintContents(c, art.tile, { x: p.x, y: p.y, time: f.now, spritesOff: look.spritesOff, reduceMotion: look.reduceMotion, area1: look.area1, lifted: true });
     else {
       c.imageSmoothingEnabled = false;
       c.drawImage(image!, 3, 3, 18, 18);

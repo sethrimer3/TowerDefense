@@ -89,9 +89,6 @@ export class Game {
   effect = { text: "", x: 0, y: 0, until: 0 };
   /** Rewards picked up since the board last took them, oldest first. */
   gains: Gain[] = [];
-  /** Plays each fight out round by round (the app's default) instead of
-   * settling it at once; a future setting will choose. */
-  animateFights = false;
   /** The fight being played out, if any; steps wait until it settles. */
   encounter: Encounter | null = null;
   summary: null | {
@@ -552,7 +549,8 @@ export class Game {
       this.feedback("Lethal encounter. Inspect the enemy before proceeding.");
       return false;
     }
-    if (t.kind === "enemy" && this.animateFights) {
+    // The Animate fights setting plays the fight out before it counts.
+    if (t.kind === "enemy" && this.save.settings.fightAnimation) {
       this.encounter = {
         from: { x: p.x, y: p.y }, to: dest, bout: bout(p, t.enemy!), start: performance.now(),
         settle: () => this.take(t, outcome, dest, track),

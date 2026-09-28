@@ -48,6 +48,9 @@ export const SETTINGS = {
   },
   /** Unlimited currency, every floor section and game mode unlocked. */
   devMode: { kind: "toggle", default: false, page: { id: "dev-mode", label: "Dev mode (unlimited currency, all floors &amp; modes unlocked)" } },
+  /** Play each fight out strike by strike, damage rising off whoever was
+   * struck, instead of settling it at once. */
+  fightAnimation: { kind: "toggle", default: false, page: { id: "fight-animation", label: "Animate fights" } },
 } as const satisfies Record<string, Setting>;
 
 export type SettingKey = keyof typeof SETTINGS;

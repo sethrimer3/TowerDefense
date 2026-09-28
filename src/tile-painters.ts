@@ -41,8 +41,10 @@ export type BoardLook = {
 };
 type TileWorld = { tile(x: number, y: number): Tile | undefined };
 /** What a contents painter needs besides the tile: its position (for
- * per-tile variation), the time (for sparkles), and which art to use. */
-export type TileArt = { x: number; y: number; time: number; spritesOff: boolean; reduceMotion: boolean; area1: boolean };
+ * per-tile variation), the time (for sparkles), and which art to use.
+ * `lifted` items are off the ground (a reward rising from its tile), so they
+ * cast no ground shadow. */
+export type TileArt = { x: number; y: number; time: number; spritesOff: boolean; reduceMotion: boolean; area1: boolean; lifted?: boolean };
 
 /** The first Tower section has its own hand-drawn doors, chests, and floor. */
 export const isArea1 = (mode: Mode, height: number) => mode === "tower" && height >= 0 && height < 10;
@@ -177,7 +179,7 @@ function paintStairsDown(c: CanvasRenderingContext2D, _t: Tile, art: TileArt) {
 }
 
 function paintKey(c: CanvasRenderingContext2D, t: Tile, art: TileArt) {
-  groundShadow(c, 11, 18, 5, 1.8, 0.3);
+  if (!art.lifted) groundShadow(c, 11, 18, 5, 1.8, 0.3);
   withOutline(c, DARK_GOLD, (c) => {
     if (!art.spritesOff && drawArea1Item(c, t)) return;
     c.strokeStyle = COLORS[t.color!];
@@ -207,7 +209,7 @@ function paintDoor(c: CanvasRenderingContext2D, t: Tile, art: TileArt) {
 }
 
 function paintPotion(c: CanvasRenderingContext2D, t: Tile, art: TileArt) {
-  groundShadow(c, 12, 22, 6, 1.6, 0.3);
+  if (!art.lifted) groundShadow(c, 12, 22, 6, 1.6, 0.3);
   withOutline(c, DARK_GOLD, (c) => {
     if (!art.spritesOff && drawArea1Item(c, t)) return;
     const isPercent = t.color === "red";
@@ -236,7 +238,7 @@ function paintPotion(c: CanvasRenderingContext2D, t: Tile, art: TileArt) {
 }
 
 function paintAttack(c: CanvasRenderingContext2D, t: Tile, art: TileArt) {
-  groundShadow(c, 12, 22, 6, 1.6, 0.3);
+  if (!art.lifted) groundShadow(c, 12, 22, 6, 1.6, 0.3);
   withOutline(c, DARK_GOLD, (c) => {
     if (!art.spritesOff && drawArea1Item(c, t)) return;
     c.save();
@@ -255,7 +257,7 @@ function paintAttack(c: CanvasRenderingContext2D, t: Tile, art: TileArt) {
 }
 
 function paintDefense(c: CanvasRenderingContext2D, t: Tile, art: TileArt) {
-  groundShadow(c, 12, 22, 6, 1.6, 0.3);
+  if (!art.lifted) groundShadow(c, 12, 22, 6, 1.6, 0.3);
   withOutline(c, DARK_GOLD, (c) => {
     if (!art.spritesOff && drawArea1Item(c, t)) return;
     c.fillStyle = "#9cb0c2";
@@ -276,7 +278,7 @@ function paintDefense(c: CanvasRenderingContext2D, t: Tile, art: TileArt) {
 }
 
 function paintOpenedChest(c: CanvasRenderingContext2D, t: Tile, art: TileArt) {
-  groundShadow(c, 12, 22.5, 9, 1.8, 0.25);
+  if (!art.lifted) groundShadow(c, 12, 22.5, 9, 1.8, 0.25);
   withOutline(c, DARK_GOLD, (c) => {
     if (art.area1 && drawArea1Item(c, t)) return;
     const metal = t.tier ? { silver: "#9aa8b8", gold: "#d5a943", platinum: "#8fd4d8" }[t.tier] : "#b98a3e";
@@ -286,7 +288,7 @@ function paintOpenedChest(c: CanvasRenderingContext2D, t: Tile, art: TileArt) {
 }
 
 function paintReward(c: CanvasRenderingContext2D, t: Tile, art: TileArt) {
-  groundShadow(c, 12, 22.5, 8, 1.8, 0.32);
+  if (!art.lifted) groundShadow(c, 12, 22.5, 8, 1.8, 0.32);
   withOutline(c, DARK_GOLD, (c) => {
     if (art.area1 && drawArea1Item(c, t)) return;
     const metal = { silver: "#c5d0df", gold: "#f5cd62", platinum: "#bcfff3" }[t.tier!];
@@ -313,7 +315,7 @@ function paintReward(c: CanvasRenderingContext2D, t: Tile, art: TileArt) {
 }
 
 function paintTreasure(c: CanvasRenderingContext2D, t: Tile, art: TileArt) {
-  groundShadow(c, 12, 22.5, 8, 1.8, 0.32);
+  if (!art.lifted) groundShadow(c, 12, 22.5, 8, 1.8, 0.32);
   withOutline(c, DARK_GOLD, (c) => {
     if (art.area1 && drawArea1Item(c, t)) return;
     c.fillStyle = "#d0a34d";

@@ -15,7 +15,7 @@ const foe = (over: Partial<Enemy> = {}): Enemy => ({ name: "Slime", hp: 30, atta
  * stairs in the far corner and an enemy that keeps the floor from clearing. */
 function arena(east: Tile, animate = true) {
   const g = new Game(defaults());
-  g.animateFights = animate;
+  g.save.settings.fightAnimation = animate;
   // The deadlock search reads the floor regenerated from the seed, not this one.
   g.checkDeadlock = () => {};
   const w = g.world as RoomWorld;

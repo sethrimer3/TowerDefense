@@ -182,7 +182,7 @@ function playBoard(name: string, seed: number, canvas: HTMLCanvasElement, grab: 
     grab("settled");
     const to = scene.to ?? neighbour(g), from = { ...g.run.player };
     if (scene.fight) {
-      g.animateFights = true;
+      g.save.settings.fightAnimation = true;
       g.move(to.x - from.x, to.y - from.y);
       g.encounter!.start = 1400;
     } else {

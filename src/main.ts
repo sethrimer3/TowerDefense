@@ -24,8 +24,6 @@ import { renderSettingsPage } from "./ui/settings-page.ts";
 
 buildShell(document.querySelector<HTMLDivElement>("#app")!);
 const game = new Game(load());
-// Fights play out strike by strike; a future setting will offer settling them at once.
-game.animateFights = true;
 const renderer = new Renderer(document.querySelector("#world")!, game);
 {
   const portraitCtx = (document.querySelector("#portrait-sprite") as HTMLCanvasElement).getContext("2d")!;

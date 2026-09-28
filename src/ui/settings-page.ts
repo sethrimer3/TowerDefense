@@ -7,7 +7,7 @@ import { MODES } from "../modes.ts";
 /** The settings on the page, in order; each control comes from its row in
  * SETTINGS. */
 const PAGE = [
-  "speed", "transition", "brightness", "spritesOff", "decorOff", "batterySaver", "showArrows", "reduceMotion", "weatherSound",
+  "speed", "transition", "fightAnimation", "brightness", "spritesOff", "decorOff", "batterySaver", "showArrows", "reduceMotion", "weatherSound",
   "infoDisplay", "oneTapMove", "devMode",
 ] as const satisfies readonly SettingKey[];
 type PageKey = (typeof PAGE)[number];
