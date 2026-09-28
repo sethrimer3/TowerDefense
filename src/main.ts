@@ -24,6 +24,8 @@ import { renderSettingsPage } from "./ui/settings-page.ts";
 
 buildShell(document.querySelector<HTMLDivElement>("#app")!);
 const game = new Game(load());
+// The frame loop settles fights as they finish playing out.
+game.playsFights = true;
 const renderer = new Renderer(document.querySelector("#world")!, game);
 {
   const portraitCtx = (document.querySelector("#portrait-sprite") as HTMLCanvasElement).getContext("2d")!;

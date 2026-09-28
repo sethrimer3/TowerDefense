@@ -89,6 +89,10 @@ export class Game {
   effect = { text: "", x: 0, y: 0, until: 0 };
   /** Rewards picked up since the board last took them, oldest first. */
   gains: Gain[] = [];
+  /** Whether something settles fights played out (the app's frame loop).
+   * A game without one (tests, tools) settles every fight at once, whatever
+   * the Animate fights setting says. */
+  playsFights = false;
   /** The fight being played out, if any; steps wait until it settles. */
   encounter: Encounter | null = null;
   summary: null | {
@@ -550,7 +554,7 @@ export class Game {
       return false;
     }
     // The Animate fights setting plays the fight out before it counts.
-    if (t.kind === "enemy" && this.save.settings.fightAnimation) {
+    if (t.kind === "enemy" && this.playsFights && this.save.settings.fightAnimation) {
       this.encounter = {
         from: { x: p.x, y: p.y }, to: dest, bout: bout(p, t.enemy!), start: performance.now(),
         settle: () => this.take(t, outcome, dest, track),
