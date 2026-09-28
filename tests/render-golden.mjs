@@ -45,7 +45,7 @@ await page.addInitScript(() => {
     return getContext.call(this, type, type === "2d" ? { ...options, willReadFrequently: true } : options);
   };
 });
-await page.goto("http://127.0.0.1:5173/");
+await page.goto(process.env.TEST_URL || "http://127.0.0.1:5173/");
 await page.evaluate(() => document.fonts.ready);
 
 const shots = await page.evaluate(async () => {

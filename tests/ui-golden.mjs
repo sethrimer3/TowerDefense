@@ -14,7 +14,7 @@ const UPDATE = process.env.UPDATE_GOLDEN === "1";
 const GOLDEN = new URL("./fixtures/ui.golden.json", import.meta.url);
 const BASELINE_DIR = "test-results/ui-golden";
 const OUT_DIR = "test-results/ui";
-const URL_ROOT = "http://127.0.0.1:5173/";
+const URL_ROOT = process.env.TEST_URL || "http://127.0.0.1:5173/";
 
 const browser = await chromium.launch({ headless: true, channel: process.env.PLAYWRIGHT_CHANNEL || "msedge" });
 const page = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1 });

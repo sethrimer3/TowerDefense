@@ -13,7 +13,7 @@ await page.addInitScript(() => {
     sessionStorage.removeItem("__fixture");
   }
 });
-await page.goto("http://127.0.0.1:5173/");
+await page.goto(process.env.TEST_URL || "http://127.0.0.1:5173/");
 await expect(page.locator(".dpad")).toBeHidden();
 
 const saved = () =>

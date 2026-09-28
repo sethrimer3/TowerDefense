@@ -8,7 +8,7 @@ try {
     const fixture = sessionStorage.getItem("outsideFixture");
     if (fixture) { localStorage.setItem("towerincramental.v1", fixture); sessionStorage.removeItem("outsideFixture"); }
   });
-  await page.goto("http://127.0.0.1:5173/");
+  await page.goto(process.env.TEST_URL || "http://127.0.0.1:5173/");
   await page.evaluate(async () => {
     const { Game } = await import("/src/state.ts"), { defaults } = await import("/src/save.ts");
     const g = new Game(defaults()); g.newRun({ outside: true }); g.save.upgrades.delve = 1;

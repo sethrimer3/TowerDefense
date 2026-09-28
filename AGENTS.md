@@ -26,7 +26,7 @@ node --experimental-transform-types tools/delve-ai-sim.ts   # headless Automove 
 npm run tiles:area1 / tiles:outside     # regenerate tile PNGs
 ```
 
-- Browser tests default to installed Microsoft Edge; set `PLAYWRIGHT_CHANNEL=chrome` otherwise. Screenshots go to `test-results/`. They hit `http://127.0.0.1:5173/` and seed state by writing the `towerincramental.v1` save into localStorage.
+- Browser tests default to installed Microsoft Edge; set `PLAYWRIGHT_CHANNEL=chrome` otherwise. Screenshots go to `test-results/`. They hit `http://127.0.0.1:5173/` (or `TEST_URL`, for a dev server on another port, such as one run from a separate worktree) and seed state by writing the `towerincramental.v1` save into localStorage.
 - Source imports use explicit `.ts` extensions (`allowImportingTsExtensions`) — required so Node can run them directly. Keep this in new imports.
 - `tsconfig` only includes `src/`; tests and tools are not type-checked by `npm run build`.
 - CI (`.github/workflows/static.yml`) runs `npm test` and `npm run build` on push to `main`, then deploys `dist/` to GitHub Pages. Vite `base: "./"` keeps asset paths relative — asset URLs must not be root-absolute (a test enforces this).

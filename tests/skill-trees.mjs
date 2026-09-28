@@ -3,7 +3,7 @@ const browser = await chromium.launch({headless:true,channel:'msedge'});
 const page = await browser.newPage({viewport:{width:390,height:844}});
 const errors=[];page.on('pageerror',e=>errors.push(e.message));
 await page.addInitScript(() => { const fixture = sessionStorage.getItem("__treeFixture"); if (fixture) { localStorage.setItem("towerincramental.v1", fixture); sessionStorage.removeItem("__treeFixture"); } });
-await page.goto('http://127.0.0.1:5173/');
+await page.goto(process.env.TEST_URL || 'http://127.0.0.1:5173/');
 await expect(page.locator('[data-tab="delve"]')).toBeHidden();
 await page.locator('[data-tab="upgrades"]').click();
 await page.locator('[data-skill="delve"]').click();

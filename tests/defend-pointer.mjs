@@ -12,7 +12,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 
 const UPDATE = process.env.UPDATE_GOLDEN === "1";
 const GOLDEN = new URL("./fixtures/defend-pointer.golden.json", import.meta.url);
-const URL_ROOT = "http://127.0.0.1:5173/";
+const URL_ROOT = process.env.TEST_URL || "http://127.0.0.1:5173/";
 
 const browser = await chromium.launch({ headless: true, channel: process.env.PLAYWRIGHT_CHANNEL || "msedge" });
 const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, hasTouch: true });
