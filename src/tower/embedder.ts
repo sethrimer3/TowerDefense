@@ -1,8 +1,9 @@
 import { TOWER_HEIGHT, TOWER_START_X, TOWER_WIDTH } from "../config.ts";
 import { point, type Tile } from "../entities.ts";
-import type { Gate, ShortcutRequest, StrategicGraph, StrategicNode } from "./types.ts";
+import type { Fork, Gate, ShortcutRequest, StrategicGraph, StrategicNode } from "./types.ts";
 import { area, inRect, minSide, centre, type Rect, type XY } from "./grid.ts";
-import { Furnisher, gateTile, type Dropped, type Placement } from "./furnisher.ts";
+import { Furnisher, gateTile, laneTile, type Dropped, type Placement } from "./furnisher.ts";
+import { forkDepth } from "./forks.ts";
 
 /** Layer B: express a StrategicGraph on the 17x17 grid.
  *
@@ -13,7 +14,10 @@ import { Furnisher, gateTile, type Dropped, type Placement } from "./furnisher.t
  * lock, or an open gap. A backtracking search assigns regions to chambers so
  * that every graph edge becomes a pair of neighbouring chambers, the main
  * route moves away from the entrance, and the stairs chamber reaches the
- * outer wall. Chamber contents are then arranged by furnisher.ts. */
+ * outer wall. A forked connection is several such doorways side by side,
+ * one per lane; a lane deeper than one tile runs through a band of rows
+ * taken from one of the two chambers. Chamber contents are then arranged
+ * by furnisher.ts. */
 
 const INTERIOR: Rect = { x1: 1, y1: 1, x2: TOWER_WIDTH - 2, y2: TOWER_HEIGHT - 2 };
 /** First tile inside the tower, directly below the entrance at (START_X, 0). */
@@ -36,7 +40,9 @@ export const EMBED_TUNING = {
 };
 
 export type { Placement };
-export type Doorway = { parent: number; child: number; x: number; y: number; shortcut: boolean };
+/** A connecting tile between two regions. A fork's lanes give one per lane
+ * tile, numbered by `lane`. */
+export type Doorway = { parent: number; child: number; x: number; y: number; shortcut: boolean; lane?: number };
 export type Embedding = {
   /** The graph as actually furnished (niche fallbacks may move rewards). */
   graph: StrategicGraph;
@@ -183,7 +189,7 @@ function startHallFits(r: Rect | undefined, start: StrategicNode) {
   return !!r && area(r) >= need(start) && minSide(r) >= 3;
 }
 
-function assign(graph: StrategicGraph, rects: Rect[], neighbours: number[][], rng: () => number): number[] | null {
+function assign(graph: StrategicGraph, rects: Rect[], { neighbours, between }: Pick<ReturnType<typeof doorwayCandidates>, "neighbours" | "between">, rng: () => number): number[] | null {
   const order = embedOrder(graph);
   const leafOf: number[] = graph.nodes.map(() => -1);
   const used = new Set<number>();
@@ -197,6 +203,8 @@ function assign(graph: StrategicGraph, rects: Rect[], neighbours: number[][], rn
     let s = -Math.abs(area(r) - EMBED_TUNING.idealArea[node.footprint]) * 0.35;
     // Hubs are chambers, not corridors.
     if (node.footprint === "hall" && minSide(r) < 3) s -= 8;
+    // A fork wants a shared wall long enough for its lanes side by side.
+    if (node.forks && between(leafOf[node.parent!], leaf).length >= node.forks[0].lanes.length * 2 - 1) s += 4;
     if (node.route === "main") {
       // The main route should travel away from the entrance.
       s += (distFromEntrance(r) - distFromEntrance(rects[leafOf[node.parent!]])) * 0.8;
@@ -262,8 +270,9 @@ type Layout = { rects: Rect[]; leafOf: number[]; between: (a: number, b: number)
 function tryLayout(graph: StrategicGraph, rng: () => number): Layout | null {
   const rects = partition(graph.nodes.length, rng);
   if (!rects) return null;
-  const { between, neighbours } = doorwayCandidates(rects);
-  const leafOf = assign(graph, rects, neighbours, rng);
+  const candidates = doorwayCandidates(rects);
+  const leafOf = assign(graph, rects, candidates, rng);
+  const { between } = candidates;
   return leafOf && { rects, leafOf, between };
 }
 
@@ -299,7 +308,7 @@ class FloorBuilder {
   private between: Layout["between"];
 
   constructor(graph: StrategicGraph, { rects, leafOf, between }: Layout, private rng: () => number) {
-    this.rects = rects;
+    this.rects = rects.map((r) => ({ ...r }));
     this.leafOf = leafOf;
     this.between = between;
     // Work on a copy: furnishing mutates reward lists (niche fallbacks).
@@ -312,6 +321,7 @@ class FloorBuilder {
   }
 
   build(): Embedding | null {
+    this.carveForks();
     if (!this.connectRegions()) return null;
     const shortcutsPlaced = this.placeShortcuts();
     const stairs = this.placeStairs();
@@ -328,7 +338,7 @@ class FloorBuilder {
   /** A doorway from each region's parent into it, holding its gate. */
   private connectRegions() {
     for (const node of this.graph.nodes) {
-      if (node.parent === null) continue;
+      if (node.parent === null || node.forks) continue;
       const c = this.chooseDoorway(node.parent, node.id);
       if (!c) return false;
       this.cut(c, node.gate);
@@ -352,13 +362,127 @@ class FloorBuilder {
   /** The doorway between regions a and b: centred doorways read as
    * authored, a little jitter keeps variety, and doorways keep apart. */
   private chooseDoorway(a: number, b: number) {
-    const options = this.between(this.leafOf[a], this.leafOf[b]).filter((c) => !this.nearDoor(c, 1));
+    const options = this.doorwayOptions(a, b);
     if (!options.length) return null;
     const mid = options.reduce((s, c) => [s[0] + c.x / options.length, s[1] + c.y / options.length], [0, 0]);
     const score = (c: Candidate) =>
       Math.abs(c.x - mid[0]) + Math.abs(c.y - mid[1]) + this.rng() * 1.5 +
       (c.inA[0] === ENTRY[0] && c.inA[1] === ENTRY[1] ? 3 : 0) + (this.nearDoor(c, 2) ? 4 : 0);
     return options.sort((p, q) => score(p) - score(q))[0];
+  }
+
+  /** Wall tiles that can still join regions a and b: both sides inside
+   * their chambers as they now stand, and no doorway beside them. */
+  private doorwayOptions(a: number, b: number) {
+    const ra = this.rects[this.leafOf[a]], rb = this.rects[this.leafOf[b]];
+    return this.between(this.leafOf[a], this.leafOf[b])
+      .filter((c) => inRect(ra, ...c.inA) && inRect(rb, ...c.inB) && !this.nearDoor(c, 1));
+  }
+
+  // ---------------------------------------------------------------- forks
+
+  /** Each forked region's way in: the first of its forks that fits, else
+   * none, and connectRegions cuts its single gate instead. */
+  private carveForks() {
+    for (const node of this.graph.nodes) {
+      if (!node.forks) continue;
+      const built = node.forks.find((fork) => this.carveFork(node, fork));
+      if (built) node.forks = [built];
+      else delete node.forks;
+    }
+  }
+
+  /** Lays one fork's lanes between a region and its parent, or returns
+   * false (changing nothing) when they don't fit. */
+  private carveFork(node: StrategicNode, fork: Fork): boolean {
+    const parent = node.parent!, depth = forkDepth(fork);
+    const options = this.doorwayOptions(parent, node.id);
+    if (!options.length) return false;
+    // From the parent's chamber towards the child's.
+    const u: XY = [options[0].inB[0] - options[0].x, options[0].inB[1] - options[0].y];
+    const band = depth === 1 ? null : this.band(node, u, depth - 1);
+    if (depth > 1 && !band) return false;
+    const walls = this.laneSpots(options, fork.lanes.length);
+    if (!walls) return false;
+    if (band) {
+      for (const p of band.cells) this.cells.set(point(...p), { kind: "wall" });
+      this.rects[this.leafOf[band.node]] = band.rect;
+    }
+    const childSide = band?.node === node.id;
+    const at = ([x, y]: XY, k: number): XY => [x + u[0] * k, y + u[1] * k];
+    const ends = walls.map((w, lane) => {
+      // The lane's tiles from the parent's side to the child's.
+      const first = childSide || !band ? 0 : -(depth - 1);
+      const tiles = Array.from({ length: depth }, (_, k) => at([w.x, w.y], first + k));
+      tiles.forEach((p, k) => {
+        const step = fork.lanes[lane][k];
+        this.cells.set(point(...p), step ? laneTile(step, this.graph.depth, this.rng) : { kind: "floor" });
+        this.doorTiles.push(p);
+        this.doorways.push({ parent, child: node.id, x: p[0], y: p[1], shortcut: false, lane });
+      });
+      return { out: at(tiles[0], -1), in: at(tiles[tiles.length - 1], 1) };
+    });
+    const middle = Math.floor(ends.length / 2);
+    for (const e of ends) this.exitsOf.get(parent)!.push(e.out);
+    this.entryOf.set(node.id, { entry: ends[middle].in, inward: u });
+    ends.forEach((e, i) => i !== middle && this.exitsOf.get(node.id)!.push(e.in));
+    return true;
+  }
+
+  /** `count` doorway tiles for side-by-side lanes, centred on the shared
+   * wall and at least two apart so a wall stands between each pair. */
+  private laneSpots(options: Candidate[], count: number): Candidate[] | null {
+    const mid = options.reduce((s, c) => [s[0] + c.x / options.length, s[1] + c.y / options.length], [0, 0]);
+    const ranked = options
+      .map((c) => ({ c, s: Math.abs(c.x - mid[0]) + Math.abs(c.y - mid[1]) + this.rng() * 1.5 }))
+      .sort((p, q) => p.s - q.s).map((o) => o.c);
+    const picked: Candidate[] = [];
+    for (const c of ranked)
+      if (picked.length < count && picked.every((p) => Math.abs(p.x - c.x) + Math.abs(p.y - c.y) >= 2)) picked.push(c);
+    return picked.length === count ? picked : null;
+  }
+
+  /** The rows a deep fork's lanes run through: taken from the child's
+   * chamber if it can spare them, else the parent's, along the wall they
+   * share. Null when neither chamber can. */
+  private band(node: StrategicNode, u: XY, rows: number) {
+    const child = this.bandFrom(node, [-u[0], -u[1]], rows, node.parent!);
+    return child ?? this.bandFrom(this.graph.nodes[node.parent!], u, rows, node.id);
+  }
+
+  /** `rows` rows off the side of `donor`'s chamber facing `side`, or null
+   * when the chamber would get too small, lose the entrance tile, crowd a
+   * doorway, or be cut off from a region it still has to join other than
+   * `across`, the region the lanes lead to. */
+  private bandFrom(donor: StrategicNode, side: XY, rows: number, across: number) {
+    const r = this.rects[this.leafOf[donor.id]];
+    const rect = { ...r };
+    if (side[0] === 1) rect.x2 -= rows;
+    else if (side[0] === -1) rect.x1 += rows;
+    else if (side[1] === 1) rect.y2 -= rows;
+    else rect.y1 += rows;
+    const hall = donor.footprint === "hall";
+    if (rect.x2 < rect.x1 || rect.y2 < rect.y1 || minSide(rect) < (hall ? 3 : MIN_SIDE)) return null;
+    if (area(rect) < need(donor) + (hall ? 2 : 0)) return null;
+    if (donor.purpose === "stairs" && !touchesExitWall(rect)) return null;
+    const cells: XY[] = [];
+    for (let y = r.y1; y <= r.y2; y++)
+      for (let x = r.x1; x <= r.x2; x++) if (!inRect(rect, x, y)) cells.push([x, y]);
+    if (cells.some(([x, y]) => x === ENTRY[0] && y === ENTRY[1])) return null;
+    if (cells.some(([x, y]) => this.nearDoor({ x, y }, 1))) return null;
+    if (!this.stillJoins(donor, rect, across)) return null;
+    return { node: donor.id, rect, cells };
+  }
+
+  /** Whether `donor`, shrunk to `rect`, can still get a doorway to each
+   * region it joins that isn't joined to it yet. */
+  private stillJoins(donor: StrategicNode, rect: Rect, across: number) {
+    const joined = (a: number, b: number) =>
+      this.doorways.some((d) => (d.parent === a && d.child === b) || (d.parent === b && d.child === a));
+    const others = [...(donor.parent === null ? [] : [donor.parent]), ...donor.children]
+      .filter((o) => o !== across && !joined(donor.id, o));
+    return others.every((o) => this.between(this.leafOf[donor.id], this.leafOf[o]).some((c) =>
+      inRect(rect, ...c.inA) && inRect(this.rects[this.leafOf[o]], ...c.inB)));
   }
 
   /** Shortcuts: realise each request between the requested regions, or any

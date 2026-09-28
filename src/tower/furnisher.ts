@@ -1,6 +1,6 @@
 import { point, type Tile } from "../entities.ts";
 import { getTowerGateEnemy, type TowerEnemyProfile } from "../scaling.ts";
-import type { Gate, Reward, StrategicNode, Strength } from "./types.ts";
+import type { Gate, LaneStep, Reward, StrategicNode, Strength } from "./types.ts";
 import { centre, DIRS, inRect, type Rect, type XY } from "./grid.ts";
 
 /** Arranges each chamber's contents once embedder.ts has laid out the
@@ -33,20 +33,25 @@ const PROFILES_FOR: Record<Strength, TowerEnemyProfile[]> = {
   elite: ["defenseHeavy"],
 };
 
-function enemyTile(strength: Strength, depth: number, rng: () => number): Tile {
+function enemyTile(strength: Strength, depth: number, rng: () => number, named?: TowerEnemyProfile): Tile {
   const profiles = PROFILES_FOR[strength];
-  const profile = profiles[Math.floor(rng() * profiles.length)];
+  const profile = named ?? profiles[Math.floor(rng() * profiles.length)];
   return { kind: "enemy", enemy: getTowerGateEnemy(depth, strength, profile) };
 }
 
 export function gateTile(gate: Gate, depth: number, rng: () => number): Tile {
   switch (gate.kind) {
     case "open": return { kind: "floor" };
-    case "enemy": return enemyTile(gate.strength, depth, rng);
+    case "enemy": return enemyTile(gate.strength, depth, rng, gate.profile);
     case "door": return { kind: "door", color: gate.color, door: { type: "keys", keys: [gate.color], mode: "all" } };
     case "steel": return { kind: "door", door: { type: "keys", keys: ["yellow", "blue", "red"], mode: "any" } };
     case "heart": return { kind: "door", door: { type: "fullHp" } };
   }
+}
+
+/** One tile of a fork's lane. */
+export function laneTile(step: LaneStep, depth: number, rng: () => number): Tile {
+  return step.kind === "reward" ? rewardTile(step.reward, rng) : gateTile(step, depth, rng);
 }
 
 function rewardTile(r: Reward, rng: () => number): Tile {

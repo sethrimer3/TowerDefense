@@ -7,11 +7,13 @@ import { generateTowerFloor } from "./index.ts";
 // v3 adds declarative multi-key/condition doors and places their prerequisite
 // keys differently; old per-room coordinate mutations must not overlay it.
 // v4 replaces the maze generator with strategic chamber layouts.
-export const TOWER_LAYOUT_VERSION = 4;
+// v5 adds forks: parallel lanes of gates between chambers.
+export const TOWER_LAYOUT_VERSION = 5;
 
 /** A self-contained 17x17 Tower floor. Generation is strategy-first (see
  * src/tower/index.ts): an abstract graph of gates, keys and rewards is
- * planned, then embedded as chambers joined by single-tile doorways.
+ * planned, then embedded as chambers joined by single-tile doorways or
+ * forks of parallel lanes.
  * Geometry is always valid; the key/HP economy is deliberately allowed to
  * be harsh or occasionally unwinnable. Deterministic for (seed, room). */
 export function generateTowerRoom(

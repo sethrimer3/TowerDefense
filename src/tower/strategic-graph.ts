@@ -9,6 +9,7 @@ import {
   type TowerPattern,
   type Weighted,
 } from "./patterns.ts";
+import { planForks } from "./forks.ts";
 import { MAX_REGIONS, planResources } from "./resource-planner.ts";
 import type {
   Archetype,
@@ -27,8 +28,9 @@ import type {
  *     └ branch    └ branch ─ nested chain …       (optional value)
  *
  * The main route is the spine that moves towards the staircase; branches are
- * pattern instances (see patterns.ts) that hang off main-route regions. The
- * resource planner then applies soft key/door coherence. */
+ * pattern instances (see patterns.ts) that hang off main-route regions.
+ * Some gated edges then become forks of parallel lanes (forks.ts), and the
+ * resource planner applies soft key/door coherence. */
 
 /** How many child doorways a region can comfortably host. */
 const MAX_CHILDREN: Record<Footprint, number> = { hall: 4, room: 2, pocket: 1 };
@@ -152,6 +154,7 @@ export function generateStrategicGraph(seed: number, depth: number, budgetCut = 
   const { mainIds, stairs } = addMainRoute(b, profile, budget);
   addBranches(b, archetype, mainIds, budget);
   const shortcuts = planShortcuts(b, profile, mainIds, stairs);
+  planForks(b, archetype);
   const graph: StrategicGraph = { archetype, depth, nodes: b.nodes, shortcuts, notes: [] };
   planResources(graph, b, rng);
   return graph;

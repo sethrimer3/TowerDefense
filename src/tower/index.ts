@@ -10,6 +10,7 @@ import type { StrategicGraph } from "./types.ts";
 /** Tower floor generation pipeline:
  *
  *   strategic graph (what decisions exist)      strategic-graph.ts, patterns.ts
+ *     → forks (parallel lanes of gates)          forks.ts
  *     → resource planning (key/door economy)     resource-planner.ts
  *     → spatial embedding (chambers + doorways)  embedder.ts
  *     → geometry checks (never economy checks)   below

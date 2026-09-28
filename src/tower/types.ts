@@ -1,5 +1,5 @@
 import type { KeyColor } from "../config.ts";
-import type { TowerEnemyStrength } from "../scaling.ts";
+import type { TowerEnemyProfile, TowerEnemyStrength } from "../scaling.ts";
 
 /** Shared vocabulary for strategic Tower generation.
  *
@@ -14,11 +14,14 @@ import type { TowerEnemyStrength } from "../scaling.ts";
  * cost HP instead of keys. */
 export type Strength = TowerEnemyStrength;
 
-/** The cost of crossing from a parent region into a child region. It always
- * occupies the single doorway tile between the two rooms. */
+/** The cost of crossing from a parent region into a child region. It
+ * occupies the single doorway tile between the two rooms, or one tile of a
+ * fork's lane. An enemy may name its profile (attack-heavy enemies punish a
+ * low-DEF build, defense-heavy ones a low-ATK build); otherwise the
+ * furnisher picks one its strength allows. */
 export type Gate =
   | { kind: "open" }
-  | { kind: "enemy"; strength: Strength }
+  | { kind: "enemy"; strength: Strength; profile?: TowerEnemyProfile }
   | { kind: "door"; color: KeyColor }
   /** Special locks from the door vocabulary: steel takes any one key
    * (cheapest first), heart opens only while HP is full. */
@@ -31,6 +34,16 @@ export type Reward =
   | { kind: "attack" }
   | { kind: "defense" }
   | { kind: "treasure" };
+
+/** One tile of a fork's lane: a gate to pay or an item to pick up. */
+export type LaneStep = Gate | { kind: "reward"; reward: Reward };
+/** A lane's tiles in the order the player walks them, parent side first. */
+export type Lane = LaneStep[];
+/** Two or three parallel lanes from a parent region into the same child
+ * region, each costing a different resource (HP to one build, HP to
+ * another, keys of a colour, full HP), so entering is a choice of what to
+ * spend rather than whether to pay. */
+export type Fork = { patternId: string; lanes: Lane[] };
 
 /** An item that sits in a one-tile niche with an enemy standing in front of
  * it, so the item can only be taken by fighting that enemy. */
@@ -81,6 +94,9 @@ export type StrategicNode = {
   parent: number | null;
   children: number[];
   gate: Gate;
+  /** Forks to try for the way in, best first. The embedder builds the first
+   * that fits and falls back to the single `gate` when none does. */
+  forks?: Fork[];
   rewards: Reward[];
   guarded: GuardedReward[];
   /** Ring formation: `rewards[0]` is the centrepiece, surrounded by these. */

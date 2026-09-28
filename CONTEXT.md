@@ -32,6 +32,20 @@ _Avoid_: explored room, old floor
 A run of ten Tower floors. Its first floor is sealed below, and the ATK/DEF gathered from items resets on entering it; each section remembers the best HP the player arrived with, and later ascents can start there.
 _Avoid_: stage, chapter
 
+### Floor layout
+
+**Gate**:
+What it costs to pass from one part of a floor into the next: an enemy to fight or a door to open.
+_Avoid_: barrier, lock (for enemies)
+
+**Fork**:
+Two or three lanes side by side leading into the same place, each costing about the same but in a different resource (HP against one kind of enemy or another, keys of a colour, full HP), so the player chooses what to spend rather than whether to pay.
+_Avoid_: split path, branch (a branch is an optional side room)
+
+**Lane**:
+One way through a fork: one to three tiles of gates walked in order, sometimes with an item between them (a treasure, or a key that pays for the door after it).
+_Avoid_: corridor, path
+
 ### The character
 
 **Loadout**:

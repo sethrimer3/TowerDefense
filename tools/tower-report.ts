@@ -15,6 +15,7 @@ if (Number.isFinite(seedArg) && Number.isFinite(depthArg)) {
   };
   const archetypes: Record<string, number> = {};
   const patterns: Record<string, number> = {};
+  const forks: Record<string, number> = {};
   for (let seed = 0; seed < 30; seed++)
     for (const depth of depths) {
       const t0 = performance.now();
@@ -34,6 +35,7 @@ if (Number.isFinite(seedArg) && Number.isFinite(depthArg)) {
       if (a.regions.some((r) => r.purpose === "exchange")) agg.exchanges++;
       archetypes[a.archetype] = (archetypes[a.archetype] ?? 0) + 1;
       for (const r of a.regions) patterns[r.pattern] = (patterns[r.pattern] ?? 0) + 1;
+      for (const [f, count] of Object.entries(a.forks)) forks[f] = (forks[f] ?? 0) + count;
     }
   for (const [s, d] of [[1, 0], [2, 6], [3, 25]]) console.log(towerFloorReport(s, d).text + "\n");
   const n = agg.floors;
@@ -46,4 +48,5 @@ if (Number.isFinite(seedArg) && Number.isFinite(depthArg)) {
   console.log(`floors with an unaffordable door ${agg.unaffordable} · stairs key-blocked ${agg.stairsBlocked}`);
   console.log("archetypes", archetypes);
   console.log("patterns", patterns);
+  console.log(`forks ${Object.values(forks).reduce((s, v) => s + v, 0)}`, forks);
 }

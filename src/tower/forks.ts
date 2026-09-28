@@ -1,0 +1,251 @@
+import type { KeyColor } from "../config.ts";
+import type { TowerEnemyProfile } from "../scaling.ts";
+import { ARCHETYPES, pick, type Weighted } from "./patterns.ts";
+import type { GraphBuilder } from "./strategic-graph.ts";
+import type { Archetype, Fork, Gate, Lane, LaneStep, Reward, StrategicNode, StrategicTag, Strength } from "./types.ts";
+
+/** Forks: two or three parallel lanes from one region into the next, each
+ * paying a different resource, so entering asks *what* to spend.
+ *
+ *   hub ─┬─ [yellow door] ──────────┬─ room
+ *        └─ [strong enemy] ─────────┘
+ *
+ * Every lane is priced on one scale (`GATE_VALUE`, roughly "yellow keys"),
+ * the lanes of a fork cost about the same, and none is cheaper than
+ * another in every way. A lane can be one to three tiles deep; deeper
+ * lanes need room the embedder carves from one of the two chambers. */
+
+/** What paying each gate or taking each item is worth, in yellow keys. */
+export const GATE_VALUE = {
+  door: { yellow: 1, blue: 3, red: 8 } as Record<KeyColor, number>,
+  steel: 1,
+  heart: 1,
+  enemy: { weak: 1, normal: 1.5, strong: 2.5, elite: 4 } as Record<Strength, number>,
+  reward: { potion: 1, attack: 2, defense: 2, treasure: 1 },
+};
+
+export const FORK_TUNING = {
+  /** Chance each eligible edge gets a fork, rising with depth. */
+  chance: (depth: number) => Math.min(0.6, 0.35 + depth * 0.005),
+  maxPerFloor: 3,
+  /** A fork may replace a gate whose value is within this factor of its own. */
+  valueBand: 1.8,
+  /** Forks to try for one edge (the chosen one, then fallbacks). */
+  fallbacks: 4,
+};
+
+export function stepValue(step: LaneStep): number {
+  switch (step.kind) {
+    case "open": return 0;
+    case "door": return GATE_VALUE.door[step.color];
+    case "steel": return GATE_VALUE.steel;
+    case "heart": return GATE_VALUE.heart;
+    case "enemy": return GATE_VALUE.enemy[step.strength];
+    case "reward": return -rewardValue(step.reward);
+  }
+}
+
+function rewardValue(r: Reward) {
+  return r.kind === "key" ? GATE_VALUE.door[r.color] : GATE_VALUE.reward[r.kind];
+}
+
+/** What walking a lane costs overall. Items inside it pay some back. */
+export const laneValue = (lane: Lane) => lane.reduce((s, step) => s + stepValue(step), 0);
+
+type Keys = Record<KeyColor, number>;
+const noKeys = (): Keys => ({ yellow: 0, blue: 0, red: 0 });
+
+/** The keys a lane needs held on the way in (the deepest it runs short at
+ * any point, since a key found inside pays only for doors after it) and
+ * what it costs overall. A steel lock is counted as the yellow key it eats
+ * first. */
+export function laneKeys(lane: Lane): { upfront: Keys; net: Keys } {
+  const held = noKeys(), upfront = noKeys();
+  for (const step of lane) {
+    const color = step.kind === "door" ? step.color : step.kind === "steel" ? "yellow" : null;
+    if (color) upfront[color] = Math.max(upfront[color], -(--held[color]));
+    if (step.kind === "reward" && step.reward.kind === "key") held[step.reward.color]++;
+  }
+  const net = noKeys();
+  for (const c of Object.keys(held) as KeyColor[]) net[c] = 0 - held[c];
+  return { upfront, net };
+}
+
+/** The resources a lane spends, so the planner can tell lanes apart: keys
+ * by colour, a fight against a profile, or full HP. */
+export function laneSpends(lane: Lane): Set<string> {
+  const out = new Set<string>();
+  for (const step of lane) {
+    if (step.kind === "door") out.add(`key:${step.color}`);
+    if (step.kind === "steel") out.add("key:any");
+    if (step.kind === "heart") out.add("fullHp");
+    if (step.kind === "enemy") out.add(`fight:${step.profile ?? "any"}`);
+  }
+  return out;
+}
+
+/** The keys entering through a fork asks the player to hold: none when a
+ * lane needs no key, else the cheapest keyed lane's up-front keys. */
+export function forkKeyDemand(fork: Fork): KeyColor[] {
+  const keyed = fork.lanes.map((lane) => ({ lane, need: laneKeys(lane).upfront }));
+  const total = (k: Keys) => k.yellow + k.blue + k.red;
+  if (keyed.some(({ need }) => total(need) === 0)) return [];
+  const cheapest = keyed.sort((a, b) => laneValue(a.lane) - laneValue(b.lane))[0].need;
+  return (["red", "blue", "yellow"] as KeyColor[]).flatMap((c) => Array.from({ length: cheapest[c] }, () => c));
+}
+
+// ---------------------------------------------------------------- patterns
+
+export type ForkPattern = {
+  id: string;
+  weight: number;
+  minimumDepth: number;
+  tags: StrategicTag[];
+  /** One weighted choice per lane. */
+  lanes: Weighted<Lane>[];
+};
+
+const Y: Gate = { kind: "door", color: "yellow" };
+const B: Gate = { kind: "door", color: "blue" };
+const R: Gate = { kind: "door", color: "red" };
+const STEEL: Gate = { kind: "steel" };
+const HEART: Gate = { kind: "heart" };
+const foe = (strength: Strength, profile?: TowerEnemyProfile): Gate => ({ kind: "enemy", strength, profile });
+const item = (reward: Reward): LaneStep => ({ kind: "reward", reward });
+const T = item({ kind: "treasure" });
+const P = item({ kind: "potion" });
+const yKey = item({ kind: "key", color: "yellow" });
+function one(lane: Lane): Weighted<Lane> { return [{ w: 1, v: lane }]; }
+
+export const FORK_PATTERNS: ForkPattern[] = [
+  // A fight against one build's weakness or the other's.
+  {
+    id: "monsterTypes", weight: 4, minimumDepth: 0, tags: ["combatGate"],
+    lanes: [one([foe("normal", "attackHeavy")]), one([foe("normal", "defenseHeavy")])],
+  },
+  {
+    id: "strongMonsterTypes", weight: 2, minimumDepth: 3, tags: ["combatGate"],
+    lanes: [one([foe("strong", "attackHeavy")]), one([foe("strong", "defenseHeavy")])],
+  },
+  // A key, or wait until HP is full.
+  {
+    id: "doorTypes", weight: 2, minimumDepth: 2, tags: ["doorGate"],
+    lanes: [[{ w: 2, v: [Y] }, { w: 1, v: [STEEL] }], one([HEART])],
+  },
+  // Keys or HP, at about the same price.
+  {
+    id: "doorOrMonster", weight: 5, minimumDepth: 0, tags: ["doorGate", "combatGate"],
+    lanes: [one([Y]), [{ w: 2, v: [foe("normal")] }, { w: 1, v: [foe("weak")] }]],
+  },
+  {
+    id: "blueDoorOrStrongMonster", weight: 2, minimumDepth: 3, tags: ["doorGate", "combatGate"],
+    lanes: [one([B]), one([foe("strong")])],
+  },
+  {
+    id: "doorAndWeakOrStrong", weight: 3, minimumDepth: 1, tags: ["doorGate", "combatGate"],
+    lanes: [one([Y, foe("weak")]), one([foe("strong")])],
+  },
+  // One key, or two keys with a treasure between them.
+  {
+    id: "doorOrTreasureDoors", weight: 3, minimumDepth: 0, tags: ["doorGate", "treasureRoom"],
+    lanes: [[{ w: 3, v: [Y] }, { w: 1, v: [foe("normal")] }], one([Y, T, Y])],
+  },
+  {
+    id: "twoDoorsOrTwoMonsters", weight: 3, minimumDepth: 1, tags: ["doorGate", "combatGate"],
+    lanes: [one([Y, Y]), [{ w: 2, v: [foe("weak"), foe("weak")] }, { w: 1, v: [foe("normal", "attackHeavy"), foe("weak")] }]],
+  },
+  {
+    id: "twoDoorsOrStrongMonster", weight: 3, minimumDepth: 2, tags: ["doorGate", "combatGate"],
+    lanes: [one([Y, Y]), one([foe("strong")])],
+  },
+  {
+    id: "twoLowerDoorsOrHigherDoor", weight: 2, minimumDepth: 3, tags: ["doorGate", "resourceExchange"],
+    lanes: [one([Y, Y]), one([B])],
+  },
+  {
+    id: "twoBlueDoorsOrRedDoor", weight: 1, minimumDepth: 10, tags: ["doorGate", "resourceExchange"],
+    lanes: [one([B, B]), one([R])],
+  },
+  // A fight that heals you after, or a key.
+  {
+    id: "fightThenHeal", weight: 2, minimumDepth: 2, tags: ["combatGate"],
+    lanes: [one([foe("strong"), P]), one([Y])],
+  },
+  // Pay a blue key and get two yellow back on the way through.
+  {
+    id: "blueForYellows", weight: 1.5, minimumDepth: 3, tags: ["doorGate", "resourceExchange"],
+    lanes: [one([B, yKey, yKey]), one([foe("normal")])],
+  },
+  // Three ways in.
+  {
+    id: "doorOrEitherMonster", weight: 3, minimumDepth: 1, tags: ["doorGate", "combatGate"],
+    lanes: [one([Y]), one([foe("normal", "attackHeavy")]), one([foe("normal", "defenseHeavy")])],
+  },
+  {
+    id: "doorMonsterOrHeart", weight: 2, minimumDepth: 2, tags: ["doorGate", "combatGate"],
+    lanes: [one([Y]), one([foe("normal")]), one([HEART])],
+  },
+  {
+    id: "keysBlueOrStrong", weight: 2, minimumDepth: 3, tags: ["doorGate", "combatGate", "resourceExchange"],
+    lanes: [one([Y, Y]), one([B]), one([foe("strong")])],
+  },
+];
+
+/** The deepest lane decides how deep a fork's crossing must be. */
+export const forkDepth = (fork: Fork) => Math.max(...fork.lanes.map((l) => l.length));
+
+const gateValue = (g: Gate) => stepValue(g);
+const mean = (fork: Fork) => fork.lanes.reduce((s, l) => s + laneValue(l), 0) / fork.lanes.length;
+
+function forkWeight(p: ForkPattern, depth: number, archetype: Archetype) {
+  if (depth < p.minimumDepth) return 0;
+  const bias = ARCHETYPES[archetype].tagBias;
+  return p.tags.reduce((w, tag) => w * (bias[tag] ?? 1), p.weight);
+}
+
+function build(p: ForkPattern, rng: () => number): Fork {
+  return { patternId: p.id, lanes: p.lanes.map((options) => structuredClone(pick(options, rng))) };
+}
+
+/** Whether entering this region is worth paying for: the main route leads
+ * on to the stairs, and a branch must hold something. */
+function worthReaching(nodes: StrategicNode[], id: number): boolean {
+  const n = nodes[id];
+  if (n.route === "main") return true;
+  const holds = n.rewards.length + n.guarded.length > 0 || !!n.ringGuard;
+  return holds || n.children.some((c) => worthReaching(nodes, c));
+}
+
+/** Rolls forks for the floor's gated edges: a pattern priced near the gate
+ * it replaces, plus fallbacks the embedder tries (shallower and narrower
+ * first) before it settles for the single gate. */
+export function planForks(b: GraphBuilder, archetype: Archetype) {
+  const { depth, rng } = b;
+  let placed = 0;
+  for (const node of b.nodes) {
+    if (placed >= FORK_TUNING.maxPerFloor) break;
+    if (node.parent === null || node.gate.kind === "open" || !worthReaching(b.nodes, node.id)) continue;
+    if (rng() >= FORK_TUNING.chance(depth)) continue;
+    const forks = forksFor(node.gate, depth, archetype, rng);
+    if (!forks.length) continue;
+    node.forks = forks;
+    placed++;
+  }
+}
+
+function forksFor(gate: Gate, depth: number, archetype: Archetype, rng: () => number): Fork[] {
+  const v = gateValue(gate);
+  let options = FORK_PATTERNS.map((p) => ({ p, w: forkWeight(p, depth, archetype) }))
+    .filter(({ w }) => w > 0)
+    .map(({ p, w }) => ({ w, v: build(p, rng) }))
+    .filter(({ v: fork }) => mean(fork) <= v * FORK_TUNING.valueBand && mean(fork) * FORK_TUNING.valueBand >= v);
+  const chosen: Fork[] = [];
+  while (options.length && chosen.length < FORK_TUNING.fallbacks) {
+    const fork = pick(options, rng);
+    chosen.push(fork);
+    options = options.filter((o) => o.v !== fork);
+  }
+  const [first, ...rest] = chosen;
+  const footprint = (f: Fork) => forkDepth(f) * 10 + f.lanes.length;
+  return first ? [first, ...rest.sort((a, b) => footprint(a) - footprint(b))] : [];
+}

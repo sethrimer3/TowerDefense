@@ -2,7 +2,7 @@ import { TOWER_HEIGHT, TOWER_START_X, TOWER_WIDTH, type KeyColor } from "../conf
 import { doorCost } from "../doors.ts";
 import { point, type Tile } from "../entities.ts";
 import type { Embedding } from "./embedder.ts";
-import type { Gate, Reward, StrategicNode } from "./types.ts";
+import type { Gate, LaneStep, Reward, StrategicNode } from "./types.ts";
 
 /** Generation analysis: measures whether a floor reads as a strategic
  * economy (it never rejects a floor for being hard or unwinnable). Used by
@@ -15,6 +15,8 @@ export type FloorAnalysis = {
   doors: Record<string, number>;
   /** e.g. "yellow via weak enemy": 2, "yellow via blue door": 3 */
   keys: Record<string, number>;
+  /** Forks built, by pattern. */
+  forks: Record<string, number>;
   progressionGates: number;
   strategicBranches: number;
   rewardDeadEnds: number;
@@ -35,9 +37,19 @@ export type FloorAnalysis = {
 
 function gateLabel(g: Gate): string {
   if (g.kind === "open") return "open";
+  if (g.kind === "enemy" && g.profile) return `${g.strength} ${g.profile} enemy`;
   if (g.kind === "enemy") return `${g.strength} enemy`;
   if (g.kind === "door") return `${g.color} door`;
   return `${g.kind} door`;
+}
+
+const stepLabel = (s: LaneStep) => (s.kind === "reward" ? rewardLabel(s.reward) : gateLabel(s));
+
+/** How a region is entered: its gate, or its fork's lanes side by side. */
+function wayIn(n: StrategicNode): string {
+  const fork = n.forks?.[0];
+  if (!fork) return gateLabel(n.gate);
+  return `fork ${fork.patternId}: ${fork.lanes.map((l) => l.map(stepLabel).join(" → ")).join(" | ")}`;
 }
 
 const INTERACTIVE = new Set(["enemy", "key", "door", "potion", "attack", "defense", "treasure", "stairs"]);
@@ -154,10 +166,11 @@ export function analyzeFloor(emb: Embedding): FloorAnalysis {
     depth: graph.depth,
     regions: nodes.map((n) => ({
       id: n.id, purpose: n.purpose, pattern: n.patternId, route: n.route,
-      gate: gateLabel(n.gate), contents: contentOf(n),
+      gate: wayIn(n), contents: contentOf(n),
     })),
     doors: doorCounts(cells),
     keys: keySources(emb),
+    forks: nodes.reduce<Record<string, number>>((out, n) => (n.forks ? tally(out, n.forks[0].patternId) : 0, out), {}),
     progressionGates: nodes.filter((n) => n.route === "main" && n.gate.kind !== "open").length,
     strategicBranches: nodes.filter((n) => n.route === "optional" && n.parent !== null && nodes[n.parent].route === "main").length,
     rewardDeadEnds: leaves.filter(hasContent).length,
@@ -195,7 +208,7 @@ function keySources(emb: Embedding) {
  * from the start. */
 function entryCost(nodes: StrategicNode[], id: number): string {
   for (let cur: StrategicNode | null = nodes[id]; cur; cur = cur.parent === null ? null : nodes[cur.parent])
-    if (cur.gate.kind !== "open") return gateLabel(cur.gate);
+    if (cur.gate.kind !== "open") return cur.forks ? "fork" : gateLabel(cur.gate);
   return "open";
 }
 
@@ -257,6 +270,7 @@ export function formatFloorSummary(a: FloorAnalysis, cells?: Map<string, Tile>):
     `Doors: ${Object.entries(a.doors).map(([k, v]) => `${k} ${v}`).join(", ") || "none"}`,
     "Keys:",
     ...(Object.entries(a.keys).map(([k, v]) => `  ${k}: ${v}`)),
+    `Forks: ${Object.entries(a.forks).map(([k, v]) => `${k} ${v}`).join(", ") || "none"}`,
     `Progression gates: ${a.progressionGates} · Strategic branches: ${a.strategicBranches} · Shortcuts: ${a.shortcutsPlaced}`,
     `Reward dead ends: ${a.rewardDeadEnds} · Empty dead ends: ${a.emptyDeadEnds}`,
     `Interactions: ${a.interactions} on ${a.walkable} walkable tiles · Longest empty traversal: ${a.longestEmptyTraversal} tiles`,

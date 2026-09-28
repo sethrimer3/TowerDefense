@@ -165,7 +165,7 @@ test("density is a rendering setting only: it never mutates world or run state",
   }
 });
 
-test("every Tower tree door is a real choke point; shortcut doors are the only deliberate bypasses", () => {
+test("every Tower tree door is a real choke point; shortcuts and fork lanes are the only deliberate bypasses", () => {
   for (let seed = 0; seed < 60; seed += 5)
     for (const room of [0, 3, 8, 15, 40]) {
       const { cells, embedding } = generateTowerFloor(seed, room);
@@ -174,14 +174,23 @@ test("every Tower tree door is a real choke point; shortcut doors are the only d
       // door must be the only way into what it locks.
       const shortcuts = embedding.doorways.filter((d) => d.shortcut).map((d) => point(d.x, d.y));
       const all = reachable(cells, start, new Set(shortcuts));
+      const forks = new Map<number, string[]>();
       for (const d of embedding.doorways) {
+        if (d.lane !== undefined) forks.set(d.child, [...(forks.get(d.child) ?? []), point(d.x, d.y)]);
         const t = cells.get(point(d.x, d.y))!;
-        if (t.kind !== "door" || d.shortcut) continue;
+        if (t.kind !== "door" || d.shortcut || d.lane !== undefined) continue;
         assert.ok(
           reachable(cells, start, new Set([...shortcuts, point(d.x, d.y)])).size < all.size - 1,
           `Seed ${seed} room ${room}: door at ${d.x},${d.y} has a physical bypass`,
         );
       }
+      // A fork's lanes bypass each other on purpose, but together they are
+      // the only way into their region.
+      for (const [child, lanes] of forks)
+        assert.ok(
+          reachable(cells, start, new Set([...shortcuts, ...lanes])).size < all.size - lanes.length,
+          `Seed ${seed} room ${room}: fork into region ${child} has a physical bypass`,
+        );
     }
 });
 test("the key economy is coherent on early floors but never force-balanced", () => {

@@ -1,4 +1,5 @@
 import type { KeyColor } from "../config.ts";
+import { forkKeyDemand } from "./forks.ts";
 import { pick, type Weighted } from "./patterns.ts";
 import type { GraphBuilder } from "./strategic-graph.ts";
 import type { Gate, Reward, StrategicGraph, StrategicNode, Strength } from "./types.ts";
@@ -63,10 +64,13 @@ function keysIn(node: StrategicNode, color: KeyColor): number {
   return node.rewards.reduce((s, r) => s + count(r), 0) + node.guarded.reduce((s, g) => s + count(g.reward), 0);
 }
 
-/** The key colour a region's lock takes: a steel lock eats the cheapest key
- * available, so it is yellow demand. */
-function lockColor(n: StrategicNode): KeyColor | null {
-  return n.gate.kind === "door" ? n.gate.color : n.gate.kind === "steel" ? "yellow" : null;
+/** The keys a region's way in asks the player to hold. A steel lock eats
+ * the cheapest key available, so it is yellow demand. A forked region is
+ * planned for its first fork, the one the embedder tries first; a fork with
+ * a lane that needs no key demands none. */
+function lockColors(n: StrategicNode): KeyColor[] {
+  if (n.forks?.length) return forkKeyDemand(n.forks[0]);
+  return n.gate.kind === "door" ? [n.gate.color] : n.gate.kind === "steel" ? ["yellow"] : [];
 }
 
 function ancestors(nodes: StrategicNode[], id: number): number[] {
@@ -80,10 +84,9 @@ type Door = { color: KeyColor; route: "main" | "optional"; lockedNode: number | 
 function collectDoors(graph: StrategicGraph): Door[] {
   const doors: Door[] = [];
   const depthOf = (id: number) => ancestors(graph.nodes, id).length;
-  for (const n of graph.nodes) {
-    const color = lockColor(n);
-    if (color) doors.push({ color, route: n.route, lockedNode: n.id, order: (n.route === "main" ? 0 : 100) + depthOf(n.id) });
-  }
+  for (const n of graph.nodes)
+    for (const color of lockColors(n))
+      doors.push({ color, route: n.route, lockedNode: n.id, order: (n.route === "main" ? 0 : 100) + depthOf(n.id) });
   for (const s of graph.shortcuts)
     if (s.gate.kind === "door") doors.push({ color: s.gate.color, route: "optional", lockedNode: null, order: 1000 });
   return doors.sort((a, b) => a.order - b.order);
@@ -132,13 +135,14 @@ const sweetens = (door: Door, rng: () => number) => door.route === "optional" &&
 function supply(nodes: StrategicNode[], door: Door) {
   const locked = lockedBy(nodes, door);
   return nodes
-    .filter((n) => !locked.has(n.id) && ![n.id, ...ancestors(nodes, n.id)].some((a) => lockColor(nodes[a]) === door.color))
+    .filter((n) => !locked.has(n.id) && ![n.id, ...ancestors(nodes, n.id)].some((a) => lockColors(nodes[a]).includes(door.color)))
     .reduce((s, n) => s + keysIn(n, door.color), 0);
 }
 
 const lockedBy = (nodes: StrategicNode[], door: Door) =>
   door.lockedNode === null ? new Set<number>() : subtreeOf(nodes, door.lockedNode);
-const lockedWith = (n: StrategicNode, color: KeyColor) => n.gate.kind === "door" && n.gate.color === color;
+const lockedWith = (n: StrategicNode, color: KeyColor) =>
+  n.forks?.length ? lockColors(n).includes(color) : n.gate.kind === "door" && n.gate.color === color;
 
 function sweeten(node: StrategicNode, rng: () => number) {
   node.rewards.push(rng() < 0.5 ? { kind: "treasure" } : rng() < 0.5 ? { kind: "attack" } : { kind: "defense" });
