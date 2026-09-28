@@ -1,5 +1,5 @@
 import { point, type Tile } from "../entities.ts";
-import { getTowerEnemy, type TowerEnemyProfile } from "../scaling.ts";
+import { getTowerGateEnemy, type TowerEnemyProfile } from "../scaling.ts";
 import type { Gate, Reward, StrategicNode, Strength } from "./types.ts";
 import { centre, DIRS, inRect, type Rect, type XY } from "./grid.ts";
 
@@ -36,7 +36,7 @@ const PROFILES_FOR: Record<Strength, TowerEnemyProfile[]> = {
 function enemyTile(strength: Strength, depth: number, rng: () => number): Tile {
   const profiles = PROFILES_FOR[strength];
   const profile = profiles[Math.floor(rng() * profiles.length)];
-  return { kind: "enemy", enemy: getTowerEnemy(depth, rng, profile) };
+  return { kind: "enemy", enemy: getTowerGateEnemy(depth, strength, profile) };
 }
 
 export function gateTile(gate: Gate, depth: number, rng: () => number): Tile {

@@ -5,7 +5,7 @@ import { defaults, decode } from "../src/save.ts";
 import { RoomWorld, generateTowerRoom } from "../src/tower/room-world.ts";
 import { predict } from "../src/combat.ts";
 import { isDeadlocked } from "../src/analysis.ts";
-import { getTowerEnemy, TOWER_CYCLE_MULTIPLIER, TOWER_ZONE_ENEMIES, towerZoneIndex } from "../src/scaling.ts";
+import { getTowerEnemy, getTowerGateEnemy, TOWER_CYCLE_MULTIPLIER, TOWER_ZONE_ENEMIES, towerZoneIndex } from "../src/scaling.ts";
 import { TOWER_HEIGHT, TOWER_START_X, TOWER_WIDTH } from "../src/config.ts";
 import { point, type Tile } from "../src/entities.ts";
 
@@ -301,6 +301,22 @@ test("rooms after 100 reuse the roster with a whole-number cycle multiplier", ()
     assert.equal(repeated.hp, base.hp * TOWER_CYCLE_MULTIPLIER);
     assert.equal(repeated.attack, base.attack * TOWER_CYCLE_MULTIPLIER);
     assert.equal(repeated.defense, base.defense * TOWER_CYCLE_MULTIPLIER);
+  }
+});
+
+test("strong gate enemies are hardened locals and elites come from the next zone", () => {
+  for (const room of [0, 14, 95, 250]) {
+    for (const profile of ["attackHeavy", "balanced", "defenseHeavy"] as const) {
+      const local = getTowerEnemy(room, () => 0, profile);
+      for (const strength of ["weak", "normal"] as const)
+        assert.deepEqual(getTowerGateEnemy(room, strength, profile), local);
+      const strong = getTowerGateEnemy(room, "strong", profile);
+      assert.equal(strong.name, local.name);
+      assert.equal(strong.tier, 2);
+      for (const stat of ["hp", "attack", "defense"] as const) assert.equal(strong[stat], Math.round(local[stat] * 1.25));
+      const elite = getTowerGateEnemy(room, "elite", profile);
+      assert.deepEqual(elite, { ...getTowerEnemy(room + 10, () => 0, profile), tier: 3 });
+    }
   }
 });
 

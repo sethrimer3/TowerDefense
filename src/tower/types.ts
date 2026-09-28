@@ -1,4 +1,5 @@
 import type { KeyColor } from "../config.ts";
+import type { TowerEnemyStrength } from "../scaling.ts";
 
 /** Shared vocabulary for strategic Tower generation.
  *
@@ -9,8 +10,9 @@ import type { KeyColor } from "../config.ts";
  *   B. a spatial embedding of that graph onto the 17x17 tile grid.
  * Nothing in layer A knows about coordinates. */
 
-/** Enemy difficulty bands. Enemies are gates that cost HP instead of keys. */
-export type Strength = "weak" | "normal" | "strong" | "elite";
+/** Enemy difficulty bands (stats in scaling.ts). Enemies are gates that
+ * cost HP instead of keys. */
+export type Strength = TowerEnemyStrength;
 
 /** The cost of crossing from a parent region into a child region. It always
  * occupies the single doorway tile between the two rooms. */

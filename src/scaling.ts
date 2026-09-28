@@ -97,3 +97,31 @@ export function getTowerEnemy(room: number, rng: () => number, forceProfile?: To
     tier: 1,
   };
 }
+
+/** How hard a Tower floor's generator asks an enemy to be. */
+export type TowerEnemyStrength = "weak" | "normal" | "strong" | "elite";
+
+/** How far each strength exceeds the floor's own zone: the roster it comes
+ * from (zones ahead), a multiplier on every stat, and its tier (which sets
+ * the XP a kill pays). Weak and normal differ only in which profiles the
+ * generator picks; strong is a hardened local, elite a visitor from the
+ * next zone up. */
+export const TOWER_ENEMY_STRENGTH: Record<TowerEnemyStrength, { zonesAhead: number; multiplier: number; tier: number }> = {
+  weak: { zonesAhead: 0, multiplier: 1, tier: 1 },
+  normal: { zonesAhead: 0, multiplier: 1, tier: 1 },
+  strong: { zonesAhead: 0, multiplier: 1.25, tier: 2 },
+  elite: { zonesAhead: 1, multiplier: 1, tier: 3 },
+};
+
+/** A Tower enemy of the given strength and profile for floor `room`. */
+export function getTowerGateEnemy(room: number, strength: TowerEnemyStrength, profile: TowerEnemyProfile) {
+  const { zonesAhead, multiplier, tier } = TOWER_ENEMY_STRENGTH[strength];
+  const base = getTowerEnemy(room + zonesAhead * 10, () => 0, profile);
+  return {
+    name: base.name,
+    hp: Math.round(base.hp * multiplier),
+    attack: Math.round(base.attack * multiplier),
+    defense: Math.round(base.defense * multiplier),
+    tier,
+  };
+}
