@@ -11,6 +11,7 @@ import { isArea1, paintHero, paintHeroFallback, paintTile, paintTorch, type Boar
 import type { AtmosphereConfig } from "./lighting-pass.ts";
 import { DungeonLight, type LitBoard } from "./dungeon-light.ts";
 import { RoutePath } from "./route-path.ts";
+import { BoardPopups, lunges } from "./board-popups.ts";
 import { darknessOf, forEachViewTile, tileTransform, toTileSpace, type FrameContext } from "./render-frame.ts";
 
 export { ATMOSPHERE_CONFIG, type AtmosphereConfig } from "./lighting-pass.ts";
@@ -49,6 +50,10 @@ export class Renderer {
   private nextWorldId = 1;
   private light = new DungeonLight();
   private routePath = new RoutePath();
+  /** Damage numbers and rewards rising off their tiles. */
+  popups = new BoardPopups();
+  /** The enemy's lean into its strike this frame, drawn at its tile. */
+  private enemyLunge = { x: 0, y: 0, dx: 0, dy: 0 };
   /** A golden path to preview for a highlighted-but-unconfirmed destination.
    * Drawn via the same line as an in-progress walk whenever no walk is
    * actually underway (game.route takes priority when both are set). */
@@ -110,6 +115,7 @@ export class Renderer {
     if (f.look.outside) this.drawOutside(f);
     else this.light.draw(f, this.litBoard(f));
     this.drawBlockedMark(f);
+    this.popups.draw(f);
     this.drawEffectText(f);
   }
   /** The forest clearing: its contents, the entrance, the route, the hero
@@ -155,11 +161,14 @@ export class Renderer {
     const dt = Math.min(0.1, (now - this.last) / 1000 || 0.016);
     this.last = now;
     this.follow(n, dt);
+    this.popups.update(g, now);
+    const lunge = lunges(g.encounter, now, g.save.settings.reduceMotion);
+    this.enemyLunge = { ...(g.encounter?.to ?? { x: 0, y: 0 }), ...lunge.enemy };
     const c = this.ctx, s = this.size, outside = !!g.run.outside, settings = g.save.settings;
     c.fillStyle = "#0b1017";
     c.fillRect(0, 0, box.width, box.width);
     const f: FrameContext = {
-      c, now, dt, dpr, width: box.width, n, s, left: this.left, bottom: this.bottom, playerX: this.playerX, playerY: this.playerY,
+      c, now, dt, dpr, width: box.width, n, s, left: this.left, bottom: this.bottom, playerX: this.playerX + lunge.hero.dx, playerY: this.playerY + lunge.hero.dy,
       world: g.world, look: this.look(), darkness: darknessOf(g), torches: [], walls: [], glows: [],
     };
     f.torches = outside ? [] : this.visibleTorches();
@@ -243,8 +252,9 @@ export class Renderer {
     forEachViewTile(f, (x, y) => {
       const t = this.game.world.tile(x, y);
       if (t.kind === "wall" || t.kind === "floor") return;
+      const lunge = this.enemyLunge, leaning = x === lunge.x && y === lunge.y;
       ctx.save();
-      toTileSpace(ctx, f, x, y);
+      toTileSpace(ctx, f, leaning ? x + lunge.dx : x, leaning ? y + lunge.dy : y);
       this.tile(ctx, f, t, x, y, 1);
       ctx.restore();
     });
@@ -351,13 +361,14 @@ export class Renderer {
   }
 
   /** True when nothing on the board is moving: the hero and camera have
-   * settled, no route is being walked, no feedback is showing, and no decor
+   * settled, no route is being walked, no fight is playing out, no feedback
+   * or popup is showing, and no decor
    * effect is playing. (Torches and grass still sway.) Used by Battery saver. */
   isIdle(now: number) {
     const g = this.game, p = g.run.player, t = this.target(this.density), eps = 0.01;
     return Math.abs(this.playerX - p.x) < eps && Math.abs(this.playerY - p.y) < eps &&
       Math.abs(this.left - t.left) < eps && Math.abs(this.bottom - t.bottom) < eps &&
-      !g.route.length && g.blocked.until <= now && g.effect.until <= now && !this.decor.busy;
+      !g.route.length && !g.encounter && g.blocked.until <= now && g.effect.until <= now && this.popups.idle && !this.decor.busy;
   }
   /** Active torches roughly within the camera viewport, padded so a torch
    * whose center is just offscreen can still light visible ground. Cheap

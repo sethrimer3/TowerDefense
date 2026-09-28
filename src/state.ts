@@ -35,7 +35,7 @@ import {
 import { World, LAYOUT_VERSION } from "./delve/world.ts";
 import { RoomWorld, TOWER_LAYOUT_VERSION } from "./tower/room-world.ts";
 import type { Board } from "./board.ts";
-import type { CombatPrediction } from "./combat.ts";
+import { bout, heroHpDuring, type Bout, type CombatPrediction } from "./combat.ts";
 import { ATTACK_SHARD, DEFENSE_SHARD, isLethal, resolveStep, type StepBlocked, type StepEffect } from "./step-effects.ts";
 import { OutsideWorld } from "./outside.ts";
 import { ClearLedger } from "./tower/clear-ledger.ts";
@@ -55,7 +55,7 @@ import {
   type ConsumableId,
 } from "./crafting.ts";
 import type { EquipmentSlot } from "./equipment.ts";
-import type { MaterialStack, MetalId } from "./materials.ts";
+import type { MaterialId, MaterialStack, MetalId } from "./materials.ts";
 /** How a new run starts: out in the forest or at the entrance, and from
  * which seed (rolled from the game's randomness when left out). */
 export type RunStart = { outside?: boolean; seed?: number };
@@ -65,6 +65,16 @@ export type RouteEffects = {
   defense: [number, number];
   keys: Partial<Record<KeyColor, [number, number]>>;
 };
+/** A reward just picked up, to rise from the tile it came from: drawn as its
+ * sprite (a tile's contents or a material), or as `text` where it has none. */
+export type Gain = { x: number; y: number; text: string; art: GainArt | null };
+export type GainArt = { tile: Tile } | { material: MaterialId; quantity: number };
+/** Rewards kept for the board to show; older ones are dropped unseen. */
+const MAX_GAINS = 12;
+/** A fight being played out round by round before it counts: the hero waits
+ * at `from`, the enemy stands at `to`, and nothing changes until
+ * `finishEncounter` settles it (at `start + bout.duration`, performance time). */
+export type Encounter = { from: { x: number; y: number }; to: { x: number; y: number }; bout: Bout; start: number; settle: () => void };
 /** Tiles that stay on the board after being stepped on. */
 const PERMANENT_TILES = new Set<Tile["kind"]>(["floor", "stairs", "stairsDown", "oneway", "openedChest"]);
 export class Game {
@@ -77,6 +87,13 @@ export class Game {
   paused = false;
   message = "";
   effect = { text: "", x: 0, y: 0, until: 0 };
+  /** Rewards picked up since the board last took them, oldest first. */
+  gains: Gain[] = [];
+  /** Plays each fight out round by round (the app's default) instead of
+   * settling it at once; a future setting will choose. */
+  animateFights = false;
+  /** The fight being played out, if any; steps wait until it settles. */
+  encounter: Encounter | null = null;
   summary: null | {
     height: number;
     kills: number;
@@ -124,6 +141,7 @@ export class Game {
   switchMode(next: Mode) {
     if (next === this.mode) return;
     if (next === "delve" && !this.save.upgrades.delve) return;
+    this.finishEncounter();
     this.claimRewards();
     this.mode = next;
     this.loadMode();
@@ -140,6 +158,7 @@ export class Game {
     this.route = [];
     this.auto = false;
     this.summary = null;
+    this.encounter = null;
     this.blocked = { x: 0, y: 0, until: 0 };
   }
   /** Makes `run` the live run of this mode and rebuilds its board. */
@@ -208,6 +227,7 @@ export class Game {
     this.route = [];
     this.auto = false;
     this.summary = null;
+    this.encounter = null;
     this.paused = false;
     this.blocked.until = 0;
   }
@@ -223,6 +243,8 @@ export class Game {
     return run;
   }
   undo() {
+    // A fight still playing out counts first, so undo takes it back.
+    this.finishEncounter();
     const slice = this.slice;
     if (slice.revival) {
       const snapshot = slice.revival.snapshot;
@@ -271,7 +293,7 @@ export class Game {
     return result;
   }
   walkTo(x: number, y: number) {
-    if (this.paused || this.summary) return;
+    if (this.paused || this.summary || this.encounter) return;
     this.auto = false;
     const route = routeTo(this, x, y);
     if (!route) {
@@ -290,6 +312,7 @@ export class Game {
   }
   /** A step the player takes themselves: it drops any queued route and Automove. */
   stepManually(dx: number, dy: number) {
+    if (this.encounter) return false;
     this.route = [];
     this.auto = false;
     return this.move(dx, dy, true);
@@ -309,6 +332,21 @@ export class Game {
       this.move(step.dx, step.dy, false);
       this.message = step.label;
     } else this.message = "Waiting · no safe route. Explore or retire this ascent.";
+  }
+  /** Settles the fight being played out, as if it had played to the end.
+   * Returns whether there was one. */
+  finishEncounter() {
+    const fight = this.encounter;
+    if (!fight) return false;
+    this.encounter = null;
+    fight.settle();
+    return true;
+  }
+  /** The hero's HP as the HUD shows it at `now` (performance time): during
+   * a fight being played out, what the strikes so far have left. */
+  shownHp(now: number) {
+    const fight = this.encounter, hp = this.run.player.hp;
+    return fight ? heroHpDuring(fight.bout, hp, now - fight.start) : hp;
   }
   /** Closes the run summary for the next run, in the forest; a death has
    * already started it. */
@@ -340,6 +378,7 @@ export class Game {
     this.slice.history = [];
     this.route = [];
     this.summary = null;
+    this.encounter = null;
     const { attack, defense, maxHp, keys } = loadout(this.save);
     // Tower ascents begin at the first floor of the chosen section.
     const section = this.mode === "tower" ? this.startSection() : 0,
@@ -419,6 +458,11 @@ export class Game {
       until: performance.now() + 1300,
     };
   }
+  /** Queues a reward to rise from (x, y). */
+  private gain(x: number, y: number, text: string, art: GainArt | null = null) {
+    this.gains.push({ x, y, text, art });
+    if (this.gains.length > MAX_GAINS) this.gains.shift();
+  }
   gainXp(enemy: Enemy) {
     this.save.xp += xpForKill(enemy.tier, enemy.attack);
   }
@@ -488,7 +532,7 @@ export class Game {
   }
   /** A single orthogonal step while play is live. */
   private canStep(dx: number, dy: number) {
-    return !this.paused && !this.summary && Math.abs(dx) + Math.abs(dy) === 1;
+    return !this.paused && !this.summary && !this.encounter && Math.abs(dx) + Math.abs(dy) === 1;
   }
   move(dx: number, dy: number, force = true, track = true) {
     if (!this.canStep(dx, dy)) return false;
@@ -508,6 +552,17 @@ export class Game {
       this.feedback("Lethal encounter. Inspect the enemy before proceeding.");
       return false;
     }
+    if (t.kind === "enemy" && this.animateFights) {
+      this.encounter = {
+        from: { x: p.x, y: p.y }, to: dest, bout: bout(p, t.enemy!), start: performance.now(),
+        settle: () => this.take(t, outcome, dest, track),
+      };
+      return true;
+    }
+    return this.take(t, outcome, dest, track);
+  }
+  /** Takes a resolved step: in through its door or fight, then onto the tile. */
+  private take(t: Tile, outcome: StepEffect, dest: { x: number; y: number }, track: boolean) {
     if (!this.enter(t, outcome, dest, track)) return false;
     this.land(t, dest.x, dest.y, outcome);
     return true;
@@ -537,7 +592,7 @@ export class Game {
     }
     if (t.kind === "reward") {
       this.run.changes[`${x},${y}`] = { kind: "openedChest", tier: t.tier };
-      this.claimRewards(t.tier);
+      this.claimRewards(t.tier, { x, y });
       return;
     }
     this.collect(t, x, y, outcome);
@@ -598,25 +653,22 @@ export class Game {
     }
     this.run.kills++;
     this.gainXp(enemy);
-    const dropText = this.creditEnemyDrops(enemy, at.x, at.y);
-    this.feedback(
-      (combat.damage
-        ? `−${combat.damage} HP · ${enemy.name} defeated`
-        : "Unscathed victory") + dropText,
-    );
+    const drops = this.creditEnemyDrops(enemy, at.x, at.y);
+    for (const d of drops) this.gain(at.x, at.y, materialText(d), { material: d.id, quantity: d.quantity });
+    this.message = [combat.damage ? `−${combat.damage} HP · ${enemy.name} defeated` : "Unscathed victory",
+      ...drops.map(materialText)].join(" · ");
     return true;
   }
   /** Persistent drops are gated by lootedTiles (outside `run`), so undo can
    * restore the enemy but can never duplicate its material reward. */
-  private creditEnemyDrops(enemy: Enemy, x: number, y: number): string {
+  private creditEnemyDrops(enemy: Enemy, x: number, y: number): MaterialStack[] {
     const slice = this.slice,
       key = this.lootKey(x, y);
-    if (slice.lootedTiles[key]) return "";
+    if (slice.lootedTiles[key]) return [];
     slice.lootedTiles[key] = true;
     const drops = this.rules.enemyDrops(enemy.name, this.rng);
-    if (!drops.length) return "";
     creditMaterials(this.save, drops);
-    return " · +" + drops.map(d => `${d.quantity} ${materialDef(d.id).name}${d.quantity > 1 ? "s" : ""}`).join(", +");
+    return drops;
   }
   private enterFromOutside() {
     const p = this.run.player;
@@ -736,10 +788,16 @@ export class Game {
   private syncRewards() {
     if (this.mode === "tower" && this.world instanceof RoomWorld) this.ledger.settle(this.towerRun);
   }
-  private claimRewards(tier?: ClearTier) {
+  /** Pays clear rewards: the chest opened at `at`, or every tier still owed. */
+  private claimRewards(tier?: ClearTier, at?: { x: number; y: number }) {
     if (this.mode !== "tower") return 0;
     const earned = tier ? this.ledger.open(tier, this.towerRun) : this.ledger.claimAll(this.towerRun);
-    if (earned) this.feedback(`+${earned} Inspiration · clear reward${earned > 1 ? "s" : ""}`);
+    if (!earned) return 0;
+    const text = `+${earned} Inspiration`;
+    if (at) {
+      this.gain(at.x, at.y, text);
+      this.message = `${text} · clear reward`;
+    } else this.feedback(`${text} · clear reward${earned > 1 ? "s" : ""}`);
     return earned;
   }
   /** Once a Tower floor has no enemies or doors left, earns its clear tiers
@@ -749,12 +807,17 @@ export class Game {
     for (const tier of this.ledger.check(this.world, this.towerRun))
       this.feedback(`${tier[0].toUpperCase() + tier.slice(1)} clear · reward by the stairs`);
   }
-  /** Pickup feedback and treasure payouts; stats were already applied. */
+  /** Pickup rewards and treasure payouts; stats were already applied. */
   private collect(t: Tile, x: number, y: number, outcome: StepEffect) {
-    if (t.kind === "key") this.feedback(`+1 ${t.color} key`);
-    if (t.kind === "potion") this.feedback(`+${outcome.healed} HP`);
-    if (t.kind === "attack") this.feedback(`+${ATTACK_SHARD} attack`);
-    if (t.kind === "defense") this.feedback(`+${DEFENSE_SHARD} defense`);
+    const text = t.kind === "key" ? `+1 ${t.color} key`
+      : t.kind === "potion" ? `+${outcome.healed} HP`
+      : t.kind === "attack" ? `+${ATTACK_SHARD} attack`
+      : t.kind === "defense" ? `+${DEFENSE_SHARD} defense`
+      : null;
+    if (text) {
+      this.gain(x, y, text, { tile: { ...t } });
+      this.message = text;
+    }
     if (t.kind === "treasure") {
       this.run.treasures++;
       // Generated treasure never upgrades gear directly — it always grants
@@ -768,12 +831,14 @@ export class Game {
         const loot = rollTreasureLoot(E, this.rng);
         this.save.gold += loot.gold;
         creditMaterials(this.save, loot.materials);
-        const extra = loot.materials.map(m => `+${m.quantity} ${materialDef(m.id).name}${m.quantity > 1 ? "s" : ""}`);
-        this.feedback([`+${loot.gold} Gold`, ...extra].join(" · "));
+        this.gain(x, y, `+${loot.gold} Gold`);
+        for (const m of loot.materials) this.gain(x, y, materialText(m), { material: m.id, quantity: m.quantity });
+        this.message = [`+${loot.gold} Gold`, ...loot.materials.map(materialText)].join(" · ");
       }
     }
   }
   finish(reason: string) {
+    this.finishEncounter();
     this.finalizeRun(reason, { dead: false });
   }
   buy(id: UpgradeId) {
@@ -833,7 +898,7 @@ export class Game {
     return craftConsumableItem(this.save, id);
   }
   useConsumable(id: ConsumableId) {
-    if (!this.playing || (this.save.consumables[id] ?? 0) <= 0) return false;
+    if (!this.playing || this.encounter || (this.save.consumables[id] ?? 0) <= 0) return false;
     const def = CONSUMABLES.find(c => c.id === id)!;
     const p = this.run.player;
     const n = Math.min(p.maxHp - p.hp, def.healAmount);
@@ -843,3 +908,6 @@ export class Game {
     return true;
   }
 }
+
+/** "+2 Slime Gels": a material reward as the board and status line name it. */
+const materialText = (m: MaterialStack) => `+${m.quantity} ${materialDef(m.id).name}${m.quantity > 1 ? "s" : ""}`;

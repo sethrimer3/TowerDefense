@@ -22,7 +22,6 @@ export function renderHud(game: Game, renderer: Renderer, overlay: BoardOverlay)
   text("inspiration", devAmount(game, game.save.tower.inspiration));
   text("level", `LV ${levelForXp(game.save.xp)}`);
   renderStatus(game, overlay);
-  el("health").style.width = `${(100 * game.run.player.hp) / game.run.player.maxHp}%`;
   text("auto-state", game.save.upgrades.auto ? (game.auto ? "ON" : "OFF") : "LOCKED");
   el("auto").classList.toggle("enabled", game.auto);
   text("density-label", `${renderer.density} × ${renderer.density}`);
@@ -60,15 +59,32 @@ export function renderBoardHeading(game: Game, overlay: BoardOverlay) {
 /** True when the heading still shows the other side of the forest entrance. */
 export const boardHeadingStale = (game: Game) => el("board").dataset.outside !== String(!!game.run.outside);
 
-function renderVitals(game: Game) {
-  const p = game.run.player;
-  text("hp", `${p.hp} / ${p.maxHp}`);
+/** HP, ATK, DEF and keys. During a fight being played out, HP counts down
+ * strike by strike. */
+export function renderVitals(game: Game) {
+  const p = game.run.player, hp = game.shownHp(performance.now());
+  text("hp", `${hp} / ${p.maxHp}`);
+  el("health").style.width = `${(100 * hp) / p.maxHp}%`;
+  renderHealthLoss(game.encounter ? p.hp - hp : 0, p.maxHp);
   text("attack", p.attack);
   text("defense", p.defense);
   for (const k of ["yellow", "blue", "red"] as const) text(k, p.keys[k]);
   const skeletonKeys = p.skeletonKeys ?? 0;
   text("skeleton", skeletonKeys);
   el("skeleton-key").hidden = skeletonKeys < 1;
+}
+
+/** The HP the fight being played out has cost so far, shown in purple just
+ * past the HP left; once the fight settles it shrinks away over a second. */
+function renderHealthLoss(lost: number, maxHp: number) {
+  const bar = el("health-loss");
+  if (lost > 0) {
+    bar.classList.remove("settling");
+    bar.style.width = `${(100 * lost) / maxHp}%`;
+  } else if (bar.style.width && bar.style.width !== "0%") {
+    bar.classList.add("settling");
+    bar.style.width = "0%";
+  }
 }
 
 function renderConsumables(game: Game) {

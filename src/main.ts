@@ -13,7 +13,7 @@ import { capitalized, displayedProgress, el } from "./ui/dom.ts";
 import { MODES } from "./modes.ts";
 import { buildShell } from "./ui/shell.ts";
 import { BoardOverlay } from "./ui/board-overlay.ts";
-import { boardHeadingStale, renderBoardHeading, renderHud } from "./ui/hud.ts";
+import { boardHeadingStale, renderBoardHeading, renderHud, renderVitals } from "./ui/hud.ts";
 import { confirmAction, RunEnd, showAutoSettings, showLog, showSectionPicker } from "./ui/dialogs.ts";
 import { SkillTreePage } from "./ui/skill-tree-page.ts";
 import { GearPage } from "./ui/gear-page.ts";
@@ -24,6 +24,8 @@ import { renderSettingsPage } from "./ui/settings-page.ts";
 
 buildShell(document.querySelector<HTMLDivElement>("#app")!);
 const game = new Game(load());
+// Fights play out strike by strike; a future setting will offer settling them at once.
+game.animateFights = true;
 const renderer = new Renderer(document.querySelector("#world")!, game);
 {
   const portraitCtx = (document.querySelector("#portrait-sprite") as HTMLCanvasElement).getContext("2d")!;
@@ -90,6 +92,8 @@ function unlockTarget(id: string): string {
 }
 function navigate(requested: string) {
   const id = unlockTarget(requested) as Tab;
+  // Only the board plays a fight out: leaving it settles one still playing.
+  game.finishEncounter();
   if (id !== "defend") defendPage.pause();
   tab = id;
   renderer.weather.silence();
@@ -172,6 +176,7 @@ const loop = new FrameLoop({
   upgradesFrame: (time) => skillTree.drawParticles(time),
   defendFrame: (time) => defendPage.frame(time),
   update,
+  vitals: () => renderVitals(game),
   save,
 });
 document.addEventListener("visibilitychange", () => {

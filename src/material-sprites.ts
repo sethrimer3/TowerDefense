@@ -1,4 +1,4 @@
-import type { MaterialId, MetalId } from "./materials.ts";
+import { METALS, type MaterialId, type MetalId } from "./materials.ts";
 
 const ASSET_BASE = (import.meta as ImportMeta & { env?: { BASE_URL?: string } }).env?.BASE_URL ?? "/";
 
@@ -49,4 +49,25 @@ export function metalBarSprite(id: MetalId, className = "ui-sprite") {
 export function monsterPartSprite(id: MaterialId, className = "ui-sprite") {
   const url = MONSTER_PART_URLS[id as keyof typeof MONSTER_PART_URLS];
   return url ? `<img class="${className}" src="${url}" alt="" aria-hidden="true">` : "";
+}
+
+/** Every material with sprite art: the metal bars and the monster parts. */
+const MATERIAL_SPRITE_URLS: Partial<Record<MaterialId, string>> = {
+  ...Object.fromEntries(METALS.map((m) => [m.materialId, METAL_BAR_URLS[m.id]])),
+  ...MONSTER_PART_URLS,
+};
+const images = new Map<MaterialId, HTMLImageElement>();
+
+/** The material's loaded sprite for drawing on a canvas, or null while it
+ * loads or when the material has none. */
+export function materialImage(id: MaterialId) {
+  const url = MATERIAL_SPRITE_URLS[id];
+  if (!url || typeof Image === "undefined") return null;
+  let image = images.get(id);
+  if (!image) {
+    image = new Image();
+    image.src = url;
+    images.set(id, image);
+  }
+  return image.complete && image.naturalWidth ? image : null;
 }

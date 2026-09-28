@@ -86,7 +86,8 @@ function neighbour(g: Game): Point {
   return p;
 }
 
-type BoardScene = { g: Game; to?: Point; check?: (decor: DecorLayer) => boolean };
+/** `fight`: the step goes into an enemy there, played out strike by strike. */
+type BoardScene = { g: Game; to?: Point; fight?: boolean; check?: (decor: DecorLayer) => boolean };
 
 /** A Tower game on the first floor where `want(plan)` holds for a floor
  * tile with a plain floor tile beside it: the hero starts beside it and
@@ -157,27 +158,48 @@ const BOARD_SCENES: Record<string, () => BoardScene> = {
   }),
 };
 
+/** Board scenes added since the Defend scenes: they draw after all the
+ * others, since each scene's seed is its place in JOBS. */
+const LATER_BOARD_SCENES: Record<string, () => BoardScene> = {
+  towerFight: () => {
+    const g = game("tower", { brightness: 70 });
+    const to = neighbour(g);
+    g.run.changes[`${to.x},${to.y}`] = { kind: "enemy", enemy: { name: "Slime", hp: 40, attack: 9, defense: 1, tier: 0, strength: "normal" } };
+    return { g, to, fight: true };
+  },
+};
+
 /** One board scene on `canvas` (408×408 CSS pixels), fully synchronous so
  * no frame loop can interleave: a settled frame, a frame mid-step with
- * feedback showing and a route preview, and later frames once the camera
- * has caught up. */
+ * feedback, rising rewards and a route preview showing (or, in a fight
+ * scene, mid-strike), and later frames once the camera has caught up. */
 function playBoard(name: string, seed: number, canvas: HTMLCanvasElement, grab: Grab) {
   seeded(seed, () => {
-    const scene = BOARD_SCENES[name](), g = scene.g;
+    const scene = (BOARD_SCENES[name] ?? LATER_BOARD_SCENES[name])(), g = scene.g;
     quiet(g);
     const r = new Renderer(canvas, g);
     for (let t = 1000; t <= 1400; t += 50) r.draw(t);
     grab("settled");
     const to = scene.to ?? neighbour(g), from = { ...g.run.player };
-    g.run.player.x = to.x;
-    g.run.player.y = to.y;
-    r.previewRoute = [from, to, neighbour(g)];
-    g.blocked = { x: from.x, y: from.y + 1, until: 1900 };
-    g.effect = { text: "+2 ATK", x: to.x, y: to.y, until: 2600 };
+    if (scene.fight) {
+      g.animateFights = true;
+      g.move(to.x - from.x, to.y - from.y);
+      g.encounter!.start = 1400;
+    } else {
+      g.run.player.x = to.x;
+      g.run.player.y = to.y;
+      r.previewRoute = [from, to, neighbour(g)];
+      g.blocked = { x: from.x, y: from.y + 1, until: 1900 };
+      g.effect = { text: "Move undone", x: to.x, y: to.y, until: 2600 };
+      // A reward with a sprite rises first, then one written out.
+      g.gains.push({ x: to.x, y: to.y, text: "+2 attack", art: { tile: { kind: "attack" } } }, { x: to.x, y: to.y, text: "+40 Gold", art: null });
+    }
     r.draw(1450);
     r.draw(1483);
     grab("moving");
     for (let t = 1500; t <= 3300; t += 60) {
+      // As the frame loop does: the fight counts once its last strike is done.
+      if (g.encounter && t >= g.encounter.start + g.encounter.bout.duration) g.finishEncounter();
       r.draw(t);
       // Ripples spread past the hero's feet.
       if (t === 2100) grab("ripples");
@@ -187,6 +209,7 @@ function playBoard(name: string, seed: number, canvas: HTMLCanvasElement, grab: 
       // Guards the scene itself: the effect it exists for must be live.
       if (scene.check && !scene.check(r.decor)) throw Error(`${name}: its decor effect never started`);
     }
+    if (scene.fight && (g.encounter || g.run.player.x !== to.x || g.run.player.y !== to.y)) throw Error(`${name}: the fight never settled`);
     grab("later");
   });
 }
@@ -365,4 +388,5 @@ export const JOBS: Job[] = [
   ...Object.keys(BOARD_SCENES).map((name) => ({ name, canvas: "board" as const, run: playBoard })),
   ...Object.keys(DEFEND_SCENES).map((name) => ({ name, canvas: "defend" as const, run: playDefend })),
   { name: "defendIcons", canvas: "icons" as const, run: playIcons },
+  ...Object.keys(LATER_BOARD_SCENES).map((name) => ({ name, canvas: "board" as const, run: playBoard })),
 ].map(({ name, canvas, run }, i) => ({ name, seed: i + 1, canvas, play: (cv: HTMLCanvasElement, grab: Grab) => run(name, i + 1, cv, grab) }));

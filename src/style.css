@@ -247,6 +247,7 @@ h1 span {
   image-rendering: pixelated;
 }
 .health-track {
+  display: flex;
   height: 6px;
   background: #482a33;
   margin: 6px 3px 8px;
@@ -259,6 +260,15 @@ h1 span {
   display: block;
   background: repeating-linear-gradient(90deg, #974759 0 5px, #b95f6c 5px 10px, #dc8890 10px 15px);
   height: 100%;
+}
+/* The HP a fight being played out has cost so far, just past what is left. */
+#health-loss {
+  flex: none;
+  width: 0;
+  background: repeating-linear-gradient(90deg, #6b3f9e 0 5px, #8a5cc4 5px 10px, #a97ee0 10px 15px);
+}
+#health-loss.settling {
+  transition: width 1s linear;
 }
 .combat-stats {
   display: grid;

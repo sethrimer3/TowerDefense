@@ -50,6 +50,24 @@ _Avoid_: corridor, path
 How hard the floor asked an enemy to be: weak, normal, strong or elite. Strong enemies are the zone's own made tougher, elite ones come from the next zone. The board shows it round the enemy (a dark red rim for normal, bright red with one chevron for strong, bright red inside a gold rim with two chevrons for elite) and the inspect title names strong and elite.
 _Avoid_: tier (a tier is the XP a kill pays), rank, level
 
+### Fights
+
+**Fight**:
+What stepping into an enemy costs: rounds in which the hero strikes first and the enemy strikes back, until one of them falls. How it ends is known before it starts, as the inspect panel shows.
+_Avoid_: battle, combat round
+
+**Strike**:
+One attack in a fight: the hero's ATK less the enemy's DEF, or the enemy's ATK less the hero's DEF (never below zero).
+_Avoid_: blow, hit (a hit is the damage one strike deals)
+
+**Encounter**:
+A fight being played out on the board, strike by strike, with its damage rising off whoever was struck and the HP it has cost so far shown in purple on the HP bar. The hero waits on the tile it came from, nothing counts until the fight is settled, and only then does the hero step onto the enemy's tile, or fall.
+_Avoid_: combat animation, pending fight
+
+**Gain**:
+A reward just picked up (an item's stats, keys, Gold, materials, a clear chest's Inspiration), shown rising from the tile it came from, one after another: as its sprite, or written out where it has none.
+_Avoid_: popup, loot text
+
 ### The character
 
 **Loadout**:

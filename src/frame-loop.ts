@@ -12,6 +12,8 @@ export type FrameLoopHost = {
   /** Advances the Defend battle while its page shows. */
   defendFrame(time: number): void;
   update(): void;
+  /** Refreshes only the HP readouts, as a fight's strikes land. */
+  vitals(): void;
   save(): void;
 };
 
@@ -21,8 +23,9 @@ const ROUTE_STEP_MS = 130;
 const IDLE_FRAME_MS = 30;
 const AUTOSAVE_MS = 10000;
 
-/** The requestAnimationFrame loop: draws the visible page, walks queued
- * routes, runs Automove at its chosen speed, and autosaves. */
+/** The requestAnimationFrame loop: draws the visible page, plays fights
+ * out, walks queued routes, runs Automove at its chosen speed, and
+ * autosaves. */
 export class FrameLoop {
   private lastAuto = 0;
   private lastRoute = 0;
@@ -61,6 +64,7 @@ export class FrameLoop {
       this.host.renderer.draw(time);
       this.lastBoardDraw = time;
     }
+    if (game.encounter) this.playFight(time);
     if (game.route.length && this.due(time, this.lastRoute, ROUTE_STEP_MS)) {
       this.lastRoute = time;
       game.routeStep();
@@ -71,6 +75,15 @@ export class FrameLoop {
       game.autoTurn();
       this.host.update();
     }
+  }
+
+  /** Shows the HP the fight's strikes have left, and settles the fight once
+   * its last strike is done. */
+  private playFight(time: number) {
+    const fight = this.host.game.encounter!;
+    if (time < fight.start + fight.bout.duration) return this.host.vitals();
+    this.host.game.finishEncounter();
+    this.host.update();
   }
 
   /** Battery saver: while nothing on the board moves, skip every other frame. */
@@ -84,9 +97,10 @@ export class FrameLoop {
     return this.canAct() && time - last > interval;
   }
 
-  /** Steps only run while the game is live: not paused, finished, or behind a dialog. */
+  /** Steps only run while the game is live: not paused, finished, in a
+   * fight still playing out, or behind a dialog. */
   private canAct() {
     const { game, modal } = this.host;
-    return !game.paused && !game.summary && !modal.open;
+    return !game.paused && !game.summary && !game.encounter && !modal.open;
   }
 }
