@@ -34,6 +34,23 @@ test("routes are planned on a hand-built board", () => {
   assert.equal(routeTo(at, 3, 3), null);
 });
 
+test("of two equally long routes, one through a yellow door and one through a blue, the route spends the yellow key", () => {
+  // Two lanes up from (2, 0) round a pillar at (2, 1) to (2, 2), a door in each.
+  for (const [left, right] of [["yellow", "blue"], ["blue", "yellow"]] as const) {
+    const tiles = new Map<string, Tile>([
+      ["1,0", { kind: "floor" }], ["2,0", { kind: "floor" }], ["3,0", { kind: "floor" }],
+      ["1,1", { kind: "door", color: left }], ["3,1", { kind: "door", color: right }],
+      ["1,2", { kind: "floor" }], ["2,2", { kind: "floor" }], ["3,2", { kind: "floor" }],
+    ]);
+    const at = corridor();
+    at.world.tile = (x, y) => tiles.get(`${x},${y}`) ?? { kind: "wall" };
+    at.run.player.keys = { yellow: 1, blue: 1, red: 0 };
+    const route = routeTo(at, 2, 2)!;
+    assert.equal(route.length, 4);
+    assert.ok(route.some((s) => at.world.tile(s.x, s.y).color === "yellow"), `${left} left, ${right} right`);
+  }
+});
+
 test("Delve Automove plans on a hand-built board, keeping what it saw and chose", () => {
   const at = corridor(), memory: AutomoveMemory = { known: {}, visited: {} }, plan = new DelvePlan();
   const step = chooseDelveStep(at, { memory, plan, capabilities: capabilities(defaults().upgrades) });

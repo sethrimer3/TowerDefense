@@ -24,6 +24,13 @@ test("every fork pattern's lanes cost about the same, and none is cheaper in eve
       assert.ok(lanes.every((l) => l.length >= 1 && l.length <= 3), `${p.id}: lanes are one to three tiles deep`);
       const values = lanes.map(laneValue);
       assert.ok(values.every((v) => v > 0), `${p.id}: every lane costs something`);
+      if (p.fallback) {
+        // One door, and beside it a door of the next rarity up.
+        assert.ok(lanes.every((l) => l.length === 1 && l[0].kind === "door"), `${p.id}: fallback lanes are single doors`);
+        const colors = lanes.map((l) => (l[0] as { color: string }).color);
+        assert.ok(["yellow,blue", "blue,red"].includes(colors.join()), `${p.id}: ${colors}`);
+        continue;
+      }
       assert.ok(Math.max(...values) <= Math.min(...values) * 1.6, `${p.id}: lane values ${values}`);
       lanes.forEach((a, i) => lanes.forEach((b, j) => {
         if (i === j) return;
@@ -73,7 +80,9 @@ test("built forks lead into their region by every lane, and never into a region 
         built.add(fork.patternId);
         assert.ok(worthReaching(embedding.graph.nodes, node.id), `seed ${seed} room ${room}: fork into an empty dead end`);
         const r = embedding.rects[embedding.leafOf[node.id]];
-        const inside = point(r.x1, r.y1);
+        const inside: string[] = [];
+        for (let y = r.y1; y <= r.y2; y++)
+          for (let x = r.x1; x <= r.x2; x++) if (cells.get(point(x, y))?.kind !== "wall") inside.push(point(x, y));
         const lanes = fork.lanes.map((_, i) =>
           embedding.doorways.filter((d) => d.child === node.id && d.lane === i).map((d) => point(d.x, d.y)));
         assert.equal(lanes.length, fork.lanes.length);
@@ -87,7 +96,8 @@ test("built forks lead into their region by every lane, and never into a region 
             assert.equal(t.kind, want, `seed ${seed} room ${room} lane ${i} step ${k}`);
           });
           const others = lanes.filter((_, j) => j !== i).flat();
-          assert.ok(reachable(cells, start, new Set([...shortcuts, ...others])).has(inside),
+          const seen = reachable(cells, start, new Set([...shortcuts, ...others]));
+          assert.ok(inside.every((k) => seen.has(k)),
             `seed ${seed} room ${room}: lane ${i} into region ${node.id} doesn't lead in`);
         });
       }

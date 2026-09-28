@@ -12,7 +12,8 @@ import type { Archetype, Fork, Gate, Lane, LaneStep, Reward, StrategicNode, Stra
  *
  * Every lane is priced on one scale (`GATE_VALUE`, roughly "yellow keys"),
  * the lanes of a fork cost about the same, and none is cheaper than
- * another in every way. A lane can be one to three tiles deep; deeper
+ * another in every way. The exception is a fallback fork: a door beside a
+ * door of the next rarity up, for a player without the cheaper key. A lane can be one to three tiles deep; deeper
  * lanes need room the embedder carves from one of the two chambers. */
 
 /** What paying each gate or taking each item is worth, in yellow keys. */
@@ -103,6 +104,9 @@ export type ForkPattern = {
   tags: StrategicTag[];
   /** One weighted choice per lane. */
   lanes: Weighted<Lane>[];
+  /** A door with a dearer door beside it for a player who lacks the
+   * cheaper key: priced by its cheapest lane, not by all of them. */
+  fallback?: boolean;
 };
 
 const Y: Gate = { kind: "door", color: "yellow" };
@@ -176,6 +180,15 @@ export const FORK_PATTERNS: ForkPattern[] = [
     id: "blueForYellows", weight: 1.5, minimumDepth: 3, tags: ["doorGate", "resourceExchange"],
     lanes: [one([B, yKey, yKey]), one([foe("normal")])],
   },
+  // The same door, or a dearer one for a player without that key.
+  {
+    id: "yellowOrBlueDoor", weight: 2, minimumDepth: 3, tags: ["doorGate"], fallback: true,
+    lanes: [one([Y]), one([B])],
+  },
+  {
+    id: "blueOrRedDoor", weight: 1, minimumDepth: 10, tags: ["doorGate"], fallback: true,
+    lanes: [one([B]), one([R])],
+  },
   // Three ways in.
   {
     id: "doorOrEitherMonster", weight: 3, minimumDepth: 1, tags: ["doorGate", "combatGate"],
@@ -194,7 +207,13 @@ export const FORK_PATTERNS: ForkPattern[] = [
 /** The deepest lane decides how deep a fork's crossing must be. */
 export const forkDepth = (fork: Fork) => Math.max(...fork.lanes.map((l) => l.length));
 
-const mean = (fork: Fork) => fork.lanes.reduce((s, l) => s + laneValue(l), 0) / fork.lanes.length;
+const FALLBACKS = new Set(FORK_PATTERNS.filter((p) => p.fallback).map((p) => p.id));
+/** What a fork costs to go through: its lanes' average, or a fallback
+ * fork's cheapest lane. */
+export function forkValue(fork: Fork) {
+  const values = fork.lanes.map(laneValue);
+  return FALLBACKS.has(fork.patternId) ? Math.min(...values) : values.reduce((s, v) => s + v, 0) / values.length;
+}
 
 function forkWeight(p: ForkPattern, depth: number, archetype: Archetype) {
   if (depth < p.minimumDepth) return 0;
@@ -239,7 +258,7 @@ export function forksWorth(v: number, depth: number, archetype: Archetype, rng: 
   let options = FORK_PATTERNS.map((p) => ({ p, w: forkWeight(p, depth, archetype) }))
     .filter(({ w }) => w > 0)
     .map(({ p, w }) => ({ w, v: build(p, rng) }))
-    .filter(({ v: fork }) => fits(fork) && mean(fork) <= v * FORK_TUNING.valueBand && mean(fork) * FORK_TUNING.valueBand >= v);
+    .filter(({ v: fork }) => fits(fork) && forkValue(fork) <= v * FORK_TUNING.valueBand && forkValue(fork) * FORK_TUNING.valueBand >= v);
   const chosen: Fork[] = [];
   while (options.length && chosen.length < FORK_TUNING.fallbacks) {
     const fork = pick(options, rng);

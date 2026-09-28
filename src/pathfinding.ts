@@ -1,8 +1,13 @@
 import { CHUNK } from "./config.ts";
 import { point } from "./entities.ts";
 import type { Position } from "./board.ts";
+import type { KeyColor } from "./config.ts";
 import { doorCost } from "./doors.ts";
 export type Step = { dx: number; dy: number; x: number; y: number };
+/** A sliver of route cost per key a door eats, by rarity: never enough to
+ * lengthen a route, only to pick the cheaper of two equally long ones (a
+ * yellow door beside a blue one). */
+const KEY_TIE_BREAK: Record<KeyColor, number> = { yellow: 1e-4, blue: 3e-4, red: 8e-4 };
 /** Find a structural route. Missing-key doors are expensive rather than
  * impassable, so a player can approach the first necessary locked door. */
 export function routeTo(at: Position, x: number, y: number): Step[] | null {
@@ -41,11 +46,12 @@ export function routeTo(at: Position, x: number, y: number): Step[] | null {
       if (!dest || dest.y < minY || dest.y > maxY) continue;
       const tile = w.tile(dest.x, dest.y);
       if (tile.kind === "wall") continue;
+      const keys = tile.kind === "door" ? doorCost(tile, p) : [];
       const next = point(dest.x, dest.y),
         value =
           n.cost +
           1 +
-          (tile.kind === "door" && doorCost(tile, p) === null ? 10000 : 0);
+          (keys === null ? 10000 : keys.reduce((s, c) => s + KEY_TIE_BREAK[c], 0));
       if (value >= (cost.get(next) ?? Infinity)) continue;
       cost.set(next, value);
       previous.set(next, { from: k, step: { ...dest, dx, dy } });

@@ -8,7 +8,8 @@ import { generateTowerFloor } from "./index.ts";
 // keys differently; old per-room coordinate mutations must not overlay it.
 // v4 replaces the maze generator with strategic chamber layouts.
 // v5 adds forks: parallel lanes of gates between chambers.
-export const TOWER_LAYOUT_VERSION = 5;
+// v6 adds yellow-or-blue and blue-or-red door forks.
+export const TOWER_LAYOUT_VERSION = 6;
 
 /** A self-contained 17x17 Tower floor. Generation is strategy-first (see
  * src/tower/index.ts): an abstract graph of gates, keys and rewards is
