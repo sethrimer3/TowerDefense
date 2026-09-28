@@ -13,7 +13,7 @@ Requires Node 22.18+ (CI uses 24). Tests and tools run `.ts` files directly via 
 ```sh
 npm run dev            # Vite on 127.0.0.1:5173 (PORT env overrides)
 npm run build          # tsc --noEmit && vite build -> dist/
-npm test               # all tests/*.test.ts via node:test
+npm test               # all tests/*.test.ts via node:test (local sample; CI=1 for CI's full size)
 node --experimental-transform-types --test tests/defend.test.ts                          # one file
 node --experimental-transform-types --test --test-name-pattern="gold formula" tests/*.test.ts  # one test
 npm run test:browser   # Playwright suites (tests/*.mjs); needs `npm run dev` running in another terminal
@@ -26,6 +26,7 @@ node --experimental-transform-types tools/delve-ai-sim.ts   # headless Automove 
 npm run tiles:area1 / tiles:outside     # regenerate tile PNGs
 ```
 
+- `npm test` runs the broad property checks on a smaller sample and skips the slowest (`tests/test-size.ts`: `FULL`, `ciOnly`); CI sets `CI`, so it runs them in full. Set `CI=1` to run the full suite locally. The files run in parallel, so one slow file sets the suite's time: give a new slow test its own file.
 - Browser tests default to installed Microsoft Edge; set `PLAYWRIGHT_CHANNEL=chrome` otherwise. Screenshots go to `test-results/`. They hit `http://127.0.0.1:5173/` (or `TEST_URL`, for a dev server on another port, such as one run from a separate worktree) and seed state by writing the `towerincramental.v1` save into localStorage.
 - Source imports use explicit `.ts` extensions (`allowImportingTsExtensions`) — required so Node can run them directly. Keep this in new imports.
 - `tsconfig` only includes `src/`; tests and tools are not type-checked by `npm run build`.
@@ -80,8 +81,24 @@ Most tests here are characterization goldens (`tests/fixtures/*.golden.json`): t
 | UI text, pages, HUD or dialogs | `ui.golden.json` (`npm run test:ui`), and `defend-pointer.golden.json` for the Defend page |
 | Save format | `save-decode` |
 
+While iterating, run only the tests for the area you touched, then `npm test` once before committing (after pushing, don't wait on CI):
+
+| Area | Tests (`node --experimental-transform-types --test …`) |
+|---|---|
+| Tower generation (`src/tower/`) | `tests/tower-*.test.ts tests/world-boards.test.ts tests/decor-plan.test.ts` |
+| Delve labyrinth (`src/delve/labyrinth.ts`, `world.ts`) | `tests/delve.test.ts tests/delve-labyrinth.test.ts tests/world-boards.test.ts tests/decor-plan.test.ts` |
+| Automove (`automation.ts`, `delve/automove.ts`, `pathfinding.ts`) | `tests/planners.test.ts tests/tower-automation.test.ts tests/tower-overhaul.test.ts tests/delve-automove.test.ts` (and `CI=1 … tests/delve-ai-tiers.test.ts`) |
+| Movement, steps, run lifecycle (`state.ts`, `step-effects.ts`, `tower/climb.ts`, `tower/clear-ledger.ts`) | `tests/step-*.test.ts tests/undo-clear-trace.test.ts tests/game*.test.ts tests/movement.test.ts tests/doors.test.ts tests/tower-climb.test.ts tests/clear-ledger.test.ts` |
+| Economy (`config.ts`, `loadout.ts`, gear, skill trees, `modes.ts`) | `tests/loadout.test.ts tests/progression.test.ts tests/crafting.test.ts tests/skill-trees.test.ts tests/modes.test.ts tests/step-trace.test.ts` |
+| Saves and settings | `tests/save.test.ts tests/settings.test.ts` |
+| Board drawing, lighting, decor art | `tests/render-calls.test.ts tests/lighting-passes.test.ts tests/art-modules.test.ts tests/terrain-paint.test.ts tests/decor.test.ts` |
+| Outside and weather | `tests/outside*.test.ts tests/outdoor-art.test.ts tests/torch-light.test.ts` |
+| Defend (`src/defend/`) | `tests/defend*.test.ts` |
+
+Run a browser golden only when the change reaches what it captures: `test:ui` for pages, HUD and dialogs; `test:render` for board drawing, art, or anything that changes the render scenes' boards; `test:pointer` for the Defend page.
+
 How:
-1. **Refactor (no visible change intended):** re-record nothing. For the browser goldens (`test:render`, `test:ui`, `test:pointer`), first run them with `UPDATE_GOLDEN=1` on the unchanged code, since their hashes are machine-specific; then every golden must still match after the change.
+1. **Refactor (no visible change intended):** re-record nothing. Every golden must still match after the change. The browser goldens' hashes are machine-specific, so if one fails, record it on the unchanged code (`git stash`, then `UPDATE_GOLDEN=1`), restore the change, and compare again; only a failure then is yours.
 2. **Intended change:** make it, run `npm test` (and the browser goldens if visuals or UI changed) and check that only the keys the change should touch fail; for pixels, look at the PNGs in `test-results/render*/`. Then re-record those goldens with `UPDATE_GOLDEN=1` (one file: `UPDATE_GOLDEN=1 node --experimental-transform-types --test tests/<name>.test.ts`), commit the fixtures in the same commit, and say in the message which goldens were re-recorded and why.
 3. The browser goldens need `npm run dev` and aren't run by CI; when visuals or UI change, run them yourself. The Node goldens run in CI on Linux, so they must hash the same on every OS: one whose hashes depend on `Math.pow` imports `tests/portable-math.ts` first.
 

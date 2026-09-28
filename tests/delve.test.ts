@@ -6,10 +6,13 @@ import { World, generate } from '../src/delve/world.ts';
 import { Game } from '../src/state.ts';
 import { defaults, decode } from '../src/save.ts';
 import { point } from '../src/entities.ts';
+import { FULL } from './test-size.ts';
 
-test('600 regions have connected geometry and exactly one unbypassable milestone connection', () => {
+// 600 regions in CI, 150 locally; the totals below scale with the sample.
+const SEEDS = FULL ? 60 : 15;
+test(`${SEEDS * 10} regions have connected geometry and exactly one unbypassable milestone connection`, () => {
   const quality = { good: 0, poor: 0, contextual: 0 }; let loops = 0;
-  for (let seed = 0; seed < 60; seed++) for (let area = 0; area < 10; area++) {
+  for (let seed = 0; seed < SEEDS; seed++) for (let area = 0; area < 10; area++) {
     const a = analyzeDelve(seed, area);
     assert.ok(a.connected, JSON.stringify(a)); assert.equal(a.gateBypass, false, JSON.stringify(a));
     assert.ok(a.pastAboveGate && a.futureBelowGate, 'geometry must overlap the physical milestone');
@@ -18,7 +21,7 @@ test('600 regions have connected geometry and exactly one unbypassable milestone
     assert.ok(a.deadEnds >= 2); loops += a.loops;
     for (const k of ['good', 'poor', 'contextual'] as const) quality[k] += a.qualities[k];
   }
-  assert.ok(loops > 200); for (const count of Object.values(quality)) assert.ok(count > 500);
+  assert.ok(loops > SEEDS * 10 / 3); for (const count of Object.values(quality)) assert.ok(count > SEEDS * 25 / 3);
 });
 test('generation is deterministic, order independent and extends past the old depth cap', () => {
   const before = generate(12, 2); generate(12, 6000); assert.deepEqual(generate(12, 2), before);
@@ -83,15 +86,6 @@ test('physical false ascent cannot award the next official milestone', () => {
   assert.ok(high.y > r.gate.y); assert.ok(depthAt(42, high.x, high.y, 0) < 100);
 });
 
-test('Automove intelligence tiers are measurably better on identical labyrinths', async () => {
-  const { simulate, AI_LEVELS } = await import('../tools/delve-ai-sim.ts');
-  // Six labyrinths, since one unlucky layout can outweigh a smaller sample.
-  const sum = (level: keyof typeof AI_LEVELS, f: (r: ReturnType<typeof simulate>) => number) => [0, 1, 2, 3, 4, 5].reduce((s, i) => s + f(simulate(2000 + i, AI_LEVELS[level], { steps: 700 })), 0);
-  // Naive Automove walks into more intentionally poor pockets than an AI
-  // that can price fights and keys, and reaches less depth for its steps.
-  assert.ok(sum('naive', r => r.pockets.poor) > sum('judgment', r => r.pockets.poor));
-  assert.ok(sum('full', r => r.depth) > sum('naive', r => r.depth));
-});
 test('torches sit on plain floor, once, even where areas interlock', () => {
   for (let seed = 0; seed < 6; seed++) {
     const w = new World({ seed, changes: {}, floor: 0, milestone: 0 }), spots = w.torches.map(t => point(t.x, t.y));
