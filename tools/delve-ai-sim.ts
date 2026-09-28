@@ -20,7 +20,7 @@ export function simulate(seed: number, level: AiLevel, opts: { steps?: number; h
   Object.assign(g.save.upgrades, level);
   g.switchMode('delve');
   g.newRun({ seed });
-  Object.assign(g.run.player, { hp: opts.hp ?? 400, maxHp: opts.hp ?? 400, attack: opts.attack ?? 14, defense: opts.defense ?? 4, keys: { yellow: opts.keys ?? 1, blue: 0, red: 0 } });
+  Object.assign(g.run.player, { hp: opts.hp ?? 800, maxHp: opts.hp ?? 800, attack: opts.attack ?? 14, defense: opts.defense ?? 8, keys: { yellow: opts.keys ?? 1, blue: 0, red: 0 } });
   const run = g.delveRun;
   const pockets = new Map<string, string>();
   const note = (a: number) => { for (const n of region(seed, a).nodes) if (n.pattern) pockets.set(point(n.x, n.y), n.pattern.quality); };
