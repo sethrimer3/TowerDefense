@@ -1,6 +1,7 @@
 import { themeInfluence } from "./delve/labyrinth.ts";
 import type { Mode } from "./entities.ts";
 import { tileRandom } from "./random.ts";
+import { AREA1_RIM } from "./area1-tileset.ts";
 
 // Presentation only: themes never consume the generation RNG or alter tiles.
 export const THEMES = [
@@ -414,19 +415,17 @@ export type Corner = "nw" | "ne" | "sw" | "se";
 /** Larger than the 6px exposed rim the wall art runs along open edges, so
  * the corner stone reads as a quoin rather than more rim. */
 const CORNER_BRICK_SIZE = 8;
-/** The area1 wall sprites' rim colours (tools/generate-area1-tiles.mjs). */
-const AREA1_RIM = { face: "#8fa0ad", light: "#c1c2b5", joint: "#607283", dark: "#344354" };
 
 /** Paints a quoin stone into each given corner of a wall tile: the corners
  * that touch a room's corner, where the walls on both sides run their
  * exposed rims up to this tile. The stone's two outer edges lie on the tile
  * edges those rims meet, drawn as mortar joints; its inner edges take the
- * walls' top-left light. On area1 art it uses that art's rim colours;
- * elsewhere it is built from the theme's wall colours. */
-export function drawCornerBricks(c: CanvasRenderingContext2D, tile: TerrainTile, corners: readonly Corner[], spriteArt: boolean) {
+ * walls' top-left light. Over area1 wall sprites it uses their rim
+ * colours; elsewhere it is built from the theme's wall colours. */
+export function drawCornerBricks(c: CanvasRenderingContext2D, tile: TerrainTile, corners: readonly Corner[], area1Art: boolean) {
   if (!corners.length) return;
-  const { ink, theme } = inkAt(tile);
-  const rim = spriteArt && theme === 0 ? AREA1_RIM : {
+  const { ink } = inkAt(tile);
+  const rim = area1Art ? AREA1_RIM : {
     face: brighten(ink.wall, 0.9), light: brighten(ink.wall, 1.3), joint: brighten(ink.seam, 0.6), dark: ink.seam,
   };
   const s = CORNER_BRICK_SIZE;

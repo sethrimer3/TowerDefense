@@ -1,10 +1,10 @@
 import { CHUNK, COLORS } from "./config.ts";
-import { drawCornerBricks, drawTerrain, type Corner } from "./themes.ts";
+import { drawCornerBricks, drawTerrain, themeAt, type Corner } from "./themes.ts";
 import { tileRandom } from "./random.ts";
 import type { Mode, Tile, Torch } from "./entities.ts";
 import { drawForestTile } from "./outside.ts";
 import { getTorchFlicker, getTorchSway } from "./lighting.ts";
-import { drawArea1Door, drawArea1Item } from "./area1-tileset.ts";
+import { drawArea1Door, drawArea1Item, drawArea1Quoins, wallAdjacencyMask } from "./area1-tileset.ts";
 import { drawThemedTile } from "./themed-tilesets.ts";
 import { doorColor } from "./doors.ts";
 import { drawEnemySprite } from "./enemy-sprites.ts";
@@ -72,23 +72,28 @@ function paintGround(c: CanvasRenderingContext2D, world: TileWorld, t: Tile, x: 
   // fallback and the Sprites setting can still opt out of bitmap art.
   const drewSprite = !look.spritesOff && drawThemedTile(c, look.mode, look.height, wall, x, y, look.seed, neighbors);
   if (!drewSprite) drawTerrain(c, terrain);
-  if (wall) drawCornerBricks(c, terrain, roomCorners(world, x, y, neighbors), drewSprite);
+  if (wall) {
+    const area1Art = drewSprite && themeAt(look.mode, look.height, x, y, look.seed).decor === 0;
+    // Inner room corners: walls on both sides, the room's corner diagonally across.
+    drawCornerBricks(c, terrain, openCorners(world, x, y, (side) => side), area1Art);
+    // Outer corners of a wall: open on both sides and diagonally, where two
+    // exposed rims meet. Only the area1 art has rims to wrap a quoin round.
+    if (area1Art) drawArea1Quoins(c, wallAdjacencyMask(neighbors), openCorners(world, x, y, (side) => !side));
+  }
   return drewSprite || look.spritesOff;
 }
 
-/** The corners of a wall tile that touch a room's corner: the walls on both
- * sides of that corner and an open tile diagonally across it. (North is +y
- * in the world and the top of the tile.) */
-function roomCorners(world: TileWorld, x: number, y: number, n: { northWall: boolean; southWall: boolean; westWall: boolean; eastWall: boolean }) {
-  const open = (dx: number, dy: number) => {
-    const kind = world.tile(x + dx, y + dy)?.kind;
-    return kind !== undefined && kind !== "wall";
-  };
+/** The corners of a tile with an open tile diagonally across them whose two
+ * side neighbours' wall-ness (true for a wall) passes `sides`. North is +y
+ * in the world and the top of the tile. */
+function openCorners(world: TileWorld, x: number, y: number, sides: (wall: boolean) => boolean) {
+  const kindAt = (dx: number, dy: number) => world.tile(x + dx, y + dy)?.kind;
   const corners: Corner[] = [];
-  if (n.northWall && n.westWall && open(-1, 1)) corners.push("nw");
-  if (n.northWall && n.eastWall && open(1, 1)) corners.push("ne");
-  if (n.southWall && n.westWall && open(-1, -1)) corners.push("sw");
-  if (n.southWall && n.eastWall && open(1, -1)) corners.push("se");
+  for (const [corner, dx, dy] of [["nw", -1, 1], ["ne", 1, 1], ["sw", -1, -1], ["se", 1, -1]] as const) {
+    const diagonal = kindAt(dx, dy);
+    if (diagonal === undefined || diagonal === "wall") continue;
+    if (sides(kindAt(0, dy) === "wall") && sides(kindAt(dx, 0) === "wall")) corners.push(corner);
+  }
   return corners;
 }
 
