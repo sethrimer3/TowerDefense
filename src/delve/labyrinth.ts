@@ -1,6 +1,6 @@
 import { point, type Point, type Tile } from '../entities.ts';
 import type { Fork, Gate, LaneStep, Strength } from '../tower/types.ts';
-import { DELVE_ENEMY_NAMES, enemyTier, type TowerEnemyProfile } from '../scaling.ts';
+import { DELVE_ENEMY_NAMES, ENEMY_STAT_SCALE, enemyTier, type TowerEnemyProfile } from '../scaling.ts';
 import { FORK_TUNING, forkDepth, forksWorth, stepValue } from '../tower/forks.ts';
 import { choosePattern, FALSE_ASCENTS, type Pattern } from './patterns.ts';
 import { tileRandom } from '../random.ts';
@@ -356,6 +356,26 @@ function chamber({ rng, seed }: Lab, n: Node) {
 const widens = (n: Node, rng: () => number) => !n.pattern && n.col < COLS - 1 && rng() < DELVE_TUNING.wideChamberChance;
 
 
+/** A normal, balanced Delve enemy before `ENEMY_STAT_SCALE`: HP and attack
+ * start from a base and rise steadily with depth, and defense gains one
+ * point every `depthPerDefense` rows. */
+export const DELVE_ENEMY_BASE = {
+  hp: 12, hpPerDepth: 0.6,
+  attack: 6, depthPerAttack: 16,
+  depthPerDefense: 65,
+};
+
+/** A normal, balanced Delve enemy's stats at `depth`, unrounded, before its
+ * strength and profile. */
+export function delveEnemyBase(depth: number) {
+  const b = DELVE_ENEMY_BASE;
+  return {
+    hp: (b.hp + depth * b.hpPerDepth) * ENEMY_STAT_SCALE.hp,
+    attack: (b.attack + depth / b.depthPerAttack) * ENEMY_STAT_SCALE.attack,
+    defense: Math.floor(depth / b.depthPerDefense) * ENEMY_STAT_SCALE.defense,
+  };
+}
+
 /** How each gate strength scales a Delve enemy: HP and attack multiply, and
  * defense rises by a flat bonus. */
 export const DELVE_ENEMY_STRENGTH: Record<Strength, { scale: number; defense: number }> = {
@@ -383,13 +403,12 @@ function gateTile({ rng }: Lab, g: LaneStep, n: Node): Tile {
   const { scale, defense: tough } = DELVE_ENEMY_STRENGTH[g.strength], shape = DELVE_ENEMY_PROFILE[g.profile ?? 'balanced'];
   // Populations mix around transitions: influence is fractional there.
   const population = Math.max(0, Math.round(n.influence + (rng() - 0.5) * 0.8));
-  const depth = n.depth;
-  // Doubled HP and ATK, matching the Tower's rosters: careless play can die early.
+  const base = delveEnemyBase(n.depth);
   return { kind: 'enemy', enemy: {
     name: DELVE_ENEMY_NAMES[population % DELVE_ENEMY_NAMES.length], tier: enemyTier(g.strength), strength: g.strength,
-    hp: Math.round((24 + depth * 1.2) * scale * shape.hp),
-    attack: Math.round((12 + depth / 8) * scale * shape.attack),
-    defense: Math.floor(depth / 65) + tough + shape.defense,
+    hp: Math.round(base.hp * scale * shape.hp),
+    attack: Math.round(base.attack * scale * shape.attack),
+    defense: base.defense + tough + shape.defense,
   } };
 }
 

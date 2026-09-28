@@ -13,61 +13,69 @@ export type TowerEnemyDefinition = {
   drop?: MaterialId;
 };
 
-/** Ten-room Tower zones. The roster repeats every 100 rooms. Base stats are
- * deliberately hand-tuned whole numbers, increasing by roughly 50% between
- * adjacent zones instead of looking like raw formula output. HP and ATK were
- * doubled from the first tuning so that careless play can die even on the
- * first ten floors; later zones keep their rise over that baseline. */
+/** How hard every enemy in both modes is, on top of its own stats: HP and
+ * ATK are doubled so that careless play can die even on the first ten
+ * floors. Tune overall difficulty here; each mode's own numbers set how its
+ * enemies compare with one another and rise with depth. */
+export const ENEMY_STAT_SCALE = { hp: 2, attack: 2, defense: 1 };
+
+/** How many floors each Tower zone (one roster) spans. */
+export const TOWER_ZONE_FLOORS = 10;
+
+/** Ten-room Tower zones, before `ENEMY_STAT_SCALE`. The roster repeats every
+ * `TOWER_CYCLE_FLOORS` rooms. Stats are deliberately hand-tuned whole
+ * numbers, increasing by roughly 50% between adjacent zones instead of
+ * looking like raw formula output. */
 export const TOWER_ZONE_ENEMIES: readonly (readonly TowerEnemyDefinition[])[] = [
   [
-    { name: "Goblin", profile: "attackHeavy", hp: 36, attack: 18, defense: 1 },
-    { name: "Thief", profile: "balanced", hp: 40, attack: 12, defense: 2, drop: "thievesTools" },
-    { name: "Armored Knight", profile: "defenseHeavy", hp: 52, attack: 10, defense: 4, drop: "knightsCrest" },
+    { name: "Goblin", profile: "attackHeavy", hp: 18, attack: 9, defense: 1 },
+    { name: "Thief", profile: "balanced", hp: 20, attack: 6, defense: 2, drop: "thievesTools" },
+    { name: "Armored Knight", profile: "defenseHeavy", hp: 26, attack: 5, defense: 4, drop: "knightsCrest" },
   ],
   [
-    { name: "Bat", profile: "attackHeavy", hp: 54, attack: 28, defense: 2 },
-    { name: "Slime", profile: "balanced", hp: 60, attack: 18, defense: 3, drop: "slimeGel" },
-    { name: "Stone Warden", profile: "defenseHeavy", hp: 78, attack: 14, defense: 6, drop: "wardenHeartstone" },
+    { name: "Bat", profile: "attackHeavy", hp: 27, attack: 14, defense: 2 },
+    { name: "Slime", profile: "balanced", hp: 30, attack: 9, defense: 3, drop: "slimeGel" },
+    { name: "Stone Warden", profile: "defenseHeavy", hp: 39, attack: 7, defense: 6, drop: "wardenHeartstone" },
   ],
   [
-    { name: "Assassin", profile: "attackHeavy", hp: 80, attack: 42, defense: 3 },
-    { name: "Skeleton", profile: "balanced", hp: 90, attack: 28, defense: 5, drop: "skeletonBone" },
-    { name: "Golem", profile: "defenseHeavy", hp: 120, attack: 22, defense: 10, drop: "golemCore" },
+    { name: "Assassin", profile: "attackHeavy", hp: 40, attack: 21, defense: 3 },
+    { name: "Skeleton", profile: "balanced", hp: 45, attack: 14, defense: 5, drop: "skeletonBone" },
+    { name: "Golem", profile: "defenseHeavy", hp: 60, attack: 11, defense: 10, drop: "golemCore" },
   ],
   [
-    { name: "Mage", profile: "attackHeavy", hp: 126, attack: 64, defense: 4 },
-    { name: "Orc", profile: "balanced", hp: 140, attack: 42, defense: 8, drop: "orcTusk" },
-    { name: "Gargoyle", profile: "defenseHeavy", hp: 180, attack: 34, defense: 16, drop: "frozenGargoyleShard" },
+    { name: "Mage", profile: "attackHeavy", hp: 63, attack: 32, defense: 4 },
+    { name: "Orc", profile: "balanced", hp: 70, attack: 21, defense: 8, drop: "orcTusk" },
+    { name: "Gargoyle", profile: "defenseHeavy", hp: 90, attack: 17, defense: 16, drop: "frozenGargoyleShard" },
   ],
   [
-    { name: "Berserker", profile: "attackHeavy", hp: 190, attack: 96, defense: 6 },
-    { name: "Ogre", profile: "balanced", hp: 210, attack: 64, defense: 12, drop: "ogreHide" },
-    { name: "Demon", profile: "defenseHeavy", hp: 280, attack: 50, defense: 24, drop: "demonEmberheart" },
+    { name: "Berserker", profile: "attackHeavy", hp: 95, attack: 48, defense: 6 },
+    { name: "Ogre", profile: "balanced", hp: 105, attack: 32, defense: 12, drop: "ogreHide" },
+    { name: "Demon", profile: "defenseHeavy", hp: 140, attack: 25, defense: 24, drop: "demonEmberheart" },
   ],
   [
-    { name: "Cultist", profile: "attackHeavy", hp: 290, attack: 144, defense: 9 },
-    { name: "Crystal Savant", profile: "balanced", hp: 320, attack: 96, defense: 18, drop: "crystalDust" },
-    { name: "Amethyst Golem", profile: "defenseHeavy", hp: 420, attack: 76, defense: 36, drop: "amethystCore" },
+    { name: "Cultist", profile: "attackHeavy", hp: 145, attack: 72, defense: 9 },
+    { name: "Crystal Savant", profile: "balanced", hp: 160, attack: 48, defense: 18, drop: "crystalDust" },
+    { name: "Amethyst Golem", profile: "defenseHeavy", hp: 210, attack: 38, defense: 36, drop: "amethystCore" },
   ],
   [
-    { name: "Drowned Marauder", profile: "attackHeavy", hp: 430, attack: 220, defense: 14 },
-    { name: "Temple Wraith", profile: "balanced", hp: 480, attack: 144, defense: 27, drop: "wraithEctoplasm" },
-    { name: "Coral Knight", profile: "defenseHeavy", hp: 620, attack: 116, defense: 54, drop: "coralCrest" },
+    { name: "Drowned Marauder", profile: "attackHeavy", hp: 215, attack: 110, defense: 14 },
+    { name: "Temple Wraith", profile: "balanced", hp: 240, attack: 72, defense: 27, drop: "wraithEctoplasm" },
+    { name: "Coral Knight", profile: "defenseHeavy", hp: 310, attack: 58, defense: 54, drop: "coralCrest" },
   ],
   [
-    { name: "Sporeling", profile: "attackHeavy", hp: 650, attack: 330, defense: 20 },
-    { name: "Troll", profile: "balanced", hp: 720, attack: 220, defense: 40, drop: "trollWart" },
-    { name: "Spore Colossus", profile: "defenseHeavy", hp: 940, attack: 176, defense: 80, drop: "sporeheart" },
+    { name: "Sporeling", profile: "attackHeavy", hp: 325, attack: 165, defense: 20 },
+    { name: "Troll", profile: "balanced", hp: 360, attack: 110, defense: 40, drop: "trollWart" },
+    { name: "Spore Colossus", profile: "defenseHeavy", hp: 470, attack: 88, defense: 80, drop: "sporeheart" },
   ],
   [
-    { name: "Shadow Stalker", profile: "attackHeavy", hp: 970, attack: 500, defense: 30 },
-    { name: "Obsidian Revenant", profile: "balanced", hp: 1080, attack: 330, defense: 60, drop: "revenantShard" },
-    { name: "Blackstone Colossus", profile: "defenseHeavy", hp: 1400, attack: 260, defense: 120, drop: "blackstoneHeart" },
+    { name: "Shadow Stalker", profile: "attackHeavy", hp: 485, attack: 250, defense: 30 },
+    { name: "Obsidian Revenant", profile: "balanced", hp: 540, attack: 165, defense: 60, drop: "revenantShard" },
+    { name: "Blackstone Colossus", profile: "defenseHeavy", hp: 700, attack: 130, defense: 120, drop: "blackstoneHeart" },
   ],
   [
-    { name: "Starfire Adept", profile: "attackHeavy", hp: 1460, attack: 750, defense: 45 },
-    { name: "Dragon Whelp", profile: "balanced", hp: 1620, attack: 500, defense: 90, drop: "whelpScale" },
-    { name: "Celestial Guardian", profile: "defenseHeavy", hp: 2100, attack: 400, defense: 180, drop: "celestialAegis" },
+    { name: "Starfire Adept", profile: "attackHeavy", hp: 730, attack: 375, defense: 45 },
+    { name: "Dragon Whelp", profile: "balanced", hp: 810, attack: 250, defense: 90, drop: "whelpScale" },
+    { name: "Celestial Guardian", profile: "defenseHeavy", hp: 1050, attack: 200, defense: 180, drop: "celestialAegis" },
   ],
 ] as const;
 
@@ -75,12 +83,15 @@ export const TOWER_ZONE_ENEMIES: readonly (readonly TowerEnemyDefinition[])[] = 
  * keeps room 101 about 50% stronger than room 100. */
 export const TOWER_CYCLE_MULTIPLIER = 60;
 
+/** How many floors pass before the roster repeats: one of every zone. */
+export const TOWER_CYCLE_FLOORS = TOWER_ZONE_FLOORS * TOWER_ZONE_ENEMIES.length;
+
 export function towerZoneIndex(room: number) {
-  return Math.floor(Math.max(0, room) / 10) % TOWER_ZONE_ENEMIES.length;
+  return Math.floor(Math.max(0, room) / TOWER_ZONE_FLOORS) % TOWER_ZONE_ENEMIES.length;
 }
 
 function towerCycle(room: number) {
-  return Math.floor(Math.max(0, room) / 100);
+  return Math.floor(Math.max(0, room) / TOWER_CYCLE_FLOORS);
 }
 
 export function towerEnemyDrop(name: string): MaterialId | null {
@@ -95,9 +106,9 @@ export function getTowerEnemy(room: number, rng: () => number, forceProfile?: To
   const multiplier = intPow(TOWER_CYCLE_MULTIPLIER, towerCycle(room));
   return {
     name: definition.name,
-    hp: definition.hp * multiplier,
-    attack: definition.attack * multiplier,
-    defense: definition.defense * multiplier,
+    hp: definition.hp * ENEMY_STAT_SCALE.hp * multiplier,
+    attack: definition.attack * ENEMY_STAT_SCALE.attack * multiplier,
+    defense: definition.defense * ENEMY_STAT_SCALE.defense * multiplier,
     tier: 1,
   };
 }
@@ -127,7 +138,7 @@ export const DELVE_ENEMY_NAMES = ["Cinder slime", "Bone sentinel", "Dusk wing", 
 /** A Tower enemy of the given strength and profile for floor `room`. */
 export function getTowerGateEnemy(room: number, strength: TowerEnemyStrength, profile: TowerEnemyProfile) {
   const { zonesAhead, multiplier, tier } = TOWER_ENEMY_STRENGTH[strength];
-  const base = getTowerEnemy(room + zonesAhead * 10, () => 0, profile);
+  const base = getTowerEnemy(room + zonesAhead * TOWER_ZONE_FLOORS, () => 0, profile);
   return {
     name: base.name,
     hp: Math.round(base.hp * multiplier),
