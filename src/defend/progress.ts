@@ -13,7 +13,7 @@ import {
   type Price,
   type UpgradeId,
 } from "./catalog.ts";
-import { SPAWN_ROW, TILES_H, TILES_W, parseTileKey, tileKey } from "./grid.ts";
+import { SPAWN_ROW, TILES_H, TILES_W, defendRandom, parseTileKey, tileKey } from "./grid.ts";
 import { defaultLayout, fitLayout, placedCount, tilesConnected, type Layout, type PlacedKind, type PlacedStructure } from "./layout.ts";
 
 export type DefendSave = {
@@ -38,7 +38,7 @@ export function defaultDefendSave(): DefendSave {
     bestWave: 0,
     paletteSide: "left",
     speed3: false,
-    seed: 1 + Math.floor(Math.random() * 1e9),
+    seed: 1 + Math.floor(defendRandom("rolls")() * 1e9),
   };
 }
 

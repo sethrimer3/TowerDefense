@@ -3,6 +3,10 @@ import assert from "node:assert/strict";
 import { createHash, type Hash } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { random } from "../src/random.ts";
+import { withDefendStream } from "../src/defend/grid.ts";
+
+/** Runs `body` with both Defend streams drawing from `r`. */
+const drawingFrom = <T>(r: () => number, body: () => T): T => withDefendStream("rolls", r, () => withDefendStream("effects", r, body));
 import { defaultLayout, fitLayout, placeCityTile, placeStructure, type Layout, type PlacedKind } from "../src/defend/layout.ts";
 import { generateCity, type CityMap } from "../src/defend/citygen.ts";
 import { Fences, parkFences } from "../src/defend/fences.ts";
@@ -184,11 +188,9 @@ const MUTATIONS: Mutation[] = [
 
 function decodeCases() {
   const out: Record<string, string> = {};
-  const realRandom = Math.random;
-  try {
-    for (let seed = 1; seed <= 6; seed++) {
-      const rnd = random(seed * 104729);
-      Math.random = rnd;
+  for (let seed = 1; seed <= 6; seed++) {
+    const rnd = random(seed * 104729);
+    drawingFrom(rnd, () => {
       const layouts = [defaultLayout(), grow(rnd, 10), grow(rnd, 40), grow(rnd, 90)];
       const results = [];
       for (const l of layouts)
@@ -199,22 +201,13 @@ function decodeCases() {
         }
       results.push(["undefined", decodeDefendSave(undefined)], ["number", decodeDefendSave(4)]);
       out[`decode ${seed}`] = digest(results);
-    }
-  } finally {
-    Math.random = realRandom;
+    });
   }
   return out;
 }
 
 test("Defend park fences and save decoding match the recorded golden", () => {
-  const realRandom = Math.random;
-  let actual: Record<string, string>;
-  try {
-    Math.random = random(4242);
-    actual = { ...fenceTraces(), ...decodeCases() };
-  } finally {
-    Math.random = realRandom;
-  }
+  const actual = drawingFrom(random(4242), () => ({ ...fenceTraces(), ...decodeCases() }));
   if (process.env.UPDATE_GOLDEN || !existsSync(GOLDEN)) {
     writeFileSync(GOLDEN, JSON.stringify(actual, null, 1) + "\n");
     return;

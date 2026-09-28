@@ -122,10 +122,10 @@ const GENERATION = [
 test("generation modules use no ** (intPow or sqrt instead)", () => {
   const found: string[] = [];
   for (const file of GENERATION) {
-    const lines = readFileSync(new URL(`../src/${file}`, import.meta.url), "utf8").split("\n");
+    const lines = readFileSync(new URL(`../src/${file}`, import.meta.url), "utf8").split(/\r?\n/);
     lines.forEach((line, i) => {
       const code = line.replace(/\/\/.*$/, "");
-      if (!/^\s*\*/.test(code) && /[^/*]\*\*[^/*]/.test(code)) found.push(`${file}:${i + 1}`);
+      if (!/^\s*(\/\*|\*)/.test(code) && /[^/*]\*\*[^/*]/.test(code)) found.push(`${file}:${i + 1}`);
     });
   }
   assert.deepEqual(found, []);

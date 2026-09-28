@@ -90,3 +90,22 @@ export function rng(seed: number): () => number {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
+
+/** Defend's own random streams, kept apart from the rest of the game's and
+ * from each other: `rolls` for what decides play (a new save's city seed,
+ * battle seeds, weather), `effects` for what only shows (fence splinters,
+ * rain). Each is seeded from one start-up seed and its place in the list. */
+export type DefendStream = "rolls" | "effects";
+const defendSeed = Math.floor(Math.random() * 4294967296);
+let defendStreams: Record<DefendStream, () => number> = { rolls: rng(defendSeed ^ 0x9e3779b9), effects: rng(defendSeed ^ 0x3c6ef372) };
+
+/** Draws from the named Defend stream as it stands at each draw. */
+export const defendRandom = (name: DefendStream) => () => defendStreams[name]();
+
+/** Runs `body` with the named Defend stream replaced by `r` (tests), then
+ * restores it. */
+export function withDefendStream<T>(name: DefendStream, r: () => number, body: () => T): T {
+  const saved = defendStreams[name];
+  defendStreams = { ...defendStreams, [name]: r };
+  try { return body(); } finally { defendStreams = { ...defendStreams, [name]: saved }; }
+}

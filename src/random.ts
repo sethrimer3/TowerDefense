@@ -19,3 +19,30 @@ export function tileRandom(x: number, y: number, seed: number) {
   h = Math.imul(h ^ (h >>> 13), 1274126177);
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 }
+
+/** The game's independent random streams, one per purpose, so drawing from
+ * one never shifts another: `game` for what decides play outside the world
+ * itself (new run seeds, enemy drops, treasure loot), `effects` for what
+ * only shows (particles and the like). Worlds don't use these: each board
+ * is a pure function of its run seed (`random`, `tileRandom`). A new purpose,
+ * such as a chance-based effect or a minigame, gets its own name here. */
+export type StreamName = "game" | "effects";
+const STREAMS: StreamName[] = ["game", "effects"];
+let streams = seeded(Math.floor(Math.random() * 4294967296));
+
+/** Every stream started afresh from one seed: each stream's own seed comes
+ * from it and the stream's place in the list, never from another's use. */
+function seeded(seed: number) {
+  return Object.fromEntries(STREAMS.map((name, i) => [name, random(seed ^ Math.imul(i + 1, 0x9e3779b9))])) as Record<StreamName, () => number>;
+}
+
+/** Draws from the named stream as it stands at each draw. */
+export const stream = (name: StreamName) => () => streams[name]();
+
+/** Runs `body` with the named stream replaced by `rng` (tests), then
+ * restores it. */
+export function withStream<T>(name: StreamName, rng: () => number, body: () => T): T {
+  const saved = streams[name];
+  streams = { ...streams, [name]: rng };
+  try { return body(); } finally { streams = { ...streams, [name]: saved }; }
+}

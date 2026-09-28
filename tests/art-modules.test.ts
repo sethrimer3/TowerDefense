@@ -7,6 +7,7 @@ import { World } from "../src/delve/world.ts";
 import type { Board } from "../src/board.ts";
 import { area1ItemId, floorVariant, wallAdjacencyMask } from "../src/area1-tileset.ts";
 import { TreeParticles } from "../src/tree-particles.ts";
+import { withStream } from "../src/random.ts";
 import { DecorLayer, type DecorFrame, type MirroredSprites } from "../src/decor-render.ts";
 import type { BoardView } from "../src/render-frame.ts";
 import { decorSourceFor, tileDecor, type TileDecor } from "../src/decor.ts";
@@ -133,10 +134,12 @@ function seeded(seed: number) {
 
 type TreeCanvas = { clientWidth: number; clientHeight: number; width: number; height: number; getContext: () => CanvasRenderingContext2D | null };
 
+/** The particles draw from the effects stream. */
 function treeRun(seed: number): string {
-  const random = Math.random;
-  Math.random = seeded(seed);
-  try {
+  return withStream("effects", seeded(seed), () => treeRunDrawn(seed));
+}
+function treeRunDrawn(seed: number): string {
+  {
     const fluid = new TreeParticles();
     const ctx = recorder("tree");
     const canvas: TreeCanvas = { clientWidth: 400, clientHeight: 600, width: 0, height: 0, getContext: () => ctx };
@@ -162,17 +165,16 @@ function treeRun(seed: number): string {
     const f = fluid as unknown as { u: Float32Array; v: Float32Array; particles: unknown[]; pulses: unknown[] };
     note(JSON.stringify([Array.from(f.u), Array.from(f.v), f.particles, f.pulses]));
     return digest();
-  } finally {
-    Math.random = random;
   }
 }
 
 /** A steady 40 ms frame (exactly the 30 Hz step), long-lived purchase
  * pulses, a mote right at a pulse's centre, and a frame with no height. */
 function treeSteady(): string {
-  const random = Math.random;
-  Math.random = seeded(9);
-  try {
+  return withStream("effects", seeded(9), treeSteadyDrawn);
+}
+function treeSteadyDrawn(): string {
+  {
     g.devicePixelRatio = 1;
     const fluid = new TreeParticles(), ctx = recorder("steady");
     const canvas: TreeCanvas = { clientWidth: 360, clientHeight: 480, width: 0, height: 0, getContext: () => ctx };
@@ -192,8 +194,6 @@ function treeSteady(): string {
     const f = fluid as unknown as { u: Float32Array; particles: unknown[]; pulses: unknown[] };
     note(JSON.stringify([Array.from(f.u), f.particles, f.pulses]));
     return digest();
-  } finally {
-    Math.random = random;
   }
 }
 

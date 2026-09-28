@@ -3,9 +3,13 @@
  * rainy for the whole run. Night isn't rolled: it falls over every 10th
  * wave — the boss wave — fading in as it starts and out once it's beaten. */
 
+import { defendRandom } from "./grid.ts";
+
+const fx = defendRandom("effects");
+
 export type Weather = { rain: boolean };
 
-export function rollWeather(rand = Math.random): Weather {
+export function rollWeather(rand = defendRandom("rolls")): Weather {
   return { rain: rand() < 0.3 };
 }
 
@@ -59,7 +63,7 @@ export class Rain {
       d.y += d.v * dt;
       d.x -= d.v * 0.18 * dt;
       if (d.y > this.h + d.len) {
-        if (Math.random() < 0.35) this.splashes.push({ x: d.x, y: Math.random() * this.h, t: 0 });
+        if (fx() < 0.35) this.splashes.push({ x: d.x, y: fx() * this.h, t: 0 });
         Object.assign(d, this.drop(false));
       }
     }
@@ -68,8 +72,8 @@ export class Rain {
   }
 
   private drop(anywhere: boolean): Drop {
-    const v = this.h * (0.9 + Math.random() * 0.5);
-    return { x: Math.random() * (this.w * 1.2), y: anywhere ? Math.random() * this.h : -Math.random() * this.h * 0.2, v, len: this.h * (0.012 + Math.random() * 0.012) };
+    const v = this.h * (0.9 + fx() * 0.5);
+    return { x: fx() * (this.w * 1.2), y: anywhere ? fx() * this.h : -fx() * this.h * 0.2, v, len: this.h * (0.012 + fx() * 0.012) };
   }
 
   draw(c: CanvasRenderingContext2D, px: number) {

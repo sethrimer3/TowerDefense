@@ -3,7 +3,9 @@
  * section (or a blast next to it) snap it: it splinters into pieces that
  * scatter, settle on the ground and fade away after 5–10 seconds. Fences
  * live only in the renderer and are rebuilt fresh for every city/run. */
-import { CELL_COUNT, CELLS_W, ORTHO, cellInBounds, cellIndex, hash01 } from "./grid.ts";
+import { CELL_COUNT, CELLS_W, ORTHO, cellInBounds, cellIndex, defendRandom, hash01 } from "./grid.ts";
+
+const fx = defendRandom("effects");
 import { CellType, type CityMap } from "./citygen.ts";
 import { ENEMIES } from "./catalog.ts";
 import type { DefendSim, Effect } from "./sim.ts";
@@ -165,24 +167,24 @@ export class Fences {
   /** Break a section: it bursts into splinters flung away from the cause. */
   snap(s: FenceSection, fromX: number, fromY: number, force = 1) {
     s.broken = true;
-    const n = 6 + Math.floor(Math.random() * 4);
+    const n = 6 + Math.floor(fx() * 4);
     for (let i = 0; i < n; i++) {
       const t = (i + 0.5) / n;
       const x = s.x1 + (s.x2 - s.x1) * t,
         y = s.y1 + (s.y2 - s.y1) * t;
       const d = Math.hypot(x - fromX, y - fromY) || 1;
-      const speed = (0.8 + Math.random() * 1.6) * force;
+      const speed = (0.8 + fx() * 1.6) * force;
       this.splinters.push({
         x,
         y,
-        vx: ((x - fromX) / d) * speed + (Math.random() - 0.5) * 1.2,
-        vy: ((y - fromY) / d) * speed + (Math.random() - 0.5) * 1.2,
-        rot: Math.random() * Math.PI,
-        vr: (Math.random() - 0.5) * 18,
-        len: 0.12 + Math.random() * 0.22,
+        vx: ((x - fromX) / d) * speed + (fx() - 0.5) * 1.2,
+        vy: ((y - fromY) / d) * speed + (fx() - 0.5) * 1.2,
+        rot: fx() * Math.PI,
+        vr: (fx() - 0.5) * 18,
+        len: 0.12 + fx() * 0.22,
         age: 0,
-        life: 5 + Math.random() * 5,
-        shade: Math.random(),
+        life: 5 + fx() * 5,
+        shade: fx(),
       });
     }
   }

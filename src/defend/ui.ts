@@ -17,7 +17,7 @@ import {
   type PaletteItem,
   type Price,
 } from "./catalog.ts";
-import { TILES_H, TILES_W } from "./grid.ts";
+import { TILES_H, TILES_W, defendRandom } from "./grid.ts";
 import { fitLayout, type Layout } from "./layout.ts";
 import { generateCity, type CityMap } from "./citygen.ts";
 import { DefendSim } from "./sim.ts";
@@ -422,7 +422,7 @@ export class DefendPage {
     // A fresh city every run; upgrades bought mid-run apply next time.
     this.map = null;
     const map = this.currentMap();
-    this.sim = new DefendSim(map, { ...this.save.levels }, (Math.random() * 2 ** 31) | 0);
+    this.sim = new DefendSim(map, { ...this.save.levels }, (defendRandom("rolls")() * 2147483648) | 0);
     this.phase = "sim";
     this.newRecord = 0;
     this.weather = rollWeather();

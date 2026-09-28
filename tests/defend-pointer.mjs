@@ -28,8 +28,9 @@ await page.addInitScript(() => {
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
-  // Frames draw random effects, so the battle reseeds right before it starts.
-  window.__reseed = (value) => { seed = value; };
+  // Defend's random streams seed themselves from this once, as the page
+  // loads; rain and splinters draw from their own stream, so the battle's
+  // seed doesn't depend on how many frames have run.
   const fixture = sessionStorage.getItem("__defendFixture");
   if (fixture) localStorage.setItem("towerincramental.v1", fixture);
 });
@@ -292,10 +293,8 @@ await shot("fingers lifted");
 await shot("palette drag cancelled");
 
 // --- Battle: bombs ---
-// Reseeded and started in one task, so no frame's draws come between, and
-// frozen at once so no wave or message arrives mid-gesture.
+// Started and frozen in one task, so no wave or message arrives mid-gesture.
 await page.evaluate(() => {
-  window.__reseed(777);
   document.querySelector("#defend-start").click();
   window.__dp.sim.speed = 0;
 });

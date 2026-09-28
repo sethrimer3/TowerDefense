@@ -1,4 +1,7 @@
 import type { SkillNode } from './skill-trees.ts';
+import { stream } from './random.ts';
+
+const fx = stream('effects');
 
 type Point = { x: number; y: number };
 /** A size in CSS pixels. */
@@ -59,7 +62,7 @@ export class TreeParticles {
   private reset(tree: string, { w, h }: Size) {
     this.tree = tree; this.u.fill(0); this.v.fill(0); this.pulses = [];
     this.particles = Array.from({ length: Math.min(360, Math.max(150, Math.round(w*h/850))) }, () => ({
-      x: Math.random(), y: Math.random(), radius: .65 + Math.random()*.8, alpha: .2 + Math.random()*.35,
+      x: fx(), y: fx(), radius: .65 + fx()*.8, alpha: .2 + fx()*.35,
     }));
   }
 

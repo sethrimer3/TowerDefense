@@ -15,7 +15,8 @@ import { defaultLayout, fitLayout, placeCityTile, placeStructure } from "../src/
 import { generateCity } from "../src/defend/citygen.ts";
 import { DefendSim } from "../src/defend/sim.ts";
 import { UPGRADES, ENEMIES, BOMB_RADIUS } from "../src/defend/catalog.ts";
-import { tileKey, SUB, TILES_W, TILES_H } from "../src/defend/grid.ts";
+import { tileKey, SUB, TILES_W, TILES_H, withDefendStream } from "../src/defend/grid.ts";
+import { withStream } from "../src/random.ts";
 
 type Point = { x: number; y: number };
 /** Called at each captured frame with its name. */
@@ -27,7 +28,8 @@ const mulberry32 = (seed: number) => () => {
   t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
   return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 };
-/** Runs `body` with Math.random and crypto.getRandomValues seeded. */
+/** Runs `body` with Math.random, crypto.getRandomValues and every named
+ * random stream drawing from one seeded stream. */
 function seeded<T>(seed: number, body: () => T): T {
   const realRandom = Math.random, realValues = crypto.getRandomValues.bind(crypto);
   const rng = mulberry32(seed);
@@ -37,7 +39,8 @@ function seeded<T>(seed: number, body: () => T): T {
     for (let i = 0; i < a.length; i++) a[i] = Math.floor(rng() * 2 ** 32);
     return arr;
   }) as typeof crypto.getRandomValues;
-  try { return body(); } finally { Math.random = realRandom; crypto.getRandomValues = realValues; }
+  const streams = () => withStream("game", rng, () => withStream("effects", rng, () => withDefendStream("rolls", rng, () => withDefendStream("effects", rng, body))));
+  try { return streams(); } finally { Math.random = realRandom; crypto.getRandomValues = realValues; }
 }
 
 // ── Tower, Delve and outside ─────────────────────────────────────────────

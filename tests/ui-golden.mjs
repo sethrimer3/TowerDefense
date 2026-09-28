@@ -30,10 +30,10 @@ await page.addInitScript(() => {
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
+  // The game's random streams seed themselves from this once, as the page
+  // loads; frame effects draw from their own stream, so no reseeding is
+  // needed before a step that rolls a new run.
   Math.random = rng;
-  // Frames draw random effects, so reseed right before a step that rolls a
-  // new run seed, in the same task, to keep that seed fixed.
-  window.__reseed = (value) => { seed = value; };
   crypto.getRandomValues = (arr) => { for (let i = 0; i < arr.length; i++) arr[i] = Math.floor(rng() * 2 ** 32); return arr; };
   const fixture = sessionStorage.getItem("__uiFixture");
   if (fixture) localStorage.setItem("towerincramental.v1", fixture);
@@ -249,7 +249,7 @@ async function settingsTour(prefix) {
   await shot(`${prefix}.retire.confirm`);
   await click("#confirm");
   await shot(`${prefix}.summary`);
-  await page.evaluate(() => { window.__reseed(777); document.querySelector("#again").click(); });
+  await click("#again");
   await shot(`${prefix}.again`);
 }
 
@@ -272,8 +272,7 @@ await dialogsTour("floor");
 await load("rich");
 await boardTour("rich", "rich");
 await dialogsTour("rich");
-// The rich save has no Delve run yet, so entering the Delve rolls one.
-await page.evaluate(() => { window.__reseed(778); document.querySelector('[data-tab="delve"]').click(); });
+await tab("delve");
 await shot("rich.delve");
 await tab("defend");
 await shot("rich.defend");

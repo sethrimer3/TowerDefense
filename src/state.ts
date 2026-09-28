@@ -3,6 +3,7 @@ import { isDeadlocked } from "./analysis.ts";
 import { chooseStep } from "./automation.ts";
 import { DelvePlan } from "./delve/automove.ts";
 import { defaults } from "./save.ts";
+import { stream } from "./random.ts";
 import { doorBlockedMessage, doorName, KEY_ORDER } from "./doors.ts";
 import { skillAvailable } from "./skill-trees.ts";
 import { routeTo, type Step } from "./pathfinding.ts";
@@ -86,11 +87,12 @@ export class Game {
     autoDeath?: boolean;
     record: boolean;
   } = null;
-  /** `rng` is the game's randomness: new run seeds, enemy drops and
-   * treasure loot all draw from it, so a seeded stream replays a game. */
   /** Delve Automove's committed route and last weighed decisions. */
   readonly delvePlan = new DelvePlan();
-  constructor(public save: Save, private rng: () => number = Math.random) {
+  /** `rng` is the game's randomness: new run seeds, enemy drops and
+   * treasure loot all draw from it (the `game` stream unless given), so a
+   * seeded stream replays a game and no visual effect can shift it. */
+  constructor(public save: Save, private rng: () => number = stream("game")) {
     this.loadMode();
   }
   get undoCapacity() {
