@@ -27,7 +27,7 @@ Delve is one endless, vertically ascending labyrinth. Tower is a compact solved 
 
 ## Themes and enemies
 
-Each node gets an `influence` in `[area−0.49, area+0.49]`. It is pushed toward the next area by graph and physical proximity to the exit and by climbing above the next boundary. It is pulled toward the previous area near the entrance, plus a per-room bias. `themeAt` blends tiles from their owning cell's influence, and enemy tiers roll from the same influence, so populations mix around gates and settle once you are past them.
+Each node gets an `influence` in `[area−0.49, area+0.49]`. It is pushed toward the next area by graph and physical proximity to the exit and by climbing above the next boundary. It is pulled toward the previous area near the entrance, plus a per-room bias. `themeAt` blends tiles from their owning cell's influence, and the enemy kind (`DELVE_ENEMY_NAMES`) rolls from the same influence, so populations mix around gates and settle once you are past them.
 
 ## Patterns
 

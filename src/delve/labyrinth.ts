@@ -1,6 +1,6 @@
 import { point, type Point, type Tile } from '../entities.ts';
 import type { Fork, Gate, LaneStep, Strength } from '../tower/types.ts';
-import type { TowerEnemyProfile } from '../scaling.ts';
+import { DELVE_ENEMY_NAMES, enemyTier, type TowerEnemyProfile } from '../scaling.ts';
 import { FORK_TUNING, forkDepth, forksWorth, stepValue } from '../tower/forks.ts';
 import { choosePattern, FALSE_ASCENTS, type Pattern } from './patterns.ts';
 import { tileRandom } from '../random.ts';
@@ -355,7 +355,6 @@ function chamber({ rng, seed }: Lab, n: Node) {
  * the last column. */
 const widens = (n: Node, rng: () => number) => !n.pattern && n.col < COLS - 1 && rng() < DELVE_TUNING.wideChamberChance;
 
-const ENEMY_NAMES =['Cinder slime', 'Bone sentinel', 'Dusk wing', 'Ash warden'];
 
 /** How each gate strength scales a Delve enemy: HP and attack multiply, and
  * defense rises by a flat bonus. */
@@ -384,9 +383,9 @@ function gateTile({ rng }: Lab, g: LaneStep, n: Node): Tile {
   const { scale, defense: tough } = DELVE_ENEMY_STRENGTH[g.strength], shape = DELVE_ENEMY_PROFILE[g.profile ?? 'balanced'];
   // Populations mix around transitions: influence is fractional there.
   const population = Math.max(0, Math.round(n.influence + (rng() - 0.5) * 0.8));
-  const tier = population % 4, depth = n.depth;
+  const depth = n.depth;
   return { kind: 'enemy', enemy: {
-    name: ENEMY_NAMES[tier], tier, strength: g.strength,
+    name: DELVE_ENEMY_NAMES[population % DELVE_ENEMY_NAMES.length], tier: enemyTier(g.strength), strength: g.strength,
     hp: Math.round((12 + depth * 0.6) * scale * shape.hp),
     attack: Math.round((6 + depth / 16) * scale * shape.attack),
     defense: Math.floor(depth / 65) + tough + shape.defense,

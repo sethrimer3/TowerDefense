@@ -8,6 +8,7 @@ import { drawArea1Door, drawArea1Item, drawArea1Quoins, wallAdjacencyMask } from
 import { drawThemedTile } from "./themed-tilesets.ts";
 import { doorColor } from "./doors.ts";
 import { drawEnemySprite, enemySpriteReady } from "./enemy-sprites.ts";
+import { DELVE_ENEMY_NAMES } from "./scaling.ts";
 import { drawGameSprite, drawGameSpriteFrame, gameSprite, torchAnimationFrame, TORCH_FRAME_COUNT } from "./game-sprites.ts";
 
 // Everything here paints in 24x24 tile space: the caller translates and
@@ -407,7 +408,7 @@ function paintEnemy(c: CanvasRenderingContext2D, t: Tile, art: TileArt) {
  * its own opacity; the sprite goes on last. */
 function bakeEnemy(e: Enemy, sprite: boolean) {
   const m = ENEMY_MARGIN, body = square(24), bc = body.getContext("2d")!;
-  if (!(sprite && drawEnemySprite(bc, e.name))) paintEnemyBody(bc, e.tier);
+  if (!(sprite && drawEnemySprite(bc, e.name))) paintEnemyBody(bc, e);
   const out = square(24 + 2 * m), oc = out.getContext("2d")!;
   const look = ENEMY_LOOK[e.strength];
   for (const ring of [...look.rings, ENEMY_OUTLINE]) {
@@ -446,10 +447,12 @@ function chevron(c: CanvasRenderingContext2D, x: number, y: number) {
   rows.forEach(([dx, w], i) => c.fillRect(x + dx, y + i, w, 1));
 }
 
-/** The procedural body for a tier, for when sprite art is off or missing. */
-function paintEnemyBody(c: CanvasRenderingContext2D, tier: number) {
-  (ENEMY_BODIES[tier] ?? ENEMY_BODIES[3])(c);
-  c.fillStyle = tier === 1 ? "#17202a" : "#f5ca7d";
+/** The procedural body, for when sprite art is off or missing: each Delve
+ * kind has its own, and other enemies take the body for their tier. */
+function paintEnemyBody(c: CanvasRenderingContext2D, e: Enemy) {
+  const kind = DELVE_ENEMY_NAMES.indexOf(e.name), body = kind >= 0 ? kind : e.tier;
+  (ENEMY_BODIES[body] ?? ENEMY_BODIES[3])(c);
+  c.fillStyle = body === 1 ? "#17202a" : "#f5ca7d";
   c.fillRect(9, 11, 2, 2);
   c.fillRect(15, 11, 2, 2);
 }

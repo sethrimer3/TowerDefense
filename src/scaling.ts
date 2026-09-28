@@ -114,6 +114,13 @@ export const TOWER_ENEMY_STRENGTH: Record<TowerEnemyStrength, { zonesAhead: numb
   elite: { zonesAhead: 1, multiplier: 1, tier: 3 },
 };
 
+/** The XP tier a kill of each strength pays, in both modes. */
+export const enemyTier = (strength: EnemyStrength) => TOWER_ENEMY_STRENGTH[strength].tier;
+
+/** The Delve's enemy kinds, one per population an area can hold. Each has
+ * its own procedural body (tile-painters.ts), since none has sprite art. */
+export const DELVE_ENEMY_NAMES = ["Cinder slime", "Bone sentinel", "Dusk wing", "Ash warden"];
+
 /** A Tower enemy of the given strength and profile for floor `room`. */
 export function getTowerGateEnemy(room: number, strength: TowerEnemyStrength, profile: TowerEnemyProfile) {
   const { zonesAhead, multiplier, tier } = TOWER_ENEMY_STRENGTH[strength];
