@@ -28,7 +28,14 @@ export function tileRandom(x: number, y: number, seed: number) {
  * such as a chance-based effect or a minigame, gets its own name here. */
 export type StreamName = "game" | "effects";
 const STREAMS: StreamName[] = ["game", "effects"];
-let streams = seeded(Math.floor(Math.random() * 4294967296));
+let streams = seeded(startSeed("game"));
+
+/** The start-up seed of the named set of streams: the one a test pinned
+ * (`globalThis.__pinnedSeeds`), so no seed depends on which module happened
+ * to draw first, or else a fresh one from Math.random. */
+function startSeed(name: string) {
+  return (globalThis as { __pinnedSeeds?: Record<string, number> }).__pinnedSeeds?.[name] ?? Math.floor(Math.random() * 4294967296);
+}
 
 /** Every stream started afresh from one seed: each stream's own seed comes
  * from it and the stream's place in the list, never from another's use. */

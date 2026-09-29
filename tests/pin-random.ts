@@ -14,3 +14,7 @@ Math.random = () => {
   t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
   return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 };
+
+// The streams' start-up seeds, pinned by name, so they never depend on
+// which module a test file happens to load first.
+(globalThis as { __pinnedSeeds?: Record<string, number> }).__pinnedSeeds = { game: 3887091088, defend: 3182828918 };
