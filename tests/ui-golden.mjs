@@ -120,19 +120,29 @@ try {
   /** `#app` HTML, with crafted items' random UUIDs replaced by a placeholder. */
   const snapshot = () => page.evaluate(() =>
     document.querySelector("#app").outerHTML.replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g, "<uuid>"));
-  /** Waits until the HTML has stopped changing for 400ms, longer than any
-   * fade (the tile highlight's is 300ms), so routes and fades have finished.
-   * Each check also waits for two animation frames to run: on a busy machine
-   * a frame can come late, and HTML the next frame would change (a canvas it
-   * sizes, say) must not count as settled. */
+  /** After two animation frames have run (a busy machine can delay one, and
+   * HTML the next frame would change, like a canvas it sizes, must not count
+   * as settled): whether nothing is still moving. That is no route being
+   * walked or fight playing out (`boardBusy`, from the app's debug hooks), no
+   * finite CSS animation or transition running (endless ones, like the tile
+   * glow's pulse, never finish), and no tile highlight fading out (its class
+   * goes as the fade's timer hides it). */
+  const quiet = () => page.evaluate(async () => {
+    await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+    const animating = document.getAnimations().some((a) => a.playState === "running" && a.effect?.getTiming().iterations !== Infinity);
+    return !window.boardBusy?.() && !animating && !document.querySelector(".fade-out");
+  });
+  /** Waits until nothing is moving and the HTML is the same on two checks in
+   * a row, rather than a fixed time after every step. */
   async function settled() {
-    let previous = null, same = 0;
-    for (let i = 0; i < 80; i++) {
-      await page.waitForTimeout(100);
-      await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
+    let previous = null;
+    for (let i = 0; i < 300; i++) {
+      if (!(await quiet())) {
+        previous = null;
+        continue;
+      }
       const html = await snapshot();
-      same = html === previous ? same + 1 : 0;
-      if (same >= 4) return html;
+      if (html === previous) return html;
       previous = html;
     }
     throw Error("UI never settled");

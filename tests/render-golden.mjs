@@ -16,7 +16,7 @@
 // (tests/snapshot-preview.mjs; `npm run test:render` builds it first).
 import { chromium } from "@playwright/test";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { bounded, startPreview } from "./snapshot-preview.mjs";
 
 const UPDATE = process.env.UPDATE_GOLDEN === "1";
@@ -56,7 +56,10 @@ try {
   await page.goto(server.url);
   await page.evaluate(() => document.fonts.ready);
 
-  const shots = await page.evaluate(async () => {
+  // The recorded hashes, so the page encodes PNGs and redraws scenes only
+  // where they are needed; none when recording.
+  const recorded = UPDATE || !existsSync(GOLDEN) ? null : JSON.parse(readFileSync(GOLDEN, "utf8"));
+  const shots = await page.evaluate(async (recorded) => {
     const { JOBS } = await import("/snapshot/render-scenes.js");
 
     const board = document.createElement("canvas");
@@ -64,9 +67,14 @@ try {
     const defendCanvas = document.createElement("canvas");
     defendCanvas.style.cssText = "position:fixed;left:0;top:0";
     document.body.append(board, defendCanvas);
-    const pixelsOf = (cv) => {
-      const c = cv.getContext("2d");
-      return { pixels: c.getImageData(0, 0, cv.width, cv.height).data.slice(), png: cv.toDataURL("image/png") };
+    const pixelsOf = (cv) => ({ pixels: cv.getContext("2d").getImageData(0, 0, cv.width, cv.height).data.slice(), width: cv.width, height: cv.height });
+    /** A captured frame as a PNG, made only for a frame someone will look at. */
+    const encode = ({ pixels, width, height }) => {
+      const c = document.createElement("canvas");
+      c.width = width;
+      c.height = height;
+      c.getContext("2d").putImageData(new ImageData(new Uint8ClampedArray(pixels), width, height), 0, 0);
+      return c.toDataURL("image/png");
     };
     /** One job's frames: its pixels at each grab. */
     const capture = (job) => {
@@ -105,30 +113,40 @@ try {
       }
       if (!shot) throw Error(`${name}: kept asking for new art`);
       const hashes = await hashShot(shot);
-      // With its art in place a scene draws the same every time; a difference
-      // here is a real nondeterminism bug, not loading.
-      const again = await hashShot(run());
-      const drift = Object.keys(hashes).filter((frame) => hashes[frame] !== again[frame]);
-      if (drift.length) throw Error(`${name}: drew differently twice with all art loaded (${drift.join(", ")})`);
-      for (const [frame, h] of Object.entries(hashes)) results[`${name}.${frame}`] = { hash: h, png: shot[frame].png };
+      const frames = Object.keys(hashes);
+      const changed = recorded ? frames.filter((frame) => recorded[`${name}.${frame}`] !== hashes[frame]) : frames;
+      // With its art in place a scene draws the same every time. Recording
+      // checks that for every scene; otherwise a scene is drawn again only
+      // when it no longer matches, to tell a nondeterminism bug (not loading)
+      // from a real change.
+      if (changed.length) {
+        const again = await hashShot(run());
+        const drift = frames.filter((frame) => hashes[frame] !== again[frame]);
+        if (drift.length) throw Error(`${name}: drew differently twice with all art loaded (${drift.join(", ")})`);
+      }
+      for (const frame of frames)
+        results[`${name}.${frame}`] = { hash: hashes[frame], png: changed.includes(frame) ? encode(shot[frame]) : null };
     }
     board.remove();
     defendCanvas.remove();
     return results;
-  });
+  }, recorded);
 
   const png = (dataUrl) => Buffer.from(dataUrl.split(",")[1], "base64");
   const hashes = Object.fromEntries(Object.entries(shots).map(([k, v]) => [k, v.hash]));
+  // Only the frames that changed (every frame when recording) come back as
+  // PNGs; clear the old ones so what is here is this run's.
+  rmSync(OUT_DIR, { recursive: true, force: true });
   mkdirSync(OUT_DIR, { recursive: true });
-  for (const [k, v] of Object.entries(shots)) writeFileSync(`${OUT_DIR}/${k}.png`, png(v.png));
+  for (const [k, v] of Object.entries(shots)) if (v.png) writeFileSync(`${OUT_DIR}/${k}.png`, png(v.png));
 
-  if (UPDATE || !existsSync(GOLDEN)) {
+  if (!recorded) {
     mkdirSync(BASELINE_DIR, { recursive: true });
     for (const [k, v] of Object.entries(shots)) writeFileSync(`${BASELINE_DIR}/${k}.png`, png(v.png));
     writeFileSync(GOLDEN, JSON.stringify(hashes, null, 2) + "\n");
     console.log(`Wrote ${Object.keys(hashes).length} render hashes to the golden file.`);
   } else {
-    const golden = JSON.parse(readFileSync(GOLDEN, "utf8"));
+    const golden = recorded;
     const changed = Object.keys({ ...golden, ...hashes }).filter((k) => golden[k] !== hashes[k]);
     for (const k of changed) {
       const base = `${BASELINE_DIR}/${k}.png`;
