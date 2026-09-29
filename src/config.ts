@@ -1,3 +1,4 @@
+import type { EnemyStrength } from "./entities.ts";
 import { intPow } from "./exact.ts";
 export const UNGUARDED_LOOT_CHANCE = 1 / 1000;
 export const WIDTH = 30;
@@ -228,8 +229,11 @@ export const UPGRADES = [
 export type UpgradeId = (typeof UPGRADES)[number]["id"];
 export const cost = (id: UpgradeId, level: number) =>
   Math.ceil(UPGRADES.find((u) => u.id === id)!.base * intPow(1.65, level));
-export const goldReward = (kills: number, treasures: number) =>
-  Math.floor(kills / 3) + treasures;
+/** Gold a beaten enemy pays, by its strength, in both modes. Area bosses
+ * don't exist yet; `boss` is their rate for when they do. */
+export const ENEMY_GOLD: Record<EnemyStrength | "boss", number> = { weak: 0, normal: 1, strong: 2, elite: 4, boss: 5 };
+/** Gold the Delve pays at a run's end: one for each treasure opened. */
+export const goldReward = (treasures: number) => treasures;
 export const xpForKill = (tier: number, attack: number) =>
   3 + tier * 4 + Math.floor(attack / 5);
 export const levelForXp = (xp: number) =>

@@ -100,7 +100,7 @@ export const MODES: { tower: ModeProfile<TowerRun>; delve: ModeProfile<DelveRun>
     layoutVersion: LAYOUT_VERSION,
     board: (run) => new World(run),
     enemyDrops: (name, rng) => rollEnemyDrops(name, rng),
-    endGold: (run) => goldReward(run.kills, run.treasures),
+    endGold: (run) => goldReward(run.treasures),
     lootKey: (run, x, y) => `${run.seed}:${x},${y}`,
     words: {
       currency: "Courage",

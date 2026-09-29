@@ -21,6 +21,7 @@ import {
   type GoldItemId,
   type KeyColor,
   FOCUS_PER_RUN,
+  ENEMY_GOLD,
 } from "./config.ts";
 import {
   type Save,
@@ -806,22 +807,27 @@ export class Game {
     }
     this.run.kills++;
     this.gainXp(enemy);
-    const drops = this.creditEnemyDrops(enemy, at.x, at.y);
+    const { gold, drops } = this.creditEnemyLoot(enemy, at.x, at.y);
+    if (gold) this.gain(at.x, at.y, `+${gold} Gold`);
     for (const d of drops) this.gain(at.x, at.y, materialText(d), { material: d.id, quantity: d.quantity });
     this.message = [combat.damage ? `−${combat.damage} HP · ${enemy.name} defeated` : "Unscathed victory",
-      ...drops.map(materialText)].join(" · ");
+      ...(gold ? [`+${gold} Gold`] : []), ...drops.map(materialText)].join(" · ");
     return true;
   }
-  /** Persistent drops are gated by lootedTiles (outside `run`), so undo can
-   * restore the enemy but can never duplicate its material reward. */
-  private creditEnemyDrops(enemy: Enemy, x: number, y: number): MaterialStack[] {
+  /** An enemy's Gold (by its strength) and material drops. Both are gated
+   * by lootedTiles (outside `run`), so undo can restore the enemy but can
+   * never pay for it twice. */
+  private creditEnemyLoot(enemy: Enemy, x: number, y: number): { gold: number; drops: MaterialStack[] } {
     const slice = this.slice,
       key = this.lootKey(x, y);
-    if (slice.lootedTiles[key]) return [];
+    if (slice.lootedTiles[key]) return { gold: 0, drops: [] };
     slice.lootedTiles[key] = true;
+    const gold = ENEMY_GOLD[enemy.strength];
+    this.save.gold += gold;
+    slice.runGold += gold;
     const drops = this.rules.enemyDrops(enemy.name, this.rng);
     creditMaterials(this.save, drops);
-    return drops;
+    return { gold, drops };
   }
   private enterFromOutside() {
     const p = this.run.player;

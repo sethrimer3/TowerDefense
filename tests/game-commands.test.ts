@@ -249,3 +249,22 @@ test("a run going inside gets its Focus uses once the skill is owned", () => {
   assert.equal(g.run.outside, false);
   assert.equal(g.run.focus, 1);
 });
+
+test("a beaten enemy pays Gold by its strength, once, whatever undo does", () => {
+  for (const [strength, gold] of [["weak", 0], ["normal", 1], ["strong", 2], ["elite", 4]] as const) {
+    const g = arena();
+    g.save.settings.devMode = true;
+    const w = g.world as RoomWorld, cells = new Map(w.cells);
+    cells.set("1,0", { kind: "enemy", enemy: { name: "Cinder slime", hp: 1, attack: 0, defense: 0, tier: 1, strength } });
+    w.cells = new Map(cells);
+    assert.ok(g.stepManually(1, 0));
+    assert.equal(g.save.gold, gold, strength);
+    assert.equal(g.save.tower.runGold, gold);
+    g.undo();
+    // Undo rebuilds the real floor; lay the arena, enemy and all, back.
+    (g.world as RoomWorld).cells = new Map(cells);
+    assert.equal(g.run.player.x, 0);
+    assert.ok(g.stepManually(1, 0));
+    assert.equal(g.save.gold, gold, "undo never pays twice");
+  }
+});
