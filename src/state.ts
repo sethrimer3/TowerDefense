@@ -65,10 +65,12 @@ export type RouteEffects = {
   defense: [number, number];
   keys: Partial<Record<KeyColor, [number, number]>>;
 };
-/** A reward just picked up, to rise from the tile it came from: drawn as its
- * sprite (a tile's contents or a material), or as `text` where it has none. */
+/** A reward just picked up, or what a door took, to rise from the tile it
+ * came from: drawn as its sprite (a tile's contents, marked `spent` for a
+ * key a door used, a material, or the heart a Heart Door checked), or as
+ * `text` where it has none. */
 export type Gain = { x: number; y: number; text: string; art: GainArt | null };
-export type GainArt = { tile: Tile } | { material: MaterialId; quantity: number };
+export type GainArt = { tile: Tile; spent?: true } | { material: MaterialId; quantity: number } | { heart: true };
 /** A potion's heal: the HP from and to, where the hero stood, and its number. */
 export type Heal = { from: number; to: number; x: number; y: number; id: number };
 /** Rewards kept for the board to show; older ones are dropped unseen. */
@@ -582,7 +584,7 @@ export class Game {
     const before = this.snapshot();
     if (track) this.remember(before);
     this.applyStats(outcome.player);
-    if (t.kind === "door") this.openDoor(t, outcome.keysSpent);
+    if (t.kind === "door") this.openDoor(t, outcome.keysSpent, dest);
     return t.kind !== "enemy" || this.winFight(t.enemy!, outcome.combat!, before, dest);
   }
   /** Moves the player onto the tile and applies what standing there does. */
@@ -642,10 +644,14 @@ export class Game {
   private mar(what: "damaged" | "keysSpent") {
     if (this.mode === "tower") this.towerRun[what] = true;
   }
-  private openDoor(t: Tile, keysSpent: KeyColor[]) {
+  /** Each key the door took rises from it with a minus sign; a Heart Door,
+   * which takes nothing, raises a checked heart. */
+  private openDoor(t: Tile, keysSpent: KeyColor[], at: { x: number; y: number }) {
     const n = keysSpent.length;
     if (n) this.mar("keysSpent");
-    this.feedback(`${doorName(t)} opened${n ? ` · ${n} key${n === 1 ? "" : "s"} spent` : " · full HP"}`);
+    for (const color of keysSpent) this.gain(at.x, at.y, `−1 ${color} key`, { tile: { kind: "key", color }, spent: true });
+    if (!n) this.gain(at.x, at.y, "Full HP ✓", { heart: true });
+    this.message = `${doorName(t)} opened${n ? ` · ${n} key${n === 1 ? "" : "s"} spent` : " · full HP"}`;
   }
   /** Settles a fight whose damage is already applied. Returns false (and ends
    * the run, allowing Revive) when the player fell. */

@@ -86,8 +86,10 @@ function neighbour(g: Game): Point {
   return p;
 }
 
-/** `fight`: the step goes into an enemy there, played out strike by strike. */
-type BoardScene = { g: Game; to?: Point; fight?: boolean; check?: (decor: DecorLayer) => boolean };
+/** `fight`: the step goes into an enemy there, played out strike by strike.
+ * `climb`: the hero takes the stairs instead, and a door's spent keys and a
+ * Heart Door's checked heart rise on the new floor. */
+type BoardScene = { g: Game; to?: Point; fight?: boolean; climb?: boolean; check?: (decor: DecorLayer) => boolean };
 
 /** A Tower game on the first floor where `want(plan)` holds for a floor
  * tile with a plain floor tile beside it: the hero starts beside it and
@@ -167,6 +169,7 @@ const LATER_BOARD_SCENES: Record<string, () => BoardScene> = {
     g.run.changes[`${to.x},${to.y}`] = { kind: "enemy", enemy: { name: "Slime", hp: 40, attack: 9, defense: 1, tier: 0, strength: "normal" } };
     return { g, to, fight: true };
   },
+  towerClimb: () => ({ g: game("tower", { brightness: 70 }), climb: true }),
 };
 
 /** One board scene on `canvas` (408×408 CSS pixels), fully synchronous so
@@ -181,7 +184,15 @@ function playBoard(name: string, seed: number, canvas: HTMLCanvasElement, grab: 
     for (let t = 1000; t <= 1400; t += 50) r.draw(t);
     grab("settled");
     const to = scene.to ?? neighbour(g), from = { ...g.run.player };
-    if (scene.fight) {
+    if (scene.climb) {
+      g.advanceTowerRoom();
+      quiet(g); // Its feedback text is timed by the real clock.
+      const p = g.run.player, at = { x: p.x, y: p.y + 1 };
+      g.gains.push(
+        { ...at, text: "−1 yellow key", art: { tile: { kind: "key", color: "yellow" }, spent: true } },
+        { ...at, text: "Full HP ✓", art: { heart: true } },
+      );
+    } else if (scene.fight) {
       g.playsFights = true;
       g.save.settings.fightAnimation = true;
       g.move(to.x - from.x, to.y - from.y);

@@ -65,7 +65,7 @@ A fight being played out on the board, strike by strike, with its damage rising 
 _Avoid_: combat animation, pending fight
 
 **Gain**:
-A reward just picked up (an item's stats, keys, Gold, materials, a clear chest's Inspiration), shown rising from the tile it came from, one after another: as its sprite, or written out where it has none.
+A reward just picked up (an item's stats, keys, Gold, materials, a clear chest's Inspiration), or what a door took (each key, or the full HP a Heart Door checked), shown rising from the tile it came from the moment it happens: as its sprite, or written out where it has none.
 _Avoid_: popup, loot text
 
 ### The character

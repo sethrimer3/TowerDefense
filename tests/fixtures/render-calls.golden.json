@@ -57,5 +57,10 @@
  "towerFight.moving": "fa36e430b7a48212",
  "towerFight.after": "8e5582d6c7818294",
  "towerFight.ripples": "d0dcbb9493983cc2",
- "towerFight.later": "07423188677a1bd3"
+ "towerFight.later": "07423188677a1bd3",
+ "towerClimb.settled": "0af419fcf715210e",
+ "towerClimb.moving": "3166800edd6797ac",
+ "towerClimb.after": "5e0310a172935503",
+ "towerClimb.ripples": "557b71de0182f65f",
+ "towerClimb.later": "768434e58bef5e45"
 }

@@ -16,6 +16,9 @@ import { darknessOf, forEachViewTile, tileTransform, toTileSpace, type FrameCont
 
 export { ATMOSPHERE_CONFIG, type AtmosphereConfig } from "./lighting-pass.ts";
 
+/** How long the glow behind the hero lasts after it reaches a new floor (ms). */
+const ARRIVAL_GLOW_MS = 700;
+
 /** Columns the ground and decor caches may cover (Delve wraps around). */
 const CACHE_COLUMNS: [number, number] = [-64, 191];
 
@@ -52,6 +55,10 @@ export class Renderer {
   private routePath = new RoutePath();
   /** Damage numbers and rewards rising off their tiles. */
   popups = new BoardPopups();
+  /** The Tower floor the hero was last drawn on (seed and height), and when
+   * it arrived on the one it stands on now. */
+  private floorKey = "";
+  private arrived = -Infinity;
   /** The enemy's lean into its strike this frame, drawn at its tile. */
   private enemyLunge = { x: 0, y: 0, dx: 0, dy: 0 };
   /** A golden path to preview for a highlighted-but-unconfirmed destination.
@@ -136,6 +143,8 @@ export class Renderer {
       contents: (ctx) => this.drawEachContents(f, ctx),
       torches: () => { for (const t of f.torches) this.drawTorchSprite(f.c, f, t); },
       route: () => this.drawRoute(f),
+      // Only while the hero has just reached a new floor.
+      halo: f.now - this.arrived < ARRIVAL_GLOW_MS ? (ctx) => this.drawArrivalGlow(ctx, f.now) : undefined,
       hero: (ctx) => paintHero(ctx, f.look.spritesOff),
       foreground: () => {
         const bounds = decor && this.decor.foregroundBounds(decor);
@@ -149,7 +158,7 @@ export class Renderer {
    * clears the board, and gathers what this frame shows. */
   private beginFrame(now: number): FrameContext {
     const g = this.game, n = this.density;
-    this.snapOnNewBoard(n);
+    this.snapOnNewBoard(n, now);
     const box = this.canvas.getBoundingClientRect(),
       dpr = Math.min(devicePixelRatio || 1, 2);
     if (this.canvas.width !== Math.round(box.width * dpr)) {
@@ -181,9 +190,21 @@ export class Renderer {
     }
     return f;
   }
-  /** A new run or a step outside resets the camera and hero onto their targets. */
-  private snapOnNewBoard(n: number) {
+  /** A new run or a step outside resets the camera and hero onto their
+   * targets; reaching another Tower floor snaps the hero onto its tile there,
+   * with a glow behind it. */
+  private snapOnNewBoard(n: number, now: number) {
     const g = this.game, p = g.run.player;
+    const floor = g.mode === "tower" && !g.run.outside ? `${g.run.seed}|${g.run.height}` : "";
+    if (floor !== this.floorKey) {
+      const sameRun = floor && this.floorKey.startsWith(`${g.run.seed}|`);
+      this.floorKey = floor;
+      if (sameRun) {
+        this.playerX = p.x;
+        this.playerY = p.y;
+        this.arrived = now;
+      }
+    }
     if (this.seed !== g.run.seed || this.outside !== !!g.run.outside) {
       this.outside = !!g.run.outside;
       this.weather.silence();
@@ -290,6 +311,20 @@ export class Renderer {
     this.weather.draw(f.c, f.width, g.run.seed, { dt: f.dt, reduceMotion: g.save.settings.reduceMotion,
       active: !g.paused && !g.summary && !document.hidden, sound: g.save.settings.weatherSound });
   }
+  /** A white glow fading behind the hero just after it reaches a new floor,
+   * drawn in its tile space. */
+  private drawArrivalGlow(c: CanvasRenderingContext2D, now: number) {
+    const left = 1 - (now - this.arrived) / ARRIVAL_GLOW_MS;
+    if (left <= 0) return;
+    const glow = c.createRadialGradient(12, 13, 0, 12, 13, 27);
+    glow.addColorStop(0, `rgba(255, 255, 255, ${left})`);
+    glow.addColorStop(0.5, `rgba(255, 255, 255, ${0.7 * left})`);
+    glow.addColorStop(1, "rgba(255, 255, 255, 0)");
+    c.save();
+    c.fillStyle = glow;
+    c.fillRect(-15, -14, 54, 54);
+    c.restore();
+  }
   /** The dungeon board's thin stone frame. */
   private drawFrameEdge(f: FrameContext) {
     const c = f.c, w = f.width;
@@ -368,7 +403,7 @@ export class Renderer {
     const g = this.game, p = g.run.player, t = this.target(this.density), eps = 0.01;
     return Math.abs(this.playerX - p.x) < eps && Math.abs(this.playerY - p.y) < eps &&
       Math.abs(this.left - t.left) < eps && Math.abs(this.bottom - t.bottom) < eps &&
-      !g.route.length && !g.encounter && g.blocked.until <= now && g.effect.until <= now && this.popups.idle && !this.decor.busy;
+      !g.route.length && !g.encounter && now - this.arrived > ARRIVAL_GLOW_MS && g.blocked.until <= now && g.effect.until <= now && this.popups.idle && !this.decor.busy;
   }
   /** Active torches roughly within the camera viewport, padded so a torch
    * whose center is just offscreen can still light visible ground. Cheap

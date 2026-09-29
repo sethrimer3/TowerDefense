@@ -26,6 +26,9 @@ export type LitBoard = {
   torches(): void;
   /** Whatever goes between the torchlight and the hero (the route line). */
   route(): void;
+  /** Light around the hero, in 24×24 tile space: drawn on the board after
+   * the darkness and just before the hero, so it is never dimmed. */
+  halo?(ctx: CanvasRenderingContext2D): void;
   /** The hero, in 24×24 tile space. */
   hero(ctx: CanvasRenderingContext2D): void;
   /** Called after the hero; null when nothing stands in front of it. */
@@ -69,6 +72,7 @@ export class DungeonLight {
     board.torches();
     this.pass.drawLightmap(f, this.entities.shadows);
     board.route();
+    this.drawHalo(f, board);
     if (spriteDark) this.drawHeroInDarkness(f, spriteDark, board);
     else this.drawHeroInLight(f, board);
     board.edge();
@@ -97,6 +101,15 @@ export class DungeonLight {
     } else board.contents(c);
     this.entities.drawSpriteLighting(f, c);
     return dark?.spriteDark ?? null;
+  }
+
+  private drawHalo(f: FrameContext, board: LitBoard) {
+    if (!board.halo) return;
+    const c = f.c;
+    c.save();
+    c.setTransform(tileTransform(f, f.playerX, f.playerY));
+    board.halo(c);
+    c.restore();
   }
 
   /** The hero with torchlight on it, and what stands in front of it. */

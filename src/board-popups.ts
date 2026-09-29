@@ -17,6 +17,20 @@ const REWARD_COLOR = "#f3d69a";
 const DAMAGE_COLOR = "#ff4040";
 const HERO_DAMAGE_COLOR = "#b3121f";
 const HEAL_COLOR = "#5fdc6a";
+/** The minus sign on a key a door took. */
+const SPENT_COLOR = "#ff6b6b";
+/** The HUD's heart, raised with a check when a Heart Door opens. */
+const HEART_URL = `${(import.meta as ImportMeta & { env?: { BASE_URL?: string } }).env?.BASE_URL ?? "/"}assets/ui/health.png`;
+let heartImage: HTMLImageElement | null = null;
+/** The heart sprite, or null while it loads. */
+function heart() {
+  if (typeof Image === "undefined") return null;
+  if (!heartImage) {
+    heartImage = new Image();
+    heartImage.src = HEART_URL;
+  }
+  return heartImage.complete && heartImage.naturalWidth ? heartImage : null;
+}
 /** How far a strike leans into its target at the moment it lands, in tiles. */
 const LUNGE = 0.3;
 
@@ -26,7 +40,8 @@ const STILL: Offset = { dx: 0, dy: 0 };
 
 /** What rises off the board over its tiles: the damage number of each strike
  * in a fight as it lands, the HP each potion heals, and each reward picked
- * up, one after another. */
+ * up. Each starts the moment it happens, over whatever is still rising, and
+ * later ones draw on top. */
 export class BoardPopups {
   private rewards: (Popup & { gain: Gain })[] = [];
   /** Damage and heal numbers. */
@@ -38,9 +53,10 @@ export class BoardPopups {
   private landed = 0;
   private seed = NaN;
 
-  /** Takes the game's new rewards, each queued to start as the one before
-   * it ends, the fight's strikes that have landed by `now`, and a new heal.
-   * A new run clears whatever was still showing. */
+  /** Takes the game's new rewards, starting now (those that came together,
+   * like a chest's Gold and materials, one after another), the fight's
+   * strikes that have landed by `now`, and a new heal. A new run clears
+   * whatever was still showing. */
   update(game: { run: { seed: number }; gains: Gain[]; encounter: Encounter | null; lastHeal: Heal | null }, now: number) {
     if (game.run.seed !== this.seed) {
       this.seed = game.run.seed;
@@ -52,8 +68,7 @@ export class BoardPopups {
       this.healed = heal.id;
       this.numbers.push({ x: heal.x, y: heal.y + DAMAGE_START, start: now, text: `+${heal.to - heal.from}`, color: HEAL_COLOR });
     }
-    const last = this.rewards.at(-1);
-    let start = last ? Math.max(now, last.start + POPUP_MS) : now;
+    let start = now;
     for (const gain of game.gains.splice(0)) {
       this.rewards.push({ x: gain.x, y: gain.y, start, gain });
       start += POPUP_MS;
@@ -82,12 +97,16 @@ export class BoardPopups {
     return !this.rewards.length && !this.numbers.length;
   }
 
+  /** Every popup that has started, oldest first, so newer ones draw on top. */
   draw(f: FrameContext) {
-    for (const p of this.numbers) this.drawText(f, p, p.text, p.color, DAMAGE_RISE, 0.55);
-    for (const p of this.rewards) {
-      if (f.now < p.start) continue;
-      if (!this.drawSprite(f, p)) this.drawText(f, p, p.gain.text, REWARD_COLOR, REWARD_RISE, 0.42);
-    }
+    const shown = [
+      ...this.numbers.map((p) => ({ start: p.start, draw: () => this.drawText(f, p, p.text, p.color, DAMAGE_RISE, 0.55) })),
+      ...this.rewards.map((p) => ({
+        start: p.start,
+        draw: () => { if (!this.drawSprite(f, p)) this.drawText(f, p, p.gain.text, REWARD_COLOR, REWARD_RISE, 0.42); },
+      })),
+    ].filter((p) => p.start <= f.now).sort((a, b) => a.start - b.start);
+    for (const p of shown) p.draw();
   }
   /** The popup's opacity and how far it has risen (in tiles) at `now`. */
   private phase(f: FrameContext, p: Popup, rise: number) {
@@ -115,27 +134,28 @@ export class BoardPopups {
   private drawSprite(f: FrameContext, p: Popup & { gain: Gain }) {
     const art = p.gain.art;
     if (!art) return false;
-    const image = "material" in art ? materialImage(art.material) : null;
-    if ("material" in art && !image) return false;
+    const image = "material" in art ? materialImage(art.material) : "heart" in art ? heart() : null;
+    if (!("tile" in art) && !image) return false;
     const c = f.c, { alpha, rise } = this.phase(f, p, REWARD_RISE), look = f.look;
     c.save();
     c.globalAlpha = alpha;
     toTileSpace(c, f, p.x, p.y + rise);
-    if ("tile" in art)
+    if ("tile" in art) {
+      // A key a door took shifts right to make room for its minus sign.
+      if (art.spent) c.translate(4, 0);
       paintContents(c, art.tile, { x: p.x, y: p.y, time: f.now, spritesOff: look.spritesOff, reduceMotion: look.reduceMotion, area1: look.area1, lifted: true });
-    else {
+      if (art.spent) {
+        c.translate(-4, 0);
+        mark(c, "−", SPENT_COLOR, 3, 12, 14);
+      }
+    } else if ("heart" in art) {
+      c.imageSmoothingEnabled = false;
+      c.drawImage(image!, 2, 2, 18, 18);
+      check(c, 13, 13);
+    } else {
       c.imageSmoothingEnabled = false;
       c.drawImage(image!, 3, 3, 18, 18);
-      if (art.quantity > 1) {
-        const count = `×${art.quantity}`;
-        c.font = "700 8px Cinzel";
-        c.textAlign = "left";
-        c.lineWidth = 2;
-        c.strokeStyle = "#000";
-        c.strokeText(count, 18, 21);
-        c.fillStyle = REWARD_COLOR;
-        c.fillText(count, 18, 21);
-      }
+      if (art.quantity > 1) mark(c, `×${art.quantity}`, REWARD_COLOR, 18, 21, 8, "left");
     }
     c.restore();
     return true;
@@ -155,4 +175,32 @@ export function lunges(fight: Encounter | null, now: number, reduceMotion: boole
   return s.by === "hero"
     ? { hero: { dx: dx * reach, dy: dy * reach }, enemy: STILL }
     : { hero: STILL, enemy: { dx: -dx * reach, dy: -dy * reach } };
+}
+
+/** Outlined text in tile space: a count, or the minus on a spent key. */
+function mark(c: CanvasRenderingContext2D, text: string, color: string, x: number, y: number, size: number, align: CanvasTextAlign = "center") {
+  c.font = `700 ${size}px Cinzel`;
+  c.textAlign = align;
+  c.textBaseline = "middle";
+  c.lineWidth = 2;
+  c.strokeStyle = "#000";
+  c.strokeText(text, x, y);
+  c.fillStyle = color;
+  c.fillText(text, x, y);
+}
+
+/** A green checkmark with its lower-left corner near (x, y), in tile space. */
+function check(c: CanvasRenderingContext2D, x: number, y: number) {
+  c.lineCap = "round";
+  c.lineJoin = "round";
+  c.beginPath();
+  c.moveTo(x, y + 4);
+  c.lineTo(x + 3, y + 7);
+  c.lineTo(x + 9, y);
+  c.strokeStyle = "#000";
+  c.lineWidth = 4;
+  c.stroke();
+  c.strokeStyle = HEAL_COLOR;
+  c.lineWidth = 2;
+  c.stroke();
 }

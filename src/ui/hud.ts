@@ -22,6 +22,8 @@ export function renderHud(game: Game, renderer: Renderer, overlay: BoardOverlay)
   text("inspiration", devAmount(game, game.save.tower.inspiration));
   text("level", `LV ${levelForXp(game.save.xp)}`);
   renderStatus(game, overlay);
+  // The status line sits over the board's bottom row: let the hero show through.
+  el("status-row").classList.toggle("see-through", game.run.player.y === renderer.target(renderer.density).bottom);
   text("auto-state", game.save.upgrades.auto ? (game.auto ? "ON" : "OFF") : "LOCKED");
   el("auto").classList.toggle("enabled", game.auto);
   text("density-label", `${renderer.density} × ${renderer.density}`);

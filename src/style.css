@@ -1122,6 +1122,10 @@ footer {
   background: #0b1018d9;
   pointer-events: none;
 }
+/* Over the hero, on the board's bottom row, the status line lets it show through. */
+.board > .status.see-through {
+  opacity: 0.5;
+}
 .board > .inspection {
   position: absolute;
   z-index: 7;

@@ -131,7 +131,7 @@ test("pickups and treasure queue their rewards to rise from their tiles", () => 
   assert.ok(chest.gains.every((g) => g.x === 1 && g.y === 0));
 });
 
-test("the board shows rewards one after another and each strike's damage as it lands", () => {
+test("the board shows rewards that came together one after another, and each strike's damage as it lands", () => {
   const popups = new BoardPopups(), gain = (text: string) => ({ x: 1, y: 0, text, art: null });
   const game = { run: { seed: 1 }, gains: [gain("+5 Gold"), gain("+1 Slime Gel")], encounter: null, lastHeal: null };
   popups.update(game, 1000);
@@ -140,7 +140,7 @@ test("the board shows rewards one after another and each strike's damage as it l
   assert.deepEqual(shown, [1000, 2000]);
   game.gains.push(gain("+3 Inspiration"));
   popups.update(game, 1500);
-  assert.equal((popups as unknown as { rewards: { start: number }[] }).rewards.at(-1)!.start, 3000);
+  assert.equal((popups as unknown as { rewards: { start: number }[] }).rewards.at(-1)!.start, 1500, "a later reward starts at once, over the others");
   popups.update(game, 4000);
   assert.ok(popups.idle);
 
@@ -187,4 +187,20 @@ test("each heal raises its HP healed in green over the hero, once", () => {
   assert.deepEqual(numbers(popups).map((n) => [n.x, n.text, n.color]), [[3, "+35", "#5fdc6a"]]);
   popups.update(game, 2000);
   assert.ok(popups.idle);
+});
+
+test("a door raises each key it took, with a minus sign, and a Heart Door a checked heart", () => {
+  const keys = arena({ kind: "door", door: { type: "keys", keys: ["yellow", "blue"], mode: "all" } });
+  Object.assign(keys.run.player.keys, { yellow: 1, blue: 1 });
+  assert.ok(keys.move(1, 0));
+  assert.deepEqual(keys.gains.map((g) => [g.text, g.art]), [
+    ["−1 yellow key", { tile: { kind: "key", color: "yellow" }, spent: true }],
+    ["−1 blue key", { tile: { kind: "key", color: "blue" }, spent: true }],
+  ]);
+  assert.match(keys.message, /opened · 2 keys spent$/);
+  assert.equal(keys.effect.until, 0, "no text flashes over the board");
+
+  const heart = arena({ kind: "door", door: { type: "fullHp" } });
+  assert.ok(heart.move(1, 0));
+  assert.deepEqual(heart.gains.map((g) => [g.x, g.y, g.art]), [[1, 0, { heart: true }]]);
 });
