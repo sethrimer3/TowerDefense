@@ -103,7 +103,7 @@ The cards the player sets up before a run, in priority order. Inside a run the h
 _Avoid_: deck, loadout (what the character starts a run with)
 
 **Stuck hand**:
-No card in the hand can act. The hero waits and End Run lights up, and the run ends only when the player ends it; the hand keeps checking, so anything that changes the floor lets it carry on.
+No card in the hand can act. The hand pauses and End Run lights up, and the run ends only when the player ends it; each thing the player does (an item used, a skill) checks the hand again, and it plays on once a card can act.
 _Avoid_: deadlock
 
 ### The Delve

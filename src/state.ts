@@ -95,9 +95,9 @@ export class Game {
   cardPlan: CardPlan | null = null;
   /** The hand's card that made the latest step, to show it glowing. */
   activeCard: number | null = null;
-  /** No card in the hand can act: the hero waits, and the run ends only
-   * when the player ends it. The hand keeps checking, so a skill that
-   * changes the floor lets it carry on. */
+  /** No card in the hand can act: the hand pauses, and the run ends only
+   * when the player ends it. Each thing the player does (an item used, a
+   * skill) checks the hand again, and it plays on once a card can act. */
   handStuck = false;
   paused = false;
   message = "";
@@ -391,7 +391,8 @@ export class Game {
     if (!plan) {
       this.cardPlan = null;
       this.activeCard = null;
-      this.message = "No card can move · end the run, or use a skill.";
+      this.auto = false;
+      this.message = "No card can move · end the run, or use an item or skill.";
       return;
     }
     const step = plan.path.shift()!;
@@ -401,6 +402,16 @@ export class Game {
     // The board changes only as the hero moves, so a refused step means the
     // plan is stale: drop it and let the next turn choose again.
     if (!this.move(step.dx, step.dy, true)) this.cardPlan = null;
+  }
+  /** After something the player does inside a run (an item used, a skill),
+   * a stuck hand checks its cards again and plays on if one can act. */
+  private afterPlayerAction() {
+    if (!this.handStuck || !this.playing) return;
+    const plan = planHand(this, this.save.hand, this.mode);
+    if (!plan) return;
+    this.handStuck = false;
+    this.cardPlan = plan;
+    this.auto = true;
   }
   /** Forgets the hand's committed path and which card glows. */
   private dropHandPlan() {
@@ -983,6 +994,7 @@ export class Game {
     this.save.consumables[id]--;
     this.recordHeal(n);
     this.message = `${def.name} · +${n} HP`;
+    this.afterPlayerAction();
     return true;
   }
   /** Records a potion's heal of `n` HP, already applied, where the hero stands. */

@@ -4,6 +4,7 @@ import { Game } from "../src/state.ts";
 import { defaults } from "../src/save.ts";
 import { RoomWorld } from "../src/tower/room-world.ts";
 import { chooseStep } from "../src/automation.ts";
+import { CONSUMABLES } from "../src/crafting.ts";
 
 /** A Tower floor of open tiles with `size` columns and rows, the player in
  * the corner and (when it fits) the stairs opposite. */
@@ -29,17 +30,24 @@ test("inside a run the hand plays, and a turn steps along the first card's path"
   assert.equal(g.run.height, 1, "the path ends on the stairs");
 });
 
-test("a hand with no card that can act waits, lights End Run, and carries on once one can", () => {
+test("a hand with no card that can act pauses, lights End Run, and plays on after the player acts", () => {
   const g = arena(3);
   (g.world as RoomWorld).cells.set("2,2", { kind: "floor" });
+  const tonic = CONSUMABLES[0].id;
+  g.save.consumables[tonic] = 2;
   g.autoTurn();
-  assert.ok(g.handStuck && g.activeCard === null && !g.summary);
+  assert.ok(g.handStuck && !g.auto && g.activeCard === null && !g.summary);
   assert.deepEqual([g.run.player.x, g.run.player.y], [0, 0]);
   assert.match(g.message, /^No card can move/);
-  // A skill that changes the floor (here, a key appearing) frees the hand.
+  // Acting while nothing has changed leaves it paused.
+  assert.ok(g.useConsumable(tonic));
+  assert.ok(g.handStuck && !g.auto);
+  // Once the floor has changed (here, a key appearing, as a skill might
+  // make), the player's next action sets the hand playing again.
   (g.world as RoomWorld).cells.set("2,0", { kind: "key", color: "yellow" });
+  assert.ok(g.useConsumable(tonic));
+  assert.ok(!g.handStuck && g.auto);
   g.autoTurn();
-  assert.ok(!g.handStuck);
   assert.equal(g.save.hand[g.activeCard!], "key");
   assert.deepEqual([g.run.player.x, g.run.player.y], [1, 0]);
 });
