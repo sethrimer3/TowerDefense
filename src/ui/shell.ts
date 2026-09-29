@@ -8,6 +8,8 @@ const CURRENCIES = `<div id="currencies" class="currencies" hidden><div class="c
 const NAV = `<nav aria-label="Main navigation">${Object.entries(TAB_ICONS)
   .map(([id, icon]) => `<button data-tab="${id}" class="${id === "tower" ? "selected" : ""}"><span>${icon}</span>${id[0].toUpperCase() + id.slice(1)}</button>`)
   .join("")}<div id="hand" class="hand" role="list" aria-label="Card hand"></div></nav>`;
+/** Focus uses left, before the potions: a lightning bolt and the count. */
+const FOCUS_STAT = `<span id="focus-stat" class="focus-stat" hidden title="Focus: press a card in your hand to put it first"><svg viewBox="0 0 10 14" aria-hidden="true"><path d="M6.2 0.5L1 8h3.6L3.4 13.5 9 5.8H5.4L6.2 0.5z" fill="#ffe27a" stroke="#6b4a10" stroke-width="0.7" stroke-linejoin="round"/></svg><b id="focus-left">0</b></span>`;
 const MOVEMENT_SPRITES: Record<string, UiSprite> = {
   "-1,0": "arrow-left", "1,0": "arrow-right", "0,1": "arrow-up", "0,-1": "arrow-down",
 };
@@ -37,7 +39,7 @@ function arrangeHud() {
   heightPanel.insertAdjacentHTML("beforeend", `<div id="height-zone" class="height-zone">THE ASCENT TRIALS</div>`);
   vitals.insertAdjacentHTML(
     "beforeend",
-    `<div class="inventory-divider" aria-hidden="true"></div><div class="run-consumables" aria-label="Run consumables">${CONSUMABLES.map(c => `<button type="button" data-hud-consumable="${c.id}" aria-label="Use ${c.name}" title="${c.name}: ${c.description}">${itemSprite("potion_flat", "consumable-sprite")}<b data-consumable-count="${c.id}">0</b></button>`).join("")}</div>`,
+    `<div class="inventory-divider" aria-hidden="true"></div><div class="run-consumables" aria-label="Run consumables">${FOCUS_STAT}${CONSUMABLES.map(c => `<button type="button" data-hud-consumable="${c.id}" aria-label="Use ${c.name}" title="${c.name}: ${c.description}">${itemSprite("potion_flat", "consumable-sprite")}<b data-consumable-count="${c.id}">0</b></button>`).join("")}</div>`,
   );
   const boardFrame = document.querySelector<HTMLElement>("#board-frame")!;
   boardFrame.append(

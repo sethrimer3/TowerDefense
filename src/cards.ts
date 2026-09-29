@@ -3,7 +3,7 @@ import type { Position } from "./board.ts";
 import type { Step } from "./pathfinding.ts";
 import { doorCost } from "./doors.ts";
 import { predict } from "./combat.ts";
-import { VIEWPORT_TILES } from "./config.ts";
+import { UPGRADES, VIEWPORT_TILES, type UpgradeId } from "./config.ts";
 import type { Mode } from "./entities.ts";
 
 /** Every card a hand can hold: its name and what it moves the hero toward. */
@@ -20,12 +20,20 @@ export const CARD_IDS = Object.keys(CARDS) as CardId[];
 
 /** How many cards a hand holds. */
 export const HAND_SLOTS = 5;
-/** The hand a new profile starts with, in priority order. The Equipment
- * card is earned later, so it isn't in it. */
-export const BASE_HAND: readonly CardId[] = ["stairs", "heal", "door", "key", "monster"];
-/** The cards the player owns, in the Deck page's order: the base hand's
- * for now. A hand holds any of them, but always STAIRS. */
-export const DECK_CARDS: readonly CardId[] = BASE_HAND;
+/** The hand a new profile starts with, in priority order: its whole deck.
+ * HEAL and EQUIPMENT are earned from the Inspiration tree. */
+export const BASE_HAND: readonly CardId[] = ["stairs", "door", "key", "monster"];
+/** The cards the player owns, in `CARDS` order: the base hand's, and each
+ * card whose upgrade is owned. A hand holds any of them, but always STAIRS. */
+export function deckCards(upgrades: Record<UpgradeId, number>): CardId[] {
+  const earned = UPGRADES.flatMap((u) => ("card" in u && upgrades[u.id] ? [u.card as CardId] : []));
+  return CARD_IDS.filter((id) => BASE_HAND.includes(id) || earned.includes(id));
+}
+/** The card an upgrade adds to the deck, if any. */
+export const upgradeCard = (id: UpgradeId): CardId | undefined => {
+  const u = UPGRADES.find((u) => u.id === id);
+  return u && "card" in u ? (u.card as CardId) : undefined;
+};
 
 /** `hand` with the card at `from` moved to slot `to`, each card between
  * the two shifting one slot over to make room. */
@@ -76,10 +84,12 @@ function wants(card: CardId, t: Tile, at: Position): boolean {
 /** The first card in `hand` with a target the hero can reach, and the
  * shortest path to its closest target; null when no card can act. It looks
  * only at the floor the hero stands on: stairs up end a path, and stairs
- * down are never crossed or a target. */
-export function planHand(at: Position, hand: readonly CardId[], mode: Mode): CardPlan | null {
+ * down are never crossed or a target. With `only`, it plans that card
+ * alone (a Focus). */
+export function planHand(at: Position, hand: readonly CardId[], mode: Mode, only?: number): CardPlan | null {
   const reached = search(at);
   for (let card = 0; card < hand.length; card++) {
+    if (only !== undefined && card !== only) continue;
     const target = hand[card] === "stairs" && mode === "delve"
       ? climb(at, reached)
       : reached.find((r) => wants(hand[card], r.tile, at));

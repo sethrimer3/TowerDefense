@@ -6,7 +6,7 @@ import { CONSUMABLES, type ConsumableId } from "./crafting.ts";
 import { decodeDefendSave, defaultDefendSave } from "./defend/progress.ts";
 import { decodeSettings, defaultSettings } from "./settings.ts";
 import { loadout } from "./loadout.ts";
-import { BASE_HAND, CARD_IDS, HAND_SLOTS, type CardId } from "./cards.ts";
+import { BASE_HAND, CARD_IDS, HAND_SLOTS, deckCards, type CardId } from "./cards.ts";
 export function defaults(): Save {
   return {
     version: 3,
@@ -79,6 +79,8 @@ const DELVE_FIELDS = ["milestone"];
 function without<R>(r: any, fields: string[]): R {
   for (const k of ["rewards", "known", "visited", ...fields]) delete r[k];
   if (r.hand !== undefined && !validHand(r.hand)) delete r.hand;
+  if (r.focus !== undefined && !(Number.isInteger(r.focus) && finite(r.focus, 99))) delete r.focus;
+  if (r.focused !== undefined && !r.hand?.includes(r.focused)) delete r.focused;
   return r;
 }
 /** A hand as the Deck can order it: known cards, each once, no more than
@@ -281,12 +283,12 @@ const VERSION_STEPS = new Map<unknown, VersionStep[]>([
   [2, [decodeProgress]],
   [3, [decodeProgress, decodeInventory]],
 ]);
-/** The saved hand's known cards in order, each once and no more than the
- * hand holds, or the base hand when the save has none or lost its STAIRS
- * card, which every hand must hold. */
-function decodeHand(raw: any): CardId[] {
+/** The saved hand's cards the player owns, in order, each once and no
+ * more than the hand holds, or the base hand when the save has none or
+ * lost its STAIRS card, which every hand must hold. */
+function decodeHand(raw: any, owned: CardId[]): CardId[] {
   if (!Array.isArray(raw)) return [...BASE_HAND];
-  const hand = [...new Set(raw.filter((id): id is CardId => CARD_IDS.includes(id)))].slice(0, HAND_SLOTS);
+  const hand = [...new Set(raw.filter((id): id is CardId => owned.includes(id)))].slice(0, HAND_SLOTS);
   return validHand(hand) ? hand : [...BASE_HAND];
 }
 export function decode(raw: string | null): Save {
@@ -301,7 +303,7 @@ export function decode(raw: string | null): Save {
     decodeSections(s.tower, d);
     migratePreSkillTrees(s.upgrades, d);
     d.defend = decodeDefendSave(s.defend);
-    d.hand = decodeHand(s.hand);
+    d.hand = decodeHand(s.hand, deckCards(d.upgrades));
     for (const k of ["deck", "removeCard", "addCard"] as const) d.tutorials[k] = s.tutorials?.[k] === true;
   } catch {}
   return d;

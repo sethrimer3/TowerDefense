@@ -2000,3 +2000,118 @@ nav button.notify::after {
 .deck-note { display: block; width: 100%; margin: 0 0 12px; min-height: 0; font: inherit; cursor: pointer; }
 .deck-note small { display: block; margin-top: 6px; font-size: 9px; letter-spacing: 2px; color: #8d794e; text-transform: uppercase; }
 dialog.dismiss-anywhere { cursor: pointer; }
+
+/* --- A new card's reveal --- */
+.card-reveal {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 26px;
+  padding: 16px;
+  background: #04070bd9;
+  overflow: hidden;
+}
+.card-reveal-stage { position: relative; display: grid; place-items: center; }
+.card-reveal-rays {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 640px;
+  height: 640px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, #9dffb0aa 0 12%, #4fe07a55 22%, transparent 48%),
+    repeating-conic-gradient(from 0deg, #74f593 0deg 5deg, transparent 5deg 15deg);
+  -webkit-mask-image: radial-gradient(circle, #000 18%, transparent 68%);
+  mask-image: radial-gradient(circle, #000 18%, transparent 68%);
+  opacity: 0.85;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  animation: card-rays-in 0.6s 0.7s ease-out backwards, card-rays-turn 16s linear infinite;
+}
+.card-reveal-card {
+  position: relative;
+  width: 132px;
+  aspect-ratio: 3 / 4;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  box-shadow: 0 0 0 2px #b8ffc6, 0 0 28px 8px #4fe07a99, 0 14px 30px #000c;
+  animation: card-rise 0.9s cubic-bezier(0.2, 0.9, 0.3, 1.08) backwards;
+}
+.card-reveal-card:hover { box-shadow: 0 0 0 2px #fff, 0 0 32px 10px #6ff592bb, 0 14px 30px #000c; }
+.card-reveal-card .card-art { border-radius: 6px; }
+.card-reveal-text {
+  position: relative;
+  max-width: 320px;
+  text-align: center;
+  animation: card-text-in 0.5s 0.8s ease-out backwards;
+}
+.card-reveal-text small { display: block; font-size: 10px; letter-spacing: 3px; color: #8fdc9f; }
+.card-reveal-text b { display: block; margin: 6px 0; font-size: 24px; font-weight: 500; color: #e9f7d8; }
+.card-reveal-text p { font-size: 13px; line-height: 1.6; color: #b9c9bd; }
+.card-reveal-text span { display: block; margin-top: 12px; font-size: 9px; letter-spacing: 2px; color: #6f8a76; text-transform: uppercase; }
+.card-reveal.still .card-reveal-rays,
+.card-reveal.still .card-reveal-card,
+.card-reveal.still .card-reveal-text { animation: none; }
+@keyframes card-rise {
+  from { transform: translateY(75vh) scale(0.8); }
+  to { transform: none; }
+}
+@keyframes card-rays-in {
+  from { opacity: 0; }
+}
+@keyframes card-rays-turn {
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+@keyframes card-text-in {
+  from { opacity: 0; transform: translateY(10px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .card-reveal-rays, .card-reveal-card, .card-reveal-text { animation: none; }
+}
+
+/* --- Focus --- */
+.focus-stat {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 25px;
+  height: 25px;
+  border: 1px solid #5d5230;
+  border-radius: 3px;
+  background: #1a1a14;
+}
+.focus-stat[hidden] { display: none; }
+.focus-stat svg { width: 13px; height: 18px; }
+.focus-stat b {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  min-width: 11px;
+  padding: 0 2px;
+  border: 1px solid #8a7a42;
+  border-radius: 5px;
+  background: #0b1018;
+  color: #ffe27a;
+  font-size: 9px;
+  line-height: 11px;
+  text-align: center;
+}
+.hand.can-focus .hand-card { cursor: pointer; }
+/* The card a Focus put first. */
+.hand-card.focused,
+.hand-card.focused.active {
+  box-shadow: 0 0 0 2px #fff, 0 0 14px 4px #ffffffcc;
+}
+/* A refused action: no Focus left, or no path for the card. */
+.flash-red { animation: flash-red 0.6s ease-out; }
+@keyframes flash-red {
+  0%, 60% { box-shadow: 0 0 0 2px #ff5a4a, 0 0 14px 4px #e0302a; background-color: #5a1510; }
+}

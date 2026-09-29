@@ -15,6 +15,8 @@ export type KeyColor = keyof typeof COLORS;
 export type Currency = "courage" | "inspiration";
 /** Upgrades that make the character stronger say so in `grants` (what one
  * rank adds; see loadout.ts), which also writes their description. */
+/** Focus uses a run starts with, once the Focus skill is owned. */
+export const FOCUS_PER_RUN = 1;
 export const UPGRADES = [
   { id: "delve", name: "Into the depths", description: "Unlock Delve and the Courage skill tree", base: 3, max: 1, currency: "inspiration" },
   { id: "legacy", name: "An enduring legacy", description: "Unlock the Legacy skill tree and unlock Defend", base: 8, max: 1, currency: "courage" },
@@ -128,16 +130,34 @@ export const UPGRADES = [
     id: "combatStance",
     name: "Combat Stance",
     description: "Unlock the Deck: add its cards to your hand, or set them aside, to choose what a run heads for",
+    base: 2,
+    max: 1,
+    currency: "inspiration",
+  },
+  {
+    id: "cardHeal",
+    name: "Heal",
+    description: "Add the HEAL card to your deck: it moves you toward the closest healing potion",
+    card: "heal",
     base: 3,
     max: 1,
     currency: "inspiration",
   },
   {
-    id: "inspirationDefense",
-    name: "Iron resolve",
-    grants: { defense: 1 },
+    id: "cardGear",
+    name: "Gear",
+    description: "Add the EQUIPMENT card to your deck: it moves you toward the closest ATK or DEF pickup",
+    card: "equipment",
     base: 5,
-    max: 40,
+    max: 1,
+    currency: "inspiration",
+  },
+  {
+    id: "focus",
+    name: "Focus",
+    description: `Inside a run, press a card in your hand to put it ahead of the others until it reaches its target (${FOCUS_PER_RUN} use a run)`,
+    base: 10,
+    max: 1,
     currency: "inspiration",
   },
   {

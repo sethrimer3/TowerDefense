@@ -4,10 +4,12 @@ export type SkillNode = { id: UpgradeId; icon: string; x: number; y: number; req
 export const TREES: { id: TreeId; name: string; currency: Currency; gate?: UpgradeId; description: string; nodes: SkillNode[] }[] = [
   { id: "inspiration", name: "Inspiration", currency: "inspiration", description: "Earn Inspiration by beating your best Tower climb.", nodes: [
     { id: "handOrdering", icon: "▤", x: 50, y: 12, requires: [] },
-    { id: "combatStance", icon: "⚔", x: 23, y: 36, requires: ["handOrdering"] },
-    { id: "inspirationDefense", icon: "⛨", x: 77, y: 36, requires: ["handOrdering"] },
-    { id: "inspirationUndos", icon: "↺", x: 23, y: 65, requires: ["combatStance"] },
-    { id: "delve", icon: "▼", x: 50, y: 87, requires: ["combatStance", "inspirationDefense"] },
+    { id: "combatStance", icon: "⚔", x: 50, y: 33, requires: ["handOrdering"] },
+    { id: "cardHeal", icon: "♥", x: 24, y: 51, requires: ["combatStance"] },
+    { id: "cardGear", icon: "⛨", x: 76, y: 51, requires: ["combatStance"] },
+    { id: "focus", icon: "ϟ", x: 50, y: 69, requires: ["cardHeal", "cardGear"] },
+    { id: "inspirationUndos", icon: "↺", x: 24, y: 88, requires: ["focus"] },
+    { id: "delve", icon: "▼", x: 76, y: 88, requires: ["focus"] },
   ] },
   { id: "courage", name: "Courage", currency: "courage", gate: "delve", description: "Earn Courage by beating your best Delve depth.", nodes: [
     { id: "auto", icon: "✦", x: 50, y: 10, requires: ["delve"] },

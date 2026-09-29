@@ -143,14 +143,16 @@ Instead:
 With the current first-level costs, the direct prerequisite path to unlock Delve is approximately:
 
 - Hand Ordering: 1 Inspiration
-- Combat Stance: 3 Inspiration
-- Iron resolve: 5 Inspiration
+- Combat Stance: 2 Inspiration
+- Heal: 3 Inspiration
+- Gear: 5 Inspiration
+- Focus: 10 Inspiration
 - Into the depths: 3 Inspiration
-- **Total minimum path: 12 Inspiration**
+- **Total minimum path: 24 Inspiration**
 
-If the player earned only the guaranteed reach-based Inspiration, this naturally places the current Delve unlock around the low teens in Tower progression. Silver/Gold/Platinum rewards can move that timing earlier.
+If the player earned only the guaranteed reach-based Inspiration, this naturally places the current Delve unlock in the low-to-mid twenties in Tower progression. Silver/Gold/Platinum rewards can move that timing earlier.
 
-This is a useful reference point, **not a commitment that 12 is the final desired Delve-unlock cost**.
+This is a useful reference point, **not a commitment that 24 is the final desired Delve-unlock cost**.
 
 ---
 

@@ -144,17 +144,17 @@ test("the Deck reorders the hand only with Hand Ordering and in the forest, and 
   assert.equal(g.arrangeHand(0, 2), false, "not before Hand Ordering is bought");
   g.save.upgrades.handOrdering = 1;
   assert.ok(g.arrangeHand(0, 2));
-  const ordered = ["heal", "door", "stairs", "key", "monster"];
+  const ordered = ["door", "key", "stairs", "monster"];
   assert.deepEqual(g.save.hand, ordered);
   assert.deepEqual(g.hand, ordered, "in the forest the hand is the one the next run takes");
-  assert.equal(g.arrangeHand(0, 5), false);
+  assert.equal(g.arrangeHand(0, 4), false);
   assert.equal(g.arrangeHand(-1, 0), false);
   g.walkTo(g.run.player.x, ENTRANCE_Y);
   for (let i = 0; i < 20 && g.route.length; i++) g.routeStep();
   assert.equal(g.run.outside, false);
   assert.deepEqual(g.run.hand, ordered, "the run saves the hand's order on the way in");
   assert.equal(g.arrangeHand(0, 1), false, "not inside a run");
-  g.save.hand = ["stairs", "monster", "key", "door", "heal"];
+  g.save.hand = ["stairs", "monster", "key", "door"];
   assert.deepEqual(g.hand, ordered, "a later change waits for the next run");
   const loaded = new Game(decode(JSON.stringify(g.save)));
   assert.deepEqual(loaded.hand, ordered, "and survives a reload");
@@ -165,6 +165,8 @@ test("Combat Stance moves cards between the deck and the hand in the forest, and
   g.newRun({ outside: true, seed: 1 });
   assert.equal(g.removeFromHand("monster"), false, "not before Combat Stance is bought");
   g.save.upgrades.combatStance = 1;
+  g.save.upgrades.cardHeal = 1;
+  g.save.hand.push("heal");
   assert.equal(g.removeFromHand("stairs"), false, "STAIRS can't leave the hand");
   assert.ok(g.removeFromHand("monster"));
   assert.ok(g.removeFromHand("heal"));
@@ -181,4 +183,69 @@ test("Combat Stance moves cards between the deck and the hand in the forest, and
   for (let i = 0; i < 20 && g.route.length; i++) g.routeStep();
   assert.equal(g.run.outside, false);
   assert.equal(g.removeFromHand("heal"), false, "not inside a run");
+});
+
+/** An arena with the Focus skill and `uses` Focus uses left this run. */
+function focusArena(uses = 1) {
+  const g = arena();
+  g.save.upgrades.focus = 1;
+  g.run.focus = uses;
+  return g;
+}
+
+test("Focus puts a hand card first, spending a use, until it reaches its target", () => {
+  const g = focusArena();
+  (g.world as RoomWorld).cells.set("2,0", { kind: "key", color: "yellow" });
+  const key = g.hand.indexOf("key");
+  g.autoTurn();
+  assert.equal(g.activeCard, 0, "STAIRS leads before the focus");
+  assert.equal(g.focus(key), "focused");
+  assert.equal(g.run.focus, 0);
+  assert.equal(g.run.focused, "key");
+  for (let i = 0; i < 6 && g.run.focused; i++) g.autoTurn();
+  assert.equal(g.run.focused, undefined, "the focus ends at the key");
+  assert.equal(g.run.player.keys.yellow, 1);
+  g.autoTurn();
+  assert.equal(g.activeCard, 0, "then the hand's order leads again");
+  const loaded = new Game(decode(JSON.stringify(g.save)));
+  assert.equal(loaded.focusLeft, 0, "the uses left are saved with the run");
+});
+
+test("Focus is refused without the skill, with no uses left, for the card already leading, or with no path, which costs nothing", () => {
+  const locked = arena();
+  assert.equal(locked.focus(2), "unavailable");
+  const g = focusArena();
+  g.autoTurn();
+  assert.equal(g.focus(0), "active", "STAIRS is already moving the hero");
+  assert.equal(g.focus(g.hand.indexOf("key")), "noPath", "there is no key on the floor");
+  assert.equal(g.run.focus, 1, "a failed focus costs nothing");
+  const spent = focusArena(0);
+  (spent.world as RoomWorld).cells.set("2,0", { kind: "key", color: "yellow" });
+  assert.equal(spent.focus(spent.hand.indexOf("key")), "spent");
+});
+
+test("a focused card that loses its path hands the lead back", () => {
+  const g = focusArena();
+  const w = g.world as RoomWorld;
+  w.cells.set("0,4", { kind: "key", color: "yellow" });
+  assert.equal(g.focus(g.hand.indexOf("key")), "focused");
+  g.autoTurn();
+  w.cells.set("0,4", { kind: "floor" });
+  g.cardPlan = null;
+  g.autoTurn();
+  assert.equal(g.run.focused, undefined);
+  assert.match(g.message, /Focus lost/);
+  assert.equal(g.hand[g.activeCard!], "stairs");
+});
+
+test("a run going inside gets its Focus uses once the skill is owned", () => {
+  const g = new Game(defaults());
+  g.newRun({ outside: true, seed: 1 });
+  assert.equal(g.focusLeft, 0);
+  g.save.upgrades.focus = 1;
+  assert.equal(g.focusLeft, 1, "the forest shows what the next run gets");
+  g.walkTo(g.run.player.x, ENTRANCE_Y);
+  for (let i = 0; i < 20 && g.route.length; i++) g.routeStep();
+  assert.equal(g.run.outside, false);
+  assert.equal(g.run.focus, 1);
 });

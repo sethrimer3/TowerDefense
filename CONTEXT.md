@@ -113,6 +113,10 @@ _Avoid_: loadout (what the character starts a run with)
 **Deck**:
 All the player's cards: those in the hand and those waiting outside it. Also the page where the hand is ordered (with the Hand Ordering skill) and its cards chosen from the deck (with Combat Stance).
 
+**Focus**:
+Putting one card of the hand ahead of the others inside a run, until the hero reaches its target or the card has no path to one. A run has a limited number of Focus uses.
+_Avoid_: priority, override
+
 **Stuck hand**:
 No card in the hand can act. The hand pauses and End Run lights up, and the run ends only when the player ends it; each thing the player does (an item used, a skill) checks the hand again, and it plays on once a card can act.
 _Avoid_: deadlock

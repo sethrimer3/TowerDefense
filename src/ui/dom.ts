@@ -31,7 +31,7 @@ export const itemSprite = (name: keyof typeof AREA1_ITEM_URLS, className = "ui-s
 
 const SKILL_ITEM_SPRITES: Partial<Record<UpgradeId, keyof typeof AREA1_ITEM_URLS>> = {
   attack: "upgrade_attack",
-  inspirationDefense: "upgrade_defense", defense: "upgrade_defense",
+  defense: "upgrade_defense",
   yellow: "key_yellow", blue: "key_blue", red: "key_red",
 };
 const SKILL_UI_SPRITES: Partial<Record<UpgradeId, UiSprite>> = {
@@ -42,7 +42,7 @@ const SKILL_UI_SPRITES: Partial<Record<UpgradeId, UiSprite>> = {
   renownBanner: "tower", renownOath: "defense", renownCrown: "gear",
 };
 /** Skills about the hand show a card face. */
-const SKILL_CARDS: Partial<Record<UpgradeId, CardId>> = { handOrdering: "stairs", combatStance: "monster" };
+const SKILL_CARDS: Partial<Record<UpgradeId, CardId>> = { handOrdering: "stairs", combatStance: "monster", cardHeal: "heal", cardGear: "equipment" };
 /** Two cards fanned out: the Deck's icon, made from the card faces. */
 const DECK_ICON = `<span class="deck-icon" aria-hidden="true"><img src="${UI_ASSET_BASE}assets/cards/heal.png" alt=""><img src="${UI_ASSET_BASE}assets/cards/stairs.png" alt=""></span>`;
 export const skillSprite = (id: UpgradeId) => {

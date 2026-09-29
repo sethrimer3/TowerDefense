@@ -87,7 +87,7 @@ try {
     };
     const rich = (s) => {
       quiet(s);
-      Object.assign(s.upgrades, { delve: 1, auto: 1, legacy: 1, revive: 1, handOrdering: 1, combatStance: 1, undos: 1, autoPersist: 1 });
+      Object.assign(s.upgrades, { delve: 1, auto: 1, legacy: 1, revive: 1, handOrdering: 1, combatStance: 1, cardHeal: 1, focus: 1, undos: 1, autoPersist: 1 });
       s.delve.courage = 37;
       s.tower.inspiration = 21;
       s.gold = 480;
@@ -221,12 +221,22 @@ try {
     await shot(`${prefix}.deck.addNote`);
     await click("#deck-add-note");
     await shot(`${prefix}.deck`);
-    await dragCard(3, 0);
+    await dragCard(2, 0);
     await shot(`${prefix}.deck.reordered`);
-    await click('[data-return="heal"]');
+    await click('[data-return="door"]');
     await shot(`${prefix}.deck.returned`);
-    await click('[data-add="monster"]');
+    await click('[data-add="heal"]');
     await shot(`${prefix}.deck.added`);
+  }
+  /** Buying a card's skill raises the card over the screen until pressed. */
+  async function cardRevealTour(prefix) {
+    await tab("upgrades");
+    await click('[data-tree="inspiration"]');
+    await click('[data-skill="cardGear"]');
+    await click('[data-skill="cardGear"]');
+    await shot(`${prefix}.cardReveal`);
+    await click("#card-reveal-card");
+    await shot(`${prefix}.cardRevealed`);
   }
   async function dialogsTour(prefix) {
     await click("#log");
@@ -357,8 +367,14 @@ try {
   await load("rich");
   await boardTour("rich", "rich");
   await dialogsTour("rich");
+  // Focus: a card with no target flashes red for free; one with a target takes the lead.
+  for (const card of ["door", "key", "monster"]) {
+    await click(`#hand .hand-card[data-card="${card}"]`);
+    await shot(`rich.focus.${card}`);
+  }
   await leaveRun();
   await deckTour("rich");
+  await cardRevealTour("rich");
   await tab("defend");
   await shot("rich.defend");
   await upgradesTour("rich");

@@ -17,6 +17,7 @@ export const devAmount = (game: Pick<Game, "save">, value: number) => game.save.
 export function renderHud(game: Game, renderer: Renderer, overlay: BoardOverlay) {
   overlay.clearIfAt(game.run.player);
   renderVitals(game);
+  renderFocus(game);
   renderConsumables(game);
   renderProgress(game);
   renderModeActions(game);
@@ -98,10 +99,15 @@ function renderHand(game: Game) {
   if (hand.join() !== shownHand) {
     shownHand = hand.join();
     row.style.setProperty("--slots", String(HAND_SLOTS));
-    row.innerHTML = hand.map((id) => `<div class="hand-card" role="listitem" data-card="${id}" title="${CARDS[id].name}: ${CARDS[id].text}">${cardArt(id, CARDS[id].name)}</div>`).join("");
+    row.innerHTML = hand.map((id, i) => `<div class="hand-card" role="listitem" data-card="${id}" data-hand-slot="${i}" title="${CARDS[id].name}: ${CARDS[id].text}">${cardArt(id, CARDS[id].name)}</div>`).join("");
   }
   const glowing = game.auto && !game.handStuck ? game.activeCard : null;
-  row.querySelectorAll<HTMLElement>(".hand-card").forEach((card, i) => card.classList.toggle("active", i === glowing));
+  const focused = game.run.focused ? hand.indexOf(game.run.focused) : -1;
+  row.classList.toggle("can-focus", !!game.save.upgrades.focus);
+  row.querySelectorAll<HTMLElement>(".hand-card").forEach((card, i) => {
+    card.classList.toggle("active", i === glowing);
+    card.classList.toggle("focused", i === focused);
+  });
   el("end-run").classList.toggle("deadlocked", game.handStuck && !game.run.outside);
 }
 
@@ -165,6 +171,22 @@ function renderHealthLoss(lost: number, maxHp: number) {
     bar.classList.add("settling");
     bar.style.width = "0%";
   }
+}
+
+/** Focus uses left, once the Focus skill is owned. */
+function renderFocus(game: Game) {
+  const stat = el("focus-stat");
+  stat.hidden = !game.save.upgrades.focus;
+  text("focus-left", game.focusLeft);
+  stat.setAttribute("aria-label", `Focus: ${game.focusLeft} left`);
+}
+
+/** Replays a brief red flash on `target`, as a refusal. */
+export function flashRed(target: Element) {
+  target.classList.remove("flash-red");
+  void (target as HTMLElement).offsetWidth;
+  target.classList.add("flash-red");
+  target.addEventListener("animationend", () => target.classList.remove("flash-red"), { once: true });
 }
 
 function renderConsumables(game: Game) {

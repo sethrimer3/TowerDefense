@@ -1,6 +1,6 @@
 import { entrance, floorFor } from "./delve/labyrinth.ts";
 import { chooseStep } from "./automation.ts";
-import { CARDS, DECK_CARDS, HAND_SLOTS, moveCard, planHand, type CardId, type CardPlan } from "./cards.ts";
+import { CARDS, HAND_SLOTS, deckCards, moveCard, planHand, type CardId, type CardPlan } from "./cards.ts";
 import { DelvePlan } from "./delve/automove.ts";
 import { defaults } from "./save.ts";
 import { stream } from "./random.ts";
@@ -20,6 +20,7 @@ import {
   type TrainingId,
   type GoldItemId,
   type KeyColor,
+  FOCUS_PER_RUN,
 } from "./config.ts";
 import {
   type Save,
@@ -395,7 +396,17 @@ export class Game {
    * first card in priority order that can reach a target. When none can,
    * the hero waits and the End Run button lights up. */
   private handTurn() {
-    const plan = this.cardPlan ?? planHand(this, this.hand, this.mode);
+    let plan = this.cardPlan, lost: CardId | null = null;
+    const focused = this.run.focused;
+    if (!plan && focused) {
+      // The focused card keeps the lead while it has a path to a target.
+      plan = planHand(this, this.hand, this.mode, this.hand.indexOf(focused));
+      if (!plan) {
+        this.run.focused = undefined;
+        lost = focused;
+      }
+    }
+    plan ??= planHand(this, this.hand, this.mode);
     this.handStuck = !plan;
     if (!plan) {
       this.cardPlan = null;
@@ -407,10 +418,15 @@ export class Game {
     const step = plan.path.shift()!;
     this.cardPlan = plan.path.length ? plan : null;
     this.activeCard = plan.card;
-    this.message = `${CARDS[this.hand[plan.card]].name} · ${CARDS[this.hand[plan.card]].text}`;
+    const id = this.hand[plan.card];
+    this.message = lost
+      ? `Focus lost · ${CARDS[lost].name} has no path to a target · ${CARDS[id].name} leads.`
+      : `${id === this.run.focused ? "Focus · " : ""}${CARDS[id].name} · ${CARDS[id].text}`;
     // The board changes only as the hero moves, so a refused step means the
     // plan is stale: drop it and let the next turn choose again.
     if (!this.move(step.dx, step.dy, true)) this.cardPlan = null;
+    // The focused card's last step reaches its target: the focus is spent.
+    else if (!this.cardPlan && id === this.run.focused) this.run.focused = undefined;
   }
   /** After something the player does inside a run (an item used, a skill),
    * a stuck hand checks its cards again and plays on if one can act. */
@@ -421,6 +437,40 @@ export class Game {
     this.handStuck = false;
     this.cardPlan = plan;
     this.auto = true;
+  }
+  /** A run going inside keeps the hand as it was ordered on the way in,
+   * and gets its Focus uses. */
+  private dealHand() {
+    this.run.hand = [...this.save.hand];
+    this.run.focus = this.save.upgrades.focus ? FOCUS_PER_RUN : 0;
+  }
+  /** Focus uses left: this run's inside one, or in the forest what the
+   * next run will start with. */
+  get focusLeft() {
+    if (this.run.outside) return this.save.upgrades.focus ? FOCUS_PER_RUN : 0;
+    return this.run.focus ?? 0;
+  }
+  /** Puts the hand's card in slot `card` ahead of the others until it
+   * reaches its target, spending a Focus use; the hand plays on to it. A
+   * card with no path to a target fails and costs nothing, and the card
+   * already moving the hero can't be focused. */
+  focus(card: number): "focused" | "unavailable" | "active" | "spent" | "noPath" {
+    const id = this.hand[card];
+    if (!this.save.upgrades.focus || this.run.outside || this.summary || !id) return "unavailable";
+    if (this.run.focused === id || (card === this.activeCard && !this.handStuck)) return "active";
+    if (this.focusLeft < 1) return "spent";
+    const plan = planHand(this, this.hand, this.mode, card);
+    if (!plan) return "noPath";
+    this.run.focus = this.focusLeft - 1;
+    this.run.focused = id;
+    this.route = [];
+    // During a fight, the path is found again once the hero has stepped in.
+    this.cardPlan = this.encounter ? null : plan;
+    this.activeCard = card;
+    this.handStuck = false;
+    this.auto = true;
+    this.message = `Focus · ${CARDS[id].name} · ${CARDS[id].text}`;
+    return "focused";
   }
   /** Forgets the hand's committed path and which card glows. */
   private dropHandPlan() {
@@ -512,7 +562,7 @@ export class Game {
       this.message = "Follow the forest path to the entrance.";
     } else {
       this.forgetLabyrinth();
-      this.run.hand = [...this.save.hand];
+      this.dealHand();
     }
     this.slice.run = this.run;
     this.auto = !outside && this.handStartsPlaying;
@@ -770,8 +820,7 @@ export class Game {
   private enterFromOutside() {
     const p = this.run.player;
     this.run.outside = false;
-    // The run keeps the hand as it was ordered on the way in.
-    this.run.hand = [...this.save.hand];
+    this.dealHand();
     p.x = this.rules.entranceX;
     p.y = 0;
     this.world = this.rules.board(this.run);
@@ -963,7 +1012,7 @@ export class Game {
    * the forest only). */
   addToHand(id: CardId) {
     const hand = this.save.hand;
-    if (!this.canChooseCards || !DECK_CARDS.includes(id) || hand.includes(id) || hand.length >= HAND_SLOTS) return false;
+    if (!this.canChooseCards || !deckCards(this.save.upgrades).includes(id) || hand.includes(id) || hand.length >= HAND_SLOTS) return false;
     hand.push(id);
     return true;
   }

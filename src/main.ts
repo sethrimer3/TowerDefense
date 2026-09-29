@@ -13,7 +13,7 @@ import { capitalized, displayedProgress, el } from "./ui/dom.ts";
 import { MODES } from "./modes.ts";
 import { buildShell } from "./ui/shell.ts";
 import { BoardOverlay } from "./ui/board-overlay.ts";
-import { boardHeadingStale, renderBoardHeading, renderHud, renderVitals } from "./ui/hud.ts";
+import { boardHeadingStale, flashRed, renderBoardHeading, renderHud, renderVitals } from "./ui/hud.ts";
 import { confirmAction, RunEnd, showLog, showSectionPicker } from "./ui/dialogs.ts";
 import { SkillTreePage } from "./ui/skill-tree-page.ts";
 import { GearPage } from "./ui/gear-page.ts";
@@ -133,6 +133,15 @@ document.querySelectorAll<HTMLButtonElement>("[data-hud-consumable]").forEach(bu
     update();
   };
 });
+// Focus: pressing a hand card inside a run puts it ahead of the others.
+el("hand").onclick = (e) => {
+  const card = (e.target as HTMLElement).closest<HTMLElement>(".hand-card");
+  if (!card || !game.save.upgrades.focus) return;
+  const result = game.focus(Number(card.dataset.handSlot));
+  if (result === "spent") flashRed(el("focus-stat"));
+  if (result === "noPath") flashRed(card);
+  update();
+};
 el("log").onclick = () => showLog(ctx);
 el("section-pick").onclick = () => showSectionPicker(ctx);
 el("end-run").onclick = () =>

@@ -84,6 +84,11 @@ export type RunCore = {
   /** The hand as it was ordered when the run went inside: the cards that
    * move the hero for the rest of the run. */
   hand?: CardId[];
+  /** Focus uses left this run. */
+  focus?: number;
+  /** The card a Focus put ahead of the others, until it reaches its target
+   * or has no path to one. */
+  focused?: CardId;
 };
 /** A Tower ascent. */
 export type TowerRun = RunCore & {

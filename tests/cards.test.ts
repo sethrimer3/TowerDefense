@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { BASE_HAND, CARD_IDS, HAND_SLOTS, moveCard, planHand, type CardId } from "../src/cards.ts";
+import { BASE_HAND, CARD_IDS, HAND_SLOTS, deckCards, moveCard, planHand, upgradeCard, type CardId } from "../src/cards.ts";
+import { defaults } from "../src/save.ts";
 import type { Board, Position } from "../src/board.ts";
 import type { Enemy, Run, Tile } from "../src/entities.ts";
 
@@ -44,7 +45,7 @@ function board(rows: string[], hero: Partial<Run["player"]> = {}, wrap = false):
 }
 
 /** The card the hand plays, and where its path ends. */
-function play(at: Position, hand: readonly CardId[] = BASE_HAND, mode: "tower" | "delve" = "tower") {
+function play(at: Position, hand: readonly CardId[] = CARD_IDS, mode: "tower" | "delve" = "tower") {
   const plan = planHand(at, hand, mode);
   if (!plan) return null;
   const end = plan.path.at(-1)!;
@@ -129,9 +130,22 @@ test("the Delve's paths wrap across the sides and climb through one-way gates", 
   assert.deepEqual(play(gate, ["stairs"], "delve"), { card: "stairs", to: [0, 2], steps: 2 });
 });
 
-test("the base hand fills the hand's slots, without the Equipment card", () => {
-  assert.equal(BASE_HAND.length, HAND_SLOTS);
-  assert.ok(!BASE_HAND.includes("equipment"));
+test("the deck starts as the base hand, and HEAL and EQUIPMENT join it with their skills", () => {
+  const none = defaults().upgrades;
+  assert.deepEqual(BASE_HAND, ["stairs", "door", "key", "monster"]);
+  assert.ok(BASE_HAND.length <= HAND_SLOTS);
+  assert.deepEqual(deckCards(none), ["stairs", "door", "key", "monster"]);
+  assert.deepEqual(deckCards({ ...none, cardHeal: 1 }), ["stairs", "heal", "door", "key", "monster"]);
+  assert.deepEqual(deckCards({ ...none, cardHeal: 1, cardGear: 1 }), CARD_IDS);
+  assert.equal(upgradeCard("cardGear"), "equipment");
+  assert.equal(upgradeCard("focus"), undefined);
+});
+
+test("a hand can plan one card alone, for a Focus", () => {
+  const rows = ["S..", "...", "@.K"];
+  assert.equal(play(board(rows), ["stairs", "key"])?.card, "stairs");
+  assert.deepEqual(planHand(board(rows), ["stairs", "key"], "tower", 1)?.card, 1);
+  assert.equal(planHand(board(["@.K"]), ["stairs", "key"], "tower", 0), null, "the focused card alone, never the next");
 });
 
 test("moving a card shifts each card between its old and new slots over one", () => {

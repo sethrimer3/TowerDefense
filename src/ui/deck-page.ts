@@ -1,4 +1,4 @@
-import { CARDS, DECK_CARDS, HAND_SLOTS, moveCard, type CardId } from "../cards.ts";
+import { CARDS, HAND_SLOTS, deckCards, moveCard, type CardId } from "../cards.ts";
 import type { AppContext } from "./app.ts";
 import { cardArt, el } from "./dom.ts";
 
@@ -105,7 +105,7 @@ export class DeckPage {
    * returns them, the rest ready to add. */
   private deckHtml(note: boolean) {
     const hand = this.ctx.game.save.hand, full = hand.length >= HAND_SLOTS;
-    const cards = DECK_CARDS.map((id) => {
+    const cards = deckCards(this.ctx.game.save.upgrades).map((id) => {
       const name = CARDS[id].name;
       if (hand.includes(id)) {
         const stays = id === "stairs";

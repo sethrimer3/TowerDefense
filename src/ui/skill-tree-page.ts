@@ -1,3 +1,5 @@
+import { upgradeCard } from "../cards.ts";
+import { revealCard } from "./card-reveal.ts";
 import { TRAINING, TRAINING_PER_LEVEL, UPGRADES, cost, type TrainingId, type UpgradeId } from "../config.ts";
 import { TREES, skillAvailable, type TreeId } from "../skill-trees.ts";
 import { trainingPoints, trainingStep, upgradeText } from "../loadout.ts";
@@ -148,8 +150,10 @@ export class SkillTreePage {
     if (canBuy) {
       const game = this.ctx.game;
       game.buy(id);
-      if (game.save.upgrades[id] > level && !game.save.settings.reduceMotion) this.particles.purchase(this.current().nodes.find(n => n.id === id)!);
+      const bought = game.save.upgrades[id] > level, card = upgradeCard(id);
+      if (bought && !game.save.settings.reduceMotion) this.particles.purchase(this.current().nodes.find(n => n.id === id)!);
       this.ctx.update();
+      if (bought && card) revealCard(card, game.save.settings.reduceMotion);
     }
     this.render();
   }
