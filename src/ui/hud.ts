@@ -6,6 +6,7 @@ import { outsideWeather } from "../outside.ts";
 import { MODES, milestones } from "../modes.ts";
 import { cardArt, displayedProgress, el, text } from "./dom.ts";
 import { CARDS } from "../cards.ts";
+import { trainingPoints } from "../loadout.ts";
 import type { BoardOverlay } from "./board-overlay.ts";
 
 /** The stats cluster, action buttons and status line around the board. */
@@ -21,6 +22,7 @@ export function renderHud(game: Game, renderer: Renderer, overlay: BoardOverlay)
   renderModeActions(game);
   text("courage", devAmount(game, game.save.delve.courage));
   text("inspiration", devAmount(game, game.save.tower.inspiration));
+  text("training", String(trainingPoints(game.save).left));
   renderXp(game);
   renderStatus(game, overlay);
   // The status line sits over the board's bottom row: let the hero show through.

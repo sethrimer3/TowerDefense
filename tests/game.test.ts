@@ -29,7 +29,7 @@ test("combat predicts first strike, defenses, strict survival, and impervious/le
   const p = new Game(defaults()).run.player;
   assert.deepEqual(
     predict(p, { name: "test", hp: 25, attack: 10, defense: 0, tier: 0 }),
-    { impervious: false, hit: 12, turns: 3, damage: 11, survivable: true, requiredAttack: 0 }, // 5, then 6
+    { impervious: false, hit: 12, turns: 3, damage: 21, survivable: true, requiredAttack: 0 }, // 10, then 11
   );
   p.hp = 10;
   assert.equal(

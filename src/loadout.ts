@@ -15,9 +15,9 @@ export type Loadout = {
   undoCapacity: number;
 };
 
-/** Every character's baseline: 10 ATK and 4 DEF plus the starter weapon
- * (+2) and armor (+1), which Heirloom steel improves; 100 HP; one undo. */
-const BASE = { attack: 12, defense: 5, maxHp: 100, undos: 1 };
+/** Every character's baseline: 10 ATK plus the starter weapon (+2), which
+ * Heirloom steel improves; no DEF; 100 HP; one undo. */
+const BASE = { attack: 12, defense: 0, maxHp: 100, undos: 1 };
 
 const WORDS: Record<Stat, string> = {
   attack: "starting attack",

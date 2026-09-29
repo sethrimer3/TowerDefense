@@ -71,6 +71,9 @@ function trace(mode: Mode, seed: number, smartAi: boolean): string[] {
   const rng = mulberry32(seed);
   const save = defaults();
   save.upgrades.delve = 1;
+  // Five ranks of DEF training (a new hero has none), so runs last long
+  // enough to reach the stairs.
+  save.training.defense = 5;
   if (smartAi) Object.assign(save.upgrades, { aiMemory: 2, aiEvaluation: 4, aiLookahead: 2 });
   const g = new Game(save, rng);
   g.switchMode(mode);
