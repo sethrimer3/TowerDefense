@@ -81,6 +81,9 @@ export type RunCore = {
    * gear change since. In the Tower, ATK/DEF return to it whenever the
    * climb crosses into a new section. */
   loadout?: { attack: number; defense: number; maxHp: number };
+  /** The hand as it was ordered when the run went inside: the cards that
+   * move the hero for the rest of the run. */
+  hand?: CardId[];
 };
 /** A Tower ascent. */
 export type TowerRun = RunCore & {
@@ -153,6 +156,9 @@ export type Save = {
    * priority order. Set up before a run; a new profile starts with the
    * base hand. */
   hand: CardId[];
+  /** Tutorials the player has finished: `deck`, reordering the hand on
+   * the Deck page. */
+  tutorials: { deck: boolean };
   /** DEFEND mini-game: city layout, purchases, upgrades and best wave. A
    * defense run itself is never saved. */
   defend: DefendSave;

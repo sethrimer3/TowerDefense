@@ -5,7 +5,7 @@ import { CONSUMABLES } from "../crafting.ts";
 import { outsideWeather } from "../outside.ts";
 import { MODES, milestones } from "../modes.ts";
 import { cardArt, displayedProgress, el, text } from "./dom.ts";
-import { CARDS } from "../cards.ts";
+import { CARDS, HAND_SLOTS } from "../cards.ts";
 import { trainingPoints } from "../loadout.ts";
 import type { BoardOverlay } from "./board-overlay.ts";
 
@@ -33,6 +33,9 @@ export function renderHud(game: Game, renderer: Renderer, overlay: BoardOverlay)
   renderUndo(game);
   (document.querySelector(".dpad") as HTMLElement).hidden = !game.save.settings.showArrows;
   renderLockedTab("delve", !!game.save.upgrades.delve, "Delve", "Unlock Into the depths in the Inspiration tree");
+  renderLockedTab("deck", !!game.save.upgrades.handOrdering, "Deck", "Unlock Hand Ordering in the Inspiration tree");
+  // A new Deck lesson waits behind the button until its tutorial is done.
+  document.querySelector(`[data-tab="deck"]`)?.classList.toggle("notify", !game.save.tutorials.deck);
   renderLockedTab("defend", !!game.save.upgrades.legacy, "Defend", "Unlock An enduring legacy in the Courage tree");
 }
 
@@ -90,11 +93,10 @@ let shownHand = "";
 /** The active hand in the row under the board, the card that made the
  * latest step glowing; End Run lights up while no card can act. */
 function renderHand(game: Game) {
-  const row = el("hand"), hand = game.save.hand;
+  const row = el("hand"), hand = game.hand;
   if (hand.join() !== shownHand) {
     shownHand = hand.join();
-    // Six slots at least, and one per card beyond that, all in one row.
-    row.style.setProperty("--slots", String(Math.max(6, hand.length)));
+    row.style.setProperty("--slots", String(HAND_SLOTS));
     row.innerHTML = hand.map((id) => `<div class="hand-card" role="listitem" data-card="${id}" title="${CARDS[id].name}: ${CARDS[id].text}">${cardArt(id, CARDS[id].name)}</div>`).join("");
   }
   const glowing = game.auto && !game.handStuck ? game.activeCard : null;

@@ -17,6 +17,7 @@ import { boardHeadingStale, renderBoardHeading, renderHud, renderVitals } from "
 import { confirmAction, RunEnd, showLog, showSectionPicker } from "./ui/dialogs.ts";
 import { SkillTreePage } from "./ui/skill-tree-page.ts";
 import { GearPage } from "./ui/gear-page.ts";
+import { DeckPage } from "./ui/deck-page.ts";
 import { renderSettingsPage } from "./ui/settings-page.ts";
 
 // Wires the pages together: builds the shell, creates the game and renderer,
@@ -48,6 +49,7 @@ const runEnd = new RunEnd(ctx);
 const overlay = new BoardOverlay(game, renderer);
 const skillTree = new SkillTreePage(ctx);
 const gear = new GearPage(ctx);
+const deck = new DeckPage(ctx);
 const defendPage = new DefendPage(el("defend"), {
   save: () => game.save.defend,
   wallet: () => ({ gold: game.save.gold, ironBar: game.save.materials.ironBar, steelBar: game.save.materials.steelBar }),
@@ -70,12 +72,15 @@ function update() {
   if (boardHeadingStale(game)) renderBoardHeading(game, overlay);
   // Inside a run the tabs give way to an empty row, kept for the hand.
   document.querySelector("nav")!.classList.toggle("in-run", !game.run.outside);
+  // The Deck tutorial keeps the player on its page until they reorder the hand.
+  document.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach((b) => (b.disabled = deck.teaching && b.dataset.tab !== "deck"));
   renderHud(game, renderer, overlay);
   save();
   runEnd.check();
 }
 function renderPage() {
   if (tab === "defend") defendPage.show();
+  if (tab === "deck") deck.render();
   if (tab === "gear") gear.render();
   if (tab === "upgrades") skillTree.render();
   if (tab === "settings") renderSettingsPage(ctx, overlay);
@@ -86,6 +91,10 @@ function unlockTarget(id: string): string {
     skillTree.focus("inspiration", "delve");
     return "upgrades";
   }
+  if (id === "deck" && !game.save.upgrades.handOrdering) {
+    skillTree.focus("inspiration", "handOrdering");
+    return "upgrades";
+  }
   if (id === "defend" && !game.save.upgrades.legacy) {
     skillTree.focus("courage", "legacy");
     return "upgrades";
@@ -93,11 +102,13 @@ function unlockTarget(id: string): string {
   return id;
 }
 function navigate(requested: string) {
+  if (deck.teaching && requested !== "deck") return;
   const id = unlockTarget(requested) as Tab;
   // Only the board plays a fight out: leaving it settles one still playing.
   game.finishEncounter();
   if (id !== "defend") defendPage.pause();
   tab = id;
+  deck.shown(id === "deck");
   renderer.weather.silence();
   if (isBoard(id)) {
     game.switchMode(id);

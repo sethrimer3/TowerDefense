@@ -107,8 +107,11 @@ One way of moving the hero, toward one kind of target: the stairs, a potion, a d
 _Avoid_: skill (a skill is something the player uses), ability
 
 **Hand**:
-The cards the player sets up before a run, in priority order. Inside a run the hand moves the hero, and the player can't: the first card that can act picks its closest target, and the hero follows the shortest path there a step at a time before the hand chooses again. The player can pause it, and undo pauses it.
-_Avoid_: deck, loadout (what the character starts a run with)
+The cards the player sets up before a run, in priority order, in up to five slots. Inside a run the hand moves the hero, and the player can't: the first card that can act picks its closest target, and the hero follows the shortest path there a step at a time before the hand chooses again. The player can pause it, and undo pauses it. Each run keeps the hand as ordered when it went inside.
+_Avoid_: loadout (what the character starts a run with)
+
+**Deck**:
+All the player's cards: those in the hand and those waiting outside it. Also the page where the hand is ordered (with the Hand Ordering skill).
 
 **Stuck hand**:
 No card in the hand can act. The hand pauses and End Run lights up, and the run ends only when the player ends it; each thing the player does (an item used, a skill) checks the hand again, and it plays on once a card can act.

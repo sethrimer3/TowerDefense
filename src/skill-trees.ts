@@ -3,9 +3,9 @@ export type TreeId = "wayfinding" | "inspiration" | "courage" | "legacy" | "wisd
 export type SkillNode = { id: UpgradeId; icon: string; x: number; y: number; requires: UpgradeId[] };
 export const TREES: { id: TreeId; name: string; currency: Currency; gate?: UpgradeId; description: string; nodes: SkillNode[] }[] = [
   { id: "inspiration", name: "Inspiration", currency: "inspiration", description: "Earn Inspiration by beating your best Tower climb.", nodes: [
-    { id: "inspirationHp", icon: "♥", x: 50, y: 12, requires: [] },
-    { id: "inspirationAttack", icon: "⚔", x: 23, y: 36, requires: ["inspirationHp"] },
-    { id: "inspirationDefense", icon: "⛨", x: 77, y: 36, requires: ["inspirationHp"] },
+    { id: "handOrdering", icon: "▤", x: 50, y: 12, requires: [] },
+    { id: "inspirationAttack", icon: "⚔", x: 23, y: 36, requires: ["handOrdering"] },
+    { id: "inspirationDefense", icon: "⛨", x: 77, y: 36, requires: ["handOrdering"] },
     { id: "inspirationUndos", icon: "↺", x: 23, y: 65, requires: ["inspirationAttack"] },
     { id: "delve", icon: "▼", x: 50, y: 87, requires: ["inspirationAttack", "inspirationDefense"] },
   ] },

@@ -6,7 +6,7 @@ import { CONSUMABLES, type ConsumableId } from "./crafting.ts";
 import { decodeDefendSave, defaultDefendSave } from "./defend/progress.ts";
 import { decodeSettings, defaultSettings } from "./settings.ts";
 import { loadout } from "./loadout.ts";
-import { BASE_HAND, CARD_IDS, type CardId } from "./cards.ts";
+import { BASE_HAND, CARD_IDS, HAND_SLOTS, type CardId } from "./cards.ts";
 export function defaults(): Save {
   return {
     version: 3,
@@ -27,6 +27,7 @@ export function defaults(): Save {
     equipped: {},
     consumables: Object.fromEntries(CONSUMABLES.map((c) => [c.id, 0])) as Save["consumables"],
     hand: [...BASE_HAND],
+    tutorials: { deck: false },
     defend: defaultDefendSave(),
   };
 }
@@ -77,8 +78,14 @@ const DELVE_FIELDS = ["milestone"];
  * `changes` now, and the memory beside the run). */
 function without<R>(r: any, fields: string[]): R {
   for (const k of ["rewards", "known", "visited", ...fields]) delete r[k];
+  if (r.hand !== undefined && !validHand(r.hand)) delete r.hand;
   return r;
 }
+/** A hand as the Deck can order it: known cards, each once, no more than
+ * the hand holds, STAIRS among them. */
+const validHand = (h: any) =>
+  Array.isArray(h) && h.length <= HAND_SLOTS && new Set(h).size === h.length &&
+  h.every((id) => CARD_IDS.includes(id)) && h.includes("stairs");
 /** Validate an untrusted Tower run; null unless it has the shape a
  * TowerRun needs. */
 function decodeTowerRun(r: any): TowerRun | null {
@@ -274,11 +281,13 @@ const VERSION_STEPS = new Map<unknown, VersionStep[]>([
   [2, [decodeProgress]],
   [3, [decodeProgress, decodeInventory]],
 ]);
-/** The saved hand's known cards in order, or the base hand when the save
- * has none. */
+/** The saved hand's known cards in order, each once and no more than the
+ * hand holds, or the base hand when the save has none or lost its STAIRS
+ * card, which every hand must hold. */
 function decodeHand(raw: any): CardId[] {
   if (!Array.isArray(raw)) return [...BASE_HAND];
-  return raw.filter((id): id is CardId => CARD_IDS.includes(id));
+  const hand = [...new Set(raw.filter((id): id is CardId => CARD_IDS.includes(id)))].slice(0, HAND_SLOTS);
+  return validHand(hand) ? hand : [...BASE_HAND];
 }
 export function decode(raw: string | null): Save {
   const d = defaults();
@@ -293,6 +302,7 @@ export function decode(raw: string | null): Save {
     migratePreSkillTrees(s.upgrades, d);
     d.defend = decodeDefendSave(s.defend);
     d.hand = decodeHand(s.hand);
+    d.tutorials.deck = s.tutorials?.deck === true;
   } catch {}
   return d;
 }

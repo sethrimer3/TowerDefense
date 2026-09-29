@@ -12,7 +12,7 @@ test("fresh progression gates Delve, currencies, Courage root, and Legacy", () =
   assert.equal(g.mode, "tower");
   assert.equal(g.buy("auto"), false);
   assert.equal(g.buy("delve"), false);
-  for (const id of ["inspirationHp", "inspirationAttack", "inspirationDefense", "delve"] as const) assert.ok(g.buy(id));
+  for (const id of ["handOrdering", "inspirationAttack", "inspirationDefense", "delve"] as const) assert.ok(g.buy(id));
   assert.equal(g.save.delve.courage, 100);
   g.switchMode("delve");
   assert.equal(g.mode, "delve");

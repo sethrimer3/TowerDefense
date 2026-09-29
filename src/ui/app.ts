@@ -2,7 +2,7 @@ import type { Game } from "../state.ts";
 import type { ConfirmPrompt } from "./dialogs.ts";
 
 /** Every page tab. Tower and Delve both show the board. */
-export type Tab = "tower" | "delve" | "defend" | "gear" | "upgrades" | "settings";
+export type Tab = "tower" | "delve" | "deck" | "defend" | "gear" | "upgrades" | "settings";
 export const isBoard = (id: string): id is "tower" | "delve" => id === "tower" || id === "delve";
 
 /** The game as pages see it: its state to read (a page may change a setting
@@ -13,7 +13,7 @@ export type PageGame = Readonly<Pick<Game, "mode" | "run" | "save" | "summary">>
     Game,
     | "undo" | "nextRun" | "eraseAll" | "finish" | "setDevMode"
     | "sectionUnlocked" | "startSection" | "setStartSection"
-    | "buy" | "train" | "buyGold" | "craftEquipment" | "craftConsumable" | "salvageEquipment"
+    | "buy" | "train" | "arrangeHand" | "buyGold" | "craftEquipment" | "craftConsumable" | "salvageEquipment"
     | "equipItem" | "unequipSlot" | "useConsumable"
   >;
 

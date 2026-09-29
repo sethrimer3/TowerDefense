@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { TreeParticles } from '../src/tree-particles.ts';
 import type { SkillNode } from '../src/skill-trees.ts';
 
-const node: SkillNode = { id: 'inspirationHp', x: 50, y: 50, requires: [], icon: '' };
+const node: SkillNode = { id: 'handOrdering', x: 50, y: 50, requires: [], icon: '' };
 
 test('ambient rotation is CCW and selected rotation is stronger CW in screen coordinates', () => {
   const ambient = new TreeParticles(), selected = new TreeParticles();

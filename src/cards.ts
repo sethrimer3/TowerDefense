@@ -18,8 +18,20 @@ export const CARDS = {
 export type CardId = keyof typeof CARDS;
 export const CARD_IDS = Object.keys(CARDS) as CardId[];
 
-/** The hand a new profile starts with, in priority order. */
-export const BASE_HAND: readonly CardId[] = ["stairs", "heal", "door", "key", "monster", "equipment"];
+/** How many cards a hand holds. */
+export const HAND_SLOTS = 5;
+/** The hand a new profile starts with, in priority order. The Equipment
+ * card is earned later, so it isn't in it. */
+export const BASE_HAND: readonly CardId[] = ["stairs", "heal", "door", "key", "monster"];
+
+/** `hand` with the card at `from` moved to slot `to`, each card between
+ * the two shifting one slot over to make room. */
+export function moveCard(hand: readonly CardId[], from: number, to: number): CardId[] {
+  const next = [...hand];
+  const [card] = next.splice(from, 1);
+  next.splice(to, 0, card);
+  return next;
+}
 
 /** The card that moves the hero and the path it committed to: the steps
  * still to take, the last one onto its target. */

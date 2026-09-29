@@ -1,6 +1,6 @@
 import { entrance, floorFor } from "./delve/labyrinth.ts";
 import { chooseStep } from "./automation.ts";
-import { CARDS, planHand, type CardPlan } from "./cards.ts";
+import { CARDS, moveCard, planHand, type CardId, type CardPlan } from "./cards.ts";
 import { DelvePlan } from "./delve/automove.ts";
 import { defaults } from "./save.ts";
 import { stream } from "./random.ts";
@@ -395,7 +395,7 @@ export class Game {
    * first card in priority order that can reach a target. When none can,
    * the hero waits and the End Run button lights up. */
   private handTurn() {
-    const plan = this.cardPlan ?? planHand(this, this.save.hand, this.mode);
+    const plan = this.cardPlan ?? planHand(this, this.hand, this.mode);
     this.handStuck = !plan;
     if (!plan) {
       this.cardPlan = null;
@@ -407,7 +407,7 @@ export class Game {
     const step = plan.path.shift()!;
     this.cardPlan = plan.path.length ? plan : null;
     this.activeCard = plan.card;
-    this.message = `${CARDS[this.save.hand[plan.card]].name} · ${CARDS[this.save.hand[plan.card]].text}`;
+    this.message = `${CARDS[this.hand[plan.card]].name} · ${CARDS[this.hand[plan.card]].text}`;
     // The board changes only as the hero moves, so a refused step means the
     // plan is stale: drop it and let the next turn choose again.
     if (!this.move(step.dx, step.dy, true)) this.cardPlan = null;
@@ -416,7 +416,7 @@ export class Game {
    * a stuck hand checks its cards again and plays on if one can act. */
   private afterPlayerAction() {
     if (!this.handStuck || !this.playing) return;
-    const plan = planHand(this, this.save.hand, this.mode);
+    const plan = planHand(this, this.hand, this.mode);
     if (!plan) return;
     this.handStuck = false;
     this.cardPlan = plan;
@@ -510,7 +510,10 @@ export class Game {
       this.run.outside = true;
       this.world = new OutsideWorld(seed, this.mode);
       this.message = "Follow the forest path to the entrance.";
-    } else this.forgetLabyrinth();
+    } else {
+      this.forgetLabyrinth();
+      this.run.hand = [...this.save.hand];
+    }
     this.slice.run = this.run;
     this.auto = !outside && this.handStartsPlaying;
     this.dropHandPlan();
@@ -767,6 +770,8 @@ export class Game {
   private enterFromOutside() {
     const p = this.run.player;
     this.run.outside = false;
+    // The run keeps the hand as it was ordered on the way in.
+    this.run.hand = [...this.save.hand];
     p.x = this.rules.entranceX;
     p.y = 0;
     this.world = this.rules.board(this.run);
@@ -941,6 +946,19 @@ export class Game {
     this.finalizeRun(reason, { dead: false });
   }
   /** Spends training points on one rank of a stat; false if short. */
+  /** Inside a run, the hand it went in with; in the forest, the hand the
+   * next run will take, as the Deck orders it. */
+  get hand(): readonly CardId[] {
+    return this.run.hand ?? this.save.hand;
+  }
+  /** Moves the hand's card in slot `from` to slot `to`, the cards between
+   * shifting over one (Hand Ordering, in the forest only). */
+  arrangeHand(from: number, to: number) {
+    const n = this.save.hand.length;
+    if (!this.save.upgrades.handOrdering || !this.run.outside || !(from >= 0 && from < n && to >= 0 && to < n)) return false;
+    this.save.hand = moveCard(this.save.hand, from, to);
+    return true;
+  }
   train(id: TrainingId) {
     const row = TRAINING.find((t) => t.id === id)!;
     return this.changeLoadout(() => {

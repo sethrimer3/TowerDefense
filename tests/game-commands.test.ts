@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Game } from "../src/state.ts";
-import { defaults } from "../src/save.ts";
+import { decode, defaults } from "../src/save.ts";
+import { ENTRANCE_Y } from "../src/outside.ts";
 import { RoomWorld } from "../src/tower/room-world.ts";
 import { chooseStep } from "../src/automation.ts";
 import { CONSUMABLES } from "../src/crafting.ts";
@@ -135,4 +136,26 @@ test("erasing everything leaves a fresh save with a new run outside the Tower", 
   fresh.tower.run = g.run;
   fresh.defend.seed = g.save.defend.seed;
   assert.deepEqual(g.save, fresh);
+});
+
+test("the Deck reorders the hand only with Hand Ordering and in the forest, and a run keeps the hand it went in with", () => {
+  const g = new Game(defaults());
+  g.newRun({ outside: true, seed: 1 });
+  assert.equal(g.arrangeHand(0, 2), false, "not before Hand Ordering is bought");
+  g.save.upgrades.handOrdering = 1;
+  assert.ok(g.arrangeHand(0, 2));
+  const ordered = ["heal", "door", "stairs", "key", "monster"];
+  assert.deepEqual(g.save.hand, ordered);
+  assert.deepEqual(g.hand, ordered, "in the forest the hand is the one the next run takes");
+  assert.equal(g.arrangeHand(0, 5), false);
+  assert.equal(g.arrangeHand(-1, 0), false);
+  g.walkTo(g.run.player.x, ENTRANCE_Y);
+  for (let i = 0; i < 20 && g.route.length; i++) g.routeStep();
+  assert.equal(g.run.outside, false);
+  assert.deepEqual(g.run.hand, ordered, "the run saves the hand's order on the way in");
+  assert.equal(g.arrangeHand(0, 1), false, "not inside a run");
+  g.save.hand = ["stairs", "monster", "key", "door", "heal"];
+  assert.deepEqual(g.hand, ordered, "a later change waits for the next run");
+  const loaded = new Game(decode(JSON.stringify(g.save)));
+  assert.deepEqual(loaded.hand, ordered, "and survives a reload");
 });

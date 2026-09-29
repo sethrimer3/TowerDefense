@@ -87,7 +87,7 @@ try {
     };
     const rich = (s) => {
       quiet(s);
-      Object.assign(s.upgrades, { delve: 1, auto: 1, legacy: 1, revive: 1, inspirationHp: 2, undos: 1, autoPersist: 1 });
+      Object.assign(s.upgrades, { delve: 1, auto: 1, legacy: 1, revive: 1, handOrdering: 1, undos: 1, autoPersist: 1 });
       s.delve.courage = 37;
       s.tower.inspiration = 21;
       s.gold = 480;
@@ -196,6 +196,26 @@ try {
       await click("#undo");
       await shot(`${prefix}.undone`);
     }
+  }
+  /** Drags the hand's card in slot `from` onto slot `to` on the Deck page. */
+  async function dragCard(from, to) {
+    const a = await page.locator(`.deck-card[data-slot="${from}"]`).boundingBox();
+    const b = await page.locator(".deck-slot").nth(to).boundingBox();
+    await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps: 8 });
+    await page.mouse.up();
+  }
+  /** The Deck's first visit teaches the drag, then the hand reorders freely. */
+  async function deckTour(prefix) {
+    await tab("deck");
+    await shot(`${prefix}.deck.tutorial`);
+    await dragCard(0, 3);
+    await shot(`${prefix}.deck.praise`);
+    await click("#deck-praise-ok");
+    await shot(`${prefix}.deck`);
+    await dragCard(4, 0);
+    await shot(`${prefix}.deck.reordered`);
   }
   async function dialogsTour(prefix) {
     await click("#log");
@@ -327,6 +347,7 @@ try {
   await boardTour("rich", "rich");
   await dialogsTour("rich");
   await leaveRun();
+  await deckTour("rich");
   await tab("defend");
   await shot("rich.defend");
   await upgradesTour("rich");

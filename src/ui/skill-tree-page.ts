@@ -17,7 +17,7 @@ const TREE_ICONS: Record<string, UiSprite> = {
  * a rank. */
 export class SkillTreePage {
   private tree: TreeId | "training" = "inspiration";
-  private skill: UpgradeId = "inspirationHp";
+  private skill: UpgradeId = "handOrdering";
   private tooltipVisible = false;
   private views: Partial<Record<TreeId, View>> = {};
   private particles = new TreeParticles();

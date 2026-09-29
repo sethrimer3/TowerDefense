@@ -117,11 +117,11 @@ export const UPGRADES = [
     currency: "courage",
   },
   {
-    id: "inspirationHp",
-    name: "Battle-tested",
-    grants: { maxHp: 15 },
-    base: 4,
-    max: 40,
+    id: "handOrdering",
+    name: "Hand Ordering",
+    description: "Open the Deck, where you reorder the cards in your hand before a run",
+    base: 1,
+    max: 1,
     currency: "inspiration",
   },
   {

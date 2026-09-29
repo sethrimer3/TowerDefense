@@ -705,8 +705,7 @@ nav button {
 nav button[hidden] {
   display: none;
 }
-/* Inside a run the tabs give way to the hand: at least six card slots in
-   one row, each narrower as more cards join past six. */
+/* Inside a run the tabs give way to the hand: one row of card slots. */
 nav.in-run button,
 nav:not(.in-run) .hand {
   display: none;
@@ -1786,3 +1785,139 @@ nav button > span img { display: block; width: 42px; height: 42px; max-width: 10
 .training-arrow { text-align: center; color: var(--gold); font-size: 14px; }
 button.training-cost { border-color: #d8b572; color: #ffe1a1; background: #2b2718; font-size: 10px; letter-spacing: .5px; }
 button.training-cost:disabled { border-color: #4a5566; color: #7c8898; background: #111925; }
+
+/* --- Deck page --- */
+nav button { position: relative; }
+/* A lesson waits behind the button. */
+nav button.notify::after {
+  content: "";
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: #d8352b;
+  box-shadow: 0 0 0 2px #10161f, 0 0 6px #ff4a3a;
+}
+.deck-icon { position: relative; display: block; width: 42px; height: 42px; }
+.deck-icon img { position: absolute; top: 4px; width: 25px; height: 33px; image-rendering: pixelated; border-radius: 2px; box-shadow: 0 1px 3px #000a; }
+.deck-icon img:first-child { left: 4px; transform: rotate(-12deg); }
+.deck-icon img:last-child { left: 13px; transform: rotate(8deg); }
+.skill-sprite.card-sprite { image-rendering: pixelated; object-fit: contain; }
+.deck-page { display: flex; flex-direction: column; gap: 14px; min-height: 100%; padding: 10px 2px 4px; }
+.deck-label { font-size: 13px; letter-spacing: 2px; color: #e9d4ac; text-transform: uppercase; margin: 0 0 8px; }
+.deck-hand {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  max-width: 440px;
+  touch-action: none;
+}
+.deck-slot {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  border: 1px dashed #3a4454;
+  border-radius: 5px;
+  background: #0b0f16;
+}
+.deck-card {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  cursor: grab;
+  box-shadow: 0 2px 6px #000a;
+}
+.deck-card:disabled { opacity: 1; filter: brightness(0.45); cursor: default; }
+.deck-card:not(:disabled):hover { box-shadow: 0 0 0 2px #ebc77f, 0 0 10px 2px #e0b25a88; }
+/* Where the dragged card will land. */
+.deck-slot.held .deck-card { opacity: 0.25; }
+.deck-ghost {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 50;
+  pointer-events: none;
+  border-radius: 4px;
+  box-shadow: 0 0 0 2px #ebc77f, 0 10px 24px #000c;
+}
+.deck-ghost img { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+.deck-hand.dragging .deck-pointer { display: none; }
+/* The tutorial's hand points up at STAIRS from below its slot. */
+.deck-pointer {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 50%;
+  width: 30px;
+  margin-left: -12px;
+  pointer-events: none;
+  filter: drop-shadow(0 2px 2px #000c);
+  animation: deck-point 1s ease-in-out infinite;
+  z-index: 3;
+}
+.deck-pointer svg { display: block; width: 100%; }
+@keyframes deck-point {
+  0%, 100% { transform: translateY(6px); }
+  50% { transform: translateY(0); }
+}
+.deck-pointer.still { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  .deck-pointer { animation: none; }
+}
+.deck-tip {
+  margin-top: 46px;
+  max-width: 440px;
+  border: 1px solid #8d794e;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #222c3a, #101823);
+  box-shadow: 0 10px 30px #0009;
+  padding: 12px 14px;
+  text-align: center;
+}
+.deck-tip b { display: block; color: #e9d4ac; font-size: 14px; margin-bottom: 6px; }
+.deck-tip p { font-size: 12px; line-height: 1.6; color: #a9b6c8; }
+.deck-reserve {
+  position: relative;
+  flex: 1;
+  min-height: 190px;
+  border: 1px solid #262d38;
+  border-radius: 6px;
+  padding: 10px;
+  background: #07090d;
+  overflow: hidden;
+}
+.deck-reserve > .deck-label { position: relative; z-index: 1; color: #6c778a; }
+.deck-reserve-slots {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  max-width: 440px;
+  filter: brightness(0.7);
+}
+.deck-reserve-slots i { aspect-ratio: 3 / 4; border: 1px dashed #3a4454; border-radius: 5px; background: #0d1118; }
+/* The locked deck sits in shadow under its notice. */
+.deck-reserve::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 55%, #0009, #000b 75%);
+  pointer-events: none;
+}
+.deck-lock {
+  position: absolute;
+  left: 50%;
+  top: 55%;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+  width: min(80%, 300px);
+  text-align: center;
+  font-size: 11px;
+  line-height: 1.6;
+  color: #7f8a9d;
+}
+.deck-lock b { display: block; font-size: 14px; letter-spacing: 3px; color: #a3afbc; text-transform: uppercase; margin-bottom: 4px; }

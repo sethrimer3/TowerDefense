@@ -277,8 +277,11 @@ test("each mode's run keeps only its own fields, on its own board's width, and A
   assert.equal(decode(JSON.stringify(noMilestone)).delve.run, null);
 });
 
-test("the hand decodes to its known cards in order, and a save without one gets the base hand", () => {
+test("the hand decodes to its known cards in order, and a save without one, or without STAIRS, gets the base hand", () => {
   assert.deepEqual(decode(JSON.stringify({ version: 3 })).hand, [...BASE_HAND]);
   assert.deepEqual(decode(JSON.stringify({ version: 3, hand: ["key", "joker", "stairs", 4] })).hand, ["key", "stairs"]);
-  assert.deepEqual(decode(JSON.stringify({ version: 3, hand: [] })).hand, []);
+  assert.deepEqual(decode(JSON.stringify({ version: 3, hand: ["key", "stairs", "key"] })).hand, ["key", "stairs"], "each card once");
+  assert.deepEqual(decode(JSON.stringify({ version: 3, hand: ["key", "stairs", "heal", "door", "monster", "equipment"] })).hand, ["key", "stairs", "heal", "door", "monster"], "no more cards than the hand's slots");
+  assert.deepEqual(decode(JSON.stringify({ version: 3, hand: [] })).hand, [...BASE_HAND], "every hand holds STAIRS");
+  assert.deepEqual(decode(JSON.stringify({ version: 3, hand: ["key"] })).hand, [...BASE_HAND]);
 });

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { BASE_HAND, planHand, type CardId } from "../src/cards.ts";
+import { BASE_HAND, CARD_IDS, HAND_SLOTS, moveCard, planHand, type CardId } from "../src/cards.ts";
 import type { Board, Position } from "../src/board.ts";
 import type { Enemy, Run, Tile } from "../src/entities.ts";
 
@@ -62,8 +62,8 @@ test("the first card in the hand that can reach a target moves the hero", () => 
   assert.deepEqual(play(board(rows), ["key", "heal"]), { card: "key", to: [4, 0], steps: 4 });
 });
 
-test("each base card heads for its own kind of target", () => {
-  const only = (tile: string, hero = {}) => play(board([`@.${tile}`], hero))?.card ?? null;
+test("each card heads for its own kind of target", () => {
+  const only = (tile: string, hero = {}) => play(board([`@.${tile}`], hero), CARD_IDS)?.card ?? null;
   assert.equal(only("S"), "stairs");
   assert.equal(only("P"), "heal");
   assert.equal(only("K"), "key");
@@ -127,4 +127,17 @@ test("the Delve's paths wrap across the sides and climb through one-way gates", 
   assert.deepEqual(play(wrapped, ["heal"]), { card: "heal", to: [0, 0], steps: 1 });
   const gate = board([".", "O", "@"]);
   assert.deepEqual(play(gate, ["stairs"], "delve"), { card: "stairs", to: [0, 2], steps: 2 });
+});
+
+test("the base hand fills the hand's slots, without the Equipment card", () => {
+  assert.equal(BASE_HAND.length, HAND_SLOTS);
+  assert.ok(!BASE_HAND.includes("equipment"));
+});
+
+test("moving a card shifts each card between its old and new slots over one", () => {
+  const hand: CardId[] = ["stairs", "heal", "door", "key", "monster"];
+  assert.deepEqual(moveCard(hand, 0, 3), ["heal", "door", "key", "stairs", "monster"]);
+  assert.deepEqual(moveCard(hand, 4, 1), ["stairs", "monster", "heal", "door", "key"]);
+  assert.deepEqual(moveCard(hand, 2, 2), hand);
+  assert.deepEqual(hand, ["stairs", "heal", "door", "key", "monster"], "the hand given is left alone");
 });

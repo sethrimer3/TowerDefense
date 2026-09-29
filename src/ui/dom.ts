@@ -35,19 +35,22 @@ const SKILL_ITEM_SPRITES: Partial<Record<UpgradeId, keyof typeof AREA1_ITEM_URLS
   yellow: "key_yellow", blue: "key_blue", red: "key_red",
 };
 const SKILL_UI_SPRITES: Partial<Record<UpgradeId, UiSprite>> = {
-  inspirationHp: "health", hp: "health", inspirationUndos: "undo", undos: "undo",
+  hp: "health", inspirationUndos: "undo", undos: "undo",
   delve: "delve", auto: "automove", autoPersist: "settings",
   revive: "revive", legacy: "tower", quality: "tower",
   wisdomFocus: "settings", wisdomMemory: "undo", wisdomSight: "upgrades",
   renownBanner: "tower", renownOath: "defense", renownCrown: "gear",
 };
+/** Two cards fanned out: the Deck's icon, made from the card faces. */
+const DECK_ICON = `<span class="deck-icon" aria-hidden="true"><img src="${UI_ASSET_BASE}assets/cards/heal.png" alt=""><img src="${UI_ASSET_BASE}assets/cards/stairs.png" alt=""></span>`;
 export const skillSprite = (id: UpgradeId) => {
+  if (id === "handOrdering") return `<img class="skill-sprite card-sprite" src="${UI_ASSET_BASE}assets/cards/stairs.png" alt="" aria-hidden="true">`;
   const item = SKILL_ITEM_SPRITES[id];
   if (item) return itemSprite(item, "skill-sprite");
   return uiSprite(SKILL_UI_SPRITES[id] ?? "upgrades", "skill-sprite");
 };
 export const TAB_ICONS = {
-  tower: uiSprite("tower"), delve: uiSprite("delve"), defend: uiSprite("defend"), gear: uiSprite("gear"),
+  tower: uiSprite("tower"), delve: uiSprite("delve"), deck: DECK_ICON, defend: uiSprite("defend"), gear: uiSprite("gear"),
   upgrades: uiSprite("upgrades"), settings: uiSprite("settings"),
 };
 export const SLOT_ICONS: Record<EquipmentSlot, string> = {

@@ -16,7 +16,7 @@ const MOVEMENT_SPRITES: Record<string, UiSprite> = {
  * pages, navigation and the shared dialog, with sprite icons in place of
  * the text glyphs. */
 export function buildShell(app: HTMLElement) {
-  app.innerHTML = `<main class="shell">${CURRENCIES}${STATS}${BOARD}<section id="defend" class="page"></section><section id="gear" class="page"></section><section id="upgrades" class="page"></section><section id="settings" class="page"></section>${NAV}</main><dialog id="modal"></dialog>`;
+  app.innerHTML = `<main class="shell">${CURRENCIES}${STATS}${BOARD}<section id="deck" class="page"></section><section id="defend" class="page"></section><section id="gear" class="page"></section><section id="upgrades" class="page"></section><section id="settings" class="page"></section>${NAV}</main><dialog id="modal"></dialog>`;
   arrangeHud();
   replaceGlyphs();
 }

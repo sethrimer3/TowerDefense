@@ -15,13 +15,13 @@ test("a new character starts at 12 ATK, 0 DEF, 100 HP, no keys and one undo", ()
 test("each rank of an upgrade adds its grant", () => {
   const s = defaults();
   Object.assign(s.upgrades, {
-    hp: 2, inspirationHp: 3, attack: 2, inspirationAttack: 3, defense: 2, inspirationDefense: 3, quality: 1,
+    hp: 2, handOrdering: 1, attack: 2, inspirationAttack: 3, defense: 2, inspirationDefense: 3, quality: 1,
     yellow: 1, blue: 2, red: 3, undos: 2, inspirationUndos: 1,
   });
   assert.deepEqual(loadout(s), {
     attack: 12 + 2 * 2 + 3 + 2,
     defense: 0 + 2 + 3 + 1,
-    maxHp: 100 + 2 * 20 + 3 * 15,
+    maxHp: 100 + 2 * 20,
     keys: { yellow: 1, blue: 2, red: 3 },
     undoCapacity: 1 + 2 + 1,
   });
@@ -79,7 +79,7 @@ test("descriptions are written from the grants", () => {
   const text = Object.fromEntries(UPGRADES.map((u) => [u.id, upgradeText(u.id)]));
   assert.deepEqual(
     { hp: text.hp, attack: text.attack, defense: text.defense, yellow: text.yellow, blue: text.blue, red: text.red,
-      quality: text.quality, undos: text.undos, inspirationHp: text.inspirationHp, inspirationAttack: text.inspirationAttack,
+      quality: text.quality, undos: text.undos, handOrdering: text.handOrdering, inspirationAttack: text.inspirationAttack,
       inspirationDefense: text.inspirationDefense, inspirationUndos: text.inspirationUndos, revive: text.revive },
     {
       hp: "+20 starting maximum HP",
@@ -90,7 +90,7 @@ test("descriptions are written from the grants", () => {
       red: "+1 starting crimson key",
       quality: "+2 weapon attack and +1 armor defense",
       undos: "Store one additional undo (up to 9)",
-      inspirationHp: "+15 starting maximum HP",
+      handOrdering: "Open the Deck, where you reorder the cards in your hand before a run",
       inspirationAttack: "+1 starting attack",
       inspirationDefense: "+1 starting defense",
       inspirationUndos: "Store one additional undo (up to 9)",
