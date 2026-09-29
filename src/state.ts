@@ -69,6 +69,8 @@ export type RouteEffects = {
  * sprite (a tile's contents or a material), or as `text` where it has none. */
 export type Gain = { x: number; y: number; text: string; art: GainArt | null };
 export type GainArt = { tile: Tile } | { material: MaterialId; quantity: number };
+/** A potion's heal: the HP from and to, where the hero stood, and its number. */
+export type Heal = { from: number; to: number; x: number; y: number; id: number };
 /** Rewards kept for the board to show; older ones are dropped unseen. */
 const MAX_GAINS = 12;
 /** A fight being played out round by round before it counts: the hero waits
@@ -95,9 +97,10 @@ export class Game {
   playsFights = false;
   /** The fight being played out, if any; steps wait until it settles. */
   encounter: Encounter | null = null;
-  /** The last potion picked up: the HP it healed from and to, and a number
-   * that grows with each, so the HP bar can fill up to it. */
-  lastHeal: { from: number; to: number; id: number } | null = null;
+  /** The last potion that healed, picked up or crafted: the HP it healed
+   * from and to, where the hero stood, and a number that grows with each, so
+   * the HP bar can fill up to it and the board raise the HP healed. */
+  lastHeal: Heal | null = null;
   summary: null | {
     height: number;
     kills: number;
@@ -821,10 +824,7 @@ export class Game {
       : null;
     if (text) {
       this.gain(x, y, text, { tile: { ...t } });
-      if (t.kind === "potion" && outcome.healed > 0) {
-        const hp = this.run.player.hp;
-        this.lastHeal = { from: hp - outcome.healed, to: hp, id: (this.lastHeal?.id ?? 0) + 1 };
-      }
+      if (t.kind === "potion") this.recordHeal(outcome.healed);
       this.message = text;
     }
     if (t.kind === "treasure") {
@@ -913,8 +913,15 @@ export class Game {
     const n = Math.min(p.maxHp - p.hp, def.healAmount);
     p.hp += n;
     this.save.consumables[id]--;
-    this.feedback(`${def.name} · +${n} HP`);
+    this.recordHeal(n);
+    this.message = `${def.name} · +${n} HP`;
     return true;
+  }
+  /** Records a potion's heal of `n` HP, already applied, where the hero stands. */
+  private recordHeal(n: number) {
+    if (n <= 0) return;
+    const p = this.run.player;
+    this.lastHeal = { from: p.hp - n, to: p.hp, x: p.x, y: p.y, id: (this.lastHeal?.id ?? 0) + 1 };
   }
 }
 

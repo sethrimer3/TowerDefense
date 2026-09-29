@@ -7,6 +7,9 @@ import { bout, heroHpDuring, predict, raisedAttack } from "../src/combat.ts";
 import { BoardPopups, lunges } from "../src/board-popups.ts";
 import type { Enemy, Player, Tile } from "../src/entities.ts";
 
+/** The damage and heal numbers rising off the board. */
+const numbers = (popups: BoardPopups) =>
+  (popups as unknown as { numbers: { x: number; y: number; text: string; color: string }[] }).numbers;
 const hero = (over: Partial<Player> = {}): Player =>
   ({ x: 0, y: 0, hp: 100, maxHp: 100, attack: 10, defense: 2, keys: { yellow: 0, blue: 0, red: 0 }, ...over });
 const foe = (over: Partial<Enemy> = {}): Enemy => ({ name: "Slime", hp: 30, attack: 7, defense: 4, tier: 0, ...over });
@@ -130,7 +133,7 @@ test("pickups and treasure queue their rewards to rise from their tiles", () => 
 
 test("the board shows rewards one after another and each strike's damage as it lands", () => {
   const popups = new BoardPopups(), gain = (text: string) => ({ x: 1, y: 0, text, art: null });
-  const game = { run: { seed: 1 }, gains: [gain("+5 Gold"), gain("+1 Slime Gel")], encounter: null };
+  const game = { run: { seed: 1 }, gains: [gain("+5 Gold"), gain("+1 Slime Gel")], encounter: null, lastHeal: null };
   popups.update(game, 1000);
   assert.deepEqual(game.gains, [], "the board takes the rewards");
   const shown = (popups as unknown as { rewards: { start: number }[] }).rewards.map((p) => p.start);
@@ -142,11 +145,11 @@ test("the board shows rewards one after another and each strike's damage as it l
   assert.ok(popups.idle);
 
   const fight = { from: { x: 0, y: 0 }, to: { x: 1, y: 0 }, bout: bout(hero(), foe()), start: 5000, settle() {} };
-  const damage = () => (popups as unknown as { damage: { x: number; text: string }[] }).damage.map((d) => `${d.x}:${d.text}`);
+  const damage = () => numbers(popups).map((d) => `${d.x}:${d.text}:${d.color}`);
   popups.update({ ...game, encounter: fight }, 5000 + fight.bout.strikes[0].at);
-  assert.deepEqual(damage(), ["1:6"], "the hero's strike rises off the enemy");
+  assert.deepEqual(damage(), ["1:6:#ff4040"], "the hero's strike rises off the enemy");
   popups.update({ ...game, encounter: fight }, 5000 + fight.bout.strikes[1].at);
-  assert.deepEqual(damage(), ["1:6", "0:5"], "the enemy's rises off the hero");
+  assert.deepEqual(damage(), ["1:6:#ff4040", "0:5:#b3121f"], "the enemy's rises off the hero, a darker red");
 
   const mid = 5000 + fight.bout.strikes[0].at;
   assert.ok(lunges(fight, mid, false).hero.dx > 0.29, "the hero leans into its strike");
@@ -158,8 +161,30 @@ test("a potion records the HP it healed from and to, for the HP bar to fill up",
   const g = arena({ kind: "potion", amount: 30 });
   g.run.player.hp = 50;
   g.move(1, 0);
-  assert.deepEqual(g.lastHeal, { from: 50, to: 80, id: 1 });
+  assert.deepEqual(g.lastHeal, { from: 50, to: 80, x: 1, y: 0, id: 1 });
   const full = arena({ kind: "potion", amount: 30 });
   full.move(1, 0);
   assert.equal(full.lastHeal, null, "a potion at full HP heals nothing to show");
+});
+
+test("a crafted potion records its heal just as a picked-up one does", () => {
+  const g = arena({ kind: "floor" });
+  g.run.outside = false;
+  g.run.player.hp = g.run.player.maxHp - 10;
+  g.save.consumables.cinderTonic = 1;
+  assert.ok(g.useConsumable("cinderTonic"));
+  const hp = g.run.player.hp;
+  assert.deepEqual(g.lastHeal, { from: hp - 10, to: hp, x: 0, y: 0, id: 1 }, "it heals only the HP missing");
+  assert.match(g.message, /\+10 HP$/);
+  assert.equal(g.effect.until, 0, "the green number shows it, not text over the board");
+});
+
+test("each heal raises its HP healed in green over the hero, once", () => {
+  const popups = new BoardPopups();
+  const game = { run: { seed: 1 }, gains: [], encounter: null, lastHeal: { from: 40, to: 75, x: 3, y: 2, id: 1 } };
+  popups.update(game, 1000);
+  popups.update(game, 1100);
+  assert.deepEqual(numbers(popups).map((n) => [n.x, n.text, n.color]), [[3, "+35", "#5fdc6a"]]);
+  popups.update(game, 2000);
+  assert.ok(popups.idle);
 });

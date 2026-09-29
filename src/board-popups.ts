@@ -1,4 +1,4 @@
-import type { Encounter, Gain } from "./state.ts";
+import type { Encounter, Gain, Heal } from "./state.ts";
 import { paintContents } from "./tile-painters.ts";
 import { materialImage } from "./material-sprites.ts";
 import { tileCenter, toTileSpace, type FrameContext } from "./render-frame.ts";
@@ -13,7 +13,10 @@ const DAMAGE_RISE = 0.9;
 const DAMAGE_START = 0.35;
 /** Rewards without a sprite are written in the feedback text's gold. */
 const REWARD_COLOR = "#f3d69a";
+/** Damage the hero deals, the darker damage it takes, and HP it heals. */
 const DAMAGE_COLOR = "#ff4040";
+const HERO_DAMAGE_COLOR = "#b3121f";
+const HEAL_COLOR = "#5fdc6a";
 /** How far a strike leans into its target at the moment it lands, in tiles. */
 const LUNGE = 0.3;
 
@@ -22,23 +25,32 @@ type Offset = { dx: number; dy: number };
 const STILL: Offset = { dx: 0, dy: 0 };
 
 /** What rises off the board over its tiles: the damage number of each strike
- * in a fight as it lands, and each reward picked up, one after another. */
+ * in a fight as it lands, the HP each potion heals, and each reward picked
+ * up, one after another. */
 export class BoardPopups {
   private rewards: (Popup & { gain: Gain })[] = [];
-  private damage: (Popup & { text: string })[] = [];
+  /** Damage and heal numbers. */
+  private numbers: (Popup & { text: string; color: string })[] = [];
+  /** The last heal raised. */
+  private healed = 0;
   private fight: Encounter | null = null;
   /** How many of the fight's strikes have landed. */
   private landed = 0;
   private seed = NaN;
 
   /** Takes the game's new rewards, each queued to start as the one before
-   * it ends, and the fight's strikes that have landed by `now`. A new run
-   * clears whatever was still showing. */
-  update(game: { run: { seed: number }; gains: Gain[]; encounter: Encounter | null }, now: number) {
+   * it ends, the fight's strikes that have landed by `now`, and a new heal.
+   * A new run clears whatever was still showing. */
+  update(game: { run: { seed: number }; gains: Gain[]; encounter: Encounter | null; lastHeal: Heal | null }, now: number) {
     if (game.run.seed !== this.seed) {
       this.seed = game.run.seed;
       this.rewards = [];
-      this.damage = [];
+      this.numbers = [];
+    }
+    const heal = game.lastHeal;
+    if (heal && heal.id !== this.healed) {
+      this.healed = heal.id;
+      this.numbers.push({ x: heal.x, y: heal.y + DAMAGE_START, start: now, text: `+${heal.to - heal.from}`, color: HEAL_COLOR });
     }
     const last = this.rewards.at(-1);
     let start = last ? Math.max(now, last.start + POPUP_MS) : now;
@@ -48,7 +60,7 @@ export class BoardPopups {
     }
     this.strike(game.encounter, now);
     this.rewards = this.rewards.filter((p) => now < p.start + POPUP_MS);
-    this.damage = this.damage.filter((p) => now < p.start + POPUP_MS);
+    this.numbers = this.numbers.filter((p) => now < p.start + POPUP_MS);
   }
   private strike(fight: Encounter | null, now: number) {
     if (fight !== this.fight) {
@@ -59,16 +71,19 @@ export class BoardPopups {
     const strikes = fight.bout.strikes;
     while (this.landed < strikes.length && fight.start + strikes[this.landed].at <= now) {
       const s = strikes[this.landed++], on = s.by === "hero" ? fight.to : fight.from;
-      this.damage.push({ x: on.x, y: on.y + DAMAGE_START, start: fight.start + s.at, text: String(s.damage) });
+      this.numbers.push({
+        x: on.x, y: on.y + DAMAGE_START, start: fight.start + s.at, text: String(s.damage),
+        color: s.by === "hero" ? DAMAGE_COLOR : HERO_DAMAGE_COLOR,
+      });
     }
   }
   /** Nothing is rising or waiting to. */
   get idle() {
-    return !this.rewards.length && !this.damage.length;
+    return !this.rewards.length && !this.numbers.length;
   }
 
   draw(f: FrameContext) {
-    for (const p of this.damage) this.drawText(f, p, p.text, DAMAGE_COLOR, DAMAGE_RISE, 0.55);
+    for (const p of this.numbers) this.drawText(f, p, p.text, p.color, DAMAGE_RISE, 0.55);
     for (const p of this.rewards) {
       if (f.now < p.start) continue;
       if (!this.drawSprite(f, p)) this.drawText(f, p, p.gain.text, REWARD_COLOR, REWARD_RISE, 0.42);

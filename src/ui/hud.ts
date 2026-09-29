@@ -77,7 +77,7 @@ export function renderVitals(game: Game) {
 
 /** The last heal the HP bar has filled up to. */
 let shownHeal = 0;
-/** A potion just picked up: the red fill starts at the HP before it with the
+/** A potion just picked up or drunk: the red fill starts at the HP before it with the
  * HP it healed in light red beyond, and grows over the light red in a
  * second. A fight starting, or the next potion, stops it where it is. */
 function renderHealthGain(game: Game) {
