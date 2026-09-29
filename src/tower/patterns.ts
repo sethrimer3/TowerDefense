@@ -58,6 +58,9 @@ const DEF: Reward = { kind: "defense" };
 const T: Reward = { kind: "treasure" };
 function one<V>(v: V): Weighted<V> { return [{ w: 1, v }]; }
 const times = (n: number, r: Reward) => Array.from({ length: n }, () => r);
+/** What a blue door trades for in yellow keys: mostly two, sometimes three,
+ * now and then just one, so the trade rooms don't flood a section. */
+const BLUE_FOR_YELLOWS: Weighted<Reward[]> = [{ w: 85, v: times(2, Y) }, { w: 10, v: times(3, Y) }, { w: 5, v: [Y] }];
 
 export const TOWER_PATTERNS: TowerPattern[] = [
   // B. KEY BEHIND ENEMY — the bread-and-butter Magic Tower proposition.
@@ -127,7 +130,7 @@ export const TOWER_PATTERNS: TowerPattern[] = [
     steps: [{
       purpose: "exchange", footprint: "room", formation: "row",
       gate: one(door("blue")),
-      rewards: [{ w: 3, v: times(3, Y) }, { w: 2, v: times(4, Y) }, { w: 1, v: [...times(4, Y), P, P] }],
+      rewards: BLUE_FOR_YELLOWS,
     }],
   },
   {
@@ -225,7 +228,7 @@ export const TOWER_PATTERNS: TowerPattern[] = [
     strategicTags: ["doorGate", "keyReward", "resourceExchange", "branch", "optionalRoute"],
     steps: [
       { purpose: "keyRoom", footprint: "pocket", gate: one(door("yellow")), rewards: [{ w: 2, v: [B] }, { w: 1, v: [B, P] }] },
-      { purpose: "exchange", footprint: "pocket", gate: one(door("blue")), rewards: [{ w: 1, v: times(3, Y) }, { w: 1, v: [Y, Y, Y, P] }] },
+      { purpose: "exchange", footprint: "pocket", gate: one(door("blue")), rewards: BLUE_FOR_YELLOWS },
     ],
   },
   // PATTERN 6 — CHOICE ROOM: fight for ATK, or spend a key for potions.
