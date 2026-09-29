@@ -9,8 +9,8 @@ import { loadout } from "./loadout.ts";
 export function defaults(): Save {
   return {
     version: 3,
-    tower: { run: null, history: [], revival: null, best: 0, reached: 0, inspiration: 0, log: {}, lootedTiles: {}, startSection: 0, sectionHp: {} },
-    delve: { run: null, history: [], revival: null, best: 0, reached: 0, courage: 0, lootedTiles: {}, memory: { known: {}, visited: {} } },
+    tower: { run: null, history: [], revival: null, best: 0, reached: 0, inspiration: 0, log: {}, lootedTiles: {}, runGold: 0, startSection: 0, sectionHp: {} },
+    delve: { run: null, history: [], revival: null, best: 0, reached: 0, courage: 0, lootedTiles: {}, runGold: 0, memory: { known: {}, visited: {} } },
     gold: 0,
     provisions: Object.fromEntries(
       GOLD_SHOP.map((g) => [g.id, 0]),
@@ -93,7 +93,7 @@ function decodeDelveRun(r: any): DelveRun | null {
 }
 
 // --- Mode slices ---
-type DecodedMode<R extends Run> = Pick<ModeSave<R>, "run" | "history" | "revival" | "lootedTiles">;
+type DecodedMode<R extends Run> = Pick<ModeSave<R>, "run" | "history" | "revival" | "lootedTiles" | "runGold">;
 type RunDecoder<R extends Run> = (raw: any) => R | null;
 function snapshot<R extends Run>(value: any, decodeRun: RunDecoder<R>): MoveSnapshot<R> | null {
   if (!value || !finite(value.best)) return null;
@@ -134,6 +134,7 @@ function decodeMode<R extends Run>(s: any, undoCapacity: number, decodeRun: RunD
     history: run ? decodeHistory(s.history, run, undoCapacity, decodeRun) : [],
     revival: run ? decodeRevival(s.revival, run, decodeRun) : null,
     lootedTiles: decodeLootedTiles(s?.lootedTiles),
+    runGold: run ? count(s.runGold, 0) : 0,
   };
 }
 function applyMode<R extends Run>(slice: ModeSave<R>, decoded: DecodedMode<R>) {
@@ -141,6 +142,7 @@ function applyMode<R extends Run>(slice: ModeSave<R>, decoded: DecodedMode<R>) {
   slice.history = decoded.history;
   slice.revival = decoded.revival;
   slice.lootedTiles = decoded.lootedTiles;
+  slice.runGold = decoded.runGold;
 }
 
 // --- Inventory ---

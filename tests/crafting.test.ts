@@ -314,6 +314,10 @@ test("undo/reopen the same treasure chest cannot duplicate its Gold/material pay
     g.move(1, 0);
   }
   assert.equal(g.save.gold, goldAfterFirst, "lootedTiles blocks every re-grant for this physical chest");
+  assert.ok(goldAfterFirst > 0);
+  assert.equal(g.save.tower.runGold, goldAfterFirst, "the run's Gold counts the chest once and undo keeps it");
+  g.newRun();
+  assert.equal(g.save.tower.runGold, 0, "a new run starts its Gold count afresh");
 });
 
 test("craft equipment, undo unrelated gameplay: both the equipment and the spent materials remain (spend is not run-scoped)", () => {

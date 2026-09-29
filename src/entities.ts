@@ -116,6 +116,9 @@ export type ModeSave<R extends Run = Run> = {
    * persistent rewards, kept outside `run` so it survives movement undo and
    * blocks the same physical kill/chest from paying out twice. */
   lootedTiles: Record<string, true>;
+  /** Gold picked up during the current run, kept outside `run` like
+   * `lootedTiles`, since undo never takes Gold back. */
+  runGold: number;
 };
 export type Save = {
   version: 3;

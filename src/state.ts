@@ -385,6 +385,7 @@ export class Game {
     if (this.run) this.claimRewards();
     this.settleRevival();
     this.slice.history = [];
+    this.slice.runGold = 0;
     this.route = [];
     this.summary = null;
     this.encounter = null;
@@ -845,6 +846,7 @@ export class Game {
         const E = this.rules.equivalentFloor(this.rules.progressAt(this.run, y));
         const loot = rollTreasureLoot(E, this.rng);
         this.save.gold += loot.gold;
+        slice.runGold += loot.gold;
         creditMaterials(this.save, loot.materials);
         this.gain(x, y, `+${loot.gold} Gold`);
         for (const m of loot.materials) this.gain(x, y, materialText(m), { material: m.id, quantity: m.quantity });

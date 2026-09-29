@@ -283,7 +283,7 @@ h1 span {
 }
 .combat-stats {
   display: grid;
-  grid-template-columns: minmax(40px, 1fr) 24px minmax(40px, 1fr) 24px;
+  grid-template-columns: minmax(40px, 1fr) 24px minmax(40px, 1fr) 24px minmax(40px, 1fr);
   gap: 7px;
   color: #97a9bf;
 }
@@ -943,7 +943,7 @@ dialog p {
     margin-left: 4px;
   }
   .combat-stats {
-    grid-template-columns: minmax(34px, 1fr) 14px minmax(34px, 1fr) 14px;
+    grid-template-columns: minmax(34px, 1fr) 14px minmax(34px, 1fr) 14px minmax(34px, 1fr);
     gap: 4px;
   }
   .tower-heading {

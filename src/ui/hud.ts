@@ -61,7 +61,7 @@ export function renderBoardHeading(game: Game, overlay: BoardOverlay) {
 /** True when the heading still shows the other side of the forest entrance. */
 export const boardHeadingStale = (game: Game) => el("board").dataset.outside !== String(!!game.run.outside);
 
-/** HP, ATK, DEF and keys. During a fight being played out, HP counts down
+/** HP, ATK, DEF, the run's Gold and keys. During a fight being played out, HP counts down
  * strike by strike. */
 export function renderVitals(game: Game) {
   const p = game.run.player, hp = game.shownHp(performance.now());
@@ -71,6 +71,7 @@ export function renderVitals(game: Game) {
   renderHealthLoss(game.encounter ? p.hp - hp : 0, p.maxHp);
   text("attack", p.attack);
   text("defense", p.defense);
+  text("run-gold", game.save[game.mode].runGold);
   for (const k of ["yellow", "blue", "red"] as const) text(k, p.keys[k]);
   const skeletonKeys = p.skeletonKeys ?? 0;
   text("skeleton", skeletonKeys);
