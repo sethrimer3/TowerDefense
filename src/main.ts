@@ -14,7 +14,7 @@ import { MODES } from "./modes.ts";
 import { buildShell } from "./ui/shell.ts";
 import { BoardOverlay } from "./ui/board-overlay.ts";
 import { boardHeadingStale, renderBoardHeading, renderHud, renderVitals } from "./ui/hud.ts";
-import { confirmAction, RunEnd, showAutoSettings, showLog, showSectionPicker } from "./ui/dialogs.ts";
+import { confirmAction, RunEnd, showLog, showSectionPicker } from "./ui/dialogs.ts";
 import { SkillTreePage } from "./ui/skill-tree-page.ts";
 import { GearPage } from "./ui/gear-page.ts";
 import { renderSettingsPage } from "./ui/settings-page.ts";
@@ -68,6 +68,8 @@ function save() {
 /** Refreshes the HUD from game state, saves, and shows any finished run. */
 function update() {
   if (boardHeadingStale(game)) renderBoardHeading(game, overlay);
+  // Inside a run the tabs give way to an empty row, kept for the hand.
+  document.querySelector("nav")!.classList.toggle("in-run", !game.run.outside);
   renderHud(game, renderer, overlay);
   save();
   runEnd.check();
@@ -138,9 +140,15 @@ el("end-run").onclick = () =>
 modal.addEventListener("cancel", (e) => {
   if (game.summary) e.preventDefault();
 });
-el("auto-settings").onclick = () => showAutoSettings(ctx);
+el("auto-settings").onclick = () => navigate("settings");
 el("auto").onclick = () => {
   if (!game.save.upgrades.auto) {
+    // Upgrades are bought between runs, so inside one the button only says where.
+    if (!game.run.outside) {
+      game.message = "Unlock Automove in the Upgrades trees, between runs.";
+      update();
+      return;
+    }
     if (game.save.upgrades.delve) skillTree.focus("courage", "auto");
     else skillTree.focus("inspiration", "delve");
     navigate("upgrades");

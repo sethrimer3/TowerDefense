@@ -681,6 +681,10 @@ nav button {
 nav button[hidden] {
   display: none;
 }
+/* Inside a run the row stays, empty: it will hold the hand. */
+nav.in-run button {
+  visibility: hidden;
+}
 nav button > span {
   font-family: Cinzel, Georgia, serif;
   font-size: 26px;
@@ -705,6 +709,12 @@ footer {
 }
 .page-title {
   margin: 30px 0 24px;
+}
+#settings-back {
+  margin-top: 12px;
+}
+#settings-back + .page-title {
+  margin-top: 16px;
 }
 .page-title small,
 dialog > small {

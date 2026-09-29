@@ -38,6 +38,19 @@ if (!fontCheck.loaded || fontCheck.wrong.length || fontCheck.remote)
   );
 if (await page.locator(".dpad").isVisible())
   throw Error("Arrows should be hidden by default");
+// Inside a run the tabs give way to an empty row; Settings opens from the HUD.
+if (await page.locator('[data-tab="gear"]').isVisible())
+  throw Error("Tabs should be hidden inside a run");
+await page.locator("#auto-settings").click();
+if (await page.locator("#auto-off-death").count())
+  throw Error("Turn off upon death should wait for its upgrade");
+await page.locator("#settings-back").click();
+if (!(await page.locator("#world").isVisible()))
+  throw Error("Back should return to the board");
+// Inside a run the tabs are hidden: end the first Tower run to reach the forest.
+await page.locator("#end-run").click();
+await page.locator("#confirm").click();
+await page.locator("#again").click();
 await page.locator('[data-tab="settings"]').click();
 await page.locator("#arrows").check();
 await page.locator('[data-tab="delve"]').click();
@@ -51,7 +64,7 @@ if ((await page.locator("#height").textContent()) !== "1")
 // The viewport is a fixed 17 × 17 tiles, independent of world size.
 if ((await page.locator("#density-label").textContent()) !== "17 × 17")
   throw Error("Viewport size failed");
-await page.locator('[data-tab="settings"]').click();
+await page.locator("#auto-settings").click();
 await page.locator("#retire").click();
 await page.locator("#confirm").click();
 await page.locator("#again").click();
@@ -92,7 +105,7 @@ for (let i = 0; i < 2; i++) {
     throw Error("Forest walking awarded depth");
   for (let step = 0; step < i + 2; step++)
     await page.getByRole("button", { name: "Move up", exact: true }).click();
-  await page.locator('[data-tab="settings"]').click();
+  await page.locator("#auto-settings").click();
   await page.locator("#retire").click();
   await page.locator("#confirm").click();
   await page.locator("#again").click();
@@ -126,7 +139,7 @@ const before = await page.locator("#height").textContent();
 await page.waitForTimeout(500);
 if ((await page.locator("#height").textContent()) !== before)
   throw Error("Pause failed");
-await page.locator('[data-tab="settings"]').click();
+await page.locator("#auto-settings").click();
 await page.locator("#erase").click();
 await page.locator("#cancel").click();
 await page.reload();

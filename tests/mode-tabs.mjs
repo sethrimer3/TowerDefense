@@ -23,6 +23,14 @@ await page.addInitScript(() => {
 const url = process.env.TEST_URL || "http://127.0.0.1:5173/";
 await page.goto(url);
 
+// 0. A fresh game starts inside a Tower run, where the tabs are hidden but
+// keep their row; ending the run returns to the forest and shows them.
+assert.equal(await page.locator('[data-tab="tower"]').isVisible(), false, "Tabs should be hidden inside a run");
+assert.ok((await page.locator("nav").boundingBox()).height > 40, "The tab row should keep its space inside a run");
+await page.locator("#end-run").click();
+await page.locator("#confirm").click();
+await page.locator("#again").click();
+
 // 1. Fresh start: Delve and Defend tabs must be completely hidden
 const delveVisibleFresh = await page.locator('[data-tab="delve"]').isVisible();
 const defendVisibleFresh = await page.locator('[data-tab="defend"]').isVisible();

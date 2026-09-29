@@ -30,6 +30,8 @@ Death immediately starts a fresh run at the entrance (floor 1 / height 0) and cl
 
 Rewards are credited as you climb (Courage for every 10 Delve height, Inspiration for each new Tower floor and floor clear), so retiring from Settings simply starts a fresh run. Starting-stat and equipment upgrades apply on the next ascent; Wayfinder, Revive, and undo-capacity upgrades unlock immediately. Automation still avoids lethal fights and pauses outside the Tower tab, in dialogs, and when hidden. No offline progress is calculated.
 
+Inside a run, the row of tabs at the bottom (Tower, Delve, Defend, Gear, Upgrades, Settings) is hidden and its space left empty: modes, gear and upgrades are chosen in the forest before a run, and a run ends back there. The Settings button in the stats opens the Settings page at any time, with a Back button to the board. Once **Steadfast wayfinder** is owned, the page also holds **Automove turns off upon death**. Inside a run, a still-locked Automove button only says where it unlocks.
+
 
 ## How it's built
 

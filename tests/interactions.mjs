@@ -14,6 +14,10 @@ await page.addInitScript(() => {
   }
 });
 await page.goto(process.env.TEST_URL || "http://127.0.0.1:5173/");
+// Inside a run the tabs are hidden: end the first Tower run to reach the forest.
+await page.locator("#end-run").click();
+await page.locator("#confirm").click();
+await page.locator("#again").click();
 await expect(page.locator(".dpad")).toBeHidden();
 
 const saved = () =>

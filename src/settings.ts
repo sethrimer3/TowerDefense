@@ -34,9 +34,9 @@ export const SETTINGS = {
   reduceMotion: { kind: "toggle", default: false, page: { id: "motion", label: "Reduce motion" } },
   /** Dungeon brightness, 20 (very dark) to 100 (default look). */
   brightness: { kind: "range", default: 100, min: 20, max: 100, step: 5, page: { id: "brightness", label: "Brightness", aria: "Dungeon brightness" } },
-  /** Requires the autoPersist upgrade to configure (in the Automove
-   * dialog); otherwise Automove always turns off on death. */
-  autoOffOnDeath: { kind: "toggle", default: true },
+  /** Configurable on the Settings page once the autoPersist upgrade is
+   * owned; otherwise Automove always turns off on death. */
+  autoOffOnDeath: { kind: "toggle", default: true, page: { id: "auto-off-death", label: "Automove turns off upon death" } },
   /** Tapping a tile walks there immediately instead of requiring a second
    * tap to confirm. The info box still appears either way. */
   oneTapMove: { kind: "toggle", default: false, page: { id: "one-tap", label: "Move with one tap" } },

@@ -1,4 +1,5 @@
 import { SETTINGS, type SettingKey, type Settings } from "../settings.ts";
+import type { Save } from "../entities.ts";
 import type { AppContext } from "./app.ts";
 import type { BoardOverlay } from "./board-overlay.ts";
 import { capitalized, displayedProgress, el } from "./dom.ts";
@@ -7,10 +8,16 @@ import { MODES } from "../modes.ts";
 /** The settings on the page, in order; each control comes from its row in
  * SETTINGS. */
 const PAGE = [
-  "speed", "transition", "fightAnimation", "brightness", "spritesOff", "decorOff", "batterySaver", "showArrows", "reduceMotion", "weatherSound",
+  "speed", "autoOffOnDeath", "transition", "fightAnimation", "brightness", "spritesOff", "decorOff", "batterySaver", "showArrows", "reduceMotion", "weatherSound",
   "infoDisplay", "oneTapMove", "devMode",
 ] as const satisfies readonly SettingKey[];
 type PageKey = (typeof PAGE)[number];
+
+/** Settings that stay off the page until the upgrade behind them is owned. */
+const SHOWN: Partial<Record<PageKey, (save: Save) => boolean>> = {
+  autoOffOnDeath: (save) => !!save.upgrades.autoPersist,
+};
+const onPage = (save: Save) => PAGE.filter((key) => SHOWN[key]?.(save) ?? true);
 
 /** What a change does once written, beyond saving. */
 const AFTER: Partial<Record<PageKey, (ctx: AppContext, overlay: BoardOverlay, s: Settings) => void>> = {
@@ -49,13 +56,14 @@ function control(key: PageKey, s: Settings): string {
   }
 }
 
-/** The Settings page: display and control options, retire, and erase. */
+/** The Settings page: a way back to the board, display and control
+ * options, retire, and erase. */
 export function renderSettingsPage(ctx: AppContext, overlay: BoardOverlay) {
   const { game } = ctx, s = game.save.settings;
   const words = MODES[game.mode].words;
   el("settings").innerHTML =
-    `<div class="page-title"><small>MAKE THE ASCENT YOUR OWN</small><h2>Settings</h2></div>` +
-    PAGE.map((key) => control(key, s)).join("") +
+    `<button class="back" id="settings-back">← Back</button><div class="page-title"><small>MAKE THE ASCENT YOUR OWN</small><h2>Settings</h2></div>` +
+    onPage(game.save).map((key) => control(key, s)).join("") +
     `<p class="hint">Automation pauses outside the board tabs and while the browser is hidden. Progress saves after each action.</p><button class="wide" id="retire">Retire this ${words.run}</button><p class="hint">Keep your milestone rewards and enter a freshly generated ${words.fresh}.</p><button class="wide danger" id="erase">Erase all progress</button><p class="seed">RUN SEED · ${game.run.seed}</p>`;
   bindSettings(ctx, overlay);
 }
@@ -64,7 +72,8 @@ function bindSettings(ctx: AppContext, overlay: BoardOverlay) {
   const { game } = ctx;
   // Read live: erasing progress replaces the whole save.
   const s = () => game.save.settings;
-  for (const key of PAGE) {
+  el("settings-back").onclick = () => ctx.navigate(game.mode);
+  for (const key of onPage(game.save)) {
     const row = SETTINGS[key], input = el(row.page.id) as HTMLInputElement & HTMLSelectElement;
     const changed = () => (AFTER[key] ?? (() => ctx.save()))(ctx, overlay, s());
     const set = (value: unknown) => { (s() as Record<SettingKey, unknown>)[key] = value; };

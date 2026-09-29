@@ -88,21 +88,6 @@ export class RunEnd {
   }
 }
 
-export function showAutoSettings(ctx: AppContext) {
-  const { game, modal } = ctx;
-  if (modal.open) return;
-  const owned = !!game.save.upgrades.autoPersist;
-  modal.innerHTML = `<span class="summary-icon">${uiSprite("settings")}</span><small>WAYFINDER</small><h2>Automove settings</h2><label class="setting">Turn off upon death<input type="checkbox" id="auto-off-death" ${game.save.settings.autoOffOnDeath ? "checked" : ""} ${owned ? "" : "disabled"}></label><p class="hint">${owned ? "Disable to keep the wayfinder moving after you fall in battle." : "Research Steadfast wayfinder in the Courage tree to configure this."}</p><div class="dialog-actions"><button id="auto-settings-close">Close</button></div>`;
-  modal.showModal();
-  el("auto-settings-close").onclick = () => modal.close();
-  const cb = document.querySelector<HTMLInputElement>("#auto-off-death");
-  if (cb)
-    cb.onchange = () => {
-      game.save.settings.autoOffOnDeath = cb.checked;
-      ctx.save();
-    };
-}
-
 const LOG_PAGE = 25;
 
 /** The Tower's adventure log: records, clear tiers, and floors 25 at a time. */

@@ -51,7 +51,11 @@ const fixture = await page.evaluate(async () => {
   layout = placeStructure(layout, "barracks", tx - 1, ty) ?? layout;
   layout = placeStructure(layout, "archerTower", tx + 1, ty - 1) ?? layout;
   s.defend.layout = layout;
-  return JSON.stringify(s);
+  // Tabs show only outside a run, so the Tower's run waits in the forest.
+  const { Game } = await import("/src/state.ts");
+  const game = new Game(s);
+  game.newRun({ outside: true, seed: 1 });
+  return JSON.stringify(game.save);
 });
 await page.evaluate((f) => { sessionStorage.setItem("__defendFixture", f); }, fixture);
 await page.reload();

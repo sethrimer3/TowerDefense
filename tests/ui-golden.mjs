@@ -165,13 +165,19 @@ try {
     const box = await page.locator("#world").boundingBox(), s = box.width / 17;
     await page.mouse.click(box.x + (x + 0.5) * s, box.y + (16 - y + 0.5) * s);
   }
+  /** Ends the current run and returns to the forest, where the tabs show. */
+  async function leaveRun() {
+    await click("#end-run");
+    await click("#confirm");
+    await click("#again");
+  }
   async function closeModal() {
     await page.evaluate(() => document.querySelector("#modal").open && document.querySelector("#modal").close());
   }
 
   // --- Scripted walks ---
+  /** Taps round the Tower board a fixture loads onto. */
   async function boardTour(prefix, fixture) {
-    await tab("tower");
     await shot(`${prefix}.tower`);
     const tiles = [[8, 1], [8, 3], [3, 8], [13, 8], [8, 13], [1, 1], [15, 15], ...FIXTURES[fixture].targets];
     for (const [x, y] of tiles) {
@@ -199,7 +205,7 @@ try {
     await closeModal();
     await click("#auto-settings");
     await shot(`${prefix}.autoSettings`);
-    await closeModal();
+    await click("#settings-back");
     await click("#end-run");
     await shot(`${prefix}.endRun`);
     await click("#cancel");
@@ -257,19 +263,20 @@ try {
       await shot(`${prefix}.gear.filtered`);
     }
   }
+  /** Settings from inside a run: opened from the HUD, left by its Back button. */
   async function settingsTour(prefix) {
-    await tab("settings");
+    await click("#auto-settings");
     await shot(`${prefix}.settings`);
     await page.locator("#info-display").selectOption("status");
-    await tab("tower");
+    await click("#settings-back");
     await tapTile(8, 3);
     await shot(`${prefix}.statusInfo`);
-    await tab("settings");
+    await click("#auto-settings");
     await page.locator("#info-display").selectOption("popup");
     await page.locator("#arrows").setChecked(true);
-    await tab("tower");
+    await click("#settings-back");
     await shot(`${prefix}.popupArrows`);
-    await tab("settings");
+    await click("#auto-settings");
     await page.locator("#dev-mode").setChecked(true);
     await shot(`${prefix}.settings.dev`);
     await click("#retire");
@@ -282,15 +289,22 @@ try {
 
   await load("fresh");
   await shot("fresh.start");
+  // Inside a run the locked Automove only says where it unlocks.
+  await click("#auto");
+  await shot("fresh.autoLocked");
+  await click("#auto-settings");
+  await shot("fresh.settings");
+  await click("#settings-back");
+  await leaveRun();
+  await shot("fresh.forest");
   await tab("upgrades");
   await shot("fresh.upgrades");
   await tab("gear");
   await shot("fresh.gear");
-  await tab("settings");
-  await shot("fresh.settings");
   await tab("tower");
+  // In the forest it leads to the upgrade instead.
   await click("#auto");
-  await shot("fresh.autoLocked");
+  await shot("fresh.autoLocked.forest");
 
   await load("towerFloor");
   await boardTour("floor", "towerFloor");
@@ -299,16 +313,18 @@ try {
   await load("rich");
   await boardTour("rich", "rich");
   await dialogsTour("rich");
-  await tab("delve");
-  await shot("rich.delve");
+  await leaveRun();
   await tab("defend");
   await shot("rich.defend");
   await upgradesTour("rich");
   await gearTour("rich");
+  await tab("delve");
+  await shot("rich.delve");
   await settingsTour("rich");
 
   await load("devStatus");
   await boardTour("dev", "devStatus");
+  await leaveRun();
   await tab("gear");
   await click("[data-geartab=crafting]");
   await shot("dev.gear.crafting");
