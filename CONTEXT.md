@@ -100,6 +100,18 @@ _Avoid_: shards
 The Delve's currency: one for each new equivalent floor reached, spent on upgrades in the skill trees.
 _Avoid_: essence
 
+**Archives**:
+Research that lasts between runs, paid in Gold and real time, unlocked by the Archives skill.
+_Avoid_: lab, research tree
+
+**Research**:
+One project in the Archives, researched a level at a time; each completed level changes the game for good, and the levels add up.
+_Avoid_: tech, study
+
+**Archivist**:
+One research slot: it works on one research level at a time, and optionally auto-continues to the next.
+_Avoid_: lab slot, researcher
+
 ### The hand
 
 **Card**:

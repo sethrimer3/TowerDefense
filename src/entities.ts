@@ -1,3 +1,4 @@
+import type { ArchivesSave } from "./archives.ts";
 import type { CardId } from "./cards.ts";
 import type { GoldItemId, KeyColor, TrainingId, UpgradeId } from "./config.ts";
 import type { MaterialId } from "./materials.ts";
@@ -165,6 +166,9 @@ export type Save = {
    * reordering the hand; `removeCard`, taking a card out of it; `addCard`,
    * the note on adding cards from the deck. */
   tutorials: { deck: boolean; removeCard: boolean; addCard: boolean };
+  /** The Archives' archivists, completed research and its history
+   * (archives.ts). */
+  archives: ArchivesSave;
   /** DEFEND mini-game: city layout, purchases, upgrades and best wave. A
    * defense run itself is never saved. */
   defend: DefendSave;

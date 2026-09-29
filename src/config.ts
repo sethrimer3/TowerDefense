@@ -161,6 +161,14 @@ export const UPGRADES = [
     currency: "inspiration",
   },
   {
+    id: "archives",
+    name: "Archives",
+    description: "Unlock the Archives on the Upgrades page: research that lasts, paid in Gold and real time",
+    base: 10,
+    max: 1,
+    currency: "inspiration",
+  },
+  {
     id: "inspirationUndos",
     name: "Rehearsed steps",
     grants: { undos: 1 },

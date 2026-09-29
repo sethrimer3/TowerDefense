@@ -12,6 +12,9 @@ export type FrameLoopHost = {
   /** Advances the Defend battle while its page shows. */
   defendFrame(time: number): void;
   update(): void;
+  /** Once a second: completes research the clock has reached and ticks the
+   * Archives' countdowns. */
+  archivesTick(): void;
   /** Refreshes only the HP readouts, as a fight's strikes land. */
   vitals(): void;
   save(): void;
@@ -22,6 +25,7 @@ const ROUTE_STEP_MS = 130;
 /** Battery saver: while nothing moves, draw at most every this many ms. */
 const IDLE_FRAME_MS = 30;
 const AUTOSAVE_MS = 10000;
+const ARCHIVES_TICK_MS = 1000;
 
 /** The requestAnimationFrame loop: draws the visible page, plays fights
  * out, walks queued routes, runs Automove at its chosen speed, and
@@ -30,6 +34,7 @@ export class FrameLoop {
   private lastAuto = 0;
   private lastRoute = 0;
   private lastSave = 0;
+  private lastArchives = 0;
   private lastBoardDraw = -Infinity;
 
   constructor(private host: FrameLoopHost) {}
@@ -50,6 +55,10 @@ export class FrameLoop {
       if (tab === "upgrades") host.upgradesFrame(time);
       if (isBoard(tab)) this.boardFrame(time);
       if (tab === "defend" && !host.modal.open) host.defendFrame(time);
+    }
+    if (time - this.lastArchives > ARCHIVES_TICK_MS) {
+      host.archivesTick();
+      this.lastArchives = time;
     }
     if (time - this.lastSave > AUTOSAVE_MS) {
       host.save();

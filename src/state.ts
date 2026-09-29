@@ -48,6 +48,7 @@ import { materialDef, MATERIALS } from "./materials.ts";
 import { rollTreasureLoot } from "./loot.ts";
 import { MODES, milestones, type ModeProfile } from "./modes.ts";
 import { loadout, trainingPoints } from "./loadout.ts";
+import { RESEARCH, cancelResearch, hastenResearch, hireArchivist, researched, settleArchives, startResearch, type ResearchId, type ResearchRecord } from "./archives.ts";
 import {
   creditMaterials,
   craftEquipment as craftEquipmentItem,
@@ -442,12 +443,17 @@ export class Game {
    * and gets its Focus uses. */
   private dealHand() {
     this.run.hand = [...this.save.hand];
-    this.run.focus = this.save.upgrades.focus ? FOCUS_PER_RUN : 0;
+    this.run.focus = this.focusPerRun;
+  }
+  /** Focus uses a run starts with: none without the Focus skill, and more
+   * with Focus Count research. */
+  private get focusPerRun() {
+    return this.save.upgrades.focus ? researched(this.save.archives, "focusPerRun", FOCUS_PER_RUN) : 0;
   }
   /** Focus uses left: this run's inside one, or in the forest what the
    * next run will start with. */
   get focusLeft() {
-    if (this.run.outside) return this.save.upgrades.focus ? FOCUS_PER_RUN : 0;
+    if (this.run.outside) return this.focusPerRun;
     return this.run.focus ?? 0;
   }
   /** Puts the hand's card in slot `card` ahead of the others until it
@@ -1045,6 +1051,41 @@ export class Game {
     else this.save.tower.inspiration -= price;
     this.save.upgrades[id]++;
     return true;
+  }
+  /** The wall clock the Archives' research runs on (ms); tests set it. */
+  clock: () => number = () => Date.now();
+  /** Sets archivist `slot` to research `id`'s next level, paying its Gold. */
+  startResearch(slot: number, id: ResearchId) {
+    this.settleResearch();
+    return !!this.save.upgrades.archives && startResearch(this.save, slot, id, this.clock());
+  }
+  /** Stops archivist `slot`'s research, refunding its Gold and keeping the
+   * time already spent on it for when it starts again. */
+  cancelResearch(slot: number) {
+    return cancelResearch(this.save, slot, this.clock());
+  }
+  /** Whether archivist `slot` starts the next level on its own. */
+  setAutoContinue(slot: number, on: boolean) {
+    const s = this.save.archives.slots[slot];
+    if (s) s.autoContinue = on;
+  }
+  /** Dev mode: finishes archivist `slot`'s research now. */
+  finishResearchNow(slot: number) {
+    const job = this.save.archives.slots[slot]?.job;
+    if (!this.save.settings.devMode || !job) return [];
+    hastenResearch(this.save.archives, slot, Math.max(0, job.completesAt - this.clock()));
+    return this.settleResearch();
+  }
+  hireArchivist() {
+    return !!this.save.upgrades.archives && hireArchivist(this.save);
+  }
+  /** Completes the research that the clock has reached, saying so in the
+   * status line. */
+  settleResearch(): ResearchRecord[] {
+    const done = settleArchives(this.save, this.clock());
+    const last = done.at(-1);
+    if (last) this.message = `Archives · ${RESEARCH[last.research].name} level ${last.level} complete.`;
+    return done;
   }
   buyGold(id: GoldItemId) {
     const item = GOLD_SHOP.find((g) => g.id === id)!;

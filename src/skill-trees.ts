@@ -8,8 +8,9 @@ export const TREES: { id: TreeId; name: string; currency: Currency; gate?: Upgra
     { id: "cardHeal", icon: "♥", x: 24, y: 51, requires: ["combatStance"] },
     { id: "cardGear", icon: "⛨", x: 76, y: 51, requires: ["combatStance"] },
     { id: "focus", icon: "ϟ", x: 50, y: 69, requires: ["cardHeal", "cardGear"] },
-    { id: "inspirationUndos", icon: "↺", x: 24, y: 88, requires: ["focus"] },
-    { id: "delve", icon: "▼", x: 76, y: 88, requires: ["focus"] },
+    { id: "inspirationUndos", icon: "↺", x: 18, y: 88, requires: ["focus"] },
+    { id: "archives", icon: "▥", x: 50, y: 88, requires: ["focus"] },
+    { id: "delve", icon: "▼", x: 82, y: 88, requires: ["focus"] },
   ] },
   { id: "courage", name: "Courage", currency: "courage", gate: "delve", description: "Earn Courage by beating your best Delve depth.", nodes: [
     { id: "auto", icon: "✦", x: 50, y: 10, requires: ["delve"] },

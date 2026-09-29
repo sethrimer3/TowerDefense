@@ -192,12 +192,19 @@ bindInput(
   () => isBoard(tab),
 );
 
+/** Research completes on the wall clock, whatever page shows. */
+function archivesTick() {
+  const done = game.settleResearch().length > 0;
+  if (done) update();
+  if (tab === "upgrades") skillTree.archivesTick(done);
+}
 const loop = new FrameLoop({
   game,
   renderer,
   modal,
   tab: () => tab,
   upgradesFrame: (time) => skillTree.drawParticles(time),
+  archivesTick,
   defendFrame: (time) => defendPage.frame(time),
   update,
   vitals: () => renderVitals(game),

@@ -7,6 +7,7 @@ import { decodeDefendSave, defaultDefendSave } from "./defend/progress.ts";
 import { decodeSettings, defaultSettings } from "./settings.ts";
 import { loadout } from "./loadout.ts";
 import { BASE_HAND, CARD_IDS, HAND_SLOTS, deckCards, type CardId } from "./cards.ts";
+import { decodeArchives, defaultArchives } from "./archives.ts";
 export function defaults(): Save {
   return {
     version: 3,
@@ -28,6 +29,7 @@ export function defaults(): Save {
     consumables: Object.fromEntries(CONSUMABLES.map((c) => [c.id, 0])) as Save["consumables"],
     hand: [...BASE_HAND],
     tutorials: { deck: false, removeCard: false, addCard: false },
+    archives: defaultArchives(),
     defend: defaultDefendSave(),
   };
 }
@@ -302,6 +304,7 @@ export function decode(raw: string | null): Save {
     decodeReached(s, d);
     decodeSections(s.tower, d);
     migratePreSkillTrees(s.upgrades, d);
+    d.archives = decodeArchives(s.archives);
     d.defend = decodeDefendSave(s.defend);
     d.hand = decodeHand(s.hand, deckCards(d.upgrades));
     for (const k of ["deck", "removeCard", "addCard"] as const) d.tutorials[k] = s.tutorials?.[k] === true;

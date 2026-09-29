@@ -7,24 +7,29 @@ import { TreeParticles } from "../tree-particles.ts";
 import type { AppContext } from "./app.ts";
 import { clamp, el, skillSprite, uiSprite, type UiSprite } from "./dom.ts";
 import { bindPanZoom, type View } from "./pan-zoom.ts";
+import { ArchivesPanel } from "./archives-page.ts";
 
 type Tree = (typeof TREES)[number];
 
 const TREE_ICONS: Record<string, UiSprite> = {
   inspiration: "upgrades", courage: "automove", legacy: "tower", wisdom: "settings",
 };
+type PageTab = TreeId | "training" | "archives";
 
-/** The Upgrades page: the Training table, or one skill tree at a time,
- * pannable and zoomable. Tap a node to see its tooltip; tap it again to buy
- * a rank. */
+/** The Upgrades page: the Training table, one skill tree at a time
+ * (pannable and zoomable; tap a node to see its tooltip, tap it again to
+ * buy a rank), or the Archives once that skill is owned. */
 export class SkillTreePage {
-  private tree: TreeId | "training" = "inspiration";
+  private tree: PageTab = "inspiration";
   private skill: UpgradeId = "handOrdering";
   private tooltipVisible = false;
   private views: Partial<Record<TreeId, View>> = {};
   private particles = new TreeParticles();
+  private archives: ArchivesPanel;
 
-  constructor(private ctx: AppContext) {}
+  constructor(private ctx: AppContext) {
+    this.archives = new ArchivesPanel(ctx, () => this.render());
+  }
 
   /** Opens on `skill` in `tree` with its tooltip showing, e.g. to point a
    * locked tab or button at the upgrade that unlocks it. */
@@ -36,13 +41,23 @@ export class SkillTreePage {
 
   render() {
     const upgrades = this.ctx.game.save.upgrades;
+    if (this.tree === "archives" && !upgrades.archives) this.tree = "inspiration";
+    const busy = this.ctx.game.save.archives.slots.filter(s => s.job).length;
+    // The Archives tab, once owned, sits before Wayfinding.
+    const archives = upgrades.archives ? `<button data-tree="archives" aria-pressed="${this.tree === "archives"}"><span>${uiSprite("log")}</span>Archives<small>${busy} RESEARCHING</small></button>` : "";
     const tabs = `<button data-tree="training" aria-pressed="${this.tree === "training"}"><span>${uiSprite("attack")}</span>Training<small>${trainingPoints(this.ctx.game.save).left} POINTS</small></button>` +
-      TREES.map(t => `<button data-tree="${t.id}" aria-pressed="${t.id === this.tree}"><span>${uiSprite(TREE_ICONS[t.id] ?? "defend")}</span>${t.name}<small>${t.gate && !upgrades[t.gate] ? "LOCKED" : "UNLOCKED"}</small></button>`).join("");
+      TREES.map(t => `${t.id === "wayfinding" ? archives : ""}<button data-tree="${t.id}" aria-pressed="${t.id === this.tree}"><span>${uiSprite(TREE_ICONS[t.id] ?? "defend")}</span>${t.name}<small>${t.gate && !upgrades[t.gate] ? "LOCKED" : "UNLOCKED"}</small></button>`).join("");
     const bindTabs = () => document.querySelectorAll<HTMLButtonElement>("[data-tree]").forEach(b => b.onclick = () => {
-      this.tree = b.dataset.tree as TreeId | "training";
+      this.tree = b.dataset.tree as PageTab;
       this.tooltipVisible = false;
       this.render();
     });
+    if (this.tree === "archives") {
+      el("upgrades").innerHTML = `<div class="tree-tabs" role="group" aria-label="Skill trees">${tabs}</div>${this.archives.html()}`;
+      bindTabs();
+      this.archives.bind();
+      return;
+    }
     if (this.tree === "training") {
       el("upgrades").innerHTML = `<div class="tree-tabs" role="group" aria-label="Skill trees">${tabs}</div>${this.trainingHtml()}`;
       bindTabs();
@@ -90,10 +105,17 @@ export class SkillTreePage {
       <div class="training-table" role="list" aria-label="Stat training">${rows}</div></section>`;
   }
 
+  /** Once a second while the page shows: the Archives' countdowns, or the
+   * whole page once research completes (a tab's count changes). */
+  archivesTick(completed: boolean) {
+    if (this.tree === "archives") this.archives.tick(completed);
+    else if (completed) this.render();
+  }
+
   /** Purchase sparkles and node glow on the particle canvas, if showing. */
   drawParticles(time: number) {
     const canvas = document.querySelector<HTMLCanvasElement>(".tree-particles");
-    if (!canvas || this.tree === "training") return;
+    if (!canvas || this.tree === "training" || this.tree === "archives") return;
     const tree = this.current();
     this.particles.draw(canvas, time, {
       tree: tree.id, nodes: tree.nodes, selected: this.tooltipVisible ? this.skill : null, reduced: this.ctx.game.save.settings.reduceMotion,

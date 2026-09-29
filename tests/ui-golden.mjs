@@ -87,7 +87,7 @@ try {
     };
     const rich = (s) => {
       quiet(s);
-      Object.assign(s.upgrades, { delve: 1, auto: 1, legacy: 1, revive: 1, handOrdering: 1, combatStance: 1, cardHeal: 1, focus: 1, undos: 1, autoPersist: 1 });
+      Object.assign(s.upgrades, { delve: 1, auto: 1, legacy: 1, revive: 1, handOrdering: 1, combatStance: 1, cardHeal: 1, focus: 1, archives: 1, undos: 1, autoPersist: 1 });
       s.delve.courage = 37;
       s.tower.inspiration = 21;
       s.gold = 480;
@@ -269,6 +269,14 @@ try {
           await click(`[data-train="${stat}"]:not([disabled])`);
           await shot(`${prefix}.tree.training.${stat}`);
         }
+        continue;
+      }
+      if (tree === "archives") {
+        // Idle archivists, so nothing shown depends on the clock; the
+        // research costs more Gold than the save holds.
+        await page.fill("#research-search", "no such research");
+        await shot(`${prefix}.tree.archives.search`);
+        await page.fill("#research-search", "");
         continue;
       }
       const skills = await page.locator("[data-skill]").evaluateAll((bs) => bs.map((b) => b.dataset.skill));

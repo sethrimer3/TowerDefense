@@ -15,6 +15,7 @@ export type PageGame = Readonly<Pick<Game, "mode" | "run" | "save" | "summary">>
     | "sectionUnlocked" | "startSection" | "setStartSection"
     | "buy" | "train" | "arrangeHand" | "addToHand" | "removeFromHand" | "buyGold" | "craftEquipment" | "craftConsumable" | "salvageEquipment"
     | "equipItem" | "unequipSlot" | "useConsumable"
+    | "clock" | "startResearch" | "cancelResearch" | "setAutoContinue" | "hireArchivist" | "finishResearchNow"
   >;
 
 /** What pages and dialogs need from the app around them. */

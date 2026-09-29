@@ -35,7 +35,7 @@ const SKILL_ITEM_SPRITES: Partial<Record<UpgradeId, keyof typeof AREA1_ITEM_URLS
   yellow: "key_yellow", blue: "key_blue", red: "key_red",
 };
 const SKILL_UI_SPRITES: Partial<Record<UpgradeId, UiSprite>> = {
-  hp: "health", inspirationUndos: "undo", undos: "undo",
+  hp: "health", inspirationUndos: "undo", undos: "undo", archives: "log",
   delve: "delve", auto: "automove", autoPersist: "settings",
   revive: "revive", legacy: "tower", quality: "tower",
   wisdomFocus: "settings", wisdomMemory: "undo", wisdomSight: "upgrades",

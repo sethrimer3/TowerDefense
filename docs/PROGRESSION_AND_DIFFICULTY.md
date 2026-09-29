@@ -288,6 +288,10 @@ This is preferable to having a new metal tier become available and immediately g
 
 **Target feel:** discovery first, accumulation second, payoff third.
 
+### The Archives
+
+The Archives skill (10 Inspiration, after Focus, off the Delve path) opens the second progression axis: research paid in Gold and real time, running between sessions. Its limits are Gold, the archivists (one at first, up to five, hired for 1000, 2500, 5000 and 10000 Gold) and the clock. The first project is Focus Count (after the Focus skill): nine levels, each +1 Focus use a run; level n takes 8n hours, and costs 500 Gold for level 1 and 500 × (n − 1) more than level n − 1 after it (500, 1000, 2000, 3500, 5500, 8000, 11000, 14500, 18500; 64,500 Gold and 360 hours in all). These numbers live in `src/archives.ts` and `tests/archives.test.ts` asserts them.
+
 ---
 
 ## 9. Tower checkpoints / starting-floor selection
