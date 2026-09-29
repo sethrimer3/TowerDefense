@@ -15,6 +15,8 @@ await page.goto(process.env.TEST_URL || "http://127.0.0.1:5173/");
 await page.evaluate(() => {
   const save = JSON.parse(localStorage.getItem("towerincramental.v1"));
   save.upgrades.delve = 1;
+  // Inside a run only Dev mode walks by hand, and it starts the hand paused.
+  save.settings.devMode = true;
   sessionStorage.setItem("__treeFixture", JSON.stringify(save));
 });
 await page.reload();
@@ -69,7 +71,8 @@ await page.locator("#retire").click();
 await page.locator("#confirm").click();
 await page.locator("#again").click();
 // Delve Courage is credited per 10 height as it's reached; retiring pays nothing extra.
-if ((await page.locator("#courage").textContent()) !== "0")
+// Dev mode shows balances as ∞, so read the saved one.
+if ((await page.evaluate(() => JSON.parse(localStorage.getItem("towerincramental.v1")).delve.courage)) !== 0)
   throw Error("Retire paid an unexpected reward");
 const overflow = await page.evaluate(
   () => document.documentElement.scrollWidth > innerWidth,

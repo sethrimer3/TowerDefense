@@ -4,7 +4,8 @@ import { levelForXp } from "../config.ts";
 import { CONSUMABLES } from "../crafting.ts";
 import { outsideWeather } from "../outside.ts";
 import { MODES, milestones } from "../modes.ts";
-import { displayedProgress, el, text } from "./dom.ts";
+import { cardArt, displayedProgress, el, text } from "./dom.ts";
+import { CARDS } from "../cards.ts";
 import type { BoardOverlay } from "./board-overlay.ts";
 
 /** The stats cluster, action buttons and status line around the board. */
@@ -24,8 +25,8 @@ export function renderHud(game: Game, renderer: Renderer, overlay: BoardOverlay)
   renderStatus(game, overlay);
   // The status line sits over the board's bottom row: let the hero show through.
   el("status-row").classList.toggle("see-through", game.run.player.y === renderer.target(renderer.density).bottom);
-  text("auto-state", game.save.upgrades.auto ? (game.auto ? "ON" : "OFF") : "LOCKED");
-  el("auto").classList.toggle("enabled", game.auto);
+  renderAutoButton(game);
+  renderHand(game);
   text("density-label", `${renderer.density} × ${renderer.density}`);
   renderUndo(game);
   (document.querySelector(".dpad") as HTMLElement).hidden = !game.save.settings.showArrows;
@@ -56,6 +57,34 @@ export function renderBoardHeading(game: Game, overlay: BoardOverlay) {
     el("inspect").textContent = "";
   }
   overlay.hide();
+}
+
+/** Inside a run the button plays and pauses the hand; in the forest it
+ * turns Automove on and off, once bought. */
+function renderAutoButton(game: Game) {
+  const button = el("auto"), inside = !game.run.outside;
+  const label = inside ? (game.auto ? "Pause the hand" : "Play the hand") : "Automove";
+  text("auto-state", inside ? (game.auto ? "PLAYING" : "PAUSED") : game.save.upgrades.auto ? (game.auto ? "ON" : "OFF") : "LOCKED");
+  button.classList.toggle("enabled", game.auto);
+  button.setAttribute("aria-label", label);
+  button.title = label;
+}
+
+/** The hand the cards were last drawn for. */
+let shownHand = "";
+/** The active hand in the row under the board, the card that made the
+ * latest step glowing; End Run lights up while no card can act. */
+function renderHand(game: Game) {
+  const row = el("hand"), hand = game.save.hand;
+  if (hand.join() !== shownHand) {
+    shownHand = hand.join();
+    // Six slots at least, and one per card beyond that, all in one row.
+    row.style.setProperty("--slots", String(Math.max(6, hand.length)));
+    row.innerHTML = hand.map((id) => `<div class="hand-card" role="listitem" data-card="${id}" title="${CARDS[id].name}: ${CARDS[id].text}">${cardArt(id, CARDS[id].name)}</div>`).join("");
+  }
+  const glowing = game.auto && !game.handStuck ? game.activeCard : null;
+  row.querySelectorAll<HTMLElement>(".hand-card").forEach((card, i) => card.classList.toggle("active", i === glowing));
+  el("end-run").classList.toggle("deadlocked", game.handStuck && !game.run.outside);
 }
 
 /** True when the heading still shows the other side of the forest entrance. */

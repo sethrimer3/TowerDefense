@@ -9,6 +9,8 @@ import { reachable } from "../src/board.ts";
 import { WIDTH } from "../src/config.ts";
 function corridor() {
   const g = new Game(defaults());
+  // Inside a run only Dev mode lets the player walk; these test walking.
+  g.save.settings.devMode = true;
   g.save.upgrades.delve = 1;
   g.switchMode("delve");
   for (let y = 0; y < 20; y++)

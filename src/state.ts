@@ -1,6 +1,6 @@
 import { entrance, floorFor } from "./delve/labyrinth.ts";
-import { isDeadlocked } from "./analysis.ts";
 import { chooseStep } from "./automation.ts";
+import { CARDS, planHand, type CardPlan } from "./cards.ts";
 import { DelvePlan } from "./delve/automove.ts";
 import { defaults } from "./save.ts";
 import { stream } from "./random.ts";
@@ -87,7 +87,18 @@ export class Game {
   run!: Run;
   route: Step[] = [];
   blocked = { x: 0, y: 0, until: 0 };
+  /** Inside a run, whether the hand moves the hero (the play/pause
+   * button); in the forest, whether Automove walks. */
   auto = false;
+  /** The card moving the hero and the path it committed to, until the
+   * hero reaches its target. */
+  cardPlan: CardPlan | null = null;
+  /** The hand's card that made the latest step, to show it glowing. */
+  activeCard: number | null = null;
+  /** No card in the hand can act: the hero waits, and the run ends only
+   * when the player ends it. The hand keeps checking, so a skill that
+   * changes the floor lets it carry on. */
+  handStuck = false;
   paused = false;
   message = "";
   effect = { text: "", x: 0, y: 0, until: 0 };
@@ -165,7 +176,8 @@ export class Game {
     this.syncRewards();
     this.recordProgress();
     this.route = [];
-    this.auto = false;
+    this.auto = !this.run.outside && this.handStartsPlaying;
+    this.dropHandPlan();
     this.summary = null;
     this.encounter = null;
     this.blocked = { x: 0, y: 0, until: 0 };
@@ -234,7 +246,9 @@ export class Game {
     // Lifetime achievements are never rolled back by movement undo.
     this.recordProgress();
     this.route = [];
+    // Undo pauses the hand, so the player can act before it carries on.
     this.auto = false;
+    this.dropHandPlan();
     this.summary = null;
     this.encounter = null;
     this.paused = false;
@@ -303,6 +317,10 @@ export class Game {
   }
   walkTo(x: number, y: number) {
     if (this.paused || this.summary || this.encounter) return;
+    if (!this.manualMoves) {
+      this.handMovesNote();
+      return;
+    }
     this.auto = false;
     const route = routeTo(this, x, y);
     if (!route) {
@@ -319,9 +337,21 @@ export class Game {
     this.route = route;
     this.message = route.length ? "Walking to destination." : "Already here.";
   }
+  /** Whether the player may move the hero themselves: in the forest, or
+   * with Dev mode on. Inside a run the hand moves the hero. */
+  get manualMoves() {
+    return !!this.run.outside || this.save.settings.devMode;
+  }
+  /** Inside a run the hand plays from the start, except in Dev mode, where
+   * it waits so the player can walk by hand. */
+  private get handStartsPlaying() {
+    // The browser UI suite starts it paused too, so no snapshot races a card's step.
+    return !this.save.settings.devMode && !(globalThis as { __handStartsPaused?: boolean }).__handStartsPaused;
+  }
   /** A step the player takes themselves: it drops any queued route and Automove. */
   stepManually(dx: number, dy: number) {
     if (this.encounter) return false;
+    if (!this.manualMoves) return this.handMovesNote();
     this.route = [];
     this.auto = false;
     return this.move(dx, dy, true);
@@ -329,18 +359,54 @@ export class Game {
   cancelRoute() {
     this.route = [];
   }
+  private handMovesNote(): false {
+    this.message = "The hand moves you inside a run.";
+    return false;
+  }
+  /** Inside a run, plays or pauses the hand; in the forest, turns Automove on or off. */
   toggleAuto() {
     this.route = [];
     this.auto = !this.auto;
-    this.message = this.auto ? "Wayfinder is searching for a route." : "Manual climbing";
+    if (!this.run.outside) {
+      this.dropHandPlan();
+      this.message = this.auto ? "The hand takes over." : "Paused · the hand waits.";
+    } else this.message = this.auto ? "Wayfinder is searching for a route." : "Manual climbing";
   }
-  /** One Automove step: the step it chooses, or a note that none is safe. */
+  /** One turn of automatic movement: the hand's step inside a run, or
+   * Automove's in the forest. */
   autoTurn() {
+    if (!this.run.outside) return this.handTurn();
     const step = chooseStep(this);
     if (step) {
       this.move(step.dx, step.dy, false);
       this.message = step.label;
     } else this.message = "Waiting · no safe route. Explore or retire this ascent.";
+  }
+  /** One step by the hand: follow the committed path, or, with none, the
+   * first card in priority order that can reach a target. When none can,
+   * the hero waits and the End Run button lights up. */
+  private handTurn() {
+    const plan = this.cardPlan ?? planHand(this, this.save.hand, this.mode);
+    this.handStuck = !plan;
+    if (!plan) {
+      this.cardPlan = null;
+      this.activeCard = null;
+      this.message = "No card can move · end the run, or use a skill.";
+      return;
+    }
+    const step = plan.path.shift()!;
+    this.cardPlan = plan.path.length ? plan : null;
+    this.activeCard = plan.card;
+    this.message = `${CARDS[this.save.hand[plan.card]].name} · ${CARDS[this.save.hand[plan.card]].text}`;
+    // The board changes only as the hero moves, so a refused step means the
+    // plan is stale: drop it and let the next turn choose again.
+    if (!this.move(step.dx, step.dy, true)) this.cardPlan = null;
+  }
+  /** Forgets the hand's committed path and which card glows. */
+  private dropHandPlan() {
+    this.cardPlan = null;
+    this.activeCard = null;
+    this.handStuck = false;
   }
   /** Settles the fight being played out, as if it had played to the end.
    * Returns whether there was one. */
@@ -426,7 +492,8 @@ export class Game {
       this.message = "Follow the forest path to the entrance.";
     } else this.forgetLabyrinth();
     this.slice.run = this.run;
-    this.auto = false;
+    this.auto = !outside && this.handStartsPlaying;
+    this.dropHandPlan();
     this.paused = false;
   }
   /** A Tower section can be started in once its first floor has been
@@ -476,11 +543,11 @@ export class Game {
   gainXp(enemy: Enemy) {
     this.save.xp += xpForKill(enemy.tier, enemy.attack);
   }
-  /** The single path that ends the current run, whether by death, by a
-   * detected deadlock, or by the player choosing to retire. Captures the
+  /** The single path that ends the current run, whether by death or by
+   * the player ending or retiring it. Captures the
    * dying run's stats into the summary before any new run is created, pays
    * out exactly once, and only opens a Revive opportunity for an actual
-   * fatal player choice (never for a deadlock or a manual retire). */
+   * fatal player choice (never for an ended or retired run). */
   private finalizeRun(
     reason: string,
     options: { dead?: boolean; allowRevive?: boolean; preFatalSnapshot?: MoveSnapshot } = {},
@@ -517,17 +584,9 @@ export class Game {
       this.slice.revival = { snapshot: preFatalSnapshot };
     this.summary = summary;
     this.auto = keepAuto;
+    this.dropHandPlan();
     if (dead)
       this.message = "Returned to the forest. Follow the path to begin again.";
-  }
-  /** Runs only after a meaningful Tower state change (never every frame):
-   * a defeated enemy, a collected pickup, a consumed door, or a floor
-   * transition. Lethal (but non-impervious) enemies never count as viable
-   * progress here, matching automation's own avoidance of them. */
-  checkDeadlock() {
-    if (this.mode !== "tower" || !this.playing) return;
-    if (isDeadlocked(this.towerRun))
-      this.finalizeRun("No viable moves remain", { dead: false });
   }
   /** Keys every physical enemy kill / treasure chest by seed (+height for
    * Tower, whose x/y space is reused per room) so persistent loot can be
@@ -616,14 +675,12 @@ export class Game {
     if (this.mode === "delve") this.afterDelveStep(t, x, y);
     else if (t.kind === "stairs") this.advanceTowerRoom();
     else if (t.kind === "stairsDown") this.descendTowerRoom();
-    if (t.kind !== "floor" && t.kind !== "oneway") this.checkDeadlock();
   }
   private rejectStep(outcome: StepBlocked, t: Tile, x: number, y: number): false {
     if (outcome.blocked === "wall") this.reject(x, y, "A wall blocks the way.");
     else if (outcome.blocked === "locked") this.reject(x, y, doorBlockedMessage(t));
     else {
       this.reject(x, y, `Impervious — requires ${outcome.combat.requiredAttack} more ATK`);
-      this.checkDeadlock();
     }
     return false;
   }
@@ -693,6 +750,9 @@ export class Game {
     this.world = this.rules.board(this.run);
     this.forgetLabyrinth();
     this.route = [];
+    // Inside, the hand takes over from the player (or Automove).
+    this.auto = this.handStartsPlaying;
+    this.dropHandPlan();
     this.feedback(this.rules.words.enter);
   }
   /** Removes what the step used up: chests stay behind opened, fixtures stay. */

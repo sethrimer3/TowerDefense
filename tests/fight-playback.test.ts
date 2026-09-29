@@ -20,8 +20,6 @@ function arena(east: Tile, animate = true) {
   const g = new Game(defaults());
   g.playsFights = true;
   g.save.settings.fightAnimation = animate;
-  // The deadlock search reads the floor regenerated from the seed, not this one.
-  g.checkDeadlock = () => {};
   const w = g.world as RoomWorld;
   w.cells = new Map();
   for (let y = 0; y < 3; y++) for (let x = 0; x < 3; x++) w.cells.set(`${x},${y}`, { kind: "floor" });

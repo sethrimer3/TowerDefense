@@ -92,6 +92,20 @@ _Avoid_: shards
 The Delve's currency: one for each new equivalent floor reached, spent on upgrades in the skill trees.
 _Avoid_: essence
 
+### The hand
+
+**Card**:
+One way of moving the hero, toward one kind of target: the stairs, a potion, a door the hero holds the keys for, a key, a monster, or an ATK or DEF pickup. A card can act when the hero can reach such a target on the current floor over open floor and items.
+_Avoid_: skill (a skill is something the player uses), ability
+
+**Hand**:
+The cards the player sets up before a run, in priority order. Inside a run the hand moves the hero, and the player can't: the first card that can act picks its closest target, and the hero follows the shortest path there a step at a time before the hand chooses again. The player can pause it, and undo pauses it.
+_Avoid_: deck, loadout (what the character starts a run with)
+
+**Stuck hand**:
+No card in the hand can act. The hero waits and End Run lights up, and the run ends only when the player ends it; the hand keeps checking, so anything that changes the floor lets it carry on.
+_Avoid_: deadlock
+
 ### The Delve
 
 **Automove memory**:

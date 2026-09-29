@@ -1,0 +1,110 @@
+import { point, type Tile } from "./entities.ts";
+import type { Position } from "./board.ts";
+import type { Step } from "./pathfinding.ts";
+import { doorCost } from "./doors.ts";
+import { predict } from "./combat.ts";
+import { VIEWPORT_TILES } from "./config.ts";
+import type { Mode } from "./entities.ts";
+
+/** Every card a hand can hold: its name and what it moves the hero toward. */
+export const CARDS = {
+  stairs: { name: "Stairs", text: "Move toward the stairs up (in the Delve, the highest open tile in view)." },
+  heal: { name: "Heal", text: "Move toward the closest healing potion." },
+  door: { name: "Door", text: "Move toward the closest door you hold the keys for." },
+  key: { name: "Key", text: "Move toward the closest key." },
+  monster: { name: "Monster", text: "Move toward the closest monster." },
+  equipment: { name: "Equipment", text: "Move toward the closest ATK or DEF pickup." },
+} as const;
+export type CardId = keyof typeof CARDS;
+export const CARD_IDS = Object.keys(CARDS) as CardId[];
+
+/** The hand a new profile starts with, in priority order. */
+export const BASE_HAND: readonly CardId[] = ["stairs", "heal", "door", "key", "monster", "equipment"];
+
+/** The card that moves the hero and the path it committed to: the steps
+ * still to take, the last one onto its target. */
+export type CardPlan = { card: number; path: Step[] };
+
+/** Tiles a card's path may cross on the way to its target, taking what
+ * lies there: open floor and every item. Walls, doors, monsters and stairs
+ * block it, though any of them can be the target itself. */
+const CROSSABLE = new Set<Tile["kind"]>(["floor", "openedChest", "oneway", "key", "potion", "attack", "defense", "treasure", "reward"]);
+/** How many rows above and below the hero the search looks. */
+const REACH = 40;
+/** The highest row the Delve's STAIRS card may climb to: the top of the view. */
+const VIEW_ABOVE = Math.floor(VIEWPORT_TILES / 2);
+
+/** A tile the search reached, and the step onto it from the tile before. */
+type Reached = { x: number; y: number; tile: Tile; dx: number; dy: number; from: Reached | null };
+
+/** The steps from the hero to `r`, the last one onto it. */
+function pathTo(r: Reached): Step[] {
+  const path: Step[] = [];
+  for (let at: Reached | null = r; at?.from; at = at.from) path.push({ x: at.x, y: at.y, dx: at.dx, dy: at.dy });
+  return path.reverse();
+}
+
+/** Whether `card` wants the tile, from where the hero stands. The Delve's
+ * STAIRS card is decided over the whole search instead (`climb`). */
+function wants(card: CardId, t: Tile, at: Position): boolean {
+  switch (card) {
+    case "stairs": return t.kind === "stairs";
+    case "heal": return t.kind === "potion";
+    case "door": return t.kind === "door" && doorCost(t, at.run.player) !== null;
+    case "key": return t.kind === "key";
+    // An impervious monster can't be fought at all, so it is never a target.
+    case "monster": return t.kind === "enemy" && !predict(at.run.player, t.enemy!).impervious;
+    case "equipment": return t.kind === "attack" || t.kind === "defense";
+  }
+}
+
+/** The first card in `hand` with a target the hero can reach, and the
+ * shortest path to its closest target; null when no card can act. It looks
+ * only at the floor the hero stands on: stairs up end a path, and stairs
+ * down are never crossed or a target. */
+export function planHand(at: Position, hand: readonly CardId[], mode: Mode): CardPlan | null {
+  const reached = search(at);
+  for (let card = 0; card < hand.length; card++) {
+    const target = hand[card] === "stairs" && mode === "delve"
+      ? climb(at, reached)
+      : reached.find((r) => wants(hand[card], r.tile, at));
+    if (target) return { card, path: pathTo(target) };
+  }
+  return null;
+}
+
+/** The Delve's STAIRS target: the highest crossable tile in view above the
+ * hero, the closest of those tied for highest. */
+function climb(at: Position, reached: Reached[]): Reached | undefined {
+  const p = at.run.player;
+  let best: Reached | undefined;
+  for (const r of reached)
+    if (CROSSABLE.has(r.tile.kind) && r.y > p.y && r.y <= p.y + VIEW_ABOVE && (!best || r.y > best.y)) best = r;
+  return best;
+}
+
+/** Breadth-first search from the hero over crossable tiles. Returns every
+ * tile reached, closest first, each with the shortest path to it; a tile
+ * that isn't crossable is reached but never walked through. */
+function search(at: Position): Reached[] {
+  const { world, run } = at, p = run.player;
+  const seen = new Set([point(p.x, p.y)]);
+  const walk: Reached[] = [{ x: p.x, y: p.y, tile: world.tile(p.x, p.y), dx: 0, dy: 0, from: null }];
+  const reached: Reached[] = [];
+  for (let i = 0; i < walk.length; i++) {
+    const from = walk[i];
+    for (const [dx, dy] of [[0, 1], [1, 0], [0, -1], [-1, 0]] as const) {
+      const dest = world.step(from.x, from.y, dx, dy);
+      if (!dest || dest.y < Math.max(world.floor, p.y - REACH) || dest.y > p.y + REACH) continue;
+      const k = point(dest.x, dest.y);
+      if (seen.has(k)) continue;
+      seen.add(k);
+      const tile = world.tile(dest.x, dest.y);
+      if (tile.kind === "wall") continue;
+      const next = { ...dest, tile, dx, dy, from };
+      reached.push(next);
+      if (CROSSABLE.has(tile.kind)) walk.push(next);
+    }
+  }
+  return reached;
+}

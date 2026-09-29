@@ -6,6 +6,7 @@ import { CONSUMABLES, type ConsumableId } from "./crafting.ts";
 import { decodeDefendSave, defaultDefendSave } from "./defend/progress.ts";
 import { decodeSettings, defaultSettings } from "./settings.ts";
 import { loadout } from "./loadout.ts";
+import { BASE_HAND, CARD_IDS, type CardId } from "./cards.ts";
 export function defaults(): Save {
   return {
     version: 3,
@@ -24,6 +25,7 @@ export function defaults(): Save {
     equipmentInventory: [],
     equipped: {},
     consumables: Object.fromEntries(CONSUMABLES.map((c) => [c.id, 0])) as Save["consumables"],
+    hand: [...BASE_HAND],
     defend: defaultDefendSave(),
   };
 }
@@ -270,6 +272,12 @@ const VERSION_STEPS = new Map<unknown, VersionStep[]>([
   [2, [decodeProgress]],
   [3, [decodeProgress, decodeInventory]],
 ]);
+/** The saved hand's known cards in order, or the base hand when the save
+ * has none. */
+function decodeHand(raw: any): CardId[] {
+  if (!Array.isArray(raw)) return [...BASE_HAND];
+  return raw.filter((id): id is CardId => CARD_IDS.includes(id));
+}
 export function decode(raw: string | null): Save {
   const d = defaults();
   try {
@@ -282,6 +290,7 @@ export function decode(raw: string | null): Save {
     decodeSections(s.tower, d);
     migratePreSkillTrees(s.upgrades, d);
     d.defend = decodeDefendSave(s.defend);
+    d.hand = decodeHand(s.hand);
   } catch {}
   return d;
 }

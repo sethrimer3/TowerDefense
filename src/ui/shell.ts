@@ -6,7 +6,7 @@ const BOARD = `<section id="board" class="page active"><div class="tower-heading
 const CURRENCIES = `<div id="currencies" class="currencies" hidden><div class="currency">✦ <b id="courage">0</b><small>COURAGE</small></div><div class="currency">◆ <b id="inspiration">0</b><small>INSPIRATION</small></div></div>`;
 const NAV = `<nav aria-label="Main navigation">${Object.entries(TAB_ICONS)
   .map(([id, icon]) => `<button data-tab="${id}" class="${id === "tower" ? "selected" : ""}"><span>${icon}</span>${id[0].toUpperCase() + id.slice(1)}</button>`)
-  .join("")}</nav>`;
+  .join("")}<div id="hand" class="hand" role="list" aria-label="Card hand"></div></nav>`;
 const MOVEMENT_SPRITES: Record<string, UiSprite> = {
   "-1,0": "arrow-left", "1,0": "arrow-right", "0,1": "arrow-up", "0,-1": "arrow-down",
 };

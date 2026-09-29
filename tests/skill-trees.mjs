@@ -23,7 +23,9 @@ await page.locator('[data-skill="auto"]').click();
 await expect(page.locator('#tree-tooltip')).toContainText('Automove');
 await page.locator('[data-skill="auto"]').click();
 await page.screenshot({path:'test-results/courage-tree.png',fullPage:true});
-for(const mode of ['tower','delve']) {await page.locator(`[data-tab="${mode}"]`).click();await expect(page.locator('#auto-state')).toHaveText('OFF');await page.locator('#auto').click();await expect(page.locator('#auto-state')).toHaveText('ON');await page.locator('#auto').click();}
+// In the forest the button is Automove; inside a run it plays and pauses the hand.
+await page.locator('[data-tab="tower"]').click();await expect(page.locator('#auto-state')).toHaveText('OFF');await page.locator('#auto').click();await expect(page.locator('#auto-state')).toHaveText('ON');await page.locator('#auto').click();
+await page.locator('[data-tab="delve"]').click();await expect(page.locator('#auto-state')).toHaveText('PLAYING');await page.locator('#auto').click();await expect(page.locator('#auto-state')).toHaveText('PAUSED');
 await page.reload();await page.locator('[data-tab="upgrades"]').click();
 await page.screenshot({path:'test-results/inspiration-tree.png',fullPage:true});
 for(const width of [320,390,1280]) {await page.setViewportSize({width,height:1000});for(const tree of ['inspiration','courage','legacy','wisdom','renown']) {await page.locator(`[data-tree="${tree}"]`).click();if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)) throw Error('overflow '+tree+' '+width);if(await page.locator('#upgrades').evaluate(el=>el.scrollHeight>el.clientHeight)) throw Error('vertical scroll '+tree+' '+width);}}

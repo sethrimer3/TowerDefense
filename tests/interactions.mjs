@@ -27,6 +27,8 @@ const player = async () => (await saved()).delve.run.player;
 async function fixture(edit, arg = null) {
   await page.evaluate(([body, arg]) => {
     const s = JSON.parse(localStorage.getItem("towerincramental.v1"));
+    // Inside a run only Dev mode walks by hand, and it starts the hand paused.
+    s.settings.devMode = true;
     new Function("s", "arg", body)(s, arg);
     sessionStorage.setItem("__fixture", JSON.stringify(s));
   }, [`(${edit})(s, arg)`, arg]);

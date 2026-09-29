@@ -1,3 +1,4 @@
+import type { CardId } from "./cards.ts";
 import type { GoldItemId, KeyColor, UpgradeId } from "./config.ts";
 import type { MaterialId } from "./materials.ts";
 import type { CraftedEquipment, EquipmentSlot } from "./equipment.ts";
@@ -144,6 +145,10 @@ export type Save = {
   equipmentInventory: CraftedEquipment[];
   equipped: Partial<Record<EquipmentSlot, string>>;
   consumables: Record<ConsumableId, number>;
+  /** The active hand: the cards that move the hero inside a run, in
+   * priority order. Set up before a run; a new profile starts with the
+   * base hand. */
+  hand: CardId[];
   /** DEFEND mini-game: city layout, purchases, upgrades and best wave. A
    * defense run itself is never saved. */
   defend: DefendSave;

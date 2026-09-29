@@ -681,9 +681,40 @@ nav button {
 nav button[hidden] {
   display: none;
 }
-/* Inside a run the row stays, empty: it will hold the hand. */
-nav.in-run button {
-  visibility: hidden;
+/* Inside a run the tabs give way to the hand: at least six card slots in
+   one row, each narrower as more cards join past six. */
+nav.in-run button,
+nav:not(.in-run) .hand {
+  display: none;
+}
+.hand {
+  display: grid;
+  grid-template-columns: repeat(var(--slots, 6), minmax(0, 54px));
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 69px;
+}
+.hand-card {
+  aspect-ratio: 3 / 4;
+  border-radius: 3px;
+  transition: box-shadow 0.15s;
+}
+.card-art {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+/* The card that made the latest step. */
+.hand-card.active {
+  box-shadow: 0 0 0 2px #ebc77f, 0 0 12px 3px #e0b25a;
+}
+/* No card can act: the run waits for the player to end it. */
+#end-run.deadlocked {
+  border-color: #e29898;
+  box-shadow: 0 0 10px 2px #c8453c;
 }
 nav button > span {
   font-family: Cinzel, Georgia, serif;

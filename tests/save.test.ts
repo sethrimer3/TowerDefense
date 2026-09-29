@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { decode, defaults } from "../src/save.ts";
+import { BASE_HAND } from "../src/cards.ts";
 
 // Characterization corpus for decode(): every field path of several base saves
 // is replaced by hostile values, and each decoded result is hashed against a
@@ -272,4 +273,10 @@ test("each mode's run keeps only its own fields, on its own board's width, and A
   const noMilestone = v3();
   delete (noMilestone.delve.run as any).milestone;
   assert.equal(decode(JSON.stringify(noMilestone)).delve.run, null);
+});
+
+test("the hand decodes to its known cards in order, and a save without one gets the base hand", () => {
+  assert.deepEqual(decode(JSON.stringify({ version: 3 })).hand, [...BASE_HAND]);
+  assert.deepEqual(decode(JSON.stringify({ version: 3, hand: ["key", "joker", "stairs", 4] })).hand, ["key", "stairs"]);
+  assert.deepEqual(decode(JSON.stringify({ version: 3, hand: [] })).hand, []);
 });

@@ -298,7 +298,6 @@ test("undo/reopen the same treasure chest cannot duplicate its Gold/material pay
   w.cells.set("1,0", { kind: "treasure" });
   w.cells.set("4,4", { kind: "stairs" });
   g.run.changes["1,0"] = { kind: "treasure" };
-  g.checkDeadlock = () => {};
   g.run.player.x = 0; g.run.player.y = 0;
   const before = g.snapshot();
   g.move(1, 0);

@@ -152,27 +152,14 @@ test("an opened door stays open across a floor round-trip", () => {
 });
 
 test("multi-floor Tower state survives a save encode/decode round trip", () => {
-  // isDeadlocked() (run via checkDeadlock() after every non-floor move)
-  // never sees this fixture's synthetic cells: it re-derives each floor from
-  // generateTowerRoom(seed, height), and on most real floors nothing is left
-  // to do from where this test stands, so the run ends as deadlocked and the
-  // save/reload round trip would test nothing. Rather than pin a seed that
-  // breaks with every generation change, take the first seed on which the
-  // run survives both steps.
   const p1 = point(TOWER_START_X + 1, 0);
-  const play = (seed: number) => {
-    const g = arena();
-    g.run.seed = seed;
-    (g.world as RoomWorld).cells.set(point(1, 0), { kind: "enemy", enemy: SURVIVABLE });
-    if (!g.move(1, 0, false) || !g.save.tower.run) return null;
-    g.advanceTowerRoom();
-    // advanceTowerRoom() re-centers the player on the new room's own entrance.
-    (g.world as RoomWorld).cells.set(p1, { kind: "attack" });
-    return g.move(1, 0) && g.save.tower.run ? g : null;
-  };
-  let g: Game | null = null;
-  for (let seed = 1; seed <= 200 && !g; seed++) g = play(seed);
-  assert.ok(g, "some seed lets the run survive both steps");
+  const g = arena();
+  (g.world as RoomWorld).cells.set(point(1, 0), { kind: "enemy", enemy: SURVIVABLE });
+  assert.ok(g.move(1, 0, false));
+  g.advanceTowerRoom();
+  // advanceTowerRoom() re-centers the player on the new room's own entrance.
+  (g.world as RoomWorld).cells.set(p1, { kind: "attack" });
+  assert.ok(g.move(1, 0));
   const reloaded = new Game(decode(JSON.stringify(g.save)));
   assert.equal(reloaded.run.height, 1);
   // Floor 0 was cleared, so its chests were paid on leaving and left floor.
@@ -184,17 +171,13 @@ test("multi-floor Tower state survives a save encode/decode round trip", () => {
 
 // ---------- Deadlock detection ----------
 
-test("no viable actions on any visited floor, with no unexplored stair reachable, ends the run without granting Revive", () => {
+test("a deadlocked floor leaves the hand stuck, and the run waits for the player to end it", () => {
   const g = deadlockGame();
-  g.save.upgrades.revive = 1;
   assert.ok(isDeadlocked(g.run));
-  const inspirationBefore = g.save.tower.inspiration;
-  g.checkDeadlock();
-  assert.ok(g.summary);
-  assert.equal(g.summary!.reason, "No viable moves remain");
-  assert.equal(g.summary!.dead, false);
-  assert.ok(g.save.tower.inspiration >= inspirationBefore, "legitimate run rewards are still awarded");
-  assert.equal(g.save.tower.revival, null, "a deadlock must never create a Revive opportunity");
+  g.autoTurn();
+  assert.equal(g.summary, null, "only End Run ends a stuck run");
+  assert.ok(g.handStuck);
+  assert.deepEqual([g.run.player.x, g.run.player.y], [TOWER_START_X, 0]);
 });
 
 test("a reachable survivable enemy, item, or unlocked door each mean the run is not deadlocked", () => {
@@ -247,14 +230,11 @@ test("the deadlock search follows stairs into visited floors above and below", (
     }
 });
 
-test("a deadlock caused by an impervious bump also terminates the run harmlessly, without Revive", () => {
+test("bumping an impervious enemy on a deadlocked floor leaves the run going", () => {
   const g = deadlockGame();
   g.run.changes[point(TOWER_START_X + 1, 0)] = { kind: "enemy", enemy: IMPERVIOUS };
-  g.save.upgrades.revive = 1;
-  g.move(1, 0, true); // bump the impervious enemy: rejected, then deadlock-checked
-  assert.ok(g.summary);
-  assert.equal(g.summary!.reason, "No viable moves remain");
-  assert.equal(g.save.tower.revival, null);
+  assert.equal(g.move(1, 0, true), false);
+  assert.equal(g.summary, null);
 });
 
 // ---------- Enemy scaling ----------

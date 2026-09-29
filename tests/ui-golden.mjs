@@ -41,6 +41,8 @@ try {
   // The random streams' start-up seeds, pinned by name, so they never depend
   // on which module (or the dev server's client) drew from Math.random first.
   globalThis.__pinnedSeeds = { game: 3513001552, defend: 2079646450 };
+  // The hand would keep stepping inside a run; snapshots need the board still.
+  globalThis.__handStartsPaused = true;
     crypto.getRandomValues = (arr) => { for (let i = 0; i < arr.length; i++) arr[i] = Math.floor(rng() * 2 ** 32); return arr; };
     const fixture = sessionStorage.getItem("__uiFixture");
     if (fixture) localStorage.setItem("towerincramental.v1", fixture);
@@ -185,12 +187,15 @@ try {
       await tapTile(x, y);
       await shot(`${prefix}.tap.${x}.${y}`);
     }
-    // Tap the same tile twice: the first previews, the second walks.
+    // Tap the same tile twice: the first previews, the second walks (inside
+    // a run only in Dev mode; otherwise it says the hand moves the hero).
     await tapTile(8, 2);
     await tapTile(8, 2);
     await shot(`${prefix}.walked`);
-    await click("#undo");
-    await shot(`${prefix}.undone`);
+    if (await page.locator("#undo:not([disabled])").count()) {
+      await click("#undo");
+      await shot(`${prefix}.undone`);
+    }
   }
   async function dialogsTour(prefix) {
     await click("#log");
