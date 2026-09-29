@@ -17,7 +17,7 @@ const UPDATE = process.env.UPDATE_GOLDEN === "1";
 const GOLDEN = new URL("./fixtures/ui.golden.json", import.meta.url);
 const BASELINE_DIR = "test-results/ui-golden";
 const OUT_DIR = "test-results/ui";
-const server = await startPreview();
+const server = await startPreview(4190);
 const browser = await chromium.launch({ headless: true, channel: process.env.PLAYWRIGHT_CHANNEL || "msedge" });
 let exitCode = 1;
 try {
@@ -121,11 +121,15 @@ try {
   const snapshot = () => page.evaluate(() =>
     document.querySelector("#app").outerHTML.replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g, "<uuid>"));
   /** Waits until the HTML has stopped changing for 400ms, longer than any
-   * fade (the tile highlight's is 300ms), so routes and fades have finished. */
+   * fade (the tile highlight's is 300ms), so routes and fades have finished.
+   * Each check also waits for two animation frames to run: on a busy machine
+   * a frame can come late, and HTML the next frame would change (a canvas it
+   * sizes, say) must not count as settled. */
   async function settled() {
     let previous = null, same = 0;
     for (let i = 0; i < 80; i++) {
       await page.waitForTimeout(100);
+      await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
       const html = await snapshot();
       same = html === previous ? same + 1 : 0;
       if (same >= 4) return html;

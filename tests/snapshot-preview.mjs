@@ -5,11 +5,13 @@
 import { existsSync } from "node:fs";
 import { preview } from "vite";
 
-/** Starts the preview server; `url` is its root and `close` stops it. */
-export async function startPreview() {
+/** Starts the preview server on the first free port from `port` (each suite
+ * starts from its own, so suites run side by side never race for one);
+ * `url` is its root and `close` stops it. */
+export async function startPreview(port) {
   if (!existsSync("dist-snapshot/snapshot/render-scenes.js"))
     throw Error("No snapshot build: run `vite build --mode snapshot` first (the npm script does).");
-  const server = await preview({ mode: "snapshot", logLevel: "warn", preview: { host: "127.0.0.1", port: 4180, strictPort: false } });
+  const server = await preview({ mode: "snapshot", logLevel: "warn", preview: { host: "127.0.0.1", port, strictPort: false } });
   return { url: server.resolvedUrls.local[0], close: () => server.close() };
 }
 

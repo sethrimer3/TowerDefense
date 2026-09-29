@@ -24,7 +24,7 @@ const GOLDEN = new URL("./fixtures/render.golden.json", import.meta.url);
 const BASELINE_DIR = "test-results/render-golden";
 const OUT_DIR = "test-results/render";
 
-const server = await startPreview();
+const server = await startPreview(4180);
 const browser = await chromium.launch({ headless: true, channel: process.env.PLAYWRIGHT_CHANNEL || "msedge" });
 let exitCode = 1;
 try {
