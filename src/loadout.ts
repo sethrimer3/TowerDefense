@@ -1,5 +1,5 @@
 import type { Save } from "./entities.ts";
-import { GOLD_SHOP, UPGRADES, levelBonus, levelForXp, type GoldItemId, type UpgradeId } from "./config.ts";
+import { GOLD_SHOP, TRAINING, TRAINING_PER_LEVEL, UPGRADES, levelForXp, type GoldItemId, type TrainingId, type UpgradeId } from "./config.ts";
 import { getEquippedBonuses } from "./crafting.ts";
 
 /** What one rank of an upgrade, or one provision, adds to a character. */
@@ -16,8 +16,8 @@ export type Loadout = {
 };
 
 /** Every character's baseline: 10 ATK and 4 DEF plus the starter weapon
- * (+2) and armor (+1), which Heirloom steel improves; one undo. */
-const BASE = { attack: 12, defense: 5, maxHp: 120, undos: 1 };
+ * (+2) and armor (+1), which Heirloom steel improves; 100 HP; one undo. */
+const BASE = { attack: 12, defense: 5, maxHp: 100, undos: 1 };
 
 const WORDS: Record<Stat, string> = {
   attack: "starting attack",
@@ -47,13 +47,13 @@ function add(total: Record<Stat, number>, rows: readonly (Granting & { id: strin
 }
 
 /** The character a run would start with now: the baseline, permanent
- * upgrades and the level bonus, then equipped gear (flat bonuses, then
+ * upgrades and training, then equipped gear (flat bonuses, then
  * percentages of the total, rounded), then the provisions bought for the
  * next run. */
 export function loadout(save: Save): Loadout {
-  const level = levelBonus(levelForXp(save.xp));
-  const own = { attack: BASE.attack + level.attack, defense: BASE.defense + level.defense, maxHp: BASE.maxHp + level.hp, yellow: 0, blue: 0, red: 0, undos: BASE.undos };
+  const own = { attack: BASE.attack, defense: BASE.defense, maxHp: BASE.maxHp, yellow: 0, blue: 0, red: 0, undos: BASE.undos };
   add(own, UPGRADES, save.upgrades);
+  add(own, TRAINING, save.training);
   const prov = { attack: 0, defense: 0, maxHp: 0, yellow: 0, blue: 0, red: 0, undos: 0 };
   add(prov, GOLD_SHOP, save.provisions);
   const equip = getEquippedBonuses(save);
@@ -88,4 +88,20 @@ export function upgradeText(id: UpgradeId) {
 export function provisionText(id: GoldItemId) {
   const item = GOLD_SHOP.find((g) => g.id === id)!;
   return describeGrants(item.grants, item.words);
+}
+
+/** Training points: earned per level, spent on ranks of training. `left`
+ * never goes below zero, even if undo takes back a level already spent. */
+export function trainingPoints(save: Pick<Save, "xp" | "training">) {
+  const earned = TRAINING_PER_LEVEL * levelForXp(save.xp),
+    spent = TRAINING.reduce((sum, t) => sum + t.cost * save.training[t.id], 0);
+  return { earned, spent, left: Math.max(0, earned - spent) };
+}
+
+/** What one more rank of `id` costs and does to the next run's character. */
+export function trainingStep(save: Save, id: TrainingId) {
+  const row = TRAINING.find((t) => t.id === id)!,
+    [stat, amount] = Object.entries(row.grants)[0] as ["attack" | "defense" | "maxHp", number];
+  const now = loadout(save)[stat];
+  return { row, stat, now, next: now + amount, affordable: trainingPoints(save).left >= row.cost };
 }

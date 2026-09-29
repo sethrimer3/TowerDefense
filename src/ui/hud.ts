@@ -1,6 +1,6 @@
 import type { Game } from "../state.ts";
 import type { Renderer } from "../rendering.ts";
-import { levelForXp } from "../config.ts";
+import { levelForXp, xpForLevel } from "../config.ts";
 import { CONSUMABLES } from "../crafting.ts";
 import { outsideWeather } from "../outside.ts";
 import { MODES, milestones } from "../modes.ts";
@@ -21,7 +21,7 @@ export function renderHud(game: Game, renderer: Renderer, overlay: BoardOverlay)
   renderModeActions(game);
   text("courage", devAmount(game, game.save.delve.courage));
   text("inspiration", devAmount(game, game.save.tower.inspiration));
-  text("level", `LV ${levelForXp(game.save.xp)}`);
+  renderXp(game);
   renderStatus(game, overlay);
   // The status line sits over the board's bottom row: let the hero show through.
   el("status-row").classList.toggle("see-through", game.run.player.y === renderer.target(renderer.density).bottom);
@@ -32,6 +32,19 @@ export function renderHud(game: Game, renderer: Renderer, overlay: BoardOverlay)
   (document.querySelector(".dpad") as HTMLElement).hidden = !game.save.settings.showArrows;
   renderLockedTab("delve", !!game.save.upgrades.delve, "Delve", "Unlock Into the depths in the Inspiration tree");
   renderLockedTab("defend", !!game.save.upgrades.legacy, "Defend", "Unlock An enduring legacy in the Courage tree");
+}
+
+/** The level at the front of the XP bar, which fills with this level's
+ * progress; hovering shows the XP still needed. */
+function renderXp(game: Game) {
+  const level = levelForXp(game.save.xp), from = xpForLevel(level),
+    into = game.save.xp - from, need = xpForLevel(level + 1) - from;
+  text("level", String(level));
+  el("xp-fill").style.width = `${(100 * into) / need}%`;
+  const tip = `${into}/${need} XP to level ${level + 1}`;
+  const row = el("xp");
+  row.title = tip;
+  row.setAttribute("aria-label", `Level ${level} · ${tip}`);
 }
 
 /** The board's heading: the forest's title outside, the mode's inside. */

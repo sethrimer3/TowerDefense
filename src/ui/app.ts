@@ -13,7 +13,7 @@ export type PageGame = Readonly<Pick<Game, "mode" | "run" | "save" | "summary">>
     Game,
     | "undo" | "nextRun" | "eraseAll" | "finish" | "setDevMode"
     | "sectionUnlocked" | "startSection" | "setStartSection"
-    | "buy" | "buyGold" | "craftEquipment" | "craftConsumable" | "salvageEquipment"
+    | "buy" | "train" | "buyGold" | "craftEquipment" | "craftConsumable" | "salvageEquipment"
     | "equipItem" | "unequipSlot" | "useConsumable"
   >;
 

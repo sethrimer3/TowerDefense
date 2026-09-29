@@ -71,8 +71,16 @@ _Avoid_: popup, loot text
 ### The character
 
 **Loadout**:
-What the character starts a run with: ATK, DEF, max HP, keys and how many undos it can store. It comes from the baseline, the upgrades bought, the character's level, the equipped gear and the provisions bought for that run.
+What the character starts a run with: ATK, DEF, max HP, keys and how many undos it can store. It comes from the baseline, the upgrades bought, the training bought, the equipped gear and the provisions bought for that run.
 _Avoid_: base stats, starting stats
+
+**Level**:
+How much XP the character has gathered from kills over every run. Each new level earns training points; a level gives no stats by itself.
+_Avoid_: rank
+
+**Training point**:
+The currency each level earns (three a level), spent on permanent raises to the character's stats (max HP, ATK, DEF) on the Training tab.
+_Avoid_: skill point, stat point
 
 **Provision**:
 A one-run boost bought with Gold; it adds to the next run's loadout and is spent when that run starts.

@@ -6,7 +6,7 @@ import { point, type Tile } from "../src/entities.ts";
 import { generate } from "../src/delve/world.ts";
 import { generateDelveMap } from "./delve-map.ts";
 import { reachable } from "../src/board.ts";
-import { WIDTH } from "../src/config.ts";
+import { WIDTH, levelForXp, xpForLevel } from "../src/config.ts";
 function corridor() {
   const g = new Game(defaults());
   // Inside a run only Dev mode lets the player walk; these test walking.
@@ -37,7 +37,7 @@ test("tap route collects items, fights enemies, consumes keys and reaches destin
   while (g.route.length) g.routeStep();
   assert.equal(g.run.player.y, 5);
   assert.equal(g.run.kills, 1);
-  assert.equal(g.run.player.hp, 113); // strikes back for 3, then 4
+  assert.equal(g.run.player.hp, 93); // strikes back for 3, then 4
   assert.equal(g.run.player.keys.red, 0);
 });
 test("missing key walks to door, stops, and places feedback on the door", () => {
@@ -176,4 +176,18 @@ test("generated boundaries are closed and sparse region snapshots stay connected
     }
     assert.equal(reachable(full, '15,0', undefined, WIDTH).size, [...full.values()].filter(t => t.kind !== 'wall').length);
   }
+});
+test("undoing a kill takes back its XP and the level it reached", () => {
+  const g = corridor();
+  g.run.changes["15,1"] = enemy;
+  g.save.xp = xpForLevel(1) - 1;
+  assert.ok(g.move(0, 1));
+  assert.equal(levelForXp(g.save.xp), 1);
+  assert.ok(g.levelUpAt > -Infinity);
+  assert.ok(g.undo());
+  assert.equal(g.save.xp, xpForLevel(1) - 1);
+  assert.equal(g.levelUpAt, -Infinity);
+  // The kill pays its XP again when retaken.
+  assert.ok(g.move(0, 1));
+  assert.equal(levelForXp(g.save.xp), 1);
 });

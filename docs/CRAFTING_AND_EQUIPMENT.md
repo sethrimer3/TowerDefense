@@ -417,7 +417,7 @@ On a new run, player combat stats are rebuilt from:
 
 1. baseline character stats,
 2. permanent progression/upgrades,
-3. level bonuses,
+3. training bought with the points each level earns,
 4. equipped crafted gear,
 5. any temporary provision/run modifiers.
 

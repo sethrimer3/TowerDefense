@@ -1,5 +1,5 @@
 import type { CardId } from "./cards.ts";
-import type { GoldItemId, KeyColor, UpgradeId } from "./config.ts";
+import type { GoldItemId, KeyColor, TrainingId, UpgradeId } from "./config.ts";
 import type { MaterialId } from "./materials.ts";
 import type { CraftedEquipment, EquipmentSlot } from "./equipment.ts";
 import type { ConsumableId } from "./crafting.ts";
@@ -103,7 +103,9 @@ export type DelveRun = RunCore & {
  * in it, so undo never copies or rewinds it. */
 export type AutomoveMemory = { known: Record<string, true>; visited: Record<string, number> };
 export type Run = TowerRun | DelveRun;
-export type MoveSnapshot<R extends Run = Run> = { run: R; best: number };
+/** The run and lifetime XP just before a move, so undo takes back the XP
+ * (and any level) a kill paid. */
+export type MoveSnapshot<R extends Run = Run> = { run: R; best: number; xp: number };
 export type Revival<R extends Run = Run> = { snapshot: MoveSnapshot<R> };
 export type Mode = "tower" | "delve";
 export type ModeSave<R extends Run = Run> = {
@@ -137,6 +139,8 @@ export type Save = {
   gold: number;
   provisions: Record<GoldItemId, number>;
   xp: number;
+  /** Ranks of each stat bought with training points (earned per level). */
+  training: Record<TrainingId, number>;
   upgrades: Record<UpgradeId, number>;
   settings: Settings;
   /** Persistent crafting-material inventory. Never part of `Run` — must

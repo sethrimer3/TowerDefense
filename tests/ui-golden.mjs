@@ -222,6 +222,14 @@ try {
     for (const tree of await page.locator("[data-tree]").evaluateAll((bs) => bs.map((b) => b.dataset.tree))) {
       await click(`[data-tree="${tree}"]`);
       await shot(`${prefix}.tree.${tree}`);
+      if (tree === "training") {
+        // Train each stat the points still cover.
+        for (const stat of await page.locator("[data-train]:not([disabled])").evaluateAll((bs) => bs.map((b) => b.dataset.train))) {
+          await click(`[data-train="${stat}"]:not([disabled])`);
+          await shot(`${prefix}.tree.training.${stat}`);
+        }
+        continue;
+      }
       const skills = await page.locator("[data-skill]").evaluateAll((bs) => bs.map((b) => b.dataset.skill));
       for (const skill of skills.slice(0, 3)) {
         await click(`[data-skill="${skill}"]`);

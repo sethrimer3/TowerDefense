@@ -12,6 +12,7 @@ import type { AtmosphereConfig } from "./lighting-pass.ts";
 import { DungeonLight, type LitBoard } from "./dungeon-light.ts";
 import { RoutePath } from "./route-path.ts";
 import { BoardPopups, lunges } from "./board-popups.ts";
+import { drawLevelUp, LEVEL_UP_MS } from "./level-up.ts";
 import { darknessOf, forEachViewTile, tileTransform, toTileSpace, type FrameContext } from "./render-frame.ts";
 
 export { ATMOSPHERE_CONFIG, type AtmosphereConfig } from "./lighting-pass.ts";
@@ -124,6 +125,7 @@ export class Renderer {
     this.drawBlockedMark(f);
     this.popups.draw(f);
     this.drawEffectText(f);
+    drawLevelUp(f, f.now - this.game.levelUpAt);
   }
   /** The forest clearing: its contents, the entrance, the route, the hero
    * in its grass, and the weather. */
@@ -397,13 +399,14 @@ export class Renderer {
 
   /** True when nothing on the board is moving: the hero and camera have
    * settled, no route is being walked, no fight is playing out, no feedback
-   * or popup is showing, and no decor
+   * or popup is showing, no level-up is shining, and no decor
    * effect is playing. (Torches and grass still sway.) Used by Battery saver. */
   isIdle(now: number) {
     const g = this.game, p = g.run.player, t = this.target(this.density), eps = 0.01;
     return Math.abs(this.playerX - p.x) < eps && Math.abs(this.playerY - p.y) < eps &&
       Math.abs(this.left - t.left) < eps && Math.abs(this.bottom - t.bottom) < eps &&
-      !g.route.length && !g.encounter && now - this.arrived > ARRIVAL_GLOW_MS && g.blocked.until <= now && g.effect.until <= now && this.popups.idle && !this.decor.busy;
+      !g.route.length && !g.encounter && now - this.arrived > ARRIVAL_GLOW_MS && g.blocked.until <= now && g.effect.until <= now && this.popups.idle && !this.decor.busy &&
+      now - g.levelUpAt >= LEVEL_UP_MS;
   }
   /** Active torches roughly within the camera viewport, padded so a torch
    * whose center is just offscreen can still light visible ground. Cheap

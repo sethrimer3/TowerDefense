@@ -206,11 +206,18 @@ export const xpForKill = (tier: number, attack: number) =>
   3 + tier * 4 + Math.floor(attack / 5);
 export const levelForXp = (xp: number) =>
   Math.floor((Math.sqrt(1 + xp / 5) - 1) / 2);
-export const levelBonus = (level: number) => ({
-  hp: level * 2,
-  attack: Math.floor(level / 3),
-  defense: Math.floor(level / 5),
-});
+/** The lifetime XP that reaches `level`: 20 × level × (level + 1). */
+export const xpForLevel = (level: number) => 20 * level * (level + 1);
+/** Training points each level earns, to spend on the hero's stats. */
+export const TRAINING_PER_LEVEL = 3;
+/** The stats training raises: each rank costs `cost` points and adds
+ * `grants` to the character, the same price every rank for now. */
+export const TRAINING = [
+  { id: "hp", name: "Max HP", grants: { maxHp: 10 }, cost: 1 },
+  { id: "attack", name: "ATK", grants: { attack: 1 }, cost: 5 },
+  { id: "defense", name: "DEF", grants: { defense: 1 }, cost: 3 },
+] as const;
+export type TrainingId = (typeof TRAINING)[number]["id"];
 export const GOLD_SHOP = [
   {
     id: "heal",

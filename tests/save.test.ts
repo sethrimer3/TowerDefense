@@ -39,13 +39,14 @@ const delveRun = (over: object = {}) => run({
 const mode = (make: (over?: object) => object, extra: object = {}) => ({
   run: make(),
   history: [
-    { run: make({ kills: 4 }), best: 3 },
-    { run: make({ seed: 999 }), best: 3 },
-    { run: make({ layoutVersion: 6 }), best: 3 },
-    { run: make({ kills: 3 }), best: 2 },
-    { run: make({ kills: 2 }), best: 2 },
+    { run: make({ kills: 4 }), best: 3, xp: 0 },
+    { run: make({ seed: 999 }), best: 3, xp: 0 },
+    { run: make({ layoutVersion: 6 }), best: 3, xp: 0 },
+    { run: make({ kills: 3 }), best: 2, xp: 0 },
+    { run: make({ kills: 2 }), best: 2, xp: 0 },
+    { run: make({ kills: 1 }), best: 2 },
   ],
-  revival: { earned: 2, snapshot: { run: make({ kills: 1 }), best: 2 } },
+  revival: { earned: 2, snapshot: { run: make({ kills: 1 }), best: 2, xp: 0 } },
   best: 9, reached: 7,
   lootedTiles: { "1234:3,4": true, "1234:2:3,4": true, "bad": true, "-1:-2:-3,-4": true },
   ...extra,
@@ -208,6 +209,7 @@ test("decode keeps a valid v3 save's progress and clamps settings", () => {
   assert.equal(d.tower.run?.seed, 1234);
   // Capacity is 1 + undos + inspirationUndos = 4; mismatched seed/layout snapshots drop out.
   assert.equal(d.tower.history.length, 2);
+  assert.deepEqual(d.tower.history.map((h) => h.xp), [0, 0]);
   assert.ok(d.tower.revival);
   assert.deepEqual(Object.keys(d.tower.lootedTiles).sort(), ["-1:-2:-3,-4", "1234:2:3,4", "1234:3,4"]);
   assert.deepEqual(d.tower.log, { "3": { silver: "earned", gold: "claimed" }, "5": { silver: "claimed", platinum: "earned" } });

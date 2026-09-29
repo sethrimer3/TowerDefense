@@ -11,10 +11,13 @@ import {
   TOWER_START_X,
   TOWER_SECTION,
   xpForKill,
+  levelForXp,
+  TRAINING,
   cost,
   UPGRADES,
   GOLD_SHOP,
   type UpgradeId,
+  type TrainingId,
   type GoldItemId,
   type KeyColor,
 } from "./config.ts";
@@ -43,7 +46,7 @@ import { TowerClimb } from "./tower/climb.ts";
 import { materialDef, MATERIALS } from "./materials.ts";
 import { rollTreasureLoot } from "./loot.ts";
 import { MODES, milestones, type ModeProfile } from "./modes.ts";
-import { loadout } from "./loadout.ts";
+import { loadout, trainingPoints } from "./loadout.ts";
 import {
   creditMaterials,
   craftEquipment as craftEquipmentItem,
@@ -114,6 +117,9 @@ export class Game {
    * from and to, where the hero stood, and a number that grows with each, so
    * the HP bar can fill up to it and the board raise the HP healed. */
   lastHeal: Heal | null = null;
+  /** When the hero last reached a new level (performance.now()), for the
+   * board's level-up burst; -Infinity once undo takes the level back. */
+  levelUpAt = -Infinity;
   summary: null | {
     height: number;
     kills: number;
@@ -235,7 +241,7 @@ export class Game {
     return record;
   }
   snapshot(): MoveSnapshot {
-    return { run: structuredClone(this.run), best: this.slice.best };
+    return { run: structuredClone(this.run), best: this.slice.best, xp: this.save.xp };
   }
   restore(snapshot: MoveSnapshot) {
     this.claimRewards();
@@ -243,8 +249,11 @@ export class Game {
     // pays nothing when opened again.
     this.adoptRun(this.rewound(snapshot.run));
     this.syncRewards();
-    // Lifetime achievements are never rolled back by movement undo.
+    // Lifetime achievements are never rolled back by movement undo, but XP
+    // (and any level it reached) is: the kill it paid for is undone.
     this.recordProgress();
+    if (levelForXp(snapshot.xp) < levelForXp(this.save.xp)) this.levelUpAt = -Infinity;
+    this.save.xp = snapshot.xp;
     this.route = [];
     // Undo pauses the hand, so the player can act before it carries on.
     this.auto = false;
@@ -552,7 +561,9 @@ export class Game {
     if (this.gains.length > MAX_GAINS) this.gains.shift();
   }
   gainXp(enemy: Enemy) {
+    const level = levelForXp(this.save.xp);
     this.save.xp += xpForKill(enemy.tier, enemy.attack);
+    if (levelForXp(this.save.xp) > level) this.levelUpAt = performance.now();
   }
   /** The single path that ends the current run, whether by death or by
    * the player ending or retiring it. Captures the
@@ -929,6 +940,14 @@ export class Game {
     this.finishEncounter();
     this.finalizeRun(reason, { dead: false });
   }
+  /** Spends training points on one rank of a stat; false if short. */
+  train(id: TrainingId) {
+    const row = TRAINING.find((t) => t.id === id)!;
+    return this.changeLoadout(() => {
+      if (trainingPoints(this.save).left < row.cost) return false;
+      this.save.training[id]++;
+    });
+  }
   buy(id: UpgradeId) {
     if (!skillAvailable(id, this.save.upgrades)) return false;
     const u = UPGRADES.find((u) => u.id === id)!;
@@ -949,11 +968,11 @@ export class Game {
     this.save.provisions[id]++;
     return true;
   }
-  /** A gear change applies at once to the runs of both modes: each gains
+  /** A gear change or training applies at once to the runs of both modes: each gains
    * or loses exactly what it changed in the loadout, so ATK/DEF gathered
    * from items and the provisions a run started with are kept. A run still
    * outside hasn't started, so it also starts with the HP it now would. */
-  private changeGear(change: () => boolean | void) {
+  private changeLoadout(change: () => boolean | void) {
     const before = loadout(this.save);
     if (change() === false) return false;
     const after = loadout(this.save);
@@ -977,10 +996,10 @@ export class Game {
     return salvageEquipmentItem(this.save, itemId);
   }
   equipItem(itemId: string) {
-    return this.changeGear(() => equipItemAction(this.save, itemId));
+    return this.changeLoadout(() => equipItemAction(this.save, itemId));
   }
   unequipSlot(slot: EquipmentSlot) {
-    this.changeGear(() => unequipSlotAction(this.save, slot));
+    this.changeLoadout(() => unequipSlotAction(this.save, slot));
   }
   craftConsumable(id: ConsumableId) {
     return craftConsumableItem(this.save, id);

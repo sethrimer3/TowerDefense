@@ -116,7 +116,7 @@ test("automation avoids lethal fights; manual death resets immediately and award
   assert.ok(g.buy("hp"));
   g.summary = null;
   g.newRun();
-  assert.equal(g.run.player.maxHp, 140);
+  assert.equal(g.run.player.maxHp, 120);
 });
 test("automation climbs purposefully, never takes lethal fights, bounds chunk memory", () => {
   const g = new Game(defaults());

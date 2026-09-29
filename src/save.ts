@@ -1,4 +1,4 @@
-import { GOLD_SHOP, SAVE_KEY, TOWER_WIDTH, UPGRADES, WIDTH } from "./config.ts";
+import { GOLD_SHOP, SAVE_KEY, TOWER_WIDTH, TRAINING, UPGRADES, WIDTH } from "./config.ts";
 import type { AutomoveMemory, DelveRun, FloorRecord, ModeSave, MoveSnapshot, Revival, Run, Save, TowerRun } from "./entities.ts";
 import { emptyMaterials, MATERIAL_IDS, type MaterialId } from "./materials.ts";
 import { EQUIPMENT_SLOTS, type CraftedEquipment, type EquipmentSlot } from "./equipment.ts";
@@ -17,6 +17,7 @@ export function defaults(): Save {
       GOLD_SHOP.map((g) => [g.id, 0]),
     ) as Save["provisions"],
     xp: 0,
+    training: Object.fromEntries(TRAINING.map((t) => [t.id, 0])) as Save["training"],
     upgrades: Object.fromEntries(
       UPGRADES.map((u) => [u.id, 0]),
     ) as Save["upgrades"],
@@ -98,9 +99,9 @@ function decodeDelveRun(r: any): DelveRun | null {
 type DecodedMode<R extends Run> = Pick<ModeSave<R>, "run" | "history" | "revival" | "lootedTiles" | "runGold">;
 type RunDecoder<R extends Run> = (raw: any) => R | null;
 function snapshot<R extends Run>(value: any, decodeRun: RunDecoder<R>): MoveSnapshot<R> | null {
-  if (!value || !finite(value.best)) return null;
+  if (!value || !finite(value.best) || !finite(value.xp)) return null;
   const run = decodeRun(value.run);
-  return run ? { run, best: value.best } : null;
+  return run ? { run, best: value.best, xp: Math.floor(value.xp) } : null;
 }
 /** Undo history only survives for the same seed and layout as the live run. */
 function decodeHistory<R extends Run>(raw: any, run: R, undoCapacity: number, decodeRun: RunDecoder<R>): MoveSnapshot<R>[] {
@@ -200,6 +201,7 @@ function decodeProgress(s: any, d: Save, undoCapacity: number) {
   d.gold = count(s.gold, d.gold);
   for (const g of GOLD_SHOP) d.provisions[g.id] = count(s.provisions?.[g.id], d.provisions[g.id], 999);
   d.xp = count(s.xp, d.xp);
+  for (const t of TRAINING) d.training[t.id] = count(s.training?.[t.id], d.training[t.id], 1e6);
   d.tower.inspiration = count(s.tower?.inspiration ?? s.tower?.shards, d.tower.inspiration);
   d.tower.best = count(s.tower?.best, d.tower.best);
   d.delve.courage = count(s.delve?.courage ?? s.delve?.essence, d.delve.courage);
