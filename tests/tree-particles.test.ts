@@ -20,7 +20,7 @@ test('connection current flows from prerequisite toward child', () => {
   const fluid = new TreeParticles();
   const nodes: SkillNode[] = [
     { ...node, x: 20 },
-    { ...node, id: 'inspirationAttack', x: 80, requires: [node.id] },
+    { ...node, id: 'combatStance', x: 80, requires: [node.id] },
   ];
   for (let i=0; i<90; i++) fluid['step'](1/30, { w: 600, h: 400, nodes, selected: null });
   assert.ok(fluid['u'][20*40+20] > 0, 'middle of link must move toward the child');

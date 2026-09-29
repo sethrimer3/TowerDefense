@@ -125,11 +125,11 @@ export const UPGRADES = [
     currency: "inspiration",
   },
   {
-    id: "inspirationAttack",
-    name: "Keen instinct",
-    grants: { attack: 1 },
-    base: 5,
-    max: 40,
+    id: "combatStance",
+    name: "Combat Stance",
+    description: "Unlock the Deck: add its cards to your hand, or set them aside, to choose what a run heads for",
+    base: 3,
+    max: 1,
     currency: "inspiration",
   },
   {

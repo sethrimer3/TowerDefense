@@ -87,7 +87,7 @@ try {
     };
     const rich = (s) => {
       quiet(s);
-      Object.assign(s.upgrades, { delve: 1, auto: 1, legacy: 1, revive: 1, handOrdering: 1, undos: 1, autoPersist: 1 });
+      Object.assign(s.upgrades, { delve: 1, auto: 1, legacy: 1, revive: 1, handOrdering: 1, combatStance: 1, undos: 1, autoPersist: 1 });
       s.delve.courage = 37;
       s.tower.inspiration = 21;
       s.gold = 480;
@@ -206,16 +206,27 @@ try {
     await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps: 8 });
     await page.mouse.up();
   }
-  /** The Deck's first visit teaches the drag, then the hand reorders freely. */
+  /** The Deck's first visit teaches the drag, then taking a card out and
+   * adding one; then the hand reorders and changes freely. */
   async function deckTour(prefix) {
     await tab("deck");
     await shot(`${prefix}.deck.tutorial`);
     await dragCard(0, 3);
     await shot(`${prefix}.deck.praise`);
     await click("#deck-praise-ok");
+    await shot(`${prefix}.deck.remove`);
+    await click('[data-remove="monster"]');
+    await shot(`${prefix}.deck.removePraise`);
+    await click("#modal h2");
+    await shot(`${prefix}.deck.addNote`);
+    await click("#deck-add-note");
     await shot(`${prefix}.deck`);
-    await dragCard(4, 0);
+    await dragCard(3, 0);
     await shot(`${prefix}.deck.reordered`);
+    await click('[data-return="heal"]');
+    await shot(`${prefix}.deck.returned`);
+    await click('[data-add="monster"]');
+    await shot(`${prefix}.deck.added`);
   }
   async function dialogsTour(prefix) {
     await click("#log");

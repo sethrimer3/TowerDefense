@@ -156,9 +156,10 @@ export type Save = {
    * priority order. Set up before a run; a new profile starts with the
    * base hand. */
   hand: CardId[];
-  /** Tutorials the player has finished: `deck`, reordering the hand on
-   * the Deck page. */
-  tutorials: { deck: boolean };
+  /** Tutorials the player has finished, all on the Deck page: `deck`,
+   * reordering the hand; `removeCard`, taking a card out of it; `addCard`,
+   * the note on adding cards from the deck. */
+  tutorials: { deck: boolean; removeCard: boolean; addCard: boolean };
   /** DEFEND mini-game: city layout, purchases, upgrades and best wave. A
    * defense run itself is never saved. */
   defend: DefendSave;

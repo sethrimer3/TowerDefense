@@ -1,6 +1,6 @@
 import { entrance, floorFor } from "./delve/labyrinth.ts";
 import { chooseStep } from "./automation.ts";
-import { CARDS, moveCard, planHand, type CardId, type CardPlan } from "./cards.ts";
+import { CARDS, DECK_CARDS, HAND_SLOTS, moveCard, planHand, type CardId, type CardPlan } from "./cards.ts";
 import { DelvePlan } from "./delve/automove.ts";
 import { defaults } from "./save.ts";
 import { stream } from "./random.ts";
@@ -958,6 +958,24 @@ export class Game {
     if (!this.save.upgrades.handOrdering || !this.run.outside || !(from >= 0 && from < n && to >= 0 && to < n)) return false;
     this.save.hand = moveCard(this.save.hand, from, to);
     return true;
+  }
+  /** Puts a deck card into the hand's first empty slot (Combat Stance, in
+   * the forest only). */
+  addToHand(id: CardId) {
+    const hand = this.save.hand;
+    if (!this.canChooseCards || !DECK_CARDS.includes(id) || hand.includes(id) || hand.length >= HAND_SLOTS) return false;
+    hand.push(id);
+    return true;
+  }
+  /** Takes a card out of the hand, back to the deck; STAIRS always stays. */
+  removeFromHand(id: CardId) {
+    const hand = this.save.hand;
+    if (!this.canChooseCards || id === "stairs" || !hand.includes(id)) return false;
+    this.save.hand = hand.filter((c) => c !== id);
+    return true;
+  }
+  private get canChooseCards() {
+    return !!this.save.upgrades.combatStance && !!this.run.outside;
   }
   train(id: TrainingId) {
     const row = TRAINING.find((t) => t.id === id)!;

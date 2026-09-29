@@ -17,7 +17,7 @@ await expect(page.locator('#upgrades')).not.toContainText('Tap a skill for detai
 await expect(page.locator('.tree-heading')).not.toContainText(/INSPIRATION|COURAGE/);
 await page.evaluate(()=>{const s=JSON.parse(localStorage.getItem('towerincramental.v1'));s.tower.inspiration=100;s.delve.courage=100;sessionStorage.setItem('__treeFixture',JSON.stringify(s));});
 await page.reload();await page.locator('[data-tab="upgrades"]').click();
-for(const id of ['handOrdering','inspirationAttack','inspirationDefense','delve']) {await page.locator(`[data-skill="${id}"]`).click();await page.locator(`[data-skill="${id}"]`).click();}
+for(const id of ['handOrdering','combatStance','inspirationDefense','delve']) {await page.locator(`[data-skill="${id}"]`).click();await page.locator(`[data-skill="${id}"]`).click();}
 await page.locator('[data-tree="courage"]').click();
 await page.locator('[data-skill="auto"]').click();
 await expect(page.locator('#tree-tooltip')).toContainText('Automove');

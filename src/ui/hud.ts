@@ -35,7 +35,8 @@ export function renderHud(game: Game, renderer: Renderer, overlay: BoardOverlay)
   renderLockedTab("delve", !!game.save.upgrades.delve, "Delve", "Unlock Into the depths in the Inspiration tree");
   renderLockedTab("deck", !!game.save.upgrades.handOrdering, "Deck", "Unlock Hand Ordering in the Inspiration tree");
   // A new Deck lesson waits behind the button until its tutorial is done.
-  document.querySelector(`[data-tab="deck"]`)?.classList.toggle("notify", !game.save.tutorials.deck);
+  const { deck, addCard } = game.save.tutorials;
+  document.querySelector(`[data-tab="deck"]`)?.classList.toggle("notify", !deck || (!!game.save.upgrades.combatStance && !addCard));
   renderLockedTab("defend", !!game.save.upgrades.legacy, "Defend", "Unlock An enduring legacy in the Courage tree");
 }
 

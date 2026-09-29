@@ -23,6 +23,9 @@ export const HAND_SLOTS = 5;
 /** The hand a new profile starts with, in priority order. The Equipment
  * card is earned later, so it isn't in it. */
 export const BASE_HAND: readonly CardId[] = ["stairs", "heal", "door", "key", "monster"];
+/** The cards the player owns, in the Deck page's order: the base hand's
+ * for now. A hand holds any of them, but always STAIRS. */
+export const DECK_CARDS: readonly CardId[] = BASE_HAND;
 
 /** `hand` with the card at `from` moved to slot `to`, each card between
  * the two shifting one slot over to make room. */

@@ -1921,3 +1921,82 @@ nav button.notify::after {
   color: #7f8a9d;
 }
 .deck-lock b { display: block; font-size: 14px; letter-spacing: 3px; color: #a3afbc; text-transform: uppercase; margin-bottom: 4px; }
+/* The remove tutorial's hand points up at the X from inside the card. */
+.deck-pointer.at-x { top: 20px; left: auto; right: -4px; width: 24px; margin-left: 0; }
+/* A hand card's X, shown while the card is hovered or focused (always on
+   touch screens, which can't hover). */
+.deck-remove {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  min-height: 0;
+  padding: 0;
+  border: 1px solid #f0b3a8;
+  border-radius: 50%;
+  background: #a8322a;
+  color: #fff;
+  box-shadow: 0 1px 4px #000c;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s;
+}
+.deck-remove svg { width: 12px; height: 12px; }
+.deck-remove:hover { background: #cf4034; color: #fff; }
+.deck-slot:hover .deck-remove,
+.deck-slot:focus-within .deck-remove,
+.deck-remove.shown { opacity: 1; pointer-events: auto; }
+@media (hover: none) {
+  .deck-remove { opacity: 1; pointer-events: auto; }
+}
+.deck-hand.dragging .deck-remove { display: none; }
+.deck-reserve.open { overflow: visible; background: #0a0e14; }
+.deck-reserve.open::after { display: none; }
+.deck-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(62px, 1fr));
+  gap: 10px;
+  max-width: 440px;
+}
+.deck-entry { position: relative; aspect-ratio: 3 / 4; }
+.deck-add, .deck-entry-art {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  box-shadow: 0 2px 6px #000a;
+}
+.deck-add:not(:disabled):hover { box-shadow: 0 0 0 2px #ebc77f, 0 0 10px 2px #e0b25a88; }
+.deck-add:disabled { opacity: 1; filter: brightness(0.6); }
+/* A card already in the hand: greyed, with a check that returns it. */
+.deck-entry.in-hand .deck-entry-art { filter: grayscale(1) brightness(0.45); }
+.deck-check {
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  min-height: 0;
+  padding: 0;
+  border: 1px solid #b9e0a6;
+  border-radius: 50%;
+  background: #3f7a35;
+  color: #fff;
+  box-shadow: 0 1px 4px #000c;
+}
+.deck-check svg { width: 13px; height: 13px; }
+.deck-check:hover { background: #4f9443; color: #fff; }
+.deck-check:disabled { opacity: 1; background: #4b5361; border-color: #7b8494; cursor: default; }
+.deck-note { display: block; width: 100%; margin: 0 0 12px; min-height: 0; font: inherit; cursor: pointer; }
+.deck-note small { display: block; margin-top: 6px; font-size: 9px; letter-spacing: 2px; color: #8d794e; text-transform: uppercase; }
+dialog.dismiss-anywhere { cursor: pointer; }

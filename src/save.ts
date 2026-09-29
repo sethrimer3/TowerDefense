@@ -27,7 +27,7 @@ export function defaults(): Save {
     equipped: {},
     consumables: Object.fromEntries(CONSUMABLES.map((c) => [c.id, 0])) as Save["consumables"],
     hand: [...BASE_HAND],
-    tutorials: { deck: false },
+    tutorials: { deck: false, removeCard: false, addCard: false },
     defend: defaultDefendSave(),
   };
 }
@@ -302,7 +302,7 @@ export function decode(raw: string | null): Save {
     migratePreSkillTrees(s.upgrades, d);
     d.defend = decodeDefendSave(s.defend);
     d.hand = decodeHand(s.hand);
-    d.tutorials.deck = s.tutorials?.deck === true;
+    for (const k of ["deck", "removeCard", "addCard"] as const) d.tutorials[k] = s.tutorials?.[k] === true;
   } catch {}
   return d;
 }

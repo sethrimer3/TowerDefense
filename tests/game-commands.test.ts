@@ -159,3 +159,26 @@ test("the Deck reorders the hand only with Hand Ordering and in the forest, and 
   const loaded = new Game(decode(JSON.stringify(g.save)));
   assert.deepEqual(loaded.hand, ordered, "and survives a reload");
 });
+
+test("Combat Stance moves cards between the deck and the hand in the forest, and STAIRS always stays", () => {
+  const g = new Game(defaults());
+  g.newRun({ outside: true, seed: 1 });
+  assert.equal(g.removeFromHand("monster"), false, "not before Combat Stance is bought");
+  g.save.upgrades.combatStance = 1;
+  assert.equal(g.removeFromHand("stairs"), false, "STAIRS can't leave the hand");
+  assert.ok(g.removeFromHand("monster"));
+  assert.ok(g.removeFromHand("heal"));
+  assert.deepEqual(g.save.hand, ["stairs", "door", "key"]);
+  assert.equal(g.removeFromHand("heal"), false, "a card already in the deck");
+  assert.ok(g.addToHand("monster"));
+  assert.deepEqual(g.save.hand, ["stairs", "door", "key", "monster"], "an added card takes the first empty slot");
+  assert.equal(g.addToHand("monster"), false, "a card already in the hand");
+  assert.equal(g.addToHand("equipment"), false, "a card the player doesn't own");
+  assert.ok(g.addToHand("heal"));
+  assert.equal(g.addToHand("heal"), false);
+  assert.deepEqual(decode(JSON.stringify(g.save)).hand, ["stairs", "door", "key", "monster", "heal"], "the hand is saved as chosen");
+  g.walkTo(g.run.player.x, ENTRANCE_Y);
+  for (let i = 0; i < 20 && g.route.length; i++) g.routeStep();
+  assert.equal(g.run.outside, false);
+  assert.equal(g.removeFromHand("heal"), false, "not inside a run");
+});

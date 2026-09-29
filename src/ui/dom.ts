@@ -30,7 +30,7 @@ export const itemSprite = (name: keyof typeof AREA1_ITEM_URLS, className = "ui-s
   `<img class="${className}" src="${AREA1_ITEM_URLS[name]}" alt="" aria-hidden="true">`;
 
 const SKILL_ITEM_SPRITES: Partial<Record<UpgradeId, keyof typeof AREA1_ITEM_URLS>> = {
-  inspirationAttack: "upgrade_attack", attack: "upgrade_attack",
+  attack: "upgrade_attack",
   inspirationDefense: "upgrade_defense", defense: "upgrade_defense",
   yellow: "key_yellow", blue: "key_blue", red: "key_red",
 };
@@ -41,10 +41,13 @@ const SKILL_UI_SPRITES: Partial<Record<UpgradeId, UiSprite>> = {
   wisdomFocus: "settings", wisdomMemory: "undo", wisdomSight: "upgrades",
   renownBanner: "tower", renownOath: "defense", renownCrown: "gear",
 };
+/** Skills about the hand show a card face. */
+const SKILL_CARDS: Partial<Record<UpgradeId, CardId>> = { handOrdering: "stairs", combatStance: "monster" };
 /** Two cards fanned out: the Deck's icon, made from the card faces. */
 const DECK_ICON = `<span class="deck-icon" aria-hidden="true"><img src="${UI_ASSET_BASE}assets/cards/heal.png" alt=""><img src="${UI_ASSET_BASE}assets/cards/stairs.png" alt=""></span>`;
 export const skillSprite = (id: UpgradeId) => {
-  if (id === "handOrdering") return `<img class="skill-sprite card-sprite" src="${UI_ASSET_BASE}assets/cards/stairs.png" alt="" aria-hidden="true">`;
+  const card = SKILL_CARDS[id];
+  if (card) return `<img class="skill-sprite card-sprite" src="${UI_ASSET_BASE}assets/cards/${card}.png" alt="" aria-hidden="true">`;
   const item = SKILL_ITEM_SPRITES[id];
   if (item) return itemSprite(item, "skill-sprite");
   return uiSprite(SKILL_UI_SPRITES[id] ?? "upgrades", "skill-sprite");
