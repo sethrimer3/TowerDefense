@@ -16,9 +16,10 @@ import type { Archetype, Fork, Gate, Lane, LaneStep, Reward, StrategicNode, Stra
  * door of the next rarity up, for a player without the cheaper key. A lane can be one to three tiles deep; deeper
  * lanes need room the embedder carves from one of the two chambers. */
 
-/** What paying each gate or taking each item is worth, in yellow keys. */
+/** What paying each gate or taking each item is worth, in yellow keys. A
+ * blue key is worth two yellow, a red about two and a half blue. */
 export const GATE_VALUE = {
-  door: { yellow: 1, blue: 3, red: 8 } as Record<KeyColor, number>,
+  door: { yellow: 1, blue: 2, red: 5 } as Record<KeyColor, number>,
   steel: 1,
   heart: 1,
   enemy: { weak: 1, normal: 1.5, strong: 2.5, elite: 4 } as Record<Strength, number>,
@@ -175,10 +176,10 @@ export const FORK_PATTERNS: ForkPattern[] = [
     id: "fightThenHeal", weight: 2, minimumDepth: 2, tags: ["combatGate"],
     lanes: [one([foe("strong"), P]), one([Y])],
   },
-  // Pay a blue key and get two yellow back on the way through.
+  // Pay a blue key and get a yellow back on the way through.
   {
-    id: "blueForYellows", weight: 1.5, minimumDepth: 3, tags: ["doorGate", "resourceExchange"],
-    lanes: [one([B, yKey, yKey]), one([foe("normal")])],
+    id: "blueForYellow", weight: 1.5, minimumDepth: 3, tags: ["doorGate", "resourceExchange"],
+    lanes: [one([B, yKey]), one([foe("normal")])],
   },
   // The same door, or a dearer one for a player without that key.
   {

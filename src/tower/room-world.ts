@@ -11,7 +11,8 @@ import { generateTowerFloor } from "./index.ts";
 // v6 adds yellow-or-blue and blue-or-red door forks.
 // v7 generates the same floors in every JavaScript engine.
 // v8 trades a blue door for fewer yellow keys (mostly two).
-export const TOWER_LAYOUT_VERSION = 8;
+// v9 prices a blue key at two yellow and a red at five.
+export const TOWER_LAYOUT_VERSION = 9;
 
 /** A self-contained 17x17 Tower floor. Generation is strategy-first (see
  * src/tower/index.ts): an abstract graph of gates, keys and rewards is

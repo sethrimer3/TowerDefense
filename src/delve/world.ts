@@ -6,7 +6,9 @@ import { breakTorch, placeTorches } from "../torches.ts";
 
 // v8 turns some pocket throats into forks: two parallel lanes of costs.
 // v9 adds yellow-or-blue and blue-or-red door forks.
-export const LAYOUT_VERSION = 10;
+// v10 generates the same regions in every JavaScript engine.
+// v11 prices a blue key at two yellow and a red at five.
+export const LAYOUT_VERSION = 11;
 
 /** The one 20-row chunk `index` of the labyrinth, as generated. */
 export function generate(seed: number, index: number): Map<string, Tile> {
