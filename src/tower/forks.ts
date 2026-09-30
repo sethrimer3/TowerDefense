@@ -22,7 +22,7 @@ export const GATE_VALUE = {
   door: { yellow: 1, blue: 2, red: 5 } as Record<KeyColor, number>,
   steel: 1,
   heart: 1,
-  enemy: { weak: 1, normal: 1.5, strong: 2.5, elite: 4 } as Record<Strength, number>,
+  enemy: { weak: 1, normal: 1.5, strong: 2.5, elite: 4, boss: 6 } as Record<Strength, number>,
   reward: { potion: 1, attack: 2, defense: 2, treasure: 1 },
 };
 

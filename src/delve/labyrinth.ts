@@ -1,6 +1,6 @@
 import { point, type Point, type Tile } from '../entities.ts';
 import type { Fork, Gate, LaneStep, Strength } from '../tower/types.ts';
-import { DELVE_ENEMY_NAMES, ENEMY_STAT_SCALE, enemyTier, type TowerEnemyProfile } from '../scaling.ts';
+import { bossFactor, DELVE_ENEMY_NAMES, ENEMY_STAT_SCALE, enemyTier, type TowerEnemyProfile } from '../scaling.ts';
 import { FORK_TUNING, forkDepth, forksWorth, stepValue } from '../tower/forks.ts';
 import { choosePattern, FALSE_ASCENTS, type Pattern } from './patterns.ts';
 import { tileRandom } from '../random.ts';
@@ -121,8 +121,9 @@ export function region(seed: number, area: number): Region {
   assignPatterns(lab);
   const board = carve(lab);
   placePatternCosts(lab, board);
-  // Character power remains necessary even when every optional tax is avoided.
-  board.put({ x: board.gate.x, y: board.gate.y - 2 }, gateTile(lab, { kind: 'enemy', strength: 'normal' }, lab.nodes[lab.exit]), area * 100 + 99);
+  // Every milestone gate, ten equivalent floors up, is held by a boss, so
+  // character power stays necessary even when every optional tax is avoided.
+  board.put({ x: board.gate.x, y: board.gate.y - 2 }, gateTile(lab, { kind: 'enemy', strength: 'boss' }, lab.nodes[lab.exit]), area * 100 + 99);
   placeJunctionKeys(lab, board);
   const { nodes, edges, exit, start, nodeAt } = lab, { cells, metadata, gate } = board;
   const result: Region = { area, nodes, edges, cells, metadata, gate, entry: entrance(seed, area), exit, start, ...rowSpan(cells), nodeAt };
@@ -383,6 +384,8 @@ export const DELVE_ENEMY_STRENGTH: Record<Strength, { scale: number; defense: nu
   normal: { scale: 1, defense: 0 },
   strong: { scale: 2, defense: 2 },
   elite: { scale: 3, defense: 4 },
+  // A strong enemy, then `bossFactor` doubles its HP and ATK.
+  boss: { scale: 2, defense: 2 },
 };
 /** How a named profile reshapes one: attack-heavy enemies hit harder but
  * fold sooner (hard on a low-DEF build), defense-heavy ones are armoured
@@ -403,11 +406,11 @@ function gateTile({ rng }: Lab, g: LaneStep, n: Node): Tile {
   const { scale, defense: tough } = DELVE_ENEMY_STRENGTH[g.strength], shape = DELVE_ENEMY_PROFILE[g.profile ?? 'balanced'];
   // Populations mix around transitions: influence is fractional there.
   const population = Math.max(0, Math.round(n.influence + (rng() - 0.5) * 0.8));
-  const base = delveEnemyBase(n.depth);
+  const base = delveEnemyBase(n.depth), boss = bossFactor(g.strength);
   return { kind: 'enemy', enemy: {
     name: DELVE_ENEMY_NAMES[population % DELVE_ENEMY_NAMES.length], tier: enemyTier(g.strength), strength: g.strength,
-    hp: Math.round(base.hp * scale * shape.hp),
-    attack: Math.round(base.attack * scale * shape.attack),
+    hp: Math.round(base.hp * scale * shape.hp) * boss,
+    attack: Math.round(base.attack * scale * shape.attack) * boss,
     defense: base.defense + tough + shape.defense,
   } };
 }

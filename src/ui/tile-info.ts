@@ -32,8 +32,8 @@ const stairs: Describe = (t, _p, g) => {
   return { title: t.kind === "stairs" ? "Stairs Up" : "Stairs Down", body: `Leads to Floor ${target}` };
 };
 
-/** Strong and elite enemies say so in the inspect title. */
-const RANK: Record<EnemyStrength, string> = { weak: "", normal: "", strong: "Strong ", elite: "Elite " };
+/** Strong and elite enemies and bosses say so in the inspect title. */
+const RANK: Record<EnemyStrength, string> = { weak: "", normal: "", strong: "Strong ", elite: "Elite ", boss: "Boss " };
 
 const DESCRIBE: Partial<Record<Kind, Describe>> = {
   enemy: (t, p) => {

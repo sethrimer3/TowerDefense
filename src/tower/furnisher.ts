@@ -31,6 +31,7 @@ const PROFILES_FOR: Record<Strength, TowerEnemyProfile[]> = {
   normal: ["attackHeavy", "balanced", "defenseHeavy"],
   strong: ["attackHeavy", "defenseHeavy"],
   elite: ["defenseHeavy"],
+  boss: ["balanced"],
 };
 
 function enemyTile(strength: Strength, depth: number, rng: () => number, named?: TowerEnemyProfile): Tile {

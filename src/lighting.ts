@@ -104,6 +104,7 @@ export const LIGHTING_CONFIG = {
       normal: { color: [235, 70, 60], radius: 1.2, strength: 1.05 },
       strong: { color: [255, 60, 40], radius: 1.4, strength: 1.25 },
       elite: { color: [255, 110, 50], radius: 1.6, strength: 1.4 },
+      boss: { color: [255, 110, 50], radius: 1.9, strength: 1.55 },
     },
     item: { color: [255, 200, 90], radius: 1.1, strength: 1 },
     /** Doors glow in their lock color; heart doors magenta, steel doors grey.

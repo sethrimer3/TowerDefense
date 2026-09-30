@@ -8,7 +8,8 @@ import { breakTorch, placeTorches } from "../torches.ts";
 // v9 adds yellow-or-blue and blue-or-red door forks.
 // v10 generates the same regions in every JavaScript engine.
 // v11 prices a blue key at two yellow and a red at five.
-export const LAYOUT_VERSION = 11;
+// v12 makes each milestone gate's guard a boss.
+export const LAYOUT_VERSION = 12;
 
 /** The one 20-row chunk `index` of the labyrinth, as generated. */
 export function generate(seed: number, index: number): Map<string, Tile> {

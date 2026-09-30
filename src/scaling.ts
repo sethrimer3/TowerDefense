@@ -120,13 +120,21 @@ export type TowerEnemyStrength = EnemyStrength;
  * from (zones ahead), a multiplier on every stat, and its tier (which sets
  * the XP a kill pays). Weak and normal differ only in which profiles the
  * generator picks; strong is a hardened local, elite a visitor from the
- * next zone up. */
+ * next zone up, and a boss a strong enemy with more HP and ATK (see
+ * `bossFactor`). */
 export const TOWER_ENEMY_STRENGTH: Record<TowerEnemyStrength, { zonesAhead: number; multiplier: number; tier: number }> = {
   weak: { zonesAhead: 0, multiplier: 1, tier: 1 },
   normal: { zonesAhead: 0, multiplier: 1, tier: 1 },
   strong: { zonesAhead: 0, multiplier: 1.25, tier: 2 },
   elite: { zonesAhead: 1, multiplier: 1, tier: 3 },
+  boss: { zonesAhead: 0, multiplier: 1.25, tier: 4 },
 };
+
+/** How many times a strong enemy's HP and ATK a boss has, in both modes. */
+export const BOSS_OVER_STRONG = 2;
+/** What an enemy of `strength` multiplies a strong enemy's rounded HP and
+ * ATK by: BOSS_OVER_STRONG for a boss, 1 for every other. */
+export const bossFactor = (strength: EnemyStrength) => (strength === "boss" ? BOSS_OVER_STRONG : 1);
 
 /** The XP tier a kill of each strength pays, in both modes. */
 export const enemyTier = (strength: EnemyStrength) => TOWER_ENEMY_STRENGTH[strength].tier;
@@ -139,10 +147,11 @@ export const DELVE_ENEMY_NAMES = ["Cinder slime", "Bone sentinel", "Dusk wing", 
 export function getTowerGateEnemy(room: number, strength: TowerEnemyStrength, profile: TowerEnemyProfile) {
   const { zonesAhead, multiplier, tier } = TOWER_ENEMY_STRENGTH[strength];
   const base = getTowerEnemy(room + zonesAhead * TOWER_ZONE_FLOORS, () => 0, profile);
+  const boss = bossFactor(strength);
   return {
     name: base.name,
-    hp: Math.round(base.hp * multiplier),
-    attack: Math.round(base.attack * multiplier),
+    hp: Math.round(base.hp * multiplier) * boss,
+    attack: Math.round(base.attack * multiplier) * boss,
     defense: Math.round(base.defense * multiplier),
     tier,
     strength,

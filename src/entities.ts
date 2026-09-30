@@ -22,8 +22,9 @@ export type Kind =
   | "stairsDown"
   | "oneway";
 /** How hard a generator asked an enemy to be. Strong and elite enemies wear
- * a brighter glow and rank chevrons, so the player can tell them apart. */
-export type EnemyStrength = "weak" | "normal" | "strong" | "elite";
+ * a brighter glow and rank chevrons, so the player can tell them apart. A
+ * boss guards the way up at the end of every ten floors. */
+export type EnemyStrength = "weak" | "normal" | "strong" | "elite" | "boss";
 export type Enemy = {
   name: string;
   hp: number;

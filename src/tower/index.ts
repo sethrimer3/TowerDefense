@@ -2,6 +2,8 @@ import { TOWER_SECTION, TOWER_START_X, UNGUARDED_LOOT_CHANCE } from "../config.t
 import { point, type Tile } from "../entities.ts";
 import { random } from "../random.ts";
 import { reachable } from "../board.ts";
+import { getTowerGateEnemy } from "../scaling.ts";
+import type { XY } from "./grid.ts";
 import { analyzeFloor, formatFloorSummary, type FloorAnalysis } from "./analyzer.ts";
 import { embed, ENTRY, type Embedding } from "./embedder.ts";
 import { GraphBuilder, generateStrategicGraph } from "./strategic-graph.ts";
@@ -41,6 +43,18 @@ export function geometryProblems(cells: Map<string, Tile>): string[] {
   return problems;
 }
 
+/** Whether floor `room` (0-based) is a section's last, the 10th, 20th, …
+ * floor, whose stairs a boss guards. */
+export const isBossFloor = (room: number) => room % TOWER_SECTION === TOWER_SECTION - 1;
+
+/** The one interior tile beside stairs on the outer wall: the only way on
+ * to them. */
+function insideStairs([x, y]: XY): XY {
+  if (x === 0) return [1, y];
+  if (x === 16) return [15, y];
+  return y === 0 ? [x, 1] : [x, 15];
+}
+
 /** Smallest possible floor: start hall → stairs. Always embeddable. */
 function minimalGraph(depth: number, rng: () => number): StrategicGraph {
   const b = new GraphBuilder(depth, rng);
@@ -64,6 +78,10 @@ export function generateTowerFloor(seed: number, room: number): TowerFloor {
     // Room 0 opens onto the forest and each section's first room (10, 20, …)
     // is sealed below; every other room keeps a way back down.
     cells.set(point(TOWER_START_X, 0), room % TOWER_SECTION ? { kind: "stairsDown" } : { kind: "floor" });
+    // A section's last floor puts its boss on the one tile beside the
+    // stairs, in place of any guard there, so it must be beaten to climb.
+    if (isBossFloor(room))
+      cells.set(point(...insideStairs(embedding.stairs)), { kind: "enemy", enemy: getTowerGateEnemy(room, "boss", "balanced") });
     // The rare unguarded find: only on floor reachable without a fight.
     const blockers = new Set([...cells].filter(([, t]) => t.kind === "enemy").map(([k]) => k));
     for (const k of reachable(cells, point(TOWER_START_X, 0), blockers))
