@@ -125,6 +125,7 @@ export function renderVitals(game: Game) {
   text("attack", p.attack);
   text("defense", p.defense);
   text("run-gold", game.save[game.mode].runGold);
+  text("run-silver", game.silver);
   for (const k of ["yellow", "blue", "red"] as const) text(k, p.keys[k]);
   const skeletonKeys = p.skeletonKeys ?? 0;
   text("skeleton", skeletonKeys);

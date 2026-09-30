@@ -6,6 +6,7 @@ import { ENTRANCE_Y } from "../src/outside.ts";
 import { RoomWorld } from "../src/tower/room-world.ts";
 import { chooseStep } from "../src/automation.ts";
 import { CONSUMABLES } from "../src/crafting.ts";
+import { silverForKill } from "../src/config.ts";
 
 /** A Tower floor of open tiles with `size` columns and rows, the player in
  * the corner and (when it fits) the stairs opposite. */
@@ -267,4 +268,29 @@ test("a beaten enemy pays Gold by its strength, once, whatever undo does", () =>
     assert.ok(g.stepManually(1, 0));
     assert.equal(g.save.gold, gold, "undo never pays twice");
   }
+});
+
+test("silver: 1 for a weak enemy, 1 more every ten floors, times 2–5 by strength", () => {
+  assert.deepEqual((["weak", "normal", "strong", "elite", "boss"] as const).map((s) => silverForKill(s, 0)), [1, 2, 3, 4, 5]);
+  assert.equal(silverForKill("weak", 9), 1, "floor 10");
+  assert.equal(silverForKill("weak", 10), 2, "floor 11");
+  assert.equal(silverForKill("elite", 25), 12, "floor 26: 3 × 4");
+});
+
+test("a beaten enemy pays silver into the run, and undo takes it back", () => {
+  const g = arena();
+  g.save.settings.devMode = true;
+  g.run.height = 10;
+  const w = g.world as RoomWorld, cells = new Map(w.cells);
+  cells.set("1,0", { kind: "enemy", enemy: { name: "Cinder slime", hp: 1, attack: 0, defense: 0, tier: 1, strength: "strong" } });
+  w.cells = new Map(cells);
+  assert.equal(g.silver, 0);
+  assert.ok(g.stepManually(1, 0));
+  assert.equal(g.run.silver, 6, "floor 11: 2 × 3 for a strong enemy");
+  assert.ok(g.gains.some((gain) => gain.text === "+6 Silver"), "it rises off the enemy's tile");
+  assert.equal(new Game(decode(JSON.stringify(g.save))).silver, 6, "saved with the run");
+  g.undo();
+  assert.equal(g.silver, 0, "undo takes the kill's silver back");
+  g.newRun({ outside: true, seed: 1 });
+  assert.equal(g.silver, 0, "a new run starts with none");
 });

@@ -307,7 +307,7 @@ h1 span {
 }
 .combat-stats {
   display: grid;
-  grid-template-columns: minmax(40px, 1fr) 24px minmax(40px, 1fr) 24px minmax(40px, 1fr);
+  grid-template-columns: minmax(40px, 1fr) 24px minmax(40px, 1fr) 24px minmax(40px, 1fr) minmax(40px, 1fr);
   gap: 7px;
   color: #97a9bf;
 }
@@ -1007,8 +1007,9 @@ dialog p {
     margin-left: 4px;
   }
   .combat-stats {
-    grid-template-columns: minmax(34px, 1fr) 14px minmax(34px, 1fr) 14px minmax(34px, 1fr);
-    gap: 4px;
+    /* Four stats in a narrow column: the empty secret-stat slots fold away. */
+    grid-template-columns: minmax(0, 1fr) 0 minmax(0, 1fr) 0 minmax(0, 1fr) minmax(0, 1fr);
+    gap: 4px 2px;
   }
   .tower-heading {
     margin-top: 20px;
@@ -2158,3 +2159,7 @@ p.research-kept { color: #ffe1a1; }
 .research-history { margin: 0; padding: 0; list-style: none; display: grid; gap: 3px; font-size: 10px; color: #b7c0cc; }
 .research-history time { margin-right: 6px; color: #8793a2; font-variant-numeric: tabular-nums; }
 @media (max-width: 440px) { .research-filters { grid-template-columns: 1fr 1fr; } .research-filters input { grid-column: 1 / -1; } }
+
+/* Silver: the run's own currency, shown beside Gold. */
+.silver-sprite { filter: grayscale(1) brightness(1.35); }
+.silver-stat b { color: #d6dde6; }

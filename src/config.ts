@@ -232,6 +232,14 @@ export const cost = (id: UpgradeId, level: number) =>
 /** Gold a beaten enemy pays, by its strength, in both modes. Area bosses
  * don't exist yet; `boss` is their rate for when they do. */
 export const ENEMY_GOLD: Record<EnemyStrength | "boss", number> = { weak: 0, normal: 1, strong: 2, elite: 4, boss: 5 };
+/** Silver, the currency spent inside a run, that a beaten enemy pays per
+ * base amount, by its strength. */
+export const SILVER_MULTIPLIER: Record<EnemyStrength | "boss", number> = { weak: 1, normal: 2, strong: 3, elite: 4, boss: 5 };
+/** Silver a beaten enemy pays on equivalent floor `floor` (0 is the first):
+ * a weak enemy's 1, plus 1 every ten floors (2 from floor 11), times its
+ * strength's multiplier. */
+export const silverForKill = (strength: EnemyStrength | "boss", floor: number) =>
+  (1 + Math.floor(Math.max(0, floor) / TOWER_SECTION)) * SILVER_MULTIPLIER[strength];
 /** Gold the Delve pays at a run's end: one for each treasure opened. */
 export const goldReward = (treasures: number) => treasures;
 export const xpForKill = (tier: number, attack: number) =>

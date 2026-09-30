@@ -85,6 +85,9 @@ export type RunCore = {
   /** The hand as it was ordered when the run went inside: the cards that
    * move the hero for the rest of the run. */
   hand?: CardId[];
+  /** Silver held: earned from enemies and spent inside this run only, so
+   * undo and Revive take it back with the rest of the run. */
+  silver?: number;
   /** Focus uses left this run. */
   focus?: number;
   /** The card a Focus put ahead of the others, until it reaches its target

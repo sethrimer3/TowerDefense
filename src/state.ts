@@ -22,6 +22,7 @@ import {
   type KeyColor,
   FOCUS_PER_RUN,
   ENEMY_GOLD,
+  silverForKill,
 } from "./config.ts";
 import {
   type Save,
@@ -451,6 +452,10 @@ export class Game {
   private get focusPerRun() {
     return this.save.upgrades.focus ? researched(this.save.archives, "focusPerRun", FOCUS_PER_RUN) : 0;
   }
+  /** Silver held this run. */
+  get silver() {
+    return this.run.silver ?? 0;
+  }
   /** Focus uses left: this run's inside one, or in the forest what the
    * next run will start with. */
   get focusLeft() {
@@ -807,11 +812,15 @@ export class Game {
     }
     this.run.kills++;
     this.gainXp(enemy);
+    // Silver belongs to the run, so it isn't gated like Gold: undo takes it back.
+    const silver = silverForKill(enemy.strength, this.rules.equivalentFloor(this.rules.progressAt(this.run, at.y)));
+    this.run.silver = this.silver + silver;
     const { gold, drops } = this.creditEnemyLoot(enemy, at.x, at.y);
     if (gold) this.gain(at.x, at.y, `+${gold} Gold`);
+    this.gain(at.x, at.y, `+${silver} Silver`);
     for (const d of drops) this.gain(at.x, at.y, materialText(d), { material: d.id, quantity: d.quantity });
     this.message = [combat.damage ? `−${combat.damage} HP · ${enemy.name} defeated` : "Unscathed victory",
-      ...(gold ? [`+${gold} Gold`] : []), ...drops.map(materialText)].join(" · ");
+      ...(gold ? [`+${gold} Gold`] : []), `+${silver} Silver`, ...drops.map(materialText)].join(" · ");
     return true;
   }
   /** An enemy's Gold (by its strength) and material drops. Both are gated

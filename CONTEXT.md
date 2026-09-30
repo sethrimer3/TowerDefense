@@ -96,6 +96,10 @@ _Avoid_: effective floor, tier
 The Tower's currency: one for each new floor reached and each clear tier paid, spent on upgrades in the skill trees.
 _Avoid_: shards
 
+**Silver**:
+The currency of a single run: each monster beaten pays some, more on higher floors and for stronger monsters, and it is spent only inside that run. Undo takes it back with the kill, and it is gone when the run ends.
+_Avoid_: coins, run gold
+
 **Courage**:
 The Delve's currency: one for each new equivalent floor reached, spent on upgrades in the skill trees.
 _Avoid_: essence
