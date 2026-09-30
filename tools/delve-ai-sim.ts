@@ -14,7 +14,7 @@ export const AI_LEVELS: Record<string, AiLevel> = {
   judgment: { aiMemory: 2, aiEvaluation: 4, aiLookahead: 0 },
   full: { aiMemory: 2, aiEvaluation: 4, aiLookahead: 4 },
 };
-export function simulate(seed: number, level: AiLevel, opts: { steps?: number; hp?: number; attack?: number; defense?: number; keys?: number } = {}) {
+export function simulate(seed: number, level: AiLevel, opts: { steps?: number; hp?: number; attack?: number; defense?: number; keys?: number; depthAt?: number } = {}) {
   const g = new Game(defaults());
   g.save.upgrades.delve = 1; g.save.upgrades.auto = 1;
   Object.assign(g.save.upgrades, level);
@@ -25,7 +25,7 @@ export function simulate(seed: number, level: AiLevel, opts: { steps?: number; h
   const pockets = new Map<string, string>();
   const note = (a: number) => { for (const n of region(seed, a).nodes) if (n.pattern) pockets.set(point(n.x, n.y), n.pattern.quality); };
   note(0); note(1);
-  const stats = { seed, steps: 0, depth: 0, hp: 0, kills: 0, keysSpent: 0, hpLost: 0, pockets: { good: 0, poor: 0, contextual: 0 } as Record<string, number>, ended: 'steps' };
+  const stats = { seed, steps: 0, depth: 0, depthAt: 0, hp: 0, kills: 0, keysSpent: 0, hpLost: 0, pockets: { good: 0, poor: 0, contextual: 0 } as Record<string, number>, ended: 'steps' };
   const seenPockets = new Set<string>();
   for (let i = 0; i < (opts.steps ?? 3000); i++) {
     const before = { ...run.player, keys: { ...run.player.keys } }, milestone = run.milestone;
@@ -34,13 +34,15 @@ export function simulate(seed: number, level: AiLevel, opts: { steps?: number; h
     if (!g.move(step.dx, step.dy)) { stats.ended = 'blocked'; break; }
     if (g.run !== run) { stats.ended = g.summary?.dead ? 'died' : 'ended'; break; }
     stats.steps++;
+    // The depth reached after `depthAt` steps (the final depth if the run ends first).
+    if (stats.steps === opts.depthAt) stats.depthAt = run.height;
     const p = run.player, k = point(p.x, p.y);
     stats.keysSpent += Math.max(0, before.keys.yellow - p.keys.yellow) + Math.max(0, before.keys.blue - p.keys.blue) * 2;
     stats.hpLost += Math.max(0, before.hp - p.hp);
     if (run.milestone !== milestone) note(run.milestone + 1);
     const q = pockets.get(k); if (q && !seenPockets.has(k)) { seenPockets.add(k); stats.pockets[q]++; }
   }
-  stats.depth = run.height; stats.hp = run.player.hp; stats.kills = run.kills;
+  stats.depth = run.height; if (stats.steps < (opts.depthAt ?? 0)) stats.depthAt = run.height; stats.hp = run.player.hp; stats.kills = run.kills;
   return stats;
 }
 if (import.meta.url === `file:///${process.argv[1].replace(/\\/g, '/')}` || process.argv[1]?.endsWith('delve-ai-sim.ts')) {
