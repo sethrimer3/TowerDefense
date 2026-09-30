@@ -4,6 +4,7 @@ import { bossFactor, delveDefenseGrowth, DELVE_ENEMY_NAMES, ENEMY_STAT_SCALE, en
 import { FORK_TUNING, forkDepth, forksWorth, stepValue } from '../tower/forks.ts';
 import { choosePattern, FALSE_ASCENTS, type Pattern } from './patterns.ts';
 import { tileRandom } from '../random.ts';
+import { intPow } from '../exact.ts';
 
 /** Delve is one continuous lattice of chambers (COLUMNS wide, endless rows).
  * Every lattice cell belongs to exactly one AREA. Area ownership is decided
@@ -24,6 +25,14 @@ export const DELVE_TUNING = {
   junctionKeyChance: 0.32, cacheAreas: 16,
   /** Most pockets per area whose throat becomes a fork. */
   forksPerArea: 6,
+  /** Chance that a corridor not leading into a pocket gets a guard, and the
+   * odds of each guard's strength (about the Tower's mix per floor), so an
+   * area holds about as many enemies as ten Tower floors. */
+  guardChance: 0.65,
+  guardStrengths: { weak: 0.31, normal: 0.4, strong: 0.26, elite: 0.03 },
+  /** The odds of the reward left beside a guard (none otherwise), so an area
+   * also holds about the potions and shards of ten Tower floors. */
+  guardRewards: { potion: 0.55, attack: 0.15, defense: 0.1 },
 };
 const { columns: COLS, rowsPerArea: ROWS, pitch: PITCH } = DELVE_TUNING;
 /** Nominal world-Y span of one area; only used to find candidate areas. */
@@ -121,6 +130,7 @@ export function region(seed: number, area: number): Region {
   assignPatterns(lab);
   const board = carve(lab);
   placePatternCosts(lab, board);
+  placeGuards(lab, board);
   // Every milestone gate, ten equivalent floors up, is held by a boss, so
   // character power stays necessary even when every optional tax is avoided.
   board.put({ x: board.gate.x, y: board.gate.y - 2 }, gateTile(lab, { kind: 'enemy', strength: 'boss' }, lab.nodes[lab.exit]), area * 100 + 99);
@@ -357,23 +367,21 @@ function chamber({ rng, seed }: Lab, n: Node) {
 const widens = (n: Node, rng: () => number) => !n.pattern && n.col < COLS - 1 && rng() < DELVE_TUNING.wideChamberChance;
 
 
-/** A normal, balanced Delve enemy before `ENEMY_STAT_SCALE`: HP and attack
- * start from a base and rise steadily with depth, and defense gains one
- * point every `depthPerDefense` rows. */
-export const DELVE_ENEMY_BASE = {
-  hp: 12, hpPerDepth: 0.6,
-  attack: 6, depthPerAttack: 16,
-  depthPerDefense: 65,
-};
+/** A normal, balanced Delve enemy before `ENEMY_STAT_SCALE` on the first
+ * equivalent floor: the Tower's first balanced enemy (the Thief). Every stat
+ * then compounds by `floorGrowth` for each equivalent floor (ten depth), ×1.5
+ * every ten floors like the Tower's zones (×58 every hundred, where the
+ * Tower's cycle is ×60). */
+export const DELVE_ENEMY_BASE = { hp: 20, attack: 6, defense: 2, floorGrowth: 1.0414 };
 
 /** A normal, balanced Delve enemy's stats at `depth`, unrounded, before its
  * strength and profile. */
 export function delveEnemyBase(depth: number) {
-  const b = DELVE_ENEMY_BASE;
+  const b = DELVE_ENEMY_BASE, growth = intPow(b.floorGrowth, Math.floor(Math.max(0, depth) / 10));
   return {
-    hp: (b.hp + depth * b.hpPerDepth) * ENEMY_STAT_SCALE.hp,
-    attack: (b.attack + depth / b.depthPerAttack) * ENEMY_STAT_SCALE.attack,
-    defense: Math.floor(depth / b.depthPerDefense) * ENEMY_STAT_SCALE.defense,
+    hp: b.hp * ENEMY_STAT_SCALE.hp * growth,
+    attack: b.attack * ENEMY_STAT_SCALE.attack * growth,
+    defense: b.defense * ENEMY_STAT_SCALE.defense * growth,
   };
 }
 
@@ -488,6 +496,30 @@ function carveFork(lab: Lab, board: Board, n: Node, fork: Fork, lanes: Point[][]
   }));
   n.fork = fork;
   n.lanes = lanes;
+}
+
+/** Guards the labyrinth's corridors: each corridor that doesn't lead into a
+ * pocket may get one enemy on its middle corridor tile, outside any chamber,
+ * with a random strength and profile, and often a potion or shard on the
+ * corridor tile beside it. */
+function placeGuards(lab: Lab, board: Board) {
+  const { nodes, rng } = lab, pockets = new Set(nodes.filter(n => n.pattern).map(n => n.id));
+  const strengths = Object.entries(DELVE_TUNING.guardStrengths) as [Strength, number][];
+  const profiles: TowerEnemyProfile[] = ['attackHeavy', 'balanced', 'defenseHeavy'];
+  const rewards = Object.entries(DELVE_TUNING.guardRewards) as ['potion' | 'attack' | 'defense', number][];
+  for (const e of lab.edges) {
+    if (pockets.has(e.a) || pockets.has(e.b) || rng() >= DELVE_TUNING.guardChance) continue;
+    const open = e.path.filter(p => !board.roomTiles.has(point(p.x, p.y)) && board.cells.get(point(p.x, p.y))?.kind === 'floor');
+    const strength = strengths[pickWeighted(rng, strengths.map(([, w]) => w))][0];
+    const profile = profiles[Math.floor(rng() * profiles.length)];
+    let roll = rng();
+    const reward = rewards.find(([, chance]) => (roll -= chance) < 0)?.[0];
+    if (!open.length) continue;
+    const middle = Math.floor(open.length / 2), at = open[middle], depth = board.metadata.get(point(at.x, at.y))!.depth;
+    board.put(at, gateTile(lab, { kind: 'enemy', strength, profile }, { ...nodes[e.a], depth }), depth);
+    const beside = open[middle + 1];
+    if (reward && beside) board.put(beside, { kind: reward }, board.metadata.get(point(beside.x, beside.y))!.depth);
+  }
 }
 
 /** Coherent key sources at strategic junctions; no blanket key-solvability fixup. */

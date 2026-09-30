@@ -75,11 +75,11 @@ What the character starts a run with: ATK, DEF, max HP, keys and how many undos 
 _Avoid_: base stats, starting stats
 
 **Level**:
-How much XP the character has gathered from kills over every run. A kill pays more for a stronger enemy and a higher floor, but each floor is worth a smaller share of a level than the one before. Each new level earns training points; a level gives no stats by itself.
+How much XP the character has gathered from kills over every run. A kill pays more for a stronger enemy and a higher floor, but each floor is worth a smaller share of a level than the one before. Each new level needs more XP than the last and earns training points; a level gives no stats by itself, but every training rank is worth more at a higher level.
 _Avoid_: rank
 
 **Training point**:
-The currency each level earns (three a level), spent on permanent raises to the character's stats (max HP, ATK, DEF) on the Training tab.
+The currency each level earns (three a level), spent on ranks of training in the character's stats (max HP, ATK, DEF) on the Training tab. A rank's worth grows with the character's level.
 _Avoid_: skill point, stat point
 
 **Provision**:

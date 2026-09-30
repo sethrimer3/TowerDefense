@@ -11,7 +11,8 @@ import { breakTorch, placeTorches } from "../torches.ts";
 // v12 makes each milestone gate's guard a boss.
 // v13 scales strong enemies (and bosses) from 1.5 times a normal one, not 2.
 // v14 grows enemy DEF 1% every 20 depth.
-export const LAYOUT_VERSION = 14;
+// v15 compounds enemy stats by equivalent floor and guards corridors.
+export const LAYOUT_VERSION = 15;
 
 /** The one 20-row chunk `index` of the labyrinth, as generated. */
 export function generate(seed: number, index: number): Map<string, Tile> {

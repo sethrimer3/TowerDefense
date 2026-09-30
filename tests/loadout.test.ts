@@ -5,6 +5,9 @@ import { defaults } from "../src/save.ts";
 import { GOLD_SHOP, UPGRADES, levelForXp, xpForLevel } from "../src/config.ts";
 import type { CraftedEquipment } from "../src/equipment.ts";
 import { Game } from "../src/state.ts";
+import { predict } from "../src/combat.ts";
+import { delveDefenseGrowth, getTowerGateEnemy } from "../src/scaling.ts";
+import { delveEnemyBase } from "../src/delve/labyrinth.ts";
 
 test("a new character starts at 12 ATK, 0 DEF, 100 HP, no keys and one undo", () => {
   assert.deepEqual(loadout(defaults()), {
@@ -36,17 +39,30 @@ test("each level earns three training points and nothing else", () => {
   assert.deepEqual(loadout(s), loadout(defaults()));
 });
 
-test("training ranks add 10 HP for a point, 1 DEF for three and 1 ATK for five", () => {
+test("each training rank is worth more as the hero levels up", () => {
   const s = defaults();
   s.xp = xpForLevel(5);
   Object.assign(s.training, { hp: 3, defense: 2, attack: 1 });
+  // At level 5 a rank is worth 15 HP (10 + L), 1.42 DEF (1 + L/12) and 2 ATK (1 + L/5).
   const l = loadout(s);
-  assert.deepEqual([l.attack, l.defense, l.maxHp], [12 + 1, 0 + 2, 100 + 30]);
+  assert.deepEqual([l.attack, l.defense, l.maxHp], [12 + 2, 0 + 3, 100 + 45]);
   assert.deepEqual(trainingPoints(s), { earned: 15, spent: 3 + 6 + 5, left: 1 });
   assert.deepEqual(
-    [trainingStep(s, "hp"), trainingStep(s, "defense")].map(({ now, next, affordable }) => [now, next, affordable]),
-    [[130, 140, true], [2, 3, false]],
+    [trainingStep(s, "hp"), trainingStep(s, "defense")].map(({ now, next, worth, affordable }) => [now, next, worth, affordable]),
+    [[145, 160, 15, true], [3, 4, 1 + 5 / 12, false]],
   );
+  // Levelling up raises every rank already bought.
+  s.xp = xpForLevel(20);
+  const later = loadout(s);
+  assert.deepEqual([later.attack, later.defense, later.maxHp], [12 + 5, 0 + 5, 100 + 90]);
+});
+
+test("each level costs the cube of its number in XP, and levels are found exactly", () => {
+  assert.deepEqual([1, 5, 10, 20, 50].map(xpForLevel), [48, 1200, 6600, 42000, 561000]);
+  for (const level of [0, 1, 2, 7, 49, 300]) {
+    assert.equal(levelForXp(xpForLevel(level)), level);
+    if (level) assert.equal(levelForXp(xpForLevel(level) - 1), level - 1);
+  }
 });
 
 test("training spends points and reaches a run still outside", () => {
@@ -56,7 +72,28 @@ test("training spends points and reaches a run still outside", () => {
   g.save.xp = xpForLevel(1);
   assert.equal(g.train("attack"), false);
   assert.equal(g.train("hp"), true);
-  assert.deepEqual([g.run.player.maxHp, g.run.player.hp, trainingPoints(g.save).left], [110, 110, 2]);
+  assert.deepEqual([g.run.player.maxHp, g.run.player.hp, trainingPoints(g.save).left], [111, 111, 2]);
+});
+
+test("evenly spread training alone falls behind both modes' enemies by floor 75", () => {
+  // The levels a hero reaches by each floor when every run climbs about 1.5
+  // floors past the last, clearing the floors below again (see
+  // docs/PROGRESSION_AND_DIFFICULTY.md).
+  const hero = (level: number) => {
+    const s = defaults(), points = 3 * level;
+    s.xp = xpForLevel(level);
+    Object.assign(s.training, { hp: Math.floor(points / 3), defense: Math.floor(points / 9), attack: Math.floor(points / 15) });
+    const l = loadout(s);
+    return { x: 0, y: 0, hp: l.maxHp, maxHp: l.maxHp, attack: l.attack, defense: l.defense, keys: l.keys };
+  };
+  const delve = (floor: number) => {
+    const b = delveEnemyBase(floor * 10);
+    return { name: "Cinder slime", tier: 1, strength: "normal" as const, hp: Math.round(b.hp), attack: Math.round(b.attack), defense: Math.round(b.defense * delveDefenseGrowth(floor * 10)) };
+  };
+  const wins = (level: number, floor: number) => [getTowerGateEnemy(floor - 1, "normal", "balanced"), delve(floor - 1)].map((e) => predict(hero(level), e).survivable);
+  assert.deepEqual(wins(7, 10), [true, true]);
+  assert.deepEqual(wins(28, 50), [true, true]);
+  assert.deepEqual(wins(39, 75), [false, false]);
 });
 
 test("gear adds flat bonuses, then its percentages of the total, rounded; provisions come last", () => {

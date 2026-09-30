@@ -1,5 +1,5 @@
 import type { Save } from "./entities.ts";
-import { GOLD_SHOP, TRAINING, TRAINING_PER_LEVEL, UPGRADES, levelForXp, type GoldItemId, type TrainingId, type UpgradeId } from "./config.ts";
+import { GOLD_SHOP, TRAINING, TRAINING_PER_LEVEL, UPGRADES, levelForXp, trained, trainingWorth, type GoldItemId, type TrainingId, type UpgradeId } from "./config.ts";
 import { getEquippedBonuses } from "./crafting.ts";
 
 /** What one rank of an upgrade, or one provision, adds to a character. */
@@ -53,7 +53,8 @@ function add(total: Record<Stat, number>, rows: readonly (Granting & { id: strin
 export function loadout(save: Save): Loadout {
   const own = { attack: BASE.attack, defense: BASE.defense, maxHp: BASE.maxHp, yellow: 0, blue: 0, red: 0, undos: BASE.undos };
   add(own, UPGRADES, save.upgrades);
-  add(own, TRAINING, save.training);
+  const level = levelForXp(save.xp);
+  for (const row of TRAINING) own[row.stat] += trained(row, save.training[row.id], level);
   const prov = { attack: 0, defense: 0, maxHp: 0, yellow: 0, blue: 0, red: 0, undos: 0 };
   add(prov, GOLD_SHOP, save.provisions);
   const equip = getEquippedBonuses(save);
@@ -100,8 +101,8 @@ export function trainingPoints(save: Pick<Save, "xp" | "training">) {
 
 /** What one more rank of `id` costs and does to the next run's character. */
 export function trainingStep(save: Save, id: TrainingId) {
-  const row = TRAINING.find((t) => t.id === id)!,
-    [stat, amount] = Object.entries(row.grants)[0] as ["attack" | "defense" | "maxHp", number];
-  const now = loadout(save)[stat];
-  return { row, stat, now, next: now + amount, affordable: trainingPoints(save).left >= row.cost };
+  const row = TRAINING.find((t) => t.id === id)!, stat = row.stat;
+  const now = loadout(save)[stat], next = loadout({ ...save, training: { ...save.training, [id]: save.training[id] + 1 } })[stat];
+  const worth = trainingWorth(row, levelForXp(save.xp));
+  return { row, stat, now, next, worth, affordable: trainingPoints(save).left >= row.cost };
 }

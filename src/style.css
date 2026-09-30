@@ -1781,6 +1781,7 @@ nav button > span img { display: block; width: 42px; height: 42px; max-width: 10
 .training-table { display: grid; gap: 8px; }
 .training-row { display: grid; grid-template-columns: minmax(52px, 1fr) minmax(42px, auto) 18px minmax(42px, auto) minmax(64px, auto); align-items: center; gap: 6px; }
 .training-label { font-size: 11px; letter-spacing: 1px; color: #e3d2ad; }
+.training-label small { display: block; font-size: 9px; letter-spacing: .5px; color: #9aa6b6; }
 .training-box { padding: 6px 8px; min-height: 30px; display: grid; place-items: center; border: 1px solid #4a5566; border-radius: 8px; background: #111925; font-size: 12px; color: #dfe5ee; }
 .training-box.next { border-color: #6e9a70; color: #b8f0b4; }
 .training-arrow { text-align: center; color: var(--gold); font-size: 14px; }

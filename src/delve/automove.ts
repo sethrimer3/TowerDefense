@@ -24,8 +24,10 @@ const TRAVERSAL = ['floor', 'openedChest', 'oneway'];
 const MAX_EXPANSIONS = 2400, MAX_TRAVEL = 180;
 /** What each HP lost (or healed) is worth: a share of the HP the player has,
  * so a fight costing a fifth of it weighs the same at 400 HP as at 4000, and
- * HP grows dearer as it runs low. At 400 HP one HP is worth 0.55. */
-const HP_WORTH = 220;
+ * HP grows dearer as it runs low. At 400 HP one HP is worth 0.15: most
+ * corridors have a guard, so fights are routine and pricing them higher only
+ * makes Automove circle instead of climbing. */
+const HP_WORTH = 60;
 const hpPrice = (p: Player) => HP_WORTH / Math.max(1, p.hp);
 
 /** What Automove plans with besides the board: what it has seen, what it

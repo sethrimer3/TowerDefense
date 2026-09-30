@@ -252,20 +252,41 @@ export const xpBase = (floor: number) => 3 * Math.sqrt(1 + Math.max(0, floor) / 
 /** XP a beaten enemy pays on equivalent floor `floor`, in both modes. */
 export const xpForKill = (strength: EnemyStrength, floor: number) =>
   Math.round(xpBase(floor) * XP_MULTIPLIER[strength]);
-export const levelForXp = (xp: number) =>
-  Math.floor((Math.sqrt(1 + xp / 5) - 1) / 2);
-/** The lifetime XP that reaches `level`: 20 × level × (level + 1). */
-export const xpForLevel = (level: number) => 20 * level * (level + 1);
+/** The lifetime XP that reaches `level`: 20 × level × (level + 1) ×
+ * (1 + level / 5), written in whole numbers. It grows with the cube of the
+ * level, faster than kills pay more on higher floors, so levels come more
+ * slowly the higher the hero climbs, even replaying the floors below. */
+export const xpForLevel = (level: number) => 4 * level * (level + 1) * (level + 5);
+/** The level `xp` lifetime XP reaches, found among the exact whole-number
+ * costs (a cube root could differ between engines). */
+export function levelForXp(xp: number) {
+  let low = 0, high = 1;
+  while (xpForLevel(high) <= xp) high *= 2;
+  while (high - low > 1) {
+    const mid = Math.floor((low + high) / 2);
+    if (xpForLevel(mid) <= xp) low = mid;
+    else high = mid;
+  }
+  return low;
+}
 /** Training points each level earns, to spend on the hero's stats. */
 export const TRAINING_PER_LEVEL = 3;
-/** The stats training raises: each rank costs `cost` points and adds
- * `grants` to the character, the same price every rank for now. */
+/** The stats training raises: each rank costs `cost` points and is worth
+ * `base` × (1 + level / `growth`) of `stat` at the hero's level (see
+ * `trainingWorth`), so every rank already bought grows as the hero levels
+ * up and saving points up never pays. */
 export const TRAINING = [
-  { id: "hp", name: "Max HP", grants: { maxHp: 10 }, cost: 1 },
-  { id: "attack", name: "ATK", grants: { attack: 1 }, cost: 5 },
-  { id: "defense", name: "DEF", grants: { defense: 1 }, cost: 3 },
+  { id: "hp", name: "Max HP", stat: "maxHp", base: 10, growth: 10, cost: 1 },
+  { id: "attack", name: "ATK", stat: "attack", base: 1, growth: 5, cost: 5 },
+  { id: "defense", name: "DEF", stat: "defense", base: 1, growth: 12, cost: 3 },
 ] as const;
 export type TrainingId = (typeof TRAINING)[number]["id"];
+type TrainingRow = (typeof TRAINING)[number];
+/** What one rank of `row` is worth at `level`, unrounded. */
+export const trainingWorth = (row: TrainingRow, level: number) => row.base * (1 + level / row.growth);
+/** What `ranks` ranks of `row` add to the character at `level`, rounded
+ * once. */
+export const trained = (row: TrainingRow, ranks: number, level: number) => Math.round(ranks * trainingWorth(row, level));
 export const GOLD_SHOP = [
   {
     id: "heal",

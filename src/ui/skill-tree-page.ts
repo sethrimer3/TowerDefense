@@ -91,17 +91,17 @@ export class SkillTreePage {
     if (this.tooltipVisible && tree.nodes.some(n => n.id === this.skill)) this.showTooltip();
   }
 
-  /** The hero's stats, each with what one more rank of training makes it
-   * and what that costs; tap the cost to train. */
+  /** The hero's stats, each with what a rank is worth at the hero's level,
+   * what one more rank makes it and what that costs; tap the cost to train. */
   private trainingHtml() {
     const save = this.ctx.game.save, points = trainingPoints(save);
     const rows = TRAINING.map(t => {
-      const { now, next, affordable } = trainingStep(save, t.id);
+      const { now, next, worth, affordable } = trainingStep(save, t.id);
       const price = `${t.cost} ${t.cost === 1 ? "point" : "points"}`;
-      return `<div class="training-row" role="listitem"><span class="training-label">${t.name}</span><span class="training-box">${now}</span><span class="training-arrow" aria-hidden="true">→</span><span class="training-box next">${next}</span><button class="training-box training-cost" data-train="${t.id}" ${affordable ? "" : "disabled"} aria-label="Train ${t.name} to ${next} for ${price}">${price}</button></div>`;
+      return `<div class="training-row" role="listitem"><span class="training-label">${t.name}<small>+${Math.round(worth * 10) / 10} a rank</small></span><span class="training-box">${now}</span><span class="training-arrow" aria-hidden="true">→</span><span class="training-box next">${next}</span><button class="training-box training-cost" data-train="${t.id}" ${affordable ? "" : "disabled"} aria-label="Train ${t.name} to ${next} for ${price}">${price}</button></div>`;
     }).join("");
     return `<section class="training"><header class="tree-heading"><h3>Training</h3></header>
-      <p class="training-points">Training points: <b id="training-points">${points.left}</b> <small>· ${TRAINING_PER_LEVEL} each level</small></p>
+      <p class="training-points">Training points: <b id="training-points">${points.left}</b> <small>· ${TRAINING_PER_LEVEL} each level · every rank grows as you level up</small></p>
       <div class="training-table" role="list" aria-label="Stat training">${rows}</div></section>`;
   }
 

@@ -118,10 +118,14 @@ test("automation avoids lethal fights; manual death resets immediately and award
   g.newRun();
   assert.equal(g.run.player.maxHp, 120);
 });
+/** A seasoned hero (the Automove simulator's), since the Delve's enemies
+ * are as strong as the Tower's from its first depth. */
+const seasoned = (g: Game) => Object.assign(g.run.player, { hp: 800, maxHp: 800, attack: 14, defense: 8 });
 test("automation climbs purposefully, never takes lethal fights, bounds chunk memory", () => {
   const g = new Game(defaults());
   g.save.upgrades.delve = 1;
   g.switchMode("delve");
+  seasoned(g);
   for (let i = 0; i < 1500; i++) {
     const s = chooseStep(g);
     if (!s) break;
@@ -246,6 +250,7 @@ test("automation reliably makes forward progress, never taking a lethal fight, a
     g.save.upgrades.delve = 1;
     g.switchMode("delve");
     g.newRun({ seed });
+    seasoned(g);
     for (let i = 0; i < 1400 && g.run.height < 15; i++) {
       const step = chooseStep(g);
       if (!step) break;
