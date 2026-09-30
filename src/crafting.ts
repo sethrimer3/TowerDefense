@@ -31,6 +31,7 @@ export function canCraft(save: Save, slot: EquipmentSlot, metal: MetalId, enhanc
   const { gems, rareParts } = enhancementTotals(enhancements);
   if (gems > ENHANCEMENT_CAPS.gems || rareParts > ENHANCEMENT_CAPS.rareParts) return false;
   if (enhancements.some((s) => s.quantity <= 0 || !(GEMS.some((g) => g.id === s.id) || RARE_ENHANCEMENTS[s.id]))) return false;
+  if (save.settings.freePurchases) return true;
   const cost = materialCost(slot, metal, enhancements);
   for (const [id, qty] of cost) if ((save.materials[id] ?? 0) < qty) return false;
   return true;
@@ -44,8 +45,8 @@ export function craftEquipment(
   makeId: () => string = () => crypto.randomUUID(),
 ): CraftedEquipment | null {
   if (!canCraft(save, slot, metal, enhancements)) return null;
-  const cost = materialCost(slot, metal, enhancements);
-  for (const [id, qty] of cost) save.materials[id] = (save.materials[id] ?? 0) - qty;
+  if (!save.settings.freePurchases)
+    for (const [id, qty] of materialCost(slot, metal, enhancements)) save.materials[id] = (save.materials[id] ?? 0) - qty;
   const stats = calculateEquipmentStats(slot, metal, enhancements);
   const recipe = RECIPES[slot];
   const metalDef = METALS.find((m) => m.id === metal)!;
@@ -164,13 +165,13 @@ export const consumableText = (def: ConsumableDef, rules: StepRules) =>
 
 export function canCraftConsumable(save: Save, id: ConsumableId): boolean {
   const def = CONSUMABLES.find((c) => c.id === id)!;
-  return def.recipe.every((s) => (save.materials[s.id] ?? 0) >= s.quantity);
+  return save.settings.freePurchases || def.recipe.every((s) => (save.materials[s.id] ?? 0) >= s.quantity);
 }
 
 export function craftConsumable(save: Save, id: ConsumableId): boolean {
   if (!canCraftConsumable(save, id)) return false;
   const def = CONSUMABLES.find((c) => c.id === id)!;
-  for (const s of def.recipe) save.materials[s.id] -= s.quantity;
+  if (!save.settings.freePurchases) for (const s of def.recipe) save.materials[s.id] -= s.quantity;
   save.consumables[id] = (save.consumables[id] ?? 0) + 1;
   return true;
 }

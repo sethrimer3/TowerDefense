@@ -51,6 +51,9 @@ export const SETTINGS = {
   /** Play each fight out strike by strike, damage rising off whoever was
    * struck, instead of settling it at once. */
   fightAnimation: { kind: "toggle", default: true, page: { id: "fight-animation", label: "Animate fights" } },
+  /** Dev: every purchase is allowed and costs nothing, and research
+   * completes the moment it starts. Unlocks and grants nothing itself. */
+  freePurchases: { kind: "toggle", default: false, page: { id: "free-purchases", label: "Dev: free purchases (instant research)" } },
 } as const satisfies Record<string, Setting>;
 
 export type SettingKey = keyof typeof SETTINGS;

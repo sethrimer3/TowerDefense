@@ -1,4 +1,5 @@
 import { levelForXp, type UpgradeId } from "./config.ts";
+import type { Settings } from "./settings.ts";
 
 // The Archives: research that lasts between runs. An archivist takes one
 // research project at a time; each level costs Gold and real time, and once
@@ -133,6 +134,9 @@ export type ArchivesOwner = {
   upgrades: Record<UpgradeId, number>;
   /** Lifetime XP, for the hero's level. */
   xp: number;
+  /** Dev free purchases: research costs no Gold and takes no time, and
+   * archivists are hired for nothing. */
+  settings: Pick<Settings, "freePurchases">;
 };
 
 export const researchLevel = (a: ArchivesSave, id: ResearchId) => a.levels[id] ?? 0;
@@ -187,7 +191,7 @@ export function cannotStart(o: ArchivesOwner, slot: number, id: ResearchId): str
   if (!level) return "Research complete.";
   if (activeSlot(a, id) >= 0) return "Already being researched.";
   if (missing(o, id).length) return "Locked.";
-  if (o.gold < level.gold) return `Need ${level.gold} Gold.`;
+  if (!o.settings.freePurchases && o.gold < level.gold) return `Need ${level.gold} Gold.`;
   return null;
 }
 
@@ -199,12 +203,13 @@ export function startResearch(o: ArchivesOwner, slot: number, id: ResearchId, no
   return true;
 }
 function begin(o: ArchivesOwner, slot: number, id: ResearchId, now: number) {
-  const a = o.archives, level = nextLevel(a, id)!, ms = duration(a, level);
+  const a = o.archives, level = nextLevel(a, id)!, free = o.settings.freePurchases;
+  const ms = free ? 0 : duration(a, level), paid = free ? 0 : level.gold;
   const done = a.progress[id] ?? 0;
   delete a.progress[id];
-  o.gold -= level.gold;
+  o.gold -= paid;
   const startedAt = now - Math.round(done * ms);
-  a.slots[slot].job = { research: id, level: researchLevel(a, id) + 1, startedAt, completesAt: startedAt + ms, paid: level.gold };
+  a.slots[slot].job = { research: id, level: researchLevel(a, id) + 1, startedAt, completesAt: startedAt + ms, paid };
 }
 
 /** Stops `slot`'s job at `now`: its Gold comes back, and the share done is
@@ -260,8 +265,11 @@ export const nextArchivistPrice = (a: ArchivesSave): number | undefined => ARCHI
 /** Hires the next archivist for its Gold. */
 export function hireArchivist(o: ArchivesOwner) {
   const price = nextArchivistPrice(o.archives);
-  if (price === undefined || o.gold < price) return false;
-  o.gold -= price;
+  if (price === undefined) return false;
+  if (!o.settings.freePurchases) {
+    if (o.gold < price) return false;
+    o.gold -= price;
+  }
   o.archives.slots.push({ autoContinue: false });
   return true;
 }

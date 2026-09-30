@@ -47,13 +47,15 @@ export function available(save: DefendSave, item: PaletteItem): number {
   return Math.max(0, save.owned[item] - placedCount(save.layout, item as PlacedKind | "cityTile"));
 }
 
-/** The wallet DEFEND spends from: main-game gold and metal bars. */
-export type Wallet = { gold: number; ironBar: number; steelBar: number };
+/** The wallet DEFEND spends from: main-game gold and metal bars; `free`
+ * (Dev free purchases) buys anything for nothing. */
+export type Wallet = { gold: number; ironBar: number; steelBar: number; free?: boolean };
 
 export const canAfford = (w: Wallet, p: Price) =>
-  w.gold >= p.gold && w.ironBar >= (p.ironBar ?? 0) && w.steelBar >= (p.steelBar ?? 0);
+  !!w.free || (w.gold >= p.gold && w.ironBar >= (p.ironBar ?? 0) && w.steelBar >= (p.steelBar ?? 0));
 
 export function pay(w: Wallet, p: Price) {
+  if (w.free) return;
   w.gold -= p.gold;
   w.ironBar -= p.ironBar ?? 0;
   w.steelBar -= p.steelBar ?? 0;

@@ -16,6 +16,7 @@ import { BoardOverlay } from "./ui/board-overlay.ts";
 import { boardHeadingStale, flashRed, renderBoardHeading, renderHud, renderVitals } from "./ui/hud.ts";
 import { confirmAction, RunEnd, showLog, showSectionPicker } from "./ui/dialogs.ts";
 import { SkillTreePage } from "./ui/skill-tree-page.ts";
+import { ResearchToasts } from "./ui/research-toast.ts";
 import { GearPage } from "./ui/gear-page.ts";
 import { DeckPage } from "./ui/deck-page.ts";
 import { renderSettingsPage } from "./ui/settings-page.ts";
@@ -50,9 +51,10 @@ const overlay = new BoardOverlay(game, renderer);
 const skillTree = new SkillTreePage(ctx);
 const gear = new GearPage(ctx);
 const deck = new DeckPage(ctx);
+const researchToasts = new ResearchToasts(() => game.save.settings.reduceMotion);
 const defendPage = new DefendPage(el("defend"), {
   save: () => game.save.defend,
-  wallet: () => ({ gold: game.save.gold, ironBar: game.save.materials.ironBar, steelBar: game.save.materials.steelBar }),
+  wallet: () => ({ gold: game.save.gold, ironBar: game.save.materials.ironBar, steelBar: game.save.materials.steelBar, free: game.free }),
   setWallet: (w) => {
     game.save.gold = w.gold;
     game.save.materials.ironBar = w.ironBar;
@@ -75,6 +77,7 @@ function update() {
   // The Deck tutorial keeps the player on its page until they reorder the hand.
   document.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach((b) => (b.disabled = deck.teaching && b.dataset.tab !== "deck"));
   renderHud(game, renderer, overlay);
+  researchToasts.add(game.researchDone.splice(0));
   save();
   runEnd.check();
 }

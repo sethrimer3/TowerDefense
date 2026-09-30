@@ -19,6 +19,7 @@ export function defaults(): Save {
     ) as Save["provisions"],
     xp: 0,
     training: Object.fromEntries(TRAINING.map((t) => [t.id, 0])) as Save["training"],
+    freeTraining: 0,
     upgrades: Object.fromEntries(
       UPGRADES.map((u) => [u.id, 0]),
     ) as Save["upgrades"],
@@ -216,6 +217,7 @@ function decodeProgress(s: any, d: Save, undoCapacity: number) {
   for (const g of GOLD_SHOP) d.provisions[g.id] = count(s.provisions?.[g.id], d.provisions[g.id], 999);
   d.xp = count(s.xp, d.xp);
   for (const t of TRAINING) d.training[t.id] = count(s.training?.[t.id], d.training[t.id], 1e6);
+  d.freeTraining = count(s.freeTraining, d.freeTraining);
   d.tower.inspiration = count(s.tower?.inspiration ?? s.tower?.shards, d.tower.inspiration);
   d.tower.best = count(s.tower?.best, d.tower.best);
   d.delve.courage = count(s.delve?.courage ?? s.delve?.essence, d.delve.courage);

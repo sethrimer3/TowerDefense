@@ -2166,3 +2166,27 @@ p.research-kept { color: #ffe1a1; }
 /* Silver: the run's own currency, shown beside Gold. */
 .silver-sprite { filter: grayscale(1) brightness(1.35); }
 .silver-stat b { color: #d6dde6; }
+
+/* --- Research complete notification --- */
+.research-toast {
+  position: fixed;
+  inset: 12px auto auto 50%;
+  z-index: 1000;
+  width: max-content;
+  max-width: min(90vw, 380px);
+  margin: 0;
+  padding: 12px 24px;
+  overflow: visible;
+  border: 1px solid #8d794e;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #222c3a, #101823);
+  color: #cbd0d8;
+  box-shadow: 0 10px 40px #000b;
+  text-align: center;
+  pointer-events: none;
+  transform: translateX(-50%);
+  transition: transform 0.45s ease-in;
+}
+.research-toast.leaving { transform: translate(-50%, calc(-100% - 24px)); }
+.research-toast b { display: block; color: #e9d4ac; font-size: 15px; letter-spacing: 1px; }
+.research-toast span { display: block; margin-top: 4px; font-size: 12px; color: #99a8bd; }

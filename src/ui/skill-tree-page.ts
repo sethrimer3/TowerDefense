@@ -158,7 +158,8 @@ export class SkillTreePage {
     const locked = this.locked(tree);
     const maxed = level >= u.max;
     const available = skillAvailable(id, save.upgrades);
-    return { u, level, price, balance, locked, maxed, available, affordable: balance >= price, canBuy: !locked && !maxed && available && balance >= price };
+    const affordable = this.ctx.game.free || balance >= price;
+    return { u, level, price, balance, locked, maxed, available, affordable, canBuy: !locked && !maxed && available && affordable };
   }
 
   private tapped(target: HTMLElement | null) {

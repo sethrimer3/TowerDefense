@@ -159,6 +159,9 @@ export type Save = {
   xp: number;
   /** Ranks of each stat bought with training points (earned per level). */
   training: Record<TrainingId, number>;
+  /** Training points' worth of ranks bought with Dev free purchases on,
+   * which cost no points. */
+  freeTraining: number;
   upgrades: Record<UpgradeId, number>;
   settings: Settings;
   /** Persistent crafting-material inventory. Never part of `Run` — must

@@ -9,7 +9,7 @@ import { MODES } from "../modes.ts";
  * SETTINGS. */
 const PAGE = [
   "speed", "autoOffOnDeath", "transition", "fightAnimation", "brightness", "spritesOff", "decorOff", "batterySaver", "showArrows", "reduceMotion", "weatherSound",
-  "infoDisplay", "oneTapMove", "devMode",
+  "infoDisplay", "oneTapMove", "devMode", "freePurchases",
 ] as const satisfies readonly SettingKey[];
 type PageKey = (typeof PAGE)[number];
 

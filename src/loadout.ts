@@ -93,9 +93,9 @@ export function provisionText(id: GoldItemId) {
 
 /** Training points: earned per level, spent on ranks of training. `left`
  * never goes below zero, even if undo takes back a level already spent. */
-export function trainingPoints(save: Pick<Save, "xp" | "training">) {
+export function trainingPoints(save: Pick<Save, "xp" | "training"> & Partial<Pick<Save, "freeTraining">>) {
   const earned = TRAINING_PER_LEVEL * levelForXp(save.xp),
-    spent = TRAINING.reduce((sum, t) => sum + t.cost * save.training[t.id], 0);
+    spent = TRAINING.reduce((sum, t) => sum + t.cost * save.training[t.id], 0) - (save.freeTraining ?? 0);
   return { earned, spent, left: Math.max(0, earned - spent) };
 }
 
@@ -107,7 +107,7 @@ export const potionPercent = (save: Pick<Save, "upgrades" | "training">) =>
 /** What one more rank of `id` costs and does: to the next run's character
  * for a stat, or to what a percent potion restores (in % of max HP). */
 export function trainingStep(save: Save, id: TrainingId) {
-  const row = TRAINING.find((t) => t.id === id)!, affordable = trainingPoints(save).left >= row.cost;
+  const row = TRAINING.find((t) => t.id === id)!, affordable = save.settings.freePurchases || trainingPoints(save).left >= row.cost;
   if (!isStatRow(row)) {
     const ranks = save.training[id];
     const percent = (r: number) => (POTION_PERCENT_BASE + POTION_PERCENT_RANK * r) / 100;

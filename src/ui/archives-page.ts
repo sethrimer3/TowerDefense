@@ -124,7 +124,7 @@ export class ArchivesPanel {
       const slot = a.slots[i], title = `<small>ARCHIVIST ${i + 1}</small>`;
       if (!slot) {
         if (i === a.slots.length && price !== undefined)
-          return `<article class="archivist hire" role="listitem">${title}<button data-hire ${game.save.gold < price ? "disabled" : ""}>Hire · ${uiSprite("gold", "stat-sprite")} ${price}</button></article>`;
+          return `<article class="archivist hire" role="listitem">${title}<button data-hire ${game.save.gold < price && !game.free ? "disabled" : ""}>Hire · ${uiSprite("gold", "stat-sprite")} ${price}</button></article>`;
         return `<article class="archivist locked" role="listitem">${title}<p>Locked</p></article>`;
       }
       const auto = `<label class="archivist-auto"><input type="checkbox" data-auto="${i}" ${slot.autoContinue ? "checked" : ""}> Auto-continue</label>`;

@@ -143,6 +143,11 @@ export class Game {
   constructor(public save: Save, private rng: () => number = stream("game")) {
     this.loadMode();
   }
+  /** Dev: whether every purchase is allowed and costs nothing (and research
+   * takes no time). */
+  get free() {
+    return this.save.settings.freePurchases;
+  }
   get undoCapacity() {
     return loadout(this.save).undoCapacity;
   }
@@ -1062,7 +1067,8 @@ export class Game {
     const row = TRAINING.find((t) => t.id === id)!;
     if (!trainingOpen(row, this.save.upgrades)) return false;
     return this.changeLoadout(() => {
-      if (trainingPoints(this.save).left < row.cost) return false;
+      if (this.free) this.save.freeTraining += row.cost;
+      else if (trainingPoints(this.save).left < row.cost) return false;
       this.save.training[id]++;
     });
   }
@@ -1073,9 +1079,11 @@ export class Game {
       price = cost(id, n),
       balance =
         u.currency === "courage" ? this.save.delve.courage : this.save.tower.inspiration;
-    if (n >= u.max || price > balance) return false;
-    if (u.currency === "courage") this.save.delve.courage -= price;
-    else this.save.tower.inspiration -= price;
+    if (n >= u.max || (!this.free && price > balance)) return false;
+    if (!this.free) {
+      if (u.currency === "courage") this.save.delve.courage -= price;
+      else this.save.tower.inspiration -= price;
+    }
     this.save.upgrades[id]++;
     return true;
   }
@@ -1084,7 +1092,10 @@ export class Game {
   /** Sets archivist `slot` to research `id`'s next level, paying its Gold. */
   startResearch(slot: number, id: ResearchId) {
     this.settleResearch();
-    return !!this.save.upgrades.archives && startResearch(this.save, slot, id, this.clock());
+    const started = !!this.save.upgrades.archives && startResearch(this.save, slot, id, this.clock());
+    // Free purchases' research takes no time: it completes now.
+    if (started && this.free) this.settleResearch();
+    return started;
   }
   /** Stops archivist `slot`'s research, refunding its Gold and keeping the
    * time already spent on it for when it starts again. */
@@ -1106,18 +1117,24 @@ export class Game {
   hireArchivist() {
     return !!this.save.upgrades.archives && hireArchivist(this.save);
   }
+  /** Research completed and not yet announced, oldest first; the app takes
+   * them for its notifications. */
+  researchDone: ResearchRecord[] = [];
   /** Completes the research that the clock has reached, saying so in the
-   * status line. */
+   * status line and queuing it in `researchDone`. */
   settleResearch(): ResearchRecord[] {
     const done = settleArchives(this.save, this.clock());
+    this.researchDone.push(...done);
     const last = done.at(-1);
     if (last) this.message = `Archives · ${RESEARCH[last.research].name} level ${last.level} complete.`;
     return done;
   }
   buyGold(id: GoldItemId) {
     const item = GOLD_SHOP.find((g) => g.id === id)!;
-    if (this.save.gold < item.cost) return false;
-    this.save.gold -= item.cost;
+    if (!this.free) {
+      if (this.save.gold < item.cost) return false;
+      this.save.gold -= item.cost;
+    }
     this.save.provisions[id]++;
     return true;
   }
