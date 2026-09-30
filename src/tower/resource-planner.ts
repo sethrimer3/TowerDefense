@@ -1,6 +1,6 @@
 import type { KeyColor } from "../config.ts";
 import { forkKeyDemand } from "./forks.ts";
-import { pick, type Weighted } from "./patterns.ts";
+import { keyedFloor, pick, type Weighted } from "./patterns.ts";
 import type { GraphBuilder } from "./strategic-graph.ts";
 import type { Gate, Reward, StrategicGraph, StrategicNode, Strength } from "./types.ts";
 
@@ -87,6 +87,9 @@ function collectDoors(graph: StrategicGraph): Door[] {
   for (const n of graph.nodes)
     for (const color of lockColors(n))
       doors.push({ color, route: n.route, lockedNode: n.id, order: (n.route === "main" ? 0 : 100) + depthOf(n.id) });
+  // A yellow door in front of the stairs is the last door on the main route.
+  for (const n of graph.nodes)
+    if (n.stairsGuard === "door") doors.push({ color: "yellow", route: "main", lockedNode: null, order: 999 });
   for (const s of graph.shortcuts)
     if (s.gate.kind === "door") doors.push({ color: s.gate.color, route: "optional", lockedNode: null, order: 1000 });
   return doors.sort((a, b) => a.order - b.order);
@@ -106,6 +109,16 @@ export function planResources(graph: StrategicGraph, b: GraphBuilder, rng: () =>
   }
   // A red door should always feel important.
   for (const n of graph.nodes) if (thinRedVault(n)) sweeten(n, rng);
+  if (keyedFloor(graph.depth)) keyEveryDoor(graph.nodes);
+}
+
+/** Floors 2 to 5: a yellow key in the open in the start hall, and behind
+ * each door (in the region it opens) a key of every colour it takes, so
+ * opening a door never leaves the hand short of the key the stairs' door
+ * needs. */
+function keyEveryDoor(nodes: StrategicNode[]) {
+  nodes[0].rewards.push({ kind: "key", color: "yellow" });
+  for (const n of nodes) for (const color of lockColors(n)) n.rewards.push({ kind: "key", color });
 }
 
 const thinRedVault = (n: StrategicNode) =>
@@ -118,6 +131,11 @@ function coverDoor(plan: Plan, door: Door, demand: number) {
   if (supply(graph.nodes, door) >= demand) return;
   const chance = door.route === "main" ? COHERENCE_TUNING.main[door.color](graph.depth) : COHERENCE_TUNING.optional[door.color];
   if (rng() < chance && addKeySource(plan, door)) return;
+  // Floors 2 to 5 always pay for the main route's doors.
+  if (door.route === "main" && keyedFloor(graph.depth)) {
+    keyInOpen(graph.nodes, keySite(graph.nodes, plan.b, door), rng);
+    return;
+  }
   const region = door.lockedNode;
   if (region !== null && sweetens(door, rng)) {
     sweeten(graph.nodes[region], rng);

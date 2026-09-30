@@ -14,19 +14,26 @@ for (const mode of ["tower", "delve"] as const) {
     g.switchMode(mode);
     g.save.upgrades.revive = 1;
     const before = g.snapshot();
-    const originalTile = g.world.tile.bind(g.world);
-    // Lethal but damageable (low defense so it's not impervious).
-    g.world.tile = (x, y) => y === 1 && x === g.run.player.x
-      ? { kind: "enemy", enemy: { name: "Fatal guardian", hp: 999999, attack: 9999, defense: 0, tier: 3 } }
-      : originalTile(x, y);
+    // Lethal but damageable (low defense so it's not impervious), on the
+    // board as it stands (undo builds it again).
+    const guard = () => {
+      const originalTile = g.world.tile.bind(g.world);
+      g.world.tile = (x, y) => y === 1 && x === g.run.player.x
+        ? { kind: "enemy", enemy: { name: "Fatal guardian", hp: 999999, attack: 9999, defense: 0, tier: 3 } }
+        : originalTile(x, y);
+    };
+    guard();
     g.move(0, 1);
-    assert.ok(g.summary?.dead);
+    assert.ok(g.fallen);
+    assert.ok(g.undo());
+    // The damage stays on the floor's record, as after any undo.
+    assert.deepEqual(g.run, mode === "tower" ? { ...before.run, damaged: true } : before.run);
+    guard();
+    g.move(0, 1);
+    assert.ok(g.acceptDefeat());
     assert.ok(g.run.outside);
     assert.ok(g.world instanceof OutsideWorld);
     assert.equal(g.run.height, 0);
-    assert.ok(g.undo());
-    assert.deepEqual(g.run, before.run);
-    assert.ok(!(g.world instanceof OutsideWorld));
     g.newRun({ outside: true });
     g.move(0, 1);
     const loaded = new Game(decode(JSON.stringify(g.save)));

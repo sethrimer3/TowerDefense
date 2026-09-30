@@ -71,14 +71,13 @@ test("Shards and Essence only pay out on a new best, Gold and XP accrue regardle
   g.run.height = 5;
   g.run.kills = 3;
   g.finish("test retire");
-  assert.ok(g.summary!.record);
+  assert.match(g.message, /a new record/);
   assert.ok(g.save.tower.inspiration > 0);
   const inspirationAfterFirst = g.save.tower.inspiration;
-  g.summary = null;
   g.newRun();
   g.run.height = 5;
   g.finish("test retire again");
-  assert.equal(g.summary!.record, false);
+  assert.doesNotMatch(g.message, /a new record/);
   assert.equal(g.save.tower.inspiration, inspirationAfterFirst);
 });
 test("XP is earned from kills in both modes and grants a level", () => {

@@ -52,7 +52,7 @@ function trace(seed: number, level: Level, who: typeof CHARACTERS.strong): strin
     h.update(JSON.stringify({ step, moved, decisions: g.delvePlan.decisions, player: run.player, milestone: run.milestone, height: run.height }));
     if (i % CHECKPOINT === 0) out.push(h.copy().digest("hex").slice(0, 12));
     if (!step || !moved || g.run !== run) {
-      out.push(`ended at ${i}: ${!step ? "stuck" : !moved ? "blocked" : g.summary?.dead ? "died" : "ended"} ${h.digest("hex").slice(0, 12)}`);
+      out.push(`ended at ${i}: ${!step ? "stuck" : !moved ? "blocked" : g.fallen ? "died" : "ended"} ${h.digest("hex").slice(0, 12)}`);
       break;
     }
   }

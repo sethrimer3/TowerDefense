@@ -24,16 +24,10 @@ export function confirmAction(ctx: AppContext, { title, body, label, cancel }: C
   };
 }
 
-/** Closes the summary for the next run, in the forest clearing. */
-function returnToForest(ctx: AppContext) {
-  ctx.game.nextRun();
-  ctx.navigate(ctx.game.mode);
-}
-
-/** Watches for a finished run: fades in from black after a death, then shows
- * the summary (or, after an Automove death, goes straight back outside). */
-export class RunEnd {
-  private deathFaded = false;
+/** Watches for a fallen hero: a dialog the player must answer, taking back
+ * the fatal fight (with an undo left, or with Revive) or accepting defeat,
+ * after which the forest fades in from black. */
+export class DefeatDialog {
   private fadeOverlay = document.createElement("div");
 
   constructor(private ctx: AppContext) {
@@ -42,17 +36,7 @@ export class RunEnd {
   }
 
   check() {
-    const s = this.ctx.game.summary;
-    if (!s) {
-      this.deathFaded = false;
-      return;
-    }
-    if (s.dead && !this.deathFaded) {
-      this.deathFaded = true;
-      this.fadeInFromBlack();
-    }
-    if (s.dead && s.autoDeath) returnToForest(this.ctx);
-    else this.showSummary();
+    if (this.ctx.game.fallen && !this.ctx.modal.open) this.show();
   }
 
   private fadeInFromBlack() {
@@ -61,29 +45,34 @@ export class RunEnd {
     requestAnimationFrame(() => requestAnimationFrame(() => overlay.classList.remove("active")));
   }
 
-  private showSummary() {
+  private show() {
     const ctx = this.ctx, { game, modal } = ctx;
-    const s = game.summary!,
-      rules = MODES[game.mode],
-      currencyName = rules.words.currency.toUpperCase(),
-      heightName = rules.words.progress.toUpperCase();
-    if (modal.open) return;
-    const saved = devAmount(game, rules.balance(game.save));
-    const revive = game.save[game.mode].revival
-      ? `<p>Revive is available until your next move.</p><button class="wide" id="revive-now">Revive</button>`
-      : "";
-    modal.innerHTML = `<span class="summary-icon">${uiSprite("automove")}</span><small>${s.reason.toUpperCase()}</small><h2>The tower remembers.</h2><p>Your milestone and clear rewards are already saved.</p><div class="summary-stats"><div><strong>${displayedProgress(s.height)}</strong>${heightName}</div><div><strong>${s.kills}</strong>VICTORIES</div><div><strong>${saved}</strong>${currencyName} SAVED</div></div>${s.record ? "" : `<p class="hint">Milestone rewards were credited as you reached them. Clear rewards are kept.</p>`}${revive}<button class="wide" id="again">${s.dead ? `Return to the forest` : `Begin another ${rules.words.run} →`}</button>`;
+    const rules = MODES[game.mode],
+      slice = game.save[game.mode],
+      undos = slice.history.length,
+      revive = !undos && !!slice.fall && !!game.save.upgrades.revive,
+      by = slice.fall?.by;
+    const takeBack = undos
+      ? `<p>Undo takes back the fight, and the hand waits for you.</p>`
+      : revive
+        ? `<p>Revive takes back the fight without an undo, and the hand waits for you.</p>`
+        : `<p class="hint">No undo is left to take the fight back.</p>`;
+    const button = undos ? `<button id="defeat-undo">Undo (${undos} left)</button>` : revive ? `<button id="defeat-undo">Revive</button>` : "";
+    modal.innerHTML = `<span class="summary-icon">${uiSprite("revive")}</span><small>FALLEN IN COMBAT</small><h2>Your hero has fallen.</h2><p>${by ? `Defeated by ${by}` : "Defeated"} at ${rules.words.progress} ${displayedProgress(game.run.height)}. Milestone and clear rewards are already saved.</p><div class="summary-stats"><div><strong>${displayedProgress(game.run.height)}</strong>${rules.words.progress.toUpperCase()}</div><div><strong>${game.run.kills}</strong>VICTORIES</div><div><strong>${devAmount(game, rules.balance(game.save))}</strong>${rules.words.currency.toUpperCase()}</div></div>${takeBack}<div class="dialog-actions">${button}<button id="defeat-accept">Accept defeat</button></div>`;
     modal.showModal();
-    const reviveButton = document.querySelector<HTMLButtonElement>("#revive-now");
-    if (reviveButton)
-      reviveButton.onclick = () => {
+    const undo = document.querySelector<HTMLButtonElement>("#defeat-undo");
+    if (undo)
+      undo.onclick = () => {
         modal.close();
-        game.undo();
+        if (undos) game.undo();
+        else game.revive();
         ctx.navigate(game.mode);
       };
-    el("again").onclick = () => {
+    el("defeat-accept").onclick = () => {
       modal.close();
-      returnToForest(ctx);
+      game.acceptDefeat();
+      this.fadeInFromBlack();
+      ctx.navigate(game.mode);
     };
   }
 }

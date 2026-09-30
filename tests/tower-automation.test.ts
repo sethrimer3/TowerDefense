@@ -83,8 +83,8 @@ function trace(mode: Mode, seed: number, outside: boolean): string[] {
     g.newRun({ outside });
     const out: string[] = [];
     for (let i = 0; i < STEPS; i++) {
-      if (g.summary) {
-        g.summary = null;
+      if (g.fallen) {
+        g.acceptDefeat();
         g.newRun({ outside: rng() < 0.5 });
       }
       const roll = rng();

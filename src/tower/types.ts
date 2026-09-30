@@ -105,8 +105,9 @@ export type StrategicNode = {
   route: "main" | "optional";
   footprint: Footprint;
   tags: StrategicTag[];
-  /** Stairs region only: an enemy standing directly in front of the stairs. */
-  stairsGuard?: Strength;
+  /** Stairs region only: what stands directly in front of the stairs, an
+   * enemy of this strength or a yellow door. */
+  stairsGuard?: Strength | "door";
 };
 
 /** An extra connection that turns the tree into a loop: typically a locked

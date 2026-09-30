@@ -372,7 +372,7 @@ const widens = (n: Node, rng: () => number) => !n.pattern && n.col < COLS - 1 &&
  * then compounds by `floorGrowth` for each equivalent floor (ten depth), ×1.5
  * every ten floors like the Tower's zones (×58 every hundred, where the
  * Tower's cycle is ×60). */
-export const DELVE_ENEMY_BASE = { hp: 20, attack: 6, defense: 2, floorGrowth: 1.0414 };
+export const DELVE_ENEMY_BASE = { hp: 16, attack: 6, defense: 2, floorGrowth: 1.0414 };
 
 /** A normal, balanced Delve enemy's stats at `depth`, unrounded, before its
  * strength and profile. */

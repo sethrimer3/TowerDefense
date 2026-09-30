@@ -312,6 +312,15 @@ export const ARCHETYPES: Record<Archetype, ArchetypeProfile> = {
   },
 };
 
+/** The first floor: every gate on the way to its stairs stands open, so the
+ * hand a first run starts with (STAIRS first) climbs it without a fight. */
+export const openFirstFloor = (depth: number) => depth === 0;
+/** Floors 2 to 5: a yellow door stands in front of the stairs, a yellow key
+ * lies in the open in the start hall, and behind every door lies a key for
+ * each it takes, so whichever doors the hand opens, a key is left for the
+ * stairs. */
+export const keyedFloor = (depth: number) => depth >= 1 && depth <= 4;
+
 export function pick<T>(options: Weighted<T>, rng: () => number): T {
   const total = options.reduce((s, o) => s + o.w, 0);
   let r = rng() * total;

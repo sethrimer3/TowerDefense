@@ -44,6 +44,7 @@ test('uncollected rewards survive reload, undo, departure, death and retirement 
       // Lethal but damageable (low defense so it's not impervious).
       (g.world as RoomWorld).cells.set('2,0', {kind:'enemy',enemy:{name:'doom',hp:99999,attack:999,defense:0,tier:3}});
       g.move(1,0);
+      assert.ok(g.acceptDefeat());
     }
     assert.equal(g.save.tower.inspiration, action === 'stairs' ? 4 : 3, action);
   }

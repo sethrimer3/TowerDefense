@@ -32,7 +32,7 @@ export function simulate(seed: number, level: AiLevel, opts: { steps?: number; h
     const step = chooseStep(g);
     if (!step) { stats.ended = 'stuck'; break; }
     if (!g.move(step.dx, step.dy)) { stats.ended = 'blocked'; break; }
-    if (g.run !== run) { stats.ended = g.summary?.dead ? 'died' : 'ended'; break; }
+    if (g.fallen || g.run !== run) { stats.ended = g.fallen ? 'died' : 'ended'; break; }
     stats.steps++;
     // The depth reached after `depthAt` steps (the final depth if the run ends first).
     if (stats.steps === opts.depthAt) stats.depthAt = run.height;

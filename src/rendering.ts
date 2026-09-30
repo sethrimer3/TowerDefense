@@ -311,7 +311,7 @@ export class Renderer {
   private drawWeather(f: FrameContext) {
     const g = this.game;
     this.weather.draw(f.c, f.width, g.run.seed, { dt: f.dt, reduceMotion: g.save.settings.reduceMotion,
-      active: !g.paused && !g.summary && !document.hidden, sound: g.save.settings.weatherSound });
+      active: !g.paused && !g.fallen && !document.hidden, sound: g.save.settings.weatherSound });
   }
   /** A white glow fading behind the hero just after it reaches a new floor,
    * drawn in its tile space. */

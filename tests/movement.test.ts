@@ -81,69 +81,81 @@ test("undo restores combat, health, drops, equipment, door keys and score; histo
   for (let i = 0; i < 6; i++) g.move(0, 1);
   assert.equal(g.save.delve.history.length, 5);
 });
-test("fatal path resets to entrance, stops route, and cannot undo without Revive", () => {
+test("a fatal fight stops a walked route; accepting defeat starts the next run, with nothing to undo", () => {
   const g = corridor();
   g.run.changes["15,2"] = doom;
   const seed = g.run.seed;
   g.walkTo(15, 5);
   while (g.route.length) g.routeStep();
+  assert.ok(g.fallen);
+  assert.deepEqual([g.run.seed, g.run.player.y, g.run.player.hp], [seed, 1, 0], "stopped before the fight");
+  assert.ok(g.acceptDefeat());
   assert.notEqual(g.run.seed, seed);
   assert.equal(g.run.player.y, 0);
   assert.equal(g.save.delve.history.length, 0);
   assert.equal(g.undo(), false);
   assert.equal(g.save.delve.courage, 0);
 });
-test("Revive restores pre-fatal state and rolls back pending rewards; next move forfeits it irreversibly", () => {
+test("a fallen hero waits: undo spends one to take the fight back, and the hand stays paused", () => {
   const g = corridor();
-  g.save.upgrades.revive = 1;
   g.move(0, 1);
   g.move(0, 1);
   g.run.changes["15,3"] = doom;
   const before = structuredClone(g.run);
   g.move(0, 1);
-  assert.ok(g.save.delve.revival);
-  assert.equal(g.save.delve.courage, 0);
+  assert.ok(g.fallen);
+  assert.equal(g.run.player.hp, 0);
+  assert.equal(g.save.delve.fall?.by, "Doom");
+  assert.equal(g.move(0, -1), false, "a fallen hero takes no step");
+  assert.equal(g.revive(), false, "Revive needs the skill");
+  const undos = g.save.delve.history.length;
   assert.ok(g.undo());
   assert.deepEqual(g.run, before);
-  assert.equal(g.save.delve.courage, 0);
-  g.move(0, 1);
-  g.summary = null;
-  g.move(0, -1);
-  assert.ok(g.save.delve.revival, "Blocked move must not forfeit revival");
-  g.move(0, 1);
-  assert.equal(g.save.delve.revival, null);
-  assert.equal(g.save.delve.courage, 0);
-  g.undo();
-  assert.equal(g.run.player.y, 0);
-  assert.equal(g.save.delve.revival, null);
+  assert.equal(g.save.delve.history.length, undos - 1, "one undo spent");
+  assert.ok(!g.fallen && !g.auto && g.save.delve.fall === null);
   assert.equal(g.save.delve.courage, 0);
 });
-test("undo and Revive persist safely across refresh", () => {
-  const g = new Game(defaults());
-  g.save.upgrades.inspirationUndos = 1; // undo needs Rehearsed steps
-  g.save.upgrades.delve = 1;
-  g.switchMode("delve");
+test("Revive takes the fatal fight back when no undo is left", () => {
+  const g = corridor();
   g.save.upgrades.revive = 1;
-  g.run.changes["15,1"] = { kind: "floor" }; // Isolate persistence from procedural encounters.
   g.move(0, 1);
-  let loaded = new Game(decode(JSON.stringify(g.save)));
+  g.run.changes["15,2"] = doom;
+  const before = structuredClone(g.run);
+  g.move(0, 1);
+  g.save.delve.history = [];
+  assert.equal(g.undo(), false, "no undo left");
+  assert.ok(g.revive());
+  assert.deepEqual(g.run, before);
+  assert.ok(!g.fallen && g.save.delve.fall === null);
+  assert.equal(g.revive(), false, "only a fallen hero revives");
+});
+test("a fallen hero, and the fight to take back, persist safely across refresh", () => {
+  const g = corridor();
+  g.save.upgrades.revive = 1;
+  // Saved changes hold only terrain, so the enemy stands on the live board.
+  const tile = g.world.tile.bind(g.world);
+  g.world.tile = (x, y) => (x === 15 && y === 1 ? doom : tile(x, y));
+  const before = structuredClone(g.run);
+  g.move(0, 1);
+  assert.ok(g.fallen);
+  const saved = decode(JSON.stringify(g.save));
+  assert.equal(saved.delve.fall?.by, "Doom");
+  let loaded = new Game(saved);
   loaded.switchMode("delve");
+  assert.ok(loaded.fallen && !loaded.auto);
   assert.ok(loaded.undo());
-  assert.equal(loaded.run.player.y, 0);
-  const before = loaded.snapshot();
-  loaded.save.delve.revival = { snapshot: before };
+  assert.deepEqual(loaded.run, before);
+  loaded = new Game(decode(JSON.stringify(g.save)));
+  loaded.switchMode("delve");
   loaded.save.delve.history = [];
-  const saved = decode(JSON.stringify(loaded.save));
-  assert.ok(saved.delve.revival);
-  loaded = new Game(saved);
-  loaded.switchMode("delve");
-  assert.ok(loaded.undo());
-  assert.equal(loaded.save.delve.courage, 0);
-  const corrupt = JSON.parse(JSON.stringify(saved));
-  corrupt.delve.history = [{ run: { player: {} }, best: 0 }];
-  corrupt.delve.revival = { snapshot: null };
-  assert.equal(decode(JSON.stringify(corrupt)).delve.history.length, 0);
-  assert.equal(decode(JSON.stringify(corrupt)).delve.revival, null);
+  assert.ok(loaded.revive());
+  assert.deepEqual(loaded.run, before);
+  const corrupt = JSON.parse(JSON.stringify(g.save));
+  corrupt.delve.fall = { snapshot: null };
+  assert.equal(decode(JSON.stringify(corrupt)).delve.fall, null);
+  const alive = JSON.parse(JSON.stringify(g.save));
+  alive.delve.run.player.hp = 5;
+  assert.equal(decode(JSON.stringify(alive)).delve.fall, null, "a fall only beside a fallen hero");
 });
 test("paired horizontal openings wrap, use destination locks, and undo correctly", () => {
   const g = corridor();

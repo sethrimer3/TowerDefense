@@ -52,7 +52,6 @@ if (!(await page.locator("#world").isVisible()))
 // Inside a run the tabs are hidden: end the first Tower run to reach the forest.
 await page.locator("#end-run").click();
 await page.locator("#confirm").click();
-await page.locator("#again").click();
 await page.locator('[data-tab="settings"]').click();
 await page.locator("#arrows").check();
 await page.locator('[data-tab="delve"]').click();
@@ -69,7 +68,6 @@ if ((await page.locator("#density-label").textContent()) !== "17 × 17")
 await page.locator("#auto-settings").click();
 await page.locator("#retire").click();
 await page.locator("#confirm").click();
-await page.locator("#again").click();
 // Delve Courage is credited per 10 height as it's reached; retiring pays nothing extra.
 // Dev mode shows balances as ∞, so read the saved one.
 if ((await page.evaluate(() => JSON.parse(localStorage.getItem("towerincramental.v1")).delve.courage)) !== 0)
@@ -91,7 +89,7 @@ console.log(
       "reload",
       "viewport",
       "retire confirmation",
-      "summary",
+      "straight back to the forest",
       "new run",
       "courage",
     ],
@@ -111,7 +109,6 @@ for (let i = 0; i < 2; i++) {
   await page.locator("#auto-settings").click();
   await page.locator("#retire").click();
   await page.locator("#confirm").click();
-  await page.locator("#again").click();
 }
 // Earning Courage takes 10 height per point, so grant enough for Automove.
 await page.evaluate(() => {

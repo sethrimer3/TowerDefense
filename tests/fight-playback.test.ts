@@ -135,12 +135,12 @@ test("undo during a fight takes the whole fight back", () => {
   assert.deepEqual([g.run.player.x, g.run.player.hp, g.run.kills], [0, hp, 0]);
 });
 
-test("a fight the hero loses ends the run only once it has played out", () => {
+test("a fight the hero loses leaves it fallen only once it has played out", () => {
   const g = arena({ kind: "enemy", enemy: foe({ hp: 600, attack: 30 }) });
   assert.ok(g.move(1, 0, true));
-  assert.equal(g.summary, null);
+  assert.equal(g.fallen, false);
   g.finishEncounter();
-  assert.ok(g.summary?.dead);
+  assert.ok(g.fallen);
 });
 
 test("pickups and treasure queue their rewards to rise from their tiles", () => {

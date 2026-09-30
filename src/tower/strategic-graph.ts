@@ -2,6 +2,8 @@ import { random } from "../random.ts";
 import {
   ARCHETYPES,
   TOWER_PATTERNS,
+  keyedFloor,
+  openFirstFloor,
   patternWeight,
   pick,
   type ArchetypeProfile,
@@ -43,6 +45,8 @@ export const GRAPH_TUNING = {
   mainRouteLength: (depth: number) => (depth < 3 ? 1 : depth < 10 ? 2 : 3),
   startPotionChance: (depth: number) => (depth === 0 ? 0.6 : 0.3),
   hubPotionChance: 0.3,
+  /** Of the stairs no enemy guards, the share with a yellow door in front. */
+  stairsDoorChance: 0.5,
 };
 
 function mainGateTable(depth: number, doorBias: number): Weighted<Gate> {
@@ -186,7 +190,7 @@ function addHub(b: GraphBuilder, profile: ArchetypeProfile, parent: number, last
   const hub = b.add({
     purpose: last || rng() < 0.6 ? "hub" : "transition",
     patternId: "main", parent,
-    gate: pick(mainGateTable(depth, profile.doorBias), rng),
+    gate: openFirstFloor(depth) ? { kind: "open" } : pick(mainGateTable(depth, profile.doorBias), rng),
     rewards: rng() < GRAPH_TUNING.hubPotionChance ? [{ kind: "potion" }] : [],
     formation: "cluster", route: "main", footprint: "hall", tags: ["progressionRoute"],
   });
@@ -194,15 +198,24 @@ function addHub(b: GraphBuilder, profile: ArchetypeProfile, parent: number, last
   return hub.id;
 }
 
-/** The staircase pocket; an open one may still have a guard. */
+/** The staircase pocket; an open one may still have an enemy or a yellow
+ * door in front of the stairs. The first floor's stairs stand open, and
+ * floors 2 to 5 always have the door. */
 function addStairs(b: GraphBuilder, profile: ArchetypeProfile, parent: number) {
-  const gate = pick(stairsGateTable(b.depth, profile.doorBias), b.rng);
-  const guardRoll = b.rng();
-  const guarded = gate.kind === "open" && guardRoll < 0.5;
+  const { depth, rng } = b;
+  let gate = pick(stairsGateTable(depth, profile.doorBias), rng);
+  let guard: StrategicNode["stairsGuard"];
+  if (openFirstFloor(depth) || keyedFloor(depth)) gate = { kind: "open" };
+  if (keyedFloor(depth)) guard = "door";
+  else if (!openFirstFloor(depth) && gate.kind === "open") {
+    const guardRoll = rng();
+    if (guardRoll < 0.5) guard = guardRoll < 0.2 ? "strong" : "normal";
+    else if (rng() < GRAPH_TUNING.stairsDoorChance) guard = "door";
+  }
   return b.add({
     purpose: "stairs", patternId: "main", parent,
     gate, route: "main", footprint: "pocket", tags: ["progressionRoute"],
-    stairsGuard: guarded ? ((guardRoll < 0.2 ? "strong" : "normal") as Strength) : undefined,
+    stairsGuard: guard,
   });
 }
 
@@ -224,7 +237,8 @@ function addBranches(b: GraphBuilder, archetype: Archetype, mainIds: number[], b
  * the enemy path costs HP, the shortcut costs a key. */
 function planShortcuts(b: GraphBuilder, profile: ArchetypeProfile, mainIds: number[], stairs: StrategicNode): StrategicGraph["shortcuts"] {
   const { depth, rng } = b;
-  if (mainIds.length < 2 || rng() >= profile.shortcutChance) return [];
+  // The first five floors keep every door on the way to the stairs paid for.
+  if (openFirstFloor(depth) || keyedFloor(depth) || mainIds.length < 2 || rng() >= profile.shortcutChance) return [];
   return [{
     from: mainIds[0],
     to: rng() < 0.5 ? stairs.id : mainIds[mainIds.length - 1],

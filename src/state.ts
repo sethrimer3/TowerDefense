@@ -125,16 +125,6 @@ export class Game {
   /** When the hero last reached a new level (performance.now()), for the
    * board's level-up burst; -Infinity once undo takes the level back. */
   levelUpAt = -Infinity;
-  summary: null | {
-    height: number;
-    kills: number;
-    reason: string;
-    dead?: boolean;
-    /** True when the fatal move happened while Automove was on — the
-     * summary page is skipped and the player is dropped outside directly. */
-    autoDeath?: boolean;
-    record: boolean;
-  } = null;
   /** Delve Automove's committed route and last weighed decisions. */
   readonly delvePlan = new DelvePlan();
   /** `rng` is the game's randomness: new run seeds, enemy drops and
@@ -192,9 +182,8 @@ export class Game {
     this.syncRewards();
     this.recordProgress();
     this.route = [];
-    this.auto = !this.run.outside && this.handStartsPlaying;
+    this.auto = !this.run.outside && this.handStartsPlaying && !this.fallen;
     this.dropHandPlan();
-    this.summary = null;
     this.encounter = null;
     this.blocked = { x: 0, y: 0, until: 0 };
   }
@@ -219,7 +208,7 @@ export class Game {
   /** Returns the player to their section's entrance on the new labyrinth. */
   private reshapeDelve(run: DelveRun) {
     this.save.delve.history = [];
-    this.save.delve.revival = null;
+    this.save.delve.fall = null;
     run.layoutVersion = LAYOUT_VERSION;
     run.changes = {};
     run.milestone = Math.floor(run.height / 100);
@@ -237,10 +226,6 @@ export class Game {
     run.floors = {};
     run.player.x = TOWER_START_X;
     run.player.y = 0;
-  }
-  /** Revive is only offered until the next move. */
-  private settleRevival() {
-    this.slice.revival = null;
   }
   /** Pays what the run still owes; returns whether it set a new record. */
   private payout(): boolean {
@@ -268,7 +253,6 @@ export class Game {
     // Undo pauses the hand, so the player can act before it carries on.
     this.auto = false;
     this.dropHandPlan();
-    this.summary = null;
     this.encounter = null;
     this.paused = false;
     this.blocked.until = 0;
@@ -288,19 +272,32 @@ export class Game {
     // A fight still playing out counts first, so undo takes it back.
     this.finishEncounter();
     const slice = this.slice;
-    if (slice.revival) {
-      const snapshot = slice.revival.snapshot;
-      slice.revival = null;
-      slice.history = [];
-      this.restore(snapshot);
-      this.feedback("Revived - fatal move undone");
-      return true;
-    }
-    if (this.summary) return false;
+    // Fallen, undo spends one and takes back the fight the hero fell in.
+    const fall = this.fallen ? slice.fall : null;
     const snapshot = slice.history.pop();
     if (!snapshot) return false;
-    this.restore(snapshot);
-    this.feedback("Move undone");
+    slice.fall = null;
+    this.restore(fall?.snapshot ?? snapshot);
+    this.feedback(fall ? "Fatal fight undone · the hand waits" : "Move undone");
+    return true;
+  }
+  /** Takes back the fight the hero fell in without spending an undo: the
+   * Revive skill, for a hero with no undo left. */
+  revive() {
+    this.finishEncounter();
+    const fall = this.slice.fall;
+    if (!this.fallen || !fall || !this.save.upgrades.revive) return false;
+    if (this.slice.history.length) return this.undo();
+    this.slice.fall = null;
+    this.restore(fall.snapshot);
+    this.feedback("Revived · the fatal fight is undone");
+    return true;
+  }
+  /** Accepts the hero's defeat: the run ends and pays out, and the next one
+   * waits in the forest. */
+  acceptDefeat() {
+    if (!this.fallen) return false;
+    this.finalizeRun("Fallen in combat", true);
     return true;
   }
   private reject(x: number, y: number, message: string) {
@@ -335,7 +332,7 @@ export class Game {
     return result;
   }
   walkTo(x: number, y: number) {
-    if (this.paused || this.summary || this.encounter) return;
+    if (this.paused || this.fallen || this.encounter) return;
     if (!this.manualMoves) {
       this.handMovesNote();
       return;
@@ -348,7 +345,6 @@ export class Game {
     }
     // The whole tap-to-walk route counts as a single undo step, not one per tile.
     if (route.length) {
-      this.settleRevival();
       const slice = this.slice;
       slice.history.push(this.snapshot());
       slice.history = keepUndos(slice.history, this.undoCapacity);
@@ -482,7 +478,7 @@ export class Game {
    * already moving the hero can't be focused. */
   focus(card: number): "focused" | "unavailable" | "active" | "spent" | "noPath" {
     const id = this.hand[card];
-    if (!this.save.upgrades.focus || this.run.outside || this.summary || !id) return "unavailable";
+    if (!this.save.upgrades.focus || this.run.outside || this.fallen || !id) return "unavailable";
     if (this.run.focused === id || (card === this.activeCard && !this.handStuck)) return "active";
     if (this.focusLeft < 1) return "spent";
     const plan = planHand(this, this.hand, this.mode, card);
@@ -519,18 +515,9 @@ export class Game {
     const fight = this.encounter, hp = this.run.player.hp;
     return fight ? heroHpDuring(fight.bout, hp, now - fight.start) : hp;
   }
-  /** Closes the run summary for the next run, in the forest; a death has
-   * already started it. */
-  nextRun() {
-    const dead = this.summary?.dead;
-    this.summary = null;
-    if (!dead) this.newRun({ outside: true });
-    this.message = "Follow the forest path to the entrance.";
-  }
   /** Erases all progress and starts again outside the Tower. */
   eraseAll() {
     this.save = defaults();
-    this.summary = null;
     this.mode = "tower";
     this.newRun({ outside: true });
   }
@@ -545,11 +532,10 @@ export class Game {
    * one. */
   newRun({ outside = false, seed = Math.floor(this.rng() * 2 ** 32) }: RunStart = {}) {
     if (this.run) this.claimRewards();
-    this.settleRevival();
+    this.slice.fall = null;
     this.slice.history = [];
     this.slice.runGold = 0;
     this.route = [];
-    this.summary = null;
     this.encounter = null;
     // Tower ascents begin at the first floor of the chosen section.
     const section = this.mode === "tower" ? this.startSection() : 0,
@@ -666,50 +652,29 @@ export class Game {
     this.save.xp += xpForKill(enemy.strength, floor);
     if (levelForXp(this.save.xp) > level) this.levelUpAt = performance.now();
   }
-  /** The single path that ends the current run, whether by death or by
-   * the player ending or retiring it. Captures the
-   * dying run's stats into the summary before any new run is created, pays
-   * out exactly once, and only opens a Revive opportunity for an actual
-   * fatal player choice (never for an ended or retired run). */
-  private finalizeRun(
-    reason: string,
-    options: { dead?: boolean; allowRevive?: boolean; preFatalSnapshot?: MoveSnapshot } = {},
-  ) {
-    if (this.summary) return;
-    const { dead = false, allowRevive = false, preFatalSnapshot } = options;
-    const wasAuto = this.auto;
-    this.settleRevival();
-    // Capture the dying run's own stats — height/kills/record — and pay out
-    // rewards while `this.run` still refers to this run, before newRun()
-    // (below) replaces it.
+  /** The single path that ends the current run, whether the player
+   * accepts defeat or ends it: pays out exactly once and starts the next run
+   * in the forest. */
+  private finalizeRun(reason: string, dead: boolean) {
     const record = this.payout();
     this.slice.history = [];
     this.route = [];
-    // Automove keeps running through death only when the player has
-    // researched Steadfast wayfinder and switched off the default
-    // turn-off-on-death behavior.
-    const keepAuto =
-      dead &&
-      wasAuto &&
-      !!this.save.upgrades.autoPersist &&
-      !this.save.settings.autoOffOnDeath;
-    const summary = {
-      height: this.run.height,
-      kills: this.run.kills,
-      reason,
-      dead,
-      autoDeath: dead && wasAuto,
-      record,
-    };
-    if (dead) this.newRun({ outside: true });
-    else this.slice.run = null;
-    if (allowRevive && dead && preFatalSnapshot && this.save.upgrades.revive)
-      this.slice.revival = { snapshot: preFatalSnapshot };
-    this.summary = summary;
-    this.auto = keepAuto;
+    this.newRun({ outside: true });
+    // Automove keeps running through a defeat only when the player has
+    // Steadfast wayfinder and switched off the default turn-off-on-death.
+    this.auto = dead && !!this.save.upgrades.autoPersist && !this.save.settings.autoOffOnDeath;
     this.dropHandPlan();
-    if (dead)
-      this.message = "Returned to the forest. Follow the path to begin again.";
+    this.message = `${reason}${record ? " · a new record" : ""}. Follow the forest path to begin again.`;
+  }
+  /** The hero fell in a fight: the run waits at 0 HP, the hand paused, for
+   * the player to undo the fight or accept defeat. */
+  private fallIn(before: MoveSnapshot, enemy: Enemy) {
+    this.run.player.hp = 0;
+    this.slice.fall = { snapshot: before, by: enemy.name };
+    this.route = [];
+    this.auto = false;
+    this.dropHandPlan();
+    this.message = `Fallen in combat against ${enemy.name}.`;
   }
   /** Keys every physical enemy kill / treasure chest by seed (+height for
    * Tower, whose x/y space is reused per room) so persistent loot can be
@@ -718,13 +683,20 @@ export class Game {
   private lootKey(x: number, y: number): string {
     return this.rules.lootKey(this.run, x, y);
   }
-  /** Inside a run that hasn't ended: not in the forest, no summary showing. */
+  /** Inside a run the hero is still standing in: not in the forest, not
+   * fallen. */
   private get playing() {
-    return !this.run.outside && !this.summary;
+    return !this.run.outside && !this.fallen;
+  }
+  /** The hero fell in the fight just taken: the run waits at 0 HP, the hand
+   * paused, until the player undoes that fight (or Revives) or accepts
+   * defeat. */
+  get fallen() {
+    return !this.run.outside && this.run.player.hp <= 0;
   }
   /** A single orthogonal step while play is live. */
   private canStep(dx: number, dy: number) {
-    return !this.paused && !this.summary && !this.encounter && Math.abs(dx) + Math.abs(dy) === 1;
+    return !this.paused && !this.fallen && !this.encounter && Math.abs(dx) + Math.abs(dy) === 1;
   }
   move(dx: number, dy: number, force = true, track = true) {
     if (!this.canStep(dx, dy)) return false;
@@ -763,7 +735,6 @@ export class Game {
   /** Commits a resolved step: undo history, stats, and the door or fight on
    * the way in. Returns false when the player fell. */
   private enter(t: Tile, outcome: StepEffect, dest: { x: number; y: number }, track: boolean) {
-    this.settleRevival();
     const before = this.snapshot();
     if (track) this.remember(before);
     this.applyStats(outcome.player);
@@ -834,16 +805,12 @@ export class Game {
     if (!n) this.gain(at.x, at.y, "Full HP ✓", { heart: true });
     this.message = `${doorName(t)} opened${n ? ` · ${n} key${n === 1 ? "" : "s"} spent` : " · full HP"}`;
   }
-  /** Settles a fight whose damage is already applied. Returns false (and ends
-   * the run, allowing Revive) when the player fell. */
+  /** Settles a fight whose damage is already applied. Returns false when
+   * the player fell. */
   private winFight(enemy: Enemy, combat: CombatPrediction, before: MoveSnapshot, at: { x: number; y: number }) {
     if (combat.damage > 0) this.mar("damaged");
     if (this.run.player.hp <= 0) {
-      this.finalizeRun("Fallen in battle", {
-        dead: true,
-        allowRevive: true,
-        preFatalSnapshot: before,
-      });
+      this.fallIn(before, enemy);
       return false;
     }
     this.run.kills++;
@@ -1049,9 +1016,11 @@ export class Game {
       }
     }
   }
+  /** Ends the run (the End Run button), or, fallen, accepts defeat. */
   finish(reason: string) {
     this.finishEncounter();
-    this.finalizeRun(reason, { dead: false });
+    if (this.fallen) this.acceptDefeat();
+    else this.finalizeRun(reason, false);
   }
   /** Spends training points on one rank of a stat; false if short. */
   /** Inside a run, the hand it went in with; in the forest, the hand the

@@ -83,12 +83,12 @@ function toChest(g: Game) {
 function observe(g: Game, action: unknown, result: unknown) {
   const r = g.run, slice = g.save[g.mode];
   return canonical({
-    action, result, message: g.message, summary: g.summary?.reason ?? null,
+    action, result, message: g.message, fallen: g.fallen,
     player: r.player, height: r.height, floor: r.floor, outside: !!r.outside,
     ...(g.mode === "tower" ? { damaged: r.damaged, keysSpent: r.keysSpent } : {}),
     log: g.save.tower.log, shards: g.save.tower.inspiration, essence: g.save.delve.courage,
     gold: g.save.gold, reached: slice.reached, best: slice.best,
-    history: slice.history.length, revival: !!slice.revival,
+    history: slice.history.length, fall: !!slice.fall,
     changes: r.changes, floors: r.floors ?? null, route: g.route.length, auto: g.auto, paused: g.paused,
     blocked: g.blocked.until, brokenTorches: (g.world.torches ?? []).filter((t) => !t.active).length,
   });
@@ -110,13 +110,14 @@ function trace(mode: Mode, seed: number): string[] {
     for (let i = 0; i < STEPS; i++) {
       let action: unknown, result: unknown;
       const roll = rng();
-      if (g.summary) {
-        // A fallen run is revived, or the summary is closed and the player
-        // walks on from the forest, or a fresh run starts.
-        action = "summary";
-        if (roll < 0.4) result = g.undo();
-        else if (roll < 0.8) g.summary = null;
-        else result = (g.summary = null, g.newRun(), "new");
+      if (g.fallen) {
+        // A fallen hero's fight is undone or revived, or defeat is accepted
+        // and the player walks on from the forest, or a fresh run starts.
+        action = "fallen";
+        if (roll < 0.3) result = g.undo();
+        else if (roll < 0.5) result = g.revive();
+        else if (roll < 0.8) result = g.acceptDefeat();
+        else result = (g.acceptDefeat(), g.newRun(), "new");
       } else if (roll < 0.15) {
         action = "undo";
         result = g.undo();

@@ -59,7 +59,7 @@ function observe(g: Game, action: unknown, result: unknown, preview: unknown) {
   const r = g.run;
   const materials = Object.values(g.save.materials).reduce((a, b) => a + b, 0);
   return canonical({
-    action, result, preview, message: g.message, decisions: g.delvePlan.decisions, summary: g.summary?.reason ?? null,
+    action, result, preview, message: g.message, decisions: g.delvePlan.decisions, fallen: g.fallen,
     player: r.player, kills: r.kills, treasures: r.treasures, height: r.height, floor: r.floor,
     outside: !!r.outside, ...(g.mode === "tower" ? { damaged: r.damaged, keysSpent: r.keysSpent } : {}),
     gold: g.save.gold, xp: g.save.xp, materials, looted: Object.keys(g.save[g.mode].lootedTiles).length,
@@ -81,8 +81,8 @@ function trace(mode: Mode, seed: number, smartAi: boolean): string[] {
   g.newRun();
   const out: string[] = [];
   for (let i = 0; i < STEPS; i++) {
-    if (g.summary) {
-      g.summary = null;
+    if (g.fallen) {
+      g.acceptDefeat();
       g.newRun();
     }
     if (!g.run.outside && rng() < 0.15) plant(g, rng);

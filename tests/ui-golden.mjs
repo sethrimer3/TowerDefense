@@ -105,6 +105,23 @@ try {
       };
       s.provisions.heal = 2;
     };
+    /** A Tower run whose hero, down to 1 HP, has just fallen to the first
+     * enemy on the floor, the defeat dialog waiting. */
+    const fallen = (edit) => {
+      const s = defaults();
+      quiet(s);
+      edit?.(s);
+      const g = new Game(s);
+      g.switchMode("tower");
+      g.newRun({ seed: 7 });
+      const p = g.run.player;
+      const beside = [];
+      for (let y = 1; y < 16 && !beside.length; y++) for (let x = 1; x < 16 && !beside.length; x++)
+        if (g.world.tile(x, y).kind === "enemy" && g.world.tile(x, y - 1).kind === "floor") beside.push(x, y - 1);
+      Object.assign(p, { x: beside[0], y: beside[1], hp: 1 });
+      g.move(0, 1, true);
+      return { save: JSON.stringify(g.save), targets: [] };
+    };
     return {
       fresh: make(quiet),
       towerFloor: inside(quiet, 3),
@@ -115,6 +132,10 @@ try {
         s.settings.infoDisplay = "status";
         s.settings.showArrows = true;
       }, 25),
+      // Built last, so the fixtures above keep their run seeds.
+      fallenUndo: fallen((s) => { s.upgrades.inspirationUndos = 1; }),
+      fallenRevive: fallen((s) => { s.upgrades.revive = 1; }),
+      fallenBare: fallen(),
     };
   });
 
@@ -171,7 +192,6 @@ try {
   async function leaveRun() {
     await click("#end-run");
     await click("#confirm");
-    await click("#again");
   }
   async function closeModal() {
     await page.evaluate(() => document.querySelector("#modal").open && document.querySelector("#modal").close());
@@ -344,9 +364,7 @@ try {
     await click("#retire");
     await shot(`${prefix}.retire.confirm`);
     await click("#confirm");
-    await shot(`${prefix}.summary`);
-    await click("#again");
-    await shot(`${prefix}.again`);
+    await shot(`${prefix}.retired`);
   }
 
   await load("fresh");
@@ -367,6 +385,20 @@ try {
   // In the forest it leads to the upgrade instead.
   await click("#auto");
   await shot("fresh.autoLocked.forest");
+
+  // A fallen hero: the defeat dialog, with an undo, with Revive, or with neither.
+  await load("fallenUndo");
+  await shot("fallen.undo");
+  await click("#defeat-undo");
+  await shot("fallen.undo.undone");
+  await load("fallenRevive");
+  await shot("fallen.revive");
+  await click("#defeat-undo");
+  await shot("fallen.revive.revived");
+  await load("fallenBare");
+  await shot("fallen.bare");
+  await click("#defeat-accept");
+  await shot("fallen.accepted");
 
   await load("towerFloor");
   await boardTour("floor", "towerFloor");

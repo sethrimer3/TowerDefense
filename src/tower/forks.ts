@@ -1,6 +1,6 @@
 import type { KeyColor } from "../config.ts";
 import type { TowerEnemyProfile } from "../scaling.ts";
-import { ARCHETYPES, pick, type Weighted } from "./patterns.ts";
+import { ARCHETYPES, keyedFloor, pick, type Weighted } from "./patterns.ts";
 import type { GraphBuilder } from "./strategic-graph.ts";
 import type { Archetype, Fork, Gate, Lane, LaneStep, Reward, StrategicNode, StrategicTag, Strength } from "./types.ts";
 
@@ -244,13 +244,20 @@ export function planForks(b: GraphBuilder, archetype: Archetype) {
   for (const node of b.nodes) {
     if (placed >= FORK_TUNING.maxPerFloor) break;
     if (node.parent === null || node.gate.kind === "open" || !worthReaching(b.nodes, node.id)) continue;
+    // Floors 2 to 5 lay a key behind every door, planned from its gate: a
+    // fork there never replaces a lock (the embedder may fall back to it)
+    // nor adds one.
+    if (keyedFloor(depth) && (node.gate.kind === "door" || node.gate.kind === "steel")) continue;
     if (rng() >= FORK_TUNING.chance(depth)) continue;
-    const forks = forksWorth(stepValue(node.gate), depth, archetype, rng);
+    const forks = forksWorth(stepValue(node.gate), depth, archetype, rng, keyedFloor(depth) ? withoutLocks : undefined);
     if (!forks.length) continue;
     node.forks = forks;
     placed++;
   }
 }
+
+/** A fork with no lane through a door that takes keys. */
+const withoutLocks = (f: Fork) => !f.lanes.some((lane) => lane.some((s) => s.kind === "door" || s.kind === "steel"));
 
 /** Forks priced near `v` for a floor `depth` deep (Delve passes its
  * equivalent floor), best first, the rest shallower and narrower first.

@@ -7,6 +7,7 @@ import type { XY } from "./grid.ts";
 import { analyzeFloor, formatFloorSummary, type FloorAnalysis } from "./analyzer.ts";
 import { embed, ENTRY, type Embedding } from "./embedder.ts";
 import { GraphBuilder, generateStrategicGraph } from "./strategic-graph.ts";
+import { keyedFloor, openFirstFloor } from "./patterns.ts";
 import type { StrategicGraph } from "./types.ts";
 
 /** Tower floor generation pipeline:
@@ -55,11 +56,17 @@ function insideStairs([x, y]: XY): XY {
   return y === 0 ? [x, 1] : [x, 15];
 }
 
-/** Smallest possible floor: start hall → stairs. Always embeddable. */
+/** Smallest possible floor: start hall → stairs. Always embeddable. It
+ * keeps the first floors' rules: floor 1's stairs stand open, and floors 2
+ * to 5 have a yellow door before them and its key in the start hall. */
 function minimalGraph(depth: number, rng: () => number): StrategicGraph {
   const b = new GraphBuilder(depth, rng);
-  b.add({ purpose: "start", patternId: "main", parent: null, gate: { kind: "open" }, route: "main", footprint: "hall", rewards: [{ kind: "potion" }] });
-  b.add({ purpose: "stairs", patternId: "main", parent: 0, gate: { kind: "enemy", strength: "normal" }, route: "main", footprint: "pocket" });
+  const keyed = keyedFloor(depth);
+  b.add({ purpose: "start", patternId: "main", parent: null, gate: { kind: "open" }, route: "main", footprint: "hall",
+    rewards: [{ kind: "potion" }, ...(keyed ? [{ kind: "key", color: "yellow" } as const] : [])] });
+  b.add({ purpose: "stairs", patternId: "main", parent: 0, route: "main", footprint: "pocket",
+    gate: openFirstFloor(depth) || keyed ? { kind: "open" } : { kind: "enemy", strength: "normal" },
+    ...(keyed ? { stairsGuard: "door" as const } : {}) });
   return { archetype: "mixed", depth, nodes: b.nodes, shortcuts: [], notes: ["fallback minimal floor"] };
 }
 

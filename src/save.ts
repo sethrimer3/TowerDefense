@@ -1,5 +1,5 @@
 import { FIND_POTION_MAX, GOLD_SHOP, SAVE_KEY, TOWER_WIDTH, TRAINING, UPGRADES, WIDTH } from "./config.ts";
-import type { AutomoveMemory, DelveRun, FloorRecord, ModeSave, MoveSnapshot, Revival, Run, Save, TowerRun } from "./entities.ts";
+import type { AutomoveMemory, DelveRun, FloorRecord, ModeSave, Fall, MoveSnapshot, Run, Save, TowerRun } from "./entities.ts";
 import { emptyMaterials, MATERIAL_IDS, type MaterialId } from "./materials.ts";
 import { EQUIPMENT_SLOTS, type CraftedEquipment, type EquipmentSlot } from "./equipment.ts";
 import { CONSUMABLES, type ConsumableId } from "./crafting.ts";
@@ -11,8 +11,8 @@ import { decodeArchives, defaultArchives } from "./archives.ts";
 export function defaults(): Save {
   return {
     version: 3,
-    tower: { run: null, history: [], revival: null, best: 0, reached: 0, inspiration: 0, log: {}, lootedTiles: {}, runGold: 0, startSection: 0, sectionHp: {} },
-    delve: { run: null, history: [], revival: null, best: 0, reached: 0, courage: 0, lootedTiles: {}, runGold: 0, memory: { known: {}, visited: {} } },
+    tower: { run: null, history: [], fall: null, best: 0, reached: 0, inspiration: 0, log: {}, lootedTiles: {}, runGold: 0, startSection: 0, sectionHp: {} },
+    delve: { run: null, history: [], fall: null, best: 0, reached: 0, courage: 0, lootedTiles: {}, runGold: 0, memory: { known: {}, visited: {} } },
     gold: 0,
     provisions: Object.fromEntries(
       GOLD_SHOP.map((g) => [g.id, 0]),
@@ -67,7 +67,7 @@ const validPlayer = (p: any, width: number) =>
   !!p &&
   Number.isInteger(p.x) && p.x >= 0 && p.x < width &&
   Number.isInteger(p.y) && finite(p.y) &&
-  finite(p.hp) && p.hp > 0 && finite(p.maxHp) && p.hp <= p.maxHp &&
+  finite(p.hp) && p.hp >= 0 && finite(p.maxHp) && p.hp <= p.maxHp &&
   finite(p.attack) && finite(p.defense) && (p.shroud === undefined || (finite(p.shroud) && p.shroud >= 0)) &&
   KEY_COLORS.every((k) => finite(p.keys?.[k]));
 /** Checks every run passes, whatever its mode; `width` is the mode's board. */
@@ -111,7 +111,7 @@ function decodeDelveRun(r: any): DelveRun | null {
 }
 
 // --- Mode slices ---
-type DecodedMode<R extends Run> = Pick<ModeSave<R>, "run" | "history" | "revival" | "lootedTiles" | "runGold">;
+type DecodedMode<R extends Run> = Pick<ModeSave<R>, "run" | "history" | "fall" | "lootedTiles" | "runGold">;
 type RunDecoder<R extends Run> = (raw: any) => R | null;
 function snapshot<R extends Run>(value: any, decodeRun: RunDecoder<R>): MoveSnapshot<R> | null {
   if (!value || !finite(value.best) || !finite(value.xp)) return null;
@@ -126,9 +126,13 @@ function decodeHistory<R extends Run>(raw: any, run: R, undoCapacity: number, de
     .filter((item): item is MoveSnapshot<R> =>
       !!item && item.run.seed === run.seed && item.run.layoutVersion === run.layoutVersion);
 }
-function decodeRevival<R extends Run>(raw: any, run: R, decodeRun: RunDecoder<R>): Revival<R> | null {
+/** A fall is kept only beside a run whose hero lies fallen, from the same
+ * run and layout. */
+function decodeFall<R extends Run>(raw: any, run: R, decodeRun: RunDecoder<R>): Fall<R> | null {
+  if (run.outside || run.player.hp > 0) return null;
   const item = snapshot(raw?.snapshot, decodeRun);
-  return item && item.run.layoutVersion === run.layoutVersion ? { snapshot: item } : null;
+  if (!item || item.run.seed !== run.seed || item.run.layoutVersion !== run.layoutVersion) return null;
+  return { snapshot: item, by: typeof raw.by === "string" ? raw.by : "" };
 }
 /** Automove's memory, each half kept only when every entry is well formed. */
 function decodeMemory(raw: any): AutomoveMemory {
@@ -149,7 +153,7 @@ function decodeMode<R extends Run>(s: any, undoCapacity: number, decodeRun: RunD
   return {
     run,
     history: run ? decodeHistory(s.history, run, undoCapacity, decodeRun) : [],
-    revival: run ? decodeRevival(s.revival, run, decodeRun) : null,
+    fall: run ? decodeFall(s.fall, run, decodeRun) : null,
     lootedTiles: decodeLootedTiles(s?.lootedTiles),
     runGold: run ? count(s.runGold, 0) : 0,
   };
@@ -157,7 +161,7 @@ function decodeMode<R extends Run>(s: any, undoCapacity: number, decodeRun: RunD
 function applyMode<R extends Run>(slice: ModeSave<R>, decoded: DecodedMode<R>) {
   slice.run = decoded.run;
   slice.history = decoded.history;
-  slice.revival = decoded.revival;
+  slice.fall = decoded.fall;
   slice.lootedTiles = decoded.lootedTiles;
   slice.runGold = decoded.runGold;
 }
@@ -229,7 +233,7 @@ function decodeProgress(s: any, d: Save, undoCapacity: number) {
 function migrateV1(s: any, d: Save, undoCapacity: number) {
   d.delve.best = count(s.best, d.delve.best);
   d.delve.courage = count(s.essence, d.delve.courage);
-  applyMode(d.delve, decodeMode({ run: s.run, history: s.history, revival: s.revival }, undoCapacity, decodeDelveRun));
+  applyMode(d.delve, decodeMode({ run: s.run, history: s.history, fall: s.fall }, undoCapacity, decodeDelveRun));
 }
 /** Existing records are already rewarded; preserve old balances without double-paying. */
 function decodeReached(s: any, d: Save) {

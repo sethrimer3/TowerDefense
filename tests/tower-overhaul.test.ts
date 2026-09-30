@@ -66,7 +66,7 @@ test("impervious enemy blocks manual movement harmlessly: no combat, no damage, 
   assert.equal(g.run.player.hp, hpBefore);
   assert.equal(g.run.player.x, startX);
   assert.equal(g.save.tower.history.length, historyBefore);
-  assert.equal(g.summary, null);
+  assert.equal(g.fallen, false);
   assert.deepEqual(
     (g.world as RoomWorld).tile(TOWER_START_X + 1, 0).enemy,
     IMPERVIOUS,
@@ -89,9 +89,9 @@ test("a lethal but damageable enemy can still be entered manually, and it kills 
   (g.world as RoomWorld).cells.set(point(1, 0), { kind: "enemy", enemy: LETHAL });
   assert.equal(predict(g.run.player, LETHAL).impervious, false);
   assert.equal(g.move(1, 0, false), false); // automation refuses
-  assert.equal(g.summary, null);
+  assert.equal(g.fallen, false);
   assert.equal(g.move(1, 0, true), false); // manual attempt is allowed to fight...
-  assert.ok(g.summary?.dead); // ...and it is fatal.
+  assert.ok(g.fallen); // ...and it is fatal.
 });
 
 test("a survivable encounter resolves normally: damage applies, enemy clears, run continues", () => {
@@ -176,7 +176,8 @@ test("a deadlocked floor leaves the hand stuck, and the run waits for the player
   const g = deadlockGame();
   assert.ok(isDeadlocked(g.run));
   g.autoTurn();
-  assert.equal(g.summary, null, "only End Run ends a stuck run");
+  assert.equal(g.fallen, false);
+  assert.ok(!g.run.outside, "only End Run ends a stuck run");
   assert.ok(g.handStuck);
   assert.deepEqual([g.run.player.x, g.run.player.y], [TOWER_START_X, 0]);
 });
@@ -235,7 +236,7 @@ test("bumping an impervious enemy on a deadlocked floor leaves the run going", (
   const g = deadlockGame();
   g.run.changes[point(TOWER_START_X + 1, 0)] = { kind: "enemy", enemy: IMPERVIOUS };
   assert.equal(g.move(1, 0, true), false);
-  assert.equal(g.summary, null);
+  assert.ok(!g.fallen && !g.run.outside);
 });
 
 // ---------- Enemy scaling ----------
@@ -308,8 +309,8 @@ test("strong gate enemies are hardened locals, weak ones softer, and elites come
 test("enemy DEF compounds 1% every 5 Tower floors and every 20 Delve depth", () => {
   assert.deepEqual([0, 4, 5, 9, 10, 99].map(towerDefenseGrowth), [1, 1, 1.01, 1.01, 1.01 * 1.01, intPow(1.01, 19)]);
   assert.deepEqual([0, 19, 20, 99, 1000].map(delveDefenseGrowth), [1, 1, 1.01, intPow(1.01, 4), intPow(1.01, 50)]);
-  // Floor 100's normal defense-heavy enemy: 180 DEF before growth.
-  assert.equal(getTowerGateEnemy(99, "normal", "defenseHeavy").defense, Math.round(180 * intPow(1.01, 19)));
+  // Floor 100's normal defense-heavy enemy: 135 DEF before growth.
+  assert.equal(getTowerGateEnemy(99, "normal", "defenseHeavy").defense, Math.round(135 * intPow(1.01, 19)));
 });
 
 test("Tower enemy scaling is deterministic for a given seed/rng sequence", () => {
@@ -322,16 +323,20 @@ test("Tower enemy scaling is deterministic for a given seed/rng sequence", () =>
 
 // ---------- Death / finalization ----------
 
-test("the death summary reports the dying run's own height and kills, not the freshly reset run's", () => {
+test("a fallen hero's run waits at 0 HP with its own height and kills until defeat is accepted", () => {
   const g = arena();
   g.run.height = 7;
   g.run.kills = 3;
   (g.world as RoomWorld).cells.set(point(1, 0), { kind: "enemy", enemy: LETHAL });
   g.move(1, 0, true);
-  assert.ok(g.summary?.dead);
-  assert.equal(g.summary!.height, 7);
-  assert.equal(g.summary!.kills, 3);
-  assert.equal(g.run.height, 0, "the new run itself must already be reset");
+  assert.ok(g.fallen && !g.auto);
+  assert.deepEqual([g.run.player.hp, g.run.height, g.run.kills], [0, 7, 3]);
+  assert.equal(g.save.tower.fall?.by, LETHAL.name);
+  assert.equal(g.move(0, 1, true), false, "a fallen hero takes no step");
+  assert.ok(g.acceptDefeat());
+  assert.ok(g.run.outside && !g.fallen);
+  assert.equal(g.run.height, 0, "the next run starts afresh");
+  assert.equal(g.save.tower.fall, null);
 });
 
 test("clear rewards are paid out exactly once across a fatal encounter", () => {
@@ -341,7 +346,7 @@ test("clear rewards are paid out exactly once across a fatal encounter", () => {
   (g.world as RoomWorld).cells.set(point(1, 1), { kind: "enemy", enemy: LETHAL });
   const inspirationBefore = g.save.tower.inspiration;
   g.move(1, 0, true);
-  assert.ok(g.summary?.dead);
+  assert.ok(g.acceptDefeat());
   const inspirationAfterDeath = g.save.tower.inspiration;
   assert.ok(inspirationAfterDeath > inspirationBefore);
   // Nothing left to claim a second time.

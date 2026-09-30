@@ -4,7 +4,7 @@ import { levelForXp, xpForLevel } from "../config.ts";
 import { CONSUMABLES, consumableText } from "../crafting.ts";
 import { outsideWeather } from "../outside.ts";
 import { MODES, milestones } from "../modes.ts";
-import { cardArt, displayedProgress, el, text } from "./dom.ts";
+import { cardArt, displayedProgress, el, text, uiSprite } from "./dom.ts";
 import { CARDS, HAND_SLOTS } from "../cards.ts";
 import { trainingPoints } from "../loadout.ts";
 import type { BoardOverlay } from "./board-overlay.ts";
@@ -79,11 +79,22 @@ export function renderBoardHeading(game: Game, overlay: BoardOverlay) {
   overlay.hide();
 }
 
-/** Inside a run the button plays and pauses the hand; in the forest it
- * turns Automove on and off, once bought. */
+/** The button's icon inside a run, by what pressing it does: text glyphs
+ * (the variation selector keeps ▶ from turning into an emoji). */
+const HAND_ICON = { play: "▶︎", pause: "❚❚" };
+
+/** Inside a run the button plays and pauses the hand, showing the play or
+ * pause icon; in the forest it turns Automove on and off, once bought. */
 function renderAutoButton(game: Game) {
   const button = el("auto"), inside = !game.run.outside;
   const label = inside ? (game.auto ? "Pause the hand" : "Play the hand") : "Automove";
+  const icon = inside ? (game.auto ? HAND_ICON.pause : HAND_ICON.play) : "automove",
+    slot = button.querySelector<HTMLElement>(".mini-icon")!;
+  if (slot.dataset.icon !== icon) {
+    slot.dataset.icon = icon;
+    if (inside) slot.textContent = icon;
+    else slot.innerHTML = uiSprite("automove");
+  }
   text("auto-state", inside ? (game.auto ? "PLAYING" : "PAUSED") : game.save.upgrades.auto ? (game.auto ? "ON" : "OFF") : "LOCKED");
   button.classList.toggle("enabled", game.auto);
   button.setAttribute("aria-label", label);
@@ -198,7 +209,7 @@ function renderConsumables(game: Game) {
     const countEl = document.querySelector<HTMLElement>(`[data-consumable-count="${c.id}"]`)!;
     const button = countEl.closest("button") as HTMLButtonElement;
     countEl.textContent = String(count);
-    button.disabled = count < 1 || game.run.outside || !!game.summary;
+    button.disabled = count < 1 || game.run.outside || game.fallen;
     // Potion HP research changes what it restores.
     button.title = `${c.name}: ${consumableText(c, game.stepRules)}`;
   }
@@ -241,17 +252,16 @@ function renderStatus(game: Game, overlay: BoardOverlay) {
   text("message", game.paused ? "Paused · take a breath." : overlay.statusLine() ?? game.message);
 }
 
-/** The undo button doubles as Revive while a revival is pending. */
+/** The undo button and how many undos are left. */
 function renderUndo(game: Game) {
   const slice = game.save[game.mode],
     undo = el("undo") as HTMLButtonElement,
     count = `${slice.history.length}/${game.undoCapacity}`;
-  text("undo-state", slice.revival ? "REVIVE" : count);
-  undo.classList.toggle("enabled", !!slice.revival);
-  undo.setAttribute("aria-label", slice.revival ? "Revive" : `Undo (${count})`);
-  undo.disabled = !slice.revival && !slice.history.length;
-  // Undo needs Rehearsed steps; before it the button shows only to Revive.
-  undo.hidden = !slice.revival && !game.save.upgrades.inspirationUndos;
+  text("undo-state", count);
+  undo.setAttribute("aria-label", `Undo (${count})`);
+  undo.disabled = !slice.history.length;
+  // Undo needs Rehearsed steps.
+  undo.hidden = !game.save.upgrades.inspirationUndos;
 }
 
 function renderLockedTab(id: string, unlocked: boolean, name: string, hint: string) {

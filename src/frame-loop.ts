@@ -110,6 +110,6 @@ export class FrameLoop {
    * fight still playing out, or behind a dialog. */
   private canAct() {
     const { game, modal } = this.host;
-    return !game.paused && !game.summary && !game.encounter && !modal.open;
+    return !game.paused && !game.fallen && !game.encounter && !modal.open;
   }
 }

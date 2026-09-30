@@ -46,7 +46,7 @@ const mode = (make: (over?: object) => object, extra: object = {}) => ({
     { run: make({ kills: 2 }), best: 2, xp: 0 },
     { run: make({ kills: 1 }), best: 2 },
   ],
-  revival: { earned: 2, snapshot: { run: make({ kills: 1 }), best: 2, xp: 0 } },
+  fall: { by: "Goblin", snapshot: { run: make({ kills: 1 }), best: 2, xp: 0 } },
   best: 9, reached: 7,
   lootedTiles: { "1234:3,4": true, "1234:2:3,4": true, "bad": true, "-1:-2:-3,-4": true },
   ...extra,
@@ -78,9 +78,9 @@ const v3 = () => ({
   consumables: { ...defaults().consumables },
 });
 // Each base mutates only the subtrees where it behaves differently, keeping the
-// corpus small: snapshots nested in history/revival reuse the run validator.
+// corpus small: snapshots nested in history/fall reuse the run validator.
 const nested = (p: string[]) => {
-  const i = p.findIndex((k) => k === "history" || k === "revival");
+  const i = p.findIndex((k) => k === "history" || k === "fall");
   return i >= 0 && p.length > i + 3;
 };
 const under = (...prefixes: string[]) => (p: string[]) => prefixes.some((x) => p.join(".").startsWith(x));
@@ -210,7 +210,7 @@ test("decode keeps a valid v3 save's progress and clamps settings", () => {
   // Capacity is 1 + undos + inspirationUndos = 4; mismatched seed/layout snapshots drop out.
   assert.equal(d.tower.history.length, 2);
   assert.deepEqual(d.tower.history.map((h) => h.xp), [0, 0]);
-  assert.ok(d.tower.revival);
+  assert.equal(d.tower.fall, null, "a fall is kept only beside a fallen hero");
   assert.deepEqual(Object.keys(d.tower.lootedTiles).sort(), ["-1:-2:-3,-4", "1234:2:3,4", "1234:3,4"]);
   assert.deepEqual(d.tower.log, { "3": { silver: "earned", gold: "claimed" }, "5": { silver: "claimed", platinum: "earned" } });
   assert.deepEqual(d.tower.sectionHp, { "1": 80 });
@@ -247,7 +247,7 @@ test("a malformed run.floors drops only that run, not the rest of the save", () 
 });
 
 test("decode rejects runs that break player invariants", () => {
-  for (const bad of [player({ hp: 0 }), player({ hp: 60 }), player({ x: 17 }), player({ keys: { yellow: 1 } })]) {
+  for (const bad of [player({ hp: -1 }), player({ hp: 60 }), player({ x: 17 }), player({ keys: { yellow: 1 } })]) {
     const s = v3();
     s.tower.run = towerRun({ player: bad });
     assert.equal(decode(JSON.stringify(s)).tower.run, null);

@@ -42,6 +42,10 @@ _Avoid_: barrier, lock (for enemies)
 Two or three lanes side by side leading into the same place, each costing about the same but in a different resource (HP against one kind of enemy or another, keys of a colour, full HP), so the player chooses what to spend rather than whether to pay.
 _Avoid_: split path, branch (a branch is an optional side room)
 
+**Stairs guard**:
+What stands on the one tile in front of a floor's stairs: an enemy, a yellow door, or nothing (a section's last floor puts its boss there).
+_Avoid_: stairs gate (the gate is the stairs room's way in)
+
 **Lane**:
 One way through a fork: one to three tiles of gates walked in order, sometimes with an item between them (a treasure, or a key that pays for the door after it).
 _Avoid_: corridor, path
@@ -63,6 +67,10 @@ _Avoid_: blow, hit (a hit is the damage one strike deals)
 **Encounter**:
 A fight being played out on the board, strike by strike, with its damage rising off whoever was struck and the HP it has cost so far shown in purple on the HP bar. The hero waits on the tile it came from, nothing counts until the fight is settled, and only then does the hero step onto the enemy's tile, or fall.
 _Avoid_: combat animation, pending fight
+
+**Fallen**:
+The hero lost a fight: the run waits at 0 HP, the hand paused, until the player takes the fight back (Undo, spending one; or Revive, when none is left) or accepts defeat, which ends the run and returns to the forest.
+_Avoid_: dead, game over
 
 **Gain**:
 A reward just picked up (an item's stats, keys, Gold, materials, a clear chest's Inspiration), or what a door took (each key, or the full HP a Heart Door checked), shown rising from the tile it came from the moment it happens: as its sprite, or written out where it has none.

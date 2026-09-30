@@ -111,7 +111,7 @@ function bindSettings(ctx: AppContext, overlay: BoardOverlay) {
       },
       () => {
         game.finish(`${capitalized(MODES[game.mode].words.run)} retired`);
-        ctx.update();
+        ctx.navigate(game.mode);
       },
     );
   el("erase").onclick = () =>

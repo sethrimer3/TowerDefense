@@ -1,3 +1,4 @@
+import { TOWER_SECTION } from "../config.ts";
 import { point, type Tile } from "../entities.ts";
 import { getTowerGateEnemy, type TowerEnemyProfile } from "../scaling.ts";
 import type { Gate, LaneStep, Reward, StrategicNode, Strength } from "./types.ts";
@@ -34,7 +35,11 @@ const PROFILES_FOR: Record<Strength, TowerEnemyProfile[]> = {
   boss: ["balanced"],
 };
 
-function enemyTile(strength: Strength, depth: number, rng: () => number, named?: TowerEnemyProfile): Tile {
+/** An enemy for floor `depth`. The first section holds no elites (the next
+ * zone's roster): one there stands as a strong enemy, so no enemy below the
+ * floor 10 boss can beat a new hero in a single fight. */
+function enemyTile(asked: Strength, depth: number, rng: () => number, named?: TowerEnemyProfile): Tile {
+  const strength = asked === "elite" && depth < TOWER_SECTION ? "strong" : asked;
   const profiles = PROFILES_FOR[strength];
   const profile = named ?? profiles[Math.floor(rng() * profiles.length)];
   return { kind: "enemy", enemy: getTowerGateEnemy(depth, strength, profile) };
@@ -308,7 +313,8 @@ export class Furnisher {
     this.reserveLanes(room);
     if (node.stairsGuard && room.exits.length) {
       const s = room.exits[room.exits.length - 1];
-      this.put(room, ...s, enemyTile(node.stairsGuard, this.depth, this.rng), "stairsGuard");
+      const guard = node.stairsGuard === "door" ? gateTile({ kind: "door", color: "yellow" }, this.depth, this.rng) : enemyTile(node.stairsGuard, this.depth, this.rng);
+      this.put(room, ...s, guard, "stairsGuard");
     }
     this.ring(room);
     let last: XY | null = null;

@@ -14,7 +14,7 @@ import { MODES } from "./modes.ts";
 import { buildShell } from "./ui/shell.ts";
 import { BoardOverlay } from "./ui/board-overlay.ts";
 import { boardHeadingStale, flashRed, renderBoardHeading, renderHud, renderVitals } from "./ui/hud.ts";
-import { confirmAction, RunEnd, showLog, showSectionPicker } from "./ui/dialogs.ts";
+import { confirmAction, DefeatDialog, showLog, showSectionPicker } from "./ui/dialogs.ts";
 import { SkillTreePage } from "./ui/skill-tree-page.ts";
 import { ResearchToasts } from "./ui/research-toast.ts";
 import { GearPage } from "./ui/gear-page.ts";
@@ -46,7 +46,7 @@ const ctx: AppContext = {
   navigate,
   confirm: (prompt, action) => confirmAction(ctx, prompt, action),
 };
-const runEnd = new RunEnd(ctx);
+const defeat = new DefeatDialog(ctx);
 const overlay = new BoardOverlay(game, renderer);
 const skillTree = new SkillTreePage(ctx);
 const gear = new GearPage(ctx);
@@ -69,7 +69,7 @@ function save() {
   if (!persist(game.save))
     game.message = "Storage unavailable — progress is only kept for this session.";
 }
-/** Refreshes the HUD from game state, saves, and shows any finished run. */
+/** Refreshes the HUD from game state, saves, and asks a fallen hero's player what next. */
 function update() {
   if (boardHeadingStale(game)) renderBoardHeading(game, overlay);
   // Inside a run the tabs give way to an empty row, kept for the hand.
@@ -79,7 +79,7 @@ function update() {
   renderHud(game, renderer, overlay);
   researchToasts.add(game.researchDone.splice(0));
   save();
-  runEnd.check();
+  defeat.check();
 }
 function renderPage() {
   if (tab === "defend") defendPage.show();
@@ -157,11 +157,12 @@ el("end-run").onclick = () =>
     },
     () => {
       game.finish(`${capitalized(MODES[game.mode].words.run)} ended`);
-      update();
+      navigate(game.mode);
     },
   );
 modal.addEventListener("cancel", (e) => {
-  if (game.summary) e.preventDefault();
+  // The defeat dialog waits for an answer.
+  if (game.fallen) e.preventDefault();
 });
 el("auto-settings").onclick = () => navigate("settings");
 el("auto").onclick = () => {

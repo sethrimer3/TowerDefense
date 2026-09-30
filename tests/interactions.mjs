@@ -17,7 +17,6 @@ await page.goto(process.env.TEST_URL || "http://127.0.0.1:5173/");
 // Inside a run the tabs are hidden: end the first Tower run to reach the forest.
 await page.locator("#end-run").click();
 await page.locator("#confirm").click();
-await page.locator("#again").click();
 await expect(page.locator(".dpad")).toBeHidden();
 
 const saved = () =>
@@ -94,7 +93,7 @@ const place = (s, { seed, x, y, open = [], closed = [], stats = {}, revive = fal
   for (const [cx, cy] of closed) r.changes[`${cx},${cy}`] = { kind: "wall" };
   Object.assign(r.player, { x, y, hp: 120, attack: 12, defense: 5, keys: { yellow: 0, blue: 0, red: 0 } }, stats);
   s.delve.history = [];
-  s.delve.revival = null;
+  s.delve.fall = null;
 };
 
 // A fresh save has no Delve run until Delve is unlocked and opened.
@@ -134,7 +133,8 @@ await expect.poll(async () => (await player()).y).toBe(door.y - 1);
 await expect(page.locator("#message")).toContainText("Requires amber key.");
 await page.screenshot({ path: "test-results/blocked-door.png", fullPage: true });
 
-// A lethal fight ends the run; Revive survives a refresh and restores it.
+// A lethal fight leaves the hero fallen: the defeat dialog survives a
+// refresh, and Revive takes the fight back.
 const weak = {
   seed: scene.seed, x: enemy.x, y: enemy.y - 2,
   open: [[enemy.x, enemy.y - 2], [enemy.x, enemy.y - 1]],
@@ -144,25 +144,20 @@ const weak = {
 await fixture(place, weak);
 await swipe(0, -1);
 await swipe(0, -1);
-await expect(page.locator("#revive-now")).toBeVisible();
-await expect.poll(async () => (await player()).y).toBe(0);
-await page.locator("#again").click();
-await expect(page.locator("#undo")).toHaveAttribute("aria-label", "Revive");
+await expect(page.locator("#defeat-undo")).toBeVisible();
+await expect.poll(async () => (await player()).hp).toBe(0);
 await page.reload();
 await page.locator('[data-tab="delve"]').click();
-await expect(page.locator("#undo")).toHaveAttribute("aria-label", "Revive");
-await page.locator("#undo").click();
+await expect(page.locator("#defeat-undo")).toBeVisible();
+await page.locator("#defeat-undo").click();
 await expect.poll(async () => (await player()).y).toBe(enemy.y - 1);
 await expect.poll(async () => (await player()).hp).toBe(1);
-// Revive expires once the new run takes a step.
+await expect.poll(async () => (await saved()).delve.fall).toBe(null);
+// Accepting defeat ends the run and returns to the forest.
 await swipe(0, -1);
-await page.locator("#again").click();
-await swipe(0, -1);
-await expect(page.locator("#undo")).toHaveAttribute("aria-label", /^Undo/);
-await expect.poll(async () => (await saved()).delve.revival).toBe(null);
-await page.locator("#undo").click();
-await expect.poll(async () => (await player()).y).toBe(0);
-await expect.poll(async () => (await saved()).delve.revival).toBe(null);
+await page.locator("#defeat-accept").click();
+await expect.poll(async () => (await saved()).delve.run.outside).toBe(true);
+await expect.poll(async () => (await saved()).delve.fall).toBe(null);
 await page.screenshot({ path: "test-results/touch-controls.png", fullPage: true });
 
 // The Delve wraps left/right where both edge tiles of a row are open. The

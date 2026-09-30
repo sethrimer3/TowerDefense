@@ -25,7 +25,7 @@ await page.getByRole('button',{name:'Adventure log',exact:true}).click();
 assert.match(await page.locator('.floor-log').innerText(),/Silver.*Gold.*Platinum/);
 await page.locator('#log-close').click();
 // Inside a run the tabs are hidden: end the Tower run to reach the Delve.
-await page.locator('#end-run').click(); await page.locator('#confirm').click(); await page.locator('#again').click();
+await page.locator('#end-run').click(); await page.locator('#confirm').click();
 await page.locator('[data-tab="delve"]').click();
 assert.equal(await page.getByRole('button',{name:'Adventure log',exact:true}).count(),0);
 assert.equal(await page.getByRole('button',{name:'Choose starting floor',exact:true}).count(),0);

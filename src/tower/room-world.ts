@@ -14,7 +14,7 @@ import { generateTowerFloor } from "./index.ts";
 // v9 prices a blue key at two yellow and a red at five.
 // v10 puts a boss beside the stairs of every section's last floor.
 // v11 softens weak enemies and grows enemy DEF 1% every five floors.
-export const TOWER_LAYOUT_VERSION = 11;
+export const TOWER_LAYOUT_VERSION = 12;
 
 /** A self-contained 17x17 Tower floor. Generation is strategy-first (see
  * src/tower/index.ts): an abstract graph of gates, keys and rewards is

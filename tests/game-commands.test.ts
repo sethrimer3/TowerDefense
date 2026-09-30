@@ -39,7 +39,7 @@ test("a hand with no card that can act pauses, lights End Run, and plays on afte
   const tonic = CONSUMABLES[0].id;
   g.save.consumables[tonic] = 2;
   g.autoTurn();
-  assert.ok(g.handStuck && !g.auto && g.activeCard === null && !g.summary);
+  assert.ok(g.handStuck && !g.auto && g.activeCard === null && !g.fallen);
   assert.deepEqual([g.run.player.x, g.run.player.y], [0, 0]);
   assert.match(g.message, /^No card can move/);
   // Acting while nothing has changed leaves it paused.
@@ -107,21 +107,13 @@ test("a manual step drops the queued route and Automove", () => {
   assert.equal(g.message, "Manual climbing");
 });
 
-test("after a retire the next run starts fresh in the forest; after a death it is already there", () => {
+test("ending a run goes straight back to the forest with the next run", () => {
   const g = arena();
   const retired = g.run.seed;
   g.finish("Ascent retired");
-  assert.ok(g.summary && !g.summary.dead);
-  g.nextRun();
-  assert.equal(g.summary, null);
   assert.ok(g.run.outside && g.run.seed !== retired && g.save.tower.run === g.run);
-  assert.equal(g.message, "Follow the forest path to the entrance.");
-
-  const afterDeath = g.run;
-  g.summary = { height: 3, kills: 1, reason: "Fallen", dead: true, record: false };
-  g.nextRun();
-  assert.equal(g.summary, null);
-  assert.equal(g.run, afterDeath, "the run a death started is kept");
+  assert.equal(g.fallen, false);
+  assert.match(g.message, /^Ascent retired.*Follow the forest path to begin again\.$/);
 });
 
 test("erasing everything leaves a fresh save with a new run outside the Tower", () => {
@@ -131,7 +123,6 @@ test("erasing everything leaves a fresh save with a new run outside the Tower", 
   g.finish("Delve run ended");
   g.eraseAll();
   assert.equal(g.mode, "tower");
-  assert.equal(g.summary, null);
   assert.ok(g.run.outside && g.save.tower.run === g.run);
   // Everything but the new run and the Defend city's random seed.
   const fresh = defaults();

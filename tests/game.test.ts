@@ -92,7 +92,7 @@ test("combination, steel, and heart doors apply their runtime rules", () => {
   assert.equal(heart.move(0, 1), true);
   assert.deepEqual(heart.run.player.keys, keys);
 });
-test("automation avoids lethal fights; manual death resets immediately and awards once", () => {
+test("automation avoids lethal fights; a manual death waits on the player, and accepting it awards once", () => {
   const g = new Game(defaults());
   g.save.upgrades.delve = 1;
   g.switchMode("delve");
@@ -103,18 +103,19 @@ test("automation avoids lethal fights; manual death resets immediately and award
     enemy: { name: "doom", hp: 99999, attack: 999, defense: 0, tier: 3 },
   };
   assert.equal(g.move(0, 1, false), false);
-  assert.equal(g.summary, null);
+  assert.equal(g.fallen, false);
   g.move(0, 1, true);
-  assert.ok(g.summary);
+  assert.ok(g.fallen);
+  assert.equal(g.undo(), false, "no undo to take it back");
+  assert.ok(g.acceptDefeat());
+  assert.ok(g.run.outside);
   assert.equal(g.save.delve.run?.player.y, 0);
-  assert.equal(g.undo(), false);
   const earned = g.save.delve.courage;
   g.finish("again");
   assert.equal(g.save.delve.courage, earned);
   g.save.delve.courage = 100;
   g.save.upgrades.auto = 1;
   assert.ok(g.buy("hp"));
-  g.summary = null;
   g.newRun();
   assert.equal(g.run.player.maxHp, 120);
 });
@@ -198,12 +199,12 @@ test("every Tower tree door is a real choke point; shortcuts and fork lanes are 
     }
 });
 test("the key economy is coherent on early floors but never force-balanced", () => {
-  let early = 0, earlyOk = 0, anyUnaffordable = 0, exchanges = 0, floors = 0;
+  let early = 0, earlyOk = 0, anyUnaffordable = 0, exchanges = 0, floors = 0, deep = 0;
   for (let seed = 0; seed < 80; seed++)
     for (const room of [0, 1, 6, 12, 30]) {
       const a = towerFloorReport(seed, room).analysis;
       floors++;
-      if (room <= 1) { early++; if (a.stairsKeyReachable) earlyOk++; }
+      if (room <= 1) { early++; if (a.stairsKeyReachable) earlyOk++; } else deep++;
       if (!a.keyEconomyComplete) anyUnaffordable++;
       // Higher-tier door -> several lower-tier keys (resource conversion).
       if (a.regions.some((r) => /^(blue|red) door$/.test(r.gate) && (r.contents.match(/key/g) ?? []).length >= 3)) exchanges++;
@@ -212,7 +213,8 @@ test("the key economy is coherent on early floors but never force-balanced", () 
   assert.ok(earlyOk / early > 0.9, `early floors key-reachable ${earlyOk}/${early}`);
   // Scarcity is allowed: some floors leave a door (or the stairs) unaffordable.
   assert.ok(anyUnaffordable > 0 && anyUnaffordable < floors * 0.6, `${anyUnaffordable}/${floors} floors with an unaffordable door`);
-  assert.ok(exchanges > floors * 0.1, `${exchanges}/${floors} floors with a key exchange room`);
+  // Floors 1 to 5 keep to their own door and key rules, so count past them.
+  assert.ok(exchanges > deep * 0.1, `${exchanges}/${deep} floors past the fifth with a key exchange room`);
 });
 
 test("old runs safely migrate topology while retaining earned stats and permanent progress", () => {

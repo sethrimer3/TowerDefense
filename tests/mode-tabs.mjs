@@ -29,7 +29,6 @@ assert.equal(await page.locator('[data-tab="tower"]').isVisible(), false, "Tabs 
 assert.ok((await page.locator("nav").boundingBox()).height > 40, "The tab row should keep its space inside a run");
 await page.locator("#end-run").click();
 await page.locator("#confirm").click();
-await page.locator("#again").click();
 
 // 1. Fresh start: Delve and Defend tabs must be completely hidden
 const delveVisibleFresh = await page.locator('[data-tab="delve"]').isVisible();

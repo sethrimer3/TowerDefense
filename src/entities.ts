@@ -128,11 +128,14 @@ export type Run = TowerRun | DelveRun;
 /** The run and lifetime XP just before a move, so undo takes back the XP
  * (and any level) a kill paid. */
 export type MoveSnapshot<R extends Run = Run> = { run: R; best: number; xp: number };
-export type Revival<R extends Run = Run> = { snapshot: MoveSnapshot<R> };
+/** A hero fallen in a fight, waiting for the player to undo it or accept
+ * defeat: the run just before that fight, and the enemy that won it. */
+export type Fall<R extends Run = Run> = { snapshot: MoveSnapshot<R>; by: string };
 export type Mode = "tower" | "delve";
 export type ModeSave<R extends Run = Run> = {
   history: MoveSnapshot<R>[];
-  revival: Revival<R> | null;
+  /** Set while the run's hero lies fallen (a run inside at 0 HP). */
+  fall: Fall<R> | null;
   best: number;
   reached: number;
   run: R | null;
