@@ -4,6 +4,7 @@
 // See docs/CRAFTING_AND_EQUIPMENT.md for the design source of truth.
 import type { Save } from "./entities.ts";
 import { GEMS, RARE_ENHANCEMENTS, type MaterialId, type MaterialStack } from "./materials.ts";
+import { potionHeal, type StepRules } from "./step-effects.ts";
 import {
   calculateEquipmentStats,
   EQUIPMENT_SLOTS,
@@ -143,8 +144,8 @@ export type ConsumableId = "cinderTonic";
 export type ConsumableDef = {
   id: ConsumableId;
   name: string;
-  description: string;
   recipe: MaterialStack[];
+  /** HP it restores before Potion HP research (see `consumableText`). */
   healAmount: number;
 };
 
@@ -152,11 +153,14 @@ export const CONSUMABLES: ConsumableDef[] = [
   {
     id: "cinderTonic",
     name: "Cinder Tonic",
-    description: "Restores 35 HP. Cannot increase Max HP.",
     recipe: [{ id: "emptyVial", quantity: 1 }, { id: "cinderSlimeBlob", quantity: 3 }],
     healAmount: 35,
   },
 ];
+
+/** A consumable's description, with the HP it restores under `rules`. */
+export const consumableText = (def: ConsumableDef, rules: StepRules) =>
+  `Restores ${potionHeal(def.healAmount, rules)} HP. Cannot increase Max HP.`;
 
 export function canCraftConsumable(save: Save, id: ConsumableId): boolean {
   const def = CONSUMABLES.find((c) => c.id === id)!;

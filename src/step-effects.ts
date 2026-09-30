@@ -28,10 +28,18 @@ export type StepEffect = {
 };
 export type StepOutcome = StepBlocked | StepEffect;
 
+/** What research changes about stepping: the percent of its HP a potion
+ * restores (Potion HP). Read from the Archives at the moment of the step, so
+ * a level completed mid-run counts at once. */
+export type StepRules = { potionHeal: number };
+export const BASE_RULES: StepRules = { potionHeal: 100 };
+/** The HP a potion of `amount` restores under `rules`, rounded. */
+export const potionHeal = (amount: number, rules: StepRules) => Math.round((amount * rules.potionHeal) / 100);
+
 /** Resolves stepping onto `tile` with stats `player`: whether the step is
  * possible, and the player's stats afterwards. Pure: movement, previews, and
  * AI planning all apply the same rules without touching game state. */
-export function resolveStep(player: Player, tile: Tile): StepOutcome {
+export function resolveStep(player: Player, tile: Tile, rules: StepRules = BASE_RULES): StepOutcome {
   if (tile.kind === "wall") return { blocked: "wall" };
   const next: Player = { ...player, keys: { ...player.keys } };
   const effect: StepEffect = { player: next, combat: null, keysSpent: [], healed: 0 };
@@ -53,10 +61,13 @@ export function resolveStep(player: Player, tile: Tile): StepOutcome {
     case "key":
       next.keys[tile.color!]++;
       break;
-    case "potion":
-      effect.healed = Math.min(next.maxHp - next.hp, tile.amount ?? POTION_HEAL);
+    case "potion": {
+      // The red (percent) potion is left to its own rules for now.
+      const amount = tile.amount ?? POTION_HEAL;
+      effect.healed = Math.min(next.maxHp - next.hp, tile.color === "red" ? amount : potionHeal(amount, rules));
       next.hp += effect.healed;
       break;
+    }
     case "attack":
       next.attack += ATTACK_SHARD;
       break;

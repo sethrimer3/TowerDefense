@@ -42,7 +42,7 @@ import { World, LAYOUT_VERSION } from "./delve/world.ts";
 import { RoomWorld, TOWER_LAYOUT_VERSION } from "./tower/room-world.ts";
 import type { Board } from "./board.ts";
 import { bout, heroHpDuring, type Bout, type CombatPrediction } from "./combat.ts";
-import { ATTACK_SHARD, DEFENSE_SHARD, isLethal, resolveStep, type StepBlocked, type StepEffect } from "./step-effects.ts";
+import { ATTACK_SHARD, DEFENSE_SHARD, isLethal, potionHeal, resolveStep, type StepBlocked, type StepEffect, type StepRules } from "./step-effects.ts";
 import { OutsideWorld } from "./outside.ts";
 import { ClearLedger } from "./tower/clear-ledger.ts";
 import { TowerClimb } from "./tower/climb.ts";
@@ -313,7 +313,7 @@ export class Game {
     const start = this.run.player;
     let end = start;
     for (const step of route) {
-      const outcome = resolveStep(end, this.world.tile(step.x, step.y));
+      const outcome = resolveStep(end, this.world.tile(step.x, step.y), this.stepRules);
       if (outcome.blocked) break;
       end = outcome.player;
       if (end.hp <= 0) break;
@@ -445,12 +445,17 @@ export class Game {
    * and gets its Focus uses. */
   private dealHand() {
     this.run.hand = [...this.save.hand];
-    this.run.focus = this.focusPerRun;
+    this.run.focusUsed = 0;
   }
   /** Focus uses a run starts with: none without the Focus skill, and more
    * with Focus Count research. */
   private get focusPerRun() {
     return this.save.upgrades.focus ? researched(this.save.archives, "focusPerRun", FOCUS_PER_RUN) : 0;
+  }
+  /** What research changes about stepping now: the step rules every move,
+   * preview, inspect box and planner resolves with. */
+  get stepRules(): StepRules {
+    return { potionHeal: researched(this.save.archives, "potionHeal", 100) };
   }
   /** Silver held this run. */
   get silver() {
@@ -460,7 +465,7 @@ export class Game {
    * next run will start with. */
   get focusLeft() {
     if (this.run.outside) return this.focusPerRun;
-    return this.run.focus ?? 0;
+    return Math.max(0, this.focusPerRun - (this.run.focusUsed ?? 0));
   }
   /** Puts the hand's card in slot `card` ahead of the others until it
    * reaches its target, spending a Focus use; the hand plays on to it. A
@@ -473,7 +478,7 @@ export class Game {
     if (this.focusLeft < 1) return "spent";
     const plan = planHand(this, this.hand, this.mode, card);
     if (!plan) return "noPath";
-    this.run.focus = this.focusLeft - 1;
+    this.run.focusUsed = (this.run.focusUsed ?? 0) + 1;
     this.run.focused = id;
     this.route = [];
     // During a fight, the path is found again once the hero has stepped in.
@@ -703,7 +708,7 @@ export class Game {
     // The step is resolved once, before any snapshot/undo bookkeeping, so a
     // wall, lock, impervious enemy, or (automation's) declined lethal fight
     // never touches history, damages the player, alters the enemy, or ends the run.
-    const outcome = resolveStep(p, t);
+    const outcome = resolveStep(p, t, this.stepRules);
     if (outcome.blocked) return this.rejectStep(outcome, t, dest.x, dest.y);
     if (!force && isLethal(outcome)) {
       this.feedback("Lethal encounter. Inspect the enemy before proceeding.");
@@ -1151,7 +1156,7 @@ export class Game {
     if (!this.playing || this.encounter || (this.save.consumables[id] ?? 0) <= 0) return false;
     const def = CONSUMABLES.find(c => c.id === id)!;
     const p = this.run.player;
-    const n = Math.min(p.maxHp - p.hp, def.healAmount);
+    const n = Math.min(p.maxHp - p.hp, potionHeal(def.healAmount, this.stepRules));
     p.hp += n;
     this.save.consumables[id]--;
     this.recordHeal(n);

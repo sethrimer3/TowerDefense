@@ -89,8 +89,9 @@ export type RunCore = {
   /** Silver held: earned from enemies and spent inside this run only, so
    * undo and Revive take it back with the rest of the run. */
   silver?: number;
-  /** Focus uses left this run. */
-  focus?: number;
+  /** Focus uses spent this run. What is left is what a run gets now less
+   * these, so a Focus Count level completed mid-run counts at once. */
+  focusUsed?: number;
   /** The card a Focus put ahead of the others, until it reaches its target
    * or has no path to one. */
   focused?: CardId;

@@ -27,7 +27,7 @@ export function score(t: Tile, y: number, current: number, distance: number) {
  * Tower search (the Tower, and the forest outside either mode). */
 export function chooseStep(game: Game) {
   if (game.mode === "delve" && !game.run.outside)
-    return chooseDelveStep(game, { memory: game.save.delve.memory, plan: game.delvePlan, capabilities: capabilities(game.save.upgrades) });
+    return chooseDelveStep(game, { memory: game.save.delve.memory, plan: game.delvePlan, capabilities: capabilities(game.save.upgrades), rules: game.stepRules });
   const tower = game.mode === "tower";
   const best = new Search(game, {
     progress: tower ? game.run.player.y : game.run.height,

@@ -145,6 +145,14 @@ export const UPGRADES = [
     currency: "inspiration",
   },
   {
+    id: "greaterHeal",
+    name: "Greater Heal",
+    description: "Unlock Potion HP research in the Archives: every potion restores more HP",
+    base: 3,
+    max: 1,
+    currency: "inspiration",
+  },
+  {
     id: "cardGear",
     name: "Gear",
     description: "Add the EQUIPMENT card to your deck: it moves you toward the closest ATK or DEF pickup",

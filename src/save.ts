@@ -82,7 +82,8 @@ function without<R>(r: any, fields: string[]): R {
   for (const k of ["rewards", "known", "visited", ...fields]) delete r[k];
   if (r.hand !== undefined && !validHand(r.hand)) delete r.hand;
   if (r.silver !== undefined && !(Number.isInteger(r.silver) && finite(r.silver))) delete r.silver;
-  if (r.focus !== undefined && !(Number.isInteger(r.focus) && finite(r.focus, 99))) delete r.focus;
+  delete r.focus;
+  if (r.focusUsed !== undefined && !(Number.isInteger(r.focusUsed) && finite(r.focusUsed, 99))) delete r.focusUsed;
   if (r.focused !== undefined && !r.hand?.includes(r.focused)) delete r.focused;
   return r;
 }

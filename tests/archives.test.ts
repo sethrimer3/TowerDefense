@@ -161,7 +161,55 @@ test("Focus Count adds to the Focus uses each run starts with", () => {
   g.walkTo(g.run.player.x, ENTRANCE_Y);
   for (let i = 0; i < 20 && g.route.length; i++) g.routeStep();
   assert.equal(g.run.outside, false);
-  assert.equal(g.run.focus, 2);
+  assert.equal(g.focusLeft, 2);
+});
+
+test("a Focus Count level completed mid-run adds its use at once", () => {
+  const g = new Game(owner());
+  g.clock = () => T0;
+  g.newRun({ outside: true, seed: 1 });
+  g.walkTo(g.run.player.x, ENTRANCE_Y);
+  for (let i = 0; i < 20 && g.route.length; i++) g.routeStep();
+  assert.equal(g.run.outside, false);
+  assert.equal(g.focusLeft, 1);
+  assert.ok(g.startResearch(0, "focusCount"));
+  g.clock = () => T0 + 8 * HOUR;
+  g.settleResearch();
+  assert.equal(g.focusLeft, 2, "inside the run already");
+  g.run.focusUsed = 2;
+  assert.equal(g.focusLeft, 0);
+});
+
+test("Potion HP: +3% a level for 100 levels; quick first levels, then n / 4 hours and 100 × n Gold", () => {
+  const levels = RESEARCH.potionHp.levels;
+  assert.equal(levels.length, 100);
+  assert.deepEqual(levels.slice(0, 6).map((l) => l.gold), [10, 25, 50, 75, 500, 600]);
+  assert.deepEqual(levels.slice(0, 6).map((l) => Math.round(l.hours * 3600)), [15, 60, 300, 600, 4500, 5400]);
+  assert.equal(levels[99].gold, 10_000);
+  assert.equal(levels[99].hours, 25);
+  assert.equal(levels.reduce((sum, l) => sum + l.gold, 0), 504_160);
+  assert.deepEqual(levels.slice(0, 4).map((l) => duration(defaultArchives(), l)), [15_000, 60_000, 300_000, 600_000]);
+  assert.ok(levels.every((l) => l.effect.target === "potionHeal" && l.effect.op === "add" && l.effect.value === 3));
+  assert.deepEqual(RESEARCH_IDS.slice(0, 2), ["potionHp", "focusCount"], "listed before Focus Count");
+  assert.deepEqual(RESEARCH.potionHp.categories, ["defense"]);
+});
+
+test("Potion HP needs Greater Heal, and every level strengthens potions at once, mid-run too", () => {
+  const save = owner();
+  const g = new Game(save);
+  g.clock = () => T0;
+  assert.equal(status(save, "potionHp"), "locked");
+  assert.equal(g.startResearch(0, "potionHp"), false);
+  save.upgrades.greaterHeal = 1;
+  assert.equal(status(save, "potionHp"), "available");
+  assert.equal(g.stepRules.potionHeal, 100);
+  assert.ok(g.startResearch(0, "potionHp"));
+  g.clock = () => T0 + 15_000;
+  assert.equal(g.settleResearch().length, 1);
+  assert.equal(g.stepRules.potionHeal, 103);
+  save.archives.levels.potionHp = 100;
+  assert.equal(g.stepRules.potionHeal, 400);
+  assert.equal(researched(save.archives, "potionHeal", 100), 400);
 });
 
 test("the Game's research commands need the Archives skill", () => {

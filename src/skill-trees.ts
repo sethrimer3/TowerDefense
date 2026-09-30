@@ -7,6 +7,7 @@ export const TREES: { id: TreeId; name: string; currency: Currency; gate?: Upgra
     { id: "combatStance", icon: "⚔", x: 50, y: 33, requires: ["handOrdering"] },
     { id: "cardHeal", icon: "♥", x: 24, y: 51, requires: ["combatStance"] },
     { id: "cardGear", icon: "⛨", x: 76, y: 51, requires: ["combatStance"] },
+    { id: "greaterHeal", icon: "✚", x: 24, y: 69, requires: ["cardHeal"] },
     { id: "focus", icon: "ϟ", x: 50, y: 69, requires: ["cardHeal", "cardGear"] },
     { id: "inspirationUndos", icon: "↺", x: 18, y: 88, requires: ["focus"] },
     { id: "archives", icon: "▥", x: 50, y: 88, requires: ["focus"] },

@@ -1,13 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ATTACK_SHARD, DEFENSE_SHARD, POTION_HEAL, resolveStep, type StepEffect } from "../src/step-effects.ts";
+import { ATTACK_SHARD, DEFENSE_SHARD, POTION_HEAL, resolveStep, type StepEffect, type StepRules } from "../src/step-effects.ts";
 import type { Player, Tile } from "../src/entities.ts";
 
 const player = (over: Partial<Player> = {}): Player => ({
   x: 0, y: 0, hp: 50, maxHp: 100, attack: 10, defense: 2, keys: { yellow: 1, blue: 0, red: 2 }, ...over,
 });
-const effect = (p: Player, t: Tile) => {
-  const outcome = resolveStep(p, t);
+const effect = (p: Player, t: Tile, rules?: StepRules) => {
+  const outcome = resolveStep(p, t, rules);
   assert.equal(outcome.blocked, undefined);
   return outcome as StepEffect;
 };
@@ -19,6 +19,17 @@ test("pickups grant their documented amounts", () => {
   const potion = effect(player(), { kind: "potion" });
   assert.equal(potion.healed, POTION_HEAL);
   assert.equal(potion.player.hp, 50 + POTION_HEAL);
+});
+
+test("Potion HP research scales every potion but the red (percent) one, rounded", () => {
+  const rules = { potionHeal: 130 };
+  const hurt = player({ hp: 1, maxHp: 500 });
+  assert.equal(effect(hurt, { kind: "potion" }, rules).healed, 46, "35 × 1.3 = 45.5");
+  assert.equal(effect(hurt, { kind: "potion", color: "blue" }, rules).healed, 46);
+  assert.equal(effect(hurt, { kind: "potion", amount: 60 }, rules).healed, 78);
+  assert.equal(effect(hurt, { kind: "potion", color: "red" }, rules).healed, POTION_HEAL);
+  assert.equal(effect(hurt, { kind: "potion" }, { potionHeal: 400 }).healed, 140);
+  assert.equal(effect(player({ hp: 90 }), { kind: "potion" }, rules).healed, 10, "still capped at max HP");
 });
 
 test("potions heal their own amount, capped at max HP", () => {

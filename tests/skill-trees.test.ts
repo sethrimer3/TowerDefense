@@ -30,6 +30,19 @@ test("fresh progression gates Delve, currencies, Courage root, and Legacy", () =
   assert.deepEqual(TREES.map(tree => tree.id), ["inspiration", "courage", "wayfinding", "legacy", "wisdom", "renown"]);
   assert.ok(TREES.slice(3).every(tree => tree.nodes.length >= 3));
 });
+test("Greater Heal follows Heal for 3 Inspiration and opens Potion HP research", () => {
+  const g = new Game(defaults());
+  g.save.tower.inspiration = 100;
+  for (const id of ["handOrdering", "combatStance"] as const) assert.ok(g.buy(id));
+  assert.equal(g.buy("greaterHeal"), false, "Heal comes first");
+  assert.ok(g.buy("cardHeal"));
+  const before = g.save.tower.inspiration;
+  assert.ok(g.buy("greaterHeal"));
+  assert.equal(before - g.save.tower.inspiration, 3);
+  assert.equal(g.buy("greaterHeal"), false, "one rank");
+  const node = TREES[0].nodes.find((n) => n.id === "greaterHeal")!;
+  assert.deepEqual([node.x, node.y, node.requires], [24, 69, ["cardHeal"]]);
+});
 test("older saves retain earned access without unlocking fresh saves", () => {
   const old: any = defaults();
   delete old.upgrades.delve;

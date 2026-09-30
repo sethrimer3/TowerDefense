@@ -1,6 +1,6 @@
 import { GOLD_SHOP, type GoldItemId } from "../config.ts";
 import { provisionText } from "../loadout.ts";
-import { canCraft, getSalvageReturns, isEquipped, CONSUMABLES, canCraftConsumable, type ConsumableId } from "../crafting.ts";
+import { canCraft, getSalvageReturns, isEquipped, CONSUMABLES, canCraftConsumable, consumableText, type ConsumableId } from "../crafting.ts";
 import {
   EQUIPMENT_SLOTS,
   RECIPES,
@@ -220,7 +220,7 @@ export class GearPage {
     const consumableRows = CONSUMABLES.map(c => {
       const ownedC = game.save.consumables[c.id] ?? 0;
       const craftableC = canCraftConsumable(game.save, c.id);
-      return `<article class="card"><div class="item-icon">${itemSprite("potion_flat")}</div><div><small>${ownedC ? `OWNED × ${ownedC}` : "CONSUMABLE"} · ${stackList(c.recipe, " + ")}</small><h3>${c.name}</h3><p>${c.description}</p></div><div class="card-actions"><button data-craft-consumable="${c.id}" ${craftableC ? "" : "disabled"}>Craft</button>${ownedC ? `<button data-use-consumable="${c.id}" ${game.run.outside || game.summary ? "disabled" : ""}>Use</button>` : ""}</div></article>`;
+      return `<article class="card"><div class="item-icon">${itemSprite("potion_flat")}</div><div><small>${ownedC ? `OWNED × ${ownedC}` : "CONSUMABLE"} · ${stackList(c.recipe, " + ")}</small><h3>${c.name}</h3><p>${consumableText(c, game.stepRules)}</p></div><div class="card-actions"><button data-craft-consumable="${c.id}" ${craftableC ? "" : "disabled"}>Craft</button>${ownedC ? `<button data-use-consumable="${c.id}" ${game.run.outside || game.summary ? "disabled" : ""}>Use</button>` : ""}</div></article>`;
     }).join("");
     return `<h3>1. Choose a slot</h3>${slotButtons}<h3>2. Choose a metal</h3>${metalButtons}${recipeLine}<h3>3. Optional enhancements</h3><p class="hint">Up to ${ENHANCEMENT_CAPS.gems} gems and ${ENHANCEMENT_CAPS.rareParts} rare monster parts (${totals.gems}/${ENHANCEMENT_CAPS.gems} gems, ${totals.rareParts}/${ENHANCEMENT_CAPS.rareParts} rare parts selected).</p>${gemRows}${rareRows}${preview}${craftBtn}<h3>Consumables</h3>${consumableRows}`;
   }

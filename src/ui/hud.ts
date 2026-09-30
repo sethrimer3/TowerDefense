@@ -1,7 +1,7 @@
 import type { Game } from "../state.ts";
 import type { Renderer } from "../rendering.ts";
 import { levelForXp, xpForLevel } from "../config.ts";
-import { CONSUMABLES } from "../crafting.ts";
+import { CONSUMABLES, consumableText } from "../crafting.ts";
 import { outsideWeather } from "../outside.ts";
 import { MODES, milestones } from "../modes.ts";
 import { cardArt, displayedProgress, el, text } from "./dom.ts";
@@ -197,6 +197,8 @@ function renderConsumables(game: Game) {
     const button = countEl.closest("button") as HTMLButtonElement;
     countEl.textContent = String(count);
     button.disabled = count < 1 || game.run.outside || !!game.summary;
+    // Potion HP research changes what it restores.
+    button.title = `${c.name}: ${consumableText(c, game.stepRules)}`;
   }
 }
 

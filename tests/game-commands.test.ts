@@ -186,11 +186,12 @@ test("Combat Stance moves cards between the deck and the hand in the forest, and
   assert.equal(g.removeFromHand("heal"), false, "not inside a run");
 });
 
-/** An arena with the Focus skill and `uses` Focus uses left this run. */
+/** An arena with the Focus skill and `uses` Focus uses left this run (of
+ * the one a run gets). */
 function focusArena(uses = 1) {
   const g = arena();
   g.save.upgrades.focus = 1;
-  g.run.focus = uses;
+  g.run.focusUsed = 1 - uses;
   return g;
 }
 
@@ -201,7 +202,7 @@ test("Focus puts a hand card first, spending a use, until it reaches its target"
   g.autoTurn();
   assert.equal(g.activeCard, 0, "STAIRS leads before the focus");
   assert.equal(g.focus(key), "focused");
-  assert.equal(g.run.focus, 0);
+  assert.equal(g.focusLeft, 0);
   assert.equal(g.run.focused, "key");
   for (let i = 0; i < 6 && g.run.focused; i++) g.autoTurn();
   assert.equal(g.run.focused, undefined, "the focus ends at the key");
@@ -219,7 +220,7 @@ test("Focus is refused without the skill, with no uses left, for the card alread
   g.autoTurn();
   assert.equal(g.focus(0), "active", "STAIRS is already moving the hero");
   assert.equal(g.focus(g.hand.indexOf("key")), "noPath", "there is no key on the floor");
-  assert.equal(g.run.focus, 1, "a failed focus costs nothing");
+  assert.equal(g.focusLeft, 1, "a failed focus costs nothing");
   const spent = focusArena(0);
   (spent.world as RoomWorld).cells.set("2,0", { kind: "key", color: "yellow" });
   assert.equal(spent.focus(spent.hand.indexOf("key")), "spent");
@@ -248,7 +249,8 @@ test("a run going inside gets its Focus uses once the skill is owned", () => {
   g.walkTo(g.run.player.x, ENTRANCE_Y);
   for (let i = 0; i < 20 && g.route.length; i++) g.routeStep();
   assert.equal(g.run.outside, false);
-  assert.equal(g.run.focus, 1);
+  assert.equal(g.run.focusUsed, 0);
+  assert.equal(g.focusLeft, 1);
 });
 
 test("a beaten enemy pays Gold by its strength, once, whatever undo does", () => {

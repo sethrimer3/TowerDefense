@@ -26,6 +26,8 @@ export type ResearchCategory = keyof typeof RESEARCH_CATEGORIES;
 export const RESEARCH_TARGETS = {
   /** Focus uses a run starts with. */
   focusPerRun: { text: (v: number) => `+${v} Focus use each run` },
+  /** The percent of its HP a potion restores, from 100 (red potions aside). */
+  potionHeal: { text: (v: number) => `+${v}% potion healing` },
   /** How fast archivists work: a level of `d` hours takes d / (1 + speed). */
   researchSpeed: { text: (v: number) => `+${Math.round(v * 100)}% research speed` },
 } as const;
@@ -61,8 +63,25 @@ const focusCountLevels = Array.from({ length: 9 }, (_, i): ResearchLevel => ({
   effect: { target: "focusPerRun", op: "add", value: 1 },
 }));
 
+/** Potion HP: +3% potion healing a level, for 100 levels. The first four
+ * are quick, to draw players in (15 s for 10 Gold, 1 min for 25, 5 min for
+ * 50, 10 min for 75); from level 5 on, level n takes n / 4 hours and costs
+ * 100 × n Gold (1¼ h and 500 Gold at level 5, 25 h and 10,000 at 100). */
+const POTION_HP_START: [gold: number, seconds: number][] = [[10, 15], [25, 60], [50, 300], [75, 600]];
+const potionHpLevels = Array.from({ length: 100 }, (_, i): ResearchLevel => {
+  const n = i + 1, [gold, seconds] = POTION_HP_START[i] ?? [100 * n, 900 * n];
+  return { gold, hours: seconds / 3600, effect: { target: "potionHeal", op: "add", value: 3 } };
+});
+
 /** The research library, in the order the Archives list it. */
 export const RESEARCH = {
+  potionHp: {
+    name: "Potion HP",
+    description: "Stronger draughts: every potion restores more HP.",
+    categories: ["defense"],
+    requires: [{ upgrade: "greaterHeal" }],
+    levels: potionHpLevels,
+  },
   focusCount: {
     name: "Focus Count",
     description: "Study the old climbers' journals to start each run with more Focus.",

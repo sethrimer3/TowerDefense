@@ -1,7 +1,7 @@
 import { point, type AutomoveMemory, type Player, type Run, type Save, type Tile } from '../entities.ts';
 import type { Position } from '../board.ts';
 import type { KeyColor } from '../config.ts';
-import { isLethal, resolveStep, type StepEffect } from '../step-effects.ts';
+import { BASE_RULES, isLethal, resolveStep, type StepEffect, type StepRules } from '../step-effects.ts';
 
 export type Capabilities = { memory: boolean; deadEnds: boolean; combat: boolean; keys: boolean; contextual: boolean; scarcity: boolean; lookahead: number; interactions: number };
 /** What Automove's upgrades let it do. */
@@ -31,23 +31,24 @@ const HP_WORTH = 60;
 const hpPrice = (p: Player) => HP_WORTH / Math.max(1, p.hp);
 
 /** What Automove plans with besides the board: what it has seen, what it
- * planned last step, and what its upgrades let it do. */
-export type DelveMind = { memory: AutomoveMemory; plan: DelvePlan; capabilities: Capabilities };
+ * planned last step, what its upgrades let it do, and the step rules
+ * research has changed (the game's own when left out). */
+export type DelveMind = { memory: AutomoveMemory; plan: DelvePlan; capabilities: Capabilities; rules?: StepRules };
 
 /** Automove's next step from `at`. Marks what it can see in `memory` and
  * updates `plan`. Deliberately uses observed tiles, never generation nodes,
  * pattern IDs, hidden route ownership, or the generator's true-continuation
  * labels. */
-export function chooseDelveStep(at: Position, { memory, plan, capabilities: c }: DelveMind) {
+export function chooseDelveStep(at: Position, { memory, plan, capabilities: c, rules = BASE_RULES }: DelveMind) {
   const { canKnow, discovered } = observe(at, memory, c);
   const current = plan.commitment?.run === at.run ? plan.commitment : undefined;
   // A committed route is followed until it ends, an interaction happens, or
   // newly observed corridors warrant a fresh look (with a continuity bonus
   // for the old target, so small visibility changes cannot flip-flop it).
-  const followed = current && !discovered ? follow(at, plan, current, c) : undefined;
+  const followed = current && !discovered ? follow(at, plan, current, c, rules) : undefined;
   if (followed) return followed;
   plan.commitment = undefined;
-  const scan: Scan = { at, c, canKnow, hpPrice: hpPrice(at.run.player), visits: memory.visited, previousTarget: current?.target ?? '', bestAt: new Map(), report: [], best: null, bestValue: -Infinity };
+  const scan: Scan = { at, c, rules, canKnow, hpPrice: hpPrice(at.run.player), visits: memory.visited, previousTarget: current?.target ?? '', bestAt: new Map(), report: [], best: null, bestValue: -Infinity };
   explore(scan);
   plan.decisions = scan.report.sort((a, b) => b.utility - a.utility).slice(0, 12);
   const { best } = scan, p = at.run.player;
@@ -77,7 +78,7 @@ function observe({ run, world }: Position, { known, visited: visits }: AutomoveM
 
 /** The next step of the committed route, if it is still one step away and
  * still safe to take. */
-function follow({ run, world }: Position, plan: DelvePlan, route: Commitment, c: Capabilities) {
+function follow({ run, world }: Position, plan: DelvePlan, route: Commitment, c: Capabilities, rules: StepRules) {
   const p = run.player;
   const next = nextOnRoute(route, point(p.x, p.y));
   if (!next) return undefined;
@@ -85,7 +86,7 @@ function follow({ run, world }: Position, plan: DelvePlan, route: Commitment, c:
   const dx = x - p.x, dy = y - p.y, tile = world.tile(x, y);
   const trial = { player: { ...p, keys: { ...p.keys } }, damage: 0, keyCost: 0, reward: 0 };
   const walkable = Math.abs(dx) + Math.abs(dy) === 1 && world.step(p.x, p.y, dx, dy) && tile.kind !== 'wall';
-  if (!walkable || !apply(tile, trial, c, hpPrice(p))) return undefined;
+  if (!walkable || !apply(tile, trial, c, hpPrice(p), rules)) return undefined;
   if (!['floor', 'openedChest'].includes(tile.kind)) plan.commitment = undefined;
   return { dx, dy, label: 'Following the chosen Delve route' };
 }
@@ -101,7 +102,7 @@ function nextOnRoute(route: Commitment, here: string): string | undefined {
 type Search = { x: number; y: number; first: number[]; d: number; player: Player; damage: number; keyCost: number; reward: number; interactions: number; path: Set<string> };
 /** The search's inputs and its running results. */
 type Scan = {
-  at: Position; c: Capabilities;
+  at: Position; c: Capabilities; rules: StepRules;
   canKnow: (x: number, y: number) => boolean;
   /** What one HP is worth this step (`hpPrice`). */
   hpPrice: number;
@@ -129,7 +130,7 @@ function successors(scan: Scan, n: Search) {
 /** Extends route `n` one tile in `dir`: scores the new tile, and returns the
  * extended route when it is worth searching on from. */
 function advance(scan: Scan, n: Search, [dx, dy]: number[]): Search | undefined {
-  const { at: { world }, c, hpPrice } = scan;
+  const { at: { world }, c, hpPrice, rules } = scan;
   const dest = world.step(n.x, n.y, dx, dy); if (!dest || !scan.canKnow(dest.x, dest.y)) return undefined;
   const k = point(dest.x, dest.y); if (n.path.has(k)) return undefined;
   const tile = world.tile(dest.x, dest.y); if (tile.kind === 'wall') return undefined;
@@ -137,7 +138,7 @@ function advance(scan: Scan, n: Search, [dx, dy]: number[]): Search | undefined 
   next.path.add(k);
   const interaction = !TRAVERSAL.includes(tile.kind);
   if (interaction && next.interactions++ >= c.interactions) return undefined;
-  if (!apply(tile, next, c, hpPrice)) return undefined;
+  if (!apply(tile, next, c, hpPrice, rules)) return undefined;
   consider(scan, next, dest, { tile, interaction });
   return improves(scan, next, k) ? next : undefined;
 }
@@ -204,8 +205,8 @@ function improves({ bestAt, hpPrice }: Scan, next: Search, k: string) {
 type Planned = { player: Player; damage: number; keyCost: number; reward: number };
 /** Advances a planned route by one tile using the game's own step rules;
  * false when the step is blocked or the fight would be lethal. */
-function apply(tile: Tile, n: Planned, c: Capabilities, hpPrice: number) {
-  const before = n.player, outcome = resolveStep(before, tile);
+function apply(tile: Tile, n: Planned, c: Capabilities, hpPrice: number, rules: StepRules) {
+  const before = n.player, outcome = resolveStep(before, tile, rules);
   if (outcome.blocked || isLethal(outcome)) return false;
   n.player = outcome.player;
   n.damage += outcome.combat?.damage ?? 0;

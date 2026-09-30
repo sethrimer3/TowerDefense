@@ -172,7 +172,7 @@ Initial example recipe:
 
 - **Cinder Tonic** — `1 Empty Vial + 3 Cinder Slime Blobs`
 - One-time use.
-- Restore `35 HP`, without increasing Max HP.
+- Restore `35 HP` (more with Potion HP research), without increasing Max HP.
 
 Future enemies can support equivalent recipes such as `Empty Vial + Red Slime material -> Red Potion` without changing the inventory architecture.
 

@@ -7,7 +7,7 @@ import { MODES } from "../modes.ts";
 
 /** What the inspect panel says about one board tile. */
 export type TileInfo = { color: string; title: string; body: string };
-type Board = Pick<Game, "world" | "run" | "mode">;
+type Board = Pick<Game, "world" | "run" | "mode" | "stepRules">;
 type Describe = (t: Tile, p: Player, g: Board) => Omit<TileInfo, "color">;
 
 const KIND_COLORS: Partial<Record<Kind, string>> = {
@@ -58,8 +58,8 @@ const DESCRIBE: Partial<Record<Kind, Describe>> = {
     const color = t.color!, name = KEY_NAMES[color];
     return { title: `${name} Key`, body: `<span>Unlocks ${name} doors</span><br>Keys: ${p.keys[color]} → ${p.keys[color] + 1}` };
   },
-  potion: (t, p) => {
-    const after = resolveStep(p, t);
+  potion: (t, p, g) => {
+    const after = resolveStep(p, t, g.stepRules);
     return { title: "Potion", body: `<span>Restores HP</span><br>(${p.hp} → ${after.blocked ? p.hp : after.player.hp})` };
   },
   stairs,

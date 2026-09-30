@@ -33,6 +33,7 @@ const SKILL_ITEM_SPRITES: Partial<Record<UpgradeId, keyof typeof AREA1_ITEM_URLS
   attack: "upgrade_attack",
   defense: "upgrade_defense",
   yellow: "key_yellow", blue: "key_blue", red: "key_red",
+  greaterHeal: "potion_flat",
 };
 const SKILL_UI_SPRITES: Partial<Record<UpgradeId, UiSprite>> = {
   hp: "health", inspirationUndos: "undo", undos: "undo", archives: "log",
