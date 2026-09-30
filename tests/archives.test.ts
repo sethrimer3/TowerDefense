@@ -180,14 +180,14 @@ test("a Focus Count level completed mid-run adds its use at once", () => {
   assert.equal(g.focusLeft, 0);
 });
 
-test("Potion HP: +3% a level for 100 levels; quick first levels, then n / 4 hours and 100 × n Gold", () => {
+test("Potion HP: +3% a level for 100 levels; quick first levels, then the formula starts over at level 5", () => {
   const levels = RESEARCH.potionHp.levels;
   assert.equal(levels.length, 100);
-  assert.deepEqual(levels.slice(0, 6).map((l) => l.gold), [10, 25, 50, 75, 500, 600]);
-  assert.deepEqual(levels.slice(0, 6).map((l) => Math.round(l.hours * 3600)), [15, 60, 300, 600, 4500, 5400]);
-  assert.equal(levels[99].gold, 10_000);
-  assert.equal(levels[99].hours, 25);
-  assert.equal(levels.reduce((sum, l) => sum + l.gold, 0), 504_160);
+  assert.deepEqual(levels.slice(0, 6).map((l) => l.gold), [10, 25, 50, 75, 100, 200]);
+  assert.deepEqual(levels.slice(0, 6).map((l) => Math.round(l.hours * 3600)), [15, 60, 300, 600, 900, 1800]);
+  assert.equal(levels[99].gold, 9_600);
+  assert.equal(levels[99].hours, 24);
+  assert.equal(levels.reduce((sum, l) => sum + l.gold, 0), 465_760);
   assert.deepEqual(levels.slice(0, 4).map((l) => duration(defaultArchives(), l)), [15_000, 60_000, 300_000, 600_000]);
   assert.ok(levels.every((l) => l.effect.target === "potionHeal" && l.effect.op === "add" && l.effect.value === 3));
   assert.deepEqual(RESEARCH_IDS.slice(0, 2), ["potionHp", "focusCount"], "listed before Focus Count");

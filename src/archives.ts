@@ -65,11 +65,13 @@ const focusCountLevels = Array.from({ length: 9 }, (_, i): ResearchLevel => ({
 
 /** Potion HP: +3% potion healing a level, for 100 levels. The first four
  * are quick, to draw players in (15 s for 10 Gold, 1 min for 25, 5 min for
- * 50, 10 min for 75); from level 5 on, level n takes n / 4 hours and costs
- * 100 × n Gold (1¼ h and 500 Gold at level 5, 25 h and 10,000 at 100). */
+ * 50, 10 min for 75); then the formula starts over from level 5, so the
+ * seam is smooth: the m-th level after them (level 4 + m) takes m / 4 hours
+ * and costs 100 × m Gold (15 min and 100 Gold at level 5, 24 h and 9,600 at
+ * 100). */
 const POTION_HP_START: [gold: number, seconds: number][] = [[10, 15], [25, 60], [50, 300], [75, 600]];
 const potionHpLevels = Array.from({ length: 100 }, (_, i): ResearchLevel => {
-  const n = i + 1, [gold, seconds] = POTION_HP_START[i] ?? [100 * n, 900 * n];
+  const m = i + 1 - POTION_HP_START.length, [gold, seconds] = POTION_HP_START[i] ?? [100 * m, 900 * m];
   return { gold, hours: seconds / 3600, effect: { target: "potionHeal", op: "add", value: 3 } };
 });
 
