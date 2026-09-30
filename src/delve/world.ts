@@ -10,7 +10,8 @@ import { breakTorch, placeTorches } from "../torches.ts";
 // v11 prices a blue key at two yellow and a red at five.
 // v12 makes each milestone gate's guard a boss.
 // v13 scales strong enemies (and bosses) from 1.5 times a normal one, not 2.
-export const LAYOUT_VERSION = 13;
+// v14 grows enemy DEF 1% every 20 depth.
+export const LAYOUT_VERSION = 14;
 
 /** The one 20-row chunk `index` of the labyrinth, as generated. */
 export function generate(seed: number, index: number): Map<string, Tile> {

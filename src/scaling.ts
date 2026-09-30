@@ -117,18 +117,28 @@ export function getTowerEnemy(room: number, rng: () => number, forceProfile?: To
 export type TowerEnemyStrength = EnemyStrength;
 
 /** How far each strength exceeds the floor's own zone: the roster it comes
- * from (zones ahead), a multiplier on every stat, and its tier (which sets
- * the XP a kill pays). Weak and normal differ only in which profiles the
- * generator picks; strong is a hardened local, elite a visitor from the
- * next zone up, and a boss a strong enemy with more HP and ATK (see
- * `bossFactor`). */
-export const TOWER_ENEMY_STRENGTH: Record<TowerEnemyStrength, { zonesAhead: number; multiplier: number; tier: number }> = {
-  weak: { zonesAhead: 0, multiplier: 1, tier: 1 },
-  normal: { zonesAhead: 0, multiplier: 1, tier: 1 },
-  strong: { zonesAhead: 0, multiplier: 1.25, tier: 2 },
-  elite: { zonesAhead: 1, multiplier: 1, tier: 3 },
-  boss: { zonesAhead: 0, multiplier: 1.25, tier: 4 },
+ * from (zones ahead), multipliers on HP and ATK (`stats`) and on DEF, and
+ * its tier (which sets the XP a kill pays). A weak enemy is a balanced one
+ * with less HP and ATK, as in the Delve; strong is a hardened local, elite a
+ * visitor from the next zone up, and a boss a strong enemy with more HP and
+ * ATK (see `bossFactor`). */
+export const TOWER_ENEMY_STRENGTH: Record<TowerEnemyStrength, { zonesAhead: number; stats: number; defense: number; tier: number }> = {
+  weak: { zonesAhead: 0, stats: 0.75, defense: 1, tier: 1 },
+  normal: { zonesAhead: 0, stats: 1, defense: 1, tier: 1 },
+  strong: { zonesAhead: 0, stats: 1.25, defense: 1.25, tier: 2 },
+  elite: { zonesAhead: 1, stats: 1, defense: 1, tier: 3 },
+  boss: { zonesAhead: 0, stats: 1.25, defense: 1.25, tier: 4 },
 };
+
+/** Enemy DEF compounds on top of everything else: `rate` for every
+ * `towerFloors` Tower floors climbed and every `delveDepth` Delve depth. */
+export const ENEMY_DEFENSE_GROWTH = { rate: 1.01, towerFloors: 5, delveDepth: 20 };
+/** What every enemy's DEF is multiplied by on Tower floor `room` (0-based). */
+export const towerDefenseGrowth = (room: number) =>
+  intPow(ENEMY_DEFENSE_GROWTH.rate, Math.floor(Math.max(0, room) / ENEMY_DEFENSE_GROWTH.towerFloors));
+/** What every enemy's DEF is multiplied by at Delve depth `depth`. */
+export const delveDefenseGrowth = (depth: number) =>
+  intPow(ENEMY_DEFENSE_GROWTH.rate, Math.floor(Math.max(0, depth) / ENEMY_DEFENSE_GROWTH.delveDepth));
 
 /** How many times a strong enemy's HP and ATK a boss has, in both modes. */
 export const BOSS_OVER_STRONG = 2;
@@ -143,16 +153,18 @@ export const enemyTier = (strength: EnemyStrength) => TOWER_ENEMY_STRENGTH[stren
  * its own procedural body (tile-painters.ts), since none has sprite art. */
 export const DELVE_ENEMY_NAMES = ["Cinder slime", "Bone sentinel", "Dusk wing", "Ash warden"];
 
-/** A Tower enemy of the given strength and profile for floor `room`. */
+/** A Tower enemy of the given strength and profile for floor `room`. Its
+ * DEF grows with the floor it stands on, even for an elite from the next
+ * zone's roster. */
 export function getTowerGateEnemy(room: number, strength: TowerEnemyStrength, profile: TowerEnemyProfile) {
-  const { zonesAhead, multiplier, tier } = TOWER_ENEMY_STRENGTH[strength];
+  const { zonesAhead, stats, defense, tier } = TOWER_ENEMY_STRENGTH[strength];
   const base = getTowerEnemy(room + zonesAhead * TOWER_ZONE_FLOORS, () => 0, profile);
   const boss = bossFactor(strength);
   return {
     name: base.name,
-    hp: Math.round(base.hp * multiplier) * boss,
-    attack: Math.round(base.attack * multiplier) * boss,
-    defense: Math.round(base.defense * multiplier),
+    hp: Math.round(base.hp * stats) * boss,
+    attack: Math.round(base.attack * stats) * boss,
+    defense: Math.round(base.defense * defense * towerDefenseGrowth(room)),
     tier,
     strength,
   };

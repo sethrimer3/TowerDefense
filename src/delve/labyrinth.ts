@@ -1,6 +1,6 @@
 import { point, type Point, type Tile } from '../entities.ts';
 import type { Fork, Gate, LaneStep, Strength } from '../tower/types.ts';
-import { bossFactor, DELVE_ENEMY_NAMES, ENEMY_STAT_SCALE, enemyTier, type TowerEnemyProfile } from '../scaling.ts';
+import { bossFactor, delveDefenseGrowth, DELVE_ENEMY_NAMES, ENEMY_STAT_SCALE, enemyTier, type TowerEnemyProfile } from '../scaling.ts';
 import { FORK_TUNING, forkDepth, forksWorth, stepValue } from '../tower/forks.ts';
 import { choosePattern, FALSE_ASCENTS, type Pattern } from './patterns.ts';
 import { tileRandom } from '../random.ts';
@@ -378,7 +378,7 @@ export function delveEnemyBase(depth: number) {
 }
 
 /** How each gate strength scales a Delve enemy: HP and attack multiply, and
- * defense rises by a flat bonus. */
+ * defense rises by a flat bonus (before `delveDefenseGrowth`). */
 export const DELVE_ENEMY_STRENGTH: Record<Strength, { scale: number; defense: number }> = {
   weak: { scale: 0.75, defense: 0 },
   normal: { scale: 1, defense: 0 },
@@ -411,7 +411,8 @@ function gateTile({ rng }: Lab, g: LaneStep, n: Node): Tile {
     name: DELVE_ENEMY_NAMES[population % DELVE_ENEMY_NAMES.length], tier: enemyTier(g.strength), strength: g.strength,
     hp: Math.round(base.hp * scale * shape.hp) * boss,
     attack: Math.round(base.attack * scale * shape.attack) * boss,
-    defense: base.defense + tough + shape.defense,
+    // The whole DEF (base, strength and profile) compounds with depth.
+    defense: Math.round((base.defense + tough + shape.defense) * delveDefenseGrowth(n.depth)),
   } };
 }
 
