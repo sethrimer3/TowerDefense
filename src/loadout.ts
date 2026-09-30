@@ -1,6 +1,7 @@
 import type { Save } from "./entities.ts";
 import { GOLD_SHOP, POTION_PERCENT_BASE, POTION_PERCENT_RANK, TRAINING, TRAINING_PER_LEVEL, UPGRADES, isStatRow, levelForXp, trained, trainingWorth, type GoldItemId, type TrainingId, type UpgradeId } from "./config.ts";
 import { getEquippedBonuses } from "./crafting.ts";
+import { RESEARCH, researched } from "./archives.ts";
 
 /** What one rank of an upgrade, or one provision, adds to a character. */
 export type Grants = Partial<Record<Stat, number>>;
@@ -16,8 +17,9 @@ export type Loadout = {
 };
 
 /** Every character's baseline: 10 ATK plus the starter weapon (+2), which
- * Heirloom steel improves; no DEF; 100 HP; one undo. */
-const BASE = { attack: 12, defense: 0, maxHp: 100, undos: 1 };
+ * Heirloom steel improves; no DEF; 100 HP; no undo (Rehearsed steps gives
+ * the first). */
+const BASE = { attack: 12, defense: 0, maxHp: 100, undos: 0 };
 
 const WORDS: Record<Stat, string> = {
   attack: "starting attack",
@@ -32,11 +34,14 @@ const WORDS: Record<Stat, string> = {
 type Granting = { grants?: Grants };
 
 /** The most undos a character can store, with every upgrade that adds one
- * at its highest level. */
+ * at its highest level and every level of Undo Count. */
 const UNDO_CAP = UPGRADES.reduce(
   (cap, u: Granting & { max: number }) => cap + (u.grants?.undos ?? 0) * u.max,
-  BASE.undos,
+  BASE.undos + RESEARCH.undoCount.levels.length,
 );
+/** The last `capacity` snapshots of an undo history (none at 0, where
+ * `slice(-0)` would keep them all). */
+export const keepUndos = <T>(history: T[], capacity: number) => (capacity > 0 ? history.slice(-capacity) : []);
 const grantsOf = (row: Granting): Grants => row.grants ?? {};
 
 /** Adds `ranks` of each row's grants to `total`. */
@@ -63,7 +68,8 @@ export function loadout(save: Save): Loadout {
     defense: Math.round((own.defense + equip.flatDefense) * (1 + equip.percentDefense)) + prov.defense,
     maxHp: Math.round((own.maxHp + equip.flatMaxHp) * (1 + equip.percentMaxHp)) + prov.maxHp,
     keys: { yellow: own.yellow, blue: own.blue, red: own.red },
-    undoCapacity: own.undos,
+    // Undo needs Rehearsed steps: without it nothing else stores one.
+    undoCapacity: save.upgrades.inspirationUndos ? researched(save.archives, "undoCapacity", own.undos) : 0,
   };
 }
 

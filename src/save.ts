@@ -5,7 +5,7 @@ import { EQUIPMENT_SLOTS, type CraftedEquipment, type EquipmentSlot } from "./eq
 import { CONSUMABLES, type ConsumableId } from "./crafting.ts";
 import { decodeDefendSave, defaultDefendSave } from "./defend/progress.ts";
 import { decodeSettings, defaultSettings } from "./settings.ts";
-import { loadout } from "./loadout.ts";
+import { keepUndos, loadout } from "./loadout.ts";
 import { BASE_HAND, CARD_IDS, HAND_SLOTS, deckCards, type CardId } from "./cards.ts";
 import { decodeArchives, defaultArchives } from "./archives.ts";
 export function defaults(): Save {
@@ -121,8 +121,7 @@ function snapshot<R extends Run>(value: any, decodeRun: RunDecoder<R>): MoveSnap
 /** Undo history only survives for the same seed and layout as the live run. */
 function decodeHistory<R extends Run>(raw: any, run: R, undoCapacity: number, decodeRun: RunDecoder<R>): MoveSnapshot<R>[] {
   if (!Array.isArray(raw)) return [];
-  return raw
-    .slice(-undoCapacity)
+  return keepUndos(raw, undoCapacity)
     .map((item) => snapshot(item, decodeRun))
     .filter((item): item is MoveSnapshot<R> =>
       !!item && item.run.seed === run.seed && item.run.layoutVersion === run.layoutVersion);
@@ -303,13 +302,14 @@ export function decode(raw: string | null): Save {
   try {
     const s = JSON.parse(raw ?? "null") ?? {};
     decodeUpgrades(s.upgrades, d);
+    // Undo capacity counts Undo Count research, so the Archives come first.
+    d.archives = decodeArchives(s.archives);
     const { undoCapacity } = loadout(d);
     d.settings = decodeSettings(s.settings);
     for (const step of VERSION_STEPS.get(s.version) ?? []) step(s, d, undoCapacity);
     decodeReached(s, d);
     decodeSections(s.tower, d);
     migratePreSkillTrees(s.upgrades, d);
-    d.archives = decodeArchives(s.archives);
     d.defend = decodeDefendSave(s.defend);
     d.hand = decodeHand(s.hand, deckCards(d.upgrades));
     for (const k of ["deck", "removeCard", "addCard"] as const) d.tutorials[k] = s.tutorials?.[k] === true;

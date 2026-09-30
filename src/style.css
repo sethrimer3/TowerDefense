@@ -567,6 +567,9 @@ canvas {
   white-space: normal;
   text-align: center;
 }
+.mini-action[hidden] {
+  display: none;
+}
 .mini-action.enabled {
   border-color: #b59861;
   color: #ecd19d;

@@ -12,6 +12,7 @@ import { silverForKill } from "../src/config.ts";
  * the corner and (when it fits) the stairs opposite. */
 function arena(size = 5) {
   const g = new Game(defaults());
+  g.save.upgrades.inspirationUndos = 1; // undo needs Rehearsed steps
   const w = g.world as RoomWorld;
   w.cells = new Map();
   for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) w.cells.set(`${x},${y}`, { kind: "floor" });

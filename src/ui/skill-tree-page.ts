@@ -144,7 +144,9 @@ export class SkillTreePage {
     const rank = upgrades[n.id];
     const available = skillAvailable(n.id, upgrades);
     const chosen = n.id === this.skill && this.tooltipVisible;
-    return `<button class="skill-node ${rank ? "owned" : ""} ${available ? "available" : "locked"} ${chosen ? "chosen" : ""}" data-skill="${n.id}" style="left:${n.x}%;top:${n.y}%" aria-label="${skill.name}, ${rank} of ${skill.max}${available ? "" : ", locked"}" aria-pressed="${chosen}"><span class="node-icon">${skillSprite(n.id)}</span><span class="node-name">${skill.name}</span><small>${rank} / ${skill.max}</small></button>`;
+    const unlocks = this.current().unlocks;
+    const state = unlocks ? (rank ? ", unlocked" : "") : `, ${rank} of ${skill.max}`;
+    return `<button class="skill-node ${rank ? "owned" : ""} ${available ? "available" : "locked"} ${chosen ? "chosen" : ""}" data-skill="${n.id}" style="left:${n.x}%;top:${n.y}%" aria-label="${skill.name}${state}${available ? "" : ", locked"}" aria-pressed="${chosen}"><span class="node-icon">${skillSprite(n.id)}</span><span class="node-name">${skill.name}</span>${unlocks ? "" : `<small>${rank} / ${skill.max}</small>`}</button>`;
   }
 
   /** Where buying `id` stands: its price, the balance, and whether it can
@@ -192,14 +194,15 @@ export class SkillTreePage {
     const { u, level, price, balance, locked, maxed, available, canBuy } = this.purchase(id);
     const requirements = node.requires.filter(rid => !this.ctx.game.save.upgrades[rid]).map(rid => UPGRADES.find(u => u.id === rid)!.name);
     const currency = this.current().currency === "inspiration" ? "Inspiration" : "Courage";
+    const unlocks = this.current().unlocks;
     let hint: string;
     if (locked) hint = "Unlock this tree to learn its skills.";
-    else if (maxed) hint = "Mastered.";
-    else if (requirements.length) hint = `Requires: ${requirements.join(" + ")} (one rank each).`;
+    else if (maxed) hint = unlocks ? "Unlocked." : "Mastered.";
+    else if (requirements.length) hint = `Requires: ${requirements.join(" + ")}${unlocks ? "" : " (one rank each)"}.`;
     else if (!available) hint = "Locked.";
     else if (balance < price) hint = `Need ${price} ${currency} · have ${balance}.`;
     else hint = "Tap again to purchase.";
-    return `<b style="color:var(--tree-color)">${u.name}</b><div>${level} / ${u.max} ranks</div><div>${upgradeText(u.id)}.</div><div class="${canBuy ? "safe" : ""}">${hint}</div>${!maxed && !locked ? `<div>Cost: ${price} ${currency}</div>` : ""}`;
+    return `<b style="color:var(--tree-color)">${u.name}</b>${unlocks ? "" : `<div>${level} / ${u.max} ranks</div>`}<div>${upgradeText(u.id)}.</div><div class="${canBuy ? "safe" : ""}">${hint}</div>${!maxed && !locked ? `<div>Cost: ${price} ${currency}</div>` : ""}`;
   }
 
   /** Above the selected node, or below it when there is no room above. */

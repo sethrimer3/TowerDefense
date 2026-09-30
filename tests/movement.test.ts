@@ -9,6 +9,7 @@ import { reachable } from "../src/board.ts";
 import { WIDTH, levelForXp, xpForLevel } from "../src/config.ts";
 function corridor() {
   const g = new Game(defaults());
+  g.save.upgrades.inspirationUndos = 1; // undo needs Rehearsed steps
   // Inside a run only Dev mode lets the player walk; these test walking.
   g.save.settings.devMode = true;
   g.save.upgrades.delve = 1;
@@ -119,6 +120,7 @@ test("Revive restores pre-fatal state and rolls back pending rewards; next move 
 });
 test("undo and Revive persist safely across refresh", () => {
   const g = new Game(defaults());
+  g.save.upgrades.inspirationUndos = 1; // undo needs Rehearsed steps
   g.save.upgrades.delve = 1;
   g.switchMode("delve");
   g.save.upgrades.revive = 1;

@@ -50,7 +50,7 @@ import { TowerClimb } from "./tower/climb.ts";
 import { materialDef, MATERIALS } from "./materials.ts";
 import { rollTreasureLoot } from "./loot.ts";
 import { MODES, milestones, type ModeProfile } from "./modes.ts";
-import { loadout, potionPercent, trainingPoints } from "./loadout.ts";
+import { keepUndos, loadout, potionPercent, trainingPoints } from "./loadout.ts";
 import { RESEARCH, cancelResearch, hastenResearch, hireArchivist, researched, settleArchives, startResearch, type ResearchId, type ResearchRecord } from "./archives.ts";
 import {
   creditMaterials,
@@ -351,7 +351,7 @@ export class Game {
       this.settleRevival();
       const slice = this.slice;
       slice.history.push(this.snapshot());
-      slice.history = slice.history.slice(-this.undoCapacity);
+      slice.history = keepUndos(slice.history, this.undoCapacity);
     }
     this.route = route;
     this.message = route.length ? "Walking to destination." : "Already here.";
@@ -789,7 +789,7 @@ export class Game {
   private remember(snapshot: MoveSnapshot) {
     const slice = this.slice;
     slice.history.push(snapshot);
-    slice.history = slice.history.slice(-this.undoCapacity);
+    slice.history = keepUndos(slice.history, this.undoCapacity);
   }
   /** Copies resolved stats onto the live player, keeping its object identity. */
   private applyStats(next: Player) {

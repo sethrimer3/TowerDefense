@@ -188,9 +188,10 @@ export const UPGRADES = [
   {
     id: "inspirationUndos",
     name: "Rehearsed steps",
+    description: "Rewind an action, and open Undo Count research in the Archives",
     grants: { undos: 1 },
-    base: 6,
-    max: 4,
+    base: 10,
+    max: 1,
     currency: "inspiration",
   },
   {

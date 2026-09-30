@@ -9,10 +9,20 @@ import { predict } from "../src/combat.ts";
 import { delveDefenseGrowth, getTowerGateEnemy } from "../src/scaling.ts";
 import { delveEnemyBase } from "../src/delve/labyrinth.ts";
 
-test("a new character starts at 12 ATK, 0 DEF, 100 HP, no keys and one undo", () => {
+test("a new character starts at 12 ATK, 0 DEF, 100 HP, no keys and no undo", () => {
   assert.deepEqual(loadout(defaults()), {
-    attack: 12, defense: 0, maxHp: 100, keys: { yellow: 0, blue: 0, red: 0 }, undoCapacity: 1,
+    attack: 12, defense: 0, maxHp: 100, keys: { yellow: 0, blue: 0, red: 0 }, undoCapacity: 0,
   });
+});
+
+test("Rehearsed steps gives the first undo; without it nothing else stores one", () => {
+  const s = defaults();
+  s.upgrades.undos = 2;
+  assert.equal(loadout(s).undoCapacity, 0, "Echoes of time alone");
+  s.upgrades.inspirationUndos = 1;
+  assert.equal(loadout(s).undoCapacity, 1 + 2);
+  s.archives.levels.undoCount = 3;
+  assert.equal(loadout(s).undoCapacity, 1 + 2 + 3, "Undo Count research adds to it");
 });
 
 test("each rank of an upgrade adds its grant", () => {
@@ -26,7 +36,7 @@ test("each rank of an upgrade adds its grant", () => {
     defense: 0 + 2 + 1,
     maxHp: 100 + 2 * 20,
     keys: { yellow: 1, blue: 2, red: 3 },
-    undoCapacity: 1 + 2 + 1,
+    undoCapacity: 2 + 1,
   });
 });
 
@@ -126,10 +136,10 @@ test("descriptions are written from the grants", () => {
       blue: "+1 starting azure key",
       red: "+1 starting crimson key",
       quality: "+2 weapon attack and +1 armor defense",
-      undos: "Store one additional undo (up to 9)",
+      undos: "Store one additional undo (up to 14)",
       handOrdering: "Open the Deck, where you reorder the cards in your hand before a run",
       combatStance: "Unlock the Deck: add its cards to your hand, or set them aside, to choose what a run heads for",
-      inspirationUndos: "Store one additional undo (up to 9)",
+      inspirationUndos: "Rewind an action, and open Undo Count research in the Archives",
       revive: "Undo a fatal move before moving in the new run",
     },
   );

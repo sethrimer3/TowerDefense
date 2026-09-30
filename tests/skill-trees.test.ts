@@ -48,6 +48,13 @@ test("Greater Heal and Recovery come after the Archives, whose research they ope
   assert.deepEqual([at("greaterHeal").x, at("greaterHeal").y, at("greaterHeal").requires], [50, 106, ["archives"]]);
   assert.deepEqual([at("recovery").x, at("recovery").y, at("recovery").requires], [50, 124, ["greaterHeal"]]);
 });
+test("each skill in a tree of unlocks is bought once", () => {
+  const unlockTrees = TREES.filter((t) => t.unlocks);
+  assert.deepEqual(unlockTrees.map((t) => t.id), ["inspiration"]);
+  for (const tree of unlockTrees)
+    for (const n of tree.nodes) assert.equal(UPGRADES.find((u) => u.id === n.id)!.max, 1, n.id);
+});
+
 test("a tree taller than its view places its nodes on a taller map", () => {
   const inspiration = TREES[0];
   assert.equal(treeHeight(inspiration), 136);

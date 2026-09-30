@@ -18,6 +18,7 @@ const foe = (over: Partial<Enemy> = {}): Enemy => ({ name: "Slime", hp: 30, atta
  * stairs in the far corner and an enemy that keeps the floor from clearing. */
 function arena(east: Tile, animate = true) {
   const g = new Game(defaults());
+  g.save.upgrades.inspirationUndos = 1; // undo needs Rehearsed steps
   g.playsFights = true;
   g.save.settings.fightAnimation = animate;
   const w = g.world as RoomWorld;

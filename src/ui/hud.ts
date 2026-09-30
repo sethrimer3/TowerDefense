@@ -248,6 +248,8 @@ function renderUndo(game: Game) {
   undo.classList.toggle("enabled", !!slice.revival);
   undo.setAttribute("aria-label", slice.revival ? "Revive" : `Undo (${count})`);
   undo.disabled = !slice.revival && !slice.history.length;
+  // Undo needs Rehearsed steps; before it the button shows only to Revive.
+  undo.hidden = !slice.revival && !game.save.upgrades.inspirationUndos;
 }
 
 function renderLockedTab(id: string, unlocked: boolean, name: string, hint: string) {

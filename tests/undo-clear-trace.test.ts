@@ -101,6 +101,7 @@ function trace(mode: Mode, seed: number): string[] {
   try {
     const save = defaults();
     save.upgrades.delve = 1;
+    save.upgrades.inspirationUndos = 1;
     save.upgrades.revive = 1;
     const g = new Game(save, rng);
     g.switchMode(mode);

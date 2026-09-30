@@ -8,6 +8,7 @@ import { chooseStep } from '../src/automation.ts';
 const chests = (g: Game) => Object.values(g.run.changes).filter(t => t.kind === 'reward').length;
 function arena() {
   const g = new Game(defaults());
+  g.save.upgrades.inspirationUndos = 1; // undo needs Rehearsed steps
   const w = g.world as RoomWorld;
   w.cells = new Map();
   for (let y = 0; y < 5; y++) for (let x = 0; x < 5; x++) w.cells.set(`${x},${y}`, { kind: 'floor' });

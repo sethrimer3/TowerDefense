@@ -194,6 +194,26 @@ test("Potion HP: +3% a level for 100 levels; quick first levels, then the formul
   assert.deepEqual(RESEARCH.potionHp.categories, ["defense"]);
 });
 
+test("Undo Count needs Rehearsed steps, costs what Focus Count does, and each level stores one more undo at once", () => {
+  const save = owner();
+  const g = new Game(save);
+  g.clock = () => T0;
+  assert.deepEqual(
+    RESEARCH.undoCount.levels.map(({ gold, hours }) => [gold, hours]),
+    RESEARCH.focusCount.levels.map(({ gold, hours }) => [gold, hours]),
+  );
+  assert.equal(status(save, "undoCount"), "locked");
+  assert.equal(g.startResearch(0, "undoCount"), false);
+  save.upgrades.inspirationUndos = 1;
+  assert.equal(g.undoCapacity, 1);
+  assert.ok(g.startResearch(0, "undoCount"));
+  g.clock = () => T0 + 8 * HOUR;
+  assert.equal(g.settleResearch().length, 1);
+  assert.equal(g.undoCapacity, 2);
+  save.archives.levels.undoCount = RESEARCH.undoCount.levels.length;
+  assert.equal(g.undoCapacity, 1 + 9);
+});
+
 test("Potion HP needs Greater Heal, and every level strengthens potions at once, mid-run too", () => {
   const save = owner();
   const g = new Game(save);

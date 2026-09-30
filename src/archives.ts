@@ -27,6 +27,8 @@ export type ResearchCategory = keyof typeof RESEARCH_CATEGORIES;
 export const RESEARCH_TARGETS = {
   /** Focus uses a run starts with. */
   focusPerRun: { text: (v: number) => `+${v} Focus use each run` },
+  /** Undos the hero can store, once Rehearsed steps has given the first. */
+  undoCapacity: { text: (v: number) => `+${v} undo stored` },
   /** The percent of its HP a potion restores, from 100 (red potions aside). */
   potionHeal: { text: (v: number) => `+${v}% potion healing` },
   /** How fast archivists work: a level of `d` hours takes d / (1 + speed). */
@@ -55,13 +57,14 @@ export type ResearchDefinition = {
   levels: ResearchLevel[];
 };
 
-/** Focus Count: level 1 costs 500 Gold and takes 8 hours; each level after
- * takes 8 hours more, and costs 500 × n Gold more than level n before it
- * (500, 1000, 2000, 3500, …). */
-const focusCountLevels = Array.from({ length: 9 }, (_, i): ResearchLevel => ({
+/** Focus Count and Undo Count: +1 to `target` a level, for nine levels.
+ * Level 1 costs 500 Gold and takes 8 hours; each level after takes 8 hours
+ * more, and costs 500 × n Gold more than level n before it (500, 1000,
+ * 2000, 3500, …). */
+const countLevels = (target: ResearchTarget) => Array.from({ length: 9 }, (_, i): ResearchLevel => ({
   gold: 500 * (1 + (i * (i + 1)) / 2),
   hours: 8 * (i + 1),
-  effect: { target: "focusPerRun", op: "add", value: 1 },
+  effect: { target, op: "add", value: 1 },
 }));
 
 /** Potion HP: +3% potion healing a level, for 100 levels. The first four
@@ -90,7 +93,14 @@ export const RESEARCH = {
     description: "Study the old climbers' journals to start each run with more Focus.",
     categories: ["abilities"],
     requires: [{ upgrade: "focus" }],
-    levels: focusCountLevels,
+    levels: countLevels("focusPerRun"),
+  },
+  undoCount: {
+    name: "Undo Count",
+    description: "Rehearse old climbs to store more undos.",
+    categories: ["abilities"],
+    requires: [{ upgrade: "inspirationUndos" }],
+    levels: countLevels("undoCapacity"),
   },
 } satisfies Record<string, ResearchDefinition>;
 export type ResearchId = keyof typeof RESEARCH;

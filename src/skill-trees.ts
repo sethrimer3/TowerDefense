@@ -3,10 +3,12 @@ export type TreeId = "wayfinding" | "inspiration" | "courage" | "legacy" | "wisd
 export type SkillNode = { id: UpgradeId; icon: string; x: number; y: number; requires: UpgradeId[] };
 /** A skill tree. Node positions are percentages of the tree's view: x of
  * its width, y of its height, so a tree taller than one screen (`height`,
- * in the same units, 100 by default) scrolls. */
-export type SkillTree = { id: TreeId; name: string; currency: Currency; gate?: UpgradeId; description: string; height?: number; nodes: SkillNode[] };
+ * in the same units, 100 by default) scrolls. In a tree of `unlocks`, each
+ * skill is bought once (more of it comes from other panels, such as the
+ * Archives), so its page shows no ranks. */
+export type SkillTree = { id: TreeId; name: string; currency: Currency; gate?: UpgradeId; description: string; height?: number; unlocks?: boolean; nodes: SkillNode[] };
 export const TREES: SkillTree[] = [
-  { id: "inspiration", name: "Inspiration", currency: "inspiration", description: "Earn Inspiration by beating your best Tower climb.", height: 136, nodes: [
+  { id: "inspiration", name: "Inspiration", currency: "inspiration", description: "Earn Inspiration by beating your best Tower climb.", height: 136, unlocks: true, nodes: [
     { id: "handOrdering", icon: "▤", x: 50, y: 12, requires: [] },
     { id: "combatStance", icon: "⚔", x: 50, y: 33, requires: ["handOrdering"] },
     { id: "cardHeal", icon: "♥", x: 24, y: 51, requires: ["combatStance"] },

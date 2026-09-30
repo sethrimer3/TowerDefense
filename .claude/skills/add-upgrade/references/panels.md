@@ -15,6 +15,8 @@ The Upgrades page's trees: Inspiration (Tower currency), Courage, Wayfinding, Le
 - Otherwise `description` is the player-facing text, and the effect is code that checks `save.upgrades.<id>` (look at how `focus`, `autoPersist` or `revive` are read in `state.ts`, `main.ts`, `hud.ts`).
 - `card` adds a card to the deck (`deckCards` in `cards.ts`); the card itself needs a `CARDS` entry and face art.
 
+**Inspiration tree:** its skills are unlocks (`unlocks: true` on the tree): each has `max: 1`, is bought once and shows no rank count (a test holds every node to one rank). More of what one gives comes from another panel, usually Archives research it opens (Rehearsed steps gives the first undo and opens Undo Count).
+
 **Price:** `cost(id, rank) = ceil(base × 1.65^rank)`, the same curve for every node, paid in `currency`. Existing bases run from 1 (roots) to about 12 (deep one-offs). Total for all ranks = Σ over rank 0…max−1.
 
 **Node** (`TREES` in `src/skill-trees.ts`): `{ id, icon, x, y, requires }`.
@@ -37,7 +39,7 @@ Research that lasts, paid in Gold and real (wall-clock) time, run by archivists.
 **Row** (`RESEARCH` in `src/archives.ts`, listed in this order on the page): `{ name, description, categories, requires, levels }`.
 - `categories`: keys of `RESEARCH_CATEGORIES` (combat, economy, defense, abilities, equipment, progression, qualityOfLife, special), used by the library's filters.
 - `requires`: any of `{ upgrade: UpgradeId }`, `{ research: id, level }`, `{ playerLevel: n }`.
-- `levels`: one `{ gold, hours, effect }` per level; the max level is the array's length. Write them as a small formula with a comment, like `focusCountLevels` (500 × (1 + n(n+1)/2) Gold, 8 × n hours).
+- `levels`: one `{ gold, hours, effect }` per level; the max level is the array's length. Write them as a small formula with a comment, like `countLevels` (Focus Count's and Undo Count's: 500 × (1 + n(n+1)/2) Gold, 8 × n hours).
 - `effect`: `{ target, op: "add" | "multiply" | "set", value }`. Adds sum, then multipliers apply, a `set` overrides.
 
 **Effect in code:** a target in `RESEARCH_TARGETS` (with its `text` for the page) and one place that reads it with `researched(save.archives, target, base)`, e.g. `Game.focusPerRun`, or `Game.stepRules` for what changes a step's outcome (`potionHeal`). A new kind of effect = one target + that one read. A target that changes step outcomes goes in `StepRules` (`step-effects.ts`), which `resolveStep` takes and every caller passes on: `Game.move`, `previewRouteEffects`, the inspect box (`tile-info.ts`) and Delve Automove (`DelveMind.rules`). Read it when it's used rather than copying it into the run, so it applies the moment a level completes and undo can't roll it back. Research speed divides `hours` (`duration`), so quote hours before speed; `hours` may be a fraction (15 seconds is `15 / 3600`).

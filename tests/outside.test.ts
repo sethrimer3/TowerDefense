@@ -9,6 +9,7 @@ import { chooseStep } from "../src/automation.ts";
 for (const mode of ["tower", "delve"] as const) {
   test(`${mode}: death, forest persistence, entry, Undo and Revive preserve progression`, () => {
     const g = new Game(defaults());
+    g.save.upgrades.inspirationUndos = 1; // undo needs Rehearsed steps
     g.save.upgrades.delve = 1;
     g.switchMode(mode);
     g.save.upgrades.revive = 1;

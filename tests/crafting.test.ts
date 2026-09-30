@@ -292,6 +292,7 @@ test("Tower monster parts are guaranteed and cannot be duplicated with undo", ()
 
 test("undo/reopen the same treasure chest cannot duplicate its Gold/material payout", () => {
   const g = new Game(defaults());
+  g.save.upgrades.inspirationUndos = 1; // undo needs Rehearsed steps
   const w = g.world as RoomWorld;
   w.cells = new Map();
   for (let y = 0; y < 5; y++) for (let x = 0; x < 5; x++) w.cells.set(`${x},${y}`, { kind: "floor" });
