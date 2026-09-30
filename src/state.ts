@@ -549,7 +549,7 @@ export class Game {
     this.route = [];
     this.summary = null;
     this.encounter = null;
-    const { attack, defense, maxHp, keys } = loadout(this.save);
+    const { attack, defense, maxHp, shroud, keys } = loadout(this.save);
     // Tower ascents begin at the first floor of the chosen section.
     const section = this.mode === "tower" ? this.startSection() : 0,
       height = section * TOWER_SECTION;
@@ -560,6 +560,8 @@ export class Game {
       maxHp,
       attack,
       defense,
+      // Only a hero with a shroud carries one.
+      ...(shroud ? { shroud } : {}),
       keys,
     };
     // The provisions bought for this run are spent on it.
@@ -578,7 +580,7 @@ export class Game {
     this.run = this.mode === "tower"
       ? { damaged: false, keysSpent: false, ...core }
       : { ...core, milestone: 0 };
-    this.run.loadout = { attack, defense, maxHp };
+    this.run.loadout = { attack, defense, maxHp, ...(shroud ? { shroud } : {}) };
     // The floors hold percent potions only once Recovery is owned.
     if (!outside) this.run.percentPotions = !!this.save.upgrades.recovery;
     this.world = this.rules.board(this.run);
@@ -1151,7 +1153,10 @@ export class Game {
       if (!run) continue;
       for (const stats of [run.player, run.loadout])
         if (stats)
-          for (const stat of ["attack", "defense", "maxHp"] as const) stats[stat] += after[stat] - before[stat];
+          for (const stat of ["attack", "defense", "maxHp", "shroud"] as const) {
+            const change = after[stat] - before[stat];
+            if (change) stats[stat] = (stats[stat] ?? 0) + change;
+          }
       const p = run.player;
       p.hp = run.outside
         ? mode === "tower" ? this.sectionStartHp(run.height / TOWER_SECTION, p.maxHp) : p.maxHp

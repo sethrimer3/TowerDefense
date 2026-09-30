@@ -62,6 +62,9 @@ export type Player = {
   maxHp: number;
   attack: number;
   defense: number;
+  /** The damage the shroud blocks at the start of every fight (none when
+   * absent). */
+  shroud?: number;
   keys: Record<KeyColor, number>;
   /** Optional secret inventory counters stay absent from legacy saves until
    * the corresponding item has actually been found. */
@@ -82,7 +85,7 @@ export type RunCore = {
   /** The ATK/DEF/max HP the run started with (its loadout), shifted by any
    * gear change since. In the Tower, ATK/DEF return to it whenever the
    * climb crosses into a new section. */
-  loadout?: { attack: number; defense: number; maxHp: number };
+  loadout?: { attack: number; defense: number; maxHp: number; shroud?: number };
   /** The hand as it was ordered when the run went inside: the cards that
    * move the hero for the rest of the run. */
   hand?: CardId[];

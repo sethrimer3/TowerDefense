@@ -9,9 +9,9 @@ import { predict } from "../src/combat.ts";
 import { delveDefenseGrowth, getTowerGateEnemy } from "../src/scaling.ts";
 import { delveEnemyBase } from "../src/delve/labyrinth.ts";
 
-test("a new character starts at 12 ATK, 0 DEF, 100 HP, no keys and no undo", () => {
+test("a new character starts at 12 ATK, 0 DEF, 100 HP, no shroud, no keys and no undo", () => {
   assert.deepEqual(loadout(defaults()), {
-    attack: 12, defense: 0, maxHp: 100, keys: { yellow: 0, blue: 0, red: 0 }, undoCapacity: 0,
+    attack: 12, defense: 0, maxHp: 100, shroud: 0, keys: { yellow: 0, blue: 0, red: 0 }, undoCapacity: 0,
   });
 });
 
@@ -29,12 +29,13 @@ test("each rank of an upgrade adds its grant", () => {
   const s = defaults();
   Object.assign(s.upgrades, {
     hp: 2, handOrdering: 1, attack: 2, combatStance: 1, defense: 2, quality: 1,
-    yellow: 1, blue: 2, red: 3, undos: 2, inspirationUndos: 1,
+    yellow: 1, blue: 2, red: 3, undos: 2, inspirationUndos: 1, shroud: 1,
   });
   assert.deepEqual(loadout(s), {
     attack: 12 + 2 * 2 + 2,
     defense: 0 + 2 + 1,
     maxHp: 100 + 2 * 20,
+    shroud: 1,
     keys: { yellow: 1, blue: 2, red: 3 },
     undoCapacity: 2 + 1,
   });
@@ -65,6 +66,28 @@ test("each training rank is worth more as the hero levels up", () => {
   s.xp = xpForLevel(20);
   const later = loadout(s);
   assert.deepEqual([later.attack, later.defense, later.maxHp], [12 + 5, 0 + 5, 100 + 90]);
+});
+
+test("Shroud blocks 1 damage a fight and opens Shroud training, each rank worth more as the hero levels", () => {
+  const g = new Game(defaults());
+  g.newRun({ outside: true });
+  g.save.xp = xpForLevel(10);
+  assert.equal(g.train("shroud"), false, "not before Shroud");
+  assert.equal(g.run.player.shroud, undefined, "no shroud yet");
+  g.save.tower.inspiration = 10;
+  assert.equal(g.buy("shroud"), false, "not before Greater Heal");
+  g.save.upgrades.greaterHeal = 1;
+  assert.ok(g.buy("shroud"));
+  assert.equal(loadout(g.save).shroud, 1);
+  assert.equal(g.save.tower.inspiration, 0, "10 Inspiration");
+  g.newRun({ outside: true });
+  assert.equal(g.run.player.shroud, 1, "a new run starts with it");
+  assert.ok(g.train("shroud") && g.train("shroud"));
+  // At level 10 a rank is worth 1 × (1 + 10 / 10) = 2.
+  assert.equal(loadout(g.save).shroud, 1 + 2 * 2);
+  assert.equal(g.run.player.shroud, 1 + 2 * 2, "training reaches a run still outside");
+  assert.deepEqual([trainingStep(g.save, "shroud").now, trainingStep(g.save, "shroud").next], [5, 7]);
+  assert.equal(trainingPoints(g.save).spent, 2, "a point a rank");
 });
 
 test("each level costs the cube of its number in XP, and levels are found exactly", () => {

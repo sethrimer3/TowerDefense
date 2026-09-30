@@ -79,11 +79,15 @@ How much XP the character has gathered from kills over every run. A kill pays mo
 _Avoid_: rank
 
 **Training point**:
-The currency each level earns (three a level), spent on ranks of training in the character's stats (max HP, ATK, DEF) and, with Recovery, in Potion % on the Training tab. A stat rank's worth grows with the character's level.
+The currency each level earns (three a level), spent on ranks of training in the character's stats (max HP, ATK, DEF, and the shroud once the Shroud skill is owned) and, with Recovery, in Potion % on the Training tab. A stat rank's worth grows with the character's level.
 _Avoid_: skill point, stat point
 
 **Percent potion**:
 The red, striped potion: it restores a regular potion's HP plus a share of max HP (1% with the Recovery skill, more with Potion % training). Floors hold them only in runs that went inside with Recovery owned; otherwise each is a regular potion.
+
+**Shroud**:
+The damage a hero's shroud blocks in each fight: the enemy's strikes, after DEF, wear it away before any HP is lost, and it is whole again when the next fight starts. The Shroud skill gives the first point; Shroud training adds more.
+_Avoid_: shield (the equipment slot), barrier
 
 **Provision**:
 A one-run boost bought with Gold; it adds to the next run's loadout and is spent when that run starts.

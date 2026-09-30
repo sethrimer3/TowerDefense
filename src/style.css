@@ -314,6 +314,10 @@ h1 span {
 .combat-stats span {
   min-width: 0;
 }
+.combat-stats .shroud-stat {
+  color: #c9d3e0;
+  white-space: nowrap;
+}
 .secret-stat-slot {
   display: block;
   visibility: hidden;

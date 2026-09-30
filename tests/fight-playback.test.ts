@@ -61,6 +61,34 @@ test("the enemy's ATK rises after every round by 1% (at least 1), so no DEF hold
   assert.equal(endless.damage, Infinity);
 });
 
+test("the shroud takes the enemy's first damage, then the hero's HP takes the rest", () => {
+  const p = hero({ shroud: 8 }), e = foe({ hp: 36 }); // The enemy strikes 5, 6, 7, 8, 9.
+  const fight = bout(p, e), odds = predict(p, e);
+  const struck = fight.strikes.filter((s) => s.by === "enemy");
+  assert.deepEqual(struck.map((s) => [s.shrouded ?? 0, s.damage]), [[5, 0], [3, 3], [0, 7], [0, 8], [0, 9]]);
+  assert.equal(odds.damage, 35 - 8);
+  assert.equal(heroHpDuring(fight, p.hp, fight.duration), p.hp - odds.damage);
+  assert.equal(predict(hero({ shroud: 50 }), e).damage, 0, "a shroud bigger than the fight blocks all of it");
+
+  const popups = new BoardPopups(), game = { run: { seed: 1 }, gains: [], encounter: null, lastHeal: null };
+  const encounter = { from: { x: 0, y: 0 }, to: { x: 1, y: 0 }, bout: fight, start: 0, settle() {} };
+  popups.update({ ...game, encounter }, fight.strikes[3].at);
+  assert.deepEqual(numbers(popups).filter((d) => d.x < 1).map((d) => `${d.x}:${d.text}:${d.color}`),
+    ["0:5:#c9d3e0", "-0.22:3:#c9d3e0", "0.22:3:#b3121f"], "what the shroud blocks rises in silver, beside what got through");
+});
+
+test("the shroud is whole again for every fight", () => {
+  const g = arena({ kind: "enemy", enemy: foe() }, false);
+  g.world.cells.set("0,1", { kind: "enemy", enemy: foe() });
+  g.run.player.shroud = 4;
+  const full = predict({ ...g.run.player, shroud: 0 }, foe()).damage;
+  assert.ok(g.move(1, 0));
+  assert.equal(g.run.player.hp, 100 - (full - 4));
+  assert.ok(g.move(-1, 0) && g.move(0, 1));
+  assert.equal(g.run.player.hp, 100 - 2 * (full - 4), "the second fight is shrouded too");
+  assert.equal(g.run.player.shroud, 4);
+});
+
 test("strikes speed up by a tenth a round down to 50 ms, then hold", () => {
   const fight = bout(hero({ attack: 5, hp: 10_000 }), foe({ hp: 40, defense: 4, attack: 3 }));
   const rounds = fight.strikes.filter((s) => s.by === "hero").map((s) => s.end - s.start);

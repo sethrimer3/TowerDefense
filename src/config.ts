@@ -161,6 +161,15 @@ export const UPGRADES = [
     currency: "inspiration",
   },
   {
+    id: "shroud",
+    name: "Shroud",
+    description: "A shroud blocks the first damage of every fight, and opens Shroud training",
+    grants: { shroud: 1 },
+    base: 10,
+    max: 1,
+    currency: "inspiration",
+  },
+  {
     id: "cardGear",
     name: "Gear",
     description: "Add the EQUIPMENT card to your deck: it moves you toward the closest ATK or DEF pickup",
@@ -293,13 +302,15 @@ export const TRAINING_GROUPS = { offense: "Offense", defense: "Defense" } as con
 /** What training raises, each rank costing `cost` points. A stat row is
  * worth `base` × (1 + level / `growth`) of `stat` at the hero's level (see
  * `trainingWorth`), so every rank already bought grows as the hero levels
- * up and saving points up never pays. Potion % adds `POTION_PERCENT_RANK`
+ * up and saving points up never pays. Shroud adds to the damage the
+ * shroud blocks each fight. Potion % adds `POTION_PERCENT_RANK`
  * to what a percent potion restores, the same at every level. A row with
  * `requires` shows, and trains, only once that upgrade is owned. */
 export const TRAINING = [
   { id: "hp", name: "Max HP", group: "defense", stat: "maxHp", base: 10, growth: 10, cost: 1 },
   { id: "attack", name: "ATK", group: "offense", stat: "attack", base: 1, growth: 5, cost: 5 },
   { id: "defense", name: "DEF", group: "defense", stat: "defense", base: 1, growth: 12, cost: 3 },
+  { id: "shroud", name: "Shroud", group: "defense", stat: "shroud", base: 1, growth: 10, cost: 1, requires: "shroud" },
   { id: "potion", name: "Potion %", group: "defense", requires: "recovery", cost: 1 },
 ] as const;
 export type TrainingId = (typeof TRAINING)[number]["id"];

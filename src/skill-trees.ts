@@ -19,7 +19,8 @@ export const TREES: SkillTree[] = [
     { id: "delve", icon: "▼", x: 82, y: 88, requires: ["focus"] },
     // Research needs the Archives, so the skills that open it come after them.
     { id: "greaterHeal", icon: "✚", x: 50, y: 106, requires: ["archives"] },
-    { id: "recovery", icon: "✦", x: 50, y: 124, requires: ["greaterHeal"] },
+    { id: "recovery", icon: "✦", x: 30, y: 124, requires: ["greaterHeal"] },
+    { id: "shroud", icon: "◈", x: 70, y: 124, requires: ["greaterHeal"] },
   ] },
   { id: "courage", name: "Courage", currency: "courage", gate: "delve", description: "Earn Courage by beating your best Delve depth.", nodes: [
     { id: "auto", icon: "✦", x: 50, y: 10, requires: ["delve"] },

@@ -5,26 +5,29 @@ import { RESEARCH, researched } from "./archives.ts";
 
 /** What one rank of an upgrade, or one provision, adds to a character. */
 export type Grants = Partial<Record<Stat, number>>;
-export type Stat = "attack" | "defense" | "maxHp" | "yellow" | "blue" | "red" | "undos";
+export type Stat = "attack" | "defense" | "maxHp" | "shroud" | "yellow" | "blue" | "red" | "undos";
 
 /** The character a run starts with. */
 export type Loadout = {
   attack: number;
   defense: number;
   maxHp: number;
+  /** The damage the shroud blocks at the start of every fight. */
+  shroud: number;
   keys: { yellow: number; blue: number; red: number };
   undoCapacity: number;
 };
 
 /** Every character's baseline: 10 ATK plus the starter weapon (+2), which
- * Heirloom steel improves; no DEF; 100 HP; no undo (Rehearsed steps gives
- * the first). */
-const BASE = { attack: 12, defense: 0, maxHp: 100, undos: 0 };
+ * Heirloom steel improves; no DEF; 100 HP; no shroud (Shroud gives the
+ * first point); no undo (Rehearsed steps gives the first). */
+const BASE = { attack: 12, defense: 0, maxHp: 100, shroud: 0, undos: 0 };
 
 const WORDS: Record<Stat, string> = {
   attack: "starting attack",
   defense: "starting defense",
   maxHp: "starting maximum HP",
+  shroud: "damage blocked each fight",
   yellow: "starting amber key",
   blue: "starting azure key",
   red: "starting crimson key",
@@ -56,17 +59,18 @@ function add(total: Record<Stat, number>, rows: readonly (Granting & { id: strin
  * percentages of the total, rounded), then the provisions bought for the
  * next run. */
 export function loadout(save: Save): Loadout {
-  const own = { attack: BASE.attack, defense: BASE.defense, maxHp: BASE.maxHp, yellow: 0, blue: 0, red: 0, undos: BASE.undos };
+  const own = { ...BASE, yellow: 0, blue: 0, red: 0 };
   add(own, UPGRADES, save.upgrades);
   const level = levelForXp(save.xp);
   for (const row of TRAINING) if (isStatRow(row)) own[row.stat] += trained(row, save.training[row.id], level);
-  const prov = { attack: 0, defense: 0, maxHp: 0, yellow: 0, blue: 0, red: 0, undos: 0 };
+  const prov = { attack: 0, defense: 0, maxHp: 0, shroud: 0, yellow: 0, blue: 0, red: 0, undos: 0 };
   add(prov, GOLD_SHOP, save.provisions);
   const equip = getEquippedBonuses(save);
   return {
     attack: Math.round((own.attack + equip.flatAttack) * (1 + equip.percentAttack)) + prov.attack,
     defense: Math.round((own.defense + equip.flatDefense) * (1 + equip.percentDefense)) + prov.defense,
     maxHp: Math.round((own.maxHp + equip.flatMaxHp) * (1 + equip.percentMaxHp)) + prov.maxHp,
+    shroud: own.shroud,
     keys: { yellow: own.yellow, blue: own.blue, red: own.red },
     // Undo needs Rehearsed steps: without it nothing else stores one.
     undoCapacity: save.upgrades.inspirationUndos ? researched(save.archives, "undoCapacity", own.undos) : 0,

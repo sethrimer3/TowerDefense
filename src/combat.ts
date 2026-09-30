@@ -22,7 +22,8 @@ export function predict(player: Player, enemy: Enemy): CombatPrediction {
     };
   }
   const turns = Math.ceil(enemy.hp / hit);
-  const damage = damageTaken(enemy.attack, player.defense, turns - 1);
+  // The shroud takes the first of it, whichever strikes that falls on.
+  const damage = Math.max(0, damageTaken(enemy.attack, player.defense, turns - 1) - (player.shroud ?? 0));
   return {
     impervious: false,
     hit,
@@ -60,29 +61,32 @@ export const FASTEST_STRIKE_MS = 50;
 
 /** One strike of a fight: who struck, for how much, when it swings (`start`
  * to `end`, in ms from the fight's start) and lands (`at`), and the HP the
- * struck side has left. */
-export type Strike = { by: "hero" | "enemy"; damage: number; start: number; at: number; end: number; hp: number };
+ * struck side has left. Of an enemy's strike, the shroud takes what it can
+ * (`shrouded`), and `damage` is what gets through to the hero. */
+export type Strike = { by: "hero" | "enemy"; damage: number; shrouded?: number; start: number; at: number; end: number; hp: number };
 export type Bout = { strikes: Strike[]; duration: number };
 
 /** The rounds `predict` sums up, one strike at a time: the hero strikes first,
- * then the enemy (its ATK rising after each round), until one of them falls. Ends with the same HP as the
- * prediction (or at 0 in a fight the hero loses). */
+ * then the enemy (its ATK rising after each round, the shroud taking its
+ * strikes until it is spent), until one of them falls. Ends with the same HP
+ * as the prediction (or at 0 in a fight the hero loses). */
 export function bout(player: Player, enemy: Enemy): Bout {
   const hit = player.attack - enemy.defense;
   const strikes: Strike[] = [];
   if (hit <= 0) return { strikes, duration: 0 };
-  let enemyHp = enemy.hp, heroHp = player.hp, attack = enemy.attack, t = 0, ms = FIRST_STRIKE_MS;
-  const strike = (by: Strike["by"], damage: number, hp: number) => {
-    strikes.push({ by, damage, start: t, at: t + ms / 2, end: t + ms, hp });
+  let enemyHp = enemy.hp, heroHp = player.hp, shroud = player.shroud ?? 0, attack = enemy.attack, t = 0, ms = FIRST_STRIKE_MS;
+  const strike = (by: Strike["by"], damage: number, hp: number, shrouded = 0) => {
+    strikes.push({ by, damage, ...(shrouded ? { shrouded } : {}), start: t, at: t + ms / 2, end: t + ms, hp });
     t += ms;
   };
   for (;;) {
     enemyHp = Math.max(0, enemyHp - hit);
     strike("hero", hit, enemyHp);
     if (!enemyHp) break;
-    const taken = Math.max(0, attack - player.defense);
+    const struck = Math.max(0, attack - player.defense), shrouded = Math.min(shroud, struck), taken = struck - shrouded;
+    shroud -= shrouded;
     heroHp = Math.max(0, heroHp - taken);
-    strike("enemy", taken, heroHp);
+    strike("enemy", taken, heroHp, shrouded);
     if (!heroHp) break;
     attack = raisedAttack(attack);
     ms = Math.max(FASTEST_STRIKE_MS, ms * STRIKE_SPEEDUP);

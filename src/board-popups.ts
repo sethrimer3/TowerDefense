@@ -17,6 +17,10 @@ const REWARD_COLOR = "#f3d69a";
 const DAMAGE_COLOR = "#ff4040";
 const HERO_DAMAGE_COLOR = "#b3121f";
 const HEAL_COLOR = "#5fdc6a";
+/** Damage the shroud blocked, and how far apart it and the damage that got
+ * through rise when a strike has both, in tiles. */
+const SHROUD_COLOR = "#c9d3e0";
+const SHROUD_SPLIT = 0.22;
 /** The minus sign on a key a door took. */
 const SPENT_COLOR = "#ff6b6b";
 /** The HUD's heart, raised with a check when a Heart Door opens. */
@@ -85,11 +89,15 @@ export class BoardPopups {
     if (!fight) return;
     const strikes = fight.bout.strikes;
     while (this.landed < strikes.length && fight.start + strikes[this.landed].at <= now) {
-      const s = strikes[this.landed++], on = s.by === "hero" ? fight.to : fight.from;
-      this.numbers.push({
-        x: on.x, y: on.y + DAMAGE_START, start: fight.start + s.at, text: String(s.damage),
-        color: s.by === "hero" ? DAMAGE_COLOR : HERO_DAMAGE_COLOR,
-      });
+      const s = strikes[this.landed++], on = s.by === "hero" ? fight.to : fight.from,
+        start = fight.start + s.at, both = !!s.shrouded && s.damage > 0;
+      if (s.shrouded)
+        this.numbers.push({ x: on.x - (both ? SHROUD_SPLIT : 0), y: on.y + DAMAGE_START, start, text: String(s.shrouded), color: SHROUD_COLOR });
+      if (!s.shrouded || s.damage)
+        this.numbers.push({
+          x: on.x + (both ? SHROUD_SPLIT : 0), y: on.y + DAMAGE_START, start, text: String(s.damage),
+          color: s.by === "hero" ? DAMAGE_COLOR : HERO_DAMAGE_COLOR,
+        });
     }
   }
   /** Nothing is rising or waiting to. */

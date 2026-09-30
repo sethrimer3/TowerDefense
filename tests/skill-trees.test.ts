@@ -30,7 +30,7 @@ test("fresh progression gates Delve, currencies, Courage root, and Legacy", () =
   assert.deepEqual(TREES.map(tree => tree.id), ["inspiration", "courage", "wayfinding", "legacy", "wisdom", "renown"]);
   assert.ok(TREES.slice(3).every(tree => tree.nodes.length >= 3));
 });
-test("Greater Heal and Recovery come after the Archives, whose research they open", () => {
+test("Greater Heal, then Recovery and Shroud, come after the Archives, whose research they open", () => {
   const g = new Game(defaults());
   g.save.tower.inspiration = 1000;
   for (const id of ["handOrdering", "combatStance", "cardHeal", "cardGear", "focus"] as const) assert.ok(g.buy(id));
@@ -46,7 +46,8 @@ test("Greater Heal and Recovery come after the Archives, whose research they ope
   assert.equal(g.buy("recovery"), false, "one rank");
   const at = (id: string) => TREES[0].nodes.find((n) => n.id === id)!;
   assert.deepEqual([at("greaterHeal").x, at("greaterHeal").y, at("greaterHeal").requires], [50, 106, ["archives"]]);
-  assert.deepEqual([at("recovery").x, at("recovery").y, at("recovery").requires], [50, 124, ["greaterHeal"]]);
+  assert.deepEqual([at("recovery").x, at("recovery").y, at("recovery").requires], [30, 124, ["greaterHeal"]]);
+  assert.deepEqual([at("shroud").x, at("shroud").y, at("shroud").requires], [70, 124, ["greaterHeal"]], "Shroud sits beside Recovery");
 });
 test("each skill in a tree of unlocks is bought once", () => {
   const unlockTrees = TREES.filter((t) => t.unlocks);
