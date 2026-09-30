@@ -33,6 +33,9 @@ export const DELVE_TUNING = {
   /** The odds of the reward left beside a guard (none otherwise), so an area
    * also holds about the potions and shards of ten Tower floors. */
   guardRewards: { potion: 0.55, attack: 0.15, defense: 0.1 },
+  /** The share of guard potions that are percent potions, as in the
+   * Tower's furnisher; a run shows them only once Recovery is owned. */
+  percentPotionShare: 0.5,
 };
 const { columns: COLS, rowsPerArea: ROWS, pitch: PITCH } = DELVE_TUNING;
 /** Nominal world-Y span of one area; only used to find candidate areas. */
@@ -502,6 +505,7 @@ function carveFork(lab: Lab, board: Board, n: Node, fork: Fork, lanes: Point[][]
  * pocket may get one enemy on its middle corridor tile, outside any chamber,
  * with a random strength and profile, and often a potion or shard on the
  * corridor tile beside it. */
+const PERCENT_POTION_SALT = 0x5eed7;
 function placeGuards(lab: Lab, board: Board) {
   const { nodes, rng } = lab, pockets = new Set(nodes.filter(n => n.pattern).map(n => n.id));
   const strengths = Object.entries(DELVE_TUNING.guardStrengths) as [Strength, number][];
@@ -518,7 +522,13 @@ function placeGuards(lab: Lab, board: Board) {
     const middle = Math.floor(open.length / 2), at = open[middle], depth = board.metadata.get(point(at.x, at.y))!.depth;
     board.put(at, gateTile(lab, { kind: 'enemy', strength, profile }, { ...nodes[e.a], depth }), depth);
     const beside = open[middle + 1];
-    if (reward && beside) board.put(beside, { kind: reward }, board.metadata.get(point(beside.x, beside.y))!.depth);
+    if (!reward || !beside) continue;
+    // A fixed number per tile, so choosing a potion's kind never shifts the
+    // region's stream.
+    const tile: Tile = reward === 'potion'
+      ? { kind: 'potion', color: tileRandom(beside.x, beside.y, lab.seed ^ PERCENT_POTION_SALT) < DELVE_TUNING.percentPotionShare ? 'red' : 'blue' }
+      : { kind: reward };
+    board.put(beside, tile, board.metadata.get(point(beside.x, beside.y))!.depth);
   }
 }
 

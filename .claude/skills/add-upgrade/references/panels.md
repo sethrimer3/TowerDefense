@@ -18,7 +18,8 @@ The Upgrades page's trees: Inspiration (Tower currency), Courage, Wayfinding, Le
 **Price:** `cost(id, rank) = ceil(base × 1.65^rank)`, the same curve for every node, paid in `currency`. Existing bases run from 1 (roots) to about 12 (deep one-offs). Total for all ranks = Σ over rank 0…max−1.
 
 **Node** (`TREES` in `src/skill-trees.ts`): `{ id, icon, x, y, requires }`.
-- `x`, `y` are percentages of the tree's canvas (0–100). Roots sit near the top (y ≈ 10–20), each tier lower, the capstone near y ≈ 85–90. Keep nodes about 20+ apart horizontally on a shared row and 15+ apart vertically so their labels don't collide; check the neighbours' positions.
+- `x`, `y` are percentages of one view (0–100). Roots sit near the top (y ≈ 10–20), each tier about 18 lower. Keep nodes about 20+ apart horizontally on a shared row and 15+ apart vertically so their labels don't collide; check the neighbours' positions. A tree that needs more room gets a `height` (in the same units, e.g. 136) and scrolls; nodes may then sit below y = 100. Leave about 12 below the lowest node.
+- A skill that only matters once another is owned (one that opens Archives research, say) goes below that one in the tree, even when that takes more height.
 - `requires` lists `UpgradeId`s that must each have a rank; they may be in another tree (`auto` requires `delve`).
 - A tree's `gate` hides the whole tree until that upgrade is owned.
 - `icon` is the glyph in `TREES`; the sprite shown comes from `skillSprite` in `src/ui/dom.ts` (`SKILL_UI_SPRITES`, `SKILL_ITEM_SPRITES`, or `SKILL_CARDS` for card skills; default is the upgrades sprite). Add a mapping when a fitting sprite exists.
@@ -51,13 +52,13 @@ Research that lasts, paid in Gold and real (wall-clock) time, run by archivists.
 
 Hero stats bought with training points (`TRAINING_PER_LEVEL` per hero level), on the Upgrades page's Training tab.
 
-**Row** (`TRAINING` in `src/config.ts`): `{ id, name, stat, base, growth, cost }`. A rank is worth `base × (1 + level / growth)` of `stat` at the hero's current level, ranks already bought included (`trainingWorth`, `trained`). `cost` is points per rank. `stat` must be one of the loadout's stats (`Stat` in `loadout.ts`).
+**Row** (`TRAINING` in `src/config.ts`): `{ id, name, group, stat, base, growth, cost, requires? }`. A stat row's rank is worth `base × (1 + level / growth)` of `stat` at the hero's current level, ranks already bought included (`trainingWorth`, `trained`). `cost` is points per rank. `stat` must be one of the loadout's stats (`Stat` in `loadout.ts`). `group` is a key of `TRAINING_GROUPS` (Offense, Defense), under which the tab lists it. A row without `stat` (Potion %) raises something else: give it its own branch in `trainingStep` (its `unit`, now and next) and read its ranks where it's used (Potion % through `potionPercent` and `game.stepRules`).
 
 **Balance:** training alone is meant to fall behind enemy growth in the mid game (research and gear have to make up the rest). `tests/loadout.test.ts` models an evenly spread hero winning at floors 10 and 50 and losing at 75; a new row must keep that true, or the model and docs change with it.
 
-**Unlocks:** Training has no requirements today; every row is always shown. Gating a row needs new code (say so in the spec).
+**Unlocks:** a row with `requires: <UpgradeId>` is hidden, and `Game.train` refuses it, until that upgrade is owned (`trainingOpen`).
 
-**Touches:** `config.ts`, `tests/loadout.test.ts`, `docs/PROGRESSION_AND_DIFFICULTY.md` (training paragraph), `ui.golden.json` (Training tab), `save-decode` (the `training` record).
+**Touches:** `config.ts`, `tests/loadout.test.ts`, `docs/PROGRESSION_AND_DIFFICULTY.md` (training paragraph), `README.md` (the Training tab paragraph), `CONTEXT.md` (Training point), `ui.golden.json` (Training tab), `save-decode` (the `training` record).
 
 ---
 
@@ -91,11 +92,12 @@ What works today without new mechanism code:
 | a skill | a tab or page | the checks in `main.ts` `navigate`, `ui/hud.ts` `renderLockedTab`, `skill-tree-page.ts` (Archives tab) |
 | a skill | a Settings row | the map in `ui/settings-page.ts` |
 | a skill | a deck card | the row's `card` |
+| a skill | a Training row | the row's `requires` |
 | a skill | the Defend Armory | `legacy` only |
 | research level | another project | `requires: [{ research, level }]` |
 | hero level | a research project | `requires: [{ playerLevel }]` |
 
 Needs new code (flag it in the spec as a mechanism change, not just a row):
 - a skill node requiring research or a hero level (`skillAvailable` only reads `save.upgrades`),
-- gating an individual Training row or Armory upgrade,
+- gating an individual Armory upgrade,
 - research unlocking a tab, card or setting.

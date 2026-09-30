@@ -92,6 +92,10 @@ export type RunCore = {
   /** Focus uses spent this run. What is left is what a run gets now less
    * these, so a Focus Count level completed mid-run counts at once. */
   focusUsed?: number;
+  /** Percent potions stand on this run's floors (Recovery was owned when it
+   * went inside); otherwise each is a regular potion. Fixed for the run, so
+   * its floors never change under it. */
+  percentPotions?: boolean;
   /** The card a Focus put ahead of the others, until it reaches its target
    * or has no path to one. */
   focused?: CardId;

@@ -14,13 +14,16 @@ const MIN_SCALE = 0.75, MAX_SCALE = 2.5, DRAG_SLOP = 4;
 
 /** Drag-to-pan, pinch- and wheel-to-zoom for `map` inside `viewport`,
  * writing into `view` (which the caller keeps, so the view survives
- * re-renders). A content smaller than the viewport stays centred. */
+ * re-renders). A content smaller than the viewport stays centred. A map
+ * taller than the viewport scrolls: dragging moves it, and so does the
+ * mouse wheel, which zooms only with Ctrl held (as a trackpad pinch
+ * reports). */
 export function bindPanZoom(viewport: HTMLElement, map: HTMLElement, view: View, on: PanZoomEvents) {
   const apply = () => {
     const width = viewport.clientWidth,
       height = viewport.clientHeight,
-      scaledWidth = width * view.scale,
-      scaledHeight = height * view.scale;
+      scaledWidth = (map.offsetWidth || width) * view.scale,
+      scaledHeight = (map.offsetHeight || height) * view.scale;
     view.x = scaledWidth <= width ? (width - scaledWidth) / 2 : clamp(view.x, width - scaledWidth, 0);
     view.y = scaledHeight <= height ? (height - scaledHeight) / 2 : clamp(view.y, height - scaledHeight, 0);
     map.style.transform = `translate(${view.x}px,${view.y}px) scale(${view.scale})`;
@@ -79,6 +82,12 @@ export function bindPanZoom(viewport: HTMLElement, map: HTMLElement, view: View,
   viewport.onpointercancel = end;
   viewport.onwheel = (e) => {
     e.preventDefault();
+    if (!e.ctrlKey && map.offsetHeight * view.scale > viewport.clientHeight) {
+      view.y -= e.deltaY;
+      apply();
+      on.pan();
+      return;
+    }
     const rect = viewport.getBoundingClientRect(),
       cx = e.clientX - rect.left,
       cy = e.clientY - rect.top,

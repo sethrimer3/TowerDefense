@@ -59,8 +59,9 @@ const DESCRIBE: Partial<Record<Kind, Describe>> = {
     return { title: `${name} Key`, body: `<span>Unlocks ${name} doors</span><br>Keys: ${p.keys[color]} → ${p.keys[color] + 1}` };
   },
   potion: (t, p, g) => {
-    const after = resolveStep(p, t, g.stepRules);
-    return { title: "Potion", body: `<span>Restores HP</span><br>(${p.hp} → ${after.blocked ? p.hp : after.player.hp})` };
+    const after = resolveStep(p, t, g.stepRules), percent = t.color === "red";
+    const restores = percent ? `Restores HP and ${g.stepRules.percentPotion / 100}% of max HP` : "Restores HP";
+    return { title: percent ? "Percent Potion" : "Potion", body: `<span>${restores}</span><br>(${p.hp} → ${after.blocked ? p.hp : after.player.hp})` };
   },
   stairs,
   stairsDown: stairs,

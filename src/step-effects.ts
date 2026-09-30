@@ -28,11 +28,13 @@ export type StepEffect = {
 };
 export type StepOutcome = StepBlocked | StepEffect;
 
-/** What research changes about stepping: the percent of its HP a potion
- * restores (Potion HP). Read from the Archives at the moment of the step, so
- * a level completed mid-run counts at once. */
-export type StepRules = { potionHeal: number };
-export const BASE_RULES: StepRules = { potionHeal: 100 };
+/** What upgrades change about stepping, read at the moment of the step so
+ * a research level completed mid-run counts at once: the percent of its HP
+ * a potion restores (Potion HP research), and what a percent potion
+ * restores beyond its HP, in hundredths of a percent of max HP (Recovery
+ * and Potion % training). */
+export type StepRules = { potionHeal: number; percentPotion: number };
+export const BASE_RULES: StepRules = { potionHeal: 100, percentPotion: 0 };
 /** The HP a potion of `amount` restores under `rules`, rounded. */
 export const potionHeal = (amount: number, rules: StepRules) => Math.round((amount * rules.potionHeal) / 100);
 
@@ -62,9 +64,11 @@ export function resolveStep(player: Player, tile: Tile, rules: StepRules = BASE_
       next.keys[tile.color!]++;
       break;
     case "potion": {
-      // The red (percent) potion is left to its own rules for now.
+      // A percent (red) potion restores its HP, which Potion HP leaves alone,
+      // and a share of max HP.
       const amount = tile.amount ?? POTION_HEAL;
-      effect.healed = Math.min(next.maxHp - next.hp, tile.color === "red" ? amount : potionHeal(amount, rules));
+      const heal = tile.color === "red" ? amount + Math.round((next.maxHp * rules.percentPotion) / 10000) : potionHeal(amount, rules);
+      effect.healed = Math.min(next.maxHp - next.hp, heal);
       next.hp += effect.healed;
       break;
     }

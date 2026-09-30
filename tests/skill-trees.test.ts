@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { defaults, decode } from "../src/save.ts";
 import { Game } from "../src/state.ts";
-import { TREES } from "../src/skill-trees.ts";
+import { TREES, mapNodes, treeHeight } from "../src/skill-trees.ts";
 import { UPGRADES } from "../src/config.ts";
 test("fresh progression gates Delve, currencies, Courage root, and Legacy", () => {
   const g = new Game(defaults());
@@ -30,18 +30,30 @@ test("fresh progression gates Delve, currencies, Courage root, and Legacy", () =
   assert.deepEqual(TREES.map(tree => tree.id), ["inspiration", "courage", "wayfinding", "legacy", "wisdom", "renown"]);
   assert.ok(TREES.slice(3).every(tree => tree.nodes.length >= 3));
 });
-test("Greater Heal follows Heal for 3 Inspiration and opens Potion HP research", () => {
+test("Greater Heal and Recovery come after the Archives, whose research they open", () => {
   const g = new Game(defaults());
-  g.save.tower.inspiration = 100;
-  for (const id of ["handOrdering", "combatStance"] as const) assert.ok(g.buy(id));
-  assert.equal(g.buy("greaterHeal"), false, "Heal comes first");
-  assert.ok(g.buy("cardHeal"));
-  const before = g.save.tower.inspiration;
+  g.save.tower.inspiration = 1000;
+  for (const id of ["handOrdering", "combatStance", "cardHeal", "cardGear", "focus"] as const) assert.ok(g.buy(id));
+  assert.equal(g.buy("greaterHeal"), false, "the Archives come first");
+  assert.ok(g.buy("archives"));
+  assert.equal(g.buy("recovery"), false, "Greater Heal comes first");
+  let before = g.save.tower.inspiration;
   assert.ok(g.buy("greaterHeal"));
   assert.equal(before - g.save.tower.inspiration, 3);
-  assert.equal(g.buy("greaterHeal"), false, "one rank");
-  const node = TREES[0].nodes.find((n) => n.id === "greaterHeal")!;
-  assert.deepEqual([node.x, node.y, node.requires], [24, 69, ["cardHeal"]]);
+  before = g.save.tower.inspiration;
+  assert.ok(g.buy("recovery"));
+  assert.equal(before - g.save.tower.inspiration, 10);
+  assert.equal(g.buy("recovery"), false, "one rank");
+  const at = (id: string) => TREES[0].nodes.find((n) => n.id === id)!;
+  assert.deepEqual([at("greaterHeal").x, at("greaterHeal").y, at("greaterHeal").requires], [50, 106, ["archives"]]);
+  assert.deepEqual([at("recovery").x, at("recovery").y, at("recovery").requires], [50, 124, ["greaterHeal"]]);
+});
+test("a tree taller than its view places its nodes on a taller map", () => {
+  const inspiration = TREES[0];
+  assert.equal(treeHeight(inspiration), 136);
+  assert.ok(inspiration.nodes.every((n) => n.y > 0 && n.y < treeHeight(inspiration)), "every node on the map");
+  assert.equal(mapNodes(inspiration).find((n) => n.id === "recovery")!.y, (124 * 100) / 136);
+  assert.ok(TREES.slice(1).every((t) => treeHeight(t) === 100 && mapNodes(t).every((n, i) => n.y === t.nodes[i].y)), "other trees fit one view");
 });
 test("older saves retain earned access without unlocking fresh saves", () => {
   const old: any = defaults();

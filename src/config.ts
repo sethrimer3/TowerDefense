@@ -153,6 +153,14 @@ export const UPGRADES = [
     currency: "inspiration",
   },
   {
+    id: "recovery",
+    name: "Recovery",
+    description: "Percent potions appear on the floors: each restores 35 HP and a share of your max HP, raised by Potion % training",
+    base: 10,
+    max: 1,
+    currency: "inspiration",
+  },
+  {
     id: "cardGear",
     name: "Gear",
     description: "Add the EQUIPMENT card to your deck: it moves you toward the closest ATK or DEF pickup",
@@ -279,22 +287,36 @@ export function levelForXp(xp: number) {
 }
 /** Training points each level earns, to spend on the hero's stats. */
 export const TRAINING_PER_LEVEL = 3;
-/** The stats training raises: each rank costs `cost` points and is worth
- * `base` × (1 + level / `growth`) of `stat` at the hero's level (see
+/** The groups the Training tab shows its rows in, in order. */
+export const TRAINING_GROUPS = { offense: "Offense", defense: "Defense" } as const;
+/** What training raises, each rank costing `cost` points. A stat row is
+ * worth `base` × (1 + level / `growth`) of `stat` at the hero's level (see
  * `trainingWorth`), so every rank already bought grows as the hero levels
- * up and saving points up never pays. */
+ * up and saving points up never pays. Potion % adds `POTION_PERCENT_RANK`
+ * to what a percent potion restores, the same at every level. A row with
+ * `requires` shows, and trains, only once that upgrade is owned. */
 export const TRAINING = [
-  { id: "hp", name: "Max HP", stat: "maxHp", base: 10, growth: 10, cost: 1 },
-  { id: "attack", name: "ATK", stat: "attack", base: 1, growth: 5, cost: 5 },
-  { id: "defense", name: "DEF", stat: "defense", base: 1, growth: 12, cost: 3 },
+  { id: "hp", name: "Max HP", group: "defense", stat: "maxHp", base: 10, growth: 10, cost: 1 },
+  { id: "attack", name: "ATK", group: "offense", stat: "attack", base: 1, growth: 5, cost: 5 },
+  { id: "defense", name: "DEF", group: "defense", stat: "defense", base: 1, growth: 12, cost: 3 },
+  { id: "potion", name: "Potion %", group: "defense", requires: "recovery", cost: 1 },
 ] as const;
 export type TrainingId = (typeof TRAINING)[number]["id"];
-type TrainingRow = (typeof TRAINING)[number];
+export type TrainingRow = (typeof TRAINING)[number];
+/** A row that raises one of the character's stats. */
+export type StatTrainingRow = Extract<TrainingRow, { stat: string }>;
+export const isStatRow = (row: TrainingRow): row is StatTrainingRow => "stat" in row;
+/** Whether `row` can be seen and trained with `upgrades` owned. */
+export const trainingOpen = (row: TrainingRow, upgrades: Record<UpgradeId, number>) =>
+  !("requires" in row) || upgrades[row.requires] > 0;
+/** What a percent potion restores beyond its HP, in hundredths of a percent
+ * of max HP: 1% with Recovery, and 0.25% more for each Potion % rank. */
+export const POTION_PERCENT_BASE = 100, POTION_PERCENT_RANK = 25;
 /** What one rank of `row` is worth at `level`, unrounded. */
-export const trainingWorth = (row: TrainingRow, level: number) => row.base * (1 + level / row.growth);
+export const trainingWorth = (row: StatTrainingRow, level: number) => row.base * (1 + level / row.growth);
 /** What `ranks` ranks of `row` add to the character at `level`, rounded
  * once. */
-export const trained = (row: TrainingRow, ranks: number, level: number) => Math.round(ranks * trainingWorth(row, level));
+export const trained = (row: StatTrainingRow, ranks: number, level: number) => Math.round(ranks * trainingWorth(row, level));
 export const GOLD_SHOP = [
   {
     id: "heal",

@@ -1,6 +1,6 @@
 import { TOWER_WIDTH, TOWER_HEIGHT } from "../config.ts";
 import { point, type Tile, type Torch } from "../entities.ts";
-import type { Board } from "../board.ts";
+import { withPotions, type Board } from "../board.ts";
 import { breakTorch, placeTorches } from "../torches.ts";
 import { generateTowerFloor } from "./index.ts";
 
@@ -50,6 +50,9 @@ export class RoomWorld implements Board {
     public seed: number,
     public room: number,
     public changes: Record<string, Tile>,
+    /** Whether the floor's percent potions stand as generated; without,
+     * each is a regular potion (a run's `percentPotions`). */
+    public percentPotions = true,
   ) {
     this.cells = generateTowerRoom(seed, room);
     this.torches = torchesForRoom(seed, room, this.cells);
@@ -65,11 +68,7 @@ export class RoomWorld implements Board {
     if (!this.inside(x, y)) return { kind: "wall" };
     const changed = this.changes[point(x, y)];
     if (changed) return changed;
-    return (
-      this.cells.get(point(x, y)) ?? {
-        kind: "wall",
-      }
-    );
+    return withPotions(this.cells.get(point(x, y)) ?? { kind: "wall" }, this.percentPotions);
   }
   step(x: number, y: number, dx: number, dy: number) {
     const nx = x + dx,

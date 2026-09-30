@@ -1,7 +1,7 @@
 import { upgradeCard } from "../cards.ts";
 import { revealCard } from "./card-reveal.ts";
-import { TRAINING, TRAINING_PER_LEVEL, UPGRADES, cost, type TrainingId, type UpgradeId } from "../config.ts";
-import { TREES, skillAvailable, type TreeId } from "../skill-trees.ts";
+import { TRAINING, TRAINING_GROUPS, TRAINING_PER_LEVEL, UPGRADES, cost, trainingOpen, type TrainingId, type UpgradeId } from "../config.ts";
+import { TREES, mapNodes, skillAvailable, treeHeight, type TreeId } from "../skill-trees.ts";
 import { trainingPoints, trainingStep, upgradeText } from "../loadout.ts";
 import { TreeParticles } from "../tree-particles.ts";
 import type { AppContext } from "./app.ts";
@@ -72,16 +72,17 @@ export class SkillTreePage {
     const lock = this.locked(tree)
       ? `<p class="tree-lock">Unlock ${UPGRADES.find(u => u.id === tree.gate)!.name} in the ${tree.id === "courage" ? "Inspiration" : "Courage"} tree.</p>`
       : "";
-    const lines = tree.nodes.flatMap(n => n.requires.map(id => {
-      const parent = tree.nodes.find(p => p.id === id);
+    const nodes = mapNodes(tree);
+    const lines = nodes.flatMap(n => n.requires.map(id => {
+      const parent = nodes.find(p => p.id === id);
       return parent ? `<line x1="${parent.x}" y1="${parent.y}" x2="${n.x}" y2="${n.y}" class="${upgrades[id] ? "lit" : ""}"/>` : "";
     })).join("");
     el("upgrades").innerHTML = `<div class="tree-tabs" role="group" aria-label="Skill trees">${tabs}</div>
       <section class="skill-tree ${tree.id}"><header class="tree-heading"><h3>${tree.name} skill tree</h3></header>
       ${lock}
-      <div class="tree-viewport" id="tree-viewport"><div class="tree-map" id="tree-map" style="transform:translate(${view.x}px,${view.y}px) scale(${view.scale})"><svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${lines}</svg>
+      <div class="tree-viewport" id="tree-viewport"><div class="tree-map" id="tree-map" style="${treeHeight(tree) === 100 ? "" : `height:${treeHeight(tree)}%;`}transform:translate(${view.x}px,${view.y}px) scale(${view.scale})"><svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${lines}</svg>
       <canvas class="tree-particles" aria-hidden="true"></canvas>
-      ${tree.nodes.map(n => this.nodeHtml(n)).join("")}</div><div class="inspect-box tree-tooltip" id="tree-tooltip" hidden></div></div></section>`;
+      ${nodes.map(n => this.nodeHtml(n)).join("")}</div><div class="inspect-box tree-tooltip" id="tree-tooltip" hidden></div></div></section>`;
     bindTabs();
     bindPanZoom(el("tree-viewport"), el("tree-map"), view, {
       tap: (target) => this.tapped(target),
@@ -95,10 +96,15 @@ export class SkillTreePage {
    * what one more rank makes it and what that costs; tap the cost to train. */
   private trainingHtml() {
     const save = this.ctx.game.save, points = trainingPoints(save);
-    const rows = TRAINING.map(t => {
-      const { now, next, worth, affordable } = trainingStep(save, t.id);
+    const row = (t: (typeof TRAINING)[number]) => {
+      const { now, next, worth, affordable, unit } = trainingStep(save, t.id);
       const price = `${t.cost} ${t.cost === 1 ? "point" : "points"}`;
-      return `<div class="training-row" role="listitem"><span class="training-label">${t.name}<small>+${Math.round(worth * 10) / 10} a rank</small></span><span class="training-box">${now}</span><span class="training-arrow" aria-hidden="true">→</span><span class="training-box next">${next}</span><button class="training-box training-cost" data-train="${t.id}" ${affordable ? "" : "disabled"} aria-label="Train ${t.name} to ${next} for ${price}">${price}</button></div>`;
+      return `<div class="training-row" role="listitem"><span class="training-label">${t.name}<small>+${unit ? worth : Math.round(worth * 10) / 10}${unit} a rank</small></span><span class="training-box">${now}${unit}</span><span class="training-arrow" aria-hidden="true">→</span><span class="training-box next">${next}${unit}</span><button class="training-box training-cost" data-train="${t.id}" ${affordable ? "" : "disabled"} aria-label="Train ${t.name} to ${next}${unit} for ${price}">${price}</button></div>`;
+    };
+    // Each group's rows, leaving out any whose upgrade isn't owned yet.
+    const rows = (Object.entries(TRAINING_GROUPS) as [keyof typeof TRAINING_GROUPS, string][]).map(([group, name]) => {
+      const open = TRAINING.filter(t => t.group === group && trainingOpen(t, save.upgrades));
+      return open.length ? `<h4 class="training-group">${name}</h4>${open.map(row).join("")}` : "";
     }).join("");
     return `<section class="training"><header class="tree-heading"><h3>Training</h3></header>
       <p class="training-points">Training points: <b id="training-points">${points.left}</b> <small>· ${TRAINING_PER_LEVEL} each level · every rank grows as you level up</small></p>
@@ -118,7 +124,7 @@ export class SkillTreePage {
     if (!canvas || this.tree === "training" || this.tree === "archives") return;
     const tree = this.current();
     this.particles.draw(canvas, time, {
-      tree: tree.id, nodes: tree.nodes, selected: this.tooltipVisible ? this.skill : null, reduced: this.ctx.game.save.settings.reduceMotion,
+      tree: tree.id, nodes: mapNodes(tree), selected: this.tooltipVisible ? this.skill : null, reduced: this.ctx.game.save.settings.reduceMotion,
     });
   }
 
@@ -173,7 +179,7 @@ export class SkillTreePage {
       const game = this.ctx.game;
       game.buy(id);
       const bought = game.save.upgrades[id] > level, card = upgradeCard(id);
-      if (bought && !game.save.settings.reduceMotion) this.particles.purchase(this.current().nodes.find(n => n.id === id)!);
+      if (bought && !game.save.settings.reduceMotion) this.particles.purchase(mapNodes(this.current()).find(n => n.id === id)!);
       this.ctx.update();
       if (bought && card) revealCard(card, game.save.settings.reduceMotion);
     }

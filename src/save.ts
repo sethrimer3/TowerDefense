@@ -85,6 +85,7 @@ function without<R>(r: any, fields: string[]): R {
   delete r.focus;
   if (r.focusUsed !== undefined && !(Number.isInteger(r.focusUsed) && finite(r.focusUsed, 99))) delete r.focusUsed;
   if (r.focused !== undefined && !r.hand?.includes(r.focused)) delete r.focused;
+  if (r.percentPotions !== undefined && r.percentPotions !== true) delete r.percentPotions;
   return r;
 }
 /** A hand as the Deck can order it: known cards, each once, no more than

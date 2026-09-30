@@ -1779,6 +1779,8 @@ nav button > span img { display: block; width: 42px; height: 42px; max-width: 10
 .training-points b { color: var(--gold); font-size: 15px; }
 .training-points small { color: #8793a2; font-size: 9px; }
 .training-table { display: grid; gap: 8px; }
+.training-group { margin: 6px 0 0; font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: #9aa6b6; }
+.training-group:first-child { margin-top: 0; }
 .training-row { display: grid; grid-template-columns: minmax(52px, 1fr) minmax(42px, auto) 18px minmax(42px, auto) minmax(64px, auto); align-items: center; gap: 6px; }
 .training-label { font-size: 11px; letter-spacing: 1px; color: #e3d2ad; }
 .training-label small { display: block; font-size: 9px; letter-spacing: .5px; color: #9aa6b6; }

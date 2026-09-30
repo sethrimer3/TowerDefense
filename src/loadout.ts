@@ -1,5 +1,5 @@
 import type { Save } from "./entities.ts";
-import { GOLD_SHOP, TRAINING, TRAINING_PER_LEVEL, UPGRADES, levelForXp, trained, trainingWorth, type GoldItemId, type TrainingId, type UpgradeId } from "./config.ts";
+import { GOLD_SHOP, POTION_PERCENT_BASE, POTION_PERCENT_RANK, TRAINING, TRAINING_PER_LEVEL, UPGRADES, isStatRow, levelForXp, trained, trainingWorth, type GoldItemId, type TrainingId, type UpgradeId } from "./config.ts";
 import { getEquippedBonuses } from "./crafting.ts";
 
 /** What one rank of an upgrade, or one provision, adds to a character. */
@@ -54,7 +54,7 @@ export function loadout(save: Save): Loadout {
   const own = { attack: BASE.attack, defense: BASE.defense, maxHp: BASE.maxHp, yellow: 0, blue: 0, red: 0, undos: BASE.undos };
   add(own, UPGRADES, save.upgrades);
   const level = levelForXp(save.xp);
-  for (const row of TRAINING) own[row.stat] += trained(row, save.training[row.id], level);
+  for (const row of TRAINING) if (isStatRow(row)) own[row.stat] += trained(row, save.training[row.id], level);
   const prov = { attack: 0, defense: 0, maxHp: 0, yellow: 0, blue: 0, red: 0, undos: 0 };
   add(prov, GOLD_SHOP, save.provisions);
   const equip = getEquippedBonuses(save);
@@ -99,10 +99,22 @@ export function trainingPoints(save: Pick<Save, "xp" | "training">) {
   return { earned, spent, left: Math.max(0, earned - spent) };
 }
 
-/** What one more rank of `id` costs and does to the next run's character. */
+/** What a percent potion restores beyond its HP, in hundredths of a
+ * percent of max HP: none without Recovery. */
+export const potionPercent = (save: Pick<Save, "upgrades" | "training">) =>
+  save.upgrades.recovery ? POTION_PERCENT_BASE + POTION_PERCENT_RANK * save.training.potion : 0;
+
+/** What one more rank of `id` costs and does: to the next run's character
+ * for a stat, or to what a percent potion restores (in % of max HP). */
 export function trainingStep(save: Save, id: TrainingId) {
-  const row = TRAINING.find((t) => t.id === id)!, stat = row.stat;
+  const row = TRAINING.find((t) => t.id === id)!, affordable = trainingPoints(save).left >= row.cost;
+  if (!isStatRow(row)) {
+    const ranks = save.training[id];
+    const percent = (r: number) => (POTION_PERCENT_BASE + POTION_PERCENT_RANK * r) / 100;
+    return { row, unit: "%", now: percent(ranks), next: percent(ranks + 1), worth: POTION_PERCENT_RANK / 100, affordable };
+  }
+  const stat = row.stat;
   const now = loadout(save)[stat], next = loadout({ ...save, training: { ...save.training, [id]: save.training[id] + 1 } })[stat];
   const worth = trainingWorth(row, levelForXp(save.xp));
-  return { row, stat, now, next, worth, affordable: trainingPoints(save).left >= row.cost };
+  return { row, unit: "", now, next, worth, affordable };
 }

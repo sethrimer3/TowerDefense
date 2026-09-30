@@ -1,7 +1,7 @@
 import { region, depthAt, areasBetween, floorFor, ownerAt } from "./labyrinth.ts";
 import { CHUNK, WIDTH, START_X } from "../config.ts";
 import { point, type DelveRun, type Tile, type Torch } from "../entities.ts";
-import type { Board } from "../board.ts";
+import { withPotions, type Board } from "../board.ts";
 import { breakTorch, placeTorches } from "../torches.ts";
 
 // v8 turns some pocket throats into forks: two parallel lanes of costs.
@@ -12,7 +12,8 @@ import { breakTorch, placeTorches } from "../torches.ts";
 // v13 scales strong enemies (and bosses) from 1.5 times a normal one, not 2.
 // v14 grows enemy DEF 1% every 20 depth.
 // v15 compounds enemy stats by equivalent floor and guards corridors.
-export const LAYOUT_VERSION = 15;
+// v16 makes half the guard potions percent potions.
+export const LAYOUT_VERSION = 16;
 
 /** The one 20-row chunk `index` of the labyrinth, as generated. */
 export function generate(seed: number, index: number): Map<string, Tile> {
@@ -31,7 +32,7 @@ const upward = (dx: number, dy: number) => dx === 0 && dy === 1;
 
 /** What of a run the Delve board keeps: its map edits, the floor below
  * which the labyrinth is sealed, and the milestones crossed. */
-type WorldRun = Pick<DelveRun, "seed" | "changes" | "floor" | "milestone">;
+type WorldRun = Pick<DelveRun, "seed" | "changes" | "floor" | "milestone" | "percentPotions">;
 
 /** The endless Delve labyrinth of a run, generated chunk by chunk around
  * the player. It reads and writes the run's own changes, floor and
@@ -59,7 +60,7 @@ export class World implements Board {
       this.chunks.set(index, generate(this.seed, index));
     return (
       this.changes[point(x, y)] ??
-      this.chunks.get(index)!.get(point(x, y)) ?? { kind: "wall" }
+      withPotions(this.chunks.get(index)!.get(point(x, y)) ?? { kind: "wall" }, !!this.run.percentPotions)
     );
   }
   /** On the board and at or above the floor. */

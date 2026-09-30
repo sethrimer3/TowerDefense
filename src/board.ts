@@ -56,3 +56,8 @@ export function reachable(
   }
   return seen;
 }
+
+/** A generated tile as a run sees it: a percent (red) potion is a regular
+ * one on the floors of a run without percent potions. */
+export const withPotions = (t: Tile, percentPotions: boolean): Tile =>
+  !percentPotions && t.kind === "potion" && t.color === "red" ? { ...t, color: "blue" } : t;

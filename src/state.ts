@@ -13,6 +13,7 @@ import {
   xpForKill,
   levelForXp,
   TRAINING,
+  trainingOpen,
   cost,
   UPGRADES,
   GOLD_SHOP,
@@ -49,7 +50,7 @@ import { TowerClimb } from "./tower/climb.ts";
 import { materialDef, MATERIALS } from "./materials.ts";
 import { rollTreasureLoot } from "./loot.ts";
 import { MODES, milestones, type ModeProfile } from "./modes.ts";
-import { loadout, trainingPoints } from "./loadout.ts";
+import { loadout, potionPercent, trainingPoints } from "./loadout.ts";
 import { RESEARCH, cancelResearch, hastenResearch, hireArchivist, researched, settleArchives, startResearch, type ResearchId, type ResearchRecord } from "./archives.ts";
 import {
   creditMaterials,
@@ -445,6 +446,7 @@ export class Game {
    * and gets its Focus uses. */
   private dealHand() {
     this.run.hand = [...this.save.hand];
+    this.run.percentPotions = !!this.save.upgrades.recovery;
     this.run.focusUsed = 0;
   }
   /** Focus uses a run starts with: none without the Focus skill, and more
@@ -455,7 +457,7 @@ export class Game {
   /** What research changes about stepping now: the step rules every move,
    * preview, inspect box and planner resolves with. */
   get stepRules(): StepRules {
-    return { potionHeal: researched(this.save.archives, "potionHeal", 100) };
+    return { potionHeal: researched(this.save.archives, "potionHeal", 100), percentPotion: potionPercent(this.save) };
   }
   /** Silver held this run. */
   get silver() {
@@ -572,6 +574,8 @@ export class Game {
       ? { damaged: false, keysSpent: false, ...core }
       : { ...core, milestone: 0 };
     this.run.loadout = { attack, defense, maxHp };
+    // The floors hold percent potions only once Recovery is owned.
+    if (!outside) this.run.percentPotions = !!this.save.upgrades.recovery;
     this.world = this.rules.board(this.run);
     if (outside) {
       this.run.outside = true;
@@ -1056,6 +1060,7 @@ export class Game {
   }
   train(id: TrainingId) {
     const row = TRAINING.find((t) => t.id === id)!;
+    if (!trainingOpen(row, this.save.upgrades)) return false;
     return this.changeLoadout(() => {
       if (trainingPoints(this.save).left < row.cost) return false;
       this.save.training[id]++;

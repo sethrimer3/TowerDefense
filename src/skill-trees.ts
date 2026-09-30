@@ -1,17 +1,23 @@
 import type { UpgradeId, Currency } from "./config.ts";
 export type TreeId = "wayfinding" | "inspiration" | "courage" | "legacy" | "wisdom" | "renown";
 export type SkillNode = { id: UpgradeId; icon: string; x: number; y: number; requires: UpgradeId[] };
-export const TREES: { id: TreeId; name: string; currency: Currency; gate?: UpgradeId; description: string; nodes: SkillNode[] }[] = [
-  { id: "inspiration", name: "Inspiration", currency: "inspiration", description: "Earn Inspiration by beating your best Tower climb.", nodes: [
+/** A skill tree. Node positions are percentages of the tree's view: x of
+ * its width, y of its height, so a tree taller than one screen (`height`,
+ * in the same units, 100 by default) scrolls. */
+export type SkillTree = { id: TreeId; name: string; currency: Currency; gate?: UpgradeId; description: string; height?: number; nodes: SkillNode[] };
+export const TREES: SkillTree[] = [
+  { id: "inspiration", name: "Inspiration", currency: "inspiration", description: "Earn Inspiration by beating your best Tower climb.", height: 136, nodes: [
     { id: "handOrdering", icon: "▤", x: 50, y: 12, requires: [] },
     { id: "combatStance", icon: "⚔", x: 50, y: 33, requires: ["handOrdering"] },
     { id: "cardHeal", icon: "♥", x: 24, y: 51, requires: ["combatStance"] },
     { id: "cardGear", icon: "⛨", x: 76, y: 51, requires: ["combatStance"] },
-    { id: "greaterHeal", icon: "✚", x: 24, y: 69, requires: ["cardHeal"] },
     { id: "focus", icon: "ϟ", x: 50, y: 69, requires: ["cardHeal", "cardGear"] },
     { id: "inspirationUndos", icon: "↺", x: 18, y: 88, requires: ["focus"] },
     { id: "archives", icon: "▥", x: 50, y: 88, requires: ["focus"] },
     { id: "delve", icon: "▼", x: 82, y: 88, requires: ["focus"] },
+    // Research needs the Archives, so the skills that open it come after them.
+    { id: "greaterHeal", icon: "✚", x: 50, y: 106, requires: ["archives"] },
+    { id: "recovery", icon: "✦", x: 50, y: 124, requires: ["greaterHeal"] },
   ] },
   { id: "courage", name: "Courage", currency: "courage", gate: "delve", description: "Earn Courage by beating your best Delve depth.", nodes: [
     { id: "auto", icon: "✦", x: 50, y: 10, requires: ["delve"] },
@@ -50,3 +56,8 @@ export function skillAvailable(id: UpgradeId, levels: Record<UpgradeId, number>)
   const node = tree?.nodes.find(n => n.id === id);
   return !!node && (!tree?.gate || levels[tree.gate] > 0) && node.requires.every(key => levels[key] > 0);
 }
+/** How tall `tree` is, in view heights × 100. */
+export const treeHeight = (tree: SkillTree) => tree.height ?? 100;
+/** `tree`'s nodes placed on its map: y as a percentage of the map's height. */
+export const mapNodes = (tree: SkillTree): SkillNode[] =>
+  tree.nodes.map((n) => ({ ...n, y: (n.y * 100) / treeHeight(tree) }));
