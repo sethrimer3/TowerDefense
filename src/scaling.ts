@@ -118,7 +118,7 @@ export type TowerEnemyStrength = EnemyStrength;
 
 /** How far each strength exceeds the floor's own zone: the roster it comes
  * from (zones ahead), multipliers on HP and ATK (`stats`) and on DEF, and
- * its tier (which sets the XP a kill pays). A weak enemy is a balanced one
+ * its tier (which picks its art). A weak enemy is a balanced one
  * with less HP and ATK, as in the Delve; strong is a hardened local, elite a
  * visitor from the next zone up, and a boss a strong enemy with more HP and
  * ATK (see `bossFactor`). */
@@ -146,7 +146,7 @@ export const BOSS_OVER_STRONG = 2;
  * ATK by: BOSS_OVER_STRONG for a boss, 1 for every other. */
 export const bossFactor = (strength: EnemyStrength) => (strength === "boss" ? BOSS_OVER_STRONG : 1);
 
-/** The XP tier a kill of each strength pays, in both modes. */
+/** The tier an enemy of each strength carries, in both modes. */
 export const enemyTier = (strength: EnemyStrength) => TOWER_ENEMY_STRENGTH[strength].tier;
 
 /** The Delve's enemy kinds, one per population an area can hold. Each has

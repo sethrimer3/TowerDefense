@@ -20,7 +20,7 @@ function corridor() {
 }
 const enemy: Tile = {
   kind: "enemy",
-  enemy: { name: "Test foe", hp: 25, attack: 8, defense: 0, tier: 0 },
+  enemy: { name: "Test foe", hp: 25, attack: 8, defense: 0, tier: 0, strength: "normal" },
 };
 // Lethal but damageable: defense stays low so the player can hit it (not
 // impervious); hp/attack are large enough that the fight is always fatal.

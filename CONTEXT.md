@@ -48,7 +48,7 @@ _Avoid_: corridor, path
 
 **Enemy strength**:
 How hard the floor asked an enemy to be: weak, normal, strong or elite. Strong enemies are the zone's own made tougher, elite ones come from the next zone. The board shows it round the enemy (a dark red rim for normal, bright red with one chevron for strong, bright red inside a gold rim with two chevrons for elite) and the inspect title names strong and elite.
-_Avoid_: tier (a tier is the XP a kill pays), rank, level
+_Avoid_: tier, rank, level
 
 ### Fights
 
@@ -75,7 +75,7 @@ What the character starts a run with: ATK, DEF, max HP, keys and how many undos 
 _Avoid_: base stats, starting stats
 
 **Level**:
-How much XP the character has gathered from kills over every run. Each new level earns training points; a level gives no stats by itself.
+How much XP the character has gathered from kills over every run. A kill pays more for a stronger enemy and a higher floor, but each floor is worth a smaller share of a level than the one before. Each new level earns training points; a level gives no stats by itself.
 _Avoid_: rank
 
 **Training point**:

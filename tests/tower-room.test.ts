@@ -5,7 +5,7 @@ import { reachable } from "../src/board.ts";
 import { point } from "../src/entities.ts";
 import { Game } from "../src/state.ts";
 import { defaults } from "../src/save.ts";
-import { TOWER_WIDTH, TOWER_HEIGHT, TOWER_START_X } from "../src/config.ts";
+import { TOWER_WIDTH, TOWER_HEIGHT, TOWER_START_X, levelForXp, xpForKill, xpForLevel } from "../src/config.ts";
 test("tower rooms are fully generated and reachable from entrance to exit", () => {
   for (let seed = 0; seed < 40; seed++)
     for (const room of [0, 3, 7, 15, 30]) {
@@ -84,8 +84,23 @@ test("Shards and Essence only pay out on a new best, Gold and XP accrue regardle
 test("XP is earned from kills in both modes and grants a level", () => {
   const g = new Game(defaults());
   assert.equal(g.save.xp, 0);
-  g.gainXp({ name: "x", hp: 1, attack: 20, defense: 0, tier: 3 });
-  assert.ok(g.save.xp > 0);
+  g.gainXp({ name: "x", hp: 1, attack: 20, defense: 0, tier: 3, strength: "elite" }, 0);
+  assert.equal(g.save.xp, 24);
+  assert.equal(levelForXp(g.save.xp), 0);
+  g.gainXp({ name: "x", hp: 1, attack: 20, defense: 0, tier: 3, strength: "elite" }, 0);
+  assert.equal(levelForXp(g.save.xp), 1);
+});
+test("XP comes from strength and equivalent floor, and each floor is a smaller share of a level", () => {
+  assert.deepEqual((["weak", "normal", "strong", "elite", "boss"] as const).map((s) => xpForKill(s, 0)), [6, 9, 15, 24, 36]);
+  assert.deepEqual([0, 30, 100, 1000].map((f) => xpForKill("normal", f)), [9, 18, 30, 90]);
+  // A floor of ten normal kills, as a share of the level it reaches.
+  let xp = 0, last = Infinity;
+  for (let f = 0; f < 1000; f++) {
+    const gained = 10 * xpForKill("normal", f), level = levelForXp(xp);
+    const share = gained / (xpForLevel(level + 1) - xpForLevel(level));
+    if (f % 50 === 49) { assert.ok(share < last, `floor ${f + 1}`); last = share; }
+    xp += gained;
+  }
 });
 test("a Tower run saved under an older layout version restarts its floor at the entrance", () => {
   const g = new Game(defaults());

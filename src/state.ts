@@ -625,9 +625,10 @@ export class Game {
     this.gains.push({ x, y, text, art });
     if (this.gains.length > MAX_GAINS) this.gains.shift();
   }
-  gainXp(enemy: Enemy) {
+  /** Pays the XP for beating `enemy` on equivalent floor `floor`. */
+  gainXp(enemy: Enemy, floor: number) {
     const level = levelForXp(this.save.xp);
-    this.save.xp += xpForKill(enemy.tier, enemy.attack);
+    this.save.xp += xpForKill(enemy.strength, floor);
     if (levelForXp(this.save.xp) > level) this.levelUpAt = performance.now();
   }
   /** The single path that ends the current run, whether by death or by
@@ -811,9 +812,10 @@ export class Game {
       return false;
     }
     this.run.kills++;
-    this.gainXp(enemy);
+    const floor = this.rules.equivalentFloor(this.rules.progressAt(this.run, at.y));
+    this.gainXp(enemy, floor);
     // Silver belongs to the run, so it isn't gated like Gold: undo takes it back.
-    const silver = silverForKill(enemy.strength, this.rules.equivalentFloor(this.rules.progressAt(this.run, at.y)));
+    const silver = silverForKill(enemy.strength, floor);
     this.run.silver = this.silver + silver;
     const { gold, drops } = this.creditEnemyLoot(enemy, at.x, at.y);
     if (gold) this.gain(at.x, at.y, `+${gold} Gold`);

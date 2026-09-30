@@ -38,7 +38,7 @@ function plantable(rng: () => number): Tile {
   if (kind === "potion") return { kind, amount: pick([undefined, 10, 60, 500]) };
   if (kind === "key") return { kind, color: pick(COLORS) };
   if (kind === "enemy")
-    return { kind, enemy: { name: "Planted", hp: 5 + Math.floor(rng() * 60), attack: Math.floor(rng() * 40), defense: Math.floor(rng() * 14), tier: 0 } };
+    return { kind, enemy: { name: "Planted", hp: 5 + Math.floor(rng() * 60), attack: Math.floor(rng() * 40), defense: Math.floor(rng() * 14), tier: 0, strength: "normal" as const } };
   if (kind === "door")
     return { kind, door: pick<DoorRule>([
       { type: "keys", keys: [pick(COLORS)], mode: "all" },

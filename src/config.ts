@@ -241,8 +241,17 @@ export const silverForKill = (strength: EnemyStrength, floor: number) =>
   (1 + Math.floor(Math.max(0, floor) / TOWER_SECTION)) * SILVER_MULTIPLIER[strength];
 /** Gold the Delve pays at a run's end: one for each treasure opened. */
 export const goldReward = (treasures: number) => treasures;
-export const xpForKill = (tier: number, attack: number) =>
-  3 + tier * 4 + Math.floor(attack / 5);
+/** XP a beaten enemy pays per base amount, by its strength (the same
+ * proportions as the forks' `GATE_VALUE`). */
+export const XP_MULTIPLIER: Record<EnemyStrength, number> = { weak: 2, normal: 3, strong: 5, elite: 8, boss: 12 };
+/** The base XP a kill pays on equivalent floor `floor` (0 is the first): 3,
+ * rising with the square root of the floor (×2 by floor 30, ×3.3 by 100,
+ * ×10 by 1000). The XP a level needs rises faster, so each floor is worth a
+ * smaller share of a level than the one before. */
+export const xpBase = (floor: number) => 3 * Math.sqrt(1 + Math.max(0, floor) / TOWER_SECTION);
+/** XP a beaten enemy pays on equivalent floor `floor`, in both modes. */
+export const xpForKill = (strength: EnemyStrength, floor: number) =>
+  Math.round(xpBase(floor) * XP_MULTIPLIER[strength]);
 export const levelForXp = (xp: number) =>
   Math.floor((Math.sqrt(1 + xp / 5) - 1) / 2);
 /** The lifetime XP that reaches `level`: 20 × level × (level + 1). */
