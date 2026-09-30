@@ -1,5 +1,5 @@
 import type { Save } from "./entities.ts";
-import { GOLD_SHOP, POTION_PERCENT_BASE, POTION_PERCENT_RANK, TRAINING, TRAINING_PER_LEVEL, UPGRADES, isStatRow, levelForXp, trained, trainingWorth, type GoldItemId, type TrainingId, type UpgradeId } from "./config.ts";
+import { FIND_POTION_BASE, FIND_POTION_MAX, FIND_POTION_RANK, GOLD_SHOP, POTION_PERCENT_BASE, POTION_PERCENT_RANK, TRAINING, TRAINING_PER_LEVEL, UPGRADES, isStatRow, levelForXp, trained, trainingWorth, type GoldItemId, type TrainingId, type UpgradeId } from "./config.ts";
 import { getEquippedBonuses } from "./crafting.ts";
 import { RESEARCH, researched } from "./archives.ts";
 
@@ -114,17 +114,34 @@ export function trainingPoints(save: Pick<Save, "xp" | "training"> & Partial<Pic
 export const potionPercent = (save: Pick<Save, "upgrades" | "training">) =>
   save.upgrades.recovery ? POTION_PERCENT_BASE + POTION_PERCENT_RANK * save.training.potion : 0;
 
+/** The chance each potion that may be one is a percent potion, in
+ * hundredths of a percent: none without Recovery, and Find Potion training
+ * raises it. */
+export const percentPotionChance = (save: Pick<Save, "upgrades" | "training">) =>
+  save.upgrades.recovery ? findPotionChance(save.upgrades.findPotion ? save.training.findPotion : 0) : 0;
+const findPotionChance = (ranks: number) => Math.min(FIND_POTION_MAX, FIND_POTION_BASE + FIND_POTION_RANK * ranks);
+
+/** Whether `id` has as many ranks as it can take. */
+export const trainingMaxed = (save: Pick<Save, "training">, id: TrainingId) => {
+  const row = TRAINING.find((t) => t.id === id)!;
+  return "max" in row && save.training[id] >= row.max;
+};
+
 /** What one more rank of `id` costs and does: to the next run's character
- * for a stat, or to what a percent potion restores (in % of max HP). */
+ * for a stat, or in % to what a percent potion restores or the chance a
+ * potion is one. A row at its most ranks has no next rank to buy. */
 export function trainingStep(save: Save, id: TrainingId) {
-  const row = TRAINING.find((t) => t.id === id)!, affordable = save.settings.freePurchases || trainingPoints(save).left >= row.cost;
+  const row = TRAINING.find((t) => t.id === id)!, maxed = trainingMaxed(save, id),
+    affordable = !maxed && (save.settings.freePurchases || trainingPoints(save).left >= row.cost);
   if (!isStatRow(row)) {
     const ranks = save.training[id];
-    const percent = (r: number) => (POTION_PERCENT_BASE + POTION_PERCENT_RANK * r) / 100;
-    return { row, unit: "%", now: percent(ranks), next: percent(ranks + 1), worth: POTION_PERCENT_RANK / 100, affordable };
+    const [value, rank] = id === "findPotion"
+      ? [findPotionChance, FIND_POTION_RANK]
+      : [(r: number) => POTION_PERCENT_BASE + POTION_PERCENT_RANK * r, POTION_PERCENT_RANK];
+    return { row, unit: "%", now: value(ranks) / 100, next: value(maxed ? ranks : ranks + 1) / 100, worth: rank / 100, affordable, maxed };
   }
   const stat = row.stat;
   const now = loadout(save)[stat], next = loadout({ ...save, training: { ...save.training, [id]: save.training[id] + 1 } })[stat];
   const worth = trainingWorth(row, levelForXp(save.xp));
-  return { row, unit: "", now, next, worth, affordable };
+  return { row, unit: "", now, next, worth, affordable, maxed };
 }

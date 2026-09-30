@@ -1,4 +1,4 @@
-import { GOLD_SHOP, SAVE_KEY, TOWER_WIDTH, TRAINING, UPGRADES, WIDTH } from "./config.ts";
+import { FIND_POTION_MAX, GOLD_SHOP, SAVE_KEY, TOWER_WIDTH, TRAINING, UPGRADES, WIDTH } from "./config.ts";
 import type { AutomoveMemory, DelveRun, FloorRecord, ModeSave, MoveSnapshot, Revival, Run, Save, TowerRun } from "./entities.ts";
 import { emptyMaterials, MATERIAL_IDS, type MaterialId } from "./materials.ts";
 import { EQUIPMENT_SLOTS, type CraftedEquipment, type EquipmentSlot } from "./equipment.ts";
@@ -86,7 +86,7 @@ function without<R>(r: any, fields: string[]): R {
   delete r.focus;
   if (r.focusUsed !== undefined && !(Number.isInteger(r.focusUsed) && finite(r.focusUsed, 99))) delete r.focusUsed;
   if (r.focused !== undefined && !r.hand?.includes(r.focused)) delete r.focused;
-  if (r.percentPotions !== undefined && r.percentPotions !== true) delete r.percentPotions;
+  if (r.percentPotions !== undefined && !(Number.isInteger(r.percentPotions) && r.percentPotions > 0 && r.percentPotions <= FIND_POTION_MAX)) delete r.percentPotions;
   return r;
 }
 /** A hand as the Deck can order it: known cards, each once, no more than
@@ -215,7 +215,7 @@ function decodeProgress(s: any, d: Save, undoCapacity: number) {
   d.gold = count(s.gold, d.gold);
   for (const g of GOLD_SHOP) d.provisions[g.id] = count(s.provisions?.[g.id], d.provisions[g.id], 999);
   d.xp = count(s.xp, d.xp);
-  for (const t of TRAINING) d.training[t.id] = count(s.training?.[t.id], d.training[t.id], 1e6);
+  for (const t of TRAINING) d.training[t.id] = count(s.training?.[t.id], d.training[t.id], "max" in t ? t.max : 1e6);
   d.freeTraining = count(s.freeTraining, d.freeTraining);
   d.tower.inspiration = count(s.tower?.inspiration ?? s.tower?.shards, d.tower.inspiration);
   d.tower.best = count(s.tower?.best, d.tower.best);

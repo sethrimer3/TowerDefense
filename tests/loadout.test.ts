@@ -5,6 +5,7 @@ import { defaults } from "../src/save.ts";
 import { GOLD_SHOP, UPGRADES, levelForXp, xpForLevel } from "../src/config.ts";
 import type { CraftedEquipment } from "../src/equipment.ts";
 import { Game } from "../src/state.ts";
+import { ENTRANCE_Y } from "../src/outside.ts";
 import { predict } from "../src/combat.ts";
 import { delveDefenseGrowth, getTowerGateEnemy } from "../src/scaling.ts";
 import { delveEnemyBase } from "../src/delve/labyrinth.ts";
@@ -80,8 +81,7 @@ test("Shroud blocks 1 damage a fight and opens Shroud training, each rank worth 
   assert.ok(g.buy("shroud"));
   assert.equal(loadout(g.save).shroud, 1);
   assert.equal(g.save.tower.inspiration, 0, "10 Inspiration");
-  g.newRun({ outside: true });
-  assert.equal(g.run.player.shroud, 1, "a new run starts with it");
+  assert.equal(g.run.player.shroud, 1, "the run in the forest takes it at once");
   assert.ok(g.train("shroud") && g.train("shroud"));
   // At level 10 a rank is worth 1 × (1 + 10 / 10) = 2.
   assert.equal(loadout(g.save).shroud, 1 + 2 * 2);
@@ -200,4 +200,37 @@ test("a gear change reaches a run still outside, which starts at its new full HP
   g.save.equipmentInventory.push(ring(3, 10));
   g.equipItem("r");
   assert.deepEqual([g.run.player.attack, g.run.player.maxHp, g.run.player.hp], [15, 110, 110]);
+});
+
+/** Walks the hero from the forest in through the entrance. */
+function goInside(g: Game) {
+  g.walkTo(g.run.player.x, ENTRANCE_Y);
+  for (let i = 0; i < 40 && g.route.length; i++) g.routeStep();
+  assert.equal(g.run.outside, false);
+}
+
+test("a run still in the forest takes every skill and provision bought there, and spends the provisions going inside", () => {
+  const g = new Game(defaults()), s = g.save;
+  s.upgrades.delve = 1;
+  g.switchMode("delve");
+  g.newRun({ outside: true, seed: 5 });
+  g.switchMode("tower");
+  g.newRun({ outside: true, seed: 5 });
+  s.tower.inspiration = 100;
+  s.gold = 100;
+  s.upgrades.greaterHeal = 1;
+  assert.ok(g.buy("shroud"));
+  assert.ok(g.buyGold("edge") && g.buyGold("heal"));
+  const ready = { attack: 15, maxHp: 120, hp: 120, shroud: 1 };
+  const hero = (run = g.run) => ({ attack: run.player.attack, maxHp: run.player.maxHp, hp: run.player.hp, shroud: run.player.shroud });
+  assert.deepEqual(hero(), ready, "the Tower's run in the forest");
+  assert.deepEqual(hero(s.delve.run!), ready, "and the Delve's");
+  assert.deepEqual(g.run.loadout, { attack: 15, defense: 0, maxHp: 120, shroud: 1 });
+  goInside(g);
+  assert.deepEqual(hero(), ready, "the run takes its provisions inside");
+  assert.deepEqual(s.provisions, { heal: 0, edge: 0, guard: 0 }, "spent on it, not kept for a later run");
+  assert.deepEqual(hero(s.delve.run!), { attack: 12, maxHp: 100, hp: 100, shroud: 1 }, "the other forest run no longer has them");
+  assert.ok(g.buyGold("guard"));
+  assert.equal(g.run.player.defense, 0, "a provision bought now waits for the next run");
+  assert.equal(s.delve.run!.player.defense, 3, "which the Delve's forest run is");
 });

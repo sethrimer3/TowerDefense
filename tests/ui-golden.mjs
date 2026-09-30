@@ -87,7 +87,7 @@ try {
     };
     const rich = (s) => {
       quiet(s);
-      Object.assign(s.upgrades, { delve: 1, auto: 1, legacy: 1, revive: 1, handOrdering: 1, combatStance: 1, cardHeal: 1, focus: 1, archives: 1, inspirationUndos: 1, greaterHeal: 1, shroud: 1, undos: 1, autoPersist: 1 });
+      Object.assign(s.upgrades, { delve: 1, auto: 1, legacy: 1, revive: 1, handOrdering: 1, combatStance: 1, cardHeal: 1, focus: 1, archives: 1, inspirationUndos: 1, greaterHeal: 1, recovery: 1, findPotion: 1, shroud: 1, undos: 1, autoPersist: 1 });
       s.delve.courage = 37;
       s.tower.inspiration = 21;
       s.gold = 480;

@@ -8,7 +8,7 @@ export type SkillNode = { id: UpgradeId; icon: string; x: number; y: number; req
  * Archives), so its page shows no ranks. */
 export type SkillTree = { id: TreeId; name: string; currency: Currency; gate?: UpgradeId; description: string; height?: number; unlocks?: boolean; nodes: SkillNode[] };
 export const TREES: SkillTree[] = [
-  { id: "inspiration", name: "Inspiration", currency: "inspiration", description: "Earn Inspiration by beating your best Tower climb.", height: 136, unlocks: true, nodes: [
+  { id: "inspiration", name: "Inspiration", currency: "inspiration", description: "Earn Inspiration by beating your best Tower climb.", height: 154, unlocks: true, nodes: [
     { id: "handOrdering", icon: "▤", x: 50, y: 12, requires: [] },
     { id: "combatStance", icon: "⚔", x: 50, y: 33, requires: ["handOrdering"] },
     { id: "cardHeal", icon: "♥", x: 24, y: 51, requires: ["combatStance"] },
@@ -20,6 +20,7 @@ export const TREES: SkillTree[] = [
     // Research needs the Archives, so the skills that open it come after them.
     { id: "greaterHeal", icon: "✚", x: 50, y: 106, requires: ["archives"] },
     { id: "recovery", icon: "✦", x: 30, y: 124, requires: ["greaterHeal"] },
+    { id: "findPotion", icon: "⚗", x: 30, y: 142, requires: ["recovery"] },
     { id: "shroud", icon: "◈", x: 70, y: 124, requires: ["greaterHeal"] },
   ] },
   { id: "courage", name: "Courage", currency: "courage", gate: "delve", description: "Earn Courage by beating your best Delve depth.", nodes: [

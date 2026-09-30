@@ -50,7 +50,7 @@ import { TowerClimb } from "./tower/climb.ts";
 import { materialDef, MATERIALS } from "./materials.ts";
 import { rollTreasureLoot } from "./loot.ts";
 import { MODES, milestones, type ModeProfile } from "./modes.ts";
-import { keepUndos, loadout, potionPercent, trainingPoints } from "./loadout.ts";
+import { keepUndos, loadout, percentPotionChance, potionPercent, trainingMaxed, trainingPoints } from "./loadout.ts";
 import { RESEARCH, cancelResearch, hastenResearch, hireArchivist, researched, settleArchives, startResearch, type ResearchId, type ResearchRecord } from "./archives.ts";
 import {
   creditMaterials,
@@ -448,10 +448,12 @@ export class Game {
     this.auto = true;
   }
   /** A run going inside keeps the hand as it was ordered on the way in,
-   * and gets its Focus uses. */
+   * gets its Focus uses, and fixes its chance of percent potions. */
   private dealHand() {
     this.run.hand = [...this.save.hand];
-    this.run.percentPotions = !!this.save.upgrades.recovery;
+    const chance = percentPotionChance(this.save);
+    if (chance) this.run.percentPotions = chance;
+    else delete this.run.percentPotions;
     this.run.focusUsed = 0;
   }
   /** Focus uses a run starts with: none without the Focus skill, and more
@@ -549,23 +551,12 @@ export class Game {
     this.route = [];
     this.summary = null;
     this.encounter = null;
-    const { attack, defense, maxHp, shroud, keys } = loadout(this.save);
     // Tower ascents begin at the first floor of the chosen section.
     const section = this.mode === "tower" ? this.startSection() : 0,
       height = section * TOWER_SECTION;
-    const player = {
-      x: this.rules.entranceX,
-      y: 0,
-      hp: this.sectionStartHp(section, maxHp),
-      maxHp,
-      attack,
-      defense,
-      // Only a hero with a shroud carries one.
-      ...(shroud ? { shroud } : {}),
-      keys,
-    };
-    // The provisions bought for this run are spent on it.
-    for (const item of GOLD_SHOP) this.save.provisions[item.id] = 0;
+    const { player, loadout } = this.startingHero(this.mode, height);
+    // The provisions bought for a run are spent on it once it goes inside.
+    if (!outside) this.spendProvisions();
     const core: RunCore = {
       layoutVersion: this.rules.layoutVersion,
       seed,
@@ -580,9 +571,7 @@ export class Game {
     this.run = this.mode === "tower"
       ? { damaged: false, keysSpent: false, ...core }
       : { ...core, milestone: 0 };
-    this.run.loadout = { attack, defense, maxHp, ...(shroud ? { shroud } : {}) };
-    // The floors hold percent potions only once Recovery is owned.
-    if (!outside) this.run.percentPotions = !!this.save.upgrades.recovery;
+    this.run.loadout = loadout;
     this.world = this.rules.board(this.run);
     if (outside) {
       this.run.outside = true;
@@ -596,6 +585,36 @@ export class Game {
     this.auto = !outside && this.handStartsPlaying;
     this.dropHandPlan();
     this.paused = false;
+  }
+  /** The hero a run in `mode` starting at `height` gets with everything
+   * owned now, standing at the entrance's row, and the loadout it keeps. */
+  private startingHero(mode: Mode, height: number) {
+    const { attack, defense, maxHp, shroud, keys } = loadout(this.save);
+    // Only a hero with a shroud carries one.
+    const withShroud = shroud ? { shroud } : {};
+    const hp = mode === "tower" ? this.sectionStartHp(height / TOWER_SECTION, maxHp) : maxHp;
+    return {
+      player: { x: MODES[mode].entranceX, y: 0, hp, maxHp, attack, defense, ...withShroud, keys } as Player,
+      loadout: { attack, defense, maxHp, ...withShroud },
+    };
+  }
+  /** A run still in the forest hasn't started: after anything bought,
+   * unlocked, trained or equipped, it takes everything owned now, as if it
+   * had just begun. */
+  private readyForestRuns() {
+    for (const mode of ["tower", "delve"] as const) {
+      const run = this.save[mode].run;
+      if (!run?.outside) continue;
+      const { player, loadout } = this.startingHero(mode, run.height);
+      run.player = { ...player, x: run.player.x, y: run.player.y };
+      run.loadout = loadout;
+    }
+  }
+  /** Provisions are spent on the run that goes inside; a run of the other
+   * mode still in the forest no longer has them. */
+  private spendProvisions() {
+    for (const item of GOLD_SHOP) this.save.provisions[item.id] = 0;
+    this.readyForestRuns();
   }
   /** A Tower section can be started in once its first floor has been
    * reached (which records its starting HP); section 0 always can. */
@@ -859,6 +878,7 @@ export class Game {
   private enterFromOutside() {
     const p = this.run.player;
     this.run.outside = false;
+    this.spendProvisions();
     this.dealHand();
     p.x = this.rules.entranceX;
     p.y = 0;
@@ -1067,7 +1087,7 @@ export class Game {
   }
   train(id: TrainingId) {
     const row = TRAINING.find((t) => t.id === id)!;
-    if (!trainingOpen(row, this.save.upgrades)) return false;
+    if (!trainingOpen(row, this.save.upgrades) || trainingMaxed(this.save, id)) return false;
     return this.changeLoadout(() => {
       if (this.free) this.save.freeTraining += row.cost;
       else if (trainingPoints(this.save).left < row.cost) return false;
@@ -1087,6 +1107,7 @@ export class Game {
       else this.save.tower.inspiration -= price;
     }
     this.save.upgrades[id]++;
+    this.readyForestRuns();
     return true;
   }
   /** The wall clock the Archives' research runs on (ms); tests set it. */
@@ -1126,6 +1147,7 @@ export class Game {
    * status line and queuing it in `researchDone`. */
   settleResearch(): ResearchRecord[] {
     const done = settleArchives(this.save, this.clock());
+    if (done.length) this.readyForestRuns();
     this.researchDone.push(...done);
     const last = done.at(-1);
     if (last) this.message = `Archives · ${RESEARCH[last.research].name} level ${last.level} complete.`;
@@ -1138,19 +1160,20 @@ export class Game {
       this.save.gold -= item.cost;
     }
     this.save.provisions[id]++;
+    this.readyForestRuns();
     return true;
   }
-  /** A gear change or training applies at once to the runs of both modes: each gains
-   * or loses exactly what it changed in the loadout, so ATK/DEF gathered
-   * from items and the provisions a run started with are kept. A run still
-   * outside hasn't started, so it also starts with the HP it now would. */
+  /** A gear change or training applies at once to the runs of both modes: a
+   * run inside gains or loses exactly what it changed in the loadout, so
+   * ATK/DEF gathered from items and the provisions it started with are kept,
+   * and a run still in the forest takes everything owned now. */
   private changeLoadout(change: () => boolean | void) {
     const before = loadout(this.save);
     if (change() === false) return false;
     const after = loadout(this.save);
     for (const mode of ["tower", "delve"] as const) {
       const run = this.save[mode].run;
-      if (!run) continue;
+      if (!run || run.outside) continue;
       for (const stats of [run.player, run.loadout])
         if (stats)
           for (const stat of ["attack", "defense", "maxHp", "shroud"] as const) {
@@ -1158,10 +1181,9 @@ export class Game {
             if (change) stats[stat] = (stats[stat] ?? 0) + change;
           }
       const p = run.player;
-      p.hp = run.outside
-        ? mode === "tower" ? this.sectionStartHp(run.height / TOWER_SECTION, p.maxHp) : p.maxHp
-        : Math.max(1, Math.min(p.hp, p.maxHp));
+      p.hp = Math.max(1, Math.min(p.hp, p.maxHp));
     }
+    this.readyForestRuns();
     return true;
   }
   craftEquipment(slot: EquipmentSlot, metal: MetalId, enhancements: MaterialStack[]) {

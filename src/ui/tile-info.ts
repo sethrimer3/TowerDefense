@@ -61,7 +61,9 @@ const DESCRIBE: Partial<Record<Kind, Describe>> = {
   potion: (t, p, g) => {
     const after = resolveStep(p, t, g.stepRules), percent = t.color === "red";
     const restores = percent ? `Restores HP and ${g.stepRules.percentPotion / 100}% of max HP` : "Restores HP";
-    return { title: percent ? "Percent Potion" : "Potion", body: `<span>${restores}</span><br>(${p.hp} → ${after.blocked ? p.hp : after.player.hp})` };
+    // A run with percent potions says how many of its potions are.
+    const chance = g.run.percentPotions ? `<br><small>${g.run.percentPotions / 100}% of this run's potions are percent potions</small>` : "";
+    return { title: percent ? "Percent Potion" : "Potion", body: `<span>${restores}</span><br>(${p.hp} → ${after.blocked ? p.hp : after.player.hp})${chance}` };
   },
   stairs,
   stairsDown: stairs,

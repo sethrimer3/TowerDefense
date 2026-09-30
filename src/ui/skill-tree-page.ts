@@ -97,9 +97,14 @@ export class SkillTreePage {
   private trainingHtml() {
     const save = this.ctx.game.save, points = trainingPoints(save);
     const row = (t: (typeof TRAINING)[number]) => {
-      const { now, next, worth, affordable, unit } = trainingStep(save, t.id);
+      const { now, next, worth, affordable, unit, maxed } = trainingStep(save, t.id);
       const price = `${t.cost} ${t.cost === 1 ? "point" : "points"}`;
-      return `<div class="training-row" role="listitem"><span class="training-label">${t.name}<small>+${unit ? worth : Math.round(worth * 10) / 10}${unit} a rank</small></span><span class="training-box">${now}${unit}</span><span class="training-arrow" aria-hidden="true">→</span><span class="training-box next">${next}${unit}</span><button class="training-box training-cost" data-train="${t.id}" ${affordable ? "" : "disabled"} aria-label="Train ${t.name} to ${next}${unit} for ${price}">${price}</button></div>`;
+      // A row with a most ranks says so, and once there offers no next one.
+      const most = "max" in t ? `, up to ${trainingStep({ ...save, training: { ...save.training, [t.id]: t.max } }, t.id).now}${unit}` : "";
+      const buy = maxed
+        ? `<button class="training-box training-cost" disabled aria-label="${t.name} is fully trained">Max</button>`
+        : `<button class="training-box training-cost" data-train="${t.id}" ${affordable ? "" : "disabled"} aria-label="Train ${t.name} to ${next}${unit} for ${price}">${price}</button>`;
+      return `<div class="training-row" role="listitem"><span class="training-label">${t.name}<small>+${unit ? worth : Math.round(worth * 10) / 10}${unit} a rank${most}</small></span><span class="training-box">${now}${unit}</span><span class="training-arrow" aria-hidden="true">→</span><span class="training-box next">${next}${unit}</span>${buy}</div>`;
     };
     // Each group's rows, leaving out any whose upgrade isn't owned yet.
     const rows = (Object.entries(TRAINING_GROUPS) as [keyof typeof TRAINING_GROUPS, string][]).map(([group, name]) => {

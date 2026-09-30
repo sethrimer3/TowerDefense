@@ -30,7 +30,7 @@ test("fresh progression gates Delve, currencies, Courage root, and Legacy", () =
   assert.deepEqual(TREES.map(tree => tree.id), ["inspiration", "courage", "wayfinding", "legacy", "wisdom", "renown"]);
   assert.ok(TREES.slice(3).every(tree => tree.nodes.length >= 3));
 });
-test("Greater Heal, then Recovery and Shroud, come after the Archives, whose research they open", () => {
+test("Greater Heal, then Recovery, Shroud and Find Potion, come after the Archives, whose research they open", () => {
   const g = new Game(defaults());
   g.save.tower.inspiration = 1000;
   for (const id of ["handOrdering", "combatStance", "cardHeal", "cardGear", "focus"] as const) assert.ok(g.buy(id));
@@ -44,10 +44,14 @@ test("Greater Heal, then Recovery and Shroud, come after the Archives, whose res
   assert.ok(g.buy("recovery"));
   assert.equal(before - g.save.tower.inspiration, 10);
   assert.equal(g.buy("recovery"), false, "one rank");
+  before = g.save.tower.inspiration;
+  assert.ok(g.buy("findPotion"));
+  assert.equal(before - g.save.tower.inspiration, 10);
   const at = (id: string) => TREES[0].nodes.find((n) => n.id === id)!;
   assert.deepEqual([at("greaterHeal").x, at("greaterHeal").y, at("greaterHeal").requires], [50, 106, ["archives"]]);
   assert.deepEqual([at("recovery").x, at("recovery").y, at("recovery").requires], [30, 124, ["greaterHeal"]]);
   assert.deepEqual([at("shroud").x, at("shroud").y, at("shroud").requires], [70, 124, ["greaterHeal"]], "Shroud sits beside Recovery");
+  assert.deepEqual([at("findPotion").x, at("findPotion").y, at("findPotion").requires], [30, 142, ["recovery"]], "Find Potion sits below Recovery");
 });
 test("each skill in a tree of unlocks is bought once", () => {
   const unlockTrees = TREES.filter((t) => t.unlocks);
@@ -58,9 +62,9 @@ test("each skill in a tree of unlocks is bought once", () => {
 
 test("a tree taller than its view places its nodes on a taller map", () => {
   const inspiration = TREES[0];
-  assert.equal(treeHeight(inspiration), 136);
+  assert.equal(treeHeight(inspiration), 154);
   assert.ok(inspiration.nodes.every((n) => n.y > 0 && n.y < treeHeight(inspiration)), "every node on the map");
-  assert.equal(mapNodes(inspiration).find((n) => n.id === "recovery")!.y, (124 * 100) / 136);
+  assert.equal(mapNodes(inspiration).find((n) => n.id === "recovery")!.y, (124 * 100) / 154);
   assert.ok(TREES.slice(1).every((t) => treeHeight(t) === 100 && mapNodes(t).every((n, i) => n.y === t.nodes[i].y)), "other trees fit one view");
 });
 test("older saves retain earned access without unlocking fresh saves", () => {

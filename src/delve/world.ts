@@ -60,7 +60,7 @@ export class World implements Board {
       this.chunks.set(index, generate(this.seed, index));
     return (
       this.changes[point(x, y)] ??
-      withPotions(this.chunks.get(index)!.get(point(x, y)) ?? { kind: "wall" }, !!this.run.percentPotions)
+      withPotions(this.chunks.get(index)!.get(point(x, y)) ?? { kind: "wall" }, x, y, this.seed, this.run.percentPotions ?? 0)
     );
   }
   /** On the board and at or above the floor. */

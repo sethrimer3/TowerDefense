@@ -155,7 +155,15 @@ export const UPGRADES = [
   {
     id: "recovery",
     name: "Recovery",
-    description: "Percent potions appear on the floors: each restores 35 HP and a share of your max HP, raised by Potion % training",
+    description: "Percent potions appear on the floors (2% of potions, more with Find Potion): each restores 35 HP and a share of your max HP, raised by Potion % training",
+    base: 10,
+    max: 1,
+    currency: "inspiration",
+  },
+  {
+    id: "findPotion",
+    name: "Find Potion",
+    description: "More of the potions you find are percent potions: opens Find Potion training",
     base: 10,
     max: 1,
     currency: "inspiration",
@@ -304,14 +312,17 @@ export const TRAINING_GROUPS = { offense: "Offense", defense: "Defense" } as con
  * `trainingWorth`), so every rank already bought grows as the hero levels
  * up and saving points up never pays. Shroud adds to the damage the
  * shroud blocks each fight. Potion % adds `POTION_PERCENT_RANK`
- * to what a percent potion restores, the same at every level. A row with
- * `requires` shows, and trains, only once that upgrade is owned. */
+ * to what a percent potion restores, and Find Potion `FIND_POTION_RANK` to
+ * the chance a potion is a percent potion, the same at every level. A row
+ * with `requires` shows, and trains, only once that upgrade is owned; one
+ * with `max` trains no further than that many ranks. */
 export const TRAINING = [
   { id: "hp", name: "Max HP", group: "defense", stat: "maxHp", base: 10, growth: 10, cost: 1 },
   { id: "attack", name: "ATK", group: "offense", stat: "attack", base: 1, growth: 5, cost: 5 },
   { id: "defense", name: "DEF", group: "defense", stat: "defense", base: 1, growth: 12, cost: 3 },
   { id: "shroud", name: "Shroud", group: "defense", stat: "shroud", base: 1, growth: 10, cost: 1, requires: "shroud" },
   { id: "potion", name: "Potion %", group: "defense", requires: "recovery", cost: 1 },
+  { id: "findPotion", name: "Find Potion", group: "defense", requires: "findPotion", cost: 1, max: 72 },
 ] as const;
 export type TrainingId = (typeof TRAINING)[number]["id"];
 export type TrainingRow = (typeof TRAINING)[number];
@@ -324,6 +335,10 @@ export const trainingOpen = (row: TrainingRow, upgrades: Record<UpgradeId, numbe
 /** What a percent potion restores beyond its HP, in hundredths of a percent
  * of max HP: 1% with Recovery, and 0.25% more for each Potion % rank. */
 export const POTION_PERCENT_BASE = 100, POTION_PERCENT_RANK = 25;
+/** The chance each potion that may be one is a percent potion, in
+ * hundredths of a percent: 2% with Recovery, and 0.25% more for each Find
+ * Potion rank, up to 20% (72 ranks). */
+export const FIND_POTION_BASE = 200, FIND_POTION_RANK = 25, FIND_POTION_MAX = 2000;
 /** What one rank of `row` is worth at `level`, unrounded. */
 export const trainingWorth = (row: StatTrainingRow, level: number) => row.base * (1 + level / row.growth);
 /** What `ranks` ranks of `row` add to the character at `level`, rounded

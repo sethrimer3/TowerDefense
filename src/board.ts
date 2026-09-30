@@ -1,4 +1,5 @@
 import { point, type Run, type Tile, type Torch } from "./entities.ts";
+import { tileRandom } from "./random.ts";
 
 /** A board the player walks: the Delve labyrinth, a Tower floor, or the
  * forest outside. */
@@ -57,7 +58,11 @@ export function reachable(
   return seen;
 }
 
-/** A generated tile as a run sees it: a percent (red) potion is a regular
- * one on the floors of a run without percent potions. */
-export const withPotions = (t: Tile, percentPotions: boolean): Tile =>
-  !percentPotions && t.kind === "potion" && t.color === "red" ? { ...t, color: "blue" } : t;
+const PERCENT_POTION_SALT = 0x5eed7;
+/** A generated tile at (x, y) on a board generated from `seed`, as a run
+ * with `chance` (hundredths of a percent) of percent potions sees it: each
+ * potion that may be one (generated blue) is a percent (red) potion when its
+ * tile's fixed number falls under the chance, so a higher chance only ever
+ * adds percent potions. */
+export const withPotions = (t: Tile, x: number, y: number, seed: number, chance: number): Tile =>
+  t.kind === "potion" && t.color && tileRandom(x, y, seed ^ PERCENT_POTION_SALT) * 10000 < chance ? { ...t, color: "red" } : t;

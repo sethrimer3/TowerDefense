@@ -57,7 +57,13 @@ export function laneTile(step: LaneStep, depth: number, rng: () => number): Tile
 
 function rewardTile(r: Reward, rng: () => number): Tile {
   if (r.kind === "key") return { kind: "key", color: r.color };
-  if (r.kind === "potion") return { kind: "potion", color: rng() < 0.5 ? "red" : "blue" };
+  if (r.kind === "potion") {
+    // Every potion may be a percent potion, as the run decides
+    // (`withPotions`). The draw that once chose stays, so floors keep their
+    // layouts.
+    rng();
+    return { kind: "potion", color: "blue" };
+  }
   return { kind: r.kind };
 }
 

@@ -50,9 +50,9 @@ export class RoomWorld implements Board {
     public seed: number,
     public room: number,
     public changes: Record<string, Tile>,
-    /** Whether the floor's percent potions stand as generated; without,
-     * each is a regular potion (a run's `percentPotions`). */
-    public percentPotions = true,
+    /** The chance each potion is a percent potion, in hundredths of a
+     * percent (a run's `percentPotions`); none without. */
+    public percentPotions = 0,
   ) {
     this.cells = generateTowerRoom(seed, room);
     this.torches = torchesForRoom(seed, room, this.cells);
@@ -68,7 +68,7 @@ export class RoomWorld implements Board {
     if (!this.inside(x, y)) return { kind: "wall" };
     const changed = this.changes[point(x, y)];
     if (changed) return changed;
-    return withPotions(this.cells.get(point(x, y)) ?? { kind: "wall" }, this.percentPotions);
+    return withPotions(this.cells.get(point(x, y)) ?? { kind: "wall" }, x, y, this.seed ^ Math.imul(this.room + 1, 0x9e3779b1), this.percentPotions);
   }
   step(x: number, y: number, dx: number, dy: number) {
     const nx = x + dx,
