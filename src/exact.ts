@@ -19,3 +19,9 @@ export function intPow(base: number, n: number) {
  * or difference of them is snapped back onto the grid, so 0.1 + 0.2 is 0.3
  * and a fight's forecast and the fight played out agree to the last strike. */
 export const snap = (n: number) => Math.round(n * 1e6) / 1e6;
+
+/** `x` squared, as one exact multiplication (`x ** 2` goes through pow). */
+export const sq = (x: number) => x * x;
+
+/** The length of (dx, dy): `Math.hypot`'s answer from exact operations. */
+export const dist = (dx: number, dy: number) => Math.sqrt(dx * dx + dy * dy);

@@ -4,6 +4,7 @@
  * until rebuilt (backing off when enemies come close), takes the next job,
  * and goes indoors when there's nothing left. A killed civilian's slot
  * refills after a delay. */
+import { dist } from "../exact.ts";
 import { CIVILIAN, civilianCount, civilianHp, rebuildSeconds, type UpgradeId } from "./catalog.ts";
 import { cellCenter, center, findPath, rectDist, type Point } from "./pathing.ts";
 import type { Civilian, DefendSim } from "./sim.ts";
@@ -55,7 +56,7 @@ function stepCivilian(sim: DefendSim, c: Civilian, dt: number) {
 function goToJob(sim: DefendSim, c: Civilian, dt: number) {
   if (sim.solid[c.job] || !jobOpen(sim, c.job, c)) return assignNext(sim, c);
   const j = cellCenter(c.job);
-  if (Math.hypot(j.x - c.x, j.y - c.y) < 0.35) {
+  if (dist(j.x - c.x, j.y - c.y) < 0.35) {
     c.state = "working";
     c.work = 0;
     return;
@@ -64,7 +65,7 @@ function goToJob(sim: DefendSim, c: Civilian, dt: number) {
     c.thinkT = 1;
     c.path = findPath(sim.solid, c, j, ERRAND) ?? [];
     // Unreachable: try another job next time (but still step toward this one now).
-    if (!c.path.length && Math.hypot(j.x - c.x, j.y - c.y) > 1.5) assignNext(sim, c, c.job);
+    if (!c.path.length && dist(j.x - c.x, j.y - c.y) > 1.5) assignNext(sim, c, c.job);
   }
   sim.followPath(c, j, CIVILIAN.speed, dt);
 }
@@ -109,7 +110,7 @@ function pickJob(sim: DefendSim, from: Point, skip = -1): number {
     bestScore = Infinity;
   for (const { cell, tier } of openJobs(sim, skip)) {
     const p = cellCenter(cell);
-    const score = tier * 1000 + Math.hypot(p.x - from.x, p.y - from.y);
+    const score = tier * 1000 + dist(p.x - from.x, p.y - from.y);
     if (score < bestScore) {
       bestScore = score;
       best = cell;

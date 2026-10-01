@@ -2,6 +2,7 @@
  * enemy in range with homing arrows; cannon towers lob a shell at the
  * nearest ground enemy (not too close), which bursts where the target stood
  * when it fired. */
+import { dist, sq } from "../exact.ts";
 import {
   archerCooldown,
   archerDamage,
@@ -54,12 +55,12 @@ export class Towers {
     if (!this.ready(b, dt)) return;
     const c = center(b.rect);
     const ground = sim.enemiesNear(c.x, c.y, CANNON_RANGE).filter(
-      (e) => !ENEMIES[e.kind].flying && (e.x - c.x) ** 2 + (e.y - c.y) ** 2 > CANNON_MIN * CANNON_MIN,
+      (e) => !ENEMIES[e.kind].flying && sq(e.x - c.x) + sq(e.y - c.y) > CANNON_MIN * CANNON_MIN,
     );
     const target = nearest(ground, c);
     if (!target) return this.cooldown.set(b.id, 0);
     this.cooldown.set(b.id, cannonCooldown(sim.levels.cannonRate) * sim.bonuses.towerReload);
-    const dist = Math.sqrt((target.x - c.x) ** 2 + (target.y - c.y) ** 2);
+    const dist = Math.sqrt(sq(target.x - c.x) + sq(target.y - c.y));
     sim.shells.push({
       x0: c.x,
       y0: c.y - 0.4,
@@ -86,7 +87,7 @@ export function stepArrows(sim: DefendSim, dt: number) {
     }
     const dx = a.tx - a.x,
       dy = a.ty - a.y;
-    const d = Math.hypot(dx, dy);
+    const d = dist(dx, dy);
     const step = ARROW_SPEED * dt;
     if (d > step) {
       a.x += (dx / d) * step;

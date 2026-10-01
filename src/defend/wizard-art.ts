@@ -85,12 +85,12 @@ export class WizardArt {
     for (const f of flames)
       for (let k = 0; k < n; k++) {
         const spread = (this.rand() + this.rand() + this.rand() - 1.5) * 0.36;
-        const a = f.angle + spread, speed = FIRE_SPEED * (0.75 + this.rand() * 0.45);
+        const aim = Math.atan2(f.dy, f.dx), a = aim + spread, speed = FIRE_SPEED * (0.75 + this.rand() * 0.45);
         const ember = this.rand() < 0.08;
         // Spread over the frame, so the jet is continuous, not one puff a frame.
         const head = this.rand() * dt;
         this.fire.push({
-          x: f.x + Math.cos(f.angle) * 0.35 + Math.cos(a) * speed * head, y: f.y + Math.sin(f.angle) * 0.35 + Math.sin(a) * speed * head,
+          x: f.x + f.dx * 0.35 + Math.cos(a) * speed * head, y: f.y + f.dy * 0.35 + Math.sin(a) * speed * head,
           vx: Math.cos(a) * speed, vy: Math.sin(a) * speed, age: head,
           life: (f.range / FIRE_SPEED) * (1.15 + this.rand() * 0.45) * (ember ? 1.4 : 1),
           size: 0.2 + this.rand() * 0.16, ember,
@@ -139,11 +139,12 @@ export class WizardArt {
       this.sown.set(w.seed, w.r);
       const rnd = random((w.seed ^ Math.floor(from * 1000)) >>> 0);
       // Clusters scatter over the band, thinner toward the fan's edges.
-      const area = (w.r - from) * (from + w.r) * w.half;
+      const angle = Math.atan2(w.dy, w.dx), half = Math.atan(w.spread);
+      const area = (w.r - from) * (from + w.r) * half;
       const count = Math.round(area * 1.25 + rnd());
       for (let k = 0; k < count; k++) {
         const side = (rnd() * 2 - 1) * (rnd() < 0.7 ? 0.8 : 1);
-        const a = w.angle + side * w.half;
+        const a = angle + side * half;
         const r = from + rnd() * (w.r - from);
         if (rnd() < Math.abs(side) * 0.45) continue;
         this.clusters.push(cluster(rnd, w.x + Math.cos(a) * r, w.y + Math.sin(a) * r, a, 1 - Math.abs(side) * 0.5, now / 1000 + rnd() * 0.06));
@@ -189,7 +190,8 @@ export class WizardArt {
       c.fillStyle = g;
       c.beginPath();
       c.moveTo(w.x * px, w.y * px);
-      c.arc(w.x * px, w.y * px, (w.r + 0.25) * px, w.angle - w.half, w.angle + w.half);
+      const angle = Math.atan2(w.dy, w.dx), half = Math.atan(w.spread);
+      c.arc(w.x * px, w.y * px, (w.r + 0.25) * px, angle - half, angle + half);
       c.closePath();
       c.fill();
     }
@@ -224,8 +226,9 @@ export class WizardArt {
     const out: ReliefLight[] = [];
     for (const w of frosts) {
       if (w.r >= w.range) continue;
+      const angle = Math.atan2(w.dy, w.dx), half = Math.atan(w.spread);
       for (const s of [-0.6, 0, 0.6]) {
-        const a = w.angle + s * w.half;
+        const a = angle + s * half;
         out.push({ x: w.x + Math.cos(a) * w.r, y: w.y + Math.sin(a) * w.r, r: 2.2, k: 0.55, color: "#a8dcff" });
       }
     }
@@ -247,7 +250,7 @@ export function flameLights(sim: DefendSim): { carried: CarriedLight[]; relief: 
     const grow = Math.min(1, f.t / 0.25), fade = Math.min(1, (f.dur - f.t) / 0.3);
     const reach = f.range * grow;
     [[0.25, 2.6, 1.1], [0.6, 3.4, 1.05], [0.95, 3, 0.8]].forEach(([at, r, k], i) => {
-      const x = f.x + Math.cos(f.angle) * reach * at, y = f.y + Math.sin(f.angle) * reach * at;
+      const x = f.x + f.dx * reach * at, y = f.y + f.dy * reach * at;
       carried.push({ x, y, id: f.tower * 10 + i, r, k: k * fade });
       relief.push({ x, y, r: r * 1.15, k: k * fade, color: "#ffb36b" });
     });

@@ -11,6 +11,7 @@
  * and what happens to it (damage, rebuilding, blasts, movement). What each
  * kind of unit decides to do lives beside it: `enemies.ts`, `troops.ts`,
  * `civilians.ts` and `towers.ts`, with grid pathing in `pathing.ts`. */
+import { dist, sq } from "../exact.ts";
 import { CELL_COUNT, CELLS_H, CELLS_W, cellIndex, cellX, cellY, rng, sideCells } from "./grid.ts";
 import {
   BOMB_DAMAGE,
@@ -357,7 +358,7 @@ export class DefendSim {
       y1 = Math.min(CELLS_H - 1, Math.floor(y + r));
     for (let cy = y0; cy <= y1; cy++)
       for (let cx = x0; cx <= x1; cx++)
-        for (const e of this.grid[cellIndex(cx, cy)]) if (e.hp > 0 && (e.x - x) ** 2 + (e.y - y) ** 2 <= r * r) out.push(e);
+        for (const e of this.grid[cellIndex(cx, cy)]) if (e.hp > 0 && sq(e.x - x) + sq(e.y - y) <= r * r) out.push(e);
     return out;
   }
 
@@ -434,10 +435,10 @@ export class DefendSim {
   explode(x: number, y: number, { r, damage, friendlyFire }: Blast) {
     this.indexEnemies();
     const hit = (d: number) => damage * (1 - 0.6 * Math.min(1, d / r));
-    for (const e of this.enemiesNear(x, y, r)) this.hurtEnemy(e, hit(Math.hypot(e.x - x, e.y - y)));
+    for (const e of this.enemiesNear(x, y, r)) this.hurtEnemy(e, hit(dist(e.x - x, e.y - y)));
     if (friendlyFire)
       for (const u of [...this.soldiers, ...this.civilians]) {
-        const d = Math.hypot(u.x - x, u.y - y);
+        const d = dist(u.x - x, u.y - y);
         if (d > r || u.hp <= 0) continue;
         u.hp -= hit(d) * FRIENDLY_FIRE;
         u.flash = 0.12;
@@ -459,7 +460,7 @@ export class DefendSim {
   moveToward(u: Point, to: Point, { speed, dt, flying = false }: Stride): boolean {
     let dx = to.x - u.x,
       dy = to.y - u.y;
-    const len = Math.hypot(dx, dy);
+    const len = dist(dx, dy);
     if (len < 0.02) return true;
     dx /= len;
     dy /= len;
@@ -487,7 +488,7 @@ export class DefendSim {
       if (o === u) continue;
       const ox = u.x - o.x,
         oy = u.y - o.y;
-      const d = Math.hypot(ox, oy) || 0.01;
+      const d = dist(ox, oy) || 0.01;
       sx += (ox / d) * (0.45 - d);
       sy += (oy / d) * (0.45 - d);
     }
@@ -501,7 +502,7 @@ export class DefendSim {
     while (u.path.length) {
       const c = u.path[0];
       const p = cellCenter(c);
-      if (Math.hypot(p.x - u.x, p.y - u.y) < 0.3) {
+      if (dist(p.x - u.x, p.y - u.y) < 0.3) {
         u.path.shift();
         continue;
       }

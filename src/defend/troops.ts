@@ -3,6 +3,7 @@
  * last Patrol routes level) and head home when there's nothing to fight;
  * archers roam the streets, shooting whatever comes within sight, or with
  * Hunter's instinct path toward the nearest enemy in the city. */
+import { dist, sq } from "../exact.ts";
 import {
   ARCHER_UNIT,
   archerUnitRange,
@@ -77,7 +78,7 @@ export class Barracks {
 
 const isBarracks = (b: Building) => b.kind === "barracks" || b.kind === "archerBarracks";
 
-const byDistanceFrom = (p: Point) => (a: Enemy, b: Enemy) => (a.x - p.x) ** 2 + (a.y - p.y) ** 2 - ((b.x - p.x) ** 2 + (b.y - p.y) ** 2);
+const byDistanceFrom = (p: Point) => (a: Enemy, b: Enemy) => sq(a.x - p.x) + sq(a.y - p.y) - (sq(b.x - p.x) + sq(b.y - p.y));
 const inCity = (sim: DefendSim, e: Enemy) => sim.map.city[cellAt(e.x, e.y)] === 1;
 /** Search limits for chasing across the whole city. */
 const CITYWIDE: PathLimits = { maxCost: 1e9, maxNodes: CELL_COUNT };
@@ -104,7 +105,7 @@ class Patrol {
 
   covers(e: Enemy) {
     const { hc, leash } = this;
-    return this.citywide ? inCity(this.sim, e) : (e.x - hc.x) ** 2 + (e.y - hc.y) ** 2 <= leash ** 2;
+    return this.citywide ? inCity(this.sim, e) : sq(e.x - hc.x) + sq(e.y - hc.y) <= sq(leash);
   }
 
   /** Enemies it may go after, nearest `s` first. */
@@ -129,7 +130,7 @@ export function stepSwordsman(sim: DefendSim, s: Soldier, dt: number) {
   sim.followPath(s, target, SOLDIER.speed, dt);
 }
 
-const inSwordReach = (s: Soldier, e: Enemy) => Math.hypot(e.x - s.x, e.y - s.y) <= SOLDIER.reach + ENEMIES[e.kind].size / 2;
+const inSwordReach = (s: Soldier, e: Enemy) => dist(e.x - s.x, e.y - s.y) <= SOLDIER.reach + ENEMIES[e.kind].size / 2;
 
 function strike(sim: DefendSim, s: Soldier, e: Enemy) {
   if (s.cd > 0) return;
@@ -163,7 +164,7 @@ function returnToDoor(sim: DefendSim, s: Soldier, home: Building) {
   const door = sim.doorOf(home);
   if (door < 0) return;
   // (Subtracting the half cell separately keeps the original rounding.)
-  const away = Math.hypot(s.x - cellX(door) - 0.5, s.y - cellY(door) - 0.5);
+  const away = dist(s.x - cellX(door) - 0.5, s.y - cellY(door) - 0.5);
   if (away > 1.2) s.path = findPath(sim.solid, s, cellCenter(door), { maxCost: 400 }) ?? [];
 }
 

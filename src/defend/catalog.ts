@@ -1,3 +1,5 @@
+import { intPow } from "../exact.ts";
+
 /** Data tables for DEFEND: what the player can place, what it costs in
  * Gold and metal bars, the universal upgrades, the bonuses Training and the
  * skill trees add, and the enemy roster. */
@@ -113,9 +115,9 @@ export function purchasePrice(item: PaletteItem, owned: number): Price {
     wizardTower: { gold: 450, ironBar: 6 },
   };
   const growth = item === "cityTile" ? 1.3 : 1.5;
-  const m = Math.pow(growth, extra);
+  const m = intPow(growth, extra);
   const b = base[item];
-  return { gold: Math.round(b.gold * m), ironBar: Math.ceil((b.ironBar ?? 0) * Math.pow(1.25, extra)) };
+  return { gold: Math.round(b.gold * m), ironBar: Math.ceil((b.ironBar ?? 0) * intPow(1.25, extra)) };
 }
 
 export type UpgradeId =
@@ -193,7 +195,7 @@ export const UPGRADES: UpgradeDef[] = [
 
 export function upgradePrice(level: number): Price {
   return {
-    gold: Math.round(200 * Math.pow(1.6, level)),
+    gold: Math.round(200 * intPow(1.6, level)),
     ironBar: 2 + level * 2,
     steelBar: level >= 3 ? level - 2 : 0,
   };
@@ -207,18 +209,18 @@ export const BOMB_DAMAGE = 45;
 
 // Stat curves, keyed by upgrade level.
 export const soldierCap = (l: number) => 2 + l;
-export const trainSeconds = (l: number) => 5 * Math.pow(0.85, l);
+export const trainSeconds = (l: number) => 5 * intPow(0.85, l);
 export const soldierScale = (l: number) => 1 + l * 0.25;
 /** How far from their barracks swordsmen go after enemies (cells). */
 export const soldierLeash = (l: number) => (l >= SOLDIER_REACH_MAX ? Infinity : SOLDIER.leash + l * 7);
 export const archerDamage = (l: number) => 6 + l * 3;
 export const archerRange = (l: number) => 10 + l * 2;
-export const archerCooldown = (l: number) => 1.1 * Math.pow(0.85, l);
+export const archerCooldown = (l: number) => 1.1 * intPow(0.85, l);
 export const watchRadius = (l: number) => 8 + l * 2;
 export const archerUnitRange = (l: number) => 3 + l;
 export const cannonDamage = (l: number) => 20 + l * 9;
 export const cannonSplash = (l: number) => 1.7 + l * 0.15;
-export const cannonCooldown = (l: number) => 2.8 * Math.pow(0.86, l);
+export const cannonCooldown = (l: number) => 2.8 * intPow(0.86, l);
 export const CANNON_RANGE = 11;
 /** Share of blast damage your own units take when friendly fire is on. */
 export const FRIENDLY_FIRE = 0.6;
@@ -227,23 +229,26 @@ export const FRIENDLY_FIRE = 0.6;
 export const flameDps = (l: number) => 16 + l * 6;
 export const flameRange = (l: number) => 4.5 + l * 0.3;
 export const FLAME_SECONDS = 1.6;
-export const FLAME_HALF_ANGLE = 0.38;
+/** The cone's half-width as a slope (the tangent of its half-angle, about
+ * 22°), so the battle tests it with exact arithmetic. */
+export const FLAME_SPREAD = 0.4;
 /** The ice wave: damage to everything the front crosses, how long they stay
  * chilled (moving at `CHILL_SPEED` of their pace), its reach, speed (cells a
- * second) and half-angle. */
+ * second) and spread. */
 export const iceDamage = (l: number) => 14 + l * 6;
 export const iceChill = (l: number) => 2 + l * 0.4;
 export const CHILL_SPEED = 0.5;
 export const ICE_RANGE = 6.5;
 export const ICE_SPEED = 7;
-export const ICE_HALF_ANGLE = 0.62;
+/** The ice fan's half-width as a slope (about 36°). */
+export const ICE_SPREAD = 0.72;
 /** Seconds the tower rests after each attack before the other one. */
 export const WIZARD_REST = 1.3;
 export const wallHp = (l: number) => Math.round(100 * (1 + l * 0.35));
 export const keepHp = (l: number) => Math.round(STRUCTURES.keep.maxHp * (1 + l * 0.3));
 export const civilianCount = (l: number) => 2 + l;
 export const civilianHp = (l: number) => 8 + l * 5;
-export const rebuildSeconds = (l: number) => 3 * Math.pow(0.82, l);
+export const rebuildSeconds = (l: number) => 3 * intPow(0.82, l);
 export const HOUSE_HP_PER_CELL = 22;
 
 export type EnemyKind = "roach" | "orc" | "ogre" | "bat" | "warlord";
@@ -304,8 +309,16 @@ export const NO_BONUSES: Readonly<Bonuses> = Object.freeze({
 });
 
 /** Enemies get tougher every wave. */
-export const waveHpScale = (wave: number) => Math.pow(1.11, wave - 1);
-export const waveBudget = (wave: number) => Math.round(4 + wave * 2.6 + Math.pow(wave, 1.45));
+export const waveHpScale = (wave: number) => intPow(1.11, wave - 1);
+export const waveBudget = (wave: number) => Math.round(4 + wave * 2.6 + pow145(wave));
+/** `n` to the power 1.45 from exact operations (n^1.45 = n × n^(1/4) ×
+ * n^(1/8) × n^(1/16) × n^(1/128) × n^(1/256) × n^(1/512): 1.4492…, close
+ * enough), so every engine sizes a wave alike. */
+function pow145(n: number) {
+  const r4 = Math.sqrt(Math.sqrt(n)), r8 = Math.sqrt(r4), r16 = Math.sqrt(r8), r128 = Math.sqrt(Math.sqrt(Math.sqrt(r16)));
+  const r256 = Math.sqrt(r128), r512 = Math.sqrt(r256);
+  return n * r4 * r8 * r16 * r128 * r256 * r512;
+}
 
 export const SOLDIER = { hp: 40, damage: 6, cooldown: 0.8, speed: 2.4, reach: 0.75, leash: 16, size: 0.4, color: "#5b8fd9" };
 export const ARCHER_UNIT = { hp: 24, damage: 5, cooldown: 1.1, speed: 2.1, size: 0.36, color: "#6cc08a" };

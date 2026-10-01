@@ -68,7 +68,7 @@ test("the flame burns what is in its cone and spares what is not", () => {
 test("the ice front hits each enemy once and chills it, which slows it", () => {
   const { sim, at } = wizardSim();
   const e = orc(sim, at.x, at.y - 3);
-  sim.frosts.push({ x: at.x, y: at.y, angle: -Math.PI / 2, half: 0.6, r: 0.6, range: ICE_RANGE, t: 0, seed: 1, hit: [] });
+  sim.frosts.push({ x: at.x, y: at.y, dx: 0, dy: -1, spread: 0.7, r: 0.6, range: ICE_RANGE, t: 0, seed: 1, hit: [] });
   for (let k = 0; k < 60; k++) stepFrosts(sim, 1 / 30);
   const once = e.maxHp - e.hp;
   assert.ok(once > 0);

@@ -3,6 +3,7 @@
  * troops and civilians, the enemies' flow field toward the keep, and the
  * collision test for a unit's body. Units live in continuous cell
  * coordinates, so (x, y) lies in cell (floor x, floor y). */
+import { dist, sq } from "../exact.ts";
 import { CELLS_H, CELLS_W, cellInBounds, cellIndex, type Rect } from "./grid.ts";
 import { MinHeap } from "./heap.ts";
 
@@ -28,7 +29,7 @@ export function nearestPoint(r: Rect, x: number, y: number): Point {
 }
 export function rectDist(r: Rect, x: number, y: number) {
   const p = nearestPoint(r, x, y);
-  return Math.hypot(p.x - x, p.y - y);
+  return dist(p.x - x, p.y - y);
 }
 
 /** The item nearest `p` strictly within squared distance `within`. Earlier
@@ -38,7 +39,7 @@ export function nearest<T extends Point>(items: Iterable<T>, p: Point, within = 
   let best: T | null = null,
     bd = within;
   for (const it of items) {
-    const d = (it.x - p.x) ** 2 + (it.y - p.y) ** 2;
+    const d = sq(it.x - p.x) + sq(it.y - p.y);
     if (closer(d, bd)) {
       bd = d;
       best = it;
@@ -73,7 +74,7 @@ export function nearestOpen(solid: Uint8Array, cx: number, cy: number, from: Poi
     const nx = cx + dx,
       ny = cy + dy;
     if (!cellInBounds(nx, ny) || solid[cellIndex(nx, ny)]) continue;
-    const d = Math.hypot(nx + 0.5 - from.x, ny + 0.5 - from.y);
+    const d = dist(nx + 0.5 - from.x, ny + 0.5 - from.y);
     if (d < bd) {
       bd = d;
       best = [nx + 0.5, ny + 0.5];
