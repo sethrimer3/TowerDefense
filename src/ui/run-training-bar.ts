@@ -58,6 +58,12 @@ export class RunTrainingBar {
     });
     cards.addEventListener("pointerleave", () => this.hideTip());
     cards.addEventListener("scroll", () => this.hideTip());
+    // With no scrollbar shown, a mouse wheel scrolls the cards sideways.
+    cards.addEventListener("wheel", (e) => {
+      if (!e.deltaY || cards.scrollWidth <= cards.clientWidth) return;
+      cards.scrollLeft += e.deltaY;
+      e.preventDefault();
+    }, { passive: false });
   }
 
   /** Shows the bar inside a run, and the open group's cards in the hand's place. */
@@ -80,7 +86,7 @@ export class RunTrainingBar {
       this.hideTip();
       el("run-drills").innerHTML = rows.map((id) => {
         const row = TRAINING.find((t) => t.id === id)!;
-        return `<div class="drill-card" role="listitem" data-drill="${id}"><b class="drill-name">${row.name}</b><span class="drill-value"></span><small class="drill-level"></small><button type="button" class="drill-buy" data-run-train="${id}"></button></div>`;
+        return `<div class="drill-card" role="listitem" data-drill="${id}"><b class="drill-name">${row.name}</b><span class="drill-value"></span><button type="button" class="drill-buy" data-run-train="${id}"></button></div>`;
       }).join("");
     }
     for (const id of rows) this.fill(id);
@@ -91,14 +97,13 @@ export class RunTrainingBar {
     return TRAINING.filter((t) => t.group === group && trainingOpen(t, this.game.save.upgrades)).map((t) => t.id);
   }
 
-  /** One card's value, level and price, greyed while the Silver isn't there. */
+  /** One card's value and price, greyed while the Silver isn't there. */
   private fill(id: TrainingId) {
     const game = this.game, card = document.querySelector<HTMLElement>(`[data-drill="${id}"]`)!;
     const offer = runTrainingOffer(game.save, game.run, id), { value, unit } = runTrainingValue(game.save, game.run, id);
     const short = !offer.maxed && !game.free && game.silver < offer.price;
     card.classList.toggle("short", short || offer.maxed);
     card.querySelector(".drill-value")!.textContent = `${value}${unit}`;
-    card.querySelector(".drill-level")!.textContent = `Lv ${offer.level}`;
     const buy = card.querySelector<HTMLButtonElement>(".drill-buy")!;
     const label = offer.maxed ? "Max" : `${silverIcon()}<b>${offer.price.toLocaleString("en-US")}</b>`;
     if (buy.dataset.label !== label) {

@@ -55,6 +55,16 @@ test("a hand with no card that can act pauses, lights End Run, and plays on afte
   assert.deepEqual([g.run.player.x, g.run.player.y], [1, 0]);
 });
 
+test("pausing the hand drops its path but keeps the card that led glowing", () => {
+  const g = arena();
+  g.autoTurn();
+  g.toggleAuto();
+  assert.ok(!g.auto && g.cardPlan === null);
+  assert.equal(g.activeCard, 0);
+  g.toggleAuto();
+  assert.ok(g.auto && g.activeCard === null, "playing on plans afresh");
+});
+
 test("undo pauses the hand and drops its path", () => {
   const g = arena();
   g.autoTurn();

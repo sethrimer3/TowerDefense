@@ -1858,7 +1858,7 @@ button.training-cost:disabled { border-color: #4a5566; color: #7c8898; backgroun
 
 /* --- Deck page --- */
 nav button { position: relative; }
-/* A lesson waits behind the button. */
+/* A lesson, or the first Inspiration, waits behind the button. */
 nav button.notify::after {
   content: "";
   position: absolute;
@@ -2282,24 +2282,28 @@ p.research-kept { color: #ffe1a1; }
 /* A Training group open shows its cards in the hand's place. */
 .run-drills { display: none; }
 nav.in-run.drilling .hand { display: none; }
+/* As tall as the hand's cards (54 px wide, 3:4), with no scrollbar to add
+ * to that, so the screen above stays put as the cards and the hand swap. */
 nav.in-run.drilling .run-drills {
   display: flex;
   gap: 6px;
   width: 100%;
-  min-height: 69px;
   overflow-x: auto;
   overscroll-behavior-x: contain;
   scroll-snap-type: x proximity;
-  padding: 1px;
+  scrollbar-width: none;
 }
+.run-drills::-webkit-scrollbar { display: none; }
 .drill-card {
   flex: 0 0 92px;
+  box-sizing: border-box;
+  height: 72px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: space-between;
   gap: 2px;
-  padding: 5px 4px;
+  padding: 6px 4px;
   border: 1px solid #4b5566;
   border-radius: 4px;
   background: linear-gradient(#1d2531, #121821);
@@ -2309,7 +2313,6 @@ nav.in-run.drilling .run-drills {
 }
 .drill-name { font-size: 10px; color: #efd496; letter-spacing: 0.5px; white-space: nowrap; }
 .drill-value { font-size: 15px; color: #eee5d4; }
-.drill-level { font-size: 8px; color: #8f9bac; letter-spacing: 1px; }
 /* Written over the nav's tab buttons, which the cards sit among. */
 .run-drills .drill-buy {
   display: flex;

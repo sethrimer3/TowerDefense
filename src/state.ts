@@ -58,7 +58,7 @@ import { snap } from "./exact.ts";
 import { whole, wholeChange, wholeHp } from "./whole.ts";
 import { MODES, milestones, type ModeProfile } from "./modes.ts";
 import { ranksInRun, runTrainingOffer } from "./run-training.ts";
-import { keepUndos, loadout, percentPotionChance, potionPercent, reviveChance, trainingMaxed, trainingPoints } from "./loadout.ts";
+import { floorGold, keepUndos, loadout, percentPotionChance, potionPercent, reviveChance, trainingMaxed, trainingPoints } from "./loadout.ts";
 import { RESEARCH, cancelResearch, hastenResearch, hireArchivist, researched, settleArchives, startResearch, type ResearchId, type ResearchRecord } from "./archives.ts";
 import {
   creditMaterials,
@@ -391,7 +391,9 @@ export class Game {
     this.route = [];
     this.auto = !this.auto;
     if (!this.run.outside) {
-      this.dropHandPlan();
+      // Pausing keeps the card that led glowing; playing on plans afresh.
+      if (this.auto) this.dropHandPlan();
+      else this.cardPlan = null;
       this.message = this.auto ? "The hand takes over." : "Paused · the hand waits.";
     } else this.message = this.auto ? "Wayfinder is searching for a route." : "Manual climbing";
   }
@@ -1002,17 +1004,37 @@ export class Game {
     }
     const visited = this.save.delve.memory.visited;
     visited[`${x},${y}`] = (visited[`${x},${y}`] ?? 0) + 1;
+    const floorBefore = this.rules.equivalentFloor(this.run.maxHeight ?? 0);
     this.run.height = Math.max(this.run.height, world.depth(x, y));
     this.run.maxHeight = Math.max(this.run.maxHeight ?? 0, this.run.height);
+    // Each new equivalent floor is the Delve's floor climbed (Spare Change),
+    // keyed off the labyrinth's columns (x = -1) so it pays once a run.
+    let gold = 0;
+    for (let f = floorBefore + 1; f <= this.rules.equivalentFloor(this.run.maxHeight); f++) gold += this.payFloorGold(this.lootKey(-1, f));
+    if (gold) this.gain(x, y, `+${wholeChange(gold)} Gold`);
     world.maintain(y);
     this.recordProgress();
   }
   advanceTowerRoom() {
     this.claimRewards();
+    // Keyed by the stairs taken, so a floor pays once a run, whatever undo does.
+    const gold = this.payFloorGold(this.lootKey(this.run.player.x, this.run.player.y));
     const { board, sectionStart } = this.climb.up();
     this.enterTowerFloor(board);
     if (sectionStart) this.enterTowerSection();
     else this.feedback("A new chamber opens.");
+    if (gold) this.gain(this.run.player.x, this.run.player.y, `+${wholeChange(gold)} Gold`);
+  }
+  /** Spare Change: Gold for a floor climbed for the first time in the run,
+   * its Gold / Floor raised by research and the tier's bonus. Gated by
+   * `key` in lootedTiles, like a kill's Gold; returns what it paid. */
+  private payFloorGold(key: string) {
+    const base = floorGold(this.trainingNow), slice = this.slice;
+    if (!base || slice.lootedTiles[key]) return 0;
+    slice.lootedTiles[key] = true;
+    const gold = tierGold(this.tier, snap((base * researched(this.save.archives, "floorGold", 100)) / 100));
+    this.creditGold(gold);
+    return gold;
   }
   /** Crossing into a new 10-floor section: the way down is sealed (its
    * first room has no down stairs), ATK/DEF gathered from items in the

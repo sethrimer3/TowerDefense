@@ -14,7 +14,7 @@ import { capitalized, displayedProgress, el } from "./ui/dom.ts";
 import { MODES } from "./modes.ts";
 import { buildShell } from "./ui/shell.ts";
 import { BoardOverlay } from "./ui/board-overlay.ts";
-import { boardHeadingStale, flashRed, renderAdButton, renderBoardHeading, renderHud, renderVitals } from "./ui/hud.ts";
+import { boardHeadingStale, flashRed, renderAdButton, renderBoardHeading, renderHud, renderVitals, upgradesWaiting } from "./ui/hud.ts";
 import { confirmAction, DefeatDialog, showLog, showSectionPicker } from "./ui/dialogs.ts";
 import { SkillTreePage } from "./ui/skill-tree-page.ts";
 import { ResearchToasts } from "./ui/research-toast.ts";
@@ -115,6 +115,8 @@ function navigate(requested: string) {
   game.finishEncounter();
   if (id !== "defend") defendPage.pause();
   tab = id;
+  // Opening the Upgrades page clears the dot the first Inspiration put on it.
+  if (id === "upgrades" && upgradesWaiting(game)) game.save.tutorials.upgrades = true;
   deck.shown(id === "deck");
   renderer.weather.silence();
   if (isBoard(id)) {

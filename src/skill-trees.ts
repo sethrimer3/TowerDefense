@@ -21,6 +21,7 @@ export const TREES: SkillTree[] = [
     { id: "delve", icon: "▼", x: 86, y: 106, requires: ["focus"] },
     // Research needs the Archives, so the skills that open it come after them.
     { id: "greaterHeal", icon: "✚", x: 62, y: 124, requires: ["archives"] },
+    { id: "spareChange", icon: "¤", x: 22, y: 124, requires: ["archives"] },
     { id: "recovery", icon: "✦", x: 42, y: 142, requires: ["greaterHeal"] },
     { id: "findPotion", icon: "⚗", x: 42, y: 160, requires: ["recovery"] },
     { id: "shroud", icon: "◈", x: 82, y: 142, requires: ["greaterHeal"] },

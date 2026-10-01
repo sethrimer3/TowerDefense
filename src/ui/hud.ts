@@ -58,8 +58,14 @@ export function renderHud(game: Game, renderer: Renderer, overlay: BoardOverlay)
   // A new Deck lesson waits behind the button until its tutorial is done.
   const { deck, addCard } = game.save.tutorials;
   document.querySelector(`[data-tab="deck"]`)?.classList.toggle("notify", !deck || (!!game.save.upgrades.combatStance && !addCard));
+  document.querySelector(`[data-tab="upgrades"]`)?.classList.toggle("notify", upgradesWaiting(game));
   renderLockedTab("defend", !!game.save.upgrades.legacy, "Defend", "Unlock An enduring legacy in the Courage tree");
 }
+
+/** Whether the Upgrades button shows its dot: the first Inspiration has
+ * been earned (so the run that paid it has ended by the time the tabs show)
+ * and the page hasn't been opened since. */
+export const upgradesWaiting = (game: Game) => !game.save.tutorials.upgrades && game.save.tower.inspiration > 0;
 
 /** The level at the front of the XP bar, which fills with this level's
  * progress; hovering shows the XP still needed. */
@@ -151,7 +157,7 @@ function renderAutoButton(game: Game) {
 /** The hand the cards were last drawn for. */
 let shownHand = "";
 /** The active hand in the row under the board, the card that made the
- * latest step glowing; End Run lights up while no card can act. */
+ * latest step glowing (paused too); End Run lights up while no card can act. */
 function renderHand(game: Game) {
   const row = el("hand"), hand = game.hand;
   if (hand.join() !== shownHand) {
@@ -160,7 +166,8 @@ function renderHand(game: Game) {
     row.style.setProperty("--slots", String(Math.max(5, hand.length)));
     row.innerHTML = hand.map((id, i) => `<div class="hand-card" role="listitem" data-card="${id}" data-hand-slot="${i}" title="${CARDS[id].name}: ${CARDS[id].text}">${cardArt(id, CARDS[id].name)}</div>`).join("");
   }
-  const glowing = game.auto && !game.handStuck ? game.activeCard : null;
+  // Paused, the card that made the latest step still glows.
+  const glowing = game.handStuck ? null : game.activeCard;
   const focused = game.run.focused ? hand.indexOf(game.run.focused) : -1;
   row.classList.toggle("can-focus", !!game.save.upgrades.focus);
   row.querySelectorAll<HTMLElement>(".hand-card").forEach((card, i) => {

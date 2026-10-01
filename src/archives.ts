@@ -31,6 +31,8 @@ export const RESEARCH_TARGETS = {
   undoCapacity: { text: (v: number) => `+${v} undo stored` },
   /** The percent of its HP a potion restores, from 100 (red potions aside). */
   potionHeal: { text: (v: number) => `+${v}% potion healing` },
+  /** The percent of its Gold / Floor a new floor pays, from 100. */
+  floorGold: { text: (v: number) => `+${v}% Gold per floor` },
   /** How fast archivists work: a level of `d` hours takes d / (1 + speed). */
   researchSpeed: { text: (v: number) => `+${Math.round(v * 100)}% research speed` },
 } as const;
@@ -67,16 +69,17 @@ const countLevels = (target: ResearchTarget) => Array.from({ length: 9 }, (_, i)
   effect: { target, op: "add", value: 1 },
 }));
 
-/** Potion HP: +3% potion healing a level, for 100 levels. The first four
+/** Potion HP (+3% potion healing a level) and Gold / Floor (+5% of the
+ * Gold a new floor pays a level), for 100 levels each. The first four
  * are quick, to draw players in (15 s for 10 Gold, 1 min for 25, 5 min for
  * 50, 10 min for 75); then the formula starts over from level 5, so the
  * seam is smooth: the m-th level after them (level 4 + m) takes m / 4 hours
  * and costs 100 × m Gold (15 min and 100 Gold at level 5, 24 h and 9,600 at
  * 100). */
 const POTION_HP_START: [gold: number, seconds: number][] = [[10, 15], [25, 60], [50, 300], [75, 600]];
-const potionHpLevels = Array.from({ length: 100 }, (_, i): ResearchLevel => {
+const hundredLevels = (target: ResearchTarget, value: number) => Array.from({ length: 100 }, (_, i): ResearchLevel => {
   const m = i + 1 - POTION_HP_START.length, [gold, seconds] = POTION_HP_START[i] ?? [100 * m, 900 * m];
-  return { gold, hours: seconds / 3600, effect: { target: "potionHeal", op: "add", value: 3 } };
+  return { gold, hours: seconds / 3600, effect: { target, op: "add", value } };
 });
 
 /** The research library, in the order the Archives list it. */
@@ -86,7 +89,7 @@ export const RESEARCH = {
     description: "Stronger draughts: every potion restores more HP.",
     categories: ["defense"],
     requires: [{ upgrade: "greaterHeal" }],
-    levels: potionHpLevels,
+    levels: hundredLevels("potionHeal", 3),
   },
   focusCount: {
     name: "Focus Count",
@@ -101,6 +104,13 @@ export const RESEARCH = {
     categories: ["abilities"],
     requires: [{ upgrade: "inspirationUndos" }],
     levels: countLevels("undoCapacity"),
+  },
+  floorGold: {
+    name: "Gold / Floor",
+    description: "Count the coins in the cracks: every new floor of a run pays more Gold.",
+    categories: ["economy"],
+    requires: [{ upgrade: "spareChange" }],
+    levels: hundredLevels("floorGold", 5),
   },
 } satisfies Record<string, ResearchDefinition>;
 export type ResearchId = keyof typeof RESEARCH;

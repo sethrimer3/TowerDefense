@@ -1,7 +1,7 @@
 import { whole } from "./whole.ts";
 import { RUN_TRAINING_CAP, RUN_TRAINING_PRICES, TRAINING, isStatRow, trainingOpen, type TrainingId, type TrainingRow } from "./config.ts";
 import type { RunCore, Save } from "./entities.ts";
-import { percentPotionChance, potionPercent, reviveChance } from "./loadout.ts";
+import { floorGold, percentPotionChance, potionPercent, reviveChance } from "./loadout.ts";
 
 /** Run training: Training ranks bought with Silver inside a run, on top of
  * the hero's own, lasting only for that run (`run.training`, so undo takes
@@ -47,11 +47,13 @@ export function runTrainingOffer(save: Pick<Save, "training" | "upgrades">, run:
 }
 
 /** What row `id` stands at in `run` now, as the run's cards show it: the
- * hero's stat for a stat row, or the percentage for the others. */
+ * hero's stat for a stat row, the Gold a new floor pays, or the
+ * percentage for the others. */
 export function runTrainingValue(save: Pick<Save, "training" | "upgrades">, run: Pick<RunCore, "training" | "player">, id: TrainingId) {
   const row = TRAINING.find((t) => t.id === id)!;
   if (isStatRow(row)) return { value: whole(run.player[row.stat] ?? 0), unit: "" };
   const now = { upgrades: save.upgrades, training: ranksInRun(save, run) };
+  if (id === "floorGold") return { value: floorGold(now), unit: "" };
   const chance = id === "findPotion" ? percentPotionChance(now) : id === "revive" ? reviveChance(now) : potionPercent(now);
   return { value: chance / 100, unit: "%" };
 }

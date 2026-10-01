@@ -87,7 +87,7 @@ How much XP the character has gathered from kills over every run. A kill pays mo
 _Avoid_: rank
 
 **Training point**:
-The currency each level earns (three a level), spent on ranks of training in the character's stats (max HP, ATK, DEF, and the shroud once the Shroud skill is owned) and, with Recovery, Find Potion and Revive, in Potion %, Find Potion and Revive on the Training tab. A stat rank's worth grows with the character's level.
+The currency each level earns (three a level), spent on ranks of training in the character's stats (max HP, ATK, DEF, and the shroud once the Shroud skill is owned) and, with Recovery, Find Potion, Revive and Spare Change, in Potion %, Find Potion, Revive and Gold / Floor on the Training tab. A stat rank's worth grows with the character's level.
 _Avoid_: skill point, stat point
 
 **Revival**:

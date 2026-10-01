@@ -1,7 +1,7 @@
 import { whole } from "./whole.ts";
 import { snap } from "./exact.ts";
 import type { Save } from "./entities.ts";
-import { FIND_POTION_BASE, FIND_POTION_MAX, FIND_POTION_RANK, REVIVE_BASE, REVIVE_MAX, REVIVE_RANK, GOLD_SHOP, POTION_PERCENT_BASE, POTION_PERCENT_RANK, TRAINING, TRAINING_PER_LEVEL, UPGRADES, isStatRow, levelForXp, trained, trainingWorth, type GoldItemId, type TrainingId, type UpgradeId } from "./config.ts";
+import { FIND_POTION_BASE, FIND_POTION_MAX, FLOOR_GOLD_BASE, FLOOR_GOLD_RANK, FIND_POTION_RANK, REVIVE_BASE, REVIVE_MAX, REVIVE_RANK, GOLD_SHOP, POTION_PERCENT_BASE, POTION_PERCENT_RANK, TRAINING, TRAINING_PER_LEVEL, UPGRADES, isStatRow, levelForXp, trained, trainingWorth, type GoldItemId, type TrainingId, type UpgradeId } from "./config.ts";
 import { getEquippedBonuses } from "./crafting.ts";
 import { RESEARCH, researched } from "./archives.ts";
 
@@ -130,6 +130,12 @@ export const reviveChance = (save: Pick<Save, "upgrades" | "training">) =>
   save.upgrades.revive ? reviveChanceAt(save.training.revive) : 0;
 const reviveChanceAt = (ranks: number) => Math.min(REVIVE_MAX, REVIVE_BASE + REVIVE_RANK * ranks);
 
+/** The Gold each floor climbed for the first time in a run pays, before
+ * the tier's bonus and research: none without Spare Change. */
+export const floorGold = (save: Pick<Save, "upgrades" | "training">) =>
+  save.upgrades.spareChange ? floorGoldAt(save.training.floorGold) : 0;
+const floorGoldAt = (ranks: number) => FLOOR_GOLD_BASE + FLOOR_GOLD_RANK * ranks;
+
 /** Whether `id` has as many ranks as it can take. */
 export const trainingMaxed = (save: Pick<Save, "training">, id: TrainingId) => {
   const row = TRAINING.find((t) => t.id === id)!;
@@ -137,13 +143,15 @@ export const trainingMaxed = (save: Pick<Save, "training">, id: TrainingId) => {
 };
 
 /** What one more rank of `id` costs and does: to the next run's character
- * for a stat, or in % to what a percent potion restores or the chance a
- * potion is one. A row at its most ranks has no next rank to buy. */
+ * for a stat, in % to what a percent potion restores or the chance a
+ * potion is one, or to the Gold a new floor pays. A row at its most
+ * ranks has no next rank to buy. */
 export function trainingStep(save: Save, id: TrainingId) {
   const row = TRAINING.find((t) => t.id === id)!, maxed = trainingMaxed(save, id),
     affordable = !maxed && (save.settings.freePurchases || trainingPoints(save).left >= row.cost);
   if (!isStatRow(row)) {
     const ranks = save.training[id];
+    if (id === "floorGold") return { row, unit: "", now: floorGoldAt(ranks), next: floorGoldAt(ranks + 1), worth: FLOOR_GOLD_RANK, affordable, maxed };
     const [value, rank] = id === "findPotion" ? [findPotionChance, FIND_POTION_RANK]
       : id === "revive" ? [reviveChanceAt, REVIVE_RANK]
       : [(r: number) => POTION_PERCENT_BASE + POTION_PERCENT_RANK * r, POTION_PERCENT_RANK];
