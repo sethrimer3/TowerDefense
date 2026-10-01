@@ -42,6 +42,8 @@ export type ModeProfile<R extends Run = Run> = {
     run: string;
     /** What a retired run is replaced with. */
     fresh: string;
+    /** The numbered places a run climbs, as in "Tower II" (tiers.ts). */
+    tierName: string;
     /** Declines a prompt to end the run. */
     keepGoing: string;
     /** The board's title in the forest outside, and inside. */
@@ -93,7 +95,7 @@ export const MODES: { tower: ModeProfile<TowerRun>; delve: ModeProfile<DelveRun>
     width: TOWER_WIDTH,
     entranceX: TOWER_START_X,
     layoutVersion: TOWER_LAYOUT_VERSION,
-    board: (run) => new RoomWorld(run.seed, run.height, run.changes, run.percentPotions),
+    board: (run) => new RoomWorld(run.seed, run.height, run.changes, run.percentPotions, run.tier),
     enemyDrops: (name) => towerEnemyDrops(name),
     endGold: () => 0,
     // Tower floors reuse the same x/y space, so the floor is part of the key.
@@ -103,6 +105,7 @@ export const MODES: { tower: ModeProfile<TowerRun>; delve: ModeProfile<DelveRun>
       progress: "height",
       run: "ascent",
       fresh: "tower",
+      tierName: "Tower",
       keepGoing: "Keep climbing",
       outsideTitle: "THE TOWER APPROACH",
       title: "THE ASCENT TRIALS",
@@ -129,6 +132,7 @@ export const MODES: { tower: ModeProfile<TowerRun>; delve: ModeProfile<DelveRun>
       progress: "depth",
       run: "delve",
       fresh: "descent",
+      tierName: "Delve",
       keepGoing: "Keep delving",
       outsideTitle: "THE MOUNTAIN HOLLOW",
       title: "THE HOLLOW SPIRE",

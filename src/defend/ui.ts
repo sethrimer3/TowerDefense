@@ -554,7 +554,7 @@ export class DefendPage {
             .join(""),
       )
       .join("");
-    const balance = (amount: number) => this.host.devMode() ? "∞" : amount;
+    const balance = (amount: number) => this.host.devMode() ? "∞" : Math.floor(amount + 1e-9);
     el.innerHTML = `<p class="hint defend-wallet">Spend what you earn in the tower. <b>${balance(w.gold)}</b> gold · <b>${balance(w.ironBar)}</b> iron bars · <b>${balance(w.steelBar)}</b> steel bars${this.phase === "sim" ? " · upgrades apply from the next defense" : ""}</p>
       <h3 class="defend-section">City elements</h3>${items}
       <h3 class="defend-section">Consumables</h3>${bomb}

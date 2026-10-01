@@ -55,18 +55,19 @@ test("each training rank is worth more as the hero levels up", () => {
   const s = defaults();
   s.xp = xpForLevel(5);
   Object.assign(s.training, { hp: 3, defense: 2, attack: 1 });
-  // At level 5 a rank is worth 15 HP (10 + L), 1.42 DEF (1 + L/12) and 2 ATK (1 + L/5).
+  // At level 5 a rank is worth 15 HP (10 + L), 1.42 DEF (1 + L/12) and 2 ATK (1 + L/5),
+  // fractions kept (the page shows the stats whole).
   const l = loadout(s);
-  assert.deepEqual([l.attack, l.defense, l.maxHp], [12 + 2, 0 + 3, 100 + 45]);
+  assert.deepEqual([l.attack, l.defense, l.maxHp], [12 + 2, 2.833333, 100 + 45]);
   assert.deepEqual(trainingPoints(s), { earned: 15, spent: 3 + 6 + 5, left: 1 });
   assert.deepEqual(
     [trainingStep(s, "hp"), trainingStep(s, "defense")].map(({ now, next, worth, affordable }) => [now, next, worth, affordable]),
-    [[145, 160, 15, true], [3, 4, 1 + 5 / 12, false]],
+    [[145, 160, 15, true], [2, 4, 1 + 5 / 12, false]],
   );
   // Levelling up raises every rank already bought.
   s.xp = xpForLevel(20);
   const later = loadout(s);
-  assert.deepEqual([later.attack, later.defense, later.maxHp], [12 + 5, 0 + 5, 100 + 90]);
+  assert.deepEqual([later.attack, later.defense, later.maxHp], [12 + 5, 5.333333, 100 + 90]);
 });
 
 test("Shroud blocks 1 damage a fight and opens Shroud training, each rank worth more as the hero levels", () => {
@@ -129,7 +130,7 @@ test("evenly spread training alone falls behind both modes' enemies by floor 75"
   assert.deepEqual(wins(39, 75), [false, false]);
 });
 
-test("gear adds flat bonuses, then its percentages of the total, rounded; provisions come last", () => {
+test("gear adds flat bonuses, then its percentages of the total, fractions kept; provisions come last", () => {
   const s = defaults();
   const ring: CraftedEquipment = {
     id: "r", slot: "ring", name: "Ring", metal: "iron",
@@ -140,9 +141,9 @@ test("gear adds flat bonuses, then its percentages of the total, rounded; provis
   s.equipped.ring = "r";
   Object.assign(s.provisions, { edge: 1, guard: 2, heal: 1 });
   const l = loadout(s);
-  assert.equal(l.attack, Math.round((12 + 3) * 1.1) + 3);
+  assert.equal(l.attack, 19.5, "(12 + 3) × 1.1 + 3");
   assert.equal(l.defense, 6); // 25% of no DEF is nothing
-  assert.equal(l.maxHp, Math.round(110 * 1.05) + 20);
+  assert.equal(l.maxHp, 135.5, "110 × 1.05 + 20");
 });
 
 test("descriptions are written from the grants", () => {

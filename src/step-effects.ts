@@ -1,3 +1,4 @@
+import { snap } from "./exact.ts";
 import { predict, type CombatPrediction } from "./combat.ts";
 import { doorCost } from "./doors.ts";
 import type { KeyColor } from "./config.ts";
@@ -36,7 +37,7 @@ export type StepOutcome = StepBlocked | StepEffect;
 export type StepRules = { potionHeal: number; percentPotion: number };
 export const BASE_RULES: StepRules = { potionHeal: 100, percentPotion: 0 };
 /** The HP a potion of `amount` restores under `rules`, rounded. */
-export const potionHeal = (amount: number, rules: StepRules) => Math.round((amount * rules.potionHeal) / 100);
+export const potionHeal = (amount: number, rules: StepRules) => snap((amount * rules.potionHeal) / 100);
 
 /** Resolves stepping onto `tile` with stats `player`: whether the step is
  * possible, and the player's stats afterwards. Pure: movement, previews, and
@@ -49,7 +50,7 @@ export function resolveStep(player: Player, tile: Tile, rules: StepRules = BASE_
     case "enemy": {
       const combat = predict(player, tile.enemy!);
       if (combat.impervious) return { blocked: "impervious", combat };
-      next.hp = Math.max(0, next.hp - combat.damage);
+      next.hp = snap(Math.max(0, next.hp - combat.damage));
       effect.combat = combat;
       break;
     }
@@ -67,9 +68,9 @@ export function resolveStep(player: Player, tile: Tile, rules: StepRules = BASE_
       // A percent (red) potion restores its HP, which Potion HP leaves alone,
       // and a share of max HP.
       const amount = tile.amount ?? POTION_HEAL;
-      const heal = tile.color === "red" ? amount + Math.round((next.maxHp * rules.percentPotion) / 10000) : potionHeal(amount, rules);
-      effect.healed = Math.min(next.maxHp - next.hp, heal);
-      next.hp += effect.healed;
+      const heal = tile.color === "red" ? snap(amount + (next.maxHp * rules.percentPotion) / 10000) : potionHeal(amount, rules);
+      effect.healed = snap(Math.min(next.maxHp - next.hp, heal));
+      next.hp = snap(next.hp + effect.healed);
       break;
     }
     case "attack":

@@ -131,12 +131,29 @@ function paintPebbles(c: CanvasRenderingContext2D) {
 }
 
 // World-space landmark: its doorway meets the actual interactive stairs tile.
-export function drawEntrance(c: CanvasRenderingContext2D, mode: Mode, center: number) {
+// `numeral` (once a second tier is open) glows over the doorway: the tier
+// the path leads into.
+export function drawEntrance(c: CanvasRenderingContext2D, mode: Mode, center: number, numeral = "") {
   const x = center * 24 + 12, base = (OUTSIDE_SIZE - 1 - ENTRANCE_Y) * 24;
   c.save();
   if (mode === "tower") drawTowerGate(c, x, base);
   else drawCaveMouth(c, x, base);
+  if (numeral) drawTierNumeral(c, numeral, x, base - (mode === "tower" ? 66 : 76));
   c.restore();
+}
+
+/** The tier's number, glowing gold. */
+function drawTierNumeral(c: CanvasRenderingContext2D, numeral: string, x: number, y: number) {
+  c.font = "700 22px Cinzel";
+  c.textAlign = "center";
+  c.textBaseline = "middle";
+  c.shadowColor = "#ffc94a";
+  c.shadowBlur = 14;
+  c.fillStyle = "#ffe9a8";
+  c.fillText(numeral, x, y);
+  c.shadowBlur = 4;
+  c.fillStyle = "#fff6d8";
+  c.fillText(numeral, x, y);
 }
 
 /** The tower's stone foot, its arched doorway and steps. */

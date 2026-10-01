@@ -1,4 +1,5 @@
 import type { Enemy, Player } from "./entities.ts";
+import { snap } from "./exact.ts";
 
 export type CombatPrediction = {
   impervious: boolean;
@@ -10,7 +11,7 @@ export type CombatPrediction = {
 };
 
 export function predict(player: Player, enemy: Enemy): CombatPrediction {
-  const hit = player.attack - enemy.defense;
+  const hit = snap(player.attack - enemy.defense);
   if (hit <= 0) {
     return {
       impervious: true,
@@ -18,12 +19,13 @@ export function predict(player: Player, enemy: Enemy): CombatPrediction {
       turns: Infinity,
       damage: Infinity,
       survivable: false,
-      requiredAttack: enemy.defense - player.attack + 1,
+      requiredAttack: snap(enemy.defense - player.attack + 1),
     };
   }
-  const turns = Math.ceil(enemy.hp / hit);
+  // Snapped, so 10.2 HP against strikes of 1.02 takes 10, as it does played out.
+  const turns = Math.ceil(snap(enemy.hp / hit));
   // The shroud takes the first of it, whichever strikes that falls on.
-  const damage = Math.max(0, damageTaken(enemy.attack, player.defense, turns - 1) - (player.shroud ?? 0));
+  const damage = snap(Math.max(0, damageTaken(enemy.attack, player.defense, turns - 1) - (player.shroud ?? 0)));
   return {
     impervious: false,
     hit,
@@ -38,7 +40,7 @@ export function predict(player: Player, enemy: Enemy): CombatPrediction {
  * its ATK (rounded down), and by at least 1, so no DEF holds it off forever
  * and no fight drags on without end. */
 export function raisedAttack(attack: number) {
-  return attack + Math.max(1, Math.floor(attack / 100));
+  return snap(attack + Math.max(1, Math.floor(attack / 100)));
 }
 
 /** What the enemy's strikes back cost the hero over `strikes` rounds, starting
@@ -47,7 +49,7 @@ export function raisedAttack(attack: number) {
 function damageTaken(attack: number, defense: number, strikes: number) {
   let damage = 0;
   for (let i = 0; i < strikes && damage <= Number.MAX_SAFE_INTEGER; i++, attack = raisedAttack(attack)) {
-    damage += Math.max(0, attack - defense);
+    damage = snap(damage + Math.max(0, attack - defense));
   }
   return damage > Number.MAX_SAFE_INTEGER ? Infinity : damage;
 }
@@ -78,7 +80,7 @@ export type Revival = (strike: number) => boolean;
  * raises the hero at full HP from a strike that would fell it: the fight
  * then goes on from the next round, the enemy as it was. */
 export function bout(player: Player, enemy: Enemy, revives?: Revival): Bout {
-  const hit = player.attack - enemy.defense;
+  const hit = snap(player.attack - enemy.defense);
   const strikes: Strike[] = [];
   if (hit <= 0) return { strikes, duration: 0 };
   let enemyHp = enemy.hp, heroHp = player.hp, shroud = player.shroud ?? 0, attack = enemy.attack, t = 0, ms = FIRST_STRIKE_MS;
@@ -88,12 +90,12 @@ export function bout(player: Player, enemy: Enemy, revives?: Revival): Bout {
     t += ms;
   };
   for (;;) {
-    enemyHp = Math.max(0, enemyHp - hit);
+    enemyHp = snap(Math.max(0, enemyHp - hit));
     strike("hero", hit, enemyHp);
     if (!enemyHp) break;
-    const struck = Math.max(0, attack - player.defense), shrouded = Math.min(shroud, struck), taken = struck - shrouded;
-    shroud -= shrouded;
-    heroHp = Math.max(0, heroHp - taken);
+    const struck = snap(Math.max(0, attack - player.defense)), shrouded = Math.min(shroud, struck), taken = snap(struck - shrouded);
+    shroud = snap(shroud - shrouded);
+    heroHp = snap(Math.max(0, heroHp - taken));
     const revived = !heroHp && !!revives?.(enemyStrikes);
     if (revived) heroHp = player.maxHp;
     enemyStrikes++;

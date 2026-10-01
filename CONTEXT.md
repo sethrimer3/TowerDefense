@@ -111,6 +111,10 @@ _Avoid_: consumable (a crafted item used during a run), buff
 The one scale both modes' progress maps onto: a Tower floor counts as itself, and every ten Delve depth count as one. Loot tables are gated on it, and each new equivalent floor reached pays one of the mode's currency, up to 100; past that one every 10 to 1,000, one every 100 to 10,000, and none after.
 _Avoid_: effective floor, tier
 
+**Tier**:
+One of the numbered towers (Tower I to IX), or of the delves (Delve I to IX), that a run climbs. Beating the boss on floor 100 of the highest one opened opens the next. Each has the same floors as the first with monsters three times as strong as the one before, pays more Gold and XP, and keeps its own records, milestones and clear chests. Not to be confused with a clear tier or a monster's rank.
+_Avoid_: new tower, prestige, world
+
 **Inspiration**:
 The Tower's currency: one for each new floor reached and each clear tier paid, spent on upgrades in the skill trees.
 _Avoid_: shards

@@ -1,8 +1,10 @@
+import { whole, wholeHp } from "../whole.ts";
 import type { Game } from "../state.ts";
 import type { Renderer } from "../rendering.ts";
 import { levelForXp, xpForLevel } from "../config.ts";
 import { CONSUMABLES, consumableText } from "../crafting.ts";
 import { outsideWeather } from "../outside.ts";
+import { tierBonusText, tierNumeral } from "../tiers.ts";
 import { MODES, milestones } from "../modes.ts";
 import { cardArt, displayedProgress, el, text, uiSprite } from "./dom.ts";
 import { CARDS } from "../cards.ts";
@@ -11,7 +13,7 @@ import type { BoardOverlay } from "./board-overlay.ts";
 
 /** The stats cluster, action buttons and status line around the board. */
 
-export const devAmount = (game: Pick<Game, "save">, value: number) => game.save.settings.devMode ? "∞" : String(value);
+export const devAmount = (game: Pick<Game, "save">, value: number) => game.save.settings.devMode ? "∞" : String(whole(value));
 /** An amount short enough for the HUD's narrow purse: in full below 10,000,
  * then to three figures in thousands, millions or billions (12.3K, 456M). */
 export function shortAmount(n: number) {
@@ -23,8 +25,8 @@ export function shortAmount(n: number) {
 }
 /** Shows `value` in the purse's `id`, shortened, the exact amount in its
  * tooltip (∞ in Dev mode). */
-function purse(game: Game, id: string, value: number, name: string) {
-  const dev = game.save.settings.devMode;
+function purse(game: Game, id: string, held: number, name: string) {
+  const dev = game.save.settings.devMode, value = whole(held);
   text(id, dev ? "∞" : shortAmount(value));
   el(id).parentElement!.title = `${name}: ${dev ? "∞" : value.toLocaleString("en-US")}`;
 }
@@ -82,19 +84,47 @@ export function boardTitle(game: Pick<Game, "mode" | "run">) {
  * the Tower/Delve name inside. */
 export function renderBoardHeading(game: Game, overlay: BoardOverlay) {
   el("board").dataset.outside = String(!!game.run.outside);
+  el("board").dataset.heading = headingKey(game);
   el("board").classList.toggle("mode-tower", game.mode === "tower");
-  const words = MODES[game.mode].words;
+  const words = MODES[game.mode].words, tiers = tierLine(game);
   text("board-title", boardTitle(game));
   if (game.run.outside) {
     const labels = { cloudy: "CLOUDY", sunny: "SUNNY", rain: "RAINING", storm: "THUNDERSTORM" };
-    text("board-subtitle", `FOREST CLEARING · ${labels[outsideWeather(game.run.seed)]}`);
+    text("board-subtitle", tiers ?? `FOREST CLEARING · ${labels[outsideWeather(game.run.seed)]}`);
     el("inspect").textContent = "Follow the forest path and step onto the entrance at the top to begin again.";
   } else {
-    text("board-subtitle", words.subtitle);
+    text("board-subtitle", tiers ?? words.subtitle);
     el("inspect").textContent = "";
   }
+  renderTierArrows(game);
   overlay.hide();
 }
+
+/** Once a second tier is open: the tier climbed and its Gold & XP bonus. */
+function tierLine(game: Game) {
+  const slice = game.save[game.mode];
+  if (slice.tiersOpen < 2) return null;
+  return `${MODES[game.mode].words.tierName.toUpperCase()} ${tierNumeral(slice.tier)} · ${tierBonusText(slice.tier)} GOLD & XP`;
+}
+
+/** In the forest, once a second tier is open, the arrows beside the board
+ * choose the tier the next run climbs. */
+function renderTierArrows(game: Game) {
+  const slice = game.save[game.mode], shown = !!game.run.outside && slice.tiersOpen > 1;
+  const name = MODES[game.mode].words.tierName;
+  for (const [id, to] of [["tier-prev", slice.tier - 1], ["tier-next", slice.tier + 1]] as const) {
+    const button = el(id) as HTMLButtonElement;
+    button.hidden = !shown;
+    button.disabled = to < 1 || to > slice.tiersOpen;
+    button.title = button.disabled ? "" : `${name} ${tierNumeral(to)} · ${tierBonusText(to)} Gold & XP`;
+  }
+}
+
+/** What the board's heading shows: redrawn when it changes. */
+const headingKey = (game: Game) => {
+  const slice = game.save[game.mode];
+  return `${!!game.run.outside}:${slice.tier}:${slice.tiersOpen}`;
+};
 
 /** The button's icon inside a run, by what pressing it does: text glyphs
  * (the variation selector keeps ▶ from turning into an emoji). */
@@ -141,19 +171,19 @@ function renderHand(game: Game) {
 }
 
 /** True when the heading still shows the other side of the forest entrance. */
-export const boardHeadingStale = (game: Game) => el("board").dataset.outside !== String(!!game.run.outside);
+export const boardHeadingStale = (game: Game) => el("board").dataset.heading !== headingKey(game);
 
 /** HP, ATK, DEF (and the shroud, once owned), the run's Gold and keys. During a fight being played out, HP counts down
  * strike by strike. */
 export function renderVitals(game: Game) {
   const p = game.run.player, hp = game.shownHp(performance.now());
-  text("hp", `${hp} / ${p.maxHp}`);
+  text("hp", `${wholeHp(hp)} / ${whole(p.maxHp)}`);
   renderHealthGain(game);
   el("health").style.width = `${(100 * hp) / p.maxHp}%`;
   renderHealthLoss(game.encounter ? p.hp - hp : 0, p.maxHp);
-  text("attack", p.attack);
-  text("defense", p.defense);
-  text("shroud", p.shroud ?? 0);
+  text("attack", whole(p.attack));
+  text("defense", whole(p.defense));
+  text("shroud", whole(p.shroud ?? 0));
   el("shroud-stat").hidden = !game.save.upgrades.shroud;
   purse(game, "gems", game.save.gems, "Gems, kept between runs");
   purse(game, "gold", game.save.gold, "Gold, kept between runs");

@@ -203,7 +203,7 @@ test("decode matches the characterization corpus", () => {
 
 test("decode keeps a valid v3 save's progress and clamps settings", () => {
   const d = decode(JSON.stringify(v3()));
-  assert.equal(d.gold, 120);
+  assert.equal(d.gold, 120.7, "Gold keeps its fraction");
   assert.equal(d.settings.brightness, 55);
   assert.equal(d.settings.infoDisplay, "popup");
   assert.equal(d.tower.run?.seed, 1234);
@@ -213,7 +213,7 @@ test("decode keeps a valid v3 save's progress and clamps settings", () => {
   assert.equal(d.tower.fall, null, "a fall is kept only beside a fallen hero");
   assert.deepEqual(Object.keys(d.tower.lootedTiles).sort(), ["-1:-2:-3,-4", "1234:2:3,4", "1234:3,4"]);
   assert.deepEqual(d.tower.log, { "3": { silver: "earned", gold: "claimed" }, "5": { silver: "claimed", platinum: "earned" } });
-  assert.deepEqual(d.tower.sectionHp, { "1": 80 });
+  assert.deepEqual(d.tower.sectionHp, { "1": 80.5 });
   assert.equal(d.tower.startSection, 1);
   assert.deepEqual(d.tower.run?.changes["4,5"], { kind: "reward", tier: "silver" });
   assert.ok(!("rewards" in d.tower.run!));
@@ -241,7 +241,7 @@ test("a malformed run.floors drops only that run, not the rest of the save", () 
   (s.tower.run as any).floors = null;
   const d = decode(JSON.stringify(s));
   assert.equal(d.tower.run, null);
-  assert.equal(d.gold, 120);
+  assert.equal(d.gold, 120.7);
   assert.equal(d.delve.run?.seed, 1234);
   assert.equal(d.equipmentInventory.length, 1);
 });

@@ -1,3 +1,4 @@
+import { wholeChange } from "./whole.ts";
 import type { Encounter, Gain, Heal } from "./state.ts";
 import { paintContents } from "./tile-painters.ts";
 import { materialImage } from "./material-sprites.ts";
@@ -71,7 +72,7 @@ export class BoardPopups {
     const heal = game.lastHeal;
     if (heal && heal.id !== this.healed) {
       this.healed = heal.id;
-      this.numbers.push({ x: heal.x, y: heal.y + DAMAGE_START, start: now, text: `+${heal.to - heal.from}`, color: HEAL_COLOR });
+      this.numbers.push({ x: heal.x, y: heal.y + DAMAGE_START, start: now, text: `+${wholeChange(heal.to - heal.from)}`, color: HEAL_COLOR });
     }
     let start = now;
     for (const gain of game.gains.splice(0)) {
@@ -93,10 +94,10 @@ export class BoardPopups {
       const s = strikes[this.landed++], on = s.by === "hero" ? fight.to : fight.from,
         start = fight.start + s.at, both = !!s.shrouded && s.damage > 0;
       if (s.shrouded)
-        this.numbers.push({ x: on.x - (both ? SHROUD_SPLIT : 0), y: on.y + DAMAGE_START, start, text: String(s.shrouded), color: SHROUD_COLOR });
+        this.numbers.push({ x: on.x - (both ? SHROUD_SPLIT : 0), y: on.y + DAMAGE_START, start, text: String(wholeChange(s.shrouded)), color: SHROUD_COLOR });
       if (!s.shrouded || s.damage)
         this.numbers.push({
-          x: on.x + (both ? SHROUD_SPLIT : 0), y: on.y + DAMAGE_START, start, text: String(s.damage),
+          x: on.x + (both ? SHROUD_SPLIT : 0), y: on.y + DAMAGE_START, start, text: String(wholeChange(s.damage)),
           color: s.by === "hero" ? DAMAGE_COLOR : HERO_DAMAGE_COLOR,
         });
     }

@@ -533,6 +533,27 @@ canvas {
   touch-action: none;
   image-rendering: pixelated;
 }
+/* In the forest, once a second tier is open: choose the tower (or delve). */
+.tier-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 34px;
+  height: 58px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid #d8b57299;
+  border-radius: 6px;
+  background: #0d131acc;
+  box-shadow: 0 0 10px #ffc94a33;
+  z-index: 3;
+}
+.tier-arrow[hidden] { display: none; }
+.tier-arrow.tier-prev { left: 6px; }
+.tier-arrow.tier-next { right: 6px; }
+.tier-arrow:disabled { opacity: 0.3; box-shadow: none; }
+.tier-arrow .ui-sprite { width: 20px; height: 20px; }
 .board-caption {
   position: absolute;
   bottom: 5px;

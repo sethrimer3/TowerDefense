@@ -3,7 +3,12 @@
  * paid. The log in `save.tower` is lifetime state, so a tier is paid once
  * however the run is undone, revived, reloaded or replaced. A chest is a
  * `reward` tile in the floor's changes, so undo and Revive bring it back
- * with the rest of the board; opening a tier already paid pays nothing. */
+ * with the rest of the board; opening a tier already paid pays nothing.
+ * Each numbered tower keeps a log of its own (tiers.ts), so its floors'
+ * chests pay again there.
+ *
+ * TODO: the clear rewards are to be revamped (how they are earned, paid
+ * and tracked across towers). */
 import type { ClearTier, TowerRun, Save } from "../entities.ts";
 import { RoomWorld } from "./room-world.ts";
 import type { Board } from "../board.ts";

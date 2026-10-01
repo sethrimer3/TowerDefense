@@ -21,11 +21,11 @@ test("pickups grant their documented amounts", () => {
   assert.equal(potion.player.hp, 50 + POTION_HEAL);
 });
 
-test("Potion HP research scales every potion but the red (percent) one, rounded", () => {
+test("Potion HP research scales every potion but the red (percent) one, fractions kept", () => {
   const rules = { potionHeal: 130, percentPotion: 0 };
   const hurt = player({ hp: 1, maxHp: 500 });
-  assert.equal(effect(hurt, { kind: "potion" }, rules).healed, 46, "35 × 1.3 = 45.5");
-  assert.equal(effect(hurt, { kind: "potion", color: "blue" }, rules).healed, 46);
+  assert.equal(effect(hurt, { kind: "potion" }, rules).healed, 45.5, "35 × 1.3");
+  assert.equal(effect(hurt, { kind: "potion", color: "blue" }, rules).healed, 45.5);
   assert.equal(effect(hurt, { kind: "potion", amount: 60 }, rules).healed, 78);
   assert.equal(effect(hurt, { kind: "potion", color: "red" }, rules).healed, POTION_HEAL);
   assert.equal(effect(hurt, { kind: "potion" }, { potionHeal: 400, percentPotion: 0 }).healed, 140);

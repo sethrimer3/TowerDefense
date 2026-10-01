@@ -1,3 +1,5 @@
+import { snap } from "./exact.ts";
+import { TIERS, type TierRecord } from "./tiers.ts";
 import { FIND_POTION_MAX, GOLD_SHOP, RUN_TRAINING_CAP, SAVE_KEY, TOWER_WIDTH, TRAINING, UPGRADES, WIDTH } from "./config.ts";
 import type { AutomoveMemory, DelveRun, FloorRecord, ModeSave, Fall, MoveSnapshot, Run, Save, TowerRun } from "./entities.ts";
 import { emptyMaterials, MATERIAL_IDS, type MaterialId } from "./materials.ts";
@@ -12,8 +14,8 @@ import { decodeArchives, defaultArchives } from "./archives.ts";
 export function defaults(): Save {
   return {
     version: 3,
-    tower: { run: null, history: [], fall: null, best: 0, reached: 0, inspiration: 0, log: {}, lootedTiles: {}, runGold: 0, startSection: 0, sectionHp: {} },
-    delve: { run: null, history: [], fall: null, best: 0, reached: 0, courage: 0, lootedTiles: {}, runGold: 0, memory: { known: {}, visited: {} } },
+    tower: { run: null, history: [], fall: null, best: 0, reached: 0, inspiration: 0, log: {}, lootedTiles: {}, runGold: 0, startSection: 0, sectionHp: {}, tier: 1, tiersOpen: 1, tierRecords: {} },
+    delve: { run: null, history: [], fall: null, best: 0, reached: 0, courage: 0, lootedTiles: {}, runGold: 0, memory: { known: {}, visited: {} }, tier: 1, tiersOpen: 1, tierRecords: {} },
     gems: 0,
     gemDrop: defaultGemDrop(),
     gold: 0,
@@ -44,6 +46,8 @@ const isRecord = (v: any) => !!v && typeof v === "object" && !Array.isArray(v);
 /** A floored count from `raw` when it is a finite number within `max`. */
 const count = (raw: any, fallback: number, max?: number) =>
   finite(raw, max) ? Math.floor(raw) : fallback;
+/** An amount kept with its fraction (Gold), on the `snap` grid. */
+const fraction = (raw: any, fallback: number) => (finite(raw) ? snap(raw) : fallback);
 const CHEST_TIERS = ["silver", "gold", "platinum"] as const;
 const KEY_COLORS = ["yellow", "blue", "red"] as const;
 const POINT_KEY = /^\d+,\d+$/;
@@ -91,6 +95,7 @@ function without<R>(r: any, fields: string[]): R {
   if (r.focusUsed !== undefined && !(Number.isInteger(r.focusUsed) && finite(r.focusUsed, 99))) delete r.focusUsed;
   if (r.focused !== undefined && !r.hand?.includes(r.focused)) delete r.focused;
   if (r.training !== undefined && !validRunTraining(r.training)) delete r.training;
+  if (r.tier !== undefined && !(Number.isInteger(r.tier) && r.tier >= 2 && r.tier <= TIERS)) delete r.tier;
   if (r.percentPotions !== undefined && !(Number.isInteger(r.percentPotions) && r.percentPotions > 0 && r.percentPotions <= FIND_POTION_MAX)) delete r.percentPotions;
   return r;
 }
@@ -164,7 +169,7 @@ function decodeMode<R extends Run>(s: any, undoCapacity: number, decodeRun: RunD
     history: run ? decodeHistory(s.history, run, undoCapacity, decodeRun) : [],
     fall: run ? decodeFall(s.fall, run, decodeRun) : null,
     lootedTiles: decodeLootedTiles(s?.lootedTiles),
-    runGold: run ? count(s.runGold, 0) : 0,
+    runGold: run ? fraction(s.runGold, 0) : 0,
   };
 }
 function applyMode<R extends Run>(slice: ModeSave<R>, decoded: DecodedMode<R>) {
@@ -225,7 +230,7 @@ function decodeUpgrades(raw: any, d: Save) {
   for (const u of UPGRADES) d.upgrades[u.id] = count(raw?.[u.id], d.upgrades[u.id], u.max);
 }
 function decodeProgress(s: any, d: Save, undoCapacity: number) {
-  d.gold = count(s.gold, d.gold);
+  d.gold = fraction(s.gold, d.gold);
   d.gems = count(s.gems, d.gems);
   d.gemDrop = decodeGemDrop(s.gemDrop);
   for (const g of GOLD_SHOP) d.provisions[g.id] = count(s.provisions?.[g.id], d.provisions[g.id], 999);
@@ -275,7 +280,7 @@ function decodeSectionHp(raw: any): Record<string, number> {
   const sectionHp: Record<string, number> = {};
   if (raw && typeof raw === "object")
     for (const [section, hp] of Object.entries(raw) as [string, any][])
-      if (/^[1-9]\d*$/.test(section) && finite(hp) && hp > 0) sectionHp[section] = Math.floor(hp);
+      if (/^[1-9]\d*$/.test(section) && finite(hp) && hp > 0) sectionHp[section] = snap(hp);
   return sectionHp;
 }
 function decodeSections(tower: any, d: Save) {
@@ -285,6 +290,27 @@ function decodeSections(tower: any, d: Save) {
   const start = tower?.startSection;
   const unlocked = start === 0 || !!d.tower.sectionHp[start];
   if (finite(start) && unlocked) d.tower.startSection = Math.floor(start);
+}
+/** Each mode's tiers: the highest opened, the one selected (its records
+ * are the slice's), and the others' records. */
+function decodeTiers(s: any, d: Save) {
+  for (const mode of ["tower", "delve"] as const) {
+    const raw = s?.[mode], slice = d[mode];
+    slice.tiersOpen = Math.max(1, count(raw?.tiersOpen, 1, TIERS));
+    slice.tier = Math.max(1, Math.min(slice.tiersOpen, count(raw?.tier, 1)));
+    if (!isRecord(raw?.tierRecords)) continue;
+    for (const [key, r] of Object.entries(raw.tierRecords) as [string, any][]) {
+      const tier = Number(key);
+      if (!/^[1-9]$/.test(key) || tier > slice.tiersOpen || tier === slice.tier || !isRecord(r)) continue;
+      const reached = count(r.reached, 0), record: TierRecord = { best: Math.max(reached, count(r.best, 0)), reached };
+      if (mode === "tower") {
+        record.log = decodeTowerLog(r.log);
+        record.sectionHp = decodeSectionHp(r.sectionHp);
+        record.startSection = r.startSection === 0 || record.sectionHp[r.startSection] ? count(r.startSection, 0) : 0;
+      }
+      slice.tierRecords[key] = record;
+    }
+  }
 }
 const touchedDelve = (d: Save) =>
   !!(d.delve.run || d.delve.best || d.delve.courage) ||
@@ -324,6 +350,7 @@ export function decode(raw: string | null): Save {
     for (const step of VERSION_STEPS.get(s.version) ?? []) step(s, d, undoCapacity);
     decodeReached(s, d);
     decodeSections(s.tower, d);
+    decodeTiers(s, d);
     migratePreSkillTrees(s.upgrades, d);
     d.defend = decodeDefendSave(s.defend);
     // Slots bought with Gems count only with Larger Hand, which opens them.

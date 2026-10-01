@@ -1,3 +1,4 @@
+import { whole, wholeHp } from "../whole.ts";
 import { TOWER_SECTION } from "../config.ts";
 import { CLEAR_TIERS } from "../tower/clear-ledger.ts";
 import { MODES } from "../modes.ts";
@@ -61,7 +62,7 @@ export class DefeatDialog {
       stat(displayedProgress(run.height), progress.toUpperCase()),
       stat(displayedProgress(run.maxHeight ?? run.height), "HIGHEST"),
       stat(run.kills, "VICTORIES"),
-      stat(slice.runGold, "GOLD"),
+      stat(whole(slice.runGold), "GOLD"),
       stat(devAmount(game, rules.balance(game.save)), rules.words.currency.toUpperCase()),
     ].join("");
     modal.innerHTML = `<span class="summary-icon">${uiSprite("revive")}</span><small>FALLEN IN COMBAT</small><h2>Your hero has fallen.</h2><p>${by ? `Defeated by ${by}` : "Defeated"} at ${rules.words.progress} ${displayedProgress(game.run.height)}. Milestone and clear rewards and the Gold found are already saved.</p><div class="summary-stats compact">${stats}</div>${takeBack}<div class="dialog-actions">${button}<button id="defeat-accept">Accept defeat</button></div>`;
@@ -131,7 +132,7 @@ export function showSectionPicker(ctx: AppContext) {
     const option = (s: number) => {
       const first = s * TOWER_SECTION + 1,
         open = game.sectionUnlocked(s),
-        hp = s === 0 ? `${maxHp} HP · full` : open ? `${tower.sectionHp[s]} HP` : `Reach floor ${first}`;
+        hp = s === 0 ? `${whole(maxHp)} HP · full` : open ? `${wholeHp(tower.sectionHp[s])} HP` : `Reach floor ${first}`;
       return `<button class="section-option${s === current ? " selected" : ""}" data-section="${s}" ${open ? "" : "disabled"}><b>Floors ${first}–${first + TOWER_SECTION - 1}</b><span>${hp}</span></button>`;
     };
     modal.innerHTML = `<small>THE ASCENT TRIALS</small><h2>Starting floor</h2>

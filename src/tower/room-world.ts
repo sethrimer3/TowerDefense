@@ -3,6 +3,7 @@ import { point, type Tile, type Torch } from "../entities.ts";
 import { withPotions, type Board } from "../board.ts";
 import { breakTorch, placeTorches } from "../torches.ts";
 import { generateTowerFloor } from "./index.ts";
+import { tierCells } from "../tiers.ts";
 
 // v3 adds declarative multi-key/condition doors and places their prerequisite
 // keys differently; old per-room coordinate mutations must not overlay it.
@@ -53,9 +54,12 @@ export class RoomWorld implements Board {
     /** The chance each potion is a percent potion, in hundredths of a
      * percent (a run's `percentPotions`); none without. */
     public percentPotions = 0,
+    /** The numbered tower the floor stands in, whose enemies it scales. */
+    public tier = 1,
   ) {
-    this.cells = generateTowerRoom(seed, room);
-    this.torches = torchesForRoom(seed, room, this.cells);
+    const cells = generateTowerRoom(seed, room);
+    this.torches = torchesForRoom(seed, room, cells);
+    this.cells = tierCells(cells, tier);
   }
   breakTorchAt(x: number, y: number): boolean {
     return breakTorch(this.torches, x, y);

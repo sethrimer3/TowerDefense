@@ -1,3 +1,5 @@
+import { whole } from "./whole.ts";
+import { snap } from "./exact.ts";
 import type { Save } from "./entities.ts";
 import { FIND_POTION_BASE, FIND_POTION_MAX, FIND_POTION_RANK, REVIVE_BASE, REVIVE_MAX, REVIVE_RANK, GOLD_SHOP, POTION_PERCENT_BASE, POTION_PERCENT_RANK, TRAINING, TRAINING_PER_LEVEL, UPGRADES, isStatRow, levelForXp, trained, trainingWorth, type GoldItemId, type TrainingId, type UpgradeId } from "./config.ts";
 import { getEquippedBonuses } from "./crafting.ts";
@@ -56,7 +58,7 @@ function add(total: Record<Stat, number>, rows: readonly (Granting & { id: strin
 
 /** The character a run would start with now: the baseline, permanent
  * upgrades and training, then equipped gear (flat bonuses, then
- * percentages of the total, rounded), then the provisions bought for the
+ * percentages of the total, fractions kept), then the provisions bought for the
  * next run. */
 export function loadout(save: Save): Loadout {
   const own = { ...BASE, yellow: 0, blue: 0, red: 0 };
@@ -67,9 +69,9 @@ export function loadout(save: Save): Loadout {
   add(prov, GOLD_SHOP, save.provisions);
   const equip = getEquippedBonuses(save);
   return {
-    attack: Math.round((own.attack + equip.flatAttack) * (1 + equip.percentAttack)) + prov.attack,
-    defense: Math.round((own.defense + equip.flatDefense) * (1 + equip.percentDefense)) + prov.defense,
-    maxHp: Math.round((own.maxHp + equip.flatMaxHp) * (1 + equip.percentMaxHp)) + prov.maxHp,
+    attack: snap((own.attack + equip.flatAttack) * (1 + equip.percentAttack) + prov.attack),
+    defense: snap((own.defense + equip.flatDefense) * (1 + equip.percentDefense) + prov.defense),
+    maxHp: snap((own.maxHp + equip.flatMaxHp) * (1 + equip.percentMaxHp) + prov.maxHp),
     shroud: own.shroud,
     keys: { yellow: own.yellow, blue: own.blue, red: own.red },
     // Undo needs Rehearsed steps: without it nothing else stores one.
@@ -150,5 +152,6 @@ export function trainingStep(save: Save, id: TrainingId) {
   const stat = row.stat;
   const now = loadout(save)[stat], next = loadout({ ...save, training: { ...save.training, [id]: save.training[id] + 1 } })[stat];
   const worth = trainingWorth(row, levelForXp(save.xp));
-  return { row, unit: "", now, next, worth, affordable, maxed };
+  // The hero's stat as the page shows it: whole, its fraction kept in play.
+  return { row, unit: "", now: whole(now), next: whole(next), worth, affordable, maxed };
 }

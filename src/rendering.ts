@@ -1,6 +1,7 @@
 import { CHUNK, TOWER_HEIGHT, VIEWPORT_TILES } from "./config.ts";
 import type { Game } from "./state.ts";
 import type { Tile, Torch } from "./entities.ts";
+import { tierNumeral } from "./tiers.ts";
 import { drawEntrance, OUTSIDE_SIZE, outsideWeather } from "./outside.ts";
 import { DecorLayer, type DecorFrame, type MirroredSprites } from "./decor-render.ts";
 import { OutsideGrass } from "./outside-grass.ts";
@@ -293,7 +294,8 @@ export class Renderer {
     c.save();
     c.translate(-f.left * f.s, (f.n - OUTSIDE_SIZE + f.bottom) * f.s);
     c.scale(f.s / 24, f.s / 24);
-    drawEntrance(c, g.mode, Math.floor(g.world.width / 2));
+    const slice = g.save[g.mode];
+    drawEntrance(c, g.mode, Math.floor(g.world.width / 2), slice.tiersOpen > 1 ? tierNumeral(slice.tier) : "");
     c.restore();
   }
   private drawRoute(f: FrameContext) {

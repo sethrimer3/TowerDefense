@@ -1,5 +1,5 @@
 import type { EnemyStrength } from "./entities.ts";
-import { intPow } from "./exact.ts";
+import { intPow, snap } from "./exact.ts";
 export const UNGUARDED_LOOT_CHANCE = 1 / 1000;
 export const WIDTH = 30;
 export const CHUNK = 20;
@@ -378,7 +378,7 @@ export const RUN_TRAINING_CAP = 1000;
 export const trainingWorth = (row: StatTrainingRow, level: number) => row.base * (1 + level / row.growth);
 /** What `ranks` ranks of `row` add to the character at `level`, rounded
  * once. */
-export const trained = (row: StatTrainingRow, ranks: number, level: number) => Math.round(ranks * trainingWorth(row, level));
+export const trained = (row: StatTrainingRow, ranks: number, level: number) => snap(ranks * trainingWorth(row, level));
 export const GOLD_SHOP = [
   {
     id: "heal",

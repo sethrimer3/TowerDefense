@@ -1,3 +1,4 @@
+import type { TierRecord } from "./tiers.ts";
 import type { ArchivesSave } from "./archives.ts";
 import type { CardId } from "./cards.ts";
 import type { GoldItemId, KeyColor, TrainingId, UpgradeId } from "./config.ts";
@@ -107,6 +108,9 @@ export type RunCore = {
   /** Training ranks bought with Silver this run, on top of the hero's own:
    * they last only for this run. */
   training?: Partial<Record<TrainingId, number>>;
+  /** Which numbered tower (or delve) the run climbs, from 2 up (tiers.ts);
+   * absent for the first. */
+  tier?: number;
 };
 /** A Tower ascent. */
 export type TowerRun = RunCore & {
@@ -151,6 +155,13 @@ export type ModeSave<R extends Run = Run> = {
   /** Gold picked up during the current run, kept outside `run` like
    * `lootedTiles`, since undo never takes Gold back. */
   runGold: number;
+  /** The numbered tower (or delve) selected: the slice's records (`best`,
+   * `reached`, and the Tower's log and sections) are this tier's. */
+  tier: number;
+  /** The highest tier opened, from 1 to `TIERS`. */
+  tiersOpen: number;
+  /** The other tiers' records, by tier, while another is selected. */
+  tierRecords: Record<string, TierRecord>;
 };
 export type Save = {
   version: 3;

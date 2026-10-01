@@ -27,7 +27,7 @@ export class TowerClimb {
 
   /** Floor `h` as it stands now; a floor never visited is freshly generated. */
   board(h: number) {
-    return new RoomWorld(this.run.seed, h, this.changesOn(h) ?? {}, this.run.percentPotions);
+    return new RoomWorld(this.run.seed, h, this.changesOn(h) ?? {}, this.run.percentPotions, this.run.tier);
   }
 
   /** A section's first floor is sealed below. */

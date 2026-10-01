@@ -1,3 +1,4 @@
+import { whole } from "./whole.ts";
 import { RUN_TRAINING_CAP, RUN_TRAINING_PRICES, TRAINING, isStatRow, trainingOpen, type TrainingId, type TrainingRow } from "./config.ts";
 import type { RunCore, Save } from "./entities.ts";
 import { percentPotionChance, potionPercent, reviveChance } from "./loadout.ts";
@@ -49,7 +50,7 @@ export function runTrainingOffer(save: Pick<Save, "training" | "upgrades">, run:
  * hero's stat for a stat row, or the percentage for the others. */
 export function runTrainingValue(save: Pick<Save, "training" | "upgrades">, run: Pick<RunCore, "training" | "player">, id: TrainingId) {
   const row = TRAINING.find((t) => t.id === id)!;
-  if (isStatRow(row)) return { value: run.player[row.stat] ?? 0, unit: "" };
+  if (isStatRow(row)) return { value: whole(run.player[row.stat] ?? 0), unit: "" };
   const now = { upgrades: save.upgrades, training: ranksInRun(save, run) };
   const chance = id === "findPotion" ? percentPotionChance(now) : id === "revive" ? reviveChance(now) : potionPercent(now);
   return { value: chance / 100, unit: "%" };

@@ -13,3 +13,9 @@ export function intPow(base: number, n: number) {
   for (let i = 0; i < n; i++) result *= base;
   return result;
 }
+
+/** `n` on a grid of millionths. Gold, HP and the hero's and enemies' stats
+ * keep their fractions (a 2% bonus on 1 ATK strikes for 1.02), and each sum
+ * or difference of them is snapped back onto the grid, so 0.1 + 0.2 is 0.3
+ * and a fight's forecast and the fight played out agree to the last strike. */
+export const snap = (n: number) => Math.round(n * 1e6) / 1e6;

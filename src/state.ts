@@ -53,6 +53,9 @@ import { ClearLedger } from "./tower/clear-ledger.ts";
 import { TowerClimb } from "./tower/climb.ts";
 import { materialDef, MATERIALS } from "./materials.ts";
 import { rollTreasureLoot } from "./loot.ts";
+import { TIERS, TIER_BOSS_FLOOR, switchTier, tierBonus, tierBonusText, tierGold, tierNumeral } from "./tiers.ts";
+import { snap } from "./exact.ts";
+import { whole, wholeChange, wholeHp } from "./whole.ts";
 import { MODES, milestones, type ModeProfile } from "./modes.ts";
 import { ranksInRun, runTrainingOffer } from "./run-training.ts";
 import { keepUndos, loadout, percentPotionChance, potionPercent, reviveChance, trainingMaxed, trainingPoints } from "./loadout.ts";
@@ -248,9 +251,7 @@ export class Game {
     const record = this.run.height > this.slice.reached;
     this.recordProgress();
     this.claimRewards();
-    const gold = this.rules.endGold(this.run);
-    this.save.gold += gold;
-    this.slice.runGold += gold;
+    this.creditGold(tierGold(this.tier, this.rules.endGold(this.run)));
     return record;
   }
   snapshot(): MoveSnapshot {
@@ -567,6 +568,7 @@ export class Game {
       changes: {},
       floor: 0,
       player,
+      ...(this.slice.tier > 1 ? { tier: this.slice.tier } : {}),
     };
     this.run = this.mode === "tower"
       ? { damaged: false, keysSpent: false, ...core }
@@ -663,7 +665,7 @@ export class Game {
   /** Pays the XP for beating `enemy` on equivalent floor `floor`. */
   gainXp(enemy: Enemy, floor: number) {
     const level = levelForXp(this.save.xp);
-    this.save.xp += xpForKill(enemy.strength, floor);
+    this.save.xp += tierBonus(this.tier, xpForKill(enemy.strength, floor));
     if (levelForXp(this.save.xp) > level) this.levelUpAt = performance.now();
   }
   /** The single path that ends the current run, whether the player
@@ -678,7 +680,7 @@ export class Game {
     // Steadfast wayfinder and switched off the default turn-off-on-death.
     this.auto = dead && !!this.save.upgrades.autoPersist && !this.save.settings.autoOffOnDeath;
     this.dropHandPlan();
-    this.message = `${reason}${record ? " · a new record" : ""}${gold ? ` · ${gold} Gold kept` : ""}. Follow the forest path to begin again.`;
+    this.message = `${reason}${record ? " · a new record" : ""}${whole(gold) ? ` · ${whole(gold)} Gold kept` : ""}. Follow the forest path to begin again.`;
   }
   /** The hero fell in a fight: the run waits at 0 HP, the hand paused, for
    * the player to undo the fight or accept defeat. */
@@ -857,11 +859,40 @@ export class Game {
     const silver = silverForKill(enemy.strength, floor);
     this.run.silver = this.silver + silver;
     const { gold, drops } = this.creditEnemyLoot(enemy, at.x, at.y);
-    if (gold) this.gain(at.x, at.y, `+${gold} Gold`);
+    if (gold) this.gain(at.x, at.y, `+${wholeChange(gold)} Gold`);
     this.gain(at.x, at.y, `+${silver} Silver`);
     for (const d of drops) this.gain(at.x, at.y, materialText(d), { material: d.id, quantity: d.quantity });
-    this.message = [revived ? `Revived · ${enemy.name} defeated` : combat.damage ? `−${combat.damage} HP · ${enemy.name} defeated` : "Unscathed victory",
-      ...(gold ? [`+${gold} Gold`] : []), `+${silver} Silver`, ...drops.map(materialText)].join(" · ");
+    const opened = enemy.strength === "boss" && floor >= TIER_BOSS_FLOOR && this.openNextTier();
+    this.message = [revived ? `Revived · ${enemy.name} defeated` : combat.damage ? `−${wholeChange(combat.damage)} HP · ${enemy.name} defeated` : "Unscathed victory",
+      ...(gold ? [`+${wholeChange(gold)} Gold`] : []), `+${silver} Silver`, ...drops.map(materialText),
+      ...(opened ? [`${this.rules.words.tierName} ${tierNumeral(this.slice.tiersOpen)} opened`] : [])].join(" · ");
+    return true;
+  }
+  /** Banks Gold found in the run, fractions and all (`snap`). */
+  private creditGold(gold: number) {
+    this.save.gold = snap(this.save.gold + gold);
+    this.slice.runGold = snap(this.slice.runGold + gold);
+  }
+  /** The numbered tower (or delve) the run climbs. */
+  get tier() {
+    return this.run.tier ?? 1;
+  }
+  /** Beating the floor-100 boss of the highest tier opened opens the next;
+   * undo never closes it again. */
+  private openNextTier() {
+    const slice = this.slice;
+    if (this.tier !== slice.tiersOpen || slice.tiersOpen >= TIERS) return false;
+    slice.tiersOpen++;
+    return true;
+  }
+  /** Chooses which opened tier the next run climbs, from the forest: the
+   * mode's records become that tier's and a fresh run waits outside it. */
+  selectTier(tier: number) {
+    const slice = this.slice;
+    if (!this.run.outside || tier < 1 || tier > slice.tiersOpen || tier === slice.tier) return false;
+    switchTier(slice, tier);
+    this.newRun({ outside: true });
+    this.message = `${this.rules.words.tierName} ${tierNumeral(tier)} · ${tierBonusText(tier)} Gold & XP`;
     return true;
   }
   /** An enemy's Gold (by its strength) and material drops. Both are gated
@@ -872,9 +903,8 @@ export class Game {
       key = this.lootKey(x, y);
     if (slice.lootedTiles[key]) return { gold: 0, drops: [] };
     slice.lootedTiles[key] = true;
-    const gold = ENEMY_GOLD[enemy.strength];
-    this.save.gold += gold;
-    slice.runGold += gold;
+    const gold = tierGold(this.tier, ENEMY_GOLD[enemy.strength]);
+    this.creditGold(gold);
     const drops = this.rules.enemyDrops(enemy.name, this.rng);
     creditMaterials(this.save, drops);
     return { gold, drops };
@@ -998,7 +1028,7 @@ export class Game {
     if (p.hp > best) this.save.tower.sectionHp[section] = p.hp;
     this.feedback(
       `Floor ${this.run.height + 1} · ATK/DEF reset` +
-        (p.hp > best ? ` · new best start HP ${p.hp}` : ""),
+        (p.hp > best ? ` · new best start HP ${wholeHp(p.hp)}` : ""),
     );
   }
   /** Step back onto the stairs at the foot of the current room, returning
@@ -1079,7 +1109,7 @@ export class Game {
   /** Pickup rewards and treasure payouts; stats were already applied. */
   private collect(t: Tile, x: number, y: number, outcome: StepEffect) {
     const text = t.kind === "key" ? `+1 ${t.color} key`
-      : t.kind === "potion" ? `+${outcome.healed} HP`
+      : t.kind === "potion" ? `+${wholeChange(outcome.healed)} HP`
       : t.kind === "attack" ? `+${ATTACK_SHARD} attack`
       : t.kind === "defense" ? `+${DEFENSE_SHARD} defense`
       : null;
@@ -1099,12 +1129,12 @@ export class Game {
         slice.lootedTiles[key] = true;
         const E = this.rules.equivalentFloor(this.rules.progressAt(this.run, y));
         const loot = rollTreasureLoot(E, this.rng);
-        this.save.gold += loot.gold;
-        slice.runGold += loot.gold;
+        const gold = tierGold(this.tier, loot.gold);
+        this.creditGold(gold);
         creditMaterials(this.save, loot.materials);
-        this.gain(x, y, `+${loot.gold} Gold`);
+        this.gain(x, y, `+${wholeChange(gold)} Gold`);
         for (const m of loot.materials) this.gain(x, y, materialText(m), { material: m.id, quantity: m.quantity });
-        this.message = [`+${loot.gold} Gold`, ...loot.materials.map(materialText)].join(" · ");
+        this.message = [`+${wholeChange(gold)} Gold`, ...loot.materials.map(materialText)].join(" · ");
       }
     }
   }
@@ -1169,10 +1199,10 @@ export class Game {
     const row = offer.row;
     if (isStatRow(row)) {
       const level = levelForXp(this.save.xp), stat = row.stat,
-        gain = trained(row, offer.level + 1, level) - trained(row, offer.level, level);
-      for (const stats of [this.run.player, this.run.loadout]) if (stats) stats[stat] = (stats[stat] ?? 0) + gain;
+        gain = snap(trained(row, offer.level + 1, level) - trained(row, offer.level, level));
+      for (const stats of [this.run.player, this.run.loadout]) if (stats) stats[stat] = snap((stats[stat] ?? 0) + gain);
       // More maximum HP comes with the HP to fill it.
-      if (stat === "maxHp") this.run.player.hp += gain;
+      if (stat === "maxHp") this.run.player.hp = snap(this.run.player.hp + gain);
     } else if (id === "findPotion") {
       const chance = percentPotionChance(this.trainingNow);
       this.run.percentPotions = chance;
@@ -1287,8 +1317,8 @@ export class Game {
       for (const stats of [run.player, run.loadout])
         if (stats)
           for (const stat of ["attack", "defense", "maxHp", "shroud"] as const) {
-            const change = after[stat] - before[stat];
-            if (change) stats[stat] = (stats[stat] ?? 0) + change;
+            const change = snap(after[stat] - before[stat]);
+            if (change) stats[stat] = snap((stats[stat] ?? 0) + change);
           }
       const p = run.player;
       p.hp = Math.max(1, Math.min(p.hp, p.maxHp));
@@ -1315,11 +1345,11 @@ export class Game {
     if (!this.playing || this.encounter || (this.save.consumables[id] ?? 0) <= 0) return false;
     const def = CONSUMABLES.find(c => c.id === id)!;
     const p = this.run.player;
-    const n = Math.min(p.maxHp - p.hp, potionHeal(def.healAmount, this.stepRules));
-    p.hp += n;
+    const n = snap(Math.min(p.maxHp - p.hp, potionHeal(def.healAmount, this.stepRules)));
+    p.hp = snap(p.hp + n);
     this.save.consumables[id]--;
     this.recordHeal(n);
-    this.message = `${def.name} · +${n} HP`;
+    this.message = `${def.name} · +${wholeChange(n)} HP`;
     this.afterPlayerAction();
     return true;
   }

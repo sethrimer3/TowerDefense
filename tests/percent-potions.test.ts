@@ -25,7 +25,7 @@ test("a percent potion restores its HP and a share of max HP, which Potion HP le
   assert.equal(heal({ kind: "potion", color: "red" }, 100, 100), POTION_HEAL + 10, "35 and 1% of 1000");
   assert.equal(heal({ kind: "potion", color: "red" }, 200, 150), POTION_HEAL + 15, "Potion HP doubles only the regular potion");
   assert.equal(heal({ kind: "potion", color: "blue" }, 200, 150), 70);
-  assert.equal(heal({ kind: "potion", color: "red" }, 100, 125), POTION_HEAL + 13, "12.5 rounds up");
+  assert.equal(heal({ kind: "potion", color: "red" }, 100, 125), POTION_HEAL + 12.5, "the half kept");
 });
 
 test("Recovery opens percent potions at 1%, and Potion % training adds 0.25% a rank", () => {

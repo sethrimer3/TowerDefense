@@ -1,3 +1,4 @@
+import { whole } from "./whole.ts";
 import "./style.css";
 import { load, persist } from "./save.ts";
 import { Game } from "./state.ts";
@@ -150,6 +151,12 @@ el("hand").onclick = (e) => {
 };
 el("log").onclick = () => showLog(ctx);
 el("section-pick").onclick = () => showSectionPicker(ctx);
+for (const [id, step] of [["tier-prev", -1], ["tier-next", 1]] as const)
+  el(id).onclick = () => {
+    if (!game.selectTier(game.save[game.mode].tier + step)) return;
+    save();
+    update();
+  };
 el("gem-ad").onclick = () => {
   if (!game.claimAdGems()) return;
   save();
@@ -159,7 +166,7 @@ el("end-run").onclick = () =>
   ctx.confirm(
     {
       title: "End this run?",
-      body: `End the current ${MODES[game.mode].words.run} at ${MODES[game.mode].words.progress} ${displayedProgress(game.run.height, !!game.run.outside)}. Milestone rewards are already yours${game.save[game.mode].runGold ? `, uncollected clear chests will be claimed, and the ${game.save[game.mode].runGold} Gold found this ${MODES[game.mode].words.run} is kept` : ", and uncollected clear chests will be claimed"}.`,
+      body: `End the current ${MODES[game.mode].words.run} at ${MODES[game.mode].words.progress} ${displayedProgress(game.run.height, !!game.run.outside)}. Milestone rewards are already yours${whole(game.save[game.mode].runGold) ? `, uncollected clear chests will be claimed, and the ${whole(game.save[game.mode].runGold)} Gold found this ${MODES[game.mode].words.run} is kept` : ", and uncollected clear chests will be claimed"}.`,
       label: "End run",
       cancel: MODES[game.mode].words.keepGoing,
     },

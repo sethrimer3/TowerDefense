@@ -1,3 +1,4 @@
+import { enemyStat, whole, wholeChange, wholeHp } from "../whole.ts";
 import type { EnemyStrength, Kind, Player, Tile } from "../entities.ts";
 import type { Game, RouteEffects } from "../state.ts";
 import { ATTACK_SHARD, DEFENSE_SHARD, resolveStep } from "../step-effects.ts";
@@ -40,7 +41,7 @@ const DESCRIBE: Partial<Record<Kind, Describe>> = {
     const e = t.enemy!, r = predict(p, e);
     return {
       title: RANK[e.strength] + e.name,
-      body: `<span>HP ${e.hp} · ATK ${e.attack} · DEF ${e.defense}</span><br><strong class="${r.survivable ? "safe" : "danger"}">${Number.isFinite(r.damage) ? r.damage : "∞"} damage · ${r.survivable ? "Survivable" : "LETHAL"}</strong>`,
+      body: `<span>HP ${enemyStat(e.hp)} · ATK ${enemyStat(e.attack)} · DEF ${enemyStat(e.defense)}</span><br><strong class="${r.survivable ? "safe" : "danger"}">${Number.isFinite(r.damage) ? wholeChange(r.damage) : "∞"} damage · ${r.survivable ? "Survivable" : "LETHAL"}</strong>`,
     };
   },
   wall: () => ({ title: "Wall", body: "Ancient stone. Find a passage around it." }),
@@ -63,7 +64,7 @@ const DESCRIBE: Partial<Record<Kind, Describe>> = {
     const restores = percent ? `Restores HP and ${g.stepRules.percentPotion / 100}% of max HP` : "Restores HP";
     // A run with percent potions says how many of its potions are.
     const chance = g.run.percentPotions ? `<br><small>${g.run.percentPotions / 100}% of this run's potions are percent potions</small>` : "";
-    return { title: percent ? "Percent Potion" : "Potion", body: `<span>${restores}</span><br>(${p.hp} → ${after.blocked ? p.hp : after.player.hp})${chance}` };
+    return { title: percent ? "Percent Potion" : "Potion", body: `<span>${restores}</span><br>(${wholeHp(p.hp)} → ${wholeHp(after.blocked ? p.hp : after.player.hp)})${chance}` };
   },
   stairs,
   stairsDown: stairs,
@@ -94,9 +95,9 @@ export const tileInfoLine = (d: TileInfo) =>
 /** One line per stat or key a previewed route would change. */
 export function routeTotalLines(effects: RouteEffects): string[] {
   const lines: string[] = [];
-  if (effects.hp[0] !== effects.hp[1]) lines.push(`HP (${effects.hp[0]} → ${effects.hp[1]})`);
-  if (effects.attack[0] !== effects.attack[1]) lines.push(`Atk (+${effects.attack[0]} → +${effects.attack[1]})`);
-  if (effects.defense[0] !== effects.defense[1]) lines.push(`Def (+${effects.defense[0]} → +${effects.defense[1]})`);
+  if (effects.hp[0] !== effects.hp[1]) lines.push(`HP (${wholeHp(effects.hp[0])} → ${wholeHp(effects.hp[1])})`);
+  if (effects.attack[0] !== effects.attack[1]) lines.push(`Atk (+${whole(effects.attack[0])} → +${whole(effects.attack[1])})`);
+  if (effects.defense[0] !== effects.defense[1]) lines.push(`Def (+${whole(effects.defense[0])} → +${whole(effects.defense[1])})`);
   for (const color of ["yellow", "blue", "red"] as const) {
     const change = effects.keys[color];
     if (change) lines.push(`${KEY_NAMES[color]} Key (${change[0]} → ${change[1]})`);
