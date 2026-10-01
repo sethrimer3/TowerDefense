@@ -2,11 +2,11 @@
  * Gold and metal bars, the universal upgrades, the bonuses Training and the
  * skill trees add, and the enemy roster. */
 
-export type StructureKind = "keep" | "barracks" | "archerBarracks" | "archerTower" | "cannonTower" | "watchTower";
+export type StructureKind = "keep" | "barracks" | "archerBarracks" | "archerTower" | "cannonTower" | "watchTower" | "wizardTower";
 /** Everything that appears in the build palette (the keep is placed from the
  * start and can only be moved, so it is not a palette item). */
 export type PaletteItem = "cityTile" | Exclude<StructureKind, "keep">;
-export const PALETTE_ITEMS: PaletteItem[] = ["cityTile", "barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower"];
+export const PALETTE_ITEMS: PaletteItem[] = ["cityTile", "barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower"];
 
 export type StructureDef = {
   kind: StructureKind;
@@ -75,6 +75,15 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     outsideOk: true,
     description: "Marks every enemy in its radius with a golden outline — marked enemies take double damage.",
   },
+  wizardTower: {
+    kind: "wizardTower",
+    name: "Wizard tower",
+    w: 2,
+    h: 2,
+    maxHp: 130,
+    outsideOk: true,
+    description: "Alternates between a roaring flamethrower and a wave of ice shards that chills everything it crosses.",
+  },
 };
 
 /** Palette items the player owns at the very start. */
@@ -85,6 +94,7 @@ export const STARTING_OWNED: Record<PaletteItem, number> = {
   archerTower: 1,
   cannonTower: 0,
   watchTower: 0,
+  wizardTower: 0,
 };
 
 /** A price in Gold and metal bars (all earned in battle). */
@@ -100,6 +110,7 @@ export function purchasePrice(item: PaletteItem, owned: number): Price {
     archerTower: { gold: 220, ironBar: 2 },
     cannonTower: { gold: 340, ironBar: 5 },
     watchTower: { gold: 180, ironBar: 2 },
+    wizardTower: { gold: 450, ironBar: 6 },
   };
   const growth = item === "cityTile" ? 1.3 : 1.5;
   const m = Math.pow(growth, extra);
@@ -122,6 +133,8 @@ export type UpgradeId =
   | "cannonSafe"
   | "bombSafe"
   | "watchRadius"
+  | "wizardFlame"
+  | "wizardIce"
   | "wallStrength"
   | "keepStrength"
   | "civilianCount"
@@ -169,6 +182,8 @@ export const UPGRADES: UpgradeDef[] = [
   { id: "cannonSafe", group: "Cannon tower", name: "Gunnery drills", maxLevel: 1, describe: (l) => (l ? "Shells spare your own people" : "Shells hurt your own people too") },
   { id: "bombSafe", group: "Consumables", name: "Shaped charges", maxLevel: 1, describe: (l) => (l ? "Bombs spare your own people" : "Bombs hurt your own people too") },
   { id: "watchRadius", group: "Watch tower", name: "Lookouts", maxLevel: 4, describe: (l) => `${watchRadius(l)} cell marking radius` },
+  { id: "wizardFlame", group: "Wizard tower", name: "Pyromancy", maxLevel: 5, describe: (l) => `${flameDps(l)} flame damage a second, ${flameRange(l).toFixed(1)} cell reach` },
+  { id: "wizardIce", group: "Wizard tower", name: "Rime", maxLevel: 5, describe: (l) => `${iceDamage(l)} ice damage, chills for ${iceChill(l).toFixed(1)}s` },
   { id: "wallStrength", group: "City", name: "Masonry", maxLevel: 6, describe: (l) => `${wallHp(l)} HP per wall stone` },
   { id: "keepStrength", group: "City", name: "Keep bastions", maxLevel: 6, describe: (l) => `${keepHp(l)} keep HP` },
   { id: "civilianCount", group: "Civilians", name: "Guild of builders", maxLevel: 5, describe: (l) => `${civilianCount(l)} civilians repair the city` },
@@ -207,6 +222,23 @@ export const cannonCooldown = (l: number) => 2.8 * Math.pow(0.86, l);
 export const CANNON_RANGE = 11;
 /** Share of blast damage your own units take when friendly fire is on. */
 export const FRIENDLY_FIRE = 0.6;
+/** The wizard tower's flamethrower: damage a second to everything in its
+ * cone, its reach (cells), how long a burst lasts and the cone's half-angle. */
+export const flameDps = (l: number) => 16 + l * 6;
+export const flameRange = (l: number) => 4.5 + l * 0.3;
+export const FLAME_SECONDS = 1.6;
+export const FLAME_HALF_ANGLE = 0.38;
+/** The ice wave: damage to everything the front crosses, how long they stay
+ * chilled (moving at `CHILL_SPEED` of their pace), its reach, speed (cells a
+ * second) and half-angle. */
+export const iceDamage = (l: number) => 14 + l * 6;
+export const iceChill = (l: number) => 2 + l * 0.4;
+export const CHILL_SPEED = 0.5;
+export const ICE_RANGE = 6.5;
+export const ICE_SPEED = 7;
+export const ICE_HALF_ANGLE = 0.62;
+/** Seconds the tower rests after each attack before the other one. */
+export const WIZARD_REST = 1.3;
 export const wallHp = (l: number) => Math.round(100 * (1 + l * 0.35));
 export const keepHp = (l: number) => Math.round(STRUCTURES.keep.maxHp * (1 + l * 0.3));
 export const civilianCount = (l: number) => 2 + l;

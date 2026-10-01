@@ -74,6 +74,12 @@ function scenarios(): Record<string, Scenario> {
       bombs: [[90, 30, 55]],
       smash: [[60, "house"], [61, "wall"], [62, "wall"], [200, "cannonTower"]],
     },
+    // Wizard towers inside and outside the walls, flame and ice in turn.
+    wizards: {
+      layout: city(SQUARE, [["wizardTower", 0, -2], ["wizardTower", 1, 1], ["barracks", -1, 1]]),
+      citySeed: 13, levels: levelsAt({ wizardFlame: 2, wizardIce: 3 }), seed: 6, seconds: 200,
+      smash: [[120, "wizardTower"]],
+    },
   };
 }
 
@@ -88,7 +94,7 @@ function state(sim: DefendSim) {
   const s = sim as unknown as Record<string, unknown>;
   return [
     sim.time, sim.wave, sim.lost, sim.breakT, sim.spawnT, sim.spawnQueue, sim.mapVersion, sim.changed.length,
-    sim.enemies, sim.soldiers, sim.civilians, sim.arrows, sim.shells, sim.scorches, sim.effects, sim.events,
+    sim.enemies, sim.soldiers, sim.civilians, sim.arrows, sim.shells, sim.flames, sim.frosts, sim.scorches, sim.effects, sim.events,
     sim.solid, sim.hp, sim.built, sim.flash, sim.field,
     [...(s.towers as { cooldown: Map<number, number> }).cooldown], [...(s.barracks as { training: Map<number, number> }).training], (s.builders as { respawn: number[] }).respawn,
   ];
@@ -154,12 +160,15 @@ test("the Defend replays exercise every unit and effect", () => {
       for (const c of sim.civilians) seen.add(`civilian:${c.state}`);
       if (sim.arrows.length) seen.add("arrow");
       if (sim.shells.length) seen.add("shell");
+      if (sim.flames.length) seen.add("flame");
+      if (sim.frosts.length) seen.add("frost");
+      if (sim.enemies.some((e) => e.chill)) seen.add("chilled");
       if (sim.lost) seen.add(`lost:${name}`);
       if (sim.built.some((b, id) => b > 0 && b < sim.map.buildings[id].cells.length)) seen.add("half-rebuilt");
     });
   const want = [
     "enemy:warlord", "enemy:bat", "distracted", "marked", "soldier:sword", "soldier:archer", "path:sword", "path:archer", "hunting",
-    "civilian:toJob", "civilian:working", "civilian:home", "arrow", "shell", "lost:bare", "half-rebuilt",
+    "civilian:toJob", "civilian:working", "civilian:home", "arrow", "shell", "flame", "frost", "chilled", "lost:bare", "half-rebuilt",
   ];
   assert.deepEqual(want.filter((w) => !seen.has(w)), []);
 });

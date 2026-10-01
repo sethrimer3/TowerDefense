@@ -18,6 +18,8 @@ import { drawFlag } from "./structure-art.ts";
 import { ParkGrass, type Walker } from "./park-grass.ts";
 import { PondWater } from "./pond-water.ts";
 import { ENEMIES } from "./catalog.ts";
+import { GroundRelief, type ReliefLight } from "./ground-relief.ts";
+import { WizardArt, flameLights } from "./wizard-art.ts";
 
 export type DrawOptions = {
   /** Show the (dim, gold) tile grid — while the player is editing. */
@@ -36,6 +38,10 @@ export class DefendRenderer {
   readonly fences = new Fences();
   readonly grass = new ParkGrass();
   readonly water = new PondWater();
+  readonly relief = new GroundRelief();
+  readonly wizard = new WizardArt();
+  /** The battle time the wizard art last advanced to. */
+  private wizardTime = 0;
   private rain = new Rain();
   private lastNow = 0;
   private layerScale = 1;
@@ -123,9 +129,10 @@ export class DefendRenderer {
     const dt = this.lastNow ? (opts.now - this.lastNow) / 1000 : 0;
     this.lastNow = opts.now;
     this.drawCity(map, sim, opts, dt);
+    if (sim) this.advanceWizard(sim);
     if (sim) this.drawBattle(map, sim, opts);
     this.drawKeepFlag(map, sim, opts);
-    if (sim) this.drawBattleUnits(sim, !!opts.weather);
+    if (sim) this.drawBattleUnits(sim, !!opts.weather, opts);
     this.drawEditing(overlay, opts.grid);
     // Rain falls in screen space, in front of the camera.
     this.ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -185,12 +192,40 @@ export class DefendRenderer {
     drawFlag(this.ctx, this.px, { x: (keep.x + keep.w / 2) * this.px, y: (keep.y + keep.h / 2) * this.px, t: opts.now / 1000, reduceMotion: opts.reduceMotion });
   }
 
-  /** Blast scorches, then units, projectiles and effects (carrying torches
-   * in weather). */
-  private drawBattleUnits(sim: DefendSim, torches: boolean) {
+  /** Blast scorches and the wizards' ice, then units, projectiles and
+   * effects (carrying torches in weather), then the wizards' fire. */
+  private drawBattleUnits(sim: DefendSim, torches: boolean, opts: DrawOptions) {
     const brush: Brush = { c: this.ctx, px: this.px };
     drawScorches(brush, sim);
+    this.wizard.drawIce(this.ctx, this.px, sim.frosts, sim.time * 1000, flameLights(sim).relief);
     drawUnits(brush, sim, torches);
+    this.wizard.drawChill(this.ctx, this.px, sim, opts.now);
+    this.wizard.drawFire(this.ctx, this.px);
+  }
+
+  /** The wizards' fire and ice move on battle time, so they keep pace with
+   * the battle's speed and stop while it is paused. */
+  private advanceWizard(sim: DefendSim) {
+    if (sim.time < this.wizardTime) this.wizardTime = 0;
+    const dt = Math.min(0.25, sim.time - this.wizardTime);
+    this.wizardTime = sim.time;
+    this.wizard.update(sim, dt, sim.time * 1000);
+  }
+
+  /** Light catching the flagstones' bumps outside the city: the fixed
+   * fires and lanterns (baked until a building falls or rises), then the
+   * moving lights: wizard fire and ice, blasts and hand torches. */
+  private drawGroundRelief(map: CityMap, sim: DefendSim, opts: DrawOptions, flames: ReliefLight[]) {
+    if (!(opts.effects ?? true) || !this.relief.sync(map, this.px, this.canvas.width, this.canvas.height)) return;
+    const intact = standing(map, sim);
+    const fixed = () =>
+      this.lighting.lights
+        .filter((l) => l.owner < 0 || intact(l.owner))
+        .map((l) => ({ x: l.x, y: l.y, r: l.radius * 0.8, k: l.strength * 0.55, color: "#ffc68a" }));
+    const moving: ReliefLight[] = [...flames, ...this.wizard.iceLights(sim.frosts, sim.time * 1000)];
+    for (const fx of sim.effects) if (fx.kind === "boom") moving.push({ x: fx.x, y: fx.y, r: fx.r * 2.4, k: 1.4 * (1 - fx.t / 0.6), color: "#ffcf8a" });
+    for (const u of [...sim.soldiers, ...sim.civilians]) moving.push({ x: u.x, y: u.y, r: 2.2, k: 0.45, color: "#ffc68a" });
+    this.relief.draw(this.ctx, this.px, { version: String(sim.mapVersion), lights: fixed }, moving, 0.6 + opts.night * 0.4);
   }
 
   private drawRain(dt: number) {
@@ -229,12 +264,14 @@ export class DefendRenderer {
   /** Darkness and torchlight, the gravel's lit relief, and the flames. */
   private drawLighting(map: CityMap, sim: DefendSim, weather: Weather, opts: DrawOptions) {
     const frame: LightFrame = { px: this.px, now: opts.now, reduceMotion: opts.reduceMotion, intact: standing(map, sim) };
+    const flames = flameLights(sim);
     this.lighting.drawLight(this.ctx, frame, ambientFor(weather, opts.night), {
-      torches: carriedLights(sim),
+      torches: [...carriedLights(sim), ...flames.carried],
       solid: sim.solid,
       version: sim.mapVersion,
     });
     this.lighting.drawRelief(this.ctx, this.px, weather.rain ? 0.85 : 0.65);
+    this.drawGroundRelief(map, sim, opts, flames.relief);
     this.lighting.drawFlames(this.ctx, frame);
   }
 

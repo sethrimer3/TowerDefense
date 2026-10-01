@@ -69,5 +69,14 @@ Command and Stewardship: ranked skills bought with Valor, each needing the skill
 **Park life**:
 The city's live dressing, never part of the battle: grass swaying and parting around walkers, and on the ponds drips, rain rings, splashes and reflections.
 
+**Wizard tower**:
+A structure alternating a flamethrower (a cone of fire) and an ice wave (a fan of shards that chills what it crosses).
+
+**Chill**:
+A wizard's ice slowing an enemy for a few seconds.
+
+**Ground relief**:
+The flagstones' bump map outside the city: lights brighten the stone edges facing them and darken the far ones.
+
 **Torch light**:
 A flame's flickering, swaying, occlusion-aware glow: lanterns, braziers, tower fires and hand torches.

@@ -82,9 +82,22 @@ export function paintCityLayer(c: CanvasRenderingContext2D, px: number, scene: C
   paintRubble(p);
 }
 
-/** Ground: the mossy flagstones, one randomly turned tile per board tile,
- * with the spawn lane darkened as hostile ground. */
+/** Ground: the mossy flagstones, one tile per board tile, with the spawn
+ * lane darkened as hostile ground. */
 function paintFlagstones({ c, px }: Paint) {
+  const T = px * SUB;
+  const { width } = c.canvas;
+  paintFloor(c, px);
+  const g = c.createLinearGradient(0, 0, 0, T * (SPAWN_ROW + 1));
+  g.addColorStop(0, "rgba(40,6,6,0.55)");
+  g.addColorStop(1, "rgba(20,0,0,0.25)");
+  c.fillStyle = g;
+  c.fillRect(0, 0, width, T * (SPAWN_ROW + 1));
+}
+
+/** The flagstone tiles alone, over the dark grout, at `px` a cell: the
+ * city layer's ground, and what the ground relief's bump map is cut from. */
+export function paintFloor(c: CanvasRenderingContext2D, px: number) {
   const T = px * SUB;
   const { width, height } = c.canvas;
   // Very dark grey shows in the gaps around the flagstone sprites.
@@ -105,12 +118,10 @@ function paintFlagstones({ c, px }: Paint) {
         c.fillRect(x, y, s, s);
       }
     }
-  const g = c.createLinearGradient(0, 0, 0, T * (SPAWN_ROW + 1));
-  g.addColorStop(0, "rgba(40,6,6,0.55)");
-  g.addColorStop(1, "rgba(20,0,0,0.25)");
-  c.fillStyle = g;
-  c.fillRect(0, 0, width, T * (SPAWN_ROW + 1));
 }
+
+/** How many of the floor images have loaded (the bump map waits for all). */
+export const floorArtLoaded = () => floorImages.filter(ready).length;
 
 /** City ground: park grass, and gravel for streets and cleared rubble. */
 function paintCityGround(p: Paint) {

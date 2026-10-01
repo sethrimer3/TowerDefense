@@ -57,6 +57,7 @@ const ITEM_NAMES: Record<PaletteItem, string> = {
   archerTower: STRUCTURES.archerTower.name,
   cannonTower: STRUCTURES.cannonTower.name,
   watchTower: STRUCTURES.watchTower.name,
+  wizardTower: STRUCTURES.wizardTower.name,
 };
 
 const plural = (name: string) => (name.endsWith("s") ? name : `${name}s`);

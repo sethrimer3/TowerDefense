@@ -7,6 +7,7 @@ import { ENEMIES, type EnemyDef } from "./catalog.ts";
 import { CELLS_H, CELLS_W, sideCells } from "./grid.ts";
 import { cellCenter, center, clampCell, downhill, nearestPoint, rectDist } from "./pathing.ts";
 import type { DefendSim, Enemy } from "./sim.ts";
+import { chilled } from "./wizard.ts";
 
 /** One enemy's step: the sim, the enemy, its kind and how close it must be
  * to strike. */
@@ -36,7 +37,7 @@ function fightDefender({ sim, e, def, reach }: Turn) {
 function flyAtKeep(t: Turn) {
   const { sim, e, def, reach, dt } = t;
   if (rectDist(sim.keep.rect, e.x, e.y) <= reach) return hitBuilding(t, sim.keepId);
-  sim.moveToward(e, center(sim.keep.rect), { speed: def.speed, dt, flying: true });
+  sim.moveToward(e, center(sim.keep.rect), { speed: def.speed * chilled(e), dt, flying: true });
 }
 
 /** Wreck the house that caught its eye. False once the house is gone or the
@@ -50,7 +51,7 @@ function chaseDistraction(t: Turn) {
     return false;
   }
   if (rectDist(b.rect, e.x, e.y) <= reach) hitBuilding(t, b.id);
-  else if (!sim.moveToward(e, nearestPoint(b.rect, e.x, e.y), { speed: def.speed, dt })) e.distract = -1;
+  else if (!sim.moveToward(e, nearestPoint(b.rect, e.x, e.y), { speed: def.speed * chilled(e), dt })) e.distract = -1;
   return true;
 }
 
@@ -65,7 +66,7 @@ function march(t: Turn) {
   const c = cellCenter(best);
   if (sim.solid[best]) return smashThrough(t, best, c);
   rollForDistraction(t, cx, cy);
-  sim.moveToward(e, { x: c.x + e.jx, y: c.y + e.jy }, { speed: def.speed, dt });
+  sim.moveToward(e, { x: c.x + e.jx, y: c.y + e.jy }, { speed: def.speed * chilled(e), dt });
 }
 
 /** The cheapest way on goes through a building: walk up and smash it. */
@@ -73,7 +74,7 @@ function smashThrough(t: Turn, cell: number, c: { x: number; y: number }) {
   const { sim, e, def, reach, dt } = t;
   const bid = sim.map.owner[cell];
   if (rectDist(sim.map.buildings[bid].rect, e.x, e.y) <= reach) return hitBuilding(t, bid);
-  sim.moveToward(e, c, { speed: def.speed, dt });
+  sim.moveToward(e, c, { speed: def.speed * chilled(e), dt });
 }
 
 /** Streets are lined with temptations: twice a second, a chance that a

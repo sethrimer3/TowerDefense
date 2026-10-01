@@ -37,6 +37,7 @@ const STRUCTURES: Record<StructureKind, (c: CanvasRenderingContext2D, f: Frame) 
   archerTower: paintArcherTower,
   cannonTower: paintCannonTower,
   watchTower: paintWatchTower,
+  wizardTower: paintWizardTower,
 };
 
 /** A solid black outline, then the fill inside it. */
@@ -116,6 +117,52 @@ function paintWatchTower(c: CanvasRenderingContext2D, f: Frame) {
   disc(c, x + w / 2, y + h / 2, Math.min(w, h) * 0.13);
 }
 
+/** A round tower of pale stone under a pointed violet roof, seen from
+ * above: eight slate slopes meeting at a gold finial, the sunny ones to
+ * the upper left, with a ring of runes glowing round the eaves. */
+function paintWizardTower(c: CanvasRenderingContext2D, f: Frame) {
+  const { x, y, w, h, line } = f;
+  const cx = x + w / 2, cy = y + h / 2, r = Math.min(w, h) * 0.46;
+  c.fillStyle = OUTLINE;
+  disc(c, cx, cy, r);
+  c.fillStyle = "#9a958c";
+  disc(c, cx, cy, r - line);
+  const roof = r * 0.78;
+  c.fillStyle = OUTLINE;
+  disc(c, cx, cy, roof + line);
+  // Eight roof slopes, lit from the upper left like every other roof.
+  for (let k = 0; k < 8; k++) {
+    const a0 = (k / 8) * Math.PI * 2, a1 = ((k + 1) / 8) * Math.PI * 2, mid = (a0 + a1) / 2;
+    const lit = 0.5 + 0.5 * -Math.cos(mid + Math.PI / 4);
+    c.fillStyle = `rgb(${Math.round(70 + lit * 70)},${Math.round(44 + lit * 40)},${Math.round(110 + lit * 70)})`;
+    c.beginPath();
+    c.moveTo(cx, cy);
+    c.arc(cx, cy, roof, a0, a1);
+    c.closePath();
+    c.fill();
+  }
+  c.strokeStyle = "rgba(20,8,30,0.6)";
+  c.lineWidth = Math.max(1, line * 0.6);
+  c.beginPath();
+  for (let k = 0; k < 8; k++) {
+    const a = (k / 8) * Math.PI * 2;
+    c.moveTo(cx, cy);
+    c.lineTo(cx + Math.cos(a) * roof, cy + Math.sin(a) * roof);
+  }
+  c.stroke();
+  // Runes round the eaves.
+  c.fillStyle = "#9fe3ff";
+  const dot = Math.max(1, Math.round(line));
+  for (let k = 0; k < 12; k++) {
+    const a = (k / 12) * Math.PI * 2 + 0.13;
+    c.fillRect(Math.round(cx + Math.cos(a) * (r - line * 2.2) - dot / 2), Math.round(cy + Math.sin(a) * (r - line * 2.2) - dot / 2), dot, dot);
+  }
+  c.fillStyle = "#e9c46a";
+  disc(c, cx, cy, Math.max(1, r * 0.13));
+  c.fillStyle = "#fff4c8";
+  disc(c, cx - r * 0.04, cy - r * 0.04, Math.max(0.6, r * 0.05));
+}
+
 export type IconItem = StructureKind | "cityTile" | "bomb";
 
 /** Palette icon for an item, drawn into a small square canvas. */
@@ -126,7 +173,7 @@ export function paintIcon(canvas: HTMLCanvasElement, item: IconItem) {
   c.imageSmoothingEnabled = false;
   if (item === "cityTile") return paintCityIcon(c, n);
   if (item === "bomb") return paintBombIcon(c, n);
-  const def = { keep: [3, 3], barracks: [3, 4], archerBarracks: [3, 3], archerTower: [2, 2], cannonTower: [2, 2], watchTower: [2, 2] }[item];
+  const def = { keep: [3, 3], barracks: [3, 4], archerBarracks: [3, 3], archerTower: [2, 2], cannonTower: [2, 2], watchTower: [2, 2], wizardTower: [2, 2] }[item];
   const px = n / Math.max(def[0], def[1]) / 1.1;
   const w = def[0] * px,
     h = def[1] * px;

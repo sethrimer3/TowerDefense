@@ -118,6 +118,14 @@ from its seed; `tests/defend-replay.test.ts` pins it.
 - **Friendly fire:** blasts also hurt your swordsmen and civilians (60% of
   the damage) until you buy Gunnery drills (cannons) or Shaped charges
   (bombs) in the Armory.
+- **Wizard towers** (`wizard.ts`) alternate two attacks, resting 1.3 s
+  after each: a **flamethrower**, a cone of fire aimed at the nearest enemy
+  that swings after it for 1.6 s, burning everything inside (flyers too),
+  and an **ice wave**, a fan-shaped front of ice shards spreading toward the
+  nearest enemy that hits everything it crosses once and chills it (half
+  speed for a few seconds). Upgraded by Pyromancy and Rime in the Armory.
+  Neither draws from the run's random stream; how they look is the
+  renderer's (`wizard-art.ts`).
 - **Archer towers** shoot the nearest enemy in range. **Watch towers** mark
   enemies in their radius with a gold outline; marked enemies take ×2 damage.
 - During a run the palette becomes the **consumables** palette. A **bomb**
@@ -166,6 +174,23 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   space (`weather.ts`).
 - `structure-art.ts` holds the keep, barracks and tower art (shared by the
   city layer and the palette icons), the banner, and the palette colours.
+- **Wizard art** (`wizard-art.ts`): the flame is a continuous jet of
+  particles, white-hot at the nozzle through yellow, orange and red to
+  smoke, and lights the ground as it goes (through the carried lights, so
+  it carves the darkness and warms the streets). The ice wave sows clusters
+  of crystal shards in a ragged fan as its front passes; they grow, stand
+  glittering, then shatter into glints, over a soft rime. Each shard is
+  shaded as a faceted solid (two long facets and a bevelled tip) against
+  one key light from the upper left, as the roofs are, with a specular
+  glint, a lit rim and a dark edge on the far side, so every shard catches
+  the light the same way; a flame nearby warms the facets facing it.
+  Chilled enemies wear a frosty sheen.
+- **Ground relief** (`ground-relief.ts`): a bump map for the flagstones
+  outside the city, cut from the art's brightness and baked into four
+  facing masks. Each light (tower fires and lanterns baked once; wizard
+  fire and ice, blasts and hand torches every frame) brightens the stone
+  edges facing it and darkens those facing away, so light outside the
+  walls reads as 3D.
 - Between the city layer and the fences, **park life** (presentation only,
   off with the "Grass and water effects" setting):
   - `park-grass.ts`: a few clumps of pixel blades on every park cell (none

@@ -35,6 +35,7 @@ import { stepEnemy } from "./enemies.ts";
 import { blocked, cellAt, cellCenter, center, fillFlowField, nearest, nearestOpen, type FieldTerrain, type Point } from "./pathing.ts";
 import { stepArrows, stepShells, Towers } from "./towers.ts";
 import { Barracks, stepArcher, stepSwordsman } from "./troops.ts";
+import { Wizards, stepFlames, stepFrosts, type Flame, type Frost } from "./wizard.ts";
 
 export type Levels = Record<UpgradeId, number>;
 
@@ -54,6 +55,9 @@ export type Enemy = {
   rollT: number;
   marked: boolean;
   flash: number;
+  /** Seconds left chilled by a wizard's ice (slowed); absent when not, so
+   * a run without ice keeps its state exactly as before. */
+  chill?: number;
 };
 
 export type Soldier = {
@@ -131,6 +135,9 @@ export class DefendSim {
   civilians: Civilian[] = [];
   arrows: Arrow[] = [];
   shells: Shell[] = [];
+  /** Wizard towers' fire and ice. */
+  flames: Flame[] = [];
+  frosts: Frost[] = [];
   scorches: Scorch[] = [];
   effects: Effect[] = [];
   events: SimEvent[] = [];
@@ -156,6 +163,7 @@ export class DefendSim {
   private terrain: FieldTerrain;
   private towers = new Towers();
   private barracks = new Barracks();
+  private wizards = new Wizards();
   private builders: Builders;
   private grid: Enemy[][] = Array.from({ length: CELL_COUNT }, () => []);
   private gridUsed: number[] = [];
@@ -236,6 +244,9 @@ export class DefendSim {
     this.towers.step(this, dt);
     stepArrows(this, dt);
     stepShells(this, dt);
+    this.wizards.step(this, dt);
+    stepFlames(this, this.wizards, dt);
+    stepFrosts(this, dt);
     this.barracks.step(this, dt);
     for (const s of this.soldiers) (s.kind === "archer" ? stepArcher : stepSwordsman)(this, s, dt);
     this.builders.step(this, dt);
@@ -256,6 +267,8 @@ export class DefendSim {
     for (const s of this.scorches) s.t += dt;
     this.scorches = this.scorches.filter((s) => s.t < s.life);
     for (const units of [this.enemies, this.soldiers, this.civilians]) for (const u of units) u.flash = Math.max(0, u.flash - dt);
+    for (const e of this.enemies)
+      if (e.chill !== undefined && (e.chill -= dt) <= 0) delete e.chill;
     for (let i = 0; i < this.flash.length; i++) if (this.flash[i] > 0) this.flash[i] = Math.max(0, this.flash[i] - dt);
   }
 
