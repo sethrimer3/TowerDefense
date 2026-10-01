@@ -55,14 +55,20 @@ test("a hand with no card that can act pauses, lights End Run, and plays on afte
   assert.deepEqual([g.run.player.x, g.run.player.y], [1, 0]);
 });
 
-test("pausing the hand drops its path but keeps the card that led glowing", () => {
+test("pausing the hand keeps its path and the card that led, and playing on follows it", () => {
   const g = arena();
   g.autoTurn();
+  const path = g.cardPlan!.path.map(s => ({ ...s }));
   g.toggleAuto();
-  assert.ok(!g.auto && g.cardPlan === null);
+  assert.ok(!g.auto);
   assert.equal(g.activeCard, 0);
+  assert.deepEqual(g.cardPlan?.path, path, "the path waits while paused");
   g.toggleAuto();
-  assert.ok(g.auto && g.activeCard === null, "playing on plans afresh");
+  assert.ok(g.auto && g.activeCard === 0);
+  const [x, y] = [g.run.player.x, g.run.player.y];
+  g.autoTurn();
+  assert.deepEqual([g.run.player.x - x, g.run.player.y - y], [path[0].dx, path[0].dy], "it takes the path's next step");
+  assert.deepEqual(g.cardPlan?.path, path.slice(1));
 });
 
 test("undo pauses the hand and drops its path", () => {

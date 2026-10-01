@@ -391,9 +391,9 @@ export class Game {
     this.route = [];
     this.auto = !this.auto;
     if (!this.run.outside) {
-      // Pausing keeps the card that led glowing; playing on plans afresh.
-      if (this.auto) this.dropHandPlan();
-      else this.cardPlan = null;
+      // Pausing keeps the path and the card that led it: playing on follows
+      // it from where the hero stands. A stuck hand looks again.
+      if (this.auto) this.handStuck = false;
       this.message = this.auto ? "The hand takes over." : "Paused · the hand waits.";
     } else this.message = this.auto ? "Wayfinder is searching for a route." : "Manual climbing";
   }
