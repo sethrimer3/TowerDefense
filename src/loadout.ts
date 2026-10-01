@@ -1,7 +1,7 @@
 import { whole } from "./whole.ts";
 import { snap } from "./exact.ts";
 import type { Save } from "./entities.ts";
-import { FIND_POTION_BASE, FIND_POTION_MAX, FLOOR_GOLD_BASE, FLOOR_GOLD_RANK, FIND_POTION_RANK, REVIVE_BASE, REVIVE_MAX, REVIVE_RANK, GOLD_SHOP, POTION_PERCENT_BASE, POTION_PERCENT_RANK, TRAINING, TRAINING_PER_LEVEL, UPGRADES, isStatRow, levelForXp, trained, trainingWorth, type GoldItemId, type TrainingId, type UpgradeId } from "./config.ts";
+import { BONUS_RANK, FIND_POTION_BASE, FIND_POTION_MAX, FLOOR_GOLD_BASE, FLOOR_GOLD_RANK, FLOOR_SILVER_BASE, FLOOR_SILVER_RANK, FIND_POTION_RANK, REVIVE_BASE, REVIVE_MAX, REVIVE_RANK, GOLD_SHOP, POTION_PERCENT_BASE, POTION_PERCENT_RANK, TRAINING, TRAINING_PER_LEVEL, UPGRADES, isStatRow, levelForXp, trained, trainingWorth, type GoldItemId, type TrainingId, type UpgradeId } from "./config.ts";
 import { getEquippedBonuses } from "./crafting.ts";
 import { RESEARCH, researched } from "./archives.ts";
 
@@ -136,6 +136,28 @@ export const floorGold = (save: Pick<Save, "upgrades" | "training">) =>
   save.upgrades.spareChange ? floorGoldAt(save.training.floorGold) : 0;
 const floorGoldAt = (ranks: number) => FLOOR_GOLD_BASE + FLOOR_GOLD_RANK * ranks;
 
+/** The Silver each floor climbed for the first time in a run pays, before
+ * research and Silver Bonus: none without Wishing Well. */
+export const floorSilver = (save: Pick<Save, "upgrades" | "training">) =>
+  save.upgrades.wishingWell ? floorSilverAt(save.training.floorSilver) : 0;
+const floorSilverAt = (ranks: number) => FLOOR_SILVER_BASE + FLOOR_SILVER_RANK * ranks;
+
+/** Silver Bonus training's multiplier on all Silver a run finds, in
+ * percent: 100 without Wealthy. */
+export const silverBonus = (save: Pick<Save, "upgrades" | "training">) =>
+  bonusAt(save.upgrades.wealthy ? save.training.silverBonus : 0);
+/** Gold / Kill training's multiplier on the Gold a kill pays, in percent:
+ * 100 without Loot. */
+export const killGold = (save: Pick<Save, "upgrades" | "training">) =>
+  bonusAt(save.upgrades.loot ? save.training.killGold : 0);
+const bonusAt = (ranks: number) => 100 + BONUS_RANK * ranks;
+/** The training rows shown as a multiplier (×1.30), their value in percent. */
+const MULTIPLIER_ROWS: ReadonlySet<TrainingId> = new Set(["silverBonus", "killGold"]);
+
+/** How a Training row's value reads: a multiplier as ×1.30, the others
+ * with their unit after. */
+export const trainingText = (value: number, unit: string) => unit === "×" ? `×${value.toFixed(2)}` : `${value}${unit}`;
+
 /** Whether `id` has as many ranks as it can take. */
 export const trainingMaxed = (save: Pick<Save, "training">, id: TrainingId) => {
   const row = TRAINING.find((t) => t.id === id)!;
@@ -144,7 +166,8 @@ export const trainingMaxed = (save: Pick<Save, "training">, id: TrainingId) => {
 
 /** What one more rank of `id` costs and does: to the next run's character
  * for a stat, in % to what a percent potion restores or the chance a
- * potion is one, or to the Gold a new floor pays. A row at its most
+ * potion is one, to the Gold or Silver a new floor pays, or to a
+ * multiplier (its unit "×", what a rank adds in percent). A row at its most
  * ranks has no next rank to buy. */
 export function trainingStep(save: Save, id: TrainingId) {
   const row = TRAINING.find((t) => t.id === id)!, maxed = trainingMaxed(save, id),
@@ -152,6 +175,9 @@ export function trainingStep(save: Save, id: TrainingId) {
   if (!isStatRow(row)) {
     const ranks = save.training[id];
     if (id === "floorGold") return { row, unit: "", now: floorGoldAt(ranks), next: floorGoldAt(ranks + 1), worth: FLOOR_GOLD_RANK, affordable, maxed };
+    if (id === "floorSilver") return { row, unit: "", now: floorSilverAt(ranks), next: floorSilverAt(ranks + 1), worth: FLOOR_SILVER_RANK, affordable, maxed };
+    // A multiplier's rank reads as the percent it adds.
+    if (MULTIPLIER_ROWS.has(id)) return { row, unit: "×", now: bonusAt(ranks) / 100, next: bonusAt(ranks + 1) / 100, worth: BONUS_RANK, affordable, maxed };
     const [value, rank] = id === "findPotion" ? [findPotionChance, FIND_POTION_RANK]
       : id === "revive" ? [reviveChanceAt, REVIVE_RANK]
       : [(r: number) => POTION_PERCENT_BASE + POTION_PERCENT_RANK * r, POTION_PERCENT_RANK];

@@ -49,9 +49,9 @@ test("Greater Heal, then Recovery, Shroud and Find Potion, come after the Archiv
   assert.equal(before - g.save.tower.inspiration, 10);
   const at = (id: string) => TREES[0].nodes.find((n) => n.id === id)!;
   assert.deepEqual([at("greaterHeal").x, at("greaterHeal").y, at("greaterHeal").requires], [62, 124, ["archives"]]);
-  assert.deepEqual([at("recovery").x, at("recovery").y, at("recovery").requires], [42, 142, ["greaterHeal"]]);
+  assert.deepEqual([at("recovery").x, at("recovery").y, at("recovery").requires], [50, 142, ["greaterHeal"]]);
   assert.deepEqual([at("shroud").x, at("shroud").y, at("shroud").requires], [82, 142, ["greaterHeal"]], "Shroud sits beside Recovery");
-  assert.deepEqual([at("findPotion").x, at("findPotion").y, at("findPotion").requires], [42, 160, ["recovery"]], "Find Potion sits below Recovery");
+  assert.deepEqual([at("findPotion").x, at("findPotion").y, at("findPotion").requires], [50, 160, ["recovery"]], "Find Potion sits below Recovery");
 });
 test("the hand's skills run one after another to Focus, Gear after it, and Larger Hand and Buildout cost 1", () => {
   const at = (id: string) => TREES[0].nodes.find((n) => n.id === id)!;

@@ -1,6 +1,7 @@
 import type { Game } from "../state.ts";
 import { TRAINING, TRAINING_GROUPS, trainingOpen, type TrainingId } from "../config.ts";
 import { runTrainingOffer, runTrainingValue } from "../run-training.ts";
+import { trainingText } from "../loadout.ts";
 import { el, itemSprite, uiSprite } from "./dom.ts";
 import { flashRed } from "./hud.ts";
 
@@ -103,7 +104,7 @@ export class RunTrainingBar {
     const offer = runTrainingOffer(game.save, game.run, id), { value, unit } = runTrainingValue(game.save, game.run, id);
     const short = !offer.maxed && !game.free && game.silver < offer.price;
     card.classList.toggle("short", short || offer.maxed);
-    card.querySelector(".drill-value")!.textContent = `${value}${unit}`;
+    card.querySelector(".drill-value")!.textContent = trainingText(value, unit);
     const buy = card.querySelector<HTMLButtonElement>(".drill-buy")!;
     const label = offer.maxed ? "Max" : `${silverIcon()}<b>${offer.price.toLocaleString("en-US")}</b>`;
     if (buy.dataset.label !== label) {

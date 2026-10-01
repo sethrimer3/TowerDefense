@@ -41,10 +41,12 @@ const SKILL_ITEM_SPRITES: Partial<Record<UpgradeId, keyof typeof AREA1_ITEM_URLS
 const SKILL_UI_SPRITES: Partial<Record<UpgradeId, UiSprite>> = {
   hp: "health", inspirationUndos: "undo", undos: "undo", archives: "log",
   delve: "delve", auto: "automove", autoPersist: "settings",
-  revive: "revive", spareChange: "gold", legacy: "tower", quality: "tower",
+  revive: "revive", spareChange: "gold", loot: "gold", legacy: "tower", quality: "tower",
   wisdomFocus: "settings", wisdomMemory: "undo", wisdomSight: "upgrades",
   renownBanner: "tower", renownOath: "defense", renownCrown: "gear",
 };
+/** Skills about Silver show the Gold coin drained of colour, as the purse does. */
+const SKILL_SILVER = new Set<UpgradeId>(["wealthy", "wishingWell"]);
 /** Skills about the hand show a card face. */
 const SKILL_CARDS: Partial<Record<UpgradeId, CardId>> = { handOrdering: "stairs", combatStance: "monster", cardHeal: "heal", cardGear: "equipment" };
 /** Two cards fanned out: the Deck's icon, made from the card faces. */
@@ -54,6 +56,7 @@ export const skillSprite = (id: UpgradeId) => {
   if (card) return `<img class="skill-sprite card-sprite" src="${UI_ASSET_BASE}assets/cards/${card}.png" alt="" aria-hidden="true">`;
   const item = SKILL_ITEM_SPRITES[id];
   if (item) return itemSprite(item, "skill-sprite");
+  if (SKILL_SILVER.has(id)) return uiSprite("gold", "skill-sprite silver-sprite");
   return uiSprite(SKILL_UI_SPRITES[id] ?? "upgrades", "skill-sprite");
 };
 export const TAB_ICONS = {

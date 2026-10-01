@@ -219,6 +219,30 @@ export const UPGRADES = [
     currency: "inspiration",
   },
   {
+    id: "wealthy",
+    name: "Wealthy",
+    description: "All Silver found in a run is multiplied: opens Silver Bonus training, and Silver Bonus research in the Archives",
+    base: 2,
+    max: 1,
+    currency: "inspiration",
+  },
+  {
+    id: "loot",
+    name: "Loot",
+    description: "Each kill pays more Gold: opens Gold / Kill training, and Gold / Kill research in the Archives",
+    base: 2,
+    max: 1,
+    currency: "inspiration",
+  },
+  {
+    id: "wishingWell",
+    name: "Wishing Well",
+    description: "Every floor climbed for the first time in a run pays Silver: opens Silver / Floor training, and Silver / Floor research in the Archives",
+    base: 2,
+    max: 1,
+    currency: "inspiration",
+  },
+  {
     id: "inspirationUndos",
     name: "Rehearsed steps",
     description: "Rewind an action, and open Undo Count research in the Archives",
@@ -330,8 +354,10 @@ export const TRAINING_GROUPS = { offense: "Offense", defense: "Defense", utility
  * up and saving points up never pays. Shroud adds to the damage the
  * shroud blocks each fight. Potion % adds `POTION_PERCENT_RANK`
  * to what a percent potion restores, Find Potion `FIND_POTION_RANK` to
- * the chance a potion is a percent potion, and Gold / Floor
- * `FLOOR_GOLD_RANK` to the Gold a new floor pays, the same at every level. A row
+ * the chance a potion is a percent potion, Gold / Floor
+ * `FLOOR_GOLD_RANK` to the Gold a new floor pays and Silver / Floor
+ * `FLOOR_SILVER_RANK` to its Silver, and Silver Bonus and Gold / Kill
+ * `BONUS_RANK` percent to their multiplier, the same at every level. A row
  * with `requires` shows, and trains, only once that upgrade is owned; one
  * with `max` trains no further than that many ranks. */
 export const TRAINING = [
@@ -343,6 +369,9 @@ export const TRAINING = [
   { id: "findPotion", name: "Find Potion", group: "utility", requires: "findPotion", cost: 1, max: 72, description: "More of the potions found are percent potions." },
   { id: "revive", name: "Revive", group: "utility", requires: "revive", cost: 1, max: 99, description: "Raises the chance a strike that would fell you revives you at full HP instead." },
   { id: "floorGold", name: "Gold / Floor", group: "utility", requires: "spareChange", cost: 1, description: "Raises the Gold paid for each floor climbed for the first time in a run." },
+  { id: "floorSilver", name: "Silver / Floor", group: "utility", requires: "wishingWell", cost: 1, description: "Raises the Silver paid for each floor climbed for the first time in a run." },
+  { id: "silverBonus", name: "Silver Bonus", group: "utility", requires: "wealthy", cost: 1, description: "Multiplies all Silver found in a run." },
+  { id: "killGold", name: "Gold / Kill", group: "utility", requires: "loot", cost: 1, description: "Multiplies the Gold each kill pays." },
 ] as const;
 export type TrainingId = (typeof TRAINING)[number]["id"];
 export type TrainingRow = (typeof TRAINING)[number];
@@ -364,9 +393,16 @@ export const FIND_POTION_BASE = 200, FIND_POTION_RANK = 25, FIND_POTION_MAX = 20
  * rank, up to 50% (99 ranks). */
 export const REVIVE_BASE = 50, REVIVE_RANK = 50, REVIVE_MAX = 5000;
 /** The Gold each floor climbed for the first time in a run pays, before
- * the tier's bonus and Gold / Floor research: 3 with Spare Change, and 3
+ * the tier's bonus and Gold / Floor research: 3 with Spare Change, and 2
  * more for each Gold / Floor rank. */
-export const FLOOR_GOLD_BASE = 3, FLOOR_GOLD_RANK = 3;
+export const FLOOR_GOLD_BASE = 3, FLOOR_GOLD_RANK = 2;
+/** The Silver each floor climbed for the first time in a run pays, before
+ * Silver / Floor research and Silver Bonus: 3 with Wishing Well, and 3
+ * more for each Silver / Floor rank. */
+export const FLOOR_SILVER_BASE = 3, FLOOR_SILVER_RANK = 3;
+/** What each Silver Bonus or Gold / Kill rank adds to its multiplier, in
+ * percent (×1 with no ranks). */
+export const BONUS_RANK = 3;
 /** A Training row's Silver prices inside a run: the first rank bought
  * costs `base`, and each one after costs more than the last by a rate that
  * starts at `first` (50%) and eases, along an inverse square root, to
@@ -385,6 +421,9 @@ export const RUN_TRAINING_PRICES: Record<TrainingId, SilverSchedule> = {
   findPotion: silverSchedule(20),
   revive: silverSchedule(20),
   floorGold: silverSchedule(10),
+  floorSilver: silverSchedule(10),
+  silverBonus: silverSchedule(10),
+  killGold: silverSchedule(10),
 };
 /** The highest level a row without its own `max` reaches in a run, its
  * ranks and those bought there together. */

@@ -2,7 +2,7 @@ import { upgradeCard } from "../cards.ts";
 import { revealCard } from "./card-reveal.ts";
 import { TRAINING, TRAINING_GROUPS, TRAINING_PER_LEVEL, UPGRADES, cost, trainingOpen, type TrainingId, type UpgradeId } from "../config.ts";
 import { TREES, mapNodes, skillAvailable, treeHeight, type TreeId } from "../skill-trees.ts";
-import { trainingPoints, trainingStep, upgradeText } from "../loadout.ts";
+import { trainingPoints, trainingStep, trainingText, upgradeText } from "../loadout.ts";
 import { TreeParticles } from "../tree-particles.ts";
 import type { AppContext } from "./app.ts";
 import { clamp, el, gemIcon, skillSprite, uiSprite, type UiSprite } from "./dom.ts";
@@ -125,12 +125,15 @@ export class SkillTreePage {
       const price = `${t.cost} ${t.cost === 1 ? "point" : "points"}`;
       // A row with a most ranks says so, and once there offers no next one.
       const most = "max" in t ? `, up to ${trainingStep({ ...save, training: { ...save.training, [t.id]: t.max } }, t.id).now}${unit}` : "";
+      const shown = (v: number) => trainingText(v, unit);
+      // A multiplier's rank adds a percent; other rows add in their own unit.
+      const step = unit === "×" ? `${worth}%` : `${unit ? worth : Math.round(worth * 10) / 10}${unit}`;
       const buy = maxed
         ? `<button class="training-box training-cost" disabled aria-label="${t.name} is fully trained">Max</button>`
-        : `<button class="training-box training-cost" data-train="${t.id}" ${affordable ? "" : "disabled"} aria-label="Train ${t.name} to ${next}${unit} for ${price}">${price}</button>`;
+        : `<button class="training-box training-cost" data-train="${t.id}" ${affordable ? "" : "disabled"} aria-label="Train ${t.name} to ${shown(next)} for ${price}">${price}</button>`;
       const ranks = save.training[t.id];
       const reset = `<button class="training-reset" data-reset="${t.id}" ${ranks ? "" : "disabled"} aria-label="Reset ${t.name}" title="${ranks ? `Reset ${t.name} for ${TRAINING_RESET_GEMS} Gems` : `${t.name} has no ranks to reset`}">${uiSprite("undo")}</button>`;
-      return `<div class="training-row" role="listitem"><span class="training-label">${t.name}<small>+${unit ? worth : Math.round(worth * 10) / 10}${unit} a rank${most}</small></span><span class="training-box">${now}${unit}</span><span class="training-arrow" aria-hidden="true">→</span><span class="training-box next">${next}${unit}</span>${buy}${reset}</div>`;
+      return `<div class="training-row" role="listitem"><span class="training-label">${t.name}<small>+${step} a rank${most}</small></span><span class="training-box">${shown(now)}</span><span class="training-arrow" aria-hidden="true">→</span><span class="training-box next">${shown(next)}</span>${buy}${reset}</div>`;
     };
     // Each group's rows, leaving out any whose upgrade isn't owned yet.
     const rows = (Object.entries(TRAINING_GROUPS) as [keyof typeof TRAINING_GROUPS, string][]).map(([group, name]) => {

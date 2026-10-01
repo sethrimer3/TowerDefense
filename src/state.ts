@@ -58,7 +58,7 @@ import { snap } from "./exact.ts";
 import { whole, wholeChange, wholeHp } from "./whole.ts";
 import { MODES, milestones, type ModeProfile } from "./modes.ts";
 import { ranksInRun, runTrainingOffer } from "./run-training.ts";
-import { floorGold, keepUndos, loadout, percentPotionChance, potionPercent, reviveChance, trainingMaxed, trainingPoints } from "./loadout.ts";
+import { floorGold, floorSilver, keepUndos, killGold, silverBonus, loadout, percentPotionChance, potionPercent, reviveChance, trainingMaxed, trainingPoints } from "./loadout.ts";
 import { RESEARCH, cancelResearch, hastenResearch, hireArchivist, researched, settleArchives, startResearch, type ResearchId, type ResearchRecord } from "./archives.ts";
 import {
   creditMaterials,
@@ -858,17 +858,24 @@ export class Game {
     const floor = this.rules.equivalentFloor(this.rules.progressAt(this.run, at.y));
     this.gainXp(enemy, floor);
     // Silver belongs to the run, so it isn't gated like Gold: undo takes it back.
-    const silver = silverForKill(enemy.strength, floor);
-    this.run.silver = this.silver + silver;
+    const silver = this.creditSilver(silverForKill(enemy.strength, floor));
     const { gold, drops } = this.creditEnemyLoot(enemy, at.x, at.y);
     if (gold) this.gain(at.x, at.y, `+${wholeChange(gold)} Gold`);
-    this.gain(at.x, at.y, `+${silver} Silver`);
+    this.gain(at.x, at.y, `+${wholeChange(silver)} Silver`);
     for (const d of drops) this.gain(at.x, at.y, materialText(d), { material: d.id, quantity: d.quantity });
     const opened = enemy.strength === "boss" && floor >= TIER_BOSS_FLOOR && this.openNextTier();
     this.message = [revived ? `Revived · ${enemy.name} defeated` : combat.damage ? `−${wholeChange(combat.damage)} HP · ${enemy.name} defeated` : "Unscathed victory",
-      ...(gold ? [`+${wholeChange(gold)} Gold`] : []), `+${silver} Silver`, ...drops.map(materialText),
+      ...(gold ? [`+${wholeChange(gold)} Gold`] : []), `+${wholeChange(silver)} Silver`, ...drops.map(materialText),
       ...(opened ? [`${this.rules.words.tierName} ${tierNumeral(this.slice.tiersOpen)} opened`] : [])].join(" · ");
     return true;
+  }
+  /** Adds Silver found in the run, raised by Silver Bonus training and
+   * research (the two multiplied), fractions and all; returns what it
+   * added. */
+  private creditSilver(base: number) {
+    const silver = snap((base * silverBonus(this.trainingNow) * researched(this.save.archives, "silverBonus", 100)) / 10_000);
+    this.run.silver = snap(this.silver + silver);
+    return silver;
   }
   /** Banks Gold found in the run, fractions and all (`snap`). */
   private creditGold(gold: number) {
@@ -905,7 +912,9 @@ export class Game {
       key = this.lootKey(x, y);
     if (slice.lootedTiles[key]) return { gold: 0, drops: [] };
     slice.lootedTiles[key] = true;
-    const gold = tierGold(this.tier, ENEMY_GOLD[enemy.strength]);
+    // Gold / Kill training and research, multiplied, then the tier's bonus.
+    const raised = snap((ENEMY_GOLD[enemy.strength] * killGold(this.trainingNow) * researched(this.save.archives, "killGold", 100)) / 10_000);
+    const gold = tierGold(this.tier, raised);
     this.creditGold(gold);
     const drops = this.rules.enemyDrops(enemy.name, this.rng);
     creditMaterials(this.save, drops);
@@ -1009,9 +1018,13 @@ export class Game {
     this.run.maxHeight = Math.max(this.run.maxHeight ?? 0, this.run.height);
     // Each new equivalent floor is the Delve's floor climbed (Spare Change),
     // keyed off the labyrinth's columns (x = -1) so it pays once a run.
-    let gold = 0;
-    for (let f = floorBefore + 1; f <= this.rules.equivalentFloor(this.run.maxHeight); f++) gold += this.payFloorGold(this.lootKey(-1, f));
+    let gold = 0, silver = 0;
+    for (let f = floorBefore + 1; f <= this.rules.equivalentFloor(this.run.maxHeight); f++) {
+      gold += this.payFloorGold(this.lootKey(-1, f));
+      silver += this.payFloorSilver();
+    }
     if (gold) this.gain(x, y, `+${wholeChange(gold)} Gold`);
+    if (silver) this.gain(x, y, `+${wholeChange(silver)} Silver`);
     world.maintain(y);
     this.recordProgress();
   }
@@ -1019,11 +1032,20 @@ export class Game {
     this.claimRewards();
     // Keyed by the stairs taken, so a floor pays once a run, whatever undo does.
     const gold = this.payFloorGold(this.lootKey(this.run.player.x, this.run.player.y));
+    const highest = this.run.maxHeight ?? this.run.height;
     const { board, sectionStart } = this.climb.up();
+    // Silver belongs to the run, so the run's own highest floor gates it:
+    // undo takes back the Silver and the record together.
+    let silver = 0;
+    if (this.run.height > highest) {
+      this.run.maxHeight = this.run.height;
+      silver = this.payFloorSilver();
+    }
     this.enterTowerFloor(board);
     if (sectionStart) this.enterTowerSection();
     else this.feedback("A new chamber opens.");
     if (gold) this.gain(this.run.player.x, this.run.player.y, `+${wholeChange(gold)} Gold`);
+    if (silver) this.gain(this.run.player.x, this.run.player.y, `+${wholeChange(silver)} Silver`);
   }
   /** Spare Change: Gold for a floor climbed for the first time in the run,
    * its Gold / Floor raised by research and the tier's bonus. Gated by
@@ -1035,6 +1057,13 @@ export class Game {
     const gold = tierGold(this.tier, snap((base * researched(this.save.archives, "floorGold", 100)) / 100));
     this.creditGold(gold);
     return gold;
+  }
+  /** Wishing Well: Silver for a floor climbed for the first time in the
+   * run, its Silver / Floor raised by research, then by Silver Bonus.
+   * Returns what it paid. */
+  private payFloorSilver() {
+    const base = floorSilver(this.trainingNow);
+    return base ? this.creditSilver(snap((base * researched(this.save.archives, "floorSilver", 100)) / 100)) : 0;
   }
   /** Crossing into a new 10-floor section: the way down is sealed (its
    * first room has no down stairs), ATK/DEF gathered from items in the
@@ -1216,7 +1245,7 @@ export class Game {
     const offer = runTrainingOffer(this.save, this.run, id);
     if (!offer.open || offer.maxed || (!this.free && this.silver < offer.price)) return false;
     this.remember(this.snapshot());
-    if (!this.free) this.run.silver = this.silver - offer.price;
+    if (!this.free) this.run.silver = snap(this.silver - offer.price);
     this.run.training = { ...this.run.training, [id]: offer.bought + 1 };
     const row = offer.row;
     if (isStatRow(row)) {

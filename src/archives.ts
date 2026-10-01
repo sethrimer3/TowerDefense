@@ -33,6 +33,12 @@ export const RESEARCH_TARGETS = {
   potionHeal: { text: (v: number) => `+${v}% potion healing` },
   /** The percent of its Gold / Floor a new floor pays, from 100. */
   floorGold: { text: (v: number) => `+${v}% Gold per floor` },
+  /** The percent of its Silver / Floor a new floor pays, from 100. */
+  floorSilver: { text: (v: number) => `+${v}% Silver per floor` },
+  /** The percent of the Silver found that a run pays, from 100. */
+  silverBonus: { text: (v: number) => `+${v}% Silver` },
+  /** The percent of its Gold a kill pays, from 100. */
+  killGold: { text: (v: number) => `+${v}% Gold per kill` },
   /** How fast archivists work: a level of `d` hours takes d / (1 + speed). */
   researchSpeed: { text: (v: number) => `+${Math.round(v * 100)}% research speed` },
 } as const;
@@ -111,6 +117,27 @@ export const RESEARCH = {
     categories: ["economy"],
     requires: [{ upgrade: "spareChange" }],
     levels: hundredLevels("floorGold", 5),
+  },
+  floorSilver: {
+    name: "Silver / Floor",
+    description: "Toss a coin in the well: every new floor of a run pays more Silver.",
+    categories: ["economy"],
+    requires: [{ upgrade: "wishingWell" }],
+    levels: hundredLevels("floorSilver", 5),
+  },
+  silverBonus: {
+    name: "Silver Bonus",
+    description: "Learn the moneychangers' tricks: all Silver found in a run is worth more.",
+    categories: ["economy"],
+    requires: [{ upgrade: "wealthy" }],
+    levels: hundredLevels("silverBonus", 3),
+  },
+  killGold: {
+    name: "Gold / Kill",
+    description: "Search the fallen more thoroughly: every kill pays more Gold.",
+    categories: ["economy"],
+    requires: [{ upgrade: "loot" }],
+    levels: hundredLevels("killGold", 3),
   },
 } satisfies Record<string, ResearchDefinition>;
 export type ResearchId = keyof typeof RESEARCH;

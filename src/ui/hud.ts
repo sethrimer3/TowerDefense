@@ -194,8 +194,8 @@ export function renderVitals(game: Game) {
   el("shroud-stat").hidden = !game.save.upgrades.shroud;
   purse(game, "gems", game.save.gems, "Gems, kept between runs");
   purse(game, "gold", game.save.gold, "Gold, kept between runs");
-  text("run-silver", shortAmount(game.silver));
-  el("run-silver").parentElement!.title = `Silver, spent only inside this run: ${game.silver.toLocaleString("en-US")}`;
+  text("run-silver", shortAmount(whole(game.silver)));
+  el("run-silver").parentElement!.title = `Silver, spent only inside this run: ${whole(game.silver).toLocaleString("en-US")}`;
   for (const k of ["yellow", "blue", "red"] as const) text(k, p.keys[k]);
   const skeletonKeys = p.skeletonKeys ?? 0;
   text("skeleton", skeletonKeys);

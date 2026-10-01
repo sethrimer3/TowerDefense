@@ -87,7 +87,7 @@ How much XP the character has gathered from kills over every run. A kill pays mo
 _Avoid_: rank
 
 **Training point**:
-The currency each level earns (three a level), spent on ranks of training in the character's stats (max HP, ATK, DEF, and the shroud once the Shroud skill is owned) and, with Recovery, Find Potion, Revive and Spare Change, in Potion %, Find Potion, Revive and Gold / Floor on the Training tab. A stat rank's worth grows with the character's level.
+The currency each level earns (three a level), spent on ranks of training in the character's stats (max HP, ATK, DEF, and the shroud once the Shroud skill is owned) and, with Recovery, Find Potion, Revive, Spare Change, Wishing Well, Wealthy and Loot, in Potion %, Find Potion, Revive, Gold / Floor, Silver / Floor, Silver Bonus and Gold / Kill on the Training tab. A stat rank's worth grows with the character's level.
 _Avoid_: skill point, stat point
 
 **Revival**:
@@ -124,7 +124,7 @@ The monster guarding the way up at the end of every ten floors: in front of the 
 _Avoid_: area boss, guardian
 
 **Silver**:
-The currency of a single run: each monster beaten pays some, more on higher floors and for stronger monsters, and it is spent only inside that run, on run training. Undo takes it back with the kill, and it is gone when the run ends.
+The currency of a single run: each monster beaten pays some, more on higher floors and for stronger monsters (and each new floor, with Wishing Well), and it is spent only inside that run, on run training. Undo takes it back with the kill, and it is gone when the run ends.
 _Avoid_: coins, run gold
 
 **Run training**:
