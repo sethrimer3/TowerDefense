@@ -137,7 +137,7 @@ export function bonuses(save: Save): Bonuses {
 
 // ── Rewards ────────────────────────────────────────────────────────────
 /** Gold a kill pays, before bonuses. */
-export const KILL_GOLD: Record<EnemyKind, number> = { roach: 2, orc: 5, ogre: 14, bat: 4, warlord: 150 };
+export const KILL_GOLD: Record<EnemyKind, number> = { roach: 2, orc: 5, ogre: 14, bat: 4, warlord: 150, mother: 10, broodling: 2 };
 /** Gold for holding a wave. */
 export const waveGold = (wave: number) => 10 + 5 * wave;
 /** Experience a kill pays, before bonuses: what the enemy costs a wave, and

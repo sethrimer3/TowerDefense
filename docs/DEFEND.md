@@ -98,6 +98,11 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   passable at a cost (they must be smashed first) — so they walk the streets
   but break through when that's much shorter. Houses lure some enemies off
   the road to wreck them (`distraction`); bats fly straight over everything.
+- **Mothers** (from wave 6) are slow, black and violet-rimmed, with pale
+  eyes and a swollen brood sac. When one dies she splits into three quick
+  **broodlings** at the corners of a small triangle around where she fell
+  (on the spot if that is inside a wall); broodlings never come in a wave's
+  mix and don't split again. Each pays its own Gold and experience.
 - Destruction lasts for the whole run. **Civilians** come out of houses to
   rebuild rubble one cell at a time (walls and structures first); a
   structure only works again once fully rebuilt. They avoid rubble with
