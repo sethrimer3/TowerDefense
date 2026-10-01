@@ -91,7 +91,8 @@ const place = (s, { seed, x, y, open = [], closed = [], stats = {}, undo = false
   r.changes = {};
   for (const [cx, cy] of open) r.changes[`${cx},${cy}`] = { kind: "floor" };
   for (const [cx, cy] of closed) r.changes[`${cx},${cy}`] = { kind: "wall" };
-  Object.assign(r.player, { x, y, hp: 120, attack: 12, defense: 5, keys: { yellow: 0, blue: 0, red: 0 } }, stats);
+  // A save whose hero has more HP than its max is dropped as corrupt.
+  Object.assign(r.player, { x, y, hp: 120, maxHp: 120, attack: 12, defense: 5, keys: { yellow: 0, blue: 0, red: 0 } }, stats);
   s.delve.history = [];
   s.delve.fall = null;
 };
@@ -101,7 +102,7 @@ await fixture((s) => { s.upgrades.delve = 1; });
 
 // Swipes in all four directions, below the key.
 await fixture(place, {
-  seed: scene.seed, x: key.x, y: key.y - 2,
+  seed: scene.seed, x: key.x, y: key.y - 2, undo: true,
   open: [[key.x - 1, key.y - 2], [key.x, key.y - 2], [key.x, key.y - 1]],
 });
 await swipe(-1, 0);
@@ -138,7 +139,8 @@ await page.screenshot({ path: "test-results/blocked-door.png", fullPage: true })
 const weak = {
   seed: scene.seed, x: enemy.x, y: enemy.y - 2,
   open: [[enemy.x, enemy.y - 2], [enemy.x, enemy.y - 1]],
-  stats: { hp: 1, attack: 1, defense: 0 },
+  // Enough ATK to get past its DEF (a hero who can't hurt it is refused the fight).
+  stats: { hp: 1, attack: 5, defense: 0 },
   undo: true,
 };
 await fixture(place, weak);
