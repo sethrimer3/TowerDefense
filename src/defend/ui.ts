@@ -384,7 +384,8 @@ export class DefendPage {
     const boardEl = this.root.querySelector<HTMLElement>("#defend-board")!;
     if (!stage.offsetParent) return;
     const top = boardEl.getBoundingClientRect().top + window.scrollY;
-    const availH = window.innerHeight - top - this.navHeight() - 16;
+    // 24 px below leaves room for the board frame's lower brackets.
+    const availH = window.innerHeight - top - this.navHeight() - 24;
     // The palette never sets the page height: it's capped to the board and
     // scrolls on its own when it holds more than fits.
     palette.style.maxHeight = `${Math.max(60, availH)}px`;

@@ -1,4 +1,5 @@
 import "./style.css";
+import "./theme.css";
 import { defaults, load, persist, type Save } from "./save.ts";
 import { DefendPage } from "./defend/ui.ts";
 import { bonuses, levelForXp, payKills, payWave, settleTraining, whole, xpForLevel } from "./progression.ts";

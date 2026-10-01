@@ -1,0 +1,759 @@
+/* ── The keep's look: dressed stone, oiled oak, iron, brass and parchment ──
+   Loaded after style.css, which keeps the layout; this file only dresses it.
+   The textures in assets/theme/ are small tiling SVGs (noise-grained wood,
+   a stone course, mottled parchment), so nothing here is a flat web gradient
+   on its own. Text is always the bundled Cinzel. */
+:root {
+  color: #d9c9a6;
+  background: #0b0a09;
+  --gold: #e2b866;
+  --muted: #9c8b6b;
+  --line: #3a2c1e;
+  --ink: #2e1f10;
+  --ink-soft: #5a4126;
+  --brass: #b98a3e;
+  --brass-hi: #f0cf86;
+  --ember: #ff9a3c;
+  --wood: url("../assets/theme/wood.svg") 0 0 / 320px 80px;
+  --stone: url("../assets/theme/stone.svg") 0 0 / 240px 160px;
+  --parchment: url("../assets/theme/parchment.svg") 0 0 / 300px 300px;
+  /* Four round nail-heads, one in each corner. */
+  --nails: radial-gradient(circle at 6px 6px, #a7a39a 0 1.1px, #3b3833 1.7px, transparent 2.3px),
+    radial-gradient(circle at calc(100% - 6px) 6px, #a7a39a 0 1.1px, #3b3833 1.7px, transparent 2.3px),
+    radial-gradient(circle at 6px calc(100% - 6px), #a7a39a 0 1.1px, #3b3833 1.7px, transparent 2.3px),
+    radial-gradient(circle at calc(100% - 6px) calc(100% - 6px), #a7a39a 0 1.1px, #3b3833 1.7px, transparent 2.3px);
+  --brass-nails: radial-gradient(circle at 6px 6px, #ffe3a0 0 1.1px, #6b4b1c 1.8px, transparent 2.4px),
+    radial-gradient(circle at calc(100% - 6px) 6px, #ffe3a0 0 1.1px, #6b4b1c 1.8px, transparent 2.4px),
+    radial-gradient(circle at 6px calc(100% - 6px), #ffe3a0 0 1.1px, #6b4b1c 1.8px, transparent 2.4px),
+    radial-gradient(circle at calc(100% - 6px) calc(100% - 6px), #ffe3a0 0 1.1px, #6b4b1c 1.8px, transparent 2.4px);
+}
+* {
+  scrollbar-color: #8a6a3acc transparent;
+}
+::-webkit-scrollbar-thumb {
+  background-color: #3a2a1880;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 6 40' width='6' height='40'%3E%3Cpath d='M3 2 L4.3 11 L3 15 L1.7 11 Z' fill='%23c9a05a'/%3E%3Ccircle cx='3' cy='20' r='1.6' fill='%23c9a05a'/%3E%3Cpath d='M3 38 L4.3 29 L3 25 L1.7 29 Z' fill='%23c9a05a'/%3E%3C/svg%3E");
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: #5a402080;
+}
+
+/* ── The hall: a stone wall, lit from above ── */
+body {
+  background:
+    radial-gradient(ellipse at 50% -10%, #ff9a3c1f, transparent 55%),
+    linear-gradient(#000000b8, #000000d0),
+    var(--stone),
+    #0b0a09;
+}
+.shell {
+  background:
+    radial-gradient(ellipse 80% 40% at 50% 0%, #ffae5520, transparent 70%),
+    linear-gradient(90deg, #000000b0, #00000060 10%, #00000050 50%, #00000060 90%, #000000b0),
+    var(--stone),
+    #121110;
+  border-inline: 3px solid #0a0807;
+  box-shadow:
+    0 0 0 1px #4a3721,
+    0 0 120px #000;
+}
+
+/* ── Buttons: oak boards nailed at the corners ── */
+button {
+  position: relative;
+  color: #e6d2a6;
+  border: 2px solid #150f0a;
+  border-radius: 3px;
+  background:
+    var(--nails),
+    linear-gradient(#ffffff10, transparent 35%, #00000066),
+    linear-gradient(#00000038, #00000038),
+    var(--wood),
+    #3a2616;
+  box-shadow:
+    inset 0 1px 0 #ffd9a026,
+    inset 0 -2px 0 #00000080,
+    0 2px 0 #000000b0;
+  text-shadow: 0 1px 0 #000, 0 0 2px #000;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s,
+    color 0.15s;
+}
+button:hover {
+  border-color: #5e4120;
+  color: #ffe4a8;
+  box-shadow:
+    inset 0 1px 0 #ffd9a026,
+    inset 0 -2px 0 #00000080,
+    inset 0 0 14px #ffae5530,
+    0 2px 0 #000000b0;
+}
+button:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow:
+    inset 0 2px 4px #000000a0,
+    0 1px 0 #000000b0;
+}
+button:disabled {
+  opacity: 0.5;
+  filter: saturate(0.4) brightness(0.8);
+}
+button:focus-visible,
+select:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--brass-hi);
+}
+
+/* Chosen and leading buttons are bound in brass, and glow like a lit lamp. */
+button[aria-pressed="true"],
+.tree-tabs [aria-pressed="true"],
+nav button.selected,
+.defend-go,
+button.training-cost:not(:disabled),
+.defend-card button:not(:disabled) {
+  border-color: #6e4c1c;
+  color: #ffe1a0;
+  background:
+    var(--brass-nails),
+    radial-gradient(ellipse at 50% 120%, #ff9a3c40, transparent 70%),
+    linear-gradient(#ffffff10, transparent 35%, #00000060),
+    linear-gradient(#00000070, #00000070),
+    var(--wood),
+    #3a2616;
+  box-shadow:
+    inset 0 0 0 1px #d9a95266,
+    inset 0 -2px 0 #00000080,
+    inset 0 0 16px #ff9a3c26,
+    0 2px 0 #000000b0;
+  text-shadow: 0 1px 0 #000, 0 0 8px #ff9a3c70;
+}
+.defend-go {
+  border-color: #6e4c1c !important;
+}
+
+/* Danger is lacquered red, the colour of the wax that seals an order. */
+.danger,
+.defend-danger {
+  color: #ffc9b8 !important;
+  background:
+    var(--nails),
+    linear-gradient(#a3302566, #4a0f0c99),
+    var(--wood),
+    #3a1410;
+  border-color: #2a0a08;
+}
+.defend-danger.armed {
+  border-color: #e0604e;
+  background:
+    var(--brass-nails),
+    radial-gradient(ellipse at 50% 120%, #ff5a3c70, transparent 70%),
+    linear-gradient(#c0302588, #5a0f0caa),
+    var(--wood),
+    #3a1410;
+  color: #ffe0d6 !important;
+  box-shadow: inset 0 0 14px #ff6a4a50, 0 0 10px #ff4a2a50;
+}
+
+select {
+  color: #e6d2a6;
+  border: 2px solid #150f0a;
+  border-radius: 3px;
+  background: linear-gradient(#00000050, #00000050), var(--wood), #3a2616;
+}
+input[type="checkbox"] {
+  accent-color: var(--brass);
+}
+
+/* ── Headings: engraved, between two flourishes ── */
+.page-title h2,
+dialog h2,
+.tree-heading h3,
+.card h3,
+.upgrade h3 {
+  color: #f0d9a8;
+  text-shadow: 0 1px 0 #000, 0 -1px 0 #ffffff12;
+  letter-spacing: 0.6px;
+}
+.defend-section,
+.training-group,
+.page-title h2,
+.tree-heading h3 {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+.defend-section::before,
+.defend-section::after,
+.training-group::before,
+.training-group::after,
+.page-title h2::before,
+.page-title h2::after,
+.tree-heading h3::before,
+.tree-heading h3::after {
+  content: "";
+  flex: 1;
+  max-width: 120px;
+  height: 12px;
+  background: url("../assets/theme/rule.svg") right center / auto 12px no-repeat;
+}
+.defend-section::after,
+.training-group::after,
+.page-title h2::after,
+.tree-heading h3::after {
+  transform: scaleX(-1);
+}
+.defend-section {
+  font-size: 15px;
+  color: #f0d9a8;
+  text-shadow: 0 1px 0 #000;
+}
+.page-title {
+  text-align: center;
+}
+.page-title small,
+dialog > small {
+  color: #c79f5c;
+}
+
+/* ── The currency bar: a signboard hung on two chains ── */
+.td-currencies {
+  position: relative;
+  gap: 0;
+  padding: 7px 6px 6px;
+  margin: 0 0 14px;
+  border: 2px solid #120d09;
+  border-radius: 3px;
+  background:
+    var(--nails),
+    linear-gradient(#ffffff0d, transparent 30%, #00000060),
+    linear-gradient(#00000040, #00000040),
+    var(--wood),
+    #2e1e12;
+  box-shadow:
+    inset 0 1px 0 #ffd9a01c,
+    inset 0 0 0 1px #00000070,
+    0 3px 0 #000000a0,
+    0 8px 18px #000000a0;
+}
+.td-currencies::before,
+.td-currencies::after {
+  content: "";
+  position: absolute;
+  bottom: 100%;
+  width: 5px;
+  height: 24px;
+  background: repeating-linear-gradient(#8d877c 0 3px, #3a3631 3px 4px, #5e5952 4px 6px, #1a1816 6px 7px);
+  border-radius: 2px;
+}
+.td-currencies::before {
+  left: 18%;
+}
+.td-currencies::after {
+  right: 18%;
+}
+.td-currencies .currency {
+  padding: 0 10px;
+  color: var(--gold);
+  text-shadow: 0 1px 0 #000, 0 0 6px #00000080;
+}
+/* A carved groove between each holding. */
+.td-currencies .currency + .currency {
+  box-shadow: -1px 0 0 #00000090, -2px 0 0 #ffd9a014;
+}
+.td-currencies .currency small {
+  color: #b59a6c;
+}
+.td-currencies .valor-currency {
+  color: #e6c8ff;
+  text-shadow: 0 1px 0 #000, 0 0 8px #b07aff70;
+}
+.td-currencies .bar-icon {
+  border-color: #000;
+  box-shadow: inset 0 1px 0 #ffffff80, 0 1px 0 #000;
+}
+/* Experience fills a glass phial. */
+.td-currencies .level-currency .xp-track {
+  width: 48px;
+  height: 6px;
+  margin-top: 5px;
+  border-radius: 4px;
+  border: 1px solid #8a7550;
+  background: #0b0d0c;
+  box-shadow: inset 0 1px 2px #000, 0 0 0 1px #000;
+}
+.td-currencies .level-currency .xp-track i {
+  border-radius: 3px;
+  background: linear-gradient(#fff0b8, #e7a83a 45%, #8e5a12);
+  box-shadow: 0 0 6px #ffb44a;
+}
+
+/* ── The tab row: three stone tablets on a lintel; the chosen one is lit ── */
+nav {
+  margin-top: 10px;
+  padding: 6px 6px max(6px, env(safe-area-inset-bottom));
+  gap: 6px;
+  border: 2px solid #0e0a07;
+  border-radius: 3px;
+  background:
+    linear-gradient(#00000070, #00000090),
+    var(--wood),
+    #241810;
+  box-shadow:
+    inset 0 2px 0 #4a4741,
+    inset 0 3px 0 #0e0c0a,
+    0 -4px 14px #00000080;
+}
+nav button {
+  border-color: #0c0b0a;
+  color: #bfb29a;
+  background:
+    linear-gradient(#ffffff10, transparent 30%, #00000070),
+    var(--stone),
+    #1c1b19;
+  box-shadow:
+    inset 0 1px 0 #ffffff1c,
+    inset 0 -2px 0 #00000090,
+    0 2px 0 #000;
+}
+nav button.selected {
+  border-color: #6e4c1c;
+  color: #ffdc95;
+  background:
+    radial-gradient(ellipse 70% 60% at 50% 115%, #ff8a2c66, transparent 75%),
+    linear-gradient(#ffffff10, transparent 30%, #00000060),
+    var(--stone),
+    #1c1b19;
+  box-shadow:
+    inset 0 2px 0 #d9a952,
+    inset 0 0 0 1px #d9a95240,
+    inset 0 -10px 18px #ff9a3c20,
+    0 2px 0 #000,
+    0 0 14px #ff9a3c30;
+}
+nav button > span img {
+  filter: drop-shadow(0 2px 0 #000);
+}
+
+/* ── Defend: the header, the shelf and the framed board ── */
+.defend-hud {
+  color: #cbbb98;
+  text-shadow: 0 1px 0 #000;
+}
+.defend-hud b {
+  color: #fbe6b6;
+}
+.defend-sky {
+  color: #a9c2d6;
+}
+/* The keep's health, a phial of red tincture. */
+.defend-keep i {
+  height: 8px;
+  border: 1px solid #8a7550;
+  border-radius: 4px;
+  background: #160b0a;
+  box-shadow: inset 0 1px 2px #000, 0 0 0 1px #000;
+  overflow: hidden;
+}
+.defend-keep em {
+  background: linear-gradient(#ffb0a0, #c8322a 45%, #6a0f0c);
+  box-shadow: 0 0 6px #ff4a3a;
+}
+.defend-cog {
+  color: #e6d2a6;
+}
+
+/* The palette is an apothecary's shelf of cubbies. */
+.defend-palette {
+  border: 2px solid #120d09;
+  border-radius: 3px;
+  background:
+    linear-gradient(#00000080, #00000090),
+    var(--wood),
+    #241810;
+  box-shadow:
+    inset 0 0 0 1px #5a412455,
+    inset 0 0 14px #000,
+    0 3px 10px #000000a0;
+  scrollbar-color: #8a6a3a transparent;
+}
+.defend-palette-title {
+  color: #c79f5c;
+  text-shadow: 0 1px 0 #000;
+}
+.defend-item {
+  border-color: #0c0907;
+  background:
+    linear-gradient(#00000060, #00000030),
+    var(--stone),
+    #161412;
+  box-shadow:
+    inset 0 3px 6px #000000c0,
+    inset 0 -1px 0 #ffffff14,
+    0 1px 0 #ffd9a01a;
+}
+.defend-item:hover {
+  box-shadow:
+    inset 0 3px 6px #000000c0,
+    inset 0 0 12px #ffae5530,
+    0 1px 0 #ffd9a01a;
+}
+.defend-item b {
+  color: #ffd98f;
+}
+.defend-item canvas {
+  filter: drop-shadow(0 2px 1px #000);
+}
+
+/* The board hangs in an oak frame with iron corner brackets. */
+.defend-board {
+  border-color: #1a110a;
+  box-shadow:
+    0 0 0 1px #000,
+    0 0 0 4px #4d3420,
+    0 0 0 5px #120c07,
+    0 8px 30px #000000c0;
+}
+.defend-board::before {
+  content: "";
+  position: absolute;
+  inset: -7px;
+  z-index: 4;
+  border: 16px solid transparent;
+  border-image: url("../assets/theme/frame.svg") 16 / 16px;
+  pointer-events: none;
+}
+.defend-message {
+  color: #fbe6b6;
+  text-shadow: 0 1px 0 #000, 0 0 4px #000, 0 0 10px #000;
+}
+
+/* Proclamations, settings and tooltips are written on parchment. */
+.defend-banner,
+.defend-settings,
+.inspect-box,
+dialog {
+  color: var(--ink);
+  border: 1px solid #4a3218;
+  background: var(--parchment), #d8c496;
+  box-shadow:
+    inset 0 0 0 1px #f4e6c240,
+    inset 0 0 22px #6b4416a0,
+    0 2px 0 #000,
+    0 10px 30px #000000c0;
+  text-shadow: none;
+}
+.defend-banner {
+  z-index: 5;
+  border-radius: 2px;
+}
+.defend-banner strong {
+  color: #7d1a12;
+}
+.defend-banner span {
+  color: var(--ink);
+}
+.defend-banner em {
+  color: #6a4510;
+  font-weight: 600;
+}
+.defend-settings small,
+.defend-settings .hint {
+  color: var(--ink-soft);
+}
+.defend-setting {
+  color: var(--ink);
+}
+.inspect-box {
+  color: var(--ink);
+  border-radius: 2px;
+}
+.inspect-box .safe,
+.tree-tooltip .safe {
+  color: #2f5a1e;
+}
+.inspect-box .danger {
+  color: #8a1a12 !important;
+}
+/* The skill's name is inked, not lit, on parchment. */
+.tree-tooltip {
+  --tree-color: #7a3e10;
+}
+.skill-tree.stewardship .tree-tooltip {
+  --tree-color: #1f5a4a;
+}
+
+/* ── The Armory: notices nailed to dark oak ── */
+.defend-wallet {
+  color: #bfae8c;
+}
+.defend-wallet b {
+  color: #ffd98f;
+}
+.defend-armory h4 {
+  color: #c79f5c;
+}
+.card {
+  border: 2px solid #120d09;
+  border-radius: 3px;
+  background:
+    var(--nails),
+    linear-gradient(#ffffff0a, transparent 30%, #00000040),
+    linear-gradient(#000000a0, #000000a8),
+    var(--wood),
+    #1e140d;
+  box-shadow:
+    inset 0 0 0 1px #5a412440,
+    inset 0 1px 0 #ffd9a01a,
+    0 3px 0 #000,
+    0 6px 14px #00000080;
+}
+.card small {
+  color: #b59a6c;
+}
+.card p,
+.defend-card p {
+  color: #cdbd9c;
+}
+.card p b {
+  color: #ffd98f;
+}
+.defend-card > canvas {
+  padding: 3px;
+  border: 1px solid #3a2a18;
+  background: #0d0b09;
+  box-shadow: inset 0 2px 4px #000, 0 1px 0 #ffd9a014;
+}
+.hint,
+.page-title p {
+  color: #b3a282;
+}
+
+/* ── Upgrades: Training is a ledger, the trees are alchemical charts ── */
+.tree-tabs small {
+  color: #b59a6c;
+}
+.tree-tabs [aria-pressed="true"] small {
+  color: #f0cf86;
+}
+.tree-tabs span img {
+  filter: drop-shadow(0 2px 0 #000);
+}
+.skill-tree,
+.training {
+  border: 2px solid #120d09;
+  border-radius: 4px;
+  background:
+    radial-gradient(ellipse at 50% 30%, #ff9a3c14, transparent 65%),
+    linear-gradient(#000000c8, #000000d0),
+    var(--wood),
+    #1a110b;
+  box-shadow:
+    inset 0 0 0 3px #1a120c,
+    inset 0 0 0 4px #8a6a3a55,
+    inset 0 0 30px #000,
+    0 4px 14px #000000a0;
+}
+.skill-tree.stewardship {
+  border-color: #0b1210;
+  background:
+    radial-gradient(ellipse at 50% 30%, #3cc29a14, transparent 65%),
+    linear-gradient(#000000c8, #000000d0),
+    var(--wood),
+    #1a110b;
+  box-shadow:
+    inset 0 0 0 3px #1a120c,
+    inset 0 0 0 4px #5aa08a55,
+    inset 0 0 30px #000,
+    0 4px 14px #000000a0;
+}
+.tree-heading small {
+  color: var(--tree-color);
+  text-shadow: 0 1px 0 #000;
+}
+.tree-viewport {
+  border: 1px solid #3a2a18;
+  border-radius: 3px;
+  background:
+    url("../assets/theme/sigil.svg") center / min(92%, 440px) no-repeat,
+    radial-gradient(ellipse at 50% 45%, #1a1712, #08090a 75%);
+  box-shadow: inset 0 0 24px #000;
+}
+.skill-tree.stewardship .tree-viewport {
+  background:
+    url("../assets/theme/sigil.svg") center / min(92%, 440px) no-repeat,
+    radial-gradient(ellipse at 50% 45%, #111916, #08090a 75%);
+}
+.tree-map line {
+  stroke: #4a3e2e;
+}
+.tree-map line.lit {
+  filter: drop-shadow(0 0 3px var(--tree-color));
+}
+/* Each skill is a round brass medallion. */
+.skill-node {
+  box-shadow: none;
+  text-shadow: 0 1px 0 #000;
+  color: #d9c9a6;
+}
+.skill-node,
+.skill-node[aria-pressed],
+.skill-node:hover,
+.skill-node:active:not(:disabled) {
+  background: none;
+  border: 0;
+  box-shadow: none;
+  transform: translate(-50%, -50%);
+}
+.node-icon {
+  border-radius: 50%;
+  color: #c7b48e;
+  border: 2px solid #6b5636;
+  background: radial-gradient(circle at 40% 35%, #2e261b, #0e0c09 75%);
+  box-shadow:
+    0 0 0 3px #0a0908,
+    0 0 0 4px #4a3a24,
+    inset 0 2px 6px #000;
+}
+.skill-node.locked .node-icon {
+  border-style: dashed;
+  border-color: #4a4034;
+  color: #6f6555;
+  box-shadow:
+    0 0 0 3px #0a0908,
+    inset 0 2px 6px #000;
+}
+.skill-node.available .node-icon {
+  border-color: var(--tree-color);
+}
+.skill-node.owned .node-icon {
+  background: radial-gradient(circle at 40% 35%, #3a3020, #14100a 75%);
+  border-color: var(--tree-color);
+  color: var(--tree-color);
+  box-shadow:
+    0 0 0 3px #0a0908,
+    0 0 0 4px var(--tree-color),
+    0 0 16px color-mix(in srgb, var(--tree-color) 55%, transparent),
+    inset 0 2px 6px #000;
+}
+.skill-node.chosen .node-icon {
+  outline: 1px dashed var(--tree-color);
+  outline-offset: 7px;
+}
+.node-name,
+.skill-node small {
+  background: #0b0a09d8;
+  border-radius: 2px;
+}
+.skill-node small {
+  color: #a8987a;
+}
+
+.training-points {
+  color: #d9c9a6;
+}
+.training-points small {
+  color: #9c8b6b;
+}
+.training-group {
+  color: #c79f5c;
+}
+.training-label {
+  color: #f0d9a8;
+  text-shadow: 0 1px 0 #000;
+}
+.training-label small {
+  color: #a8987a;
+}
+/* The figures sit in wells cut into the ledger's board. */
+.training-box {
+  border: 1px solid #3a2c1c;
+  border-radius: 3px;
+  background: #0d0b09;
+  color: #e6d6b4;
+  box-shadow:
+    inset 0 2px 4px #000,
+    0 1px 0 #ffd9a014;
+}
+.training-box.next {
+  border-color: #4f6b3a;
+  color: #c4e6a0;
+  text-shadow: 0 0 6px #7ac24a60;
+}
+.training-arrow {
+  color: #c79f5c;
+}
+button.training-box {
+  border: 2px solid #150f0a;
+}
+button.training-cost:disabled {
+  color: #9c8b6b;
+  border-color: #150f0a;
+  background:
+    linear-gradient(#00000070, #00000070),
+    var(--wood),
+    #2a1c12;
+}
+.training-row.active .training-box.next {
+  border-color: #b8442e;
+  color: #ffc0a8;
+  text-shadow: 0 0 6px #ff5a3a60;
+}
+button.training-timer {
+  color: #ffd6c4;
+  border-color: #2a0a08;
+  background:
+    radial-gradient(ellipse at 50% 120%, #ff5a2c55, transparent 70%),
+    linear-gradient(#a3302555, #4a0f0c99),
+    var(--wood),
+    #3a1410;
+}
+
+/* ── Settings ── */
+.setting {
+  border-bottom: 1px solid #00000090;
+  box-shadow: 0 1px 0 #ffd9a014;
+  color: #e0cfab;
+}
+
+/* ── The shared dialog: an order on parchment under a wax seal ── */
+dialog {
+  border-radius: 2px;
+  padding-top: 64px;
+}
+dialog::before {
+  content: "";
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  width: 46px;
+  height: 46px;
+  transform: translateX(-50%) rotate(-8deg);
+  background: url("../assets/theme/seal.svg") center / contain no-repeat;
+  filter: drop-shadow(0 2px 2px #3a1a0a80);
+}
+dialog > small {
+  color: var(--ink-soft);
+}
+dialog h2 {
+  color: #3a200c;
+  text-shadow: 0 1px 0 #f4e6c280;
+}
+dialog p {
+  color: #4a3420;
+}
+dialog::backdrop {
+  background: radial-gradient(ellipse at 50% 40%, #1a0f06c0, #050302ee);
+  backdrop-filter: blur(3px);
+}
+
+@media (max-width: 480px) {
+  .td-currencies .currency {
+    padding: 0 6px;
+  }
+  .td-currencies::before,
+  .td-currencies::after {
+    height: 12px;
+  }
+}
