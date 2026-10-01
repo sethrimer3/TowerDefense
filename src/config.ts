@@ -404,26 +404,32 @@ export const FLOOR_SILVER_BASE = 3, FLOOR_SILVER_RANK = 3;
  * percent (×1 with no ranks). */
 export const BONUS_RANK = 3;
 /** A Training row's Silver prices inside a run: the first rank bought
- * costs `base`, and each one after costs more than the last by a rate that
- * starts at `first` (50%) and eases, along an inverse square root, to
- * `last` (1%) by the `span`th rank bought (see `silverPrice`). */
-export type SilverSchedule = { base: number; first: number; last: number; span: number };
-const silverSchedule = (base: number): SilverSchedule => ({ base, first: 0.5, last: 0.01, span: 1000 });
+ * costs `base`, and each one after costs more than the last by `step` plus
+ * the ranks already bought, the `step` growing by `growth` every five ranks
+ * (see `silverPrice`). Base 5: +1+N for the next five, then +4+N, +7+N … */
+export type SilverSchedule = { base: number; step: number; growth: number };
+/** Rows open from the start. */
+const cheap: SilverSchedule = { base: 5, step: 1, growth: 3 };
+/** Rows a skill opens: steeper, so ranks from Inspiration's Training points
+ * stay worth more than Silver's. */
+const opened: SilverSchedule = { base: 10, step: 2, growth: 3 };
+/** Rows a deeper skill opens. */
+const deep: SilverSchedule = { base: 20, step: 4, growth: 4 };
 /** Training bought with Silver inside a run, lasting only for that run:
  * each row's price schedule. The rows open from the start cost least, the
  * ones later skills open more. */
 export const RUN_TRAINING_PRICES: Record<TrainingId, SilverSchedule> = {
-  hp: silverSchedule(5),
-  attack: silverSchedule(5),
-  defense: silverSchedule(5),
-  shroud: silverSchedule(10),
-  potion: silverSchedule(10),
-  findPotion: silverSchedule(20),
-  revive: silverSchedule(20),
-  floorGold: silverSchedule(10),
-  floorSilver: silverSchedule(10),
-  silverBonus: silverSchedule(10),
-  killGold: silverSchedule(10),
+  hp: cheap,
+  attack: cheap,
+  defense: cheap,
+  shroud: opened,
+  potion: opened,
+  findPotion: deep,
+  revive: deep,
+  floorGold: opened,
+  floorSilver: opened,
+  silverBonus: opened,
+  killGold: opened,
 };
 /** The highest level a row without its own `max` reaches in a run, its
  * ranks and those bought there together. */

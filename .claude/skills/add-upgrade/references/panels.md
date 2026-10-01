@@ -60,7 +60,7 @@ Hero stats bought with training points (`TRAINING_PER_LEVEL` per hero level), on
 
 **Unlocks:** a row with `requires: <UpgradeId>` is hidden, and `Game.train` refuses it, until that upgrade is owned (`trainingOpen`).
 
-**Run training:** every row is also sold for Silver inside a run (`run-training.ts`). Give it a price schedule in `RUN_TRAINING_PRICES` (`config.ts`; base 5 for a row open from the start, 10 or 20 for one a later skill opens). A stat row then works with nothing more; a row without `stat` needs its run ranks read where it acts (through `ranksInRun`, as `game.trainingNow` does for Potion % and Revive, and `trainInRun` for Find Potion), and its value in `runTrainingValue`.
+**Run training:** every row is also sold for Silver inside a run (`run-training.ts`). Give it a price schedule in `RUN_TRAINING_PRICES` (`config.ts`: `cheap`, base 5 and +1+N, +4+N … every five ranks, for a row open from the start; `opened`, base 10 and +2+N, +5+N …, for one a skill opens; `deep`, base 20 and +4+N, +8+N …, for one a deeper skill opens; a dearer row gets its own `{ base, step, growth }`). A stat row then works with nothing more; a row without `stat` needs its run ranks read where it acts (through `ranksInRun`, as `game.trainingNow` does for Potion % and Revive, and `trainInRun` for Find Potion), and its value in `runTrainingValue`.
 
 **Reset:** every row gets a reset button for free: `Game.resetTraining` spends `TRAINING_RESET_GEMS` Gems (`gems.ts`) to set its ranks to 0 and returns `cost × ranks` points, so a new row needs nothing for it.
 

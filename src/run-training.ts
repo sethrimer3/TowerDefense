@@ -7,20 +7,13 @@ import { floorGold, floorSilver, killGold, percentPotionChance, silverBonus, pot
  * the hero's own, lasting only for that run (`run.training`, so undo takes
  * a purchase back with the rest of the run). */
 
-/** Each row's prices so far, unrounded, worked out as they are asked for. */
-const prices = new Map<TrainingId, number[]>();
-
 /** What the rank after `bought` ranks bought this run costs in Silver: the
- * schedule's base, raised by each earlier rank's rate in turn,
- * `first` / √(1 + k × (first² / last² − 1) / span) for the k-th, so the
- * rate falls quickly at first and reaches `last` at rank `span`. */
+ * schedule's base, and for the k-th rank after it `step + k` more than the
+ * one before, `step` rising by `growth` every five, summed here at once. */
 export function silverPrice(id: TrainingId, bought: number) {
-  const { base, first, last, span } = RUN_TRAINING_PRICES[id];
-  const list = prices.get(id) ?? [base];
-  prices.set(id, list);
-  const slope = (first * first / (last * last) - 1) / span;
-  for (let k = list.length - 1; k < bought; k++) list.push(list[k] * (1 + first / Math.sqrt(1 + k * slope)));
-  return Math.round(list[bought]);
+  const { base, step, growth } = RUN_TRAINING_PRICES[id];
+  const fives = Math.floor(bought / 5), rest = bought % 5;
+  return base + bought * step + bought * (bought + 1) / 2 + growth * (5 * fives * (fives - 1) / 2 + rest * fives);
 }
 
 /** The highest level `row` reaches in a run: its own `max`, or the cap. */

@@ -23,20 +23,25 @@ function arena(silver: number, edit?: (g: Game) => void) {
   return g;
 }
 
-test("Silver prices start at the row's base and rise 50% at first, easing to 1% by the thousandth rank", () => {
+test("Silver prices start at the row's base and rise by a step plus the ranks bought, the step growing every five", () => {
+  const prices = (id: Parameters<typeof silverPrice>[0], n: number) => Array.from({ length: n }, (_, k) => silverPrice(id, k));
+  // +1+N for five ranks, then +4+N, then +7+N.
+  assert.deepEqual(prices("attack", 17), [5, 7, 10, 14, 19, 25, 35, 46, 58, 71, 85, 103, 122, 142, 163, 185, 211]);
+  // +2+N, then +5+N, then +8+N.
+  assert.deepEqual(prices("shroud", 12), [10, 13, 17, 22, 28, 35, 46, 58, 71, 85, 100, 119]);
+  // +4+N, then +8+N, then +12+N.
+  assert.deepEqual(prices("revive", 12), [20, 25, 31, 38, 46, 55, 69, 84, 100, 117, 135, 158]);
   for (const row of TRAINING) {
     const { base } = RUN_TRAINING_PRICES[row.id];
     assert.ok([5, 10, 20].includes(base), `${row.id} starts at 5, 10 or 20`);
-    assert.equal(silverPrice(row.id, 0), base);
-    assert.equal(silverPrice(row.id, 1), Math.round(base * 1.5));
+    let last = 0;
+    for (let k = 0; k < 1000; k++) {
+      const price = silverPrice(row.id, k);
+      assert.ok(Number.isInteger(price) && price > last, "each rank dearer than the last, in whole Silver");
+      last = price;
+    }
   }
   assert.ok(RUN_TRAINING_PRICES.hp.base < RUN_TRAINING_PRICES.shroud.base, "rows open from the start cost least");
-  const rate = (k: number) => silverPrice("hp", k + 1) / silverPrice("hp", k) - 1;
-  assert.ok(Math.abs(rate(1000) - 0.01) < 1e-3, "1% by the thousandth");
-  for (let k = 1; k < 1000; k += 37) {
-    assert.ok(silverPrice("attack", k + 1) > silverPrice("attack", k), "each rank dearer than the last");
-    assert.ok(rate(k + 1) <= rate(k) + 1 / silverPrice("hp", k), "by a falling rate, give or take the rounding");
-  }
 });
 
 test("training for the run spends Silver and raises the stat at once; undo takes it back", () => {
@@ -47,7 +52,7 @@ test("training for the run spends Silver and raises the stat at once; undo takes
   assert.equal(g.run.player.attack, attack + trained(row, 1, level));
   assert.equal(g.run.loadout!.attack, g.run.player.attack, "kept when a new section resets ATK");
   assert.equal(runTrainingOffer(g.save, g.run, "attack").level, 1);
-  assert.equal(runTrainingOffer(g.save, g.run, "attack").price, 8, "the next costs more");
+  assert.equal(runTrainingOffer(g.save, g.run, "attack").price, 7, "the next costs more");
   assert.equal(g.save.training.attack, 0, "the hero's own training is untouched");
   assert.ok(g.undo());
   assert.equal(g.run.player.attack, attack);
