@@ -67,7 +67,7 @@ Command and Stewardship: ranked skills bought with Valor, each needing the skill
 ### Presentation
 
 **Park life**:
-The city's live dressing, never part of the battle: grass swaying and parting around walkers, and on the ponds drips, rain rings, splashes and reflections.
+The city's live dressing, never part of the battle: grass swaying and parting around walkers, and on the ponds rain rings, reflections and ducks.
 
 **Wizard tower**:
 A structure alternating a flamethrower (a cone of fire) and an ice wave (a fan of shards that chills what it crosses).

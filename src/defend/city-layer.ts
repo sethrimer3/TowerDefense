@@ -8,6 +8,9 @@ import { CellType, type Building, type CityMap } from "./citygen.ts";
 import type { Light, Stone } from "./lighting.ts";
 import type { DefendSim } from "./sim.ts";
 import { OUTLINE, ROAD, ROOFS, paintStructureArt } from "./structure-art.ts";
+import { parkArt } from "./park-art.ts";
+
+export { POND, POND_WATER, hasTree, pondDisc, pondPath, treeCanopy } from "./park-geometry.ts";
 
 const ASSET_BASE = (import.meta as ImportMeta & { env?: { BASE_URL?: string } }).env?.BASE_URL ?? "/";
 const floorImages: HTMLImageElement[] = [];
@@ -74,9 +77,8 @@ export function paintCityLayer(c: CanvasRenderingContext2D, px: number, scene: C
   paintFlagstones(p);
   paintCityGround(p);
   paintRoadStones(p, scene.stones);
-  // Ponds, then trees, over the park grass.
-  paintWater(p);
-  paintTrees(p);
+  // Ponds, then trees, over the park grass, as pixel art.
+  paintParkArt(p);
   for (const b of map.buildings) paintBuilding(p, b);
   paintLanternBrackets(p, scene.lights);
   paintRubble(p);
@@ -186,110 +188,15 @@ function paintGrass({ c, px }: Paint, cx: number, cy: number) {
   }
 }
 
-/** A pond's passes, as disc scales: the black outline, the muddy bank, the
- * reed-dark shallows and the open water. */
-export const POND = { outline: 0.86, bank: 0.8, shallows: 0.7, open: 0.6 };
-/** The open water's colour. */
-export const POND_WATER = "#2b5d71";
-
-/** Water cell (cx, cy)'s disc at `scale` (see POND), in cells. */
-export function pondDisc(cx: number, cy: number, scale: number) {
-  return {
-    x: cx + 0.5 + (hash01(cx, cy, 66) - 0.5) * 0.3,
-    y: cy + 0.5 + (hash01(cx, cy, 67) - 0.5) * 0.3,
-    r: scale * (0.9 + hash01(cx, cy, 68) * 0.25),
-  };
-}
-
-/** The union of the water cells' discs at `scale`, as one path, at `px` a cell. */
-export function pondPath(c: CanvasRenderingContext2D, px: number, cells: readonly (readonly [number, number])[], scale: number) {
-  c.beginPath();
-  for (const [cx, cy] of cells) {
-    const d = pondDisc(cx, cy, scale);
-    c.moveTo((d.x + d.r) * px, d.y * px);
-    c.arc(d.x * px, d.y * px, d.r * px, 0, Math.PI * 2);
-  }
-}
-
-/** Whether park cell (cx, cy) has a tree. */
-export const hasTree = (map: CityMap, cx: number, cy: number) =>
-  cellInBounds(cx, cy) && map.type[cellIndex(cx, cy)] === CellType.PARK && hash01(cx, cy, 21) <= 0.42;
-
-/** The canopy of the tree on cell (cx, cy): centre and radius, in cells. */
-export function treeCanopy(cx: number, cy: number) {
-  return { x: cx + 0.3 + hash01(cx, cy, 24) * 0.4, y: cy + 0.3 + hash01(cx, cy, 25) * 0.4, r: 0.3 + hash01(cx, cy, 23) * 0.18 };
-}
-
-/** Ponds, with irregular natural shores: each water cell contributes a
- * slightly jittered disc, and the union of discs forms the pond. Drawn in
- * passes — outline, muddy bank, reed-dark shallows, open water —
- * then ripples and lily pads. */
-function paintWater(p: Paint) {
-  const { c, px, map } = p;
-  const cells: [number, number][] = [];
-  for (let i = 0; i < CELL_COUNT; i++)
-    if (map.type[i] === CellType.WATER) cells.push([i % CELLS_W, Math.floor(i / CELLS_W)]);
-  if (!cells.length) return;
-  const pass = (color: string, scale: number) => {
-    c.fillStyle = color;
-    pondPath(c, px, cells, scale);
-    c.fill();
-  };
-  pass(OUTLINE, POND.outline);
-  pass("#3a3524", POND.bank);
-  pass("#2a4f45", POND.shallows);
-  pass(POND_WATER, POND.open);
-  for (const [cx, cy] of cells) paintPondSurface(p, cx, cy);
-}
-
-/** A ripple glint and, now and then, a lily pad (some in flower). */
-function paintPondSurface({ c, px }: Paint, cx: number, cy: number) {
-  const x = cx * px,
-    y = cy * px;
-  c.fillStyle = "rgba(210,235,240,0.4)";
-  const rw = Math.max(2, Math.round(px * 0.34));
-  c.fillRect(Math.round(x + px * (0.2 + hash01(cx, cy, 61) * 0.4)), Math.round(y + px * (0.25 + hash01(cx, cy, 62) * 0.5)), rw, 1);
-  if (hash01(cx, cy, 63) >= 0.35) return;
-  const r = Math.max(1.5, px * 0.15);
-  const lx = x + px * (0.25 + hash01(cx, cy, 64) * 0.5),
-    ly = y + px * (0.25 + hash01(cx, cy, 65) * 0.5);
-  c.fillStyle = "#4f7d3b";
-  c.beginPath();
-  c.moveTo(lx, ly);
-  c.arc(lx, ly, r, 0.5, Math.PI * 2);
-  c.closePath();
-  c.fill();
-  if (hash01(cx, cy, 69) < 0.4) {
-    c.fillStyle = "#e9d7e0";
-    c.fillRect(Math.round(lx - r * 0.3), Math.round(ly - r * 0.3), Math.max(1, Math.round(px * 0.08)), Math.max(1, Math.round(px * 0.08)));
-  }
-}
-
-/** Park trees: layered, lit canopies with a black outline and a shadow. */
-function paintTrees(p: Paint) {
-  for (let cy = 0; cy < CELLS_H; cy++)
-    for (let cx = 0; cx < CELLS_W; cx++)
-      if (hasTree(p.map, cx, cy)) paintTree(p, cx, cy);
-}
-
-function paintTree({ c, px }: Paint, cx: number, cy: number) {
-  const canopy = treeCanopy(cx, cy);
-  const r = px * canopy.r;
-  const x = canopy.x * px,
-    y = canopy.y * px;
-  const disc = (fill: string, dx: number, dy: number, radius: number) => {
-    c.fillStyle = fill;
-    c.beginPath();
-    c.arc(x + dx, y + dy, radius, 0, Math.PI * 2);
-    c.fill();
-  };
-  disc("rgba(0,0,0,0.3)", r * 0.35, r * 0.4, r);
-  disc(OUTLINE, 0, 0, r + Math.max(1, px * 0.06));
-  const dark = hash01(cx, cy, 22) < 0.5;
-  disc(dark ? "#284420" : "#335a27", 0, 0, r);
-  // Canopy highlights sit up and to the left.
-  disc(dark ? "#3b6330" : "#4a7a36", -r * 0.2, -r * 0.22, r * 0.66);
-  disc(dark ? "#55864a" : "#679c4e", -r * 0.35, -r * 0.38, r * 0.3);
+/** The ponds and trees, baked as pixel art (`park-art.ts`) and drawn up
+ * to size with smoothing off. */
+function paintParkArt({ c, map }: Paint) {
+  const art = parkArt(map).canvas;
+  if (!art) return;
+  c.save();
+  c.imageSmoothingEnabled = false;
+  c.drawImage(art, 0, 0, c.canvas.width, c.canvas.height);
+  c.restore();
 }
 
 function paintBuilding(p: Paint, b: Building) {

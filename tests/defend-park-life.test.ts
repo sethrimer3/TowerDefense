@@ -8,6 +8,8 @@ import { CellType, generateCity, type CityMap } from "../src/defend/citygen.ts";
 import { CELLS_W } from "../src/defend/grid.ts";
 import { ParkGrass } from "../src/defend/park-grass.ts";
 import { PondWater } from "../src/defend/pond-water.ts";
+import { ART, openAt, parkArt } from "../src/defend/park-art.ts";
+import { random } from "../src/random.ts";
 
 const RING: [number, number][] = [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1], [-2, 0], [2, 0], [-2, 1], [2, 1], [-2, -1], [2, -1], [0, -2], [-1, -2], [1, -2]];
 
@@ -45,12 +47,50 @@ test("every park cell's grass is planned once, on park cells only", () => {
   });
 });
 
-test("ponds are found whole, and each gets at least one drip", () => {
+test("the pixel-art ponds' open water lies on water cells", () => {
+  const map = parkCity();
+  const art = parkArt(map);
+  assert.ok(art.open.some((v) => v === 1));
+  for (let i = 0; i < art.open.length; i++) {
+    if (!art.open[i]) continue;
+    const x = i % art.width, y = Math.floor(i / art.width);
+    const cell = Math.floor(y / ART) * CELLS_W + Math.floor(x / ART);
+    // Open water spills a little past its cells' edges, never far.
+    const near = [-1, 0, 1].some((dy) => [-1, 0, 1].some((dx) => map.type[cell + dy * CELLS_W + dx] === CellType.WATER));
+    assert.ok(near, `open water at ${x},${y}`);
+  }
+});
+
+type DuckView = { x: number; y: number; state: string };
+const ducksOf = (water: PondWater) => (water.ducks as unknown as { ducks: DuckView[] }).ducks;
+
+test("ducks stay on open water, swim off from walkers and sleep at night", () => {
   const map = parkCity();
   const water = new PondWater();
   water.sync(map);
-  assert.ok(water.pondCount > 0);
-  assert.ok(water.dripCount >= water.pondCount);
+  const art = parkArt(map);
+  (water.ducks as unknown as { rand: () => number }).rand = random(5);
+  assert.ok(water.ducks.count >= 2, "a couple of ducks at least");
+  const rings: number[] = [];
+  const day = { night: 0, walkers: [] as { x: number; y: number }[], reduceMotion: false };
+  const states = new Set<string>();
+  for (let k = 0; k < 30 * 120; k++) {
+    water.ducks.update(1 / 30, day, () => rings.push(k));
+    for (const d of ducksOf(water)) {
+      assert.ok(openAt(art, Math.floor(d.x * ART), Math.floor(d.y * ART)), `duck on the bank at ${d.x},${d.y}`);
+      states.add(d.state);
+    }
+  }
+  for (const s of ["paddle", "dabble", "preen", "drift", "follow"]) assert.ok(states.has(s), `never ${s}`);
+  assert.ok(rings.length > 0 && rings.length < 30 * 120 / 10, `rings now and then (${rings.length})`);
+  // Someone on the bank right by the first duck: it swims away.
+  const first = ducksOf(water)[0];
+  const walker = { x: first.x + 0.4, y: first.y };
+  const before = Math.hypot(first.x - walker.x, first.y - walker.y);
+  for (let k = 0; k < 30 * 3; k++) water.ducks.update(1 / 30, { ...day, walkers: [walker] }, () => {});
+  assert.ok(Math.hypot(first.x - walker.x, first.y - walker.y) > before, "fled");
+  for (let k = 0; k < 30; k++) water.ducks.update(1 / 30, { ...day, night: 1 }, () => {});
+  assert.ok(ducksOf(water).every((d) => d.state === "sleep"));
 });
 
 test("without a DOM, drawing is a no-op", () => {
@@ -59,6 +99,6 @@ test("without a DOM, drawing is a no-op", () => {
   water.sync(map);
   grass.sync(map);
   const c = {} as CanvasRenderingContext2D;
-  water.draw({ c, px: 8, now: 0, rain: true, reduceMotion: false, layer: {} as HTMLCanvasElement, layerScale: 1 });
+  water.draw({ c, px: 8, now: 0, rain: true, night: 0, walkers: [], reduceMotion: false, layer: {} as HTMLCanvasElement, layerScale: 1 });
   grass.draw({ c, px: 8, now: 0, dt: 0.016, wind: "rain", walkers: [{ x: 10, y: 10, size: 0.4 }], reduceMotion: false });
 });

@@ -1,35 +1,36 @@
-/** Life on the city's ponds, after the dungeon's pools: water drips from the
- * trees that overhang them (a falling drop, its shadow sharpening, a splash,
- * then spreading rings), rain stipples them with rings, and the bank, its
- * trees and the houses beside it are mirrored into the water, wavering with
- * a faint idle shimmer and pushed about by every ring that passes.
+/** Life on the city's ponds, after the dungeon's pools. When it rains,
+ * drops fall all over the open water, each a faint pixel ring that spreads
+ * and fades; when it doesn't, ducks paddle about (`pond-ducks.ts`), now
+ * and then leaving a ring of their own. The bank, its trees and the houses
+ * beside it are mirrored into the water, wavering with a faint idle
+ * shimmer and pushed about by every ring that passes.
  *
- * The mirror image is cut from the cached city layer, flipped about each
- * column's shoreline, then copied back in thin strips shifted by the
- * ripples, tinted by the water and masked to it. All plain image copies:
- * no pixel readback. Presentation only. */
-import { CELLS_W, cellInBounds, cellIndex, hash01 } from "./grid.ts";
+ * Everything keeps to the open water of the pixel-art ponds (`park-art.ts`)
+ * and is drawn on their pixel grid. The mirror image is cut from the cached
+ * city layer, flipped about each column's shoreline, then copied back in
+ * thin strips shifted by the ripples, tinted by the water and masked to
+ * it: plain image copies, no pixel readback. Presentation only. */
+import { CELLS_W, cellInBounds, cellIndex, defendRandom } from "./grid.ts";
 import { CellType, type CityMap } from "./citygen.ts";
-import { POND, POND_WATER, hasTree, pondPath, treeCanopy } from "./city-layer.ts";
-import { defendRandom } from "./grid.ts";
+import { POND, POND_WATER } from "./park-geometry.ts";
+import { ART, openAt, parkArt, type ParkArt } from "./park-art.ts";
+import { Ducks, type Walker } from "./pond-ducks.ts";
 
-/** Seconds a drip takes to fall from the leaves. */
-const DRIP_FALL = 0.55;
-/** Seconds a ring spreads before it fades out, and how fast (cells a second). */
-const RING_LIFE = 1.8;
-const RING_SPEED = 0.55;
+/** Rain rings: how long one spreads (s), how fast (cells a second), how
+ * many fall a second on each cell of water, and how strongly they show. */
+const RAIN = { life: 0.85, speed: 0.6, rate: 2.6, alpha: 0.5 };
+/** A duck's ring: slower, wider and a little stronger, but rare. */
+const WAKE = { life: 1.6, speed: 0.42, alpha: 0.34 };
 /** Reflection tuning: opacity, how far the water tints it, and how far (in
  * cells) the shimmer and the ripples push its strips around. */
-const REFLECTION = { alpha: 0.55, tint: 0.4, shimmer: 0.03, rippleShift: 0.08, rippleWidth: 0.25 };
+const REFLECTION = { alpha: 0.55, tint: 0.4, shimmer: 0.03, rippleShift: 0.05, rippleWidth: 0.2 };
 
-/** A drip point under a canopy: where it lands (cells), how high it falls
- * from (cells), and its cycle (s). */
-type Drip = { x: number; y: number; z: number; period: number; phase: number };
-/** A ring spreading from (x, y) since `t0` (s). */
-type Ring = { x: number; y: number; t0: number };
+/** A ring spreading from (x, y) since `t0` (s): rain's or a duck's. */
+type Ring = { x: number; y: number; t0: number; kind: "rain" | "wake"; k: number };
+type Wave = { x: number; y: number; r: number; fade: number };
 /** One pond: its water cells, its bounding box in cells, and for each
  * column the row its open water starts (the mirror line). */
-type Pond = { cells: [number, number][]; x0: number; x1: number; y0: number; y1: number; shore: Map<number, number> };
+export type Pond = { cells: [number, number][]; x0: number; x1: number; y0: number; y1: number; shore: Map<number, number> };
 
 export type WaterFrame = {
   c: CanvasRenderingContext2D;
@@ -38,6 +39,10 @@ export type WaterFrame = {
   now: number;
   /** Rain falling on the city. */
   rain: boolean;
+  /** How far night has fallen (0..1): ducks sleep at night. */
+  night: number;
+  /** People and enemies on foot, whom the ducks keep away from. */
+  walkers: readonly Walker[];
   reduceMotion: boolean;
   /** The cached city layer, at `layerScale` times the canvas resolution. */
   layer: HTMLCanvasElement;
@@ -46,10 +51,12 @@ export type WaterFrame = {
 
 export class PondWater {
   private map: CityMap | null = null;
+  private art: ParkArt | null = null;
   private ponds: Pond[] = [];
-  private drips: Drip[] = [];
   private rings: Ring[] = [];
+  readonly ducks = new Ducks();
   private rainDue = 0;
+  private lastNow = 0;
   private rand = defendRandom("effects");
   private mask: HTMLCanvasElement | null = null;
   private mirror: HTMLCanvasElement | null = null;
@@ -61,63 +68,79 @@ export class PondWater {
   sync(map: CityMap) {
     if (map === this.map) return;
     this.map = map;
+    this.art = parkArt(map);
     this.ponds = findPonds(map);
-    this.drips = this.ponds.flatMap((p) => dripsFor(map, p));
+    this.ducks.sync(this.ponds, this.art, this.rand);
     this.rings = [];
     this.maskKey = "";
     this.builtKey = "";
   }
 
-  /** How many drip points the ponds have (tests, tuning). */
-  get dripCount() {
-    return this.drips.length;
-  }
   get pondCount() {
     return this.ponds.length;
   }
 
   draw(f: WaterFrame) {
-    if (!this.ponds.length || typeof document === "undefined") return;
+    if (!this.ponds.length || !this.art || typeof document === "undefined") return;
     const t = f.now / 1000;
-    this.spawn(f, t);
+    const dt = this.lastNow ? Math.min(0.1, Math.max(0, t - this.lastNow)) : 0;
+    this.lastNow = t;
+    this.rings = this.rings.filter((r) => t >= r.t0 && t - r.t0 < (r.kind === "rain" ? RAIN.life : WAKE.life));
+    if (f.rain) this.rainOn(f, t);
+    else this.rainDue = 0;
+    // Ducks shelter from the rain; out in the dry they paddle about.
+    if (!f.rain) this.ducks.update(dt, f, (x, y, k) => this.rings.push({ x, y, t0: t, kind: "wake", k }));
     const waves = f.reduceMotion ? [] : this.waves(t);
     this.drawReflections(f, t, waves);
-    this.drawSurface(f, t, waves);
+    this.drawRings(f, t);
+    if (!f.rain) this.ducks.draw(f.c, f.px, f.now, this.art);
   }
 
   // ── Rings ─────────────────────────────────────────────────────────────
-  /** Rain rings, a few a second per pond cell's worth of open water. */
-  private spawn(f: WaterFrame, t: number) {
-    this.rings = this.rings.filter((r) => t - r.t0 < RING_LIFE && t >= r.t0);
-    if (!f.rain || f.reduceMotion) return;
+  /** Rain all over the open water: a few drops a second on every cell. */
+  private rainOn(f: WaterFrame, t: number) {
+    if (f.reduceMotion) return;
     // Catch up at most a second (a hidden tab or a pause never floods the ponds).
     if (this.rainDue === 0 || this.rainDue > t + 1 || this.rainDue < t - 1) this.rainDue = t;
     const cells = this.ponds.reduce((n, p) => n + p.cells.length, 0);
     while (this.rainDue <= t) {
-      this.rainDue += 1 / (cells * 1.6);
+      this.rainDue += 1 / (cells * RAIN.rate);
       const pond = this.ponds[Math.floor(this.rand() * this.ponds.length)];
       const [cx, cy] = pond.cells[Math.floor(this.rand() * pond.cells.length)];
-      this.rings.push({ x: cx + 0.15 + this.rand() * 0.7, y: cy + 0.15 + this.rand() * 0.7, t0: this.rainDue });
-      if (this.rings.length > 160) this.rings.shift();
+      const x = cx + this.rand(), y = cy + this.rand();
+      if (!openAt(this.art!, Math.floor(x * ART), Math.floor(y * ART))) continue;
+      this.rings.push({ x, y, t0: this.rainDue, kind: "rain", k: 0.6 + this.rand() * 0.4 });
+      if (this.rings.length > 220) this.rings.shift();
     }
   }
 
-  /** Every ring spreading right now (rain and drips): centre, radius and strength. */
-  private waves(t: number) {
-    const out: { x: number; y: number; r: number; fade: number }[] = [];
+  /** Every ring spreading right now: centre, radius and strength. */
+  private waves(t: number): Wave[] {
+    const out: Wave[] = [];
     for (const r of this.rings) {
-      const age = t - r.t0;
-      out.push({ x: r.x, y: r.y, r: age * RING_SPEED * 0.7, fade: 1 - age / (RING_LIFE * 0.7) });
-    }
-    for (const d of this.drips) {
-      const age = ((t + d.phase) % d.period) - DRIP_FALL;
-      if (age >= 0 && age < RING_LIFE) out.push({ x: d.x, y: d.y, r: age * RING_SPEED, fade: 1 - age / RING_LIFE });
+      const kind = r.kind === "rain" ? RAIN : WAKE, age = t - r.t0;
+      out.push({ x: r.x, y: r.y, r: age * kind.speed, fade: (1 - age / kind.life) * r.k * (r.kind === "rain" ? 0.5 : 1) });
     }
     return out.filter((w) => w.fade > 0);
   }
 
+  /** Each ring as a flattened ring of art pixels, only on open water. */
+  private drawRings(f: WaterFrame, t: number) {
+    const { c, px } = f, s = px / ART;
+    c.save();
+    for (const r of this.rings) {
+      const kind = r.kind === "rain" ? RAIN : WAKE, age = t - r.t0, fade = 1 - age / kind.life;
+      const R = age * kind.speed * ART;
+      c.fillStyle = `rgba(196,228,240,${(kind.alpha * fade * r.k).toFixed(3)})`;
+      ringPixels(r.x * ART, r.y * ART, R, (x, y) => {
+        if (openAt(this.art!, x, y)) c.fillRect(x * s, y * s, s, s);
+      });
+    }
+    c.restore();
+  }
+
   // ── Reflections ──────────────────────────────────────────────────────
-  private drawReflections(f: WaterFrame, t: number, waves: { x: number; y: number; r: number; fade: number }[]) {
+  private drawReflections(f: WaterFrame, t: number, waves: Wave[]) {
     const { px } = f;
     const box = this.box(px);
     if (!box) return;
@@ -149,7 +172,7 @@ export class PondWater {
     return { x, y, w, h, key: `${x},${y},${w},${h}` };
   }
 
-  /** Opaque where there is open water. */
+  /** Opaque where there is open water: the pixel art's own mask, cut to the box. */
   private ensureMask(f: WaterFrame, box: { x: number; y: number; w: number; h: number; key: string }) {
     if (!this.mask) this.mask = document.createElement("canvas");
     if (this.maskKey === box.key) return this.mask;
@@ -157,10 +180,9 @@ export class PondWater {
     this.mask.width = box.w;
     this.mask.height = box.h;
     const m = this.mask.getContext("2d")!;
-    m.translate(-box.x, -box.y);
-    m.fillStyle = "#fff";
-    pondPath(m, f.px, this.ponds.flatMap((p) => p.cells), POND.open);
-    m.fill();
+    m.imageSmoothingEnabled = false;
+    const k = ART / f.px;
+    if (this.art?.mask) m.drawImage(this.art.mask, box.x * k, box.y * k, box.w * k, box.h * k, 0, 0, box.w, box.h);
     return this.mask;
   }
 
@@ -192,7 +214,7 @@ export class PondWater {
 
   /** The mirror copied back in thin rows, each shifted by the shimmer and
    * the rings passing through it, then tinted and masked to the water. */
-  private compose(f: WaterFrame, box: { x: number; y: number; w: number; h: number }, mask: HTMLCanvasElement, time: number, waves: { x: number; y: number; r: number; fade: number }[]) {
+  private compose(f: WaterFrame, box: { x: number; y: number; w: number; h: number }, mask: HTMLCanvasElement, time: number, waves: Wave[]) {
     const out = (this.out ??= document.createElement("canvas"));
     if (out.width !== box.w || out.height !== box.h) {
       out.width = box.w;
@@ -227,54 +249,6 @@ export class PondWater {
     o.globalCompositeOperation = "source-over";
   }
 
-  // ── The surface: rings, drops and splashes ────────────────────────────
-  private drawSurface(f: WaterFrame, t: number, waves: { x: number; y: number; r: number; fade: number }[]) {
-    const { c, px } = f;
-    c.save();
-    pondPath(c, px, this.ponds.flatMap((p) => p.cells), POND.open);
-    c.clip();
-    const line = Math.max(1, px * 0.06);
-    c.lineWidth = line;
-    for (const w of waves) {
-      if (w.r <= 0.02) continue;
-      c.strokeStyle = `rgba(186,222,236,${(w.fade * 0.6).toFixed(2)})`;
-      c.beginPath();
-      c.ellipse(w.x * px, w.y * px, w.r * px, w.r * px * 0.8, 0, 0, Math.PI * 2);
-      c.stroke();
-      if (w.r > 0.12) {
-        c.strokeStyle = `rgba(130,176,196,${(w.fade * 0.4).toFixed(2)})`;
-        c.beginPath();
-        c.ellipse(w.x * px, w.y * px, (w.r - 0.1) * px, (w.r - 0.1) * px * 0.8, 0, 0, Math.PI * 2);
-        c.stroke();
-      }
-    }
-    c.restore();
-    // Drops fall from the leaves, over the bank as well as the water.
-    if (!f.reduceMotion) for (const d of this.drips) this.drawDrop(c, px, d, (t + d.phase) % d.period);
-  }
-
-  /** A drip: falling from the leaves with its shadow sharpening below, then
-   * a few droplets thrown up where it lands. */
-  private drawDrop(c: CanvasRenderingContext2D, px: number, d: Drip, local: number) {
-    const dot = Math.max(1, Math.round(px * 0.08));
-    if (local < DRIP_FALL) {
-      const k = local / DRIP_FALL;
-      if (k > 0.3) {
-        c.fillStyle = `rgba(0,0,0,${(0.35 * k).toFixed(2)})`;
-        c.fillRect(Math.round(d.x * px), Math.round(d.y * px), dot, dot);
-      }
-      const y = d.y - d.z * (1 - k * k);
-      c.fillStyle = "rgba(200,232,244,0.9)";
-      c.fillRect(Math.round(d.x * px), Math.round(y * px) - dot, dot, dot * 2);
-      return;
-    }
-    const age = local - DRIP_FALL;
-    if (age > 0.18) return;
-    const up = age * 20;
-    c.fillStyle = "rgba(200,232,244,0.9)";
-    for (const [dx, dy] of [[-1, -1], [1, -1], [-2, 0], [2, 0]])
-      c.fillRect(Math.round(d.x * px + dx * dot * (1 + up)), Math.round(d.y * px + (dy - up) * dot), dot, dot);
-  }
 }
 
 /** The city's ponds: each connected group of water cells. */
@@ -308,28 +282,19 @@ function findPonds(map: CityMap): Pond[] {
   return ponds;
 }
 
-/** Drip points where a tree's canopy overhangs the pond's water, and one
- * slow drip in the open water for a pond no tree reaches. */
-function dripsFor(map: CityMap, pond: Pond): Drip[] {
-  const water = new Set(pond.cells.map(([x, y]) => cellIndex(x, y)));
-  const drips: Drip[] = [];
-  const trees = new Set<number>();
-  for (const [x, y] of pond.cells)
-    for (let dy = -2; dy <= 2; dy++)
-      for (let dx = -2; dx <= 2; dx++) if (hasTree(map, x + dx, y + dy)) trees.add(cellIndex(x + dx, y + dy));
-  for (const i of trees) {
-    const tx = i % CELLS_W, ty = (i - tx) / CELLS_W, canopy = treeCanopy(tx, ty);
-    // Points around the canopy's edge that hang over water.
-    for (let k = 0; k < 6; k++) {
-      const a = (k / 6) * Math.PI * 2 + hash01(tx, ty, 400) * 6.28;
-      const x = canopy.x + Math.cos(a) * canopy.r * 0.8, y = canopy.y + Math.sin(a) * canopy.r * 0.8;
-      if (!water.has(cellIndex(Math.floor(x), Math.floor(y))) || hash01(tx, ty, 401 + k) > 0.5) continue;
-      drips.push({ x, y, z: 0.5 + hash01(tx, ty, 410 + k) * 0.3, period: 2.4 + hash01(tx, ty, 420 + k) * 4, phase: hash01(tx, ty, 430 + k) * 7 });
-    }
+/** The art pixels of a ring centred (x, y) of radius `r` (art pixels),
+ * flattened for the top-down view; a fresh one is a single pixel. */
+function ringPixels(x: number, y: number, r: number, put: (x: number, y: number) => void) {
+  if (r < 0.75) return put(Math.floor(x), Math.floor(y));
+  const steps = Math.max(8, Math.ceil(r * 6));
+  let lx = NaN, ly = NaN;
+  for (let k = 0; k < steps; k++) {
+    const a = (k / steps) * Math.PI * 2;
+    const px = Math.floor(x + Math.cos(a) * r), py = Math.floor(y + Math.sin(a) * r * 0.62);
+    if (px === lx && py === ly) continue;
+    lx = px;
+    ly = py;
+    put(px, py);
   }
-  if (!drips.length) {
-    const [x, y] = pond.cells[Math.floor(hash01(pond.x0, pond.y0, 440) * pond.cells.length)];
-    drips.push({ x: x + 0.5, y: y + 0.5, z: 0.7, period: 5 + hash01(x, y, 441) * 3, phase: hash01(x, y, 442) * 8 });
-  }
-  return drips;
 }
+

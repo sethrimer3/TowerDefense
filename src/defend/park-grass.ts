@@ -10,7 +10,7 @@
  * image copy. The buffer is rebuilt at most 30 times a second. */
 import { CELLS_H, CELLS_W, cellInBounds, cellIndex, hash01 } from "./grid.ts";
 import { CellType, type CityMap } from "./citygen.ts";
-import { POND, hasTree, pondDisc, treeCanopy } from "./city-layer.ts";
+import { POND, hasTree, pondDisc, treeCanopy } from "./park-geometry.ts";
 
 /** Blade pixels per cell. */
 const ART = 8;

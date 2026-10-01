@@ -165,12 +165,13 @@ export class DefendRenderer {
   private drawParkLife(map: CityMap, sim: DefendSim | null, opts: DrawOptions, dt: number) {
     const rain = !!(sim && opts.weather?.rain);
     this.water.sync(map);
-    this.water.draw({ c: this.ctx, px: this.px, now: opts.now, rain, reduceMotion: opts.reduceMotion, layer: this.layer, layerScale: this.layerScale });
+    const feet = sim ? walkers(sim) : [];
+    this.water.draw({ c: this.ctx, px: this.px, now: opts.now, rain, night: opts.night, walkers: feet, reduceMotion: opts.reduceMotion, layer: this.layer, layerScale: this.layerScale });
     this.grass.sync(map);
     this.grass.draw({
       c: this.ctx, px: this.px, now: opts.now, dt, reduceMotion: opts.reduceMotion,
       wind: rain ? "rain" : opts.weather ? "cloud" : "calm",
-      walkers: sim ? walkers(sim) : [],
+      walkers: feet,
     });
   }
 

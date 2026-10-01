@@ -62,8 +62,14 @@ holds it against endless waves. Code lives in `src/defend/`.
   nothing is more than 2 cells from a road. Some small blocks become parks;
   the rest fills with houses (mostly 2 × 2 to 3 × 3), each touching a street.
 - Larger parks get a pond: every park cell whose eight neighbours are all
-  park becomes water, drawn as overlapping jittered discs for an irregular,
-  natural shore. Ponds block movement but not light.
+  park becomes water, its shore the union of jittered discs for an irregular,
+  natural edge. Ponds block movement but not light.
+- Ponds and trees are pixel art (`park-art.ts`), painted pixel by pixel at
+  8 pixels a cell and drawn up with smoothing off, to match the blocky
+  roofs and grass: the pond in dithered bands (black outline, muddy bank,
+  reedy shallows, open water, a deep heart) with glints and lily pads;
+  trees as lumpy canopies with a one-pixel outline, a drop shadow and four
+  shades lit from the upper left.
 - About 60% of parks have a thin wooden fence along their street sides,
   with one gap left as a gate (`fences.ts`). Fences are purely visual: an
   enemy walking across a section, or a blast next to it, snaps it into
@@ -199,13 +205,18 @@ from its seed; `tests/defend-replay.test.ts` pins it.
     and pressing down around enemies, troops and civilians walking through,
     then wobbling back. Built in one pixel buffer at 8 pixels a cell, at most
     30 times a second.
-  - `pond-water.ts`: drips fall from the trees overhanging each pond (a pond
-    no tree reaches gets one slow drip of its own): the drop and its
-    sharpening shadow, a splash, then spreading rings. Rain stipples the
-    ponds with rings. The bank, its trees and the houses beside it are
+  - `pond-water.ts`: in the rain, drops fall all over the open water, each
+    a faint ring of pixels that spreads and fades. The bank, its trees and the houses beside it are
     mirrored into the water, cut from the city layer about each column's
     shoreline and copied back in thin strips shifted by a faint shimmer and
     by every ring passing through, tinted by the water and masked to it.
+  - `pond-ducks.ts`: when it isn't raining, a mallard pair paddles on the
+    biggest pond and a hen with two or three ducklings on the next. They
+    drift and bob, paddle to a spot nearby (now and then leaving a faint
+    ring), tip up to dabble (a ring going under and coming up), preen; the
+    hen keeps near the drake and ducklings trail their mother nose to tail;
+    anyone walking close by sends them to the far side; at night they sleep,
+    heads tucked. Each has a faint reflection.
 
 ## Economy (`progress.ts`, Armory tab; `src/progression.ts`)
 
