@@ -16,7 +16,7 @@ page.on("pageerror", (e) => errors.push(e.message));
 await page.addInitScript(() => {
   const fixture = sessionStorage.getItem("__testFixture");
   if (fixture) {
-    localStorage.setItem("towerincramental.v1", fixture);
+    localStorage.setItem("towerdelve.v1", fixture);
   }
 });
 
@@ -51,7 +51,7 @@ for (const width of [390, 320]) {
 
 // 2. Unlock DELVE: Delve tab appears, Defend remains hidden
 await page.evaluate(() => {
-  const save = JSON.parse(localStorage.getItem("towerincramental.v1") || "{}");
+  const save = JSON.parse(localStorage.getItem("towerdelve.v1") || "{}");
   save.upgrades = save.upgrades || {};
   save.upgrades.delve = 1;
   sessionStorage.setItem("__testFixture", JSON.stringify(save));
@@ -82,7 +82,7 @@ for (const width of [390, 320]) {
 
 // 3. Unlock AN ENDURING LEGACY: Defend tab appears
 await page.evaluate(() => {
-  const save = JSON.parse(localStorage.getItem("towerincramental.v1") || "{}");
+  const save = JSON.parse(localStorage.getItem("towerdelve.v1") || "{}");
   save.upgrades = save.upgrades || {};
   save.upgrades.legacy = 1;
   sessionStorage.setItem("__testFixture", JSON.stringify(save));

@@ -6,7 +6,7 @@ try {
   page.on("pageerror", e => errors.push(e.message));
   await page.addInitScript(() => {
     const fixture = sessionStorage.getItem("outsideFixture");
-    if (fixture) { localStorage.setItem("towerincramental.v1", fixture); sessionStorage.removeItem("outsideFixture"); }
+    if (fixture) { localStorage.setItem("towerdelve.v1", fixture); sessionStorage.removeItem("outsideFixture"); }
   });
   await page.goto(process.env.TEST_URL || "http://127.0.0.1:5173/");
   await page.evaluate(async () => {

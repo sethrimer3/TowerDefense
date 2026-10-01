@@ -10,7 +10,7 @@ type Group = keyof typeof TRAINING_GROUPS;
 const GROUP_ICONS: Record<Group, string> = {
   offense: itemSprite("upgrade_attack", "ui-sprite group-sprite"),
   defense: itemSprite("upgrade_defense", "ui-sprite group-sprite"),
-  utility: itemSprite("potion_flat", "ui-sprite group-sprite"),
+  utility: uiSprite("gold", "ui-sprite group-sprite"),
 };
 const silverIcon = () => uiSprite("gold", "ui-sprite silver-sprite");
 

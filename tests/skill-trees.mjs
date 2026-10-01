@@ -2,7 +2,7 @@ import { chromium, expect } from '@playwright/test';
 const browser = await chromium.launch({headless:true,channel:'msedge'});
 const page = await browser.newPage({viewport:{width:390,height:844}});
 const errors=[];page.on('pageerror',e=>errors.push(e.message));
-await page.addInitScript(() => { const fixture = sessionStorage.getItem("__treeFixture"); if (fixture) { localStorage.setItem("towerincramental.v1", fixture); sessionStorage.removeItem("__treeFixture"); } });
+await page.addInitScript(() => { const fixture = sessionStorage.getItem("__treeFixture"); if (fixture) { localStorage.setItem("towerdelve.v1", fixture); sessionStorage.removeItem("__treeFixture"); } });
 await page.goto(process.env.TEST_URL || 'http://127.0.0.1:5173/');
 // Inside a run the tabs are hidden: end the first Tower run to reach the forest.
 await page.locator("#end-run").click();
@@ -14,7 +14,7 @@ await expect(page.locator('#tree-tooltip')).toContainText('Into the depths');
 await expect(page.locator('#upgrades')).not.toContainText('WHAT REMAINS WHEN YOU FALL');
 await expect(page.locator('#upgrades')).not.toContainText('Tap a skill for details');
 await expect(page.locator('.tree-heading')).not.toContainText(/INSPIRATION|COURAGE/);
-await page.evaluate(()=>{const s=JSON.parse(localStorage.getItem('towerincramental.v1'));s.tower.inspiration=100;s.delve.courage=100;sessionStorage.setItem('__treeFixture',JSON.stringify(s));});
+await page.evaluate(()=>{const s=JSON.parse(localStorage.getItem('towerdelve.v1'));s.tower.inspiration=100;s.delve.courage=100;sessionStorage.setItem('__treeFixture',JSON.stringify(s));});
 await page.reload();await page.locator('[data-tab="upgrades"]').click();
 for(const id of ['handOrdering','combatStance','largerHand','cardHeal','focus','delve']) {await page.locator(`[data-skill="${id}"]`).click();await page.locator(`[data-skill="${id}"]`).click();if(await page.locator('#card-reveal-card').count()) await page.locator('#card-reveal-card').click();}
 await page.locator('[data-tree="courage"]').click();

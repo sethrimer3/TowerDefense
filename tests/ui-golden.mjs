@@ -45,7 +45,7 @@ try {
   globalThis.__handStartsPaused = true;
     crypto.getRandomValues = (arr) => { for (let i = 0; i < arr.length; i++) arr[i] = Math.floor(rng() * 2 ** 32); return arr; };
     const fixture = sessionStorage.getItem("__uiFixture");
-    if (fixture) localStorage.setItem("towerincramental.v1", fixture);
+    if (fixture) localStorage.setItem("towerdelve.v1", fixture);
   });
 
   /** Waits for the page's HTML and the HUD (filled in as the app starts), not

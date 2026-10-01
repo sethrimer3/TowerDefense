@@ -1,4 +1,4 @@
-# TowerIncramental
+# Tower Delve
 
 An incremental dungeon RPG: the player climbs the Tower's puzzle floors and delves an endless labyrinth, earning lasting upgrades between runs.
 

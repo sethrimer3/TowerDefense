@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 const browser = await chromium.launch({headless:true,channel:'msedge'});
 const page = await browser.newPage({viewport:{width:390,height:844}});
 const errors=[]; page.on('pageerror',e=>errors.push(e.message));
-await page.addInitScript(() => { const fixture = sessionStorage.getItem('logFixture'); if (fixture) { localStorage.setItem('towerincramental.v1', fixture); sessionStorage.removeItem('logFixture'); } });
+await page.addInitScript(() => { const fixture = sessionStorage.getItem('logFixture'); if (fixture) { localStorage.setItem('towerdelve.v1', fixture); sessionStorage.removeItem('logFixture'); } });
 await page.goto(process.env.TEST_URL || 'http://127.0.0.1:5173/');
 assert.equal(await page.locator('.tower-heading').isVisible(),false);
 // The height column holds the purse: Gems, Gold, then Silver.

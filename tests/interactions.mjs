@@ -9,7 +9,7 @@ page.on("pageerror", (e) => errors.push(e.message));
 await page.addInitScript(() => {
   const fixture = sessionStorage.getItem("__fixture");
   if (fixture) {
-    localStorage.setItem("towerincramental.v1", fixture);
+    localStorage.setItem("towerdelve.v1", fixture);
     sessionStorage.removeItem("__fixture");
   }
 });
@@ -20,12 +20,12 @@ await page.locator("#confirm").click();
 await expect(page.locator(".dpad")).toBeHidden();
 
 const saved = () =>
-  page.evaluate(() => JSON.parse(localStorage.getItem("towerincramental.v1")));
+  page.evaluate(() => JSON.parse(localStorage.getItem("towerdelve.v1")));
 const player = async () => (await saved()).delve.run.player;
 /** Rewrites the save with `edit(save, arg)` in the page and reloads into Delve. */
 async function fixture(edit, arg = null) {
   await page.evaluate(([body, arg]) => {
-    const s = JSON.parse(localStorage.getItem("towerincramental.v1"));
+    const s = JSON.parse(localStorage.getItem("towerdelve.v1"));
     // Inside a run only Dev mode walks by hand, and it starts the hand paused.
     s.settings.devMode = true;
     new Function("s", "arg", body)(s, arg);

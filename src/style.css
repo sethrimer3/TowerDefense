@@ -1021,6 +1021,12 @@ dialog p {
 .summary-stats.compact strong {
   font-size: 22px;
 }
+.summary-stats strong .ui-sprite {
+  width: 0.75em;
+  height: 0.75em;
+  margin-right: 3px;
+  vertical-align: -0.05em;
+}
 @media (max-width: 480px) {
   .shell {
     padding: 14px 13px max(8px, env(safe-area-inset-bottom));

@@ -1,5 +1,5 @@
 
-> towerincramental@0.1.0 test
+> tower-delve@0.1.0 test
 > node --experimental-transform-types --test tests/*.test.ts
 
 (node:26752) ExperimentalWarning: Transform Types is an experimental feature and might change at any time

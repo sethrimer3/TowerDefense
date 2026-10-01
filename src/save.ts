@@ -1,6 +1,6 @@
 import { snap } from "./exact.ts";
 import { TIERS, type TierRecord } from "./tiers.ts";
-import { FIND_POTION_MAX, GOLD_SHOP, RUN_TRAINING_CAP, SAVE_KEY, TOWER_WIDTH, TRAINING, UPGRADES, WIDTH } from "./config.ts";
+import { FIND_POTION_MAX, GOLD_SHOP, OLD_SAVE_KEY, RUN_TRAINING_CAP, SAVE_KEY, TOWER_WIDTH, TRAINING, UPGRADES, WIDTH } from "./config.ts";
 import type { AutomoveMemory, DelveRun, FloorRecord, ModeSave, Fall, MoveSnapshot, Run, Save, TowerRun } from "./entities.ts";
 import { emptyMaterials, MATERIAL_IDS, type MaterialId } from "./materials.ts";
 import { EQUIPMENT_SLOTS, type CraftedEquipment, type EquipmentSlot } from "./equipment.ts";
@@ -362,7 +362,7 @@ export function decode(raw: string | null): Save {
 }
 export function load(): Save {
   try {
-    return decode(localStorage.getItem(SAVE_KEY));
+    return decode(localStorage.getItem(SAVE_KEY) ?? localStorage.getItem(OLD_SAVE_KEY));
   } catch {
     return defaults();
   }

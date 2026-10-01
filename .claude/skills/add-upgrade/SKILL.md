@@ -1,6 +1,6 @@
 ---
 name: add-upgrade
-description: Define and add a new upgrade the player can unlock in TowerIncramental — a skill-tree node (Inspiration, Courage, Wayfinding, Legacy, Wisdom, Renown), an Archives research project, a Training stat, or a Defend Armory upgrade. Writes a spec (panel, name, cost, levels, placement, research hours, what it unlocks elsewhere) for approval, then builds it with tests, docs and goldens. Use this whenever the user wants a new upgrade, skill, perk, research, lab project, unlock, tree node or Armory item, or wants to fill in a placeholder Wisdom/Renown node, even if they only describe the effect ("I want something that gives more Focus").
+description: Define and add a new upgrade the player can unlock in Tower Delve — a skill-tree node (Inspiration, Courage, Wayfinding, Legacy, Wisdom, Renown), an Archives research project, a Training stat, or a Defend Armory upgrade. Writes a spec (panel, name, cost, levels, placement, research hours, what it unlocks elsewhere) for approval, then builds it with tests, docs and goldens. Use this whenever the user wants a new upgrade, skill, perk, research, lab project, unlock, tree node or Armory item, or wants to fill in a placeholder Wisdom/Renown node, even if they only describe the effect ("I want something that gives more Focus").
 ---
 
 # Add an upgrade

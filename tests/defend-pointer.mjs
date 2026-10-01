@@ -32,7 +32,7 @@ await page.addInitScript(() => {
   // loads; rain and splinters draw from their own stream, so the battle's
   // seed doesn't depend on how many frames have run.
   const fixture = sessionStorage.getItem("__defendFixture");
-  if (fixture) localStorage.setItem("towerincramental.v1", fixture);
+  if (fixture) localStorage.setItem("towerdelve.v1", fixture);
 });
 
 // A save with Defend unlocked, spare palette items, bombs, and a small city:
@@ -94,7 +94,7 @@ const paletteItem = async (id) => {
 async function observe() {
   return page.evaluate(() => {
     const dp = window.__dp, ov = dp.overlay(), save = dp.host.save();
-    const stored = JSON.parse(localStorage.getItem("towerincramental.v1") || "{}").defend ?? null;
+    const stored = JSON.parse(localStorage.getItem("towerdelve.v1") || "{}").defend ?? null;
     const ghost = document.querySelector(".defend-drag-ghost");
     const cam = dp.renderer.cam;
     const r = (v) => Math.round(v * 1000) / 1000;

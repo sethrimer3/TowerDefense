@@ -9,11 +9,11 @@ const page = await browser.newPage({
 });
 const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
-await page.addInitScript(() => { const fixture = sessionStorage.getItem("__treeFixture"); if (fixture) { localStorage.setItem("towerincramental.v1", fixture); sessionStorage.removeItem("__treeFixture"); } });
+await page.addInitScript(() => { const fixture = sessionStorage.getItem("__treeFixture"); if (fixture) { localStorage.setItem("towerdelve.v1", fixture); sessionStorage.removeItem("__treeFixture"); } });
 await page.goto(process.env.TEST_URL || "http://127.0.0.1:5173/");
 // Movement fixtures begin after the Delve unlock; fresh progression has its own suite.
 await page.evaluate(() => {
-  const save = JSON.parse(localStorage.getItem("towerincramental.v1"));
+  const save = JSON.parse(localStorage.getItem("towerdelve.v1"));
   save.upgrades.delve = 1;
   // Inside a run only Dev mode walks by hand, and it starts the hand paused.
   save.settings.devMode = true;
@@ -70,7 +70,7 @@ await page.locator("#retire").click();
 await page.locator("#confirm").click();
 // Delve Courage is credited per 10 height as it's reached; retiring pays nothing extra.
 // Dev mode shows balances as ∞, so read the saved one.
-if ((await page.evaluate(() => JSON.parse(localStorage.getItem("towerincramental.v1")).delve.courage)) !== 0)
+if ((await page.evaluate(() => JSON.parse(localStorage.getItem("towerdelve.v1")).delve.courage)) !== 0)
   throw Error("Retire paid an unexpected reward");
 const overflow = await page.evaluate(
   () => document.documentElement.scrollWidth > innerWidth,
@@ -101,7 +101,7 @@ for (let i = 0; i < 2; i++) {
   for (let step = 0; step < 12; step++)
     await page.getByRole("button", { name: "Move up", exact: true }).click();
   // The HUD counts the cave's first row as 1, so check the saved run instead.
-  const entered = await page.evaluate(() => JSON.parse(localStorage.getItem("towerincramental.v1")).delve.run);
+  const entered = await page.evaluate(() => JSON.parse(localStorage.getItem("towerdelve.v1")).delve.run);
   if (entered.outside || entered.height !== 0)
     throw Error("Forest walking awarded depth");
   for (let step = 0; step < i + 2; step++)
@@ -112,7 +112,7 @@ for (let i = 0; i < 2; i++) {
 }
 // Earning Courage takes 10 height per point, so grant enough for Automove.
 await page.evaluate(() => {
-  const save = JSON.parse(localStorage.getItem("towerincramental.v1"));
+  const save = JSON.parse(localStorage.getItem("towerdelve.v1"));
   save.delve.courage = 3;
   sessionStorage.setItem("__treeFixture", JSON.stringify(save));
 });
@@ -127,7 +127,7 @@ for (let step = 0; step < 12; step++)
   await page.getByRole("button", { name: "Move up", exact: true }).click();
 // Automove may spend its first steps sideways or fighting, so check that it
 // moved the player at all rather than that it gained height.
-const position = async () => JSON.stringify((await page.evaluate(() => JSON.parse(localStorage.getItem("towerincramental.v1")))).delve.run.player);
+const position = async () => JSON.stringify((await page.evaluate(() => JSON.parse(localStorage.getItem("towerdelve.v1")))).delve.run.player);
 const manual = await position();
 await page.locator("#auto").click();
 await page.waitForTimeout(2000);
