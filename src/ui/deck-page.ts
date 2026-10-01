@@ -1,6 +1,6 @@
-import { CARDS, HAND_SLOTS, deckCards, moveCard, type CardId } from "../cards.ts";
+import { CARDS, deckCards, handSlots, moveCard, nextHandSlotGems, type CardId } from "../cards.ts";
 import type { AppContext } from "./app.ts";
-import { cardArt, el } from "./dom.ts";
+import { cardArt, el, gemIcon } from "./dom.ts";
 
 /** How far a press must travel before it lifts the card. */
 const DRAG_START_PX = 4;
@@ -37,7 +37,8 @@ const CHECK_SVG = `<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2 5.4L4
  * `add`, the note on adding cards from the deck (both Buildout). */
 type Lesson = "order" | "remove" | "add" | null;
 
-/** The Deck page: the hand's five slots along the top, whose cards Hand
+/** The Deck page: the hand's slots along the top (with Larger Hand, the
+ * next one to buy with Gems after them), whose cards Hand
  * Ordering lets the player drag into a new order before a run, and the
  * deck's cards below, which Buildout lets the player add to the hand
  * or take out of it (STAIRS always stays). Each skill's first visit
@@ -104,7 +105,7 @@ export class DeckPage {
   /** The deck's cards on a grid: those in the hand greyed with a check that
    * returns them, the rest ready to add. */
   private deckHtml(note: boolean) {
-    const hand = this.ctx.game.save.hand, full = hand.length >= HAND_SLOTS;
+    const hand = this.ctx.game.save.hand, full = hand.length >= handSlots(this.ctx.game.save);
     const cards = deckCards(this.ctx.game.save.upgrades).map((id) => {
       const name = CARDS[id].name;
       if (hand.includes(id)) {
@@ -132,11 +133,23 @@ export class DeckPage {
   }
 
   /** The hand's slots as `hand` fills them, the dragged card's slot left
-   * showing where it will land. */
+   * showing where it will land, then the next slot for sale. */
   private slotsHtml(hand: readonly CardId[], held: number | null = null) {
+    return this.cardSlotsHtml(hand, held) + this.slotForSaleHtml();
+  }
+
+  /** The next hand slot, offered for its Gems, once Larger Hand is owned. */
+  private slotForSaleHtml() {
+    const { save, free } = this.ctx.game, price = nextHandSlotGems(save);
+    if (price === null || this.lesson === "order" || this.lesson === "remove") return "";
+    const short = save.gems < price && !free;
+    return `<div class="deck-slot for-sale" role="listitem"><button type="button" class="deck-buy-slot" data-buy-slot ${short ? "disabled" : ""} title="${short ? `Needs ${price} Gems` : `Buy a hand slot for ${price} Gems`}" aria-label="Buy a hand slot for ${price} Gems"><span>+</span>${gemIcon()}<b>${price}</b></button></div>`;
+  }
+
+  private cardSlotsHtml(hand: readonly CardId[], held: number | null) {
     const lesson = this.lesson, target = this.removeTarget;
     const pointer = (at: string) => `<span class="deck-pointer ${at}${this.ctx.game.save.settings.reduceMotion ? " still" : ""}">${POINTER_SVG}</span>`;
-    return Array.from({ length: HAND_SLOTS }, (_, i) => {
+    return Array.from({ length: handSlots(this.ctx.game.save) }, (_, i) => {
       const id = hand[i];
       if (!id) return `<div class="deck-slot empty" role="listitem" aria-label="Empty slot ${i + 1}"></div>`;
       const card = CARDS[id];
@@ -153,6 +166,7 @@ export class DeckPage {
     row.onclick = (e) => {
       const x = (e.target as HTMLElement).closest<HTMLButtonElement>(".deck-remove");
       if (x) this.remove(x.dataset.remove as CardId);
+      if ((e.target as HTMLElement).closest(".deck-buy-slot:not(:disabled)")) this.buySlot();
     };
     row.onpointerdown = (e) => {
       const card = (e.target as HTMLElement).closest<HTMLButtonElement>(".deck-card");
@@ -168,7 +182,7 @@ export class DeckPage {
       if (!d.lifted && Math.hypot(e.clientX - d.x, e.clientY - d.y) < DRAG_START_PX) return;
       if (!d.lifted) this.lift(d);
       d.ghost!.style.transform = `translate(${e.clientX}px, ${e.clientY}px) translate(-50%, -50%)`;
-      const to = this.slotAt(e.clientX);
+      const to = this.slotAt(e.clientX, e.clientY);
       if (to !== d.to) {
         d.to = to;
         this.preview(d);
@@ -228,12 +242,13 @@ export class DeckPage {
     el("deck-hand").innerHTML = this.slotsHtml(moveCard(this.ctx.game.save.hand, d.from, d.to), d.to);
   }
 
-  /** The slot whose middle is nearest `x`, among the slots holding cards. */
-  private slotAt(x: number) {
+  /** The slot whose middle is nearest (x, y), among the slots holding
+   * cards (a big hand wraps onto a second row). */
+  private slotAt(x: number, y: number) {
     const slots = Array.from(el("deck-hand").querySelectorAll<HTMLElement>(".deck-slot")).slice(0, this.ctx.game.save.hand.length);
     let best = 0, bestGap = Infinity;
     slots.forEach((slot, i) => {
-      const box = slot.getBoundingClientRect(), gap = Math.abs(x - (box.left + box.width / 2));
+      const box = slot.getBoundingClientRect(), gap = Math.hypot(x - (box.left + box.width / 2), y - (box.top + box.height / 2));
       if (gap < bestGap) [best, bestGap] = [i, gap];
     });
     return best;
@@ -246,6 +261,24 @@ export class DeckPage {
   }
 
   /** Saves and redraws after a change to the hand. */
+  /** Asks before spending Gems on the next hand slot. */
+  private buySlot() {
+    const { game } = this.ctx, price = nextHandSlotGems(game.save);
+    if (price === null) return;
+    this.ctx.confirm(
+      {
+        title: "Buy a hand slot?",
+        body: `Spend ${price} Gems on one more hand slot: your hand will hold ${handSlots(game.save) + 1} cards.`,
+        label: `Buy · ${price} Gems`,
+        cancel: "Cancel",
+      },
+      () => {
+        this.change(game.buyHandSlot());
+        this.ctx.update();
+      },
+    );
+  }
+
   private change(changed: boolean) {
     if (changed) this.ctx.save();
     this.render();

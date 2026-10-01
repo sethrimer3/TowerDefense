@@ -6,13 +6,16 @@ import { CONSUMABLES, type ConsumableId } from "./crafting.ts";
 import { decodeDefendSave, defaultDefendSave } from "./defend/progress.ts";
 import { decodeSettings, defaultSettings } from "./settings.ts";
 import { keepUndos, loadout } from "./loadout.ts";
-import { BASE_HAND, CARD_IDS, HAND_SLOTS, deckCards, type CardId } from "./cards.ts";
+import { BASE_HAND, CARD_IDS, HAND_SLOT_GEMS, MAX_HAND_SLOTS, deckCards, handSlots, type CardId } from "./cards.ts";
+import { decodeGemDrop, defaultGemDrop } from "./gems.ts";
 import { decodeArchives, defaultArchives } from "./archives.ts";
 export function defaults(): Save {
   return {
     version: 3,
     tower: { run: null, history: [], fall: null, best: 0, reached: 0, inspiration: 0, log: {}, lootedTiles: {}, runGold: 0, startSection: 0, sectionHp: {} },
     delve: { run: null, history: [], fall: null, best: 0, reached: 0, courage: 0, lootedTiles: {}, runGold: 0, memory: { known: {}, visited: {} } },
+    gems: 0,
+    gemDrop: defaultGemDrop(),
     gold: 0,
     provisions: Object.fromEntries(
       GOLD_SHOP.map((g) => [g.id, 0]),
@@ -29,6 +32,7 @@ export function defaults(): Save {
     equipped: {},
     consumables: Object.fromEntries(CONSUMABLES.map((c) => [c.id, 0])) as Save["consumables"],
     hand: [...BASE_HAND],
+    handSlots: 0,
     tutorials: { deck: false, removeCard: false, addCard: false },
     archives: defaultArchives(),
     defend: defaultDefendSave(),
@@ -89,10 +93,10 @@ function without<R>(r: any, fields: string[]): R {
   if (r.percentPotions !== undefined && !(Number.isInteger(r.percentPotions) && r.percentPotions > 0 && r.percentPotions <= FIND_POTION_MAX)) delete r.percentPotions;
   return r;
 }
-/** A hand as the Deck can order it: known cards, each once, no more than
- * the hand holds, STAIRS among them. */
+/** A run's hand: known cards, each once, no more than a hand can hold,
+ * STAIRS among them. */
 const validHand = (h: any) =>
-  Array.isArray(h) && h.length <= HAND_SLOTS && new Set(h).size === h.length &&
+  Array.isArray(h) && h.length <= MAX_HAND_SLOTS && new Set(h).size === h.length &&
   h.every((id) => CARD_IDS.includes(id)) && h.includes("stairs");
 /** Validate an untrusted Tower run; null unless it has the shape a
  * TowerRun needs. */
@@ -217,6 +221,8 @@ function decodeUpgrades(raw: any, d: Save) {
 }
 function decodeProgress(s: any, d: Save, undoCapacity: number) {
   d.gold = count(s.gold, d.gold);
+  d.gems = count(s.gems, d.gems);
+  d.gemDrop = decodeGemDrop(s.gemDrop);
   for (const g of GOLD_SHOP) d.provisions[g.id] = count(s.provisions?.[g.id], d.provisions[g.id], 999);
   d.xp = count(s.xp, d.xp);
   for (const t of TRAINING) d.training[t.id] = count(s.training?.[t.id], d.training[t.id], "max" in t ? t.max : 1e6);
@@ -294,11 +300,11 @@ const VERSION_STEPS = new Map<unknown, VersionStep[]>([
   [3, [decodeProgress, decodeInventory]],
 ]);
 /** The saved hand's cards the player owns, in order, each once and no
- * more than the hand holds, or the base hand when the save has none or
- * lost its STAIRS card, which every hand must hold. */
-function decodeHand(raw: any, owned: CardId[]): CardId[] {
+ * more than the hand holds (`slots`), or the base hand when the save has
+ * none or lost its STAIRS card, which every hand must hold. */
+function decodeHand(raw: any, owned: CardId[], slots: number): CardId[] {
   if (!Array.isArray(raw)) return [...BASE_HAND];
-  const hand = [...new Set(raw.filter((id): id is CardId => owned.includes(id)))].slice(0, HAND_SLOTS);
+  const hand = [...new Set(raw.filter((id): id is CardId => owned.includes(id)))].slice(0, slots);
   return validHand(hand) ? hand : [...BASE_HAND];
 }
 export function decode(raw: string | null): Save {
@@ -315,7 +321,9 @@ export function decode(raw: string | null): Save {
     decodeSections(s.tower, d);
     migratePreSkillTrees(s.upgrades, d);
     d.defend = decodeDefendSave(s.defend);
-    d.hand = decodeHand(s.hand, deckCards(d.upgrades));
+    // Slots bought with Gems count only with Larger Hand, which opens them.
+    if (d.upgrades.largerHand) d.handSlots = count(s.handSlots, 0, HAND_SLOT_GEMS.length);
+    d.hand = decodeHand(s.hand, deckCards(d.upgrades), handSlots(d));
     for (const k of ["deck", "removeCard", "addCard"] as const) d.tutorials[k] = s.tutorials?.[k] === true;
   } catch {}
   return d;

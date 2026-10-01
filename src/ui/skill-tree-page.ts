@@ -5,7 +5,8 @@ import { TREES, mapNodes, skillAvailable, treeHeight, type TreeId } from "../ski
 import { trainingPoints, trainingStep, upgradeText } from "../loadout.ts";
 import { TreeParticles } from "../tree-particles.ts";
 import type { AppContext } from "./app.ts";
-import { clamp, el, skillSprite, uiSprite, type UiSprite } from "./dom.ts";
+import { clamp, el, gemIcon, skillSprite, uiSprite, type UiSprite } from "./dom.ts";
+import { TRAINING_RESET_GEMS } from "../gems.ts";
 import { bindPanZoom, type View } from "./pan-zoom.ts";
 import { ArchivesPanel } from "./archives-page.ts";
 
@@ -65,6 +66,7 @@ export class SkillTreePage {
         if (this.ctx.game.train(b.dataset.train as TrainingId)) this.ctx.update();
         this.render();
       });
+      document.querySelectorAll<HTMLButtonElement>("[data-reset]").forEach(b => b.onclick = () => this.confirmReset(b.dataset.reset as TrainingId));
       return;
     }
     const tree = this.current();
@@ -92,6 +94,28 @@ export class SkillTreePage {
     if (this.tooltipVisible && tree.nodes.some(n => n.id === this.skill)) this.showTooltip();
   }
 
+  /** Asks before resetting a stat for Gems: what it costs, the points it
+   * returns, and the Gems held; Reset only when they cover it. */
+  private confirmReset(id: TrainingId) {
+    const { game, modal } = this.ctx, row = TRAINING.find(t => t.id === id)!,
+      ranks = game.save.training[id], points = row.cost * ranks,
+      short = game.save.gems < TRAINING_RESET_GEMS && !game.free;
+    modal.innerHTML = `<small>TRAINING</small><h2>Reset ${row.name}?</h2>
+      <p>Spend ${TRAINING_RESET_GEMS} Gems to reset ${row.name} to no ranks and recover all <b>${points}</b> training ${points === 1 ? "point" : "points"} spent on its ${ranks} ${ranks === 1 ? "rank" : "ranks"}.</p>
+      <p class="hint reset-gems">${gemIcon()} You hold ${game.save.gems} Gems${short ? ": not enough." : "."}</p>
+      <div class="dialog-actions"><button id="cancel">Cancel</button><button id="confirm" ${short ? "disabled" : ""}>Reset · ${TRAINING_RESET_GEMS} Gems</button></div>`;
+    modal.showModal();
+    el("cancel").onclick = () => modal.close();
+    el("confirm").onclick = () => {
+      modal.close();
+      if (game.resetTraining(id)) {
+        this.ctx.save();
+        this.ctx.update();
+      }
+      this.render();
+    };
+  }
+
   /** The hero's stats, each with what a rank is worth at the hero's level,
    * what one more rank makes it and what that costs; tap the cost to train. */
   private trainingHtml() {
@@ -104,7 +128,9 @@ export class SkillTreePage {
       const buy = maxed
         ? `<button class="training-box training-cost" disabled aria-label="${t.name} is fully trained">Max</button>`
         : `<button class="training-box training-cost" data-train="${t.id}" ${affordable ? "" : "disabled"} aria-label="Train ${t.name} to ${next}${unit} for ${price}">${price}</button>`;
-      return `<div class="training-row" role="listitem"><span class="training-label">${t.name}<small>+${unit ? worth : Math.round(worth * 10) / 10}${unit} a rank${most}</small></span><span class="training-box">${now}${unit}</span><span class="training-arrow" aria-hidden="true">→</span><span class="training-box next">${next}${unit}</span>${buy}</div>`;
+      const ranks = save.training[t.id];
+      const reset = `<button class="training-reset" data-reset="${t.id}" ${ranks ? "" : "disabled"} aria-label="Reset ${t.name}" title="${ranks ? `Reset ${t.name} for ${TRAINING_RESET_GEMS} Gems` : `${t.name} has no ranks to reset`}">${uiSprite("undo")}</button>`;
+      return `<div class="training-row" role="listitem"><span class="training-label">${t.name}<small>+${unit ? worth : Math.round(worth * 10) / 10}${unit} a rank${most}</small></span><span class="training-box">${now}${unit}</span><span class="training-arrow" aria-hidden="true">→</span><span class="training-box next">${next}${unit}</span>${buy}${reset}</div>`;
     };
     // Each group's rows, leaving out any whose upgrade isn't owned yet.
     const rows = (Object.entries(TRAINING_GROUPS) as [keyof typeof TRAINING_GROUPS, string][]).map(([group, name]) => {

@@ -13,6 +13,7 @@ import { DungeonLight, type LitBoard } from "./dungeon-light.ts";
 import { RoutePath } from "./route-path.ts";
 import { BoardPopups, lunges } from "./board-popups.ts";
 import { drawLevelUp, drawRevive, LEVEL_UP_MS, REVIVE_MS } from "./level-up.ts";
+import { drawGem, drawGemSparkle, GEM_SPARKLE_MS } from "./gem-art.ts";
 import { darknessOf, forEachViewTile, tileTransform, toTileSpace, type FrameContext } from "./render-frame.ts";
 
 export { ATMOSPHERE_CONFIG, type AtmosphereConfig } from "./lighting-pass.ts";
@@ -123,6 +124,10 @@ export class Renderer {
     if (f.look.outside) this.drawOutside(f);
     else this.light.draw(f, this.litBoard(f));
     this.drawBlockedMark(f);
+    // A Gem shines above the darkness, so it can be seen and tapped.
+    const gem = this.game.gem, sparkle = this.game.gemSparkle;
+    if (gem) drawGem(f, gem.x, gem.y);
+    if (sparkle) drawGemSparkle(f, sparkle.x, sparkle.y, f.now - sparkle.at);
     this.popups.draw(f);
     this.drawEffectText(f);
     for (const at of this.game.revivedAt) drawRevive(f, f.now - at);
@@ -407,7 +412,8 @@ export class Renderer {
     return Math.abs(this.playerX - p.x) < eps && Math.abs(this.playerY - p.y) < eps &&
       Math.abs(this.left - t.left) < eps && Math.abs(this.bottom - t.bottom) < eps &&
       !g.route.length && !g.encounter && now - this.arrived > ARRIVAL_GLOW_MS && g.blocked.until <= now && g.effect.until <= now && this.popups.idle && !this.decor.busy &&
-      now - g.levelUpAt >= LEVEL_UP_MS && g.revivedAt.every((at) => now - at >= REVIVE_MS);
+      now - g.levelUpAt >= LEVEL_UP_MS && g.revivedAt.every((at) => now - at >= REVIVE_MS) &&
+      (!g.gemSparkle || now - g.gemSparkle.at >= GEM_SPARKLE_MS);
   }
   /** Active torches roughly within the camera viewport, padded so a torch
    * whose center is just offscreen can still light visible ground. Cheap

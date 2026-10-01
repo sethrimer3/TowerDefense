@@ -60,6 +60,8 @@ Hero stats bought with training points (`TRAINING_PER_LEVEL` per hero level), on
 
 **Unlocks:** a row with `requires: <UpgradeId>` is hidden, and `Game.train` refuses it, until that upgrade is owned (`trainingOpen`).
 
+**Reset:** every row gets a reset button for free: `Game.resetTraining` spends `TRAINING_RESET_GEMS` Gems (`gems.ts`) to set its ranks to 0 and returns `cost × ranks` points, so a new row needs nothing for it.
+
 **Touches:** `config.ts`, `tests/loadout.test.ts`, `docs/PROGRESSION_AND_DIFFICULTY.md` (training paragraph), `README.md` (the Training tab paragraph), `CONTEXT.md` (Training point), `ui.golden.json` (Training tab), `save-decode` (the `training` record).
 
 ---

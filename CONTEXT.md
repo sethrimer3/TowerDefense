@@ -146,11 +146,15 @@ One way of moving the hero, toward one kind of target: the stairs, a potion, a d
 _Avoid_: skill (a skill is something the player uses), ability
 
 **Hand**:
-The cards the player sets up before a run, in priority order, in up to five slots; it always holds the STAIRS card. Inside a run the hand moves the hero, and the player can't: the first card that can act picks its closest target, and the hero follows the shortest path there a step at a time before the hand chooses again. The player can pause it, and undo pauses it. Each run keeps the hand as ordered when it went inside.
+The cards the player sets up before a run, in priority order, in four slots (five with Larger Hand, and more bought with Gems); it always holds the STAIRS card. Inside a run the hand moves the hero, and the player can't: the first card that can act picks its closest target, and the hero follows the shortest path there a step at a time before the hand chooses again. The player can pause it, and undo pauses it. Each run keeps the hand as ordered when it went inside.
 _Avoid_: loadout (what the character starts a run with)
 
 **Deck**:
 All the player's cards: those in the hand and those waiting outside it. Also the page where the hand is ordered (with the Combat Stance skill) and its cards chosen from the deck (with Buildout).
+
+**Gem**:
+The premium currency, kept between runs like Gold. Also the one lying on a run's floor now and then, collected by touching or tapping it.
+_Avoid_: diamond, crystal, premium
 
 **Focus**:
 Putting one card of the hand ahead of the others inside a run, until the hero reaches its target or the card has no path to one. A run has a limited number of Focus uses.

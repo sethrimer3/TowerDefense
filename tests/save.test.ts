@@ -283,7 +283,12 @@ test("the hand decodes to its known cards in order, and a save without one, or w
   assert.deepEqual(decode(JSON.stringify({ version: 3, hand: ["key", "stairs", "key"] })).hand, ["key", "stairs"], "each card once");
   assert.deepEqual(decode(JSON.stringify({ version: 3, hand: ["key", "stairs", "heal", "door", "monster", "equipment"] })).hand, ["key", "stairs", "door", "monster"], "only cards the player owns");
   const owned = { cardHeal: 1, cardGear: 1 };
-  assert.deepEqual(decode(JSON.stringify({ version: 3, upgrades: owned, hand: ["key", "stairs", "heal", "door", "monster", "equipment"] })).hand, ["key", "stairs", "heal", "door", "monster"], "no more cards than the hand's slots");
+  const six = ["key", "stairs", "heal", "door", "monster", "equipment"];
+  assert.deepEqual(decode(JSON.stringify({ version: 3, upgrades: owned, hand: six })).hand, ["key", "stairs", "heal", "door"], "no more cards than the hand's four slots");
+  assert.deepEqual(decode(JSON.stringify({ version: 3, upgrades: { ...owned, largerHand: 1 }, hand: six })).hand, six.slice(0, 5), "five with Larger Hand");
+  assert.deepEqual(decode(JSON.stringify({ version: 3, upgrades: { ...owned, largerHand: 1 }, handSlots: 1, hand: six })).hand, six, "and one more for each slot bought");
+  assert.equal(decode(JSON.stringify({ version: 3, upgrades: owned, handSlots: 3 })).handSlots, 0, "slots bought count only with Larger Hand");
+  assert.equal(decode(JSON.stringify({ version: 3, upgrades: { largerHand: 1 }, handSlots: 99 })).handSlots, 0, "no more than there are to buy");
   assert.deepEqual(decode(JSON.stringify({ version: 3, hand: [] })).hand, [...BASE_HAND], "every hand holds STAIRS");
   assert.deepEqual(decode(JSON.stringify({ version: 3, hand: ["key"] })).hand, [...BASE_HAND]);
 });

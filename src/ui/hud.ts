@@ -5,13 +5,29 @@ import { CONSUMABLES, consumableText } from "../crafting.ts";
 import { outsideWeather } from "../outside.ts";
 import { MODES, milestones } from "../modes.ts";
 import { cardArt, displayedProgress, el, text, uiSprite } from "./dom.ts";
-import { CARDS, HAND_SLOTS } from "../cards.ts";
+import { CARDS } from "../cards.ts";
 import { trainingPoints } from "../loadout.ts";
 import type { BoardOverlay } from "./board-overlay.ts";
 
 /** The stats cluster, action buttons and status line around the board. */
 
 export const devAmount = (game: Pick<Game, "save">, value: number) => game.save.settings.devMode ? "∞" : String(value);
+/** An amount short enough for the HUD's narrow purse: in full below 10,000,
+ * then to three figures in thousands, millions or billions (12.3K, 456M). */
+export function shortAmount(n: number) {
+  if (n < 10_000) return String(n);
+  const [size, unit] = n < 1e6 ? [1e3, "K"] : n < 1e9 ? [1e6, "M"] : [1e9, "B"];
+  // Whole steps of the last figure shown, so no rounding creeps in.
+  const v = n / size, digits = v < 10 ? 2 : v < 100 ? 1 : 0, step = size / 10 ** digits;
+  return `${Math.floor(n / step) / 10 ** digits}${unit}`;
+}
+/** Shows `value` in the purse's `id`, shortened, the exact amount in its
+ * tooltip (∞ in Dev mode). */
+function purse(game: Game, id: string, value: number, name: string) {
+  const dev = game.save.settings.devMode;
+  text(id, dev ? "∞" : shortAmount(value));
+  el(id).parentElement!.title = `${name}: ${dev ? "∞" : value.toLocaleString("en-US")}`;
+}
 
 /** Refreshes every HUD readout from game state. */
 export function renderHud(game: Game, renderer: Renderer, overlay: BoardOverlay) {
@@ -21,6 +37,7 @@ export function renderHud(game: Game, renderer: Renderer, overlay: BoardOverlay)
   renderConsumables(game);
   renderProgress(game);
   renderModeActions(game);
+  text("gems-held", devAmount(game, game.save.gems));
   text("courage", devAmount(game, game.save.delve.courage));
   text("inspiration", devAmount(game, game.save.tower.inspiration));
   text("training", String(trainingPoints(game.save).left));
@@ -34,6 +51,7 @@ export function renderHud(game: Game, renderer: Renderer, overlay: BoardOverlay)
   renderUndo(game);
   (document.querySelector(".dpad") as HTMLElement).hidden = !game.save.settings.showArrows;
   renderLockedTab("delve", !!game.save.upgrades.delve, "Delve", "Unlock Into the depths in the Inspiration tree");
+  renderAdButton(game);
   renderLockedTab("deck", !!game.save.upgrades.handOrdering, "Deck", "Unlock Combat Stance in the Inspiration tree");
   // A new Deck lesson waits behind the button until its tutorial is done.
   const { deck, addCard } = game.save.tutorials;
@@ -67,7 +85,6 @@ export function renderBoardHeading(game: Game, overlay: BoardOverlay) {
   el("board").classList.toggle("mode-tower", game.mode === "tower");
   const words = MODES[game.mode].words;
   text("board-title", boardTitle(game));
-  text("height-zone", boardTitle(game));
   if (game.run.outside) {
     const labels = { cloudy: "CLOUDY", sunny: "SUNNY", rain: "RAINING", storm: "THUNDERSTORM" };
     text("board-subtitle", `FOREST CLEARING · ${labels[outsideWeather(game.run.seed)]}`);
@@ -109,7 +126,8 @@ function renderHand(game: Game) {
   const row = el("hand"), hand = game.hand;
   if (hand.join() !== shownHand) {
     shownHand = hand.join();
-    row.style.setProperty("--slots", String(HAND_SLOTS));
+    // Room for five cards, and narrower cards for a bigger hand.
+    row.style.setProperty("--slots", String(Math.max(5, hand.length)));
     row.innerHTML = hand.map((id, i) => `<div class="hand-card" role="listitem" data-card="${id}" data-hand-slot="${i}" title="${CARDS[id].name}: ${CARDS[id].text}">${cardArt(id, CARDS[id].name)}</div>`).join("");
   }
   const glowing = game.auto && !game.handStuck ? game.activeCard : null;
@@ -137,8 +155,10 @@ export function renderVitals(game: Game) {
   text("defense", p.defense);
   text("shroud", p.shroud ?? 0);
   el("shroud-stat").hidden = !game.save.upgrades.shroud;
-  text("gold", devAmount(game, game.save.gold));
-  text("run-silver", game.silver);
+  purse(game, "gems", game.save.gems, "Gems, kept between runs");
+  purse(game, "gold", game.save.gold, "Gold, kept between runs");
+  text("run-silver", shortAmount(game.silver));
+  el("run-silver").parentElement!.title = `Silver, spent only inside this run: ${game.silver.toLocaleString("en-US")}`;
   for (const k of ["yellow", "blue", "red"] as const) text(k, p.keys[k]);
   const skeletonKeys = p.skeletonKeys ?? 0;
   text("skeleton", skeletonKeys);
@@ -215,8 +235,7 @@ function renderConsumables(game: Game) {
   }
 }
 
-/** Current height/depth, the run and all-time bests, and the reward a new
- * best would pay. */
+/** Current height/depth, and the reward the run's new best would pay. */
 function renderProgress(game: Game) {
   const outside = !!game.run.outside,
     rules = MODES[game.mode];
@@ -224,13 +243,21 @@ function renderProgress(game: Game) {
   const rawRunBest = game.run.maxHeight ?? game.run.height;
   const rawAllBest = game.save[game.mode].best;
   text("height", displayedProgress(game.run.height, outside));
-  text("best-run", displayedProgress(rawRunBest, outside));
-  text("best-all", displayedProgress(rawAllBest));
   const rewardEl = el("best-reward");
   rewardEl.hidden = rawRunBest <= rawAllBest;
   if (rewardEl.hidden) return;
   text("best-reward-val", milestones(rules, rawAllBest, rawRunBest));
   text("best-reward-type", rules.words.currency.toUpperCase());
+}
+
+/** Inside a run, the ad button stands where Floors is in the forest:
+ * showing its Gems when they can be claimed, an empty space while it waits. */
+export function renderAdButton(game: Game) {
+  const inside = !game.run.outside, button = el("gem-ad") as HTMLButtonElement;
+  el("section-pick").hidden = inside;
+  button.hidden = !inside;
+  button.classList.toggle("waiting", !game.adReady);
+  button.disabled = !game.adReady;
 }
 
 /** Log and Floors act on the Tower; in the Delve they are placeholders. */

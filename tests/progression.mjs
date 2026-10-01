@@ -6,7 +6,8 @@ const errors=[]; page.on('pageerror',e=>errors.push(e.message));
 await page.addInitScript(() => { const fixture = sessionStorage.getItem('logFixture'); if (fixture) { localStorage.setItem('towerincramental.v1', fixture); sessionStorage.removeItem('logFixture'); } });
 await page.goto(process.env.TEST_URL || 'http://127.0.0.1:5173/');
 assert.equal(await page.locator('.tower-heading').isVisible(),false);
-assert.equal(await page.locator('#height-zone').innerText(),'THE ASCENT TRIALS');
+// The height column holds the purse: Gems, Gold, then Silver.
+assert.deepEqual(await page.locator('.purse > span').evaluateAll((s) => s.map((e) => e.className)), ['gem-stat', 'gold-stat', 'silver-stat']);
 assert.equal(await page.locator('.run-consumables [data-hud-consumable="cinderTonic"]').count(),1);
 await page.getByRole('button',{name:'Adventure log',exact:true}).click();
 await page.getByRole('heading',{name:'Adventure log'}).waitFor();
@@ -30,7 +31,9 @@ await page.locator('[data-tab="delve"]').click();
 assert.equal(await page.getByRole('button',{name:'Adventure log',exact:true}).count(),0);
 assert.equal(await page.getByRole('button',{name:'Choose starting floor',exact:true}).count(),0);
 assert.equal(await page.getByRole('button',{name:'Future Delve action 1',exact:true}).innerText(),'BUTTON 1');
-assert.equal(await page.getByRole('button',{name:'Future Delve action 2',exact:true}).innerText(),'BUTTON 2');
+// Inside a run the ad's Gems stand where the second button is in the forest.
+assert.equal(await page.getByRole('button',{name:'Future Delve action 2',exact:true}).count(),0);
+assert.equal(await page.getByRole('button',{name:'Claim 7 Gems',exact:true}).innerText(),'7');
 await page.getByRole('button',{name:'End current run',exact:true}).click();
 assert.match(await page.locator('#modal').innerText(),/End this run\?/);
 await page.locator('#cancel').click();

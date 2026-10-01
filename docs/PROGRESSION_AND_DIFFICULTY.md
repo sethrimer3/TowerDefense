@@ -145,16 +145,20 @@ Every Inspiration skill is an unlock, bought once; more of what one gives comes 
 With the current first-level costs, the direct prerequisite path to unlock Delve is approximately:
 
 - Combat Stance: 1 Inspiration
-- Buildout: 2 Inspiration
+- Buildout: 1 Inspiration
+- Larger Hand: 1 Inspiration
 - Heal: 3 Inspiration
-- Gear: 5 Inspiration
 - Focus: 10 Inspiration
 - Into the depths: 3 Inspiration
-- **Total minimum path: 24 Inspiration**
+- **Total minimum path: 19 Inspiration**
 
-If the player earned only the guaranteed reach-based Inspiration, this naturally places the current Delve unlock in the low-to-mid twenties in Tower progression. Silver/Gold/Platinum rewards can move that timing earlier.
+Gear (5 Inspiration) now comes after Focus, beside Rehearsed steps, the Archives and Into the depths, so it is off that path. If the player earned only the guaranteed reach-based Inspiration, this places the current Delve unlock around floor 20 in Tower progression. Silver/Gold/Platinum rewards can move that timing earlier.
 
-This is a useful reference point, **not a commitment that 24 is the final desired Delve-unlock cost**.
+This is a useful reference point, **not a commitment that 19 is the final desired Delve-unlock cost**.
+
+### Gems and the hand's slots
+
+Gems are the premium currency, kept between runs. A run's floors give one Gem at a time: the next new floor reached (Tower floor, or each 10 Delve depth) holds one, then none for 30 minutes after it is collected; one missed (its floor left, or its run ended) comes back every 3 new floors until collected. The ad button pays 7 Gems every 10 minutes (not yet a real ad). The hand holds 4 cards, 5 with Larger Hand, and Larger Hand sells six more slots for 50, 200, 400, 600, 800 and 1,000 Gems (3,050 in all, 11 slots), sold whether or not the deck has cards to fill them yet. A Training stat resets for 2 Gems, returning every point spent on it. Still to come: a Shop page with free Gems once a day (resetting at 00:00 GMT) and Gems bought with real money.
 
 ---
 

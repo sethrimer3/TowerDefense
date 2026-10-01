@@ -1,6 +1,7 @@
 import type { Encounter, Gain, Heal } from "./state.ts";
 import { paintContents } from "./tile-painters.ts";
 import { materialImage } from "./material-sprites.ts";
+import { paintGem } from "./gem-art.ts";
 import { tileCenter, toTileSpace, type FrameContext } from "./render-frame.ts";
 
 /** How long each popup shows, and the fade that ends it (ms). */
@@ -143,7 +144,7 @@ export class BoardPopups {
     const art = p.gain.art;
     if (!art) return false;
     const image = "material" in art ? materialImage(art.material) : "heart" in art ? heart() : null;
-    if (!("tile" in art) && !image) return false;
+    if (!("tile" in art) && !("gem" in art) && !image) return false;
     const c = f.c, { alpha, rise } = this.phase(f, p, REWARD_RISE), look = f.look;
     c.save();
     c.globalAlpha = alpha;
@@ -156,6 +157,8 @@ export class BoardPopups {
         c.translate(-4, 0);
         mark(c, "−", SPENT_COLOR, 3, 12, 14);
       }
+    } else if ("gem" in art) {
+      paintGem(c, f.now, true);
     } else if ("heart" in art) {
       c.imageSmoothingEnabled = false;
       c.drawImage(image!, 2, 2, 18, 18);

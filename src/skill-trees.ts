@@ -8,21 +8,23 @@ export type SkillNode = { id: UpgradeId; icon: string; x: number; y: number; req
  * Archives), so its page shows no ranks. */
 export type SkillTree = { id: TreeId; name: string; currency: Currency; gate?: UpgradeId; description: string; height?: number; unlocks?: boolean; nodes: SkillNode[] };
 export const TREES: SkillTree[] = [
-  { id: "inspiration", name: "Inspiration", currency: "inspiration", description: "Earn Inspiration by beating your best Tower climb.", height: 154, unlocks: true, nodes: [
+  { id: "inspiration", name: "Inspiration", currency: "inspiration", description: "Earn Inspiration by beating your best Tower climb.", height: 190, unlocks: true, nodes: [
+    // The hand's skills, one after another down to Focus.
     { id: "handOrdering", icon: "▤", x: 50, y: 12, requires: [] },
-    { id: "combatStance", icon: "⚔", x: 50, y: 33, requires: ["handOrdering"] },
-    { id: "cardHeal", icon: "♥", x: 24, y: 51, requires: ["combatStance"] },
-    { id: "cardGear", icon: "⛨", x: 76, y: 51, requires: ["combatStance"] },
-    { id: "focus", icon: "ϟ", x: 50, y: 69, requires: ["cardHeal", "cardGear"] },
-    { id: "inspirationUndos", icon: "↺", x: 18, y: 88, requires: ["focus"] },
-    { id: "archives", icon: "▥", x: 50, y: 88, requires: ["focus"] },
-    { id: "delve", icon: "▼", x: 82, y: 88, requires: ["focus"] },
+    { id: "combatStance", icon: "⚔", x: 50, y: 30, requires: ["handOrdering"] },
+    { id: "largerHand", icon: "▦", x: 50, y: 48, requires: ["combatStance"] },
+    { id: "cardHeal", icon: "♥", x: 50, y: 66, requires: ["largerHand"] },
+    { id: "focus", icon: "ϟ", x: 50, y: 84, requires: ["cardHeal"] },
+    { id: "cardGear", icon: "⛨", x: 14, y: 106, requires: ["focus"] },
+    { id: "inspirationUndos", icon: "↺", x: 38, y: 106, requires: ["focus"] },
+    { id: "archives", icon: "▥", x: 62, y: 106, requires: ["focus"] },
+    { id: "delve", icon: "▼", x: 86, y: 106, requires: ["focus"] },
     // Research needs the Archives, so the skills that open it come after them.
-    { id: "greaterHeal", icon: "✚", x: 50, y: 106, requires: ["archives"] },
-    { id: "recovery", icon: "✦", x: 30, y: 124, requires: ["greaterHeal"] },
-    { id: "findPotion", icon: "⚗", x: 30, y: 142, requires: ["recovery"] },
-    { id: "shroud", icon: "◈", x: 70, y: 124, requires: ["greaterHeal"] },
-    { id: "revive", icon: "☼", x: 70, y: 142, requires: ["shroud"] },
+    { id: "greaterHeal", icon: "✚", x: 62, y: 124, requires: ["archives"] },
+    { id: "recovery", icon: "✦", x: 42, y: 142, requires: ["greaterHeal"] },
+    { id: "findPotion", icon: "⚗", x: 42, y: 160, requires: ["recovery"] },
+    { id: "shroud", icon: "◈", x: 82, y: 142, requires: ["greaterHeal"] },
+    { id: "revive", icon: "☼", x: 82, y: 160, requires: ["shroud"] },
   ] },
   { id: "courage", name: "Courage", currency: "courage", gate: "delve", description: "Earn Courage by beating your best Delve depth.", nodes: [
     { id: "auto", icon: "✦", x: 50, y: 10, requires: ["delve"] },

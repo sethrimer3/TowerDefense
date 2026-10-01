@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { BASE_HAND, CARD_IDS, HAND_SLOTS, deckCards, moveCard, planHand, upgradeCard, type CardId } from "../src/cards.ts";
+import { BASE_HAND, BASE_HAND_SLOTS, CARD_IDS, HAND_SLOT_GEMS, MAX_HAND_SLOTS, deckCards, handSlots, nextHandSlotGems, moveCard, planHand, upgradeCard, type CardId } from "../src/cards.ts";
 import { defaults } from "../src/save.ts";
 import type { Board, Position } from "../src/board.ts";
 import type { Enemy, Run, Tile } from "../src/entities.ts";
@@ -133,12 +133,25 @@ test("the Delve's paths wrap across the sides and climb through one-way gates", 
 test("the deck starts as the base hand, and HEAL and EQUIPMENT join it with their skills", () => {
   const none = defaults().upgrades;
   assert.deepEqual(BASE_HAND, ["stairs", "door", "key", "monster"]);
-  assert.ok(BASE_HAND.length <= HAND_SLOTS);
+  assert.equal(BASE_HAND.length, BASE_HAND_SLOTS, "the base hand fills the base slots");
   assert.deepEqual(deckCards(none), ["stairs", "door", "key", "monster"]);
   assert.deepEqual(deckCards({ ...none, cardHeal: 1 }), ["stairs", "heal", "door", "key", "monster"]);
   assert.deepEqual(deckCards({ ...none, cardHeal: 1, cardGear: 1 }), CARD_IDS);
   assert.equal(upgradeCard("cardGear"), "equipment");
   assert.equal(upgradeCard("focus"), undefined);
+});
+
+test("the hand holds four cards, five with Larger Hand, and one more for each slot bought with Gems", () => {
+  const upgrades = defaults().upgrades;
+  assert.equal(handSlots({ upgrades, handSlots: 0 }), 4);
+  assert.equal(nextHandSlotGems({ upgrades, handSlots: 0 }), null, "none for sale before Larger Hand");
+  const larger = { ...upgrades, largerHand: 1 };
+  assert.equal(handSlots({ upgrades: larger, handSlots: 0 }), 5);
+  assert.deepEqual(HAND_SLOT_GEMS, [50, 200, 400, 600, 800, 1000]);
+  assert.deepEqual(HAND_SLOT_GEMS.map((_, n) => nextHandSlotGems({ upgrades: larger, handSlots: n })), [...HAND_SLOT_GEMS]);
+  assert.equal(nextHandSlotGems({ upgrades: larger, handSlots: HAND_SLOT_GEMS.length }), null, "every slot bought");
+  assert.equal(handSlots({ upgrades: larger, handSlots: HAND_SLOT_GEMS.length }), MAX_HAND_SLOTS);
+  assert.equal(MAX_HAND_SLOTS, 11);
 });
 
 test("a hand can plan one card alone, for a Focus", () => {

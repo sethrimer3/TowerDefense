@@ -5,6 +5,7 @@ import type { MaterialId } from "./materials.ts";
 import type { CraftedEquipment, EquipmentSlot } from "./equipment.ts";
 import type { ConsumableId } from "./crafting.ts";
 import type { DefendSave } from "./defend/progress.ts";
+import type { GemDrop } from "./gems.ts";
 import type { Settings } from "./settings.ts";
 export type Kind =
   | "wall"
@@ -161,6 +162,11 @@ export type Save = {
     sectionHp: Record<string, number>;
   };
   delve: ModeSave<DelveRun> & { courage: number; memory: AutomoveMemory };
+  /** The premium currency, kept between runs like Gold (gems.ts). */
+  gems: number;
+  /** Where the Gems found on floors and the ad button's stand: never part
+   * of a run, so undo can't touch them. */
+  gemDrop: GemDrop;
   gold: number;
   provisions: Record<GoldItemId, number>;
   xp: number;
@@ -181,6 +187,8 @@ export type Save = {
    * priority order. Set up before a run; a new profile starts with the
    * base hand. */
   hand: CardId[];
+  /** Hand slots bought with Gems (after Larger Hand's). */
+  handSlots: number;
   /** Tutorials the player has finished, all on the Deck page: `deck`,
    * reordering the hand; `removeCard`, taking a card out of it; `addCard`,
    * the note on adding cards from the deck. */

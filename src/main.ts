@@ -13,7 +13,7 @@ import { capitalized, displayedProgress, el } from "./ui/dom.ts";
 import { MODES } from "./modes.ts";
 import { buildShell } from "./ui/shell.ts";
 import { BoardOverlay } from "./ui/board-overlay.ts";
-import { boardHeadingStale, flashRed, renderBoardHeading, renderHud, renderVitals } from "./ui/hud.ts";
+import { boardHeadingStale, flashRed, renderAdButton, renderBoardHeading, renderHud, renderVitals } from "./ui/hud.ts";
 import { confirmAction, DefeatDialog, showLog, showSectionPicker } from "./ui/dialogs.ts";
 import { SkillTreePage } from "./ui/skill-tree-page.ts";
 import { ResearchToasts } from "./ui/research-toast.ts";
@@ -147,6 +147,11 @@ el("hand").onclick = (e) => {
 };
 el("log").onclick = () => showLog(ctx);
 el("section-pick").onclick = () => showSectionPicker(ctx);
+el("gem-ad").onclick = () => {
+  if (!game.claimAdGems()) return;
+  save();
+  update();
+};
 el("end-run").onclick = () =>
   ctx.confirm(
     {
@@ -200,6 +205,8 @@ bindInput(
 function archivesTick() {
   const done = game.settleResearch().length > 0;
   if (done) update();
+  // The ad button comes back on the wall clock too.
+  else renderAdButton(game);
   if (tab === "upgrades") skillTree.archivesTick(done);
 }
 const loop = new FrameLoop({

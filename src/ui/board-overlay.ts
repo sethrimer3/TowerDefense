@@ -16,6 +16,11 @@ export class BoardOverlay {
   constructor(private game: Game, private renderer: Renderer) {}
 
   tap(x: number, y: number) {
+    // A Gem is collected wherever the hero stands.
+    if (this.game.collectGemAt(x, y)) {
+      this.hide();
+      return;
+    }
     if (this.game.save.settings.oneTapMove || this.isHighlighted({ x, y })) {
       this.hide();
       this.game.walkTo(x, y);

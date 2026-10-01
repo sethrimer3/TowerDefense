@@ -169,6 +169,8 @@ test("Buildout moves cards between the deck and the hand in the forest, and STAI
   assert.deepEqual(g.save.hand, ["stairs", "door", "key", "monster"], "an added card takes the first empty slot");
   assert.equal(g.addToHand("monster"), false, "a card already in the hand");
   assert.equal(g.addToHand("equipment"), false, "a card the player doesn't own");
+  assert.equal(g.addToHand("heal"), false, "four slots until Larger Hand");
+  g.save.upgrades.largerHand = 1;
   assert.ok(g.addToHand("heal"));
   assert.equal(g.addToHand("heal"), false);
   assert.deepEqual(decode(JSON.stringify(g.save)).hand, ["stairs", "door", "key", "monster", "heal"], "the hand is saved as chosen");

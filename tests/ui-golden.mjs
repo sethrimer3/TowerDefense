@@ -87,10 +87,11 @@ try {
     };
     const rich = (s) => {
       quiet(s);
-      Object.assign(s.upgrades, { delve: 1, auto: 1, legacy: 1, revive: 1, handOrdering: 1, combatStance: 1, cardHeal: 1, focus: 1, archives: 1, inspirationUndos: 1, greaterHeal: 1, recovery: 1, findPotion: 1, shroud: 1, undos: 1, autoPersist: 1 });
+      Object.assign(s.upgrades, { delve: 1, auto: 1, legacy: 1, revive: 1, handOrdering: 1, combatStance: 1, largerHand: 1, cardHeal: 1, focus: 1, archives: 1, inspirationUndos: 1, greaterHeal: 1, recovery: 1, findPotion: 1, shroud: 1, undos: 1, autoPersist: 1 });
       s.delve.courage = 37;
       s.tower.inspiration = 21;
       s.gold = 480;
+      s.gems = 260;
       s.xp = 900;
       for (const k of Object.keys(s.materials)) s.materials[k] = 120;
       s.tower.reached = 31;
@@ -246,6 +247,11 @@ try {
     await shot(`${prefix}.deck.returned`);
     await click('[data-add="heal"]');
     await shot(`${prefix}.deck.added`);
+    // Larger Hand sells the next slot for Gems.
+    await click(".deck-buy-slot");
+    await shot(`${prefix}.deck.buySlot`);
+    await click("#confirm");
+    await shot(`${prefix}.deck.slotBought`);
   }
   /** Buying a card's skill raises the card over the screen until pressed. */
   async function cardRevealTour(prefix) {
@@ -265,9 +271,9 @@ try {
       await shot(`${prefix}.log.older`);
     }
     await closeModal();
-    await click("#section-pick");
-    await shot(`${prefix}.sections`);
-    await closeModal();
+    // Inside a run the ad's Gems stand where Floors is in the forest.
+    await click("#gem-ad");
+    await shot(`${prefix}.adGems`);
     await click("#auto-settings");
     await shot(`${prefix}.autoSettings`);
     await click("#settings-back");
@@ -289,6 +295,13 @@ try {
           if (!(await page.locator(`[data-train="${stat}"]:not([disabled])`).count())) continue;
           await click(`[data-train="${stat}"]:not([disabled])`);
           await shot(`${prefix}.tree.training.${stat}`);
+        }
+        // A trained stat resets for Gems, asking first.
+        if (await page.locator("[data-reset]:not([disabled])").count()) {
+          await click("[data-reset]:not([disabled])");
+          await shot(`${prefix}.tree.training.resetAsk`);
+          await click("#confirm");
+          await shot(`${prefix}.tree.training.reset`);
         }
         continue;
       }
@@ -410,6 +423,10 @@ try {
     await shot(`rich.focus.${card}`);
   }
   await leaveRun();
+  // In the forest, Floors chooses where the next ascent starts.
+  await click("#section-pick");
+  await shot("rich.sections");
+  await closeModal();
   await deckTour("rich");
   await cardRevealTour("rich");
   await tab("defend");

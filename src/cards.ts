@@ -18,8 +18,21 @@ export const CARDS = {
 export type CardId = keyof typeof CARDS;
 export const CARD_IDS = Object.keys(CARDS) as CardId[];
 
-/** How many cards a hand holds. */
-export const HAND_SLOTS = 5;
+/** How many cards a hand holds before Larger Hand, and at most, with
+ * Larger Hand's slot and every slot bought with Gems. */
+export const BASE_HAND_SLOTS = 4;
+/** What each hand slot bought with Gems costs, in order (Larger Hand opens
+ * them). */
+export const HAND_SLOT_GEMS = [50, 200, 400, 600, 800, 1000] as const;
+export const MAX_HAND_SLOTS = BASE_HAND_SLOTS + 1 + HAND_SLOT_GEMS.length;
+/** How many cards the player's hand holds: the base, one more with Larger
+ * Hand, and each slot bought with Gems. */
+export const handSlots = (save: { upgrades: Record<UpgradeId, number>; handSlots: number }) =>
+  BASE_HAND_SLOTS + (save.upgrades.largerHand ? 1 + save.handSlots : 0);
+/** The Gems the next hand slot costs, or null when there is none to buy
+ * (Larger Hand not owned, or every slot bought). */
+export const nextHandSlotGems = (save: { upgrades: Record<UpgradeId, number>; handSlots: number }) =>
+  save.upgrades.largerHand ? HAND_SLOT_GEMS[save.handSlots] ?? null : null;
 /** The hand a new profile starts with, in priority order: its whole deck.
  * HEAL and EQUIPMENT are earned from the Inspiration tree. */
 export const BASE_HAND: readonly CardId[] = ["stairs", "door", "key", "monster"];

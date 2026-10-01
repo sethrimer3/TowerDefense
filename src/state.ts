@@ -1,9 +1,10 @@
 import { entrance, floorFor } from "./delve/labyrinth.ts";
 import { chooseStep } from "./automation.ts";
-import { CARDS, HAND_SLOTS, deckCards, moveCard, planHand, type CardId, type CardPlan } from "./cards.ts";
+import { CARDS, deckCards, handSlots, moveCard, nextHandSlotGems, planHand, type CardId, type CardPlan } from "./cards.ts";
+import { AD_COOLDOWN_MS, AD_GEMS, TRAINING_RESET_GEMS, collectedGem, gemOn, gemSpot, missGem, reachFloor, type GemSpot } from "./gems.ts";
 import { DelvePlan } from "./delve/automove.ts";
 import { defaults } from "./save.ts";
-import { stream, tileRandom } from "./random.ts";
+import { random, stream, tileRandom } from "./random.ts";
 import { doorBlockedMessage, doorName, KEY_ORDER } from "./doors.ts";
 import { skillAvailable } from "./skill-trees.ts";
 import { routeTo, type Step } from "./pathfinding.ts";
@@ -24,6 +25,7 @@ import {
   FOCUS_PER_RUN,
   ENEMY_GOLD,
   silverForKill,
+  VIEWPORT_TILES,
 } from "./config.ts";
 import {
   type Save,
@@ -78,13 +80,15 @@ export type RouteEffects = {
  * key a door used, a material, or the heart a Heart Door checked), or as
  * `text` where it has none. */
 export type Gain = { x: number; y: number; text: string; art: GainArt | null };
-export type GainArt = { tile: Tile; spent?: true } | { material: MaterialId; quantity: number } | { heart: true };
+export type GainArt = { tile: Tile; spent?: true } | { material: MaterialId; quantity: number } | { heart: true } | { gem: true };
 /** A potion's heal: the HP from and to, where the hero stood, and its number. */
 export type Heal = { from: number; to: number; x: number; y: number; id: number };
 /** Rewards kept for the board to show; older ones are dropped unseen. */
 const MAX_GAINS = 12;
 /** Salts the run seed for Revive's rolls, apart from the world's own. */
 const REVIVE_SALT = 0x7e51e;
+/** Salts the run seed for where a Gem lies on a floor. */
+const GEM_SALT = 0x6e3a1;
 /** A fight being played out round by round before it counts: the hero waits
  * at `from`, the enemy stands at `to`, and nothing changes until
  * `finishEncounter` settles it (at `start + bout.duration`, performance time). */
@@ -130,6 +134,9 @@ export class Game {
   /** When each of the latest fight's revivals lands (performance.now()),
    * for the board's golden fire; emptied by undo. */
   revivedAt: number[] = [];
+  /** Where and when (performance.now()) the latest Gem was collected, for
+   * the board's sparkle. */
+  gemSparkle: { x: number; y: number; at: number } | null = null;
   /** Delve Automove's committed route and last weighed decisions. */
   readonly delvePlan = new DelvePlan();
   /** `rng` is the game's randomness: new run seeds, enemy drops and
@@ -153,6 +160,7 @@ export class Game {
     this.save.settings.devMode = on;
     if (!on) return;
     this.save.gold = 999_999_999;
+    this.save.gems = 999_999_999;
     this.save.tower.inspiration = 999_999_999;
     this.save.delve.courage = 999_999_999;
     for (const material of MATERIALS) {
@@ -528,6 +536,8 @@ export class Game {
    * one. */
   newRun({ outside = false, seed = Math.floor(this.rng() * 2 ** 32) }: RunStart = {}) {
     if (this.run) this.claimRewards();
+    // A Gem the last run left lying on a floor is missed.
+    if (this.save.gemDrop.out?.mode === this.mode) missGem(this.save.gemDrop);
     this.slice.fall = null;
     this.slice.history = [];
     this.slice.runGold = 0;
@@ -748,6 +758,7 @@ export class Game {
   private take(t: Tile, outcome: StepEffect, dest: { x: number; y: number }, track: boolean, revived = 0) {
     if (!this.enter(t, outcome, dest, track, revived)) return false;
     this.land(t, dest.x, dest.y, outcome);
+    this.gemStep();
     return true;
   }
   /** Commits a resolved step: undo history, stats, and the door or fight on
@@ -874,6 +885,61 @@ export class Game {
     this.auto = this.handStartsPlaying;
     this.dropHandPlan();
     this.feedback(this.rules.words.enter);
+    this.gemStep();
+  }
+  /** The floor a Gem belongs to: the Tower floor the hero stands on, or in
+   * the Delve the furthest equivalent floor reached. */
+  private get gemFloor() {
+    const r = this.run;
+    return this.mode === "tower" ? r.height : this.rules.equivalentFloor(r.maxHeight ?? r.height);
+  }
+  /** The Gem lying on the floor the board shows, if any. */
+  get gem(): GemSpot | null {
+    return this.run.outside ? null : gemOn(this.save.gemDrop, this.mode, this.run.seed, this.gemFloor);
+  }
+  /** The hero stands somewhere new inside a run: it takes a Gem lying on
+   * its tile, a Gem left on another floor is missed, and on a new floor
+   * (once the last Gem's cooldown is over) a new one may appear: on a plain
+   * tile the hero can walk to, in the Delve within the view. */
+  private gemStep() {
+    if (!this.playing) return;
+    const drop = this.save.gemDrop, p = this.run.player, gem = this.gem;
+    if (gem && gem.x === p.x && gem.y === p.y) this.takeGem(gem);
+    if (!reachFloor(drop, this.mode, this.run.seed, this.gemFloor, this.clock())) return;
+    const view = Math.floor(VIEWPORT_TILES / 2);
+    const [minY, maxY] = this.mode === "tower" ? [0, Infinity] : [p.y - view, p.y + view];
+    // Where it lies is fixed for the run and floor, like the floor itself.
+    const spot = gemSpot(this.world, p, minY, maxY, random(this.run.seed ^ GEM_SALT ^ Math.imul(this.gemFloor + 1, 0x9e3779b1)));
+    if (spot) drop.out = { mode: this.mode, seed: this.run.seed, floor: this.gemFloor, ...spot };
+  }
+  /** Pays the Gem and starts the cooldown to the next; it vanishes in a sparkle. */
+  private takeGem(gem: GemSpot) {
+    this.save.gems++;
+    collectedGem(this.save.gemDrop, this.clock());
+    this.gemSparkle = { x: gem.x, y: gem.y, at: performance.now() };
+    this.gain(gem.x, gem.y, "+1 Gem", { gem: true });
+  }
+  /** Collects the Gem at (x, y) on the board, tapped from anywhere; false
+   * when none lies there. */
+  collectGemAt(x: number, y: number) {
+    const gem = this.gem;
+    if (!gem || gem.x !== x || gem.y !== y) return false;
+    this.takeGem(gem);
+    this.message = "+1 Gem";
+    return true;
+  }
+  /** Whether the ad's Gems can be claimed now. */
+  get adReady() {
+    return this.clock() >= this.save.gemDrop.adReadyAt;
+  }
+  /** Claims the ad's Gems, and the button waits out its cooldown. No ad
+   * plays yet: this is where watching one will be hooked up. */
+  claimAdGems() {
+    if (!this.adReady) return false;
+    this.save.gems += AD_GEMS;
+    this.save.gemDrop.adReadyAt = this.clock() + AD_COOLDOWN_MS;
+    this.message = `+${AD_GEMS} Gems`;
+    return true;
   }
   /** Removes what the step used up: chests stay behind opened, fixtures stay. */
   private consumeTile(t: Tile, x: number, y: number) {
@@ -1058,7 +1124,7 @@ export class Game {
    * the forest only). */
   addToHand(id: CardId) {
     const hand = this.save.hand;
-    if (!this.canChooseCards || !deckCards(this.save.upgrades).includes(id) || hand.includes(id) || hand.length >= HAND_SLOTS) return false;
+    if (!this.canChooseCards || !deckCards(this.save.upgrades).includes(id) || hand.includes(id) || hand.length >= handSlots(this.save)) return false;
     hand.push(id);
     return true;
   }
@@ -1080,6 +1146,27 @@ export class Game {
       else if (trainingPoints(this.save).left < row.cost) return false;
       this.save.training[id]++;
     });
+  }
+  /** Resets a Training stat to no ranks for `TRAINING_RESET_GEMS` Gems,
+   * returning every point spent on it. With Dev free purchases it costs
+   * nothing and takes back the free ranks first. */
+  resetTraining(id: TrainingId) {
+    const row = TRAINING.find((t) => t.id === id)!, ranks = this.save.training[id];
+    if (!ranks || (!this.free && this.save.gems < TRAINING_RESET_GEMS)) return false;
+    return this.changeLoadout(() => {
+      if (this.free) this.save.freeTraining = Math.max(0, this.save.freeTraining - row.cost * ranks);
+      else this.save.gems -= TRAINING_RESET_GEMS;
+      this.save.training[id] = 0;
+    });
+  }
+  /** Buys the next hand slot with Gems (Larger Hand opens them); the next
+   * run's hand can hold one more card. */
+  buyHandSlot() {
+    const price = nextHandSlotGems(this.save);
+    if (price === null || (!this.free && this.save.gems < price)) return false;
+    if (!this.free) this.save.gems -= price;
+    this.save.handSlots++;
+    return true;
   }
   buy(id: UpgradeId) {
     if (!skillAvailable(id, this.save.upgrades)) return false;
