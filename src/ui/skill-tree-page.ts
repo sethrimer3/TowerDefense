@@ -4,11 +4,13 @@ import { TRAINING, TRAINING_GROUPS, TRAINING_PER_LEVEL, UPGRADES, cost, training
 import { TREES, mapNodes, skillAvailable, treeHeight, type TreeId } from "../skill-trees.ts";
 import { trainingPoints, trainingStep, upgradeText } from "../loadout.ts";
 import { TreeParticles } from "../tree-particles.ts";
+import { TrainingParticles } from "../training-particles.ts";
+import { trainingJob, trainingSeconds, trainingSlots } from "../training-jobs.ts";
 import type { AppContext } from "./app.ts";
 import { clamp, el, gemIcon, skillSprite, uiSprite, type UiSprite } from "./dom.ts";
 import { TRAINING_RESET_GEMS } from "../gems.ts";
 import { bindPanZoom, type View } from "./pan-zoom.ts";
-import { ArchivesPanel } from "./archives-page.ts";
+import { ArchivesPanel, formatDuration } from "./archives-page.ts";
 
 type Tree = (typeof TREES)[number];
 
@@ -26,6 +28,7 @@ export class SkillTreePage {
   private tooltipVisible = false;
   private views: Partial<Record<TreeId, View>> = {};
   private particles = new TreeParticles();
+  private trainingParticles = new TrainingParticles();
   private archives: ArchivesPanel;
 
   constructor(private ctx: AppContext) {
@@ -64,6 +67,10 @@ export class SkillTreePage {
       bindTabs();
       document.querySelectorAll<HTMLButtonElement>("[data-train]").forEach(b => b.onclick = () => {
         if (this.ctx.game.train(b.dataset.train as TrainingId)) this.ctx.update();
+        this.render();
+      });
+      document.querySelectorAll<HTMLButtonElement>("[data-cancel]").forEach(b => b.onclick = () => {
+        if (this.ctx.game.cancelTraining(b.dataset.cancel as TrainingId)) this.ctx.update();
         this.render();
       });
       document.querySelectorAll<HTMLButtonElement>("[data-reset]").forEach(b => b.onclick = () => this.confirmReset(b.dataset.reset as TrainingId));
@@ -119,26 +126,33 @@ export class SkillTreePage {
   /** The hero's stats, each with what a rank is worth at the hero's level,
    * what one more rank makes it and what that costs; tap the cost to train. */
   private trainingHtml() {
-    const save = this.ctx.game.save, points = trainingPoints(save);
+    const save = this.ctx.game.save, points = trainingPoints(save), slots = trainingSlots(save);
     const row = (t: (typeof TRAINING)[number]) => {
       const { now, next, worth, affordable, unit, maxed } = trainingStep(save, t.id);
       const price = `${t.cost} ${t.cost === 1 ? "point" : "points"}`;
       // A row with a most ranks says so, and once there offers no next one.
       const most = "max" in t ? `, up to ${trainingStep({ ...save, training: { ...save.training, [t.id]: t.max } }, t.id).now}${unit}` : "";
-      const buy = maxed
+      const job = trainingJob(save.trainingJobs, t.id), full = save.trainingJobs.length >= slots;
+      const takes = formatDuration(trainingSeconds(save.training[t.id]) * 1000);
+      // A rank in training shows its countdown (tap to stop it and get the points back).
+      const buy = job
+        ? `<button class="training-box training-timer" data-cancel="${t.id}" aria-label="Training ${t.name}: tap to cancel and get the points back" title="Tap to cancel and get the points back"><span data-training-timer="${t.id}">${formatDuration(job.completesAt - this.ctx.game.clock())}</span></button>`
+        : maxed
         ? `<button class="training-box training-cost" disabled aria-label="${t.name} is fully trained">Max</button>`
-        : `<button class="training-box training-cost" data-train="${t.id}" ${affordable ? "" : "disabled"} aria-label="Train ${t.name} to ${next}${unit} for ${price}">${price}</button>`;
+        : `<button class="training-box training-cost" data-train="${t.id}" ${affordable && !full ? "" : "disabled"} aria-label="Train ${t.name} to ${next}${unit} for ${price}, taking ${takes}" title="${full ? "Every training slot is busy" : `Takes ${takes}`}">${price}</button>`;
       const ranks = save.training[t.id];
       const reset = `<button class="training-reset" data-reset="${t.id}" ${ranks ? "" : "disabled"} aria-label="Reset ${t.name}" title="${ranks ? `Reset ${t.name} for ${TRAINING_RESET_GEMS} Gems` : `${t.name} has no ranks to reset`}">${uiSprite("undo")}</button>`;
-      return `<div class="training-row" role="listitem"><span class="training-label">${t.name}<small>+${unit ? worth : Math.round(worth * 10) / 10}${unit} a rank${most}</small></span><span class="training-box">${now}${unit}</span><span class="training-arrow" aria-hidden="true">→</span><span class="training-box next">${next}${unit}</span>${buy}${reset}</div>`;
+      const takesText = maxed ? "" : ` · takes ${takes}`;
+      return `<div class="training-row${job ? " active" : ""}" role="listitem" data-training-row="${t.id}"><span class="training-label">${t.name}<small>+${unit ? worth : Math.round(worth * 10) / 10}${unit} a rank${most}${takesText}</small></span><span class="training-box">${now}${unit}</span><span class="training-arrow" aria-hidden="true">→</span><span class="training-box next">${next}${unit}</span>${buy}${reset}</div>`;
     };
     // Each group's rows, leaving out any whose upgrade isn't owned yet.
     const rows = (Object.entries(TRAINING_GROUPS) as [keyof typeof TRAINING_GROUPS, string][]).map(([group, name]) => {
       const open = TRAINING.filter(t => t.group === group && trainingOpen(t, save.upgrades));
       return open.length ? `<h4 class="training-group">${name}</h4>${open.map(row).join("")}` : "";
     }).join("");
-    return `<section class="training"><header class="tree-heading"><h3>Training</h3></header>
+    return `<section class="training"><canvas class="training-particles" aria-hidden="true"></canvas><header class="tree-heading"><h3>Training</h3></header>
       <p class="training-points">Training points: <b id="training-points">${points.left}</b> <small>· ${TRAINING_PER_LEVEL} each level · every rank grows as you level up</small></p>
+      <p class="training-points training-slots">Training slots: <b id="training-slots">${save.trainingJobs.length} / ${slots}</b> <small>· each rank trained takes 50% longer than the last</small></p>
       <div class="training-table" role="list" aria-label="Stat training">${rows}</div></section>`;
   }
 
@@ -147,16 +161,39 @@ export class SkillTreePage {
   archivesTick(completed: boolean) {
     if (this.tree === "archives") this.archives.tick(completed);
     else if (completed) this.render();
+    else if (this.tree === "training") this.tickTraining();
+  }
+
+  /** Counts the timers beside the ranks in training down. */
+  private tickTraining() {
+    const now = this.ctx.game.clock();
+    for (const job of this.ctx.game.save.trainingJobs) {
+      const span = document.querySelector<HTMLElement>(`[data-training-timer="${job.id}"]`);
+      if (span) span.textContent = formatDuration(job.completesAt - now);
+    }
   }
 
   /** Purchase sparkles and node glow on the particle canvas, if showing. */
   drawParticles(time: number) {
     const canvas = document.querySelector<HTMLCanvasElement>(".tree-particles");
-    if (!canvas || this.tree === "training" || this.tree === "archives") return;
+    if (this.tree === "training") return this.drawTrainingParticles(time);
+    if (!canvas || this.tree === "archives") return;
     const tree = this.current();
     this.particles.draw(canvas, time, {
       tree: tree.id, nodes: mapNodes(tree), selected: this.tooltipVisible ? this.skill : null, reduced: this.ctx.game.save.settings.reduceMotion,
     });
+  }
+
+  /** The Training tab's specks and the stream along each row in training. */
+  private drawTrainingParticles(time: number) {
+    const canvas = document.querySelector<HTMLCanvasElement>(".training-particles");
+    if (!canvas) return;
+    const top = canvas.getBoundingClientRect().top;
+    const lanes = [...document.querySelectorAll<HTMLElement>(".training-row.active")].map(row => {
+      const r = row.getBoundingClientRect();
+      return r.top + r.height / 2 - top;
+    });
+    this.trainingParticles.draw(canvas, time, { lanes, reduced: this.ctx.game.save.settings.reduceMotion });
   }
 
   private current(): Tree {

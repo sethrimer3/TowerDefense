@@ -103,11 +103,12 @@ export function provisionText(id: GoldItemId) {
   return describeGrants(item.grants, item.words);
 }
 
-/** Training points: earned per level, spent on ranks of training. `left`
+/** Training points: earned per level, spent on ranks of training (a rank
+ * still in training is already paid for). `left`
  * never goes below zero, even if undo takes back a level already spent. */
-export function trainingPoints(save: Pick<Save, "xp" | "training"> & Partial<Pick<Save, "freeTraining">>) {
+export function trainingPoints(save: Pick<Save, "xp" | "training"> & Partial<Pick<Save, "freeTraining" | "trainingJobs">>) {
   const earned = TRAINING_PER_LEVEL * levelForXp(save.xp),
-    spent = TRAINING.reduce((sum, t) => sum + t.cost * save.training[t.id], 0) - (save.freeTraining ?? 0);
+    spent = TRAINING.reduce((sum, t) => sum + t.cost * (save.training[t.id] + (save.trainingJobs?.some((j) => j.id === t.id) ? 1 : 0)), 0) - (save.freeTraining ?? 0);
   return { earned, spent, left: Math.max(0, earned - spent) };
 }
 

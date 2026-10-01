@@ -1,3 +1,4 @@
+import { trainingSlots, type TrainingJob } from "./training-jobs.ts";
 import { snap } from "./exact.ts";
 import { TIERS, type TierRecord } from "./tiers.ts";
 import { FIND_POTION_MAX, GOLD_SHOP, RUN_TRAINING_CAP, SAVE_KEY, TOWER_WIDTH, TRAINING, UPGRADES, WIDTH } from "./config.ts";
@@ -25,6 +26,7 @@ export function defaults(): Save {
     xp: 0,
     training: Object.fromEntries(TRAINING.map((t) => [t.id, 0])) as Save["training"],
     freeTraining: 0,
+    trainingJobs: [],
     upgrades: Object.fromEntries(
       UPGRADES.map((u) => [u.id, 0]),
     ) as Save["upgrades"],
@@ -237,6 +239,7 @@ function decodeProgress(s: any, d: Save, undoCapacity: number) {
   d.xp = count(s.xp, d.xp);
   for (const t of TRAINING) d.training[t.id] = count(s.training?.[t.id], d.training[t.id], "max" in t ? t.max : 1e6);
   d.freeTraining = count(s.freeTraining, d.freeTraining);
+  d.trainingJobs = decodeTrainingJobs(s.trainingJobs);
   d.tower.inspiration = count(s.tower?.inspiration ?? s.tower?.shards, d.tower.inspiration);
   d.tower.best = count(s.tower?.best, d.tower.best);
   d.delve.courage = count(s.delve?.courage ?? s.delve?.essence, d.delve.courage);
@@ -244,6 +247,16 @@ function decodeProgress(s: any, d: Save, undoCapacity: number) {
   applyMode(d.tower, decodeMode(s.tower, undoCapacity, decodeTowerRun));
   applyMode(d.delve, decodeMode(s.delve, undoCapacity, decodeDelveRun));
   d.delve.memory = decodeMemory(s.delve?.memory);
+}
+/** The ranks in training: only well-formed jobs for distinct rows, up to the slots. */
+function decodeTrainingJobs(raw: any): TrainingJob[] {
+  const jobs: TrainingJob[] = [];
+  if (!Array.isArray(raw)) return jobs;
+  for (const j of raw) {
+    const ok = TRAINING.some((t) => t.id === j?.id) && Number.isFinite(j.startedAt) && Number.isFinite(j.completesAt) && j.completesAt >= j.startedAt;
+    if (ok && !jobs.some((o) => o.id === j.id) && jobs.length < trainingSlots()) jobs.push({ id: j.id, startedAt: j.startedAt, completesAt: j.completesAt });
+  }
+  return jobs;
 }
 /** Version 1 had a single run (the endless climb); it becomes the Delve slice. */
 function migrateV1(s: any, d: Save, undoCapacity: number) {

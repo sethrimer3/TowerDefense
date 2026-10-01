@@ -1,3 +1,4 @@
+import { trainNow } from "./train-now.ts";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { GOLD_SHOP, TRAINING, xpForLevel } from "../src/config.ts";
@@ -27,7 +28,7 @@ test("free purchases: skills, Training and provisions are bought with nothing an
 
   const hp = TRAINING.find((t) => t.id === "hp")!;
   assert.ok(trainingStep(g.save, "hp").affordable);
-  assert.ok(g.train("hp") && g.train("hp"));
+  assert.ok(trainNow(g, "hp") && trainNow(g, "hp"));
   assert.equal(g.save.training.hp, 2);
   assert.deepEqual(trainingPoints(g.save), { earned: 3, spent: 0, left: 3 }, "no points spent");
   assert.equal(g.save.freeTraining, 2 * hp.cost);
@@ -39,10 +40,10 @@ test("free purchases: skills, Training and provisions are bought with nothing an
 
 test("free Training stays unspent after free purchases are turned off, and saves", () => {
   const g = new Game(freeSave());
-  g.train("attack");
+  trainNow(g, "attack");
   g.save.settings.freePurchases = false;
   assert.equal(trainingPoints(g.save).left, 3);
-  assert.ok(!g.train("attack"), "5 points a rank, 3 left");
+  assert.ok(!trainNow(g, "attack"), "5 points a rank, 3 left");
   const loaded = decode(JSON.stringify(g.save));
   assert.equal(loaded.freeTraining, g.save.freeTraining);
   assert.equal(loaded.training.attack, 1);
@@ -81,7 +82,7 @@ test("without free purchases, nothing is bought on credit", () => {
   g.save.upgrades.greaterHeal = 1;
   g.clock = () => T0;
   assert.ok(!g.buy("handOrdering"));
-  assert.ok(!g.train("hp"));
+  assert.ok(!trainNow(g, "hp"));
   assert.ok(!g.buyGold(GOLD_SHOP[0].id));
   assert.equal(craftConsumable(g.save, "cinderTonic"), false);
   assert.ok(!g.startResearch(0, "potionHp"));

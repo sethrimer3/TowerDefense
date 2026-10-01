@@ -1,3 +1,4 @@
+import { trainNow } from "./train-now.ts";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Game } from "../src/state.ts";
@@ -195,8 +196,8 @@ test("the ad's Gems: seven, then ten minutes before the next", () => {
 test("resetting a Training stat costs two Gems and returns every point spent on it, inside a run too", () => {
   const g = arena((g) => { g.save.xp = xpForLevel(10); });
   const left = trainingPoints(g.save).left;
-  for (let i = 0; i < 3; i++) assert.ok(g.train("attack"));
-  assert.ok(g.train("hp"));
+  for (let i = 0; i < 3; i++) assert.ok(trainNow(g, "attack"));
+  assert.ok(trainNow(g, "hp"));
   const attack = g.run.player.attack;
   assert.equal(trainingPoints(g.save).left, left - 16);
   assert.equal(g.resetTraining("attack"), false, "no Gems");
@@ -210,7 +211,7 @@ test("resetting a Training stat costs two Gems and returns every point spent on 
   assert.ok(g.run.player.attack < attack, "the run inside loses what those ranks gave");
   // Dev free purchases: free, and the free ranks are taken back first.
   g.save.settings.freePurchases = true;
-  assert.ok(g.train("attack") && g.train("attack"));
+  assert.ok(trainNow(g, "attack") && trainNow(g, "attack"));
   assert.equal(g.save.freeTraining, 10);
   assert.ok(g.resetTraining("attack"));
   assert.equal(g.save.freeTraining, 0);
