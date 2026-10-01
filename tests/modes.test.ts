@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { MODES, milestones } from "../src/modes.ts";
+import { MODES, milestonePoints, milestones } from "../src/modes.ts";
 import { defaults } from "../src/save.ts";
 import { RoomWorld } from "../src/tower/room-world.ts";
 import { World } from "../src/delve/world.ts";
@@ -26,6 +26,13 @@ test("each new equivalent floor reached pays one of the mode's currency", () => 
   delve.credit(save, 5);
   assert.deepEqual([save.tower.inspiration, save.delve.courage], [2, 5]);
   assert.deepEqual([tower.balance(save), delve.balance(save)], [2, 5]);
+});
+
+test("past floor 100 a point takes 10 floors, past 1,000 it takes 100, and past 10,000 none", () => {
+  assert.deepEqual([0, 1, 99, 100, 109, 110, 199, 1000, 1099, 1100, 9999, 10000, 50000].map(milestonePoints),
+    [0, 1, 99, 100, 100, 101, 109, 190, 190, 191, 279, 280, 280]);
+  for (const [from, to, t, d] of [[99, 101, 1, 1], [100, 120, 2, 2], [105, 115, 1, 1], [995, 1105, 2, 2], [9999, 20000, 1, 11], [1000, 11000, 90, 91], [10000, 1000000, 0, 90]])
+    assert.deepEqual([milestones(tower, from, to), milestones(delve, from, to)], [t, d], `${from} → ${to}`);
 });
 
 test("each mode builds its own board from a run and enters it at its own column", () => {

@@ -56,10 +56,32 @@ export type ModeProfile<R extends Run = Run> = {
   };
 };
 
-/** Milestone currency for progress rising from `from` to `to`: one per new
- * equivalent floor. */
+/** The milestone schedule: from each equivalent floor (`from`) on, one point
+ * every `per` equivalent floors, until the next stage. Past the last stage's
+ * `until`, no more points. */
+export const MILESTONE_STAGES = [
+  { from: 0, per: 1 },
+  { from: 100, per: 10 },
+  { from: 1000, per: 100 },
+] as const;
+export const MILESTONE_END = 10000;
+
+/** The milestone points reaching equivalent floor `floor` pays in all: one a
+ * floor to 100, one per 10 floors to 1,000, one per 100 floors to 10,000,
+ * then none (100, 190 and 280 points at those floors). */
+export function milestonePoints(floor: number) {
+  let points = 0;
+  MILESTONE_STAGES.forEach((stage, i) => {
+    const end = Math.min(floor, MILESTONE_STAGES[i + 1]?.from ?? MILESTONE_END);
+    if (end > stage.from) points += Math.floor((end - stage.from) / stage.per);
+  });
+  return points;
+}
+
+/** Milestone currency for progress rising from `from` to `to`, by the
+ * equivalent floors it reaches (`milestonePoints`). */
 export function milestones(profile: ModeProfile, from: number, to: number) {
-  return profile.equivalentFloor(to) - profile.equivalentFloor(from);
+  return milestonePoints(profile.equivalentFloor(to)) - milestonePoints(profile.equivalentFloor(from));
 }
 
 export const MODES: { tower: ModeProfile<TowerRun>; delve: ModeProfile<DelveRun> } = {

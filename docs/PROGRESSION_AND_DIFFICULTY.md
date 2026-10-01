@@ -118,7 +118,7 @@ Inspiration is the Tower's persistent research currency and is the main bridge b
 
 ### Baseline Inspiration
 
-The current progression model awards approximately **1 Inspiration for each new maximum Tower floor reached**. This provides a predictable guaranteed budget tied directly to progression.
+The current progression model awards approximately **1 Inspiration for each new maximum Tower floor reached**, up to floor 100. This provides a predictable guaranteed budget tied directly to progression. Past floor 100 it slows: 1 for every 10 new floors up to floor 1,000, then 1 for every 100 new floors up to floor 10,000, and none after (100, 190 and 280 Inspiration in all at those floors; `milestonePoints` in `src/modes.ts`). Courage follows the same schedule over equivalent floors (10 Delve depth each).
 
 ### Mastery Inspiration
 

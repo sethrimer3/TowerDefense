@@ -108,7 +108,7 @@ _Avoid_: consumable (a crafted item used during a run), buff
 ### Progress
 
 **Equivalent floor**:
-The one scale both modes' progress maps onto: a Tower floor counts as itself, and every ten Delve depth count as one. Loot tables are gated on it, and each new equivalent floor reached pays one of the mode's currency.
+The one scale both modes' progress maps onto: a Tower floor counts as itself, and every ten Delve depth count as one. Loot tables are gated on it, and each new equivalent floor reached pays one of the mode's currency, up to 100; past that one every 10 to 1,000, one every 100 to 10,000, and none after.
 _Avoid_: effective floor, tier
 
 **Inspiration**:
