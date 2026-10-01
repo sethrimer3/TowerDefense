@@ -1841,7 +1841,7 @@ nav button > span img { display: block; width: 42px; height: 42px; max-width: 10
 .tree-particles { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 
 /* Training: a table of stats, each current value → trained value, and its cost. */
-.training { display: flex; flex: 1; min-height: 0; flex-direction: column; border: 1px solid #63543a; background: radial-gradient(ellipse at 50% 30%, #74552326, transparent 65%), #0a1016; padding: 8px 10px 12px; border-radius: 9px; }
+.training { position: relative; display: flex; flex: 1; min-height: 0; flex-direction: column; border: 1px solid #63543a; background: radial-gradient(ellipse at 50% 30%, #74552326, transparent 65%), #0a1016; padding: 8px 10px 12px; border-radius: 9px; }
 .training-points { margin: 2px 0 10px; font-size: 11px; letter-spacing: 1px; color: #c9d0da; }
 .training-points b { color: var(--gold); font-size: 15px; }
 .training-points small { color: #8793a2; font-size: 9px; }
@@ -1849,6 +1849,11 @@ nav button > span img { display: block; width: 42px; height: 42px; max-width: 10
 .training-group { margin: 6px 0 0; font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: #9aa6b6; }
 .training-group:first-child { margin-top: 0; }
 .training-row { display: grid; grid-template-columns: minmax(52px, 1fr) minmax(42px, auto) 18px minmax(42px, auto) minmax(64px, auto) 30px; align-items: center; gap: 6px; }
+/* The Training tab's specks sit behind the rows. */
+.training-particles { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; border-radius: inherit; }
+.training > :not(.training-particles) { position: relative; }
+.training-row.active .training-box.next { border-color: #c0483c; color: #ffb3a6; }
+button.training-timer { border-color: #c0483c; color: #ffd0c8; background: #2a1416; font-size: 10px; letter-spacing: .5px; font-variant-numeric: tabular-nums; }
 /* Resets a stat for Gems, returning its points. */
 .training-reset { min-height: 30px; padding: 0; display: grid; place-items: center; border: 1px solid #3f6f86; border-radius: 8px; background: #10202a; }
 .training-reset .ui-sprite { width: 16px; height: 16px; }

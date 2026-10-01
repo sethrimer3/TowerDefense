@@ -1,3 +1,4 @@
+import { trainingJob, trainingSeconds, trainingSlots } from "./training-jobs.ts";
 import { entrance, floorFor } from "./delve/labyrinth.ts";
 import { chooseStep } from "./automation.ts";
 import { CARDS, deckCards, handSlots, moveCard, nextHandSlotGems, planHand, type CardId, type CardPlan } from "./cards.ts";
@@ -1229,14 +1230,44 @@ export class Game {
   private get canChooseCards() {
     return !!this.save.upgrades.combatStance && !!this.run.outside;
   }
+  /** Starts training one more rank of `id`, paying its points now: it takes
+   * `trainingSeconds` of the wall clock and counts once that has passed
+   * (`settleTraining`). Refused for a stat already in training, with every
+   * slot busy, or without the points. With Dev free purchases it costs
+   * nothing and counts at once. */
   train(id: TrainingId) {
-    const row = TRAINING.find((t) => t.id === id)!;
-    if (!trainingOpen(row, this.save.upgrades) || trainingMaxed(this.save, id)) return false;
-    return this.changeLoadout(() => {
-      if (this.free) this.save.freeTraining += row.cost;
-      else if (trainingPoints(this.save).left < row.cost) return false;
-      this.save.training[id]++;
+    this.settleTraining();
+    const row = TRAINING.find((t) => t.id === id)!, jobs = this.save.trainingJobs;
+    if (!trainingOpen(row, this.save.upgrades) || trainingMaxed(this.save, id) || trainingJob(jobs, id)) return false;
+    if (this.free) {
+      return this.changeLoadout(() => {
+        this.save.freeTraining += row.cost;
+        this.save.training[id]++;
+      });
+    }
+    if (jobs.length >= trainingSlots(this.save) || trainingPoints(this.save).left < row.cost) return false;
+    const now = this.clock();
+    jobs.push({ id, startedAt: now, completesAt: now + trainingSeconds(this.save.training[id]) * 1000 });
+    return true;
+  }
+  /** Stops the training of `id`, giving its points back. */
+  cancelTraining(id: TrainingId) {
+    const jobs = this.save.trainingJobs;
+    if (!trainingJob(jobs, id)) return false;
+    this.save.trainingJobs = jobs.filter((j) => j.id !== id);
+    return true;
+  }
+  /** Counts the ranks whose training the clock has reached, saying so in the
+   * status line; returns how many. */
+  settleTraining() {
+    const now = this.clock(), due = this.save.trainingJobs.filter((j) => j.completesAt <= now);
+    if (!due.length) return 0;
+    this.changeLoadout(() => {
+      this.save.trainingJobs = this.save.trainingJobs.filter((j) => !due.includes(j));
+      for (const j of due) this.save.training[j.id]++;
     });
+    this.message = `Training · ${due.map((j) => TRAINING.find((t) => t.id === j.id)!.name).join(", ")} complete.`;
+    return due.length;
   }
   /** Buys one rank of Training `id` for this run with its Silver: it counts
    * from the next turn on, until the run ends. Each purchase is a turn of
@@ -1270,12 +1301,15 @@ export class Game {
    * returning every point spent on it. With Dev free purchases it costs
    * nothing and takes back the free ranks first. */
   resetTraining(id: TrainingId) {
+    this.settleTraining();
     const row = TRAINING.find((t) => t.id === id)!, ranks = this.save.training[id];
     if (!ranks || (!this.free && this.save.gems < TRAINING_RESET_GEMS)) return false;
     return this.changeLoadout(() => {
       if (this.free) this.save.freeTraining = Math.max(0, this.save.freeTraining - row.cost * ranks);
       else this.save.gems -= TRAINING_RESET_GEMS;
       this.save.training[id] = 0;
+      // A rank still in training goes too, with its points back.
+      this.save.trainingJobs = this.save.trainingJobs.filter((j) => j.id !== id);
     });
   }
   /** Buys the next hand slot with Gems (Larger Hand opens them); the next

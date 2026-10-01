@@ -1,3 +1,4 @@
+import type { TrainingJob } from "./training-jobs.ts";
 import type { TierRecord } from "./tiers.ts";
 import type { ArchivesSave } from "./archives.ts";
 import type { CardId } from "./cards.ts";
@@ -192,6 +193,9 @@ export type Save = {
   /** Training points' worth of ranks bought with Dev free purchases on,
    * which cost no points. */
   freeTraining: number;
+  /** Ranks being trained now (their points are spent), each done when the
+   * wall clock reaches it. */
+  trainingJobs: TrainingJob[];
   upgrades: Record<UpgradeId, number>;
   settings: Settings;
   /** Persistent crafting-material inventory. Never part of `Run` — must

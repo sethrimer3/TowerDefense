@@ -201,7 +201,7 @@ bindInput(
 
 /** Research completes on the wall clock, whatever page shows. */
 function archivesTick() {
-  const done = game.settleResearch().length > 0;
+  const done = game.settleResearch().length > 0 || game.settleTraining() > 0;
   if (done) update();
   // The ad button comes back on the wall clock too.
   else renderAdButton(game);

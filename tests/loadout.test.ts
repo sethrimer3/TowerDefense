@@ -1,3 +1,4 @@
+import { trainNow } from "./train-now.ts";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { loadout, trainingPoints, trainingStep, upgradeText, provisionText } from "../src/loadout.ts";
@@ -74,7 +75,7 @@ test("Shroud blocks 1 damage a fight and opens Shroud training, each rank worth 
   const g = new Game(defaults());
   g.newRun({ outside: true });
   g.save.xp = xpForLevel(10);
-  assert.equal(g.train("shroud"), false, "not before Shroud");
+  assert.equal(trainNow(g, "shroud"), false, "not before Shroud");
   assert.equal(g.run.player.shroud, undefined, "no shroud yet");
   g.save.tower.inspiration = 10;
   assert.equal(g.buy("shroud"), false, "not before Greater Heal");
@@ -83,7 +84,7 @@ test("Shroud blocks 1 damage a fight and opens Shroud training, each rank worth 
   assert.equal(loadout(g.save).shroud, 1);
   assert.equal(g.save.tower.inspiration, 0, "10 Inspiration");
   assert.equal(g.run.player.shroud, 1, "the run in the forest takes it at once");
-  assert.ok(g.train("shroud") && g.train("shroud"));
+  assert.ok(trainNow(g, "shroud") && trainNow(g, "shroud"));
   // At level 10 a rank is worth 1 × (1 + 10 / 10) = 2.
   assert.equal(loadout(g.save).shroud, 1 + 2 * 2);
   assert.equal(g.run.player.shroud, 1 + 2 * 2, "training reaches a run still outside");
@@ -102,10 +103,10 @@ test("each level costs the cube of its number in XP, and levels are found exactl
 test("training spends points and reaches a run still outside", () => {
   const g = new Game(defaults());
   g.newRun({ outside: true });
-  assert.equal(g.train("hp"), false);
+  assert.equal(trainNow(g, "hp"), false);
   g.save.xp = xpForLevel(1);
-  assert.equal(g.train("attack"), false);
-  assert.equal(g.train("hp"), true);
+  assert.equal(trainNow(g, "attack"), false);
+  assert.equal(trainNow(g, "hp"), true);
   assert.deepEqual([g.run.player.maxHp, g.run.player.hp, trainingPoints(g.save).left], [111, 111, 2]);
 });
 
