@@ -15,6 +15,9 @@ import { onCityArtLoaded, paintCityLayer } from "./city-layer.ts";
 import { carriedLights, drawDamage, drawScorches, drawUnits, shadowCasters, type Brush } from "./battle-art.ts";
 import { drawGrid, drawOverlay, type Overlay } from "./edit-overlay.ts";
 import { drawFlag } from "./structure-art.ts";
+import { ParkGrass, type Walker } from "./park-grass.ts";
+import { PondWater } from "./pond-water.ts";
+import { ENEMIES } from "./catalog.ts";
 
 export type DrawOptions = {
   /** Show the (dim, gold) tile grid — while the player is editing. */
@@ -24,11 +27,15 @@ export type DrawOptions = {
   night: number;
   now: number;
   reduceMotion: boolean;
+  /** Draw the live park grass and pond effects. */
+  effects?: boolean;
 };
 
 export class DefendRenderer {
   readonly lighting = new DefendLighting();
   readonly fences = new Fences();
+  readonly grass = new ParkGrass();
+  readonly water = new PondWater();
   private rain = new Rain();
   private lastNow = 0;
   private layerScale = 1;
@@ -115,7 +122,7 @@ export class DefendRenderer {
     this.refreshLayer(map, sim);
     const dt = this.lastNow ? (opts.now - this.lastNow) / 1000 : 0;
     this.lastNow = opts.now;
-    this.drawCity(map, sim);
+    this.drawCity(map, sim, opts, dt);
     if (sim) this.drawBattle(map, sim, opts);
     this.drawKeepFlag(map, sim, opts);
     if (sim) this.drawBattleUnits(sim, !!opts.weather);
@@ -131,17 +138,33 @@ export class DefendRenderer {
     if (overlay) drawOverlay(this.ctx, this.px, overlay);
   }
 
-  /** The city layer through the camera, and the park fences on it. */
-  private drawCity(map: CityMap, sim: DefendSim | null) {
+  /** The city layer through the camera, the live park grass and ponds over
+   * it, and the park fences. */
+  private drawCity(map: CityMap, sim: DefendSim | null, opts: DrawOptions, dt: number) {
     const ctx = this.ctx;
     ctx.setTransform(this.cam.s, 0, 0, this.cam.s, this.cam.x, this.cam.y);
     ctx.imageSmoothingEnabled = this.cam.s / this.layerScale < 1;
     ctx.drawImage(this.layer, 0, 0, this.canvas.width, this.canvas.height);
     ctx.imageSmoothingEnabled = false;
+    if (opts.effects ?? true) this.drawParkLife(map, sim, opts, dt);
     // Park fences sit on the ground layer, under the lighting and units.
     this.fences.sync(map);
     if (sim) this.fences.update(sim);
     this.fences.draw(ctx, this.px);
+  }
+
+  /** Pond drips, rings and reflections, then the grass swaying and parting
+   * around everyone walking through the parks. */
+  private drawParkLife(map: CityMap, sim: DefendSim | null, opts: DrawOptions, dt: number) {
+    const rain = !!(sim && opts.weather?.rain);
+    this.water.sync(map);
+    this.water.draw({ c: this.ctx, px: this.px, now: opts.now, rain, reduceMotion: opts.reduceMotion, layer: this.layer, layerScale: this.layerScale });
+    this.grass.sync(map);
+    this.grass.draw({
+      c: this.ctx, px: this.px, now: opts.now, dt, reduceMotion: opts.reduceMotion,
+      wind: rain ? "rain" : opts.weather ? "cloud" : "calm",
+      walkers: sim ? walkers(sim) : [],
+    });
   }
 
   /** What a battle lays over the city before its units: damage, and in
@@ -222,6 +245,15 @@ function standingKeep(map: CityMap, sim: DefendSim | null) {
   const keep = map.buildings.find((b) => b.kind === "keep");
   if (!keep) return null;
   return !sim || sim.intact(keep) ? keep.rect : null;
+}
+
+/** Everyone on foot, for the grass to part around. */
+function walkers(sim: DefendSim): Walker[] {
+  const out: Walker[] = [];
+  for (const e of sim.enemies) if (!ENEMIES[e.kind].flying) out.push({ x: e.x, y: e.y, size: ENEMIES[e.kind].size });
+  for (const s of sim.soldiers) out.push({ x: s.x, y: s.y, size: 0.4 });
+  for (const c of sim.civilians) out.push({ x: c.x, y: c.y, size: 0.3 });
+  return out;
 }
 
 /** Whether building `id` still stands in the battle. */

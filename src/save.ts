@@ -1,387 +1,104 @@
-import { trainingSlots, type TrainingJob } from "./training-jobs.ts";
-import { snap } from "./exact.ts";
-import { TIERS, type TierRecord } from "./tiers.ts";
-import { FIND_POTION_MAX, GOLD_SHOP, OLD_SAVE_KEY, RUN_TRAINING_CAP, SAVE_KEY, TOWER_WIDTH, TRAINING, UPGRADES, WIDTH } from "./config.ts";
-import type { AutomoveMemory, DelveRun, FloorRecord, ModeSave, Fall, MoveSnapshot, Run, Save, TowerRun } from "./entities.ts";
-import { emptyMaterials, MATERIAL_IDS, type MaterialId } from "./materials.ts";
-import { EQUIPMENT_SLOTS, type CraftedEquipment, type EquipmentSlot } from "./equipment.ts";
-import { CONSUMABLES, type ConsumableId } from "./crafting.ts";
-import { decodeDefendSave, defaultDefendSave } from "./defend/progress.ts";
-import { decodeSettings, defaultSettings } from "./settings.ts";
-import { keepUndos, loadout } from "./loadout.ts";
-import { BASE_HAND, CARD_IDS, HAND_SLOT_GEMS, MAX_HAND_SLOTS, deckCards, handSlots, type CardId } from "./cards.ts";
-import { decodeGemDrop, defaultGemDrop } from "./gems.ts";
-import { decodeArchives, defaultArchives } from "./archives.ts";
+/** The one save, kept in localStorage under its own key (another game served
+ * from the same site never shares it). Loading is defensive: `defaults()`
+ * defines every field, and `decode()` keeps only what is well formed. */
+import { decodeDefendSave, defaultDefendSave, type DefendSave } from "./defend/progress.ts";
+import { TRAINING, TRAINING_IDS, type TrainingId } from "./progression.ts";
+import { SKILLS, SKILL_IDS, type SkillId } from "./skill-trees.ts";
+import type { TrainingJob } from "./training-jobs.ts";
+import { decodeSettings, defaultSettings, type Settings } from "./settings.ts";
+
+export const SAVE_KEY = "towerdefense.v1";
+export const SAVE_VERSION = 1;
+
+export type Save = {
+  version: number;
+  /** Earned in battle, spent in the Armory. Keeps its fractions (bonuses). */
+  gold: number;
+  ironBar: number;
+  steelBar: number;
+  /** Lifetime experience from kills: the Commander's level. */
+  xp: number;
+  /** Earned by holding past the best wave, spent on the skill trees. */
+  valor: number;
+  skills: Record<SkillId, number>;
+  /** Training ranks completed per row. */
+  training: Record<TrainingId, number>;
+  trainingJobs: TrainingJob[];
+  /** Training points that ranks bought free (Dev) didn't spend. */
+  freeTraining: number;
+  defend: DefendSave;
+  settings: Settings;
+};
+
 export function defaults(): Save {
   return {
-    version: 3,
-    tower: { run: null, history: [], fall: null, best: 0, reached: 0, inspiration: 0, log: {}, lootedTiles: {}, runGold: 0, runCurrency: 0, startSection: 0, sectionHp: {}, tier: 1, tiersOpen: 1, tierRecords: {} },
-    delve: { run: null, history: [], fall: null, best: 0, reached: 0, courage: 0, lootedTiles: {}, runGold: 0, runCurrency: 0, memory: { known: {}, visited: {} }, tier: 1, tiersOpen: 1, tierRecords: {} },
-    gems: 0,
-    gemDrop: defaultGemDrop(),
+    version: SAVE_VERSION,
     gold: 0,
-    provisions: Object.fromEntries(
-      GOLD_SHOP.map((g) => [g.id, 0]),
-    ) as Save["provisions"],
+    ironBar: 0,
+    steelBar: 0,
     xp: 0,
-    training: Object.fromEntries(TRAINING.map((t) => [t.id, 0])) as Save["training"],
-    freeTraining: 0,
+    valor: 0,
+    skills: Object.fromEntries(SKILL_IDS.map((id) => [id, 0])) as Record<SkillId, number>,
+    training: Object.fromEntries(TRAINING_IDS.map((id) => [id, 0])) as Record<TrainingId, number>,
     trainingJobs: [],
-    upgrades: Object.fromEntries(
-      UPGRADES.map((u) => [u.id, 0]),
-    ) as Save["upgrades"],
-    settings: defaultSettings(),
-    materials: emptyMaterials(),
-    equipmentInventory: [],
-    equipped: {},
-    consumables: Object.fromEntries(CONSUMABLES.map((c) => [c.id, 0])) as Save["consumables"],
-    hand: [...BASE_HAND],
-    handSlots: 0,
-    tutorials: { deck: false, removeCard: false, addCard: false, upgrades: false },
-    archives: defaultArchives(),
+    freeTraining: 0,
     defend: defaultDefendSave(),
+    settings: defaultSettings(),
   };
 }
-const finite = (n: unknown, max = 1e9) =>
-  typeof n === "number" && Number.isFinite(n) && n >= 0 && n <= max;
-const isRecord = (v: any) => !!v && typeof v === "object" && !Array.isArray(v);
-/** A floored count from `raw` when it is a finite number within `max`. */
-const count = (raw: any, fallback: number, max?: number) =>
-  finite(raw, max) ? Math.floor(raw) : fallback;
-/** An amount kept with its fraction (Gold), on the `snap` grid. */
-const fraction = (raw: any, fallback: number) => (finite(raw) ? snap(raw) : fallback);
-const CHEST_TIERS = ["silver", "gold", "platinum"] as const;
-const KEY_COLORS = ["yellow", "blue", "red"] as const;
-const POINT_KEY = /^\d+,\d+$/;
-/** Every key is an `x,y` point and every value passes `valid`. */
-const pointMap = (m: any, valid: (v: any) => boolean) =>
-  isRecord(m) && Object.entries(m).every(([k, v]) => POINT_KEY.test(k) && valid(v));
 
-// --- Runs ---
-const validChange = (v: any) =>
-  v?.kind === "floor" || v?.kind === "wall" ||
-  (v?.kind === "openedChest" && (v.tier === undefined || CHEST_TIERS.includes(v.tier))) ||
-  (v?.kind === "reward" && CHEST_TIERS.includes(v.tier));
-const validChanges = (m: any) => pointMap(m, validChange);
-const validFloors = (m: any) =>
-  m === undefined ||
-  (isRecord(m) && Object.entries(m).every(([k, v]) => /^\d+$/.test(k) && validChanges(v)));
-/** Outside runs only exist in the forest clearing below the first floor. */
-const validOutside = (r: any) =>
-  (r.outside === undefined || typeof r.outside === "boolean") &&
-  (!r.outside || (r.height === 0 && r.player?.y < 12 && r.floor === 0));
-const validCounters = (r: any) =>
-  Number.isInteger(r.seed) && finite(r.height) && finite(r.floor) && r.floor <= r.player?.y &&
-  finite(r.kills) && finite(r.treasures);
-const validPlayer = (p: any, width: number) =>
-  !!p &&
-  Number.isInteger(p.x) && p.x >= 0 && p.x < width &&
-  Number.isInteger(p.y) && finite(p.y) &&
-  finite(p.hp) && p.hp >= 0 && finite(p.maxHp) && p.hp <= p.maxHp &&
-  finite(p.attack) && finite(p.defense) && (p.shroud === undefined || (finite(p.shroud) && p.shroud >= 0)) &&
-  KEY_COLORS.every((k) => finite(p.keys?.[k]));
-/** Checks every run passes, whatever its mode; `width` is the mode's board. */
-const validCore = (r: any, width: number) =>
-  !!r && validOutside(r) && validCounters(r) && validPlayer(r.player, width) && validChanges(r.changes);
-const validDelveState = (r: any) => Number.isInteger(r.milestone) && finite(r.milestone);
-const TOWER_FIELDS = ["damaged", "keysSpent", "floors"];
-const DELVE_FIELDS = ["milestone"];
-/** Drops fields a run of this mode doesn't keep: the other mode's, and an
- * older run's clear chest list and Automove memory (clear chests stand in
- * `changes` now, and the memory beside the run). */
-function without<R>(r: any, fields: string[]): R {
-  for (const k of ["rewards", "known", "visited", ...fields]) delete r[k];
-  if (r.hand !== undefined && !validHand(r.hand)) delete r.hand;
-  if (r.silver !== undefined && !finite(r.silver)) delete r.silver;
-  delete r.focus;
-  if (r.focusUsed !== undefined && !(Number.isInteger(r.focusUsed) && finite(r.focusUsed, 99))) delete r.focusUsed;
-  if (r.focused !== undefined && !r.hand?.includes(r.focused)) delete r.focused;
-  if (r.training !== undefined && !validRunTraining(r.training)) delete r.training;
-  if (r.tier !== undefined && !(Number.isInteger(r.tier) && r.tier >= 2 && r.tier <= TIERS)) delete r.tier;
-  if (r.percentPotions !== undefined && !(Number.isInteger(r.percentPotions) && r.percentPotions > 0 && r.percentPotions <= FIND_POTION_MAX)) delete r.percentPotions;
-  return r;
-}
-/** Training ranks bought in a run: known rows, each a whole number of ranks. */
-const validRunTraining = (t: any) =>
-  !!t && typeof t === "object" && !Array.isArray(t) &&
-  Object.entries(t).every(([id, n]) => TRAINING.some((row) => row.id === id) && Number.isInteger(n) && (n as number) >= 0 && (n as number) <= RUN_TRAINING_CAP);
-/** A run's hand: known cards, each once, no more than a hand can hold,
- * STAIRS among them. */
-const validHand = (h: any) =>
-  Array.isArray(h) && h.length <= MAX_HAND_SLOTS && new Set(h).size === h.length &&
-  h.every((id) => CARD_IDS.includes(id)) && h.includes("stairs");
-/** Validate an untrusted Tower run; null unless it has the shape a
- * TowerRun needs. */
-function decodeTowerRun(r: any): TowerRun | null {
-  if (!validCore(r, TOWER_WIDTH) || !validFloors(r.floors)) return null;
-  // Older runs have no damage/key history; do not assume a perfect attempt.
-  r.damaged = r.damaged !== false;
-  r.keysSpent = r.keysSpent !== false;
-  return without(r, DELVE_FIELDS);
-}
-/** Validate an untrusted Delve run; null unless it has the shape a
- * DelveRun needs. */
-function decodeDelveRun(r: any): DelveRun | null {
-  if (!validCore(r, WIDTH) || !validDelveState(r)) return null;
-  return without(r, TOWER_FIELDS);
-}
+const num = (v: unknown, fallback: number, min = 0, max = 1e15) =>
+  typeof v === "number" && Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : fallback;
+const int = (v: unknown, fallback: number, min = 0, max = 1e9) =>
+  Number.isInteger(v) ? Math.min(max, Math.max(min, v as number)) : fallback;
 
-// --- Mode slices ---
-type DecodedMode<R extends Run> = Pick<ModeSave<R>, "run" | "history" | "fall" | "lootedTiles" | "runGold" | "runCurrency">;
-type RunDecoder<R extends Run> = (raw: any) => R | null;
-function snapshot<R extends Run>(value: any, decodeRun: RunDecoder<R>): MoveSnapshot<R> | null {
-  if (!value || !finite(value.best) || !finite(value.xp)) return null;
-  const run = decodeRun(value.run);
-  return run ? { run, best: value.best, xp: Math.floor(value.xp) } : null;
-}
-/** Undo history only survives for the same seed and layout as the live run. */
-function decodeHistory<R extends Run>(raw: any, run: R, undoCapacity: number, decodeRun: RunDecoder<R>): MoveSnapshot<R>[] {
-  if (!Array.isArray(raw)) return [];
-  return keepUndos(raw, undoCapacity)
-    .map((item) => snapshot(item, decodeRun))
-    .filter((item): item is MoveSnapshot<R> =>
-      !!item && item.run.seed === run.seed && item.run.layoutVersion === run.layoutVersion);
-}
-/** A fall is kept only beside a run whose hero lies fallen, from the same
- * run and layout. */
-function decodeFall<R extends Run>(raw: any, run: R, decodeRun: RunDecoder<R>): Fall<R> | null {
-  if (run.outside || run.player.hp > 0) return null;
-  const item = snapshot(raw?.snapshot, decodeRun);
-  if (!item || item.run.seed !== run.seed || item.run.layoutVersion !== run.layoutVersion) return null;
-  return { snapshot: item, by: typeof raw.by === "string" ? raw.by : "" };
-}
-/** Automove's memory, each half kept only when every entry is well formed. */
-function decodeMemory(raw: any): AutomoveMemory {
-  return {
-    known: pointMap(raw?.known, (v) => v === true) ? raw.known : {},
-    visited: pointMap(raw?.visited, (v) => finite(v)) ? raw.visited : {},
-  };
-}
-function decodeLootedTiles(raw: any): Record<string, true> {
-  const lootedTiles: Record<string, true> = {};
-  if (isRecord(raw))
-    for (const key of Object.keys(raw))
-      if (/^-?\d+:(-?\d+:)?-?\d+,-?\d+$/.test(key)) lootedTiles[key] = true;
-  return lootedTiles;
-}
-function decodeMode<R extends Run>(s: any, undoCapacity: number, decodeRun: RunDecoder<R>): DecodedMode<R> {
-  const run = decodeRun(s?.run);
-  return {
-    run,
-    history: run ? decodeHistory(s.history, run, undoCapacity, decodeRun) : [],
-    fall: run ? decodeFall(s.fall, run, decodeRun) : null,
-    lootedTiles: decodeLootedTiles(s?.lootedTiles),
-    runGold: run ? fraction(s.runGold, 0) : 0,
-    runCurrency: run ? count(s.runCurrency, 0) : 0,
-  };
-}
-function applyMode<R extends Run>(slice: ModeSave<R>, decoded: DecodedMode<R>) {
-  slice.run = decoded.run;
-  slice.history = decoded.history;
-  slice.fall = decoded.fall;
-  slice.lootedTiles = decoded.lootedTiles;
-  slice.runGold = decoded.runGold;
-  slice.runCurrency = decoded.runCurrency;
-}
-
-// --- Inventory ---
-function decodeMaterials(s: any): Record<MaterialId, number> {
-  const materials = emptyMaterials();
-  if (s && typeof s === "object")
-    for (const id of MATERIAL_IDS) materials[id] = count(s[id], materials[id]);
-  return materials;
-}
-const validStacks = (arr: any): boolean =>
-  Array.isArray(arr) &&
-  arr.every((m: any) => MATERIAL_IDS.includes(m?.id) && finite(m?.quantity, 999));
-const validEquipment = (e: any) =>
-  typeof e?.id === "string" && e.id.length > 0 && e.id.length < 100 &&
-  EQUIPMENT_SLOTS.includes(e.slot) &&
-  typeof e.name === "string" && e.name.length < 100 &&
-  ["iron", "steel", "silversteel", "embersteel", "starsteel", "voidsteel"].includes(e.metal) &&
-  finite(e.flatAttack, 9999) && finite(e.flatDefense, 9999) && finite(e.flatMaxHp, 9999) &&
-  finite(e.percentAttack, 10) && finite(e.percentDefense, 10) && finite(e.percentMaxHp, 10) &&
-  validStacks(e.baseRecipe) && validStacks(e.enhancements) &&
-  finite(e.createdAt, 1e15);
-function decodeEquipmentInventory(s: any): CraftedEquipment[] {
-  return Array.isArray(s) ? s.filter(validEquipment) : [];
-}
-const owns = (inventory: CraftedEquipment[], id: unknown, slot: EquipmentSlot) =>
-  typeof id === "string" && inventory.some((e) => e.id === id && e.slot === slot);
-function decodeEquipped(s: any, inventory: CraftedEquipment[]): Partial<Record<EquipmentSlot, string>> {
-  const equipped: Partial<Record<EquipmentSlot, string>> = {};
-  if (isRecord(s))
-    for (const slot of EQUIPMENT_SLOTS) if (owns(inventory, s[slot], slot)) equipped[slot] = s[slot];
-  return equipped;
-}
-function decodeConsumables(s: any): Record<ConsumableId, number> {
-  const consumables = Object.fromEntries(CONSUMABLES.map((c) => [c.id, 0])) as Record<ConsumableId, number>;
-  if (s && typeof s === "object")
-    for (const c of CONSUMABLES) consumables[c.id] = count(s[c.id], consumables[c.id], 999);
-  return consumables;
-}
-/** Older (version-2) saves intentionally get an empty material/equipment
- * inventory rather than being invalidated. */
-function decodeInventory(s: any, d: Save) {
-  d.materials = decodeMaterials(s.materials);
-  d.equipmentInventory = decodeEquipmentInventory(s.equipmentInventory);
-  d.equipped = decodeEquipped(s.equipped, d.equipmentInventory);
-  d.consumables = decodeConsumables(s.consumables);
-}
-
-// --- Settings, currencies and records ---
-function decodeUpgrades(raw: any, d: Save) {
-  for (const u of UPGRADES) d.upgrades[u.id] = count(raw?.[u.id], d.upgrades[u.id], u.max);
-}
-function decodeProgress(s: any, d: Save, undoCapacity: number) {
-  d.gold = fraction(s.gold, d.gold);
-  d.gems = count(s.gems, d.gems);
-  d.gemDrop = decodeGemDrop(s.gemDrop);
-  for (const g of GOLD_SHOP) d.provisions[g.id] = count(s.provisions?.[g.id], d.provisions[g.id], 999);
-  d.xp = count(s.xp, d.xp);
-  for (const t of TRAINING) d.training[t.id] = count(s.training?.[t.id], d.training[t.id], "max" in t ? t.max : 1e6);
-  d.freeTraining = count(s.freeTraining, d.freeTraining);
-  d.trainingJobs = decodeTrainingJobs(s.trainingJobs);
-  d.tower.inspiration = count(s.tower?.inspiration ?? s.tower?.shards, d.tower.inspiration);
-  d.tower.best = count(s.tower?.best, d.tower.best);
-  d.delve.courage = count(s.delve?.courage ?? s.delve?.essence, d.delve.courage);
-  d.delve.best = count(s.delve?.best, d.delve.best);
-  applyMode(d.tower, decodeMode(s.tower, undoCapacity, decodeTowerRun));
-  applyMode(d.delve, decodeMode(s.delve, undoCapacity, decodeDelveRun));
-  d.delve.memory = decodeMemory(s.delve?.memory);
-}
-/** The ranks in training: only well-formed jobs for distinct rows, up to the slots. */
-function decodeTrainingJobs(raw: any): TrainingJob[] {
-  const jobs: TrainingJob[] = [];
-  if (!Array.isArray(raw)) return jobs;
-  for (const j of raw) {
-    const ok = TRAINING.some((t) => t.id === j?.id) && Number.isFinite(j.startedAt) && Number.isFinite(j.completesAt) && j.completesAt >= j.startedAt;
-    if (ok && !jobs.some((o) => o.id === j.id) && jobs.length < trainingSlots()) jobs.push({ id: j.id, startedAt: j.startedAt, completesAt: j.completesAt });
-  }
-  return jobs;
-}
-/** Version 1 had a single run (the endless climb); it becomes the Delve slice. */
-function migrateV1(s: any, d: Save, undoCapacity: number) {
-  d.delve.best = count(s.best, d.delve.best);
-  d.delve.courage = count(s.essence, d.delve.courage);
-  applyMode(d.delve, decodeMode({ run: s.run, history: s.history, fall: s.fall }, undoCapacity, decodeDelveRun));
-}
-/** Existing records are already rewarded; preserve old balances without double-paying. */
-function decodeReached(s: any, d: Save) {
-  for (const mode of ["tower", "delve"] as const) {
-    d[mode].reached = count(s?.[mode]?.reached, d[mode].best);
-    d[mode].best = Math.max(d[mode].best, d[mode].reached);
-  }
-}
-function decodeTowerLog(raw: any): Save["tower"]["log"] {
-  const log: Save["tower"]["log"] = {};
-  if (!raw || typeof raw !== "object") return log;
-  for (const [floor, record] of Object.entries(raw) as [string, any][]) {
-    if (!/^\d+$/.test(floor) || !finite(Number(floor)) || !record || typeof record !== "object") continue;
-    // Older saves list the tiers: { earned: [...], claimed: [...] }.
-    const listed = Array.isArray(record.earned);
-    const entry: FloorRecord = {};
-    for (const t of CHEST_TIERS) {
-      const state = listed
-        ? record.earned.includes(t) && (Array.isArray(record.claimed) && record.claimed.includes(t) ? "claimed" : "earned")
-        : record[t];
-      if (state === "earned" || state === "claimed") entry[t] = state;
-    }
-    if (Object.keys(entry).length) log[floor] = entry;
-  }
-  return log;
-}
-function decodeSectionHp(raw: any): Record<string, number> {
-  const sectionHp: Record<string, number> = {};
-  if (raw && typeof raw === "object")
-    for (const [section, hp] of Object.entries(raw) as [string, any][])
-      if (/^[1-9]\d*$/.test(section) && finite(hp) && hp > 0) sectionHp[section] = snap(hp);
-  return sectionHp;
-}
-function decodeSections(tower: any, d: Save) {
-  d.tower.log = decodeTowerLog(tower?.log);
-  d.tower.sectionHp = decodeSectionHp(tower?.sectionHp);
-  // A section can only be the start once it has been reached (has a recorded HP).
-  const start = tower?.startSection;
-  const unlocked = start === 0 || !!d.tower.sectionHp[start];
-  if (finite(start) && unlocked) d.tower.startSection = Math.floor(start);
-}
-/** Each mode's tiers: the highest opened, the one selected (its records
- * are the slice's), and the others' records. */
-function decodeTiers(s: any, d: Save) {
-  for (const mode of ["tower", "delve"] as const) {
-    const raw = s?.[mode], slice = d[mode];
-    slice.tiersOpen = Math.max(1, count(raw?.tiersOpen, 1, TIERS));
-    slice.tier = Math.max(1, Math.min(slice.tiersOpen, count(raw?.tier, 1)));
-    if (!isRecord(raw?.tierRecords)) continue;
-    for (const [key, r] of Object.entries(raw.tierRecords) as [string, any][]) {
-      const tier = Number(key);
-      if (!/^[1-9]$/.test(key) || tier > slice.tiersOpen || tier === slice.tier || !isRecord(r)) continue;
-      const reached = count(r.reached, 0), record: TierRecord = { best: Math.max(reached, count(r.best, 0)), reached };
-      if (mode === "tower") {
-        record.log = decodeTowerLog(r.log);
-        record.sectionHp = decodeSectionHp(r.sectionHp);
-        record.startSection = r.startSection === 0 || record.sectionHp[r.startSection] ? count(r.startSection, 0) : 0;
-      }
-      slice.tierRecords[key] = record;
-    }
-  }
-}
-const touchedDelve = (d: Save) =>
-  !!(d.delve.run || d.delve.best || d.delve.courage) ||
-  UPGRADES.some((u) => u.currency === "courage" && d.upgrades[u.id]);
-/** Preserve access and purchases in saves made before skill trees existed. */
-function migratePreSkillTrees(upgrades: any, d: Save) {
-  if (!upgrades || "delve" in upgrades) return;
-  if (touchedDelve(d)) d.upgrades.delve = 1;
-  if (["quality", "yellow", "blue", "red"].some((id) => upgrades[id] > 0)) d.upgrades.legacy = 1;
-}
-
-type VersionStep = (s: any, d: Save, undoCapacity: number) => void;
-/** What each save version carries beyond upgrades and settings. A Map, so
- * lookups match versions strictly (no "3" or prototype keys). */
-const VERSION_STEPS = new Map<unknown, VersionStep[]>([
-  [1, [migrateV1]],
-  [2, [decodeProgress]],
-  [3, [decodeProgress, decodeInventory]],
-]);
-/** The saved hand's cards the player owns, in order, each once and no
- * more than the hand holds (`slots`), or the base hand when the save has
- * none or lost its STAIRS card, which every hand must hold. */
-function decodeHand(raw: any, owned: CardId[], slots: number): CardId[] {
-  if (!Array.isArray(raw)) return [...BASE_HAND];
-  const hand = [...new Set(raw.filter((id): id is CardId => owned.includes(id)))].slice(0, slots);
-  return validHand(hand) ? hand : [...BASE_HAND];
-}
+/** A save from its stored JSON: every well-formed field kept, the rest
+ * defaulted. A newer or unreadable save starts afresh. */
 export function decode(raw: string | null): Save {
   const d = defaults();
+  let s: any;
   try {
-    const s = JSON.parse(raw ?? "null") ?? {};
-    decodeUpgrades(s.upgrades, d);
-    // Undo capacity counts Undo Count research, so the Archives come first.
-    d.archives = decodeArchives(s.archives);
-    const { undoCapacity } = loadout(d);
-    d.settings = decodeSettings(s.settings);
-    for (const step of VERSION_STEPS.get(s.version) ?? []) step(s, d, undoCapacity);
-    decodeReached(s, d);
-    decodeSections(s.tower, d);
-    decodeTiers(s, d);
-    migratePreSkillTrees(s.upgrades, d);
-    d.defend = decodeDefendSave(s.defend);
-    // Slots bought with Gems count only with Larger Hand, which opens them.
-    if (d.upgrades.largerHand) d.handSlots = count(s.handSlots, 0, HAND_SLOT_GEMS.length);
-    d.hand = decodeHand(s.hand, deckCards(d.upgrades), handSlots(d));
-    for (const k of ["deck", "removeCard", "addCard", "upgrades"] as const) d.tutorials[k] = s.tutorials?.[k] === true;
-  } catch {}
+    s = raw ? JSON.parse(raw) : null;
+  } catch {
+    return d;
+  }
+  if (!s || typeof s !== "object" || !Number.isInteger(s.version) || s.version > SAVE_VERSION) return d;
+  d.gold = num(s.gold, 0);
+  d.ironBar = int(s.ironBar, 0);
+  d.steelBar = int(s.steelBar, 0);
+  d.xp = int(s.xp, 0, 0, 1e12);
+  d.valor = int(s.valor, 0);
+  for (const id of SKILL_IDS) d.skills[id] = int(s.skills?.[id], 0, 0, SKILLS[id].max);
+  for (const t of TRAINING) d.training[t.id] = int(s.training?.[t.id], 0, 0, t.max);
+  d.trainingJobs = decodeJobs(s.trainingJobs, d.training);
+  d.freeTraining = int(s.freeTraining, 0);
+  d.defend = decodeDefendSave(s.defend);
+  d.settings = decodeSettings(s.settings);
   return d;
 }
+
+/** Jobs on known rows, one per row, short of the row's most ranks. */
+function decodeJobs(list: unknown, training: Record<TrainingId, number>): TrainingJob[] {
+  if (!Array.isArray(list)) return [];
+  const out: TrainingJob[] = [];
+  for (const j of list) {
+    const row = TRAINING.find((t) => t.id === j?.id);
+    if (!row || out.some((o) => o.id === row.id) || training[row.id] >= row.max) continue;
+    if (!Number.isFinite(j.startedAt) || !Number.isFinite(j.completesAt)) continue;
+    out.push({ id: row.id, startedAt: j.startedAt, completesAt: j.completesAt });
+  }
+  return out;
+}
+
 export function load(): Save {
   try {
-    return decode(localStorage.getItem(SAVE_KEY) ?? localStorage.getItem(OLD_SAVE_KEY));
+    return decode(localStorage.getItem(SAVE_KEY));
   } catch {
     return defaults();
   }
 }
+
+/** Writes the save; false when storage is unavailable. */
 export function persist(save: Save): boolean {
   try {
     localStorage.setItem(SAVE_KEY, JSON.stringify(save));

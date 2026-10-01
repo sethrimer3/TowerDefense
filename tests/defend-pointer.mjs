@@ -14,7 +14,10 @@ const UPDATE = process.env.UPDATE_GOLDEN === "1";
 const GOLDEN = new URL("./fixtures/defend-pointer.golden.json", import.meta.url);
 const URL_ROOT = process.env.TEST_URL || "http://127.0.0.1:5173/";
 
-const browser = await chromium.launch({ headless: true, channel: process.env.PLAYWRIGHT_CHANNEL || "msedge" });
+// PLAYWRIGHT_EXECUTABLE runs a browser at that path instead of a channel's.
+const browser = await chromium.launch(process.env.PLAYWRIGHT_EXECUTABLE
+  ? { headless: true, executablePath: process.env.PLAYWRIGHT_EXECUTABLE }
+  : { headless: true, channel: process.env.PLAYWRIGHT_CHANNEL || "msedge" });
 const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, hasTouch: true });
 const page = await context.newPage();
 page.setDefaultTimeout(10000);
@@ -32,17 +35,16 @@ await page.addInitScript(() => {
   // loads; rain and splinters draw from their own stream, so the battle's
   // seed doesn't depend on how many frames have run.
   const fixture = sessionStorage.getItem("__defendFixture");
-  if (fixture) localStorage.setItem("towerdelve.v1", fixture);
+  if (fixture) localStorage.setItem("towerdefense.v1", fixture);
 });
 
-// A save with Defend unlocked, spare palette items, bombs, and a small city:
+// A save with spare palette items, bombs, and a small city:
 // a ring of city tiles around the keep with a barracks and an archer tower.
 await page.goto(URL_ROOT);
 const fixture = await page.evaluate(async () => {
   const { defaults } = await import("/src/save.ts");
   const { placeCityTile, placeStructure } = await import("/src/defend/layout.ts");
   const s = defaults();
-  s.upgrades.legacy = 1;
   Object.assign(s.defend.owned, { cityTile: 14, barracks: 3, archerTower: 2, watchTower: 1 });
   s.defend.bombs = 4;
   let layout = s.defend.layout;
@@ -51,11 +53,7 @@ const fixture = await page.evaluate(async () => {
   layout = placeStructure(layout, "barracks", tx - 1, ty) ?? layout;
   layout = placeStructure(layout, "archerTower", tx + 1, ty - 1) ?? layout;
   s.defend.layout = layout;
-  // Tabs show only outside a run, so the Tower's run waits in the forest.
-  const { Game } = await import("/src/state.ts");
-  const game = new Game(s);
-  game.newRun({ outside: true, seed: 1 });
-  return JSON.stringify(game.save);
+  return JSON.stringify(s);
 });
 await page.evaluate((f) => { sessionStorage.setItem("__defendFixture", f); }, fixture);
 await page.reload();
@@ -94,7 +92,7 @@ const paletteItem = async (id) => {
 async function observe() {
   return page.evaluate(() => {
     const dp = window.__dp, ov = dp.overlay(), save = dp.host.save();
-    const stored = JSON.parse(localStorage.getItem("towerdelve.v1") || "{}").defend ?? null;
+    const stored = JSON.parse(localStorage.getItem("towerdefense.v1") || "{}").defend ?? null;
     const ghost = document.querySelector(".defend-drag-ghost");
     const cam = dp.renderer.cam;
     const r = (v) => Math.round(v * 1000) / 1000;

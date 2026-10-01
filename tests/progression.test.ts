@@ -1,102 +1,140 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
-import { Game } from '../src/state.ts';
-import { defaults, decode } from '../src/save.ts';
-import { RoomWorld } from '../src/tower/room-world.ts';
-import { chooseStep } from '../src/automation.ts';
-/** How many clear chests stand on the board. */
-const chests = (g: Game) => Object.values(g.run.changes).filter(t => t.kind === 'reward').length;
-function arena() {
-  const g = new Game(defaults());
-  g.save.upgrades.inspirationUndos = 1; // undo needs Rehearsed steps
-  const w = g.world as RoomWorld;
-  w.cells = new Map();
-  for (let y = 0; y < 5; y++) for (let x = 0; x < 5; x++) w.cells.set(`${x},${y}`, { kind: 'floor' });
-  w.cells.set('4,4', { kind: 'stairs' });
-  g.run.player.x = 0; g.run.player.y = 0;
-  return g;
-}
-test('milestones are immediate, incremental and cannot be farmed with undo or reruns', () => {
-  const g = arena();
-  g.advanceTowerRoom(); assert.equal(g.save.tower.inspiration, 1);
-  g.advanceTowerRoom(); assert.equal(g.save.tower.inspiration, 2);
-  g.newRun(); g.advanceTowerRoom(); assert.equal(g.save.tower.inspiration, 2);
-  g.save.upgrades.delve = 1; g.switchMode('delve');
-  for (const [height, balance] of [[9,0],[10,1],[19,1],[20,2],[10,2],[30,3]]) {
-    g.run.height = height; g.recordProgress(); assert.equal(g.save.delve.courage, balance);
-  }
-  g.finish('test'); assert.equal(g.save.delve.courage, 3);
-});
-test('uncollected rewards survive reload, undo, departure, death and retirement exactly once', () => {
-  for (const action of ['reload','undo','stairs','death','retire','mode']) {
-    // The arena is clear from the start, so the first step earns its chests.
-    const g = arena(), before = g.snapshot(); g.move(1, 0);
-    if (action === 'reload') {
-      const loaded = new Game(decode(JSON.stringify(g.save)));
-      assert.equal(chests(loaded), 3); loaded.finish('test');
-      assert.equal(loaded.save.tower.inspiration, 3); continue;
-    }
-    if (action === 'undo') g.restore(before);
-    if (action === 'stairs') g.advanceTowerRoom();
-    if (action === 'retire') g.finish('test');
-    if (action === 'mode') { g.save.upgrades.delve=1; g.switchMode('delve'); }
-    if (action === 'death') {
-      // Lethal but damageable (low defense so it's not impervious).
-      (g.world as RoomWorld).cells.set('2,0', {kind:'enemy',enemy:{name:'doom',hp:99999,attack:999,defense:0,tier:3}});
-      g.move(1,0);
-      assert.ok(g.acceptDefeat());
-    }
-    assert.equal(g.save.tower.inspiration, action === 'stairs' ? 4 : 3, action);
-  }
-});
-test('automove walks to and collects every clear chest before the stairs', () => {
-  const g = arena(); g.move(1, 0);
-  for (let n=0; n<50 && chests(g); n++) {
-    const step = chooseStep(g); assert.ok(step); assert.ok(g.move(step.dx,step.dy));
-  }
-  assert.equal(g.run.height,0); assert.equal(g.save.tower.inspiration,3); assert.equal(chests(g),0);
-});
-test('reward chests persist open, undo closed, and never repay after undo', () => {
-  const g = arena(), w = g.world as RoomWorld;
-  g.save.tower.log[0] = { silver: 'earned' };
-  g.run.changes['1,0'] = { kind: 'reward', tier: 'silver' };
-  const before = g.save.tower.inspiration;
-  assert.ok(g.move(1, 0));
-  assert.equal(g.world.tile(1, 0).kind, 'openedChest');
-  assert.equal(g.save.tower.inspiration, before + 1);
-  assert.ok(g.undo());
-  assert.equal(g.world.tile(1, 0).kind, 'reward');
-  assert.ok(g.move(1, 0));
-  assert.equal(g.world.tile(1, 0).kind, 'openedChest');
-  assert.equal(g.save.tower.inspiration, before + 1);
-});
-test('delve approach movement does not award physical Y as progression', () => {
-  const g = new Game(defaults());
-  g.save.upgrades.delve = 1;
-  g.switchMode('delve');
-  // Keep the two northward cells deterministic instead of relying on a
-  // Date.now-derived map that can occasionally place a wall in the route.
-  g.newRun({ seed: 3 });
-  assert.equal(g.run.player.y, 0);
-  assert.equal(g.run.maxHeight, 0);
+// Training, the skill trees and a defense's rewards (src/progression.ts),
+// and how they reach the battle (DefendSim's bonuses).
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { decode, defaults } from "../src/save.ts";
+import {
+  TRAINING, bonuses, buySkill, cancelTraining, levelForXp, multiplier, payKills, payWave, settleTraining, skillPurchase,
+  startTraining, trainingPoints, trainingSlots, xpForLevel,
+} from "../src/progression.ts";
+import { SKILLS, TREES, skillCost, type SkillId } from "../src/skill-trees.ts";
+import { trainingSeconds } from "../src/training-jobs.ts";
+import { NO_BONUSES } from "../src/defend/catalog.ts";
+import { defaultLayout, fitLayout } from "../src/defend/layout.ts";
+import { generateCity } from "../src/defend/citygen.ts";
+import { DefendSim } from "../src/defend/sim.ts";
+import { UPGRADES } from "../src/defend/catalog.ts";
 
-  // Manually step up (north, dy = +1)
-  g.move(0, 1);
-  assert.equal(g.run.player.y, 1);
-  assert.equal(g.run.maxHeight, 0);
-
-  g.move(0, 1);
-  assert.equal(g.run.player.y, 2);
-  assert.equal(g.run.maxHeight, 0);
-
-  // Move back down (south, dy = -1)
-  g.move(0, -1);
-  assert.equal(g.run.player.y, 1);
-  assert.equal(g.run.maxHeight, 0); // Run best stays 2 even as current depth goes down to 1
+test("a new save fights with no bonuses", () => {
+  assert.deepEqual(bonuses(defaults()), NO_BONUSES);
 });
-test('legacy balances and records migrate without retroactive duplication', () => {
-  const old = defaults(); old.tower.best=8; old.tower.inspiration=4;
-  delete (old.tower as any).reached; delete (old.tower as any).log;
-  const g = new Game(decode(JSON.stringify(old))); g.run.height=8; g.recordProgress();
-  assert.equal(g.save.tower.inspiration,4); g.run.height=9; g.recordProgress(); assert.equal(g.save.tower.inspiration,5);
+
+test("levels come from lifetime experience, one training point each", () => {
+  assert.equal(levelForXp(0), 0);
+  assert.equal(levelForXp(xpForLevel(1) - 1), 0);
+  assert.equal(levelForXp(xpForLevel(1)), 1);
+  assert.equal(levelForXp(xpForLevel(7)), 7);
+  const s = defaults();
+  s.xp = xpForLevel(3);
+  assert.deepEqual(trainingPoints(s), { earned: 3, spent: 0, left: 3 });
+});
+
+test("a rank of Training takes time, spends its point at once and counts when done", () => {
+  const s = defaults();
+  s.xp = xpForLevel(2);
+  assert.ok(startTraining(s, "troopDamage", 1000));
+  assert.equal(trainingPoints(s).left, 1);
+  assert.equal(s.trainingJobs[0].completesAt, 1000 + trainingSeconds(0) * 1000);
+  assert.equal(startTraining(s, "troopDamage", 1000), false, "one job per row");
+  assert.equal(settleTraining(s, 1000 + trainingSeconds(0) * 1000 - 1), 0);
+  assert.equal(bonuses(s).troopDamage, 1, "not before it completes");
+  assert.equal(settleTraining(s, 1000 + trainingSeconds(0) * 1000), 1);
+  assert.equal(s.training.troopDamage, 1);
+  assert.equal(bonuses(s).troopDamage, 1.04);
+  // Cancelling gives the point back.
+  assert.ok(startTraining(s, "wallHp", 0));
+  assert.equal(trainingPoints(s).left, 0);
+  assert.ok(cancelTraining(s, "wallHp"));
+  assert.equal(trainingPoints(s).left, 1);
+});
+
+test("Training slots fill up, and Tactician adds one", () => {
+  const s = defaults();
+  s.xp = xpForLevel(10);
+  assert.ok(startTraining(s, "troopHp", 0));
+  assert.ok(startTraining(s, "troopDamage", 0));
+  assert.equal(startTraining(s, "drill", 0), false);
+  s.skills.tactician = 1;
+  assert.equal(trainingSlots(s), 3);
+  assert.ok(startTraining(s, "drill", 0));
+});
+
+test("times shorten: a percent on drill, reload or rebuild divides", () => {
+  const s = defaults();
+  s.training.drill = 10;
+  s.skills.drillSergeant = 2;
+  assert.equal(multiplier(s, "drill"), 1 / 1.5);
+});
+
+test("skills need Valor and their requirements, and each rank costs more", () => {
+  const s = defaults();
+  assert.equal(buySkill(s, "drillSergeant"), false, "no Valor");
+  s.valor = 100;
+  assert.equal(buySkill(s, "veterans"), false, "needs Drill sergeant");
+  assert.ok(buySkill(s, "drillSergeant"));
+  assert.equal(s.valor, 100 - skillCost("drillSergeant", 0));
+  assert.ok(buySkill(s, "veterans"));
+  assert.ok(buySkill(s, "veterans"));
+  assert.equal(bonuses(s).troopHp, 1.2);
+  for (let i = 0; i < 5; i++) buySkill(s, "drillSergeant");
+  assert.equal(s.skills.drillSergeant, SKILLS.drillSergeant.max);
+  assert.equal(skillPurchase(s, "drillSergeant").maxed, true);
+});
+
+test("every tree node is a skill, each listed once, its requirements in the same tree", () => {
+  const ids = TREES.flatMap((t) => t.nodes.map((n) => n.id));
+  assert.deepEqual([...ids].sort(), (Object.keys(SKILLS) as SkillId[]).sort());
+  for (const t of TREES) for (const n of t.nodes) for (const r of n.requires) assert.ok(t.nodes.some((m) => m.id === r), `${n.id} needs ${r}`);
+});
+
+test("kills pay Gold and experience; waves pay Gold, iron, steel on boss waves, and Valor past the best", () => {
+  const s = defaults();
+  payKills(s, { roach: 3, orc: 1 });
+  assert.equal(s.gold, 3 * 2 + 5);
+  assert.equal(s.xp, 3 * 1 + 3);
+  s.defend.bestWave = 4;
+  const held = payWave(s, 4);
+  assert.deepEqual({ iron: held.ironBar, steel: held.steelBar, valor: held.valor }, { iron: 1, steel: 0, valor: 0 });
+  const boss = payWave(s, 10);
+  assert.deepEqual({ iron: boss.ironBar, steel: boss.steelBar, valor: boss.valor }, { iron: 1, steel: 1, valor: 3 });
+  s.skills.plunder = 2;
+  s.skills.ironworks = 1;
+  const rich = payWave(s, 5);
+  assert.equal(rich.gold, (10 + 25) * 1.2);
+  assert.equal(rich.ironBar, 2);
+});
+
+test("bonuses reach the battle: troops, walls and the keep", () => {
+  const fit = fitLayout(defaultLayout());
+  assert.ok(fit.ok);
+  const map = generateCity(fit, 3);
+  const levels = Object.fromEntries(UPGRADES.map((u) => [u.id, 0])) as never;
+  const plain = new DefendSim(map, levels, 1);
+  const s = defaults();
+  s.training.keepHp = 4;
+  s.training.wallHp = 2;
+  const strong = new DefendSim(map, levels, 1, bonuses(s));
+  assert.equal(strong.keepMaxHp(), plain.keepMaxHp() * 1.2);
+  const wall = map.buildings.find((b) => b.kind === "wall")!;
+  assert.ok(Math.abs(strong.maxHp[wall.id] - plain.maxHp[wall.id] * 1.1) < 1e-3);
+});
+
+test("saves keep what is well formed and default the rest", () => {
+  const s = defaults();
+  s.gold = 12.5;
+  s.valor = 3;
+  s.skills.masonry = 2;
+  s.training.gold = 4;
+  s.trainingJobs = [{ id: "keepHp", startedAt: 1, completesAt: 2 }];
+  const back = decode(JSON.stringify(s));
+  assert.deepEqual(back, s);
+  const bad = decode(JSON.stringify({ ...s, gold: "lots", skills: { masonry: 99 }, training: { gold: -2 }, trainingJobs: [{ id: "nope" }, { id: "keepHp", startedAt: 1, completesAt: 2 }, { id: "keepHp", startedAt: 1, completesAt: 2 }] }));
+  assert.equal(bad.gold, 0);
+  assert.equal(bad.skills.masonry, SKILLS.masonry.max);
+  assert.equal(bad.training.gold, 0);
+  assert.equal(bad.trainingJobs.length, 1);
+  const fresh = decode("not json");
+  assert.deepEqual({ ...fresh, defend: null }, { ...defaults(), defend: null }, "unreadable JSON starts afresh");
+  assert.equal(decode(JSON.stringify({ version: 99, gold: 5 })).gold, 0, "a newer save starts afresh");
+  assert.ok(TRAINING.every((t) => back.training[t.id] !== undefined));
 });

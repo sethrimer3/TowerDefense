@@ -1,11 +1,12 @@
 /** The DEFEND page: a City tab (palette + board) and an Armory tab (buy
- * city elements, bombs and universal upgrades with main-game currency).
+ * city elements, bombs and universal upgrades with what battles earn).
  *
  * Build phase: drag city elements from the palette onto gold-outlined
  * tiles; drag placed ones around, or back to the palette to pick them up.
  * Once the defense starts, the palette becomes the consumables palette and
  * waves roll in without stopping until the keep falls. */
 import {
+  ENEMIES,
   BOMB_PRICE,
   BOMB_RADIUS,
   SPEED3_PRICE,
@@ -14,6 +15,8 @@ import {
   UPGRADES,
   purchasePrice,
   upgradePrice,
+  type Bonuses,
+  type EnemyKind,
   type PaletteItem,
   type Price,
 } from "./catalog.ts";
@@ -34,8 +37,16 @@ export type DefendHost = {
   save(): DefendSave;
   wallet(): Wallet;
   setWallet(w: Wallet): void;
+  /** Training's and the skill trees' multipliers for the next defense. */
+  bonuses(): Bonuses;
+  /** Pays for enemies slain (Gold and experience); returns Commander levels gained. */
+  earnKills(slain: Partial<Record<EnemyKind, number>>): number;
+  /** Pays for holding `wave` (called before the best wave is raised). */
+  earnWave(wave: number): { gold: number; ironBar: number; steelBar: number; valor: number };
   persist(): void;
   reduceMotion(): boolean;
+  /** The park grass and pond effects are on. */
+  effects(): boolean;
   devMode(): boolean;
 };
 
@@ -75,6 +86,8 @@ export class DefendPage {
   /** Abandon needs a second click within a few seconds. */
   private abandonArmed = 0;
   private settingsOpen = false;
+  /** Kills already paid for this run, by kind. */
+  private paid: Record<EnemyKind, number> = { roach: 0, orc: 0, ogre: 0, bat: 0, warlord: 0 };
 
   constructor(root: HTMLElement, host: DefendHost) {
     this.root = root;
@@ -422,7 +435,8 @@ export class DefendPage {
     // A fresh city every run; upgrades bought mid-run apply next time.
     this.map = null;
     const map = this.currentMap();
-    this.sim = new DefendSim(map, { ...this.save.levels }, (defendRandom("rolls")() * 2147483648) | 0);
+    this.sim = new DefendSim(map, { ...this.save.levels }, (defendRandom("rolls")() * 2147483648) | 0, this.host.bonuses());
+    this.paid = { roach: 0, orc: 0, ogre: 0, bat: 0, warlord: 0 };
     this.phase = "sim";
     this.newRecord = 0;
     this.weather = rollWeather();
@@ -434,28 +448,49 @@ export class DefendPage {
 
   private endRun() {
     if (!this.sim) return;
+    this.payKills();
     this.phase = "over";
     const wave = this.sim.wave;
     const cleared = Math.max(0, wave - 1);
     this.showBanner(
       `<strong>The keep has fallen</strong><span>Fell during wave ${wave} · best ${this.save.bestWave}</span>${
-        this.newRecord ? `<em>New record this run: wave ${this.newRecord}</em>` : cleared < this.save.bestWave ? `<em>Strengthen the city in the Armory and try again.</em>` : ""
+        this.newRecord ? `<em>New record this run: wave ${this.newRecord}</em>` : cleared < this.save.bestWave ? `<em>Strengthen the city in the Armory, Training and skill trees, then try again.</em>` : ""
       }`,
     );
     this.renderChrome();
   }
 
+  /** Pays for the kills since the last frame. */
+  private payKills() {
+    const sim = this.sim!;
+    const fresh: Partial<Record<EnemyKind, number>> = {};
+    let any = false;
+    for (const kind of Object.keys(ENEMIES) as EnemyKind[]) {
+      const n = sim.slain[kind] - this.paid[kind];
+      if (n > 0) {
+        fresh[kind] = n;
+        this.paid[kind] = sim.slain[kind];
+        any = true;
+      }
+    }
+    if (!any) return;
+    const levels = this.host.earnKills(fresh);
+    if (levels > 0) this.setMessage(`Commander level up! +${levels} training ${levels === 1 ? "point" : "points"}.`, 3);
+  }
+
   private handleEvents() {
     const sim = this.sim!;
+    this.payKills();
     for (const ev of sim.events.splice(0)) {
       if (ev.type === "waveCleared") {
+        const r = this.host.earnWave(ev.wave);
+        const pay = `+${Math.floor(r.gold)} gold · +${r.ironBar} iron${r.steelBar ? ` · +${r.steelBar} steel` : ""}${r.valor ? ` · +${r.valor} Valor` : ""}`;
         if (ev.wave > this.save.bestWave) {
           this.save.bestWave = ev.wave;
           this.newRecord = ev.wave;
-          // Record rewards are not defined yet; this is where they will land.
           this.host.persist();
-          this.setMessage(`New record — wave ${ev.wave} survived!`, 3);
-        } else this.setMessage(`Wave ${ev.wave} cleared.`, 2);
+          this.setMessage(`New record — wave ${ev.wave} survived! ${pay}`, 3);
+        } else this.setMessage(`Wave ${ev.wave} cleared. ${pay}`, 2);
       } else if (ev.type === "waveStart") {
         if (isBossWave(ev.wave)) this.setMessage(`Boss wave ${ev.wave}! Night falls as ${ev.wave > 10 ? `${ev.wave / 10} warlords approach` : "a warlord approaches"}…`, 4);
         else if (!this.message) this.setMessage(`Wave ${ev.wave}`, 1.5);
@@ -472,6 +507,7 @@ export class DefendPage {
       night: this.night,
       now: performance.now(),
       reduceMotion: this.host.reduceMotion(),
+      effects: this.host.effects(),
     });
   }
 
@@ -555,7 +591,7 @@ export class DefendPage {
       )
       .join("");
     const balance = (amount: number) => this.host.devMode() ? "∞" : Math.floor(amount + 1e-9);
-    el.innerHTML = `<p class="hint defend-wallet">Spend what you earn in the tower. <b>${balance(w.gold)}</b> gold · <b>${balance(w.ironBar)}</b> iron bars · <b>${balance(w.steelBar)}</b> steel bars${this.phase === "sim" ? " · upgrades apply from the next defense" : ""}</p>
+    el.innerHTML = `<p class="hint defend-wallet">Spend what you earn in battle: kills pay Gold, every wave held pays Gold and iron, boss waves steel. <b>${balance(w.gold)}</b> gold · <b>${balance(w.ironBar)}</b> iron bars · <b>${balance(w.steelBar)}</b> steel bars${this.phase === "sim" ? " · upgrades apply from the next defense" : ""}</p>
       <h3 class="defend-section">City elements</h3>${items}
       <h3 class="defend-section">Consumables</h3>${bomb}
       <h3 class="defend-section">Battle</h3>${speed}

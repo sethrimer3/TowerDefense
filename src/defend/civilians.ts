@@ -74,7 +74,7 @@ function work(sim: DefendSim, c: Civilian, dt: number) {
   // Too dangerous: come back to it later.
   if (sim.enemiesNear(c.x, c.y, 2.5).length) return assignNext(sim, c, c.job);
   c.work += dt;
-  if (c.work < rebuildSeconds(sim.levels.rebuildSpeed)) return;
+  if (c.work < rebuildSeconds(sim.levels.rebuildSpeed) * sim.bonuses.rebuild) return;
   sim.rebuildCell(c.job);
   assignNext(sim, c);
 }

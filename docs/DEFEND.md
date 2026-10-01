@@ -135,7 +135,8 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   rain ("Storm").
 - Swordsmen and civilians carry hand torches: small flickering pools that
   move with them, clipped to open ground so they never light a roof.
-- Lights reuse the main game's candle colours, flicker and sway. Each pool
+- Lights use the torch-light toolkit's candle colours, flicker and sway
+  (`src/lighting.ts`, `src/torch-light.ts`). Each pool
   is baked once with occlusion, so walls and buildings cast shadows; an
   archer tower's fire ignores its own roof but is blocked by its four corner
   pillars, throwing four shadows into the street. Only lights near cells
@@ -165,18 +166,44 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   space (`weather.ts`).
 - `structure-art.ts` holds the keep, barracks and tower art (shared by the
   city layer and the palette icons), the banner, and the palette colours.
-- `npm run test:render` draws seeded Defend scenes (building mode, a rainy
-  battle, the night boss wave, a stormy night zoomed in) and the palette
-  icons, and compares their pixels to the recorded golden.
+- Between the city layer and the fences, **park life** (presentation only,
+  off with the "Grass and water effects" setting):
+  - `park-grass.ts`: a few clumps of pixel blades on every park cell (none
+    under a tree's canopy or on a pond's shore), swaying in the wind, bowing
+    under gusts that roll across the city, harder in the rain, and parting
+    and pressing down around enemies, troops and civilians walking through,
+    then wobbling back. Built in one pixel buffer at 8 pixels a cell, at most
+    30 times a second.
+  - `pond-water.ts`: drips fall from the trees overhanging each pond (a pond
+    no tree reaches gets one slow drip of its own): the drop and its
+    sharpening shadow, a splash, then spreading rings. Rain stipples the
+    ponds with rings. The bank, its trees and the houses beside it are
+    mirrored into the water, cut from the city layer about each column's
+    shoreline and copied back in thin strips shifted by a faint shimmer and
+    by every ring passing through, tinted by the water and masked to it.
 
-## Economy (`progress.ts`, Armory tab)
+## Economy (`progress.ts`, Armory tab; `src/progression.ts`)
 
-- Everything is bought with main-game gold, iron bars and steel bars.
+- The Armory sells with Gold, iron bars and steel bars, all earned in
+  battle: each kill pays Gold (`KILL_GOLD`) and experience, each wave held
+  pays Gold (10 + 5 × the wave) and an iron bar, and each boss wave held
+  pays a steel bar for every ten waves. Gold is paid as enemies fall, so an
+  abandoned defense keeps what it earned.
 - City elements get more expensive with each one owned. Upgrades are
   universal (they apply to every building of that type) and take effect from
   the next run.
-- Reaching a **new best wave** is recorded (`bestWave`). The reward for a
-  new record is not defined yet — see `handleEvents` in `ui.ts`.
+- Reaching a **new best wave** is recorded (`bestWave`) and pays Valor: one
+  for each wave held past the best before it, three for a boss wave.
+- **Training** (Upgrades tab): experience raises the Commander level; each
+  level is a training point, which trains one rank of a row (a few percent on
+  troop HP or damage, drill speed, tower damage or reload, bomb damage, wall
+  or keep HP, rebuild speed, or Gold found). A rank takes time: a minute
+  for the first, each after 50% longer; two train at once.
+- **Skill trees** (Upgrades tab): Command (garrison and towers) and
+  Stewardship (walls, keep, builders, Gold, iron, experience, a third
+  Training slot), ranked skills bought with Valor.
+- Training and the skills fold into the run's `Bonuses`, fixed when the
+  defense starts.
 
 ## Not saved
 

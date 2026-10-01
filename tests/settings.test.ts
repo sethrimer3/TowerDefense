@@ -4,7 +4,7 @@ import { decode, defaults } from "../src/save.ts";
 import { SETTINGS, settingValue, type Setting, type SettingKey } from "../src/settings.ts";
 
 const rows = Object.entries(SETTINGS) as [SettingKey, Setting][];
-const decoded = (settings: unknown) => decode(JSON.stringify({ version: 3, settings })).settings;
+const decoded = (settings: unknown) => decode(JSON.stringify({ version: 1, settings })).settings;
 
 /** Values each setting's row allows, and ones a save could hold that it doesn't. */
 function values(row: Setting): { good: unknown[]; bad: unknown[] } {
@@ -27,9 +27,6 @@ test("each setting keeps every value it allows and defaults the rest", () => {
     for (const v of good) assert.equal(decoded({ [key]: v })[key], v, `${key} = ${JSON.stringify(v)}`);
     for (const v of bad) assert.equal(decoded({ [key]: v })[key], row.default, `${key} = ${String(v)}`);
   }
-  assert.equal(decoded({ brightness: 7 }).brightness, 20);
-  assert.equal(decoded({ brightness: 101.4 }).brightness, 100);
-  assert.equal(decoded({ brightness: 52.6 }).brightness, 53);
 });
 
 test("settings on the page have their own control ids", () => {

@@ -35,7 +35,7 @@ export class Barracks {
   /** Counts down the barracks' drill; true when a recruit is ready. A full
    * garrison keeps the clock at a whole drill. */
   private drilled(sim: DefendSim, b: Building, cap: number, dt: number) {
-    const drill = () => trainSeconds(sim.levels.barracksTraining);
+    const drill = () => trainSeconds(sim.levels.barracksTraining) * sim.bonuses.drill;
     const alive = sim.soldiers.filter((s) => s.home === b.id).length;
     if (alive >= cap) {
       this.training.set(b.id, drill());
@@ -63,9 +63,9 @@ export class Barracks {
       home: b.id,
       x: at.x,
       y: at.y,
-      hp: stats.hp * scale,
-      maxHp: stats.hp * scale,
-      damage: stats.damage * scale,
+      hp: stats.hp * scale * sim.bonuses.troopHp,
+      maxHp: stats.hp * scale * sim.bonuses.troopHp,
+      damage: stats.damage * scale * sim.bonuses.troopDamage,
       cd: 0,
       target: -1,
       path: [],

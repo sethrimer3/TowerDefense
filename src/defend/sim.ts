@@ -24,6 +24,8 @@ import {
   watchRadius,
   waveBudget,
   waveHpScale,
+  NO_BONUSES,
+  type Bonuses,
   type EnemyKind,
   type UpgradeId,
 } from "./catalog.ts";
@@ -108,6 +110,11 @@ const BREAK_SECONDS = 3;
 export class DefendSim {
   readonly map: CityMap;
   readonly levels: Levels;
+  /** Training and skill-tree multipliers (all 1 without them). */
+  readonly bonuses: Readonly<Bonuses>;
+  /** Enemies slain this run, by kind: what the run pays out. Not part of
+   * the replayed state. */
+  readonly slain: Record<EnemyKind, number> = { roach: 0, orc: 0, ogre: 0, bat: 0, warlord: 0 };
   /** 1 while a cell is part of a standing (built) building. */
   readonly solid: Uint8Array;
   readonly hp: Float32Array;
@@ -153,9 +160,10 @@ export class DefendSim {
   private grid: Enemy[][] = Array.from({ length: CELL_COUNT }, () => []);
   private gridUsed: number[] = [];
 
-  constructor(map: CityMap, levels: Levels, seed = 1) {
+  constructor(map: CityMap, levels: Levels, seed = 1, bonuses: Readonly<Bonuses> = NO_BONUSES) {
     this.map = map;
     this.levels = levels;
+    this.bonuses = bonuses;
     this.rand = rng(seed);
     const n = map.buildings.length;
     this.solid = new Uint8Array(CELL_COUNT);
@@ -164,7 +172,7 @@ export class DefendSim {
     this.built = new Int32Array(n);
     this.flash = new Float32Array(n);
     for (const b of map.buildings) {
-      this.hp[b.id] = this.maxHp[b.id] = maxHpOf(b, levels);
+      this.hp[b.id] = this.maxHp[b.id] = maxHpOf(b, levels, bonuses);
       this.built[b.id] = b.cells.length;
       for (const c of b.cells) this.solid[c] = 1;
     }
@@ -235,6 +243,7 @@ export class DefendSim {
 
   /** The dead, and civilians who made it indoors, leave the board. */
   private sweepAway() {
+    for (const e of this.enemies) if (e.hp <= 0) this.slain[e.kind]++;
     this.enemies = this.enemies.filter((e) => e.hp > 0);
     this.soldiers = this.soldiers.filter((s) => s.hp > 0);
     this.civilians = this.civilians.filter((c) => c.hp > 0 && !atHome(this, c));
@@ -491,14 +500,14 @@ export class DefendSim {
 
   // ── Consumables ───────────────────────────────────────────────────────
   dropBomb(x: number, y: number) {
-    this.explode(x, y, { r: BOMB_RADIUS, damage: BOMB_DAMAGE, friendlyFire: !this.levels.bombSafe });
+    this.explode(x, y, { r: BOMB_RADIUS, damage: BOMB_DAMAGE * this.bonuses.bombDamage, friendlyFire: !this.levels.bombSafe });
   }
 }
 
-function maxHpOf(b: Building, levels: Levels) {
-  if (b.kind === "wall") return wallHp(levels.wallStrength);
+function maxHpOf(b: Building, levels: Levels, bonuses: Readonly<Bonuses>) {
+  if (b.kind === "wall") return wallHp(levels.wallStrength) * bonuses.wallHp;
   if (b.kind === "house") return HOUSE_HP_PER_CELL * b.cells.length;
-  if (b.kind === "keep") return keepHp(levels.keepStrength);
+  if (b.kind === "keep") return keepHp(levels.keepStrength) * bonuses.keepHp;
   return STRUCTURES[b.kind].maxHp;
 }
 

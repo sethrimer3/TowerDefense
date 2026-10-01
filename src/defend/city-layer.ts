@@ -175,6 +175,40 @@ function paintGrass({ c, px }: Paint, cx: number, cy: number) {
   }
 }
 
+/** A pond's passes, as disc scales: the black outline, the muddy bank, the
+ * reed-dark shallows and the open water. */
+export const POND = { outline: 0.86, bank: 0.8, shallows: 0.7, open: 0.6 };
+/** The open water's colour. */
+export const POND_WATER = "#2b5d71";
+
+/** Water cell (cx, cy)'s disc at `scale` (see POND), in cells. */
+export function pondDisc(cx: number, cy: number, scale: number) {
+  return {
+    x: cx + 0.5 + (hash01(cx, cy, 66) - 0.5) * 0.3,
+    y: cy + 0.5 + (hash01(cx, cy, 67) - 0.5) * 0.3,
+    r: scale * (0.9 + hash01(cx, cy, 68) * 0.25),
+  };
+}
+
+/** The union of the water cells' discs at `scale`, as one path, at `px` a cell. */
+export function pondPath(c: CanvasRenderingContext2D, px: number, cells: readonly (readonly [number, number])[], scale: number) {
+  c.beginPath();
+  for (const [cx, cy] of cells) {
+    const d = pondDisc(cx, cy, scale);
+    c.moveTo((d.x + d.r) * px, d.y * px);
+    c.arc(d.x * px, d.y * px, d.r * px, 0, Math.PI * 2);
+  }
+}
+
+/** Whether park cell (cx, cy) has a tree. */
+export const hasTree = (map: CityMap, cx: number, cy: number) =>
+  cellInBounds(cx, cy) && map.type[cellIndex(cx, cy)] === CellType.PARK && hash01(cx, cy, 21) <= 0.42;
+
+/** The canopy of the tree on cell (cx, cy): centre and radius, in cells. */
+export function treeCanopy(cx: number, cy: number) {
+  return { x: cx + 0.3 + hash01(cx, cy, 24) * 0.4, y: cy + 0.3 + hash01(cx, cy, 25) * 0.4, r: 0.3 + hash01(cx, cy, 23) * 0.18 };
+}
+
 /** Ponds, with irregular natural shores: each water cell contributes a
  * slightly jittered disc, and the union of discs forms the pond. Drawn in
  * passes — outline, muddy bank, reed-dark shallows, open water —
@@ -187,20 +221,13 @@ function paintWater(p: Paint) {
   if (!cells.length) return;
   const pass = (color: string, scale: number) => {
     c.fillStyle = color;
-    c.beginPath();
-    for (const [cx, cy] of cells) {
-      const x = (cx + 0.5 + (hash01(cx, cy, 66) - 0.5) * 0.3) * px,
-        y = (cy + 0.5 + (hash01(cx, cy, 67) - 0.5) * 0.3) * px;
-      const r = px * scale * (0.9 + hash01(cx, cy, 68) * 0.25);
-      c.moveTo(x + r, y);
-      c.arc(x, y, r, 0, Math.PI * 2);
-    }
+    pondPath(c, px, cells, scale);
     c.fill();
   };
-  pass(OUTLINE, 0.86);
-  pass("#3a3524", 0.8);
-  pass("#2a4f45", 0.7);
-  pass("#2b5d71", 0.6);
+  pass(OUTLINE, POND.outline);
+  pass("#3a3524", POND.bank);
+  pass("#2a4f45", POND.shallows);
+  pass(POND_WATER, POND.open);
   for (const [cx, cy] of cells) paintPondSurface(p, cx, cy);
 }
 
@@ -231,13 +258,14 @@ function paintPondSurface({ c, px }: Paint, cx: number, cy: number) {
 function paintTrees(p: Paint) {
   for (let cy = 0; cy < CELLS_H; cy++)
     for (let cx = 0; cx < CELLS_W; cx++)
-      if (p.map.type[cellIndex(cx, cy)] === CellType.PARK && hash01(cx, cy, 21) <= 0.42) paintTree(p, cx, cy);
+      if (hasTree(p.map, cx, cy)) paintTree(p, cx, cy);
 }
 
 function paintTree({ c, px }: Paint, cx: number, cy: number) {
-  const r = px * (0.3 + hash01(cx, cy, 23) * 0.18);
-  const x = (cx + 0.3 + hash01(cx, cy, 24) * 0.4) * px,
-    y = (cy + 0.3 + hash01(cx, cy, 25) * 0.4) * px;
+  const canopy = treeCanopy(cx, cy);
+  const r = px * canopy.r;
+  const x = canopy.x * px,
+    y = canopy.y * px;
   const disc = (fill: string, dx: number, dy: number, radius: number) => {
     c.fillStyle = fill;
     c.beginPath();

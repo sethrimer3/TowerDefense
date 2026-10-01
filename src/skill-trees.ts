@@ -1,70 +1,71 @@
-import type { UpgradeId, Currency } from "./config.ts";
-export type TreeId = "wayfinding" | "inspiration" | "courage" | "legacy" | "wisdom" | "renown";
-export type SkillNode = { id: UpgradeId; icon: string; x: number; y: number; requires: UpgradeId[] };
-/** A skill tree. Node positions are percentages of the tree's view: x of
- * its width, y of its height, so a tree taller than one screen (`height`,
- * in the same units, 100 by default) scrolls. In a tree of `unlocks`, each
- * skill is bought once (more of it comes from other panels, such as the
- * Archives), so its page shows no ranks. */
-export type SkillTree = { id: TreeId; name: string; currency: Currency; gate?: UpgradeId; description: string; height?: number; unlocks?: boolean; nodes: SkillNode[] };
+/** The Upgrades page's skill trees, bought with Valor (one for each wave a
+ * defense holds past the best before it). Each skill has ranks; every rank
+ * applies its effect once more, to every defense from the next one on.
+ * Node positions are percentages of the tree's view: x of its width, y of
+ * its height, so a tree taller than one screen (`height`, in the same
+ * units, 100 by default) scrolls. */
+import type { BonusTarget } from "./progression.ts";
+
+export type SkillId =
+  | "drillSergeant" | "veterans" | "bladework" | "fletchers" | "gunpowder" | "ballistics" | "warBanner"
+  | "masonry" | "bastions" | "guilds" | "plunder" | "ironworks" | "scholars" | "tactician";
+export type TreeId = "command" | "stewardship";
+
+/** What one rank of a skill does: `per` added to a target's percent (a
+ * negative `per` on a time makes it shorter), or, for `slots` and
+ * `ironPerWave`, a whole number added. */
+export type SkillEffect = { target: BonusTarget | "slots" | "ironPerWave"; per: number };
+export type Skill = { id: SkillId; name: string; icon: string; max: number; base: number; effect: SkillEffect; text: string };
+export type SkillNode = { id: SkillId; x: number; y: number; requires: SkillId[] };
+export type SkillTree = { id: TreeId; name: string; description: string; height?: number; nodes: SkillNode[] };
+
+export const SKILLS: Record<SkillId, Skill> = {
+  drillSergeant: { id: "drillSergeant", name: "Drill sergeant", icon: "⚑", max: 3, base: 1, effect: { target: "drill", per: 10 }, text: "Barracks train recruits 10% faster a rank" },
+  veterans: { id: "veterans", name: "Veterans", icon: "♥", max: 3, base: 2, effect: { target: "troopHp", per: 10 }, text: "+10% swordsman and archer HP a rank" },
+  bladework: { id: "bladework", name: "Bladework", icon: "⚔", max: 3, base: 2, effect: { target: "troopDamage", per: 10 }, text: "+10% swordsman and archer damage a rank" },
+  fletchers: { id: "fletchers", name: "Fletchers", icon: "➶", max: 3, base: 3, effect: { target: "towerDamage", per: 10 }, text: "+10% archer and cannon tower damage a rank" },
+  ballistics: { id: "ballistics", name: "Ballistics", icon: "◎", max: 3, base: 3, effect: { target: "towerReload", per: 8 }, text: "Towers reload 8% faster a rank" },
+  gunpowder: { id: "gunpowder", name: "Gunpowder", icon: "✹", max: 3, base: 2, effect: { target: "bombDamage", per: 20 }, text: "+20% bomb damage a rank" },
+  warBanner: { id: "warBanner", name: "War banner", icon: "♛", max: 3, base: 5, effect: { target: "troopDamage", per: 15 }, text: "+15% swordsman and archer damage a rank" },
+  masonry: { id: "masonry", name: "Masonry", icon: "▦", max: 3, base: 1, effect: { target: "wallHp", per: 10 }, text: "+10% wall HP a rank" },
+  bastions: { id: "bastions", name: "Bastions", icon: "♜", max: 3, base: 2, effect: { target: "keepHp", per: 10 }, text: "+10% keep HP a rank" },
+  guilds: { id: "guilds", name: "Builders' guilds", icon: "⚒", max: 3, base: 2, effect: { target: "rebuild", per: 10 }, text: "Civilians rebuild 10% faster a rank" },
+  plunder: { id: "plunder", name: "Plunder", icon: "¤", max: 3, base: 2, effect: { target: "gold", per: 10 }, text: "+10% Gold from every defense a rank" },
+  ironworks: { id: "ironworks", name: "Ironworks", icon: "▬", max: 2, base: 3, effect: { target: "ironPerWave", per: 1 }, text: "+1 iron bar for every wave held a rank" },
+  scholars: { id: "scholars", name: "War college", icon: "✦", max: 3, base: 2, effect: { target: "xp", per: 15 }, text: "+15% experience from every kill a rank" },
+  tactician: { id: "tactician", name: "Tactician", icon: "⌛", max: 1, base: 6, effect: { target: "slots", per: 1 }, text: "One more Training slot" },
+};
+
 export const TREES: SkillTree[] = [
-  { id: "inspiration", name: "Inspiration", currency: "inspiration", description: "Earn Inspiration by beating your best Tower climb.", height: 190, unlocks: true, nodes: [
-    // The hand's skills, one after another down to Focus.
-    { id: "handOrdering", icon: "▤", x: 50, y: 12, requires: [] },
-    { id: "combatStance", icon: "⚔", x: 50, y: 30, requires: ["handOrdering"] },
-    { id: "largerHand", icon: "▦", x: 50, y: 48, requires: ["combatStance"] },
-    { id: "cardHeal", icon: "♥", x: 50, y: 66, requires: ["largerHand"] },
-    { id: "focus", icon: "ϟ", x: 50, y: 84, requires: ["cardHeal"] },
-    { id: "cardGear", icon: "⛨", x: 14, y: 106, requires: ["focus"] },
-    { id: "inspirationUndos", icon: "↺", x: 38, y: 106, requires: ["focus"] },
-    { id: "archives", icon: "▥", x: 62, y: 106, requires: ["focus"] },
-    { id: "delve", icon: "▼", x: 86, y: 106, requires: ["focus"] },
-    // Research needs the Archives, so the skills that open it come after them.
-    { id: "greaterHeal", icon: "✚", x: 62, y: 124, requires: ["archives"] },
-    { id: "spareChange", icon: "¤", x: 22, y: 124, requires: ["archives"] },
-    { id: "wealthy", icon: "¤", x: 10, y: 142, requires: ["spareChange"] },
-    { id: "loot", icon: "☠", x: 30, y: 142, requires: ["spareChange"] },
-    { id: "wishingWell", icon: "◎", x: 20, y: 160, requires: ["spareChange"] },
-    { id: "recovery", icon: "✦", x: 50, y: 142, requires: ["greaterHeal"] },
-    { id: "findPotion", icon: "⚗", x: 50, y: 160, requires: ["recovery"] },
-    { id: "shroud", icon: "◈", x: 82, y: 142, requires: ["greaterHeal"] },
-    { id: "revive", icon: "☼", x: 82, y: 160, requires: ["shroud"] },
+  { id: "command", name: "Command", description: "Earn Valor by holding past your best wave. Command sharpens the garrison and its towers.", nodes: [
+    { id: "drillSergeant", x: 50, y: 10, requires: [] },
+    { id: "veterans", x: 22, y: 32, requires: ["drillSergeant"] },
+    { id: "bladework", x: 78, y: 32, requires: ["drillSergeant"] },
+    { id: "fletchers", x: 78, y: 56, requires: ["bladework"] },
+    { id: "gunpowder", x: 22, y: 56, requires: ["veterans"] },
+    { id: "ballistics", x: 50, y: 70, requires: ["fletchers", "gunpowder"] },
+    { id: "warBanner", x: 50, y: 90, requires: ["ballistics"] },
   ] },
-  { id: "courage", name: "Courage", currency: "courage", gate: "delve", description: "Earn Courage by beating your best Delve depth.", nodes: [
-    { id: "auto", icon: "✦", x: 50, y: 10, requires: ["delve"] },
-    { id: "autoPersist", icon: "⚙", x: 82, y: 10, requires: ["auto"] },
-    { id: "hp", icon: "♥", x: 18, y: 34, requires: ["auto"] },
-    { id: "attack", icon: "⚔", x: 50, y: 34, requires: ["auto"] },
-    { id: "defense", icon: "⛨", x: 82, y: 34, requires: ["auto"] },
-    { id: "undos", icon: "↺", x: 23, y: 61, requires: ["hp"] },
-    { id: "legacy", icon: "♜", x: 50, y: 87, requires: ["attack", "undos"] },
-  ] },
-  { id: "wayfinding", name: "Wayfinding", currency: "courage", gate: "auto", description: "Teach Delve Automove to explore, compare routes and preserve resources.", nodes: [
-    { id: "aiMemory", icon: "◇", x: 50, y: 20, requires: ["auto"] },
-    { id: "aiEvaluation", icon: "⚖", x: 25, y: 52, requires: ["aiMemory"] },
-    { id: "aiLookahead", icon: "✧", x: 75, y: 78, requires: ["aiMemory"] },
-  ] },
-  { id: "legacy", name: "Legacy", currency: "courage", gate: "legacy", description: "Spend Courage on heirlooms carried into every new run.", nodes: [
-    { id: "quality", icon: "♜", x: 50, y: 15, requires: ["legacy"] },
-    { id: "yellow", icon: "⚿", x: 23, y: 40, requires: ["quality"] },
-    { id: "blue", icon: "⚿", x: 77, y: 65, requires: ["yellow"] },
-    { id: "red", icon: "⚿", x: 50, y: 87, requires: ["blue"] },
-  ] },
-  { id: "wisdom", name: "Wisdom", currency: "inspiration", gate: "legacy", description: "A path awaiting its final purpose.", nodes: [
-    { id: "wisdomFocus", icon: "◈", x: 50, y: 20, requires: ["legacy"] },
-    { id: "wisdomMemory", icon: "◇", x: 28, y: 52, requires: ["wisdomFocus"] },
-    { id: "wisdomSight", icon: "✧", x: 72, y: 78, requires: ["wisdomMemory"] },
-  ] },
-  { id: "renown", name: "Renown", currency: "courage", gate: "legacy", description: "A path awaiting its final purpose.", nodes: [
-    { id: "renownBanner", icon: "⚑", x: 50, y: 18, requires: ["legacy"] },
-    { id: "renownOath", icon: "◆", x: 72, y: 50, requires: ["renownBanner"] },
-    { id: "renownCrown", icon: "♛", x: 38, y: 80, requires: ["renownOath"] },
+  { id: "stewardship", name: "Stewardship", description: "Earn Valor by holding past your best wave. Stewardship strengthens the city and fills its coffers.", nodes: [
+    { id: "masonry", x: 50, y: 10, requires: [] },
+    { id: "bastions", x: 22, y: 32, requires: ["masonry"] },
+    { id: "guilds", x: 78, y: 32, requires: ["masonry"] },
+    { id: "plunder", x: 78, y: 56, requires: ["guilds"] },
+    { id: "scholars", x: 22, y: 56, requires: ["bastions"] },
+    { id: "ironworks", x: 78, y: 80, requires: ["plunder"] },
+    { id: "tactician", x: 30, y: 84, requires: ["scholars", "plunder"] },
   ] },
 ];
-export function skillAvailable(id: UpgradeId, levels: Record<UpgradeId, number>) {
-  const tree = TREES.find(t => t.nodes.some(n => n.id === id));
-  const node = tree?.nodes.find(n => n.id === id);
-  return !!node && (!tree?.gate || levels[tree.gate] > 0) && node.requires.every(key => levels[key] > 0);
+
+export const SKILL_IDS = Object.keys(SKILLS) as SkillId[];
+
+/** Valor the next rank of `id` costs, with `level` ranks owned. */
+export const skillCost = (id: SkillId, level: number) => SKILLS[id].base * (level + 1);
+
+/** Whether every skill `id` requires has a rank. */
+export function skillAvailable(id: SkillId, levels: Record<SkillId, number>) {
+  const node = TREES.flatMap((t) => t.nodes).find((n) => n.id === id);
+  return !!node && node.requires.every((key) => levels[key] > 0);
 }
 /** How tall `tree` is, in view heights × 100. */
 export const treeHeight = (tree: SkillTree) => tree.height ?? 100;

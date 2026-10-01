@@ -1,5 +1,6 @@
 /** Data tables for DEFEND: what the player can place, what it costs in
- * main-game currency, the universal upgrades, and the enemy roster. */
+ * Gold and metal bars, the universal upgrades, the bonuses Training and the
+ * skill trees add, and the enemy roster. */
 
 export type StructureKind = "keep" | "barracks" | "archerBarracks" | "archerTower" | "cannonTower" | "watchTower";
 /** Everything that appears in the build palette (the keep is placed from the
@@ -86,7 +87,7 @@ export const STARTING_OWNED: Record<PaletteItem, number> = {
   watchTower: 0,
 };
 
-/** A price in main-game currency. */
+/** A price in Gold and metal bars (all earned in battle). */
 export type Price = { gold: number; ironBar?: number; steelBar?: number };
 
 /** Price of buying one more of a palette item, given how many are owned. */
@@ -242,6 +243,33 @@ export const ENEMIES: Record<EnemyKind, EnemyDef> = {
   warlord: { kind: "warlord", name: "Warlord", hp: 700, speed: 0.85, damage: 40, cooldown: 1.6, size: 1.05, color: "#b3372f", distraction: 0.1, flying: false, boss: true, firstWave: 10, weight: 0, cost: 0 },
   bat: { kind: "bat", name: "Bat", hp: 14, speed: 3.2, damage: 3, cooldown: 0.7, size: 0.3, color: "#8a5bb8", distraction: 0, flying: true, firstWave: 7, weight: 2, cost: 2 },
 };
+
+/** Multipliers the player's Training and skill trees lay over a run, on top
+ * of the Armory's levels. Each is 1 when nothing is owned, so a run without
+ * them plays exactly as before. */
+export type Bonuses = {
+  /** Swordsmen's and archers' HP. */
+  troopHp: number;
+  /** Swordsmen's and archers' damage. */
+  troopDamage: number;
+  /** Seconds a barracks takes to train a recruit. */
+  drill: number;
+  /** Archer and cannon tower damage. */
+  towerDamage: number;
+  /** Seconds between tower shots. */
+  towerReload: number;
+  /** HP of every wall stone. */
+  wallHp: number;
+  /** The keep's HP. */
+  keepHp: number;
+  /** Seconds civilians take to rebuild a section. */
+  rebuild: number;
+  /** Bomb damage. */
+  bombDamage: number;
+};
+export const NO_BONUSES: Readonly<Bonuses> = Object.freeze({
+  troopHp: 1, troopDamage: 1, drill: 1, towerDamage: 1, towerReload: 1, wallHp: 1, keepHp: 1, rebuild: 1, bombDamage: 1,
+});
 
 /** Enemies get tougher every wave. */
 export const waveHpScale = (wave: number) => Math.pow(1.11, wave - 1);

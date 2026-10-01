@@ -1,7 +1,8 @@
-import type { Torch } from "./entities.ts";
-import { TORCH_LIGHT } from "./torches.ts";
+import { TORCH_LIGHT, type Torch } from "./visibility.ts";
 
-/** Centralized dungeon lighting parameters for fast tuning and consistency. */
+/** Torch-light parameters, kept from the old dungeon renderer: Defend reads
+ * the candle colours, falloff, flicker and sway; the rest (darkness, sprite
+ * light, shadows, relief) is saved for future use. */
 export const LIGHTING_CONFIG = {
   /** Global ambient darkness overlay color and opacity.
    * A subtle dark-purple tone that keeps the dungeon fully readable without torches. */

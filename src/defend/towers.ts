@@ -46,8 +46,8 @@ export class Towers {
     const c = center(b.rect);
     const target = nearest(sim.enemiesNear(c.x, c.y, archerRange(sim.levels.archerRange)), c);
     if (!target) return this.cooldown.set(b.id, 0);
-    this.cooldown.set(b.id, archerCooldown(sim.levels.archerRate));
-    sim.arrows.push({ x: c.x, y: c.y - 0.6, target: target.id, damage: archerDamage(sim.levels.archerDamage), tx: target.x, ty: target.y, life: 2 });
+    this.cooldown.set(b.id, archerCooldown(sim.levels.archerRate) * sim.bonuses.towerReload);
+    sim.arrows.push({ x: c.x, y: c.y - 0.6, target: target.id, damage: archerDamage(sim.levels.archerDamage) * sim.bonuses.towerDamage, tx: target.x, ty: target.y, life: 2 });
   }
 
   private stepCannon(sim: DefendSim, b: Building, dt: number) {
@@ -58,7 +58,7 @@ export class Towers {
     );
     const target = nearest(ground, c);
     if (!target) return this.cooldown.set(b.id, 0);
-    this.cooldown.set(b.id, cannonCooldown(sim.levels.cannonRate));
+    this.cooldown.set(b.id, cannonCooldown(sim.levels.cannonRate) * sim.bonuses.towerReload);
     const dist = Math.sqrt((target.x - c.x) ** 2 + (target.y - c.y) ** 2);
     sim.shells.push({
       x0: c.x,
@@ -67,7 +67,7 @@ export class Towers {
       y1: target.y,
       t: 0,
       dur: 0.45 + dist * 0.07,
-      damage: cannonDamage(sim.levels.cannonDamage),
+      damage: cannonDamage(sim.levels.cannonDamage) * sim.bonuses.towerDamage,
       r: cannonSplash(sim.levels.cannonDamage),
     });
   }

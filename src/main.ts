@@ -1,130 +1,91 @@
 import "./style.css";
-import { load, persist } from "./save.ts";
-import { Game } from "./state.ts";
-import { Renderer } from "./rendering.ts";
-import { bindInput } from "./input.ts";
+import { defaults, load, persist, type Save } from "./save.ts";
 import { DefendPage } from "./defend/ui.ts";
-import { drawGameSprite } from "./game-sprites.ts";
-import type { ConsumableId } from "./crafting.ts";
-import { FrameLoop } from "./frame-loop.ts";
-import { installDebugHooks } from "./debug-hooks.ts";
-import { isBoard, type AppContext, type Tab } from "./ui/app.ts";
-import { el } from "./ui/dom.ts";
+import { bonuses, levelForXp, payKills, payWave, settleTraining, whole, xpForLevel } from "./progression.ts";
+import type { AppContext } from "./ui/app.ts";
+import { el, type Tab } from "./ui/dom.ts";
 import { buildShell } from "./ui/shell.ts";
-import { BoardOverlay } from "./ui/board-overlay.ts";
-import { boardHeadingStale, flashRed, renderAdButton, renderBoardHeading, renderHud, renderVitals, upgradesWaiting } from "./ui/hud.ts";
-import { confirmAction, RunEndDialog, showLog, showSectionPicker } from "./ui/dialogs.ts";
 import { SkillTreePage } from "./ui/skill-tree-page.ts";
-import { ResearchToasts } from "./ui/research-toast.ts";
-import { GearPage } from "./ui/gear-page.ts";
-import { DeckPage } from "./ui/deck-page.ts";
-import { RunTrainingBar } from "./ui/run-training-bar.ts";
 import { renderSettingsPage } from "./ui/settings-page.ts";
+import type { Weather } from "./defend/weather.ts";
 
-// Wires the pages together: builds the shell, creates the game and renderer,
-// and routes navigation, HUD refreshes and input between the ui/ modules.
+// Wires the pages together: builds the shell, loads the save, and routes
+// navigation, the currency bar and the frame loop between the pages.
 
 buildShell(document.querySelector<HTMLDivElement>("#app")!);
-const game = new Game(load());
-// The frame loop settles fights as they finish playing out.
-game.playsFights = true;
-const renderer = new Renderer(document.querySelector("#world")!, game);
-{
-  const portraitCtx = (document.querySelector("#portrait-sprite") as HTMLCanvasElement).getContext("2d")!;
-  if (game.save.settings.spritesOff || !drawGameSprite(portraitCtx, "player")) {
-    Renderer.drawHero(portraitCtx);
-  }
-}
-let tab: Tab = "tower";
+let save: Save = load();
+let tab: Tab = "defend";
+const clock = () => Date.now();
 const modal = el("modal") as HTMLDialogElement;
 const ctx: AppContext = {
-  game,
+  save: () => save,
   modal,
-  save,
   update,
   renderPage,
   navigate,
-  confirm: (prompt, action) => confirmAction(ctx, prompt, action),
-};
-const runEnd = new RunEndDialog(ctx);
-const overlay = new BoardOverlay(game, renderer);
-const skillTree = new SkillTreePage(ctx);
-const gear = new GearPage(ctx);
-const deck = new DeckPage(ctx);
-const runTraining = new RunTrainingBar(game, () => update());
-const researchToasts = new ResearchToasts(() => game.save.settings.reduceMotion);
-const defendPage = new DefendPage(el("defend"), {
-  save: () => game.save.defend,
-  wallet: () => ({ gold: game.save.gold, ironBar: game.save.materials.ironBar, steelBar: game.save.materials.steelBar, free: game.free }),
-  setWallet: (w) => {
-    game.save.gold = w.gold;
-    game.save.materials.ironBar = w.ironBar;
-    game.save.materials.steelBar = w.steelBar;
+  clock,
+  eraseAll: () => {
+    save = defaults();
+    store();
   },
-  persist: save,
-  reduceMotion: () => game.save.settings.reduceMotion,
-  devMode: () => game.save.settings.devMode,
+};
+const skillTree = new SkillTreePage(ctx);
+const defendPage = new DefendPage(el("defend"), {
+  save: () => save.defend,
+  wallet: () => ({ gold: save.gold, ironBar: save.ironBar, steelBar: save.steelBar, free: save.settings.freePurchases || save.settings.devMode }),
+  setWallet: (w) => {
+    if (save.settings.devMode) return;
+    save.gold = w.gold;
+    save.ironBar = w.ironBar;
+    save.steelBar = w.steelBar;
+  },
+  bonuses: () => bonuses(save),
+  earnKills: (slain) => {
+    const { levelsGained } = payKills(save, slain);
+    refreshCurrencies();
+    return levelsGained;
+  },
+  earnWave: (wave) => {
+    const r = payWave(save, wave);
+    store();
+    refreshCurrencies();
+    return r;
+  },
+  persist: store,
+  reduceMotion: () => save.settings.reduceMotion,
+  effects: () => !save.settings.effectsOff,
+  devMode: () => save.settings.devMode,
 });
 
-function save() {
-  if (!persist(game.save))
-    game.message = "Storage unavailable — progress is only kept for this session.";
+function store() {
+  if (!persist(save)) console.warn("Storage unavailable — progress is only kept for this session.");
 }
-/** Refreshes the HUD from game state, saves, and asks a fallen hero's player what next. */
+/** The currency bar, from the save. */
+function refreshCurrencies() {
+  const dev = save.settings.devMode;
+  const show = (id: string, n: number) => (el(id).textContent = dev ? "∞" : String(whole(n)));
+  show("gold", save.gold);
+  show("iron", save.ironBar);
+  show("steel", save.steelBar);
+  show("valor", save.valor);
+  const level = levelForXp(save.xp), from = xpForLevel(level), to = xpForLevel(level + 1);
+  el("level").textContent = String(level);
+  el("xp-fill").style.width = `${((save.xp - from) / (to - from)) * 100}%`;
+}
+/** Saves and refreshes the currency bar. */
 function update() {
-  if (boardHeadingStale(game)) renderBoardHeading(game, overlay);
-  // Inside a run the tabs give way to an empty row, kept for the hand.
-  document.querySelector("nav")!.classList.toggle("in-run", !game.run.outside);
-  // The Deck tutorial keeps the player on its page until they reorder the hand.
-  document.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach((b) => (b.disabled = deck.teaching && b.dataset.tab !== "deck"));
-  renderHud(game, renderer, overlay);
-  runTraining.render();
-  researchToasts.add(game.researchDone.splice(0));
-  save();
-  runEnd.check();
+  store();
+  refreshCurrencies();
 }
 function renderPage() {
   if (tab === "defend") defendPage.show();
-  if (tab === "deck") deck.render();
-  if (tab === "gear") gear.render();
   if (tab === "upgrades") skillTree.render();
-  if (tab === "settings") renderSettingsPage(ctx, overlay);
+  if (tab === "settings") renderSettingsPage(ctx);
 }
-/** Locked tabs point at the upgrade that unlocks them instead. */
-function unlockTarget(id: string): string {
-  if (id === "delve" && !game.save.upgrades.delve) {
-    skillTree.focus("inspiration", "delve");
-    return "upgrades";
-  }
-  if (id === "deck" && !game.save.upgrades.handOrdering) {
-    skillTree.focus("inspiration", "handOrdering");
-    return "upgrades";
-  }
-  if (id === "defend" && !game.save.upgrades.legacy) {
-    skillTree.focus("courage", "legacy");
-    return "upgrades";
-  }
-  return id;
-}
-function navigate(requested: string) {
-  if (deck.teaching && requested !== "deck") return;
-  const id = unlockTarget(requested) as Tab;
-  // Only the board plays a fight out: leaving it settles one still playing.
-  game.finishEncounter();
+function navigate(id: Tab) {
   if (id !== "defend") defendPage.pause();
   tab = id;
-  // Opening the Upgrades page clears the dot the first Inspiration put on it.
-  if (id === "upgrades" && upgradesWaiting(game)) game.save.tutorials.upgrades = true;
-  deck.shown(id === "deck");
-  renderer.weather.silence();
-  if (isBoard(id)) {
-    game.switchMode(id);
-    renderBoardHeading(game, overlay);
-  } else game.cancelRoute();
-  el("stats").toggleAttribute("hidden", !isBoard(id));
-  el("currencies").toggleAttribute("hidden", id !== "upgrades");
-  const page = isBoard(id) ? "board" : id;
-  document.querySelectorAll(".page").forEach((p) => p.classList.toggle("active", p.id === page));
+  document.querySelectorAll(".page").forEach((p) => p.classList.toggle("active", p.id === id));
   document.querySelectorAll<HTMLElement>("[data-tab]").forEach((b) => {
     b.classList.toggle("selected", b.dataset.tab === id);
     b.setAttribute("aria-current", b.dataset.tab === id ? "page" : "false");
@@ -132,102 +93,27 @@ function navigate(requested: string) {
   renderPage();
   update();
 }
+document.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach((b) => (b.onclick = () => navigate(b.dataset.tab as Tab)));
 
-document.querySelectorAll<HTMLButtonElement>("[data-hud-consumable]").forEach(button => {
-  button.onclick = () => {
-    if (!game.useConsumable(button.dataset.hudConsumable as ConsumableId)) return;
-    save();
-    update();
-  };
-});
-// Focus: pressing a hand card inside a run puts it ahead of the others.
-el("hand").onclick = (e) => {
-  const card = (e.target as HTMLElement).closest<HTMLElement>(".hand-card");
-  if (!card || !game.save.upgrades.focus) return;
-  const result = game.focus(Number(card.dataset.handSlot));
-  if (result === "spent") flashRed(el("focus-stat"));
-  if (result === "noPath") flashRed(card);
-  update();
-};
-el("log").onclick = () => showLog(ctx);
-el("section-pick").onclick = () => showSectionPicker(ctx);
-for (const [id, step] of [["tier-prev", -1], ["tier-next", 1]] as const)
-  el(id).onclick = () => {
-    if (!game.selectTier(game.save[game.mode].tier + step)) return;
-    save();
-    update();
-  };
-el("gem-ad").onclick = () => {
-  if (!game.claimAdGems()) return;
-  save();
-  update();
-};
-el("end-run").onclick = () => runEnd.ask();
-modal.addEventListener("cancel", (e) => {
-  // The defeat dialog waits for an answer.
-  if (game.fallen) e.preventDefault();
-});
-el("auto-settings").onclick = () => navigate("settings");
-el("auto").onclick = () => {
-  // Inside a run the button plays and pauses the hand; in the forest it is
-  // Automove, which leads to its upgrade until bought.
-  if (game.run.outside && !game.save.upgrades.auto) {
-    if (game.save.upgrades.delve) skillTree.focus("courage", "auto");
-    else skillTree.focus("inspiration", "delve");
-    navigate("upgrades");
-    return;
+/** Training completes on the wall clock, whatever page shows. */
+let lastTick = 0;
+function frame(time: number) {
+  if (tab === "defend") defendPage.frame(time);
+  if (tab === "upgrades") skillTree.drawParticles(time);
+  if (time - lastTick >= 1000) {
+    lastTick = time;
+    const done = settleTraining(save, clock()) > 0;
+    if (done) update();
+    if (tab === "upgrades") skillTree.tick(done);
   }
-  game.toggleAuto();
-  update();
-};
-el("undo").onclick = () => {
-  overlay.hide();
-  game.undo();
-  update();
-};
-document
-  .querySelectorAll<HTMLButtonElement>("[data-tab]")
-  .forEach((b) => (b.onclick = () => navigate(b.dataset.tab!)));
-bindInput(
-  game,
-  renderer,
-  (x, y) => overlay.tap(x, y),
-  () => {
-    overlay.refresh();
-    update();
-  },
-  () => isBoard(tab),
-);
-
-/** Research completes on the wall clock, whatever page shows. */
-function archivesTick() {
-  const done = game.settleResearch().length > 0 || game.settleTraining() > 0;
-  if (done) update();
-  // The ad button comes back on the wall clock too.
-  else renderAdButton(game);
-  if (tab === "upgrades") skillTree.archivesTick(done);
+  requestAnimationFrame(frame);
 }
-const loop = new FrameLoop({
-  game,
-  renderer,
-  modal,
-  tab: () => tab,
-  upgradesFrame: (time) => skillTree.drawParticles(time),
-  archivesTick,
-  defendFrame: (time) => defendPage.frame(time),
-  update,
-  vitals: () => renderVitals(game),
-  save,
-});
-document.addEventListener("visibilitychange", () => {
-  loop.resetAutoTimer();
-  save();
-});
-window.addEventListener("pagehide", save);
-installDebugHooks(game, defendPage);
-// Start on the Tower board: stats showing, currencies (an Upgrades-only bar) hidden.
-el("stats").toggleAttribute("hidden", false);
-el("currencies").toggleAttribute("hidden", true);
-renderBoardHeading(game, overlay);
-update();
-loop.start();
+document.addEventListener("visibilitychange", store);
+window.addEventListener("pagehide", store);
+
+// Console helper: fast-forward a running defense, optionally forcing the weather.
+(globalThis as { defendDebug?: unknown }).defendDebug = (seconds = 30, weather?: Weather) => defendPage.fastForward(seconds, weather);
+
+settleTraining(save, clock());
+navigate("defend");
+requestAnimationFrame(frame);
