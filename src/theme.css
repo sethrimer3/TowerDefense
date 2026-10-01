@@ -757,3 +757,233 @@ dialog::backdrop {
     height: 12px;
   }
 }
+
+/* ── Motion: what moves when the keep answers the player ──
+   Everything here is off under Reduce motion (the setting puts
+   .reduce-motion on the root) or the system's reduced-motion preference. */
+@media (prefers-reduced-motion: no-preference) {
+  /* A pressed board sinks into its frame and springs back. */
+  :root:not(.reduce-motion) button:active:not(:disabled) {
+    transform: translateY(1px) scale(0.97);
+    transition: transform 0.04s;
+  }
+  :root:not(.reduce-motion) button {
+    transition:
+      border-color 0.15s,
+      box-shadow 0.15s,
+      color 0.15s,
+      transform 0.22s cubic-bezier(0.3, 1.8, 0.5, 1);
+  }
+
+  /* A page comes up like a lamp being lit. */
+  :root:not(.reduce-motion) .page.active {
+    animation: page-lit 0.28s ease-out;
+  }
+
+  /* Orders and proclamations unroll from the top. */
+  :root:not(.reduce-motion) dialog[open] {
+    animation: unroll 0.32s cubic-bezier(0.2, 0.9, 0.3, 1.15);
+  }
+  :root:not(.reduce-motion) .defend-banner:not([hidden]) {
+    animation: unroll 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.15) 0.35s backwards;
+  }
+  :root:not(.reduce-motion) .defend-settings:not([hidden]) {
+    animation: unroll 0.2s ease-out;
+  }
+
+  /* A holding that rises on the signboard glints in brass. */
+  :root:not(.reduce-motion) .td-currencies .currency.gain b {
+    display: inline-block;
+    animation: coin-pop 0.55s cubic-bezier(0.2, 1.6, 0.4, 1);
+  }
+  :root:not(.reduce-motion) .td-currencies .currency.gain {
+    animation: holding-glint 0.9s ease-out;
+  }
+  :root:not(.reduce-motion) .td-currencies .level-currency.gain {
+    animation: level-glow 1.4s ease-out;
+  }
+
+  /* The herald's line: a win rises in gold, a boss wave shudders in red. */
+  :root:not(.reduce-motion) .defend-message.herald {
+    animation: herald 1.1s cubic-bezier(0.2, 1.4, 0.4, 1);
+  }
+  :root:not(.reduce-motion) .defend-message.dread {
+    animation: dread 1.2s ease-out;
+  }
+
+  /* The keep falls: the whole board shudders. */
+  :root:not(.reduce-motion) .defend-board.quake {
+    animation: quake 0.6s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+  }
+
+  /* A purchase stamps its card with a brass flash. */
+  :root:not(.reduce-motion) .card.bought {
+    animation: stamped 0.7s ease-out;
+  }
+
+  /* The tab you chose keeps a slow ember breathing under it. */
+  :root:not(.reduce-motion) nav button.selected {
+    animation: ember-breathe 3.2s ease-in-out infinite;
+  }
+}
+
+@keyframes page-lit {
+  from {
+    opacity: 0;
+    filter: brightness(0.4) sepia(0.6);
+  }
+}
+@keyframes unroll {
+  from {
+    clip-path: inset(-40px -40px 100% -40px);
+    opacity: 0.4;
+    transform: translateY(-6px);
+  }
+  to {
+    clip-path: inset(-40px);
+  }
+}
+@keyframes coin-pop {
+  30% {
+    transform: scale(1.35) translateY(-2px);
+    color: #fff4cf;
+    text-shadow: 0 0 10px #ffd27a, 0 1px 0 #000;
+  }
+}
+@keyframes holding-glint {
+  from {
+    background: radial-gradient(ellipse at 50% 50%, #ffcf6a55, transparent 70%);
+  }
+  to {
+    background: radial-gradient(ellipse at 50% 50%, #ffcf6a00, transparent 70%);
+  }
+}
+@keyframes level-glow {
+  from {
+    background: radial-gradient(ellipse at 50% 50%, #c08aff70, transparent 70%);
+  }
+  to {
+    background: radial-gradient(ellipse at 50% 50%, #c08aff00, transparent 70%);
+  }
+}
+@keyframes herald {
+  from {
+    transform: translateY(10px) scale(0.9);
+    opacity: 0;
+  }
+  35% {
+    transform: translateY(-3px) scale(1.08);
+    color: #fff1c4;
+    text-shadow: 0 1px 2px #000, 0 0 12px #ffb84a, 0 0 22px #ff9a3c;
+  }
+}
+@keyframes dread {
+  from {
+    opacity: 0;
+    letter-spacing: 3px;
+  }
+  15%,
+  45% {
+    color: #ffb0a0;
+    text-shadow: 0 1px 2px #000, 0 0 12px #ff3a2a;
+    transform: translateX(-2px);
+  }
+  30%,
+  60% {
+    transform: translateX(2px);
+  }
+}
+@keyframes quake {
+  10%,
+  90% {
+    transform: translate(-1px, 0);
+  }
+  20%,
+  80% {
+    transform: translate(3px, 1px);
+  }
+  30%,
+  50%,
+  70% {
+    transform: translate(-4px, -1px);
+  }
+  40%,
+  60% {
+    transform: translate(4px, 1px);
+  }
+}
+@keyframes stamped {
+  from {
+    box-shadow: inset 0 0 0 2px #f0cf86, inset 0 0 30px #ffb84a80, 0 0 18px #ff9a3c80;
+  }
+}
+@keyframes ember-breathe {
+  50% {
+    box-shadow:
+      inset 0 2px 0 #d9a952,
+      inset 0 0 0 1px #d9a95240,
+      inset 0 -12px 22px #ff9a3c38,
+      0 2px 0 #000,
+      0 0 20px #ff9a3c50;
+  }
+}
+
+/* Sparks: struck embers, gold dust and arcane glints, flying from a point. */
+.sparks {
+  position: fixed;
+  z-index: 100;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.sparks i {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--size);
+  height: var(--size);
+  margin: calc(var(--size) / -2);
+  border-radius: 50%;
+  font-style: normal;
+  animation: spark var(--life) cubic-bezier(0.15, 0.7, 0.35, 1) var(--delay) both;
+}
+.sparks.embers i {
+  background: #ffb35a;
+  box-shadow: 0 0 4px #ff7a1a, 0 0 8px #ff7a1a80;
+}
+.sparks.gold i {
+  background: #ffe39a;
+  box-shadow: 0 0 5px #ffbf4a, 0 0 10px #ff9a3c90;
+}
+.sparks.arcane i {
+  background: #e6c8ff;
+  box-shadow: 0 0 5px #b07aff, 0 0 10px #8a4aff90;
+}
+.sparks i.glint {
+  width: auto;
+  height: auto;
+  margin: -0.6em -0.4em;
+  background: none;
+  box-shadow: none;
+  font-size: calc(var(--size) * 3.4);
+  line-height: 1;
+  color: #fff0c0;
+  text-shadow: 0 0 6px #ffb84a;
+}
+.sparks.arcane i.glint {
+  color: #f2e2ff;
+  text-shadow: 0 0 6px #b07aff;
+}
+@keyframes spark {
+  from {
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
+  70% {
+    opacity: 0.9;
+  }
+  to {
+    transform: translate(var(--dx), var(--dy)) scale(0.2);
+    opacity: 0;
+  }
+}

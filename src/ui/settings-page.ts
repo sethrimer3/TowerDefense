@@ -3,7 +3,7 @@ import type { AppContext } from "./app.ts";
 import { el } from "./dom.ts";
 
 /** The settings on the page, in order; each control comes from its row in SETTINGS. */
-const PAGE = ["reduceMotion", "effectsOff", "devMode", "freePurchases"] as const satisfies readonly SettingKey[];
+const PAGE = ["reduceMotion", "effectsOff", "soundOff", "devMode", "freePurchases"] as const satisfies readonly SettingKey[];
 
 /** One toggle, showing its current value. */
 function control(key: (typeof PAGE)[number], ctx: AppContext): string {
