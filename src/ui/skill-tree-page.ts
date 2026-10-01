@@ -1,3 +1,4 @@
+import { play } from "../sound.ts";
 import { TRAINING, TRAINING_GROUPS, TRAINING_PER_LEVEL, buySkill, cancelTraining, levelForXp, skillPurchase, startTraining, trainingPoints, trainingSlots, trainingStep, type TrainingId } from "../progression.ts";
 import { SKILLS, TREES, mapNodes, treeHeight, type SkillId, type SkillNode, type TreeId } from "../skill-trees.ts";
 import { TreeParticles } from "../tree-particles.ts";
@@ -51,7 +52,10 @@ export class SkillTreePage {
       el("upgrades").innerHTML = head + this.trainingHtml();
       bindTabs();
       document.querySelectorAll<HTMLButtonElement>("[data-train]").forEach((b) => (b.onclick = () => {
-        if (startTraining(this.save, b.dataset.train as TrainingId, this.ctx.clock())) this.ctx.update();
+        if (startTraining(this.save, b.dataset.train as TrainingId, this.ctx.clock())) {
+          this.ctx.update();
+          play("coin");
+        }
         this.render();
       }));
       document.querySelectorAll<HTMLButtonElement>("[data-cancel]").forEach((b) => (b.onclick = () => {
@@ -164,6 +168,7 @@ export class SkillTreePage {
     }
     const level = this.save.skills[id];
     if (buySkill(this.save, id)) {
+      play(level === 0 ? "unlock" : "chime");
       if (!this.save.settings.reduceMotion) {
         // The first rank unlocks the node: it shines as well as bursting.
         const node = mapNodes(this.current()).find((n) => n.id === id)!;

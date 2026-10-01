@@ -9,6 +9,8 @@ import { buildShell } from "./ui/shell.ts";
 import { SkillTreePage } from "./ui/skill-tree-page.ts";
 import { renderSettingsPage } from "./ui/settings-page.ts";
 import type { Weather } from "./defend/weather.ts";
+import { play, soundEnabledBy } from "./sound.ts";
+import { flourishesEnabledBy, replay, sparks, sparksOver } from "./ui/flourish.ts";
 
 // Wires the pages together: builds the shell, loads the save, and routes
 // navigation, the currency bar and the frame loop between the pages.
@@ -44,6 +46,10 @@ const defendPage = new DefendPage(el("defend"), {
   earnKills: (slain) => {
     const { levelsGained } = payKills(save, slain);
     refreshCurrencies();
+    if (levelsGained > 0) {
+      play("levelUp");
+      sparksOver(el("level"), "arcane");
+    }
     return levelsGained;
   },
   earnWave: (wave) => {
@@ -58,19 +64,38 @@ const defendPage = new DefendPage(el("defend"), {
   devMode: () => save.settings.devMode,
 });
 
+soundEnabledBy(() => !save.settings.soundOff);
+flourishesEnabledBy(() => !save.settings.reduceMotion);
+// Every button knocks like the oak board it is (the tab row's stone
+// tablets grate), and strikes a few embers where it was pressed.
+document.addEventListener("click", (e) => {
+  const target = (e.target as Element).closest?.("button, input[type=checkbox]");
+  if (!target) return;
+  play(target.closest("nav") ? "stone" : "knock");
+  if (e.detail > 0) sparks(e.clientX, e.clientY, "embers");
+});
+
 function store() {
   if (!persist(save)) console.warn("Storage unavailable — progress is only kept for this session.");
 }
+/** What the currency bar last showed, so a rise can glint. */
+const shown = new Map<string, string>();
 /** The currency bar, from the save. */
 function refreshCurrencies() {
   const dev = save.settings.devMode;
-  const show = (id: string, n: number) => (el(id).textContent = dev ? "∞" : String(whole(n)));
+  document.documentElement.classList.toggle("reduce-motion", save.settings.reduceMotion);
+  const show = (id: string, n: number) => {
+    const text = dev ? "∞" : String(whole(n)), before = shown.get(id);
+    el(id).textContent = text;
+    shown.set(id, text);
+    if (before !== undefined && Number(text) > Number(before)) replay(el(id).closest(".currency"), "gain");
+  };
   show("gold", save.gold);
   show("iron", save.ironBar);
   show("steel", save.steelBar);
   show("valor", save.valor);
   const level = levelForXp(save.xp), from = xpForLevel(level), to = xpForLevel(level + 1);
-  el("level").textContent = String(level);
+  show("level", level);
   el("xp-fill").style.width = `${((save.xp - from) / (to - from)) * 100}%`;
 }
 /** Saves and refreshes the currency bar. */
@@ -104,7 +129,10 @@ function frame(time: number) {
   if (time - lastTick >= 1000) {
     lastTick = time;
     const done = settleTraining(save, clock()) > 0;
-    if (done) update();
+    if (done) {
+      update();
+      play("trained");
+    }
     if (tab === "upgrades") skillTree.tick(done);
   }
   requestAnimationFrame(frame);

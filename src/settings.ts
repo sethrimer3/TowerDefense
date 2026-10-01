@@ -16,6 +16,8 @@ export const SETTINGS = {
   /** The city's live dressing: wind-blown park grass, and drips, ripples
    * and reflections on the ponds. */
   effectsOff: { kind: "toggle", default: false, page: { id: "effects", label: "Grass and water effects", invert: true } },
+  /** The synthesized knocks, chimes, horns and bells. */
+  soundOff: { kind: "toggle", default: false, page: { id: "sound", label: "Sound", invert: true } },
   /** Unlimited currency: the Armory, Training and skill trees show ∞. */
   devMode: { kind: "toggle", default: false, page: { id: "dev-mode", label: "Dev mode (unlimited currency)" } },
   /** Dev: every purchase is allowed and costs nothing, and Training
