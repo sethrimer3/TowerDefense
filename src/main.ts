@@ -19,6 +19,7 @@ import { SkillTreePage } from "./ui/skill-tree-page.ts";
 import { ResearchToasts } from "./ui/research-toast.ts";
 import { GearPage } from "./ui/gear-page.ts";
 import { DeckPage } from "./ui/deck-page.ts";
+import { RunTrainingBar } from "./ui/run-training-bar.ts";
 import { renderSettingsPage } from "./ui/settings-page.ts";
 
 // Wires the pages together: builds the shell, creates the game and renderer,
@@ -51,6 +52,7 @@ const overlay = new BoardOverlay(game, renderer);
 const skillTree = new SkillTreePage(ctx);
 const gear = new GearPage(ctx);
 const deck = new DeckPage(ctx);
+const runTraining = new RunTrainingBar(game, () => update());
 const researchToasts = new ResearchToasts(() => game.save.settings.reduceMotion);
 const defendPage = new DefendPage(el("defend"), {
   save: () => game.save.defend,
@@ -77,6 +79,7 @@ function update() {
   // The Deck tutorial keeps the player on its page until they reorder the hand.
   document.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach((b) => (b.disabled = deck.teaching && b.dataset.tab !== "deck"));
   renderHud(game, renderer, overlay);
+  runTraining.render();
   researchToasts.add(game.researchDone.splice(0));
   save();
   defeat.check();

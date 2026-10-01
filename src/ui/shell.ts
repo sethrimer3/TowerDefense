@@ -11,7 +11,9 @@ const BOARD = `<section id="board" class="page active"><div class="tower-heading
 const CURRENCIES = `<div id="currencies" class="currencies" hidden><div class="currency gem-currency">${gemIcon()} <b id="gems-held">0</b><small>GEMS</small></div><div class="currency training-currency">⚔ <b id="training">0</b><small>TRAINING</small></div><div class="currency inspiration-currency">◆ <b id="inspiration">0</b><small>INSPIRATION</small></div><div class="currency courage-currency">✦ <b id="courage">0</b><small>COURAGE</small></div></div>`;
 const NAV = `<nav aria-label="Main navigation">${Object.entries(TAB_ICONS)
   .map(([id, icon]) => `<button data-tab="${id}" class="${id === "tower" ? "selected" : ""}"><span>${icon}</span>${id[0].toUpperCase() + id.slice(1)}</button>`)
-  .join("")}<div id="hand" class="hand" role="list" aria-label="Card hand"></div></nav>`;
+  .join("")}<div id="hand" class="hand" role="list" aria-label="Card hand"></div><div id="run-drills" class="run-drills" role="list" aria-label="Training for this run"></div></nav>`;
+/** Inside a run, under the hand: a button for each Training group, to train for the run with Silver (`RunTrainingBar`). */
+const TRAINING_BAR = `<div id="training-bar" class="training-bar" role="group" aria-label="Training for this run" hidden></div><div id="drill-tip" class="drill-tip" role="tooltip" hidden></div>`;
 /** Focus uses left, before the potions: a lightning bolt and the count. */
 const FOCUS_STAT = `<span id="focus-stat" class="focus-stat" hidden title="Focus: press a card in your hand to put it first"><svg viewBox="0 0 10 14" aria-hidden="true"><path d="M6.2 0.5L1 8h3.6L3.4 13.5 9 5.8H5.4L6.2 0.5z" fill="#ffe27a" stroke="#6b4a10" stroke-width="0.7" stroke-linejoin="round"/></svg><b id="focus-left">0</b></span>`;
 const MOVEMENT_SPRITES: Record<string, UiSprite> = {
@@ -22,7 +24,7 @@ const MOVEMENT_SPRITES: Record<string, UiSprite> = {
  * pages, navigation and the shared dialog, with sprite icons in place of
  * the text glyphs. */
 export function buildShell(app: HTMLElement) {
-  app.innerHTML = `<main class="shell">${CURRENCIES}${STATS}${BOARD}<section id="deck" class="page"></section><section id="defend" class="page"></section><section id="gear" class="page"></section><section id="upgrades" class="page"></section><section id="settings" class="page"></section>${NAV}</main><dialog id="modal"></dialog>`;
+  app.innerHTML = `<main class="shell">${CURRENCIES}${STATS}${BOARD}<section id="deck" class="page"></section><section id="defend" class="page"></section><section id="gear" class="page"></section><section id="upgrades" class="page"></section><section id="settings" class="page"></section>${NAV}${TRAINING_BAR}</main><dialog id="modal"></dialog>`;
   arrangeHud();
   replaceGlyphs();
 }

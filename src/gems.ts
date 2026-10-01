@@ -96,26 +96,83 @@ export function collectedGem(drop: GemDrop, now: number) {
 
 /** Tiles a hero can walk through to reach the Gem's tile. */
 const CROSSABLE = new Set<Tile["kind"]>(["floor", "openedChest", "oneway", "key", "potion", "attack", "defense", "treasure", "reward"]);
+/** Tiles the hand's cards head for, where their paths end. */
+const TARGETS = new Set<Tile["kind"]>(["key", "potion", "attack", "defense", "treasure", "reward", "door", "enemy", "stairs"]);
 const DIRECTIONS = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const;
+type Spot = { x: number; y: number };
 
-/** A plain floor tile for a Gem, drawn at random from those the hero at
- * `from` can walk to without passing a door, monster or stairs: in rows
- * `minY` to `maxY` (the view, in the Delve, preferring rows above the hero),
- * never the hero's own tile. Null when there is none. */
-export function gemSpot(board: Board, from: { x: number; y: number }, minY: number, maxY: number, rng: () => number): { x: number; y: number } | null {
-  const seen = new Set([`${from.x},${from.y}`]), queue = [from], plain: { x: number; y: number }[] = [];
-  for (let i = 0; i < queue.length; i++) {
-    const at = queue[i];
+/** A plain floor tile for a Gem, out of the way where it can be, from those
+ * the hero at `from` can walk to without passing a door, monster or stairs:
+ * in rows `minY` to `maxY` (the view, in the Delve, preferring rows above
+ * the hero), never the hero's own tile. Null when there is none.
+ *
+ * Out of the way means on as few shortest paths as possible between the
+ * hero and the floor's targets, and between one target and the next, so
+ * the hand's cards seldom walk the hero over it; then tucked against the
+ * most walls (a corner or nook). `rng` picks among the tiles left. */
+export function gemSpot(board: Board, from: Spot, minY: number, maxY: number, rng: () => number): Spot | null {
+  // The area the hero can reach, each tile numbered, and the targets at its edge.
+  const index = new Map<string, number>([[`${from.x},${from.y}`, 0]]), tiles: Spot[] = [from];
+  const targets: number[] = [];
+  const neighbours: number[][] = [[]];
+  for (let i = 0; i < tiles.length; i++) {
+    const at = tiles[i];
+    if (i > 0 && !CROSSABLE.has(board.tile(at.x, at.y).kind)) continue;
     for (const [dx, dy] of DIRECTIONS) {
       const next = board.step(at.x, at.y, dx, dy);
-      if (!next || next.y < minY || next.y > maxY || seen.has(`${next.x},${next.y}`)) continue;
-      seen.add(`${next.x},${next.y}`);
-      const kind = board.tile(next.x, next.y).kind;
-      if (!CROSSABLE.has(kind)) continue;
-      queue.push(next);
-      if (kind === "floor") plain.push(next);
+      if (!next || next.y < minY || next.y > maxY) continue;
+      const key = `${next.x},${next.y}`, kind = board.tile(next.x, next.y).kind;
+      let n = index.get(key);
+      if (n === undefined) {
+        if (!CROSSABLE.has(kind) && !TARGETS.has(kind)) continue;
+        n = tiles.length;
+        index.set(key, n);
+        tiles.push(next);
+        neighbours.push([]);
+        if (TARGETS.has(kind)) targets.push(n);
+      }
+      // Each walkable tile lists its own neighbours; a target, never walked
+      // on from, lists the tiles beside it here.
+      neighbours[i].push(n);
+      if (!CROSSABLE.has(kind)) neighbours[n].push(i);
     }
   }
-  const ahead = plain.filter((t) => t.y > from.y), pool = ahead.length ? ahead : plain;
-  return pool.length ? pool[Math.floor(rng() * pool.length)] : null;
+  const plain = tiles.map((t, i) => i).filter((i) => i > 0 && board.tile(tiles[i].x, tiles[i].y).kind === "floor");
+  const ahead = plain.filter((i) => tiles[i].y > from.y), pool = ahead.length ? ahead : plain;
+  if (!pool.length) return null;
+  // Walking distances from each source over the area: a target is walked
+  // from, but nothing walks on through a door, monster or the stairs.
+  const crossable = tiles.map((t, i) => i === 0 || CROSSABLE.has(board.tile(t.x, t.y).kind));
+  const distances = (start: number) => {
+    const d = new Int32Array(tiles.length).fill(-1), queue = [start];
+    d[start] = 0;
+    for (let q = 0; q < queue.length; q++) {
+      const at = queue[q];
+      if (at !== start && !crossable[at]) continue;
+      for (const n of neighbours[at])
+        if (d[n] < 0) {
+          d[n] = d[at] + 1;
+          queue.push(n);
+        }
+    }
+    return d;
+  };
+  const sources = [0, ...targets].map((s) => ({ s, d: distances(s) }));
+  const ends = sources.slice(1);
+  /** How many hero-or-target to target trips have a shortest path through `v`. */
+  const traffic = (v: number) => {
+    let n = 0;
+    for (const a of sources)
+      for (const b of ends)
+        if (a.s !== b.s && a.d[b.s] > 0 && a.d[v] >= 0 && b.d[v] >= 0 && a.d[v] + b.d[v] === a.d[b.s]) n++;
+    return n;
+  };
+  const walls = (v: number) => DIRECTIONS.filter(([dx, dy]) => {
+    const next = board.step(tiles[v].x, tiles[v].y, dx, dy);
+    return !next || board.tile(next.x, next.y).kind === "wall";
+  }).length;
+  const scored = pool.map((v) => ({ v, score: traffic(v) * 8 - walls(v) }));
+  const best = Math.min(...scored.map((t) => t.score));
+  const quiet = scored.filter((t) => t.score === best);
+  return { ...tiles[quiet[Math.floor(rng() * quiet.length)].v] };
 }

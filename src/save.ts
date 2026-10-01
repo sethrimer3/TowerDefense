@@ -1,4 +1,4 @@
-import { FIND_POTION_MAX, GOLD_SHOP, SAVE_KEY, TOWER_WIDTH, TRAINING, UPGRADES, WIDTH } from "./config.ts";
+import { FIND_POTION_MAX, GOLD_SHOP, RUN_TRAINING_CAP, SAVE_KEY, TOWER_WIDTH, TRAINING, UPGRADES, WIDTH } from "./config.ts";
 import type { AutomoveMemory, DelveRun, FloorRecord, ModeSave, Fall, MoveSnapshot, Run, Save, TowerRun } from "./entities.ts";
 import { emptyMaterials, MATERIAL_IDS, type MaterialId } from "./materials.ts";
 import { EQUIPMENT_SLOTS, type CraftedEquipment, type EquipmentSlot } from "./equipment.ts";
@@ -90,9 +90,14 @@ function without<R>(r: any, fields: string[]): R {
   delete r.focus;
   if (r.focusUsed !== undefined && !(Number.isInteger(r.focusUsed) && finite(r.focusUsed, 99))) delete r.focusUsed;
   if (r.focused !== undefined && !r.hand?.includes(r.focused)) delete r.focused;
+  if (r.training !== undefined && !validRunTraining(r.training)) delete r.training;
   if (r.percentPotions !== undefined && !(Number.isInteger(r.percentPotions) && r.percentPotions > 0 && r.percentPotions <= FIND_POTION_MAX)) delete r.percentPotions;
   return r;
 }
+/** Training ranks bought in a run: known rows, each a whole number of ranks. */
+const validRunTraining = (t: any) =>
+  !!t && typeof t === "object" && !Array.isArray(t) &&
+  Object.entries(t).every(([id, n]) => TRAINING.some((row) => row.id === id) && Number.isInteger(n) && (n as number) >= 0 && (n as number) <= RUN_TRAINING_CAP);
 /** A run's hand: known cards, each once, no more than a hand can hold,
  * STAIRS among them. */
 const validHand = (h: any) =>

@@ -313,8 +313,9 @@ export function levelForXp(xp: number) {
 }
 /** Training points each level earns, to spend on the hero's stats. */
 export const TRAINING_PER_LEVEL = 3;
-/** The groups the Training tab shows its rows in, in order. */
-export const TRAINING_GROUPS = { offense: "Offense", defense: "Defense" } as const;
+/** The groups the Training tab, and a run's training bar, show the rows
+ * in, in order. */
+export const TRAINING_GROUPS = { offense: "Offense", defense: "Defense", utility: "Utility" } as const;
 /** What training raises, each rank costing `cost` points. A stat row is
  * worth `base` × (1 + level / `growth`) of `stat` at the hero's level (see
  * `trainingWorth`), so every rank already bought grows as the hero levels
@@ -325,13 +326,13 @@ export const TRAINING_GROUPS = { offense: "Offense", defense: "Defense" } as con
  * with `requires` shows, and trains, only once that upgrade is owned; one
  * with `max` trains no further than that many ranks. */
 export const TRAINING = [
-  { id: "hp", name: "Max HP", group: "defense", stat: "maxHp", base: 10, growth: 10, cost: 1 },
-  { id: "attack", name: "ATK", group: "offense", stat: "attack", base: 1, growth: 5, cost: 5 },
-  { id: "defense", name: "DEF", group: "defense", stat: "defense", base: 1, growth: 12, cost: 3 },
-  { id: "shroud", name: "Shroud", group: "defense", stat: "shroud", base: 1, growth: 10, cost: 1, requires: "shroud" },
-  { id: "potion", name: "Potion %", group: "defense", requires: "recovery", cost: 1 },
-  { id: "findPotion", name: "Find Potion", group: "defense", requires: "findPotion", cost: 1, max: 72 },
-  { id: "revive", name: "Revive", group: "defense", requires: "revive", cost: 1, max: 99 },
+  { id: "hp", name: "Max HP", group: "defense", stat: "maxHp", base: 10, growth: 10, cost: 1, description: "Raises maximum HP." },
+  { id: "attack", name: "ATK", group: "offense", stat: "attack", base: 1, growth: 5, cost: 5, description: "Raises ATK, the damage each strike deals before the enemy's DEF." },
+  { id: "defense", name: "DEF", group: "defense", stat: "defense", base: 1, growth: 12, cost: 3, description: "Raises DEF, taken off the damage of every enemy strike." },
+  { id: "shroud", name: "Shroud", group: "defense", stat: "shroud", base: 1, growth: 10, cost: 1, requires: "shroud", description: "Raises the damage the shroud blocks at the start of every fight." },
+  { id: "potion", name: "Potion %", group: "utility", requires: "recovery", cost: 1, description: "Percent potions restore more of your maximum HP." },
+  { id: "findPotion", name: "Find Potion", group: "utility", requires: "findPotion", cost: 1, max: 72, description: "More of the potions found are percent potions." },
+  { id: "revive", name: "Revive", group: "utility", requires: "revive", cost: 1, max: 99, description: "Raises the chance a strike that would fell you revives you at full HP instead." },
 ] as const;
 export type TrainingId = (typeof TRAINING)[number]["id"];
 export type TrainingRow = (typeof TRAINING)[number];
@@ -352,6 +353,27 @@ export const FIND_POTION_BASE = 200, FIND_POTION_RANK = 25, FIND_POTION_MAX = 20
  * hundredths of a percent: 0.5% with Revive, and 0.5% more for each Revive
  * rank, up to 50% (99 ranks). */
 export const REVIVE_BASE = 50, REVIVE_RANK = 50, REVIVE_MAX = 5000;
+/** A Training row's Silver prices inside a run: the first rank bought
+ * costs `base`, and each one after costs more than the last by a rate that
+ * starts at `first` (50%) and eases, along an inverse square root, to
+ * `last` (1%) by the `span`th rank bought (see `silverPrice`). */
+export type SilverSchedule = { base: number; first: number; last: number; span: number };
+const silverSchedule = (base: number): SilverSchedule => ({ base, first: 0.5, last: 0.01, span: 1000 });
+/** Training bought with Silver inside a run, lasting only for that run:
+ * each row's price schedule. The rows open from the start cost least, the
+ * ones later skills open more. */
+export const RUN_TRAINING_PRICES: Record<TrainingId, SilverSchedule> = {
+  hp: silverSchedule(5),
+  attack: silverSchedule(5),
+  defense: silverSchedule(5),
+  shroud: silverSchedule(10),
+  potion: silverSchedule(10),
+  findPotion: silverSchedule(20),
+  revive: silverSchedule(20),
+};
+/** The highest level a row without its own `max` reaches in a run, its
+ * ranks and those bought there together. */
+export const RUN_TRAINING_CAP = 1000;
 /** What one rank of `row` is worth at `level`, unrounded. */
 export const trainingWorth = (row: StatTrainingRow, level: number) => row.base * (1 + level / row.growth);
 /** What `ranks` ranks of `row` add to the character at `level`, rounded

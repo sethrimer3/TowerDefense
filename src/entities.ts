@@ -104,6 +104,9 @@ export type RunCore = {
   /** The card a Focus put ahead of the others, until it reaches its target
    * or has no path to one. */
   focused?: CardId;
+  /** Training ranks bought with Silver this run, on top of the hero's own:
+   * they last only for this run. */
+  training?: Partial<Record<TrainingId, number>>;
 };
 /** A Tower ascent. */
 export type TowerRun = RunCore & {

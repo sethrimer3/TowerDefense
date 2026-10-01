@@ -96,6 +96,30 @@ test("a Gem lies on a plain floor tile the hero can walk to, past items but not 
   for (let i = 0; i < 50; i++) assert.ok(gemSpot(rows, { x: 1, y: 1 }, 0, 2, rng)!.y > 1, "rows above the hero first");
 });
 
+test("a Gem lies out of the way: off the paths between the hero and the targets, tucked into a nook", () => {
+  const rng = random(9);
+  // A corridor from the hero to a key, a door beyond, and a nook off it.
+  const b = board([
+    "#######",
+    "......k",
+    "#.##D##",
+    "#.#####",
+  ]);
+  for (let i = 0; i < 30; i++) assert.deepEqual(gemSpot(b, { x: 0, y: 1 }, 0, Infinity, rng), { x: 1, y: 3 }, "the nook's end");
+  // An open room: a corner away from the line between hero and key.
+  const room = board([
+    ".....",
+    ".....",
+    "k....",
+  ]);
+  const spots = new Set<string>();
+  for (let i = 0; i < 50; i++) {
+    const s = gemSpot(room, { x: 0, y: 0 }, 0, Infinity, rng)!;
+    spots.add(`${s.x},${s.y}`);
+  }
+  assert.deepEqual([...spots], ["4,2"], "the far corner");
+});
+
 /** A Tower run on an open 5×5 floor, stairs in the far corner. */
 function arena(edit?: (g: Game) => void) {
   const g = new Game(defaults());

@@ -2256,3 +2256,88 @@ p.research-kept { color: #ffe1a1; }
 .research-toast b { display: block; color: #e9d4ac; font-size: 15px; letter-spacing: 1px; }
 .research-toast span { display: block; margin-top: 4px; font-size: 12px; color: #99a8bd; }
 .currency.gem-currency { color: #8fe3ff; }
+
+/* --- Training for this run, with Silver --- */
+/* A Training group open shows its cards in the hand's place. */
+.run-drills { display: none; }
+nav.in-run.drilling .hand { display: none; }
+nav.in-run.drilling .run-drills {
+  display: flex;
+  gap: 6px;
+  width: 100%;
+  min-height: 69px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  padding: 1px;
+}
+.drill-card {
+  flex: 0 0 92px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2px;
+  padding: 5px 4px;
+  border: 1px solid #4b5566;
+  border-radius: 4px;
+  background: linear-gradient(#1d2531, #121821);
+  font-family: Cinzel, Georgia, serif;
+  cursor: help;
+  scroll-snap-align: start;
+}
+.drill-name { font-size: 10px; color: #efd496; letter-spacing: 0.5px; white-space: nowrap; }
+.drill-value { font-size: 15px; color: #eee5d4; }
+.drill-level { font-size: 8px; color: #8f9bac; letter-spacing: 1px; }
+/* Written over the nav's tab buttons, which the cards sit among. */
+.run-drills .drill-buy {
+  display: flex;
+  flex: none;
+  flex-direction: row;
+  align-items: center;
+  gap: 3px;
+  min-height: 0;
+  padding: 2px 8px;
+  font-size: 11px;
+  background: linear-gradient(#2a3342, #18202b);
+  border-color: #6b778a;
+  cursor: pointer;
+}
+.run-drills .drill-buy .ui-sprite { width: 12px; height: 12px; }
+/* Not enough Silver, or at its highest: greyed out. */
+.drill-card.short { opacity: 0.45; filter: grayscale(0.8); }
+.training-bar { display: flex; flex-shrink: 0; gap: 5px; padding: 0 0 max(5px, env(safe-area-inset-bottom)); }
+.training-bar[hidden] { display: none; }
+.training-bar button {
+  flex: 1 1 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 4px;
+  font-family: Cinzel, Georgia, serif;
+  font-size: 11px;
+  letter-spacing: 1px;
+  background: linear-gradient(#1b222d, #10161f);
+  border-color: #333c49;
+}
+.training-bar .group-sprite { width: 22px; height: 22px; }
+.training-bar button.selected { border-color: #d6ae68; color: #efd496; box-shadow: inset 0 -2px #d9ac5a; }
+.training-bar button:disabled { opacity: 0.4; }
+.drill-tip {
+  position: fixed;
+  z-index: 20;
+  max-width: 220px;
+  padding: 8px 10px;
+  border: 1px solid #d6ae68;
+  border-radius: 5px;
+  background: #0b1018f2;
+  color: #d8dee8;
+  font-size: 11px;
+  pointer-events: none;
+}
+.drill-tip[hidden] { display: none; }
+.drill-tip b { color: #efd496; font-family: Cinzel, Georgia, serif; }
+.drill-tip p { margin: 4px 0; }
+.drill-tip small { color: #8f9bac; }

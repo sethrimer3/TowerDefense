@@ -120,8 +120,12 @@ The monster guarding the way up at the end of every ten floors: in front of the 
 _Avoid_: area boss, guardian
 
 **Silver**:
-The currency of a single run: each monster beaten pays some, more on higher floors and for stronger monsters, and it is spent only inside that run. Undo takes it back with the kill, and it is gone when the run ends.
+The currency of a single run: each monster beaten pays some, more on higher floors and for stronger monsters, and it is spent only inside that run, on run training. Undo takes it back with the kill, and it is gone when the run ends.
 _Avoid_: coins, run gold
+
+**Run training**:
+Training levels bought with Silver inside a run, on top of the hero's own, lasting only for that run.
+_Avoid_: drills, run upgrades, temporary training
 
 **Courage**:
 The Delve's currency: one for each new equivalent floor reached, spent on upgrades in the skill trees.

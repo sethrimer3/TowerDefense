@@ -15,6 +15,8 @@ import {
   levelForXp,
   TRAINING,
   trainingOpen,
+  isStatRow,
+  trained,
   cost,
   UPGRADES,
   GOLD_SHOP,
@@ -52,6 +54,7 @@ import { TowerClimb } from "./tower/climb.ts";
 import { materialDef, MATERIALS } from "./materials.ts";
 import { rollTreasureLoot } from "./loot.ts";
 import { MODES, milestones, type ModeProfile } from "./modes.ts";
+import { ranksInRun, runTrainingOffer } from "./run-training.ts";
 import { keepUndos, loadout, percentPotionChance, potionPercent, reviveChance, trainingMaxed, trainingPoints } from "./loadout.ts";
 import { RESEARCH, cancelResearch, hastenResearch, hireArchivist, researched, settleArchives, startResearch, type ResearchId, type ResearchRecord } from "./archives.ts";
 import {
@@ -464,7 +467,12 @@ export class Game {
   /** What research changes about stepping now: the step rules every move,
    * preview, inspect box and planner resolves with. */
   get stepRules(): StepRules {
-    return { potionHeal: researched(this.save.archives, "potionHeal", 100), percentPotion: potionPercent(this.save) };
+    return { potionHeal: researched(this.save.archives, "potionHeal", 100), percentPotion: potionPercent(this.trainingNow) };
+  }
+  /** The upgrades owned and the Training ranks that count now: the hero's
+   * own, and those this run bought with Silver. */
+  private get trainingNow() {
+    return { upgrades: this.save.upgrades, training: ranksInRun(this.save, this.run) };
   }
   /** Silver held this run. */
   get silver() {
@@ -748,7 +756,7 @@ export class Game {
    * so taking the fight back and fighting it again ends the same way, and
    * more Revive training only ever adds revivals. */
   private revival(at: { x: number; y: number }): Revival | undefined {
-    const chance = reviveChance(this.save);
+    const chance = reviveChance(this.trainingNow);
     if (!chance || this.run.outside) return undefined;
     const floor = this.mode === "tower" ? this.run.height + 1 : 0,
       seed = this.run.seed ^ REVIVE_SALT ^ Math.imul(floor, 0x9e3779b1);
@@ -1146,6 +1154,34 @@ export class Game {
       else if (trainingPoints(this.save).left < row.cost) return false;
       this.save.training[id]++;
     });
+  }
+  /** Buys one rank of Training `id` for this run with its Silver: it counts
+   * from the next turn on, until the run ends. Each purchase is a turn of
+   * its own, so undo takes it back. Refused during a fight, for a row whose
+   * upgrade isn't owned or at its highest, or without the Silver. */
+  trainInRun(id: TrainingId) {
+    if (!this.playing || this.encounter) return false;
+    const offer = runTrainingOffer(this.save, this.run, id);
+    if (!offer.open || offer.maxed || (!this.free && this.silver < offer.price)) return false;
+    this.remember(this.snapshot());
+    if (!this.free) this.run.silver = this.silver - offer.price;
+    this.run.training = { ...this.run.training, [id]: offer.bought + 1 };
+    const row = offer.row;
+    if (isStatRow(row)) {
+      const level = levelForXp(this.save.xp), stat = row.stat,
+        gain = trained(row, offer.level + 1, level) - trained(row, offer.level, level);
+      for (const stats of [this.run.player, this.run.loadout]) if (stats) stats[stat] = (stats[stat] ?? 0) + gain;
+      // More maximum HP comes with the HP to fill it.
+      if (stat === "maxHp") this.run.player.hp += gain;
+    } else if (id === "findPotion") {
+      const chance = percentPotionChance(this.trainingNow);
+      this.run.percentPotions = chance;
+      // The floor stood on shows its new percent potions at once.
+      if (this.world instanceof RoomWorld) this.world.percentPotions = chance;
+    }
+    this.message = `${row.name} trained for this run · level ${offer.level + 1}`;
+    this.afterPlayerAction();
+    return true;
   }
   /** Resets a Training stat to no ranks for `TRAINING_RESET_GEMS` Gems,
    * returning every point spent on it. With Dev free purchases it costs
