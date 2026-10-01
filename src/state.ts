@@ -552,6 +552,7 @@ export class Game {
     this.slice.fall = null;
     this.slice.history = [];
     this.slice.runGold = 0;
+    this.slice.runCurrency = 0;
     this.route = [];
     this.encounter = null;
     // Tower ascents begin at the first floor of the chosen section.
@@ -1111,6 +1112,7 @@ export class Game {
     slice.reached = reached;
     slice.best = Math.max(slice.best, reached);
     this.rules.credit(this.save, earned);
+    slice.runCurrency += earned;
     return earned;
   }
   /** How the current mode differs from the other. */

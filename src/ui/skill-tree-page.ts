@@ -216,7 +216,12 @@ export class SkillTreePage {
       const game = this.ctx.game;
       game.buy(id);
       const bought = game.save.upgrades[id] > level, card = upgradeCard(id);
-      if (bought && !game.save.settings.reduceMotion) this.particles.purchase(mapNodes(this.current()).find(n => n.id === id)!);
+      if (bought && !game.save.settings.reduceMotion) {
+        // The first rank unlocks the node: it shines as well as bursting.
+        const node = mapNodes(this.current()).find(n => n.id === id)!;
+        if (level === 0) this.particles.unlock(node);
+        else this.particles.purchase(node);
+      }
       this.ctx.update();
       if (bought && card) revealCard(card, game.save.settings.reduceMotion);
     }

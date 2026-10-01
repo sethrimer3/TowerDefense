@@ -1,4 +1,3 @@
-import { whole } from "./whole.ts";
 import "./style.css";
 import { load, persist } from "./save.ts";
 import { Game } from "./state.ts";
@@ -10,12 +9,11 @@ import type { ConsumableId } from "./crafting.ts";
 import { FrameLoop } from "./frame-loop.ts";
 import { installDebugHooks } from "./debug-hooks.ts";
 import { isBoard, type AppContext, type Tab } from "./ui/app.ts";
-import { capitalized, displayedProgress, el } from "./ui/dom.ts";
-import { MODES } from "./modes.ts";
+import { el } from "./ui/dom.ts";
 import { buildShell } from "./ui/shell.ts";
 import { BoardOverlay } from "./ui/board-overlay.ts";
 import { boardHeadingStale, flashRed, renderAdButton, renderBoardHeading, renderHud, renderVitals, upgradesWaiting } from "./ui/hud.ts";
-import { confirmAction, DefeatDialog, showLog, showSectionPicker } from "./ui/dialogs.ts";
+import { confirmAction, RunEndDialog, showLog, showSectionPicker } from "./ui/dialogs.ts";
 import { SkillTreePage } from "./ui/skill-tree-page.ts";
 import { ResearchToasts } from "./ui/research-toast.ts";
 import { GearPage } from "./ui/gear-page.ts";
@@ -48,7 +46,7 @@ const ctx: AppContext = {
   navigate,
   confirm: (prompt, action) => confirmAction(ctx, prompt, action),
 };
-const defeat = new DefeatDialog(ctx);
+const runEnd = new RunEndDialog(ctx);
 const overlay = new BoardOverlay(game, renderer);
 const skillTree = new SkillTreePage(ctx);
 const gear = new GearPage(ctx);
@@ -83,7 +81,7 @@ function update() {
   runTraining.render();
   researchToasts.add(game.researchDone.splice(0));
   save();
-  defeat.check();
+  runEnd.check();
 }
 function renderPage() {
   if (tab === "defend") defendPage.show();
@@ -164,19 +162,7 @@ el("gem-ad").onclick = () => {
   save();
   update();
 };
-el("end-run").onclick = () =>
-  ctx.confirm(
-    {
-      title: "End this run?",
-      body: `End the current ${MODES[game.mode].words.run} at ${MODES[game.mode].words.progress} ${displayedProgress(game.run.height, !!game.run.outside)}. Milestone rewards are already yours${whole(game.save[game.mode].runGold) ? `, uncollected clear chests will be claimed, and the ${whole(game.save[game.mode].runGold)} Gold found this ${MODES[game.mode].words.run} is kept` : ", and uncollected clear chests will be claimed"}.`,
-      label: "End run",
-      cancel: MODES[game.mode].words.keepGoing,
-    },
-    () => {
-      game.finish(`${capitalized(MODES[game.mode].words.run)} ended`);
-      navigate(game.mode);
-    },
-  );
+el("end-run").onclick = () => runEnd.ask();
 modal.addEventListener("cancel", (e) => {
   // The defeat dialog waits for an answer.
   if (game.fallen) e.preventDefault();

@@ -14,8 +14,8 @@ import { decodeArchives, defaultArchives } from "./archives.ts";
 export function defaults(): Save {
   return {
     version: 3,
-    tower: { run: null, history: [], fall: null, best: 0, reached: 0, inspiration: 0, log: {}, lootedTiles: {}, runGold: 0, startSection: 0, sectionHp: {}, tier: 1, tiersOpen: 1, tierRecords: {} },
-    delve: { run: null, history: [], fall: null, best: 0, reached: 0, courage: 0, lootedTiles: {}, runGold: 0, memory: { known: {}, visited: {} }, tier: 1, tiersOpen: 1, tierRecords: {} },
+    tower: { run: null, history: [], fall: null, best: 0, reached: 0, inspiration: 0, log: {}, lootedTiles: {}, runGold: 0, runCurrency: 0, startSection: 0, sectionHp: {}, tier: 1, tiersOpen: 1, tierRecords: {} },
+    delve: { run: null, history: [], fall: null, best: 0, reached: 0, courage: 0, lootedTiles: {}, runGold: 0, runCurrency: 0, memory: { known: {}, visited: {} }, tier: 1, tiersOpen: 1, tierRecords: {} },
     gems: 0,
     gemDrop: defaultGemDrop(),
     gold: 0,
@@ -125,7 +125,7 @@ function decodeDelveRun(r: any): DelveRun | null {
 }
 
 // --- Mode slices ---
-type DecodedMode<R extends Run> = Pick<ModeSave<R>, "run" | "history" | "fall" | "lootedTiles" | "runGold">;
+type DecodedMode<R extends Run> = Pick<ModeSave<R>, "run" | "history" | "fall" | "lootedTiles" | "runGold" | "runCurrency">;
 type RunDecoder<R extends Run> = (raw: any) => R | null;
 function snapshot<R extends Run>(value: any, decodeRun: RunDecoder<R>): MoveSnapshot<R> | null {
   if (!value || !finite(value.best) || !finite(value.xp)) return null;
@@ -170,6 +170,7 @@ function decodeMode<R extends Run>(s: any, undoCapacity: number, decodeRun: RunD
     fall: run ? decodeFall(s.fall, run, decodeRun) : null,
     lootedTiles: decodeLootedTiles(s?.lootedTiles),
     runGold: run ? fraction(s.runGold, 0) : 0,
+    runCurrency: run ? count(s.runCurrency, 0) : 0,
   };
 }
 function applyMode<R extends Run>(slice: ModeSave<R>, decoded: DecodedMode<R>) {
@@ -178,6 +179,7 @@ function applyMode<R extends Run>(slice: ModeSave<R>, decoded: DecodedMode<R>) {
   slice.fall = decoded.fall;
   slice.lootedTiles = decoded.lootedTiles;
   slice.runGold = decoded.runGold;
+  slice.runCurrency = decoded.runCurrency;
 }
 
 // --- Inventory ---

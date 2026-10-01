@@ -4,7 +4,7 @@ import { CLEAR_TIERS } from "../tower/clear-ledger.ts";
 import { MODES } from "../modes.ts";
 import { loadout } from "../loadout.ts";
 import type { AppContext } from "./app.ts";
-import { displayedProgress, el, itemSprite, uiSprite } from "./dom.ts";
+import { capitalized, displayedProgress, el, itemSprite, uiSprite } from "./dom.ts";
 import { boardTitle, devAmount } from "./hud.ts";
 
 /** The modal dialogs opened from the HUD, all sharing `ctx.modal`. */
@@ -29,11 +29,18 @@ export function confirmAction(ctx: AppContext, { title, body, label, cancel }: C
  * the Upgrades sprite, Courage the Automove one. */
 const CURRENCY_SPRITES = { tower: "upgrades", delve: "automove" } as const;
 
-/** Watches for a fallen hero: a dialog the player must answer, taking back
- * the fatal fight (with an undo left; undo is mentioned only once Rehearsed
- * steps has unlocked it) or accepting defeat, after which the
- * forest fades in from black. */
-export class DefeatDialog {
+/** Why the run's end dialog opened: the hero fell, the End Run button was
+ * pressed while no card in the hand can act, or it was pressed by choice. */
+type RunEndCause = "fallen" | "stuck" | "chosen";
+
+/** The run's end dialog, one for every way a run ends: it says what brought
+ * it up, shows the same totals of what the run obtained, and asks what next.
+ * A fallen hero must answer it (undo the fight, once undo is unlocked and
+ * one is left, or accept defeat), after which the forest fades in from
+ * black; otherwise the player ends the run or keeps going.
+ * TODO: show the run's totals another way, viewable during the run and
+ * when it ends (the victories, among more), in place of this summary. */
+export class RunEndDialog {
   private fadeOverlay = document.createElement("div");
 
   constructor(private ctx: AppContext) {
@@ -41,8 +48,15 @@ export class DefeatDialog {
     document.body.appendChild(this.fadeOverlay);
   }
 
+  /** Opens the dialog for a fallen hero, unless it is already open. */
   check() {
-    if (this.ctx.game.fallen && !this.ctx.modal.open) this.show();
+    if (this.ctx.game.fallen && !this.ctx.modal.open) this.show("fallen");
+  }
+
+  /** The End Run button: a fallen hero's dialog, or the prompt to end. */
+  ask() {
+    const game = this.ctx.game;
+    this.show(game.fallen ? "fallen" : game.handStuck && !game.run.outside ? "stuck" : "chosen");
   }
 
   private fadeInFromBlack() {
@@ -51,38 +65,58 @@ export class DefeatDialog {
     requestAnimationFrame(() => requestAnimationFrame(() => overlay.classList.remove("active")));
   }
 
-  private show() {
-    const ctx = this.ctx, { game, modal } = ctx;
-    const rules = MODES[game.mode],
-      slice = game.save[game.mode],
-      undos = slice.history.length,
-      by = slice.fall?.by,
-      progress = rules.words.progress, run = game.run;
-    const takeBack = !loadout(game.save).undoCapacity ? ""
-      : undos ? `<p>Undo takes back the fight, and the hand waits for you.</p>`
-      : `<p class="hint">No undo is left to take the fight back.</p>`;
-    const button = undos ? `<button id="defeat-undo">Undo (${undos} left)</button>` : "";
+  /** The run's totals, the same whatever ended it: where it stands, its
+   * highest, and the Gold and currency it obtained (not the balances held). */
+  private stats() {
+    const { game } = this.ctx, rules = MODES[game.mode], slice = game.save[game.mode], run = game.run;
     const stat = (value: string | number, label: string, icon = "") => `<div><strong>${icon}${value}</strong>${label}</div>`;
-    const stats = [
-      stat(displayedProgress(run.height), progress.toUpperCase()),
-      stat(displayedProgress(run.maxHeight ?? run.height), "HIGHEST"),
-      stat(run.kills, "VICTORIES"),
+    return [
+      stat(displayedProgress(run.height, !!run.outside), rules.words.progress.toUpperCase()),
+      stat(displayedProgress(run.maxHeight ?? run.height, !!run.outside), "HIGHEST"),
       stat(whole(slice.runGold), "GOLD", uiSprite("gold")),
-      stat(devAmount(game, rules.balance(game.save)), rules.words.currency.toUpperCase(), uiSprite(CURRENCY_SPRITES[game.mode])),
+      stat(slice.runCurrency, rules.words.currency.toUpperCase(), uiSprite(CURRENCY_SPRITES[game.mode])),
     ].join("");
-    modal.innerHTML = `<span class="summary-icon">${uiSprite("revive")}</span><small>FALLEN IN COMBAT</small><h2>Your hero has fallen.</h2><p>${by ? `Defeated by ${by}` : "Defeated"} at ${rules.words.progress} ${displayedProgress(game.run.height)}. Milestone and clear rewards and the Gold found are already saved.</p><div class="summary-stats compact">${stats}</div>${takeBack}<div class="dialog-actions">${button}<button id="defeat-accept">Accept defeat</button></div>`;
-    modal.showModal();
-    const undo = document.querySelector<HTMLButtonElement>("#defeat-undo");
-    if (undo)
-      undo.onclick = () => {
+  }
+
+  private show(cause: RunEndCause) {
+    const ctx = this.ctx, { game, modal } = ctx;
+    const words = MODES[game.mode].words, slice = game.save[game.mode];
+    const where = `${words.progress} ${displayedProgress(game.run.height, !!game.run.outside)}`;
+    const kept = `Milestone rewards and the Gold found are already saved${game.mode === "tower" ? "; uncollected clear chests will be claimed" : ""}.`;
+    const stats = `<div class="summary-stats compact">${this.stats()}</div>`;
+    if (cause === "fallen") {
+      const undos = slice.history.length, by = slice.fall?.by;
+      // Undo goes unmentioned until Rehearsed steps unlocks it.
+      const takeBack = !loadout(game.save).undoCapacity ? ""
+        : undos ? `<p>Undo takes back the fight, and the hand waits for you.</p>`
+        : `<p class="hint">No undo is left to take the fight back.</p>`;
+      const button = undos ? `<button id="defeat-undo">Undo (${undos} left)</button>` : "";
+      modal.innerHTML = `<span class="summary-icon">${uiSprite("revive")}</span><small>FALLEN IN COMBAT</small><h2>Your hero has fallen.</h2><p>${by ? `Defeated by ${by}` : "Defeated"} at ${where}. ${kept}</p>${stats}${takeBack}<div class="dialog-actions">${button}<button id="defeat-accept">Accept defeat</button></div>`;
+      modal.showModal();
+      const undo = document.querySelector<HTMLButtonElement>("#defeat-undo");
+      if (undo)
+        undo.onclick = () => {
+          modal.close();
+          game.undo();
+          ctx.navigate(game.mode);
+        };
+      el("defeat-accept").onclick = () => {
         modal.close();
-        game.undo();
+        game.acceptDefeat();
+        this.fadeInFromBlack();
         ctx.navigate(game.mode);
       };
-    el("defeat-accept").onclick = () => {
+      return;
+    }
+    const [label, title, why] = cause === "stuck"
+      ? ["NO CARD CAN ACT", `End this ${words.run}?`, `Nothing in your hand can act at ${where}. `]
+      : ["END RUN", `End this ${words.run}?`, `End the current ${words.run} at ${where}. `];
+    modal.innerHTML = `<small>${label}</small><h2>${title}</h2><p>${why}${kept}</p>${stats}<div class="dialog-actions"><button id="cancel">${words.keepGoing}</button><button id="confirm">End run</button></div>`;
+    modal.showModal();
+    el("cancel").onclick = () => modal.close();
+    el("confirm").onclick = () => {
       modal.close();
-      game.acceptDefeat();
-      this.fadeInFromBlack();
+      game.finish(`${capitalized(words.run)} ended`);
       ctx.navigate(game.mode);
     };
   }

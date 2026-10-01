@@ -128,5 +128,6 @@ export class ClearLedger {
   private pay(entry: NonNullable<Save["tower"]["log"][string]>, tier: ClearTier) {
     entry[tier] = "claimed";
     this.tower.inspiration++;
+    this.tower.runCurrency++;
   }
 }

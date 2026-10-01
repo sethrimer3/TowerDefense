@@ -8,6 +8,12 @@ type Point = { x: number; y: number };
 type Size = { w: number; h: number };
 type Particle = Point & { radius: number; alpha: number };
 type Pulse = Point & { age: number };
+/** Shimmering rays around a node the player has just unlocked. */
+type Rays = Point & { age: number };
+/** How long an unlock's rays shine, in seconds. */
+const RAYS_LIFE = 1.8;
+/** How many rays, long and short in turn. */
+const RAY_COUNT = 16;
 type Edge = { from: SkillNode; to: SkillNode };
 /** What one frame shows: the tree (a new id reseeds the particles), its
  * nodes, the node whose tooltip is open, and whether motion is reduced. */
@@ -25,12 +31,19 @@ export class TreeParticles {
   private pressure = new Float32Array(1600);
   private particles: Particle[] = [];
   private pulses: Pulse[] = [];
+  private rays: Rays[] = [];
   private tree = '';
   private last = 0;
   private elapsed = 0;
 
   purchase(node: SkillNode) {
     this.pulses.push({ x: node.x / 100, y: node.y / 100, age: 0 });
+  }
+
+  /** A node's first rank: the purchase burst, and shimmering rays around it. */
+  unlock(node: SkillNode) {
+    this.purchase(node);
+    this.rays.push({ x: node.x / 100, y: node.y / 100, age: 0 });
   }
 
   private sample(field: Float32Array, x: number, y: number) {
@@ -49,18 +62,21 @@ export class TreeParticles {
     if (scene.tree !== this.tree) this.reset(scene.tree, size);
     const dt = this.frameTime(time);
     ctx.clearRect(0, 0, size.w, size.h);
-    if (scene.reduced) { this.pulses = []; return; }
+    if (scene.reduced) { this.pulses = []; this.rays = []; return; }
     this.advance(dt, { ...size, nodes: scene.nodes, selected: scene.selected });
     for (const p of this.particles) {
       this.move(p, dt, size);
       drawParticle(ctx, p, size);
     }
     ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+    if (!this.rays.length) return;
+    for (const rays of this.rays) drawRays(ctx, rays, size);
+    ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
   }
 
   /** A still fluid and fresh particles for a new tree. */
   private reset(tree: string, { w, h }: Size) {
-    this.tree = tree; this.u.fill(0); this.v.fill(0); this.pulses = [];
+    this.tree = tree; this.u.fill(0); this.v.fill(0); this.pulses = []; this.rays = [];
     this.particles = Array.from({ length: Math.min(360, Math.max(150, Math.round(w*h/850))) }, () => ({
       x: fx(), y: fx(), radius: .65 + fx()*.8, alpha: .2 + fx()*.35,
     }));
@@ -83,6 +99,8 @@ export class TreeParticles {
     }
     for (const pulse of this.pulses) pulse.age += dt;
     this.pulses = this.pulses.filter(p => p.age < 1.2);
+    for (const rays of this.rays) rays.age += dt;
+    this.rays = this.rays.filter(r => r.age < RAYS_LIFE);
   }
 
   /** Carries a particle along the fluid and the purchase bursts, wrapping
@@ -157,6 +175,39 @@ function drawParticle(ctx: CanvasRenderingContext2D, p: Particle, { w, h }: Size
   ctx.shadowColor = '#edbe63'; ctx.shadowBlur = 5;
   ctx.fillStyle = '#f3cf82';
   ctx.beginPath(); ctx.arc(p.x*w, p.y*h, p.radius, 0, Math.PI*2); ctx.fill();
+}
+
+/** An unlock's rays: a soft halo and a wheel of thin golden rays, long and
+ * short in turn, that grow out from the node, turn slowly and shimmer, each
+ * at its own beat, fading in quickly and out over most of their life. */
+function drawRays(ctx: CanvasRenderingContext2D, rays: Rays, { w, h }: Size) {
+  const t = rays.age / RAYS_LIFE;
+  const fade = Math.min(1, rays.age / .15) * (t < .4 ? 1 : 1 - (t - .4) / .6);
+  if (fade <= 0) return;
+  const cx = rays.x*w, cy = rays.y*h, grow = 1 - (1 - t) ** 3;
+  ctx.globalCompositeOperation = 'lighter';
+  const halo = ctx.createRadialGradient(cx, cy, 0, cx, cy, 34 + 16*grow);
+  halo.addColorStop(0, `rgba(255, 236, 170, ${.5*fade})`);
+  halo.addColorStop(1, 'rgba(255, 220, 140, 0)');
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = halo;
+  ctx.beginPath(); ctx.arc(cx, cy, 34 + 16*grow, 0, Math.PI*2); ctx.fill();
+  const inner = 14, turn = rays.age * .5;
+  for (let i = 0; i < RAY_COUNT; i++) {
+    const angle = turn + i * Math.PI*2 / RAY_COUNT;
+    const shimmer = .7 + .3*Math.sin(rays.age*11 + i*2.4);
+    const length = inner + (i % 2 ? 26 : 48) * (.35 + .65*grow) * shimmer;
+    const spread = i % 2 ? .05 : .075;
+    const ray = ctx.createRadialGradient(cx, cy, inner, cx, cy, length);
+    ray.addColorStop(0, `rgba(255, 244, 200, ${.85*fade*shimmer})`);
+    ray.addColorStop(1, 'rgba(255, 210, 120, 0)');
+    ctx.fillStyle = ray;
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(angle - spread)*inner, cy + Math.sin(angle - spread)*inner);
+    ctx.lineTo(cx + Math.cos(angle)*length, cy + Math.sin(angle)*length);
+    ctx.lineTo(cx + Math.cos(angle + spread)*inner, cy + Math.sin(angle + spread)*inner);
+    ctx.closePath(); ctx.fill();
+  }
 }
 
 /** A purchase's outward push on a particle, in map units per second. */

@@ -155,6 +155,9 @@ export type ModeSave<R extends Run = Run> = {
   /** Gold picked up during the current run, kept outside `run` like
    * `lootedTiles`, since undo never takes Gold back. */
   runGold: number;
+  /** The mode's currency (Inspiration or Courage) earned during the current
+   * run, from milestones and clear chests, kept beside `runGold`. */
+  runCurrency: number;
   /** The numbered tower (or delve) selected: the slice's records (`best`,
    * `reached`, and the Tower's log and sections) are this tier's. */
   tier: number;

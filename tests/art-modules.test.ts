@@ -41,6 +41,13 @@ function recorder(name: string, extra: Record<string, unknown> = {}): CanvasRend
           for (let i = 0; i < data.length; i++) data[i] = (i * 37 + w * 11 + h) & 255;
           return { data, width: w, height: h };
         };
+      // A gradient notes its colour stops, and names itself where it's used.
+      if (key === "createLinearGradient" || key === "createRadialGradient")
+        return (...a: number[]) => {
+          const label = `${name}.${key}(${a.join(",")})`;
+          note(label);
+          return { addColorStop: (at: number, colour: string) => note(`${label}.stop(${at},${colour})`), toString: () => label };
+        };
       return (...args: unknown[]) => note(`${name}.${key}(${args.map((a) => (a instanceof Object && "data" in a ? "img" : a)).join(",")})`);
     },
     set: (_, key: string, value) => {
@@ -169,7 +176,8 @@ function treeRunDrawn(seed: number): string {
 }
 
 /** A steady 40 ms frame (exactly the 30 Hz step), long-lived purchase
- * pulses, a mote right at a pulse's centre, and a frame with no height. */
+ * pulses, a mote right at a pulse's centre, two unlocks' rays (one still
+ * shining as the next comes), and a frame with no height. */
 function treeSteady(): string {
   return withStream("effects", seeded(9), treeSteadyDrawn);
 }
@@ -186,13 +194,14 @@ function treeSteadyDrawn(): string {
         (fluid as unknown as { particles: unknown[] }).particles.push({ x: pulse.x / 100 + 0.5 / 360, y: pulse.y / 100, radius: 1, alpha: 0.5 });
       }
       if (frame === 3) fluid.purchase(nodes[0]);
+      if (frame === 5 || frame === 20) fluid.unlock(nodes[frame === 5 ? 2 : 0]);
       canvas.clientHeight = frame === 50 ? 0 : 480;
       time += 40;
       note(`steady ${frame}`);
       fluid.draw(el, time, { tree: "steady", nodes, selected: null, reduced: false });
     }
-    const f = fluid as unknown as { u: Float32Array; particles: unknown[]; pulses: unknown[] };
-    note(JSON.stringify([Array.from(f.u), f.particles, f.pulses]));
+    const f = fluid as unknown as { u: Float32Array; particles: unknown[]; pulses: unknown[]; rays: unknown[] };
+    note(JSON.stringify([Array.from(f.u), f.particles, f.pulses, f.rays]));
     return digest();
   }
 }
