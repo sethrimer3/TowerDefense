@@ -134,7 +134,6 @@ try {
       }, 25),
       // Built last, so the fixtures above keep their run seeds.
       fallenUndo: fallen((s) => { s.upgrades.inspirationUndos = 1; }),
-      fallenRevive: fallen((s) => { s.upgrades.revive = 1; }),
       fallenBare: fallen(),
     };
   });
@@ -286,6 +285,8 @@ try {
       if (tree === "training") {
         // Train each stat the points still cover.
         for (const stat of await page.locator("[data-train]:not([disabled])").evaluateAll((bs) => bs.map((b) => b.dataset.train))) {
+          // Training one stat can spend the last point another needed.
+          if (!(await page.locator(`[data-train="${stat}"]:not([disabled])`).count())) continue;
           await click(`[data-train="${stat}"]:not([disabled])`);
           await shot(`${prefix}.tree.training.${stat}`);
         }
@@ -386,15 +387,11 @@ try {
   await click("#auto");
   await shot("fresh.autoLocked.forest");
 
-  // A fallen hero: the defeat dialog, with an undo, with Revive, or with neither.
+  // A fallen hero: the defeat dialog, with an undo or without.
   await load("fallenUndo");
   await shot("fallen.undo");
   await click("#defeat-undo");
   await shot("fallen.undo.undone");
-  await load("fallenRevive");
-  await shot("fallen.revive");
-  await click("#defeat-undo");
-  await shot("fallen.revive.revived");
   await load("fallenBare");
   await shot("fallen.bare");
   await click("#defeat-accept");

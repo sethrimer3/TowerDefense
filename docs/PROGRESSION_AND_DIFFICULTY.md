@@ -144,8 +144,8 @@ Every Inspiration skill is an unlock, bought once; more of what one gives comes 
 
 With the current first-level costs, the direct prerequisite path to unlock Delve is approximately:
 
-- Hand Ordering: 1 Inspiration
-- Combat Stance: 2 Inspiration
+- Combat Stance: 1 Inspiration
+- Buildout: 2 Inspiration
 - Heal: 3 Inspiration
 - Gear: 5 Inspiration
 - Focus: 10 Inspiration
@@ -300,6 +300,8 @@ The Archives skill (10 Inspiration, after Focus, off the Delve path) opens the s
 Recovery (10 Inspiration below Greater Heal, 44 down the path) brings percent potions onto the floors of runs that go inside with it: each of the Tower's potions and the Delve's corridor-guard potions (not the pockets' sized ones) is one with a chance fixed when the run goes inside, 2% at first, each restoring the regular 35 HP plus 1% of max HP, and 0.25% more per rank of Potion % training (1 training point a rank, the same at every level). Before Recovery each is a regular potion, so buying it only adds healing; over time the percent share grows to dominate the flat one, which keeps potions useful as max HP scales in long-term progression.
 
 Find Potion (10 Inspiration below Recovery, 54 down the path) opens Find Potion training: each rank (1 training point, the same at every level) adds 0.25% to that chance, up to 20% at 72 ranks. Each potion has a fixed number of its own, and is a percent potion when that falls under the run's chance, so a higher chance only ever adds percent potions.
+
+Revive (10 Inspiration below Shroud, 54 down the path; formerly a Courage skill that took a fatal fight back) gives every enemy strike that would fell the hero a chance to raise it at full HP instead, 0.5% at first and 0.5% more per rank of Revive training (1 training point a rank, the same at every level), up to 50% at 99 ranks; the fight goes on from the next round. Each strike's roll is a fixed number for its run, floor, tile and strike, so undo cannot reroll it and a higher chance only ever adds revivals. Forecasts and the planners ignore it: nothing should be planned on a 0.5% chance.
 
 Shroud (10 Inspiration below Greater Heal, beside Recovery, 44 down the path) gives the hero a shroud that blocks the first 1 damage of every fight, whole again at each fight's start, and opens Shroud training (1 training point a rank, each worth 1 + L/10 at level L, like the other stats). Because it renews every fight, a point of shroud is worth far more over a run than a point of max HP, so its ranks are worth a tenth of max HP's. The shroud comes off the damage after DEF, so it matters most against enemies DEF has fallen behind; fight forecasts count it.
 ---

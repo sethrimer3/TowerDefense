@@ -34,7 +34,7 @@ export function renderHud(game: Game, renderer: Renderer, overlay: BoardOverlay)
   renderUndo(game);
   (document.querySelector(".dpad") as HTMLElement).hidden = !game.save.settings.showArrows;
   renderLockedTab("delve", !!game.save.upgrades.delve, "Delve", "Unlock Into the depths in the Inspiration tree");
-  renderLockedTab("deck", !!game.save.upgrades.handOrdering, "Deck", "Unlock Hand Ordering in the Inspiration tree");
+  renderLockedTab("deck", !!game.save.upgrades.handOrdering, "Deck", "Unlock Combat Stance in the Inspiration tree");
   // A new Deck lesson waits behind the button until its tutorial is done.
   const { deck, addCard } = game.save.tutorials;
   document.querySelector(`[data-tab="deck"]`)?.classList.toggle("notify", !deck || (!!game.save.upgrades.combatStance && !addCard));
@@ -137,7 +137,7 @@ export function renderVitals(game: Game) {
   text("defense", p.defense);
   text("shroud", p.shroud ?? 0);
   el("shroud-stat").hidden = !game.save.upgrades.shroud;
-  text("run-gold", game.save[game.mode].runGold);
+  text("gold", devAmount(game, game.save.gold));
   text("run-silver", game.silver);
   for (const k of ["yellow", "blue", "red"] as const) text(k, p.keys[k]);
   const skeletonKeys = p.skeletonKeys ?? 0;

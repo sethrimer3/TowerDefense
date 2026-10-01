@@ -69,7 +69,7 @@ A fight being played out on the board, strike by strike, with its damage rising 
 _Avoid_: combat animation, pending fight
 
 **Fallen**:
-The hero lost a fight: the run waits at 0 HP, the hand paused, until the player takes the fight back (Undo, spending one; or Revive, when none is left) or accepts defeat, which ends the run and returns to the forest.
+The hero lost a fight: the run waits at 0 HP, the hand paused, until the player takes the fight back (Undo, spending one) or accepts defeat, which ends the run and returns to the forest.
 _Avoid_: dead, game over
 
 **Gain**:
@@ -87,8 +87,12 @@ How much XP the character has gathered from kills over every run. A kill pays mo
 _Avoid_: rank
 
 **Training point**:
-The currency each level earns (three a level), spent on ranks of training in the character's stats (max HP, ATK, DEF, and the shroud once the Shroud skill is owned) and, with Recovery and Find Potion, in Potion % and Find Potion on the Training tab. A stat rank's worth grows with the character's level.
+The currency each level earns (three a level), spent on ranks of training in the character's stats (max HP, ATK, DEF, and the shroud once the Shroud skill is owned) and, with Recovery, Find Potion and Revive, in Potion %, Find Potion and Revive on the Training tab. A stat rank's worth grows with the character's level.
 _Avoid_: skill point, stat point
+
+**Revival**:
+The hero rising at full HP from a strike that would have felled it, by the Revive skill's chance (0.5%, more with Revive training); the fight goes on.
+_Avoid_: resurrection, second life
 
 **Percent potion**:
 The red, striped potion: it restores a regular potion's HP plus a share of max HP (1% with the Recovery skill, more with Potion % training). With Recovery owned, each potion a run finds may be one, by a chance fixed when the run goes inside (2%, more with Find Potion training, up to 20%); otherwise each is a regular potion.
@@ -146,7 +150,7 @@ The cards the player sets up before a run, in priority order, in up to five slot
 _Avoid_: loadout (what the character starts a run with)
 
 **Deck**:
-All the player's cards: those in the hand and those waiting outside it. Also the page where the hand is ordered (with the Hand Ordering skill) and its cards chosen from the deck (with Combat Stance).
+All the player's cards: those in the hand and those waiting outside it. Also the page where the hand is ordered (with the Combat Stance skill) and its cards chosen from the deck (with Buildout).
 
 **Focus**:
 Putting one card of the hand ahead of the others inside a run, until the hero reaches its target or the card has no path to one. A run has a limited number of Focus uses.
@@ -159,5 +163,5 @@ _Avoid_: deadlock
 ### The Delve
 
 **Automove memory**:
-What Delve Automove has seen of the labyrinth during this run, and how often the player has stood on each tile. Undo and Revive leave it as it is, since what was seen stays seen; it is forgotten when a run enters the labyrinth, when a milestone gate seals behind the player, and when the layout changes.
+What Delve Automove has seen of the labyrinth during this run, and how often the player has stood on each tile. Undo leaves it as it is, since what was seen stays seen; it is forgotten when a run enters the labyrinth, when a milestone gate seals behind the player, and when the layout changes.
 _Avoid_: known tiles, visit map

@@ -24,10 +24,10 @@ export const UPGRADES = [
   {
     id: "revive",
     name: "Revive",
-    description: "Undo a fatal move before moving in the new run",
-    base: 12,
+    description: "When a strike would fell you, a 0.5% chance to rise at full HP and fight on: opens Revive training",
+    base: 10,
     max: 1,
-    currency: "courage",
+    currency: "inspiration",
   },
   {
     id: "undos",
@@ -121,7 +121,7 @@ export const UPGRADES = [
   },
   {
     id: "handOrdering",
-    name: "Hand Ordering",
+    name: "Combat Stance",
     description: "Open the Deck, where you reorder the cards in your hand before a run",
     base: 1,
     max: 1,
@@ -129,7 +129,7 @@ export const UPGRADES = [
   },
   {
     id: "combatStance",
-    name: "Combat Stance",
+    name: "Buildout",
     description: "Unlock the Deck: add its cards to your hand, or set them aside, to choose what a run heads for",
     base: 2,
     max: 1,
@@ -323,6 +323,7 @@ export const TRAINING = [
   { id: "shroud", name: "Shroud", group: "defense", stat: "shroud", base: 1, growth: 10, cost: 1, requires: "shroud" },
   { id: "potion", name: "Potion %", group: "defense", requires: "recovery", cost: 1 },
   { id: "findPotion", name: "Find Potion", group: "defense", requires: "findPotion", cost: 1, max: 72 },
+  { id: "revive", name: "Revive", group: "defense", requires: "revive", cost: 1, max: 99 },
 ] as const;
 export type TrainingId = (typeof TRAINING)[number]["id"];
 export type TrainingRow = (typeof TRAINING)[number];
@@ -339,6 +340,10 @@ export const POTION_PERCENT_BASE = 100, POTION_PERCENT_RANK = 25;
  * hundredths of a percent: 2% with Recovery, and 0.25% more for each Find
  * Potion rank, up to 20% (72 ranks). */
 export const FIND_POTION_BASE = 200, FIND_POTION_RANK = 25, FIND_POTION_MAX = 2000;
+/** The chance each strike that would fell the hero revives it instead, in
+ * hundredths of a percent: 0.5% with Revive, and 0.5% more for each Revive
+ * rank, up to 50% (99 ranks). */
+export const REVIVE_BASE = 50, REVIVE_RANK = 50, REVIVE_MAX = 5000;
 /** What one rank of `row` is worth at `level`, unrounded. */
 export const trainingWorth = (row: StatTrainingRow, level: number) => row.base * (1 + level / row.growth);
 /** What `ranks` ranks of `row` add to the character at `level`, rounded

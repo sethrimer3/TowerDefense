@@ -1,5 +1,5 @@
 import type { Save } from "./entities.ts";
-import { FIND_POTION_BASE, FIND_POTION_MAX, FIND_POTION_RANK, GOLD_SHOP, POTION_PERCENT_BASE, POTION_PERCENT_RANK, TRAINING, TRAINING_PER_LEVEL, UPGRADES, isStatRow, levelForXp, trained, trainingWorth, type GoldItemId, type TrainingId, type UpgradeId } from "./config.ts";
+import { FIND_POTION_BASE, FIND_POTION_MAX, FIND_POTION_RANK, REVIVE_BASE, REVIVE_MAX, REVIVE_RANK, GOLD_SHOP, POTION_PERCENT_BASE, POTION_PERCENT_RANK, TRAINING, TRAINING_PER_LEVEL, UPGRADES, isStatRow, levelForXp, trained, trainingWorth, type GoldItemId, type TrainingId, type UpgradeId } from "./config.ts";
 import { getEquippedBonuses } from "./crafting.ts";
 import { RESEARCH, researched } from "./archives.ts";
 
@@ -121,6 +121,13 @@ export const percentPotionChance = (save: Pick<Save, "upgrades" | "training">) =
   save.upgrades.recovery ? findPotionChance(save.upgrades.findPotion ? save.training.findPotion : 0) : 0;
 const findPotionChance = (ranks: number) => Math.min(FIND_POTION_MAX, FIND_POTION_BASE + FIND_POTION_RANK * ranks);
 
+/** The chance each strike that would fell the hero revives it, in
+ * hundredths of a percent: none without Revive, and Revive training raises
+ * it. */
+export const reviveChance = (save: Pick<Save, "upgrades" | "training">) =>
+  save.upgrades.revive ? reviveChanceAt(save.training.revive) : 0;
+const reviveChanceAt = (ranks: number) => Math.min(REVIVE_MAX, REVIVE_BASE + REVIVE_RANK * ranks);
+
 /** Whether `id` has as many ranks as it can take. */
 export const trainingMaxed = (save: Pick<Save, "training">, id: TrainingId) => {
   const row = TRAINING.find((t) => t.id === id)!;
@@ -135,8 +142,8 @@ export function trainingStep(save: Save, id: TrainingId) {
     affordable = !maxed && (save.settings.freePurchases || trainingPoints(save).left >= row.cost);
   if (!isStatRow(row)) {
     const ranks = save.training[id];
-    const [value, rank] = id === "findPotion"
-      ? [findPotionChance, FIND_POTION_RANK]
+    const [value, rank] = id === "findPotion" ? [findPotionChance, FIND_POTION_RANK]
+      : id === "revive" ? [reviveChanceAt, REVIVE_RANK]
       : [(r: number) => POTION_PERCENT_BASE + POTION_PERCENT_RANK * r, POTION_PERCENT_RANK];
     return { row, unit: "%", now: value(ranks) / 100, next: value(maxed ? ranks : ranks + 1) / 100, worth: rank / 100, affordable, maxed };
   }

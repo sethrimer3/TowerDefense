@@ -7,12 +7,11 @@ import { lightningOpacity } from "../src/weather.ts";
 import { chooseStep } from "../src/automation.ts";
 
 for (const mode of ["tower", "delve"] as const) {
-  test(`${mode}: death, forest persistence, entry, Undo and Revive preserve progression`, () => {
+  test(`${mode}: death, forest persistence, entry and Undo preserve progression`, () => {
     const g = new Game(defaults());
     g.save.upgrades.inspirationUndos = 1; // undo needs Rehearsed steps
     g.save.upgrades.delve = 1;
     g.switchMode(mode);
-    g.save.upgrades.revive = 1;
     const before = g.snapshot();
     // Lethal but damageable (low defense so it's not impervious), on the
     // board as it stands (undo builds it again).

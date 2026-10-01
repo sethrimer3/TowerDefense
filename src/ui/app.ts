@@ -11,7 +11,7 @@ export const isBoard = (id: string): id is "tower" | "delve" => id === "tower" |
 export type PageGame = Readonly<Pick<Game, "mode" | "run" | "save" | "fallen" | "stepRules" | "free">> &
   Pick<
     Game,
-    | "undo" | "revive" | "acceptDefeat" | "eraseAll" | "finish" | "setDevMode"
+    | "undo" | "acceptDefeat" | "eraseAll" | "finish" | "setDevMode"
     | "sectionUnlocked" | "startSection" | "setStartSection"
     | "buy" | "train" | "arrangeHand" | "addToHand" | "removeFromHand" | "buyGold" | "craftEquipment" | "craftConsumable" | "salvageEquipment"
     | "equipItem" | "unequipSlot" | "useConsumable"

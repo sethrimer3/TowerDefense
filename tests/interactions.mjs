@@ -76,9 +76,9 @@ const scene = await page.evaluate(async () => {
 const { key, door, enemy } = scene;
 /** A fresh run on the chosen seed with the player at (x, y) and `open` /
  * `closed` tiles forced to floor / wall. */
-const place = (s, { seed, x, y, open = [], closed = [], stats = {}, revive = false }) => {
+const place = (s, { seed, x, y, open = [], closed = [], stats = {}, undo = false }) => {
   s.upgrades.delve = 1;
-  if (revive) s.upgrades.revive = 1;
+  if (undo) s.upgrades.inspirationUndos = 1;
   // A settled camera and single-tap moves keep tap positions deterministic.
   s.settings.transition = "instant";
   s.settings.oneTapMove = true;
@@ -134,12 +134,12 @@ await expect(page.locator("#message")).toContainText("Requires amber key.");
 await page.screenshot({ path: "test-results/blocked-door.png", fullPage: true });
 
 // A lethal fight leaves the hero fallen: the defeat dialog survives a
-// refresh, and Revive takes the fight back.
+// refresh, and Undo takes the fight back.
 const weak = {
   seed: scene.seed, x: enemy.x, y: enemy.y - 2,
   open: [[enemy.x, enemy.y - 2], [enemy.x, enemy.y - 1]],
   stats: { hp: 1, attack: 1, defense: 0 },
-  revive: true,
+  undo: true,
 };
 await fixture(place, weak);
 await swipe(0, -1);
@@ -170,6 +170,6 @@ await page.locator("#undo").click();
 await expect.poll(async () => (await player()).x).toBe(29);
 if (errors.length) throw Error(errors.join("\n"));
 console.log(
-  `Four swipe directions, tap path/pickup, undo, locked-door stop, death reset, Revive refresh and expiry, and edge wrap passed (seed ${scene.seed}).`,
+  `Four swipe directions, tap path/pickup, undo, locked-door stop, death reset, the defeat dialog across a refresh, and edge wrap passed (seed ${scene.seed}).`,
 );
 await browser.close();

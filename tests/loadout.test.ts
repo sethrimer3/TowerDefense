@@ -163,7 +163,7 @@ test("descriptions are written from the grants", () => {
       handOrdering: "Open the Deck, where you reorder the cards in your hand before a run",
       combatStance: "Unlock the Deck: add its cards to your hand, or set them aside, to choose what a run heads for",
       inspirationUndos: "Rewind an action, and open Undo Count research in the Archives",
-      revive: "Undo a fatal move before moving in the new run",
+      revive: "When a strike would fell you, a 0.5% chance to rise at full HP and fight on: opens Revive training",
     },
   );
   assert.deepEqual(GOLD_SHOP.map((g) => provisionText(g.id)), [

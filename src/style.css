@@ -967,6 +967,13 @@ dialog p {
   color: #e8cd94;
   margin-bottom: 5px;
 }
+/* Five figures to a row (the defeat dialog) fit a phone's width. */
+.summary-stats.compact {
+  gap: 6px;
+}
+.summary-stats.compact strong {
+  font-size: 22px;
+}
 @media (max-width: 480px) {
   .shell {
     padding: 14px 13px max(8px, env(safe-area-inset-bottom));

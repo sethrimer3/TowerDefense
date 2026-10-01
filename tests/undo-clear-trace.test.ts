@@ -111,11 +111,10 @@ function trace(mode: Mode, seed: number): string[] {
       let action: unknown, result: unknown;
       const roll = rng();
       if (g.fallen) {
-        // A fallen hero's fight is undone or revived, or defeat is accepted
+        // A fallen hero's fight is undone, or defeat is accepted
         // and the player walks on from the forest, or a fresh run starts.
         action = "fallen";
-        if (roll < 0.3) result = g.undo();
-        else if (roll < 0.5) result = g.revive();
+        if (roll < 0.5) result = g.undo();
         else if (roll < 0.8) result = g.acceptDefeat();
         else result = (g.acceptDefeat(), g.newRun(), "new");
       } else if (roll < 0.15) {

@@ -90,7 +90,7 @@ export type RunCore = {
    * move the hero for the rest of the run. */
   hand?: CardId[];
   /** Silver held: earned from enemies and spent inside this run only, so
-   * undo and Revive take it back with the rest of the run. */
+   * undo takes it back with the rest of the run. */
   silver?: number;
   /** Focus uses spent this run. What is left is what a run gets now less
    * these, so a Focus Count level completed mid-run counts at once. */

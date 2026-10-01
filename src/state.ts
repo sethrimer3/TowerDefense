@@ -3,7 +3,7 @@ import { chooseStep } from "./automation.ts";
 import { CARDS, HAND_SLOTS, deckCards, moveCard, planHand, type CardId, type CardPlan } from "./cards.ts";
 import { DelvePlan } from "./delve/automove.ts";
 import { defaults } from "./save.ts";
-import { stream } from "./random.ts";
+import { stream, tileRandom } from "./random.ts";
 import { doorBlockedMessage, doorName, KEY_ORDER } from "./doors.ts";
 import { skillAvailable } from "./skill-trees.ts";
 import { routeTo, type Step } from "./pathfinding.ts";
@@ -42,7 +42,7 @@ import {
 import { World, LAYOUT_VERSION } from "./delve/world.ts";
 import { RoomWorld, TOWER_LAYOUT_VERSION } from "./tower/room-world.ts";
 import type { Board } from "./board.ts";
-import { bout, heroHpDuring, type Bout, type CombatPrediction } from "./combat.ts";
+import { bout, heroHpAfter, heroHpDuring, revivals, type Bout, type CombatPrediction, type Revival } from "./combat.ts";
 import { ATTACK_SHARD, DEFENSE_SHARD, isLethal, potionHeal, resolveStep, type StepBlocked, type StepEffect, type StepRules } from "./step-effects.ts";
 import { OutsideWorld } from "./outside.ts";
 import { ClearLedger } from "./tower/clear-ledger.ts";
@@ -50,7 +50,7 @@ import { TowerClimb } from "./tower/climb.ts";
 import { materialDef, MATERIALS } from "./materials.ts";
 import { rollTreasureLoot } from "./loot.ts";
 import { MODES, milestones, type ModeProfile } from "./modes.ts";
-import { keepUndos, loadout, percentPotionChance, potionPercent, trainingMaxed, trainingPoints } from "./loadout.ts";
+import { keepUndos, loadout, percentPotionChance, potionPercent, reviveChance, trainingMaxed, trainingPoints } from "./loadout.ts";
 import { RESEARCH, cancelResearch, hastenResearch, hireArchivist, researched, settleArchives, startResearch, type ResearchId, type ResearchRecord } from "./archives.ts";
 import {
   creditMaterials,
@@ -83,6 +83,8 @@ export type GainArt = { tile: Tile; spent?: true } | { material: MaterialId; qua
 export type Heal = { from: number; to: number; x: number; y: number; id: number };
 /** Rewards kept for the board to show; older ones are dropped unseen. */
 const MAX_GAINS = 12;
+/** Salts the run seed for Revive's rolls, apart from the world's own. */
+const REVIVE_SALT = 0x7e51e;
 /** A fight being played out round by round before it counts: the hero waits
  * at `from`, the enemy stands at `to`, and nothing changes until
  * `finishEncounter` settles it (at `start + bout.duration`, performance time). */
@@ -125,6 +127,9 @@ export class Game {
   /** When the hero last reached a new level (performance.now()), for the
    * board's level-up burst; -Infinity once undo takes the level back. */
   levelUpAt = -Infinity;
+  /** When each of the latest fight's revivals lands (performance.now()),
+   * for the board's golden fire; emptied by undo. */
+  revivedAt: number[] = [];
   /** Delve Automove's committed route and last weighed decisions. */
   readonly delvePlan = new DelvePlan();
   /** `rng` is the game's randomness: new run seeds, enemy drops and
@@ -232,7 +237,9 @@ export class Game {
     const record = this.run.height > this.slice.reached;
     this.recordProgress();
     this.claimRewards();
-    this.save.gold += this.rules.endGold(this.run);
+    const gold = this.rules.endGold(this.run);
+    this.save.gold += gold;
+    this.slice.runGold += gold;
     return record;
   }
   snapshot(): MoveSnapshot {
@@ -248,6 +255,7 @@ export class Game {
     // (and any level it reached) is: the kill it paid for is undone.
     this.recordProgress();
     if (levelForXp(snapshot.xp) < levelForXp(this.save.xp)) this.levelUpAt = -Infinity;
+    this.revivedAt = [];
     this.save.xp = snapshot.xp;
     this.route = [];
     // Undo pauses the hand, so the player can act before it carries on.
@@ -279,18 +287,6 @@ export class Game {
     slice.fall = null;
     this.restore(fall?.snapshot ?? snapshot);
     this.feedback(fall ? "Fatal fight undone · the hand waits" : "Move undone");
-    return true;
-  }
-  /** Takes back the fight the hero fell in without spending an undo: the
-   * Revive skill, for a hero with no undo left. */
-  revive() {
-    this.finishEncounter();
-    const fall = this.slice.fall;
-    if (!this.fallen || !fall || !this.save.upgrades.revive) return false;
-    if (this.slice.history.length) return this.undo();
-    this.slice.fall = null;
-    this.restore(fall.snapshot);
-    this.feedback("Revived · the fatal fight is undone");
     return true;
   }
   /** Accepts the hero's defeat: the run ends and pays out, and the next one
@@ -656,7 +652,7 @@ export class Game {
    * accepts defeat or ends it: pays out exactly once and starts the next run
    * in the forest. */
   private finalizeRun(reason: string, dead: boolean) {
-    const record = this.payout();
+    const record = this.payout(), gold = this.slice.runGold;
     this.slice.history = [];
     this.route = [];
     this.newRun({ outside: true });
@@ -664,7 +660,7 @@ export class Game {
     // Steadfast wayfinder and switched off the default turn-off-on-death.
     this.auto = dead && !!this.save.upgrades.autoPersist && !this.save.settings.autoOffOnDeath;
     this.dropHandPlan();
-    this.message = `${reason}${record ? " · a new record" : ""}. Follow the forest path to begin again.`;
+    this.message = `${reason}${record ? " · a new record" : ""}${gold ? ` · ${gold} Gold kept` : ""}. Follow the forest path to begin again.`;
   }
   /** The hero fell in a fight: the run waits at 0 HP, the hand paused, for
    * the player to undo the fight or accept defeat. */
@@ -689,8 +685,7 @@ export class Game {
     return !this.run.outside && !this.fallen;
   }
   /** The hero fell in the fight just taken: the run waits at 0 HP, the hand
-   * paused, until the player undoes that fight (or Revives) or accepts
-   * defeat. */
+   * paused, until the player undoes that fight or accepts defeat. */
   get fallen() {
     return !this.run.outside && this.run.player.hp <= 0;
   }
@@ -716,30 +711,53 @@ export class Game {
       this.feedback("Lethal encounter. Inspect the enemy before proceeding.");
       return false;
     }
+    const animate = t.kind === "enemy" && this.playsFights && this.save.settings.fightAnimation;
+    // A strike that would fell the hero may revive it instead (Revive), so
+    // a lost fight is played out strike by strike to see how it ends.
+    const revive = isLethal(outcome) ? this.revival(dest) : undefined;
+    const fight = animate || revive ? bout(p, t.enemy!, revive) : null, start = performance.now();
+    const rose = fight ? revivals(fight) : [];
+    if (fight && rose.length) {
+      outcome.player.hp = heroHpAfter(fight, p.hp);
+      outcome.combat = { ...outcome.combat!, survivable: outcome.player.hp > 0 };
+    }
     // The Animate fights setting plays the fight out before it counts.
-    if (t.kind === "enemy" && this.playsFights && this.save.settings.fightAnimation) {
+    if (animate) {
+      this.revivedAt = rose.map((at) => start + at);
       this.encounter = {
-        from: { x: p.x, y: p.y }, to: dest, bout: bout(p, t.enemy!), start: performance.now(),
-        settle: () => this.take(t, outcome, dest, track),
+        from: { x: p.x, y: p.y }, to: dest, bout: fight!, start,
+        settle: () => this.take(t, outcome, dest, track, rose.length),
       };
       return true;
     }
-    return this.take(t, outcome, dest, track);
+    if (rose.length) this.revivedAt = [start];
+    return this.take(t, outcome, dest, track, rose.length);
+  }
+  /** Whether each strike at (x, y) that would fell the hero revives it: a
+   * fixed number per run, floor, tile and strike, under the Revive chance,
+   * so taking the fight back and fighting it again ends the same way, and
+   * more Revive training only ever adds revivals. */
+  private revival(at: { x: number; y: number }): Revival | undefined {
+    const chance = reviveChance(this.save);
+    if (!chance || this.run.outside) return undefined;
+    const floor = this.mode === "tower" ? this.run.height + 1 : 0,
+      seed = this.run.seed ^ REVIVE_SALT ^ Math.imul(floor, 0x9e3779b1);
+    return (strike) => tileRandom(at.x, at.y, (seed ^ Math.imul(strike + 1, 0x85ebca6b)) | 0) * 10000 < chance;
   }
   /** Takes a resolved step: in through its door or fight, then onto the tile. */
-  private take(t: Tile, outcome: StepEffect, dest: { x: number; y: number }, track: boolean) {
-    if (!this.enter(t, outcome, dest, track)) return false;
+  private take(t: Tile, outcome: StepEffect, dest: { x: number; y: number }, track: boolean, revived = 0) {
+    if (!this.enter(t, outcome, dest, track, revived)) return false;
     this.land(t, dest.x, dest.y, outcome);
     return true;
   }
   /** Commits a resolved step: undo history, stats, and the door or fight on
    * the way in. Returns false when the player fell. */
-  private enter(t: Tile, outcome: StepEffect, dest: { x: number; y: number }, track: boolean) {
+  private enter(t: Tile, outcome: StepEffect, dest: { x: number; y: number }, track: boolean, revived: number) {
     const before = this.snapshot();
     if (track) this.remember(before);
     this.applyStats(outcome.player);
     if (t.kind === "door") this.openDoor(t, outcome.keysSpent, dest);
-    return t.kind !== "enemy" || this.winFight(t.enemy!, outcome.combat!, before, dest);
+    return t.kind !== "enemy" || this.winFight(t.enemy!, outcome.combat!, before, dest, revived);
   }
   /** Moves the player onto the tile and applies what standing there does. */
   private land(t: Tile, x: number, y: number, outcome: StepEffect) {
@@ -807,7 +825,7 @@ export class Game {
   }
   /** Settles a fight whose damage is already applied. Returns false when
    * the player fell. */
-  private winFight(enemy: Enemy, combat: CombatPrediction, before: MoveSnapshot, at: { x: number; y: number }) {
+  private winFight(enemy: Enemy, combat: CombatPrediction, before: MoveSnapshot, at: { x: number; y: number }, revived: number) {
     if (combat.damage > 0) this.mar("damaged");
     if (this.run.player.hp <= 0) {
       this.fallIn(before, enemy);
@@ -823,7 +841,7 @@ export class Game {
     if (gold) this.gain(at.x, at.y, `+${gold} Gold`);
     this.gain(at.x, at.y, `+${silver} Silver`);
     for (const d of drops) this.gain(at.x, at.y, materialText(d), { material: d.id, quantity: d.quantity });
-    this.message = [combat.damage ? `−${combat.damage} HP · ${enemy.name} defeated` : "Unscathed victory",
+    this.message = [revived ? `Revived · ${enemy.name} defeated` : combat.damage ? `−${combat.damage} HP · ${enemy.name} defeated` : "Unscathed victory",
       ...(gold ? [`+${gold} Gold`] : []), `+${silver} Silver`, ...drops.map(materialText)].join(" · ");
     return true;
   }
@@ -864,7 +882,7 @@ export class Game {
   }
   /** Clears Automove's memory when the labyrinth behind it is gone: a Delve
    * run entering it (a death sends the player to the forest first, so
-   * Revive keeps the memory), a sealed milestone gate, or a reshaped layout. */
+   * undo keeps the memory), a sealed milestone gate, or a reshaped layout. */
   private forgetLabyrinth() {
     if (this.mode === "delve") this.save.delve.memory = { known: {}, visited: {} };
   }
@@ -1029,14 +1047,14 @@ export class Game {
     return this.run.hand ?? this.save.hand;
   }
   /** Moves the hand's card in slot `from` to slot `to`, the cards between
-   * shifting over one (Hand Ordering, in the forest only). */
+   * shifting over one (Combat Stance, in the forest only). */
   arrangeHand(from: number, to: number) {
     const n = this.save.hand.length;
     if (!this.save.upgrades.handOrdering || !this.run.outside || !(from >= 0 && from < n && to >= 0 && to < n)) return false;
     this.save.hand = moveCard(this.save.hand, from, to);
     return true;
   }
-  /** Puts a deck card into the hand's first empty slot (Combat Stance, in
+  /** Puts a deck card into the hand's first empty slot (Buildout, in
    * the forest only). */
   addToHand(id: CardId) {
     const hand = this.save.hand;

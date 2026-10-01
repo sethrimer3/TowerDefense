@@ -151,7 +151,7 @@ el("end-run").onclick = () =>
   ctx.confirm(
     {
       title: "End this run?",
-      body: `End the current ${MODES[game.mode].words.run} at ${MODES[game.mode].words.progress} ${displayedProgress(game.run.height, !!game.run.outside)}. Milestone rewards are already yours, and uncollected clear chests will be claimed.`,
+      body: `End the current ${MODES[game.mode].words.run} at ${MODES[game.mode].words.progress} ${displayedProgress(game.run.height, !!game.run.outside)}. Milestone rewards are already yours${game.save[game.mode].runGold ? `, uncollected clear chests will be claimed, and the ${game.save[game.mode].runGold} Gold found this ${MODES[game.mode].words.run} is kept` : ", and uncollected clear chests will be claimed"}.`,
       label: "End run",
       cancel: MODES[game.mode].words.keepGoing,
     },

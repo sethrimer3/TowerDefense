@@ -131,10 +131,10 @@ test("erasing everything leaves a fresh save with a new run outside the Tower", 
   assert.deepEqual(g.save, fresh);
 });
 
-test("the Deck reorders the hand only with Hand Ordering and in the forest, and a run keeps the hand it went in with", () => {
+test("the Deck reorders the hand only with Combat Stance and in the forest, and a run keeps the hand it went in with", () => {
   const g = new Game(defaults());
   g.newRun({ outside: true, seed: 1 });
-  assert.equal(g.arrangeHand(0, 2), false, "not before Hand Ordering is bought");
+  assert.equal(g.arrangeHand(0, 2), false, "not before Combat Stance is bought");
   g.save.upgrades.handOrdering = 1;
   assert.ok(g.arrangeHand(0, 2));
   const ordered = ["door", "key", "stairs", "monster"];
@@ -153,10 +153,10 @@ test("the Deck reorders the hand only with Hand Ordering and in the forest, and 
   assert.deepEqual(loaded.hand, ordered, "and survives a reload");
 });
 
-test("Combat Stance moves cards between the deck and the hand in the forest, and STAIRS always stays", () => {
+test("Buildout moves cards between the deck and the hand in the forest, and STAIRS always stays", () => {
   const g = new Game(defaults());
   g.newRun({ outside: true, seed: 1 });
-  assert.equal(g.removeFromHand("monster"), false, "not before Combat Stance is bought");
+  assert.equal(g.removeFromHand("monster"), false, "not before Buildout is bought");
   g.save.upgrades.combatStance = 1;
   g.save.upgrades.cardHeal = 1;
   g.save.hand.push("heal");
@@ -287,4 +287,16 @@ test("a beaten enemy pays silver into the run, and undo takes it back", () => {
   assert.equal(g.silver, 0, "undo takes the kill's silver back");
   g.newRun({ outside: true, seed: 1 });
   assert.equal(g.silver, 0, "a new run starts with none");
+});
+
+test("ending a run keeps the Gold found in it and says how much", () => {
+  const g = new Game(defaults());
+  g.switchMode("tower");
+  g.newRun({ seed: 3 });
+  g.save.gold = 40;
+  g.save.tower.runGold = 12;
+  g.finish("Ascent ended");
+  assert.equal(g.save.gold, 40, "Gold is banked as it is found, and stays");
+  assert.match(g.message, /12 Gold kept/);
+  assert.equal(g.save.tower.runGold, 0, "the next run starts finding afresh");
 });

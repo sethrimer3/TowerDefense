@@ -22,6 +22,7 @@ export const TREES: SkillTree[] = [
     { id: "recovery", icon: "✦", x: 30, y: 124, requires: ["greaterHeal"] },
     { id: "findPotion", icon: "⚗", x: 30, y: 142, requires: ["recovery"] },
     { id: "shroud", icon: "◈", x: 70, y: 124, requires: ["greaterHeal"] },
+    { id: "revive", icon: "☼", x: 70, y: 142, requires: ["shroud"] },
   ] },
   { id: "courage", name: "Courage", currency: "courage", gate: "delve", description: "Earn Courage by beating your best Delve depth.", nodes: [
     { id: "auto", icon: "✦", x: 50, y: 10, requires: ["delve"] },
@@ -30,8 +31,7 @@ export const TREES: SkillTree[] = [
     { id: "attack", icon: "⚔", x: 50, y: 34, requires: ["auto"] },
     { id: "defense", icon: "⛨", x: 82, y: 34, requires: ["auto"] },
     { id: "undos", icon: "↺", x: 23, y: 61, requires: ["hp"] },
-    { id: "revive", icon: "☼", x: 77, y: 61, requires: ["defense"] },
-    { id: "legacy", icon: "♜", x: 50, y: 87, requires: ["attack", "undos", "revive"] },
+    { id: "legacy", icon: "♜", x: 50, y: 87, requires: ["attack", "undos"] },
   ] },
   { id: "wayfinding", name: "Wayfinding", currency: "courage", gate: "auto", description: "Teach Delve Automove to explore, compare routes and preserve resources.", nodes: [
     { id: "aiMemory", icon: "◇", x: 50, y: 20, requires: ["auto"] },

@@ -25,8 +25,8 @@ export function confirmAction(ctx: AppContext, { title, body, label, cancel }: C
 }
 
 /** Watches for a fallen hero: a dialog the player must answer, taking back
- * the fatal fight (with an undo left, or with Revive) or accepting defeat,
- * after which the forest fades in from black. */
+ * the fatal fight (with an undo left) or accepting defeat, after which the
+ * forest fades in from black. */
 export class DefeatDialog {
   private fadeOverlay = document.createElement("div");
 
@@ -50,22 +50,27 @@ export class DefeatDialog {
     const rules = MODES[game.mode],
       slice = game.save[game.mode],
       undos = slice.history.length,
-      revive = !undos && !!slice.fall && !!game.save.upgrades.revive,
-      by = slice.fall?.by;
+      by = slice.fall?.by,
+      progress = rules.words.progress, run = game.run;
     const takeBack = undos
       ? `<p>Undo takes back the fight, and the hand waits for you.</p>`
-      : revive
-        ? `<p>Revive takes back the fight without an undo, and the hand waits for you.</p>`
-        : `<p class="hint">No undo is left to take the fight back.</p>`;
-    const button = undos ? `<button id="defeat-undo">Undo (${undos} left)</button>` : revive ? `<button id="defeat-undo">Revive</button>` : "";
-    modal.innerHTML = `<span class="summary-icon">${uiSprite("revive")}</span><small>FALLEN IN COMBAT</small><h2>Your hero has fallen.</h2><p>${by ? `Defeated by ${by}` : "Defeated"} at ${rules.words.progress} ${displayedProgress(game.run.height)}. Milestone and clear rewards are already saved.</p><div class="summary-stats"><div><strong>${displayedProgress(game.run.height)}</strong>${rules.words.progress.toUpperCase()}</div><div><strong>${game.run.kills}</strong>VICTORIES</div><div><strong>${devAmount(game, rules.balance(game.save))}</strong>${rules.words.currency.toUpperCase()}</div></div>${takeBack}<div class="dialog-actions">${button}<button id="defeat-accept">Accept defeat</button></div>`;
+      : `<p class="hint">No undo is left to take the fight back.</p>`;
+    const button = undos ? `<button id="defeat-undo">Undo (${undos} left)</button>` : "";
+    const stat = (value: string | number, label: string) => `<div><strong>${value}</strong>${label}</div>`;
+    const stats = [
+      stat(displayedProgress(run.height), progress.toUpperCase()),
+      stat(displayedProgress(run.maxHeight ?? run.height), "HIGHEST"),
+      stat(run.kills, "VICTORIES"),
+      stat(slice.runGold, "GOLD"),
+      stat(devAmount(game, rules.balance(game.save)), rules.words.currency.toUpperCase()),
+    ].join("");
+    modal.innerHTML = `<span class="summary-icon">${uiSprite("revive")}</span><small>FALLEN IN COMBAT</small><h2>Your hero has fallen.</h2><p>${by ? `Defeated by ${by}` : "Defeated"} at ${rules.words.progress} ${displayedProgress(game.run.height)}. Milestone and clear rewards and the Gold found are already saved.</p><div class="summary-stats compact">${stats}</div>${takeBack}<div class="dialog-actions">${button}<button id="defeat-accept">Accept defeat</button></div>`;
     modal.showModal();
     const undo = document.querySelector<HTMLButtonElement>("#defeat-undo");
     if (undo)
       undo.onclick = () => {
         modal.close();
-        if (undos) game.undo();
-        else game.revive();
+        game.undo();
         ctx.navigate(game.mode);
       };
     el("defeat-accept").onclick = () => {

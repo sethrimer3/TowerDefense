@@ -33,13 +33,13 @@ const X_SVG = `<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2.5 2.5L7.5
 const CHECK_SVG = `<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2 5.4L4.2 7.6L8.2 2.8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
 /** Which Deck tutorial step waits on the player: `order`, dragging STAIRS
- * (Hand Ordering); `remove`, taking a card out of the hand with its X, and
- * `add`, the note on adding cards from the deck (both Combat Stance). */
+ * (Combat Stance); `remove`, taking a card out of the hand with its X, and
+ * `add`, the note on adding cards from the deck (both Buildout). */
 type Lesson = "order" | "remove" | "add" | null;
 
 /** The Deck page: the hand's five slots along the top, whose cards Hand
  * Ordering lets the player drag into a new order before a run, and the
- * deck's cards below, which Combat Stance lets the player add to the hand
+ * deck's cards below, which Buildout lets the player add to the hand
  * or take out of it (STAIRS always stays). Each skill's first visit
  * teaches it; while a step waits on the player, the page points at what to
  * do and nothing else on it or the tab row can be used. */
@@ -127,7 +127,7 @@ export class DeckPage {
     return `<section class="deck-reserve" aria-label="Deck (locked)">
         <h3 class="deck-label">Deck</h3>
         <div class="deck-reserve-slots" aria-hidden="true">${"<i></i>".repeat(10)}</div>
-        <p class="deck-lock"><b>Locked</b>${soon ? "Take a card out of your hand first." : "Unlock Combat Stance in the Inspiration tree to choose your hand's cards from here."}</p>
+        <p class="deck-lock"><b>Locked</b>${soon ? "Take a card out of your hand first." : "Unlock Buildout in the Inspiration tree to choose your hand's cards from here."}</p>
       </section>`;
   }
 
@@ -261,7 +261,7 @@ export class DeckPage {
     this.change(true);
     if (!taught) return;
     this.ctx.update();
-    this.praise("HAND ORDERING", "Well arranged!", "Your hand will now try its cards in this order. Each run takes the hand as you leave it here, so try different orders and see which carries you farthest.");
+    this.praise("COMBAT STANCE", "Well arranged!", "Your hand will now try its cards in this order. Each run takes the hand as you leave it here, so try different orders and see which carries you farthest.");
   }
 
   /** Returns a hand card to the deck; the first one finishes the remove tutorial. */
@@ -273,7 +273,7 @@ export class DeckPage {
     this.change(true);
     if (!taught) return;
     this.ctx.update();
-    this.praise("COMBAT STANCE", "Nicely done!", "With that card set aside, your runs will leave its targets alone. Try out different hands to find the one that suits each climb.");
+    this.praise("BUILDOUT", "Nicely done!", "With that card set aside, your runs will leave its targets alone. Try out different hands to find the one that suits each climb.");
   }
 
   /** A dialog praising what the player just did, closed by a press anywhere

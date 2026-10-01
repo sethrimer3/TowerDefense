@@ -107,7 +107,6 @@ test("a fallen hero waits: undo spends one to take the fight back, and the hand 
   assert.equal(g.run.player.hp, 0);
   assert.equal(g.save.delve.fall?.by, "Doom");
   assert.equal(g.move(0, -1), false, "a fallen hero takes no step");
-  assert.equal(g.revive(), false, "Revive needs the skill");
   const undos = g.save.delve.history.length;
   assert.ok(g.undo());
   assert.deepEqual(g.run, before);
@@ -115,23 +114,8 @@ test("a fallen hero waits: undo spends one to take the fight back, and the hand 
   assert.ok(!g.fallen && !g.auto && g.save.delve.fall === null);
   assert.equal(g.save.delve.courage, 0);
 });
-test("Revive takes the fatal fight back when no undo is left", () => {
-  const g = corridor();
-  g.save.upgrades.revive = 1;
-  g.move(0, 1);
-  g.run.changes["15,2"] = doom;
-  const before = structuredClone(g.run);
-  g.move(0, 1);
-  g.save.delve.history = [];
-  assert.equal(g.undo(), false, "no undo left");
-  assert.ok(g.revive());
-  assert.deepEqual(g.run, before);
-  assert.ok(!g.fallen && g.save.delve.fall === null);
-  assert.equal(g.revive(), false, "only a fallen hero revives");
-});
 test("a fallen hero, and the fight to take back, persist safely across refresh", () => {
   const g = corridor();
-  g.save.upgrades.revive = 1;
   // Saved changes hold only terrain, so the enemy stands on the live board.
   const tile = g.world.tile.bind(g.world);
   g.world.tile = (x, y) => (x === 15 && y === 1 ? doom : tile(x, y));
@@ -140,15 +124,10 @@ test("a fallen hero, and the fight to take back, persist safely across refresh",
   assert.ok(g.fallen);
   const saved = decode(JSON.stringify(g.save));
   assert.equal(saved.delve.fall?.by, "Doom");
-  let loaded = new Game(saved);
+  const loaded = new Game(saved);
   loaded.switchMode("delve");
   assert.ok(loaded.fallen && !loaded.auto);
   assert.ok(loaded.undo());
-  assert.deepEqual(loaded.run, before);
-  loaded = new Game(decode(JSON.stringify(g.save)));
-  loaded.switchMode("delve");
-  loaded.save.delve.history = [];
-  assert.ok(loaded.revive());
   assert.deepEqual(loaded.run, before);
   const corrupt = JSON.parse(JSON.stringify(g.save));
   corrupt.delve.fall = { snapshot: null };

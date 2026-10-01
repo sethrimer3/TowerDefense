@@ -62,21 +62,29 @@ export const FASTEST_STRIKE_MS = 50;
 /** One strike of a fight: who struck, for how much, when it swings (`start`
  * to `end`, in ms from the fight's start) and lands (`at`), and the HP the
  * struck side has left. Of an enemy's strike, the shroud takes what it can
- * (`shrouded`), and `damage` is what gets through to the hero. */
-export type Strike = { by: "hero" | "enemy"; damage: number; shrouded?: number; start: number; at: number; end: number; hp: number };
+ * (`shrouded`), and `damage` is what gets through to the hero. A strike
+ * that would have felled the hero but revived it (`revived`) leaves it at
+ * full HP. */
+export type Strike = { by: "hero" | "enemy"; damage: number; shrouded?: number; revived?: true; start: number; at: number; end: number; hp: number };
 export type Bout = { strikes: Strike[]; duration: number };
+/** Whether the enemy's strike numbered `strike` (from 0) in a fight, which
+ * would fell the hero, revives it instead (the Revive skill). */
+export type Revival = (strike: number) => boolean;
 
 /** The rounds `predict` sums up, one strike at a time: the hero strikes first,
  * then the enemy (its ATK rising after each round, the shroud taking its
  * strikes until it is spent), until one of them falls. Ends with the same HP
- * as the prediction (or at 0 in a fight the hero loses). */
-export function bout(player: Player, enemy: Enemy): Bout {
+ * as the prediction (or at 0 in a fight the hero loses), unless `revives`
+ * raises the hero at full HP from a strike that would fell it: the fight
+ * then goes on from the next round, the enemy as it was. */
+export function bout(player: Player, enemy: Enemy, revives?: Revival): Bout {
   const hit = player.attack - enemy.defense;
   const strikes: Strike[] = [];
   if (hit <= 0) return { strikes, duration: 0 };
   let enemyHp = enemy.hp, heroHp = player.hp, shroud = player.shroud ?? 0, attack = enemy.attack, t = 0, ms = FIRST_STRIKE_MS;
-  const strike = (by: Strike["by"], damage: number, hp: number, shrouded = 0) => {
-    strikes.push({ by, damage, ...(shrouded ? { shrouded } : {}), start: t, at: t + ms / 2, end: t + ms, hp });
+  let enemyStrikes = 0;
+  const strike = (by: Strike["by"], damage: number, hp: number, shrouded = 0, revived = false) => {
+    strikes.push({ by, damage, ...(shrouded ? { shrouded } : {}), ...(revived ? { revived: true as const } : {}), start: t, at: t + ms / 2, end: t + ms, hp });
     t += ms;
   };
   for (;;) {
@@ -86,13 +94,21 @@ export function bout(player: Player, enemy: Enemy): Bout {
     const struck = Math.max(0, attack - player.defense), shrouded = Math.min(shroud, struck), taken = struck - shrouded;
     shroud -= shrouded;
     heroHp = Math.max(0, heroHp - taken);
-    strike("enemy", taken, heroHp, shrouded);
+    const revived = !heroHp && !!revives?.(enemyStrikes);
+    if (revived) heroHp = player.maxHp;
+    enemyStrikes++;
+    strike("enemy", taken, heroHp, shrouded, revived);
     if (!heroHp) break;
     attack = raisedAttack(attack);
     ms = Math.max(FASTEST_STRIKE_MS, ms * STRIKE_SPEEDUP);
   }
   return { strikes, duration: t };
 }
+
+/** The hero's HP once the fight is over, from `hp` at its start. */
+export const heroHpAfter = (fight: Bout, hp: number) => heroHpDuring(fight, hp, Infinity);
+/** When each of the fight's revivals lands, in ms from its start. */
+export const revivals = (fight: Bout) => fight.strikes.filter((s) => s.revived).map((s) => s.at);
 
 /** The hero's HP `elapsed` ms into a fight that began at `hp`. */
 export function heroHpDuring(fight: Bout, hp: number, elapsed: number) {
