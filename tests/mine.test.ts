@@ -532,7 +532,11 @@ test("a new prospect is a fresh world; the crew, their trades and the stock go w
   minutes(sim, 6);
   sim.ore = { iron: 9, gold: 2 };
   sim.bars = { iron: 3, gold: 1 };
+  for (const m of sim.miners) m.iron = m.gold = 0;
   sim.miners[0].iron = 4;
+  sim.yard = { iron: 5, gold: 0 };
+  sim.carts.length = sim.buckets.length = 0;
+  sim.hoist.iron = sim.hoist.gold = 0;
   const crew = sim.miners.map((m) => [m.name, m.job]);
   const next = sim.prospectNext(4242, 0);
   assert.equal(next.seed, 4242);
@@ -541,7 +545,7 @@ test("a new prospect is a fresh world; the crew, their trades and the stock go w
   assert.deepEqual(next.miners.map((m) => [m.name, m.job]), crew);
   const door = next.buildings.barracks.door;
   assert.ok(next.miners.every((m) => m.x === door && m.iron + m.gold === 0));
-  assert.equal(next.ore.iron, 13, "ore in packs goes to the forge's piles");
+  assert.equal(next.ore.iron, 18, "ore in packs and the yard goes to the forge's piles");
   assert.deepEqual(next.bars, { iron: 3, gold: 1 });
   assert.equal(next.hired, sim.hired);
   assert.equal(next.oreLeft, next.oreFound);
@@ -577,4 +581,28 @@ test("a mine from before the world was widened moves its crew to a fresh prospec
   assert.equal(moved.miners.length, 3);
   assert.deepEqual(moved.jobs, { forge: 1, smith: 0 });
   assert.ok(moved.miners.every((m) => m.name.length > 0));
+});
+
+test("the hoist lets its bucket down to a load, winds it up and tips it in the yard; the forge's hands carry it in", () => {
+  const sim = new MineSim(64);
+  sim.hire();
+  sim.setJobs(1, 0);
+  const top = sim.hoist.y, level = top + 40;
+  sim.buckets.push({ y: level, iron: 20, gold: 2 });
+  let deepest = top;
+  for (let t = 0; t < 400 && sim.hoist.state !== "up"; t++) {
+    sim.step();
+    deepest = Math.max(deepest, sim.hoist.y);
+  }
+  assert.equal(deepest, level, "let down to the load");
+  assert.equal(sim.buckets.length, 0);
+  for (let t = 0; t < 400 && sim.hoist.state !== "idle"; t++) sim.step();
+  assert.equal(sim.hoist.y, top, "wound back up");
+  assert.ok(sim.yard.iron + sim.yard.gold > 0 || sim.ore.iron + sim.ore.gold > 0, "tipped in the yard");
+  const yard = sim.yard.iron + sim.yard.gold;
+  sim.miners.forEach((m) => m.job === "mine" && (m.iron = m.gold = m.spoil = 0));
+  minutes(sim, 4);
+  assert.equal(sim.yard.gold, 0, "gold is carried in first");
+  assert.ok(sim.ore.gold + sim.bars.gold + sim.collect().gold > 0, "into the forge, and on to the smithy");
+  assert.ok(yard > 0);
 });

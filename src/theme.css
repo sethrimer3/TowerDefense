@@ -520,6 +520,7 @@ nav button > span img {
 }
 
 /* Proclamations, settings and tooltips are written on parchment. */
+.mine-info,
 .mine-away,
 .defend-banner,
 .defend-settings,
@@ -1102,3 +1103,10 @@ dialog::backdrop {
     opacity: 0;
   }
 }
+
+/* A building's stats: its bars an inked groove filled with brass. */
+.mine-info { z-index: 2; border-radius: 2px; }
+.mine-info h3 { color: var(--ink); }
+.mine-info .info-row b { color: var(--ink); font-weight: 700; }
+.mine-info .info-bar { border: 1px solid #4a3218; border-radius: 2px; background: #00000030; box-shadow: inset 0 1px 2px #00000060; }
+.mine-info .info-bar i { background: linear-gradient(#f0cf86, #b98a3e 60%, #7a5420); }

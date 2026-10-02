@@ -3,8 +3,9 @@
  * into the stone, drive a tunnel out either side at every level, lay track
  * and torches along each, hang lamps in the shaft, chase any iron or gold
  * they glimpse, and build a mine cart for each tunnel. Ore goes up in a
- * miner's pack to the forge on the surface, or rides a cart back to the
- * shaft where the hoist lifts it, onto the forge's piles.
+ * miner's pack to the yard by the shaft house, or rides a cart back to the
+ * shaft where the hoist's bucket is let down for it and wound up again; the
+ * forge's hands carry it from the yard to the forge's piles.
  *
  * The crew live and work in the buildings on the surface (`buildings.ts`):
  * the player puts each miner to a trade, the face, the forge or the smithy.
@@ -60,6 +61,9 @@ export const KIT = 12;
  * worker. Every `BARS_PER_STEEL` iron bars worked also folds a steel bar. */
 export const SMELT_TICKS = 6 * TICK_HZ, SMITH_IRON_TICKS = 40 * TICK_HZ, SMITH_GOLD_TICKS = 4 * TICK_HZ, BARS_PER_STEEL = 20;
 const IDLE_PACE = 4, STOCK_TICKS = 2 * TICK_HZ;
+/** Ore a forge hand carries in from the yard at a time, and the most the
+ * forge's piles and shelves hold. */
+export const CARRY = 8, FORGE_CAP = 160;
 /** Share of the crew that works through the night (the rest sleep), and
  * what each rank of Coffee adds, up to the most. */
 export const NIGHT_SHIFT = 0.2, COFFEE_STEP = 0.05, NIGHT_SHIFT_MAX = 0.8;
@@ -156,12 +160,17 @@ type Task =
   | { kind: "dig" | "build" | "bail" | "douse"; cell: number }
   | { kind: "escape" }
   | { kind: "deliver" }
+  | { kind: "fetch" }
   | { kind: "dump" }
   | { kind: "cart"; level: number; side: number }
   | { kind: "enter"; b: BuildingId; why: Purpose }
   | { kind: "rest" };
 export type Cart = { level: number; side: number; x: number; y: number; iron: number; gold: number; state: "out" | "parked" | "back"; timer: number };
+/** A load waiting at a level's foot of the shaft for the hoist. */
 export type Bucket = { y: number; iron: number; gold: number };
+/** The hoist's bucket: waiting at the top, let down to a load, or wound up
+ * with it. */
+export type Hoist = { y: number; state: "idle" | "down" | "up"; iron: number; gold: number };
 
 export type MineSave = {
   seed: number;
@@ -192,6 +201,8 @@ export type MineSave = {
   ore?: { iron: number; gold: number };
   bars?: { iron: number; gold: number };
   steelWork?: number;
+  /** Ore tipped in the yard, waiting for the forge's hands. */
+  yard?: { iron: number; gold: number };
   /** Added with prospects: which prospect this is (the first is 1), and
    * the miners lost whom the crew's list still remembers. */
   prospect?: number;
@@ -252,6 +263,11 @@ export class MineSim {
   miners: Miner[] = [];
   carts: Cart[] = [];
   buckets: Bucket[] = [];
+  hoist!: Hoist;
+  /** Ore brought up, tipped in the yard by the shaft house until the forge's
+   * hands carry it in; and the yard's column. */
+  yard = { iron: 0, gold: 0 };
+  readonly yardX = W / 2 - 5;
   tick = 0;
   /** Deepest level the shaft has been planned down to. */
   shaftLevel = 0;
@@ -311,6 +327,7 @@ export class MineSim {
       this.ore = { ...(saved.ore ?? { iron: 0, gold: 0 }) };
       this.bars = { ...(saved.bars ?? { iron: 0, gold: 0 }) };
       this.steelWork = saved.steelWork ?? 0;
+      this.yard = { ...(saved.yard ?? { iron: 0, gold: 0 }) };
       this.prospect = saved.prospect ?? 1;
       if (cells && plan) this.workedOut = saved.workedOut ?? false;
       this.fallen = (saved.fallen ?? []).map((f) => ({ ...f }));
@@ -336,6 +353,7 @@ export class MineSim {
       // A new mine's first crew learns the ropes before anyone can die.
       this.mercy = DEATH_GAP;
     }
+    this.hoist = { y: this.strata.surface[this.shaftX] - 1, state: "idle", iron: 0, gold: 0 };
     // Saves from before each miner kept its trade held only the counts.
     if (saved?.jobs && saved.miners.every((m) => m.job === undefined)) this.setJobs(saved.jobs.forge, saved.jobs.smith);
   }
@@ -347,9 +365,9 @@ export class MineSim {
     const carried = this.save(now);
     const ore = { ...this.ore };
     for (const m of this.miners) (ore.iron += m.iron), (ore.gold += m.gold);
-    for (const c of [...this.carts, ...this.buckets]) (ore.iron += c.iron), (ore.gold += c.gold);
+    for (const c of [...this.carts, ...this.buckets, this.hoist, this.yard]) (ore.iron += c.iron), (ore.gold += c.gold);
     const { cells, plan, water, burning, ...rest } = carried;
-    const next = new MineSim(seed, { ...rest, carts: [], buckets: [], shaftLevel: 0, mercy: 0, ore, prospect: this.prospect + 1 });
+    const next = new MineSim(seed, { ...rest, carts: [], buckets: [], yard: { iron: 0, gold: 0 }, shaftLevel: 0, mercy: 0, ore, prospect: this.prospect + 1 });
     next.coffee = this.coffee;
     next.waterproof = this.waterproof;
     next.weatherOverride = this.weatherOverride;
@@ -713,7 +731,7 @@ export class MineSim {
     m.x = building.door;
     m.y = this.standY(building.door);
     // What it carries is left on the way: ore at the forge, spoil tipped.
-    if (m.iron + m.gold > 0) this.pay(m.iron, m.gold);
+    if (m.iron + m.gold > 0) b === "forge" ? this.toForge(m.iron, m.gold) : this.toYard(m.iron, m.gold);
     m.iron = m.gold = m.spoil = 0;
     const s: Inside = { b, why, slot: this.freeSlot(b, why), t: 0, out: false, until: 0 };
     const walk = pathTicks(this.spotOf(s).path);
@@ -766,6 +784,10 @@ export class MineSim {
       const trade = s.b === "forge" ? "forge" : "smith";
       if (m.job !== trade || this.bedtime(m) || m.fed > MEAL_TICKS) return this.goOut(m);
       const pace = this.craftTicks(trade);
+      // Ore piling up in the yard and room for it here (or nothing left to
+      // smelt): out to fetch it.
+      const yard = this.yard.iron + this.yard.gold, forge = this.ore.iron + this.ore.gold;
+      if (trade === "forge" && yard > 0 && (yard >= CARRY || !pace) && forge <= FORGE_CAP - CARRY) return this.goOut(m);
       if (!pace) {
         m.action = "idle";
         s.until = 0;
@@ -816,8 +838,16 @@ export class MineSim {
   }
   /** A stage nobody is put to still gets done, slowly. */
   private stepIdleTrades() {
+    const jobs = this.jobs;
+    // With nobody at the forge, its ore still finds its way in, slowly.
+    if (jobs.forge === 0 && this.tick % SMELT_TICKS === 0 && this.yard.iron + this.yard.gold > 0) {
+      const gold = this.yard.gold > 0 ? 1 : 0;
+      this.yard.gold -= gold;
+      this.yard.iron -= 1 - gold;
+      this.toForge(1 - gold, gold);
+    }
     for (const trade of ["forge", "smith"] as const) {
-      if (this.jobs[trade] > 0) continue;
+      if (jobs[trade] > 0) continue;
       const pace = this.craftTicks(trade);
       if (!pace) {
         this.idleWork[trade] = 0;
@@ -834,10 +864,19 @@ export class MineSim {
     return this.miners.filter((m) => m.inside?.b === b && !m.inside.out && (m.action === "smelt" || m.action === "smith")).length;
   }
 
+  /** Fittings planned and waiting on supplies (as of the last survey). */
+  get fittingsWaiting() {
+    return this.fittings;
+  }
+  /** The share of the runoff the shaft house keeps out of the shaft. */
+  get sealShare() {
+    return Math.min(0.95, SEAL_BASE + SEAL_STEP * this.waterproof);
+  }
+
   /** The shaft house keeps out a share of the water running into the
    * shaft's mouth (it lingers in the mouth about three ticks). */
   private seal() {
-    const keep = Math.min(0.95, SEAL_BASE + SEAL_STEP * this.waterproof), q = 1 - Math.pow(1 - keep, 1 / 3);
+    const keep = this.sealShare, q = 1 - Math.pow(1 - keep, 1 / 3);
     const top = this.strata.surface[this.shaftX];
     for (let y = top - 2; y <= top + 1; y++)
       for (let x = this.shaftX - 1; x <= this.shaftX + 1; x++)
@@ -881,6 +920,8 @@ export class MineSim {
       if (this.goEnter(m, start, "barracks", "lounge")) return;
       cutOff = true;
     }
+    // The forge's hands fetch the ore from the yard, while there's room for it.
+    if (m.job === "forge" && ore === 0 && this.yard.iron + this.yard.gold > 0 && this.ore.iron + this.ore.gold < FORGE_CAP && this.goFetch(m, start)) return;
     // The forge's and the smithy's hands go to their work; one cut off below
     // digs on till it can get there.
     if (m.job !== "mine" && this.goEnter(m, start, m.job === "forge" ? "forge" : "smithy", "work")) return;
@@ -953,7 +994,7 @@ export class MineSim {
   }
 
   private goDeliver(m: Miner, start: number) {
-    const top = (x: number) => this.strata.surface[x] + 4, forge = this.buildings.forge.door;
+    const top = (x: number) => this.strata.surface[x] + 4, forge = this.yardX;
     const path = this.search(start, (x, y, d) => {
       if (Math.abs(x - forge) <= 1 && y < top(x)) return d;
       if (m.spoil < PACK_SPOIL || m.iron + m.gold > 0)
@@ -962,6 +1003,14 @@ export class MineSim {
     });
     if (!path) return false;
     m.task = { kind: "deliver" };
+    m.path = path;
+    return true;
+  }
+  /** Off to the yard for a load of ore for the forge. */
+  private goFetch(m: Miner, start: number) {
+    const path = this.search(start, (x, y, d) => (Math.abs(x - this.yardX) <= 1 && y < this.strata.surface[x] + 4 ? d : null), 0, 8000);
+    if (!path) return false;
+    m.task = { kind: "fetch" };
     m.path = path;
     return true;
   }
@@ -1131,8 +1180,8 @@ export class MineSim {
         this.release(m);
         return;
       }
-      if (Math.abs(m.x - this.buildings.forge.door) <= 1 && m.y < this.strata.surface[m.x] + 4) {
-        this.pay(m.iron, m.gold);
+      if (Math.abs(m.x - this.yardX) <= 1 && m.y < this.strata.surface[m.x] + 4) {
+        this.toYard(m.iron, m.gold);
         m.iron = m.gold = 0;
         // In a storm nobody goes out to the heap: spoil is tipped by the forge.
         if (this.sky.weather === "storm") m.spoil = 0;
@@ -1147,6 +1196,18 @@ export class MineSim {
         }
       }
       return this.release(m);
+    }
+    if (t.kind === "fetch") {
+      // A load from the yard for the forge: gold first, then iron.
+      const gold = Math.min(this.yard.gold, CARRY), iron = Math.min(this.yard.iron, CARRY - gold);
+      this.yard.gold -= gold;
+      this.yard.iron -= iron;
+      m.gold += gold;
+      m.iron += iron;
+      m.action = "stock";
+      m.timer = STOCK_TICKS / 2;
+      m.task = null;
+      return;
     }
     if (t.kind === "dump") {
       m.action = "build";
@@ -1263,19 +1324,38 @@ export class MineSim {
     }
   }
 
-  private stepBuckets() {
+  /** The hoist works one load at a time: its bucket is let down the shaft
+   * to the oldest load waiting, takes it on, and is wound up to tip it in
+   * the yard. */
+  private stepHoist() {
     if (this.tick % BUCKET_STEP) return;
-    const top = this.strata.surface[this.shaftX] - 1;
-    this.buckets = this.buckets.filter((b) => {
-      b.y--;
-      if (b.y > top) return true;
-      this.pay(b.iron, b.gold);
-      return false;
-    });
+    const h = this.hoist, top = this.strata.surface[this.shaftX] - 1;
+    if (h.state === "idle") {
+      if (this.buckets.length) h.state = "down";
+    } else if (h.state === "down") {
+      const load = this.buckets[0];
+      if (!load) h.state = "up";
+      else if (h.y < load.y) h.y++;
+      else {
+        this.buckets.shift();
+        h.iron += load.iron;
+        h.gold += load.gold;
+        h.state = "up";
+      }
+    } else if (h.y > top) h.y--;
+    else {
+      this.toYard(h.iron, h.gold);
+      h.iron = h.gold = 0;
+      h.state = "idle";
+    }
   }
 
-  /** Ore brought up goes onto the forge's piles. */
-  private pay(iron: number, gold: number) {
+  /** Ore brought up is tipped in the yard; the forge's hands carry it in. */
+  private toYard(iron: number, gold: number) {
+    this.yard.iron += iron;
+    this.yard.gold += gold;
+  }
+  private toForge(iron: number, gold: number) {
     this.ore.iron += iron;
     this.ore.gold += gold;
   }
@@ -1468,7 +1548,7 @@ export class MineSim {
     for (const m of [...this.miners]) this.stepMiner(m);
     this.stepIdleTrades();
     for (const c of this.carts) this.stepCart(c);
-    this.stepBuckets();
+    this.stepHoist();
     if (this.tick % 30 === 0) this.replan();
     if (this.tick % 6 === 0 && this.burning.length) this.stepFire(6);
     if (this.tick % 10 === 0 && this.world.waterCount) this.drain();
@@ -1490,7 +1570,8 @@ export class MineSim {
       plan: encodeGrid(this.plan),
       miners: this.miners.map((m) => ({ x: m.x, y: m.y, iron: m.iron, gold: m.gold, spoil: m.spoil, fed: m.fed, job: m.job, kit: m.kit, name: m.name })),
       carts: this.carts.map((c) => ({ level: c.level, side: c.side, x: c.x, iron: c.iron, gold: c.gold })),
-      buckets: this.buckets.map((b) => ({ ...b })),
+      buckets: [...(this.hoist.iron + this.hoist.gold > 0 ? [{ y: this.hoist.y, iron: this.hoist.iron, gold: this.hoist.gold }] : []), ...this.buckets.map((b) => ({ ...b }))],
+      yard: { ...this.yard },
       shaftLevel: this.shaftLevel,
       hired: this.hired,
       ironOre: this.ironOre,
@@ -1553,6 +1634,7 @@ export function decodeMineSave(s: any): MineSave | null {
   if (s.ore !== undefined && !pair(s.ore, "iron", "gold", 1e9)) return null;
   if (s.bars !== undefined && !pair(s.bars, "iron", "gold", 1e9)) return null;
   if (s.steelWork !== undefined && !int(s.steelWork, 0, BARS_PER_STEEL)) return null;
+  if (s.yard !== undefined && !pair(s.yard, "iron", "gold", 1e9)) return null;
   // And the prospects'.
   if (s.prospect !== undefined && !int(s.prospect, 1, 1e6)) return null;
   if (s.fallen !== undefined && !(Array.isArray(s.fallen) && s.fallen.length <= MAX_MINERS && s.fallen.every((f: any) => name(f?.name) && JOBS.includes(f.job) && CAUSES.includes(f.cause)))) return null;
@@ -1562,6 +1644,7 @@ export function decodeMineSave(s: any): MineSave | null {
     ...(s.ore !== undefined ? { ore: { iron: s.ore.iron, gold: s.ore.gold } } : {}),
     ...(s.bars !== undefined ? { bars: { iron: s.bars.iron, gold: s.bars.gold } } : {}),
     ...(s.steelWork !== undefined ? { steelWork: s.steelWork } : {}),
+    ...(s.yard !== undefined ? { yard: { iron: s.yard.iron, gold: s.yard.gold } } : {}),
     ...(s.water !== undefined ? { water: s.water } : {}),
     ...(s.burning !== undefined ? { burning: s.burning.map((b: number[]) => [b[0], b[1]] as [number, number]) } : {}),
     ...(s.lost !== undefined ? { lost: Object.fromEntries(CAUSES.filter((c) => s.lost[c] !== undefined).map((c) => [c, s.lost[c]])) } : {}),

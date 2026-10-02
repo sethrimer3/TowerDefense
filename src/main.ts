@@ -216,6 +216,8 @@ window.addEventListener("pagehide", store);
   for (let t = 0; t < seconds * 10; t++) libraryPage.sim.step(0.1);
   if (fire) libraryPage.sim.ignite();
 };
+// Console helper: look closely at one of the mine's buildings, picked.
+(globalThis as { mineLook?: unknown }).mineLook = (id: "shaft" | "barracks" | "warehouse" | "forge" | "smithy" = "forge", zoom = 4) => minePage.look(id, zoom);
 // Console helper: run the mine some minutes ahead, optionally hiring miners first.
 (globalThis as { mineDebug?: unknown }).mineDebug = (minutes = 10, hire = 0, weather?: MineWeather | null) => {
   for (let i = 0; i < hire; i++) minePage.sim.hire();

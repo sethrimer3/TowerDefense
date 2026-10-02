@@ -6,7 +6,8 @@
  * is closed: on loading, the time away (up to a cap) is caught up a slice
  * each frame. */
 import { play } from "../sound.ts";
-import { DAY_TICKS, JOBS, MAX_MINERS, MineSim, TICK_HZ, type Cause, type Job, type Miner, type MineNews, type MineSave, type Weather } from "./sim.ts";
+import { BARS_PER_STEEL, DAY_TICKS, FORGE_CAP, JOBS, KIT, MAX_MINERS, MineSim, TICK_HZ, type Cause, type Job, type Miner, type MineNews, type MineSave, type Weather } from "./sim.ts";
+import type { BuildingId } from "./buildings.ts";
 import { MineRenderer } from "./render.ts";
 
 /** Longest time away the mine catches up on. */
@@ -133,7 +134,7 @@ export class MinePage {
           ${JOBS.map((j) => `<section class="crew-box" data-job="${j}" title="${TRADE[j].hint}"><h3><i class="job-mark job-${j}"></i>${TRADE[j].name} <b data-count="${j}">0</b></h3><ul></ul></section>`).join("")}
           <p class="crew-hint">Drag a name to another trade. Tap one to follow them.</p>
         </aside>
-        <div class="mine-view"><canvas id="mine-canvas" aria-label="The mine"></canvas><p id="mine-away" class="mine-away" hidden></p></div>
+        <div class="mine-view"><canvas id="mine-canvas" aria-label="The mine"></canvas><div id="mine-info" class="mine-info" hidden></div><p id="mine-away" class="mine-away" hidden></p></div>
       </div>`;
     const canvas = this.root.querySelector<HTMLCanvasElement>("#mine-canvas")!;
     this.renderer = new MineRenderer(canvas);
@@ -160,10 +161,12 @@ export class MinePage {
     this.bindCrew(this.root.querySelector<HTMLElement>("#mine-crew")!);
   }
 
-  /** Drag pans; the wheel, a pinch or a double-tap zooms. */
+  /** Drag pans; the wheel, a pinch or a double-tap zooms; a tap on a
+   * building picks it (its stats shown, its wall open), a tap elsewhere
+   * lets it go. */
   private bindView(canvas: HTMLCanvasElement) {
     const r = this.renderer!, pointers = new Map<number, { x: number; y: number }>();
-    let pinch = 0, lastTap = 0;
+    let pinch = 0, lastTap = 0, press: { x: number; y: number; moved: boolean } | null = null;
     const dpr = () => canvas.width / Math.max(1, canvas.clientWidth);
     const local = (e: { clientX: number; clientY: number }) => {
       const b = canvas.getBoundingClientRect();
@@ -172,6 +175,7 @@ export class MinePage {
     canvas.onpointerdown = (e) => {
       canvas.setPointerCapture(e.pointerId);
       pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      press = pointers.size === 1 ? { x: e.clientX, y: e.clientY, moved: false } : null;
       if (pointers.size === 2) {
         const [a, b] = [...pointers.values()];
         pinch = Math.hypot(a.x - b.x, a.y - b.y);
@@ -194,6 +198,7 @@ export class MinePage {
         }
         return;
       }
+      if (press && Math.hypot(e.clientX - press.x, e.clientY - press.y) > 6) press.moved = true;
       r.pan((e.clientX - before.x) * dpr(), (e.clientY - before.y) * dpr());
       if (Math.abs(e.clientX - before.x) + Math.abs(e.clientY - before.y) > 2) {
         this.unfollow();
@@ -204,7 +209,14 @@ export class MinePage {
       pointers.delete(e.pointerId);
       if (pointers.size < 2) pinch = 0;
     };
-    canvas.onpointerup = end;
+    canvas.onpointerup = (e) => {
+      if (press && !press.moved && pointers.size === 1) {
+        const p = local(e), id = r.buildingAt(this.sim, p.x, p.y);
+        this.pick(id === r.picked ? null : id);
+      }
+      press = null;
+      end(e);
+    };
     canvas.onpointercancel = end;
     canvas.onwheel = (e) => {
       e.preventDefault();
@@ -270,6 +282,67 @@ export class MinePage {
     panel.onpointerup = (e) => finish(e, false);
     panel.onpointercancel = (e) => finish(e, true);
   }
+  /** Looks at building `id`, picked and zoomed in to `zoom` (console helper). */
+  look(id: BuildingId, zoom = 4) {
+    if (!this.renderer) return;
+    const b = this.sim.buildings[id];
+    this.renderer.lookAt((b.x0 + b.x1 + 1) / 2, b.floor - 3, zoom);
+    this.pick(id);
+  }
+  /** Picks a building (or none): outlined, its wall open, its stats shown. */
+  private pick(id: BuildingId | null) {
+    if (!this.renderer) return;
+    this.renderer.picked = id;
+    this.shownInfo = "";
+    this.refreshInfo();
+  }
+  /** The picked building's stats, redrawn when they change. */
+  private refreshInfo() {
+    const box = this.root.querySelector<HTMLElement>("#mine-info");
+    const id = this.renderer?.picked ?? null;
+    if (!box) return;
+    if (!id) {
+      box.hidden = true;
+      return;
+    }
+    const sim = this.sim, b = sim.buildings[id], inside = sim.miners.filter((m) => m.inside?.b === id);
+    const bar = (label: string, n: number, max: number, note = "") =>
+      `<div class="info-row"><span>${label}</span><b>${note || `${Math.floor(n)} / ${max}`}</b></div><div class="info-bar"><i style="width:${Math.min(100, (100 * n) / Math.max(1, max)).toFixed(1)}%"></i></div>`;
+    const row = (label: string, value: string | number) => `<div class="info-row"><span>${label}</span><b>${value}</b></div>`;
+    let title = "", body = "";
+    if (id === "shaft") {
+      const h = sim.hoist, where = h.state === "idle" ? "waiting at the top" : h.state === "down" ? "going down for a load" : "winding up a load";
+      title = "Shaft house";
+      body = row("Depth", `${sim.depth} ft`) + row("Levels open", `${sim.shaftLevel + 1} of ${sim.levels.length}`) + row("Hoist", where) + row("Loads waiting below", sim.buckets.length) +
+        row("Ore in the yard", sim.yard.iron + sim.yard.gold) + row("Rain kept out", `${Math.round(sim.sealShare * 100)}%`);
+    } else if (id === "barracks") {
+      const asleep = inside.filter((m) => m.inside!.why === "sleep").length, lounge = inside.filter((m) => m.inside!.why === "lounge").length;
+      title = "Barracks";
+      body = bar("Bunks taken", asleep, b.spots.sleep?.length ?? 0) + row("Asleep", asleep) + row("In the lounge", lounge) + row("At work", sim.miners.length - asleep - lounge) +
+        row("Night shift", `${Math.round(sim.nightShift * 100)}% of the crew`);
+    } else if (id === "warehouse") {
+      const kit = sim.miners.reduce((n, m) => n + m.kit, 0);
+      title = "Warehouse";
+      body = bar("Supplies in the crew's hands", kit, sim.miners.length * KIT) + row("Fittings waiting", sim.fittingsWaiting) + row("Fetching supplies", inside.length);
+    } else if (id === "forge") {
+      const ore = sim.ore.iron + sim.ore.gold, hands = sim.jobs.forge;
+      title = "Forge";
+      body = bar("Ore in the forge", ore, FORGE_CAP) + row("Iron ore", sim.ore.iron) + row("Gold ore", sim.ore.gold) + row("Waiting in the yard", sim.yard.iron + sim.yard.gold) +
+        row("Hands at work", `${sim.working("forge")} of ${hands}`) + row("Smelting", hands ? `${hands * 10} ore a minute` : "slowly, with nobody here");
+    } else {
+      const smiths = sim.jobs.smith;
+      title = "Smithy";
+      body = row("Iron bars waiting", sim.bars.iron) + row("Gold ingots waiting", sim.bars.gold) + row("Smiths at work", `${sim.working("smithy")} of ${smiths}`) +
+        bar("Toward the next steel bar", sim.steelWork, BARS_PER_STEEL);
+    }
+    const html = `<h3>${title}</h3>${body}<p class="info-hint">Tap the building again, or elsewhere, to close.</p>`;
+    if (html === this.shownInfo) return;
+    this.shownInfo = html;
+    box.innerHTML = html;
+    box.hidden = false;
+  }
+  private shownInfo = "";
+
   private minerOf(item: HTMLElement) {
     return this.sim.miners.find((m) => String(m.id) === item.dataset.id) ?? null;
   }
@@ -340,6 +413,7 @@ export class MinePage {
     const news = latest ? tell(latest) : null;
     const ore = sim.ore.iron + sim.ore.gold, bars = sim.bars.iron + sim.bars.gold;
     this.refreshCrew();
+    this.refreshInfo();
     const left = Math.round((100 * sim.oreLeft) / Math.max(1, sim.oreFound));
     const tally = `${crew}|${price}|${afford}|${sim.depth}|${ore}|${bars}|${Math.ceil(this.owed / TICK_HZ / 60)}|${hour}|${sky.weather}|${lost}|${news}|${left}|${sim.workedOut}|${sim.prospect}`;
     if (tally === this.shownTally) return;
