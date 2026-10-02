@@ -107,4 +107,10 @@ What the mine pays: gold straight into Gold, iron ore smelted into iron bars.
 ### The library
 
 **Library**:
-A tab reserved for the keep's archive; not yet open.
+A dark cathedral nave the player fills with bookshelves and librarians. It gives nothing yet.
+
+**Bookshelf**:
+A unit of two rows of books; units stack bay by bay up the nave to just under the stained-glass window.
+
+**Librarian**:
+A scholar the player hires with Gold. Librarians put up ladders and shuffle books between shelves; some sit at the tables indexing.
