@@ -446,3 +446,34 @@ test('park fences: street-facing, with a gate; trampled or blasted into fading s
   }
   assert.equal(fences.splinters.length, 0);
 });
+
+test('a Mother splits into three broodlings when she dies, and they do not split again', () => {
+  const sim = new DefendSim(mapOf(squareCity()), zeroLevels(), 1);
+  sim.spawnQueue = [];
+  sim.breakT = 1e9;
+  // On open ground in the spawn lane, so all three land around her.
+  const mother = { id: 1, kind: 'mother', x: 10.5, y: 2.5, hp: 1, maxHp: 1, cd: 99, jx: 0, jy: 0, distract: -1, distractT: 0, rollT: 99, marked: false, flash: 0 } as any;
+  sim.enemies = [mother];
+  sim.hurtEnemy(mother, 5);
+  sim.step(1 / 30);
+  assert.equal(sim.slain.mother, 1);
+  const brood = sim.enemies.filter((e) => e.kind === 'broodling');
+  assert.equal(brood.length, 3, 'three broodlings hatch');
+  assert.equal(sim.enemies.length, 3, 'and the Mother is gone');
+  assert.equal(new Set(brood.map((e) => e.id)).size, 3);
+  for (const e of brood) assert.ok(Math.hypot(e.x - 10.5, e.y - 2.5) < 1, 'close to where she fell');
+  for (const e of brood) sim.hurtEnemy(e, 1e9);
+  sim.step(1 / 30);
+  assert.equal(sim.slain.broodling, 3);
+  assert.equal(sim.enemies.length, 0, 'broodlings leave nothing behind');
+});
+
+test('Mothers join the waves from wave 6; broodlings only ever hatch', () => {
+  let r = 1;
+  const rand = () => ((r = (r * 16807) % 2147483647) / 2147483647);
+  const early = Array.from({ length: 40 }, () => buildWave(5, rand)).flat();
+  const later = Array.from({ length: 40 }, () => buildWave(12, rand)).flat();
+  assert.ok(!early.includes('mother'));
+  assert.ok(later.includes('mother'));
+  assert.ok(![...early, ...later].includes('broodling'));
+});

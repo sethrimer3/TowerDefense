@@ -251,7 +251,7 @@ export const civilianHp = (l: number) => 8 + l * 5;
 export const rebuildSeconds = (l: number) => 3 * intPow(0.82, l);
 export const HOUSE_HP_PER_CELL = 22;
 
-export type EnemyKind = "roach" | "orc" | "ogre" | "bat" | "warlord";
+export type EnemyKind = "roach" | "orc" | "ogre" | "bat" | "warlord" | "mother" | "broodling";
 export type EnemyDef = {
   kind: EnemyKind;
   name: string;
@@ -267,6 +267,10 @@ export type EnemyDef = {
   flying: boolean;
   /** Only arrives on boss waves (every 10th), never in the regular mix. */
   boss?: boolean;
+  /** Only ever hatched from another enemy's death, never in a wave's mix. */
+  hatched?: boolean;
+  /** On death it splits into `count` of `into`, spread around where it fell. */
+  splits?: { into: EnemyKind; count: number };
   firstWave: number;
   weight: number;
   /** How much of the wave budget one of these costs. */
@@ -278,6 +282,8 @@ export const ENEMIES: Record<EnemyKind, EnemyDef> = {
   orc: { kind: "orc", name: "Orc", hp: 34, speed: 1.6, damage: 6, cooldown: 0.9, size: 0.46, color: "#6fa04a", distraction: 0.6, flying: false, firstWave: 3, weight: 3, cost: 3 },
   ogre: { kind: "ogre", name: "Ogre", hp: 120, speed: 1.0, damage: 18, cooldown: 1.4, size: 0.62, color: "#a08a6a", distraction: 0.35, flying: false, firstWave: 5, weight: 1, cost: 8 },
   warlord: { kind: "warlord", name: "Warlord", hp: 700, speed: 0.85, damage: 40, cooldown: 1.6, size: 1.05, color: "#b3372f", distraction: 0.1, flying: false, boss: true, firstWave: 10, weight: 0, cost: 0 },
+  mother: { kind: "mother", name: "Mother", hp: 70, speed: 1.15, damage: 8, cooldown: 1.1, size: 0.58, color: "#141218", distraction: 0.3, flying: false, splits: { into: "broodling", count: 3 }, firstWave: 6, weight: 1, cost: 7 },
+  broodling: { kind: "broodling", name: "Broodling", hp: 12, speed: 2.3, damage: 3, cooldown: 0.7, size: 0.3, color: "#1d1a22", distraction: 0.2, flying: false, hatched: true, firstWave: 6, weight: 0, cost: 1 },
   bat: { kind: "bat", name: "Bat", hp: 14, speed: 3.2, damage: 3, cooldown: 0.7, size: 0.3, color: "#8a5bb8", distraction: 0, flying: true, firstWave: 7, weight: 2, cost: 2 },
 };
 
