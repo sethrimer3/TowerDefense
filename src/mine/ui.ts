@@ -3,11 +3,23 @@
  * loop), and works on while the game is closed: on loading, the time away
  * (up to a cap) is caught up a slice each frame. */
 import { play } from "../sound.ts";
-import { MAX_MINERS, MineSim, ORE_PER_IRON_BAR, TICK_HZ, hirePrice, type MineSave } from "./sim.ts";
+import { DAY_TICKS, MAX_MINERS, MineSim, ORE_PER_IRON_BAR, TICK_HZ, type Cause, type MineNews, type MineSave, type Weather } from "./sim.ts";
 import { MineRenderer } from "./render.ts";
 
 /** Longest time away the mine catches up on. */
 export const MAX_AWAY_MS = 2 * 60 * 60 * 1000;
+
+const WEATHER_NAME: Record<Weather, string> = { clear: "Clear", cloudy: "Cloudy", rain: "Rain", storm: "Thunderstorm" };
+const LOSS: Record<Cause, string> = {
+  crushed: "crushed by falling ground", drowned: "drowned in the flood", starved: "starved, trapped below", burnt: "burnt", struck: "struck by lightning",
+};
+/** How a piece of the mine's news reads in the tally, if it's told there. */
+function tell(n: MineNews) {
+  if (n.kind === "lost") return `A miner was ${LOSS[n.cause!]}`;
+  if (n.kind === "saved") return `A miner was nearly ${LOSS[n.cause!]}, and pulled out`;
+  if (n.kind === "fire") return "Fire in the workings!";
+  return null;
+}
 
 export interface MineHost {
   /** Gold the player holds, and whether purchases are free (Dev). */
@@ -56,6 +68,8 @@ export class MinePage {
     this.last = now;
     this.owed = Math.min((MAX_AWAY_MS * TICK_HZ) / 1000, this.owed + (gap * TICK_HZ) / 1000);
     const start = performance.now(), budget = this.owed > TICK_HZ * 2 ? 12 : 6;
+    // Catching up on time away, only the first miner to come to harm dies.
+    this.sim.catchingUp = this.owed > TICK_HZ * 5;
     let n = 0;
     while (this.owed >= 1) {
       this.sim.step();
@@ -164,7 +178,7 @@ export class MinePage {
   }
 
   private hire() {
-    const price = hirePrice(this.sim.hired), free = this.host.free();
+    const price = this.sim.price, free = this.host.free();
     if (this.sim.miners.length >= MAX_MINERS || (!free && this.host.gold() < price)) return;
     if (!this.sim.hire()) return;
     if (!free) this.host.spendGold(price);
@@ -175,18 +189,22 @@ export class MinePage {
   /** Updates the hire button and the tally (cheap; called every frame). */
   refresh() {
     if (!this.built) return;
-    const sim = this.sim, price = hirePrice(sim.hired), full = sim.miners.length >= MAX_MINERS;
+    const sim = this.sim, price = sim.price, full = sim.miners.length >= MAX_MINERS;
     const afford = this.host.free() || this.host.gold() >= price;
-    const crew = sim.miners.length;
-    const tally = `${crew}|${price}|${afford}|${sim.depth}|${sim.ironOre}|${sim.mined.iron}|${sim.mined.gold}|${Math.ceil(this.owed / TICK_HZ / 60)}`;
+    const crew = sim.miners.length, sky = sim.sky, lost = sim.lostTotal;
+    const hour = sky.daylight > 0.6 ? "☀ Day" : sky.daylight > 0.05 ? (Math.abs(((sim.tick / DAY_TICKS + 0.1) % 1) - 0.5) < 0.25 ? "◐ Dusk" : "◐ Dawn") : "☾ Night";
+    const latest = [...sim.news].reverse().find((n) => tell(n) && sim.tick - n.tick < 90 * TICK_HZ);
+    const news = latest ? tell(latest) : null;
+    const tally = `${crew}|${price}|${afford}|${sim.depth}|${sim.ironOre}|${sim.mined.iron}|${sim.mined.gold}|${Math.ceil(this.owed / TICK_HZ / 60)}|${hour}|${sky.weather}|${lost}|${news}`;
     if (tally === this.shownTally) return;
     this.shownTally = tally;
     const hire = this.root.querySelector<HTMLButtonElement>("#mine-hire")!;
     hire.innerHTML = full ? `Crew full<small>${crew} miners</small>` : `⛏ Hire a miner<small>${price} gold</small>`;
     hire.disabled = full || !afford;
     this.root.querySelector("#mine-tally")!.innerHTML =
-      `<b>${crew}</b> ${crew === 1 ? "miner" : "miners"} · <b>${sim.depth}</b> ft deep<br>` +
-      `Iron ore <b>${sim.ironOre}</b>/${ORE_PER_IRON_BAR} to the next bar · mined <b>${sim.mined.iron}</b> iron, <b>${sim.mined.gold}</b> gold`;
+      `<b>${crew}</b> ${crew === 1 ? "miner" : "miners"} · <b>${sim.depth}</b> ft deep · ${hour}, ${WEATHER_NAME[sky.weather].toLowerCase()}<br>` +
+      `Iron ore <b>${sim.ironOre}</b>/${ORE_PER_IRON_BAR} to the next bar · mined <b>${sim.mined.iron}</b> iron, <b>${sim.mined.gold}</b> gold` +
+      (news || lost ? `<br><span class="mine-news">${lost ? `${lost} lost${news ? " · " : ""}` : ""}${news ?? ""}</span>` : "");
     const away = this.root.querySelector<HTMLElement>("#mine-away")!;
     const mins = Math.ceil(this.owed / TICK_HZ / 60);
     away.hidden = this.owed < TICK_HZ * 5;

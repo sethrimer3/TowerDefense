@@ -10,10 +10,20 @@
  * The work itself is a plan painted over the grid: each cell may be marked to
  * be dug out, or dug and fitted with a ladder, rail, torch or lamp. A miner
  * looks for the nearest unclaimed marked cell it can reach (a breadth-first
- * search over where it can stand), walks there, and does it. */
+ * search over where it can stand), walks there, and does it. Fires and
+ * floodwater in the workings are jobs too: miners douse the one and bail
+ * the other.
+ *
+ * Above ground the days turn and the weather changes (`skyAt`): rain lies on
+ * the ground, runs downhill and pours down the shaft. Below, the mine is
+ * dangerous: loose ground falls, floods rise, lava waits deep down, and wood
+ * catches fire. A miner can be crushed, drown, starve when trapped, be burnt
+ * or be struck by lightning; deaths are spaced out (`DEATH_GAP`, which a new
+ * mine also starts with), the last miner always gets out, and a catch-up
+ * after time away loses at most one. */
 import {
-  AIR, BEDROCK, CELLS, DIG_TICKS, DIRT, GOLD, H, IRON, LADDER, LAMP, MATERIAL_COUNT, RAIL, RUBBLE, STONE, TIMBER, TORCH, W, World,
-  decodeGrid, encodeGrid, generate, hash01, idx, inBounds, isLoose, isOre, isPassable, isSolid, strata, type Material, type Strata,
+  AIR, BEDROCK, CELLS, DIG_TICKS, DIRT, GOLD, GRAVEL, H, IRON, LADDER, LAMP, LAVA, LOOSE, MATERIAL_COUNT, RAIL, ROCK, RUBBLE, STONE, TIMBER, TORCH, W, World,
+  decodeGrid, encodeGrid, generate, hash01, idx, inBounds, isLoose, isOre, isPassable, isSoil, isSolid, isWood, strata, type Material, type Strata,
 } from "./world.ts";
 
 export const TICK_HZ = 30;
@@ -36,6 +46,49 @@ const STEP_TICKS = 8, CLIMB_TICKS = 10, FALL_TICKS = 2, CART_STEP = 5, BUCKET_ST
  * is sunk to the next. */
 const LEVEL_GAP = 14, OPEN_REACH = 28;
 
+/** One day and night, and how long each spell of weather lasts. */
+export const DAY_TICKS = 12 * 60 * TICK_HZ;
+export const WEATHER_TICKS = 4 * 60 * TICK_HZ;
+/** A miner goes up to eat this long after its last meal, and starves at
+ * the second; it holds its breath under water for the third. */
+export const MEAL_TICKS = 9 * 60 * TICK_HZ, STARVE_TICKS = 25 * 60 * TICK_HZ, BREATH_TICKS = 15 * TICK_HZ;
+/** After a miner dies, the next one to come to harm this soon gets out alive. */
+export const DEATH_GAP = 20 * 60 * TICK_HZ;
+const FIRE_TICKS = 240, BAIL_TICKS = 24, DOUSE_TICKS = 30, SCORCH_TICKS = 2 * TICK_HZ;
+
+export type Weather = "clear" | "cloudy" | "rain" | "storm";
+export type Sky = { weather: Weather; daylight: number; clouds: number; rain: number };
+export type Cause = "crushed" | "drowned" | "starved" | "burnt" | "struck";
+export const CAUSES: readonly Cause[] = ["crushed", "drowned", "starved", "burnt", "struck"];
+/** Something the page or renderer may tell of: a miner lost or saved, a
+ * fire, a lightning strike. */
+export type MineNews = { tick: number; kind: "lost" | "saved" | "fire" | "strike"; cause?: Cause; x: number; y: number };
+
+const WEATHER_LOOK: Record<Weather, { clouds: number; rain: number }> = {
+  clear: { clouds: 0.05, rain: 0 }, cloudy: { clouds: 0.6, rain: 0 }, rain: { clouds: 0.85, rain: 0.5 }, storm: { clouds: 1, rain: 1 },
+};
+
+/** How bright the day is at `tick`: 1 in full day, 0 at night, with short
+ * dawns and dusks; a new mine starts in the morning. */
+export function daylight(tick: number) {
+  const phase = (tick / DAY_TICKS + 0.1) % 1;
+  return Math.max(0, Math.min(1, 0.5 + 1.6 * Math.sin(phase * Math.PI * 2)));
+}
+/** The weather of spell `n` for a seed: the first is always clear. */
+export function weatherOf(seed: number, n: number): Weather {
+  if (n <= 0) return "clear";
+  const r = hash01(n, 91, seed);
+  return r < 0.46 ? "clear" : r < 0.74 ? "cloudy" : r < 0.92 ? "rain" : "storm";
+}
+/** The sky at `tick`: the weather, the daylight, and the cloud and rain,
+ * eased from the last spell over the first twenty seconds of each. */
+export function skyAt(seed: number, tick: number, force?: Weather | null): Sky {
+  const n = Math.floor(tick / WEATHER_TICKS), weather = force ?? weatherOf(seed, n);
+  const now = WEATHER_LOOK[weather], before = WEATHER_LOOK[force ?? weatherOf(seed, n - 1)];
+  const t = force ? 1 : Math.min(1, (tick - n * WEATHER_TICKS) / (20 * TICK_HZ));
+  return { weather, daylight: daylight(tick), clouds: before.clouds + (now.clouds - before.clouds) * t, rain: before.rain + (now.rain - before.rain) * t };
+}
+
 export type Miner = {
   id: number;
   x: number;
@@ -44,7 +97,7 @@ export type Miner = {
   gold: number;
   spoil: number;
   /** What it is doing now (drawn), and toward where it faces. */
-  action: "idle" | "walk" | "dig" | "build" | "rest";
+  action: "idle" | "walk" | "dig" | "build" | "bail" | "douse" | "rest" | "shelter";
   facing: number;
   /** The cell being dug or built, or -1. */
   work: number;
@@ -54,9 +107,14 @@ export type Miner = {
   /** The timer runs down on work (`finish` follows), not a step or a rest. */
   working: boolean;
   fall: number;
+  /** Ticks since its last meal; breath left; ticks spent in fire. */
+  fed: number;
+  breath: number;
+  scorch: number;
 };
 type Task =
-  | { kind: "dig" | "build"; cell: number }
+  | { kind: "dig" | "build" | "bail" | "douse"; cell: number }
+  | { kind: "escape" }
   | { kind: "deliver" }
   | { kind: "dump" }
   | { kind: "cart"; level: number; side: number }
@@ -69,7 +127,7 @@ export type MineSave = {
   tick: number;
   cells: string;
   plan: string;
-  miners: { x: number; y: number; iron: number; gold: number; spoil: number }[];
+  miners: { x: number; y: number; iron: number; gold: number; spoil: number; fed?: number }[];
   carts: { level: number; side: number; x: number; iron: number; gold: number }[];
   buckets: Bucket[];
   shaftLevel: number;
@@ -77,10 +135,21 @@ export type MineSave = {
   ironOre: number;
   mined: { iron: number; gold: number };
   savedAt: number;
+  /** Added with the weather (absent from older saves): the water layer,
+   * burning cells as [cell, ticks left], miners lost by cause, and the
+   * ticks left before another can die. */
+  water?: string;
+  burning?: [number, number][];
+  lost?: Partial<Record<Cause, number>>;
+  mercy?: number;
 };
 
-/** Price in Gold of hiring the next miner, after `hired` hires. */
-export const hirePrice = (hired: number) => Math.round(120 * Math.pow(1.6, hired));
+/** The job each `jobAt` value stands for. */
+const JOB_KIND = ["", "dig", "build", "bail", "douse"] as const;
+
+/** Price in Gold of the next miner for a crew of `crew` (the first is free,
+ * so a crew of one pays the base price): a smaller crew hires cheaper. */
+export const hirePrice = (crew: number) => Math.round(120 * Math.pow(1.6, crew - 1));
 
 export class MineSim {
   readonly seed: number;
@@ -102,6 +171,24 @@ export class MineSim {
   hired = 0;
   ironOre = 0;
   mined = { iron: 0, gold: 0 };
+  /** Miners lost, by cause. */
+  lost: Record<Cause, number> = { crushed: 0, drowned: 0, starved: 0, burnt: 0, struck: 0 };
+  /** Ticks left in which a miner who comes to harm gets out alive. */
+  mercy = 0;
+  /** Set by the page while it catches up on time away: then only the first
+   * miner to come to harm dies. */
+  catchingUp = false;
+  private lostCatchingUp = 0;
+  /** Recent news, newest last (not saved). */
+  news: MineNews[] = [];
+  /** Fixes the weather (the console helper and tests); null follows the
+   * seed's own. */
+  weatherOverride: Weather | null = null;
+  /** Ticks each cell has left to burn, and the burning cells. */
+  readonly burn = new Uint16Array(CELLS);
+  private burning: number[] = [];
+  private rainOwed = 0;
+  private hits: [number, number, Material][] = [];
   /** Paid out but not yet collected by the page (`collect`). */
   private owed = { gold: 0, ironOre: 0 };
   private reserved = new Int32Array(CELLS);
@@ -121,7 +208,8 @@ export class MineSim {
     for (let y = maxStone + 5; y < H - 12; y += LEVEL_GAP) this.levels.push(y);
     const cells = saved ? decodeGrid(saved.cells, CELLS, MATERIAL_COUNT) : null;
     const plan = saved ? decodeGrid(saved.plan, CELLS, 6) : null;
-    this.world = new World(cells ?? generate(this.seed));
+    const water = saved?.water !== undefined && cells ? decodeGrid(saved.water, CELLS, 2) : null;
+    this.world = new World(cells ?? generate(this.seed), water ?? undefined);
     this.plan = plan ?? new Uint8Array(CELLS);
     if (saved && cells && plan) {
       this.tick = saved.tick;
@@ -129,7 +217,13 @@ export class MineSim {
       this.hired = saved.hired;
       this.ironOre = saved.ironOre;
       this.mined = { ...saved.mined };
-      for (const m of saved.miners) this.addMiner(m.x, m.y, m);
+      this.mercy = saved.mercy ?? 0;
+      for (const c of CAUSES) this.lost[c] = saved.lost?.[c] ?? 0;
+      for (const [c, t] of saved.burning ?? []) this.ignite(c, t);
+      for (const m of saved.miners) {
+        this.addMiner(m.x, m.y, m);
+        this.miners[this.miners.length - 1].fed = m.fed ?? 0;
+      }
       for (const c of saved.carts) {
         const y = this.levels[c.level];
         if (y !== undefined) this.carts.push({ level: c.level, side: c.side, x: c.x, y, iron: c.iron, gold: c.gold, state: "back", timer: 0 });
@@ -138,6 +232,8 @@ export class MineSim {
     } else {
       this.planShaft(0);
       this.addMiner(this.hutX, this.standY(this.hutX));
+      // A new mine's first crew learns the ropes before anyone can die.
+      this.mercy = DEATH_GAP;
     }
   }
 
@@ -184,8 +280,32 @@ export class MineSim {
     return y > this.strata.surface[x];
   }
 
-  /** Calls `visit` with every position one move away from feet (x, y). */
+  /** Lava touches a miner standing at (x, y). */
+  private lavaBeside(x: number, y: number) {
+    const c = (dx: number, dy: number) => this.cell(x + dx, y + dy) === LAVA;
+    return c(-1, 0) || c(1, 0) || c(-1, -1) || c(1, -1) || c(0, 1) || c(0, -2);
+  }
+  /** A miner can stand at (x, y) without harm: head above water, out of the
+   * fire, away from lava. */
+  safe(x: number, y: number) {
+    const i = idx(x, y);
+    return !this.under(i) && !this.burn[i] && !this.burn[i - W] && !this.lavaBeside(x, y);
+  }
+  /** A miner with its feet in cell i is under water (not just in a drip). */
+  private under(i: number) {
+    return this.world.water[i] === 1 && this.world.water[i - W] === 1;
+  }
+  /** While set, searches cross unsafe ground (a miner fleeing it). */
+  private daring = false;
+
+  /** Calls `visit` with every safe position one move away from feet (x, y). */
   private moves(x: number, y: number, visit: (nx: number, ny: number) => void) {
+    if (!this.daring) {
+      const inner = visit;
+      visit = (nx, ny) => {
+        if (this.safe(nx, ny)) inner(nx, ny);
+      };
+    }
     for (const d of [-1, 1]) {
       const nx = x + d;
       if (nx < 0 || nx >= W) continue;
@@ -254,14 +374,18 @@ export class MineSim {
 
   // ── The plan ────────────────────────────────────────────────────────
 
-  /** The work a cell waits on: 1 to dig it, 2 to fit it, 0 none. */
+  /** The work a cell waits on: 4 to douse its fire, 1 to dig it, 2 to fit
+   * it (a ladder or rail goes in under water too), 3 to bail the water out
+   * of it (underground), 0 none. */
   jobAt(c: number) {
+    const m = this.world.cells[c];
+    if (this.burn[c]) return 4;
     const p = this.plan[c];
     if (!p) return 0;
-    const m = this.world.cells[c];
     if (m === BEDROCK) return 0;
     if (isSolid(m)) return 1;
     if (p >= P_LADDER && m === AIR) return 2;
+    if (this.world.water[c] && c >= this.strata.surface[c % W] * W + W) return 3;
     return 0;
   }
   private mark(x: number, y: number, p: number) {
@@ -299,9 +423,13 @@ export class MineSim {
     if (k + 1 >= this.levels.length) return;
     const y = this.levels[k];
     if (this.cell(this.shaftX, y) !== LADDER) return;
+    // A side stops where its tunnel was given up (at lava), or reaches on.
     const reach = (side: number) => {
       let n = 0;
-      for (let x = this.shaftX + side; x >= 2 && x <= W - 3 && this.passable(x, y - 1); x += side) n++;
+      for (let x = this.shaftX + side; x >= 2 && x <= W - 3; x += side) {
+        if (!this.passable(x, y - 1)) return this.plan[idx(x, y - 1)] ? n : W;
+        n++;
+      }
       return n;
     };
     const most = this.shaftX - 3;
@@ -312,8 +440,11 @@ export class MineSim {
    * with timber, follow any ore it bared, and glimpse ore a few cells on. */
   private afterDig(x: number, y: number) {
     for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [-1, -1], [1, -1]]) {
-      const nx = x + dx, ny = y + dy;
-      if (inBounds(nx, ny) && isLoose(this.cell(nx, ny)) && !this.plan[idx(nx, ny)]) this.world.set(nx, ny, TIMBER);
+      const nx = x + dx, ny = y + dy, m = this.cell(nx, ny);
+      if (!inBounds(nx, ny) || !isLoose(m) || this.plan[idx(nx, ny)]) continue;
+      // Gravel and loose dirt run before they can all be shored.
+      if ((m === GRAVEL || m === LOOSE) && hash01(nx, ny, this.seed + this.tick) < 0.3) continue;
+      this.world.set(nx, ny, TIMBER);
     }
     if (y < this.strata.stoneTop[x]) return;
     for (let dy = -1; dy <= 1; dy++)
@@ -344,7 +475,7 @@ export class MineSim {
   addMiner(x: number, y: number, pack?: { iron: number; gold: number; spoil: number }) {
     this.miners.push({
       id: this.nextId++, x, y, iron: pack?.iron ?? 0, gold: pack?.gold ?? 0, spoil: pack?.spoil ?? 0,
-      action: "idle", facing: 1, work: -1, task: null, path: [], timer: 0, working: false, fall: 0,
+      action: "idle", facing: 1, work: -1, task: null, path: [], timer: 0, working: false, fall: 0, fed: 0, breath: BREATH_TICKS, scorch: 0,
     });
   }
   /** Hires a miner at the hut (the page charges for it). */
@@ -357,7 +488,7 @@ export class MineSim {
 
   private release(m: Miner) {
     const t = m.task;
-    if (t && (t.kind === "dig" || t.kind === "build") && this.reserved[t.cell] === m.id) this.reserved[t.cell] = 0;
+    if (t && "cell" in t && this.reserved[t.cell] === m.id) this.reserved[t.cell] = 0;
     if (t?.kind === "cart") this.cartClaims.delete(`${t.level}:${t.side}`);
     m.task = null;
     m.working = false;
@@ -370,15 +501,24 @@ export class MineSim {
   private static readonly REACH: readonly [number, number, boolean][] = [
     [-1, 0, true], [1, 0, true], [-1, -1, true], [1, -1, true], [-1, -2, true], [1, -2, true], [0, 1, true], [0, -2, true], [0, 0, false], [0, -1, false],
   ];
+  /** Water and fire are also reached down a step to either side (a bucket
+   * dipped into a flooded hole beside one's feet). */
+  private static readonly WET_REACH: readonly [number, number][] = [[-1, 1], [1, 1]];
   private reachable(x: number, y: number, c: number) {
-    const cx = c % W, cy = (c - cx) / W;
-    return MineSim.REACH.some(([dx, dy, dig]) => x + dx === cx && y + dy === cy && (dig || this.world.cells[c] === AIR));
+    const cx = c % W, cy = (c - cx) / W, near = this.jobAt(c) >= 3;
+    return (
+      MineSim.REACH.some(([dx, dy, dig]) => x + dx === cx && y + dy === cy && (dig || near || this.world.cells[c] === AIR)) ||
+      (near && MineSim.WET_REACH.some(([dx, dy]) => x + dx === cx && y + dy === cy))
+    );
   }
 
   private chooseTask(m: Miner) {
     const start = idx(m.x, m.y), ore = m.iron + m.gold;
     const shallow = m.y < this.strata.stoneTop[this.shaftX] + 6;
-    if (ore >= PACK_ORE || (m.spoil >= PACK_SPOIL && shallow)) return this.goDeliver(m, start);
+    // Hungry: up to the hut for a meal, unless there's no way up.
+    if (m.fed > MEAL_TICKS && m.y >= this.strata.surface[m.x] + 4 && this.goRest(m, start, true)) return;
+    // A full pack goes up, if there's a way; a miner cut off works on.
+    if ((ore >= PACK_ORE || (m.spoil >= PACK_SPOIL && shallow)) && this.goDeliver(m, start)) return;
     const cartJobs = this.cartJobs();
     const path = this.search(start, (x, y, d) => {
       const b = this.bestAt(x, y, cartJobs);
@@ -391,13 +531,13 @@ export class MineSim {
         m.task = { kind: "cart", ...chosen.cart };
         this.cartClaims.add(`${chosen.cart.level}:${chosen.cart.side}`);
       } else {
-        m.task = { kind: this.jobAt(chosen.cell) === 1 ? "dig" : "build", cell: chosen.cell };
+        m.task = { kind: JOB_KIND[this.jobAt(chosen.cell)] as "dig", cell: chosen.cell };
         this.reserved[chosen.cell] = m.id;
       }
       m.path = path;
       return;
     }
-    if (ore + m.spoil > 0) return this.goDeliver(m, start);
+    if (ore + m.spoil > 0 && this.goDeliver(m, start)) return;
     this.goRest(m, start);
   }
   /** The best work a miner standing at (x, y) could take up, scored (lower
@@ -410,7 +550,14 @@ export class MineSim {
       if (!inBounds(cx, cy)) continue;
       const c = idx(cx, cy), job = this.jobAt(c);
       if (!job || this.reserved[c] || (job === 1 && !dig)) continue;
-      const score = job === 1 && isOre(this.world.cells[c]) ? -30 : job === 2 ? -2 : 0;
+      const score = job === 4 ? -40 : job === 1 && isOre(this.world.cells[c]) ? -30 : job === 3 ? -1 : job === 2 ? -2 : 0;
+      if (!best || score < best.score) best = { score, cell: c, cart: null };
+    }
+    for (const [dx, dy] of MineSim.WET_REACH) {
+      if (!inBounds(x + dx, y + dy)) continue;
+      const c = idx(x + dx, y + dy), job = this.jobAt(c);
+      if (job < 3 || this.reserved[c]) continue;
+      const score = job === 4 ? -40 : -1;
       if (!best || score < best.score) best = { score, cell: c, cart: null };
     }
     for (const j of cartJobs)
@@ -436,19 +583,61 @@ export class MineSim {
         for (const c of this.carts) if (c.state === "parked" && c.y === y && Math.abs(c.x - x) <= 1 && c.iron + c.gold < CART_LOAD) return d;
       return null;
     });
-    if (!path) return this.goRest(m, start);
+    if (!path) return false;
     m.task = { kind: "deliver" };
     m.path = path;
+    return true;
   }
-  private goRest(m: Miner, start: number) {
-    const tx = this.hutX - 6 + Math.floor(hash01(this.tick, m.id, this.seed) * 12);
-    const path = this.search(start, (x, y, d) => (Math.abs(x - tx) <= 1 && y < this.strata.surface[x] + 4 ? d : null), 0, 6000);
+  /** Off to rest by the hut (inside it, out of the rain); with `only`, only
+   * if there's a way there. */
+  private goRest(m: Miner, start: number, only = false) {
+    const tx = this.raining ? this.hutX : this.hutX - 6 + Math.floor(hash01(this.tick, m.id, this.seed) * 12);
+    const path = this.search(start, (x, y, d) => (Math.abs(x - tx) <= 1 && y < this.strata.surface[x] + 4 ? d : null), 0, only ? 30000 : 6000);
+    if (only && !path) return false;
     m.task = { kind: "rest" };
     m.path = path ?? [];
     m.timer = 0;
+    return true;
+  }
+  /** Out of the water, fire or lava's reach, by any way there is. */
+  private goEscape(m: Miner) {
+    this.release(m);
+    m.timer = 0;
+    this.daring = true;
+    const path = this.search(idx(m.x, m.y), (x, y, d) => (d > 0 && this.safe(x, y) ? d : null), 0, 8000);
+    this.daring = false;
+    if (!path) return;
+    m.task = { kind: "escape" };
+    m.path = path;
+  }
+
+  /** It's raining (or storming) hard enough to shelter from. */
+  get raining() {
+    return this.sky.rain > 0.2;
+  }
+  get sky(): Sky {
+    return skyAt(this.seed, this.tick, this.weatherOverride);
+  }
+
+  /** Harm that finds a miner where it stands: water over its head, fire,
+   * lava beside it, hunger. Returns false if it died. */
+  private hazards(m: Miner) {
+    const head = idx(m.x, m.y - 1);
+    if (this.under(head + W)) {
+      if (--m.breath <= 0) return this.kill(m, "drowned");
+      if (m.task?.kind !== "escape") this.goEscape(m);
+    } else m.breath = Math.min(BREATH_TICKS, m.breath + 3);
+    if (this.lavaBeside(m.x, m.y)) return this.kill(m, "burnt");
+    if (this.burn[head + W] || this.burn[head]) {
+      if (++m.scorch > SCORCH_TICKS) return this.kill(m, "burnt");
+      if (m.task?.kind !== "escape") this.goEscape(m);
+    } else m.scorch = 0;
+    if (++m.fed > STARVE_TICKS) return this.kill(m, "starved");
+    return true;
   }
 
   private stepMiner(m: Miner) {
+    if (!this.hazards(m)) return;
     // Buried by a fall of dirt: shoulder it aside.
     for (const yy of [m.y, m.y - 1])
       if (!this.passable(m.x, yy) && this.cell(m.x, yy) !== BEDROCK && inBounds(m.x, yy)) {
@@ -487,9 +676,11 @@ export class MineSim {
       return;
     }
     let ok = false;
+    this.daring = m.task?.kind === "escape";
     this.moves(m.x, m.y, (ax, ay) => {
       if (ax === nx && ay === ny) ok = true;
     });
+    this.daring = false;
     if (!ok) return this.release(m);
     m.action = "walk";
     if (nx !== m.x) {
@@ -522,14 +713,21 @@ export class MineSim {
 
   private arrive(m: Miner) {
     const t = m.task!;
-    if (t.kind === "dig" || t.kind === "build") {
+    if (t.kind === "escape") return this.release(m);
+    if (t.kind === "dig" || t.kind === "build" || t.kind === "bail" || t.kind === "douse") {
       const job = this.jobAt(t.cell);
-      if (!job || !this.reachable(m.x, m.y, t.cell) || (job === 1) !== (t.kind === "dig")) return this.release(m);
+      if (!job || !this.reachable(m.x, m.y, t.cell) || JOB_KIND[job] !== t.kind) return this.release(m);
+      // Heat through the rock: most miners feel lava before they break into
+      // it, and give up the workings round about.
+      if (t.kind === "dig" && this.nearLava(t.cell) && hash01(t.cell, 77, this.seed) < 0.85) {
+        this.abandon(t.cell);
+        return this.release(m);
+      }
       const m2 = this.world.cells[t.cell];
       m.action = t.kind;
       m.work = t.cell;
       m.facing = t.cell % W > m.x ? 1 : t.cell % W < m.x ? -1 : m.facing;
-      m.timer = t.kind === "dig" ? DIG_TICKS[m2] ?? 120 : BUILD_TICKS[FIXTURE[this.plan[t.cell]]];
+      m.timer = t.kind === "dig" ? DIG_TICKS[m2] ?? 120 : t.kind === "bail" ? BAIL_TICKS : t.kind === "douse" ? DOUSE_TICKS : BUILD_TICKS[FIXTURE[this.plan[t.cell]]];
       m.working = true;
       return;
     }
@@ -553,6 +751,8 @@ export class MineSim {
       if (Math.abs(m.x - this.hutX) <= 1 && m.y < this.strata.surface[m.x] + 4) {
         this.pay(m.iron, m.gold);
         m.iron = m.gold = 0;
+        // In a storm nobody goes out to the heap: spoil is tipped by the hut.
+        if (this.sky.weather === "storm") m.spoil = 0;
         if (m.spoil > 0) {
           const path = this.search(idx(m.x, m.y), (x, y, d) => (Math.abs(x - this.heapX) <= 2 && y < this.strata.surface[x] + 4 ? d : null), 0, 8000);
           if (path) {
@@ -577,10 +777,27 @@ export class MineSim {
       }
       return this.release(m);
     }
-    // Resting by the hut.
-    m.action = "rest";
+    // Resting by the hut (and eating), or inside it out of the rain.
+    const home = m.y < this.strata.surface[m.x] + 4;
+    if (home) m.fed = 0;
+    m.action = home && this.raining && Math.abs(m.x - this.hutX) <= 1 ? "shelter" : "rest";
     m.timer = 90 + Math.floor(hash01(m.id, this.tick, this.seed) * 120);
     m.task = null;
+  }
+
+  private nearLava(c: number) {
+    const x = c % W, y = (c - x) / W;
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (this.cell(x + dx, y + dy) === LAVA) return true;
+    return false;
+  }
+  /** Gives up the unworked plan round cell c. */
+  private abandon(c: number) {
+    const x = c % W, y = (c - x) / W;
+    for (let dy = -3; dy <= 3; dy++)
+      for (let dx = -3; dx <= 3; dx++) {
+        const nx = x + dx, ny = y + dy;
+        if (inBounds(nx, ny) && nx !== this.shaftX && isSolid(this.cell(nx, ny))) this.plan[idx(nx, ny)] = P_NONE;
+      }
   }
 
   /** A miner's timed work is done. */
@@ -602,6 +819,11 @@ export class MineSim {
     } else if (t.kind === "build") {
       const c = t.cell, x = c % W, y = (c - x) / W;
       if (this.jobAt(c) === 2) this.world.set(x, y, FIXTURE[this.plan[c]]);
+    } else if (t.kind === "bail") {
+      const c = t.cell, x = c % W;
+      this.world.setWater(x, (c - x) / W, false);
+    } else if (t.kind === "douse") {
+      this.burn[t.cell] = 0;
     } else if (t.kind === "cart") {
       this.cartClaims.delete(`${t.level}:${t.side}`);
       const y = this.levels[t.level];
@@ -682,24 +904,165 @@ export class MineSim {
     return out;
   }
 
+  // ── Harm ────────────────────────────────────────────────────────────
+
+  /** A miner comes to harm. It dies (returning false), unless it is the
+   * last, or another died too lately, or one already died in this
+   * catch-up: then it gets out, dragged up to the hut by the crew. */
+  private kill(m: Miner, cause: Cause) {
+    const spared = this.miners.length <= 1 || this.mercy > 0 || (this.catchingUp && this.lostCatchingUp > 0);
+    this.release(m);
+    this.tell(spared ? "saved" : "lost", m.x, m.y, cause);
+    if (spared) {
+      m.x = this.hutX;
+      m.y = this.standY(this.hutX);
+      m.iron = m.gold = m.spoil = 0;
+      m.fed = 0;
+      m.breath = BREATH_TICKS;
+      m.scorch = 0;
+      m.action = "rest";
+      m.timer = 10 * TICK_HZ;
+      return false;
+    }
+    this.miners.splice(this.miners.indexOf(m), 1);
+    this.lost[cause]++;
+    this.mercy = DEATH_GAP;
+    if (this.catchingUp) this.lostCatchingUp++;
+    return false;
+  }
+  get lostTotal() {
+    return CAUSES.reduce((n, c) => n + this.lost[c], 0);
+  }
+  private tell(kind: MineNews["kind"], x: number, y: number, cause?: Cause) {
+    this.news.push({ tick: this.tick, kind, x, y, cause });
+    if (this.news.length > 24) this.news.shift();
+  }
+
+  /** Something solid fell on a miner: a rock may kill it (or glance off),
+   * and so may a deep fall of loose ground, now and then. */
+  private struckBy(x: number, y: number, mat: Material) {
+    const m = this.miners.find((o) => o.x === x && (o.y === y || o.y - 1 === y));
+    if (!m) return;
+    if (mat === ROCK) {
+      if (hash01(x, this.tick, this.seed + 11) < 0.5) this.kill(m, "crushed");
+      return;
+    }
+    let depth = 0;
+    while (depth < 8 && isLoose(this.cell(x, y - 1 - depth))) depth++;
+    if (depth >= 5 && hash01(x, this.tick, this.seed + 13) < 0.35) this.kill(m, "crushed");
+  }
+
+  /** Sets wood cell c alight for `ticks`. */
+  ignite(c: number, ticks = FIRE_TICKS) {
+    if (c < 0 || c >= CELLS || !isWood(this.world.cells[c]) || this.burn[c] || this.world.water[c]) return;
+    this.burn[c] = ticks;
+    this.burning.push(c);
+  }
+  /** Fire burns down, spreads to wood beside it, and goes out in water or
+   * the rain; what burns through is gone (and what it held up falls). */
+  private stepFire(dt: number) {
+    const now = this.burning;
+    this.burning = [];
+    const rain = this.sky.rain;
+    for (const c of now) {
+      if (!this.burn[c]) continue;
+      const x = c % W, y = (c - x) / W;
+      if (!isWood(this.world.cells[c]) || this.world.water[c] || this.world.wet01(x, y - 1) || (rain > 0.3 && y <= this.strata.surface[x])) {
+        this.burn[c] = 0;
+        continue;
+      }
+      this.burn[c] = Math.max(0, this.burn[c] - dt);
+      for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, -1]])
+        if (inBounds(x + dx, y + dy) && hash01(c, dx * 3 + dy, this.tick + this.seed) < 0.035) this.ignite(idx(x + dx, y + dy));
+      if (this.burn[c] === 0) this.world.set(x, y, AIR);
+      else this.burning.push(c);
+    }
+  }
+
+  /** Every ten seconds: a torch may start a fire (rarely), wood beside lava
+   * catches, and lava open to the air crusts over into stone. */
+  private survey() {
+    const cells = this.world.cells, torches: number[] = [];
+    for (let i = 0; i < CELLS; i++) {
+      const m = cells[i];
+      if (m === TORCH) torches.push(i);
+      if (m !== LAVA) continue;
+      const x = i % W, y = (i - x) / W;
+      let open = false;
+      for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+        const n = this.cell(x + dx, y + dy);
+        if (isWood(n)) this.ignite(idx(x + dx, y + dy));
+        if (isPassable(n) && dy <= 0) open = true;
+      }
+      if (open && hash01(i, this.tick, this.seed + 21) < 0.08) this.world.set(x, y, STONE);
+    }
+    if (torches.length && hash01(this.tick, 3, this.seed + 23) < 0.003) {
+      const t = torches[Math.floor(hash01(this.tick, 4, this.seed + 23) * torches.length)];
+      this.ignite(t);
+      this.tell("fire", t % W, Math.floor(t / W));
+    }
+  }
+
+  /** Rain falls on the ground, a few drops a tick; in a storm, lightning. */
+  private weather() {
+    const sky = this.sky;
+    this.rainOwed += sky.rain * 0.3;
+    for (let n = 0; this.rainOwed >= 1; n++, this.rainOwed--) {
+      const x = Math.floor(hash01(this.tick, n, this.seed + 33) * W);
+      // The headframe's roof keeps the rain out of the shaft's mouth.
+      if (Math.abs(x - this.shaftX) <= 2 || !this.passable(x, 0) || this.world.water[x]) continue;
+      let y = 0;
+      while (y < H - 1 && this.passable(x, y + 1) && !this.world.water[idx(x, y + 1)]) y++;
+      this.world.setWater(x, y, true);
+    }
+    if (sky.weather !== "storm" || sky.rain < 0.8 || hash01(this.tick, 5, this.seed + 35) > 1 / (9 * TICK_HZ)) return;
+    const x = Math.floor(hash01(this.tick, 6, this.seed + 35) * W);
+    let y = 0;
+    while (y < H - 1 && this.cell(x, y + 1) === AIR && !this.world.water[idx(x, y + 1)]) y++;
+    this.tell("strike", x, y);
+    if (isWood(this.cell(x, y + 1))) this.ignite(idx(x, y + 1));
+    for (const m of [...this.miners])
+      if (m.x === x && Math.abs(m.y - y) <= 2 && m.y <= this.strata.surface[x] + 1 && hash01(m.id, this.tick, this.seed + 37) < 0.5) this.kill(m, "struck");
+  }
+
+  /** Water drains away: into soil it lies on, slowly drying where it lies
+   * on rock, quicker under the open sky once the rain stops. */
+  private drain() {
+    const water = this.world.water, cells = this.world.cells, dry = this.sky.rain < 0.05;
+    for (let i = 0; i < CELLS - W; i++) {
+      if (!water[i]) continue;
+      const x = i % W, y = (i - x) / W, open = y <= this.strata.surface[x];
+      const p = isSoil(cells[i + W]) ? 0.12 : open ? (dry ? 0.02 : 0.002) : 0.0015;
+      if (hash01(i, this.tick, this.seed + 61) < p) this.world.setWater(x, y, false);
+    }
+  }
+
   // ── The tick ────────────────────────────────────────────────────────
 
   step() {
     this.tick++;
+    if (this.mercy > 0) this.mercy--;
+    if (!this.catchingUp) this.lostCatchingUp = 0;
+    this.weather();
     const occ = this.occupied;
     for (const m of this.miners) {
       occ[idx(m.x, m.y)] = 1;
       if (m.y > 0) occ[idx(m.x, m.y - 1)] = 1;
     }
-    this.world.step((x, y) => occ[idx(x, y)] === 1);
+    this.world.step((x, y) => occ[idx(x, y)] === 1, (x, y, mat) => this.hits.push([x, y, mat]));
     for (const m of this.miners) {
       occ[idx(m.x, m.y)] = 0;
       if (m.y > 0) occ[idx(m.x, m.y - 1)] = 0;
     }
-    for (const m of this.miners) this.stepMiner(m);
+    for (const [x, y, mat] of this.hits) this.struckBy(x, y, mat);
+    this.hits.length = 0;
+    for (const m of [...this.miners]) this.stepMiner(m);
     for (const c of this.carts) this.stepCart(c);
     this.stepBuckets();
     if (this.tick % 30 === 0) this.replan();
+    if (this.tick % 6 === 0 && this.burning.length) this.stepFire(6);
+    if (this.tick % 10 === 0 && this.world.waterCount) this.drain();
+    if (this.tick % 300 === 0) this.survey();
   }
 
   /** Deepest the shaft's ladder reaches, in rows below the surface. */
@@ -715,7 +1078,7 @@ export class MineSim {
       tick: this.tick,
       cells: encodeGrid(this.world.cells),
       plan: encodeGrid(this.plan),
-      miners: this.miners.map((m) => ({ x: m.x, y: m.y, iron: m.iron, gold: m.gold, spoil: m.spoil })),
+      miners: this.miners.map((m) => ({ x: m.x, y: m.y, iron: m.iron, gold: m.gold, spoil: m.spoil, fed: m.fed })),
       carts: this.carts.map((c) => ({ level: c.level, side: c.side, x: c.x, iron: c.iron, gold: c.gold })),
       buckets: this.buckets.map((b) => ({ ...b })),
       shaftLevel: this.shaftLevel,
@@ -723,7 +1086,16 @@ export class MineSim {
       ironOre: this.ironOre + this.owed.ironOre,
       mined: { ...this.mined },
       savedAt: now,
+      water: encodeGrid(this.world.water),
+      burning: this.burning.filter((c) => this.burn[c]).map((c) => [c, this.burn[c]]),
+      lost: { ...this.lost },
+      mercy: this.mercy,
     };
+  }
+
+  /** The next miner's price: a smaller crew hires cheaper. */
+  get price() {
+    return hirePrice(this.miners.length);
   }
 }
 
@@ -733,17 +1105,26 @@ const int = (v: unknown, min: number, max: number) => Number.isInteger(v) && (v 
  * page starts a fresh one). */
 export function decodeMineSave(s: any): MineSave | null {
   if (!s || typeof s !== "object") return null;
-  if (!int(s.seed, 0, 0xffffffff) || !int(s.tick, 0, 1e12) || !int(s.shaftLevel, 0, 100) || !int(s.hired, 0, MAX_MINERS)) return null;
+  if (!int(s.seed, 0, 0xffffffff) || !int(s.tick, 0, 1e12) || !int(s.shaftLevel, 0, 100) || !int(s.hired, 0, 1e6)) return null;
   if (!int(s.ironOre, 0, 1e9) || !Number.isFinite(s.savedAt) || !s.mined || !int(s.mined.iron, 0, 1e9) || !int(s.mined.gold, 0, 1e9)) return null;
   if (!decodeGrid(s.cells, CELLS, MATERIAL_COUNT) || !decodeGrid(s.plan, CELLS, 6)) return null;
-  const pack = (m: any) => int(m?.iron, 0, 1000) && int(m?.gold, 0, 1000) && int(m?.spoil, 0, 1000);
+  const pack = (m: any) => int(m?.iron, 0, 1000) && int(m?.gold, 0, 1000) && int(m?.spoil, 0, 1000) && (m.fed === undefined || int(m.fed, 0, 1e9));
   if (!Array.isArray(s.miners) || s.miners.length > MAX_MINERS || !s.miners.every((m: any) => int(m?.x, 0, W - 1) && int(m?.y, 1, H - 1) && pack(m))) return null;
   if (!Array.isArray(s.carts) || !s.carts.every((c: any) => int(c?.level, 0, 100) && (c.side === 1 || c.side === -1) && int(c.x, 0, W - 1) && int(c.iron, 0, 1e4) && int(c.gold, 0, 1e4))) return null;
   if (!Array.isArray(s.buckets) || !s.buckets.every((b: any) => int(b?.y, 0, H) && int(b.iron, 0, 1e4) && int(b.gold, 0, 1e4))) return null;
+  // The weather's additions may be missing (an older save), never malformed.
+  if (s.water !== undefined && !decodeGrid(s.water, CELLS, 2)) return null;
+  if (s.burning !== undefined && !(Array.isArray(s.burning) && s.burning.every((b: any) => Array.isArray(b) && b.length === 2 && int(b[0], 0, CELLS - 1) && int(b[1], 1, 1e5)))) return null;
+  if (s.lost !== undefined && !(s.lost && typeof s.lost === "object" && CAUSES.every((c) => s.lost[c] === undefined || int(s.lost[c], 0, 1e6)))) return null;
+  if (s.mercy !== undefined && !int(s.mercy, 0, 1e9)) return null;
   return {
+    ...(s.water !== undefined ? { water: s.water } : {}),
+    ...(s.burning !== undefined ? { burning: s.burning.map((b: number[]) => [b[0], b[1]] as [number, number]) } : {}),
+    ...(s.lost !== undefined ? { lost: Object.fromEntries(CAUSES.filter((c) => s.lost[c] !== undefined).map((c) => [c, s.lost[c]])) } : {}),
+    ...(s.mercy !== undefined ? { mercy: s.mercy } : {}),
     seed: s.seed, tick: s.tick, cells: s.cells, plan: s.plan, shaftLevel: s.shaftLevel, hired: s.hired, ironOre: s.ironOre, savedAt: s.savedAt,
     mined: { iron: s.mined.iron, gold: s.mined.gold },
-    miners: s.miners.map((m: any) => ({ x: m.x, y: m.y, iron: m.iron, gold: m.gold, spoil: m.spoil })),
+    miners: s.miners.map((m: any) => ({ x: m.x, y: m.y, iron: m.iron, gold: m.gold, spoil: m.spoil, ...(m.fed !== undefined ? { fed: m.fed } : {}) })),
     carts: s.carts.map((c: any) => ({ level: c.level, side: c.side, x: c.x, iron: c.iron, gold: c.gold })),
     buckets: s.buckets.map((b: any) => ({ y: b.y, iron: b.iron, gold: b.gold })),
   };

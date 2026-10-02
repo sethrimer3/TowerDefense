@@ -104,6 +104,21 @@ A level's mine cart takes miners' ore to the shaft, where the hoist's bucket lif
 **Iron ore** and **gold**:
 What the mine pays: gold straight into Gold, iron ore smelted into iron bars.
 
+**Weather**:
+The mine's sky: clear, cloudy, rain or storm, in spells that turn with its days and nights. Miners shelter from rain in the hut; storms bring lightning.
+
+**Flood** and **bailing**:
+Rainwater that runs down the shaft and fills the workings; miners bail it out with buckets.
+
+**Gravel** and **loose dirt**:
+Ground that slides at the slightest drop and can bury the shaft, crushing ladders and timber.
+
+**Lava**:
+Molten rock in pools deep down. It creeps, burns miners and wood, and turns to stone where water meets it.
+
+**Lost miner** and **grave**:
+A miner killed by a fall of ground, drowning, starvation, lava, fire or lightning. Losses are rare and spaced out, the last miner always survives, and each lost miner gets a grave by the hut.
+
 ### The library
 
 **Library**:

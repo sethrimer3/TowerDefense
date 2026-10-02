@@ -34,7 +34,7 @@ The city is alive between and during battles: park grass sways in the wind (hard
 ## How it's built
 
 - `src/defend/` is the game: the layout and its fitting (`layout.ts`), the procedural city (`citygen.ts`), the deterministic battle (`sim.ts`, with `enemies.ts`, `troops.ts`, `civilians.ts`, `towers.ts`, `pathing.ts`), drawing (`render.ts` and its passes: `city-layer.ts`, `lighting.ts`, `battle-art.ts`, `wizard-art.ts`, `ground-relief.ts`, `park-art.ts`, `park-grass.ts`, `pond-water.ts`, `pond-ducks.ts`, `fences.ts`, `edit-overlay.ts`, `structure-art.ts`, `weather.ts`), the pointer state machine and drag sessions, and the page (`ui.ts`). See `docs/DEFEND.md`.
-- `src/mine/` is the idle Mine: a falling-sand world from a seed (`world.ts`), the crew's work, carts, hoist and pay (`sim.ts`), its lit pixel drawing (`render.ts`) and the tab (`ui.ts`).
+- `src/mine/` is the idle Mine: a falling-sand world from a seed with water, gravel, loose dirt and lava (`world.ts`), the crew's work, carts, hoist and pay, the day, weather, floods, fires and miners' deaths (`sim.ts`), its lit pixel drawing (`render.ts`) and the tab (`ui.ts`).
 - `src/library/` is the Library: a cathedral nave filled with bookshelves and librarians (`sim.ts`), drawn with torchlit stone relief, stained glass, stars and god rays (`render.ts`), and its tab (`ui.ts`).
 - `src/progression.ts` holds Training, Commander levels, the skill trees' effects and a defense's rewards, folded into the `Bonuses` the battle reads; `src/skill-trees.ts` the trees; `src/save.ts` the save.
 - `src/lighting.ts`, `src/torch-light.ts` and `src/visibility.ts` are the torch-light toolkit (flicker, sway, candle colours, occlusion-aware baked glow, visibility polygons) that Defend's lights are built on.
