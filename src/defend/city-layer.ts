@@ -7,7 +7,8 @@ import { CELL_COUNT, CELLS_H, CELLS_W, SPAWN_ROW, SUB, TILES_H, TILES_W, cellInB
 import { CellType, type Building, type CityMap } from "./citygen.ts";
 import type { Light, Stone } from "./lighting.ts";
 import type { DefendSim } from "./sim.ts";
-import { OUTLINE, ROAD, ROOFS, paintStructureArt } from "./structure-art.ts";
+import { ROAD, paintStructureArt } from "./structure-art.ts";
+import { roofSeed, roofSprite } from "./roof-art.ts";
 import { parkArt } from "./park-art.ts";
 
 export { POND, POND_WATER, hasTree, pondDisc, pondPath, treeCanopy } from "./park-geometry.ts";
@@ -212,13 +213,13 @@ function paintBuilding(p: Paint, b: Building) {
     y = Math.round(r.y * px),
     w = Math.round((r.x + r.w) * px) - x,
     h = Math.round((r.y + r.h) * px) - y;
+  if (b.kind === "house") return paintHouse(p, b, { x, y, w, h });
   const gap = Math.max(1, Math.round(px * 0.09));
   // Drop shadow.
   const sh = Math.max(1, Math.round(px * 0.14));
   c.fillStyle = "rgba(0,0,0,0.35)";
   c.fillRect(x + gap + sh, y + gap + sh, w - gap * 2, h - gap * 2);
-  if (b.kind === "house") paintHouse(p, b, { x: x + gap, y: y + gap, w: w - gap * 2, h: h - gap * 2 });
-  else paintStructureArt(c, b.kind, { x, y, w, h, px });
+  paintStructureArt(c, b.kind, { x, y, w, h, px });
 }
 
 /** Partially rebuilt: finished sections show as fresh timber framing. */
@@ -235,30 +236,16 @@ function paintRebuilding({ c, px, solid }: Paint, b: Building) {
   }
 }
 
-/** A roof inside a black outline: two slopes meeting at a ridge along the
- * long axis, the sunny slope lighter, a crisp dark ridge line, and faint
- * tile courses. `box` is the outline's extent in canvas pixels. */
-function paintHouse({ c, px }: Paint, b: Building, box: { x: number; y: number; w: number; h: number }) {
-  const line = Math.max(1, Math.round(px * 0.08));
-  c.fillStyle = OUTLINE;
-  c.fillRect(box.x, box.y, box.w, box.h);
-  const ix = box.x + line,
-    iy = box.y + line,
-    iw = box.w - line * 2,
-    ih = box.h - line * 2;
-  c.fillStyle = ROOFS[b.variant % ROOFS.length];
-  c.fillRect(ix, iy, iw, ih);
-  const along = b.rect.w >= b.rect.h;
-  c.fillStyle = "rgba(255,240,210,0.14)";
-  if (along) c.fillRect(ix, iy, iw, Math.floor(ih / 2));
-  else c.fillRect(ix, iy, Math.floor(iw / 2), ih);
-  c.fillStyle = "rgba(0,0,0,0.18)";
-  const course = Math.max(2, Math.round(px * 0.3));
-  if (along) for (let yy = iy + course; yy < iy + ih - 1; yy += course) c.fillRect(ix, yy, iw, 1);
-  else for (let xx = ix + course; xx < ix + iw - 1; xx += course) c.fillRect(xx, iy, 1, ih);
-  c.fillStyle = OUTLINE;
-  if (along) c.fillRect(ix, iy + Math.floor(ih / 2), iw, line);
-  else c.fillRect(ix + Math.floor(iw / 2), iy, line, ih);
+/** A house's shingled roof, pixel art from `roof-art.ts` seeded by its
+ * lot, drawn up over its cells (`box`, canvas pixels) with smoothing off. */
+function paintHouse({ c }: Paint, b: Building, box: { x: number; y: number; w: number; h: number }) {
+  const r = b.rect;
+  const art = roofSprite(r.w, r.h, b.variant, roofSeed(r.x, r.y, r.w, r.h));
+  if (!art) return;
+  c.save();
+  c.imageSmoothingEnabled = false;
+  c.drawImage(art, box.x, box.y, box.w, box.h);
+  c.restore();
 }
 
 /** One wall stone. Edges and the hanging brick face follow the *standing*
