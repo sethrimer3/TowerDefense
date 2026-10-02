@@ -1526,3 +1526,39 @@ nav button { position: relative; }
   .mine-prospect { font-size: 9px; }
   .crew-member { font-size: 10px; padding: 4px 5px; }
 }
+/* A building's stats, over the corner of the mine's view. */
+.mine-info {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 2;
+  width: min(220px, 70%);
+  padding: 8px 10px;
+  font-size: 10px;
+  line-height: 1.5;
+  pointer-events: none;
+}
+.mine-info h3 {
+  margin: 0 0 4px;
+  font-size: 12px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.mine-info .info-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.mine-info .info-bar {
+  height: 6px;
+  margin: 2px 0 4px;
+}
+.mine-info .info-bar i {
+  display: block;
+  height: 100%;
+}
+.mine-info .info-hint {
+  margin: 4px 0 0;
+  font-size: 9px;
+  opacity: 0.7;
+}

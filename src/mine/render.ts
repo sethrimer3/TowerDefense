@@ -5,10 +5,14 @@
  * up crisp under a camera (a whole number of screen pixels a cell, so the
  * pixels meet without seams). Over it: clouds, rain and lightning, the
  * headframe, the buildings (their front walls fading to show who's inside),
- * the graves of the miners lost, the carts, hoist bucket, miners and dust. Water is tinted into the
+ * the graves of the miners lost, the carts, the hoist's rope and bucket, the
+ * yard's ore, the miners (2 × 4 half-cell figures, `figures.ts`) and the
+ * effects (`particles.ts`). Water is tinted into the
  * cells it fills; stars glint in the night sky. */
 import { stream } from "../random.ts";
-import { CART_LOAD, type Inside, type Job, type Miner, type MineSim, type Sky } from "./sim.ts";
+import { CART_LOAD, FORGE_CAP, type Inside, type Miner, type MineSim, type Sky } from "./sim.ts";
+import { drawFigure, drawSleeper, outfit, type Fine, type Pose } from "./figures.ts";
+import { Particles } from "./particles.ts";
 import { BUILDINGS, along, pathTicks, type Building, type BuildingId } from "./buildings.ts";
 import {
   AIR, BEDROCK, CELLS, DIRT, GOLD, GRASS, GRAVEL, H, IRON, LADDER, LAMP, LAVA, LOOSE, RAIL, ROCK, RUBBLE, STONE, TIMBER, TORCH, W, hash01, idx, isPassable,
@@ -47,10 +51,6 @@ const WINDOW_DARK: RGB = [44, 38, 32], WINDOW_LIT: RGB = [255, 214, 122];
 const PLANK: RGB[] = [[138, 90, 44], [120, 78, 38]], POST: RGB = [86, 54, 26], BACK: RGB = [62, 42, 26], BACK_STONE: RGB = [54, 52, 56];
 const ROOF: RGB[] = [[163, 58, 38], [122, 42, 28]], SLATE: RGB[] = [[84, 86, 98], [66, 68, 80]], ASHLAR: RGB[] = [[118, 112, 104], [98, 94, 90]];
 const FOOTING: RGB = [84, 80, 76], IRON_DARK: RGB = [58, 58, 66], BLANKET: RGB = [96, 112, 150], BAR_IRON: RGB = [176, 180, 190], BAR_GOLD: RGB = [240, 200, 80];
-/** Each trade's look: a miner's yellow hat, a forge hand's grey welder's
- * mask, a smith's brown leather apron. */
-const HEAD: Record<Job, string> = { mine: "#f2c230", forge: "#8d929c", smith: "#f4e6d4" };
-const BODY: Record<Job, string> = { mine: "#f4f2ec", forge: "#f4f2ec", smith: "#7a4a26" };
 /** A grave for each miner lost. */
 const GRAVE = [".c.", "ccc", ".C.", ".C."];
 const HEADFRAME = [
@@ -71,7 +71,6 @@ const HEADFRAME = [
 /** Cells across the view at the furthest zoom out, and how far in it goes. */
 export const VIEW_CELLS = 256, MAX_ZOOM = 8;
 
-type Dust = { x: number; y: number; vx: number; vy: number; life: number; color: string };
 type Bolt = { points: [number, number][]; until: number };
 
 export class MineRenderer {
@@ -89,7 +88,14 @@ export class MineRenderer {
   private paintedVersion = -1;
   private paintedRows = "";
   private seed = -1;
-  private dust: Dust[] = [];
+  private fx2 = new Particles();
+  /** Fills a rectangle in cells, snapped to whole screen pixels (set each
+   * frame, for the half-cell figures and the effects). */
+  private fine: Fine = () => {};
+  /** Where the hoist's bucket is drawn, eased after the sim's. */
+  private hoistY = -1;
+  /** The building the player tapped, shown open and outlined. */
+  picked: BuildingId | null = null;
   private fx = stream("effects");
   /** The newest piece of the sim's news already shown, lightning bolts in
    * flight, and the screen flash's end. */
@@ -174,6 +180,16 @@ export class MineRenderer {
     this.size.scale = next;
     this.camX = cx - px / next;
     this.camY = cy - py / next;
+    this.clamp();
+  }
+  /** Centres the view on cell (x, y) at `zoom`. */
+  lookAt(x: number, y: number, zoom: number) {
+    this.want = Math.max(1, Math.min(MAX_ZOOM, zoom));
+    this.size.scale = this.scaleFor(this.size.min, this.want);
+    this.camX = x - this.size.w / this.size.scale / 2;
+    this.camY = y - this.size.h / this.size.scale / 2;
+    this.target = null;
+    this.follow = false;
     this.clamp();
   }
   /** Looks at the top of the shaft. */
@@ -323,6 +339,13 @@ export class MineRenderer {
     ctx.fillStyle = "#0b0908";
     ctx.fillRect(0, 0, w, h);
     const ox = Math.round(-this.camX * scale), oy = Math.round(-this.camY * scale);
+    this.fine = (x, y, fw, fh, color) => {
+      const x0 = Math.round(ox + x * scale), y0 = Math.round(oy + y * scale);
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.fillStyle = color;
+      ctx.fillRect(x0, y0, Math.round(ox + (x + fw) * scale) - x0, Math.round(oy + (y + fh) * scale) - y0);
+      ctx.setTransform(scale, 0, 0, scale, ox, oy);
+    };
     ctx.setTransform(scale, 0, 0, scale, ox, oy);
     ctx.drawImage(this.off, 0, y0, W, y1 - y0, 0, y0, W, y1 - y0);
     if (y0 < 60) this.drawClouds(sim, time);
@@ -343,34 +366,46 @@ export class MineRenderer {
         ctx.fillRect(load > CART_LOAD / 2 ? c.x - 1 : c.x, c.y - 2, load > CART_LOAD / 2 ? 3 : 1, 1);
       }
     }
+    const fine = this.fine;
     for (const m of sim.miners) {
       if (m.inside || m.y < y0 - 2 || m.y > y1 + 2) continue;
-      drawMiner(ctx, m.job, m.x, m.y);
+      const climbing = m.action === "walk" && sim.world.get(m.x, m.y) === LADDER;
+      const pose: Pose = climbing ? "climb" : m.action === "walk" ? "walk" : m.action === "idle" || m.action === "rest" ? "stand" : "work";
+      const step = Math.floor(time / 140 + m.id * 3);
+      drawFigure(fine, outfit(m.name, m.job), m.x, m.y, m.facing, pose, step);
+      const front = m.facing > 0 ? m.x + 1 : m.x - 0.5;
+      // A sack of ore on the back.
       if (m.iron + m.gold > 0) {
-        ctx.fillStyle = m.gold > 0 ? "#f0c850" : "#c07a50";
-        ctx.fillRect(m.x - m.facing, m.y, 1, 1);
+        fine(m.facing > 0 ? m.x - 0.5 : m.x + 1, m.y - 0.5, 0.5, 1, "#6a5236");
+        fine(m.facing > 0 ? m.x - 0.5 : m.x + 1, m.y - 0.5, 0.5, 0.5, m.gold > 0 ? "#f0c850" : "#c07a50");
       }
       // A bucket swung at floodwater or a fire.
       if ((m.action === "bail" || m.action === "douse") && m.work >= 0) {
-        const wx = m.work % W, up = Math.floor(time / 240 + m.id) % 2;
-        ctx.fillStyle = m.action === "douse" ? "#9fc6f0" : "#5a86c8";
-        ctx.fillRect(m.x + (Math.sign(wx - m.x) || m.facing), m.y - up, 1, 1);
+        const up = step % 2;
+        fine(front, m.y - up * 0.5, 0.5, 0.5, m.action === "douse" ? "#9fc6f0" : "#5a86c8");
+        fine(front, m.y - up * 0.5 - 0.25, 0.5, 0.25, "#7a7a82");
       }
-      if (m.action === "dig" && m.work >= 0 && Math.floor(time / 180 + m.id) % 2 === 0) {
-        ctx.fillStyle = "#b9bcc4";
-        const wx = m.work % W, wy = (m.work - wx) / W;
-        ctx.fillRect(m.x + Math.sign(wx - m.x), wy < m.y - 1 ? m.y - 2 : m.y - 1, 1, 1);
-        if (effects && this.fx() < 0.18) this.kick(wx, wy, sim.world.get(wx, wy));
+      if (m.action === "dig" && m.work >= 0) {
+        // The pick: raised, then struck at the face.
+        const wx = m.work % W, wy = (m.work - wx) / W, dir = Math.sign(wx - m.x) || m.facing, raised = Math.floor(time / 180 + m.id) % 2 === 0;
+        const hx = dir > 0 ? m.x + 1 : m.x - 0.5, hy = wy < m.y - 1 ? m.y - 1.5 : wy > m.y ? m.y + 0.5 : m.y - 1;
+        fine(hx, raised ? hy - 0.5 : hy, 0.5, 0.5, "#b9bcc4");
+        fine(dir > 0 ? m.x + 0.5 : m.x, m.y - (raised ? 0.5 : 0), 0.5, 0.5, "#7a5230");
+        if (effects && !raised && this.fx() < 0.25) this.kick(wx, wy, sim.world.get(wx, wy));
       }
+      if (m.action === "build" && m.work >= 0 && Math.floor(time / 200 + m.id) % 2 === 0) fine(front, m.y - 1, 0.5, 0.5, "#c8ccd4");
     }
     if (this.target) {
       // A brass marker bobbing over the miner picked in the crew's list.
-      const at = this.whereIs(sim, this.target), bob = Math.floor(time / 300) % 2;
-      ctx.fillStyle = "#f0c850";
-      ctx.fillRect(at.x - 1, at.y - 4 - bob, 3, 1);
-      ctx.fillRect(at.x, at.y - 3 - bob, 1, 1);
+      const at = this.whereIs(sim, this.target), bob = Math.floor(time / 300) % 2 ? 0.5 : 0;
+      fine(at.x - 0.5, at.y - 3 - bob, 2, 0.5, "#f0c850");
+      fine(at.x, at.y - 2.5 - bob, 1, 0.5, "#f0c850");
     }
-    if (effects) this.drawDust();
+    if (effects) {
+      const cells = sim.world.cells;
+      this.fx2.step((x, y) => x < 0 || x >= W || y < 0 || y >= H || !isPassable(cells[idx(Math.floor(x), Math.floor(y))]), 1 + this.skyNow.clouds + this.skyNow.rain * 2);
+      this.fx2.draw(ctx, fine);
+    }
     this.drawLightning(time);
   }
 
@@ -395,7 +430,7 @@ export class MineRenderer {
     // The shaft house shows the miners passing through its mouth.
     const passing = sim.miners.some((m) => !m.inside && m.x >= shaft.x0 && m.x <= shaft.x1 && m.y >= shaft.floor - shaft.height && m.y <= shaft.floor + 3);
     for (const id of BUILDINGS) {
-      const want = id === "shaft" ? (passing ? 1 : 0) : inside[id].length ? 1 : 0;
+      const want = id === this.picked || (id === "shaft" ? passing : inside[id].length > 0) ? 1 : 0;
       this.open[id] += (want - this.open[id]) * 0.12;
       if (Math.abs(want - this.open[id]) < 0.01) this.open[id] = want;
       this.drawBuilding(sim, sim.buildings[id], inside[id], time, k, night, effects);
@@ -453,8 +488,10 @@ export class MineRenderer {
     if (b.id === "forge") {
       // The chimney, smoking while the furnace is worked.
       fill(ASHLAR[1], k, b.x0 + 2, top - 1 - rows - 3, 2, rows + 3);
-      if (effects && sim.working("forge") && this.fx() < 0.25)
-        this.dust.push({ x: b.x0 + 3, y: top - rows - 4, vx: 0.01 + this.fx() * 0.03, vy: -0.03 - this.fx() * 0.03, life: 70 + this.fx() * 50, color: "rgba(150,146,140,0.7)" });
+      if (effects && this.fx() < (sim.working("forge") ? 0.22 : 0.03)) {
+        const grey = 110 + Math.floor(this.fx() * 50);
+        this.fx2.add("smoke", b.x0 + 2.5 + this.fx(), top - rows - 4.2, (this.fx() - 0.5) * 0.01, -0.035 - this.fx() * 0.025, 140 + this.fx() * 90, `rgb(${grey},${grey - 4},${grey - 8})`, 0.5);
+      }
     }
     if (b.id === "shaft") {
       // The lantern by the door, aglow after dark.
@@ -462,6 +499,16 @@ export class MineRenderer {
       fill(IRON_DARK, k, lx, ly - 1);
       fill(mix([150, 120, 60], [255, 220, 130], Math.min(1, night * 1.5)), night > 0.3 ? 1 : k, lx, ly);
       if (effects && night > 0.2) this.glowAt(lx, ly, 10, Math.min(1, (night - 0.2) * 1.3) * 0.55 * (0.85 + 0.15 * Math.sin(time / 170) * Math.sin(time / 410)));
+    }
+    if (this.picked === b.id) {
+      // The building picked: an outline of brass, gently pulsing.
+      const { scale } = this.size, ox = Math.round(-this.camX * scale), oy = Math.round(-this.camY * scale), roof = top - 1 - rows - (b.id === "forge" ? 3 : 0);
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.strokeStyle = `rgba(240,207,134,${0.65 + 0.35 * Math.sin(time / 260)})`;
+      ctx.lineWidth = Math.max(1, Math.round(scale / 3));
+      const x0 = Math.round(ox + (b.x0 - 1) * scale), y0 = Math.round(oy + (roof - 0.5) * scale);
+      ctx.strokeRect(x0, y0, Math.round(ox + (b.x1 + 2) * scale) - x0, Math.round(oy + (F + 1.5) * scale) - y0);
+      ctx.setTransform(scale, 0, 0, scale, ox, oy);
     }
     if (effects && b.id === "barracks" && night > 0.2)
       for (const wx of this.windows(b).filter((_, i) => i % 2 === 0)) this.glowAt(wx, F - 4, 8, Math.min(1, (night - 0.2) * 1.3) * 0.35);
@@ -528,8 +575,7 @@ export class MineRenderer {
       fill(ASHLAR[1], k, x0 + 1, F - 4, 3, 5);
       for (let y = F - 2; y <= F - 1; y++)
         for (let x = x0 + 2; x <= x0 + 3; x++) fill(hot ? FIRE_RGB[(x + y + flick) % 3] : [90, 40, 24], 1, x, y);
-      pile(fill, SHADES[IRON], k, b.x1 - 4, F, Math.min(20, Math.ceil(sim.ore.iron / 4)));
-      pile(fill, SHADES[GOLD], k, b.x1 - 7, F, Math.min(9, Math.ceil(sim.ore.gold / 2)));
+      this.forgeStock(sim, b, k, fill);
     } else if (b.id === "smithy") {
       // The anvil, the rack of bars waiting, the quench trough.
       fill(IRON_DARK, k, x0 + 4, F - 1, 3, 1);
@@ -542,37 +588,62 @@ export class MineRenderer {
     }
   }
 
+  /** The forge's ore, filling a heap by the door, then a low shelf and a
+   * high one along the back wall, as it nears what the forge holds. */
+  private forgeStock(sim: MineSim, b: Building, k: number, fill: (c: RGB, k: number, x: number, y: number, w?: number, h?: number) => void) {
+    const F = b.floor, fine = this.fine, sx0 = b.x0 + 4, sx1 = b.x1 - 1, tone = (c: RGB) => `rgb(${(c[0] * k) | 0},${(c[1] * k) | 0},${(c[2] * k) | 0})`;
+    for (const sy of [F - 2, F - 4]) {
+      fill(PLANK[1], k, sx0, sy, sx1 - sx0, 1);
+      fill(POST, k, sx0, sy, 1, 1);
+    }
+    const total = sim.ore.iron + sim.ore.gold;
+    if (!total) return;
+    const heapRows = [6, 6, 5, 4, 3, 2], heapSlots = 26, shelfSlots = (sx1 - sx0) * 2 * 2;
+    const slots = Math.max(1, Math.round(((heapSlots + 2 * shelfSlots) * Math.min(total, FORGE_CAP)) / FORGE_CAP));
+    const goldShare = sim.ore.gold / total;
+    const heap = Math.min(heapSlots, slots);
+    oreHeap(fine, b.x1 - 1.5, F + 0.5, heapRows, heap, Math.round(heap * goldShare), k);
+    let left = slots - heap;
+    for (const sy of [F - 2, F - 4]) {
+      for (let r = 0; r < 2 && left > 0; r++)
+        for (let i = 0; i < (sx1 - sx0) * 2 && left > 0; i++, left--) {
+          const gold = hash01(i, r + sy, 5) < goldShare, shades = gold ? SHADES[GOLD] : SHADES[IRON];
+          fine(sx0 + 0.5 + i * 0.5, sy + 0.25 - r * 0.5, 0.5, 0.5, tone(shades[(i + r) % shades.length]));
+        }
+    }
+  }
+
   /** A miner inside, at its place on its way in or out, or at its spot:
    * lying in its bunk, or at work (a shovel at the furnace, a hammer on
    * the anvil, striking sparks). */
   private drawInside(sim: MineSim, b: Building, m: Miner, time: number, effects: boolean) {
-    const ctx = this.ctx, s = m.inside as Inside, spot = sim.spotOf(s), walk = pathTicks(spot.path);
+    const fine = this.fine, s = m.inside as Inside, spot = sim.spotOf(s), walk = pathTicks(spot.path);
     const t = s.out ? walk - s.t : Math.min(s.t, walk), at = along([b.door, b.floor], spot.path, t);
-    const arrived = !s.out && s.t >= walk;
+    const arrived = !s.out && s.t >= walk, look = outfit(m.name, m.job);
     if (arrived && spot.lie && s.why === "sleep") {
-      ctx.fillStyle = HEAD[m.job];
-      ctx.fillRect(spot.x, spot.y, 1, 1);
-      ctx.fillStyle = `rgb(${BLANKET.join(",")})`;
-      ctx.fillRect(spot.x + spot.facing, spot.y, 1, 1);
-      // Now and then, a snore.
-      if (effects && this.fx() < 0.004) this.dust.push({ x: spot.x + 0.5, y: spot.y - 0.5, vx: 0.01, vy: -0.02, life: 60, color: "rgba(230,230,255,0.8)" });
+      drawSleeper(fine, look, spot.x, spot.y, spot.facing, `rgb(${BLANKET.join(",")})`);
+      // Now and then, a snore drifts up.
+      if (effects && this.fx() < 0.006) this.fx2.add("zzz", spot.x + 0.5, spot.y - 0.4, 0, -0.012, 110, "#e8ecff");
       return;
     }
-    drawMiner(ctx, m.job, at.x, at.y);
+    const prev = t > 0 ? along([b.door, b.floor], spot.path, t - 8) : at;
+    const facing = arrived ? spot.facing : Math.sign(at.x - prev.x) || (s.out ? -spot.facing : spot.facing);
+    const climbing = !arrived && at.x === prev.x && at.y !== prev.y;
+    drawFigure(fine, look, at.x, at.y, facing, arrived ? "work" : climbing ? "climb" : "walk", Math.floor(time / 140 + m.id * 3));
     if (!arrived) return;
-    const beat = Math.floor(time / 220 + m.id) % 2;
+    const beat = Math.floor(time / 220 + m.id) % 2, front = facing > 0 ? at.x + 1 : at.x - 0.5;
     if (m.action === "smelt") {
-      ctx.fillStyle = "#9a9ca4";
-      ctx.fillRect(at.x + spot.facing, at.y - beat, 1, 1);
+      // A shovel of ore into the furnace.
+      fine(front, at.y - beat * 0.5, 0.5, 0.5, "#9a9ca4");
+      if (beat === 0) fine(front, at.y - 0.25, 0.5, 0.25, "#c07a50");
     } else if (m.action === "smith") {
-      ctx.fillStyle = "#c8ccd4";
-      ctx.fillRect(at.x + spot.facing, at.y - 2 + beat, 1, 1);
+      fine(front, at.y - 1 + beat * 0.5, 0.5, 0.5, "#c8ccd4");
+      fine(facing > 0 ? at.x + 0.5 : at.x, at.y - 0.5 + beat * 0.5, 0.5, 0.5, "#6a4428");
       if (effects && beat === 1 && this.fx() < 0.3)
-        for (let n = 0; n < 2; n++)
-          this.dust.push({ x: at.x + spot.facing + 0.5, y: at.y - 0.6, vx: (this.fx() - 0.5) * 0.2, vy: -0.05 - this.fx() * 0.1, life: 12 + this.fx() * 10, color: this.fx() < 0.5 ? "#ffd27a" : "#ff9a3c" });
+        for (let n = 0; n < 3; n++)
+          this.fx2.add("spark", front + 0.25, at.y + 0.1, (this.fx() - 0.5) * 0.24, -0.06 - this.fx() * 0.14, 14 + this.fx() * 14, this.fx() < 0.5 ? "#ffd27a" : "#ff9a3c", 0.25);
     } else if (m.action === "stock") {
-      ctx.fillStyle = `rgb(${TIMBER_END.join(",")})`;
-      ctx.fillRect(at.x - spot.facing, at.y - 1, 1, 1);
+      fine(facing > 0 ? at.x - 0.5 : at.x + 1, at.y - 0.5, 0.5, 1, `rgb(${TIMBER_END.join(",")})`);
     }
   }
 
@@ -627,7 +698,7 @@ export class MineRenderer {
         this.flashUntil = time + 160;
       } else if (effects && (n.kind === "lost" || n.kind === "saved"))
         for (let k = 0; k < 10; k++)
-          this.dust.push({ x: n.x + 0.5, y: n.y - 1, vx: (this.fx() - 0.5) * 0.08, vy: -0.05 - this.fx() * 0.08, life: 60 + this.fx() * 40, color: n.kind === "lost" ? "#dfe6ff" : "#ffe9a8" });
+          this.fx2.add("wisp", n.x + 0.5 + (this.fx() - 0.5), n.y - 1, 0, -0.03 - this.fx() * 0.04, 80 + this.fx() * 60, n.kind === "lost" ? "#b8c6ff" : "#ffe9a8", this.fx() < 0.5 ? 0.5 : 0.25);
     }
     if (sim.news.length) this.newsTick = sim.news[sim.news.length - 1].tick;
   }
@@ -651,16 +722,51 @@ export class MineRenderer {
     }
   }
 
+  /** The hoist: its rope always hangs from the headframe's wheel down the
+   * shaft to the bucket, which waits at the top, is let down to a load and
+   * wound up with it (eased between the sim's steps). */
   private drawHoist(sim: MineSim) {
-    const ctx = this.ctx, x = sim.shaftX, top = sim.strata.surface[x] - HEADFRAME.length + 2;
-    for (const b of sim.buckets) {
-      ctx.fillStyle = "#c9c3b4";
-      ctx.fillRect(x + 0.45, top, 0.1, b.y - top);
-      ctx.fillStyle = "#6a4422";
-      ctx.fillRect(x, b.y, 1, 1);
-      ctx.fillStyle = b.gold > b.iron ? "#f0c850" : "#c07a50";
-      ctx.fillRect(x, b.y - 0.3, 1, 0.3);
+    const ctx = this.ctx, fine = this.fine, x = sim.shaftX, wheel = sim.strata.surface[x] - HEADFRAME.length + 2.5;
+    const target = sim.hoist.y;
+    this.hoistY = this.hoistY < 0 || Math.abs(target - this.hoistY) > 30 ? target : this.hoistY + (target - this.hoistY) * 0.3;
+    const y = this.hoistY, { scale } = this.size;
+    // The rope: a screen pixel or so wide, in two strands' tones.
+    const ox = Math.round(-this.camX * scale), oy = Math.round(-this.camY * scale);
+    const rx = Math.round(ox + (x + 0.5) * scale - scale / 8), rw = Math.max(1, Math.round(scale / 4));
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = "#b8a47c";
+    ctx.fillRect(rx, Math.round(oy + wheel * scale), rw, Math.round(oy + (y - 0.25) * scale) - Math.round(oy + wheel * scale));
+    if (rw > 1) {
+      ctx.fillStyle = "#8a7656";
+      for (let ry = wheel; ry < y - 0.5; ry += 1) ctx.fillRect(rx, Math.round(oy + ry * scale), rw, Math.max(1, Math.round(scale / 4)));
     }
+    ctx.setTransform(scale, 0, 0, scale, ox, oy);
+    // The hook, the bucket's bail and the bucket itself.
+    fine(x + 0.25, y - 0.25, 0.5, 0.25, "#5a5a62");
+    fine(x, y, 1, 0.25, "#4a4a52");
+    fine(x, y + 0.25, 1, 0.75, "#6a4422");
+    fine(x, y + 0.5, 1, 0.125, "#3a2a1a");
+    const h = sim.hoist;
+    if (h.iron + h.gold > 0) {
+      fine(x, y, 0.5, 0.25, h.gold > 0 ? "#f0c850" : "#c07a50");
+      fine(x + 0.5, y, 0.5, 0.25, h.gold > h.iron ? "#f0c850" : "#b06a44");
+    }
+    // The yard by the shaft house, where the ore brought up is tipped.
+    const n = sim.yard.iron + sim.yard.gold;
+    if (n > 0) {
+      const lumps = Math.min(30, Math.ceil(n / 3)), gold = Math.round((lumps * sim.yard.gold) / n), fy = sim.standY(sim.yardX) + 0.5;
+      oreHeap(fine, sim.yardX + 0.5, fy, [6, 5, 4, 3, 2, 1, 1], lumps, gold);
+    }
+  }
+
+  /** The building drawn at device pixel (px, py) of the view, if any. */
+  buildingAt(sim: MineSim, px: number, py: number): BuildingId | null {
+    const cx = this.camX + px / this.size.scale, cy = this.camY + py / this.size.scale;
+    for (const id of BUILDINGS) {
+      const b = sim.buildings[id], roof = b.floor - b.height - (id === "forge" ? 7 : 3);
+      if (cx >= b.x0 - 1 && cx < b.x1 + 2 && cy >= roof && cy < b.floor + 2) return id;
+    }
+    return null;
   }
 
   private drawGlow(sim: MineSim, time: number, y0: number, y1: number) {
@@ -679,24 +785,16 @@ export class MineRenderer {
     ctx.restore();
   }
 
-  /** A few specks of `m` thrown off the face being dug. */
+  /** A few specks of `m` thrown off the face being dug: they fall and settle. */
   private kick(x: number, y: number, m: Material) {
     const shades = SHADES[m];
     if (!shades) return;
-    const [r, g, b] = shades[Math.floor(this.fx() * shades.length)];
-    this.dust.push({ x: x + 0.5, y: y + 0.5, vx: (this.fx() - 0.5) * 0.25, vy: -this.fx() * 0.2, life: 30 + this.fx() * 20, color: `rgb(${r},${g},${b})` });
-    if (this.dust.length > 200) this.dust.shift();
-  }
-  private drawDust() {
-    const ctx = this.ctx;
-    this.dust = this.dust.filter((d) => {
-      d.x += d.vx;
-      d.y += d.vy;
-      d.vy += 0.02;
-      ctx.fillStyle = d.color;
-      ctx.fillRect(d.x - 0.25, d.y - 0.25, 0.5, 0.5);
-      return --d.life > 0;
-    });
+    for (let n = 0; n < 2; n++) {
+      const [r, g, b] = shades[Math.floor(this.fx() * shades.length)];
+      this.fx2.add("dust", x + 0.25 + this.fx() * 0.5, y + 0.25 + this.fx() * 0.5, (this.fx() - 0.5) * 0.18, -0.04 - this.fx() * 0.12, 40 + this.fx() * 30, `rgb(${r},${g},${b})`, this.fx() < 0.5 ? 0.5 : 0.25);
+    }
+    // A puff of fine dust hangs a moment.
+    if (this.fx() < 0.3) this.fx2.add("steam", x + 0.5, y + 0.5, (this.fx() - 0.5) * 0.02, -0.004, 50, "rgb(150,140,128)", 0.5);
   }
 }
 
@@ -739,20 +837,16 @@ function sprite(ctx: CanvasRenderingContext2D, rows: string[], x: number, y: num
 
 const TIMBER_END: RGB = [168, 116, 62];
 
-/** A miner standing: hat or mask over its body (or apron). */
-function drawMiner(ctx: CanvasRenderingContext2D, job: Job, x: number, y: number) {
-  ctx.fillStyle = HEAD[job];
-  ctx.fillRect(x, y - 1, 1, 1);
-  ctx.fillStyle = BODY[job];
-  ctx.fillRect(x, y, 1, 1);
-}
-
-/** A mound of `n` lumps of ore on the floor from column x, in its shades. */
-function pile(fill: (c: RGB, k: number, x: number, y: number) => void, shades: RGB[], k: number, x: number, floor: number, n: number) {
-  const rows = [4, 3, 2, 1];
+/** A heap of `n` half-cell lumps of ore (`gold` of them gold) centred on
+ * column `cx`, its bottom row ending at `floor`, `rows` lumps wide from the
+ * bottom up, dimmed to `k`. */
+function oreHeap(fine: Fine, cx: number, floor: number, rows: number[], n: number, gold: number, k = 1) {
   let placed = 0;
   for (let r = 0; r < rows.length && placed < n; r++)
-    for (let i = 0; i < rows[r] && placed < n; i++, placed++) fill(shades[(i + r) % shades.length], k, x + i + (r >> 1), floor - r);
+    for (let i = 0; i < rows[r] && placed < n; i++, placed++) {
+      const shades = placed < gold ? SHADES[GOLD] : SHADES[IRON], c = shades[(i + r) % shades.length];
+      fine(cx - rows[r] / 4 + i * 0.5, floor - 0.5 - r * 0.5, 0.5, 0.5, `rgb(${(c[0] * k) | 0},${(c[1] * k) | 0},${(c[2] * k) | 0})`);
+    }
 }
 
 /** A soft warm disc, drawn additively round each torch and lamp. */

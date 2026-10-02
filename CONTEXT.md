@@ -114,10 +114,13 @@ Timber a miner sets into loose dirt beside a hole so it doesn't slide in.
 Dirt and rubble carried up and tipped onto the heap.
 
 **Cart** and **hoist**:
-A level's mine cart takes miners' ore to the shaft, where the hoist's bucket lifts it to the surface.
+A level's mine cart takes miners' ore to the shaft, where the hoist lets its bucket down for the load and winds it up to the surface.
+
+**Yard**:
+The ground by the shaft house where ore brought up is tipped, until the forge's hands carry it into the forge.
 
 **Iron ore** and **gold**:
-What the miners dig. Brought up, it waits in piles at the forge.
+What the miners dig. Brought up, it waits in the yard, then in heaps and on shelves in the forge.
 
 **Buildings**:
 Along the surface: the **shaft house** over the shaft's mouth, with a lantern by its door; the **barracks**, where the crew sleeps in bunks (a bay of six for every six of the crew) and sits in the **lounge** to eat or wait out a storm; the **warehouse** of supplies; the **forge**; and the **smithy**. A building's front wall fades to show whoever is inside.
