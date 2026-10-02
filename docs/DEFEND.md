@@ -75,7 +75,11 @@ holds it against endless waves. Code lives in `src/defend/`.
   enemy walking across a section, or a blast next to it, snaps it into
   splinters that scatter, settle and fade out after 5–10 s.
 - Art: medieval roofs (terracotta, brick, timber, thatch, slate, straw)
-  with crisp black outlines on whole-pixel edges; when zoomed in, the city
+  as pixel art at 8 pixels a cell inside crisp black outlines and a black
+  ridge, laid in staggered shingle courses each shingle shaded a little
+  differently; each house is seeded from its lot, so some stay neat while
+  others weather with missing and patched shingles, moss up from the eaves,
+  rain streaks and now and then a chimney (`roof-art.ts`). When zoomed in, the city
   is repainted at 2–3× resolution so edges stay sharp. The keep is pixel
   art at 8 pixels a cell, like the parks' ponds and trees: four round
   corner turrets, crenellated walls with a gate, a courtyard and a hipped
