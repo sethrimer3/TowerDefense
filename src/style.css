@@ -1398,3 +1398,4 @@ nav button { position: relative; }
 .library-head .mine-hire {
   min-width: 96px;
 }
+.mine-news { font-style: italic; opacity: 0.9; }
