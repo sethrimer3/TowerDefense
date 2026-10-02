@@ -12,10 +12,10 @@ import type { DefendSim } from "./sim.ts";
 import { DefendLighting, type LightFrame } from "./lighting.ts";
 import { Fences } from "./fences.ts";
 import { Rain, ambientFor, type Weather } from "./weather.ts";
-import { onCityArtLoaded, paintCityLayer } from "./city-layer.ts";
+import { damageKey, onCityArtLoaded, paintCityLayer } from "./city-layer.ts";
 import { carriedLights, drawDamage, drawScorches, drawUnits, shadowCasters, type Brush, type Burning } from "./battle-art.ts";
 import { drawGrid, drawOverlay, type Overlay } from "./edit-overlay.ts";
-import { drawFlag, keepStage } from "./structure-art.ts";
+import { drawFlag } from "./structure-art.ts";
 import { ParkGrass, type Walker } from "./park-grass.ts";
 import { PondWater } from "./pond-water.ts";
 import { ENEMIES } from "./catalog.ts";
@@ -283,15 +283,15 @@ export class DefendRenderer {
   }
 
   /** Repaints the city layer if the map, size, zoom band, buildings or the
-   * keep's damage changed. Zoomed in, the city is painted at 2–4× so edges
+   * buildings' damage stages changed. Zoomed in, the city is painted at 2–4× so edges
    * stay crisp. */
   private refreshLayer(map: CityMap, sim: DefendSim | null) {
     const { W, H } = this.board;
     let k = this.cam.s >= 4 ? 4 : this.cam.s >= 2.5 ? 3 : this.cam.s >= 1.4 ? 2 : 1;
     while (k > 1 && W * H * k * k > 18e6) k--;
     this.layerScale = k;
-    // The keep's damage stage is painted into the layer too.
-    const key = `${W}:${k}:${sim ? `${sim.mapVersion}:${keepStage(sim.keepHp(), sim.keepMaxHp())}` : -1}`;
+    // Every building's damage stage is painted into the layer too.
+    const key = `${W}:${k}:${sim ? `${sim.mapVersion}:${damageKey(sim)}` : -1}`;
     if (map === this.map && key === this.layerKey) return;
     this.map = map;
     this.layerKey = key;

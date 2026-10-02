@@ -9,9 +9,10 @@ import { CELL_COUNT, CELLS_H, CELLS_W, SPAWN_ROW, SUB, TILES_H, TILES_W, cellInB
 import { CellType, type Building, type CityMap } from "./citygen.ts";
 import type { Light, Stone } from "./lighting.ts";
 import type { DefendSim } from "./sim.ts";
-import { ROAD, keepStage, paintKeepRubble, paintStructureArt } from "./structure-art.ts";
-import { roofSeed, roofSprite } from "./roof-art.ts";
-import { parkArt } from "./park-art.ts";
+import { ROAD, keepStage, paintKeepRubble, paintStructureArt, paintStructureRubble } from "./structure-art.ts";
+import { houseRubbleSprite, roofSeed, roofSprite } from "./roof-art.ts";
+import { ART, parkArt } from "./park-art.ts";
+import { damageStage, drawSprite, sprite, wallDamagePixels, wallRubblePixels } from "./damage-art.ts";
 import { GRASS, grassPatch, groundArt } from "./ground-art.ts";
 import { heights, shadowCanvas, shadowMask } from "./shadow-art.ts";
 
@@ -89,7 +90,6 @@ export function paintCityLayer(c: CanvasRenderingContext2D, px: number, scene: C
   // structure standing there is in front of the face, so it covers it.
   for (const b of map.buildings) if (b.kind === "wall") paintBuilding(p, b);
   for (const b of map.buildings) if (b.kind !== "wall") paintBuilding(p, b);
-  paintRubble(p);
   paintPixelArt(p, cityShadows(map, sim));
   paintLanternBrackets(p, scene.lights);
 }
@@ -221,22 +221,48 @@ function paintPixelArt({ c }: Paint, art: HTMLCanvasElement | null) {
 
 function paintBuilding(p: Paint, b: Building) {
   const { c, px, sim, solid } = p;
-  if (b.kind === "wall") {
-    if (solid(b.cells[0])) paintWall(p, b.rect.x, b.rect.y);
-    return;
-  }
   const r = b.rect;
   // Everything snaps to whole pixels so outlines stay crisp.
   const x = Math.round(r.x * px),
     y = Math.round(r.y * px),
     w = Math.round((r.x + r.w) * px) - x,
     h = Math.round((r.y + r.h) * px) - y;
-  if (sim && !sim.intact(b)) return b.kind === "keep" ? paintKeepRubble(c, { x, y, w, h, px }) : paintRebuilding(p, b);
-  if (b.kind === "house") return paintHouse(p, b, { x, y, w, h });
-  paintStructureArt(c, b.kind, { x, y, w, h, px }, b.kind === "keep" && sim ? keepStage(sim.hp[b.id], sim.maxHp[b.id]) : 0);
+  const box = { x, y, w, h, px };
+  if (b.kind === "wall") {
+    if (solid(b.cells[0])) paintWall(p, b);
+    else paintArt(p, wallRubbleSprite(lotSeed(b)), box);
+    return;
+  }
+  if (sim && !sim.intact(b)) {
+    if (b.kind === "keep") return paintKeepRubble(c, box);
+    if (b.kind === "house") paintArt(p, houseRubbleSprite(r.w, r.h, b.variant, roofSeed(r.x, r.y, r.w, r.h)), box);
+    else paintStructureRubble(c, b.kind, box, lotSeed(b));
+    return paintRebuilding(p, b);
+  }
+  if (b.kind === "house") return paintArt(p, roofSprite(r.w, r.h, b.variant, roofSeed(r.x, r.y, r.w, r.h), stageOf(sim, b)), box);
+  paintStructureArt(c, b.kind, box, stageOf(sim, b), lotSeed(b));
 }
 
-/** Partially rebuilt: finished sections show as fresh timber framing. */
+/** The seed a building's damage and rubble are drawn from: its lot. */
+const lotSeed = (b: Building) => hash(b.rect.x, b.rect.y, b.rect.w, b.rect.h, 77);
+
+/** How damaged a standing building looks: the keep's `keepStage`, anything
+ * else's `damageStage` (0 out of battle). */
+function stageOf(sim: DefendSim | null, b: Building) {
+  if (!sim) return 0;
+  return b.kind === "keep" ? keepStage(sim.hp[b.id], sim.maxHp[b.id]) : damageStage(sim.hp[b.id], sim.maxHp[b.id]);
+}
+
+/** A number that changes whenever any standing building's damage stage
+ * does, so the renderer knows to repaint the layer. */
+export function damageKey(sim: DefendSim) {
+  let k = 0;
+  for (const b of sim.map.buildings) k = (Math.imul(k, 31) + (sim.intact(b) ? stageOf(sim, b) : 7)) | 0;
+  return k;
+}
+
+/** Partially rebuilt: finished sections show as fresh timber framing over
+ * the rubble. */
 function paintRebuilding({ c, px, solid }: Paint, b: Building) {
   for (const i of b.cells) {
     if (!solid(i)) continue;
@@ -250,22 +276,20 @@ function paintRebuilding({ c, px, solid }: Paint, b: Building) {
   }
 }
 
-/** A house's shingled roof, pixel art from `roof-art.ts` seeded by its
- * lot, drawn up over its cells (`box`, canvas pixels) with smoothing off. */
-function paintHouse({ c }: Paint, b: Building, box: { x: number; y: number; w: number; h: number }) {
-  const r = b.rect;
-  const art = roofSprite(r.w, r.h, b.variant, roofSeed(r.x, r.y, r.w, r.h));
-  if (!art) return;
-  c.save();
-  c.imageSmoothingEnabled = false;
-  c.drawImage(art, box.x, box.y, box.w, box.h);
-  c.restore();
+/** A cached sprite of art pixels drawn up over `box` (canvas pixels). */
+function paintArt({ c }: Paint, art: HTMLCanvasElement | null, box: { x: number; y: number; w: number; h: number }) {
+  drawSprite(c, art, box.x, box.y, box.w, box.h);
 }
+
+const wallRubbleSprite = (seed: number) => sprite(`wall:rubble:${seed}`, ART, ART, () => wallRubblePixels(seed, ART));
+const wallDamageSprite = (stage: number, seed: number) => sprite(`wall:${stage}:${seed}`, ART, ART, () => wallDamagePixels(stage, seed, ART));
 
 /** One wall stone. Edges and the hanging brick face follow the *standing*
  * wall, so a breach gets proper broken edges. */
-function paintWall(p: Paint, cx: number, cy: number) {
-  const { c, px, map, solid } = p;
+function paintWall(p: Paint, b: Building) {
+  const { c, px, map, sim, solid } = p;
+  const cx = b.rect.x,
+    cy = b.rect.y;
   const x = Math.round(cx * px),
     y = Math.round(cy * px);
   const standing = (dx: number, dy: number) => {
@@ -283,6 +307,8 @@ function paintWall(p: Paint, cx: number, cy: number) {
     c.fillRect(x, y, px + 0.5, px + 0.5);
   }
   paintWallEdges(p, { x, y }, standing);
+  const stage = stageOf(sim, b);
+  if (stage) paintArt(p, wallDamageSprite(stage, lotSeed(b)), { x, y, w: Math.round((cx + 1) * px) - x, h: Math.round((cy + 1) * px) - y });
   if (!standing(0, 1) && cy + 1 < CELLS_H) paintWallFace(p, cx, { x, y });
 }
 
@@ -324,20 +350,5 @@ function paintLanternBrackets({ c, px, map, sim }: Paint, lights: readonly Light
     c.fillRect(l.x * px - s / 2, l.y * px - s / 2, s, s);
     c.fillStyle = "#8a7045";
     c.fillRect(l.x * px - s / 4, l.y * px - s / 4, s / 2, s / 2);
-  }
-}
-
-/** Rubble chunks over the cells of fallen buildings (the keep has its own
- * rubble art). */
-function paintRubble({ c, px, map, solid }: Paint) {
-  for (let i = 0; i < map.type.length; i++) {
-    if (map.owner[i] < 0 || solid(i) || map.buildings[map.owner[i]].kind === "keep") continue;
-    const cx = i % CELLS_W,
-      cy = (i - cx) / CELLS_W;
-    for (let k = 0; k < 3; k++) {
-      c.fillStyle = k === 0 ? "#6b645a" : "#57514a";
-      const s = px * (0.14 + hash01(i, k, 41) * 0.16);
-      c.fillRect(cx * px + hash01(i, k, 42) * (px - s), cy * px + hash01(i, k, 43) * (px - s), s, s);
-    }
   }
 }

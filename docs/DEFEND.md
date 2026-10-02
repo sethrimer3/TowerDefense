@@ -112,6 +112,19 @@ holds it against endless waves. Code lives in `src/defend/`.
   wall is down too and half the roof has caved in over smouldering rafters.
   When it falls it leaves its own rubble: wall and turret stumps round a
   heap of stone, slate and charred beams.
+- Every other building shows its wounds too, in three stages below 75%,
+  50% and 25% of its HP (`damageStage`): cracks, chipped edges and soot;
+  then holes through the roof (to the rafters) or the floor, and scorching;
+  then a burning cave-in with embers and fallen stone. The placeable
+  structures are pixel art at 8 pixels a cell (a red-roofed barracks with
+  a blue shield on the ridge, the archers' timber hall and target yard,
+  the crenellated archer tower, the round cannon bastion, the watch tower's
+  beacon in its brazier, the wizard's violet roof), houses damage their
+  shingled roofs, and wall stones take an overlay of cracks and pits. A
+  fallen building leaves its own rubble: stumps of its walls round a heap
+  of stone and roofing with charred beams and embers, and a fallen wall
+  stone leaves broken blocks on the gravel. The damage is seeded by the
+  building's lot, so each building wears its own.
 - Generation is seeded per save and keyed by position, so the same layout
   always produces the same city. `tests/defend-city.test.ts` pins both
   `fitLayout` and `generateCity` against recorded hashes.
@@ -219,8 +232,12 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   scorches, then units, projectiles and effects (`battle-art.ts`), the
   trees (`park-trees.ts`), the wizards' fire, the building grid and drag
   overlay (`edit-overlay.ts`), and rain in screen space (`weather.ts`).
-- `structure-art.ts` holds the keep, barracks and tower art (shared by the
-  city layer and the palette icons), the banner, and the palette colours.
+- `structure-art.ts` holds the keep art and draws the other structures'
+  (`tower-art.ts`, `structurePixels`/`structureRubblePixels`) for the city
+  layer and the palette icons, with the banner and the palette colours.
+  `damage-art.ts` paints the damage stages and rubble over any sprite
+  (`damage`, `rubblePixels`), the wall stones' overlays, and caches the
+  sprites; `tests/defend-damage-art.test.ts` checks them.
   The keep (`keepPixels`) and banner (`flagPixels`, redrawn each frame) are
   pixel buffers at `ART` pixels a cell, drawn up with smoothing off;
   `tests/defend-keep-art.test.ts` checks them.

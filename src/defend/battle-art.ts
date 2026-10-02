@@ -31,16 +31,10 @@ function drawHurt(b: Brush, sim: DefendSim) {
   for (const bd of sim.map.buildings) {
     const hp = sim.hp[bd.id],
       max = sim.maxHp[bd.id];
-    if (!sim.intact(bd) || hp >= max) continue;
-    if (bd.kind === "house" || bd.kind === "wall") shadeHurt(b, bd, hp / max);
-    else healthBar(b, bd, hp / max);
+    // Houses and walls show their hurt only in their art's damage stages.
+    if (!sim.intact(bd) || hp >= max || bd.kind === "house" || bd.kind === "wall") continue;
+    healthBar(b, bd, hp / max);
   }
-}
-
-function shadeHurt({ c, px }: Brush, bd: Building, frac: number) {
-  const r = bd.rect;
-  c.fillStyle = `rgba(20,10,5,${(1 - frac) * 0.5})`;
-  c.fillRect(r.x * px, r.y * px, r.w * px, r.h * px);
 }
 
 function healthBar({ c, px }: Brush, bd: Building, frac: number) {
