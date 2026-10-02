@@ -1,9 +1,12 @@
-/** DEFEND's structure art, seen from above: the keep, barracks and towers
- * (drawn into the city layer and the palette icons), the keep's live banner,
- * and the shared palette. */
-import { SOLDIER, type StructureKind } from "./catalog.ts";
+/** DEFEND's structure art, seen from above: the keep, and the barracks and
+ * towers from `tower-art.ts` at their damage stages and as rubble (drawn
+ * into the city layer and the palette icons), the keep's live banner, and
+ * the shared palette. */
+import type { StructureKind } from "./catalog.ts";
 import { hash, hash01 } from "./grid.ts";
 import { ART } from "./park-art.ts";
+import { drawSprite, sprite } from "./damage-art.ts";
+import { structurePixels, structureRubblePixels } from "./tower-art.ts";
 
 /** Medieval roofing: terracotta tile, old brick, weathered timber, thatch,
  * slate and straw. */
@@ -15,156 +18,29 @@ const PARK = "#3c5d31";
 /** Where a structure is drawn, in canvas pixels, and the cell size. */
 export type ArtBox = { x: number; y: number; w: number; h: number; px: number };
 
-/** A structure's box snapped to whole pixels, with its outline widths. */
-type Frame = ArtBox & { inset: number; line: number };
-
-/** Paints a structure into `box`; the keep shows damage `stage` (see
- * `keepStage`). */
-export function paintStructureArt(c: CanvasRenderingContext2D, kind: StructureKind, box: ArtBox, stage = 0) {
-  const px = box.px;
-  const f: Frame = {
-    x: Math.round(box.x),
-    y: Math.round(box.y),
-    w: Math.round(box.w),
-    h: Math.round(box.h),
-    px,
-    inset: Math.max(1, Math.round(px * 0.1)),
-    line: Math.max(1, Math.round(px * 0.08)),
-  };
-  if (kind === "keep") return paintKeep(c, f, stage);
-  STRUCTURES[kind](c, f);
+/** Paints a structure into `box`: the keep at its damage `stage` (see
+ * `keepStage`), anything else at its `damageStage`, seeded by `seed` (its
+ * lot) so each looks its own. */
+export function paintStructureArt(c: CanvasRenderingContext2D, kind: StructureKind, box: ArtBox, stage = 0, seed = 0) {
+  const x = Math.round(box.x), y = Math.round(box.y), w = Math.round(box.w), h = Math.round(box.h);
+  if (kind === "keep") return paintKeep(c, { x, y, w, h, px: box.px }, stage);
+  const cw = Math.max(1, Math.round(box.w / box.px)), ch = Math.max(1, Math.round(box.h / box.px));
+  const art = sprite(`${kind}:${cw}x${ch}:${stage}:${seed}`, cw * ART, ch * ART, () => structurePixels(kind, cw, ch, stage, seed));
+  drawSprite(c, art, x, y, w, h);
 }
 
-const STRUCTURES: Record<Exclude<StructureKind, "keep">, (c: CanvasRenderingContext2D, f: Frame) => void> = {
-  barracks: paintBarracks,
-  archerBarracks: paintArcherBarracks,
-  archerTower: paintArcherTower,
-  cannonTower: paintCannonTower,
-  watchTower: paintWatchTower,
-  wizardTower: paintWizardTower,
-};
-
-/** A solid black outline, then the fill inside it. */
-function stone(c: CanvasRenderingContext2D, { x, y, w, h, inset, line }: Frame, fill: string) {
-  c.fillStyle = OUTLINE;
-  c.fillRect(x + inset, y + inset, w - inset * 2, h - inset * 2);
-  c.fillStyle = fill;
-  c.fillRect(x + inset + line, y + inset + line, w - (inset + line) * 2, h - (inset + line) * 2);
-}
-
-/** A hall roof inside the stone, its sunny half lighter. */
-function hallRoof(c: CanvasRenderingContext2D, { x, y, w, h, inset }: Frame, fill: string, sun: number) {
-  c.fillStyle = fill;
-  c.fillRect(x + inset * 2, y + inset * 2, w - inset * 4, h - inset * 4);
-  c.fillStyle = `rgba(255,255,255,${sun})`;
-  c.fillRect(x + inset * 2, y + inset * 2, (w - inset * 4) / 2, h - inset * 4);
+/** A fallen structure's rubble over its cells (`box`, canvas pixels). */
+export function paintStructureRubble(c: CanvasRenderingContext2D, kind: StructureKind, box: ArtBox, seed = 0) {
+  if (kind === "keep") return paintKeepRubble(c, box);
+  const cw = Math.max(1, Math.round(box.w / box.px)), ch = Math.max(1, Math.round(box.h / box.px));
+  const art = sprite(`${kind}:${cw}x${ch}:rubble:${seed}`, cw * ART, ch * ART, () => structureRubblePixels(kind, cw, ch, seed));
+  drawSprite(c, art, Math.round(box.x), Math.round(box.y), Math.round(box.w), Math.round(box.h));
 }
 
 function disc(c: CanvasRenderingContext2D, x: number, y: number, r: number) {
   c.beginPath();
   c.arc(x, y, r, 0, Math.PI * 2);
   c.fill();
-}
-
-function paintBarracks(c: CanvasRenderingContext2D, f: Frame) {
-  const { x, y, w, h, px } = f;
-  stone(c, f, "#7a6a5a");
-  hallRoof(c, f, "#a03a2e", 0.15);
-  c.fillStyle = SOLDIER.color;
-  c.fillRect(x + w / 2 - px * 0.3, y + h / 2 - px * 0.3, px * 0.6, px * 0.6);
-}
-
-/** Green-roofed hall with a target butt out front. */
-function paintArcherBarracks(c: CanvasRenderingContext2D, f: Frame) {
-  const { x, y, w, h } = f;
-  stone(c, f, "#7a6e5c");
-  hallRoof(c, f, "#5e4632", 0.14);
-  const cx = x + w / 2,
-    cy = y + h / 2,
-    r = Math.min(w, h) * 0.16;
-  c.fillStyle = "#e8dcc0";
-  disc(c, cx, cy, r);
-  c.fillStyle = "#b3372f";
-  disc(c, cx, cy, r * 0.6);
-  c.fillStyle = "#e8dcc0";
-  disc(c, cx, cy, r * 0.25);
-}
-
-function paintArcherTower(c: CanvasRenderingContext2D, f: Frame) {
-  const { x, y, w, h, px } = f;
-  stone(c, f, "#8c8577");
-  c.fillStyle = "#6e4a2c";
-  disc(c, x + w / 2, y + h / 2, Math.min(w, h) * 0.3);
-  c.fillStyle = "#c9a36a";
-  c.fillRect(x + w / 2 - px * 0.12, y + h / 2 - px * 0.5, px * 0.24, px);
-}
-
-/** Iron gun on a round turntable, barrel pointing north. */
-function paintCannonTower(c: CanvasRenderingContext2D, f: Frame) {
-  const { x, y, w, h, px } = f;
-  stone(c, f, "#6f6a62");
-  c.fillStyle = "#4a4038";
-  disc(c, x + w / 2, y + h / 2, Math.min(w, h) * 0.32);
-  c.fillStyle = "#26262a";
-  c.fillRect(x + w / 2 - px * 0.2, y + h * 0.12, px * 0.4, h * 0.45);
-  disc(c, x + w / 2, y + h / 2, Math.min(w, h) * 0.17);
-  c.fillStyle = "#6a6a70";
-  c.fillRect(x + w / 2 - px * 0.1, y + h * 0.14, px * 0.12, h * 0.1);
-}
-
-function paintWatchTower(c: CanvasRenderingContext2D, f: Frame) {
-  const { x, y, w, h } = f;
-  stone(c, f, "#7d8288");
-  c.fillStyle = "#3d3f44";
-  c.fillRect(x + w * 0.3, y + h * 0.3, w * 0.4, h * 0.4);
-  c.fillStyle = "#f2d27a";
-  disc(c, x + w / 2, y + h / 2, Math.min(w, h) * 0.13);
-}
-
-/** A round tower of pale stone under a pointed violet roof, seen from
- * above: eight slate slopes meeting at a gold finial, the sunny ones to
- * the upper left, with a ring of runes glowing round the eaves. */
-function paintWizardTower(c: CanvasRenderingContext2D, f: Frame) {
-  const { x, y, w, h, line } = f;
-  const cx = x + w / 2, cy = y + h / 2, r = Math.min(w, h) * 0.46;
-  c.fillStyle = OUTLINE;
-  disc(c, cx, cy, r);
-  c.fillStyle = "#9a958c";
-  disc(c, cx, cy, r - line);
-  const roof = r * 0.78;
-  c.fillStyle = OUTLINE;
-  disc(c, cx, cy, roof + line);
-  // Eight roof slopes, lit from the upper left like every other roof.
-  for (let k = 0; k < 8; k++) {
-    const a0 = (k / 8) * Math.PI * 2, a1 = ((k + 1) / 8) * Math.PI * 2, mid = (a0 + a1) / 2;
-    const lit = 0.5 + 0.5 * -Math.cos(mid + Math.PI / 4);
-    c.fillStyle = `rgb(${Math.round(70 + lit * 70)},${Math.round(44 + lit * 40)},${Math.round(110 + lit * 70)})`;
-    c.beginPath();
-    c.moveTo(cx, cy);
-    c.arc(cx, cy, roof, a0, a1);
-    c.closePath();
-    c.fill();
-  }
-  c.strokeStyle = "rgba(20,8,30,0.6)";
-  c.lineWidth = Math.max(1, line * 0.6);
-  c.beginPath();
-  for (let k = 0; k < 8; k++) {
-    const a = (k / 8) * Math.PI * 2;
-    c.moveTo(cx, cy);
-    c.lineTo(cx + Math.cos(a) * roof, cy + Math.sin(a) * roof);
-  }
-  c.stroke();
-  // Runes round the eaves.
-  c.fillStyle = "#9fe3ff";
-  const dot = Math.max(1, Math.round(line));
-  for (let k = 0; k < 12; k++) {
-    const a = (k / 12) * Math.PI * 2 + 0.13;
-    c.fillRect(Math.round(cx + Math.cos(a) * (r - line * 2.2) - dot / 2), Math.round(cy + Math.sin(a) * (r - line * 2.2) - dot / 2), dot, dot);
-  }
-  c.fillStyle = "#e9c46a";
-  disc(c, cx, cy, Math.max(1, r * 0.13));
-  c.fillStyle = "#fff4c8";
-  disc(c, cx - r * 0.04, cy - r * 0.04, Math.max(0.6, r * 0.05));
 }
 
 export type IconItem = StructureKind | "cityTile" | "bomb";

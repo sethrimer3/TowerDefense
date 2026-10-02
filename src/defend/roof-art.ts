@@ -7,11 +7,16 @@
  * and patched shingles, moss creeping up from the eaves, rain streaks
  * below the gaps, and now and then a stone chimney.
  *
- * Presentation only; `roofPixels` is pure, and `roofSprite` caches the
- * canvases the city layer draws up to size with smoothing off. */
+ * Damaged, a roof loses tiles, then burns through to its rafters, then
+ * caves in (`houseDamagePixels`); fallen, it is rubble (`houseRubblePixels`).
+ *
+ * Presentation only; the pixel functions are pure, and `roofSprite` and
+ * `houseRubbleSprite` cache the canvases the city layer draws up to size
+ * with smoothing off. */
 import { hash, hash01 } from "./grid.ts";
 import { ART } from "./park-art.ts";
 import { ROOFS } from "./structure-art.ts";
+import { damage, pixels, rubblePixels, sprite } from "./damage-art.ts";
 
 const OUTLINE = 0x0b0907;
 const HOLE = 0x231c17;
@@ -141,26 +146,37 @@ export function roofPixels(cw: number, ch: number, variant: number, seed: number
   return out;
 }
 
-const sprites = new Map<string, HTMLCanvasElement>();
+/** A house's roof at damage `stage` (0 to 3, `damageStage`): missing
+ * tiles and cracks, then holes through to the rafters, then a burning
+ * cave-in strewn with fallen tiles. */
+export function houseDamagePixels(cw: number, ch: number, variant: number, seed: number, stage: number): Uint32Array {
+  const out = roofPixels(cw, ch, variant, seed);
+  const base = hex(ROOFS[variant % ROOFS.length]);
+  damage(pixels(out, cw * ART, ch * ART), stage, hash(seed, 3), { tones: [shade(base, 0.7), base, shade(base, 1.2)], roofed: true });
+  return out;
+}
 
-/** The roof for a house of `cw × ch` cells, seeded by `seed`, as a canvas
- * of art pixels (null outside a browser), cached by its inputs. */
-export function roofSprite(cw: number, ch: number, variant: number, seed: number): HTMLCanvasElement | null {
-  if (typeof document === "undefined") return null;
-  const key = `${cw},${ch},${variant},${seed}`;
-  let cv = sprites.get(key);
-  if (!cv) {
-    if (sprites.size > 2000) sprites.clear();
-    cv = document.createElement("canvas");
-    cv.width = cw * ART;
-    cv.height = ch * ART;
-    const c = cv.getContext("2d")!;
-    const img = c.createImageData(cv.width, cv.height);
-    new Uint32Array(img.data.buffer).set(roofPixels(cw, ch, variant, seed));
-    c.putImageData(img, 0, 0);
-    sprites.set(key, cv);
-  }
-  return cv;
+/** A fallen house: stumps of its walls round a heap of stone, roof tiles
+ * and charred beams. */
+export function houseRubblePixels(cw: number, ch: number, variant: number, seed: number): Uint32Array {
+  const W = cw * ART, H = ch * ART, base = hex(ROOFS[variant % ROOFS.length]);
+  return rubblePixels(W, H, hash(seed, 5), {
+    x0: 1, y0: 1, x1: W - 3, y1: H - 3,
+    stone: [STONE.dark, 0x8f897d, STONE.lit],
+    top: [shade(base, 0.7), base, shade(base, 1.2)],
+    beams: true,
+  });
+}
+
+/** The roof for a house of `cw × ch` cells, seeded by `seed`, at damage
+ * `stage`, as a canvas of art pixels (null outside a browser), cached. */
+export function roofSprite(cw: number, ch: number, variant: number, seed: number, stage = 0): HTMLCanvasElement | null {
+  return sprite(`house:${cw},${ch},${variant},${seed}:${stage}`, cw * ART, ch * ART, () => houseDamagePixels(cw, ch, variant, seed, stage));
+}
+
+/** A fallen house's rubble as a canvas of art pixels, cached. */
+export function houseRubbleSprite(cw: number, ch: number, variant: number, seed: number): HTMLCanvasElement | null {
+  return sprite(`house:${cw},${ch},${variant},${seed}:rubble`, cw * ART, ch * ART, () => houseRubblePixels(cw, ch, variant, seed));
 }
 
 /** The seed a house's roof is drawn from: its lot, so it never changes. */
