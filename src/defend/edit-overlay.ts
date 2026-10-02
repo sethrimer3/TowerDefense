@@ -1,7 +1,7 @@
 /** What DEFEND draws over the board while the player is building: the dim
  * gold tile grid, and for a drag, which tiles accept the item, the hovered
  * tile, the item's ghost and an aimed bomb's reach. */
-import { SUB, TILES_H, TILES_W, tileKey, type Rect } from "./grid.ts";
+import { SUB, TILES_H, TILES_W, boardSize, tileKey, type Rect } from "./grid.ts";
 import type { StructureKind } from "./catalog.ts";
 
 export type Overlay = {
@@ -16,7 +16,7 @@ export type Overlay = {
 /** Dim gold tile lines at `alpha`, `px` canvas pixels per cell. */
 export function drawGrid(c: CanvasRenderingContext2D, px: number, alpha: number) {
   const T = px * SUB;
-  const { width, height } = c.canvas;
+  const { W: width, H: height } = boardSize(px);
   c.save();
   c.strokeStyle = `rgba(216,181,114,${alpha})`;
   c.lineWidth = 1;

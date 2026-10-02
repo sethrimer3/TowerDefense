@@ -15,7 +15,7 @@
  * casting per unit per frame. */
 import { LIGHTING_CONFIG, getTorchFlicker, getTorchSway } from "../lighting.ts";
 import { glowColor, lightFalloff } from "../torch-light.ts";
-import { CELL_COUNT, CELLS_H, CELLS_W, ORTHO, cellInBounds, cellIndex, hash, hash01, type Rect } from "./grid.ts";
+import { CELL_COUNT, CELLS_H, CELLS_W, ORTHO, boardSize, cellInBounds, cellIndex, hash, hash01, type Rect } from "./grid.ts";
 import { CellType, type Building, type CityMap } from "./citygen.ts";
 
 export type LightKind = "lantern" | "archerTower" | "cannonTower" | "watchTower" | "wizardTower" | "door";
@@ -332,8 +332,7 @@ export class DefendLighting {
   /** Darkness carved by light, then warm glow blended as light — the main
    * game's recipe. `ambient` is the overlay colour and opacity. */
   drawLight(c: CanvasRenderingContext2D, frame: LightFrame, ambient: Ambient, carried: Carried) {
-    const W = c.canvas.width,
-      H = c.canvas.height;
+    const { W, H } = boardSize(frame.px);
     this.dark = sized(this.dark, W, H);
     this.glow = sized(this.glow, W, H);
     const layers = { dk: this.dark.getContext("2d")!, gl: this.glow.getContext("2d")! };
@@ -418,8 +417,7 @@ export class DefendLighting {
    * side facing its dominant light and a dark one on the far side. Baked
    * into one board-sized layer; redrawn when the lights change. */
   drawRelief(c: CanvasRenderingContext2D, px: number, alpha: number) {
-    const W = c.canvas.width,
-      H = c.canvas.height;
+    const { W, H } = boardSize(px);
     const key = `${W}x${H}`;
     if (key !== this.reliefKey || !this.relief) {
       this.reliefKey = key;

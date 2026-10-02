@@ -1,7 +1,8 @@
 /** The DEFEND page: a City tab (palette + board) and an Armory tab (buy
  * city elements, bombs and universal upgrades with what battles earn).
  *
- * Build phase: drag city elements from the palette onto gold-outlined
+ * Build phase: drag city elements from the palette (a side panel that
+ * slides in beside the board's view) onto gold-outlined
  * tiles; drag placed ones around, or back to the palette to pick them up.
  * Once the defense starts, the palette becomes the consumables palette and
  * waves roll in without stopping until the keep falls. */
@@ -89,6 +90,9 @@ export class DefendPage {
   /** Abandon needs a second click within a few seconds. */
   private abandonArmed = 0;
   private settingsOpen = false;
+  /** Whether the side panel is open in each phase: the build palette starts
+   * open, the battle's items closed so the battle has the whole view. */
+  private sideOpen = { build: true, sim: false };
   /** Kills already paid for this run, by kind. */
   private paid: Record<EnemyKind, number> = { roach: 0, orc: 0, ogre: 0, bat: 0, warlord: 0, mother: 0, broodling: 0 };
 
@@ -168,7 +172,7 @@ export class DefendPage {
       </div>
       <div class="defend-city" id="defend-city">
         <div class="defend-stage" id="defend-stage">
-          <div class="defend-palette" id="defend-palette"></div>
+          <aside class="defend-side" id="defend-side" aria-label="Palette"><div class="defend-palette" id="defend-palette"></div></aside>
           <div class="defend-board" id="defend-board"><canvas id="defend-canvas" aria-label="City defense board. Scroll or pinch to zoom, drag to pan."></canvas>
             <div class="defend-banner" id="defend-banner" hidden></div>
             <div class="defend-message" id="defend-message" aria-live="polite"></div></div>
@@ -206,6 +210,7 @@ export class DefendPage {
     this.root.querySelector("#defend-stage")!.classList.toggle("palette-right", this.save.paletteSide === "right");
     this.renderControls();
     this.renderPalette();
+    this.renderSide();
     this.renderSettings();
     this.updateHud();
     if (this.tab === "armory") this.renderArmory();
@@ -217,7 +222,7 @@ export class DefendPage {
     if (this.phase === "build") {
       el.innerHTML = `<button data-dtab="city" aria-pressed="${this.tab === "city"}">City</button>
         <button data-dtab="armory" aria-pressed="${this.tab === "armory"}">Armory</button>
-        <button class="defend-go" id="defend-start">Start the defense</button>`;
+        <button class="defend-go" id="defend-start">Start the defense</button>${this.tab === "city" ? this.sideToggle("Build") : ""}`;
       el.querySelectorAll<HTMLButtonElement>("[data-dtab]").forEach((b) => {
         b.onclick = () => {
           this.tab = b.dataset.dtab as "city" | "armory";
@@ -225,6 +230,7 @@ export class DefendPage {
           this.relayout();
         };
       });
+      this.bindSideToggle(el);
       el.querySelector<HTMLButtonElement>("#defend-start")!.onclick = () => {
         this.tab = "city";
         this.startRun();
@@ -233,7 +239,7 @@ export class DefendPage {
     } else if (this.phase === "sim") {
       const armed = performance.now() < this.abandonArmed;
       el.innerHTML = `<button id="defend-abandon" class="defend-danger ${armed ? "armed" : ""}">${armed ? "Confirm?" : "Abandon"}</button>
-        <button id="defend-speed" title="Battle speed">${this.sim?.speed ?? 1}×</button>`;
+        <button id="defend-speed" title="Battle speed">${this.sim?.speed ?? 1}×</button>${this.sideToggle("Items")}`;
       el.querySelector<HTMLButtonElement>("#defend-abandon")!.onclick = () => {
         if (performance.now() < this.abandonArmed) {
           this.abandonArmed = 0;
@@ -244,6 +250,7 @@ export class DefendPage {
         this.renderControls();
         setTimeout(() => this.phase === "sim" && this.renderControls(), 3050);
       };
+      this.bindSideToggle(el);
       el.querySelector<HTMLButtonElement>("#defend-speed")!.onclick = () => {
         if (!this.sim) return;
         const top = this.save.speed3 ? 3 : 2;
@@ -262,6 +269,30 @@ export class DefendPage {
         this.renderChrome();
       };
     }
+  }
+
+  /** The button that slides the side panel (the palette) in and out. */
+  private sideToggle(label: string) {
+    const open = this.phase !== "over" && this.sideOpen[this.phase];
+    return `<button id="defend-side-toggle" class="defend-side-toggle" aria-pressed="${open}" aria-controls="defend-side">☰ ${label}</button>`;
+  }
+  private bindSideToggle(el: HTMLElement) {
+    const toggle = el.querySelector<HTMLButtonElement>("#defend-side-toggle");
+    if (!toggle) return;
+    toggle.onclick = () => {
+      if (this.phase === "over") return;
+      this.sideOpen[this.phase] = !this.sideOpen[this.phase];
+      toggle.setAttribute("aria-pressed", String(this.sideOpen[this.phase]));
+      this.renderSide();
+    };
+  }
+
+  /** Opens or closes the side panel; the board's view narrows or widens
+   * with it, frame by frame, as it slides. */
+  private renderSide() {
+    const open = this.phase !== "over" && this.sideOpen[this.phase];
+    this.root.querySelector("#defend-stage")!.classList.toggle("side-open", open);
+    this.root.querySelector("#defend-side")!.setAttribute("aria-hidden", String(!open));
   }
 
   /** DEFEND-only settings, behind the cog. */
@@ -329,8 +360,11 @@ export class DefendPage {
     if (!el) return;
     const best = this.save.bestWave;
     if (this.phase === "build" || !this.sim) {
-      const html = `<span>Best wave <b>${best}</b></span>`;
-      if (el.innerHTML !== html) el.innerHTML = html;
+      const html = `<span data-drop="1">Best wave <b>${best}</b></span>`;
+      if (el.dataset.html !== html) {
+        el.dataset.html = el.innerHTML = html;
+        this.fitHud();
+      }
       return;
     }
     const sim = this.sim;
@@ -339,8 +373,8 @@ export class DefendPage {
     const sky = this.weather ? skyLabel(this.weather, this.night) : "";
     // data-drop: the order pieces are left out when the row gets crowded.
     const html = `${sky ? `<span class="defend-sky" data-drop="1">${sky}</span>` : ""}<span>Wave <b>${sim.wave}</b></span><span class="defend-best" data-drop="2">Best <b>${best}</b></span><span class="defend-keep" title="Keep ${Math.ceil(hp)} / ${max}"><small data-drop="3">Keep</small><i><em style="width:${(hp / max) * 100}%"></em></i></span><span class="defend-foes"><small data-drop="4">Foes </small><b>${sim.enemies.length + sim.spawnQueue.length}</b></span>`;
-    if (el.innerHTML !== html) {
-      el.innerHTML = html;
+    if (el.dataset.html !== html) {
+      el.dataset.html = el.innerHTML = html;
       this.fitHud();
     }
   }
@@ -383,34 +417,37 @@ export class DefendPage {
     if (b) b.hidden = true;
   }
 
-  /** Fit the board to the space left on screen: 9:13, as big as possible
-   * without the page ever scrolling. */
+  /** Fit the stage to the space left on screen, as tall as it can be
+   * without the page ever scrolling; the board's view fills what the side
+   * panel leaves of it. */
   private layoutBoard() {
     if (!this.renderer) return;
     this.fitHud();
     if (this.tab === "armory") return this.layoutArmory();
     const stage = this.root.querySelector<HTMLElement>("#defend-stage")!;
-    const palette = this.root.querySelector<HTMLElement>("#defend-palette")!;
-    const boardEl = this.root.querySelector<HTMLElement>("#defend-board")!;
     if (!stage.offsetParent) return;
-    const top = boardEl.getBoundingClientRect().top + window.scrollY;
+    const top = stage.getBoundingClientRect().top + window.scrollY;
     // 24 px below leaves room for the board frame's lower brackets.
-    const availH = window.innerHeight - top - this.navHeight() - 24;
-    // The palette never sets the page height: it's capped to the board and
-    // scrolls on its own when it holds more than fits.
-    palette.style.maxHeight = `${Math.max(60, availH)}px`;
-    const availW = stage.clientWidth - palette.offsetWidth - 10;
-    let width = Math.max(120, Math.floor(Math.min(availW, (availH * TILES_W) / TILES_H)));
-    this.renderer.resize(width);
-    palette.style.maxHeight = `${boardEl.offsetHeight}px`;
+    let height = Math.max(160, Math.floor(window.innerHeight - top - this.navHeight() - 24));
+    stage.style.height = `${height}px`;
     // Whatever padding the page adds, shrink until nothing overflows.
     const over = document.documentElement.scrollHeight - window.innerHeight;
     if (over > 0) {
-      width = Math.max(120, Math.floor(width - (over * TILES_W) / TILES_H) - 1);
-      this.renderer.resize(width);
-      palette.style.maxHeight = `${boardEl.offsetHeight}px`;
+      height = Math.max(160, height - over - 1);
+      stage.style.height = `${height}px`;
     }
+    this.fitView();
     this.draw();
+  }
+
+  /** Matches the board's canvas to its view, which changes size as the
+   * side panel slides; the board keeps the scale the whole stage gives it. */
+  private fitView() {
+    const stage = this.root.querySelector<HTMLElement>("#defend-stage");
+    const board = this.root.querySelector<HTMLElement>("#defend-board");
+    if (!this.renderer || !stage || !board || !stage.offsetParent) return;
+    const frame = board.offsetWidth - board.clientWidth;
+    this.renderer.resize(stage.clientWidth - frame, board.clientHeight);
   }
 
   /** Lay out now, and again next frame once the new DOM has settled. */
@@ -455,7 +492,7 @@ export class DefendPage {
     this.night = 0;
     this.renderChrome();
     const sky = this.weather.rain ? "Rain rolls in. " : "";
-    this.setMessage(`${sky}Here they come! Drag a bomb onto the field to thin the horde.`, 4);
+    this.setMessage(`${sky}Here they come! ${this.sideOpen.sim ? "Drag" : "Open Items and drag"} a bomb onto the field to thin the horde.`, 4);
   }
 
   private endRun() {
@@ -520,7 +557,9 @@ export class DefendPage {
   }
 
   private draw() {
-    if (!this.renderer || !this.renderer.canvas.width) return;
+    if (!this.renderer) return;
+    this.fitView();
+    if (!this.renderer.canvas.width) return;
     const map = this.sim ? this.sim.map : this.currentMap();
     this.renderer.draw(map, this.sim, this.overlay(), {
       grid: this.phase === "build",

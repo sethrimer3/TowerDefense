@@ -40,6 +40,8 @@ export class GroundRelief {
   private scratch: HTMLCanvasElement | null = null;
   private fixed: HTMLCanvasElement | null = null;
   private fixedKey = "";
+  /** The board's size in canvas pixels, as of the last `sync`. */
+  private size = { W: 0, H: 0 };
 
   /** Bakes the masks for `map` at `px` canvas pixels a cell, if anything
    * they depend on changed. False until there is a DOM and the floor art. */
@@ -49,6 +51,7 @@ export class GroundRelief {
     if (key === this.key) return this.masks.length === 4;
     this.key = key;
     this.fixedKey = "";
+    this.size = { W, H };
     for (let i = 0; i < this.outside.length; i++) this.outside[i] = map.type[i] === CellType.OUT ? 1 : 0;
     this.masks = bakeMasks(this.outside, px, W, H);
     if (!this.weights.length) this.weights = AXES.map(([ax, ay]) => weightSprite(ax, ay));
@@ -67,7 +70,7 @@ export class GroundRelief {
    * come back with their buildings), then the moving lights over it. */
   draw(c: CanvasRenderingContext2D, px: number, fixed: { version: string; lights: () => ReliefLight[] }, moving: ReliefLight[], alpha: number) {
     if (this.masks.length !== 4) return;
-    const W = c.canvas.width, H = c.canvas.height;
+    const { W, H } = this.size;
     const fixedKey = `${this.key}|${fixed.version}`;
     if (fixedKey !== this.fixedKey) {
       this.fixedKey = fixedKey;
@@ -89,7 +92,7 @@ export class GroundRelief {
   private light(c: CanvasRenderingContext2D, px: number, l: ReliefLight) {
     const R = l.r * px;
     const x0 = Math.max(0, Math.floor(l.x * px - R)), y0 = Math.max(0, Math.floor(l.y * px - R));
-    const x1 = Math.min(c.canvas.width, Math.ceil(l.x * px + R)), y1 = Math.min(c.canvas.height, Math.ceil(l.y * px + R));
+    const x1 = Math.min(this.size.W, Math.ceil(l.x * px + R)), y1 = Math.min(this.size.H, Math.ceil(l.y * px + R));
     const w = x1 - x0, h = y1 - y0;
     if (w <= 0 || h <= 0) return;
     const s = (this.scratch ??= document.createElement("canvas"));
