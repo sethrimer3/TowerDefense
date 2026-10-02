@@ -8,7 +8,9 @@
  * and levels out. Only the chunks where something changed are stepped, so a
  * settled world costs almost nothing. */
 
-export const W = 128;
+/** The world's width and depth in cells: a prospect holds plenty of ore,
+ * but not without end. */
+export const W = 384;
 export const H = 480;
 export const CELLS = W * H;
 
@@ -105,7 +107,7 @@ export function generate(seed: number): Uint8Array {
     }
   const rand = (i: number) => hash01(i, 17, seed);
   // Rocks lodged in the dirt.
-  for (let i = 0; i < 45; i++) {
+  for (let i = 0; i < 135; i++) {
     const x = Math.floor(rand(i * 3) * W), top = surface[x] + 2, depth = stoneTop[x] - top;
     if (depth <= 1) continue;
     const y = top + Math.floor(rand(i * 3 + 1) * depth), big = rand(i * 3 + 2) < 0.3;
@@ -125,8 +127,8 @@ export function generate(seed: number): Uint8Array {
     }
   };
   const stoneMin = Math.min(...stoneTop);
-  veins(420, IRON, stoneMin + 4, 9, 101);
-  veins(160, GOLD, stoneMin + 30, 6, 202);
+  veins(1260, IRON, stoneMin + 4, 9, 101);
+  veins(480, GOLD, stoneMin + 30, 6, 202);
   // Pockets of loose dirt in the dirt and gravel in the stone: sealed in,
   // they hold until someone digs beside them.
   const pockets = (count: number, m: Material, top: (x: number) => number, bottom: (x: number) => number, over: Material, salt: number) => {
@@ -137,10 +139,10 @@ export function generate(seed: number): Uint8Array {
       blob(cells, x, t + Math.floor(r(1) * depth), 1 + Math.floor(r(2) * 3), m, seed + salt + i, (c) => c === over);
     }
   };
-  pockets(26, LOOSE, (x) => surface[x] + 4, (x) => stoneTop[x] - 1, DIRT, 303);
-  pockets(70, GRAVEL, (x) => stoneTop[x] + 2, () => H - 12, STONE, 404);
+  pockets(78, LOOSE, (x) => surface[x] + 4, (x) => stoneTop[x] - 1, DIRT, 303);
+  pockets(210, GRAVEL, (x) => stoneTop[x] + 2, () => H - 12, STONE, 404);
   // Deep down, sealed pools of lava (never under the shaft).
-  for (let i = 0; i < 11; i++) {
+  for (let i = 0; i < 33; i++) {
     const r = (k: number) => hash01(i, k, seed + 505);
     const x = 4 + Math.floor(r(0) * (W - 8));
     if (Math.abs(x - W / 2) < 8) continue;

@@ -95,8 +95,14 @@ A flame's flickering, swaying, occlusion-aware glow: lanterns, braziers, tower f
 **Mine**:
 The idle side view of the ground under the city, worked by miners whatever tab is open and while the game is closed. Its world comes from a seed.
 
+**Prospect**:
+One world the mine works, with only so much ore in it. Once the shaft is at the bottom and the work there is done it is **worked out**, and the player moves the crew, the buildings and the stock to a **new prospect**: fresh ground from a new seed.
+
 **Miner**:
-A worker the player hires with Gold and puts to one of three **trades**: the face (digging, shoring, laying track, hanging torches and lamps, building carts, carrying ore up), the forge, or the smithy. A miner at the face wears a yellow hat, a forge hand a grey welder's mask, a smith a brown leather apron.
+A worker the player hires with Gold and puts to one of three **trades**: the face (digging, shoring, laying track, hanging torches and lamps, building carts, carrying ore up), the forge, or the smithy. A miner at the face wears a yellow hat, a forge hand a grey welder's mask, a smith a brown leather apron. Each miner has a name for life.
+
+**Crew list**:
+The miners by name in a box for each trade, opened beside the mine's view: a name dragged to another box changes that miner's trade, and one tapped is followed by the camera. A miner lost stays in the list crossed out under a skull until tapped away or replaced by the next hire.
 
 **Shaft**, **level** and **tunnel**:
 The laddered shaft is sunk through the dirt into the stone; at every level a tunnel with track and torches runs out either side.

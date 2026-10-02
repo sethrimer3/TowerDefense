@@ -1407,22 +1407,10 @@ nav button { position: relative; }
   cursor: pointer;
 }
 .mine-news { font-style: italic; opacity: 0.9; }
-/* The crew's trades: a counter each, with steppers for the forge and smithy. */
-.mine-jobs {
-  display: flex;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 6px 14px;
-  margin: 0 0 6px;
-  font-size: 11px;
-}
-.mine-job {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-}
+/* Each trade's mark: a hat, mask or apron over a miner's body. */
 .job-mark {
   display: inline-block;
+  flex: none;
   width: 6px;
   height: 12px;
   background: linear-gradient(var(--hat) 50%, var(--coat) 50%);
@@ -1431,10 +1419,110 @@ nav button { position: relative; }
 .job-mine { --hat: #f2c230; --coat: #f4f2ec; }
 .job-forge { --hat: #8d929c; --coat: #f4f2ec; }
 .job-smith { --hat: #f4e6d4; --coat: #7a4a26; }
-.mine-jobs .mine-job button {
-  min-width: 28px;
+/* Over the view: the crew's list, the prospect, and moving on. */
+.mine-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 4px;
+}
+.mine-tools button {
+  flex: none;
   min-height: 0;
-  height: 26px;
-  padding: 0 6px;
-  font-size: 14px;
+  height: 32px;
+  padding: 0 10px;
+  font-size: 11px;
+}
+.mine-prospect {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 10px;
+  text-align: center;
+}
+/* The crew's list opens beside the view, which narrows to make room. */
+.mine-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+.mine-body .mine-view {
+  min-width: 0;
+}
+.mine-crew {
+  flex: none;
+  width: 0;
+  margin: 7px 0;
+  overflow: hidden auto;
+  opacity: 0;
+  transition: width 0.35s ease, margin 0.35s ease, opacity 0.25s ease;
+}
+.mine-body.crew-open .mine-crew {
+  width: clamp(132px, 34%, 210px);
+  margin-right: 6px;
+  opacity: 1;
+}
+.crew-box {
+  margin: 0 0 8px;
+  padding: 6px;
+  min-width: 120px;
+}
+.crew-box h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 5px;
+  font-size: 11px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.crew-box ul {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-height: 24px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.crew-member {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 6px;
+  font-size: 11px;
+  white-space: nowrap;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.crew-member span,
+.crew-member s {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.crew-member.lifted { opacity: 0.35; }
+.crew-member.fallen { cursor: pointer; }
+.crew-member .skull {
+  flex: none;
+  width: 12px;
+  font-style: normal;
+  text-align: center;
+}
+.crew-ghost {
+  position: fixed;
+  z-index: 50;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.crew-hint {
+  margin: 0 0 4px;
+  font-size: 9px;
+  line-height: 1.4;
+  opacity: 0.75;
+}
+@media (max-width: 440px) {
+  .mine-tools button { height: 30px; padding: 0 8px; font-size: 10px; }
+  .mine-prospect { font-size: 9px; }
+  .crew-member { font-size: 10px; padding: 4px 5px; }
 }
