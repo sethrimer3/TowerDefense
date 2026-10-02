@@ -76,9 +76,11 @@ holds it against endless waves. Code lives in `src/defend/`.
   splinters that scatter, settle and fade out after 5–10 s.
 - Art: medieval roofs (terracotta, brick, timber, thatch, slate, straw)
   with crisp black outlines on whole-pixel edges; when zoomed in, the city
-  is repainted at 2–3× resolution so edges stay sharp. The keep has four
-  round corner turrets, a courtyard and a hipped slate roof, with a red and
-  gold banner rippling in the wind on top.
+  is repainted at 2–3× resolution so edges stay sharp. The keep is pixel
+  art at 8 pixels a cell, like the parks' ponds and trees: four round
+  corner turrets, crenellated walls with a gate, a courtyard and a hipped
+  slate roof, with a pixel red and gold swallowtail banner rippling on top
+  (held still under Reduce motion).
 - Generation is seeded per save and keyed by position, so the same layout
   always produces the same city. `tests/defend-city.test.ts` pins both
   `fitLayout` and `generateCity` against recorded hashes.
@@ -185,6 +187,9 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   space (`weather.ts`).
 - `structure-art.ts` holds the keep, barracks and tower art (shared by the
   city layer and the palette icons), the banner, and the palette colours.
+  The keep (`keepPixels`) and banner (`flagPixels`, redrawn each frame) are
+  pixel buffers at `ART` pixels a cell, drawn up with smoothing off;
+  `tests/defend-keep-art.test.ts` checks them.
 - **Wizard art** (`wizard-art.ts`): the flame is a continuous jet of
   particles, white-hot at the nozzle through yellow, orange and red to
   smoke, and lights the ground as it goes (through the carried lights, so
@@ -233,7 +238,7 @@ from its seed; `tests/defend-replay.test.ts` pins it.
 - City elements get more expensive with each one owned. Upgrades are
   universal (they apply to every building of that type) and take effect from
   the next run.
-- Reaching a **new best wave** is recorded (`bestWave`) and pays Valor: one
+- Reaching a **new best wave** is recorded (`bestWave`) and pays Knowledge: one
   for each wave held past the best before it, three for a boss wave.
 - **Training** (Upgrades tab): experience raises the Commander level; each
   level is a training point, which trains one rank of a row (a few percent on
@@ -242,7 +247,7 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   for the first, each after 50% longer; two train at once.
 - **Skill trees** (Upgrades tab): Command (garrison and towers) and
   Stewardship (walls, keep, builders, Gold, iron, experience, a third
-  Training slot), ranked skills bought with Valor.
+  Training slot), ranked skills bought with Knowledge.
 - Training and the skills fold into the run's `Bonuses`, fixed when the
   defense starts.
 

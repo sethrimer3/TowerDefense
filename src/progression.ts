@@ -1,6 +1,6 @@
 /** Everything the player keeps between defenses beyond the city itself:
  * the Commander's level (from experience), Training (timed ranks bought
- * with training points), the skill trees (bought with Valor), and what a
+ * with training points), the skill trees (bought with Knowledge), and what a
  * defense pays out. All of it folds into one `Bonuses` the battle reads.
  * Pure functions over the save, so tests drive them without a page. */
 import { ENEMIES, NO_BONUSES, type Bonuses, type EnemyKind } from "./defend/catalog.ts";
@@ -99,14 +99,14 @@ export function settleTraining(save: Save, now: number): number {
 export function skillPurchase(save: Save, id: SkillId) {
   const level = save.skills[id], price = skillCost(id, level);
   const maxed = level >= SKILLS[id].max, available = skillAvailable(id, save.skills);
-  const affordable = save.settings.freePurchases || save.valor >= price;
+  const affordable = save.settings.freePurchases || save.knowledge >= price;
   return { level, price, maxed, available, affordable, canBuy: !maxed && available && affordable };
 }
 
 export function buySkill(save: Save, id: SkillId): boolean {
   const p = skillPurchase(save, id);
   if (!p.canBuy) return false;
-  if (!save.settings.freePurchases) save.valor -= p.price;
+  if (!save.settings.freePurchases) save.knowledge -= p.price;
   save.skills[id]++;
   return true;
 }
@@ -145,13 +145,13 @@ export const waveGold = (wave: number) => 10 + 5 * wave;
 export const killXp = (kind: EnemyKind) => (kind === "warlord" ? 60 : ENEMIES[kind].cost);
 
 /** What holding a wave pays: Gold, iron bars, a steel bar for each boss
- * wave held, and Valor for each wave past the best before it. */
+ * wave held, and Knowledge for each wave past the best before it. */
 export function waveReward(save: Save, wave: number, best: number) {
   return {
     gold: waveGold(wave) * multiplier(save, "gold"),
     ironBar: 1 + skillTotal(save, "ironPerWave"),
     steelBar: wave % 10 === 0 ? wave / 10 : 0,
-    valor: wave > best ? (wave % 10 === 0 ? 3 : 1) : 0,
+    knowledge: wave > best ? (wave % 10 === 0 ? 3 : 1) : 0,
   };
 }
 
@@ -173,7 +173,7 @@ export function payWave(save: Save, wave: number) {
   save.gold += r.gold;
   save.ironBar += r.ironBar;
   save.steelBar += r.steelBar;
-  save.valor += r.valor;
+  save.knowledge += r.knowledge;
   return r;
 }
 

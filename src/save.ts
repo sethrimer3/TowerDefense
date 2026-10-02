@@ -6,6 +6,8 @@ import { TRAINING, TRAINING_IDS, type TrainingId } from "./progression.ts";
 import { SKILLS, SKILL_IDS, type SkillId } from "./skill-trees.ts";
 import type { TrainingJob } from "./training-jobs.ts";
 import { decodeSettings, defaultSettings, type Settings } from "./settings.ts";
+import { decodeMineSave, type MineSave } from "./mine/sim.ts";
+import { decodeLibrarySave, type LibrarySave } from "./library/sim.ts";
 
 export const SAVE_KEY = "towerdefense.v1";
 export const SAVE_VERSION = 1;
@@ -18,8 +20,10 @@ export type Save = {
   steelBar: number;
   /** Lifetime experience from kills: the Commander's level. */
   xp: number;
-  /** Earned by holding past the best wave, spent on the skill trees. */
-  valor: number;
+  /** Earned in the Library (shelves × librarians an hour, idle too) and by
+   * holding past the best wave; spent on the skill trees. Keeps its fractions.
+   * Saves from before it was renamed call it `valor`. */
+  knowledge: number;
   skills: Record<SkillId, number>;
   /** Training ranks completed per row. */
   training: Record<TrainingId, number>;
@@ -27,6 +31,10 @@ export type Save = {
   /** Training points that ranks bought free (Dev) didn't spend. */
   freeTraining: number;
   defend: DefendSave;
+  /** The mine as last saved (null until it first runs). */
+  mine: MineSave | null;
+  /** The library's shelves, books, ladders and librarians (null until it first shows). */
+  library: LibrarySave | null;
   settings: Settings;
 };
 
@@ -37,12 +45,14 @@ export function defaults(): Save {
     ironBar: 0,
     steelBar: 0,
     xp: 0,
-    valor: 0,
+    knowledge: 0,
     skills: Object.fromEntries(SKILL_IDS.map((id) => [id, 0])) as Record<SkillId, number>,
     training: Object.fromEntries(TRAINING_IDS.map((id) => [id, 0])) as Record<TrainingId, number>,
     trainingJobs: [],
     freeTraining: 0,
     defend: defaultDefendSave(),
+    mine: null,
+    library: null,
     settings: defaultSettings(),
   };
 }
@@ -67,12 +77,14 @@ export function decode(raw: string | null): Save {
   d.ironBar = int(s.ironBar, 0);
   d.steelBar = int(s.steelBar, 0);
   d.xp = int(s.xp, 0, 0, 1e12);
-  d.valor = int(s.valor, 0);
+  d.knowledge = num(s.knowledge ?? s.valor, 0);
   for (const id of SKILL_IDS) d.skills[id] = int(s.skills?.[id], 0, 0, SKILLS[id].max);
   for (const t of TRAINING) d.training[t.id] = int(s.training?.[t.id], 0, 0, t.max);
   d.trainingJobs = decodeJobs(s.trainingJobs, d.training);
   d.freeTraining = int(s.freeTraining, 0);
   d.defend = decodeDefendSave(s.defend);
+  d.mine = decodeMineSave(s.mine);
+  d.library = decodeLibrarySave(s.library);
   d.settings = decodeSettings(s.settings);
   return d;
 }

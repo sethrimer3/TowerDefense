@@ -2,6 +2,8 @@
  * (drawn into the city layer and the palette icons), the keep's live banner,
  * and the shared palette. */
 import { SOLDIER, type StructureKind } from "./catalog.ts";
+import { hash } from "./grid.ts";
+import { ART } from "./park-art.ts";
 
 /** Medieval roofing: terracotta tile, old brick, weathered timber, thatch,
  * slate and straw. */
@@ -208,100 +210,133 @@ function paintBombIcon(c: CanvasRenderingContext2D, n: number) {
 }
 
 // ── The keep ──────────────────────────────────────────────────────────────
+//
+// The keep and its banner are pixel art at `ART` pixels a cell, like the
+// parks' ponds and trees: painted pixel by pixel, then drawn up to size
+// with smoothing off, so they sit with the blocky roofs and canopies.
 
-/** The keep's parts, in canvas pixels: the curtain wall's box, outline
- * width and cell size. */
-type Keep = { X: number; Y: number; W: number; H: number; line: number; px: number };
+/** Art pixels across the keep (3 cells). */
+const KEEP = 3 * ART;
 
-/** The keep, from above: a square curtain of crenellated wall with a round
- * turret on each corner, a flagstone courtyard, and the great tower in the
- * middle under a four-sided slate roof. The flag is drawn live (drawFlag). */
-function paintKeep(c: CanvasRenderingContext2D, { x, y, w, h, px }: ArtBox) {
-  const line = Math.max(1, Math.round(px * 0.08));
-  const inset = Math.max(1, Math.round(px * 0.12));
-  const k: Keep = { X: x + inset, Y: y + inset, W: w - inset * 2, H: h - inset * 2, line, px };
-  curtainWall(c, k);
-  courtyard(c, k);
-  greatTower(c, k);
-  cornerTurrets(c, k);
+/** 0xRRGGBB colours, lit from the upper left like every other roof. */
+const K = {
+  outline: 0x0b0907,
+  merlon: 0xc9c2b2, crenel: 0x5c574e, walk: 0x9d968a, walkLit: 0xb0a99b, walkShade: 0x847e72,
+  court: 0x6f6a60, courtLit: 0x7d786c, courtDark: 0x5f5a51, courtShade: 0x4d4942,
+  roof: { n: 0x7c838e, w: 0x5d636c, e: 0x494e57, s: 0x3c4048 }, ridge: 0x2a2d33, ridgeLit: 0x8f96a1,
+  turret: 0xa8a194, turretLit: 0xc4bdae, cap: [0x3a3e45, 0x50555e, 0x6c727c, 0x8b929d], finial: 0xd8b572,
+  door: 0x6b4a2c, doorDark: 0x4a321e,
+};
+
+/** Opaque little-endian RGBA for 0xRRGGBB, at `alpha`. */
+const rgba = (c: number, alpha = 255) => ((alpha << 24) | ((c & 0xff) << 16) | (c & 0xff00) | ((c >> 16) & 0xff)) >>> 0;
+
+/** The keep, from above, as `KEEP × KEEP` RGBA pixels: a square curtain of
+ * crenellated wall with a round turret on each corner and a gate to the
+ * south, a flagstone courtyard, and the great tower in the middle under a
+ * four-sided slate roof. The banner is drawn live (drawFlag). */
+export function keepPixels(): Uint32Array {
+  const n = KEEP, out = new Uint32Array(n * n);
+  const set = (x: number, y: number, c: number) => (out[y * n + x] = rgba(c));
+  // Curtain wall: outline, merlons on the outer edge, the wall walk, and an
+  // inner outline round the courtyard.
+  for (let y = 1; y < n - 1; y++)
+    for (let x = 1; x < n - 1; x++) {
+      const ring = Math.min(x - 1, y - 1, n - 2 - x, n - 2 - y);
+      if (ring === 0 || ring === 3) set(x, y, K.outline);
+      else if (ring === 1) set(x, y, (x + y) % 3 === 0 ? K.crenel : K.merlon);
+      else if (ring === 2) set(x, y, x === 3 || y === 3 ? K.walkLit : x === n - 4 || y === n - 4 ? K.walkShade : K.walk);
+      else courtyard(x, y, set);
+    }
+  greatTower(set);
+  for (const [cx, cy] of [[4, 4], [n - 4, 4], [4, n - 4], [n - 4, n - 4]]) turret(cx, cy, set);
+  // The gate: oak doors across the south wall.
+  for (let y = n - 4; y < n - 1; y++)
+    for (let x = n / 2 - 2; x < n / 2 + 2; x++) set(x, y, y === n - 2 ? K.outline : x === n / 2 - 1 ? K.doorDark : K.door);
+  return out;
 }
 
-/** The curtain wall, with merlons around the wall walk. */
-function curtainWall(c: CanvasRenderingContext2D, { X, Y, W, H, line, px }: Keep) {
-  c.fillStyle = OUTLINE;
-  c.fillRect(X, Y, W, H);
-  c.fillStyle = "#9d968a";
-  c.fillRect(X + line, Y + line, W - line * 2, H - line * 2);
-  const m = Math.max(1, Math.round(px * 0.2));
-  c.fillStyle = "#bcb5a6";
-  for (let xx = X + line + m; xx < X + W - line - m; xx += m * 2) {
-    c.fillRect(xx, Y + line, m, m);
-    c.fillRect(xx, Y + H - line - m, m, m);
-  }
-  for (let yy = Y + line + m; yy < Y + H - line - m; yy += m * 2) {
-    c.fillRect(X + line, yy, m, m);
-    c.fillRect(X + W - line - m, yy, m, m);
-  }
+type Put = (x: number, y: number, c: number) => void;
+
+/** Flagstones, speckled, in the shade of the walls along the north and
+ * west and of the tower to its lower right. */
+function courtyard(x: number, y: number, set: Put) {
+  if (x === 5 || y === 5) return set(x, y, K.courtShade);
+  const t = KEEP - 7; // Just past the tower's lower-right edge.
+  if ((x === t && y >= 8 && y <= t) || (y === t && x >= 8 && x <= t)) return set(x, y, K.courtShade);
+  const r = hash(x, y, 71) % 7;
+  set(x, y, r === 0 ? K.courtLit : r === 1 ? K.courtDark : K.court);
 }
 
-function courtyard(c: CanvasRenderingContext2D, { X, Y, W, H, line, px }: Keep) {
-  const wall = Math.round(px * 0.45);
-  c.fillStyle = OUTLINE;
-  c.fillRect(X + wall, Y + wall, W - wall * 2, H - wall * 2);
-  c.fillStyle = "#6f6a60";
-  c.fillRect(X + wall + line, Y + wall + line, W - (wall + line) * 2, H - (wall + line) * 2);
+/** The great tower: an outlined square under a hipped slate roof, four
+ * faces meeting at a point, its ridges dark but for the sunny north-west
+ * one, with faint tile courses. */
+function greatTower(set: Put) {
+  const lo = 7, hi = KEEP - 8, mid = KEEP / 2 - 0.5;
+  for (let y = lo; y <= hi; y++)
+    for (let x = lo; x <= hi; x++) {
+      if (x === lo || y === lo || x === hi || y === hi) {
+        set(x, y, K.outline);
+        continue;
+      }
+      const dx = x - mid, dy = y - mid;
+      if (Math.abs(dx) === Math.abs(dy)) {
+        set(x, y, dx < 0 && dy < 0 ? K.ridgeLit : K.ridge);
+        continue;
+      }
+      const ns = Math.abs(dy) > Math.abs(dx);
+      const face = ns ? (dy < 0 ? K.roof.n : K.roof.s) : dx < 0 ? K.roof.w : K.roof.e;
+      const course = ns ? y % 2 === 0 : x % 2 === 0;
+      set(x, y, course ? shade(face, 0.88) : face);
+    }
 }
 
-/** The great tower with a hipped slate roof (four shaded faces). */
-function greatTower(c: CanvasRenderingContext2D, { X, Y, W, H, line }: Keep) {
-  const tw = Math.round(W * 0.46),
-    tx = Math.round(X + (W - tw) / 2),
-    ty = Math.round(Y + (H - tw) / 2);
-  c.fillStyle = OUTLINE;
-  c.fillRect(tx - line, ty - line, tw + line * 2, tw + line * 2);
-  const cx = tx + tw / 2,
-    cy = ty + tw / 2;
-  const face = (pts: [number, number][], fill: string) => {
-    c.fillStyle = fill;
-    c.beginPath();
-    c.moveTo(pts[0][0], pts[0][1]);
-    for (const p of pts.slice(1)) c.lineTo(p[0], p[1]);
-    c.closePath();
-    c.fill();
-  };
-  face([[tx, ty], [tx + tw, ty], [cx, cy]], "#6a707a");
-  face([[tx + tw, ty], [tx + tw, ty + tw], [cx, cy]], "#474c55");
-  face([[tx, ty + tw], [tx + tw, ty + tw], [cx, cy]], "#3b3f47");
-  face([[tx, ty], [tx, ty + tw], [cx, cy]], "#5a6069");
-  c.strokeStyle = OUTLINE;
-  c.lineWidth = line;
-  c.beginPath();
-  c.moveTo(tx, ty);
-  c.lineTo(tx + tw, ty + tw);
-  c.moveTo(tx + tw, ty);
-  c.lineTo(tx, ty + tw);
-  c.stroke();
+/** A round turret centred at (cx, cy): outline, a pale stone rim lit to the
+ * upper left, and a conical slate cap shaded by facing and dithered between
+ * shades, with a gold finial. */
+function turret(cx: number, cy: number, set: Put) {
+  const r = 3.9;
+  for (let y = Math.floor(cy - r); y <= Math.ceil(cy + r); y++)
+    for (let x = Math.floor(cx - r); x <= Math.ceil(cx + r); x++) {
+      const dx = x + 0.5 - cx, dy = y + 0.5 - cy, d = Math.sqrt(dx * dx + dy * dy);
+      if (d > r) continue;
+      if (d > r - 1) set(x, y, K.outline);
+      else if (d > r - 1.9) set(x, y, dx + dy < 0 ? K.turretLit : K.turret);
+      else if (d < 0.8 && dx < 0 && dy < 0) set(x, y, K.finial);
+      else {
+        const lit = (-(dx + dy) / (d * Math.SQRT2)) * 1.5 + 1.5; // 0 (lower right) to 3 (upper left)
+        const k = Math.max(0, Math.min(3, Math.floor(lit + ((x + y) % 2 ? 0.25 : -0.25))));
+        set(x, y, K.cap[k]);
+      }
+    }
 }
 
-/** Round towers with conical slate caps. */
-function cornerTurrets(c: CanvasRenderingContext2D, { X, Y, W, H, line, px }: Keep) {
-  const tr = Math.max(2, Math.round(px * 0.5));
-  for (const [ox, oy] of [
-    [X + tr * 0.7, Y + tr * 0.7],
-    [X + W - tr * 0.7, Y + tr * 0.7],
-    [X + tr * 0.7, Y + H - tr * 0.7],
-    [X + W - tr * 0.7, Y + H - tr * 0.7],
-  ]) {
-    c.fillStyle = OUTLINE;
-    disc(c, ox, oy, tr + line);
-    c.fillStyle = "#a8a194";
-    disc(c, ox, oy, tr);
-    const g = c.createRadialGradient(ox - tr * 0.3, oy - tr * 0.3, 0, ox, oy, tr * 0.72);
-    g.addColorStop(0, "#7d848f");
-    g.addColorStop(1, "#3f444c");
-    c.fillStyle = g;
-    disc(c, ox, oy, tr * 0.72);
-  }
+/** `c` darkened (or lightened) by `f`. */
+function shade(c: number, f: number) {
+  const ch = (s: number) => Math.max(0, Math.min(255, Math.round(((c >> s) & 0xff) * f)));
+  return (ch(16) << 16) | (ch(8) << 8) | ch(0);
+}
+
+let keepSprite: HTMLCanvasElement | null = null;
+
+/** The keep's pixels drawn up to fill its box, smoothing off. */
+function paintKeep(c: CanvasRenderingContext2D, { x, y, w, h }: ArtBox) {
+  if (typeof document === "undefined") return;
+  keepSprite ??= spriteCanvas(keepPixels(), KEEP, KEEP);
+  c.save();
+  c.imageSmoothingEnabled = false;
+  c.drawImage(keepSprite, x, y, w, h);
+  c.restore();
+}
+
+function spriteCanvas(px: Uint32Array, w: number, h: number, cv = document.createElement("canvas")) {
+  cv.width = w;
+  cv.height = h;
+  const c = cv.getContext("2d")!;
+  const img = c.createImageData(w, h);
+  new Uint32Array(img.data.buffer).set(px);
+  c.putImageData(img, 0, 0);
+  return cv;
 }
 
 // ── The keep's banner ─────────────────────────────────────────────────────
@@ -309,87 +344,67 @@ function cornerTurrets(c: CanvasRenderingContext2D, { X, Y, W, H, line, px }: Ke
 /** Where the banner's pole stands (canvas pixels) and the time it waves at. */
 export type FlagPose = { x: number; y: number; t: number; reduceMotion: boolean };
 
-/** Folds along the flag. */
-const STRIPS = 10;
+/** The banner's pixel grid: `FLAG_W × FLAG_H` art pixels with the pole at
+ * art pixel corner (POLE, POLE). */
+export const FLAG_W = 30, FLAG_H = 24;
+const POLE = 12;
+/** The cloth: columns long, rows deep. */
+const CLOTH_L = 11, CLOTH_D = 5;
+const RED = [0x7a2022, 0xa8302a, 0xd2412f], GOLD = [0x9c7a34, 0xd2a84a, 0xf0cf6a];
 
-/** The keep's banner, seen from above, rippling in the wind. Drawn every
- * frame from the time, so it keeps waving. */
+/** The banner, seen from above, as `FLAG_W × FLAG_H` RGBA pixels at time
+ * `t` (seconds): red cloth with a gold stripe and a swallowtail, each
+ * column lifted by the ripple running down it and shaded by its fold, with
+ * a one-pixel outline, a shadow on the roof below, and the pole's gold cap.
+ * The ripple steps at 12 frames a second, like a sprite; under reduced
+ * motion it holds still. */
+export function flagPixels(t: number, reduceMotion: boolean): Uint32Array {
+  const out = new Uint32Array(FLAG_W * FLAG_H);
+  const tick = reduceMotion ? 0 : Math.floor(t * 12) / 12;
+  // 0 off the cloth, else 1 + shade index (+ 3 on the stripe).
+  const cloth = new Uint8Array(FLAG_W * FLAG_H);
+  for (let i = 0; i < CLOTH_L; i++) {
+    const phase = tick * 6 - i * 0.5;
+    const lift = Math.round(Math.sin(phase) * 1.6 * ((i + 1) / CLOTH_L));
+    const fold = Math.cos(phase);
+    const tone = fold > 0.35 ? 2 : fold < -0.35 ? 0 : 1;
+    for (let j = 0; j < CLOTH_D; j++) {
+      // The swallowtail: the last column's middle is cut away.
+      if (i === CLOTH_L - 1 && j > 0 && j < CLOTH_D - 1) continue;
+      const x = POLE + 1 + i, y = POLE - 2 + j + lift;
+      cloth[y * FLAG_W + x] = 1 + tone + (j === (CLOTH_D - 1) / 2 ? 3 : 0);
+    }
+  }
+  const on = (x: number, y: number) => x >= 0 && y >= 0 && x < FLAG_W && y < FLAG_H && cloth[y * FLAG_W + x] > 0;
+  const edge = (x: number, y: number) => !on(x, y) && (on(x - 1, y) || on(x + 1, y) || on(x, y - 1) || on(x, y + 1));
+  // Shadow two pixels down and right, under the cloth and its outline.
+  for (let y = 2; y < FLAG_H; y++)
+    for (let x = 2; x < FLAG_W; x++) if (on(x - 2, y - 2) || edge(x - 2, y - 2)) out[y * FLAG_W + x] = rgba(0, 80);
+  for (let y = 0; y < FLAG_H; y++)
+    for (let x = 0; x < FLAG_W; x++) {
+      const v = cloth[y * FLAG_W + x];
+      if (v) out[y * FLAG_W + x] = rgba(v > 3 ? GOLD[v - 4] : RED[v - 1]);
+      else if (edge(x, y)) out[y * FLAG_W + x] = rgba(K.outline);
+    }
+  // The pole's cap: two by two gold pixels in an outline, over the cloth's
+  // hoist.
+  for (let y = POLE - 2; y < POLE + 2; y++)
+    for (let x = POLE - 2; x < POLE + 2; x++) {
+      const rim = x === POLE - 2 || y === POLE - 2 || x === POLE + 1 || y === POLE + 1;
+      out[y * FLAG_W + x] = rgba(rim ? K.outline : x === POLE - 1 && y === POLE - 1 ? 0xf6e2a8 : K.finial);
+    }
+  return out;
+}
+
+let flagCanvas: HTMLCanvasElement | null = null;
+
+/** The keep's banner, redrawn every frame from the time so it keeps
+ * waving, at the city's art scale. */
 export function drawFlag(c: CanvasRenderingContext2D, px: number, pose: FlagPose) {
-  const pt = flagPoints(px, pose);
+  flagCanvas = spriteCanvas(flagPixels(pose.t, pose.reduceMotion), FLAG_W, FLAG_H, flagCanvas ?? undefined);
+  const s = px / ART;
   c.save();
-  // Shadow on the roof below.
-  c.fillStyle = "rgba(0,0,0,0.3)";
-  traceFlag(c, pt, px * 0.25, px * 0.3);
-  c.fill();
-  for (let i = 0; i < STRIPS; i++) flagStrip(c, pt, i, pose.t);
-  // Outline and pole cap.
-  c.strokeStyle = OUTLINE;
-  c.lineWidth = Math.max(1, px * 0.06);
-  traceFlag(c, pt, 0, 0);
-  c.closePath();
-  c.stroke();
-  c.fillStyle = "#d8b572";
-  c.strokeStyle = OUTLINE;
-  c.beginPath();
-  c.arc(pose.x, pose.y, Math.max(1.5, px * 0.14), 0, Math.PI * 2);
-  c.fill();
-  c.stroke();
+  c.imageSmoothingEnabled = false;
+  c.drawImage(flagCanvas, pose.x - POLE * s, pose.y - POLE * s, FLAG_W * s, FLAG_H * s);
   c.restore();
-}
-
-type FlagPoint = (u: number, v: number) => readonly [number, number];
-
-/** The cloth's surface: u along the flag (0 at the pole), v across it; the
- * ripple grows with u. */
-function flagPoints(px: number, { x: ax, y: ay, t, reduceMotion }: FlagPose): FlagPoint {
-  const len = 1.35 * px,
-    wid = 0.5 * px;
-  const wind = -0.35; // Blowing a little north of east.
-  const cw = Math.cos(wind),
-    sw = Math.sin(wind);
-  const amp = reduceMotion ? 0.03 : 0.12;
-  return (u, v) => {
-    const wave = Math.sin(t * 7 - u * 5.5) * amp * px * (0.25 + u);
-    const along = u * len,
-      across = v * wid + wave;
-    return [ax + along * cw - across * sw, ay + along * sw + across * cw] as const;
-  };
-}
-
-/** Starts a path round the flag's edge, shifted by (ox, oy). */
-function traceFlag(c: CanvasRenderingContext2D, pt: FlagPoint, ox: number, oy: number) {
-  c.beginPath();
-  for (let i = 0; i <= STRIPS; i++) {
-    const [x, y] = pt(i / STRIPS, -0.5);
-    if (i === 0) c.moveTo(x + ox, y + oy);
-    else c.lineTo(x + ox, y + oy);
-  }
-  for (let i = STRIPS; i >= 0; i--) {
-    const [x, y] = pt(i / STRIPS, 0.5);
-    c.lineTo(x + ox, y + oy);
-  }
-}
-
-/** One strip of cloth, shaded by the slope of its fold, with the gold
- * stripe down the middle. */
-function flagStrip(c: CanvasRenderingContext2D, pt: FlagPoint, i: number, t: number) {
-  const u0 = i / STRIPS,
-    u1 = (i + 1) / STRIPS;
-  const slope = Math.cos(t * 7 - ((u0 + u1) / 2) * 5.5);
-  const light = Math.round(150 + slope * 45);
-  c.fillStyle = `rgb(${light + 40},${Math.round(light * 0.2)},${Math.round(light * 0.18)})`;
-  quad(c, pt(u0, -0.5), pt(u1, -0.5), pt(u1, 0.5), pt(u0, 0.5));
-  c.fillStyle = `rgb(${Math.round(200 + slope * 40)},${Math.round(160 + slope * 35)},70)`;
-  quad(c, pt(u0, -0.1), pt(u1, -0.1), pt(u1, 0.1), pt(u0, 0.1));
-}
-
-type Corner = readonly [number, number];
-function quad(c: CanvasRenderingContext2D, a: Corner, b: Corner, d: Corner, e: Corner) {
-  c.beginPath();
-  c.moveTo(a[0], a[1]);
-  c.lineTo(b[0], b[1]);
-  c.lineTo(d[0], d[1]);
-  c.lineTo(e[0], e[1]);
-  c.closePath();
-  c.fill();
 }

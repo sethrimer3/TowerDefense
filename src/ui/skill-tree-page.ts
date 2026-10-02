@@ -1,5 +1,5 @@
 import { play } from "../sound.ts";
-import { TRAINING, TRAINING_GROUPS, TRAINING_PER_LEVEL, buySkill, cancelTraining, levelForXp, skillPurchase, startTraining, trainingPoints, trainingSlots, trainingStep, type TrainingId } from "../progression.ts";
+import { TRAINING, TRAINING_GROUPS, TRAINING_PER_LEVEL, whole, buySkill, cancelTraining, levelForXp, skillPurchase, startTraining, trainingPoints, trainingSlots, trainingStep, type TrainingId } from "../progression.ts";
 import { SKILLS, TREES, mapNodes, treeHeight, type SkillId, type SkillNode, type TreeId } from "../skill-trees.ts";
 import { TreeParticles } from "../tree-particles.ts";
 import { TrainingParticles } from "../training-particles.ts";
@@ -9,7 +9,7 @@ import { clamp, el, uiSprite, type UiSprite } from "./dom.ts";
 import { bindPanZoom, type View } from "./pan-zoom.ts";
 
 type Tree = (typeof TREES)[number];
-const TREE_ICONS: Record<TreeId, UiSprite> = { command: "attack", stewardship: "defense" };
+const TREE_ICONS: Record<TreeId, UiSprite> = { command: "attack", stewardship: "defense", mine: "mine", library: "library" };
 type PageTab = TreeId | "training";
 
 /** Hours, minutes and seconds left, as the timers show them. */
@@ -73,7 +73,7 @@ export class SkillTreePage {
       <section class="skill-tree ${tree.id}"><header class="tree-heading"><h3>${tree.name}</h3><small>${tree.description}</small></header>
       <div class="tree-viewport" id="tree-viewport"><div class="tree-map" id="tree-map" style="${treeHeight(tree) === 100 ? "" : `height:${treeHeight(tree)}%;`}transform:translate(${view.x}px,${view.y}px) scale(${view.scale})"><svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${lines}</svg>
       <canvas class="tree-particles" aria-hidden="true"></canvas>
-      ${nodes.map((n) => this.nodeHtml(n)).join("")}</div><div class="inspect-box tree-tooltip" id="tree-tooltip" hidden></div></div></section>`;
+      ${nodes.map((n) => this.nodeHtml(n)).join("")}</div>${nodes.length ? "" : `<p class="tree-empty">No skills to learn here yet.</p>`}<div class="inspect-box tree-tooltip" id="tree-tooltip" hidden></div></div></section>`;
     bindTabs();
     bindPanZoom(el("tree-viewport"), el("tree-map"), view, {
       tap: (target) => this.tapped(target),
@@ -188,9 +188,9 @@ export class SkillTreePage {
     if (maxed) hint = "Mastered.";
     else if (requirements.length) hint = `Requires: ${requirements.join(" + ")} (one rank each).`;
     else if (!available) hint = "Locked.";
-    else if (!canBuy) hint = `Need ${price} Valor · have ${save.valor}.`;
+    else if (!canBuy) hint = `Need ${price} Knowledge · have ${whole(save.knowledge)}.`;
     else hint = "Tap again to purchase.";
-    return `<b style="color:var(--tree-color)">${skill.name}</b><div>${level} / ${skill.max} ranks</div><div>${skill.text}.</div><div class="${canBuy ? "safe" : ""}">${hint}</div>${maxed ? "" : `<div>Cost: ${price} Valor</div>`}`;
+    return `<b style="color:var(--tree-color)">${skill.name}</b><div>${level} / ${skill.max} ranks</div><div>${skill.text}.</div><div class="${canBuy ? "safe" : ""}">${hint}</div>${maxed ? "" : `<div>Cost: ${price} Knowledge</div>`}`;
   }
 
   /** Above the selected node, or below it when there is no room above. */
