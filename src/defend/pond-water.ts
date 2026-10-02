@@ -208,6 +208,9 @@ export class PondWater {
         if (sh <= 0) continue;
         m.setTransform(1, 0, 0, -1, -box.x, 2 * line - box.y);
         m.drawImage(layer, sx * k, sy * k, sw * k, sh * k, sx, sy, sw, sh);
+        // The trees stand apart from the city layer, over the walkers.
+        const a = ART / px, trees = this.art?.canopies;
+        if (trees) m.drawImage(trees, sx * a, sy * a, sw * a, sh * a, sx, sy, sw, sh);
       }
     m.setTransform(1, 0, 0, 1, 0, 0);
   }

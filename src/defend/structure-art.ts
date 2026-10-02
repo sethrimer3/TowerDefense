@@ -9,7 +9,7 @@ import { ART } from "./park-art.ts";
  * slate and straw. */
 export const ROOFS = ["#8e4a36", "#a35a3e", "#6b5540", "#86704b", "#5a5c62", "#9a7a4a"];
 export const OUTLINE = "#0b0907";
-export const ROAD = "#5f584d";
+export const ROAD = "#62523f";
 const PARK = "#3c5d31";
 
 /** Where a structure is drawn, in canvas pixels, and the cell size. */

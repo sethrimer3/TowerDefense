@@ -35,14 +35,13 @@ function mix(a: number, b: number, t: number) {
 }
 
 /** One house's roof, seeded by `seed`, as `(cw·ART) × (ch·ART)` RGBA pixels
- * filling its cells: a one-pixel gap round the edge, the roof inside its
- * outline, and a drop shadow one pixel to the lower right. */
+ * filling its cells: a one-pixel gap round the edge and the roof inside its
+ * outline. The house's shadow is cast with the city's (`shadow-art.ts`). */
 export function roofPixels(cw: number, ch: number, variant: number, seed: number): Uint32Array {
   const W = cw * ART, H = ch * ART, out = new Uint32Array(W * H);
-  const set = (x: number, y: number, c: number, a = 255) => (out[y * W + x] = rgba(c, a));
-  // The house sits one pixel in from its cells; its shadow one further.
+  const set = (x: number, y: number, c: number) => (out[y * W + x] = rgba(c));
+  // The house sits one pixel in from its cells (two on the lower right).
   const x0 = 1, y0 = 1, x1 = W - 3, y1 = H - 3;
-  for (let y = y0 + 1; y <= y1 + 1; y++) for (let x = x0 + 1; x <= x1 + 1; x++) set(x, y, 0, 90);
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) set(x, y, OUTLINE);
 
   // Work in roof coordinates: u along the ridge, v across it, over the

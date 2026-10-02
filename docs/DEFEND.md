@@ -68,8 +68,25 @@ holds it against endless waves. Code lives in `src/defend/`.
   8 pixels a cell and drawn up with smoothing off, to match the blocky
   roofs and grass: the pond in dithered bands (black outline, muddy bank,
   reedy shallows, open water, a deep heart) with glints and lily pads;
-  trees as lumpy canopies with a one-pixel outline, a drop shadow and four
-  shades lit from the upper left.
+  trees as lumpy canopies with a one-pixel outline and four shades lit from
+  the upper left. Trees stand over everyone (`park-trees.ts`): they are
+  drawn after the units, each fading to half opacity while an enemy, soldier
+  or civilian is under it, and darkened with the city in a battle's weather.
+- Streets are packed dirt (`ground-art.ts`), pixel art at 8 pixels a cell in
+  soft blotches of brown, darker along the kerbs and worn lighter down the
+  middle, flecked with grit and pebbles. Where a street meets a park the
+  grass grows out over it unevenly (ragged turf, a dithered band of worn
+  grass, a stray tuft or two) and the dirt bites back into the park's edge
+  in bare patches, which the live grass keeps off.
+- Shadows (`shadow-art.ts`): one crisp pixel mask cast over a height map in
+  the afternoon sun from the upper left. Houses stand as gabled roofs (low
+  eaves, a higher ridge, so a gable end throws a longer pointed shadow), the
+  city wall stands taller than any house with its face sloping to the
+  street, then the keep's curtain, turrets and great tower, the other
+  structures, and the trees' domed canopies. Everything shades whatever
+  lies below it: the wall's shadow falls across the roofs beside it,
+  shortened where they rise toward it and running on past the ridge. Fallen
+  buildings cast nothing.
 - About 60% of parks have a thin wooden fence along their street sides,
   with one gap left as a gate (`fences.ts`). Fences are purely visual: an
   enemy walking across a section, or a blast next to it, snaps it into
@@ -179,16 +196,16 @@ from its seed; `tests/defend-replay.test.ts` pins it.
 ## Drawing (`render.ts` and its passes)
 
 - `DefendRenderer` owns the camera (zoom and pan) and runs each frame's
-  passes in order. The city layer (`city-layer.ts`: flagstones, streets,
-  parks, ponds, trees, walls, houses and structures, lantern brackets,
-  rubble) is painted once into an offscreen canvas, at 2–3× when zoomed in,
+  passes in order. The city layer (`city-layer.ts`: flagstones, dirt
+  streets, parks, ponds, walls, houses and structures, rubble, the shadows,
+  lantern brackets) is painted once into an offscreen canvas, at 2–3× when zoomed in,
   and repainted only when a building falls or is rebuilt, the size or zoom
   band changes, or floor and wall art finishes loading.
 - Over it each frame: park fences (`fences.ts`), building damage, unit
   shadows, the overcast and torchlight (`lighting.ts`), the keep's banner,
   scorches, then units, projectiles and effects (`battle-art.ts`), the
-  building grid and drag overlay (`edit-overlay.ts`), and rain in screen
-  space (`weather.ts`).
+  trees (`park-trees.ts`), the wizards' fire, the building grid and drag
+  overlay (`edit-overlay.ts`), and rain in screen space (`weather.ts`).
 - `structure-art.ts` holds the keep, barracks and tower art (shared by the
   city layer and the palette icons), the banner, and the palette colours.
   The keep (`keepPixels`) and banner (`flagPixels`, redrawn each frame) are
@@ -221,7 +238,8 @@ from its seed; `tests/defend-replay.test.ts` pins it.
     30 times a second.
   - `pond-water.ts`: in the rain, drops fall all over the open water, each
     a faint ring of pixels that spreads and fades. The bank, its trees and the houses beside it are
-    mirrored into the water, cut from the city layer about each column's
+    mirrored into the water, cut from the city layer (and the trees' own
+    canvas) about each column's
     shoreline and copied back in thin strips shifted by a faint shimmer and
     by every ring passing through, tinted by the water and masked to it.
   - `pond-ducks.ts`: when it isn't raining, a mallard pair paddles on the

@@ -4,13 +4,15 @@
  * part around anyone walking through them, and wobble back after they pass.
  *
  * Blades are planned per cell from its position (presentation only: they
- * never change the city), kept clear of tree canopies and pond shores, and
+ * never change the city), kept clear of tree canopies, pond shores and the
+ * park edges worn to bare dirt (`ground-art.ts`), and
  * written into one pixel buffer at `ART` pixels per cell covering the parks,
  * then drawn scaled up with smoothing off, so thousands of blades cost one
  * image copy. The buffer is rebuilt at most 30 times a second. */
 import { CELLS_H, CELLS_W, cellInBounds, cellIndex, hash01 } from "./grid.ts";
 import { CellType, type CityMap } from "./citygen.ts";
 import { POND, hasTree, pondDisc, treeCanopy } from "./park-geometry.ts";
+import { bareAt, groundArt } from "./ground-art.ts";
 
 /** Blade pixels per cell. */
 const ART = 8;
@@ -191,13 +193,13 @@ function nearbyWalkers(walkers: readonly Walker[]) {
 }
 
 /** Park cell (cx, cy)'s blades: clumps of two to four fanning out from one
- * root, none under a tree's canopy or on a pond's shore, none reaching out
+ * root, none under a tree's canopy, on a pond's shore or on bare dirt, none reaching out
  * of the cell's top unless the cell above is park too. */
 function plan(map: CityMap, cx: number, cy: number): Blade[] | null {
   if (map.type[cellIndex(cx, cy)] !== CellType.PARK) return null;
   const r = (k: number) => hash01(cx, cy, 300 + k);
   const openAbove = cellInBounds(cx, cy - 1) && map.type[cellIndex(cx, cy - 1)] === CellType.PARK;
-  const blocked = covers(map, cx, cy);
+  const blocked = covers(map, cx, cy), ground = groundArt(map);
   const out: Blade[] = [];
   const clumps = 2 + Math.floor(r(0) * 3);
   for (let k = 1; k <= clumps; k++) {
@@ -208,7 +210,7 @@ function plan(map: CityMap, cx: number, cy: number): Blade[] | null {
       const side = q - (n - 1) / 2, bi = i + Math.round(side);
       let h = Math.max(2, tall - Math.abs(Math.round(side * 2)));
       if (!openAbove) h = Math.min(h, j);
-      if (bi < 0 || bi >= ART || blocked(cx + bi / ART, cy + j / ART) || blocked(cx + bi / ART, cy + (j - h) / ART)) continue;
+      if (bi < 0 || bi >= ART || bareAt(ground, cx * ART + bi, cy * ART + j) || blocked(cx + bi / ART, cy + j / ART) || blocked(cx + bi / ART, cy + (j - h) / ART)) continue;
       out.push({
         i: bi, j, h, color: Math.max(0, color - (q % 2)), phase: phase + q * 0.35, splay: side * 0.9,
         flower: q === 0 && r(k + 120) < 0.12 ? 1 + Math.floor(r(k + 140) * FLOWERS.length) : 0,

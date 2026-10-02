@@ -1,6 +1,8 @@
 /** The static city layer for DEFEND: flagstone ground, the spawn lane,
- * gravel streets and their stones, park grass, ponds and trees, walls,
- * houses and structures, lantern brackets and rubble. The renderer paints it
+ * dirt streets (`ground-art.ts`) and their stones, park grass and ponds,
+ * walls, houses and structures, rubble, the shadows everything standing
+ * casts (`shadow-art.ts`), and lantern brackets. Trees stand over the units,
+ * so the renderer draws them later (`park-trees.ts`). The renderer paints it
  * once into an offscreen canvas and repaints it only when a building falls or
  * is rebuilt, the size changes, or art finishes loading. */
 import { CELL_COUNT, CELLS_H, CELLS_W, SPAWN_ROW, SUB, TILES_H, TILES_W, cellInBounds, cellIndex, hash, hash01 } from "./grid.ts";
@@ -10,6 +12,8 @@ import type { DefendSim } from "./sim.ts";
 import { ROAD, paintStructureArt } from "./structure-art.ts";
 import { roofSeed, roofSprite } from "./roof-art.ts";
 import { parkArt } from "./park-art.ts";
+import { GRASS, grassPatch, groundArt } from "./ground-art.ts";
+import { heights, shadowCanvas, shadowMask } from "./shadow-art.ts";
 
 export { POND, POND_WATER, hasTree, pondDisc, pondPath, treeCanopy } from "./park-geometry.ts";
 
@@ -77,12 +81,28 @@ export function paintCityLayer(c: CanvasRenderingContext2D, px: number, scene: C
   c.imageSmoothingEnabled = false;
   paintFlagstones(p);
   paintCityGround(p);
+  paintPixelArt(p, groundArt(map).canvas);
   paintRoadStones(p, scene.stones);
-  // Ponds, then trees, over the park grass, as pixel art.
-  paintParkArt(p);
-  for (const b of map.buildings) paintBuilding(p, b);
-  paintLanternBrackets(p, scene.lights);
+  // Ponds over the park grass, as pixel art.
+  paintPixelArt(p, parkArt(map).canvas);
+  // Walls first: a wall's face hangs over the cell below it, and a house or
+  // structure standing there is in front of the face, so it covers it.
+  for (const b of map.buildings) if (b.kind === "wall") paintBuilding(p, b);
+  for (const b of map.buildings) if (b.kind !== "wall") paintBuilding(p, b);
   paintRubble(p);
+  paintPixelArt(p, cityShadows(map, sim));
+  paintLanternBrackets(p, scene.lights);
+}
+
+/** The shadows of what stands, cached for the last city and battle state. */
+let shadows: { map: CityMap; sim: DefendSim | null; version: number; canvas: HTMLCanvasElement | null } | null = null;
+function cityShadows(map: CityMap, sim: DefendSim | null) {
+  const version = sim ? sim.mapVersion : -1;
+  if (shadows?.map !== map || shadows.sim !== sim || shadows.version !== version) {
+    const standing = (b: Building) => !sim || sim.intact(b);
+    shadows = { map, sim, version, canvas: shadowCanvas(shadowMask(heights(map, standing))) };
+  }
+  return shadows.canvas;
 }
 
 /** Ground: the mossy flagstones, one tile per board tile, with the spawn
@@ -126,7 +146,8 @@ export function paintFloor(c: CanvasRenderingContext2D, px: number) {
 /** How many of the floor images have loaded (the bump map waits for all). */
 export const floorArtLoaded = () => floorImages.filter(ready).length;
 
-/** City ground: park grass, and gravel for streets and cleared rubble. */
+/** City ground: park grass, and gravel under the streets' dirt and for
+ * cleared rubble and breached wall. */
 function paintCityGround(p: Paint) {
   const { map, solid } = p;
   for (let cy = 0; cy < CELLS_H; cy++)
@@ -154,7 +175,7 @@ function paintGravel({ c, px, map, solid }: Paint, cx: number, cy: number) {
   }
 }
 
-/** Road stones, with a darker underside so they sit in the gravel. */
+/** Pebbles on the streets, with a darker underside so they sit in the dirt. */
 function paintRoadStones({ c, px }: Paint, stones: readonly Stone[]) {
   for (const st of stones) {
     const s = Math.max(1, st.s * px);
@@ -162,7 +183,7 @@ function paintRoadStones({ c, px }: Paint, stones: readonly Stone[]) {
       y = st.y * px - s / 2;
     c.fillStyle = "rgba(0,0,0,0.25)";
     c.fillRect(x + s * 0.3, y + s * 0.35, s, s);
-    c.fillStyle = st.shade < 0.33 ? "#7a7266" : st.shade < 0.66 ? "#6b645a" : "#857c6d";
+    c.fillStyle = st.shade < 0.33 ? "#857660" : st.shade < 0.66 ? "#74664f" : "#918268";
     c.fillRect(x, y, s, s);
   }
 }
@@ -173,14 +194,13 @@ function paintGrass({ c, px }: Paint, cx: number, cy: number) {
     y = Math.round(cy * px),
     s = Math.round((cx + 1) * px) - x,
     t = Math.round((cy + 1) * px) - y;
-  const patch = hash01(Math.floor(cx / 2), Math.floor(cy / 2), 50);
-  c.fillStyle = patch < 0.5 ? "#3d5e30" : "#446834";
+  c.fillStyle = grassPatch(cx, cy);
   c.fillRect(x, y, s, t);
   const d = Math.max(1, Math.round(px * 0.09));
   for (let k = 0; k < 5; k++) {
     const hx = x + Math.floor(hash01(cx, cy, 51, k) * (s - d)),
       hy = y + Math.floor(hash01(cx, cy, 52, k) * (t - d * 2));
-    c.fillStyle = k % 2 ? "#2f4b26" : "#56803f";
+    c.fillStyle = k % 2 ? GRASS.dark : GRASS.light;
     c.fillRect(hx, hy, d, d * 2);
   }
   if (hash01(cx, cy, 53) < 0.18) {
@@ -189,10 +209,9 @@ function paintGrass({ c, px }: Paint, cx: number, cy: number) {
   }
 }
 
-/** The ponds and trees, baked as pixel art (`park-art.ts`) and drawn up
- * to size with smoothing off. */
-function paintParkArt({ c, map }: Paint) {
-  const art = parkArt(map).canvas;
+/** Pixel art baked at `ART` pixels a cell (streets, ponds, shadows), drawn
+ * up to size with smoothing off. */
+function paintPixelArt({ c }: Paint, art: HTMLCanvasElement | null) {
   if (!art) return;
   c.save();
   c.imageSmoothingEnabled = false;
@@ -214,11 +233,6 @@ function paintBuilding(p: Paint, b: Building) {
     w = Math.round((r.x + r.w) * px) - x,
     h = Math.round((r.y + r.h) * px) - y;
   if (b.kind === "house") return paintHouse(p, b, { x, y, w, h });
-  const gap = Math.max(1, Math.round(px * 0.09));
-  // Drop shadow.
-  const sh = Math.max(1, Math.round(px * 0.14));
-  c.fillStyle = "rgba(0,0,0,0.35)";
-  c.fillRect(x + gap + sh, y + gap + sh, w - gap * 2, h - gap * 2);
   paintStructureArt(c, b.kind, { x, y, w, h, px });
 }
 
