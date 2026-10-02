@@ -1,6 +1,8 @@
-/** The Upgrades page's skill trees, bought with Valor (one for each wave a
- * defense holds past the best before it). Each skill has ranks; every rank
- * applies its effect once more, to every defense from the next one on.
+/** The Upgrades page's skill trees, bought with Knowledge (which the Library
+ * earns by the hour, and each wave a defense holds past the best before it
+ * pays). Each skill has ranks; every rank applies its effect once more:
+ * Command's and Stewardship's to every defense from the next one on, the
+ * Library's to the library at once. The Mine's tree has no skills yet.
  * Node positions are percentages of the tree's view: x of its width, y of
  * its height, so a tree taller than one screen (`height`, in the same
  * units, 100 by default) scrolls. */
@@ -8,13 +10,15 @@ import type { BonusTarget } from "./progression.ts";
 
 export type SkillId =
   | "drillSergeant" | "veterans" | "bladework" | "fletchers" | "gunpowder" | "ballistics" | "warBanner"
-  | "masonry" | "bastions" | "guilds" | "plunder" | "ironworks" | "scholars" | "tactician";
-export type TreeId = "command" | "stewardship";
+  | "masonry" | "bastions" | "guilds" | "plunder" | "ironworks" | "scholars" | "tactician"
+  | "fireproofWood" | "fireTraining";
+export type TreeId = "command" | "stewardship" | "mine" | "library";
 
 /** What one rank of a skill does: `per` added to a target's percent (a
  * negative `per` on a time makes it shorter), or, for `slots` and
- * `ironPerWave`, a whole number added. */
-export type SkillEffect = { target: BonusTarget | "slots" | "ironPerWave"; per: number };
+ * `ironPerWave`, a whole number added. The Library's skills are read as
+ * ranks (`library/sim.ts`: `accidentChance`, `fireDrill`). */
+export type SkillEffect = { target: BonusTarget | "slots" | "ironPerWave" | "fireproof" | "fireTraining"; per: number };
 export type Skill = { id: SkillId; name: string; icon: string; max: number; base: number; effect: SkillEffect; text: string };
 export type SkillNode = { id: SkillId; x: number; y: number; requires: SkillId[] };
 export type SkillTree = { id: TreeId; name: string; description: string; height?: number; nodes: SkillNode[] };
@@ -34,10 +38,12 @@ export const SKILLS: Record<SkillId, Skill> = {
   ironworks: { id: "ironworks", name: "Ironworks", icon: "▬", max: 2, base: 3, effect: { target: "ironPerWave", per: 1 }, text: "+1 iron bar for every wave held a rank" },
   scholars: { id: "scholars", name: "War college", icon: "✦", max: 3, base: 2, effect: { target: "xp", per: 15 }, text: "+15% experience from every kill a rank" },
   tactician: { id: "tactician", name: "Tactician", icon: "⌛", max: 1, base: 6, effect: { target: "slots", per: 1 }, text: "One more Training slot" },
+  fireproofWood: { id: "fireproofWood", name: "Fireproof wood", icon: "▤", max: 10, base: 5, effect: { target: "fireproof", per: 1 }, text: "The library's tables catch fire 10% less often a rank (1% a minute to start, then 0.9%, 0.81%…)" },
+  fireTraining: { id: "fireTraining", name: "Fire training", icon: "♒", max: 5, base: 8, effect: { target: "fireTraining", per: 1 }, text: "More librarians fight a fire, fetching and throwing water faster and further, and each splash more likely to douse the flames" },
 };
 
 export const TREES: SkillTree[] = [
-  { id: "command", name: "Command", description: "Earn Valor by holding past your best wave. Command sharpens the garrison and its towers.", nodes: [
+  { id: "command", name: "Command", description: "Earn Knowledge in the Library and by holding past your best wave. Command sharpens the garrison and its towers.", nodes: [
     { id: "drillSergeant", x: 50, y: 10, requires: [] },
     { id: "veterans", x: 22, y: 32, requires: ["drillSergeant"] },
     { id: "bladework", x: 78, y: 32, requires: ["drillSergeant"] },
@@ -46,7 +52,7 @@ export const TREES: SkillTree[] = [
     { id: "ballistics", x: 50, y: 70, requires: ["fletchers", "gunpowder"] },
     { id: "warBanner", x: 50, y: 90, requires: ["ballistics"] },
   ] },
-  { id: "stewardship", name: "Stewardship", description: "Earn Valor by holding past your best wave. Stewardship strengthens the city and fills its coffers.", nodes: [
+  { id: "stewardship", name: "Stewardship", description: "Earn Knowledge in the Library and by holding past your best wave. Stewardship strengthens the city and fills its coffers.", nodes: [
     { id: "masonry", x: 50, y: 10, requires: [] },
     { id: "bastions", x: 22, y: 32, requires: ["masonry"] },
     { id: "guilds", x: 78, y: 32, requires: ["masonry"] },
@@ -55,11 +61,16 @@ export const TREES: SkillTree[] = [
     { id: "ironworks", x: 78, y: 80, requires: ["plunder"] },
     { id: "tactician", x: 30, y: 84, requires: ["scholars", "plunder"] },
   ] },
+  { id: "mine", name: "Mine", description: "Earn Knowledge in the Library. The Mine's skills are still being dug out.", nodes: [] },
+  { id: "library", name: "Library", description: "Earn Knowledge in the Library: shelves × librarians an hour. Library skills guard it from fire.", nodes: [
+    { id: "fireproofWood", x: 28, y: 30, requires: [] },
+    { id: "fireTraining", x: 72, y: 30, requires: [] },
+  ] },
 ];
 
 export const SKILL_IDS = Object.keys(SKILLS) as SkillId[];
 
-/** Valor the next rank of `id` costs, with `level` ranks owned. */
+/** Knowledge the next rank of `id` costs, with `level` ranks owned. */
 export const skillCost = (id: SkillId, level: number) => SKILLS[id].base * (level + 1);
 
 /** Whether every skill `id` requires has a rank. */

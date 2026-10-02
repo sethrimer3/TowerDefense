@@ -20,7 +20,7 @@ export type SparkKind =
   | "embers"
   /** A shower of gold motes and ✦ glints for a win. */
   | "gold"
-  /** Violet ✦ glints, the colour of Valor, for a level. */
+  /** Violet ✦ glints, the colour of Knowledge, for a level. */
   | "arcane";
 
 const KINDS: Record<SparkKind, { count: number; spread: number; rise: number; life: number; glyphs: number }> = {

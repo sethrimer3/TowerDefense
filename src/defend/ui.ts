@@ -44,7 +44,7 @@ export type DefendHost = {
   /** Pays for enemies slain (Gold and experience); returns Commander levels gained. */
   earnKills(slain: Partial<Record<EnemyKind, number>>): number;
   /** Pays for holding `wave` (called before the best wave is raised). */
-  earnWave(wave: number): { gold: number; ironBar: number; steelBar: number; valor: number };
+  earnWave(wave: number): { gold: number; ironBar: number; steelBar: number; knowledge: number };
   persist(): void;
   reduceMotion(): boolean;
   /** The park grass and pond effects are on. */
@@ -498,7 +498,7 @@ export class DefendPage {
     for (const ev of sim.events.splice(0)) {
       if (ev.type === "waveCleared") {
         const r = this.host.earnWave(ev.wave);
-        const pay = `+${Math.floor(r.gold)} gold · +${r.ironBar} iron${r.steelBar ? ` · +${r.steelBar} steel` : ""}${r.valor ? ` · +${r.valor} Valor` : ""}`;
+        const pay = `+${Math.floor(r.gold)} gold · +${r.ironBar} iron${r.steelBar ? ` · +${r.steelBar} steel` : ""}${r.knowledge ? ` · +${r.knowledge} Knowledge` : ""}`;
         if (ev.wave > this.save.bestWave) {
           this.save.bestWave = ev.wave;
           this.newRecord = ev.wave;

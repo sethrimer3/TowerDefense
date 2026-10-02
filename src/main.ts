@@ -34,7 +34,7 @@ const ctx: AppContext = {
   eraseAll: () => {
     save = defaults();
     minePage.load(null, clock());
-    libraryPage.load(null);
+    libraryPage.load(null, clock());
     store();
   },
 };
@@ -96,10 +96,20 @@ const libraryPage = new LibraryPage(el("library"), {
   effects: () => !save.settings.effectsOff,
   newSeed: () => Math.floor(stream("game")() * 4294967296),
   clock,
+  earnKnowledge: (n) => {
+    const before = whole(save.knowledge);
+    save.knowledge += n;
+    if (whole(save.knowledge) !== before) {
+      refreshCurrencies();
+      mineDirty = true;
+    }
+  },
+  upgrades: () => ({ fireproof: save.skills.fireproofWood, fireTraining: save.skills.fireTraining }),
+  showing: () => tab === "library",
 });
-libraryPage.load(save.library);
-/** The mine has paid out since the last save. */
+/** The mine or the library has paid out since the last save. */
 let mineDirty = false;
+libraryPage.load(save.library, clock());
 minePage.load(save.mine, clock());
 
 soundEnabledBy(() => !save.settings.soundOff);
@@ -115,7 +125,7 @@ document.addEventListener("click", (e) => {
 
 function store() {
   save.mine = minePage.snapshot(clock());
-  save.library = libraryPage.snapshot();
+  save.library = libraryPage.snapshot(clock());
   mineDirty = false;
   if (!persist(save)) console.warn("Storage unavailable — progress is only kept for this session.");
 }
@@ -134,7 +144,7 @@ function refreshCurrencies() {
   show("gold", save.gold);
   show("iron", save.ironBar);
   show("steel", save.steelBar);
-  show("valor", save.valor);
+  show("knowledge", save.knowledge);
   const level = levelForXp(save.xp), from = xpForLevel(level), to = xpForLevel(level + 1);
   show("level", level);
   el("xp-fill").style.width = `${((save.xp - from) / (to - from)) * 100}%`;
@@ -164,11 +174,12 @@ function navigate(id: Tab) {
 }
 document.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach((b) => (b.onclick = () => navigate(b.dataset.tab as Tab)));
 
-/** Training completes on the wall clock, whatever page shows; so does the
- * mine's work, which is saved every half minute it pays. */
+/** Training completes on the wall clock, whatever page shows; so do the
+ * mine's and the library's work, saved every half minute they pay. */
 let lastTick = 0, lastMineSave = 0;
 function frame(time: number) {
   minePage.advance(clock());
+  libraryPage.advance(clock());
   if (tab === "defend") defendPage.frame(time);
   if (tab === "mine") minePage.frame(time);
   if (tab === "library") libraryPage.frame(time);
@@ -193,11 +204,13 @@ window.addEventListener("pagehide", store);
 
 // Console helper: fast-forward a running defense, optionally forcing the weather.
 (globalThis as { defendDebug?: unknown }).defendDebug = (seconds = 30, weather?: Weather) => defendPage.fastForward(seconds, weather);
-// Console helper: furnish the library and run it some seconds ahead.
-(globalThis as { libraryDebug?: unknown }).libraryDebug = (shelves = 20, librarians = 4, seconds = 60) => {
-  for (let i = 0; i < shelves; i++) libraryPage.sim.buildShelf();
+// Console helper: furnish the library (shelves built and stocked at once),
+// run it some seconds ahead, and optionally set a table alight.
+(globalThis as { libraryDebug?: unknown }).libraryDebug = (shelves = 20, librarians = 4, seconds = 60, fire = false) => {
+  libraryPage.sim.furnish(shelves);
   for (let i = 0; i < librarians; i++) libraryPage.sim.hire();
   for (let t = 0; t < seconds * 10; t++) libraryPage.sim.step(0.1);
+  if (fire) libraryPage.sim.ignite();
 };
 // Console helper: run the mine some minutes ahead, optionally hiring miners first.
 (globalThis as { mineDebug?: unknown }).mineDebug = (minutes = 10, hire = 0, weather?: MineWeather | null) => {

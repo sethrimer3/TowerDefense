@@ -49,8 +49,11 @@ Paid by kills, by every wave held and by gold the mine digs; spent in the Armory
 **Iron bar** and **steel bar**:
 Paid for each wave held (iron) and each boss wave held (steel); iron bars are also smelted from the mine's iron ore. Spent in the Armory.
 
-**Valor**:
-Paid for each wave held past the best wave; spent on the skill trees.
+**Knowledge**:
+Earned by the Library, an hour's worth being its built bookshelves times its librarians (idle too), and paid for each wave held past the best wave; spent on the skill trees. Once called Valor.
+
+**Freak accident** (Library):
+A table's candle catching it alight: a small chance each minute, lowered by Fireproof Wood. The fire burns whatever it reaches until it burns out or the librarians put it out (Fire Training).
 
 **Experience** and **Commander level**:
 Kills pay experience; enough lifetime experience raises the Commander level.
@@ -62,7 +65,7 @@ One per Commander level, spent on Training ranks.
 Ranks of a few percent each on one row (troop HP, tower damage, Gold found…). A rank takes time on the wall clock; a few can be in training at once (Training slots).
 
 **Skill tree**:
-Command and Stewardship: ranked skills bought with Valor, each needing the skills above it.
+Command and Stewardship (for Defend), Mine and Library: ranked skills bought with Knowledge, each needing the skills above it.
 
 ### Presentation
 
