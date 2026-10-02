@@ -11,6 +11,9 @@ import { renderSettingsPage } from "./ui/settings-page.ts";
 import type { Weather } from "./defend/weather.ts";
 import { play, soundEnabledBy } from "./sound.ts";
 import { flourishesEnabledBy, replay, sparks, sparksOver } from "./ui/flourish.ts";
+import { MinePage } from "./mine/ui.ts";
+import { renderLibraryPage } from "./ui/library-page.ts";
+import { stream } from "./random.ts";
 
 // Wires the pages together: builds the shell, loads the save, and routes
 // navigation, the currency bar and the frame loop between the pages.
@@ -29,6 +32,7 @@ const ctx: AppContext = {
   clock,
   eraseAll: () => {
     save = defaults();
+    minePage.load(null, clock());
     store();
   },
 };
@@ -64,6 +68,26 @@ const defendPage = new DefendPage(el("defend"), {
   devMode: () => save.settings.devMode,
 });
 
+const minePage = new MinePage(el("mine"), {
+  gold: () => save.gold,
+  free: () => save.settings.freePurchases || save.settings.devMode,
+  spendGold: (n) => {
+    save.gold = Math.max(0, save.gold - n);
+    update();
+  },
+  earn: (gold, ironBar) => {
+    save.gold += gold;
+    save.ironBar += ironBar;
+    refreshCurrencies();
+    mineDirty = true;
+  },
+  effects: () => !save.settings.effectsOff,
+  newSeed: () => Math.floor(stream("game")() * 4294967296),
+});
+/** The mine has paid out since the last save. */
+let mineDirty = false;
+minePage.load(save.mine, clock());
+
 soundEnabledBy(() => !save.settings.soundOff);
 flourishesEnabledBy(() => !save.settings.reduceMotion);
 // Every button knocks like the oak board it is (the tab row's stone
@@ -76,6 +100,8 @@ document.addEventListener("click", (e) => {
 });
 
 function store() {
+  save.mine = minePage.snapshot(clock());
+  mineDirty = false;
   if (!persist(save)) console.warn("Storage unavailable — progress is only kept for this session.");
 }
 /** What the currency bar last showed, so a rise can glint. */
@@ -105,6 +131,8 @@ function update() {
 }
 function renderPage() {
   if (tab === "defend") defendPage.show();
+  if (tab === "mine") minePage.show();
+  if (tab === "library") renderLibraryPage();
   if (tab === "upgrades") skillTree.render();
   if (tab === "settings") renderSettingsPage(ctx);
 }
@@ -121,10 +149,17 @@ function navigate(id: Tab) {
 }
 document.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach((b) => (b.onclick = () => navigate(b.dataset.tab as Tab)));
 
-/** Training completes on the wall clock, whatever page shows. */
-let lastTick = 0;
+/** Training completes on the wall clock, whatever page shows; so does the
+ * mine's work, which is saved every half minute it pays. */
+let lastTick = 0, lastMineSave = 0;
 function frame(time: number) {
+  minePage.advance(clock());
   if (tab === "defend") defendPage.frame(time);
+  if (tab === "mine") minePage.frame(time);
+  if (mineDirty && time - lastMineSave > 30000) {
+    lastMineSave = time;
+    store();
+  }
   if (tab === "upgrades") skillTree.drawParticles(time);
   if (time - lastTick >= 1000) {
     lastTick = time;
@@ -142,6 +177,11 @@ window.addEventListener("pagehide", store);
 
 // Console helper: fast-forward a running defense, optionally forcing the weather.
 (globalThis as { defendDebug?: unknown }).defendDebug = (seconds = 30, weather?: Weather) => defendPage.fastForward(seconds, weather);
+// Console helper: run the mine some minutes ahead, optionally hiring miners first.
+(globalThis as { mineDebug?: unknown }).mineDebug = (minutes = 10, hire = 0) => {
+  for (let i = 0; i < hire; i++) minePage.sim.hire();
+  minePage.fastForward(minutes);
+};
 
 settleTraining(save, clock());
 navigate("defend");

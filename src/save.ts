@@ -6,6 +6,7 @@ import { TRAINING, TRAINING_IDS, type TrainingId } from "./progression.ts";
 import { SKILLS, SKILL_IDS, type SkillId } from "./skill-trees.ts";
 import type { TrainingJob } from "./training-jobs.ts";
 import { decodeSettings, defaultSettings, type Settings } from "./settings.ts";
+import { decodeMineSave, type MineSave } from "./mine/sim.ts";
 
 export const SAVE_KEY = "towerdefense.v1";
 export const SAVE_VERSION = 1;
@@ -27,6 +28,8 @@ export type Save = {
   /** Training points that ranks bought free (Dev) didn't spend. */
   freeTraining: number;
   defend: DefendSave;
+  /** The mine as last saved (null until it first runs). */
+  mine: MineSave | null;
   settings: Settings;
 };
 
@@ -43,6 +46,7 @@ export function defaults(): Save {
     trainingJobs: [],
     freeTraining: 0,
     defend: defaultDefendSave(),
+    mine: null,
     settings: defaultSettings(),
   };
 }
@@ -73,6 +77,7 @@ export function decode(raw: string | null): Save {
   d.trainingJobs = decodeJobs(s.trainingJobs, d.training);
   d.freeTraining = int(s.freeTraining, 0);
   d.defend = decodeDefendSave(s.defend);
+  d.mine = decodeMineSave(s.mine);
   d.settings = decodeSettings(s.settings);
   return d;
 }
