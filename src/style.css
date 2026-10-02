@@ -1297,12 +1297,13 @@ nav button { position: relative; }
 .td-currencies .bar-icon { display: inline-block; width: 16px; height: 8px; border-radius: 2px; border: 1px solid #000a; vertical-align: 1px; }
 .td-currencies .bar-icon.iron { background: linear-gradient(#b9bcc2, #6d7179); }
 .td-currencies .bar-icon.steel { background: linear-gradient(#d9e6f2, #7f93a8); }
-.td-currencies .valor-currency { color: #e6c8ff; }
+.td-currencies .knowledge-currency { color: #e6c8ff; }
 .td-currencies .level-currency .xp-track { display: block; position: relative; width: 44px; height: 4px; margin: 4px auto 0; border-radius: 2px; background: #2a3140; overflow: hidden; }
 .td-currencies .level-currency .xp-track i { position: absolute; inset: 0 auto 0 0; width: 0; background: var(--gold); }
 .td-currencies .currency { flex-direction: row; flex-wrap: wrap; justify-content: center; max-width: 90px; }
 .td-currencies .currency small { flex-basis: 100%; }
-.tree-tabs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.tree-tabs { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.tree-empty { position: absolute; inset: 40% 10% auto; margin: 0; text-align: center; font-size: 12px; color: #b3a282; pointer-events: none; }
 .skill-tree.stewardship { --tree-color: #82c9b3; border-color: #355e55; background: radial-gradient(ellipse at 50% 36%, #2b92782a, transparent 65%), #090f15; }
 .tree-heading small { display: block; margin-top: 4px; letter-spacing: 1px; font-size: 10px; text-transform: none; }
 .training-row { grid-template-columns: minmax(52px, 1fr) minmax(42px, auto) 18px minmax(42px, auto) minmax(64px, auto); }
@@ -1397,4 +1398,11 @@ nav button { position: relative; }
 }
 .library-head .mine-hire {
   min-width: 96px;
+}
+/* A fire's alarm, and afterwards what it cost (tap to put it away). */
+.library-alert {
+  top: 10px;
+  bottom: auto;
+  pointer-events: auto;
+  cursor: pointer;
 }

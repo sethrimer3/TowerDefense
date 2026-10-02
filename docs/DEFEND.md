@@ -233,7 +233,7 @@ from its seed; `tests/defend-replay.test.ts` pins it.
 - City elements get more expensive with each one owned. Upgrades are
   universal (they apply to every building of that type) and take effect from
   the next run.
-- Reaching a **new best wave** is recorded (`bestWave`) and pays Valor: one
+- Reaching a **new best wave** is recorded (`bestWave`) and pays Knowledge: one
   for each wave held past the best before it, three for a boss wave.
 - **Training** (Upgrades tab): experience raises the Commander level; each
   level is a training point, which trains one rank of a row (a few percent on
@@ -242,7 +242,7 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   for the first, each after 50% longer; two train at once.
 - **Skill trees** (Upgrades tab): Command (garrison and towers) and
   Stewardship (walls, keep, builders, Gold, iron, experience, a third
-  Training slot), ranked skills bought with Valor.
+  Training slot), ranked skills bought with Knowledge.
 - Training and the skills fold into the run's `Bonuses`, fixed when the
   defense starts.
 

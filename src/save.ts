@@ -20,8 +20,10 @@ export type Save = {
   steelBar: number;
   /** Lifetime experience from kills: the Commander's level. */
   xp: number;
-  /** Earned by holding past the best wave, spent on the skill trees. */
-  valor: number;
+  /** Earned in the Library (shelves × librarians an hour, idle too) and by
+   * holding past the best wave; spent on the skill trees. Keeps its fractions.
+   * Saves from before it was renamed call it `valor`. */
+  knowledge: number;
   skills: Record<SkillId, number>;
   /** Training ranks completed per row. */
   training: Record<TrainingId, number>;
@@ -43,7 +45,7 @@ export function defaults(): Save {
     ironBar: 0,
     steelBar: 0,
     xp: 0,
-    valor: 0,
+    knowledge: 0,
     skills: Object.fromEntries(SKILL_IDS.map((id) => [id, 0])) as Record<SkillId, number>,
     training: Object.fromEntries(TRAINING_IDS.map((id) => [id, 0])) as Record<TrainingId, number>,
     trainingJobs: [],
@@ -75,7 +77,7 @@ export function decode(raw: string | null): Save {
   d.ironBar = int(s.ironBar, 0);
   d.steelBar = int(s.steelBar, 0);
   d.xp = int(s.xp, 0, 0, 1e12);
-  d.valor = int(s.valor, 0);
+  d.knowledge = num(s.knowledge ?? s.valor, 0);
   for (const id of SKILL_IDS) d.skills[id] = int(s.skills?.[id], 0, 0, SKILLS[id].max);
   for (const t of TRAINING) d.training[t.id] = int(s.training?.[t.id], 0, 0, t.max);
   d.trainingJobs = decodeJobs(s.trainingJobs, d.training);
