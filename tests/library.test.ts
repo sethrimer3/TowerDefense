@@ -5,7 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   BAYS, EXITS, FLOOR, HALL, LibrarySim, MAX_LIBRARIANS, MAX_SHELVES, MAX_UNITS, PLANKS, SHELF_ORDER, SHELF_TOP, SLOTS, W, WINDOW,
-  accidentChance, decodeLibrarySave, fireDrill, knowledgeRate, librarianPrice, shelfPrice, slotPlace, unitTop,
+  BUTT_FULL, accidentChance, decodeLibrarySave, homeBay, fireDrill, knowledgeRate, librarianPrice, shelfPrice, slotPlace, unitTop,
 } from "../src/library/sim.ts";
 import { DAY_MS, daylight } from "../src/library/render.ts";
 import { decode } from "../src/save.ts";
@@ -80,6 +80,70 @@ test("librarians shuffle, read and index books, carrying each one, losing none",
   assert.ok(wrote, "an indexer wrote at a table");
   assert.ok(read, "someone read a book they took down");
   assert.ok(climbed, "someone climbed a ladder");
+});
+
+test("librarians sort the stacks by colour, rebind books, talk, gaze up at the window and take tea when tired", () => {
+  const sim = new LibrarySim(13);
+  sim.furnish(40, 0.4);
+  for (let i = 0; i < 9; i++) sim.hire();
+  const misplaced = () => {
+    let n = 0;
+    sim.slots.forEach((c, s) => (n += c && slotPlace(s).bay !== homeBay(c) ? 1 : 0));
+    return n;
+  };
+  const before = misplaced(), seen = new Set<string>();
+  run(sim, 900, () => {
+    for (const l of sim.librarians) {
+      seen.add(l.action);
+      if (l.hand === "cup") seen.add("cup");
+      const now = l.steps[0];
+      if (now?.kind === "work" && now.action === "chat") assert.ok(l.with, "talking with someone");
+    }
+  });
+  assert.ok(sim.sorted > 20 && misplaced() < before, `books sorted into their colours' bays (${before} misplaced, now ${misplaced()})`);
+  assert.ok(sim.mended > 0, "books rebound at the tables");
+  for (const a of ["chat", "gaze", "drink", "mend", "cup"]) assert.ok(seen.has(a), `someone did ${a}`);
+  assert.ok(sim.librarians.every((l) => l.energy >= 0 && l.energy <= 1));
+});
+
+test("by night half the librarians go home and come back by day; the tired doze at the tables", () => {
+  const sim = new LibrarySim(17);
+  sim.furnish(20);
+  for (let i = 0; i < 8; i++) sim.hire();
+  run(sim, 20);
+  sim.night = 1;
+  let dozed = false;
+  run(sim, 600, () => {
+    for (const l of sim.librarians) if (l.action === "doze") dozed = true;
+  });
+  const home = sim.librarians.filter((l) => l.home && l.away).length;
+  assert.ok(home >= 2 && home <= 4, `${home} went home`);
+  assert.ok(dozed, "someone dozed at a table");
+  sim.night = 0;
+  run(sim, 60);
+  assert.equal(sim.librarians.filter((l) => l.home).length, 0, "all back by day");
+});
+
+test("after a fire the dead are mourned and swept up, and the water butts refilled", () => {
+  const sim = new LibrarySim(5);
+  sim.furnish(40);
+  for (let i = 0; i < 10; i++) sim.hire();
+  run(sim, 20);
+  sim.fireTraining = 2;
+  sim.ignite(0);
+  let low = BUTT_FULL;
+  run(sim, 400, () => (low = Math.min(low, ...sim.butts)));
+  assert.ok(!sim.fire.active);
+  assert.ok(low < BUTT_FULL, "the buckets came from the butts");
+  // A death to mourn, if the fire took nobody.
+  if (!sim.remains.length) sim.remains.push({ x: 90, at: sim.time, mourners: [] });
+  let mourned = false;
+  run(sim, 400, () => {
+    for (const l of sim.librarians) if (l.action === "mourn") mourned = true;
+  });
+  assert.ok(mourned, "the dead were mourned");
+  assert.equal(sim.remains.length, 0, "and their ashes swept up");
+  assert.deepEqual(sim.butts, [BUTT_FULL, BUTT_FULL], "the butts were filled again");
 });
 
 test("an empty nave: librarians walk in from the hallway and wander", () => {

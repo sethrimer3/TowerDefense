@@ -116,6 +116,15 @@ export class Fire {
     return m;
   }
 
+  /** Scrubs the soot off the stone between pixels x0–x1 and y0–y1. */
+  scrub(x0: number, x1: number, y0: number, y1: number) {
+    for (let y = Math.max(0, y0); y < Math.min(H, y1); y += CELL)
+      for (let x = Math.max(0, x0); x < Math.min(W, x1); x += CELL) {
+        const i = cellAt(x, y);
+        if (i >= 0) this.soot[i] = 0;
+      }
+  }
+
   /** Throws `n` droplets of water `w` each from (x, y) to land on (tx, ty)
    * after `t` seconds, scattered by `jitter`. */
   splash(x: number, y: number, tx: number, ty: number, n: number, w: number, rng: () => number, t = 0.7) {

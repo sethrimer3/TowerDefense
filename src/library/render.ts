@@ -17,7 +17,7 @@
  * only where a librarian has lately walked, fading back to dark behind them. */
 import { stream } from "../random.ts";
 import {
-  BAYS, BAY_W, BAY_X0, BOOKS_PER_ROW, BOOK_COLORS, BUTTS, FLOOR, H, HALL, HALL_H, MAX_UNITS, PLANKS, ROW_H, TABLES, TABLE_PLANKS, TABLE_TOP, W, WINDOW,
+  BAYS, BAY_W, BAY_X0, BOOKS_PER_ROW, BOOK_COLORS, BUTTS, BUTT_FULL, FLOOR, H, HALL, HALL_H, MAX_UNITS, PLANKS, ROW_H, TABLES, TABLE_PLANKS, TABLE_TOP, W, WINDOW,
   bayX, ladderX, slotIndex, unitTop, type Cart, type Librarian, type LibrarySim,
 } from "./sim.ts";
 import { CELL, FW } from "./fire.ts";
@@ -493,7 +493,8 @@ export class LibraryRenderer {
     ctx.drawImage(this.off, 0, 0);
     if (day < 0.6) this.drawStars(now, 1 - day / 0.6);
     if (effects && day > 0.02) this.drawRays(now, day);
-    for (const r of sim.remains) this.drawRemains(r.x, Math.min(1, (240 - (sim.time - r.at)) / 30));
+    for (const r of sim.remains) this.drawRemains(r.x, Math.min(1, (600 - (sim.time - r.at)) / 30));
+    this.drawButts(sim);
     for (const c of [sim.barrow, sim.bookCart]) if (c.here) this.drawCart(c);
     for (const l of sim.librarians) if (!l.away) this.drawLibrarian(l, time);
     this.drawFlames(time, effects);
@@ -582,6 +583,21 @@ export class LibraryRenderer {
     ctx.fillStyle = shade([200, 192, 176], k);
     ctx.fillRect(Math.round(x) + 1, FLOOR - 2, 1, 1);
     ctx.globalAlpha = 1;
+  }
+
+  /** How full each water butt is: dark where the buckets have emptied it. */
+  private drawButts(sim: LibrarySim) {
+    const ctx = this.ctx;
+    sim.butts.forEach((b, side) => {
+      const x = BUTTS[side], k = this.lum(x, FLOOR - 6), empty = Math.round((1 - b / BUTT_FULL) * 6);
+      if (!empty) return;
+      ctx.fillStyle = shade([24, 18, 14], k);
+      ctx.fillRect(x - 2, FLOOR - 9, 5, empty);
+      if (b > 0) {
+        ctx.fillStyle = shade([60, 110, 150], k);
+        ctx.fillRect(x - 2, FLOOR - 9 + empty, 5, 1);
+      }
+    });
   }
 
   // ── Fire ────────────────────────────────────────────────────────────
@@ -707,7 +723,9 @@ export class LibraryRenderer {
     const ctx = this.ctx, x = Math.round(l.x) - 1, y = Math.round(l.y), lum = this.lum(l.x, y - 3);
     ctx.fillStyle = shade([240, 236, 228], lum);
     // A step's bob while walking (quicker running from a fire); crouched when cowering.
-    const bob = l.action === "walk" && Math.floor(time * (l.mode === "work" ? 6 : 10) + l.id) % 2 ? 1 : 0, low = l.action === "cower" ? 1 : 0;
+    const bob = l.action === "walk" && Math.floor(time * (l.mode === "work" ? 6 : 10) + l.id) % 2 ? 1 : 0;
+    // Crouched cowering, head bowed mourning, slumped dozing.
+    const low = l.action === "cower" || l.action === "mourn" || l.action === "doze" ? 1 : 0;
     ctx.fillRect(x, y - 4 - bob + low, 2, 4 + bob - low);
     hat(ctx, l, x, y - 4 - bob + low);
     const front = l.facing > 0 ? x + 2 : x - 1;
@@ -743,6 +761,58 @@ export class LibraryRenderer {
         ctx.fillStyle = "#d8d2c4";
         ctx.fillRect(l.facing > 0 ? x + 2 : x - 1, y - 3, 1, 1);
       }
+    }
+    if (l.action === "mend") {
+      // Rebinding at the table: the old cover off, a new one going on, the needle flashing.
+      if (l.reading) {
+        ctx.fillStyle = "#efe6cc";
+        ctx.fillRect(l.facing > 0 ? x + 3 : x - 4, TABLE_TOP - 1, 2, 1);
+        ctx.fillStyle = BOOK_COLORS[l.reading];
+        ctx.fillRect(l.facing > 0 ? x + 6 : x - 6, TABLE_TOP - 1, 1, 1);
+      }
+      if (Math.floor(time * 4 + l.id) % 2) {
+        ctx.fillStyle = "#e8e8f0";
+        ctx.fillRect(front, y - 3, 1, 1);
+      }
+    }
+    if (l.hand === "cup") {
+      ctx.fillStyle = shade([226, 220, 206], lum);
+      ctx.fillRect(front, y - 3, 1, 1);
+      // Steam off the tea.
+      ctx.globalAlpha = 0.5;
+      ctx.fillStyle = "#e8e4dc";
+      ctx.fillRect(front + (Math.floor(time * 2 + l.id) % 2), y - 5 - (Math.floor(time * 3) % 2), 1, 1);
+      ctx.globalAlpha = 1;
+    }
+    if (l.hand === "broom") {
+      const sw = l.action === "sweep" && Math.floor(time * 4 + l.id) % 2 ? 1 : 0;
+      ctx.fillStyle = shade([120, 84, 44], lum);
+      ctx.fillRect(front, y - 4, 1, 3);
+      ctx.fillStyle = shade([196, 170, 96], lum);
+      ctx.fillRect(front + (l.facing > 0 ? sw : -sw), y - 1, 2, 1);
+    }
+    if (l.action === "pour") {
+      ctx.fillStyle = "#6aa8e0";
+      ctx.fillRect(front + l.facing, y - 2 + (Math.floor(time * 8) % 2), 1, 2);
+    }
+    if (l.action === "chat" && Math.floor(time * 2 + l.id * 0.7) % 3 === 0) {
+      // A few words, turn and turn about.
+      ctx.fillStyle = shade([236, 228, 206], lum);
+      for (let k = 0; k < 3; k++) ctx.fillRect(x - 1 + k * 2, y - 9, 1, 1);
+    }
+    if (l.action === "doze") {
+      const z = (time * 0.8 + l.id * 0.37) % 1;
+      ctx.globalAlpha = 1 - z;
+      ctx.fillStyle = "#cfd8f0";
+      ctx.fillRect(x + 2 + Math.round(z * 3), y - 7 - Math.round(z * 6), 2, 1);
+      ctx.fillRect(x + 3 + Math.round(z * 3), y - 6 - Math.round(z * 6), 1, 1);
+      ctx.fillRect(x + 2 + Math.round(z * 3), y - 5 - Math.round(z * 6), 2, 1);
+      ctx.globalAlpha = 1;
+    }
+    if (l.action === "gaze") {
+      // Face turned up to the glass, catching its light.
+      ctx.fillStyle = "rgba(255,236,190,0.8)";
+      ctx.fillRect(x + (l.facing > 0 ? 1 : 0), y - 4, 1, 1);
     }
     if (l.action === "read" && l.carrying) {
       // The book held open: its pages and its cover's colour.
