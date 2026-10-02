@@ -77,7 +77,7 @@ function house(b: Building, raise: Raise) {
     }
 }
 
-/** A wall stone, and its face hung over the ground below where the wall
+/** A wall stone, and its face hung over the open ground below where the wall
  * has an open south side, sloping from the wall's top to the street. */
 function wall(map: CityMap, b: Building, raise: Raise, standing: (b: Building) => boolean) {
   const cx = b.rect.x, cy = b.rect.y;
@@ -85,6 +85,9 @@ function wall(map: CityMap, b: Building, raise: Raise, standing: (b: Building) =
   const below = cy + 1;
   const open = !cellInBounds(cx, below) || !(map.wall[cellIndex(cx, below)] === 1 && standing(map.buildings[map.owner[cellIndex(cx, below)]]));
   if (!open || below >= CELLS_H) return;
+  // A house or structure below stands in front of the face and hides it.
+  const i0 = cellIndex(cx, below), owner = map.owner[i0];
+  if (owner >= 0 && map.buildings[owner].kind !== "wall" && standing(map.buildings[owner])) return;
   const face = ART * 0.45;
   for (let j = 0; j < Math.ceil(face); j++)
     for (let i = 0; i < ART; i++) raise(cx * ART + i, below * ART + j, HEIGHT.wall * (1 - (j + 0.5) / face));

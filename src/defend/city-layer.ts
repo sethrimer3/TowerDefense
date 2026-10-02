@@ -85,7 +85,10 @@ export function paintCityLayer(c: CanvasRenderingContext2D, px: number, scene: C
   paintRoadStones(p, scene.stones);
   // Ponds over the park grass, as pixel art.
   paintPixelArt(p, parkArt(map).canvas);
-  for (const b of map.buildings) paintBuilding(p, b);
+  // Walls first: a wall's face hangs over the cell below it, and a house or
+  // structure standing there is in front of the face, so it covers it.
+  for (const b of map.buildings) if (b.kind === "wall") paintBuilding(p, b);
+  for (const b of map.buildings) if (b.kind !== "wall") paintBuilding(p, b);
   paintRubble(p);
   paintPixelArt(p, cityShadows(map, sim));
   paintLanternBrackets(p, scene.lights);
