@@ -6,16 +6,16 @@
  * and effects (battle-art.ts), the trees over them (park-trees.ts), the
  * wizards' fire, the building grid and drag overlay (edit-overlay.ts), then
  * rain in screen space. */
-import { CELLS_H, CELLS_W } from "./grid.ts";
+import { CELLS_H, CELLS_W, hash01 } from "./grid.ts";
 import type { CityMap } from "./citygen.ts";
 import type { DefendSim } from "./sim.ts";
 import { DefendLighting, type LightFrame } from "./lighting.ts";
 import { Fences } from "./fences.ts";
 import { Rain, ambientFor, type Weather } from "./weather.ts";
 import { onCityArtLoaded, paintCityLayer } from "./city-layer.ts";
-import { carriedLights, drawDamage, drawScorches, drawUnits, shadowCasters, type Brush } from "./battle-art.ts";
+import { carriedLights, drawDamage, drawScorches, drawUnits, shadowCasters, type Brush, type Burning } from "./battle-art.ts";
 import { drawGrid, drawOverlay, type Overlay } from "./edit-overlay.ts";
-import { drawFlag } from "./structure-art.ts";
+import { drawFlag, keepStage } from "./structure-art.ts";
 import { ParkGrass, type Walker } from "./park-grass.ts";
 import { PondWater } from "./pond-water.ts";
 import { ENEMIES } from "./catalog.ts";
@@ -33,7 +33,14 @@ export type DrawOptions = {
   reduceMotion: boolean;
   /** Draw the live park grass and pond effects. */
   effects?: boolean;
+  /** The run is over: the city's torches go out in a wave from the keep. */
+  over?: boolean;
 };
+
+/** The torches going out after a lost run: seconds before the first, then
+ * seconds a cell further from the keep, the most a torch may be early or
+ * late (so neighbours go one by one), and how long one takes to gutter out. */
+const DOUSE = { delay: 1.2, perCell: 0.16, jitter: 0.6, fade: 0.7 };
 
 export class DefendRenderer {
   readonly lighting = new DefendLighting();
@@ -51,7 +58,7 @@ export class DefendRenderer {
   /** Camera: zoom `s` and translation (canvas pixels) applied to the whole
    * board. s = 1 shows everything; the view is clamped to the board. */
   readonly cam = { s: 1, x: 0, y: 0 };
-  static readonly MAX_ZOOM = 4;
+  static readonly MAX_ZOOM = 6;
   readonly canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
   private layer: HTMLCanvasElement;
@@ -129,13 +136,14 @@ export class DefendRenderer {
 
   draw(map: CityMap, sim: DefendSim | null, overlay: Overlay | null, opts: DrawOptions) {
     this.refreshLayer(map, sim);
+    this.douse(sim, opts);
     const dt = this.lastNow ? (opts.now - this.lastNow) / 1000 : 0;
     this.lastNow = opts.now;
     this.drawCity(map, sim, opts, dt);
     if (sim) this.advanceWizard(sim);
     if (sim) this.drawBattle(map, sim, opts);
     this.drawKeepFlag(map, sim, opts);
-    if (sim) this.drawBattleUnits(sim, !!opts.weather, opts);
+    if (sim) this.drawBattleUnits(sim, opts.weather ? this.burning ?? (() => 1) : null, opts);
     this.drawTrees(map, sim, opts, dt);
     if (sim) this.wizard.drawFire(this.ctx, this.px);
     this.drawEditing(overlay, opts.grid);
@@ -200,7 +208,7 @@ export class DefendRenderer {
 
   /** Blast scorches and the wizards' ice, then units, projectiles and
    * effects (carrying torches in weather), and the frost on the chilled. */
-  private drawBattleUnits(sim: DefendSim, torches: boolean, opts: DrawOptions) {
+  private drawBattleUnits(sim: DefendSim, torches: Burning | null, opts: DrawOptions) {
     const brush: Brush = { c: this.ctx, px: this.px };
     drawScorches(brush, sim);
     this.wizard.drawIce(this.ctx, this.px, sim.frosts, sim.time * 1000, flameLights(sim).relief);
@@ -238,12 +246,17 @@ export class DefendRenderer {
     const intact = standing(map, sim);
     const fixed = () =>
       this.lighting.lights
-        .filter((l) => l.owner < 0 || intact(l.owner))
+        .filter((l) => (l.owner < 0 || intact(l.owner)) && this.lighting.burn(l) > 0)
         .map((l) => ({ x: l.x, y: l.y, r: l.radius * 0.8, k: l.strength * 0.55, color: "#ffc68a" }));
     const moving: ReliefLight[] = [...flames, ...this.wizard.iceLights(sim.frosts, sim.time * 1000)];
     for (const fx of sim.effects) if (fx.kind === "boom") moving.push({ x: fx.x, y: fx.y, r: fx.r * 2.4, k: 1.4 * (1 - fx.t / 0.6), color: "#ffcf8a" });
-    for (const u of [...sim.soldiers, ...sim.civilians]) moving.push({ x: u.x, y: u.y, r: 2.2, k: 0.45, color: "#ffc68a" });
-    this.relief.draw(this.ctx, this.px, { version: String(sim.mapVersion), lights: fixed }, moving, 0.6 + opts.night * 0.4);
+    const burns = this.burning ?? (() => 1);
+    for (const u of [...sim.soldiers, ...sim.civilians]) {
+      const b = burns(u.x, u.y, u.id);
+      if (b > 0) moving.push({ x: u.x, y: u.y, r: 2.2, k: 0.45 * b, color: "#ffc68a" });
+    }
+    const out = this.lighting.lights.filter((l) => this.lighting.burn(l) <= 0).length;
+    this.relief.draw(this.ctx, this.px, { version: `${sim.mapVersion}:${out}`, lights: fixed }, moving, 0.6 + opts.night * 0.4);
   }
 
   private drawRain(dt: number) {
@@ -251,15 +264,17 @@ export class DefendRenderer {
     this.rain.draw(this.ctx, this.px);
   }
 
-  /** Repaints the city layer if the map, size, zoom band or buildings
-   * changed. Zoomed in, the city is painted at 2–3× so edges stay crisp. */
+  /** Repaints the city layer if the map, size, zoom band, buildings or the
+   * keep's damage changed. Zoomed in, the city is painted at 2–4× so edges
+   * stay crisp. */
   private refreshLayer(map: CityMap, sim: DefendSim | null) {
     const W = this.canvas.width,
       H = this.canvas.height;
-    let k = this.cam.s >= 2.5 ? 3 : this.cam.s >= 1.4 ? 2 : 1;
+    let k = this.cam.s >= 4 ? 4 : this.cam.s >= 2.5 ? 3 : this.cam.s >= 1.4 ? 2 : 1;
     while (k > 1 && W * H * k * k > 18e6) k--;
     this.layerScale = k;
-    const key = `${W}:${k}:${sim ? sim.mapVersion : -1}`;
+    // The keep's damage stage is painted into the layer too.
+    const key = `${W}:${k}:${sim ? `${sim.mapVersion}:${keepStage(sim.keepHp(), sim.keepMaxHp())}` : -1}`;
     if (map === this.map && key === this.layerKey) return;
     this.map = map;
     this.layerKey = key;
@@ -279,12 +294,51 @@ export class DefendRenderer {
     if (weather) this.lighting.drawUnitShadows(this.ctx, this.px, shadowCasters(sim), 0.8 + 0.2 * night);
   }
 
+  /** Notes when a run ends (or a new one starts), and from then on tells
+   * the lighting how brightly each torch still burns. */
+  private douse(sim: DefendSim | null, opts: DrawOptions) {
+    if (!sim || !(opts.over || sim.lost)) {
+      this.dousing = null;
+      this.burning = null;
+      this.lighting.burning = null;
+      return;
+    }
+    if (this.dousing?.sim !== sim) this.dousing = { sim, at: opts.now };
+    const k = sim.keep.rect,
+      kx = k.x + k.w / 2,
+      ky = k.y + k.h / 2;
+    const t = (opts.now - this.dousing.at) / 1000;
+    const burns: Burning = (x, y, id) => {
+      const u = (t - DOUSE.delay - Math.sqrt((x - kx) * (x - kx) + (y - ky) * (y - ky)) * DOUSE.perCell - hash01(id, 97) * DOUSE.jitter) / DOUSE.fade;
+      if (u <= 0) return 1;
+      if (u >= 1) return 0;
+      // A last sputter as it gutters out.
+      return (1 - u) * (opts.reduceMotion ? 1 : 0.7 + 0.3 * Math.sin(u * 37 + id));
+    };
+    this.burning = burns;
+    this.lighting.burning = (l) => burns(l.x, l.y, l.id + 5000);
+  }
+  private dousing: { sim: DefendSim; at: number } | null = null;
+  /** How brightly a torch still burns while the city's lights go out. */
+  private burning: Burning | null = null;
+
+  /** The moving lights, hand torches dimmed as they go out. */
+  private carried(sim: DefendSim) {
+    const burns = this.burning;
+    if (!burns) return carriedLights(sim);
+    return carriedLights(sim).flatMap((t) => {
+      if (t.r) return [t];
+      const b = burns(t.x, t.y, t.id);
+      return b > 0 ? [{ ...t, k: 0.8 * b }] : [];
+    });
+  }
+
   /** Darkness and torchlight, the gravel's lit relief, and the flames. */
   private drawLighting(map: CityMap, sim: DefendSim, weather: Weather, opts: DrawOptions) {
     const frame: LightFrame = { px: this.px, now: opts.now, reduceMotion: opts.reduceMotion, intact: standing(map, sim) };
     const flames = flameLights(sim);
     this.lighting.drawLight(this.ctx, frame, ambientFor(weather, opts.night), {
-      torches: [...carriedLights(sim), ...flames.carried],
+      torches: [...this.carried(sim), ...flames.carried],
       solid: sim.solid,
       version: sim.mapVersion,
     });
