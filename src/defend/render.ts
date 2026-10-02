@@ -3,8 +3,9 @@
  * into an offscreen layer and only repainted when a building falls or is
  * rebuilt. Over it each frame: park fences, damage, unit shadows, the
  * overcast and torchlight (lighting.ts), the keep's banner, scorches, units
- * and effects (battle-art.ts), the building grid and drag overlay
- * (edit-overlay.ts), then rain in screen space. */
+ * and effects (battle-art.ts), the trees over them (park-trees.ts), the
+ * wizards' fire, the building grid and drag overlay (edit-overlay.ts), then
+ * rain in screen space. */
 import { CELLS_H, CELLS_W } from "./grid.ts";
 import type { CityMap } from "./citygen.ts";
 import type { DefendSim } from "./sim.ts";
@@ -20,6 +21,7 @@ import { PondWater } from "./pond-water.ts";
 import { ENEMIES } from "./catalog.ts";
 import { GroundRelief, type ReliefLight } from "./ground-relief.ts";
 import { WizardArt, flameLights } from "./wizard-art.ts";
+import { ParkTrees, type Under } from "./park-trees.ts";
 
 export type DrawOptions = {
   /** Show the (dim, gold) tile grid — while the player is editing. */
@@ -40,6 +42,7 @@ export class DefendRenderer {
   readonly water = new PondWater();
   readonly relief = new GroundRelief();
   readonly wizard = new WizardArt();
+  readonly trees = new ParkTrees();
   /** The battle time the wizard art last advanced to. */
   private wizardTime = 0;
   private rain = new Rain();
@@ -133,6 +136,8 @@ export class DefendRenderer {
     if (sim) this.drawBattle(map, sim, opts);
     this.drawKeepFlag(map, sim, opts);
     if (sim) this.drawBattleUnits(sim, !!opts.weather, opts);
+    this.drawTrees(map, sim, opts, dt);
+    if (sim) this.wizard.drawFire(this.ctx, this.px);
     this.drawEditing(overlay, opts.grid);
     // Rain falls in screen space, in front of the camera.
     this.ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -194,14 +199,26 @@ export class DefendRenderer {
   }
 
   /** Blast scorches and the wizards' ice, then units, projectiles and
-   * effects (carrying torches in weather), then the wizards' fire. */
+   * effects (carrying torches in weather), and the frost on the chilled. */
   private drawBattleUnits(sim: DefendSim, torches: boolean, opts: DrawOptions) {
     const brush: Brush = { c: this.ctx, px: this.px };
     drawScorches(brush, sim);
     this.wizard.drawIce(this.ctx, this.px, sim.frosts, sim.time * 1000, flameLights(sim).relief);
     drawUnits(brush, sim, torches);
     this.wizard.drawChill(this.ctx, this.px, sim, opts.now);
-    this.wizard.drawFire(this.ctx, this.px);
+  }
+
+  /** The trees over everyone, half faded over anyone under them, and in a
+   * battle's weather darkened with the city below them. */
+  private drawTrees(map: CityMap, sim: DefendSim | null, opts: DrawOptions, dt: number) {
+    this.trees.sync(map);
+    this.trees.update(sim ? beneath(sim) : [], dt, opts.reduceMotion);
+    const dim = sim && opts.weather ? (o: CanvasRenderingContext2D) => {
+      o.fillStyle = `rgba(118,118,118,${opts.weather!.rain ? 0.2 : 0.12})`;
+      o.fillRect(0, 0, this.canvas.width, this.canvas.height);
+      this.lighting.darken(o);
+    } : undefined;
+    this.trees.draw(this.ctx, this.px, dim);
   }
 
   /** The wizards' fire and ice move on battle time, so they keep pace with
@@ -289,6 +306,15 @@ function standingKeep(map: CityMap, sim: DefendSim | null) {
 function walkers(sim: DefendSim): Walker[] {
   const out: Walker[] = [];
   for (const e of sim.enemies) if (!ENEMIES[e.kind].flying) out.push({ x: e.x, y: e.y, size: ENEMIES[e.kind].size });
+  for (const s of sim.soldiers) out.push({ x: s.x, y: s.y, size: 0.4 });
+  for (const c of sim.civilians) out.push({ x: c.x, y: c.y, size: 0.3 });
+  return out;
+}
+
+/** Everyone a tree can stand over. */
+function beneath(sim: DefendSim): Under[] {
+  const out: Under[] = [];
+  for (const e of sim.enemies) out.push({ x: e.x, y: e.y, size: ENEMIES[e.kind].size });
   for (const s of sim.soldiers) out.push({ x: s.x, y: s.y, size: 0.4 });
   for (const c of sim.civilians) out.push({ x: c.x, y: c.y, size: 0.3 });
   return out;

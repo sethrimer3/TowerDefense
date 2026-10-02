@@ -7,9 +7,11 @@
  *   `pondDisc` describes), in bands: a black outline, a muddy bank, reedy
  *   shallows, open water and a darker deep heart, the band edges broken
  *   with a checker dither; flat glints and lily pads, some in flower.
- * - **Trees:** lumpy round canopies with a one-pixel outline, a drop
- *   shadow to the lower right and four shades lit from the upper left,
- *   dithered where shades meet.
+ * - **Trees:** lumpy round canopies with a one-pixel outline and four
+ *   shades lit from the upper left, dithered where shades meet. They stand
+ *   over the walkers, so each is baked as its own sprite (`trees`) the
+ *   renderer draws after the units (`park-trees.ts`); their shadows are cast
+ *   with the buildings' (`shadow-art.ts`).
  *
  * Baked once per city (`parkArt`), with the open-water mask the ripples,
  * reflections and ducks keep to. Presentation only. */
@@ -21,11 +23,18 @@ import { POND, hasTree, pondDisc, treeCanopy } from "./park-geometry.ts";
 export const ART = 8;
 const W = CELLS_W * ART, H = CELLS_H * ART;
 
+/** One tree's sprite: its art-pixel box and canopy, centre and radius in cells. */
+export type TreeSprite = { x: number; y: number; w: number; h: number; canvas: HTMLCanvasElement | null; cx: number; cy: number; r: number };
+
 export type ParkArt = {
   /** Art pixels across (rows are this long in `open`). */
   width: number;
-  /** The ponds and trees, transparent elsewhere, `W × H` art pixels. */
+  /** The ponds, transparent elsewhere, `W × H` art pixels. */
   canvas: HTMLCanvasElement | null;
+  /** Every tree in one `W × H` canvas (the ponds mirror them). */
+  canopies: HTMLCanvasElement | null;
+  /** Each tree on its own, in reading order. */
+  trees: TreeSprite[];
   /** 1 on art pixels of open water (where ripples and ducks may be). */
   open: Uint8Array;
   /** The open water as a white-on-clear canvas, for masking. */
@@ -57,28 +66,29 @@ const GLINT = 0x9cc8d6, PAD = 0x4f7d3b, PAD_DARK = 0x3a5f2c, BLOSSOM = [0xe9d7e0
 const TREE = { outline: 0x0b0907, dark: [0x223b1c, 0x284420], mid: [0x2f5224, 0x335a27], light: [0x45702f, 0x4a7a36], top: [0x679c4e, 0x6fa452] };
 
 function bake(map: CityMap): ParkArt {
-  const px = new Uint32Array(W * H), open = new Uint8Array(W * H);
+  const px = new Uint32Array(W * H), open = new Uint8Array(W * H), leaves = new Uint32Array(W * H);
   paintPonds(map, px, open);
-  paintTrees(map, px, open);
-  let canvas: HTMLCanvasElement | null = null, mask: HTMLCanvasElement | null = null;
+  const trees = paintTrees(map, leaves, open);
+  let canvas: HTMLCanvasElement | null = null, mask: HTMLCanvasElement | null = null, canopies: HTMLCanvasElement | null = null;
   if (typeof document !== "undefined") {
     canvas = toCanvas(px);
+    canopies = toCanvas(leaves);
     const m = new Uint32Array(W * H);
     for (let i = 0; i < m.length; i++) if (open[i]) m[i] = 0xffffffff;
     mask = toCanvas(m);
   }
-  return { width: W, canvas, open, mask };
+  return { width: W, canvas, canopies, trees, open, mask };
 }
 
 /** Opaque little-endian RGBA for 0xRRGGBB. */
 const rgba = (c: number) => ((255 << 24) | ((c & 0xff) << 16) | (c & 0xff00) | ((c >> 16) & 0xff)) >>> 0;
 
-function toCanvas(px: Uint32Array) {
+function toCanvas(px: Uint32Array, w = W, h = H) {
   const cv = document.createElement("canvas");
-  cv.width = W;
-  cv.height = H;
+  cv.width = w;
+  cv.height = h;
   const c = cv.getContext("2d")!;
-  const img = c.createImageData(W, H);
+  const img = c.createImageData(w, h);
   new Uint32Array(img.data.buffer).set(px);
   c.putImageData(img, 0, 0);
   return cv;
@@ -142,35 +152,44 @@ function put(px: Uint32Array, open: Uint8Array, x: number, y: number, c: number)
   px[y * W + x] = rgba(c);
 }
 
-function paintTrees(map: CityMap, px: Uint32Array, open: Uint8Array) {
-  // Shadows first, so no tree's shadow falls on a neighbour's canopy.
-  const trees: { cx: number; cy: number }[] = [];
-  for (let cy = 0; cy < CELLS_H; cy++) for (let cx = 0; cx < CELLS_W; cx++) if (hasTree(map, cx, cy)) trees.push({ cx, cy });
-  for (const { cx, cy } of trees) canopy(cx, cy, (x, y, part) => {
-    const i = (y + 1) * W + x + 1;
-    // A soft shadow on the grass; water keeps its own colour.
-    if (part === "body" && x + 1 < W && y + 1 < H && !px[i]) px[i] = 0x55000000;
-  });
-  for (const { cx, cy } of trees) {
-    const dark = hash01(cx, cy, 22) < 0.5 ? 0 : 1;
-    canopy(cx, cy, (x, y, part, light) => {
-      const i = y * W + x;
-      // Water under a canopy is hidden: nothing swims or ripples there.
-      open[i] = 0;
-      if (part === "edge") return void (px[i] = rgba(TREE.outline));
-      // Four shades from the upper left, the boundaries dithered.
-      const dither = ((x + y) & 1) * 0.12 - 0.06;
-      const v = light + dither;
-      const c = v > 0.55 ? TREE.top[dark] : v > 0.12 ? TREE.light[dark] : v > -0.35 ? TREE.mid[dark] : TREE.dark[dark];
-      px[i] = rgba(c);
-    });
-  }
+/** Paints every tree into `px` and returns each as its own sprite. */
+function paintTrees(map: CityMap, px: Uint32Array, open: Uint8Array): TreeSprite[] {
+  const out: TreeSprite[] = [];
+  for (let cy = 0; cy < CELLS_H; cy++)
+    for (let cx = 0; cx < CELLS_W; cx++) {
+      if (!hasTree(map, cx, cy)) continue;
+      const dark = hash01(cx, cy, 22) < 0.5 ? 0 : 1;
+      const own: [number, number, number][] = [];
+      treePixels(cx, cy, (x, y, part, light) => {
+        // Water under a canopy is hidden: nothing swims or ripples there.
+        open[y * W + x] = 0;
+        if (part === "edge") return void own.push([x, y, TREE.outline]);
+        // Four shades from the upper left, the boundaries dithered.
+        const dither = ((x + y) & 1) * 0.12 - 0.06;
+        const v = light + dither;
+        own.push([x, y, v > 0.55 ? TREE.top[dark] : v > 0.12 ? TREE.light[dark] : v > -0.35 ? TREE.mid[dark] : TREE.dark[dark]]);
+      });
+      let x0 = W, y0 = H, x1 = 0, y1 = 0;
+      for (const [x, y, c] of own) {
+        px[y * W + x] = rgba(c);
+        x0 = Math.min(x0, x), y0 = Math.min(y0, y), x1 = Math.max(x1, x), y1 = Math.max(y1, y);
+      }
+      const w = x1 - x0 + 1, h = y1 - y0 + 1, t = treeCanopy(cx, cy);
+      let canvas: HTMLCanvasElement | null = null;
+      if (typeof document !== "undefined") {
+        const sprite = new Uint32Array(w * h);
+        for (const [x, y, c] of own) sprite[(y - y0) * w + x - x0] = rgba(c);
+        canvas = toCanvas(sprite, w, h);
+      }
+      out.push({ x: x0, y: y0, w, h, canvas, cx: t.x, cy: t.y, r: t.r });
+    }
+  return out;
 }
 
 /** Visits the art pixels of the tree on cell (cx, cy): "body" inside its
  * lumpy canopy, with how squarely it faces the light (-1..1), and "edge"
  * on the one-pixel outline round it. */
-function canopy(cx: number, cy: number, visit: (x: number, y: number, part: "body" | "edge", light: number) => void) {
+export function treePixels(cx: number, cy: number, visit: (x: number, y: number, part: "body" | "edge", light: number) => void) {
   const t = treeCanopy(cx, cy);
   const ox = t.x * ART, oy = t.y * ART, R = Math.max(2, t.r * ART);
   const phase = hash01(cx, cy, 26) * 6.28, lumps = 3 + (hash(cx, cy, 27) % 3);

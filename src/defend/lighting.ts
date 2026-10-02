@@ -342,6 +342,13 @@ export class DefendLighting {
     c.restore();
   }
 
+  /** Lays this frame's darkness (from the last `drawLight`) over what is
+   * on `c`, through its current composite (source-atop keeps it to what is
+   * drawn): for what stands over the lighting pass, like the trees. */
+  darken(c: CanvasRenderingContext2D) {
+    if (this.dark) c.drawImage(this.dark, 0, 0);
+  }
+
   /** Each fixed light's baked pool, blended between its two swayed bakes
    * by how far the flame leans. */
   private drawPools(layers: Layers, frame: LightFrame, glow: number) {
