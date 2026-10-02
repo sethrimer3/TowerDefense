@@ -1,5 +1,6 @@
 import { play } from "../sound.ts";
-import { TRAINING, TRAINING_GROUPS, TRAINING_PER_LEVEL, whole, buySkill, cancelTraining, levelForXp, skillPurchase, startTraining, trainingPoints, trainingSlots, trainingStep, type TrainingId } from "../progression.ts";
+import { TRAINING, TRAINING_GROUPS, addSmith, busySmiths, whole, buySkill, cancelTraining, removeSmith, skillPurchase, startTraining, trainingLeft, trainingStep, type TrainingId } from "../progression.ts";
+import { BARS_PER_POINT, METALS } from "../mine/sim.ts";
 import { SKILLS, TREES, mapNodes, treeHeight, type SkillId, type SkillNode, type TreeId } from "../skill-trees.ts";
 import { TreeParticles } from "../tree-particles.ts";
 import { TrainingParticles } from "../training-particles.ts";
@@ -21,9 +22,10 @@ export function formatDuration(ms: number) {
   return `${sec}s`;
 }
 
-/** The Upgrades page: the Training table, or one skill tree at a time
- * (pannable and zoomable; tap a node to see its tooltip, tap it again to
- * buy a rank). Everything here strengthens the next defense. */
+/** The Upgrades page: the Smithy's table (Training in code: ranks bought
+ * with Smithy points and worked by the mine's smiths), or one skill tree at
+ * a time (pannable and zoomable; tap a node to see its tooltip, tap it again
+ * to buy a rank). Everything here strengthens the next defense. */
 export class SkillTreePage {
   private tree: PageTab = "training";
   private skill: SkillId = "drillSergeant";
@@ -40,7 +42,8 @@ export class SkillTreePage {
 
   render() {
     const save = this.save;
-    const tabs = `<button data-tree="training" aria-pressed="${this.tree === "training"}"><span>${uiSprite("upgrades")}</span>Training<small>${trainingPoints(save).left} POINTS</small></button>` +
+    const points = METALS.reduce((n, k) => n + save.smithy[k], 0);
+    const tabs = `<button data-tree="training" aria-pressed="${this.tree === "training"}"><span>${uiSprite("upgrades")}</span>Smithy<small>${points} ${points === 1 ? "POINT" : "POINTS"}</small></button>` +
       TREES.map((t) => `<button data-tree="${t.id}" aria-pressed="${t.id === this.tree}"><span>${uiSprite(TREE_ICONS[t.id])}</span>${t.name}<small>${t.nodes.reduce((n, node) => n + save.skills[node.id], 0)} RANKS</small></button>`).join("");
     const head = `<div class="tree-tabs" role="group" aria-label="Skill trees">${tabs}</div>`;
     const bindTabs = () => document.querySelectorAll<HTMLButtonElement>("[data-tree]").forEach((b) => (b.onclick = () => {
@@ -52,14 +55,22 @@ export class SkillTreePage {
       el("upgrades").innerHTML = head + this.trainingHtml();
       bindTabs();
       document.querySelectorAll<HTMLButtonElement>("[data-train]").forEach((b) => (b.onclick = () => {
-        if (startTraining(this.save, b.dataset.train as TrainingId, this.ctx.clock())) {
+        const smith = this.freeSmiths()[0];
+        if ((smith || this.save.settings.freePurchases) && startTraining(this.save, b.dataset.train as TrainingId, smith ?? "")) {
           this.ctx.update();
           play("coin");
         }
         this.render();
       }));
-      document.querySelectorAll<HTMLButtonElement>("[data-cancel]").forEach((b) => (b.onclick = () => {
-        if (cancelTraining(this.save, b.dataset.cancel as TrainingId)) this.ctx.update();
+      document.querySelectorAll<HTMLButtonElement>("[data-more]").forEach((b) => (b.onclick = () => {
+        const smith = this.freeSmiths()[0];
+        if (smith && addSmith(this.save, b.dataset.more as TrainingId, smith)) this.ctx.update();
+        this.render();
+      }));
+      document.querySelectorAll<HTMLButtonElement>("[data-less]").forEach((b) => (b.onclick = () => {
+        const id = b.dataset.less as TrainingId;
+        if (removeSmith(this.save, id)) this.ctx.update();
+        else this.askCancel(id);
         this.render();
       }));
       return;
@@ -83,30 +94,61 @@ export class SkillTreePage {
     if (this.tooltipVisible && tree.nodes.some((n) => n.id === this.skill)) this.showTooltip();
   }
 
-  /** Each row's percent now and after one more rank, and what that costs;
-   * tap the cost to train it. */
+  /** The mine's smiths with no upgrade in hand. */
+  private freeSmiths() {
+    const busy = busySmiths(this.save);
+    return this.ctx.smiths().filter((n) => !busy.has(n));
+  }
+
+  /** Asks before taking the last smith off an upgrade: that cancels it, and
+   * its point comes back. */
+  private askCancel(id: TrainingId) {
+    const row = TRAINING.find((t) => t.id === id)!, modal = this.ctx.modal;
+    modal.innerHTML = `<small>SMITHY</small><h2>Cancel this upgrade?</h2><p>Taking the last smith off ${row.name} stops the work on it. Its Smithy point is returned, and the work done so far is lost.</p>
+      <div class="dialog-actions"><button id="smithy-keep">Keep working</button><button id="smithy-cancel" class="danger">Cancel upgrade</button></div>`;
+    modal.showModal();
+    modal.querySelector<HTMLButtonElement>("#smithy-keep")!.onclick = () => modal.close();
+    modal.querySelector<HTMLButtonElement>("#smithy-cancel")!.onclick = () => {
+      modal.close();
+      if (cancelTraining(this.save, id)) this.ctx.update();
+      this.render();
+    };
+  }
+
+  /** How long the rank in work for `id` has left, as its timer shows it. */
+  private timeLeft(id: TrainingId) {
+    const ms = trainingLeft(this.save, id);
+    return ms === Infinity ? "Needs a smith" : formatDuration(ms);
+  }
+
+  /** Each row's percent now and after one more rank, and the Smithy point
+   * it costs; tap the cost to start it with a free smith, and put more
+   * smiths on (or take them off) a rank in work. */
   private trainingHtml() {
-    const save = this.save, points = trainingPoints(save), slots = trainingSlots(save);
+    const save = this.save, smiths = this.ctx.smiths(), free = this.freeSmiths(), devFree = save.settings.freePurchases;
     const row = (t: (typeof TRAINING)[number]) => {
-      const { now, next, affordable, maxed } = trainingStep(save, t.id);
-      const price = `${t.cost} ${t.cost === 1 ? "point" : "points"}`;
-      const job = trainingJob(save.trainingJobs, t.id), full = save.trainingJobs.length >= slots;
+      const { now, next, affordable, maxed, metal } = trainingStep(save, t.id);
+      const price = `1 ${metal}`;
+      const job = save.trainingJobs.find((j) => j.id === t.id);
       const takes = formatDuration(trainingSeconds(save.training[t.id]) * 1000);
       const shown = (v: number) => `+${v}%`;
+      const why = !affordable ? `Needs a ${metal} Smithy point` : !free.length && !devFree ? (smiths.length ? "Every smith is busy" : "Put a miner to the smithy in the Mine") : `One smith takes ${takes}`;
       const buy = job
-        ? `<button class="training-box training-timer" data-cancel="${t.id}" aria-label="Training ${t.name}: tap to cancel and get the points back" title="Tap to cancel and get the points back"><span data-training-timer="${t.id}">${formatDuration(job.completesAt - this.ctx.clock())}</span></button>`
+        ? `<span class="training-work"><span class="training-box training-timer" title="Time left at this many smiths"><span data-training-timer="${t.id}">${this.timeLeft(t.id)}</span></span>
+           <span class="smith-count" role="group" aria-label="Smiths on ${t.name}"><button class="smith-step" data-less="${t.id}" aria-label="One smith fewer on ${t.name}" title="${job.smiths.length <= 1 ? "Cancel this upgrade" : "One smith fewer"}">−</button><b title="${job.smiths.join(", ") || "No smith"}">⚒ ${job.smiths.length}</b><button class="smith-step" data-more="${t.id}" ${free.length ? "" : "disabled"} aria-label="One more smith on ${t.name}" title="${free.length ? "One more smith shares the work" : "No free smith"}">+</button></span></span>`
         : maxed
-        ? `<button class="training-box training-cost" disabled aria-label="${t.name} is fully trained">Max</button>`
-        : `<button class="training-box training-cost" data-train="${t.id}" ${affordable && !full ? "" : "disabled"} aria-label="Train ${t.name} to ${shown(next)} for ${price}, taking ${takes}" title="${full ? "Every training slot is busy" : `Takes ${takes}`}">${price}</button>`;
-      return `<div class="training-row${job ? " active" : ""}" role="listitem" data-training-row="${t.id}"><span class="training-label">${t.name}<small>+${t.per}% a rank, up to ${t.max * t.per}%${maxed ? "" : ` · takes ${takes}`}</small></span><span class="training-box">${shown(now)}</span><span class="training-arrow" aria-hidden="true">→</span><span class="training-box next">${shown(next)}</span>${buy}</div>`;
+        ? `<button class="training-box training-cost" disabled aria-label="${t.name} is fully upgraded">Max</button>`
+        : `<button class="training-box training-cost metal-${metal}" data-train="${t.id}" ${affordable && (free.length || devFree) ? "" : "disabled"} aria-label="Upgrade ${t.name} to ${shown(next)} for ${price} Smithy point, taking one smith ${takes}" title="${why}">${price}</button>`;
+      return `<div class="training-row${job ? " active" : ""}" role="listitem" data-training-row="${t.id}"><span class="training-label">${t.name}<small>+${t.per}% a rank, up to ${t.max * t.per}%${maxed ? "" : ` · one smith takes ${takes}`}</small></span><span class="training-box">${shown(now)}</span><span class="training-arrow" aria-hidden="true">→</span><span class="training-box next">${shown(next)}</span>${buy}</div>`;
     };
     const rows = (Object.entries(TRAINING_GROUPS) as [keyof typeof TRAINING_GROUPS, string][])
       .map(([group, name]) => `<h4 class="training-group">${name}</h4>${TRAINING.filter((t) => t.group === group).map(row).join("")}`)
       .join("");
-    return `<section class="training"><canvas class="training-particles" aria-hidden="true"></canvas><header class="tree-heading"><h3>Training</h3></header>
-      <p class="training-points">Training points: <b id="training-points">${points.left}</b> <small>· ${TRAINING_PER_LEVEL} each Commander level (level ${levelForXp(save.xp)}) · kills earn experience</small></p>
-      <p class="training-points training-slots">Training slots: <b id="training-slots">${save.trainingJobs.length} / ${slots}</b> <small>· each rank trained takes 50% longer than the last</small></p>
-      <div class="training-table" role="list" aria-label="Training">${rows}</div></section>`;
+    const points = METALS.map((k) => `<b class="metal-${k}">${save.smithy[k]}</b> ${k}`).join(" · ");
+    return `<section class="training"><canvas class="training-particles" aria-hidden="true"></canvas><header class="tree-heading"><h3>Smithy</h3></header>
+      <p class="training-points">Smithy points: ${points} <small>· every ${BARS_PER_POINT} bars of a metal the mine's smiths work make a point of it</small></p>
+      <p class="training-points training-slots">Smiths: <b id="training-slots">${smiths.length - free.length} / ${smiths.length}</b> busy <small>· put miners to the smithy in the Mine; more smiths on an upgrade share its time</small></p>
+      <div class="training-table" role="list" aria-label="Smithy upgrades">${rows}</div></section>`;
   }
 
   /** Once a second while the page shows: the whole page once a rank
@@ -114,10 +156,9 @@ export class SkillTreePage {
   tick(completed: boolean) {
     if (completed) return this.render();
     if (this.tree !== "training") return;
-    const now = this.ctx.clock();
     for (const job of this.save.trainingJobs) {
       const span = document.querySelector<HTMLElement>(`[data-training-timer="${job.id}"]`);
-      if (span) span.textContent = formatDuration(job.completesAt - now);
+      if (span) span.textContent = this.timeLeft(job.id);
     }
   }
 

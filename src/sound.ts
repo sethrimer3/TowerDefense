@@ -21,9 +21,9 @@ export type Cue =
   | "wave"
   /** A wave held past the best: a fanfare and a bell. */
   | "record"
-  /** A Commander level gained: bells climbing a chord. */
+  /** An upgrade point earned: bells climbing a chord. */
   | "levelUp"
-  /** A Training rank completed: one bright hand bell. */
+  /** A Smithy upgrade completed: one bright hand bell. */
   | "trained"
   /** A boss wave: a low war horn. */
   | "horn"

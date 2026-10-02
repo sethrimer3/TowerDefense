@@ -1,7 +1,7 @@
 import { intPow } from "../exact.ts";
 
 /** Data tables for DEFEND: what the player can place, what it costs in
- * Gold and metal bars, the universal upgrades, the bonuses Training and the
+ * copper, silver and Gold, the universal upgrades, the bonuses the Smithy and the
  * skill trees add, and the enemy roster. */
 
 export type StructureKind = "keep" | "barracks" | "archerBarracks" | "archerTower" | "cannonTower" | "watchTower" | "wizardTower";
@@ -100,24 +100,24 @@ export const STARTING_OWNED: Record<PaletteItem, number> = {
 };
 
 /** A price in Gold and metal bars (all earned in battle). */
-export type Price = { gold: number; ironBar?: number; steelBar?: number };
+export type Price = { gold: number; copper?: number; silver?: number };
 
 /** Price of buying one more of a palette item, given how many are owned. */
 export function purchasePrice(item: PaletteItem, owned: number): Price {
   const extra = Math.max(0, owned - STARTING_OWNED[item]);
   const base: Record<PaletteItem, Price> = {
-    cityTile: { gold: 120, ironBar: 1 },
-    barracks: { gold: 300, ironBar: 3 },
-    archerBarracks: { gold: 330, ironBar: 4 },
-    archerTower: { gold: 220, ironBar: 2 },
-    cannonTower: { gold: 340, ironBar: 5 },
-    watchTower: { gold: 180, ironBar: 2 },
-    wizardTower: { gold: 450, ironBar: 6 },
+    cityTile: { gold: 120, copper: 1 },
+    barracks: { gold: 300, copper: 3 },
+    archerBarracks: { gold: 330, copper: 4 },
+    archerTower: { gold: 220, copper: 2 },
+    cannonTower: { gold: 340, copper: 5 },
+    watchTower: { gold: 180, copper: 2 },
+    wizardTower: { gold: 450, copper: 6 },
   };
   const growth = item === "cityTile" ? 1.3 : 1.5;
   const m = intPow(growth, extra);
   const b = base[item];
-  return { gold: Math.round(b.gold * m), ironBar: Math.ceil((b.ironBar ?? 0) * intPow(1.25, extra)) };
+  return { gold: Math.round(b.gold * m), copper: Math.ceil((b.copper ?? 0) * intPow(1.25, extra)) };
 }
 
 export type UpgradeId =
@@ -174,7 +174,7 @@ export const UPGRADES: UpgradeDef[] = [
     name: "Hunter's instinct",
     maxLevel: 1,
     describe: (l) => (l ? "Archers track enemies through the streets" : "Archers wander the streets at random"),
-    price: () => ({ gold: 1500, ironBar: 12, steelBar: 4 }),
+    price: () => ({ gold: 1500, copper: 12, silver: 4 }),
   },
   { id: "archerDamage", group: "Archer tower", name: "Bodkin points", maxLevel: 6, describe: (l) => `${archerDamage(l)} damage per arrow` },
   { id: "archerRange", group: "Archer tower", name: "Longbows", maxLevel: 4, describe: (l) => `${archerRange(l)} cell range` },
@@ -196,14 +196,14 @@ export const UPGRADES: UpgradeDef[] = [
 export function upgradePrice(level: number): Price {
   return {
     gold: Math.round(200 * intPow(1.6, level)),
-    ironBar: 2 + level * 2,
-    steelBar: level >= 3 ? level - 2 : 0,
+    copper: 2 + level * 2,
+    silver: level >= 3 ? level - 2 : 0,
   };
 }
 
 export const BOMB_PRICE: Price = { gold: 60 };
 /** One-off unlock of the 3× battle speed. */
-export const SPEED3_PRICE: Price = { gold: 400, ironBar: 4 };
+export const SPEED3_PRICE: Price = { gold: 400, copper: 4 };
 export const BOMB_RADIUS = 3.2;
 export const BOMB_DAMAGE = 45;
 
@@ -287,7 +287,7 @@ export const ENEMIES: Record<EnemyKind, EnemyDef> = {
   bat: { kind: "bat", name: "Bat", hp: 14, speed: 3.2, damage: 3, cooldown: 0.7, size: 0.3, color: "#8a5bb8", distraction: 0, flying: true, firstWave: 7, weight: 2, cost: 2 },
 };
 
-/** Multipliers the player's Training and skill trees lay over a run, on top
+/** Multipliers the player's Smithy and skill trees lay over a run, on top
  * of the Armory's levels. Each is 1 when nothing is owned, so a run without
  * them plays exactly as before. */
 export type Bonuses = {

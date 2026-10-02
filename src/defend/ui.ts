@@ -40,12 +40,12 @@ export type DefendHost = {
   save(): DefendSave;
   wallet(): Wallet;
   setWallet(w: Wallet): void;
-  /** Training's and the skill trees' multipliers for the next defense. */
+  /** The Smithy's and the skill trees' multipliers for the next defense. */
   bonuses(): Bonuses;
-  /** Pays for enemies slain (Gold and experience); returns Commander levels gained. */
-  earnKills(slain: Partial<Record<EnemyKind, number>>): number;
+  /** Pays Gold for enemies slain. */
+  earnKills(slain: Partial<Record<EnemyKind, number>>): void;
   /** Pays for holding `wave` (called before the best wave is raised). */
-  earnWave(wave: number): { gold: number; ironBar: number; steelBar: number; knowledge: number };
+  earnWave(wave: number): { gold: number; copper: number; silver: number; knowledge: number; upgrade: number };
   persist(): void;
   reduceMotion(): boolean;
   /** The park grass and pond effects are on. */
@@ -525,8 +525,7 @@ export class DefendPage {
       }
     }
     if (!any) return;
-    const levels = this.host.earnKills(fresh);
-    if (levels > 0) this.setMessage(`Commander level up! +${levels} training ${levels === 1 ? "point" : "points"}.`, 3);
+    this.host.earnKills(fresh);
   }
 
   private handleEvents() {
@@ -535,7 +534,7 @@ export class DefendPage {
     for (const ev of sim.events.splice(0)) {
       if (ev.type === "waveCleared") {
         const r = this.host.earnWave(ev.wave);
-        const pay = `+${Math.floor(r.gold)} gold · +${r.ironBar} iron${r.steelBar ? ` · +${r.steelBar} steel` : ""}${r.knowledge ? ` · +${r.knowledge} Knowledge` : ""}`;
+        const pay = `+${Math.floor(r.gold)} gold · +${r.copper} copper${r.silver ? ` · +${r.silver} silver` : ""}${r.knowledge ? ` · +${r.knowledge} Knowledge` : ""}${r.upgrade ? ` · +${r.upgrade} upgrade point` : ""}`;
         if (ev.wave > this.save.bestWave) {
           this.save.bestWave = ev.wave;
           this.newRecord = ev.wave;
@@ -624,7 +623,7 @@ export class DefendPage {
     const s = this.save;
     const w = this.host.wallet();
     const price = (p: Price) =>
-      [`${p.gold} gold`, p.ironBar ? `${p.ironBar} iron` : "", p.steelBar ? `${p.steelBar} steel` : ""].filter(Boolean).join(" · ");
+      [`${p.gold} gold`, p.copper ? `${p.copper} copper` : "", p.silver ? `${p.silver} silver` : ""].filter(Boolean).join(" · ");
     const items = PALETTE_ITEMS.map((item) => {
       const p = purchasePrice(item, s.owned[item]);
       const desc = item === "cityTile" ? "Expands the city limits. New tiles must touch the city; the wall moves out to enclose them." : STRUCTURES[item].description;
@@ -652,7 +651,7 @@ export class DefendPage {
       )
       .join("");
     const balance = (amount: number) => this.host.devMode() ? "∞" : Math.floor(amount + 1e-9);
-    el.innerHTML = `<p class="hint defend-wallet">Spend what you earn in battle: kills pay Gold, every wave held pays Gold and iron, boss waves steel. <b>${balance(w.gold)}</b> gold · <b>${balance(w.ironBar)}</b> iron bars · <b>${balance(w.steelBar)}</b> steel bars${this.phase === "sim" ? " · upgrades apply from the next defense" : ""}</p>
+    el.innerHTML = `<p class="hint defend-wallet">Spend what you earn in battle: kills pay Gold, every wave held pays Gold and copper, boss waves silver. <b>${balance(w.copper)}</b> copper · <b>${balance(w.silver)}</b> silver · <b>${balance(w.gold)}</b> gold${this.phase === "sim" ? " · upgrades apply from the next defense" : ""}</p>
       <h3 class="defend-section">City elements</h3>${items}
       <h3 class="defend-section">Consumables</h3>${bomb}
       <h3 class="defend-section">Battle</h3>${speed}

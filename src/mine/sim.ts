@@ -1,7 +1,8 @@
 /** The Mine: an idle mining operation in a falling-sand world. Miners sink a
  * laddered shaft through the dirt (shoring its walls with timber so it holds)
  * into the stone, drive a tunnel out either side at every level, lay track
- * and torches along each, hang lamps in the shaft, chase any iron or gold
+ * and torches along each, hang lamps in the shaft, chase any copper, silver
+ * or gold
  * they glimpse, and build a mine cart for each tunnel. Ore goes up in a
  * miner's pack to the yard by the shaft house, or rides a cart back to the
  * shaft where the hoist's bucket is let down for it and wound up again; the
@@ -9,8 +10,9 @@
  *
  * The crew live and work in the buildings on the surface (`buildings.ts`):
  * the player puts each miner to a trade, the face, the forge or the smithy.
- * Forge hands smelt the ore into bars; smiths work the bars into iron bars,
- * steel and Gold for the player. Miners fetch supplies from the warehouse
+ * Forge hands smelt the ore into copper, silver and gold bars; smiths work
+ * the bars, and every hundred of a metal make a Smithy point of it for the
+ * player. Miners fetch supplies from the warehouse
  * for the fittings, eat in the barracks' lounge, and sleep in its bunks at
  * night, all but the night shift.
  *
@@ -42,7 +44,7 @@
  * planned is done (`workedOut`), the player takes the crew, the buildings
  * and the stock to a new prospect (`prospectNext`), a fresh world. */
 import {
-  AIR, BEDROCK, CELLS, DIG_TICKS, DIRT, GOLD, GRAVEL, H, IRON, LADDER, LAMP, LAVA, LOOSE, MATERIAL_COUNT, RAIL, ROCK, RUBBLE, STONE, TIMBER, TORCH, W, World,
+  AIR, BEDROCK, CELLS, COPPER, DIG_TICKS, DIRT, GOLD, GRAVEL, H, LADDER, LAMP, LAVA, LOOSE, MATERIAL_COUNT, RAIL, ROCK, RUBBLE, SILVER, STONE, TIMBER, TORCH, W, World,
   decodeGrid, encodeGrid, generate, hash01, idx, inBounds, isLoose, isOre, isPassable, isSoil, isSolid, isWood, strata, type Material, type Strata,
 } from "./world.ts";
 import { BUILDINGS, FIRST_LEVELS, MAX_LEVEL, layout, pathTicks, type BuildingId, type Layout, type Levels, type Purpose, type Spot } from "./buildings.ts";
@@ -58,9 +60,18 @@ const BUILD_TICKS: Record<number, number> = { [LADDER]: 24, [RAIL]: 30, [TORCH]:
 export const PACK_ORE = 6;
 const PACK_SPOIL = 10;
 export const CART_LOAD = 18;
-/** What the mine pays. */
-export const GOLD_PER_NUGGET = 10;
-export const ORE_PER_IRON_BAR = 12;
+/** The three metals: their ore in the ground, their bars, and the Smithy
+ * points they make. */
+export type Metal = "copper" | "silver" | "gold";
+export const METALS: readonly Metal[] = ["copper", "silver", "gold"];
+export type Metals = Record<Metal, number>;
+export const noMetals = (): Metals => ({ copper: 0, silver: 0, gold: 0 });
+export const metalSum = (m: Metals) => m.copper + m.silver + m.gold;
+/** The metal of an ore cell. */
+export const oreMetal = (m: Material): Metal | null => (m === COPPER ? "copper" : m === SILVER ? "silver" : m === GOLD ? "gold" : null);
+/** Ore smelted into one bar, and bars worked into one Smithy point. */
+export const ORE_PER_BAR: Metals = { copper: 4, silver: 2, gold: 1 };
+export const BARS_PER_POINT = 100;
 /** Each level of the barracks bunks this many more of the crew; of the
  * forge, makes room for this many more hands; of the smithy, more smiths. */
 export const CREW_PER_LEVEL = 5, FORGE_PER_LEVEL = 2, SMITHS_PER_LEVEL = 1;
@@ -78,10 +89,9 @@ export const upgradePrice = (id: BuildingId, level: number) => Math.round(UPGRAD
 /** Supplies a miner fetches from the warehouse: each fitting and each
  * timber shoring uses one. */
 export const KIT = 12;
-/** Ticks a forge worker takes to smelt one ore, and a smith to work an iron
- * bar or a gold ingot; a stage nobody is put to works at a quarter of one
- * worker. Every `BARS_PER_STEEL` iron bars worked also folds a steel bar. */
-export const SMELT_TICKS = 6 * TICK_HZ, SMITH_IRON_TICKS = 40 * TICK_HZ, SMITH_GOLD_TICKS = 4 * TICK_HZ, BARS_PER_STEEL = 20;
+/** Ticks a forge worker takes to smelt one ore, and a smith to work a bar;
+ * a stage nobody is put to works at a quarter of one worker. */
+export const SMELT_TICKS = 6 * TICK_HZ, SMITH_TICKS = 3 * TICK_HZ;
 const IDLE_PACE = 4, STOCK_TICKS = 2 * TICK_HZ;
 /** Ore a forge hand carries in from the yard at a time, and the most the
  * forge's piles and shelves hold at its first level (each more holds half
@@ -146,14 +156,13 @@ export function skyAt(seed: number, tick: number, force?: Weather | null): Sky {
   return { weather, daylight: daylight(tick), clouds: before.clouds + (now.clouds - before.clouds) * t, rain: before.rain + (now.rain - before.rain) * t };
 }
 
-export type Miner = {
+export type Miner = Metals & {
   id: number;
   /** Its name, for life. */
   name: string;
   x: number;
   y: number;
-  iron: number;
-  gold: number;
+  /** Ore in its pack (by metal), and spoil. */
   spoil: number;
   /** Its trade (the player's allocation), and supplies in hand. */
   job: Job;
@@ -188,12 +197,12 @@ type Task =
   | { kind: "cart"; level: number; side: number }
   | { kind: "enter"; b: BuildingId; why: Purpose }
   | { kind: "rest" };
-export type Cart = { level: number; side: number; x: number; y: number; iron: number; gold: number; state: "out" | "parked" | "back"; timer: number };
+export type Cart = Metals & { level: number; side: number; x: number; y: number; state: "out" | "parked" | "back"; timer: number };
 /** A load waiting at a level's foot of the shaft for the hoist. */
-export type Bucket = { y: number; iron: number; gold: number };
+export type Bucket = Metals & { y: number };
 /** The hoist's bucket: waiting at the top, let down to a load, or wound up
  * with it. */
-export type Hoist = { y: number; state: "idle" | "down" | "up"; iron: number; gold: number };
+export type Hoist = Metals & { y: number; state: "idle" | "down" | "up" };
 /** Where a building stood before it was moved. */
 export type Footprint = { x0: number; x1: number; floor: number; height: number };
 /** A building being rebuilt: ticks done of `total`, supplies used of those
@@ -208,13 +217,14 @@ export type MineSave = {
    * world from the seed, the crew at the barracks). */
   cells?: string;
   plan?: string;
-  miners: { x: number; y: number; iron: number; gold: number; spoil: number; fed?: number; job?: Job; kit?: number; name?: string }[];
-  carts: { level: number; side: number; x: number; iron: number; gold: number }[];
+  miners: (Metals & { x: number; y: number; spoil: number; fed?: number; job?: Job; kit?: number; name?: string })[];
+  carts: (Metals & { level: number; side: number; x: number })[];
   buckets: Bucket[];
   shaftLevel: number;
   hired: number;
-  ironOre: number;
-  mined: { iron: number; gold: number };
+  /** Ore smelted toward the next bar of each metal, and ore dug. */
+  smelted: Metals;
+  mined: Metals;
   savedAt: number;
   /** Added with the weather (absent from older saves): the water layer,
    * burning cells as [cell, ticks left], miners lost by cause, and the
@@ -224,14 +234,14 @@ export type MineSave = {
   lost?: Partial<Record<Cause, number>>;
   mercy?: number;
   /** Added with the buildings: the crew's allocation, the forge's ore
-   * piles, the bars waiting at the smithy, and the iron bars worked toward
-   * the next steel. */
+   * piles, the bars waiting at the smithy, and the bars worked toward the
+   * next Smithy point of each metal. */
   jobs?: { forge: number; smith: number };
-  ore?: { iron: number; gold: number };
-  bars?: { iron: number; gold: number };
-  steelWork?: number;
+  ore?: Metals;
+  bars?: Metals;
+  worked?: Metals;
   /** Ore tipped in the yard, waiting for the forge's hands. */
-  yard?: { iron: number; gold: number };
+  yard?: Metals;
   /** Added with prospects: which prospect this is (the first is 1), and
    * the miners lost whom the crew's list still remembers. */
   prospect?: number;
@@ -283,20 +293,22 @@ export class MineSim {
   private workLeft = Infinity;
   /** Miners lost, oldest first, until the player lets them go. */
   fallen: Fallen[] = [];
-  /** Ore waiting at the forge, bars waiting at the smithy, and iron bars
-   * worked toward the next steel. */
-  ore = { iron: 0, gold: 0 };
-  bars = { iron: 0, gold: 0 };
-  steelWork = 0;
+  /** Ore waiting at the forge, bars waiting at the smithy, and bars worked
+   * toward the next Smithy point of each metal. */
+  ore = noMetals();
+  bars = noMetals();
+  worked = noMetals();
   /** Ranks of the Mine skills: Coffee (more of the crew on the night
    * shift) and Waterproofing (the shaft house keeps more rain out). */
   coffee = 0;
   waterproof = 0;
+  /** Room for more smiths than the smithy's level gives (Master smith). */
+  extraSmiths = 0;
   private idleWork = { forge: 0, smith: 0 };
   /** Fittings planned on open air (as of the last survey), waiting on
    * supplies from the warehouse. */
   private fittings = 0;
-  private turn = false;
+  private turn = 0;
   /** Each tunnel level's floor row (the row its rails run along). */
   readonly levels: number[] = [];
   miners: Miner[] = [];
@@ -305,14 +317,14 @@ export class MineSim {
   hoist!: Hoist;
   /** Ore brought up, tipped in the yard by the shaft house until the forge's
    * hands carry it in; and the yard's column. */
-  yard = { iron: 0, gold: 0 };
+  yard = noMetals();
   readonly yardX = W / 2 - 5;
   tick = 0;
   /** Deepest level the shaft has been planned down to. */
   shaftLevel = 0;
   hired = 0;
-  ironOre = 0;
-  mined = { iron: 0, gold: 0 };
+  smelted = noMetals();
+  mined = noMetals();
   /** Miners lost, by cause. */
   lost: Record<Cause, number> = { crushed: 0, drowned: 0, starved: 0, burnt: 0, struck: 0 };
   /** Ticks left in which a miner who comes to harm gets out alive. */
@@ -332,7 +344,7 @@ export class MineSim {
   private rainOwed = 0;
   private hits: [number, number, Material][] = [];
   /** Paid out but not yet collected by the page (`collect`). */
-  private owed = { gold: 0, ironBar: 0, steelBar: 0 };
+  private owed = noMetals();
   private reserved = new Int32Array(CELLS);
   private occupied = new Uint8Array(CELLS);
   private nextId = 1;
@@ -360,13 +372,13 @@ export class MineSim {
       // What goes with the crew from prospect to prospect.
       this.tick = saved.tick;
       this.hired = saved.hired;
-      this.ironOre = saved.ironOre;
+      this.smelted = { ...saved.smelted };
       this.mined = { ...saved.mined };
       for (const c of CAUSES) this.lost[c] = saved.lost?.[c] ?? 0;
-      this.ore = { ...(saved.ore ?? { iron: 0, gold: 0 }) };
-      this.bars = { ...(saved.bars ?? { iron: 0, gold: 0 }) };
-      this.steelWork = saved.steelWork ?? 0;
-      this.yard = { ...(saved.yard ?? { iron: 0, gold: 0 }) };
+      this.ore = { ...(saved.ore ?? noMetals()) };
+      this.bars = { ...(saved.bars ?? noMetals()) };
+      this.worked = { ...(saved.worked ?? noMetals()) };
+      this.yard = { ...(saved.yard ?? noMetals()) };
       this.prospect = saved.prospect ?? 1;
       if (cells && plan) this.workedOut = saved.workedOut ?? false;
       this.fallen = (saved.fallen ?? []).map((f) => ({ ...f }));
@@ -380,7 +392,7 @@ export class MineSim {
       for (const m of saved.miners) this.addMiner(m.x, m.y, m);
       for (const c of saved.carts) {
         const y = this.levels[c.level];
-        if (y !== undefined) this.carts.push({ level: c.level, side: c.side, x: c.x, y, iron: c.iron, gold: c.gold, state: "back", timer: 0 });
+        if (y !== undefined) this.carts.push({ level: c.level, side: c.side, x: c.x, y, copper: c.copper, silver: c.silver, gold: c.gold, state: "back", timer: 0 });
       }
       this.buckets = saved.buckets.map((b) => ({ ...b }));
       this.rebuilds = (saved.rebuilds ?? []).map((r) => ({ ...r, from: r.from && { ...r.from } }));
@@ -390,12 +402,12 @@ export class MineSim {
       this.planShaft(0);
       this.relayout();
       const door = this.buildings.barracks.door, crew = saved?.miners.length ? saved.miners : [null];
-      for (const m of crew) this.addMiner(door, this.standY(door), m ? { ...m, iron: 0, gold: 0, spoil: 0, fed: 0 } : undefined);
+      for (const m of crew) this.addMiner(door, this.standY(door), m ? { ...m, ...noMetals(), spoil: 0, fed: 0 } : undefined);
       this.relayout();
       // A new mine's first crew learns the ropes before anyone can die.
       this.mercy = DEATH_GAP;
     }
-    this.hoist = { y: this.strata.surface[this.shaftX] - 1, state: "idle", iron: 0, gold: 0 };
+    this.hoist = { y: this.strata.surface[this.shaftX] - 1, state: "idle", ...noMetals() };
     // Saves from before each miner kept its trade held only the counts.
     if (saved?.jobs && saved.miners.every((m) => m.job === undefined)) this.setJobs(saved.jobs.forge, saved.jobs.smith);
     // No trade holds more than its building has room for.
@@ -409,13 +421,13 @@ export class MineSim {
   prospectNext(seed: number, now: number) {
     const carried = this.save(now);
     const ore = { ...this.ore };
-    for (const m of this.miners) (ore.iron += m.iron), (ore.gold += m.gold);
-    for (const c of [...this.carts, ...this.buckets, this.hoist, this.yard]) (ore.iron += c.iron), (ore.gold += c.gold);
+    for (const c of [...this.miners, ...this.carts, ...this.buckets, this.hoist, this.yard]) for (const k of METALS) ore[k] += c[k];
     const { cells, plan, water, burning, ...rest } = carried;
     // The buildings go up whole on the new ground.
-    const next = new MineSim(seed, { ...rest, carts: [], buckets: [], yard: { iron: 0, gold: 0 }, shaftLevel: 0, mercy: 0, ore, prospect: this.prospect + 1, rebuilds: [] });
+    const next = new MineSim(seed, { ...rest, carts: [], buckets: [], yard: noMetals(), shaftLevel: 0, mercy: 0, ore, prospect: this.prospect + 1, rebuilds: [] });
     next.coffee = this.coffee;
     next.waterproof = this.waterproof;
+    next.extraSmiths = this.extraSmiths;
     next.weatherOverride = this.weatherOverride;
     const owed = this.collect();
     next.owed = owed;
@@ -661,10 +673,10 @@ export class MineSim {
 
   // ── Miners ──────────────────────────────────────────────────────────
 
-  addMiner(x: number, y: number, from?: { iron: number; gold: number; spoil: number; fed?: number; job?: Job; kit?: number; name?: string }) {
+  addMiner(x: number, y: number, from?: Metals & { spoil: number; fed?: number; job?: Job; kit?: number; name?: string }) {
     const name = from?.name ?? minerName(this.hired, this.seed, [...this.miners.map((m) => m.name), ...this.fallen.map((f) => f.name)]);
     this.miners.push({
-      id: this.nextId++, name, x, y, iron: from?.iron ?? 0, gold: from?.gold ?? 0, spoil: from?.spoil ?? 0,
+      id: this.nextId++, name, x, y, copper: from?.copper ?? 0, silver: from?.silver ?? 0, gold: from?.gold ?? 0, spoil: from?.spoil ?? 0,
       job: from?.job ?? "mine", kit: from ? from.kit ?? KIT : 0, action: "idle", facing: 1, work: -1, task: null, path: [], timer: 0, working: false, fall: 0, fed: from?.fed ?? 0, breath: BREATH_TICKS, scorch: 0, inside: null,
     });
   }
@@ -705,7 +717,7 @@ export class MineSim {
     return CREW_PER_LEVEL * this.buildingLevels.barracks;
   }
   jobCap(job: Job) {
-    return job === "forge" ? FORGE_PER_LEVEL * this.buildingLevels.forge : job === "smith" ? SMITHS_PER_LEVEL * this.buildingLevels.smithy : Infinity;
+    return job === "forge" ? FORGE_PER_LEVEL * this.buildingLevels.forge : job === "smith" ? SMITHS_PER_LEVEL * this.buildingLevels.smithy + this.extraSmiths : Infinity;
   }
   /** The highest level building `id` may rise to: the warehouse to the top,
    * the rest one past the warehouse. */
@@ -878,8 +890,8 @@ export class MineSim {
     m.x = building.door;
     m.y = this.standY(building.door);
     // What it carries is left on the way: ore at the forge, spoil tipped.
-    if (m.iron + m.gold > 0) b === "forge" ? this.toForge(m.iron, m.gold) : this.toYard(m.iron, m.gold);
-    m.iron = m.gold = m.spoil = 0;
+    if (metalSum(m) > 0) b === "forge" ? this.toForge(m) : this.toYard(m);
+    m.copper = m.silver = m.gold = m.spoil = 0;
     const s: Inside = { b, why, slot: this.freeSlot(b, why), t: 0, out: false, until: 0 };
     const walk = pathTicks(this.spotOf(s).path);
     if (arrived) s.t = walk;
@@ -935,7 +947,7 @@ export class MineSim {
       const pace = this.craftTicks(trade);
       // Ore piling up in the yard and room for it here (or nothing left to
       // smelt): out to fetch it.
-      const yard = this.yard.iron + this.yard.gold, forge = this.ore.iron + this.ore.gold;
+      const yard = metalSum(this.yard), forge = metalSum(this.ore);
       if (trade === "forge" && yard > 0 && (yard >= CARRY || !pace) && forge <= this.forgeCap - CARRY) return this.goOut(m);
       if (!pace) {
         m.action = "idle";
@@ -953,47 +965,44 @@ export class MineSim {
   /** Ticks the next piece of work at the forge or the anvil takes, or 0 for
    * nothing to work. */
   private craftTicks(trade: "forge" | "smith") {
-    if (trade === "forge") return this.ore.iron + this.ore.gold > 0 ? SMELT_TICKS : 0;
-    return this.bars.gold > 0 ? SMITH_GOLD_TICKS : this.bars.iron > 0 ? SMITH_IRON_TICKS : 0;
+    if (trade === "forge") return metalSum(this.ore) > 0 ? SMELT_TICKS : 0;
+    return metalSum(this.bars) > 0 ? SMITH_TICKS : 0;
   }
-  /** One piece of work done: an ore smelted (twelve iron ore make a bar; a
-   * gold ore an ingot), or a bar worked into what the player is paid (iron
-   * bars, now and then a steel bar, and Gold struck from the ingots). */
+  /** One piece of work done: an ore smelted (`ORE_PER_BAR` of a metal make
+   * its bar), the metals by turns while more than one waits; or a bar worked
+   * (gold first, then silver, then copper), every `BARS_PER_POINT` of a
+   * metal making a Smithy point of it for the player. */
   private craft(trade: "forge" | "smith") {
     if (trade === "forge") {
-      // Iron and gold by turns, while both wait.
-      this.turn = !this.turn;
-      if (this.ore.iron > 0 && (this.turn || this.ore.gold === 0)) {
-        this.ore.iron--;
-        if (++this.ironOre >= ORE_PER_IRON_BAR) {
-          this.ironOre -= ORE_PER_IRON_BAR;
-          this.bars.iron++;
+      for (let k = 0; k < METALS.length; k++) {
+        this.turn = (this.turn + 1) % METALS.length;
+        const metal = METALS[this.turn];
+        if (this.ore[metal] <= 0) continue;
+        this.ore[metal]--;
+        if (++this.smelted[metal] >= ORE_PER_BAR[metal]) {
+          this.smelted[metal] -= ORE_PER_BAR[metal];
+          this.bars[metal]++;
         }
-      } else if (this.ore.gold > 0) {
-        this.ore.gold--;
-        this.bars.gold++;
+        return;
       }
-    } else if (this.bars.gold > 0) {
-      this.bars.gold--;
-      this.owed.gold += GOLD_PER_NUGGET;
-    } else if (this.bars.iron > 0) {
-      this.bars.iron--;
-      this.owed.ironBar++;
-      if (++this.steelWork >= BARS_PER_STEEL) {
-        this.steelWork = 0;
-        this.owed.steelBar++;
-      }
+      return;
+    }
+    const metal = [...METALS].reverse().find((k) => this.bars[k] > 0);
+    if (!metal) return;
+    this.bars[metal]--;
+    if (++this.worked[metal] >= BARS_PER_POINT) {
+      this.worked[metal] -= BARS_PER_POINT;
+      this.owed[metal]++;
     }
   }
   /** A stage nobody is put to still gets done, slowly. */
   private stepIdleTrades() {
     const jobs = this.jobs;
     // With nobody at the forge, its ore still finds its way in, slowly.
-    if (jobs.forge === 0 && this.tick % SMELT_TICKS === 0 && this.yard.iron + this.yard.gold > 0) {
-      const gold = this.yard.gold > 0 ? 1 : 0;
-      this.yard.gold -= gold;
-      this.yard.iron -= 1 - gold;
-      this.toForge(1 - gold, gold);
+    if (jobs.forge === 0 && this.tick % SMELT_TICKS === 0 && metalSum(this.yard) > 0) {
+      const metal = [...METALS].reverse().find((k) => this.yard[k] > 0)!;
+      this.yard[metal]--;
+      this.ore[metal]++;
     }
     for (const trade of ["forge", "smith"] as const) {
       if (jobs[trade] > 0 || this.rebuilding(trade === "forge" ? "forge" : "smithy")) continue;
@@ -1059,7 +1068,7 @@ export class MineSim {
   }
 
   private chooseTask(m: Miner) {
-    const start = idx(m.x, m.y), ore = m.iron + m.gold;
+    const start = idx(m.x, m.y), ore = metalSum(m);
     const shallow = m.y < this.strata.stoneTop[this.shaftX] + 6, up = m.y < this.strata.surface[m.x] + 4;
     // Night: off to bed, unless on the night shift (or there's no way up).
     if (this.bedtime(m) && this.goEnter(m, start, "barracks", "sleep")) return;
@@ -1071,7 +1080,7 @@ export class MineSim {
     }
     // The forge's hands fetch the ore from the yard, while there's room for it.
     const shop = m.job === "forge" ? "forge" : "smithy", shut = m.job !== "mine" && !!this.rebuilding(shop);
-    if (m.job === "forge" && !shut && ore === 0 && this.yard.iron + this.yard.gold > 0 && this.ore.iron + this.ore.gold < this.forgeCap && this.goFetch(m, start)) return;
+    if (m.job === "forge" && !shut && ore === 0 && metalSum(this.yard) > 0 && metalSum(this.ore) < this.forgeCap && this.goFetch(m, start)) return;
     // The forge's and the smithy's hands go to their work; one cut off below
     // (or whose building is being rebuilt) digs on till it can get there.
     if (m.job !== "mine" && !shut && this.goEnter(m, start, shop, "work")) return;
@@ -1118,6 +1127,9 @@ export class MineSim {
       if (!inBounds(cx, cy)) continue;
       const c = idx(cx, cy), job = this.jobAt(c);
       if (!job || this.reserved[c] || (job === 1 && !dig) || (job === 2 && kit <= 0)) continue;
+      // Sinking the shaft wants supplies to ladder and shore it (one cut off
+      // below digs out regardless).
+      if (job === 1 && cx === this.shaftX && cy > this.strata.surface[cx] && kit <= 0 && !cutOff) continue;
       const score = cutOff && cx === this.shaftX && job <= 2 ? -60 : job === 4 ? -40 : job === 1 && isOre(this.world.cells[c]) ? -30 : job === 3 ? -1 : job === 2 ? -2 : 0;
       if (!best || score < best.score) best = { score, cell: c, cart: null };
     }
@@ -1147,8 +1159,8 @@ export class MineSim {
     const top = (x: number) => this.strata.surface[x] + 4, forge = this.yardX;
     const path = this.search(start, (x, y, d) => {
       if (Math.abs(x - forge) <= 1 && y < top(x)) return d;
-      if (m.spoil < PACK_SPOIL || m.iron + m.gold > 0)
-        for (const c of this.carts) if (c.state === "parked" && c.y === y && Math.abs(c.x - x) <= 1 && c.iron + c.gold < CART_LOAD) return d;
+      if (m.spoil < PACK_SPOIL || metalSum(m) > 0)
+        for (const c of this.carts) if (c.state === "parked" && c.y === y && Math.abs(c.x - x) <= 1 && metalSum(c) < CART_LOAD) return d;
       return null;
     });
     if (!path) return false;
@@ -1272,9 +1284,13 @@ export class MineSim {
       m.timer = STEP_TICKS;
     } else if (ny < m.y) {
       // Climbing: put a ladder in first if there isn't one.
-      if (this.cell(m.x, m.y) === AIR && this.ladderOk(idx(m.x, m.y)) && !this.supports(m.x, m.y + 1)) this.world.set(m.x, m.y, LADDER);
+      if (this.cell(m.x, m.y) === AIR && this.ladderOk(idx(m.x, m.y)) && !this.supports(m.x, m.y + 1)) {
+        this.world.set(m.x, m.y, LADDER);
+        m.kit = Math.max(0, m.kit - 1);
+      }
       if (this.cell(m.x, ny) === AIR && this.ladderOk(next)) {
         this.world.set(m.x, ny, LADDER);
+        m.kit = Math.max(0, m.kit - 1);
         m.action = "build";
         m.work = next;
         m.timer = BUILD_TICKS[LADDER];
@@ -1323,16 +1339,14 @@ export class MineSim {
     if (t.kind === "deliver") {
       const cart = this.carts.find((c) => c.state === "parked" && c.y === m.y && Math.abs(c.x - m.x) <= 1);
       if (cart) {
-        cart.iron += m.iron;
-        cart.gold += m.gold;
-        m.iron = m.gold = 0;
+        for (const k of METALS) (cart[k] += m[k]), (m[k] = 0);
         m.spoil = 0;
         this.release(m);
         return;
       }
       if (Math.abs(m.x - this.yardX) <= 1 && m.y < this.strata.surface[m.x] + 4) {
-        this.toYard(m.iron, m.gold);
-        m.iron = m.gold = 0;
+        this.toYard(m);
+        m.copper = m.silver = m.gold = 0;
         // In a storm nobody goes out to the heap: spoil is tipped by the forge.
         if (this.sky.weather === "storm") m.spoil = 0;
         if (m.spoil > 0) {
@@ -1348,12 +1362,14 @@ export class MineSim {
       return this.release(m);
     }
     if (t.kind === "fetch") {
-      // A load from the yard for the forge: gold first, then iron.
-      const gold = Math.min(this.yard.gold, CARRY), iron = Math.min(this.yard.iron, CARRY - gold);
-      this.yard.gold -= gold;
-      this.yard.iron -= iron;
-      m.gold += gold;
-      m.iron += iron;
+      // A load from the yard for the forge: gold first, then silver, then copper.
+      let room = CARRY;
+      for (const k of ["gold", "silver", "copper"] as const) {
+        const n = Math.min(this.yard[k], room);
+        this.yard[k] -= n;
+        m[k] += n;
+        room -= n;
+      }
       m.action = "stock";
       m.timer = STOCK_TICKS / 2;
       m.task = null;
@@ -1410,10 +1426,10 @@ export class MineSim {
       const c = t.cell, x = c % W, y = (c - x) / W, mat = this.world.cells[c];
       if (this.jobAt(c) === 1) {
         this.world.set(x, y, AIR);
-        if (mat === IRON) m.iron++;
-        else if (mat === GOLD) m.gold++;
+        const metal = oreMetal(mat);
+        if (metal) m[metal]++;
         else if (y < this.strata.stoneTop[x] + 6 && hash01(x, y, this.seed + 9) < (mat === STONE ? 0.3 : 0.5)) m.spoil = Math.min(PACK_SPOIL, m.spoil + 1);
-        if (isOre(mat)) this.mined[mat === IRON ? "iron" : "gold"]++;
+        if (metal) this.mined[metal]++;
         // A hole dug under one's feet gets a ladder, so there's a way back.
         if (y === m.y + 1 && x === m.x && this.plan[c] === P_DIG) this.plan[c] = P_LADDER;
         this.afterDig(x, y, m);
@@ -1432,7 +1448,7 @@ export class MineSim {
     } else if (t.kind === "cart") {
       this.cartClaims.delete(`${t.level}:${t.side}`);
       const y = this.levels[t.level];
-      this.carts.push({ level: t.level, side: t.side, x: this.shaftX + t.side * 2, y, iron: 0, gold: 0, state: "out", timer: 0 });
+      this.carts.push({ level: t.level, side: t.side, x: this.shaftX + t.side * 2, y, ...noMetals(), state: "out", timer: 0 });
     } else if (t.kind === "dump") {
       return this.arrive(m);
     }
@@ -1465,7 +1481,7 @@ export class MineSim {
         c.timer = 0;
       }
     } else if (c.state === "parked") {
-      const load = c.iron + c.gold;
+      const load = metalSum(c);
       if (load >= CART_LOAD || (load > 0 && c.timer > 45 * TICK_HZ)) {
         c.state = "back";
         c.timer = 0;
@@ -1476,8 +1492,8 @@ export class MineSim {
     } else {
       if (c.x !== home) c.x -= c.side;
       else {
-        if (c.iron + c.gold > 0) this.buckets.push({ y: c.y, iron: c.iron, gold: c.gold });
-        c.iron = c.gold = 0;
+        if (metalSum(c) > 0) this.buckets.push({ y: c.y, copper: c.copper, silver: c.silver, gold: c.gold });
+        c.copper = c.silver = c.gold = 0;
         c.state = "out";
       }
     }
@@ -1497,32 +1513,28 @@ export class MineSim {
       else if (h.y < load.y) h.y++;
       else {
         this.buckets.shift();
-        h.iron += load.iron;
-        h.gold += load.gold;
+        for (const k of METALS) h[k] += load[k];
         h.state = "up";
       }
     } else if (h.y > top) h.y--;
     else {
-      this.toYard(h.iron, h.gold);
-      h.iron = h.gold = 0;
+      this.toYard(h);
+      h.copper = h.silver = h.gold = 0;
       h.state = "idle";
     }
   }
 
   /** Ore brought up is tipped in the yard; the forge's hands carry it in. */
-  private toYard(iron: number, gold: number) {
-    this.yard.iron += iron;
-    this.yard.gold += gold;
+  private toYard(load: Metals) {
+    for (const k of METALS) this.yard[k] += load[k];
   }
-  private toForge(iron: number, gold: number) {
-    this.ore.iron += iron;
-    this.ore.gold += gold;
+  private toForge(load: Metals) {
+    for (const k of METALS) this.ore[k] += load[k];
   }
-  /** Takes what the smithy has turned out since last asked: Gold, iron bars
-   * and steel bars. */
+  /** Takes the Smithy points the smithy has turned out since last asked. */
   collect() {
     const out = { ...this.owed };
-    this.owed = { gold: 0, ironBar: 0, steelBar: 0 };
+    this.owed = noMetals();
     return out;
   }
 
@@ -1536,7 +1548,7 @@ export class MineSim {
     this.release(m);
     this.tell(spared ? "saved" : "lost", m.x, m.y, cause);
     if (spared) {
-      m.iron = m.gold = m.spoil = 0;
+      m.copper = m.silver = m.gold = m.spoil = 0;
       m.fed = 0;
       m.breath = BREATH_TICKS;
       m.scorch = 0;
@@ -1728,13 +1740,13 @@ export class MineSim {
       tick: this.tick,
       cells: encodeGrid(this.world.cells),
       plan: encodeGrid(this.plan),
-      miners: this.miners.map((m) => ({ x: m.x, y: m.y, iron: m.iron, gold: m.gold, spoil: m.spoil, fed: m.fed, job: m.job, kit: m.kit, name: m.name })),
-      carts: this.carts.map((c) => ({ level: c.level, side: c.side, x: c.x, iron: c.iron, gold: c.gold })),
-      buckets: [...(this.hoist.iron + this.hoist.gold > 0 ? [{ y: this.hoist.y, iron: this.hoist.iron, gold: this.hoist.gold }] : []), ...this.buckets.map((b) => ({ ...b }))],
+      miners: this.miners.map((m) => ({ x: m.x, y: m.y, copper: m.copper, silver: m.silver, gold: m.gold, spoil: m.spoil, fed: m.fed, job: m.job, kit: m.kit, name: m.name })),
+      carts: this.carts.map((c) => ({ level: c.level, side: c.side, x: c.x, copper: c.copper, silver: c.silver, gold: c.gold })),
+      buckets: [...(metalSum(this.hoist) > 0 ? [{ y: this.hoist.y, copper: this.hoist.copper, silver: this.hoist.silver, gold: this.hoist.gold }] : []), ...this.buckets.map((b) => ({ ...b }))],
       yard: { ...this.yard },
       shaftLevel: this.shaftLevel,
       hired: this.hired,
-      ironOre: this.ironOre,
+      smelted: { ...this.smelted },
       mined: { ...this.mined },
       savedAt: now,
       water: encodeGrid(this.world.water),
@@ -1744,7 +1756,7 @@ export class MineSim {
       jobs: { ...this.jobs },
       ore: { ...this.ore },
       bars: { ...this.bars },
-      steelWork: this.steelWork,
+      worked: { ...this.worked },
       prospect: this.prospect,
       fallen: this.fallen.map((f) => ({ ...f })),
       workedOut: this.workedOut,
@@ -1769,7 +1781,7 @@ function migrateLevels(saved: MineSave): Levels {
   return { shaft: 1, barracks, forge, smithy, warehouse: clamp(Math.max(barracks, forge, smithy) - 1) };
 }
 
-/** Iron and gold cells in a grid. */
+/** Ore cells in a grid. */
 function countOre(cells: Uint8Array) {
   let n = 0;
   for (let i = 0; i < cells.length; i++) if (isOre(cells[i])) n++;
@@ -1782,19 +1794,28 @@ const int = (v: unknown, min: number, max: number) => Number.isInteger(v) && (v 
  * page starts a fresh one). */
 export function decodeMineSave(s: any): MineSave | null {
   if (!s || typeof s !== "object") return null;
-  if (!int(s.seed, 0, 0xffffffff) || !int(s.tick, 0, 1e12) || !int(s.shaftLevel, 0, 100) || !int(s.hired, 0, 1e6)) return null;
-  if (!int(s.ironOre, 0, 1e9) || !Number.isFinite(s.savedAt) || !s.mined || !int(s.mined.iron, 0, 1e9) || !int(s.mined.gold, 0, 1e9)) return null;
+  if (!int(s.seed, 0, 0xffffffff) || !int(s.tick, 0, 1e12) || !int(s.shaftLevel, 0, 100) || !int(s.hired, 0, 1e6) || !Number.isFinite(s.savedAt)) return null;
+  // Metals: copper, silver and gold; a save from before silver held iron
+  // (now copper) and gold. Null when malformed.
+  const metals = (v: any, max: number): Metals | null => {
+    if (!v || typeof v !== "object") return null;
+    const m = { copper: v.copper ?? v.iron, silver: v.silver ?? 0, gold: v.gold };
+    return METALS.every((k) => int(m[k], 0, max)) ? m : null;
+  };
+  const mined = metals(s.mined, 1e9);
+  const smelted = s.smelted !== undefined ? metals(s.smelted, 1e3) : int(s.ironOre, 0, 1e9) ? { copper: Math.min(s.ironOre, ORE_PER_BAR.copper - 1), silver: 0, gold: 0 } : null;
+  if (!mined || !smelted) return null;
   // A mine from before the world was widened moves its crew to a fresh
   // prospect from the same seed (its grid is dropped).
   const narrow = !decodeGrid(s.cells, CELLS, MATERIAL_COUNT) && decodeGrid(s.cells, NARROW_W * H, MATERIAL_COUNT) && decodeGrid(s.plan, NARROW_W * H, 6);
   if (!narrow && (!decodeGrid(s.cells, CELLS, MATERIAL_COUNT) || !decodeGrid(s.plan, CELLS, 6))) return null;
   const name = (v: unknown) => typeof v === "string" && v.length > 0 && v.length <= 32;
   const pack = (m: any) =>
-    int(m?.iron, 0, 1000) && int(m?.gold, 0, 1000) && int(m?.spoil, 0, 1000) && (m.fed === undefined || int(m.fed, 0, 1e9)) &&
+    metals(m, 1000) && int(m?.spoil, 0, 1000) && (m.fed === undefined || int(m.fed, 0, 1e9)) &&
     (m.job === undefined || JOBS.includes(m.job)) && (m.kit === undefined || int(m.kit, 0, KIT)) && (m.name === undefined || name(m.name));
   if (!Array.isArray(s.miners) || s.miners.length > MAX_MINERS || !s.miners.every((m: any) => int(m?.x, 0, W - 1) && int(m?.y, 1, H - 1) && pack(m))) return null;
-  if (!Array.isArray(s.carts) || !s.carts.every((c: any) => int(c?.level, 0, 100) && (c.side === 1 || c.side === -1) && int(c.x, 0, W - 1) && int(c.iron, 0, 1e4) && int(c.gold, 0, 1e4))) return null;
-  if (!Array.isArray(s.buckets) || !s.buckets.every((b: any) => int(b?.y, 0, H) && int(b.iron, 0, 1e4) && int(b.gold, 0, 1e4))) return null;
+  if (!Array.isArray(s.carts) || !s.carts.every((c: any) => int(c?.level, 0, 100) && (c.side === 1 || c.side === -1) && int(c.x, 0, W - 1) && metals(c, 1e4))) return null;
+  if (!Array.isArray(s.buckets) || !s.buckets.every((b: any) => int(b?.y, 0, H) && metals(b, 1e4))) return null;
   // The weather's additions may be missing (an older save), never malformed.
   if (s.water !== undefined && !narrow && !decodeGrid(s.water, CELLS, 2)) return null;
   if (s.burning !== undefined && !(Array.isArray(s.burning) && s.burning.every((b: any) => Array.isArray(b) && b.length === 2 && int(b[0], 0, CELLS - 1) && int(b[1], 1, 1e5)))) return null;
@@ -1803,10 +1824,8 @@ export function decodeMineSave(s: any): MineSave | null {
   // So may the buildings'.
   const pair = (v: any, a: string, b: string, max: number) => v && typeof v === "object" && int(v[a], 0, max) && int(v[b], 0, max);
   if (s.jobs !== undefined && !pair(s.jobs, "forge", "smith", MAX_MINERS)) return null;
-  if (s.ore !== undefined && !pair(s.ore, "iron", "gold", 1e9)) return null;
-  if (s.bars !== undefined && !pair(s.bars, "iron", "gold", 1e9)) return null;
-  if (s.steelWork !== undefined && !int(s.steelWork, 0, BARS_PER_STEEL)) return null;
-  if (s.yard !== undefined && !pair(s.yard, "iron", "gold", 1e9)) return null;
+  for (const k of ["ore", "bars", "yard"]) if (s[k] !== undefined && !metals(s[k], 1e9)) return null;
+  if (s.worked !== undefined && !metals(s.worked, BARS_PER_POINT)) return null;
   // And the prospects'.
   if (s.prospect !== undefined && !int(s.prospect, 1, 1e6)) return null;
   if (s.fallen !== undefined && !(Array.isArray(s.fallen) && s.fallen.length <= MAX_MINERS && s.fallen.every((f: any) => name(f?.name) && JOBS.includes(f.job) && CAUSES.includes(f.cause)))) return null;
@@ -1819,22 +1838,21 @@ export function decodeMineSave(s: any): MineSave | null {
   if (s.rebuilds !== undefined && !(Array.isArray(s.rebuilds) && s.rebuilds.length <= BUILDINGS.length && s.rebuilds.every(rebuild))) return null;
   const out: MineSave = {
     ...(s.jobs !== undefined ? { jobs: { forge: s.jobs.forge, smith: s.jobs.smith } } : {}),
-    ...(s.ore !== undefined ? { ore: { iron: s.ore.iron, gold: s.ore.gold } } : {}),
-    ...(s.bars !== undefined ? { bars: { iron: s.bars.iron, gold: s.bars.gold } } : {}),
-    ...(s.steelWork !== undefined ? { steelWork: s.steelWork } : {}),
-    ...(s.yard !== undefined ? { yard: { iron: s.yard.iron, gold: s.yard.gold } } : {}),
+    ...(s.ore !== undefined ? { ore: metals(s.ore, 1e9)! } : {}),
+    ...(s.bars !== undefined ? { bars: metals(s.bars, 1e9)! } : {}),
+    ...(s.worked !== undefined ? { worked: metals(s.worked, BARS_PER_POINT)! } : {}),
+    ...(s.yard !== undefined ? { yard: metals(s.yard, 1e9)! } : {}),
     ...(s.water !== undefined ? { water: s.water } : {}),
     ...(s.burning !== undefined ? { burning: s.burning.map((b: number[]) => [b[0], b[1]] as [number, number]) } : {}),
     ...(s.lost !== undefined ? { lost: Object.fromEntries(CAUSES.filter((c) => s.lost[c] !== undefined).map((c) => [c, s.lost[c]])) } : {}),
     ...(s.mercy !== undefined ? { mercy: s.mercy } : {}),
-    seed: s.seed, tick: s.tick, cells: s.cells, plan: s.plan, shaftLevel: s.shaftLevel, hired: s.hired, ironOre: s.ironOre, savedAt: s.savedAt,
-    mined: { iron: s.mined.iron, gold: s.mined.gold },
+    seed: s.seed, tick: s.tick, cells: s.cells, plan: s.plan, shaftLevel: s.shaftLevel, hired: s.hired, smelted, savedAt: s.savedAt, mined,
     miners: s.miners.map((m: any) => ({
-      x: m.x, y: m.y, iron: m.iron, gold: m.gold, spoil: m.spoil, ...(m.name !== undefined ? { name: m.name } : {}),
+      x: m.x, y: m.y, ...metals(m, 1000)!, spoil: m.spoil, ...(m.name !== undefined ? { name: m.name } : {}),
       ...(m.fed !== undefined ? { fed: m.fed } : {}), ...(m.job !== undefined ? { job: m.job } : {}), ...(m.kit !== undefined ? { kit: m.kit } : {}),
     })),
-    carts: s.carts.map((c: any) => ({ level: c.level, side: c.side, x: c.x, iron: c.iron, gold: c.gold })),
-    buckets: s.buckets.map((b: any) => ({ y: b.y, iron: b.iron, gold: b.gold })),
+    carts: s.carts.map((c: any) => ({ level: c.level, side: c.side, x: c.x, ...metals(c, 1e4)! })),
+    buckets: s.buckets.map((b: any) => ({ y: b.y, ...metals(b, 1e4)! })),
     ...(s.prospect !== undefined ? { prospect: s.prospect } : {}),
     ...(s.fallen !== undefined ? { fallen: s.fallen.map((f: any) => ({ name: f.name, job: f.job, cause: f.cause })) } : {}),
     ...(s.workedOut !== undefined ? { workedOut: s.workedOut } : {}),

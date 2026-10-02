@@ -135,7 +135,7 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   eyes and a swollen brood sac. When one dies she splits into three quick
   **broodlings** at the corners of a small triangle around where she fell
   (on the spot if that is inside a wall); broodlings never come in a wave's
-  mix and don't split again. Each pays its own Gold and experience.
+  mix and don't split again. Each pays its own Gold.
 - Destruction lasts for the whole run. **Civilians** come out of houses to
   rebuild rubble one cell at a time (walls and structures first); a
   structure only works again once fully rebuilt. They avoid rubble with
@@ -265,25 +265,26 @@ from its seed; `tests/defend-replay.test.ts` pins it.
 
 ## Economy (`progress.ts`, Armory tab; `src/progression.ts`)
 
-- The Armory sells with Gold, iron bars and steel bars, all earned in
-  battle: each kill pays Gold (`KILL_GOLD`) and experience, each wave held
-  pays Gold (10 + 5 × the wave) and an iron bar, and each boss wave held
-  pays a steel bar for every ten waves. Gold is paid as enemies fall, so an
+- The Armory sells with copper, silver and Gold, all earned in battle: each
+  kill pays Gold (`KILL_GOLD`), each wave held pays Gold (10 + 5 × the wave)
+  and copper, and each boss wave held pays a silver for every ten waves. Gold is paid as enemies fall, so an
   abandoned defense keeps what it earned.
 - City elements get more expensive with each one owned. Upgrades are
   universal (they apply to every building of that type) and take effect from
   the next run.
 - Reaching a **new best wave** is recorded (`bestWave`) and pays Knowledge: one
-  for each wave held past the best before it, three for a boss wave.
-- **Training** (Upgrades tab): experience raises the Commander level; each
-  level is a training point, which trains one rank of a row (a few percent on
-  troop HP or damage, drill speed, tower damage or reload, bomb damage, wall
-  or keep HP, rebuild speed, or Gold found). A rank takes time: a minute
-  for the first, each after 50% longer; two train at once.
+  for each wave held past the best before it, three for a boss wave, and an
+  upgrade point for each.
+- **Smithy** (Upgrades tab; Training in code): a Smithy point (copper,
+  silver or gold, from the mine's smithy) buys one rank of a row (a few
+  percent on troop HP or damage, drill speed, tower damage or reload, bomb
+  damage, wall or keep HP, rebuild speed, or Gold found). The mine's smiths
+  work it: a minute of one smith for the first, each after 50% longer, shared
+  by every smith on it.
 - **Skill trees** (Upgrades tab): Command (garrison and towers) and
-  Stewardship (walls, keep, builders, Gold, iron, experience, a third
-  Training slot), ranked skills bought with Knowledge.
-- Training and the skills fold into the run's `Bonuses`, fixed when the
+  Stewardship (walls, keep, builders, Gold, copper, faster smithing, room for
+  another smith), ranked skills bought with Knowledge.
+- The Smithy and the skills fold into the run's `Bonuses`, fixed when the
   defense starts.
 
 ## Not saved

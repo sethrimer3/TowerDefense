@@ -15,11 +15,12 @@ export type SkillId =
 export type TreeId = "command" | "stewardship" | "mine" | "library";
 
 /** What one rank of a skill does: `per` added to a target's percent (a
- * negative `per` on a time makes it shorter), or, for `slots` and
- * `ironPerWave`, a whole number added. The Library's and the Mine's skills
- * are read as ranks (`library/sim.ts`: `accidentChance`, `fireDrill`;
- * `mine/sim.ts`: `nightShift`, the shaft house's seal). */
-export type SkillEffect = { target: BonusTarget | "slots" | "ironPerWave" | "fireproof" | "fireTraining" | "coffee" | "waterproof"; per: number };
+ * time's percent makes it shorter), or, for `smiths` (room in the mine's
+ * smithy) and `copperPerWave`, a whole number added. The Library's and the
+ * Mine's skills are read as ranks (`library/sim.ts`: `accidentChance`,
+ * `fireDrill`; `mine/sim.ts`: `nightShift`, the shaft house's seal,
+ * `extraSmiths`). */
+export type SkillEffect = { target: BonusTarget | "smiths" | "copperPerWave" | "fireproof" | "fireTraining" | "coffee" | "waterproof"; per: number };
 export type Skill = { id: SkillId; name: string; icon: string; max: number; base: number; effect: SkillEffect; text: string };
 export type SkillNode = { id: SkillId; x: number; y: number; requires: SkillId[] };
 export type SkillTree = { id: TreeId; name: string; description: string; height?: number; nodes: SkillNode[] };
@@ -36,9 +37,9 @@ export const SKILLS: Record<SkillId, Skill> = {
   bastions: { id: "bastions", name: "Bastions", icon: "♜", max: 3, base: 2, effect: { target: "keepHp", per: 10 }, text: "+10% keep HP a rank" },
   guilds: { id: "guilds", name: "Builders' guilds", icon: "⚒", max: 3, base: 2, effect: { target: "rebuild", per: 10 }, text: "Civilians rebuild 10% faster a rank" },
   plunder: { id: "plunder", name: "Plunder", icon: "¤", max: 3, base: 2, effect: { target: "gold", per: 10 }, text: "+10% Gold from every defense a rank" },
-  ironworks: { id: "ironworks", name: "Ironworks", icon: "▬", max: 2, base: 3, effect: { target: "ironPerWave", per: 1 }, text: "+1 iron bar for every wave held a rank" },
-  scholars: { id: "scholars", name: "War college", icon: "✦", max: 3, base: 2, effect: { target: "xp", per: 15 }, text: "+15% experience from every kill a rank" },
-  tactician: { id: "tactician", name: "Tactician", icon: "⌛", max: 1, base: 6, effect: { target: "slots", per: 1 }, text: "One more Training slot" },
+  ironworks: { id: "ironworks", name: "Copperworks", icon: "▬", max: 2, base: 3, effect: { target: "copperPerWave", per: 1 }, text: "+1 copper for every wave held a rank" },
+  scholars: { id: "scholars", name: "Smiths' guild", icon: "✦", max: 3, base: 2, effect: { target: "smithing", per: 15 }, text: "The Smithy's upgrades are worked 15% faster a rank" },
+  tactician: { id: "tactician", name: "Master smith", icon: "⚒", max: 1, base: 6, effect: { target: "smiths", per: 1 }, text: "Room for one more smith in the mine's smithy" },
   fireproofWood: { id: "fireproofWood", name: "Fireproof wood", icon: "▤", max: 10, base: 5, effect: { target: "fireproof", per: 1 }, text: "The library's tables catch fire 10% less often a rank (1% a minute to start, then 0.9%, 0.81%…)" },
   coffee: { id: "coffee", name: "Coffee", icon: "♨", max: 12, base: 2, effect: { target: "coffee", per: 5 }, text: "5% more of the mine's crew work the night shift a rank (20% to start, up to 80%)" },
   waterproofing: { id: "waterproofing", name: "Waterproofing", icon: "☂", max: 4, base: 4, effect: { target: "waterproof", per: 15 }, text: "The shaft house keeps 15% more of the rain's runoff out of the shaft a rank (20% to start, up to 80%)" },

@@ -2,7 +2,7 @@ import "./style.css";
 import "./theme.css";
 import { defaults, load, persist, type Save } from "./save.ts";
 import { DefendPage } from "./defend/ui.ts";
-import { bonuses, levelForXp, payKills, payWave, settleTraining, whole, xpForLevel } from "./progression.ts";
+import { bonuses, busySmiths, payKills, payWave, settleTraining, skillTotal, whole } from "./progression.ts";
 import type { AppContext } from "./ui/app.ts";
 import { el, type Tab } from "./ui/dom.ts";
 import { buildShell } from "./ui/shell.ts";
@@ -12,7 +12,7 @@ import type { Weather } from "./defend/weather.ts";
 import { play, soundEnabledBy } from "./sound.ts";
 import { flourishesEnabledBy, replay, sparks, sparksOver } from "./ui/flourish.ts";
 import { MinePage } from "./mine/ui.ts";
-import type { Weather as MineWeather } from "./mine/sim.ts";
+import { METALS, type Weather as MineWeather } from "./mine/sim.ts";
 import { LibraryPage } from "./library/ui.ts";
 import { stream } from "./random.ts";
 
@@ -31,6 +31,7 @@ const ctx: AppContext = {
   renderPage,
   navigate,
   clock,
+  smiths: () => smithNames(),
   eraseAll: () => {
     save = defaults();
     minePage.load(null, clock());
@@ -41,27 +42,26 @@ const ctx: AppContext = {
 const skillTree = new SkillTreePage(ctx);
 const defendPage = new DefendPage(el("defend"), {
   save: () => save.defend,
-  wallet: () => ({ gold: save.gold, ironBar: save.ironBar, steelBar: save.steelBar, free: save.settings.freePurchases || save.settings.devMode }),
+  wallet: () => ({ gold: save.gold, copper: save.copper, silver: save.silver, free: save.settings.freePurchases || save.settings.devMode }),
   setWallet: (w) => {
     if (save.settings.devMode) return;
     save.gold = w.gold;
-    save.ironBar = w.ironBar;
-    save.steelBar = w.steelBar;
+    save.copper = w.copper;
+    save.silver = w.silver;
   },
   bonuses: () => bonuses(save),
   earnKills: (slain) => {
-    const { levelsGained } = payKills(save, slain);
+    payKills(save, slain);
     refreshCurrencies();
-    if (levelsGained > 0) {
-      play("levelUp");
-      sparksOver(el("level"), "arcane");
-    }
-    return levelsGained;
   },
   earnWave: (wave) => {
     const r = payWave(save, wave);
     store();
     refreshCurrencies();
+    if (r.upgrade > 0) {
+      play("levelUp");
+      sparksOver(el("upgrade-points"), "arcane");
+    }
     return r;
   },
   persist: store,
@@ -77,14 +77,13 @@ const minePage = new MinePage(el("mine"), {
     save.gold = Math.max(0, save.gold - n);
     update();
   },
-  earn: (gold, ironBar, steelBar) => {
-    save.gold += gold;
-    save.ironBar += ironBar;
-    save.steelBar += steelBar;
-    refreshCurrencies();
+  earn: (points) => {
+    for (const k of METALS) save.smithy[k] += points[k];
     mineDirty = true;
+    if (tab === "upgrades") skillTree.render();
   },
-  upgrades: () => ({ coffee: save.skills.coffee, waterproof: save.skills.waterproofing }),
+  upgrades: () => ({ coffee: save.skills.coffee, waterproof: save.skills.waterproofing, smiths: skillTotal(save, "smiths") }),
+  busySmiths: () => busySmiths(save),
   effects: () => !save.settings.effectsOff,
   newSeed: () => Math.floor(stream("game")() * 4294967296),
   modal,
@@ -113,6 +112,8 @@ const libraryPage = new LibraryPage(el("library"), {
 });
 /** The mine or the library has paid out since the last save. */
 let mineDirty = false;
+/** The mine's smiths, by name. */
+const smithNames = () => minePage.sim.miners.filter((m) => m.job === "smith").map((m) => m.name);
 libraryPage.load(save.library, clock());
 minePage.load(save.mine, clock());
 
@@ -145,13 +146,11 @@ function refreshCurrencies() {
     shown.set(id, text);
     if (before !== undefined && Number(text) > Number(before)) replay(el(id).closest(".currency"), "gain");
   };
+  show("copper", save.copper);
+  show("silver", save.silver);
   show("gold", save.gold);
-  show("iron", save.ironBar);
-  show("steel", save.steelBar);
   show("knowledge", save.knowledge);
-  const level = levelForXp(save.xp), from = xpForLevel(level), to = xpForLevel(level + 1);
-  show("level", level);
-  el("xp-fill").style.width = `${((save.xp - from) / (to - from)) * 100}%`;
+  show("upgrade-points", save.upgradePoints);
 }
 /** Saves and refreshes the currency bar. */
 function update() {
@@ -178,7 +177,7 @@ function navigate(id: Tab) {
 }
 document.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach((b) => (b.onclick = () => navigate(b.dataset.tab as Tab)));
 
-/** Training completes on the wall clock, whatever page shows; so do the
+/** The Smithy's upgrades are worked on the wall clock, whatever page shows; so do the
  * mine's and the library's work, saved every half minute they pay. */
 let lastTick = 0, lastMineSave = 0;
 function frame(time: number) {
@@ -194,7 +193,7 @@ function frame(time: number) {
   if (tab === "upgrades") skillTree.drawParticles(time);
   if (time - lastTick >= 1000) {
     lastTick = time;
-    const done = settleTraining(save, clock()) > 0;
+    const done = settleTraining(save, clock(), new Set(smithNames())) > 0;
     if (done) {
       update();
       play("trained");
@@ -228,6 +227,6 @@ window.addEventListener("pagehide", store);
   minePage.fastForward(minutes);
 };
 
-settleTraining(save, clock());
+settleTraining(save, clock(), new Set(smithNames()));
 navigate("defend");
 requestAnimationFrame(frame);

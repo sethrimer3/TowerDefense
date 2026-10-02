@@ -42,18 +42,18 @@ A small, quick enemy hatched only from a fallen Mother.
 The highest wave the player has held.
 
 **Bonuses**:
-The multipliers Training and the skill trees lay over a defense (troops, towers, walls, the keep, rebuilding, bombs).
+The multipliers the Smithy and the skill trees lay over a defense (troops, towers, walls, the keep, rebuilding, bombs).
 
 ### Progress
 
 **Armory**:
-The Defend tab's shop: city elements, bombs, battle speed and the universal upgrades (one level for every building of a type), bought with Gold, iron bars and steel bars.
+The Defend tab's shop: city elements, bombs, battle speed and the universal upgrades (one level for every building of a type), bought with copper, silver and Gold.
 
 **Gold**:
 Paid by kills, by every wave held and by gold the mine digs; spent in the Armory and on hiring miners.
 
-**Iron bar** and **steel bar**:
-Paid for each wave held (iron) and each boss wave held (steel); iron bars are also smelted from the mine's iron ore. Spent in the Armory.
+**Copper** and **silver**:
+Paid for each wave held (copper) and each boss wave held (silver). Spent, with Gold, in the Armory. (They were once iron and steel bars.)
 
 **Knowledge**:
 Earned by the Library, an hour's worth being its built bookshelves times its librarians (idle too), and paid for each wave held past the best wave; spent on the skill trees. Once called Valor.
@@ -61,14 +61,17 @@ Earned by the Library, an hour's worth being its built bookshelves times its lib
 **Freak accident** (Library):
 A table's candle catching it alight: a small chance each minute, lowered by Fireproof Wood. The fire burns whatever it reaches until it burns out or the librarians put it out (Fire Training).
 
-**Experience** and **Commander level**:
-Kills pay experience; enough lifetime experience raises the Commander level.
+**Upgrade point**:
+One for every new best wave held in Defend, shown in the currency bar; banked for what the meta game brings later. (It replaced the Commander level and its experience.)
 
-**Training point**:
-One per Commander level, spent on Training ranks.
+**Smithy** (the Upgrades tab; Training in code):
+Ranks of a few percent each on one row (troop HP, tower damage, Gold found…). A rank costs one Smithy point and is worked by the mine's smiths: one smith takes its whole time, more smiths share it. A smith on a rank stays at the smithy until it's done; taking the last one off cancels the rank and returns its point.
 
-**Training**:
-Ranks of a few percent each on one row (troop HP, tower damage, Gold found…). A rank takes time on the wall clock; a few can be in training at once (Training slots).
+**Smithy point**:
+Copper, silver or gold: every hundred bars of a metal the mine's smiths work make a point of it. A row's first ten ranks cost copper, the next fifteen silver, the rest gold.
+
+**Smith**:
+A miner put to the smithy. The smiths are the Smithy's hands: how many ranks can be worked at once, and how fast.
 
 **Skill tree**:
 Command and Stewardship (for Defend), Mine and Library: ranked skills bought with Knowledge, each needing the skills above it.
@@ -119,8 +122,8 @@ A level's mine cart takes miners' ore to the shaft, where the hoist lets its buc
 **Yard**:
 The ground by the shaft house where ore brought up is tipped, until the forge's hands carry it into the forge.
 
-**Iron ore** and **gold**:
-What the miners dig. Brought up, it waits in the yard, then in heaps and on shelves in the forge.
+**Copper**, **silver** and **gold ore**:
+What the miners dig: copper near the top of the stone, silver lower, gold deepest. Brought up, it waits in the yard, then in heaps and on shelves in the forge.
 
 **Buildings**:
 Along the surface: the **shaft house** over the shaft's mouth, with a lantern by its door; the **barracks**, where the crew sleeps in bunks (a bay of six a level) and sits in the **lounge** to eat or wait out a storm; the **warehouse** of supplies; the **forge**; and the **smithy**. A building's front wall fades to show whoever is inside.
@@ -135,7 +138,7 @@ An upgraded building is rebuilt, and so is any it pushes along: taken down where
 Timber, rails and lights the warehouse brings in over time, up to what it holds. A miner fetches them before fitting out the workings or shoring them, and rebuilds use them too; with none, the shaft can't be sunk further.
 
 **Forge** and **smithy**:
-Forge hands smelt the ore piles into bars (twelve iron ore to an iron bar, a gold ore to an ingot); smiths work the bars into what the mine pays: iron bars, now and then a steel bar, and Gold struck from the ingots. Too few at the forge leaves a backlog of ore; too few smiths leaves bars waiting. A trade nobody is put to still gets done, slowly.
+Forge hands smelt the ore piles into copper, silver and gold bars (four copper ore, two silver or one gold to a bar); smiths work the bars, and every hundred of a metal make a Smithy point of it. Too few at the forge leaves a backlog of ore; too few smiths leaves bars waiting. A trade nobody is put to still gets done, slowly.
 
 **Night shift**:
 The share of the crew who work through the night (a fifth, more with Coffee); the rest sleep in the barracks.

@@ -1,11 +1,12 @@
-// Training, the skill trees and a defense's rewards (src/progression.ts),
+// The Smithy's upgrades (Training in code), the skill trees and a defense's
+// rewards (src/progression.ts),
 // and how they reach the battle (DefendSim's bonuses).
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { decode, defaults } from "../src/save.ts";
 import {
-  TRAINING, bonuses, buySkill, cancelTraining, levelForXp, multiplier, payKills, payWave, settleTraining, skillPurchase,
-  startTraining, trainingPoints, trainingSlots, xpForLevel,
+  TRAINING, addSmith, bonuses, busySmiths, buySkill, cancelTraining, multiplier, payKills, payWave, rankPrice, removeSmith, settleTraining, skillPurchase,
+  skillTotal, startTraining, trainingLeft,
 } from "../src/progression.ts";
 import { SKILLS, TREES, skillCost, type SkillId } from "../src/skill-trees.ts";
 import { trainingSeconds } from "../src/training-jobs.ts";
@@ -19,44 +20,60 @@ test("a new save fights with no bonuses", () => {
   assert.deepEqual(bonuses(defaults()), NO_BONUSES);
 });
 
-test("levels come from lifetime experience, one training point each", () => {
-  assert.equal(levelForXp(0), 0);
-  assert.equal(levelForXp(xpForLevel(1) - 1), 0);
-  assert.equal(levelForXp(xpForLevel(1)), 1);
-  assert.equal(levelForXp(xpForLevel(7)), 7);
+test("a Smithy upgrade costs a Smithy point (copper, then silver, then gold), is worked by a smith and counts when done", () => {
+  assert.deepEqual([rankPrice(0), rankPrice(9), rankPrice(10), rankPrice(24), rankPrice(25)], ["copper", "copper", "silver", "silver", "gold"]);
   const s = defaults();
-  s.xp = xpForLevel(3);
-  assert.deepEqual(trainingPoints(s), { earned: 3, spent: 0, left: 3 });
-});
-
-test("a rank of Training takes time, spends its point at once and counts when done", () => {
-  const s = defaults();
-  s.xp = xpForLevel(2);
-  assert.ok(startTraining(s, "troopDamage", 1000));
-  assert.equal(trainingPoints(s).left, 1);
-  assert.equal(s.trainingJobs[0].completesAt, 1000 + trainingSeconds(0) * 1000);
-  assert.equal(startTraining(s, "troopDamage", 1000), false, "one job per row");
-  assert.equal(settleTraining(s, 1000 + trainingSeconds(0) * 1000 - 1), 0);
+  s.trainingClock = 1000;
+  assert.equal(startTraining(s, "troopDamage", "Ada Stone"), false, "no points");
+  s.smithy.copper = 2;
+  assert.ok(startTraining(s, "troopDamage", "Ada Stone"));
+  assert.equal(s.smithy.copper, 1, "its point is spent at once");
+  assert.equal(startTraining(s, "troopDamage", "Bram Hale"), false, "one rank per row at a time");
+  assert.equal(startTraining(s, "wallHp", "Ada Stone"), false, "a smith works one upgrade at a time");
+  assert.deepEqual([...busySmiths(s)], ["Ada Stone"]);
+  const takes = trainingSeconds(0) * 1000;
+  assert.equal(trainingLeft(s, "troopDamage"), takes);
+  assert.equal(settleTraining(s, 1000 + takes - 1), 0);
   assert.equal(bonuses(s).troopDamage, 1, "not before it completes");
-  assert.equal(settleTraining(s, 1000 + trainingSeconds(0) * 1000), 1);
+  assert.equal(settleTraining(s, 1000 + takes), 1);
   assert.equal(s.training.troopDamage, 1);
   assert.equal(bonuses(s).troopDamage, 1.04);
-  // Cancelling gives the point back.
-  assert.ok(startTraining(s, "wallHp", 0));
-  assert.equal(trainingPoints(s).left, 0);
-  assert.ok(cancelTraining(s, "wallHp"));
-  assert.equal(trainingPoints(s).left, 1);
+  assert.equal(busySmiths(s).size, 0, "the smith is free again");
 });
 
-test("Training slots fill up, and Tactician adds one", () => {
+test("more smiths on an upgrade share its time; the last one off cancels it and returns its point", () => {
   const s = defaults();
-  s.xp = xpForLevel(10);
-  assert.ok(startTraining(s, "troopHp", 0));
-  assert.ok(startTraining(s, "troopDamage", 0));
-  assert.equal(startTraining(s, "drill", 0), false);
+  s.trainingClock = 1;
+  s.smithy.copper = 1;
+  assert.ok(startTraining(s, "keepHp", "Ada Stone"));
+  const takes = trainingSeconds(0) * 1000;
+  assert.ok(addSmith(s, "keepHp", "Bram Hale"));
+  assert.equal(addSmith(s, "keepHp", "Bram Hale"), false, "already on it");
+  assert.equal(trainingLeft(s, "keepHp"), takes / 2);
+  settleTraining(s, 1 + takes / 4);
+  assert.equal(trainingLeft(s, "keepHp"), takes / 4);
+  assert.ok(removeSmith(s, "keepHp"));
+  assert.equal(trainingLeft(s, "keepHp"), takes / 2, "one smith left: slower again");
+  assert.equal(removeSmith(s, "keepHp"), false, "the last smith only comes off by cancelling");
+  assert.ok(cancelTraining(s, "keepHp"));
+  assert.equal(s.smithy.copper, 1, "its point back");
+  assert.equal(s.trainingJobs.length, 0);
+});
+
+test("an upgrade whose smiths have left the smithy waits for another; the Smiths' guild speeds them all", () => {
+  const s = defaults();
+  s.trainingClock = 1;
+  s.smithy.copper = 2;
+  startTraining(s, "drill", "Ada Stone");
+  settleTraining(s, 1000, new Set(["Someone Else"]));
+  assert.deepEqual(s.trainingJobs[0].smiths, [], "Ada is no longer a smith");
+  assert.equal(trainingLeft(s, "drill"), Infinity);
+  assert.equal(settleTraining(s, 10 ** 9, new Set()), 0, "no work without a smith");
+  assert.ok(addSmith(s, "drill", "Someone Else"));
+  s.skills.scholars = 2;
+  assert.ok(Math.abs(trainingLeft(s, "drill") - trainingSeconds(0) * 1000 / 1.3) < 1e-6);
   s.skills.tactician = 1;
-  assert.equal(trainingSlots(s), 3);
-  assert.ok(startTraining(s, "drill", 0));
+  assert.equal(skillTotal(s, "smiths"), 1, "Master smith makes room for one more");
 });
 
 test("times shorten: a percent on drill, reload or rebuild divides", () => {
@@ -87,21 +104,21 @@ test("every tree node is a skill, each listed once, its requirements in the same
   for (const t of TREES) for (const n of t.nodes) for (const r of n.requires) assert.ok(t.nodes.some((m) => m.id === r), `${n.id} needs ${r}`);
 });
 
-test("kills pay Gold and experience; waves pay Gold, iron, steel on boss waves, and Knowledge past the best", () => {
+test("kills pay Gold; waves pay Gold, copper, silver on boss waves, and Knowledge and an upgrade point past the best", () => {
   const s = defaults();
   payKills(s, { roach: 3, orc: 1 });
   assert.equal(s.gold, 3 * 2 + 5);
-  assert.equal(s.xp, 3 * 1 + 3);
   s.defend.bestWave = 4;
   const held = payWave(s, 4);
-  assert.deepEqual({ iron: held.ironBar, steel: held.steelBar, knowledge: held.knowledge }, { iron: 1, steel: 0, knowledge: 0 });
+  assert.deepEqual({ copper: held.copper, silver: held.silver, knowledge: held.knowledge, upgrade: held.upgrade }, { copper: 1, silver: 0, knowledge: 0, upgrade: 0 });
   const boss = payWave(s, 10);
-  assert.deepEqual({ iron: boss.ironBar, steel: boss.steelBar, knowledge: boss.knowledge }, { iron: 1, steel: 1, knowledge: 3 });
+  assert.deepEqual({ copper: boss.copper, silver: boss.silver, knowledge: boss.knowledge, upgrade: boss.upgrade }, { copper: 1, silver: 1, knowledge: 3, upgrade: 1 });
+  assert.equal(s.upgradePoints, 1);
   s.skills.plunder = 2;
   s.skills.ironworks = 1;
   const rich = payWave(s, 5);
   assert.equal(rich.gold, (10 + 25) * 1.2);
-  assert.equal(rich.ironBar, 2);
+  assert.equal(rich.copper, 2);
 });
 
 test("bonuses reach the battle: troops, walls and the keep", () => {
@@ -125,14 +142,25 @@ test("saves keep what is well formed and default the rest", () => {
   s.knowledge = 3;
   s.skills.masonry = 2;
   s.training.gold = 4;
-  s.trainingJobs = [{ id: "keepHp", startedAt: 1, completesAt: 2 }];
+  s.smithy = { copper: 3, silver: 1, gold: 0 };
+  s.upgradePoints = 7;
+  s.trainingJobs = [{ id: "keepHp", left: 5000, smiths: ["Ada Stone", "Bram Hale"] }];
+  s.trainingClock = 123;
   const back = decode(JSON.stringify(s));
   assert.deepEqual(back, s);
-  const bad = decode(JSON.stringify({ ...s, gold: "lots", skills: { masonry: 99 }, training: { gold: -2 }, trainingJobs: [{ id: "nope" }, { id: "keepHp", startedAt: 1, completesAt: 2 }, { id: "keepHp", startedAt: 1, completesAt: 2 }] }));
+  const job = { id: "keepHp", left: 5, smiths: ["Ada Stone"] };
+  const bad = decode(JSON.stringify({ ...s, gold: "lots", skills: { masonry: 99 }, training: { gold: -2 }, trainingJobs: [{ id: "nope" }, job, job, { id: "wallHp", left: 5, smiths: ["Ada Stone", 7] }] }));
   assert.equal(bad.gold, 0);
   assert.equal(bad.skills.masonry, SKILLS.masonry.max);
   assert.equal(bad.training.gold, 0);
-  assert.equal(bad.trainingJobs.length, 1);
+  assert.deepEqual(bad.trainingJobs, [job, { id: "wallHp", left: 5, smiths: [] }], "one per row, each smith on one");
+  // A save from before copper and silver, the Smithy and upgrade points.
+  const old = decode(JSON.stringify({ version: 1, ironBar: 9, steelBar: 2, xp: 500, freeTraining: 1, training: { keepHp: 2 }, trainingJobs: [{ id: "keepHp", startedAt: 1, completesAt: 2 }], defend: { bestWave: 12 } }));
+  assert.deepEqual([old.copper, old.silver], [9, 2]);
+  assert.equal(old.training.keepHp, 3, "a rank in training is counted done");
+  assert.equal(old.trainingJobs.length, 0);
+  assert.equal(old.upgradePoints, old.defend.bestWave, "an upgrade point for each wave of the best");
+  assert.deepEqual(old.smithy, { copper: 0, silver: 0, gold: 0 });
   const fresh = decode("not json");
   assert.deepEqual({ ...fresh, defend: null }, { ...defaults(), defend: null }, "unreadable JSON starts afresh");
   assert.equal(decode(JSON.stringify({ version: 99, gold: 5 })).gold, 0, "a newer save starts afresh");

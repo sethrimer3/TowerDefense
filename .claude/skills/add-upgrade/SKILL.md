@@ -1,11 +1,11 @@
 ---
 name: add-upgrade
-description: Define and add a new upgrade the player can unlock in Tower Defense — a Defend Armory upgrade, a Training row, or a skill-tree node (Command, Stewardship). Writes a spec (panel, name, cost, levels, placement, effect) for approval, then builds it with tests and docs. Use this whenever the user wants a new upgrade, skill, perk, training stat, unlock, tree node or Armory item, even if they only describe the effect ("I want something that makes towers shoot faster").
+description: Define and add a new upgrade the player can unlock in Tower Defense — a Defend Armory upgrade, a Smithy row (Training in code), or a skill-tree node (Command, Stewardship). Writes a spec (panel, name, cost, levels, placement, effect) for approval, then builds it with tests and docs. Use this whenever the user wants a new upgrade, skill, perk, training stat, unlock, tree node or Armory item, even if they only describe the effect ("I want something that makes towers shoot faster").
 ---
 
 # Add an upgrade
 
-An upgrade here is anything the player buys between defenses that lasts: an Armory upgrade, a Training row, or a skill-tree node. Work in two steps:
+An upgrade here is anything the player buys between defenses that lasts: an Armory upgrade, a Smithy row (Training in code), or a skill-tree node. Work in two steps:
 
 1. **Spec.** Turn the request into a filled-in spec, proposing sensible values for everything the user left out, and show it to them.
 2. **Build.** Once they approve (or amend) it, implement, test, document and commit.
@@ -15,7 +15,7 @@ Don't start editing code before the user has approved the spec.
 ## 1. Read the current state first
 
 - Armory: `UPGRADES`, `upgradePrice`, `UpgradeDef` and the stat curves in `src/defend/catalog.ts`.
-- Training: `TRAINING`, `TRAINING_GROUPS` in `src/progression.ts`; durations in `src/training-jobs.ts`.
+- Smithy (Training in code): `TRAINING`, `TRAINING_GROUPS` in `src/progression.ts`; durations in `src/training-jobs.ts`.
 - Skill trees: `SKILLS`, `TREES`, `skillCost` in `src/skill-trees.ts`.
 - What the battle can be changed by: `Bonuses` in `src/defend/catalog.ts`, read in `sim.ts`, `troops.ts`, `towers.ts`, `civilians.ts`.
 - Income: `KILL_GOLD`, `waveGold`, `waveReward` in `src/progression.ts`.

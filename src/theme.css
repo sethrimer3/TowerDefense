@@ -274,21 +274,18 @@ dialog > small {
   border-color: #000;
   box-shadow: inset 0 1px 0 #ffffff80, 0 1px 0 #000;
 }
-/* Experience fills a glass phial. */
-.td-currencies .level-currency .xp-track {
-  width: 48px;
-  height: 6px;
-  margin-top: 5px;
-  border-radius: 4px;
-  border: 1px solid #8a7550;
-  background: #0b0d0c;
-  box-shadow: inset 0 1px 2px #000, 0 0 0 1px #000;
+/* Undiscovered resources: dim, their sign scratched in. */
+.td-currencies .secret-currency {
+  color: #b8a888;
+  text-shadow: 0 1px 0 #000;
 }
-.td-currencies .level-currency .xp-track i {
-  border-radius: 3px;
-  background: linear-gradient(#fff0b8, #e7a83a 45%, #8e5a12);
-  box-shadow: 0 0 6px #ffb44a;
+.td-currencies .upgrade-currency b {
+  color: #ffe1a0;
 }
+/* Smithy points in their metal's colour. */
+.metal-copper { color: #f0a272 !important; }
+.metal-silver { color: #e4e8f0 !important; }
+.metal-gold { color: #ffd76a !important; }
 
 /* ── The mine: a pit framed in iron, its tally chalked on stone ── */
 .mine-tally {
@@ -819,7 +816,7 @@ button.training-cost:disabled {
   color: #ffc0a8;
   text-shadow: 0 0 6px #ff5a3a60;
 }
-button.training-timer {
+span.training-timer {
   color: #ffd6c4;
   border-color: #2a0a08;
   background:
@@ -918,7 +915,7 @@ dialog::backdrop {
   :root:not(.reduce-motion) .td-currencies .currency.gain {
     animation: holding-glint 0.9s ease-out;
   }
-  :root:not(.reduce-motion) .td-currencies .level-currency.gain {
+  :root:not(.reduce-motion) .td-currencies .upgrade-currency.gain {
     animation: level-glow 1.4s ease-out;
   }
 

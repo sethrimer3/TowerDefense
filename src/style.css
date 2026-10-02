@@ -1233,7 +1233,12 @@ nav button > span img { display: block; width: 42px; height: 42px; max-width: 10
 .training-particles { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; border-radius: inherit; }
 .training > :not(.training-particles) { position: relative; }
 .training-row.active .training-box.next { border-color: #c0483c; color: #ffb3a6; }
-button.training-timer { border-color: #c0483c; color: #ffd0c8; background: #2a1416; font-size: 10px; letter-spacing: .5px; font-variant-numeric: tabular-nums; }
+/* A rank in work: its time left, and its smiths, one fewer or one more. */
+.training-work { display: flex; flex-direction: column; gap: 4px; align-items: stretch; }
+.smith-count { display: flex; align-items: center; justify-content: space-between; gap: 4px; font-size: 11px; }
+.smith-step { min-width: 26px; min-height: 24px; height: 24px; padding: 0 6px; font-size: 18px; font-weight: 700; line-height: 1; color: #ffe1a0 !important; }
+.smith-step:disabled { color: #7c705c !important; }
+.training-timer { border-color: #c0483c; color: #ffd0c8; background: #2a1416; font-size: 10px; letter-spacing: .5px; font-variant-numeric: tabular-nums; }
 /* Resets a stat for Gems, returning its points. */
 
 .training-label { font-size: 11px; letter-spacing: 1px; color: #e3d2ad; }
@@ -1323,11 +1328,11 @@ nav button { position: relative; }
 .td-currencies .ui-sprite { width: 20px; height: 20px; vertical-align: -3px; }
 .td-currencies .currency b { display: inline-block; margin-left: 4px; }
 .td-currencies .bar-icon { display: inline-block; width: 16px; height: 8px; border-radius: 2px; border: 1px solid #000a; vertical-align: 1px; }
-.td-currencies .bar-icon.iron { background: linear-gradient(#b9bcc2, #6d7179); }
-.td-currencies .bar-icon.steel { background: linear-gradient(#d9e6f2, #7f93a8); }
+.td-currencies .bar-icon.copper { background: linear-gradient(#f0a272, #9a4e26); }
+.td-currencies .bar-icon.silver { background: linear-gradient(#f4f6fa, #8e98a8); }
 .td-currencies .knowledge-currency { color: #e6c8ff; }
-.td-currencies .level-currency .xp-track { display: block; position: relative; width: 44px; height: 4px; margin: 4px auto 0; border-radius: 2px; background: #2a3140; overflow: hidden; }
-.td-currencies .level-currency .xp-track i { position: absolute; inset: 0 auto 0 0; width: 0; background: var(--gold); }
+.td-currencies .secret-currency { opacity: 0.75; }
+.td-currencies .secret-mark { display: inline-grid; place-items: center; width: 18px; height: 18px; border: 1px dashed currentColor; border-radius: 50%; font-style: normal; font-size: 11px; }
 .td-currencies .currency { flex-direction: row; flex-wrap: wrap; justify-content: center; max-width: 90px; }
 .td-currencies .currency small { flex-basis: 100%; }
 .tree-tabs { grid-template-columns: repeat(5, minmax(0, 1fr)); }
