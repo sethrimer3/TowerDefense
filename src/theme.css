@@ -318,6 +318,9 @@ dialog > small {
   box-shadow: inset 0 0 0 1px #ffffff10, 0 0 0 1px #000, 0 3px 8px #00000080;
   transition: box-shadow 0.15s ease;
 }
+.crew-box.full h3 b { color: #c9a35a; }
+/* A full trade's board turns a name away. */
+.crew-box.full.drop { box-shadow: inset 0 0 0 1px #b4483c, 0 0 0 1px #000, 0 0 12px #c0302880; }
 .crew-box.drop {
   box-shadow: inset 0 0 0 1px var(--brass-hi), 0 0 0 1px #000, 0 0 12px #ffb44a80;
 }

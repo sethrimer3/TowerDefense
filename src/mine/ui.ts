@@ -1,13 +1,14 @@
 /** The Mine tab: the mine's view, the crew's tally, hiring miners, the
  * crew's list (each miner by name, dragged between the three trades: the
  * face, the forge, the smithy; tapped to follow), and moving on to a new
- * prospect when this one is worked out. The mine itself runs whatever tab
+ * prospect when this one is worked out. A building tapped shows its stats
+ * and the button that raises it a level. The mine itself runs whatever tab
  * shows (`advance`, from the app's frame loop), and works on while the game
  * is closed: on loading, the time away (up to a cap) is caught up a slice
  * each frame. */
 import { play } from "../sound.ts";
-import { BARS_PER_STEEL, DAY_TICKS, FORGE_CAP, JOBS, KIT, MAX_MINERS, MineSim, TICK_HZ, type Cause, type Job, type Miner, type MineNews, type MineSave, type Weather } from "./sim.ts";
-import type { BuildingId } from "./buildings.ts";
+import { BARS_PER_STEEL, CREW_PER_LEVEL, DAY_TICKS, FORGE_PER_LEVEL, JOBS, KIT, MAX_MINERS, MineSim, SEAL_LEVEL, SMITHS_PER_LEVEL, STOCK_PER_LEVEL, STOCK_RATE, TICK_HZ, type Cause, type Job, type Miner, type MineNews, type MineSave, type Weather } from "./sim.ts";
+import { MAX_LEVEL, type BuildingId } from "./buildings.ts";
 import { MineRenderer } from "./render.ts";
 
 /** Longest time away the mine catches up on. */
@@ -48,6 +49,14 @@ const TRADE: Record<Job, { name: string; hint: string }> = {
   forge: { name: "Forge", hint: "Forge hands smelt the ore into bars" },
   smith: { name: "Smithy", hint: "Smiths work the bars into iron, steel and Gold" },
 };
+/** What a building's next level brings. */
+function levelGain(id: BuildingId, level: number) {
+  if (id === "barracks") return `Bunks for ${CREW_PER_LEVEL * level} miners`;
+  if (id === "forge") return `Room for ${FORGE_PER_LEVEL * level} forge hands, and more ore`;
+  if (id === "smithy") return `Room for ${SMITHS_PER_LEVEL * level} smiths`;
+  if (id === "warehouse") return `Holds ${STOCK_PER_LEVEL * level} supplies, brings in ${STOCK_RATE * level} a minute; the rest rise to level ${Math.min(MAX_LEVEL, level + 1)}`;
+  return `Keeps out ${Math.round(SEAL_LEVEL * 100)}% more of the rain`;
+}
 const escape = (s: string) => s.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 
 export class MinePage {
@@ -157,6 +166,10 @@ export class MinePage {
       this.root.querySelector("#mine-crew")!.setAttribute("aria-hidden", String(!open));
     };
     this.root.querySelector<HTMLButtonElement>("#mine-prospect-new")!.onclick = () => this.askProspect();
+    this.root.querySelector<HTMLElement>("#mine-info")!.onclick = (e) => {
+      const up = (e.target as Element).closest<HTMLButtonElement>("[data-upgrade]");
+      if (up && !up.disabled) this.upgrade(up.dataset.upgrade as BuildingId);
+    };
     this.bindView(canvas);
     this.bindCrew(this.root.querySelector<HTMLElement>("#mine-crew")!);
   }
@@ -262,10 +275,7 @@ export class MinePage {
         this.dragging = false;
         mark(null);
         const box = cancel ? null : boxAt(e.clientX, e.clientY), m = this.minerOf(item);
-        if (box && m && box.dataset.job !== m.job) {
-          this.sim.setJob(m, box.dataset.job as Job);
-          play("knock");
-        }
+        if (box && m && box.dataset.job !== m.job && this.sim.setJob(m, box.dataset.job as Job)) play("knock");
         this.shownCrew = "";
         this.refresh();
         return;
@@ -318,30 +328,67 @@ export class MinePage {
     } else if (id === "barracks") {
       const asleep = inside.filter((m) => m.inside!.why === "sleep").length, lounge = inside.filter((m) => m.inside!.why === "lounge").length;
       title = "Barracks";
-      body = bar("Bunks taken", asleep, b.spots.sleep?.length ?? 0) + row("Asleep", asleep) + row("In the lounge", lounge) + row("At work", sim.miners.length - asleep - lounge) +
+      body = row("Crew", `${sim.miners.length} of ${sim.crewCap}`) + bar("Bunks taken", asleep, b.spots.sleep?.length ?? 0) + row("Asleep", asleep) + row("In the lounge", lounge) + row("At work", sim.miners.length - asleep - lounge) +
         row("Night shift", `${Math.round(sim.nightShift * 100)}% of the crew`);
     } else if (id === "warehouse") {
       const kit = sim.miners.reduce((n, m) => n + m.kit, 0);
       title = "Warehouse";
-      body = bar("Supplies in the crew's hands", kit, sim.miners.length * KIT) + row("Fittings waiting", sim.fittingsWaiting) + row("Fetching supplies", inside.length);
+      body = bar("Supplies", sim.stock, sim.stockCap) + row("Brought in", `${sim.stockRate} a minute`) + bar("Supplies in the crew's hands", kit, sim.miners.length * KIT) +
+        row("Fittings waiting", sim.fittingsWaiting) + row("Fetching supplies", inside.length) + row("Other buildings rise to", `level ${sim.maxLevel("forge")}`);
     } else if (id === "forge") {
       const ore = sim.ore.iron + sim.ore.gold, hands = sim.jobs.forge;
       title = "Forge";
-      body = bar("Ore in the forge", ore, FORGE_CAP) + row("Iron ore", sim.ore.iron) + row("Gold ore", sim.ore.gold) + row("Waiting in the yard", sim.yard.iron + sim.yard.gold) +
-        row("Hands at work", `${sim.working("forge")} of ${hands}`) + row("Smelting", hands ? `${hands * 10} ore a minute` : "slowly, with nobody here");
+      body = bar("Ore in the forge", ore, sim.forgeCap) + row("Iron ore", sim.ore.iron) + row("Gold ore", sim.ore.gold) + row("Waiting in the yard", sim.yard.iron + sim.yard.gold) +
+        row("Hands at work", `${sim.working("forge")} of ${hands} (room for ${sim.jobCap("forge")})`) + row("Smelting", hands ? `${hands * 10} ore a minute` : "slowly, with nobody here");
     } else {
       const smiths = sim.jobs.smith;
       title = "Smithy";
-      body = row("Iron bars waiting", sim.bars.iron) + row("Gold ingots waiting", sim.bars.gold) + row("Smiths at work", `${sim.working("smithy")} of ${smiths}`) +
+      body = row("Iron bars waiting", sim.bars.iron) + row("Gold ingots waiting", sim.bars.gold) + row("Smiths at work", `${sim.working("smithy")} of ${smiths} (room for ${sim.jobCap("smith")})`) +
         bar("Toward the next steel bar", sim.steelWork, BARS_PER_STEEL);
     }
-    const html = `<h3>${title}</h3>${body}<p class="info-hint">Tap the building again, or elsewhere, to close.</p>`;
-    if (html === this.shownInfo) return;
-    this.shownInfo = html;
-    box.innerHTML = html;
-    box.hidden = false;
+    // The stats and the upgrade are redrawn apart, so a press on the button
+    // isn't lost to a count changing under it.
+    if (box.dataset.id !== id || box.hidden) {
+      box.dataset.id = id;
+      box.innerHTML = `<h3></h3><div class="info-stats"></div><div class="info-up"></div><p class="info-hint">Tap the building again, or elsewhere, to close.</p>`;
+      this.shownInfo = this.shownUp = "";
+      box.hidden = false;
+    }
+    box.querySelector("h3")!.textContent = title;
+    if (body !== this.shownInfo) box.querySelector(".info-stats")!.innerHTML = this.shownInfo = body;
+    const up = this.upgradeHtml(id);
+    if (up !== this.shownUp) box.querySelector(".info-up")!.innerHTML = this.shownUp = up;
   }
   private shownInfo = "";
+  private shownUp = "";
+
+  /** Building `id`'s level, and the button that raises it (or why it
+   * can't be raised now, or how its rebuilding goes). */
+  private upgradeHtml(id: BuildingId) {
+    const sim = this.sim, level = sim.buildingLevels[id], r = sim.rebuilding(id), block = sim.upgradeBlock(id);
+    let html = `<div class="info-row"><span>Level</span><b>${level} of ${MAX_LEVEL}</b></div>`;
+    if (r) {
+      const moving = r.from !== null && r.t < r.total / 2, due = Math.ceil((r.supplies * (r.t + 1)) / r.total);
+      html += `<div class="info-row"><span>${moving ? "Taking it down to move it" : "Rebuilding"}</span><b>${Math.floor((100 * r.t) / r.total)}%</b></div><div class="info-bar"><i style="width:${((100 * r.t) / r.total).toFixed(1)}%"></i></div>`;
+      if (r.used < due && sim.stock < 1) html += `<p class="info-note">Waiting on supplies from the warehouse</p>`;
+      return html;
+    }
+    if (block === "top") return html + `<p class="info-note">Built as big as it goes</p>`;
+    const next = level + 1, gain = levelGain(id, next);
+    if (block === "warehouse") return html + `<button class="info-upgrade" disabled>⬆ Level ${next}<small>Raise the warehouse to level ${level} first</small></button>`;
+    const cost = sim.upgradeCost(id), afford = this.host.free() || this.host.gold() >= cost;
+    return html + `<button class="info-upgrade" data-upgrade="${id}"${afford ? "" : " disabled"} title="${gain}">⬆ Level ${next} · ${cost} gold<small>${gain}</small></button>`;
+  }
+  /** Raises a building a level, if the player can pay for it. */
+  private upgrade(id: BuildingId) {
+    const cost = this.sim.upgradeCost(id), free = this.host.free();
+    if (!free && this.host.gold() < cost) return;
+    if (!this.sim.upgrade(id)) return;
+    if (!free) this.host.spendGold(cost);
+    play("coin");
+    this.shownCrew = "";
+    this.refresh();
+  }
 
   private minerOf(item: HTMLElement) {
     return this.sim.miners.find((m) => String(m.id) === item.dataset.id) ?? null;
@@ -395,7 +442,7 @@ export class MinePage {
 
   private hire() {
     const price = this.sim.price, free = this.host.free();
-    if (this.sim.miners.length >= MAX_MINERS || (!free && this.host.gold() < price)) return;
+    if (this.sim.miners.length >= this.sim.crewCap || (!free && this.host.gold() < price)) return;
     if (!this.sim.hire()) return;
     if (!free) this.host.spendGold(price);
     play("coin");
@@ -405,7 +452,7 @@ export class MinePage {
   /** Updates the hire button and the tally (cheap; called every frame). */
   refresh() {
     if (!this.built) return;
-    const sim = this.sim, price = sim.price, full = sim.miners.length >= MAX_MINERS;
+    const sim = this.sim, price = sim.price, full = sim.miners.length >= sim.crewCap;
     const afford = this.host.free() || this.host.gold() >= price;
     const crew = sim.miners.length, sky = sim.sky, lost = sim.lostTotal;
     const hour = sky.daylight > 0.6 ? "☀ Day" : sky.daylight > 0.05 ? (Math.abs(((sim.tick / DAY_TICKS + 0.1) % 1) - 0.5) < 0.25 ? "◐ Dusk" : "◐ Dawn") : "☾ Night";
@@ -415,11 +462,11 @@ export class MinePage {
     this.refreshCrew();
     this.refreshInfo();
     const left = Math.round((100 * sim.oreLeft) / Math.max(1, sim.oreFound));
-    const tally = `${crew}|${price}|${afford}|${sim.depth}|${ore}|${bars}|${Math.ceil(this.owed / TICK_HZ / 60)}|${hour}|${sky.weather}|${lost}|${news}|${left}|${sim.workedOut}|${sim.prospect}`;
+    const tally = `${crew}|${sim.crewCap}|${price}|${afford}|${sim.depth}|${ore}|${bars}|${Math.ceil(this.owed / TICK_HZ / 60)}|${hour}|${sky.weather}|${lost}|${news}|${left}|${sim.workedOut}|${sim.prospect}`;
     if (tally === this.shownTally) return;
     this.shownTally = tally;
     const hire = this.root.querySelector<HTMLButtonElement>("#mine-hire")!;
-    hire.innerHTML = full ? `Crew full<small>${crew} miners</small>` : `⛏ Hire a miner<small>${price} gold</small>`;
+    hire.innerHTML = !full ? `⛏ Hire a miner<small>${price} gold</small>` : crew >= MAX_MINERS ? `Crew full<small>${crew} miners</small>` : `Barracks full<small>upgrade it to hire more</small>`;
     hire.disabled = full || !afford;
     this.root.querySelector("#mine-tally")!.innerHTML =
       `<b>${crew}</b> ${crew === 1 ? "miner" : "miners"} · <b>${sim.depth}</b> ft deep · ${hour}, ${WEATHER_NAME[sky.weather].toLowerCase()}<br>` +
@@ -440,13 +487,15 @@ export class MinePage {
   private refreshCrew() {
     if (this.dragging) return;
     const sim = this.sim, target = this.renderer?.target ?? null;
-    const key = sim.miners.map((m) => `${m.id}:${m.name}:${m.job}`).join(",") + "|" + sim.fallen.map((f) => f.name).join(",") + "|" + (target?.id ?? "");
+    const key = sim.miners.map((m) => `${m.id}:${m.name}:${m.job}`).join(",") + "|" + sim.jobCap("forge") + ":" + sim.jobCap("smith") + "|" + sim.fallen.map((f) => f.name).join(",") + "|" + (target?.id ?? "");
     if (key === this.shownCrew) return;
     this.shownCrew = key;
     for (const job of JOBS) {
       const box = this.root.querySelector<HTMLElement>(`.crew-box[data-job="${job}"]`)!;
       const crew = sim.miners.filter((m) => m.job === job), lost = sim.fallen.filter((f) => f.job === job);
-      box.querySelector("[data-count]")!.textContent = String(crew.length);
+      const cap = sim.jobCap(job);
+      box.querySelector("[data-count]")!.textContent = cap === Infinity ? String(crew.length) : `${crew.length} / ${cap}`;
+      box.classList.toggle("full", crew.length >= cap);
       box.querySelector("ul")!.innerHTML =
         crew.map((m) => `<li class="crew-member${m === target ? " selected" : ""}" data-id="${m.id}"><i class="job-mark job-${job}"></i><span>${escape(m.name)}</span></li>`).join("") +
         lost.map((f) => `<li class="crew-member fallen" data-fallen="${escape(f.name)}" title="Lost: ${f.cause}. Tap to let them go."><i class="skull" aria-hidden="true">☠</i><s>${escape(f.name)}</s></li>`).join("");

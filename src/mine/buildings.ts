@@ -1,9 +1,11 @@
 /** The Mine's buildings on the surface, laid out along the ground either side
- * of the shaft: the shaft house over its mouth; the barracks to the right,
- * a lounge by the door and bunks in tiers of three, two to a ladder, which
- * grows a bay for every six of the crew; and to the left the warehouse
- * (timber, rails and lights for the workings), the forge (ore piles and a
- * furnace) and the smithy (an anvil, a rack of bars and a quench trough).
+ * of the shaft: the shaft house over its mouth (its winding room growing
+ * toward the barracks); the barracks to the right, a lounge by the door and
+ * bunks in tiers of three, two to a ladder, a bay for each level; and to the
+ * left the warehouse (timber, rails and lights for the workings), the forge
+ * (ore piles, shelves and a furnace) and the smithy (an anvil for each smith,
+ * a rack of bars and a quench trough). Each building has `MAX_LEVEL` levels
+ * and grows wider with each, so an upgrade can push its neighbours along.
  *
  * Inside a building a miner isn't in the grid: it walks a short scripted
  * path (`Spot.path`, feet cells from the door) to a spot (a bunk, a stool,
@@ -36,17 +38,19 @@ export type Layout = Record<BuildingId, Building>;
 
 /** Ticks a step and a rung take inside, as in the workings. */
 export const IN_STEP = 8, IN_CLIMB = 10;
-/** Bunks per bay (three tiers either side of a ladder), bays at most, and
- * the lounge's width. */
-export const BAY_BUNKS = 6, MAX_BAYS = 4;
+/** Bunks per bay (three tiers either side of a ladder), and the lounge's
+ * width. */
+export const BAY_BUNKS = 6;
 const LOUNGE = 6, BAY = 7;
-
-/** Bays the barracks needs to bunk a crew of `crew`. */
-export const bays = (crew: number) => Math.max(1, Math.min(MAX_BAYS, Math.ceil(crew / BAY_BUNKS)));
+/** Levels each building has. */
+export const MAX_LEVEL = 5;
+export type Levels = Record<BuildingId, number>;
+export const FIRST_LEVELS: Levels = { shaft: 1, barracks: 1, warehouse: 1, forge: 1, smithy: 1 };
 
 /** The buildings for ground `surface` (first solid row per column), a shaft
- * at `shaftX`, and a barracks of `bayCount` bays. */
-export function layout(surface: ArrayLike<number>, shaftX: number, bayCount: number): Layout {
+ * at `shaftX`, and each building at its level (1 to `MAX_LEVEL`). */
+export function layout(surface: ArrayLike<number>, shaftX: number, levels: Levels = FIRST_LEVELS): Layout {
+  const lv = (id: BuildingId) => Math.max(1, Math.min(MAX_LEVEL, levels[id] | 0)), bayCount = lv("barracks");
   const floorOf = (x0: number, x1: number) => {
     let top = Infinity;
     for (let x = Math.max(0, x0); x <= Math.min(W - 1, x1); x++) top = Math.min(top, surface[x]);
@@ -62,10 +66,11 @@ export function layout(surface: ArrayLike<number>, shaftX: number, bayCount: num
   const standing = (door: number, floor: number, xs: number[], facing: (x: number) => number) =>
     xs.map((x) => ({ x, y: floor, lie: false, facing: facing(x), path: walk(door, x, floor) }));
 
-  const shaft: Building = { id: "shaft", x0: shaftX - 3, x1: shaftX + 3, floor: floorOf(shaftX - 3, shaftX + 3), height: 4, door: shaftX, spots: {} };
+  const sx = shaftX + 2 + lv("shaft");
+  const shaft: Building = { id: "shaft", x0: shaftX - 3, x1: sx, floor: floorOf(shaftX - 3, sx), height: 4, door: shaftX, spots: {} };
 
   // The barracks: door on the left (toward the shaft), the lounge, then bays.
-  const bx0 = shaftX + 6, bx1 = bx0 + 1 + LOUNGE + BAY * bayCount, bf = floorOf(bx0, bx1);
+  const bx0 = sx + 3, bx1 = bx0 + 1 + LOUNGE + BAY * bayCount, bf = floorOf(bx0, bx1);
   const bunks: (Spot & { order: number })[] = [];
   for (let p = 0; p < bayCount; p++) {
     const px = bx0 + 1 + LOUNGE + p * BAY, ladder = px + 3;
@@ -85,15 +90,24 @@ export function layout(surface: ArrayLike<number>, shaftX: number, bayCount: num
     spots: { sleep: bunks.map(({ order, ...s }) => s), lounge: standing(bx0, bf, [bx0 + 2, bx0 + 5, bx0 + 6, bx0 + 1, bx0 + 3, bx0 + 4], (x) => (x <= bx0 + 3 ? 1 : -1)) },
   };
 
-  // To the left, doors on the right (toward the shaft).
-  const wx1 = shaftX - 6, wx0 = wx1 - 8, wf = floorOf(wx0, wx1);
+  // To the left, doors on the right (toward the shaft); each a little wider
+  // a level: the warehouse for more shelves, the forge for two more hands
+  // at the furnace, the smithy for another anvil.
+  const wx1 = shaftX - 6, wx0 = wx1 - 5 - 3 * lv("warehouse"), wf = floorOf(wx0, wx1);
   const warehouse: Building = { id: "warehouse", x0: wx0, x1: wx1, floor: wf, height: 6, door: wx1, spots: { stock: standing(wx1, wf, [wx0 + 3, wx0 + 5, wx0 + 2], () => -1) } };
-  const fx1 = wx0 - 2, fx0 = fx1 - 11, ff = floorOf(fx0, fx1);
-  const forge: Building = { id: "forge", x0: fx0, x1: fx1, floor: ff, height: 6, door: fx1, spots: { work: standing(fx1, ff, [fx0 + 4, fx0 + 5, fx0 + 6, fx0 + 7], () => -1) } };
-  const sx1 = fx0 - 2, sx0 = sx1 - 9, sf = floorOf(sx0, sx1);
-  const smithy: Building = { id: "smithy", x0: sx0, x1: sx1, floor: sf, height: 6, door: sx1, spots: { work: standing(sx1, sf, [sx0 + 3, sx0 + 7, sx0 + 8], (x) => (x < sx0 + 5 ? 1 : -1)) } };
+  const fx1 = wx0 - 2, fx0 = fx1 - 8 - 3 * lv("forge"), ff = floorOf(fx0, fx1);
+  const hands = Array.from({ length: 2 * lv("forge") }, (_, i) => fx0 + 4 + i);
+  const forge: Building = { id: "forge", x0: fx0, x1: fx1, floor: ff, height: 6, door: fx1, spots: { work: standing(fx1, ff, hands, () => -1) } };
+  const mx1 = fx0 - 2, mx0 = mx1 - 6 - 3 * lv("smithy"), mf = floorOf(mx0, mx1);
+  // A smith stands at the left of each anvil (`anvils`), facing it.
+  const smiths = Array.from({ length: lv("smithy") }, (_, i) => mx0 + 3 + 3 * i);
+  const smithy: Building = { id: "smithy", x0: mx0, x1: mx1, floor: mf, height: 6, door: mx1, spots: { work: standing(mx1, mf, smiths, () => 1) } };
   return { shaft, barracks, warehouse, forge, smithy };
 }
+
+/** The anvils' first columns in a smithy (each three cells wide, its smith
+ * standing just left of it). */
+export const anvils = (b: Building) => (b.spots.work ?? []).map((s) => s.x + 1);
 
 /** Ticks to walk a spot's path. */
 export function pathTicks(path: [number, number][]) {
