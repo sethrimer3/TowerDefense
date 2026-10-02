@@ -529,6 +529,7 @@ export class DefendPage {
       now: performance.now(),
       reduceMotion: this.host.reduceMotion(),
       effects: this.host.effects(),
+      over: this.phase === "over",
     });
   }
 

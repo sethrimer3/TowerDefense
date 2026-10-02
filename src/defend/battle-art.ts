@@ -53,8 +53,12 @@ function healthBar({ c, px }: Brush, bd: Building, frac: number) {
   c.fillRect(r.x * px, r.y * px - bh - 1, bw * frac, bh);
 }
 
-/** Units, projectiles and effects. With `torches`, units carry a flame. */
-export function drawUnits(b: Brush, sim: DefendSim, torches: boolean) {
+/** How brightly a torch at (x, y) still burns, 0 (out) to 1. */
+export type Burning = (x: number, y: number, id: number) => number;
+
+/** Units, projectiles and effects. With `torches`, units carry a torch,
+ * lit while it still burns. */
+export function drawUnits(b: Brush, sim: DefendSim, torches: Burning | null) {
   drawWatchRadii(b, sim);
   drawCivilians(b, sim, torches);
   drawSoldiers(b, sim, torches);
@@ -78,13 +82,13 @@ function drawWatchRadii({ c, px }: Brush, sim: DefendSim) {
 }
 
 /** Civilians, with a flicker of gold over those at work. */
-function drawCivilians(b: Brush, sim: DefendSim, torches: boolean) {
+function drawCivilians(b: Brush, sim: DefendSim, torches: Burning | null) {
   const { c, px } = b;
   for (const u of sim.civilians) {
     const s = Math.max(2, CIVILIAN.size * px);
     c.fillStyle = u.flash > 0 ? "#fff" : CIVILIAN.color;
     c.fillRect(u.x * px - s / 2, u.y * px - s / 2, s, s);
-    if (torches) drawHandTorch(b, { x: u.x + CIVILIAN.size * 0.6, y: u.y - CIVILIAN.size * 0.4, id: u.id }, sim.time);
+    if (torches) drawHandTorch(b, { x: u.x + CIVILIAN.size * 0.6, y: u.y - CIVILIAN.size * 0.4, id: u.id }, sim.time, torches(u.x, u.y, u.id));
     if (u.state === "working" && Math.floor(sim.time * 6) % 2) {
       c.fillStyle = "#f2d27a";
       c.fillRect(u.x * px + s / 2, u.y * px - s, Math.max(1, s / 2), Math.max(1, s / 2));
@@ -93,7 +97,7 @@ function drawCivilians(b: Brush, sim: DefendSim, torches: boolean) {
 }
 
 /** Swordsmen and archers (who carry a little bow on the off side). */
-function drawSoldiers(b: Brush, sim: DefendSim, torches: boolean) {
+function drawSoldiers(b: Brush, sim: DefendSim, torches: Burning | null) {
   const { c, px } = b;
   for (const u of sim.soldiers) {
     const archer = u.kind === "archer";
@@ -106,18 +110,22 @@ function drawSoldiers(b: Brush, sim: DefendSim, torches: boolean) {
       c.fillStyle = "#b58a4f";
       c.fillRect(u.x * px - s / 2 - Math.max(1, s * 0.3), u.y * px - s / 2, Math.max(1, s * 0.2), s);
     }
-    if (torches) drawHandTorch(b, { x: u.x + SOLDIER.size * 0.65, y: u.y - SOLDIER.size * 0.45, id: u.id }, sim.time);
+    if (torches) drawHandTorch(b, { x: u.x + SOLDIER.size * 0.65, y: u.y - SOLDIER.size * 0.45, id: u.id }, sim.time, torches(u.x, u.y, u.id));
   }
 }
 
-/** The flame of a unit's hand torch, held at `at`: a flickering pixel or two. */
-function drawHandTorch({ c, px }: Brush, at: { x: number; y: number; id: number }, t: number) {
+/** A unit's hand torch, held at `at`: the stick, and while it `burns` a
+ * flickering pixel or two of flame. */
+function drawHandTorch({ c, px }: Brush, at: { x: number; y: number; id: number }, t: number, burns: number) {
   const s = Math.max(1, px * 0.14);
   const f = Math.sin(t * 17 + at.id * 1.7) * 0.5 + 0.5;
   c.fillStyle = "#5a3b1e";
   c.fillRect(at.x * px - s / 2, at.y * px, s, s * 1.6);
+  if (burns <= 0) return;
+  c.globalAlpha = burns;
   c.fillStyle = f > 0.5 ? "#ffe6a8" : "#ffb35c";
   c.fillRect(at.x * px - s / 2, at.y * px - s * (1 + f * 0.5), s, s * (1 + f * 0.5));
+  c.globalAlpha = 1;
 }
 
 /** Enemies: tiny squares, gold-outlined when marked, with a shadow under

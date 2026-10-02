@@ -195,6 +195,14 @@ export class DefendLighting {
   private dyn: HTMLCanvasElement | null = null;
   private ground: HTMLCanvasElement | null = null;
   private groundKey = "";
+  /** How brightly each light still burns, 0 (out) to 1; set each frame
+   * while the city's lights are going out, else null (all burning). */
+  burning: ((l: Light) => number) | null = null;
+
+  /** How brightly light `l` burns now. */
+  burn(l: Light) {
+    return this.burning ? this.burning(l) : 1;
+  }
 
   /** Point the lighting at a (new) city. */
   setMap(map: CityMap) {
@@ -236,7 +244,7 @@ export class DefendLighting {
   }
 
   private active(l: Light, intact: (id: number) => boolean) {
-    return intact(l.owner) && this.bakes.get(l.id);
+    return intact(l.owner) && this.burn(l) > 0 && this.bakes.get(l.id);
   }
 
   private rebuildDominant(intact: (id: number) => boolean) {
@@ -272,7 +280,7 @@ export class DefendLighting {
     this.invalidate(changed);
     this.bakePending(solid);
     // A light going out or coming back also changes who dominates.
-    const onKey = this.lights.map((l) => (intact(l.owner) ? 1 : 0)).join("");
+    const onKey = this.lights.map((l) => (intact(l.owner) && this.burn(l) > 0 ? 1 : 0)).join("");
     if (onKey !== this.lastOn) {
       this.lastOn = onKey;
       this.domDirty = true;
@@ -354,7 +362,7 @@ export class DefendLighting {
   private drawPools(layers: Layers, frame: LightFrame, glow: number) {
     for (const l of this.lights) {
       const pair = this.active(l, frame.intact);
-      if (pair) drawPool(layers, frame, glow, { l, pair });
+      if (pair) drawPool(layers, frame, glow, { l, pair, burn: this.burn(l) });
     }
   }
 
@@ -454,8 +462,9 @@ export class DefendLighting {
     for (const l of lit) {
       const f = getTorchFlicker({ x: l.id * 7, y: l.id * 13 }, now, reduceMotion);
       const sway = getTorchSway({ x: l.id * 7, y: l.id * 13 }, now, reduceMotion);
-      const r = px * (l.kind === "lantern" || l.kind === "door" ? 0.9 : 1.4) * f;
-      c.globalAlpha = Math.min(1, 0.7 * f);
+      const b = this.burn(l);
+      const r = px * (l.kind === "lantern" || l.kind === "door" ? 0.9 : 1.4) * f * (0.4 + 0.6 * b);
+      c.globalAlpha = Math.min(1, 0.7 * f * b);
       c.drawImage(this.flameSprite, (l.x + sway.x) * px - r, (l.y + sway.y) * px - r, r * 2, r * 2);
     }
     c.restore();
@@ -463,9 +472,11 @@ export class DefendLighting {
     const s = Math.max(1, px * 0.18);
     for (const l of lit) {
       const sway = getTorchSway({ x: l.id * 7, y: l.id * 13 }, now, reduceMotion);
+      c.globalAlpha = this.burn(l);
       c.fillStyle = "#ffe6a8";
       c.fillRect((l.x + sway.x) * px - s / 2, (l.y + sway.y * 0.5) * px - s / 2, s, s * sway.stretch);
     }
+    c.globalAlpha = 1;
   }
 }
 
@@ -500,13 +511,13 @@ function clearLayers({ dk, gl }: Layers, ambient: Ambient) {
   dk.imageSmoothingEnabled = gl.imageSmoothingEnabled = true;
 }
 
-/** One light's pool, blended between its two swayed bakes by how far the
- * flame leans, carved into the darkness and added to the glow. */
-function drawPool({ dk, gl }: Layers, { px, now, reduceMotion }: LightFrame, glow: number, { l, pair }: { l: Light; pair: [Bake, Bake] }) {
+/** One light's pool at `burn` brightness, blended between its two swayed
+ * bakes by how far the flame leans, carved into the darkness and added to the glow. */
+function drawPool({ dk, gl }: Layers, { px, now, reduceMotion }: LightFrame, glow: number, { l, pair, burn }: { l: Light; pair: [Bake, Bake]; burn: number }) {
   const flicker = getTorchFlicker({ x: l.id * 7, y: l.id * 13 }, now, reduceMotion);
   const sway = getTorchSway({ x: l.id * 7, y: l.id * 13 }, now, reduceMotion);
   const lean = Math.max(0, Math.min(1, 0.5 + sway.x / (2 * LIGHTING_CONFIG.flicker.swayX)));
-  const k = l.strength * flicker;
+  const k = l.strength * flicker * burn;
   for (const [b, w] of [
     [pair[0], 1 - lean],
     [pair[1], lean],

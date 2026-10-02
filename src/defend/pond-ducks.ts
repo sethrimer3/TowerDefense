@@ -40,6 +40,9 @@ type Duck = {
 };
 
 /** Sprites facing right, bottom row at the waterline. */
+/** Duck pixels a cell: twice the parks' art scale. */
+const DUCK = ART * 2;
+
 const SPRITES: Record<"swim" | "dabble" | "preen" | "duckling" | "sleepling", string[]> = {
   swim: [".....hh.", ".....hhb", "tsssscc.", ".dddddd."],
   dabble: ["..t.....", ".tss....", "wsssw...", ".wwww..."],
@@ -225,22 +228,23 @@ export class Ducks {
     if (fast > 0.12 && !still) {
       d.wake -= dt;
       if (d.wake <= 0) {
-        ring(d.x - d.face * 0.25, d.y + 0.05, d.state === "flee" ? 0.8 : 0.45);
+        ring(d.x - d.face * 0.13, d.y + 0.03, d.state === "flee" ? 0.8 : 0.45);
         d.wake = d.state === "flee" ? 0.45 : 2.5 + this.rand() * 4;
       }
     }
   }
 
-  /** Each duck and its faint reflection, on the ponds' pixel grid. */
+  /** Each duck and its faint reflection, on a grid twice as fine as the
+   * ponds' pixels (`DUCK` a cell), so the ducks are half their art's size. */
   draw(c: CanvasRenderingContext2D, px: number, now: number, art: ParkArt) {
-    const s = px / ART, t = now / 1000;
+    const s = px / DUCK, t = now / 1000, k = DUCK / ART;
     c.save();
     for (const d of [...this.ducks].sort((a, b) => a.y - b.y)) {
       const sprite = SPRITES[spriteOf(d)], colors = COLORS[d.kind === "duckling" ? "duckling" : d.kind];
       const w = sprite[0].length, h = sprite.length;
       // Bobbing: a pixel up and down while sitting still.
       const bob = d.state === "drift" || d.state === "preen" || d.state === "sleep" ? (Math.sin(t * 2.2 + d.phase) > 0.5 ? -1 : 0) : 0;
-      const ax = Math.round(d.x * ART - w / 2), ay = Math.round(d.y * ART) - h + 1 + bob;
+      const ax = Math.round(d.x * DUCK - w / 2), ay = Math.round(d.y * DUCK) - h + 1 + bob;
       for (let row = 0; row < h; row++)
         for (let col = 0; col < w; col++) {
           const ch = sprite[row][d.face === 1 ? col : w - 1 - col];
@@ -252,7 +256,7 @@ export class Ducks {
           c.fillRect(x * s, y * s, s, s);
           // The reflection: the same pixel mirrored below the waterline, faint.
           const ry = ay + h + (h - 1 - row);
-          if (ch !== "w" && ch !== "d" && openAt(art, x, ry)) {
+          if (ch !== "w" && ch !== "d" && openAt(art, Math.floor(x / k), Math.floor(ry / k))) {
             c.globalAlpha = 0.22;
             c.fillRect(x * s, ry * s, s, s);
           }

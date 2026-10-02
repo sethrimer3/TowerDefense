@@ -38,11 +38,11 @@ export const LIGHTING_CONFIG = {
     ],
     /** Side-to-side flame sway, in tiles; the light pool, haze, and cast
      * shadows move with it. */
-    swayX: 0.09,
+    swayX: 0.04,
     /** Slight up/down bob of the flame's light, in tiles. */
-    swayY: 0.035,
+    swayY: 0.015,
     /** Flame sprite stretch amount (+/- fraction of its height). */
-    stretch: 0.16,
+    stretch: 0.08,
   },
   /** Baked torch glow (see torch-light.ts). Computed once per torch, drawn
    * each frame as two cheap image blits. */
@@ -78,7 +78,7 @@ export const LIGHTING_CONFIG = {
     /** The glow is baked with the flame nudged this far (tiles) to each side
      * and cross-faded with its lean, so the pool sways while its edges stay
      * pinned to the walls. */
-    swayOffset: 0.12,
+    swayOffset: 0.05,
   },
   /** Low "Brightness" settings: a cool multiply pass over the whole dungeon
    * (walls included) that torchlight lifts back out in warm pools. Scaled by

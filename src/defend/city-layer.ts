@@ -9,7 +9,7 @@ import { CELL_COUNT, CELLS_H, CELLS_W, SPAWN_ROW, SUB, TILES_H, TILES_W, cellInB
 import { CellType, type Building, type CityMap } from "./citygen.ts";
 import type { Light, Stone } from "./lighting.ts";
 import type { DefendSim } from "./sim.ts";
-import { ROAD, paintStructureArt } from "./structure-art.ts";
+import { ROAD, keepStage, paintKeepRubble, paintStructureArt } from "./structure-art.ts";
 import { roofSeed, roofSprite } from "./roof-art.ts";
 import { parkArt } from "./park-art.ts";
 import { GRASS, grassPatch, groundArt } from "./ground-art.ts";
@@ -225,15 +225,15 @@ function paintBuilding(p: Paint, b: Building) {
     if (solid(b.cells[0])) paintWall(p, b.rect.x, b.rect.y);
     return;
   }
-  if (sim && !sim.intact(b)) return paintRebuilding(p, b);
   const r = b.rect;
   // Everything snaps to whole pixels so outlines stay crisp.
   const x = Math.round(r.x * px),
     y = Math.round(r.y * px),
     w = Math.round((r.x + r.w) * px) - x,
     h = Math.round((r.y + r.h) * px) - y;
+  if (sim && !sim.intact(b)) return b.kind === "keep" ? paintKeepRubble(c, { x, y, w, h, px }) : paintRebuilding(p, b);
   if (b.kind === "house") return paintHouse(p, b, { x, y, w, h });
-  paintStructureArt(c, b.kind, { x, y, w, h, px });
+  paintStructureArt(c, b.kind, { x, y, w, h, px }, b.kind === "keep" && sim ? keepStage(sim.hp[b.id], sim.maxHp[b.id]) : 0);
 }
 
 /** Partially rebuilt: finished sections show as fresh timber framing. */
@@ -327,10 +327,11 @@ function paintLanternBrackets({ c, px, map, sim }: Paint, lights: readonly Light
   }
 }
 
-/** Rubble chunks over the cells of fallen buildings. */
+/** Rubble chunks over the cells of fallen buildings (the keep has its own
+ * rubble art). */
 function paintRubble({ c, px, map, solid }: Paint) {
   for (let i = 0; i < map.type.length; i++) {
-    if (map.owner[i] < 0 || solid(i)) continue;
+    if (map.owner[i] < 0 || solid(i) || map.buildings[map.owner[i]].kind === "keep") continue;
     const cx = i % CELLS_W,
       cy = (i - cx) / CELLS_W;
     for (let k = 0; k < 3; k++) {

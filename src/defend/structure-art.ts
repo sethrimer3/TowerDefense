@@ -2,7 +2,7 @@
  * (drawn into the city layer and the palette icons), the keep's live banner,
  * and the shared palette. */
 import { SOLDIER, type StructureKind } from "./catalog.ts";
-import { hash } from "./grid.ts";
+import { hash, hash01 } from "./grid.ts";
 import { ART } from "./park-art.ts";
 
 /** Medieval roofing: terracotta tile, old brick, weathered timber, thatch,
@@ -18,7 +18,9 @@ export type ArtBox = { x: number; y: number; w: number; h: number; px: number };
 /** A structure's box snapped to whole pixels, with its outline widths. */
 type Frame = ArtBox & { inset: number; line: number };
 
-export function paintStructureArt(c: CanvasRenderingContext2D, kind: StructureKind, box: ArtBox) {
+/** Paints a structure into `box`; the keep shows damage `stage` (see
+ * `keepStage`). */
+export function paintStructureArt(c: CanvasRenderingContext2D, kind: StructureKind, box: ArtBox, stage = 0) {
   const px = box.px;
   const f: Frame = {
     x: Math.round(box.x),
@@ -29,11 +31,11 @@ export function paintStructureArt(c: CanvasRenderingContext2D, kind: StructureKi
     inset: Math.max(1, Math.round(px * 0.1)),
     line: Math.max(1, Math.round(px * 0.08)),
   };
+  if (kind === "keep") return paintKeep(c, f, stage);
   STRUCTURES[kind](c, f);
 }
 
-const STRUCTURES: Record<StructureKind, (c: CanvasRenderingContext2D, f: Frame) => void> = {
-  keep: (c, f) => paintKeep(c, f),
+const STRUCTURES: Record<Exclude<StructureKind, "keep">, (c: CanvasRenderingContext2D, f: Frame) => void> = {
   barracks: paintBarracks,
   archerBarracks: paintArcherBarracks,
   archerTower: paintArcherTower,
@@ -226,16 +228,35 @@ const K = {
   roof: { n: 0x7c838e, w: 0x5d636c, e: 0x494e57, s: 0x3c4048 }, ridge: 0x2a2d33, ridgeLit: 0x8f96a1,
   turret: 0xa8a194, turretLit: 0xc4bdae, cap: [0x3a3e45, 0x50555e, 0x6c727c, 0x8b929d], finial: 0xd8b572,
   door: 0x6b4a2c, doorDark: 0x4a321e,
+  // Damage: soot, the dark through a hole, charred rafters, embers, and
+  // fallen stone and slate (dark, mid, lit).
+  soot: 0x2e2925, hole: 0x15110e, rafter: 0x6a4728, rafterDark: 0x3e2a18, ember: 0xc8542a, emberHot: 0xf0a040,
+  stone: [0x5f5a51, 0x8f897d, 0xb7b0a2], slate: [0x3c4048, 0x5d636c, 0x7c838e],
 };
 
 /** Opaque little-endian RGBA for 0xRRGGBB, at `alpha`. */
 const rgba = (c: number, alpha = 255) => ((alpha << 24) | ((c & 0xff) << 16) | (c & 0xff00) | ((c >> 16) & 0xff)) >>> 0;
 
+/** The keep's damage stage at `hp` of `max` hit points: 0 whole, then 1 to
+ * 4 below 80%, 60%, 40% and 20%. */
+export function keepStage(hp: number, max: number) {
+  const f = max > 0 ? hp / max : 1;
+  return f >= 0.8 ? 0 : f >= 0.6 ? 1 : f >= 0.4 ? 2 : f >= 0.2 ? 3 : 4;
+}
+
 /** The keep, from above, as `KEEP × KEEP` RGBA pixels: a square curtain of
  * crenellated wall with a round turret on each corner and a gate to the
  * south, a flagstone courtyard, and the great tower in the middle under a
- * four-sided slate roof. The banner is drawn live (drawFlag). */
-export function keepPixels(): Uint32Array {
+ * four-sided slate roof. The banner is drawn live (drawFlag). At damage
+ * `stage` 1 to 4 it is cracked, holed, breached and ruined in turn; damage
+ * only repaints pixels, never clears one, so it always covers the ground. */
+export function keepPixels(stage = 0): Uint32Array {
+  const out = wholeKeep(), p = pixels(out);
+  for (let s = 1; s <= stage; s++) DAMAGE[s - 1](p);
+  return out;
+}
+
+function wholeKeep(): Uint32Array {
   const n = KEEP, out = new Uint32Array(n * n);
   const set = (x: number, y: number, c: number) => (out[y * n + x] = rgba(c));
   // Curtain wall: outline, merlons on the outer edge, the wall walk, and an
@@ -317,15 +338,241 @@ function shade(c: number, f: number) {
   return (ch(16) << 16) | (ch(8) << 8) | ch(0);
 }
 
-let keepSprite: HTMLCanvasElement | null = null;
+// ── The keep's damage and rubble ──────────────────────────────────────────
 
-/** The keep's pixels drawn up to fill its box, smoothing off. */
-function paintKeep(c: CanvasRenderingContext2D, { x, y, w, h }: ArtBox) {
+/** A pixel buffer being painted: `get` reads 0xRRGGBB (-1 where empty). */
+type Pix = { out: Uint32Array; set: Put; get: (x: number, y: number) => number };
+
+function pixels(out: Uint32Array): Pix {
+  const n = KEEP;
+  const inside = (x: number, y: number) => x >= 0 && y >= 0 && x < n && y < n;
+  return {
+    out,
+    set: (x, y, c) => {
+      if (inside(x, y)) out[y * n + x] = rgba(c);
+    },
+    get: (x, y) => {
+      if (!inside(x, y) || !out[y * n + x]) return -1;
+      const v = out[y * n + x];
+      return ((v & 0xff) << 16) | (v & 0xff00) | ((v >> 16) & 0xff);
+    },
+  };
+}
+
+type Pt = readonly [number, number];
+
+const paintAll = (p: Pix, pts: readonly Pt[], c: number) => pts.forEach(([x, y]) => p.set(x, y, c));
+
+/** Darkens the drawn pixels at `pts` by `f`: soot and scorching. */
+function scorch(p: Pix, pts: readonly Pt[], f = 0.62) {
+  for (const [x, y] of pts) {
+    const c = p.get(x, y);
+    if (c >= 0 && c !== K.outline) p.set(x, y, shade(c, f));
+  }
+}
+
+/** Every pixel of the box from (x0, y0) to (x1, y1), inclusive. */
+function box(x0: number, y0: number, x1: number, y1: number): Pt[] {
+  const out: Pt[] = [];
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) out.push([x, y]);
+  return out;
+}
+
+/** A fallen chunk of stone or slate: centre, radius and its tones (dark,
+ * mid, lit). */
+type Chunk = readonly [number, number, number, readonly number[]];
+
+/** Fallen chunks heaped together, later ones over earlier: each lit from
+ * the upper left with a dark crease where it meets the next, and one black
+ * outline round the whole pile. */
+function pile(p: Pix, chunks: readonly Chunk[]) {
+  const n = KEEP, id = new Int16Array(n * n).fill(-1);
+  const at = (x: number, y: number) => (x >= 0 && y >= 0 && x < n && y < n ? id[y * n + x] : -1);
+  chunks.forEach(([cx, cy, r], k) => {
+    for (let y = Math.max(0, Math.floor(cy - r)); y <= Math.min(n - 1, Math.ceil(cy + r)); y++)
+      for (let x = Math.max(0, Math.floor(cx - r)); x <= Math.min(n - 1, Math.ceil(cx + r)); x++)
+        if ((x + 0.5 - cx) ** 2 + (y + 0.5 - cy) ** 2 <= r * r) id[y * n + x] = k;
+  });
+  for (let y = 0; y < n; y++)
+    for (let x = 0; x < n; x++) {
+      const k = id[y * n + x];
+      if (k < 0) {
+        let edge = false;
+        for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++) edge ||= at(x + ox, y + oy) >= 0;
+        if (edge) p.set(x, y, K.outline);
+        continue;
+      }
+      const [cx, cy, r, tones] = chunks[k];
+      const crease = [at(x + 1, y), at(x, y + 1)].some((o) => o >= 0 && o !== k);
+      const lean = x + 0.5 - cx + (y + 0.5 - cy);
+      p.set(x, y, crease ? shade(tones[0], 0.7) : lean < -r * 0.4 ? tones[2] : lean > r * 0.4 ? tones[0] : tones[1]);
+    }
+}
+
+/** One fallen chunk on its own. */
+const chunk = (p: Pix, cx: number, cy: number, r: number, tones: readonly number[]) => pile(p, [[cx, cy, r, tones]]);
+
+/** A charred beam from (x, y), `len` pixels along (dx, dy), outlined. */
+function beam(p: Pix, x: number, y: number, len: number, [dx, dy]: Pt) {
+  const along: Pt[] = [];
+  for (let i = 0; i < len; i++) along.push([x + dx * i, y + dy * i]);
+  for (const [bx, by] of along)
+    for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++) p.set(bx + ox, by + oy, K.outline);
+  along.forEach(([bx, by], i) => p.set(bx, by, i % 3 === 1 ? K.rafter : K.rafterDark));
+}
+
+/** A breach through the curtain wall over the box (x0, y0)–(x1, y1): the
+ * broken ends capped in outline, the gap full of fallen stone. */
+function breach(p: Pix, [x0, y0, x1, y1]: readonly number[], fall: readonly (readonly number[])[]) {
+  paintAll(p, box(x0, y0, x1, y1), K.courtShade);
+  const vertical = x1 - x0 < y1 - y0;
+  if (vertical) paintAll(p, [...box(x0, y0 - 1, x1, y0 - 1), ...box(x0, y1 + 1, x1, y1 + 1)], K.outline);
+  else paintAll(p, [...box(x0 - 1, y0, x0 - 1, y1), ...box(x1 + 1, y0, x1 + 1, y1)], K.outline);
+  pile(p, fall.map(([cx, cy, r]) => [cx, cy, r, K.stone] as const));
+}
+
+/** Pixels within `r` of the turret centred at (cx, cy): its cap. */
+function capOf(cx: number, cy: number, r = 2): Pt[] {
+  return box(cx - 3, cy - 3, cx + 3, cy + 3).filter(([x, y]) => (x + 0.5 - cx) ** 2 + (y + 0.5 - cy) ** 2 < r * r);
+}
+
+const n1 = KEEP - 1;
+
+/** What each damage stage adds to the one before. */
+const DAMAGE: ((p: Pix) => void)[] = [
+  // Below 80%: cracks across the curtain wall and the roof, merlons knocked
+  // off, soot by the walls.
+  (p) => {
+    paintAll(p, [[10, 1], [10, 2], [11, 3], [2, 13], [3, 14], [3, 15], [21, 9], [20, 10], [20, 11], [9, 12], [10, 13], [16, 20], [17, 21]], K.outline);
+    paintAll(p, [[14, 2], [15, 2], [2, 9], [21, 16]], K.soot);
+    scorch(p, [[6, 15], [6, 16], [5, 16], [17, 6], [16, 5], [17, 5], [12, 18], [13, 18]], 0.7);
+  },
+  // Below 60%: slates gone from the roof, the north-east turret's cap
+  // broken open, more cracks.
+  (p) => {
+    scorch(p, box(12, 8, 15, 11));
+    scorch(p, box(8, 13, 11, 15));
+    paintAll(p, [[13, 9], [14, 9], [13, 10], [14, 10], [9, 14], [10, 14], [10, 15]], K.hole);
+    paintAll(p, [[14, 10], [10, 14]], K.rafter);
+    paintAll(p, [[20, 4], [21, 4], [20, 5]], K.hole);
+    p.set(21, 4, K.ember);
+    paintAll(p, [[1, 6], [2, 6], [3, 7], [n1 - 1, 18], [n1 - 2, 18], [7, 9], [8, 10]], K.outline);
+  },
+  // Below 40%: the east wall breached, a hole burning through the roof,
+  // the south-west turret's cap fallen in.
+  (p) => {
+    breach(p, [19, 11, 22, 14], [[20.6, 11.8, 1.7], [21.6, 14.2, 1.6], [19.4, 14.6, 1.3]]);
+    scorch(p, box(11, 11, 15, 15));
+    paintAll(p, box(12, 12, 14, 14), K.hole);
+    paintAll(p, [[12, 14], [13, 13], [14, 12]], K.rafter);
+    p.set(13, 14, K.ember);
+    p.set(12, 13, K.emberHot);
+    paintAll(p, capOf(4, 20), K.hole);
+    chunk(p, 4.2, 20.4, 1, K.slate);
+    p.set(3, 19, K.ember);
+  },
+  // Below 20%: the north wall breached too, half the roof caved in over
+  // smouldering rafters, the gate smashed, every cap broken, stone
+  // everywhere.
+  (p) => {
+    breach(p, [14, 1, 17, 4], [[14.8, 2.6, 1.6], [17.2, 3.6, 1.7], [15.6, 5.8, 1.4]]);
+    for (const [x, y] of box(8, 8, 15, 15)) {
+      if (x + y < 22) continue;
+      if (x + y === 22) p.set(x, y, K.outline);
+      else if ((x - y + 30) % 3 === 0) p.set(x, y, (x + y) % 2 ? K.rafter : K.rafterDark);
+      else p.set(x, y, hash(x, y, 13) % 5 === 0 ? K.ember : K.hole);
+    }
+    p.set(14, 14, K.emberHot);
+    scorch(p, box(7, 7, 16, 16).filter(([x, y]) => x + y < 22 && hash(x, y, 17) % 3 === 0));
+    paintAll(p, box(10, 20, 13, 21), K.hole);
+    paintAll(p, [[11, 20], [12, 21]], K.door);
+    paintAll(p, [...capOf(4, 4, 1.6), ...capOf(n1 - 4, n1 - 4, 1.6)], K.hole);
+    paintAll(p, [[20, 5], [21, 4]], K.ember);
+    chunk(p, 6.6, 9.4, 1.5, K.stone);
+    chunk(p, 17.2, 16.6, 1.6, K.stone);
+    chunk(p, 8.6, 17.6, 1.4, K.slate);
+  },
+];
+
+/** The fallen keep as `KEEP × KEEP` RGBA pixels: scorched flagstones,
+ * stumps of the curtain wall and turrets, and a heap of stone, slate and
+ * charred beams where the great tower stood, a few embers still in it. */
+export function keepRubblePixels(): Uint32Array {
+  const n = KEEP, whole = pixels(wholeKeep()), out = new Uint32Array(n * n), p = pixels(out);
+  const ring = (x: number, y: number) => Math.min(x - 1, y - 1, n - 2 - x, n - 2 - y);
+  for (let y = 1; y < n - 1; y++)
+    for (let x = 1; x < n - 1; x++) {
+      if (ring(x, y) === 0 && hash(x, y, 23) % 3 === 0) continue;
+      const r = hash(x, y, 29) % 8;
+      p.set(x, y, r === 0 ? K.soot : r < 3 ? K.courtDark : r < 7 ? K.court : K.courtLit);
+    }
+  // Stumps: runs of the curtain wall and arcs of each turret's rim still
+  // standing, their broken ends capped in outline.
+  const wall = (x: number, y: number) => x > 0 && y > 0 && x < n - 1 && y < n - 1 && ring(x, y) <= 3;
+  const turrets: Pt[] = [[4, 4], [n - 4, 4], [4, n - 4], [n - 4, n - 4]];
+  const rim = (x: number, y: number) => turrets.some(([cx, cy]) => { const d = Math.hypot(x + 0.5 - cx, y + 0.5 - cy); return d > 2 && d <= 3.9; });
+  const stands = (x: number, y: number) => {
+    if (rim(x, y)) {
+      const [cx, cy] = turrets.reduce((a, t) => (Math.hypot(x - t[0], y - t[1]) < Math.hypot(x - a[0], y - a[1]) ? t : a));
+      const sector = Math.floor(((Math.atan2(y + 0.5 - cy, x + 0.5 - cx) + Math.PI) / (2 * Math.PI)) * 6);
+      return hash(cx, cy, sector, 31) % 3 !== 0;
+    }
+    if (!wall(x, y)) return false;
+    const along = ring(x, y) === y - 1 || ring(x, y) === n - 2 - y ? x : y;
+    const side = y - 1 === ring(x, y) ? 0 : n - 2 - y === ring(x, y) ? 1 : x - 1 === ring(x, y) ? 2 : 3;
+    return hash(side, Math.floor(along / 4), 37) % 5 < 3;
+  };
+  const part = (x: number, y: number) => wall(x, y) || rim(x, y);
+  for (let y = 0; y < n; y++)
+    for (let x = 0; x < n; x++) {
+      if (!part(x, y) || !stands(x, y)) continue;
+      const end = ORTHO4.some(([dx, dy]) => part(x + dx, y + dy) && !stands(x + dx, y + dy));
+      p.set(x, y, end ? K.outline : whole.get(x, y));
+    }
+  // Fallen stone along the walls, then the heap over the great tower.
+  const fallen: Chunk[] = [];
+  for (let k = 0; k < 8; k++) {
+    const t = hash01(k, 41), side = k % 4, d = 5.8 + hash01(k, 43) * 1.2;
+    const a = 6 + t * (n - 12);
+    const [cx, cy] = side === 0 ? [a, d] : side === 1 ? [a, n - d] : side === 2 ? [d, a] : [n - d, a];
+    fallen.push([cx, cy, 1.4 + hash01(k, 47) * 0.5, K.stone]);
+  }
+  beam(p, 7, 8, 6, [1, 1]);
+  const heap: Chunk[] = Array.from({ length: 16 }, (_, k) => {
+    const ang = hash01(k, 53) * Math.PI * 2, rr = Math.sqrt(hash01(k, 59)) * 4.4;
+    return [n / 2 + Math.cos(ang) * rr, n / 2 + Math.sin(ang) * rr, 1.8 + hash01(k, 61) * (1.6 - rr * 0.2), k % 4 === 0 ? K.slate : K.stone] as const;
+  });
+  pile(p, [...fallen, ...heap.sort((a, b) => b[2] - a[2])]);
+  beam(p, 14, 9, 5, [0, 1]);
+  // Embers on the heap.
+  for (const [x, y] of [[10, 11], [13, 12], [11, 14], [14, 10], [12, 9], [9, 13]] as Pt[])
+    if (p.get(x, y) !== K.outline && hash(x, y, 67) % 3 !== 0) p.set(x, y, (x + y) % 2 ? K.ember : K.emberHot);
+  return out;
+}
+
+const ORTHO4: readonly Pt[] = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+
+const keepSprites: (HTMLCanvasElement | undefined)[] = [];
+let rubbleSprite: HTMLCanvasElement | null = null;
+
+/** The keep's pixels at damage `stage` drawn up to fill its box,
+ * smoothing off. */
+function paintKeep(c: CanvasRenderingContext2D, { x, y, w, h }: ArtBox, stage: number) {
   if (typeof document === "undefined") return;
-  keepSprite ??= spriteCanvas(keepPixels(), KEEP, KEEP);
+  const sprite = (keepSprites[stage] ??= spriteCanvas(keepPixels(stage), KEEP, KEEP));
   c.save();
   c.imageSmoothingEnabled = false;
-  c.drawImage(keepSprite, x, y, w, h);
+  c.drawImage(sprite, x, y, w, h);
+  c.restore();
+}
+
+/** The fallen keep's rubble over its cells (`box`, canvas pixels). */
+export function paintKeepRubble(c: CanvasRenderingContext2D, { x, y, w, h }: ArtBox) {
+  if (typeof document === "undefined") return;
+  rubbleSprite ??= spriteCanvas(keepRubblePixels(), KEEP, KEEP);
+  c.save();
+  c.imageSmoothingEnabled = false;
+  c.drawImage(rubbleSprite, Math.round(x), Math.round(y), Math.round(w), Math.round(h));
   c.restore();
 }
 

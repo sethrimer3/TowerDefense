@@ -23,7 +23,7 @@ holds it against endless waves. Code lives in `src/defend/`.
   the speed toggle (1× ⇄ 2×, plus 3× once War drums is bought in the
   Armory) on the left; weather, wave, best, keep health and foes on the right.
 - The board is sized so the page never scrolls. Scroll-wheel or pinch zooms
-  (up to 4×); dragging open ground pans. Messages float over the board's foot.
+  (up to 6×); dragging open ground pans. Messages float over the board's foot.
 
 ## Building (before a run)
 
@@ -97,11 +97,16 @@ holds it against endless waves. Code lives in `src/defend/`.
   differently; each house is seeded from its lot, so some stay neat while
   others weather with missing and patched shingles, moss up from the eaves,
   rain streaks and now and then a chimney (`roof-art.ts`). When zoomed in, the city
-  is repainted at 2–3× resolution so edges stay sharp. The keep is pixel
+  is repainted at 2–4× resolution so edges stay sharp. The keep is pixel
   art at 8 pixels a cell, like the parks' ponds and trees: four round
   corner turrets, crenellated walls with a gate, a courtyard and a hipped
   slate roof, with a pixel red and gold swallowtail banner rippling on top
-  (held still under Reduce motion).
+  (held still under Reduce motion). The keep shows its wounds: below 80% of
+  its HP its walls crack, below 60% slates go from the roof, below 40% the
+  east wall is breached and the roof burns through, and below 20% the north
+  wall is down too and half the roof has caved in over smouldering rafters.
+  When it falls it leaves its own rubble: wall and turret stumps round a
+  heap of stone, slate and charred beams.
 - Generation is seeded per save and keyed by position, so the same layout
   always produces the same city. `tests/defend-city.test.ts` pins both
   `fitLayout` and `generateCity` against recorded hashes.
@@ -191,6 +196,9 @@ from its seed; `tests/defend-replay.test.ts` pins it.
 - Gravel stones on the streets catch the light: a bright lip toward the
   flame, a dark one away from it.
 - A light goes out while its building is destroyed and returns when it's rebuilt.
+- When a run is lost, every lantern, brazier, tower fire and hand torch
+  gutters out one by one in a slow wave spreading out from the keep,
+  leaving the city dark.
 - Struck buildings, walls and the keep flash briefly.
 
 ## Drawing (`render.ts` and its passes)
