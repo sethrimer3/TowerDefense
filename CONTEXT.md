@@ -44,10 +44,10 @@ The multipliers Training and the skill trees lay over a defense (troops, towers,
 The Defend tab's shop: city elements, bombs, battle speed and the universal upgrades (one level for every building of a type), bought with Gold, iron bars and steel bars.
 
 **Gold**:
-Paid by kills and by every wave held; spent in the Armory.
+Paid by kills, by every wave held and by gold the mine digs; spent in the Armory and on hiring miners.
 
 **Iron bar** and **steel bar**:
-Paid for each wave held (iron) and each boss wave held (steel); spent in the Armory.
+Paid for each wave held (iron) and each boss wave held (steel); iron bars are also smelted from the mine's iron ore. Spent in the Armory.
 
 **Valor**:
 Paid for each wave held past the best wave; spent on the skill trees.
@@ -80,3 +80,31 @@ The flagstones' bump map outside the city: lights brighten the stone edges facin
 
 **Torch light**:
 A flame's flickering, swaying, occlusion-aware glow: lanterns, braziers, tower fires and hand torches.
+
+### The mine
+
+**Mine**:
+The idle side view of the ground under the city, worked by miners whatever tab is open and while the game is closed. Its world comes from a seed.
+
+**Miner**:
+A worker the player hires with Gold. Miners dig, shore, lay track, hang torches and lamps, build carts and carry ore up.
+
+**Shaft**, **level** and **tunnel**:
+The laddered shaft is sunk through the dirt into the stone; at every level a tunnel with track and torches runs out either side.
+
+**Shoring**:
+Timber a miner sets into loose dirt beside a hole so it doesn't slide in.
+
+**Spoil**:
+Dirt and rubble carried up and tipped onto the heap.
+
+**Cart** and **hoist**:
+A level's mine cart takes miners' ore to the shaft, where the hoist's bucket lifts it to the surface.
+
+**Iron ore** and **gold**:
+What the mine pays: gold straight into Gold, iron ore smelted into iron bars.
+
+### The library
+
+**Library**:
+A tab reserved for the keep's archive; not yet open.
