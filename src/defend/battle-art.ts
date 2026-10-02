@@ -121,7 +121,8 @@ function drawHandTorch({ c, px }: Brush, at: { x: number; y: number; id: number 
 }
 
 /** Enemies: tiny squares, gold-outlined when marked, with a shadow under
- * fliers; bosses get a dark rim, a crown and a health bar. */
+ * fliers; bosses get a dark rim, a crown and a health bar; a Mother and her
+ * brood are black with a violet rim, so they show against the night. */
 function drawEnemy(b: Brush, e: Enemy) {
   const { c, px } = b;
   const def = ENEMIES[e.kind];
@@ -138,10 +139,27 @@ function drawEnemy(b: Brush, e: Enemy) {
   if (def.boss) {
     c.fillStyle = "#1a0606";
     c.fillRect(x - 1, y - 1, s + 2, s + 2);
+  } else if (e.kind === "mother" || e.kind === "broodling") {
+    if (!e.marked) {
+      c.fillStyle = "#6b3d8f";
+      c.fillRect(x - 1, y - 1, s + 2, s + 2);
+    }
   }
   c.fillStyle = e.flash > 0 ? "#fff" : def.color;
   c.fillRect(x, y, s, s);
   if (def.boss) drawBossMarks(b, e, { x, y, s });
+  if (e.kind === "mother") drawMotherMarks(b, { x, y, s });
+}
+
+/** A Mother's pale eyes and the swollen brood sac on her back. */
+function drawMotherMarks({ c }: Brush, sq: { x: number; y: number; s: number }) {
+  const { x, y, s } = sq;
+  const k = Math.max(1, Math.round(s / 6));
+  c.fillStyle = "#3a2350";
+  c.fillRect(x + k, y + s - k * 3, s - k * 2, k * 2);
+  c.fillStyle = "#e4d6ff";
+  c.fillRect(x + k, y + k, k, k);
+  c.fillRect(x + s - k * 2, y + k, k, k);
 }
 
 /** A crown of spikes and a health bar, so the boss reads at a glance.

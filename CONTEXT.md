@@ -32,6 +32,12 @@ One battle from the layout, wave after wave until the keep falls or the player a
 **Wave**:
 One group of enemies. Every 10th is a boss wave, fought at night, with warlords.
 
+**Mother**:
+A black enemy that splits into three broodlings when she dies.
+
+**Broodling**:
+A small, quick enemy hatched only from a fallen Mother.
+
 **Best wave**:
 The highest wave the player has held.
 

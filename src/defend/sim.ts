@@ -111,6 +111,13 @@ const STEP = 1 / 30;
 /** How long a struck building flashes, in seconds. */
 export const BUILDING_FLASH = 0.14;
 const BREAK_SECONDS = 3;
+/** Where a Mother's young land around her, as fractions of her half-size:
+ * the corners of a triangle (exact constants, so every engine agrees). */
+const HATCH_SPOTS = [
+  { x: 0, y: -1 },
+  { x: -0.866, y: 0.5 },
+  { x: 0.866, y: 0.5 },
+];
 
 export class DefendSim {
   readonly map: CityMap;
@@ -119,7 +126,7 @@ export class DefendSim {
   readonly bonuses: Readonly<Bonuses>;
   /** Enemies slain this run, by kind: what the run pays out. Not part of
    * the replayed state. */
-  readonly slain: Record<EnemyKind, number> = { roach: 0, orc: 0, ogre: 0, bat: 0, warlord: 0 };
+  readonly slain: Record<EnemyKind, number> = { roach: 0, orc: 0, ogre: 0, bat: 0, warlord: 0, mother: 0, broodling: 0 };
   /** 1 while a cell is part of a standing (built) building. */
   readonly solid: Uint8Array;
   readonly hp: Float32Array;
@@ -253,10 +260,18 @@ export class DefendSim {
     this.builders.step(this, dt);
   }
 
-  /** The dead, and civilians who made it indoors, leave the board. */
+  /** The dead, and civilians who made it indoors, leave the board; a
+   * Mother's brood bursts out where she fell. */
   private sweepAway() {
-    for (const e of this.enemies) if (e.hp <= 0) this.slain[e.kind]++;
+    const hatched: Enemy[] = [];
+    for (const e of this.enemies) {
+      if (e.hp > 0) continue;
+      this.slain[e.kind]++;
+      const splits = ENEMIES[e.kind].splits;
+      if (splits) for (let n = 0; n < splits.count; n++) hatched.push(this.hatch(splits.into, e, n, splits.count));
+    }
     this.enemies = this.enemies.filter((e) => e.hp > 0);
+    this.enemies.push(...hatched);
     this.soldiers = this.soldiers.filter((s) => s.hp > 0);
     this.civilians = this.civilians.filter((c) => c.hp > 0 && !atHome(this, c));
   }
@@ -296,30 +311,47 @@ export class DefendSim {
   }
 
   private spawnEnemy(kind: EnemyKind) {
-    const def = ENEMIES[kind];
     for (let tries = 0; tries < 20; tries++) {
       const x = 1 + this.rand() * (CELLS_W - 2);
       const y = 0.5 + this.rand() * 2;
       if (blocked(this.solid, x, y)) continue;
-      const hp = def.hp * waveHpScale(this.wave);
-      this.enemies.push({
-        id: this.newId(),
-        kind,
-        x,
-        y,
-        hp,
-        maxHp: hp,
-        cd: 0,
-        jx: (this.rand() - 0.5) * 0.5,
-        jy: (this.rand() - 0.5) * 0.5,
-        distract: -1,
-        distractT: 0,
-        rollT: this.rand() * 0.5,
-        marked: false,
-        flash: 0,
-      });
+      this.enemies.push(this.newEnemy(kind, x, y));
       return;
     }
+  }
+
+  /** The `n`th of `count` young of `kind` bursting from `mother`: spread
+   * evenly around where she fell, or on the spot if that is inside a wall. */
+  private hatch(kind: EnemyKind, mother: Enemy, n: number, count: number): Enemy {
+    const k = HATCH_SPOTS[n % HATCH_SPOTS.length];
+    const r = ENEMIES[mother.kind].size * 0.5;
+    const x = mother.x + k.x * r,
+      y = mother.y + k.y * r;
+    const free = x > 0 && y > 0 && x < CELLS_W && y < CELLS_H && !blocked(this.solid, x, y);
+    const young = free ? this.newEnemy(kind, x, y) : this.newEnemy(kind, mother.x, mother.y);
+    // They burst out at a run, then scatter before they think to fight.
+    young.cd = 0.4 + (n / count) * 0.2;
+    return young;
+  }
+
+  private newEnemy(kind: EnemyKind, x: number, y: number): Enemy {
+    const hp = ENEMIES[kind].hp * waveHpScale(this.wave);
+    return {
+      id: this.newId(),
+      kind,
+      x,
+      y,
+      hp,
+      maxHp: hp,
+      cd: 0,
+      jx: (this.rand() - 0.5) * 0.5,
+      jy: (this.rand() - 0.5) * 0.5,
+      distract: -1,
+      distractT: 0,
+      rollT: this.rand() * 0.5,
+      marked: false,
+      flash: 0,
+    };
   }
 
   // ── Flow field ────────────────────────────────────────────────────────
@@ -534,7 +566,7 @@ function streetCells(map: CityMap) {
 
 export function buildWave(wave: number, rand: () => number): EnemyKind[] {
   let budget = waveBudget(wave);
-  const kinds = Object.values(ENEMIES).filter((d) => d.firstWave <= wave && !d.boss);
+  const kinds = Object.values(ENEMIES).filter((d) => d.firstWave <= wave && !d.boss && !d.hatched);
   const out: EnemyKind[] = [];
   while (budget > 0) {
     const pool = kinds.filter((d) => d.cost <= budget);

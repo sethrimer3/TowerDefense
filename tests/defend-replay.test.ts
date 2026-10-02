@@ -167,7 +167,7 @@ test("the Defend replays exercise every unit and effect", () => {
       if (sim.built.some((b, id) => b > 0 && b < sim.map.buildings[id].cells.length)) seen.add("half-rebuilt");
     });
   const want = [
-    "enemy:warlord", "enemy:bat", "distracted", "marked", "soldier:sword", "soldier:archer", "path:sword", "path:archer", "hunting",
+    "enemy:warlord", "enemy:bat", "enemy:mother", "enemy:broodling", "distracted", "marked", "soldier:sword", "soldier:archer", "path:sword", "path:archer", "hunting",
     "civilian:toJob", "civilian:working", "civilian:home", "arrow", "shell", "flame", "frost", "chilled", "lost:bare", "half-rebuilt",
   ];
   assert.deepEqual(want.filter((w) => !seen.has(w)), []);

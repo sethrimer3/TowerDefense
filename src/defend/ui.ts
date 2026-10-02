@@ -90,7 +90,7 @@ export class DefendPage {
   private abandonArmed = 0;
   private settingsOpen = false;
   /** Kills already paid for this run, by kind. */
-  private paid: Record<EnemyKind, number> = { roach: 0, orc: 0, ogre: 0, bat: 0, warlord: 0 };
+  private paid: Record<EnemyKind, number> = { roach: 0, orc: 0, ogre: 0, bat: 0, warlord: 0, mother: 0, broodling: 0 };
 
   constructor(root: HTMLElement, host: DefendHost) {
     this.root = root;
@@ -448,7 +448,7 @@ export class DefendPage {
     this.map = null;
     const map = this.currentMap();
     this.sim = new DefendSim(map, { ...this.save.levels }, (defendRandom("rolls")() * 2147483648) | 0, this.host.bonuses());
-    this.paid = { roach: 0, orc: 0, ogre: 0, bat: 0, warlord: 0 };
+    this.paid = { roach: 0, orc: 0, ogre: 0, bat: 0, warlord: 0, mother: 0, broodling: 0 };
     this.phase = "sim";
     this.newRecord = 0;
     this.weather = rollWeather();
