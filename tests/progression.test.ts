@@ -66,13 +66,13 @@ test("times shorten: a percent on drill, reload or rebuild divides", () => {
   assert.equal(multiplier(s, "drill"), 1 / 1.5);
 });
 
-test("skills need Valor and their requirements, and each rank costs more", () => {
+test("skills need Knowledge and their requirements, and each rank costs more", () => {
   const s = defaults();
-  assert.equal(buySkill(s, "drillSergeant"), false, "no Valor");
-  s.valor = 100;
+  assert.equal(buySkill(s, "drillSergeant"), false, "no Knowledge");
+  s.knowledge = 100;
   assert.equal(buySkill(s, "veterans"), false, "needs Drill sergeant");
   assert.ok(buySkill(s, "drillSergeant"));
-  assert.equal(s.valor, 100 - skillCost("drillSergeant", 0));
+  assert.equal(s.knowledge, 100 - skillCost("drillSergeant", 0));
   assert.ok(buySkill(s, "veterans"));
   assert.ok(buySkill(s, "veterans"));
   assert.equal(bonuses(s).troopHp, 1.2);
@@ -87,16 +87,16 @@ test("every tree node is a skill, each listed once, its requirements in the same
   for (const t of TREES) for (const n of t.nodes) for (const r of n.requires) assert.ok(t.nodes.some((m) => m.id === r), `${n.id} needs ${r}`);
 });
 
-test("kills pay Gold and experience; waves pay Gold, iron, steel on boss waves, and Valor past the best", () => {
+test("kills pay Gold and experience; waves pay Gold, iron, steel on boss waves, and Knowledge past the best", () => {
   const s = defaults();
   payKills(s, { roach: 3, orc: 1 });
   assert.equal(s.gold, 3 * 2 + 5);
   assert.equal(s.xp, 3 * 1 + 3);
   s.defend.bestWave = 4;
   const held = payWave(s, 4);
-  assert.deepEqual({ iron: held.ironBar, steel: held.steelBar, valor: held.valor }, { iron: 1, steel: 0, valor: 0 });
+  assert.deepEqual({ iron: held.ironBar, steel: held.steelBar, knowledge: held.knowledge }, { iron: 1, steel: 0, knowledge: 0 });
   const boss = payWave(s, 10);
-  assert.deepEqual({ iron: boss.ironBar, steel: boss.steelBar, valor: boss.valor }, { iron: 1, steel: 1, valor: 3 });
+  assert.deepEqual({ iron: boss.ironBar, steel: boss.steelBar, knowledge: boss.knowledge }, { iron: 1, steel: 1, knowledge: 3 });
   s.skills.plunder = 2;
   s.skills.ironworks = 1;
   const rich = payWave(s, 5);
@@ -122,7 +122,7 @@ test("bonuses reach the battle: troops, walls and the keep", () => {
 test("saves keep what is well formed and default the rest", () => {
   const s = defaults();
   s.gold = 12.5;
-  s.valor = 3;
+  s.knowledge = 3;
   s.skills.masonry = 2;
   s.training.gold = 4;
   s.trainingJobs = [{ id: "keepHp", startedAt: 1, completesAt: 2 }];
