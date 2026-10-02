@@ -2,9 +2,9 @@
 // work, its buildings and trades, what it pays, and its save.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { AIR, BEDROCK, CELLS, DIRT, GOLD, GRASS, GRAVEL, H, LAVA, LOOSE, IRON, LADDER, MATERIAL_COUNT, RAIL, ROCK, STONE, TORCH, W, World, decodeGrid, encodeGrid, generate, idx, isPassable, strata } from "../src/mine/world.ts";
+import { AIR, BEDROCK, CELLS, DIRT, GOLD, GRASS, GRAVEL, H, LAVA, LOOSE, COPPER, LADDER, MATERIAL_COUNT, RAIL, ROCK, SILVER, STONE, TORCH, W, World, decodeGrid, encodeGrid, generate, idx, isPassable, strata } from "../src/mine/world.ts";
 import {
-  BARS_PER_STEEL, BREATH_TICKS, DAY_TICKS, DEATH_GAP, GOLD_PER_NUGGET, KIT, MineSim, ORE_PER_IRON_BAR, STARVE_TICKS, TICK_HZ, WEATHER_TICKS, daylight, decodeMineSave,
+  BARS_PER_POINT, BREATH_TICKS, DAY_TICKS, DEATH_GAP, KIT, MineSim, ORE_PER_BAR, STARVE_TICKS, metalSum, TICK_HZ, WEATHER_TICKS, daylight, decodeMineSave,
   hirePrice, skyAt, weatherOf,
 } from "../src/mine/sim.ts";
 import { BAY_BUNKS, FIRST_LEVELS, MAX_LEVEL, along, layout, pathTicks } from "../src/mine/buildings.ts";
@@ -48,7 +48,7 @@ test("rocks drop straight down and never slide", () => {
   assert.equal(h[9] + h[11], 0);
 });
 
-test("a seed generates the same world: grass over dirt over stone, with iron and gold", () => {
+test("a seed generates the same world: grass over dirt over stone, with copper, silver and gold", () => {
   const a = generate(42), b = generate(42);
   assert.deepEqual(a, b);
   assert.notDeepEqual(a, generate(43));
@@ -57,10 +57,11 @@ test("a seed generates the same world: grass over dirt over stone, with iron and
     assert.equal(a[idx(x, surface[x] - 1)], AIR);
     assert.equal(a[idx(x, surface[x])], GRASS);
     assert.ok([DIRT, ROCK, LOOSE].includes(a[idx(x, surface[x] + 3)]));
-    assert.ok([STONE, IRON, GOLD, GRAVEL].includes(a[idx(x, stoneTop[x] + 1)]));
+    assert.ok([STONE, COPPER, SILVER, GOLD, GRAVEL].includes(a[idx(x, stoneTop[x] + 1)]));
     assert.equal(a[idx(x, H - 1)], BEDROCK);
   }
-  assert.ok(a.filter((m) => m === IRON).length > 500);
+  assert.ok(a.filter((m) => m === COPPER).length > 500);
+  assert.ok(a.filter((m) => m === SILVER).length > 500);
   assert.ok(a.filter((m) => m === GOLD).length > 100);
   // The generated ground already holds its slopes.
   const world = new World(new Uint8Array(a));
@@ -91,24 +92,24 @@ test("one miner sinks a shored, laddered shaft and opens a tunnel with track and
   let torches = 0;
   for (let x = 0; x < W; x++) if (sim.world.get(x, y - 1) === TORCH) torches++;
   assert.ok(torches >= 2, `torches hung (${torches})`);
-  assert.ok(sim.mined.iron > 0, "ore found and dug");
+  assert.ok(metalSum(sim.mined) > 0, "ore found and dug");
 });
 
-test("the crew's ore comes up by pack, cart and hoist to the forge, is paid out as iron bars, and nobody ends up inside rock", () => {
+test("the crew's ore comes up by pack, cart and hoist to the forge, is smelted into bars and worked, and nobody ends up inside rock", () => {
   const sim = new MineSim(99);
   sim.setLevel("barracks", 2);
   for (let i = 0; i < 5; i++) sim.hire();
-  let bars = 0;
+  let points = 0;
   for (let k = 0; k < 40; k++) {
     minutes(sim, 1);
-    const pay = sim.collect();
-    bars += pay.ironBar;
+    points += metalSum(sim.collect());
     for (const m of sim.miners) {
       assert.ok(isPassable(sim.world.get(m.x, m.y)) && isPassable(sim.world.get(m.x, m.y - 1)), `miner ${m.id} at ${m.x},${m.y}`);
     }
   }
-  assert.ok(bars > 3, `iron bars ${bars}`);
-  assert.ok(sim.mined.iron > 100, `iron mined ${sim.mined.iron}`);
+  const bars = points * BARS_PER_POINT + metalSum(sim.worked) + metalSum(sim.bars);
+  assert.ok(bars > 3, `bars ${bars}`);
+  assert.ok(sim.mined.copper > 100, `copper mined ${sim.mined.copper}`);
   assert.ok(sim.carts.length >= 2, `carts ${sim.carts.length}`);
   assert.ok(sim.world.cells.some((m) => m === RAIL));
 });
@@ -137,7 +138,7 @@ test("a mine saves and loads whole; a malformed save is dropped", () => {
   assert.equal(loaded.hired, 1);
   minutes(loaded, 2);
   assert.equal(decodeMineSave({ ...saved, cells: "AAAA" }), null);
-  assert.equal(decodeMineSave({ ...saved, miners: [{ x: -1, y: 5, iron: 0, gold: 0, spoil: 0 }] }), null);
+  assert.equal(decodeMineSave({ ...saved, miners: [{ x: -1, y: 5, copper: 0, silver: 0, gold: 0, spoil: 0 }] }), null);
   assert.equal(decodeMineSave(null), null);
   // The game save keeps the mine alongside everything else.
   assert.equal(decode(JSON.stringify({ version: 1, mine: saved })).mine?.seed, 321);
@@ -388,36 +389,30 @@ test("each building grows with its level (a bay of bunks, two forge hands, an an
   }
 });
 
-test("the forge smelts ore into bars and the smithy works them into iron, steel and Gold; a trade nobody works goes slowly", () => {
+test("the forge smelts copper, silver and gold ore into bars, and every hundred bars the smiths work make a Smithy point; a trade nobody works goes slowly", () => {
   const run = (forge: number, smith: number) => {
     const sim = new MineSim(8);
     for (let i = 0; i < 4; i++) sim.hire();
     sim.setJobs(forge, smith);
-    sim.ore = { iron: ORE_PER_IRON_BAR * 6, gold: 3 };
-    sim.steelWork = BARS_PER_STEEL - 1;
+    sim.ore = { copper: ORE_PER_BAR.copper * 6, silver: ORE_PER_BAR.silver * 3, gold: 3 };
+    sim.worked = { copper: BARS_PER_POINT - 2, silver: 0, gold: BARS_PER_POINT - 1 };
     // A morning's work, before anyone goes to bed.
-    const paid = { gold: 0, ironBar: 0, steelBar: 0 };
     for (let t = 0; t < 4 * 60 * TICK_HZ; t++) {
       sim.step();
       if (sim.night) break;
     }
-    const pay = sim.collect();
-    paid.gold += pay.gold;
-    paid.ironBar += pay.ironBar;
-    paid.steelBar += pay.steelBar;
-    return { sim, paid };
+    return { sim, paid: sim.collect() };
   };
   const busy = run(2, 1);
   assert.equal(busy.sim.miners.filter((m) => m.job === "forge").length, 2);
   assert.equal(busy.sim.miners.filter((m) => m.job === "smith").length, 1);
   assert.equal(busy.sim.miners.filter((m) => m.job === "mine").length, 2);
-  assert.equal(busy.paid.gold, 3 * GOLD_PER_NUGGET, "gold ore struck into Gold");
-  assert.ok(busy.paid.ironBar >= 2, `iron bars ${busy.paid.ironBar}`);
-  assert.equal(busy.paid.steelBar, 1, "a steel bar folded");
+  assert.deepEqual(busy.paid, { copper: 1, silver: 0, gold: 1 }, "a hundredth bar of copper and of gold made a point each");
+  assert.equal(busy.sim.worked.silver, 3, "three silver bars worked");
   // Nobody at the forge or anvil: the work still trickles through, slower.
   const idle = run(0, 0);
-  assert.ok(idle.paid.ironBar < busy.paid.ironBar, `idle ${idle.paid.ironBar} < busy ${busy.paid.ironBar}`);
-  assert.ok(idle.sim.ore.iron > busy.sim.ore.iron, "a backlog of ore at the forge");
+  assert.ok(metalSum(idle.paid) < metalSum(busy.paid), `idle ${metalSum(idle.paid)} < busy ${metalSum(busy.paid)}`);
+  assert.ok(metalSum(idle.sim.ore) > metalSum(busy.sim.ore), "a backlog of ore at the forge");
   // The allocation never takes more hands than there are, nor more than
   // each building has room for.
   busy.sim.setJobs(9, 9);
@@ -434,7 +429,7 @@ test("at night most of the crew sleeps in the barracks; the night shift works on
     for (let i = 0; i < 9; i++) sim.hire();
     sim.coffee = coffee;
     while (!sim.night) sim.step();
-    minutes(sim, 1.5);
+    minutes(sim, 2.5);
     assert.ok(sim.night);
     return sim.miners.filter((m) => m.inside?.why === "sleep").length;
   };
@@ -482,25 +477,38 @@ test("the trades and the forge's stock save and load; older saves without them s
   const sim = new MineSim(55);
   for (let i = 0; i < 4; i++) sim.hire();
   sim.setJobs(2, 1);
-  sim.ore = { iron: 30, gold: 4 };
-  sim.bars = { iron: 2, gold: 1 };
-  sim.steelWork = 5;
+  sim.ore = { copper: 30, silver: 6, gold: 4 };
+  sim.bars = { copper: 2, silver: 3, gold: 1 };
+  sim.worked = { copper: 5, silver: 50, gold: 0 };
   sim.miners[3].kit = 7;
   const saved = JSON.parse(JSON.stringify(sim.save(0)));
   const loaded = new MineSim(saved.seed, decodeMineSave(saved)!);
   assert.deepEqual(loaded.jobs, { forge: 2, smith: 1 });
-  assert.deepEqual(loaded.ore, { iron: 30, gold: 4 });
-  assert.deepEqual(loaded.bars, { iron: 2, gold: 1 });
-  assert.equal(loaded.steelWork, 5);
+  assert.deepEqual(loaded.ore, { copper: 30, silver: 6, gold: 4 });
+  assert.deepEqual(loaded.bars, { copper: 2, silver: 3, gold: 1 });
+  assert.deepEqual(loaded.worked, { copper: 5, silver: 50, gold: 0 });
   assert.deepEqual(loaded.miners.map((m) => [m.job, m.kit]), sim.miners.map((m) => [m.job, m.kit]));
-  const { jobs, ore, bars, steelWork, ...old } = saved;
+  const { jobs, ore, bars, worked, ...old } = saved;
   old.miners = old.miners.map(({ job, kit, ...m }: { job: string; kit: number }) => m);
   const plain = new MineSim(old.seed, decodeMineSave(old)!);
   assert.deepEqual(plain.jobs, { forge: 0, smith: 0 });
   assert.ok(plain.miners.every((m) => m.job === "mine" && m.kit === KIT));
   assert.equal(decodeMineSave({ ...saved, jobs: { forge: -1, smith: 0 } }), null);
   assert.equal(decodeMineSave({ ...saved, miners: [{ ...saved.miners[0], job: "baker" }] }), null);
-  assert.equal(decodeMineSave({ ...saved, ore: { iron: 1.5, gold: 0 } }), null);
+  assert.equal(decodeMineSave({ ...saved, ore: { copper: 1.5, silver: 0, gold: 0 } }), null);
+  // A save from before silver: iron became copper.
+  const { smelted, ...ironAge } = saved;
+  const aged = decodeMineSave({
+    ...ironAge, ironOre: 7, mined: { iron: 40, gold: 2 }, ore: { iron: 9, gold: 1 }, bars: { iron: 4, gold: 0 }, steelWork: 3, worked: undefined,
+    miners: saved.miners.map(({ copper, silver, ...m }: any) => ({ ...m, iron: 1 })), buckets: [{ y: 90, iron: 5, gold: 1 }],
+  })!;
+  assert.ok(aged);
+  assert.deepEqual(aged.mined, { copper: 40, silver: 0, gold: 2 });
+  assert.deepEqual(aged.ore, { copper: 9, silver: 0, gold: 1 });
+  assert.deepEqual(aged.smelted, { copper: ORE_PER_BAR.copper - 1, silver: 0, gold: 0 });
+  assert.ok(aged.miners.every((m) => m.copper === 1 && m.silver === 0));
+  assert.deepEqual(aged.buckets, [{ y: 90, copper: 5, silver: 0, gold: 1 }]);
+  new MineSim(aged.seed, aged).step();
 });
 
 test("each miner has a name for life: unlike the rest of the crew's, and kept in the save", () => {
@@ -543,13 +551,13 @@ test("a new prospect is a fresh world; the crew, their trades and the stock go w
   sim.setLevel("barracks", 2);
   for (let i = 0; i < 5; i++) sim.hire();
   minutes(sim, 6);
-  sim.ore = { iron: 9, gold: 2 };
-  sim.bars = { iron: 3, gold: 1 };
-  for (const m of sim.miners) m.iron = m.gold = 0;
-  sim.miners[0].iron = 4;
-  sim.yard = { iron: 5, gold: 0 };
+  sim.ore = { copper: 9, silver: 1, gold: 2 };
+  sim.bars = { copper: 3, silver: 0, gold: 1 };
+  for (const m of sim.miners) m.copper = m.silver = m.gold = 0;
+  sim.miners[0].copper = 4;
+  sim.yard = { copper: 5, silver: 2, gold: 0 };
   sim.carts.length = sim.buckets.length = 0;
-  sim.hoist.iron = sim.hoist.gold = 0;
+  sim.hoist.copper = sim.hoist.silver = sim.hoist.gold = 0;
   const crew = sim.miners.map((m) => [m.name, m.job]);
   const next = sim.prospectNext(4242, 0);
   assert.equal(next.seed, 4242);
@@ -557,9 +565,9 @@ test("a new prospect is a fresh world; the crew, their trades and the stock go w
   assert.deepEqual(next.world.cells, generate(4242), "untouched ground");
   assert.deepEqual(next.miners.map((m) => [m.name, m.job]), crew);
   const door = next.buildings.barracks.door;
-  assert.ok(next.miners.every((m) => m.x === door && m.iron + m.gold === 0));
-  assert.equal(next.ore.iron, 18, "ore in packs and the yard goes to the forge's piles");
-  assert.deepEqual(next.bars, { iron: 3, gold: 1 });
+  assert.ok(next.miners.every((m) => m.x === door && metalSum(m) === 0));
+  assert.deepEqual(next.ore, { copper: 18, silver: 3, gold: 2 }, "ore in packs and the yard goes to the forge's piles");
+  assert.deepEqual(next.bars, { copper: 3, silver: 0, gold: 1 });
   assert.equal(next.hired, sim.hired);
   assert.equal(next.oreLeft, next.oreFound);
   minutes(next, 4);
@@ -601,7 +609,7 @@ test("the hoist lets its bucket down to a load, winds it up and tips it in the y
   sim.hire();
   sim.setJobs(1, 0);
   const top = sim.hoist.y, level = top + 40;
-  sim.buckets.push({ y: level, iron: 20, gold: 2 });
+  sim.buckets.push({ y: level, copper: 20, silver: 3, gold: 2 });
   let deepest = top;
   for (let t = 0; t < 400 && sim.hoist.state !== "up"; t++) {
     sim.step();
@@ -611,12 +619,13 @@ test("the hoist lets its bucket down to a load, winds it up and tips it in the y
   assert.equal(sim.buckets.length, 0);
   for (let t = 0; t < 400 && sim.hoist.state !== "idle"; t++) sim.step();
   assert.equal(sim.hoist.y, top, "wound back up");
-  assert.ok(sim.yard.iron + sim.yard.gold > 0 || sim.ore.iron + sim.ore.gold > 0, "tipped in the yard");
-  const yard = sim.yard.iron + sim.yard.gold;
-  sim.miners.forEach((m) => m.job === "mine" && (m.iron = m.gold = m.spoil = 0));
+  assert.ok(metalSum(sim.yard) > 0 || metalSum(sim.ore) > 0, "tipped in the yard");
+  const yard = metalSum(sim.yard);
+  sim.miners.forEach((m) => m.job === "mine" && (m.copper = m.silver = m.gold = m.spoil = 0));
   minutes(sim, 4);
   assert.equal(sim.yard.gold, 0, "gold is carried in first");
-  assert.ok(sim.ore.gold + sim.bars.gold + sim.collect().gold > 0, "into the forge, and on to the smithy");
+  assert.equal(sim.yard.silver, 0, "then silver");
+  assert.ok(sim.ore.gold + sim.bars.gold + sim.worked.gold > 0, "into the forge, and on to the smithy");
   assert.ok(yard > 0);
 });
 

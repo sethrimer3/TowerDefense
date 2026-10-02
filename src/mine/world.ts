@@ -16,17 +16,17 @@ export const CELLS = W * H;
 
 /** Materials. Solid ones block miners and can be dug; fixtures (LADDER..LAMP)
  * are built in open air and can be walked through; lava is neither. */
-export const AIR = 0, GRASS = 1, DIRT = 2, ROCK = 3, STONE = 4, IRON = 5, GOLD = 6, BEDROCK = 7, TIMBER = 8, RUBBLE = 9,
-  LADDER = 10, RAIL = 11, TORCH = 12, LAMP = 13, GRAVEL = 14, LOOSE = 15, LAVA = 16;
+export const AIR = 0, GRASS = 1, DIRT = 2, ROCK = 3, STONE = 4, COPPER = 5, GOLD = 6, BEDROCK = 7, TIMBER = 8, RUBBLE = 9,
+  LADDER = 10, RAIL = 11, TORCH = 12, LAMP = 13, GRAVEL = 14, LOOSE = 15, LAVA = 16, SILVER = 17;
 export type Material = number;
-export const MATERIAL_COUNT = 17;
+export const MATERIAL_COUNT = 18;
 
 const table = (...ms: Material[]) => {
   const t = new Uint8Array(MATERIAL_COUNT);
   for (const m of ms) t[m] = 1;
   return t;
 };
-const SOLID = table(GRASS, DIRT, ROCK, STONE, IRON, GOLD, BEDROCK, TIMBER, RUBBLE, GRAVEL, LOOSE);
+const SOLID = table(GRASS, DIRT, ROCK, STONE, COPPER, SILVER, GOLD, BEDROCK, TIMBER, RUBBLE, GRAVEL, LOOSE);
 const FIXTURE = table(LADDER, RAIL, TORCH, LAMP);
 const LOOSE_SET = table(GRASS, DIRT, RUBBLE, GRAVEL, LOOSE);
 /** Loose ground that slides on a drop of one, not two. */
@@ -39,7 +39,7 @@ export const isFixture = (m: Material) => FIXTURE[m] === 1;
 export const isPassable = (m: Material) => m === AIR || FIXTURE[m] === 1;
 /** Falls and slides like sand. */
 export const isLoose = (m: Material) => LOOSE_SET[m] === 1;
-export const isOre = (m: Material) => m === IRON || m === GOLD;
+export const isOre = (m: Material) => m === COPPER || m === SILVER || m === GOLD;
 /** Burns: shoring, ladders, the ties under the rails, torches. */
 export const isWood = (m: Material) => WOOD[m] === 1;
 /** Drinks up water lying on it. */
@@ -47,7 +47,7 @@ export const isSoil = (m: Material) => SOIL[m] === 1;
 
 /** Simulation ticks a miner spends digging out each material. */
 export const DIG_TICKS: Record<number, number> = {
-  [GRASS]: 40, [DIRT]: 45, [RUBBLE]: 40, [ROCK]: 110, [STONE]: 150, [IRON]: 190, [GOLD]: 200, [TIMBER]: 60, [GRAVEL]: 50, [LOOSE]: 35,
+  [GRASS]: 40, [DIRT]: 45, [RUBBLE]: 40, [ROCK]: 110, [STONE]: 150, [COPPER]: 180, [SILVER]: 190, [GOLD]: 200, [TIMBER]: 60, [GRAVEL]: 50, [LOOSE]: 35,
 };
 
 const CHUNK = 16;
@@ -90,7 +90,8 @@ export function strata(seed: number): Strata {
 }
 
 /** The grid of a world fresh from its seed: sky, a grass skin, dirt with
- * rocks in it, then stone threaded with iron and, deeper, gold, over an
+ * rocks in it, then stone threaded with copper, deeper silver and deeper
+ * still gold, over an
  * uneven floor of bedrock. */
 export function generate(seed: number): Uint8Array {
   const cells = new Uint8Array(CELLS);
@@ -113,7 +114,8 @@ export function generate(seed: number): Uint8Array {
     const y = top + Math.floor(rand(i * 3 + 1) * depth), big = rand(i * 3 + 2) < 0.3;
     blob(cells, x, y, big ? 2 : 1, ROCK, seed + i, (m) => m === DIRT);
   }
-  // Ore veins: short random walks through the stone, gold only deep down.
+  // Ore veins: short random walks through the stone, silver lower down and
+  // gold only deep.
   const veins = (count: number, ore: Material, minDepth: number, length: number, salt: number) => {
     for (let i = 0; i < count; i++) {
       const r = (k: number) => hash01(i, k, seed + salt);
@@ -127,8 +129,9 @@ export function generate(seed: number): Uint8Array {
     }
   };
   const stoneMin = Math.min(...stoneTop);
-  veins(1260, IRON, stoneMin + 4, 9, 101);
+  veins(1260, COPPER, stoneMin + 4, 9, 101);
   veins(480, GOLD, stoneMin + 30, 6, 202);
+  veins(620, SILVER, stoneMin + 16, 7, 303);
   // Pockets of loose dirt in the dirt and gravel in the stone: sealed in,
   // they hold until someone digs beside them.
   const pockets = (count: number, m: Material, top: (x: number) => number, bottom: (x: number) => number, over: Material, salt: number) => {

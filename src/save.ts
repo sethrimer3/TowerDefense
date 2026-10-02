@@ -6,7 +6,7 @@ import { TRAINING, TRAINING_IDS, type TrainingId } from "./progression.ts";
 import { SKILLS, SKILL_IDS, type SkillId } from "./skill-trees.ts";
 import type { TrainingJob } from "./training-jobs.ts";
 import { decodeSettings, defaultSettings, type Settings } from "./settings.ts";
-import { decodeMineSave, type MineSave } from "./mine/sim.ts";
+import { METALS, decodeMineSave, noMetals, type MineSave, type Metals } from "./mine/sim.ts";
 import { decodeLibrarySave, type LibrarySave } from "./library/sim.ts";
 
 export const SAVE_KEY = "towerdefense.v1";
@@ -14,22 +14,28 @@ export const SAVE_VERSION = 1;
 
 export type Save = {
   version: number;
-  /** Earned in battle, spent in the Armory. Keeps its fractions (bonuses). */
+  /** Earned in battle, spent in the Armory (and Gold on the mine and the
+   * library). Gold keeps its fractions (bonuses). Saves from before copper
+   * and silver called them `ironBar` and `steelBar`. */
   gold: number;
-  ironBar: number;
-  steelBar: number;
-  /** Lifetime experience from kills: the Commander's level. */
-  xp: number;
+  copper: number;
+  silver: number;
+  /** One for each new best wave held; banked for what is to come. Saves
+   * from before them start with one for each wave of the best. */
+  upgradePoints: number;
+  /** Smithy points the mine's smithy has made (every hundred bars of a
+   * metal), spent on the Smithy's upgrades. */
+  smithy: Metals;
   /** Earned in the Library (shelves × librarians an hour, idle too) and by
    * holding past the best wave; spent on the skill trees. Keeps its fractions.
    * Saves from before it was renamed call it `valor`. */
   knowledge: number;
   skills: Record<SkillId, number>;
-  /** Training ranks completed per row. */
+  /** The Smithy's upgrades: ranks completed per row, the ranks in work, and
+   * when their work was last settled (ms). */
   training: Record<TrainingId, number>;
   trainingJobs: TrainingJob[];
-  /** Training points that ranks bought free (Dev) didn't spend. */
-  freeTraining: number;
+  trainingClock: number;
   defend: DefendSave;
   /** The mine as last saved (null until it first runs). */
   mine: MineSave | null;
@@ -42,14 +48,15 @@ export function defaults(): Save {
   return {
     version: SAVE_VERSION,
     gold: 0,
-    ironBar: 0,
-    steelBar: 0,
-    xp: 0,
+    copper: 0,
+    silver: 0,
+    upgradePoints: 0,
+    smithy: noMetals(),
     knowledge: 0,
     skills: Object.fromEntries(SKILL_IDS.map((id) => [id, 0])) as Record<SkillId, number>,
     training: Object.fromEntries(TRAINING_IDS.map((id) => [id, 0])) as Record<TrainingId, number>,
     trainingJobs: [],
-    freeTraining: 0,
+    trainingClock: 0,
     defend: defaultDefendSave(),
     mine: null,
     library: null,
@@ -74,30 +81,38 @@ export function decode(raw: string | null): Save {
   }
   if (!s || typeof s !== "object" || !Number.isInteger(s.version) || s.version > SAVE_VERSION) return d;
   d.gold = num(s.gold, 0);
-  d.ironBar = int(s.ironBar, 0);
-  d.steelBar = int(s.steelBar, 0);
-  d.xp = int(s.xp, 0, 0, 1e12);
+  d.copper = int(s.copper ?? s.ironBar, 0);
+  d.silver = int(s.silver ?? s.steelBar, 0);
+  for (const k of METALS) d.smithy[k] = int(s.smithy?.[k], 0);
   d.knowledge = num(s.knowledge ?? s.valor, 0);
   for (const id of SKILL_IDS) d.skills[id] = int(s.skills?.[id], 0, 0, SKILLS[id].max);
   for (const t of TRAINING) d.training[t.id] = int(s.training?.[t.id], 0, 0, t.max);
   d.trainingJobs = decodeJobs(s.trainingJobs, d.training);
-  d.freeTraining = int(s.freeTraining, 0);
+  d.trainingClock = num(s.trainingClock, 0);
   d.defend = decodeDefendSave(s.defend);
+  d.upgradePoints = int(s.upgradePoints, d.defend.bestWave);
   d.mine = decodeMineSave(s.mine);
   d.library = decodeLibrarySave(s.library);
   d.settings = decodeSettings(s.settings);
   return d;
 }
 
-/** Jobs on known rows, one per row, short of the row's most ranks. */
+/** Ranks in work on known rows, one per row, short of the row's most ranks,
+ * each smith on one only. A rank in training from before the Smithy (timed
+ * by the clock, with no smiths) is counted done. */
 function decodeJobs(list: unknown, training: Record<TrainingId, number>): TrainingJob[] {
   if (!Array.isArray(list)) return [];
   const out: TrainingJob[] = [];
   for (const j of list) {
     const row = TRAINING.find((t) => t.id === j?.id);
     if (!row || out.some((o) => o.id === row.id) || training[row.id] >= row.max) continue;
-    if (!Number.isFinite(j.startedAt) || !Number.isFinite(j.completesAt)) continue;
-    out.push({ id: row.id, startedAt: j.startedAt, completesAt: j.completesAt });
+    if (j.left === undefined && Number.isFinite(j.completesAt)) {
+      training[row.id]++;
+      continue;
+    }
+    if (!Number.isFinite(j.left) || j.left <= 0 || !Array.isArray(j.smiths)) continue;
+    const smiths = j.smiths.filter((n: unknown) => typeof n === "string" && n.length > 0 && n.length <= 32 && !out.some((o) => o.smiths.includes(n)));
+    out.push({ id: row.id, left: j.left, smiths: [...new Set<string>(smiths)] });
   }
   return out;
 }

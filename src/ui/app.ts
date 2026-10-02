@@ -12,8 +12,10 @@ export interface AppContext {
   /** Re-renders the current page. */
   renderPage(): void;
   navigate(tab: Tab): void;
-  /** Wall-clock time in ms (Training runs on it). */
+  /** Wall-clock time in ms (the Smithy's upgrades run on it). */
   clock(): number;
+  /** The names of the mine's smiths (who work the Smithy's upgrades). */
+  smiths(): string[];
   /** Replaces the save with a fresh one. */
   eraseAll(): void;
 }

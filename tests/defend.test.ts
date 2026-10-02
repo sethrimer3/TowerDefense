@@ -211,7 +211,7 @@ test('bombs and watch-tower marks hurt enemies', () => {
 test('shop: palette counts, purchases and upgrades use the wallet', () => {
   const save = defaultDefendSave();
   assert.equal(available(save, 'cityTile'), STARTING_OWNED.cityTile);
-  const wallet = { gold: 10_000, ironBar: 100, steelBar: 100 };
+  const wallet = { gold: 10_000, copper: 100, silver: 100 };
   const price = purchasePrice('watchTower', save.owned.watchTower);
   assert.ok(buyItem(save, wallet, 'watchTower'));
   assert.equal(available(save, 'watchTower'), 1);
@@ -219,7 +219,7 @@ test('shop: palette counts, purchases and upgrades use the wallet', () => {
   assert.ok(purchasePrice('watchTower', save.owned.watchTower).gold > price.gold, 'each extra costs more');
   assert.ok(buyUpgrade(save, wallet, 'barracksCapacity'));
   assert.equal(save.levels.barracksCapacity, 1);
-  const broke = { gold: 0, ironBar: 0, steelBar: 0 };
+  const broke = { gold: 0, copper: 0, silver: 0 };
   assert.equal(buyItem(save, broke, 'barracks'), false);
 });
 
@@ -316,7 +316,7 @@ test('patrol routes: max level sends swordsmen after enemies anywhere in the cit
 test('3× speed unlock is bought once and saved', async () => {
   const { buySpeed3 } = await import('../src/defend/progress.ts');
   const save = defaultDefendSave();
-  const wallet = { gold: 10_000, ironBar: 100, steelBar: 0 };
+  const wallet = { gold: 10_000, copper: 100, silver: 0 };
   assert.ok(buySpeed3(save, wallet));
   assert.equal(buySpeed3(save, wallet), false);
   assert.equal(decodeDefendSave(JSON.parse(JSON.stringify(save))).speed3, true);

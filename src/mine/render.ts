@@ -10,12 +10,12 @@
  * effects (`particles.ts`). Water is tinted into the
  * cells it fills; stars glint in the night sky. */
 import { stream } from "../random.ts";
-import { CART_LOAD, type Footprint, type Inside, type Miner, type MineSim, type Rebuild, type Sky } from "./sim.ts";
+import { CART_LOAD, metalSum, type Footprint, type Metals, type Inside, type Miner, type MineSim, type Rebuild, type Sky } from "./sim.ts";
 import { drawFigure, drawSleeper, outfit, type Fine, type Pose } from "./figures.ts";
 import { Particles } from "./particles.ts";
 import { BUILDINGS, along, anvils, pathTicks, type Building, type BuildingId } from "./buildings.ts";
 import {
-  AIR, BEDROCK, CELLS, DIRT, GOLD, GRASS, GRAVEL, H, IRON, LADDER, LAMP, LAVA, LOOSE, RAIL, ROCK, RUBBLE, STONE, TIMBER, TORCH, W, hash01, idx, isPassable,
+  AIR, BEDROCK, CELLS, COPPER, DIRT, GOLD, GRASS, GRAVEL, H, LADDER, LAMP, LAVA, LOOSE, RAIL, ROCK, RUBBLE, SILVER, STONE, TIMBER, TORCH, W, hash01, idx, isPassable,
   type Material,
 } from "./world.ts";
 
@@ -26,7 +26,8 @@ const SHADES: Record<number, RGB[]> = {
   [DIRT]: [[110, 76, 46], [98, 67, 40], [121, 85, 52], [90, 61, 37]],
   [ROCK]: [[124, 118, 110], [106, 101, 95], [138, 132, 122]],
   [STONE]: [[78, 78, 86], [70, 70, 79], [86, 85, 92], [64, 64, 72]],
-  [IRON]: [[170, 104, 72], [196, 132, 96], [146, 86, 62]],
+  [COPPER]: [[184, 104, 62], [212, 136, 88], [150, 82, 52]],
+  [SILVER]: [[176, 182, 194], [214, 220, 230], [142, 148, 160]],
   [GOLD]: [[236, 190, 72], [255, 226, 120], [205, 158, 52]],
   [BEDROCK]: [[32, 30, 36], [26, 25, 30], [40, 37, 44]],
   [TIMBER]: [[140, 92, 46], [118, 76, 38], [156, 106, 56]],
@@ -50,7 +51,9 @@ const WINDOW_DARK: RGB = [44, 38, 32], WINDOW_LIT: RGB = [255, 214, 122];
 /** The buildings' materials. */
 const PLANK: RGB[] = [[138, 90, 44], [120, 78, 38]], POST: RGB = [86, 54, 26], BACK: RGB = [62, 42, 26], BACK_STONE: RGB = [54, 52, 56];
 const ROOF: RGB[] = [[163, 58, 38], [122, 42, 28]], SLATE: RGB[] = [[84, 86, 98], [66, 68, 80]], ASHLAR: RGB[] = [[118, 112, 104], [98, 94, 90]];
-const FOOTING: RGB = [84, 80, 76], IRON_DARK: RGB = [58, 58, 66], BLANKET: RGB = [96, 112, 150], BAR_IRON: RGB = [176, 180, 190], BAR_GOLD: RGB = [240, 200, 80];
+const FOOTING: RGB = [84, 80, 76], IRON_DARK: RGB = [58, 58, 66], BLANKET: RGB = [96, 112, 150], BAR: Record<keyof Metals, RGB> = { copper: [200, 118, 70], silver: [206, 212, 222], gold: [240, 200, 80] };
+/** The colour a load of ore shows: its richest metal. */
+const loadColor = (m: Metals) => (m.gold > 0 ? "#f0c850" : m.silver > 0 ? "#cdd2dc" : "#c07a50");
 const SCAFFOLD: RGB = [176, 138, 88];
 /** A grave for each miner lost. */
 const GRAVE = [".c.", "ccc", ".C.", ".C."];
@@ -361,9 +364,9 @@ export class MineRenderer {
       ctx.fillStyle = "#16141a";
       ctx.fillRect(c.x - 1, c.y, 1, 1);
       ctx.fillRect(c.x + 1, c.y, 1, 1);
-      const load = c.iron + c.gold;
+      const load = metalSum(c);
       if (load > 0) {
-        ctx.fillStyle = c.gold > c.iron ? "#f0c850" : "#c07a50";
+        ctx.fillStyle = loadColor(c);
         ctx.fillRect(load > CART_LOAD / 2 ? c.x - 1 : c.x, c.y - 2, load > CART_LOAD / 2 ? 3 : 1, 1);
       }
     }
@@ -376,9 +379,9 @@ export class MineRenderer {
       drawFigure(fine, outfit(m.name, m.job), m.x, m.y, m.facing, pose, step);
       const front = m.facing > 0 ? m.x + 1 : m.x - 0.5;
       // A sack of ore on the back.
-      if (m.iron + m.gold > 0) {
+      if (metalSum(m) > 0) {
         fine(m.facing > 0 ? m.x - 0.5 : m.x + 1, m.y - 0.5, 0.5, 1, "#6a5236");
-        fine(m.facing > 0 ? m.x - 0.5 : m.x + 1, m.y - 0.5, 0.5, 0.5, m.gold > 0 ? "#f0c850" : "#c07a50");
+        fine(m.facing > 0 ? m.x - 0.5 : m.x + 1, m.y - 0.5, 0.5, 0.5, loadColor(m));
       }
       // A bucket swung at floodwater or a fire.
       if ((m.action === "bail" || m.action === "douse") && m.work >= 0) {
@@ -621,9 +624,11 @@ export class MineRenderer {
         fill(IRON_DARK, k, ax, F - 1, 3, 1);
         fill(IRON_DARK, k, ax + 1, F, 1, 1);
       }
-      const iron = Math.min(12, sim.bars.iron), gold = Math.min(6, sim.bars.gold);
-      for (let n = 0; n < iron; n++) fill(BAR_IRON, k, x0 + 1, F - Math.floor(n / 2), 1, 1);
-      for (let n = 0; n < gold; n++) fill(BAR_GOLD, k, x0 + 2, F - n, 1, 1);
+      // The rack: copper and silver stacked on the left post, gold on the right.
+      const copper = Math.min(6, sim.bars.copper), silver = Math.min(6 - Math.ceil(copper / 2), sim.bars.silver), gold = Math.min(6, sim.bars.gold);
+      for (let n = 0; n < copper; n++) fill(BAR.copper, k, x0 + 1, F - Math.floor(n / 2), 1, 1);
+      for (let n = 0; n < silver; n++) fill(BAR.silver, k, x0 + 1, F - Math.ceil(copper / 2) - n, 1, 1);
+      for (let n = 0; n < gold; n++) fill(BAR.gold, k, x0 + 2, F - n, 1, 1);
       fill(POST, k, b.x1 - 2, F, 2, 1);
       fill(WATER_RGB, k, b.x1 - 2, F - 1, 2, 1);
     }
@@ -637,18 +642,18 @@ export class MineRenderer {
       fill(PLANK[1], k, sx0, sy, sx1 - sx0, 1);
       fill(POST, k, sx0, sy, 1, 1);
     }
-    const total = sim.ore.iron + sim.ore.gold;
+    const total = metalSum(sim.ore);
     if (!total) return;
     const heapRows = [6, 6, 5, 4, 3, 2], heapSlots = 26, shelfSlots = (sx1 - sx0) * 2 * 2;
     const slots = Math.max(1, Math.round(((heapSlots + 2 * shelfSlots) * Math.min(total, sim.forgeCap)) / sim.forgeCap));
-    const goldShare = sim.ore.gold / total;
+    const goldShare = sim.ore.gold / total, silverShare = sim.ore.silver / total;
     const heap = Math.min(heapSlots, slots);
-    oreHeap(fine, b.x1 - 1.5, F + 0.5, heapRows, heap, Math.round(heap * goldShare), k);
+    oreHeap(fine, b.x1 - 1.5, F + 0.5, heapRows, heap, Math.round(heap * goldShare), k, Math.round(heap * silverShare));
     let left = slots - heap;
     for (const sy of [F - 2, F - 4]) {
       for (let r = 0; r < 2 && left > 0; r++)
         for (let i = 0; i < (sx1 - sx0) * 2 && left > 0; i++, left--) {
-          const gold = hash01(i, r + sy, 5) < goldShare, shades = gold ? SHADES[GOLD] : SHADES[IRON];
+          const pick = hash01(i, r + sy, 5), shades = pick < goldShare ? SHADES[GOLD] : pick < goldShare + silverShare ? SHADES[SILVER] : SHADES[COPPER];
           fine(sx0 + 0.5 + i * 0.5, sy + 0.25 - r * 0.5, 0.5, 0.5, tone(shades[(i + r) % shades.length]));
         }
     }
@@ -788,15 +793,15 @@ export class MineRenderer {
     fine(x, y + 0.25, 1, 0.75, "#6a4422");
     fine(x, y + 0.5, 1, 0.125, "#3a2a1a");
     const h = sim.hoist;
-    if (h.iron + h.gold > 0) {
-      fine(x, y, 0.5, 0.25, h.gold > 0 ? "#f0c850" : "#c07a50");
-      fine(x + 0.5, y, 0.5, 0.25, h.gold > h.iron ? "#f0c850" : "#b06a44");
+    if (metalSum(h) > 0) {
+      fine(x, y, 0.5, 0.25, loadColor(h));
+      fine(x + 0.5, y, 0.5, 0.25, h.copper > 0 ? "#b06a44" : loadColor(h));
     }
     // The yard by the shaft house, where the ore brought up is tipped.
-    const n = sim.yard.iron + sim.yard.gold;
+    const n = metalSum(sim.yard);
     if (n > 0) {
-      const lumps = Math.min(30, Math.ceil(n / 3)), gold = Math.round((lumps * sim.yard.gold) / n), fy = sim.standY(sim.yardX) + 0.5;
-      oreHeap(fine, sim.yardX + 0.5, fy, [6, 5, 4, 3, 2, 1, 1], lumps, gold);
+      const lumps = Math.min(30, Math.ceil(n / 3)), gold = Math.round((lumps * sim.yard.gold) / n), silver = Math.round((lumps * sim.yard.silver) / n), fy = sim.standY(sim.yardX) + 0.5;
+      oreHeap(fine, sim.yardX + 0.5, fy, [6, 5, 4, 3, 2, 1, 1], lumps, gold, 1, silver);
     }
   }
 
@@ -878,14 +883,14 @@ function sprite(ctx: CanvasRenderingContext2D, rows: string[], x: number, y: num
 
 const TIMBER_END: RGB = [168, 116, 62];
 
-/** A heap of `n` half-cell lumps of ore (`gold` of them gold) centred on
- * column `cx`, its bottom row ending at `floor`, `rows` lumps wide from the
- * bottom up, dimmed to `k`. */
-function oreHeap(fine: Fine, cx: number, floor: number, rows: number[], n: number, gold: number, k = 1) {
+/** A heap of `n` half-cell lumps of ore (`gold` of them gold, then `silver`
+ * silver, the rest copper) centred on column `cx`, its bottom row ending at
+ * `floor`, `rows` lumps wide from the bottom up, dimmed to `k`. */
+function oreHeap(fine: Fine, cx: number, floor: number, rows: number[], n: number, gold: number, k = 1, silver = 0) {
   let placed = 0;
   for (let r = 0; r < rows.length && placed < n; r++)
     for (let i = 0; i < rows[r] && placed < n; i++, placed++) {
-      const shades = placed < gold ? SHADES[GOLD] : SHADES[IRON], c = shades[(i + r) % shades.length];
+      const shades = placed < gold ? SHADES[GOLD] : placed < gold + silver ? SHADES[SILVER] : SHADES[COPPER], c = shades[(i + r) % shades.length];
       fine(cx - rows[r] / 4 + i * 0.5, floor - 0.5 - r * 0.5, 0.5, 0.5, `rgb(${(c[0] * k) | 0},${(c[1] * k) | 0},${(c[2] * k) | 0})`);
     }
 }

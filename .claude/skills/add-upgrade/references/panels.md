@@ -3,17 +3,18 @@
 ## Armory (`src/defend/catalog.ts`)
 
 - Row: `{ id, group, name, maxLevel, describe(level), price?(level) }` in `UPGRADES`; add the id to `UpgradeId`.
-- Price: `upgradePrice(level)` (Gold ×1.6 a level, iron, steel from level 3) unless `price` overrides it (one-offs).
+- Price: `upgradePrice(level)` (Gold ×1.6 a level, copper, silver from level 3) unless `price` overrides it (one-offs).
 - Effect: a stat curve beside the others (`archerRange(l)`, `wallHp(l)`…) read by the sim from `sim.levels.<id>`.
 - Shown by `renderArmory` in `src/defend/ui.ts`, grouped by `group`.
 - Saved in `save.defend.levels` (`decodeDefendSave` clamps to `maxLevel`).
 - The replay test (`tests/defend-replay.test.ts`) builds levels from `UPGRADES`; a new id at its max level changes the `fortress` scenario's golden.
 
-## Training (`src/progression.ts`)
+## Smithy (Training in code, `src/progression.ts`)
 
-- Row: `{ id, group, name, per, cost, max }` in `TRAINING`; add the id to `TrainingId`.
-- Effect: `per` percent a rank on the target of the same name: a `Bonuses` field (times in `TIMES` divide), or `gold`/`xp`, which multiply rewards.
-- Time: `trainingSeconds(ranks)` in `src/training-jobs.ts`.
+- Row: `{ id, group, name, per, max }` in `TRAINING`; add the id to `TrainingId`.
+- Cost: one Smithy point a rank, its metal by rank (`rankPrice`: copper, silver, gold).
+- Effect: `per` percent a rank on the target of the same name: a `Bonuses` field (times in `TIMES` divide), or `gold`, which multiplies rewards.
+- Time: `trainingSeconds(ranks)` of one smith in `src/training-jobs.ts`, shared by the smiths on it.
 - Saved in `save.training` (decoded against `max`).
 
 ## Skill trees (`src/skill-trees.ts`)
@@ -22,5 +23,5 @@
 - Trees: Command and Stewardship (Defend), Mine and Library.
 - Node: `{ id, x, y, requires }` in one tree's `nodes` (x and y are percentages of the tree's view).
 - Cost: `skillCost = base × (rank + 1)` Knowledge.
-- Effect: `per` on a `BonusTarget` (as Training), or `slots` (Training slots) or `ironPerWave` (iron per wave held), summed in `progression.ts`; or `fireproof` / `fireTraining`, which the Library reads as ranks (`main.ts` passes `save.skills` to the page; `accidentChance`, `fireDrill` in `library/sim.ts`), or `coffee` / `waterproof`, which the Mine reads as ranks the same way (`nightShift` and the shaft house's `seal` in `mine/sim.ts`).
+- Effect: `per` on a `BonusTarget` (as Training), or `smiths` (room for more smiths, read by the mine as `extraSmiths`) or `copperPerWave` (copper per wave held), summed in `progression.ts`; or `fireproof` / `fireTraining`, which the Library reads as ranks (`main.ts` passes `save.skills` to the page; `accidentChance`, `fireDrill` in `library/sim.ts`), or `coffee` / `waterproof`, which the Mine reads as ranks the same way (`nightShift` and the shaft house's `seal` in `mine/sim.ts`).
 - Saved in `save.skills` (decoded against `max`).
