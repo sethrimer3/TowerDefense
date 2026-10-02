@@ -1406,3 +1406,4 @@ nav button { position: relative; }
   pointer-events: auto;
   cursor: pointer;
 }
+.mine-news { font-style: italic; opacity: 0.9; }

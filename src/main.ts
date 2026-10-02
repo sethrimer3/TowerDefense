@@ -12,6 +12,7 @@ import type { Weather } from "./defend/weather.ts";
 import { play, soundEnabledBy } from "./sound.ts";
 import { flourishesEnabledBy, replay, sparks, sparksOver } from "./ui/flourish.ts";
 import { MinePage } from "./mine/ui.ts";
+import type { Weather as MineWeather } from "./mine/sim.ts";
 import { LibraryPage } from "./library/ui.ts";
 import { stream } from "./random.ts";
 
@@ -212,8 +213,9 @@ window.addEventListener("pagehide", store);
   if (fire) libraryPage.sim.ignite();
 };
 // Console helper: run the mine some minutes ahead, optionally hiring miners first.
-(globalThis as { mineDebug?: unknown }).mineDebug = (minutes = 10, hire = 0) => {
+(globalThis as { mineDebug?: unknown }).mineDebug = (minutes = 10, hire = 0, weather?: MineWeather | null) => {
   for (let i = 0; i < hire; i++) minePage.sim.hire();
+  if (weather !== undefined) minePage.sim.weatherOverride = weather;
   minePage.fastForward(minutes);
 };
 
