@@ -2,7 +2,8 @@
  * daylight falling in from the sky (dimmed by night and cloud) and by the
  * torches, lamps, lava, fires and miners underground (a two-channel light
  * map spread cell to cell, dimmed faster through rock than air), then scaled
- * up crisp under a camera. Over it: clouds, rain and lightning, the
+ * up crisp under a camera (a whole number of screen pixels a cell, so the
+ * pixels meet without seams). Over it: clouds, rain and lightning, the
  * headframe, the buildings (their front walls fading to show who's inside),
  * the graves of the miners lost, the carts, hoist bucket, miners and dust. Water is tinted into the
  * cells it fills; stars glint in the night sky. */
@@ -67,6 +68,9 @@ const HEADFRAME = [
   "w.......w",
 ];
 
+/** Cells across the view at the furthest zoom out, and how far in it goes. */
+export const VIEW_CELLS = 256, MAX_ZOOM = 8;
+
 type Dust = { x: number; y: number; vx: number; vy: number; life: number; color: string };
 type Bolt = { points: [number, number][]; until: number };
 
@@ -95,12 +99,18 @@ export class MineRenderer {
   private skyNow: Sky = { weather: "clear", daylight: 1, clouds: 0, rain: 0 };
   /** How far each building's front wall has faded (1: see-through). */
   private open: Record<BuildingId, number> = { shaft: 0, barracks: 0, warehouse: 0, forge: 0, smithy: 0 };
-  /** The camera: the top-left cell in view and the zoom step (1 = fit width). */
+  /** The camera: the top-left cell in view, and the zoom (1 = the furthest
+   * out, `VIEW_CELLS` across the view's full width). `follow` keeps the
+   * crew's deepest in view; `target` keeps one miner in the middle. */
   camX = 0;
   camY = 20;
-  zoom = 1;
+  private want = 1;
   follow = false;
-  private size = { w: 1, h: 1, scale: 1 };
+  target: Miner | null = null;
+  /** The view's full width in CSS pixels (the canvas narrows while the
+   * crew's list is open, without the zoom changing); 0 for the canvas's. */
+  refWidth = 0;
+  private size = { w: 1, h: 1, scale: 1, min: 1 };
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -114,7 +124,8 @@ export class MineRenderer {
     this.glow = makeGlow();
   }
 
-  /** Matches the canvas to its box; returns the cells per screen pixel. */
+  /** Matches the canvas to its box (keeping the middle of the view where
+   * it was); returns the cells per screen pixel. */
   resize() {
     const dpr = Math.min(3, window.devicePixelRatio || 1);
     const w = Math.max(1, Math.round(this.canvas.clientWidth * dpr)), h = Math.max(1, Math.round(this.canvas.clientHeight * dpr));
@@ -122,12 +133,26 @@ export class MineRenderer {
       this.canvas.width = w;
       this.canvas.height = h;
     }
-    this.size = { w, h, scale: (w / W) * this.zoom };
+    const before = this.size, min = Math.max(1, Math.floor((this.refWidth > 0 ? this.refWidth * dpr : w) / VIEW_CELLS));
+    const scale = this.scaleFor(min, this.want);
+    if (before.w > 1) {
+      this.camX += before.w / (2 * before.scale) - w / (2 * scale);
+      this.camY += before.h / (2 * before.scale) - h / (2 * scale);
+    }
+    this.size = { w, h, scale, min };
     this.clamp();
-    return dpr / this.size.scale;
+    return dpr / scale;
+  }
+  /** Device pixels a cell: always whole. */
+  private scaleFor(min: number, want: number) {
+    return Math.max(min, Math.min(min * MAX_ZOOM, Math.round(min * want)));
   }
   get scale() {
     return this.size.scale;
+  }
+  /** How far in the view is zoomed (1: all the way out). */
+  get zoom() {
+    return this.size.scale / this.size.min;
   }
   private clamp() {
     const { w, h, scale } = this.size, vw = w / scale, vh = h / scale;
@@ -140,15 +165,15 @@ export class MineRenderer {
     this.camY -= dy / this.size.scale;
     this.clamp();
   }
-  /** Steps the zoom in (+1) or out (-1) about the device pixel (px, py). */
-  zoomBy(step: number, px: number, py: number) {
-    const next = Math.max(1, Math.min(4, this.zoom + step));
-    if (next === this.zoom) return;
+  /** Zooms by `factor` (above 1 in) about the device pixel (px, py). */
+  zoomBy(factor: number, px: number, py: number) {
+    this.want = Math.max(1, Math.min(MAX_ZOOM, this.want * factor));
+    const next = this.scaleFor(this.size.min, this.want);
+    if (next === this.size.scale) return;
     const cx = this.camX + px / this.size.scale, cy = this.camY + py / this.size.scale;
-    this.zoom = next;
-    this.size.scale = (this.size.w / W) * next;
-    this.camX = cx - px / this.size.scale;
-    this.camY = cy - py / this.size.scale;
+    this.size.scale = next;
+    this.camX = cx - px / next;
+    this.camY = cy - py / next;
     this.clamp();
   }
   /** Looks at the top of the shaft. */
@@ -266,7 +291,13 @@ export class MineRenderer {
     }
     this.resize();
     const { w, h, scale } = this.size;
-    if (this.follow) {
+    if (this.target && !sim.miners.includes(this.target)) this.target = null;
+    if (this.target) {
+      const at = this.whereIs(sim, this.target);
+      this.camX += (at.x + 0.5 - w / scale / 2 - this.camX) * 0.12;
+      this.camY += (at.y - h / scale / 2 - this.camY) * 0.12;
+      this.clamp();
+    } else if (this.follow) {
       const below = sim.miners.filter((m) => m.y > sim.strata.surface[m.x]);
       const target = below.length ? Math.max(...below.map((m) => m.y)) - (h / scale) * 0.55 : sim.strata.surface[sim.shaftX] - (h / scale) * 0.3;
       this.camY += (target - this.camY) * 0.05;
@@ -332,8 +363,22 @@ export class MineRenderer {
         if (effects && this.fx() < 0.18) this.kick(wx, wy, sim.world.get(wx, wy));
       }
     }
+    if (this.target) {
+      // A brass marker bobbing over the miner picked in the crew's list.
+      const at = this.whereIs(sim, this.target), bob = Math.floor(time / 300) % 2;
+      ctx.fillStyle = "#f0c850";
+      ctx.fillRect(at.x - 1, at.y - 4 - bob, 3, 1);
+      ctx.fillRect(at.x, at.y - 3 - bob, 1, 1);
+    }
     if (effects) this.drawDust();
     this.drawLightning(time);
+  }
+
+  /** A miner's feet cell, inside a building or out. */
+  private whereIs(sim: MineSim, m: Miner) {
+    if (!m.inside) return { x: m.x, y: m.y };
+    const s = m.inside, b = sim.buildings[s.b], spot = sim.spotOf(s), walk = pathTicks(spot.path);
+    return along([b.door, b.floor], spot.path, s.out ? walk - s.t : Math.min(s.t, walk));
   }
 
   /** The headframe, the buildings (each front wall fading away while

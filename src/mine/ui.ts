@@ -1,10 +1,12 @@
-/** The Mine tab: the mine's view, the crew's tally, hiring miners, and
- * putting them to the three trades (the face, the forge, the smithy). The
- * mine itself runs whatever tab shows (`advance`, from the app's frame
- * loop), and works on while the game is closed: on loading, the time away
- * (up to a cap) is caught up a slice each frame. */
+/** The Mine tab: the mine's view, the crew's tally, hiring miners, the
+ * crew's list (each miner by name, dragged between the three trades: the
+ * face, the forge, the smithy; tapped to follow), and moving on to a new
+ * prospect when this one is worked out. The mine itself runs whatever tab
+ * shows (`advance`, from the app's frame loop), and works on while the game
+ * is closed: on loading, the time away (up to a cap) is caught up a slice
+ * each frame. */
 import { play } from "../sound.ts";
-import { DAY_TICKS, MAX_MINERS, MineSim, TICK_HZ, type Cause, type MineNews, type MineSave, type Weather } from "./sim.ts";
+import { DAY_TICKS, JOBS, MAX_MINERS, MineSim, TICK_HZ, type Cause, type Job, type Miner, type MineNews, type MineSave, type Weather } from "./sim.ts";
 import { MineRenderer } from "./render.ts";
 
 /** Longest time away the mine catches up on. */
@@ -34,7 +36,18 @@ export interface MineHost {
   effects(): boolean;
   /** Fresh seeds for a new mine. */
   newSeed(): number;
+  /** The shared dialog, to ask before leaving a prospect early. */
+  modal: HTMLDialogElement;
+  /** Saves the game (after moving to a new prospect). */
+  store(): void;
 }
+
+const TRADE: Record<Job, { name: string; hint: string }> = {
+  mine: { name: "Mine", hint: "Miners dig, fit out the workings and bring the ore up" },
+  forge: { name: "Forge", hint: "Forge hands smelt the ore into bars" },
+  smith: { name: "Smithy", hint: "Smiths work the bars into iron, steel and Gold" },
+};
+const escape = (s: string) => s.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 
 export class MinePage {
   sim!: MineSim;
@@ -46,6 +59,9 @@ export class MinePage {
   private last = 0;
   private built = false;
   private shownTally = "";
+  private shownCrew = "";
+  /** A name being dragged in the crew's list (the list holds still). */
+  private dragging = false;
 
   constructor(root: HTMLElement, host: MineHost) {
     this.root = root;
@@ -107,36 +123,44 @@ export class MinePage {
         <p id="mine-tally" class="mine-tally"></p>
         <button id="mine-follow" class="mine-follow" aria-pressed="false" title="Follow the crew down">⤓ Follow</button>
       </div>
-      <div class="mine-jobs" id="mine-jobs">
-        <span class="mine-job" title="Miners dig, fit out the workings and bring the ore up"><i class="job-mark job-mine"></i>Mine <b id="job-mine">0</b></span>
-        <span class="mine-job" title="Forge hands smelt the ore into bars"><button data-job="forge" data-step="-1" aria-label="One fewer at the forge">−</button><i class="job-mark job-forge"></i>Forge <b id="job-forge">0</b><button data-job="forge" data-step="1" aria-label="One more at the forge">+</button></span>
-        <span class="mine-job" title="Smiths work the bars into iron, steel and Gold"><button data-job="smith" data-step="-1" aria-label="One fewer at the smithy">−</button><i class="job-mark job-smith"></i>Smithy <b id="job-smith">0</b><button data-job="smith" data-step="1" aria-label="One more at the smithy">+</button></span>
+      <div class="mine-tools">
+        <button id="mine-crew-toggle" class="mine-crew-toggle" aria-pressed="false" aria-controls="mine-crew">☰ Crew</button>
+        <p id="mine-prospect" class="mine-prospect"></p>
+        <button id="mine-prospect-new" class="mine-prospect-new">⚑ New Prospect</button>
       </div>
-      <div class="mine-view"><canvas id="mine-canvas" aria-label="The mine"></canvas><p id="mine-away" class="mine-away" hidden></p></div>`;
+      <div class="mine-body" id="mine-body">
+        <aside class="mine-crew" id="mine-crew" aria-label="The crew" aria-hidden="true">
+          ${JOBS.map((j) => `<section class="crew-box" data-job="${j}" title="${TRADE[j].hint}"><h3><i class="job-mark job-${j}"></i>${TRADE[j].name} <b data-count="${j}">0</b></h3><ul></ul></section>`).join("")}
+          <p class="crew-hint">Drag a name to another trade. Tap one to follow them.</p>
+        </aside>
+        <div class="mine-view"><canvas id="mine-canvas" aria-label="The mine"></canvas><p id="mine-away" class="mine-away" hidden></p></div>
+      </div>`;
     const canvas = this.root.querySelector<HTMLCanvasElement>("#mine-canvas")!;
     this.renderer = new MineRenderer(canvas);
+    this.renderer.refWidth = this.root.querySelector<HTMLElement>("#mine-body")!.clientWidth;
     this.renderer.resize();
     this.renderer.home(this.sim);
     this.root.querySelector<HTMLButtonElement>("#mine-hire")!.onclick = () => this.hire();
-    this.root.querySelectorAll<HTMLButtonElement>("#mine-jobs button").forEach((b) => {
-      b.onclick = () => {
-        const { forge, smith } = this.sim.jobs, step = Number(b.dataset.step), free = this.sim.miners.length - forge - smith;
-        if (step > 0 && free <= 0) return;
-        if (b.dataset.job === "forge") this.sim.setJobs(forge + step, smith);
-        else this.sim.setJobs(forge, smith + step);
-        this.refresh();
-      };
-    });
     const follow = this.root.querySelector<HTMLButtonElement>("#mine-follow")!;
     follow.onclick = () => {
       this.renderer!.follow = !this.renderer!.follow;
+      if (this.renderer!.follow) this.select(null);
       follow.setAttribute("aria-pressed", String(this.renderer!.follow));
       follow.classList.toggle("selected", this.renderer!.follow);
     };
+    const toggle = this.root.querySelector<HTMLButtonElement>("#mine-crew-toggle")!;
+    toggle.onclick = () => {
+      const open = toggle.getAttribute("aria-pressed") !== "true";
+      toggle.setAttribute("aria-pressed", String(open));
+      this.root.querySelector("#mine-body")!.classList.toggle("crew-open", open);
+      this.root.querySelector("#mine-crew")!.setAttribute("aria-hidden", String(!open));
+    };
+    this.root.querySelector<HTMLButtonElement>("#mine-prospect-new")!.onclick = () => this.askProspect();
     this.bindView(canvas);
+    this.bindCrew(this.root.querySelector<HTMLElement>("#mine-crew")!);
   }
 
-  /** Drag pans; pinch, Ctrl-wheel or double-tap zooms; the wheel scrolls. */
+  /** Drag pans; the wheel, a pinch or a double-tap zooms. */
   private bindView(canvas: HTMLCanvasElement) {
     const r = this.renderer!, pointers = new Map<number, { x: number; y: number }>();
     let pinch = 0, lastTap = 0;
@@ -153,7 +177,7 @@ export class MinePage {
         pinch = Math.hypot(a.x - b.x, a.y - b.y);
       } else if (e.timeStamp - lastTap < 300) {
         const p = local(e);
-        r.zoomBy(r.zoom >= 4 ? -3 : 1, p.x, p.y);
+        r.zoomBy(r.zoom >= 7.5 ? 1 / 8 : 2, p.x, p.y);
       }
       lastTap = e.timeStamp;
     };
@@ -163,15 +187,18 @@ export class MinePage {
       pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (pointers.size === 2) {
         const [a, b] = [...pointers.values()], d = Math.hypot(a.x - b.x, a.y - b.y);
-        if (pinch > 0 && Math.abs(d - pinch) > 40) {
+        if (pinch > 0) {
           const mid = local({ clientX: (a.x + b.x) / 2, clientY: (a.y + b.y) / 2 });
-          r.zoomBy(d > pinch ? 1 : -1, mid.x, mid.y);
+          r.zoomBy(d / pinch, mid.x, mid.y);
           pinch = d;
         }
         return;
       }
       r.pan((e.clientX - before.x) * dpr(), (e.clientY - before.y) * dpr());
-      if (Math.abs(e.clientY - before.y) > 2) this.unfollow();
+      if (Math.abs(e.clientX - before.x) + Math.abs(e.clientY - before.y) > 2) {
+        this.unfollow();
+        this.select(null);
+      }
     };
     const end = (e: PointerEvent) => {
       pointers.delete(e.pointerId);
@@ -181,14 +208,110 @@ export class MinePage {
     canvas.onpointercancel = end;
     canvas.onwheel = (e) => {
       e.preventDefault();
-      const p = local(e);
-      if (e.ctrlKey) r.zoomBy(e.deltaY < 0 ? 1 : -1, p.x, p.y);
-      else {
-        r.pan(0, -e.deltaY * dpr());
-        this.unfollow();
-      }
+      const p = local(e), lines = e.deltaMode === 1 ? 40 : e.deltaMode === 2 ? 400 : 1;
+      r.zoomBy(Math.exp(-e.deltaY * lines * 0.0025), p.x, p.y);
     };
   }
+
+  /** The crew's list: a name pressed and dragged goes to the trade it is
+   * dropped on; one tapped is followed (tapped again, let go). A lost
+   * miner's name, tapped, is put away. */
+  private bindCrew(panel: HTMLElement) {
+    let press: { id: number; x: number; y: number; item: HTMLElement } | null = null, ghost: HTMLElement | null = null;
+    const boxAt = (x: number, y: number) => (document.elementFromPoint(x, y) as Element | null)?.closest<HTMLElement>(".crew-box") ?? null;
+    const mark = (box: HTMLElement | null) => panel.querySelectorAll(".crew-box").forEach((b) => b.classList.toggle("drop", b === box));
+    panel.onpointerdown = (e) => {
+      const item = (e.target as Element).closest<HTMLElement>(".crew-member");
+      if (!item || press) return;
+      press = { id: e.pointerId, x: e.clientX, y: e.clientY, item };
+      item.setPointerCapture(e.pointerId);
+    };
+    panel.onpointermove = (e) => {
+      if (!press || e.pointerId !== press.id) return;
+      if (!ghost && press.item.dataset.id && Math.hypot(e.clientX - press.x, e.clientY - press.y) > 6) {
+        this.dragging = true;
+        ghost = press.item.cloneNode(true) as HTMLElement;
+        ghost.classList.add("crew-ghost");
+        document.body.append(ghost);
+        press.item.classList.add("lifted");
+      }
+      if (!ghost) return;
+      ghost.style.left = `${e.clientX}px`;
+      ghost.style.top = `${e.clientY}px`;
+      mark(boxAt(e.clientX, e.clientY));
+    };
+    const finish = (e: PointerEvent, cancel: boolean) => {
+      if (!press || e.pointerId !== press.id) return;
+      const item = press.item;
+      press = null;
+      if (ghost) {
+        ghost.remove();
+        ghost = null;
+        this.dragging = false;
+        mark(null);
+        const box = cancel ? null : boxAt(e.clientX, e.clientY), m = this.minerOf(item);
+        if (box && m && box.dataset.job !== m.job) {
+          this.sim.setJob(m, box.dataset.job as Job);
+          play("knock");
+        }
+        this.shownCrew = "";
+        this.refresh();
+        return;
+      }
+      if (cancel) return;
+      if (item.dataset.fallen !== undefined) {
+        this.sim.dismiss(item.dataset.fallen);
+        this.refresh();
+        return;
+      }
+      const m = this.minerOf(item);
+      this.select(m && m !== this.renderer!.target ? m : null);
+    };
+    panel.onpointerup = (e) => finish(e, false);
+    panel.onpointercancel = (e) => finish(e, true);
+  }
+  private minerOf(item: HTMLElement) {
+    return this.sim.miners.find((m) => String(m.id) === item.dataset.id) ?? null;
+  }
+  /** Follows a miner (or none), and marks its name in the list. */
+  private select(m: Miner | null) {
+    if (!this.renderer || this.renderer.target === m) return;
+    this.renderer.target = m;
+    if (m) this.unfollow();
+    this.refresh();
+  }
+
+  /** Asks before leaving a prospect with ore still to work (a worked-out
+   * one is left at once). */
+  private askProspect() {
+    if (this.sim.workedOut) return this.newProspect();
+    const left = Math.round((100 * this.sim.oreLeft) / Math.max(1, this.sim.oreFound));
+    const modal = this.host.modal;
+    modal.innerHTML = `<small>MINE</small><h2>Leave this prospect?</h2><p>About ${left}% of its ore is still in the ground. The crew, the buildings and the stock at the forge and smithy go with you to fresh ground, and the workings here are left behind.</p>
+      <div class="dialog-actions"><button id="prospect-stay">Stay</button><button id="prospect-go" class="danger">Move on</button></div>`;
+    modal.showModal();
+    modal.querySelector<HTMLButtonElement>("#prospect-stay")!.onclick = () => modal.close();
+    modal.querySelector<HTMLButtonElement>("#prospect-go")!.onclick = () => {
+      modal.close();
+      this.newProspect();
+    };
+  }
+  /** Moves the crew to a new prospect: a fresh world. */
+  private newProspect() {
+    const target = this.renderer?.target ? this.sim.miners.indexOf(this.renderer.target) : -1;
+    this.sim = this.sim.prospectNext(this.host.newSeed(), Date.now());
+    const pay = this.sim.collect();
+    if (pay.gold > 0 || pay.ironBar > 0 || pay.steelBar > 0) this.host.earn(pay.gold, pay.ironBar, pay.steelBar);
+    if (this.renderer) {
+      this.renderer.target = this.sim.miners[target] ?? null;
+      this.renderer.home(this.sim);
+    }
+    this.shownCrew = "";
+    play("unlock");
+    this.host.store();
+    this.refresh();
+  }
+
   private unfollow() {
     if (!this.renderer?.follow) return;
     this.renderer.follow = false;
@@ -215,9 +338,10 @@ export class MinePage {
     const hour = sky.daylight > 0.6 ? "☀ Day" : sky.daylight > 0.05 ? (Math.abs(((sim.tick / DAY_TICKS + 0.1) % 1) - 0.5) < 0.25 ? "◐ Dusk" : "◐ Dawn") : "☾ Night";
     const latest = [...sim.news].reverse().find((n) => tell(n) && sim.tick - n.tick < 90 * TICK_HZ);
     const news = latest ? tell(latest) : null;
-    const { forge, smith } = sim.jobs, mine = crew - forge - smith;
     const ore = sim.ore.iron + sim.ore.gold, bars = sim.bars.iron + sim.bars.gold;
-    const tally = `${crew}|${price}|${afford}|${sim.depth}|${ore}|${bars}|${forge}|${smith}|${Math.ceil(this.owed / TICK_HZ / 60)}|${hour}|${sky.weather}|${lost}|${news}`;
+    this.refreshCrew();
+    const left = Math.round((100 * sim.oreLeft) / Math.max(1, sim.oreFound));
+    const tally = `${crew}|${price}|${afford}|${sim.depth}|${ore}|${bars}|${Math.ceil(this.owed / TICK_HZ / 60)}|${hour}|${sky.weather}|${lost}|${news}|${left}|${sim.workedOut}|${sim.prospect}`;
     if (tally === this.shownTally) return;
     this.shownTally = tally;
     const hire = this.root.querySelector<HTMLButtonElement>("#mine-hire")!;
@@ -227,22 +351,38 @@ export class MinePage {
       `<b>${crew}</b> ${crew === 1 ? "miner" : "miners"} · <b>${sim.depth}</b> ft deep · ${hour}, ${WEATHER_NAME[sky.weather].toLowerCase()}<br>` +
       `<b>${ore}</b> ore waiting at the forge · <b>${bars}</b> ${bars === 1 ? "bar" : "bars"} at the smithy` +
       (news || lost ? `<br><span class="mine-news">${lost ? `${lost} lost${news ? " · " : ""}` : ""}${news ?? ""}</span>` : "");
-    this.root.querySelector("#job-mine")!.textContent = String(mine);
-    this.root.querySelector("#job-forge")!.textContent = String(forge);
-    this.root.querySelector("#job-smith")!.textContent = String(smith);
-    this.root.querySelectorAll<HTMLButtonElement>("#mine-jobs button").forEach((b) => {
-      const have = b.dataset.job === "forge" ? forge : smith;
-      b.disabled = Number(b.dataset.step) > 0 ? mine <= 0 : have <= 0;
-    });
+    this.root.querySelector("#mine-prospect")!.innerHTML = sim.workedOut
+      ? `Prospect ${sim.prospect} is <b>worked out</b>: time to move on`
+      : `Prospect ${sim.prospect} · <b>${left}%</b> of its ore left`;
+    this.root.querySelector("#mine-prospect-new")!.classList.toggle("ready", sim.workedOut);
     const away = this.root.querySelector<HTMLElement>("#mine-away")!;
     const mins = Math.ceil(this.owed / TICK_HZ / 60);
     away.hidden = this.owed < TICK_HZ * 5;
     away.textContent = `The crew worked on while you were away… ${mins} min to catch up`;
   }
 
+  /** The crew's list, rebuilt when the crew, their trades, the lost or the
+ * miner followed change (not while a name is held). */
+  private refreshCrew() {
+    if (this.dragging) return;
+    const sim = this.sim, target = this.renderer?.target ?? null;
+    const key = sim.miners.map((m) => `${m.id}:${m.name}:${m.job}`).join(",") + "|" + sim.fallen.map((f) => f.name).join(",") + "|" + (target?.id ?? "");
+    if (key === this.shownCrew) return;
+    this.shownCrew = key;
+    for (const job of JOBS) {
+      const box = this.root.querySelector<HTMLElement>(`.crew-box[data-job="${job}"]`)!;
+      const crew = sim.miners.filter((m) => m.job === job), lost = sim.fallen.filter((f) => f.job === job);
+      box.querySelector("[data-count]")!.textContent = String(crew.length);
+      box.querySelector("ul")!.innerHTML =
+        crew.map((m) => `<li class="crew-member${m === target ? " selected" : ""}" data-id="${m.id}"><i class="job-mark job-${job}"></i><span>${escape(m.name)}</span></li>`).join("") +
+        lost.map((f) => `<li class="crew-member fallen" data-fallen="${escape(f.name)}" title="Lost: ${f.cause}. Tap to let them go."><i class="skull" aria-hidden="true">☠</i><s>${escape(f.name)}</s></li>`).join("");
+    }
+  }
+
   /** Draws the mine (when the tab shows). */
   frame(time: number) {
     if (!this.renderer) return;
+    this.renderer.refWidth = this.root.querySelector<HTMLElement>("#mine-body")?.clientWidth ?? 0;
     this.renderer.draw(this.sim, time, this.host.effects());
     this.refresh();
   }

@@ -87,6 +87,8 @@ const minePage = new MinePage(el("mine"), {
   upgrades: () => ({ coffee: save.skills.coffee, waterproof: save.skills.waterproofing }),
   effects: () => !save.settings.effectsOff,
   newSeed: () => Math.floor(stream("game")() * 4294967296),
+  modal,
+  store: () => store(),
 });
 const libraryPage = new LibraryPage(el("library"), {
   gold: () => save.gold,

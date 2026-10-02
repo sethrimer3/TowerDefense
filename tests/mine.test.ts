@@ -78,7 +78,8 @@ test("a grid survives encoding; a damaged one is refused", () => {
 
 test("one miner sinks a shored, laddered shaft and opens a tunnel with track and torches", () => {
   const sim = new MineSim(12345);
-  minutes(sim, 25);
+  // Two nights' sleep among it.
+  minutes(sim, 32);
   const x0 = sim.shaftX, { surface, stoneTop } = sim.strata;
   assert.ok(sim.depth >= sim.levels[0] - surface[x0], `shaft reached the first level (${sim.depth})`);
   for (let y = surface[x0] + 1; y < sim.levels[0]; y++) assert.equal(sim.world.get(x0, y), LADDER, `ladder at ${y}`);
@@ -490,4 +491,90 @@ test("the trades and the forge's stock save and load; older saves without them s
   assert.equal(decodeMineSave({ ...saved, jobs: { forge: -1, smith: 0 } }), null);
   assert.equal(decodeMineSave({ ...saved, miners: [{ ...saved.miners[0], job: "baker" }] }), null);
   assert.equal(decodeMineSave({ ...saved, ore: { iron: 1.5, gold: 0 } }), null);
+});
+
+test("each miner has a name for life: unlike the rest of the crew's, and kept in the save", () => {
+  const sim = new MineSim(808);
+  for (let i = 0; i < 11; i++) sim.hire();
+  const names = sim.miners.map((m) => m.name);
+  assert.equal(new Set(names).size, names.length, "no two alike");
+  assert.ok(names.every((n) => /^[A-Z][a-z]+ [A-Z][a-z]+$/.test(n)), names.join(", "));
+  const loaded = new MineSim(808, decodeMineSave(JSON.parse(JSON.stringify(sim.save(0))))!);
+  assert.deepEqual(loaded.miners.map((m) => m.name), names);
+  assert.equal(decodeMineSave({ ...sim.save(0), miners: [{ ...sim.save(0).miners[0], name: 7 }] }), null);
+});
+
+test("the player puts one miner to a trade; a miner lost is remembered until let go or replaced", () => {
+  const sim = new MineSim(909);
+  for (let i = 0; i < 4; i++) sim.hire();
+  const pick = sim.miners.find((m) => m.job === "mine")!, smiths = sim.jobs.smith;
+  sim.setJob(pick, "smith");
+  assert.equal(pick.job, "smith");
+  assert.equal(sim.jobs.smith, smiths + 1);
+  sim.mercy = 0;
+  const [a, b] = sim.miners.filter((m) => m !== pick);
+  (sim as any).kill(a, "crushed");
+  sim.mercy = 0;
+  (sim as any).kill(b, "drowned");
+  assert.deepEqual(sim.fallen.map((f) => [f.name, f.cause]), [[a.name, "crushed"], [b.name, "drowned"]]);
+  const loaded = new MineSim(909, decodeMineSave(JSON.parse(JSON.stringify(sim.save(0))))!);
+  assert.deepEqual(loaded.fallen, sim.fallen);
+  sim.dismiss(b.name);
+  assert.deepEqual(sim.fallen.map((f) => f.name), [a.name]);
+  sim.hire();
+  assert.equal(sim.fallen.length, 0, "the replacement takes the lost miner's place in the list");
+  assert.ok(!sim.miners.some((m) => m.name === a.name || m.name === b.name), "names of the lost aren't reused at once");
+});
+
+test("a new prospect is a fresh world; the crew, their trades and the stock go with them", () => {
+  const sim = new MineSim(1001);
+  for (let i = 0; i < 5; i++) sim.hire();
+  minutes(sim, 6);
+  sim.ore = { iron: 9, gold: 2 };
+  sim.bars = { iron: 3, gold: 1 };
+  sim.miners[0].iron = 4;
+  const crew = sim.miners.map((m) => [m.name, m.job]);
+  const next = sim.prospectNext(4242, 0);
+  assert.equal(next.seed, 4242);
+  assert.equal(next.prospect, 2);
+  assert.deepEqual(next.world.cells, generate(4242), "untouched ground");
+  assert.deepEqual(next.miners.map((m) => [m.name, m.job]), crew);
+  const door = next.buildings.barracks.door;
+  assert.ok(next.miners.every((m) => m.x === door && m.iron + m.gold === 0));
+  assert.equal(next.ore.iron, 13, "ore in packs goes to the forge's piles");
+  assert.deepEqual(next.bars, { iron: 3, gold: 1 });
+  assert.equal(next.hired, sim.hired);
+  assert.equal(next.oreLeft, next.oreFound);
+  minutes(next, 4);
+  assert.ok(next.depth > 0, "the crew sinks a new shaft");
+});
+
+test("a prospect is worked out once the shaft is at the bottom and its work is done", () => {
+  const sim = new MineSim(77);
+  minutes(sim, 1);
+  assert.equal(sim.workedOut, false);
+  assert.ok(sim.oreFound > 2000, `plenty of ore (${sim.oreFound})`);
+  sim.shaftLevel = sim.levels.length - 1;
+  sim.plan.fill(0);
+  (sim as any).survey();
+  assert.equal(sim.workedOut, true);
+  const loaded = new MineSim(77, decodeMineSave(JSON.parse(JSON.stringify(sim.save(0))))!);
+  assert.equal(loaded.workedOut, true);
+});
+
+test("a mine from before the world was widened moves its crew to a fresh prospect of the same seed", () => {
+  const sim = new MineSim(31);
+  for (let i = 0; i < 2; i++) sim.hire();
+  sim.setJobs(1, 0);
+  const saved = JSON.parse(JSON.stringify(sim.save(0)));
+  const narrow = new Uint8Array(128 * H);
+  const old = { ...saved, cells: encodeGrid(narrow), plan: encodeGrid(narrow), water: encodeGrid(narrow), burning: [[5, 10]] };
+  for (const m of old.miners) delete m.name;
+  const back = decodeMineSave(old)!;
+  assert.ok(back && back.cells === undefined);
+  const moved = new MineSim(back.seed, back);
+  assert.deepEqual(moved.world.cells, generate(31));
+  assert.equal(moved.miners.length, 3);
+  assert.deepEqual(moved.jobs, { forge: 1, smith: 0 });
+  assert.ok(moved.miners.every((m) => m.name.length > 0));
 });
