@@ -1407,3 +1407,34 @@ nav button { position: relative; }
   cursor: pointer;
 }
 .mine-news { font-style: italic; opacity: 0.9; }
+/* The crew's trades: a counter each, with steppers for the forge and smithy. */
+.mine-jobs {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin: 0 0 6px;
+  font-size: 11px;
+}
+.mine-job {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.job-mark {
+  display: inline-block;
+  width: 6px;
+  height: 12px;
+  background: linear-gradient(var(--hat) 50%, var(--coat) 50%);
+  box-shadow: 0 0 0 1px #000;
+}
+.job-mine { --hat: #f2c230; --coat: #f4f2ec; }
+.job-forge { --hat: #8d929c; --coat: #f4f2ec; }
+.job-smith { --hat: #f4e6d4; --coat: #7a4a26; }
+.mine-jobs .mine-job button {
+  min-width: 28px;
+  min-height: 0;
+  height: 26px;
+  padding: 0 6px;
+  font-size: 14px;
+}

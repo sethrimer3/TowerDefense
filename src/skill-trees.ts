@@ -2,7 +2,7 @@
  * earns by the hour, and each wave a defense holds past the best before it
  * pays). Each skill has ranks; every rank applies its effect once more:
  * Command's and Stewardship's to every defense from the next one on, the
- * Library's to the library at once. The Mine's tree has no skills yet.
+ * Library's and the Mine's to the library and the mine at once.
  * Node positions are percentages of the tree's view: x of its width, y of
  * its height, so a tree taller than one screen (`height`, in the same
  * units, 100 by default) scrolls. */
@@ -11,14 +11,15 @@ import type { BonusTarget } from "./progression.ts";
 export type SkillId =
   | "drillSergeant" | "veterans" | "bladework" | "fletchers" | "gunpowder" | "ballistics" | "warBanner"
   | "masonry" | "bastions" | "guilds" | "plunder" | "ironworks" | "scholars" | "tactician"
-  | "fireproofWood" | "fireTraining";
+  | "fireproofWood" | "fireTraining" | "coffee" | "waterproofing";
 export type TreeId = "command" | "stewardship" | "mine" | "library";
 
 /** What one rank of a skill does: `per` added to a target's percent (a
  * negative `per` on a time makes it shorter), or, for `slots` and
- * `ironPerWave`, a whole number added. The Library's skills are read as
- * ranks (`library/sim.ts`: `accidentChance`, `fireDrill`). */
-export type SkillEffect = { target: BonusTarget | "slots" | "ironPerWave" | "fireproof" | "fireTraining"; per: number };
+ * `ironPerWave`, a whole number added. The Library's and the Mine's skills
+ * are read as ranks (`library/sim.ts`: `accidentChance`, `fireDrill`;
+ * `mine/sim.ts`: `nightShift`, the shaft house's seal). */
+export type SkillEffect = { target: BonusTarget | "slots" | "ironPerWave" | "fireproof" | "fireTraining" | "coffee" | "waterproof"; per: number };
 export type Skill = { id: SkillId; name: string; icon: string; max: number; base: number; effect: SkillEffect; text: string };
 export type SkillNode = { id: SkillId; x: number; y: number; requires: SkillId[] };
 export type SkillTree = { id: TreeId; name: string; description: string; height?: number; nodes: SkillNode[] };
@@ -39,6 +40,8 @@ export const SKILLS: Record<SkillId, Skill> = {
   scholars: { id: "scholars", name: "War college", icon: "✦", max: 3, base: 2, effect: { target: "xp", per: 15 }, text: "+15% experience from every kill a rank" },
   tactician: { id: "tactician", name: "Tactician", icon: "⌛", max: 1, base: 6, effect: { target: "slots", per: 1 }, text: "One more Training slot" },
   fireproofWood: { id: "fireproofWood", name: "Fireproof wood", icon: "▤", max: 10, base: 5, effect: { target: "fireproof", per: 1 }, text: "The library's tables catch fire 10% less often a rank (1% a minute to start, then 0.9%, 0.81%…)" },
+  coffee: { id: "coffee", name: "Coffee", icon: "♨", max: 12, base: 2, effect: { target: "coffee", per: 5 }, text: "5% more of the mine's crew work the night shift a rank (20% to start, up to 80%)" },
+  waterproofing: { id: "waterproofing", name: "Waterproofing", icon: "☂", max: 4, base: 4, effect: { target: "waterproof", per: 15 }, text: "The shaft house keeps 15% more of the rain's runoff out of the shaft a rank (20% to start, up to 80%)" },
   fireTraining: { id: "fireTraining", name: "Fire training", icon: "♒", max: 5, base: 8, effect: { target: "fireTraining", per: 1 }, text: "More librarians fight a fire, fetching and throwing water faster and further, and each splash more likely to douse the flames" },
 };
 
@@ -61,7 +64,10 @@ export const TREES: SkillTree[] = [
     { id: "ironworks", x: 78, y: 80, requires: ["plunder"] },
     { id: "tactician", x: 30, y: 84, requires: ["scholars", "plunder"] },
   ] },
-  { id: "mine", name: "Mine", description: "Earn Knowledge in the Library. The Mine's skills are still being dug out.", nodes: [] },
+  { id: "mine", name: "Mine", description: "Earn Knowledge in the Library. Mine skills keep the crew working and the shaft dry.", nodes: [
+    { id: "coffee", x: 28, y: 30, requires: [] },
+    { id: "waterproofing", x: 72, y: 30, requires: [] },
+  ] },
   { id: "library", name: "Library", description: "Earn Knowledge in the Library: shelves × librarians an hour. Library skills guard it from fire.", nodes: [
     { id: "fireproofWood", x: 28, y: 30, requires: [] },
     { id: "fireTraining", x: 72, y: 30, requires: [] },

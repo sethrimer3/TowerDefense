@@ -19,8 +19,8 @@
 ## Skill trees (`src/skill-trees.ts`)
 
 - Skill: `{ id, name, icon, max, base, effect: { target, per }, text }` in `SKILLS`; add the id to `SkillId`.
-- Trees: Command and Stewardship (Defend), Mine (no nodes yet) and Library.
+- Trees: Command and Stewardship (Defend), Mine and Library.
 - Node: `{ id, x, y, requires }` in one tree's `nodes` (x and y are percentages of the tree's view).
 - Cost: `skillCost = base × (rank + 1)` Knowledge.
-- Effect: `per` on a `BonusTarget` (as Training), or `slots` (Training slots) or `ironPerWave` (iron per wave held), summed in `progression.ts`; or `fireproof` / `fireTraining`, which the Library reads as ranks (`main.ts` passes `save.skills` to the page; `accidentChance`, `fireDrill` in `library/sim.ts`).
+- Effect: `per` on a `BonusTarget` (as Training), or `slots` (Training slots) or `ironPerWave` (iron per wave held), summed in `progression.ts`; or `fireproof` / `fireTraining`, which the Library reads as ranks (`main.ts` passes `save.skills` to the page; `accidentChance`, `fireDrill` in `library/sim.ts`), or `coffee` / `waterproof`, which the Mine reads as ranks the same way (`nightShift` and the shaft house's `seal` in `mine/sim.ts`).
 - Saved in `save.skills` (decoded against `max`).

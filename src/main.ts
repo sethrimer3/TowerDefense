@@ -77,12 +77,14 @@ const minePage = new MinePage(el("mine"), {
     save.gold = Math.max(0, save.gold - n);
     update();
   },
-  earn: (gold, ironBar) => {
+  earn: (gold, ironBar, steelBar) => {
     save.gold += gold;
     save.ironBar += ironBar;
+    save.steelBar += steelBar;
     refreshCurrencies();
     mineDirty = true;
   },
+  upgrades: () => ({ coffee: save.skills.coffee, waterproof: save.skills.waterproofing }),
   effects: () => !save.settings.effectsOff,
   newSeed: () => Math.floor(stream("game")() * 4294967296),
 });
