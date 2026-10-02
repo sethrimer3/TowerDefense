@@ -10,7 +10,7 @@ import { MAX_LIBRARIANS, MAX_SHELVES, LibrarySim, librarianPrice, shelfPrice, ty
 /** Longest time away the library earns Knowledge for (as the mine). */
 export const MAX_AWAY_MS = 2 * 60 * 60 * 1000;
 const HOUR_MS = 60 * 60 * 1000;
-import { LibraryRenderer } from "./render.ts";
+import { LibraryRenderer, daylight } from "./render.ts";
 
 export interface LibraryHost {
   gold(): number;
@@ -61,6 +61,7 @@ export class LibraryPage {
     const up = this.host.upgrades();
     this.sim.fireproof = up.fireproof;
     this.sim.fireTraining = up.fireTraining;
+    this.sim.night = 1 - daylight(this.host.clock());
     let left = Math.min(1, Math.max(0, now - this.ranTo) / 1000);
     this.ranTo = now;
     while (left > 1e-6) {
@@ -166,7 +167,8 @@ export class LibraryPage {
     const sp = shelfPrice(sim.shelves), lp = librarianPrice(sim.hired);
     const shelvesFull = sim.shelves >= MAX_SHELVES, crewFull = sim.librarians.length >= MAX_LIBRARIANS;
     const fire = sim.fire.active, lost = sim.lost;
-    const key = `${sim.shelves}|${sim.built}|${sim.librarians.length}|${free || gold >= sp}|${free || gold >= lp}|${sim.books}|${fire}|${lost ? `${lost.shelves},${lost.librarians},${lost.books}` : ""}`;
+    const home = sim.librarians.filter((l) => l.home).length;
+    const key = `${home}|${sim.shelves}|${sim.built}|${sim.librarians.length}|${free || gold >= sp}|${free || gold >= lp}|${sim.books}|${fire}|${lost ? `${lost.shelves},${lost.librarians},${lost.books}` : ""}`;
     if (key === this.shown) return;
     this.shown = key;
     const shelf = this.root.querySelector<HTMLButtonElement>("#library-shelf")!, hire = this.root.querySelector<HTMLButtonElement>("#library-hire")!;
@@ -176,7 +178,7 @@ export class LibraryPage {
     hire.disabled = crewFull || !(free || gold >= lp);
     const n = sim.librarians.length, planned = sim.shelves - sim.built;
     this.root.querySelector("#library-tally")!.innerHTML =
-      `<b>${sim.built}</b>/${MAX_SHELVES} shelves${planned ? ` (+${planned} to build)` : ""} · <b>${n}</b> ${n === 1 ? "librarian" : "librarians"}<br><b>${sim.books}</b> books · <b>${sim.rate}</b> Knowledge an hour`;
+      `<b>${sim.built}</b>/${MAX_SHELVES} shelves${planned ? ` (+${planned} to build)` : ""} · <b>${n}</b> ${n === 1 ? "librarian" : "librarians"}${home ? ` (${home} home for the night)` : ""}<br><b>${sim.books}</b> books · <b>${sim.rate}</b> Knowledge an hour`;
     const alert = this.root.querySelector<HTMLElement>("#library-alert")!;
     const plural = (k: number, one: string) => `${k} ${one}${k === 1 ? "" : "s"}`;
     if (fire) alert.textContent = "Fire! A candle has caught a table. The librarians are fighting it with buckets from the water butts.";

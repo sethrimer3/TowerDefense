@@ -44,14 +44,18 @@ const SEATS = TABLES.flatMap((t) => [t.x - 2, t.x + t.w + 1]);
 
 export type Hat = "mortarboard" | "wizard" | "beret" | "hood" | "coif";
 export const HATS: Hat[] = ["mortarboard", "wizard", "beret", "hood", "coif"];
-export type Action = "idle" | "walk" | "climb" | "build" | "grab" | "place" | "write" | "read" | "fill" | "throw" | "cower";
+export type Action =
+  | "idle" | "walk" | "climb" | "build" | "grab" | "place" | "write" | "read" | "fill" | "throw" | "cower"
+  | "mend" | "chat" | "gaze" | "doze" | "drink" | "mourn" | "sweep" | "pour";
 
 type Step =
   | { kind: "walk"; x: number | (() => number) }
   | { kind: "climb"; y: number }
-  | { kind: "work"; t: number; action: Action; done?: () => void }
-  /** Out of sight at the end of a hallway, then `done`. */
-  | { kind: "away"; t: number; done?: () => void };
+  /** Timed work, facing `face` if given. */
+  | { kind: "work"; t: number; action: Action; done?: () => void; face?: number }
+  /** Out of sight at the end of a hallway (for `t` seconds, or until
+   * `until` holds), then `done`. */
+  | { kind: "away"; t: number; until?: () => boolean; done?: () => void };
 
 /** The book cart and the supply wheelbarrow. `here` is false while one is
  * out of the library (or burnt); `by` is the librarian using it (0 none). */
@@ -70,7 +74,7 @@ export type Librarian = {
   /** The colour of the book in hand (0 for none). */
   carrying: number;
   /** A plank or a bucket in hand (a book is `carrying`). */
-  hand: "" | "plank" | "bucket";
+  hand: "" | "plank" | "bucket" | "cup" | "broom";
   /** Water in the bucket. */
   water: number;
   /** The cart being pushed. */
@@ -94,10 +98,16 @@ export type Librarian = {
   /** A plank, or a book from the cart, promised but not yet taken. */
   plankClaim: boolean;
   bookClaim: boolean;
+  /** Vigour, 1 fresh to 0 spent: work tires, tea and a doze restore it. */
+  energy: number;
+  /** Gone home for the night. */
+  home: boolean;
+  /** Who they are talking with (0 nobody). */
+  with: number;
 };
 
 /** Where a librarian died: drawn as ash for a while. */
-export type Remains = { x: number; at: number };
+export type Remains = { x: number; at: number; mourners: number[] };
 
 export type LibrarySave = {
   seed: number;
@@ -120,14 +130,22 @@ export const accidentChance = (fireproof: number) => 0.01 * Math.pow(0.9, firepr
  * how fast they move, the water each throws, and each droplet's chance of
  * dousing the flame it lands on. */
 export function fireDrill(rank: number) {
-  return { fight: Math.min(1, 0.25 + 0.15 * rank), speed: 1 + 0.2 * rank, water: 1 + 0.35 * rank, douse: Math.min(0.9, 0.3 + 0.12 * rank) };
+  return { fight: Math.min(0.75, 0.25 + 0.1 * rank), speed: 1 + 0.2 * rank, water: 1 + 0.35 * rank, douse: Math.min(0.9, 0.3 + 0.12 * rank) };
 }
 /** Knowledge an hour: built shelves times librarians. */
+/** Buckets each water butt holds when full. */
+export const BUTT_FULL = 30;
+/** The bay each book colour belongs in, when the librarians sort the stacks. */
+export const homeBay = (color: number) => (color - 1) % BAYS;
+/** How tiring each action is, a second (rest restores). */
+const TIRING: Partial<Record<Action, number>> = { walk: 1 / 420, climb: 1 / 200, build: 1 / 160, grab: 1 / 300, place: 1 / 300, fill: 1 / 150, throw: 1 / 120, sweep: 1 / 240, pour: 1 / 200, write: 1 / 700, mend: 1 / 600, read: 1 / 900, idle: 1 / 1200 };
 export const knowledgeRate = (shelves: number, librarians: number) => shelves * librarians;
 
 const WALK = 14, CLIMB = 9, FIRE_DT = 0.1;
 /** Seconds in a flame's heat that kill a librarian. */
 const SCORCH = 4;
+/** How high above the floor a sweeper can scrub soot off the stone. */
+const SCRUB = 30;
 
 /** The order shelf units go up in: always on the lowest bay, the most
  * central first, so the stacks rise evenly from the middle out. */
@@ -199,6 +217,13 @@ export class LibrarySim {
   /** Fires so far, and where the dead fell. */
   fires = 0;
   remains: Remains[] = [];
+  /** How dark it is outside (0 day, 1 night; the page keeps it current). */
+  night = 0;
+  /** Buckets in each water butt. */
+  readonly butts = [BUTT_FULL, BUTT_FULL];
+  /** Books rebound at the tables, and sorted into their colour's bay. */
+  mended = 0;
+  sorted = 0;
   private rng: () => number;
   private reserved = new Set<number>();
   private seats = new Array<number>(SEATS.length).fill(0);
@@ -213,6 +238,9 @@ export class LibrarySim {
   private minute = 0;
   private fireClock = 0;
   private fighters = new Set<number>();
+  /** Who is refilling the butts, and who is sweeping (0 nobody). */
+  private refiller = 0;
+  private sweeper = 0;
 
   constructor(seed: number, saved?: LibrarySave) {
     this.seed = seed >>> 0;
@@ -283,6 +311,7 @@ export class LibrarySim {
       id, hat: HATS[Math.floor(r() * HATS.length)], tint: tints[Math.floor(r() * tints.length)],
       role: id % 3 === 0 ? "index" : "shuffle", x, y: FLOOR, facing: 1, carrying: 0, hand: "", water: 0, pushing: null, away: false,
       mode: "work", scorched: 0, action: "idle", steps: [], seat: -1, reading: 0, held: [], site: "", plankClaim: false, bookClaim: false,
+      energy: 0.6 + r() * 0.4, home: false, with: 0,
     });
   }
 
@@ -331,6 +360,11 @@ export class LibrarySim {
   private pick(want: (s: number) => boolean) {
     const o = this.options(want);
     return o.length ? o[Math.floor(this.rng() * o.length)] : -1;
+  }
+  /** An empty slot for a book of `color`: in its colour's bay if there is room. */
+  private pickFor(color: number) {
+    const home = this.pick((s) => this.slots[s] === 0 && slotPlace(s).bay === homeBay(color));
+    return home >= 0 ? home : this.pick((s) => this.slots[s] === 0);
   }
   private hold(l: Librarian, s: number) {
     this.reserved.add(s);
@@ -576,7 +610,7 @@ export class LibrarySim {
         l.steps = [{ kind: "walk", x: cart.x }, { kind: "work", t: 0.5, action: "place", done: () => (cart.books.push(l.carrying), (l.carrying = 0)) }];
         return;
       }
-      const to = this.pick((s) => this.slots[s] === 0);
+      const to = this.pickFor(l.carrying);
       if (to >= 0) {
         l.steps = this.shelve(l, to);
         return;
@@ -592,6 +626,20 @@ export class LibrarySim {
     if (this.exporting?.by === l.id) {
       l.steps = this.exportJob(l);
       return;
+    }
+    const routine = this.goHome(l) ?? this.rest(l) ?? this.mourn(l) ?? this.refill(l) ?? this.sweep(l);
+    if (routine) {
+      l.steps = routine;
+      return;
+    }
+    // Now and then a moment's pause: a word with a passing colleague, or a
+    // look up at the window.
+    if (r() < 0.12) {
+      const pause = this.chat(l) ?? (this.night < 0.5 && r() < 0.5 ? this.gaze(l) : null);
+      if (pause) {
+        l.steps = pause;
+        return;
+      }
     }
     const job = this.buildJob(l) ?? this.cartJob(l);
     if (job) {
@@ -622,9 +670,24 @@ export class LibrarySim {
       if (l.seat >= 0 && this.tables[Math.floor(l.seat / 2)] === TABLE_PLANKS) {
         const from = this.pick((s) => this.slots[s] > 0);
         if (from >= 0) {
-          l.steps = [...this.fetch(l, from), { kind: "walk", x: SEATS[l.seat] }, { kind: "work", t: 14 + r() * 22, action: "write" }];
+          // Index it, or now and then rebind a worn one in a new cover.
+          const mend = r() < 0.25;
+          l.steps = [...this.fetch(l, from), { kind: "walk", x: SEATS[l.seat] }, mend
+            ? { kind: "work", t: 12 + r() * 10, action: "mend", done: () => {
+              l.carrying = this.newBook();
+              this.mended++;
+            } }
+            : { kind: "work", t: 14 + r() * 22, action: "write" }];
           return;
         }
+      }
+    }
+    // Sort the stacks: a book out of its colour's bay goes home.
+    if (r() < 0.6) {
+      const sort = this.sortJob(l);
+      if (sort) {
+        l.steps = sort;
+        return;
       }
     }
     const from = this.pick((s) => this.slots[s] > 0);
@@ -634,14 +697,164 @@ export class LibrarySim {
         l.steps = [...this.fetch(l, from), { kind: "walk", x: 20 + r() * (W - 40) }, { kind: "work", t: 4 + r() * 6, action: "read" }];
         return;
       }
-      const fromBay = slotPlace(from).bay, to = this.pick((s) => this.slots[s] === 0 && slotPlace(s).bay !== fromBay);
+      // (Into its own colour's bay, where there is room.)
+      const color = this.slots[from], fromBay = slotPlace(from).bay;
+      let to = this.pick((s) => this.slots[s] === 0 && slotPlace(s).bay === homeBay(color));
+      if (to < 0) to = this.pick((s) => this.slots[s] === 0 && slotPlace(s).bay !== fromBay);
       if (to >= 0) {
         l.steps = [...this.fetch(l, from), ...this.shelve(l, to)];
         return;
       }
     }
-    // Nothing to do: wander the nave.
-    l.steps = [{ kind: "walk", x: 10 + r() * (W - 20) }, { kind: "work", t: 3 + r() * 5, action: "idle" }];
+    // Nothing to do: talk with someone at a loose end, gaze up at the
+    // window while it is light, or wander the nave.
+    l.steps = this.chat(l) ?? (this.night < 0.5 && r() < 0.35 ? this.gaze(l)
+      : [{ kind: "walk", x: 10 + r() * (W - 20) }, { kind: "work", t: 3 + r() * 5, action: "idle" }]);
+  }
+  private gaze(l: Librarian): Step[] {
+    const x = W / 2 - 12 + this.rng() * 24;
+    return [{ kind: "walk", x }, { kind: "work", t: 5 + this.rng() * 5, action: "gaze", face: x < W / 2 ? 1 : -1 }];
+  }
+
+  // ── Routines ────────────────────────────────────────────────────────
+
+  /** By night about half the librarians go home down a hallway (never the
+   * last one or two), and come back in the morning. */
+  private goHome(l: Librarian): Step[] | null {
+    if (this.night < 0.6 || h01(l.id, 99) >= 0.5) return null;
+    const staying = this.librarians.filter((o) => !o.home).length;
+    if (staying <= Math.max(1, Math.ceil(this.librarians.length / 2))) return null;
+    l.home = true;
+    return [{ kind: "walk", x: EXITS[sideOf(l.x)] }, {
+      kind: "away", t: 0, until: () => this.night < 0.4, done: () => {
+        l.home = false;
+        l.energy = 1;
+      },
+    }];
+  }
+
+  /** Tired: a doze in a free seat at night, else out for a cup of tea,
+   * brought back and drunk in the nave. */
+  private rest(l: Librarian): Step[] | null {
+    if (l.energy >= 0.25) return null;
+    const r = this.rng;
+    if (this.night >= 0.5) {
+      const seat = this.seats.findIndex((id, k) => id === 0 && this.tables[Math.floor(k / 2)] === TABLE_PLANKS);
+      if (seat >= 0) {
+        this.seats[seat] = l.id;
+        return [{ kind: "walk", x: SEATS[seat] }, {
+          kind: "work", t: 20 + r() * 20, action: "doze", face: seat % 2 ? -1 : 1, done: () => {
+            l.energy = 1;
+            if (this.seats[seat] === l.id && l.seat !== seat) this.seats[seat] = 0;
+          },
+        }];
+      }
+    }
+    return [{ kind: "walk", x: EXITS[sideOf(l.x)] }, { kind: "away", t: 8 + r() * 8, done: () => (l.hand = "cup") },
+      { kind: "walk", x: 20 + r() * (W - 40) }, {
+        kind: "work", t: 6 + r() * 4, action: "drink", done: () => {
+          l.hand = "";
+          l.energy = 1;
+        },
+      }];
+  }
+
+  /** After a death, each librarian stands a while at the ashes. */
+  private mourn(l: Librarian): Step[] | null {
+    const r = this.remains.find((m) => !m.mourners.includes(l.id) && this.time - m.at < 150);
+    if (!r) return null;
+    r.mourners.push(l.id);
+    const spot = r.x + (l.x < r.x ? -3 : 3) - 2 + this.rng() * 4;
+    return [{ kind: "walk", x: Math.max(4, Math.min(W - 4, spot)) }, { kind: "work", t: 4 + this.rng() * 3, action: "mourn", face: spot < r.x ? 1 : -1 }];
+  }
+
+  /** Buckets used on a fire are refilled, two at a trip from outside. */
+  private refill(l: Librarian): Step[] | null {
+    const side = this.butts.findIndex((b) => b < BUTT_FULL);
+    if (side < 0 || (this.refiller && this.refiller !== l.id)) return null;
+    this.refiller = l.id;
+    return [{ kind: "walk", x: EXITS[side] }, { kind: "away", t: 5 + this.rng() * 3, done: () => (l.hand = "bucket") },
+      { kind: "walk", x: BUTTS[side] + (side ? -2 : 2) }, {
+        kind: "work", t: 1.5, action: "pour", face: side ? 1 : -1, done: () => {
+          this.butts[side] = Math.min(BUTT_FULL, this.butts[side] + 2);
+          l.hand = "";
+          this.refiller = 0;
+        },
+      }];
+  }
+
+  /** One librarian sweeps up the ashes of the dead once they are mourned,
+   * then scrubs the soot off the stone low enough to reach. */
+  private sweep(l: Librarian): Step[] | null {
+    if (this.sweeper && this.sweeper !== l.id) return null;
+    const ash = this.remains.find((m) => m.mourners.length >= this.librarians.length || this.time - m.at >= 150);
+    let x = ash?.x ?? -1;
+    if (!ash) {
+      const soot = this.fire.soot;
+      let best = 0.15;
+      for (let cx = 0; cx < W / 2; cx++)
+        for (let cy = Math.floor((FLOOR - SCRUB) / 2); cy < FLOOR / 2; cy++)
+          if (soot[cy * (W / 2) + cx] > best) {
+            best = soot[cy * (W / 2) + cx];
+            x = cx * 2 + 1;
+          }
+    }
+    if (x < 0) return null;
+    this.sweeper = l.id;
+    return [{ kind: "walk", x: Math.max(4, Math.min(W - 4, x - 3)) }, { kind: "work", t: 0.4, action: "grab", done: () => (l.hand = "broom") }, {
+      kind: "work", t: 5 + this.rng() * 3, action: "sweep", face: 1, done: () => {
+        if (ash) this.remains = this.remains.filter((m) => m !== ash);
+        else this.fire.scrub(x - 10, x + 10, FLOOR - SCRUB, FLOOR);
+        l.hand = "";
+        this.sweeper = 0;
+      },
+    }];
+  }
+
+  /** Carries a book from a bay of another colour to its own colour's bay. */
+  private sortJob(l: Librarian): Step[] | null {
+    const empty = new Map<number, number[]>();
+    for (const s of this.options((s) => this.slots[s] === 0)) {
+      const bay = slotPlace(s).bay;
+      if (!empty.has(bay)) empty.set(bay, []);
+      empty.get(bay)!.push(s);
+    }
+    const from = this.pick((s) => this.slots[s] > 0 && slotPlace(s).bay !== homeBay(this.slots[s]) && empty.has(homeBay(this.slots[s])));
+    if (from < 0) return null;
+    const room = empty.get(homeBay(this.slots[from]))!, to = room[Math.floor(this.rng() * room.length)];
+    const steps = [...this.fetch(l, from), ...this.shelve(l, to)];
+    const place = steps[steps.length - 2] as { done?: () => void }, put = place.done;
+    place.done = () => {
+      const had = l.carrying;
+      put?.();
+      if (had && !l.carrying) this.sorted++;
+    };
+    return steps;
+  }
+
+  /** Two librarians stop and talk: one at a loose end, or walking the
+   * floor empty-handed (who then goes on where they were going). */
+  private chat(l: Librarian): Step[] | null {
+    if (this.rng() >= 0.45) return null;
+    const p = this.librarians.find((o) => o !== l && !o.away && o.mode === "work" && o.y === FLOOR && o.x > 4 && o.x < W - 4 && !o.with
+      && !o.pushing && !o.hand && o.steps.length > 0 && Math.abs(o.x - l.x) < 70
+      && (o.steps[0].kind === "walk" || (o.steps[0].kind === "work" && o.steps[0].action === "idle")));
+    if (!p) return null;
+    const t = 5 + this.rng() * 6, meet = p.x + (l.x < p.x ? -4 : 4);
+    l.with = p.id;
+    p.with = l.id;
+    // Whoever finishes first ends the talk for both.
+    const end = () => {
+      for (const q of [l, p]) {
+        q.with = 0;
+        const next = q.steps[0];
+        if (next?.kind === "work" && next.action === "chat") q.steps.shift();
+      }
+    };
+    const talk: Step = { kind: "work", t: t + Math.abs(meet - l.x) / WALK, action: "chat", face: meet < p.x ? -1 : 1, done: end };
+    if (p.steps[0].kind === "walk") p.steps.unshift(talk);
+    else p.steps = [talk];
+    return [{ kind: "walk", x: meet }, { kind: "work", t, action: "chat", face: meet < p.x ? 1 : -1, done: end }];
   }
 
   // ── Fire ────────────────────────────────────────────────────────────
@@ -702,25 +915,66 @@ export class LibrarySim {
     this.releaseSite(l);
     for (const c of [this.bookCart, this.barrow]) if (c.by === l.id) c.by = 0;
     if (this.exporting?.by === l.id) this.exporting = null;
+    if (this.refiller === l.id) this.refiller = 0;
+    if (this.sweeper === l.id) this.sweeper = 0;
+    this.seats.forEach((id, k) => {
+      if (id === l.id && l.seat !== k) this.seats[k] = 0;
+    });
+    if (l.with) {
+      const p = this.librarians.find((o) => o.id === l.with);
+      if (p && p.with === l.id) {
+        p.with = 0;
+        if (p.steps[0]?.kind === "work" && p.steps[0].action === "chat") p.steps = [];
+      }
+      l.with = 0;
+    }
+    if (l.hand === "cup" || l.hand === "broom") l.hand = "";
     l.pushing = null;
     l.steps = [];
   }
 
-  private planFire(l: Librarian) {
+  private planFire(l: Librarian): void {
     const fight = this.fighters.has(l.id), drill = fireDrill(this.fireTraining);
     l.mode = fight ? "fight" : "flee";
     const steps: Step[] = [];
     if (l.y < FLOOR) steps.push(this.down());
     const fx = this.fireCentre(), side = l.x < fx ? 0 : 1;
     if (!fight) {
-      // Out of the nave, down the hallway away from the flames.
+      // Out of the nave, down the hallway away from the flames; there they
+      // fetch water from outside to keep that side's butt full.
+      if (this.butts[side] <= BUTT_FULL - 2 && l.x * (side ? 1 : -1) > (side ? W : 0)) {
+        steps.push({ kind: "walk", x: EXITS[side] }, { kind: "away", t: 3 + this.rng() * 2, done: () => (l.hand = "bucket") },
+          { kind: "walk", x: BUTTS[side] + (side ? 3 : -3) }, {
+            kind: "work", t: 1.2, action: "pour", face: side ? -1 : 1, done: () => {
+              this.butts[side] = Math.min(BUTT_FULL, this.butts[side] + 2);
+              l.hand = "";
+            },
+          });
+        l.steps = steps;
+        return;
+      }
       steps.push({ kind: "walk", x: side ? W + 30 + (l.id % 4) * 5 : -30 - (l.id % 4) * 5 }, { kind: "work", t: 2, action: "cower" });
       l.steps = steps;
       return;
     }
     if (l.water <= 0) {
-      steps.push({ kind: "walk", x: BUTTS[side] + (side ? -2 : 2) }, {
+      // The nearer butt with water in it; with both dry there is nothing to fight with.
+      const butt = this.butts[side] > 0 ? side : this.butts[1 - side] > 0 ? 1 - side : -1;
+      if (butt < 0) {
+        // Both butts dry: run out to the well for a bucket.
+        steps.push({ kind: "walk", x: EXITS[side] }, {
+          kind: "away", t: 4 / drill.speed, done: () => {
+            l.hand = "bucket";
+            l.water = drill.water;
+          },
+        });
+        l.steps = steps;
+        return;
+      }
+      steps.push({ kind: "walk", x: BUTTS[butt] + (butt ? -2 : 2) }, {
         kind: "work", t: 1.4 / drill.speed, action: "fill", done: () => {
+          if (this.butts[butt] <= 0) return;
+          this.butts[butt]--;
           l.hand = "bucket";
           l.water = drill.water;
         },
@@ -874,6 +1128,7 @@ export class LibrarySim {
       const absorbed = l.action === "write" || l.action === "read" ? 3 : 0;
       if (burning && l.mode === "work" && !l.away && this.time - this.firedAt >= (0.5 + absorbed + h01(l.id, this.fires + 7) * 4) / fireDrill(this.fireTraining).speed) this.interrupt(l);
       if (burning && !l.away && this.scorch(l, dt)) continue;
+      if (!l.away) l.energy = Math.max(0, l.energy - dt * (TIRING[l.action] ?? 0));
       let left = dt, n = 0;
       while (left > 0 && n++ < 8) {
         if (!l.steps.length) {
@@ -883,7 +1138,7 @@ export class LibrarySim {
         left = this.advance(l, l.steps[0], left);
       }
     }
-    this.remains = this.remains.filter((r) => this.time - r.at < 240);
+    this.remains = this.remains.filter((r) => this.time - r.at < 600);
   }
 
   /** Heat on a librarian's body; returns true if it killed them. */
@@ -902,7 +1157,7 @@ export class LibrarySim {
     this.librarians = this.librarians.filter((o) => o !== l);
     this.deaths++;
     this.booksBurnt += (l.carrying ? 1 : 0) + (l.reading ? 1 : 0);
-    this.remains.push({ x: l.x, at: this.time });
+    this.remains.push({ x: l.x, at: this.time, mourners: [] });
     return true;
   }
 
@@ -939,17 +1194,19 @@ export class LibrarySim {
       if (!l.away && l.pushing) l.pushing.here = false;
       l.away = true;
       l.action = "idle";
-      if (s.t > dt) {
+      if (s.until ? !s.until() : s.t > dt) {
         s.t -= dt;
         return 0;
       }
+      if (s.until) s.t = 0;
       l.away = false;
       l.steps.shift();
       s.done?.();
       return dt - s.t;
     }
     l.action = s.action;
-    if (s.action === "write") {
+    if (s.face) l.facing = s.face;
+    if (s.action === "write" || s.action === "mend") {
       // Sit facing the table, the fetched book open on it.
       l.facing = l.seat % 2 === 0 ? 1 : -1;
       if (l.carrying) {
@@ -962,7 +1219,7 @@ export class LibrarySim {
       return 0;
     }
     l.steps.shift();
-    if (s.action === "write" && l.reading) {
+    if ((s.action === "write" || s.action === "mend") && l.reading) {
       // The indexed book goes back to the shelves.
       l.carrying = l.reading;
       l.reading = 0;
