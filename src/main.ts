@@ -219,6 +219,9 @@ window.addEventListener("pagehide", store);
 // Console helper: look closely at one of the mine's buildings, picked.
 (globalThis as { mineLook?: unknown }).mineLook = (id: "shaft" | "barracks" | "warehouse" | "forge" | "smithy" = "forge", zoom = 4) => minePage.look(id, zoom);
 // Console helper: run the mine some minutes ahead, optionally hiring miners first.
+// Sets a Mine building's level at once, or (with no level) upgrades it for free, rebuild and all.
+(globalThis as { mineLevel?: unknown }).mineLevel = (id: "shaft" | "barracks" | "warehouse" | "forge" | "smithy", level?: number) =>
+  level === undefined ? minePage.sim.upgrade(id) : minePage.sim.setLevel(id, level);
 (globalThis as { mineDebug?: unknown }).mineDebug = (minutes = 10, hire = 0, weather?: MineWeather | null) => {
   for (let i = 0; i < hire; i++) minePage.sim.hire();
   if (weather !== undefined) minePage.sim.weatherOverride = weather;

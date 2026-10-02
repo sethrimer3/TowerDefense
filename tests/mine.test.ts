@@ -7,7 +7,7 @@ import {
   BARS_PER_STEEL, BREATH_TICKS, DAY_TICKS, DEATH_GAP, GOLD_PER_NUGGET, KIT, MineSim, ORE_PER_IRON_BAR, STARVE_TICKS, TICK_HZ, WEATHER_TICKS, daylight, decodeMineSave,
   hirePrice, skyAt, weatherOf,
 } from "../src/mine/sim.ts";
-import { BAY_BUNKS, MAX_BAYS, along, bays, layout, pathTicks } from "../src/mine/buildings.ts";
+import { BAY_BUNKS, FIRST_LEVELS, MAX_LEVEL, along, layout, pathTicks } from "../src/mine/buildings.ts";
 import { decode } from "../src/save.ts";
 
 const minutes = (sim: MineSim, n: number) => {
@@ -96,6 +96,7 @@ test("one miner sinks a shored, laddered shaft and opens a tunnel with track and
 
 test("the crew's ore comes up by pack, cart and hoist to the forge, is paid out as iron bars, and nobody ends up inside rock", () => {
   const sim = new MineSim(99);
+  sim.setLevel("barracks", 2);
   for (let i = 0; i < 5; i++) sim.hire();
   let bars = 0;
   for (let k = 0; k < 40; k++) {
@@ -248,6 +249,7 @@ test("rain lies on the ground, pours down the shaft, and the crew bails it out a
  * sealed in a pocket deep in the stone. */
 function trapped(crew: number) {
   const sim = new MineSim(4242);
+  sim.setLevel("barracks", MAX_LEVEL);
   for (let i = 1; i < crew; i++) sim.hire();
   sim.mercy = 0;
   for (let y = 296; y <= 302; y++) for (let x = 8; x <= 12; x++) sim.world.set(x, y, STONE);
@@ -358,14 +360,17 @@ test("the weather's state saves and loads; older saves without it still load", (
 
 // ── Buildings and trades ──────────────────────────────────────────────
 
-test("the barracks grows a bay of bunks for every six of the crew, and each spot's way in starts at the door", () => {
-  assert.equal(bays(1), 1);
-  assert.equal(bays(7), 2);
-  assert.equal(bays(99), MAX_BAYS);
+test("each building grows with its level (a bay of bunks, two forge hands, an anvil a level), and each spot's way in starts at the door", () => {
   const { surface } = strata(7);
-  for (const n of [1, 3]) {
-    const b = layout(surface, W / 2, n);
+  for (const n of [1, 3, MAX_LEVEL]) {
+    const b = layout(surface, W / 2, { shaft: n, barracks: n, warehouse: n, forge: n, smithy: n });
     assert.equal(b.barracks.spots.sleep!.length, n * BAY_BUNKS);
+    assert.equal(b.forge.spots.work!.length, 2 * n);
+    assert.equal(b.smithy.spots.work!.length, n);
+    if (n > 1) for (const id of ["shaft", "barracks", "warehouse", "forge", "smithy"] as const) {
+      const first = layout(surface, W / 2, FIRST_LEVELS)[id];
+      assert.ok(b[id].x1 - b[id].x0 > first.x1 - first.x0, `${id} wider at level ${n}`);
+    }
     for (const id of ["barracks", "warehouse", "forge", "smithy"] as const) {
       const building = b[id];
       // Every building stands on the highest ground under it.
@@ -413,7 +418,11 @@ test("the forge smelts ore into bars and the smithy works them into iron, steel 
   const idle = run(0, 0);
   assert.ok(idle.paid.ironBar < busy.paid.ironBar, `idle ${idle.paid.ironBar} < busy ${busy.paid.ironBar}`);
   assert.ok(idle.sim.ore.iron > busy.sim.ore.iron, "a backlog of ore at the forge");
-  // The allocation never takes more hands than there are.
+  // The allocation never takes more hands than there are, nor more than
+  // each building has room for.
+  busy.sim.setJobs(9, 9);
+  assert.deepEqual(busy.sim.jobs, { forge: 2, smith: 1 });
+  busy.sim.setLevel("forge", 3);
   busy.sim.setJobs(9, 9);
   assert.deepEqual(busy.sim.jobs, { forge: 5, smith: 0 });
 });
@@ -421,6 +430,7 @@ test("the forge smelts ore into bars and the smithy works them into iron, steel 
 test("at night most of the crew sleeps in the barracks; the night shift works on, and Coffee keeps more awake", () => {
   const asleep = (coffee: number) => {
     const sim = new MineSim(21);
+    sim.setLevel("barracks", 2);
     for (let i = 0; i < 9; i++) sim.hire();
     sim.coffee = coffee;
     while (!sim.night) sim.step();
@@ -495,6 +505,7 @@ test("the trades and the forge's stock save and load; older saves without them s
 
 test("each miner has a name for life: unlike the rest of the crew's, and kept in the save", () => {
   const sim = new MineSim(808);
+  sim.setLevel("barracks", 3);
   for (let i = 0; i < 11; i++) sim.hire();
   const names = sim.miners.map((m) => m.name);
   assert.equal(new Set(names).size, names.length, "no two alike");
@@ -506,6 +517,7 @@ test("each miner has a name for life: unlike the rest of the crew's, and kept in
 
 test("the player puts one miner to a trade; a miner lost is remembered until let go or replaced", () => {
   const sim = new MineSim(909);
+  sim.setLevel("smithy", 2);
   for (let i = 0; i < 4; i++) sim.hire();
   const pick = sim.miners.find((m) => m.job === "mine")!, smiths = sim.jobs.smith;
   sim.setJob(pick, "smith");
@@ -528,6 +540,7 @@ test("the player puts one miner to a trade; a miner lost is remembered until let
 
 test("a new prospect is a fresh world; the crew, their trades and the stock go with them", () => {
   const sim = new MineSim(1001);
+  sim.setLevel("barracks", 2);
   for (let i = 0; i < 5; i++) sim.hire();
   minutes(sim, 6);
   sim.ore = { iron: 9, gold: 2 };
@@ -605,4 +618,105 @@ test("the hoist lets its bucket down to a load, winds it up and tips it in the y
   assert.equal(sim.yard.gold, 0, "gold is carried in first");
   assert.ok(sim.ore.gold + sim.bars.gold + sim.collect().gold > 0, "into the forge, and on to the smithy");
   assert.ok(yard > 0);
+});
+
+// ── Building levels ───────────────────────────────────────────────────
+
+test("the barracks bunks five a level, the forge two hands and the smithy one smith; the rest rise one past the warehouse", () => {
+  const sim = new MineSim(4100);
+  for (let i = 0; i < 10; i++) sim.hire();
+  assert.equal(sim.miners.length, 5, "a first barracks bunks five");
+  assert.equal(sim.crewCap, 5);
+  assert.equal(sim.jobCap("forge"), 2);
+  assert.equal(sim.jobCap("smith"), 1);
+  const spare = sim.miners.filter((m) => m.job === "mine");
+  sim.setJob(spare[0], "forge");
+  assert.equal(sim.setJob(spare[1], "forge"), false, "a full forge turns a hand away");
+  assert.equal(sim.jobs.forge, 2);
+  // The warehouse caps the others.
+  assert.equal(sim.upgrade("barracks"), true);
+  assert.equal(sim.buildingLevels.barracks, 2);
+  assert.ok(sim.rebuilding("barracks"));
+  assert.equal(sim.upgradeBlock("barracks"), "warehouse");
+  sim.setLevel("warehouse", 2);
+  assert.equal(sim.upgradeBlock("barracks"), "rebuilding");
+  sim.setLevel("warehouse", MAX_LEVEL);
+  assert.equal(sim.upgradeBlock("warehouse"), "top");
+  assert.equal(sim.maxLevel("forge"), MAX_LEVEL);
+  assert.ok(sim.upgradeCost("forge") > 0);
+  sim.setLevel("forge", 2);
+  assert.ok(sim.upgradeCost("forge") > sim.upgradeCost("smithy"), "each level costs more");
+  for (let i = 0; i < 10; i++) sim.hire();
+  assert.equal(sim.miners.length, 10);
+});
+
+test("an upgrade rebuilds the building and moves those it pushes along, sending everyone inside out, while supplies last", () => {
+  const sim = new MineSim(4200);
+  for (let i = 0; i < 2; i++) sim.hire();
+  minutes(sim, 1);
+  const before = { ...sim.buildings.smithy }, barracks = { ...sim.buildings.barracks };
+  const forgeHand = sim.miners.find((m) => m.job === "forge")!;
+  sim.setLevel("warehouse", 2);
+  assert.ok(sim.upgrade("forge"));
+  assert.equal(forgeHand.inside, null, "nobody is left inside");
+  assert.ok(sim.rebuilding("forge") && sim.rebuilding("forge")!.from, "the forge widens, so it moves");
+  assert.ok(sim.rebuilding("smithy")?.from, "the smithy is pushed along");
+  assert.equal(sim.rebuilding("barracks"), undefined, "the other side stays put");
+  assert.deepEqual([sim.buildings.barracks.x0, sim.buildings.barracks.x1], [barracks.x0, barracks.x1]);
+  assert.ok(sim.buildings.smithy.x1 < before.x0 || sim.buildings.smithy.x0 < before.x0, "the smithy's new place is further out");
+  // Without supplies the work waits.
+  sim.stock = 0;
+  const t = sim.rebuilding("forge")!.t;
+  for (let i = 0; i < 10; i++) sim.step();
+  assert.ok(sim.rebuilding("forge")!.t - t <= 1, "waits on supplies");
+  for (let i = 0; i < 40 && sim.rebuilds.length; i++) minutes(sim, 0.5);
+  assert.equal(sim.rebuilds.length, 0, "both rebuilt");
+  assert.ok(sim.miners.every((m) => !m.inside || m.inside.b !== "forge" || !sim.rebuilding("forge")));
+});
+
+test("the warehouse brings in supplies to its cap; with none, nobody fetches them and the shaft waits", () => {
+  const sim = new MineSim(4300);
+  assert.equal(sim.stock, sim.stockCap);
+  sim.stock = 0;
+  minutes(sim, 1);
+  assert.ok(Math.abs(sim.stock - (sim.stockRate - 0)) < sim.stockRate, `brought in ${sim.stock}`);
+  sim.setLevel("warehouse", 3);
+  assert.equal(sim.stockCap, 3 * 120);
+  // A mine with no supplies to fit its shaft doesn't sink it.
+  const dry = new MineSim(3), wet = new MineSim(3);
+  (dry as any).stepBuildings = () => {};
+  dry.stock = 0;
+  minutes(dry, 6);
+  minutes(wet, 6);
+  assert.ok(dry.miners[0].kit === 0, "nothing to fetch");
+  assert.ok(dry.depth < wet.depth, `dry ${dry.depth} < stocked ${wet.depth}`);
+});
+
+test("levels, supplies and rebuilds save and load; older saves get room for their crew and trades", () => {
+  const sim = new MineSim(4400);
+  sim.setLevel("warehouse", 2);
+  sim.upgrade("smithy");
+  sim.stock = 42.5;
+  const saved = JSON.parse(JSON.stringify(sim.save(0)));
+  const loaded = new MineSim(saved.seed, decodeMineSave(saved)!);
+  assert.deepEqual(loaded.buildingLevels, sim.buildingLevels);
+  assert.equal(loaded.stock, 42.5);
+  assert.deepEqual(loaded.rebuilds, sim.rebuilds);
+  assert.equal(decodeMineSave({ ...saved, buildingLevels: { ...saved.buildingLevels, forge: 9 } }), null);
+  assert.equal(decodeMineSave({ ...saved, rebuilds: [{ b: "inn", t: 0, total: 5, used: 0, supplies: 1, from: null }] }), null);
+  // A big crew from before levels keeps every miner and trade.
+  const big = new MineSim(4500);
+  big.setLevel("barracks", MAX_LEVEL);
+  big.setLevel("warehouse", MAX_LEVEL);
+  big.setLevel("forge", 3);
+  for (let i = 0; i < 23; i++) big.hire();
+  big.setJobs(5, 0);
+  const { buildingLevels, stock, rebuilds, ...old } = JSON.parse(JSON.stringify(big.save(0)));
+  const migrated = new MineSim(old.seed, decodeMineSave(old)!);
+  assert.equal(migrated.miners.length, 24);
+  assert.equal(migrated.buildingLevels.barracks, 5);
+  assert.equal(migrated.buildingLevels.forge, 3);
+  assert.equal(migrated.jobs.forge, 5);
+  assert.equal(migrated.buildingLevels.warehouse, 4);
+  assert.equal(migrated.stock, migrated.stockCap);
 });

@@ -29,6 +29,15 @@
  * mine also starts with), the last miner always gets out, and a catch-up
  * after time away loses at most one.
  *
+ * Each building has five levels, bought with Gold: the barracks bunks five
+ * more of the crew a level, the forge makes room for two more hands, the
+ * smithy for another smith, the shaft house keeps out more rain, and the
+ * warehouse holds and brings in more supplies (`stock`) and lets the others
+ * rise a level past it. Fittings and rebuilding use supplies, so a short
+ * warehouse holds the workings back. An upgraded building is rebuilt
+ * (`rebuilds`), and so is any it pushes along: taken down where it stood and
+ * raised in its new place, shut while the work goes on.
+ *
  * A prospect's ore runs out: once the shaft is at the bottom and the work
  * planned is done (`workedOut`), the player takes the crew, the buildings
  * and the stock to a new prospect (`prospectNext`), a fresh world. */
@@ -36,7 +45,7 @@ import {
   AIR, BEDROCK, CELLS, DIG_TICKS, DIRT, GOLD, GRAVEL, H, IRON, LADDER, LAMP, LAVA, LOOSE, MATERIAL_COUNT, RAIL, ROCK, RUBBLE, STONE, TIMBER, TORCH, W, World,
   decodeGrid, encodeGrid, generate, hash01, idx, inBounds, isLoose, isOre, isPassable, isSoil, isSolid, isWood, strata, type Material, type Strata,
 } from "./world.ts";
-import { BUILDINGS, bays, layout, pathTicks, type BuildingId, type Layout, type Purpose, type Spot } from "./buildings.ts";
+import { BUILDINGS, FIRST_LEVELS, MAX_LEVEL, layout, pathTicks, type BuildingId, type Layout, type Levels, type Purpose, type Spot } from "./buildings.ts";
 import { minerName } from "./names.ts";
 
 export const TICK_HZ = 30;
@@ -52,7 +61,20 @@ export const CART_LOAD = 18;
 /** What the mine pays. */
 export const GOLD_PER_NUGGET = 10;
 export const ORE_PER_IRON_BAR = 12;
-export const MAX_MINERS = 24;
+/** Each level of the barracks bunks this many more of the crew; of the
+ * forge, makes room for this many more hands; of the smithy, more smiths. */
+export const CREW_PER_LEVEL = 5, FORGE_PER_LEVEL = 2, SMITHS_PER_LEVEL = 1;
+export const MAX_MINERS = CREW_PER_LEVEL * MAX_LEVEL;
+/** Supplies the warehouse holds a level, and brings in a minute a level. */
+export const STOCK_PER_LEVEL = 120, STOCK_RATE = 30;
+/** Rebuilding: ticks a level of the building upgraded, ticks to move one
+ * pushed along, and the supplies each uses (a level, or to move). */
+export const REBUILD_TICKS = 40 * TICK_HZ, MOVE_TICKS = 25 * TICK_HZ, REBUILD_SUPPLIES = 15, MOVE_SUPPLIES = 5;
+/** Each level of the shaft house keeps out this much more of the rain. */
+export const SEAL_LEVEL = 0.1;
+const UPGRADE_BASE: Record<BuildingId, number> = { shaft: 250, barracks: 300, warehouse: 400, forge: 350, smithy: 350 };
+/** Price in Gold of raising building `id` from `level` to the next. */
+export const upgradePrice = (id: BuildingId, level: number) => Math.round(UPGRADE_BASE[id] * Math.pow(2.5, level - 1));
 /** Supplies a miner fetches from the warehouse: each fitting and each
  * timber shoring uses one. */
 export const KIT = 12;
@@ -62,7 +84,8 @@ export const KIT = 12;
 export const SMELT_TICKS = 6 * TICK_HZ, SMITH_IRON_TICKS = 40 * TICK_HZ, SMITH_GOLD_TICKS = 4 * TICK_HZ, BARS_PER_STEEL = 20;
 const IDLE_PACE = 4, STOCK_TICKS = 2 * TICK_HZ;
 /** Ore a forge hand carries in from the yard at a time, and the most the
- * forge's piles and shelves hold. */
+ * forge's piles and shelves hold at its first level (each more holds half
+ * as much again). */
 export const CARRY = 8, FORGE_CAP = 160;
 /** Share of the crew that works through the night (the rest sleep), and
  * what each rank of Coffee adds, up to the most. */
@@ -171,6 +194,12 @@ export type Bucket = { y: number; iron: number; gold: number };
 /** The hoist's bucket: waiting at the top, let down to a load, or wound up
  * with it. */
 export type Hoist = { y: number; state: "idle" | "down" | "up"; iron: number; gold: number };
+/** Where a building stood before it was moved. */
+export type Footprint = { x0: number; x1: number; floor: number; height: number };
+/** A building being rebuilt: ticks done of `total`, supplies used of those
+ * it needs, and where it stood if it is moving (taken down there in the
+ * first half, raised in its new place in the second). */
+export type Rebuild = { b: BuildingId; t: number; total: number; used: number; supplies: number; from: Footprint | null };
 
 export type MineSave = {
   seed: number;
@@ -208,6 +237,11 @@ export type MineSave = {
   prospect?: number;
   fallen?: Fallen[];
   workedOut?: boolean;
+  /** Added with building levels: each building's level, the warehouse's
+   * supplies, and the buildings being rebuilt. */
+  buildingLevels?: Levels;
+  stock?: number;
+  rebuilds?: Rebuild[];
 };
 
 /** A miner lost, remembered in the crew's list until the player lets it go
@@ -229,8 +263,13 @@ export class MineSim {
   /** The shaft's column, and the spoil heap's. */
   readonly shaftX = W / 2;
   readonly heapX = W / 2 + 50;
-  /** The buildings, laid out for the crew (the barracks grows with it). */
+  /** The buildings, laid out at their levels. */
   buildings!: Layout;
+  /** Each building's level, the warehouse's supplies, and the buildings
+   * being rebuilt. */
+  buildingLevels: Levels = { ...FIRST_LEVELS };
+  stock = STOCK_PER_LEVEL;
+  rebuilds: Rebuild[] = [];
   /** Which prospect this is, the ore its world held when it was found, the
    * ore still in the ground (as of the last survey), and whether the work
    * here is done. */
@@ -331,6 +370,8 @@ export class MineSim {
       this.prospect = saved.prospect ?? 1;
       if (cells && plan) this.workedOut = saved.workedOut ?? false;
       this.fallen = (saved.fallen ?? []).map((f) => ({ ...f }));
+      this.buildingLevels = saved.buildingLevels ? { ...saved.buildingLevels } : migrateLevels(saved);
+      this.stock = Math.min(saved.stock ?? Infinity, this.stockCap);
     }
     if (saved && cells && plan) {
       this.shaftLevel = saved.shaftLevel;
@@ -342,6 +383,7 @@ export class MineSim {
         if (y !== undefined) this.carts.push({ level: c.level, side: c.side, x: c.x, y, iron: c.iron, gold: c.gold, state: "back", timer: 0 });
       }
       this.buckets = saved.buckets.map((b) => ({ ...b }));
+      this.rebuilds = (saved.rebuilds ?? []).map((r) => ({ ...r, from: r.from && { ...r.from } }));
       this.relayout();
     } else {
       // A fresh prospect: the crew (or the first miner) at the barracks.
@@ -356,6 +398,9 @@ export class MineSim {
     this.hoist = { y: this.strata.surface[this.shaftX] - 1, state: "idle", iron: 0, gold: 0 };
     // Saves from before each miner kept its trade held only the counts.
     if (saved?.jobs && saved.miners.every((m) => m.job === undefined)) this.setJobs(saved.jobs.forge, saved.jobs.smith);
+    // No trade holds more than its building has room for.
+    const { forge, smith } = this.jobs;
+    if (forge > this.jobCap("forge") || smith > this.jobCap("smith")) this.setJobs(forge, smith);
   }
 
   /** The crew, the buildings and the stock moved to a new prospect: a fresh
@@ -367,7 +412,8 @@ export class MineSim {
     for (const m of this.miners) (ore.iron += m.iron), (ore.gold += m.gold);
     for (const c of [...this.carts, ...this.buckets, this.hoist, this.yard]) (ore.iron += c.iron), (ore.gold += c.gold);
     const { cells, plan, water, burning, ...rest } = carried;
-    const next = new MineSim(seed, { ...rest, carts: [], buckets: [], yard: { iron: 0, gold: 0 }, shaftLevel: 0, mercy: 0, ore, prospect: this.prospect + 1 });
+    // The buildings go up whole on the new ground.
+    const next = new MineSim(seed, { ...rest, carts: [], buckets: [], yard: { iron: 0, gold: 0 }, shaftLevel: 0, mercy: 0, ore, prospect: this.prospect + 1, rebuilds: [] });
     next.coffee = this.coffee;
     next.waterproof = this.waterproof;
     next.weatherOverride = this.weatherOverride;
@@ -627,13 +673,13 @@ export class MineSim {
    * hand goes to the forge, and the fifth to the smithy, while they have
    * nobody. */
   hire() {
-    if (this.miners.length >= MAX_MINERS) return false;
+    if (this.miners.length >= this.crewCap) return false;
     this.hired++;
     this.fallen.shift();
     const door = this.buildings.barracks.door, { forge, smith } = this.jobs;
     this.addMiner(door, this.standY(door));
     const m = this.miners[this.miners.length - 1];
-    m.job = forge === 0 ? "forge" : smith === 0 && this.miners.length >= 5 ? "smith" : "mine";
+    m.job = forge === 0 && this.jobCap("forge") > 0 ? "forge" : smith === 0 && this.jobCap("smith") > 0 && this.miners.length >= 5 ? "smith" : "mine";
     this.relayout();
     return true;
   }
@@ -644,14 +690,113 @@ export class MineSim {
 
   // ── Buildings and trades ────────────────────────────────────────────
 
-  /** Lays the buildings out again (the barracks bunks the whole crew). */
+  /** Lays the buildings out at their levels. */
   private relayout() {
-    const n = bays(this.miners.length);
-    if (this.buildings && this.bayCount === n) return;
-    this.bayCount = n;
-    this.buildings = layout(this.strata.surface, this.shaftX, n);
+    const key = BUILDINGS.map((b) => this.buildingLevels[b]).join();
+    if (this.buildings && this.laidOut === key) return;
+    this.laidOut = key;
+    this.buildings = layout(this.strata.surface, this.shaftX, this.buildingLevels);
   }
-  private bayCount = 0;
+  private laidOut = "";
+
+  /** The most of the crew the barracks bunks, and the most a trade's
+   * building has room for (the face takes any number). */
+  get crewCap() {
+    return CREW_PER_LEVEL * this.buildingLevels.barracks;
+  }
+  jobCap(job: Job) {
+    return job === "forge" ? FORGE_PER_LEVEL * this.buildingLevels.forge : job === "smith" ? SMITHS_PER_LEVEL * this.buildingLevels.smithy : Infinity;
+  }
+  /** The highest level building `id` may rise to: the warehouse to the top,
+   * the rest one past the warehouse. */
+  maxLevel(id: BuildingId) {
+    return id === "warehouse" ? MAX_LEVEL : Math.min(MAX_LEVEL, this.buildingLevels.warehouse + 1);
+  }
+  /** Why building `id` can't be upgraded now, or null if it can (the page
+   * charges `upgradePrice`). */
+  upgradeBlock(id: BuildingId): "top" | "warehouse" | "rebuilding" | null {
+    const level = this.buildingLevels[id];
+    if (level >= MAX_LEVEL) return "top";
+    if (level >= this.maxLevel(id)) return "warehouse";
+    return this.rebuilding(id) ? "rebuilding" : null;
+  }
+  /** The Gold the next level of building `id` costs. */
+  upgradeCost(id: BuildingId) {
+    return upgradePrice(id, this.buildingLevels[id]);
+  }
+  /** Raises building `id` a level: it is rebuilt where it now stands, and
+   * every building it pushes along is taken down and raised again in its
+   * new place. Returns false if it can't be. */
+  upgrade(id: BuildingId) {
+    if (this.upgradeBlock(id)) return false;
+    const before = this.buildings;
+    this.buildingLevels[id]++;
+    this.relayout();
+    for (const b of BUILDINGS) {
+      const was = before[b], now = this.buildings[b], moved = was.x0 !== now.x0 || was.x1 !== now.x1 || was.floor !== now.floor;
+      if (b !== id && !moved) continue;
+      const level = this.buildingLevels[b], old = this.rebuilding(b);
+      const total = b === id ? REBUILD_TICKS * level : MOVE_TICKS, supplies = b === id ? REBUILD_SUPPLIES * level : MOVE_SUPPLIES;
+      const from = old ? old.from : moved ? { x0: was.x0, x1: was.x1, floor: was.floor, height: was.height } : null;
+      if (old) Object.assign(old, { t: 0, used: 0, total: Math.max(old.total, total), supplies: Math.max(old.supplies, supplies), from });
+      else this.rebuilds.push({ b, t: 0, total, used: 0, supplies, from });
+      this.evict(b);
+    }
+    return true;
+  }
+  /** Sets building `id` to `level` at once, unbuilt work and all (tests and
+   * the console helper). */
+  setLevel(id: BuildingId, level: number) {
+    this.buildingLevels[id] = Math.max(1, Math.min(MAX_LEVEL, Math.floor(level)));
+    this.rebuilds = this.rebuilds.filter((r) => r.b !== id);
+    this.relayout();
+    this.evict(id);
+    this.stock = Math.min(this.stock, this.stockCap);
+  }
+  /** The rebuild under way on building `id`, if any. */
+  rebuilding(id: BuildingId) {
+    return this.rebuilds.find((r) => r.b === id);
+  }
+  /** Sends everyone inside building `id` out of its door. */
+  private evict(id: BuildingId) {
+    const door = this.buildings[id].door;
+    for (const m of this.miners) {
+      if (m.inside?.b !== id) continue;
+      m.inside = null;
+      m.x = door;
+      m.y = this.standY(door);
+      this.release(m);
+    }
+  }
+  /** The supplies the warehouse holds at most, and brings in a minute. */
+  get stockCap() {
+    return STOCK_PER_LEVEL * this.buildingLevels.warehouse;
+  }
+  get stockRate() {
+    return STOCK_RATE * this.buildingLevels.warehouse;
+  }
+  /** The most ore the forge's piles and shelves hold. */
+  get forgeCap() {
+    return FORGE_CAP + (FORGE_CAP / 2) * (this.buildingLevels.forge - 1);
+  }
+  /** Supplies to fetch: the warehouse is standing and not empty. */
+  private get stocked() {
+    return this.stock >= 1 && !this.rebuilding("warehouse");
+  }
+  /** The warehouse brings in supplies; each rebuild goes on while there are
+   * supplies for it (and waits while there are none). */
+  private stepBuildings() {
+    this.stock = Math.min(this.stockCap, this.stock + this.stockRate / (60 * TICK_HZ));
+    for (const r of [...this.rebuilds]) {
+      const due = Math.ceil((r.supplies * (r.t + 1)) / r.total);
+      if (r.used < due) {
+        if (this.stock < 1) continue;
+        this.stock--;
+        r.used++;
+      }
+      if (++r.t >= r.total) this.rebuilds.splice(this.rebuilds.indexOf(r), 1);
+    }
+  }
 
   /** How many of the crew are at the forge and the smithy (the rest mine). */
   get jobs() {
@@ -661,15 +806,17 @@ export class MineSim {
   }
   /** Puts one miner to a trade (the player's choice in the crew's list). */
   setJob(m: Miner, job: Job) {
-    if (this.miners.includes(m)) this.changeJob(m, job);
+    if (!this.miners.includes(m) || (m.job !== job && this.jobs[job as "forge" | "smith"] >= this.jobCap(job))) return false;
+    this.changeJob(m, job);
+    return true;
   }
   /** Puts `forge` and `smith` of the crew to those trades (the rest mine),
    * as far as the crew goes, changing as few as it can, and those nearest
    * the surface first. */
   setJobs(forge: number, smith: number) {
     const n = this.miners.length;
-    forge = Math.max(0, Math.min(n, Math.floor(forge)));
-    smith = Math.max(0, Math.min(n - forge, Math.floor(smith)));
+    forge = Math.max(0, Math.min(n, this.jobCap("forge"), Math.floor(forge)));
+    smith = Math.max(0, Math.min(n - forge, this.jobCap("smith"), Math.floor(smith)));
     const want: Record<Job, number> = { forge, smith, mine: n - forge - smith };
     const count = (j: Job) => this.miners.filter((m) => m.job === j).length;
     // Too many in a trade: the deepest of them go back to the face.
@@ -776,7 +923,9 @@ export class MineSim {
     } else if (s.why === "stock") {
       m.action = "stock";
       if (s.t >= s.until) {
-        m.kit = KIT;
+        const take = Math.max(0, Math.min(KIT - m.kit, Math.floor(this.stock)));
+        m.kit += take;
+        this.stock -= take;
         this.goOut(m);
       }
     } else {
@@ -787,7 +936,7 @@ export class MineSim {
       // Ore piling up in the yard and room for it here (or nothing left to
       // smelt): out to fetch it.
       const yard = this.yard.iron + this.yard.gold, forge = this.ore.iron + this.ore.gold;
-      if (trade === "forge" && yard > 0 && (yard >= CARRY || !pace) && forge <= FORGE_CAP - CARRY) return this.goOut(m);
+      if (trade === "forge" && yard > 0 && (yard >= CARRY || !pace) && forge <= this.forgeCap - CARRY) return this.goOut(m);
       if (!pace) {
         m.action = "idle";
         s.until = 0;
@@ -847,7 +996,7 @@ export class MineSim {
       this.toForge(1 - gold, gold);
     }
     for (const trade of ["forge", "smith"] as const) {
-      if (jobs[trade] > 0) continue;
+      if (jobs[trade] > 0 || this.rebuilding(trade === "forge" ? "forge" : "smithy")) continue;
       const pace = this.craftTicks(trade);
       if (!pace) {
         this.idleWork[trade] = 0;
@@ -870,7 +1019,7 @@ export class MineSim {
   }
   /** The share of the runoff the shaft house keeps out of the shaft. */
   get sealShare() {
-    return Math.min(0.95, SEAL_BASE + SEAL_STEP * this.waterproof);
+    return Math.min(0.95, SEAL_BASE + SEAL_STEP * this.waterproof + SEAL_LEVEL * (this.buildingLevels.shaft - 1));
   }
 
   /** The shaft house keeps out a share of the water running into the
@@ -921,12 +1070,13 @@ export class MineSim {
       cutOff = true;
     }
     // The forge's hands fetch the ore from the yard, while there's room for it.
-    if (m.job === "forge" && ore === 0 && this.yard.iron + this.yard.gold > 0 && this.ore.iron + this.ore.gold < FORGE_CAP && this.goFetch(m, start)) return;
+    const shop = m.job === "forge" ? "forge" : "smithy", shut = m.job !== "mine" && !!this.rebuilding(shop);
+    if (m.job === "forge" && !shut && ore === 0 && this.yard.iron + this.yard.gold > 0 && this.ore.iron + this.ore.gold < this.forgeCap && this.goFetch(m, start)) return;
     // The forge's and the smithy's hands go to their work; one cut off below
-    // digs on till it can get there.
-    if (m.job !== "mine" && this.goEnter(m, start, m.job === "forge" ? "forge" : "smithy", "work")) return;
-    // Out of supplies at the surface: to the warehouse first.
-    if (m.kit === 0 && (up || this.fittings > 0) && this.goEnter(m, start, "warehouse", "stock")) return;
+    // (or whose building is being rebuilt) digs on till it can get there.
+    if (m.job !== "mine" && !shut && this.goEnter(m, start, shop, "work")) return;
+    // Out of supplies at the surface: to the warehouse first, if it has any.
+    if (m.kit === 0 && (up || this.fittings > 0) && this.stocked && this.goEnter(m, start, "warehouse", "stock")) return;
     // A full pack goes up, if there's a way; a miner cut off works on.
     if (ore >= PACK_ORE || (m.spoil >= PACK_SPOIL && shallow)) {
       if (this.goDeliver(m, start)) return;
@@ -954,7 +1104,7 @@ export class MineSim {
     if (ore + m.spoil > 0 && this.goDeliver(m, start)) return;
     // Nothing it can do: fetch supplies if it has none (there may be
     // fittings waiting), else rest in the lounge.
-    if (kit < KIT / 2 && this.goEnter(m, start, "warehouse", "stock")) return;
+    if (kit < KIT / 2 && this.stocked && this.goEnter(m, start, "warehouse", "stock")) return;
     this.goRest(m, start);
   }
   /** The best work a miner standing at (x, y) could take up, scored (lower
@@ -1221,7 +1371,16 @@ export class MineSim {
       }
       return this.release(m);
     }
-    if (t.kind === "enter") return this.goIn(m, t.b, t.why);
+    if (t.kind === "enter") {
+      if (!this.rebuilding(t.b)) return this.goIn(m, t.b, t.why);
+      // Shut for rebuilding: a meal handed out at the barracks door, a rest
+      // outside it, or a wait at another's.
+      if (t.b === "barracks") m.fed = 0;
+      m.action = "rest";
+      m.timer = 120 + Math.floor(hash01(m.id, this.tick, this.seed + 5) * 120);
+      m.task = null;
+      return;
+    }
     // Resting where it stands (cut off from the lounge).
     m.action = "rest";
     m.timer = 90 + Math.floor(hash01(m.id, this.tick, this.seed) * 120);
@@ -1547,6 +1706,7 @@ export class MineSim {
     if (this.world.waterCount) this.seal();
     for (const m of [...this.miners]) this.stepMiner(m);
     this.stepIdleTrades();
+    this.stepBuildings();
     for (const c of this.carts) this.stepCart(c);
     this.stepHoist();
     if (this.tick % 30 === 0) this.replan();
@@ -1588,6 +1748,9 @@ export class MineSim {
       prospect: this.prospect,
       fallen: this.fallen.map((f) => ({ ...f })),
       workedOut: this.workedOut,
+      buildingLevels: { ...this.buildingLevels },
+      stock: this.stock,
+      rebuilds: this.rebuilds.map((r) => ({ ...r, from: r.from && { ...r.from } })),
     };
   }
 
@@ -1595,6 +1758,15 @@ export class MineSim {
   get price() {
     return hirePrice(this.miners.length);
   }
+}
+
+/** Levels for a mine saved before buildings had them: room for the crew
+ * and its trades as they were, and a warehouse to match. */
+function migrateLevels(saved: MineSave): Levels {
+  const count = (j: Job) => saved.miners.filter((m) => m.job === j).length || (j !== "mine" ? saved.jobs?.[j] ?? 0 : 0);
+  const clamp = (n: number) => Math.max(1, Math.min(MAX_LEVEL, Math.ceil(n)));
+  const barracks = clamp(saved.miners.length / CREW_PER_LEVEL), forge = clamp(count("forge") / FORGE_PER_LEVEL), smithy = clamp(count("smith") / SMITHS_PER_LEVEL);
+  return { shaft: 1, barracks, forge, smithy, warehouse: clamp(Math.max(barracks, forge, smithy) - 1) };
 }
 
 /** Iron and gold cells in a grid. */
@@ -1639,6 +1811,12 @@ export function decodeMineSave(s: any): MineSave | null {
   if (s.prospect !== undefined && !int(s.prospect, 1, 1e6)) return null;
   if (s.fallen !== undefined && !(Array.isArray(s.fallen) && s.fallen.length <= MAX_MINERS && s.fallen.every((f: any) => name(f?.name) && JOBS.includes(f.job) && CAUSES.includes(f.cause)))) return null;
   if (s.workedOut !== undefined && typeof s.workedOut !== "boolean") return null;
+  // And the building levels'.
+  if (s.buildingLevels !== undefined && !(s.buildingLevels && typeof s.buildingLevels === "object" && BUILDINGS.every((b) => int(s.buildingLevels[b], 1, MAX_LEVEL)))) return null;
+  if (s.stock !== undefined && !(Number.isFinite(s.stock) && s.stock >= 0 && s.stock <= 1e6)) return null;
+  const foot = (f: any) => f === null || (f && typeof f === "object" && int(f.x0, 0, W - 1) && int(f.x1, 0, W - 1) && int(f.floor, 0, H - 1) && int(f.height, 1, 64));
+  const rebuild = (r: any) => r && BUILDINGS.includes(r.b) && int(r.total, 1, 1e7) && int(r.t, 0, r.total) && int(r.supplies, 0, 1e5) && int(r.used, 0, r.supplies) && foot(r.from);
+  if (s.rebuilds !== undefined && !(Array.isArray(s.rebuilds) && s.rebuilds.length <= BUILDINGS.length && s.rebuilds.every(rebuild))) return null;
   const out: MineSave = {
     ...(s.jobs !== undefined ? { jobs: { forge: s.jobs.forge, smith: s.jobs.smith } } : {}),
     ...(s.ore !== undefined ? { ore: { iron: s.ore.iron, gold: s.ore.gold } } : {}),
@@ -1660,6 +1838,11 @@ export function decodeMineSave(s: any): MineSave | null {
     ...(s.prospect !== undefined ? { prospect: s.prospect } : {}),
     ...(s.fallen !== undefined ? { fallen: s.fallen.map((f: any) => ({ name: f.name, job: f.job, cause: f.cause })) } : {}),
     ...(s.workedOut !== undefined ? { workedOut: s.workedOut } : {}),
+    ...(s.buildingLevels !== undefined ? { buildingLevels: Object.fromEntries(BUILDINGS.map((b) => [b, s.buildingLevels[b]])) as Levels } : {}),
+    ...(s.stock !== undefined ? { stock: s.stock } : {}),
+    ...(s.rebuilds !== undefined
+      ? { rebuilds: s.rebuilds.map((r: any) => ({ b: r.b, t: r.t, total: r.total, used: r.used, supplies: r.supplies, from: r.from && { x0: r.from.x0, x1: r.from.x1, floor: r.from.floor, height: r.from.height } })) }
+      : {}),
   };
   if (narrow) {
     const { cells, plan, water, burning, ...rest } = out;

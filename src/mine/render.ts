@@ -10,10 +10,10 @@
  * effects (`particles.ts`). Water is tinted into the
  * cells it fills; stars glint in the night sky. */
 import { stream } from "../random.ts";
-import { CART_LOAD, FORGE_CAP, type Inside, type Miner, type MineSim, type Sky } from "./sim.ts";
+import { CART_LOAD, type Footprint, type Inside, type Miner, type MineSim, type Rebuild, type Sky } from "./sim.ts";
 import { drawFigure, drawSleeper, outfit, type Fine, type Pose } from "./figures.ts";
 import { Particles } from "./particles.ts";
-import { BUILDINGS, along, pathTicks, type Building, type BuildingId } from "./buildings.ts";
+import { BUILDINGS, along, anvils, pathTicks, type Building, type BuildingId } from "./buildings.ts";
 import {
   AIR, BEDROCK, CELLS, DIRT, GOLD, GRASS, GRAVEL, H, IRON, LADDER, LAMP, LAVA, LOOSE, RAIL, ROCK, RUBBLE, STONE, TIMBER, TORCH, W, hash01, idx, isPassable,
   type Material,
@@ -51,6 +51,7 @@ const WINDOW_DARK: RGB = [44, 38, 32], WINDOW_LIT: RGB = [255, 214, 122];
 const PLANK: RGB[] = [[138, 90, 44], [120, 78, 38]], POST: RGB = [86, 54, 26], BACK: RGB = [62, 42, 26], BACK_STONE: RGB = [54, 52, 56];
 const ROOF: RGB[] = [[163, 58, 38], [122, 42, 28]], SLATE: RGB[] = [[84, 86, 98], [66, 68, 80]], ASHLAR: RGB[] = [[118, 112, 104], [98, 94, 90]];
 const FOOTING: RGB = [84, 80, 76], IRON_DARK: RGB = [58, 58, 66], BLANKET: RGB = [96, 112, 150], BAR_IRON: RGB = [176, 180, 190], BAR_GOLD: RGB = [240, 200, 80];
+const SCAFFOLD: RGB = [176, 138, 88];
 /** A grave for each miner lost. */
 const GRAVE = [".c.", "ccc", ".C.", ".C."];
 const HEADFRAME = [
@@ -433,7 +434,9 @@ export class MineRenderer {
       const want = id === this.picked || (id === "shaft" ? passing : inside[id].length > 0) ? 1 : 0;
       this.open[id] += (want - this.open[id]) * 0.12;
       if (Math.abs(want - this.open[id]) < 0.01) this.open[id] = want;
-      this.drawBuilding(sim, sim.buildings[id], inside[id], time, k, night, effects);
+      const rebuild = sim.rebuilding(id);
+      if (rebuild) this.drawRebuild(sim, sim.buildings[id], rebuild, time, k);
+      else this.drawBuilding(sim, sim.buildings[id], inside[id], time, k, night, effects);
     }
     const graves = Math.min(10, sim.lostTotal);
     for (let g = 0; g < graves; g++) {
@@ -500,18 +503,54 @@ export class MineRenderer {
       fill(mix([150, 120, 60], [255, 220, 130], Math.min(1, night * 1.5)), night > 0.3 ? 1 : k, lx, ly);
       if (effects && night > 0.2) this.glowAt(lx, ly, 10, Math.min(1, (night - 0.2) * 1.3) * 0.55 * (0.85 + 0.15 * Math.sin(time / 170) * Math.sin(time / 410)));
     }
-    if (this.picked === b.id) {
-      // The building picked: an outline of brass, gently pulsing.
-      const { scale } = this.size, ox = Math.round(-this.camX * scale), oy = Math.round(-this.camY * scale), roof = top - 1 - rows - (b.id === "forge" ? 3 : 0);
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.strokeStyle = `rgba(240,207,134,${0.65 + 0.35 * Math.sin(time / 260)})`;
-      ctx.lineWidth = Math.max(1, Math.round(scale / 3));
-      const x0 = Math.round(ox + (b.x0 - 1) * scale), y0 = Math.round(oy + (roof - 0.5) * scale);
-      ctx.strokeRect(x0, y0, Math.round(ox + (b.x1 + 2) * scale) - x0, Math.round(oy + (F + 1.5) * scale) - y0);
-      ctx.setTransform(scale, 0, 0, scale, ox, oy);
-    }
+    if (this.picked === b.id) this.outline(b, top - 1 - rows - (b.id === "forge" ? 3 : 0), time);
     if (effects && b.id === "barracks" && night > 0.2)
       for (const wx of this.windows(b).filter((_, i) => i % 2 === 0)) this.glowAt(wx, F - 4, 8, Math.min(1, (night - 0.2) * 1.3) * 0.35);
+  }
+  /** The building picked: an outline of brass, gently pulsing, from the
+   * roof's row `roof` down to its floor. */
+  private outline(b: Footprint, roof: number, time: number) {
+    const ctx = this.ctx, { scale } = this.size, ox = Math.round(-this.camX * scale), oy = Math.round(-this.camY * scale);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.strokeStyle = `rgba(240,207,134,${0.65 + 0.35 * Math.sin(time / 260)})`;
+    ctx.lineWidth = Math.max(1, Math.round(scale / 3));
+    const x0 = Math.round(ox + (b.x0 - 1) * scale), y0 = Math.round(oy + (roof - 0.5) * scale);
+    ctx.strokeRect(x0, y0, Math.round(ox + (b.x1 + 2) * scale) - x0, Math.round(oy + (b.floor + 1.5) * scale) - y0);
+    ctx.setTransform(scale, 0, 0, scale, ox, oy);
+  }
+  /** A building being rebuilt: if it is moving, first taken down where it
+   * stood, course by course inside its scaffold, then raised the same way
+   * in its new place; timber stacked by the site. */
+  private drawRebuild(sim: MineSim, b: Building, r: Rebuild, time: number, k: number) {
+    const p = r.t / r.total, down = r.from !== null && p < 0.5;
+    const site: Footprint = down ? r.from! : b, done = r.from ? (down ? 1 - p * 2 : (p - 0.5) * 2) : p;
+    const ctx = this.ctx, F = site.floor, surface = sim.strata.surface, stone = b.id === "forge" || b.id === "smithy";
+    const fill = (c: RGB, kk: number, x: number, y: number, w = 1, h = 1) => {
+      ctx.fillStyle = `rgb(${(c[0] * kk) | 0},${(c[1] * kk) | 0},${(c[2] * kk) | 0})`;
+      ctx.fillRect(x, y, w, h);
+    };
+    for (let x = site.x0; x <= site.x1; x++) if (surface[x] > F + 1) fill(FOOTING, k, x, F + 1, 1, surface[x] - F - 1);
+    // The walls, risen (or still standing) to the share of the work done.
+    const rows = Math.round(site.height * done), top = F - site.height + 1;
+    for (let y = F - rows + 1; y <= F; y++)
+      for (let x = site.x0; x <= site.x1; x++) {
+        const edge = x === site.x0 || x === site.x1;
+        const c = edge ? POST : stone ? ASHLAR[((x + (y % 2) * 2) >> 1) % 2 === 0 && y % 2 === 0 ? 1 : 0] : PLANK[y % 2];
+        fill(c, k * (stone && (x + y) % 5 === 0 ? 0.86 : 1), x, y);
+      }
+    // The scaffold: poles either side and every few columns, boards across.
+    ctx.globalAlpha = 0.9;
+    for (let x = site.x0 - 1; x <= site.x1 + 1; x += 4) fill(SCAFFOLD, k, x, top - 2, 1, site.height + 2);
+    fill(SCAFFOLD, k, site.x1 + 1, top - 2, 1, site.height + 2);
+    for (let y = F - 1; y >= top - 2; y -= 3) fill(SCAFFOLD, k * 0.85, site.x0 - 1, y, site.x1 - site.x0 + 3, 1);
+    ctx.globalAlpha = 1;
+    // Timber stacked by the site, and a hoisting rope swaying from the top.
+    const sx = site.x1 + 2;
+    fill(TIMBER_END, k, sx, F, 2, 1);
+    fill(PLANK[1], k, sx, F - 1, 2, 1);
+    const sway = Math.round(Math.sin(time / 500));
+    fill([140, 120, 90], k, Math.floor((site.x0 + site.x1) / 2) + sway, top - 1, 1, Math.max(1, site.height - rows));
+    if (this.picked === b.id) this.outline(site, top - 3, time);
   }
   private windows(b: Building) {
     const out: number[] = [];
@@ -560,13 +599,13 @@ export class MineRenderer {
         }
       }
     } else if (b.id === "warehouse") {
-      // Shelves of timber, rails and lights; props stacked by the wall.
+      // Shelves of timber, rails and lights, as full as the warehouse's
+      // supplies; props stacked by the wall.
       for (const y of [F - 2, F - 4]) fill(PLANK[1], k, x0 + 1, y, b.x1 - x0 - 1, 1);
-      for (let x = x0 + 1; x < b.x1; x++) {
-        fill(x % 2 ? TIMBER_END : [150, 150, 158], k, x, F - 3);
-        if (x % 3 === 0) fill(TORCH_RGB, k, x, F - 5);
-        else if (x % 3 === 1) fill([230, 220, 170], k * 0.9, x, F - 5);
-      }
+      const width = b.x1 - x0 - 1;
+      let left = Math.round((2 * width * Math.min(sim.stock, sim.stockCap)) / Math.max(1, sim.stockCap));
+      for (let x = x0 + 1; x < b.x1 && left > 0; x++, left--) fill(x % 2 ? TIMBER_END : [150, 150, 158], k, x, F - 3);
+      for (let x = x0 + 1; x < b.x1 && left > 0; x++, left--) fill(x % 3 === 0 ? TORCH_RGB : x % 3 === 1 ? [230, 220, 170] : TIMBER_END, k * 0.9, x, F - 5);
       fill(PLANK[0], k, x0 + 1, F - 1, 1, 2);
       fill(PLANK[1], k, x0 + 2, F, 1, 1);
     } else if (b.id === "forge") {
@@ -577,9 +616,11 @@ export class MineRenderer {
         for (let x = x0 + 2; x <= x0 + 3; x++) fill(hot ? FIRE_RGB[(x + y + flick) % 3] : [90, 40, 24], 1, x, y);
       this.forgeStock(sim, b, k, fill);
     } else if (b.id === "smithy") {
-      // The anvil, the rack of bars waiting, the quench trough.
-      fill(IRON_DARK, k, x0 + 4, F - 1, 3, 1);
-      fill(IRON_DARK, k, x0 + 5, F, 1, 1);
+      // An anvil for each smith, the rack of bars waiting, the quench trough.
+      for (const ax of anvils(b)) {
+        fill(IRON_DARK, k, ax, F - 1, 3, 1);
+        fill(IRON_DARK, k, ax + 1, F, 1, 1);
+      }
       const iron = Math.min(12, sim.bars.iron), gold = Math.min(6, sim.bars.gold);
       for (let n = 0; n < iron; n++) fill(BAR_IRON, k, x0 + 1, F - Math.floor(n / 2), 1, 1);
       for (let n = 0; n < gold; n++) fill(BAR_GOLD, k, x0 + 2, F - n, 1, 1);
@@ -599,7 +640,7 @@ export class MineRenderer {
     const total = sim.ore.iron + sim.ore.gold;
     if (!total) return;
     const heapRows = [6, 6, 5, 4, 3, 2], heapSlots = 26, shelfSlots = (sx1 - sx0) * 2 * 2;
-    const slots = Math.max(1, Math.round(((heapSlots + 2 * shelfSlots) * Math.min(total, FORGE_CAP)) / FORGE_CAP));
+    const slots = Math.max(1, Math.round(((heapSlots + 2 * shelfSlots) * Math.min(total, sim.forgeCap)) / sim.forgeCap));
     const goldShare = sim.ore.gold / total;
     const heap = Math.min(heapSlots, slots);
     oreHeap(fine, b.x1 - 1.5, F + 0.5, heapRows, heap, Math.round(heap * goldShare), k);

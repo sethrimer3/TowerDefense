@@ -1562,3 +1562,28 @@ nav button { position: relative; }
   font-size: 9px;
   opacity: 0.7;
 }
+/* The level and the button that raises it take presses, unlike the rest. */
+.mine-info .info-up {
+  margin-top: 6px;
+  padding-top: 4px;
+  border-top: 1px solid #4a321850;
+  pointer-events: auto;
+}
+.mine-info .info-upgrade {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 5px 6px;
+  font-size: 10px;
+  line-height: 1.3;
+}
+.mine-info .info-upgrade small {
+  display: block;
+  font-size: 8px;
+  opacity: 0.85;
+}
+.mine-info .info-note {
+  margin: 2px 0 0;
+  font-size: 9px;
+  font-style: italic;
+}

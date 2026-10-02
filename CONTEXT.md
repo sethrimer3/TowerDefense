@@ -123,10 +123,16 @@ The ground by the shaft house where ore brought up is tipped, until the forge's 
 What the miners dig. Brought up, it waits in the yard, then in heaps and on shelves in the forge.
 
 **Buildings**:
-Along the surface: the **shaft house** over the shaft's mouth, with a lantern by its door; the **barracks**, where the crew sleeps in bunks (a bay of six for every six of the crew) and sits in the **lounge** to eat or wait out a storm; the **warehouse** of supplies; the **forge**; and the **smithy**. A building's front wall fades to show whoever is inside.
+Along the surface: the **shaft house** over the shaft's mouth, with a lantern by its door; the **barracks**, where the crew sleeps in bunks (a bay of six a level) and sits in the **lounge** to eat or wait out a storm; the **warehouse** of supplies; the **forge**; and the **smithy**. A building's front wall fades to show whoever is inside.
+
+**Building level**:
+Each building has five, bought with Gold, and grows wider with each: the barracks bunks five more of the crew a level, the forge makes room for two more hands, the smithy for another smith, the shaft house keeps out more rain, and the warehouse holds and brings in more supplies. No other building rises more than one level past the warehouse.
+
+**Rebuild**:
+An upgraded building is rebuilt, and so is any it pushes along: taken down where it stood, then raised in its new place, inside scaffolding. It is shut while the work goes on, and the work uses supplies.
 
 **Supplies**:
-Timber, rails and lights a miner fetches from the warehouse before fitting out the workings or shoring them.
+Timber, rails and lights the warehouse brings in over time, up to what it holds. A miner fetches them before fitting out the workings or shoring them, and rebuilds use them too; with none, the shaft can't be sunk further.
 
 **Forge** and **smithy**:
 Forge hands smelt the ore piles into bars (twelve iron ore to an iron bar, a gold ore to an ingot); smiths work the bars into what the mine pays: iron bars, now and then a steel bar, and Gold struck from the ingots. Too few at the forge leaves a backlog of ore; too few smiths leaves bars waiting. A trade nobody is put to still gets done, slowly.
