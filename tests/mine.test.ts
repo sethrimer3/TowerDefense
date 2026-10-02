@@ -1,11 +1,13 @@
 // The Mine: its falling-sand physics, the world a seed generates, the crew's
-// work, what it pays, and its save.
+// work, its buildings and trades, what it pays, and its save.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { AIR, BEDROCK, CELLS, DIRT, GOLD, GRASS, GRAVEL, H, LAVA, LOOSE, IRON, LADDER, MATERIAL_COUNT, RAIL, ROCK, STONE, TORCH, W, World, decodeGrid, encodeGrid, generate, idx, isPassable, strata } from "../src/mine/world.ts";
 import {
-  BREATH_TICKS, DAY_TICKS, DEATH_GAP, MineSim, STARVE_TICKS, TICK_HZ, WEATHER_TICKS, daylight, decodeMineSave, hirePrice, skyAt, weatherOf,
+  BARS_PER_STEEL, BREATH_TICKS, DAY_TICKS, DEATH_GAP, GOLD_PER_NUGGET, KIT, MineSim, ORE_PER_IRON_BAR, STARVE_TICKS, TICK_HZ, WEATHER_TICKS, daylight, decodeMineSave,
+  hirePrice, skyAt, weatherOf,
 } from "../src/mine/sim.ts";
+import { BAY_BUNKS, MAX_BAYS, along, bays, layout, pathTicks } from "../src/mine/buildings.ts";
 import { decode } from "../src/save.ts";
 
 const minutes = (sim: MineSim, n: number) => {
@@ -91,21 +93,20 @@ test("one miner sinks a shored, laddered shaft and opens a tunnel with track and
   assert.ok(sim.mined.iron > 0, "ore found and dug");
 });
 
-test("the crew pays Gold and iron bars, carts and the hoist bring ore up, and nobody ends up inside rock", () => {
+test("the crew's ore comes up by pack, cart and hoist to the forge, is paid out as iron bars, and nobody ends up inside rock", () => {
   const sim = new MineSim(99);
   for (let i = 0; i < 5; i++) sim.hire();
-  let gold = 0, bars = 0;
+  let bars = 0;
   for (let k = 0; k < 40; k++) {
     minutes(sim, 1);
     const pay = sim.collect();
-    gold += pay.gold;
     bars += pay.ironBar;
     for (const m of sim.miners) {
       assert.ok(isPassable(sim.world.get(m.x, m.y)) && isPassable(sim.world.get(m.x, m.y - 1)), `miner ${m.id} at ${m.x},${m.y}`);
     }
   }
-  assert.ok(bars > 10, `iron bars ${bars}`);
-  assert.ok(gold > 0, `gold ${gold}`);
+  assert.ok(bars > 3, `iron bars ${bars}`);
+  assert.ok(sim.mined.iron > 100, `iron mined ${sim.mined.iron}`);
   assert.ok(sim.carts.length >= 2, `carts ${sim.carts.length}`);
   assert.ok(sim.world.cells.some((m) => m === RAIL));
 });
@@ -289,7 +290,7 @@ test("a miner is spared soon after a death, when it's the last, and after the fi
   a.sim.step();
   assert.equal(a.sim.lostTotal, 0);
   assert.equal(a.sim.miners.length, 3);
-  assert.equal(a.m.x, a.sim.hutX);
+  assert.equal(a.m.inside?.b, "barracks");
   assert.ok(a.sim.news.some((n) => n.kind === "saved"));
   // The last miner always gets out.
   const b = trapped(1);
@@ -352,4 +353,141 @@ test("the weather's state saves and loads; older saves without it still load", (
   assert.equal(decodeMineSave({ ...saved, water: "AAAA" }), null);
   assert.equal(decodeMineSave({ ...saved, burning: [[-1, 5]] }), null);
   assert.equal(decodeMineSave({ ...saved, lost: { drowned: -1 } }), null);
+});
+
+// ── Buildings and trades ──────────────────────────────────────────────
+
+test("the barracks grows a bay of bunks for every six of the crew, and each spot's way in starts at the door", () => {
+  assert.equal(bays(1), 1);
+  assert.equal(bays(7), 2);
+  assert.equal(bays(99), MAX_BAYS);
+  const { surface } = strata(7);
+  for (const n of [1, 3]) {
+    const b = layout(surface, W / 2, n);
+    assert.equal(b.barracks.spots.sleep!.length, n * BAY_BUNKS);
+    for (const id of ["barracks", "warehouse", "forge", "smithy"] as const) {
+      const building = b[id];
+      // Every building stands on the highest ground under it.
+      for (let x = building.x0; x <= building.x1; x++) assert.ok(surface[x] > building.floor, `${id} floor at ${x}`);
+      for (const spots of Object.values(building.spots))
+        for (const spot of spots!) {
+          const end = along([building.door, building.floor], spot.path, pathTicks(spot.path));
+          assert.deepEqual([end.x, end.y], [spot.x, spot.y], `${id} spot reached`);
+          assert.ok(spot.x > building.x0 && spot.x < building.x1, `${id} spot inside`);
+        }
+    }
+    // The buildings don't overlap.
+    const spans = Object.values(b).map((x) => [x.x0, x.x1]).sort((p, q) => p[0] - q[0]);
+    for (let i = 1; i < spans.length; i++) assert.ok(spans[i][0] > spans[i - 1][1], "apart");
+  }
+});
+
+test("the forge smelts ore into bars and the smithy works them into iron, steel and Gold; a trade nobody works goes slowly", () => {
+  const run = (forge: number, smith: number) => {
+    const sim = new MineSim(8);
+    for (let i = 0; i < 4; i++) sim.hire();
+    sim.setJobs(forge, smith);
+    sim.ore = { iron: ORE_PER_IRON_BAR * 6, gold: 3 };
+    sim.steelWork = BARS_PER_STEEL - 1;
+    // A morning's work, before anyone goes to bed.
+    const paid = { gold: 0, ironBar: 0, steelBar: 0 };
+    for (let t = 0; t < 4 * 60 * TICK_HZ; t++) {
+      sim.step();
+      if (sim.night) break;
+    }
+    const pay = sim.collect();
+    paid.gold += pay.gold;
+    paid.ironBar += pay.ironBar;
+    paid.steelBar += pay.steelBar;
+    return { sim, paid };
+  };
+  const busy = run(2, 1);
+  assert.equal(busy.sim.miners.filter((m) => m.job === "forge").length, 2);
+  assert.equal(busy.sim.miners.filter((m) => m.job === "smith").length, 1);
+  assert.equal(busy.sim.miners.filter((m) => m.job === "mine").length, 2);
+  assert.equal(busy.paid.gold, 3 * GOLD_PER_NUGGET, "gold ore struck into Gold");
+  assert.ok(busy.paid.ironBar >= 2, `iron bars ${busy.paid.ironBar}`);
+  assert.equal(busy.paid.steelBar, 1, "a steel bar folded");
+  // Nobody at the forge or anvil: the work still trickles through, slower.
+  const idle = run(0, 0);
+  assert.ok(idle.paid.ironBar < busy.paid.ironBar, `idle ${idle.paid.ironBar} < busy ${busy.paid.ironBar}`);
+  assert.ok(idle.sim.ore.iron > busy.sim.ore.iron, "a backlog of ore at the forge");
+  // The allocation never takes more hands than there are.
+  busy.sim.setJobs(9, 9);
+  assert.deepEqual(busy.sim.jobs, { forge: 5, smith: 0 });
+});
+
+test("at night most of the crew sleeps in the barracks; the night shift works on, and Coffee keeps more awake", () => {
+  const asleep = (coffee: number) => {
+    const sim = new MineSim(21);
+    for (let i = 0; i < 9; i++) sim.hire();
+    sim.coffee = coffee;
+    while (!sim.night) sim.step();
+    minutes(sim, 1.5);
+    assert.ok(sim.night);
+    return sim.miners.filter((m) => m.inside?.why === "sleep").length;
+  };
+  const tired = asleep(0), wired = asleep(12);
+  assert.equal(tired, 8, "all but 20% of ten asleep");
+  assert.equal(wired, 2, "all but 80% of ten asleep");
+});
+
+test("a new hand fetches supplies from the warehouse before fitting out the workings", () => {
+  const sim = new MineSim(3);
+  const m = sim.miners[0];
+  assert.equal(m.kit, 0);
+  let fetched = false;
+  for (let t = 0; t < 60 * TICK_HZ && !fetched; t++) {
+    sim.step();
+    if (m.inside?.b === "warehouse") fetched = true;
+  }
+  assert.ok(fetched, "went to the warehouse");
+  minutes(sim, 0.2);
+  assert.ok(m.kit > 0 && m.kit <= KIT, `kit ${m.kit}`);
+});
+
+test("the shaft house keeps rain running off the ground out of the shaft, and Waterproofing keeps more out", () => {
+  const flood = (waterproof: number) => {
+    const sim = new MineSim(17);
+    sim.waterproof = waterproof;
+    const x = sim.shaftX, top = sim.strata.surface[x];
+    for (let y = top; y < top + 60; y++) sim.world.set(x, y, LADDER);
+    for (let t = 0; t < 600; t++) {
+      if (t % 15 === 0) sim.world.setWater(x - 1, top - 1, true);
+      sim.world.step();
+      sim.tick++;
+      if (sim.world.waterCount) (sim as unknown as { seal(): void }).seal();
+    }
+    let below = 0;
+    for (let y = top + 2; y < H; y++) if (sim.world.water[idx(x, y)]) below++;
+    return below;
+  };
+  const bare = flood(0), proofed = flood(4);
+  assert.ok(bare > 0, "some gets in");
+  assert.ok(proofed < bare * 0.6, `waterproofed ${proofed} < ${bare}`);
+});
+
+test("the trades and the forge's stock save and load; older saves without them still load", () => {
+  const sim = new MineSim(55);
+  for (let i = 0; i < 4; i++) sim.hire();
+  sim.setJobs(2, 1);
+  sim.ore = { iron: 30, gold: 4 };
+  sim.bars = { iron: 2, gold: 1 };
+  sim.steelWork = 5;
+  sim.miners[3].kit = 7;
+  const saved = JSON.parse(JSON.stringify(sim.save(0)));
+  const loaded = new MineSim(saved.seed, decodeMineSave(saved)!);
+  assert.deepEqual(loaded.jobs, { forge: 2, smith: 1 });
+  assert.deepEqual(loaded.ore, { iron: 30, gold: 4 });
+  assert.deepEqual(loaded.bars, { iron: 2, gold: 1 });
+  assert.equal(loaded.steelWork, 5);
+  assert.deepEqual(loaded.miners.map((m) => [m.job, m.kit]), sim.miners.map((m) => [m.job, m.kit]));
+  const { jobs, ore, bars, steelWork, ...old } = saved;
+  old.miners = old.miners.map(({ job, kit, ...m }: { job: string; kit: number }) => m);
+  const plain = new MineSim(old.seed, decodeMineSave(old)!);
+  assert.deepEqual(plain.jobs, { forge: 0, smith: 0 });
+  assert.ok(plain.miners.every((m) => m.job === "mine" && m.kit === KIT));
+  assert.equal(decodeMineSave({ ...saved, jobs: { forge: -1, smith: 0 } }), null);
+  assert.equal(decodeMineSave({ ...saved, miners: [{ ...saved.miners[0], job: "baker" }] }), null);
+  assert.equal(decodeMineSave({ ...saved, ore: { iron: 1.5, gold: 0 } }), null);
 });

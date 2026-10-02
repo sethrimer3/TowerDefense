@@ -294,9 +294,13 @@ dialog > small {
 .mine-tally {
   color: #b8a888;
 }
-.mine-tally b {
+.mine-tally b,
+.mine-job b {
   color: #ffdc95;
   font-weight: 600;
+}
+.mine-job {
+  color: #b8a888;
 }
 .mine-view {
   border: 2px solid #1a110a;

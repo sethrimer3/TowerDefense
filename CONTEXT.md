@@ -90,7 +90,7 @@ A flame's flickering, swaying, occlusion-aware glow: lanterns, braziers, tower f
 The idle side view of the ground under the city, worked by miners whatever tab is open and while the game is closed. Its world comes from a seed.
 
 **Miner**:
-A worker the player hires with Gold. Miners dig, shore, lay track, hang torches and lamps, build carts and carry ore up.
+A worker the player hires with Gold and puts to one of three **trades**: the face (digging, shoring, laying track, hanging torches and lamps, building carts, carrying ore up), the forge, or the smithy. A miner at the face wears a yellow hat, a forge hand a grey welder's mask, a smith a brown leather apron.
 
 **Shaft**, **level** and **tunnel**:
 The laddered shaft is sunk through the dirt into the stone; at every level a tunnel with track and torches runs out either side.
@@ -105,10 +105,25 @@ Dirt and rubble carried up and tipped onto the heap.
 A level's mine cart takes miners' ore to the shaft, where the hoist's bucket lifts it to the surface.
 
 **Iron ore** and **gold**:
-What the mine pays: gold straight into Gold, iron ore smelted into iron bars.
+What the miners dig. Brought up, it waits in piles at the forge.
+
+**Buildings**:
+Along the surface: the **shaft house** over the shaft's mouth, with a lantern by its door; the **barracks**, where the crew sleeps in bunks (a bay of six for every six of the crew) and sits in the **lounge** to eat or wait out a storm; the **warehouse** of supplies; the **forge**; and the **smithy**. A building's front wall fades to show whoever is inside.
+
+**Supplies**:
+Timber, rails and lights a miner fetches from the warehouse before fitting out the workings or shoring them.
+
+**Forge** and **smithy**:
+Forge hands smelt the ore piles into bars (twelve iron ore to an iron bar, a gold ore to an ingot); smiths work the bars into what the mine pays: iron bars, now and then a steel bar, and Gold struck from the ingots. Too few at the forge leaves a backlog of ore; too few smiths leaves bars waiting. A trade nobody is put to still gets done, slowly.
+
+**Night shift**:
+The share of the crew who work through the night (a fifth, more with Coffee); the rest sleep in the barracks.
+
+**Waterproofing**:
+How much of the rain running off the ground the shaft house keeps out of the shaft.
 
 **Weather**:
-The mine's sky: clear, cloudy, rain or storm, in spells that turn with its days and nights. Miners shelter from rain in the hut; storms bring lightning.
+The mine's sky: clear, cloudy, rain or storm, in spells that turn with its days and nights. Storms bring lightning, which the buildings' roofs take; miners at the surface sit a storm out in the lounge.
 
 **Flood** and **bailing**:
 Rainwater that runs down the shaft and fills the workings; miners bail it out with buckets.
@@ -120,7 +135,7 @@ Ground that slides at the slightest drop and can bury the shaft, crushing ladder
 Molten rock in pools deep down. It creeps, burns miners and wood, and turns to stone where water meets it.
 
 **Lost miner** and **grave**:
-A miner killed by a fall of ground, drowning, starvation, lava, fire or lightning. Losses are rare and spaced out, the last miner always survives, and each lost miner gets a grave by the hut.
+A miner killed by a fall of ground, drowning, starvation, lava, fire or lightning. Losses are rare and spaced out, the last miner always survives, and each lost miner gets a grave beyond the smithy.
 
 ### The library
 
