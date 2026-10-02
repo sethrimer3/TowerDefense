@@ -1011,25 +1011,45 @@ nav button > span img { display: block; width: 42px; height: 42px; max-width: 10
   margin-left: auto;
   color: #e29898;
 }
+/* The board's view fills the stage (its height set in code); the palette
+ * slides in beside it, and the view narrows to make room. */
 .defend-stage {
   display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  gap: 10px;
+  align-items: stretch;
 }
 .defend-stage.palette-right {
   flex-direction: row-reverse;
 }
+.defend-side {
+  flex: none;
+  display: flex;
+  align-items: flex-start;
+  width: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: width 0.35s ease, margin 0.35s ease, opacity 0.25s ease;
+}
+.defend-stage.side-open .defend-side {
+  width: 80px;
+  margin-right: 10px;
+  opacity: 1;
+}
+.defend-stage.palette-right.side-open .defend-side {
+  margin-right: 0;
+  margin-left: 10px;
+}
 .defend-palette {
   flex: none;
+  box-sizing: border-box;
   width: 80px;
+  max-height: 100%;
   display: flex;
   flex-direction: column;
   gap: 6px;
   padding: 6px;
   border: 1px solid var(--line);
   background: #121821;
-  /* Capped to the board's height in code; extra items scroll. */
+  /* Never taller than the stage; extra items scroll. */
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
@@ -1080,7 +1100,8 @@ nav button > span img { display: block; width: 42px; height: 42px; max-width: 10
 }
 .defend-board {
   position: relative;
-  flex: none;
+  flex: 1;
+  min-width: 0;
   line-height: 0;
   border: 2px solid #6a5a3a;
   box-shadow:
@@ -1089,6 +1110,8 @@ nav button > span img { display: block; width: 42px; height: 42px; max-width: 10
 }
 .defend-board canvas {
   display: block;
+  width: 100%;
+  height: 100%;
   touch-action: none;
   image-rendering: pixelated;
 }
@@ -1185,8 +1208,13 @@ nav button > span img { display: block; width: 42px; height: 42px; max-width: 10
   .defend-item span {
     display: none;
   }
-  .defend-stage {
-    gap: 6px;
+  .defend-stage.side-open .defend-side {
+    width: 60px;
+    margin-right: 6px;
+  }
+  .defend-stage.palette-right.side-open .defend-side {
+    margin-right: 0;
+    margin-left: 6px;
   }
 }
 

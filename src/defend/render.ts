@@ -6,7 +6,7 @@
  * and effects (battle-art.ts), the trees over them (park-trees.ts), the
  * wizards' fire, the building grid and drag overlay (edit-overlay.ts), then
  * rain in screen space. */
-import { CELLS_H, CELLS_W, hash01 } from "./grid.ts";
+import { CELLS_H, CELLS_W, boardSize, hash01 } from "./grid.ts";
 import type { CityMap } from "./citygen.ts";
 import type { DefendSim } from "./sim.ts";
 import { DefendLighting, type LightFrame } from "./lighting.ts";
@@ -56,7 +56,8 @@ export class DefendRenderer {
   private lastNow = 0;
   private layerScale = 1;
   /** Camera: zoom `s` and translation (canvas pixels) applied to the whole
-   * board. s = 1 shows everything; the view is clamped to the board. */
+   * board. s = 1 fits the board to the stage it sits in; along an edge the
+   * view is wider than the board it is centred, elsewhere clamped to it. */
   readonly cam = { s: 1, x: 0, y: 0 };
   static readonly MAX_ZOOM = 6;
   readonly canvas: HTMLCanvasElement;
@@ -75,20 +76,31 @@ export class DefendRenderer {
     onCityArtLoaded(() => (this.layerKey = ""));
   }
 
-  /** Size the backing store to `cssWidth` CSS pixels (height follows 9:13). */
-  resize(cssWidth: number) {
+  /** Matches the canvas to its box, which fills the view. The board's scale
+   * comes from the stage (`refW` × `refH` CSS pixels, the room the view has
+   * with no panel open), so it holds still while a panel slides open and the
+   * view narrows; the board point in the middle of the view stays there. */
+  resize(refW: number, refH: number) {
     const dpr = window.devicePixelRatio || 1;
-    const w = Math.max(CELLS_W, Math.round(cssWidth * dpr));
-    const h = Math.round((w * CELLS_H) / CELLS_W);
-    if (this.canvas.width !== w || this.canvas.height !== h) {
-      this.canvas.width = w;
-      this.canvas.height = h;
-      this.canvas.style.width = `${cssWidth}px`;
-      this.canvas.style.height = `${(cssWidth * CELLS_H) / CELLS_W}px`;
-      this.layerKey = "";
-    }
-    this.px = w / CELLS_W;
+    const w = Math.max(1, Math.round(this.canvas.clientWidth * dpr)),
+      h = Math.max(1, Math.round(this.canvas.clientHeight * dpr));
+    const px = Math.max(1, Math.min((refW * dpr) / CELLS_W, (refH * dpr) / CELLS_H));
+    const old = { w: this.canvas.width, h: this.canvas.height, px: this.px };
+    if (w === old.w && h === old.h && px === old.px) return;
+    const scale = this.cam.s * old.px,
+      cx = (old.w / 2 - this.cam.x) / scale,
+      cy = (old.h / 2 - this.cam.y) / scale;
+    this.canvas.width = w;
+    this.canvas.height = h;
+    this.px = px;
+    this.cam.x = w / 2 - cx * this.cam.s * px;
+    this.cam.y = h / 2 - cy * this.cam.s * px;
     this.clampCam();
+  }
+
+  /** The whole board's size in canvas pixels, unzoomed. */
+  get board() {
+    return boardSize(this.px);
   }
 
   /** Client (CSS) point → canvas pixels. */
@@ -125,17 +137,21 @@ export class DefendRenderer {
   resetCam() {
     this.cam.s = 1;
     this.cam.x = this.cam.y = 0;
+    this.clampCam();
   }
 
   private clampCam() {
-    const W = this.canvas.width,
-      H = this.canvas.height;
-    this.cam.x = Math.min(0, Math.max(W - W * this.cam.s, this.cam.x));
-    this.cam.y = Math.min(0, Math.max(H - H * this.cam.s, this.cam.y));
+    const { W, H } = this.board;
+    this.cam.x = clampAxis(this.cam.x, this.canvas.width, W * this.cam.s);
+    this.cam.y = clampAxis(this.cam.y, this.canvas.height, H * this.cam.s);
   }
 
   draw(map: CityMap, sim: DefendSim | null, overlay: Overlay | null, opts: DrawOptions) {
     this.refreshLayer(map, sim);
+    // Beyond the board's edges: the dark ground the city stands on.
+    this.ctx.setTransform(1, 0, 0, 1, 0, 0);
+    this.ctx.fillStyle = BEYOND;
+    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
     this.douse(sim, opts);
     const dt = this.lastNow ? (opts.now - this.lastNow) / 1000 : 0;
     this.lastNow = opts.now;
@@ -164,7 +180,8 @@ export class DefendRenderer {
     const ctx = this.ctx;
     ctx.setTransform(this.cam.s, 0, 0, this.cam.s, this.cam.x, this.cam.y);
     ctx.imageSmoothingEnabled = this.cam.s / this.layerScale < 1;
-    ctx.drawImage(this.layer, 0, 0, this.canvas.width, this.canvas.height);
+    const { W, H } = this.board;
+    ctx.drawImage(this.layer, 0, 0, W, H);
     ctx.imageSmoothingEnabled = false;
     if (opts.effects ?? true) this.drawParkLife(map, sim, opts, dt);
     // Park fences sit on the ground layer, under the lighting and units.
@@ -195,7 +212,8 @@ export class DefendRenderer {
     const weather = opts.weather;
     this.drawBattleGround(map, sim, weather, opts.night);
     if (!weather) return;
-    Rain.overcast(this.ctx, weather.rain ? 0.3 : 0.18);
+    const { W, H } = this.board;
+    Rain.overcast(this.ctx, weather.rain ? 0.3 : 0.18, W, H);
     this.drawLighting(map, sim, weather, opts);
   }
 
@@ -223,7 +241,7 @@ export class DefendRenderer {
     this.trees.update(sim ? beneath(sim) : [], dt, opts.reduceMotion);
     const dim = sim && opts.weather ? (o: CanvasRenderingContext2D) => {
       o.fillStyle = `rgba(118,118,118,${opts.weather!.rain ? 0.2 : 0.12})`;
-      o.fillRect(0, 0, this.canvas.width, this.canvas.height);
+      o.fillRect(0, 0, this.board.W, this.board.H);
       this.lighting.darken(o);
     } : undefined;
     this.trees.draw(this.ctx, this.px, dim);
@@ -242,7 +260,7 @@ export class DefendRenderer {
    * fires and lanterns (baked until a building falls or rises), then the
    * moving lights: wizard fire and ice, blasts and hand torches. */
   private drawGroundRelief(map: CityMap, sim: DefendSim, opts: DrawOptions, flames: ReliefLight[]) {
-    if (!(opts.effects ?? true) || !this.relief.sync(map, this.px, this.canvas.width, this.canvas.height)) return;
+    if (!(opts.effects ?? true) || !this.relief.sync(map, this.px, this.board.W, this.board.H)) return;
     const intact = standing(map, sim);
     const fixed = () =>
       this.lighting.lights
@@ -268,8 +286,7 @@ export class DefendRenderer {
    * keep's damage changed. Zoomed in, the city is painted at 2–4× so edges
    * stay crisp. */
   private refreshLayer(map: CityMap, sim: DefendSim | null) {
-    const W = this.canvas.width,
-      H = this.canvas.height;
+    const { W, H } = this.board;
     let k = this.cam.s >= 4 ? 4 : this.cam.s >= 2.5 ? 3 : this.cam.s >= 1.4 ? 2 : 1;
     while (k > 1 && W * H * k * k > 18e6) k--;
     this.layerScale = k;
@@ -347,6 +364,15 @@ export class DefendRenderer {
     this.lighting.drawFlames(this.ctx, frame);
   }
 
+}
+
+/** What shows around the board when the view is wider or taller than it. */
+const BEYOND = "#0b0907";
+
+/** A camera offset along one axis: centred when the board (`board` canvas
+ * pixels at this zoom) is narrower than the view, else kept on the board. */
+function clampAxis(at: number, view: number, board: number) {
+  return board <= view ? (view - board) / 2 : Math.min(0, Math.max(view - board, at));
 }
 
 /** The keep's rect while it stands (its banner flies over it), else null. */

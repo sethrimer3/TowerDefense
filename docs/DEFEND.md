@@ -22,12 +22,17 @@ holds it against endless waves. Code lives in `src/defend/`.
   the right. During a battle: Abandon (click twice — it asks "Confirm?") and
   the speed toggle (1× ⇄ 2×, plus 3× once War drums is bought in the
   Armory) on the left; weather, wave, best, keep health and foes on the right.
-- The board is sized so the page never scrolls. Scroll-wheel or pinch zooms
-  (up to 6×); dragging open ground pans. Messages float over the board's foot.
+- The board's view fills the room under the header, so the page never
+  scrolls; unzoomed it fits the whole city, centred on dark ground. `☰ Build`
+  (building) and `☰ Items` (in battle) slide the palette in beside the view,
+  which narrows to make room while the board keeps its scale (like the Mine's
+  Crew list). The palette starts open while building and closed in battle.
+  Scroll-wheel or pinch zooms (up to 6×); dragging open ground pans. Messages
+  float over the board's foot.
 
 ## Building (before a run)
 
-- The **palette** (left by default, `⇄ Palette` swaps it to the right) lists
+- The **palette** (left by default; the ⚙ settings move it to the right) lists
   city tiles, barracks, archer towers and watch towers with an `×N` count of
   what is owned but not yet placed; it greys out at `×0`.
 - Drag from the palette onto the board. While dragging, every tile that would

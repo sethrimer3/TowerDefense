@@ -97,10 +97,9 @@ export class Rain {
     c.restore();
   }
 
-  /** The grey, washed-out look of an overcast sky (stronger in rain). */
-  static overcast(c: CanvasRenderingContext2D, strength: number) {
-    const W = c.canvas.width,
-      H = c.canvas.height;
+  /** The grey, washed-out look of an overcast sky (stronger in rain) over
+   * a W × H board. */
+  static overcast(c: CanvasRenderingContext2D, strength: number, W: number, H: number) {
     c.save();
     c.globalCompositeOperation = "saturation";
     c.fillStyle = `rgba(128,128,128,${strength})`;

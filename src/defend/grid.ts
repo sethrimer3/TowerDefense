@@ -9,6 +9,9 @@ export const TILES_H = 13;
 export const SUB = 7;
 export const CELLS_W = TILES_W * SUB;
 export const CELLS_H = TILES_H * SUB;
+
+/** The whole board's size in canvas pixels at `px` pixels a cell. */
+export const boardSize = (px: number) => ({ W: Math.round(CELLS_W * px), H: Math.round(CELLS_H * px) });
 export const CELL_COUNT = CELLS_W * CELLS_H;
 /** The top tile row is the enemies' spawn lane: nothing can be built there. */
 export const SPAWN_ROW = 0;
