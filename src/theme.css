@@ -321,38 +321,6 @@ dialog > small {
   border-radius: 2px;
 }
 
-/* ── The library: a shelf of spines over an oak plank ── */
-.library-shelf {
-  position: relative;
-  padding-top: 10px;
-  background: linear-gradient(#000000c0, #00000070);
-  box-shadow: inset 0 0 0 2px #150f0a;
-}
-.library-shelf::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: -12px;
-  height: 12px;
-  border: 2px solid #150f0a;
-  background: var(--nails), linear-gradient(#ffffff14, #00000070), var(--wood), #3a2616;
-}
-.library-shelf i {
-  background: linear-gradient(90deg, #00000060, transparent 30%, #ffffff18 50%, transparent 70%, #00000070), #6b2a1e;
-  box-shadow: inset 0 6px 0 -3px #d9a95280, inset 0 -8px 0 -5px #d9a95260;
-}
-.library-shelf i:nth-child(3n) { height: 84%; background-color: #2e4a3a; }
-.library-shelf i:nth-child(4n + 1) { height: 62%; background-color: #3b3358; }
-.library-shelf i:nth-child(5n + 2) { height: 92%; background-color: #7a5a2a; }
-.library-shelf i:nth-child(7n) { height: 55%; transform: rotate(-8deg); transform-origin: bottom left; }
-.library-note h3 {
-  color: var(--ink);
-}
-.library-note p {
-  color: var(--ink-soft);
-}
-
 /* ── The tab row: three stone tablets on a lintel; the chosen one is lit ── */
 nav {
   margin-top: 10px;
@@ -495,7 +463,6 @@ nav button > span img {
 
 /* Proclamations, settings and tooltips are written on parchment. */
 .mine-away,
-.library-note,
 .defend-banner,
 .defend-settings,
 .inspect-box,

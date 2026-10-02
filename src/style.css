@@ -1384,28 +1384,17 @@ nav button { position: relative; }
 }
 
 /* ── LIBRARY ────────────────────────────────────────────────────────── */
-.library-shelf {
+/* Laid out like the mine: a header row over a view that fills the tab. */
+.shell:has(#library.active) {
+  min-height: 0;
+}
+#library.active {
   display: flex;
-  align-items: flex-end;
-  gap: 3px;
-  height: 92px;
-  padding: 0 14px;
-  margin: 0 0 18px;
-}
-.library-shelf i {
+  flex-direction: column;
   flex: 1;
-  height: 70%;
-  border-radius: 2px 2px 0 0;
+  min-height: 0;
+  overflow: hidden;
 }
-.library-note {
-  padding: 16px 18px;
-}
-.library-note h3 {
-  margin: 0 0 6px;
-  font-size: 15px;
-}
-.library-note p {
-  margin: 0;
-  font-size: 12px;
-  line-height: 1.7;
+.library-head .mine-hire {
+  min-width: 96px;
 }

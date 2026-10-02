@@ -12,7 +12,7 @@ import type { Weather } from "./defend/weather.ts";
 import { play, soundEnabledBy } from "./sound.ts";
 import { flourishesEnabledBy, replay, sparks, sparksOver } from "./ui/flourish.ts";
 import { MinePage } from "./mine/ui.ts";
-import { renderLibraryPage } from "./ui/library-page.ts";
+import { LibraryPage } from "./library/ui.ts";
 import { stream } from "./random.ts";
 
 // Wires the pages together: builds the shell, loads the save, and routes
@@ -33,6 +33,7 @@ const ctx: AppContext = {
   eraseAll: () => {
     save = defaults();
     minePage.load(null, clock());
+    libraryPage.load(null);
     store();
   },
 };
@@ -84,6 +85,18 @@ const minePage = new MinePage(el("mine"), {
   effects: () => !save.settings.effectsOff,
   newSeed: () => Math.floor(stream("game")() * 4294967296),
 });
+const libraryPage = new LibraryPage(el("library"), {
+  gold: () => save.gold,
+  free: () => save.settings.freePurchases || save.settings.devMode,
+  spendGold: (n) => {
+    save.gold = Math.max(0, save.gold - n);
+    update();
+  },
+  effects: () => !save.settings.effectsOff,
+  newSeed: () => Math.floor(stream("game")() * 4294967296),
+  clock,
+});
+libraryPage.load(save.library);
 /** The mine has paid out since the last save. */
 let mineDirty = false;
 minePage.load(save.mine, clock());
@@ -101,6 +114,7 @@ document.addEventListener("click", (e) => {
 
 function store() {
   save.mine = minePage.snapshot(clock());
+  save.library = libraryPage.snapshot();
   mineDirty = false;
   if (!persist(save)) console.warn("Storage unavailable — progress is only kept for this session.");
 }
@@ -132,7 +146,7 @@ function update() {
 function renderPage() {
   if (tab === "defend") defendPage.show();
   if (tab === "mine") minePage.show();
-  if (tab === "library") renderLibraryPage();
+  if (tab === "library") libraryPage.show();
   if (tab === "upgrades") skillTree.render();
   if (tab === "settings") renderSettingsPage(ctx);
 }
@@ -156,6 +170,7 @@ function frame(time: number) {
   minePage.advance(clock());
   if (tab === "defend") defendPage.frame(time);
   if (tab === "mine") minePage.frame(time);
+  if (tab === "library") libraryPage.frame(time);
   if (mineDirty && time - lastMineSave > 30000) {
     lastMineSave = time;
     store();
@@ -177,6 +192,12 @@ window.addEventListener("pagehide", store);
 
 // Console helper: fast-forward a running defense, optionally forcing the weather.
 (globalThis as { defendDebug?: unknown }).defendDebug = (seconds = 30, weather?: Weather) => defendPage.fastForward(seconds, weather);
+// Console helper: furnish the library and run it some seconds ahead.
+(globalThis as { libraryDebug?: unknown }).libraryDebug = (shelves = 20, librarians = 4, seconds = 60) => {
+  for (let i = 0; i < shelves; i++) libraryPage.sim.buildShelf();
+  for (let i = 0; i < librarians; i++) libraryPage.sim.hire();
+  for (let t = 0; t < seconds * 10; t++) libraryPage.sim.step(0.1);
+};
 // Console helper: run the mine some minutes ahead, optionally hiring miners first.
 (globalThis as { mineDebug?: unknown }).mineDebug = (minutes = 10, hire = 0) => {
   for (let i = 0; i < hire; i++) minePage.sim.hire();

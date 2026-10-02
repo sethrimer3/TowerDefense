@@ -7,6 +7,7 @@ import { SKILLS, SKILL_IDS, type SkillId } from "./skill-trees.ts";
 import type { TrainingJob } from "./training-jobs.ts";
 import { decodeSettings, defaultSettings, type Settings } from "./settings.ts";
 import { decodeMineSave, type MineSave } from "./mine/sim.ts";
+import { decodeLibrarySave, type LibrarySave } from "./library/sim.ts";
 
 export const SAVE_KEY = "towerdefense.v1";
 export const SAVE_VERSION = 1;
@@ -30,6 +31,8 @@ export type Save = {
   defend: DefendSave;
   /** The mine as last saved (null until it first runs). */
   mine: MineSave | null;
+  /** The library's shelves, books, ladders and librarians (null until it first shows). */
+  library: LibrarySave | null;
   settings: Settings;
 };
 
@@ -47,6 +50,7 @@ export function defaults(): Save {
     freeTraining: 0,
     defend: defaultDefendSave(),
     mine: null,
+    library: null,
     settings: defaultSettings(),
   };
 }
@@ -78,6 +82,7 @@ export function decode(raw: string | null): Save {
   d.freeTraining = int(s.freeTraining, 0);
   d.defend = decodeDefendSave(s.defend);
   d.mine = decodeMineSave(s.mine);
+  d.library = decodeLibrarySave(s.library);
   d.settings = decodeSettings(s.settings);
   return d;
 }
