@@ -11,6 +11,8 @@
  * and what happens to it (damage, rebuilding, blasts, movement). What each
  * kind of unit decides to do lives beside it: `enemies.ts`, `troops.ts`,
  * `mages.ts`, `civilians.ts` and `towers.ts`, with grid pathing in `pathing.ts`. */
+import { MAX_WAVE_ENEMIES, buildWave } from "./waves.ts";
+export { buildWave } from "./waves.ts";
 import { dist, sq } from "../exact.ts";
 import { CELL_COUNT, CELLS_H, CELLS_W, cellIndex, cellX, cellY, rng, sideCells } from "./grid.ts";
 import {
@@ -23,8 +25,6 @@ import {
   keepHp,
   wallHp,
   watchRadius,
-  waveCount,
-  waveHpScale,
   NO_BONUSES,
   type Bonuses,
   type EnemyKind,
@@ -171,6 +171,8 @@ export class DefendSim {
   lost = false;
   breakT = 1.5;
   spawnQueue: EnemyKind[] = [];
+  private spawnInterval = 0;
+  private waveSpawned = 0;
   spawnT = 0;
   /** Bumped whenever a building is destroyed or rebuilt (static art changes). */
   mapVersion = 0;
@@ -287,7 +289,7 @@ export class DefendSim {
       if (e.hp > 0) continue;
       this.slain[e.kind]++;
       const splits = ENEMIES[e.kind].splits;
-      if (splits) for (let n = 0; n < splits.count; n++) hatched.push(this.hatch(splits.into, e, n, splits.count));
+      if (splits) for (let n = 0; n < splits.count && this.waveSpawned < MAX_WAVE_ENEMIES; n++, this.waveSpawned++) hatched.push(this.hatch(splits.into, e, n, splits.count));
     }
     this.enemies = this.enemies.filter((e) => e.hp > 0);
     this.enemies.push(...hatched);
@@ -316,7 +318,8 @@ export class DefendSim {
       this.spawnT -= dt;
       while (this.spawnT <= 0 && this.spawnQueue.length) {
         // Release every wave over five seconds, including at the fixed 30 Hz step.
-        this.spawnT += 5 / waveCount(this.wave);
+        if (!this.spawnInterval) this.spawnInterval = 5 / this.spawnQueue.length;
+        this.spawnT += this.spawnInterval;
         this.spawnEnemy(this.spawnQueue.pop()!);
       }
       return;
@@ -328,17 +331,21 @@ export class DefendSim {
       this.wave++;
       this.breakT = BREAK_SECONDS;
       this.spawnQueue = buildWave(this.wave, this.rand);
+      this.spawnInterval = 0;
+      this.waveSpawned = 0;
       this.spawnT = 0;
       this.events.push({ type: "waveStart", wave: this.wave });
     }
   }
 
   private spawnEnemy(kind: EnemyKind) {
+    if (this.waveSpawned >= MAX_WAVE_ENEMIES) return;
     for (let tries = 0; tries < 20; tries++) {
       const x = 1 + this.rand() * (CELLS_W - 2);
       const y = 0.5 + this.rand() * 2;
       if (blocked(this.solid, x, y)) continue;
       this.enemies.push(this.newEnemy(kind, x, y));
+      this.waveSpawned++;
       return;
     }
   }
@@ -358,7 +365,7 @@ export class DefendSim {
   }
 
   private newEnemy(kind: EnemyKind, x: number, y: number): Enemy {
-    const hp = ENEMIES[kind].hp * waveHpScale(this.wave);
+    const hp = ENEMIES[kind].hp;
     return {
       id: this.newId(),
       kind,
@@ -608,22 +615,5 @@ function maxHpOf(b: Building, levels: Levels, bonuses: Readonly<Bonuses>) {
 function streetCells(map: CityMap) {
   const out: number[] = [];
   for (let i = 0; i < CELL_COUNT; i++) if (map.city[i] && map.type[i] === CellType.ROAD) out.push(i);
-  return out;
-}
-
-export function buildWave(wave: number, rand: () => number): EnemyKind[] {
-  const count = waveCount(wave);
-  const bosses = wave > 0 && wave % 10 === 0 ? wave / 10 : 0;
-  const kinds = Object.values(ENEMIES).filter((d) => d.firstWave <= wave && !d.boss && !d.hatched);
-  const out: EnemyKind[] = [];
-  const total = kinds.reduce((s, d) => s + d.weight, 0);
-  while (out.length < count - bosses) {
-    let r = rand() * total;
-    const pick = kinds.find((d) => (r -= d.weight) < 0) ?? kinds[0];
-    out.push(pick.kind);
-  }
-  // Every 10th wave brings warlords — one per ten waves — at the back of
-  // the horde (the queue spawns from its end, so they go at the front).
-  for (let n = 0; n < bosses; n++) out.unshift("warlord");
   return out;
 }

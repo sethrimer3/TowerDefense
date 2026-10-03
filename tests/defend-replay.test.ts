@@ -54,7 +54,7 @@ type Scenario = {
 function scenarios(): Record<string, Scenario> {
   return {
     // Small explicit mixed siege retains late-enemy and ice coverage even
-    // though the new 500-enemy opening overwhelms the old progression fixtures.
+    // as the random difficulty budgets change the natural wave mix.
     mixed: {
       layout: city(SQUARE, [["wizardTower", 0, -2], ["wizardTower", 1, 1], ["barracks", -1, 1], ["archerTower", -1, -1]]),
       citySeed: 13, levels: maxLevels(), seed: 6, seconds: 160, wave: 10,
@@ -75,10 +75,11 @@ function scenarios(): Record<string, Scenario> {
       smash: [[20, "house"], [21, "house"], [30, "wall"], [140, "archerTower"]],
     },
     // Fully upgraded: citywide patrols, hunting archers, safe cannons, many
-    // civilians, under the stress opening (late kinds covered by mixed above).
+    // civilians, against an explicit durable siege that exercises hunting.
     fortress: {
       layout: city(WIDE, [["barracks", 1, 1], ["barracks", -2, 0], ["archerBarracks", -1, -1], ["archerBarracks", 2, 1], ["archerTower", -1, 1], ["archerTower", 0, -3], ["watchTower", 1, -1], ["cannonTower", 2, -2], ["cannonTower", -2, -2]]),
       citySeed: 8, levels: maxLevels(), seed: 9, seconds: 520, speed: 3,
+      opening: Array<EnemyKind>(20).fill("warlord"),
       bombs: [[60, 31.5, 50]],
       smash: [[45, "house"], [46, "wall"], [47, "barracks"]],
     },
@@ -115,7 +116,7 @@ const digest = (value: unknown) =>
 function state(sim: DefendSim) {
   const s = sim as unknown as Record<string, unknown>;
   return [
-    sim.time, sim.wave, sim.lost, sim.breakT, sim.spawnT, sim.spawnQueue, sim.mapVersion, sim.changed.length,
+    sim.time, sim.wave, sim.lost, sim.breakT, sim.spawnT, s.spawnInterval, s.waveSpawned, sim.spawnQueue, sim.mapVersion, sim.changed.length,
     sim.enemies, sim.soldiers, sim.civilians, sim.arrows, sim.shells, sim.flames, sim.frosts, sim.stabs, sim.scorches, sim.effects, sim.events,
     sim.solid, sim.hp, sim.built, sim.flash, sim.field,
     [...(s.towers as { cooldown: Map<number, number> }).cooldown], [...(s.barracks as { training: Map<number, number> }).training], (s.builders as { respawn: number[] }).respawn,
