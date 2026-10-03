@@ -17,7 +17,8 @@ try {
   for (let wave = Number(process.env.PERF_WAVE || 1); wave <= Number(process.env.PERF_WAVE || 20); wave++) {
     // Release previous renderers and their canvases between samples.
     await page.reload();
-    const row = await page.evaluate(async ({ wave, scene, realtime }) => {
+    await cdp.send('HeapProfiler.collectGarbage');
+    const row = await page.evaluate(async ({ wave, scene, realtime, mixed, frames }) => {
       const { DefendSim } = await import('/src/defend/sim.ts');
       const { DefendRenderer } = await import('/src/defend/render.ts');
       const { defaultLayout, fitLayout, placeCityTile, placeStructure } = await import('/src/defend/layout.ts');
@@ -32,8 +33,11 @@ try {
       const map = generateCity(fitLayout(layout), 5);
       const sim = new DefendSim(map, Object.fromEntries(UPGRADES.map(u => [u.id, u.maxLevel])), 42);
       sim.wave = wave;
-      // Identical roach crowd at every wave: measures count independently of HP/mix.
-      for (let i = 0; i < wave * 500; i++) sim.spawnEnemy('roach');
+      // Identical crowd mix at every wave, independently of wave unlocks.
+      for (let i = 0; i < wave * 500; i++) {
+        const k = i % 100;
+        sim.spawnEnemy(!mixed || k < 65 ? 'roach' : k < 80 ? 'orc' : k < 90 ? 'bat' : k < 95 ? 'mother' : k < 99 ? 'ogre' : 'warlord');
+      }
       if (scene === 'city') {
         const { CELLS_W } = await import('/src/defend/grid.ts');
         const cells = [...map.city.keys()].filter(i => map.city[i] && !sim.solid[i]);
@@ -48,22 +52,22 @@ try {
       const canvas = document.querySelector('canvas');
       const renderer = new DefendRenderer(canvas);
       renderer.resize(720, 840);
-      const step = [], draw = [], frame = [];
+      const step = [], draw = [], frame = [], population = [];
       let last = 0;
-      for (let i = 0; i < 150; i++) {
+      for (let i = 0; i < frames; i++) {
         const now = await new Promise(requestAnimationFrame);
         const start = performance.now();
         sim.update(realtime && last ? (now - last) / 1000 : 1 / 60);
         const mid = performance.now();
         renderer.draw(map, sim, null, { grid: false, weather: { rain: true }, night: 1, now, reduceMotion: false, effects: true });
         const end = performance.now();
-        if (i >= 30) { step.push(mid-start); draw.push(end-mid); frame.push(now-last); }
+        if (i >= 30) { step.push(mid-start); draw.push(end-mid); frame.push(now-last); population.push(sim.enemies.length); }
         last = now;
       }
       const mean = a => +(a.reduce((s,v)=>s+v,0)/a.length).toFixed(2);
       const p95 = a => +a.toSorted((a,b)=>a-b)[Math.floor(a.length*.95)].toFixed(2);
-      return { wave, scene, realtime, initialEnemies: wave * 500, enemies: sim.enemies.length, updateMs: mean(step), drawMs: mean(draw), frameP95Ms: p95(frame), fps: +(1000/mean(frame)).toFixed(1) };
-    }, { wave, scene: process.env.PERF_SCENE || 'spawn', realtime: process.env.PERF_REALTIME === '1' });
+      return { wave, scene, realtime, mixed, initialEnemies: wave * 500, enemies: sim.enemies.length, averageEnemies: mean(population), updateMs: mean(step), drawMs: mean(draw), frameP95Ms: p95(frame), fps: +(1000/mean(frame)).toFixed(1) };
+    }, { wave, scene: process.env.PERF_SCENE || 'spawn', realtime: process.env.PERF_REALTIME === '1', mixed: process.env.PERF_MIX === '1', frames: Math.max(31, Number(process.env.PERF_FRAMES || 150)) });
     rows.push(row);
     console.log(JSON.stringify(row));
   }

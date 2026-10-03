@@ -75,7 +75,7 @@ function scenarios(): Record<string, Scenario> {
       smash: [[20, "house"], [21, "house"], [30, "wall"], [140, "archerTower"]],
     },
     // Fully upgraded: citywide patrols, hunting archers, safe cannons, many
-    // civilians; long enough to meet the wave-10 warlords.
+    // civilians, under the stress opening (late kinds covered by mixed above).
     fortress: {
       layout: city(WIDE, [["barracks", 1, 1], ["barracks", -2, 0], ["archerBarracks", -1, -1], ["archerBarracks", 2, 1], ["archerTower", -1, 1], ["archerTower", 0, -3], ["watchTower", 1, -1], ["cannonTower", 2, -2], ["cannonTower", -2, -2]]),
       citySeed: 8, levels: maxLevels(), seed: 9, seconds: 520, speed: 3,

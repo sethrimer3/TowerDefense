@@ -306,7 +306,7 @@ export class DefendLighting {
         this.shadowKey = key;
         const off = this.shadowLayer.getContext('2d')!;
         off.clearRect(0, 0, W, H);
-        this.paintUnitShadows(off, px, units, strength);
+        this.paintUnitShadows(off, px, units, strength, true);
       }
       c.drawImage(this.shadowLayer, 0, 0);
       return;
@@ -315,8 +315,11 @@ export class DefendLighting {
     this.paintUnitShadows(c, px, units, strength);
   }
 
-  private paintUnitShadows(c: CanvasRenderingContext2D, px: number, units: { x: number; y: number; size: number }[], strength: number) {
+  private paintUnitShadows(c: CanvasRenderingContext2D, px: number, units: { x: number; y: number; size: number }[], strength: number, coalesce = false) {
     const buckets: number[][] = [[], [], [], []];
+    // At crowd scale many units cover the same pixel. One shadow per pixel,
+    // size and dominant light avoids tessellating thousands of overlapping paths.
+    const occupied = coalesce ? new Set<string>() : null;
     for (const u of units) {
       const cx = Math.floor(u.x),
         cy = Math.floor(u.y);
@@ -325,6 +328,11 @@ export class DefendLighting {
       const id = this.domId[i];
       const v = this.domVal[i];
       if (id < 0 || v < 0.06) continue;
+      if (occupied) {
+        const key = `${Math.floor(u.x * px)}:${Math.floor(u.y * px)}:${u.size}:${id}`;
+        if (occupied.has(key)) continue;
+        occupied.add(key);
+      }
       const l = this.lights[id];
       let dx = u.x - l.x,
         dy = u.y - l.y;

@@ -146,12 +146,14 @@ export class DefendPage {
    * optionally forcing the weather. */
   fastForward(seconds: number, weather?: Weather) {
     if (!this.sim || this.phase !== "sim") return;
+    this.performance.finish('fast-forward');
     if (weather) this.weather = weather;
     for (let t = 0; t < seconds && this.phase === "sim"; t += 0.25) {
       this.sim.update(0.25 / this.sim.speed);
       this.handleEvents();
       this.fadeNight(0.25);
     }
+    this.performanceEnd = null;
     this.draw();
     this.updateHud();
   }
