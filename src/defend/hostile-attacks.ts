@@ -70,3 +70,25 @@ export function stepBlackHoles(sim: DefendSim, dt: number) {
   }
   sim.blackHoles = sim.blackHoles.filter(h => h.life > 0);
 }
+
+/** Rapid poison ticks affect people only. Lethal clouds check contact every
+ * simulation step, independently of the ordinary attack cooldown. */
+export function stepPoison(sim: DefendSim, dt: number) {
+  if (!Number.isFinite(dt) || dt <= 0) return;
+  for (const e of sim.enemies) {
+    const poison = ENEMIES[e.kind].poison;
+    if (!poison || e.hp <= 0) continue;
+    let hits = 1;
+    if (!poison.lethal) {
+      e.poisonT = (e.poisonT ?? 0) - dt;
+      hits = 0;
+      while (e.poisonT <= 0) { e.poisonT += 0.1; hits++; }
+      if (!hits) continue;
+    }
+    for (const u of [...sim.soldiers, ...sim.civilians]) {
+      if (u.hp <= 0 || sq(u.x - e.x) + sq(u.y - e.y) > sq(poison.radius)) continue;
+      u.hp = poison.lethal ? 0 : Math.max(0, u.hp - poison.damage * hits);
+      u.flash = 0.12;
+    }
+  }
+}

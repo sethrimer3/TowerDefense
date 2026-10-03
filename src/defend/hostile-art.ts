@@ -1,5 +1,26 @@
 import type { Brush } from "./battle-art.ts";
 import type { DefendSim, Enemy } from "./sim.ts";
+import { ENEMIES } from "./catalog.ts";
+
+export function drawPoisonClouds({ c, px }: Brush, sim: DefendSim) {
+  for (const e of sim.enemies) {
+    const poison = ENEMIES[e.kind].poison;
+    if (!poison || e.hp <= 0) continue;
+    const step = .25, pixel = Math.max(1, Math.ceil(px * step));
+    c.save();
+    c.fillStyle = poison.color;
+    for (let y = -poison.radius; y <= poison.radius; y += step) {
+      for (let x = -poison.radius; x <= poison.radius; x += step) {
+        const distance = Math.sqrt(x * x + y * y);
+        if (distance > poison.radius) continue;
+        const haze = Math.sin(x * 3 + sim.time * .7 + e.id) * Math.cos(y * 4 - sim.time * .6);
+        c.globalAlpha = (.09 + (haze + 1) * .055) * (1 - distance / poison.radius * .65);
+        c.fillRect(Math.round((e.x + x) * px), Math.round((e.y + y) * px), pixel, pixel);
+      }
+    }
+    c.restore();
+  }
+}
 
 export function drawHostileMarks({ c, px }: Brush, e: Enemy, { x, y, s }: { x: number; y: number; s: number }) {
   const k = Math.max(1, Math.round(s / 5));

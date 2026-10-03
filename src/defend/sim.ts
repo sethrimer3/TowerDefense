@@ -1,4 +1,4 @@
-import { stepBlackHoles } from "./hostile-attacks.ts";
+import { stepBlackHoles, stepPoison } from "./hostile-attacks.ts";
 /** Real-time DEFEND simulation. Units move freely in continuous cell
  * coordinates (1 unit = 1 cell); the procedural city supplies the solid
  * obstacles. Enemies follow a flow field toward the keep in which buildings
@@ -68,6 +68,7 @@ export type Enemy = {
   dive?: number;
   leader?: number;
   shieldHp?: number;
+  poisonT?: number;
   breath?: { dx: number; dy: number; t: number };
 };
 
@@ -148,7 +149,7 @@ export class DefendSim {
   readonly bonuses: Readonly<Bonuses>;
   /** Enemies slain this run, by kind: what the run pays out. Not part of
    * the replayed state. */
-  readonly slain: Record<EnemyKind, number> = { roach: 0, orc: 0, ogre: 0, bat: 0, warlord: 0, mother: 0, broodling: 0, snake: 0, dragon: 0, shieldBearer: 0, aegis: 0, darkKnight: 0, bombOrc: 0, bombBird: 0, voidSparrow: 0 };
+  readonly slain: Record<EnemyKind, number> = { roach: 0, orc: 0, ogre: 0, bat: 0, warlord: 0, mother: 0, broodling: 0, snake: 0, dragon: 0, shieldBearer: 0, aegis: 0, darkKnight: 0, bombOrc: 0, bombBird: 0, voidSparrow: 0, shieldLesser: 0, shieldGreater: 0, poisonLesser: 0, poisonBearer: 0, poisonGreater: 0, poisonSovereign: 0 };
   /** 1 while a cell is part of a standing (built) building. */
   readonly solid: Uint8Array;
   readonly hp: Float32Array;
@@ -273,6 +274,7 @@ export class DefendSim {
     this.markEnemies();
     this.stepUnits(dt);
     stepBlackHoles(this, dt);
+    stepPoison(this, dt);
     this.sweepAway();
     this.tick(dt);
     if (this.hp[this.keepId] <= 0 && !this.lost) {

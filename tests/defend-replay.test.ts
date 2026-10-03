@@ -56,7 +56,7 @@ function scenarios(): Record<string, Scenario> {
     newEnemies: {
       layout: city(SQUARE, [["barracks", 1, 1], ["archerTower", -1, -1], ["wizardTower", 0, -2]]),
       citySeed: 13, levels: maxLevels(), seed: 6, seconds: 100, wave: 1,
-      opening: ['snake', 'dragon', 'shieldBearer', 'aegis', 'darkKnight', 'bombOrc', 'bombBird', 'voidSparrow'],
+      opening: ['snake', 'dragon', 'shieldBearer', 'aegis', 'darkKnight', 'bombOrc', 'bombBird', 'voidSparrow', 'shieldLesser', 'shieldGreater', 'poisonLesser', 'poisonBearer', 'poisonGreater', 'poisonSovereign'],
     },
     // Small explicit mixed siege retains late-enemy and ice coverage even
     // as the random difficulty budgets change the natural wave mix.
@@ -212,7 +212,7 @@ test("the Defend replays exercise every unit and effect", () => {
       if (sim.built.some((b, id) => b > 0 && b < sim.map.buildings[id].cells.length)) seen.add("half-rebuilt");
     });
   const want = [
-    "enemy:darkKnight", "enemy:bombOrc", "enemy:bombBird", "enemy:voidSparrow", "enemy:snake", "enemy:dragon", "enemy:shieldBearer", "enemy:aegis", "enemy:warlord", "enemy:bat", "enemy:mother", "enemy:broodling", "distracted", "marked", "soldier:sword", "soldier:archer", "path:sword", "path:archer", "hunting",
+    "enemy:shieldLesser", "enemy:shieldGreater", "enemy:poisonLesser", "enemy:poisonBearer", "enemy:poisonGreater", "enemy:poisonSovereign", "enemy:darkKnight", "enemy:bombOrc", "enemy:bombBird", "enemy:voidSparrow", "enemy:snake", "enemy:dragon", "enemy:shieldBearer", "enemy:aegis", "enemy:warlord", "enemy:bat", "enemy:mother", "enemy:broodling", "distracted", "marked", "soldier:sword", "soldier:archer", "path:sword", "path:archer", "hunting",
     "civilian:toJob", "civilian:working", "civilian:home", "arrow", "shell", "flame", "frost", "chilled", "soldier:valkyrie", "stab", "guarded", "soldier:darkWizard", "chained", "lost:bare", "half-rebuilt",
   ];
   assert.deepEqual(want.filter((w) => !seen.has(w)), []);

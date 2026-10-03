@@ -444,3 +444,15 @@ Void Sparrows (5,000,000) create pixel black holes of diameter 1.5 tiles,
 pulsing 300 damage every half-second for eight seconds, with a 15-second
 casting cooldown. Hostile blasts and holes damage troops, civilians and
 buildings, spare enemies and honour valkyrie guards.
+
+
+Shield and poison generators have four difficulty tiers: 1,000, 10,000,
+100,000 and 1,000,000. Their square bodies are respectively 3, 5, 7 and 9
+pixels on the native eight-pixels-per-cell art grid (scaled with the board).
+Both families have aura radii of 2, 4, 6 and 8 cells, and body HP of 200,
+800, 2,400 and 6,000. Shield HP is 600, 3,000, 12,000 and permanent.
+Poison clouds tint from translucent green through muted green and violet to
+purple. They deal 2, 8 or 32 damage every 0.1 seconds at the lower tiers;
+the million-difficulty cloud kills a player unit immediately on contact,
+even during a valkyrie's guard. Poison affects people only and grants no
+protection against ranged attacks. A dead generator loses its cloud.

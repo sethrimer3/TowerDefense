@@ -405,7 +405,7 @@ export const civilianHp = (l: number) => 8 + l * 5;
 export const rebuildSeconds = (l: number) => 3 * intPow(0.82, l);
 export const HOUSE_HP_PER_CELL = 22;
 
-export type EnemyKind = "roach" | "orc" | "ogre" | "bat" | "warlord" | "mother" | "broodling" | "snake" | "dragon" | "shieldBearer" | "aegis" | "darkKnight" | "bombOrc" | "bombBird" | "voidSparrow";
+export type EnemyKind = "roach" | "orc" | "ogre" | "bat" | "warlord" | "mother" | "broodling" | "snake" | "dragon" | "shieldBearer" | "aegis" | "darkKnight" | "bombOrc" | "bombBird" | "voidSparrow" | "shieldLesser" | "shieldGreater" | "poisonLesser" | "poisonBearer" | "poisonGreater" | "poisonSovereign";
 export type EnemyDef = {
   kind: EnemyKind;
   name: string;
@@ -427,6 +427,9 @@ export type EnemyDef = {
   splits?: { into: EnemyKind; count: number };
   /** How much of the wave budget one of these costs. */
   cost: number;
+  /** Body width and height in the city art's eight-pixels-per-cell grid. */
+  bodyPixels?: number;
+  poison?: { radius: number; damage: number; lethal?: boolean; color: string };
   unyielding?: boolean;
   chainLength?: number;
   shield?: { radius: number; hp: number };
@@ -442,13 +445,20 @@ export const ENEMIES: Record<EnemyKind, EnemyDef> = {
   bat: { kind: "bat", name: "Bat", hp: 14, speed: 3.2, damage: 3, cooldown: 0.7, size: 0.3, color: "#8a5bb8", distraction: 0, flying: true, cost: 2 },
   snake: { kind: "snake", name: "Snake", hp: 24, speed: 1.8, damage: 5, cooldown: 0.8, size: 0.26, color: "#71ae48", distraction: 0, flying: false, chainLength: 12, cost: 60 },
   dragon: { kind: "dragon", name: "Dragon", hp: 160, speed: 1.3, damage: 30, cooldown: 2, size: 0.4, color: "#be4935", distraction: 0, flying: true, chainLength: 16, cost: 2500 },
-  shieldBearer: { kind: "shieldBearer", name: "Shield Generator", hp: 800, speed: 0.7, damage: 16, cooldown: 1.5, size: 0.65, color: "#438dcc", distraction: 0, flying: false, shield: { radius: 4, hp: 3000 }, cost: 10000 },
-  aegis: { kind: "aegis", name: "Invincible Shield Generator", hp: 6000, speed: 0.55, damage: 40, cooldown: 1.8, size: 0.85, color: "#a383ef", distraction: 0, flying: false, shield: { radius: 5, hp: Infinity }, cost: 1000000 },
+  shieldBearer: { kind: "shieldBearer", name: "Shield Generator", hp: 800, speed: 0.7, damage: 16, cooldown: 1.5, size: 5 / 8, bodyPixels: 5, color: "#438dcc", distraction: 0, flying: false, shield: { radius: 4, hp: 3000 }, cost: 10000 },
+  aegis: { kind: "aegis", name: "Invincible Shield Generator", hp: 6000, speed: 0.55, damage: 40, cooldown: 1.8, size: 9 / 8, bodyPixels: 9, color: "#a383ef", distraction: 0, flying: false, shield: { radius: 8, hp: Infinity }, cost: 1000000 },
 
   darkKnight: { kind: "darkKnight", name: "Dark Knight", hp: 450, speed: 1, damage: 35, cooldown: 1.5, size: 0.55, color: "#29243b", distraction: 0, flying: false, unyielding: true, cost: 500 },
   bombOrc: { kind: "bombOrc", name: "Kamikaze Orc", hp: 45, speed: 2, damage: 100, cooldown: 1, size: 0.46, color: "#74a04c", distraction: 0, flying: false, cost: 120 },
   bombBird: { kind: "bombBird", name: "Kamikaze Bird", hp: 25, speed: 3.5, damage: 150, cooldown: 1, size: 0.3, color: "#c47a3e", distraction: 0, flying: true, cost: 350 },
   voidSparrow: { kind: "voidSparrow", name: "Void Sparrow", hp: 12000, speed: 1.2, damage: 300, cooldown: 15, size: 0.45, color: "#33214f", distraction: 0, flying: true, cost: 5000000 },
+
+  shieldLesser: { kind: "shieldLesser", name: "Lesser Shield Generator", hp: 200, speed: 0.8, damage: 8, cooldown: 1.5, size: 3 / 8, bodyPixels: 3, color: "#5aacd8", distraction: 0, flying: false, shield: { radius: 2, hp: 600 }, cost: 1000 },
+  shieldGreater: { kind: "shieldGreater", name: "Greater Shield Generator", hp: 2400, speed: 0.6, damage: 28, cooldown: 1.5, size: 7 / 8, bodyPixels: 7, color: "#6865d9", distraction: 0, flying: false, shield: { radius: 6, hp: 12000 }, cost: 100000 },
+  poisonLesser: { kind: "poisonLesser", name: "Lesser Poison Generator", hp: 200, speed: 0.8, damage: 8, cooldown: 1.5, size: 3 / 8, bodyPixels: 3, color: "#65bc57", distraction: 0, flying: false, poison: { radius: 2, damage: 2, color: "#65c64a" }, cost: 1000 },
+  poisonBearer: { kind: "poisonBearer", name: "Poison Generator", hp: 800, speed: 0.7, damage: 16, cooldown: 1.5, size: 5 / 8, bodyPixels: 5, color: "#819d74", distraction: 0, flying: false, poison: { radius: 4, damage: 8, color: "#8aaa6a" }, cost: 10000 },
+  poisonGreater: { kind: "poisonGreater", name: "Greater Poison Generator", hp: 2400, speed: 0.6, damage: 28, cooldown: 1.5, size: 7 / 8, bodyPixels: 7, color: "#a66fc6", distraction: 0, flying: false, poison: { radius: 6, damage: 32, color: "#ad70ce" }, cost: 100000 },
+  poisonSovereign: { kind: "poisonSovereign", name: "Lethal Poison Generator", hp: 6000, speed: 0.55, damage: 40, cooldown: 1.5, size: 9 / 8, bodyPixels: 9, color: "#d55af0", distraction: 0, flying: false, poison: { radius: 8, damage: 0, lethal: true, color: "#d55af0" }, cost: 1000000 },
 
 };
 

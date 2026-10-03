@@ -1,4 +1,4 @@
-import { drawBlackHoles, drawHostileMarks } from "./hostile-art.ts";
+import { drawBlackHoles, drawHostileMarks, drawPoisonClouds } from "./hostile-art.ts";
 /** What DEFEND draws fresh each battle frame over the city layer: struck and
  * damaged buildings, blast scorches, then the units, projectiles and effects.
  * Every painter takes a `Brush`: the board's context and its pixels per cell. */
@@ -58,6 +58,7 @@ export type Burning = (x: number, y: number, id: number) => number;
  * lit while it still burns. */
 export function drawUnits(b: Brush, sim: DefendSim, torches: Burning | null) {
   drawBlackHoles(b, sim);
+  drawPoisonClouds(b, sim);
   drawWatchRadii(b, sim);
   drawCivilians(b, sim, torches);
   const swords = drawSoldiers(b, sim, torches);

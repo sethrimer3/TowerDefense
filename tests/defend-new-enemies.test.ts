@@ -133,3 +133,54 @@ test('Void Sparrow black holes pulse at the requested radius and expire', async 
   stepBlackHoles(sim, 8);
   assert.equal(sim.blackHoles.length, 0);
 });
+
+
+test('shield and poison tiers have matching pixel sizes and escalating stats and radii', () => {
+  const shields = [ENEMIES.shieldLesser, ENEMIES.shieldBearer, ENEMIES.shieldGreater, ENEMIES.aegis];
+  const poisons = [ENEMIES.poisonLesser, ENEMIES.poisonBearer, ENEMIES.poisonGreater, ENEMIES.poisonSovereign];
+  for (const family of [shields, poisons]) {
+    assert.deepEqual(family.map(d => d.cost), [1000, 10000, 100000, 1000000]);
+    assert.deepEqual(family.map(d => d.bodyPixels), [3, 5, 7, 9]);
+    assert.deepEqual(family.map(d => d.size * 8), [3, 5, 7, 9]);
+    assert.deepEqual(family.map(d => d.shield?.radius ?? d.poison!.radius), [2, 4, 6, 8]);
+    for (let n = 1; n < family.length; n++) {
+      assert.ok(family[n].hp > family[n - 1].hp);
+      assert.ok(family[n].damage > family[n - 1].damage);
+    }
+  }
+  assert.deepEqual(shields.map(d => d.shield!.hp), [600, 3000, 12000, Infinity]);
+});
+
+test('poison ticks rapidly, affects civilians and soldiers, and never buildings or ranged attacks', async () => {
+  const { stepPoison } = await import('../src/defend/hostile-attacks.ts');
+  const sim = simulation();
+  const poison = (sim as any).newEnemy('poisonLesser', 10, 10);
+  sim.enemies.push(poison);
+  sim.soldiers.push({ id: 100, x: 10, y: 11, hp: 100, flash: 0, kind: 'sword' } as any,
+    { id: 101, x: 10, y: 12.01, hp: 100, flash: 0, kind: 'sword' } as any);
+  sim.civilians.push({ id: 102, x: 11, y: 10, hp: 100, flash: 0 } as any);
+  const buildingHP = [...sim.hp];
+  stepPoison(sim, 1 / 30);
+  assert.equal(sim.soldiers[0].hp, 98);
+  assert.equal(sim.civilians[0].hp, 98);
+  stepPoison(sim, .1);
+  assert.equal(sim.soldiers[0].hp, 96);
+  assert.equal(sim.soldiers[1].hp, 100);
+  assert.deepEqual([...sim.hp], buildingHP);
+  assert.equal(sim.hurtEnemy(poison, 10), true);
+  assert.equal(poison.hp, 190);
+  poison.hp = 0;
+  stepPoison(sim, .1);
+  assert.equal(sim.soldiers[0].hp, 96);
+});
+
+test('million-tier poison kills on the next contact step, regardless of HP or guard', async () => {
+  const { stepPoison } = await import('../src/defend/hostile-attacks.ts');
+  const sim = simulation();
+  sim.enemies.push((sim as any).newEnemy('poisonSovereign', 10, 10));
+  sim.soldiers.push({ id: 100, x: 10, y: 17.9, hp: 1e12, flash: 0, kind: 'valkyrie', guard: 10 } as any,
+    { id: 101, x: 10, y: 18.01, hp: 100, flash: 0, kind: 'sword' } as any);
+  stepPoison(sim, 1 / 30);
+  assert.equal(sim.soldiers[0].hp, 0);
+  assert.equal(sim.soldiers[1].hp, 100);
+});
