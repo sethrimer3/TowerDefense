@@ -42,8 +42,16 @@ const ready = (img?: HTMLImageElement): img is HTMLImageElement => !!img?.comple
 
 /** The mossy flagstone floor tiles (floor-1..4.png) specifically: drawn in
  * their PNG orientation (rotating them made the baked-in lighting look
- * wrong) and grown 15% past their tile so the gaps between them close up. */
-const FLOOR_TILE_SCALE = 1.15;
+ * wrong). Each PNG's flagstones fill an 80 px square inside a transparent
+ * margin that differs a pixel or so between them; only that square is drawn,
+ * edge to edge over its board tile, so the tiles meet without gaps. */
+const FLOOR_CROP = [
+  { x: 8, y: 6 },
+  { x: 8, y: 6 },
+  { x: 9, y: 6 },
+  { x: 9, y: 6 },
+];
+const FLOOR_SIZE = 80;
 
 /** Wall sprites, in source pixels. wall-cap.png holds a vertical run of
  * mossy cap stones at x 38–54, lit from the left; each wall cell shows a
@@ -128,17 +136,19 @@ export function paintFloor(c: CanvasRenderingContext2D, px: number) {
   c.fillRect(0, 0, width, height);
   for (let ty = 0; ty < TILES_H; ty++)
     for (let tx = 0; tx < TILES_W; tx++) {
-      const img = floorImages[hash(tx, ty, 3) % 4];
-      const x = Math.floor(tx * T),
-        y = Math.floor(ty * T),
-        s = Math.ceil(T) + 1;
+      const k = hash(tx, ty, 3) % 4;
+      const img = floorImages[k];
+      // Whole pixels, each tile ending where the next begins.
+      const x = Math.round(tx * T),
+        y = Math.round(ty * T),
+        w = Math.round((tx + 1) * T) - x,
+        h = Math.round((ty + 1) * T) - y;
       if (ready(img)) {
-        // Mossy floor tiles only: unrotated, grown 15% about their centre.
-        const g = s * FLOOR_TILE_SCALE;
-        c.drawImage(img, x + (s - g) / 2, y + (s - g) / 2, g, g);
+        const { x: sx, y: sy } = FLOOR_CROP[k];
+        c.drawImage(img, sx, sy, FLOOR_SIZE, FLOOR_SIZE, x, y, w, h);
       } else {
         c.fillStyle = "#2c3a26";
-        c.fillRect(x, y, s, s);
+        c.fillRect(x, y, w, h);
       }
     }
 }
@@ -309,7 +319,33 @@ function paintWall(p: Paint, b: Building) {
   paintWallEdges(p, { x, y }, standing);
   const stage = stageOf(sim, b);
   if (stage) paintArt(p, wallDamageSprite(stage, lotSeed(b)), { x, y, w: Math.round((cx + 1) * px) - x, h: Math.round((cy + 1) * px) - y });
-  if (!standing(0, 1) && cy + 1 < CELLS_H) paintWallFace(p, cx, { x, y });
+  const face = !standing(0, 1) && cy + 1 < CELLS_H;
+  if (face) paintWallFace(p, cx, { x, y });
+  paintWallOutline(p, { x, y, w: Math.round((cx + 1) * px) - x, h: Math.round((cy + 1) * px) - y }, standing, face);
+}
+
+/** A thin black outline, one art pixel wide like the buildings', round the
+ * standing wall: on every side of the stone at `at` with no standing
+ * neighbour, carried down the sides and along the foot of its hanging face. */
+function paintWallOutline(
+  { c, px }: Paint,
+  { x, y, w, h }: { x: number; y: number; w: number; h: number },
+  standing: (dx: number, dy: number) => boolean,
+  face: boolean,
+) {
+  const o = Math.max(1, Math.round(px / ART));
+  const foot = face ? y + h + Math.round(px * 0.45) : y + h;
+  // A neighbour's face carries this one's on to the side.
+  const faced = (dx: number) => standing(dx, 0) && !standing(dx, 1);
+  c.fillStyle = "#000";
+  if (!standing(0, -1)) c.fillRect(x, y, w, o);
+  if (!standing(-1, 0)) c.fillRect(x, y, o, h);
+  if (!standing(1, 0)) c.fillRect(x + w - o, y, o, h);
+  if (face) {
+    if (!faced(-1)) c.fillRect(x, y + h, o, foot - y - h);
+    if (!faced(1)) c.fillRect(x + w - o, y + h, o, foot - y - h);
+  }
+  if (!standing(0, 1)) c.fillRect(x, foot - o, w, o);
 }
 
 /** Shaded sides and a lit top edge wherever the stone at `at` (canvas
