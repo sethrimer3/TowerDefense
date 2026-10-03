@@ -1501,6 +1501,11 @@ nav button { position: relative; }
 .job-mine { --hat: #f2c230; --coat: #f4f2ec; }
 .job-forge { --hat: #8d929c; --coat: #f4f2ec; }
 .job-smith { --hat: #f4e6d4; --coat: #7a4a26; }
+/* The Library's roles: a shelver's plain cap and smock, a professor's
+   mortarboard and blue gown, a researcher's pointed hat and violet robe. */
+.job-shelver { --hat: #c8a050; --coat: #f0ece4; }
+.job-professor { --hat: #16141a; --coat: #687cc8; }
+.job-researcher { --hat: #3a2a6a; --coat: #a068d2; }
 /* Over the view: the crew's list, the prospect, and moving on. */
 .mine-tools {
   display: flex;

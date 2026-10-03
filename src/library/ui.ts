@@ -1,5 +1,7 @@
-/** The Library tab: the cathedral's view, and buying bookshelves and
- * librarians for it. The library works whatever tab shows (`advance`, from
+/** The Library tab: the cathedral's view (panning down to the alchemy lab
+ * under it), buying bookshelves and librarians, and the staff's list (each
+ * librarian by name, dragged between the three roles: shelvers, professors,
+ * researchers; tapped to follow). The library works whatever tab shows (`advance`, from
  * the app's frame loop) and earns Knowledge on the wall clock. While the game
  * is closed (on loading, the time away up to `MAX_AWAY_MS`, or time added by
  * the dev option, `addAway`) it is reckoned an hour at a time (`idleHours`):
@@ -9,7 +11,7 @@
 import { play } from "../sound.ts";
 import { HOUR_MS, MAX_AWAY_MS } from "../away.ts";
 import { random } from "../random.ts";
-import { MAX_LIBRARIANS, MAX_SHELVES, LibrarySim, idleFireChance, idleHours, librarianPrice, shelfPrice, type LibrarySave } from "./sim.ts";
+import { H, LAB_FLOOR, MAX_LIBRARIANS, MAX_SHELVES, LibrarySim, ROLES, RETURN_BOOKS, idleFireChance, idleHours, librarianPrice, shelfPrice, type Librarian, type LibrarySave, type Role } from "./sim.ts";
 
 import { LibraryRenderer, daylight } from "./render.ts";
 
@@ -39,6 +41,14 @@ export interface LibraryHost {
   showing(): boolean;
 }
 
+const ROLE: Record<Role, { name: string; one: string; hint: string }> = {
+  shelver: { name: "Shelvers", one: "shelver", hint: "Shelvers build shelves and ladders, wheel the carts, shelve and sort the books, and fight fires" },
+  professor: { name: "Professors", one: "professor", hint: "Professors read the books, a book once each, for Knowledge: built shelves times professors an hour" },
+  researcher: { name: "Researchers", one: "researcher", hint: "Researchers work the alchemy lab below; with none, the Upgrades tab's Knowledge research can't be bought" },
+};
+const escape = (s: string) => s.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
+const plural = (k: number, one: string) => `${k} ${one}${k === 1 ? "" : "s"}`;
+
 export class LibraryPage {
   sim!: LibrarySim;
   private root: HTMLElement;
@@ -50,6 +60,9 @@ export class LibraryPage {
   private ranTo = 0;
   private paidTo = 0;
   private burning = false;
+  private shownStaff = "";
+  /** A name being dragged in the staff's list (the list holds still). */
+  private dragging = false;
   /** Knowledge earned over the time away (paid by the next `advance`), and
    * what became of the library, for the welcome-back screen. */
   awayKnowledge = 0;
@@ -133,7 +146,18 @@ export class LibraryPage {
         <button id="library-hire" class="mine-hire"></button>
         <p id="library-tally" class="mine-tally"></p>
       </div>
-      <div class="mine-view library-view"><canvas id="library-canvas" aria-label="The library"></canvas><p id="library-alert" class="mine-away library-alert" role="status" hidden></p></div>`;
+      <div class="mine-tools">
+        <button id="library-staff-toggle" class="mine-crew-toggle" aria-pressed="false" aria-controls="library-staff">☰ Staff</button>
+        <p id="library-roles" class="mine-prospect"></p>
+        <button id="library-lab" class="library-lab" title="Pan down to the alchemy lab, or back up">⤓ Lab</button>
+      </div>
+      <div class="mine-body" id="library-body">
+        <aside class="mine-crew" id="library-staff" aria-label="The staff" aria-hidden="true">
+          ${ROLES.map((r) => `<section class="crew-box" data-role="${r}" title="${ROLE[r].hint}"><h3><i class="job-mark job-${r}"></i>${ROLE[r].name} <b data-count="${r}">0</b></h3><ul></ul></section>`).join("")}
+          <p class="crew-hint">Drag a name to another role. Tap one to follow them. Researchers work the lab below the nave: with none, Knowledge research in the Upgrades tab can't be bought.</p>
+        </aside>
+        <div class="mine-view library-view"><canvas id="library-canvas" aria-label="The library"></canvas><p id="library-alert" class="mine-away library-alert" role="status" hidden></p></div>
+      </div>`;
     const canvas = this.root.querySelector<HTMLCanvasElement>("#library-canvas")!;
     this.renderer = new LibraryRenderer(canvas);
     this.root.querySelector<HTMLButtonElement>("#library-shelf")!.onclick = () => this.buy(shelfPrice(this.sim.shelves), () => this.sim.buildShelf());
@@ -142,7 +166,92 @@ export class LibraryPage {
       if (!this.sim.fire.active) this.sim.lost = null;
     };
     this.root.querySelector<HTMLButtonElement>("#library-hire")!.onclick = () => this.buy(librarianPrice(this.sim.hired), () => this.sim.hire());
+    const toggle = this.root.querySelector<HTMLButtonElement>("#library-staff-toggle")!;
+    toggle.onclick = () => {
+      const open = toggle.getAttribute("aria-pressed") !== "true";
+      toggle.setAttribute("aria-pressed", String(open));
+      this.root.querySelector("#library-body")!.classList.toggle("crew-open", open);
+      this.root.querySelector("#library-staff")!.setAttribute("aria-hidden", String(!open));
+    };
+    this.root.querySelector<HTMLButtonElement>("#library-lab")!.onclick = () => {
+      const r = this.renderer!;
+      r.target = null;
+      r.goal = r.inLab ? H / 2 : LAB_FLOOR - 52;
+      this.shownStaff = "";
+    };
     this.bindView(canvas);
+    this.bindStaff(this.root.querySelector<HTMLElement>("#library-staff")!);
+  }
+
+  /** The staff's list: a name pressed and dragged goes to the role it is
+   * dropped on; one tapped is followed (tapped again, let go). */
+  private bindStaff(panel: HTMLElement) {
+    let press: { id: number; x: number; y: number; item: HTMLElement } | null = null, ghost: HTMLElement | null = null;
+    const boxAt = (x: number, y: number) => (document.elementFromPoint(x, y) as Element | null)?.closest<HTMLElement>(".crew-box") ?? null;
+    const mark = (box: HTMLElement | null) => panel.querySelectorAll(".crew-box").forEach((b) => b.classList.toggle("drop", b === box));
+    panel.onpointerdown = (e) => {
+      const item = (e.target as Element).closest<HTMLElement>(".crew-member");
+      if (!item || press) return;
+      press = { id: e.pointerId, x: e.clientX, y: e.clientY, item };
+      item.setPointerCapture(e.pointerId);
+    };
+    panel.onpointermove = (e) => {
+      if (!press || e.pointerId !== press.id) return;
+      if (!ghost && Math.hypot(e.clientX - press.x, e.clientY - press.y) > 6) {
+        this.dragging = true;
+        ghost = press.item.cloneNode(true) as HTMLElement;
+        ghost.classList.add("crew-ghost");
+        document.body.append(ghost);
+        press.item.classList.add("lifted");
+      }
+      if (!ghost) return;
+      ghost.style.left = `${e.clientX}px`;
+      ghost.style.top = `${e.clientY}px`;
+      mark(boxAt(e.clientX, e.clientY));
+    };
+    const finish = (e: PointerEvent, cancel: boolean) => {
+      if (!press || e.pointerId !== press.id) return;
+      const item = press.item, l = this.librarianOf(item);
+      press = null;
+      if (ghost) {
+        ghost.remove();
+        ghost = null;
+        this.dragging = false;
+        mark(null);
+        const box = cancel ? null : boxAt(e.clientX, e.clientY);
+        if (box && l && this.sim.setRole(l, box.dataset.role as Role)) play("knock");
+        this.shownStaff = this.shown = "";
+        this.refresh();
+        return;
+      }
+      if (cancel || !this.renderer) return;
+      this.renderer.target = l && l !== this.renderer.target ? l : null;
+      this.renderer.goal = null;
+      this.refresh();
+    };
+    panel.onpointerup = (e) => finish(e, false);
+    panel.onpointercancel = (e) => finish(e, true);
+  }
+  private librarianOf(item: HTMLElement): Librarian | null {
+    return this.sim.librarians.find((l) => String(l.id) === item.dataset.id) ?? null;
+  }
+
+  /** The staff's list, rebuilt when the staff, their roles or the librarian
+   * followed change (not while a name is held). */
+  private refreshStaff() {
+    if (this.dragging) return;
+    const sim = this.sim, target = this.renderer?.target ?? null;
+    const key = sim.librarians.map((l) => `${l.id}:${l.role}:${l.home}`).join(",") + "|" + (target?.id ?? "");
+    if (key === this.shownStaff) return;
+    this.shownStaff = key;
+    for (const role of ROLES) {
+      const box = this.root.querySelector<HTMLElement>(`.crew-box[data-role="${role}"]`)!;
+      const staff = sim.librarians.filter((l) => l.role === role);
+      box.querySelector("[data-count]")!.textContent = String(staff.length);
+      box.querySelector("ul")!.innerHTML = staff
+        .map((l) => `<li class="crew-member${l === target ? " selected" : ""}" data-id="${l.id}"${l.home ? ` title="Home for the night"` : ""}><i class="job-mark job-${role}"></i><span>${escape(l.name)}</span>${l.home ? `<i class="busy-mark" aria-hidden="true">☾</i>` : ""}</li>`)
+        .join("");
+    }
   }
 
   /** Drag pans a zoomed view; double-tap, pinch or Ctrl-wheel zooms. */
@@ -210,8 +319,11 @@ export class LibraryPage {
     const sp = shelfPrice(sim.shelves), lp = librarianPrice(sim.hired);
     const shelvesFull = sim.shelves >= MAX_SHELVES, crewFull = sim.librarians.length >= MAX_LIBRARIANS;
     const fire = sim.fire.active, lost = sim.lost;
-    const home = sim.librarians.filter((l) => l.home).length;
-    const key = `${home}|${sim.shelves}|${sim.built}|${sim.librarians.length}|${free || gold >= sp}|${free || gold >= lp}|${sim.books}|${fire}|${lost ? `${lost.shelves},${lost.librarians},${lost.books}` : ""}`;
+    const home = sim.librarians.filter((l) => l.home).length, roles = sim.roles;
+    this.refreshStaff();
+    const lab = this.root.querySelector<HTMLButtonElement>("#library-lab")!, inLab = this.renderer ? (this.renderer.goal ?? this.renderer.focus.y) > H : false;
+    lab.textContent = inLab ? "⤒ Nave" : "⤓ Lab";
+    const key = `${home}|${sim.shelves}|${sim.built}|${sim.librarians.length}|${ROLES.map((r) => roles[r]).join(",")}|${free || gold >= sp}|${free || gold >= lp}|${sim.fresh}|${sim.returns.length}|${fire}|${lost ? `${lost.shelves},${lost.librarians},${lost.books}` : ""}`;
     if (key === this.shown) return;
     this.shown = key;
     const shelf = this.root.querySelector<HTMLButtonElement>("#library-shelf")!, hire = this.root.querySelector<HTMLButtonElement>("#library-hire")!;
@@ -221,9 +333,9 @@ export class LibraryPage {
     hire.disabled = crewFull || !(free || gold >= lp);
     const n = sim.librarians.length, planned = sim.shelves - sim.built;
     this.root.querySelector("#library-tally")!.innerHTML =
-      `<b>${sim.built}</b>/${MAX_SHELVES} shelves${planned ? ` (+${planned} to build)` : ""} · <b>${n}</b> ${n === 1 ? "librarian" : "librarians"}${home ? ` (${home} home for the night)` : ""}<br><b>${sim.books}</b> books · <b>${sim.rate}</b> Knowledge an hour`;
+      `<b>${sim.built}</b>/${MAX_SHELVES} shelves${planned ? ` (+${planned} to build)` : ""} · <b>${n}</b> ${n === 1 ? "librarian" : "librarians"}${home ? ` (${home} home for the night)` : ""}<br><b>${sim.fresh}</b> books to read · <b>${sim.returns.length}</b>/${RETURN_BOOKS} read · <b>${sim.rate}</b> Knowledge an hour`;
+    this.root.querySelector("#library-roles")!.innerHTML = ROLES.map((r) => `<b>${roles[r]}</b> ${roles[r] === 1 ? ROLE[r].one : ROLE[r].name.toLowerCase()}`).join(" · ");
     const alert = this.root.querySelector<HTMLElement>("#library-alert")!;
-    const plural = (k: number, one: string) => `${k} ${one}${k === 1 ? "" : "s"}`;
     if (fire) alert.textContent = "Fire! A candle has caught a table. The librarians are fighting it with buckets from the water butts.";
     else if (lost) {
       const losses = [lost.shelves && plural(lost.shelves, "shelf").replace("shelfs", "shelves"), lost.librarians && plural(lost.librarians, "librarian"), lost.books && plural(lost.books, "book")].filter(Boolean);

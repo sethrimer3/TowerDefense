@@ -208,7 +208,10 @@ export class SkillTreePage {
       return;
     }
     const level = skillRank(this.save, id);
+    // Knowledge research needs someone in the Library's lab to do it.
+    if (!this.ctx.researchers()) return this.render();
     if (buySkill(this.save, id)) {
+      this.ctx.researched();
       play(level === 0 ? "unlock" : "chime");
       if (!this.save.settings.reduceMotion) {
         // The first rank unlocks the node: it shines as well as bursting.
@@ -230,8 +233,9 @@ export class SkillTreePage {
     else if (requirements.length) hint = `Requires: ${requirements.join(" + ")} (one rank each).`;
     else if (!available) hint = "Locked.";
     else if (!canBuy) hint = `Need ${price} Knowledge · have ${whole(save.knowledge)}.`;
+    else if (!this.ctx.researchers()) hint = "Needs a researcher: put a librarian to the alchemy lab in the Library's staff list.";
     else hint = "Tap again to purchase.";
-    return `<b style="color:var(--tree-color)">${skill.name}</b><div>${level} / ${skill.max} ranks</div><div>${skill.text}.</div><div class="${canBuy ? "safe" : ""}">${hint}</div>${maxed ? "" : `<div>Cost: ${price} Knowledge</div>`}`;
+    return `<b style="color:var(--tree-color)">${skill.name}</b><div>${level} / ${skill.max} ranks</div><div>${skill.text}.</div><div class="${canBuy && this.ctx.researchers() ? "safe" : ""}">${hint}</div>${maxed ? "" : `<div>Cost: ${price} Knowledge</div>`}`;
   }
 
   /** Above the selected node, or below it when there is no room above. */

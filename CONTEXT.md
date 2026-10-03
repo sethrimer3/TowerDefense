@@ -71,7 +71,7 @@ Paid for each wave held (copper) and each boss wave held (silver). Spent, with G
 The time since the game was last saved, up to a day. The Library earns Knowledge for all of it; the Mine works through the first two hours tick by tick and is paid for the rest at its **smithy's pace** (the Smithy points an hour it has lately made). The welcome-back screen totals both when the game opens.
 
 **Knowledge**:
-Earned by the Library, an hour's worth being its built bookshelves times its librarians (idle too), and paid for each wave held past the best wave; spent on the skill trees. Once called Valor.
+Earned by the Library, an hour's worth being its built bookshelves times its professors (idle too), and paid for each wave held past the best wave; spent on the skill trees. Once called Valor.
 
 **Freak accident** (Library):
 A table's candle catching it alight: a small chance each minute, lowered by Fireproof Wood. The fire burns whatever it reaches until it burns out or the librarians put it out (Fire Training).
@@ -92,7 +92,7 @@ Copper, silver or gold: every hundred bars of a metal the mine's smiths work mak
 A miner put to the smithy. The smiths are the Smithy's hands: how many ranks can be worked at once, and how fast.
 
 **Skill tree**:
-Command and Stewardship (for Defend), Mine and Library: ranked skills bought with Knowledge, each needing the skills above it.
+Command and Stewardship (for Defend), Mine and Library: ranked skills bought with Knowledge, each needing the skills above it, and a researcher in the Library's alchemy lab.
 
 ### Presentation
 
@@ -236,10 +236,22 @@ A miner killed by a fall of ground, drowning, starvation, lava, fire or lightnin
 ### The library
 
 **Library**:
-A dark cathedral nave the player fills with bookshelves and librarians. It gives nothing yet.
+A dark cathedral nave the player fills with bookshelves and librarians, earning Knowledge, with the alchemy lab below it.
 
 **Bookshelf**:
 A unit of two rows of books; units stack bay by bay up the nave to just under the stained-glass window.
 
 **Librarian**:
-A scholar the player hires with Gold. Librarians put up ladders and shuffle books between shelves; some sit at the tables indexing.
+A scholar the player hires with Gold, put to one of three **roles** in the Staff list, each with a name for life.
+
+**Shelver**:
+A librarian who keeps the stacks: builds shelves and ladders, wheels the carts, shelves and sorts the books, fights fires, refills the water butts and sweeps up. With no shelvers, the professors do it.
+
+**Professor**:
+A librarian who reads. Each book can be read once; a book read has had its knowledge used up and goes on the **return shelf**. Knowledge an hour is built shelves times professors.
+
+**Return shelf**:
+A low stand on the nave's floor for the books the professors have read. When it fills, a shelver loads them into the cart and wheels them out, bringing back fresh books for the gaps.
+
+**Researcher**:
+A librarian who works the **alchemy lab**, a vaulted cellar under the nave reached by a ladder from a trapdoor: stoking the athanor, brewing at the cauldron, distilling, studying, chanting at the transmutation circle. With no researcher, the skill trees' Knowledge research can't be bought.
