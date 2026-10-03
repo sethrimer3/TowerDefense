@@ -33,7 +33,7 @@ holds it against endless waves. Code lives in `src/defend/`.
 ## Building (before a run)
 
 - The **palette** (left by default; the ⚙ settings move it to the right) lists
-  city tiles, barracks, archer towers and watch towers with an `×N` count of
+  city tiles, barracks, archer barracks, Mage Guilds and the towers with an `×N` count of
   what is owned but not yet placed; it greys out at `×0`.
 - Drag from the palette onto the board. While dragging, every tile that would
   accept the item gets a faint gold outline and every other tile darkens; the
@@ -45,7 +45,7 @@ holds it against endless waves. Code lives in `src/defend/`.
   can only be lifted if the city stays connected and it holds no buildings.
 - **The keep** can be moved onto any other city tile (the two swap) but never
   removed.
-- **Barracks** and **archer barracks** must be inside the city. **Archer**, **cannon** and **watch
+- **Barracks**, **archer barracks** and the **Mage Guild** must be inside the city. **Archer**, **cannon** and **watch
   towers** may stand inside or outside; outside they sit off-centre in their tile.
 - Several structures share a tile while they fit. The game picks each
   structure's exact cells (`fitLayout`): oldest first, never touching another
@@ -119,7 +119,9 @@ holds it against endless waves. Code lives in `src/defend/`.
   structures are pixel art at 8 pixels a cell (a red-roofed barracks with
   a blue shield on the ridge, the archers' timber hall and target yard,
   the crenellated archer tower, the round cannon bastion, the watch tower's
-  beacon in its brazier, the wizard's violet roof), houses damage their
+  beacon in its brazier, the wizard's violet roof, the Mage Guild's dark
+  wine-red hall with a fire well burning in a brass ring, ember runes and
+  two red swallowtail banners over its south wall), houses damage their
   shingled roofs, and wall stones take an overlay of cracks and pits. A
   fallen building leaves its own rubble: stumps of its walls round a heap
   of stone and roofing with charred beams and embers, and a fallen wall
@@ -163,6 +165,15 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   streets and stop to shoot anything within their short sight (3 cells,
   widened by Keen eyes). The pricey one-off Hunter's instinct makes them
   path toward the nearest enemy in the city instead, stopping at bow range.
+- **Mage Guilds** (`mages.ts`) train fire mages (same garrison size, drill
+  speed and arms upgrades as the barracks). Mages wander the streets like
+  archers and, when an enemy comes within 4.5 cells, stop and hurl a
+  fireball at where it stands. It bursts with splash damage (full at the
+  centre, 40% at the edge, fliers too) that spares your own people, and
+  leaves a **blaze**: burning ground that hurts every ground enemy inside it
+  each second until it dies down (fliers pass over). Upgraded by Pyroclasm
+  (fireball damage and burst) and Lingering embers (how long and how hot
+  the ground burns) in the Armory.
 - **Patrol routes** (Armory) widens how far from their barracks swordsmen
   go after enemies; its last level sends them anywhere inside the city.
 - **Cannon towers** fire slowly at the nearest ground enemy (not bats),
@@ -252,6 +263,15 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   glint, a lit rim and a dark edge on the far side, so every shard catches
   the light the same way; a flame nearby warms the facets facing it.
   Chilled enemies wear a frosty sheen.
+- **Fire mage art** (`mage-art.ts`): the mages are 7 × 8 pixel sprites
+  (pointed hat, red robe lit from the upper left, gold belt, a black
+  outline) drawn up crisp, with a flame flickering in hand while the next
+  fireball is ready. A fireball is a ball of fire inside a dark rim,
+  white-hot at its heart, arcing low over the street with a trail of
+  sparks cooling to smoke, and bursts in the usual blast. A blaze is a
+  dithered scorch strewn with flaring embers, with tongues of pixel flame
+  rising and dying back in new spots over it, thinning as it dies down;
+  blazes and fireballs light the streets round them.
 - **Ground relief** (`ground-relief.ts`): a bump map for the flagstones
   outside the city, cut from the art's brightness and baked into four
   facing masks. Each light (tower fires and lanterns baked once; wizard

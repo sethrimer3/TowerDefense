@@ -10,7 +10,7 @@
  * `DefendSim` owns the world (buildings, crowds, waves, the enemy index)
  * and what happens to it (damage, rebuilding, blasts, movement). What each
  * kind of unit decides to do lives beside it: `enemies.ts`, `troops.ts`,
- * `civilians.ts` and `towers.ts`, with grid pathing in `pathing.ts`. */
+ * `mages.ts`, `civilians.ts` and `towers.ts`, with grid pathing in `pathing.ts`. */
 import { dist, sq } from "../exact.ts";
 import { CELL_COUNT, CELLS_H, CELLS_W, cellIndex, cellX, cellY, rng, sideCells } from "./grid.ts";
 import {
@@ -36,6 +36,7 @@ import { stepEnemy } from "./enemies.ts";
 import { blocked, cellAt, cellCenter, center, fillFlowField, nearest, nearestOpen, type FieldTerrain, type Point } from "./pathing.ts";
 import { stepArrows, stepShells, Towers } from "./towers.ts";
 import { Barracks, stepArcher, stepSwordsman } from "./troops.ts";
+import { stepBlazes, stepFireballs, stepMage, type Blaze, type Fireball } from "./mages.ts";
 import { Wizards, stepFlames, stepFrosts, type Flame, type Frost } from "./wizard.ts";
 
 export type Levels = Record<UpgradeId, number>;
@@ -63,8 +64,9 @@ export type Enemy = {
 
 export type Soldier = {
   id: number;
-  /** Swordsmen chase and hack; archers roam and shoot. */
-  kind: "sword" | "archer";
+  /** Swordsmen chase and hack; archers roam and shoot; fire mages roam
+   * and hurl fireballs. */
+  kind: "sword" | "archer" | "mage";
   home: number;
   x: number;
   y: number;
@@ -146,6 +148,9 @@ export class DefendSim {
   /** Wizard towers' fire and ice. */
   flames: Flame[] = [];
   frosts: Frost[] = [];
+  /** Fire mages' fireballs in flight, and the ground they set burning. */
+  fireballs: Fireball[] = [];
+  blazes: Blaze[] = [];
   scorches: Scorch[] = [];
   effects: Effect[] = [];
   events: SimEvent[] = [];
@@ -256,7 +261,9 @@ export class DefendSim {
     stepFlames(this, this.wizards, dt);
     stepFrosts(this, dt);
     this.barracks.step(this, dt);
-    for (const s of this.soldiers) (s.kind === "archer" ? stepArcher : stepSwordsman)(this, s, dt);
+    for (const s of this.soldiers) (s.kind === "archer" ? stepArcher : s.kind === "mage" ? stepMage : stepSwordsman)(this, s, dt);
+    stepFireballs(this, dt);
+    stepBlazes(this, dt);
     this.builders.step(this, dt);
   }
 
@@ -411,10 +418,12 @@ export class DefendSim {
   }
 
   // ── Damage and rebuilding ─────────────────────────────────────────────
-  hurtEnemy(e: Enemy, amount: number) {
+  /** Hurts `e` (double when marked); a steady burn hurts it without the
+   * flash of a blow. */
+  hurtEnemy(e: Enemy, amount: number, flash = true) {
     if (e.hp <= 0) return;
     e.hp -= e.marked ? amount * 2 : amount;
-    e.flash = 0.12;
+    if (flash) e.flash = 0.12;
     if (e.hp <= 0) this.effects.push({ kind: "spark", x: e.x, y: e.y, t: 0, r: ENEMIES[e.kind].size });
   }
 
@@ -463,8 +472,9 @@ export class DefendSim {
     }
   }
 
-  /** A blast: full damage at the centre falling to 40% at the edge. */
-  explode(x: number, y: number, { r, damage, friendlyFire }: Blast) {
+  /** A blast: full damage at the centre falling to 40% at the edge. Returns
+   * the seed its fireball and scorch are drawn from. */
+  explode(x: number, y: number, { r, damage, friendlyFire }: Blast): number {
     this.indexEnemies();
     const hit = (d: number) => damage * (1 - 0.6 * Math.min(1, d / r));
     for (const e of this.enemiesNear(x, y, r)) this.hurtEnemy(e, hit(dist(e.x - x, e.y - y)));
@@ -478,6 +488,7 @@ export class DefendSim {
     const seed = (this.rand() * 1e9) | 0;
     this.effects.push({ kind: "boom", x, y, t: 0, r, seed });
     this.scorches.push({ x, y, r, seed, t: 0, life: 1 + Math.min(2, r * 0.45) + this.rand() * 0.5 });
+    return seed;
   }
 
   // ── Movement ──────────────────────────────────────────────────────────

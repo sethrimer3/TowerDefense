@@ -2,12 +2,15 @@
  * enemies within their leash of the barracks (anywhere in the city at the
  * last Patrol routes level) and head home when there's nothing to fight;
  * archers roam the streets, shooting whatever comes within sight, or with
- * Hunter's instinct path toward the nearest enemy in the city. */
+ * Hunter's instinct path toward the nearest enemy in the city. A Mage
+ * Guild trains fire mages the same way (`mages.ts`). */
 import { dist, sq } from "../exact.ts";
 import {
   ARCHER_UNIT,
   archerUnitRange,
   ENEMIES,
+  FIRE_MAGE,
+  fireballDamage,
   SOLDIER,
   soldierCap,
   soldierLeash,
@@ -54,13 +57,13 @@ export class Barracks {
   private recruit(sim: DefendSim, b: Building) {
     const door = sim.doorOf(b);
     if (door < 0) return;
-    const archer = b.kind === "archerBarracks";
+    const kind = b.kind === "archerBarracks" ? "archer" : b.kind === "mageGuild" ? "mage" : "sword";
     const scale = soldierScale(sim.levels.soldierArms);
-    const stats = archer ? ARCHER_UNIT : SOLDIER;
+    const stats = kind === "archer" ? ARCHER_UNIT : kind === "mage" ? { ...FIRE_MAGE, damage: fireballDamage(sim.levels.mageFireball ?? 0) } : SOLDIER;
     const at = cellCenter(door);
     sim.soldiers.push({
       id: sim.newId(),
-      kind: archer ? "archer" : "sword",
+      kind,
       home: b.id,
       x: at.x,
       y: at.y,
@@ -76,7 +79,7 @@ export class Barracks {
   }
 }
 
-const isBarracks = (b: Building) => b.kind === "barracks" || b.kind === "archerBarracks";
+const isBarracks = (b: Building) => b.kind === "barracks" || b.kind === "archerBarracks" || b.kind === "mageGuild";
 
 const byDistanceFrom = (p: Point) => (a: Enemy, b: Enemy) => sq(a.x - p.x) + sq(a.y - p.y) - (sq(b.x - p.x) + sq(b.y - p.y));
 const inCity = (sim: DefendSim, e: Enemy) => sim.map.city[cellAt(e.x, e.y)] === 1;
