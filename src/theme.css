@@ -2,7 +2,8 @@
    Loaded after style.css, which keeps the layout; this file only dresses it.
    The textures in assets/theme/ are small tiling SVGs (noise-grained wood,
    a stone course, mottled parchment), so nothing here is a flat web gradient
-   on its own. Text is always the bundled Cinzel. */
+   on its own. Text is the bundled Alembic pixel font, or Cinzel with Use
+   Custom Font off (style.css's --font). */
 :root {
   color: #d9c9a6;
   background: #0b0a09;

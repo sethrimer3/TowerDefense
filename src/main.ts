@@ -176,6 +176,7 @@ const shown = new Map<string, string>();
 function refreshCurrencies() {
   const dev = save.settings.devMode;
   document.documentElement.classList.toggle("reduce-motion", save.settings.reduceMotion);
+  document.documentElement.classList.toggle("pixel-font", save.settings.pixelFont);
   const show = (id: string, n: number) => {
     const text = dev ? "∞" : String(whole(n)), before = shown.get(id);
     el(id).textContent = text;

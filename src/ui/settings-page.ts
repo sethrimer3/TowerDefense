@@ -4,7 +4,7 @@ import type { AppContext } from "./app.ts";
 import { el } from "./dom.ts";
 
 /** The settings on the page, in order; each control comes from its row in SETTINGS. */
-const PAGE = ["reduceMotion", "effectsOff", "soundOff"] as const satisfies readonly SettingKey[];
+const PAGE = ["reduceMotion", "effectsOff", "soundOff", "pixelFont"] as const satisfies readonly SettingKey[];
 /** The dev options, under ALL ON. */
 const DEV = ["devMode", "devTowers", "instantResearch"] as const satisfies readonly SettingKey[];
 /** All research unlocked: one per tab of the Upgrades page. */

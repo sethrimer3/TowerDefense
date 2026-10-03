@@ -6,8 +6,32 @@
   font-style: normal;
   font-display: swap;
 }
+/* Alembic, the game's pixel font (scripts/pixel-font/), used while the
+   Use Custom Font setting is on. */
+@font-face {
+  font-family: Alembic;
+  src: url("../assets/fonts/Alembic/Alembic-Regular.ttf") format("truetype");
+  font-weight: 100 599;
+  font-style: normal;
+  font-display: block;
+}
+@font-face {
+  font-family: Alembic;
+  src: url("../assets/fonts/Alembic/Alembic-Bold.ttf") format("truetype");
+  font-weight: 600 900;
+  font-style: normal;
+  font-display: block;
+}
 :root {
-  font-family: Cinzel, Georgia, serif;
+  --font: Cinzel, Georgia, serif;
+}
+:root.pixel-font {
+  --font: Alembic, Cinzel, Georgia, serif;
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+}
+:root {
+  font-family: var(--font);
   color: #cbd0d8;
   background: #090c12;
   font-synthesis: none;
@@ -95,7 +119,7 @@ p {
 h1,
 h2,
 h3 {
-  font-family: Cinzel, Georgia, serif;
+  font-family: var(--font);
   font-weight: 500;
 }
 .shell {
@@ -214,9 +238,7 @@ h1 span {
 }
 .height strong {
   display: block;
-  font:
-    26px Cinzel,
-    Georgia;
+  font: 26px var(--font);
   color: #f1dec1;
   line-height: 1.15;
 }
@@ -343,7 +365,7 @@ nav button {
   align-items: center;
   justify-content: center;
   gap: 5px;
-  font-family: Cinzel, Georgia;
+  font-family: var(--font);
   font-size: 11px;
   min-height: 69px;
   padding: 9px 2px;
@@ -372,7 +394,7 @@ nav button[hidden] {
 /* No card can act: the run waits for the player to end it. */
 
 nav button > span {
-  font-family: Cinzel, Georgia, serif;
+  font-family: var(--font);
   font-size: 26px;
   line-height: 1.1;
   color: #79869b;
@@ -454,7 +476,7 @@ dialog > small {
   color: #e0d1b5;
 }
 .upgrade h3 small {
-  font-family: Cinzel, Georgia, serif;
+  font-family: var(--font);
   font-size: 9px;
   color: #77859a;
   margin-left: 7px;
@@ -877,7 +899,7 @@ nav button > span img { display: block; width: 42px; height: 42px; max-width: 10
 .defend-left button,
 .defend-cog {
   padding: 6px 11px;
-  font-family: Cinzel, Georgia, serif;
+  font-family: var(--font);
   font-size: 12px;
   letter-spacing: 0.5px;
   white-space: nowrap;
@@ -1130,7 +1152,7 @@ nav button > span img { display: block; width: 42px; height: 42px; max-width: 10
   border: 1px solid var(--gold);
 }
 .defend-banner strong {
-  font-family: Cinzel, Georgia, serif;
+  font-family: var(--font);
   font-size: 18px;
   color: #e29898;
 }
