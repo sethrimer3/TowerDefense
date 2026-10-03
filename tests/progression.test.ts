@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { decode, defaults } from "../src/save.ts";
 import {
   TRAINING, addSmith, bonuses, busySmiths, buySkill, cancelTraining, multiplier, payKills, payWave, rankPrice, removeSmith, settleTraining, skillPurchase,
-  skillTotal, startTraining, trainingLeft,
+  skillRank, skillTotal, startTraining, trainingLeft, trainingRank, trainingStep,
 } from "../src/progression.ts";
 import { SKILLS, TREES, skillCost, type SkillId } from "../src/skill-trees.ts";
 import { trainingSeconds } from "../src/training-jobs.ts";
@@ -96,6 +96,37 @@ test("skills need Knowledge and their requirements, and each rank costs more", (
   for (let i = 0; i < 5; i++) buySkill(s, "drillSergeant");
   assert.equal(s.skills.drillSergeant, SKILLS.drillSergeant.max);
   assert.equal(skillPurchase(s, "drillSergeant").maxed, true);
+});
+
+test("dev options: unlimited money spends nothing, instant research needs no smith, all research counts every rank while on", () => {
+  const s = defaults();
+  s.settings.instantResearch = true;
+  assert.equal(startTraining(s, "troopHp", ""), false, "instant research still costs its point");
+  s.smithy.copper = 1;
+  assert.ok(startTraining(s, "troopHp", ""), "no smith needed");
+  assert.equal(s.training.troopHp, 1, "done at once");
+  assert.equal(s.smithy.copper, 0);
+  s.settings.devMode = true;
+  assert.ok(startTraining(s, "troopHp", ""));
+  assert.equal(s.smithy.copper, 0, "unlimited money spends no point");
+  assert.ok(buySkill(s, "masonry"));
+  assert.equal(s.knowledge, 0, "nor Knowledge");
+
+  const d = defaults();
+  d.skills.coffee = 2;
+  d.settings.devMine = true;
+  assert.equal(skillRank(d, "coffee"), SKILLS.coffee.max);
+  assert.equal(skillRank(d, "fireproofWood"), 0, "only the Mine tree");
+  assert.equal(skillPurchase(d, "coffee").maxed, true);
+  d.settings.devSmithy = true;
+  assert.equal(trainingRank(d, "gold"), TRAINING.find((t) => t.id === "gold")!.max);
+  assert.equal(trainingStep(d, "gold").maxed, true);
+  assert.ok(multiplier(d, "gold") > 1);
+  d.settings.devCommand = true;
+  assert.equal(skillPurchase(d, "warBanner").maxed, true, "the deepest node counts too");
+  d.settings.devMine = d.settings.devSmithy = d.settings.devCommand = false;
+  assert.equal(skillRank(d, "coffee"), 2, "the ranks bought count again once off");
+  assert.equal(multiplier(d, "gold"), 1);
 });
 
 test("every tree node is a skill, each listed once, its requirements in the same tree", () => {

@@ -154,6 +154,19 @@ export class MinePage {
       if (this.owed < TICK_HZ) away.catchingUp = false;
     }
   }
+  /** Adds `ms` of time away (the dev option), as if the game had been
+   * closed that long: worked through tick by tick, like the catch-up on
+   * loading, up to `SIM_AWAY_MS` owed; any more is paid at the smithy's pace. */
+  addAway(ms: number) {
+    const cap = (SIM_AWAY_MS * TICK_HZ) / 1000, ticks = (ms * TICK_HZ) / 1000;
+    const run = Math.min(ticks, Math.max(0, cap - this.owed)), hours = (((ticks - run) / TICK_HZ) * 1000) / HOUR_MS;
+    const paid = { copper: 0, silver: 0, gold: 0 };
+    for (const k of METALS) paid[k] = Math.floor(this.sim.pace[k] * hours);
+    this.owed += run;
+    this.away = { ms, simulatedMs: (run / TICK_HZ) * 1000, paid, lost: 0, catchingUp: this.owed >= 1 };
+    this.lostBefore = this.lostCount();
+    if (metalSum(paid) > 0) this.host.earn(paid);
+  }
   /** Wall-clock ms of time away the catch-up still owes. */
   get owedMs() {
     return (this.owed / TICK_HZ) * 1000;

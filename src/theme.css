@@ -833,6 +833,39 @@ span.training-timer {
   box-shadow: 0 1px 0 #ffd9a014;
   color: #e0cfab;
 }
+/* Dev options: a brass-ruled heading, ALL ON in brass, and the research
+   tabs' checkboxes in a row that wraps on a phone. */
+.settings-group {
+  margin: 28px 0 0;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #c9a24a66;
+  color: #e8c46a;
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.setting-all {
+  color: #f2d48a;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+.setting-research {
+  gap: 12px;
+}
+.research-checks {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px 14px;
+}
+.research-checks label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+#dev-idle {
+  margin-top: 16px;
+}
 
 /* ── The shared dialog: an order on parchment under a wax seal ── */
 dialog {
