@@ -48,7 +48,7 @@ Recent rows are available as `window.defendPerformance`; they are not saved.
 ## Building (before a run)
 
 - The **palette** (left by default; the ⚙ settings move it to the right) lists
-  city tiles, barracks, archer barracks, Mage Guilds, Valkyrie palaces, dark wizard keeps and the towers with an `×N` count of
+  city tiles, barracks, archer barracks, Mage Guilds, Valkyrie palaces, dark wizard keeps, monster bait and the towers with an `×N` count of
   what is owned but not yet placed; it greys out at `×0`.
 - Drag from the palette onto the board. While dragging, every tile that would
   accept the item gets a faint gold outline and every other tile darkens; the
@@ -61,9 +61,9 @@ Recent rows are available as `window.defendPerformance`; they are not saved.
 - **The keep** can be moved onto any other city tile (the two swap) but never
   removed.
 - **Barracks**, **archer barracks**, the **Mage Guild**, the **Valkyrie palace** and the **dark wizard keep** must be inside the city. **Archer**, **cannon**, **watch
-  and wizard towers** may stand inside or outside.
+  and wizard towers** and **monster bait** may stand inside or outside.
 - Every structure takes a **share of its tile** (`size` in `catalog.ts`, in
-  sixteenths): 1/16 the archer and watch towers, 1/8 the cannon and wizard
+  sixteenths): 1/16 the archer and watch towers and monster bait, 1/8 the cannon and wizard
   towers, 1/4 the barracks, archer barracks and Mage Guild, and the Valkyrie
   palace a whole tile (1/2 once Folded halls is bought, which also shrinks
   it from 5 × 5 cells to 3 × 5). Several structures share a tile while
@@ -273,6 +273,22 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   renderer's (`wizard-art.ts`).
 - **Archer towers** shoot the nearest enemy in range. **Watch towers** mark
   enemies in their radius with a gold outline; marked enemies take ×2 damage.
+- **Monster bait** (`bait.ts`) is a stack of crates, one open and heaped
+  with raw meat, a haunch lashed to another stacked on top, green slime
+  seeping from the seams. While any stack stands, every enemy goes for the
+  nearest one before the keep: ground enemies walk a flow field filled from
+  every standing stack (so "nearest" is by the way they walk, smashing what
+  lies across it as usual), fliers and boats head straight for the nearest,
+  siege engines shoot one in range rather than the keep, blink imps blink
+  toward it, and houses lure nobody. Bait nobody can walk to at any price
+  doesn't call them. Enemies still fight defenders in their reach. A fallen
+  stack stays fallen: **Restocking** (Armory) lets civilians rebuild each
+  stack once a level, a defense. **Powder kegs** make a stack burst as it
+  falls (sparing your own people; a stack sunk by a boat's water only
+  sinks) and set the ground round it burning, a blaze like a fire mage's.
+- Civilians work a rubble cell standing in it; when its building's own
+  rebuilt cells have walled it in, they work it from an open cell beside
+  it (a corner will do).
 - During a run the palette becomes the **consumables** palette. A **bomb**
   can be dragged onto the field to blast everything nearby.
 - The **war banner** (`war-banner.ts`, `×∞`: never used up, never bought)

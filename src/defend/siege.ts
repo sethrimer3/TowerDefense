@@ -4,7 +4,8 @@
  * enemy, and stops to shoot whatever stands in its way once it is within
  * range (`SiegeDef` in `catalog.ts`):
  *
- * - the keep, as soon as it is in range;
+ * - the keep, as soon as it is in range (while monster bait stands, the
+ *   nearest stack instead, and its way leads there);
  * - else the building the engine's own way ahead runs into (a wall stone,
  *   a house across the street, a tower), so it breaches what blocks it and
  *   then rolls on through the gap;
@@ -21,6 +22,7 @@ import { hostileBurst } from "./hostile-attacks.ts";
 import { CELLS_H, CELLS_W, cellIndex, cellX, cellY } from "./grid.ts";
 import { clampCell, downhill, nearestPoint, rectDist, type Point } from "./pathing.ts";
 import type { DefendSim, Enemy } from "./sim.ts";
+import { lureOf } from "./bait.ts";
 
 /** A siege engine's shot in flight from (x0, y0) to (x1, y1). It flies
  * while `t` runs from 0 to `dur`; a shot with `t` below 0 is still waiting
@@ -104,9 +106,10 @@ function findAim(sim: DefendSim, e: Enemy, siege: SiegeDef): SiegeAim | null {
   return buildingAim(sim, e, siege.range) ?? people();
 }
 
-/** The keep in range, else the building the engine's way runs into. */
+/** The keep (or the nearest monster bait while any stands) in range, else
+ * the building the engine's way runs into. */
 function buildingAim(sim: DefendSim, e: Enemy, range: number): SiegeAim | null {
-  const keep = sim.keep;
+  const keep = sim.baits.length ? lureOf(sim, e.x, e.y) : sim.keep;
   if (sim.hp[keep.id] > 0 && rectDist(keep.rect, e.x, e.y) <= range) return { ...nearestPoint(keep.rect, e.x, e.y), building: keep.id };
   const id = blockerAhead(sim, e, range);
   if (id < 0) return null;
@@ -125,7 +128,7 @@ export function blockerAhead(sim: DefendSim, e: Point, range: number): number {
       const id = sim.map.owner[i];
       return id >= 0 && sim.intact(sim.map.buildings[id]) && rectDist(sim.map.buildings[id].rect, e.x, e.y) <= range ? id : -1;
     }
-    const next = downhill(sim.field, sim.solid, cx, cy);
+    const next = downhill(sim.marchField(), sim.solid, cx, cy);
     if (next < 0) return -1;
     cx = cellX(next);
     cy = cellY(next);

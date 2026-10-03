@@ -112,7 +112,13 @@ A structure inside the city that trains fire mages, as a barracks trains swordsm
 A red-robed troop who roams the streets and hurls fireballs: each bursts with splash damage that spares your own people and leaves a blaze.
 
 **Blaze**:
-Burning ground a fireball leaves, hurting every ground enemy inside it each second until it dies down.
+Burning ground a fireball (or bursting monster bait) leaves, hurting every ground enemy inside it each second until it dies down.
+
+**Monster bait**:
+A stack of crates of bait, a structure for anywhere: while any stands, every enemy goes for the nearest one before the keep.
+
+**Restock**:
+Civilians rebuilding fallen monster bait, which only Restocking allows, a set number of times a defense for each stack.
 
 **Tile share**:
 How much of its tile a structure takes, in sixteenths: 1/16 (archer and watch towers), 1/8, 1/4, 1/2 or a whole tile. What shares a tile must add up to no more than a whole tile, and fit.

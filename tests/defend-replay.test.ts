@@ -125,6 +125,14 @@ function scenarios(): Record<string, Scenario> {
       citySeed: 13, levels: maxLevels(), seed: 6, seconds: 160, wave: 1,
       opening: ['boatLesser', 'boatLesser', 'boat', 'boatGreater'],
     },
+    // Monster bait outside the walls and inside: every enemy goes for the
+    // nearest stack first (fliers and a siege engine too); fallen stacks
+    // burst and set the ground burning, and civilians restock them.
+    bait: {
+      layout: city(SQUARE, [["monsterBait", 0, -2], ["monsterBait", -1, 1], ["archerTower", 1, -1], ["barracks", 1, 1]]),
+      citySeed: 13, levels: levelsAt({ baitRestock: 2, baitBlast: 3, civilianCount: 3 }), seed: 6, seconds: 160, wave: 2,
+      opening: [...Array<EnemyKind>(40).fill('orc'), ...Array<EnemyKind>(10).fill('bat'), ...Array<EnemyKind>(4).fill('ogre'), 'rollingCannon'],
+    },
     // Wizard towers inside and outside the walls, flame and ice in turn.
     wizards: {
       layout: city(SQUARE, [["wizardTower", 0, -2], ["wizardTower", 1, 1], ["barracks", -1, 1]]),
@@ -155,6 +163,8 @@ function state(sim: DefendSim) {
     ...(sim.siegeShots.length ? [sim.siegeShots] : []),
     // And only magic boats make water and sink buildings.
     ...(sim.floods.length || sim.sinkings.length ? [sim.floods, sim.sinkings] : []),
+    // And only runs with monster bait have its field and falls.
+    ...(sim.baits.length ? [sim.baitField, [...sim.baitFalls], sim.blazes] : []),
   ];
 }
 
@@ -233,12 +243,18 @@ test("the Defend replays exercise every unit and effect", () => {
       if (sim.enemies.some((e) => e.chill)) seen.add("chilled");
       if (sim.lost) seen.add(`lost:${name}`);
       if (sim.built.some((b, id) => b > 0 && b < sim.map.buildings[id].cells.length)) seen.add("half-rebuilt");
+      for (const [id, falls] of sim.baitFalls) {
+        seen.add("bait:fell");
+        if (falls > 0 && sim.intact(sim.map.buildings[id])) seen.add("bait:restocked");
+      }
+      if (sim.baits.length && sim.blazes.length) seen.add("bait:burning");
     });
   const want = [
     "enemy:shieldLesser", "enemy:shieldGreater", "enemy:poisonLesser", "enemy:poisonBearer", "enemy:poisonGreater", "enemy:poisonSovereign", "enemy:fortressLesser", "enemy:fortress", "enemy:fortressGreater", "enemy:fortressSovereign", "enemy:darkKnight", "enemy:bombOrc", "enemy:bombBird", "enemy:voidSparrow", "enemy:snake", "enemy:dragon", "enemy:shieldBearer", "enemy:aegis", "enemy:warlord", "enemy:bat", "enemy:mother", "enemy:broodling", "distracted", "marked", "soldier:sword", "soldier:archer", "path:sword", "path:archer", "hunting",
     "civilian:toJob", "civilian:working", "civilian:home", "arrow", "shell", "flame", "frost", "chilled", "soldier:valkyrie", "stab", "guarded", "soldier:darkWizard", "chained", "lost:bare", "half-rebuilt",
     "enemy:rollingCannon", "enemy:ballista", "enemy:fireworkLauncher", "enemy:trebuchet", "enemy:bombard", "enemy:rocketBattery", "siege:ball", "siege:bolt", "siege:rocket", "siege:stone",
     "enemy:boatLesser", "enemy:boat", "enemy:boatGreater", "flood", "sunk:house", "sunk:wall", "sunk:structure", "steam",
+    "bait:fell", "bait:restocked", "bait:burning",
   ];
   assert.deepEqual(want.filter((w) => !seen.has(w)), []);
 });
