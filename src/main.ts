@@ -116,7 +116,7 @@ const libraryPage = new LibraryPage(el("library"), {
       mineDirty = true;
     }
   },
-  upgrades: () => ({ fireproof: skillRank(save, "fireproofWood"), fireTraining: skillRank(save, "fireTraining") }),
+  upgrades: () => ({ fireproof: skillRank(save, "fireproofWood"), fireTraining: skillRank(save, "fireTraining"), nightWatch: skillRank(save, "nightWatch") }),
   showing: () => tab === "library",
 });
 /** The mine or the library has paid out since the last save. */
@@ -134,16 +134,16 @@ const welcome = new WelcomeBack(modal, () => ({
   shelves: libraryPage.sim.built,
   librarians: libraryPage.sim.librarians.length,
   library: libraryPage.away,
-  libraryOwedMs: libraryPage.owedMs,
   mine: minePage.away,
   crew: minePage.sim.miners.length,
   owedMs: minePage.owedMs,
 }));
 
 /** Dev: `ms` of idle time, as if the game had been closed that long. The
- * Mine and the Library work through it a slice each frame (the Mine up to its
- * two hours of catch-up, the rest paid at the smithy's pace), the Smithy's
- * smiths work on, and the welcome-back screen keeps the account. */
+ * Mine works through it a slice each frame (up to its two hours of catch-up,
+ * the rest paid at the smithy's pace), the Library is reckoned an hour at a
+ * time (it may burn down), the Smithy's smiths work on, and the welcome-back
+ * screen keeps the account. */
 function addIdle(ms: number) {
   awayMs = ms;
   minePage.addAway(ms);
