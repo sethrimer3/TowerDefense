@@ -15,7 +15,9 @@ import type { DefendSim } from "./sim.ts";
 import { DefendLighting, type LightFrame } from "./lighting.ts";
 import { Fences } from "./fences.ts";
 import { Rain, ambientFor, type Weather } from "./weather.ts";
-import { damageKey, onCityArtLoaded, paintCityLayer } from "./city-layer.ts";
+import { damageKey, gateSprite, lotSeed, onCityArtLoaded, paintCityLayer, stageOf } from "./city-layer.ts";
+import { GATE_FRAMES } from "./gate-art.ts";
+import { rectDist } from "./pathing.ts";
 import { carriedLights, drawDamage, drawScorches, drawUnits, shadowCasters, type Brush, type Burning } from "./battle-art.ts";
 import { drawGrid, drawOverlay, type Overlay } from "./edit-overlay.ts";
 import { drawFlag, drawWarBanner } from "./structure-art.ts";
@@ -67,6 +69,8 @@ export class DefendRenderer {
   private wizardTime = 0;
   private rain = new Rain();
   private lastNow = 0;
+  /** How far each city gate stands open (0 shut to 1), by building id. */
+  private gateOpen = new Map<number, number>();
   private layerScale = 1;
   /** Camera: zoom `s` and translation (canvas pixels) applied to the whole
    * board. s = 1 fits the board to the stage it sits in; along an edge the
@@ -197,6 +201,7 @@ export class DefendRenderer {
     const { W, H } = this.board;
     ctx.drawImage(this.layer, 0, 0, W, H);
     ctx.imageSmoothingEnabled = false;
+    if (sim) this.drawGates(map, sim, opts, dt);
     if (opts.effects ?? true) this.drawParkLife(map, sim, opts, dt);
     // Park fences sit on the ground layer, under the lighting and units.
     this.fences.sync(map);
@@ -204,6 +209,28 @@ export class DefendRenderer {
     this.fences.draw(ctx, this.px);
     // Magic boats' water over the ground, sinking what it reaches.
     if (sim) this.floods.draw({ c: ctx, px: this.px, sim, rain: !!opts.weather?.rain, reduceMotion: opts.reduceMotion, reflections: opts.effects ?? true, layer: this.layer, layerScale: this.layerScale });
+  }
+
+  /** The city gates swing open while any of the city's people are at
+   * them, and shut behind them; the layer shows them shut. */
+  private drawGates(map: CityMap, sim: DefendSim, opts: DrawOptions, dt: number) {
+    for (const b of map.buildings) {
+      if (b.kind !== "gate" || !b.gate) continue;
+      if (!sim.intact(b)) {
+        this.gateOpen.delete(b.id);
+        continue;
+      }
+      const near = [...sim.soldiers, ...sim.civilians].some((u) => u.hp > 0 && rectDist(b.rect, u.x, u.y) < 1.6);
+      const was = this.gateOpen.get(b.id) ?? 0;
+      const open = opts.reduceMotion ? (near ? 1 : 0) : Math.max(0, Math.min(1, was + (near ? 2.5 : -1.5) * Math.min(dt, 0.1)));
+      this.gateOpen.set(b.id, open);
+      const frame = Math.round(open * (GATE_FRAMES - 1));
+      if (!frame) continue;
+      const r = b.rect, px = this.px;
+      const x = Math.round(r.x * px), y = Math.round(r.y * px);
+      const art = gateSprite(b.gate.side, frame, stageOf(sim, b), lotSeed(b));
+      if (art) this.ctx.drawImage(art, x, y, Math.round((r.x + r.w) * px) - x, Math.round((r.y + r.h) * px) - y);
+    }
   }
 
   /** Pond drips, rings and reflections, then the grass swaying and parting

@@ -41,7 +41,7 @@ function drawHurt(b: Brush, sim: DefendSim) {
     const hp = sim.hp[bd.id],
       max = sim.maxHp[bd.id];
     // Houses and walls show their hurt only in their art's damage stages.
-    if (!sim.intact(bd) || hp >= max || bd.kind === "house" || bd.kind === "wall") continue;
+    if (!sim.intact(bd) || hp >= max || bd.kind === "house" || bd.kind === "wall" || bd.kind === "gate") continue;
     healthBar(b, bd, hp / max);
   }
 }

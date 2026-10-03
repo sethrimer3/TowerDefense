@@ -173,7 +173,7 @@ function replan(sim: DefendSim, s: Soldier, patrol: Patrol): Enemy | null {
 /** Sets `s.path` to the first enemy that has a route, and returns it. */
 function pathToFirst(sim: DefendSim, s: Soldier, enemies: Enemy[], limits: PathLimits): Enemy | null {
   for (const e of enemies) {
-    const path = findPath(sim.solid, s, e, limits);
+    const path = findPath(sim.ownSolid, s, e, limits);
     if (!path) continue;
     s.path = path;
     return e;
@@ -186,7 +186,7 @@ function returnToDoor(sim: DefendSim, s: Soldier, home: Building) {
   if (door < 0) return;
   // (Subtracting the half cell separately keeps the original rounding.)
   const away = dist(s.x - cellX(door) - 0.5, s.y - cellY(door) - 0.5);
-  if (away > 1.2) s.path = findPath(sim.solid, s, cellCenter(door), { maxCost: 400 }) ?? [];
+  if (away > 1.2) s.path = findPath(sim.ownSolid, s, cellCenter(door), { maxCost: 400 }) ?? [];
 }
 
 // ── Archers ────────────────────────────────────────────────────────────────
@@ -227,5 +227,5 @@ function stroll(sim: DefendSim, s: Soldier) {
   s.thinkT = 0.5 + sim.rand() * 1.5;
   s.target = -1;
   const goal = sim.streets[Math.floor(sim.rand() * sim.streets.length)];
-  s.path = findPath(sim.solid, s, cellCenter(goal), CITYWIDE) ?? [];
+  s.path = findPath(sim.ownSolid, s, cellCenter(goal), CITYWIDE) ?? [];
 }

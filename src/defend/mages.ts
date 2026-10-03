@@ -48,7 +48,7 @@ function stroll(sim: DefendSim, s: Soldier) {
   s.thinkT = 0.5 + sim.rand() * 1.5;
   s.target = -1;
   const goal = sim.streets[Math.floor(sim.rand() * sim.streets.length)];
-  s.path = findPath(sim.solid, s, cellCenter(goal), { maxCost: 1e9, maxNodes: CELL_COUNT }) ?? [];
+  s.path = findPath(sim.ownSolid, s, cellCenter(goal), { maxCost: 1e9, maxNodes: CELL_COUNT }) ?? [];
 }
 
 /** Fireballs fly and burst where they land, setting the ground alight. */

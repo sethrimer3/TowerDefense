@@ -17,7 +17,7 @@ import {
   type UpgradeId,
 } from "./catalog.ts";
 import { SPAWN_ROW, TILES_H, TILES_W, defendRandom, hash, parseTileKey, tileKey } from "./grid.ts";
-import { cloneLayout, defaultLayout, fitLayout, placedCount, tilesConnected, type Layout, type PlacedKind, type PlacedStructure } from "./layout.ts";
+import { SIDES, cloneLayout, defaultLayout, fitLayout, gateOk, placedCount, sameGate, tilesConnected, type GateSpot, type Layout, type PlacedKind, type PlacedStructure } from "./layout.ts";
 
 export type DefendSave = {
   layout: Layout;
@@ -51,7 +51,7 @@ export function defaultDefendSave(): DefendSave {
 
 /** How many of a palette item are still in the palette (owned, not placed). */
 export function available(save: DefendSave, item: PaletteItem): number {
-  return Math.max(0, save.owned[item] - placedCount(save.layout, item as PlacedKind | "cityTile"));
+  return Math.max(0, save.owned[item] - placedCount(save.layout, item as PlacedKind | "cityTile" | "cityGate"));
 }
 
 /** Dev (All towers unlocked): at least one of every structure owned. */
@@ -121,6 +121,7 @@ function fitted(l: Layout): Layout {
   }
   next.structures.sort((a, b) => a.uid - b.uid);
   while (next.structures.length && !fitLayout(next).ok) next.structures.pop();
+  while (next.gates.length && !fitLayout(next).ok) next.gates.pop();
   return next;
 }
 
@@ -173,7 +174,10 @@ function decodeLayout(s: any, owned: Record<PaletteItem, number>, levels: Record
   const cityTiles = decodeCityTiles(s.cityTiles, tileKey(keep.tx, keep.ty));
   const structures = decodeStructures(s.structures, s.nextUid);
   if (!cityTiles || !structures) return null;
-  const layout: Layout = { keep, cityTiles, structures, nextUid: s.nextUid, rolls: intOr(s.rolls, 0, 1e9, 0), compact: compactKinds(levels) };
+  // Saves from before city gates have none.
+  const gates = s.gates === undefined ? [] : decodeGates(s.gates, new Set([tileKey(keep.tx, keep.ty), ...cityTiles]));
+  if (!gates) return null;
+  const layout: Layout = { keep, cityTiles, structures, nextUid: s.nextUid, rolls: intOr(s.rolls, 0, 1e9, 0), compact: compactKinds(levels), gates };
   if (!legal(layout, owned)) return null;
   const out = fitted(layout);
   return fitLayout(out).ok ? out : null;
@@ -212,6 +216,19 @@ function decodeStructures(list: unknown, nextUid: number): PlacedStructure[] | n
   return out;
 }
 
+/** Distinct gates, each in the wall of a city tile, or null. */
+function decodeGates(list: unknown, cityTiles: Set<string>): GateSpot[] | null {
+  if (!Array.isArray(list)) return null;
+  const out: GateSpot[] = [];
+  for (const g of list) {
+    if (!isObject(g) || !tileOk(g.tx, g.ty) || !SIDES.includes(g.side)) return null;
+    const spot: GateSpot = { tx: g.tx, ty: g.ty, side: g.side };
+    if (!gateOk(cityTiles, spot) || out.some((o) => sameGate(o, spot))) return null;
+    out.push(spot);
+  }
+  return out;
+}
+
 const structureOk = (p: any, nextUid: number, uids: Set<number>) =>
   PLACED.includes(p?.kind) && tileOk(p.tx, p.ty) && int(p.uid, 1, nextUid - 1) && !uids.has(p.uid);
 
@@ -223,5 +240,5 @@ function legal(layout: Layout, owned: Record<PaletteItem, number>) {
 }
 
 function affordable(layout: Layout, owned: Record<PaletteItem, number>) {
-  return layout.cityTiles.length <= owned.cityTile && PLACED.every((k) => placedCount(layout, k) <= owned[k]);
+  return layout.cityTiles.length <= owned.cityTile && layout.gates.length <= owned.cityGate && PLACED.every((k) => placedCount(layout, k) <= owned[k]);
 }

@@ -28,6 +28,7 @@ import {
   FRIENDLY_FIRE,
   HOUSE_HP_PER_CELL,
   STRUCTURES,
+  GATE,
   keepHp,
   wallHp,
   watchRadius,
@@ -140,7 +141,8 @@ export type Scorch = { x: number; y: number; r: number; seed: number; t: number;
 export type SimEvent = { type: "waveStart" | "waveCleared" | "lost"; wave: number };
 
 /** How a unit moves this step. Flying units ignore buildings. */
-export type Stride = { speed: number; dt: number; flying?: boolean };
+/** `own`: one of the city's people, whom its gates let through. */
+export type Stride = { speed: number; dt: number; flying?: boolean; own?: boolean };
 /** A blast's radius and centre damage (40% at the edge); with friendly fire
  * it also hurts your own people. */
 export type Blast = { r: number; damage: number; friendlyFire: boolean; origin?: Arrow["origin"] };
@@ -174,6 +176,9 @@ export class DefendSim {
   readonly slain: Record<EnemyKind, number> = { roach: 0, orc: 0, ogre: 0, bat: 0, warlord: 0, mother: 0, broodling: 0, snake: 0, dragon: 0, shieldBearer: 0, aegis: 0, darkKnight: 0, bombOrc: 0, bombBird: 0, voidSparrow: 0, shieldLesser: 0, shieldGreater: 0, poisonLesser: 0, poisonBearer: 0, poisonGreater: 0, poisonSovereign: 0, siegeBeetle: 0, burrowingMole: 0, necromancer: 0, skeleton: 0, bannerCaptain: 0, mirrorKnight: 0, leechSwarm: 0, ashPhoenix: 0, phoenixEgg: 0, blinkImp: 0, fortressLesser: 0, fortress: 0, fortressGreater: 0, fortressSovereign: 0, rollingCannon: 0, ballista: 0, fireworkLauncher: 0, trebuchet: 0, bombard: 0, rocketBattery: 0, boatLesser: 0, boat: 0, boatGreater: 0, boatSovereign: 0 };
   /** 1 while a cell is part of a standing (built) building. */
   readonly solid: Uint8Array;
+  /** What blocks the city's own people: `solid`, but for the standing city
+   * gates, which open for them. The same array when there are no gates. */
+  readonly ownSolid: Uint8Array;
   readonly hp: Float32Array;
   readonly maxHp: Float32Array;
   /** Built cells per building; == cells.length when intact. */
@@ -268,6 +273,9 @@ export class DefendSim {
     }
     // Ponds block movement like buildings do, but belong to no building.
     for (let i = 0; i < CELL_COUNT; i++) if (map.type[i] === CellType.WATER) this.solid[i] = 1;
+    const gates = map.buildings.filter((b) => b.kind === "gate");
+    this.ownSolid = gates.length ? this.solid.slice() : this.solid;
+    for (const b of gates) for (const c of b.cells) this.ownSolid[c] = 0;
     this.keepId = map.buildings.find((b) => b.kind === "keep")!.id;
     this.baits = map.buildings.filter((b) => b.kind === "monsterBait");
     this.baitField = new Float64Array(this.baits.length ? CELL_COUNT : 0);
@@ -604,7 +612,7 @@ export class DefendSim {
     const whole = this.intact(b);
     this.hp[b.id] = 0;
     this.built[b.id] = 0;
-    for (const c of b.cells) this.solid[c] = 0;
+    for (const c of b.cells) this.solid[c] = this.ownSolid[c] = 0;
     this.changed.push(...b.cells);
     const p = center(b.rect);
     if (dust) this.effects.push({ kind: "dust", x: p.x, y: p.y, t: 0, r: Math.max(b.rect.w, b.rect.h) * 0.7 });
@@ -624,6 +632,7 @@ export class DefendSim {
     if (id < 0 || this.solid[cell]) return;
     const b = this.map.buildings[id];
     this.solid[cell] = 1;
+    if (b.kind !== "gate") this.ownSolid[cell] = 1;
     this.changed.push(cell);
     this.built[id]++;
     this.hp[id] = Math.min(this.maxHp[id], this.hp[id] + this.maxHp[id] / b.cells.length);
@@ -675,7 +684,7 @@ export class DefendSim {
 
   /** Steer a unit toward a point with light crowd separation; returns false
    * if it made no headway (stuck against something). */
-  moveToward(u: Point, to: Point, { speed, dt, flying = false }: Stride): boolean {
+  moveToward(u: Point, to: Point, { speed, dt, flying = false, own = false }: Stride): boolean {
     let dx = to.x - u.x,
       dy = to.y - u.y;
     const len = dist(dx, dy);
@@ -694,8 +703,9 @@ export class DefendSim {
     }
     const ox = u.x,
       oy = u.y;
-    if (!blocked(this.solid, u.x + mx, u.y)) u.x += mx;
-    if (!blocked(this.solid, u.x, u.y + my)) u.y += my;
+    const solid = own ? this.ownSolid : this.solid;
+    if (!blocked(solid, u.x + mx, u.y)) u.x += mx;
+    if (!blocked(solid, u.x, u.y + my)) u.y += my;
     return Math.abs(u.x - ox) + Math.abs(u.y - oy) > step * 0.1;
   }
 
@@ -736,10 +746,10 @@ export class DefendSim {
         u.path.shift();
         continue;
       }
-      if (this.solid[c] || !this.moveToward(u, p, { speed, dt })) u.path = [];
+      if (this.ownSolid[c] || !this.moveToward(u, p, { speed, dt, own: true })) u.path = [];
       return;
     }
-    if (chase) this.moveToward(u, chase, { speed, dt });
+    if (chase) this.moveToward(u, chase, { speed, dt, own: true });
   }
 
   // ── Consumables ───────────────────────────────────────────────────────
@@ -761,6 +771,7 @@ export class DefendSim {
 
 function maxHpOf(b: Building, levels: Levels, bonuses: Readonly<Bonuses>) {
   if (b.kind === "wall") return wallHp(levels.wallStrength) * bonuses.wallHp;
+  if (b.kind === "gate") return wallHp(levels.wallStrength) * bonuses.wallHp * GATE.hpPerCell * b.cells.length;
   if (b.kind === "house") return HOUSE_HP_PER_CELL * b.cells.length;
   if (b.kind === "keep") return keepHp(levels.keepStrength) * bonuses.keepHp;
   return STRUCTURES[b.kind].maxHp;

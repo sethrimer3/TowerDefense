@@ -13,7 +13,10 @@ import {
   BOMB_RADIUS,
   SPEED3_PRICE,
   PALETTE_ITEMS,
+  PALETTE_CATEGORIES,
+  GATE_DESCRIPTION,
   STRUCTURES,
+  inCategory,
   UPGRADES,
   footprint,
   purchasePrice,
@@ -21,6 +24,7 @@ import {
   upgradePrice,
   type Bonuses,
   type EnemyKind,
+  type PaletteCategory,
   type PaletteItem,
   type Price,
 } from "./catalog.ts";
@@ -62,6 +66,7 @@ export type DefendHost = {
 
 const ITEM_NAMES: Record<PaletteItem, string> = {
   cityTile: "City tile",
+  cityGate: "City gate",
   barracks: STRUCTURES.barracks.name,
   archerBarracks: STRUCTURES.archerBarracks.name,
   archerTower: STRUCTURES.archerTower.name,
@@ -103,6 +108,10 @@ export class DefendPage {
   /** Abandon needs a second click within a few seconds. */
   private abandonArmed = 0;
   private settingsOpen = false;
+  /** The build palette's category, and whether its list of categories is
+   * open. */
+  private category: PaletteCategory = "all";
+  private categoriesOpen = false;
   private journal: HTMLDialogElement | null = null;
   /** Whether the side panel is open in each phase: the build palette starts
    * open, the battle's items closed so the battle has the whole view. */
@@ -369,13 +378,13 @@ export class DefendPage {
     const s = this.save;
     const entries: { id: string; name: string; count: number; icon: IconItem }[] =
       this.phase === "build"
-        ? PALETTE_ITEMS.map((item) => ({ id: item, name: ITEM_NAMES[item], count: available(s, item), icon: item }))
+        ? PALETTE_ITEMS.filter((item) => inCategory(item, this.category)).map((item) => ({ id: item, name: ITEM_NAMES[item], count: available(s, item), icon: item as IconItem }))
         : [
             { id: "bomb", name: "Bomb", count: s.bombs, icon: "bomb" },
             { id: "banner", name: "War banner", count: Infinity, icon: "banner" },
           ];
     el.innerHTML =
-      `<small class="defend-palette-title">${this.phase === "build" ? "BUILD" : "ITEMS"}</small>` +
+      (this.phase === "build" ? this.categoryPicker() : `<small class="defend-palette-title">ITEMS</small>`) +
       entries
         .map(
           (e) =>
@@ -387,6 +396,33 @@ export class DefendPage {
     el.querySelectorAll<HTMLButtonElement>("[data-item]").forEach((b) => {
       b.onpointerdown = (e) => this.pressPalette(b.dataset.item!, e);
     });
+    const picker = el.querySelector<HTMLButtonElement>("#defend-category");
+    if (picker)
+      picker.onclick = () => {
+        this.categoriesOpen = !this.categoriesOpen;
+        this.renderPalette();
+      };
+    el.querySelectorAll<HTMLButtonElement>("[data-category]").forEach((b) => {
+      b.onclick = () => {
+        this.category = b.dataset.category as PaletteCategory;
+        this.categoriesOpen = false;
+        this.renderPalette();
+        el.scrollTop = 0;
+      };
+    });
+  }
+
+  /** The palette's head while building: a button naming the category on
+   * show, which opens the list of them. */
+  private categoryPicker() {
+    const name = PALETTE_CATEGORIES.find((c) => c.id === this.category)!.name;
+    const open = this.categoriesOpen;
+    const list = open
+      ? `<div class="defend-categories" id="defend-categories" role="menu">${PALETTE_CATEGORIES.map(
+          (c) => `<button role="menuitemradio" aria-checked="${c.id === this.category}" data-category="${c.id}">${c.name}</button>`,
+        ).join("")}</div>`
+      : "";
+    return `<button class="defend-category" id="defend-category" aria-haspopup="menu" aria-expanded="${open}" aria-controls="defend-categories" title="Show a type of building"><span aria-hidden="true">☰</span> ${name}</button>${list}`;
   }
 
   /** A press on palette entry `id` picks up one of it, if any are left. */
@@ -724,7 +760,12 @@ export class DefendPage {
       [`${p.gold} gold`, p.copper ? `${p.copper} copper` : "", p.silver ? `${p.silver} silver` : ""].filter(Boolean).join(" · ");
     const items = PALETTE_ITEMS.map((item) => {
       const p = purchasePrice(item, s.owned[item]);
-      const desc = item === "cityTile" ? "Expands the city limits. New tiles must touch the city; the wall moves out to enclose them." : `${STRUCTURES[item].description} Takes ${shareName(footprint(item, s.layout.compact.includes(item)).size)}.`;
+      const desc =
+        item === "cityTile"
+          ? "Expands the city limits. New tiles must touch the city; the wall moves out to enclose them."
+          : item === "cityGate"
+            ? GATE_DESCRIPTION
+            : `${STRUCTURES[item].description} Takes ${shareName(footprint(item, s.layout.compact.includes(item)).size)}.`;
       return `<article class="card defend-card"><canvas width="48" height="48" data-icon="${item}"></canvas><div><small>OWNED ${s.owned[item]} · IN PALETTE ${available(s, item)}</small><h3>${ITEM_NAMES[item]}</h3><p>${desc}</p></div>
         <button data-buy="${item}" ${canAfford(w, p) ? "" : "disabled"}>Buy · ${price(p)}</button></article>`;
     }).join("");

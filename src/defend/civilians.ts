@@ -65,7 +65,7 @@ function goToJob(sim: DefendSim, c: Civilian, dt: number) {
   }
   if (!c.path.length && c.thinkT <= 0) {
     c.thinkT = 1;
-    c.path = findPath(sim.solid, c, j, ERRAND) ?? [];
+    c.path = findPath(sim.ownSolid, c, j, ERRAND) ?? [];
     // Walled in: work it from an open cell beside it instead.
     if (!c.path.length && c.stand === undefined && standBeside(sim, c)) return;
     // Unreachable: try another job next time (but still step toward this one now).
@@ -86,7 +86,7 @@ function standBeside(sim: DefendSim, c: Civilian): boolean {
     if (!cellInBounds(jx + dx, jy + dy)) continue;
     const n = cellIndex(jx + dx, jy + dy);
     if (sim.solid[n]) continue;
-    const path = findPath(sim.solid, c, cellCenter(n), ERRAND);
+    const path = findPath(sim.ownSolid, c, cellCenter(n), ERRAND);
     if (!path) continue;
     c.stand = n;
     c.path = path;
@@ -111,7 +111,7 @@ function goHome(sim: DefendSim, c: Civilian, dt: number) {
   if (!c.path.length && c.thinkT <= 0) {
     c.thinkT = 1;
     const door = sim.doorOf(home);
-    if (door >= 0) c.path = findPath(sim.solid, c, cellCenter(door), ERRAND) ?? [];
+    if (door >= 0) c.path = findPath(sim.ownSolid, c, cellCenter(door), ERRAND) ?? [];
   }
   sim.followPath(c, hx, CIVILIAN.speed, dt);
 }
@@ -150,7 +150,7 @@ function* openJobs(sim: DefendSim, skip: number) {
     if (sim.intact(b) || b.kind === "keep") continue;
     // Fallen bait waits for Restocking.
     if (b.kind === "monsterBait" && !restockable(sim, b)) continue;
-    const tier = b.kind === "house" ? 2 : b.kind === "wall" ? 1 : 0;
+    const tier = b.kind === "house" ? 2 : b.kind === "wall" || b.kind === "gate" ? 1 : 0;
     for (const cell of b.cells) if (jobAvailable(sim, cell, skip)) yield { cell, tier };
   }
 }

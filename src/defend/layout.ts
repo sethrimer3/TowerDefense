@@ -26,7 +26,7 @@ import {
   type Rect,
   type TilePos,
 } from "./grid.ts";
-import { STRUCTURES, TILE_ROOM, footprint, type StructureKind, type TileSpan } from "./catalog.ts";
+import { GATE, STRUCTURES, TILE_ROOM, footprint, type StructureKind, type TileSpan } from "./catalog.ts";
 
 export type PlacedKind = Exclude<StructureKind, "keep">;
 /** `spot` seeds where on its tile the structure stands; it is drawn afresh
@@ -34,6 +34,13 @@ export type PlacedKind = Exclude<StructureKind, "keep">;
  * spanning a block of tiles (`span`) stands on (tx, ty), its block's top
  * left tile. */
 export type PlacedStructure = { uid: number; kind: PlacedKind; tx: number; ty: number; spot: number };
+
+/** A side of a tile. */
+export type Side = "n" | "e" | "s" | "w";
+export const SIDES: readonly Side[] = ["n", "e", "s", "w"];
+const SIDE_STEP: Record<Side, readonly [number, number]> = { n: [0, -1], e: [1, 0], s: [0, 1], w: [-1, 0] };
+/** A city gate: set in the wall on `side` of city tile (tx, ty). */
+export type GateSpot = { tx: number; ty: number; side: Side };
 
 export type Layout = {
   keep: TilePos;
@@ -46,6 +53,8 @@ export type Layout = {
   /** Kinds whose building-specific upgrade makes them smaller (from the
    * Armory's levels, not saved on its own). */
   compact: PlacedKind[];
+  /** City gates, each in the wall along one edge of a city tile. */
+  gates: GateSpot[];
 };
 
 export type FittedStructure = {
@@ -58,8 +67,12 @@ export type FittedStructure = {
   inside: boolean;
 };
 
+/** A gate's cells in the wall, and the city cells just inside it, kept
+ * clear for the street that runs out through it. */
+export type FittedGate = GateSpot & { rect: Rect; inner: Rect };
+
 export type Fit =
-  | { ok: true; structures: FittedStructure[]; city: Uint8Array; wall: Uint8Array }
+  | { ok: true; structures: FittedStructure[]; city: Uint8Array; wall: Uint8Array; gates?: FittedGate[] }
   | { ok: false; reason: string };
 
 const KEEP_UID = 0;
@@ -72,6 +85,7 @@ export function defaultLayout(): Layout {
     nextUid: 1,
     rolls: 0,
     compact: [],
+    gates: [],
   };
 }
 
@@ -83,6 +97,7 @@ export function cloneLayout(l: Layout): Layout {
     nextUid: l.nextUid,
     rolls: l.rolls,
     compact: [...l.compact],
+    gates: l.gates.map((g) => ({ ...g })),
   };
 }
 
@@ -174,9 +189,12 @@ export function fitLayout(l: Layout): Fit {
   const spanned = spannedTiles(order);
   const crowded = [...spanned.values()].find((s) => s.size > TILE_ROOM);
   if (crowded) return { ok: false, reason: `That tile has no room left for the ${STRUCTURES[crowded.kind].name.toLowerCase()}.` };
+  const gates = l.gates.filter((g) => gateOk(cityTiles, g)).map(fitGate);
   let failure = "";
   for (let pass = 0; pass < PASSES; pass++) {
     const space: FitSpace = { city, wall: wallMask(city), blocked: new Uint8Array(CELL_COUNT), foot: new Uint8Array(CELL_COUNT) };
+    // The way in through each gate stays clear for its street.
+    for (const g of gates) for (const i of rectCells(grow(g.inner, g.side))) if (space.city[i]) space.blocked[i]++;
     const fitted: FittedStructure[] = [];
     for (const group of order) {
       const f = fitTile(group, space, pass * TRIES, spanned.get(tileKey(group[0].tx, group[0].ty)));
@@ -184,7 +202,7 @@ export function fitLayout(l: Layout): Fit {
       fitted.push(...f);
     }
     const cut = cutOff(fitted, space);
-    if (!cut) return { ok: true, structures: fitted, city, wall: space.wall };
+    if (!cut) return { ok: true, structures: fitted, city, wall: space.wall, ...(gates.length ? { gates } : {}) };
     failure ||= `The ${STRUCTURES[cut.kind].name.toLowerCase()} would be cut off from the streets.`;
   }
   return { ok: false, reason: failure };
@@ -330,6 +348,80 @@ function rectUsable(r: Rect, space: FitSpace, inside: boolean): boolean {
 
 const usable = (space: FitSpace, i: number, inside: boolean) => !space.blocked[i] && !space.wall[i] && !!space.city[i] === inside;
 
+// ── Gates ────────────────────────────────────────────────────────────────
+
+export const gateKey = (g: GateSpot) => `${g.tx},${g.ty},${g.side}`;
+export const sameGate = (a: GateSpot, b: GateSpot) => a.tx === b.tx && a.ty === b.ty && a.side === b.side;
+
+/** The tile across `side` of (tx, ty). */
+export const across = (g: GateSpot): TilePos => ({ tx: g.tx + SIDE_STEP[g.side][0], ty: g.ty + SIDE_STEP[g.side][1] });
+
+/** Whether a gate may stand at `g`: its tile is a city tile and the tile
+ * across that side is on the board and not, so the wall runs there. */
+export function gateOk(cityTiles: Set<string>, g: GateSpot) {
+  const o = across(g);
+  return cityTiles.has(tileKey(g.tx, g.ty)) && tileInBounds(o.tx, o.ty) && !cityTiles.has(tileKey(o.tx, o.ty));
+}
+
+/** The gate's cells: `GATE.long` along the middle of the tile's side, and
+ * the wall's whole depth outward. */
+export function gateRect({ tx, ty, side }: GateSpot): Rect {
+  const along = Math.floor((SUB - GATE.long) / 2);
+  const x0 = tx * SUB, y0 = ty * SUB;
+  if (side === "n") return { x: x0 + along, y: y0 - GATE.deep, w: GATE.long, h: GATE.deep };
+  if (side === "s") return { x: x0 + along, y: y0 + SUB, w: GATE.long, h: GATE.deep };
+  if (side === "w") return { x: x0 - GATE.deep, y: y0 + along, w: GATE.deep, h: GATE.long };
+  return { x: x0 + SUB, y: y0 + along, w: GATE.deep, h: GATE.long };
+}
+
+/** The row of city cells just inside the gate. */
+function gateInner(g: GateSpot): Rect {
+  const r = gateRect(g);
+  if (g.side === "n") return { x: r.x, y: r.y + r.h, w: r.w, h: 1 };
+  if (g.side === "s") return { x: r.x, y: r.y - 1, w: r.w, h: 1 };
+  if (g.side === "w") return { x: r.x + r.w, y: r.y, w: 1, h: r.h };
+  return { x: r.x - 1, y: r.y, w: 1, h: r.h };
+}
+
+/** `r` deepened one more cell away from `side` (into the city). */
+function grow(r: Rect, side: Side): Rect {
+  if (side === "n") return { ...r, h: r.h + 1 };
+  if (side === "s") return { ...r, y: r.y - 1, h: r.h + 1 };
+  if (side === "w") return { ...r, w: r.w + 1 };
+  return { ...r, x: r.x - 1, w: r.w + 1 };
+}
+
+const fitGate = (g: GateSpot): FittedGate => ({ tx: g.tx, ty: g.ty, side: g.side, rect: gateRect(g), inner: gateInner(g) });
+
+/** Drops the gates whose wall moved away, returning how many went. */
+function keepGates(l: Layout): number {
+  const tiles = cityTileSet(l);
+  const before = l.gates.length;
+  l.gates = l.gates.filter((g) => gateOk(tiles, g));
+  return before - l.gates.length;
+}
+
+/** Sets a new gate into the wall at `g`. */
+export function placeGate(l: Layout, g: GateSpot): Layout | null {
+  if (!gateOk(cityTileSet(l), g) || l.gates.some((o) => sameGate(o, g))) return null;
+  const next = cloneLayout(l);
+  next.gates.push({ tx: g.tx, ty: g.ty, side: g.side });
+  return fitLayout(next).ok ? next : null;
+}
+
+export function removeGate(l: Layout, g: GateSpot): Layout {
+  const next = cloneLayout(l);
+  next.gates = next.gates.filter((o) => !sameGate(o, g));
+  return next;
+}
+
+/** Moves the gate at `from` to `to` (or keeps the layout, dropped where it
+ * stood). */
+export function moveGate(l: Layout, from: GateSpot, to: GateSpot): Layout | null {
+  if (sameGate(from, to)) return l;
+  return placeGate(removeGate(l, from), to);
+}
+
 // ── Edits ────────────────────────────────────────────────────────────────
 // Every edit returns the new layout, or null when it would be illegal.
 
@@ -340,6 +432,8 @@ export function placeCityTile(l: Layout, tx: number, ty: number): Layout | null 
   if (!ORTHO.some(([dx, dy]) => tiles.has(tileKey(tx + dx, ty + dy)))) return null;
   const next = cloneLayout(l);
   next.cityTiles.push(tileKey(tx, ty));
+  // A gate facing the new tile no longer stands in the wall.
+  keepGates(next);
   return fitLayout(next).ok ? next : null;
 }
 
@@ -354,6 +448,7 @@ export function removeCityTile(l: Layout, tx: number, ty: number): { layout: Lay
   const on = (s: PlacedStructure) => covers(l, s, tx, ty);
   const returned = next.structures.filter(on).map((s) => s.kind);
   next.structures = next.structures.filter((s) => !on(s));
+  keepGates(next);
   return fitLayout(next).ok ? { layout: next, returned } : null;
 }
 
@@ -416,6 +511,7 @@ export function moveKeep(l: Layout, tx: number, ty: number): Layout | null {
   return fitLayout(next).ok ? next : null;
 }
 
-export function placedCount(l: Layout, kind: PlacedKind | "cityTile"): number {
+export function placedCount(l: Layout, kind: PlacedKind | "cityTile" | "cityGate"): number {
+  if (kind === "cityGate") return l.gates.length;
   return kind === "cityTile" ? l.cityTiles.length : l.structures.filter((s) => s.kind === kind).length;
 }

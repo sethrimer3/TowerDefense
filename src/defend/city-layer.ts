@@ -15,6 +15,8 @@ import { ART, parkArt } from "./park-art.ts";
 import { damageStage, drawSprite, sprite, wallDamagePixels, wallRubblePixels } from "./damage-art.ts";
 import { GRASS, grassPatch, groundArt } from "./ground-art.ts";
 import { heights, shadowCanvas, shadowMask } from "./shadow-art.ts";
+import { gatePixels, gateRubblePixels } from "./gate-art.ts";
+import { gateRect, type Side } from "./layout.ts";
 
 export { POND, POND_WATER, hasTree, pondDisc, pondPath, treeCanopy } from "./park-geometry.ts";
 
@@ -243,6 +245,14 @@ function paintBuilding(p: Paint, b: Building) {
     else paintArt(p, wallRubbleSprite(lotSeed(b)), box);
     return;
   }
+  if (b.kind === "gate") {
+    const side = b.gate!.side;
+    if (sim && !sim.intact(b)) {
+      paintArt(p, gateRubbleSprite(side, lotSeed(b)), box);
+      return paintRebuilding(p, b);
+    }
+    return paintArt(p, gateSprite(side, 0, stageOf(sim, b), lotSeed(b)), box);
+  }
   if (sim && !sim.intact(b)) {
     if (b.kind === "keep") return paintKeepRubble(c, box);
     if (b.kind === "house") paintArt(p, houseRubbleSprite(r.w, r.h, b.variant, roofSeed(r.x, r.y, r.w, r.h)), box);
@@ -260,11 +270,11 @@ export function paintStanding(c: CanvasRenderingContext2D, px: number, map: City
 }
 
 /** The seed a building's damage and rubble are drawn from: its lot. */
-const lotSeed = (b: Building) => hash(b.rect.x, b.rect.y, b.rect.w, b.rect.h, 77);
+export const lotSeed = (b: Building) => hash(b.rect.x, b.rect.y, b.rect.w, b.rect.h, 77);
 
 /** How damaged a standing building looks: the keep's `keepStage`, anything
  * else's `damageStage` (0 out of battle). */
-function stageOf(sim: DefendSim | null, b: Building) {
+export function stageOf(sim: DefendSim | null, b: Building) {
   if (!sim) return 0;
   return b.kind === "keep" ? keepStage(sim.hp[b.id], sim.maxHp[b.id]) : damageStage(sim.hp[b.id], sim.maxHp[b.id]);
 }
@@ -297,6 +307,15 @@ function paintArt({ c }: Paint, art: HTMLCanvasElement | null, box: { x: number;
   drawSprite(c, art, box.x, box.y, box.w, box.h);
 }
 
+/** A city gate's sprite with its doors at `frame`, and its rubble. */
+export const gateSprite = (side: Side, frame: number, stage: number, seed: number) => {
+  const r = gateRect({ tx: 0, ty: 0, side });
+  return sprite(`gate:${side}:${frame}:${stage}:${seed}`, r.w * ART, r.h * ART, () => gatePixels(side, frame, stage, seed));
+};
+const gateRubbleSprite = (side: Side, seed: number) => {
+  const r = gateRect({ tx: 0, ty: 0, side });
+  return sprite(`gate:${side}:rubble:${seed}`, r.w * ART, r.h * ART, () => gateRubblePixels(side, seed));
+};
 const wallRubbleSprite = (seed: number) => sprite(`wall:rubble:${seed}`, ART, ART, () => wallRubblePixels(seed, ART));
 const wallDamageSprite = (stage: number, seed: number) => sprite(`wall:${stage}:${seed}`, ART, ART, () => wallDamagePixels(stage, seed, ART));
 
