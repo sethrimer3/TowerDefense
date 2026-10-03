@@ -368,14 +368,17 @@ export class DefendPage {
     const entries: { id: string; name: string; count: number; icon: IconItem }[] =
       this.phase === "build"
         ? PALETTE_ITEMS.map((item) => ({ id: item, name: ITEM_NAMES[item], count: available(s, item), icon: item }))
-        : [{ id: "bomb", name: "Bomb", count: s.bombs, icon: "bomb" }];
+        : [
+            { id: "bomb", name: "Bomb", count: s.bombs, icon: "bomb" },
+            { id: "banner", name: "War banner", count: Infinity, icon: "banner" },
+          ];
     el.innerHTML =
       `<small class="defend-palette-title">${this.phase === "build" ? "BUILD" : "ITEMS"}</small>` +
       entries
         .map(
           (e) =>
-            `<button class="defend-item ${e.count ? "" : "empty"}" data-item="${e.id}" title="${e.name}" aria-label="${e.name}, ${e.count} left">
-              <canvas width="48" height="48" data-icon="${e.icon}"></canvas><span>${e.name}</span><b>×${e.count}</b></button>`,
+            `<button class="defend-item ${e.count ? "" : "empty"}" data-item="${e.id}" title="${e.name}" aria-label="${e.name}, ${e.count === Infinity ? "unlimited" : `${e.count} left`}">
+              <canvas width="48" height="48" data-icon="${e.icon}"></canvas><span>${e.name}</span><b>×${e.count === Infinity ? "∞" : e.count}</b></button>`,
         )
         .join("");
     el.querySelectorAll<HTMLCanvasElement>("canvas[data-icon]").forEach((c) => paintIcon(c, c.dataset.icon as IconItem));
@@ -388,6 +391,7 @@ export class DefendPage {
   private pressPalette(id: string, e: PointerEvent) {
     if (e.button !== 0) return;
     if (id === "bomb") return this.pressBomb(e);
+    if (id === "banner") return this.phase === "sim" ? this.beginDrag({ from: "banner" }, e) : undefined;
     const item = id as PaletteItem;
     if (!available(this.save, item)) return this.setMessage(`No ${plural(ITEM_NAMES[item].toLowerCase())} left — buy more in the Armory.`);
     this.beginDrag({ from: "palette", item }, e);
@@ -539,7 +543,7 @@ export class DefendPage {
     this.night = 0;
     this.renderChrome();
     const sky = this.weather.rain ? "Rain rolls in. " : "";
-    this.setMessage(`${sky}Here they come! ${this.sideOpen.sim ? "Drag" : "Open Items and drag"} a bomb onto the field to thin the horde.`, 4);
+    this.setMessage(`${sky}Here they come! ${this.sideOpen.sim ? "Drag" : "Open Items and drag"} a bomb onto the field, or plant the war banner to rally your troops.`, 4);
   }
 
   private endRun() {
@@ -637,6 +641,7 @@ export class DefendPage {
       effects: this.host.effects(),
       healthbars: this.host.healthbars?.() ?? true,
       over: this.phase === "over",
+      hideBanner: this.phase === "over" || (this.pointers.session?.drag.from === "banner" && !!this.pointers.session.drag.placed),
     });
   }
 
@@ -650,8 +655,10 @@ export class DefendPage {
   }
 
   /** Start dragging whatever buildable thing is under the pointer. Only the
-   * build phase picks things up; in battle a press moves the view. */
+   * build phase picks things up; in battle a press lifts the war banner where
+   * it stands (a tap takes it down), and anywhere else moves the view. */
   private pickUp(e: PointerEvent): boolean {
+    if (this.phase === "sim") return this.pickUpBanner(e);
     if (this.phase !== "build") return false;
     const { cx, cy, inside } = eventCell(this.renderer!, e);
     const edit = inside ? EditSession.lift(this.currentMap(), this.save.layout, cx, cy) : null;
@@ -659,11 +666,31 @@ export class DefendPage {
     return !!edit;
   }
 
-  /** A released drag: a bomb goes off where it lands, and a city element
-   * leaves its session's next layout. */
+  /** A press on the planted war banner (its pole or cloth) lifts it. */
+  private pickUpBanner(e: PointerEvent): boolean {
+    const banner = this.sim?.warBanner;
+    if (!banner) return false;
+    const { fx, fy } = eventCell(this.renderer!, e);
+    // The cloth flies to the right of the pole.
+    if (fx < banner.x - 1 || fx > banner.x + 2.2 || fy < banner.y - 1.4 || fy > banner.y + 1) return false;
+    this.beginDrag({ from: "banner", placed: true }, e);
+    return true;
+  }
+
+  /** A released drag: a bomb goes off where it lands, the war banner is
+   * planted where it lands (a tap on it, or carrying it off the board, takes
+   * it down), and a city element leaves its session's next layout. */
   private drop(drop: Drop) {
     if (drop.kind === "bomb") {
       if (drop.at) this.dropBomb(drop.at);
+      return;
+    }
+    if (drop.kind === "banner") {
+      const sim = this.phase === "sim" ? this.sim : null;
+      const drag = this.pointers.session?.drag;
+      if (!sim) return;
+      if (drop.at) sim.plantBanner(drop.at);
+      else if (drop.tap || (drag?.from === "banner" && drag.placed)) sim.plantBanner(null);
       return;
     }
     const s = this.save;

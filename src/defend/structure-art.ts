@@ -43,7 +43,7 @@ function disc(c: CanvasRenderingContext2D, x: number, y: number, r: number) {
   c.fill();
 }
 
-export type IconItem = StructureKind | "cityTile" | "bomb";
+export type IconItem = StructureKind | "cityTile" | "bomb" | "banner";
 
 /** Palette icon for an item, drawn into a small square canvas. */
 export function paintIcon(canvas: HTMLCanvasElement, item: IconItem) {
@@ -53,6 +53,7 @@ export function paintIcon(canvas: HTMLCanvasElement, item: IconItem) {
   c.imageSmoothingEnabled = false;
   if (item === "cityTile") return paintCityIcon(c, n);
   if (item === "bomb") return paintBombIcon(c, n);
+  if (item === "banner") return paintBannerIcon(c, n);
   const def = [STRUCTURES[item].w, STRUCTURES[item].h];
   const px = n / Math.max(def[0], def[1]) / 1.1;
   const w = def[0] * px,
@@ -530,4 +531,29 @@ export function drawFlag(c: CanvasRenderingContext2D, px: number, pose: FlagPose
   c.imageSmoothingEnabled = false;
   c.drawImage(flagCanvas, pose.x - POLE * s, pose.y - POLE * s, FLAG_W * s, FLAG_H * s);
   c.restore();
+}
+
+/** The war banner's palette icon: the keep's banner, still, cropped round
+ * its cloth. */
+function paintBannerIcon(c: CanvasRenderingContext2D, n: number) {
+  const x0 = POLE - 3, y0 = POLE - 6, w = 18, h = 14;
+  const sprite = spriteCanvas(flagPixels(0.3, false), FLAG_W, FLAG_H);
+  const s = Math.floor((n * 0.95) / w);
+  c.drawImage(sprite, x0, y0, w, h, (n - w * s) / 2, (n - h * s) / 2, w * s, h * s);
+}
+
+/** The war banner where the player planted it: the keep's banner on a
+ * pole, over a faint gold ring marking the ground its troops hold. */
+export function drawWarBanner(c: CanvasRenderingContext2D, px: number, at: { x: number; y: number }, reach: number, pose: { t: number; reduceMotion: boolean }) {
+  const x = at.x * px, y = at.y * px;
+  c.save();
+  c.strokeStyle = "rgba(242,210,122,0.35)";
+  c.lineWidth = Math.max(1, px * 0.1);
+  c.setLineDash([px * 0.5, px * 0.4]);
+  if (!pose.reduceMotion) c.lineDashOffset = -pose.t * px * 0.6;
+  c.beginPath();
+  c.arc(x, y, reach * px, 0, Math.PI * 2);
+  c.stroke();
+  c.restore();
+  drawFlag(c, px, { x, y, t: pose.t, reduceMotion: pose.reduceMotion });
 }

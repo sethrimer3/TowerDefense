@@ -14,6 +14,7 @@ import type { Building } from "./citygen.ts";
 import { nearest, type Point } from "./pathing.ts";
 import type { DefendSim, Enemy, Soldier } from "./sim.ts";
 import { seek } from "./valkyries.ts";
+import { answerBanner } from "./war-banner.ts";
 
 /** A bolt of black lightning: the points it ran through, (x, y) pairs from
  * where it was cast through every enemy it struck, and for each point after
@@ -66,6 +67,7 @@ export function stepDarkWizard(sim: DefendSim, s: Soldier, dt: number) {
     chainBolt(sim, { x: s.x + STAFF.x, y: s.y + STAFF.y }, near, s.damage, wizardChain(sim.levels.chainCount ?? 0), chainJump(sim.levels.chainReach ?? 0));
     return;
   }
+  if (sim.warBanner) return answerBanner(sim, sim.warBanner, s, DARK_WIZARD.speed, dt);
   if (s.thinkT <= 0) seek(sim, s);
   sim.followPath(s, null, DARK_WIZARD.speed, dt);
 }

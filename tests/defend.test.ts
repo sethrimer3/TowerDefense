@@ -15,6 +15,7 @@ import { CellType, generateCity } from '../src/defend/citygen.ts';
 import { buildDifficultyWave, waveDifficulty, MAX_WAVE_ENEMIES } from '../src/defend/waves.ts';
 import { ENEMIES } from '../src/defend/catalog.ts';
 import { DefendSim, buildWave } from '../src/defend/sim.ts';
+import { RALLY_REACH } from '../src/defend/war-banner.ts';
 import { stepArcher, stepSwordsman } from '../src/defend/troops.ts';
 import { stepArrows } from '../src/defend/towers.ts';
 import { stepBlazes, stepFireballs, stepMage } from '../src/defend/mages.ts';
@@ -254,6 +255,39 @@ test('barracks keep their garrison topped up', () => {
   for (let i = 0; i < 30 * 6; i++) sim.step(1 / 30);
   assert.equal(sim.soldiers.length, 2, 'the fallen swordsman is replaced after the training time');
 });
+
+test('the war banner rallies every troop to it, and taken down lets them go', () => {
+  let l = squareCity();
+  const { tx, ty } = l.keep;
+  l = placeStructure(l, 'barracks', tx - 1, ty - 1)!;
+  l = placeStructure(l, 'archerBarracks', tx - 1, ty - 1)!;
+  const sim = new DefendSim(mapOf(l), zeroLevels(), 1);
+  for (let i = 0; i < 30 * 12; i++) sim.step(1 / 30);
+  assert.ok(sim.soldiers.some((s) => s.kind === 'sword') && sim.soldiers.some((s) => s.kind === 'archer'));
+  // The street farthest from the troops, across the city.
+  const home = sim.soldiers[0];
+  const far = sim.streets.reduce((a, b) => (dist2(b, home) > dist2(a, home) ? b : a));
+  const at = { x: cellX(far) + 0.5, y: cellY(far) + 0.5 };
+  const away = (s: { x: number; y: number }) => Math.hypot(s.x - at.x, s.y - at.y);
+  assert.ok(sim.soldiers.every((s) => away(s) > 8), 'the banner starts well away from them');
+  sim.plantBanner(at);
+  for (let i = 0; i < 30 * 20; i++) sim.step(1 / 30);
+  assert.ok(sim.soldiers.every((s) => away(s) < 3.5), `all gather round the banner: ${sim.soldiers.map((s) => away(s).toFixed(1))}`);
+  // An enemy on the banner's ground is set upon.
+  sim.enemies.push({ ...(sim as any).newEnemy('ogre', at.x + 3, at.y), });
+  const foe = sim.enemies[sim.enemies.length - 1];
+  for (let i = 0; i < 30 * 4 && foe.hp > 0; i++) sim.step(1 / 30);
+  assert.ok(foe.hp < foe.maxHp, 'they fight what comes to the banner');
+  sim.enemies.length = 0;
+  sim.plantBanner(null);
+  for (let i = 0; i < 30 * 15; i++) sim.step(1 / 30);
+  const sword = sim.soldiers.find((s) => s.kind === 'sword')!;
+  assert.ok(away(sword) > 5, 'with the banner down, swordsmen go home');
+});
+
+function dist2(i: number, p: { x: number; y: number }) {
+  return (cellX(i) + 0.5 - p.x) ** 2 + (cellY(i) + 0.5 - p.y) ** 2;
+}
 
 test('civilians rebuild ruins one section at a time', () => {
   const sim = new DefendSim(mapOf(squareCity()), zeroLevels(), 1);
