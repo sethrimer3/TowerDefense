@@ -76,3 +76,60 @@ test('dragon heads breathe flame into the keep; followers fly and cuts become he
   assert.ok(ENEMIES.dragon.flying);
   assert.equal(sim.enemies[1].hp, ENEMIES.dragon.hp);
 });
+
+
+test('Dark Knights sweep multiple defenders but spare the rear and guarded units', async () => {
+  const { chilled } = await import('../src/defend/wizard.ts');
+  const sim = simulation();
+  const knight = (sim as any).newEnemy('darkKnight', 10, 10);
+  knight.chill = 100;
+  assert.equal(chilled(knight), 1);
+  const unit = (id: number, x: number, y: number, guard = 0) => ({ id, x, y, hp: 100, flash: 0, kind: 'sword', guard });
+  sim.soldiers.push(unit(100, 10, 10.5) as any, unit(101, 10.7, 10.7) as any,
+    unit(102, 10, 9) as any, unit(103, 10, 10.8, 1) as any);
+  stepEnemy(sim, knight, 1 / 30);
+  assert.ok(knight.slash);
+  assert.deepEqual(sim.soldiers.map(s => s.hp), [65, 65, 100, 100]);
+  assert.deepEqual((sim as any).separation(knight).length, 2);
+});
+
+test('kamikazes detonate once; birds must finish their dive and can be killed first', () => {
+  for (const kind of ['bombOrc', 'bombBird']) {
+    const sim = simulation();
+    const enemy = (sim as any).newEnemy(kind, 10, 10);
+    sim.enemies.push(enemy);
+    sim.soldiers.push({ id: 100, x: 10, y: 10.5, hp: 500, flash: 0, kind: 'sword' } as any);
+    stepEnemy(sim, enemy, 1 / 30);
+    if (kind === 'bombBird') {
+      assert.ok(enemy.dive > 0);
+      assert.equal(sim.soldiers[0].hp, 500);
+      stepEnemy(sim, enemy, .7);
+    }
+    assert.equal(enemy.hp, 0);
+    assert.equal(sim.soldiers[0].hp, 500 - ENEMIES[enemy.kind].damage);
+    assert.equal(sim.effects.filter(e => e.kind === 'boom').length, 1);
+  }
+  const sim = simulation();
+  const bird = (sim as any).newEnemy('bombBird', 10, 10);
+  bird.dive = .3; bird.hp = 0; sim.enemies.push(bird);
+  (sim as any).stepUnits(1 / 30);
+  assert.equal(sim.effects.filter(e => e.kind === 'boom').length, 0);
+});
+
+test('Void Sparrow black holes pulse at the requested radius and expire', async () => {
+  const { stepBlackHoles } = await import('../src/defend/hostile-attacks.ts');
+  const { SUB } = await import('../src/defend/grid.ts');
+  const sim = simulation();
+  const sparrow = (sim as any).newEnemy('voidSparrow', 10, 10);
+  sim.soldiers.push({ id: 100, x: 10, y: 11, hp: 10000, flash: 0, kind: 'sword' } as any,
+    { id: 101, x: 10 + SUB * .75 + .01, y: 10, hp: 10000, flash: 0, kind: 'sword' } as any);
+  stepEnemy(sim, sparrow, 1 / 30);
+  assert.equal(sim.blackHoles[0].r * 2, SUB * 1.5);
+  stepBlackHoles(sim, 1 / 30);
+  assert.equal(sim.soldiers[0].hp, 9700);
+  stepBlackHoles(sim, .5);
+  assert.equal(sim.soldiers[0].hp, 9400);
+  assert.equal(sim.soldiers[1].hp, 10000);
+  stepBlackHoles(sim, 8);
+  assert.equal(sim.blackHoles.length, 0);
+});

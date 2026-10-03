@@ -56,7 +56,7 @@ function scenarios(): Record<string, Scenario> {
     newEnemies: {
       layout: city(SQUARE, [["barracks", 1, 1], ["archerTower", -1, -1], ["wizardTower", 0, -2]]),
       citySeed: 13, levels: maxLevels(), seed: 6, seconds: 100, wave: 1,
-      opening: ['snake', 'dragon', 'shieldBearer', 'aegis'],
+      opening: ['snake', 'dragon', 'shieldBearer', 'aegis', 'darkKnight', 'bombOrc', 'bombBird', 'voidSparrow'],
     },
     // Small explicit mixed siege retains late-enemy and ice coverage even
     // as the random difficulty budgets change the natural wave mix.
@@ -122,7 +122,7 @@ function state(sim: DefendSim) {
   const s = sim as unknown as Record<string, unknown>;
   return [
     sim.time, sim.wave, sim.lost, sim.breakT, sim.spawnT, s.spawnInterval, s.waveSpawned, sim.spawnQueue, sim.mapVersion, sim.changed.length,
-    sim.enemies, sim.soldiers, sim.civilians, sim.arrows, sim.shells, sim.flames, sim.frosts, sim.stabs, sim.scorches, sim.effects, sim.events,
+    sim.blackHoles, sim.enemies, sim.soldiers, sim.civilians, sim.arrows, sim.shells, sim.flames, sim.frosts, sim.stabs, sim.scorches, sim.effects, sim.events,
     sim.solid, sim.hp, sim.built, sim.flash, sim.field,
     [...(s.towers as { cooldown: Map<number, number> }).cooldown], [...(s.barracks as { training: Map<number, number> }).training], (s.builders as { respawn: number[] }).respawn,
   ];
@@ -200,7 +200,7 @@ test("the Defend replays exercise every unit and effect", () => {
       if (sim.built.some((b, id) => b > 0 && b < sim.map.buildings[id].cells.length)) seen.add("half-rebuilt");
     });
   const want = [
-    "enemy:snake", "enemy:dragon", "enemy:shieldBearer", "enemy:aegis", "enemy:warlord", "enemy:bat", "enemy:mother", "enemy:broodling", "distracted", "marked", "soldier:sword", "soldier:archer", "path:sword", "path:archer", "hunting",
+    "enemy:darkKnight", "enemy:bombOrc", "enemy:bombBird", "enemy:voidSparrow", "enemy:snake", "enemy:dragon", "enemy:shieldBearer", "enemy:aegis", "enemy:warlord", "enemy:bat", "enemy:mother", "enemy:broodling", "distracted", "marked", "soldier:sword", "soldier:archer", "path:sword", "path:archer", "hunting",
     "civilian:toJob", "civilian:working", "civilian:home", "arrow", "shell", "flame", "frost", "chilled", "soldier:valkyrie", "stab", "guarded", "lost:bare", "half-rebuilt",
   ];
   assert.deepEqual(want.filter((w) => !seen.has(w)), []);

@@ -391,3 +391,14 @@ hits damage the enemy. Invincible Shield Generators protect a five-cell radius
 indefinitely. Swordsmen and valkyries bypass both shields. Arrows, explosions,
 fire, and ice are blocked (including ice's chill). Overlapping invincible
 shields take priority. Killing a generator removes its protection immediately.
+
+
+Dark Knights (500 difficulty) resist freezing and crowd displacement and strike
+all defenders in a forward crescent with a 1.6-cell reach. Kamikaze Orcs (120)
+carry pixel dynamite and detonate within contact range in a two-cell radius.
+Kamikaze Birds (350) fly over obstacles, descend for 0.6 seconds, then detonate
+in a 2.5-cell radius; killing them during the dive prevents detonation.
+Void Sparrows (5,000,000) create pixel black holes of diameter 1.5 tiles,
+pulsing 300 damage every half-second for eight seconds, with a 15-second
+casting cooldown. Hostile blasts and holes damage troops, civilians and
+buildings, spare enemies and honour valkyrie guards.

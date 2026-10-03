@@ -165,7 +165,7 @@ test('waves spend their difficulty budget and keep fixed enemy HP', () => {
 
 test('waves terminate safely with impossible budgets and invalid inputs', () => {
   assert.equal(buildDifficultyWave(1e12, () => 0).length, MAX_WAVE_ENEMIES);
-  assert.ok(buildDifficultyWave(1e12, () => 0).every(k => k === 'aegis'));
+  assert.ok(buildDifficultyWave(1e12, () => 0).every(k => k === 'voidSparrow'));
   for (const wave of [0, -1, NaN, Infinity]) assert.deepEqual(buildWave(wave, () => 0), []);
   assert.equal(waveDifficulty(1e100), Number.MAX_SAFE_INTEGER);
   for (const roll of [NaN, Infinity, -1, 2]) {
