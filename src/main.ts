@@ -67,6 +67,8 @@ const defendPage = new DefendPage(el("defend"), {
   },
   persist: store,
   reduceMotion: () => save.settings.reduceMotion,
+  healthbars: () => save.settings.showHealthbars,
+  setHealthbars: (value) => { save.settings.showHealthbars = value; store(); },
   effects: () => !save.settings.effectsOff,
   devMode: () => save.settings.devMode,
 });

@@ -1,3 +1,4 @@
+import { drawEnemyHealthbars, healthbarEnemies } from "./healthbars.ts";
 import { drawBlackHoles, drawHostileMarks, drawPoisonClouds } from "./hostile-art.ts";
 /** What DEFEND draws fresh each battle frame over the city layer: struck and
  * damaged buildings, blast scorches, then the units, projectiles and effects.
@@ -56,7 +57,9 @@ export type Burning = (x: number, y: number, id: number) => number;
 
 /** Units, projectiles and effects. With `torches`, units carry a torch,
  * lit while it still burns. */
-export function drawUnits(b: Brush, sim: DefendSim, torches: Burning | null) {
+export function drawUnits(b: Brush, sim: DefendSim, torches: Burning | null, healthbars = false) {
+  // Track the wave peak even when the setting is off.
+  healthbarEnemies(sim);
   drawBlackHoles(b, sim);
   drawPoisonClouds(b, sim);
   drawWatchRadii(b, sim);
@@ -69,6 +72,7 @@ export function drawUnits(b: Brush, sim: DefendSim, torches: Burning | null) {
   drawFireballs(b.c, b.px, sim);
   drawStabs(b.c, b.px, sim);
   for (const fx of sim.effects) drawEffect(b, fx);
+  if (healthbars) drawEnemyHealthbars(b, sim);
 }
 
 /** Watch-tower radii, very faint. */
@@ -353,12 +357,7 @@ function drawBossMarks({ c, px }: Brush, e: Enemy, sq: { x: number; y: number; s
   c.fillStyle = "#f2c94c";
   const k = Math.max(1, s / 5);
   for (let n = 0; n < 3; n++) c.fillRect(x + (n * (s - k)) / 2, y - k, k, k);
-  const bw = s * 1.6,
-    bh = Math.max(2, px * 0.18);
-  c.fillStyle = "rgba(0,0,0,0.75)";
-  c.fillRect(e.x * px - bw / 2, y - k - bh - 2, bw, bh);
-  c.fillStyle = "#d9635a";
-  c.fillRect(e.x * px - bw / 2, y - k - bh - 2, bw * Math.max(0, e.hp / e.maxHp), bh);
+
 }
 
 function drawArrows({ c, px }: Brush, sim: DefendSim) {

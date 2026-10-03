@@ -12,6 +12,7 @@ export type Setting = Toggle | Choice | Range;
  * type, the defaults and the save decoder all come from this table, so a new
  * setting is one row here. Rows are in saved key order. */
 export const SETTINGS = {
+  showHealthbars: { kind: "toggle", default: true, page: { id: "enemy-healthbars", label: "Healthbars for tough enemies" } },
   reduceMotion: { kind: "toggle", default: false, page: { id: "motion", label: "Reduce motion" } },
   /** The city's live dressing: wind-blown park grass, and drips, ripples
    * and reflections on the ponds. */

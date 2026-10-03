@@ -38,6 +38,7 @@ export type DrawOptions = {
   reduceMotion: boolean;
   /** Draw the live park grass and pond effects. */
   effects?: boolean;
+  healthbars?: boolean;
   /** The run is over: the city's torches go out in a wave from the keep. */
   over?: boolean;
 };
@@ -237,7 +238,7 @@ export class DefendRenderer {
     drawScorches(brush, sim);
     drawBlazes(this.ctx, this.px, sim);
     this.wizard.drawIce(this.ctx, this.px, sim.frosts, sim.time * 1000, flameLights(sim).relief);
-    drawUnits(brush, sim, torches);
+    drawUnits(brush, sim, torches, opts.healthbars === true);
     this.dark.draw(this.ctx, this.px, sim);
     this.wizard.drawChill(this.ctx, this.px, sim, opts.now);
   }

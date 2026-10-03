@@ -464,3 +464,13 @@ frames, with stats and special abilities. Discoveries and read entries persist
 in the Defend save; legacy saves start with an empty journal. A red pixel
 exclamation marks unread discoveries. Opening the journal marks its entries
 read and pauses the battle until the dialog closes (Close button or Escape).
+
+
+Tough enemy healthbars can be toggled in the main Settings page or Defend's
+settings cog, and the preference persists. Bars are enabled by default. They
+require at least 100 difficulty and at least one quarter of the strongest
+enemy cost in the actual randomly generated wave (including queued enemies).
+The peak is retained until the next wave. Up to eight bars are drawn, highest
+cost first and lowest remaining HP fraction next, with stable ID ties.
+Dead enemies and linked body segments are excluded; independent chain heads
+qualify. Turning the setting off also hides the old Warlord healthbar.

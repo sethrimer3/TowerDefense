@@ -55,6 +55,8 @@ export type DefendHost = {
   /** The park grass and pond effects are on. */
   effects(): boolean;
   devMode(): boolean;
+  healthbars?(): boolean;
+  setHealthbars?(value: boolean): void;
 };
 
 const ITEM_NAMES: Record<PaletteItem, string> = {
@@ -346,6 +348,7 @@ export class DefendPage {
     el.innerHTML = `<small>DEFEND SETTINGS</small>
       <div class="defend-setting"><span>Palette side</span><span class="defend-seg">
         <button data-side="left" aria-pressed="${side === "left"}">Left</button><button data-side="right" aria-pressed="${side === "right"}">Right</button></span></div>
+      <div class="defend-setting"><label for="defend-healthbars">Tough enemy healthbars</label><input type="checkbox" id="defend-healthbars" ${(this.host.healthbars?.() ?? true) ? "checked" : ""}></div>
       <div class="defend-setting"><span>Board view</span><button id="defend-reset-view">Reset zoom</button></div>
       <p class="hint">Scroll or pinch to zoom; drag open ground to pan.</p>`;
     el.querySelectorAll<HTMLButtonElement>("[data-side]").forEach((b) => {
@@ -355,6 +358,7 @@ export class DefendPage {
         this.renderChrome();
       };
     });
+    el.querySelector<HTMLInputElement>("#defend-healthbars")!.onchange = (event) => this.host.setHealthbars?.((event.target as HTMLInputElement).checked);
     el.querySelector<HTMLButtonElement>("#defend-reset-view")!.onclick = () => this.renderer?.resetCam();
   }
 
@@ -631,6 +635,7 @@ export class DefendPage {
       now: performance.now(),
       reduceMotion: this.host.reduceMotion(),
       effects: this.host.effects(),
+      healthbars: this.host.healthbars?.() ?? true,
       over: this.phase === "over",
     });
   }
