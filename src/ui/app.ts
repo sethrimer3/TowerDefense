@@ -16,6 +16,10 @@ export interface AppContext {
   clock(): number;
   /** The names of the mine's smiths (who work the Smithy's upgrades). */
   smiths(): string[];
+  /** A dev option changed: applies what it grants, saves and refreshes. */
+  devChanged(): void;
+  /** Dev: adds `ms` of idle time, as if the game had been closed that long. */
+  addIdle(ms: number): void;
   /** Replaces the save with a fresh one. */
   eraseAll(): void;
 }

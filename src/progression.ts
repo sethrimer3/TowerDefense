@@ -6,10 +6,11 @@
  * battle reads. Pure functions over the save, so tests drive them without a
  * page. */
 import { NO_BONUSES, type Bonuses, type EnemyKind } from "./defend/catalog.ts";
-import { SKILLS, SKILL_IDS, skillAvailable, skillCost, type SkillId } from "./skill-trees.ts";
+import { SKILLS, SKILL_IDS, TREES, skillAvailable, skillCost, type SkillId, type TreeId } from "./skill-trees.ts";
 import { trainingJob, trainingSeconds, type TrainingJob } from "./training-jobs.ts";
 import type { Metal } from "./mine/sim.ts";
 import type { Save } from "./save.ts";
+import type { SettingKey } from "./settings.ts";
 
 /** What the Smithy and the skill trees can raise: the battle's `Bonuses`,
  * the Gold a defense pays, and how fast the Smithy's upgrades are worked. */
@@ -37,6 +38,20 @@ export const TRAINING: TrainingRow[] = [
 ];
 export const TRAINING_IDS = TRAINING.map((t) => t.id);
 
+// ── Dev research ───────────────────────────────────────────────────────
+/** The dev setting that counts every rank of a tab of the Upgrades page as bought. */
+export const DEV_RESEARCH = {
+  training: "devSmithy", command: "devCommand", stewardship: "devStewardship", mine: "devMine", library: "devLibrary",
+} as const satisfies Record<TreeId | "training", SettingKey>;
+const TREE_OF = Object.fromEntries(TREES.flatMap((t) => t.nodes.map((n) => [n.id, t.id]))) as Record<SkillId, TreeId>;
+/** A Smithy row's ranks: the ones bought, or every one under dev research. */
+export const trainingRank = (save: Save, id: TrainingId) =>
+  save.settings.devSmithy ? TRAINING.find((t) => t.id === id)!.max : save.training[id];
+/** A skill's ranks: the ones bought, or every one under dev research. */
+export const skillRank = (save: Save, id: SkillId) => (save.settings[DEV_RESEARCH[TREE_OF[id]]] ? SKILLS[id].max : save.skills[id]);
+/** Every skill's ranks as `skillRank` counts them. */
+const skillRanks = (save: Save) => Object.fromEntries(SKILL_IDS.map((id) => [id, skillRank(save, id)])) as Record<SkillId, number>;
+
 /** The Smithy point a row's next rank costs, with `ranks` owned: copper for
  * the first ten, silver to twenty-five, gold after. */
 export const rankPrice = (ranks: number): Metal => (ranks < 10 ? "copper" : ranks < 25 ? "silver" : "gold");
@@ -47,23 +62,24 @@ export const busySmiths = (save: Save) => new Set(save.trainingJobs.flatMap((j) 
 /** Where one row stands: its percent now and after one more rank, the
  * point the rank costs, and whether it is maxed or affordable. */
 export function trainingStep(save: Save, id: TrainingId) {
-  const row = TRAINING.find((t) => t.id === id)!, ranks = save.training[id];
+  const row = TRAINING.find((t) => t.id === id)!, ranks = trainingRank(save, id);
   const maxed = ranks + (trainingJob(save.trainingJobs, id) ? 1 : 0) >= row.max, metal = rankPrice(ranks);
-  return { now: ranks * row.per, next: (ranks + 1) * row.per, maxed, metal, affordable: save.settings.freePurchases || save.smithy[metal] >= 1 };
+  return { now: ranks * row.per, next: (ranks + 1) * row.per, maxed, metal, affordable: save.settings.devMode || save.smithy[metal] >= 1 };
 }
 
 /** Starts one rank of `id`, worked by `smith` (a smith with no upgrade): its
  * point is spent at once, the rank counts once its work is done
- * (`settleTraining`). Free purchases finish it at once. */
+ * (`settleTraining`). Dev: instantaneous research finishes it at once, smith
+ * or none, and unlimited money spends no point. */
 export function startTraining(save: Save, id: TrainingId, smith: string): boolean {
   const step = trainingStep(save, id);
-  if (step.maxed || trainingJob(save.trainingJobs, id)) return false;
-  if (save.settings.freePurchases) {
+  if (step.maxed || trainingJob(save.trainingJobs, id) || !step.affordable) return false;
+  if (!save.settings.instantResearch && busySmiths(save).has(smith)) return false;
+  if (!save.settings.devMode) save.smithy[step.metal]--;
+  if (save.settings.instantResearch) {
     save.training[id]++;
     return true;
   }
-  if (!step.affordable || busySmiths(save).has(smith)) return false;
-  save.smithy[step.metal]--;
   save.trainingJobs.push({ id, left: trainingSeconds(save.training[id]) * 1000, smiths: [smith] });
   return true;
 }
@@ -126,29 +142,29 @@ export function settleTraining(save: Save, now: number, smiths?: ReadonlySet<str
 // ── Skill trees ────────────────────────────────────────────────────────
 /** A skill's state for the page: its price, and whether it can be bought. */
 export function skillPurchase(save: Save, id: SkillId) {
-  const level = save.skills[id], price = skillCost(id, level);
-  const maxed = level >= SKILLS[id].max, available = skillAvailable(id, save.skills);
-  const affordable = save.settings.freePurchases || save.knowledge >= price;
+  const level = skillRank(save, id), price = skillCost(id, level);
+  const maxed = level >= SKILLS[id].max, available = skillAvailable(id, skillRanks(save));
+  const affordable = save.settings.devMode || save.knowledge >= price;
   return { level, price, maxed, available, affordable, canBuy: !maxed && available && affordable };
 }
 
 export function buySkill(save: Save, id: SkillId): boolean {
   const p = skillPurchase(save, id);
   if (!p.canBuy) return false;
-  if (!save.settings.freePurchases) save.knowledge -= p.price;
+  if (!save.settings.devMode) save.knowledge -= p.price;
   save.skills[id]++;
   return true;
 }
 
 /** Everything every owned skill rank adds to `target`. */
 export function skillTotal(save: Save, target: BonusTarget | "smiths" | "copperPerWave") {
-  return SKILL_IDS.reduce((n, id) => (SKILLS[id].effect.target === target ? n + SKILLS[id].effect.per * save.skills[id] : n), 0);
+  return SKILL_IDS.reduce((n, id) => (SKILLS[id].effect.target === target ? n + SKILLS[id].effect.per * skillRank(save, id) : n), 0);
 }
 
 /** Percent added to `target` by Training and skills together. */
 function percent(save: Save, target: BonusTarget) {
   const row = TRAINING.find((t) => t.id === target);
-  return (row ? row.per * save.training[row.id] : 0) + skillTotal(save, target);
+  return (row ? row.per * trainingRank(save, row.id) : 0) + skillTotal(save, target);
 }
 
 /** `target` as a multiplier: 1 plus its percent, or for a time, 1 over that. */

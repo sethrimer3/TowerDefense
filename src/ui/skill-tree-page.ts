@@ -1,5 +1,5 @@
 import { play } from "../sound.ts";
-import { TRAINING, TRAINING_GROUPS, addSmith, busySmiths, whole, buySkill, cancelTraining, removeSmith, skillPurchase, startTraining, trainingLeft, trainingStep, type TrainingId } from "../progression.ts";
+import { TRAINING, TRAINING_GROUPS, addSmith, busySmiths, whole, buySkill, cancelTraining, removeSmith, skillPurchase, skillRank, startTraining, trainingLeft, trainingStep, type TrainingId } from "../progression.ts";
 import { BARS_PER_POINT, METALS } from "../mine/sim.ts";
 import { SKILLS, TREES, mapNodes, treeHeight, type SkillId, type SkillNode, type TreeId } from "../skill-trees.ts";
 import { TreeParticles } from "../tree-particles.ts";
@@ -44,7 +44,7 @@ export class SkillTreePage {
     const save = this.save;
     const points = METALS.reduce((n, k) => n + save.smithy[k], 0);
     const tabs = `<button data-tree="training" aria-pressed="${this.tree === "training"}"><span>${uiSprite("upgrades")}</span>Smithy<small>${points} ${points === 1 ? "POINT" : "POINTS"}</small></button>` +
-      TREES.map((t) => `<button data-tree="${t.id}" aria-pressed="${t.id === this.tree}"><span>${uiSprite(TREE_ICONS[t.id])}</span>${t.name}<small>${t.nodes.reduce((n, node) => n + save.skills[node.id], 0)} RANKS</small></button>`).join("");
+      TREES.map((t) => `<button data-tree="${t.id}" aria-pressed="${t.id === this.tree}"><span>${uiSprite(TREE_ICONS[t.id])}</span>${t.name}<small>${t.nodes.reduce((n, node) => n + skillRank(save, node.id), 0)} RANKS</small></button>`).join("");
     const head = `<div class="tree-tabs" role="group" aria-label="Skill trees">${tabs}</div>`;
     const bindTabs = () => document.querySelectorAll<HTMLButtonElement>("[data-tree]").forEach((b) => (b.onclick = () => {
       this.tree = b.dataset.tree as PageTab;
@@ -56,7 +56,7 @@ export class SkillTreePage {
       bindTabs();
       document.querySelectorAll<HTMLButtonElement>("[data-train]").forEach((b) => (b.onclick = () => {
         const smith = this.freeSmiths()[0];
-        if ((smith || this.save.settings.freePurchases) && startTraining(this.save, b.dataset.train as TrainingId, smith ?? "")) {
+        if ((smith || this.save.settings.instantResearch) && startTraining(this.save, b.dataset.train as TrainingId, smith ?? "")) {
           this.ctx.update();
           play("coin");
         }
@@ -78,7 +78,7 @@ export class SkillTreePage {
     const tree = this.current(), view = this.view(tree.id), nodes = mapNodes(tree);
     const lines = nodes.flatMap((n) => n.requires.map((id) => {
       const parent = nodes.find((p) => p.id === id);
-      return parent ? `<line x1="${parent.x}" y1="${parent.y}" x2="${n.x}" y2="${n.y}" class="${save.skills[id] ? "lit" : ""}"/>` : "";
+      return parent ? `<line x1="${parent.x}" y1="${parent.y}" x2="${n.x}" y2="${n.y}" class="${skillRank(save, id) ? "lit" : ""}"/>` : "";
     })).join("");
     el("upgrades").innerHTML = `${head}
       <section class="skill-tree ${tree.id}"><header class="tree-heading"><h3>${tree.name}</h3><small>${tree.description}</small></header>
@@ -125,7 +125,7 @@ export class SkillTreePage {
    * it costs; tap the cost to start it with a free smith, and put more
    * smiths on (or take them off) a rank in work. */
   private trainingHtml() {
-    const save = this.save, smiths = this.ctx.smiths(), free = this.freeSmiths(), devFree = save.settings.freePurchases;
+    const save = this.save, smiths = this.ctx.smiths(), free = this.freeSmiths(), devFree = save.settings.instantResearch;
     const row = (t: (typeof TRAINING)[number]) => {
       const { now, next, affordable, maxed, metal } = trainingStep(save, t.id);
       const price = `1 ${metal}`;
@@ -207,7 +207,7 @@ export class SkillTreePage {
       this.render();
       return;
     }
-    const level = this.save.skills[id];
+    const level = skillRank(this.save, id);
     if (buySkill(this.save, id)) {
       play(level === 0 ? "unlock" : "chime");
       if (!this.save.settings.reduceMotion) {
@@ -224,7 +224,7 @@ export class SkillTreePage {
   private tooltipHtml(id: SkillId): string {
     const node = this.current().nodes.find((n) => n.id === id)!, skill = SKILLS[id], save = this.save;
     const { level, price, maxed, available, canBuy } = skillPurchase(save, id);
-    const requirements = node.requires.filter((rid) => !save.skills[rid]).map((rid) => SKILLS[rid].name);
+    const requirements = node.requires.filter((rid) => !skillRank(save, rid)).map((rid) => SKILLS[rid].name);
     let hint: string;
     if (maxed) hint = "Mastered.";
     else if (requirements.length) hint = `Requires: ${requirements.join(" + ")} (one rank each).`;

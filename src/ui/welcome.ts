@@ -4,6 +4,7 @@
  * the Mine's figures climb while its catch-up runs. */
 import { MAX_AWAY_MS, span } from "../away.ts";
 import type { MineAway } from "../mine/ui.ts";
+import type { LibraryAway } from "../library/ui.ts";
 import { METALS, type Metals } from "../mine/sim.ts";
 import { whole } from "../progression.ts";
 import { play } from "../sound.ts";
@@ -20,6 +21,10 @@ export interface Away {
   knowledge: number;
   shelves: number;
   librarians: number;
+  /** What the library worked through of added time (null when it was paid
+   * at its rate instead), and the time it still owes. */
+  library: LibraryAway | null;
+  libraryOwedMs: number;
   /** The mine's account (null without a mine), its crew, and the time its
    * catch-up still owes. */
   mine: MineAway | null;
@@ -41,6 +46,13 @@ function ledger(a: Away) {
   const library = a.shelves > 0 || a.librarians > 0
     ? `${plural(a.shelves, "shelf", "shelves")} and ${plural(a.librarians, "librarian")} at work`
     : "Nobody at the desks yet";
+  let libraryNote = "";
+  if (a.library) {
+    const l = a.library, losses = [l.shelves && plural(l.shelves, "shelf", "shelves"), l.librarians && plural(l.librarians, "librarian")].filter(Boolean);
+    const fires = l.fires ? `${plural(l.fires, "fire")} broke out${losses.length ? `: ${losses.join(" and ")} lost` : ", put out without loss"}` : "";
+    const note = a.libraryOwedMs > 0 ? `The librarians are still at work: ${span(a.libraryOwedMs)} to catch up` : "";
+    libraryNote = note || fires ? `<p class="away-note">${note}${note && fires ? "<br>" : ""}${fires ? `<span class="${l.shelves || l.librarians ? "away-loss" : ""}">${fires}</span>` : ""}</p>` : "";
+  }
   let mine = "";
   if (a.mine) {
     const m = a.mine;
@@ -60,7 +72,7 @@ function ledger(a: Away) {
   return `<section class="away-row away-library">
       <h3>✦ The Library</h3>
       <p>${library}</p>
-      <b class="away-gain">+${whole(a.knowledge)} <small>Knowledge</small></b>
+      <b class="away-gain">+${whole(a.knowledge)} <small>Knowledge</small></b>${libraryNote}
     </section>${mine}`;
 }
 
@@ -75,14 +87,20 @@ export class WelcomeBack {
     this.read = read;
   }
 
-  /** Shows the screen, if the time away earned anything. */
-  show() {
+  /** Shows the screen, if the time away earned anything; `skipped`, for time
+   * added by the dev option, whatever it earned. */
+  show(skipped = false) {
     const a = this.read();
-    if (!worthWelcome(a)) return;
+    if (!skipped && !worthWelcome(a)) return;
     const capped = a.ms > MAX_AWAY_MS;
-    this.modal.innerHTML = `<small>WELCOME BACK</small>
+    const head = skipped
+      ? `<small>DEV · IDLE TIME</small>
+      <h2>Time passes</h2>
+      <p class="away-time"><b>${span(a.ms)}</b> of idle time added.</p>`
+      : `<small>WELCOME BACK</small>
       <h2>While you were away</h2>
-      <p class="away-time">You were gone <b>${span(a.ms)}</b>.${capped ? ` The city keeps account of the last ${span(MAX_AWAY_MS)}.` : ""}</p>
+      <p class="away-time">You were gone <b>${span(a.ms)}</b>.${capped ? ` The city keeps account of the last ${span(MAX_AWAY_MS)}.` : ""}</p>`;
+    this.modal.innerHTML = `${head}
       <div class="away-ledger" id="away-ledger"></div>
       <div class="dialog-actions"><button id="away-collect" class="away-collect">${uiSprite("gold")} Collect</button></div>`;
     this.modal.classList.add("welcome");
@@ -106,7 +124,8 @@ export class WelcomeBack {
    * the ledger is redrawn only when what it says changes). */
   refresh() {
     if (!this.open) return;
-    const a = this.read(), html = ledger({ ...a, owedMs: Math.ceil(a.owedMs / 60000) * 60000 });
+    const minute = (ms: number) => Math.ceil(ms / 60000) * 60000;
+    const a = this.read(), html = ledger({ ...a, owedMs: minute(a.owedMs), libraryOwedMs: minute(a.libraryOwedMs) });
     if (html === this.shown) return;
     this.shown = html;
     this.modal.querySelector("#away-ledger")!.innerHTML = html;
