@@ -54,6 +54,11 @@ export function available(save: DefendSave, item: PaletteItem): number {
   return Math.max(0, save.owned[item] - placedCount(save.layout, item as PlacedKind | "cityTile"));
 }
 
+/** Dev (All towers unlocked): at least one of every structure owned. */
+export function unlockAllTowers(save: DefendSave) {
+  for (const item of PALETTE_ITEMS) if (item !== "cityTile") save.owned[item] = Math.max(save.owned[item], 1);
+}
+
 /** The wallet DEFEND spends from: main-game gold and metal bars; `free`
  * (Dev free purchases) buys anything for nothing. */
 export type Wallet = { gold: number; copper: number; silver: number; free?: boolean };

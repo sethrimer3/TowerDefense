@@ -19,11 +19,21 @@ export const SETTINGS = {
   effectsOff: { kind: "toggle", default: false, page: { id: "effects", label: "Grass and water effects", invert: true } },
   /** The synthesized knocks, chimes, horns and bells. */
   soundOff: { kind: "toggle", default: false, page: { id: "sound", label: "Sound", invert: true } },
-  /** Unlimited currency: the Armory, Training and skill trees show ∞. */
-  devMode: { kind: "toggle", default: false, page: { id: "dev-mode", label: "Dev mode (unlimited currency)" } },
-  /** Dev: every purchase is allowed and costs nothing, and Training
-   * completes at once. Unlocks and grants nothing itself. */
-  freePurchases: { kind: "toggle", default: false, page: { id: "free-purchases", label: "Dev: free purchases (instant training)" } },
+  /** Dev: unlimited money. Every currency shows ∞, and every purchase
+   * (Armory, Mine, Library, Smithy points, Knowledge) costs nothing. */
+  devMode: { kind: "toggle", default: false, page: { id: "dev-mode", label: "Unlimited money" } },
+  /** Dev: the palette holds at least one of every structure (granted when
+   * turned on; turning it off takes nothing back). */
+  devTowers: { kind: "toggle", default: false, page: { id: "dev-towers", label: "All towers unlocked" } },
+  /** Dev: a Smithy rank completes the moment it is started, with or without a smith. */
+  instantResearch: { kind: "toggle", default: false, page: { id: "dev-instant", label: "Instantaneous research" } },
+  /** Dev: every rank of a tab of the Upgrades page counts as bought, while on
+   * (the ranks actually bought are kept, and count again once off). */
+  devSmithy: { kind: "toggle", default: false, page: { id: "dev-smithy", label: "Smithy" } },
+  devCommand: { kind: "toggle", default: false, page: { id: "dev-command", label: "Command" } },
+  devStewardship: { kind: "toggle", default: false, page: { id: "dev-stewardship", label: "Stewardship" } },
+  devMine: { kind: "toggle", default: false, page: { id: "dev-mine", label: "Mine" } },
+  devLibrary: { kind: "toggle", default: false, page: { id: "dev-library", label: "Library" } },
 } as const satisfies Record<string, Setting>;
 
 export type SettingKey = keyof typeof SETTINGS;

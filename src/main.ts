@@ -2,7 +2,7 @@ import "./style.css";
 import "./theme.css";
 import { defaults, load, persist, type Save } from "./save.ts";
 import { DefendPage } from "./defend/ui.ts";
-import { bonuses, busySmiths, payKills, payWave, settleTraining, skillTotal, whole } from "./progression.ts";
+import { bonuses, busySmiths, payKills, payWave, settleTraining, skillRank, skillTotal, whole } from "./progression.ts";
 import type { AppContext } from "./ui/app.ts";
 import { el, type Tab } from "./ui/dom.ts";
 import { buildShell } from "./ui/shell.ts";
@@ -16,6 +16,7 @@ import { METALS, type Weather as MineWeather } from "./mine/sim.ts";
 import { LibraryPage } from "./library/ui.ts";
 import { stream } from "./random.ts";
 import { WelcomeBack } from "./ui/welcome.ts";
+import { unlockAllTowers } from "./defend/progress.ts";
 
 // Wires the pages together: builds the shell, loads the save, and routes
 // navigation, the currency bar and the frame loop between the pages.
@@ -33,6 +34,11 @@ const ctx: AppContext = {
   navigate,
   clock,
   smiths: () => smithNames(),
+  devChanged: () => {
+    if (save.settings.devTowers) unlockAllTowers(save.defend);
+    update();
+  },
+  addIdle,
   eraseAll: () => {
     save = defaults();
     minePage.load(null, clock());
@@ -43,7 +49,7 @@ const ctx: AppContext = {
 const skillTree = new SkillTreePage(ctx);
 const defendPage = new DefendPage(el("defend"), {
   save: () => save.defend,
-  wallet: () => ({ gold: save.gold, copper: save.copper, silver: save.silver, free: save.settings.freePurchases || save.settings.devMode }),
+  wallet: () => ({ gold: save.gold, copper: save.copper, silver: save.silver, free: save.settings.devMode }),
   setWallet: (w) => {
     if (save.settings.devMode) return;
     save.gold = w.gold;
@@ -75,7 +81,7 @@ const defendPage = new DefendPage(el("defend"), {
 
 const minePage = new MinePage(el("mine"), {
   gold: () => save.gold,
-  free: () => save.settings.freePurchases || save.settings.devMode,
+  free: () => save.settings.devMode,
   spendGold: (n) => {
     save.gold = Math.max(0, save.gold - n);
     update();
@@ -85,7 +91,7 @@ const minePage = new MinePage(el("mine"), {
     mineDirty = true;
     if (tab === "upgrades") skillTree.render();
   },
-  upgrades: () => ({ coffee: save.skills.coffee, waterproof: save.skills.waterproofing, smiths: skillTotal(save, "smiths") }),
+  upgrades: () => ({ coffee: skillRank(save, "coffee"), waterproof: skillRank(save, "waterproofing"), smiths: skillTotal(save, "smiths") }),
   busySmiths: () => busySmiths(save),
   effects: () => !save.settings.effectsOff,
   newSeed: () => Math.floor(stream("game")() * 4294967296),
@@ -94,7 +100,7 @@ const minePage = new MinePage(el("mine"), {
 });
 const libraryPage = new LibraryPage(el("library"), {
   gold: () => save.gold,
-  free: () => save.settings.freePurchases || save.settings.devMode,
+  free: () => save.settings.devMode,
   spendGold: (n) => {
     save.gold = Math.max(0, save.gold - n);
     update();
@@ -110,7 +116,7 @@ const libraryPage = new LibraryPage(el("library"), {
       mineDirty = true;
     }
   },
-  upgrades: () => ({ fireproof: save.skills.fireproofWood, fireTraining: save.skills.fireTraining }),
+  upgrades: () => ({ fireproof: skillRank(save, "fireproofWood"), fireTraining: skillRank(save, "fireTraining") }),
   showing: () => tab === "library",
 });
 /** The mine or the library has paid out since the last save. */
@@ -119,7 +125,7 @@ let mineDirty = false;
 const smithNames = () => minePage.sim.miners.filter((m) => m.job === "smith").map((m) => m.name);
 /** Time since the Mine and the Library were last saved: the time away. */
 const lastSaved = Math.max(save.mine?.savedAt ?? 0, save.library?.savedAt ?? 0);
-const awayMs = lastSaved > 0 ? Math.max(0, clock() - lastSaved) : 0;
+let awayMs = lastSaved > 0 ? Math.max(0, clock() - lastSaved) : 0;
 libraryPage.load(save.library, clock());
 minePage.load(save.mine, clock());
 const welcome = new WelcomeBack(modal, () => ({
@@ -127,10 +133,25 @@ const welcome = new WelcomeBack(modal, () => ({
   knowledge: libraryPage.awayKnowledge,
   shelves: libraryPage.sim.built,
   librarians: libraryPage.sim.librarians.length,
+  library: libraryPage.away,
+  libraryOwedMs: libraryPage.owedMs,
   mine: minePage.away,
   crew: minePage.sim.miners.length,
   owedMs: minePage.owedMs,
 }));
+
+/** Dev: `ms` of idle time, as if the game had been closed that long. The
+ * Mine and the Library work through it a slice each frame (the Mine up to its
+ * two hours of catch-up, the rest paid at the smithy's pace), the Smithy's
+ * smiths work on, and the welcome-back screen keeps the account. */
+function addIdle(ms: number) {
+  awayMs = ms;
+  minePage.addAway(ms);
+  libraryPage.addAway(ms);
+  if (save.trainingClock) save.trainingClock -= ms;
+  update();
+  welcome.show(true);
+}
 
 soundEnabledBy(() => !save.settings.soundOff);
 flourishesEnabledBy(() => !save.settings.reduceMotion);
