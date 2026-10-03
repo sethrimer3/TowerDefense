@@ -16,6 +16,7 @@ import {
   cellIndex,
   cellX,
   cellY,
+  hash,
   hash01,
   parseTileKey,
   rectCells,
@@ -25,10 +26,12 @@ import {
   type Rect,
   type TilePos,
 } from "./grid.ts";
-import { STRUCTURES, type StructureKind } from "./catalog.ts";
+import { STRUCTURES, TILE_ROOM, footprint, type StructureKind } from "./catalog.ts";
 
 export type PlacedKind = Exclude<StructureKind, "keep">;
-export type PlacedStructure = { uid: number; kind: PlacedKind; tx: number; ty: number };
+/** `spot` seeds where on its tile the structure stands; it is drawn afresh
+ * for everything on a tile whenever something is dropped there. */
+export type PlacedStructure = { uid: number; kind: PlacedKind; tx: number; ty: number; spot: number };
 
 export type Layout = {
   keep: TilePos;
@@ -36,6 +39,11 @@ export type Layout = {
   cityTiles: string[];
   structures: PlacedStructure[];
   nextUid: number;
+  /** Drops so far: each draws fresh spots for the tile it lands on. */
+  rolls: number;
+  /** Kinds whose building-specific upgrade makes them smaller (from the
+   * Armory's levels, not saved on its own). */
+  compact: PlacedKind[];
 };
 
 export type FittedStructure = {
@@ -60,6 +68,8 @@ export function defaultLayout(): Layout {
     cityTiles: [],
     structures: [],
     nextUid: 1,
+    rolls: 0,
+    compact: [],
   };
 }
 
@@ -69,6 +79,8 @@ export function cloneLayout(l: Layout): Layout {
     cityTiles: [...l.cityTiles],
     structures: l.structures.map((s) => ({ ...s })),
     nextUid: l.nextUid,
+    rolls: l.rolls,
+    compact: [...l.compact],
   };
 }
 
@@ -130,49 +142,104 @@ function nearCity(city: Uint8Array, cx: number, cy: number): boolean {
 type FitSpace = {
   city: Uint8Array;
   wall: Uint8Array;
-  /** Footprints plus a one-cell ring around each, so structures never touch
-   * and there is always room for a street between them. */
+  /** How many footprints, each with a one-cell ring around it, cover each
+   * cell, so structures never touch and there is always room for a street
+   * between them. A count, so a tile's arrangement can be taken back. */
   blocked: Uint8Array;
   foot: Uint8Array;
 };
 
 /** A structure to fit onto its tile. */
-type Placement = { uid: number; kind: StructureKind; tx: number; ty: number; inside: boolean };
+type Placement = { uid: number; kind: StructureKind; tx: number; ty: number; inside: boolean; spot: number; w: number; h: number; size: number };
 
-/** Work out the exact cell rectangle of every structure, oldest first, so
- * adding a new structure never shuffles the ones already standing. Fails if
- * something cannot fit, or if any in-city structure would be cut off from
- * the keep's streets. */
+/** Tries per tile, each a fresh random arrangement, before it is full. */
+const TRIES = 24;
+/** Fresh arrangements of the whole city tried when one leaves an in-city
+ * structure cut off from the streets. */
+const PASSES = 6;
+
+/** Work out the exact cell rectangle of every structure. The keep stands in
+ * the middle of its tile; every other structure takes a random free spot on
+ * its tile (drawn from its `spot`), and the structures sharing a tile are
+ * fitted together, biggest first, rearranged until they all fit. Tiles go
+ * in order of their oldest structure. Fails if a tile's structures take
+ * more than its room or can't all fit, or if an in-city structure would be
+ * cut off from the keep's streets. */
 export function fitLayout(l: Layout): Fit {
   const city = cityMask(l);
-  const space: FitSpace = { city, wall: wallMask(city), blocked: new Uint8Array(CELL_COUNT), foot: new Uint8Array(CELL_COUNT) };
   const cityTiles = cityTileSet(l);
-  const fitted: FittedStructure[] = [];
-  for (const s of fitOrder(l)) {
-    const f = fitStructure({ ...s, inside: cityTiles.has(tileKey(s.tx, s.ty)) }, space);
-    if (typeof f === "string") return { ok: false, reason: f };
-    fitted.push(f);
+  let failure = "";
+  for (let pass = 0; pass < PASSES; pass++) {
+    const space: FitSpace = { city, wall: wallMask(city), blocked: new Uint8Array(CELL_COUNT), foot: new Uint8Array(CELL_COUNT) };
+    const fitted: FittedStructure[] = [];
+    for (const group of fitOrder(l, cityTiles)) {
+      const f = fitTile(group, space, pass * TRIES);
+      if (typeof f === "string") return { ok: false, reason: f };
+      fitted.push(...f);
+    }
+    const cut = cutOff(fitted, space);
+    if (!cut) return { ok: true, structures: fitted, city, wall: space.wall };
+    failure ||= `The ${STRUCTURES[cut.kind].name.toLowerCase()} would be cut off from the streets.`;
   }
-  const cut = cutOff(fitted, space);
-  if (cut) return { ok: false, reason: `The ${STRUCTURES[cut.kind].name.toLowerCase()} would be cut off from the streets.` };
-  return { ok: true, structures: fitted, city, wall: space.wall };
+  return { ok: false, reason: failure };
 }
 
-/** The keep, then every structure oldest first. */
-function fitOrder(l: Layout): { uid: number; kind: StructureKind; tx: number; ty: number }[] {
-  return [{ uid: KEEP_UID, kind: "keep", tx: l.keep.tx, ty: l.keep.ty }, ...[...l.structures].sort((a, b) => a.uid - b.uid)];
+/** The keep's tile, then every other tile with structures on it in order of
+ * its oldest one, each tile's structures biggest first. */
+function fitOrder(l: Layout, cityTiles: Set<string>): Placement[][] {
+  const compact = new Set(l.compact);
+  const place = (s: { uid: number; kind: StructureKind; tx: number; ty: number; spot: number }): Placement => ({
+    ...s,
+    inside: cityTiles.has(tileKey(s.tx, s.ty)),
+    ...footprint(s.kind, compact.has(s.kind as PlacedKind)),
+  });
+  const keep = place({ uid: KEEP_UID, kind: "keep", tx: l.keep.tx, ty: l.keep.ty, spot: 0 });
+  const tiles = new Map<string, Placement[]>([[tileKey(keep.tx, keep.ty), [keep]]]);
+  for (const s of [...l.structures].sort((a, b) => a.uid - b.uid)) {
+    const k = tileKey(s.tx, s.ty);
+    if (!tiles.has(k)) tiles.set(k, []);
+    tiles.get(k)!.push(place(s));
+  }
+  return [...tiles.values()].map((g) => g.sort((a, b) => b.w * b.h - a.w * a.h || a.uid - b.uid));
 }
 
-/** Fits one structure and claims its cells, or says why it can't go there. */
-function fitStructure(p: Placement, space: FitSpace): FittedStructure | string {
-  if (!tileInBounds(p.tx, p.ty) || p.ty === SPAWN_ROW) return "Nothing can be built on the spawn row.";
-  const def = STRUCTURES[p.kind];
-  if (!p.inside && !def.outsideOk) return `${def.name} must be inside the city limits.`;
-  const rect = bestRect(p, space);
-  if (!rect) return `No room for the ${def.name.toLowerCase()} there.`;
-  for (const i of rectCells({ x: rect.x - 1, y: rect.y - 1, w: rect.w + 2, h: rect.h + 2 })) space.blocked[i] = 1;
-  for (const i of rectCells(rect)) space.foot[i] = 1;
-  return { uid: p.uid, kind: p.kind, tx: p.tx, ty: p.ty, rect, inside: p.inside };
+/** Fits a tile's structures together, trying fresh arrangements until they
+ * all fit, and claims their cells; or says why they can't. */
+function fitTile(group: Placement[], space: FitSpace, salt: number): FittedStructure[] | string {
+  for (const p of group) {
+    if (!tileInBounds(p.tx, p.ty) || p.ty === SPAWN_ROW) return "Nothing can be built on the spawn row.";
+    const def = STRUCTURES[p.kind];
+    if (!p.inside && !def.outsideOk) return `${def.name} must be inside the city limits.`;
+  }
+  if (group.reduce((n, p) => n + p.size, 0) > TILE_ROOM) {
+    const last = STRUCTURES[group[group.length - 1].kind];
+    return `That tile has no room left for the ${last.name.toLowerCase()}.`;
+  }
+  let reason = "";
+  for (let t = 0; t < TRIES; t++) {
+    const fitted: FittedStructure[] = [];
+    for (const p of group) {
+      const rect = pickRect(p, space, salt + t);
+      if (!rect) {
+        reason ||= `No room for the ${STRUCTURES[p.kind].name.toLowerCase()} there.`;
+        break;
+      }
+      claim(space, rect, 1);
+      fitted.push({ uid: p.uid, kind: p.kind, tx: p.tx, ty: p.ty, rect, inside: p.inside });
+    }
+    if (fitted.length === group.length) return fitted;
+    for (const f of fitted) claim(space, f.rect, -1);
+    // The keep stands in one place, and a lone structure that can't fit
+    // anywhere won't on another try.
+    if (group.length === 1) break;
+  }
+  return reason;
+}
+
+/** Claims a footprint and its ring (`by` 1), or gives them back (-1). */
+function claim(space: FitSpace, rect: Rect, by: 1 | -1) {
+  for (const i of rectCells({ x: rect.x - 1, y: rect.y - 1, w: rect.w + 2, h: rect.h + 2 })) space.blocked[i] += by;
+  for (const i of rectCells(rect)) space.foot[i] = by > 0 ? 1 : 0;
 }
 
 /** City cells beside a rect that no structure stands on. */
@@ -195,20 +262,21 @@ function cutOff(fitted: FittedStructure[], space: FitSpace): FittedStructure | u
   return fitted.find((f) => f.inside && f.uid !== KEEP_UID && !openSides(f.rect, space).some((i) => reach[i]));
 }
 
-/** The free spot on the structure's tile closest to where it aims to stand. */
-function bestRect(p: Placement, space: FitSpace): Rect | null {
-  const target = aimPoint(p);
+/** The keep's place in the middle of its tile; for anything else a free
+ * spot on its tile picked at random by its `spot` and the try. */
+function pickRect(p: Placement, space: FitSpace, salt: number): Rect | null {
+  if (p.kind === "keep") {
+    const o = (SUB - p.w) >> 1;
+    const r = { x: p.tx * SUB + o, y: p.ty * SUB + o, w: p.w, h: p.h };
+    return rectUsable(r, space, p.inside) ? r : null;
+  }
   // In the city, a structure needs at least one open side for a street.
-  const needsStreet = p.inside && p.kind !== "keep";
   let best: Rect | null = null;
   let bestScore = Infinity;
   for (const r of candidateRects(p)) {
     if (!rectUsable(r, space, p.inside)) continue;
-    if (needsStreet && !openSides(r, space).length) continue;
-    // sqrt, not hypot: a saved layout is refitted on load, so the fit must
-    // come out the same in every engine (hypot's last bit may not).
-    const dx = r.x + r.w / 2 - target.x, dy = r.y + r.h / 2 - target.y;
-    const score = Math.sqrt(dx * dx + dy * dy) + hash01(p.uid, r.x, r.y) * 0.25;
+    if (p.inside && !openSides(r, space).length) continue;
+    const score = hash01(p.spot, salt, r.x, r.y, r.w);
     if (score < bestScore) {
       bestScore = score;
       best = r;
@@ -217,20 +285,9 @@ function bestRect(p: Placement, space: FitSpace): Rect | null {
   return best;
 }
 
-/** City structures gravitate to the tile's middle (jittered a touch);
- * outside towers pick a spot off-centre so they look placed by hand. */
-function aimPoint({ uid, kind, tx, ty, inside }: Placement) {
-  const x0 = tx * SUB,
-    y0 = ty * SUB;
-  if (kind === "keep") return { x: x0 + SUB / 2, y: y0 + SUB / 2 };
-  if (inside) return { x: x0 + SUB / 2 + (hash01(uid, 11) - 0.5) * 2, y: y0 + SUB / 2 + (hash01(uid, 12) - 0.5) * 2 };
-  return { x: x0 + 1.5 + hash01(uid, 13) * (SUB - 3), y: y0 + 1.5 + hash01(uid, 14) * (SUB - 3) };
-}
-
-/** Every position of every orientation of the structure on its tile. */
-function* candidateRects({ uid, kind, tx, ty }: Placement): Generator<Rect> {
-  const { w, h } = STRUCTURES[kind];
-  const shapes = w === h ? [[w, h]] : hash01(uid, 15) < 0.5 ? [[w, h], [h, w]] : [[h, w], [w, h]];
+/** Every position of both orientations of the structure on its tile. */
+function* candidateRects({ tx, ty, w, h }: Placement): Generator<Rect> {
+  const shapes = w === h ? [[w, h]] : [[w, h], [h, w]];
   for (const [sw, sh] of shapes)
     for (let y = ty * SUB; y + sh <= (ty + 1) * SUB; y++) for (let x = tx * SUB; x + sw <= (tx + 1) * SUB; x++) yield { x, y, w: sw, h: sh };
 }
@@ -280,14 +337,17 @@ export function moveCityTile(l: Layout, from: TilePos, to: TilePos): Layout | nu
 
 /** Place a new structure, which takes the next uid. */
 export function placeStructure(l: Layout, kind: PlacedKind, tx: number, ty: number): Layout | null {
-  const next = withStructure(l, { uid: l.nextUid, kind, tx, ty });
+  const next = withStructure(l, { uid: l.nextUid, kind, tx, ty, spot: 0 });
   if (next) next.nextUid++;
   return next;
 }
 
+/** Drops `s` on its tile, shuffling everything there into fresh spots. */
 function withStructure(l: Layout, s: PlacedStructure): Layout | null {
   const next = cloneLayout(l);
   next.structures.push(s);
+  next.rolls++;
+  for (const p of next.structures) if (p.tx === s.tx && p.ty === s.ty) p.spot = hash(next.rolls, p.uid, 0x5b07);
   return fitLayout(next).ok ? next : null;
 }
 

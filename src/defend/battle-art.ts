@@ -2,11 +2,12 @@
  * damaged buildings, blast scorches, then the units, projectiles and effects.
  * Every painter takes a `Brush`: the board's context and its pixels per cell. */
 import { hash01 } from "./grid.ts";
-import { ARCHER_UNIT, CIVILIAN, ENEMIES, FIRE_MAGE, SOLDIER, watchRadius, type EnemyDef } from "./catalog.ts";
+import { ARCHER_UNIT, CIVILIAN, ENEMIES, FIRE_MAGE, SOLDIER, VALKYRIE, watchRadius, type EnemyDef } from "./catalog.ts";
 import type { Building } from "./citygen.ts";
 import { center } from "./pathing.ts";
 import type { CarriedLight } from "./lighting.ts";
 import { drawFireballs, drawMage } from "./mage-art.ts";
+import { drawStabs, drawValkyrie } from "./valkyrie-art.ts";
 import { BUILDING_FLASH, type DefendSim, type Effect, type Enemy, type Scorch, type Soldier } from "./sim.ts";
 
 export type Brush = { c: CanvasRenderingContext2D; px: number };
@@ -62,6 +63,7 @@ export function drawUnits(b: Brush, sim: DefendSim, torches: Burning | null) {
   drawArrows(b, sim);
   drawShells(b, sim);
   drawFireballs(b.c, b.px, sim);
+  drawStabs(b.c, b.px, sim);
   for (const fx of sim.effects) drawEffect(b, fx);
 }
 
@@ -93,8 +95,9 @@ function drawCivilians(b: Brush, sim: DefendSim, torches: Burning | null) {
   }
 }
 
-/** Swordsmen and archers (who carry a little bow on the off side), and the
- * fire mages (`mage-art.ts`, lit by the flame in their hand, not a torch).
+/** Swordsmen and archers (who carry a little bow on the off side), the
+ * fire mages (`mage-art.ts`, lit by the flame in their hand, not a torch)
+ * and the valkyries (`valkyrie-art.ts`, lit by their own gold).
  * Returns the swordsmen's swings, whose swords and trails draw over the
  * enemies. */
 function drawSoldiers(b: Brush, sim: DefendSim, torches: Burning | null) {
@@ -103,6 +106,10 @@ function drawSoldiers(b: Brush, sim: DefendSim, torches: Burning | null) {
   for (const u of sim.soldiers) {
     if (u.kind === "mage") {
       drawMage(c, px, u, sim.time);
+      continue;
+    }
+    if (u.kind === "valkyrie") {
+      drawValkyrie(c, px, u, sim);
       continue;
     }
     const archer = u.kind === "archer";
@@ -463,7 +470,7 @@ function traceCrack({ c, px }: Brush, sc: Scorch, i: number, arms: number) {
 export function shadowCasters(sim: DefendSim) {
   const def = (e: Enemy): EnemyDef => ENEMIES[e.kind];
   return [
-    ...sim.soldiers.map((u) => ({ x: u.x, y: u.y, size: u.kind === "archer" ? ARCHER_UNIT.size : u.kind === "mage" ? FIRE_MAGE.size : SOLDIER.size })),
+    ...sim.soldiers.map((u) => ({ x: u.x, y: u.y, size: u.kind === "archer" ? ARCHER_UNIT.size : u.kind === "mage" ? FIRE_MAGE.size : u.kind === "valkyrie" ? VALKYRIE.size : SOLDIER.size })),
     ...sim.civilians.map((u) => ({ x: u.x, y: u.y, size: CIVILIAN.size })),
     ...sim.enemies.filter((e) => !def(e).flying).map((e) => ({ x: e.x, y: e.y, size: def(e).size })),
   ];

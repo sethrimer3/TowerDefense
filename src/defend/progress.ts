@@ -3,6 +3,7 @@
  * it always starts fresh from the layout. */
 import {
   BOMB_PRICE,
+  STRUCTURES,
   SPEED3_PRICE,
   PALETTE_ITEMS,
   STARTING_OWNED,
@@ -13,8 +14,8 @@ import {
   type Price,
   type UpgradeId,
 } from "./catalog.ts";
-import { SPAWN_ROW, TILES_H, TILES_W, defendRandom, parseTileKey, tileKey } from "./grid.ts";
-import { defaultLayout, fitLayout, placedCount, tilesConnected, type Layout, type PlacedKind, type PlacedStructure } from "./layout.ts";
+import { SPAWN_ROW, TILES_H, TILES_W, defendRandom, hash, parseTileKey, tileKey } from "./grid.ts";
+import { cloneLayout, defaultLayout, fitLayout, placedCount, tilesConnected, type Layout, type PlacedKind, type PlacedStructure } from "./layout.ts";
 
 export type DefendSave = {
   layout: Layout;
@@ -77,7 +78,39 @@ export function buyUpgrade(save: DefendSave, w: Wallet, id: UpgradeId): boolean 
   if (!canAfford(w, price)) return false;
   pay(w, price);
   save.levels[id]++;
+  if (PLACED.some((k) => STRUCTURES[k].compact?.upgrade === id)) save.layout = sized(save.layout, save.levels);
   return true;
+}
+
+/** Kinds made smaller by the building-specific upgrades in `levels`. */
+export const compactKinds = (levels: Record<UpgradeId, number>): PlacedKind[] =>
+  PLACED.filter((k) => {
+    const up = STRUCTURES[k].compact?.upgrade;
+    return !!up && levels[up] > 0;
+  });
+
+/** `layout` with its structures sized for `levels`, shuffled into fresh
+ * spots on their tiles if they no longer fit where they were, and failing
+ * that with the newest returned to the palette until it fits. */
+export function sized(layout: Layout, levels: Record<UpgradeId, number>): Layout {
+  const next = cloneLayout(layout);
+  next.compact = compactKinds(levels);
+  return fitted(next);
+}
+
+/** `l` if it fits; else its structures reshuffled; else with the newest
+ * taken off (back to the palette) until it fits. */
+function fitted(l: Layout): Layout {
+  if (fitLayout(l).ok) return l;
+  const next = cloneLayout(l);
+  for (let r = 1; r <= 8; r++) {
+    next.rolls = l.rolls + r;
+    for (const s of next.structures) s.spot = hash(next.rolls, s.uid, 0x5b07);
+    if (fitLayout(next).ok) return next;
+  }
+  next.structures.sort((a, b) => a.uid - b.uid);
+  while (next.structures.length && !fitLayout(next).ok) next.structures.pop();
+  return next;
 }
 
 export function buySpeed3(save: DefendSave, w: Wallet): boolean {
@@ -96,7 +129,7 @@ export function buyBomb(save: DefendSave, w: Wallet): boolean {
 
 // ── Decoding untrusted saves ─────────────────────────────────────────────
 const int = (n: unknown, min: number, max: number): n is number => Number.isInteger(n) && (n as number) >= min && (n as number) <= max;
-const PLACED: PlacedKind[] = ["barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild"];
+const PLACED: PlacedKind[] = ["barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace"];
 
 export function decodeDefendSave(s: any): DefendSave {
   const d = defaultDefendSave();
@@ -108,7 +141,7 @@ export function decodeDefendSave(s: any): DefendSave {
   d.paletteSide = s.paletteSide === "right" ? "right" : "left";
   d.speed3 = s.speed3 === true;
   d.seed = intOr(s.seed, 0, 2 ** 32, d.seed);
-  d.layout = decodeLayout(s.layout, d.owned) ?? d.layout;
+  d.layout = decodeLayout(s.layout, d.owned, d.levels) ?? d.layout;
   return d;
 }
 
@@ -117,15 +150,19 @@ const intOr = (n: unknown, min: number, max: number, fallback: number) => (int(n
 const tileOk = (tx: unknown, ty: unknown) => int(tx, 0, TILES_W - 1) && int(ty, 0, TILES_H - 1) && ty !== SPAWN_ROW;
 
 /** The saved layout, or null unless every part of it is well formed, the
- * player owns everything on it, and it still fits. */
-function decodeLayout(s: any, owned: Record<PaletteItem, number>): Layout | null {
+ * player owns everything on it and its tiles join the keep. Structures that
+ * no longer fit (a save from before the tile shares, say) are reshuffled on
+ * their tiles, and failing that the newest go back to the palette. */
+function decodeLayout(s: any, owned: Record<PaletteItem, number>, levels: Record<UpgradeId, number>): Layout | null {
   if (!isObject(s) || !tileOk(s.keep?.tx, s.keep?.ty) || !int(s.nextUid, 1, 1e9)) return null;
   const keep = { tx: s.keep.tx, ty: s.keep.ty };
   const cityTiles = decodeCityTiles(s.cityTiles, tileKey(keep.tx, keep.ty));
   const structures = decodeStructures(s.structures, s.nextUid);
   if (!cityTiles || !structures) return null;
-  const layout: Layout = { keep, cityTiles, structures, nextUid: s.nextUid };
-  return legal(layout, owned) ? layout : null;
+  const layout: Layout = { keep, cityTiles, structures, nextUid: s.nextUid, rolls: intOr(s.rolls, 0, 1e9, 0), compact: compactKinds(levels) };
+  if (!legal(layout, owned)) return null;
+  const out = fitted(layout);
+  return fitLayout(out).ok ? out : null;
 }
 
 /** Distinct on-board tile keys other than the keep's, or null. */
@@ -155,7 +192,8 @@ function decodeStructures(list: unknown, nextUid: number): PlacedStructure[] | n
   for (const p of list) {
     if (!structureOk(p, nextUid, uids)) return null;
     uids.add(p.uid);
-    out.push({ uid: p.uid, kind: p.kind, tx: p.tx, ty: p.ty });
+    // Saves from before random spots have none: draw one from the uid.
+    out.push({ uid: p.uid, kind: p.kind, tx: p.tx, ty: p.ty, spot: int(p.spot, 0, 2 ** 32 - 1) ? p.spot : hash(p.uid, 0x5b07) });
   }
   return out;
 }
@@ -163,11 +201,11 @@ function decodeStructures(list: unknown, nextUid: number): PlacedStructure[] | n
 const structureOk = (p: any, nextUid: number, uids: Set<number>) =>
   PLACED.includes(p?.kind) && tileOk(p.tx, p.ty) && int(p.uid, 1, nextUid - 1) && !uids.has(p.uid);
 
-/** The player owns everything the layout places, its tiles join the keep,
- * and its structures fit. */
+/** The player owns everything the layout places and its tiles join the
+ * keep. */
 function legal(layout: Layout, owned: Record<PaletteItem, number>) {
   const tiles = new Set([tileKey(layout.keep.tx, layout.keep.ty), ...layout.cityTiles]);
-  return affordable(layout, owned) && tilesConnected(tiles, layout.keep) && fitLayout(layout).ok;
+  return affordable(layout, owned) && tilesConnected(tiles, layout.keep);
 }
 
 function affordable(layout: Layout, owned: Record<PaletteItem, number>) {

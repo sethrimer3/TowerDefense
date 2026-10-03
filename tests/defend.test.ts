@@ -5,6 +5,7 @@ import {
   defaultLayout,
   fitLayout,
   moveKeep,
+  moveStructure,
   placeCityTile,
   placeStructure,
   removeCityTile,
@@ -15,7 +16,8 @@ import { DefendSim, buildWave } from '../src/defend/sim.ts';
 import { stepArcher, stepSwordsman } from '../src/defend/troops.ts';
 import { stepArrows } from '../src/defend/towers.ts';
 import { stepBlazes, stepFireballs, stepMage } from '../src/defend/mages.ts';
-import { UPGRADES, purchasePrice, STARTING_OWNED } from '../src/defend/catalog.ts';
+import { charge, stepValkyrie } from '../src/defend/valkyries.ts';
+import { UPGRADES, purchasePrice, STARTING_OWNED, STRUCTURES, TILE_ROOM, footprint, stabLength } from '../src/defend/catalog.ts';
 import { available, buyItem, buyUpgrade, decodeDefendSave, defaultDefendSave } from '../src/defend/progress.ts';
 
 const zeroLevels = () => Object.fromEntries(UPGRADES.map((u) => [u.id, 0])) as any;
@@ -550,4 +552,128 @@ test('Mothers join the waves from wave 6; broodlings only ever hatch', () => {
   assert.ok(!early.includes('mother'));
   assert.ok(later.includes('mother'));
   assert.ok(![...early, ...later].includes('broodling'));
+});
+
+test('every building takes a share of its tile, and what shares a tile fits its room', () => {
+  assert.equal(STRUCTURES.archerTower.size, 1, 'the smallest towers take a sixteenth');
+  assert.equal(STRUCTURES.watchTower.size, 1);
+  assert.equal(STRUCTURES.valkyriePalace.size, TILE_ROOM, 'the palace takes a whole tile');
+  assert.equal(footprint('valkyriePalace', true).size, TILE_ROOM / 2, 'or half, with Folded halls');
+  let l = squareCity();
+  const { tx, ty } = l.keep;
+  l = placeStructure(l, 'valkyriePalace', tx - 1, ty - 1)!;
+  assert.ok(l, 'a palace fits a city tile');
+  assert.equal(placeStructure(l, 'archerTower', tx - 1, ty - 1), null, 'and nothing else fits beside it');
+  assert.equal(placeStructure(l, 'valkyriePalace', tx, ty - 3), null, 'it must be inside the city');
+  const small = { ...l, compact: ['valkyriePalace' as const] };
+  const fit = fitLayout(small);
+  assert.ok(fit.ok);
+  const palace = fit.structures.find((s) => s.kind === 'valkyriePalace')!;
+  assert.equal(palace.rect.w * palace.rect.h, 15, 'folded, it stands on 3 × 5 cells');
+  let two = placeStructure(small, 'valkyriePalace', tx - 1, ty - 1);
+  assert.ok(two, 'two folded palaces share a tile');
+  assert.equal(placeStructure(two!, 'archerTower', tx - 1, ty - 1), null, 'which they fill');
+});
+
+test('buildings take a random free spot on their tile, and a drop reshuffles the tile', () => {
+  let l = squareCity();
+  const { tx, ty } = l.keep;
+  const spots = new Set<string>();
+  for (let n = 0; n < 12; n++) {
+    const next = n === 0 ? placeStructure(l, 'archerTower', tx + 1, ty + 1) : moveStructureTo(l, tx + 1, ty + 1);
+    l = next!;
+    const r = fitLayout(l).ok && (fitLayout(l) as any).structures.find((s: any) => s.kind === 'archerTower').rect;
+    spots.add(`${r.x},${r.y}`);
+  }
+  assert.ok(spots.size >= 4, `an archer tower lands in different spots (${spots.size})`);
+  // Four towers fill a tile; every drop shuffles all of them, and they fit.
+  for (const kind of ['watchTower', 'cannonTower', 'wizardTower'] as const) l = placeStructure(l, kind, tx + 1, ty + 1)!;
+  assert.ok(l, 'four towers share a tile');
+  const before = (fitLayout(l) as any).structures.filter((s: any) => s.tx === tx + 1).map((s: any) => `${s.rect.x},${s.rect.y}`).join(' ');
+  const again = moveStructureTo(l, tx + 1, ty + 1)!;
+  const after = (fitLayout(again) as any).structures.filter((s: any) => s.tx === tx + 1).map((s: any) => `${s.rect.x},${s.rect.y}`).join(' ');
+  assert.notEqual(after, before, 'dropping one again rearranges the tile');
+});
+
+/** Picks up the archer tower and drops it on (tx, ty). */
+const moveStructureTo = (l: Layout, tx: number, ty: number) => moveStructure(l, l.structures.find((s) => s.kind === 'archerTower')!.uid, tx, ty);
+
+test('old saves load with their buildings in valid spots, returning what no longer fits', () => {
+  const save = defaultDefendSave();
+  let l = squareCity();
+  const { tx, ty } = l.keep;
+  l = placeStructure(l, 'barracks', tx - 1, ty - 1)!;
+  l = placeStructure(l, 'archerTower', tx + 1, ty - 1)!;
+  save.layout = l;
+  save.owned.cityTile = 8;
+  save.owned.valkyriePalace = 1;
+  // A save from before spots and shares: no spot, and a palace sharing a
+  // tile with the barracks (now too full).
+  const old = JSON.parse(JSON.stringify(save));
+  for (const s of old.layout.structures) delete s.spot;
+  delete old.layout.rolls;
+  delete old.layout.compact;
+  old.layout.structures.push({ uid: old.layout.nextUid++, kind: 'valkyriePalace', tx: tx - 1, ty: ty - 1 });
+  const back = decodeDefendSave(old);
+  assert.equal(back.layout.cityTiles.length, 8, 'the city is kept');
+  assert.deepEqual(back.layout.structures.map((s) => s.kind), ['barracks', 'archerTower'], 'what no longer fits goes back to the palette');
+  assert.ok(fitLayout(back.layout).ok, 'and the rest fits');
+  assert.equal(available(back, 'valkyriePalace'), 1);
+  // Buying Folded halls shrinks the palaces on the board.
+  const s2 = decodeDefendSave(JSON.parse(JSON.stringify(save)));
+  s2.owned.valkyriePalace = 1;
+  s2.layout = placeStructure(s2.layout, 'valkyriePalace', tx - 1, ty)!;
+  assert.ok(buyUpgrade(s2, { gold: 0, copper: 0, silver: 0, free: true }, 'palaceCompact'));
+  assert.deepEqual(s2.layout.compact, ['valkyriePalace']);
+  assert.equal(decodeDefendSave(JSON.parse(JSON.stringify(s2))).layout.compact[0], 'valkyriePalace', 'and stays so on loading');
+});
+
+test('Valkyrie palace: valkyries charge-stab every enemy in a line, stop at walls, and are untouchable after', () => {
+  let l = squareCity();
+  l = placeStructure(l, 'valkyriePalace', l.keep.tx - 1, l.keep.ty - 1)!;
+  const sim = new DefendSim(mapOf(l), zeroLevels(), 1);
+  sim.spawnQueue = [];
+  sim.breakT = 1e9;
+  for (let i = 0; i < 30 * 12; i++) sim.step(1 / 30);
+  const valks = sim.soldiers.filter((s) => s.kind === 'valkyrie');
+  assert.equal(valks.length, 2, 'a full garrison of valkyries');
+  const v = valks[0];
+  const foe = (id: number, x: number, y: number, kind = 'ogre') =>
+    ({ id, kind, x, y, hp: 1000, maxHp: 1000, cd: 0, jx: 0, jy: 0, distract: -1, distractT: 0, rollT: 99, marked: false, flash: 0 }) as any;
+  // Put her on an open street with room to her east.
+  const reach = stabLength(0);
+  const open = sim.streets.find((i) => {
+    for (let d = 0; d <= reach + 1; d += 0.25) if (sim.solid[cellIndex(Math.floor(cellX(i) + 0.5 + d), cellY(i))]) return false;
+    return true;
+  });
+  assert.ok(open !== undefined, 'a straight street to charge down');
+  v.x = cellX(open!) + 0.5;
+  v.y = cellY(open!) + 0.5;
+  const near = foe(1, v.x + 1, v.y), far = foe(2, v.x + 2.2, v.y + 0.1), aside = foe(3, v.x + 1.5, v.y + 2);
+  sim.enemies = [near, far, aside];
+  v.cd = 0;
+  (sim as any).indexEnemies();
+  const x0 = v.x;
+  stepValkyrie(sim, v, 1 / 30);
+  assert.ok(near.hp < 1000 && far.hp < 1000, 'the stab runs through everything in the line');
+  assert.equal(aside.hp, 1000, 'but nothing beside it');
+  assert.ok(Math.abs(v.x - x0 - reach) < 1e-9, 'she charges her whole reach down the line');
+  assert.equal(sim.stabs.length, 1, 'leaving a streak');
+  assert.equal(v.guard, 1, 'and nothing can hurt her for a second');
+  // An ogre beside her can't hurt her while she is guarded, then can.
+  const ogre = foe(4, v.x + 0.3, v.y);
+  sim.enemies = [ogre];
+  sim.soldiers = [v];
+  const hp = v.hp;
+  for (let i = 0; i < 15; i++) sim.step(1 / 30);
+  assert.equal(v.hp, hp, 'untouchable just after a charge');
+  for (let i = 0; i < 45; i++) sim.step(1 / 30);
+  assert.ok(v.hp < hp, 'then she can be hurt again');
+  // Toward the wall she stops at the last open spot before it.
+  const west = sim.map.city.findIndex((c, i) => c === 1 && sim.map.wall[i - 1] === 1 && !sim.solid[i]);
+  v.x = cellX(west) + 0.5;
+  v.y = cellY(west) + 0.5;
+  v.cd = 0;
+  charge(sim, v, foe(5, v.x - 3, v.y), reach);
+  assert.ok(v.x > cellX(west) - 0.5 && v.x <= cellX(west) + 0.5, 'the wall stops her charge');
 });

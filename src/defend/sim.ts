@@ -37,6 +37,7 @@ import { blocked, cellAt, cellCenter, center, fillFlowField, nearestOpen, type F
 import { stepArrows, stepShells, Towers } from "./towers.ts";
 import { Barracks, stepArcher, stepSwordsman } from "./troops.ts";
 import { stepBlazes, stepFireballs, stepMage, type Blaze, type Fireball } from "./mages.ts";
+import { stepStabs, stepValkyrie, type Stab } from "./valkyries.ts";
 import { Wizards, stepFlames, stepFrosts, type Flame, type Frost } from "./wizard.ts";
 
 export type Levels = Record<UpgradeId, number>;
@@ -65,8 +66,8 @@ export type Enemy = {
 export type Soldier = {
   id: number;
   /** Swordsmen chase and hack; archers roam and shoot; fire mages roam
-   * and hurl fireballs. */
-  kind: "sword" | "archer" | "mage";
+   * and hurl fireballs; valkyries hunt and charge-stab. */
+  kind: "sword" | "archer" | "mage" | "valkyrie";
   home: number;
   x: number;
   y: number;
@@ -78,6 +79,9 @@ export type Soldier = {
   path: number[];
   thinkT: number;
   flash: number;
+  /** Seconds left that nothing can hurt her (a valkyrie after a charge);
+   * absent otherwise, so runs without valkyries keep their state as before. */
+  guard?: number;
 };
 
 export type Civilian = {
@@ -110,6 +114,12 @@ export type Stride = { speed: number; dt: number; flying?: boolean };
 export type Blast = { r: number; damage: number; friendlyFire: boolean };
 
 const STEP = 1 / 30;
+const STEP_SOLDIER: Record<Soldier["kind"], (sim: DefendSim, s: Soldier, dt: number) => void> = {
+  sword: stepSwordsman,
+  archer: stepArcher,
+  mage: stepMage,
+  valkyrie: stepValkyrie,
+};
 /** How long a struck building flashes, in seconds. */
 export const BUILDING_FLASH = 0.14;
 const BREAK_SECONDS = 3;
@@ -151,6 +161,8 @@ export class DefendSim {
   /** Fire mages' fireballs in flight, and the ground they set burning. */
   fireballs: Fireball[] = [];
   blazes: Blaze[] = [];
+  /** Valkyries' charge stabs, fading. */
+  stabs: Stab[] = [];
   scorches: Scorch[] = [];
   effects: Effect[] = [];
   events: SimEvent[] = [];
@@ -261,7 +273,7 @@ export class DefendSim {
     stepFlames(this, this.wizards, dt);
     stepFrosts(this, dt);
     this.barracks.step(this, dt);
-    for (const s of this.soldiers) (s.kind === "archer" ? stepArcher : s.kind === "mage" ? stepMage : stepSwordsman)(this, s, dt);
+    for (const s of this.soldiers) STEP_SOLDIER[s.kind](this, s, dt);
     stepFireballs(this, dt);
     stepBlazes(this, dt);
     this.builders.step(this, dt);
@@ -292,6 +304,9 @@ export class DefendSim {
     for (const units of [this.enemies, this.soldiers, this.civilians]) for (const u of units) u.flash = Math.max(0, u.flash - dt);
     for (const e of this.enemies)
       if (e.chill !== undefined && (e.chill -= dt) <= 0) delete e.chill;
+    for (const s of this.soldiers)
+      if (s.guard !== undefined && (s.guard -= dt) <= 0) delete s.guard;
+    stepStabs(this, dt);
     for (let i = 0; i < this.flash.length; i++) if (this.flash[i] > 0) this.flash[i] = Math.max(0, this.flash[i] - dt);
   }
 
@@ -491,7 +506,7 @@ export class DefendSim {
     if (friendlyFire)
       for (const u of [...this.soldiers, ...this.civilians]) {
         const d = dist(u.x - x, u.y - y);
-        if (d > r || u.hp <= 0) continue;
+        if (d > r || u.hp <= 0 || ("guard" in u && u.guard)) continue;
         u.hp -= hit(d) * FRIENDLY_FIRE;
         u.flash = 0.12;
       }

@@ -16,6 +16,10 @@
  * - Mage Guild: a stone hall under a dark wine-red roof, a fire well
  *   burning in a brass ring at its heart, ember runes on the slopes and two
  *   red swallowtail banners hung over its south wall.
+ * - Valkyrie palace: a heavenly palace of white marble on a stepped
+ *   plinth, ringed by a colonnade, a gilded terrace round a great ribbed
+ *   dome with a golden lantern, and a pair of gold wings over its south
+ *   steps. It fills a whole tile, or half once its halls are folded.
  *
  * Pure; the city layer and palette draw the cached canvases. */
 import type { StructureKind } from "./catalog.ts";
@@ -44,6 +48,9 @@ const C = {
   wine: [0x3a1f28, 0x4e2a36, 0x6e3a48],
   banner: [0x8e2620, 0xb3372f, 0xd8553f],
   ember: 0xff7a2e,
+  marble: [0x8a8c9a, 0xb9bac6, 0xdcdce4, 0xf4f3f6, 0xffffff],
+  vein: 0xa7aec4,
+  sky: [0x7d9cc8, 0xa9c4e6, 0xd6e6f8],
 };
 
 /** What each structure's damage throws down and its rubble is made of. */
@@ -55,6 +62,7 @@ const MATERIAL: Record<PlacedKind, { m: Material; ruin: Pick<Ruin, "stone" | "to
   watchTower: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.plank.slice(0, 3), beams: true } },
   wizardTower: { m: { tones: C.pale.slice(0, 3), roofed: true }, ruin: { stone: C.pale.slice(0, 3), top: C.slate.slice(0, 3), beams: true, round: true } },
   mageGuild: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.wine.slice(0, 3), beams: true } },
+  valkyriePalace: { m: { tones: C.marble.slice(1, 4), roofed: true }, ruin: { stone: C.marble.slice(1, 4), top: [C.gold[0], C.marble[2], C.marble[3]], beams: false } },
 };
 
 /** The body's corners: one pixel in from its cells, two on the lower right
@@ -76,7 +84,7 @@ export function structureRubblePixels(kind: PlacedKind, cw: number, ch: number, 
   return rubblePixels(w, h, hash(seed, KINDS.indexOf(kind), 3), { ...frame(w, h), ...MATERIAL[kind].ruin });
 }
 
-const KINDS: PlacedKind[] = ["barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild"];
+const KINDS: PlacedKind[] = ["barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace"];
 
 const PAINT: Record<PlacedKind, (p: Pix) => void> = {
   barracks: paintBarracks,
@@ -86,6 +94,7 @@ const PAINT: Record<PlacedKind, (p: Pix) => void> = {
   watchTower: paintWatchTower,
   wizardTower: paintWizardTower,
   mageGuild: paintMageGuild,
+  valkyriePalace: paintValkyriePalace,
 };
 
 function rect(p: Pix, x0: number, y0: number, x1: number, y1: number, c: number) {
@@ -334,4 +343,71 @@ function paintMageGuild(p: Pix) {
     p.set(bx + 1, y1 + 1, OUTLINE);
     for (let x = bx - 1; x <= bx + 3; x++) p.set(x, y1 + 2, OUTLINE);
   }
+}
+
+/** Gold wings spread over the palace's south steps: `Y` gold, `y` lit. */
+const WINGS = ["00.......00", "0yY0...0Yy0", ".0yYY0YYy0.", "..00yYy00..", "....000...."];
+
+function paintValkyriePalace(p: Pix) {
+  const { x0, y0, x1, y1 } = frame(p.w, p.h);
+  const short = Math.min(x1 - x0, y1 - y0) + 1;
+  const marble = (x: number, y: number, tone: number) => (hash(x, y, 51) % 13 === 0 ? C.vein : C.marble[tone]);
+  // Rings in from the outline: the marble steps (two on a whole palace,
+  // one on a folded one), the edge of the porch, the colonnade, then the
+  // cella's wall.
+  const steps = short >= 32 ? 2 : 1, edge = steps + 1, cols = edge + 1, wall = cols + 2;
+  for (let y = y0; y <= y1; y++)
+    for (let x = x0; x <= x1; x++) {
+      const ring = Math.min(x - x0, y - y0, x1 - x, y1 - y);
+      if (ring > wall) continue;
+      // Lit on the faces toward the upper left, shaded on the others.
+      const sunny = x - x0 === ring || y - y0 === ring;
+      if (ring === 0 || ring === wall) p.set(x, y, OUTLINE);
+      else if (ring <= steps) p.set(x, y, marble(x, y, sunny ? 4 - (ring - 1) : 2 - (ring - 1)));
+      else if (ring === edge) p.set(x, y, sunny ? C.marble[2] : C.marble[0]);
+      else {
+        // Columns two pixels square in a row round the porch, a shadowed
+        // gap between each, lit on their upper left pixel.
+        const along = y - y0 === ring || y1 - y === ring ? x : y;
+        const k = (along - (x0 + y0)) % 3;
+        const top = ring === cols;
+        p.set(x, y, k === 2 ? C.marble[0] : top && k === 0 ? C.marble[4] : top || k === 0 ? C.marble[3] : C.marble[2]);
+      }
+    }
+  // The cella inside, edged in gold.
+  const tx0 = x0 + wall + 1, ty0 = y0 + wall + 1, tx1 = x1 - wall - 1, ty1 = y1 - wall - 1;
+  for (let y = ty0; y <= ty1; y++)
+    for (let x = tx0; x <= tx1; x++) {
+      const rim = x === tx0 || y === ty0 || x === tx1 || y === ty1;
+      p.set(x, y, rim ? (x === tx0 || y === ty0 ? C.gold[2] : C.gold[0]) : marble(x, y, 3));
+    }
+  const cw = tx1 - tx0 + 1, ch = ty1 - ty0 + 1;
+  const dcx = (tx0 + tx1 + 1) / 2, dcy = (ty0 + ty1 + 1) / 2;
+  let r = Math.min(cw, ch) / 2 - 0.5;
+  if (Math.max(cw, ch) > Math.min(cw, ch) * 1.4) {
+    // A folded palace: a long marble roof with a gold ridge over the
+    // cella, and a small dome at its heart.
+    gable(p, tx0 + 1, ty0 + 1, tx1 - 1, ty1 - 1, C.marble[3]);
+    const along = cw >= ch;
+    for (let k = along ? tx0 + 1 : ty0 + 1; k <= (along ? tx1 - 1 : ty1 - 1); k++)
+      if (along) p.set(k, Math.floor(dcy), k % 2 ? C.gold[1] : C.gold[0]);
+      else p.set(Math.floor(dcx), k, k % 2 ? C.gold[1] : C.gold[0]);
+    r = Math.min(cw, ch) / 2 + 0.5;
+  }
+  // The dome: white marble shaded as a sphere, gold ribs, and a gold
+  // lantern at its crown.
+  disc(p, dcx, dcy, r, (x, y, d, dx, dy) => {
+    if (d > r - 1) return OUTLINE;
+    const ang = Math.atan2(dy, dx) + Math.PI;
+    if (r > 6 && Math.abs(((ang / (2 * Math.PI)) * 8) % 1 - 0.5) > 0.42 && d > 1.6) return d < r * 0.6 ? C.gold[1] : C.gold[0];
+    return C.marble[Math.min(4, 1 + lit(x, y, dx, dy, d) + (d < r * 0.45 ? 1 : 0))];
+  });
+  disc(p, dcx, dcy, 1.6, (x, y, d) => (d > 1.1 ? C.gold[0] : (x + y) % 2 ? C.gold[2] : C.gold[1]));
+  // Gold wings over the south steps.
+  const wx = Math.round((x0 + x1) / 2) - 5, wy = y1 - WINGS.length + 1;
+  WINGS.forEach((row, j) =>
+    [...row].forEach((ch, i) => {
+      if (ch !== ".") p.set(wx + i, wy + j, ch === "0" ? OUTLINE : ch === "y" ? C.gold[2] : C.gold[1]);
+    }),
+  );
 }

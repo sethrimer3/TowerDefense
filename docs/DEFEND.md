@@ -40,7 +40,7 @@ Recent rows are available as `window.defendPerformance`; they are not saved.
 ## Building (before a run)
 
 - The **palette** (left by default; the ⚙ settings move it to the right) lists
-  city tiles, barracks, archer barracks, Mage Guilds and the towers with an `×N` count of
+  city tiles, barracks, archer barracks, Mage Guilds, Valkyrie palaces and the towers with an `×N` count of
   what is owned but not yet placed; it greys out at `×0`.
 - Drag from the palette onto the board. While dragging, every tile that would
   accept the item gets a faint gold outline and every other tile darkens; the
@@ -52,12 +52,24 @@ Recent rows are available as `window.defendPerformance`; they are not saved.
   can only be lifted if the city stays connected and it holds no buildings.
 - **The keep** can be moved onto any other city tile (the two swap) but never
   removed.
-- **Barracks**, **archer barracks** and the **Mage Guild** must be inside the city. **Archer**, **cannon** and **watch
-  towers** may stand inside or outside; outside they sit off-centre in their tile.
-- Several structures share a tile while they fit. The game picks each
-  structure's exact cells (`fitLayout`): oldest first, never touching another
-  structure (there's always room for a street), and every in-city structure
-  must still reach the keep's streets.
+- **Barracks**, **archer barracks**, the **Mage Guild** and the **Valkyrie palace** must be inside the city. **Archer**, **cannon**, **watch
+  and wizard towers** may stand inside or outside.
+- Every structure takes a **share of its tile** (`size` in `catalog.ts`, in
+  sixteenths): 1/16 the archer and watch towers, 1/8 the cannon and wizard
+  towers, 1/4 the barracks, archer barracks and Mage Guild, and the Valkyrie
+  palace a whole tile (1/2 once Folded halls is bought, which also shrinks
+  it from 5 × 5 cells to 3 × 5). Several structures share a tile while
+  their shares add up to no more than a whole tile and they all fit.
+- The game picks each structure's exact cells (`fitLayout`): the keep in
+  the middle of its tile; everything else in a random free **spot** on its
+  tile, never touching another structure (there's always room for a
+  street), and every in-city structure must still reach the keep's
+  streets. The structures on a tile are fitted together, biggest first,
+  rearranged until they all fit, and whenever something is dropped on a
+  tile everything on it is reshuffled into fresh spots (each structure's
+  saved `spot`, drawn from the layout's `rolls`). A save whose buildings
+  no longer fit (from before tile shares, say) is reshuffled, and failing
+  that its newest buildings go back to the palette.
 
 ## The procedural city (`citygen.ts`)
 
@@ -181,6 +193,15 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   each second until it dies down (fliers pass over). Upgraded by Pyroclasm
   (fireball damage and burst) and Lingering embers (how long and how hot
   the ground burns) in the Armory.
+- **Valkyrie palaces** (`valkyries.ts`) train valkyries (same garrison
+  size, drill speed and arms upgrades as the barracks): armoured angels with
+  spears who path toward the nearest enemy in the city, or stroll the
+  streets. When an enemy comes within her reach she makes a **charge stab**:
+  she blinks along the line toward it, as far as her reach (3 cells, longer
+  with Long spears) or until an intact building, the city wall, a pond or
+  the board's edge stops her, and her spear hurts every enemy on that line,
+  fliers too. For a second after each charge nothing can hurt her
+  (`guard`), blasts included.
 - **Patrol routes** (Armory) widens how far from their barracks swordsmen
   go after enemies; its last level sends them anywhere inside the city.
 - **Cannon towers** fire slowly at the nearest ground enemy (not bats),
@@ -205,6 +226,15 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   enemies in their radius with a gold outline; marked enemies take ×2 damage.
 - During a run the palette becomes the **consumables** palette. A **bomb**
   can be dragged onto the field to blast everything nearby.
+
+- **Valkyrie art** (`valkyrie-art.ts`): the valkyries are 11 × 9 pixel
+  sprites (white wings spread round a steel cuirass and a gold helm, inside
+  a black outline) with a gold-bladed spear pointing where they last
+  charged. A charge leaves a blazing gold streak down its line, white-hot
+  at the core and narrowing as it fades, with speed lines, gold
+  after-images of her along the way, a star flaring at the spear's tip, a
+  ring where she lands and a spark on every enemy run through; the streak
+  lights the streets. A guarded valkyrie wears a shimmering gold halo.
 
 ## Weather and light (`weather.ts`, `lighting.ts`)
 

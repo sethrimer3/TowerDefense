@@ -99,6 +99,21 @@ A red-robed troop who roams the streets and hurls fireballs: each bursts with sp
 **Blaze**:
 Burning ground a fireball leaves, hurting every ground enemy inside it each second until it dies down.
 
+**Tile share**:
+How much of its tile a structure takes, in sixteenths: 1/16 (archer and watch towers), 1/8, 1/4, 1/2 or a whole tile. What shares a tile must add up to no more than a whole tile, and fit.
+
+**Spot**:
+Where on its tile a structure stands, picked at random; every structure on a tile is reshuffled whenever something is dropped there.
+
+**Valkyrie palace**:
+A heavenly marble palace inside the city that takes a whole tile (half with Folded halls) and trains valkyries.
+
+**Valkyrie**:
+An armoured angel with a spear who hunts enemies through the city and makes charge stabs.
+
+**Charge stab**:
+A valkyrie's attack: she blinks along a line toward an enemy, as far as her reach or until a building, the wall or a pond stops her, hurting every enemy on the line; nothing can hurt her for a second after.
+
 **Ground relief**:
 The flagstones' bump map outside the city: lights brighten the stone edges facing them and darken the far ones.
 

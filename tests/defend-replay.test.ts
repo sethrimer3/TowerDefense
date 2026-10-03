@@ -24,8 +24,8 @@ const maxLevels = (over: Partial<Levels> = {}) =>
   levelsAt({ ...Object.fromEntries(UPGRADES.map((u) => [u.id, u.maxLevel])), ...over });
 
 /** The keep, a ring of city tiles, then `extra` city tiles and structures. */
-function city(ring: [number, number][], structures: [PaletteItem, number, number][]): Layout {
-  let l = defaultLayout();
+function city(ring: [number, number][], structures: [PaletteItem, number, number][], compact: Layout["compact"] = []): Layout {
+  let l = { ...defaultLayout(), compact };
   const { tx, ty } = l.keep;
   for (const [dx, dy] of ring) l = placeCityTile(l, tx + dx, ty + dy) ?? assert.fail(`city tile ${dx},${dy}`);
   for (const [kind, dx, dy] of structures) l = placeStructure(l, kind as never, tx + dx, ty + dy) ?? assert.fail(`${kind} at ${dx},${dy}`);
@@ -89,6 +89,13 @@ function scenarios(): Record<string, Scenario> {
       bombs: [[90, 30, 55]],
       smash: [[60, "house"], [61, "wall"], [62, "wall"], [200, "cannonTower"]],
     },
+    // Valkyries charging down the streets, a folded palace beside a whole one.
+    valkyries: {
+      layout: city(SQUARE, [["valkyriePalace", -1, 1], ["valkyriePalace", 1, -1], ["valkyriePalace", 1, -1], ["archerTower", 0, -2]], ["valkyriePalace"]),
+      citySeed: 7, levels: levelsAt({ valkyrieReach: 3, palaceCompact: 1, barracksCapacity: 2 }), seed: 3, seconds: 160, wave: 4,
+      opening: [...Array<EnemyKind>(30).fill('orc'), ...Array<EnemyKind>(10).fill('bat'), ...Array<EnemyKind>(4).fill('ogre')],
+      smash: [[90, "valkyriePalace"]],
+    },
     // Wizard towers inside and outside the walls, flame and ice in turn.
     wizards: {
       layout: city(SQUARE, [["wizardTower", 0, -2], ["wizardTower", 1, 1], ["barracks", -1, 1]]),
@@ -109,7 +116,7 @@ function state(sim: DefendSim) {
   const s = sim as unknown as Record<string, unknown>;
   return [
     sim.time, sim.wave, sim.lost, sim.breakT, sim.spawnT, sim.spawnQueue, sim.mapVersion, sim.changed.length,
-    sim.enemies, sim.soldiers, sim.civilians, sim.arrows, sim.shells, sim.flames, sim.frosts, sim.scorches, sim.effects, sim.events,
+    sim.enemies, sim.soldiers, sim.civilians, sim.arrows, sim.shells, sim.flames, sim.frosts, sim.stabs, sim.scorches, sim.effects, sim.events,
     sim.solid, sim.hp, sim.built, sim.flash, sim.field,
     [...(s.towers as { cooldown: Map<number, number> }).cooldown], [...(s.barracks as { training: Map<number, number> }).training], (s.builders as { respawn: number[] }).respawn,
   ];
@@ -174,19 +181,21 @@ test("the Defend replays exercise every unit and effect", () => {
         seen.add(`soldier:${s.kind}`);
         if (s.path.length) seen.add(`path:${s.kind}`);
         if (s.kind === "archer" && s.target >= 0) seen.add("hunting");
+        if (s.guard) seen.add("guarded");
       }
       for (const c of sim.civilians) seen.add(`civilian:${c.state}`);
       if (sim.arrows.length) seen.add("arrow");
       if (sim.shells.length) seen.add("shell");
       if (sim.flames.length) seen.add("flame");
       if (sim.frosts.length) seen.add("frost");
+      if (sim.stabs.some((st) => st.hits.length > 1)) seen.add("stab");
       if (sim.enemies.some((e) => e.chill)) seen.add("chilled");
       if (sim.lost) seen.add(`lost:${name}`);
       if (sim.built.some((b, id) => b > 0 && b < sim.map.buildings[id].cells.length)) seen.add("half-rebuilt");
     });
   const want = [
     "enemy:warlord", "enemy:bat", "enemy:mother", "enemy:broodling", "distracted", "marked", "soldier:sword", "soldier:archer", "path:sword", "path:archer", "hunting",
-    "civilian:toJob", "civilian:working", "civilian:home", "arrow", "shell", "flame", "frost", "chilled", "lost:bare", "half-rebuilt",
+    "civilian:toJob", "civilian:working", "civilian:home", "arrow", "shell", "flame", "frost", "chilled", "soldier:valkyrie", "stab", "guarded", "lost:bare", "half-rebuilt",
   ];
   assert.deepEqual(want.filter((w) => !seen.has(w)), []);
 });

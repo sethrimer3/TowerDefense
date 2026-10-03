@@ -14,7 +14,9 @@ import {
   PALETTE_ITEMS,
   STRUCTURES,
   UPGRADES,
+  footprint,
   purchasePrice,
+  shareName,
   upgradePrice,
   type Bonuses,
   type EnemyKind,
@@ -63,6 +65,7 @@ const ITEM_NAMES: Record<PaletteItem, string> = {
   watchTower: STRUCTURES.watchTower.name,
   wizardTower: STRUCTURES.wizardTower.name,
   mageGuild: STRUCTURES.mageGuild.name,
+  valkyriePalace: STRUCTURES.valkyriePalace.name,
 };
 
 const plural = (name: string) => (name.endsWith("s") ? name : `${name}s`);
@@ -651,7 +654,7 @@ export class DefendPage {
       [`${p.gold} gold`, p.copper ? `${p.copper} copper` : "", p.silver ? `${p.silver} silver` : ""].filter(Boolean).join(" · ");
     const items = PALETTE_ITEMS.map((item) => {
       const p = purchasePrice(item, s.owned[item]);
-      const desc = item === "cityTile" ? "Expands the city limits. New tiles must touch the city; the wall moves out to enclose them." : STRUCTURES[item].description;
+      const desc = item === "cityTile" ? "Expands the city limits. New tiles must touch the city; the wall moves out to enclose them." : `${STRUCTURES[item].description} Takes ${shareName(footprint(item, s.layout.compact.includes(item)).size)}.`;
       return `<article class="card defend-card"><canvas width="48" height="48" data-icon="${item}"></canvas><div><small>OWNED ${s.owned[item]} · IN PALETTE ${available(s, item)}</small><h3>${ITEM_NAMES[item]}</h3><p>${desc}</p></div>
         <button data-buy="${item}" ${canAfford(w, p) ? "" : "disabled"}>Buy · ${price(p)}</button></article>`;
     }).join("");
