@@ -456,3 +456,11 @@ purple. They deal 2, 8 or 32 damage every 0.1 seconds at the lower tiers;
 the million-difficulty cloud kills a player unit immediately on contact,
 even during a valkyrie's guard. Poison affects people only and grants no
 protection against ranged attacks. A dead generator loses its cloud.
+
+
+The Defend header's pixel leather journal is available while building and
+fighting. It lists only encountered enemies, including enemies killed between
+frames, with stats and special abilities. Discoveries and read entries persist
+in the Defend save; legacy saves start with an empty journal. A red pixel
+exclamation marks unread discoveries. Opening the journal marks its entries
+read and pauses the battle until the dialog closes (Close button or Escape).
