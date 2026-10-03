@@ -5,8 +5,9 @@ import assert from "node:assert/strict";
 import { AIR, BEDROCK, CELLS, DIRT, GOLD, GRASS, GRAVEL, H, LAVA, LOOSE, COPPER, LADDER, MATERIAL_COUNT, RAIL, ROCK, SILVER, STONE, TORCH, W, World, decodeGrid, encodeGrid, generate, idx, isPassable, strata } from "../src/mine/world.ts";
 import {
   BARS_PER_POINT, BREATH_TICKS, DAY_TICKS, DEATH_GAP, KIT, MineSim, ORE_PER_BAR, STARVE_TICKS, metalSum, TICK_HZ, WEATHER_TICKS, daylight, decodeMineSave,
-  hirePrice, skyAt, weatherOf,
+  hirePrice, PACE_MINUTES, skyAt, weatherOf,
 } from "../src/mine/sim.ts";
+import { MAX_AWAY_MS, span } from "../src/away.ts";
 import { BAY_BUNKS, FIRST_LEVELS, MAX_LEVEL, along, layout, pathTicks } from "../src/mine/buildings.ts";
 import { decode } from "../src/save.ts";
 
@@ -471,6 +472,34 @@ test("the shaft house keeps rain running off the ground out of the shaft, and Wa
   const bare = flood(0), proofed = flood(4);
   assert.ok(bare > 0, "some gets in");
   assert.ok(proofed < bare * 0.6, `waterproofed ${proofed} < ${bare}`);
+});
+
+test("the smithy's pace follows the bars worked, eased in a minute at a time, and saves; a pace out of reason is forgotten", () => {
+  const sim = new MineSim(8);
+  for (let i = 0; i < 4; i++) sim.hire();
+  sim.setJobs(1, 1);
+  assert.deepEqual(sim.pace, { copper: 0, silver: 0, gold: 0 });
+  // Plenty of bars at the anvil: a smith working them steadily.
+  sim.bars = { copper: 1e6, silver: 0, gold: 0 };
+  for (let t = 0; t < 20 * 60 * TICK_HZ; t++) sim.step();
+  const worked = 1e6 - sim.bars.copper;
+  // Twenty minutes' points, three times over, an hour.
+  const hourly = (worked / BARS_PER_POINT) * 3;
+  assert.ok(sim.pace.copper > 0, "the pace rose");
+  assert.ok(sim.pace.copper < hourly, `eased in over ${PACE_MINUTES} minutes: ${sim.pace.copper} < ${hourly}`);
+  const back = new MineSim(8, decodeMineSave(JSON.parse(JSON.stringify(sim.save(1))))!);
+  assert.deepEqual(back.pace, sim.pace);
+  const odd = JSON.parse(JSON.stringify(sim.save(1)));
+  odd.pace = { copper: -1, silver: 0, gold: 0 };
+  const kept = decodeMineSave(odd);
+  assert.ok(kept, "the mine is kept");
+  assert.equal(kept!.pace, undefined);
+  // Time away reads in hours and minutes, up to a day.
+  assert.equal(MAX_AWAY_MS, 24 * 60 * 60 * 1000);
+  assert.equal(span(30 * 1000), "under a minute");
+  assert.equal(span(45 * 60 * 1000), "45 min");
+  assert.equal(span(3 * 3600 * 1000 + 12 * 60 * 1000), "3 h 12 min");
+  assert.equal(span(MAX_AWAY_MS), "24 h");
 });
 
 test("the trades and the forge's stock save and load; older saves without them still load", () => {
