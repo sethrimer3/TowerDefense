@@ -22,6 +22,7 @@
  * Side view in pixels (`geometry.ts`). Everything random draws from the
  * library's own seeded stream. */
 import { random } from "../random.ts";
+import { HOUR_MS } from "../away.ts";
 import { decodeGrid, encodeGrid } from "../mine/world.ts";
 import { Fire, cellAt, type Burnable } from "./fire.ts";
 import {
@@ -140,6 +141,24 @@ export const homeBay = (color: number) => (color - 1) % BAYS;
 /** How tiring each action is, a second (rest restores). */
 const TIRING: Partial<Record<Action, number>> = { walk: 1 / 420, climb: 1 / 200, build: 1 / 160, grab: 1 / 300, place: 1 / 300, fill: 1 / 150, throw: 1 / 120, sweep: 1 / 240, pour: 1 / 200, write: 1 / 700, mend: 1 / 600, read: 1 / 900, idle: 1 / 1200 };
 export const knowledgeRate = (shelves: number, librarians: number) => shelves * librarians;
+
+/** The chance an hour that the library burns down while the game is closed,
+ * with Night watch's ranks: 50%, 5% less a rank, 5% at least. */
+export const idleFireChance = (nightWatch: number) => Math.max(0.05, 0.5 - 0.05 * nightWatch);
+/** Time away, an hour at a time (a part hour rolls its share of the
+ * chance): each hour the library either stands and earns `rate` Knowledge,
+ * or burns down, earning nothing for that hour; a library that burnt down is
+ * a new one, empty, earning nothing more. `burntAt` is the ms into the time
+ * away at which the hour that burnt it began (null when it stood). */
+export function idleHours(ms: number, rate: number, chance: number, rng: () => number): { knowledge: number; burntAt: number | null } {
+  let knowledge = 0;
+  for (let at = 0; at < ms; at += HOUR_MS) {
+    const share = Math.min(HOUR_MS, ms - at) / HOUR_MS;
+    if (rng() < chance * share) return { knowledge, burntAt: at };
+    knowledge += rate * share;
+  }
+  return { knowledge, burntAt: null };
+}
 
 const WALK = 14, CLIMB = 9, FIRE_DT = 0.1;
 /** Seconds in a flame's heat that kill a librarian. */

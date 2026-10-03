@@ -4,6 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  idleFireChance, idleHours,
   BAYS, EXITS, FLOOR, HALL, LibrarySim, MAX_LIBRARIANS, MAX_SHELVES, MAX_UNITS, PLANKS, SHELF_ORDER, SHELF_TOP, SLOTS, W, WINDOW,
   BUTT_FULL, accidentChance, decodeLibrarySave, homeBay, fireDrill, knowledgeRate, librarianPrice, shelfPrice, slotPlace, unitTop,
 } from "../src/library/sim.ts";
@@ -285,4 +286,19 @@ test("day and night come round, and prices climb", () => {
     assert.ok(shelfPrice(n + 1) > shelfPrice(n));
     assert.ok(librarianPrice(n + 1) > librarianPrice(n));
   }
+});
+
+test("time away: the library burns down 50% of hours, 5% less a rank of Night watch, never under 5%", () => {
+  assert.equal(idleFireChance(0), 0.5);
+  assert.ok(Math.abs(idleFireChance(4) - 0.3) < 1e-9);
+  assert.equal(idleFireChance(9), 0.05);
+  assert.equal(idleFireChance(20), 0.05);
+  const HOUR = 3600000, rolls = (...r: number[]) => () => r.shift()!;
+  assert.deepEqual(idleHours(3 * HOUR, 10, 0.5, rolls(0.9, 0.9, 0.9)), { knowledge: 30, burntAt: null }, "it stood: every hour pays");
+  assert.deepEqual(idleHours(3 * HOUR, 10, 0.5, rolls(0.9, 0.1)), { knowledge: 10, burntAt: HOUR }, "burnt in the second hour: only the first pays");
+  assert.deepEqual(idleHours(1.5 * HOUR, 10, 0.5, rolls(0.9, 0.3)), { knowledge: 15, burntAt: null }, "a half hour rolls half the chance");
+  // Over many hours, the share that burns is the chance.
+  let burnt = 0, rng = Math.random;
+  for (let i = 0; i < 4000; i++) if (idleHours(HOUR, 1, 0.3, rng).burntAt !== null) burnt++;
+  assert.ok(Math.abs(burnt / 4000 - 0.3) < 0.03, `${burnt}`);
 });

@@ -64,6 +64,9 @@ Earned by the Library, an hour's worth being its built bookshelves times its lib
 **Freak accident** (Library):
 A table's candle catching it alight: a small chance each minute, lowered by Fireproof Wood. The fire burns whatever it reaches until it burns out or the librarians put it out (Fire Training).
 
+**Idle fire** (Library):
+While the game is closed, each hour the library may burn down: 50% an hour, lowered 5% a rank by Night watch to 5% at least. An hour it stands pays its Knowledge; once it burns down, nothing is left but a new, empty library.
+
 **Upgrade point**:
 One for every new best wave held in Defend, shown in the currency bar; banked for what the meta game brings later. (It replaced the Commander level and its experience.)
 
