@@ -1,25 +1,33 @@
-/** Draws the Mine: the grid one pixel a cell into an offscreen image, lit by
- * daylight falling in from the sky (dimmed by night and cloud) and by the
- * torches, lamps, lava, fires and miners underground (a two-channel light
- * map spread cell to cell, dimmed faster through rock than air), then scaled
- * up crisp under a camera (a whole number of screen pixels a cell, so the
- * pixels meet without seams). Over it: clouds, rain and lightning, the
- * headframe, the buildings (their front walls fading to show who's inside),
+/** Draws the Mine: the grid two pixels a cell each way into an offscreen
+ * image (the same size as the miners' pixels), each cell's four pixels
+ * detailed by its material and the open air beside it, lit by daylight
+ * falling in from the sky (dimmed by night and cloud) and by the torches,
+ * lamps, lava, fires and miners underground (a two-channel light map spread
+ * cell to cell, dimmed faster through rock than air, blended between cells
+ * pixel by pixel), then scaled up crisp under a camera (an even number of
+ * screen pixels a cell, so every pixel is whole and they meet without
+ * seams). Over it: clouds, rain and lightning, the headframe, the buildings
+ * (pixel art from `art.ts`, their front walls fading to show who's inside),
  * the graves of the miners lost, the carts, the hoist's rope and bucket, the
- * yard's ore, the miners (2 × 4 half-cell figures, `figures.ts`) and the
- * effects (`particles.ts`). Water is tinted into the
- * cells it fills; stars glint in the night sky. */
+ * yard's ore, the miners (2 × 4 figures, `figures.ts`) and the effects
+ * (`particles.ts`). Water is tinted into the cells it fills; stars glint in
+ * the night sky. */
 import { stream } from "../random.ts";
 import { CART_LOAD, metalSum, type Footprint, type Metals, type Inside, type Miner, type MineSim, type Rebuild, type Sky } from "./sim.ts";
 import { drawFigure, drawSleeper, outfit, type Fine, type Pose } from "./figures.ts";
 import { Particles } from "./particles.ts";
+import {
+  ASHLAR, GLASS, GRAVE_H, GRAVE_W, HEADFRAME_H, HEADFRAME_W, PLANK, POST, Sprites, WHEEL, chimneyRows, paintBack, paintGrave, paintHeadframe, paintShell, paintWall, roofRows, shellOrigin, windowsOf,
+  type RGB,
+} from "./art.ts";
 import { BUILDINGS, along, anvils, pathTicks, type Building, type BuildingId } from "./buildings.ts";
 import {
   AIR, BEDROCK, CELLS, COPPER, DIRT, GOLD, GRASS, GRAVEL, H, LADDER, LAMP, LAVA, LOOSE, RAIL, ROCK, RUBBLE, SILVER, STONE, TIMBER, TORCH, W, hash01, idx, isPassable,
   type Material,
 } from "./world.ts";
 
-type RGB = [number, number, number];
+/** Fills a rectangle in cells (to half a cell) in a colour dimmed to `k`. */
+type Fill = (c: RGB, k: number, x: number, y: number, w?: number, h?: number) => void;
 /** Each material's shades, picked per cell by a fixed hash. */
 const SHADES: Record<number, RGB[]> = {
   [GRASS]: [[86, 140, 52], [74, 124, 44], [98, 152, 60]],
@@ -41,37 +49,18 @@ const TORCH_RGB: RGB = [255, 196, 96], LAMP_RGB: RGB = [255, 238, 176];
 const SKY_TOP: RGB = [70, 104, 156], SKY_LOW: RGB = [206, 188, 160];
 const NIGHT_TOP: RGB = [8, 11, 26], NIGHT_LOW: RGB = [28, 30, 50], OVERCAST: RGB = [96, 100, 108];
 const WATER_RGB: RGB = [44, 104, 196], FIRE_RGB: RGB[] = [[255, 136, 40], [255, 204, 84], [240, 90, 30]];
+/** The finer details of the workings' fittings and ground. */
+const TORCH_HOT: RGB = [255, 238, 170], TORCH_DIM: RGB = [214, 120, 48], TORCH_STICK: RGB = [120, 78, 38], LAMP_CAP: RGB = [70, 70, 78];
+const RUNG: RGB = [160, 112, 58], RAIL_WOOD: RGB = [104, 68, 34], RAIL_WOOD_LO: RGB = [84, 54, 26];
+const RAIL_HI: RGB = [168, 168, 178], RAIL_LO: RGB = [110, 110, 120], SLEEPER: RGB = [92, 66, 40];
+const PEBBLE: RGB = [128, 118, 106], ROOT: RGB = [70, 48, 30], BLADE: RGB = [112, 168, 64], BLADE_HI: RGB = [140, 192, 82];
 
-/** Little pixel sprites over the surface: `.` is clear. */
-const PALETTE: Record<string, RGB> = {
-  w: [138, 90, 44], d: [92, 58, 28], r: [163, 58, 38], R: [122, 42, 28], s: [58, 54, 50], g: [154, 158, 166], y: [58, 50, 40], k: [26, 20, 16],
-  c: [128, 126, 122], C: [96, 94, 92],
-};
-const WINDOW_DARK: RGB = [44, 38, 32], WINDOW_LIT: RGB = [255, 214, 122];
+const WINDOW_LIT: RGB = [255, 214, 122];
 /** The buildings' materials. */
-const PLANK: RGB[] = [[138, 90, 44], [120, 78, 38]], POST: RGB = [86, 54, 26], BACK: RGB = [62, 42, 26], BACK_STONE: RGB = [54, 52, 56];
-const ROOF: RGB[] = [[163, 58, 38], [122, 42, 28]], SLATE: RGB[] = [[84, 86, 98], [66, 68, 80]], ASHLAR: RGB[] = [[118, 112, 104], [98, 94, 90]];
 const FOOTING: RGB = [84, 80, 76], IRON_DARK: RGB = [58, 58, 66], BLANKET: RGB = [96, 112, 150], BAR: Record<keyof Metals, RGB> = { copper: [200, 118, 70], silver: [206, 212, 222], gold: [240, 200, 80] };
 /** The colour a load of ore shows: its richest metal. */
 const loadColor = (m: Metals) => (m.gold > 0 ? "#f0c850" : m.silver > 0 ? "#cdd2dc" : "#c07a50");
 const SCAFFOLD: RGB = [176, 138, 88];
-/** A grave for each miner lost. */
-const GRAVE = [".c.", "ccc", ".C.", ".C."];
-const HEADFRAME = [
-  "...ddd...",
-  "..dgggd..",
-  ".dg.d.gd.",
-  ".dgd.dgd.",
-  "..dgggd..",
-  "..wd.dw..",
-  "..w...w..",
-  ".w.....w.",
-  ".w.....w.",
-  ".ww...ww.",
-  "w.......w",
-  "w.......w",
-];
-
 /** Cells across the view at the furthest zoom out, and how far in it goes. */
 export const VIEW_CELLS = 256, MAX_ZOOM = 8;
 
@@ -87,9 +76,17 @@ export class MineRenderer {
   private sky = new Float32Array(CELLS);
   private warm = new Float32Array(CELLS);
   private shade = new Uint8Array(CELLS);
+  /** A fixed number (0 to 255) for each of the four pixels of every cell,
+   * picking its grain; and the light at a cell's four pixels as it paints. */
+  private grain = new Uint8Array(CELLS * 4);
+  private lr = new Float32Array(4);
+  private lg = new Float32Array(4);
+  private lb = new Float32Array(4);
+  private sprites = new Sprites();
   private glow: HTMLCanvasElement;
   private litAt = -1e9;
   private paintedVersion = -1;
+  private paintedAt = -1e9;
   private paintedRows = "";
   private seed = -1;
   private fx2 = new Particles();
@@ -126,10 +123,10 @@ export class MineRenderer {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d")!;
     this.off = document.createElement("canvas");
-    this.off.width = W;
-    this.off.height = H;
+    this.off.width = W * 2;
+    this.off.height = H * 2;
     this.offCtx = this.off.getContext("2d")!;
-    this.image = this.offCtx.createImageData(W, H);
+    this.image = this.offCtx.createImageData(W * 2, H * 2);
     this.pixels = new Uint32Array(this.image.data.buffer);
     this.glow = makeGlow();
   }
@@ -143,7 +140,11 @@ export class MineRenderer {
       this.canvas.width = w;
       this.canvas.height = h;
     }
-    const before = this.size, min = Math.max(1, Math.floor((this.refWidth > 0 ? this.refWidth * dpr : w) / VIEW_CELLS));
+    const before = this.size, ref = this.refWidth > 0 ? this.refWidth * dpr : w;
+    // An even number of device pixels a cell, near `VIEW_CELLS` across but
+    // never so few that the view is wider than the world.
+    let min = 2 * Math.max(1, Math.floor(ref / (VIEW_CELLS * 2)));
+    if (ref / min > W) min += 2;
     const scale = this.scaleFor(min, this.want);
     if (before.w > 1) {
       this.camX += before.w / (2 * before.scale) - w / (2 * scale);
@@ -153,9 +154,10 @@ export class MineRenderer {
     this.clamp();
     return dpr / scale;
   }
-  /** Device pixels a cell: always whole. */
+  /** Device pixels a cell: always even, so each of a cell's pixels is a
+   * whole number of them. */
   private scaleFor(min: number, want: number) {
-    return Math.max(min, Math.min(min * MAX_ZOOM, Math.round(min * want)));
+    return Math.max(min, Math.min(min * MAX_ZOOM, 2 * Math.round((min * want) / 2)));
   }
   get scale() {
     return this.size.scale;
@@ -235,77 +237,189 @@ export class MineRenderer {
 
   // ── Painting ────────────────────────────────────────────────────────
 
+  /** Paints rows `y0` to `y1` of the grid, two pixels a cell each way: every
+   * cell's four pixels take its material's detail (grains of gravel, specks
+   * in dirt, cracks in stone, ore glinting in its rock, blades of grass, a
+   * ladder's rung over its rails, a rail on its sleeper, a torch's flame on
+   * its stick), a lit lip where solid ground meets open air above and a
+   * shadow under it, and a light blended from the cell's and its
+   * neighbours'. */
   private paint(sim: MineSim, y0: number, y1: number, time: number) {
-    const cells = sim.world.cells, water = sim.world.water, burn = sim.burn, px = this.pixels, sky = this.sky, warm = this.warm, shade = this.shade;
+    const cells = sim.world.cells, water = sim.world.water, burn = sim.burn, px = this.pixels, sky = this.sky, warm = this.warm, shade = this.shade, grain = this.grain;
     const { surface, stoneTop } = sim.strata;
     const { daylight, clouds } = this.skyNow, night = 1 - daylight, starlight = night * (1 - clouds), open = this.skyLight();
-    const flicker = Math.floor(time / 110);
+    const flicker = Math.floor(time / 110), W2 = W * 2, lr = this.lr, lg = this.lg, lb = this.lb;
     for (let y = y0; y < y1; y++) {
       const t = Math.min(1, Math.max(0, y / 50));
       let skyRgb = mix(mix(NIGHT_TOP, NIGHT_LOW, t), mix(SKY_TOP, SKY_LOW, t * t), daylight);
       skyRgb = mix(skyRgb, mix(NIGHT_TOP, OVERCAST, daylight), clouds * 0.65);
+      const skyPx = pack(skyRgb, 1), up = y > 0 ? -W : 0, down = y < H - 1 ? W : 0;
       for (let x = 0; x < W; x++) {
-        const i = idx(x, y), m = cells[i];
-        let rgb: RGB;
+        const i = idx(x, y), m = cells[i], o = 2 * y * W2 + 2 * x, g4 = 4 * i;
         if (m === TORCH && !burn[i]) {
-          px[i] = pack(TORCH_RGB, 1);
+          // A flame flickering on its stick.
+          const f = (flicker + shade[i]) % 3;
+          px[o] = pack(f === 0 ? TORCH_HOT : TORCH_RGB, 1);
+          px[o + 1] = pack(f === 1 ? TORCH_HOT : f === 2 ? TORCH_RGB : TORCH_DIM, 1);
+          px[o + W2] = pack(TORCH_STICK, 1);
+          px[o + W2 + 1] = pack(TORCH_DIM, 0.7);
           continue;
         }
         if (m === LAMP) {
-          px[i] = pack(LAMP_RGB, 1);
+          // A lamp: its iron cap over the glass.
+          px[o] = px[o + 1] = pack(LAMP_CAP, 1);
+          px[o + W2] = pack(LAMP_RGB, 1);
+          px[o + W2 + 1] = pack(LAMP_RGB, 0.9);
           continue;
         }
-        // Lava and fire give their own light.
-        if (m === LAVA) {
-          px[i] = pack(SHADES[LAVA][(shade[i] + ((flicker + shade[i]) >> 2)) % 3], 1);
+        // Lava and fire give their own light, each pixel flickering apart.
+        if (m === LAVA || burn[i]) {
+          const shades = m === LAVA ? SHADES[LAVA] : FIRE_RGB, slow = m === LAVA ? 2 : 0;
+          for (let q = 0; q < 4; q++) px[o + (q >> 1) * W2 + (q & 1)] = pack(shades[(grain[g4 + q] + ((flicker + grain[g4 + q]) >> slow)) % 3], 1);
           continue;
         }
-        if (burn[i]) {
-          px[i] = pack(FIRE_RGB[(shade[i] + flicker) % 3], 1);
-          continue;
-        }
-        if (isPassable(m) && y < surface[x]) {
-          rgb = skyRgb;
-          if (water[i]) rgb = mix(WATER_RGB, rgb, 0.3).map((v) => v * (0.35 + 0.65 * open)) as RGB;
-          if (m === AIR) {
-            // Stars, now and then, through clear night skies.
-            const star = hash01(x, y, sim.seed + 5);
-            if (!water[i] && starlight > 0.05 && star < 0.014 && y < surface[x] - 6) {
-              const twinkle = 0.55 + 0.45 * Math.sin(time / 380 + star * 9000);
-              rgb = mix(rgb, [236, 236, 255], starlight * twinkle * (star < 0.004 ? 1 : 0.6));
-            }
-            px[i] = pack(rgb, 1);
+        const passable = isPassable(m), inSky = passable && y < surface[x];
+        if (inSky && m === AIR) {
+          let c = skyPx;
+          if (water[i]) {
+            const rgb = mix(WATER_RGB, skyRgb, 0.3).map((v) => v * (0.35 + 0.65 * open)) as RGB;
+            c = pack(rgb, 1);
+            px[o] = px[o + 1] = i >= W && !water[i - W] ? pack(rgb, 1.25) : c;
+            px[o + W2] = px[o + W2 + 1] = c;
             continue;
           }
-        } else rgb = y < stoneTop[x] ? DIRT_BACK : STONE_BACK;
-        if (m === LADDER) rgb = y % 2 ? [150, 104, 54] : [96, 64, 32];
-        else if (m === RAIL) rgb = x % 2 ? [150, 150, 158] : [92, 66, 40];
-        else if (m !== AIR) {
-          const shades = SHADES[m];
-          rgb = shades[shade[i] % shades.length];
-          if (m === TIMBER && y % 3 === 0) rgb = [rgb[0] * 0.7, rgb[1] * 0.7, rgb[2] * 0.7];
-        }
-        // Near the surface the ground keeps a little daylight, fading with depth.
-        const s = Math.max(sky[i], (0.5 - (y - surface[x]) * 0.022) * open), w = warm[i];
-        const r = s * 0.98 + w * 1.15 + 0.025, g = s * 0.96 + w * 0.8 + 0.025, b = s * 0.94 + w * 0.5 + 0.03;
-        if (water[i]) {
-          // Water: deep blue, catching whatever light there is, its surface brighter.
-          const k = Math.min(1, 0.22 + (s + w) * 0.9), top = i >= W && !water[i - W] ? 1.35 : 1;
-          rgb = [rgb[0] * r * 0.3 + WATER_RGB[0] * k * top, rgb[1] * g * 0.3 + WATER_RGB[1] * k * top, rgb[2] * b * 0.3 + WATER_RGB[2] * k * top];
-          px[i] = pack(rgb, 1);
+          px[o] = px[o + 1] = px[o + W2] = px[o + W2 + 1] = c;
+          // Stars, now and then, through clear night skies.
+          const star = hash01(x, y, sim.seed + 5);
+          if (starlight > 0.05 && star < 0.014 && y < surface[x] - 6) {
+            const twinkle = 0.55 + 0.45 * Math.sin(time / 380 + star * 9000);
+            px[o + (shade[i] & 1) + ((shade[i] >> 1) & 1) * W2] = pack(mix(skyRgb, [236, 236, 255], starlight * twinkle * (star < 0.004 ? 1 : 0.6)), 1);
+          }
           continue;
         }
-        px[i] = 0xff000000 | (clamp255(rgb[2] * b) << 16) | (clamp255(rgb[1] * g) << 8) | clamp255(rgb[0] * r);
+        // The light at each of the cell's pixels: half its own, a quarter
+        // each from its neighbours beside and above or below that pixel.
+        const near = (0.5 - (y - surface[x]) * 0.022) * open, l = x > 0 ? -1 : 0, r = x < W - 1 ? 1 : 0;
+        if (near <= 0 && !water[i] && sky[i] + warm[i] + sky[i + l] + warm[i + l] + sky[i + r] + warm[i + r] + sky[i + up] + warm[i + up] + sky[i + down] + warm[i + down] === 0) {
+          // Unlit: too dark for any detail to show.
+          const shades = SHADES[m], c = shades ? shades[shade[i] % shades.length] : y < stoneTop[x] ? DIRT_BACK : STONE_BACK;
+          px[o] = px[o + 1] = px[o + W2] = px[o + W2 + 1] = pack3(c[0] * 0.025, c[1] * 0.025, c[2] * 0.03);
+          continue;
+        }
+        for (let q = 0; q < 4; q++) {
+          const h = q & 1 ? r : l, v = q >> 1 ? down : up;
+          const s = Math.max(sky[i] * 0.5 + sky[i + h] * 0.25 + sky[i + v] * 0.25, near), w = warm[i] * 0.5 + warm[i + h] * 0.25 + warm[i + v] * 0.25;
+          lr[q] = s * 0.98 + w * 1.15 + 0.025;
+          lg[q] = s * 0.96 + w * 0.8 + 0.025;
+          lb[q] = s * 0.94 + w * 0.5 + 0.03;
+        }
+        const back: RGB = inSky ? skyRgb : y < stoneTop[x] ? DIRT_BACK : STONE_BACK;
+        if (water[i]) {
+          // Water: deep blue, catching whatever light there is, its surface brighter.
+          const top = i >= W && !water[i - W];
+          for (let q = 0; q < 4; q++) {
+            const k = Math.min(1, 0.22 + (lr[q] + lg[q]) * 0.45) * (top && q < 2 ? 1.35 : 1), c = passable ? back : SHADES[m]?.[shade[i] % SHADES[m].length] ?? back;
+            px[o + (q >> 1) * W2 + (q & 1)] = pack3(c[0] * lr[q] * 0.3 + WATER_RGB[0] * k, c[1] * lg[q] * 0.3 + WATER_RGB[1] * k, c[2] * lb[q] * 0.3 + WATER_RGB[2] * k);
+          }
+          continue;
+        }
+        // Open ground above and below, beside: the lit lip and the shadow.
+        const solid = !passable, openUp = solid && up !== 0 && isPassable(cells[i + up]), openDown = solid && down !== 0 && isPassable(cells[i + down]);
+        const openL = solid && l !== 0 && isPassable(cells[i - 1]), openR = solid && r !== 0 && isPassable(cells[i + 1]);
+        const shades = SHADES[m];
+        for (let q = 0; q < 4; q++) {
+          const sx = q & 1, sy = q >> 1, g = grain[g4 + q];
+          let c: RGB = back, k = 1;
+          if (m === AIR) {
+            k = 0.86 + g * 0.0011;
+            if (inSky) {
+              px[o + sy * W2 + sx] = skyPx;
+              continue;
+            }
+          } else if (m === LADDER) {
+            if (sy === 0) c = RUNG;
+            else c = sx ? RAIL_WOOD_LO : RAIL_WOOD;
+            if (inSky && sy === 1 && sx === 1) {
+              px[o + W2 + 1] = skyPx;
+              continue;
+            }
+          } else if (m === RAIL) {
+            if (sy === 1) c = x % 3 === 0 && sx === 0 ? SLEEPER : sx ? RAIL_LO : RAIL_HI;
+            else if (inSky) {
+              px[o + sx] = skyPx;
+              continue;
+            } else k = 0.86 + g * 0.0011;
+          } else {
+            switch (m) {
+              case GRAVEL:
+              case RUBBLE:
+              case LOOSE:
+                c = shades[g % shades.length];
+                break;
+              case DIRT:
+                c = g < 14 ? PEBBLE : g > 248 ? ROOT : shades[(shade[i] + (g >> 6)) % shades.length];
+                k = 0.93 + g * 0.0005;
+                break;
+              case STONE:
+              case BEDROCK:
+                c = shades[shade[i] % shades.length];
+                k = g < 16 ? 0.72 : g > 246 ? 1.18 : 0.94 + g * 0.0003;
+                break;
+              case COPPER:
+              case SILVER:
+              case GOLD:
+                // Nuggets of ore set in their stone, the odd one glinting.
+                if (g < 150) {
+                  c = shades[(shade[i] + g) % shades.length];
+                  k = g < 12 ? 1.3 : 1;
+                } else c = SHADES[STONE][shade[i] % 4];
+                break;
+              case GRASS:
+                // Blades against the sky along the top; dirt showing below.
+                if (sy === 0 && openUp) {
+                  if (g < 100) {
+                    px[o + sx] = y - 1 < surface[x] ? skyPx : pack(back, 0.5);
+                    continue;
+                  }
+                  c = g > 200 ? BLADE_HI : BLADE;
+                } else c = sy === 1 && cells[i + down] === DIRT && g < 90 ? SHADES[DIRT][g & 3] : shades[(shade[i] + g) % shades.length];
+                break;
+              case TIMBER:
+                c = shades[shade[i] % shades.length];
+                k = sy === 0 ? 1.12 : y % 3 === 0 ? 0.7 : 0.88;
+                break;
+              default:
+                c = shades ? shades[shade[i] % shades.length] : back;
+                k = 0.94 + g * 0.0003;
+            }
+            // Boulders and timbers stand out from the ground round them.
+            if ((m === ROCK || m === TIMBER) && !openUp && !openDown) {
+              if (sy === 0 && up !== 0 && cells[i + up] !== m) k *= 1.16;
+              else if (sy === 1 && down !== 0 && cells[i + down] !== m) k *= 0.78;
+              if (sx === 0 && l !== 0 && cells[i - 1] !== m) k *= 1.06;
+              else if (sx === 1 && r !== 0 && cells[i + 1] !== m) k *= 0.88;
+            }
+            if (openUp && sy === 0) k *= 1.2;
+            else if (openDown && sy === 1) k *= 0.74;
+            if (openL && sx === 0) k *= 1.08;
+            else if (openR && sx === 1) k *= 0.88;
+          }
+          px[o + sy * W2 + sx] = pack3(c[0] * k * lr[q], c[1] * k * lg[q], c[2] * k * lb[q]);
+        }
       }
     }
-    this.offCtx.putImageData(this.image, 0, 0, 0, y0, W, y1 - y0);
+    this.offCtx.putImageData(this.image, 0, 0, 0, y0 * 2, W2, (y1 - y0) * 2);
   }
 
   /** Draws a frame. `time` is in ms; `effects` turns dust and glow on. */
   draw(sim: MineSim, time: number, effects: boolean) {
     if (sim.seed !== this.seed) {
       this.seed = sim.seed;
-      for (let i = 0; i < CELLS; i++) this.shade[i] = Math.floor(hash01(i % W, (i / W) | 0, sim.seed + 77) * 12);
+      for (let i = 0; i < CELLS; i++) {
+        const x = i % W, y = (i / W) | 0;
+        this.shade[i] = Math.floor(hash01(x, y, sim.seed + 77) * 12);
+        for (let q = 0; q < 4; q++) this.grain[i * 4 + q] = Math.floor(hash01(2 * x + (q & 1), 2 * y + (q >> 1), sim.seed + 78) * 256);
+      }
       this.paintedVersion = -1;
       this.litAt = -1e9;
     }
@@ -332,8 +446,11 @@ export class MineRenderer {
     }
     this.readNews(sim, time, effects);
     const rows = `${y0}:${y1}`;
-    if (relight || sim.world.version !== this.paintedVersion || rows !== this.paintedRows) {
+    // The world changes most frames while the crew works: repaint for it at
+    // most every 60 ms (each cell is four pixels now).
+    if (relight || rows !== this.paintedRows || (sim.world.version !== this.paintedVersion && time - this.paintedAt > 60)) {
       this.paint(sim, y0, y1, time);
+      this.paintedAt = time;
       this.paintedVersion = sim.world.version;
       this.paintedRows = rows;
     }
@@ -351,26 +468,27 @@ export class MineRenderer {
       ctx.setTransform(scale, 0, 0, scale, ox, oy);
     };
     ctx.setTransform(scale, 0, 0, scale, ox, oy);
-    ctx.drawImage(this.off, 0, y0, W, y1 - y0, 0, y0, W, y1 - y0);
+    ctx.drawImage(this.off, 0, y0 * 2, W * 2, (y1 - y0) * 2, 0, y0, W, y1 - y0);
     if (y0 < 60) this.drawClouds(sim, time);
     this.drawSurface(sim, time, effects);
     if (effects && y0 < 60) this.drawRain(sim, time);
     if (effects) this.drawGlow(sim, time, y0, y1);
     this.drawHoist(sim);
+    const fine = this.fine;
     for (const c of sim.carts) {
       if (c.y < y0 - 3 || c.y > y1 + 1) continue;
-      ctx.fillStyle = "#4a4a52";
-      ctx.fillRect(c.x - 1, c.y - 1, 3, 1);
-      ctx.fillStyle = "#16141a";
-      ctx.fillRect(c.x - 1, c.y, 1, 1);
-      ctx.fillRect(c.x + 1, c.y, 1, 1);
-      const load = metalSum(c);
-      if (load > 0) {
-        ctx.fillStyle = loadColor(c);
-        ctx.fillRect(load > CART_LOAD / 2 ? c.x - 1 : c.x, c.y - 2, load > CART_LOAD / 2 ? 3 : 1, 1);
+      // A tub with an iron rim and rivets on two spoked wheels.
+      fine(c.x - 1, c.y - 1, 3, 0.25, "#8a8a96");
+      fine(c.x - 1, c.y - 0.75, 3, 0.75, "#4a4a52");
+      fine(c.x - 0.5, c.y - 0.5, 0.25, 0.25, "#6e6e7a");
+      fine(c.x + 1.25, c.y - 0.5, 0.25, 0.25, "#6e6e7a");
+      for (const wx of [c.x - 0.75, c.x + 1.25]) {
+        fine(wx, c.y, 0.5, 0.5, "#16141a");
+        fine(wx + 0.125, c.y + 0.125, 0.25, 0.25, "#5a5a64");
       }
+      const load = metalSum(c);
+      if (load > 0) oreHeap(fine, c.x + 0.5, c.y - 0.75, [6, 4, 2], Math.min(12, Math.ceil((12 * load) / CART_LOAD)), Math.round((12 * c.gold) / Math.max(1, load)), 1, Math.round((12 * c.silver) / Math.max(1, load)));
     }
-    const fine = this.fine;
     for (const m of sim.miners) {
       if (m.inside || m.y < y0 - 2 || m.y > y1 + 2) continue;
       const climbing = m.action === "walk" && sim.world.get(m.x, m.y) === LADDER;
@@ -427,7 +545,7 @@ export class MineRenderer {
   private drawSurface(sim: MineSim, time: number, effects: boolean) {
     const ctx = this.ctx, k = 0.3 + 0.7 * this.skyLight(), night = 1 - this.skyNow.daylight;
     const x0 = sim.shaftX, top = sim.strata.surface[x0];
-    sprite(ctx, HEADFRAME, x0 - 4, top - HEADFRAME.length, k);
+    ctx.drawImage(this.sprites.get("headframe", HEADFRAME_W, HEADFRAME_H, paintHeadframe, k), x0 - 4, top - HEADFRAME_H / 2, HEADFRAME_W / 2, HEADFRAME_H / 2);
     const inside: Record<BuildingId, Miner[]> = { shaft: [], barracks: [], warehouse: [], forge: [], smithy: [] };
     for (const m of sim.miners) if (m.inside) inside[m.inside.b].push(m);
     const shaft = sim.buildings.shaft;
@@ -444,7 +562,30 @@ export class MineRenderer {
     const graves = Math.min(10, sim.lostTotal);
     for (let g = 0; g < graves; g++) {
       const gx = sim.buildings.smithy.x0 - 4 - g * 4;
-      sprite(ctx, GRAVE, gx - 1, sim.standY(gx) - 3, k);
+      ctx.drawImage(this.sprites.get(`grave${g}`, GRAVE_W, GRAVE_H, (p) => paintGrave(p, g), k), gx - 1, sim.standY(gx) - 3, GRAVE_W / 2, GRAVE_H / 2);
+    }
+  }
+
+  /** A building's front wall, back wall or shell, painted once for its
+   * place and size and dimmed to `k`. */
+  private piece(b: Footprint & { id: BuildingId }, part: "wall" | "back" | "shell", k: number) {
+    const bb = b as Building, key = `${part}:${b.id}:${b.x0}:${b.x1}:${b.floor}:${b.height}:${bb.door}`;
+    if (part === "shell") {
+      const o = shellOrigin(bb), w = (b.x1 - b.x0 + 3) * 2, h = (b.floor - o.y + 1) * 2;
+      return this.sprites.get(key, w, h, (p) => paintShell(p, bb), k);
+    }
+    const w = (b.x1 - b.x0 - 1) * 2, h = b.height * 2;
+    return this.sprites.get(key, w, h, (p) => (part === "wall" ? paintWall(p, bb) : paintBack(p, bb)), k);
+  }
+
+  /** The stone footing under a building, down to the ground. */
+  private footing(sim: MineSim, b: Footprint, k: number, fill: Fill) {
+    const surface = sim.strata.surface;
+    for (let x = b.x0; x <= b.x1; x++) {
+      if (surface[x] <= b.floor + 1) continue;
+      fill(FOOTING, k, x, b.floor + 1, 1, surface[x] - b.floor - 1);
+      fill(FOOTING, k * 1.2, x, b.floor + 1, 1, 0.5);
+      for (let y = b.floor + 2; y < surface[x]; y++) fill(FOOTING, k * 0.78, x + ((y + x) % 2) * 0.5, y - 0.5, 0.5, 0.5);
     }
   }
 
@@ -452,63 +593,57 @@ export class MineRenderer {
    * fading) the room behind with its fittings and the miners in it, then
    * the front wall, frame and roof. */
   private drawBuilding(sim: MineSim, b: Building, crew: Miner[], time: number, k: number, night: number, effects: boolean) {
-    const ctx = this.ctx, F = b.floor, top = F - b.height + 1, surface = sim.strata.surface;
-    const stone = b.id === "forge" || b.id === "smithy";
-    const fill = (c: RGB, kk: number, x: number, y: number, w = 1, h = 1) => {
-      ctx.fillStyle = `rgb(${(c[0] * kk) | 0},${(c[1] * kk) | 0},${(c[2] * kk) | 0})`;
-      ctx.fillRect(x, y, w, h);
-    };
-    for (let x = b.x0; x <= b.x1; x++) if (surface[x] > F + 1) fill(FOOTING, k, x, F + 1, 1, surface[x] - F - 1);
-    const open = this.open[b.id], lamp = 0.78 + 0.06 * Math.sin(time / 300);
+    const ctx = this.ctx, F = b.floor, top = F - b.height + 1;
+    const fill = this.filler();
+    this.footing(sim, b, k, fill);
+    const open = this.open[b.id], lamp = 0.78 + 0.06 * Math.sin(time / 300), inner = b.x1 - b.x0 - 1;
     if (open > 0.01) {
-      fill(stone ? BACK_STONE : BACK, lamp, b.x0 + 1, top, b.x1 - b.x0 - 1, b.height);
+      ctx.drawImage(this.piece(b, "back", lamp), b.x0 + 1, top, inner, b.height);
       this.drawRoom(sim, b, time, lamp, fill);
       for (const m of crew) this.drawInside(sim, b, m, time, effects);
     }
-    // The front wall.
+    // The front wall, its windows lit: the barracks' at night, the forge's by its fire.
     ctx.globalAlpha = 1 - open * 0.88;
-    for (let y = top; y <= F; y++)
-      for (let x = b.x0 + 1; x < b.x1; x++) {
-        const c = stone ? ASHLAR[((x + (y % 2) * 2) >> 1) % 2 === 0 && y % 2 === 0 ? 1 : 0] : PLANK[y % 2];
-        fill(c, k * (stone && (x + y) % 5 === 0 ? 0.86 : 1), x, y);
-      }
-    // Windows: the barracks' lit at night, the forge's by its fire.
+    ctx.drawImage(this.piece(b, "wall", k), b.x0 + 1, top, inner, b.height);
     const lit = b.id === "forge" ? (sim.working("forge") ? 1 : 0.25) : b.id === "barracks" || b.id === "shaft" ? Math.min(1, night * 1.4) : 0;
-    for (const wx of this.windows(b)) fill(lit > 0 ? mix(WINDOW_DARK, b.id === "forge" ? [255, 150, 60] : WINDOW_LIT, lit) : WINDOW_DARK, lit > 0 ? 1 : k, wx, F - 4, 1, 2);
+    if (lit > 0)
+      for (const wx of windowsOf(b)) {
+        const c = mix(GLASS, b.id === "forge" ? [255, 150, 60] : WINDOW_LIT, lit);
+        fill(c, 1, wx, F - 4, 1, 1);
+        fill(c, 0.85, wx, F - 2.5, 1, 0.5);
+        fill(c, 1.15, wx, F - 4, 0.5, 0.5);
+      }
     ctx.globalAlpha = 1;
     // Frame, door and roof stay put.
-    fill(POST, k, b.x0, top, 1, b.height);
-    fill(POST, k, b.x1, top, 1, b.height);
-    fill(POST, k, b.x0, top - 1, b.x1 - b.x0 + 1, 1);
-    if (b.id === "shaft") {
-      // Open both sides: the yard's way runs through it.
-      fill([24, 18, 14], k, b.x0, F - 1, 1, 2);
-      fill([24, 18, 14], k, b.x1, F - 1, 1, 2);
-    } else fill([52, 32, 18], k, b.door, F - 2, 1, 3);
-    const roof = b.id === "forge" || b.id === "smithy" ? SLATE : b.id === "barracks" ? ROOF : PLANK;
-    const rows = b.id === "shaft" ? 2 : 3;
-    for (let r = 1; r <= rows; r++) {
-      const a = b.x0 - 1 + r * 2 - 1, z = b.x1 + 1 - r * 2 + 1;
-      if (z >= a) fill(roof[r % 2], k, a, top - 1 - r, z - a + 1, 1);
-    }
-    if (b.id === "forge") {
-      // The chimney, smoking while the furnace is worked.
-      fill(ASHLAR[1], k, b.x0 + 2, top - 1 - rows - 3, 2, rows + 3);
-      if (effects && this.fx() < (sim.working("forge") ? 0.22 : 0.03)) {
-        const grey = 110 + Math.floor(this.fx() * 50);
-        this.fx2.add("smoke", b.x0 + 2.5 + this.fx(), top - rows - 4.2, (this.fx() - 0.5) * 0.01, -0.035 - this.fx() * 0.025, 140 + this.fx() * 90, `rgb(${grey},${grey - 4},${grey - 8})`, 0.5);
-      }
+    const o = shellOrigin(b);
+    ctx.drawImage(this.piece(b, "shell", k), o.x, o.y, b.x1 - b.x0 + 3, F - o.y + 1);
+    const rows = roofRows(b);
+    if (b.id === "forge" && effects && this.fx() < (sim.working("forge") ? 0.22 : 0.03)) {
+      // The chimney smokes while the furnace is worked.
+      const grey = 110 + Math.floor(this.fx() * 50);
+      this.fx2.add("smoke", b.x0 + 2.5 + this.fx(), top - rows - 4.2, (this.fx() - 0.5) * 0.01, -0.035 - this.fx() * 0.025, 140 + this.fx() * 90, `rgb(${grey},${grey - 4},${grey - 8})`, 0.5);
     }
     if (b.id === "shaft") {
-      // The lantern by the door, aglow after dark.
-      const lx = b.x1 + 1, ly = F - 3;
-      fill(IRON_DARK, k, lx, ly - 1);
-      fill(mix([150, 120, 60], [255, 220, 130], Math.min(1, night * 1.5)), night > 0.3 ? 1 : k, lx, ly);
+      // The lantern by the door on its bracket, aglow after dark.
+      const lx = b.x1 + 1, ly = F - 3, glow = mix([150, 120, 60], [255, 220, 130], Math.min(1, night * 1.5)), gk = night > 0.3 ? 1 : k;
+      fill(IRON_DARK, k, lx - 0.5, ly - 1, 1, 0.5);
+      fill(IRON_DARK, k, lx, ly - 0.5, 1, 0.5);
+      fill(glow, gk, lx, ly, 1, 0.5);
+      fill(glow, gk * 0.8, lx, ly + 0.5, 0.5, 0.5);
+      fill(IRON_DARK, k, lx + 0.5, ly + 0.5, 0.5, 0.5);
       if (effects && night > 0.2) this.glowAt(lx, ly, 10, Math.min(1, (night - 0.2) * 1.3) * 0.55 * (0.85 + 0.15 * Math.sin(time / 170) * Math.sin(time / 410)));
     }
-    if (this.picked === b.id) this.outline(b, top - 1 - rows - (b.id === "forge" ? 3 : 0), time);
+    if (this.picked === b.id) this.outline(b, top - 1 - rows - chimneyRows(b), time);
     if (effects && b.id === "barracks" && night > 0.2)
-      for (const wx of this.windows(b).filter((_, i) => i % 2 === 0)) this.glowAt(wx, F - 4, 8, Math.min(1, (night - 0.2) * 1.3) * 0.35);
+      for (const wx of windowsOf(b).filter((_, i) => i % 2 === 0)) this.glowAt(wx, F - 4, 8, Math.min(1, (night - 0.2) * 1.3) * 0.35);
+  }
+  /** Fills a rectangle in cells (to half a cell) in a colour dimmed to `k`. */
+  private filler(): Fill {
+    const ctx = this.ctx;
+    return (c, kk, x, y, w = 1, h = 1) => {
+      ctx.fillStyle = `rgb(${clamp255(c[0] * kk)},${clamp255(c[1] * kk)},${clamp255(c[2] * kk)})`;
+      ctx.fillRect(x, y, w, h);
+    };
   }
   /** The building picked: an outline of brass, gently pulsing, from the
    * roof's row `roof` down to its floor. */
@@ -527,39 +662,44 @@ export class MineRenderer {
   private drawRebuild(sim: MineSim, b: Building, r: Rebuild, time: number, k: number) {
     const p = r.t / r.total, down = r.from !== null && p < 0.5;
     const site: Footprint = down ? r.from! : b, done = r.from ? (down ? 1 - p * 2 : (p - 0.5) * 2) : p;
-    const ctx = this.ctx, F = site.floor, surface = sim.strata.surface, stone = b.id === "forge" || b.id === "smithy";
-    const fill = (c: RGB, kk: number, x: number, y: number, w = 1, h = 1) => {
-      ctx.fillStyle = `rgb(${(c[0] * kk) | 0},${(c[1] * kk) | 0},${(c[2] * kk) | 0})`;
-      ctx.fillRect(x, y, w, h);
-    };
-    for (let x = site.x0; x <= site.x1; x++) if (surface[x] > F + 1) fill(FOOTING, k, x, F + 1, 1, surface[x] - F - 1);
-    // The walls, risen (or still standing) to the share of the work done.
-    const rows = Math.round(site.height * done), top = F - site.height + 1;
-    for (let y = F - rows + 1; y <= F; y++)
-      for (let x = site.x0; x <= site.x1; x++) {
-        const edge = x === site.x0 || x === site.x1;
-        const c = edge ? POST : stone ? ASHLAR[((x + (y % 2) * 2) >> 1) % 2 === 0 && y % 2 === 0 ? 1 : 0] : PLANK[y % 2];
-        fill(c, k * (stone && (x + y) % 5 === 0 ? 0.86 : 1), x, y);
+    const ctx = this.ctx, F = site.floor, fill = this.filler();
+    this.footing(sim, site, k, fill);
+    // The walls, risen (or still standing) to the share of the work done,
+    // half a cell at a time.
+    const rows = Math.round(site.height * 2 * done) / 2, top = F - site.height + 1;
+    if (rows > 0) {
+      const wall = this.piece({ ...site, id: b.id, door: down ? site.x1 : b.door } as Building, "wall", k);
+      const from = (site.height - rows) * 2;
+      ctx.drawImage(wall, 0, from, wall.width, wall.height - from, site.x0 + 1, F + 1 - rows, site.x1 - site.x0 - 1, rows);
+      for (const x of [site.x0, site.x1]) {
+        fill(POST, k * 1.25, x, F + 1 - rows, 0.5, rows);
+        fill(POST, k * 0.75, x + 0.5, F + 1 - rows, 0.5, rows);
       }
-    // The scaffold: poles either side and every few columns, boards across.
-    ctx.globalAlpha = 0.9;
-    for (let x = site.x0 - 1; x <= site.x1 + 1; x += 4) fill(SCAFFOLD, k, x, top - 2, 1, site.height + 2);
-    fill(SCAFFOLD, k, site.x1 + 1, top - 2, 1, site.height + 2);
-    for (let y = F - 1; y >= top - 2; y -= 3) fill(SCAFFOLD, k * 0.85, site.x0 - 1, y, site.x1 - site.x0 + 3, 1);
+    }
+    // The scaffold: poles either side and every few columns, boards across
+    // with their ends shadowed, and lashings where they cross.
+    ctx.globalAlpha = 0.92;
+    const poles: number[] = [];
+    for (let x = site.x0 - 1; x <= site.x1 + 1; x += 4) poles.push(x);
+    if (poles[poles.length - 1] !== site.x1 + 1) poles.push(site.x1 + 1);
+    for (const x of poles) {
+      fill(SCAFFOLD, k, x, top - 2, 0.5, site.height + 2);
+      fill(SCAFFOLD, k * 0.7, x + 0.5, top - 2, 0.5, site.height + 2);
+    }
+    for (let y = F - 1; y >= top - 2; y -= 3) {
+      fill(SCAFFOLD, k, site.x0 - 1, y, site.x1 - site.x0 + 3, 0.5);
+      fill(SCAFFOLD, k * 0.7, site.x0 - 1, y + 0.5, site.x1 - site.x0 + 3, 0.5);
+      for (const x of poles) fill([90, 70, 44], k, x, y, 0.5, 0.5);
+    }
     ctx.globalAlpha = 1;
     // Timber stacked by the site, and a hoisting rope swaying from the top.
     const sx = site.x1 + 2;
-    fill(TIMBER_END, k, sx, F, 2, 1);
-    fill(PLANK[1], k, sx, F - 1, 2, 1);
-    const sway = Math.round(Math.sin(time / 500));
-    fill([140, 120, 90], k, Math.floor((site.x0 + site.x1) / 2) + sway, top - 1, 1, Math.max(1, site.height - rows));
+    for (let n = 0; n < 4; n++) fill(n % 2 ? TIMBER_END : [140, 96, 50], k, sx + n * 0.5, F + 0.5, 0.5, 0.5);
+    fill(PLANK[0], k, sx, F, 2, 0.5);
+    fill(PLANK[1], k, sx + 0.5, F - 0.5, 1.5, 0.5);
+    const sway = Math.round(Math.sin(time / 500) * 2) / 2;
+    fill([140, 120, 90], k, Math.floor((site.x0 + site.x1) / 2) + 0.25 + sway, top - 1, 0.5, Math.max(1, site.height - rows));
     if (this.picked === b.id) this.outline(site, top - 3, time);
-  }
-  private windows(b: Building) {
-    const out: number[] = [];
-    if (b.id === "shaft") return out;
-    for (let x = b.x0 + 3; x < b.x1 - 1; x += 5) if (x !== b.door) out.push(x);
-    return out;
   }
   private glowAt(x: number, y: number, size: number, alpha: number) {
     const ctx = this.ctx;
@@ -571,76 +711,146 @@ export class MineRenderer {
   }
 
   /** What's inside each building, lit by its own lamps. */
-  private drawRoom(sim: MineSim, b: Building, time: number, k: number, fill: (c: RGB, k: number, x: number, y: number, w?: number, h?: number) => void) {
+  private drawRoom(sim: MineSim, b: Building, time: number, k: number, fill: Fill) {
     const F = b.floor, x0 = b.x0, flick = Math.floor(time / 120);
     if (b.id === "shaft") {
-      // The hatch over the shaft and the top of its ladder.
+      // The hatch over the shaft, the top of its ladder and the winch.
       fill([20, 16, 14], k, sim.shaftX, F, 1, 1);
-      for (let y = F - b.height + 1; y <= F; y += 2) fill(PLANK[0], k, sim.shaftX, y);
+      for (let y = F - b.height + 1; y <= F; y++) {
+        fill(PLANK[1], k, sim.shaftX, y + 0.5, 0.5, 0.5);
+        fill(POST, k, sim.shaftX + 0.5, y + 0.5, 0.5, 0.5);
+        fill(PLANK[0], k * 1.1, sim.shaftX, y, 1, 0.5);
+      }
+      fill(IRON_DARK, k, b.x1 - 2, F - 1, 1.5, 1);
+      fill([120, 100, 70], k, b.x1 - 2, F - 1.5, 1.5, 0.5);
+      fill(POST, k, b.x1 - 2, F, 0.5, 1);
+      fill(POST, k, b.x1 - 1, F, 0.5, 1);
     } else if (b.id === "barracks") {
-      // The lounge: a table, two stools, a mug or two, a hanging lamp.
-      fill(PLANK[0], k, x0 + 3, F - 1, 2, 1);
-      fill(POST, k, x0 + 3, F, 1, 1);
-      fill(POST, k, x0 + 4, F, 1, 1);
-      fill(POST, k, x0 + 2, F, 1, 1);
-      fill(POST, k, x0 + 5, F, 1, 1);
-      fill([210, 200, 180], k, x0 + 4, F - 2);
-      fill(WINDOW_LIT, 1, x0 + 4, F - 6);
-      // Bays of bunks, three tiers a side of each ladder.
+      // The lounge: a table with a mug and a candle, two stools, a hanging lamp.
+      fill(PLANK[0], k * 1.1, x0 + 3, F - 1, 2, 0.5);
+      fill(PLANK[1], k, x0 + 3, F - 0.5, 2, 0.5);
+      fill(POST, k, x0 + 3, F, 0.5, 1);
+      fill(POST, k, x0 + 4.5, F, 0.5, 1);
+      for (const sx of [x0 + 2, x0 + 5]) {
+        fill(PLANK[1], k, sx, F + 0.5 - 0.5, 1, 0.5);
+        fill(POST, k, sx, F + 0.5, 0.5, 0.5);
+        fill(POST, k, sx + 0.5, F + 0.5, 0.5, 0.5);
+      }
+      fill([210, 200, 180], k, x0 + 4.5, F - 1.5, 0.5, 0.5);
+      fill([240, 228, 200], k, x0 + 3.5, F - 1.5, 0.5, 0.5);
+      fill(WINDOW_LIT, 1, x0 + 3.5, F - 2, 0.5, 0.5);
+      fill(IRON_DARK, k, x0 + 4, F - b.height + 1, 0.5, 1.5);
+      fill(IRON_DARK, k, x0 + 3.5, F - 5.5, 1.5, 0.5);
+      fill(WINDOW_LIT, 1, x0 + 3.5, F - 5, 1.5, 0.5);
+      // Bays of bunks, three tiers a side of each ladder: a pillow by the
+      // ladder, a blanket folded at the foot.
       const bays = (b.spots.sleep?.length ?? 0) / 6;
       for (let p = 0; p < bays; p++) {
         const px = x0 + 7 + p * 7, ladder = px + 3;
-        for (let y = F - 5; y <= F; y++) fill(y % 2 ? PLANK[0] : POST, k, ladder, y);
-        fill(POST, k, px, F - 5, 1, 6);
-        fill(POST, k, px + 6, F - 5, 1, 6);
+        fill(POST, k, ladder, F - 5, 0.5, 6);
+        fill(POST, k * 0.8, ladder + 0.5, F - 5, 0.5, 6);
+        for (let y = F - 5; y <= F; y++) fill(PLANK[0], k * 1.1, ladder, y, 1, 0.5);
+        fill(POST, k, px, F - 5, 0.5, 6);
+        fill(POST, k, px + 6.5, F - 5, 0.5, 6);
         for (let tier = 0; tier < 3; tier++) {
-          fill(PLANK[1], k, px, F - 2 * tier, 3, 1);
-          fill(PLANK[1], k, px + 4, F - 2 * tier, 3, 1);
-          // A folded blanket at the foot of each bunk.
-          fill(BLANKET, k * 0.8, px, F - 2 * tier - 1);
-          fill(BLANKET, k * 0.8, px + 6, F - 2 * tier - 1);
+          const y = F - 2 * tier;
+          for (const [bx, pillow, foot] of [[px, px + 2.5, px + 0.5], [px + 4, px + 4, px + 6]] as const) {
+            fill(PLANK[1], k, bx, y, 3, 0.5);
+            fill(POST, k * 0.8, bx, y + 0.5, 3, 0.5);
+            fill([226, 220, 206], k, pillow, y - 0.5, 0.5, 0.5);
+            fill(BLANKET, k * 0.8, foot, y - 0.5, 0.5, 0.5);
+            fill(BLANKET, k * 0.65, foot, y - 1, 0.5, 0.5);
+          }
         }
       }
     } else if (b.id === "warehouse") {
-      // Shelves of timber, rails and lights, as full as the warehouse's
-      // supplies; props stacked by the wall.
-      for (const y of [F - 2, F - 4]) fill(PLANK[1], k, x0 + 1, y, b.x1 - x0 - 1, 1);
-      const width = b.x1 - x0 - 1;
-      let left = Math.round((2 * width * Math.min(sim.stock, sim.stockCap)) / Math.max(1, sim.stockCap));
-      for (let x = x0 + 1; x < b.x1 && left > 0; x++, left--) fill(x % 2 ? TIMBER_END : [150, 150, 158], k, x, F - 3);
-      for (let x = x0 + 1; x < b.x1 && left > 0; x++, left--) fill(x % 3 === 0 ? TORCH_RGB : x % 3 === 1 ? [230, 220, 170] : TIMBER_END, k * 0.9, x, F - 5);
-      fill(PLANK[0], k, x0 + 1, F - 1, 1, 2);
-      fill(PLANK[1], k, x0 + 2, F, 1, 1);
+      // Shelves on brackets: timber and rails below, lamps and torches
+      // above, as full as the warehouse's supplies; props by the wall.
+      for (const y of [F - 2, F - 4]) {
+        fill(PLANK[0], k * 1.1, x0 + 1, y, b.x1 - x0 - 1, 0.5);
+        fill(POST, k, x0 + 1, y + 0.5, b.x1 - x0 - 1, 0.5);
+        for (let x = x0 + 2; x < b.x1 - 1; x += 3) fill(IRON_DARK, k, x, y + 0.5, 0.5, 0.5);
+      }
+      const slots = (b.x1 - x0 - 1) * 2;
+      let left = Math.round((2 * slots * Math.min(sim.stock, sim.stockCap)) / Math.max(1, sim.stockCap));
+      for (let n = 0; n < slots && left > 0; n++, left--) {
+        const x = x0 + 1 + n * 0.5;
+        if (n % 4 < 2) {
+          fill(TIMBER_END, k, x, F - 2.5, 0.5, 0.5);
+          fill([126, 84, 42], k, x, F - 3, 0.5, 0.5);
+        } else fill(n % 4 === 2 ? [168, 168, 178] : [110, 110, 120], k, x, F - 2.5, 0.5, 0.5);
+      }
+      for (let n = 0; n < slots && left > 0; n++, left--) {
+        const x = x0 + 1 + n * 0.5, kind = n % 3;
+        if (kind === 0) {
+          fill(TORCH_STICK, k, x, F - 4.5, 0.5, 0.5);
+          fill(TORCH_RGB, k, x, F - 5, 0.5, 0.5);
+        } else if (kind === 1) {
+          fill(LAMP_CAP, k, x, F - 5, 0.5, 0.5);
+          fill([230, 220, 170], k * 0.9, x, F - 4.5, 0.5, 0.5);
+        } else fill(TIMBER_END, k * 0.9, x, F - 4.5, 0.5, 0.5);
+      }
+      fill(PLANK[0], k, x0 + 1, F - 1, 0.5, 2);
+      fill(PLANK[1], k, x0 + 1.5, F - 0.5, 0.5, 1.5);
+      fill(PLANK[1], k, x0 + 2, F, 1, 0.5);
+      fill(TIMBER_END, k, x0 + 2, F + 0.5, 1, 0.5);
     } else if (b.id === "forge") {
-      // The furnace, its mouth roaring while it is worked; ore by the door.
+      // The furnace: brick, an arched mouth roaring while it is worked, a
+      // flue to the chimney, and the bellows; ore by the door.
       const hot = sim.working("forge") > 0;
-      fill(ASHLAR[1], k, x0 + 1, F - 4, 3, 5);
-      for (let y = F - 2; y <= F - 1; y++)
-        for (let x = x0 + 2; x <= x0 + 3; x++) fill(hot ? FIRE_RGB[(x + y + flick) % 3] : [90, 40, 24], 1, x, y);
+      for (let y = F - 4; y <= F + 0.5; y += 0.5)
+        for (let x = x0 + 1; x < x0 + 4; x += 0.5) {
+          const joint = (y * 2) % 2 === 1 || ((x * 2 + (Math.floor(y) % 2) * 2) % 4 === 3);
+          fill(joint ? [90, 82, 76] : [138, 70, 52], k * (0.9 + 0.1 * ((x * 7 + y * 3) % 2)), x, y, 0.5, 0.5);
+        }
+      for (let y = F - 2.5; y <= F - 0.5; y += 0.5)
+        for (let x = x0 + 1.5; x < x0 + 3.5; x += 0.5) {
+          if (y === F - 2.5 && (x === x0 + 1.5 || x === x0 + 3)) continue;
+          const f = Math.floor(x * 2 + y * 2 + flick) % 3;
+          fill(hot ? FIRE_RGB[f] : [90, 40, 24], hot && y === F - 0.5 ? 1.15 : 1, x, y, 0.5, 0.5);
+        }
+      fill(ASHLAR[1], k, x0 + 2, F - b.height + 1, 1, b.height - 5);
+      fill(ASHLAR[0], k, x0 + 2, F - b.height + 1, 0.5, b.height - 5);
+      fill([110, 74, 44], k, x0 + 4, F - 0.5, 1, 0.5);
+      fill([80, 52, 30], k, x0 + 4, F, 1, 0.5);
       this.forgeStock(sim, b, k, fill);
     } else if (b.id === "smithy") {
-      // An anvil for each smith, the rack of bars waiting, the quench trough.
+      // An anvil for each smith (face, horn, waist and foot on a stump),
+      // the rack of bars waiting, the quench trough, tongs on the wall.
       for (const ax of anvils(b)) {
-        fill(IRON_DARK, k, ax, F - 1, 3, 1);
-        fill(IRON_DARK, k, ax + 1, F, 1, 1);
+        fill([130, 132, 142], k, ax, F - 1, 2, 0.5);
+        fill(IRON_DARK, k, ax + 2, F - 1, 1, 0.5);
+        fill(IRON_DARK, k, ax + 0.5, F - 0.5, 1.5, 0.5);
+        fill(IRON_DARK, k, ax + 0.5, F, 1, 0.5);
+        fill(POST, k, ax + 0.5, F + 0.5, 1, 0.5);
+        fill([90, 90, 98], k, ax + 1.5, F - 4, 0.5, 1.5);
       }
       // The rack: copper and silver stacked on the left post, gold on the right.
+      fill(POST, k, x0 + 1, F - 3, 2, 0.5);
       const copper = Math.min(6, sim.bars.copper), silver = Math.min(6 - Math.ceil(copper / 2), sim.bars.silver), gold = Math.min(6, sim.bars.gold);
-      for (let n = 0; n < copper; n++) fill(BAR.copper, k, x0 + 1, F - Math.floor(n / 2), 1, 1);
-      for (let n = 0; n < silver; n++) fill(BAR.silver, k, x0 + 1, F - Math.ceil(copper / 2) - n, 1, 1);
-      for (let n = 0; n < gold; n++) fill(BAR.gold, k, x0 + 2, F - n, 1, 1);
+      const bar = (c: RGB, x: number, y: number) => {
+        fill(c, k, x, y + 0.5, 1, 0.5);
+        fill(c, k * 1.25, x, y + 0.5, 0.5, 0.25);
+      };
+      for (let n = 0; n < copper; n++) bar(BAR.copper, x0 + 1, F - Math.floor(n / 2) + (n % 2) * -0.5);
+      for (let n = 0; n < silver; n++) bar(BAR.silver, x0 + 1, F - Math.ceil(copper / 2) - n * 0.5);
+      for (let n = 0; n < gold; n++) bar(BAR.gold, x0 + 2, F - n * 0.5);
       fill(POST, k, b.x1 - 2, F, 2, 1);
-      fill(WATER_RGB, k, b.x1 - 2, F - 1, 2, 1);
+      fill(POST, k * 1.2, b.x1 - 2, F - 1, 0.5, 1);
+      fill(POST, k * 1.2, b.x1 - 0.5, F - 1, 0.5, 1);
+      fill(WATER_RGB, k, b.x1 - 1.5, F - 0.5, 1, 0.5);
+      fill([120, 170, 230], k, b.x1 - 1.5, F - 0.5, 0.5, 0.25);
     }
   }
 
   /** The forge's ore, filling a heap by the door, then a low shelf and a
    * high one along the back wall, as it nears what the forge holds. */
-  private forgeStock(sim: MineSim, b: Building, k: number, fill: (c: RGB, k: number, x: number, y: number, w?: number, h?: number) => void) {
+  private forgeStock(sim: MineSim, b: Building, k: number, fill: Fill) {
     const F = b.floor, fine = this.fine, sx0 = b.x0 + 4, sx1 = b.x1 - 1, tone = (c: RGB) => `rgb(${(c[0] * k) | 0},${(c[1] * k) | 0},${(c[2] * k) | 0})`;
     for (const sy of [F - 2, F - 4]) {
-      fill(PLANK[1], k, sx0, sy, sx1 - sx0, 1);
-      fill(POST, k, sx0, sy, 1, 1);
+      fill(PLANK[0], k * 1.1, sx0, sy + 0.5, sx1 - sx0, 0.25);
+      fill(PLANK[1], k, sx0, sy + 0.75, sx1 - sx0, 0.25);
+      fill(POST, k, sx0, sy, 0.5, 1);
     }
     const total = metalSum(sim.ore);
     if (!total) return;
@@ -772,7 +982,7 @@ export class MineRenderer {
    * shaft to the bucket, which waits at the top, is let down to a load and
    * wound up with it (eased between the sim's steps). */
   private drawHoist(sim: MineSim) {
-    const ctx = this.ctx, fine = this.fine, x = sim.shaftX, wheel = sim.strata.surface[x] - HEADFRAME.length + 2.5;
+    const ctx = this.ctx, fine = this.fine, x = sim.shaftX, wheel = sim.strata.surface[x] - HEADFRAME_H / 2 + WHEEL.y;
     const target = sim.hoist.y;
     this.hoistY = this.hoistY < 0 || Math.abs(target - this.hoistY) > 30 ? target : this.hoistY + (target - this.hoistY) * 0.3;
     const y = this.hoistY, { scale } = this.size;
@@ -864,22 +1074,9 @@ function spread(cells: Uint8Array, light: Float32Array, airCost: number, rockCos
 }
 
 const clamp255 = (v: number) => (v >= 255 ? 255 : v <= 0 ? 0 : v | 0);
+const pack3 = (r: number, g: number, b: number) => 0xff000000 | (clamp255(b) << 16) | (clamp255(g) << 8) | clamp255(r);
 const pack = (c: RGB, k: number) => 0xff000000 | (clamp255(c[2] * k) << 16) | (clamp255(c[1] * k) << 8) | clamp255(c[0] * k);
 const mix = (a: RGB, b: RGB, t: number): RGB => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
-
-/** Draws a sprite with its colours dimmed to `k` (the light it stands in);
- * `lit` overrides the window colour, which glows whatever the light. */
-function sprite(ctx: CanvasRenderingContext2D, rows: string[], x: number, y: number, k = 1, lit?: RGB) {
-  rows.forEach((row, dy) => {
-    for (let dx = 0; dx < row.length; dx++) {
-      const c = PALETTE[row[dx]];
-      if (!c) continue;
-      const rgb = row[dx] === "y" && lit ? lit : [c[0] * k, c[1] * k, c[2] * k];
-      ctx.fillStyle = `rgb(${rgb[0] | 0},${rgb[1] | 0},${rgb[2] | 0})`;
-      ctx.fillRect(x + dx, y + dy, 1, 1);
-    }
-  });
-}
 
 const TIMBER_END: RGB = [168, 116, 62];
 
