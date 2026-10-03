@@ -39,6 +39,7 @@ import { NIGHT_FADE_SECONDS, isBossWave, rollWeather, skyLabel, type Weather } f
 import { play } from "../sound.ts";
 import { replay, sparksOver } from "../ui/flourish.ts";
 import { available, buyBomb, buyItem, buySpeed3, buyUpgrade, canAfford, type DefendSave, type Wallet } from "./progress.ts";
+import { ageWater } from "./boats.ts";
 
 export type DefendHost = {
   save(): DefendSave;
@@ -106,7 +107,7 @@ export class DefendPage {
    * open, the battle's items closed so the battle has the whole view. */
   private sideOpen = { build: true, sim: false };
   /** Kills already paid for this run, by kind. */
-  private paid: Record<EnemyKind, number> = { roach: 0, orc: 0, ogre: 0, bat: 0, warlord: 0, mother: 0, broodling: 0, snake: 0, dragon: 0, shieldBearer: 0, aegis: 0, darkKnight: 0, bombOrc: 0, bombBird: 0, voidSparrow: 0, shieldLesser: 0, shieldGreater: 0, poisonLesser: 0, poisonBearer: 0, poisonGreater: 0, poisonSovereign: 0, siegeBeetle: 0, burrowingMole: 0, necromancer: 0, skeleton: 0, bannerCaptain: 0, mirrorKnight: 0, leechSwarm: 0, ashPhoenix: 0, phoenixEgg: 0, blinkImp: 0, fortressLesser: 0, fortress: 0, fortressGreater: 0, fortressSovereign: 0, rollingCannon: 0, ballista: 0, fireworkLauncher: 0, trebuchet: 0, bombard: 0, rocketBattery: 0 };
+  private paid: Record<EnemyKind, number> = { roach: 0, orc: 0, ogre: 0, bat: 0, warlord: 0, mother: 0, broodling: 0, snake: 0, dragon: 0, shieldBearer: 0, aegis: 0, darkKnight: 0, bombOrc: 0, bombBird: 0, voidSparrow: 0, shieldLesser: 0, shieldGreater: 0, poisonLesser: 0, poisonBearer: 0, poisonGreater: 0, poisonSovereign: 0, siegeBeetle: 0, burrowingMole: 0, necromancer: 0, skeleton: 0, bannerCaptain: 0, mirrorKnight: 0, leechSwarm: 0, ashPhoenix: 0, phoenixEgg: 0, blinkImp: 0, fortressLesser: 0, fortress: 0, fortressGreater: 0, fortressSovereign: 0, rollingCannon: 0, ballista: 0, fireworkLauncher: 0, trebuchet: 0, bombard: 0, rocketBattery: 0, boatLesser: 0, boat: 0, boatGreater: 0, boatSovereign: 0 };
 
   constructor(root: HTMLElement, host: DefendHost) {
     this.root = root;
@@ -133,7 +134,7 @@ export class DefendPage {
     if (this.sim && this.phase === "sim") {
       if (!this.journal?.open) this.sim.update(dt);
       this.handleEvents();
-    }
+    } else if (this.sim && this.phase === "over" && (this.sim.floods.length || this.sim.sinkings.length)) ageWater(this.sim, Math.min(dt, 0.25));
     const updated = performance.now();
     this.fadeNight(dt);
     if (this.messageT > 0) {
@@ -536,7 +537,7 @@ export class DefendPage {
     this.map = null;
     const map = this.currentMap();
     this.sim = new DefendSim(map, { ...this.save.levels }, (defendRandom("rolls")() * 2147483648) | 0, this.host.bonuses());
-    this.paid = { roach: 0, orc: 0, ogre: 0, bat: 0, warlord: 0, mother: 0, broodling: 0, snake: 0, dragon: 0, shieldBearer: 0, aegis: 0, darkKnight: 0, bombOrc: 0, bombBird: 0, voidSparrow: 0, shieldLesser: 0, shieldGreater: 0, poisonLesser: 0, poisonBearer: 0, poisonGreater: 0, poisonSovereign: 0, siegeBeetle: 0, burrowingMole: 0, necromancer: 0, skeleton: 0, bannerCaptain: 0, mirrorKnight: 0, leechSwarm: 0, ashPhoenix: 0, phoenixEgg: 0, blinkImp: 0, fortressLesser: 0, fortress: 0, fortressGreater: 0, fortressSovereign: 0, rollingCannon: 0, ballista: 0, fireworkLauncher: 0, trebuchet: 0, bombard: 0, rocketBattery: 0 };
+    this.paid = { roach: 0, orc: 0, ogre: 0, bat: 0, warlord: 0, mother: 0, broodling: 0, snake: 0, dragon: 0, shieldBearer: 0, aegis: 0, darkKnight: 0, bombOrc: 0, bombBird: 0, voidSparrow: 0, shieldLesser: 0, shieldGreater: 0, poisonLesser: 0, poisonBearer: 0, poisonGreater: 0, poisonSovereign: 0, siegeBeetle: 0, burrowingMole: 0, necromancer: 0, skeleton: 0, bannerCaptain: 0, mirrorKnight: 0, leechSwarm: 0, ashPhoenix: 0, phoenixEgg: 0, blinkImp: 0, fortressLesser: 0, fortress: 0, fortressGreater: 0, fortressSovereign: 0, rollingCannon: 0, ballista: 0, fireworkLauncher: 0, trebuchet: 0, bombard: 0, rocketBattery: 0, boatLesser: 0, boat: 0, boatGreater: 0, boatSovereign: 0 };
     this.phase = "sim";
     this.newRecord = 0;
     this.weather = rollWeather();

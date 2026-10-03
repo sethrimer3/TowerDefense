@@ -12,6 +12,7 @@
  * decided by the renderer, so a battle with a wizard tower still replays
  * exactly from its seed. Aim is a unit vector, not an angle, and cones are
  * tested by slope, so every engine plays them alike (no trigonometry). */
+import { sheltered } from "./boats.ts";
 import { ENEMIES,
   CHILL_SPEED,
   FLAME_SECONDS,
@@ -128,7 +129,7 @@ export function stepFlames(sim: DefendSim, wizards: Wizards, dt: number) {
     // The fire takes a moment to reach full length.
     const reach = f.range * Math.min(1, f.t / 0.25);
     const dps = flameDps(sim.levels.wizardFlame ?? 0) * sim.bonuses.towerDamage;
-    for (const e of sim.enemiesNear(f.x, f.y, reach)) if (inFan(e, f.x, f.y, f.dx, f.dy, FLAME_SPREAD, reach)) sim.hurtEnemy(e, dps * dt, true, "ranged", f);
+    for (const e of sim.enemiesNear(f.x, f.y, reach)) if (inFan(e, f.x, f.y, f.dx, f.dy, FLAME_SPREAD, reach) && !sheltered(sim, e.x, e.y)) sim.hurtEnemy(e, dps * dt, true, "ranged", f);
     if (f.t >= f.dur) wizards.ended(f.tower);
   }
   sim.flames = sim.flames.filter((f) => f.t < f.dur);

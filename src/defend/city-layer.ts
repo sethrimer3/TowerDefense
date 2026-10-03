@@ -253,6 +253,12 @@ function paintBuilding(p: Paint, b: Building) {
   paintStructureArt(c, b.kind, box, stageOf(sim, b), lotSeed(b));
 }
 
+/** Paints building `b` whole and undamaged onto `c` at `px` per cell (a
+ * magic boat's water drawing it down as it sinks). */
+export function paintStanding(c: CanvasRenderingContext2D, px: number, map: CityMap, b: Building) {
+  paintBuilding({ c, px, map, sim: null, solid: () => true }, b);
+}
+
 /** The seed a building's damage and rubble are drawn from: its lot. */
 const lotSeed = (b: Building) => hash(b.rect.x, b.rect.y, b.rect.w, b.rect.h, 77);
 

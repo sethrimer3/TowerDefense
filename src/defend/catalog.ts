@@ -405,7 +405,7 @@ export const civilianHp = (l: number) => 8 + l * 5;
 export const rebuildSeconds = (l: number) => 3 * intPow(0.82, l);
 export const HOUSE_HP_PER_CELL = 22;
 
-export type EnemyKind = "roach" | "orc" | "ogre" | "bat" | "warlord" | "mother" | "broodling" | "snake" | "dragon" | "shieldBearer" | "aegis" | "darkKnight" | "bombOrc" | "bombBird" | "voidSparrow" | "shieldLesser" | "shieldGreater" | "poisonLesser" | "poisonBearer" | "poisonGreater" | "poisonSovereign" | "siegeBeetle" | "burrowingMole" | "necromancer" | "skeleton" | "bannerCaptain" | "mirrorKnight" | "leechSwarm" | "ashPhoenix" | "phoenixEgg" | "blinkImp" | "fortressLesser" | "fortress" | "fortressGreater" | "fortressSovereign" | "rollingCannon" | "ballista" | "fireworkLauncher" | "trebuchet" | "bombard" | "rocketBattery";
+export type EnemyKind = "roach" | "orc" | "ogre" | "bat" | "warlord" | "mother" | "broodling" | "snake" | "dragon" | "shieldBearer" | "aegis" | "darkKnight" | "bombOrc" | "bombBird" | "voidSparrow" | "shieldLesser" | "shieldGreater" | "poisonLesser" | "poisonBearer" | "poisonGreater" | "poisonSovereign" | "siegeBeetle" | "burrowingMole" | "necromancer" | "skeleton" | "bannerCaptain" | "mirrorKnight" | "leechSwarm" | "ashPhoenix" | "phoenixEgg" | "blinkImp" | "fortressLesser" | "fortress" | "fortressGreater" | "fortressSovereign" | "rollingCannon" | "ballista" | "fireworkLauncher" | "trebuchet" | "bombard" | "rocketBattery" | "boatLesser" | "boat" | "boatGreater" | "boatSovereign";
 export type EnemyDef = {
   kind: EnemyKind;
   name: string;
@@ -438,7 +438,15 @@ export type EnemyDef = {
   /** A self-driving siege engine (`siege.ts`): it rolls toward the keep and
    * stops to bombard whatever stands in its way from `range` cells. */
   siege?: SiegeDef;
+  /** A magic boat (`boats.ts`): it sails straight through the ground toward
+   * the keep in a pool of its own water, which sinks what it touches. */
+  boat?: BoatDef;
 };
+
+/** A magic boat's water: its radius in cells around the hull, and what it
+ * sinks besides houses and structures: wall stones (`walls`) and the keep
+ * (`keep`). Whatever it can't sink, it rams with its own damage. */
+export type BoatDef = { tier: number; water: number; walls?: boolean; keep?: boolean };
 
 /** How a siege engine shoots. `ball`: a lobbed iron ball, `stone`: a high
  * lobbed boulder, both bursting in `radius`; `bolt`: a straight bolt that
@@ -495,6 +503,11 @@ export const ENEMIES: Record<EnemyKind, EnemyDef> = {
   trebuchet: { kind: "trebuchet", name: "Trebuchet", hp: 900, speed: 0.6, damage: 130, cooldown: 7, size: 1.55, color: "#6e4a2a", distraction: 0, flying: false, siege: { shot: "stone", range: 11, radius: 1.4 }, cost: 2500 },
   bombard: { kind: "bombard", name: "Great Bombard", hp: 2600, speed: 0.6, damage: 220, cooldown: 5, size: 1.4, color: "#4a4e57", distraction: 0, flying: false, siege: { shot: "ball", range: 9, radius: 1.9 }, cost: 12000 },
   rocketBattery: { kind: "rocketBattery", name: "Dragonfire Battery", hp: 2000, speed: 0.7, damage: 35, cooldown: 6, size: 1.4, color: "#8c2a24", distraction: 0, flying: false, siege: { shot: "rocket", range: 10, radius: 0.9, volley: 16, spread: 3 }, cost: 30000 },
+
+  boatLesser: { kind: "boatLesser", name: "Enchanted Skiff", hp: 1500, speed: 0.75, damage: 40, cooldown: 1.2, size: 1.4, color: "#6d4a2c", distraction: 0, flying: false, boat: { tier: 1, water: 1.6 }, cost: 1000 },
+  boat: { kind: "boat", name: "Spellbound Sloop", hp: 7000, speed: 0.7, damage: 120, cooldown: 1.2, size: 2, color: "#5a3e28", distraction: 0, flying: false, boat: { tier: 2, water: 2.4 }, cost: 10000 },
+  boatGreater: { kind: "boatGreater", name: "Arcane Galleon", hp: 35000, speed: 0.62, damage: 300, cooldown: 1.2, size: 2.8, color: "#46302a", distraction: 0, flying: false, boat: { tier: 3, water: 3.3, walls: true }, cost: 100000 },
+  boatSovereign: { kind: "boatSovereign", name: "Deluge Ark", hp: 160000, speed: 0.55, damage: 800, cooldown: 1.2, size: 3.8, color: "#2a2230", distraction: 0, flying: false, boat: { tier: 4, water: 4.4, walls: true, keep: true }, cost: 1000000 },
 };
 
 /** Multipliers the player's Smithy and skill trees lay over a run, on top
