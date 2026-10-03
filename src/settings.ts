@@ -19,6 +19,8 @@ export const SETTINGS = {
   effectsOff: { kind: "toggle", default: false, page: { id: "effects", label: "Grass and water effects", invert: true } },
   /** The synthesized knocks, chimes, horns and bells. */
   soundOff: { kind: "toggle", default: false, page: { id: "sound", label: "Sound", invert: true } },
+  /** Alembic, the game's own pixel font, for every word on the page; off, Cinzel. */
+  pixelFont: { kind: "toggle", default: true, page: { id: "pixel-font", label: "Use Custom Font" } },
   /** Dev: unlimited money. Every currency shows ∞, and every purchase
    * (Armory, Mine, Library, Smithy points, Knowledge) costs nothing. */
   devMode: { kind: "toggle", default: false, page: { id: "dev-mode", label: "Unlimited money" } },

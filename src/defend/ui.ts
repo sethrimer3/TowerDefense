@@ -569,8 +569,8 @@ export class DefendPage {
     const button = this.root.querySelector<HTMLButtonElement>("#defend-journal");
     if (!button) return;
     const unread = this.save.discovered.some(k => !this.save.journalRead.includes(k));
-    button.setAttribute("aria-label", unread ? "Enemy journal — new enemies discovered" : "Enemy journal");
-    button.title = unread ? "Enemy journal — new discoveries" : "Enemy journal";
+    button.setAttribute("aria-label", unread ? "Enemy journal â€” new enemies discovered" : "Enemy journal");
+    button.title = unread ? "Enemy journal â€” new discoveries" : "Enemy journal";
     paintJournal(button.querySelector("canvas")!, unread);
   }
 
