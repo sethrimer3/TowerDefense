@@ -20,10 +20,17 @@
  *   plinth, ringed by a colonnade, a gilded terrace round a great ribbed
  *   dome with a golden lantern, and a pair of gold wings over its south
  *   steps. It fills a whole tile, or half once its halls are folded.
+ * - Dark wizard keep: black obsidian on a stepped plinth, curtain walls of
+ *   glassy black blocks set in crimson mortar, a round turret at each
+ *   corner crowned with a great faceted ruby (where its black lightning
+ *   leaves from), a courtyard of dark flags ringed by a glowing crimson
+ *   rune circle round an eight-sided obsidian spire tipped with a ruby, and
+ *   a ruby-arched gate between two crimson banners on its south wall. Its
+ *   wounds glow: crimson fissures open in the obsidian as it is hurt.
  *
  * Pure; the city layer and palette draw the cached canvases. */
-import type { StructureKind } from "./catalog.ts";
-import { hash } from "./grid.ts";
+import { TURRET_INSET, type StructureKind } from "./catalog.ts";
+import { hash, hash01 } from "./grid.ts";
 import { ART } from "./park-art.ts";
 import { OUTLINE, STONE, damage, pixels, rubblePixels, shade, type Material, type Pix, type Ruin } from "./damage-art.ts";
 
@@ -51,6 +58,11 @@ const C = {
   marble: [0x8a8c9a, 0xb9bac6, 0xdcdce4, 0xf4f3f6, 0xffffff],
   vein: 0xa7aec4,
   sky: [0x7d9cc8, 0xa9c4e6, 0xd6e6f8],
+  obsidian: [0x060508, 0x0f0d13, 0x1c1922, 0x2c2834, 0x463f52],
+  sheen: 0x7a7090,
+  mortar: [0x2a060c, 0x4e0b16, 0x7a1222],
+  ruby: [0x3d0410, 0x7e0a1c, 0xc0182e, 0xf0425a, 0xffc4cc],
+  flag: [0x1e1c22, 0x2a272f, 0x34313a],
 };
 
 /** What each structure's damage throws down and its rubble is made of. */
@@ -63,6 +75,7 @@ const MATERIAL: Record<PlacedKind, { m: Material; ruin: Pick<Ruin, "stone" | "to
   wizardTower: { m: { tones: C.pale.slice(0, 3), roofed: true }, ruin: { stone: C.pale.slice(0, 3), top: C.slate.slice(0, 3), beams: true, round: true } },
   mageGuild: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.wine.slice(0, 3), beams: true } },
   valkyriePalace: { m: { tones: C.marble.slice(1, 4), roofed: true }, ruin: { stone: C.marble.slice(1, 4), top: [C.gold[0], C.marble[2], C.marble[3]], beams: false } },
+  darkKeep: { m: { tones: C.obsidian.slice(2, 5), roofed: false }, ruin: { stone: C.obsidian.slice(2, 5), top: C.mortar, beams: false } },
 };
 
 /** The body's corners: one pixel in from its cells, two on the lower right
@@ -75,6 +88,7 @@ export function structurePixels(kind: PlacedKind, cw: number, ch: number, stage 
   const w = cw * ART, h = ch * ART, out = new Uint32Array(w * h), p = pixels(out, w, h);
   PAINT[kind](p);
   damage(p, stage, hash(seed, KINDS.indexOf(kind)), MATERIAL[kind].m);
+  if (kind === "darkKeep") fissures(p, stage, hash(seed, 0xd4));
   return out;
 }
 
@@ -84,7 +98,7 @@ export function structureRubblePixels(kind: PlacedKind, cw: number, ch: number, 
   return rubblePixels(w, h, hash(seed, KINDS.indexOf(kind), 3), { ...frame(w, h), ...MATERIAL[kind].ruin });
 }
 
-const KINDS: PlacedKind[] = ["barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace"];
+const KINDS: PlacedKind[] = ["barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep"];
 
 const PAINT: Record<PlacedKind, (p: Pix) => void> = {
   barracks: paintBarracks,
@@ -95,6 +109,7 @@ const PAINT: Record<PlacedKind, (p: Pix) => void> = {
   wizardTower: paintWizardTower,
   mageGuild: paintMageGuild,
   valkyriePalace: paintValkyriePalace,
+  darkKeep: paintDarkKeep,
 };
 
 function rect(p: Pix, x0: number, y0: number, x1: number, y1: number, c: number) {
@@ -410,4 +425,123 @@ function paintValkyriePalace(p: Pix) {
       if (ch !== ".") p.set(wx + i, wy + j, ch === "0" ? OUTLINE : ch === "y" ? C.gold[2] : C.gold[1]);
     }),
   );
+}
+
+/** The dark wizard keep. Its parts scale with its size, so the folded keep
+ * (5 cells) is the great one (12) in small. */
+function paintDarkKeep(p: Pix) {
+  const { x0, y0, x1, y1 } = frame(p.w, p.h);
+  const S = Math.min(x1 - x0, y1 - y0) + 1;
+  const ob = (x: number, y: number, tone: number) => (hash(x, y, 61) % 23 === 0 && tone >= 2 ? C.sheen : C.obsidian[tone]);
+  // Rings in from the outline: the plinth's steps, the curtain wall (its
+  // outer and inner faces outlined) and the courtyard inside.
+  const steps = S >= 60 ? 2 : 1, wa = steps + 1, wb = wa + Math.max(2, Math.round(S * 0.07)) + 1;
+  for (let y = y0; y <= y1; y++)
+    for (let x = x0; x <= x1; x++) {
+      const ring = Math.min(x - x0, y - y0, x1 - x, y1 - y);
+      const sunny = x - x0 === ring || y - y0 === ring;
+      if (ring === 0 || ring === wa || ring === wb) p.set(x, y, OUTLINE);
+      else if (ring < wa) p.set(x, y, ob(x, y, sunny ? 4 - ring : 2 - ring + 1));
+      else if (ring < wb) {
+        // Glassy black blocks in crimson mortar, merlons along the outer edge.
+        const along = y - y0 === ring || y1 - y === ring ? x : y;
+        const depth = ring - wa - 1;
+        const seam = (along + depth * 2) % 5 === 0 || (depth > 0 && depth % 3 === 0);
+        const merlon = depth === 0 && Math.floor(along / 2) % 2 === 0;
+        p.set(x, y, seam ? C.mortar[sunny ? 2 : 1] : ob(x, y, merlon ? (sunny ? 4 : 2) : sunny ? 3 : 1));
+      } else {
+        // Dark flagstones in a grid, each its own shade.
+        const fx = Math.floor((x - x0) / 4), fy = Math.floor((y - y0) / 4);
+        const edge = (x - x0) % 4 === 0 || (y - y0) % 4 === 0;
+        p.set(x, y, edge ? C.obsidian[1] : C.flag[hash(fx, fy, 62) % 3]);
+      }
+    }
+  const cx = (x0 + x1 + 1) / 2, cy = (y0 + y1 + 1) / 2;
+  // The rune circle round the spire: a glowing crimson ring, a rune mark
+  // every so often, dithered embers just inside it.
+  const rr = S * 0.31;
+  disc(p, cx, cy, rr, (x, y, d, dx, dy) => {
+    if (d < rr - 1.2) return d > rr - 2.2 && (x + y) % 3 === 0 ? C.ruby[1] : null;
+    const a = Math.floor(((Math.atan2(dy, dx) + Math.PI) / (2 * Math.PI)) * 16);
+    return a % 2 ? C.ruby[2] : C.ruby[3];
+  });
+  // The spire: eight obsidian slopes rising to a ruby, shaded by which way
+  // they face, crimson seams between them.
+  const sr = Math.max(4, S * 0.21);
+  disc(p, cx, cy, sr, (x, y, d, dx, dy) => {
+    if (d > sr - 1) return OUTLINE;
+    const ang = Math.atan2(dy, dx) + Math.PI, f = (ang / (2 * Math.PI)) * 8 + 0.5;
+    if (Math.abs((f % 1) - 0.5) > 0.42 && d > 1.5) return C.mortar[2];
+    const mid = (Math.floor(f) % 8 / 8) * 2 * Math.PI - Math.PI;
+    const t = (-(Math.cos(mid) + Math.sin(mid)) / Math.SQRT2) * 1.6 + 2;
+    return ob(x, y, Math.max(1, Math.min(4, Math.floor(t + ((x + y) % 2 ? 0.25 : -0.25)))));
+  });
+  ruby(p, cx, cy, Math.max(1.6, S * 0.075));
+  // The gate in the south wall: a black arch edged in rubies, between two
+  // crimson banners.
+  const gw = Math.max(2, Math.round(S * 0.08)), gx = Math.round(cx) - gw;
+  for (let y = y1 - wb + 1; y <= y1 - 1; y++)
+    for (let x = gx - 1; x <= gx + gw * 2; x++) {
+      const rim = x === gx - 1 || x === gx + gw * 2;
+      p.set(x, y, rim ? (y % 2 ? C.ruby[2] : C.ruby[1]) : y === y1 - wb + 1 ? C.ruby[3] : C.obsidian[0]);
+    }
+  if (S >= 30)
+    for (const bx of [gx - Math.max(4, Math.round(S * 0.12)), gx + gw * 2 + Math.max(2, Math.round(S * 0.12)) - 1]) {
+      const len = Math.max(4, Math.round(S * 0.09));
+      for (let y = y1 - wb + 1; y <= y1 - wb + len; y++) {
+        p.set(bx - 1, y, OUTLINE);
+        p.set(bx + 3, y, OUTLINE);
+        for (let x = bx; x <= bx + 2; x++) p.set(x, y, y === y1 - wb + 1 ? OUTLINE : C.mortar[x === bx ? 2 : x === bx + 2 ? 0 : 1]);
+      }
+      p.set(bx + 1, y1 - wb + 3, C.ruby[3]);
+      p.set(bx + 1, y1 - wb + len, OUTLINE);
+      p.set(bx + 1, y1 - wb + len + 1, OUTLINE);
+    }
+  // Rubies set in the wall tops, midway along each side.
+  const wm = Math.round((wa + wb) / 2);
+  for (const [x, y] of [[cx, y0 + wm], [x0 + wm, cy], [x1 - wm, cy]]) if (S >= 30) ruby(p, x, y, 1.6);
+  // The corner turrets, where the lightning leaves from: obsidian drums,
+  // crenellated round the rim, a great ruby at the heart of each.
+  const ix = p.w * TURRET_INSET, iy = p.h * TURRET_INSET, tr = Math.max(3.4, Math.min(p.w, p.h) * 0.115);
+  for (const [tx, ty] of [[ix, iy], [p.w - ix, iy], [ix, p.h - iy], [p.w - ix, p.h - iy]]) {
+    disc(p, tx, ty, tr, (x, y, d, dx, dy) => {
+      if (d > tr - 1) return OUTLINE;
+      if (d > tr * 0.62) {
+        const a = Math.floor(((Math.atan2(dy, dx) + Math.PI) / (2 * Math.PI)) * 12);
+        return ob(x, y, a % 2 ? 1 : 1 + lit(x, y, dx, dy, d));
+      }
+      return d > tr * 0.62 - 1 ? OUTLINE : C.obsidian[0];
+    });
+    ruby(p, tx, ty, Math.max(1.4, tr * 0.5));
+  }
+}
+
+/** A faceted ruby of radius `r` at (cx, cy): dark at the rim, its facets
+ * lit to the upper left, a white-hot glint. */
+function ruby(p: Pix, cx: number, cy: number, r: number) {
+  disc(p, cx, cy, r + 1, (x, y, d, dx, dy) => {
+    if (d > r) return OUTLINE;
+    const facet = Math.floor(((Math.atan2(dy, dx) + Math.PI) / (2 * Math.PI)) * 6);
+    const t = lit(x, y, dx, dy, d) + (d < r * 0.5 ? 1 : 0) - (facet % 2 ? 1 : 0);
+    return C.ruby[Math.max(0, Math.min(3, t))];
+  });
+  p.set(Math.floor(cx - r * 0.4), Math.floor(cy - r * 0.4), C.ruby[4]);
+}
+
+/** Crimson fissures glowing through the hurt obsidian: more and longer at
+ * each stage, only over what is drawn. */
+function fissures(p: Pix, stage: number, seed: number) {
+  const many = Math.max(1, Math.round((p.w * p.h) / 900));
+  for (let s = 1; s <= stage; s++)
+    for (let k = 0; k < many * s; k++) {
+      let x = Math.floor(hash01(seed, s, k, 1) * p.w), y = Math.floor(hash01(seed, s, k, 2) * p.h);
+      const dx = hash01(seed, s, k, 3) < 0.5 ? 1 : -1, dy = hash01(seed, s, k, 4) < 0.5 ? 1 : -1;
+      for (let i = 0; i < 3 + s * 2; i++) {
+        const c = p.get(x, y);
+        if (c < 0 || c === OUTLINE) break;
+        p.set(x, y, i % 3 === 1 ? C.ruby[3] : C.ruby[2]);
+        if (hash01(seed, s, k, i) < 0.5) x += dx;
+        else y += dy;
+      }
+    }
 }

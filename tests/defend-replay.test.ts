@@ -96,6 +96,14 @@ function scenarios(): Record<string, Scenario> {
       opening: [...Array<EnemyKind>(30).fill('orc'), ...Array<EnemyKind>(10).fill('bat'), ...Array<EnemyKind>(4).fill('ogre')],
       smash: [[90, "valkyriePalace"]],
     },
+    // The dark wizard keep on a 2 × 2 block: corner turrets and the dark
+    // wizard chaining black lightning through a crowd, until it is knocked down.
+    darkKeep: {
+      layout: city([...SQUARE, [-1, -2], [-2, -1], [-2, -2]], [["darkKeep", -2, -2], ["archerTower", 1, 1]]),
+      citySeed: 9, levels: levelsAt({ chainCount: 3, chainReach: 2 }), seed: 5, seconds: 160, wave: 4,
+      opening: [...Array<EnemyKind>(60).fill('roach'), ...Array<EnemyKind>(30).fill('orc'), ...Array<EnemyKind>(12).fill('bat'), ...Array<EnemyKind>(3).fill('ogre')],
+      smash: [[60, "darkKeep"]],
+    },
     // Wizard towers inside and outside the walls, flame and ice in turn.
     wizards: {
       layout: city(SQUARE, [["wizardTower", 0, -2], ["wizardTower", 1, 1], ["barracks", -1, 1]]),
@@ -114,11 +122,14 @@ const digest = (value: unknown) =>
 /** Everything the simulation owns that later steps or the renderer read. */
 function state(sim: DefendSim) {
   const s = sim as unknown as Record<string, unknown>;
+  const dark = (s.darkKeeps as { cooldown: Map<number, number> }).cooldown;
   return [
     sim.time, sim.wave, sim.lost, sim.breakT, sim.spawnT, sim.spawnQueue, sim.mapVersion, sim.changed.length,
     sim.enemies, sim.soldiers, sim.civilians, sim.arrows, sim.shells, sim.flames, sim.frosts, sim.stabs, sim.scorches, sim.effects, sim.events,
     sim.solid, sim.hp, sim.built, sim.flash, sim.field,
     [...(s.towers as { cooldown: Map<number, number> }).cooldown], [...(s.barracks as { training: Map<number, number> }).training], (s.builders as { respawn: number[] }).respawn,
+    // Only runs with a dark keep have bolts or turrets, so the others hash as before.
+    ...(sim.bolts.length || dark.size ? [sim.bolts, [...dark]] : []),
   ];
 }
 
@@ -189,13 +200,14 @@ test("the Defend replays exercise every unit and effect", () => {
       if (sim.flames.length) seen.add("flame");
       if (sim.frosts.length) seen.add("frost");
       if (sim.stabs.some((st) => st.hits.length > 1)) seen.add("stab");
+      if (sim.bolts.some((b) => b.pts.length > 6)) seen.add("chained");
       if (sim.enemies.some((e) => e.chill)) seen.add("chilled");
       if (sim.lost) seen.add(`lost:${name}`);
       if (sim.built.some((b, id) => b > 0 && b < sim.map.buildings[id].cells.length)) seen.add("half-rebuilt");
     });
   const want = [
     "enemy:warlord", "enemy:bat", "enemy:mother", "enemy:broodling", "distracted", "marked", "soldier:sword", "soldier:archer", "path:sword", "path:archer", "hunting",
-    "civilian:toJob", "civilian:working", "civilian:home", "arrow", "shell", "flame", "frost", "chilled", "soldier:valkyrie", "stab", "guarded", "lost:bare", "half-rebuilt",
+    "civilian:toJob", "civilian:working", "civilian:home", "arrow", "shell", "flame", "frost", "chilled", "soldier:valkyrie", "stab", "guarded", "soldier:darkWizard", "chained", "lost:bare", "half-rebuilt",
   ];
   assert.deepEqual(want.filter((w) => !seen.has(w)), []);
 });

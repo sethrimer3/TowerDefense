@@ -11,6 +11,9 @@ export type Overlay = {
   ghost: { rect: Rect; kind: StructureKind | "cityTile" } | null;
   /** A bomb being aimed: centre in cells. */
   bomb?: { x: number; y: number; r: number } | null;
+  /** Tiles across the block the item takes (unset: 1). A larger item's
+   * `legal` and `hover` keys are the top left tiles of its blocks. */
+  span?: number;
 };
 
 /** Dim gold tile lines at `alpha`, `px` canvas pixels per cell. */
@@ -44,6 +47,7 @@ export function drawOverlay(c: CanvasRenderingContext2D, px: number, o: Overlay)
 /** Shades the tiles that won't take the item and frames those that will,
  * the hovered one brightest. */
 function drawTargets(c: CanvasRenderingContext2D, px: number, o: Overlay) {
+  if ((o.span ?? 1) > 1) return drawBlockTargets(c, px, o, o.span!);
   const T = px * SUB;
   for (let ty = 0; ty < TILES_H; ty++)
     for (let tx = 0; tx < TILES_W; tx++) {
@@ -63,6 +67,53 @@ function drawTargets(c: CanvasRenderingContext2D, px: number, o: Overlay) {
       c.lineWidth = Math.max(1, px * (hover ? 0.16 : 0.08));
       c.strokeRect(x + c.lineWidth / 2, y + c.lineWidth / 2, s - c.lineWidth, s - c.lineWidth);
     }
+}
+
+/** For an item spanning a block of tiles: shades every tile no legal block
+ * covers, tints those some block does, and frames the whole block under the
+ * pointer, gold where it fits and red where it won't, so the player sees
+ * every tile it takes. */
+function drawBlockTargets(c: CanvasRenderingContext2D, px: number, o: Overlay, span: number) {
+  const T = px * SUB;
+  const covered = new Set<string>();
+  for (const key of o.legal) {
+    const [tx, ty] = key.split(",").map(Number);
+    for (let dy = 0; dy < span; dy++) for (let dx = 0; dx < span; dx++) covered.add(tileKey(tx + dx, ty + dy));
+  }
+  for (let ty = 0; ty < TILES_H; ty++)
+    for (let tx = 0; tx < TILES_W; tx++) {
+      const x = Math.round(tx * T), y = Math.round(ty * T), s = Math.round((tx + 1) * T) - x;
+      c.fillStyle = covered.has(tileKey(tx, ty)) ? "rgba(242,201,76,0.04)" : "rgba(0,0,0,0.38)";
+      c.fillRect(x, y, s, s);
+    }
+  if (o.hover === null) return;
+  const [hx, hy] = o.hover.split(",").map(Number);
+  const fits = o.legal.has(o.hover);
+  const x = Math.round(hx * T), y = Math.round(hy * T);
+  const w = Math.round(Math.min(TILES_W, hx + span) * T) - x, h = Math.round(Math.min(TILES_H, hy + span) * T) - y;
+  c.fillStyle = fits ? "rgba(242,201,76,0.16)" : "rgba(200,40,50,0.18)";
+  c.fillRect(x, y, w, h);
+  const lw = Math.max(1, px * 0.16);
+  c.lineWidth = lw;
+  c.strokeStyle = fits ? "rgba(242,201,76,0.9)" : "rgba(230,70,80,0.85)";
+  c.strokeRect(x + lw / 2, y + lw / 2, w - lw, h - lw);
+  // The seams between the block's tiles, fainter.
+  c.lineWidth = Math.max(1, px * 0.08);
+  c.setLineDash([Math.max(2, px * 0.5), Math.max(2, px * 0.35)]);
+  c.beginPath();
+  for (let k = 1; k < span; k++) {
+    const sx = Math.round((hx + k) * T) + 0.5, sy = Math.round((hy + k) * T) + 0.5;
+    if (hx + k < TILES_W) {
+      c.moveTo(sx, y);
+      c.lineTo(sx, y + h);
+    }
+    if (hy + k < TILES_H) {
+      c.moveTo(x, sy);
+      c.lineTo(x + w, sy);
+    }
+  }
+  c.stroke();
+  c.setLineDash([]);
 }
 
 function drawGhost(c: CanvasRenderingContext2D, px: number, r: Rect) {

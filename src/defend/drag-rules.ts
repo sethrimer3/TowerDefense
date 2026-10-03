@@ -4,7 +4,9 @@
 import { STRUCTURES, type PaletteItem } from "./catalog.ts";
 import { SUB, TILES_H, TILES_W, tileKey, type Rect, type TilePos } from "./grid.ts";
 import {
+  blockTiles,
   cityTileSet,
+  covers,
   fitLayout,
   moveCityTile,
   moveKeep,
@@ -12,6 +14,7 @@ import {
   placeCityTile,
   placeStructure,
   removeCityTile,
+  spanOf,
   type Layout,
   type PlacedKind,
 } from "./layout.ts";
@@ -32,7 +35,15 @@ export function dragIcon(drag: Drag): IconItem {
   return drag.from;
 }
 
-/** Every layout dropping `drag` could make, keyed by the tile it lands on. */
+/** How many tiles across the block `drag` takes in `layout`: 2 for a
+ * structure spanning a 2 × 2 block, else 1. */
+export function dragSpan(drag: Drag, layout: Layout) {
+  const kind = dragIcon(drag);
+  return kind === "cityTile" || kind === "keep" || kind === "bomb" ? 1 : spanOf(layout, kind);
+}
+
+/** Every layout dropping `drag` could make, keyed by the tile it lands on
+ * (the top left tile of the block it would take). */
 export function legalLayouts(drag: Drag, layout: Layout): Map<string, Layout> {
   const out = new Map<string, Layout>();
   for (let ty = 0; ty < TILES_H; ty++)
@@ -83,6 +94,15 @@ export function refusal(drag: Drag, layout: Layout, key: string): string {
   if (kind === "cityTile")
     return inCity && drag.from === "palette" ? "That tile is already part of the city." : "City tiles must touch the city along an edge.";
   if (kind === "keep") return "The keep can only move onto another city tile.";
+  if (kind !== "bomb" && dragSpan(drag, layout) > 1) {
+    const [tx] = key.split(",").map(Number);
+    const block = blockTiles(tx, ty, 2);
+    const name = STRUCTURES[kind].name.toLowerCase();
+    if (tx + 1 >= TILES_W || ty + 1 >= TILES_H) return `The ${name} needs a 2 × 2 block of tiles there.`;
+    if (!needsCity(kind, false) || block.every((k) => cityTileSet(layout).has(k)))
+      return `The ${name} needs a 2 × 2 block of tiles with nothing else on them.`;
+    return `The ${name} needs a 2 × 2 block of city tiles.`;
+  }
   if (kind !== "bomb" && needsCity(kind, inCity)) return `The ${STRUCTURES[kind].name.toLowerCase()} must go inside the city limits.`;
   return "There isn't room for that there.";
 }
@@ -95,6 +115,6 @@ function needsCity(kind: PlacedKind, inCity: boolean) {
  * removal leaves the city whole does, and any other press pans the view. */
 export function liftsCityTile(layout: Layout, tile: TilePos) {
   if (!layout.cityTiles.includes(tileKey(tile.tx, tile.ty))) return false;
-  if (layout.structures.some((s) => s.tx === tile.tx && s.ty === tile.ty)) return false;
+  if (layout.structures.some((s) => covers(layout, s, tile.tx, tile.ty))) return false;
   return !!removeCityTile(layout, tile.tx, tile.ty);
 }

@@ -114,6 +114,21 @@ An armoured angel with a spear who hunts enemies through the city and makes char
 **Charge stab**:
 A valkyrie's attack: she blinks along a line toward an enemy, as far as her reach or until a building, the wall or a pond stops her, hurting every enemy on the line; nothing can hurt her for a second after.
 
+**Dark wizard keep**:
+A vast keep of obsidian and rubies inside the city that fills a 2 × 2 block of city tiles (one tile with Folded sanctum), with a lightning turret at each corner; it summons the dark wizard.
+
+**Dark wizard**:
+The ultimate unit, one to a dark wizard keep: a hooded figure in dark robes who hunts enemies through the city and casts black lightning.
+
+**Black lightning**:
+A bolt that strikes an enemy and leaps on to the nearest enemy it hasn't struck within its chain length, up to its chain count, hurting every enemy it strikes.
+
+**Chain length**:
+How far black lightning can leap from one enemy to the next.
+
+**Chain count**:
+How many enemies one bolt of black lightning can strike.
+
 **Ground relief**:
 The flagstones' bump map outside the city: lights brighten the stone edges facing them and darken the far ones.
 

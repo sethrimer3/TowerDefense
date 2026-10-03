@@ -3,12 +3,14 @@
  * last Patrol routes level) and head home when there's nothing to fight;
  * archers roam the streets, shooting whatever comes within sight, or with
  * Hunter's instinct path toward the nearest enemy in the city. A Mage
- * Guild trains fire mages the same way (`mages.ts`), and a Valkyrie palace
- * valkyries (`valkyries.ts`). */
+ * Guild trains fire mages the same way (`mages.ts`), a Valkyrie palace
+ * valkyries (`valkyries.ts`), and a dark wizard keep its one dark wizard
+ * (`dark-wizards.ts`). */
 import { dist, sq } from "../exact.ts";
 import {
   ARCHER_UNIT,
   archerUnitRange,
+  DARK_WIZARD,
   ENEMIES,
   FIRE_MAGE,
   fireballDamage,
@@ -34,14 +36,15 @@ export class Barracks {
     const cap = soldierCap(sim.levels.barracksCapacity);
     for (const b of sim.map.buildings) {
       if (!isBarracks(b) || !sim.intact(b)) continue;
-      if (this.drilled(sim, b, cap, dt)) this.recruit(sim, b);
+      if (this.drilled(sim, b, b.kind === "darkKeep" ? DARK_WIZARD.garrison : cap, dt)) this.recruit(sim, b);
     }
   }
 
   /** Counts down the barracks' drill; true when a recruit is ready. A full
    * garrison keeps the clock at a whole drill. */
   private drilled(sim: DefendSim, b: Building, cap: number, dt: number) {
-    const drill = () => trainSeconds(sim.levels.barracksTraining) * sim.bonuses.drill;
+    const slow = b.kind === "darkKeep" ? DARK_WIZARD.drill : 1;
+    const drill = () => trainSeconds(sim.levels.barracksTraining) * sim.bonuses.drill * slow;
     const alive = sim.soldiers.filter((s) => s.home === b.id).length;
     if (alive >= cap) {
       this.training.set(b.id, drill());
@@ -61,7 +64,7 @@ export class Barracks {
     if (door < 0) return;
     const kind = TRAINS[b.kind] ?? "sword";
     const scale = soldierScale(sim.levels.soldierArms);
-    const stats = kind === "archer" ? ARCHER_UNIT : kind === "mage" ? { ...FIRE_MAGE, damage: fireballDamage(sim.levels.mageFireball ?? 0) } : kind === "valkyrie" ? VALKYRIE : SOLDIER;
+    const stats = kind === "archer" ? ARCHER_UNIT : kind === "mage" ? { ...FIRE_MAGE, damage: fireballDamage(sim.levels.mageFireball ?? 0) } : kind === "valkyrie" ? VALKYRIE : kind === "darkWizard" ? DARK_WIZARD : SOLDIER;
     const at = cellCenter(door);
     sim.soldiers.push({
       id: sim.newId(),
@@ -82,7 +85,7 @@ export class Barracks {
 }
 
 /** What each troop building trains. */
-const TRAINS: Partial<Record<Building["kind"], Soldier["kind"]>> = { barracks: "sword", archerBarracks: "archer", mageGuild: "mage", valkyriePalace: "valkyrie" };
+const TRAINS: Partial<Record<Building["kind"], Soldier["kind"]>> = { barracks: "sword", archerBarracks: "archer", mageGuild: "mage", valkyriePalace: "valkyrie", darkKeep: "darkWizard" };
 const isBarracks = (b: Building) => b.kind in TRAINS;
 
 const byDistanceFrom = (p: Point) => (a: Enemy, b: Enemy) => sq(a.x - p.x) + sq(a.y - p.y) - (sq(b.x - p.x) + sq(b.y - p.y));

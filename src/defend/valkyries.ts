@@ -74,8 +74,8 @@ function runOut(sim: DefendSim, x: number, y: number, ux: number, uy: number, re
 }
 
 /** Path toward the nearest of up to three enemies in the city, else stroll
- * to a random street. */
-function seek(sim: DefendSim, s: Soldier) {
+ * to a random street. (The dark wizard hunts the same way.) */
+export function seek(sim: DefendSim, s: Soldier) {
   s.thinkT = 0.5;
   const inCity = (e: Enemy) => sim.map.city[cellAt(e.x, e.y)] === 1;
   const prey = sim.enemies

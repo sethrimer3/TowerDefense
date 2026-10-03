@@ -40,7 +40,7 @@ Recent rows are available as `window.defendPerformance`; they are not saved.
 ## Building (before a run)
 
 - The **palette** (left by default; the ⚙ settings move it to the right) lists
-  city tiles, barracks, archer barracks, Mage Guilds, Valkyrie palaces and the towers with an `×N` count of
+  city tiles, barracks, archer barracks, Mage Guilds, Valkyrie palaces, dark wizard keeps and the towers with an `×N` count of
   what is owned but not yet placed; it greys out at `×0`.
 - Drag from the palette onto the board. While dragging, every tile that would
   accept the item gets a faint gold outline and every other tile darkens; the
@@ -52,7 +52,7 @@ Recent rows are available as `window.defendPerformance`; they are not saved.
   can only be lifted if the city stays connected and it holds no buildings.
 - **The keep** can be moved onto any other city tile (the two swap) but never
   removed.
-- **Barracks**, **archer barracks**, the **Mage Guild** and the **Valkyrie palace** must be inside the city. **Archer**, **cannon**, **watch
+- **Barracks**, **archer barracks**, the **Mage Guild**, the **Valkyrie palace** and the **dark wizard keep** must be inside the city. **Archer**, **cannon**, **watch
   and wizard towers** may stand inside or outside.
 - Every structure takes a **share of its tile** (`size` in `catalog.ts`, in
   sixteenths): 1/16 the archer and watch towers, 1/8 the cannon and wizard
@@ -60,6 +60,15 @@ Recent rows are available as `window.defendPerformance`; they are not saved.
   palace a whole tile (1/2 once Folded halls is bought, which also shrinks
   it from 5 × 5 cells to 3 × 5). Several structures share a tile while
   their shares add up to no more than a whole tile and they all fit.
+- The **dark wizard keep** is the one structure bigger than a tile: it
+  fills a whole 2 × 2 block of city tiles (`span` 2), standing on 12 × 12
+  of their 14 × 14 cells, and nothing else can stand on any of the four.
+  Its saved tile is the block's top left one. While it is dragged, the
+  block centred nearest the pointer is framed whole, gold where it fits
+  and red where it won't, and every tile some legal block covers stays
+  lit. The pricey Folded sanctum folds it onto a single tile (5 × 5
+  cells, the whole tile). Taking away any tile it stands on returns it to
+  the palette.
 - The game picks each structure's exact cells (`fitLayout`): the keep in
   the middle of its tile; everything else in a random free **spot** on its
   tile, never touching another structure (there's always room for a
@@ -202,6 +211,21 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   the board's edge stops her, and her spear hurts every enemy on that line,
   fliers too. For a second after each charge nothing can hurt her
   (`guard`), blasts included.
+- **Dark wizard keeps** (`dark-wizards.ts`) each summon one **dark
+  wizard**, the ultimate unit, on three times a barracks' drill (arms
+  upgrades apply). He hunts the nearest enemy in the city like a valkyrie
+  and, when one comes within 6 cells, holds his ground and casts **black
+  lightning** at it every 1.6 s. A bolt strikes its target, then leaps to
+  the nearest enemy it hasn't struck within the **chain length** (0.7
+  cells: enemies must be packed close; Arc span adds 0.2 a level) and on,
+  forking back from the latest enemy struck that still has a neighbour
+  when it runs out, until it has struck its **chain count** (50, and 10
+  more a level of Conduit of night, up to 250); every enemy struck takes
+  its full damage, fliers too. The keep's four **corner turrets**
+  (`turretSpots`) each loose their own bolt at the nearest enemy within
+  7.5 cells every 1.2 s (tower damage and reload bonuses apply), chaining
+  to 5 enemies (one more a level of Conduit of night). Neither draws from
+  the run's random stream.
 - **Patrol routes** (Armory) widens how far from their barracks swordsmen
   go after enemies; its last level sends them anywhere inside the city.
 - **Cannon towers** fire slowly at the nearest ground enemy (not bats),
@@ -227,6 +251,24 @@ from its seed; `tests/defend-replay.test.ts` pins it.
 - During a run the palette becomes the **consumables** palette. A **bomb**
   can be dragged onto the field to blast everything nearby.
 
+- **Dark art** (`dark-art.ts`, the keep in `tower-art.ts`): the dark
+  wizard keep is black obsidian on a stepped plinth, glassy black curtain
+  walls in crimson mortar, a round turret at each corner crowned with a
+  faceted ruby, dark flagstones ringed by a glowing crimson rune circle
+  round an eight-sided obsidian spire tipped with a ruby, and a ruby-arched
+  gate between crimson banners; as it is hurt, crimson fissures open in
+  the obsidian over the usual damage stages. The dark wizard is an 11 × 13
+  hooded figure in black and charcoal robes with crimson trim, rimmed in crimson light, burning
+  crimson eyes and a black staff whose ruby flares as he casts, over a
+  slowly turning crimson stain. Black lightning is drawn into one
+  board-sized pixel buffer at 8 pixels a cell (`BoltBuffer`): each link a
+  jagged Bresenham run of black core pixels (crimson-hot for its first
+  instant) ringed by three levels of crimson glow that shrink as the bolt
+  fades, with short forks, a flare where it was cast and a bright crimson
+  spark on every third enemy struck. Only the changed box is cleared, coloured and
+  copied to the canvas, which is drawn once a frame with smoothing off, so
+  a chain through hundreds of enemies costs a few pixel writes a link.
+  Bolts tint the ground crimson (`darkLights`).
 - **Valkyrie art** (`valkyrie-art.ts`): the valkyries are 11 × 9 pixel
   sprites (white wings spread round a steel cuirass and a gold helm, inside
   a black outline) with a gold-bladed spear pointing where they last
