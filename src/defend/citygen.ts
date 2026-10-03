@@ -28,7 +28,7 @@ import {
 } from "./grid.ts";
 import { MinHeap } from "./heap.ts";
 import type { StructureKind } from "./catalog.ts";
-import type { FittedStructure } from "./layout.ts";
+import type { FittedGate, FittedStructure, GateSpot } from "./layout.ts";
 
 export const CellType = {
   OUT: 0,
@@ -43,7 +43,7 @@ export const CellType = {
 export type CellType = (typeof CellType)[keyof typeof CellType];
 const FREE = 9;
 
-export type BuildingKind = "house" | "wall" | StructureKind;
+export type BuildingKind = "house" | "wall" | "gate" | StructureKind;
 export type Building = {
   id: number;
   kind: BuildingKind;
@@ -53,6 +53,8 @@ export type Building = {
   structureUid?: number;
   /** Cosmetic variant (roof colour etc). */
   variant: number;
+  /** Set for a city gate: where it stands in the wall. */
+  gate?: GateSpot;
 };
 
 export type CityMap = {
@@ -81,10 +83,11 @@ const HOUSE_SHAPES: [number, number, number][] = [
 ];
 
 export function generateCity(
-  fit: { structures: FittedStructure[]; city: Uint8Array; wall: Uint8Array },
+  fit: { structures: FittedStructure[]; city: Uint8Array; wall: Uint8Array; gates?: FittedGate[] },
   seed: number,
 ): CityMap {
   const { city, wall, structures } = fit;
+  const gates = fit.gates ?? [];
   const t = new Uint8Array(CELL_COUNT);
   for (let i = 0; i < CELL_COUNT; i++) t[i] = city[i] ? FREE : wall[i] ? CellType.WALL : CellType.OUT;
   for (const s of structures) fillRect(t, s.rect, CellType.STRUCT);
@@ -93,6 +96,7 @@ export function generateCity(
   layPlaza(t, keep);
   layAvenues(t, city, keep, seed);
   layDoorStreets(t, structures, seed);
+  layGateStreets(t, gates, seed);
   subdivideBlocks(t, seed);
   connectRoads(t, keep, seed);
   plantParks(t, seed);
@@ -101,8 +105,11 @@ export function generateCity(
   for (const s of structures) lots.add(s.kind, s.rect, { structureUid: s.uid });
   buildHouses(t, lots, seed);
   digPonds(t, seed);
-  // Every wall cell is its own stone that can be knocked out.
-  for (let i = 0; i < CELL_COUNT; i++) if (t[i] === CellType.WALL) lots.add("wall", { x: cellX(i), y: cellY(i), w: 1, h: 1 });
+  // Every wall cell is its own stone that can be knocked out, but for the
+  // gates, which come last.
+  const gated = new Set(gates.flatMap((g) => rectCells(g.rect)));
+  for (let i = 0; i < CELL_COUNT; i++) if (t[i] === CellType.WALL && !gated.has(i)) lots.add("wall", { x: cellX(i), y: cellY(i), w: 1, h: 1 });
+  for (const g of gates) lots.add("gate", g.rect, { gate: { tx: g.tx, ty: g.ty, side: g.side } });
   return { type: t, owner: lots.owner, buildings: lots.buildings, city, wall, structures };
 }
 
@@ -187,6 +194,17 @@ function layDoorStreets(t: Uint8Array, structures: FittedStructure[], seed: numb
     if (!s.inside || s.kind === "keep") continue;
     const doors = sideCells(s.rect).filter((i) => paveable(t[i]));
     if (!doors.some((i) => isRoad(t[i]))) carve(t, doors, seed);
+  }
+}
+
+/** Every gate gets a street up to it: the cells just inside are paved and
+ * joined to the network. */
+function layGateStreets(t: Uint8Array, gates: FittedGate[], seed: number) {
+  for (const g of gates) {
+    const inner = rectCells(g.inner).filter((i) => paveable(t[i]));
+    if (!inner.length) continue;
+    pave(t, inner);
+    carve(t, inner, seed, true);
   }
 }
 

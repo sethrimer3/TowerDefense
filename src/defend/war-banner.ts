@@ -38,9 +38,9 @@ export class WarBanner {
     if (sim.time < this.due) return;
     this.due = sim.time + REFRESH;
     const terrain: FieldTerrain = {
-      solid: sim.solid,
+      solid: sim.ownSolid,
       impassable: (i) => sim.map.type[i] === CellType.WATER,
-      cost: (i) => (sim.solid[i] ? SOLID_COST : 1),
+      cost: (i) => (sim.ownSolid[i] ? SOLID_COST : 1),
     };
     fillFlowField(this.field, [cellAt(this.x, this.y)], terrain);
   }
@@ -57,7 +57,7 @@ export class WarBanner {
     const out: number[] = [];
     let at = cellAt(s.x, s.y);
     for (let k = 0; k < LEG; k++) {
-      const next = this.downhill(sim.solid, at);
+      const next = this.downhill(sim.ownSolid, at);
       if (next < 0) break;
       out.push(next);
       at = next;
@@ -104,7 +104,7 @@ export function answerBanner(sim: DefendSim, banner: WarBanner, s: Soldier, spee
     s.thinkT = 0.5;
     foe = banner.foe(sim, s, sight);
     s.target = foe ? foe.id : -1;
-    s.path = foe ? (findPath(sim.solid, s, foe, { maxCost: RALLY_REACH * 3, maxNodes: 600 }) ?? []) : banner.reached(s) ? [] : banner.route(sim, s);
+    s.path = foe ? (findPath(sim.ownSolid, s, foe, { maxCost: RALLY_REACH * 3, maxNodes: 600 }) ?? []) : banner.reached(s) ? [] : banner.route(sim, s);
   }
   sim.followPath(s, foe, speed, dt);
 }

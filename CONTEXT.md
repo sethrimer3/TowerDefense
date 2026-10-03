@@ -117,6 +117,12 @@ Burning ground a fireball (or bursting monster bait) leaves, hurting every groun
 **Monster bait**:
 A stack of crates of bait, a structure for anywhere: while any stands, every enemy goes for the nearest one before the keep.
 
+**City gate**:
+A gatehouse set into the city wall on the edge of a city tile: it opens for the city's own people (troops and civilians) and stays shut to the enemy, who must batter it down.
+
+**Palette category**:
+Which kind of building the build palette shows: All, Towers (they shoot), Units (they train troops) or City (city tiles, gates and monster bait).
+
 **Restock**:
 Civilians rebuilding fallen monster bait, which only Restocking allows, a set number of times a defense for each stack.
 

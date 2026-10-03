@@ -108,6 +108,7 @@ input:focus-visible {
 
 /* Chosen and leading buttons are bound in brass, and glow like a lit lamp. */
 button[aria-pressed="true"],
+button[aria-checked="true"],
 .tree-tabs [aria-pressed="true"],
 nav button.selected,
 .defend-go,
@@ -473,6 +474,15 @@ nav button > span img {
 .defend-palette-title {
   color: #c79f5c;
   text-shadow: 0 1px 0 #000;
+}
+/* The category picker: a brass-bound board while its list hangs open,
+   the list a shelf of smaller boards beneath it. */
+.defend-category[aria-expanded="true"] {
+  border-color: #6e4c1c;
+  color: #ffe1a0;
+}
+.defend-categories {
+  border-bottom: 1px solid #5a412466;
 }
 .defend-item {
   border-color: #0c0907;

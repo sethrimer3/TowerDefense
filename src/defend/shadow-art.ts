@@ -49,6 +49,7 @@ export function heights(map: CityMap, standing: (b: Building) => boolean): Float
     if (b.kind === "wall") wall(map, b, raise, standing);
     else if (b.kind === "house") house(b, raise);
     else if (b.kind === "keep") keep(b, raise);
+    else if (b.kind === "gate") structure(b, HEIGHT.wall, raise);
     else structure(b, b.kind.endsWith("Tower") ? HEIGHT.tower : HEIGHT.hall, raise);
   }
   for (let cy = 0; cy < CELLS_H; cy++)

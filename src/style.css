@@ -1093,6 +1093,25 @@ nav button > span img { display: block; width: 42px; height: 42px; max-width: 10
   letter-spacing: 2px;
   color: var(--muted);
 }
+.defend-category {
+  padding: 5px 2px;
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.defend-categories {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-bottom: 6px;
+}
+.defend-categories button {
+  padding: 4px 2px;
+  font-size: 9px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
 .defend-item {
   display: flex;
   flex-direction: column;
@@ -1229,6 +1248,11 @@ nav button > span img { display: block; width: 42px; height: 42px; max-width: 10
   }
   .defend-item span {
     display: none;
+  }
+  .defend-category,
+  .defend-categories button {
+    font-size: 8px;
+    letter-spacing: 0;
   }
   .defend-stage.side-open .defend-side {
     width: 60px;

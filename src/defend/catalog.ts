@@ -7,8 +7,40 @@ import { intPow } from "../exact.ts";
 export type StructureKind = "keep" | "barracks" | "archerBarracks" | "archerTower" | "cannonTower" | "watchTower" | "wizardTower" | "mageGuild" | "valkyriePalace" | "darkKeep" | "monsterBait";
 /** Everything that appears in the build palette (the keep is placed from the
  * start and can only be moved, so it is not a palette item). */
-export type PaletteItem = "cityTile" | Exclude<StructureKind, "keep">;
-export const PALETTE_ITEMS: PaletteItem[] = ["cityTile", "barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait"];
+export type PaletteItem = "cityTile" | "cityGate" | Exclude<StructureKind, "keep">;
+export const PALETTE_ITEMS: PaletteItem[] = ["cityTile", "barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "cityGate"];
+
+/** The build palette's categories: what each shows (All shows everything). */
+export type PaletteCategory = "all" | "towers" | "units" | "city";
+export const PALETTE_CATEGORIES: { id: PaletteCategory; name: string }[] = [
+  { id: "all", name: "All" },
+  { id: "towers", name: "Towers" },
+  { id: "units", name: "Units" },
+  { id: "city", name: "City" },
+];
+/** Which category each palette item belongs to: towers shoot, unit
+ * buildings train troops, and the city's own pieces are the rest. */
+export const ITEM_CATEGORY: Record<PaletteItem, Exclude<PaletteCategory, "all">> = {
+  cityTile: "city",
+  cityGate: "city",
+  monsterBait: "city",
+  archerTower: "towers",
+  cannonTower: "towers",
+  watchTower: "towers",
+  wizardTower: "towers",
+  barracks: "units",
+  archerBarracks: "units",
+  mageGuild: "units",
+  valkyriePalace: "units",
+  darkKeep: "units",
+};
+export const inCategory = (item: PaletteItem, category: PaletteCategory) => category === "all" || ITEM_CATEGORY[item] === category;
+
+/** The city gate: 3 cells along the wall and its 2 cells deep, worth the
+ * wall stones it stands in for, and some. */
+export const GATE = { long: 3, deep: 2, hpPerCell: 1.5 };
+export const GATE_DESCRIPTION =
+  "A gatehouse set into the city wall on the edge of a city tile. It swings open to let your soldiers, archers, mages and townsfolk out and in, and stays barred against the enemy, who must batter it down.";
 
 export type StructureDef = {
   kind: StructureKind;
@@ -168,6 +200,7 @@ export const shareName = (size: TileShare) => (size === TILE_ROOM ? "a whole til
 /** Palette items the player owns at the very start. */
 export const STARTING_OWNED: Record<PaletteItem, number> = {
   cityTile: 8,
+  cityGate: 0,
   barracks: 1,
   archerBarracks: 0,
   archerTower: 1,
@@ -188,6 +221,7 @@ export function purchasePrice(item: PaletteItem, owned: number): Price {
   const extra = Math.max(0, owned - STARTING_OWNED[item]);
   const base: Record<PaletteItem, Price> = {
     cityTile: { gold: 120, copper: 1 },
+    cityGate: { gold: 250, copper: 3 },
     barracks: { gold: 300, copper: 3 },
     archerBarracks: { gold: 330, copper: 4 },
     archerTower: { gold: 220, copper: 2 },

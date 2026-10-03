@@ -48,8 +48,24 @@ Recent rows are available as `window.defendPerformance`; they are not saved.
 ## Building (before a run)
 
 - The **palette** (left by default; the ⚙ settings move it to the right) lists
-  city tiles, barracks, archer barracks, Mage Guilds, Valkyrie palaces, dark wizard keeps, monster bait and the towers with an `×N` count of
-  what is owned but not yet placed; it greys out at `×0`.
+  city tiles, barracks, archer barracks, Mage Guilds, Valkyrie palaces, dark wizard keeps, monster bait, city gates and the towers with an `×N` count of
+  what is owned but not yet placed; it greys out at `×0`. The button at its
+  head (`☰ All`) opens a list of categories, and the palette shows only the
+  one picked: **All**, **Towers** (archer, cannon, watch and wizard towers),
+  **Units** (barracks, archer barracks, Mage Guild, Valkyrie palace, dark
+  wizard keep) or **City** (city tiles, monster bait, city gates;
+  `ITEM_CATEGORY` in `catalog.ts`). The city tile's icon is a corner of the
+  city in the board's own pixel art (`tile-art.ts`): two dirt streets
+  crossing, shingled roofs and a park with a tree.
+- A **city gate** goes on the edge of a city tile where the wall runs (the
+  tile across it is on the board and not city): carried from the palette it
+  snaps to the nearest such edge (`nearestEdge`, `EditSession.edge`), each
+  one framed in gold, and a set gate lifts, moves and goes back to the
+  palette like a structure. It is saved in the layout's `gates` as its tile
+  and side. It takes the middle 3 cells of the edge the wall's 2 cells deep
+  (`gateRect`); `fitLayout` keeps the 3 × 2 cells inside it clear, and the
+  city paves them and joins them to the streets. Adding a city tile across a
+  gate, or taking its own tile away, drops it back to the palette.
 - Drag from the palette onto the board. While dragging, every tile that would
   accept the item gets a faint gold outline and every other tile darkens; the
   hovered tile shows exactly where the building will be fitted.
@@ -273,6 +289,21 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   renderer's (`wizard-art.ts`).
 - **Archer towers** shoot the nearest enemy in range. **Watch towers** mark
   enemies in their radius with a gold outline; marked enemies take ×2 damage.
+- **City gates** are buildings (`kind: "gate"`, numbered after the wall
+  stones) with the HP of the stones they stand in for, half again: enemies
+  find them solid and batter them down like the wall, and civilians rebuild
+  them with the wall stones. The city's own people walk through them: the
+  sim keeps `ownSolid`, its `solid` mask with the standing gates open, which
+  their routes (`findPath`), steps (`followPath`, `moveToward` with `own`),
+  the war banner's field and a valkyrie's charge use. Without gates it is
+  the same array as `solid`, so a city without them replays exactly as
+  before. Drawn by `gate-art.ts`: two crenellated stone towers either side
+  of a passage under a stone lintel, barred by two oak doors with iron
+  bands and studs, painted along the wall and turned to its side, then lit
+  from the upper left in screen space; it takes the usual damage stages and
+  leaves rubble. The doors swing inward over `GATE_FRAMES` while a soldier
+  or civilian is within 1.6 cells and close behind them (`DefendRenderer`,
+  presentation only).
 - **Monster bait** (`bait.ts`) is a stack of crates, one open and heaped
   with raw meat, a haunch lashed to another stacked on top, green slime
   seeping from the seams. While any stack stands, every enemy goes for the
