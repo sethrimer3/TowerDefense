@@ -6,7 +6,7 @@ import { ARCHER_UNIT, CIVILIAN, ENEMIES, SOLDIER, watchRadius, type EnemyDef } f
 import type { Building } from "./citygen.ts";
 import { center } from "./pathing.ts";
 import type { CarriedLight } from "./lighting.ts";
-import { BUILDING_FLASH, type DefendSim, type Effect, type Enemy, type Scorch } from "./sim.ts";
+import { BUILDING_FLASH, type DefendSim, type Effect, type Enemy, type Scorch, type Soldier } from "./sim.ts";
 
 export type Brush = { c: CanvasRenderingContext2D; px: number };
 
@@ -55,8 +55,9 @@ export type Burning = (x: number, y: number, id: number) => number;
 export function drawUnits(b: Brush, sim: DefendSim, torches: Burning | null) {
   drawWatchRadii(b, sim);
   drawCivilians(b, sim, torches);
-  drawSoldiers(b, sim, torches);
+  const swords = drawSoldiers(b, sim, torches);
   for (const e of sim.enemies) drawEnemy(b, e);
+  drawSwords(b, swords);
   drawArrows(b, sim);
   drawShells(b, sim);
   for (const fx of sim.effects) drawEffect(b, fx);
@@ -90,22 +91,144 @@ function drawCivilians(b: Brush, sim: DefendSim, torches: Burning | null) {
   }
 }
 
-/** Swordsmen and archers (who carry a little bow on the off side). */
+/** Swordsmen and archers (who carry a little bow on the off side). Returns
+ * the swordsmen's swings, whose swords and trails draw over the enemies. */
 function drawSoldiers(b: Brush, sim: DefendSim, torches: Burning | null) {
   const { c, px } = b;
+  const swords: { x: number; y: number; swing: Swing }[] = [];
   for (const u of sim.soldiers) {
     const archer = u.kind === "archer";
+    const swing = archer ? null : swingOf(sim, u);
+    const x = u.x + (swing?.dx ?? 0),
+      y = u.y + (swing?.dy ?? 0);
     const s = Math.max(2, (archer ? ARCHER_UNIT.size : SOLDIER.size) * px);
     c.fillStyle = archer ? "#1b3324" : "#1c2a40";
-    c.fillRect(u.x * px - s / 2 - 1, u.y * px - s / 2 - 1, s + 2, s + 2);
+    c.fillRect(x * px - s / 2 - 1, y * px - s / 2 - 1, s + 2, s + 2);
     c.fillStyle = u.flash > 0 ? "#fff" : archer ? ARCHER_UNIT.color : SOLDIER.color;
-    c.fillRect(u.x * px - s / 2, u.y * px - s / 2, s, s);
+    c.fillRect(x * px - s / 2, y * px - s / 2, s, s);
     if (archer) {
       c.fillStyle = "#b58a4f";
-      c.fillRect(u.x * px - s / 2 - Math.max(1, s * 0.3), u.y * px - s / 2, Math.max(1, s * 0.2), s);
+      c.fillRect(x * px - s / 2 - Math.max(1, s * 0.3), y * px - s / 2, Math.max(1, s * 0.2), s);
     }
-    if (torches) drawHandTorch(b, { x: u.x + SOLDIER.size * 0.65, y: u.y - SOLDIER.size * 0.45, id: u.id }, sim.time, torches(u.x, u.y, u.id));
+    if (swing) swords.push({ x, y, swing });
+    if (torches) drawHandTorch(b, { x: x + SOLDIER.size * 0.65, y: y - SOLDIER.size * 0.45, id: u.id }, sim.time, torches(u.x, u.y, u.id));
   }
+  return swords;
+}
+
+/** Each sword and its swing's trail, over whoever it is cutting. */
+function drawSwords(b: Brush, swords: { x: number; y: number; swing: Swing }[]) {
+  for (const { x, y, swing } of swords) {
+    drawSwordTrail(b, x, y, swing);
+    drawSword(b, x, y, swing.blade, swing.k < 1 ? 1 : 0.8);
+  }
+}
+
+// ── Sword swings ───────────────────────────────────────────────────────────
+// Presentation only: a strike resets the swordsman's cooldown, so the time
+// since it is `SOLDIER.cooldown - cd`, and nothing new enters the sim state.
+
+/** Seconds a swing sweeps its half circle, and its trail's fade after. */
+const SWING = 0.22,
+  TRAIL_FADE = 0.16;
+/** How far a swordsman steps into a swing, in cells, and the blade's reach
+ * beyond its body. */
+const LUNGE = 0.16,
+  BLADE = 0.5;
+/** Where a swordsman's sword rests between swings: raised on the off side. */
+const REST = -Math.PI * 0.6;
+const TAU = Math.PI * 2;
+
+/** What the renderer remembers of each swordsman between frames: the way
+ * it last faced, the time into its last swing (a drop means a new one), and
+ * which way that swing sweeps (they alternate, forehand and back). */
+type SwingMemory = { face: number; t: number; side: 1 | -1 };
+const swings = new WeakMap<object, SwingMemory>();
+
+type Swing = {
+  /** Lunge offset, in cells. */
+  dx: number;
+  dy: number;
+  /** The blade's angle now, and where this swing began. */
+  blade: number;
+  from: number;
+  /** Where the sweep ends: the trail's head, while the blade goes home. */
+  end: number;
+  /** How far through the sweep, 0 to 1 (past 1 while the trail fades). */
+  k: number;
+};
+
+function swingOf(sim: DefendSim, u: Soldier): Swing {
+  let m = swings.get(u);
+  if (!m) swings.set(u, (m = { face: REST + Math.PI / 2, t: Infinity, side: 1 }));
+  const e = sim.enemies.find((e) => e.id === u.target);
+  if (e) m.face = Math.atan2(e.y - u.y, e.x - u.x);
+  const t = SOLDIER.cooldown - u.cd;
+  if (t < m.t) m.side = m.side === 1 ? -1 : 1;
+  m.t = t;
+  if (!(t >= 0 && t < SWING + TRAIL_FADE)) return { dx: 0, dy: 0, blade: REST, from: REST, end: REST, k: 2 };
+  const k = t / SWING;
+  const eased = k >= 1 ? 1 : 1 - (1 - k) * (1 - k);
+  const from = m.face - (m.side * Math.PI) / 2;
+  const lunge = k < 1 ? LUNGE * Math.sin(Math.PI * Math.sqrt(k)) : 0;
+  const end = from + m.side * Math.PI * eased;
+  // Once the sweep ends, the sword eases back to rest while the trail fades.
+  const back = k < 1 ? 0 : (t - SWING) / TRAIL_FADE;
+  const home = end + ((((REST - end) % TAU) + TAU + Math.PI) % TAU) - Math.PI;
+  return { dx: Math.cos(m.face) * lunge, dy: Math.sin(m.face) * lunge, blade: end + (home - end) * back * back, from, end, k };
+}
+
+/** A pixel square of side `d` centred on (x, y) in canvas pixels. */
+function dot(c: CanvasRenderingContext2D, x: number, y: number, d: number) {
+  c.fillRect(Math.round(x - d / 2), Math.round(y - d / 2), d, d);
+}
+
+/** The small sword, hilt at the body's edge, pointing along `angle`. */
+function drawSword({ c, px }: Brush, x: number, y: number, angle: number, reach: number) {
+  const d = Math.max(1, Math.round(px * 0.07));
+  const ux = Math.cos(angle),
+    uy = Math.sin(angle);
+  const r0 = SOLDIER.size * 0.5,
+    r1 = r0 + BLADE * reach;
+  // The black outline first, a pixel round the blade.
+  c.fillStyle = "#0d0d10";
+  for (let r = r0; r <= r1; r += d / px) dot(c, (x + ux * r) * px, (y + uy * r) * px, d + 2);
+  c.fillStyle = "#dfe6ee";
+  for (let r = r0 + 0.08; r <= r1; r += d / px) dot(c, (x + ux * r) * px, (y + uy * r) * px, d);
+  // The crossguard and grip in brass.
+  c.fillStyle = "#c9a14a";
+  const g = r0 + 0.06;
+  dot(c, (x + ux * g - uy * 0.07) * px, (y + uy * g + ux * 0.07) * px, d);
+  dot(c, (x + ux * g + uy * 0.07) * px, (y + uy * g - ux * 0.07) * px, d);
+  dot(c, (x + ux * r0) * px, (y + uy * r0) * px, d);
+}
+
+/** The swing's trail: a pale crescent of pixels behind the blade's tip,
+ * brightest at the blade and fading toward where the swing began, then
+ * fading out altogether once the sweep ends. */
+function drawSwordTrail({ c, px }: Brush, x: number, y: number, sw: Swing) {
+  if (sw.k > 1 + TRAIL_FADE / SWING) return;
+  const fade = sw.k <= 1 ? 1 : 1 - ((sw.k - 1) * SWING) / TRAIL_FADE;
+  const span = sw.end - sw.from;
+  if (Math.abs(span) < 0.05) return;
+  const d = Math.max(1, Math.round(px * 0.07));
+  const outer = SOLDIER.size * 0.5 + BLADE;
+  const steps = Math.max(6, Math.ceil((Math.abs(span) * outer * px) / d));
+  for (let i = 0; i <= steps; i++) {
+    const f = i / steps; // 0 where the swing began, 1 at the blade
+    const a = sw.from + span * f;
+    const ux = Math.cos(a),
+      uy = Math.sin(a);
+    // The crescent thickens toward the blade.
+    const rows = 1 + Math.round(f * 2);
+    for (let row = 0; row < rows; row++) {
+      const r = outer - (row * d) / px;
+      c.globalAlpha = fade * f * f * (row ? 0.45 : 0.85);
+      c.fillStyle = row ? "#9fc8ff" : "#eef6ff";
+      dot(c, (x + ux * r) * px, (y + uy * r) * px, d);
+    }
+  }
+  c.globalAlpha = 1;
 }
 
 /** A unit's hand torch, held at `at`: the stick, and while it `burns` a
