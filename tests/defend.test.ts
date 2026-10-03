@@ -159,7 +159,7 @@ test('waves spend their difficulty budget and keep fixed enemy HP', () => {
   for (let wave = 1; wave <= 180; wave++) {
     const enemies = buildWave(wave, rand);
     assert.equal(enemies.reduce((sum, k) => sum + ENEMIES[k].cost, 0), waveDifficulty(wave));
-    assert.ok(enemies.reduce((sum, k) => sum + (ENEMIES[k].chainLength ?? (1 + (ENEMIES[k].splits?.count ?? 0))), 0) <= MAX_WAVE_ENEMIES);
+    assert.ok(enemies.reduce((sum, k) => sum + (ENEMIES[k].fortress ? 1 + ENEMIES[k].fortress!.turrets + ENEMIES[k].fortress!.legs + ENEMIES[k].fortress!.armor : (ENEMIES[k].chainLength ?? (1 + (ENEMIES[k].splits?.count ?? 0)))), 0) <= MAX_WAVE_ENEMIES);
   }
   const sim = new DefendSim(mapOf(defaultLayout()), zeroLevels(), 5);
   sim.wave = 1000;
@@ -208,7 +208,7 @@ test('waves release their randomized count within five seconds', () => {
     const sim = new DefendSim(mapOf(defaultLayout()), zeroLevels(), 5);
     sim.wave = wave;
     sim.spawnQueue = buildWave(wave, sim.rand);
-    const count = sim.spawnQueue.reduce((sum, k) => sum + (ENEMIES[k].chainLength ?? 1), 0);
+    const count = sim.spawnQueue.reduce((sum, k) => sum + (ENEMIES[k].fortress ? 1 + ENEMIES[k].fortress!.turrets + ENEMIES[k].fortress!.legs + ENEMIES[k].fortress!.armor : (ENEMIES[k].chainLength ?? 1)), 0);
     for (let i = 0; i < 151; i++) (sim as any).runWaves(1 / 30);
     assert.equal(sim.spawnQueue.length, 0);
     assert.equal(sim.enemies.length, count);

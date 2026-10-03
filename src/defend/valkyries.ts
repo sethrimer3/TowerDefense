@@ -1,3 +1,4 @@
+import { enemySize } from "./catalog.ts";
 /** DEFEND valkyries, trained at the Valkyrie palace: armoured angels with
  * spears. When an enemy comes within her spear's reach a valkyrie makes a
  * charge stab: she blinks along the line toward it, as far as her reach
@@ -46,7 +47,7 @@ export function charge(sim: DefendSim, s: Soldier, e: Enemy, reach: number) {
   const x0 = s.x, y0 = s.y, x1 = s.x + ux * len, y1 = s.y + uy * len;
   const hits: { x: number; y: number }[] = [];
   for (const foe of sim.enemiesNear((x0 + x1) / 2, (y0 + y1) / 2, len / 2 + 1.5)) {
-    const w = STAB_WIDTH + ENEMIES[foe.kind].size / 2;
+    const w = STAB_WIDTH + enemySize(foe) / 2;
     // The nearest point of the line to the enemy, by projection.
     const t = Math.max(0, Math.min(len, (foe.x - x0) * ux + (foe.y - y0) * uy));
     if (sq(foe.x - (x0 + ux * t)) + sq(foe.y - (y0 + uy * t)) > w * w) continue;

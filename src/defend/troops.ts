@@ -1,3 +1,4 @@
+import { enemySize } from "./catalog.ts";
 /** DEFEND troops: barracks keep their garrison topped up; swordsmen chase
  * enemies within their leash of the barracks (anywhere in the city at the
  * last Patrol routes level) and head home when there's nothing to fight;
@@ -140,7 +141,7 @@ export function stepSwordsman(sim: DefendSim, s: Soldier, dt: number) {
   sim.followPath(s, target, SOLDIER.speed, dt);
 }
 
-const inSwordReach = (s: Soldier, e: Enemy) => dist(e.x - s.x, e.y - s.y) <= SOLDIER.reach + ENEMIES[e.kind].size / 2;
+const inSwordReach = (s: Soldier, e: Enemy) => dist(e.x - s.x, e.y - s.y) <= SOLDIER.reach + enemySize(e) / 2;
 
 function strike(sim: DefendSim, s: Soldier, e: Enemy) {
   if (s.cd > 0) return;

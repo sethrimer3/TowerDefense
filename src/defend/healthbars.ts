@@ -1,3 +1,4 @@
+import { enemySize } from "./catalog.ts";
 import { ENEMIES } from "./catalog.ts";
 import type { DefendSim, Enemy } from "./sim.ts";
 import type { Brush } from "./battle-art.ts";
@@ -23,7 +24,7 @@ export function drawEnemyHealthbars({ c, px }: Brush, sim: DefendSim) {
   for (const e of healthbarEnemies(sim)) {
     const width = Math.max(12, Math.round(px * 1.2)), height = Math.max(2, Math.round(px * .1));
     const x = Math.round(e.x * px - width / 2);
-    const y = Math.round(e.y * px - ENEMIES[e.kind].size * px / 2 - height - 4);
+    const y = Math.round(e.y * px - enemySize(e) * px / 2 - height - 4);
     c.fillStyle = "#170e12"; c.fillRect(x - 1, y - 1, width + 2, height + 2);
     const ratio = Math.max(0, Math.min(1, e.hp / e.maxHp));
     c.fillStyle = ratio > .5 ? "#85bd68" : ratio > .25 ? "#e2b65a" : "#d85b59";

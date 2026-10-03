@@ -1,3 +1,4 @@
+import { enemySize } from "./catalog.ts";
 /** The wizard tower's attacks as they are drawn: the flamethrower's fire
  * and the ice wave's shards. The sim says where each burns or spreads
  * (`sim.flames`, `sim.frosts`); everything here is presentation, with its
@@ -209,7 +210,7 @@ export class WizardArt {
     c.save();
     for (const e of sim.enemies) {
       if (!e.chill) continue;
-      const s = ENEMIES[e.kind].size * px, x = e.x * px - s / 2, y = e.y * px - s / 2;
+      const s = enemySize(e) * px, x = e.x * px - s / 2, y = e.y * px - s / 2;
       c.fillStyle = "rgba(170,220,255,0.45)";
       c.fillRect(x, y, s, s);
       c.fillStyle = "rgba(240,252,255,0.9)";

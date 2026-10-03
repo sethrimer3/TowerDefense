@@ -1,3 +1,4 @@
+import { enemySize } from "./catalog.ts";
 /** Thin wooden fences along the street sides of some parks. Purely
  * decorative — nothing is blocked by them — but enemies that walk across a
  * section (or a blast next to it) snap it: it splinters into pieces that
@@ -129,7 +130,7 @@ export class Fences {
       const def = ENEMIES[e.kind];
       if (def.flying) continue;
       for (const s of this.byCell.get(cellIndex(Math.floor(e.x), Math.floor(e.y))) ?? [])
-        if (!s.broken && segDist(s, e.x, e.y) < def.size / 2 + 0.06) this.snap(s, e.x, e.y);
+        if (!s.broken && segDist(s, e.x, e.y) < enemySize(e) / 2 + 0.06) this.snap(s, e.x, e.y);
     }
   }
 

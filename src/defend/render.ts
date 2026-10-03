@@ -1,3 +1,4 @@
+import { enemySize } from "./catalog.ts";
 /** Canvas renderer for DEFEND: the camera, and each frame's passes in order.
  * The city (ground, streets, houses, walls; city-layer.ts) is painted once
  * into an offscreen layer and only repainted when a building falls or is
@@ -394,7 +395,7 @@ function standingKeep(map: CityMap, sim: DefendSim | null) {
 /** Everyone on foot, for the grass to part around. */
 function walkers(sim: DefendSim): Walker[] {
   const out: Walker[] = [];
-  for (const e of sim.enemies) if (!ENEMIES[e.kind].flying) out.push({ x: e.x, y: e.y, size: ENEMIES[e.kind].size });
+  for (const e of sim.enemies) if (!ENEMIES[e.kind].flying) out.push({ x: e.x, y: e.y, size: enemySize(e) });
   for (const s of sim.soldiers) out.push({ x: s.x, y: s.y, size: 0.4 });
   for (const c of sim.civilians) out.push({ x: c.x, y: c.y, size: 0.3 });
   return out;
@@ -403,7 +404,7 @@ function walkers(sim: DefendSim): Walker[] {
 /** Everyone a tree can stand over. */
 function beneath(sim: DefendSim): Under[] {
   const out: Under[] = [];
-  for (const e of sim.enemies) out.push({ x: e.x, y: e.y, size: ENEMIES[e.kind].size });
+  for (const e of sim.enemies) out.push({ x: e.x, y: e.y, size: enemySize(e) });
   for (const s of sim.soldiers) out.push({ x: s.x, y: s.y, size: 0.4 });
   for (const c of sim.civilians) out.push({ x: c.x, y: c.y, size: 0.3 });
   return out;

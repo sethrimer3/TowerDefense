@@ -1,3 +1,5 @@
+import { drawFortress } from "./fortress-art.ts";
+import { enemySize } from "./catalog.ts";
 import { drawEnemyHealthbars, healthbarEnemies } from "./healthbars.ts";
 import { drawBlackHoles, drawHostileMarks, drawPoisonClouds } from "./hostile-art.ts";
 /** What DEFEND draws fresh each battle frame over the city layer: struck and
@@ -279,7 +281,8 @@ function drawHandTorch({ c, px }: Brush, at: { x: number; y: number; id: number 
 function drawEnemy(b: Brush, e: Enemy) {
   const { c, px } = b;
   const def = ENEMIES[e.kind];
-  const s = Math.max(2, Math.round(def.size * px));
+  if (def.fortress) { drawFortress(b, e); return; }
+  const s = Math.max(2, Math.round(enemySize(e) * px));
   const x = Math.round(e.x * px - s / 2),
     y = Math.round(e.y * px - s / 2 - (e.kind === "bombBird" ? (e.dive === undefined ? 1 : Math.max(0, e.dive / 0.6)) * px * 1.5 : 0));
   if (e.marked) {
@@ -515,7 +518,7 @@ export function shadowCasters(sim: DefendSim) {
   return [
     ...sim.soldiers.map((u) => ({ x: u.x, y: u.y, size: u.kind === "archer" ? ARCHER_UNIT.size : u.kind === "mage" ? FIRE_MAGE.size : u.kind === "valkyrie" ? VALKYRIE.size : u.kind === "darkWizard" ? DARK_WIZARD.size : SOLDIER.size })),
     ...sim.civilians.map((u) => ({ x: u.x, y: u.y, size: CIVILIAN.size })),
-    ...sim.enemies.filter((e) => !def(e).flying).map((e) => ({ x: e.x, y: e.y, size: def(e).size })),
+    ...sim.enemies.filter((e) => !def(e).flying).map((e) => ({ x: e.x, y: e.y, size: enemySize(e) })),
   ];
 }
 

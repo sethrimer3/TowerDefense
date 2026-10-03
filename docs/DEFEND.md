@@ -491,3 +491,18 @@ egg. Blink Imp (250) shows a destination for 0.6 seconds before jumping up
 to three cells, only landing in open cells. All have pixel art and journal
 entries. Necromancer reserves five enemy slots and phoenix three; every
 summon and revival also checks the lifetime 5,000-unit cap.
+
+
+Living Fortresses have four tiers: Walking Bastion (1,000 difficulty; two
+turrets, four legs, two armor plates), Living Fortress (10,000; four/six/four),
+Walking Citadel (100,000; six/eight/six) and Dread Colossus (1,000,000;
+eight/ten/eight). Body dimensions grow from 2.5 × 3 cells to 5.5 × 6, core HP
+from 1,200 to 150,000, and component HP from 160 to 12,000 (armor has 1.5×
+component HP). Each part has its own small hitbox and HP, follows the body,
+and is individually targetable by existing attacks. Armor plates must all
+be destroyed before the core takes damage. Every lost leg proportionally
+reduces speed, down to 25% with none; destroyed turrets stop firing. Turrets
+bombard player units and buildings every two seconds. Destroyed parts remain
+charred sockets. Core destruction removes surviving parts; only the core pays
+kill rewards. The wave budget reserves all 9/15/21/27 components and spawning
+checks room for the complete fortress before releasing it.

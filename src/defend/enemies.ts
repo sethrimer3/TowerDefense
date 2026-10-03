@@ -1,3 +1,4 @@
+import { enemySize } from "./catalog.ts";
 import { stepAbilities, enemyDamage, enemySpeed } from "./enemy-abilities.ts";
 import { hostileSpecial } from "./hostile-attacks.ts";
 /** How a DEFEND enemy spends one step. In order: fight any defender in
@@ -33,7 +34,7 @@ export function stepEnemy(sim: DefendSim, e: Enemy, dt: number) {
   }
   if (hostileSpecial(sim, e, dt)) return;
   if (e.kind === "dragon" && breathe(sim, e, dt)) return;
-  const t: Turn = { sim, e, def, reach: def.size / 2 + 0.4, dt };
+  const t: Turn = { sim, e, def, reach: enemySize(e) / 2 + 0.4, dt };
   if (fightDefender(t)) return;
   if (def.flying) return flyAtKeep(t);
   if (e.distract >= 0 && chaseDistraction(t)) return;

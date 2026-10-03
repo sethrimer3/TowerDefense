@@ -1,3 +1,4 @@
+import { enemySize } from "./catalog.ts";
 import { assembleFortress, syncFortress } from "./fortress.ts";
 import { damageModifier } from "./enemy-abilities.ts";
 import { stepBlackHoles, stepPoison } from "./hostile-attacks.ts";
@@ -412,7 +413,7 @@ export class DefendSim {
    * evenly around where she fell, or on the spot if that is inside a wall. */
   private hatch(kind: EnemyKind, mother: Enemy, n: number, count: number): Enemy {
     const k = HATCH_SPOTS[n % HATCH_SPOTS.length];
-    const r = ENEMIES[mother.kind].size * 0.5;
+    const r = enemySize(mother) * 0.5;
     const x = mother.x + k.x * r,
       y = mother.y + k.y * r;
     const free = x > 0 && y > 0 && x < CELLS_W && y < CELLS_H && !blocked(this.solid, x, y);
@@ -544,7 +545,7 @@ export class DefendSim {
     if (amount <= 0) return false;
     e.hp -= e.marked ? amount * 2 : amount;
     if (flash) e.flash = 0.12;
-    if (e.hp <= 0) this.effects.push({ kind: "spark", x: e.x, y: e.y, t: 0, r: ENEMIES[e.kind].size });
+    if (e.hp <= 0) this.effects.push({ kind: "spark", x: e.x, y: e.y, t: 0, r: enemySize(e) });
     return true;
   }
 
