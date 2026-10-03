@@ -267,9 +267,7 @@ export function paintHeadframe(p: Pixels) {
       const dx = x + 0.5 - cx, dy = y + 0.5 - cy, r = Math.sqrt(dx * dx + dy * dy);
       if (r <= 4.7 && r >= 3.7) p.set(x, y, dy < 0 ? IRON : IRON_LO);
       else if (r < 1.3) p.set(x, y, IRON_DK);
-      else if (r < 3.7 && (Math.abs(dx) < 0.6 || Math.abs(dy) < 0.6 || Math.abs(Math.abs(dx) - Math.abs(dy)) < 0.5)) p.set(x, y, IRON_LO);
     }
-  p.set(8, 4, IRON);
   // The legs, two pixels thick, from under the beam out to the ground.
   const leg = (y: number) => Math.round(6 - ((y - 10) * 5) / 13);
   for (let y = 10; y < HEADFRAME_H; y++) {

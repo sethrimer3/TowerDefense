@@ -50,20 +50,44 @@ export function outfit(name: string, job: Job): Outfit {
   return o;
 }
 
-export type Pose = "stand" | "walk" | "climb" | "work";
+/** How a figure stands: standing, walking or climbing (legs swinging),
+ * at work (an arm out front), reaching high (an arm over its head: a pick
+ * or hammer raised, a stretch, a brow wiped), sitting (legs out front), or
+ * crouched (knees bent, low over the ground). */
+export type Pose = "stand" | "walk" | "climb" | "work" | "reach" | "sit" | "crouch";
 
 /** A miner standing with its feet in cell (x, y), facing right (1) or left
- * (-1): 2 × 4 half cells over the cells (x, y - 1) and (x, y). `step`
- * swings the legs while it walks or climbs. */
+ * (-1): 2 × 4 half cells over the cells (x, y - 1) and (x, y), with an arm
+ * a half cell out front at work or over its head reaching. `step` swings
+ * the legs while it walks or climbs and the arms while it climbs. */
 export function drawFigure(fine: Fine, o: Outfit, x: number, y: number, facing: number, pose: Pose, step: number) {
-  const top = y - 1, front = facing > 0 ? x + 0.5 : x, back = facing > 0 ? x : x + 0.5;
+  const low = pose === "sit" || pose === "crouch" ? 0.5 : 0;
+  const top = y - 1 + low, front = facing > 0 ? x + 0.5 : x, back = facing > 0 ? x : x + 0.5, out = facing > 0 ? x + 1 : x - 0.5;
   fine(x, top, 1, 0.5, o.top);
   if (o.lamp) fine(front, top, 0.5, 0.5, LAMP);
   fine(front, top + 0.5, 0.5, 0.5, o.face);
   fine(back, top + 0.5, 0.5, 0.5, o.back);
+  if (pose === "sit") {
+    // Seated: the body over the seat, legs out front, boots beyond.
+    fine(x, y, 1, 0.5, o.body);
+    if (o.arm !== o.body) fine(back, y, 0.5, 0.5, o.arm);
+    fine(x, y + 0.5, 1, 0.5, o.legs);
+    fine(out, y + 0.5, 0.5, 0.5, o.boots);
+    return;
+  }
+  if (pose === "crouch") {
+    // Crouched: the body bent over bent knees, an arm down to the ground.
+    fine(x, y + 0.5, 1, 0.5, o.body);
+    fine(back, y + 0.5, 0.5, 0.5, o.legs);
+    fine(out, y + 0.5, 0.5, 0.5, o.arm);
+    return;
+  }
   fine(x, y, 1, 0.5, o.body);
   // A smith's shirt sleeve shows behind the apron.
   if (o.arm !== o.body) fine(back, y, 0.5, 0.5, o.arm);
+  if (pose === "work") fine(out, y, 0.5, 0.5, o.arm);
+  else if (pose === "reach") fine(front, top - 0.5, 0.5, 0.5, o.arm);
+  else if (pose === "climb") fine(step % 2 ? front : back, top - 0.5, 0.5, 0.5, o.arm);
   const moving = pose === "walk" || pose === "climb";
   fine(x, y + 0.5, 0.5, 0.5, moving && step % 2 ? o.boots : o.legs);
   fine(x + 0.5, y + 0.5, 0.5, 0.5, moving && step % 2 === 0 ? o.boots : o.legs);
@@ -71,10 +95,11 @@ export function drawFigure(fine: Fine, o: Outfit, x: number, y: number, facing: 
 
 /** A miner asleep in its bunk: its head at cell (x, y) on the pillow, under
  * a blanket toward `facing`. */
-export function drawSleeper(fine: Fine, o: Outfit, x: number, y: number, facing: number, blanket: string) {
+export function drawSleeper(fine: Fine, o: Outfit, x: number, y: number, facing: number, blanket: string, breath = true) {
   const headX = facing > 0 ? x + 0.5 : x;
   fine(headX, y + 0.5, 0.5, 0.5, o.face === VISOR ? o.back : o.face);
   fine(facing > 0 ? x : x + 0.5, y + 0.5, 0.5, 0.5, o.job === "forge" ? HAIR[1] : o.back);
   fine(Math.min(x, x + facing) + (facing > 0 ? 1 : 0), y + 0.5, 1, 0.5, blanket);
-  fine(Math.min(x, x + facing) + (facing > 0 ? 1 : 0), y + 0.25, 1, 0.25, "rgba(255,255,255,0.12)");
+  // The blanket rises and falls with each breath.
+  if (breath) fine(Math.min(x, x + facing) + (facing > 0 ? 1 : 0), y + 0.25, 1, 0.25, "rgba(255,255,255,0.12)");
 }

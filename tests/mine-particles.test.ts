@@ -26,3 +26,17 @@ test("smoke rises, dust falls and settles, sparks arc down, z's float up", () =>
   assert.ok(dust.length < 60, "and faded");
   assert.ok(at("spark", 5) < 10 && at("spark", 40) > at("spark", 5), "the spark flew up, then fell");
 });
+
+test("embers and notes drift up; a drop falls and is gone where it lands", () => {
+  const fx = new Particles();
+  fx.add("ember", 10, 10, 0, -0.03, 200, "#fb5", 0.25);
+  fx.add("note", 20, 10, 0, -0.02, 200, "#fe9");
+  fx.add("drop", 30, 10, 0, -0.05, 200, "#cdf", 0.25);
+  const floor = (_x: number, y: number) => y >= 14;
+  const read = () => (fx as unknown as { list: { kind: string; y: number }[] }).list;
+  for (let i = 0; i < 60; i++) fx.step(floor, 1);
+  const at = (k: string) => read().find((p) => p.kind === k)?.y;
+  assert.ok(at("ember")! < 9, "the ember rose");
+  assert.ok(at("note")! < 9.5, "the note rose");
+  assert.equal(at("drop"), undefined, "the drop landed and was gone");
+});
