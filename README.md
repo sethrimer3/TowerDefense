@@ -44,4 +44,6 @@ The city is alive between and during battles: park grass sways in the wind (hard
 
 ## Deploying
 
+The current stress-test measurements and reproduction steps are in [docs/PERFORMANCE.md](docs/PERFORMANCE.md).
+
 `.github/workflows/static.yml` runs the tests and the build on every push to `main` and deploys `dist/` to GitHub Pages. In the repository's **Settings → Pages**, the source must be set to **GitHub Actions**.

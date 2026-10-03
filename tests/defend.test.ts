@@ -177,7 +177,7 @@ test('dense crowd separation is deterministic, bounded and ignores dead enemies'
   const push = (a as any).separation(a.enemies[0]);
   assert.deepEqual(push, (b as any).separation(b.enemies[0]));
   assert.ok(push.every(Number.isFinite));
-  assert.ok(Math.abs(push[0]) <= 32 * .45);
+  assert.ok(Math.abs(push[0]) <= 8 * .45);
   for (const e of a.enemies) e.hp = 0;
   assert.deepEqual((a as any).separation(a.enemies[0]), [0, 0]);
 });

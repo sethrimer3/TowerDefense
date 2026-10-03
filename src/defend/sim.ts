@@ -409,10 +409,13 @@ export class DefendSim {
   nearestDefender(x: number, y: number, r: number): Soldier | Civilian | null {
     let best: Soldier | Civilian | null = null, bd = r * r;
     // Keep the original last-wins tie order without allocating a list per enemy.
-    for (const units of [this.soldiers, this.civilians]) for (const u of units) {
-      if (u.hp <= 0) continue;
-      const d = sq(u.x - x) + sq(u.y - y);
-      if (d <= bd) { best = u; bd = d; }
+    for (let team = 0; team < 2; team++) {
+      const units = team === 0 ? this.soldiers : this.civilians;
+      for (const u of units) {
+        if (u.hp <= 0) continue;
+        const d = sq(u.x - x) + sq(u.y - y);
+        if (d <= bd) { best = u; bd = d; }
+      }
     }
     return best;
   }
@@ -527,9 +530,9 @@ export class DefendSim {
     const y0 = Math.max(0, Math.floor(u.y - .45)), y1 = Math.min(CELLS_H - 1, Math.floor(u.y + .45));
     for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
       const list = this.grid[cellIndex(x, y)];
-      // Dense crowds use at most 32 representatives per cell. Ordinary crowds
+      // Dense crowds use at most 8 representatives per cell. Ordinary crowds
       // keep exact separation; bounded work avoids quadratic pile-ups at walls.
-      const stride = Math.max(1, Math.ceil(list.length / 32));
+      const stride = Math.max(1, Math.ceil(list.length / 8));
       const offset = ('id' in u ? (u.id as number) : 0) % stride;
       for (let i = offset; i < list.length; i += stride) {
         const o = list[i];
