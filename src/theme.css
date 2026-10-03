@@ -440,19 +440,6 @@ nav button > span img {
 .defend-sky {
   color: #a9c2d6;
 }
-/* The keep's health, a phial of red tincture. */
-.defend-keep i {
-  height: 8px;
-  border: 1px solid #8a7550;
-  border-radius: 4px;
-  background: #160b0a;
-  box-shadow: inset 0 1px 2px #000, 0 0 0 1px #000;
-  overflow: hidden;
-}
-.defend-keep em {
-  background: linear-gradient(#ffb0a0, #c8322a 45%, #6a0f0c);
-  box-shadow: 0 0 6px #ff4a3a;
-}
 .defend-cog {
   color: #e6d2a6;
 }
@@ -1037,7 +1024,7 @@ dialog .away-row .away-note {
 
 @media (max-width: 480px) {
   .td-currencies .currency {
-    padding: 0 6px;
+    padding: 0 3px;
   }
   .td-currencies::before,
   .td-currencies::after {
@@ -1284,10 +1271,14 @@ dialog .away-row .away-note {
 
 /* Enemy discovery journal */
 .defend-journal-button { position: relative; padding: 4px; flex: 0 0 auto; }
-.defend-journal-button canvas { display: block; width: 36px; height: 36px; image-rendering: pixelated; }
+.defend-journal-button canvas { display: block; width: 40px; height: 40px; image-rendering: pixelated; filter: drop-shadow(0 2px 0 #000a); }
 .defend-journal-dialog { width: min(640px, calc(100vw - 32px)); max-height: 85dvh; }
 .defend-journal-entries { max-height: 58dvh; overflow-y: auto; overscroll-behavior: contain; }
 .defend-journal-entries article { padding: 10px 0; border-bottom: 1px solid #73524155; }
 .defend-journal-entries h3 { margin: 0 0 5px; }
 .defend-journal-entries p { margin: 4px 0; }
 .defend-journal-stats { font-size: .85em; }
+@media (max-width: 480px) {
+  .defend-journal-button { padding: 3px; }
+  .defend-journal-button canvas { width: 30px; height: 30px; }
+}

@@ -171,17 +171,28 @@ function store() {
   if (!persist(save)) console.warn("Storage unavailable — progress is only kept for this session.");
 }
 /** What the currency bar last showed, so a rise can glint. */
-const shown = new Map<string, string>();
+const shown = new Map<string, number>();
+/** A count short enough to share the bar's one line: 9999, 12.4k, 1.23M. */
+function compact(n: number) {
+  if (n < 10000) return String(n);
+  for (const [size, suffix] of [[1e9, "B"], [1e6, "M"], [1e3, "k"]] as const) {
+    if (n < size) continue;
+    const v = n / size;
+    return `${v < 100 ? Math.floor(v * 10) / 10 : Math.floor(v)}${suffix}`;
+  }
+  return String(n);
+}
 /** The currency bar, from the save. */
 function refreshCurrencies() {
   const dev = save.settings.devMode;
   document.documentElement.classList.toggle("reduce-motion", save.settings.reduceMotion);
   document.documentElement.classList.toggle("pixel-font", save.settings.pixelFont);
   const show = (id: string, n: number) => {
-    const text = dev ? "∞" : String(whole(n)), before = shown.get(id);
-    el(id).textContent = text;
-    shown.set(id, text);
-    if (before !== undefined && Number(text) > Number(before)) replay(el(id).closest(".currency"), "gain");
+    const value = whole(n), before = shown.get(id);
+    el(id).textContent = dev ? "∞" : compact(value);
+    el(id).title = dev ? "" : value.toLocaleString();
+    shown.set(id, value);
+    if (!dev && before !== undefined && value > before) replay(el(id).closest(".currency"), "gain");
   };
   show("copper", save.copper);
   show("silver", save.silver);

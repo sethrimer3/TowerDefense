@@ -1,18 +1,64 @@
 import { ENEMIES, type EnemyKind } from "./catalog.ts";
 
+/** The enemy journal's button: a bestiary bound in oxblood leather, a
+ * skull with burning eyes on its cover and gold on its corners, outlined in
+ * black; a wax seal marked "!" while there are new enemies to read about.
+ * Drawn on a 20 × 20 canvas shown at twice that. */
+const COVER = [
+  "GhhhhhhhhhG",
+  "CCCKKKKKCCC",
+  "CCKWWWWWKCC",
+  "CKWWWWWWwKC",
+  "CKWKKWKKwKC",
+  "CKWKEWKEwKC",
+  "CKWWWKWWwKC",
+  "CCKWWWWwKCC",
+  "CCKWKWKwKCC",
+  "CCCKKKKKCCC",
+  "CCCCCCCCCCC",
+  "cCCCCCCCCCc",
+  "GcccccccccG"
+];
+const BAND_ROWS = [2, 6, 10];
+const BOOK = [
+  "KKKKKKKKKKKKKK..",
+  ...COVER.map((row, i) => `K${BAND_ROWS.includes(i) ? "s" : "S"}${row}K${i === 0 ? "K." : `${i % 2 ? "p" : "P"}K`}`),
+  "KKKKKKKKKKKKKKPK",
+  ".KPPPPPPPPPPPPpK",
+  "..KKKKKKKKKKKKKK"
+];
+const SEAL = [
+  ".KKKKK.",
+  "KRRWRRK",
+  "KRRWRRK",
+  "KRRWRrK",
+  "KRRRRrK",
+  "KRRWRrK",
+  ".KrrrK.",
+  "..KKK.."
+];
+const JOURNAL_COLOURS: Record<string, string> = {
+  K: "#0b0706", C: "#6e2b22", c: "#4f1d17", h: "#93432f", S: "#3a1410", s: "#c9973f",
+  G: "#e8b955", P: "#ead8a8", p: "#b39869", W: "#ece3c7", w: "#a89c7c", E: "#ff5a2a",
+  R: "#d42e28", r: "#82130f"
+};
+
+function paintRows(c: CanvasRenderingContext2D, rows: string[], x0: number, y0: number) {
+  rows.forEach((row, y) => {
+    for (let x = 0; x < row.length; x++) {
+      const colour = JOURNAL_COLOURS[row[x]];
+      if (!colour) continue;
+      c.fillStyle = colour;
+      c.fillRect(x0 + x, y0 + y, 1, 1);
+    }
+  });
+}
+
 export function paintJournal(canvas: HTMLCanvasElement, unread: boolean) {
   const c = canvas.getContext("2d")!;
   c.clearRect(0, 0, 20, 20);
-  c.fillStyle = "#1e1010"; c.fillRect(2, 3, 14, 16);
-  c.fillStyle = "#7d3d30"; c.fillRect(3, 2, 12, 14);
-  c.fillStyle = "#542b25"; c.fillRect(3, 3, 3, 13);
-  c.fillStyle = "#a76a46"; c.fillRect(6, 3, 8, 1);
-  c.fillStyle = "#c6a777"; c.fillRect(5, 16, 10, 2);
-  c.fillStyle = "#ddb77a"; c.fillRect(10, 7, 2, 5); c.fillRect(8, 9, 6, 1);
-  if (unread) {
-    c.fillStyle = "#210b0b"; c.fillRect(15, 0, 5, 10);
-    c.fillStyle = "#ff3939"; c.fillRect(16, 1, 3, 5); c.fillRect(16, 8, 3, 2);
-  }
+  paintRows(c, BOOK, 1, 2);
+  if (unread) paintRows(c, SEAL, 13, 0);
 }
 
 export function journalHTML(discovered: EnemyKind[]): string {
