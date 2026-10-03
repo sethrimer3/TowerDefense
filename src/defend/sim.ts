@@ -1,3 +1,4 @@
+import { damageModifier } from "./enemy-abilities.ts";
 import { stepBlackHoles, stepPoison } from "./hostile-attacks.ts";
 /** Real-time DEFEND simulation. Units move freely in continuous cell
  * coordinates (1 unit = 1 cell); the procedural city supplies the solid
@@ -64,6 +65,12 @@ export type Enemy = {
   /** Seconds left chilled by a wizard's ice (slowed); absent when not, so
    * a run without ice keeps its state exactly as before. */
   chill?: number;
+  facing?: { x: number; y: number };
+  burrow?: number;
+  blink?: { x: number; y: number; t: number };
+  abilityT?: number;
+  raised?: number;
+  reborn?: boolean;
   slash?: { dx: number; dy: number; t: number };
   dive?: number;
   leader?: number;
@@ -109,7 +116,7 @@ export type Civilian = {
   flash: number;
 };
 
-export type Arrow = { x: number; y: number; target: number; damage: number; tx: number; ty: number; life: number };
+export type Arrow = { x: number; y: number; target: number; damage: number; tx: number; ty: number; life: number; origin?: Point & { attacker?: number; building?: number } };
 export type Effect = { kind: "boom" | "dust" | "spark"; x: number; y: number; t: number; r: number; seed?: number };
 /** A cannon shell in flight: lobbed from the tower to where the target was. */
 export type Shell = { x0: number; y0: number; x1: number; y1: number; t: number; dur: number; damage: number; r: number };
@@ -149,7 +156,7 @@ export class DefendSim {
   readonly bonuses: Readonly<Bonuses>;
   /** Enemies slain this run, by kind: what the run pays out. Not part of
    * the replayed state. */
-  readonly slain: Record<EnemyKind, number> = { roach: 0, orc: 0, ogre: 0, bat: 0, warlord: 0, mother: 0, broodling: 0, snake: 0, dragon: 0, shieldBearer: 0, aegis: 0, darkKnight: 0, bombOrc: 0, bombBird: 0, voidSparrow: 0, shieldLesser: 0, shieldGreater: 0, poisonLesser: 0, poisonBearer: 0, poisonGreater: 0, poisonSovereign: 0 };
+  readonly slain: Record<EnemyKind, number> = { roach: 0, orc: 0, ogre: 0, bat: 0, warlord: 0, mother: 0, broodling: 0, snake: 0, dragon: 0, shieldBearer: 0, aegis: 0, darkKnight: 0, bombOrc: 0, bombBird: 0, voidSparrow: 0, shieldLesser: 0, shieldGreater: 0, poisonLesser: 0, poisonBearer: 0, poisonGreater: 0, poisonSovereign: 0, siegeBeetle: 0, burrowingMole: 0, necromancer: 0, skeleton: 0, bannerCaptain: 0, mirrorKnight: 0, leechSwarm: 0, ashPhoenix: 0, phoenixEgg: 0, blinkImp: 0 };
   /** 1 while a cell is part of a standing (built) building. */
   readonly solid: Uint8Array;
   readonly hp: Float32Array;
@@ -186,6 +193,8 @@ export class DefendSim {
   spawnQueue: EnemyKind[] = [];
   private spawnInterval = 0;
   blackHoles: { x: number; y: number; r: number; damage: number; life: number; pulse: number; seed: number }[] = [];
+  corpses: { x: number; y: number; life: number }[] = [];
+  bannerCarriers: Enemy[] = [];
   private waveSpawned = 0;
   private shieldGenerators: Enemy[] = [];
   spawnT = 0;
@@ -285,6 +294,9 @@ export class DefendSim {
 
   /** Everyone acts, in a fixed order (it decides the random draws). */
   private stepUnits(dt: number) {
+    this.bannerCarriers = this.enemies.filter(e => e.hp > 0 && e.kind === "bannerCaptain");
+    for (const corpse of this.corpses) corpse.life -= dt;
+    this.corpses = this.corpses.filter(c => c.life > 0);
     for (const e of this.enemies) if (e.hp > 0) stepEnemy(this, e, dt);
     this.towers.step(this, dt);
     stepArrows(this, dt);
@@ -307,6 +319,11 @@ export class DefendSim {
     for (const e of this.enemies) {
       if (e.hp > 0) continue;
       this.slain[e.kind]++;
+      if (!ENEMIES[e.kind].hatched && e.kind !== "ashPhoenix" && this.corpses.length < MAX_WAVE_ENEMIES) this.corpses.push({ x: e.x, y: e.y, life: 10 });
+      if (e.kind === "ashPhoenix" && !e.reborn) {
+        const egg = this.spawnAuxiliary("phoenixEgg", e.x, e.y);
+        if (egg) egg.abilityT = 5;
+      }
       const splits = ENEMIES[e.kind].splits;
       if (splits) for (let n = 0; n < splits.count && this.waveSpawned < MAX_WAVE_ENEMIES; n++, this.waveSpawned++) hatched.push(this.hatch(splits.into, e, n, splits.count));
     }
@@ -396,6 +413,14 @@ export class DefendSim {
     return young;
   }
 
+  spawnAuxiliary(kind: EnemyKind, x: number, y: number): Enemy | null {
+    if (this.waveSpawned >= MAX_WAVE_ENEMIES) return null;
+    const enemy = this.newEnemy(kind, x, y);
+    this.enemies.push(enemy);
+    this.waveSpawned++;
+    return enemy;
+  }
+
   private newEnemy(kind: EnemyKind, x: number, y: number): Enemy {
     const hp = ENEMIES[kind].hp;
     const enemy: Enemy = {
@@ -413,6 +438,7 @@ export class DefendSim {
       rollT: this.rand() * 0.5,
       marked: false,
       flash: 0,
+      ...(kind === "burrowingMole" ? { burrow: 1 } : {}),
       ...(ENEMIES[kind].shield ? { shieldHp: ENEMIES[kind].shield!.hp } : {}),
     };
     if (ENEMIES[kind].shield) this.shieldGenerators.push(enemy);
@@ -487,7 +513,7 @@ export class DefendSim {
   // ── Damage and rebuilding ─────────────────────────────────────────────
   /** Hurts `e` (double when marked); a steady burn hurts it without the
    * flash of a blow. */
-  hurtEnemy(e: Enemy, amount: number, flash = true, source: "ranged" | "melee" = "ranged") {
+  hurtEnemy(e: Enemy, amount: number, flash = true, source: "ranged" | "melee" = "ranged", origin?: Point & { attacker?: number; building?: number }, projectile = false) {
     if (e.hp <= 0 || !Number.isFinite(amount) || amount <= 0) return false;
     if (source === "ranged") {
       const shields = this.shieldGenerators.filter(g => g.hp > 0 && (g.shieldHp ?? 0) > 0 &&
@@ -498,6 +524,15 @@ export class DefendSim {
         return false;
       }
     }
+    if (e.kind === "mirrorKnight" && projectile && source === "ranged" && origin) {
+      const reflected = amount * .4;
+      if (origin.attacker !== undefined) {
+        const shooter = this.soldiers.find(s => s.id === origin.attacker && s.hp > 0);
+        if (shooter && !shooter.guard) { shooter.hp -= reflected; shooter.flash = .12; }
+      } else if (origin.building !== undefined) this.damageBuilding(origin.building, reflected);
+    }
+    amount *= damageModifier(this, e, origin, source, projectile);
+    if (amount <= 0) return false;
     e.hp -= e.marked ? amount * 2 : amount;
     if (flash) e.flash = 0.12;
     if (e.hp <= 0) this.effects.push({ kind: "spark", x: e.x, y: e.y, t: 0, r: ENEMIES[e.kind].size });
@@ -554,7 +589,7 @@ export class DefendSim {
   explode(x: number, y: number, { r, damage, friendlyFire }: Blast): number {
     this.indexEnemies();
     const hit = (d: number) => damage * (1 - 0.6 * Math.min(1, d / r));
-    for (const e of this.enemiesNear(x, y, r)) this.hurtEnemy(e, hit(dist(e.x - x, e.y - y)));
+    for (const e of this.enemiesNear(x, y, r)) this.hurtEnemy(e, hit(dist(e.x - x, e.y - y)), true, "ranged", { x, y });
     if (friendlyFire)
       for (const u of [...this.soldiers, ...this.civilians]) {
         const d = dist(u.x - x, u.y - y);
@@ -585,6 +620,7 @@ export class DefendSim {
     dx /= len;
     dy /= len;
     const [sx, sy] = "kind" in u && ENEMIES[(u as Enemy).kind]?.unyielding ? [0, 0] : this.separation(u);
+    if ("kind" in u && (u as Enemy).kind === "siegeBeetle") (u as Enemy).facing = { x: dx, y: dy };
     const step = Math.min(len, speed * dt);
     const mx = dx * step + sx * 0.5 * speed * dt * 4;
     const my = dy * step + sy * 0.5 * speed * dt * 4;

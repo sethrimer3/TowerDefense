@@ -145,7 +145,7 @@ const inSwordReach = (s: Soldier, e: Enemy) => dist(e.x - s.x, e.y - s.y) <= SOL
 function strike(sim: DefendSim, s: Soldier, e: Enemy) {
   if (s.cd > 0) return;
   s.cd = SOLDIER.cooldown;
-  sim.hurtEnemy(e, s.damage, true, "melee");
+  sim.hurtEnemy(e, s.damage, true, "melee", s);
 }
 
 /** Twice a second: path to the nearest of up to three reachable enemies, or
@@ -199,7 +199,7 @@ const idle = (s: Soldier) => !s.path.length && s.thinkT <= 0;
 function shoot(sim: DefendSim, s: Soldier, e: Enemy) {
   if (s.cd > 0) return;
   s.cd = ARCHER_UNIT.cooldown;
-  sim.arrows.push({ x: s.x, y: s.y, target: e.id, damage: s.damage, tx: e.x, ty: e.y, life: 2 });
+  sim.arrows.push({ x: s.x, y: s.y, origin: { x: s.x, y: s.y, attacker: s.id }, target: e.id, damage: s.damage, tx: e.x, ty: e.y, life: 2 });
 }
 
 /** Path toward the nearest of up to three enemies in the city. */

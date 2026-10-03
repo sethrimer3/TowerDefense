@@ -1,3 +1,4 @@
+import { enemyDamage, bannerBonus } from "./enemy-abilities.ts";
 import { dist, sq } from "../exact.ts";
 import { ENEMIES } from "./catalog.ts";
 import { SUB } from "./grid.ts";
@@ -33,7 +34,7 @@ export function hostileSpecial(sim: DefendSim, e: Enemy, dt: number): boolean {
   e.cd = def.cooldown;
   if (e.kind === "voidSparrow") {
     // Diameter 1.5 building tiles = 10.5 cells; radius 5.25 cells.
-    sim.blackHoles.push({ x: e.x, y: e.y, r: SUB * 0.75, damage: def.damage, life: 8, pulse: 0, seed: e.id });
+    sim.blackHoles.push({ x: e.x, y: e.y, r: SUB * 0.75, damage: enemyDamage(sim, e), life: 8, pulse: 0, seed: e.id });
     return true;
   }
   let dx = target.x - e.x, dy = target.y - e.y;
@@ -42,18 +43,18 @@ export function hostileSpecial(sim: DefendSim, e: Enemy, dt: number): boolean {
   e.slash = { dx, dy, t: 0.35 };
   const inside = (x: number, y: number) => sq(x - e.x) + sq(y - e.y) <= sq(range) && (x - e.x) * dx + (y - e.y) * dy >= 0;
   for (const u of [...sim.soldiers, ...sim.civilians]) if (u.hp > 0 && !("guard" in u && u.guard) && inside(u.x, u.y)) {
-    u.hp -= def.damage; u.flash = 0.12;
+    u.hp -= enemyDamage(sim, e); u.flash = 0.12;
   }
   for (const b of sim.map.buildings) {
     const near = nearestPoint(b.rect, e.x, e.y);
-    if (sim.intact(b) && inside(near.x, near.y)) sim.damageBuilding(b.id, def.damage);
+    if (sim.intact(b) && inside(near.x, near.y)) sim.damageBuilding(b.id, enemyDamage(sim, e));
   }
   return true;
 }
 
 function detonate(sim: DefendSim, e: Enemy, r: number) {
   e.hp = 0;
-  hostileBurst(sim, e.x, e.y, r, ENEMIES[e.kind].damage);
+  hostileBurst(sim, e.x, e.y, r, enemyDamage(sim, e));
   sim.effects.push({ kind: "boom", x: e.x, y: e.y, t: 0, r, seed: e.id });
   sim.scorches.push({ x: e.x, y: e.y, r, seed: e.id, t: 0, life: 3 });
 }
@@ -87,7 +88,7 @@ export function stepPoison(sim: DefendSim, dt: number) {
     }
     for (const u of [...sim.soldiers, ...sim.civilians]) {
       if (u.hp <= 0 || sq(u.x - e.x) + sq(u.y - e.y) > sq(poison.radius)) continue;
-      u.hp = poison.lethal ? 0 : Math.max(0, u.hp - poison.damage * hits);
+      u.hp = poison.lethal ? 0 : Math.max(0, u.hp - poison.damage * hits * (bannerBonus(sim, e) ? 1.3 : 1));
       u.flash = 0.12;
     }
   }

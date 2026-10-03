@@ -63,7 +63,7 @@ export function stepFireballs(sim: DefendSim, dt: number) {
 export function stepBlazes(sim: DefendSim, dt: number) {
   for (const b of sim.blazes) {
     b.t += dt;
-    for (const e of sim.enemiesNear(b.x, b.y, b.r)) if (!ENEMIES[e.kind].flying) sim.hurtEnemy(e, b.dps * dt, false);
+    for (const e of sim.enemiesNear(b.x, b.y, b.r)) if (!ENEMIES[e.kind].flying) sim.hurtEnemy(e, b.dps * dt, false, "ranged", b);
   }
   sim.blazes = sim.blazes.filter((b) => b.t < b.life);
 }

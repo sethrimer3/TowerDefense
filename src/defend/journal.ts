@@ -26,6 +26,19 @@ export function journalHTML(discovered: EnemyKind[]): string {
       if (d.shield) notes.push(`Shields itself and nearby enemies against ranged damage within ${d.shield.radius} cells. ${Number.isFinite(d.shield.hp) ? `${d.shield.hp.toLocaleString()} shield HP; shatters when depleted.` : "Permanent shield; only melee damage gets through."}`);
       if (d.poison) notes.push(`Poison cloud reaches ${d.poison.radius} cells. ${d.poison.lethal ? "Instantly kills player units on contact." : `${d.poison.damage} damage every 0.1 seconds to player units.`} The cloud leaves buildings unharmed and does not block ranged attacks.`);
       if (d.unyielding) notes.push("Cannot be frozen or pushed back. Sweeps a wide crescent with its sword.");
+      const tactics: Partial<Record<EnemyKind, string>> = {
+        siegeBeetle: "Front armor takes only 25% damage; attacks from behind deal 150%. Surround it.",
+        burrowingMole: "Tunnels beneath walls as a dirt mound, then surfaces on a city street. Cannot be hurt underground; maintain an interior garrison.",
+        necromancer: "Raises up to four nearby corpses as weaker skeletons, one every three seconds. Kill the necromancer first.",
+        skeleton: "A weak raised enemy. Cannot be raised again.",
+        bannerCaptain: "Nearby enemies gain 25% speed and 30% damage within four cells. Auras do not stack; target the captain.",
+        mirrorKnight: "Reflects 40% of incoming arrow damage back to its shooter. Melee is not reflected.",
+        leechSwarm: "Heals for damage dealt to player units, up to its maximum health. Use burst damage or area attacks.",
+        ashPhoenix: "Leaves a destructible egg on its first death. The egg revives it after five seconds; destroy it first. Can revive only once.",
+        phoenixEgg: "Destroy this egg before its five-second hatch finishes.",
+        blinkImp: "Telegraphs a destination for 0.6 seconds, then jumps up to three cells. Use layered defenses."
+      };
+      if (tactics[k]) notes.push(tactics[k]!);
       if (k === "dragon") notes.push("Breathes flame in a five-cell cone.");
       if (k === "bombOrc") notes.push("Carries dynamite and explodes on contact in a two-cell radius.");
       if (k === "bombBird") notes.push("Dives for 0.6 seconds, then explodes in a 2.5-cell radius. Kill it before it lands.");

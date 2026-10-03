@@ -48,7 +48,7 @@ export class Towers {
     const target = nearest(sim.enemiesNear(c.x, c.y, archerRange(sim.levels.archerRange)), c);
     if (!target) return this.cooldown.set(b.id, 0);
     this.cooldown.set(b.id, archerCooldown(sim.levels.archerRate) * sim.bonuses.towerReload);
-    sim.arrows.push({ x: c.x, y: c.y - 0.6, target: target.id, damage: archerDamage(sim.levels.archerDamage) * sim.bonuses.towerDamage, tx: target.x, ty: target.y, life: 2 });
+    sim.arrows.push({ x: c.x, y: c.y - 0.6, origin: { x: c.x, y: c.y, building: b.id }, target: target.id, damage: archerDamage(sim.levels.archerDamage) * sim.bonuses.towerDamage, tx: target.x, ty: target.y, life: 2 });
   }
 
   private stepCannon(sim: DefendSim, b: Building, dt: number) {
@@ -94,7 +94,7 @@ export function stepArrows(sim: DefendSim, dt: number) {
       a.y += (dy / d) * step;
       continue;
     }
-    if (alive) sim.hurtEnemy(t, a.damage);
+    if (alive) sim.hurtEnemy(t, a.damage, true, "ranged", a.origin ?? { x: a.x, y: a.y }, true);
     a.life = 0;
   }
   sim.arrows = sim.arrows.filter((a) => a.life > 0);

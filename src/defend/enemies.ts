@@ -1,3 +1,4 @@
+import { stepAbilities, enemyDamage, enemySpeed } from "./enemy-abilities.ts";
 import { hostileSpecial } from "./hostile-attacks.ts";
 /** How a DEFEND enemy spends one step. In order: fight any defender in
  * reach; bats fly straight at the keep; a house that caught its eye is
@@ -16,13 +17,15 @@ import { chilled } from "./wizard.ts";
 type Turn = { sim: DefendSim; e: Enemy; def: EnemyDef; reach: number; dt: number };
 
 export function stepEnemy(sim: DefendSim, e: Enemy, dt: number) {
+  if (e.hp <= 0) return;
   const def = ENEMIES[e.kind];
   e.cd -= dt;
+  if (stepAbilities(sim, e, dt)) return;
   if (e.leader !== undefined) {
     const leader = sim.enemies.find(other => other.id === e.leader && other.hp > 0);
     if (leader) {
       const distance = dist(leader.x - e.x, leader.y - e.y);
-      if (distance > 0.3) sim.moveToward(e, leader, { speed: Math.min(def.speed * 2, (distance - 0.3) / dt), dt, flying: def.flying });
+      if (distance > 0.3) sim.moveToward(e, leader, { speed: Math.min(enemySpeed(sim, e) * 2, (distance - 0.3) / dt), dt, flying: def.flying });
       return;
     }
     // The segment immediately behind a cut becomes a new independent head.
@@ -44,7 +47,10 @@ function fightDefender({ sim, e, def, reach }: Turn) {
     e.cd = def.cooldown;
     // A valkyrie just after her charge can't be hurt.
     if ("guard" in foe && foe.guard) return true;
-    foe.hp -= def.damage;
+    const damage = enemyDamage(sim, e);
+    const drained = Math.min(foe.hp, damage);
+    foe.hp -= damage;
+    if (e.kind === "leechSwarm") e.hp = Math.min(e.maxHp, e.hp + drained);
     foe.flash = 0.12;
   }
   return true;
@@ -53,7 +59,7 @@ function fightDefender({ sim, e, def, reach }: Turn) {
 function flyAtKeep(t: Turn) {
   const { sim, e, def, reach, dt } = t;
   if (rectDist(sim.keep.rect, e.x, e.y) <= reach) return hitBuilding(t, sim.keepId);
-  sim.moveToward(e, center(sim.keep.rect), { speed: def.speed * chilled(e), dt, flying: true });
+  sim.moveToward(e, center(sim.keep.rect), { speed: enemySpeed(sim, e) * chilled(e), dt, flying: true });
 }
 
 /** Wreck the house that caught its eye. False once the house is gone or the
@@ -67,7 +73,7 @@ function chaseDistraction(t: Turn) {
     return false;
   }
   if (rectDist(b.rect, e.x, e.y) <= reach) hitBuilding(t, b.id);
-  else if (!sim.moveToward(e, nearestPoint(b.rect, e.x, e.y), { speed: def.speed * chilled(e), dt })) e.distract = -1;
+  else if (!sim.moveToward(e, nearestPoint(b.rect, e.x, e.y), { speed: enemySpeed(sim, e) * chilled(e), dt })) e.distract = -1;
   return true;
 }
 
@@ -82,7 +88,7 @@ function march(t: Turn) {
   const c = cellCenter(best);
   if (sim.solid[best]) return smashThrough(t, best, c);
   rollForDistraction(t, cx, cy);
-  sim.moveToward(e, { x: c.x + e.jx, y: c.y + e.jy }, { speed: def.speed * chilled(e), dt });
+  sim.moveToward(e, { x: c.x + e.jx, y: c.y + e.jy }, { speed: enemySpeed(sim, e) * chilled(e), dt });
 }
 
 /** The cheapest way on goes through a building: walk up and smash it. */
@@ -90,7 +96,7 @@ function smashThrough(t: Turn, cell: number, c: { x: number; y: number }) {
   const { sim, e, def, reach, dt } = t;
   const bid = sim.map.owner[cell];
   if (rectDist(sim.map.buildings[bid].rect, e.x, e.y) <= reach) return hitBuilding(t, bid);
-  sim.moveToward(e, c, { speed: def.speed * chilled(e), dt });
+  sim.moveToward(e, c, { speed: enemySpeed(sim, e) * chilled(e), dt });
 }
 
 /** Streets are lined with temptations: twice a second, a chance that a
@@ -112,7 +118,7 @@ const isHouse = (sim: DefendSim, bid: number) => bid >= 0 && sim.map.buildings[b
 function hitBuilding({ sim, e, def }: Turn, id: number) {
   if (e.cd > 0) return;
   e.cd = def.cooldown;
-  sim.damageBuilding(id, def.damage);
+  sim.damageBuilding(id, enemyDamage(sim, e));
 }
 
 /** Deterministic cone breath; only chain heads attack. */
@@ -133,16 +139,16 @@ function breathe(sim: DefendSim, e: Enemy, _dt: number): boolean {
     return along >= 0 && along <= 5 && Math.abs(ux * dy - uy * dx) <= 0.35 + along * 0.45;
   };
   for (const soldier of sim.soldiers) if (soldier.hp > 0 && !soldier.guard && inside(soldier.x, soldier.y)) {
-    soldier.hp -= ENEMIES.dragon.damage;
+    soldier.hp -= enemyDamage(sim, e);
     soldier.flash = 0.12;
   }
   for (const civilian of sim.civilians) if (civilian.hp > 0 && inside(civilian.x, civilian.y)) {
-    civilian.hp -= ENEMIES.dragon.damage;
+    civilian.hp -= enemyDamage(sim, e);
     civilian.flash = 0.12;
   }
   for (const b of sim.map.buildings) {
     const near = nearestPoint(b.rect, e.x, e.y);
-    if (sim.intact(b) && inside(near.x, near.y)) sim.damageBuilding(b.id, ENEMIES.dragon.damage);
+    if (sim.intact(b) && inside(near.x, near.y)) sim.damageBuilding(b.id, enemyDamage(sim, e));
   }
   return true;
 }

@@ -405,7 +405,7 @@ export const civilianHp = (l: number) => 8 + l * 5;
 export const rebuildSeconds = (l: number) => 3 * intPow(0.82, l);
 export const HOUSE_HP_PER_CELL = 22;
 
-export type EnemyKind = "roach" | "orc" | "ogre" | "bat" | "warlord" | "mother" | "broodling" | "snake" | "dragon" | "shieldBearer" | "aegis" | "darkKnight" | "bombOrc" | "bombBird" | "voidSparrow" | "shieldLesser" | "shieldGreater" | "poisonLesser" | "poisonBearer" | "poisonGreater" | "poisonSovereign";
+export type EnemyKind = "roach" | "orc" | "ogre" | "bat" | "warlord" | "mother" | "broodling" | "snake" | "dragon" | "shieldBearer" | "aegis" | "darkKnight" | "bombOrc" | "bombBird" | "voidSparrow" | "shieldLesser" | "shieldGreater" | "poisonLesser" | "poisonBearer" | "poisonGreater" | "poisonSovereign" | "siegeBeetle" | "burrowingMole" | "necromancer" | "skeleton" | "bannerCaptain" | "mirrorKnight" | "leechSwarm" | "ashPhoenix" | "phoenixEgg" | "blinkImp";
 export type EnemyDef = {
   kind: EnemyKind;
   name: string;
@@ -429,6 +429,7 @@ export type EnemyDef = {
   cost: number;
   /** Body width and height in the city art's eight-pixels-per-cell grid. */
   bodyPixels?: number;
+  summonSlots?: number;
   poison?: { radius: number; damage: number; lethal?: boolean; color: string };
   unyielding?: boolean;
   chainLength?: number;
@@ -459,6 +460,17 @@ export const ENEMIES: Record<EnemyKind, EnemyDef> = {
   poisonBearer: { kind: "poisonBearer", name: "Poison Generator", hp: 800, speed: 0.7, damage: 16, cooldown: 1.5, size: 5 / 8, bodyPixels: 5, color: "#819d74", distraction: 0, flying: false, poison: { radius: 4, damage: 8, color: "#8aaa6a" }, cost: 10000 },
   poisonGreater: { kind: "poisonGreater", name: "Greater Poison Generator", hp: 2400, speed: 0.6, damage: 28, cooldown: 1.5, size: 7 / 8, bodyPixels: 7, color: "#a66fc6", distraction: 0, flying: false, poison: { radius: 6, damage: 32, color: "#ad70ce" }, cost: 100000 },
   poisonSovereign: { kind: "poisonSovereign", name: "Lethal Poison Generator", hp: 6000, speed: 0.55, damage: 40, cooldown: 1.5, size: 9 / 8, bodyPixels: 9, color: "#d55af0", distraction: 0, flying: false, poison: { radius: 8, damage: 0, lethal: true, color: "#d55af0" }, cost: 1000000 },
+
+  siegeBeetle: { kind: "siegeBeetle", name: "Siege Beetle", hp: 600, speed: 0.8, damage: 25, cooldown: 1, size: 0.7, color: "#827c48", distraction: 0, flying: false,  cost: 400 },
+  burrowingMole: { kind: "burrowingMole", name: "Burrowing Mole", hp: 100, speed: 1.5, damage: 10, cooldown: 1, size: 0.4, color: "#9c7653", distraction: 0, flying: false,  cost: 200 },
+  necromancer: { kind: "necromancer", name: "Necromancer", hp: 160, speed: 1, damage: 8, cooldown: 1, size: 0.45, color: "#5b447f", distraction: 0, flying: false, summonSlots: 5, cost: 800 },
+  skeleton: { kind: "skeleton", name: "Raised Skeleton", hp: 20, speed: 1.5, damage: 4, cooldown: 1, size: 0.3, color: "#d7ccb2", distraction: 0, flying: false, hatched: true, cost: 1 },
+  bannerCaptain: { kind: "bannerCaptain", name: "Banner Captain", hp: 250, speed: 1.2, damage: 15, cooldown: 1, size: 0.5, color: "#984047", distraction: 0, flying: false,  cost: 700 },
+  mirrorKnight: { kind: "mirrorKnight", name: "Mirror Knight", hp: 350, speed: 1.1, damage: 20, cooldown: 1, size: 0.55, color: "#9ba8bf", distraction: 0, flying: false,  cost: 600 },
+  leechSwarm: { kind: "leechSwarm", name: "Leech Swarm", hp: 90, speed: 2.2, damage: 12, cooldown: 1, size: 0.4, color: "#80456b", distraction: 0, flying: false,  cost: 150 },
+  ashPhoenix: { kind: "ashPhoenix", name: "Ash Phoenix", hp: 300, speed: 2, damage: 22, cooldown: 1, size: 0.5, color: "#d97532", distraction: 0, flying: true, summonSlots: 3, cost: 1200 },
+  phoenixEgg: { kind: "phoenixEgg", name: "Phoenix Egg", hp: 60, speed: 0, damage: 0, cooldown: 1, size: 0.4, color: "#dfac6e", distraction: 0, flying: false, hatched: true, cost: 1 },
+  blinkImp: { kind: "blinkImp", name: "Blink Imp", hp: 70, speed: 1.7, damage: 9, cooldown: 1, size: 0.3, color: "#9874bf", distraction: 0, flying: false,  cost: 250 },
 
 };
 

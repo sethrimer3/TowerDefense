@@ -14,7 +14,7 @@ export function healthbarEnemies(sim: DefendSim): Enemy[] {
   for (const e of sim.enemies) peak.cost = Math.max(peak.cost, ENEMIES[e.kind].cost);
   peaks.set(sim, peak);
   const threshold = Math.max(100, peak.cost / 4);
-  return sim.enemies.filter(e => e.hp > 0 && e.leader === undefined && ENEMIES[e.kind].cost >= threshold)
+  return sim.enemies.filter(e => e.hp > 0 && !(e.burrow && e.burrow > 0) && e.leader === undefined && ENEMIES[e.kind].cost >= threshold)
     .sort((a, b) => ENEMIES[b.kind].cost - ENEMIES[a.kind].cost || a.hp / a.maxHp - b.hp / b.maxHp || a.id - b.id)
     .slice(0, MAX_ENEMY_HEALTHBARS);
 }

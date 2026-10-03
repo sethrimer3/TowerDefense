@@ -128,7 +128,7 @@ export function stepFlames(sim: DefendSim, wizards: Wizards, dt: number) {
     // The fire takes a moment to reach full length.
     const reach = f.range * Math.min(1, f.t / 0.25);
     const dps = flameDps(sim.levels.wizardFlame ?? 0) * sim.bonuses.towerDamage;
-    for (const e of sim.enemiesNear(f.x, f.y, reach)) if (inFan(e, f.x, f.y, f.dx, f.dy, FLAME_SPREAD, reach)) sim.hurtEnemy(e, dps * dt);
+    for (const e of sim.enemiesNear(f.x, f.y, reach)) if (inFan(e, f.x, f.y, f.dx, f.dy, FLAME_SPREAD, reach)) sim.hurtEnemy(e, dps * dt, true, "ranged", f);
     if (f.t >= f.dur) wizards.ended(f.tower);
   }
   sim.flames = sim.flames.filter((f) => f.t < f.dur);
@@ -144,7 +144,7 @@ export function stepFrosts(sim: DefendSim, dt: number) {
     for (const e of sim.enemiesNear(w.x, w.y, w.r)) {
       if (w.hit.includes(e.id) || !inFan(e, w.x, w.y, w.dx, w.dy, w.spread, w.r)) continue;
       w.hit.push(e.id);
-      if (sim.hurtEnemy(e, damage) && !ENEMIES[e.kind].unyielding) e.chill = Math.max(e.chill ?? 0, chill);
+      if (sim.hurtEnemy(e, damage, true, "ranged", w) && !ENEMIES[e.kind].unyielding) e.chill = Math.max(e.chill ?? 0, chill);
     }
   }
   sim.frosts = sim.frosts.filter((w) => w.r < w.range || w.t < w.range / ICE_SPEED + FROST_LINGER);

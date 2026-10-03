@@ -24,6 +24,57 @@ export function drawPoisonClouds({ c, px }: Brush, sim: DefendSim) {
 
 export function drawHostileMarks({ c, px }: Brush, e: Enemy, { x, y, s }: { x: number; y: number; s: number }) {
   const k = Math.max(1, Math.round(s / 5));
+
+  if (e.kind === "siegeBeetle") {
+    c.fillStyle = "#3d3925"; c.fillRect(x - k, y + k, s + 2 * k, s - k);
+    c.fillStyle = "#aaa171"; c.fillRect(x, y, s, s - k);
+    const facing = e.facing ?? { x: 0, y: 1 };
+    c.fillStyle = "#d8925e"; c.fillRect(x + s / 2 - facing.x * s / 2, y + s / 2 - facing.y * s / 2, k * 2, k * 2);
+    c.fillStyle = "#e0d7a6"; c.fillRect(x + s / 2 + facing.x * s / 3, y + s / 2 + facing.y * s / 3, k * 2, k * 2);
+  }
+  if (e.kind === "burrowingMole") {
+    c.fillStyle = (e.burrow ?? 1) > 0 ? "#85623d" : "#a98262";
+    c.fillRect(x - k, y + k, s + 2 * k, s - k);
+    c.fillStyle = "#b59460"; c.fillRect(x + k, y, s - 2 * k, k);
+    if (!e.burrow) { c.fillStyle = "#e0b699"; c.fillRect(x + s - k, y + k, k * 2, k); }
+  }
+  if (e.kind === "necromancer" || e.kind === "skeleton") {
+    c.fillStyle = "#e1d6b8"; c.fillRect(x + k, y, s - 2 * k, k * 3);
+    c.fillStyle = "#1b1424"; c.fillRect(x + k, y + k, k, k); c.fillRect(x + s - 2 * k, y + k, k, k);
+    if (e.kind === "necromancer") { c.fillStyle = "#705094"; c.fillRect(x + s, y - k, k, s * 1.8); c.fillStyle = "#9add83"; c.fillRect(x + s - k, y - 2 * k, 3 * k, k); }
+  }
+  if (e.kind === "bannerCaptain") {
+    c.fillStyle = "#b5a074"; c.fillRect(x + s, y - s, k, s * 2);
+    c.fillStyle = "#ae3546"; c.fillRect(x + s + k, y - s, s, s / 2);
+    c.fillStyle = "#f0c678"; c.fillRect(x + s + k, y - s, k, s / 2);
+  }
+  if (e.kind === "mirrorKnight") {
+    c.fillStyle = "#394455"; c.fillRect(x - k, y, k * 3, s);
+    c.fillStyle = "#dae9ef"; c.fillRect(x - k, y + k, k * 2, s - 2 * k);
+    c.fillStyle = "#f9fdff"; c.fillRect(x, y + k, k, k);
+  }
+  if (e.kind === "leechSwarm") {
+    c.fillStyle = "#a15e83";
+    for (let n = 0; n < 6; n++) c.fillRect(x + (n % 3) * s / 2 - k, y + Math.floor(n / 3) * s / 2, k, k * 2);
+  }
+  if (e.kind === "ashPhoenix") {
+    c.fillStyle = "#a73a32"; c.fillRect(x - s, y + k, s, k * 2); c.fillRect(x + s, y + k, s, k * 2);
+    c.fillStyle = "#ffcf61"; c.fillRect(x + k, y - k, k * 2, s); c.fillRect(x + k, y + s, k, k * 3);
+  }
+  if (e.kind === "phoenixEgg") {
+    c.fillStyle = "#594034"; c.fillRect(x - k, y + s - k, s + 2 * k, k * 2);
+    c.fillStyle = "#f8d59d"; c.fillRect(x + k, y - k, s - 2 * k, s); c.fillRect(x, y + k, s, s - k);
+    c.fillStyle = "#ce5c33"; c.fillRect(x + s / 2, y + k, k, k * 2);
+  }
+  if (e.kind === "blinkImp") {
+    c.fillStyle = "#d3afe9"; c.fillRect(x - k, y - k, k, k * 2); c.fillRect(x + s, y - k, k, k * 2);
+    if (e.blink) {
+      const tx = e.blink.x * px, ty = e.blink.y * px, radius = px * .45;
+      c.save(); c.globalAlpha = .65; c.fillStyle = "#d3afe9";
+      for (let n = 0; n < 16; n++) { const a = n * Math.PI / 8; c.fillRect(Math.round(tx + Math.cos(a) * radius), Math.round(ty + Math.sin(a) * radius), k, k); }
+      c.restore();
+    }
+  }
   if (e.kind === "darkKnight") {
     c.fillStyle = "#0e101b"; c.fillRect(x - k, y - k, s + 2 * k, s + 2 * k);
     c.fillStyle = "#706781"; c.fillRect(x, y, s, k); c.fillRect(x + s / 2, y, k, s);

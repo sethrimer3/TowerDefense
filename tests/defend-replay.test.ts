@@ -56,7 +56,7 @@ function scenarios(): Record<string, Scenario> {
     newEnemies: {
       layout: city(SQUARE, [["barracks", 1, 1], ["archerTower", -1, -1], ["wizardTower", 0, -2]]),
       citySeed: 13, levels: maxLevels(), seed: 6, seconds: 100, wave: 1,
-      opening: ['snake', 'dragon', 'shieldBearer', 'aegis', 'darkKnight', 'bombOrc', 'bombBird', 'voidSparrow', 'shieldLesser', 'shieldGreater', 'poisonLesser', 'poisonBearer', 'poisonGreater', 'poisonSovereign'],
+      opening: ['snake', 'dragon', 'shieldBearer', 'aegis', 'darkKnight', 'bombOrc', 'bombBird', 'voidSparrow', 'shieldLesser', 'shieldGreater', 'poisonLesser', 'poisonBearer', 'poisonGreater', 'poisonSovereign', 'siegeBeetle', 'burrowingMole', 'necromancer', 'bannerCaptain', 'mirrorKnight', 'leechSwarm', 'ashPhoenix', 'blinkImp'],
     },
     // Small explicit mixed siege retains late-enemy and ice coverage even
     // as the random difficulty budgets change the natural wave mix.
@@ -131,7 +131,7 @@ function state(sim: DefendSim) {
   const dark = (s.darkKeeps as { cooldown: Map<number, number> }).cooldown;
   return [
     sim.time, sim.wave, sim.lost, sim.breakT, sim.spawnT, s.spawnInterval, s.waveSpawned, sim.spawnQueue, sim.mapVersion, sim.changed.length,
-    sim.blackHoles, sim.enemies, sim.soldiers, sim.civilians, sim.arrows, sim.shells, sim.flames, sim.frosts, sim.stabs, sim.scorches, sim.effects, sim.events,
+    sim.corpses, sim.blackHoles, sim.enemies, sim.soldiers, sim.civilians, sim.arrows, sim.shells, sim.flames, sim.frosts, sim.stabs, sim.scorches, sim.effects, sim.events,
     sim.solid, sim.hp, sim.built, sim.flash, sim.field,
     [...(s.towers as { cooldown: Map<number, number> }).cooldown], [...(s.barracks as { training: Map<number, number> }).training], (s.builders as { respawn: number[] }).respawn,
     // Only runs with a dark keep have bolts or turrets, so the others hash as before.

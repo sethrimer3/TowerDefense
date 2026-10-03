@@ -50,7 +50,7 @@ export function charge(sim: DefendSim, s: Soldier, e: Enemy, reach: number) {
     // The nearest point of the line to the enemy, by projection.
     const t = Math.max(0, Math.min(len, (foe.x - x0) * ux + (foe.y - y0) * uy));
     if (sq(foe.x - (x0 + ux * t)) + sq(foe.y - (y0 + uy * t)) > w * w) continue;
-    sim.hurtEnemy(foe, s.damage, true, "melee");
+    sim.hurtEnemy(foe, s.damage, true, "melee", s);
     hits.push({ x: foe.x, y: foe.y });
   }
   s.x = x1;

@@ -85,7 +85,7 @@ export function chainBolt(sim: DefendSim, cast: Point, first: Enemy, damage: num
     from.push(parent);
     pts.push(at.x, at.y);
     live.push([at, pts.length / 2 - 1]);
-    sim.hurtEnemy(at, damage);
+    sim.hurtEnemy(at, damage, true, "ranged", { x: pts[parent * 2], y: pts[parent * 2 + 1] });
     at = null;
     while (struck.size < links && live.length && !at) {
       const [e, k] = live[live.length - 1];
