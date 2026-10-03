@@ -1,3 +1,4 @@
+import { hostileSpecial } from "./hostile-attacks.ts";
 /** How a DEFEND enemy spends one step. In order: fight any defender in
  * reach; bats fly straight at the keep; a house that caught its eye is
  * wrecked; otherwise it walks the flow field downhill toward the keep,
@@ -27,6 +28,7 @@ export function stepEnemy(sim: DefendSim, e: Enemy, dt: number) {
     // The segment immediately behind a cut becomes a new independent head.
     delete e.leader;
   }
+  if (hostileSpecial(sim, e, dt)) return;
   if (e.kind === "dragon" && breathe(sim, e, dt)) return;
   const t: Turn = { sim, e, def, reach: def.size / 2 + 0.4, dt };
   if (fightDefender(t)) return;

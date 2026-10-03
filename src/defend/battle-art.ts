@@ -1,3 +1,4 @@
+import { drawBlackHoles, drawHostileMarks } from "./hostile-art.ts";
 /** What DEFEND draws fresh each battle frame over the city layer: struck and
  * damaged buildings, blast scorches, then the units, projectiles and effects.
  * Every painter takes a `Brush`: the board's context and its pixels per cell. */
@@ -55,6 +56,7 @@ export type Burning = (x: number, y: number, id: number) => number;
 /** Units, projectiles and effects. With `torches`, units carry a torch,
  * lit while it still burns. */
 export function drawUnits(b: Brush, sim: DefendSim, torches: Burning | null) {
+  drawBlackHoles(b, sim);
   drawWatchRadii(b, sim);
   drawCivilians(b, sim, torches);
   const swords = drawSoldiers(b, sim, torches);
@@ -268,7 +270,7 @@ function drawEnemy(b: Brush, e: Enemy) {
   const def = ENEMIES[e.kind];
   const s = Math.max(2, Math.round(def.size * px));
   const x = Math.round(e.x * px - s / 2),
-    y = Math.round(e.y * px - s / 2);
+    y = Math.round(e.y * px - s / 2 - (e.kind === "bombBird" ? (e.dive === undefined ? 1 : Math.max(0, e.dive / 0.6)) * px * 1.5 : 0));
   if (e.marked) {
     c.fillStyle = "#f2c94c";
     c.fillRect(x - 1, y - 1, s + 2, s + 2);
@@ -287,6 +289,7 @@ function drawEnemy(b: Brush, e: Enemy) {
   }
   c.fillStyle = e.flash > 0 ? "#fff" : def.color;
   c.fillRect(x, y, s, s);
+  drawHostileMarks(b, e, { x, y, s });
   if (def.boss) drawBossMarks(b, e, { x, y, s });
   if (def.chainLength) {
     c.fillStyle = "#fff2ba";

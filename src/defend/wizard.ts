@@ -12,7 +12,7 @@
  * decided by the renderer, so a battle with a wizard tower still replays
  * exactly from its seed. Aim is a unit vector, not an angle, and cones are
  * tested by slope, so every engine plays them alike (no trigonometry). */
-import {
+import { ENEMIES,
   CHILL_SPEED,
   FLAME_SECONDS,
   FLAME_SPREAD,
@@ -144,11 +144,11 @@ export function stepFrosts(sim: DefendSim, dt: number) {
     for (const e of sim.enemiesNear(w.x, w.y, w.r)) {
       if (w.hit.includes(e.id) || !inFan(e, w.x, w.y, w.dx, w.dy, w.spread, w.r)) continue;
       w.hit.push(e.id);
-      if (sim.hurtEnemy(e, damage)) e.chill = Math.max(e.chill ?? 0, chill);
+      if (sim.hurtEnemy(e, damage) && !ENEMIES[e.kind].unyielding) e.chill = Math.max(e.chill ?? 0, chill);
     }
   }
   sim.frosts = sim.frosts.filter((w) => w.r < w.range || w.t < w.range / ICE_SPEED + FROST_LINGER);
 }
 
 /** How fast a chilled enemy moves, as a share of its pace. */
-export const chilled = (e: Enemy) => (e.chill ? CHILL_SPEED : 1);
+export const chilled = (e: Enemy) => (!ENEMIES[e.kind].unyielding && e.chill ? CHILL_SPEED : 1);

@@ -1,3 +1,4 @@
+import { stepBlackHoles } from "./hostile-attacks.ts";
 /** Real-time DEFEND simulation. Units move freely in continuous cell
  * coordinates (1 unit = 1 cell); the procedural city supplies the solid
  * obstacles. Enemies follow a flow field toward the keep in which buildings
@@ -61,6 +62,8 @@ export type Enemy = {
   /** Seconds left chilled by a wizard's ice (slowed); absent when not, so
    * a run without ice keeps its state exactly as before. */
   chill?: number;
+  slash?: { dx: number; dy: number; t: number };
+  dive?: number;
   leader?: number;
   shieldHp?: number;
   breath?: { dx: number; dy: number; t: number };
@@ -141,7 +144,7 @@ export class DefendSim {
   readonly bonuses: Readonly<Bonuses>;
   /** Enemies slain this run, by kind: what the run pays out. Not part of
    * the replayed state. */
-  readonly slain: Record<EnemyKind, number> = { roach: 0, orc: 0, ogre: 0, bat: 0, warlord: 0, mother: 0, broodling: 0, snake: 0, dragon: 0, shieldBearer: 0, aegis: 0 };
+  readonly slain: Record<EnemyKind, number> = { roach: 0, orc: 0, ogre: 0, bat: 0, warlord: 0, mother: 0, broodling: 0, snake: 0, dragon: 0, shieldBearer: 0, aegis: 0, darkKnight: 0, bombOrc: 0, bombBird: 0, voidSparrow: 0 };
   /** 1 while a cell is part of a standing (built) building. */
   readonly solid: Uint8Array;
   readonly hp: Float32Array;
@@ -175,6 +178,7 @@ export class DefendSim {
   breakT = 1.5;
   spawnQueue: EnemyKind[] = [];
   private spawnInterval = 0;
+  blackHoles: { x: number; y: number; r: number; damage: number; life: number; pulse: number; seed: number }[] = [];
   private waveSpawned = 0;
   private shieldGenerators: Enemy[] = [];
   spawnT = 0;
@@ -261,6 +265,7 @@ export class DefendSim {
     this.indexEnemies();
     this.markEnemies();
     this.stepUnits(dt);
+    stepBlackHoles(this, dt);
     this.sweepAway();
     this.tick(dt);
     if (this.hp[this.keepId] <= 0 && !this.lost) {
@@ -271,7 +276,7 @@ export class DefendSim {
 
   /** Everyone acts, in a fixed order (it decides the random draws). */
   private stepUnits(dt: number) {
-    for (const e of this.enemies) stepEnemy(this, e, dt);
+    for (const e of this.enemies) if (e.hp > 0) stepEnemy(this, e, dt);
     this.towers.step(this, dt);
     stepArrows(this, dt);
     stepShells(this, dt);
@@ -309,6 +314,7 @@ export class DefendSim {
     for (const s of this.scorches) s.t += dt;
     this.scorches = this.scorches.filter((s) => s.t < s.life);
     for (const units of [this.enemies, this.soldiers, this.civilians]) for (const u of units) u.flash = Math.max(0, u.flash - dt);
+    for (const e of this.enemies) if (e.slash && (e.slash.t -= dt) <= 0) delete e.slash;
     for (const e of this.enemies) if (e.breath && (e.breath.t -= dt) <= 0) delete e.breath;
     for (const e of this.enemies)
       if (e.chill !== undefined && (e.chill -= dt) <= 0) delete e.chill;
@@ -567,7 +573,7 @@ export class DefendSim {
     if (len < 0.02) return true;
     dx /= len;
     dy /= len;
-    const [sx, sy] = this.separation(u);
+    const [sx, sy] = "kind" in u && ENEMIES[(u as Enemy).kind]?.unyielding ? [0, 0] : this.separation(u);
     const step = Math.min(len, speed * dt);
     const mx = dx * step + sx * 0.5 * speed * dt * 4;
     const my = dy * step + sy * 0.5 * speed * dt * 4;

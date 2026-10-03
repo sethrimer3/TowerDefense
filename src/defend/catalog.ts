@@ -340,7 +340,7 @@ export const civilianHp = (l: number) => 8 + l * 5;
 export const rebuildSeconds = (l: number) => 3 * intPow(0.82, l);
 export const HOUSE_HP_PER_CELL = 22;
 
-export type EnemyKind = "roach" | "orc" | "ogre" | "bat" | "warlord" | "mother" | "broodling" | "snake" | "dragon" | "shieldBearer" | "aegis";
+export type EnemyKind = "roach" | "orc" | "ogre" | "bat" | "warlord" | "mother" | "broodling" | "snake" | "dragon" | "shieldBearer" | "aegis" | "darkKnight" | "bombOrc" | "bombBird" | "voidSparrow";
 export type EnemyDef = {
   kind: EnemyKind;
   name: string;
@@ -362,6 +362,7 @@ export type EnemyDef = {
   splits?: { into: EnemyKind; count: number };
   /** How much of the wave budget one of these costs. */
   cost: number;
+  unyielding?: boolean;
   chainLength?: number;
   shield?: { radius: number; hp: number };
 };
@@ -378,6 +379,11 @@ export const ENEMIES: Record<EnemyKind, EnemyDef> = {
   dragon: { kind: "dragon", name: "Dragon", hp: 160, speed: 1.3, damage: 30, cooldown: 2, size: 0.4, color: "#be4935", distraction: 0, flying: true, chainLength: 16, cost: 2500 },
   shieldBearer: { kind: "shieldBearer", name: "Shield Generator", hp: 800, speed: 0.7, damage: 16, cooldown: 1.5, size: 0.65, color: "#438dcc", distraction: 0, flying: false, shield: { radius: 4, hp: 3000 }, cost: 10000 },
   aegis: { kind: "aegis", name: "Invincible Shield Generator", hp: 6000, speed: 0.55, damage: 40, cooldown: 1.8, size: 0.85, color: "#a383ef", distraction: 0, flying: false, shield: { radius: 5, hp: Infinity }, cost: 1000000 },
+
+  darkKnight: { kind: "darkKnight", name: "Dark Knight", hp: 450, speed: 1, damage: 35, cooldown: 1.5, size: 0.55, color: "#29243b", distraction: 0, flying: false, unyielding: true, cost: 500 },
+  bombOrc: { kind: "bombOrc", name: "Kamikaze Orc", hp: 45, speed: 2, damage: 100, cooldown: 1, size: 0.46, color: "#74a04c", distraction: 0, flying: false, cost: 120 },
+  bombBird: { kind: "bombBird", name: "Kamikaze Bird", hp: 25, speed: 3.5, damage: 150, cooldown: 1, size: 0.3, color: "#c47a3e", distraction: 0, flying: true, cost: 350 },
+  voidSparrow: { kind: "voidSparrow", name: "Void Sparrow", hp: 12000, speed: 1.2, damage: 300, cooldown: 15, size: 0.45, color: "#33214f", distraction: 0, flying: true, cost: 5000000 },
 
 };
 
