@@ -11,6 +11,8 @@ export type Overlay = {
   ghost: { rect: Rect; kind: StructureKind | "cityTile" } | null;
   /** A bomb being aimed: centre in cells. */
   bomb?: { x: number; y: number; r: number } | null;
+  /** The war banner being planted: centre and the reach it rallies to. */
+  banner?: { x: number; y: number; r: number } | null;
   /** Tiles across the block the item takes (unset: 1). A larger item's
    * `legal` and `hover` keys are the top left tiles of its blocks. */
   span?: number;
@@ -42,6 +44,7 @@ export function drawOverlay(c: CanvasRenderingContext2D, px: number, o: Overlay)
   if (o.legal.size || o.ghost || o.hover !== null) drawTargets(c, px, o);
   if (o.ghost) drawGhost(c, px, o.ghost.rect);
   if (o.bomb) drawBombReach(c, px, o.bomb);
+  if (o.banner) drawRallyReach(c, px, o.banner);
 }
 
 /** Shades the tiles that won't take the item and frames those that will,
@@ -130,6 +133,16 @@ function drawBombReach(c: CanvasRenderingContext2D, px: number, bomb: { x: numbe
   c.lineWidth = Math.max(1, px * 0.12);
   c.beginPath();
   c.arc(bomb.x * px, bomb.y * px, bomb.r * px, 0, Math.PI * 2);
+  c.fill();
+  c.stroke();
+}
+
+function drawRallyReach(c: CanvasRenderingContext2D, px: number, at: { x: number; y: number; r: number }) {
+  c.strokeStyle = "rgba(242,210,122,0.9)";
+  c.fillStyle = "rgba(242,210,122,0.12)";
+  c.lineWidth = Math.max(1, px * 0.12);
+  c.beginPath();
+  c.arc(at.x * px, at.y * px, at.r * px, 0, Math.PI * 2);
   c.fill();
   c.stroke();
 }

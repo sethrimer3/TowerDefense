@@ -275,6 +275,20 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   enemies in their radius with a gold outline; marked enemies take ×2 damage.
 - During a run the palette becomes the **consumables** palette. A **bomb**
   can be dragged onto the field to blast everything nearby.
+- The **war banner** (`war-banner.ts`, `×∞`: never used up, never bought)
+  is dragged from the same palette and planted anywhere on the board as the
+  keep's waving banner over a faint gold ring. While it stands every mobile
+  troop (swordsmen, archers, fire mages, valkyries and the dark wizard)
+  rallies to it: each still fights whatever is within its own reach
+  (swordsmen whatever is within 2.5 cells), and otherwise marches down the
+  banner's walking field (refreshed each second; standing buildings cost 40
+  a cell, so troops go round them, and a banner beyond the wall draws them
+  up to it), stops on a ring round it, and closes on the nearest enemy
+  within 5 cells of it. Swordsmen forget their leash meanwhile. Dropping
+  another banner moves it; pressing the planted banner and letting go where
+  it stands takes it down, as does carrying it off the board, and dragging
+  it elsewhere moves it. It draws nothing from the run's random stream, so a
+  run without one replays exactly as before.
 
 - **Dark art** (`dark-art.ts`, the keep in `tower-art.ts`): the dark
   wizard keep is black obsidian on a stepped plinth, glassy black curtain

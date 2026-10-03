@@ -26,7 +26,12 @@ export type Drag =
   | { from: "structure"; uid: number; kind: PlacedKind }
   | { from: "cityTile"; tile: TilePos }
   | { from: "keep" }
-  | { from: "bomb" };
+  | { from: "bomb" }
+  /** The war banner, from the palette or (`placed`) where it stands. */
+  | { from: "banner"; placed?: boolean };
+
+/** Consumables are dropped at a point, not built on a tile. */
+export const consumable = (kind: IconItem): kind is "bomb" | "banner" => kind === "bomb" || kind === "banner";
 
 /** The icon of what `drag` carries. */
 export function dragIcon(drag: Drag): IconItem {
@@ -39,7 +44,7 @@ export function dragIcon(drag: Drag): IconItem {
  * structure spanning a 2 × 2 block, else 1. */
 export function dragSpan(drag: Drag, layout: Layout) {
   const kind = dragIcon(drag);
-  return kind === "cityTile" || kind === "keep" || kind === "bomb" ? 1 : spanOf(layout, kind);
+  return kind === "cityTile" || kind === "keep" || consumable(kind) ? 1 : spanOf(layout, kind);
 }
 
 /** Every layout dropping `drag` could make, keyed by the tile it lands on
@@ -94,7 +99,7 @@ export function refusal(drag: Drag, layout: Layout, key: string): string {
   if (kind === "cityTile")
     return inCity && drag.from === "palette" ? "That tile is already part of the city." : "City tiles must touch the city along an edge.";
   if (kind === "keep") return "The keep can only move onto another city tile.";
-  if (kind !== "bomb" && dragSpan(drag, layout) > 1) {
+  if (!consumable(kind) && dragSpan(drag, layout) > 1) {
     const [tx] = key.split(",").map(Number);
     const block = blockTiles(tx, ty, 2);
     const name = STRUCTURES[kind].name.toLowerCase();
@@ -103,7 +108,7 @@ export function refusal(drag: Drag, layout: Layout, key: string): string {
       return `The ${name} needs a 2 × 2 block of tiles with nothing else on them.`;
     return `The ${name} needs a 2 × 2 block of city tiles.`;
   }
-  if (kind !== "bomb" && needsCity(kind, inCity)) return `The ${STRUCTURES[kind].name.toLowerCase()} must go inside the city limits.`;
+  if (!consumable(kind) && needsCity(kind, inCity)) return `The ${STRUCTURES[kind].name.toLowerCase()} must go inside the city limits.`;
   return "There isn't room for that there.";
 }
 

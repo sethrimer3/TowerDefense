@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { BOMB_RADIUS } from "../src/defend/catalog.ts";
+import { RALLY_REACH } from "../src/defend/war-banner.ts";
 import { generateCity } from "../src/defend/citygen.ts";
 import { dropGhost, legalLayouts, refusal } from "../src/defend/drag-rules.ts";
 import { EditSession, type DragAt } from "../src/defend/edit-session.ts";
@@ -66,6 +67,21 @@ test("a bomb shows its reach over the board and goes off where it is released", 
   assert.equal(bomb.overlay(), null);
   assert.deepEqual(bomb.release(on(2, 3)), { kind: "bomb", at: { x: 2.5 * SUB, y: 3.5 * SUB } });
   assert.deepEqual(new EditSession({ from: "bomb" }, L).release(OFF), { kind: "bomb", at: null });
+});
+
+test("the war banner shows its rally ground and is planted, moved or tapped down", () => {
+  const fresh = new EditSession({ from: "banner" }, L);
+  assert.equal(fresh.legal.size, 0);
+  fresh.hover(on(2, 3));
+  assert.deepEqual(fresh.overlay(), { legal: new Set(), hover: null, ghost: null, banner: { x: 2.5 * SUB, y: 3.5 * SUB, r: RALLY_REACH } });
+  assert.deepEqual(fresh.release(on(2, 3)), { kind: "banner", at: { x: 2.5 * SUB, y: 3.5 * SUB }, tap: false }, "from the palette it is planted, even where pressed");
+  assert.deepEqual(new EditSession({ from: "banner" }, L).release(OFF), { kind: "banner", at: null, tap: false });
+  const tapped = new EditSession({ from: "banner", placed: true }, L);
+  tapped.hover(on(2, 3));
+  assert.deepEqual(tapped.release({ ...on(2, 3), cellX: on(2, 3).cellX + 0.3 }), { kind: "banner", at: null, tap: true }, "a planted one let go where it stands was tapped");
+  const moved = new EditSession({ from: "banner", placed: true }, L);
+  moved.hover(on(2, 3));
+  assert.deepEqual(moved.release(on(4, 5)), { kind: "banner", at: { x: 4.5 * SUB, y: 5.5 * SUB }, tap: false }, "carried elsewhere it moves");
 });
 
 test("releasing a city element takes the tile, goes back to the palette, or says why not", () => {

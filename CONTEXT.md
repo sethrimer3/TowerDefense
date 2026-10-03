@@ -41,6 +41,9 @@ A small, quick enemy hatched only from a fallen Mother.
 **Siege engine**:
 An enemy machine with no crew (rolling cannon, ballista, firework launcher, trebuchet, great bombard, dragonfire battery): it drives itself toward the keep and stops to shoot what blocks its way, or the keep, from range.
 
+**War banner**:
+A consumable with no limit: planted anywhere on the board mid-defense, it rallies every mobile troop (swordsmen, archers, fire mages, valkyries, the dark wizard) to fight round it. Planting it again moves it; a tap takes it down.
+
 **Best wave**:
 The highest wave the player has held.
 

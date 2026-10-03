@@ -11,6 +11,7 @@ import { ENEMIES, STAB_GUARD, STAB_WIDTH, VALKYRIE, stabLength } from "./catalog
 import { CELL_COUNT } from "./grid.ts";
 import { blocked, cellAt, cellCenter, findPath, nearest, type PathLimits } from "./pathing.ts";
 import type { DefendSim, Enemy, Soldier } from "./sim.ts";
+import { answerBanner } from "./war-banner.ts";
 
 /** A charge stab: the line from (x0, y0) to (x1, y1) she blinked along, `t`
  * of `life` seconds ago, and where it struck. How it looks is the
@@ -33,6 +34,7 @@ export function stepValkyrie(sim: DefendSim, s: Soldier, dt: number) {
     if (s.cd <= 0) charge(sim, s, near, reach);
     return;
   }
+  if (sim.warBanner) return answerBanner(sim, sim.warBanner, s, VALKYRIE.speed, dt);
   if (s.thinkT <= 0) seek(sim, s);
   sim.followPath(s, null, VALKYRIE.speed, dt);
 }

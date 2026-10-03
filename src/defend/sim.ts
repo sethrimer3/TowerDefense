@@ -46,6 +46,7 @@ import { stepBlazes, stepFireballs, stepMage, type Blaze, type Fireball } from "
 import { stepStabs, stepValkyrie, type Stab } from "./valkyries.ts";
 import { Wizards, stepFlames, stepFrosts, type Flame, type Frost } from "./wizard.ts";
 import { DarkKeeps, stepBolts, stepDarkWizard, type Bolt } from "./dark-wizards.ts";
+import { WarBanner } from "./war-banner.ts";
 
 export type Levels = Record<UpgradeId, number>;
 
@@ -195,6 +196,9 @@ export class DefendSim {
   bolts: Bolt[] = [];
   scorches: Scorch[] = [];
   effects: Effect[] = [];
+  /** The war banner the player planted, rallying the troops; null when none
+   * stands (and so in every run without one). */
+  warBanner: WarBanner | null = null;
   events: SimEvent[] = [];
   wave = 0;
   time = 0;
@@ -318,6 +322,7 @@ export class DefendSim {
     stepFrosts(this, dt);
     this.darkKeeps.step(this, dt);
     this.barracks.step(this, dt);
+    this.warBanner?.refresh(this);
     for (const s of this.soldiers) STEP_SOLDIER[s.kind](this, s, dt);
     stepFireballs(this, dt);
     stepBlazes(this, dt);
@@ -698,6 +703,17 @@ export class DefendSim {
   // ── Consumables ───────────────────────────────────────────────────────
   dropBomb(x: number, y: number) {
     this.explode(x, y, { r: BOMB_RADIUS, damage: BOMB_DAMAGE * this.bonuses.bombDamage, friendlyFire: !this.levels.bombSafe });
+  }
+
+  /** Plants the war banner at (x, y), taking down any other, or with null
+   * takes it down. Every troop rethinks at once. */
+  plantBanner(at: Point | null) {
+    this.warBanner = at ? new WarBanner(at.x, at.y) : null;
+    for (const s of this.soldiers) {
+      s.thinkT = 0;
+      s.path = [];
+      s.target = -1;
+    }
   }
 }
 

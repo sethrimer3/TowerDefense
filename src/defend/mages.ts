@@ -8,6 +8,7 @@ import { dist } from "../exact.ts";
 import { EMBER_SHARE, ENEMIES, FIRE_MAGE, FIREBALL_RANGE, FIREBALL_SPEED, emberDps, emberSeconds, fireballSplash } from "./catalog.ts";
 import { cellCenter, findPath, nearest } from "./pathing.ts";
 import type { DefendSim, Soldier, Arrow } from "./sim.ts";
+import { answerBanner } from "./war-banner.ts";
 import { CELL_COUNT } from "./grid.ts";
 
 /** A fireball in flight from (x0, y0) to where its target stood (x1, y1):
@@ -27,6 +28,7 @@ export function stepMage(sim: DefendSim, s: Soldier, dt: number) {
     if (s.cd <= 0) throwFireball(sim, s, near);
     return;
   }
+  if (sim.warBanner) return answerBanner(sim, sim.warBanner, s, FIRE_MAGE.speed, dt);
   if (!s.path.length && s.thinkT <= 0 && sim.streets.length) stroll(sim, s);
   sim.followPath(s, null, FIRE_MAGE.speed, dt);
 }

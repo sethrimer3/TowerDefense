@@ -7,7 +7,7 @@ import { enemySize } from "./catalog.ts";
  * fire mages' burning ground (mage-art.ts), units and effects
  * (battle-art.ts, with the valkyries' charges from valkyrie-art.ts), the
  * black lightning (dark-art.ts), the trees over them (park-trees.ts), the
- * wizards' fire, the building grid and drag overlay (edit-overlay.ts), then
+ * planted war banner, the wizards' fire, the building grid and drag overlay (edit-overlay.ts), then
  * rain in screen space. */
 import { CELLS_H, CELLS_W, boardSize, hash01 } from "./grid.ts";
 import type { CityMap } from "./citygen.ts";
@@ -18,7 +18,8 @@ import { Rain, ambientFor, type Weather } from "./weather.ts";
 import { damageKey, onCityArtLoaded, paintCityLayer } from "./city-layer.ts";
 import { carriedLights, drawDamage, drawScorches, drawUnits, shadowCasters, type Brush, type Burning } from "./battle-art.ts";
 import { drawGrid, drawOverlay, type Overlay } from "./edit-overlay.ts";
-import { drawFlag } from "./structure-art.ts";
+import { drawFlag, drawWarBanner } from "./structure-art.ts";
+import { RALLY_REACH } from "./war-banner.ts";
 import { ParkGrass, type Walker } from "./park-grass.ts";
 import { PondWater } from "./pond-water.ts";
 import { ENEMIES } from "./catalog.ts";
@@ -42,6 +43,8 @@ export type DrawOptions = {
   healthbars?: boolean;
   /** The run is over: the city's torches go out in a wave from the keep. */
   over?: boolean;
+  /** Leave out the planted war banner (while the player carries it). */
+  hideBanner?: boolean;
 };
 
 /** The torches going out after a lost run: seconds before the first, then
@@ -169,6 +172,7 @@ export class DefendRenderer {
     this.drawKeepFlag(map, sim, opts);
     if (sim) this.drawBattleUnits(sim, opts.weather ? this.burning ?? (() => 1) : null, opts);
     this.drawTrees(map, sim, opts, dt);
+    if (sim?.warBanner && !opts.hideBanner) drawWarBanner(this.ctx, this.px, sim.warBanner, RALLY_REACH, { t: opts.now / 1000, reduceMotion: opts.reduceMotion });
     if (sim) this.wizard.drawFire(this.ctx, this.px);
     this.drawEditing(overlay, opts.grid);
     // Rain falls in screen space, in front of the camera.
