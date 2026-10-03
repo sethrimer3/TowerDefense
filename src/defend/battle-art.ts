@@ -2,6 +2,7 @@ import { drawFortress } from "./fortress-art.ts";
 import { enemySize } from "./catalog.ts";
 import { drawEnemyHealthbars, healthbarEnemies } from "./healthbars.ts";
 import { drawBlackHoles, drawHostileMarks, drawPoisonClouds } from "./hostile-art.ts";
+import { drawFirework, drawSiegeEngine, drawSiegeShots, siegeLights } from "./siege-art.ts";
 /** What DEFEND draws fresh each battle frame over the city layer: struck and
  * damaged buildings, blast scorches, then the units, projectiles and effects.
  * Every painter takes a `Brush`: the board's context and its pixels per cell. */
@@ -67,10 +68,11 @@ export function drawUnits(b: Brush, sim: DefendSim, torches: Burning | null, hea
   drawWatchRadii(b, sim);
   drawCivilians(b, sim, torches);
   const swords = drawSoldiers(b, sim, torches);
-  for (const e of sim.enemies) drawEnemy(b, e);
+  for (const e of sim.enemies) if (ENEMIES[e.kind].siege) drawSiegeEngine(b, e, sim.time); else drawEnemy(b, e);
   drawSwords(b, swords);
   drawArrows(b, sim);
   drawShells(b, sim);
+  drawSiegeShots(b, sim);
   drawFireballs(b.c, b.px, sim);
   drawStabs(b.c, b.px, sim);
   for (const fx of sim.effects) drawEffect(b, fx);
@@ -399,6 +401,7 @@ function drawEffect(b: Brush, fx: Effect) {
   const { c, px } = b;
   const k = fx.t / 0.6;
   if (fx.kind === "boom") return drawExplosion(b, fx, k);
+  if (fx.kind === "firework") return drawFirework(b, fx);
   if (fx.kind === "dust") {
     c.fillStyle = `rgba(150,140,125,${0.45 * (1 - k)})`;
     c.beginPath();
@@ -528,5 +531,6 @@ export function carriedLights(sim: DefendSim): CarriedLight[] {
   const torches: CarriedLight[] = [...sim.soldiers, ...sim.civilians].map((u) => ({ x: u.x, y: u.y, id: u.id }));
   for (const fx of sim.effects)
     if (fx.kind === "boom") torches.push({ x: fx.x, y: fx.y, id: fx.seed ?? 0, r: fx.r * 2.4, k: 1.6 * (1 - fx.t / 0.6) });
+  torches.push(...siegeLights(sim));
   return torches;
 }
