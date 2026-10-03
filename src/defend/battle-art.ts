@@ -67,7 +67,7 @@ export function drawUnits(b: Brush, sim: DefendSim, torches: Burning | null, hea
   drawWatchRadii(b, sim);
   drawCivilians(b, sim, torches);
   const swords = drawSoldiers(b, sim, torches);
-  for (const e of sim.enemies) drawEnemy(b, e);
+  for (const e of sim.enemies) drawEnemy(b, e, sim);
   drawSwords(b, swords);
   drawArrows(b, sim);
   drawShells(b, sim);
@@ -278,10 +278,10 @@ function drawHandTorch({ c, px }: Brush, at: { x: number; y: number; id: number 
 /** Enemies: tiny squares, gold-outlined when marked, with a shadow under
  * fliers; bosses get a dark rim, a crown and a health bar; a Mother and her
  * brood are black with a violet rim, so they show against the night. */
-function drawEnemy(b: Brush, e: Enemy) {
+function drawEnemy(b: Brush, e: Enemy, sim: DefendSim) {
   const { c, px } = b;
   const def = ENEMIES[e.kind];
-  if (def.fortress) { drawFortress(b, e); return; }
+  if (def.fortress) { drawFortress(b, e, sim); return; }
   const s = Math.max(2, Math.round(enemySize(e) * px));
   const x = Math.round(e.x * px - s / 2),
     y = Math.round(e.y * px - s / 2 - (e.kind === "bombBird" ? (e.dive === undefined ? 1 : Math.max(0, e.dive / 0.6)) * px * 1.5 : 0));
