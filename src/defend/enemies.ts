@@ -1,8 +1,10 @@
+import { hostileSpecial } from "./hostile-attacks.ts";
 /** How a DEFEND enemy spends one step. In order: fight any defender in
  * reach; bats fly straight at the keep; a house that caught its eye is
  * wrecked; otherwise it walks the flow field downhill toward the keep,
  * smashing any building that lies across the cheapest way, and now and then
  * a house beside the street lures it off the road. */
+import { dist } from "../exact.ts";
 import { ENEMIES, type EnemyDef } from "./catalog.ts";
 import { CELLS_H, CELLS_W, sideCells } from "./grid.ts";
 import { cellCenter, center, clampCell, downhill, nearestPoint, rectDist } from "./pathing.ts";
@@ -16,6 +18,18 @@ type Turn = { sim: DefendSim; e: Enemy; def: EnemyDef; reach: number; dt: number
 export function stepEnemy(sim: DefendSim, e: Enemy, dt: number) {
   const def = ENEMIES[e.kind];
   e.cd -= dt;
+  if (e.leader !== undefined) {
+    const leader = sim.enemies.find(other => other.id === e.leader && other.hp > 0);
+    if (leader) {
+      const distance = dist(leader.x - e.x, leader.y - e.y);
+      if (distance > 0.3) sim.moveToward(e, leader, { speed: Math.min(def.speed * 2, (distance - 0.3) / dt), dt, flying: def.flying });
+      return;
+    }
+    // The segment immediately behind a cut becomes a new independent head.
+    delete e.leader;
+  }
+  if (hostileSpecial(sim, e, dt)) return;
+  if (e.kind === "dragon" && breathe(sim, e, dt)) return;
   const t: Turn = { sim, e, def, reach: def.size / 2 + 0.4, dt };
   if (fightDefender(t)) return;
   if (def.flying) return flyAtKeep(t);
@@ -99,4 +113,36 @@ function hitBuilding({ sim, e, def }: Turn, id: number) {
   if (e.cd > 0) return;
   e.cd = def.cooldown;
   sim.damageBuilding(id, def.damage);
+}
+
+/** Deterministic cone breath; only chain heads attack. */
+function breathe(sim: DefendSim, e: Enemy, _dt: number): boolean {
+  const foe = sim.nearestDefender(e.x, e.y, 5);
+  const building = sim.map.buildings.find(b => sim.intact(b) && rectDist(b.rect, e.x, e.y) <= 5);
+  const target = foe ?? (building ? nearestPoint(building.rect, e.x, e.y) : null);
+  if (!target) return false;
+  if (e.cd > 0) return true;
+  e.cd = ENEMIES.dragon.cooldown;
+  let dx = target.x - e.x, dy = target.y - e.y;
+  const length = dist(dx, dy);
+  if (length > 0) { dx /= length; dy /= length; } else { dx = 0; dy = 1; }
+  e.breath = { dx, dy, t: 0.45 };
+  const inside = (x: number, y: number) => {
+    const ux = x - e.x, uy = y - e.y;
+    const along = ux * dx + uy * dy;
+    return along >= 0 && along <= 5 && Math.abs(ux * dy - uy * dx) <= 0.35 + along * 0.45;
+  };
+  for (const soldier of sim.soldiers) if (soldier.hp > 0 && !soldier.guard && inside(soldier.x, soldier.y)) {
+    soldier.hp -= ENEMIES.dragon.damage;
+    soldier.flash = 0.12;
+  }
+  for (const civilian of sim.civilians) if (civilian.hp > 0 && inside(civilian.x, civilian.y)) {
+    civilian.hp -= ENEMIES.dragon.damage;
+    civilian.flash = 0.12;
+  }
+  for (const b of sim.map.buildings) {
+    const near = nearestPoint(b.rect, e.x, e.y);
+    if (sim.intact(b) && inside(near.x, near.y)) sim.damageBuilding(b.id, ENEMIES.dragon.damage);
+  }
+  return true;
 }

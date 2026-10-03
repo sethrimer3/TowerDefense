@@ -12,6 +12,8 @@ import {
   type Layout,
 } from '../src/defend/layout.ts';
 import { CellType, generateCity } from '../src/defend/citygen.ts';
+import { buildDifficultyWave, waveDifficulty, MAX_WAVE_ENEMIES } from '../src/defend/waves.ts';
+import { ENEMIES } from '../src/defend/catalog.ts';
 import { DefendSim, buildWave } from '../src/defend/sim.ts';
 import { stepArcher, stepSwordsman } from '../src/defend/troops.ts';
 import { stepArrows } from '../src/defend/towers.ts';
@@ -151,24 +153,65 @@ test('the same layout and seed always generate the same city', () => {
   assert.deepEqual([...a.type], [...b.type]);
 });
 
-test('waves grow and escalate in variety', () => {
-  const r = () => 0.5;
-  assert.ok(buildWave(1, r).every((k) => k === 'roach'));
-  assert.ok(buildWave(10, r).length > buildWave(1, r).length);
-  assert.ok(new Set(buildWave(12, Math.random)).size > 1);
-  for (let wave = 1; wave <= 20; wave++) assert.equal(buildWave(wave, r).length, wave * 500);
-  assert.equal(buildWave(0, r).length, 0);
+test('waves spend their difficulty budget and keep fixed enemy HP', () => {
+  let seed = 1;
+  const rand = () => ((seed = seed * 16807 % 2147483647) / 2147483647);
+  for (let wave = 1; wave <= 180; wave++) {
+    const enemies = buildWave(wave, rand);
+    assert.equal(enemies.reduce((sum, k) => sum + ENEMIES[k].cost, 0), waveDifficulty(wave));
+    assert.ok(enemies.reduce((sum, k) => sum + (ENEMIES[k].chainLength ?? (1 + (ENEMIES[k].splits?.count ?? 0))), 0) <= MAX_WAVE_ENEMIES);
+  }
+  const sim = new DefendSim(mapOf(defaultLayout()), zeroLevels(), 5);
+  sim.wave = 1000;
+  assert.equal((sim as any).newEnemy('roach', 5, 5).hp, ENEMIES.roach.hp);
 });
 
-test('stress waves release their full count within five seconds', () => {
-  for (const wave of [1, 10, 20]) {
+test('waves terminate safely with impossible budgets and invalid inputs', () => {
+  assert.equal(buildDifficultyWave(1e12, () => 0).length, MAX_WAVE_ENEMIES);
+  assert.ok(buildDifficultyWave(1e12, () => 0).every(k => k === 'voidSparrow'));
+  for (const wave of [0, -1, NaN, Infinity]) assert.deepEqual(buildWave(wave, () => 0), []);
+  assert.equal(waveDifficulty(1e100), Number.MAX_SAFE_INTEGER);
+  for (const roll of [NaN, Infinity, -1, 2]) {
+    const enemies = buildDifficultyWave(53, () => roll);
+    assert.equal(enemies.reduce((sum, k) => sum + ENEMIES[k].cost, 0), 53);
+  }
+  assert.deepEqual(buildDifficultyWave(Infinity, () => 0), []);
+});
+
+test('offspring cannot push a wave past its lifetime enemy cap', () => {
+  const sim = new DefendSim(mapOf(defaultLayout()), zeroLevels(), 5);
+  const mother = (sim as any).newEnemy('mother', 10.5, 2.5);
+  mother.hp = 0;
+  sim.enemies.push(mother);
+  (sim as any).waveSpawned = MAX_WAVE_ENEMIES - 1;
+  (sim as any).sweepAway();
+  assert.equal(sim.enemies.length, 1);
+  assert.equal((sim as any).waveSpawned, MAX_WAVE_ENEMIES);
+  (sim as any).spawnEnemy('roach');
+  assert.equal(sim.enemies.length, 1);
+});
+
+test('unspendable remainders and invalid costs safely stop spawning', () => {
+  const costs = Object.values(ENEMIES).map(d => d.cost);
+  try {
+    for (const d of Object.values(ENEMIES)) d.cost = 4;
+    assert.equal(buildDifficultyWave(53, () => 0).length, 13);
+    for (const d of Object.values(ENEMIES)) d.cost = 0;
+    assert.deepEqual(buildDifficultyWave(53, () => 0), []);
+  } finally {
+    Object.values(ENEMIES).forEach((d, i) => d.cost = costs[i]);
+  }
+});
+
+test('waves release their randomized count within five seconds', () => {
+  for (const wave of [1, 10, 100]) {
     const sim = new DefendSim(mapOf(defaultLayout()), zeroLevels(), 5);
     sim.wave = wave;
     sim.spawnQueue = buildWave(wave, sim.rand);
-    // Isolate spawning from combat so every released enemy is countable.
+    const count = sim.spawnQueue.reduce((sum, k) => sum + (ENEMIES[k].chainLength ?? 1), 0);
     for (let i = 0; i < 151; i++) (sim as any).runWaves(1 / 30);
     assert.equal(sim.spawnQueue.length, 0);
-    assert.equal(sim.enemies.length, wave * 500);
+    assert.equal(sim.enemies.length, count);
   }
 });
 
@@ -306,11 +349,9 @@ test('weather: 30% rainy runs; night falls on every 10th (boss) wave', async () 
   assert.equal(skyLabel({ rain: false }, 0), 'Cloudy');
 });
 
-test('boss waves bring warlords, one per ten waves', () => {
-  const r = () => 0.5;
-  assert.equal(buildWave(10, r).filter((k) => k === 'warlord').length, 1);
-  assert.equal(buildWave(20, r).filter((k) => k === 'warlord').length, 2);
-  assert.equal(buildWave(19, r).includes('warlord'), false);
+test('warlords appear by affordability rather than scheduled waves', () => {
+  assert.ok(!buildDifficultyWave(99, () => .999).includes('warlord'));
+  assert.deepEqual(buildDifficultyWave(100, () => .5), ['warlord']);
 });
 
 test('struck buildings flash', () => {
@@ -547,14 +588,10 @@ test('a Mother splits into three broodlings when she dies, and they do not split
   assert.equal(sim.enemies.length, 0, 'broodlings leave nothing behind');
 });
 
-test('Mothers join the waves from wave 6; broodlings only ever hatch', () => {
-  let r = 1;
-  const rand = () => ((r = (r * 16807) % 2147483647) / 2147483647);
-  const early = Array.from({ length: 40 }, () => buildWave(5, rand)).flat();
-  const later = Array.from({ length: 40 }, () => buildWave(12, rand)).flat();
-  assert.ok(!early.includes('mother'));
-  assert.ok(later.includes('mother'));
-  assert.ok(![...early, ...later].includes('broodling'));
+test('Mothers appear by affordability; broodlings only hatch', () => {
+  assert.ok(!buildDifficultyWave(9, () => .999).includes('mother'));
+  assert.deepEqual(buildDifficultyWave(10, () => .7), ['mother']);
+  assert.ok(!buildWave(100, () => .5).includes('broodling'));
 });
 
 test('every building takes a share of its tile, and what shares a tile fits its room', () => {

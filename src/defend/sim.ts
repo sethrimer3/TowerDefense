@@ -1,3 +1,4 @@
+import { stepBlackHoles } from "./hostile-attacks.ts";
 /** Real-time DEFEND simulation. Units move freely in continuous cell
  * coordinates (1 unit = 1 cell); the procedural city supplies the solid
  * obstacles. Enemies follow a flow field toward the keep in which buildings
@@ -12,6 +13,8 @@
  * kind of unit decides to do lives beside it: `enemies.ts`, `troops.ts`,
  * `mages.ts`, `valkyries.ts`, `dark-wizards.ts`, `civilians.ts` and
  * `towers.ts`, with grid pathing in `pathing.ts`. */
+import { MAX_WAVE_ENEMIES, buildWave } from "./waves.ts";
+export { buildWave } from "./waves.ts";
 import { dist, sq } from "../exact.ts";
 import { CELL_COUNT, CELLS_H, CELLS_W, cellIndex, cellX, cellY, rng, sideCells } from "./grid.ts";
 import {
@@ -24,8 +27,6 @@ import {
   keepHp,
   wallHp,
   watchRadius,
-  waveCount,
-  waveHpScale,
   NO_BONUSES,
   type Bonuses,
   type EnemyKind,
@@ -63,6 +64,11 @@ export type Enemy = {
   /** Seconds left chilled by a wizard's ice (slowed); absent when not, so
    * a run without ice keeps its state exactly as before. */
   chill?: number;
+  slash?: { dx: number; dy: number; t: number };
+  dive?: number;
+  leader?: number;
+  shieldHp?: number;
+  breath?: { dx: number; dy: number; t: number };
 };
 
 export type Soldier = {
@@ -142,7 +148,7 @@ export class DefendSim {
   readonly bonuses: Readonly<Bonuses>;
   /** Enemies slain this run, by kind: what the run pays out. Not part of
    * the replayed state. */
-  readonly slain: Record<EnemyKind, number> = { roach: 0, orc: 0, ogre: 0, bat: 0, warlord: 0, mother: 0, broodling: 0 };
+  readonly slain: Record<EnemyKind, number> = { roach: 0, orc: 0, ogre: 0, bat: 0, warlord: 0, mother: 0, broodling: 0, snake: 0, dragon: 0, shieldBearer: 0, aegis: 0, darkKnight: 0, bombOrc: 0, bombBird: 0, voidSparrow: 0 };
   /** 1 while a cell is part of a standing (built) building. */
   readonly solid: Uint8Array;
   readonly hp: Float32Array;
@@ -177,6 +183,10 @@ export class DefendSim {
   lost = false;
   breakT = 1.5;
   spawnQueue: EnemyKind[] = [];
+  private spawnInterval = 0;
+  blackHoles: { x: number; y: number; r: number; damage: number; life: number; pulse: number; seed: number }[] = [];
+  private waveSpawned = 0;
+  private shieldGenerators: Enemy[] = [];
   spawnT = 0;
   /** Bumped whenever a building is destroyed or rebuilt (static art changes). */
   mapVersion = 0;
@@ -262,6 +272,7 @@ export class DefendSim {
     this.indexEnemies();
     this.markEnemies();
     this.stepUnits(dt);
+    stepBlackHoles(this, dt);
     this.sweepAway();
     this.tick(dt);
     if (this.hp[this.keepId] <= 0 && !this.lost) {
@@ -272,7 +283,7 @@ export class DefendSim {
 
   /** Everyone acts, in a fixed order (it decides the random draws). */
   private stepUnits(dt: number) {
-    for (const e of this.enemies) stepEnemy(this, e, dt);
+    for (const e of this.enemies) if (e.hp > 0) stepEnemy(this, e, dt);
     this.towers.step(this, dt);
     stepArrows(this, dt);
     stepShells(this, dt);
@@ -295,9 +306,10 @@ export class DefendSim {
       if (e.hp > 0) continue;
       this.slain[e.kind]++;
       const splits = ENEMIES[e.kind].splits;
-      if (splits) for (let n = 0; n < splits.count; n++) hatched.push(this.hatch(splits.into, e, n, splits.count));
+      if (splits) for (let n = 0; n < splits.count && this.waveSpawned < MAX_WAVE_ENEMIES; n++, this.waveSpawned++) hatched.push(this.hatch(splits.into, e, n, splits.count));
     }
     this.enemies = this.enemies.filter((e) => e.hp > 0);
+    this.shieldGenerators = this.shieldGenerators.filter(e => e.hp > 0);
     this.enemies.push(...hatched);
     this.soldiers = this.soldiers.filter((s) => s.hp > 0);
     this.civilians = this.civilians.filter((c) => c.hp > 0 && !atHome(this, c));
@@ -310,6 +322,8 @@ export class DefendSim {
     for (const s of this.scorches) s.t += dt;
     this.scorches = this.scorches.filter((s) => s.t < s.life);
     for (const units of [this.enemies, this.soldiers, this.civilians]) for (const u of units) u.flash = Math.max(0, u.flash - dt);
+    for (const e of this.enemies) if (e.slash && (e.slash.t -= dt) <= 0) delete e.slash;
+    for (const e of this.enemies) if (e.breath && (e.breath.t -= dt) <= 0) delete e.breath;
     for (const e of this.enemies)
       if (e.chill !== undefined && (e.chill -= dt) <= 0) delete e.chill;
     for (const s of this.soldiers)
@@ -325,7 +339,8 @@ export class DefendSim {
       this.spawnT -= dt;
       while (this.spawnT <= 0 && this.spawnQueue.length) {
         // Release every wave over five seconds, including at the fixed 30 Hz step.
-        this.spawnT += 5 / waveCount(this.wave);
+        if (!this.spawnInterval) this.spawnInterval = 5 / this.spawnQueue.length;
+        this.spawnT += this.spawnInterval;
         this.spawnEnemy(this.spawnQueue.pop()!);
       }
       return;
@@ -337,17 +352,30 @@ export class DefendSim {
       this.wave++;
       this.breakT = BREAK_SECONDS;
       this.spawnQueue = buildWave(this.wave, this.rand);
+      this.spawnInterval = 0;
+      this.waveSpawned = 0;
       this.spawnT = 0;
       this.events.push({ type: "waveStart", wave: this.wave });
     }
   }
 
   private spawnEnemy(kind: EnemyKind) {
+    if (this.waveSpawned >= MAX_WAVE_ENEMIES) return;
     for (let tries = 0; tries < 20; tries++) {
       const x = 1 + this.rand() * (CELLS_W - 2);
       const y = 0.5 + this.rand() * 2;
       if (blocked(this.solid, x, y)) continue;
       this.enemies.push(this.newEnemy(kind, x, y));
+      this.waveSpawned++;
+      let leader = this.enemies[this.enemies.length - 1];
+      const length = ENEMIES[kind].chainLength ?? 1;
+      for (let n = 1; n < length && this.waveSpawned < MAX_WAVE_ENEMIES; n++) {
+        const segment = this.newEnemy(kind, x, Math.max(0.25, y - n * 0.3));
+        segment.leader = leader.id;
+        this.enemies.push(segment);
+        this.waveSpawned++;
+        leader = segment;
+      }
       return;
     }
   }
@@ -367,8 +395,8 @@ export class DefendSim {
   }
 
   private newEnemy(kind: EnemyKind, x: number, y: number): Enemy {
-    const hp = ENEMIES[kind].hp * waveHpScale(this.wave);
-    return {
+    const hp = ENEMIES[kind].hp;
+    const enemy: Enemy = {
       id: this.newId(),
       kind,
       x,
@@ -383,7 +411,10 @@ export class DefendSim {
       rollT: this.rand() * 0.5,
       marked: false,
       flash: 0,
+      ...(ENEMIES[kind].shield ? { shieldHp: ENEMIES[kind].shield!.hp } : {}),
     };
+    if (ENEMIES[kind].shield) this.shieldGenerators.push(enemy);
+    return enemy;
   }
 
   // ── Flow field ────────────────────────────────────────────────────────
@@ -454,11 +485,21 @@ export class DefendSim {
   // ── Damage and rebuilding ─────────────────────────────────────────────
   /** Hurts `e` (double when marked); a steady burn hurts it without the
    * flash of a blow. */
-  hurtEnemy(e: Enemy, amount: number, flash = true) {
-    if (e.hp <= 0) return;
+  hurtEnemy(e: Enemy, amount: number, flash = true, source: "ranged" | "melee" = "ranged") {
+    if (e.hp <= 0 || !Number.isFinite(amount) || amount <= 0) return false;
+    if (source === "ranged") {
+      const shields = this.shieldGenerators.filter(g => g.hp > 0 && (g.shieldHp ?? 0) > 0 &&
+        sq(g.x - e.x) + sq(g.y - e.y) <= sq(ENEMIES[g.kind].shield!.radius));
+      const shield = shields.find(g => g.shieldHp === Infinity) ?? shields[0];
+      if (shield) {
+        if (shield.shieldHp !== Infinity) shield.shieldHp = Math.max(0, shield.shieldHp! - amount);
+        return false;
+      }
+    }
     e.hp -= e.marked ? amount * 2 : amount;
     if (flash) e.flash = 0.12;
     if (e.hp <= 0) this.effects.push({ kind: "spark", x: e.x, y: e.y, t: 0, r: ENEMIES[e.kind].size });
+    return true;
   }
 
   damageBuilding(id: number, amount: number) {
@@ -541,7 +582,7 @@ export class DefendSim {
     if (len < 0.02) return true;
     dx /= len;
     dy /= len;
-    const [sx, sy] = this.separation(u);
+    const [sx, sy] = "kind" in u && ENEMIES[(u as Enemy).kind]?.unyielding ? [0, 0] : this.separation(u);
     const step = Math.min(len, speed * dt);
     const mx = dx * step + sx * 0.5 * speed * dt * 4;
     const my = dy * step + sy * 0.5 * speed * dt * 4;
@@ -617,22 +658,5 @@ function maxHpOf(b: Building, levels: Levels, bonuses: Readonly<Bonuses>) {
 function streetCells(map: CityMap) {
   const out: number[] = [];
   for (let i = 0; i < CELL_COUNT; i++) if (map.city[i] && map.type[i] === CellType.ROAD) out.push(i);
-  return out;
-}
-
-export function buildWave(wave: number, rand: () => number): EnemyKind[] {
-  const count = waveCount(wave);
-  const bosses = wave > 0 && wave % 10 === 0 ? wave / 10 : 0;
-  const kinds = Object.values(ENEMIES).filter((d) => d.firstWave <= wave && !d.boss && !d.hatched);
-  const out: EnemyKind[] = [];
-  const total = kinds.reduce((s, d) => s + d.weight, 0);
-  while (out.length < count - bosses) {
-    let r = rand() * total;
-    const pick = kinds.find((d) => (r -= d.weight) < 0) ?? kinds[0];
-    out.push(pick.kind);
-  }
-  // Every 10th wave brings warlords — one per ten waves — at the back of
-  // the horde (the queue spawns from its end, so they go at the front).
-  for (let n = 0; n < bosses; n++) out.unshift("warlord");
   return out;
 }

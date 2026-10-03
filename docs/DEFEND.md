@@ -3,9 +3,17 @@
 A tower-defense-style simulation where the player lays out a walled city and
 holds it against endless waves. Code lives in `src/defend/`.
 
-The current performance experiment uses exactly 500 enemies per wave number:
-wave 1 has 500, wave 2 has 1,000, and wave 20 has 10,000. Each wave releases
-over five seconds. Warlords count toward the total; hatched brood is extra.
+Waves spend a difficulty budget starting at 20, growing 5% per wave (rounded
+down). Enemy costs are Roach 1, Bat 2, Orc 4, Ogre 8, Mother 10 (including
+three Broodlings), Warlord 100, Snake 60, Dragon 2,500, Shield Generator
+10,000, and Invincible Shield Generator 1,000,000. Affordable enemies are selected randomly;
+there are no starting-wave gates or scheduled Warlord spawns. Enemy HP stays
+fixed. Each wave reserves at most 5,000 enemies, including hatched offspring.
+Selection favours expensive enemies when capacity is tight; any budget the
+roster cannot spend is discarded. Invalid costs and cyclic offspring are
+excluded, and extremely late budgets saturate at the largest safe integer.
+Waves release their initial enemies over five seconds.
+
 The console logs `[Defend performance]` every five seconds and at wave end,
 including FPS, p95 frame interval, update/draw time and peak live enemies.
 Recent rows are available as `window.defendPerformance`; they are not saved.
@@ -174,7 +182,7 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   passable at a cost (they must be smashed first) — so they walk the streets
   but break through when that's much shorter. Houses lure some enemies off
   the road to wreck them (`distraction`); bats fly straight over everything.
-- **Mothers** (from wave 6) are slow, black and violet-rimmed, with pale
+- **Mothers** (10 difficulty) are slow, black and violet-rimmed, with pale
   eyes and a swollen brood sac. When one dies she splits into three quick
   **broodlings** at the corners of a small triangle around where she fell
   (on the spot if that is inside a wall); broodlings never come in a wave's
@@ -284,7 +292,7 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   city's lights are always lit: lanterns hung on house walls, braziers at
   the keep's corners, a lamp at each barracks door, and fires inside archer
   and watch towers. 30% of runs are also rainy for the whole run.
-- **Every 10th wave is a boss wave**, with one Warlord per ten waves (a huge,
+- **Every 10th wave is a boss wave**, for weather and rewards; Warlords spawn by affordability (a huge,
   crowned brute with its own health bar). Night fades in over ~2.5 s as the
   boss wave starts and lifts once it's cleared; a rainy run becomes night
   rain ("Storm").
@@ -410,3 +418,29 @@ it. The layout, purchases, upgrades, bombs and best wave are saved.
 
 `defendDebug(seconds, { rain }?)` in the console fast-forwards a running
 battle, optionally forcing its weather.
+
+### Segmented enemies and shields
+
+Snakes have twelve individually targetable pixel segments. Dragons have sixteen
+flying segments with wings; each head breathes a five-cell cone of flame that
+hurts troops, civilians and buildings. Destroying a segment cuts its chain:
+the surviving rear segment becomes an independent head, without healing or
+creating additional enemies. Whole chains count against the 5,000-unit cap.
+
+Shield Generators protect themselves and enemies within four cells from ranged
+damage with a 3,000-HP shield. The hit that shatters it is absorbed; subsequent
+hits damage the enemy. Invincible Shield Generators protect a five-cell radius
+indefinitely. Swordsmen and valkyries bypass both shields. Arrows, explosions,
+fire, and ice are blocked (including ice's chill). Overlapping invincible
+shields take priority. Killing a generator removes its protection immediately.
+
+
+Dark Knights (500 difficulty) resist freezing and crowd displacement and strike
+all defenders in a forward crescent with a 1.6-cell reach. Kamikaze Orcs (120)
+carry pixel dynamite and detonate within contact range in a two-cell radius.
+Kamikaze Birds (350) fly over obstacles, descend for 0.6 seconds, then detonate
+in a 2.5-cell radius; killing them during the dive prevents detonation.
+Void Sparrows (5,000,000) create pixel black holes of diameter 1.5 tiles,
+pulsing 300 damage every half-second for eight seconds, with a 15-second
+casting cooldown. Hostile blasts and holes damage troops, civilians and
+buildings, spare enemies and honour valkyrie guards.
