@@ -1,3 +1,4 @@
+import { assembleFortress, syncFortress } from "./fortress.ts";
 import { damageModifier } from "./enemy-abilities.ts";
 import { stepBlackHoles, stepPoison } from "./hostile-attacks.ts";
 /** Real-time DEFEND simulation. Units move freely in continuous cell
@@ -65,11 +66,14 @@ export type Enemy = {
   /** Seconds left chilled by a wizard's ice (slowed); absent when not, so
    * a run without ice keeps its state exactly as before. */
   chill?: number;
+  fortressPart?: { core: number; role: "turret" | "leg" | "armor"; dx: number; dy: number };
+  fortressParts?: Enemy[];
   facing?: { x: number; y: number };
   burrow?: number;
   blink?: { x: number; y: number; t: number };
   abilityT?: number;
   raised?: number;
+  raisedDamage?: number;
   reborn?: boolean;
   slash?: { dx: number; dy: number; t: number };
   dive?: number;
@@ -119,7 +123,7 @@ export type Civilian = {
 export type Arrow = { x: number; y: number; target: number; damage: number; tx: number; ty: number; life: number; origin?: Point & { attacker?: number; building?: number } };
 export type Effect = { kind: "boom" | "dust" | "spark"; x: number; y: number; t: number; r: number; seed?: number };
 /** A cannon shell in flight: lobbed from the tower to where the target was. */
-export type Shell = { x0: number; y0: number; x1: number; y1: number; t: number; dur: number; damage: number; r: number };
+export type Shell = { x0: number; y0: number; x1: number; y1: number; t: number; dur: number; damage: number; r: number; origin?: Arrow["origin"] };
 /** Glowing cracks left where something exploded; they cool and fade. */
 export type Scorch = { x: number; y: number; r: number; seed: number; t: number; life: number };
 export type SimEvent = { type: "waveStart" | "waveCleared" | "lost"; wave: number };
@@ -128,7 +132,7 @@ export type SimEvent = { type: "waveStart" | "waveCleared" | "lost"; wave: numbe
 export type Stride = { speed: number; dt: number; flying?: boolean };
 /** A blast's radius and centre damage (40% at the edge); with friendly fire
  * it also hurts your own people. */
-export type Blast = { r: number; damage: number; friendlyFire: boolean };
+export type Blast = { r: number; damage: number; friendlyFire: boolean; origin?: Arrow["origin"] };
 
 const STEP = 1 / 30;
 const STEP_SOLDIER: Record<Soldier["kind"], (sim: DefendSim, s: Soldier, dt: number) => void> = {
@@ -156,7 +160,7 @@ export class DefendSim {
   readonly bonuses: Readonly<Bonuses>;
   /** Enemies slain this run, by kind: what the run pays out. Not part of
    * the replayed state. */
-  readonly slain: Record<EnemyKind, number> = { roach: 0, orc: 0, ogre: 0, bat: 0, warlord: 0, mother: 0, broodling: 0, snake: 0, dragon: 0, shieldBearer: 0, aegis: 0, darkKnight: 0, bombOrc: 0, bombBird: 0, voidSparrow: 0, shieldLesser: 0, shieldGreater: 0, poisonLesser: 0, poisonBearer: 0, poisonGreater: 0, poisonSovereign: 0, siegeBeetle: 0, burrowingMole: 0, necromancer: 0, skeleton: 0, bannerCaptain: 0, mirrorKnight: 0, leechSwarm: 0, ashPhoenix: 0, phoenixEgg: 0, blinkImp: 0 };
+  readonly slain: Record<EnemyKind, number> = { roach: 0, orc: 0, ogre: 0, bat: 0, warlord: 0, mother: 0, broodling: 0, snake: 0, dragon: 0, shieldBearer: 0, aegis: 0, darkKnight: 0, bombOrc: 0, bombBird: 0, voidSparrow: 0, shieldLesser: 0, shieldGreater: 0, poisonLesser: 0, poisonBearer: 0, poisonGreater: 0, poisonSovereign: 0, siegeBeetle: 0, burrowingMole: 0, necromancer: 0, skeleton: 0, bannerCaptain: 0, mirrorKnight: 0, leechSwarm: 0, ashPhoenix: 0, phoenixEgg: 0, blinkImp: 0, fortressLesser: 0, fortress: 0, fortressGreater: 0, fortressSovereign: 0 };
   /** 1 while a cell is part of a standing (built) building. */
   readonly solid: Uint8Array;
   readonly hp: Float32Array;
@@ -193,7 +197,7 @@ export class DefendSim {
   spawnQueue: EnemyKind[] = [];
   private spawnInterval = 0;
   blackHoles: { x: number; y: number; r: number; damage: number; life: number; pulse: number; seed: number }[] = [];
-  corpses: { x: number; y: number; life: number }[] = [];
+  corpses: { x: number; y: number; life: number; hp?: number; damage?: number }[] = [];
   bannerCarriers: Enemy[] = [];
   private waveSpawned = 0;
   private shieldGenerators: Enemy[] = [];
@@ -298,6 +302,7 @@ export class DefendSim {
     for (const corpse of this.corpses) corpse.life -= dt;
     this.corpses = this.corpses.filter(c => c.life > 0);
     for (const e of this.enemies) if (e.hp > 0) stepEnemy(this, e, dt);
+    for (const e of this.enemies) if (e.fortressParts) syncFortress(e);
     this.towers.step(this, dt);
     stepArrows(this, dt);
     stepShells(this, dt);
@@ -318,8 +323,9 @@ export class DefendSim {
     const hatched: Enemy[] = [];
     for (const e of this.enemies) {
       if (e.hp > 0) continue;
-      this.slain[e.kind]++;
-      if (!ENEMIES[e.kind].hatched && e.kind !== "ashPhoenix" && this.corpses.length < MAX_WAVE_ENEMIES) this.corpses.push({ x: e.x, y: e.y, life: 10 });
+      if (!e.fortressPart) this.slain[e.kind]++;
+      if (e.fortressParts) for (const part of e.fortressParts) part.hp = 0;
+      if (!e.fortressPart && !ENEMIES[e.kind].fortress && !ENEMIES[e.kind].hatched && e.kind !== "ashPhoenix" && this.corpses.length < MAX_WAVE_ENEMIES) this.corpses.push({ x: e.x, y: e.y, life: 10, hp: Math.max(1, e.maxHp * .4), damage: ENEMIES[e.kind].damage * .4 });
       if (e.kind === "ashPhoenix" && !e.reborn) {
         const egg = this.spawnAuxiliary("phoenixEgg", e.x, e.y);
         if (egg) egg.abilityT = 5;
@@ -379,14 +385,17 @@ export class DefendSim {
   }
 
   private spawnEnemy(kind: EnemyKind) {
-    if (this.waveSpawned >= MAX_WAVE_ENEMIES) return;
+    const fort = ENEMIES[kind].fortress;
+    if (this.waveSpawned + (fort ? 1 + fort.turrets + fort.legs + fort.armor : 1) > MAX_WAVE_ENEMIES) return;
     for (let tries = 0; tries < 20; tries++) {
-      const x = 1 + this.rand() * (CELLS_W - 2);
-      const y = 0.5 + this.rand() * 2;
+      const margin = fort ? ENEMIES[kind].size / 2 + 1 : 1;
+      const x = margin + this.rand() * (CELLS_W - 2 * margin);
+      const y = (fort ? fort.height / 2 + .5 : .5) + this.rand() * 2;
       if (blocked(this.solid, x, y)) continue;
       this.enemies.push(this.newEnemy(kind, x, y));
       this.waveSpawned++;
       let leader = this.enemies[this.enemies.length - 1];
+      if (fort) assembleFortress(this, leader);
       const length = ENEMIES[kind].chainLength ?? 1;
       for (let n = 1; n < length && this.waveSpawned < MAX_WAVE_ENEMIES; n++) {
         const segment = this.newEnemy(kind, x, Math.max(0.25, y - n * 0.3));
@@ -586,10 +595,10 @@ export class DefendSim {
 
   /** A blast: full damage at the centre falling to 40% at the edge. Returns
    * the seed its fireball and scorch are drawn from. */
-  explode(x: number, y: number, { r, damage, friendlyFire }: Blast): number {
+  explode(x: number, y: number, { r, damage, friendlyFire, origin }: Blast): number {
     this.indexEnemies();
     const hit = (d: number) => damage * (1 - 0.6 * Math.min(1, d / r));
-    for (const e of this.enemiesNear(x, y, r)) this.hurtEnemy(e, hit(dist(e.x - x, e.y - y)), true, "ranged", { x, y });
+    for (const e of this.enemiesNear(x, y, r)) this.hurtEnemy(e, hit(dist(e.x - x, e.y - y)), true, "ranged", origin ?? { x, y }, !!origin);
     if (friendlyFire)
       for (const u of [...this.soldiers, ...this.civilians]) {
         const d = dist(u.x - x, u.y - y);

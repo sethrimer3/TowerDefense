@@ -72,3 +72,22 @@ test('blink imps visibly wait before jumping and only land in open cells', () =>
   assert.ok(!blocked(s.solid, e.x, e.y));
 });
 
+
+
+test('raised skeletons are weaker than even the original roach', () => {
+  const s = sim(), roach = create(s, 'roach'), necro = create(s, 'necromancer', 10.1, 10);
+  roach.hp = 0; (s as any).sweepAway();
+  stepEnemy(s, necro, 1 / 30);
+  const skeleton = s.enemies.find(e => e.kind === 'skeleton')!;
+  assert.ok(skeleton.maxHp < 10);
+  assert.ok(enemyDamage(s, skeleton) < 2);
+});
+
+
+test('projectile explosions reflect damage to their original caster', () => {
+  const s = sim(), knight = create(s, 'mirrorKnight');
+  s.soldiers.push({ id: 100, x: 10, y: 8, hp: 100, flash: 0, kind: 'mage' } as any);
+  s.explode(10, 10, { r: 1, damage: 50, friendlyFire: false, origin: { x: 10, y: 8, attacker: 100 } });
+  assert.equal(s.soldiers[0].hp, 80);
+  assert.equal(knight.hp, 300);
+});

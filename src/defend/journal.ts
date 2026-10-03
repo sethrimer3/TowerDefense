@@ -32,7 +32,7 @@ export function journalHTML(discovered: EnemyKind[]): string {
         necromancer: "Raises up to four nearby corpses as weaker skeletons, one every three seconds. Kill the necromancer first.",
         skeleton: "A weak raised enemy. Cannot be raised again.",
         bannerCaptain: "Nearby enemies gain 25% speed and 30% damage within four cells. Auras do not stack; target the captain.",
-        mirrorKnight: "Reflects 40% of incoming arrow damage back to its shooter. Melee is not reflected.",
+        mirrorKnight: "Reflects 40% of incoming arrow, cannon shell and fireball damage back to its shooter. Melee is not reflected.",
         leechSwarm: "Heals for damage dealt to player units, up to its maximum health. Use burst damage or area attacks.",
         ashPhoenix: "Leaves a destructible egg on its first death. The egg revives it after five seconds; destroy it first. Can revive only once.",
         phoenixEgg: "Destroy this egg before its five-second hatch finishes.",

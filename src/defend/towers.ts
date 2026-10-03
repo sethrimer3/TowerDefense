@@ -62,6 +62,7 @@ export class Towers {
     this.cooldown.set(b.id, cannonCooldown(sim.levels.cannonRate) * sim.bonuses.towerReload);
     const dist = Math.sqrt(sq(target.x - c.x) + sq(target.y - c.y));
     sim.shells.push({
+      origin: { x: c.x, y: c.y, building: b.id },
       x0: c.x,
       y0: c.y - 0.4,
       x1: target.x,
@@ -104,7 +105,7 @@ export function stepArrows(sim: DefendSim, dt: number) {
 export function stepShells(sim: DefendSim, dt: number) {
   for (const s of sim.shells) {
     s.t += dt;
-    if (s.t >= s.dur) sim.explode(s.x1, s.y1, { r: s.r, damage: s.damage, friendlyFire: !sim.levels.cannonSafe });
+    if (s.t >= s.dur) sim.explode(s.x1, s.y1, { r: s.r, damage: s.damage, friendlyFire: !sim.levels.cannonSafe, origin: s.origin });
   }
   sim.shells = sim.shells.filter((s) => s.t < s.dur);
 }

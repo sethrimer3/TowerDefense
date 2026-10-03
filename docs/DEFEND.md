@@ -483,7 +483,7 @@ Necromancer (800) raises up to four nearby ten-second corpses, one every three
 seconds, into weak skeletons that cannot be raised again. Banner Captain (700)
 grants nearby enemies 25% speed and 30% attack damage within four cells;
 auras do not stack and stop on its death. Mirror Knight (600) reflects 40%
-of incoming arrow damage to the original soldier or tower; melee is safe.
+of incoming arrow, cannon shell and fireball damage to the original soldier or tower; melee is safe.
 Leech Swarm (150) heals by damage dealt to player units, never beyond max HP.
 Ash Phoenix (1,200) leaves a 60-HP egg on its first death, reviving after five
 seconds unless the egg is destroyed; the revived phoenix cannot lay another

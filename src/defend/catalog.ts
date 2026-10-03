@@ -405,7 +405,7 @@ export const civilianHp = (l: number) => 8 + l * 5;
 export const rebuildSeconds = (l: number) => 3 * intPow(0.82, l);
 export const HOUSE_HP_PER_CELL = 22;
 
-export type EnemyKind = "roach" | "orc" | "ogre" | "bat" | "warlord" | "mother" | "broodling" | "snake" | "dragon" | "shieldBearer" | "aegis" | "darkKnight" | "bombOrc" | "bombBird" | "voidSparrow" | "shieldLesser" | "shieldGreater" | "poisonLesser" | "poisonBearer" | "poisonGreater" | "poisonSovereign" | "siegeBeetle" | "burrowingMole" | "necromancer" | "skeleton" | "bannerCaptain" | "mirrorKnight" | "leechSwarm" | "ashPhoenix" | "phoenixEgg" | "blinkImp";
+export type EnemyKind = "roach" | "orc" | "ogre" | "bat" | "warlord" | "mother" | "broodling" | "snake" | "dragon" | "shieldBearer" | "aegis" | "darkKnight" | "bombOrc" | "bombBird" | "voidSparrow" | "shieldLesser" | "shieldGreater" | "poisonLesser" | "poisonBearer" | "poisonGreater" | "poisonSovereign" | "siegeBeetle" | "burrowingMole" | "necromancer" | "skeleton" | "bannerCaptain" | "mirrorKnight" | "leechSwarm" | "ashPhoenix" | "phoenixEgg" | "blinkImp" | "fortressLesser" | "fortress" | "fortressGreater" | "fortressSovereign";
 export type EnemyDef = {
   kind: EnemyKind;
   name: string;
@@ -430,6 +430,7 @@ export type EnemyDef = {
   /** Body width and height in the city art's eight-pixels-per-cell grid. */
   bodyPixels?: number;
   summonSlots?: number;
+  fortress?: { tier: number; turrets: number; legs: number; armor: number; height: number; partHp: number };
   poison?: { radius: number; damage: number; lethal?: boolean; color: string };
   unyielding?: boolean;
   chainLength?: number;
@@ -472,6 +473,11 @@ export const ENEMIES: Record<EnemyKind, EnemyDef> = {
   phoenixEgg: { kind: "phoenixEgg", name: "Phoenix Egg", hp: 60, speed: 0, damage: 0, cooldown: 1, size: 0.4, color: "#dfac6e", distraction: 0, flying: false, hatched: true, cost: 1 },
   blinkImp: { kind: "blinkImp", name: "Blink Imp", hp: 70, speed: 1.7, damage: 9, cooldown: 1, size: 0.3, color: "#9874bf", distraction: 0, flying: false,  cost: 250 },
 
+  fortressLesser: { kind: "fortressLesser", name: "Walking Bastion", hp: 1200, speed: .7, damage: 25, cooldown: 1.6, size: 2.5, color: "#80634c", distraction: 0, flying: false, fortress: { tier: 1, turrets: 2, legs: 4, armor: 2, height: 3, partHp: 160 }, cost: 1000 },
+  fortress: { kind: "fortress", name: "Living Fortress", hp: 6000, speed: .65, damage: 70, cooldown: 1.6, size: 3.5, color: "#7e6662", distraction: 0, flying: false, fortress: { tier: 2, turrets: 4, legs: 6, armor: 4, height: 4, partHp: 700 }, cost: 10000 },
+  fortressGreater: { kind: "fortressGreater", name: "Walking Citadel", hp: 30000, speed: .6, damage: 200, cooldown: 1.6, size: 4.5, color: "#625674", distraction: 0, flying: false, fortress: { tier: 3, turrets: 6, legs: 8, armor: 6, height: 5, partHp: 3000 }, cost: 100000 },
+  fortressSovereign: { kind: "fortressSovereign", name: "Dread Colossus", hp: 150000, speed: .55, damage: 600, cooldown: 1.6, size: 5.5, color: "#4c3d5c", distraction: 0, flying: false, fortress: { tier: 4, turrets: 8, legs: 10, armor: 8, height: 6, partHp: 12000 }, cost: 1000000 },
+
 };
 
 /** Multipliers the player's Smithy and skill trees lay over a run, on top
@@ -510,3 +516,7 @@ export const VALKYRIE = { hp: 50, damage: 16, cooldown: 1.8, speed: 2.3, size: 0
 export const DARK_WIZARD = { hp: 160, damage: 30, cooldown: 1.6, speed: 1.9, size: 0.5, range: 6, garrison: 1, drill: 3, color: "#2a1418" };
 export const FIRE_MAGE = { hp: 22, cooldown: 2.1, speed: 2, size: 0.38, color: "#c8372d" };
 export const CIVILIAN = { speed: 1.9, size: 0.3, color: "#e6d7b4", respawnSeconds: 10 };
+
+/** Multipart forts share a species, but each part has its own hitbox. */
+export const enemySize = (e: { kind: EnemyKind; fortressPart?: { role: string } }) =>
+  e.fortressPart ? (e.fortressPart.role === "leg" ? .4 : .6) : ENEMIES[e.kind].size;
