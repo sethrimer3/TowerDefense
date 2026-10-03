@@ -33,6 +33,8 @@ The city is alive between and during battles: park grass sways in the wind (hard
 
 ## How it's built
 
+The current stress-test measurements and reproduction steps are in [docs/PERFORMANCE.md](docs/PERFORMANCE.md).
+
 - **Current performance experiment:** waves contain 500, 1,000, 1,500… enemies, released over five seconds. Bosses are included in that count; a Mother's brood adds extra enemies. The browser console logs `[Defend performance]` every five seconds and at each wave's end, with recent rows in `window.defendPerformance` (not saved). `npm run test:performance` runs the isolated 20-count browser benchmark against the dev server; set `PERF_SCENE=city` for combat congestion and `PERF_REALTIME=1` for real-time playback. Results go to `test-results/`. `src/defend/performance.ts` measures frame/update/draw timings; crowd separation uses bounded neighbor sampling and the renderer reuses crowd shadows between simulation ticks.
 
 - `src/defend/` is the game: the layout and its fitting (`layout.ts`), the procedural city (`citygen.ts`), the deterministic battle (`sim.ts`, with `enemies.ts`, `troops.ts`, `civilians.ts`, `towers.ts`, `pathing.ts`), drawing (`render.ts` and its passes: `city-layer.ts`, `lighting.ts`, `battle-art.ts`, `wizard-art.ts`, `ground-relief.ts`, `park-art.ts`, `park-trees.ts`, `ground-art.ts`, `shadow-art.ts`, `roof-art.ts`, `park-grass.ts`, `pond-water.ts`, `pond-ducks.ts`, `fences.ts`, `edit-overlay.ts`, `structure-art.ts`, `tower-art.ts`, `damage-art.ts`, `weather.ts`), the pointer state machine and drag sessions, and the page (`ui.ts`). See `docs/DEFEND.md`.
@@ -43,7 +45,5 @@ The city is alive between and during battles: park grass sways in the wind (hard
 - `src/ui/` holds the shell, the Upgrades page (the Smithy and skill trees, with `src/tree-particles.ts` and `src/training-particles.ts`) and Settings. `src/style.css` lays the pages out and `src/theme.css` dresses them as the keep: stone, oak, iron, brass and parchment, from the small tiling SVGs in `assets/theme/`, and animates presses, purchases and wins. `src/ui/flourish.ts` throws the sparks and glints over the page, and `src/sound.ts` synthesizes every sound with Web Audio (no sound files).
 
 ## Deploying
-
-The current stress-test measurements and reproduction steps are in [docs/PERFORMANCE.md](docs/PERFORMANCE.md).
 
 `.github/workflows/static.yml` runs the tests and the build on every push to `main` and deploys `dist/` to GitHub Pages. In the repository's **Settings → Pages**, the source must be set to **GitHub Actions**.

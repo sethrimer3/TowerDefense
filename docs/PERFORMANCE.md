@@ -45,6 +45,8 @@ A 600-frame mixed-enemy run (30 warm-up, 570 measured) started with 10,000 enemi
 
 ## Reproduce and inspect
 
+Validation: all 138 Node tests passed, the Node 24 replay and coverage checks passed, and the production build passed. An isolated browser smoke test verified the 500-enemy opening, the 1,000-enemy second wave, periodic logging and clear/lost/abandoned summaries without browser errors.
+
 Start the dev server with `npm run dev`, then run this in PowerShell:
 
 ```powershell
