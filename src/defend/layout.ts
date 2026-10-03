@@ -26,11 +26,13 @@ import {
   type Rect,
   type TilePos,
 } from "./grid.ts";
-import { STRUCTURES, TILE_ROOM, footprint, type StructureKind } from "./catalog.ts";
+import { STRUCTURES, TILE_ROOM, footprint, type StructureKind, type TileSpan } from "./catalog.ts";
 
 export type PlacedKind = Exclude<StructureKind, "keep">;
 /** `spot` seeds where on its tile the structure stands; it is drawn afresh
- * for everything on a tile whenever something is dropped there. */
+ * for everything on a tile whenever something is dropped there. A structure
+ * spanning a block of tiles (`span`) stands on (tx, ty), its block's top
+ * left tile. */
 export type PlacedStructure = { uid: number; kind: PlacedKind; tx: number; ty: number; spot: number };
 
 export type Layout = {
@@ -149,8 +151,8 @@ type FitSpace = {
   foot: Uint8Array;
 };
 
-/** A structure to fit onto its tile. */
-type Placement = { uid: number; kind: StructureKind; tx: number; ty: number; inside: boolean; spot: number; w: number; h: number; size: number };
+/** A structure to fit onto its tile (its block of `span` × `span` tiles). */
+type Placement = { uid: number; kind: StructureKind; tx: number; ty: number; inside: boolean; spot: number; w: number; h: number; size: number; span: TileSpan };
 
 /** Tries per tile, each a fresh random arrangement, before it is full. */
 const TRIES = 24;
@@ -168,12 +170,16 @@ const PASSES = 6;
 export function fitLayout(l: Layout): Fit {
   const city = cityMask(l);
   const cityTiles = cityTileSet(l);
+  const order = fitOrder(l, cityTiles);
+  const spanned = spannedTiles(order);
+  const crowded = [...spanned.values()].find((s) => s.size > TILE_ROOM);
+  if (crowded) return { ok: false, reason: `That tile has no room left for the ${STRUCTURES[crowded.kind].name.toLowerCase()}.` };
   let failure = "";
   for (let pass = 0; pass < PASSES; pass++) {
     const space: FitSpace = { city, wall: wallMask(city), blocked: new Uint8Array(CELL_COUNT), foot: new Uint8Array(CELL_COUNT) };
     const fitted: FittedStructure[] = [];
-    for (const group of fitOrder(l, cityTiles)) {
-      const f = fitTile(group, space, pass * TRIES);
+    for (const group of order) {
+      const f = fitTile(group, space, pass * TRIES, spanned.get(tileKey(group[0].tx, group[0].ty)));
       if (typeof f === "string") return { ok: false, reason: f };
       fitted.push(...f);
     }
@@ -188,11 +194,10 @@ export function fitLayout(l: Layout): Fit {
  * its oldest one, each tile's structures biggest first. */
 function fitOrder(l: Layout, cityTiles: Set<string>): Placement[][] {
   const compact = new Set(l.compact);
-  const place = (s: { uid: number; kind: StructureKind; tx: number; ty: number; spot: number }): Placement => ({
-    ...s,
-    inside: cityTiles.has(tileKey(s.tx, s.ty)),
-    ...footprint(s.kind, compact.has(s.kind as PlacedKind)),
-  });
+  const place = (s: { uid: number; kind: StructureKind; tx: number; ty: number; spot: number }): Placement => {
+    const f = footprint(s.kind, compact.has(s.kind as PlacedKind));
+    return { ...s, ...f, inside: blockTiles(s.tx, s.ty, f.span).every((k) => cityTiles.has(k)) };
+  };
   const keep = place({ uid: KEEP_UID, kind: "keep", tx: l.keep.tx, ty: l.keep.ty, spot: 0 });
   const tiles = new Map<string, Placement[]>([[tileKey(keep.tx, keep.ty), [keep]]]);
   for (const s of [...l.structures].sort((a, b) => a.uid - b.uid)) {
@@ -203,16 +208,39 @@ function fitOrder(l: Layout, cityTiles: Set<string>): Placement[][] {
   return [...tiles.values()].map((g) => g.sort((a, b) => b.w * b.h - a.w * a.h || a.uid - b.uid));
 }
 
+/** The tile keys of the `span` × `span` block whose top left tile is
+ * (tx, ty). */
+export function blockTiles(tx: number, ty: number, span: TileSpan): string[] {
+  const out: string[] = [];
+  for (let dy = 0; dy < span; dy++) for (let dx = 0; dx < span; dx++) out.push(tileKey(tx + dx, ty + dy));
+  return out;
+}
+
+/** The room that structures spanning a block of tiles take on each tile of
+ * it, keyed by tile, and the newest of them there. Empty unless something
+ * spans more than one tile. */
+function spannedTiles(order: Placement[][]): Map<string, { size: number; kind: StructureKind }> {
+  const out = new Map<string, { size: number; kind: StructureKind }>();
+  for (const group of order)
+    for (const p of group) {
+      if (p.span === 1) continue;
+      for (const k of blockTiles(p.tx, p.ty, p.span).slice(1)) out.set(k, { size: (out.get(k)?.size ?? 0) + p.size, kind: p.kind });
+    }
+  return out;
+}
+
 /** Fits a tile's structures together, trying fresh arrangements until they
- * all fit, and claims their cells; or says why they can't. */
-function fitTile(group: Placement[], space: FitSpace, salt: number): FittedStructure[] | string {
+ * all fit, and claims their cells; or says why they can't. `spanned` is the
+ * room a structure spanning from another tile takes on this one. */
+function fitTile(group: Placement[], space: FitSpace, salt: number, spanned?: { size: number; kind: StructureKind }): FittedStructure[] | string {
   for (const p of group) {
     if (!tileInBounds(p.tx, p.ty) || p.ty === SPAWN_ROW) return "Nothing can be built on the spawn row.";
+    if (!tileInBounds(p.tx + p.span - 1, p.ty + p.span - 1)) return `The ${STRUCTURES[p.kind].name.toLowerCase()} would hang off the board.`;
     const def = STRUCTURES[p.kind];
     if (!p.inside && !def.outsideOk) return `${def.name} must be inside the city limits.`;
   }
-  if (group.reduce((n, p) => n + p.size, 0) > TILE_ROOM) {
-    const last = STRUCTURES[group[group.length - 1].kind];
+  if (group.reduce((n, p) => n + p.size, spanned?.size ?? 0) > TILE_ROOM) {
+    const last = STRUCTURES[spanned?.kind ?? group[group.length - 1].kind];
     return `That tile has no room left for the ${last.name.toLowerCase()}.`;
   }
   let reason = "";
@@ -285,11 +313,12 @@ function pickRect(p: Placement, space: FitSpace, salt: number): Rect | null {
   return best;
 }
 
-/** Every position of both orientations of the structure on its tile. */
-function* candidateRects({ tx, ty, w, h }: Placement): Generator<Rect> {
+/** Every position of both orientations of the structure on its tile (or
+ * its block of tiles). */
+function* candidateRects({ tx, ty, w, h, span }: Placement): Generator<Rect> {
   const shapes = w === h ? [[w, h]] : [[w, h], [h, w]];
   for (const [sw, sh] of shapes)
-    for (let y = ty * SUB; y + sh <= (ty + 1) * SUB; y++) for (let x = tx * SUB; x + sw <= (tx + 1) * SUB; x++) yield { x, y, w: sw, h: sh };
+    for (let y = ty * SUB; y + sh <= (ty + span) * SUB; y++) for (let x = tx * SUB; x + sw <= (tx + span) * SUB; x++) yield { x, y, w: sw, h: sh };
 }
 
 /** Whether a structure may stand on every cell of `r`: unclaimed, not wall,
@@ -322,8 +351,9 @@ export function removeCityTile(l: Layout, tx: number, ty: number): { layout: Lay
   const next = cloneLayout(l);
   next.cityTiles = next.cityTiles.filter((k) => k !== key);
   if (!tilesConnected(cityTileSet(next), next.keep)) return null;
-  const returned = next.structures.filter((s) => s.tx === tx && s.ty === ty).map((s) => s.kind);
-  next.structures = next.structures.filter((s) => !(s.tx === tx && s.ty === ty));
+  const on = (s: PlacedStructure) => covers(l, s, tx, ty);
+  const returned = next.structures.filter(on).map((s) => s.kind);
+  next.structures = next.structures.filter((s) => !on(s));
   return fitLayout(next).ok ? { layout: next, returned } : null;
 }
 
@@ -333,6 +363,16 @@ export function moveCityTile(l: Layout, from: TilePos, to: TilePos): Layout | nu
   const removed = removeCityTile(l, from.tx, from.ty);
   if (!removed || removed.returned.length) return null;
   return placeCityTile(removed.layout, to.tx, to.ty);
+}
+
+/** How many tiles across `kind`'s block is in layout `l`. */
+export const spanOf = (l: Layout, kind: PlacedKind): TileSpan => footprint(kind, l.compact.includes(kind)).span;
+
+/** Whether structure `s` stands on tile (tx, ty), on its own tile or
+ * anywhere in its block. */
+export function covers(l: Layout, s: PlacedStructure, tx: number, ty: number) {
+  const span = spanOf(l, s.kind);
+  return tx >= s.tx && tx < s.tx + span && ty >= s.ty && ty < s.ty + span;
 }
 
 /** Place a new structure, which takes the next uid. */

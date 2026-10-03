@@ -4,7 +4,8 @@
  * rebuilt. Over it each frame: park fences, damage, unit shadows, the
  * overcast and torchlight (lighting.ts), the keep's banner, scorches, the
  * fire mages' burning ground (mage-art.ts), units and effects
- * (battle-art.ts, with the valkyries' charges from valkyrie-art.ts), the trees over them (park-trees.ts), the
+ * (battle-art.ts, with the valkyries' charges from valkyrie-art.ts), the
+ * black lightning (dark-art.ts), the trees over them (park-trees.ts), the
  * wizards' fire, the building grid and drag overlay (edit-overlay.ts), then
  * rain in screen space. */
 import { CELLS_H, CELLS_W, boardSize, hash01 } from "./grid.ts";
@@ -24,6 +25,7 @@ import { GroundRelief, type ReliefLight } from "./ground-relief.ts";
 import { WizardArt, flameLights } from "./wizard-art.ts";
 import { drawBlazes, mageLights } from "./mage-art.ts";
 import { stabLights } from "./valkyrie-art.ts";
+import { DarkArt, darkLights } from "./dark-art.ts";
 import { ParkTrees, type Under } from "./park-trees.ts";
 
 export type DrawOptions = {
@@ -53,6 +55,7 @@ export class DefendRenderer {
   readonly relief = new GroundRelief();
   readonly wizard = new WizardArt();
   readonly trees = new ParkTrees();
+  readonly dark = new DarkArt();
   /** The battle time the wizard art last advanced to. */
   private wizardTime = 0;
   private rain = new Rain();
@@ -235,6 +238,7 @@ export class DefendRenderer {
     drawBlazes(this.ctx, this.px, sim);
     this.wizard.drawIce(this.ctx, this.px, sim.frosts, sim.time * 1000, flameLights(sim).relief);
     drawUnits(brush, sim, torches);
+    this.dark.draw(this.ctx, this.px, sim);
     this.wizard.drawChill(this.ctx, this.px, sim, opts.now);
   }
 
@@ -357,14 +361,14 @@ export class DefendRenderer {
   /** Darkness and torchlight, the gravel's lit relief, and the flames. */
   private drawLighting(map: CityMap, sim: DefendSim, weather: Weather, opts: DrawOptions) {
     const frame: LightFrame = { px: this.px, now: opts.now, reduceMotion: opts.reduceMotion, intact: standing(map, sim) };
-    const flames = flameLights(sim), mages = mageLights(sim), stabs = stabLights(sim);
+    const flames = flameLights(sim), mages = mageLights(sim), stabs = stabLights(sim), dark = darkLights(sim);
     this.lighting.drawLight(this.ctx, frame, ambientFor(weather, opts.night), {
-      torches: [...this.carried(sim), ...flames.carried, ...mages.carried, ...stabs.carried],
+      torches: [...this.carried(sim), ...flames.carried, ...mages.carried, ...stabs.carried, ...dark.carried],
       solid: sim.solid,
       version: sim.mapVersion,
     });
     this.lighting.drawRelief(this.ctx, this.px, weather.rain ? 0.85 : 0.65);
-    this.drawGroundRelief(map, sim, opts, [...flames.relief, ...mages.relief, ...stabs.relief]);
+    this.drawGroundRelief(map, sim, opts, [...flames.relief, ...mages.relief, ...stabs.relief, ...dark.relief]);
     this.lighting.drawFlames(this.ctx, frame);
   }
 

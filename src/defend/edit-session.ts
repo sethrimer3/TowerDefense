@@ -5,7 +5,7 @@
  * positions in cells and applies the result. */
 import { BOMB_RADIUS } from "./catalog.ts";
 import type { CityMap } from "./citygen.ts";
-import { dropGhost, legalLayouts, liftsCityTile, refusal, type Drag } from "./drag-rules.ts";
+import { dragSpan, dropGhost, legalLayouts, liftsCityTile, refusal, type Drag } from "./drag-rules.ts";
 import type { Overlay } from "./edit-overlay.ts";
 import { CELLS_W, SUB, tileKey } from "./grid.ts";
 import { removeCityTile, removeStructure, type Layout } from "./layout.ts";
@@ -24,10 +24,14 @@ export type Drop =
 export class EditSession {
   /** The layouts dropping the item could make, keyed by tile. */
   readonly legal: Map<string, Layout>;
+  /** Tiles across the block the item takes: 2 for a structure spanning a
+   * 2 × 2 block of tiles, which is carried by its middle. */
+  readonly span: number;
   private at: DragAt | null = null;
 
   constructor(readonly drag: Drag, private layout: Layout) {
     this.legal = drag.from === "bomb" ? new Map() : legalLayouts(drag, layout);
+    this.span = dragSpan(drag, layout);
   }
 
   /** The session for whatever a press on cell (cx, cy) of `map`, built from
@@ -48,10 +52,14 @@ export class EditSession {
     this.at = at;
   }
 
-  /** The board tile under the pointer, if it is over the board. */
+  /** The board tile under the pointer, if it is over the board; for an item
+   * spanning a block of tiles, the top left tile of the block centred
+   * nearest the pointer. */
   get tile(): string | null {
     const at = this.at;
-    return at?.overBoard ? tileKey(Math.floor(at.cellX / SUB), Math.floor(at.cellY / SUB)) : null;
+    if (!at?.overBoard) return null;
+    const half = (this.span - 1) / 2;
+    return tileKey(Math.floor(at.cellX / SUB - half), Math.floor(at.cellY / SUB - half));
   }
 
   /** What the board shows while the item is held: for a bomb its reach while
@@ -64,7 +72,7 @@ export class EditSession {
       return at.overBoard ? { legal: new Set(), hover: null, ghost: null, bomb: { x: at.cellX, y: at.cellY, r: BOMB_RADIUS } } : null;
     const hover = this.tile;
     const next = hover ? this.legal.get(hover) : undefined;
-    return { legal: new Set(this.legal.keys()), hover, ghost: next ? dropGhost(this.drag, next, hover!) : null };
+    return { legal: new Set(this.legal.keys()), hover, ghost: next ? dropGhost(this.drag, next, hover!) : null, ...(this.span > 1 ? { span: this.span } : {}) };
   }
 
   /** Releasing the item at `at`: a city element takes the legal tile under

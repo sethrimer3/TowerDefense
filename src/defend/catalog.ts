@@ -4,11 +4,11 @@ import { intPow } from "../exact.ts";
  * copper, silver and Gold, the universal upgrades, the bonuses the Smithy and the
  * skill trees add, and the enemy roster. */
 
-export type StructureKind = "keep" | "barracks" | "archerBarracks" | "archerTower" | "cannonTower" | "watchTower" | "wizardTower" | "mageGuild" | "valkyriePalace";
+export type StructureKind = "keep" | "barracks" | "archerBarracks" | "archerTower" | "cannonTower" | "watchTower" | "wizardTower" | "mageGuild" | "valkyriePalace" | "darkKeep";
 /** Everything that appears in the build palette (the keep is placed from the
  * start and can only be moved, so it is not a palette item). */
 export type PaletteItem = "cityTile" | Exclude<StructureKind, "keep">;
-export const PALETTE_ITEMS: PaletteItem[] = ["cityTile", "barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace"];
+export const PALETTE_ITEMS: PaletteItem[] = ["cityTile", "barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep"];
 
 export type StructureDef = {
   kind: StructureKind;
@@ -20,8 +20,11 @@ export type StructureDef = {
    * 2, 4, 8 or 16 (a whole tile, alone). What shares a tile must add up to
    * no more than 16, and fit. */
   size: TileShare;
+  /** How many tiles across (and down) it spans: 2 for a structure that
+   * fills a 2 × 2 block of tiles (taking all of each), else 1 (unset). */
+  span?: TileSpan;
   /** The smaller footprint and share a building-specific upgrade gives it. */
-  compact?: { upgrade: UpgradeId; w: number; h: number; size: TileShare };
+  compact?: { upgrade: UpgradeId; w: number; h: number; size: TileShare; span?: TileSpan };
   maxHp: number;
   /** Can be placed on ground outside the city limits. */
   outsideOk: boolean;
@@ -30,6 +33,8 @@ export type StructureDef = {
 
 /** Sixteenths of a tile. */
 export type TileShare = 1 | 2 | 4 | 8 | 16;
+/** Tiles across a structure's block. */
+export type TileSpan = 1 | 2;
 /** A tile's whole room, in sixteenths. */
 export const TILE_ROOM = 16;
 
@@ -125,13 +130,26 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     outsideOk: false,
     description: "A heavenly marble palace that fills a whole tile. Trains armoured valkyries whose golden spear charges through every enemy in a line.",
   },
+  darkKeep: {
+    kind: "darkKeep",
+    name: "Dark wizard keep",
+    w: 12,
+    h: 12,
+    size: 16,
+    span: 2,
+    compact: { upgrade: "darkKeepCompact", w: 5, h: 5, size: 16, span: 1 },
+    maxHp: 900,
+    outsideOk: false,
+    description: "A vast keep of black obsidian and rubies filling a 2 × 2 block of tiles. Its four corner turrets hurl black lightning that leaps from foe to foe, and it summons a dark wizard whose bolts chain through whole crowds.",
+  },
 };
 
 /** A structure's footprint and share of its tile, smaller once its
  * building-specific upgrade is owned (`compact`). */
-export function footprint(kind: StructureKind, compact: boolean): { w: number; h: number; size: TileShare } {
+export function footprint(kind: StructureKind, compact: boolean): { w: number; h: number; size: TileShare; span: TileSpan } {
   const def = STRUCTURES[kind];
-  return compact && def.compact ? def.compact : def;
+  const f = compact && def.compact ? def.compact : def;
+  return { w: f.w, h: f.h, size: f.size, span: f.span ?? 1 };
 }
 
 /** A tile share in words. */
@@ -148,6 +166,7 @@ export const STARTING_OWNED: Record<PaletteItem, number> = {
   wizardTower: 0,
   mageGuild: 0,
   valkyriePalace: 0,
+  darkKeep: 0,
 };
 
 /** A price in Gold and metal bars (all earned in battle). */
@@ -166,6 +185,7 @@ export function purchasePrice(item: PaletteItem, owned: number): Price {
     wizardTower: { gold: 450, copper: 6 },
     mageGuild: { gold: 520, copper: 7 },
     valkyriePalace: { gold: 800, copper: 10, silver: 1 },
+    darkKeep: { gold: 3000, copper: 25, silver: 8 },
   };
   const growth = item === "cityTile" ? 1.3 : 1.5;
   const m = intPow(growth, extra);
@@ -196,6 +216,9 @@ export type UpgradeId =
   | "mageEmbers"
   | "palaceCompact"
   | "valkyrieReach"
+  | "darkKeepCompact"
+  | "chainReach"
+  | "chainCount"
   | "wallStrength"
   | "keepStrength"
   | "civilianCount"
@@ -211,6 +234,9 @@ export type UpgradeDef = {
   /** Overrides the usual escalating price (for special one-offs). */
   price?: (level: number) => Price;
 };
+
+/** Conduit of night's top level: the dark wizard's bolts reach 250 enemies. */
+const CHAIN_COUNT_MAX = 20;
 
 /** At the top level of Patrol routes, swordsmen answer anywhere in the city. */
 const SOLDIER_REACH_MAX = 4;
@@ -256,6 +282,23 @@ export const UPGRADES: UpgradeDef[] = [
     price: () => ({ gold: 1200, copper: 10, silver: 3 }),
   },
   { id: "valkyrieReach", group: "Valkyrie palace", name: "Long spears", maxLevel: 5, describe: (l) => `Valkyries charge ${stabLength(l).toFixed(1)} cells` },
+  {
+    id: "darkKeepCompact",
+    group: "Dark wizard keep",
+    name: "Folded sanctum",
+    maxLevel: 1,
+    describe: (l) => (l ? "The keep takes a single tile" : "The keep takes a 2 × 2 block of tiles"),
+    price: () => ({ gold: 9000, copper: 45, silver: 20 }),
+  },
+  { id: "chainReach", group: "Dark wizard keep", name: "Arc span", maxLevel: 5, describe: (l) => `Black lightning leaps ${chainJump(l).toFixed(2)} cells between enemies` },
+  {
+    id: "chainCount",
+    group: "Dark wizard keep",
+    name: "Conduit of night",
+    maxLevel: CHAIN_COUNT_MAX,
+    describe: (l) => `The dark wizard's bolts chain to ${wizardChain(l)} enemies, the turrets' to ${turretChain(l)}`,
+    price: (l) => ({ gold: 600 + 300 * l * l, copper: 4 + l, silver: 1 + Math.floor(l / 3) }),
+  },
   { id: "wallStrength", group: "City", name: "Masonry", maxLevel: 6, describe: (l) => `${wallHp(l)} HP per wall stone` },
   { id: "keepStrength", group: "City", name: "Keep bastions", maxLevel: 6, describe: (l) => `${keepHp(l)} keep HP` },
   { id: "civilianCount", group: "Civilians", name: "Guild of builders", maxLevel: 5, describe: (l) => `${civilianCount(l)} civilians repair the city` },
@@ -333,6 +376,28 @@ export const EMBER_SHARE = 0.85;
 export const stabLength = (l: number) => 3 + l * 0.8;
 export const STAB_WIDTH = 0.45;
 export const STAB_GUARD = 1;
+/** Black lightning, from the dark wizard keep's corner turrets and its dark
+ * wizard: each bolt strikes its target, then leaps to the nearest enemy not
+ * yet struck within `chainJump` cells (enemies must be packed close), and so
+ * on, up to its chain's length. Every enemy struck takes the bolt's damage. */
+export const chainJump = (l: number) => 0.7 + l * 0.2;
+export const wizardChain = (l: number) => 50 + l * 10;
+export const turretChain = (l: number) => 5 + l;
+/** The dark keep's corner turrets: range (cells), damage and seconds
+ * between bolts. */
+export const TURRET = { range: 7.5, damage: 12, cooldown: 1.2 };
+/** How far in from the dark keep's sides its corner turrets stand, as a
+ * share of its width; `turretSpots` gives their centres. */
+export const TURRET_INSET = 0.14;
+export function turretSpots(r: { x: number; y: number; w: number; h: number }) {
+  const ix = r.w * TURRET_INSET, iy = r.h * TURRET_INSET;
+  return [
+    { x: r.x + ix, y: r.y + iy },
+    { x: r.x + r.w - ix, y: r.y + iy },
+    { x: r.x + ix, y: r.y + r.h - iy },
+    { x: r.x + r.w - ix, y: r.y + r.h - iy },
+  ];
+}
 export const wallHp = (l: number) => Math.round(100 * (1 + l * 0.35));
 export const keepHp = (l: number) => Math.round(STRUCTURES.keep.maxHp * (1 + l * 0.3));
 export const civilianCount = (l: number) => 2 + l;
@@ -417,5 +482,9 @@ export const NO_BONUSES: Readonly<Bonuses> = Object.freeze({
 export const SOLDIER = { hp: 40, damage: 6, cooldown: 0.8, speed: 2.4, reach: 0.75, leash: 16, size: 0.4, color: "#5b8fd9" };
 export const ARCHER_UNIT = { hp: 24, damage: 5, cooldown: 1.1, speed: 2.1, size: 0.36, color: "#6cc08a" };
 export const VALKYRIE = { hp: 50, damage: 16, cooldown: 1.8, speed: 2.3, size: 0.44, color: "#f2e6c4" };
+/** The dark wizard, the keep's one ultimate unit: slow to summon (`drill`
+ * times a barracks' drill), casting a bolt of black lightning within
+ * `range` cells every `cooldown` seconds. */
+export const DARK_WIZARD = { hp: 160, damage: 30, cooldown: 1.6, speed: 1.9, size: 0.5, range: 6, garrison: 1, drill: 3, color: "#2a1418" };
 export const FIRE_MAGE = { hp: 22, cooldown: 2.1, speed: 2, size: 0.38, color: "#c8372d" };
 export const CIVILIAN = { speed: 1.9, size: 0.3, color: "#e6d7b4", respawnSeconds: 10 };

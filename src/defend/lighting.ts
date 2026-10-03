@@ -70,7 +70,7 @@ function buildingLights(map: CityMap, b: Building): NewLight[] {
   const radius = TOWER_RADIUS[b.kind];
   if (radius !== undefined) return [towerFire(b, radius)];
   if (b.kind === "keep") return keepBraziers(b);
-  if (b.kind !== "barracks" && b.kind !== "archerBarracks" && b.kind !== "valkyriePalace") return [];
+  if (b.kind !== "barracks" && b.kind !== "archerBarracks" && b.kind !== "valkyriePalace" && b.kind !== "darkKeep") return [];
   const door = doorPoint(map, r);
   return door ? [{ kind: "door", x: door.x, y: door.y, radius: 4.5, strength: 0.85, owner: b.id, inside: false, pillars: [] }] : [];
 }

@@ -19,7 +19,10 @@ import { stepArcher, stepSwordsman } from '../src/defend/troops.ts';
 import { stepArrows } from '../src/defend/towers.ts';
 import { stepBlazes, stepFireballs, stepMage } from '../src/defend/mages.ts';
 import { charge, stepValkyrie } from '../src/defend/valkyries.ts';
-import { UPGRADES, purchasePrice, STARTING_OWNED, STRUCTURES, TILE_ROOM, footprint, stabLength } from '../src/defend/catalog.ts';
+import { chainBolt, stepDarkWizard } from '../src/defend/dark-wizards.ts';
+import { BoltBuffer } from '../src/defend/dark-art.ts';
+import { EditSession } from '../src/defend/edit-session.ts';
+import { UPGRADES, purchasePrice, STARTING_OWNED, STRUCTURES, TILE_ROOM, footprint, stabLength, chainJump, wizardChain, turretChain, turretSpots, DARK_WIZARD } from '../src/defend/catalog.ts';
 import { available, buyItem, buyUpgrade, decodeDefendSave, defaultDefendSave } from '../src/defend/progress.ts';
 
 const zeroLevels = () => Object.fromEntries(UPGRADES.map((u) => [u.id, 0])) as any;
@@ -713,4 +716,150 @@ test('Valkyrie palace: valkyries charge-stab every enemy in a line, stop at wall
   v.cd = 0;
   charge(sim, v, foe(5, v.x - 3, v.y), reach);
   assert.ok(v.x > cellX(west) - 0.5 && v.x <= cellX(west) + 0.5, 'the wall stops her charge');
+});
+
+/** The keep in a 3 × 3 square, with a 2 × 2 block of city tiles above and
+ * left of it (the square's top left tile and the three above and beside). */
+function darkCity(): Layout {
+  let l = squareCity();
+  const { tx, ty } = l.keep;
+  for (const [dx, dy] of [[-1, -2], [-2, -2], [-2, -1]]) l = placeCityTile(l, tx + dx, ty + dy)!;
+  return l;
+}
+
+test('the dark wizard keep fills a 2 × 2 block of city tiles, or one tile folded', () => {
+  let l = darkCity();
+  const { tx, ty } = l.keep;
+  assert.equal(footprint('darkKeep', false).span, 2);
+  assert.equal(placeStructure(l, 'darkKeep', tx - 1, ty - 1), null, 'not over the keep');
+  assert.equal(placeStructure(l, 'darkKeep', tx - 1, ty - 3), null, 'not half outside the city');
+  const placed = placeStructure(l, 'darkKeep', tx - 2, ty - 2);
+  assert.ok(placed, 'on a block of four city tiles');
+  l = placed;
+  const fit = fitLayout(l);
+  assert.ok(fit.ok);
+  const keep = fit.structures.find((s) => s.kind === 'darkKeep')!;
+  assert.deepEqual([keep.rect.w, keep.rect.h], [12, 12], 'a vast 12 × 12 keep');
+  assert.ok(keep.rect.x >= (tx - 2) * SUB && keep.rect.x + 12 <= tx * SUB && keep.rect.y >= (ty - 2) * SUB && keep.rect.y + 12 <= ty * SUB, 'inside its block');
+  for (const [x, y] of [[tx - 2, ty - 2], [tx - 1, ty - 2], [tx - 2, ty - 1], [tx - 1, ty - 1]])
+    assert.equal(placeStructure(l, 'archerTower', x, y), null, `nothing else fits on its tile ${x},${y}`);
+  assert.equal(moveKeep(l, tx - 1, ty - 1), null, 'the keep can\'t move under it');
+  assert.deepEqual(removeCityTile(l, tx - 2, ty - 2)?.returned, ['darkKeep'], 'taking away any tile it stands on returns it');
+  // Two blocks that overlap on a tile neither stands on still clash.
+  let wide = darkCity();
+  for (const [dx, dy] of [[-3, -2], [-3, -3], [-2, -3], [-1, -3]]) wide = placeCityTile(wide, tx + dx, ty + dy)!;
+  wide = placeStructure(wide, 'darkKeep', tx - 2, ty - 2)!;
+  assert.equal(placeStructure(wide, 'darkKeep', tx - 3, ty - 3), null, 'two dark keeps can\'t share a tile');
+  const city = generateCity(fit, 3);
+  const b = city.buildings.find((b) => b.kind === 'darkKeep')!;
+  assert.ok(city.city[b.cells[0]], 'it stands in the city');
+  // Folded, it fits a single tile.
+  const folded = placeStructure({ ...darkCity(), compact: ['darkKeep'] }, 'darkKeep', tx + 1, ty + 1);
+  assert.ok(folded, 'folded, a single tile takes it');
+  const f2 = fitLayout(folded);
+  assert.ok(f2.ok && f2.structures.find((s) => s.kind === 'darkKeep')!.rect.w === 5);
+});
+
+test('dragging the dark keep shows the whole 2 × 2 block centred under the pointer', () => {
+  const l = darkCity();
+  const { tx, ty } = l.keep;
+  const edit = new EditSession({ from: 'palette', item: 'darkKeep' }, l);
+  assert.equal(edit.span, 2);
+  assert.deepEqual([...edit.legal.keys()], [tileKey(tx - 2, ty - 2)], 'the one block of four free city tiles');
+  // The pointer at the corner where the block's four tiles meet picks it.
+  edit.hover({ cellX: (tx - 1) * SUB + 0.4, cellY: (ty - 1) * SUB - 0.4, overBoard: true, overPalette: false });
+  const o = edit.overlay()!;
+  assert.equal(o.hover, tileKey(tx - 2, ty - 2));
+  assert.equal(o.span, 2, 'the overlay frames a 2 × 2 block');
+  assert.ok(o.ghost && o.ghost.rect.w === 12, 'with the keep\'s outline in it');
+  edit.hover({ cellX: (tx + 1) * SUB, cellY: (ty + 1) * SUB, overBoard: true, overPalette: false });
+  assert.equal(edit.overlay()!.ghost, null, 'a block that won\'t take it shows no ghost');
+  assert.match(edit.release({ cellX: (tx + 1) * SUB, cellY: (ty + 1) * SUB, overBoard: true, overPalette: false }).message as string, /2 × 2 block/);
+  const folded = new EditSession({ from: 'palette', item: 'darkKeep' }, { ...l, compact: ['darkKeep'] });
+  assert.equal(folded.span, 1, 'folded, it is carried like any one-tile building');
+});
+
+/** An enemy for the lightning tests. */
+const foeAt = (id: number, x: number, y: number) =>
+  ({ id, kind: 'orc', x, y, hp: 1000, maxHp: 1000, cd: 0, jx: 0, jy: 0, distract: -1, distractT: 0, rollT: 99, marked: false, flash: 0 }) as any;
+
+function darkSim(levels = zeroLevels()) {
+  let l = darkCity();
+  l = placeStructure(l, 'darkKeep', l.keep.tx - 2, l.keep.ty - 2)!;
+  const sim = new DefendSim(mapOf(l), levels, 1);
+  sim.spawnQueue = [];
+  sim.breakT = 1e9;
+  return sim;
+}
+
+test('black lightning leaps between enemies packed close, up to its chain\'s length', () => {
+  const sim = darkSim();
+  const jump = chainJump(0);
+  // A line of enemies just within a leap of each other, then a gap.
+  const line = Array.from({ length: 8 }, (_, i) => foeAt(i + 1, 30 + i * (jump - 0.05), 4));
+  const beyond = foeAt(99, 30 + 7 * (jump - 0.05) + jump + 0.2, 4);
+  sim.enemies = [...line, beyond];
+  (sim as any).indexEnemies();
+  const bolt = chainBolt(sim, { x: 29, y: 4 }, line[0], 10, 50, jump);
+  assert.ok(line.every((e) => e.hp === 990), 'every enemy in the packed line is struck');
+  assert.equal(beyond.hp, 1000, 'one too far away is not');
+  assert.equal(bolt.pts.length, 2 + line.length * 2, 'the bolt runs through each');
+  sim.enemies.forEach((e: any) => (e.hp = 1000));
+  chainBolt(sim, { x: 29, y: 4 }, line[0], 10, 3, jump);
+  assert.equal(line.filter((e) => e.hp < 1000).length, 3, 'a short chain stops at its length');
+  assert.equal(wizardChain(0), 50);
+  assert.equal(wizardChain(20), 250, 'Conduit of night takes the wizard\'s chain to 250');
+  assert.equal(turretChain(0), 5);
+  assert.ok(chainJump(5) > chainJump(0), 'Arc span lengthens the leaps');
+});
+
+test('the dark keep\'s corner turrets fire, and it summons one dark wizard who chains through a crowd', () => {
+  const sim = darkSim();
+  const keep = sim.map.buildings.find((b) => b.kind === 'darkKeep')!;
+  const spots = turretSpots(keep.rect);
+  assert.equal(spots.length, 4);
+  // A crowd beside one turret, outside the keep.
+  const s = spots[0];
+  sim.enemies = Array.from({ length: 12 }, (_, i) => foeAt(i + 1, s.x - 3 - (i % 4) * 0.4, s.y - (i >> 2) * 0.4));
+  sim.step(1 / 30);
+  assert.ok(sim.bolts.length >= 1, 'a turret looses a bolt');
+  assert.ok(sim.bolts.every((b) => b.pts.length / 2 - 1 <= turretChain(0)), 'chaining at most five');
+  assert.ok(sim.enemies.filter((e) => e.hp < 1000).length >= 2, 'through more than one enemy');
+  // Clear the board and let the keep summon its wizard: only ever one.
+  sim.enemies = [];
+  for (let i = 0; i < 30 * 60; i++) sim.step(1 / 30);
+  const wizards = sim.soldiers.filter((u) => u.kind === 'darkWizard');
+  assert.equal(wizards.length, 1, 'one dark wizard');
+  const w = wizards[0];
+  // A packed crowd of 80 within his reach: his bolt chains through 50.
+  const open = sim.streets.find((i) => !sim.solid[i] && Math.abs(cellX(i) + 0.5 - (keep.rect.x + 6)) > 8)!;
+  w.x = cellX(open) + 0.5;
+  w.y = cellY(open) + 0.5;
+  sim.enemies = Array.from({ length: 80 }, (_, i) => foeAt(100 + i, w.x + 2 + (i % 10) * 0.3, w.y + Math.floor(i / 10) * 0.3));
+  sim.bolts = [];
+  w.cd = 0;
+  (sim as any).indexEnemies();
+  stepDarkWizard(sim, w, 1 / 30);
+  assert.equal(sim.bolts.length, 1);
+  assert.equal(sim.enemies.filter((e) => e.hp < 1000).length, wizardChain(0), 'his bolt strikes fifty');
+  assert.equal(w.cd, DARK_WIZARD.cooldown);
+});
+
+test('the bolt buffer draws a black core in a crimson glow, and clears it after', () => {
+  const buf = new BoltBuffer();
+  const bolt = { pts: [10, 10, 11, 10.5, 12, 10], from: [0, 1], t: 0.1, life: 0.32, seed: 7 };
+  const box = buf.raster([bolt]);
+  assert.ok(box, 'something drew');
+  const drawn = [...buf.rgba].filter((v) => v);
+  const core = 0xff070205; // 0x050207 as little-endian RGBA
+  assert.ok(drawn.includes(core), 'a black core');
+  assert.ok(drawn.filter((v) => (v & 0xff) > 0x50 && ((v >> 8) & 0xff) < 0x40).length > drawn.length / 3, 'mostly crimson glow round it');
+  assert.ok(box!.x0 >= 10 * 8 - 8 && box!.x1 <= 12 * 8 + 8, 'only round the bolt');
+  // A long chain of hundreds of links draws without fuss.
+  const pts = [5, 5];
+  for (let i = 0; i < 250; i++) pts.push(5 + (i % 25) * 0.6, 5 + Math.floor(i / 25) * 0.6);
+  assert.ok(buf.raster([{ pts, from: Array.from({ length: 250 }, (_, i) => i), t: 0.02, life: 0.32, seed: 3 }]));
+  assert.equal(buf.raster([]) !== null, true, 'clearing reports the box it cleared');
+  assert.ok(buf.rgba.every((v) => v === 0), 'and leaves nothing behind');
+  assert.equal(buf.raster([]), null, 'then nothing changes');
 });

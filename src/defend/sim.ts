@@ -11,7 +11,8 @@ import { stepBlackHoles } from "./hostile-attacks.ts";
  * `DefendSim` owns the world (buildings, crowds, waves, the enemy index)
  * and what happens to it (damage, rebuilding, blasts, movement). What each
  * kind of unit decides to do lives beside it: `enemies.ts`, `troops.ts`,
- * `mages.ts`, `civilians.ts` and `towers.ts`, with grid pathing in `pathing.ts`. */
+ * `mages.ts`, `valkyries.ts`, `dark-wizards.ts`, `civilians.ts` and
+ * `towers.ts`, with grid pathing in `pathing.ts`. */
 import { MAX_WAVE_ENEMIES, buildWave } from "./waves.ts";
 export { buildWave } from "./waves.ts";
 import { dist, sq } from "../exact.ts";
@@ -40,6 +41,7 @@ import { Barracks, stepArcher, stepSwordsman } from "./troops.ts";
 import { stepBlazes, stepFireballs, stepMage, type Blaze, type Fireball } from "./mages.ts";
 import { stepStabs, stepValkyrie, type Stab } from "./valkyries.ts";
 import { Wizards, stepFlames, stepFrosts, type Flame, type Frost } from "./wizard.ts";
+import { DarkKeeps, stepBolts, stepDarkWizard, type Bolt } from "./dark-wizards.ts";
 
 export type Levels = Record<UpgradeId, number>;
 
@@ -72,8 +74,9 @@ export type Enemy = {
 export type Soldier = {
   id: number;
   /** Swordsmen chase and hack; archers roam and shoot; fire mages roam
-   * and hurl fireballs; valkyries hunt and charge-stab. */
-  kind: "sword" | "archer" | "mage" | "valkyrie";
+   * and hurl fireballs; valkyries hunt and charge-stab; the dark wizard
+   * hunts and casts chain lightning. */
+  kind: "sword" | "archer" | "mage" | "valkyrie" | "darkWizard";
   home: number;
   x: number;
   y: number;
@@ -125,6 +128,7 @@ const STEP_SOLDIER: Record<Soldier["kind"], (sim: DefendSim, s: Soldier, dt: num
   archer: stepArcher,
   mage: stepMage,
   valkyrie: stepValkyrie,
+  darkWizard: stepDarkWizard,
 };
 /** How long a struck building flashes, in seconds. */
 export const BUILDING_FLASH = 0.14;
@@ -169,6 +173,8 @@ export class DefendSim {
   blazes: Blaze[] = [];
   /** Valkyries' charge stabs, fading. */
   stabs: Stab[] = [];
+  /** Black lightning from dark keeps' turrets and dark wizards, fading. */
+  bolts: Bolt[] = [];
   scorches: Scorch[] = [];
   effects: Effect[] = [];
   events: SimEvent[] = [];
@@ -199,6 +205,7 @@ export class DefendSim {
   private towers = new Towers();
   private barracks = new Barracks();
   private wizards = new Wizards();
+  private darkKeeps = new DarkKeeps();
   private builders: Builders;
   private grid: Enemy[][] = Array.from({ length: CELL_COUNT }, () => []);
   private gridUsed: number[] = [];
@@ -283,6 +290,7 @@ export class DefendSim {
     this.wizards.step(this, dt);
     stepFlames(this, this.wizards, dt);
     stepFrosts(this, dt);
+    this.darkKeeps.step(this, dt);
     this.barracks.step(this, dt);
     for (const s of this.soldiers) STEP_SOLDIER[s.kind](this, s, dt);
     stepFireballs(this, dt);
@@ -321,6 +329,7 @@ export class DefendSim {
     for (const s of this.soldiers)
       if (s.guard !== undefined && (s.guard -= dt) <= 0) delete s.guard;
     stepStabs(this, dt);
+    stepBolts(this, dt);
     for (let i = 0; i < this.flash.length; i++) if (this.flash[i] > 0) this.flash[i] = Math.max(0, this.flash[i] - dt);
   }
 
