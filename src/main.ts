@@ -15,6 +15,7 @@ import { MinePage } from "./mine/ui.ts";
 import { METALS, type Weather as MineWeather } from "./mine/sim.ts";
 import { LibraryPage } from "./library/ui.ts";
 import { stream } from "./random.ts";
+import { WelcomeBack } from "./ui/welcome.ts";
 
 // Wires the pages together: builds the shell, loads the save, and routes
 // navigation, the currency bar and the frame loop between the pages.
@@ -114,8 +115,20 @@ const libraryPage = new LibraryPage(el("library"), {
 let mineDirty = false;
 /** The mine's smiths, by name. */
 const smithNames = () => minePage.sim.miners.filter((m) => m.job === "smith").map((m) => m.name);
+/** Time since the Mine and the Library were last saved: the time away. */
+const lastSaved = Math.max(save.mine?.savedAt ?? 0, save.library?.savedAt ?? 0);
+const awayMs = lastSaved > 0 ? Math.max(0, clock() - lastSaved) : 0;
 libraryPage.load(save.library, clock());
 minePage.load(save.mine, clock());
+const welcome = new WelcomeBack(modal, () => ({
+  ms: awayMs,
+  knowledge: libraryPage.awayKnowledge,
+  shelves: libraryPage.sim.built,
+  librarians: libraryPage.sim.librarians.length,
+  mine: minePage.away,
+  crew: minePage.sim.miners.length,
+  owedMs: minePage.owedMs,
+}));
 
 soundEnabledBy(() => !save.settings.soundOff);
 flourishesEnabledBy(() => !save.settings.reduceMotion);
@@ -190,6 +203,7 @@ function frame(time: number) {
     lastMineSave = time;
     store();
   }
+  welcome.refresh();
   if (tab === "upgrades") skillTree.drawParticles(time);
   if (time - lastTick >= 1000) {
     lastTick = time;
@@ -229,4 +243,5 @@ window.addEventListener("pagehide", store);
 
 settleTraining(save, clock(), new Set(smithNames()));
 navigate("defend");
+welcome.show();
 requestAnimationFrame(frame);

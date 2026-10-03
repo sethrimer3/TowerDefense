@@ -112,7 +112,8 @@ nav button.selected,
 .defend-go,
 button.training-cost:not(:disabled),
 .defend-card button:not(:disabled),
-.mine-hire:not(:disabled) {
+.mine-hire:not(:disabled),
+.away-collect {
   border-color: #6e4c1c;
   color: #ffe1a0;
   background:
@@ -862,6 +863,132 @@ dialog p {
 dialog::backdrop {
   background: radial-gradient(ellipse at 50% 40%, #1a0f06c0, #050302ee);
   backdrop-filter: blur(3px);
+}
+
+/* ── Welcome back: the time away's ledger, its figures in wells cut into
+   oak boards nailed to the parchment ── */
+dialog.welcome {
+  width: min(92vw, 440px);
+}
+.away-time {
+  margin: 0 0 14px;
+}
+.away-time b {
+  color: #3a200c;
+}
+.away-ledger {
+  display: grid;
+  gap: 10px;
+  text-align: left;
+}
+.away-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 2px 12px;
+  padding: 11px 14px;
+  border: 2px solid #150f0a;
+  border-radius: 3px;
+  color: #e6d6b4;
+  background:
+    var(--nails),
+    linear-gradient(#ffffff0c, transparent 40%, #00000050),
+    linear-gradient(#00000060, #00000060),
+    var(--wood),
+    #3a2616;
+  box-shadow:
+    inset 0 1px 0 #ffd9a020,
+    0 2px 0 #000,
+    0 4px 10px #00000060;
+}
+.away-row h3 {
+  margin: 0;
+  font-size: 13px;
+  letter-spacing: 1px;
+  color: #f0d9a8;
+  text-shadow: 0 1px 0 #000;
+}
+dialog .away-row p {
+  grid-column: 1;
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #a8987a;
+}
+.away-gain {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  min-width: 92px;
+  padding: 7px 10px;
+  border: 1px solid #3a2c1c;
+  border-radius: 3px;
+  background: #0d0b09;
+  box-shadow: inset 0 2px 4px #000, 0 1px 0 #ffd9a014;
+  text-align: center;
+  font-size: 18px;
+  color: #e6c8ff;
+  text-shadow: 0 1px 0 #000, 0 0 8px #b07aff70;
+}
+.away-gain small {
+  display: block;
+  font-size: 8px;
+  letter-spacing: 2px;
+  color: #a8987a;
+  text-transform: uppercase;
+}
+.away-metals {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 8px 0 4px;
+  padding: 0;
+  list-style: none;
+}
+.away-metals li {
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  padding: 7px 4px 6px;
+  border: 1px solid #3a2c1c;
+  border-radius: 3px;
+  background: #0d0b09;
+  box-shadow: inset 0 2px 4px #000, 0 1px 0 #ffd9a014;
+}
+.away-metals b {
+  font-size: 17px;
+  text-shadow: 0 1px 0 #000;
+}
+.away-metals small {
+  font-size: 8px;
+  letter-spacing: 2px;
+  color: #a8987a;
+  text-transform: uppercase;
+}
+.away-bar {
+  width: 16px;
+  height: 8px;
+  border: 1px solid #000;
+  border-radius: 2px;
+  box-shadow: inset 0 1px 0 #ffffff80, 0 1px 0 #000;
+}
+.away-bar.copper { background: linear-gradient(#f0a272, #9a4e26); }
+.away-bar.silver { background: linear-gradient(#f4f6fa, #8e98a8); }
+.away-bar.gold { background: linear-gradient(#ffe7a0, #b07a1c); }
+dialog .away-row .away-note {
+  grid-column: 1 / -1;
+  font-style: italic;
+}
+.away-loss {
+  color: #ff9f86;
+  font-style: normal;
+}
+.away-collect {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 
 @media (max-width: 480px) {
