@@ -21,10 +21,8 @@ export interface Away {
   knowledge: number;
   shelves: number;
   librarians: number;
-  /** What the library worked through of added time (null when it was paid
-   * at its rate instead), and the time it still owes. */
+  /** Whether the library stood through the time away (null without any). */
   library: LibraryAway | null;
-  libraryOwedMs: number;
   /** The mine's account (null without a mine), its crew, and the time its
    * catch-up still owes. */
   mine: MineAway | null;
@@ -38,7 +36,7 @@ const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? o
 /** Whether the time away earned anything worth a welcome. */
 export function worthWelcome(a: Away) {
   if (a.ms < WELCOME_MS) return false;
-  return whole(a.knowledge) > 0 || (a.mine !== null && a.crew > 0);
+  return whole(a.knowledge) > 0 || (a.mine !== null && a.crew > 0) || (a.library?.burntAt ?? null) !== null;
 }
 
 /** The ledger of the Library and the Mine, as shown. */
@@ -46,13 +44,9 @@ function ledger(a: Away) {
   const library = a.shelves > 0 || a.librarians > 0
     ? `${plural(a.shelves, "shelf", "shelves")} and ${plural(a.librarians, "librarian")} at work`
     : "Nobody at the desks yet";
-  let libraryNote = "";
-  if (a.library) {
-    const l = a.library, losses = [l.shelves && plural(l.shelves, "shelf", "shelves"), l.librarians && plural(l.librarians, "librarian")].filter(Boolean);
-    const fires = l.fires ? `${plural(l.fires, "fire")} broke out${losses.length ? `: ${losses.join(" and ")} lost` : ", put out without loss"}` : "";
-    const note = a.libraryOwedMs > 0 ? `The librarians are still at work: ${span(a.libraryOwedMs)} to catch up` : "";
-    libraryNote = note || fires ? `<p class="away-note">${note}${note && fires ? "<br>" : ""}${fires ? `<span class="${l.shelves || l.librarians ? "away-loss" : ""}">${fires}</span>` : ""}</p>` : "";
-  }
+  const l = a.library, burnt = l && l.burntAt !== null
+    ? `<p class="away-note"><span class="away-loss">The library burnt down ${l.burntAt ? `after ${span(l.burntAt)}` : "in the first hour"}${l.shelves || l.librarians ? `: ${[l.shelves && plural(l.shelves, "shelf", "shelves"), l.librarians && plural(l.librarians, "librarian")].filter(Boolean).join(" and ")} lost` : ""}</span></p>`
+    : "";
   let mine = "";
   if (a.mine) {
     const m = a.mine;
@@ -72,7 +66,7 @@ function ledger(a: Away) {
   return `<section class="away-row away-library">
       <h3>✦ The Library</h3>
       <p>${library}</p>
-      <b class="away-gain">+${whole(a.knowledge)} <small>Knowledge</small></b>${libraryNote}
+      <b class="away-gain">+${whole(a.knowledge)} <small>Knowledge</small></b>${burnt}
     </section>${mine}`;
 }
 
@@ -125,7 +119,7 @@ export class WelcomeBack {
   refresh() {
     if (!this.open) return;
     const minute = (ms: number) => Math.ceil(ms / 60000) * 60000;
-    const a = this.read(), html = ledger({ ...a, owedMs: minute(a.owedMs), libraryOwedMs: minute(a.libraryOwedMs) });
+    const a = this.read(), html = ledger({ ...a, owedMs: minute(a.owedMs) });
     if (html === this.shown) return;
     this.shown = html;
     this.modal.querySelector("#away-ledger")!.innerHTML = html;

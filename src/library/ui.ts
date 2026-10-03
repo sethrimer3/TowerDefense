@@ -1,28 +1,26 @@
 /** The Library tab: the cathedral's view, and buying bookshelves and
  * librarians for it. The library works whatever tab shows (`advance`, from
- * the app's frame loop) and earns Knowledge on the wall clock, including
- * while the game is closed: on loading, the time away (up to
- * `MAX_AWAY_MS`) is paid at the rate the library had when it was saved. The
- * librarians themselves only move while the game is open, except for time
- * added with `addAway` (the dev option), which the library works through
- * step by step, fires and all, a slice each frame. */
+ * the app's frame loop) and earns Knowledge on the wall clock. While the game
+ * is closed (on loading, the time away up to `MAX_AWAY_MS`, or time added by
+ * the dev option, `addAway`) it is reckoned an hour at a time (`idleHours`):
+ * each hour it earns at its rate unless it burns down (`idleFireChance`, less
+ * with Night watch), after which it is a new, empty library. The librarians
+ * themselves only move while the game is open. */
 import { play } from "../sound.ts";
 import { HOUR_MS, MAX_AWAY_MS } from "../away.ts";
-import { MAX_LIBRARIANS, MAX_SHELVES, LibrarySim, librarianPrice, shelfPrice, type LibrarySave } from "./sim.ts";
+import { random } from "../random.ts";
+import { MAX_LIBRARIANS, MAX_SHELVES, LibrarySim, idleFireChance, idleHours, librarianPrice, shelfPrice, type LibrarySave } from "./sim.ts";
 
 import { LibraryRenderer, daylight } from "./render.ts";
 
-/** What the library made of time added with `addAway`, for the welcome-back
- * screen: it grows while the catch-up runs. */
+/** What became of the library over time away, for the welcome-back screen. */
 export interface LibraryAway {
-  /** Fires that broke out, and shelves and librarians they cost. */
-  fires: number;
+  /** Ms into the time away at which the hour it burnt down in began (null
+   * when it stood), and the shelves and librarians lost with it. */
+  burntAt: number | null;
   shelves: number;
   librarians: number;
 }
-
-/** Library seconds owed are worked through in steps this long. */
-const CATCH_UP_STEP = 0.1;
 
 export interface LibraryHost {
   gold(): number;
@@ -35,8 +33,8 @@ export interface LibraryHost {
   clock(): number;
   /** The library earned Knowledge (fractions included). */
   earnKnowledge(n: number): void;
-  /** Fireproof Wood's and Fire Training's ranks. */
-  upgrades(): { fireproof: number; fireTraining: number };
+  /** Fireproof Wood's, Fire Training's and Night watch's ranks. */
+  upgrades(): { fireproof: number; fireTraining: number; nightWatch: number };
   /** Whether the Library tab shows. */
   showing(): boolean;
 }
@@ -52,12 +50,10 @@ export class LibraryPage {
   private ranTo = 0;
   private paidTo = 0;
   private burning = false;
-  /** Knowledge owed for the time away when the save was loaded (paid by
-   * the first `advance`), for the welcome-back screen. */
+  /** Knowledge earned over the time away (paid by the next `advance`), and
+   * what became of the library, for the welcome-back screen. */
   awayKnowledge = 0;
-  /** Seconds of added time the library still owes, and what it has made of
-   * it (null when no time was added). */
-  private owed = 0;
+  private owedKnowledge = 0;
   away: LibraryAway | null = null;
 
   constructor(root: HTMLElement, host: LibraryHost) {
@@ -67,14 +63,30 @@ export class LibraryPage {
 
   load(saved: LibrarySave | null, now: number) {
     this.sim = saved ? new LibrarySim(saved.seed, saved) : new LibrarySim(this.host.newSeed());
-    this.ranTo = now;
-    this.paidTo = saved?.savedAt ? now - Math.min(MAX_AWAY_MS, Math.max(0, now - saved.savedAt)) : now;
-    this.awayKnowledge = (this.sim.rate * (now - this.paidTo)) / HOUR_MS;
-    this.owed = 0;
+    this.ranTo = this.paidTo = now;
+    this.awayKnowledge = this.owedKnowledge = 0;
     this.away = null;
+    if (saved?.savedAt) this.idle(Math.min(MAX_AWAY_MS, Math.max(0, now - saved.savedAt)), saved.savedAt);
   }
   snapshot(now: number): LibrarySave {
     return this.sim.save(now);
+  }
+
+  /** Reckons `ms` of time away an hour at a time (rolls drawn from the
+   * library's seed and `stamp`): Knowledge for the hours it stood, and a new
+   * library if it burnt down. An empty library has nothing to burn. */
+  private idle(ms: number, stamp: number) {
+    const sim = this.sim, chance = sim.shelves > 0 ? idleFireChance(this.host.upgrades().nightWatch) : 0;
+    const r = idleHours(ms, sim.rate, chance, random(sim.seed ^ (stamp >>> 0) ^ 0x1d1e));
+    this.awayKnowledge += r.knowledge;
+    this.owedKnowledge += r.knowledge;
+    this.away = { burntAt: r.burntAt, shelves: 0, librarians: 0 };
+    if (r.burntAt !== null) {
+      this.away.shelves = sim.shelves;
+      this.away.librarians = sim.librarians.length;
+      this.sim = new LibrarySim(this.host.newSeed());
+      this.burning = false;
+    }
   }
 
   /** Runs the library up to wall-clock time `now` (a second at most: time
@@ -93,48 +105,20 @@ export class LibraryPage {
     }
     const gap = Math.min(MAX_AWAY_MS, Math.max(0, now - this.paidTo));
     this.paidTo = now;
-    if (gap > 0 && this.sim.rate > 0) this.host.earnKnowledge((this.sim.rate * gap) / HOUR_MS);
-    this.catchUp();
+    const earned = (this.sim.rate * gap) / HOUR_MS + this.owedKnowledge;
+    this.owedKnowledge = 0;
+    if (earned > 0) this.host.earnKnowledge(earned);
     if (this.sim.fire.active !== this.burning) {
       this.burning = this.sim.fire.active;
-      if (this.burning && this.host.showing() && !this.owed) play("horn");
+      if (this.burning && this.host.showing()) play("horn");
     }
   }
 
-  /** Adds `ms` of time to work through: the librarians build, shelve and
-   * fight fires as they would have, and Knowledge is paid as it goes at the
-   * rate of each moment (`awayKnowledge` and `away` keep the account). */
+  /** Dev: adds `ms` of time away, reckoned as if the game had been closed
+   * that long. */
   addAway(ms: number) {
-    this.owed += ms / 1000;
     this.awayKnowledge = 0;
-    this.away = { fires: 0, shelves: 0, librarians: 0 };
-  }
-  /** Wall-clock ms of added time the library still owes. */
-  get owedMs() {
-    return this.owed * 1000;
-  }
-  /** Works through owed time within a slice of the frame; day and night
-   * follow the time being worked through. */
-  private catchUp() {
-    const away = this.away;
-    if (!away || this.owed <= 0) return;
-    const start = performance.now();
-    let n = 0, knowledge = 0;
-    while (this.owed > 0) {
-      if (n % 600 === 0) this.sim.night = 1 - daylight(this.host.clock() - this.owed * 1000);
-      const dt = Math.min(CATCH_UP_STEP, this.owed), shelves = this.sim.shelves, librarians = this.sim.librarians.length, burning = this.sim.fire.active;
-      this.sim.step(dt);
-      this.owed -= dt;
-      knowledge += (this.sim.rate * dt * 1000) / HOUR_MS;
-      if (!burning && this.sim.fire.active) away.fires++;
-      away.shelves += Math.max(0, shelves - this.sim.shelves);
-      away.librarians += Math.max(0, librarians - this.sim.librarians.length);
-      if (++n % 64 === 0 && performance.now() - start > 6) break;
-    }
-    if (this.owed < 1e-6) this.owed = 0;
-    this.sim.night = 1 - daylight(this.host.clock());
-    this.awayKnowledge += knowledge;
-    if (knowledge > 0) this.host.earnKnowledge(knowledge);
+    this.idle(ms, this.host.clock());
   }
 
   show() {
