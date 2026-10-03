@@ -288,6 +288,40 @@ function drawEnemy(b: Brush, e: Enemy) {
   c.fillStyle = e.flash > 0 ? "#fff" : def.color;
   c.fillRect(x, y, s, s);
   if (def.boss) drawBossMarks(b, e, { x, y, s });
+  if (def.chainLength) {
+    c.fillStyle = "#fff2ba";
+    c.fillRect(x, y, Math.max(1, s / 3), Math.max(1, s / 3));
+    if (e.kind === "dragon") {
+      const flap = 0.5 + Math.sin(e.id + e.cd * 8) * 0.25;
+      c.fillStyle = "#793254";
+      c.fillRect(x - s * flap, y - s / 2, s * flap, s * 1.5);
+      c.fillRect(x + s, y - s / 2, s * flap, s * 1.5);
+    }
+  }
+  if (def.shield && (e.shieldHp ?? 0) > 0) {
+    c.save();
+    c.fillStyle = e.shieldHp === Infinity ? "rgba(166,124,255,0.12)" : "rgba(72,173,255,0.12)";
+    c.strokeStyle = e.shieldHp === Infinity ? "#c1a2ff" : "#72c5ff";
+    c.lineWidth = Math.max(1, px * 0.06);
+    c.beginPath(); c.arc(e.x * px, e.y * px, def.shield.radius * px, 0, Math.PI * 2); c.fill(); c.stroke();
+    if (Number.isFinite(e.shieldHp)) {
+      c.fillStyle = "#72c5ff";
+      c.fillRect(x - s, y - 3, s * 3 * e.shieldHp! / def.shield.hp, 2);
+    }
+    c.restore();
+  }
+  if (e.breath) {
+    const { dx, dy, t } = e.breath;
+    c.save(); c.globalAlpha = Math.min(1, t / 0.2);
+    for (let n = 1; n <= 20; n++) {
+      const along = n / 4;
+      const width = (0.35 + along * 0.45) * px;
+      c.fillStyle = n < 9 ? "#fff2a0" : n < 15 ? "#ffad38" : "#e85a27";
+      const spread = Math.sin(n * 7 + e.id) * width;
+      c.fillRect((e.x + dx * along) * px - dy * spread, (e.y + dy * along) * px + dx * spread, Math.max(2, px * .22), Math.max(2, px * .22));
+    }
+    c.restore();
+  }
   if (e.kind === "mother") drawMotherMarks(b, { x, y, s });
 }
 

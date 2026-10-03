@@ -61,6 +61,9 @@ export type Enemy = {
   /** Seconds left chilled by a wizard's ice (slowed); absent when not, so
    * a run without ice keeps its state exactly as before. */
   chill?: number;
+  leader?: number;
+  shieldHp?: number;
+  breath?: { dx: number; dy: number; t: number };
 };
 
 export type Soldier = {
@@ -138,7 +141,7 @@ export class DefendSim {
   readonly bonuses: Readonly<Bonuses>;
   /** Enemies slain this run, by kind: what the run pays out. Not part of
    * the replayed state. */
-  readonly slain: Record<EnemyKind, number> = { roach: 0, orc: 0, ogre: 0, bat: 0, warlord: 0, mother: 0, broodling: 0 };
+  readonly slain: Record<EnemyKind, number> = { roach: 0, orc: 0, ogre: 0, bat: 0, warlord: 0, mother: 0, broodling: 0, snake: 0, dragon: 0, shieldBearer: 0, aegis: 0 };
   /** 1 while a cell is part of a standing (built) building. */
   readonly solid: Uint8Array;
   readonly hp: Float32Array;
@@ -173,6 +176,7 @@ export class DefendSim {
   spawnQueue: EnemyKind[] = [];
   private spawnInterval = 0;
   private waveSpawned = 0;
+  private shieldGenerators: Enemy[] = [];
   spawnT = 0;
   /** Bumped whenever a building is destroyed or rebuilt (static art changes). */
   mapVersion = 0;
@@ -292,6 +296,7 @@ export class DefendSim {
       if (splits) for (let n = 0; n < splits.count && this.waveSpawned < MAX_WAVE_ENEMIES; n++, this.waveSpawned++) hatched.push(this.hatch(splits.into, e, n, splits.count));
     }
     this.enemies = this.enemies.filter((e) => e.hp > 0);
+    this.shieldGenerators = this.shieldGenerators.filter(e => e.hp > 0);
     this.enemies.push(...hatched);
     this.soldiers = this.soldiers.filter((s) => s.hp > 0);
     this.civilians = this.civilians.filter((c) => c.hp > 0 && !atHome(this, c));
@@ -304,6 +309,7 @@ export class DefendSim {
     for (const s of this.scorches) s.t += dt;
     this.scorches = this.scorches.filter((s) => s.t < s.life);
     for (const units of [this.enemies, this.soldiers, this.civilians]) for (const u of units) u.flash = Math.max(0, u.flash - dt);
+    for (const e of this.enemies) if (e.breath && (e.breath.t -= dt) <= 0) delete e.breath;
     for (const e of this.enemies)
       if (e.chill !== undefined && (e.chill -= dt) <= 0) delete e.chill;
     for (const s of this.soldiers)
@@ -346,6 +352,15 @@ export class DefendSim {
       if (blocked(this.solid, x, y)) continue;
       this.enemies.push(this.newEnemy(kind, x, y));
       this.waveSpawned++;
+      let leader = this.enemies[this.enemies.length - 1];
+      const length = ENEMIES[kind].chainLength ?? 1;
+      for (let n = 1; n < length && this.waveSpawned < MAX_WAVE_ENEMIES; n++) {
+        const segment = this.newEnemy(kind, x, Math.max(0.25, y - n * 0.3));
+        segment.leader = leader.id;
+        this.enemies.push(segment);
+        this.waveSpawned++;
+        leader = segment;
+      }
       return;
     }
   }
@@ -366,7 +381,7 @@ export class DefendSim {
 
   private newEnemy(kind: EnemyKind, x: number, y: number): Enemy {
     const hp = ENEMIES[kind].hp;
-    return {
+    const enemy: Enemy = {
       id: this.newId(),
       kind,
       x,
@@ -381,7 +396,10 @@ export class DefendSim {
       rollT: this.rand() * 0.5,
       marked: false,
       flash: 0,
+      ...(ENEMIES[kind].shield ? { shieldHp: ENEMIES[kind].shield!.hp } : {}),
     };
+    if (ENEMIES[kind].shield) this.shieldGenerators.push(enemy);
+    return enemy;
   }
 
   // ── Flow field ────────────────────────────────────────────────────────
@@ -452,11 +470,21 @@ export class DefendSim {
   // ── Damage and rebuilding ─────────────────────────────────────────────
   /** Hurts `e` (double when marked); a steady burn hurts it without the
    * flash of a blow. */
-  hurtEnemy(e: Enemy, amount: number, flash = true) {
-    if (e.hp <= 0) return;
+  hurtEnemy(e: Enemy, amount: number, flash = true, source: "ranged" | "melee" = "ranged") {
+    if (e.hp <= 0 || !Number.isFinite(amount) || amount <= 0) return false;
+    if (source === "ranged") {
+      const shields = this.shieldGenerators.filter(g => g.hp > 0 && (g.shieldHp ?? 0) > 0 &&
+        sq(g.x - e.x) + sq(g.y - e.y) <= sq(ENEMIES[g.kind].shield!.radius));
+      const shield = shields.find(g => g.shieldHp === Infinity) ?? shields[0];
+      if (shield) {
+        if (shield.shieldHp !== Infinity) shield.shieldHp = Math.max(0, shield.shieldHp! - amount);
+        return false;
+      }
+    }
     e.hp -= e.marked ? amount * 2 : amount;
     if (flash) e.flash = 0.12;
     if (e.hp <= 0) this.effects.push({ kind: "spark", x: e.x, y: e.y, t: 0, r: ENEMIES[e.kind].size });
+    return true;
   }
 
   damageBuilding(id: number, amount: number) {

@@ -144,8 +144,7 @@ export function stepFrosts(sim: DefendSim, dt: number) {
     for (const e of sim.enemiesNear(w.x, w.y, w.r)) {
       if (w.hit.includes(e.id) || !inFan(e, w.x, w.y, w.dx, w.dy, w.spread, w.r)) continue;
       w.hit.push(e.id);
-      sim.hurtEnemy(e, damage);
-      e.chill = Math.max(e.chill ?? 0, chill);
+      if (sim.hurtEnemy(e, damage)) e.chill = Math.max(e.chill ?? 0, chill);
     }
   }
   sim.frosts = sim.frosts.filter((w) => w.r < w.range || w.t < w.range / ICE_SPEED + FROST_LINGER);

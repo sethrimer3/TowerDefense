@@ -156,7 +156,7 @@ test('waves spend their difficulty budget and keep fixed enemy HP', () => {
   for (let wave = 1; wave <= 180; wave++) {
     const enemies = buildWave(wave, rand);
     assert.equal(enemies.reduce((sum, k) => sum + ENEMIES[k].cost, 0), waveDifficulty(wave));
-    assert.ok(enemies.reduce((sum, k) => sum + 1 + (ENEMIES[k].splits?.count ?? 0), 0) <= MAX_WAVE_ENEMIES);
+    assert.ok(enemies.reduce((sum, k) => sum + (ENEMIES[k].chainLength ?? (1 + (ENEMIES[k].splits?.count ?? 0))), 0) <= MAX_WAVE_ENEMIES);
   }
   const sim = new DefendSim(mapOf(defaultLayout()), zeroLevels(), 5);
   sim.wave = 1000;
@@ -164,8 +164,8 @@ test('waves spend their difficulty budget and keep fixed enemy HP', () => {
 });
 
 test('waves terminate safely with impossible budgets and invalid inputs', () => {
-  assert.equal(buildDifficultyWave(1e9, () => 0).length, MAX_WAVE_ENEMIES);
-  assert.ok(buildDifficultyWave(1e9, () => 0).every(k => k === 'warlord'));
+  assert.equal(buildDifficultyWave(1e12, () => 0).length, MAX_WAVE_ENEMIES);
+  assert.ok(buildDifficultyWave(1e12, () => 0).every(k => k === 'aegis'));
   for (const wave of [0, -1, NaN, Infinity]) assert.deepEqual(buildWave(wave, () => 0), []);
   assert.equal(waveDifficulty(1e100), Number.MAX_SAFE_INTEGER);
   for (const roll of [NaN, Infinity, -1, 2]) {
@@ -205,7 +205,7 @@ test('waves release their randomized count within five seconds', () => {
     const sim = new DefendSim(mapOf(defaultLayout()), zeroLevels(), 5);
     sim.wave = wave;
     sim.spawnQueue = buildWave(wave, sim.rand);
-    const count = sim.spawnQueue.length;
+    const count = sim.spawnQueue.reduce((sum, k) => sum + (ENEMIES[k].chainLength ?? 1), 0);
     for (let i = 0; i < 151; i++) (sim as any).runWaves(1 / 30);
     assert.equal(sim.spawnQueue.length, 0);
     assert.equal(sim.enemies.length, count);
@@ -348,7 +348,7 @@ test('weather: 30% rainy runs; night falls on every 10th (boss) wave', async () 
 
 test('warlords appear by affordability rather than scheduled waves', () => {
   assert.ok(!buildDifficultyWave(99, () => .999).includes('warlord'));
-  assert.deepEqual(buildDifficultyWave(100, () => .6), ['warlord']);
+  assert.deepEqual(buildDifficultyWave(100, () => .5), ['warlord']);
 });
 
 test('struck buildings flash', () => {

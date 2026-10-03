@@ -142,7 +142,7 @@ const inSwordReach = (s: Soldier, e: Enemy) => dist(e.x - s.x, e.y - s.y) <= SOL
 function strike(sim: DefendSim, s: Soldier, e: Enemy) {
   if (s.cd > 0) return;
   s.cd = SOLDIER.cooldown;
-  sim.hurtEnemy(e, s.damage);
+  sim.hurtEnemy(e, s.damage, true, "melee");
 }
 
 /** Twice a second: path to the nearest of up to three reachable enemies, or

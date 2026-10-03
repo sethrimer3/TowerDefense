@@ -20,6 +20,7 @@ export function waveDifficulty(wave: number): number {
  * Cyclic or invalid future split definitions are excluded safely. */
 function slots(def: EnemyDef, seen = new Set<EnemyKind>()): number {
   if (seen.has(def.kind)) return Infinity;
+  if (def.chainLength !== undefined) return Number.isSafeInteger(def.chainLength) && def.chainLength > 0 ? def.chainLength : Infinity;
   if (!def.splits) return 1;
   if (!Number.isSafeInteger(def.splits.count) || def.splits.count < 0) return Infinity;
   const child = ENEMIES[def.splits.into];

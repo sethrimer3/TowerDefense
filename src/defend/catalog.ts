@@ -340,7 +340,7 @@ export const civilianHp = (l: number) => 8 + l * 5;
 export const rebuildSeconds = (l: number) => 3 * intPow(0.82, l);
 export const HOUSE_HP_PER_CELL = 22;
 
-export type EnemyKind = "roach" | "orc" | "ogre" | "bat" | "warlord" | "mother" | "broodling";
+export type EnemyKind = "roach" | "orc" | "ogre" | "bat" | "warlord" | "mother" | "broodling" | "snake" | "dragon" | "shieldBearer" | "aegis";
 export type EnemyDef = {
   kind: EnemyKind;
   name: string;
@@ -362,6 +362,8 @@ export type EnemyDef = {
   splits?: { into: EnemyKind; count: number };
   /** How much of the wave budget one of these costs. */
   cost: number;
+  chainLength?: number;
+  shield?: { radius: number; hp: number };
 };
 
 export const ENEMIES: Record<EnemyKind, EnemyDef> = {
@@ -372,6 +374,11 @@ export const ENEMIES: Record<EnemyKind, EnemyDef> = {
   mother: { kind: "mother", name: "Mother", hp: 70, speed: 1.15, damage: 8, cooldown: 1.1, size: 0.58, color: "#141218", distraction: 0.3, flying: false, splits: { into: "broodling", count: 3 }, cost: 10 },
   broodling: { kind: "broodling", name: "Broodling", hp: 12, speed: 2.3, damage: 3, cooldown: 0.7, size: 0.3, color: "#1d1a22", distraction: 0.2, flying: false, hatched: true, cost: 1 },
   bat: { kind: "bat", name: "Bat", hp: 14, speed: 3.2, damage: 3, cooldown: 0.7, size: 0.3, color: "#8a5bb8", distraction: 0, flying: true, cost: 2 },
+  snake: { kind: "snake", name: "Snake", hp: 24, speed: 1.8, damage: 5, cooldown: 0.8, size: 0.26, color: "#71ae48", distraction: 0, flying: false, chainLength: 12, cost: 60 },
+  dragon: { kind: "dragon", name: "Dragon", hp: 160, speed: 1.3, damage: 30, cooldown: 2, size: 0.4, color: "#be4935", distraction: 0, flying: true, chainLength: 16, cost: 2500 },
+  shieldBearer: { kind: "shieldBearer", name: "Shield Generator", hp: 800, speed: 0.7, damage: 16, cooldown: 1.5, size: 0.65, color: "#438dcc", distraction: 0, flying: false, shield: { radius: 4, hp: 3000 }, cost: 10000 },
+  aegis: { kind: "aegis", name: "Invincible Shield Generator", hp: 6000, speed: 0.55, damage: 40, cooldown: 1.8, size: 0.85, color: "#a383ef", distraction: 0, flying: false, shield: { radius: 5, hp: Infinity }, cost: 1000000 },
+
 };
 
 /** Multipliers the player's Smithy and skill trees lay over a run, on top

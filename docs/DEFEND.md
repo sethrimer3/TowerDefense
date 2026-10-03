@@ -5,7 +5,8 @@ holds it against endless waves. Code lives in `src/defend/`.
 
 Waves spend a difficulty budget starting at 20, growing 5% per wave (rounded
 down). Enemy costs are Roach 1, Bat 2, Orc 4, Ogre 8, Mother 10 (including
-three Broodlings), and Warlord 100. Affordable enemies are selected randomly;
+three Broodlings), Warlord 100, Snake 60, Dragon 2,500, Shield Generator
+10,000, and Invincible Shield Generator 1,000,000. Affordable enemies are selected randomly;
 there are no starting-wave gates or scheduled Warlord spawns. Enemy HP stays
 fixed. Each wave reserves at most 5,000 enemies, including hatched offspring.
 Selection favours expensive enemies when capacity is tight; any budget the
@@ -375,3 +376,18 @@ it. The layout, purchases, upgrades, bombs and best wave are saved.
 
 `defendDebug(seconds, { rain }?)` in the console fast-forwards a running
 battle, optionally forcing its weather.
+
+### Segmented enemies and shields
+
+Snakes have twelve individually targetable pixel segments. Dragons have sixteen
+flying segments with wings; each head breathes a five-cell cone of flame that
+hurts troops, civilians and buildings. Destroying a segment cuts its chain:
+the surviving rear segment becomes an independent head, without healing or
+creating additional enemies. Whole chains count against the 5,000-unit cap.
+
+Shield Generators protect themselves and enemies within four cells from ranged
+damage with a 3,000-HP shield. The hit that shatters it is absorbed; subsequent
+hits damage the enemy. Invincible Shield Generators protect a five-cell radius
+indefinitely. Swordsmen and valkyries bypass both shields. Arrows, explosions,
+fire, and ice are blocked (including ice's chill). Overlapping invincible
+shields take priority. Killing a generator removes its protection immediately.
