@@ -1,15 +1,13 @@
 /** The Library tab: the cathedral's view, and buying bookshelves and
  * librarians for it. The library works whatever tab shows (`advance`, from
  * the app's frame loop) and earns Knowledge on the wall clock, including
- * while the game is closed: on loading, the time away (up to the mine's
- * cap) is paid at the rate the library had when it was saved. The
+ * while the game is closed: on loading, the time away (up to
+ * `MAX_AWAY_MS`) is paid at the rate the library had when it was saved. The
  * librarians themselves only move while the game is open. */
 import { play } from "../sound.ts";
+import { HOUR_MS, MAX_AWAY_MS } from "../away.ts";
 import { MAX_LIBRARIANS, MAX_SHELVES, LibrarySim, librarianPrice, shelfPrice, type LibrarySave } from "./sim.ts";
 
-/** Longest time away the library earns Knowledge for (as the mine). */
-export const MAX_AWAY_MS = 2 * 60 * 60 * 1000;
-const HOUR_MS = 60 * 60 * 1000;
 import { LibraryRenderer, daylight } from "./render.ts";
 
 export interface LibraryHost {
@@ -40,6 +38,9 @@ export class LibraryPage {
   private ranTo = 0;
   private paidTo = 0;
   private burning = false;
+  /** Knowledge owed for the time away when the save was loaded (paid by
+   * the first `advance`), for the welcome-back screen. */
+  awayKnowledge = 0;
 
   constructor(root: HTMLElement, host: LibraryHost) {
     this.root = root;
@@ -50,6 +51,7 @@ export class LibraryPage {
     this.sim = saved ? new LibrarySim(saved.seed, saved) : new LibrarySim(this.host.newSeed());
     this.ranTo = now;
     this.paidTo = saved?.savedAt ? now - Math.min(MAX_AWAY_MS, Math.max(0, now - saved.savedAt)) : now;
+    this.awayKnowledge = (this.sim.rate * (now - this.paidTo)) / HOUR_MS;
   }
   snapshot(now: number): LibrarySave {
     return this.sim.save(now);

@@ -344,15 +344,8 @@ export const NO_BONUSES: Readonly<Bonuses> = Object.freeze({
 
 /** Enemies get tougher every wave. */
 export const waveHpScale = (wave: number) => intPow(1.11, wave - 1);
-export const waveBudget = (wave: number) => Math.round(4 + wave * 2.6 + pow145(wave));
-/** `n` to the power 1.45 from exact operations (n^1.45 = n × n^(1/4) ×
- * n^(1/8) × n^(1/16) × n^(1/128) × n^(1/256) × n^(1/512): 1.4492…, close
- * enough), so every engine sizes a wave alike. */
-function pow145(n: number) {
-  const r4 = Math.sqrt(Math.sqrt(n)), r8 = Math.sqrt(r4), r16 = Math.sqrt(r8), r128 = Math.sqrt(Math.sqrt(Math.sqrt(r16)));
-  const r256 = Math.sqrt(r128), r512 = Math.sqrt(r256);
-  return n * r4 * r8 * r16 * r128 * r256 * r512;
-}
+/** Performance-test waves: bosses count toward the total; hatched brood is extra. */
+export const waveCount = (wave: number) => Math.max(0, Math.floor(wave)) * 500;
 
 export const SOLDIER = { hp: 40, damage: 6, cooldown: 0.8, speed: 2.4, reach: 0.75, leash: 16, size: 0.4, color: "#5b8fd9" };
 export const ARCHER_UNIT = { hp: 24, damage: 5, cooldown: 1.1, speed: 2.1, size: 0.36, color: "#6cc08a" };

@@ -55,6 +55,9 @@ Paid by kills, by every wave held and by gold the mine digs; spent in the Armory
 **Copper** and **silver**:
 Paid for each wave held (copper) and each boss wave held (silver). Spent, with Gold, in the Armory. (They were once iron and steel bars.)
 
+**Time away** (welcome back):
+The time since the game was last saved, up to a day. The Library earns Knowledge for all of it; the Mine works through the first two hours tick by tick and is paid for the rest at its **smithy's pace** (the Smithy points an hour it has lately made). The welcome-back screen totals both when the game opens.
+
 **Knowledge**:
 Earned by the Library, an hour's worth being its built bookshelves times its librarians (idle too), and paid for each wave held past the best wave; spent on the skill trees. Once called Valor.
 

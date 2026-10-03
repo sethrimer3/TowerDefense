@@ -23,7 +23,7 @@ import {
   keepHp,
   wallHp,
   watchRadius,
-  waveBudget,
+  waveCount,
   waveHpScale,
   NO_BONUSES,
   type Bonuses,
@@ -33,7 +33,7 @@ import {
 import { CellType, type Building, type CityMap } from "./citygen.ts";
 import { atHome, Builders } from "./civilians.ts";
 import { stepEnemy } from "./enemies.ts";
-import { blocked, cellAt, cellCenter, center, fillFlowField, nearest, nearestOpen, type FieldTerrain, type Point } from "./pathing.ts";
+import { blocked, cellAt, cellCenter, center, fillFlowField, nearestOpen, type FieldTerrain, type Point } from "./pathing.ts";
 import { stepArrows, stepShells, Towers } from "./towers.ts";
 import { Barracks, stepArcher, stepSwordsman } from "./troops.ts";
 import { stepBlazes, stepFireballs, stepMage, type Blaze, type Fireball } from "./mages.ts";
@@ -299,8 +299,9 @@ export class DefendSim {
   private runWaves(dt: number) {
     if (this.spawnQueue.length) {
       this.spawnT -= dt;
-      if (this.spawnT <= 0) {
-        this.spawnT = Math.max(0.2, 0.85 - this.wave * 0.02);
+      while (this.spawnT <= 0 && this.spawnQueue.length) {
+        // Release every wave over five seconds, including at the fixed 30 Hz step.
+        this.spawnT += 5 / waveCount(this.wave);
         this.spawnEnemy(this.spawnQueue.pop()!);
       }
       return;
@@ -413,8 +414,17 @@ export class DefendSim {
 
   /** The living soldier or civilian nearest (x, y) within `r`. */
   nearestDefender(x: number, y: number, r: number): Soldier | Civilian | null {
-    const alive = [...this.soldiers, ...this.civilians].filter((u) => u.hp > 0);
-    return nearest(alive, { x, y }, r * r, true);
+    let best: Soldier | Civilian | null = null, bd = r * r;
+    // Keep the original last-wins tie order without allocating a list per enemy.
+    for (let team = 0; team < 2; team++) {
+      const units = team === 0 ? this.soldiers : this.civilians;
+      for (const u of units) {
+        if (u.hp <= 0) continue;
+        const d = sq(u.x - x) + sq(u.y - y);
+        if (d <= bd) { best = u; bd = d; }
+      }
+    }
+    return best;
   }
 
   // ── Damage and rebuilding ─────────────────────────────────────────────
@@ -527,13 +537,24 @@ export class DefendSim {
   private separation(u: Point): [number, number] {
     let sx = 0,
       sy = 0;
-    for (const o of this.enemiesNear(u.x, u.y, 0.45)) {
-      if (o === u) continue;
-      const ox = u.x - o.x,
-        oy = u.y - o.y;
-      const d = dist(ox, oy) || 0.01;
-      sx += (ox / d) * (0.45 - d);
-      sy += (oy / d) * (0.45 - d);
+    const x0 = Math.max(0, Math.floor(u.x - .45)), x1 = Math.min(CELLS_W - 1, Math.floor(u.x + .45));
+    const y0 = Math.max(0, Math.floor(u.y - .45)), y1 = Math.min(CELLS_H - 1, Math.floor(u.y + .45));
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      const list = this.grid[cellIndex(x, y)];
+      // Dense crowds use at most 8 representatives per cell. Ordinary crowds
+      // keep exact separation; bounded work avoids quadratic pile-ups at walls.
+      const stride = Math.max(1, Math.ceil(list.length / 8));
+      const offset = ('id' in u ? (u.id as number) : 0) % stride;
+      for (let i = offset; i < list.length; i += stride) {
+        const o = list[i];
+        if (o === u) continue;
+        const ox = u.x - o.x,
+          oy = u.y - o.y;
+        if (o.hp <= 0 || sq(ox) + sq(oy) > .45 * .45) continue;
+        const d = dist(ox, oy) || 0.01;
+        sx += (ox / d) * (0.45 - d);
+        sy += (oy / d) * (0.45 - d);
+      }
     }
     return [sx, sy];
   }
@@ -576,20 +597,18 @@ function streetCells(map: CityMap) {
 }
 
 export function buildWave(wave: number, rand: () => number): EnemyKind[] {
-  let budget = waveBudget(wave);
+  const count = waveCount(wave);
+  const bosses = wave > 0 && wave % 10 === 0 ? wave / 10 : 0;
   const kinds = Object.values(ENEMIES).filter((d) => d.firstWave <= wave && !d.boss && !d.hatched);
   const out: EnemyKind[] = [];
-  while (budget > 0) {
-    const pool = kinds.filter((d) => d.cost <= budget);
-    if (!pool.length) break;
-    const total = pool.reduce((s, d) => s + d.weight, 0);
+  const total = kinds.reduce((s, d) => s + d.weight, 0);
+  while (out.length < count - bosses) {
     let r = rand() * total;
-    const pick = pool.find((d) => (r -= d.weight) < 0) ?? pool[0];
+    const pick = kinds.find((d) => (r -= d.weight) < 0) ?? kinds[0];
     out.push(pick.kind);
-    budget -= pick.cost;
   }
   // Every 10th wave brings warlords — one per ten waves — at the back of
   // the horde (the queue spawns from its end, so they go at the front).
-  if (wave > 0 && wave % 10 === 0) for (let n = 0; n < wave / 10; n++) out.unshift("warlord");
+  for (let n = 0; n < bosses; n++) out.unshift("warlord");
   return out;
 }

@@ -3,6 +3,13 @@
 A tower-defense-style simulation where the player lays out a walled city and
 holds it against endless waves. Code lives in `src/defend/`.
 
+The current performance experiment uses exactly 500 enemies per wave number:
+wave 1 has 500, wave 2 has 1,000, and wave 20 has 10,000. Each wave releases
+over five seconds. Warlords count toward the total; hatched brood is extra.
+The console logs `[Defend performance]` every five seconds and at wave end,
+including FPS, p95 frame interval, update/draw time and peak live enemies.
+Recent rows are available as `window.defendPerformance`; they are not saved.
+
 ## Board
 
 - 9 × 13 **tiles**, each subdivided into 7 × 7 **cells** (63 × 91 cells).

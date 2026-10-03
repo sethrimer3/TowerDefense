@@ -4,15 +4,32 @@
  * prospect when this one is worked out. A building tapped shows its stats
  * and the button that raises it a level. The mine itself runs whatever tab
  * shows (`advance`, from the app's frame loop), and works on while the game
- * is closed: on loading, the time away (up to a cap) is caught up a slice
- * each frame. */
+ * is closed: on loading, the time away (up to `SIM_AWAY_MS`) is caught up
+ * a slice each frame, and any more (up to `MAX_AWAY_MS`) is paid at once at
+ * the smithy's `pace`. */
 import { play } from "../sound.ts";
+import { HOUR_MS, MAX_AWAY_MS } from "../away.ts";
 import { BARS_PER_POINT, CREW_PER_LEVEL, METALS, metalSum, type Metals, DAY_TICKS, FORGE_PER_LEVEL, JOBS, KIT, MAX_MINERS, MineSim, SEAL_LEVEL, SMITHS_PER_LEVEL, STOCK_PER_LEVEL, STOCK_RATE, TICK_HZ, type Cause, type Job, type Miner, type MineNews, type MineSave, type Weather } from "./sim.ts";
 import { MAX_LEVEL, type BuildingId } from "./buildings.ts";
 import { MineRenderer } from "./render.ts";
 
-/** Longest time away the mine catches up on. */
-export const MAX_AWAY_MS = 2 * 60 * 60 * 1000;
+/** Longest time away the mine works through tick by tick; the rest of the
+ * time away is paid at the smithy's pace. */
+export const SIM_AWAY_MS = 2 * 60 * 60 * 1000;
+
+/** What the mine made of the time away when the save was loaded, for the
+ * welcome-back screen: `paid` grows while the catch-up runs. */
+export interface MineAway {
+  /** Time away paid for, and the part of it worked through tick by tick. */
+  ms: number;
+  simulatedMs: number;
+  /** Smithy points made, those of the catch-up included so far. */
+  paid: Metals;
+  /** Miners lost in the catch-up so far. */
+  lost: number;
+  /** Whether the catch-up is still running. */
+  catchingUp: boolean;
+}
 
 const WEATHER_NAME: Record<Weather, string> = { clear: "Clear", cloudy: "Cloudy", rain: "Rain", storm: "Thunderstorm" };
 const LOSS: Record<Cause, string> = {
@@ -74,6 +91,9 @@ export class MinePage {
   private built = false;
   private shownTally = "";
   private shownCrew = "";
+  /** The time away when the save was loaded (null for a fresh mine). */
+  away: MineAway | null = null;
+  private lostBefore = 0;
   /** A name being dragged in the crew's list (the list holds still). */
   private dragging = false;
 
@@ -86,8 +106,19 @@ export class MinePage {
    * a fresh one. */
   load(saved: MineSave | null, now: number) {
     this.sim = saved ? new MineSim(saved.seed, saved) : new MineSim(this.host.newSeed());
-    this.owed = saved ? (Math.min(MAX_AWAY_MS, Math.max(0, now - saved.savedAt)) * TICK_HZ) / 1000 : 0;
+    const away = saved ? Math.min(MAX_AWAY_MS, Math.max(0, now - saved.savedAt)) : 0;
+    const simulated = Math.min(away, SIM_AWAY_MS);
+    this.owed = (simulated * TICK_HZ) / 1000;
     this.last = now;
+    this.away = null;
+    if (saved) {
+      // Past the catch-up, the smithy is paid at its pace, whole points.
+      const hours = (away - simulated) / HOUR_MS, paid = { copper: 0, silver: 0, gold: 0 };
+      for (const k of METALS) paid[k] = Math.floor(this.sim.pace[k] * hours);
+      this.away = { ms: away, simulatedMs: simulated, paid, lost: 0, catchingUp: this.owed >= 1 };
+      this.lostBefore = this.lostCount();
+      if (metalSum(paid) > 0) this.host.earn(paid);
+    }
     if (this.renderer) this.renderer.home(this.sim);
   }
   snapshot(now: number): MineSave {
@@ -99,7 +130,7 @@ export class MinePage {
   advance(now: number) {
     const gap = Math.max(0, now - this.last);
     this.last = now;
-    this.owed = Math.min((MAX_AWAY_MS * TICK_HZ) / 1000, this.owed + (gap * TICK_HZ) / 1000);
+    this.owed = Math.min((SIM_AWAY_MS * TICK_HZ) / 1000, this.owed + (gap * TICK_HZ) / 1000);
     const start = performance.now(), budget = this.owed > TICK_HZ * 2 ? 12 : 6;
     // Catching up on time away, only the first miner to come to harm dies.
     this.sim.catchingUp = this.owed > TICK_HZ * 5;
@@ -115,6 +146,20 @@ export class MinePage {
     }
     const pay = this.sim.collect();
     if (metalSum(pay) > 0) this.host.earn(pay);
+    const away = this.away;
+    if (away?.catchingUp) {
+      for (const k of METALS) away.paid[k] += pay[k];
+      away.lost = this.lostCount() - this.lostBefore;
+      // Caught up once less than a second is owed.
+      if (this.owed < TICK_HZ) away.catchingUp = false;
+    }
+  }
+  /** Wall-clock ms of time away the catch-up still owes. */
+  get owedMs() {
+    return (this.owed / TICK_HZ) * 1000;
+  }
+  private lostCount() {
+    return Object.values(this.sim.lost).reduce((a, b) => a + b, 0);
   }
 
   /** Runs the mine `minutes` ahead at once (console helper). */
