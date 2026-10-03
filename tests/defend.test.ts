@@ -14,6 +14,7 @@ import { CellType, generateCity } from '../src/defend/citygen.ts';
 import { DefendSim, buildWave } from '../src/defend/sim.ts';
 import { stepArcher, stepSwordsman } from '../src/defend/troops.ts';
 import { stepArrows } from '../src/defend/towers.ts';
+import { stepBlazes, stepFireballs, stepMage } from '../src/defend/mages.ts';
 import { UPGRADES, purchasePrice, STARTING_OWNED } from '../src/defend/catalog.ts';
 import { available, buyItem, buyUpgrade, decodeDefendSave, defaultDefendSave } from '../src/defend/progress.ts';
 
@@ -414,6 +415,49 @@ test('archer barracks: archers roam the streets and shoot what comes near', () =
     foe.y = a.y;
   }
   assert.ok(foe.hp < 100, 'arrows land');
+});
+
+test('Mage Guild: fire mages hurl fireballs that burst and leave the ground burning', () => {
+  let l = squareCity();
+  l = placeStructure(l, 'mageGuild', l.keep.tx - 1, l.keep.ty - 1)!;
+  assert.ok(l, 'a Mage Guild fits in a city tile');
+  assert.equal(placeStructure(l, 'mageGuild', l.keep.tx, l.keep.ty - 3), null, 'but not outside the walls');
+  const map = mapOf(l);
+  const sim = new DefendSim(map, zeroLevels(), 1);
+  sim.spawnQueue = [];
+  sim.breakT = 1e9;
+  for (let i = 0; i < 30 * 12; i++) sim.step(1 / 30);
+  const mages = sim.soldiers.filter((s) => s.kind === 'mage');
+  assert.equal(mages.length, 2, 'a full garrison of mages');
+  const m = mages[0];
+  const foe = (id: number, x: number, y: number, kind = 'ogre') =>
+    ({ id, kind, x, y, hp: 1000, maxHp: 1000, cd: 99, jx: 0, jy: 0, distract: -1, distractT: 0, rollT: 99, marked: false, flash: 0 }) as any;
+  // Two enemies side by side: the fireball's burst hurts both, and a bat
+  // overhead too; a civilian beside them is spared.
+  const a = foe(1, m.x + 2, m.y), b = foe(2, m.x + 2.6, m.y), bat = foe(3, m.x + 2.3, m.y + 0.3, 'bat');
+  sim.enemies = [a, b, bat];
+  sim.civilians = [{ id: 9, x: m.x + 2.2, y: m.y, hp: 10, maxHp: 10, job: -1, state: 'home', work: 0, path: [], home: 0, thinkT: 99, flash: 0 }];
+  m.cd = 0;
+  (sim as any).indexEnemies();
+  stepMage(sim, m, 1 / 30);
+  assert.equal(sim.fireballs.length, 1, 'a fireball is thrown at the nearest');
+  for (let i = 0; i < 30 && sim.fireballs.length; i++) stepFireballs(sim, 1 / 30);
+  assert.equal(sim.fireballs.length, 0, 'it lands');
+  assert.ok(a.hp < 1000 && b.hp < 1000 && bat.hp < 1000, 'the burst splashes everyone near');
+  assert.equal(sim.civilians[0].hp, 10, 'and spares your own people');
+  assert.equal(sim.blazes.length, 1, 'the ground is left burning');
+  // The fire burns ground enemies standing in it, over time, but not fliers.
+  const [ha, hBat] = [a.hp, bat.hp];
+  a.flash = 0;
+  for (let i = 0; i < 30; i++) {
+    (sim as any).indexEnemies();
+    stepBlazes(sim, 1 / 30);
+  }
+  assert.ok(ha - a.hp > 5, 'the flames burn what stands in them');
+  assert.equal(bat.hp, hBat, 'fliers pass over the flames');
+  assert.equal(a.flash, 0, 'a burn does not flash like a blow');
+  for (let i = 0; i < 30 * 10; i++) stepBlazes(sim, 1 / 30);
+  assert.equal(sim.blazes.length, 0, 'and the fire dies down');
 });
 
 test("Hunter's instinct sends archers toward enemies they can't see yet", () => {

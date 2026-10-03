@@ -2,7 +2,7 @@
  * towers from `tower-art.ts` at their damage stages and as rubble (drawn
  * into the city layer and the palette icons), the keep's live banner, and
  * the shared palette. */
-import type { StructureKind } from "./catalog.ts";
+import { STRUCTURES, type StructureKind } from "./catalog.ts";
 import { hash, hash01 } from "./grid.ts";
 import { ART } from "./park-art.ts";
 import { drawSprite, sprite } from "./damage-art.ts";
@@ -53,7 +53,7 @@ export function paintIcon(canvas: HTMLCanvasElement, item: IconItem) {
   c.imageSmoothingEnabled = false;
   if (item === "cityTile") return paintCityIcon(c, n);
   if (item === "bomb") return paintBombIcon(c, n);
-  const def = { keep: [3, 3], barracks: [3, 4], archerBarracks: [3, 3], archerTower: [2, 2], cannonTower: [2, 2], watchTower: [2, 2], wizardTower: [2, 2] }[item];
+  const def = [STRUCTURES[item].w, STRUCTURES[item].h];
   const px = n / Math.max(def[0], def[1]) / 1.1;
   const w = def[0] * px,
     h = def[1] * px;

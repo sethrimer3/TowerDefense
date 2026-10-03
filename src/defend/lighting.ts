@@ -18,7 +18,7 @@ import { glowColor, lightFalloff } from "../torch-light.ts";
 import { CELL_COUNT, CELLS_H, CELLS_W, ORTHO, boardSize, cellInBounds, cellIndex, hash, hash01, type Rect } from "./grid.ts";
 import { CellType, type Building, type CityMap } from "./citygen.ts";
 
-export type LightKind = "lantern" | "archerTower" | "cannonTower" | "watchTower" | "wizardTower" | "door";
+export type LightKind = "lantern" | "archerTower" | "cannonTower" | "watchTower" | "wizardTower" | "mageGuild" | "door";
 export type Light = {
   id: number;
   kind: LightKind;
@@ -61,10 +61,10 @@ export function cityLights(map: CityMap): Light[] {
 type NewLight = Omit<Light, "id">;
 
 /** Reach of each tower's fire, in cells. */
-const TOWER_RADIUS: Partial<Record<Building["kind"], number>> = { archerTower: 7.5, cannonTower: 5.5, watchTower: 6.5, wizardTower: 5 };
+const TOWER_RADIUS: Partial<Record<Building["kind"], number>> = { archerTower: 7.5, cannonTower: 5.5, watchTower: 6.5, wizardTower: 5, mageGuild: 5.5 };
 
-/** A building's own lights: a tower's fire, the keep's braziers, a barracks
- * door lamp. */
+/** A building's own lights: a tower's fire (and the Mage Guild's fire
+ * well), the keep's braziers, a barracks door lamp. */
 function buildingLights(map: CityMap, b: Building): NewLight[] {
   const r = b.rect;
   const radius = TOWER_RADIUS[b.kind];

@@ -13,6 +13,9 @@
  * - Watch tower: a square tower with a beacon burning in an iron brazier.
  * - Wizard tower: a round tower under an eight-sided violet roof, runes
  *   glowing round the eaves and a gold finial.
+ * - Mage Guild: a stone hall under a dark wine-red roof, a fire well
+ *   burning in a brass ring at its heart, ember runes on the slopes and two
+ *   red swallowtail banners hung over its south wall.
  *
  * Pure; the city layer and palette draw the cached canvases. */
 import type { StructureKind } from "./catalog.ts";
@@ -38,6 +41,9 @@ const C = {
   gold: [0xb08a3e, 0xe9c46a, 0xfff4c8],
   shield: [0x2f5592, 0x5b8fd9, 0x9fc1f0],
   dirt: [0x5a4a36, 0x6e5c44, 0x80704f],
+  wine: [0x3a1f28, 0x4e2a36, 0x6e3a48],
+  banner: [0x8e2620, 0xb3372f, 0xd8553f],
+  ember: 0xff7a2e,
 };
 
 /** What each structure's damage throws down and its rubble is made of. */
@@ -48,6 +54,7 @@ const MATERIAL: Record<PlacedKind, { m: Material; ruin: Pick<Ruin, "stone" | "to
   cannonTower: { m: { tones: STONE, roofed: false }, ruin: { stone: STONE, top: C.iron.slice(1), beams: false, round: true } },
   watchTower: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.plank.slice(0, 3), beams: true } },
   wizardTower: { m: { tones: C.pale.slice(0, 3), roofed: true }, ruin: { stone: C.pale.slice(0, 3), top: C.slate.slice(0, 3), beams: true, round: true } },
+  mageGuild: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.wine.slice(0, 3), beams: true } },
 };
 
 /** The body's corners: one pixel in from its cells, two on the lower right
@@ -69,7 +76,7 @@ export function structureRubblePixels(kind: PlacedKind, cw: number, ch: number, 
   return rubblePixels(w, h, hash(seed, KINDS.indexOf(kind), 3), { ...frame(w, h), ...MATERIAL[kind].ruin });
 }
 
-const KINDS: PlacedKind[] = ["barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower"];
+const KINDS: PlacedKind[] = ["barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild"];
 
 const PAINT: Record<PlacedKind, (p: Pix) => void> = {
   barracks: paintBarracks,
@@ -78,6 +85,7 @@ const PAINT: Record<PlacedKind, (p: Pix) => void> = {
   cannonTower: paintCannonTower,
   watchTower: paintWatchTower,
   wizardTower: paintWizardTower,
+  mageGuild: paintMageGuild,
 };
 
 function rect(p: Pix, x0: number, y0: number, x1: number, y1: number, c: number) {
@@ -293,4 +301,37 @@ function paintWizardTower(p: Pix) {
   p.set(fx, fy - 1, C.gold[1]);
   p.set(fx - 1, fy, C.gold[1]);
   p.set(fx, fy, C.gold[0]);
+}
+
+function paintMageGuild(p: Pix) {
+  const { x0, y0, x1, y1 } = frame(p.w, p.h);
+  hall(p, x0, y0, x1, y1, C.wine[1]);
+  // Ember runes glowing on the four slopes, each a lit pixel and its dimmer
+  // tail.
+  for (const [rx, ry, tx] of [[x0 + 6, y0 + 6, 1], [x1 - 6, y0 + 6, -1], [x0 + 6, y1 - 6, 1], [x1 - 6, y1 - 6, -1]]) {
+    p.set(rx, ry, C.ember);
+    p.set(rx + tx, ry + 1, C.fire[0]);
+  }
+  // The fire well at the hall's heart: an outlined brass ring lit to the
+  // upper left round a fire white-hot in the middle.
+  const cx = (x0 + x1 + 1) / 2, cy = (y0 + y1 + 1) / 2;
+  disc(p, cx, cy, 4.2, (x, y, d, dx, dy) => {
+    if (d > 3.4) return OUTLINE;
+    if (d > 2.4) return C.gold[Math.min(2, lit(x, y, dx, dy, d) >> 1)];
+    if (d > 2) return OUTLINE;
+    return d < 0.8 ? C.fire[3] : d < 1.5 ? C.fire[2] : (x + y) % 2 ? C.fire[1] : C.fire[0];
+  });
+  // Two swallowtail banners hung over the south wall, red (lit on the west)
+  // with a gold flame, their tails notched.
+  for (const bx of [x0 + 4, x1 - 6]) {
+    for (let y = y1 - 4; y <= y1 + 1; y++) {
+      p.set(bx - 1, y, OUTLINE);
+      p.set(bx + 3, y, OUTLINE);
+      for (let x = bx; x <= bx + 2; x++) p.set(x, y, y === y1 - 4 ? OUTLINE : C.banner[x === bx ? 2 : x === bx + 2 ? 0 : 1]);
+    }
+    p.set(bx + 1, y1 - 2, C.gold[1]);
+    p.set(bx + 1, y1 - 1, C.fire[2]);
+    p.set(bx + 1, y1 + 1, OUTLINE);
+    for (let x = bx - 1; x <= bx + 3; x++) p.set(x, y1 + 2, OUTLINE);
+  }
 }

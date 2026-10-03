@@ -90,6 +90,15 @@ A structure alternating a flamethrower (a cone of fire) and an ice wave (a fan o
 **Chill**:
 A wizard's ice slowing an enemy for a few seconds.
 
+**Mage Guild**:
+A structure inside the city that trains fire mages, as a barracks trains swordsmen.
+
+**Fire mage**:
+A red-robed troop who roams the streets and hurls fireballs: each bursts with splash damage that spares your own people and leaves a blaze.
+
+**Blaze**:
+Burning ground a fireball leaves, hurting every ground enemy inside it each second until it dies down.
+
 **Ground relief**:
 The flagstones' bump map outside the city: lights brighten the stone edges facing them and darken the far ones.
 

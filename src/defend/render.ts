@@ -2,8 +2,9 @@
  * The city (ground, streets, houses, walls; city-layer.ts) is painted once
  * into an offscreen layer and only repainted when a building falls or is
  * rebuilt. Over it each frame: park fences, damage, unit shadows, the
- * overcast and torchlight (lighting.ts), the keep's banner, scorches, units
- * and effects (battle-art.ts), the trees over them (park-trees.ts), the
+ * overcast and torchlight (lighting.ts), the keep's banner, scorches, the
+ * fire mages' burning ground (mage-art.ts), units and effects
+ * (battle-art.ts), the trees over them (park-trees.ts), the
  * wizards' fire, the building grid and drag overlay (edit-overlay.ts), then
  * rain in screen space. */
 import { CELLS_H, CELLS_W, boardSize, hash01 } from "./grid.ts";
@@ -21,6 +22,7 @@ import { PondWater } from "./pond-water.ts";
 import { ENEMIES } from "./catalog.ts";
 import { GroundRelief, type ReliefLight } from "./ground-relief.ts";
 import { WizardArt, flameLights } from "./wizard-art.ts";
+import { drawBlazes, mageLights } from "./mage-art.ts";
 import { ParkTrees, type Under } from "./park-trees.ts";
 
 export type DrawOptions = {
@@ -224,11 +226,12 @@ export class DefendRenderer {
     drawFlag(this.ctx, this.px, { x: (keep.x + keep.w / 2) * this.px, y: (keep.y + keep.h / 2) * this.px, t: opts.now / 1000, reduceMotion: opts.reduceMotion });
   }
 
-  /** Blast scorches and the wizards' ice, then units, projectiles and
+  /** Blast scorches, burning ground and the wizards' ice, then units, projectiles and
    * effects (carrying torches in weather), and the frost on the chilled. */
   private drawBattleUnits(sim: DefendSim, torches: Burning | null, opts: DrawOptions) {
     const brush: Brush = { c: this.ctx, px: this.px };
     drawScorches(brush, sim);
+    drawBlazes(this.ctx, this.px, sim);
     this.wizard.drawIce(this.ctx, this.px, sim.frosts, sim.time * 1000, flameLights(sim).relief);
     drawUnits(brush, sim, torches);
     this.wizard.drawChill(this.ctx, this.px, sim, opts.now);
@@ -353,14 +356,14 @@ export class DefendRenderer {
   /** Darkness and torchlight, the gravel's lit relief, and the flames. */
   private drawLighting(map: CityMap, sim: DefendSim, weather: Weather, opts: DrawOptions) {
     const frame: LightFrame = { px: this.px, now: opts.now, reduceMotion: opts.reduceMotion, intact: standing(map, sim) };
-    const flames = flameLights(sim);
+    const flames = flameLights(sim), mages = mageLights(sim);
     this.lighting.drawLight(this.ctx, frame, ambientFor(weather, opts.night), {
-      torches: [...this.carried(sim), ...flames.carried],
+      torches: [...this.carried(sim), ...flames.carried, ...mages.carried],
       solid: sim.solid,
       version: sim.mapVersion,
     });
     this.lighting.drawRelief(this.ctx, this.px, weather.rain ? 0.85 : 0.65);
-    this.drawGroundRelief(map, sim, opts, flames.relief);
+    this.drawGroundRelief(map, sim, opts, [...flames.relief, ...mages.relief]);
     this.lighting.drawFlames(this.ctx, frame);
   }
 

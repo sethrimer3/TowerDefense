@@ -4,11 +4,11 @@ import { intPow } from "../exact.ts";
  * copper, silver and Gold, the universal upgrades, the bonuses the Smithy and the
  * skill trees add, and the enemy roster. */
 
-export type StructureKind = "keep" | "barracks" | "archerBarracks" | "archerTower" | "cannonTower" | "watchTower" | "wizardTower";
+export type StructureKind = "keep" | "barracks" | "archerBarracks" | "archerTower" | "cannonTower" | "watchTower" | "wizardTower" | "mageGuild";
 /** Everything that appears in the build palette (the keep is placed from the
  * start and can only be moved, so it is not a palette item). */
 export type PaletteItem = "cityTile" | Exclude<StructureKind, "keep">;
-export const PALETTE_ITEMS: PaletteItem[] = ["cityTile", "barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower"];
+export const PALETTE_ITEMS: PaletteItem[] = ["cityTile", "barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild"];
 
 export type StructureDef = {
   kind: StructureKind;
@@ -86,6 +86,15 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     outsideOk: true,
     description: "Alternates between a roaring flamethrower and a wave of ice shards that chills everything it crosses.",
   },
+  mageGuild: {
+    kind: "mageGuild",
+    name: "Mage Guild",
+    w: 3,
+    h: 3,
+    maxHp: 140,
+    outsideOk: false,
+    description: "Trains red fire mages who roam the streets hurling explosive fireballs. Each blast leaves the ground burning, scorching whatever walks through.",
+  },
 };
 
 /** Palette items the player owns at the very start. */
@@ -97,6 +106,7 @@ export const STARTING_OWNED: Record<PaletteItem, number> = {
   cannonTower: 0,
   watchTower: 0,
   wizardTower: 0,
+  mageGuild: 0,
 };
 
 /** A price in Gold and metal bars (all earned in battle). */
@@ -113,6 +123,7 @@ export function purchasePrice(item: PaletteItem, owned: number): Price {
     cannonTower: { gold: 340, copper: 5 },
     watchTower: { gold: 180, copper: 2 },
     wizardTower: { gold: 450, copper: 6 },
+    mageGuild: { gold: 520, copper: 7 },
   };
   const growth = item === "cityTile" ? 1.3 : 1.5;
   const m = intPow(growth, extra);
@@ -137,6 +148,8 @@ export type UpgradeId =
   | "watchRadius"
   | "wizardFlame"
   | "wizardIce"
+  | "mageFireball"
+  | "mageEmbers"
   | "wallStrength"
   | "keepStrength"
   | "civilianCount"
@@ -157,7 +170,7 @@ export type UpgradeDef = {
 const SOLDIER_REACH_MAX = 4;
 
 export const UPGRADES: UpgradeDef[] = [
-  { id: "barracksCapacity", group: "Barracks", name: "Garrison", maxLevel: 4, describe: (l) => `${2 + l} troops per barracks (swordsmen and archers)` },
+  { id: "barracksCapacity", group: "Barracks", name: "Garrison", maxLevel: 4, describe: (l) => `${2 + l} troops per barracks or guild (swordsmen, archers and mages)` },
   { id: "barracksTraining", group: "Barracks", name: "Drill yard", maxLevel: 5, describe: (l) => `Train one every ${trainSeconds(l).toFixed(1)}s` },
   { id: "soldierArms", group: "Barracks", name: "Arms & armour", maxLevel: 6, describe: (l) => `+${l * 25}% troop HP and damage` },
   {
@@ -186,6 +199,8 @@ export const UPGRADES: UpgradeDef[] = [
   { id: "watchRadius", group: "Watch tower", name: "Lookouts", maxLevel: 4, describe: (l) => `${watchRadius(l)} cell marking radius` },
   { id: "wizardFlame", group: "Wizard tower", name: "Pyromancy", maxLevel: 5, describe: (l) => `${flameDps(l)} flame damage a second, ${flameRange(l).toFixed(1)} cell reach` },
   { id: "wizardIce", group: "Wizard tower", name: "Rime", maxLevel: 5, describe: (l) => `${iceDamage(l)} ice damage, chills for ${iceChill(l).toFixed(1)}s` },
+  { id: "mageFireball", group: "Mage Guild", name: "Pyroclasm", maxLevel: 5, describe: (l) => `${fireballDamage(l)} fireball damage, ${fireballSplash(l).toFixed(1)} cell burst` },
+  { id: "mageEmbers", group: "Mage Guild", name: "Lingering embers", maxLevel: 5, describe: (l) => `The ground burns for ${emberSeconds(l).toFixed(1)}s, ${emberDps(l)} damage a second` },
   { id: "wallStrength", group: "City", name: "Masonry", maxLevel: 6, describe: (l) => `${wallHp(l)} HP per wall stone` },
   { id: "keepStrength", group: "City", name: "Keep bastions", maxLevel: 6, describe: (l) => `${keepHp(l)} keep HP` },
   { id: "civilianCount", group: "Civilians", name: "Guild of builders", maxLevel: 5, describe: (l) => `${civilianCount(l)} civilians repair the city` },
@@ -244,6 +259,19 @@ export const ICE_SPEED = 7;
 export const ICE_SPREAD = 0.72;
 /** Seconds the tower rests after each attack before the other one. */
 export const WIZARD_REST = 1.3;
+/** The fire mage's fireball: its damage at the centre of the burst (40% at
+ * the edge), the burst's radius, how far a mage throws and how often. It
+ * spares your own people. */
+export const fireballDamage = (l: number) => 16 + l * 6;
+export const fireballSplash = (l: number) => 1.3 + l * 0.12;
+export const FIREBALL_RANGE = 4.5;
+export const FIREBALL_SPEED = 8;
+/** The fire a fireball leaves on the ground: damage a second to every
+ * ground enemy inside it, how long it burns, and its radius as a share of
+ * the burst's. */
+export const emberDps = (l: number) => 6 + l * 3;
+export const emberSeconds = (l: number) => 3 + l * 0.6;
+export const EMBER_SHARE = 0.85;
 export const wallHp = (l: number) => Math.round(100 * (1 + l * 0.35));
 export const keepHp = (l: number) => Math.round(STRUCTURES.keep.maxHp * (1 + l * 0.3));
 export const civilianCount = (l: number) => 2 + l;
@@ -321,4 +349,5 @@ export const waveCount = (wave: number) => Math.max(0, Math.floor(wave)) * 500;
 
 export const SOLDIER = { hp: 40, damage: 6, cooldown: 0.8, speed: 2.4, reach: 0.75, leash: 16, size: 0.4, color: "#5b8fd9" };
 export const ARCHER_UNIT = { hp: 24, damage: 5, cooldown: 1.1, speed: 2.1, size: 0.36, color: "#6cc08a" };
+export const FIRE_MAGE = { hp: 22, cooldown: 2.1, speed: 2, size: 0.38, color: "#c8372d" };
 export const CIVILIAN = { speed: 1.9, size: 0.3, color: "#e6d7b4", respawnSeconds: 10 };
