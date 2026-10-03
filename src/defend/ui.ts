@@ -1,4 +1,5 @@
 import { journalHTML, paintJournal } from "./journal.ts";
+import { KeepBricks } from "./keep-bricks.ts";
 /** The DEFEND page: a City tab (palette + board) and an Armory tab (buy
  * city elements, bombs and universal upgrades with what battles earn).
  *
@@ -113,6 +114,8 @@ export class DefendPage {
   private category: PaletteCategory = "all";
   private categoriesOpen = false;
   private journal: HTMLDialogElement | null = null;
+  /** The keep's health in the header, a wall of bricks. */
+  private keepBricks: KeepBricks | null = null;
   /** Whether the side panel is open in each phase: the build palette starts
    * open, the battle's items closed so the battle has the whole view. */
   private sideOpen = { build: true, sim: false };
@@ -147,6 +150,7 @@ export class DefendPage {
     } else if (this.sim && this.phase === "over" && (this.sim.floods.length || this.sim.sinkings.length)) ageWater(this.sim, Math.min(dt, 0.25));
     const updated = performance.now();
     this.fadeNight(dt);
+    this.keepBricks?.step(dt);
     if (this.messageT > 0) {
       this.messageT -= dt;
       if (this.messageT <= 0) this.setMessage("");
@@ -218,6 +222,7 @@ export class DefendPage {
       </div>
       <div class="defend-armory" id="defend-armory" hidden></div>
       <dialog class="defend-journal-dialog" aria-labelledby="defend-journal-title"></dialog>`;
+    this.keepBricks = new KeepBricks();
     this.renderer = new DefendRenderer(this.root.querySelector("#defend-canvas")!);
     const canvas = this.renderer.canvas;
     canvas.addEventListener("pointerdown", (e) => this.pointers.down(e));
@@ -457,9 +462,11 @@ export class DefendPage {
       max = sim.keepMaxHp();
     const sky = this.weather ? skyLabel(this.weather, this.night) : "";
     // data-drop: the order pieces are left out when the row gets crowded.
-    const html = `${sky ? `<span class="defend-sky" data-drop="1">${sky}</span>` : ""}<span>Wave <b>${sim.wave}</b></span><span class="defend-best" data-drop="2">Best <b>${best}</b></span><span class="defend-keep" title="Keep ${Math.ceil(hp)} / ${max}"><small data-drop="3">Keep</small><i><em style="width:${(hp / max) * 100}%"></em></i></span><span class="defend-foes"><small data-drop="4">Foes </small><b>${sim.enemies.length + sim.spawnQueue.length}</b></span>`;
+    const html = `${sky ? `<span class="defend-sky" data-drop="1">${sky}</span>` : ""}<span><small data-drop="5">Wave </small><b>${sim.wave}</b></span><span class="defend-best" data-drop="2">Best <b>${best}</b></span><span class="defend-keep" title="Keep ${Math.ceil(hp)} / ${max}"><small data-drop="3">Keep</small><i></i></span><span class="defend-foes"><small data-drop="4">Foes </small><b>${sim.enemies.length + sim.spawnQueue.length}</b></span>`;
+    this.keepBricks?.set(hp / max);
     if (el.dataset.html !== html) {
       el.dataset.html = el.innerHTML = html;
+      if (this.keepBricks) el.querySelector(".defend-keep i")?.replaceWith(this.keepBricks.canvas);
       this.fitHud();
     }
   }

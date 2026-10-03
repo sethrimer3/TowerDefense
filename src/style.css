@@ -1001,8 +1001,7 @@ nav button > span img { display: block; width: 42px; height: 42px; max-width: 10
 .defend-hud b {
   color: #efe3c6;
 }
-.defend-keep small,
-.defend-foes small {
+.defend-hud small {
   font-size: inherit;
 }
 .defend-hud [hidden] {
@@ -1011,19 +1010,13 @@ nav button > span img { display: block; width: 42px; height: 42px; max-width: 10
 .defend-hud > :first-child {
   margin-left: auto;
 }
-.defend-keep i {
+.defend-keep canvas {
   display: inline-block;
-  width: 70px;
-  height: 7px;
-  margin: 0 4px;
+  width: 74px;
+  height: 36px;
+  margin: -10px 2px;
   vertical-align: middle;
-  background: #2a1c1c;
-  border: 1px solid #4a3a3a;
-}
-.defend-keep em {
-  display: block;
-  height: 100%;
-  background: linear-gradient(90deg, #c9463d, #e3b14c);
+  image-rendering: pixelated;
 }
 .defend-go {
   border-color: var(--gold) !important;
@@ -1239,8 +1232,10 @@ nav button > span img { display: block; width: 42px; height: 42px; max-width: 10
     gap: 6px;
     font-size: 10px;
   }
-  .defend-keep i {
-    width: 40px;
+  .defend-keep canvas {
+    width: 56px;
+    height: 27px;
+    margin: -8px 1px;
   }
   .defend-palette {
     width: 60px;
@@ -1368,19 +1363,27 @@ nav button { position: relative; }
 /* Not enough Silver, or at its highest: greyed out. */
 
 /* ── Tower Defense: the currency bar, the tree tabs and Training rows ── */
-.td-currencies { flex-wrap: wrap; gap: 14px; align-items: flex-start; }
-.td-currencies .currency { display: flex; flex-direction: column; align-items: center; min-width: 44px; font-size: 17px; }
-.td-currencies .currency > :first-child { display: inline-flex; align-items: center; }
-.td-currencies .ui-sprite { width: 20px; height: 20px; vertical-align: -3px; }
-.td-currencies .currency b { display: inline-block; margin-left: 4px; }
-.td-currencies .bar-icon { display: inline-block; width: 16px; height: 8px; border-radius: 2px; border: 1px solid #000a; vertical-align: 1px; }
+/* Every holding on one line, however narrow: each takes an equal share,
+   its sign and count side by side over its name. */
+.td-currencies { flex-wrap: nowrap; gap: 0; align-items: stretch; }
+.td-currencies .currency { flex: 1 1 0; min-width: 0; display: grid; grid-template-columns: auto auto; justify-content: center; align-content: center; align-items: center; column-gap: 4px; font-size: 17px; white-space: nowrap; }
+.td-currencies .currency small { grid-column: 1 / -1; overflow: hidden; }
+.td-currencies .ui-sprite { width: 20px; height: 20px; display: block; }
+.td-currencies .currency b { display: block; }
+.td-currencies .bar-icon { display: block; width: 16px; height: 8px; border-radius: 2px; border: 1px solid #000a; }
 .td-currencies .bar-icon.copper { background: linear-gradient(#f0a272, #9a4e26); }
 .td-currencies .bar-icon.silver { background: linear-gradient(#f4f6fa, #8e98a8); }
 .td-currencies .knowledge-currency { color: #e6c8ff; }
-.td-currencies .secret-currency { opacity: 0.75; }
-.td-currencies .secret-mark { display: inline-grid; place-items: center; width: 18px; height: 18px; border: 1px dashed currentColor; border-radius: 50%; font-style: normal; font-size: 11px; }
-.td-currencies .currency { flex-direction: row; flex-wrap: wrap; justify-content: center; max-width: 90px; }
-.td-currencies .currency small { flex-basis: 100%; }
+.td-currencies .secret-currency { flex: 0 1 auto; opacity: 0.75; grid-template-columns: auto; }
+.td-currencies .secret-mark { display: grid; place-items: center; justify-self: center; width: 18px; height: 18px; border: 1px dashed currentColor; border-radius: 50%; font-style: normal; font-size: 11px; }
+@media (max-width: 480px) {
+  .td-currencies { padding-left: 2px; padding-right: 2px; }
+  .td-currencies .currency { column-gap: 2px; font-size: 13px; }
+  .td-currencies .currency small { font-size: 6px; letter-spacing: 0; }
+  .td-currencies .ui-sprite { width: 14px; height: 14px; }
+  .td-currencies .bar-icon { width: 10px; height: 6px; }
+  .td-currencies .secret-mark { width: 13px; height: 13px; font-size: 8px; }
+}
 .tree-tabs { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 .tree-empty { position: absolute; inset: 40% 10% auto; margin: 0; text-align: center; font-size: 12px; color: #b3a282; pointer-events: none; }
 .skill-tree.stewardship { --tree-color: #82c9b3; border-color: #355e55; background: radial-gradient(ellipse at 50% 36%, #2b92782a, transparent 65%), #090f15; }
