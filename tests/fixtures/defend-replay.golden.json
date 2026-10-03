@@ -495,6 +495,34 @@
    "end:1dee5bc5b25f"
   ]
  },
+ "boats": {
+  "wave": 1,
+  "lost": true,
+  "time": "103.60",
+  "digests": [
+   "5s:54e9f35bfd86",
+   "10s:1731ab4c7185",
+   "15s:d348e36a6c0f",
+   "20s:9b9e4a2b845c",
+   "25s:8762ba1ac65c",
+   "30s:479ff0a5f86b",
+   "35s:9b922dbc329e",
+   "40s:b241e2d65104",
+   "45s:d8d462fc4c18",
+   "50s:b6002a532765",
+   "55s:98a5a990a66a",
+   "60s:c45b0efb8e90",
+   "65s:f7999dfebf5c",
+   "70s:6b86b0b3eeaa",
+   "75s:983ad71b364b",
+   "80s:15cb223088be",
+   "85s:6ef2b0970ab0",
+   "90s:79b2697ce716",
+   "95s:fae4f447d691",
+   "100s:0d17d0e670ad",
+   "end:b36a5b680b3d"
+  ]
+ },
  "wizards": {
   "wave": 3,
   "lost": false,

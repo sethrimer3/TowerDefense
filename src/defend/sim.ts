@@ -47,6 +47,7 @@ import { stepStabs, stepValkyrie, type Stab } from "./valkyries.ts";
 import { Wizards, stepFlames, stepFrosts, type Flame, type Frost } from "./wizard.ts";
 import { DarkKeeps, stepBolts, stepDarkWizard, type Bolt } from "./dark-wizards.ts";
 import { WarBanner } from "./war-banner.ts";
+import { sheltered, fizzles, stepFloods, type Flood, type Sinking } from "./boats.ts";
 
 export type Levels = Record<UpgradeId, number>;
 
@@ -126,7 +127,7 @@ export type Civilian = {
 };
 
 export type Arrow = { x: number; y: number; target: number; damage: number; tx: number; ty: number; life: number; origin?: Point & { attacker?: number; building?: number } };
-export type Effect = { kind: "boom" | "dust" | "spark" | "firework"; x: number; y: number; t: number; r: number; seed?: number };
+export type Effect = { kind: "boom" | "dust" | "spark" | "firework" | "steam"; x: number; y: number; t: number; r: number; seed?: number };
 /** A cannon shell in flight: lobbed from the tower to where the target was. */
 export type Shell = { x0: number; y0: number; x1: number; y1: number; t: number; dur: number; damage: number; r: number; origin?: Arrow["origin"] };
 /** Glowing cracks left where something exploded; they cool and fade. */
@@ -165,7 +166,7 @@ export class DefendSim {
   readonly bonuses: Readonly<Bonuses>;
   /** Enemies slain this run, by kind: what the run pays out. Not part of
    * the replayed state. */
-  readonly slain: Record<EnemyKind, number> = { roach: 0, orc: 0, ogre: 0, bat: 0, warlord: 0, mother: 0, broodling: 0, snake: 0, dragon: 0, shieldBearer: 0, aegis: 0, darkKnight: 0, bombOrc: 0, bombBird: 0, voidSparrow: 0, shieldLesser: 0, shieldGreater: 0, poisonLesser: 0, poisonBearer: 0, poisonGreater: 0, poisonSovereign: 0, siegeBeetle: 0, burrowingMole: 0, necromancer: 0, skeleton: 0, bannerCaptain: 0, mirrorKnight: 0, leechSwarm: 0, ashPhoenix: 0, phoenixEgg: 0, blinkImp: 0, fortressLesser: 0, fortress: 0, fortressGreater: 0, fortressSovereign: 0, rollingCannon: 0, ballista: 0, fireworkLauncher: 0, trebuchet: 0, bombard: 0, rocketBattery: 0 };
+  readonly slain: Record<EnemyKind, number> = { roach: 0, orc: 0, ogre: 0, bat: 0, warlord: 0, mother: 0, broodling: 0, snake: 0, dragon: 0, shieldBearer: 0, aegis: 0, darkKnight: 0, bombOrc: 0, bombBird: 0, voidSparrow: 0, shieldLesser: 0, shieldGreater: 0, poisonLesser: 0, poisonBearer: 0, poisonGreater: 0, poisonSovereign: 0, siegeBeetle: 0, burrowingMole: 0, necromancer: 0, skeleton: 0, bannerCaptain: 0, mirrorKnight: 0, leechSwarm: 0, ashPhoenix: 0, phoenixEgg: 0, blinkImp: 0, fortressLesser: 0, fortress: 0, fortressGreater: 0, fortressSovereign: 0, rollingCannon: 0, ballista: 0, fireworkLauncher: 0, trebuchet: 0, bombard: 0, rocketBattery: 0, boatLesser: 0, boat: 0, boatGreater: 0, boatSovereign: 0 };
   /** 1 while a cell is part of a standing (built) building. */
   readonly solid: Uint8Array;
   readonly hp: Float32Array;
@@ -199,6 +200,10 @@ export class DefendSim {
   /** The war banner the player planted, rallying the troops; null when none
    * stands (and so in every run without one). */
   warBanner: WarBanner | null = null;
+  /** Magic boats' water, drying up behind them, and the buildings it sank
+   * going under; both empty in every run without boats. */
+  floods: Flood[] = [];
+  sinkings: Sinking[] = [];
   events: SimEvent[] = [];
   wave = 0;
   time = 0;
@@ -326,6 +331,7 @@ export class DefendSim {
     for (const s of this.soldiers) STEP_SOLDIER[s.kind](this, s, dt);
     stepFireballs(this, dt);
     stepBlazes(this, dt);
+    stepFloods(this, dt);
     this.builders.step(this, dt);
   }
 
@@ -567,13 +573,20 @@ export class DefendSim {
     if (this.hp[id] <= 0) this.collapse(this.map.buildings[id]);
   }
 
-  private collapse(b: Building) {
+  /** A magic boat's water sinks building `id` whole: it goes under and
+   * leaves its rubble when the water dries. */
+  sink(id: number) {
+    this.sinkings.push({ building: id, t: 0 });
+    this.collapse(this.map.buildings[id], false);
+  }
+
+  private collapse(b: Building, dust = true) {
     this.hp[b.id] = 0;
     this.built[b.id] = 0;
     for (const c of b.cells) this.solid[c] = 0;
     this.changed.push(...b.cells);
     const p = center(b.rect);
-    this.effects.push({ kind: "dust", x: p.x, y: p.y, t: 0, r: Math.max(b.rect.w, b.rect.h) * 0.7 });
+    if (dust) this.effects.push({ kind: "dust", x: p.x, y: p.y, t: 0, r: Math.max(b.rect.w, b.rect.h) * 0.7 });
     this.fieldDirty = true;
     this.mapVersion++;
   }
@@ -608,13 +621,15 @@ export class DefendSim {
   /** A blast: full damage at the centre falling to 40% at the edge. Returns
    * the seed its fireball and scorch are drawn from. */
   explode(x: number, y: number, { r, damage, friendlyFire, origin }: Blast): number {
+    // A blast in a magic boat's water fizzles.
+    if (fizzles(this, x, y, r)) return 0;
     this.indexEnemies();
     const hit = (d: number) => damage * (1 - 0.6 * Math.min(1, d / r));
-    for (const e of this.enemiesNear(x, y, r)) this.hurtEnemy(e, hit(dist(e.x - x, e.y - y)), true, "ranged", origin ?? { x, y }, !!origin);
+    for (const e of this.enemiesNear(x, y, r)) if (!sheltered(this, e.x, e.y)) this.hurtEnemy(e, hit(dist(e.x - x, e.y - y)), true, "ranged", origin ?? { x, y }, !!origin);
     if (friendlyFire)
       for (const u of [...this.soldiers, ...this.civilians]) {
         const d = dist(u.x - x, u.y - y);
-        if (d > r || u.hp <= 0 || ("guard" in u && u.guard)) continue;
+        if (d > r || u.hp <= 0 || ("guard" in u && u.guard) || sheltered(this, u.x, u.y)) continue;
         u.hp -= hit(d) * FRIENDLY_FIRE;
         u.flash = 0.12;
       }

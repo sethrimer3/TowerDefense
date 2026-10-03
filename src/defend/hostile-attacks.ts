@@ -4,11 +4,14 @@ import { ENEMIES } from "./catalog.ts";
 import { SUB } from "./grid.ts";
 import { nearestPoint, rectDist } from "./pathing.ts";
 import type { DefendSim, Enemy } from "./sim.ts";
+import { fizzles, sheltered } from "./boats.ts";
 
 /** Enemy attacks spare other enemies and deal full damage to the city. */
 export function hostileBurst(sim: DefendSim, x: number, y: number, radius: number, damage: number) {
+  // A burst in a magic boat's water fizzles, and spares whoever stands in it.
+  if (fizzles(sim, x, y, radius)) return;
   for (const u of [...sim.soldiers, ...sim.civilians]) {
-    if (u.hp <= 0 || ("guard" in u && u.guard) || sq(u.x - x) + sq(u.y - y) > sq(radius)) continue;
+    if (u.hp <= 0 || ("guard" in u && u.guard) || sq(u.x - x) + sq(u.y - y) > sq(radius) || sheltered(sim, u.x, u.y)) continue;
     u.hp -= damage;
     u.flash = 0.12;
   }

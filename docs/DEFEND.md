@@ -6,7 +6,7 @@ holds it against endless waves. Code lives in `src/defend/`.
 Waves spend a difficulty budget starting at 20, growing 5% per wave (rounded
 down). Enemy costs are Roach 1, Bat 2, Orc 4, Ogre 8, Mother 10 (including
 three Broodlings), Warlord 100, Snake 60, Dragon 2,500, Shield Generator
-10,000, and Invincible Shield Generator 1,000,000; the siege engines cost Rolling Cannon 80, Ballista 120, Firework Launcher 200, Trebuchet 2,500, Great Bombard 12,000 and Dragonfire Battery 30,000. Affordable enemies are selected randomly;
+10,000, and Invincible Shield Generator 1,000,000; the siege engines cost Rolling Cannon 80, Ballista 120, Firework Launcher 200, Trebuchet 2,500, Great Bombard 12,000 and Dragonfire Battery 30,000; the magic boats Enchanted Skiff 1,000, Spellbound Sloop 10,000, Arcane Galleon 100,000 and Deluge Ark 1,000,000. Affordable enemies are selected randomly;
 there are no starting-wave gates or scheduled Warlord spawns. Enemy HP stays
 fixed. Each wave reserves at most 5,000 enemies, including hatched offspring.
 Selection favours expensive enemies when capacity is tight; any budget the
@@ -522,6 +522,36 @@ egg. Blink Imp (250) shows a destination for 0.6 seconds before jumping up
 to three cells, only landing in open cells. All have pixel art and journal
 entries. Necromancer reserves five enemy slots and phoenix three; every
 summon and revival also checks the lifetime 5,000-unit cap.
+
+
+Magic boats have the same four tiers: Enchanted Skiff (1,000 difficulty;
+1,500 HP), Spellbound Sloop (10,000; 7,000 HP), Arcane Galleon (100,000;
+35,000 HP) and Deluge Ark (1,000,000; 160,000 HP), 1.4 to 3.8 cells long with
+water 1.6, 2.4, 3.3 and 4.4 cells round the hull (`boats.ts`). A boat sails
+in a straight line through the ground toward the keep, ignoring streets,
+dropping a pool of its water every quarter second; each pool holds for
+3.2 seconds, then dries up from its edge over 4.8, so a trail of water
+follows it and evaporates behind it. Every house and structure the water
+reaches is sunk at once: the water spreads over the whole of it and it
+goes down into it amid bubbles and rings, leaving its rubble when the water
+dries (sunk buildings can be rebuilt like any other). The skiff and sloop
+can't sink wall stones or the keep: they ram them with the bow (40 and 120
+damage every 1.2 seconds) until a stone breaks. The Arcane Galleon sinks
+wall stones too and rams the keep; the Deluge Ark sinks the keep as soon as
+its water reaches it, which loses the run. The water hurts nobody but fire
+mages (10 damage a second while they stand in it). It puts out fires:
+burning ground in it goes out, fireballs landing in it fizzle and the
+wizard tower's fire can't burn an enemy standing in it. It stops splash
+damage: cannon shells, bombs, fireballs and enemy bursts centred in it
+fizzle with a hiss of steam, and a blast beside it spares whoever stands
+in the water, enemy or defender. So cannons and bombs can't touch a boat;
+arrows, blades, the valkyries' charge and black lightning can. The water
+is pixel art like the parks' ponds (`flood-art.ts`): the same bands and
+dither, the bank mirrored into it with the shimmer, rings off the wake and
+the rain, crests and sparkles; standing walls and the keep rise out of it.
+The boats are pixel sprites per heading (`boat-art.ts`): a planked hull
+with rune-lit rails and a bow crystal, one to four masts with billowing
+sails (cream, sea green, blue, violet), gold rails on the two biggest.
 
 
 Living Fortresses have four tiers: Walking Bastion (1,000 difficulty; two

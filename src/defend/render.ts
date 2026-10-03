@@ -7,7 +7,7 @@ import { enemySize } from "./catalog.ts";
  * fire mages' burning ground (mage-art.ts), units and effects
  * (battle-art.ts, with the valkyries' charges from valkyrie-art.ts), the
  * black lightning (dark-art.ts), the trees over them (park-trees.ts), the
- * planted war banner, the wizards' fire, the building grid and drag overlay (edit-overlay.ts), then
+ * planted war banner, the magic boats' water (flood-art.ts) over the ground, the wizards' fire, the building grid and drag overlay (edit-overlay.ts), then
  * rain in screen space. */
 import { CELLS_H, CELLS_W, boardSize, hash01 } from "./grid.ts";
 import type { CityMap } from "./citygen.ts";
@@ -29,6 +29,7 @@ import { drawBlazes, mageLights } from "./mage-art.ts";
 import { stabLights } from "./valkyrie-art.ts";
 import { DarkArt, darkLights } from "./dark-art.ts";
 import { ParkTrees, type Under } from "./park-trees.ts";
+import { FloodArt } from "./flood-art.ts";
 
 export type DrawOptions = {
   /** Show the (dim, gold) tile grid — while the player is editing. */
@@ -61,6 +62,7 @@ export class DefendRenderer {
   readonly wizard = new WizardArt();
   readonly trees = new ParkTrees();
   readonly dark = new DarkArt();
+  readonly floods = new FloodArt();
   /** The battle time the wizard art last advanced to. */
   private wizardTime = 0;
   private rain = new Rain();
@@ -200,6 +202,8 @@ export class DefendRenderer {
     this.fences.sync(map);
     if (sim) this.fences.update(sim);
     this.fences.draw(ctx, this.px);
+    // Magic boats' water over the ground, sinking what it reaches.
+    if (sim) this.floods.draw({ c: ctx, px: this.px, sim, rain: !!opts.weather?.rain, reduceMotion: opts.reduceMotion, reflections: opts.effects ?? true, layer: this.layer, layerScale: this.layerScale });
   }
 
   /** Pond drips, rings and reflections, then the grass swaying and parting

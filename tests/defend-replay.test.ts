@@ -117,6 +117,14 @@ function scenarios(): Record<string, Scenario> {
       opening: [...Array<EnemyKind>(60).fill('roach'), ...Array<EnemyKind>(30).fill('orc'), ...Array<EnemyKind>(12).fill('bat'), ...Array<EnemyKind>(3).fill('ogre')],
       smash: [[60, "darkKeep"]],
     },
+    // Magic boats sailing in on their own water, sinking the houses and
+    // structures it reaches (and the galleon the wall), past fire mages and
+    // a cannon tower whose shells fizzle in it.
+    boats: {
+      layout: city(SQUARE, [["mageGuild", 1, 1], ["cannonTower", 0, -2], ["archerTower", -1, -1], ["barracks", 1, -1]]),
+      citySeed: 13, levels: maxLevels(), seed: 6, seconds: 160, wave: 1,
+      opening: ['boatLesser', 'boatLesser', 'boat', 'boatGreater'],
+    },
     // Wizard towers inside and outside the walls, flame and ice in turn.
     wizards: {
       layout: city(SQUARE, [["wizardTower", 0, -2], ["wizardTower", 1, 1], ["barracks", -1, 1]]),
@@ -145,6 +153,8 @@ function state(sim: DefendSim) {
     ...(sim.bolts.length || dark.size ? [sim.bolts, [...dark]] : []),
     // Likewise only siege engines shoot siege shots.
     ...(sim.siegeShots.length ? [sim.siegeShots] : []),
+    // And only magic boats make water and sink buildings.
+    ...(sim.floods.length || sim.sinkings.length ? [sim.floods, sim.sinkings] : []),
   ];
 }
 
@@ -213,6 +223,9 @@ test("the Defend replays exercise every unit and effect", () => {
       if (sim.arrows.length) seen.add("arrow");
       if (sim.shells.length) seen.add("shell");
       for (const s of sim.siegeShots) seen.add(`siege:${s.kind}`);
+      if (sim.floods.length) seen.add("flood");
+      for (const sk of sim.sinkings) seen.add(`sunk:${sim.map.buildings[sk.building].kind === "wall" ? "wall" : sim.map.buildings[sk.building].kind === "house" ? "house" : "structure"}`);
+      if (sim.effects.some((fx) => fx.kind === "steam")) seen.add("steam");
       if (sim.flames.length) seen.add("flame");
       if (sim.frosts.length) seen.add("frost");
       if (sim.stabs.some((st) => st.hits.length > 1)) seen.add("stab");
@@ -225,6 +238,7 @@ test("the Defend replays exercise every unit and effect", () => {
     "enemy:shieldLesser", "enemy:shieldGreater", "enemy:poisonLesser", "enemy:poisonBearer", "enemy:poisonGreater", "enemy:poisonSovereign", "enemy:fortressLesser", "enemy:fortress", "enemy:fortressGreater", "enemy:fortressSovereign", "enemy:darkKnight", "enemy:bombOrc", "enemy:bombBird", "enemy:voidSparrow", "enemy:snake", "enemy:dragon", "enemy:shieldBearer", "enemy:aegis", "enemy:warlord", "enemy:bat", "enemy:mother", "enemy:broodling", "distracted", "marked", "soldier:sword", "soldier:archer", "path:sword", "path:archer", "hunting",
     "civilian:toJob", "civilian:working", "civilian:home", "arrow", "shell", "flame", "frost", "chilled", "soldier:valkyrie", "stab", "guarded", "soldier:darkWizard", "chained", "lost:bare", "half-rebuilt",
     "enemy:rollingCannon", "enemy:ballista", "enemy:fireworkLauncher", "enemy:trebuchet", "enemy:bombard", "enemy:rocketBattery", "siege:ball", "siege:bolt", "siege:rocket", "siege:stone",
+    "enemy:boatLesser", "enemy:boat", "enemy:boatGreater", "flood", "sunk:house", "sunk:wall", "sunk:structure", "steam",
   ];
   assert.deepEqual(want.filter((w) => !seen.has(w)), []);
 });
