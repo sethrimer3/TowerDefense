@@ -177,6 +177,9 @@ export function roadStones(map: CityMap): Stone[] {
 }
 
 export class DefendLighting {
+  private shadowLayer: HTMLCanvasElement | null = null;
+  private shadowKey = '';
+  private dominantRevision = 0;
   lights: Light[] = [];
   private map: CityMap | null = null;
   private stones: Stone[] = [];
@@ -249,6 +252,7 @@ export class DefendLighting {
 
   private rebuildDominant(intact: (id: number) => boolean) {
     if (!this.domDirty) return;
+    this.dominantRevision++;
     this.domDirty = false;
     this.domId.fill(-1);
     this.domVal.fill(0);
@@ -291,7 +295,27 @@ export class DefendLighting {
 
   /** Unit shadows, stepped away from each unit's dominant light. Batched by
    * opacity into a handful of fills, so it scales to hundreds of units. */
-  drawUnitShadows(c: CanvasRenderingContext2D, px: number, units: { x: number; y: number; size: number }[], strength: number) {
+  drawUnitShadows(c: CanvasRenderingContext2D, px: number, units: { x: number; y: number; size: number }[], strength: number, tick?: number) {
+    // Positions only change on simulation ticks. Reuse the union between ticks,
+    // but invalidate for zoom, light changes and night strength too.
+    if (units.length > 1000 && tick !== undefined) {
+      const { W, H } = boardSize(px);
+      this.shadowLayer = sized(this.shadowLayer, W, H);
+      const key = `${tick}:${px}:${strength}:${this.dominantRevision}`;
+      if (key !== this.shadowKey) {
+        this.shadowKey = key;
+        const off = this.shadowLayer.getContext('2d')!;
+        off.clearRect(0, 0, W, H);
+        this.paintUnitShadows(off, px, units, strength);
+      }
+      c.drawImage(this.shadowLayer, 0, 0);
+      return;
+    }
+    this.shadowKey = '';
+    this.paintUnitShadows(c, px, units, strength);
+  }
+
+  private paintUnitShadows(c: CanvasRenderingContext2D, px: number, units: { x: number; y: number; size: number }[], strength: number) {
     const buckets: number[][] = [[], [], [], []];
     for (const u of units) {
       const cx = Math.floor(u.x),
@@ -315,13 +339,15 @@ export class DefendLighting {
     for (let b = 0; b < 4; b++) {
       const list = buckets[b];
       if (!list.length) continue;
-      c.fillStyle = `rgba(0,0,0,${(0.18 + b * 0.1) * strength})`;
+      const alpha = (0.18 + b * 0.1) * strength;
+      c.fillStyle = `rgba(0,0,0,${alpha})`;
       c.beginPath();
       for (let k = 0; k < list.length; k += 6) {
-        const [x, y, dx, dy, len, size] = list.slice(k, k + 6);
+        const x = list[k], y = list[k + 1], dx = list[k + 2], dy = list[k + 3], len = list[k + 4], size = list[k + 5];
         for (const t of [0.35, 0.7, 1]) {
           const s = size * (1 - t * 0.25) * px;
-          c.rect((x + dx * len * t) * px - s / 2, (y + dy * len * t) * px - s / 2, s, s);
+          const rx = (x + dx * len * t) * px - s / 2, ry = (y + dy * len * t) * px - s / 2;
+          c.rect(rx, ry, s, s);
         }
       }
       c.fill();

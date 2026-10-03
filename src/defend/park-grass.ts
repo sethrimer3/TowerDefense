@@ -117,7 +117,7 @@ export class ParkGrass {
       if (bx < 0 || bx >= W) return;
       for (let yy = Math.max(0, y - oy), end = Math.min(H, y - oy + h); yy < end; yy++) px[yy * W + bx] = PALETTE32[color];
     };
-    const near = nearbyWalkers(f.walkers);
+    const near = nearbyWalkers(f.walkers, this.plans);
     const t = f.now / 1000, wind = WIND[f.wind];
     for (let i = 0; i < this.plans.length; i++) {
       const list = this.plans[i];
@@ -177,7 +177,7 @@ export class ParkGrass {
 }
 
 /** Walkers by the cells they can bend blades in: their own and the eight around. */
-function nearbyWalkers(walkers: readonly Walker[]) {
+function nearbyWalkers(walkers: readonly Walker[], plans: readonly (Blade[] | null)[]) {
   const out = new Map<number, Walker[]>();
   for (const w of walkers)
     for (let dy = -1; dy <= 1; dy++)
@@ -185,6 +185,7 @@ function nearbyWalkers(walkers: readonly Walker[]) {
         const x = Math.floor(w.x) + dx, y = Math.floor(w.y) + dy;
         if (!cellInBounds(x, y)) continue;
         const i = cellIndex(x, y);
+        if (!plans[i]?.length) continue;
         const list = out.get(i);
         if (list) list.push(w);
         else out.set(i, [w]);

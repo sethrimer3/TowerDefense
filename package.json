@@ -8,7 +8,8 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 127.0.0.1",
     "test": "node --experimental-transform-types --import ./tests/pin-random.ts --test tests/*.test.ts",
-    "test:pointer": "node tests/defend-pointer.mjs"
+    "test:pointer": "node tests/defend-pointer.mjs",
+    "test:performance": "node tests/defend-performance.mjs"
   },
   "devDependencies": {
     "typescript": "~5.9.3",

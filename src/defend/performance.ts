@@ -12,8 +12,9 @@ class Timings {
   }
   mean() { return this.count ? this.total / this.count : 0; }
   p95() {
+    if (!this.count) return 0;
     let remaining = Math.ceil(this.count * .95);
-    for (let i = 0; i < this.bins.length; i++) if ((remaining -= this.bins[i]) <= 0) return i;
+    for (let i = 0; i < this.bins.length; i++) if ((remaining -= this.bins[i]) <= 0) return i === 500 ? this.max : i;
     return 500;
   }
 }
@@ -29,6 +30,7 @@ const round = (n: number) => Math.round(n * 100) / 100;
 export class BattlePerformance {
   readonly history: WavePerformance[] = [];
   private wave = 0;
+  private completed = 0;
   private peak = 0;
   private slow = 0;
   private sinceLog = 0;
@@ -37,14 +39,14 @@ export class BattlePerformance {
   private draws = new Timings();
 
   sample(wave: number, enemies: number, frameMs: number, updateMs: number, drawMs: number) {
+    if (wave === this.completed) return;
     if (wave !== this.wave) {
       this.finish('cleared');
       this.wave = wave;
       this.peak = this.slow = this.sinceLog = 0;
       this.frames = new Timings(); this.updates = new Timings(); this.draws = new Timings();
     }
-    // Ignore tab suspension, which is not a rendered frame. CPU stalls remain visible.
-    if (!wave || document.hidden || frameMs <= 0 || frameMs > 1000) return;
+    if (!wave || frameMs <= 0) return;
     this.peak = Math.max(this.peak, enemies);
     this.frames.add(frameMs); this.updates.add(updateMs); this.draws.add(drawMs);
     if (frameMs > 1000 / 60 + 1) this.slow++;
@@ -55,6 +57,7 @@ export class BattlePerformance {
   finish(status: string) {
     if (!this.wave) return;
     this.log(status);
+    this.completed = this.wave;
     this.wave = 0;
   }
 

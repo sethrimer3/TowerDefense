@@ -308,7 +308,7 @@ export class DefendRenderer {
     if (weather) this.lighting.update(sim.solid, changed, standing(map, sim));
     else if (changed.length) this.lighting.invalidate(changed);
     drawDamage({ c: this.ctx, px: this.px }, sim);
-    if (weather) this.lighting.drawUnitShadows(this.ctx, this.px, shadowCasters(sim), 0.8 + 0.2 * night);
+    if (weather) this.lighting.drawUnitShadows(this.ctx, this.px, shadowCasters(sim), 0.8 + 0.2 * night, this.burning || this.cam.s !== 1 ? undefined : sim.time);
   }
 
   /** Notes when a run ends (or a new one starts), and from then on tells

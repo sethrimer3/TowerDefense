@@ -15,7 +15,9 @@ try {
   if (process.env.PERF_PROFILE) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.start'); }
   const rows = [];
   for (let wave = Number(process.env.PERF_WAVE || 1); wave <= Number(process.env.PERF_WAVE || 20); wave++) {
-    const row = await page.evaluate(async ({ wave, scene }) => {
+    // Release previous renderers and their canvases between samples.
+    await page.reload();
+    const row = await page.evaluate(async ({ wave, scene, realtime }) => {
       const { DefendSim } = await import('/src/defend/sim.ts');
       const { DefendRenderer } = await import('/src/defend/render.ts');
       const { defaultLayout, fitLayout, placeCityTile, placeStructure } = await import('/src/defend/layout.ts');
@@ -51,7 +53,7 @@ try {
       for (let i = 0; i < 150; i++) {
         const now = await new Promise(requestAnimationFrame);
         const start = performance.now();
-        sim.update(1 / 60);
+        sim.update(realtime && last ? (now - last) / 1000 : 1 / 60);
         const mid = performance.now();
         renderer.draw(map, sim, null, { grid: false, weather: { rain: true }, night: 1, now, reduceMotion: false, effects: true });
         const end = performance.now();
@@ -60,13 +62,14 @@ try {
       }
       const mean = a => +(a.reduce((s,v)=>s+v,0)/a.length).toFixed(2);
       const p95 = a => +a.toSorted((a,b)=>a-b)[Math.floor(a.length*.95)].toFixed(2);
-      return { wave, scene, initialEnemies: wave * 500, enemies: sim.enemies.length, updateMs: mean(step), drawMs: mean(draw), frameP95Ms: p95(frame), fps: +(1000/mean(frame)).toFixed(1) };
-    }, { wave, scene: process.env.PERF_SCENE || 'spawn' });
+      return { wave, scene, realtime, initialEnemies: wave * 500, enemies: sim.enemies.length, updateMs: mean(step), drawMs: mean(draw), frameP95Ms: p95(frame), fps: +(1000/mean(frame)).toFixed(1) };
+    }, { wave, scene: process.env.PERF_SCENE || 'spawn', realtime: process.env.PERF_REALTIME === '1' });
     rows.push(row);
     console.log(JSON.stringify(row));
   }
   mkdirSync('test-results', { recursive: true });
   writeFileSync(`test-results/performance-${process.env.PERF_LABEL || 'latest'}.json`, JSON.stringify(rows, null, 2));
+  await page.screenshot({ path: 'test-results/performance.png' });
   if (process.env.PERF_PROFILE) {
     const { profile } = await cdp.send('Profiler.stop');
     writeFileSync('test-results/defend.cpuprofile', JSON.stringify(profile));

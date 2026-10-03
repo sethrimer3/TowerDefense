@@ -26,6 +26,7 @@ import { fitLayout, type Layout } from "./layout.ts";
 import { generateCity, type CityMap } from "./citygen.ts";
 import { DefendSim } from "./sim.ts";
 import { DefendRenderer } from "./render.ts";
+import { BattlePerformance } from "./performance.ts";
 import type { Overlay } from "./edit-overlay.ts";
 import { paintIcon, type IconItem } from "./structure-art.ts";
 import { BoardPointers, eventCell } from "./board-pointers.ts";
@@ -80,6 +81,8 @@ export class DefendPage {
     drop: (drop) => this.drop(drop),
   });
   private lastTime = 0;
+  private performance = new BattlePerformance();
+  private performanceEnd: string | null = null;
   private message = "";
   private messageT = 0;
   private newRecord = 0;
@@ -100,10 +103,12 @@ export class DefendPage {
     this.root = root;
     this.host = host;
     window.addEventListener("resize", () => this.layoutBoard());
+    document.addEventListener('visibilitychange', () => { this.lastTime = 0; });
   }
 
   /** Called when the DEFEND tab is shown (or its data changed elsewhere). */
   show() {
+    this.lastTime = 0;
     if (!this.built) this.build();
     this.renderChrome();
     this.relayout();
@@ -114,16 +119,26 @@ export class DefendPage {
     const dt = this.lastTime ? (time - this.lastTime) / 1000 : 0;
     this.lastTime = time;
     if (!this.built || this.tab !== "city") return;
+    const measuring = this.sim && this.phase === "sim";
+    const start = performance.now();
     if (this.sim && this.phase === "sim") {
       this.sim.update(dt);
       this.handleEvents();
     }
+    const updated = performance.now();
     this.fadeNight(dt);
     if (this.messageT > 0) {
       this.messageT -= dt;
       if (this.messageT <= 0) this.setMessage("");
     }
+    const drawing = performance.now();
     this.draw();
+    const drawn = performance.now();
+    if (measuring && this.sim && !document.hidden) {
+      this.performance.sample(this.sim.wave, this.sim.enemies.length, dt * 1000, updated - start, drawn - drawing);
+      if (this.performanceEnd) this.performance.finish(this.performanceEnd);
+      this.performanceEnd = null;
+    }
     if (this.phase === "sim") this.updateHud();
   }
 
@@ -243,6 +258,7 @@ export class DefendPage {
       el.querySelector<HTMLButtonElement>("#defend-abandon")!.onclick = () => {
         if (performance.now() < this.abandonArmed) {
           this.abandonArmed = 0;
+          this.performance.finish('abandoned');
           this.endRun();
           return;
         }
@@ -481,6 +497,10 @@ export class DefendPage {
   }
 
   private startRun() {
+    this.performance.finish('restarted');
+    this.performance = new BattlePerformance();
+    this.performanceEnd = null;
+    Object.assign(window, { defendPerformance: this.performance.history });
     // A fresh city every run; upgrades bought mid-run apply next time.
     this.map = null;
     const map = this.currentMap();
@@ -498,6 +518,7 @@ export class DefendPage {
   private endRun() {
     if (!this.sim) return;
     this.payKills();
+    this.performanceEnd = this.sim.lost ? 'lost' : 'abandoned';
     this.phase = "over";
     play("fallen");
     replay(this.root.querySelector("#defend-board"), "quake");
@@ -533,6 +554,7 @@ export class DefendPage {
     this.payKills();
     for (const ev of sim.events.splice(0)) {
       if (ev.type === "waveCleared") {
+        this.performanceEnd = 'cleared';
         const r = this.host.earnWave(ev.wave);
         const pay = `+${Math.floor(r.gold)} gold · +${r.copper} copper${r.silver ? ` · +${r.silver} silver` : ""}${r.knowledge ? ` · +${r.knowledge} Knowledge` : ""}${r.upgrade ? ` · +${r.upgrade} upgrade point` : ""}`;
         if (ev.wave > this.save.bestWave) {

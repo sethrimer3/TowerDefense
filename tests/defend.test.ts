@@ -150,6 +150,36 @@ test('waves grow and escalate in variety', () => {
   assert.ok(buildWave(1, r).every((k) => k === 'roach'));
   assert.ok(buildWave(10, r).length > buildWave(1, r).length);
   assert.ok(new Set(buildWave(12, Math.random)).size > 1);
+  for (let wave = 1; wave <= 20; wave++) assert.equal(buildWave(wave, r).length, wave * 500);
+  assert.equal(buildWave(0, r).length, 0);
+});
+
+test('stress waves release their full count within five seconds', () => {
+  for (const wave of [1, 10, 20]) {
+    const sim = new DefendSim(mapOf(defaultLayout()), zeroLevels(), 5);
+    sim.wave = wave;
+    sim.spawnQueue = buildWave(wave, sim.rand);
+    // Isolate spawning from combat so every released enemy is countable.
+    for (let i = 0; i < 151; i++) (sim as any).runWaves(1 / 30);
+    assert.equal(sim.spawnQueue.length, 0);
+    assert.equal(sim.enemies.length, wave * 500);
+  }
+});
+
+test('dense crowd separation is deterministic, bounded and ignores dead enemies', () => {
+  const make = () => {
+    const sim = new DefendSim(mapOf(defaultLayout()), zeroLevels(), 9);
+    for (let i = 0; i < 10000; i++) sim.enemies.push((sim as any).newEnemy('roach', 5 + i % 10 * .01, 5));
+    (sim as any).indexEnemies();
+    return sim;
+  };
+  const a = make(), b = make();
+  const push = (a as any).separation(a.enemies[0]);
+  assert.deepEqual(push, (b as any).separation(b.enemies[0]));
+  assert.ok(push.every(Number.isFinite));
+  assert.ok(Math.abs(push[0]) <= 32 * .45);
+  for (const e of a.enemies) e.hp = 0;
+  assert.deepEqual((a as any).separation(a.enemies[0]), [0, 0]);
 });
 
 test('an undefended city eventually falls, and enemies breach the wall to do it', () => {

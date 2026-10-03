@@ -5,7 +5,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { defaultLayout, fitLayout, placeCityTile, placeStructure, type Layout } from "../src/defend/layout.ts";
 import { generateCity } from "../src/defend/citygen.ts";
 import { DefendSim, type Levels } from "../src/defend/sim.ts";
-import { UPGRADES, type PaletteItem } from "../src/defend/catalog.ts";
+import { UPGRADES, type PaletteItem, type EnemyKind } from "../src/defend/catalog.ts";
 
 // Characterization replay of the Defend simulation: fixed cities, upgrade
 // levels, seeds and bomb drops, stepped at the fixed timestep, with the whole
@@ -46,10 +46,25 @@ type Scenario = {
   /** Buildings knocked down outright: [second, kind], the first intact one. */
   smash?: [number, string][];
   speed?: number;
+  opening?: EnemyKind[];
+  wave?: number;
+  breakSeconds?: number;
 };
 
 function scenarios(): Record<string, Scenario> {
   return {
+    // Small explicit mixed siege retains late-enemy and ice coverage even
+    // though the new 500-enemy opening overwhelms the old progression fixtures.
+    mixed: {
+      layout: city(SQUARE, [["wizardTower", 0, -2], ["wizardTower", 1, 1], ["barracks", -1, 1], ["archerTower", -1, -1]]),
+      citySeed: 13, levels: maxLevels(), seed: 6, seconds: 160, wave: 10,
+      opening: ['warlord', ...Array<EnemyKind>(12).fill('mother'), ...Array<EnemyKind>(12).fill('bat')],
+      smash: [[5, 'house']],
+    },
+    repairs: {
+      layout: city(SQUARE, []), citySeed: 5, levels: maxLevels(), seed: 2, seconds: 100,
+      breakSeconds: 70, smash: [[1, 'house']],
+    },
     // Only the keep: walls breached, houses smashed, civilians rebuilding, a loss.
     bare: { layout: city([], []), citySeed: 3, levels: levelsAt(), seed: 1, seconds: 240 },
     // Every structure at level 0, with bombs that catch friendly units.
@@ -112,6 +127,9 @@ function replay(sc: Scenario, observe: (sim: DefendSim) => void = () => {}) {
   const fit = fitLayout(sc.layout);
   assert.ok(fit.ok);
   const sim = new DefendSim(generateCity(fit, sc.citySeed), sc.levels, sc.seed);
+  if (sc.opening) sim.spawnQueue = [...sc.opening];
+  if (sc.wave) sim.wave = sc.wave;
+  if (sc.breakSeconds) sim.breakT = sc.breakSeconds;
   sim.speed = sc.speed ?? 1;
   const out: string[] = [];
   for (let t = 1; t <= sc.seconds && !sim.lost; t++) {
