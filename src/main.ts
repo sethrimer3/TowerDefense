@@ -34,6 +34,8 @@ const ctx: AppContext = {
   navigate,
   clock,
   smiths: () => smithNames(),
+  researchers: () => libraryPage.sim.count("researcher"),
+  researched: () => libraryPage.sim.researched(),
   devChanged: () => {
     if (save.settings.devTowers) unlockAllTowers(save.defend);
     update();

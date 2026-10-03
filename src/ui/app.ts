@@ -16,6 +16,11 @@ export interface AppContext {
   clock(): number;
   /** The names of the mine's smiths (who work the Smithy's upgrades). */
   smiths(): string[];
+  /** The Library's researchers: with none, the skill trees' Knowledge
+   * research can't be bought. */
+  researchers(): number;
+  /** A research was bought: the Library's lab celebrates. */
+  researched(): void;
   /** A dev option changed: applies what it grants, saves and refreshes. */
   devChanged(): void;
   /** Dev: adds `ms` of idle time, as if the game had been closed that long. */

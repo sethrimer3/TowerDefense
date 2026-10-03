@@ -33,4 +33,28 @@ export const BUTTS = [-12, W + 11];
 /** Where the carts stand when parked: the book cart under the window, the
  * barrow by whichever spot is nearest the work. */
 export const CART_HOME = 106;
-export const BARROW_SPOTS = [26, 80, 166];
+export const BARROW_SPOTS = [26, 74, 166];
+/** The return shelf: a low stand on the floor between the barrow's middle
+ * spot and the cart, where professors put the books they have read (two
+ * rows of `RETURN_PER_ROW`), to be wheeled out. */
+export const RETURN = { x: 84, w: 14 };
+export const RETURN_PER_ROW = 6;
+export const RETURN_BOOKS = 2 * RETURN_PER_ROW;
+
+/** The alchemy lab, a vaulted cellar under the nave (the view pans down to
+ * it): its ceiling's top, its floor's top (researchers' feet), and the
+ * picture's whole height. A stair runs down from a trapdoor in the nave's
+ * floor at `STAIR_X`. */
+export const LAB_TOP = H + 8;
+export const LAB_FLOOR = LAB_TOP + 112;
+export const WORLD_H = LAB_FLOOR + 10;
+export const STAIR_X = 20;
+/** Where the researchers stand to work, on the lab's floor (x), and which
+ * way they face: the shelf of jars, the alembic, the athanor's bellows, the
+ * transmutation circle, the cauldron, the desk's stool, the mortar bench and
+ * the homunculus in its jar. */
+export const LAB = {
+  jars: { x: 33, face: 1 }, alembic: { x: 51, face: -1 }, athanor: { x: 86, face: -1 }, circle: { x: 98, face: 1 },
+  cauldron: { x: 115, face: 1 }, desk: { x: 155, face: -1 }, mortar: { x: 168, face: -1 }, jar: { x: 174, face: 1 },
+} as const;
+export type LabStation = keyof typeof LAB;
