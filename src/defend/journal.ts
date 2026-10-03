@@ -1,18 +1,64 @@
 import { ENEMIES, type EnemyKind } from "./catalog.ts";
 
+/** The enemy journal's button: a bestiary bound in oxblood leather, a
+ * skull with burning eyes on its cover and gold on its corners, outlined in
+ * black; a wax seal marked "!" while there are new enemies to read about.
+ * Drawn on a 20 × 20 canvas shown at twice that. */
+const COVER = [
+  "GhhhhhhhhhG",
+  "CCCKKKKKCCC",
+  "CCKWWWWWKCC",
+  "CKWWWWWWwKC",
+  "CKWKKWKKwKC",
+  "CKWKEWKEwKC",
+  "CKWWWKWWwKC",
+  "CCKWWWWwKCC",
+  "CCKWKWKwKCC",
+  "CCCKKKKKCCC",
+  "CCCCCCCCCCC",
+  "cCCCCCCCCCc",
+  "GcccccccccG"
+];
+const BAND_ROWS = [2, 6, 10];
+const BOOK = [
+  "KKKKKKKKKKKKKK..",
+  ...COVER.map((row, i) => `K${BAND_ROWS.includes(i) ? "s" : "S"}${row}K${i === 0 ? "K." : `${i % 2 ? "p" : "P"}K`}`),
+  "KKKKKKKKKKKKKKPK",
+  ".KPPPPPPPPPPPPpK",
+  "..KKKKKKKKKKKKKK"
+];
+const SEAL = [
+  ".KKKKK.",
+  "KRRWRRK",
+  "KRRWRRK",
+  "KRRWRrK",
+  "KRRRRrK",
+  "KRRWRrK",
+  ".KrrrK.",
+  "..KKK.."
+];
+const JOURNAL_COLOURS: Record<string, string> = {
+  K: "#0b0706", C: "#6e2b22", c: "#4f1d17", h: "#93432f", S: "#3a1410", s: "#c9973f",
+  G: "#e8b955", P: "#ead8a8", p: "#b39869", W: "#ece3c7", w: "#a89c7c", E: "#ff5a2a",
+  R: "#d42e28", r: "#82130f"
+};
+
+function paintRows(c: CanvasRenderingContext2D, rows: string[], x0: number, y0: number) {
+  rows.forEach((row, y) => {
+    for (let x = 0; x < row.length; x++) {
+      const colour = JOURNAL_COLOURS[row[x]];
+      if (!colour) continue;
+      c.fillStyle = colour;
+      c.fillRect(x0 + x, y0 + y, 1, 1);
+    }
+  });
+}
+
 export function paintJournal(canvas: HTMLCanvasElement, unread: boolean) {
   const c = canvas.getContext("2d")!;
   c.clearRect(0, 0, 20, 20);
-  c.fillStyle = "#1e1010"; c.fillRect(2, 3, 14, 16);
-  c.fillStyle = "#7d3d30"; c.fillRect(3, 2, 12, 14);
-  c.fillStyle = "#542b25"; c.fillRect(3, 3, 3, 13);
-  c.fillStyle = "#a76a46"; c.fillRect(6, 3, 8, 1);
-  c.fillStyle = "#c6a777"; c.fillRect(5, 16, 10, 2);
-  c.fillStyle = "#ddb77a"; c.fillRect(10, 7, 2, 5); c.fillRect(8, 9, 6, 1);
-  if (unread) {
-    c.fillStyle = "#210b0b"; c.fillRect(15, 0, 5, 10);
-    c.fillStyle = "#ff3939"; c.fillRect(16, 1, 3, 5); c.fillRect(16, 8, 3, 2);
-  }
+  paintRows(c, BOOK, 1, 2);
+  if (unread) paintRows(c, SEAL, 13, 0);
 }
 
 export function journalHTML(discovered: EnemyKind[]): string {
@@ -26,6 +72,8 @@ export function journalHTML(discovered: EnemyKind[]): string {
       if (d.splits) notes.push(`Hatches ${d.splits.count} ${ENEMIES[d.splits.into].name}s when killed.`);
       if (d.shield) notes.push(`Shields itself and nearby enemies against ranged damage within ${d.shield.radius} cells. ${Number.isFinite(d.shield.hp) ? `${d.shield.hp.toLocaleString()} shield HP; shatters when depleted.` : "Permanent shield; only melee damage gets through."}`);
       if (d.poison) notes.push(`Poison cloud reaches ${d.poison.radius} cells. ${d.poison.lethal ? "Instantly kills player units on contact." : `${d.poison.damage} damage every 0.1 seconds to player units.`} The cloud leaves buildings unharmed and does not block ranged attacks.`);
+      if (d.siege) notes.push(`Self-driving siege engine: no crew, it rolls toward the keep and stops to shoot whatever blocks its way from ${d.siege.range} cells, the keep once it is in range${d.siege.people ? ", and your people before either" : ", or your people when nothing else is"}. It never fights hand to hand.`);
+      if (d.boat) notes.push(`Magic boat: sails straight through the ground toward the keep in a pool of conjured water ${d.boat.water} cells round its hull, which dries up in a trail behind it. Its water sinks every house and structure it reaches${d.boat.keep ? ", every wall stone, and the keep itself, ending the defense at once" : d.boat.walls ? " and every wall stone; it rams the keep" : "; it rams the walls and the keep"}. The water hurts only fire mages, puts out fires and stops splash damage: blasts in it fizzle, and anyone standing in it is safe from blasts. Bring arrows, blades and lightning.`);
       if (d.unyielding) notes.push("Cannot be frozen or pushed back. Sweeps a wide crescent with its sword.");
       const tactics: Partial<Record<EnemyKind, string>> = {
         siegeBeetle: "Front armor takes only 25% damage; attacks from behind deal 150%. Surround it.",
@@ -37,6 +85,12 @@ export function journalHTML(discovered: EnemyKind[]): string {
         leechSwarm: "Heals for damage dealt to player units, up to its maximum health. Use burst damage or area attacks.",
         ashPhoenix: "Leaves a destructible egg on its first death. The egg revives it after five seconds; destroy it first. Can revive only once.",
         phoenixEgg: "Destroy this egg before its five-second hatch finishes.",
+        rollingCannon: "Lobs an iron ball that bursts on landing. Cheap and fragile; archers outrange it.",
+        ballista: "Its bolt runs through every soldier and civilian on its line, then strikes the building behind.",
+        fireworkLauncher: "Fires a volley of six rockets that scatter round its mark and burst in showers of sparks.",
+        trebuchet: "Hurls a boulder from eleven cells, far past most defenses, crushing walls in a wide burst. Slow to reload; meet it outside the walls.",
+        bombard: "A huge iron cannon on a heavy sledge whose shells blow open whole stretches of wall. Very tough.",
+        rocketBattery: "Looses sixteen rockets at once over a wide area from ten cells. Kill it before it reaches range.",
         blinkImp: "Telegraphs a destination for 0.6 seconds, then jumps up to three cells. Use layered defenses."
       };
       if (tactics[k]) notes.push(tactics[k]!);

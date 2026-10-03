@@ -1,15 +1,15 @@
 /** Pointer gestures on the DEFEND board, as a small state machine:
  * - idle: nothing is held.
  * - viewing: board pointers move the camera, one panning, two pinch-zooming.
- * - dragging: a palette item, placed structure, keep, city tile or bomb
- *   follows the pointer under a ghost icon until it is released (dropped
+ * - dragging: a palette item, placed structure, keep, city tile, bomb or
+ *   the war banner follows the pointer under a ghost icon until it is released (dropped
  *   where it is) or cancelled.
  * A pointer landing on the board while a gesture is under way joins the view
- * gesture. It ends a building drag, but a bomb stays held, and while a drag
+ * gesture. It ends a building drag, but a bomb or banner stays held, and while a drag
  * lasts every pointer steers it and the first one lifted drops it.
  * What a press picks up and what a drop does are the page's and its
  * `EditSession`'s decisions; this only turns pointers into cells. */
-import { dragIcon, type Drag } from "./drag-rules.ts";
+import { consumable, dragIcon, type Drag } from "./drag-rules.ts";
 import type { DragAt, Drop, EditSession } from "./edit-session.ts";
 import { CELLS_W, SUB, TILES_H } from "./grid.ts";
 import type { DefendRenderer } from "./render.ts";
@@ -53,7 +53,7 @@ export class BoardPointers {
 
   /** A second pointer turns whatever was happening into a pinch. */
   private join(e: PointerEvent) {
-    if (this.held && this.held.edit.drag.from !== "bomb") this.end();
+    if (this.held && !consumable(dragIcon(this.held.edit.drag))) this.end();
     this.touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
   }
 

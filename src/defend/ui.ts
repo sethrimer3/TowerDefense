@@ -1,4 +1,5 @@
 import { journalHTML, paintJournal } from "./journal.ts";
+import { KeepBricks } from "./keep-bricks.ts";
 /** The DEFEND page: a City tab (palette + board) and an Armory tab (buy
  * city elements, bombs and universal upgrades with what battles earn).
  *
@@ -13,7 +14,10 @@ import {
   BOMB_RADIUS,
   SPEED3_PRICE,
   PALETTE_ITEMS,
+  PALETTE_CATEGORIES,
+  GATE_DESCRIPTION,
   STRUCTURES,
+  inCategory,
   UPGRADES,
   footprint,
   purchasePrice,
@@ -21,6 +25,7 @@ import {
   upgradePrice,
   type Bonuses,
   type EnemyKind,
+  type PaletteCategory,
   type PaletteItem,
   type Price,
 } from "./catalog.ts";
@@ -39,6 +44,7 @@ import { NIGHT_FADE_SECONDS, isBossWave, rollWeather, skyLabel, type Weather } f
 import { play } from "../sound.ts";
 import { replay, sparksOver } from "../ui/flourish.ts";
 import { available, buyBomb, buyItem, buySpeed3, buyUpgrade, canAfford, type DefendSave, type Wallet } from "./progress.ts";
+import { ageWater } from "./boats.ts";
 
 export type DefendHost = {
   save(): DefendSave;
@@ -61,6 +67,7 @@ export type DefendHost = {
 
 const ITEM_NAMES: Record<PaletteItem, string> = {
   cityTile: "City tile",
+  cityGate: "City gate",
   barracks: STRUCTURES.barracks.name,
   archerBarracks: STRUCTURES.archerBarracks.name,
   archerTower: STRUCTURES.archerTower.name,
@@ -70,6 +77,7 @@ const ITEM_NAMES: Record<PaletteItem, string> = {
   mageGuild: STRUCTURES.mageGuild.name,
   valkyriePalace: STRUCTURES.valkyriePalace.name,
   darkKeep: STRUCTURES.darkKeep.name,
+  monsterBait: STRUCTURES.monsterBait.name,
 };
 
 const plural = (name: string) => (name.endsWith("s") ? name : `${name}s`);
@@ -101,12 +109,18 @@ export class DefendPage {
   /** Abandon needs a second click within a few seconds. */
   private abandonArmed = 0;
   private settingsOpen = false;
+  /** The build palette's category, and whether its list of categories is
+   * open. */
+  private category: PaletteCategory = "all";
+  private categoriesOpen = false;
   private journal: HTMLDialogElement | null = null;
+  /** The keep's health in the header, a wall of bricks. */
+  private keepBricks: KeepBricks | null = null;
   /** Whether the side panel is open in each phase: the build palette starts
    * open, the battle's items closed so the battle has the whole view. */
   private sideOpen = { build: true, sim: false };
   /** Kills already paid for this run, by kind. */
-  private paid: Record<EnemyKind, number> = { roach: 0, orc: 0, ogre: 0, bat: 0, warlord: 0, mother: 0, broodling: 0, snake: 0, dragon: 0, shieldBearer: 0, aegis: 0, darkKnight: 0, bombOrc: 0, bombBird: 0, voidSparrow: 0, shieldLesser: 0, shieldGreater: 0, poisonLesser: 0, poisonBearer: 0, poisonGreater: 0, poisonSovereign: 0, siegeBeetle: 0, burrowingMole: 0, necromancer: 0, skeleton: 0, bannerCaptain: 0, mirrorKnight: 0, leechSwarm: 0, ashPhoenix: 0, phoenixEgg: 0, blinkImp: 0, fortressLesser: 0, fortress: 0, fortressGreater: 0, fortressSovereign: 0 };
+  private paid: Record<EnemyKind, number> = { roach: 0, orc: 0, ogre: 0, bat: 0, warlord: 0, mother: 0, broodling: 0, snake: 0, dragon: 0, shieldBearer: 0, aegis: 0, darkKnight: 0, bombOrc: 0, bombBird: 0, voidSparrow: 0, shieldLesser: 0, shieldGreater: 0, poisonLesser: 0, poisonBearer: 0, poisonGreater: 0, poisonSovereign: 0, siegeBeetle: 0, burrowingMole: 0, necromancer: 0, skeleton: 0, bannerCaptain: 0, mirrorKnight: 0, leechSwarm: 0, ashPhoenix: 0, phoenixEgg: 0, blinkImp: 0, fortressLesser: 0, fortress: 0, fortressGreater: 0, fortressSovereign: 0, rollingCannon: 0, ballista: 0, fireworkLauncher: 0, trebuchet: 0, bombard: 0, rocketBattery: 0, boatLesser: 0, boat: 0, boatGreater: 0, boatSovereign: 0 };
 
   constructor(root: HTMLElement, host: DefendHost) {
     this.root = root;
@@ -133,9 +147,10 @@ export class DefendPage {
     if (this.sim && this.phase === "sim") {
       if (!this.journal?.open) this.sim.update(dt);
       this.handleEvents();
-    }
+    } else if (this.sim && this.phase === "over" && (this.sim.floods.length || this.sim.sinkings.length)) ageWater(this.sim, Math.min(dt, 0.25));
     const updated = performance.now();
     this.fadeNight(dt);
+    this.keepBricks?.step(dt);
     if (this.messageT > 0) {
       this.messageT -= dt;
       if (this.messageT <= 0) this.setMessage("");
@@ -207,6 +222,7 @@ export class DefendPage {
       </div>
       <div class="defend-armory" id="defend-armory" hidden></div>
       <dialog class="defend-journal-dialog" aria-labelledby="defend-journal-title"></dialog>`;
+    this.keepBricks = new KeepBricks();
     this.renderer = new DefendRenderer(this.root.querySelector("#defend-canvas")!);
     const canvas = this.renderer.canvas;
     canvas.addEventListener("pointerdown", (e) => this.pointers.down(e));
@@ -367,27 +383,58 @@ export class DefendPage {
     const s = this.save;
     const entries: { id: string; name: string; count: number; icon: IconItem }[] =
       this.phase === "build"
-        ? PALETTE_ITEMS.map((item) => ({ id: item, name: ITEM_NAMES[item], count: available(s, item), icon: item }))
-        : [{ id: "bomb", name: "Bomb", count: s.bombs, icon: "bomb" }];
+        ? PALETTE_ITEMS.filter((item) => inCategory(item, this.category)).map((item) => ({ id: item, name: ITEM_NAMES[item], count: available(s, item), icon: item as IconItem }))
+        : [
+            { id: "bomb", name: "Bomb", count: s.bombs, icon: "bomb" },
+            { id: "banner", name: "War banner", count: Infinity, icon: "banner" },
+          ];
     el.innerHTML =
-      `<small class="defend-palette-title">${this.phase === "build" ? "BUILD" : "ITEMS"}</small>` +
+      (this.phase === "build" ? this.categoryPicker() : `<small class="defend-palette-title">ITEMS</small>`) +
       entries
         .map(
           (e) =>
-            `<button class="defend-item ${e.count ? "" : "empty"}" data-item="${e.id}" title="${e.name}" aria-label="${e.name}, ${e.count} left">
-              <canvas width="48" height="48" data-icon="${e.icon}"></canvas><span>${e.name}</span><b>×${e.count}</b></button>`,
+            `<button class="defend-item ${e.count ? "" : "empty"}" data-item="${e.id}" title="${e.name}" aria-label="${e.name}, ${e.count === Infinity ? "unlimited" : `${e.count} left`}">
+              <canvas width="48" height="48" data-icon="${e.icon}"></canvas><span>${e.name}</span><b>×${e.count === Infinity ? "∞" : e.count}</b></button>`,
         )
         .join("");
     el.querySelectorAll<HTMLCanvasElement>("canvas[data-icon]").forEach((c) => paintIcon(c, c.dataset.icon as IconItem));
     el.querySelectorAll<HTMLButtonElement>("[data-item]").forEach((b) => {
       b.onpointerdown = (e) => this.pressPalette(b.dataset.item!, e);
     });
+    const picker = el.querySelector<HTMLButtonElement>("#defend-category");
+    if (picker)
+      picker.onclick = () => {
+        this.categoriesOpen = !this.categoriesOpen;
+        this.renderPalette();
+      };
+    el.querySelectorAll<HTMLButtonElement>("[data-category]").forEach((b) => {
+      b.onclick = () => {
+        this.category = b.dataset.category as PaletteCategory;
+        this.categoriesOpen = false;
+        this.renderPalette();
+        el.scrollTop = 0;
+      };
+    });
+  }
+
+  /** The palette's head while building: a button naming the category on
+   * show, which opens the list of them. */
+  private categoryPicker() {
+    const name = PALETTE_CATEGORIES.find((c) => c.id === this.category)!.name;
+    const open = this.categoriesOpen;
+    const list = open
+      ? `<div class="defend-categories" id="defend-categories" role="menu">${PALETTE_CATEGORIES.map(
+          (c) => `<button role="menuitemradio" aria-checked="${c.id === this.category}" data-category="${c.id}">${c.name}</button>`,
+        ).join("")}</div>`
+      : "";
+    return `<button class="defend-category" id="defend-category" aria-haspopup="menu" aria-expanded="${open}" aria-controls="defend-categories" title="Show a type of building"><span aria-hidden="true">☰</span> ${name}</button>${list}`;
   }
 
   /** A press on palette entry `id` picks up one of it, if any are left. */
   private pressPalette(id: string, e: PointerEvent) {
     if (e.button !== 0) return;
     if (id === "bomb") return this.pressBomb(e);
+    if (id === "banner") return this.phase === "sim" ? this.beginDrag({ from: "banner" }, e) : undefined;
     const item = id as PaletteItem;
     if (!available(this.save, item)) return this.setMessage(`No ${plural(ITEM_NAMES[item].toLowerCase())} left — buy more in the Armory.`);
     this.beginDrag({ from: "palette", item }, e);
@@ -415,9 +462,11 @@ export class DefendPage {
       max = sim.keepMaxHp();
     const sky = this.weather ? skyLabel(this.weather, this.night) : "";
     // data-drop: the order pieces are left out when the row gets crowded.
-    const html = `${sky ? `<span class="defend-sky" data-drop="1">${sky}</span>` : ""}<span>Wave <b>${sim.wave}</b></span><span class="defend-best" data-drop="2">Best <b>${best}</b></span><span class="defend-keep" title="Keep ${Math.ceil(hp)} / ${max}"><small data-drop="3">Keep</small><i><em style="width:${(hp / max) * 100}%"></em></i></span><span class="defend-foes"><small data-drop="4">Foes </small><b>${sim.enemies.length + sim.spawnQueue.length}</b></span>`;
+    const html = `${sky ? `<span class="defend-sky" data-drop="1">${sky}</span>` : ""}<span><small data-drop="5">Wave </small><b>${sim.wave}</b></span><span class="defend-best" data-drop="2">Best <b>${best}</b></span><span class="defend-keep" title="Keep ${Math.ceil(hp)} / ${max}"><small data-drop="3">Keep</small><i></i></span><span class="defend-foes"><small data-drop="4">Foes </small><b>${sim.enemies.length + sim.spawnQueue.length}</b></span>`;
+    this.keepBricks?.set(hp / max);
     if (el.dataset.html !== html) {
       el.dataset.html = el.innerHTML = html;
+      if (this.keepBricks) el.querySelector(".defend-keep i")?.replaceWith(this.keepBricks.canvas);
       this.fitHud();
     }
   }
@@ -532,14 +581,14 @@ export class DefendPage {
     this.map = null;
     const map = this.currentMap();
     this.sim = new DefendSim(map, { ...this.save.levels }, (defendRandom("rolls")() * 2147483648) | 0, this.host.bonuses());
-    this.paid = { roach: 0, orc: 0, ogre: 0, bat: 0, warlord: 0, mother: 0, broodling: 0, snake: 0, dragon: 0, shieldBearer: 0, aegis: 0, darkKnight: 0, bombOrc: 0, bombBird: 0, voidSparrow: 0, shieldLesser: 0, shieldGreater: 0, poisonLesser: 0, poisonBearer: 0, poisonGreater: 0, poisonSovereign: 0, siegeBeetle: 0, burrowingMole: 0, necromancer: 0, skeleton: 0, bannerCaptain: 0, mirrorKnight: 0, leechSwarm: 0, ashPhoenix: 0, phoenixEgg: 0, blinkImp: 0, fortressLesser: 0, fortress: 0, fortressGreater: 0, fortressSovereign: 0 };
+    this.paid = { roach: 0, orc: 0, ogre: 0, bat: 0, warlord: 0, mother: 0, broodling: 0, snake: 0, dragon: 0, shieldBearer: 0, aegis: 0, darkKnight: 0, bombOrc: 0, bombBird: 0, voidSparrow: 0, shieldLesser: 0, shieldGreater: 0, poisonLesser: 0, poisonBearer: 0, poisonGreater: 0, poisonSovereign: 0, siegeBeetle: 0, burrowingMole: 0, necromancer: 0, skeleton: 0, bannerCaptain: 0, mirrorKnight: 0, leechSwarm: 0, ashPhoenix: 0, phoenixEgg: 0, blinkImp: 0, fortressLesser: 0, fortress: 0, fortressGreater: 0, fortressSovereign: 0, rollingCannon: 0, ballista: 0, fireworkLauncher: 0, trebuchet: 0, bombard: 0, rocketBattery: 0, boatLesser: 0, boat: 0, boatGreater: 0, boatSovereign: 0 };
     this.phase = "sim";
     this.newRecord = 0;
     this.weather = rollWeather();
     this.night = 0;
     this.renderChrome();
     const sky = this.weather.rain ? "Rain rolls in. " : "";
-    this.setMessage(`${sky}Here they come! ${this.sideOpen.sim ? "Drag" : "Open Items and drag"} a bomb onto the field to thin the horde.`, 4);
+    this.setMessage(`${sky}Here they come! ${this.sideOpen.sim ? "Drag" : "Open Items and drag"} a bomb onto the field, or plant the war banner to rally your troops.`, 4);
   }
 
   private endRun() {
@@ -563,8 +612,8 @@ export class DefendPage {
     const button = this.root.querySelector<HTMLButtonElement>("#defend-journal");
     if (!button) return;
     const unread = this.save.discovered.some(k => !this.save.journalRead.includes(k));
-    button.setAttribute("aria-label", unread ? "Enemy journal � new enemies discovered" : "Enemy journal");
-    button.title = unread ? "Enemy journal � new discoveries" : "Enemy journal";
+    button.setAttribute("aria-label", unread ? "Enemy journal — new enemies discovered" : "Enemy journal");
+    button.title = unread ? "Enemy journal — new discoveries" : "Enemy journal";
     paintJournal(button.querySelector("canvas")!, unread);
   }
 
@@ -637,6 +686,7 @@ export class DefendPage {
       effects: this.host.effects(),
       healthbars: this.host.healthbars?.() ?? true,
       over: this.phase === "over",
+      hideBanner: this.phase === "over" || (this.pointers.session?.drag.from === "banner" && !!this.pointers.session.drag.placed),
     });
   }
 
@@ -650,8 +700,10 @@ export class DefendPage {
   }
 
   /** Start dragging whatever buildable thing is under the pointer. Only the
-   * build phase picks things up; in battle a press moves the view. */
+   * build phase picks things up; in battle a press lifts the war banner where
+   * it stands (a tap takes it down), and anywhere else moves the view. */
   private pickUp(e: PointerEvent): boolean {
+    if (this.phase === "sim") return this.pickUpBanner(e);
     if (this.phase !== "build") return false;
     const { cx, cy, inside } = eventCell(this.renderer!, e);
     const edit = inside ? EditSession.lift(this.currentMap(), this.save.layout, cx, cy) : null;
@@ -659,11 +711,31 @@ export class DefendPage {
     return !!edit;
   }
 
-  /** A released drag: a bomb goes off where it lands, and a city element
-   * leaves its session's next layout. */
+  /** A press on the planted war banner (its pole or cloth) lifts it. */
+  private pickUpBanner(e: PointerEvent): boolean {
+    const banner = this.sim?.warBanner;
+    if (!banner) return false;
+    const { fx, fy } = eventCell(this.renderer!, e);
+    // The cloth flies to the right of the pole.
+    if (fx < banner.x - 1 || fx > banner.x + 2.2 || fy < banner.y - 1.4 || fy > banner.y + 1) return false;
+    this.beginDrag({ from: "banner", placed: true }, e);
+    return true;
+  }
+
+  /** A released drag: a bomb goes off where it lands, the war banner is
+   * planted where it lands (a tap on it, or carrying it off the board, takes
+   * it down), and a city element leaves its session's next layout. */
   private drop(drop: Drop) {
     if (drop.kind === "bomb") {
       if (drop.at) this.dropBomb(drop.at);
+      return;
+    }
+    if (drop.kind === "banner") {
+      const sim = this.phase === "sim" ? this.sim : null;
+      const drag = this.pointers.session?.drag;
+      if (!sim) return;
+      if (drop.at) sim.plantBanner(drop.at);
+      else if (drop.tap || (drag?.from === "banner" && drag.placed)) sim.plantBanner(null);
       return;
     }
     const s = this.save;
@@ -695,7 +767,12 @@ export class DefendPage {
       [`${p.gold} gold`, p.copper ? `${p.copper} copper` : "", p.silver ? `${p.silver} silver` : ""].filter(Boolean).join(" · ");
     const items = PALETTE_ITEMS.map((item) => {
       const p = purchasePrice(item, s.owned[item]);
-      const desc = item === "cityTile" ? "Expands the city limits. New tiles must touch the city; the wall moves out to enclose them." : `${STRUCTURES[item].description} Takes ${shareName(footprint(item, s.layout.compact.includes(item)).size)}.`;
+      const desc =
+        item === "cityTile"
+          ? "Expands the city limits. New tiles must touch the city; the wall moves out to enclose them."
+          : item === "cityGate"
+            ? GATE_DESCRIPTION
+            : `${STRUCTURES[item].description} Takes ${shareName(footprint(item, s.layout.compact.includes(item)).size)}.`;
       return `<article class="card defend-card"><canvas width="48" height="48" data-icon="${item}"></canvas><div><small>OWNED ${s.owned[item]} · IN PALETTE ${available(s, item)}</small><h3>${ITEM_NAMES[item]}</h3><p>${desc}</p></div>
         <button data-buy="${item}" ${canAfford(w, p) ? "" : "disabled"}>Buy · ${price(p)}</button></article>`;
     }).join("");

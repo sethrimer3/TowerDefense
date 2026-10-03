@@ -15,6 +15,8 @@ import { ART, parkArt } from "./park-art.ts";
 import { damageStage, drawSprite, sprite, wallDamagePixels, wallRubblePixels } from "./damage-art.ts";
 import { GRASS, grassPatch, groundArt } from "./ground-art.ts";
 import { heights, shadowCanvas, shadowMask } from "./shadow-art.ts";
+import { gatePixels, gateRubblePixels } from "./gate-art.ts";
+import { gateRect, type Side } from "./layout.ts";
 
 export { POND, POND_WATER, hasTree, pondDisc, pondPath, treeCanopy } from "./park-geometry.ts";
 
@@ -42,8 +44,16 @@ const ready = (img?: HTMLImageElement): img is HTMLImageElement => !!img?.comple
 
 /** The mossy flagstone floor tiles (floor-1..4.png) specifically: drawn in
  * their PNG orientation (rotating them made the baked-in lighting look
- * wrong) and grown 15% past their tile so the gaps between them close up. */
-const FLOOR_TILE_SCALE = 1.15;
+ * wrong). Each PNG's flagstones fill an 80 px square inside a transparent
+ * margin that differs a pixel or so between them; only that square is drawn,
+ * edge to edge over its board tile, so the tiles meet without gaps. */
+const FLOOR_CROP = [
+  { x: 8, y: 6 },
+  { x: 8, y: 6 },
+  { x: 9, y: 6 },
+  { x: 9, y: 6 },
+];
+const FLOOR_SIZE = 80;
 
 /** Wall sprites, in source pixels. wall-cap.png holds a vertical run of
  * mossy cap stones at x 38–54, lit from the left; each wall cell shows a
@@ -128,17 +138,19 @@ export function paintFloor(c: CanvasRenderingContext2D, px: number) {
   c.fillRect(0, 0, width, height);
   for (let ty = 0; ty < TILES_H; ty++)
     for (let tx = 0; tx < TILES_W; tx++) {
-      const img = floorImages[hash(tx, ty, 3) % 4];
-      const x = Math.floor(tx * T),
-        y = Math.floor(ty * T),
-        s = Math.ceil(T) + 1;
+      const k = hash(tx, ty, 3) % 4;
+      const img = floorImages[k];
+      // Whole pixels, each tile ending where the next begins.
+      const x = Math.round(tx * T),
+        y = Math.round(ty * T),
+        w = Math.round((tx + 1) * T) - x,
+        h = Math.round((ty + 1) * T) - y;
       if (ready(img)) {
-        // Mossy floor tiles only: unrotated, grown 15% about their centre.
-        const g = s * FLOOR_TILE_SCALE;
-        c.drawImage(img, x + (s - g) / 2, y + (s - g) / 2, g, g);
+        const { x: sx, y: sy } = FLOOR_CROP[k];
+        c.drawImage(img, sx, sy, FLOOR_SIZE, FLOOR_SIZE, x, y, w, h);
       } else {
         c.fillStyle = "#2c3a26";
-        c.fillRect(x, y, s, s);
+        c.fillRect(x, y, w, h);
       }
     }
 }
@@ -233,6 +245,14 @@ function paintBuilding(p: Paint, b: Building) {
     else paintArt(p, wallRubbleSprite(lotSeed(b)), box);
     return;
   }
+  if (b.kind === "gate") {
+    const side = b.gate!.side;
+    if (sim && !sim.intact(b)) {
+      paintArt(p, gateRubbleSprite(side, lotSeed(b)), box);
+      return paintRebuilding(p, b);
+    }
+    return paintArt(p, gateSprite(side, 0, stageOf(sim, b), lotSeed(b)), box);
+  }
   if (sim && !sim.intact(b)) {
     if (b.kind === "keep") return paintKeepRubble(c, box);
     if (b.kind === "house") paintArt(p, houseRubbleSprite(r.w, r.h, b.variant, roofSeed(r.x, r.y, r.w, r.h)), box);
@@ -243,12 +263,18 @@ function paintBuilding(p: Paint, b: Building) {
   paintStructureArt(c, b.kind, box, stageOf(sim, b), lotSeed(b));
 }
 
+/** Paints building `b` whole and undamaged onto `c` at `px` per cell (a
+ * magic boat's water drawing it down as it sinks). */
+export function paintStanding(c: CanvasRenderingContext2D, px: number, map: CityMap, b: Building) {
+  paintBuilding({ c, px, map, sim: null, solid: () => true }, b);
+}
+
 /** The seed a building's damage and rubble are drawn from: its lot. */
-const lotSeed = (b: Building) => hash(b.rect.x, b.rect.y, b.rect.w, b.rect.h, 77);
+export const lotSeed = (b: Building) => hash(b.rect.x, b.rect.y, b.rect.w, b.rect.h, 77);
 
 /** How damaged a standing building looks: the keep's `keepStage`, anything
  * else's `damageStage` (0 out of battle). */
-function stageOf(sim: DefendSim | null, b: Building) {
+export function stageOf(sim: DefendSim | null, b: Building) {
   if (!sim) return 0;
   return b.kind === "keep" ? keepStage(sim.hp[b.id], sim.maxHp[b.id]) : damageStage(sim.hp[b.id], sim.maxHp[b.id]);
 }
@@ -281,6 +307,15 @@ function paintArt({ c }: Paint, art: HTMLCanvasElement | null, box: { x: number;
   drawSprite(c, art, box.x, box.y, box.w, box.h);
 }
 
+/** A city gate's sprite with its doors at `frame`, and its rubble. */
+export const gateSprite = (side: Side, frame: number, stage: number, seed: number) => {
+  const r = gateRect({ tx: 0, ty: 0, side });
+  return sprite(`gate:${side}:${frame}:${stage}:${seed}`, r.w * ART, r.h * ART, () => gatePixels(side, frame, stage, seed));
+};
+const gateRubbleSprite = (side: Side, seed: number) => {
+  const r = gateRect({ tx: 0, ty: 0, side });
+  return sprite(`gate:${side}:rubble:${seed}`, r.w * ART, r.h * ART, () => gateRubblePixels(side, seed));
+};
 const wallRubbleSprite = (seed: number) => sprite(`wall:rubble:${seed}`, ART, ART, () => wallRubblePixels(seed, ART));
 const wallDamageSprite = (stage: number, seed: number) => sprite(`wall:${stage}:${seed}`, ART, ART, () => wallDamagePixels(stage, seed, ART));
 
@@ -309,7 +344,33 @@ function paintWall(p: Paint, b: Building) {
   paintWallEdges(p, { x, y }, standing);
   const stage = stageOf(sim, b);
   if (stage) paintArt(p, wallDamageSprite(stage, lotSeed(b)), { x, y, w: Math.round((cx + 1) * px) - x, h: Math.round((cy + 1) * px) - y });
-  if (!standing(0, 1) && cy + 1 < CELLS_H) paintWallFace(p, cx, { x, y });
+  const face = !standing(0, 1) && cy + 1 < CELLS_H;
+  if (face) paintWallFace(p, cx, { x, y });
+  paintWallOutline(p, { x, y, w: Math.round((cx + 1) * px) - x, h: Math.round((cy + 1) * px) - y }, standing, face);
+}
+
+/** A thin black outline, one art pixel wide like the buildings', round the
+ * standing wall: on every side of the stone at `at` with no standing
+ * neighbour, carried down the sides and along the foot of its hanging face. */
+function paintWallOutline(
+  { c, px }: Paint,
+  { x, y, w, h }: { x: number; y: number; w: number; h: number },
+  standing: (dx: number, dy: number) => boolean,
+  face: boolean,
+) {
+  const o = Math.max(1, Math.round(px / ART));
+  const foot = face ? y + h + Math.round(px * 0.45) : y + h;
+  // A neighbour's face carries this one's on to the side.
+  const faced = (dx: number) => standing(dx, 0) && !standing(dx, 1);
+  c.fillStyle = "#000";
+  if (!standing(0, -1)) c.fillRect(x, y, w, o);
+  if (!standing(-1, 0)) c.fillRect(x, y, o, h);
+  if (!standing(1, 0)) c.fillRect(x + w - o, y, o, h);
+  if (face) {
+    if (!faced(-1)) c.fillRect(x, y + h, o, foot - y - h);
+    if (!faced(1)) c.fillRect(x + w - o, y + h, o, foot - y - h);
+  }
+  if (!standing(0, 1)) c.fillRect(x, foot - o, w, o);
 }
 
 /** Shaded sides and a lit top edge wherever the stone at `at` (canvas

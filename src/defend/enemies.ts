@@ -1,14 +1,18 @@
 import { enemySize } from "./catalog.ts";
 import { stepAbilities, enemyDamage, enemySpeed } from "./enemy-abilities.ts";
 import { hostileSpecial } from "./hostile-attacks.ts";
+import { stepSiege } from "./siege.ts";
+import { stepBoat } from "./boats.ts";
+import { baitStanding, lureOf } from "./bait.ts";
 /** How a DEFEND enemy spends one step. In order: fight any defender in
  * reach; bats fly straight at the keep; a house that caught its eye is
  * wrecked; otherwise it walks the flow field downhill toward the keep,
  * smashing any building that lies across the cheapest way, and now and then
- * a house beside the street lures it off the road. */
+ * a house beside the street lures it off the road. While monster bait
+ * stands, the nearest stack takes the keep's place and no house lures. */
 import { dist } from "../exact.ts";
 import { ENEMIES, type EnemyDef } from "./catalog.ts";
-import { CELLS_H, CELLS_W, sideCells } from "./grid.ts";
+import { CELLS_H, CELLS_W, cellIndex, sideCells } from "./grid.ts";
 import { cellCenter, center, clampCell, downhill, nearestPoint, rectDist } from "./pathing.ts";
 import type { DefendSim, Enemy } from "./sim.ts";
 import { chilled } from "./wizard.ts";
@@ -33,11 +37,13 @@ export function stepEnemy(sim: DefendSim, e: Enemy, dt: number) {
     delete e.leader;
   }
   if (hostileSpecial(sim, e, dt)) return;
+  if (def.siege && stepSiege(sim, e, dt)) return;
+  if (def.boat) return stepBoat(sim, e, dt);
   if (e.kind === "dragon" && breathe(sim, e, dt)) return;
   const t: Turn = { sim, e, def, reach: enemySize(e) / 2 + 0.4, dt };
   if (fightDefender(t)) return;
   if (def.flying) return flyAtKeep(t);
-  if (e.distract >= 0 && chaseDistraction(t)) return;
+  if (e.distract >= 0 && (sim.baits.length === 0 || !baitStanding(sim)) && chaseDistraction(t)) return;
   march(t);
 }
 
@@ -57,10 +63,12 @@ function fightDefender({ sim, e, def, reach }: Turn) {
   return true;
 }
 
+/** Fliers make straight for the keep, or the nearest monster bait. */
 function flyAtKeep(t: Turn) {
   const { sim, e, def, reach, dt } = t;
-  if (rectDist(sim.keep.rect, e.x, e.y) <= reach) return hitBuilding(t, sim.keepId);
-  sim.moveToward(e, center(sim.keep.rect), { speed: enemySpeed(sim, e) * chilled(e), dt, flying: true });
+  const goal = sim.baits.length ? lureOf(sim, e.x, e.y) : sim.keep;
+  if (rectDist(goal.rect, e.x, e.y) <= reach) return hitBuilding(t, goal.id);
+  sim.moveToward(e, center(goal.rect), { speed: enemySpeed(sim, e) * chilled(e), dt, flying: true });
 }
 
 /** Wreck the house that caught its eye. False once the house is gone or the
@@ -78,17 +86,32 @@ function chaseDistraction(t: Turn) {
   return true;
 }
 
-/** Downhill on the flow field toward the keep. */
+/** Downhill on the flow field toward the keep, or the nearest monster
+ * bait while any stands. */
 function march(t: Turn) {
   const { sim, e, def, reach, dt } = t;
   const cx = clampCell(e.x, CELLS_W),
     cy = clampCell(e.y, CELLS_H);
-  if (rectDist(sim.keep.rect, e.x, e.y) <= reach) return hitBuilding(t, sim.keepId);
-  const best = downhill(sim.field, sim.solid, cx, cy);
+  let field: Float64Array = sim.field;
+  if (sim.baits.length && baitStanding(sim)) {
+    const bait = lureOf(sim, e.x, e.y);
+    if (rectDist(bait.rect, e.x, e.y) <= reach) return hitBuilding(t, bait.id);
+    // Bait it can't walk to at any price doesn't call it.
+    const left = sim.baitField[cellIndex(cx, cy)];
+    if (left < Infinity) field = sim.baitField;
+    // Close by in the open, the crowd closes round the stack from all sides
+    // rather than queueing at one corner.
+    if (left < CLOSE_IN) {
+      const p = nearestPoint(bait.rect, e.x, e.y);
+      if (sim.moveToward(e, { x: p.x + e.jx * 3, y: p.y + e.jy * 3 }, { speed: enemySpeed(sim, e) * chilled(e), dt })) return;
+    }
+  }
+  if (field === sim.field && rectDist(sim.keep.rect, e.x, e.y) <= reach) return hitBuilding(t, sim.keepId);
+  const best = downhill(field, sim.solid, cx, cy);
   if (best < 0) return;
   const c = cellCenter(best);
   if (sim.solid[best]) return smashThrough(t, best, c);
-  rollForDistraction(t, cx, cy);
+  if (field === sim.field) rollForDistraction(t, cx, cy);
   sim.moveToward(e, { x: c.x + e.jx, y: c.y + e.jy }, { speed: enemySpeed(sim, e) * chilled(e), dt });
 }
 
@@ -112,6 +135,9 @@ function rollForDistraction({ sim, e, def, dt }: Turn, cx: number, cy: number) {
   e.distract = sim.map.owner[house];
   e.distractT = 5;
 }
+
+/** Walking cost to monster bait under which an enemy makes straight for it. */
+const CLOSE_IN = 8;
 
 const isRubble = (sim: DefendSim, id: number) => sim.hp[id] <= 0 || !sim.built[id];
 const isHouse = (sim: DefendSim, bid: number) => bid >= 0 && sim.map.buildings[bid].kind === "house";

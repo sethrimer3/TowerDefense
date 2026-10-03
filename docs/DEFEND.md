@@ -6,7 +6,7 @@ holds it against endless waves. Code lives in `src/defend/`.
 Waves spend a difficulty budget starting at 20, growing 5% per wave (rounded
 down). Enemy costs are Roach 1, Bat 2, Orc 4, Ogre 8, Mother 10 (including
 three Broodlings), Warlord 100, Snake 60, Dragon 2,500, Shield Generator
-10,000, and Invincible Shield Generator 1,000,000. Affordable enemies are selected randomly;
+10,000, and Invincible Shield Generator 1,000,000; the siege engines cost Rolling Cannon 80, Ballista 120, Firework Launcher 200, Trebuchet 2,500, Great Bombard 12,000 and Dragonfire Battery 30,000; the magic boats Enchanted Skiff 1,000, Spellbound Sloop 10,000, Arcane Galleon 100,000 and Deluge Ark 1,000,000. Affordable enemies are selected randomly;
 there are no starting-wave gates or scheduled Warlord spawns. Enemy HP stays
 fixed. Each wave reserves at most 5,000 enemies, including hatched offspring.
 Selection favours expensive enemies when capacity is tight; any budget the
@@ -48,8 +48,24 @@ Recent rows are available as `window.defendPerformance`; they are not saved.
 ## Building (before a run)
 
 - The **palette** (left by default; the ⚙ settings move it to the right) lists
-  city tiles, barracks, archer barracks, Mage Guilds, Valkyrie palaces, dark wizard keeps and the towers with an `×N` count of
-  what is owned but not yet placed; it greys out at `×0`.
+  city tiles, barracks, archer barracks, Mage Guilds, Valkyrie palaces, dark wizard keeps, monster bait, city gates and the towers with an `×N` count of
+  what is owned but not yet placed; it greys out at `×0`. The button at its
+  head (`☰ All`) opens a list of categories, and the palette shows only the
+  one picked: **All**, **Towers** (archer, cannon, watch and wizard towers),
+  **Units** (barracks, archer barracks, Mage Guild, Valkyrie palace, dark
+  wizard keep) or **City** (city tiles, monster bait, city gates;
+  `ITEM_CATEGORY` in `catalog.ts`). The city tile's icon is a corner of the
+  city in the board's own pixel art (`tile-art.ts`): two dirt streets
+  crossing, shingled roofs and a park with a tree.
+- A **city gate** goes on the edge of a city tile where the wall runs (the
+  tile across it is on the board and not city): carried from the palette it
+  snaps to the nearest such edge (`nearestEdge`, `EditSession.edge`), each
+  one framed in gold, and a set gate lifts, moves and goes back to the
+  palette like a structure. It is saved in the layout's `gates` as its tile
+  and side. It takes the middle 3 cells of the edge the wall's 2 cells deep
+  (`gateRect`); `fitLayout` keeps the 3 × 2 cells inside it clear, and the
+  city paves them and joins them to the streets. Adding a city tile across a
+  gate, or taking its own tile away, drops it back to the palette.
 - Drag from the palette onto the board. While dragging, every tile that would
   accept the item gets a faint gold outline and every other tile darkens; the
   hovered tile shows exactly where the building will be fitted.
@@ -61,9 +77,9 @@ Recent rows are available as `window.defendPerformance`; they are not saved.
 - **The keep** can be moved onto any other city tile (the two swap) but never
   removed.
 - **Barracks**, **archer barracks**, the **Mage Guild**, the **Valkyrie palace** and the **dark wizard keep** must be inside the city. **Archer**, **cannon**, **watch
-  and wizard towers** may stand inside or outside.
+  and wizard towers** and **monster bait** may stand inside or outside.
 - Every structure takes a **share of its tile** (`size` in `catalog.ts`, in
-  sixteenths): 1/16 the archer and watch towers, 1/8 the cannon and wizard
+  sixteenths): 1/16 the archer and watch towers and monster bait, 1/8 the cannon and wizard
   towers, 1/4 the barracks, archer barracks and Mage Guild, and the Valkyrie
   palace a whole tile (1/2 once Folded halls is bought, which also shrinks
   it from 5 × 5 cells to 3 × 5). Several structures share a tile while
@@ -187,6 +203,23 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   **broodlings** at the corners of a small triangle around where she fell
   (on the spot if that is inside a wall); broodlings never come in a wave's
   mix and don't split again. Each pays its own Gold.
+- **Siege engines** (`siege.ts`) have no crew: each drives itself toward
+  the keep like any ground enemy and stops to shoot once something is in
+  range: the keep first, else the building its own way runs into (a wall
+  stone, a house across the street), else a defender. It braces for 0.8 s
+  before the first shot at a new mark, never fights hand to hand, and its
+  shots hurt only the city and its people. The cheap ones: the **Rolling
+  Cannon** (a lobbed iron ball, 5 cells), the **Ballista** (a bolt through
+  every defender on its line, 7 cells, people first) and the **Firework
+  Launcher** (six scattered rockets, 6 cells). The heavy ones: the
+  **Trebuchet** (a boulder in a wide burst from 11 cells, reloading for
+  7 s), the **Great Bombard** (a huge shell, 9 cells) and the **Dragonfire
+  Battery** (sixteen rockets over a wide area, 10 cells). Drawn as pixel
+  sprites (`siege-art.ts`) whose barrel, bow or throwing arm turns to the
+  mark: a boiler puffing steam on the rolling cannon, the ballista's string
+  drawn back with a bolt laid on, rockets refilling their racks, the
+  trebuchet's arm swinging over; rockets wobble up on spark trails and burst
+  into fireworks.
 - Destruction lasts for the whole run. **Civilians** come out of houses to
   rebuild rubble one cell at a time (walls and structures first); a
   structure only works again once fully rebuilt. They avoid rubble with
@@ -256,8 +289,53 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   renderer's (`wizard-art.ts`).
 - **Archer towers** shoot the nearest enemy in range. **Watch towers** mark
   enemies in their radius with a gold outline; marked enemies take ×2 damage.
+- **City gates** are buildings (`kind: "gate"`, numbered after the wall
+  stones) with the HP of the stones they stand in for, half again: enemies
+  find them solid and batter them down like the wall, and civilians rebuild
+  them with the wall stones. The city's own people walk through them: the
+  sim keeps `ownSolid`, its `solid` mask with the standing gates open, which
+  their routes (`findPath`), steps (`followPath`, `moveToward` with `own`),
+  the war banner's field and a valkyrie's charge use. Without gates it is
+  the same array as `solid`, so a city without them replays exactly as
+  before. Drawn by `gate-art.ts`: two crenellated stone towers either side
+  of a passage under a stone lintel, barred by two oak doors with iron
+  bands and studs, painted along the wall and turned to its side, then lit
+  from the upper left in screen space; it takes the usual damage stages and
+  leaves rubble. The doors swing inward over `GATE_FRAMES` while a soldier
+  or civilian is within 1.6 cells and close behind them (`DefendRenderer`,
+  presentation only).
+- **Monster bait** (`bait.ts`) is a stack of crates, one open and heaped
+  with raw meat, a haunch lashed to another stacked on top, green slime
+  seeping from the seams. While any stack stands, every enemy goes for the
+  nearest one before the keep: ground enemies walk a flow field filled from
+  every standing stack (so "nearest" is by the way they walk, smashing what
+  lies across it as usual), fliers and boats head straight for the nearest,
+  siege engines shoot one in range rather than the keep, blink imps blink
+  toward it, and houses lure nobody. Bait nobody can walk to at any price
+  doesn't call them. Enemies still fight defenders in their reach. A fallen
+  stack stays fallen: **Restocking** (Armory) lets civilians rebuild each
+  stack once a level, a defense. **Powder kegs** make a stack burst as it
+  falls (sparing your own people; a stack sunk by a boat's water only
+  sinks) and set the ground round it burning, a blaze like a fire mage's.
+- Civilians work a rubble cell standing in it; when its building's own
+  rebuilt cells have walled it in, they work it from an open cell beside
+  it (a corner will do).
 - During a run the palette becomes the **consumables** palette. A **bomb**
   can be dragged onto the field to blast everything nearby.
+- The **war banner** (`war-banner.ts`, `×∞`: never used up, never bought)
+  is dragged from the same palette and planted anywhere on the board as the
+  keep's waving banner over a faint gold ring. While it stands every mobile
+  troop (swordsmen, archers, fire mages, valkyries and the dark wizard)
+  rallies to it: each still fights whatever is within its own reach
+  (swordsmen whatever is within 2.5 cells), and otherwise marches down the
+  banner's walking field (refreshed each second; standing buildings cost 40
+  a cell, so troops go round them, and a banner beyond the wall draws them
+  up to it), stops on a ring round it, and closes on the nearest enemy
+  within 5 cells of it. Swordsmen forget their leash meanwhile. Dropping
+  another banner moves it; pressing the planted banner and letting go where
+  it stands takes it down, as does carrying it off the board, and dragging
+  it elsewhere moves it. It draws nothing from the run's random stream, so a
+  run without one replays exactly as before.
 
 - **Dark art** (`dark-art.ts`, the keep in `tower-art.ts`): the dark
   wizard keep is black obsidian on a stepped plinth, glassy black curtain
@@ -491,6 +569,36 @@ egg. Blink Imp (250) shows a destination for 0.6 seconds before jumping up
 to three cells, only landing in open cells. All have pixel art and journal
 entries. Necromancer reserves five enemy slots and phoenix three; every
 summon and revival also checks the lifetime 5,000-unit cap.
+
+
+Magic boats have the same four tiers: Enchanted Skiff (1,000 difficulty;
+1,500 HP), Spellbound Sloop (10,000; 7,000 HP), Arcane Galleon (100,000;
+35,000 HP) and Deluge Ark (1,000,000; 160,000 HP), 1.4 to 3.8 cells long with
+water 1.6, 2.4, 3.3 and 4.4 cells round the hull (`boats.ts`). A boat sails
+in a straight line through the ground toward the keep, ignoring streets,
+dropping a pool of its water every quarter second; each pool holds for
+3.2 seconds, then dries up from its edge over 4.8, so a trail of water
+follows it and evaporates behind it. Every house and structure the water
+reaches is sunk at once: the water spreads over the whole of it and it
+goes down into it amid bubbles and rings, leaving its rubble when the water
+dries (sunk buildings can be rebuilt like any other). The skiff and sloop
+can't sink wall stones or the keep: they ram them with the bow (40 and 120
+damage every 1.2 seconds) until a stone breaks. The Arcane Galleon sinks
+wall stones too and rams the keep; the Deluge Ark sinks the keep as soon as
+its water reaches it, which loses the run. The water hurts nobody but fire
+mages (10 damage a second while they stand in it). It puts out fires:
+burning ground in it goes out, fireballs landing in it fizzle and the
+wizard tower's fire can't burn an enemy standing in it. It stops splash
+damage: cannon shells, bombs, fireballs and enemy bursts centred in it
+fizzle with a hiss of steam, and a blast beside it spares whoever stands
+in the water, enemy or defender. So cannons and bombs can't touch a boat;
+arrows, blades, the valkyries' charge and black lightning can. The water
+is pixel art like the parks' ponds (`flood-art.ts`): the same bands and
+dither, the bank mirrored into it with the shimmer, rings off the wake and
+the rain, crests and sparkles; standing walls and the keep rise out of it.
+The boats are pixel sprites per heading (`boat-art.ts`): a planked hull
+with rune-lit rails and a bow crystal, one to four masts with billowing
+sails (cream, sea green, blue, violet), gold rails on the two biggest.
 
 
 Living Fortresses have four tiers: Walking Bastion (1,000 difficulty; two

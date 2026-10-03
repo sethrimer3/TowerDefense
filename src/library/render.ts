@@ -14,13 +14,24 @@
  * are painted into the same lit image, charred where they burnt and with
  * soot above. Librarians, carts, flames, smoke, thrown water and the light's
  * glow go over it. A dark hallway leads out of each side wall: it shows
- * only where a librarian has lately walked, fading back to dark behind them. */
+ * only where a librarian has lately walked, fading back to dark behind them.
+ * The return shelf stands on the floor before the stacks, and a trapdoor
+ * by the left-hand bay opens on the ladder down to the alchemy lab, which
+ * `lab-render.ts` draws below the nave; the view pans down to it. Each role
+ * dresses its own way: shelvers in undyed smocks with plain caps, professors
+ * in blue gowns and mortarboards, researchers in violet robes and pointed
+ * hats. */
 import { stream } from "../random.ts";
 import {
-  BAYS, BAY_W, BAY_X0, BOOKS_PER_ROW, BOOK_COLORS, BUTTS, BUTT_FULL, FLOOR, H, HALL, HALL_H, MAX_UNITS, PLANKS, ROW_H, TABLES, TABLE_PLANKS, TABLE_TOP, W, WINDOW,
-  bayX, ladderX, slotIndex, unitTop, type Cart, type Librarian, type LibrarySim,
+  BAYS, BAY_W, BAY_X0, BOOKS_PER_ROW, BOOK_COLORS, BUTTS, BUTT_FULL, FLOOR, H, HALL, HALL_H, MAX_UNITS, PLANKS, RETURN, RETURN_PER_ROW, ROW_H, STAIR_X, TABLES, TABLE_PLANKS,
+  TABLE_TOP, W, WINDOW, WORLD_H, bayX, ladderX, slotIndex, unitTop, type Cart, type Librarian, type LibrarySim, type Role,
 } from "./sim.ts";
 import { CELL, FW } from "./fire.ts";
+import { ELIXIRS } from "./lab.ts";
+import { LabRenderer } from "./lab-render.ts";
+
+/** Each role's robe. */
+const ROBES: Record<Role, RGB> = { shelver: [240, 236, 228], professor: [104, 124, 200], researcher: [160, 104, 210] };
 
 /** One day and night, in ms of wall-clock time. */
 export const DAY_MS = 8 * 60 * 1000;
@@ -121,6 +132,11 @@ export class LibraryRenderer {
   /** Zoom (1 shows the whole nave) and the world point at the view's centre. */
   zoom = 1;
   focus = { x: W / 2, y: H / 2 };
+  /** The librarian the view follows (null for none), and a height the view
+   * is gliding to (null for none). */
+  target: Librarian | null = null;
+  goal: number | null = null;
+  private lab = new LabRenderer();
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -238,6 +254,16 @@ export class LibraryRenderer {
         this.base[i * 3 + 1] = rgb[1];
         this.base[i * 3 + 2] = rgb[2];
         height[i] = hgt;
+      }
+    // The trapdoor's opening in the floor, the lab's ladder in it.
+    for (let y = FLOOR; y < H; y++)
+      for (let x = STAIR_X - 4; x <= STAIR_X + 4; x++) {
+        const i = y * W + x, rail = x === STAIR_X - 2 || x === STAIR_X + 1, rung = y % 3 === 0 && x > STAIR_X - 2 && x < STAIR_X + 1;
+        const rgb: RGB = rail ? [150, 106, 58] : rung ? [124, 86, 46] : x === STAIR_X - 4 || x === STAIR_X + 4 ? [34, 30, 28] : [12, 10, 10];
+        this.base[i * 3] = rgb[0];
+        this.base[i * 3 + 1] = rgb[1];
+        this.base[i * 3 + 2] = rgb[2];
+        height[i] = 0;
       }
     this.bakeHalls();
     for (let y = 1; y < H - 1; y++)
@@ -367,6 +393,19 @@ export class LibraryRenderer {
       // A stack of ledgers at one end.
       for (let k = 0; k < 3; k++) for (let x = t.x + 3; x < t.x + 7; x++) put(x, TABLE_TOP - 1 - k, k === 1 ? [40, 60, 90] : [110, 40, 34]);
     });
+    // The return shelf: two rows of books read, waiting to go out.
+    for (let y = FLOOR - 11; y < FLOOR; y++)
+      for (let x = RETURN.x; x < RETURN.x + RETURN.w; x++) {
+        const post = x === RETURN.x || x === RETURN.x + RETURN.w - 1, plank = y === FLOOR - 11 || y === FLOOR - 6 || y === FLOOR - 1;
+        put(x, y, post || plank ? [110, 72, 40] : [44, 30, 18]);
+      }
+    sim.returns.forEach((c, n) => {
+      const row = n < RETURN_PER_ROW ? 1 : 0, i = n % RETURN_PER_ROW, rgb = hex(BOOK_COLORS[c]), bx = RETURN.x + 1 + i * 2, by = row ? FLOOR - 2 : FLOOR - 7;
+      for (let k = 0; k < 4; k++) {
+        put(bx, by - k, rgb);
+        put(bx + 1, by - k, [rgb[0] * 0.75, rgb[1] * 0.75, rgb[2] * 0.75]);
+      }
+    });
     // Charred wood, and soot on the stone above where it burnt.
     const { char, soot } = sim.fire;
     for (let y = 0; y < H; y++)
@@ -427,14 +466,24 @@ export class LibraryRenderer {
     }
     const scale = Math.min(w / FIT_W, h / H) * this.zoom;
     const half = { x: w / scale / 2, y: h / scale / 2 };
+    if (this.target) {
+      this.focus.x = this.target.x;
+      this.focus.y = this.target.y - 12;
+    }
     this.focus.x = half.x * 2 >= W + 2 * HALL ? W / 2 : Math.max(half.x - HALL, Math.min(W + HALL - half.x, this.focus.x));
-    this.focus.y = half.y * 2 >= H ? H / 2 : Math.max(half.y, Math.min(H - half.y, this.focus.y));
+    this.focus.y = half.y * 2 >= WORLD_H ? WORLD_H / 2 : Math.max(half.y, Math.min(WORLD_H - half.y, this.focus.y));
     this.view = { scale, ox: Math.round(w / 2 - this.focus.x * scale), oy: Math.round(h / 2 - this.focus.y * scale) };
   }
-  /** Pans by a drag of device pixels. */
+  /** Pans by a drag of device pixels (letting go of whoever was followed). */
   pan(dx: number, dy: number) {
+    this.target = null;
+    this.goal = null;
     this.focus.x -= dx / this.view.scale;
     this.focus.y -= dy / this.view.scale;
+  }
+  /** Whether the view looks mostly at the lab. */
+  get inLab() {
+    return this.focus.y > H;
   }
   /** Zooms to `zoom` keeping the world point under device pixel (px, py). */
   zoomTo(zoom: number, px: number, py: number) {
@@ -444,14 +493,21 @@ export class LibraryRenderer {
   }
 
   draw(sim: LibrarySim, now: number, time: number, effects: boolean) {
-    this.resize();
     const day = daylight(now);
     const dt = this.lastTime < 0 ? 0 : Math.min(0.2, Math.max(0, time - this.lastTime));
     this.lastTime = time;
+    if (this.target && !sim.librarians.includes(this.target)) this.target = null;
+    if (this.goal !== null) {
+      // Glide down to the lab, or back up to the nave.
+      const d = this.goal - this.focus.y;
+      this.focus.y += d * Math.min(1, dt * 5);
+      if (Math.abs(d) < 0.5) this.goal = null;
+    }
+    this.resize();
     this.gatherFire(sim);
     this.candles = sim.tables.map((p) => p === TABLE_PLANKS);
     const f = sim.fire;
-    const key = `${sim.units.join(",")}|${sim.tables.join(",")}|${sim.ladders.join(",")}|${slotsKey(sim)}|${f.active ? f.version : 0}|${f.sooty ? Math.floor(sim.time / 3) : 0}`;
+    const key = `${sim.units.join(",")}|${sim.tables.join(",")}|${sim.ladders.join(",")}|${slotsKey(sim)}|${sim.returns.join("")}|${f.active ? f.version : 0}|${f.sooty ? Math.floor(sim.time / 3) : 0}`;
     if (key !== this.sceneKey) {
       this.sceneKey = key;
       this.paintScene(sim);
@@ -491,12 +547,22 @@ export class LibraryRenderer {
     ctx.setTransform(scale, 0, 0, scale, ox, oy);
     this.drawHalls(sim, dt);
     ctx.drawImage(this.off, 0, 0);
+    const top = -oy / scale, bottom = (this.canvas.height - oy) / scale;
+    if (LabRenderer.visible(top, bottom)) this.lab.draw(ctx, sim, time, dt, effects);
+    this.drawTrapdoor();
     if (day < 0.6) this.drawStars(now, 1 - day / 0.6);
     if (effects && day > 0.02) this.drawRays(now, day);
     for (const r of sim.remains) this.drawRemains(r.x, Math.min(1, (600 - (sim.time - r.at)) / 30));
     this.drawButts(sim);
     for (const c of [sim.barrow, sim.bookCart]) if (c.here) this.drawCart(c);
     for (const l of sim.librarians) if (!l.away) this.drawLibrarian(l, time);
+    if (this.target && !this.target.away) {
+      // A brass marker over whoever is followed.
+      const t = this.target, y = Math.round(t.y) - 12 - (Math.floor(time * 2) % 2);
+      ctx.fillStyle = "#ffd76a";
+      ctx.fillRect(Math.round(t.x) - 2, y, 3, 1);
+      ctx.fillRect(Math.round(t.x) - 1, y + 1, 1, 1);
+    }
     this.drawFlames(time, effects);
     if (f.active || this.puffs.length) this.drawFire(sim, time, dt, effects);
   }
@@ -530,8 +596,19 @@ export class LibraryRenderer {
       this.ctx.drawImage(this.hallCanvas[side], side ? W : -HALL, HALL_TOP);
     }
   }
-  /** How lit a point is: the nave's light, or the hallway's. */
+  /** The trapdoor's lid, standing open beside its opening. */
+  private drawTrapdoor() {
+    const ctx = this.ctx, x = STAIR_X + 5, k = this.lum(x, FLOOR - 4);
+    ctx.fillStyle = shade([118, 78, 42], k);
+    ctx.fillRect(x, FLOOR - 8, 2, 8);
+    ctx.fillStyle = shade([70, 46, 24], k);
+    ctx.fillRect(x + 1, FLOOR - 8, 1, 8);
+    ctx.fillStyle = shade([90, 90, 96], k);
+    ctx.fillRect(x - 1, FLOOR - 5, 1, 2);
+  }
+  /** How lit a point is: the nave's light, the hallway's, or the lab's. */
   private lum(x: number, y: number) {
+    if (y > H) return this.lab.lum(x, y);
     const xi = Math.round(x);
     if (xi >= BAY_X0 && xi < W - BAY_X0) {
       const i = Math.min(H - 1, Math.max(0, Math.round(y))) * W + xi;
@@ -721,13 +798,20 @@ export class LibraryRenderer {
 
   private drawLibrarian(l: Librarian, time: number) {
     const ctx = this.ctx, x = Math.round(l.x) - 1, y = Math.round(l.y), lum = this.lum(l.x, y - 3);
-    ctx.fillStyle = shade([240, 236, 228], lum);
+    ctx.fillStyle = shade(ROBES[l.role], lum);
     // A step's bob while walking (quicker running from a fire); crouched when cowering.
     const bob = l.action === "walk" && Math.floor(time * (l.mode === "work" ? 6 : 10) + l.id) % 2 ? 1 : 0;
-    // Crouched cowering, head bowed mourning, slumped dozing.
-    const low = l.action === "cower" || l.action === "mourn" || l.action === "doze" ? 1 : 0;
+    // Crouched cowering, head bowed mourning, slumped dozing, bent to the mortar.
+    const low = l.action === "cower" || l.action === "mourn" || l.action === "doze" || (l.action === "grind" && Math.floor(time * 4 + l.id) % 2) ? 1 : 0;
     ctx.fillRect(x, y - 4 - bob + low, 2, 4 + bob - low);
-    hat(ctx, l, x, y - 4 - bob + low);
+    if (l.soot > 0.05) {
+      // Blackened by a brew gone wrong.
+      ctx.globalAlpha = Math.min(1, l.soot * 1.5);
+      ctx.fillStyle = "#1a1614";
+      ctx.fillRect(x, y - 4 - bob + low, 2, 2);
+      ctx.globalAlpha = 1;
+    }
+    hat(ctx, l, x, y - 4 - bob + low + (l.action === "stumble" ? 1 : 0));
     const front = l.facing > 0 ? x + 2 : x - 1;
     if (l.hand === "plank") {
       ctx.fillStyle = shade([176, 132, 76], lum);
@@ -750,30 +834,52 @@ export class LibraryRenderer {
       ctx.fillStyle = l.action === "build" ? "#9a9ca4" : "#e8d8a8";
       ctx.fillRect(l.facing > 0 ? x + 2 : x - 1, y - 4, 1, 1);
     }
-    if (l.action === "write") {
+    if (l.action === "study") {
+      // Reading at the table: the book open on it, a page turning now and then.
       if (l.reading) {
+        const page = Math.floor(time * 0.4 + l.id) % 4 === 0;
         ctx.fillStyle = "#efe6cc";
         ctx.fillRect(l.facing > 0 ? x + 3 : x - 4, TABLE_TOP - 1, 2, 1);
+        if (page) ctx.fillRect(l.facing > 0 ? x + 4 : x - 3, TABLE_TOP - 2, 1, 1);
         ctx.fillStyle = BOOK_COLORS[l.reading];
         ctx.fillRect(l.facing > 0 ? x + 5 : x - 2, TABLE_TOP - 1, 1, 1);
       }
-      if (Math.floor(time * 3 + l.id) % 3 === 0) {
-        ctx.fillStyle = "#d8d2c4";
-        ctx.fillRect(l.facing > 0 ? x + 2 : x - 1, y - 3, 1, 1);
-      }
     }
-    if (l.action === "mend") {
-      // Rebinding at the table: the old cover off, a new one going on, the needle flashing.
-      if (l.reading) {
-        ctx.fillStyle = "#efe6cc";
-        ctx.fillRect(l.facing > 0 ? x + 3 : x - 4, TABLE_TOP - 1, 2, 1);
-        ctx.fillStyle = BOOK_COLORS[l.reading];
-        ctx.fillRect(l.facing > 0 ? x + 6 : x - 6, TABLE_TOP - 1, 1, 1);
-      }
-      if (Math.floor(time * 4 + l.id) % 2) {
-        ctx.fillStyle = "#e8e8f0";
-        ctx.fillRect(front, y - 3, 1, 1);
-      }
+    if (l.hand === "flask") {
+      // A flask of an elixir, raised to the lips when drinking.
+      const up = l.action === "drink" ? 3 : 0;
+      ctx.fillStyle = shade([200, 226, 236], lum);
+      ctx.fillRect(front, y - 3 - up, 1, 1);
+      ctx.fillStyle = ELIXIRS[l.vial];
+      ctx.fillRect(front, y - 2 - up, 1, 1);
+    }
+    if (l.action === "stir") {
+      // The paddle going round in the pot.
+      const k = Math.floor(time * 3 + l.id) % 4;
+      ctx.fillStyle = shade([150, 110, 64], lum);
+      ctx.fillRect(front + (k < 2 ? 1 : 2) * l.facing, y - 5 + (k % 2), 1, 4);
+    }
+    if (l.action === "stoke" && Math.floor(time * 3) % 2) {
+      ctx.fillStyle = shade(ROBES[l.role], lum);
+      ctx.fillRect(front, y - 3, 1, 1);
+    }
+    if (l.action === "distill" && Math.floor(time * 2 + l.id) % 3 === 0) {
+      ctx.fillStyle = "#a0e0ff";
+      ctx.fillRect(front, y - 5, 1, 1);
+    }
+    if (l.action === "grind") {
+      ctx.fillStyle = shade([180, 160, 120], lum);
+      ctx.fillRect(front, y - 4 + (Math.floor(time * 4 + l.id) % 2), 1, 2);
+    }
+    if (l.action === "chant") {
+      // Arms raised to the circle, turn and turn about.
+      ctx.fillStyle = shade(ROBES[l.role], lum);
+      const k = Math.floor(time * 2 + l.id) % 2;
+      ctx.fillRect(x - 1 + k * 3, y - 6, 1, 2);
+    }
+    if (l.action === "observe") {
+      ctx.fillStyle = "rgba(170,255,200,0.7)";
+      ctx.fillRect(x + (l.facing > 0 ? 1 : 0), y - 4, 1, 1);
     }
     if (l.hand === "cup") {
       ctx.fillStyle = shade([226, 220, 206], lum);
@@ -792,7 +898,7 @@ export class LibraryRenderer {
       ctx.fillRect(front + (l.facing > 0 ? sw : -sw), y - 1, 2, 1);
     }
     if (l.action === "pour") {
-      ctx.fillStyle = "#6aa8e0";
+      ctx.fillStyle = l.y > H ? ELIXIRS[l.vial] : "#6aa8e0";
       ctx.fillRect(front + l.facing, y - 2 + (Math.floor(time * 8) % 2), 1, 2);
     }
     if (l.action === "chat" && Math.floor(time * 2 + l.id * 0.7) % 3 === 0) {

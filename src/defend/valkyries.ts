@@ -11,6 +11,7 @@ import { ENEMIES, STAB_GUARD, STAB_WIDTH, VALKYRIE, stabLength } from "./catalog
 import { CELL_COUNT } from "./grid.ts";
 import { blocked, cellAt, cellCenter, findPath, nearest, type PathLimits } from "./pathing.ts";
 import type { DefendSim, Enemy, Soldier } from "./sim.ts";
+import { answerBanner } from "./war-banner.ts";
 
 /** A charge stab: the line from (x0, y0) to (x1, y1) she blinked along, `t`
  * of `life` seconds ago, and where it struck. How it looks is the
@@ -33,6 +34,7 @@ export function stepValkyrie(sim: DefendSim, s: Soldier, dt: number) {
     if (s.cd <= 0) charge(sim, s, near, reach);
     return;
   }
+  if (sim.warBanner) return answerBanner(sim, sim.warBanner, s, VALKYRIE.speed, dt);
   if (s.thinkT <= 0) seek(sim, s);
   sim.followPath(s, null, VALKYRIE.speed, dt);
 }
@@ -68,7 +70,7 @@ function runOut(sim: DefendSim, x: number, y: number, ux: number, uy: number, re
   let free = 0;
   for (let k = 1; free < reach; k++) {
     const at = Math.min(reach, k * STRIDE);
-    if (blocked(sim.solid, x + ux * at, y + uy * at)) break;
+    if (blocked(sim.ownSolid, x + ux * at, y + uy * at)) break;
     free = at;
   }
   return free;
@@ -84,7 +86,7 @@ export function seek(sim: DefendSim, s: Soldier) {
     .sort((a, b) => sq(a.x - s.x) + sq(a.y - s.y) - (sq(b.x - s.x) + sq(b.y - s.y)))
     .slice(0, 3);
   for (const e of prey) {
-    const path = findPath(sim.solid, s, e, CITYWIDE);
+    const path = findPath(sim.ownSolid, s, e, CITYWIDE);
     if (!path) continue;
     s.path = path;
     s.target = e.id;
@@ -94,7 +96,7 @@ export function seek(sim: DefendSim, s: Soldier) {
   if (!s.path.length && sim.streets.length) {
     s.thinkT = 0.5 + sim.rand() * 1.5;
     const goal = sim.streets[Math.floor(sim.rand() * sim.streets.length)];
-    s.path = findPath(sim.solid, s, cellCenter(goal), CITYWIDE) ?? [];
+    s.path = findPath(sim.ownSolid, s, cellCenter(goal), CITYWIDE) ?? [];
   }
 }
 

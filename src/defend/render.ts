@@ -7,7 +7,7 @@ import { enemySize } from "./catalog.ts";
  * fire mages' burning ground (mage-art.ts), units and effects
  * (battle-art.ts, with the valkyries' charges from valkyrie-art.ts), the
  * black lightning (dark-art.ts), the trees over them (park-trees.ts), the
- * wizards' fire, the building grid and drag overlay (edit-overlay.ts), then
+ * planted war banner, the magic boats' water (flood-art.ts) over the ground, the wizards' fire, the building grid and drag overlay (edit-overlay.ts), then
  * rain in screen space. */
 import { CELLS_H, CELLS_W, boardSize, hash01 } from "./grid.ts";
 import type { CityMap } from "./citygen.ts";
@@ -15,10 +15,13 @@ import type { DefendSim } from "./sim.ts";
 import { DefendLighting, type LightFrame } from "./lighting.ts";
 import { Fences } from "./fences.ts";
 import { Rain, ambientFor, type Weather } from "./weather.ts";
-import { damageKey, onCityArtLoaded, paintCityLayer } from "./city-layer.ts";
+import { damageKey, gateSprite, lotSeed, onCityArtLoaded, paintCityLayer, stageOf } from "./city-layer.ts";
+import { GATE_FRAMES } from "./gate-art.ts";
+import { rectDist } from "./pathing.ts";
 import { carriedLights, drawDamage, drawScorches, drawUnits, shadowCasters, type Brush, type Burning } from "./battle-art.ts";
 import { drawGrid, drawOverlay, type Overlay } from "./edit-overlay.ts";
-import { drawFlag } from "./structure-art.ts";
+import { drawFlag, drawWarBanner } from "./structure-art.ts";
+import { RALLY_REACH } from "./war-banner.ts";
 import { ParkGrass, type Walker } from "./park-grass.ts";
 import { PondWater } from "./pond-water.ts";
 import { ENEMIES } from "./catalog.ts";
@@ -28,6 +31,7 @@ import { drawBlazes, mageLights } from "./mage-art.ts";
 import { stabLights } from "./valkyrie-art.ts";
 import { DarkArt, darkLights } from "./dark-art.ts";
 import { ParkTrees, type Under } from "./park-trees.ts";
+import { FloodArt } from "./flood-art.ts";
 
 export type DrawOptions = {
   /** Show the (dim, gold) tile grid — while the player is editing. */
@@ -42,6 +46,8 @@ export type DrawOptions = {
   healthbars?: boolean;
   /** The run is over: the city's torches go out in a wave from the keep. */
   over?: boolean;
+  /** Leave out the planted war banner (while the player carries it). */
+  hideBanner?: boolean;
 };
 
 /** The torches going out after a lost run: seconds before the first, then
@@ -58,10 +64,13 @@ export class DefendRenderer {
   readonly wizard = new WizardArt();
   readonly trees = new ParkTrees();
   readonly dark = new DarkArt();
+  readonly floods = new FloodArt();
   /** The battle time the wizard art last advanced to. */
   private wizardTime = 0;
   private rain = new Rain();
   private lastNow = 0;
+  /** How far each city gate stands open (0 shut to 1), by building id. */
+  private gateOpen = new Map<number, number>();
   private layerScale = 1;
   /** Camera: zoom `s` and translation (canvas pixels) applied to the whole
    * board. s = 1 fits the board to the stage it sits in; along an edge the
@@ -169,6 +178,7 @@ export class DefendRenderer {
     this.drawKeepFlag(map, sim, opts);
     if (sim) this.drawBattleUnits(sim, opts.weather ? this.burning ?? (() => 1) : null, opts);
     this.drawTrees(map, sim, opts, dt);
+    if (sim?.warBanner && !opts.hideBanner) drawWarBanner(this.ctx, this.px, sim.warBanner, RALLY_REACH, { t: opts.now / 1000, reduceMotion: opts.reduceMotion });
     if (sim) this.wizard.drawFire(this.ctx, this.px);
     this.drawEditing(overlay, opts.grid);
     // Rain falls in screen space, in front of the camera.
@@ -191,11 +201,36 @@ export class DefendRenderer {
     const { W, H } = this.board;
     ctx.drawImage(this.layer, 0, 0, W, H);
     ctx.imageSmoothingEnabled = false;
+    if (sim) this.drawGates(map, sim, opts, dt);
     if (opts.effects ?? true) this.drawParkLife(map, sim, opts, dt);
     // Park fences sit on the ground layer, under the lighting and units.
     this.fences.sync(map);
     if (sim) this.fences.update(sim);
     this.fences.draw(ctx, this.px);
+    // Magic boats' water over the ground, sinking what it reaches.
+    if (sim) this.floods.draw({ c: ctx, px: this.px, sim, rain: !!opts.weather?.rain, reduceMotion: opts.reduceMotion, reflections: opts.effects ?? true, layer: this.layer, layerScale: this.layerScale });
+  }
+
+  /** The city gates swing open while any of the city's people are at
+   * them, and shut behind them; the layer shows them shut. */
+  private drawGates(map: CityMap, sim: DefendSim, opts: DrawOptions, dt: number) {
+    for (const b of map.buildings) {
+      if (b.kind !== "gate" || !b.gate) continue;
+      if (!sim.intact(b)) {
+        this.gateOpen.delete(b.id);
+        continue;
+      }
+      const near = [...sim.soldiers, ...sim.civilians].some((u) => u.hp > 0 && rectDist(b.rect, u.x, u.y) < 1.6);
+      const was = this.gateOpen.get(b.id) ?? 0;
+      const open = opts.reduceMotion ? (near ? 1 : 0) : Math.max(0, Math.min(1, was + (near ? 2.5 : -1.5) * Math.min(dt, 0.1)));
+      this.gateOpen.set(b.id, open);
+      const frame = Math.round(open * (GATE_FRAMES - 1));
+      if (!frame) continue;
+      const r = b.rect, px = this.px;
+      const x = Math.round(r.x * px), y = Math.round(r.y * px);
+      const art = gateSprite(b.gate.side, frame, stageOf(sim, b), lotSeed(b));
+      if (art) this.ctx.drawImage(art, x, y, Math.round((r.x + r.w) * px) - x, Math.round((r.y + r.h) * px) - y);
+    }
   }
 
   /** Pond drips, rings and reflections, then the grass swaying and parting

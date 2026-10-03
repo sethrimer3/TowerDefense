@@ -8,9 +8,14 @@ export type Overlay = {
   /** Tile keys that accept the dragged item. */
   legal: Set<string>;
   hover: string | null;
-  ghost: { rect: Rect; kind: StructureKind | "cityTile" } | null;
+  ghost: { rect: Rect; kind: StructureKind | "cityTile" | "cityGate" } | null;
+  /** A city gate being carried: the wall edges that take it, the one under
+   * the pointer and whether it fits there. */
+  gates?: { legal: Rect[]; hover: Rect | null; fits: boolean };
   /** A bomb being aimed: centre in cells. */
   bomb?: { x: number; y: number; r: number } | null;
+  /** The war banner being planted: centre and the reach it rallies to. */
+  banner?: { x: number; y: number; r: number } | null;
   /** Tiles across the block the item takes (unset: 1). A larger item's
    * `legal` and `hover` keys are the top left tiles of its blocks. */
   span?: number;
@@ -39,9 +44,11 @@ export function drawGrid(c: CanvasRenderingContext2D, px: number, alpha: number)
 }
 
 export function drawOverlay(c: CanvasRenderingContext2D, px: number, o: Overlay) {
-  if (o.legal.size || o.ghost || o.hover !== null) drawTargets(c, px, o);
+  if (o.gates) drawGateTargets(c, px, o.gates);
+  else if (o.legal.size || o.ghost || o.hover !== null) drawTargets(c, px, o);
   if (o.ghost) drawGhost(c, px, o.ghost.rect);
   if (o.bomb) drawBombReach(c, px, o.bomb);
+  if (o.banner) drawRallyReach(c, px, o.banner);
 }
 
 /** Shades the tiles that won't take the item and frames those that will,
@@ -116,6 +123,24 @@ function drawBlockTargets(c: CanvasRenderingContext2D, px: number, o: Overlay, s
   c.setLineDash([]);
 }
 
+/** For a city gate: dims the board and frames every stretch of wall that
+ * takes it, the one under the pointer brightest (red where it won't go). */
+function drawGateTargets(c: CanvasRenderingContext2D, px: number, g: NonNullable<Overlay["gates"]>) {
+  const { W, H } = boardSize(px);
+  c.fillStyle = "rgba(0,0,0,0.3)";
+  c.fillRect(0, 0, W, H);
+  const frame = (r: Rect, fill: string, stroke: string, lw: number) => {
+    const x = Math.round(r.x * px), y = Math.round(r.y * px), w = Math.round((r.x + r.w) * px) - x, h = Math.round((r.y + r.h) * px) - y;
+    c.fillStyle = fill;
+    c.fillRect(x, y, w, h);
+    c.lineWidth = lw;
+    c.strokeStyle = stroke;
+    c.strokeRect(x + lw / 2, y + lw / 2, w - lw, h - lw);
+  };
+  for (const r of g.legal) frame(r, "rgba(242,201,76,0.12)", "rgba(242,201,76,0.6)", Math.max(1, px * 0.1));
+  if (g.hover && !g.fits) frame(g.hover, "rgba(200,40,50,0.22)", "rgba(230,70,80,0.85)", Math.max(1, px * 0.16));
+}
+
 function drawGhost(c: CanvasRenderingContext2D, px: number, r: Rect) {
   c.fillStyle = "rgba(242,210,122,0.45)";
   c.fillRect(r.x * px, r.y * px, r.w * px, r.h * px);
@@ -130,6 +155,16 @@ function drawBombReach(c: CanvasRenderingContext2D, px: number, bomb: { x: numbe
   c.lineWidth = Math.max(1, px * 0.12);
   c.beginPath();
   c.arc(bomb.x * px, bomb.y * px, bomb.r * px, 0, Math.PI * 2);
+  c.fill();
+  c.stroke();
+}
+
+function drawRallyReach(c: CanvasRenderingContext2D, px: number, at: { x: number; y: number; r: number }) {
+  c.strokeStyle = "rgba(242,210,122,0.9)";
+  c.fillStyle = "rgba(242,210,122,0.12)";
+  c.lineWidth = Math.max(1, px * 0.12);
+  c.beginPath();
+  c.arc(at.x * px, at.y * px, at.r * px, 0, Math.PI * 2);
   c.fill();
   c.stroke();
 }

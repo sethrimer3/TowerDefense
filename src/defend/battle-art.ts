@@ -2,6 +2,8 @@ import { drawFortress } from "./fortress-art.ts";
 import { enemySize } from "./catalog.ts";
 import { drawEnemyHealthbars, healthbarEnemies } from "./healthbars.ts";
 import { drawBlackHoles, drawHostileMarks, drawPoisonClouds } from "./hostile-art.ts";
+import { drawFirework, drawSiegeEngine, drawSiegeShots, siegeLights } from "./siege-art.ts";
+import { boatLights, drawBoat } from "./boat-art.ts";
 /** What DEFEND draws fresh each battle frame over the city layer: struck and
  * damaged buildings, blast scorches, then the units, projectiles and effects.
  * Every painter takes a `Brush`: the board's context and its pixels per cell. */
@@ -39,7 +41,7 @@ function drawHurt(b: Brush, sim: DefendSim) {
     const hp = sim.hp[bd.id],
       max = sim.maxHp[bd.id];
     // Houses and walls show their hurt only in their art's damage stages.
-    if (!sim.intact(bd) || hp >= max || bd.kind === "house" || bd.kind === "wall") continue;
+    if (!sim.intact(bd) || hp >= max || bd.kind === "house" || bd.kind === "wall" || bd.kind === "gate") continue;
     healthBar(b, bd, hp / max);
   }
 }
@@ -67,10 +69,16 @@ export function drawUnits(b: Brush, sim: DefendSim, torches: Burning | null, hea
   drawWatchRadii(b, sim);
   drawCivilians(b, sim, torches);
   const swords = drawSoldiers(b, sim, torches);
-  for (const e of sim.enemies) drawEnemy(b, e, sim);
+  for (const e of sim.enemies) {
+    const def = ENEMIES[e.kind];
+    if (def.siege) drawSiegeEngine(b, e, sim.time);
+    else if (def.boat) drawBoat(b, e, sim.time);
+    else drawEnemy(b, e, sim);
+  }
   drawSwords(b, swords);
   drawArrows(b, sim);
   drawShells(b, sim);
+  drawSiegeShots(b, sim);
   drawFireballs(b.c, b.px, sim);
   drawStabs(b.c, b.px, sim);
   for (const fx of sim.effects) drawEffect(b, fx);
@@ -399,6 +407,8 @@ function drawEffect(b: Brush, fx: Effect) {
   const { c, px } = b;
   const k = fx.t / 0.6;
   if (fx.kind === "boom") return drawExplosion(b, fx, k);
+  if (fx.kind === "firework") return drawFirework(b, fx);
+  if (fx.kind === "steam") return drawSteam(b, fx, k);
   if (fx.kind === "dust") {
     c.fillStyle = `rgba(150,140,125,${0.45 * (1 - k)})`;
     c.beginPath();
@@ -411,6 +421,18 @@ function drawEffect(b: Brush, fx: Effect) {
   for (let n = 0; n < 4; n++) {
     const a = n * 1.57 + fx.x;
     c.fillRect((fx.x + Math.cos(a) * k * 0.6) * px, (fx.y + Math.sin(a) * k * 0.6) * px, s, s);
+  }
+}
+
+/** A hiss of steam where fire or a blast met a magic boat's water: pale
+ * pixel puffs rising and thinning. */
+function drawSteam({ c, px }: Brush, fx: Effect, k: number) {
+  const s = Math.max(1, Math.round(px / 8)) * 2;
+  for (let n = 0; n < 7; n++) {
+    const a = n * 2.4 + fx.x * 3.1, out = fx.r * (0.2 + 0.6 * k) * (0.5 + hash01(n, Math.round(fx.x * 64), Math.round(fx.y * 64)) * 0.5);
+    const x = fx.x + Math.cos(a) * out, y = fx.y + Math.sin(a) * out * 0.7 - k * 0.7;
+    c.fillStyle = `rgba(232,238,242,${(0.7 * (1 - k)).toFixed(3)})`;
+    c.fillRect(Math.round(x * px - s / 2), Math.round(y * px - s / 2), s, s);
   }
 }
 
@@ -528,5 +550,6 @@ export function carriedLights(sim: DefendSim): CarriedLight[] {
   const torches: CarriedLight[] = [...sim.soldiers, ...sim.civilians].map((u) => ({ x: u.x, y: u.y, id: u.id }));
   for (const fx of sim.effects)
     if (fx.kind === "boom") torches.push({ x: fx.x, y: fx.y, id: fx.seed ?? 0, r: fx.r * 2.4, k: 1.6 * (1 - fx.t / 0.6) });
+  torches.push(...siegeLights(sim), ...boatLights(sim));
   return torches;
 }

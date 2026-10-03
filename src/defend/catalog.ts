@@ -4,11 +4,43 @@ import { intPow } from "../exact.ts";
  * copper, silver and Gold, the universal upgrades, the bonuses the Smithy and the
  * skill trees add, and the enemy roster. */
 
-export type StructureKind = "keep" | "barracks" | "archerBarracks" | "archerTower" | "cannonTower" | "watchTower" | "wizardTower" | "mageGuild" | "valkyriePalace" | "darkKeep";
+export type StructureKind = "keep" | "barracks" | "archerBarracks" | "archerTower" | "cannonTower" | "watchTower" | "wizardTower" | "mageGuild" | "valkyriePalace" | "darkKeep" | "monsterBait";
 /** Everything that appears in the build palette (the keep is placed from the
  * start and can only be moved, so it is not a palette item). */
-export type PaletteItem = "cityTile" | Exclude<StructureKind, "keep">;
-export const PALETTE_ITEMS: PaletteItem[] = ["cityTile", "barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep"];
+export type PaletteItem = "cityTile" | "cityGate" | Exclude<StructureKind, "keep">;
+export const PALETTE_ITEMS: PaletteItem[] = ["cityTile", "barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "cityGate"];
+
+/** The build palette's categories: what each shows (All shows everything). */
+export type PaletteCategory = "all" | "towers" | "units" | "city";
+export const PALETTE_CATEGORIES: { id: PaletteCategory; name: string }[] = [
+  { id: "all", name: "All" },
+  { id: "towers", name: "Towers" },
+  { id: "units", name: "Units" },
+  { id: "city", name: "City" },
+];
+/** Which category each palette item belongs to: towers shoot, unit
+ * buildings train troops, and the city's own pieces are the rest. */
+export const ITEM_CATEGORY: Record<PaletteItem, Exclude<PaletteCategory, "all">> = {
+  cityTile: "city",
+  cityGate: "city",
+  monsterBait: "city",
+  archerTower: "towers",
+  cannonTower: "towers",
+  watchTower: "towers",
+  wizardTower: "towers",
+  barracks: "units",
+  archerBarracks: "units",
+  mageGuild: "units",
+  valkyriePalace: "units",
+  darkKeep: "units",
+};
+export const inCategory = (item: PaletteItem, category: PaletteCategory) => category === "all" || ITEM_CATEGORY[item] === category;
+
+/** The city gate: 3 cells along the wall and its 2 cells deep, worth the
+ * wall stones it stands in for, and some. */
+export const GATE = { long: 3, deep: 2, hpPerCell: 1.5 };
+export const GATE_DESCRIPTION =
+  "A gatehouse set into the city wall on the edge of a city tile. It swings open to let your soldiers, archers, mages and townsfolk out and in, and stays barred against the enemy, who must batter it down.";
 
 export type StructureDef = {
   kind: StructureKind;
@@ -142,6 +174,16 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     outsideOk: false,
     description: "A vast keep of black obsidian and rubies filling a 2 × 2 block of tiles. Its four corner turrets hurl black lightning that leaps from foe to foe, and it summons a dark wizard whose bolts chain through whole crowds.",
   },
+  monsterBait: {
+    kind: "monsterBait",
+    name: "Monster bait",
+    w: 2,
+    h: 2,
+    size: 1,
+    maxHp: 300,
+    outsideOk: true,
+    description: "A stack of crates reeking of monster bait. While any stands, every enemy goes for the nearest one before the keep.",
+  },
 };
 
 /** A structure's footprint and share of its tile, smaller once its
@@ -158,6 +200,7 @@ export const shareName = (size: TileShare) => (size === TILE_ROOM ? "a whole til
 /** Palette items the player owns at the very start. */
 export const STARTING_OWNED: Record<PaletteItem, number> = {
   cityTile: 8,
+  cityGate: 0,
   barracks: 1,
   archerBarracks: 0,
   archerTower: 1,
@@ -167,6 +210,7 @@ export const STARTING_OWNED: Record<PaletteItem, number> = {
   mageGuild: 0,
   valkyriePalace: 0,
   darkKeep: 0,
+  monsterBait: 0,
 };
 
 /** A price in Gold and metal bars (all earned in battle). */
@@ -177,6 +221,7 @@ export function purchasePrice(item: PaletteItem, owned: number): Price {
   const extra = Math.max(0, owned - STARTING_OWNED[item]);
   const base: Record<PaletteItem, Price> = {
     cityTile: { gold: 120, copper: 1 },
+    cityGate: { gold: 250, copper: 3 },
     barracks: { gold: 300, copper: 3 },
     archerBarracks: { gold: 330, copper: 4 },
     archerTower: { gold: 220, copper: 2 },
@@ -186,6 +231,7 @@ export function purchasePrice(item: PaletteItem, owned: number): Price {
     mageGuild: { gold: 520, copper: 7 },
     valkyriePalace: { gold: 800, copper: 10, silver: 1 },
     darkKeep: { gold: 3000, copper: 25, silver: 8 },
+    monsterBait: { gold: 160, copper: 2 },
   };
   const growth = item === "cityTile" ? 1.3 : 1.5;
   const m = intPow(growth, extra);
@@ -219,6 +265,8 @@ export type UpgradeId =
   | "darkKeepCompact"
   | "chainReach"
   | "chainCount"
+  | "baitRestock"
+  | "baitBlast"
   | "wallStrength"
   | "keepStrength"
   | "civilianCount"
@@ -298,6 +346,21 @@ export const UPGRADES: UpgradeDef[] = [
     maxLevel: CHAIN_COUNT_MAX,
     describe: (l) => `The dark wizard's bolts chain to ${wizardChain(l)} enemies, the turrets' to ${turretChain(l)}`,
     price: (l) => ({ gold: 600 + 300 * l * l, copper: 4 + l, silver: 1 + Math.floor(l / 3) }),
+  },
+  {
+    id: "baitRestock",
+    group: "Monster bait",
+    name: "Restocking",
+    maxLevel: 5,
+    describe: (l) => (l ? `Civilians restock fallen bait ${l === 1 ? "once" : `${l} times`} a defense` : "Fallen bait stays fallen"),
+  },
+  {
+    id: "baitBlast",
+    group: "Monster bait",
+    name: "Powder kegs",
+    maxLevel: 5,
+    describe: (l) =>
+      l ? `Fallen bait bursts for ${baitBlastDamage(l)} damage over ${baitBlastRadius(l).toFixed(1)} cells, the ground burning ${baitFireSeconds(l).toFixed(1)}s` : "Fallen bait just falls",
   },
   { id: "wallStrength", group: "City", name: "Masonry", maxLevel: 6, describe: (l) => `${wallHp(l)} HP per wall stone` },
   { id: "keepStrength", group: "City", name: "Keep bastions", maxLevel: 6, describe: (l) => `${keepHp(l)} keep HP` },
@@ -398,6 +461,13 @@ export function turretSpots(r: { x: number; y: number; w: number; h: number }) {
     { x: r.x + r.w - ix, y: r.y + r.h - iy },
   ];
 }
+/** Monster bait's powder kegs: the burst when a stack falls (spares your
+ * own people), its radius, and the burning ground it leaves: damage a
+ * second to ground enemies, and how long it burns. */
+export const baitBlastDamage = (l: number) => 30 + l * 15;
+export const baitBlastRadius = (l: number) => 1.8 + l * 0.2;
+export const baitFireDps = (l: number) => 8 + l * 4;
+export const baitFireSeconds = (l: number) => 3 + l;
 export const wallHp = (l: number) => Math.round(100 * (1 + l * 0.35));
 export const keepHp = (l: number) => Math.round(STRUCTURES.keep.maxHp * (1 + l * 0.3));
 export const civilianCount = (l: number) => 2 + l;
@@ -405,7 +475,7 @@ export const civilianHp = (l: number) => 8 + l * 5;
 export const rebuildSeconds = (l: number) => 3 * intPow(0.82, l);
 export const HOUSE_HP_PER_CELL = 22;
 
-export type EnemyKind = "roach" | "orc" | "ogre" | "bat" | "warlord" | "mother" | "broodling" | "snake" | "dragon" | "shieldBearer" | "aegis" | "darkKnight" | "bombOrc" | "bombBird" | "voidSparrow" | "shieldLesser" | "shieldGreater" | "poisonLesser" | "poisonBearer" | "poisonGreater" | "poisonSovereign" | "siegeBeetle" | "burrowingMole" | "necromancer" | "skeleton" | "bannerCaptain" | "mirrorKnight" | "leechSwarm" | "ashPhoenix" | "phoenixEgg" | "blinkImp" | "fortressLesser" | "fortress" | "fortressGreater" | "fortressSovereign";
+export type EnemyKind = "roach" | "orc" | "ogre" | "bat" | "warlord" | "mother" | "broodling" | "snake" | "dragon" | "shieldBearer" | "aegis" | "darkKnight" | "bombOrc" | "bombBird" | "voidSparrow" | "shieldLesser" | "shieldGreater" | "poisonLesser" | "poisonBearer" | "poisonGreater" | "poisonSovereign" | "siegeBeetle" | "burrowingMole" | "necromancer" | "skeleton" | "bannerCaptain" | "mirrorKnight" | "leechSwarm" | "ashPhoenix" | "phoenixEgg" | "blinkImp" | "fortressLesser" | "fortress" | "fortressGreater" | "fortressSovereign" | "rollingCannon" | "ballista" | "fireworkLauncher" | "trebuchet" | "bombard" | "rocketBattery" | "boatLesser" | "boat" | "boatGreater" | "boatSovereign";
 export type EnemyDef = {
   kind: EnemyKind;
   name: string;
@@ -435,7 +505,26 @@ export type EnemyDef = {
   unyielding?: boolean;
   chainLength?: number;
   shield?: { radius: number; hp: number };
+  /** A self-driving siege engine (`siege.ts`): it rolls toward the keep and
+   * stops to bombard whatever stands in its way from `range` cells. */
+  siege?: SiegeDef;
+  /** A magic boat (`boats.ts`): it sails straight through the ground toward
+   * the keep in a pool of its own water, which sinks what it touches. */
+  boat?: BoatDef;
 };
+
+/** A magic boat's water: its radius in cells around the hull, and what it
+ * sinks besides houses and structures: wall stones (`walls`) and the keep
+ * (`keep`). Whatever it can't sink, it rams with its own damage. */
+export type BoatDef = { tier: number; water: number; walls?: boolean; keep?: boolean };
+
+/** How a siege engine shoots. `ball`: a lobbed iron ball, `stone`: a high
+ * lobbed boulder, both bursting in `radius`; `bolt`: a straight bolt that
+ * runs through every defender on its line; `rocket`: a volley of `volley`
+ * fireworks scattered up to `spread` cells round the target, each bursting
+ * in `radius`. `people` engines shoot defenders before buildings. `damage`
+ * and `cooldown` are the enemy's own (per rocket, per volley). */
+export type SiegeDef = { shot: "ball" | "stone" | "bolt" | "rocket"; range: number; radius: number; volley?: number; spread?: number; people?: boolean };
 
 export const ENEMIES: Record<EnemyKind, EnemyDef> = {
   roach: { kind: "roach", name: "Roach", hp: 10, speed: 2.6, damage: 2, cooldown: 0.6, size: 0.34, color: "#b0643a", distraction: 0.15, flying: false, cost: 1 },
@@ -478,6 +567,17 @@ export const ENEMIES: Record<EnemyKind, EnemyDef> = {
   fortressGreater: { kind: "fortressGreater", name: "Walking Citadel", hp: 30000, speed: .6, damage: 200, cooldown: 1.6, size: 4.5, color: "#625674", distraction: 0, flying: false, fortress: { tier: 3, turrets: 6, legs: 8, armor: 6, height: 5, partHp: 3000 }, cost: 100000 },
   fortressSovereign: { kind: "fortressSovereign", name: "Dread Colossus", hp: 150000, speed: .55, damage: 600, cooldown: 1.6, size: 5.5, color: "#4c3d5c", distraction: 0, flying: false, fortress: { tier: 4, turrets: 8, legs: 10, armor: 8, height: 6, partHp: 12000 }, cost: 1000000 },
 
+  rollingCannon: { kind: "rollingCannon", name: "Rolling Cannon", hp: 90, speed: 1, damage: 22, cooldown: 3, size: 1, color: "#7e5230", distraction: 0, flying: false, siege: { shot: "ball", range: 5, radius: 0.7 }, cost: 80 },
+  ballista: { kind: "ballista", name: "Ballista", hp: 70, speed: 1.1, damage: 40, cooldown: 2.6, size: 1, color: "#8a5a32", distraction: 0, flying: false, siege: { shot: "bolt", range: 7, radius: 0.35, people: true }, cost: 120 },
+  fireworkLauncher: { kind: "fireworkLauncher", name: "Firework Launcher", hp: 80, speed: 1.15, damage: 9, cooldown: 4, size: 1, color: "#9a3a2a", distraction: 0, flying: false, siege: { shot: "rocket", range: 6, radius: 0.55, volley: 6, spread: 1.3 }, cost: 200 },
+  trebuchet: { kind: "trebuchet", name: "Trebuchet", hp: 900, speed: 0.6, damage: 130, cooldown: 7, size: 1.55, color: "#6e4a2a", distraction: 0, flying: false, siege: { shot: "stone", range: 11, radius: 1.4 }, cost: 2500 },
+  bombard: { kind: "bombard", name: "Great Bombard", hp: 2600, speed: 0.6, damage: 220, cooldown: 5, size: 1.4, color: "#4a4e57", distraction: 0, flying: false, siege: { shot: "ball", range: 9, radius: 1.9 }, cost: 12000 },
+  rocketBattery: { kind: "rocketBattery", name: "Dragonfire Battery", hp: 2000, speed: 0.7, damage: 35, cooldown: 6, size: 1.4, color: "#8c2a24", distraction: 0, flying: false, siege: { shot: "rocket", range: 10, radius: 0.9, volley: 16, spread: 3 }, cost: 30000 },
+
+  boatLesser: { kind: "boatLesser", name: "Enchanted Skiff", hp: 1500, speed: 0.75, damage: 40, cooldown: 1.2, size: 1.4, color: "#6d4a2c", distraction: 0, flying: false, boat: { tier: 1, water: 1.6 }, cost: 1000 },
+  boat: { kind: "boat", name: "Spellbound Sloop", hp: 7000, speed: 0.7, damage: 120, cooldown: 1.2, size: 2, color: "#5a3e28", distraction: 0, flying: false, boat: { tier: 2, water: 2.4 }, cost: 10000 },
+  boatGreater: { kind: "boatGreater", name: "Arcane Galleon", hp: 35000, speed: 0.62, damage: 300, cooldown: 1.2, size: 2.8, color: "#46302a", distraction: 0, flying: false, boat: { tier: 3, water: 3.3, walls: true }, cost: 100000 },
+  boatSovereign: { kind: "boatSovereign", name: "Deluge Ark", hp: 160000, speed: 0.55, damage: 800, cooldown: 1.2, size: 3.8, color: "#2a2230", distraction: 0, flying: false, boat: { tier: 4, water: 4.4, walls: true, keep: true }, cost: 1000000 },
 };
 
 /** Multipliers the player's Smithy and skill trees lay over a run, on top

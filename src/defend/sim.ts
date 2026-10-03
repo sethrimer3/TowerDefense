@@ -2,6 +2,7 @@ import { enemySize } from "./catalog.ts";
 import { assembleFortress, syncFortress } from "./fortress.ts";
 import { damageModifier } from "./enemy-abilities.ts";
 import { stepBlackHoles, stepPoison } from "./hostile-attacks.ts";
+import { stepSiegeShots, type SiegeAim, type SiegeShot } from "./siege.ts";
 /** Real-time DEFEND simulation. Units move freely in continuous cell
  * coordinates (1 unit = 1 cell); the procedural city supplies the solid
  * obstacles. Enemies follow a flow field toward the keep in which buildings
@@ -27,6 +28,7 @@ import {
   FRIENDLY_FIRE,
   HOUSE_HP_PER_CELL,
   STRUCTURES,
+  GATE,
   keepHp,
   wallHp,
   watchRadius,
@@ -45,6 +47,9 @@ import { stepBlazes, stepFireballs, stepMage, type Blaze, type Fireball } from "
 import { stepStabs, stepValkyrie, type Stab } from "./valkyries.ts";
 import { Wizards, stepFlames, stepFrosts, type Flame, type Frost } from "./wizard.ts";
 import { DarkKeeps, stepBolts, stepDarkWizard, type Bolt } from "./dark-wizards.ts";
+import { WarBanner } from "./war-banner.ts";
+import { sheltered, fizzles, stepFloods, type Flood, type Sinking } from "./boats.ts";
+import { baitFell, baitStanding } from "./bait.ts";
 
 export type Levels = Record<UpgradeId, number>;
 
@@ -82,6 +87,8 @@ export type Enemy = {
   shieldHp?: number;
   poisonT?: number;
   breath?: { dx: number; dy: number; t: number };
+  /** What a siege engine is shooting at; absent while it rolls on. */
+  aim?: SiegeAim;
 };
 
 export type Soldier = {
@@ -119,10 +126,14 @@ export type Civilian = {
   home: number;
   thinkT: number;
   flash: number;
+  /** The open cell beside its job it works from, when the job is walled in
+   * (by its building's own rebuilt cells); absent otherwise, so runs where
+   * every job can be stood in keep their state exactly as before. */
+  stand?: number;
 };
 
 export type Arrow = { x: number; y: number; target: number; damage: number; tx: number; ty: number; life: number; origin?: Point & { attacker?: number; building?: number } };
-export type Effect = { kind: "boom" | "dust" | "spark"; x: number; y: number; t: number; r: number; seed?: number };
+export type Effect = { kind: "boom" | "dust" | "spark" | "firework" | "steam"; x: number; y: number; t: number; r: number; seed?: number };
 /** A cannon shell in flight: lobbed from the tower to where the target was. */
 export type Shell = { x0: number; y0: number; x1: number; y1: number; t: number; dur: number; damage: number; r: number; origin?: Arrow["origin"] };
 /** Glowing cracks left where something exploded; they cool and fade. */
@@ -130,7 +141,8 @@ export type Scorch = { x: number; y: number; r: number; seed: number; t: number;
 export type SimEvent = { type: "waveStart" | "waveCleared" | "lost"; wave: number };
 
 /** How a unit moves this step. Flying units ignore buildings. */
-export type Stride = { speed: number; dt: number; flying?: boolean };
+/** `own`: one of the city's people, whom its gates let through. */
+export type Stride = { speed: number; dt: number; flying?: boolean; own?: boolean };
 /** A blast's radius and centre damage (40% at the edge); with friendly fire
  * it also hurts your own people. */
 export type Blast = { r: number; damage: number; friendlyFire: boolean; origin?: Arrow["origin"] };
@@ -161,14 +173,23 @@ export class DefendSim {
   readonly bonuses: Readonly<Bonuses>;
   /** Enemies slain this run, by kind: what the run pays out. Not part of
    * the replayed state. */
-  readonly slain: Record<EnemyKind, number> = { roach: 0, orc: 0, ogre: 0, bat: 0, warlord: 0, mother: 0, broodling: 0, snake: 0, dragon: 0, shieldBearer: 0, aegis: 0, darkKnight: 0, bombOrc: 0, bombBird: 0, voidSparrow: 0, shieldLesser: 0, shieldGreater: 0, poisonLesser: 0, poisonBearer: 0, poisonGreater: 0, poisonSovereign: 0, siegeBeetle: 0, burrowingMole: 0, necromancer: 0, skeleton: 0, bannerCaptain: 0, mirrorKnight: 0, leechSwarm: 0, ashPhoenix: 0, phoenixEgg: 0, blinkImp: 0, fortressLesser: 0, fortress: 0, fortressGreater: 0, fortressSovereign: 0 };
+  readonly slain: Record<EnemyKind, number> = { roach: 0, orc: 0, ogre: 0, bat: 0, warlord: 0, mother: 0, broodling: 0, snake: 0, dragon: 0, shieldBearer: 0, aegis: 0, darkKnight: 0, bombOrc: 0, bombBird: 0, voidSparrow: 0, shieldLesser: 0, shieldGreater: 0, poisonLesser: 0, poisonBearer: 0, poisonGreater: 0, poisonSovereign: 0, siegeBeetle: 0, burrowingMole: 0, necromancer: 0, skeleton: 0, bannerCaptain: 0, mirrorKnight: 0, leechSwarm: 0, ashPhoenix: 0, phoenixEgg: 0, blinkImp: 0, fortressLesser: 0, fortress: 0, fortressGreater: 0, fortressSovereign: 0, rollingCannon: 0, ballista: 0, fireworkLauncher: 0, trebuchet: 0, bombard: 0, rocketBattery: 0, boatLesser: 0, boat: 0, boatGreater: 0, boatSovereign: 0 };
   /** 1 while a cell is part of a standing (built) building. */
   readonly solid: Uint8Array;
+  /** What blocks the city's own people: `solid`, but for the standing city
+   * gates, which open for them. The same array when there are no gates. */
+  readonly ownSolid: Uint8Array;
   readonly hp: Float32Array;
   readonly maxHp: Float32Array;
   /** Built cells per building; == cells.length when intact. */
   readonly built: Int32Array;
   readonly field = new Float64Array(CELL_COUNT);
+  /** The monster bait on the board, and the flow field toward the nearest
+   * standing stack (empty when there is none on the board). */
+  readonly baits: Building[];
+  readonly baitField: Float64Array;
+  /** How often each stack of bait has fallen this run. */
+  readonly baitFalls = new Map<number, number>();
   /** Seconds left on each building's hit flash. */
   readonly flash: Float32Array;
   /** Cells whose solidity changed since the renderer last drained this. */
@@ -178,6 +199,8 @@ export class DefendSim {
   civilians: Civilian[] = [];
   arrows: Arrow[] = [];
   shells: Shell[] = [];
+  /** Siege engines' balls, bolts, stones and rockets in flight. */
+  siegeShots: SiegeShot[] = [];
   /** Wizard towers' fire and ice. */
   flames: Flame[] = [];
   frosts: Frost[] = [];
@@ -190,6 +213,13 @@ export class DefendSim {
   bolts: Bolt[] = [];
   scorches: Scorch[] = [];
   effects: Effect[] = [];
+  /** The war banner the player planted, rallying the troops; null when none
+   * stands (and so in every run without one). */
+  warBanner: WarBanner | null = null;
+  /** Magic boats' water, drying up behind them, and the buildings it sank
+   * going under; both empty in every run without boats. */
+  floods: Flood[] = [];
+  sinkings: Sinking[] = [];
   events: SimEvent[] = [];
   wave = 0;
   time = 0;
@@ -243,7 +273,12 @@ export class DefendSim {
     }
     // Ponds block movement like buildings do, but belong to no building.
     for (let i = 0; i < CELL_COUNT; i++) if (map.type[i] === CellType.WATER) this.solid[i] = 1;
+    const gates = map.buildings.filter((b) => b.kind === "gate");
+    this.ownSolid = gates.length ? this.solid.slice() : this.solid;
+    for (const b of gates) for (const c of b.cells) this.ownSolid[c] = 0;
     this.keepId = map.buildings.find((b) => b.kind === "keep")!.id;
+    this.baits = map.buildings.filter((b) => b.kind === "monsterBait");
+    this.baitField = new Float64Array(this.baits.length ? CELL_COUNT : 0);
     this.builders = new Builders(levels);
     this.streets = streetCells(map);
     this.terrain = {
@@ -307,14 +342,17 @@ export class DefendSim {
     this.towers.step(this, dt);
     stepArrows(this, dt);
     stepShells(this, dt);
+    stepSiegeShots(this, dt);
     this.wizards.step(this, dt);
     stepFlames(this, this.wizards, dt);
     stepFrosts(this, dt);
     this.darkKeeps.step(this, dt);
     this.barracks.step(this, dt);
+    this.warBanner?.refresh(this);
     for (const s of this.soldiers) STEP_SOLDIER[s.kind](this, s, dt);
     stepFireballs(this, dt);
     stepBlazes(this, dt);
+    stepFloods(this, dt);
     this.builders.step(this, dt);
   }
 
@@ -469,6 +507,13 @@ export class DefendSim {
     this.fieldDirty = false;
     this.fieldT = 0.25;
     fillFlowField(this.field, this.keep.cells, this.terrain);
+    if (this.baits.length) fillFlowField(this.baitField, this.baits.filter((b) => this.intact(b)).flatMap((b) => b.cells), this.terrain);
+  }
+
+  /** The field enemies on foot walk: toward the nearest standing bait while
+   * any stands, else the keep. */
+  marchField(): Float64Array {
+    return this.baits.length && baitStanding(this) ? this.baitField : this.field;
   }
 
   // ── Enemy index ───────────────────────────────────────────────────────
@@ -556,15 +601,28 @@ export class DefendSim {
     if (this.hp[id] <= 0) this.collapse(this.map.buildings[id]);
   }
 
-  private collapse(b: Building) {
+  /** A magic boat's water sinks building `id` whole: it goes under and
+   * leaves its rubble when the water dries. */
+  sink(id: number) {
+    this.sinkings.push({ building: id, t: 0 });
+    this.collapse(this.map.buildings[id], false);
+  }
+
+  private collapse(b: Building, dust = true) {
+    const whole = this.intact(b);
     this.hp[b.id] = 0;
     this.built[b.id] = 0;
-    for (const c of b.cells) this.solid[c] = 0;
+    for (const c of b.cells) this.solid[c] = this.ownSolid[c] = 0;
     this.changed.push(...b.cells);
     const p = center(b.rect);
-    this.effects.push({ kind: "dust", x: p.x, y: p.y, t: 0, r: Math.max(b.rect.w, b.rect.h) * 0.7 });
+    if (dust) this.effects.push({ kind: "dust", x: p.x, y: p.y, t: 0, r: Math.max(b.rect.w, b.rect.h) * 0.7 });
     this.fieldDirty = true;
     this.mapVersion++;
+    if (b.kind === "monsterBait" && whole) {
+      // Every enemy turns at once for the next stack (or the keep).
+      this.fieldT = 0;
+      baitFell(this, b, dust);
+    }
   }
 
   /** Civilians restore a building one cell at a time; it regains its
@@ -574,11 +632,13 @@ export class DefendSim {
     if (id < 0 || this.solid[cell]) return;
     const b = this.map.buildings[id];
     this.solid[cell] = 1;
+    if (b.kind !== "gate") this.ownSolid[cell] = 1;
     this.changed.push(cell);
     this.built[id]++;
     this.hp[id] = Math.min(this.maxHp[id], this.hp[id] + this.maxHp[id] / b.cells.length);
     this.pushOut(cell);
     this.fieldDirty = true;
+    if (b.kind === "monsterBait" && this.intact(b)) this.fieldT = 0;
     this.mapVersion++;
   }
 
@@ -597,13 +657,15 @@ export class DefendSim {
   /** A blast: full damage at the centre falling to 40% at the edge. Returns
    * the seed its fireball and scorch are drawn from. */
   explode(x: number, y: number, { r, damage, friendlyFire, origin }: Blast): number {
+    // A blast in a magic boat's water fizzles.
+    if (fizzles(this, x, y, r)) return 0;
     this.indexEnemies();
     const hit = (d: number) => damage * (1 - 0.6 * Math.min(1, d / r));
-    for (const e of this.enemiesNear(x, y, r)) this.hurtEnemy(e, hit(dist(e.x - x, e.y - y)), true, "ranged", origin ?? { x, y }, !!origin);
+    for (const e of this.enemiesNear(x, y, r)) if (!sheltered(this, e.x, e.y)) this.hurtEnemy(e, hit(dist(e.x - x, e.y - y)), true, "ranged", origin ?? { x, y }, !!origin);
     if (friendlyFire)
       for (const u of [...this.soldiers, ...this.civilians]) {
         const d = dist(u.x - x, u.y - y);
-        if (d > r || u.hp <= 0 || ("guard" in u && u.guard)) continue;
+        if (d > r || u.hp <= 0 || ("guard" in u && u.guard) || sheltered(this, u.x, u.y)) continue;
         u.hp -= hit(d) * FRIENDLY_FIRE;
         u.flash = 0.12;
       }
@@ -622,7 +684,7 @@ export class DefendSim {
 
   /** Steer a unit toward a point with light crowd separation; returns false
    * if it made no headway (stuck against something). */
-  moveToward(u: Point, to: Point, { speed, dt, flying = false }: Stride): boolean {
+  moveToward(u: Point, to: Point, { speed, dt, flying = false, own = false }: Stride): boolean {
     let dx = to.x - u.x,
       dy = to.y - u.y;
     const len = dist(dx, dy);
@@ -630,7 +692,7 @@ export class DefendSim {
     dx /= len;
     dy /= len;
     const [sx, sy] = "kind" in u && ENEMIES[(u as Enemy).kind]?.unyielding ? [0, 0] : this.separation(u);
-    if ("kind" in u && (u as Enemy).kind === "siegeBeetle") (u as Enemy).facing = { x: dx, y: dy };
+    if ("kind" in u && ((u as Enemy).kind === "siegeBeetle" || ENEMIES[(u as Enemy).kind]?.siege)) (u as Enemy).facing = { x: dx, y: dy };
     const step = Math.min(len, speed * dt);
     const mx = dx * step + sx * 0.5 * speed * dt * 4;
     const my = dy * step + sy * 0.5 * speed * dt * 4;
@@ -641,8 +703,9 @@ export class DefendSim {
     }
     const ox = u.x,
       oy = u.y;
-    if (!blocked(this.solid, u.x + mx, u.y)) u.x += mx;
-    if (!blocked(this.solid, u.x, u.y + my)) u.y += my;
+    const solid = own ? this.ownSolid : this.solid;
+    if (!blocked(solid, u.x + mx, u.y)) u.x += mx;
+    if (!blocked(solid, u.x, u.y + my)) u.y += my;
     return Math.abs(u.x - ox) + Math.abs(u.y - oy) > step * 0.1;
   }
 
@@ -683,20 +746,32 @@ export class DefendSim {
         u.path.shift();
         continue;
       }
-      if (this.solid[c] || !this.moveToward(u, p, { speed, dt })) u.path = [];
+      if (this.ownSolid[c] || !this.moveToward(u, p, { speed, dt, own: true })) u.path = [];
       return;
     }
-    if (chase) this.moveToward(u, chase, { speed, dt });
+    if (chase) this.moveToward(u, chase, { speed, dt, own: true });
   }
 
   // ── Consumables ───────────────────────────────────────────────────────
   dropBomb(x: number, y: number) {
     this.explode(x, y, { r: BOMB_RADIUS, damage: BOMB_DAMAGE * this.bonuses.bombDamage, friendlyFire: !this.levels.bombSafe });
   }
+
+  /** Plants the war banner at (x, y), taking down any other, or with null
+   * takes it down. Every troop rethinks at once. */
+  plantBanner(at: Point | null) {
+    this.warBanner = at ? new WarBanner(at.x, at.y) : null;
+    for (const s of this.soldiers) {
+      s.thinkT = 0;
+      s.path = [];
+      s.target = -1;
+    }
+  }
 }
 
 function maxHpOf(b: Building, levels: Levels, bonuses: Readonly<Bonuses>) {
   if (b.kind === "wall") return wallHp(levels.wallStrength) * bonuses.wallHp;
+  if (b.kind === "gate") return wallHp(levels.wallStrength) * bonuses.wallHp * GATE.hpPerCell * b.cells.length;
   if (b.kind === "house") return HOUSE_HP_PER_CELL * b.cells.length;
   if (b.kind === "keep") return keepHp(levels.keepStrength) * bonuses.keepHp;
   return STRUCTURES[b.kind].maxHp;

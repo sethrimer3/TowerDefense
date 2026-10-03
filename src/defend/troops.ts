@@ -26,6 +26,7 @@ import type { Building } from "./citygen.ts";
 import { CELL_COUNT, cellX, cellY } from "./grid.ts";
 import { cellAt, cellCenter, center, findPath, nearest, type PathLimits, type Point } from "./pathing.ts";
 import type { DefendSim, Enemy, Soldier } from "./sim.ts";
+import { answerBanner, MARCH_SIGHT } from "./war-banner.ts";
 
 /** Trains one troop at a time per barracks, while it's standing and below
  * its garrison cap. */
@@ -133,12 +134,21 @@ class Patrol {
 export function stepSwordsman(sim: DefendSim, s: Soldier, dt: number) {
   s.cd -= dt;
   s.thinkT -= dt;
+  if (sim.warBanner) return rally(sim, s, dt);
   const patrol = new Patrol(sim, s);
   let target = sim.enemies.find((e) => e.id === s.target && e.hp > 0) ?? null;
   if (target && !patrol.covers(target)) target = null;
   if (target && inSwordReach(s, target)) return strike(sim, s, target);
   if (s.thinkT <= 0) target = replan(sim, s, patrol);
   sim.followPath(s, target, SOLDIER.speed, dt);
+}
+
+/** Answering the war banner: strike whatever is in reach, else close on
+ * what is near or march to the banner (no leash while it stands). */
+function rally(sim: DefendSim, s: Soldier, dt: number) {
+  const near = sim.enemiesNear(s.x, s.y, SOLDIER.reach + 1).find((e) => inSwordReach(s, e));
+  if (near) return strike(sim, s, near);
+  answerBanner(sim, sim.warBanner!, s, SOLDIER.speed, dt, MARCH_SIGHT);
 }
 
 const inSwordReach = (s: Soldier, e: Enemy) => dist(e.x - s.x, e.y - s.y) <= SOLDIER.reach + enemySize(e) / 2;
@@ -163,7 +173,7 @@ function replan(sim: DefendSim, s: Soldier, patrol: Patrol): Enemy | null {
 /** Sets `s.path` to the first enemy that has a route, and returns it. */
 function pathToFirst(sim: DefendSim, s: Soldier, enemies: Enemy[], limits: PathLimits): Enemy | null {
   for (const e of enemies) {
-    const path = findPath(sim.solid, s, e, limits);
+    const path = findPath(sim.ownSolid, s, e, limits);
     if (!path) continue;
     s.path = path;
     return e;
@@ -176,7 +186,7 @@ function returnToDoor(sim: DefendSim, s: Soldier, home: Building) {
   if (door < 0) return;
   // (Subtracting the half cell separately keeps the original rounding.)
   const away = dist(s.x - cellX(door) - 0.5, s.y - cellY(door) - 0.5);
-  if (away > 1.2) s.path = findPath(sim.solid, s, cellCenter(door), { maxCost: 400 }) ?? [];
+  if (away > 1.2) s.path = findPath(sim.ownSolid, s, cellCenter(door), { maxCost: 400 }) ?? [];
 }
 
 // ── Archers ────────────────────────────────────────────────────────────────
@@ -189,6 +199,7 @@ export function stepArcher(sim: DefendSim, s: Soldier, dt: number) {
   const range = archerUnitRange(sim.levels.archerSight ?? 0);
   const near = nearest(sim.enemiesNear(s.x, s.y, range), s, range * range, true);
   if (near) return shoot(sim, s, near);
+  if (sim.warBanner) return answerBanner(sim, sim.warBanner, s, ARCHER_UNIT.speed, dt);
   if ((sim.levels.archerHunt ?? 0) > 0 && s.thinkT <= 0) hunt(sim, s);
   if (idle(s) && sim.streets.length) stroll(sim, s);
   sim.followPath(s, null, ARCHER_UNIT.speed, dt);
@@ -216,5 +227,5 @@ function stroll(sim: DefendSim, s: Soldier) {
   s.thinkT = 0.5 + sim.rand() * 1.5;
   s.target = -1;
   const goal = sim.streets[Math.floor(sim.rand() * sim.streets.length)];
-  s.path = findPath(sim.solid, s, cellCenter(goal), CITYWIDE) ?? [];
+  s.path = findPath(sim.ownSolid, s, cellCenter(goal), CITYWIDE) ?? [];
 }

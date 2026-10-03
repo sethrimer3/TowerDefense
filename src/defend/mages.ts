@@ -8,7 +8,9 @@ import { dist } from "../exact.ts";
 import { EMBER_SHARE, ENEMIES, FIRE_MAGE, FIREBALL_RANGE, FIREBALL_SPEED, emberDps, emberSeconds, fireballSplash } from "./catalog.ts";
 import { cellCenter, findPath, nearest } from "./pathing.ts";
 import type { DefendSim, Soldier, Arrow } from "./sim.ts";
+import { answerBanner } from "./war-banner.ts";
 import { CELL_COUNT } from "./grid.ts";
+import { fizzles, sheltered } from "./boats.ts";
 
 /** A fireball in flight from (x0, y0) to where its target stood (x1, y1):
  * `t` of `dur` seconds along, with the burst it makes on landing. */
@@ -27,6 +29,7 @@ export function stepMage(sim: DefendSim, s: Soldier, dt: number) {
     if (s.cd <= 0) throwFireball(sim, s, near);
     return;
   }
+  if (sim.warBanner) return answerBanner(sim, sim.warBanner, s, FIRE_MAGE.speed, dt);
   if (!s.path.length && s.thinkT <= 0 && sim.streets.length) stroll(sim, s);
   sim.followPath(s, null, FIRE_MAGE.speed, dt);
 }
@@ -45,7 +48,7 @@ function stroll(sim: DefendSim, s: Soldier) {
   s.thinkT = 0.5 + sim.rand() * 1.5;
   s.target = -1;
   const goal = sim.streets[Math.floor(sim.rand() * sim.streets.length)];
-  s.path = findPath(sim.solid, s, cellCenter(goal), { maxCost: 1e9, maxNodes: CELL_COUNT }) ?? [];
+  s.path = findPath(sim.ownSolid, s, cellCenter(goal), { maxCost: 1e9, maxNodes: CELL_COUNT }) ?? [];
 }
 
 /** Fireballs fly and burst where they land, setting the ground alight. */
@@ -53,6 +56,8 @@ export function stepFireballs(sim: DefendSim, dt: number) {
   for (const f of sim.fireballs) {
     f.t += dt;
     if (f.t < f.dur) continue;
+    // A fireball landing in a magic boat's water goes out with a hiss.
+    if (fizzles(sim, f.x1, f.y1, f.r)) continue;
     const seed = sim.explode(f.x1, f.y1, { r: f.r, damage: f.damage, friendlyFire: false, origin: f.origin });
     const level = sim.levels.mageEmbers ?? 0;
     sim.blazes.push({ x: f.x1, y: f.y1, r: f.r * EMBER_SHARE, t: 0, life: emberSeconds(level), dps: emberDps(level) * sim.bonuses.troopDamage, seed });
@@ -64,7 +69,7 @@ export function stepFireballs(sim: DefendSim, dt: number) {
 export function stepBlazes(sim: DefendSim, dt: number) {
   for (const b of sim.blazes) {
     b.t += dt;
-    for (const e of sim.enemiesNear(b.x, b.y, b.r)) if (!ENEMIES[e.kind].flying) sim.hurtEnemy(e, b.dps * dt, false, "ranged", b);
+    for (const e of sim.enemiesNear(b.x, b.y, b.r)) if (!ENEMIES[e.kind].flying && !sheltered(sim, e.x, e.y)) sim.hurtEnemy(e, b.dps * dt, false, "ranged", b);
   }
   sim.blazes = sim.blazes.filter((b) => b.t < b.life);
 }

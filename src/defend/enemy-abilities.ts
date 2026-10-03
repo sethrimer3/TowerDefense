@@ -4,6 +4,7 @@ import { ENEMIES } from "./catalog.ts";
 import { cellCenter, center, nearestPoint, blocked } from "./pathing.ts";
 import type { Point } from "./pathing.ts";
 import type { DefendSim, Enemy } from "./sim.ts";
+import { lureOf } from "./bait.ts";
 
 export function bannerBonus(sim: DefendSim, e: Enemy) {
   return sim.bannerCarriers.some(c => c.hp > 0 && c.id !== e.id && sq(c.x - e.x) + sq(c.y - e.y) <= 16);
@@ -70,7 +71,7 @@ export function stepAbilities(sim: DefendSim, e: Enemy, dt: number): boolean {
     }
     e.abilityT = (e.abilityT ?? 2) - dt;
     if (e.abilityT <= 0) {
-      const goal = nearestPoint(sim.keep.rect, e.x, e.y), length = dist(goal.x - e.x, goal.y - e.y);
+      const goal = nearestPoint((sim.baits.length ? lureOf(sim, e.x, e.y) : sim.keep).rect, e.x, e.y), length = dist(goal.x - e.x, goal.y - e.y);
       if (length > .1) {
         for (const range of [3, 2, 1]) {
           const x = e.x + (goal.x - e.x) / length * Math.min(range, length);
