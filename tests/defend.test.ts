@@ -897,3 +897,77 @@ test('the bolt buffer draws a black core in a crimson glow, and clears it after'
   assert.ok(buf.rgba.every((v) => v === 0), 'and leaves nothing behind');
   assert.equal(buf.raster([]), null, 'then nothing changes');
 });
+
+test('monster bait: every enemy goes for the nearest stack before the keep', () => {
+  let l = squareCity();
+  const { tx, ty } = l.keep;
+  assert.equal(STRUCTURES.monsterBait.size, 1, 'a sixteenth of a tile, like the watch tower');
+  l = placeStructure(l, 'monsterBait', tx - 3, ty - 3)!;
+  assert.ok(l, 'bait may stand outside the walls');
+  l = placeStructure(l, 'monsterBait', tx + 3, ty - 3)!;
+  const map = mapOf(l);
+  const sim = new DefendSim(map, zeroLevels(), 1);
+  sim.spawnQueue = [];
+  sim.breakT = 1e9;
+  sim.computeField();
+  const [west, east] = sim.baits.sort((a, b) => a.rect.x - b.rect.x);
+  for (const b of sim.baits) for (const c of b.cells) assert.equal(sim.baitField[c], 0, 'the bait field leads to every stack');
+  const foe = (id: number, x: number, y: number, kind = 'orc') =>
+    ({ id, kind, x, y, hp: 1e6, maxHp: 1e6, cd: 0, jx: 0, jy: 0, distract: -1, distractT: 0, rollT: 99, marked: false, flash: 0 }) as any;
+  const wc = { x: west.rect.x + 1, y: west.rect.y + 1 }, ec = { x: east.rect.x + 1, y: east.rect.y + 1 };
+  // Each walks to the stack nearer it, and a bat flies to one too.
+  sim.enemies = [foe(1, wc.x - 2, wc.y - 8), foe(2, ec.x + 2, ec.y - 8), foe(3, wc.x + 1, wc.y - 9, 'bat')];
+  const keepHp = sim.keepHp();
+  for (let i = 0; i < 30 * 20; i++) sim.step(1 / 30);
+  assert.ok(sim.hp[west.id] < sim.maxHp[west.id], 'the west stack is set upon');
+  assert.ok(sim.hp[east.id] < sim.maxHp[east.id], 'and so is the east one');
+  assert.equal(sim.keepHp(), keepHp, 'the keep is left alone meanwhile');
+  // Once both are down, they go on to the keep.
+  sim.damageBuilding(west.id, 1e9);
+  sim.damageBuilding(east.id, 1e9);
+  assert.equal(sim.marchField(), sim.field);
+  for (let i = 0; i < 30 * 60 && sim.keepHp() === keepHp; i++) sim.step(1 / 30);
+  assert.ok(sim.keepHp() < keepHp, 'with the bait gone the keep is next');
+});
+
+test('monster bait: Restocking lets civilians rebuild a stack so many times; Powder kegs burst and burn', () => {
+  let l = squareCity();
+  l = placeStructure(l, 'monsterBait', l.keep.tx - 1, l.keep.ty - 1)!;
+  const map = mapOf(l);
+  const run = (levels: Record<string, number>) => {
+    const sim = new DefendSim(map, { ...zeroLevels(), ...levels }, 1);
+    sim.spawnQueue = [];
+    sim.breakT = 1e9;
+    return sim;
+  };
+  const rebuildAll = (sim: DefendSim) => {
+    for (let i = 0; i < 30 * 120 && !sim.intact(sim.baits[0]); i++) sim.step(1 / 30);
+    return sim.intact(sim.baits[0]);
+  };
+  const plain = run({});
+  plain.damageBuilding(plain.baits[0].id, 1e9);
+  assert.equal(rebuildAll(plain), false, 'without Restocking a fallen stack stays fallen');
+  assert.equal(plain.blazes.length, 0, 'and without Powder kegs it just falls');
+
+  const stocked = run({ baitRestock: 1 });
+  stocked.damageBuilding(stocked.baits[0].id, 1e9);
+  assert.equal(rebuildAll(stocked), true, 'one level of Restocking: civilians rebuild it once');
+  stocked.damageBuilding(stocked.baits[0].id, 1e9);
+  assert.equal(rebuildAll(stocked), false, 'but not twice');
+
+  const kegs = run({ baitBlast: 2 });
+  const b = kegs.baits[0], c = { x: b.rect.x + 1, y: b.rect.y + 1 };
+  const near = { id: 1, kind: 'ogre', x: c.x + 1.2, y: c.y, hp: 1000, maxHp: 1000, cd: 99, jx: 0, jy: 0, distract: -1, distractT: 0, rollT: 99, marked: false, flash: 0 } as any;
+  kegs.enemies = [near];
+  kegs.civilians = [{ id: 9, x: c.x - 1.2, y: c.y, hp: 10, maxHp: 10, job: -1, state: 'home', work: 0, path: [], home: 0, thinkT: 99, flash: 0 }];
+  kegs.damageBuilding(b.id, 1e9);
+  assert.ok(near.hp < 1000, 'the kegs burst and hurt what is near');
+  assert.equal(kegs.civilians[0].hp, 10, 'sparing your own people');
+  assert.equal(kegs.blazes.length, 1, 'and the ground round it burns');
+  const hp = near.hp;
+  for (let i = 0; i < 30; i++) {
+    (kegs as any).indexEnemies();
+    stepBlazes(kegs, 1 / 30);
+  }
+  assert.ok(near.hp < hp, 'burning what stands in it');
+});

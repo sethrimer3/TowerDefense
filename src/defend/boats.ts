@@ -24,6 +24,7 @@ import { enemyDamage, enemySpeed } from "./enemy-abilities.ts";
 import { CELLS_H, CELLS_W, SUB, cellIndex } from "./grid.ts";
 import { cellAt, center, rectDist } from "./pathing.ts";
 import type { Building } from "./citygen.ts";
+import { lureOf } from "./bait.ts";
 import type { DefendSim, Enemy } from "./sim.ts";
 import { chilled } from "./wizard.ts";
 
@@ -109,7 +110,8 @@ export function stepBoat(sim: DefendSim, e: Enemy, dt: number) {
     e.abilityT += TRAIL_GAP;
     sim.floods.push({ x: e.x, y: e.y, r: boat.water, t: 0, life: FLOOD_LIFE, boat: e.id });
   }
-  const keep = sim.keep, half = def.size / 2;
+  // Monster bait calls a boat too: the nearest stack while any stands.
+  const keep = sim.baits.length ? lureOf(sim, e.x, e.y) : sim.keep, half = def.size / 2;
   if (rectDist(keep.rect, e.x, e.y) <= half + 0.4) return ram(sim, e, keep.id);
   const goal = center(keep.rect);
   let dx = goal.x - e.x, dy = goal.y - e.y;

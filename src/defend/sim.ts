@@ -48,6 +48,7 @@ import { Wizards, stepFlames, stepFrosts, type Flame, type Frost } from "./wizar
 import { DarkKeeps, stepBolts, stepDarkWizard, type Bolt } from "./dark-wizards.ts";
 import { WarBanner } from "./war-banner.ts";
 import { sheltered, fizzles, stepFloods, type Flood, type Sinking } from "./boats.ts";
+import { baitFell, baitStanding } from "./bait.ts";
 
 export type Levels = Record<UpgradeId, number>;
 
@@ -124,6 +125,10 @@ export type Civilian = {
   home: number;
   thinkT: number;
   flash: number;
+  /** The open cell beside its job it works from, when the job is walled in
+   * (by its building's own rebuilt cells); absent otherwise, so runs where
+   * every job can be stood in keep their state exactly as before. */
+  stand?: number;
 };
 
 export type Arrow = { x: number; y: number; target: number; damage: number; tx: number; ty: number; life: number; origin?: Point & { attacker?: number; building?: number } };
@@ -174,6 +179,12 @@ export class DefendSim {
   /** Built cells per building; == cells.length when intact. */
   readonly built: Int32Array;
   readonly field = new Float64Array(CELL_COUNT);
+  /** The monster bait on the board, and the flow field toward the nearest
+   * standing stack (empty when there is none on the board). */
+  readonly baits: Building[];
+  readonly baitField: Float64Array;
+  /** How often each stack of bait has fallen this run. */
+  readonly baitFalls = new Map<number, number>();
   /** Seconds left on each building's hit flash. */
   readonly flash: Float32Array;
   /** Cells whose solidity changed since the renderer last drained this. */
@@ -258,6 +269,8 @@ export class DefendSim {
     // Ponds block movement like buildings do, but belong to no building.
     for (let i = 0; i < CELL_COUNT; i++) if (map.type[i] === CellType.WATER) this.solid[i] = 1;
     this.keepId = map.buildings.find((b) => b.kind === "keep")!.id;
+    this.baits = map.buildings.filter((b) => b.kind === "monsterBait");
+    this.baitField = new Float64Array(this.baits.length ? CELL_COUNT : 0);
     this.builders = new Builders(levels);
     this.streets = streetCells(map);
     this.terrain = {
@@ -486,6 +499,13 @@ export class DefendSim {
     this.fieldDirty = false;
     this.fieldT = 0.25;
     fillFlowField(this.field, this.keep.cells, this.terrain);
+    if (this.baits.length) fillFlowField(this.baitField, this.baits.filter((b) => this.intact(b)).flatMap((b) => b.cells), this.terrain);
+  }
+
+  /** The field enemies on foot walk: toward the nearest standing bait while
+   * any stands, else the keep. */
+  marchField(): Float64Array {
+    return this.baits.length && baitStanding(this) ? this.baitField : this.field;
   }
 
   // ── Enemy index ───────────────────────────────────────────────────────
@@ -581,6 +601,7 @@ export class DefendSim {
   }
 
   private collapse(b: Building, dust = true) {
+    const whole = this.intact(b);
     this.hp[b.id] = 0;
     this.built[b.id] = 0;
     for (const c of b.cells) this.solid[c] = 0;
@@ -589,6 +610,11 @@ export class DefendSim {
     if (dust) this.effects.push({ kind: "dust", x: p.x, y: p.y, t: 0, r: Math.max(b.rect.w, b.rect.h) * 0.7 });
     this.fieldDirty = true;
     this.mapVersion++;
+    if (b.kind === "monsterBait" && whole) {
+      // Every enemy turns at once for the next stack (or the keep).
+      this.fieldT = 0;
+      baitFell(this, b, dust);
+    }
   }
 
   /** Civilians restore a building one cell at a time; it regains its
@@ -603,6 +629,7 @@ export class DefendSim {
     this.hp[id] = Math.min(this.maxHp[id], this.hp[id] + this.maxHp[id] / b.cells.length);
     this.pushOut(cell);
     this.fieldDirty = true;
+    if (b.kind === "monsterBait" && this.intact(b)) this.fieldT = 0;
     this.mapVersion++;
   }
 

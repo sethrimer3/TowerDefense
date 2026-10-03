@@ -7,7 +7,9 @@
 import { dist } from "../exact.ts";
 import { CIVILIAN, civilianCount, civilianHp, rebuildSeconds, type UpgradeId } from "./catalog.ts";
 import { cellCenter, center, findPath, rectDist, type Point } from "./pathing.ts";
+import { cellInBounds, cellIndex, cellX, cellY } from "./grid.ts";
 import type { Civilian, DefendSim } from "./sim.ts";
+import { restockable } from "./bait.ts";
 
 /** Paths for civilians give up beyond this many cells. */
 const ERRAND = { maxCost: 400 };
@@ -55,7 +57,7 @@ function stepCivilian(sim: DefendSim, c: Civilian, dt: number) {
 
 function goToJob(sim: DefendSim, c: Civilian, dt: number) {
   if (sim.solid[c.job] || !jobOpen(sim, c.job, c)) return assignNext(sim, c);
-  const j = cellCenter(c.job);
+  const j = cellCenter(c.stand ?? c.job);
   if (dist(j.x - c.x, j.y - c.y) < 0.35) {
     c.state = "working";
     c.work = 0;
@@ -64,10 +66,33 @@ function goToJob(sim: DefendSim, c: Civilian, dt: number) {
   if (!c.path.length && c.thinkT <= 0) {
     c.thinkT = 1;
     c.path = findPath(sim.solid, c, j, ERRAND) ?? [];
+    // Walled in: work it from an open cell beside it instead.
+    if (!c.path.length && c.stand === undefined && standBeside(sim, c)) return;
     // Unreachable: try another job next time (but still step toward this one now).
     if (!c.path.length && dist(j.x - c.x, j.y - c.y) > 1.5) assignNext(sim, c, c.job);
   }
   sim.followPath(c, j, CIVILIAN.speed, dt);
+}
+
+/** The eight cells round a job, sides first. */
+const AROUND = [[0, -1], [1, 0], [0, 1], [-1, 0], [-1, -1], [1, -1], [1, 1], [-1, 1]] as const;
+
+/** A job no one can stand in (the last cell of a building rebuilt round
+ * it): the civilian takes the first open cell beside it they can reach as
+ * where to work from (a corner will do). False if there is none. */
+function standBeside(sim: DefendSim, c: Civilian): boolean {
+  const jx = cellX(c.job), jy = cellY(c.job);
+  for (const [dx, dy] of AROUND) {
+    if (!cellInBounds(jx + dx, jy + dy)) continue;
+    const n = cellIndex(jx + dx, jy + dy);
+    if (sim.solid[n]) continue;
+    const path = findPath(sim.solid, c, cellCenter(n), ERRAND);
+    if (!path) continue;
+    c.stand = n;
+    c.path = path;
+    return true;
+  }
+  return false;
 }
 
 function work(sim: DefendSim, c: Civilian, dt: number) {
@@ -123,6 +148,8 @@ function pickJob(sim: DefendSim, from: Point, skip = -1): number {
 function* openJobs(sim: DefendSim, skip: number) {
   for (const b of sim.map.buildings) {
     if (sim.intact(b) || b.kind === "keep") continue;
+    // Fallen bait waits for Restocking.
+    if (b.kind === "monsterBait" && !restockable(sim, b)) continue;
     const tier = b.kind === "house" ? 2 : b.kind === "wall" ? 1 : 0;
     for (const cell of b.cells) if (jobAvailable(sim, cell, skip)) yield { cell, tier };
   }
@@ -139,6 +166,7 @@ function jobAvailable(sim: DefendSim, cell: number, skip: number) {
 /** The next job, or home to the nearest house when there is none. */
 function assignNext(sim: DefendSim, c: Civilian, skip = -1) {
   c.path = [];
+  delete c.stand;
   c.thinkT = 0;
   const job = pickJob(sim, c, skip);
   if (job >= 0) {

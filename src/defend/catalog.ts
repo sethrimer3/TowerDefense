@@ -4,11 +4,11 @@ import { intPow } from "../exact.ts";
  * copper, silver and Gold, the universal upgrades, the bonuses the Smithy and the
  * skill trees add, and the enemy roster. */
 
-export type StructureKind = "keep" | "barracks" | "archerBarracks" | "archerTower" | "cannonTower" | "watchTower" | "wizardTower" | "mageGuild" | "valkyriePalace" | "darkKeep";
+export type StructureKind = "keep" | "barracks" | "archerBarracks" | "archerTower" | "cannonTower" | "watchTower" | "wizardTower" | "mageGuild" | "valkyriePalace" | "darkKeep" | "monsterBait";
 /** Everything that appears in the build palette (the keep is placed from the
  * start and can only be moved, so it is not a palette item). */
 export type PaletteItem = "cityTile" | Exclude<StructureKind, "keep">;
-export const PALETTE_ITEMS: PaletteItem[] = ["cityTile", "barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep"];
+export const PALETTE_ITEMS: PaletteItem[] = ["cityTile", "barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait"];
 
 export type StructureDef = {
   kind: StructureKind;
@@ -142,6 +142,16 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     outsideOk: false,
     description: "A vast keep of black obsidian and rubies filling a 2 × 2 block of tiles. Its four corner turrets hurl black lightning that leaps from foe to foe, and it summons a dark wizard whose bolts chain through whole crowds.",
   },
+  monsterBait: {
+    kind: "monsterBait",
+    name: "Monster bait",
+    w: 2,
+    h: 2,
+    size: 1,
+    maxHp: 300,
+    outsideOk: true,
+    description: "A stack of crates reeking of monster bait. While any stands, every enemy goes for the nearest one before the keep.",
+  },
 };
 
 /** A structure's footprint and share of its tile, smaller once its
@@ -167,6 +177,7 @@ export const STARTING_OWNED: Record<PaletteItem, number> = {
   mageGuild: 0,
   valkyriePalace: 0,
   darkKeep: 0,
+  monsterBait: 0,
 };
 
 /** A price in Gold and metal bars (all earned in battle). */
@@ -186,6 +197,7 @@ export function purchasePrice(item: PaletteItem, owned: number): Price {
     mageGuild: { gold: 520, copper: 7 },
     valkyriePalace: { gold: 800, copper: 10, silver: 1 },
     darkKeep: { gold: 3000, copper: 25, silver: 8 },
+    monsterBait: { gold: 160, copper: 2 },
   };
   const growth = item === "cityTile" ? 1.3 : 1.5;
   const m = intPow(growth, extra);
@@ -219,6 +231,8 @@ export type UpgradeId =
   | "darkKeepCompact"
   | "chainReach"
   | "chainCount"
+  | "baitRestock"
+  | "baitBlast"
   | "wallStrength"
   | "keepStrength"
   | "civilianCount"
@@ -298,6 +312,21 @@ export const UPGRADES: UpgradeDef[] = [
     maxLevel: CHAIN_COUNT_MAX,
     describe: (l) => `The dark wizard's bolts chain to ${wizardChain(l)} enemies, the turrets' to ${turretChain(l)}`,
     price: (l) => ({ gold: 600 + 300 * l * l, copper: 4 + l, silver: 1 + Math.floor(l / 3) }),
+  },
+  {
+    id: "baitRestock",
+    group: "Monster bait",
+    name: "Restocking",
+    maxLevel: 5,
+    describe: (l) => (l ? `Civilians restock fallen bait ${l === 1 ? "once" : `${l} times`} a defense` : "Fallen bait stays fallen"),
+  },
+  {
+    id: "baitBlast",
+    group: "Monster bait",
+    name: "Powder kegs",
+    maxLevel: 5,
+    describe: (l) =>
+      l ? `Fallen bait bursts for ${baitBlastDamage(l)} damage over ${baitBlastRadius(l).toFixed(1)} cells, the ground burning ${baitFireSeconds(l).toFixed(1)}s` : "Fallen bait just falls",
   },
   { id: "wallStrength", group: "City", name: "Masonry", maxLevel: 6, describe: (l) => `${wallHp(l)} HP per wall stone` },
   { id: "keepStrength", group: "City", name: "Keep bastions", maxLevel: 6, describe: (l) => `${keepHp(l)} keep HP` },
@@ -398,6 +427,13 @@ export function turretSpots(r: { x: number; y: number; w: number; h: number }) {
     { x: r.x + r.w - ix, y: r.y + r.h - iy },
   ];
 }
+/** Monster bait's powder kegs: the burst when a stack falls (spares your
+ * own people), its radius, and the burning ground it leaves: damage a
+ * second to ground enemies, and how long it burns. */
+export const baitBlastDamage = (l: number) => 30 + l * 15;
+export const baitBlastRadius = (l: number) => 1.8 + l * 0.2;
+export const baitFireDps = (l: number) => 8 + l * 4;
+export const baitFireSeconds = (l: number) => 3 + l;
 export const wallHp = (l: number) => Math.round(100 * (1 + l * 0.35));
 export const keepHp = (l: number) => Math.round(STRUCTURES.keep.maxHp * (1 + l * 0.3));
 export const civilianCount = (l: number) => 2 + l;

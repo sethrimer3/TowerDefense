@@ -27,6 +27,9 @@
  *   rune circle round an eight-sided obsidian spire tipped with a ruby, and
  *   a ruby-arched gate between two crimson banners on its south wall. Its
  *   wounds glow: crimson fissures open in the obsidian as it is hurt.
+ * - Monster bait: a stack of iron-bound crates, one open and heaped with
+ *   raw meat, another crate stacked on top with a haunch lashed to it and
+ *   green slime seeping from the seams.
  *
  * Pure; the city layer and palette draw the cached canvases. */
 import { TURRET_INSET, type StructureKind } from "./catalog.ts";
@@ -63,6 +66,10 @@ const C = {
   mortar: [0x2a060c, 0x4e0b16, 0x7a1222],
   ruby: [0x3d0410, 0x7e0a1c, 0xc0182e, 0xf0425a, 0xffc4cc],
   flag: [0x1e1c22, 0x2a272f, 0x34313a],
+  crate: [0x4a3018, 0x6e4a26, 0x8c6232, 0xab7c42, 0xc89a5a],
+  meat: [0x5e1414, 0x8e2222, 0xb83a32, 0xd8685a],
+  bone: [0xb8ae94, 0xe8e0c8],
+  slime: [0x3e6a1c, 0x6aa82a, 0xa8e050],
 };
 
 /** What each structure's damage throws down and its rubble is made of. */
@@ -76,6 +83,7 @@ const MATERIAL: Record<PlacedKind, { m: Material; ruin: Pick<Ruin, "stone" | "to
   mageGuild: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.wine.slice(0, 3), beams: true } },
   valkyriePalace: { m: { tones: C.marble.slice(1, 4), roofed: true }, ruin: { stone: C.marble.slice(1, 4), top: [C.gold[0], C.marble[2], C.marble[3]], beams: false } },
   darkKeep: { m: { tones: C.obsidian.slice(2, 5), roofed: false }, ruin: { stone: C.obsidian.slice(2, 5), top: C.mortar, beams: false } },
+  monsterBait: { m: { tones: [C.crate[0], C.crate[2], C.crate[3]], roofed: false }, ruin: { stone: [C.crate[0], C.crate[1], C.crate[3]], top: [C.meat[0], C.meat[1], C.slime[1]], beams: true } },
 };
 
 /** The body's corners: one pixel in from its cells, two on the lower right
@@ -98,7 +106,7 @@ export function structureRubblePixels(kind: PlacedKind, cw: number, ch: number, 
   return rubblePixels(w, h, hash(seed, KINDS.indexOf(kind), 3), { ...frame(w, h), ...MATERIAL[kind].ruin });
 }
 
-const KINDS: PlacedKind[] = ["barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep"];
+const KINDS: PlacedKind[] = ["barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait"];
 
 const PAINT: Record<PlacedKind, (p: Pix) => void> = {
   barracks: paintBarracks,
@@ -110,6 +118,7 @@ const PAINT: Record<PlacedKind, (p: Pix) => void> = {
   mageGuild: paintMageGuild,
   valkyriePalace: paintValkyriePalace,
   darkKeep: paintDarkKeep,
+  monsterBait: paintMonsterBait,
 };
 
 function rect(p: Pix, x0: number, y0: number, x1: number, y1: number, c: number) {
@@ -544,4 +553,68 @@ function fissures(p: Pix, stage: number, seed: number) {
         else y += dy;
       }
     }
+}
+
+/** One crate seen from above in `x0..x1, y0..y1` (outline included): boards
+ * running `across` or down, lit to the upper left, the seams between them
+ * a shade darker, an iron corner catching the sun; `lift` lightens a crate
+ * stacked higher. */
+function crate(p: Pix, x0: number, y0: number, x1: number, y1: number, across: boolean, lift = 0) {
+  for (let y = y0; y <= y1; y++)
+    for (let x = x0; x <= x1; x++) {
+      if (x === x0 || y === y0 || x === x1 || y === y1) {
+        p.set(x, y, OUTLINE);
+        continue;
+      }
+      const u = across ? y - y0 - 1 : x - x0 - 1;
+      const edge = x === x0 + 1 || y === y0 + 1 ? 1 : x === x1 - 1 || y === y1 - 1 ? -1 : 0;
+      const seam = u % 3 === 2 && edge === 0;
+      const grain = hash(x, y, 77) % 9 === 0 ? -1 : 0;
+      p.set(x, y, C.crate[Math.max(0, Math.min(4, 2 + lift + edge + grain - (seam ? 1 : 0)))]);
+    }
+  p.set(x0 + 1, y0 + 1, C.iron[3]);
+  p.set(x1 - 1, y1 - 1, C.iron[1]);
+}
+
+/** Darkens the drawn, non-outline pixels in a box: a shadow cast by
+ * what is stacked above. */
+function shadow(p: Pix, x0: number, y0: number, x1: number, y1: number) {
+  for (let y = y0; y <= y1; y++)
+    for (let x = x0; x <= x1; x++) {
+      const c = p.get(x, y);
+      if (c >= 0 && c !== OUTLINE) p.set(x, y, shade(c, 0.6));
+    }
+}
+
+function paintMonsterBait(p: Pix) {
+  const { x0, y0, x1, y1 } = frame(p.w, p.h);
+  // On the ground: a long crate along the south, boards across, and an open
+  // one to the north-east heaped with raw meat.
+  crate(p, x0, y0 + 6, x1, y1, true);
+  crate(p, x0 + 5, y0, x1, y0 + 6, false);
+  for (let y = y0 + 2; y <= y0 + 4; y++)
+    for (let x = x0 + 8; x <= x1 - 2; x++) {
+      const k = hash(x, y, 91) % 4;
+      p.set(x, y, k === 0 ? C.meat[3] : (x + y) % 2 ? C.meat[2] : C.meat[1]);
+    }
+  p.set(x1 - 2, y0 + 2, C.bone[1]);
+  p.set(x1 - 1, y0 + 1, C.bone[1]);
+  // Slime seeping from the long crate's seams and pooling below.
+  for (const [x, y, t] of [[x1 - 3, y1 - 1, 2], [x1 - 3, y1, 1], [x1 - 2, y1 + 1, 0], [x1 - 4, y1 + 1, 1], [x1 - 1, y0 + 9, 1]] as const) p.set(x, y, C.slime[t]);
+  // A crate stacked on top to the west, throwing its shadow to the lower
+  // right, a haunch of meat lashed across it with rope.
+  const tx0 = x0, ty0 = y0 + 1, tx1 = x0 + 7, ty1 = y0 + 8;
+  shadow(p, tx1 + 1, ty0 + 1, tx1 + 2, ty1 + 1);
+  shadow(p, tx0 + 1, ty1 + 1, tx1 + 2, ty1 + 2);
+  crate(p, tx0, ty0, tx1, ty1, false, 1);
+  for (let y = ty0 + 1; y < ty1; y++) p.set(tx0 + 5, y, C.straw[0]);
+  for (const [dx, dy, c] of [
+    [1, 3, C.meat[3]], [2, 3, C.meat[3]], [3, 3, C.meat[2]], [4, 3, C.meat[2]],
+    [1, 4, C.meat[2]], [2, 4, C.meat[2]], [3, 4, C.meat[1]], [4, 4, C.meat[1]],
+    [2, 5, C.meat[1]], [3, 5, C.meat[0]],
+    [5, 3, C.bone[1]], [6, 2, C.bone[1]], [6, 1, C.bone[0]],
+  ] as const) p.set(tx0 + dx, ty0 + dy, c);
+  // Slime dribbling down the top crate's side.
+  p.set(tx0 + 1, ty1 - 1, C.slime[2]);
+  p.set(tx0 + 1, ty1, C.slime[1]);
 }
