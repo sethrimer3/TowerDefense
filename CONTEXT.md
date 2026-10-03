@@ -146,6 +146,9 @@ One world the mine works, with only so much ore in it. Once the shaft is at the 
 **Miner**:
 A worker the player hires with Gold and puts to one of three **trades**: the face (digging, shoring, laying track, hanging torches and lamps, building carts, carrying ore up), the forge, or the smithy. A miner at the face wears a yellow hat, a forge hand a grey welder's mask, a smith a brown leather apron. Each miner has a name for life.
 
+**Temperament** and **habits** (Mine):
+What a miner does with itself while it waits: looking about, stretching, sitting down, whistling, yawning, tapping a foot or sifting the ground. Its temperament is the two habits it falls into most, from its name, so each miner idles in its own way. Two miners waiting side by side chat instead.
+
 **Crew list**:
 The miners by name in a box for each trade, opened beside the mine's view: a name dragged to another box changes that miner's trade, and one tapped is followed by the camera. A miner lost stays in the list crossed out under a skull until tapped away or replaced by the next hire.
 

@@ -13,9 +13,10 @@
  * (`particles.ts`). Water is tinted into the cells it fills; stars glint in
  * the night sky. */
 import { stream } from "../random.ts";
-import { CART_LOAD, metalSum, type Footprint, type Metals, type Inside, type Miner, type MineSim, type Rebuild, type Sky } from "./sim.ts";
+import { CART_LOAD, MEAL_TICKS, metalSum, type Footprint, type Metals, type Inside, type Miner, type MineSim, type Rebuild, type Sky } from "./sim.ts";
 import { drawFigure, drawSleeper, outfit, type Fine, type Pose } from "./figures.ts";
 import { Particles } from "./particles.ts";
+import { habitAt, habitPose, hammerAt, shovelAt } from "./acts.ts";
 import {
   ASHLAR, GLASS, GRAVE_H, GRAVE_W, HEADFRAME_H, HEADFRAME_W, PLANK, POST, Sprites, WHEEL, chimneyRows, paintBack, paintGrave, paintHeadframe, paintShell, paintWall, roofRows, shellOrigin, windowsOf,
   type RGB,
@@ -90,6 +91,10 @@ export class MineRenderer {
   private paintedRows = "";
   private seed = -1;
   private fx2 = new Particles();
+  /** The last beat each one-off effect played on, by key. */
+  private beats = new Map<string, number>();
+  /** Until when (ms) the furnace flares from ore just thrown in. */
+  private flareUntil = 0;
   /** Fills a rectangle in cells, snapped to whole screen pixels (set each
    * frame, for the half-cell figures and the effects). */
   private fine: Fine = () => {};
@@ -489,33 +494,10 @@ export class MineRenderer {
       const load = metalSum(c);
       if (load > 0) oreHeap(fine, c.x + 0.5, c.y - 0.75, [6, 4, 2], Math.min(12, Math.ceil((12 * load) / CART_LOAD)), Math.round((12 * c.gold) / Math.max(1, load)), 1, Math.round((12 * c.silver) / Math.max(1, load)));
     }
+    const waiting = sim.miners.filter((m) => !m.inside && (m.action === "idle" || m.action === "rest"));
     for (const m of sim.miners) {
       if (m.inside || m.y < y0 - 2 || m.y > y1 + 2) continue;
-      const climbing = m.action === "walk" && sim.world.get(m.x, m.y) === LADDER;
-      const pose: Pose = climbing ? "climb" : m.action === "walk" ? "walk" : m.action === "idle" || m.action === "rest" ? "stand" : "work";
-      const step = Math.floor(time / 140 + m.id * 3);
-      drawFigure(fine, outfit(m.name, m.job), m.x, m.y, m.facing, pose, step);
-      const front = m.facing > 0 ? m.x + 1 : m.x - 0.5;
-      // A sack of ore on the back.
-      if (metalSum(m) > 0) {
-        fine(m.facing > 0 ? m.x - 0.5 : m.x + 1, m.y - 0.5, 0.5, 1, "#6a5236");
-        fine(m.facing > 0 ? m.x - 0.5 : m.x + 1, m.y - 0.5, 0.5, 0.5, loadColor(m));
-      }
-      // A bucket swung at floodwater or a fire.
-      if ((m.action === "bail" || m.action === "douse") && m.work >= 0) {
-        const up = step % 2;
-        fine(front, m.y - up * 0.5, 0.5, 0.5, m.action === "douse" ? "#9fc6f0" : "#5a86c8");
-        fine(front, m.y - up * 0.5 - 0.25, 0.5, 0.25, "#7a7a82");
-      }
-      if (m.action === "dig" && m.work >= 0) {
-        // The pick: raised, then struck at the face.
-        const wx = m.work % W, wy = (m.work - wx) / W, dir = Math.sign(wx - m.x) || m.facing, raised = Math.floor(time / 180 + m.id) % 2 === 0;
-        const hx = dir > 0 ? m.x + 1 : m.x - 0.5, hy = wy < m.y - 1 ? m.y - 1.5 : wy > m.y ? m.y + 0.5 : m.y - 1;
-        fine(hx, raised ? hy - 0.5 : hy, 0.5, 0.5, "#b9bcc4");
-        fine(dir > 0 ? m.x + 0.5 : m.x, m.y - (raised ? 0.5 : 0), 0.5, 0.5, "#7a5230");
-        if (effects && !raised && this.fx() < 0.25) this.kick(wx, wy, sim.world.get(wx, wy));
-      }
-      if (m.action === "build" && m.work >= 0 && Math.floor(time / 200 + m.id) % 2 === 0) fine(front, m.y - 1, 0.5, 0.5, "#c8ccd4");
+      this.drawMiner(sim, m, time, effects, waiting);
     }
     if (this.target) {
       // A brass marker bobbing over the miner picked in the crew's list.
@@ -529,6 +511,84 @@ export class MineRenderer {
       this.fx2.draw(ctx, fine);
     }
     this.drawLightning(time);
+  }
+
+  /** True once each time `n` moves on for the key: a beat's one-off effect. */
+  private once(key: string, n: number) {
+    if (this.beats.get(key) === n) return false;
+    const fresh = this.beats.has(key);
+    this.beats.set(key, n);
+    if (this.beats.size > 400) this.beats.clear();
+    return fresh;
+  }
+
+  /** A miner out in the world, at what it's doing: the pick raised over its
+   * head and struck at the face, the hammer at a fitting, a bucket swung,
+   * a sack on its back, a lamp on its hat lighting the dark; waiting, it
+   * falls into its habits (`acts.ts`) or, beside another waiting, chats. */
+  private drawMiner(sim: MineSim, m: Miner, time: number, effects: boolean, waiting: Miner[]) {
+    const fine = this.fine, look = outfit(m.name, m.job), step = Math.floor(time / 140 + m.id * 3);
+    const climbing = m.action === "walk" && sim.world.get(m.x, m.y) === LADDER;
+    let pose: Pose = climbing ? "climb" : m.action === "walk" ? "walk" : "work", facing = m.facing;
+    const front = () => (facing > 0 ? m.x + 1 : m.x - 0.5);
+    const below = m.y > sim.strata.surface[m.x];
+    if (m.action === "idle" || m.action === "rest") {
+      const mate = waiting.find((o) => o !== m && o.y === m.y && Math.abs(o.x - m.x) <= 2 && Math.abs(o.x - m.x) >= 1);
+      if (mate) {
+        // Two waiting side by side turn to each other and talk in turns.
+        facing = Math.sign(mate.x - m.x);
+        pose = "stand";
+        const turn = Math.floor((time + Math.min(m.id, mate.id) * 977) / 2600);
+        if (effects && (turn + (m.id < mate.id ? 0 : 1)) % 2 === 0 && this.once(`talk${m.id}`, turn)) this.fx2.add("word", m.x + 0.6, m.y - 2, 0, 0, 50, "#f0ead8");
+      } else {
+        const h = habitAt(m.name, time + m.id * 313), hp = habitPose(h.habit, h.t, m.facing, step);
+        pose = hp.pose;
+        facing = hp.facing;
+        if (effects && h.habit === "whistle" && h.t > 0.2 && this.once(`note${m.id}`, h.spell * 4 + Math.floor(h.t * 3)))
+          this.fx2.add("note", m.x + (facing > 0 ? 1.2 : -0.2), m.y - 1.6, facing * 0.004, -0.02, 70, "#f4e9c0");
+        if (effects && h.habit === "sift" && pose === "crouch" && this.fx() < 0.04) this.kick(m.x + (facing > 0 ? 1 : -1), m.y, sim.world.get(m.x + (facing > 0 ? 1 : -1), m.y + 1));
+      }
+    }
+    if (m.action === "dig" && m.work >= 0) {
+      // The pick: raised over the head, then struck at the face.
+      const wx = m.work % W, wy = (m.work - wx) / W, dir = Math.sign(wx - m.x) || m.facing, beat = Math.floor(time / 180 + m.id), raised = beat % 2 === 0;
+      facing = dir;
+      pose = raised ? "reach" : "work";
+      const hx = dir > 0 ? m.x + 1 : m.x - 0.5, hy = wy < m.y - 1 ? m.y - 1.5 : wy > m.y ? m.y + 0.5 : m.y - 1;
+      drawFigure(fine, look, m.x, m.y, facing, pose, step);
+      if (raised) {
+        fine(dir > 0 ? m.x + 0.5 : m.x, m.y - 1.5, 0.5, 0.5, "#7a5230");
+        fine(dir > 0 ? m.x + 1 : m.x - 0.5, m.y - 2, 0.5, 0.5, "#b9bcc4");
+      } else {
+        fine(hx, hy, 0.5, 0.5, "#b9bcc4");
+        fine(dir > 0 ? m.x + 0.5 : m.x, m.y, 0.5, 0.5, "#7a5230");
+        if (effects && this.once(`dig${m.id}`, beat) && this.fx() < 0.5) this.kick(wx, wy, sim.world.get(wx, wy));
+      }
+    } else if (m.action === "build" && m.work >= 0) {
+      // A hammer at the fitting: up, then down with a puff of dust.
+      const wx = m.work % W, beat = Math.floor(time / 200 + m.id), up = beat % 2 === 0;
+      facing = Math.sign(wx - m.x) || m.facing;
+      drawFigure(fine, look, m.x, m.y, facing, up ? "reach" : "work", step);
+      fine(up ? (facing > 0 ? m.x + 0.5 : m.x) : front(), up ? m.y - 2 : m.y - 0.5, 0.5, 0.5, "#c8ccd4");
+      if (effects && !up && this.once(`build${m.id}`, beat) && this.fx() < 0.4) this.fx2.add("dust", front() + 0.25, m.y - 0.25, facing * 0.05, -0.06, 30, "#bcb4a4", 0.25);
+    } else if ((m.action === "bail" || m.action === "douse") && m.work >= 0) {
+      // A bucket dipped low, then swung out.
+      const up = step % 2;
+      drawFigure(fine, look, m.x, m.y, facing, up ? "work" : "crouch", step);
+      fine(front(), m.y - up * 0.5 + (up ? 0 : 0.5), 0.5, 0.5, m.action === "douse" ? "#9fc6f0" : "#5a86c8");
+      fine(front(), m.y - up * 0.5 + (up ? 0 : 0.5) - 0.25, 0.5, 0.25, "#7a7a82");
+      if (effects && up && this.once(`splash${m.id}`, step) && this.fx() < 0.6) this.fx2.add("drop", front() + 0.25, m.y - 0.5, facing * 0.06, -0.08, 40, "#9fc6f0");
+    } else drawFigure(fine, look, m.x, m.y, facing, pose, step);
+    const back = facing > 0 ? m.x - 0.5 : m.x + 1;
+    // A sack of ore on the back, or a basket of spoil.
+    if (metalSum(m) > 0) {
+      fine(back, m.y - 0.5, 0.5, 1, "#6a5236");
+      fine(back, m.y - 0.5, 0.5, 0.5, loadColor(m));
+    } else if (m.spoil > 0) fine(back, m.y - 0.5, 0.5, 1, "#5a4630");
+    // Hungry and hard at it: now and then a drop of sweat.
+    if (effects && m.fed > MEAL_TICKS * 0.8 && m.action !== "idle" && this.fx() < 0.006) this.fx2.add("drop", m.x + 0.5, m.y - 1, facing * -0.02, -0.03, 40, "#cfe4ff");
+    // A lamp on the hat lights the dark round its wearer.
+    if (effects && look.lamp && below) this.glowAt(m.x + (facing > 0 ? 0.75 : 0.25), m.y - 1, 4, 0.22);
   }
 
   /** A miner's feet cell, inside a building or out. */
@@ -623,6 +683,8 @@ export class MineRenderer {
       const grey = 110 + Math.floor(this.fx() * 50);
       this.fx2.add("smoke", b.x0 + 2.5 + this.fx(), top - rows - 4.2, (this.fx() - 0.5) * 0.01, -0.035 - this.fx() * 0.025, 140 + this.fx() * 90, `rgb(${grey},${grey - 4},${grey - 8})`, 0.5);
     }
+    if (b.id === "forge" && effects && open > 0.3 && sim.working("forge") && this.fx() < 0.06)
+      this.fx2.add("ember", b.x0 + 2 + this.fx() * 1.5, F - 2.5, (this.fx() - 0.5) * 0.02, -0.015 - this.fx() * 0.015, 50 + this.fx() * 40, "#ffb050", 0.25);
     if (b.id === "shaft") {
       // The lantern by the door on its bracket, aglow after dark.
       const lx = b.x1 + 1, ly = F - 3, glow = mix([150, 120, 60], [255, 220, 130], Math.min(1, night * 1.5)), gk = night > 0.3 ? 1 : k;
@@ -721,8 +783,10 @@ export class MineRenderer {
         fill(POST, k, sim.shaftX + 0.5, y + 0.5, 0.5, 0.5);
         fill(PLANK[0], k * 1.1, sim.shaftX, y, 1, 0.5);
       }
+      // The winch drum, its rope wraps turning while the hoist runs.
       fill(IRON_DARK, k, b.x1 - 2, F - 1, 1.5, 1);
-      fill([120, 100, 70], k, b.x1 - 2, F - 1.5, 1.5, 0.5);
+      const turn = sim.hoist.state === "idle" ? 0 : Math.floor(this.hoistY * 2) % 3;
+      for (let n = 0; n < 3; n++) fill([120, 100, 70], k * (n === turn ? 1.25 : 0.9), b.x1 - 2 + n * 0.5, F - 1.5, 0.5, 0.5);
       fill(POST, k, b.x1 - 2, F, 0.5, 1);
       fill(POST, k, b.x1 - 1, F, 0.5, 1);
     } else if (b.id === "barracks") {
@@ -806,13 +870,17 @@ export class MineRenderer {
       for (let y = F - 2.5; y <= F - 0.5; y += 0.5)
         for (let x = x0 + 1.5; x < x0 + 3.5; x += 0.5) {
           if (y === F - 2.5 && (x === x0 + 1.5 || x === x0 + 3)) continue;
-          const f = Math.floor(x * 2 + y * 2 + flick) % 3;
-          fill(hot ? FIRE_RGB[f] : [90, 40, 24], hot && y === F - 0.5 ? 1.15 : 1, x, y, 0.5, 0.5);
+          const f = Math.floor(x * 2 + y * 2 + flick) % 3, flare = time < this.flareUntil ? 1.3 : 1;
+          fill(hot ? (flare > 1 && f === 0 ? [255, 236, 160] : FIRE_RGB[f]) : [90, 40, 24], hot ? (y === F - 0.5 ? 1.15 : 1) * flare : 1, x, y, 0.5, 0.5);
         }
       fill(ASHLAR[1], k, x0 + 2, F - b.height + 1, 1, b.height - 5);
       fill(ASHLAR[0], k, x0 + 2, F - b.height + 1, 0.5, b.height - 5);
-      fill([110, 74, 44], k, x0 + 4, F - 0.5, 1, 0.5);
+      // The bellows, pumping while the furnace is worked.
+      const pump = hot && Math.floor(time / 450) % 2 === 0 ? 0.5 : 0;
+      fill([110, 74, 44], k, x0 + 4, F - 0.5 - pump, 1, 0.5);
+      if (pump) fill([70, 46, 26], k, x0 + 4, F - 0.5, 1, 0.5);
       fill([80, 52, 30], k, x0 + 4, F, 1, 0.5);
+      fill(IRON_DARK, k, x0 + 3.5, F - 0.25, 0.5, 0.25);
       this.forgeStock(sim, b, k, fill);
     } else if (b.id === "smithy") {
       // An anvil for each smith (face, horn, waist and foot on a stump),
@@ -870,37 +938,109 @@ export class MineRenderer {
   }
 
   /** A miner inside, at its place on its way in or out, or at its spot:
-   * lying in its bunk, or at work (a shovel at the furnace, a hammer on
-   * the anvil, striking sparks). */
+   * lying in its bunk breathing, eating and talking in the lounge, reaching
+   * along the warehouse's shelves, shovelling ore into the furnace (scoop,
+   * carry, throw, and the fire flares), or hammering a bar on the anvil as
+   * it cools from orange heat until it is quenched in a hiss of steam; a
+   * hand with nothing to work falls into its habits. */
   private drawInside(sim: MineSim, b: Building, m: Miner, time: number, effects: boolean) {
     const fine = this.fine, s = m.inside as Inside, spot = sim.spotOf(s), walk = pathTicks(spot.path);
     const t = s.out ? walk - s.t : Math.min(s.t, walk), at = along([b.door, b.floor], spot.path, t);
-    const arrived = !s.out && s.t >= walk, look = outfit(m.name, m.job);
+    const arrived = !s.out && s.t >= walk, look = outfit(m.name, m.job), step = Math.floor(time / 140 + m.id * 3);
     if (arrived && spot.lie && s.why === "sleep") {
-      drawSleeper(fine, look, spot.x, spot.y, spot.facing, `rgb(${BLANKET.join(",")})`);
+      drawSleeper(fine, look, spot.x, spot.y, spot.facing, `rgb(${BLANKET.join(",")})`, Math.floor((time + m.id * 911) / 1700) % 2 === 0);
       // Now and then, a snore drifts up.
       if (effects && this.fx() < 0.006) this.fx2.add("zzz", spot.x + 0.5, spot.y - 0.4, 0, -0.012, 110, "#e8ecff");
       return;
     }
     const prev = t > 0 ? along([b.door, b.floor], spot.path, t - 8) : at;
-    const facing = arrived ? spot.facing : Math.sign(at.x - prev.x) || (s.out ? -spot.facing : spot.facing);
+    let facing = arrived ? spot.facing : Math.sign(at.x - prev.x) || (s.out ? -spot.facing : spot.facing);
     const climbing = !arrived && at.x === prev.x && at.y !== prev.y;
-    drawFigure(fine, look, at.x, at.y, facing, arrived ? "work" : climbing ? "climb" : "walk", Math.floor(time / 140 + m.id * 3));
-    if (!arrived) return;
-    const beat = Math.floor(time / 220 + m.id) % 2, front = facing > 0 ? at.x + 1 : at.x - 0.5;
-    if (m.action === "smelt") {
-      // A shovel of ore into the furnace.
-      fine(front, at.y - beat * 0.5, 0.5, 0.5, "#9a9ca4");
-      if (beat === 0) fine(front, at.y - 0.25, 0.5, 0.25, "#c07a50");
-    } else if (m.action === "smith") {
-      fine(front, at.y - 1 + beat * 0.5, 0.5, 0.5, "#c8ccd4");
-      fine(facing > 0 ? at.x + 0.5 : at.x, at.y - 0.5 + beat * 0.5, 0.5, 0.5, "#6a4428");
-      if (effects && beat === 1 && this.fx() < 0.3)
-        for (let n = 0; n < 3; n++)
-          this.fx2.add("spark", front + 0.25, at.y + 0.1, (this.fx() - 0.5) * 0.24, -0.06 - this.fx() * 0.14, 14 + this.fx() * 14, this.fx() < 0.5 ? "#ffd27a" : "#ff9a3c", 0.25);
-    } else if (m.action === "stock") {
-      fine(facing > 0 ? at.x - 0.5 : at.x + 1, at.y - 0.5, 0.5, 1, `rgb(${TIMBER_END.join(",")})`);
+    if (!arrived) {
+      drawFigure(fine, look, at.x, at.y, facing, climbing ? "climb" : "walk", step);
+      return;
     }
+    const out = (f: number) => (f > 0 ? at.x + 1 : at.x - 0.5);
+    if (m.action === "smelt") {
+      // The shovel: scooped from the pile behind, carried round, thrown in.
+      const beat = shovelAt(m.id, time), ore = sim.ore.gold > 0 && beat.n % 5 === 0 ? "#f0c850" : sim.ore.silver > 0 && beat.n % 3 === 0 ? "#cdd2dc" : "#c07a50";
+      if (beat.stage === "scoop") {
+        facing = -spot.facing;
+        drawFigure(fine, look, at.x, at.y, facing, "crouch", step);
+        fine(out(facing), at.y + 0.5, 0.5, 0.5, "#9a9ca4");
+      } else if (beat.stage === "carry") {
+        drawFigure(fine, look, at.x, at.y, facing, "work", step);
+        fine(out(facing), at.y, 0.5, 0.5, "#9a9ca4");
+        fine(out(facing), at.y - 0.25, 0.5, 0.25, ore);
+      } else {
+        drawFigure(fine, look, at.x, at.y, facing, "reach", step);
+        fine(out(facing), at.y - 1, 0.5, 0.5, "#9a9ca4");
+        if (effects && this.once(`throw${m.id}`, beat.n)) this.flare(b, time);
+      }
+      return;
+    }
+    if (m.action === "smith") {
+      // The hammer raised and struck on a bar cooling from orange to dull
+      // red, then the bar quenched.
+      const beat = hammerAt(m.id, time), ax = at.x + 1, ay = b.floor - 1.5;
+      const hot: RGB = mix([150, 40, 20], [255, 190, 90], beat.heat);
+      const metal = BAR[(["copper", "silver", "gold"] as const)[beat.bar % 3]];
+      if (beat.stage === "quench") {
+        drawFigure(fine, look, at.x, at.y, facing, "stand", step);
+        fine(ax + 0.5, ay, 1, 0.5, `rgb(${metal.join(",")})`);
+        if (effects && this.once(`quench${m.id}`, beat.bar))
+          for (let n = 0; n < 4; n++) this.fx2.add("steam", ax + 0.5 + this.fx(), ay - 0.2, (this.fx() - 0.5) * 0.02, -0.02 - this.fx() * 0.02, 60 + this.fx() * 40, "rgb(220,224,232)", 0.5);
+        return;
+      }
+      const raised = beat.stage === "raise";
+      drawFigure(fine, look, at.x, at.y, facing, raised ? "reach" : "work", step);
+      fine(ax + 0.5, ay, 1, 0.5, `rgb(${hot.map((v) => v | 0).join(",")})`);
+      if (beat.heat > 0.5) fine(ax + 0.5, ay, 0.5, 0.25, "#ffe6a8");
+      if (raised) {
+        fine(facing > 0 ? at.x + 0.5 : at.x, at.y - 1.5, 0.5, 0.5, "#6a4428");
+        fine(facing > 0 ? at.x + 0.5 : at.x, at.y - 2, 0.5, 0.5, "#c8ccd4");
+      } else {
+        fine(facing > 0 ? at.x + 0.5 : at.x, at.y - 0.5, 0.5, 0.5, "#6a4428");
+        fine(ax + 0.5, ay - 0.5, 0.5, 0.5, "#c8ccd4");
+        if (effects && this.once(`strike${m.id}`, beat.n)) {
+          const n = 2 + Math.round(beat.heat * 4);
+          for (let k = 0; k < n; k++)
+            this.fx2.add("spark", ax + 0.75, ay, (this.fx() - 0.5) * 0.24, -0.06 - this.fx() * 0.14, 14 + this.fx() * 14, this.fx() < 0.5 ? "#ffd27a" : "#ff9a3c", 0.25);
+        }
+      }
+      return;
+    }
+    if (m.action === "stock") {
+      // Reaching along the shelves, then a timber on the shoulder.
+      const beat = Math.floor((time + m.id * 400) / 600) % 3;
+      drawFigure(fine, look, at.x, at.y, facing, beat === 0 ? "reach" : beat === 1 ? "work" : "stand", step);
+      fine(facing > 0 ? at.x - 0.5 : at.x + 1, at.y - 0.5, 0.5, 1, `rgb(${TIMBER_END.join(",")})`);
+      return;
+    }
+    if (m.action === "lounge") {
+      // At the table: seated, a mug or a spoon to the mouth now and then,
+      // and a word with whoever sits nearest.
+      const sits = s.slot % 3 !== 2, sip = Math.floor((time + m.id * 733) / 900) % 4 === 0;
+      drawFigure(fine, look, at.x, at.y, facing, sits ? "sit" : sip ? "reach" : "stand", step);
+      if (sits && sip) fine(out(facing), at.y - 0.5, 0.5, 0.5, "#d8ccb0");
+      const turn = Math.floor((time + s.slot * 1500) / 3300);
+      if (effects && turn % 3 === 0 && this.once(`lounge${m.id}`, turn)) this.fx2.add("word", at.x + 0.6, at.y - (sits ? 1.5 : 2), 0, 0, 45, "#f0ead8");
+      return;
+    }
+    // Waiting at its station with nothing to work: its habits, kept in place.
+    const h = habitAt(m.name, time + m.id * 313), hp = habitPose(h.habit === "sift" ? "look" : h.habit, h.t, facing, step);
+    drawFigure(fine, look, at.x, at.y, hp.facing, hp.pose, step);
+    if (effects && h.habit === "whistle" && h.t > 0.2 && this.once(`note${m.id}`, h.spell * 4 + Math.floor(h.t * 3)))
+      this.fx2.add("note", at.x + 0.5, at.y - 1.6, 0, -0.02, 70, "#f4e9c0");
+  }
+
+  /** Ore thrown into the furnace: the fire flares, sparks and embers fly
+   * out of its mouth. */
+  private flare(b: Building, time: number) {
+    const mx = b.x0 + 2.5, my = b.floor - 1.5;
+    this.flareUntil = Math.max(this.flareUntil, time + 260);
+    for (let n = 0; n < 5; n++) this.fx2.add("spark", mx + this.fx(), my, 0.04 + this.fx() * 0.1, -0.05 - this.fx() * 0.1, 14 + this.fx() * 12, this.fx() < 0.5 ? "#ffd27a" : "#ff8a3c", 0.25);
+    for (let n = 0; n < 2; n++) this.fx2.add("ember", mx + this.fx(), my - 0.5, (this.fx() - 0.5) * 0.02, -0.02 - this.fx() * 0.02, 70 + this.fx() * 50, "#ffb050", 0.25);
   }
 
   /** Clouds drifting along the sky, more and darker as the weather turns. */
@@ -997,6 +1137,12 @@ export class MineRenderer {
       for (let ry = wheel; ry < y - 0.5; ry += 1) ctx.fillRect(rx, Math.round(oy + ry * scale), rw, Math.max(1, Math.round(scale / 4)));
     }
     ctx.setTransform(scale, 0, 0, scale, ox, oy);
+    // The wheel's spokes, turning as the rope runs over it.
+    const k = 0.3 + 0.7 * this.skyLight(), spoke = `rgb(${(96 * k) | 0},${(98 * k) | 0},${(108 * k) | 0})`, cx = x + 0.5, turn = y / 2.25;
+    for (let n = 0; n < 4; n++) {
+      const a = turn + (n * Math.PI) / 4, dx = Math.cos(a), dy = Math.sin(a);
+      for (const r of [1.5, 2.5, 3.3, -1.5, -2.5, -3.3]) fine(Math.floor((cx + (dx * r) / 2) * 2) / 2, Math.floor((wheel + (dy * r) / 2) * 2) / 2, 0.5, 0.5, spoke);
+    }
     // The hook, the bucket's bail and the bucket itself.
     fine(x + 0.25, y - 0.25, 0.5, 0.25, "#5a5a62");
     fine(x, y, 1, 0.25, "#4a4a52");
