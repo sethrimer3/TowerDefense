@@ -4,7 +4,7 @@
  * rebuilt. Over it each frame: park fences, damage, unit shadows, the
  * overcast and torchlight (lighting.ts), the keep's banner, scorches, the
  * fire mages' burning ground (mage-art.ts), units and effects
- * (battle-art.ts), the trees over them (park-trees.ts), the
+ * (battle-art.ts, with the valkyries' charges from valkyrie-art.ts), the trees over them (park-trees.ts), the
  * wizards' fire, the building grid and drag overlay (edit-overlay.ts), then
  * rain in screen space. */
 import { CELLS_H, CELLS_W, boardSize, hash01 } from "./grid.ts";
@@ -23,6 +23,7 @@ import { ENEMIES } from "./catalog.ts";
 import { GroundRelief, type ReliefLight } from "./ground-relief.ts";
 import { WizardArt, flameLights } from "./wizard-art.ts";
 import { drawBlazes, mageLights } from "./mage-art.ts";
+import { stabLights } from "./valkyrie-art.ts";
 import { ParkTrees, type Under } from "./park-trees.ts";
 
 export type DrawOptions = {
@@ -356,14 +357,14 @@ export class DefendRenderer {
   /** Darkness and torchlight, the gravel's lit relief, and the flames. */
   private drawLighting(map: CityMap, sim: DefendSim, weather: Weather, opts: DrawOptions) {
     const frame: LightFrame = { px: this.px, now: opts.now, reduceMotion: opts.reduceMotion, intact: standing(map, sim) };
-    const flames = flameLights(sim), mages = mageLights(sim);
+    const flames = flameLights(sim), mages = mageLights(sim), stabs = stabLights(sim);
     this.lighting.drawLight(this.ctx, frame, ambientFor(weather, opts.night), {
-      torches: [...this.carried(sim), ...flames.carried, ...mages.carried],
+      torches: [...this.carried(sim), ...flames.carried, ...mages.carried, ...stabs.carried],
       solid: sim.solid,
       version: sim.mapVersion,
     });
     this.lighting.drawRelief(this.ctx, this.px, weather.rain ? 0.85 : 0.65);
-    this.drawGroundRelief(map, sim, opts, [...flames.relief, ...mages.relief]);
+    this.drawGroundRelief(map, sim, opts, [...flames.relief, ...mages.relief, ...stabs.relief]);
     this.lighting.drawFlames(this.ctx, frame);
   }
 

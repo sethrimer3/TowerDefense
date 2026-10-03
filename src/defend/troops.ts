@@ -3,7 +3,8 @@
  * last Patrol routes level) and head home when there's nothing to fight;
  * archers roam the streets, shooting whatever comes within sight, or with
  * Hunter's instinct path toward the nearest enemy in the city. A Mage
- * Guild trains fire mages the same way (`mages.ts`). */
+ * Guild trains fire mages the same way (`mages.ts`), and a Valkyrie palace
+ * valkyries (`valkyries.ts`). */
 import { dist, sq } from "../exact.ts";
 import {
   ARCHER_UNIT,
@@ -16,6 +17,7 @@ import {
   soldierLeash,
   soldierScale,
   trainSeconds,
+  VALKYRIE,
 } from "./catalog.ts";
 import type { Building } from "./citygen.ts";
 import { CELL_COUNT, cellX, cellY } from "./grid.ts";
@@ -57,9 +59,9 @@ export class Barracks {
   private recruit(sim: DefendSim, b: Building) {
     const door = sim.doorOf(b);
     if (door < 0) return;
-    const kind = b.kind === "archerBarracks" ? "archer" : b.kind === "mageGuild" ? "mage" : "sword";
+    const kind = TRAINS[b.kind] ?? "sword";
     const scale = soldierScale(sim.levels.soldierArms);
-    const stats = kind === "archer" ? ARCHER_UNIT : kind === "mage" ? { ...FIRE_MAGE, damage: fireballDamage(sim.levels.mageFireball ?? 0) } : SOLDIER;
+    const stats = kind === "archer" ? ARCHER_UNIT : kind === "mage" ? { ...FIRE_MAGE, damage: fireballDamage(sim.levels.mageFireball ?? 0) } : kind === "valkyrie" ? VALKYRIE : SOLDIER;
     const at = cellCenter(door);
     sim.soldiers.push({
       id: sim.newId(),
@@ -79,7 +81,9 @@ export class Barracks {
   }
 }
 
-const isBarracks = (b: Building) => b.kind === "barracks" || b.kind === "archerBarracks" || b.kind === "mageGuild";
+/** What each troop building trains. */
+const TRAINS: Partial<Record<Building["kind"], Soldier["kind"]>> = { barracks: "sword", archerBarracks: "archer", mageGuild: "mage", valkyriePalace: "valkyrie" };
+const isBarracks = (b: Building) => b.kind in TRAINS;
 
 const byDistanceFrom = (p: Point) => (a: Enemy, b: Enemy) => sq(a.x - p.x) + sq(a.y - p.y) - (sq(b.x - p.x) + sq(b.y - p.y));
 const inCity = (sim: DefendSim, e: Enemy) => sim.map.city[cellAt(e.x, e.y)] === 1;

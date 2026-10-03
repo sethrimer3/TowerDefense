@@ -28,6 +28,8 @@ function fightDefender({ sim, e, def, reach }: Turn) {
   if (!foe) return false;
   if (e.cd <= 0) {
     e.cd = def.cooldown;
+    // A valkyrie just after her charge can't be hurt.
+    if ("guard" in foe && foe.guard) return true;
     foe.hp -= def.damage;
     foe.flash = 0.12;
   }

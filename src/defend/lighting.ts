@@ -64,13 +64,13 @@ type NewLight = Omit<Light, "id">;
 const TOWER_RADIUS: Partial<Record<Building["kind"], number>> = { archerTower: 7.5, cannonTower: 5.5, watchTower: 6.5, wizardTower: 5, mageGuild: 5.5 };
 
 /** A building's own lights: a tower's fire (and the Mage Guild's fire
- * well), the keep's braziers, a barracks door lamp. */
+ * well), the keep's braziers, a barracks or palace door lamp. */
 function buildingLights(map: CityMap, b: Building): NewLight[] {
   const r = b.rect;
   const radius = TOWER_RADIUS[b.kind];
   if (radius !== undefined) return [towerFire(b, radius)];
   if (b.kind === "keep") return keepBraziers(b);
-  if (b.kind !== "barracks" && b.kind !== "archerBarracks") return [];
+  if (b.kind !== "barracks" && b.kind !== "archerBarracks" && b.kind !== "valkyriePalace") return [];
   const door = doorPoint(map, r);
   return door ? [{ kind: "door", x: door.x, y: door.y, radius: 4.5, strength: 0.85, owner: b.id, inside: false, pillars: [] }] : [];
 }

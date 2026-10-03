@@ -12,7 +12,7 @@ test("damage stages fall at 75%, 50% and 25% of hit points", () => {
 });
 
 const SPRITES: [string, number, number, (stage: number) => Uint32Array, () => Uint32Array][] = [
-  ...(([["barracks", 3, 4], ["barracks", 4, 3], ["archerBarracks", 3, 3], ["archerTower", 2, 2], ["cannonTower", 2, 2], ["watchTower", 2, 2], ["wizardTower", 2, 2], ["mageGuild", 3, 3]] as [PlacedKind, number, number][]).map(
+  ...(([["barracks", 3, 4], ["barracks", 4, 3], ["archerBarracks", 3, 3], ["archerTower", 2, 2], ["cannonTower", 2, 2], ["watchTower", 2, 2], ["wizardTower", 2, 2], ["mageGuild", 3, 3], ["valkyriePalace", 5, 5], ["valkyriePalace", 3, 5], ["valkyriePalace", 5, 3]] as [PlacedKind, number, number][]).map(
     ([k, w, h]) => [`${k} ${w}×${h}`, w, h, (s: number) => structurePixels(k, w, h, s, 41), () => structureRubblePixels(k, w, h, 41)] as const,
   )),
   ["house 4×2", 4, 2, (s) => houseDamagePixels(4, 2, 1, 9, s), () => houseRubblePixels(4, 2, 1, 9)],

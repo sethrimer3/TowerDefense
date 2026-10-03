@@ -4,11 +4,11 @@ import { intPow } from "../exact.ts";
  * copper, silver and Gold, the universal upgrades, the bonuses the Smithy and the
  * skill trees add, and the enemy roster. */
 
-export type StructureKind = "keep" | "barracks" | "archerBarracks" | "archerTower" | "cannonTower" | "watchTower" | "wizardTower" | "mageGuild";
+export type StructureKind = "keep" | "barracks" | "archerBarracks" | "archerTower" | "cannonTower" | "watchTower" | "wizardTower" | "mageGuild" | "valkyriePalace";
 /** Everything that appears in the build palette (the keep is placed from the
  * start and can only be moved, so it is not a palette item). */
 export type PaletteItem = "cityTile" | Exclude<StructureKind, "keep">;
-export const PALETTE_ITEMS: PaletteItem[] = ["cityTile", "barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild"];
+export const PALETTE_ITEMS: PaletteItem[] = ["cityTile", "barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace"];
 
 export type StructureDef = {
   kind: StructureKind;
@@ -16,11 +16,22 @@ export type StructureDef = {
   /** Footprint in cells (before rotation). */
   w: number;
   h: number;
+  /** How much of its tile it takes, in sixteenths: 1 (the smallest towers),
+   * 2, 4, 8 or 16 (a whole tile, alone). What shares a tile must add up to
+   * no more than 16, and fit. */
+  size: TileShare;
+  /** The smaller footprint and share a building-specific upgrade gives it. */
+  compact?: { upgrade: UpgradeId; w: number; h: number; size: TileShare };
   maxHp: number;
   /** Can be placed on ground outside the city limits. */
   outsideOk: boolean;
   description: string;
 };
+
+/** Sixteenths of a tile. */
+export type TileShare = 1 | 2 | 4 | 8 | 16;
+/** A tile's whole room, in sixteenths. */
+export const TILE_ROOM = 16;
 
 export const STRUCTURES: Record<StructureKind, StructureDef> = {
   keep: {
@@ -28,6 +39,7 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     name: "Keep",
     w: 3,
     h: 3,
+    size: 16,
     maxHp: 600,
     outsideOk: false,
     description: "The heart of the city. Enemies march on it; if it falls, the defense is over.",
@@ -37,6 +49,7 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     name: "Barracks",
     w: 3,
     h: 4,
+    size: 4,
     maxHp: 160,
     outsideOk: false,
     description: "Trains swordsmen who sally out against anything that breaches the walls.",
@@ -46,6 +59,7 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     name: "Archer barracks",
     w: 3,
     h: 3,
+    size: 4,
     maxHp: 150,
     outsideOk: false,
     description: "Trains archers who wander the city streets, loosing arrows at anything that comes near.",
@@ -55,6 +69,7 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     name: "Archer tower",
     w: 2,
     h: 2,
+    size: 1,
     maxHp: 120,
     outsideOk: true,
     description: "Looses arrows at the nearest enemy in range. Can stand inside or outside the walls.",
@@ -64,6 +79,7 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     name: "Cannon tower",
     w: 2,
     h: 2,
+    size: 2,
     maxHp: 150,
     outsideOk: true,
     description: "Slow, heavy guns lobbing explosive shells that burst among the enemy. Careful — the blast hurts your own people too.",
@@ -73,6 +89,7 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     name: "Watch tower",
     w: 2,
     h: 2,
+    size: 1,
     maxHp: 100,
     outsideOk: true,
     description: "Marks every enemy in its radius with a golden outline — marked enemies take double damage.",
@@ -82,6 +99,7 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     name: "Wizard tower",
     w: 2,
     h: 2,
+    size: 2,
     maxHp: 130,
     outsideOk: true,
     description: "Alternates between a roaring flamethrower and a wave of ice shards that chills everything it crosses.",
@@ -91,11 +109,33 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     name: "Mage Guild",
     w: 3,
     h: 3,
+    size: 4,
     maxHp: 140,
     outsideOk: false,
     description: "Trains red fire mages who roam the streets hurling explosive fireballs. Each blast leaves the ground burning, scorching whatever walks through.",
   },
+  valkyriePalace: {
+    kind: "valkyriePalace",
+    name: "Valkyrie palace",
+    w: 5,
+    h: 5,
+    size: 16,
+    compact: { upgrade: "palaceCompact", w: 3, h: 5, size: 8 },
+    maxHp: 260,
+    outsideOk: false,
+    description: "A heavenly marble palace that fills a whole tile. Trains armoured valkyries whose golden spear charges through every enemy in a line.",
+  },
 };
+
+/** A structure's footprint and share of its tile, smaller once its
+ * building-specific upgrade is owned (`compact`). */
+export function footprint(kind: StructureKind, compact: boolean): { w: number; h: number; size: TileShare } {
+  const def = STRUCTURES[kind];
+  return compact && def.compact ? def.compact : def;
+}
+
+/** A tile share in words. */
+export const shareName = (size: TileShare) => (size === TILE_ROOM ? "a whole tile" : `1/${TILE_ROOM / size} of a tile`);
 
 /** Palette items the player owns at the very start. */
 export const STARTING_OWNED: Record<PaletteItem, number> = {
@@ -107,6 +147,7 @@ export const STARTING_OWNED: Record<PaletteItem, number> = {
   watchTower: 0,
   wizardTower: 0,
   mageGuild: 0,
+  valkyriePalace: 0,
 };
 
 /** A price in Gold and metal bars (all earned in battle). */
@@ -124,11 +165,14 @@ export function purchasePrice(item: PaletteItem, owned: number): Price {
     watchTower: { gold: 180, copper: 2 },
     wizardTower: { gold: 450, copper: 6 },
     mageGuild: { gold: 520, copper: 7 },
+    valkyriePalace: { gold: 800, copper: 10, silver: 1 },
   };
   const growth = item === "cityTile" ? 1.3 : 1.5;
   const m = intPow(growth, extra);
   const b = base[item];
-  return { gold: Math.round(b.gold * m), copper: Math.ceil((b.copper ?? 0) * intPow(1.25, extra)) };
+  const price: Price = { gold: Math.round(b.gold * m), copper: Math.ceil((b.copper ?? 0) * intPow(1.25, extra)) };
+  if (b.silver) price.silver = Math.ceil(b.silver * intPow(1.25, extra));
+  return price;
 }
 
 export type UpgradeId =
@@ -150,6 +194,8 @@ export type UpgradeId =
   | "wizardIce"
   | "mageFireball"
   | "mageEmbers"
+  | "palaceCompact"
+  | "valkyrieReach"
   | "wallStrength"
   | "keepStrength"
   | "civilianCount"
@@ -170,7 +216,7 @@ export type UpgradeDef = {
 const SOLDIER_REACH_MAX = 4;
 
 export const UPGRADES: UpgradeDef[] = [
-  { id: "barracksCapacity", group: "Barracks", name: "Garrison", maxLevel: 4, describe: (l) => `${2 + l} troops per barracks or guild (swordsmen, archers and mages)` },
+  { id: "barracksCapacity", group: "Barracks", name: "Garrison", maxLevel: 4, describe: (l) => `${2 + l} troops per barracks, guild or palace (swordsmen, archers, mages and valkyries)` },
   { id: "barracksTraining", group: "Barracks", name: "Drill yard", maxLevel: 5, describe: (l) => `Train one every ${trainSeconds(l).toFixed(1)}s` },
   { id: "soldierArms", group: "Barracks", name: "Arms & armour", maxLevel: 6, describe: (l) => `+${l * 25}% troop HP and damage` },
   {
@@ -201,6 +247,15 @@ export const UPGRADES: UpgradeDef[] = [
   { id: "wizardIce", group: "Wizard tower", name: "Rime", maxLevel: 5, describe: (l) => `${iceDamage(l)} ice damage, chills for ${iceChill(l).toFixed(1)}s` },
   { id: "mageFireball", group: "Mage Guild", name: "Pyroclasm", maxLevel: 5, describe: (l) => `${fireballDamage(l)} fireball damage, ${fireballSplash(l).toFixed(1)} cell burst` },
   { id: "mageEmbers", group: "Mage Guild", name: "Lingering embers", maxLevel: 5, describe: (l) => `The ground burns for ${emberSeconds(l).toFixed(1)}s, ${emberDps(l)} damage a second` },
+  {
+    id: "palaceCompact",
+    group: "Valkyrie palace",
+    name: "Folded halls",
+    maxLevel: 1,
+    describe: (l) => `The palace takes ${shareName(l ? 8 : 16)}`,
+    price: () => ({ gold: 1200, copper: 10, silver: 3 }),
+  },
+  { id: "valkyrieReach", group: "Valkyrie palace", name: "Long spears", maxLevel: 5, describe: (l) => `Valkyries charge ${stabLength(l).toFixed(1)} cells` },
   { id: "wallStrength", group: "City", name: "Masonry", maxLevel: 6, describe: (l) => `${wallHp(l)} HP per wall stone` },
   { id: "keepStrength", group: "City", name: "Keep bastions", maxLevel: 6, describe: (l) => `${keepHp(l)} keep HP` },
   { id: "civilianCount", group: "Civilians", name: "Guild of builders", maxLevel: 5, describe: (l) => `${civilianCount(l)} civilians repair the city` },
@@ -272,6 +327,12 @@ export const FIREBALL_SPEED = 8;
 export const emberDps = (l: number) => 6 + l * 3;
 export const emberSeconds = (l: number) => 3 + l * 0.6;
 export const EMBER_SHARE = 0.85;
+/** The valkyrie's charge stab: how far she charges (cells), the damage to
+ * every enemy along the line, how wide the line is, and how long she can't
+ * be hurt after it. */
+export const stabLength = (l: number) => 3 + l * 0.8;
+export const STAB_WIDTH = 0.45;
+export const STAB_GUARD = 1;
 export const wallHp = (l: number) => Math.round(100 * (1 + l * 0.35));
 export const keepHp = (l: number) => Math.round(STRUCTURES.keep.maxHp * (1 + l * 0.3));
 export const civilianCount = (l: number) => 2 + l;
@@ -349,5 +410,6 @@ export const waveCount = (wave: number) => Math.max(0, Math.floor(wave)) * 500;
 
 export const SOLDIER = { hp: 40, damage: 6, cooldown: 0.8, speed: 2.4, reach: 0.75, leash: 16, size: 0.4, color: "#5b8fd9" };
 export const ARCHER_UNIT = { hp: 24, damage: 5, cooldown: 1.1, speed: 2.1, size: 0.36, color: "#6cc08a" };
+export const VALKYRIE = { hp: 50, damage: 16, cooldown: 1.8, speed: 2.3, size: 0.44, color: "#f2e6c4" };
 export const FIRE_MAGE = { hp: 22, cooldown: 2.1, speed: 2, size: 0.38, color: "#c8372d" };
 export const CIVILIAN = { speed: 1.9, size: 0.3, color: "#e6d7b4", respawnSeconds: 10 };
