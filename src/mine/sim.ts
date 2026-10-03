@@ -72,6 +72,9 @@ export const oreMetal = (m: Material): Metal | null => (m === COPPER ? "copper" 
 /** Ore smelted into one bar, and bars worked into one Smithy point. */
 export const ORE_PER_BAR: Metals = { copper: 4, silver: 2, gold: 1 };
 export const BARS_PER_POINT = 100;
+/** Minutes the smithy's `pace` takes to follow its work. */
+export const PACE_MINUTES = 30;
+const MINUTE_TICKS = 60 * TICK_HZ;
 /** Each level of the barracks bunks this many more of the crew; of the
  * forge, makes room for this many more hands; of the smithy, more smiths. */
 export const CREW_PER_LEVEL = 5, FORGE_PER_LEVEL = 2, SMITHS_PER_LEVEL = 1;
@@ -252,6 +255,9 @@ export type MineSave = {
   buildingLevels?: Levels;
   stock?: number;
   rebuilds?: Rebuild[];
+  /** Added with the welcome-back screen: the Smithy points an hour the
+   * smithy has lately made (`pace`). */
+  pace?: Metals;
 };
 
 /** A miner lost, remembered in the crew's list until the player lets it go
@@ -298,6 +304,11 @@ export class MineSim {
   ore = noMetals();
   bars = noMetals();
   worked = noMetals();
+  /** Smithy points an hour the smithy has lately made, fractions and all:
+   * each minute's work eased in over `PACE_MINUTES`. What time away past
+   * the mine's catch-up is paid at. */
+  pace = noMetals();
+  private paceBars = noMetals();
   /** Ranks of the Mine skills: Coffee (more of the crew on the night
    * shift) and Waterproofing (the shaft house keeps more rain out). */
   coffee = 0;
@@ -377,6 +388,7 @@ export class MineSim {
       for (const c of CAUSES) this.lost[c] = saved.lost?.[c] ?? 0;
       this.ore = { ...(saved.ore ?? noMetals()) };
       this.bars = { ...(saved.bars ?? noMetals()) };
+      this.pace = { ...(saved.pace ?? noMetals()) };
       this.worked = { ...(saved.worked ?? noMetals()) };
       this.yard = { ...(saved.yard ?? noMetals()) };
       this.prospect = saved.prospect ?? 1;
@@ -990,6 +1002,7 @@ export class MineSim {
     const metal = [...METALS].reverse().find((k) => this.bars[k] > 0);
     if (!metal) return;
     this.bars[metal]--;
+    this.paceBars[metal]++;
     if (++this.worked[metal] >= BARS_PER_POINT) {
       this.worked[metal] -= BARS_PER_POINT;
       this.owed[metal]++;
@@ -1725,6 +1738,16 @@ export class MineSim {
     if (this.tick % 6 === 0 && this.burning.length) this.stepFire(6);
     if (this.tick % 10 === 0 && this.world.waterCount) this.drain();
     if (this.tick % 300 === 0) this.survey();
+    if (this.tick % MINUTE_TICKS === 0) this.timePace();
+  }
+
+  /** A minute's work at the anvils eased into the smithy's `pace`. */
+  private timePace() {
+    for (const k of METALS) {
+      const hourly = (this.paceBars[k] / BARS_PER_POINT) * 60;
+      this.pace[k] += (hourly - this.pace[k]) / PACE_MINUTES;
+    }
+    this.paceBars = noMetals();
   }
 
   /** Deepest the shaft's ladder reaches, in rows below the surface. */
@@ -1763,6 +1786,7 @@ export class MineSim {
       buildingLevels: { ...this.buildingLevels },
       stock: this.stock,
       rebuilds: this.rebuilds.map((r) => ({ ...r, from: r.from && { ...r.from } })),
+      pace: { ...this.pace },
     };
   }
 
@@ -1858,6 +1882,8 @@ export function decodeMineSave(s: any): MineSave | null {
     ...(s.workedOut !== undefined ? { workedOut: s.workedOut } : {}),
     ...(s.buildingLevels !== undefined ? { buildingLevels: Object.fromEntries(BUILDINGS.map((b) => [b, s.buildingLevels[b]])) as Levels } : {}),
     ...(s.stock !== undefined ? { stock: s.stock } : {}),
+    // A pace out of reason is forgotten, not the mine.
+    ...(s.pace && METALS.every((k) => Number.isFinite(s.pace[k]) && s.pace[k] >= 0 && s.pace[k] <= 1e6) ? { pace: { copper: s.pace.copper, silver: s.pace.silver, gold: s.pace.gold } } : {}),
     ...(s.rebuilds !== undefined
       ? { rebuilds: s.rebuilds.map((r: any) => ({ b: r.b, t: r.t, total: r.total, used: r.used, supplies: r.supplies, from: r.from && { x0: r.from.x0, x1: r.from.x1, floor: r.from.floor, height: r.from.height } })) }
       : {}),
