@@ -26,6 +26,7 @@ export function journalHTML(discovered: EnemyKind[]): string {
       if (d.splits) notes.push(`Hatches ${d.splits.count} ${ENEMIES[d.splits.into].name}s when killed.`);
       if (d.shield) notes.push(`Shields itself and nearby enemies against ranged damage within ${d.shield.radius} cells. ${Number.isFinite(d.shield.hp) ? `${d.shield.hp.toLocaleString()} shield HP; shatters when depleted.` : "Permanent shield; only melee damage gets through."}`);
       if (d.poison) notes.push(`Poison cloud reaches ${d.poison.radius} cells. ${d.poison.lethal ? "Instantly kills player units on contact." : `${d.poison.damage} damage every 0.1 seconds to player units.`} The cloud leaves buildings unharmed and does not block ranged attacks.`);
+      if (d.siege) notes.push(`Self-driving siege engine: no crew, it rolls toward the keep and stops to shoot whatever blocks its way from ${d.siege.range} cells, the keep once it is in range${d.siege.people ? ", and your people before either" : ", or your people when nothing else is"}. It never fights hand to hand.`);
       if (d.unyielding) notes.push("Cannot be frozen or pushed back. Sweeps a wide crescent with its sword.");
       const tactics: Partial<Record<EnemyKind, string>> = {
         siegeBeetle: "Front armor takes only 25% damage; attacks from behind deal 150%. Surround it.",
@@ -37,6 +38,12 @@ export function journalHTML(discovered: EnemyKind[]): string {
         leechSwarm: "Heals for damage dealt to player units, up to its maximum health. Use burst damage or area attacks.",
         ashPhoenix: "Leaves a destructible egg on its first death. The egg revives it after five seconds; destroy it first. Can revive only once.",
         phoenixEgg: "Destroy this egg before its five-second hatch finishes.",
+        rollingCannon: "Lobs an iron ball that bursts on landing. Cheap and fragile; archers outrange it.",
+        ballista: "Its bolt runs through every soldier and civilian on its line, then strikes the building behind.",
+        fireworkLauncher: "Fires a volley of six rockets that scatter round its mark and burst in showers of sparks.",
+        trebuchet: "Hurls a boulder from eleven cells, far past most defenses, crushing walls in a wide burst. Slow to reload; meet it outside the walls.",
+        bombard: "A huge iron cannon on a heavy sledge whose shells blow open whole stretches of wall. Very tough.",
+        rocketBattery: "Looses sixteen rockets at once over a wide area from ten cells. Kill it before it reaches range.",
         blinkImp: "Telegraphs a destination for 0.6 seconds, then jumps up to three cells. Use layered defenses."
       };
       if (tactics[k]) notes.push(tactics[k]!);

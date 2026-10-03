@@ -58,6 +58,13 @@ function scenarios(): Record<string, Scenario> {
       citySeed: 13, levels: maxLevels(), seed: 6, seconds: 100, wave: 1,
       opening: ['snake', 'dragon', 'shieldBearer', 'aegis', 'darkKnight', 'bombOrc', 'bombBird', 'voidSparrow', 'shieldLesser', 'shieldGreater', 'poisonLesser', 'poisonBearer', 'poisonGreater', 'poisonSovereign', 'siegeBeetle', 'burrowingMole', 'necromancer', 'bannerCaptain', 'mirrorKnight', 'leechSwarm', 'ashPhoenix', 'blinkImp', 'fortressLesser', 'fortress', 'fortressGreater', 'fortressSovereign'],
     },
+    // Self-driving siege engines shelling the wall, the houses in their way
+    // and the keep, under fire from towers.
+    siege: {
+      layout: city(SQUARE, [["barracks", 1, 1], ["archerTower", -1, -1], ["cannonTower", 0, -2]]),
+      citySeed: 13, levels: maxLevels({ archerRange: 0, archerDamage: 0 }), seed: 6, seconds: 200, wave: 1,
+      opening: ['rollingCannon', 'rollingCannon', ...Array<EnemyKind>(6).fill('ballista'), 'fireworkLauncher', 'fireworkLauncher', 'trebuchet', 'bombard', 'rocketBattery'],
+    },
     // Small explicit mixed siege retains late-enemy and ice coverage even
     // as the random difficulty budgets change the natural wave mix.
     mixed: {
@@ -136,6 +143,8 @@ function state(sim: DefendSim) {
     [...(s.towers as { cooldown: Map<number, number> }).cooldown], [...(s.barracks as { training: Map<number, number> }).training], (s.builders as { respawn: number[] }).respawn,
     // Only runs with a dark keep have bolts or turrets, so the others hash as before.
     ...(sim.bolts.length || dark.size ? [sim.bolts, [...dark]] : []),
+    // Likewise only siege engines shoot siege shots.
+    ...(sim.siegeShots.length ? [sim.siegeShots] : []),
   ];
 }
 
@@ -203,6 +212,7 @@ test("the Defend replays exercise every unit and effect", () => {
       for (const c of sim.civilians) seen.add(`civilian:${c.state}`);
       if (sim.arrows.length) seen.add("arrow");
       if (sim.shells.length) seen.add("shell");
+      for (const s of sim.siegeShots) seen.add(`siege:${s.kind}`);
       if (sim.flames.length) seen.add("flame");
       if (sim.frosts.length) seen.add("frost");
       if (sim.stabs.some((st) => st.hits.length > 1)) seen.add("stab");
@@ -214,6 +224,7 @@ test("the Defend replays exercise every unit and effect", () => {
   const want = [
     "enemy:shieldLesser", "enemy:shieldGreater", "enemy:poisonLesser", "enemy:poisonBearer", "enemy:poisonGreater", "enemy:poisonSovereign", "enemy:fortressLesser", "enemy:fortress", "enemy:fortressGreater", "enemy:fortressSovereign", "enemy:darkKnight", "enemy:bombOrc", "enemy:bombBird", "enemy:voidSparrow", "enemy:snake", "enemy:dragon", "enemy:shieldBearer", "enemy:aegis", "enemy:warlord", "enemy:bat", "enemy:mother", "enemy:broodling", "distracted", "marked", "soldier:sword", "soldier:archer", "path:sword", "path:archer", "hunting",
     "civilian:toJob", "civilian:working", "civilian:home", "arrow", "shell", "flame", "frost", "chilled", "soldier:valkyrie", "stab", "guarded", "soldier:darkWizard", "chained", "lost:bare", "half-rebuilt",
+    "enemy:rollingCannon", "enemy:ballista", "enemy:fireworkLauncher", "enemy:trebuchet", "enemy:bombard", "enemy:rocketBattery", "siege:ball", "siege:bolt", "siege:rocket", "siege:stone",
   ];
   assert.deepEqual(want.filter((w) => !seen.has(w)), []);
 });

@@ -6,7 +6,7 @@ holds it against endless waves. Code lives in `src/defend/`.
 Waves spend a difficulty budget starting at 20, growing 5% per wave (rounded
 down). Enemy costs are Roach 1, Bat 2, Orc 4, Ogre 8, Mother 10 (including
 three Broodlings), Warlord 100, Snake 60, Dragon 2,500, Shield Generator
-10,000, and Invincible Shield Generator 1,000,000. Affordable enemies are selected randomly;
+10,000, and Invincible Shield Generator 1,000,000; the siege engines cost Rolling Cannon 80, Ballista 120, Firework Launcher 200, Trebuchet 2,500, Great Bombard 12,000 and Dragonfire Battery 30,000. Affordable enemies are selected randomly;
 there are no starting-wave gates or scheduled Warlord spawns. Enemy HP stays
 fixed. Each wave reserves at most 5,000 enemies, including hatched offspring.
 Selection favours expensive enemies when capacity is tight; any budget the
@@ -187,6 +187,23 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   **broodlings** at the corners of a small triangle around where she fell
   (on the spot if that is inside a wall); broodlings never come in a wave's
   mix and don't split again. Each pays its own Gold.
+- **Siege engines** (`siege.ts`) have no crew: each drives itself toward
+  the keep like any ground enemy and stops to shoot once something is in
+  range: the keep first, else the building its own way runs into (a wall
+  stone, a house across the street), else a defender. It braces for 0.8 s
+  before the first shot at a new mark, never fights hand to hand, and its
+  shots hurt only the city and its people. The cheap ones: the **Rolling
+  Cannon** (a lobbed iron ball, 5 cells), the **Ballista** (a bolt through
+  every defender on its line, 7 cells, people first) and the **Firework
+  Launcher** (six scattered rockets, 6 cells). The heavy ones: the
+  **Trebuchet** (a boulder in a wide burst from 11 cells, reloading for
+  7 s), the **Great Bombard** (a huge shell, 9 cells) and the **Dragonfire
+  Battery** (sixteen rockets over a wide area, 10 cells). Drawn as pixel
+  sprites (`siege-art.ts`) whose barrel, bow or throwing arm turns to the
+  mark: a boiler puffing steam on the rolling cannon, the ballista's string
+  drawn back with a bolt laid on, rockets refilling their racks, the
+  trebuchet's arm swinging over; rockets wobble up on spark trails and burst
+  into fireworks.
 - Destruction lasts for the whole run. **Civilians** come out of houses to
   rebuild rubble one cell at a time (walls and structures first); a
   structure only works again once fully rebuilt. They avoid rubble with

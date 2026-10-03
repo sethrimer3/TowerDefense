@@ -2,6 +2,7 @@ import { enemySize } from "./catalog.ts";
 import { assembleFortress, syncFortress } from "./fortress.ts";
 import { damageModifier } from "./enemy-abilities.ts";
 import { stepBlackHoles, stepPoison } from "./hostile-attacks.ts";
+import { stepSiegeShots, type SiegeAim, type SiegeShot } from "./siege.ts";
 /** Real-time DEFEND simulation. Units move freely in continuous cell
  * coordinates (1 unit = 1 cell); the procedural city supplies the solid
  * obstacles. Enemies follow a flow field toward the keep in which buildings
@@ -82,6 +83,8 @@ export type Enemy = {
   shieldHp?: number;
   poisonT?: number;
   breath?: { dx: number; dy: number; t: number };
+  /** What a siege engine is shooting at; absent while it rolls on. */
+  aim?: SiegeAim;
 };
 
 export type Soldier = {
@@ -122,7 +125,7 @@ export type Civilian = {
 };
 
 export type Arrow = { x: number; y: number; target: number; damage: number; tx: number; ty: number; life: number; origin?: Point & { attacker?: number; building?: number } };
-export type Effect = { kind: "boom" | "dust" | "spark"; x: number; y: number; t: number; r: number; seed?: number };
+export type Effect = { kind: "boom" | "dust" | "spark" | "firework"; x: number; y: number; t: number; r: number; seed?: number };
 /** A cannon shell in flight: lobbed from the tower to where the target was. */
 export type Shell = { x0: number; y0: number; x1: number; y1: number; t: number; dur: number; damage: number; r: number; origin?: Arrow["origin"] };
 /** Glowing cracks left where something exploded; they cool and fade. */
@@ -161,7 +164,7 @@ export class DefendSim {
   readonly bonuses: Readonly<Bonuses>;
   /** Enemies slain this run, by kind: what the run pays out. Not part of
    * the replayed state. */
-  readonly slain: Record<EnemyKind, number> = { roach: 0, orc: 0, ogre: 0, bat: 0, warlord: 0, mother: 0, broodling: 0, snake: 0, dragon: 0, shieldBearer: 0, aegis: 0, darkKnight: 0, bombOrc: 0, bombBird: 0, voidSparrow: 0, shieldLesser: 0, shieldGreater: 0, poisonLesser: 0, poisonBearer: 0, poisonGreater: 0, poisonSovereign: 0, siegeBeetle: 0, burrowingMole: 0, necromancer: 0, skeleton: 0, bannerCaptain: 0, mirrorKnight: 0, leechSwarm: 0, ashPhoenix: 0, phoenixEgg: 0, blinkImp: 0, fortressLesser: 0, fortress: 0, fortressGreater: 0, fortressSovereign: 0 };
+  readonly slain: Record<EnemyKind, number> = { roach: 0, orc: 0, ogre: 0, bat: 0, warlord: 0, mother: 0, broodling: 0, snake: 0, dragon: 0, shieldBearer: 0, aegis: 0, darkKnight: 0, bombOrc: 0, bombBird: 0, voidSparrow: 0, shieldLesser: 0, shieldGreater: 0, poisonLesser: 0, poisonBearer: 0, poisonGreater: 0, poisonSovereign: 0, siegeBeetle: 0, burrowingMole: 0, necromancer: 0, skeleton: 0, bannerCaptain: 0, mirrorKnight: 0, leechSwarm: 0, ashPhoenix: 0, phoenixEgg: 0, blinkImp: 0, fortressLesser: 0, fortress: 0, fortressGreater: 0, fortressSovereign: 0, rollingCannon: 0, ballista: 0, fireworkLauncher: 0, trebuchet: 0, bombard: 0, rocketBattery: 0 };
   /** 1 while a cell is part of a standing (built) building. */
   readonly solid: Uint8Array;
   readonly hp: Float32Array;
@@ -178,6 +181,8 @@ export class DefendSim {
   civilians: Civilian[] = [];
   arrows: Arrow[] = [];
   shells: Shell[] = [];
+  /** Siege engines' balls, bolts, stones and rockets in flight. */
+  siegeShots: SiegeShot[] = [];
   /** Wizard towers' fire and ice. */
   flames: Flame[] = [];
   frosts: Frost[] = [];
@@ -307,6 +312,7 @@ export class DefendSim {
     this.towers.step(this, dt);
     stepArrows(this, dt);
     stepShells(this, dt);
+    stepSiegeShots(this, dt);
     this.wizards.step(this, dt);
     stepFlames(this, this.wizards, dt);
     stepFrosts(this, dt);
@@ -630,7 +636,7 @@ export class DefendSim {
     dx /= len;
     dy /= len;
     const [sx, sy] = "kind" in u && ENEMIES[(u as Enemy).kind]?.unyielding ? [0, 0] : this.separation(u);
-    if ("kind" in u && (u as Enemy).kind === "siegeBeetle") (u as Enemy).facing = { x: dx, y: dy };
+    if ("kind" in u && ((u as Enemy).kind === "siegeBeetle" || ENEMIES[(u as Enemy).kind]?.siege)) (u as Enemy).facing = { x: dx, y: dy };
     const step = Math.min(len, speed * dt);
     const mx = dx * step + sx * 0.5 * speed * dt * 4;
     const my = dy * step + sy * 0.5 * speed * dt * 4;

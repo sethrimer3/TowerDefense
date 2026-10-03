@@ -38,6 +38,9 @@ A black enemy that splits into three broodlings when she dies.
 **Broodling**:
 A small, quick enemy hatched only from a fallen Mother.
 
+**Siege engine**:
+An enemy machine with no crew (rolling cannon, ballista, firework launcher, trebuchet, great bombard, dragonfire battery): it drives itself toward the keep and stops to shoot what blocks its way, or the keep, from range.
+
 **Best wave**:
 The highest wave the player has held.
 

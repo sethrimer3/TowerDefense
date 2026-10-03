@@ -405,7 +405,7 @@ export const civilianHp = (l: number) => 8 + l * 5;
 export const rebuildSeconds = (l: number) => 3 * intPow(0.82, l);
 export const HOUSE_HP_PER_CELL = 22;
 
-export type EnemyKind = "roach" | "orc" | "ogre" | "bat" | "warlord" | "mother" | "broodling" | "snake" | "dragon" | "shieldBearer" | "aegis" | "darkKnight" | "bombOrc" | "bombBird" | "voidSparrow" | "shieldLesser" | "shieldGreater" | "poisonLesser" | "poisonBearer" | "poisonGreater" | "poisonSovereign" | "siegeBeetle" | "burrowingMole" | "necromancer" | "skeleton" | "bannerCaptain" | "mirrorKnight" | "leechSwarm" | "ashPhoenix" | "phoenixEgg" | "blinkImp" | "fortressLesser" | "fortress" | "fortressGreater" | "fortressSovereign";
+export type EnemyKind = "roach" | "orc" | "ogre" | "bat" | "warlord" | "mother" | "broodling" | "snake" | "dragon" | "shieldBearer" | "aegis" | "darkKnight" | "bombOrc" | "bombBird" | "voidSparrow" | "shieldLesser" | "shieldGreater" | "poisonLesser" | "poisonBearer" | "poisonGreater" | "poisonSovereign" | "siegeBeetle" | "burrowingMole" | "necromancer" | "skeleton" | "bannerCaptain" | "mirrorKnight" | "leechSwarm" | "ashPhoenix" | "phoenixEgg" | "blinkImp" | "fortressLesser" | "fortress" | "fortressGreater" | "fortressSovereign" | "rollingCannon" | "ballista" | "fireworkLauncher" | "trebuchet" | "bombard" | "rocketBattery";
 export type EnemyDef = {
   kind: EnemyKind;
   name: string;
@@ -435,7 +435,18 @@ export type EnemyDef = {
   unyielding?: boolean;
   chainLength?: number;
   shield?: { radius: number; hp: number };
+  /** A self-driving siege engine (`siege.ts`): it rolls toward the keep and
+   * stops to bombard whatever stands in its way from `range` cells. */
+  siege?: SiegeDef;
 };
+
+/** How a siege engine shoots. `ball`: a lobbed iron ball, `stone`: a high
+ * lobbed boulder, both bursting in `radius`; `bolt`: a straight bolt that
+ * runs through every defender on its line; `rocket`: a volley of `volley`
+ * fireworks scattered up to `spread` cells round the target, each bursting
+ * in `radius`. `people` engines shoot defenders before buildings. `damage`
+ * and `cooldown` are the enemy's own (per rocket, per volley). */
+export type SiegeDef = { shot: "ball" | "stone" | "bolt" | "rocket"; range: number; radius: number; volley?: number; spread?: number; people?: boolean };
 
 export const ENEMIES: Record<EnemyKind, EnemyDef> = {
   roach: { kind: "roach", name: "Roach", hp: 10, speed: 2.6, damage: 2, cooldown: 0.6, size: 0.34, color: "#b0643a", distraction: 0.15, flying: false, cost: 1 },
@@ -478,6 +489,12 @@ export const ENEMIES: Record<EnemyKind, EnemyDef> = {
   fortressGreater: { kind: "fortressGreater", name: "Walking Citadel", hp: 30000, speed: .6, damage: 200, cooldown: 1.6, size: 4.5, color: "#625674", distraction: 0, flying: false, fortress: { tier: 3, turrets: 6, legs: 8, armor: 6, height: 5, partHp: 3000 }, cost: 100000 },
   fortressSovereign: { kind: "fortressSovereign", name: "Dread Colossus", hp: 150000, speed: .55, damage: 600, cooldown: 1.6, size: 5.5, color: "#4c3d5c", distraction: 0, flying: false, fortress: { tier: 4, turrets: 8, legs: 10, armor: 8, height: 6, partHp: 12000 }, cost: 1000000 },
 
+  rollingCannon: { kind: "rollingCannon", name: "Rolling Cannon", hp: 90, speed: 1, damage: 22, cooldown: 3, size: 1, color: "#7e5230", distraction: 0, flying: false, siege: { shot: "ball", range: 5, radius: 0.7 }, cost: 80 },
+  ballista: { kind: "ballista", name: "Ballista", hp: 70, speed: 1.1, damage: 40, cooldown: 2.6, size: 1, color: "#8a5a32", distraction: 0, flying: false, siege: { shot: "bolt", range: 7, radius: 0.35, people: true }, cost: 120 },
+  fireworkLauncher: { kind: "fireworkLauncher", name: "Firework Launcher", hp: 80, speed: 1.15, damage: 9, cooldown: 4, size: 1, color: "#9a3a2a", distraction: 0, flying: false, siege: { shot: "rocket", range: 6, radius: 0.55, volley: 6, spread: 1.3 }, cost: 200 },
+  trebuchet: { kind: "trebuchet", name: "Trebuchet", hp: 900, speed: 0.6, damage: 130, cooldown: 7, size: 1.55, color: "#6e4a2a", distraction: 0, flying: false, siege: { shot: "stone", range: 11, radius: 1.4 }, cost: 2500 },
+  bombard: { kind: "bombard", name: "Great Bombard", hp: 2600, speed: 0.6, damage: 220, cooldown: 5, size: 1.4, color: "#4a4e57", distraction: 0, flying: false, siege: { shot: "ball", range: 9, radius: 1.9 }, cost: 12000 },
+  rocketBattery: { kind: "rocketBattery", name: "Dragonfire Battery", hp: 2000, speed: 0.7, damage: 35, cooldown: 6, size: 1.4, color: "#8c2a24", distraction: 0, flying: false, siege: { shot: "rocket", range: 10, radius: 0.9, volley: 16, spread: 3 }, cost: 30000 },
 };
 
 /** Multipliers the player's Smithy and skill trees lay over a run, on top

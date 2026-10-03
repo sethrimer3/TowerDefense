@@ -1,6 +1,7 @@
 import { enemySize } from "./catalog.ts";
 import { stepAbilities, enemyDamage, enemySpeed } from "./enemy-abilities.ts";
 import { hostileSpecial } from "./hostile-attacks.ts";
+import { stepSiege } from "./siege.ts";
 /** How a DEFEND enemy spends one step. In order: fight any defender in
  * reach; bats fly straight at the keep; a house that caught its eye is
  * wrecked; otherwise it walks the flow field downhill toward the keep,
@@ -33,6 +34,7 @@ export function stepEnemy(sim: DefendSim, e: Enemy, dt: number) {
     delete e.leader;
   }
   if (hostileSpecial(sim, e, dt)) return;
+  if (def.siege && stepSiege(sim, e, dt)) return;
   if (e.kind === "dragon" && breathe(sim, e, dt)) return;
   const t: Turn = { sim, e, def, reach: enemySize(e) / 2 + 0.4, dt };
   if (fightDefender(t)) return;
