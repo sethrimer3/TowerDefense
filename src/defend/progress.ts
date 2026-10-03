@@ -2,6 +2,8 @@
  * own and have upgraded, and their best wave. A run itself is never saved —
  * it always starts fresh from the layout. */
 import {
+  ENEMIES,
+  type EnemyKind,
   BOMB_PRICE,
   STRUCTURES,
   SPEED3_PRICE,
@@ -23,6 +25,8 @@ export type DefendSave = {
   levels: Record<UpgradeId, number>;
   bombs: number;
   bestWave: number;
+  discovered: EnemyKind[];
+  journalRead: EnemyKind[];
   paletteSide: "left" | "right";
   /** 3× battle speed has been bought in the Armory. */
   speed3: boolean;
@@ -37,6 +41,8 @@ export function defaultDefendSave(): DefendSave {
     levels: Object.fromEntries(UPGRADES.map((u) => [u.id, 0])) as Record<UpgradeId, number>,
     bombs: 0,
     bestWave: 0,
+    discovered: [],
+    journalRead: [],
     paletteSide: "left",
     speed3: false,
     seed: 1 + Math.floor(defendRandom("rolls")() * 1e9),
@@ -141,6 +147,9 @@ export function decodeDefendSave(s: any): DefendSave {
   d.paletteSide = s.paletteSide === "right" ? "right" : "left";
   d.speed3 = s.speed3 === true;
   d.seed = intOr(s.seed, 0, 2 ** 32, d.seed);
+  const kinds = Object.keys(ENEMIES) as EnemyKind[];
+  d.discovered = kinds.filter(k => Array.isArray(s.discovered) && s.discovered.includes(k));
+  d.journalRead = d.discovered.filter(k => Array.isArray(s.journalRead) && s.journalRead.includes(k));
   d.layout = decodeLayout(s.layout, d.owned, d.levels) ?? d.layout;
   return d;
 }

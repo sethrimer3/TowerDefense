@@ -1237,3 +1237,13 @@ dialog .away-row .away-note {
 .mine-info .info-row b { color: var(--ink); font-weight: 700; }
 .mine-info .info-bar { border: 1px solid #4a3218; border-radius: 2px; background: #00000030; box-shadow: inset 0 1px 2px #00000060; }
 .mine-info .info-bar i { background: linear-gradient(#f0cf86, #b98a3e 60%, #7a5420); }
+
+/* Enemy discovery journal */
+.defend-journal-button { position: relative; padding: 4px; flex: 0 0 auto; }
+.defend-journal-button canvas { display: block; width: 36px; height: 36px; image-rendering: pixelated; }
+.defend-journal-dialog { width: min(640px, calc(100vw - 32px)); max-height: 85dvh; }
+.defend-journal-entries { max-height: 58dvh; overflow-y: auto; overscroll-behavior: contain; }
+.defend-journal-entries article { padding: 10px 0; border-bottom: 1px solid #73524155; }
+.defend-journal-entries h3 { margin: 0 0 5px; }
+.defend-journal-entries p { margin: 4px 0; }
+.defend-journal-stats { font-size: .85em; }

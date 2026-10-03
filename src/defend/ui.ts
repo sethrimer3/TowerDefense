@@ -1,3 +1,4 @@
+import { journalHTML, paintJournal } from "./journal.ts";
 /** The DEFEND page: a City tab (palette + board) and an Armory tab (buy
  * city elements, bombs and universal upgrades with what battles earn).
  *
@@ -98,6 +99,7 @@ export class DefendPage {
   /** Abandon needs a second click within a few seconds. */
   private abandonArmed = 0;
   private settingsOpen = false;
+  private journal: HTMLDialogElement | null = null;
   /** Whether the side panel is open in each phase: the build palette starts
    * open, the battle's items closed so the battle has the whole view. */
   private sideOpen = { build: true, sim: false };
@@ -127,7 +129,7 @@ export class DefendPage {
     const measuring = this.sim && this.phase === "sim";
     const start = performance.now();
     if (this.sim && this.phase === "sim") {
-      this.sim.update(dt);
+      if (!this.journal?.open) this.sim.update(dt);
       this.handleEvents();
     }
     const updated = performance.now();
@@ -189,6 +191,7 @@ export class DefendPage {
       <div class="defend-head">
         <div class="defend-left" id="defend-left"></div>
         <div class="defend-hud" id="defend-hud"></div>
+        <button class="defend-journal-button" id="defend-journal" aria-label="Enemy journal" aria-haspopup="dialog"><canvas width="20" height="20"></canvas></button>
         <button class="defend-cog" id="defend-cog" aria-label="Defend settings" aria-expanded="false">âš™</button>
         <div class="defend-settings" id="defend-settings" hidden></div>
       </div>
@@ -200,7 +203,8 @@ export class DefendPage {
             <div class="defend-message" id="defend-message" aria-live="polite"></div></div>
         </div>
       </div>
-      <div class="defend-armory" id="defend-armory" hidden></div>`;
+      <div class="defend-armory" id="defend-armory" hidden></div>
+      <dialog class="defend-journal-dialog" aria-labelledby="defend-journal-title"></dialog>`;
     this.renderer = new DefendRenderer(this.root.querySelector("#defend-canvas")!);
     const canvas = this.renderer.canvas;
     canvas.addEventListener("pointerdown", (e) => this.pointers.down(e));
@@ -212,6 +216,17 @@ export class DefendPage {
       },
       { passive: false },
     );
+    this.journal = this.root.querySelector<HTMLDialogElement>(".defend-journal-dialog")!;
+    this.journal.addEventListener("close", () => { this.lastTime = 0; this.root.querySelector<HTMLButtonElement>("#defend-journal")!.focus(); });
+    this.root.querySelector<HTMLButtonElement>("#defend-journal")!.onclick = () => {
+      this.journal!.innerHTML = journalHTML(this.save.discovered);
+      this.journal!.querySelector<HTMLButtonElement>("[data-journal-close]")!.onclick = () => this.journal!.close();
+      this.journal!.showModal();
+      this.save.journalRead = [...this.save.discovered];
+      this.host.persist();
+      this.refreshJournal();
+    };
+    this.refreshJournal();
     const cog = this.root.querySelector<HTMLButtonElement>("#defend-cog")!;
     cog.onclick = (e) => {
       e.stopPropagation();
@@ -230,6 +245,7 @@ export class DefendPage {
     this.root.querySelector<HTMLElement>("#defend-city")!.hidden = this.tab !== "city";
     this.root.querySelector<HTMLElement>("#defend-armory")!.hidden = this.tab !== "armory";
     this.root.querySelector("#defend-stage")!.classList.toggle("palette-right", this.save.paletteSide === "right");
+    this.refreshJournal();
     this.renderControls();
     this.renderPalette();
     this.renderSide();
@@ -539,6 +555,24 @@ export class DefendPage {
     this.renderChrome();
   }
 
+  private refreshJournal() {
+    const button = this.root.querySelector<HTMLButtonElement>("#defend-journal");
+    if (!button) return;
+    const unread = this.save.discovered.some(k => !this.save.journalRead.includes(k));
+    button.setAttribute("aria-label", unread ? "Enemy journal — new enemies discovered" : "Enemy journal");
+    button.title = unread ? "Enemy journal — new discoveries" : "Enemy journal";
+    paintJournal(button.querySelector("canvas")!, unread);
+  }
+
+  private discoverEnemies() {
+    if (!this.sim) return;
+    const encountered = new Set(this.sim.enemies.map(e => e.kind));
+    for (const k of Object.keys(ENEMIES) as EnemyKind[]) if (this.sim.slain[k] > 0) encountered.add(k);
+    let changed = false;
+    for (const k of encountered) if (!this.save.discovered.includes(k)) { this.save.discovered.push(k); changed = true; }
+    if (changed) { this.host.persist(); this.refreshJournal(); }
+  }
+
   /** Pays for the kills since the last frame. */
   private payKills() {
     const sim = this.sim!;
@@ -557,6 +591,7 @@ export class DefendPage {
   }
 
   private handleEvents() {
+    this.discoverEnemies();
     const sim = this.sim!;
     this.payKills();
     for (const ev of sim.events.splice(0)) {
