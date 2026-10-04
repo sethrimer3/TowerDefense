@@ -35,3 +35,21 @@ test('healthbar preference persists and defaults on for older saves', () => {
   assert.equal(decodeSettings({}).showHealthbars, true);
   assert.equal(decodeSettings({ showHealthbars: false }).showHealthbars, false);
 });
+
+test('bounded healthbar selection matches stable full sorting for large mixed crowds', () => {
+  const kinds = Object.keys(ENEMIES) as EnemyKind[];
+  for (let wave=1;wave<=8;wave++) {
+    const enemies = Array.from({length:2500},(_,i)=>({
+      ...enemy(kinds[(i*17+wave)%kinds.length],i),
+      hp: (i%29+1)*7,
+      ...(i%31===0 ? {hp:0} : {}),
+      ...(i%37===0 ? {leader:1} : {}),
+      ...(i%41===0 ? {burrow:1} : {}),
+    }));
+    const sim:any={wave,spawnQueue:[],enemies};
+    const threshold=Math.max(100,Math.max(...enemies.map(e=>ENEMIES[e.kind].cost))/4);
+    const expected=enemies.filter((e:any)=>e.hp>0 && !(e.burrow>0) && e.leader===undefined && ENEMIES[e.kind].cost>=threshold)
+      .sort((a,b)=>ENEMIES[b.kind].cost-ENEMIES[a.kind].cost || a.hp/a.maxHp-b.hp/b.maxHp || a.id-b.id).slice(0,MAX_ENEMY_HEALTHBARS);
+    assert.deepEqual(healthbarEnemies(sim),expected);
+  }
+});

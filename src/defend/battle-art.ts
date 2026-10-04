@@ -1,6 +1,6 @@
 import { drawFortress } from "./fortress-art.ts";
 import { enemySize } from "./catalog.ts";
-import { drawEnemyHealthbars, healthbarEnemies } from "./healthbars.ts";
+import { drawEnemyHealthbars, trackHealthbarPeak } from "./healthbars.ts";
 import { drawBlackHoles, drawHostileMarks, drawPoisonClouds } from "./hostile-art.ts";
 import { drawFirework, drawSiegeEngine, drawSiegeShots, siegeLights } from "./siege-art.ts";
 import { boatLights, drawBoat } from "./boat-art.ts";
@@ -64,7 +64,7 @@ export type Burning = (x: number, y: number, id: number) => number;
  * lit while it still burns. */
 export function drawUnits(b: Brush, sim: DefendSim, torches: Burning | null, healthbars = false, timing?: { entityMs: number }) {
   // Track the wave peak even when the setting is off.
-  healthbarEnemies(sim);
+  if (!healthbars) trackHealthbarPeak(sim);
   drawBlackHoles(b, sim);
   drawPoisonClouds(b, sim);
   drawWatchRadii(b, sim);

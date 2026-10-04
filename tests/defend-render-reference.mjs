@@ -3,7 +3,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 /** Frozen pre-fix renderers for a reproducible A/B, without touching the checkout. */
 export function makeReference(ref = process.env.PERF_REF || '3b9f8a9', variant = '') {
-  const files = ['render.ts', 'battle-art.ts', 'mage-art.ts', 'ground-relief.ts', 'pixel-fx.ts', 'wizard-art.ts', 'blast-art.ts', 'dark-art.ts'];
+  const files = ['render.ts', 'battle-art.ts', 'mage-art.ts', 'ground-relief.ts', 'pixel-fx.ts', 'wizard-art.ts', 'blast-art.ts', 'dark-art.ts', 'flood-art.ts'];
   const sources = new Map();
   for (const file of files) {
     const current = variant && (file === 'ground-relief.ts' || (variant === 'scorch' && file === 'mage-art.ts') || (variant === 'combat' && file !== 'pixel-fx.ts'));

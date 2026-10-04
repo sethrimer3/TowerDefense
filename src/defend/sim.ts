@@ -1,3 +1,4 @@
+import { DefenderIndex } from "./defender-index.ts";
 import { enemySize } from "./catalog.ts";
 import { assembleFortress, syncFortress } from "./fortress.ts";
 import { damageModifier } from "./enemy-abilities.ts";
@@ -254,6 +255,8 @@ export class DefendSim {
   private builders: Builders;
   private grid: Enemy[][] = Array.from({ length: CELL_COUNT }, () => []);
   private gridUsed: number[] = [];
+  private defenders = new DefenderIndex();
+  private defenderIndexActive = false;
 
   constructor(map: CityMap, levels: Levels, seed = 1, bonuses: Readonly<Bonuses> = NO_BONUSES) {
     this.map = map;
@@ -337,7 +340,15 @@ export class DefendSim {
     this.bannerCarriers = this.enemies.filter(e => e.hp > 0 && e.kind === "bannerCaptain");
     for (const corpse of this.corpses) corpse.life -= dt;
     this.corpses = this.corpses.filter(c => c.life > 0);
-    for (const e of this.enemies) if (e.hp > 0) stepEnemy(this, e, dt);
+    // Defenders do not move or spawn until after all enemies have acted.
+    // Outside this phase, direct callers retain the live linear lookup.
+    this.defenderIndexActive = this.enemies.length >= 32 && this.soldiers.length + this.civilians.length >= 16;
+    if (this.defenderIndexActive) this.defenders.rebuild(this.soldiers, this.civilians);
+    try {
+      for (const e of this.enemies) if (e.hp > 0) stepEnemy(this, e, dt);
+    } finally {
+      this.defenderIndexActive = false;
+    }
     for (const e of this.enemies) if (e.fortressParts) syncFortress(e);
     this.towers.step(this, dt);
     stepArrows(this, dt);
@@ -552,6 +563,7 @@ export class DefendSim {
 
   /** The living soldier or civilian nearest (x, y) within `r`. */
   nearestDefender(x: number, y: number, r: number): Soldier | Civilian | null {
+    if (this.defenderIndexActive && Number.isFinite(x + y + r)) return this.defenders.nearest(x, y, r);
     let best: Soldier | Civilian | null = null, bd = r * r;
     // Keep the original last-wins tie order without allocating a list per enemy.
     for (let team = 0; team < 2; team++) {

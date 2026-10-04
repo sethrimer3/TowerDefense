@@ -30,6 +30,29 @@ try {
       return {max,mean:total/aa.length,different};
     };
     const reports=[];
+    const {FloodArt}=await import('/src/defend/flood-art.ts');
+    const {FloodArt:OriginalFlood}=await import(`${referenceRoot}/flood-art.ts`);
+    const flood=new FloodArt(), originalFlood=new OriginalFlood();
+    const waterSim={...sim,floods:[],sinkings:[]};
+    const waterLayer=make();
+    const waterBrush=waterLayer.getContext('2d');
+    waterBrush.fillStyle='#765432';waterBrush.fillRect(0,0,waterLayer.width,waterLayer.height);
+    let reused;
+    for(const [n,radius] of [4,4,1,8,2,0,4].entries()) {
+      waterSim.time=1+n/10;
+      waterSim.floods=radius ? [{x:30,y:35,r:radius,t:1,life:10,boat:7}] : [];
+      for(const rain of [false,true])for(const reduceMotion of [false,true]){
+        const a=make(),b=make();
+        const frame={px:6,sim:waterSim,rain,reduceMotion,reflections:true,layer:waterLayer,layerScale:1};
+        for(const cv of [a,b]){const c=cv.getContext('2d');c.fillStyle='#73615a';c.fillRect(0,0,cv.width,cv.height);}
+        originalFlood.draw({...frame,c:a.getContext('2d')});
+        flood.draw({...frame,c:b.getContext('2d')});
+        reports.push({check:`water buffers ${n}, rain ${rain}, motion ${!reduceMotion}`,...compare(a,b)});
+      }
+      if(n===0)reused=flood.rasters.top.pixels.buffer;
+      if(n===1 && reused!==flood.rasters.top.pixels.buffer)throw new Error('water buffer was not reused');
+      for(const raster of Object.values(flood.rasters))if(raster.pixels.length>63*91*64)throw new Error('water capacity exceeds the board');
+    }
     const {BoltBuffer}=await import('/src/defend/dark-art.ts');
     const {BoltBuffer:OriginalBolts}=await import(`${referenceRoot}/dark-art.ts`);
     const bolts=new BoltBuffer(), originalBolts=new OriginalBolts();

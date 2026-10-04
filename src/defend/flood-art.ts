@@ -42,9 +42,11 @@ export type FloodFrame = {
 };
 
 type Box = { x: number; y: number; w: number; h: number };
+type Raster = { pixels: Uint32Array<ArrayBuffer>; image: ImageData };
 
 export class FloodArt {
   private depth = new Float32Array(W * H);
+  private rasters: Partial<Record<"base" | "top" | "mask", Raster>> = {};
   private base: HTMLCanvasElement | null = null;
   private top: HTMLCanvasElement | null = null;
   private mask: HTMLCanvasElement | null = null;
@@ -109,8 +111,7 @@ export class FloodArt {
   /** The water in its bands (`base`), what moves on it (`top`) and its open
    * water as a mask for the reflection. */
   private paint(f: FloodFrame, box: Box, t: number) {
-    const n = box.w * box.h;
-    const base = new Uint32Array(n), top = new Uint32Array(n), mask = new Uint32Array(n);
+    const base = this.raster("base", box), top = this.raster("top", box), mask = this.raster("mask", box);
     const tick = Math.floor(t * 5);
     for (let j = 0; j < box.h; j++)
       for (let i = 0; i < box.w; i++) {
@@ -146,7 +147,7 @@ export class FloodArt {
       });
     };
     if (t) this.rings(f, ring, t);
-    return { base: this.toCanvas("base", base, box), top: this.toCanvas("top", top, box), mask: this.toCanvas("mask", mask, box) };
+    return { base: this.toCanvas("base", box), top: this.toCanvas("top", box), mask: this.toCanvas("mask", box) };
   }
 
   /** Rings: the boat's wake, raindrops, and the burst where something sank. */
@@ -184,16 +185,29 @@ export class FloodArt {
     }
   }
 
-  private toCanvas(which: "base" | "top" | "mask", px: Uint32Array, box: Box) {
+  /** Write straight into reusable ImageData storage, without a second RGBA
+   * allocation and copy for each layer. Capacity grows only up to the board. */
+  private raster(which: "base" | "top" | "mask", box: Box): Uint32Array {
+    const n = box.w * box.h;
+    let raster = this.rasters[which];
+    if (!raster || raster.image.width !== box.w || raster.image.height !== box.h) {
+      const pixels = raster && raster.pixels.length >= n ? raster.pixels
+        : new Uint32Array(Math.min(W * H, Math.max(n, (raster?.pixels.length ?? 0) * 2)));
+      const image = new ImageData(new Uint8ClampedArray(pixels.buffer, 0, n * 4), box.w, box.h);
+      raster = this.rasters[which] = { pixels, image };
+    }
+    raster.pixels.fill(0, 0, n);
+    return raster.pixels;
+  }
+
+  private toCanvas(which: "base" | "top" | "mask", box: Box) {
     const cv = (this[which] ??= document.createElement("canvas"));
     if (cv.width !== box.w || cv.height !== box.h) {
       cv.width = box.w;
       cv.height = box.h;
     }
     const g = cv.getContext("2d")!;
-    const img = g.createImageData(box.w, box.h);
-    new Uint32Array(img.data.buffer).set(px);
-    g.putImageData(img, 0, 0);
+    g.putImageData(this.rasters[which]!.image, 0, 0);
     return cv;
   }
 

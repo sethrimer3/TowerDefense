@@ -55,6 +55,8 @@ The tower-and-effects stress scene, frame overlay and before/after rendering mea
 
 DEFEND lightning buffers clear and colour only occupied pixels, avoiding scans across empty space between distant bolts. The rendering regression checks compare their pixels against the original renderer.
 
+DEFEND also indexes nearby defenders during enemy turns, selects only the eight displayed health bars, and reuses boat-water pixel storage to reduce allocation and copying.
+
 ## Deploying
 
 `.github/workflows/static.yml` runs the tests and the build on every push to `main` and deploys `dist/` to GitHub Pages. In the repository's **Settings → Pages**, the source must be set to **GitHub Actions**.

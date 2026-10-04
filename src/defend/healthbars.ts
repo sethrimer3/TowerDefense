@@ -8,16 +8,29 @@ const peaks = new WeakMap<DefendSim, { wave: number; cost: number }>();
 
 /** Presentation only: relative to the actual random wave, not its number.
  * Keep the peak after strong enemies die so weak survivors don't gain bars. */
-export function healthbarEnemies(sim: DefendSim): Enemy[] {
+export function trackHealthbarPeak(sim: DefendSim): number {
   let peak = peaks.get(sim);
   if (!peak || peak.wave !== sim.wave) peak = { wave: sim.wave, cost: 0 };
   for (const kind of sim.spawnQueue) peak.cost = Math.max(peak.cost, ENEMIES[kind].cost);
   for (const e of sim.enemies) peak.cost = Math.max(peak.cost, ENEMIES[e.kind].cost);
   peaks.set(sim, peak);
-  const threshold = Math.max(100, peak.cost / 4);
-  return sim.enemies.filter(e => e.hp > 0 && !(e.burrow && e.burrow > 0) && e.leader === undefined && ENEMIES[e.kind].cost >= threshold)
-    .sort((a, b) => ENEMIES[b.kind].cost - ENEMIES[a.kind].cost || a.hp / a.maxHp - b.hp / b.maxHp || a.id - b.id)
-    .slice(0, MAX_ENEMY_HEALTHBARS);
+  return Math.max(100, peak.cost / 4);
+}
+
+const compare = (a: Enemy, b: Enemy) => ENEMIES[b.kind].cost - ENEMIES[a.kind].cost || a.hp / a.maxHp - b.hp / b.maxHp || a.id - b.id;
+
+/** Keep only the eight displayed enemies, in the same stable priority order. */
+export function healthbarEnemies(sim: DefendSim): Enemy[] {
+  const threshold = trackHealthbarPeak(sim), best: Enemy[] = [];
+  for (const e of sim.enemies) {
+    if (e.hp <= 0 || (e.burrow && e.burrow > 0) || e.leader !== undefined || ENEMIES[e.kind].cost < threshold) continue;
+    let i = best.length;
+    while (i > 0 && compare(e, best[i - 1]) < 0) i--;
+    if (i >= MAX_ENEMY_HEALTHBARS) continue;
+    best.splice(i, 0, e);
+    if (best.length > MAX_ENEMY_HEALTHBARS) best.pop();
+  }
+  return best;
 }
 
 export function drawEnemyHealthbars({ c, px }: Brush, sim: DefendSim) {
