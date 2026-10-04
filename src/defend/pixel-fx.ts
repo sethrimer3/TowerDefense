@@ -37,5 +37,7 @@ export function bake(w: number, h: number) {
   const cv = document.createElement("canvas");
   cv.width = Math.max(1, w);
   cv.height = Math.max(1, h);
-  return { cv, c: cv.getContext("2d")! };
+  // Tiny sprites are built with pixel writes, then copied to the board. A
+  // software backing avoids flushing a new GPU canvas for every ice shard.
+  return { cv, c: cv.getContext("2d", { willReadFrequently: true })! };
 }

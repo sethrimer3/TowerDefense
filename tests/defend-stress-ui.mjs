@@ -13,12 +13,15 @@ try {
   if(process.env.PERF_CPU_RATE)await cdp.send('Emulation.setCPUThrottlingRate',{rate:Number(process.env.PERF_CPU_RATE)});
   const result=await page.evaluate(async ({frames,realtime})=>{
     const p=window.stressPage,sim=window.stressSim;
+    const originalSample=p.frameTimes.sample.bind(p.frameTimes);let actualFrame=0;
+    p.frameTimes.sample=row=>originalSample({...row,frameMs:actualFrame});
     let update=0,draw=0;const originalUpdate=sim.update.bind(sim),originalDraw=p.renderer.draw.bind(p.renderer);
     sim.update=(dt)=>{const t=performance.now();originalUpdate(dt);update+=performance.now()-t;};
     p.renderer.draw=(...args)=>{const t=performance.now();originalDraw(...args);draw+=performance.now()-t;};
     const rows=[];let last=0,clock=1000;
     for(let i=0;i<frames+60;i++){
       const now=await new Promise(requestAnimationFrame);clock+=1000/60;update=draw=0;
+      actualFrame=last?now-last:0;
       const start=performance.now();p.frame(realtime?now:clock);const end=performance.now();
       if(i>=60)rows.push({frame:now-last,update,draw,ui:end-start-update-draw});last=now;
     }

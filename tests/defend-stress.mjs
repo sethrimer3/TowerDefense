@@ -6,7 +6,7 @@ const label = process.env.PERF_LABEL || 'latest';
 const frames = Math.max(60, Number(process.env.PERF_FRAMES || 360));
 mkdirSync('test-results', { recursive: true });
 const reference = !!(process.env.PERF_REFERENCE || process.env.PERF_VARIANT);
-if (reference) makeReference(undefined, process.env.PERF_VARIANT);
+const referenceRoot = reference ? makeReference(undefined, process.env.PERF_VARIANT) : '';
 const browser = await chromium.launch({ headless: true, channel: process.env.PLAYWRIGHT_CHANNEL || 'chrome' });
 try {
   const browserCdp = await browser.newBrowserCDPSession();
@@ -18,9 +18,9 @@ try {
   await page.goto((process.env.TEST_URL || 'http://127.0.0.1:5173/') + 'tests/performance.html');
   console.log('Preparing stress scene');
   page.on('console', msg => { if (msg.text().startsWith('[stress]')) console.log(msg.text()); });
-  await page.evaluate(async ({ count, reference, heavy }) => {
+  await page.evaluate(async ({ count, referenceRoot, heavy }) => {
     const { stressScene } = await import('/tests/defend-stress-scene.ts');
-    const { DefendRenderer } = await import(reference ? '/test-results/reference/render.ts' : '/src/defend/render.ts');
+    const { DefendRenderer } = await import(referenceRoot ? `${referenceRoot}/render.ts` : '/src/defend/render.ts');
     const { map, sim } = stressScene(count, heavy);
     console.log('[stress] scene ready', sim.soldiers.length);
     const renderer = new DefendRenderer(document.querySelector('canvas'));
@@ -42,7 +42,7 @@ try {
     for (let i=0;i<30;i++) { await new Promise(requestAnimationFrame); sim.update(1/60); opts.now=sim.time*1000; renderer.draw(map,sim,null,opts); }
     console.log('[stress] warmup complete');
     for (const key in costs) costs[key]=0;
-  }, { count: Number(process.env.PERF_ENEMIES || 2500), reference, heavy: process.env.PERF_MIX === 'heavy' });
+  }, { count: Number(process.env.PERF_ENEMIES || 2500), referenceRoot, heavy: process.env.PERF_MIX === 'heavy' });
   const cdp = await page.context().newCDPSession(page);
   await cdp.send('HeapProfiler.collectGarbage');
   if (process.env.PERF_CPU_RATE) await cdp.send('Emulation.setCPUThrottlingRate', { rate:Number(process.env.PERF_CPU_RATE) });
@@ -51,7 +51,7 @@ try {
   console.log('Recording');
   const events = [];
   cdp.on('Tracing.dataCollected', ({ value }) => events.push(...value));
-  if (process.env.PERF_TRACE) await cdp.send('Tracing.start', { categories:'devtools.timeline,v8,blink.user_timing,disabled-by-default-devtools.timeline,disabled-by-default-v8.gc', options:'sampling-frequency=1000' });
+  if (process.env.PERF_TRACE) await cdp.send('Tracing.start', { categories:'devtools.timeline,v8,blink.user_timing,disabled-by-default-devtools.timeline,disabled-by-default-v8.gc,disabled-by-default-v8.cpu_profiler', options:'sampling-frequency=1000' });
   const row = await page.evaluate(async frames => {
     const {map,sim,renderer,costs,opts}=window.bench;
     const update=[],draw=[],interval=[],populations=[],entities=[],effects=[],activity={}; let last=0;

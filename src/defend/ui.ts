@@ -202,6 +202,7 @@ export class DefendPage {
   pause() {
     this.lastTime = 0;
     this.pointers.end();
+    this.frameTimes.toggle(this.frameTimes.enabled);
   }
 
   private get save() {

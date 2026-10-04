@@ -3,21 +3,22 @@ import { chromium } from '@playwright/test';
 import assert from 'node:assert/strict';
 import { makeReference } from './defend-render-reference.mjs';
 import { writeFileSync } from 'node:fs';
-makeReference();
+const referenceRoot=makeReference();
 const browser = await chromium.launch({ headless:true, channel:process.env.PLAYWRIGHT_CHANNEL || 'chrome' });
 try {
   const page = await browser.newPage({ viewport:{width:1280,height:900} });
   await page.route('**/@vite/client', route=>route.fulfill({contentType:'application/javascript',body:'export const injectQuery = (url) => url;'}));
   await page.addInitScript(()=>{ globalThis.__pinnedSeeds={defend:3182828918,game:3887091088}; });
   await page.goto((process.env.TEST_URL || 'http://127.0.0.1:5173/')+'tests/performance.html');
-  const results = await page.evaluate(async () => {
+  const results = await page.evaluate(async referenceRoot => {
     const {GroundRelief}=await import('/src/defend/ground-relief.ts');
-    const {GroundRelief:ReferenceRelief}=await import('/test-results/reference/ground-relief.ts');
+    const {GroundRelief:ReferenceRelief}=await import(`${referenceRoot}/ground-relief.ts`);
     const {DefendRenderer}=await import('/src/defend/render.ts');
     const {stressScene}=await import('/tests/defend-stress-scene.ts');
     const {drawBlazes}=await import('/src/defend/mage-art.ts');
-    const {drawBlazes:referenceBlazes}=await import('/test-results/reference/mage-art.ts');
-    const referenceBattle=await import('/test-results/reference/battle-art.ts');
+    const {drawBlazes:referenceBlazes}=await import(`${referenceRoot}/mage-art.ts`);
+    const referenceBattle=await import(`${referenceRoot}/battle-art.ts`);
+    const {WizardArt:ReferenceWizard}=await import(`${referenceRoot}/wizard-art.ts`);
     const {map,sim}=stressScene(100);
     const make=(w=504,h=728)=>{const c=document.createElement('canvas');c.width=w;c.height=h;return c;};
     const compare=(a,b)=>{
@@ -74,7 +75,9 @@ try {
       referenceBattle.drawScorches(brush,sim);
       referenceBlazes(g,r.px,sim);
       const {flameLights}=await import('/src/defend/wizard-art.ts');
-      r.wizard.drawIce(g,r.px,sim.frosts,sim.time*1000,flameLights(sim).relief);
+      const oldWizard=new ReferenceWizard();
+      Object.assign(oldWizard,{clusters:r.wizard.clusters,fire:r.wizard.fire,glints:r.wizard.glints});
+      oldWizard.drawIce(g,r.px,sim.frosts,sim.time*1000,flameLights(sim).relief);
       referenceBattle.drawUnits(brush,sim,()=>1,true);
       r.dark.draw(g,r.px,sim);
       r.paintCombat(fresh.getContext('2d'),sim,()=>1,opts);
@@ -104,7 +107,7 @@ try {
     r.combatKey='';r.draw(map,sim,null,opts);
     reports.push({check:'resize and healthbars',...compare(resized,capture())});
     return reports;
-  });
+  },referenceRoot);
   writeFileSync('test-results/render-cache.json',JSON.stringify(results,null,2));
   console.table(results);
   for(const result of results){

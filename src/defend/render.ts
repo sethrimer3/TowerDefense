@@ -183,7 +183,9 @@ export class DefendRenderer {
     this.douse(sim, opts);
     const dt = this.lastNow ? (opts.now - this.lastNow) / 1000 : 0;
     this.lastNow = opts.now;
+    const cityStart = opts.timings ? performance.now() : 0;
     this.drawCity(map, sim, opts, dt);
+    if (opts.timings) this.timings.terrainMs += performance.now() - cityStart;
     if (sim) this.advanceWizard(sim);
     if (sim) this.drawBattle(map, sim, opts);
     this.drawKeepFlag(map, sim, opts);
