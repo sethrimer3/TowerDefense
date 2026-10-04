@@ -91,8 +91,8 @@ export function strata(seed: number): Strata {
 
 /** The grid of a world fresh from its seed: sky, a grass skin, dirt with
  * rocks in it, then stone threaded with copper, deeper silver and deeper
- * still gold, over an
- * uneven floor of bedrock. */
+ * still gold, natural caves winding through it (`caves`), over an uneven
+ * floor of bedrock. */
 export function generate(seed: number): Uint8Array {
   const cells = new Uint8Array(CELLS);
   const { surface, stoneTop } = strata(seed);
@@ -144,14 +144,99 @@ export function generate(seed: number): Uint8Array {
   };
   pockets(78, LOOSE, (x) => surface[x] + 4, (x) => stoneTop[x] - 1, DIRT, 303);
   pockets(210, GRAVEL, (x) => stoneTop[x] + 2, () => H - 12, STONE, 404);
-  // Deep down, sealed pools of lava (never under the shaft).
+  caves(cells, seed, stoneTop);
+  // Deep down, sealed pools of lava (never under the shaft, nor open to a
+  // cave).
   for (let i = 0; i < 33; i++) {
     const r = (k: number) => hash01(i, k, seed + 505);
     const x = 4 + Math.floor(r(0) * (W - 8));
     if (Math.abs(x - W / 2) < 8) continue;
-    blob(cells, x, H - 150 + Math.floor(r(1) * 132), 2 + Math.floor(r(2) * 3), LAVA, seed + 505 + i, (c) => c === STONE || isOre(c) || c === GRAVEL);
+    const y = H - 150 + Math.floor(r(1) * 132), radius = 2 + Math.floor(r(2) * 3);
+    if (openNear(cells, x, y, radius + 2)) continue;
+    blob(cells, x, y, radius, LAVA, seed + 505 + i, (c) => c === STONE || isOre(c) || c === GRAVEL);
   }
   return cells;
+}
+
+/** Whether any cell within `radius` of (cx, cy) is open air. */
+function openNear(cells: Uint8Array, cx: number, cy: number, radius: number) {
+  for (let y = cy - radius; y <= cy + radius; y++)
+    for (let x = cx - radius; x <= cx + radius; x++) if (inBounds(x, y) && cells[idx(x, y)] === AIR) return true;
+  return false;
+}
+
+/** Natural caves through the stone, as in Terraria: winding passages that
+ * swell and pinch as they go (each a walk that mostly keeps its heading,
+ * flatter than steep), open caverns with ragged walls, and stalactites and
+ * stalagmites along their roofs and floors. They keep clear of the dirt
+ * (which would fall in), the bedrock and the shaft's column. */
+export function caves(cells: Uint8Array, seed: number, stoneTop: ArrayLike<number>) {
+  const top = (x: number) => stoneTop[x] + 6, bottom = H - 12, shaft = W / 2;
+  const carve = (cx: number, cy: number, rx: number, ry: number, rough: number, salt: number) => {
+    const x0 = Math.floor(cx - rx - 1), x1 = Math.ceil(cx + rx + 1), y0 = Math.floor(cy - ry - 1), y1 = Math.ceil(cy + ry + 1);
+    for (let y = y0; y <= y1; y++)
+      for (let x = x0; x <= x1; x++) {
+        if (x < 2 || x >= W - 2 || y < top(Math.max(0, Math.min(W - 1, x))) || y >= bottom || Math.abs(x - shaft) <= 3) continue;
+        const dx = (x + 0.5 - cx) / rx, dy = (y + 0.5 - cy) / ry;
+        if (dx * dx + dy * dy > 1 - rough * hash01(x, y, salt)) continue;
+        const i = idx(x, y), m = cells[i];
+        if (m === STONE || isOre(m) || m === GRAVEL) cells[i] = AIR;
+      }
+  };
+  // Passages: walks that wander, swelling into chambers now and then.
+  for (let w = 0; w < 30; w++) {
+    const r = (k: number) => hash01(w, k, seed + 707);
+    let x = 4 + r(0) * (W - 8);
+    let y = top(Math.floor(x)) + 6 + r(1) * (bottom - top(Math.floor(x)) - 12);
+    let hx = r(2) < 0.5 ? -1 : 1, hy = (r(3) - 0.5) * 0.8;
+    const steps = 50 + Math.floor(r(4) * 170);
+    for (let s = 0; s < steps; s++) {
+      const swell = noise1(s, 14, seed + 711 + w), bulge = noise1(s, 37, seed + 733 + w);
+      const radius = 1.1 + swell * 2.1 + (bulge > 0.78 ? (bulge - 0.78) * 22 : 0);
+      carve(x, y, radius * 1.25, radius, 0.35, seed + 757 + w);
+      // Keep the heading, turning a little, flatter than steep.
+      hx += (hash01(w, s, seed + 761) - 0.5) * 0.5;
+      hy += (hash01(w, s, seed + 769) - 0.5) * 0.45;
+      const tx = Math.floor(x);
+      if (y < top(Math.max(0, Math.min(W - 1, tx))) + 4) hy += 0.12;
+      if (y > bottom - 6) hy -= 0.12;
+      hy = Math.max(-0.7, Math.min(0.7, hy));
+      const len = Math.sqrt(hx * hx + hy * hy) || 1;
+      hx /= len;
+      hy /= len;
+      x += hx * 1.4;
+      y += hy * 1.4;
+      if (x < 3 || x > W - 4) hx = -hx;
+    }
+  }
+  // Caverns: wide open rooms with ragged walls.
+  for (let c = 0; c < 9; c++) {
+    const r = (k: number) => hash01(c, k, seed + 808);
+    const x = 10 + r(0) * (W - 20), rx = 6 + r(2) * 10, ry = 3.5 + r(3) * 5;
+    const y = top(Math.floor(x)) + ry + 4 + r(1) * (bottom - top(Math.floor(x)) - ry * 2 - 8);
+    carve(x, y, rx, ry, 0.45, seed + 811 + c);
+    carve(x + (r(4) - 0.5) * rx, y - ry * 0.4, rx * 0.6, ry * 0.7, 0.5, seed + 813 + c);
+  }
+  // Gravel bared by a cave sets firm (else it would all run at once).
+  for (let y = 1; y < H - 1; y++)
+    for (let x = 1; x < W - 1; x++) {
+      const i = idx(x, y);
+      if (cells[i] !== GRAVEL) continue;
+      let open = false;
+      for (let dy = -1; dy <= 1 && !open; dy++) for (let dx = -1; dx <= 1; dx++) if (cells[i + dy * W + dx] === AIR) open = true;
+      if (open) cells[i] = STONE;
+    }
+  // Stalactites hang from cave roofs, stalagmites rise from their floors.
+  for (let y = 2; y < H - 2; y++)
+    for (let x = 2; x < W - 2; x++) {
+      const i = idx(x, y);
+      if (cells[i] !== AIR || y < stoneTop[x] + 4) continue;
+      const h = hash01(x, y, seed + 909);
+      if (cells[i - W] === STONE && cells[i + W] === AIR && cells[i + 2 * W] === AIR && h < 0.12) {
+        cells[i] = STONE;
+        if (h < 0.04 && cells[i + 2 * W] === AIR && cells[i + 3 * W] === AIR) cells[i + W] = STONE;
+      } else if (cells[i + W] === STONE && cells[i - W] === AIR && cells[i - 2 * W] === AIR && h > 0.93) cells[i] = STONE;
+    }
 }
 
 /** Fills a rough disc of `radius` around (cx, cy) with `m`, only over cells

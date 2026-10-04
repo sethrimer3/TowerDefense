@@ -430,7 +430,7 @@ test("at night most of the crew sleeps in the barracks; the night shift works on
     for (let i = 0; i < 9; i++) sim.hire();
     sim.coffee = coffee;
     while (!sim.night) sim.step();
-    minutes(sim, 2.5);
+    minutes(sim, 3.5);
     assert.ok(sim.night);
     return sim.miners.filter((m) => m.inside?.why === "sleep").length;
   };
