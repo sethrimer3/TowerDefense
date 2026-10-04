@@ -93,6 +93,8 @@ function h01(a: number, b: number, c = 0) {
 type Mote = { x: number; y: number; vx: number; vy: number; life: number };
 /** Smoke and embers off the flames. */
 type Puff = { x: number; y: number; vx: number; vy: number; age: number; life: number; ember: boolean };
+/** How far in the view zooms. */
+const MAX_ZOOM = 6;
 /** How much of the hallways the view shows at the widest zoom: all the
  * nave and most of each hallway (the rest pans into view). */
 const FIT_W = W + HALL * 1.2;
@@ -502,11 +504,16 @@ export class LibraryRenderer {
   get inLab() {
     return this.focus.y > H;
   }
-  /** Zooms to `zoom` keeping the world point under device pixel (px, py). */
-  zoomTo(zoom: number, px: number, py: number) {
-    const wx = (px - this.view.ox) / this.view.scale, wy = (py - this.view.oy) / this.view.scale;
-    this.zoom = Math.max(1, Math.min(4, zoom));
-    this.focus = { x: wx, y: wy };
+  /** Zooms by `factor` (above 1 in), from the whole nave in to `MAX_ZOOM`,
+   * keeping the world point under device pixel (px, py) where it is. */
+  zoomBy(factor: number, px: number, py: number) {
+    const { scale, ox, oy } = this.view, wx = (px - ox) / scale, wy = (py - oy) / scale;
+    const zoom = Math.max(1, Math.min(MAX_ZOOM, this.zoom * factor));
+    if (zoom === this.zoom) return;
+    const next = (scale / this.zoom) * zoom, w = this.canvas.width, h = this.canvas.height;
+    this.zoom = zoom;
+    this.focus = { x: wx - (px - w / 2) / next, y: wy - (py - h / 2) / next };
+    this.resize();
   }
 
   draw(sim: LibrarySim, now: number, time: number, effects: boolean) {
