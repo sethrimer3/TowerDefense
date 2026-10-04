@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { BattlePerformance } from '../src/defend/performance.ts';
+import { BattlePerformance, FrameTimeOverlay, Timings } from '../src/defend/performance.ts';
 
 test('wave timing keeps terminal summaries once, including slow frames', (t) => {
   t.mock.method(console, 'info', () => {});
@@ -20,6 +20,25 @@ test('wave timing keeps terminal summaries once, including slow frames', (t) => 
   assert.equal(perf.history[1].planned, 1000);
   assert.equal(perf.history[1].samples, 1);
   assert.equal(perf.history[1].status, 'lost');
+});
+
+test('frame timing histogram counts percentiles without retaining samples', () => {
+  const times = new Timings();
+  for (let i = 0; i < 95; i++) times.add(16.1);
+  for (let i = 0; i < 5; i++) times.add(800);
+  assert.equal(times.p95(), 17);
+  assert.equal(times.count, 100);
+  assert.equal(times.max, 800);
+});
+
+test('disabled overlay does no DOM work and resets on toggle', () => {
+  const overlay = new FrameTimeOverlay();
+  overlay.sample({ frameMs: 1000, updateMs: 1, entityMs: 2, effectsMs: 3, terrainMs: 4, uiMs: 5 });
+  assert.equal(overlay.enabled, false);
+  overlay.toggle(true);
+  overlay.sample({ frameMs: 0, updateMs: 1, entityMs: 2, effectsMs: 3, terrainMs: 4, uiMs: 5 });
+  overlay.toggle(false);
+  assert.equal(overlay.enabled, false);
 });
 
 test('long runs keep bounded log history and emit periodic snapshots', (t) => {
