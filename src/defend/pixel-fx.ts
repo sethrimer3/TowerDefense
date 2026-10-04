@@ -25,6 +25,14 @@ export function artPen(c: Ctx, px: number) {
   };
 }
 
+/** A puff of fire or smoke `r` art pixels across from its middle: a square
+ * with its corners cut, or a single pixel. */
+export function puff(dot: ReturnType<typeof artPen>, x: number, y: number, r: number) {
+  if (r <= 0) return dot(x, y);
+  dot(x - r + 1, y - r, 2 * r - 1, 2 * r + 1);
+  dot(x - r, y - r + 1, 2 * r + 1, 2 * r - 1);
+}
+
 /** Draws a baked sprite (one canvas pixel an art pixel) with its top left at
  * art pixel (ax, ay), without smoothing. */
 export function blit(c: Ctx, px: number, img: HTMLCanvasElement, ax: number, ay: number) {

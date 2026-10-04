@@ -13,6 +13,7 @@ import type { Building } from "./citygen.ts";
 import { center } from "./pathing.ts";
 import type { CarriedLight } from "./lighting.ts";
 import { drawFireballs, drawMage } from "./mage-art.ts";
+import { drawArrows, drawBreath, drawShells, drawSparks } from "./projectile-art.ts";
 import { drawStabs, drawValkyrie } from "./valkyrie-art.ts";
 import { drawDarkWizard } from "./dark-art.ts";
 import { drawExplosion, drawScorches as drawScorchArt } from "./blast-art.ts";
@@ -79,8 +80,8 @@ export function drawUnits(b: Brush, sim: DefendSim, torches: Burning | null, hea
   }
   drawSwords(b, swords);
   if (timing) timing.entityMs += performance.now() - start;
-  drawArrows(b, sim);
-  drawShells(b, sim);
+  drawArrows(b.c, b.px, sim);
+  drawShells(b.c, b.px, sim);
   drawSiegeShots(b, sim);
   drawFireballs(b.c, b.px, sim);
   drawStabs(b.c, b.px, sim);
@@ -338,18 +339,7 @@ function drawEnemy(b: Brush, e: Enemy, sim: DefendSim) {
     }
     c.restore();
   }
-  if (e.breath) {
-    const { dx, dy, t } = e.breath;
-    c.save(); c.globalAlpha = Math.min(1, t / 0.2);
-    for (let n = 1; n <= 20; n++) {
-      const along = n / 4;
-      const width = (0.35 + along * 0.45) * px;
-      c.fillStyle = n < 9 ? "#fff2a0" : n < 15 ? "#ffad38" : "#e85a27";
-      const spread = Math.sin(n * 7 + e.id) * width;
-      c.fillRect((e.x + dx * along) * px - dy * spread, (e.y + dy * along) * px + dx * spread, Math.max(2, px * .22), Math.max(2, px * .22));
-    }
-    c.restore();
-  }
+  drawBreath(c, px, e, sim.time);
   if (e.kind === "mother") drawMotherMarks(b, { x, y, s });
 }
 
@@ -374,37 +364,6 @@ function drawBossMarks({ c, px }: Brush, e: Enemy, sq: { x: number; y: number; s
 
 }
 
-function drawArrows({ c, px }: Brush, sim: DefendSim) {
-  c.strokeStyle = "#eadcb2";
-  c.lineWidth = Math.max(1, px * 0.1);
-  c.beginPath();
-  for (const a of sim.arrows) {
-    const dx = a.tx - a.x,
-      dy = a.ty - a.y;
-    const d = Math.hypot(dx, dy) || 1;
-    c.moveTo(a.x * px, a.y * px);
-    c.lineTo((a.x - (dx / d) * 0.6) * px, (a.y - (dy / d) * 0.6) * px);
-  }
-  c.stroke();
-}
-
-/** Cannon shells: an iron ball arcing over, its shadow on the ground. */
-function drawShells({ c, px }: Brush, sim: DefendSim) {
-  for (const sh of sim.shells) {
-    const k = sh.t / sh.dur;
-    const gx = sh.x0 + (sh.x1 - sh.x0) * k,
-      gy = sh.y0 + (sh.y1 - sh.y0) * k;
-    const lift = Math.sin(Math.PI * k) * (0.8 + Math.hypot(sh.x1 - sh.x0, sh.y1 - sh.y0) * 0.12);
-    const s = Math.max(2, px * 0.3);
-    c.fillStyle = "rgba(0,0,0,0.35)";
-    c.fillRect(gx * px - s / 2, gy * px - s / 2, s, s * 0.7);
-    c.fillStyle = "#1d1d20";
-    c.fillRect(gx * px - s / 2, (gy - lift) * px - s / 2, s, s);
-    c.fillStyle = "#6a6a70";
-    c.fillRect(gx * px - s / 2, (gy - lift) * px - s / 2, Math.max(1, s / 3), Math.max(1, s / 3));
-  }
-}
-
 /** A blast, a puff of dust from a collapse, or sparks from a hit. */
 function drawEffect(b: Brush, fx: Effect) {
   const { c, px } = b;
@@ -419,12 +378,7 @@ function drawEffect(b: Brush, fx: Effect) {
     c.fill();
     return;
   }
-  c.fillStyle = `rgba(255,230,180,${1 - k})`;
-  const s = Math.max(1, px * 0.15);
-  for (let n = 0; n < 4; n++) {
-    const a = n * 1.57 + fx.x;
-    c.fillRect((fx.x + Math.cos(a) * k * 0.6) * px, (fx.y + Math.sin(a) * k * 0.6) * px, s, s);
-  }
+  drawSparks(c, px, fx);
 }
 
 /** A hiss of steam where fire or a blast met a magic boat's water: pale
