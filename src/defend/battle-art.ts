@@ -15,7 +15,8 @@ import type { CarriedLight } from "./lighting.ts";
 import { drawFireballs, drawMage } from "./mage-art.ts";
 import { drawStabs, drawValkyrie } from "./valkyrie-art.ts";
 import { drawDarkWizard } from "./dark-art.ts";
-import { BUILDING_FLASH, type DefendSim, type Effect, type Enemy, type Scorch, type Soldier } from "./sim.ts";
+import { drawExplosion, drawScorches as drawScorchArt } from "./blast-art.ts";
+import { BUILDING_FLASH, type DefendSim, type Effect, type Enemy, type Soldier } from "./sim.ts";
 
 export type Brush = { c: CanvasRenderingContext2D; px: number };
 
@@ -406,7 +407,7 @@ function drawShells({ c, px }: Brush, sim: DefendSim) {
 function drawEffect(b: Brush, fx: Effect) {
   const { c, px } = b;
   const k = fx.t / 0.6;
-  if (fx.kind === "boom") return drawExplosion(b, fx, k);
+  if (fx.kind === "boom") return drawExplosion(c, px, fx);
   if (fx.kind === "firework") return drawFirework(b, fx);
   if (fx.kind === "steam") return drawSteam(b, fx, k);
   if (fx.kind === "dust") {
@@ -436,102 +437,11 @@ function drawSteam({ c, px }: Brush, fx: Effect, k: number) {
   }
 }
 
-/** A ragged fireball `k` of the way through: noisy blob outlines (never a
- * clean circle) for the smoke, flame and white-hot core, plus flung sparks
- * and debris. */
-function drawExplosion({ c, px }: Brush, fx: Effect, k: number) {
-  const { x, y, r } = fx;
-  const seed = fx.seed ?? 0;
-  const blob = (radius: number, salt: number, wobble: number) => {
-    const n = 16;
-    c.beginPath();
-    for (let i = 0; i <= n; i++) {
-      const a = (i / n) * Math.PI * 2 + hash01(seed, salt) * 0.8;
-      const rr = radius * (1 - wobble + wobble * 2 * hash01(seed, salt, i % n));
-      const px2 = (x + Math.cos(a) * rr) * px,
-        py2 = (y + Math.sin(a) * rr * 0.9) * px;
-      if (i === 0) c.moveTo(px2, py2);
-      else c.lineTo(px2, py2);
-    }
-    c.closePath();
-    c.fill();
-  };
-  const grow = 0.35 + 0.65 * Math.sqrt(k);
-  c.save();
-  // Smoke billows out and lingers darkest at the end.
-  c.fillStyle = `rgba(40,32,28,${0.45 * (1 - k) * Math.min(1, k * 4)})`;
-  blob(r * grow * 1.05, 1, 0.3);
-  c.globalCompositeOperation = "lighter";
-  c.fillStyle = `rgba(255,120,30,${0.75 * (1 - k)})`;
-  blob(r * grow * 0.85, 2, 0.28);
-  c.fillStyle = `rgba(255,200,90,${0.8 * (1 - k) ** 1.5})`;
-  blob(r * grow * 0.55, 3, 0.25);
-  c.fillStyle = `rgba(255,250,220,${0.9 * (1 - k) ** 3})`;
-  blob(r * grow * 0.28, 4, 0.2);
-  const s = Math.max(1, px * 0.12);
-  for (let i = 0; i < 12; i++) {
-    const a = hash01(seed, 20, i) * Math.PI * 2;
-    const d = r * (0.3 + hash01(seed, 21, i) * 1.1) * Math.sqrt(k);
-    c.fillStyle = i % 3 ? `rgba(255,190,90,${1 - k})` : `rgba(90,70,55,${1 - k})`;
-    c.fillRect((x + Math.cos(a) * d) * px, (y + Math.sin(a) * d) * px, s, s);
-  }
-  c.restore();
-}
-
 // ── Scorches ──────────────────────────────────────────────────────────────
 
 /** Branching cracks, glowing like cooling embers where a blast landed. */
-export function drawScorches(b: Brush, sim: DefendSim) {
-  for (const sc of sim.scorches) drawScorch(b, sc);
-}
-
-function drawScorch(b: Brush, sc: Scorch) {
-  const { c, px } = b;
-  const k = sc.t / sc.life;
-  const heat = (1 - k) ** 1.6;
-  // Scorched ground under the cracks.
-  c.fillStyle = `rgba(20,14,10,${0.35 * (1 - k)})`;
-  c.beginPath();
-  c.ellipse(sc.x * px, sc.y * px, sc.r * 0.55 * px, sc.r * 0.5 * px, 0, 0, Math.PI * 2);
-  c.fill();
-  c.save();
-  c.globalCompositeOperation = "lighter";
-  c.lineCap = "round";
-  const arms = 5 + (hash01(sc.seed, 30) * 3) | 0;
-  // A wide dim glow under a narrow bright one.
-  for (const [width, color] of [
-    [0.22, `rgba(255,90,20,${0.35 * heat})`],
-    [0.09, `rgba(255,190,90,${0.9 * heat})`],
-  ] as const) {
-    c.strokeStyle = color;
-    c.lineWidth = Math.max(1, px * width);
-    c.beginPath();
-    for (let i = 0; i < arms; i++) traceCrack(b, sc, i, arms);
-    c.stroke();
-  }
-  c.restore();
-}
-
-/** Crack `i` of `arms`: a wandering line out from the blast, with the odd
- * little fork. */
-function traceCrack({ c, px }: Brush, sc: Scorch, i: number, arms: number) {
-  let a = (i / arms) * Math.PI * 2 + hash01(sc.seed, 31, i) * 0.9;
-  let cx = sc.x,
-    cy = sc.y;
-  c.moveTo(cx * px, cy * px);
-  const len = sc.r * (0.45 + hash01(sc.seed, 32, i) * 0.45);
-  const steps = 4;
-  for (let j = 1; j <= steps; j++) {
-    a += (hash01(sc.seed, 33, i * 7 + j) - 0.5) * 0.9;
-    cx += (Math.cos(a) * len) / steps;
-    cy += (Math.sin(a) * len) / steps;
-    c.lineTo(cx * px, cy * px);
-    if (j === 2 && hash01(sc.seed, 34, i) < 0.6) {
-      const f = a + (hash01(sc.seed, 35, i) < 0.5 ? 0.9 : -0.9);
-      c.lineTo((cx + Math.cos(f) * len * 0.3) * px, (cy + Math.sin(f) * len * 0.3) * px);
-      c.moveTo(cx * px, cy * px);
-    }
-  }
+export function drawScorches({ c, px }: Brush, sim: DefendSim) {
+  drawScorchArt(c, px, sim.scorches);
 }
 
 /** Walking units' footprints for the lighting's shadow pass. */

@@ -1,23 +1,30 @@
 import { enemySize } from "./catalog.ts";
-/** The wizard tower's attacks as they are drawn: the flamethrower's fire
- * and the ice wave's shards. The sim says where each burns or spreads
- * (`sim.flames`, `sim.frosts`); everything here is presentation, with its
- * randomness from the effects stream or the wave's own seed.
+/** The wizard tower's attacks as they are drawn, as pixel art at `ART`
+ * pixels a cell inside the city's black outline. The sim says where each
+ * burns or spreads (`sim.flames`, `sim.frosts`); everything here is
+ * presentation, with its randomness from the effects stream or the wave's
+ * own seed.
  *
- * - **Fire:** particles poured from the tower along the flame's aim, white
- *   hot at the nozzle, turning yellow, orange and red, then smoke. The
- *   flame lights the ground through the battle's lighting (`flameLights`).
- * - **Ice:** as each wave's front passes, clusters of crystal shards sprout
- *   from the ground in a natural, ragged fan, stand glittering, then
- *   shatter into glints. Every shard is shaded as a faceted solid against
- *   one key light from the upper left (as the roofs and trees are), with a
- *   Blinn specular glint and a lit rim, so they all catch the light the
- *   same way; nearby fire adds a warm reflection on the facets facing it. */
+ * - **Fire:** puffs poured from the tower along the flame's aim, white hot
+ *   at the nozzle, turning yellow, orange and red, then smoke, each a
+ *   cut-cornered square of art pixels with a hotter lick, all inside one
+ *   black outline. The flame lights the ground through the battle's
+ *   lighting (`flameLights`).
+ * - **Ice:** as each wave's front (a dithered band of frost) passes,
+ *   clusters of crystal shards sprout from dithered rime in a natural,
+ *   ragged fan, stand glittering, then shatter into glints. Each cluster is
+ *   baked per size step: every shard's facets shaded against one key light
+ *   from the upper left (as the roofs and trees are) into the ice palette,
+ *   all the clusters sharing one dark outline; nearby fire warms the lit
+ *   facets. */
 import { ENEMIES } from "./catalog.ts";
 import { defendRandom } from "./grid.ts";
 import type { DefendSim } from "./sim.ts";
 import type { Flame, Frost } from "./wizard.ts";
 import { random } from "../random.ts";
+import { hash01 } from "./grid.ts";
+import { ART } from "./park-art.ts";
+import { artPen, bake, blit, FLAME, OUTLINE, SMOKE } from "./pixel-fx.ts";
 import type { CarriedLight } from "./lighting.ts";
 import type { ReliefLight } from "./ground-relief.ts";
 
@@ -32,6 +39,11 @@ const KEY = norm3(-0.5, -0.62, 0.6);
 /** Halfway between the key light and the viewer (straight above), for the
  * specular glint. */
 const HALF = norm3(KEY[0], KEY[1], KEY[2] + 1);
+/** Ice, from its outline's deepest blue to white. */
+const OUTLINE_ICE = "#0b1628";
+const ICE = ["#0b1628", "#24508c", "#4b8fd0", "#8fd0f6", "#d4f2ff", "#ffffff"];
+/** Ice warmed by a fire nearby. */
+const WARM_ICE = ["#0b1628", "#4a4a86", "#9a7fa8", "#f0b88a", "#ffe2bc", "#ffffff"];
 const FIRE_RATE = 150;
 const FIRE_SPEED = 9;
 
@@ -42,8 +54,6 @@ export class WizardArt {
   /** How far each wave's front had come when shards were last sown. */
   private sown = new Map<number, number>();
   private rand = defendRandom("effects");
-  private sprites: HTMLCanvasElement[] | null = null;
-  private rime: HTMLCanvasElement | null = null;
   private due = 0;
 
   /** Advances the fire and ice by `dt` seconds of the battle. */
@@ -99,32 +109,46 @@ export class WizardArt {
       }
   }
 
-  /** Smoke under the fire, then the fire itself, blended as light. */
+  /** The flame as pixel art: smoke behind, then one black outline round
+   * the whole jet, then each puff from coolest to hottest so the white-hot
+   * core shows through, and embers as single bright pixels. */
   drawFire(c: CanvasRenderingContext2D, px: number) {
     if (!this.fire.length) return;
-    const sprites = (this.sprites ??= fireSprites());
+    const dot = artPen(c, px);
     c.save();
+    // Smoke, lit from the upper left, thinning as it drifts.
     for (const p of this.fire) {
       const k = p.age / p.life;
       if (k < 0.62 || p.ember) continue;
-      const r = (p.size + k * 0.9) * px;
-      c.globalAlpha = 0.28 * (1 - k);
-      c.drawImage(sprites[4], p.x * px - r, p.y * px - r, r * 2, r * 2);
+      const r = Math.max(1, Math.round((p.size + k * 0.5) * ART * 0.5)), ax = Math.round(p.x * ART), ay = Math.round(p.y * ART);
+      c.globalAlpha = (1 - k) < 0.2 ? 0.35 : 0.6;
+      c.fillStyle = SMOKE[1];
+      puff(dot, ax, ay, r);
+      c.fillStyle = SMOKE[3];
+      dot(ax - r + 1, ay - r + 1, Math.max(1, r - 1), 1);
     }
-    c.globalCompositeOperation = "lighter";
-    for (const p of this.fire) {
-      const k = p.age / p.life;
-      if (p.ember) {
-        c.globalAlpha = 1 - k;
-        c.fillStyle = "#ffd27a";
-        const s = Math.max(1, px * 0.08);
-        c.fillRect(p.x * px - s / 2, p.y * px - s / 2, s, s);
-        continue;
+    c.globalAlpha = 1;
+    const live = this.fire.filter((p) => !p.ember && p.age / p.life < 0.85);
+    live.sort((p, q) => q.age / q.life - p.age / p.life);
+    c.fillStyle = OUTLINE;
+    for (const p of live) puff(dot, Math.round(p.x * ART), Math.round(p.y * ART), fireRadius(p) + 1);
+    for (const p of live) {
+      const k = p.age / p.life, tone = k < 0.08 ? 4 : k < 0.22 ? 3 : k < 0.4 ? 2 : k < 0.62 ? 1 : 0;
+      const x = Math.round(p.x * ART), y = Math.round(p.y * ART), r = fireRadius(p);
+      c.fillStyle = FLAME[tone];
+      puff(dot, x, y, r);
+      // A hotter lick at its upper left, so the jet flickers inside.
+      if (r > 0 && tone < 4) {
+        c.fillStyle = FLAME[tone + 1];
+        dot(x - r + 1, y - r + 1, r, 1);
+        dot(x - r + 1, y - r + 1, 1, r);
       }
-      if (k >= 0.88) continue;
-      const r = (p.size + k * 0.8) * px;
-      c.globalAlpha = Math.min(1, (1 - k / 0.88) * 0.8);
-      c.drawImage(sprites[Math.min(3, Math.floor(k * 5))], p.x * px - r, p.y * px - r, r * 2, r * 2);
+    }
+    for (const p of this.fire) {
+      if (!p.ember) continue;
+      const k = p.age / p.life;
+      c.fillStyle = k < 0.4 ? FLAME[4] : k < 0.75 ? FLAME[3] : FLAME[2];
+      dot(Math.round(p.x * ART), Math.round(p.y * ART));
     }
     c.restore();
   }
@@ -164,59 +188,85 @@ export class WizardArt {
     if (this.glints.length > 600) this.glints.splice(0, this.glints.length - 600);
   }
 
-  /** Frost on the ground where the shards stand, the shards, and the
-   * waves' cold fronts. `fires` are flame lights the shards reflect. */
+  /** Frost on the ground where the shards stand, the shards, the waves'
+   * cold fronts and the glints of shattered ice, all as pixel art. `fires`
+   * are flame lights whose glow warms the shards near them. */
   drawIce(c: CanvasRenderingContext2D, px: number, frosts: readonly Frost[], now: number, fires: readonly ReliefLight[]) {
     const t = now / 1000;
+    const dot = artPen(c, px);
     c.save();
-    // Soft rime on the ground under each cluster, fading as it melts.
-    const rime = (this.rime ??= rimeSprite());
+    c.imageSmoothingEnabled = false;
+    // Dithered rime on the ground under each cluster, fading as it melts.
     for (const cl of this.clusters) {
       const age = t - cl.born, fade = Math.max(0, 1 - age / cl.life);
+      if (age < 0) continue;
       c.globalAlpha = fade * Math.min(1, age / 0.2);
-      c.drawImage(rime, (cl.x - 0.6) * px, (cl.y - 0.45) * px, 1.2 * px, 0.9 * px);
+      const art = clusterArt(cl);
+      blit(c, px, art.rime, Math.round(cl.x * ART) - RIME_W, Math.round(cl.y * ART) - RIME_H);
     }
     c.globalAlpha = 1;
     // Shards, back to front so nearer ones overlap farther ones.
     const order = [...this.clusters].sort((a, b) => a.y - b.y);
-    for (const cl of order) drawCluster(c, px, cl, t, fires);
-    c.globalCompositeOperation = "lighter";
-    // The cold front: a pale band racing outward.
+    // One outline round them all, then the ice, so neighbouring clusters
+    // merge into one field of crystals.
+    for (const cl of order) drawCluster(c, px, dot, cl, t, fires, true);
+    for (const cl of order) drawCluster(c, px, dot, cl, t, fires, false);
+    // The cold front: a dithered band of frost racing outward, brightest at
+    // its leading edge.
     for (const w of frosts) {
       if (w.r >= w.range) continue;
-      const g = c.createRadialGradient(w.x * px, w.y * px, Math.max(0, w.r - 0.7) * px, w.x * px, w.y * px, (w.r + 0.25) * px);
-      g.addColorStop(0, "rgba(120,190,255,0)");
-      g.addColorStop(0.75, "rgba(170,225,255,0.32)");
-      g.addColorStop(1, "rgba(230,248,255,0)");
-      c.fillStyle = g;
-      c.beginPath();
-      c.moveTo(w.x * px, w.y * px);
       const angle = Math.atan2(w.dy, w.dx), half = Math.atan(w.spread);
-      c.arc(w.x * px, w.y * px, (w.r + 0.25) * px, angle - half, angle + half);
-      c.closePath();
-      c.fill();
+      const cx = w.x * ART, cy = w.y * ART, rr = w.r * ART;
+      const steps = Math.ceil(2 * half * (rr + 1));
+      for (let o = 0; o < 4; o++) {
+        c.fillStyle = ICE[o === 0 ? 5 : o === 1 ? 4 : 3];
+        c.globalAlpha = o === 0 ? 0.9 : o === 1 ? 0.75 : 0.45;
+        let lx = NaN, ly = NaN;
+        for (let i = 0; i <= steps; i++) {
+          const a = angle - half + (2 * half * i) / steps;
+          const x = Math.round(cx + Math.cos(a) * (rr - o)), y = Math.round(cy + Math.sin(a) * (rr - o));
+          if ((x === lx && y === ly) || (o >= 2 && (x + y + o) & 1)) continue;
+          [lx, ly] = [x, y];
+          dot(x, y);
+        }
+      }
     }
+    c.globalAlpha = 1;
+    // Glints of shattered ice: a little star while young, then a speck.
+    c.fillStyle = ICE[5];
     for (const gl of this.glints) {
-      c.globalAlpha = 1 - gl.age / gl.life;
-      c.fillStyle = "#eaf8ff";
-      const s = Math.max(1, px * 0.07);
-      c.fillRect(gl.x * px - s / 2, gl.y * px - s / 2, s, s);
+      const k = gl.age / gl.life, x = Math.round(gl.x * ART), y = Math.round(gl.y * ART);
+      dot(x, y);
+      if (k < 0.45) {
+        c.fillStyle = ICE[4];
+        dot(x - 1, y);
+        dot(x + 1, y);
+        dot(x, y - 1);
+        dot(x, y + 1);
+        c.fillStyle = ICE[5];
+      }
     }
     c.restore();
   }
 
-  /** A frosty sheen over chilled enemies. */
+  /** Frost over chilled enemies: dithered rime across them, a pale rim on
+   * top and a glint that twinkles. */
   drawChill(c: CanvasRenderingContext2D, px: number, sim: DefendSim, now: number) {
+    const dot = artPen(c, px);
     c.save();
     for (const e of sim.enemies) {
       if (!e.chill) continue;
-      const s = enemySize(e) * px, x = e.x * px - s / 2, y = e.y * px - s / 2;
-      c.fillStyle = "rgba(170,220,255,0.45)";
-      c.fillRect(x, y, s, s);
-      c.fillStyle = "rgba(240,252,255,0.9)";
-      const d = Math.max(1, px * 0.07), tw = Math.sin(now / 160 + e.id) > 0.3;
-      c.fillRect(x + s * 0.15, y + s * 0.15, d, d);
-      if (tw) c.fillRect(x + s * 0.7, y + s * 0.6, d, d);
+      const n = Math.max(2, Math.round(enemySize(e) * ART)), x0 = Math.round(e.x * ART - n / 2), y0 = Math.round(e.y * ART - n / 2);
+      c.fillStyle = ICE[3];
+      c.globalAlpha = 0.55;
+      for (let y = 1; y < n; y++) for (let x = (y + e.id) & 1; x < n; x += 2) dot(x0 + x, y0 + y);
+      c.globalAlpha = 0.9;
+      c.fillStyle = ICE[4];
+      dot(x0 + 1, y0, n - 2, 1);
+      if (Math.sin(now / 160 + e.id) > 0.3) {
+        c.fillStyle = ICE[5];
+        dot(x0 + n - 2, y0 + 1);
+      }
     }
     c.restore();
   }
@@ -284,139 +334,123 @@ function cluster(rnd: () => number, x: number, y: number, a: number, big: number
   return { x, y, born, life: 1.1 + rnd() * 0.6, shards };
 }
 
-/** Grows in, stands, then shrinks away as it shatters. */
-function drawCluster(c: CanvasRenderingContext2D, px: number, cl: Cluster, t: number, fires: readonly ReliefLight[]) {
+/** How big a cluster's shards stand: growing in, then shrinking away as it
+ * shatters, in `SCALES` steps. */
+const SCALES = 5;
+/** Half the rime patch's size, in art pixels. */
+const RIME_W = 5, RIME_H = 4;
+/** Half a cluster sprite's size, in art pixels. */
+const CLUSTER_R = 12;
+
+type ClusterArt = { rime: HTMLCanvasElement; shards: ({ outline: HTMLCanvasElement; fill: HTMLCanvasElement } | undefined)[] };
+const clusterArts = new WeakMap<Cluster, ClusterArt>();
+
+function clusterArt(cl: Cluster) {
+  let art = clusterArts.get(cl);
+  if (!art) clusterArts.set(cl, (art = { rime: rimeSprite(cl), shards: [] }));
+  return art;
+}
+
+function drawCluster(c: CanvasRenderingContext2D, px: number, dot: ReturnType<typeof artPen>, cl: Cluster, t: number, fires: readonly ReliefLight[], outline: boolean) {
   const age = t - cl.born;
   if (age < 0) return;
   const grow = Math.min(1, age / 0.14), end = Math.min(1, (cl.life - age) / 0.25);
   const scale = (1 - (1 - grow) * (1 - grow)) * Math.max(0, end);
-  if (scale <= 0.02) return;
-  // The warmest fire nearby, for a reflection on the facets facing it.
-  let fire: ReliefLight | null = null, heat = 0;
-  for (const f of fires) {
-    const d = Math.hypot(f.x - cl.x, f.y - cl.y), v = f.k * Math.max(0, 1 - d / (f.r * 1.4));
-    if (v > heat) [heat, fire] = [v, f];
+  const step = Math.round(scale * SCALES);
+  if (step <= 0) return;
+  // The warmest fire nearby warms the shards' lit facets.
+  let heat = 0;
+  for (const f of fires) heat = Math.max(heat, f.k * Math.max(0, 1 - Math.hypot(f.x - cl.x, f.y - cl.y) / (f.r * 1.4)));
+  const warm = heat > 0.3 ? 1 : 0;
+  const art = clusterArt(cl);
+  const img = (art.shards[step * 2 + warm] ??= bakeCluster(cl, step / SCALES, warm === 1));
+  const ax = Math.round(cl.x * ART) - CLUSTER_R, ay = Math.round(cl.y * ART) - CLUSTER_R;
+  blit(c, px, outline ? img.outline : img.fill, ax, ay);
+  // Glints twinkling at the shards' lit tips.
+  if (outline || step < SCALES) return;
+  c.fillStyle = ICE[5];
+  for (const s of cl.shards) {
+    if (Math.sin(t * 5 + s.phase) < 0.93 || s.len < 0.6) continue;
+    const x = Math.round((cl.x + s.ox + s.ux * s.len * 0.75) * ART), y = Math.round((cl.y + s.oy + s.uy * s.len * 0.75) * ART);
+    dot(x - 1, y, 3, 1);
+    dot(x, y - 1, 1, 3);
   }
-  for (const s of cl.shards) drawShard(c, px, cl.x + s.ox, cl.y + s.oy, s, scale, t, fire, heat);
 }
 
-/** One shard: two long facets either side of its spine and a short bevel
- * at the tip, each shaded by its own normal against the key light. */
-function drawShard(c: CanvasRenderingContext2D, px: number, x: number, y: number, s: Shard, scale: number, t: number, fire: ReliefLight | null, heat: number) {
-  const len = s.len * scale, w = s.w * Math.min(1, scale * 1.4);
-  const nx = -s.uy, ny = s.ux;
-  const P = (along: number, side: number) => [(x + s.ux * len * along + nx * w * side) * px, (y + s.uy * len * along + ny * w * side) * px] as const;
-  const base = P(0, 0), tip = P(1, 0), l0 = P(0.02, 0.55), r0 = P(0.02, -0.55), l1 = P(0.74, 0.5), r1 = P(0.74, -0.5), spine = P(0.8, 0);
-  // Facet normals: the long sides lean out from the spine and up toward
-  // the viewer; the bevel at the tip faces along the shard and up.
-  const left = norm3(nx * 0.75, ny * 0.75, 0.66), right = norm3(-nx * 0.75, -ny * 0.75, 0.66), bevelL = norm3(nx * 0.45 + s.ux * 0.55, ny * 0.45 + s.uy * 0.55, 0.7), bevelR = norm3(-nx * 0.45 + s.ux * 0.55, -ny * 0.45 + s.uy * 0.55, 0.7);
-  const facets: [readonly (readonly [number, number])[], number[]][] = [
-    [[base, l0, l1, spine], left],
-    [[base, r0, r1, spine], right],
-    [[l1, tip, spine], bevelL],
-    [[r1, tip, spine], bevelR],
-  ];
-  // Fire's direction, low over the ground.
-  const fd = fire ? norm3(fire.x - x, fire.y - y, 0.35) : null;
-  c.lineJoin = "round";
-  for (const [pts, n] of facets) {
-    const diffuse = Math.max(0, dot(n, KEY));
-    const spec = Math.pow(Math.max(0, dot(n, HALF)), 28);
-    let r = 34 + diffuse * 150 + spec * 120, g = 84 + diffuse * 140 + spec * 80, b = 140 + diffuse * 110 + spec * 40;
-    if (fd) {
-      const warm = Math.max(0, dot(n, fd)) * heat;
-      r += warm * 150;
-      g += warm * 70;
-      b -= warm * 30;
+/** A cluster's shards at `scale`, rasterized: each shard two long facets
+ * either side of its spine and a bevel at its tip, each shaded by its own
+ * normal against the key light into the ice palette, darker where it sinks
+ * into the frost, all inside one black outline. `warm` turns the lit
+ * facets toward the fire's glow. */
+function bakeCluster(cl: Cluster, scale: number, warm: boolean) {
+  const N = CLUSTER_R * 2 + 1;
+  const grid = new Int8Array(N * N).fill(-1);
+  for (const s of cl.shards) {
+    const len = s.len * scale * ART, w = Math.max(0.9, s.w * Math.min(1, scale * 1.4) * ART * 0.7);
+    const ox = s.ox * ART, oy = s.oy * ART, nx = -s.uy, ny = s.ux;
+    const left = norm3(nx * 0.75, ny * 0.75, 0.66), right = norm3(-nx * 0.75, -ny * 0.75, 0.66);
+    const bevelL = norm3(nx * 0.45 + s.ux * 0.55, ny * 0.45 + s.uy * 0.55, 0.7), bevelR = norm3(-nx * 0.45 + s.ux * 0.55, -ny * 0.45 + s.uy * 0.55, 0.7);
+    for (let y = 0; y < N; y++)
+      for (let x = 0; x < N; x++) {
+        const dx = x + 0.5 - CLUSTER_R - 0.5 - ox, dy = y + 0.5 - CLUSTER_R - 0.5 - oy;
+        const along = (dx * s.ux + dy * s.uy) / len, side = (dx * nx + dy * ny) / w;
+        if (along < -0.05 || along > 1) continue;
+        const hw = along < 0.74 ? 1 : (1 - along) / 0.26;
+        if (Math.abs(side) > hw + 0.15) continue;
+        const n = along >= 0.74 ? (side >= 0 ? bevelL : bevelR) : side >= 0 ? left : right;
+        const lit = Math.max(0, dot3(n, KEY)) + Math.pow(Math.max(0, dot3(n, HALF)), 28) * 0.8;
+        let tone = lit < 0.3 ? 1 : lit < 0.55 ? 2 : lit < 0.8 ? 3 : 4;
+        if (Math.abs(side) < 0.3 && along > 0.2 && along < 0.85 && tone >= 2) tone = Math.min(5, tone + 1);
+        if (along < 0.25) tone = Math.max(1, tone - 1);
+        grid[y * N + x] = tone;
+      }
+  }
+  const { cv: line, c } = bake(N, N);
+  c.fillStyle = OUTLINE_ICE;
+  for (let y = 0; y < N; y++)
+    for (let x = 0; x < N; x++) {
+      if (grid[y * N + x] >= 0) continue;
+      const near = (xx: number, yy: number) => xx >= 0 && yy >= 0 && xx < N && yy < N && grid[yy * N + xx] >= 0;
+      if (near(x - 1, y) || near(x + 1, y) || near(x, y - 1) || near(x, y + 1)) c.fillRect(x, y, 1, 1);
     }
-    c.fillStyle = `rgba(${clamp255(r)},${clamp255(g)},${clamp255(b)},0.92)`;
-    c.beginPath();
-    c.moveTo(pts[0][0], pts[0][1]);
-    for (let k = 1; k < pts.length; k++) c.lineTo(pts[k][0], pts[k][1]);
-    c.closePath();
-    c.fill();
+  const palette = warm ? WARM_ICE : ICE;
+  const { cv: fill, c: f } = bake(N, N);
+  for (let i = 0; i < grid.length; i++) {
+    if (grid[i] < 0) continue;
+    f.fillStyle = palette[grid[i]];
+    f.fillRect(i % N, Math.floor(i / N), 1, 1);
   }
-  // The base sinks into the frost, deeper blue and in shadow.
-  const lb = P(0.28, 0.55), rb = P(0.28, -0.55);
-  c.fillStyle = "rgba(8,26,58,0.35)";
-  c.beginPath();
-  c.moveTo(l0[0], l0[1]);
-  c.lineTo(lb[0], lb[1]);
-  c.lineTo(rb[0], rb[1]);
-  c.lineTo(r0[0], r0[1]);
-  c.closePath();
-  c.fill();
-  const line = Math.max(0.7, px * 0.035);
-  c.lineWidth = line;
-  // A dark outline on the side turned from the light, a bright rim on the
-  // lit side, and the spine as a crisp ridge.
-  const litLeft = dot(left, KEY) >= dot(right, KEY);
-  const [litA, litB, darkA, darkB] = litLeft ? [l0, l1, r0, r1] : [r0, r1, l0, l1];
-  c.strokeStyle = "rgba(10,26,52,0.9)";
-  c.beginPath();
-  c.moveTo(darkA[0], darkA[1]);
-  c.lineTo(darkB[0], darkB[1]);
-  c.lineTo(tip[0], tip[1]);
-  c.stroke();
-  c.strokeStyle = "rgba(236,250,255,0.7)";
-  c.beginPath();
-  c.moveTo(litA[0], litA[1]);
-  c.lineTo(litB[0], litB[1]);
-  c.lineTo(tip[0], tip[1]);
-  c.stroke();
-  c.strokeStyle = "rgba(255,255,255,0.35)";
-  c.beginPath();
-  c.moveTo(base[0], base[1]);
-  c.lineTo(spine[0], spine[1]);
-  c.stroke();
-  // The glint: where the lit bevel catches the key light, twinkling.
-  const tw = 0.6 + 0.4 * Math.sin(t * 5 + s.phase);
-  const glint = Math.pow(Math.max(0, dot(litLeft ? bevelL : bevelR, HALF)), 10) * tw;
-  if (glint > 0.25 && len * px > 3) {
-    const at = litLeft ? P(0.78, 0.22) : P(0.78, -0.22), g = Math.max(1, px * 0.12 * glint);
-    c.fillStyle = `rgba(255,255,255,${Math.min(1, glint).toFixed(2)})`;
-    c.fillRect(at[0] - g, at[1] - line / 2, g * 2, line);
-    c.fillRect(at[0] - line / 2, at[1] - g, line, g * 2);
-  }
+  return { outline: line, fill };
 }
 
-/** A soft patch of frost: pale blue at the heart, feathered to nothing. */
-function rimeSprite() {
-  const cv = document.createElement("canvas");
-  cv.width = cv.height = 32;
-  const c = cv.getContext("2d")!;
-  const g = c.createRadialGradient(16, 16, 0, 16, 16, 16);
-  g.addColorStop(0, "rgba(214,238,255,0.32)");
-  g.addColorStop(0.55, "rgba(190,224,250,0.16)");
-  g.addColorStop(1, "rgba(180,220,250,0)");
-  c.fillStyle = g;
-  c.fillRect(0, 0, 32, 32);
-  // A few frozen specks.
-  c.fillStyle = "rgba(240,250,255,0.5)";
-  for (const [x, y] of [[9, 14], [20, 10], [24, 19], [13, 22], [16, 16]]) c.fillRect(x, y, 1, 1);
+/** Rime on the ground: pale specks dithered over a patch, thicker at its
+ * heart. */
+function rimeSprite(cl: Cluster) {
+  const { cv, c } = bake(RIME_W * 2 + 1, RIME_H * 2 + 1);
+  const seed = Math.round(cl.x * 131 + cl.y * 977);
+  for (let y = -RIME_H; y <= RIME_H; y++)
+    for (let x = -RIME_W; x <= RIME_W; x++) {
+      const d = Math.sqrt((x / RIME_W) ** 2 + (y / RIME_H) ** 2);
+      if (d > 1 || (x + y) & 1 || hash01(seed, x, y) > 1.1 - d) continue;
+      c.fillStyle = d < 0.5 ? "rgba(214,240,255,0.7)" : "rgba(170,214,246,0.5)";
+      c.fillRect(x + RIME_W, y + RIME_H, 1, 1);
+    }
   return cv;
 }
 
-function fireSprites() {
-  const tints: [number, number, number][] = [[255, 250, 220], [255, 214, 120], [255, 150, 60], [220, 70, 30]];
-  const make = (stops: [number, string][]) => {
-    const cv = document.createElement("canvas");
-    cv.width = cv.height = 32;
-    const c = cv.getContext("2d")!;
-    const g = c.createRadialGradient(16, 16, 0, 16, 16, 16);
-    for (const [o, col] of stops) g.addColorStop(o, col);
-    c.fillStyle = g;
-    c.fillRect(0, 0, 32, 32);
-    return cv;
-  };
-  const fire = tints.map(([r, g, b]) => make([[0, `rgba(${r},${g},${b},0.95)`], [0.45, `rgba(${r},${Math.round(g * 0.7)},${Math.round(b * 0.5)},0.45)`], [1, `rgba(${r},${Math.round(g * 0.5)},0,0)`]]));
-  const smoke = make([[0, "rgba(40,36,34,0.8)"], [1, "rgba(40,36,34,0)"]]);
-  return [...fire, smoke];
+/** A puff of fire or smoke `r` art pixels across from its middle: a square
+ * with its corners cut, or a single pixel. */
+function puff(dot: ReturnType<typeof artPen>, x: number, y: number, r: number) {
+  if (r <= 0) return dot(x, y);
+  dot(x - r + 1, y - r, 2 * r - 1, 2 * r + 1);
+  dot(x - r, y - r + 1, 2 * r + 1, 2 * r - 1);
 }
+
+/** A flame puff's size as it spreads, in art pixels. */
+const fireRadius = (p: Fire) => Math.max(0, Math.round((p.size + (p.age / p.life) * 0.6) * ART * 0.36));
 
 function norm3(x: number, y: number, z: number) {
   const l = Math.sqrt(x * x + y * y + z * z);
   return [x / l, y / l, z / l];
 }
-const dot = (a: number[], b: number[]) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-const clamp255 = (v: number) => Math.max(0, Math.min(255, Math.round(v)));
+const dot3 = (a: number[], b: number[]) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
