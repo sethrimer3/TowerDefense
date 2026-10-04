@@ -11,7 +11,7 @@
 import { play } from "../sound.ts";
 import { HOUR_MS, MAX_AWAY_MS } from "../away.ts";
 import { random } from "../random.ts";
-import { H, LAB_FLOOR, MAX_LIBRARIANS, MAX_SHELVES, LibrarySim, ROLES, RETURN_BOOKS, idleFireChance, idleHours, librarianPrice, shelfPrice, type Librarian, type LibrarySave, type Role } from "./sim.ts";
+import { H, LAB_FLOOR, LAB_MAX_LEVEL, MAX_LIBRARIANS, labPrice, MAX_SHELVES, LibrarySim, ROLES, RETURN_BOOKS, idleFireChance, idleHours, librarianPrice, shelfPrice, type Librarian, type LibrarySave, type Role } from "./sim.ts";
 
 import { LibraryRenderer, daylight } from "./render.ts";
 
@@ -44,7 +44,7 @@ export interface LibraryHost {
 const ROLE: Record<Role, { name: string; one: string; hint: string }> = {
   shelver: { name: "Shelvers", one: "shelver", hint: "Shelvers build shelves and ladders, wheel the carts, shelve and sort the books, and fight fires" },
   professor: { name: "Professors", one: "professor", hint: "Professors read the books, a book once each, for Knowledge: built shelves times professors an hour" },
-  researcher: { name: "Researchers", one: "researcher", hint: "Researchers work the alchemy lab below; with none, the Upgrades tab's Knowledge research can't be bought" },
+  researcher: { name: "Researchers", one: "researcher", hint: "Researchers work the alchemy lab below, one a lab level; with none, the Upgrades tab's Knowledge research can't be bought" },
 };
 const escape = (s: string) => s.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 const plural = (k: number, one: string) => `${k} ${one}${k === 1 ? "" : "s"}`;
@@ -144,6 +144,7 @@ export class LibraryPage {
     this.root.innerHTML = `<div class="mine-head library-head">
         <button id="library-shelf" class="mine-hire"></button>
         <button id="library-hire" class="mine-hire"></button>
+        <button id="library-lab-up" class="mine-hire" title="Dig the alchemy lab out further: each level makes room for another researcher"></button>
         <p id="library-tally" class="mine-tally"></p>
       </div>
       <div class="mine-tools">
@@ -154,7 +155,7 @@ export class LibraryPage {
       <div class="mine-body" id="library-body">
         <aside class="mine-crew" id="library-staff" aria-label="The staff" aria-hidden="true">
           ${ROLES.map((r) => `<section class="crew-box" data-role="${r}" title="${ROLE[r].hint}"><h3><i class="job-mark job-${r}"></i>${ROLE[r].name} <b data-count="${r}">0</b></h3><ul></ul></section>`).join("")}
-          <p class="crew-hint">Drag a name to another role. Tap one to follow them. Researchers work the lab below the nave: with none, Knowledge research in the Upgrades tab can't be bought.</p>
+          <p class="crew-hint">Drag a name to another role. Tap one to follow them. Researchers work the lab below the nave: with none, Knowledge research in the Upgrades tab can't be bought. The lab has room for one researcher a level: expand it for more.</p>
         </aside>
         <div class="mine-view library-view"><canvas id="library-canvas" aria-label="The library"></canvas><p id="library-alert" class="mine-away library-alert" role="status" hidden></p></div>
       </div>`;
@@ -166,6 +167,7 @@ export class LibraryPage {
       if (!this.sim.fire.active) this.sim.lost = null;
     };
     this.root.querySelector<HTMLButtonElement>("#library-hire")!.onclick = () => this.buy(librarianPrice(this.sim.hired), () => this.sim.hire());
+    this.root.querySelector<HTMLButtonElement>("#library-lab-up")!.onclick = () => this.buy(labPrice(this.sim.labLevel), () => this.sim.upgradeLab());
     const toggle = this.root.querySelector<HTMLButtonElement>("#library-staff-toggle")!;
     toggle.onclick = () => {
       const open = toggle.getAttribute("aria-pressed") !== "true";
@@ -241,13 +243,14 @@ export class LibraryPage {
   private refreshStaff() {
     if (this.dragging) return;
     const sim = this.sim, target = this.renderer?.target ?? null;
-    const key = sim.librarians.map((l) => `${l.id}:${l.role}:${l.home}`).join(",") + "|" + (target?.id ?? "");
+    const key = sim.librarians.map((l) => `${l.id}:${l.role}:${l.home}`).join(",") + "|" + (target?.id ?? "") + "|" + sim.researcherCap;
     if (key === this.shownStaff) return;
     this.shownStaff = key;
     for (const role of ROLES) {
       const box = this.root.querySelector<HTMLElement>(`.crew-box[data-role="${role}"]`)!;
       const staff = sim.librarians.filter((l) => l.role === role);
-      box.querySelector("[data-count]")!.textContent = String(staff.length);
+      box.querySelector("[data-count]")!.textContent = role === "researcher" ? `${staff.length}/${sim.researcherCap}` : String(staff.length);
+      box.classList.toggle("full", role === "researcher" && staff.length >= sim.researcherCap);
       box.querySelector("ul")!.innerHTML = staff
         .map((l) => `<li class="crew-member${l === target ? " selected" : ""}" data-id="${l.id}"${l.home ? ` title="Home for the night"` : ""}><i class="job-mark job-${role}"></i><span>${escape(l.name)}</span>${l.home ? `<i class="busy-mark" aria-hidden="true">☾</i>` : ""}</li>`)
         .join("");
@@ -316,14 +319,14 @@ export class LibraryPage {
   refresh() {
     if (!this.built) return;
     const sim = this.sim, free = this.host.free(), gold = this.host.gold();
-    const sp = shelfPrice(sim.shelves), lp = librarianPrice(sim.hired);
+    const sp = shelfPrice(sim.shelves), lp = librarianPrice(sim.hired), level = sim.labLevel, up = labPrice(level), labFull = level >= LAB_MAX_LEVEL;
     const shelvesFull = sim.shelves >= MAX_SHELVES, crewFull = sim.librarians.length >= MAX_LIBRARIANS;
     const fire = sim.fire.active, lost = sim.lost;
     const home = sim.librarians.filter((l) => l.home).length, roles = sim.roles;
     this.refreshStaff();
     const lab = this.root.querySelector<HTMLButtonElement>("#library-lab")!, inLab = this.renderer ? (this.renderer.goal ?? this.renderer.focus.y) > H : false;
     lab.textContent = inLab ? "⤒ Nave" : "⤓ Lab";
-    const key = `${home}|${sim.shelves}|${sim.built}|${sim.librarians.length}|${ROLES.map((r) => roles[r]).join(",")}|${free || gold >= sp}|${free || gold >= lp}|${sim.fresh}|${sim.returns.length}|${fire}|${lost ? `${lost.shelves},${lost.librarians},${lost.books}` : ""}`;
+    const key = `${home}|${sim.shelves}|${sim.built}|${sim.librarians.length}|${ROLES.map((r) => roles[r]).join(",")}|${free || gold >= sp}|${free || gold >= lp}|${level}|${free || gold >= up}|${sim.fresh}|${sim.returns.length}|${fire}|${lost ? `${lost.shelves},${lost.librarians},${lost.books}` : ""}`;
     if (key === this.shown) return;
     this.shown = key;
     const shelf = this.root.querySelector<HTMLButtonElement>("#library-shelf")!, hire = this.root.querySelector<HTMLButtonElement>("#library-hire")!;
@@ -331,6 +334,9 @@ export class LibraryPage {
     shelf.disabled = shelvesFull || !(free || gold >= sp);
     hire.innerHTML = crewFull ? `Librarians full<small>${sim.librarians.length}</small>` : `Librarian<small>${lp} gold</small>`;
     hire.disabled = crewFull || !(free || gold >= lp);
+    const labUp = this.root.querySelector<HTMLButtonElement>("#library-lab-up")!;
+    labUp.innerHTML = labFull ? `Lab complete<small>level ${level}</small>` : `Expand lab ${level + 1}<small>${up} gold</small>`;
+    labUp.disabled = labFull || !(free || gold >= up);
     const n = sim.librarians.length, planned = sim.shelves - sim.built;
     this.root.querySelector("#library-tally")!.innerHTML =
       `<b>${sim.built}</b>/${MAX_SHELVES} shelves${planned ? ` (+${planned} to build)` : ""} · <b>${n}</b> ${n === 1 ? "librarian" : "librarians"}${home ? ` (${home} home for the night)` : ""}<br><b>${sim.fresh}</b> books to read · <b>${sim.returns.length}</b>/${RETURN_BOOKS} read · <b>${sim.rate}</b> Knowledge an hour`;
