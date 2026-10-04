@@ -62,7 +62,7 @@ Successive fixed-workload ablations isolate the changes without editing the chec
 - **Combat reuse:** retain screen pixels between unchanged simulation ticks, with camera, scale, canvas dimensions, settings, map version and out-of-tick bomb/effect changes invalidating the cache. Wall-clock chill glints remain live; loss-time torch fading bypasses reuse. This saved about 8.76 ms in the ablation. It helps repeated ticks and pauses, but cannot skip a new simulation tick during slow real-time playback.
 - **Sprite backing:** tiny ice/explosion sprites are built in software rather than flushing many new GPU surfaces. Ice drawing fell from 3.03 to 2.32 ms in comparable final runs (2.12 ms in an untraced trial); total draw improvement is smaller than machine variance, so no large standalone FPS claim is made.
 
-An enemy-body sprite cache and forcing the whole main canvas or combat buffer into software made the benchmark slower and were removed. The opaque/desynchronized main canvas gave no reliably isolated large gain; every frame already fills it opaquely.
+An enemy-body sprite cache and forcing the whole main canvas or combat buffer into software made the benchmark slower and were removed. The opaque main canvas gave no reliably isolated large gain; every frame already fills it opaquely. Its `desynchronized` flag was removed (October 4, 2026): a low-latency canvas may be shown before a frame is finished, which made the lighting, trees and rain flicker on real devices.
 
 ## Investigation of other suspects
 
