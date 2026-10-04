@@ -1292,7 +1292,9 @@ dialog .away-row .away-note {
   background: var(--parchment), #eedcba;
   color: var(--ink);
   font-family: var(--font);
-  white-space: pre;
+  white-space: pre-wrap;
+  max-width: calc(100vw - 16px);
+  box-sizing: border-box;
   pointer-events: none;
   border: 1px solid #b69352;
   font-size: 12px;

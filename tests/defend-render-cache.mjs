@@ -17,6 +17,7 @@ try {
     const {stressScene}=await import('/tests/defend-stress-scene.ts');
     const {drawBlazes}=await import('/src/defend/mage-art.ts');
     const {drawBlazes:referenceBlazes}=await import('/test-results/reference/mage-art.ts');
+    const referenceBattle=await import('/test-results/reference/battle-art.ts');
     const {map,sim}=stressScene(100);
     const make=(w=504,h=728)=>{const c=document.createElement('canvas');c.width=w;c.height=h;return c;};
     const compare=(a,b)=>{
@@ -65,6 +66,19 @@ try {
     for(const [zoom,x,y] of [[1,0,0],[2.5,-300,-500]]){
       Object.assign(r.cam,{s:zoom,x,y});
       r.draw(map,sim,null,opts);const a=capture();
+      const original=make(canvas.width,canvas.height),fresh=make(canvas.width,canvas.height);
+      for(const cv of [original,fresh]){
+        const g=cv.getContext('2d');g.setTransform(zoom,0,0,zoom,x,y);g.imageSmoothingEnabled=false;
+      }
+      const g=original.getContext('2d'),brush={c:g,px:r.px};
+      referenceBattle.drawScorches(brush,sim);
+      referenceBlazes(g,r.px,sim);
+      const {flameLights}=await import('/src/defend/wizard-art.ts');
+      r.wizard.drawIce(g,r.px,sim.frosts,sim.time*1000,flameLights(sim).relief);
+      referenceBattle.drawUnits(brush,sim,()=>1,true);
+      r.dark.draw(g,r.px,sim);
+      r.paintCombat(fresh.getContext('2d'),sim,()=>1,opts);
+      reports.push({check:'original combat pixels',zoom,...compare(original,fresh)});
       r.draw(map,sim,null,opts);const b=capture();
       r.combatKey='';r.draw(map,sim,null,opts);const direct=capture();
       reports.push({check:'combat reuse',zoom,...compare(b,direct)});
@@ -74,6 +88,21 @@ try {
       reports.push({check:'settled repeat',zoom,...compare(settled,capture())});
       if(!a.width)throw new Error('empty capture');
     }
+    // A dropped bomb changes combat between ticks. It must not leave a cached
+    // pre-blast frame on screen while a journal has paused the simulation.
+    r.draw(map,sim,null,opts);
+    const time=sim.time;
+    sim.dropBomb(30,35);
+    if(sim.time!==time)throw new Error('bomb advanced battle time');
+    r.draw(map,sim,null,opts);const bomb=capture();
+    r.combatKey='';r.draw(map,sim,null,opts);
+    reports.push({check:'same-tick bomb',...compare(bomb,capture())});
+    // Settings and canvas dimensions independently invalidate screen pixels.
+    opts.healthbars=false;
+    canvas.width-=17;
+    r.draw(map,sim,null,opts);const resized=capture();
+    r.combatKey='';r.draw(map,sim,null,opts);
+    reports.push({check:'resize and healthbars',...compare(resized,capture())});
     return reports;
   });
   writeFileSync('test-results/render-cache.json',JSON.stringify(results,null,2));

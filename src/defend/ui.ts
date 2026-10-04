@@ -157,8 +157,9 @@ export class DefendPage {
       this.messageT -= dt;
       if (this.messageT <= 0) this.setMessage("");
     }
+    this.fitView();
     const drawing = performance.now();
-    this.draw();
+    this.draw(false);
     const drawn = performance.now();
     if (measuring && this.sim && !document.hidden) {
       this.performance.sample(this.sim.wave, this.sim.enemies.length, dt * 1000, updated - start, drawn - drawing);
@@ -678,9 +679,9 @@ export class DefendPage {
     }
   }
 
-  private draw() {
+  private draw(fit = true) {
     if (!this.renderer) return;
-    this.fitView();
+    if (fit) this.fitView();
     if (!this.renderer.canvas.width) return;
     const map = this.sim ? this.sim.map : this.currentMap();
     this.renderer.draw(map, this.sim, this.overlay(), {

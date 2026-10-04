@@ -29,10 +29,10 @@ export function stressScene(count = 2500, heavy = false) {
   for (let i = 0; i < 900; i++) sim.update(1 / 30);
   const cells = [...map.city.keys()].filter(i => map.city[i] && !sim.solid[i]);
   sim.enemies.length = 0;
+  const siegeMix: EnemyKind[] = ['roach', 'roach', 'orc', 'ogre', 'bat', 'shieldBearer', 'darkKnight', 'rollingCannon', 'fireworkLauncher'];
   for (let i = 0; i < count; i++) {
     const k = i % 100;
     const kind: EnemyKind = k < 65 ? 'roach' : k < 80 ? 'orc' : k < 90 ? 'bat' : k < 95 ? 'ogre' : k < 97 ? 'darkKnight' : k < 99 ? 'shieldBearer' : 'fireworkLauncher';
-    const siegeMix: EnemyKind[] = ['roach', 'roach', 'orc', 'ogre', 'bat', 'shieldBearer', 'darkKnight', 'rollingCannon', 'fireworkLauncher'];
     sim.spawnEnemy(heavy ? siegeMix[i % siegeMix.length] : kind);
     const e = sim.enemies.at(-1)!;
     const cell = cells[(i * 37) % cells.length];

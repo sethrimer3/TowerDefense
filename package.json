@@ -10,6 +10,9 @@
     "test": "node --experimental-transform-types --import ./tests/pin-random.ts --test tests/*.test.ts",
     "test:pointer": "node tests/defend-pointer.mjs",
     "test:performance": "node tests/defend-performance.mjs",
+    "test:stress": "node tests/defend-stress.mjs",
+    "test:stress-ui": "node tests/defend-stress-ui.mjs",
+    "test:render-cache": "node tests/defend-render-cache.mjs",
     "font": "node --experimental-transform-types scripts/pixel-font/build.ts"
   },
   "devDependencies": {
