@@ -55,8 +55,14 @@ export class ParkTrees {
    * (drawing source-atop) as the battle's light darkens the city below. */
   draw(c: CanvasRenderingContext2D, px: number, shade?: (o: CanvasRenderingContext2D) => void) {
     if (!this.trees.length) return;
+    const k = px / ART;
     let target = c;
+    // With `shade`, only the box round the trees (in canvas pixels) is
+    // cleared, shaded and copied back: nothing else is drawn there.
+    let box: { x: number; y: number; w: number; h: number } | null = null;
     if (shade) {
+      box = this.screenBox(c, k);
+      if (!box) return;
       this.off ??= document.createElement("canvas");
       if (this.off.width !== c.canvas.width || this.off.height !== c.canvas.height) {
         this.off.width = c.canvas.width;
@@ -64,10 +70,9 @@ export class ParkTrees {
       }
       target = this.off.getContext("2d")!;
       target.setTransform(1, 0, 0, 1, 0, 0);
-      target.clearRect(0, 0, this.off.width, this.off.height);
+      target.clearRect(box.x, box.y, box.w, box.h);
       target.setTransform(c.getTransform());
     }
-    const k = px / ART;
     target.save();
     target.imageSmoothingEnabled = false;
     this.trees.forEach((t, i) => {
@@ -76,14 +81,42 @@ export class ParkTrees {
       target.drawImage(t.canvas, t.x * k, t.y * k, t.w * k, t.h * k);
     });
     target.restore();
-    if (!shade) return;
+    if (!shade || !box) return;
     target.save();
+    target.setTransform(1, 0, 0, 1, 0, 0);
+    target.beginPath();
+    target.rect(box.x, box.y, box.w, box.h);
+    target.clip();
+    target.setTransform(c.getTransform());
     target.globalCompositeOperation = "source-atop";
     shade(target);
     target.restore();
     c.save();
     c.setTransform(1, 0, 0, 1, 0, 0);
-    c.drawImage(this.off!, 0, 0);
+    c.drawImage(this.off!, box.x, box.y, box.w, box.h, box.x, box.y, box.w, box.h);
     c.restore();
+  }
+
+  /** The canvas pixels the trees cover through `c`'s camera (whole
+   * pixels, on the canvas), or null when none shows. */
+  private screenBox(c: CanvasRenderingContext2D, k: number) {
+    const m = c.getTransform();
+    let x0 = Infinity,
+      y0 = Infinity,
+      x1 = -Infinity,
+      y1 = -Infinity;
+    for (const t of this.trees) {
+      if (!t.canvas) continue;
+      x0 = Math.min(x0, t.x * k);
+      y0 = Math.min(y0, t.y * k);
+      x1 = Math.max(x1, (t.x + t.w) * k);
+      y1 = Math.max(y1, (t.y + t.h) * k);
+    }
+    // The camera only scales and moves.
+    const left = Math.max(0, Math.floor(m.a * x0 + m.e) - 1),
+      top = Math.max(0, Math.floor(m.d * y0 + m.f) - 1);
+    const right = Math.min(c.canvas.width, Math.ceil(m.a * x1 + m.e) + 1),
+      bottom = Math.min(c.canvas.height, Math.ceil(m.d * y1 + m.f) + 1);
+    return right > left && bottom > top ? { x: left, y: top, w: right - left, h: bottom - top } : null;
   }
 }
