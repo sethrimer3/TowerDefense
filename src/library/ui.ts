@@ -257,7 +257,8 @@ export class LibraryPage {
     }
   }
 
-  /** Drag pans a zoomed view; double-tap, pinch or Ctrl-wheel zooms. */
+  /** Drag pans; the wheel, a pinch or a double-tap zooms smoothly about
+   * the pointer, as in the Mine. */
   private bindView(canvas: HTMLCanvasElement) {
     const r = this.renderer!, pointers = new Map<number, { x: number; y: number }>();
     let pinch = 0, lastTap = 0;
@@ -274,7 +275,7 @@ export class LibraryPage {
         pinch = Math.hypot(a.x - b.x, a.y - b.y);
       } else if (e.timeStamp - lastTap < 300) {
         const p = local(e);
-        r.zoomTo(r.zoom >= 3 ? 1 : r.zoom + 1, p.x, p.y);
+        r.zoomBy(r.zoom >= 5.5 ? 1 / 8 : 2, p.x, p.y);
       }
       lastTap = e.timeStamp;
     };
@@ -284,9 +285,9 @@ export class LibraryPage {
       pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (pointers.size === 2) {
         const [a, b] = [...pointers.values()], d = Math.hypot(a.x - b.x, a.y - b.y);
-        if (pinch > 0 && Math.abs(d - pinch) > 40) {
+        if (pinch > 0) {
           const mid = local({ clientX: (a.x + b.x) / 2, clientY: (a.y + b.y) / 2 });
-          r.zoomTo(r.zoom + (d > pinch ? 1 : -1), mid.x, mid.y);
+          r.zoomBy(d / pinch, mid.x, mid.y);
           pinch = d;
         }
         return;
@@ -301,9 +302,8 @@ export class LibraryPage {
     canvas.onpointercancel = end;
     canvas.onwheel = (e) => {
       e.preventDefault();
-      const p = local(e);
-      if (e.ctrlKey) r.zoomTo(r.zoom + (e.deltaY < 0 ? 1 : -1), p.x, p.y);
-      else r.pan(0, -e.deltaY * dpr());
+      const p = local(e), lines = e.deltaMode === 1 ? 40 : e.deltaMode === 2 ? 400 : 1;
+      r.zoomBy(Math.exp(-e.deltaY * lines * 0.0025), p.x, p.y);
     };
   }
 
