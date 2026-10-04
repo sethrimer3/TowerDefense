@@ -52,6 +52,7 @@ const NIGHT_TOP: RGB = [8, 11, 26], NIGHT_LOW: RGB = [28, 30, 50], OVERCAST: RGB
 const WATER_RGB: RGB = [44, 104, 196], FIRE_RGB: RGB[] = [[255, 136, 40], [255, 204, 84], [240, 90, 30]];
 /** The finer details of the workings' fittings and ground. */
 const TORCH_HOT: RGB = [255, 238, 170], TORCH_DIM: RGB = [214, 120, 48], TORCH_STICK: RGB = [120, 78, 38], LAMP_CAP: RGB = [70, 70, 78];
+const SCAFFOLD_BOARD: RGB = [176, 138, 88], SCAFFOLD_LO: RGB = [150, 114, 70];
 const RUNG: RGB = [160, 112, 58], RAIL_WOOD: RGB = [104, 68, 34], RAIL_WOOD_LO: RGB = [84, 54, 26];
 const RAIL_HI: RGB = [168, 168, 178], RAIL_LO: RGB = [110, 110, 120], SLEEPER: RGB = [92, 66, 40];
 const PEBBLE: RGB = [128, 118, 106], ROOT: RGB = [70, 48, 30], BLADE: RGB = [112, 168, 64], BLADE_HI: RGB = [140, 192, 82];
@@ -65,7 +66,7 @@ const SCAFFOLD: RGB = [176, 138, 88];
 /** Cells across the view at the furthest zoom out, and how far in it goes. */
 export const VIEW_CELLS = 256, MAX_ZOOM = 8;
 
-type Bolt = { points: [number, number][]; until: number };
+type Bolt = { points: [number, number][]; forks: [number, number][][]; until: number };
 
 export class MineRenderer {
   readonly canvas: HTMLCanvasElement;
@@ -341,6 +342,12 @@ export class MineRenderer {
               px[o + sy * W2 + sx] = skyPx;
               continue;
             }
+          } else if (m === LADDER && !inSky && x > 0 && x < W - 1 && isPassable(cells[i - 1]) && isPassable(cells[i + 1])) {
+            // Standing free in a cave: scaffolding, a pole with a board
+            // across it every few cells.
+            if (sy === 0 && y % 4 === 0) c = sx ? SCAFFOLD_LO : SCAFFOLD_BOARD;
+            else if (sx === (x & 1)) c = sy ? RAIL_WOOD_LO : RAIL_WOOD;
+            else k = 0.86 + g * 0.0011;
           } else if (m === LADDER) {
             if (sy === 0) c = RUNG;
             else c = sx ? RAIL_WOOD_LO : RAIL_WOOD;
@@ -390,6 +397,16 @@ export class MineRenderer {
                 } else c = sy === 1 && cells[i + down] === DIRT && g < 90 ? SHADES[DIRT][g & 3] : shades[(shade[i] + g) % shades.length];
                 break;
               case TIMBER:
+                if (openDown) {
+                  // A beam over open air: a trestle, its deck over a post.
+                  if (sy === 0) c = shades[shade[i] % shades.length];
+                  else if ((x & 1) === sx) c = RAIL_WOOD_LO;
+                  else {
+                    c = back;
+                    k = 0.86 + g * 0.0011;
+                  }
+                  break;
+                }
                 c = shades[shade[i] % shades.length];
                 k = sy === 0 ? 1.12 : y % 3 === 0 ? 0.7 : 0.88;
                 break;
@@ -510,7 +527,7 @@ export class MineRenderer {
       this.fx2.step((x, y) => x < 0 || x >= W || y < 0 || y >= H || !isPassable(cells[idx(Math.floor(x), Math.floor(y))]), 1 + this.skyNow.clouds + this.skyNow.rain * 2);
       this.fx2.draw(ctx, fine);
     }
-    this.drawLightning(time);
+    this.drawLightning(sim, time);
   }
 
   /** True once each time `n` moves on for the key: a beat's one-off effect. */
@@ -1090,7 +1107,16 @@ export class MineRenderer {
         const points: [number, number][] = [[n.x + (this.fx() - 0.5) * 16, -4]];
         for (let y = 4; y < n.y; y += 3 + this.fx() * 4) points.push([n.x + (this.fx() - 0.5) * 6 * (1 - y / n.y), y]);
         points.push([n.x + 0.5, n.y + 1]);
-        this.bolts.push({ points, until: time + 260 });
+        // A fork or two off the bolt's upper half, dying out.
+        const forks: [number, number][][] = [];
+        for (let f = 0; f < 2; f++) {
+          const from = points[1 + Math.floor(this.fx() * Math.max(1, points.length / 2))], dir = this.fx() < 0.5 ? -1 : 1;
+          if (!from) continue;
+          const fork: [number, number][] = [from];
+          for (let j = 1; j <= 3; j++) fork.push([from[0] + dir * j * (1.5 + this.fx() * 2), from[1] + j * (2 + this.fx() * 2)]);
+          forks.push(fork);
+        }
+        this.bolts.push({ points, forks, until: time + 260 });
         this.flashUntil = time + 160;
       } else if (effects && (n.kind === "lost" || n.kind === "saved"))
         for (let k = 0; k < 10; k++)
@@ -1099,22 +1125,43 @@ export class MineRenderer {
     if (sim.news.length) this.newsTick = sim.news[sim.news.length - 1].tick;
   }
 
-  private drawLightning(time: number) {
-    const ctx = this.ctx;
+  /** Lightning as pixel art: each bolt's path traced in half-cell pixels, a
+   * white core with a pale blue fringe, its forks fainter, fading as it
+   * goes; the flash lights only the sky, down to the ground, and softly. */
+  private drawLightning(sim: MineSim, time: number) {
+    const fine = this.fine, ctx = this.ctx;
     this.bolts = this.bolts.filter((b) => b.until > time);
     for (const b of this.bolts) {
-      ctx.strokeStyle = "rgba(240,244,255,0.95)";
-      ctx.lineWidth = 0.6;
-      ctx.beginPath();
-      b.points.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
-      ctx.stroke();
+      const life = Math.max(0, (b.until - time) / 260);
+      const trace = (pts: [number, number][], core: number) => {
+        for (let i = 1; i < pts.length; i++) {
+          const [ax, ay] = pts[i - 1], [bx, by] = pts[i], steps = Math.max(1, Math.ceil(Math.max(Math.abs(bx - ax), Math.abs(by - ay)) * 2));
+          for (let k = 0; k <= steps; k++) {
+            const x = Math.floor((ax + ((bx - ax) * k) / steps) * 2) / 2, y = Math.floor((ay + ((by - ay) * k) / steps) * 2) / 2;
+            if (y >= sim.strata.surface[Math.max(0, Math.min(W - 1, Math.floor(x)))] + 1) continue;
+            ctx.globalAlpha = life * core * 0.45;
+            fine(x - 0.5, y, 0.5, 0.5, "#9fb4ff");
+            fine(x + 0.5, y, 0.5, 0.5, "#9fb4ff");
+            ctx.globalAlpha = life * core;
+            fine(x, y, 0.5, 0.5, "#f4f6ff");
+          }
+        }
+      };
+      trace(b.points, 0.9);
+      for (const f of b.forks) trace(f, 0.5);
     }
+    ctx.globalAlpha = 1;
     if (time < this.flashUntil) {
-      ctx.save();
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.fillStyle = `rgba(230,236,255,${((this.flashUntil - time) / 160) * 0.3})`;
-      ctx.fillRect(0, 0, this.size.w, this.size.h);
-      ctx.restore();
+      // The sky alone lights up, column runs down to the ground.
+      ctx.globalAlpha = ((this.flashUntil - time) / 160) * 0.14;
+      const surface = sim.strata.surface;
+      for (let x = 0; x < W; ) {
+        let end = x + 1;
+        while (end < W && surface[end] === surface[x]) end++;
+        fine(x, -8, end - x, surface[x] + 8, "#dfe6ff");
+        x = end;
+      }
+      ctx.globalAlpha = 1;
     }
   }
 

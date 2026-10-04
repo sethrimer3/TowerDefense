@@ -182,6 +182,18 @@ The miners by name in a box for each trade, opened beside the mine's view: a nam
 **Shaft**, **level** and **tunnel**:
 The laddered shaft is sunk through the dirt into the stone; at every level a tunnel with track and torches runs out either side.
 
+**Cave**:
+Open ground the world leaves in the stone: winding passages and wide caverns, hung with stalactites and grown with stalagmites. When a dig breaks into one the crew learn its extent, hang torches along its floors, go after the ore on its walls and drive drifts on from its ends and its lowest point.
+
+**Drift**:
+A short side tunnel driven off a level's tunnel or a cave, level or slanting up or down after the ore, lit as it goes and ending in a small chamber. Off a tunnel it is reached by a few rungs of ladder through the roof or floor.
+
+**Winze**:
+A ladder sunk from one level down to the next, away from the shaft.
+
+**Scaffolding** and **trestle**:
+A ladder standing free in a cave is braced as scaffolding; where a tunnel's track crosses a cave it runs on a trestle of beams.
+
 **Shoring**:
 Timber a miner sets into loose dirt beside a hole so it doesn't slide in.
 

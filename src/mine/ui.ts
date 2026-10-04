@@ -468,7 +468,7 @@ export class MinePage {
    * one is left at once). */
   private askProspect() {
     if (this.sim.workedOut) return this.newProspect();
-    const left = Math.round((100 * this.sim.oreLeft) / Math.max(1, this.sim.oreFound));
+    const left = Math.min(100, Math.round((100 * this.sim.oreLeft) / Math.max(1, this.sim.oreFound)));
     const modal = this.host.modal;
     modal.innerHTML = `<small>MINE</small><h2>Leave this prospect?</h2><p>About ${left}% of its ore is still in the ground. The crew, the buildings and the stock at the forge and smithy go with you to fresh ground, and the workings here are left behind.</p>
       <div class="dialog-actions"><button id="prospect-stay">Stay</button><button id="prospect-go" class="danger">Move on</button></div>`;
@@ -524,7 +524,7 @@ export class MinePage {
     const ore = metalSum(sim.ore), bars = metalSum(sim.bars);
     this.refreshCrew();
     this.refreshInfo();
-    const left = Math.round((100 * sim.oreLeft) / Math.max(1, sim.oreFound));
+    const left = Math.min(100, Math.round((100 * sim.oreLeft) / Math.max(1, sim.oreFound)));
     const tally = `${crew}|${sim.crewCap}|${price}|${afford}|${sim.depth}|${ore}|${bars}|${Math.ceil(this.owed / TICK_HZ / 60)}|${hour}|${sky.weather}|${lost}|${news}|${left}|${sim.workedOut}|${sim.prospect}`;
     if (tally === this.shownTally) return;
     this.shownTally = tally;

@@ -51,10 +51,13 @@ import { BUILDINGS, FIRST_LEVELS, MAX_LEVEL, layout, pathTicks, type BuildingId,
 import { minerName } from "./names.ts";
 
 export const TICK_HZ = 30;
-/** Plan marks: dig out, or dig out and fit. */
-export const P_NONE = 0, P_DIG = 1, P_LADDER = 2, P_RAIL = 3, P_TORCH = 4, P_LAMP = 5;
-const FIXTURE: Record<number, Material> = { [P_LADDER]: LADDER, [P_RAIL]: RAIL, [P_TORCH]: TORCH, [P_LAMP]: LAMP };
-const BUILD_TICKS: Record<number, number> = { [LADDER]: 24, [RAIL]: 30, [TORCH]: 45, [LAMP]: 75 };
+/** Plan marks: dig out, or dig out and fit; a beam is timber laid into
+ * open air under a track crossing a cave, a trestle to carry it. */
+export const P_NONE = 0, P_DIG = 1, P_LADDER = 2, P_RAIL = 3, P_TORCH = 4, P_LAMP = 5, P_BEAM = 6;
+/** Plan marks there are (for decoding saves). */
+const PLAN_MARKS = 7;
+const FIXTURE: Record<number, Material> = { [P_LADDER]: LADDER, [P_RAIL]: RAIL, [P_TORCH]: TORCH, [P_LAMP]: LAMP, [P_BEAM]: TIMBER };
+const BUILD_TICKS: Record<number, number> = { [LADDER]: 24, [RAIL]: 30, [TORCH]: 45, [LAMP]: 75, [TIMBER]: 40 };
 
 /** Ore a miner carries before heading out with it; spoil likewise. */
 export const PACK_ORE = 6;
@@ -372,7 +375,7 @@ export class MineSim {
     const maxStone = Math.max(...this.strata.stoneTop);
     for (let y = maxStone + 5; y < H - 12; y += LEVEL_GAP) this.levels.push(y);
     const cells = saved?.cells !== undefined ? decodeGrid(saved.cells, CELLS, MATERIAL_COUNT) : null;
-    const plan = cells && saved?.plan !== undefined ? decodeGrid(saved.plan, CELLS, 6) : null;
+    const plan = cells && saved?.plan !== undefined ? decodeGrid(saved.plan, CELLS, PLAN_MARKS) : null;
     const water = saved?.water !== undefined && cells ? decodeGrid(saved.water, CELLS, 2) : null;
     const found = generate(this.seed);
     this.oreFound = countOre(found);
@@ -593,6 +596,7 @@ export class MineSim {
     const p = this.plan[c];
     if (!p) return 0;
     if (m === BEDROCK) return 0;
+    if (p === P_BEAM) return m === AIR ? 2 : 0;
     if (isSolid(m)) return 1;
     if (p >= P_LADDER && m === AIR) return 2;
     if (this.world.water[c] && c >= this.strata.surface[c % W] * W + W) return 3;
@@ -614,8 +618,143 @@ export class MineSim {
         this.mark(x, to - 2, P_DIG);
         this.mark(x, to - 1, (x - x0) % 8 === 4 * side ? P_TORCH : P_DIG);
         this.mark(x, to, P_RAIL);
+        // Across a cave the track runs on a trestle of beams.
+        if (this.passable(x, to) && this.passable(x, to + 1)) this.mark(x, to + 1, P_BEAM);
       }
+    // Off the tunnels, now and then, a drift slanting up or down after
+    // whatever lies there, reached by a few rungs of ladder through the
+    // tunnel's roof or floor; and from the second level down, a winze
+    // laddered down from the level above.
+    for (const side of [-1, 1]) {
+      let x = x0 + side * (10 + Math.floor(hash01(k, side, this.seed + 21) * 14));
+      for (let n = 0; Math.abs(x - x0) < W / 2 - 12; n++) {
+        const r = hash01(k * 7 + n, side, this.seed + 23), down = r < 0.5, len = 6 + Math.floor(hash01(n, k, this.seed + 25) * 8);
+        if ((x - x0) % 8 !== 4 * side) {
+          const rungs: number[] = down ? [to + 1, to + 2, to + 3, to + 4] : [to - 1, to - 2, to - 3, to - 4];
+          if (rungs.every((y) => (!this.plan[idx(x, y)] || this.plan[idx(x, y)] === P_DIG) && !this.unsound(idx(x, y))) && this.planDrift(x, down ? to + 4 : to - 4, side, down ? "down" : "up", len))
+            for (const y of rungs) this.mark(x, y, P_LADDER);
+        }
+        x += side * (26 + Math.floor(hash01(n, k * 3 + side, this.seed + 27) * 30));
+      }
+      if (k > 0) {
+        let wx = x0 + side * (24 + Math.floor(hash01(k, side, this.seed + 29) * 80));
+        if ((wx - x0) % 8 === 4 * side) wx += side;
+        const above = this.levels[k - 1];
+        if (wx >= 4 && wx <= W - 5) for (let y = above + 1; y <= to - 3; y++) if (!this.plan[idx(wx, y)] || this.plan[idx(wx, y)] === P_DIG) this.mark(wx, y, P_LADDER);
+      }
+    }
     this.shaftLevel = k;
+  }
+
+  /** Cell c is ground a drift shouldn't open: soil, a boulder or loose
+   * ground, which would slide or drop into it. */
+  private unsound(c: number) {
+    const m = this.world.cells[c];
+    return isSoil(m) || isLoose(m) || m === ROCK;
+  }
+
+  /** Plans a drift with its feet starting at (x, y), heading `dir`: level
+   * ("flat", two tall), or slanting a row every two cells ("down" or "up",
+   * three tall so a miner keeps its head), lit as it goes and at its end,
+   * which opens into a small chamber. It stops short of the dirt, the
+   * bedrock, lava, the shaft and other work; returns whether it was
+   * planned (too short a drift isn't). */
+  private planDrift(x: number, y: number, dir: number, kind: "flat" | "down" | "up", len: number) {
+    const marks: [number, number, number][] = [];
+    let fx = x, fy = y;
+    for (let i = 1; i <= len; i++) {
+      fx += dir;
+      if (kind !== "flat" && i % 2 === 0) fy += kind === "down" ? 1 : -1;
+      if (fx < 3 || fx > W - 4 || Math.abs(fx - this.shaftX) <= 2 || fy >= H - 14 || fy - 3 < this.strata.stoneTop[fx] + 2) break;
+      const rows = kind === "flat" ? 2 : 3;
+      let stop = false;
+      for (let r = 0; r <= rows; r++) {
+        const c = idx(fx, fy - r);
+        if (this.unsound(c)) stop = true;
+        if (r === rows) continue;
+        if (this.nearLava(c)) stop = true;
+        if (this.plan[c] && isSolid(this.world.cells[c])) stop = true;
+      }
+      if (stop) break;
+      for (let r = 0; r < rows; r++) marks.push([fx, fy - r, r === 1 && i % 8 === 0 ? P_TORCH : P_DIG]);
+    }
+    if (marks.length < 6) return false;
+    // The end: a chamber a little wider and taller, with a torch.
+    for (let r = 0; r < 3; r++) marks.push([fx + dir, fy - r, r === 1 ? P_TORCH : P_DIG]);
+    marks.push([fx, fy - (kind === "flat" ? 2 : 3), P_DIG]);
+    for (const [mx, my, p] of marks) if (inBounds(mx, my) && (!this.plan[idx(mx, my)] || this.plan[idx(mx, my)] === P_DIG) && this.cell(mx, my) !== BEDROCK) this.plan[idx(mx, my)] = p;
+    return true;
+  }
+
+  /** After a dig opens (x, y): if it broke into open ground nobody has
+   * worked (a natural cave), the crew learn its extent and plan its work:
+   * torches along its floors, the ore showing on its walls, and drifts
+   * driven on from its far ends and its lowest point. */
+  private discover(x: number, y: number) {
+    for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+      const nx = x + dx, ny = y + dy;
+      if (!inBounds(nx, ny) || ny <= this.strata.surface[nx] + 2 || !this.passable(nx, ny) || this.plan[idx(nx, ny)]) continue;
+      const region: number[] = [idx(nx, ny)];
+      this.plan[region[0]] = P_DIG;
+      for (let h = 0; h < region.length && region.length < 6000; h++) {
+        const c = region[h], cx = c % W, cy = (c - cx) / W;
+        for (const [ex, ey] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+          const qx = cx + ex, qy = cy + ey;
+          if (!inBounds(qx, qy) || qy <= this.strata.surface[qx] + 2 || !this.passable(qx, qy)) continue;
+          const q = idx(qx, qy);
+          if (this.plan[q]) continue;
+          this.plan[q] = P_DIG;
+          region.push(q);
+        }
+      }
+      if (region.length >= 16) this.planCave(region);
+    }
+  }
+
+  private planCave(region: number[]) {
+    const floors: [number, number][] = [];
+    let sx = 0;
+    for (const c of region) {
+      const cx = c % W, cy = (c - cx) / W;
+      sx += cx;
+      if (this.passable(cx, cy - 1) && this.supports(cx, cy + 1)) floors.push([cx, cy]);
+      // The ore showing on its walls, and the vein behind it.
+      for (const [ex, ey] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) if (isOre(this.cell(cx + ex, cy + ey)) && !this.plan[idx(cx + ex, cy + ey)]) this.markVein(cx + ex, cy + ey);
+    }
+    if (!floors.length) return;
+    // Torches along the floors, spaced out, at head height.
+    const lit: [number, number][] = [];
+    floors.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    for (const [fx, fy] of floors) {
+      if (lit.some(([lx, ly]) => Math.abs(lx - fx) + Math.abs(ly - fy) < 7)) continue;
+      if (this.cell(fx, fy - 1) !== AIR) continue;
+      lit.push([fx, fy]);
+      this.plan[idx(fx, fy - 1)] = P_TORCH;
+    }
+    // Drifts on from its far ends and its lowest floor.
+    const mid = sx / region.length, ends = [floors[0], floors[floors.length - 1]];
+    const lowest = floors.reduce((a, b) => (b[1] > a[1] ? b : a));
+    if (region.length > 60) ends.push(lowest);
+    ends.forEach(([fx, fy], i) => {
+      const dir = Math.sign(fx - mid) || (i % 2 ? 1 : -1), r = hash01(fx, fy, this.seed + 31);
+      this.planDrift(fx, fy, dir, r < 0.35 ? "down" : r < 0.6 ? "up" : "flat", 7 + Math.floor(r * 12));
+    });
+  }
+
+  /** Marks the ore vein at (x, y) to be dug, up to a dozen cells of it. */
+  private markVein(x: number, y: number) {
+    const todo = [idx(x, y)];
+    this.plan[todo[0]] = P_DIG;
+    for (let h = 0; h < todo.length && todo.length < 12; h++) {
+      const c = todo[h], cx = c % W, cy = (c - cx) / W;
+      for (const [ex, ey] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+        const q = idx(cx + ex, cy + ey);
+        if (inBounds(cx + ex, cy + ey) && isOre(this.world.cells[q]) && !this.plan[q]) {
+          this.plan[q] = P_DIG;
+          todo.push(q);
+        }
+      }
+    }
   }
 
   /** Cells of track laid outward from the shaft along level `k` on `side`. */
@@ -1070,13 +1209,14 @@ export class MineSim {
     [-1, 0, true], [1, 0, true], [-1, -1, true], [1, -1, true], [-1, -2, true], [1, -2, true], [0, 1, true], [0, -2, true], [0, 0, false], [0, -1, false],
   ];
   /** Water and fire are also reached down a step to either side (a bucket
-   * dipped into a flooded hole beside one's feet). */
+   * dipped into a flooded hole beside one's feet), and so is a beam laid
+   * out ahead under the track. */
   private static readonly WET_REACH: readonly [number, number][] = [[-1, 1], [1, 1]];
   private reachable(x: number, y: number, c: number) {
-    const cx = c % W, cy = (c - cx) / W, near = this.jobAt(c) >= 3;
+    const cx = c % W, cy = (c - cx) / W, job = this.jobAt(c), near = job >= 3, beam = job === 2 && this.plan[c] === P_BEAM;
     return (
       MineSim.REACH.some(([dx, dy, dig]) => x + dx === cx && y + dy === cy && (dig || near || this.world.cells[c] === AIR)) ||
-      (near && MineSim.WET_REACH.some(([dx, dy]) => x + dx === cx && y + dy === cy))
+      ((near || beam) && MineSim.WET_REACH.some(([dx, dy]) => x + dx === cx && y + dy === cy))
     );
   }
 
@@ -1149,8 +1289,9 @@ export class MineSim {
     for (const [dx, dy] of MineSim.WET_REACH) {
       if (!inBounds(x + dx, y + dy)) continue;
       const c = idx(x + dx, y + dy), job = this.jobAt(c);
-      if (job < 3 || this.reserved[c]) continue;
-      const score = job === 4 ? -40 : -1;
+      const beam = job === 2 && this.plan[c] === P_BEAM && kit > 0;
+      if ((job < 3 && !beam) || this.reserved[c]) continue;
+      const score = job === 4 ? -40 : beam ? -2 : -1;
       if (!best || score < best.score) best = { score, cell: c, cart: null };
     }
     for (const j of cartJobs)
@@ -1446,6 +1587,7 @@ export class MineSim {
         // A hole dug under one's feet gets a ladder, so there's a way back.
         if (y === m.y + 1 && x === m.x && this.plan[c] === P_DIG) this.plan[c] = P_LADDER;
         this.afterDig(x, y, m);
+        this.discover(x, y);
       }
     } else if (t.kind === "build") {
       const c = t.cell, x = c % W, y = (c - x) / W;
@@ -1638,7 +1780,7 @@ export class MineSim {
       const m = cells[i];
       if (this.plan[i] >= P_LADDER && m === AIR) fittings++;
       if (isOre(m)) ore++;
-      if (this.plan[i] && (isSolid(m) ? m !== BEDROCK : this.plan[i] >= P_LADDER && m === AIR)) work++;
+      if (this.plan[i] && (isSolid(m) ? m !== BEDROCK && this.plan[i] !== P_BEAM : this.plan[i] >= P_LADDER && m === AIR)) work++;
       if (m === TORCH) torches.push(i);
       if (m !== LAVA) continue;
       const x = i % W, y = (i - x) / W;
@@ -1831,8 +1973,8 @@ export function decodeMineSave(s: any): MineSave | null {
   if (!mined || !smelted) return null;
   // A mine from before the world was widened moves its crew to a fresh
   // prospect from the same seed (its grid is dropped).
-  const narrow = !decodeGrid(s.cells, CELLS, MATERIAL_COUNT) && decodeGrid(s.cells, NARROW_W * H, MATERIAL_COUNT) && decodeGrid(s.plan, NARROW_W * H, 6);
-  if (!narrow && (!decodeGrid(s.cells, CELLS, MATERIAL_COUNT) || !decodeGrid(s.plan, CELLS, 6))) return null;
+  const narrow = !decodeGrid(s.cells, CELLS, MATERIAL_COUNT) && decodeGrid(s.cells, NARROW_W * H, MATERIAL_COUNT) && decodeGrid(s.plan, NARROW_W * H, PLAN_MARKS);
+  if (!narrow && (!decodeGrid(s.cells, CELLS, MATERIAL_COUNT) || !decodeGrid(s.plan, CELLS, PLAN_MARKS))) return null;
   const name = (v: unknown) => typeof v === "string" && v.length > 0 && v.length <= 32;
   const pack = (m: any) =>
     metals(m, 1000) && int(m?.spoil, 0, 1000) && (m.fed === undefined || int(m.fed, 0, 1e9)) &&
