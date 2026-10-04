@@ -93,9 +93,11 @@ export class DefendRenderer {
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
-    // Every frame begins with an opaque ground fill. Let the compositor skip
-    // preserving destination alpha and present without an extra sync queue.
-    this.ctx = canvas.getContext("2d", { alpha: false, desynchronized: true })!;
+    // Every frame begins with an opaque ground fill, so the compositor can
+    // skip destination alpha. Never `desynchronized`: a low-latency canvas
+    // can be shown part way through a frame, so the lights, trees and rain
+    // drawn last flicker in and out.
+    this.ctx = canvas.getContext("2d", { alpha: false })!;
     this.layer = document.createElement("canvas");
     this.lctx = this.layer.getContext("2d")!;
     onCityArtLoaded(() => (this.layerKey = ""));
