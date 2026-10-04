@@ -1,20 +1,26 @@
 // Chrome CPU profile + Performance-panel trace, with a fixed simulation clock.
 import { chromium } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { makeReference } from './defend-render-reference.mjs';
 const label = process.env.PERF_LABEL || 'latest';
 const frames = Math.max(60, Number(process.env.PERF_FRAMES || 360));
 mkdirSync('test-results', { recursive: true });
+if (process.env.PERF_REFERENCE) makeReference();
 const browser = await chromium.launch({ headless: true, channel: process.env.PLAYWRIGHT_CHANNEL || 'chrome' });
 try {
+  const browserCdp = await browser.newBrowserCDPSession();
+  const system = await browserCdp.send('SystemInfo.getInfo');
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: Number(process.env.PERF_DPR || 1) });
-  await page.addInitScript(() => { globalThis.__pinnedSeeds = { rolls: 42, effects: 73 }; });
+  // Keep a running recording frozen even if the developer edits the checkout.
+  await page.route('**/@vite/client', route => route.fulfill({ contentType:'application/javascript', body:'export const injectQuery = (url) => url;' }));
+  await page.addInitScript(() => { globalThis.__pinnedSeeds = { defend: 3182828918, game: 3887091088 }; });
   await page.goto((process.env.TEST_URL || 'http://127.0.0.1:5173/') + 'tests/performance.html');
   console.log('Preparing stress scene');
   page.on('console', msg => { if (msg.text().startsWith('[stress]')) console.log(msg.text()); });
-  await page.evaluate(async count => {
+  await page.evaluate(async ({ count, reference, heavy }) => {
     const { stressScene } = await import('/tests/defend-stress-scene.ts');
-    const { DefendRenderer } = await import('/src/defend/render.ts');
-    const { map, sim } = stressScene(count);
+    const { DefendRenderer } = await import(reference ? '/test-results/reference/render.ts' : '/src/defend/render.ts');
+    const { map, sim } = stressScene(count, heavy);
     console.log('[stress] scene ready', sim.soldiers.length);
     const renderer = new DefendRenderer(document.querySelector('canvas'));
     renderer.resize(720, 840);
@@ -35,7 +41,7 @@ try {
     for (let i=0;i<30;i++) { await new Promise(requestAnimationFrame); sim.update(1/60); opts.now=sim.time*1000; renderer.draw(map,sim,null,opts); }
     console.log('[stress] warmup complete');
     for (const key in costs) costs[key]=0;
-  }, Number(process.env.PERF_ENEMIES || 2500));
+  }, { count: Number(process.env.PERF_ENEMIES || 2500), reference: !!process.env.PERF_REFERENCE, heavy: process.env.PERF_MIX === 'heavy' });
   const cdp = await page.context().newCDPSession(page);
   await cdp.send('HeapProfiler.collectGarbage');
   if (process.env.PERF_CPU_RATE) await cdp.send('Emulation.setCPUThrottlingRate', { rate:Number(process.env.PERF_CPU_RATE) });
@@ -53,7 +59,7 @@ try {
       sim.update(1/60); const mid=performance.now(); opts.now=sim.time*1000;
       renderer.draw(map,sim,null,opts); const end=performance.now();
       update.push(mid-start); draw.push(end-mid); if(last) interval.push(now-last); last=now;
-      entities.push(renderer.timings.entityMs); effects.push(renderer.timings.effectsMs);
+      entities.push(renderer.timings?.entityMs || 0); effects.push(renderer.timings?.effectsMs || 0);
       populations.push(sim.enemies.length);
       for(const key of ['soldiers','arrows','shells','flames','frosts','fireballs','blazes','bolts','floods','effects']) activity[key]=Math.max(activity[key]||0,sim[key].length);
     }
@@ -68,6 +74,9 @@ try {
     writeFileSync(`test-results/stress-${label}.trace.json`,JSON.stringify({traceEvents:events}));
   }
   row.browser=browser.version(); row.dpr=Number(process.env.PERF_DPR || 1); row.cpuRate=Number(process.env.PERF_CPU_RATE || 1);
+  row.gpu = { renderer: system.gpu.auxAttributes.glRenderer, features: system.gpu.featureStatus };
+  row.reference = process.env.PERF_REFERENCE ? process.env.PERF_REF || '3b9f8a9' : null;
+  row.mix = process.env.PERF_MIX === 'heavy' ? 'heavy' : 'mixed';
   writeFileSync(`test-results/stress-${label}.json`, JSON.stringify(row,null,2));
   await page.screenshot({path:`test-results/stress-${label}.png`});
   console.log(JSON.stringify(row,null,2));

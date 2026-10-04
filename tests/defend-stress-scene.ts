@@ -6,7 +6,7 @@ import { generateCity } from "../src/defend/citygen.ts";
 import { UPGRADES, type EnemyKind } from "../src/defend/catalog.ts";
 import { CELLS_W } from "../src/defend/grid.ts";
 
-export function stressScene(count = 2500) {
+export function stressScene(count = 2500, heavy = false) {
   let layout = defaultLayout();
   layout.compact = ["darkKeep", "valkyriePalace"];
   for (let y = 5; y <= 11; y++) for (let x = 1; x <= 7; x++)
@@ -28,10 +28,12 @@ export function stressScene(count = 2500) {
   // Fill real garrisons via the normal training mechanism before enemies arrive.
   for (let i = 0; i < 900; i++) sim.update(1 / 30);
   const cells = [...map.city.keys()].filter(i => map.city[i] && !sim.solid[i]);
-  const mix: EnemyKind[] = ["roach", "roach", "orc", "ogre", "bat", "shieldBearer", "darkKnight", "rollingCannon", "fireworkLauncher"];
   sim.enemies.length = 0;
   for (let i = 0; i < count; i++) {
-    sim.spawnEnemy(mix[i % mix.length]);
+    const k = i % 100;
+    const kind: EnemyKind = k < 65 ? 'roach' : k < 80 ? 'orc' : k < 90 ? 'bat' : k < 95 ? 'ogre' : k < 97 ? 'darkKnight' : k < 99 ? 'shieldBearer' : 'fireworkLauncher';
+    const siegeMix: EnemyKind[] = ['roach', 'roach', 'orc', 'ogre', 'bat', 'shieldBearer', 'darkKnight', 'rollingCannon', 'fireworkLauncher'];
+    sim.spawnEnemy(heavy ? siegeMix[i % siegeMix.length] : kind);
     const e = sim.enemies.at(-1)!;
     const cell = cells[(i * 37) % cells.length];
     e.x = cell % CELLS_W + .5 + e.jx; e.y = Math.floor(cell / CELLS_W) + .5 + e.jy;

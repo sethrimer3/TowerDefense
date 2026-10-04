@@ -86,11 +86,16 @@ export class DefendRenderer {
   private lctx: CanvasRenderingContext2D;
   private layerKey = "";
   private map: CityMap | null = null;
+  private combatLayer: HTMLCanvasElement | null = null;
+  private combatSim: DefendSim | null = null;
+  private combatKey = '';
   px = 8;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
-    this.ctx = canvas.getContext("2d")!;
+    // Every frame begins with an opaque ground fill. Let the compositor skip
+    // preserving destination alpha and present without an extra sync queue.
+    this.ctx = canvas.getContext("2d", { alpha: false, desynchronized: true })!;
     this.layer = document.createElement("canvas");
     this.lctx = this.layer.getContext("2d")!;
     onCityArtLoaded(() => (this.layerKey = ""));
@@ -277,13 +282,37 @@ export class DefendRenderer {
   /** Blast scorches, burning ground and the wizards' ice, then units, projectiles and
    * effects (carrying torches in weather), and the frost on the chilled. */
   private drawBattleUnits(sim: DefendSim, torches: Burning | null, opts: DrawOptions) {
-    const brush: Brush = { c: this.ctx, px: this.px };
+    const c = this.ctx;
+    if (this.burning || opts.over) this.paintCombat(c, sim, torches, opts);
+    else {
+      // Combat art advances on the fixed simulation clock. Keep screen pixels
+      // (including artPen's camera snapping), never rescale a cached frame.
+      const key = `${sim.time}:${this.px}:${c.canvas.width}:${c.canvas.height}:${this.cam.s}:${this.cam.x}:${this.cam.y}:${!!torches}:${opts.healthbars === true}`;
+      this.combatLayer ??= document.createElement('canvas');
+      const layer = this.combatLayer;
+      if (sim !== this.combatSim || key !== this.combatKey) {
+        this.combatSim = sim; this.combatKey = key;
+        if (layer.width !== c.canvas.width || layer.height !== c.canvas.height) {
+          layer.width = c.canvas.width; layer.height = c.canvas.height;
+        }
+        const off = layer.getContext('2d')!;
+        off.setTransform(1, 0, 0, 1, 0, 0); off.clearRect(0, 0, layer.width, layer.height);
+        off.setTransform(c.getTransform()); off.imageSmoothingEnabled = false;
+        this.paintCombat(off, sim, torches, opts);
+      }
+      c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.drawImage(layer, 0, 0); c.restore();
+    }
+    // Chilled enemies twinkle on wall time, independently of simulation ticks.
+    this.wizard.drawChill(c, this.px, sim, opts.now);
+  }
+
+  private paintCombat(c: CanvasRenderingContext2D, sim: DefendSim, torches: Burning | null, opts: DrawOptions) {
+    const brush: Brush = { c, px: this.px };
     drawScorches(brush, sim);
-    drawBlazes(this.ctx, this.px, sim);
-    this.wizard.drawIce(this.ctx, this.px, sim.frosts, sim.time * 1000, flameLights(sim).relief);
+    drawBlazes(c, this.px, sim);
+    this.wizard.drawIce(c, this.px, sim.frosts, sim.time * 1000, flameLights(sim).relief);
     drawUnits(brush, sim, torches, opts.healthbars === true, opts.timings ? this.timings : undefined);
-    this.dark.draw(this.ctx, this.px, sim);
-    this.wizard.drawChill(this.ctx, this.px, sim, opts.now);
+    this.dark.draw(c, this.px, sim);
   }
 
   /** The trees over everyone, half faded over anyone under them, and in a
