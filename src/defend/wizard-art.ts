@@ -24,7 +24,7 @@ import type { Flame, Frost } from "./wizard.ts";
 import { random } from "../random.ts";
 import { hash01 } from "./grid.ts";
 import { ART } from "./park-art.ts";
-import { artPen, bake, blit, FLAME, OUTLINE, SMOKE } from "./pixel-fx.ts";
+import { artPen, bake, blit, FLAME, OUTLINE, puff, SMOKE } from "./pixel-fx.ts";
 import type { CarriedLight } from "./lighting.ts";
 import type { ReliefLight } from "./ground-relief.ts";
 
@@ -436,14 +436,6 @@ function rimeSprite(cl: Cluster) {
       c.fillRect(x + RIME_W, y + RIME_H, 1, 1);
     }
   return cv;
-}
-
-/** A puff of fire or smoke `r` art pixels across from its middle: a square
- * with its corners cut, or a single pixel. */
-function puff(dot: ReturnType<typeof artPen>, x: number, y: number, r: number) {
-  if (r <= 0) return dot(x, y);
-  dot(x - r + 1, y - r, 2 * r - 1, 2 * r + 1);
-  dot(x - r, y - r + 1, 2 * r + 1, 2 * r - 1);
 }
 
 /** A flame puff's size as it spreads, in art pixels. */
