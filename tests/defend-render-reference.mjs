@@ -3,10 +3,12 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 /** Frozen pre-fix renderers for a reproducible A/B, without touching the checkout. */
 export function makeReference(ref = process.env.PERF_REF || '3b9f8a9', variant = '') {
-  const files = ['render.ts', 'battle-art.ts', 'mage-art.ts', 'ground-relief.ts', 'pixel-fx.ts', 'wizard-art.ts', 'blast-art.ts', 'dark-art.ts', 'flood-art.ts'];
+  const files = ['render.ts', 'battle-art.ts', 'mage-art.ts', 'ground-relief.ts', 'pixel-fx.ts', 'wizard-art.ts', 'blast-art.ts', 'dark-art.ts', 'flood-art.ts', 'lighting.ts', 'park-trees.ts'];
   const sources = new Map();
   for (const file of files) {
-    const current = variant && (file === 'ground-relief.ts' || (variant === 'scorch' && file === 'mage-art.ts') || (variant === 'combat' && file !== 'pixel-fx.ts'));
+    // The lighting field and tree shading came after these variants: `light` adds them.
+    const later = file === 'lighting.ts' || file === 'park-trees.ts';
+    const current = variant && (variant === 'light' || (!later && (file === 'ground-relief.ts' || (variant === 'scorch' && file === 'mage-art.ts') || (variant === 'combat' && file !== 'pixel-fx.ts'))));
     let source = current ? readFileSync(`src/defend/${file}`, 'utf8') : execFileSync('git', ['show', `${ref}:src/defend/${file}`], { encoding: 'utf8' });
     source = source.replace(/from "\.\.\/(.*?)"/g, 'from "../../src/$1"');
     source = source.replace(/from "\.\/(.*?)"/g, (_, path) => `from "${files.includes(path) ? './' : '../../src/defend/'}${path}"`);

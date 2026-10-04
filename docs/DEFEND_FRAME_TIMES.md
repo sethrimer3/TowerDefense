@@ -2,6 +2,22 @@
 
 The dominant stall was the ground-relief light compositor. The mixed stress scene improved from **316.2 ms / 3.2 FPS to 39.7 ms / 25.2 FPS** average frame interval. This is a substantial improvement, **not completion of the 60 FPS goal**. The siege-heavy scene and phone emulation also remain below the target. The PR should remain a draft until the remaining budget is resolved.
 
+## Follow-up: the light field (October 4, 2026)
+
+Profiling current `main` (3f71ff2) with Chrome's software canvas, the frame was dominated by the night lighting: every light's two swayed bakes were drawn scaled up onto both board-sized layers, about 590 filtered draws a frame for 147 lights, plus one per hand torch (about 290). Flushing the canvas between steps put **99 ms** of a 160 ms draw in the pools alone. On a GPU these draws are cheap per call but their fill grows with the pixel ratio, which is where phones are.
+
+The pools are now summed in `LightField` (`src/defend/light-field.ts`) on the bakes' own lattice, three samples a cell, and drawn up to the board once; torches the same way, still clipped to open ground at full resolution. Separately, `ParkTrees` shades only the trees' box instead of three board-sized passes.
+
+| Stress scene | Draw before, ms | Draw after, ms | Lighting before → after, ms | FPS before → after |
+| --- | ---: | ---: | ---: | ---: |
+| Mixed, DPR 1 | 160.3 | 58.1 | 125.0 → 25.1 | 5.33 → 11.78 |
+| Siege-heavy, DPR 1 | 195.3 | 78.5 | 140.8 → 27.0 | 4.43 → 9.38 |
+| Mixed, DPR 2 | 585.5 | 193.2 | 510.6 → 136.3 | 1.65 → 4.69 |
+
+Trees went from 2.7 to 1.0 ms (DPR 1) and 25.5 to 5.6 ms (DPR 2). Update and the combat pass are unchanged (about 6.5 and 21 ms mixed). These runs are `npm run test:stress` with 120 measured frames in the cloud container: headless Chromium 141, SwiftShader, no GPU (`2d_canvas: unavailable_software`), on a slow 4-core Xeon, with the CPU profiler recording, so absolute numbers are far below a desktop with a GPU; the before column is `PERF_REFERENCE=1 PERF_REF=3f71ff2`. The JavaScript summing costs about 3 ms for the pools and 2.4 ms for the torches a frame on this machine. Results are `test-results/stress-{before,after}-{mixed,heavy,dpr2}.json` (ignored).
+
+The field is close to the old drawing, not identical. Bilinear smoothing commutes with the glow's sum, and saturated sums are handled by painting them halved and doubling after the draw up. The darkness multiplies its pools, and where two strong pools meet a building's edge, multiplying and then smoothing is darker over the one to two pixels of the edge than smoothing each pool and then multiplying. Across the stress city at night the lit frame differs by a mean of about 1 level of 255 a channel, at most 30, at 6, 9.2 and 18 pixels a cell. `test:render-cache` holds it to at most 40 and a mean under 1.2 a byte against the frozen original. Still left: the combat pass (scorches, blazes, ice clusters and units, about 21 ms here), the ground relief's moving lights, and at high pixel ratios the lighting's eight or so board-sized composite passes.
+
 ## Workload and measurement
 
 `tests/defend-stress-scene.ts` builds the same seeded city and combat state on every run: 44 archer towers, 43 cannon towers, 38 wizard towers, four dark keeps and 88 trained friendly units (24 swordsmen, 18 archers, 24 mages, 18 valkyries, four dark wizards). It places 2,500 mixed enemies on open city cells and adds four boats outside the city. Extra HP keeps attacks, movement and water active without disabling simulation work. The mixed roster is 65% roaches, 15% orcs, 10% bats, 5% ogres, 2% dark knights, 2% shield bearers and 1% firework launchers. `PERF_MIX=heavy` instead gives rolling cannons and firework launchers roughly 22% of the roster.

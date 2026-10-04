@@ -4,7 +4,9 @@ import assert from 'node:assert/strict';
 import { makeReference } from './defend-render-reference.mjs';
 import { writeFileSync } from 'node:fs';
 const referenceRoot=makeReference();
-const browser = await chromium.launch({ headless:true, channel:process.env.PLAYWRIGHT_CHANNEL || 'chrome' });
+const browser = await chromium.launch(process.env.PLAYWRIGHT_EXECUTABLE
+  ? { headless: true, executablePath: process.env.PLAYWRIGHT_EXECUTABLE }
+  : { headless: true, channel: process.env.PLAYWRIGHT_CHANNEL || 'chrome' });
 try {
   const page = await browser.newPage({ viewport:{width:1280,height:900} });
   await page.route('**/@vite/client', route=>route.fulfill({contentType:'application/javascript',body:'export const injectQuery = (url) => url;'}));
@@ -110,9 +112,46 @@ try {
         reports.push({check:'scorch',px,time,...compare(a,b)});
       }
     }
+    // The light field sums each pool where the canvas once drew it scaled up:
+    // close to the original, not exact (pools meeting a wall's edge are
+    // multiplied before they are smoothed, not after).
+    const {DefendLighting}=await import('/src/defend/lighting.ts');
+    const {DefendLighting:ReferenceLighting}=await import(`${referenceRoot}/lighting.ts`);
+    const {carriedLights}=await import('/src/defend/battle-art.ts');
+    const {ambientFor}=await import('/src/defend/weather.ts');
+    const {paintCityLayer}=await import('/src/defend/city-layer.ts');
+    const intact=id=>sim.intact(map.buildings[id]);
+    for(const px of [6,9.23076923076923,18])for(const [night,rain] of [[1,true],[0.3,false]]){
+      const w=Math.round(63*px),h=Math.round(91*px),shots=[];
+      for(const L of [new ReferenceLighting(),new DefendLighting()]){
+        L.setMap(map);L.update(sim.solid,[],intact);L.bakePending(sim.solid,1e4);L.update(sim.solid,[],intact);
+        const cv=make(w,h),g=cv.getContext('2d');
+        paintCityLayer(g,px,{map,sim,lights:L.lights,stones:L.roadStones});
+        L.drawLight(g,{px,now:1234,reduceMotion:false,intact},ambientFor({rain},night),{torches:carriedLights(sim),solid:sim.solid,version:sim.mapVersion});
+        shots.push(cv);
+      }
+      reports.push({check:'light field',px,night,...compare(...shots),limit:{max:40,mean:1.2}});
+    }
+    // Shading only the trees' own box leaves every pixel as it was.
+    const {ParkTrees}=await import('/src/defend/park-trees.ts');
+    const {ParkTrees:ReferenceTrees}=await import(`${referenceRoot}/park-trees.ts`);
+    for(const [zoom,x,y] of [[1,0,0],[2.5,-300,-500]]){
+      const shots=[];
+      for(const T of [ReferenceTrees,ParkTrees]){
+        const trees=new T();trees.sync(map);trees.update([],1,true);
+        const cv=make(720,840),g=cv.getContext('2d');
+        g.fillStyle='#73615a';g.fillRect(0,0,720,840);g.setTransform(zoom,0,0,zoom,x,y);
+        trees.draw(g,9.23076923076923,o=>{o.fillStyle='rgba(118,118,118,0.2)';o.fillRect(0,0,581,840);o.fillStyle='rgba(7,10,24,0.5)';o.fillRect(100,100,300,300);});
+        shots.push(cv);
+      }
+      reports.push({check:'tree shading box',zoom,...compare(...shots)});
+    }
     const canvas=document.querySelector('canvas'),r=new DefendRenderer(canvas);
     r.resize(720,840);
     const opts={grid:false,weather:{rain:false},night:1,now:1000,reduceMotion:true,effects:true,healthbars:true};
+    // Lights bake a few a frame: settle them first, or consecutive frames
+    // differ in their lighting rather than their combat.
+    r.draw(map,sim,null,opts);r.lighting.bakePending(sim.solid,1000);
     const capture=()=>{const copy=make(canvas.width,canvas.height);copy.getContext('2d').drawImage(canvas,0,0);return copy;};
     for(const [zoom,x,y] of [[1,0,0],[2.5,-300,-500]]){
       Object.assign(r.cam,{s:zoom,x,y});
@@ -162,7 +201,8 @@ try {
   console.table(results);
   for(const result of results){
     // Alpha rounding across a transparent intermediate can differ by one byte.
-    assert.ok(result.max<=3 && result.mean<.03,JSON.stringify(result));
+    const limit=result.limit ?? {max:3,mean:.03};
+    assert.ok(result.max<=limit.max && result.mean<limit.mean,JSON.stringify(result));
   }
   console.log('Renderer cache pixel, invalidation and memory checks passed');
 } finally { await browser.close(); }

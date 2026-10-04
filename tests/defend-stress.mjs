@@ -7,7 +7,9 @@ const frames = Math.max(60, Number(process.env.PERF_FRAMES || 360));
 mkdirSync('test-results', { recursive: true });
 const reference = !!(process.env.PERF_REFERENCE || process.env.PERF_VARIANT);
 const referenceRoot = reference ? makeReference(undefined, process.env.PERF_VARIANT) : '';
-const browser = await chromium.launch({ headless: true, channel: process.env.PLAYWRIGHT_CHANNEL || 'chrome' });
+const browser = await chromium.launch(process.env.PLAYWRIGHT_EXECUTABLE
+  ? { headless: true, executablePath: process.env.PLAYWRIGHT_EXECUTABLE }
+  : { headless: true, channel: process.env.PLAYWRIGHT_CHANNEL || 'chrome' });
 try {
   const browserCdp = await browser.newBrowserCDPSession();
   const system = await browserCdp.send('SystemInfo.getInfo');

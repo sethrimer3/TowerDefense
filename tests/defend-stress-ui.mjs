@@ -1,7 +1,9 @@
 // Full DefendPage loop, including HUD, layout, overlay and wall-clock pacing.
 import { chromium } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
-const browser=await chromium.launch({headless:true,channel:process.env.PLAYWRIGHT_CHANNEL || 'chrome'});
+const browser=await chromium.launch(process.env.PLAYWRIGHT_EXECUTABLE
+  ? { headless: true, executablePath: process.env.PLAYWRIGHT_EXECUTABLE }
+  : { headless: true, channel: process.env.PLAYWRIGHT_CHANNEL || 'chrome' });
 try {
   const phone=process.env.PERF_PHONE==='1';
   const page=await browser.newPage({viewport:phone?{width:390,height:844}:{width:1280,height:900},deviceScaleFactor:phone?2:1,hasTouch:phone});

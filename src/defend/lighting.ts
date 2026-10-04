@@ -17,6 +17,7 @@ import { LIGHTING_CONFIG, getTorchFlicker, getTorchSway } from "../lighting.ts";
 import { glowColor, lightFalloff } from "../torch-light.ts";
 import { CELL_COUNT, CELLS_H, CELLS_W, ORTHO, boardSize, cellInBounds, cellIndex, hash, hash01, type Rect } from "./grid.ts";
 import { CellType, type Building, type CityMap } from "./citygen.ts";
+import { FIELD_H, FIELD_W, LightField, RES, poolSamples, type PoolSamples } from "./light-field.ts";
 
 export type LightKind = "lantern" | "archerTower" | "cannonTower" | "watchTower" | "wizardTower" | "mageGuild" | "door";
 export type Light = {
@@ -35,19 +36,13 @@ export type Light = {
   pillars: [number, number, number][];
 };
 
-/** Samples per cell in a light field. */
-const RES = 3;
 const SWAY = LIGHTING_CONFIG.glow.swayOffset;
 
-type Bake = {
-  canvas: HTMLCanvasElement;
-  values: Float32Array;
-  cols: number;
-  rows: number;
-  /** Top-left of the field, in cells. */
-  left: number;
-  top: number;
-};
+/** A light's baked pool: its levels, `RES` samples a cell, `cols` × `rows`
+ * from cell (`left`, `top`). */
+type Bake = { values: Float32Array; cols: number; rows: number; left: number; top: number };
+/** A light's two bakes, swayed left and right, and both as field samples. */
+type Baked = { pair: [Bake, Bake]; pool: PoolSamples };
 
 /** Where the lights of a city go. Deterministic per map. */
 export function cityLights(map: CityMap): Light[] {
@@ -183,7 +178,7 @@ export class DefendLighting {
   lights: Light[] = [];
   private map: CityMap | null = null;
   private stones: Stone[] = [];
-  private bakes = new Map<number, [Bake, Bake] | null>();
+  private bakes = new Map<number, Baked | null>();
   private queue = new Set<number>();
   /** Per cell: brightest light's id (-1 = none) and its level. */
   readonly domId = new Int32Array(CELL_COUNT).fill(-1);
@@ -194,7 +189,9 @@ export class DefendLighting {
   private dark: HTMLCanvasElement | null = null;
   private glow: HTMLCanvasElement | null = null;
   private flameSprite: HTMLCanvasElement | null = null;
-  private torchSprite: HTMLCanvasElement | null = null;
+  /** This frame's darkness and glow, summed at the bakes' resolution. */
+  private field: LightField | null = null;
+  private small: { dark: HTMLCanvasElement; glow: HTMLCanvasElement; torch: HTMLCanvasElement; darkImg: ImageData; glowImg: ImageData; torchImg: ImageData } | null = null;
   private dyn: HTMLCanvasElement | null = null;
   private ground: HTMLCanvasElement | null = null;
   private groundKey = "";
@@ -241,7 +238,9 @@ export class DefendLighting {
       if (budget-- <= 0) break;
       this.queue.delete(id);
       const l = this.lights[id];
-      this.bakes.set(id, [bakeLight(l, this.map, solid, -SWAY), bakeLight(l, this.map, solid, SWAY)]);
+      const pair: [Bake, Bake] = [bakeLight(l, this.map, solid, -SWAY), bakeLight(l, this.map, solid, SWAY)];
+      const pool = { ...poolSamples([pair[0].values, pair[1].values], pair[0].cols, glowColor), cols: pair[0].cols, rows: pair[0].rows, left: pair[0].left, top: pair[0].top };
+      this.bakes.set(id, { pair, pool });
       this.domDirty = true;
     }
   }
@@ -257,9 +256,9 @@ export class DefendLighting {
     this.domId.fill(-1);
     this.domVal.fill(0);
     for (const l of this.lights) {
-      const pair = this.active(l, intact);
-      if (!pair) continue;
-      const b = pair[0];
+      const baked = this.active(l, intact);
+      if (!baked) continue;
+      const b = baked.pair[0];
       const x0 = Math.max(0, b.left),
         y0 = Math.max(0, b.top);
       const x1 = Math.min(CELLS_W, b.left + b.cols / RES),
@@ -364,15 +363,22 @@ export class DefendLighting {
   }
 
   /** Darkness carved by light, then warm glow blended as light — the main
-   * game's recipe. `ambient` is the overlay colour and opacity. */
+   * game's recipe. `ambient` is the overlay colour and opacity. The pools
+   * and torches are summed in a `LightField`, then drawn scaled up into
+   * the board-sized darkness and glow, as each pool once was. */
   drawLight(c: CanvasRenderingContext2D, frame: LightFrame, ambient: Ambient, carried: Carried) {
     const { W, H } = boardSize(frame.px);
-    this.dark = sized(this.dark, W, H);
-    this.glow = sized(this.glow, W, H);
-    const layers = { dk: this.dark.getContext("2d")!, gl: this.glow.getContext("2d")! };
-    clearLayers(layers, ambient);
-    this.drawPools(layers, frame, ambient.glow);
-    this.drawCarried(layers, frame, ambient.glow, carried);
+    const field = (this.field ??= new LightField());
+    field.clear();
+    this.addPools(field, frame, ambient.glow);
+    const small = (this.small ??= smallLayers());
+    field.paintDark(small.darkImg.data, rgbOf(ambient.color), ambient.alpha);
+    const doublings = field.paintGlow(small.glowImg.data);
+    small.dark.getContext("2d")!.putImageData(small.darkImg, 0, 0);
+    small.glow.getContext("2d")!.putImageData(small.glowImg, 0, 0);
+    this.dark = upscale(this.dark, small.dark, frame.px, W, H);
+    this.glow = upscale(this.glow, small.glow, frame.px, W, H, doublings);
+    this.drawCarried(field, frame, ambient.glow, carried);
     c.save();
     c.drawImage(this.dark, 0, 0);
     c.globalCompositeOperation = "soft-light";
@@ -392,45 +398,47 @@ export class DefendLighting {
 
   /** Each fixed light's baked pool, blended between its two swayed bakes
    * by how far the flame leans. */
-  private drawPools(layers: Layers, frame: LightFrame, glow: number) {
+  private addPools(field: LightField, frame: LightFrame, glow: number) {
     for (const l of this.lights) {
-      const pair = this.active(l, frame.intact);
-      if (pair) drawPool(layers, frame, glow, { l, pair, burn: this.burn(l) });
+      const baked = this.active(l, frame.intact);
+      if (baked) addPool(field, frame, glow, { l, pool: baked.pool, burn: this.burn(l) });
     }
   }
 
-  /** Units' hand torches: small unoccluded pools that move with them, so
-   * they're drawn fresh each frame onto their own layer, clipped to open
-   * ground (a torch in the street never lights a roof), then carved into the
-   * darkness and added to the glow like the fixed lights. */
-  private drawCarried({ dk, gl }: Layers, { px, now, reduceMotion }: LightFrame, glow: number, carried: Carried) {
+  /** Units' hand torches: small unoccluded pools that move with them,
+   * summed fresh each frame on their own layer, drawn up to the board and
+   * clipped to open ground (a torch in the street never lights a roof),
+   * then carved into the darkness and added to the glow like the fixed
+   * lights. */
+  private drawCarried(field: LightField, { px, now, reduceMotion }: LightFrame, glow: number, carried: Carried) {
     if (!carried.torches.length) return;
-    const W = dk.canvas.width,
-      H = dk.canvas.height;
-    this.torchSprite ??= makeTorchSprite();
-    this.dyn = sized(this.dyn, W, H);
-    const d = this.dyn.getContext("2d")!;
-    d.globalCompositeOperation = "source-over";
-    d.globalAlpha = 1;
-    d.clearRect(0, 0, W, H);
-    d.globalCompositeOperation = "lighter";
-    const R = CARRIED_RADIUS * px;
     for (const t of carried.torches) {
       const f = getTorchFlicker({ x: t.id * 11, y: t.id * 5 }, now, reduceMotion);
       // Explosion flashes pass their own reach and brightness.
-      d.globalAlpha = Math.min(1, (t.k ?? 0.8) * f);
-      const r = (t.r ? t.r * px : R) * (0.95 + (f - 1) * 0.6);
-      d.drawImage(this.torchSprite, t.x * px - r, t.y * px - r, r * 2, r * 2);
+      const alpha = Math.min(1, (t.k ?? 0.8) * f);
+      field.addTorch(t.x, t.y, (t.r || CARRIED_RADIUS) * (0.95 + (f - 1) * 0.6), alpha);
     }
-    d.globalAlpha = 1;
+    const small = this.small!;
+    field.paintTorches(small.torchImg.data);
+    small.torch.getContext("2d")!.putImageData(small.torchImg, 0, 0);
+    const dk = this.dark!.getContext("2d")!,
+      gl = this.glow!.getContext("2d")!;
+    const W = dk.canvas.width,
+      H = dk.canvas.height;
+    this.dyn = upscale(this.dyn, small.torch, px, W, H);
+    const d = this.dyn.getContext("2d")!;
     d.globalCompositeOperation = "destination-in";
     d.drawImage(this.groundMask(carried, px, W, H), 0, 0);
     dk.globalCompositeOperation = "destination-out";
     dk.globalAlpha = 0.85;
     dk.drawImage(this.dyn, 0, 0);
+    dk.globalCompositeOperation = "source-over";
+    dk.globalAlpha = 1;
     gl.globalCompositeOperation = "lighter";
     gl.globalAlpha = Math.min(1, glow * 0.8);
     gl.drawImage(this.dyn, 0, 0);
+    gl.globalCompositeOperation = "source-over";
+    gl.globalAlpha = 1;
   }
 
   /** White wherever the ground is open (no standing building or wall). */
@@ -522,48 +530,28 @@ export type Ambient = { color: string; alpha: number; glow: number };
 export type CarriedLight = { x: number; y: number; id: number; r?: number; k?: number };
 /** Hand torches, masked to the open ground of `solid` (at map `version`). */
 export type Carried = { torches: CarriedLight[]; solid: Uint8Array; version: number };
-type Layers = { dk: CanvasRenderingContext2D; gl: CanvasRenderingContext2D };
-
-/** Clears the glow, and fills the darkness with the ambient overlay, ready
- * for lights to be carved out of it. */
-function clearLayers({ dk, gl }: Layers, ambient: Ambient) {
-  const W = dk.canvas.width,
-    H = dk.canvas.height;
-  dk.globalCompositeOperation = "source-over";
-  dk.globalAlpha = 1;
-  dk.clearRect(0, 0, W, H);
-  dk.fillStyle = ambient.color;
-  dk.globalAlpha = ambient.alpha;
-  dk.fillRect(0, 0, W, H);
-  gl.globalCompositeOperation = "source-over";
-  gl.globalAlpha = 1;
-  gl.clearRect(0, 0, W, H);
-  dk.globalCompositeOperation = "destination-out";
-  gl.globalCompositeOperation = "lighter";
-  dk.imageSmoothingEnabled = gl.imageSmoothingEnabled = true;
-}
-
 /** One light's pool at `burn` brightness, blended between its two swayed
  * bakes by how far the flame leans, carved into the darkness and added to the glow. */
-function drawPool({ dk, gl }: Layers, { px, now, reduceMotion }: LightFrame, glow: number, { l, pair, burn }: { l: Light; pair: [Bake, Bake]; burn: number }) {
+function addPool(field: LightField, { now, reduceMotion }: LightFrame, glow: number, { l, pool, burn }: { l: Light; pool: PoolSamples; burn: number }) {
   const flicker = getTorchFlicker({ x: l.id * 7, y: l.id * 13 }, now, reduceMotion);
   const sway = getTorchSway({ x: l.id * 7, y: l.id * 13 }, now, reduceMotion);
   const lean = Math.max(0, Math.min(1, 0.5 + sway.x / (2 * LIGHTING_CONFIG.flicker.swayX)));
   const k = l.strength * flicker * burn;
-  for (const [b, w] of [
-    [pair[0], 1 - lean],
-    [pair[1], lean],
-  ] as const) {
-    if (w <= 0.01) continue;
-    const x = b.left * px,
-      y = (b.top + sway.y) * px,
-      w2 = (b.cols / RES) * px,
-      h2 = (b.rows / RES) * px;
-    dk.globalAlpha = Math.min(1, 0.95 * k * w);
-    dk.drawImage(b.canvas, x, y, w2, h2);
-    gl.globalAlpha = Math.min(1, glow * k * w);
-    gl.drawImage(b.canvas, x, y, w2, h2);
-  }
+  // Canvas clamps globalAlpha to 0–1; a bake leaned all but away from is left out.
+  const clamp = (a: number, w: number) => (w <= 0.01 ? 0 : Math.max(0, Math.min(1, a * w)));
+  field.addPool(pool, sway.y * RES, clamp(0.95 * k, 1 - lean), clamp(glow * k, 1 - lean), clamp(0.95 * k, lean), clamp(glow * k, lean));
+}
+
+/** The field-sized darkness and glow, and their pixels. */
+function smallLayers() {
+  const make = () => {
+    const cv = document.createElement("canvas");
+    cv.width = FIELD_W;
+    cv.height = FIELD_H;
+    return cv;
+  };
+  const img = () => new ImageData(FIELD_W, FIELD_H);
+  return { dark: make(), glow: make(), torch: make(), darkImg: img(), glowImg: img(), torchImg: img() };
 }
 
 /** Fills each run of open cells along row `cy`. */
@@ -579,6 +567,36 @@ function fillOpenRuns(g: CanvasRenderingContext2D, px: number, cy: number, open:
   }
 }
 
+/** `src` (the field) drawn smoothly over the whole board, `px` pixels a
+ * cell, into a board-sized canvas, then added onto itself `doublings`
+ * times (a summed layer painted at a half or a quarter). */
+function upscale(cv: HTMLCanvasElement | null, src: HTMLCanvasElement, px: number, W: number, H: number, doublings = 0) {
+  const out = sized(cv, W, H);
+  const c = out.getContext("2d")!;
+  c.globalCompositeOperation = "source-over";
+  c.globalAlpha = 1;
+  c.clearRect(0, 0, W, H);
+  c.imageSmoothingEnabled = true;
+  c.drawImage(src, 0, 0, CELLS_W * px, CELLS_H * px);
+  if (doublings) {
+    c.globalCompositeOperation = "lighter";
+    for (let i = 0; i < doublings; i++) c.drawImage(out, 0, 0);
+    c.globalCompositeOperation = "source-over";
+  }
+  return out;
+}
+
+const rgbCache = new Map<string, number[]>();
+/** "rgb(r,g,b)" as numbers. */
+function rgbOf(color: string) {
+  let rgb = rgbCache.get(color);
+  if (!rgb) {
+    rgb = (color.match(/\d+(\.\d+)?/g) ?? ["0", "0", "0"]).slice(0, 3).map(Number);
+    rgbCache.set(color, rgb);
+  }
+  return rgb;
+}
+
 function sized(cv: HTMLCanvasElement | null, w: number, h: number) {
   const c = cv ?? document.createElement("canvas");
   if (c.width !== w || c.height !== h) {
@@ -590,29 +608,6 @@ function sized(cv: HTMLCanvasElement | null, w: number, h: number) {
 
 /** Reach of a unit's hand torch, in cells. */
 const CARRIED_RADIUS = 2.4;
-
-/** A soft pool in the candle palette, for hand torches. */
-function makeTorchSprite() {
-  const n = 64;
-  const cv = document.createElement("canvas");
-  cv.width = cv.height = n;
-  const c = cv.getContext("2d")!;
-  const img = c.createImageData(n, n);
-  for (let y = 0; y < n; y++)
-    for (let x = 0; x < n; x++) {
-      const d = Math.hypot(x + 0.5 - n / 2, y + 0.5 - n / 2) / (n / 2);
-      const v = lightFalloff(d, 1);
-      if (v <= 0) continue;
-      const [r, g, b] = glowColor(v);
-      const k = (y * n + x) * 4;
-      img.data[k] = r;
-      img.data[k + 1] = g;
-      img.data[k + 2] = b;
-      img.data[k + 3] = v * 255;
-    }
-  c.putImageData(img, 0, 0);
-  return cv;
-}
 
 function makeFlameSprite() {
   const cv = document.createElement("canvas");
@@ -647,7 +642,7 @@ function bakeLight(l: Light, map: CityMap, solid: Uint8Array, offsetX: number): 
   }
   const values = blur({ src: raw, cols, rows });
   unlightStanding(values, { left, top, cols, rows }, map, solid);
-  return { canvas: glowCanvas(values, cols, rows), values, cols, rows, left, top };
+  return { values, cols, rows, left, top };
 }
 
 type Point = { x: number; y: number };
@@ -696,26 +691,6 @@ function unlightStanding(values: Float32Array, f: { left: number; top: number; c
     const cy = Math.floor(f.top + (sy + 0.5) / RES);
     for (let sx = 0; sx < f.cols; sx++) if (standing(Math.floor(f.left + (sx + 0.5) / RES), cy)) values[sy * f.cols + sx] = 0;
   }
-}
-
-/** The field as candle-coloured pixels, alpha by brightness. */
-function glowCanvas(values: Float32Array, cols: number, rows: number) {
-  const canvas = document.createElement("canvas");
-  canvas.width = cols;
-  canvas.height = rows;
-  const ctx = canvas.getContext("2d")!;
-  const img = ctx.createImageData(cols, rows);
-  for (let i = 0; i < values.length; i++) {
-    const v = values[i];
-    if (v <= 0.003) continue;
-    const [r, g, b] = glowColor(v);
-    img.data[i * 4] = r;
-    img.data[i * 4 + 1] = g;
-    img.data[i * 4 + 2] = b;
-    img.data[i * 4 + 3] = Math.min(255, v * 255);
-  }
-  ctx.putImageData(img, 0, 0);
-  return canvas;
 }
 
 /** Distance from `p` to the segment a–b. */
