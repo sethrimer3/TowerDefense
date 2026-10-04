@@ -34,7 +34,7 @@ import { fitLayout, type Layout } from "./layout.ts";
 import { generateCity, type CityMap } from "./citygen.ts";
 import { DefendSim } from "./sim.ts";
 import { DefendRenderer } from "./render.ts";
-import { BattlePerformance } from "./performance.ts";
+import { BattlePerformance, FrameTimeOverlay } from "./performance.ts";
 import type { Overlay } from "./edit-overlay.ts";
 import { paintIcon, type IconItem } from "./structure-art.ts";
 import { BoardPointers, eventCell } from "./board-pointers.ts";
@@ -98,6 +98,7 @@ export class DefendPage {
   });
   private lastTime = 0;
   private performance = new BattlePerformance();
+  private frameTimes = new FrameTimeOverlay();
   private performanceEnd: string | null = null;
   private message = "";
   private messageT = 0;
@@ -125,6 +126,7 @@ export class DefendPage {
   constructor(root: HTMLElement, host: DefendHost) {
     this.root = root;
     this.host = host;
+    Object.assign(window, { defendFrameTimes: (enabled?: boolean) => this.frameTimes.toggle(enabled) });
     window.addEventListener("resize", () => this.layoutBoard());
     document.addEventListener('visibilitychange', () => { this.lastTime = 0; });
   }
@@ -146,9 +148,9 @@ export class DefendPage {
     const start = performance.now();
     if (this.sim && this.phase === "sim") {
       if (!this.journal?.open) this.sim.update(dt);
-      this.handleEvents();
     } else if (this.sim && this.phase === "over" && (this.sim.floods.length || this.sim.sinkings.length)) ageWater(this.sim, Math.min(dt, 0.25));
     const updated = performance.now();
+    if (this.sim && this.phase === 'sim') this.handleEvents();
     this.fadeNight(dt);
     this.keepBricks?.step(dt);
     if (this.messageT > 0) {
@@ -164,6 +166,10 @@ export class DefendPage {
       this.performanceEnd = null;
     }
     if (this.phase === "sim") this.updateHud();
+    if (measuring && this.renderer && !document.hidden) this.frameTimes.sample({
+      frameMs: dt * 1000, updateMs: updated - start, ...this.renderer.timings,
+      uiMs: drawing - updated + performance.now() - drawn,
+    });
   }
 
   /** Developer aid: advance the running defense by `seconds` at once,
@@ -679,6 +685,7 @@ export class DefendPage {
     const map = this.sim ? this.sim.map : this.currentMap();
     this.renderer.draw(map, this.sim, this.overlay(), {
       grid: this.phase === "build",
+      timings: this.frameTimes.enabled,
       weather: this.weather,
       night: this.night,
       now: performance.now(),

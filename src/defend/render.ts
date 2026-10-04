@@ -48,6 +48,8 @@ export type DrawOptions = {
   over?: boolean;
   /** Leave out the planted war banner (while the player carries it). */
   hideBanner?: boolean;
+  /** Developer timing, disabled by default. */
+  timings?: boolean;
 };
 
 /** The torches going out after a lost run: seconds before the first, then
@@ -56,6 +58,7 @@ export type DrawOptions = {
 const DOUSE = { delay: 1.2, perCell: 0.16, jitter: 0.6, fade: 0.7 };
 
 export class DefendRenderer {
+  readonly timings = { entityMs: 0, effectsMs: 0, terrainMs: 0 };
   readonly lighting = new DefendLighting();
   readonly fences = new Fences();
   readonly grass = new ParkGrass();
@@ -164,7 +167,10 @@ export class DefendRenderer {
   }
 
   draw(map: CityMap, sim: DefendSim | null, overlay: Overlay | null, opts: DrawOptions) {
+    const start = opts.timings ? performance.now() : 0;
+    this.timings.entityMs = this.timings.effectsMs = this.timings.terrainMs = 0;
     this.refreshLayer(map, sim);
+    if (opts.timings) this.timings.terrainMs = performance.now() - start;
     // Beyond the board's edges: the dark ground the city stands on.
     this.ctx.setTransform(1, 0, 0, 1, 0, 0);
     this.ctx.fillStyle = BEYOND;
@@ -184,6 +190,7 @@ export class DefendRenderer {
     // Rain falls in screen space, in front of the camera.
     this.ctx.setTransform(1, 0, 0, 1, 0, 0);
     if (sim && opts.weather?.rain) this.drawRain(dt);
+    if (opts.timings) this.timings.effectsMs = performance.now() - start - this.timings.terrainMs - this.timings.entityMs;
   }
 
   /** The building grid (brighter during a drag) and the drag's overlay. */
@@ -274,7 +281,7 @@ export class DefendRenderer {
     drawScorches(brush, sim);
     drawBlazes(this.ctx, this.px, sim);
     this.wizard.drawIce(this.ctx, this.px, sim.frosts, sim.time * 1000, flameLights(sim).relief);
-    drawUnits(brush, sim, torches, opts.healthbars === true);
+    drawUnits(brush, sim, torches, opts.healthbars === true, opts.timings ? this.timings : undefined);
     this.dark.draw(this.ctx, this.px, sim);
     this.wizard.drawChill(this.ctx, this.px, sim, opts.now);
   }

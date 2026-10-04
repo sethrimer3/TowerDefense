@@ -1282,3 +1282,18 @@ dialog .away-row .away-note {
   .defend-journal-button { padding: 3px; }
   .defend-journal-button canvas { width: 30px; height: 30px; }
 }
+/* Developer timing overlay; never participates in the battle page's layout. */
+.defend-frame-times {
+  position: fixed;
+  z-index: 1000;
+  right: 8px;
+  bottom: 8px;
+  padding: 8px 12px;
+  background: var(--parchment), #eedcba;
+  color: var(--ink);
+  font-family: var(--font);
+  white-space: pre;
+  pointer-events: none;
+  border: 1px solid #b69352;
+  font-size: 12px;
+}

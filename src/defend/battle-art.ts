@@ -62,7 +62,8 @@ export type Burning = (x: number, y: number, id: number) => number;
 
 /** Units, projectiles and effects. With `torches`, units carry a torch,
  * lit while it still burns. */
-export function drawUnits(b: Brush, sim: DefendSim, torches: Burning | null, healthbars = false) {
+export function drawUnits(b: Brush, sim: DefendSim, torches: Burning | null, healthbars = false, timing?: { entityMs: number }) {
+  const start = timing ? performance.now() : 0;
   // Track the wave peak even when the setting is off.
   healthbarEnemies(sim);
   drawBlackHoles(b, sim);
@@ -77,6 +78,7 @@ export function drawUnits(b: Brush, sim: DefendSim, torches: Burning | null, hea
     else drawEnemy(b, e, sim);
   }
   drawSwords(b, swords);
+  if (timing) timing.entityMs += performance.now() - start;
   drawArrows(b, sim);
   drawShells(b, sim);
   drawSiegeShots(b, sim);

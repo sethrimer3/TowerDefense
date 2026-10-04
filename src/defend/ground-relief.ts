@@ -31,13 +31,18 @@ const LIGHT_HEIGHT = 0.22;
 const SPRITE = 96;
 /** How strongly lit and shaded slopes show. */
 const LIT = 0.85, SHADE = 0.6;
+/** Bounded sprite memory, measured in RGBA pixels (32 MiB maximum). */
+const CACHE_PIXELS = 8 * 1024 * 1024;
+type LightSprite = { passes: HTMLCanvasElement[]; pixels: number };
 
 export class GroundRelief {
   private masks: HTMLCanvasElement[] = [];
   private weights: HTMLCanvasElement[] = [];
   private outside = new Uint8Array(CELLS_W * CELLS_H);
   private key = "";
-  private scratch: HTMLCanvasElement | null = null;
+  private sprites = new Map<string, LightSprite>();
+  private spritePixels = 0;
+  private map: CityMap | null = null;
   private fixed: HTMLCanvasElement | null = null;
   private fixedKey = "";
   /** The board's size in canvas pixels, as of the last `sync`. */
@@ -48,9 +53,11 @@ export class GroundRelief {
   sync(map: CityMap, px: number, W: number, H: number) {
     if (typeof document === "undefined") return false;
     const key = `${W}x${H}:${floorArtLoaded()}`;
-    if (key === this.key) return this.masks.length === 4;
+    if (map === this.map && key === this.key) return this.masks.length === 4;
+    this.map = map;
     this.key = key;
     this.fixedKey = "";
+    this.sprites.clear(); this.spritePixels = 0;
     this.size = { W, H };
     for (let i = 0; i < this.outside.length; i++) this.outside[i] = map.type[i] === CellType.OUT ? 1 : 0;
     this.masks = bakeMasks(this.outside, px, W, H);
@@ -95,34 +102,47 @@ export class GroundRelief {
     const x1 = Math.min(this.size.W, Math.ceil(l.x * px + R)), y1 = Math.min(this.size.H, Math.ceil(l.y * px + R));
     const w = x1 - x0, h = y1 - y0;
     if (w <= 0 || h <= 0) return;
-    const s = (this.scratch ??= document.createElement("canvas"));
-    if (s.width < w || s.height < h) {
-      s.width = Math.max(s.width, w);
-      s.height = Math.max(s.height, h);
+    // Brightness changes independently of the masks, so fading bolts reuse
+    // their exact sprites. Do not quantize positions, colours or reach.
+    const key = `${px}:${l.x}:${l.y}:${l.r}:${l.color}`;
+    let sprite = this.sprites.get(key);
+    if (sprite) { this.sprites.delete(key); this.sprites.set(key, sprite); }
+    else {
+      const pixels = w * h * 8;
+      let recycled: LightSprite | undefined;
+      while (this.sprites.size && (this.sprites.size >= 256 || this.spritePixels + pixels > CACHE_PIXELS)) {
+        const oldest = this.sprites.keys().next().value!;
+        const entry = this.sprites.get(oldest)!;
+        this.sprites.delete(oldest); this.spritePixels -= entry.pixels;
+        recycled ??= entry;
+      }
+      const passes = recycled?.passes ?? Array.from({ length: 8 }, () => document.createElement('canvas'));
+      const sx = l.x * px - R - x0, sy = l.y * px - R - y0;
+      for (let a = 0; a < 8; a++) {
+        const s = passes[a]; s.width = w; s.height = h;
+        const g = s.getContext('2d', { willReadFrequently: true })!;
+        const axis = a >> 1;
+        g.drawImage(this.masks[a % 2 ? axis ^ 1 : axis], x0, y0, w, h, 0, 0, w, h);
+        g.globalCompositeOperation = 'destination-in';
+        g.drawImage(this.weights[axis], sx, sy, R * 2, R * 2);
+        g.globalCompositeOperation = 'source-in';
+        g.fillStyle = a % 2 ? '#000' : l.color;
+        g.fillRect(0, 0, w, h);
+      }
+      sprite = { passes, pixels };
+      // An oversized one-off blast is drawn but never retained.
+      if (pixels <= CACHE_PIXELS) { this.sprites.set(key, sprite); this.spritePixels += pixels; }
     }
-    const g = s.getContext("2d")!;
-    // The weight sprite spans the light's whole square, wherever it is clipped.
-    const sx = l.x * px - R - x0, sy = l.y * px - R - y0;
-    const pass = (mask: HTMLCanvasElement, weight: HTMLCanvasElement, color: string, op: GlobalCompositeOperation, k: number) => {
-      g.globalCompositeOperation = "copy";
-      g.drawImage(mask, x0, y0, w, h, 0, 0, w, h);
-      g.globalCompositeOperation = "destination-in";
-      g.drawImage(weight, sx, sy, R * 2, R * 2);
-      g.globalCompositeOperation = "source-in";
-      g.fillStyle = color;
-      g.fillRect(0, 0, w, h);
-      c.save();
-      c.globalCompositeOperation = op;
-      c.globalAlpha = Math.min(1, k);
-      c.drawImage(s, 0, 0, w, h, x0, y0, w, h);
-      c.restore();
-    };
+    c.save();
     for (let a = 0; a < 4; a++) {
-      // Ground facing this way catches the light from that side; ground
-      // facing the opposite way (axis a ^ 1) turns its back on it.
-      pass(this.masks[a], this.weights[a], l.color, "lighter", l.k * LIT);
-      pass(this.masks[a ^ 1], this.weights[a], "#000", "source-over", l.k * SHADE);
+      c.globalCompositeOperation = 'lighter';
+      c.globalAlpha = Math.min(1, l.k * LIT);
+      c.drawImage(sprite.passes[a * 2], x0, y0);
+      c.globalCompositeOperation = 'source-over';
+      c.globalAlpha = Math.min(1, l.k * SHADE);
+      c.drawImage(sprite.passes[a * 2 + 1], x0, y0);
     }
+    c.restore();
   }
 }
 
@@ -163,7 +183,7 @@ function bakeMasks(outside: Uint8Array, px: number, W: number, H: number): HTMLC
     const cv = document.createElement("canvas");
     cv.width = W;
     cv.height = H;
-    cv.getContext("2d")!.putImageData(img, 0, 0);
+    cv.getContext("2d", { willReadFrequently: true })!.putImageData(img, 0, 0);
     return cv;
   });
 }
@@ -219,7 +239,7 @@ function boxBlur(src: Float32Array, W: number, H: number, r: number) {
 function weightSprite(ax: number, ay: number) {
   const cv = document.createElement("canvas");
   cv.width = cv.height = SPRITE;
-  const c = cv.getContext("2d")!;
+  const c = cv.getContext("2d", { willReadFrequently: true })!;
   const img = c.createImageData(SPRITE, SPRITE);
   for (let y = 0; y < SPRITE; y++)
     for (let x = 0; x < SPRITE; x++) {

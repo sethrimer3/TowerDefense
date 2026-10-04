@@ -138,8 +138,30 @@ const strength = (b: Blaze) => Math.min(1, b.t / 0.2) * Math.min(1, (b.life - b.
 
 /** Every patch of burning ground: the scorch and embers, then the flames. */
 export function drawBlazes(c: Ctx, px: number, sim: DefendSim) {
-  for (const b of sim.blazes) drawScorched(c, px, b, sim.time);
+  for (const b of sim.blazes) drawCachedScorch(c, px, b, sim.time);
   for (const b of sim.blazes) drawTongues(c, px, b, sim.time);
+}
+
+/** Scorch pixels change at eight Hz, with full brightness for most of a
+ * blaze's life. Bake at the actual screen scale to preserve every rounded
+ * pixel edge, including fractional scales. One recyclable sprite per blaze. */
+const scorchSprites = new WeakMap<Blaze, { key: string; canvas: HTMLCanvasElement; x: number; y: number }>();
+function drawCachedScorch(c: Ctx, px: number, b: Blaze, now: number) {
+  const cx = Math.round(b.x * ART), cy = Math.round(b.y * ART), r = Math.ceil(b.r * ART);
+  const key = `${px}:${cx}:${cy}:${b.r}:${b.seed}:${Math.floor(now * 8)}:${strength(b)}`;
+  let sprite = scorchSprites.get(b);
+  if (!sprite || sprite.key !== key) {
+    const x = Math.round((cx - r) * px / ART), y = Math.round((cy - r) * px / ART);
+    const w = Math.max(1, Math.round((cx + r + 1) * px / ART) - x);
+    const h = Math.max(1, Math.round((cy + r + 1) * px / ART) - y);
+    const canvas = sprite?.canvas ?? document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    const off = canvas.getContext('2d', { willReadFrequently: true })!;
+    off.translate(-x, -y);
+    drawScorched(off, px, b, now);
+    sprite = { key, canvas, x, y }; scorchSprites.set(b, sprite);
+  }
+  c.drawImage(sprite.canvas, sprite.x, sprite.y);
 }
 
 /** One art pixel at (ax, ay) (in `ART`ths of a cell), snapped to the screen. */
