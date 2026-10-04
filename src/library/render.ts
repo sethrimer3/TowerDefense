@@ -28,7 +28,8 @@ import {
 } from "./sim.ts";
 import { CELL, FW } from "./fire.ts";
 import { ELIXIRS } from "./lab.ts";
-import { LabRenderer } from "./lab-render.ts";
+import { HATCH_Y, LabRenderer } from "./lab-render.ts";
+import { ashlar, facing } from "./ashlar.ts";
 
 /** Each role's robe. */
 const ROBES: Record<Role, RGB> = { shelver: [240, 236, 228], professor: [104, 124, 200], researcher: [160, 104, 210] };
@@ -122,6 +123,9 @@ export class LibraryRenderer {
   private hallCanvas: HTMLCanvasElement[] = [];
   private hallImage: ImageData[] = [];
   private seen = [new Float32Array(HALL + BAY_X0), new Float32Array(HALL + BAY_X0)];
+  private hallSx = [new Float32Array(HALL * HALL_ROWS), new Float32Array(HALL * HALL_ROWS)];
+  private hallSy = [new Float32Array(HALL * HALL_ROWS), new Float32Array(HALL * HALL_ROWS)];
+  private hallRelief = [new Uint8Array(HALL * HALL_ROWS), new Uint8Array(HALL * HALL_ROWS)];
   private lastTime = -1;
   /** Which tables stand whole, their candles lit. */
   private candles = TABLES.map(() => true);
@@ -198,14 +202,9 @@ export class LibraryRenderer {
           rgb = lx === 0 || ly === 0 ? [20, 18, 18] : [58, 52, 48];
         } else {
           // Ashlar: courses of blocks, bigger on the piers at either side.
-          const pier = x < BAYS_EDGE || x >= W - BAYS_EDGE;
-          const ch = pier ? 12 : 9, bw = pier ? 16 : 18;
-          const course = Math.floor(y / ch), off = course % 2 ? bw / 2 : 0;
-          const bx = Math.floor((x + off) / bw), lx = (x + off) % bw, ly = y % ch;
-          const edge = Math.min(lx, bw - 1 - lx, ly, ch - 1 - ly);
-          const t = (pier ? 0.95 : 0.82) * (0.82 + h01(bx, course, 9) * 0.3) * (0.93 + h01(x, y, 1) * 0.12);
-          rgb = edge === 0 ? [30, 27, 26] : [92 * t, 86 * t, 80 * t];
-          hgt = edge === 0 ? 0 : Math.min(1, edge / 2.2) * (0.85 + h01(x, y, 2) * 0.15);
+          const stone = ashlar(x, y, x < BAYS_EDGE || x >= W - BAYS_EDGE);
+          rgb = stone.rgb;
+          hgt = stone.hgt;
         }
         // The lintel over each doorway: three wedged stones.
         if (kind === Kind.Wall && (x < BAY_X0 || x >= W - BAY_X0) && y >= FLOOR - HALL_H - 4 && y < FLOOR - HALL_H) {
@@ -255,16 +254,16 @@ export class LibraryRenderer {
         this.base[i * 3 + 2] = rgb[2];
         height[i] = hgt;
       }
-    // The trapdoor's opening in the floor, the lab's ladder in it.
-    for (let y = FLOOR; y < H; y++)
-      for (let x = STAIR_X - 4; x <= STAIR_X + 4; x++) {
-        const i = y * W + x, rail = x === STAIR_X - 2 || x === STAIR_X + 1, rung = y % 3 === 0 && x > STAIR_X - 2 && x < STAIR_X + 1;
-        const rgb: RGB = rail ? [150, 106, 58] : rung ? [124, 86, 46] : x === STAIR_X - 4 || x === STAIR_X + 4 ? [34, 30, 28] : [12, 10, 10];
-        this.base[i * 3] = rgb[0];
-        this.base[i * 3 + 1] = rgb[1];
-        this.base[i * 3 + 2] = rgb[2];
-        height[i] = 0;
-      }
+    // The trapdoor: an iron-bound frame let into the floor, its opening a
+    // dark slot (the ladder goes down out of sight, under the floor).
+    for (let x = STAIR_X - 4; x <= STAIR_X + 4; x++) {
+      const i = FLOOR * W + x, rim = x === STAIR_X - 4 || x === STAIR_X + 4;
+      const rgb: RGB = rim ? [74, 72, 78] : [8, 6, 6];
+      this.base[i * 3] = rgb[0];
+      this.base[i * 3 + 1] = rgb[1];
+      this.base[i * 3 + 2] = rgb[2];
+      height[i] = rim ? 1 : 0;
+    }
     this.bakeHalls();
     for (let y = 1; y < H - 1; y++)
       for (let x = 1; x < W - 1; x++) {
@@ -274,37 +273,55 @@ export class LibraryRenderer {
       }
   }
 
-  /** The two hallways: stone walls and a flagged floor, a water butt by
-   * each door, fading to black where they lead out. */
+  /** The two hallways: the nave's ashlar on their walls under a beamed
+   * ceiling, a flagged floor, a water butt by each door, fading to black
+   * where they lead out. Walls and floor are bump mapped, lit each frame by
+   * whoever walks them. */
   private bakeHalls() {
     for (let side = 0; side < 2; side++) {
-      const base = this.hallBase[side];
+      const base = this.hallBase[side], height = new Float32Array(HALL * HALL_ROWS), relief = this.hallRelief[side];
       for (let y = 0; y < HALL_ROWS; y++)
         for (let hx = 0; hx < HALL; hx++) {
           const wy = HALL_TOP + y, wx = side ? W + hx : hx - HALL, i = y * HALL + hx;
-          let rgb: RGB;
+          let rgb: RGB, hgt = 0;
+          relief[i] = 1;
           if (wy < FLOOR - HALL_H) {
-            const lx = (wx + 64) % 9, ly = wy - HALL_TOP;
-            rgb = lx === 0 || ly === 3 ? [22, 20, 20] : [70, 64, 60];
+            // Oak beams across the ceiling, end on.
+            const lx = (wx + 64) % 9, ly = wy - HALL_TOP, t = 0.8 + h01((wx + 64) >> 3, 7, 43) * 0.3;
+            rgb = lx === 0 || ly === 3 ? [22, 16, 12] : [84 * t, 56 * t, 32 * t];
+            hgt = lx === 0 || ly === 3 ? 0 : Math.min(1, Math.min(lx, 8 - lx, ly, 2 - ly + 1) / 1.5);
           } else if (wy < FLOOR) {
-            const course = Math.floor((FLOOR - wy) / 5), lx = (wx + 64 + (course % 2) * 4) % 8, ly = (FLOOR - wy) % 5;
-            const t = 0.8 + h01((wx + 64 + (course % 2) * 4) >> 3, course, 41) * 0.3;
-            rgb = lx === 0 || ly === 0 ? [20, 18, 18] : [62 * t, 56 * t, 52 * t];
+            const stone = ashlar(wx, wy, false);
+            rgb = stone.rgb;
+            hgt = stone.hgt;
           } else if (wy < FLOOR + 6) {
-            const lx = (wx + 64) % 12;
-            rgb = lx === 0 || wy === FLOOR + 5 ? [26, 24, 22] : [82, 76, 70];
-          } else rgb = [10, 9, 9];
+            const lx = (wx + 64) % 12, t = 0.8 + h01((wx + 64) >> 4, 3, 45) * 0.3;
+            rgb = lx === 0 || wy === FLOOR + 5 ? [26, 24, 22] : [86 * t, 80 * t, 76 * t];
+            hgt = lx === 0 || wy === FLOOR + 5 ? 0 : Math.min(1, Math.min(lx, 11 - lx, wy - FLOOR, FLOOR + 4 - wy) / 1.5);
+          } else {
+            rgb = [10, 9, 9];
+            relief[i] = 0;
+          }
           // The water butt: staves, two iron hoops, the water's face.
           const bx = wx - BUTTS[side];
           if (Math.abs(bx) <= 3 && wy >= FLOOR - 9 && wy < FLOOR) {
             const by = wy - (FLOOR - 9);
             rgb = by === 0 ? [60, 110, 150] : by === 2 || by === 6 ? [70, 70, 76] : Math.abs(bx) === 3 ? [70, 44, 24] : [118 - Math.abs(bx) * 8, 78, 42];
+            relief[i] = 0;
           }
           // Out of sight where the hallway leads away.
           const fade = Math.min(1, (side ? HALL - hx : hx) / 18);
           base[i * 3] = rgb[0] * fade;
           base[i * 3 + 1] = rgb[1] * fade;
           base[i * 3 + 2] = rgb[2] * fade;
+          height[i] = hgt;
+        }
+      const sx = this.hallSx[side], sy = this.hallSy[side];
+      for (let y = 1; y < HALL_ROWS - 1; y++)
+        for (let hx = 1; hx < HALL - 1; hx++) {
+          const i = y * HALL + hx;
+          sx[i] = (height[i + 1] - height[i - 1]) * 0.5;
+          sy[i] = (height[i + HALL] - height[i - HALL]) * 0.5;
         }
     }
   }
@@ -547,15 +564,24 @@ export class LibraryRenderer {
     ctx.setTransform(scale, 0, 0, scale, ox, oy);
     this.drawHalls(sim, dt);
     ctx.drawImage(this.off, 0, 0);
-    const top = -oy / scale, bottom = (this.canvas.height - oy) / scale;
-    if (LabRenderer.visible(top, bottom)) this.lab.draw(ctx, sim, time, dt, effects);
+    const top = -oy / scale, bottom = (this.canvas.height - oy) / scale, labShown = LabRenderer.visible(top, bottom);
+    if (labShown) this.lab.draw(ctx, sim, time, dt, effects);
     this.drawTrapdoor();
     if (day < 0.6) this.drawStars(now, 1 - day / 0.6);
     if (effects && day > 0.02) this.drawRays(now, day);
     for (const r of sim.remains) this.drawRemains(r.x, Math.min(1, (600 - (sim.time - r.at)) / 30));
     this.drawButts(sim);
     for (const c of [sim.barrow, sim.bookCart]) if (c.here) this.drawCart(c);
+    // Whoever is on the ladder between the nave's floor and the lab's vault
+    // is out of sight, through the trapdoor.
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(-HALL - 8, -8, W + 2 * HALL + 16, FLOOR + 8);
+    ctx.rect(-HALL - 8, HATCH_Y, W + 2 * HALL + 16, WORLD_H - HATCH_Y + 8);
+    ctx.clip();
     for (const l of sim.librarians) if (!l.away) this.drawLibrarian(l, time);
+    ctx.restore();
+    if (labShown) this.lab.drawOver(ctx, sim, time, dt, effects);
     if (this.target && !this.target.away) {
       // A brass marker over whoever is followed.
       const t = this.target, y = Math.round(t.y) - 12 - (Math.floor(time * 2) % 2);
@@ -584,21 +610,36 @@ export class LibraryRenderer {
         }
       }
       const base = this.hallBase[side], img = this.hallImage[side], px = new Uint32Array(img.data.buffer);
-      for (let hx = 0; hx < HALL; hx++) {
-        const v = 0.025 + seen[side ? hx + BAY_X0 : hx] * 0.95;
-        for (let y = 0; y < HALL_ROWS; y++) {
-          const i = y * HALL + hx;
+      const sx = this.hallSx[side], sy = this.hallSy[side], relief = this.hallRelief[side];
+      // Whoever walks the hallway lights it close by, the stones' faces
+      // turned toward them catching it; further off, only the memory of it.
+      const walkers = sim.librarians.filter((l) => !l.away && l.y <= FLOOR && (side ? l.x > W - BAY_X0 - LANTERN : l.x < BAY_X0 + LANTERN));
+      for (let y = 0; y < HALL_ROWS; y++)
+        for (let hx = 0; hx < HALL; hx++) {
+          const i = y * HALL + hx, wx = side ? W + hx : hx - HALL, wy = HALL_TOP + y;
+          let v = 0.025 + seen[side ? hx + BAY_X0 : hx] * 0.6;
+          for (const l of walkers) {
+            const dx = wx - l.x, dy = wy - (l.y - 5), d = Math.sqrt(dx * dx + dy * dy);
+            if (d >= LANTERN * 1.2) continue;
+            const fall = 1 - d / (LANTERN * 1.2);
+            v += fall * fall * 0.75 * (relief[i] ? facing(sx[i], sy[i], dx, dy, d) : 1);
+          }
           px[i] = 0xff000000 | (c255(base[i * 3 + 2] * v * 0.62) << 16) | (c255(base[i * 3 + 1] * v * 0.84) << 8) | c255(base[i * 3] * v);
         }
-      }
       const ctx = this.hallCanvas[side].getContext("2d")!;
       ctx.putImageData(img, 0, 0);
       this.ctx.drawImage(this.hallCanvas[side], side ? W : -HALL, HALL_TOP);
     }
   }
-  /** The trapdoor's lid, standing open beside its opening. */
+  /** The trapdoor's lid, standing open beside its opening, and the ladder's
+   * top poking up through it. */
   private drawTrapdoor() {
     const ctx = this.ctx, x = STAIR_X + 5, k = this.lum(x, FLOOR - 4);
+    ctx.fillStyle = shade([150, 106, 58], k);
+    ctx.fillRect(STAIR_X - 2, FLOOR - 4, 1, 4);
+    ctx.fillRect(STAIR_X + 1, FLOOR - 4, 1, 4);
+    ctx.fillStyle = shade([124, 86, 46], k);
+    ctx.fillRect(STAIR_X - 1, FLOOR - 3, 2, 1);
     ctx.fillStyle = shade([118, 78, 42], k);
     ctx.fillRect(x, FLOOR - 8, 2, 8);
     ctx.fillStyle = shade([70, 46, 24], k);
@@ -797,7 +838,9 @@ export class LibraryRenderer {
   }
 
   private drawLibrarian(l: Librarian, time: number) {
-    const ctx = this.ctx, x = Math.round(l.x) - 1, y = Math.round(l.y), lum = this.lum(l.x, y - 3);
+    // Lifted off the flags by a sip of the brew.
+    const float = l.action === "float" ? 2 + Math.round(Math.sin(time * 3 + l.id)) : 0;
+    const ctx = this.ctx, x = Math.round(l.x) - 1, y = Math.round(l.y) - float, lum = this.lum(l.x, y - 3);
     ctx.fillStyle = shade(ROBES[l.role], lum);
     // A step's bob while walking (quicker running from a fire); crouched when cowering.
     const bob = l.action === "walk" && Math.floor(time * (l.mode === "work" ? 6 : 10) + l.id) % 2 ? 1 : 0;
@@ -847,7 +890,7 @@ export class LibraryRenderer {
     }
     if (l.hand === "flask") {
       // A flask of an elixir, raised to the lips when drinking.
-      const up = l.action === "drink" ? 3 : 0;
+      const up = l.action === "drink" || l.action === "taste" ? 3 : 0;
       ctx.fillStyle = shade([200, 226, 236], lum);
       ctx.fillRect(front, y - 3 - up, 1, 1);
       ctx.fillStyle = ELIXIRS[l.vial];
@@ -880,6 +923,79 @@ export class LibraryRenderer {
     if (l.action === "observe") {
       ctx.fillStyle = "rgba(170,255,200,0.7)";
       ctx.fillRect(x + (l.facing > 0 ? 1 : 0), y - 4, 1, 1);
+    }
+    if (float) {
+      // Sparkles under their feet while they hang in the air.
+      ctx.fillStyle = Math.floor(time * 6) % 2 ? "#e8d0ff" : ELIXIRS[l.vial] || "#c890ff";
+      ctx.fillRect(x + (Math.floor(time * 5 + l.id) % 3) - 1, y + 1 + (Math.floor(time * 7) % 2), 1, 1);
+    }
+    if (l.action === "hiccup") {
+      // Bubbles of the brew rising off them, one a hiccup.
+      const p = (time * 1.6 + l.id * 0.3) % 1;
+      ctx.globalAlpha = 1 - p;
+      ctx.fillStyle = ELIXIRS[l.vial] || "#4ad86a";
+      ctx.fillRect(x + (l.facing > 0 ? 2 : -1) + Math.round(Math.sin(p * 6)), y - 6 - Math.round(p * 6), 1, 1);
+      ctx.fillRect(x + (l.facing > 0 ? 3 : -2), y - 5 - Math.round(((p + 0.5) % 1) * 6), 1, 1);
+      ctx.globalAlpha = 1;
+    }
+    if (l.action === "scroll") {
+      // A scroll unrolled before them, a line of writing across it.
+      ctx.fillStyle = shade([232, 220, 186], lum);
+      ctx.fillRect(l.facing > 0 ? x + 2 : x - 3, y - 4, 3, 2);
+      ctx.fillStyle = shade([150, 120, 70], lum);
+      ctx.fillRect(l.facing > 0 ? x + 2 : x - 3, y - 4, 1, 2);
+      ctx.fillRect(l.facing > 0 ? x + 4 : x - 1, y - 4, 1, 2);
+    }
+    if (l.action === "confer" && Math.floor(time * 0.8 + l.id) % 2) {
+      // An alchemical sign held up in talk: sulphur, then salt.
+      ctx.fillStyle = shade([236, 228, 206], lum);
+      const sign = Math.floor(time * 0.4 + l.id) % 2 ? [[1, 0], [0, 1], [2, 1], [1, 2]] : [[0, 0], [1, 0], [2, 0], [1, 1], [1, 2]];
+      for (const [dx, dy] of sign) ctx.fillRect(x - 1 + dx, y - 10 + dy, 1, 1);
+    }
+    if (l.action === "feed") {
+      // A morsel held out, then tossed.
+      ctx.fillStyle = shade([150, 100, 60], lum);
+      ctx.fillRect(front + (Math.floor(time * 2) % 2) * l.facing, y - 4 - (Math.floor(time * 2) % 2), 1, 1);
+    }
+    if (l.action === "tend") {
+      // A watering can, tipped, dripping.
+      ctx.fillStyle = shade([120, 124, 132], lum);
+      ctx.fillRect(front, y - 3, 2, 2);
+      ctx.fillStyle = "#6aa8e0";
+      ctx.fillRect(front + 2 * l.facing, y - 1 + (Math.floor(time * 8) % 3), 1, 1);
+    }
+    if (l.action === "pull") {
+      // The mandrake held up by its leaves, its little face howling.
+      const up = Math.min(4, Math.floor(time * 6) % 10);
+      ctx.fillStyle = shade([200, 160, 110], lum);
+      ctx.fillRect(front, y - 4 - up, 2, 3);
+      ctx.fillStyle = "#3a2010";
+      ctx.fillRect(front, y - 3 - up, 1, 1);
+      ctx.fillStyle = "#5a9a40";
+      ctx.fillRect(front, y - 6 - up, 2, 2);
+    }
+    if (l.action === "recite" || l.action === "scry") {
+      // Hands raised to the book, or held over the orb.
+      ctx.fillStyle = shade(ROBES[l.role], lum);
+      const k = l.action === "recite" ? Math.floor(time * 1.5 + l.id) % 2 : 0;
+      ctx.fillRect(front, y - 5 + k, 1, 1);
+      if (l.action === "scry") {
+        ctx.fillStyle = "rgba(150,200,255,0.8)";
+        ctx.fillRect(x + (l.facing > 0 ? 1 : 0), y - 4, 1, 1);
+      }
+    }
+    if (l.action === "cast") {
+      // Tongs gripping the crucible, tipped to pour.
+      ctx.fillStyle = shade([70, 70, 76], lum);
+      ctx.fillRect(l.facing > 0 ? front : front - 1, y - 4, 2, 1);
+      ctx.fillStyle = "#ffb030";
+      ctx.fillRect(front + l.facing, y - 3, 1, 1);
+    }
+    if (l.action === "wind") {
+      // A brass key turned round and round.
+      const k = Math.floor(time * 4 + l.id) % 4;
+      ctx.fillStyle = shade([200, 160, 70], lum);
+      ctx.fillRect(front + (k === 1 ? l.facing : 0), y - 4 + (k === 2 ? 1 : 0), 1, 1);
     }
     if (l.hand === "cup") {
       ctx.fillStyle = shade([226, 220, 206], lum);

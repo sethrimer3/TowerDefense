@@ -49,12 +49,24 @@ export const LAB_TOP = H + 8;
 export const LAB_FLOOR = LAB_TOP + 112;
 export const WORLD_H = LAB_FLOOR + 10;
 export const STAIR_X = 20;
+/** The lab's levels: each makes room for one more researcher. Level 2
+ * opens a west annex (a mandrake garden and a lectern), level 3 an east one
+ * (a crucible and an orrery); level 4 brings a salamander to the west annex
+ * and level 5 a scrying orb to the east. */
+export const LAB_MAX_LEVEL = 5;
+/** The annexes, dug out either side of the cellar beneath the hallways. */
+export const ANNEXES = { west: { x0: -48, x1: -2, level: 2 }, east: { x0: 194, x1: 240, level: 3 } } as const;
 /** Where the researchers stand to work, on the lab's floor (x), and which
  * way they face: the shelf of jars, the alembic, the athanor's bellows, the
- * transmutation circle, the cauldron, the desk's stool, the mortar bench and
- * the homunculus in its jar. */
+ * transmutation circle, the cauldron, the desk's stool, the mortar bench,
+ * the homunculus in its jar; in the annexes the mandrake garden, the
+ * lectern, the salamander's cage, the crucible, the orrery and the orb. */
 export const LAB = {
   jars: { x: 33, face: 1 }, alembic: { x: 51, face: -1 }, athanor: { x: 86, face: -1 }, circle: { x: 98, face: 1 },
   cauldron: { x: 115, face: 1 }, desk: { x: 155, face: -1 }, mortar: { x: 168, face: -1 }, jar: { x: 174, face: 1 },
+  garden: { x: -35, face: -1 }, lectern: { x: -24, face: -1 }, salamander: { x: -18, face: 1 },
+  crucible: { x: 213, face: -1 }, orrery: { x: 228, face: -1 }, orb: { x: 231, face: 1 },
 } as const;
 export type LabStation = keyof typeof LAB;
+/** The lab level each station needs (the rest are there from the start). */
+export const LAB_NEEDS: Partial<Record<LabStation, number>> = { garden: 2, lectern: 2, crucible: 3, orrery: 3, salamander: 4, orb: 5 };

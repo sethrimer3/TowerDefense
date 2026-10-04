@@ -34,7 +34,7 @@ import { HOUR_MS } from "../away.ts";
 import { decodeGrid, encodeGrid } from "../mine/world.ts";
 import { Fire, cellAt, type Burnable } from "./fire.ts";
 import {
-  BARROW_SPOTS, BAYS, BAY_W, BAY_X0, BOOKS_PER_ROW, BUTTS, CART_HOME, EXITS, FLOOR, H, LAB, LAB_FLOOR, MAX_SHELVES, MAX_UNITS, RETURN, RETURN_BOOKS, ROW_H, SLOTS, STAIR_X,
+  BARROW_SPOTS, BAYS, BAY_W, BAY_X0, BOOKS_PER_ROW, BUTTS, CART_HOME, EXITS, FLOOR, H, LAB, LAB_FLOOR, LAB_MAX_LEVEL, MAX_SHELVES, MAX_UNITS, RETURN, RETURN_BOOKS, ROW_H, SLOTS, STAIR_X,
   TABLES, TABLE_TOP, UNIT_H, W,
 } from "./geometry.ts";
 import { labErrand, leaveLab, newLab, stepLab } from "./lab.ts";
@@ -59,7 +59,9 @@ export type Action =
   | "idle" | "walk" | "climb" | "build" | "grab" | "place" | "study" | "read" | "fill" | "throw" | "cower"
   | "chat" | "gaze" | "doze" | "drink" | "mourn" | "sweep" | "pour"
   // In the lab.
-  | "stoke" | "stir" | "distill" | "grind" | "chant" | "observe" | "stumble";
+  | "stoke" | "stir" | "distill" | "grind" | "chant" | "observe" | "stumble" | "taste" | "float" | "hiccup" | "scroll" | "confer" | "feed"
+  // In the lab's annexes.
+  | "tend" | "pull" | "recite" | "cast" | "wind" | "scry";
 
 /** What a librarian is for: keeping the stacks, reading, or the lab. */
 export type Role = "shelver" | "professor" | "researcher";
@@ -152,10 +154,15 @@ export type LibrarySave = {
   crew?: { name: string; role: Role }[];
   /** The books on the return shelf, read and waiting to go out. */
   returns?: number[];
+  /** The alchemy lab's level (absent in saves from before it had levels:
+   * it gets room for the researchers it has). */
+  lab?: number;
 };
 
 export const shelfPrice = (built: number) => Math.round(40 * Math.pow(1.06, built));
 export const librarianPrice = (hired: number) => Math.round(100 * Math.pow(1.5, hired));
+/** Gold to raise the alchemy lab from `level` to the next. */
+export const labPrice = (level: number) => 1500 * Math.pow(4, level - 1);
 /** The chance a minute that a table catches fire, with Fireproof Wood's ranks. */
 export const accidentChance = (fireproof: number) => 0.01 * Math.pow(0.9, fireproof);
 /** What Fire Training's ranks do: the share of librarians who fight a fire,
@@ -170,16 +177,17 @@ export const BUTT_FULL = 30;
 export const homeBay = (color: number) => (color - 1) % BAYS;
 /** How tiring each action is, a second (rest restores). */
 const TIRING: Partial<Record<Action, number>> = { walk: 1 / 420, climb: 1 / 200, build: 1 / 160, grab: 1 / 300, place: 1 / 300, fill: 1 / 150, throw: 1 / 120, sweep: 1 / 240, pour: 1 / 200, study: 1 / 800, read: 1 / 900, idle: 1 / 1200,
-  stoke: 1 / 200, stir: 1 / 400, distill: 1 / 600, grind: 1 / 300, chant: 1 / 500, observe: 1 / 1200 };
+  stoke: 1 / 200, stir: 1 / 400, distill: 1 / 600, grind: 1 / 300, chant: 1 / 500, observe: 1 / 1200, scroll: 1 / 900, confer: 1 / 1200, feed: 1 / 600,
+  tend: 1 / 400, pull: 1 / 150, recite: 1 / 600, cast: 1 / 200, wind: 1 / 300, scry: 1 / 800 };
 /** Knowledge an hour: built shelves times professors. */
 export const knowledgeRate = (shelves: number, professors: number) => shelves * professors;
 /** The role a new hire takes: the first reads, the second shelves, the third
- * goes to the lab, and after that whichever of shelving and reading has
- * fewer (reading on a tie). */
-export function roleFor(counts: Record<Role, number>): Role {
+ * goes to the lab (if it has `room` for another researcher), and after that
+ * whichever of shelving and reading has fewer (reading on a tie). */
+export function roleFor(counts: Record<Role, number>, room = 1): Role {
   if (!counts.professor) return "professor";
   if (!counts.shelver) return "shelver";
-  if (!counts.researcher) return "researcher";
+  if (!counts.researcher && room > 0) return "researcher";
   return counts.shelver < counts.professor ? "shelver" : "professor";
 }
 
@@ -334,9 +342,13 @@ export class LibrarySim {
     const slots = decodeGrid(saved.slots, SLOTS, BOOK_COLORS.length);
     if (slots) this.slots.set(slots);
     saved.ladders.forEach((h, b) => (this.ladders[b] = Math.min(h, this.bayComplete(b))));
+    const researchers = saved.crew?.filter((c) => c.role === "researcher").length ?? 0;
+    this.lab.level = Math.max(1, Math.min(LAB_MAX_LEVEL, saved.lab ?? researchers));
     for (let i = 0; i < saved.hired; i++) {
       const c = saved.crew?.[i];
-      const l = this.addLibrarian(4 + i * 3, c?.role, c?.name);
+      // A lab without room for them all sends the rest upstairs.
+      const role = c?.role === "researcher" && this.count("researcher") >= this.researcherCap ? undefined : c?.role;
+      const l = this.addLibrarian(4 + i * 3, role, c?.name);
       // Researchers start the day in the lab.
       if (l.role === "researcher") {
         l.x = STAIR_X + 8 + ((i * 23) % 140);
@@ -382,6 +394,20 @@ export class LibrarySim {
     for (const l of this.librarians) if (l.role === role) n++;
     return n;
   }
+  /** Researchers the lab has room for: one a level. */
+  get researcherCap() {
+    return this.lab.level;
+  }
+  get labLevel() {
+    return this.lab.level;
+  }
+  /** Raises the lab a level (the page charges for it); false at the top. */
+  upgradeLab() {
+    if (this.lab.level >= LAB_MAX_LEVEL) return false;
+    this.lab.level++;
+    this.lab.glow = 1;
+    return true;
+  }
   get roles(): Record<Role, number> {
     return { shelver: this.count("shelver"), professor: this.count("professor"), researcher: this.count("researcher") };
   }
@@ -408,10 +434,10 @@ export class LibrarySim {
    * in down the left-hand hallway. */
   hire(role?: Role) {
     if (this.librarians.length >= MAX_LIBRARIANS) return false;
-    this.addLibrarian(EXITS[0], role);
+    this.addLibrarian(EXITS[0], role === "researcher" && this.count("researcher") >= this.researcherCap ? undefined : role);
     return true;
   }
-  private addLibrarian(x: number, role = roleFor(this.roles), name?: string) {
+  private addLibrarian(x: number, role = roleFor(this.roles, this.researcherCap - this.count("researcher")), name?: string) {
     const id = this.nextId++;
     const r = random(this.seed ^ Math.imul(id, 0x9e3779b9));
     const tints = ["#1a1a22", "#3a2a6a", "#7a2222", "#2a4a3a", "#5a3a1a", "#20304a"];
@@ -437,9 +463,10 @@ export class LibrarySim {
 
   /** Puts a librarian to another role: they drop what they were doing and
    * set about it (a new researcher goes down to the lab, one leaving it comes
-   * up). False if they already have it. */
+   * up). False if they already have it, or the lab has no room. */
   setRole(l: Librarian, role: Role) {
     if (l.role === role || !this.librarians.includes(l)) return false;
+    if (role === "researcher" && this.count("researcher") >= this.researcherCap) return false;
     if (!l.away) this.interrupt(l);
     l.role = role;
     this.dress(l);
@@ -1432,7 +1459,7 @@ export class LibrarySim {
     return {
       seed: this.seed, units: [...this.units], tables: [...this.tables], hired: this.librarians.length,
       slots: encodeGrid(slots), ladders: [...this.ladders], savedAt: now,
-      crew: this.librarians.map((l) => ({ name: l.name, role: l.role })), returns,
+      crew: this.librarians.map((l) => ({ name: l.name, role: l.role })), returns, lab: this.lab.level,
     };
   }
 
@@ -1480,6 +1507,7 @@ export function decodeLibrarySave(s: any): LibrarySave | null {
   const out: LibrarySave = { seed: s.seed, units, tables, hired: s.hired, slots: s.slots, ladders: [...s.ladders], savedAt };
   if (Array.isArray(s.crew) && s.crew.length === s.hired && s.crew.every((c: any) => c && typeof c.name === "string" && c.name.length <= 40 && ROLES.includes(c.role)))
     out.crew = s.crew.map((c: any) => ({ name: c.name, role: c.role }));
+  if (int(s.lab, 1, LAB_MAX_LEVEL)) out.lab = s.lab;
   if (Array.isArray(s.returns) && s.returns.length <= RETURN_BOOKS && s.returns.every((c: unknown) => int(c, 1, BOOK_COLORS.length - 1))) out.returns = [...s.returns];
   return out;
 }

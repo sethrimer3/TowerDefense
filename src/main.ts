@@ -266,6 +266,12 @@ window.addEventListener("pagehide", store);
   for (let t = 0; t < seconds * 10; t++) libraryPage.sim.step(0.1);
   if (fire) libraryPage.sim.ignite();
 };
+// Console helper: raise the alchemy lab to `level` (free) and fill it with researchers.
+(globalThis as { libraryLab?: unknown }).libraryLab = (level = 5) => {
+  const sim = libraryPage.sim;
+  while (sim.labLevel < level && sim.upgradeLab());
+  for (const l of [...sim.librarians].reverse()) if (sim.count("researcher") < sim.researcherCap && l.role !== "researcher") sim.setRole(l, "researcher");
+};
 // Console helper: look closely at one of the mine's buildings, picked.
 (globalThis as { mineLook?: unknown }).mineLook = (id: "shaft" | "barracks" | "warehouse" | "forge" | "smithy" = "forge", zoom = 4) => minePage.look(id, zoom);
 // Console helper: run the mine some minutes ahead, optionally hiring miners first.

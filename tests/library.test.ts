@@ -6,7 +6,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   idleFireChance, idleHours,
-  BAYS, EXITS, FLOOR, H, HALL, LAB_FLOOR, LibrarySim, RETURN_BOOKS, ROLES, STAIR_X, librarianName, roleFor, MAX_LIBRARIANS, MAX_SHELVES, MAX_UNITS, PLANKS, SHELF_ORDER, SHELF_TOP, SLOTS, W, WINDOW,
+  BAYS, EXITS, FLOOR, H, HALL, LAB_FLOOR, LAB_MAX_LEVEL, LibrarySim, labPrice, RETURN_BOOKS, ROLES, STAIR_X, librarianName, roleFor, MAX_LIBRARIANS, MAX_SHELVES, MAX_UNITS, PLANKS, SHELF_ORDER, SHELF_TOP, SLOTS, W, WINDOW,
   BUTT_FULL, accidentChance, decodeLibrarySave, homeBay, fireDrill, knowledgeRate, librarianPrice, shelfPrice, slotPlace, unitTop,
 } from "../src/library/sim.ts";
 import { DAY_MS, daylight } from "../src/library/render.ts";
@@ -99,6 +99,7 @@ test("researchers go down the ladder to the alchemy lab and work it; the lab is 
   const sim = new LibrarySim(19);
   sim.furnish(20);
   sim.hire("professor");
+  sim.upgradeLab();
   sim.hire("researcher");
   sim.hire("researcher");
   const seen = new Set<string>();
@@ -383,4 +384,46 @@ test("time away: the library burns down 50% of hours, 5% less a rank of Night wa
   let burnt = 0, rng = Math.random;
   for (let i = 0; i < 4000; i++) if (idleHours(HOUR, 1, 0.3, rng).burntAt !== null) burnt++;
   assert.ok(Math.abs(burnt / 4000 - 0.3) < 0.03, `${burnt}`);
+});
+
+test("the lab has room for a researcher a level; expanding it opens annexes and their errands, and the level is saved", () => {
+  const sim = new LibrarySim(31);
+  sim.furnish(10);
+  assert.equal(sim.labLevel, 1);
+  assert.equal(sim.researcherCap, 1);
+  for (let i = 0; i < 6; i++) sim.hire();
+  assert.equal(sim.count("researcher"), 1, "one researcher in a level 1 lab");
+  const other = sim.librarians.find((l) => l.role !== "researcher")!;
+  assert.equal(sim.setRole(other, "researcher"), false, "no room for a second");
+  assert.equal(roleFor({ shelver: 1, professor: 1, researcher: 0 }, 0), "professor", "no room, no researcher");
+  assert.equal(labPrice(1), 1500);
+  assert.ok(labPrice(2) > labPrice(1));
+  for (let level = 2; level <= LAB_MAX_LEVEL; level++) assert.ok(sim.upgradeLab());
+  assert.equal(sim.upgradeLab(), false, "no further than the top");
+  assert.equal(sim.researcherCap, LAB_MAX_LEVEL);
+  for (const l of sim.librarians) if (sim.count("researcher") < sim.researcherCap) sim.setRole(l, "researcher");
+  assert.equal(sim.count("researcher"), LAB_MAX_LEVEL);
+  const seen = new Set<string>();
+  let west = false, east = false;
+  run(sim, 1500, () => {
+    for (const l of sim.librarians) {
+      if (l.role !== "researcher" || l.y !== LAB_FLOOR) continue;
+      seen.add(l.action);
+      if (l.x < 0) west = true;
+      if (l.x > W) east = true;
+    }
+  });
+  assert.ok(west && east, "researchers work in both annexes");
+  for (const a of ["tend", "recite", "cast", "wind", "scry", "feed"]) assert.ok(seen.has(a), `a researcher did ${a} (${[...seen]})`);
+  assert.ok(sim.lab.casts > 0, "gold was cast");
+  const saved = decodeLibrarySave(JSON.parse(JSON.stringify(sim.save(1000))))!;
+  assert.equal(saved.lab, LAB_MAX_LEVEL);
+  const back = new LibrarySim(saved.seed, saved);
+  assert.equal(back.labLevel, LAB_MAX_LEVEL);
+  assert.equal(back.count("researcher"), LAB_MAX_LEVEL);
+  // A save from before lab levels gets room for the researchers it had.
+  const old = { ...saved, lab: undefined, crew: saved.crew!.map((c, n) => ({ ...c, role: n < 3 ? "researcher" as const : c.role })) };
+  const older = new LibrarySim(old.seed, decodeLibrarySave(JSON.parse(JSON.stringify(old)))!);
+  assert.equal(older.labLevel, older.count("researcher"));
+  assert.ok(older.labLevel >= 3);
 });
