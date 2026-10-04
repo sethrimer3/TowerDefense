@@ -10,6 +10,7 @@ try {
   await page.route('**/@vite/client', route=>route.fulfill({contentType:'application/javascript',body:'export const injectQuery = (url) => url;'}));
   await page.addInitScript(()=>{ globalThis.__pinnedSeeds={defend:3182828918,game:3887091088}; });
   await page.goto((process.env.TEST_URL || 'http://127.0.0.1:5173/')+'tests/performance.html');
+  page.on('console',msg=>{if(msg.text().startsWith('Sparse lightning'))console.log(msg.text());});
   const results = await page.evaluate(async referenceRoot => {
     const {GroundRelief}=await import('/src/defend/ground-relief.ts');
     const {GroundRelief:ReferenceRelief}=await import(`${referenceRoot}/ground-relief.ts`);
@@ -29,6 +30,32 @@ try {
       return {max,mean:total/aa.length,different};
     };
     const reports=[];
+    const {BoltBuffer}=await import('/src/defend/dark-art.ts');
+    const {BoltBuffer:OriginalBolts}=await import(`${referenceRoot}/dark-art.ts`);
+    const bolts=new BoltBuffer(), originalBolts=new OriginalBolts();
+    const near={pts:[2,2,3,3,4,2],from:[0,1],t:0,life:.32,seed:7};
+    const far={pts:[58,85,59,86,60,85],from:[0,1],t:0,life:.32,seed:13};
+    const clipped={pts:[-2,-2,1,1,65,93],from:[0,1],t:.02,life:.32,seed:9};
+    const chain={pts:[5,5],from:[],t:0,life:.32,seed:3};
+    for(let i=0;i<250;i++){chain.pts.push(5+(i%25)*.6,5+Math.floor(i/25)*.6);chain.from.push(i);}
+    const sequence=[[near,far],[near,near,far],[chain],[clipped],[],[],[far]];
+    for(const t of [0,.04,.08,.19,.28,.33]) {
+      for(const input of sequence) {
+        const frame=input.map(b=>({...b,t}));
+        const a=originalBolts.raster(frame),b=bolts.raster(frame);
+        if(JSON.stringify(a)!==JSON.stringify(b))throw new Error('bolt dirty bounds changed');
+        for(let i=0;i<bolts.rgba.length;i++)if(bolts.rgba[i]!==originalBolts.rgba[i])throw new Error(`bolt pixel mismatch at ${i}, age ${t}`);
+      }
+    }
+    reports.push({check:'sparse bolt overlap, clipping, fading and clearing',max:0,mean:0,different:0});
+    const bench=Type=>{
+      const buf=new Type();
+      for(let i=0;i<50;i++)buf.raster([near,far]);
+      const start=performance.now();
+      for(let i=0;i<500;i++)buf.raster([near,far]);
+      return (performance.now()-start)/500;
+    };
+    console.log('Sparse lightning ms/frame',JSON.stringify({before:bench(OriginalBolts),after:bench(BoltBuffer)}));
     // Exact original compositing order, including clipped lights and fading.
     for(const px of [6,9.23076923076923,18]){
       const w=Math.round(63*px),h=Math.round(91*px),a=make(w,h),b=make(w,h);

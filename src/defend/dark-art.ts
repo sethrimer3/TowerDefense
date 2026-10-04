@@ -182,39 +182,48 @@ export class BoltBuffer {
   /** 0 nothing, 1–3 glow, 4 spark, 5 core, 6 hot core. */
   private kind = new Uint8Array(this.w * this.h);
   private box: Box | null = null;
+  // A chain can span the board while occupying very few of its pixels.
+  // Record each occupied pixel once, even when glow and cores overlap.
+  private touched = new Uint32Array(this.w * this.h);
+  private touchedCount = 0;
 
   /** Clears last frame's bolts and draws `bolts` in their place; returns
    * the box that changed (last frame's and this frame's together), or null
    * when nothing did. */
   raster(bolts: readonly Bolt[]): Box | null {
     const was = this.box;
-    if (was) this.clear(was);
+    this.clear();
     this.box = bolts.length ? rasterBolts(this, bolts) : null;
     return union(was, this.box);
   }
 
-  private clear(b: Box) {
-    for (let y = b.y0; y <= b.y1; y++) {
-      const i = y * this.w;
-      this.kind.fill(0, i + b.x0, i + b.x1 + 1);
-      this.rgba.fill(0, i + b.x0, i + b.x1 + 1);
+  private clear() {
+    for (let n = 0; n < this.touchedCount; n++) {
+      const i = this.touched[n];
+      this.kind[i] = 0;
+      this.rgba[i] = 0;
     }
+    this.touchedCount = 0;
   }
 
   /** Marks pixel (x, y) as `k` if that outranks what it is. */
   mark(x: number, y: number, k: number) {
     if (x < 0 || y < 0 || x >= this.w || y >= this.h) return;
     const i = y * this.w + x;
-    if (this.kind[i] < k) this.kind[i] = k;
+    if (this.kind[i] < k) {
+      if (!this.kind[i]) this.touched[this.touchedCount++] = i;
+      this.kind[i] = k;
+    }
   }
 
   /** Turns the marks inside `b` into colours. */
   paint(b: Box) {
-    for (let y = b.y0; y <= b.y1; y++)
-      for (let x = b.x0, i = y * this.w + b.x0; x <= b.x1; x++, i++) {
-        const k = this.kind[i];
-        this.rgba[i] = k === 0 ? 0 : k <= 3 ? GLOW[k] : k === 4 ? SPARK : k === 5 ? CORE : CORE_HOT;
-      }
+    for (let n = 0; n < this.touchedCount; n++) {
+      const i = this.touched[n], y = Math.floor(i / this.w), x = i - y * this.w;
+      if (x < b.x0 || x > b.x1 || y < b.y0 || y > b.y1) continue;
+      const k = this.kind[i];
+      this.rgba[i] = k <= 3 ? GLOW[k] : k === 4 ? SPARK : k === 5 ? CORE : CORE_HOT;
+    }
   }
 }
 

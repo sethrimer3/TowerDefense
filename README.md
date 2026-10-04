@@ -53,6 +53,8 @@ The tower-and-effects stress scene, frame overlay and before/after rendering mea
 - `src/ui/` holds the shell, the Upgrades page (the Smithy and skill trees, with `src/tree-particles.ts` and `src/training-particles.ts`) Settings, and the welcome-back screen (`welcome.ts`: on opening the game, up to 24 hours away and the Knowledge and Smithy points the Library and the Mine made of it; `src/away.ts` holds the cap). `src/style.css` lays the pages out and `src/theme.css` dresses them as the keep: stone, oak, iron, brass and parchment, from the small tiling SVGs in `assets/theme/`, and animates presses, purchases and wins. `src/ui/flourish.ts` throws the sparks and glints over the page, and `src/sound.ts` synthesizes every sound with Web Audio (no sound files).
 - `scripts/pixel-font/` draws Alembic, the game's pixel font: its glyphs are rows of pixels in `glyphs.txt`, which `npm run font` traces into `assets/fonts/Alembic/` (a regular and a bold). The Use Custom Font setting (on by default) sets every word in it; off, the page uses Cinzel.
 
+DEFEND lightning buffers clear and colour only occupied pixels, avoiding scans across empty space between distant bolts. The rendering regression checks compare their pixels against the original renderer.
+
 ## Deploying
 
 `.github/workflows/static.yml` runs the tests and the build on every push to `main` and deploys `dist/` to GitHub Pages. In the repository's **Settings → Pages**, the source must be set to **GitHub Actions**.
