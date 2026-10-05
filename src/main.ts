@@ -142,11 +142,8 @@ const welcome = new WelcomeBack(modal, () => ({
   owedMs: minePage.owedMs,
 }));
 
-/** Dev: `ms` of idle time, as if the game had been closed that long. The
- * Mine works through it a slice each frame (up to its two hours of catch-up,
- * the rest paid at the smithy's pace), the Library is reckoned an hour at a
- * time (it may burn down), the Smithy's smiths work on, and the welcome-back
- * screen keeps the account. */
+/** Dev: bank idle time for both simulations. Their gains appear as they
+ * fast-forward; the welcome screen keeps the running account. */
 function addIdle(ms: number) {
   awayMs = ms;
   minePage.addAway(ms);

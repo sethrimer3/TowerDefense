@@ -23,9 +23,8 @@
  * caught in it dies. Librarians drop what they are doing: most flee down
  * the hallways, while the brave shelvers (more with Fire Training) fetch
  * buckets from the water butts and throw them on the flames. The lab is
- * safe below. When it is out, what burned below a quarter of itself is gone
- * (shelves must be bought again, and so must the dead); what survived is
- * rebuilt with new planks for free.
+ * safe below. Purchased shelves retain their surviving pixels and books;
+ * shelvers carry charred books outside and repair the holes with planks.
  *
  * Side view in pixels (`geometry.ts`). Everything random draws from the
  * library's own seeded stream. */
@@ -152,6 +151,9 @@ export type LibrarySave = {
   savedAt: number;
   idleMs?: number;
   time?: number;
+  rngState?: number;
+  minute?: number;
+  firedAt?: number;
   fire?: FireSave;
   burnables?: { kind: "unit" | "ladder" | "table" | "cart" | "return"; k: number }[];
   damaged?: number[];
@@ -160,6 +162,7 @@ export type LibrarySave = {
   looseBooks?: number[];
   burntLoose?: { color: number; x: number }[];
   returnPlanks?: number;
+  exportedBooks?: number[];
   crewState?: { x: number; y: number; scorched: number; energy: number }[];
   counters?: { booksIn: number; booksOut: number; booksBurnt: number; deaths: number; fires: number };
 
@@ -322,6 +325,7 @@ export class LibrarySim {
   /** The alchemy lab's apparatus. */
   readonly lab = newLab();
   private rng: () => number;
+  private rngState = 0;
   private reserved = new Set<number>();
   private seats = new Array<number>(SEATS.length).fill(0);
   /** Planks promised to each building site, and taken from the barrow. */
@@ -341,7 +345,12 @@ export class LibrarySim {
 
   constructor(seed: number, saved?: LibrarySave) {
     this.seed = seed >>> 0;
-    this.rng = random(this.seed ^ 0x51b2a);
+    this.rngState = saved?.rngState ?? ((this.seed ^ 0x51b2a) >>> 0);
+    const draw = random(this.rngState);
+    this.rng = () => {
+      this.rngState = (this.rngState + 0x6d2b79f5) >>> 0;
+      return draw();
+    };
     if (!saved) return;
     saved.units.forEach((p, k) => (this.units[k] = p));
     saved.tables.forEach((p, t) => (this.tables[t] = p));
@@ -370,6 +379,7 @@ export class LibrarySim {
       this.bookCart.books = [...saved.looseBooks];
     }
     this.time = saved.time ?? 0;
+    this.minute = saved.minute ?? this.time % 60;
     for (const k of saved.damaged ?? []) this.damaged.add(k);
     if (saved.burntSlots) this.burntSlots.set(decodeGrid(saved.burntSlots, SLOTS, BOOK_COLORS.length)!);
     if (saved.butts) saved.butts.forEach((v, i) => this.butts[i] = v);
@@ -378,9 +388,20 @@ export class LibrarySim {
     if (saved.fire && saved.burnables) {
       this.burnables = saved.burnables;
       this.fire.restore(saved.fire, this.burnables.length);
-      this.firedAt = this.time;
+      this.firedAt = saved.firedAt ?? this.time;
       this.before = { shelves: this.shelves, librarians: this.librarians.length, books: this.booksBurnt };
       this.chooseFighters();
+    }
+    // Read books already loaded for export must go outside, not back to
+    // the unread shelves, when a save interrupts the cart's trip.
+    if (saved.exportedBooks?.length) {
+      this.returns.push(...saved.exportedBooks.slice(0, RETURN_BOOKS - this.returns.length));
+      const excess = saved.exportedBooks.slice(RETURN_BOOKS - (saved.returns?.length ?? 0));
+      if (excess.length) {
+        this.bookCart.here = true;
+        this.bookCart.books.push(...excess);
+        this.exporting = this.librarians.find((l) => this.shelving(l))?.id ?? 0;
+      }
     }
   }
 
@@ -803,7 +824,13 @@ export class LibrarySim {
 
   private plan(l: Librarian) {
     const r = this.rng, cart = this.bookCart, inLab = l.y > H;
-    if (this.fire.active && !inLab) return this.planFire(l);
+    if (this.fire.active && !inLab) {
+      if (l.mode === "work" && this.time - this.firedAt < this.noticeDelay(l)) {
+        l.steps = [{ kind: "work", t: 0.1, action: "idle" }];
+        return;
+      }
+      return this.planFire(l);
+    }
     l.mode = "work";
     if (inLab) {
       // Researchers work the lab; anyone else goes back up the stair.
@@ -1170,6 +1197,10 @@ export class LibrarySim {
     const drill = this.drill();
     this.fighters = new Set(this.librarians.filter((l) => l.y <= H && (l.role === "shelver" || (this.shelving(l) && h01(l.id, this.fires) < drill.fight))).map((l) => l.id));
   }
+  private noticeDelay(l: Librarian) {
+    const absorbed = l.action === "study" || l.action === "read" ? 3 : 0;
+    return (0.5 + absorbed + h01(l.id, this.fires + 7) * 4) / this.drill().speed;
+  }
   private firedAt = 0;
   private before = { shelves: 0, librarians: 0, books: 0 };
   /** What the last fire cost, once it is out: shelves, librarians, books. */
@@ -1308,9 +1339,8 @@ export class LibrarySim {
     return best;
   }
 
-  /** Whatever survived the fire: below a quarter, a shelf (and every one
-   * stacked on it) is gone; above, it is short the planks it lost and the
-   * librarians rebuild it. Burnt books, ladders and carts are gone. */
+  /** Retain purchased shelves at every damage level and queue their repair.
+   * Only books whose own cells burned are lost; debris is carried out. */
   private settleFire() {
     this.burnBooks();
     const left = this.fire.integrity();
@@ -1407,8 +1437,8 @@ export class LibrarySim {
     for (const l of [...this.librarians]) {
       // Each in the nave notices the fire after a moment of their own
       // (longer, deep in a book; shorter, drilled for it).
-      const absorbed = l.action === "study" || l.action === "read" ? 3 : 0, nave = l.y <= H;
-      if (burning && nave && l.mode === "work" && !l.away && this.time - this.firedAt >= (0.5 + absorbed + h01(l.id, this.fires + 7) * 4) / this.drill().speed) this.interrupt(l);
+      const nave = l.y <= H;
+      if (burning && nave && l.mode === "work" && !l.away && this.time - this.firedAt >= this.noticeDelay(l)) this.interrupt(l);
       if (burning && nave && !l.away && this.scorch(l, dt)) continue;
       if (!l.away) l.energy = Math.max(0, l.energy - dt * (TIRING[l.action] ?? 0));
       if (l.soot > 0) l.soot = Math.max(0, l.soot - dt / 40);
@@ -1519,11 +1549,13 @@ export class LibrarySim {
     const slots = new Uint8Array(this.slots), returns = [...this.returns], burnt = new Uint8Array(this.burntSlots);
     for (const l of this.librarians) if (l.burntFrom >= 0 && l.burntFrom < SLOTS && l.carrying) burnt[l.burntFrom] = l.carrying;
     const loose: number[] = [...(this.exporting ? [] : this.bookCart.books)];
+    const exportedBooks = this.exporting ? [...this.bookCart.books] : [];
     const debris = this.burntLoose.map((b) => ({ ...b }));
     for (const l of this.librarians) {
       if (l.burntFrom >= SLOTS && l.carrying) debris.push({ color: l.carrying, x: Math.max(0, Math.min(W - 1, l.x)) });
       if (l.burntFrom >= 0) continue;
       if (l.spent && l.carrying && returns.length < RETURN_BOOKS) returns.push(l.carrying);
+      else if (l.spent && l.carrying) exportedBooks.push(l.carrying);
       else if (l.carrying) loose.push(l.carrying);
       if (l.reading) loose.push(l.reading);
     }
@@ -1531,14 +1563,16 @@ export class LibrarySim {
       const { bay, unit } = slotPlace(s);
       if (!slots[s] && !burnt[s] && this.units[unitKey(bay, unit)] === PLANKS) slots[s] = loose.pop()!;
     }
-    // A fire burning as the game closes burns out unseen: it is saved as it stood before.
+    // Keep active heat, consumed fuel and debris for the next catch-up.
     return {
       seed: this.seed, units: [...this.units], tables: [...this.tables], hired: this.librarians.length,
       slots: encodeGrid(slots), ladders: [...this.ladders], savedAt: now,
       crew: this.librarians.map((l) => ({ name: l.name, role: l.role })), returns, lab: this.lab.level,
       time: this.time, fire: this.fire.save(), burnables: this.burnables.map((b) => ({ ...b })),
+      rngState: this.rngState, minute: this.minute, firedAt: this.firedAt,
       damaged: [...this.damaged], burntSlots: encodeGrid(burnt), butts: [...this.butts],
       looseBooks: loose, burntLoose: debris, returnPlanks: this.returnPlanks,
+      exportedBooks,
       crewState: this.librarians.map((l) => ({ x: l.x, y: l.y, scorched: l.scorched, energy: l.energy })),
       counters: { booksIn: this.booksIn, booksOut: this.booksOut, booksBurnt: this.booksBurnt, deaths: this.deaths, fires: this.fires },
     };
@@ -1592,10 +1626,14 @@ export function decodeLibrarySave(s: any): LibrarySave | null {
   if (Array.isArray(s.returns) && s.returns.length <= RETURN_BOOKS && s.returns.every((c: unknown) => int(c, 1, BOOK_COLORS.length - 1))) out.returns = [...s.returns];
   if (Number.isFinite(s.idleMs) && s.idleMs >= 0 && s.idleMs <= 86400000) out.idleMs = s.idleMs;
   if (Number.isFinite(s.time) && s.time >= 0 && s.time <= 1e12) out.time = s.time;
+  if (int(s.rngState, 0, 0xffffffff)) out.rngState = s.rngState;
+  if (Number.isFinite(s.minute) && s.minute >= 0 && s.minute < 60) out.minute = s.minute;
+  if (Number.isFinite(s.firedAt) && s.firedAt >= 0 && s.firedAt <= (out.time ?? 0)) out.firedAt = s.firedAt;
   if (Array.isArray(s.damaged) && s.damaged.length <= MAX_SHELVES && s.damaged.every((k: unknown) => int(k, 0, BAYS * MAX_UNITS - 1))) out.damaged = [...s.damaged];
   if (decodeGrid(s.burntSlots, SLOTS, BOOK_COLORS.length)) out.burntSlots = s.burntSlots;
   if (int(s.returnPlanks, 0, TABLE_PLANKS)) out.returnPlanks = s.returnPlanks;
   if (Array.isArray(s.looseBooks) && s.looseBooks.length <= SLOTS && s.looseBooks.every((c: unknown) => int(c, 1, BOOK_COLORS.length - 1))) out.looseBooks = [...s.looseBooks];
+  if (Array.isArray(s.exportedBooks) && s.exportedBooks.length <= CART_BOOKS + MAX_LIBRARIANS && s.exportedBooks.every((c: unknown) => int(c, 1, BOOK_COLORS.length - 1))) out.exportedBooks = [...s.exportedBooks];
   if (Array.isArray(s.burntLoose) && s.burntLoose.length <= SLOTS && s.burntLoose.every((b: any) => b && int(b.color, 1, BOOK_COLORS.length - 1) && Number.isFinite(b.x) && b.x >= 0 && b.x < W)) out.burntLoose = s.burntLoose.map((b: any) => ({ color: b.color, x: b.x }));
   if (list(s.butts, 2, 0, BUTT_FULL)) out.butts = [...s.butts];
   const fire = decodeFireSave(s.fire);
@@ -1605,6 +1643,6 @@ export function decodeLibrarySave(s: any): LibrarySave | null {
     out.burnables = s.burnables.map((b: any) => ({ kind: b.kind, k: b.k }));
   }
   if (Array.isArray(s.crewState) && s.crewState.length === s.hired && s.crewState.every((c: any) => c && Number.isFinite(c.x) && c.x >= EXITS[0] && c.x <= EXITS[1] && Number.isFinite(c.y) && c.y >= 0 && c.y <= LAB_FLOOR && Number.isFinite(c.scorched) && c.scorched >= 0 && c.scorched < SCORCH && Number.isFinite(c.energy) && c.energy >= 0 && c.energy <= 1)) out.crewState = s.crewState.map((c: any) => ({ x: c.x, y: c.y, scorched: c.scorched, energy: c.energy }));
-  if (s.counters && ["booksIn", "booksOut", "booksBurnt", "deaths", "fires"].every((k) => int(s.counters[k], 0, 1e12))) out.counters = { ...s.counters };
+  if (s.counters && ["booksIn", "booksOut", "booksBurnt", "deaths", "fires"].every((k) => int(s.counters[k], 0, 1e12))) out.counters = { booksIn: s.counters.booksIn, booksOut: s.counters.booksOut, booksBurnt: s.counters.booksBurnt, deaths: s.counters.deaths, fires: s.counters.fires };
   return out;
 }

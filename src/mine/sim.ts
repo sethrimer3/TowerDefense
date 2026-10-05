@@ -310,8 +310,8 @@ export class MineSim {
   bars = noMetals();
   worked = noMetals();
   /** Smithy points an hour the smithy has lately made, fractions and all:
-   * each minute's work eased in over `PACE_MINUTES`. What time away past
-   * the mine's catch-up is paid at. */
+   * each minute's work eased in over `PACE_MINUTES`. Retained as a
+   * historical output measurement; catch-up pays actual simulated work. */
   pace = noMetals();
   private paceBars = noMetals();
   /** Ranks of the Mine skills: Coffee (more of the crew on the night

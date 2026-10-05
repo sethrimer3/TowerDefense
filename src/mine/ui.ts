@@ -4,17 +4,15 @@
  * prospect when this one is worked out. A building tapped shows its stats
  * and the button that raises it a level. The mine itself runs whatever tab
  * shows (`advance`, from the app's frame loop), and works on while the game
- * is closed: on loading, the time away (up to `SIM_AWAY_MS`) is caught up
- * a slice each frame, and any more (up to `MAX_AWAY_MS`) is paid at once at
- * the smithy's `pace`. */
+ * is closed: time away is banked (up to 24 hours), then spent tick by tick
+ * a slice each frame. Only simulated work pays Smithy points. */
 import { play } from "../sound.ts";
 import { countdown, IDLE_SPEED, MAX_AWAY_MS } from "../away.ts";
 import { BARS_PER_POINT, CREW_PER_LEVEL, METALS, metalSum, type Metals, DAY_TICKS, FORGE_PER_LEVEL, JOBS, KIT, MAX_MINERS, MineSim, SEAL_LEVEL, SMITHS_PER_LEVEL, STOCK_PER_LEVEL, STOCK_RATE, TICK_HZ, type Cause, type Job, type Miner, type MineNews, type MineSave, type Weather } from "./sim.ts";
 import { MAX_LEVEL, type BuildingId } from "./buildings.ts";
 import { MineRenderer } from "./render.ts";
 
-/** Longest time away the mine works through tick by tick; the rest of the
- * time away is paid at the smithy's pace. */
+/** Longest bank of unused simulation time. */
 export const SIM_AWAY_MS = MAX_AWAY_MS;
 
 /** What the mine made of the time away when the save was loaded, for the
@@ -112,7 +110,6 @@ export class MinePage {
     this.last = now;
     this.away = null;
     if (saved) {
-      // Past the catch-up, the smithy is paid at its pace, whole points.
       const paid = { copper: 0, silver: 0, gold: 0 };
       this.away = { ms: simulated, simulatedMs: simulated, paid, lost: 0, catchingUp: this.owed >= 1 };
       this.lostBefore = this.lostCount();
@@ -149,13 +146,13 @@ export class MinePage {
     if (away?.catchingUp) {
       for (const k of METALS) away.paid[k] += pay[k];
       away.lost = this.lostCount() - this.lostBefore;
-      // Caught up once less than a second is owed.
+      // Finish the account after all whole simulation ticks are spent.
       if (this.owed < 1) away.catchingUp = false;
     }
   }
   /** Adds `ms` of time away (the dev option), as if the game had been
    * closed that long: worked through tick by tick, like the catch-up on
-   * loading, up to `SIM_AWAY_MS` owed; any more is paid at the smithy's pace. */
+   * loading, with up to `SIM_AWAY_MS` banked. */
   addAway(ms: number) {
     const cap = (SIM_AWAY_MS * TICK_HZ) / 1000, ticks = (ms * TICK_HZ) / 1000;
     const run = Math.min(Math.max(0, ticks), Math.max(0, cap - this.owed));

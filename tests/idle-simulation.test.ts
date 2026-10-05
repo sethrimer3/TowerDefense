@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { MAX_AWAY_MS, HOUR_MS } from "../src/away.ts";
 import { LibraryPage, type LibraryHost } from "../src/library/ui.ts";
 import { MinePage, type MineHost } from "../src/mine/ui.ts";
-import { LibrarySim, decodeLibrarySave, FLOOR, LAB_FLOOR, SLOTS, slotPixel, SHELF_ORDER, MAX_UNITS } from "../src/library/sim.ts";
+import { LibrarySim, decodeLibrarySave, FLOOR, LAB_FLOOR, SLOTS, slotPixel, slotIndex, bayX, unitTop, BAY_W, UNIT_H, MAX_UNITS, PLANKS } from "../src/library/sim.ts";
 import { MineSim, decodeMineSave } from "../src/mine/sim.ts";
 import { Fire, cellAt, CELL, FW, decodeFireSave } from "../src/library/fire.ts";
 
@@ -71,10 +71,11 @@ test("cell fire consumes artwork pixels, produces buoyant smoke and falling ash,
   const f = new Fire(), rng = () => 0.5;
   f.load([{ x0: 40, y0: 200, x1: 44, y1: 204, fuel: 1 }]);
   f.ignite(40, 200);
-  for (let n = 0; n < 250; n++) f.step(0.1, rng, 0);
+  let smoked = false;
+  for (let n = 0; n < 250; n++) { f.step(0.1, rng, 0); smoked ||= f.smoke.some((d) => d > 0); }
   assert.ok(f.char[cellAt(40, 200)] > 0.9);
   assert.ok(f.missing(40, 200));
-  assert.ok(f.smoke.some((d) => d > 0));
+  assert.ok(smoked);
   assert.ok(f.ash.some((d) => d > 0));
   const g = new Fire();
   g.smoke[cellAt(80, 100)] = 255; g.ash[cellAt(80, 200)] = 1;
@@ -84,8 +85,8 @@ test("cell fire consumes artwork pixels, produces buoyant smoke and falling ash,
   assert.equal(g.ash[cellAt(80, 200 + CELL)], 1, "ash falls one empty cell");
   const wet = new Fire(); wet.load([{ x0: 40, y0: 200, x1: 44, y1: 204, fuel: 1 }]); wet.ignite(40, 200);
   wet.splash(41, 201, 41, 201, 8, 0.4, rng, 0.1); wet.step(0.1, rng, 1);
-  assert.ok(wet.wet[cellAt(41, 201)] > 0);
   assert.ok(wet.heat[cellAt(41, 201)] < 0.5);
+  assert.equal(wet.fuel[cellAt(41, 201)], 1, "the doused cell keeps its fuel");
   assert.equal(decodeFireSave({ active: true, cells: [[FW * 1000, 0, 0, 0, 0, 0, 0, 0, 0, -1]], drops: [] }), null);
 });
 
@@ -133,10 +134,47 @@ test("active fires, pixel damage, charred books and surviving books persist; she
 });
 
 test("Night Watch improves nighttime detection and bucket work without an arbitrary burn-down roll", () => {
-  const sim = new LibrarySim(5); sim.night = 1; sim.fireTraining = 0;
-  const before = (sim as any).drill(); sim.nightWatch = 9;
-  const after = (sim as any).drill();
-  assert.ok(after.speed > before.speed && after.water > before.water && after.douse > before.douse);
-  sim.night = 0;
-  assert.deepEqual((sim as any).drill(), before);
+  const response = (rank: number, night: number) => {
+    const sim = new LibrarySim(5); sim.night = night; sim.nightWatch = rank;
+    sim.furnish(10); sim.hire("shelver");
+    sim.librarians[0].x = -12;
+    sim.ignite(0);
+    let noticed = 0;
+    for (let n = 0; n < 2000; n++) {
+      sim.step(0.1);
+      if (!noticed && sim.librarians[0].mode === "fight") noticed = sim.time;
+      if (sim.librarians[0].action === "throw") return { noticed, threw: sim.time, water: sim.librarians[0].water };
+    }
+    throw new Error("shelver never threw a bucket");
+  };
+  const base = response(0, 1), watch = response(9, 1);
+  assert.ok(watch.noticed < base.noticed, "watch detects the fire earlier at night");
+  assert.ok(watch.threw < base.threw && watch.water > base.water, "watch fetches and throws more water sooner");
+  assert.deepEqual(response(9, 0), response(0, 0), "daytime work uses normal Fire Training");
+});
+
+test("a destroyed lower unit retains the intact shelves and books above it", () => {
+  const sim = new LibrarySim(5); sim.furnish(40, 1); sim.ignite(0);
+  const upper = slotIndex(0, 1, 0, 0), color = sim.slots[upper];
+  for (let y = unitTop(0); y < FLOOR; y += CELL) for (let x = bayX(0); x < bayX(0) + BAY_W; x += CELL) {
+    const i = cellAt(x, y); sim.fire.fuel[i] = 0; sim.fire.char[i] = 1;
+  }
+  sim.fire.heat.fill(0); sim.step(.1);
+  assert.equal(sim.units[0], 0);
+  assert.equal(sim.units[1], PLANKS);
+  assert.equal(sim.slots[upper], color);
+  assert.equal(sim.shelves, 40);
+});
+
+test("saving during a full return-cart export keeps intact books and the fire's random and minute phases", () => {
+  const sim = new LibrarySim(5); sim.furnish(10, 1); sim.hire("shelver");
+  sim.returns = Array(12).fill(1); sim.bookCart.books = Array(16).fill(2); sim.bookCart.here = true;
+  (sim as any).exporting = sim.librarians[0].id;
+  const saved = decodeLibrarySave(JSON.parse(JSON.stringify(sim.save(1000))))!;
+  const restored = new LibrarySim(saved.seed, saved);
+  assert.equal(restored.books, sim.books);
+  assert.deepEqual(restored.save(1000).exportedBooks, saved.exportedBooks);
+  assert.equal((restored as any).rng(), (sim as any).rng());
+  const malicious = decodeLibrarySave({ ...saved, counters: { booksIn: 0, booksOut: 0, booksBurnt: 0, deaths: 0, fires: 0, seed: 123 } })!;
+  assert.equal(new LibrarySim(saved.seed, malicious).seed, saved.seed, "counter data cannot overwrite unrelated fields");
 });

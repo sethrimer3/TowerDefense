@@ -68,7 +68,7 @@ Paid by kills, by every wave held and by gold the mine digs; spent in the Armory
 Paid for each wave held (copper) and each boss wave held (silver). Spent, with Gold, in the Armory. (They were once iron and steel bars.)
 
 **Time away** (welcome back):
-The time since the game was last saved, up to a day. The Library earns Knowledge for all of it; the Mine works through the first two hours tick by tick and is paid for the rest at its **smithy's pace** (the Smithy points an hour it has lately made). The welcome-back screen totals both when the game opens.
+The time since the game was last saved, up to a day, banked for each of the Mine and Library. On returning, both automatically fast-forward their work, earning gains as they go. Remaining idle time survives closing the game, and the welcome-back screen shows the running gains.
 
 **Knowledge**:
 Earned by the Library, an hour's worth being its built bookshelves times its professors (idle too), and paid for each wave held past the best wave; spent on the skill trees. Once called Valor.
@@ -76,8 +76,14 @@ Earned by the Library, an hour's worth being its built bookshelves times its pro
 **Freak accident** (Library):
 A table's candle catching it alight: a small chance each minute, lowered by Fireproof Wood. The fire burns whatever it reaches until it burns out or the librarians put it out (Fire Training).
 
-**Idle fire** (Library):
-While the game is closed, each hour the library may burn down: 50% an hour, lowered 5% a rank by Night watch to 5% at least. An hour it stands pays its Knowledge; once it burns down, nothing is left but a new, empty library.
+**Night watch** (Library):
+Librarians detecting fires earlier and fetching and throwing buckets faster during the night. It protects the same fires that can happen while fast-forwarding.
+
+**Charred book** (Library):
+A book ruined by heat, kept as debris until a shelver carries it outside. Intact books remain usable.
+
+**Shelf repair** (Library):
+Shelvers filling the burned holes in a purchased bookshelf with new planks, keeping its surviving wood and books.
 
 **Upgrade point**:
 One for every new best wave held in Defend, shown in the currency bar; banked for what the meta game brings later. (It replaced the Commander level and its experience.)

@@ -2,12 +2,9 @@
  * under it), buying bookshelves and librarians, and the staff's list (each
  * librarian by name, dragged between the three roles: shelvers, professors,
  * researchers; tapped to follow). The library works whatever tab shows (`advance`, from
- * the app's frame loop) and earns Knowledge on the wall clock. While the game
- * is closed (on loading, the time away up to `MAX_AWAY_MS`, or time added by
- * the dev option, `addAway`) it is reckoned an hour at a time (`idleHours`):
- * each hour it earns at its rate unless it burns down (`idleFireChance`, less
- * with Night watch), after which it is a new, empty library. The librarians
- * themselves only move while the game is open. */
+ * the app's frame loop). Time away is banked, then spent in ordinary
+ * simulation steps at up to 120 times speed. Knowledge, fires, deaths,
+ * firefighting and repairs happen as those steps run. */
 import { play } from "../sound.ts";
 import { countdown, HOUR_MS, IDLE_SPEED, MAX_AWAY_MS } from "../away.ts";
 import { H, LAB_FLOOR, LAB_MAX_LEVEL, MAX_LIBRARIANS, labPrice, MAX_SHELVES, LibrarySim, ROLES, RETURN_BOOKS, librarianPrice, shelfPrice, type Librarian, type LibrarySave, type Role } from "./sim.ts";
@@ -56,7 +53,7 @@ export class LibraryPage {
   private renderer: LibraryRenderer | null = null;
   private built = false;
   private shown = "";
-  /** Wall-clock ms the library last advanced to, and paid Knowledge up to. */
+  /** Last frame clock and simulation time still owed. */
   private ranTo = 0;
   private owed = 0;
   private deathsBefore = 0;
@@ -65,8 +62,7 @@ export class LibraryPage {
   private shownStaff = "";
   /** A name being dragged in the staff's list (the list holds still). */
   private dragging = false;
-  /** Knowledge earned over the time away (paid by the next `advance`), and
-   * what became of the library, for the welcome-back screen. */
+  /** Gains actually made so far while spending the idle-time bank. */
   awayKnowledge = 0;
   away: LibraryAway | null = null;
 

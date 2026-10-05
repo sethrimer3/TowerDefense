@@ -1,7 +1,7 @@
 /** Time away from the game: how much of it the Mine and the Library work
  * through, and how it reads on the welcome-back screen. */
 
-/** Longest time away the Mine and the Library are paid for. */
+/** Longest unused idle-time bank for each simulation. */
 export const MAX_AWAY_MS = 24 * 60 * 60 * 1000;
 export const HOUR_MS = 60 * 60 * 1000;
 /** Maximum simulation speed while spending banked idle time. */
