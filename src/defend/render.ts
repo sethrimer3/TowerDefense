@@ -7,6 +7,7 @@ import { enemySize } from "./catalog.ts";
  * fire mages' burning ground (mage-art.ts), units and effects
  * (battle-art.ts, with the valkyries' charges from valkyrie-art.ts), the
  * black lightning (dark-art.ts), the trees over them (park-trees.ts), the
+ * chimneys' smoke (chimney-smoke.ts), the
  * planted war banner, the magic boats' water (flood-art.ts) over the ground, the wizards' fire, the building grid and drag overlay (edit-overlay.ts), then
  * rain in screen space. */
 import { CELLS_H, CELLS_W, boardSize, hash01 } from "./grid.ts";
@@ -33,6 +34,7 @@ import { stabLights } from "./valkyrie-art.ts";
 import { DarkArt, darkLights } from "./dark-art.ts";
 import { ParkTrees, type Under } from "./park-trees.ts";
 import { FloodArt } from "./flood-art.ts";
+import { ChimneySmoke } from "./chimney-smoke.ts";
 
 export type DrawOptions = {
   /** Show the (dim, gold) tile grid — while the player is editing. */
@@ -69,6 +71,7 @@ export class DefendRenderer {
   readonly trees = new ParkTrees();
   readonly dark = new DarkArt();
   readonly floods = new FloodArt();
+  readonly smoke = new ChimneySmoke();
   /** The battle time the wizard art last advanced to. */
   private wizardTime = 0;
   private rain = new Rain();
@@ -194,6 +197,7 @@ export class DefendRenderer {
     this.drawKeepFlag(map, sim, opts);
     if (sim) this.drawBattleUnits(sim, opts.weather ? this.burning ?? (() => 1) : null, opts);
     this.drawTrees(map, sim, opts, dt);
+    if (opts.effects ?? true) this.drawSmoke(map, sim, opts);
     if (sim?.warBanner && !opts.hideBanner) drawWarBanner(this.ctx, this.px, sim.warBanner, RALLY_REACH, { t: opts.now / 1000, reduceMotion: opts.reduceMotion });
     if (sim) this.wizard.drawFire(this.ctx, this.px);
     this.drawEditing(overlay, opts.grid);
@@ -332,6 +336,17 @@ export class DefendRenderer {
       this.lighting.darken(o);
     } : undefined;
     this.trees.draw(this.ctx, this.px, dim);
+  }
+
+  /** Faint smoke drifting off the houses' chimneys, over the trees. */
+  private drawSmoke(map: CityMap, sim: DefendSim | null, opts: DrawOptions) {
+    this.smoke.sync(map);
+    const weather = sim ? opts.weather : null;
+    this.smoke.draw(this.ctx, this.px, {
+      now: opts.now, sim, reduceMotion: opts.reduceMotion,
+      wind: weather?.rain ? 0.8 : weather ? 0.3 : 0,
+      dim: weather ? opts.night : 0,
+    });
   }
 
   /** The wizards' fire and ice move on battle time, so they keep pace with
