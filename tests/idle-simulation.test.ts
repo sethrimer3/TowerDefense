@@ -71,12 +71,14 @@ test("cell fire consumes artwork pixels, produces buoyant smoke and falling ash,
   const f = new Fire(), rng = () => 0.5;
   f.load([{ x0: 40, y0: 200, x1: 44, y1: 204, fuel: 1 }]);
   f.ignite(40, 200);
-  let smoked = false;
-  for (let n = 0; n < 250; n++) { f.step(0.1, rng, 0); smoked ||= f.smoke.some((d) => d > 0); }
+  let smoked = false, ashed = false;
+  for (let n = 0; n < 250; n++) { f.step(0.1, rng, 0); smoked ||= f.smoke.some((d) => d > 0); ashed ||= f.ash.some((d) => d > 0); }
   assert.ok(f.char[cellAt(40, 200)] > 0.9);
   assert.ok(f.missing(40, 200));
   assert.ok(smoked);
-  assert.ok(f.ash.some((d) => d > 0));
+  assert.ok(ashed);
+  for (let n = 0; n < 210; n++) f.step(0.1, rng, 0);
+  assert.ok(!f.ash.some((d) => d > 0), "the ash is swept away once the fire is out");
   const g = new Fire();
   g.smoke[cellAt(80, 100)] = 255; g.ash[cellAt(80, 200)] = 1;
   const saved = g.save(); g.restore(saved, 0);
