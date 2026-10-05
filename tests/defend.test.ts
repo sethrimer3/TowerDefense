@@ -24,7 +24,8 @@ import { chainBolt, stepDarkWizard } from '../src/defend/dark-wizards.ts';
 import { BoltBuffer } from '../src/defend/dark-art.ts';
 import { EditSession } from '../src/defend/edit-session.ts';
 import { UPGRADES, purchasePrice, STARTING_OWNED, STRUCTURES, TILE_ROOM, footprint, stabLength, chainJump, wizardChain, turretChain, turretSpots, DARK_WIZARD } from '../src/defend/catalog.ts';
-import { available, buyItem, buyUpgrade, decodeDefendSave, defaultDefendSave } from '../src/defend/progress.ts';
+import { available, buyItem, buyUpgrade, decodeDefendSave, defaultDefendSave, startingWave, unlockWaves, waveReach } from '../src/defend/progress.ts';
+import { difficultyLabel, wavePickerHTML } from '../src/defend/wave-picker.ts';
 
 const zeroLevels = () => Object.fromEntries(UPGRADES.map((u) => [u.id, 0])) as any;
 
@@ -970,4 +971,36 @@ test('monster bait: Restocking lets civilians rebuild a stack so many times; Pow
     stepBlazes(kegs, 1 / 30);
   }
   assert.ok(near.hp < hp, 'burning what stands in it');
+});
+
+test('the starting wave: within reach, opened 100 at a time by the dev option, saved, and started on', () => {
+  const save = defaultDefendSave();
+  assert.equal(waveReach(save), 1);
+  save.startWave = 40;
+  assert.equal(startingWave(save), 1, 'a wave out of reach starts on the furthest in reach');
+  save.bestWave = 12;
+  assert.equal(startingWave(save), 12);
+  assert.equal(unlockWaves(save), 112, '100 waves past the best');
+  assert.equal(unlockWaves(save), 212, 'and 100 more past those');
+  assert.equal(startingWave(save), 40);
+  const back = decodeDefendSave(JSON.parse(JSON.stringify(save)));
+  assert.equal(back.unlockedWave, 212);
+  assert.equal(back.startWave, 40);
+  assert.equal(decodeDefendSave({ ...save, startWave: 0, unlockedWave: -3 }).startWave, 1);
+  assert.equal(decodeDefendSave({ startWave: 'x' }).unlockedWave, 0);
+
+  const html = wavePickerHTML(save);
+  assert.equal(html.match(/data-wave="/g)!.length, 212, 'a row for every wave in reach');
+  assert.match(html, /data-wave="40" aria-pressed="true"/);
+  assert.match(html, new RegExp(`Difficulty</small>${difficultyLabel(waveDifficulty(212))}`));
+  assert.equal(difficultyLabel(950), '950');
+  assert.equal(difficultyLabel(12_480), '12.4k');
+  assert.equal(difficultyLabel(1_234_567), '1.2M');
+
+  const sim = new DefendSim(mapOf(defaultLayout()), zeroLevels(), 5);
+  sim.startAt(40);
+  const events: { type: string; wave: number }[] = [];
+  for (let i = 0; i < 90 && !events.some((e) => e.type === 'waveStart'); i++) { sim.update(1 / 30); events.push(...sim.events); sim.events.length = 0; }
+  assert.deepEqual(events, [{ type: 'waveStart', wave: 40 }], 'the first wave is the chosen one, and the one before is not counted as cleared');
+  assert.equal(sim.spawnQueue.length > 0, true);
 });

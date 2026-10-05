@@ -1282,6 +1282,81 @@ dialog .away-row .away-note {
   .defend-journal-button { padding: 3px; }
   .defend-journal-button canvas { width: 30px; height: 30px; }
 }
+/* The starting wave picker: oak boards down the parchment, each wave's
+   difficulty in a well cut into the board beside an ember bar. */
+.defend-wave small { font-size: inherit; }
+.defend-wave b { color: #ffe1a0; }
+.defend-wave-dialog { width: min(480px, calc(100vw - 32px)); max-height: 85dvh; }
+.wave-list {
+  display: grid;
+  gap: 6px;
+  max-height: 52dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 2px 4px 4px;
+  text-align: left;
+}
+.wave-row {
+  display: grid;
+  grid-template-columns: 7.5em 1fr 6.5em;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 40px;
+  padding: 6px 10px;
+}
+.wave-name b { font-size: 1.15em; }
+.wave-name em {
+  margin-left: 6px;
+  font-style: normal;
+  font-size: 9px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #ffb8a0;
+  text-shadow: 0 1px 0 #000, 0 0 6px #ff4a2a90;
+}
+.wave-bar {
+  height: 8px;
+  border: 1px solid #000;
+  border-radius: 2px;
+  background: #0d0b09;
+  box-shadow: inset 0 1px 2px #000, 0 1px 0 #ffd9a014;
+  overflow: hidden;
+}
+.wave-bar i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(#ffd27a, #c9601c 60%, #7a2a0c);
+  box-shadow: inset 0 1px 0 #fff4c080;
+}
+.wave-row.boss .wave-bar i { background: linear-gradient(#ff9a7a, #b0201c 60%, #4a0808); }
+.wave-difficulty {
+  justify-self: end;
+  min-width: 5.5em;
+  padding: 3px 6px;
+  border: 1px solid #3a2c1c;
+  border-radius: 3px;
+  background: #0d0b09;
+  box-shadow: inset 0 2px 4px #000, 0 1px 0 #ffd9a014;
+  text-align: center;
+  color: #ffd9a0;
+}
+.wave-difficulty small {
+  display: block;
+  font-size: 7px;
+  letter-spacing: 1px;
+  color: #a8987a;
+  text-transform: uppercase;
+}
+@media (max-width: 480px) {
+  /* The header's one row: Start drops "the defense", and the wave's label
+     sits small over its number. */
+  .defend-wide { display: none; }
+  .defend-left .defend-wave { display: grid; justify-items: center; padding: 2px 7px; line-height: 1; }
+  .defend-wave small { font-size: 7px; letter-spacing: 1px; text-transform: uppercase; }
+  .wave-row { grid-template-columns: 6.5em 1fr 5.5em; gap: 6px; padding: 5px 8px; }
+}
+#dev-waves { margin-top: 10px; }
 /* Developer timing overlay; never participates in the battle page's layout. */
 .defend-frame-times {
   position: fixed;

@@ -41,6 +41,10 @@ export type DefendSave = {
   levels: Record<UpgradeId, number>;
   bombs: number;
   bestWave: number;
+  /** The furthest wave the dev option has opened to start from, past the best (0 when never used). */
+  unlockedWave: number;
+  /** The wave the next defense starts on (1 unless the player picked another). */
+  startWave: number;
   discovered: EnemyKind[];
   journalRead: EnemyKind[];
   paletteSide: "left" | "right";
@@ -57,6 +61,8 @@ export function defaultDefendSave(): DefendSave {
     levels: Object.fromEntries(UPGRADES.map((u) => [u.id, 0])) as Record<UpgradeId, number>,
     bombs: 0,
     bestWave: 0,
+    unlockedWave: 0,
+    startWave: 1,
     discovered: [],
     journalRead: [],
     paletteSide: "left",
@@ -150,6 +156,28 @@ export function buySpeed3(save: DefendSave, w: Wallet): boolean {
   return true;
 }
 
+// ── The starting wave ─────────────────────────────────────────────────────
+/** The furthest wave a save may open to start from. */
+export const MAX_START_WAVE = 1e6;
+/** Waves the dev option opens at a time. */
+export const UNLOCK_WAVES = 100;
+
+/** The furthest wave a defense may start on: the best wave held, or what the dev option opened. */
+export function waveReach(save: DefendSave): number {
+  return Math.max(1, save.bestWave, save.unlockedWave);
+}
+
+/** The wave the next defense starts on, kept within reach. */
+export function startingWave(save: DefendSave): number {
+  return Math.min(Math.max(1, save.startWave), waveReach(save));
+}
+
+/** Dev: opens `UNLOCK_WAVES` more waves past the furthest the player can start on now. */
+export function unlockWaves(save: DefendSave): number {
+  save.unlockedWave = Math.min(MAX_START_WAVE, Math.max(save.bestWave, save.unlockedWave) + UNLOCK_WAVES);
+  return save.unlockedWave;
+}
+
 export function buyBomb(save: DefendSave, w: Wallet): boolean {
   if (!canAfford(w, BOMB_PRICE)) return false;
   pay(w, BOMB_PRICE);
@@ -168,6 +196,8 @@ export function decodeDefendSave(s: any): DefendSave {
   for (const u of UPGRADES) d.levels[u.id] = intOr(s.levels?.[u.id], 0, u.maxLevel, d.levels[u.id]);
   d.bombs = intOr(s.bombs, 0, 9999, d.bombs);
   d.bestWave = intOr(s.bestWave, 0, 1e6, d.bestWave);
+  d.unlockedWave = intOr(s.unlockedWave, 0, MAX_START_WAVE, d.unlockedWave);
+  d.startWave = intOr(s.startWave, 1, MAX_START_WAVE, d.startWave);
   d.paletteSide = s.paletteSide === "right" ? "right" : "left";
   d.speed3 = s.speed3 === true;
   d.seed = intOr(s.seed, 0, 2 ** 32, d.seed);
