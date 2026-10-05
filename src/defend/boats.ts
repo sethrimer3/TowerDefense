@@ -61,6 +61,9 @@ export function floodRadius(f: Flood) {
 type FloodIndex = { floods: Flood[]; n: number; tiles: Flood[][] };
 const TILES_W = Math.ceil(CELLS_W / SUB), TILES_H = Math.ceil(CELLS_H / SUB);
 const indexes = new WeakMap<DefendSim, FloodIndex>();
+/** Keep one decorative pool refreshed while a small boat is stopped at a
+ * wall. Moving boats still drop a trail, and abandoned pools dry normally. */
+const decorativePools = new WeakMap<Enemy, Flood>();
 const tileOf = (v: number, max: number) => Math.max(0, Math.min(max - 1, Math.floor(v / SUB)));
 
 function floodIndex(sim: DefendSim) {
@@ -112,7 +115,13 @@ export function stepBoat(sim: DefendSim, e: Enemy, dt: number) {
   e.abilityT = (e.abilityT ?? 0) - dt;
   if (e.abilityT <= 0) {
     e.abilityT += TRAIL_GAP;
-    sim.floods.push({ x: e.x, y: e.y, r: boat.water, t: 0, life: FLOOD_LIFE, boat: e.id, ...(boat.decorativeWater ? { decorative: true } : {}) });
+    const previous = boat.decorativeWater ? decorativePools.get(e) : undefined;
+    if (previous && previous.t < previous.life && previous.x === e.x && previous.y === e.y) previous.t = 0;
+    else {
+      const pool: Flood = { x: e.x, y: e.y, r: boat.water, t: 0, life: FLOOD_LIFE, boat: e.id, ...(boat.decorativeWater ? { decorative: true } : {}) };
+      sim.floods.push(pool);
+      if (boat.decorativeWater) decorativePools.set(e, pool);
+    }
   }
   // Monster bait calls a boat too: the nearest stack while any stands.
   const keep = sim.baits.length ? lureOf(sim, e.x, e.y) : sim.keep, half = def.size / 2;

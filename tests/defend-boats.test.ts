@@ -107,6 +107,22 @@ test('overlapping decorative water never disables the larger boats water effects
   assert.equal(wetAt(s, 10, 10), false);
 });
 
+test('a stopped small boat refreshes one pool; moving, death and expiry still leave drying trails', () => {
+  const s = sim(), k = s.keep.rect, e = create(s, 'boatDinghy', k.x + k.w / 2, k.y - .4);
+  e.cd = 99;
+  for (let n = 0; n < 100; n++) { stepFloods(s, .1); stepBoat(s, e, .1); }
+  assert.equal(s.floods.length, 1);
+  const old = s.floods[0];
+  e.x = 10; e.y = 10; e.abilityT = 0; stepBoat(s, e, .1);
+  assert.equal(s.floods.length, 2);
+  stepFloods(s, 1);
+  assert.ok(old.t >= 1);
+  e.hp = 0; stepFloods(s, FLOOD_LIFE);
+  assert.equal(s.floods.length, 0);
+  e.hp = e.maxHp; e.abilityT = 0; stepBoat(s, e, 0);
+  assert.equal(s.floods.length, 1, 'expired pool is replaced');
+});
+
 test('small boats pay valid kill rewards and persist journal discoveries with accurate water notes', () => {
   for (const kind of SMALL_BOATS) {
     const s = sim(), e = create(s, kind, 10, 10), save = defaults(), gold = save.gold;

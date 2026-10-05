@@ -38,7 +38,8 @@ try {
       c.fillStyle = '#e8d8b5'; c.font = '14px monospace'; c.textAlign = 'center';
       c.fillText(ENEMIES[e.kind].name, col * 200 + 100, row * 220 + 25);
       c.fillText(`${ENEMIES[e.kind].cost} difficulty`, col * 200 + 100, row * 220 + 45);
-      c.fillText(ENEMIES[e.kind].boat.decorativeWater ? 'Visual water / normal ram' : 'Sinking water', col * 200 + 100, row * 220 + 192);
+      c.fillText(ENEMIES[e.kind].boat.decorativeWater ? 'Visual water' : 'Sinking water', col * 200 + 100, row * 220 + 192);
+      if (ENEMIES[e.kind].boat.decorativeWater) c.fillText('Normal ramming', col * 200 + 100, row * 220 + 208);
     }
     // Exercise every heading and hit-flash sprite at mobile and desktop scales.
     const probe = document.createElement('canvas'); probe.width = probe.height = 100;
