@@ -65,6 +65,8 @@ export type DefendHost = {
   effects(): boolean;
   devMode(): boolean;
   healthbars?(): boolean;
+  /** The tile grid's opacity while building, 0 when it's hidden. */
+  gridLines?(): number;
   setHealthbars?(value: boolean): void;
 };
 
@@ -712,7 +714,7 @@ export class DefendPage {
     if (!this.renderer.canvas.width) return;
     const map = this.sim ? this.sim.map : this.currentMap();
     this.renderer.draw(map, this.sim, this.overlay(), {
-      grid: this.phase === "build",
+      grid: this.phase === "build" ? (this.host.gridLines?.() ?? 0) : 0,
       timings: this.frameTimes.enabled,
       weather: this.weather,
       night: this.night,

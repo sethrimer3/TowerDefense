@@ -7,6 +7,7 @@ import { defaultLayout, fitLayout, placeCityTile, type Layout } from "../src/def
 import { CellType, generateCity, type CityMap } from "../src/defend/citygen.ts";
 import { CELLS_W } from "../src/defend/grid.ts";
 import { ParkGrass } from "../src/defend/park-grass.ts";
+import { groundArt, turfAt } from "../src/defend/ground-art.ts";
 import { PondWater } from "../src/defend/pond-water.ts";
 import { ART, openAt, parkArt } from "../src/defend/park-art.ts";
 import { random } from "../src/random.ts";
@@ -31,7 +32,7 @@ function parkCity() {
   assert.fail("no seed made a pond");
 }
 
-test("every park cell's grass is planned once, on park cells only", () => {
+test("every park cell's grass is planned once, on park cells and the turf beside them only", () => {
   const map = parkCity();
   const grass = new ParkGrass();
   grass.sync(map);
@@ -42,9 +43,18 @@ test("every park cell's grass is planned once, on park cells only", () => {
   again.sync(map);
   assert.equal(again.bladeCount, grass.bladeCount, "the same city plans the same grass");
   const plans = (grass as unknown as { plans: (unknown[] | null)[] }).plans;
+  const ground = groundArt(map);
+  let street = 0;
   plans.forEach((p, i) => {
-    if (p?.length) assert.equal(map.type[i], CellType.PARK, `blades on cell ${i % CELLS_W},${Math.floor(i / CELLS_W)}`);
+    if (!p?.length) return;
+    const cx = i % CELLS_W, cy = Math.floor(i / CELLS_W);
+    if (map.type[i] === CellType.PARK) return;
+    assert.equal(map.type[i], CellType.ROAD, `blades on cell ${cx},${cy}`);
+    street++;
+    // A street's blades root on its turf.
+    for (const b of p as { i: number; j: number }[]) assert.ok(turfAt(ground, cx * ART + b.i, cy * ART + b.j), `blade off the turf in cell ${cx},${cy}`);
   });
+  assert.ok(street > 0, "grass grows on the turf over the streets too");
 });
 
 test("the pixel-art ponds' open water lies on water cells", () => {

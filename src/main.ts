@@ -77,6 +77,7 @@ const defendPage = new DefendPage(el("defend"), {
   reduceMotion: () => save.settings.reduceMotion,
   healthbars: () => save.settings.showHealthbars,
   setHealthbars: (value) => { save.settings.showHealthbars = value; store(); },
+  gridLines: () => (save.settings.tileGrid ? save.settings.gridOpacity / 100 : 0),
   effects: () => !save.settings.effectsOff,
   devMode: () => save.settings.devMode,
 });

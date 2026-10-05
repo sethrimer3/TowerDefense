@@ -148,7 +148,7 @@ try {
     }
     const canvas=document.querySelector('canvas'),r=new DefendRenderer(canvas);
     r.resize(720,840);
-    const opts={grid:false,weather:{rain:false},night:1,now:1000,reduceMotion:true,effects:true,healthbars:true};
+    const opts={grid:0,weather:{rain:false},night:1,now:1000,reduceMotion:true,effects:true,healthbars:true};
     // Lights bake a few a frame: settle them first, or consecutive frames
     // differ in their lighting rather than their combat.
     r.draw(map,sim,null,opts);r.lighting.bakePending(sim.solid,1000);

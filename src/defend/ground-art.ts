@@ -3,12 +3,16 @@
  * worn lighter down the middle, flecked with grit and pebbles. Where a
  * street meets a park the grass grows out over it unevenly, a ragged edge
  * of turf, then a dithered band of worn grass, then the odd stray tuft;
- * and the dirt bites back into the park's edge in bare patches here and
- * there, so the two blend instead of meeting at a ruled line.
+ * and here and there the dirt bites back into the park's edge instead, so
+ * the two blend instead of meeting at a ruled line. One wavering line
+ * (`edge`) divides grass from dirt on both sides of the cells' boundary,
+ * so the turf over a street and the bare patches in a park never meet
+ * along the cell edge itself.
  *
  * Baked once per city (`groundArt`), transparent off the streets and the
  * bare patches, with `bare` marking the park pixels gone to dirt (the
- * live grass keeps off them). Presentation only. */
+ * live grass keeps off them) and `turf` the street pixels grassed over
+ * (the live grass grows on them too). Presentation only. */
 import { CELLS_H, CELLS_W, cellInBounds, cellIndex, hash, hash01 } from "./grid.ts";
 import { CellType, type CityMap } from "./citygen.ts";
 import { ART } from "./park-art.ts";
@@ -32,6 +36,8 @@ export type GroundArt = {
   canvas: HTMLCanvasElement | null;
   /** 1 on park art pixels worn to bare dirt. */
   bare: Uint8Array;
+  /** 1 on street art pixels the park's grass grows over. */
+  turf: Uint8Array;
 };
 
 const cache = new WeakMap<CityMap, GroundArt>();
@@ -45,6 +51,8 @@ export function groundArt(map: CityMap): GroundArt {
 
 /** Whether art pixel (x, y) is park worn to bare dirt. */
 export const bareAt = (art: GroundArt, x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H && art.bare[y * W + x] === 1;
+/** Whether art pixel (x, y) is street grassed over by a park beside it. */
+export const turfAt = (art: GroundArt, x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H && art.turf[y * W + x] === 1;
 
 /** Opaque little-endian RGBA for 0xRRGGBB. */
 const rgba = (c: number) => ((255 << 24) | ((c & 0xff) << 16) | (c & 0xff00) | ((c >> 16) & 0xff)) >>> 0;
@@ -75,11 +83,11 @@ function nearest(map: CityMap, cx: number, cy: number, x: number, y: number, wan
 }
 
 function bake(map: CityMap): GroundArt {
-  const px = new Uint32Array(W * H), bare = new Uint8Array(W * H);
+  const px = new Uint32Array(W * H), bare = new Uint8Array(W * H), turf = new Uint8Array(W * H);
   for (let cy = 0; cy < CELLS_H; cy++)
     for (let cx = 0; cx < CELLS_W; cx++) {
       const t = map.type[cellIndex(cx, cy)];
-      if (t === CellType.ROAD) paintStreet(map, px, cx, cy);
+      if (t === CellType.ROAD) paintStreet(map, px, turf, cx, cy);
       else if (t === CellType.PARK) paintBare(map, px, bare, cx, cy);
     }
   let canvas: HTMLCanvasElement | null = null;
@@ -92,28 +100,37 @@ function bake(map: CityMap): GroundArt {
     new Uint32Array(img.data.buffer).set(px);
     c.putImageData(img, 0, 0);
   }
-  return { canvas, bare };
+  return { canvas, bare, turf };
 }
 
-/** How far grass reaches out over the street at art pixel (x, y): a slow
- * swell along the edge with a quicker ragged one on top. */
-const reach = (x: number, y: number) => 0.4 + noise(x, y, 7, 401) * 3.2 + noise(x, y, 2.5, 402) * 1.4;
+/** Where grass gives way to dirt near art pixel (x, y), in art pixels from
+ * the boundary between park and street cells: out over the street where
+ * positive (a slow swell along the edge with a quicker ragged one on top),
+ * into the park where the dirt bites back. Smooth, so the line it draws
+ * runs on unbroken across the cells' boundary. */
+const edge = (x: number, y: number) =>
+  0.4 + noise(x, y, 7, 401) * 3.2 + noise(x, y, 2.5, 402) * 1.4 - Math.max(0, noise(x, y, 5, 430) - 0.5) * 11 - noise(x, y, 2, 431) * 0.8;
+
+/** Worn grass is dithered over this many art pixels on the dirt side of
+ * the edge. */
+const WORN_BAND = 1.3;
 
 /** One street cell's dirt, with the grass of any park beside it creeping in. */
-function paintStreet(map: CityMap, px: Uint32Array, cx: number, cy: number) {
+function paintStreet(map: CityMap, px: Uint32Array, turf: Uint8Array, cx: number, cy: number) {
   for (let j = 0; j < ART; j++)
     for (let i = 0; i < ART; i++) {
       const x = cx * ART + i, y = cy * ART + j, mx = x + 0.5, my = y + 0.5;
       const park = nearest(map, cx, cy, mx, my, isGrass);
-      const g = park.d - reach(x, y);
+      const g = park.d - edge(x, y);
       const k = y * W + x;
       if (g < 0) {
         // Turf: the park's own patch green, flecked dark and light.
         const h = hash01(x, y, 410);
         px[k] = rgba(h < 0.12 ? TURF.dark : h > 0.92 ? TURF.light : grassPatch(park.cx, park.cy) === GRASS.patch[0] ? TURF.patch[0] : TURF.patch[1]);
+        turf[k] = 1;
         continue;
       }
-      if (g < 1.3 && ((x + y) & 1) === 0) {
+      if (g < WORN_BAND && ((x + y) & 1) === 0) {
         px[k] = rgba(WORN[hash(x, y, 411) & 1]);
         continue;
       }
@@ -146,17 +163,18 @@ function dirt(map: CityMap, cx: number, cy: number, mx: number, my: number, x: n
 }
 
 /** Bare patches where the dirt of a street beside park cell (cx, cy) bites
- * into its edge. */
+ * into its edge: wherever `edge` falls inside the park. */
 function paintBare(map: CityMap, px: Uint32Array, bare: Uint8Array, cx: number, cy: number) {
   for (let j = 0; j < ART; j++)
     for (let i = 0; i < ART; i++) {
       const x = cx * ART + i, y = cy * ART + j;
       const road = nearest(map, cx, cy, x + 0.5, y + 0.5, (t) => t === CellType.ROAD).d;
-      if (road > 4) continue;
-      const bite = noise(x, y, 5, 430) * 4.2 - 1.6 + noise(x, y, 2, 431) * 0.8;
-      if (road > bite) continue;
+      if (road > ART) continue;
+      // How far past the edge, on its dirt side (negative: still grass).
+      const g = -edge(x, y) - road;
+      if (g < 0) continue;
       const k = y * W + x;
       bare[k] = 1;
-      px[k] = rgba(road > bite - 0.8 && ((x + y) & 1) === 0 ? WORN[hash(x, y, 432) & 1] : DIRT[hash01(x, y, 433) < 0.15 ? 1 : 2]);
+      px[k] = rgba(g < WORN_BAND && ((x + y) & 1) === 0 ? WORN[hash(x, y, 432) & 1] : DIRT[hash01(x, y, 433) < 0.15 ? 1 : 2]);
     }
 }
