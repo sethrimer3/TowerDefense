@@ -420,6 +420,13 @@ export class DefendSim {
   }
 
   // ── Waves ─────────────────────────────────────────────────────────────
+  /** Starts the defense on `wave` rather than the first, before the first
+   * step. The opening break is shorter than a wave's, so the wave before is
+   * never counted as cleared. */
+  startAt(wave: number) {
+    if (this.time === 0 && this.wave === 0) this.wave = Math.max(1, Math.floor(wave)) - 1;
+  }
+
   private runWaves(dt: number) {
     if (this.spawnQueue.length) {
       this.spawnT -= dt;

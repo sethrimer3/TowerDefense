@@ -1,4 +1,5 @@
 import { journalHTML, paintJournal } from "./journal.ts";
+import { wavePickerHTML } from "./wave-picker.ts";
 import { KeepBricks } from "./keep-bricks.ts";
 /** The DEFEND page: a City tab (palette + board) and an Armory tab (buy
  * city elements, bombs and universal upgrades with what battles earn).
@@ -45,7 +46,7 @@ import { EditSession, type Drop } from "./edit-session.ts";
 import { NIGHT_FADE_SECONDS, isBossWave, rollWeather, skyLabel, type Weather } from "./weather.ts";
 import { play } from "../sound.ts";
 import { replay, sparksOver } from "../ui/flourish.ts";
-import { available, buyBomb, buyItem, buySpeed3, buyUpgrade, canAfford, type DefendSave, type Wallet } from "./progress.ts";
+import { available, buyBomb, buyItem, buySpeed3, buyUpgrade, canAfford, startingWave, type DefendSave, type Wallet } from "./progress.ts";
 import { ageWater } from "./boats.ts";
 
 export type DefendHost = {
@@ -233,7 +234,8 @@ export class DefendPage {
         </div>
       </div>
       <div class="defend-armory" id="defend-armory" hidden></div>
-      <dialog class="defend-journal-dialog" aria-labelledby="defend-journal-title"></dialog>`;
+      <dialog class="defend-journal-dialog" aria-labelledby="defend-journal-title"></dialog>
+      <dialog class="defend-wave-dialog" aria-labelledby="defend-wave-title"></dialog>`;
     this.keepBricks = new KeepBricks();
     this.renderer = new DefendRenderer(this.root.querySelector("#defend-canvas")!);
     const canvas = this.renderer.canvas;
@@ -290,7 +292,8 @@ export class DefendPage {
     if (this.phase === "build") {
       el.innerHTML = `<button data-dtab="city" aria-pressed="${this.tab === "city"}">City</button>
         <button data-dtab="armory" aria-pressed="${this.tab === "armory"}">Armory</button>
-        <button class="defend-go" id="defend-start">Start the defense</button>${this.tab === "city" ? this.sideToggle("Build") : ""}`;
+        <button class="defend-go" id="defend-start">Start<span class="defend-wide"> the defense</span></button>
+        <button class="defend-wave" id="defend-wave" title="Choose the starting wave" aria-haspopup="dialog"><small>Wave </small><b>${startingWave(this.save)}</b></button>${this.tab === "city" ? this.sideToggle("Build") : ""}`;
       el.querySelectorAll<HTMLButtonElement>("[data-dtab]").forEach((b) => {
         b.onclick = () => {
           this.tab = b.dataset.dtab as "city" | "armory";
@@ -299,6 +302,7 @@ export class DefendPage {
         };
       });
       this.bindSideToggle(el);
+      el.querySelector<HTMLButtonElement>("#defend-wave")!.onclick = () => this.pickWave();
       el.querySelector<HTMLButtonElement>("#defend-start")!.onclick = () => {
         this.tab = "city";
         this.startRun();
@@ -584,6 +588,23 @@ export class DefendPage {
     return this.map;
   }
 
+  /** The starting wave picker: a tap on a wave starts the next defense there. */
+  private pickWave() {
+    const dialog = this.root.querySelector<HTMLDialogElement>(".defend-wave-dialog")!;
+    dialog.innerHTML = wavePickerHTML(this.save);
+    dialog.querySelector<HTMLButtonElement>("[data-wave-close]")!.onclick = () => dialog.close();
+    dialog.querySelectorAll<HTMLButtonElement>("[data-wave]").forEach((b) => {
+      b.onclick = () => {
+        this.save.startWave = Number(b.dataset.wave);
+        this.host.persist();
+        dialog.close();
+        this.renderControls();
+      };
+    });
+    dialog.showModal();
+    dialog.querySelector<HTMLElement>('[aria-pressed="true"]')?.scrollIntoView({ block: "center" });
+  }
+
   private startRun() {
     this.performance.finish('restarted');
     this.performance = new BattlePerformance();
@@ -593,6 +614,7 @@ export class DefendPage {
     this.map = null;
     const map = this.currentMap();
     this.sim = new DefendSim(map, { ...this.save.levels }, (defendRandom("rolls")() * 2147483648) | 0, this.host.bonuses());
+    this.sim.startAt(startingWave(this.save));
     this.paid = { roach: 0, orc: 0, ogre: 0, bat: 0, warlord: 0, mother: 0, broodling: 0, snake: 0, dragon: 0, shieldBearer: 0, aegis: 0, darkKnight: 0, bombOrc: 0, bombBird: 0, voidSparrow: 0, shieldLesser: 0, shieldGreater: 0, poisonLesser: 0, poisonBearer: 0, poisonGreater: 0, poisonSovereign: 0, siegeBeetle: 0, burrowingMole: 0, necromancer: 0, skeleton: 0, bannerCaptain: 0, mirrorKnight: 0, leechSwarm: 0, ashPhoenix: 0, phoenixEgg: 0, blinkImp: 0, fortressLesser: 0, fortress: 0, fortressGreater: 0, fortressSovereign: 0, rollingCannon: 0, ballista: 0, fireworkLauncher: 0, trebuchet: 0, bombard: 0, rocketBattery: 0, boatLesser: 0, boat: 0, boatGreater: 0, boatSovereign: 0 };
     this.phase = "sim";
     this.newRecord = 0;

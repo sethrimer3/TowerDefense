@@ -1,4 +1,5 @@
 import { HOUR_MS } from "../away.ts";
+import { UNLOCK_WAVES, unlockWaves, waveReach } from "../defend/progress.ts";
 import { SETTINGS, type SettingKey } from "../settings.ts";
 import type { AppContext } from "./app.ts";
 import { el } from "./dom.ts";
@@ -32,6 +33,8 @@ export function renderSettingsPage(ctx: AppContext) {
     DEV.map((key) => control(key, ctx)).join("") +
     `<div class="setting setting-research"><span>All research unlocked</span><span class="research-checks">${RESEARCH.map((key) => `<label>${SETTINGS[key].page.label}${checkbox(key, ctx)}</label>`).join("")}</span></div>` +
     `<button class="wide" id="dev-idle">Add 1 hour of idle time</button>` +
+    `<button class="wide" id="dev-waves">Unlock ${UNLOCK_WAVES} more waves</button>` +
+    `<p class="hint" id="dev-waves-reach">Defenses can start on any wave up to ${waveReach(ctx.save().defend)}; choose it with the Wave button on the Defend tab.</p>` +
     `<p class="hint">Progress saves after each action. A defense in progress is never saved: reloading ends it.</p><button class="wide danger" id="erase">Erase all progress</button>`;
   for (const key of [...PAGE, ...ALL_DEV]) {
     const row = SETTINGS[key], input = el(row.page.id) as HTMLInputElement;
@@ -51,6 +54,12 @@ export function renderSettingsPage(ctx: AppContext) {
     ctx.devChanged();
   };
   el("dev-idle").onclick = () => ctx.addIdle(HOUR_MS);
+  el("dev-waves").onclick = () => {
+    const defend = ctx.save().defend;
+    unlockWaves(defend);
+    el("dev-waves-reach").textContent = `Defenses can start on any wave up to ${waveReach(defend)}; choose it with the Wave button on the Defend tab.`;
+    ctx.update();
+  };
   el("erase").onclick = () => confirmErase(ctx);
 }
 
