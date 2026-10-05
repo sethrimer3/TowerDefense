@@ -201,6 +201,7 @@ export class DefendRenderer {
       this.previousKey = "";
     }
     this.areaMix = this.previousArea ? areaFade(opts.now - this.areaChangedAt, opts.reduceMotion) : 1;
+    if (!sim) { this.areaMix = 1; this.previousArea = null; }
     if (this.areaMix === 1) this.previousArea = null;
     this.lastWeather = opts.weather;
     this.refreshLayer(map, sim);

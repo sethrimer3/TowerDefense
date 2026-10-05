@@ -30,7 +30,7 @@ const NIGHT_RAIN: Ambient = { rgb: [7, 10, 24], alpha: 0.72, glow: 0.95 };
 
 /** Darkness overlay for the lighting pass — colour, opacity, and how strong
  * the warm glow is against it — blended by how far night has fallen (0–1). */
-export function ambientFor(w: Weather, night: number, previous?: Weather | null, progress = 1) {
+export function ambientFor(w: Weather, night: number, previous?: Weather | null, progress = 1): { color: string; alpha: number; glow: number } {
   const a = w.clear ? { rgb: [48, 35, 24] as [number, number, number], alpha: .14, glow: .4 } : w.rain ? RAIN : CLOUDY,
     b = w.rain ? NIGHT_RAIN : NIGHT;
   const t = Math.max(0, Math.min(1, night));
