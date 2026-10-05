@@ -18,6 +18,8 @@ npm run preview
 
 ## How to play
 
+- **Areas.** Every 20 waves brings another area, beginning with the original Mossbound Ruins: desert, frost, embers, crystals, flooded temple, mushrooms, obsidian and stars follow, then the cycle repeats after wave 180. Ground and city walls fade between areas over three seconds. The Wave selector uses each area's colors. Dry areas have no rain, the cold area snows, and the flooded temple is frequently rainy. Reduce Motion makes the change immediate and hides falling rain/snow.
+
 - **City.** Drag city tiles, barracks, archer barracks, Mage Guilds, Valkyrie palaces, dark wizard keeps, monster bait, city gates, wall spikes, wall ballistas and archer, cannon, watch and wizard towers from the palette onto the gold-outlined tiles. The button at the palette's head picks what it shows: All, Towers, Units or City. City tiles must touch the city; the wall moves out to enclose them. Placed things can be dragged elsewhere or back to the palette. Scroll or pinch to zoom, drag open ground to pan.
 - **Start the defense.** The Wave button beside it picks the wave to start on (any up to your best), listing each wave's difficulty. Waves roll in without stopping (a short breather after each) until the keep falls. Every 10th wave is a boss wave fought at night. Civilians rebuild what the enemy smashes; bombs (bought in the Armory) can be dragged onto the field mid-battle, and the war banner (never used up) can be planted anywhere to rally every troop to it; tap it to take it down.
 - **Wizard towers** alternate a flamethrower, which lights up the ground around it, and a wave of ice shards that chills (slows) everything it crosses.
@@ -39,6 +41,8 @@ npm run preview
 The city is alive between and during battles: park grass sways in the wind (harder in the rain) and parts around anyone walking through it; ponds, trees, roofs and dirt streets are drawn as pixel art, with grass growing unevenly over the street edges and crisp shadows cast from a height map (the city wall's falling across the roofs beside it); trees stand over the units and fade while anyone is under them; ponds reflect their banks, trees and houses and ripple faintly all over when it rains, and in dry weather a few ducks paddle, dabble, preen and shy away from passers-by; lanterns, braziers and hand torches light the streets under cloud and at night (and when the keep falls, crumbling through four damaged stages to rubble, they go out one by one in a wave from it), and outside the walls the flagstones have a bump map, so every fire, blast and ice wave catches their edges.
 
 ## How it's built
+
+`src/defend/areas.ts` defines area identities, wave ranges, climate and colors. `city-layer.ts` uses area floor and cap/face textures, while the renderer crossfades city layers and invalidates ground relief on area changes. Areas can gain separate enemy rosters later; all currently use the existing roster.
 
 The current stress-test measurements and reproduction steps are in [docs/PERFORMANCE.md](docs/PERFORMANCE.md).
 

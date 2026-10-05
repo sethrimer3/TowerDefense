@@ -405,10 +405,17 @@ from its seed; `tests/defend-replay.test.ts` pins it.
 
 ## Weather and light (`weather.ts`, `lighting.ts`)
 
-- Battles are always fought under cloud (a light grey overcast), so the
-  city's lights are always lit: lanterns hung on house walls, braziers at
-  the keep's corners, a lamp at each barracks door, and fires inside archer
-  and watch towers. 30% of runs are also rainy for the whole run.
+- Areas (`areas.ts`) change every twenty waves: Mossbound Ruins, Amber
+  Desert, Frozen Vault, Ember Forge, Violet Geode, Drowned Temple, Fungal
+  Hollow, Obsidian Crypt and Astral Sanctuary, then repeat. Selected starting
+  waves preview their own area. Ground and connected wall cap/face textures
+  crossfade over three seconds, with matching wave button and list colors.
+  Enemy rosters remain shared until area enemies are added.
+- Weather rolls at the start and on entering an area: Mossbound Ruins has
+  30% rain, Drowned Temple 75%, Frozen Vault snow, and dry or underground
+  areas no rain. Ambient light and precipitation fade with the terrain.
+  Reduce Motion snaps the transition and suppresses rain/snow animation.
+  The city's lanterns and fires stay lit in all areas.
 - **Every 10th wave is a boss wave**, for weather and rewards; Warlords spawn by affordability (a huge,
   crowned brute with its own health bar). Night fades in over ~2.5 s as the
   boss wave starts and lifts once it's cleared; a rainy run becomes night
