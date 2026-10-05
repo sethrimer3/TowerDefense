@@ -12,6 +12,7 @@
  * sim's floods and sinkings and hashes of the battle's time. */
 import { CELLS_H, CELLS_W, hash01 } from "./grid.ts";
 import { paintStanding } from "./city-layer.ts";
+import type { AreaId } from "./areas.ts";
 import { HOLD, SINK_SECONDS, floodRadius } from "./boats.ts";
 import type { DefendSim } from "./sim.ts";
 
@@ -28,6 +29,7 @@ const BANDS = { bank: 1, shallows: 2.2, open: 4.5, deep: 10 };
 const REFLECTION = { alpha: 0.5, tint: 0.4 };
 
 export type FloodFrame = {
+  area?: AreaId;
   c: CanvasRenderingContext2D;
   /** Canvas pixels a cell (the camera already applied). */
   px: number;
@@ -280,7 +282,7 @@ export class FloodArt {
       const lurch = f.reduceMotion ? 0 : Math.sin(s.t * 18 + s.building) * px * 0.04 * (1 - k);
       c.translate(lurch, Math.round(k * Math.sqrt(k) * h * 0.95));
       c.globalAlpha = 1 - k * k * k;
-      paintStanding(c, px, sim.map, b);
+      paintStanding(c, px, sim.map, b, f.area);
       c.restore();
       c.save();
       c.beginPath();

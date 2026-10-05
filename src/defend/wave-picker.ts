@@ -6,6 +6,7 @@
 import { startingWave, waveReach, type DefendSave } from "./progress.ts";
 import { waveDifficulty } from "./waves.ts";
 import { isBossWave } from "./weather.ts";
+import { areaForWave, areaStyle, WAVES_PER_AREA } from "./areas.ts";
 
 /** A difficulty in a few characters: 950, 12.4k, 1.2M. */
 export function difficultyLabel(n: number): string {
@@ -23,9 +24,11 @@ export function wavePickerHTML(save: DefendSave): string {
   const top = Math.log(waveDifficulty(reach) + 1);
   const rows: string[] = [];
   for (let wave = 1; wave <= reach; wave++) {
+    const area = areaForWave(wave);
+    if ((wave - 1) % WAVES_PER_AREA === 0) rows.push(`<h3 class="wave-area" style="${areaStyle(area)}">${area.name}<small>Waves ${wave}–${wave + WAVES_PER_AREA - 1}</small></h3>`);
     const difficulty = waveDifficulty(wave), boss = isBossWave(wave);
     const share = top > 0 ? Math.max(4, Math.round((Math.log(difficulty + 1) / top) * 100)) : 100;
-    rows.push(`<button class="wave-row${boss ? " boss" : ""}" data-wave="${wave}" aria-pressed="${wave === chosen}">` +
+    rows.push(`<button class="wave-row${boss ? " boss" : ""}" style="${areaStyle(area)}" title="${area.name}" data-wave="${wave}" aria-pressed="${wave === chosen}">` +
       `<span class="wave-name">Wave <b>${wave}</b>${boss ? `<em>Boss</em>` : ""}</span>` +
       `<span class="wave-bar" aria-hidden="true"><i style="width:${share}%"></i></span>` +
       `<span class="wave-difficulty" title="Difficulty ${difficulty.toLocaleString("en-US")}"><small>Difficulty</small>${difficultyLabel(difficulty)}</span></button>`);

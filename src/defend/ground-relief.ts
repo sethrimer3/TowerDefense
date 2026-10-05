@@ -18,6 +18,7 @@
 import { CELLS_H, CELLS_W, cellIndex } from "./grid.ts";
 import { CellType, type CityMap } from "./citygen.ts";
 import { floorArtLoaded, paintFloor } from "./city-layer.ts";
+import type { AreaId } from "./areas.ts";
 
 /** A light on the relief: centre and reach (cells), strength, and colour. */
 export type ReliefLight = { x: number; y: number; r: number; k: number; color: string };
@@ -50,9 +51,9 @@ export class GroundRelief {
 
   /** Bakes the masks for `map` at `px` canvas pixels a cell, if anything
    * they depend on changed. False until there is a DOM and the floor art. */
-  sync(map: CityMap, px: number, W: number, H: number) {
+  sync(map: CityMap, px: number, W: number, H: number, area: AreaId = "moss") {
     if (typeof document === "undefined") return false;
-    const key = `${W}x${H}:${floorArtLoaded()}`;
+    const key = `${W}x${H}:${area}:${floorArtLoaded(area)}`;
     if (map === this.map && key === this.key) return this.masks.length === 4;
     this.map = map;
     this.key = key;
@@ -60,7 +61,7 @@ export class GroundRelief {
     this.sprites.clear(); this.spritePixels = 0;
     this.size = { W, H };
     for (let i = 0; i < this.outside.length; i++) this.outside[i] = map.type[i] === CellType.OUT ? 1 : 0;
-    this.masks = bakeMasks(this.outside, px, W, H);
+    this.masks = bakeMasks(this.outside, px, W, H, area);
     if (!this.weights.length) this.weights = AXES.map(([ax, ay]) => weightSprite(ax, ay));
     return this.masks.length === 4;
   }
@@ -147,13 +148,13 @@ export class GroundRelief {
 }
 
 /** The four facing masks, from the flagstones' brightness as height. */
-function bakeMasks(outside: Uint8Array, px: number, W: number, H: number): HTMLCanvasElement[] {
+function bakeMasks(outside: Uint8Array, px: number, W: number, H: number, area: AreaId): HTMLCanvasElement[] {
   const floor = document.createElement("canvas");
   floor.width = W;
   floor.height = H;
   const fc = floor.getContext("2d", { willReadFrequently: true });
   if (!fc) return [];
-  paintFloor(fc, px);
+  paintFloor(fc, px, area);
   const rgba = fc.getImageData(0, 0, W, H).data;
   const height = new Float32Array(W * H);
   for (let i = 0; i < W * H; i++) height[i] = (rgba[i * 4] * 0.3 + rgba[i * 4 + 1] * 0.59 + rgba[i * 4 + 2] * 0.11) / 255;

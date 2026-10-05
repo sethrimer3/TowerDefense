@@ -1,5 +1,6 @@
 import { journalHTML, paintJournal } from "./journal.ts";
 import { wavePickerHTML } from "./wave-picker.ts";
+import { areaForWave, areaStyle } from "./areas.ts";
 import { uiSprite } from "../ui/dom.ts";
 import { KeepBricks } from "./keep-bricks.ts";
 /** The DEFEND page: a City tab (palette + board) and an Armory tab (buy
@@ -296,7 +297,7 @@ export class DefendPage {
       el.innerHTML = `<button data-dtab="city" aria-pressed="${this.tab === "city"}">City</button>
         <button data-dtab="armory" aria-pressed="${this.tab === "armory"}">Armory</button>
         <button class="defend-go" id="defend-start">Start<span class="defend-wide"> the defense</span></button>
-        <button class="defend-wave" id="defend-wave" title="Choose the starting wave" aria-haspopup="dialog">${uiSprite("stage-select")}<small>Wave </small><b>${startingWave(this.save)}</b></button>${this.tab === "city" ? this.sideToggle("Build") : ""}`;
+        <button class="defend-wave" id="defend-wave" style="${areaStyle(areaForWave(startingWave(this.save)))}" title="Choose the starting wave · ${areaForWave(startingWave(this.save)).name}" aria-haspopup="dialog">${uiSprite("stage-select")}<small>Wave </small><b>${startingWave(this.save)}</b></button>${this.tab === "city" ? this.sideToggle("Build") : ""}`;
       el.querySelectorAll<HTMLButtonElement>("[data-dtab]").forEach((b) => {
         b.onclick = () => {
           this.tab = b.dataset.dtab as "city" | "armory";
@@ -621,10 +622,10 @@ export class DefendPage {
     this.paid = { roach: 0, orc: 0, ogre: 0, bat: 0, warlord: 0, mother: 0, broodling: 0, snake: 0, dragon: 0, shieldBearer: 0, aegis: 0, darkKnight: 0, bombOrc: 0, bombBird: 0, voidSparrow: 0, shieldLesser: 0, shieldGreater: 0, poisonLesser: 0, poisonBearer: 0, poisonGreater: 0, poisonSovereign: 0, siegeBeetle: 0, burrowingMole: 0, necromancer: 0, skeleton: 0, bannerCaptain: 0, mirrorKnight: 0, leechSwarm: 0, ashPhoenix: 0, phoenixEgg: 0, blinkImp: 0, fortressLesser: 0, fortress: 0, fortressGreater: 0, fortressSovereign: 0, rollingCannon: 0, ballista: 0, fireworkLauncher: 0, trebuchet: 0, bombard: 0, rocketBattery: 0, boatLesser: 0, boat: 0, boatGreater: 0, boatSovereign: 0 };
     this.phase = "sim";
     this.newRecord = 0;
-    this.weather = rollWeather();
+    this.weather = rollWeather(undefined, areaForWave(this.sim.wave));
     this.night = 0;
     this.renderChrome();
-    const sky = this.weather.rain ? "Rain rolls in. " : "";
+    const sky = this.weather.snow ? "Snow drifts in. " : this.weather.rain ? "Rain rolls in. " : "";
     this.setMessage(`${sky}Here they come! ${this.sideOpen.sim ? "Drag" : "Open Items and drag"} a bomb onto the field, or plant the war banner to rally your troops.`, 4);
   }
 
@@ -700,6 +701,11 @@ export class DefendPage {
           play("wave");
         }
       } else if (ev.type === "waveStart") {
+        if (areaForWave(ev.wave).id !== areaForWave(ev.wave - 1).id) {
+          const area = areaForWave(ev.wave);
+          this.weather = rollWeather(undefined, area);
+          this.setMessage(`${area.name} · Wave ${ev.wave}`, 3);
+        }
         if (isBossWave(ev.wave)) {
           this.proclaim(`Boss wave ${ev.wave}! Night falls as ${ev.wave > 10 ? `${ev.wave / 10} warlords approach` : "a warlord approaches"}…`, 4, "dread");
           play("horn");
@@ -715,6 +721,7 @@ export class DefendPage {
     if (!this.renderer.canvas.width) return;
     const map = this.sim ? this.sim.map : this.currentMap();
     this.renderer.draw(map, this.sim, this.overlay(), {
+      area: areaForWave(this.sim?.wave ?? startingWave(this.save)).id,
       grid: this.phase === "build" ? (this.host.gridLines?.() ?? 0) : 0,
       timings: this.frameTimes.enabled,
       weather: this.weather,

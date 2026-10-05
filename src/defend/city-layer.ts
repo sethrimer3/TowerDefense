@@ -18,11 +18,13 @@ import { heights, shadowCanvas, shadowMask } from "./shadow-art.ts";
 import { gatePixels, gateRubblePixels } from "./gate-art.ts";
 import { gateRect, type Side } from "./layout.ts";
 import { SPIKE_REACH, bastionPixels, bastionRubblePixels, spikePixels } from "./wall-defense-art.ts";
+import { AREAS, type AreaId } from "./areas.ts";
 
 export { POND, POND_WATER, hasTree, pondDisc, pondPath, treeCanopy } from "./park-geometry.ts";
 
 const ASSET_BASE = (import.meta as ImportMeta & { env?: { BASE_URL?: string } }).env?.BASE_URL ?? "/";
 const floorImages: HTMLImageElement[] = [];
+const themedArt = new Map<AreaId, { floors: HTMLImageElement[]; cap: HTMLImageElement; face: HTMLImageElement }>();
 const artListeners = new Set<() => void>();
 /** Wall art is cut from two hand-drawn sprites (see paintWall). */
 const wallArt: { cap?: HTMLImageElement; face?: HTMLImageElement } = {};
@@ -40,6 +42,10 @@ export function onCityArtLoaded(repaint: () => void) {
   for (let i = 1; i <= 4; i++) floorImages.push(loadImage(`floor-${i}`));
   wallArt.cap = loadImage("wall-cap");
   wallArt.face = loadImage("wall-face");
+  for (const area of AREAS.slice(1)) themedArt.set(area.id, {
+    floors: [1, 2, 3, 4].map(i => loadImage(`areas/${area.id}/floor-${i}`)),
+    cap: loadImage(`areas/${area.id}/wall-cap`), face: loadImage(`areas/${area.id}/wall-face`),
+  });
 }
 const ready = (img?: HTMLImageElement): img is HTMLImageElement => !!img?.complete && !!img.naturalWidth;
 
@@ -68,6 +74,7 @@ const WALL = "#8e897c";
 
 /** What the city layer is painted from. `px` is canvas pixels per cell. */
 export type CityScene = {
+  area?: AreaId;
   map: CityMap;
   /** The battle, if one is on: buildings it knocked down show as rubble. */
   sim: DefendSim | null;
@@ -77,6 +84,7 @@ export type CityScene = {
 
 /** Everything the painters share for one repaint. */
 type Paint = {
+  area: AreaId;
   c: CanvasRenderingContext2D;
   px: number;
   map: CityMap;
@@ -89,7 +97,7 @@ type Paint = {
 export function paintCityLayer(c: CanvasRenderingContext2D, px: number, scene: CityScene) {
   const { map, sim } = scene;
   const solid = (i: number) => (sim ? sim.solid[i] === 1 : map.owner[i] >= 0 && map.type[i] !== CellType.ROAD);
-  const p: Paint = { c, px, map, sim, solid };
+  const p: Paint = { c, px, map, sim, solid, area: scene.area ?? "moss" };
   c.imageSmoothingEnabled = false;
   paintFlagstones(p);
   paintCityGround(p);
@@ -119,10 +127,10 @@ function cityShadows(map: CityMap, sim: DefendSim | null) {
 
 /** Ground: the mossy flagstones, one tile per board tile, with the spawn
  * lane darkened as hostile ground. */
-function paintFlagstones({ c, px }: Paint) {
+function paintFlagstones({ c, px, area }: Paint) {
   const T = px * SUB;
   const { width } = c.canvas;
-  paintFloor(c, px);
+  paintFloor(c, px, area);
   const g = c.createLinearGradient(0, 0, 0, T * (SPAWN_ROW + 1));
   g.addColorStop(0, "rgba(40,6,6,0.55)");
   g.addColorStop(1, "rgba(20,0,0,0.25)");
@@ -132,7 +140,7 @@ function paintFlagstones({ c, px }: Paint) {
 
 /** The flagstone tiles alone, over the dark grout, at `px` a cell: the
  * city layer's ground, and what the ground relief's bump map is cut from. */
-export function paintFloor(c: CanvasRenderingContext2D, px: number) {
+export function paintFloor(c: CanvasRenderingContext2D, px: number, area: AreaId = "moss") {
   const T = px * SUB;
   const { width, height } = c.canvas;
   // Very dark grey shows in the gaps around the flagstone sprites.
@@ -141,24 +149,25 @@ export function paintFloor(c: CanvasRenderingContext2D, px: number) {
   for (let ty = 0; ty < TILES_H; ty++)
     for (let tx = 0; tx < TILES_W; tx++) {
       const k = hash(tx, ty, 3) % 4;
-      const img = floorImages[k];
+      const img = area === "moss" ? floorImages[k] : themedArt.get(area)?.floors[k];
       // Whole pixels, each tile ending where the next begins.
       const x = Math.round(tx * T),
         y = Math.round(ty * T),
         w = Math.round((tx + 1) * T) - x,
         h = Math.round((ty + 1) * T) - y;
       if (ready(img)) {
-        const { x: sx, y: sy } = FLOOR_CROP[k];
-        c.drawImage(img, sx, sy, FLOOR_SIZE, FLOOR_SIZE, x, y, w, h);
+        const { x: sx, y: sy } = area === "moss" ? FLOOR_CROP[k] : { x: 0, y: 0 };
+        const size = area === "moss" ? FLOOR_SIZE : img.naturalWidth;
+        c.drawImage(img, sx, sy, size, size, x, y, w, h);
       } else {
-        c.fillStyle = "#2c3a26";
+        c.fillStyle = AREAS.find(a => a.id === area)!.dark;
         c.fillRect(x, y, w, h);
       }
     }
 }
 
 /** How many of the floor images have loaded (the bump map waits for all). */
-export const floorArtLoaded = () => floorImages.filter(ready).length;
+export const floorArtLoaded = (area: AreaId = "moss") => (area === "moss" ? floorImages : themedArt.get(area)?.floors ?? []).filter(ready).length;
 
 /** City ground: park grass, and gravel under the streets' dirt and for
  * cleared rubble and breached wall. */
@@ -274,8 +283,8 @@ function paintBuilding(p: Paint, b: Building) {
 
 /** Paints building `b` whole and undamaged onto `c` at `px` per cell (a
  * magic boat's water drawing it down as it sinks). */
-export function paintStanding(c: CanvasRenderingContext2D, px: number, map: CityMap, b: Building) {
-  paintBuilding({ c, px, map, sim: null, solid: () => true }, b);
+export function paintStanding(c: CanvasRenderingContext2D, px: number, map: CityMap, b: Building, area: AreaId = "moss") {
+  paintBuilding({ c, px, map, sim: null, solid: () => true, area }, b);
 }
 
 /** The seed a building's damage and rubble are drawn from: its lot. */
@@ -364,9 +373,11 @@ function paintWall(p: Paint, b: Building) {
     const i = cellIndex(nx, ny);
     return map.wall[i] === 1 && solid(i);
   };
-  if (ready(wallArt.cap)) {
+  const cap = p.area === "moss" ? wallArt.cap : themedArt.get(p.area)?.cap;
+  if (ready(cap)) {
     const sy = CAP.y0 + ((cy * CAP.w + cx * 37) % CAP.span);
-    c.drawImage(wallArt.cap, CAP.x, sy, CAP.w, CAP.w, x, y, Math.round((cx + 1) * px) - x, Math.round((cy + 1) * px) - y);
+    if (p.area === "moss") c.drawImage(cap, CAP.x, sy, CAP.w, CAP.w, x, y, Math.round((cx + 1) * px) - x, Math.round((cy + 1) * px) - y);
+    else c.drawImage(cap, (cx % 4) * 16, (cy % 4) * 16, 16, 16, x, y, Math.round((cx + 1) * px) - x, Math.round((cy + 1) * px) - y);
   } else {
     c.fillStyle = WALL;
     c.fillRect(x, y, px + 0.5, px + 0.5);
@@ -417,12 +428,13 @@ function paintWallEdges({ c, px }: Paint, at: { x: number; y: number }, standing
 
 /** The wall's south face, seen from above at a slant, hung below the stone
  * in column `cx` whose top-left is `at` (canvas pixels). */
-function paintWallFace({ c, px }: Paint, cx: number, { x, y }: { x: number; y: number }) {
+function paintWallFace({ c, px, area }: Paint, cx: number, { x, y }: { x: number; y: number }) {
   const e = Math.max(1, px * 0.12);
   const h = px * 0.45;
-  if (ready(wallArt.face)) {
+  const face = area === "moss" ? wallArt.face : themedArt.get(area)?.face;
+  if (ready(face)) {
     const sx = FACE.x0 + ((cx * CAP.w) % FACE.span);
-    c.drawImage(wallArt.face, sx, FACE.y, CAP.w, FACE.h, x, y + px, px + 0.5, h);
+    c.drawImage(face, area === "moss" ? sx : (cx % 4) * 16, area === "moss" ? FACE.y : 16, CAP.w, FACE.h, x, y + px, px + 0.5, h);
   } else {
     c.fillStyle = "#3a3a33";
     c.fillRect(x, y + px, px + 0.5, h);

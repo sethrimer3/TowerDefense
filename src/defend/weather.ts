@@ -1,16 +1,19 @@
-/** Per-run weather for DEFEND battles. Every battle is under cloud, so the
- * city's lanterns and tower fires are always lit; 30% of runs are also
- * rainy for the whole run. Night isn't rolled: it falls over every 10th
+/** Area weather for DEFEND battles. Moss starts with the original 30%
+ * chance of rain; cold areas snow and dry areas never rain. Weather is
+ * rerolled on entering another area. Night falls over every 10th
  * wave — the boss wave — fading in as it starts and out once it's beaten. */
 
 import { defendRandom } from "./grid.ts";
+import { AREAS, type Area } from "./areas.ts";
 
 const fx = defendRandom("effects");
 
-export type Weather = { rain: boolean };
+export type Weather = { rain: boolean; snow?: boolean; clear?: boolean };
 
-export function rollWeather(rand = defendRandom("rolls")): Weather {
-  return { rain: rand() < 0.3 };
+export function rollWeather(rand = defendRandom("rolls"), area: Area = AREAS[0]): Weather {
+  const roll = rand();
+  if (area.climate === "cold") return { rain: false, snow: true };
+  return { rain: roll < area.rainChance, clear: area.climate === "dry" };
 }
 
 /** Every 10th wave is a boss wave, fought at night. */
@@ -27,18 +30,50 @@ const NIGHT_RAIN: Ambient = { rgb: [7, 10, 24], alpha: 0.72, glow: 0.95 };
 
 /** Darkness overlay for the lighting pass — colour, opacity, and how strong
  * the warm glow is against it — blended by how far night has fallen (0–1). */
-export function ambientFor(w: Weather, night: number) {
-  const a = w.rain ? RAIN : CLOUDY,
+export function ambientFor(w: Weather, night: number, previous?: Weather | null, progress = 1) {
+  const a = w.clear ? { rgb: [48, 35, 24] as [number, number, number], alpha: .14, glow: .4 } : w.rain ? RAIN : CLOUDY,
     b = w.rain ? NIGHT_RAIN : NIGHT;
   const t = Math.max(0, Math.min(1, night));
   const mix = (x: number, y: number) => x + (y - x) * t;
   const [r, g, bl] = a.rgb.map((v, i) => Math.round(mix(v, b.rgb[i])));
-  return { color: `rgb(${r},${g},${bl})`, alpha: mix(a.alpha, b.alpha), glow: mix(a.glow, b.glow) };
+  const current = { color: `rgb(${r},${g},${bl})`, alpha: mix(a.alpha, b.alpha), glow: mix(a.glow, b.glow) };
+  if (!previous || progress >= 1) return current;
+  const old = ambientFor(previous, night);
+  const rgb = old.color.match(/\d+/g)!.map(Number);
+  const p = Math.max(0, progress);
+  return { color: `rgb(${[r, g, bl].map((v, i) => Math.round(rgb[i] + (v - rgb[i]) * p)).join(",")})`, alpha: old.alpha + (current.alpha - old.alpha) * p, glow: old.glow + (current.glow - old.glow) * p };
 }
 
 /** Name for the HUD. */
 export function skyLabel(w: Weather, night: number) {
+  if (w.snow) return night > .5 ? "Snow · Night" : "Snow";
+  if (w.clear && night <= .5) return "Clear";
   return night > 0.5 ? (w.rain ? "Storm" : "Night") : w.rain ? "Rain" : "Cloudy";
+}
+
+/** Slow drifting flakes, bounded by view size, presentation only. */
+export class Snow {
+  private flakes: { x: number; y: number; speed: number; phase: number }[] = [];
+  private w = 0;
+  private h = 0;
+  private time = 0;
+  update(dt: number, w: number, h: number) {
+    if (w !== this.w || h !== this.h) {
+      this.w = w; this.h = h;
+      this.flakes = Array.from({ length: Math.min(250, Math.round(w * h / 4500)) }, () => ({ x: fx() * w, y: fx() * h, speed: 18 + fx() * 35, phase: fx() * Math.PI * 2 }));
+    }
+    dt = Math.max(0, Math.min(dt, .1));
+    this.time += dt;
+    for (const f of this.flakes) {
+      f.y = (f.y + f.speed * dt) % Math.max(1, h);
+      f.x = (f.x + Math.sin(this.time + f.phase) * dt * 9 + w) % Math.max(1, w);
+    }
+  }
+  draw(c: CanvasRenderingContext2D, px: number) {
+    c.fillStyle = "rgba(225,242,255,.7)";
+    const size = Math.max(1, Math.round(px * .12));
+    for (const f of this.flakes) c.fillRect(Math.round(f.x), Math.round(f.y), size, size);
+  }
 }
 
 type Drop = { x: number; y: number; v: number; len: number };

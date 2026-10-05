@@ -15,7 +15,8 @@ import type { CityMap } from "./citygen.ts";
 import type { DefendSim } from "./sim.ts";
 import { DefendLighting, type LightFrame } from "./lighting.ts";
 import { Fences } from "./fences.ts";
-import { Rain, ambientFor, type Weather } from "./weather.ts";
+import { Rain, Snow, ambientFor, type Weather } from "./weather.ts";
+import { areaFade, type AreaId } from "./areas.ts";
 import { damageKey, gateSprite, lotSeed, onCityArtLoaded, paintCityLayer, stageOf } from "./city-layer.ts";
 import { GATE_FRAMES } from "./gate-art.ts";
 import { drawBallistas } from "./wall-defense-art.ts";
@@ -37,6 +38,7 @@ import { FloodArt } from "./flood-art.ts";
 import { ChimneySmoke } from "./chimney-smoke.ts";
 
 export type DrawOptions = {
+  area?: AreaId;
   /** The (dim, gold) tile grid's opacity, 0 to hide it: shown while the
    * player is editing, if they turned it on. */
   grid: number;
@@ -76,6 +78,15 @@ export class DefendRenderer {
   /** The battle time the wizard art last advanced to. */
   private wizardTime = 0;
   private rain = new Rain();
+  private snow = new Snow();
+  private area: AreaId = "moss";
+  private previousArea: AreaId | null = null;
+  private areaChangedAt = 0;
+  private previousLayer: HTMLCanvasElement | null = null;
+  private previousKey = "";
+  private previousWeather: Weather | null = null;
+  private lastWeather: Weather | null = null;
+  private areaMix = 1;
   private lastNow = 0;
   /** How far each city gate stands open (0 shut to 1), by building id. */
   private gateOpen = new Map<number, number>();
@@ -181,6 +192,17 @@ export class DefendRenderer {
   draw(map: CityMap, sim: DefendSim | null, overlay: Overlay | null, opts: DrawOptions) {
     const start = opts.timings ? performance.now() : 0;
     this.timings.entityMs = this.timings.effectsMs = this.timings.terrainMs = 0;
+    const area = opts.area ?? "moss";
+    if (area !== this.area) {
+      this.previousArea = sim && map === this.map ? this.area : null;
+      this.previousWeather = this.lastWeather;
+      this.area = area;
+      this.areaChangedAt = opts.now;
+      this.previousKey = "";
+    }
+    this.areaMix = this.previousArea ? areaFade(opts.now - this.areaChangedAt, opts.reduceMotion) : 1;
+    if (this.areaMix === 1) this.previousArea = null;
+    this.lastWeather = opts.weather;
     this.refreshLayer(map, sim);
     if (opts.timings) this.timings.terrainMs = performance.now() - start;
     // Beyond the board's edges: the dark ground the city stands on.
@@ -204,7 +226,15 @@ export class DefendRenderer {
     this.drawEditing(overlay, opts.grid);
     // Rain falls in screen space, in front of the camera.
     this.ctx.setTransform(1, 0, 0, 1, 0, 0);
-    if (sim && opts.weather?.rain) this.drawRain(dt);
+    if (sim && !opts.reduceMotion) {
+      const old = this.previousArea ? this.previousWeather : null;
+      const rainAlpha = (opts.weather?.rain ? this.areaMix : 0) + (old?.rain ? 1 - this.areaMix : 0);
+      const snowAlpha = (opts.weather?.snow ? this.areaMix : 0) + (old?.snow ? 1 - this.areaMix : 0);
+      this.ctx.save();
+      if (rainAlpha) { this.ctx.globalAlpha = rainAlpha; this.drawRain(dt); }
+      if (snowAlpha) { this.ctx.globalAlpha = snowAlpha; this.snow.update(dt, this.canvas.width, this.canvas.height); this.snow.draw(this.ctx, this.px); }
+      this.ctx.restore();
+    }
     if (opts.timings) this.timings.effectsMs = performance.now() - start - this.timings.terrainMs - this.timings.entityMs;
   }
 
@@ -222,6 +252,12 @@ export class DefendRenderer {
     ctx.imageSmoothingEnabled = this.cam.s / this.layerScale < 1;
     const { W, H } = this.board;
     ctx.drawImage(this.layer, 0, 0, W, H);
+    if (this.previousArea && this.previousLayer) {
+      ctx.save();
+      ctx.globalAlpha = 1 - this.areaMix;
+      ctx.drawImage(this.previousLayer, 0, 0, W, H);
+      ctx.restore();
+    }
     ctx.imageSmoothingEnabled = false;
     if (sim) this.drawGates(map, sim, opts, dt);
     drawBallistas(ctx, this.px, map, sim);
@@ -231,7 +267,7 @@ export class DefendRenderer {
     if (sim) this.fences.update(sim);
     this.fences.draw(ctx, this.px);
     // Magic boats' water over the ground, sinking what it reaches.
-    if (sim) this.floods.draw({ c: ctx, px: this.px, sim, rain: !!opts.weather?.rain, reduceMotion: opts.reduceMotion, reflections: opts.effects ?? true, layer: this.layer, layerScale: this.layerScale });
+    if (sim) this.floods.draw({ c: ctx, px: this.px, sim, area: this.area, rain: !!opts.weather?.rain, reduceMotion: opts.reduceMotion, reflections: opts.effects ?? true, layer: this.layer, layerScale: this.layerScale });
   }
 
   /** The city gates swing open while any of the city's people are at
@@ -279,7 +315,10 @@ export class DefendRenderer {
     this.drawBattleGround(map, sim, weather, opts.night);
     if (!weather) return;
     const { W, H } = this.board;
-    Rain.overcast(this.ctx, weather.rain ? 0.3 : 0.18, W, H);
+    const overcast = (w: Weather) => w.clear ? .04 : w.rain ? .3 : .18;
+    const strength = overcast(weather);
+    const old = this.previousArea && this.previousWeather ? overcast(this.previousWeather) : strength;
+    Rain.overcast(this.ctx, old + (strength - old) * this.areaMix, W, H);
     this.drawLighting(map, sim, weather, opts);
   }
 
@@ -363,7 +402,7 @@ export class DefendRenderer {
    * fires and lanterns (baked until a building falls or rises), then the
    * moving lights: wizard fire and ice, blasts and hand torches. */
   private drawGroundRelief(map: CityMap, sim: DefendSim, opts: DrawOptions, flames: ReliefLight[]) {
-    if (!(opts.effects ?? true) || !this.relief.sync(map, this.px, this.board.W, this.board.H)) return;
+    if (!(opts.effects ?? true) || !this.relief.sync(map, this.px, this.board.W, this.board.H, this.area)) return;
     const intact = standing(map, sim);
     const fixed = () =>
       this.lighting.lights
@@ -394,14 +433,22 @@ export class DefendRenderer {
     while (k > 1 && W * H * k * k > 18e6) k--;
     this.layerScale = k;
     // Every building's damage stage is painted into the layer too.
-    const key = `${W}:${k}:${sim ? `${sim.mapVersion}:${damageKey(sim)}` : -1}`;
+    const key = `${W}:${k}:${this.area}:${sim ? `${sim.mapVersion}:${damageKey(sim)}` : -1}`;
+    if (this.previousArea && (key !== this.previousKey || !this.layerKey)) {
+      this.previousLayer ??= document.createElement("canvas");
+      this.previousLayer.width = W * k;
+      this.previousLayer.height = H * k;
+      this.lighting.setMap(map);
+      paintCityLayer(this.previousLayer.getContext("2d")!, this.px * k, { map, sim, area: this.previousArea, lights: this.lighting.lights, stones: this.lighting.roadStones });
+      this.previousKey = key;
+    }
     if (map === this.map && key === this.layerKey) return;
     this.map = map;
     this.layerKey = key;
     this.lighting.setMap(map);
     this.layer.width = W * k;
     this.layer.height = H * k;
-    paintCityLayer(this.lctx, this.px * k, { map, sim, lights: this.lighting.lights, stones: this.lighting.roadStones });
+    paintCityLayer(this.lctx, this.px * k, { map, sim, area: this.area, lights: this.lighting.lights, stones: this.lighting.roadStones });
   }
 
   /** Folds fallen and rebuilt buildings into the lighting, then draws what
@@ -457,7 +504,7 @@ export class DefendRenderer {
   private drawLighting(map: CityMap, sim: DefendSim, weather: Weather, opts: DrawOptions) {
     const frame: LightFrame = { px: this.px, now: opts.now, reduceMotion: opts.reduceMotion, intact: standing(map, sim) };
     const flames = flameLights(sim), mages = mageLights(sim), stabs = stabLights(sim), dark = darkLights(sim);
-    this.lighting.drawLight(this.ctx, frame, ambientFor(weather, opts.night), {
+    this.lighting.drawLight(this.ctx, frame, ambientFor(weather, opts.night, this.previousArea ? this.previousWeather : null, this.areaMix), {
       torches: [...this.carried(sim), ...flames.carried, ...mages.carried, ...stabs.carried, ...dark.carried],
       solid: sim.solid,
       version: sim.mapVersion,
