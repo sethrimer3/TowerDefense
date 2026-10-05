@@ -125,11 +125,9 @@ export function roofPixels(cw: number, ch: number, variant: number, seed: number
 
   // A chimney on some longer roofs: a stone stack in its own outline,
   // astride the ridge near a gable end, casting a pixel of shadow.
-  if (U >= 12 && V >= 5 && hash01(seed, 7) < 0.3) {
-    // Toward one gable end, never mid-roof.
-    const end = 1 + Math.floor(hash01(seed, 8) * 2);
-    const cu = hash01(seed, 10) < 0.5 ? end : U - 4 - end;
-    const cv = ridge - 1 - (hash01(seed, 9) < 0.5 ? 1 : 0);
+  const stack = chimneyAt(cw, ch, seed);
+  if (stack) {
+    const { u: cu, v: cv } = stack;
     for (let dv = 0; dv < 4; dv++)
       for (let du = 0; du < 4; du++) {
         const v = cv + dv, u = cu + du;
@@ -144,6 +142,33 @@ export function roofPixels(cw: number, ch: number, variant: number, seed: number
     }
   }
   return out;
+}
+
+/** Where a house's chimney stack stands, in roof coordinates (its top
+ * left, `u` along the ridge and `v` across it), or null for a house
+ * without one: some longer roofs, toward one gable end, never mid-roof. */
+function chimneyAt(cw: number, ch: number, seed: number) {
+  const along = cw >= ch;
+  const W = cw * ART, H = ch * ART;
+  const U = (along ? W - 4 : H - 4) - 1, V = (along ? H - 4 : W - 4) - 1;
+  if (!(U >= 12 && V >= 5 && hash01(seed, 7) < 0.3)) return null;
+  const ridge = Math.floor(V / 2);
+  const end = 1 + Math.floor(hash01(seed, 8) * 2);
+  const u = hash01(seed, 10) < 0.5 ? end : U - 4 - end;
+  const v = ridge - 1 - (hash01(seed, 9) < 0.5 ? 1 : 0);
+  return { u, v };
+}
+
+/** The art pixel (from the house's top left, `ART` a cell) at the middle
+ * of a house's chimney flue, where its smoke rises, or null for a house
+ * without a chimney. */
+export function chimneyFlue(cw: number, ch: number, seed: number): { x: number; y: number } | null {
+  const at = chimneyAt(cw, ch, seed);
+  if (!at) return null;
+  // The flue is the stack's dark inner pixel, two in from its top left;
+  // the roof's inside starts two pixels in (gap and outline).
+  const u = at.u + 2, v = at.v + 2;
+  return cw >= ch ? { x: 2 + u, y: 2 + v } : { x: 2 + v, y: 2 + u };
 }
 
 /** A house's roof at damage `stage` (0 to 3, `damageStage`): missing
