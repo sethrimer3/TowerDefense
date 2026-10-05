@@ -8,8 +8,8 @@ const CURRENCIES = `<div id="currencies" class="currencies td-currencies">
   <div class="currency copper-currency" title="Copper: every wave held pays some, spent in the Armory"><i class="bar-icon copper" aria-hidden="true"></i> <b id="copper">0</b><small>COPPER</small></div>
   <div class="currency silver-currency" title="Silver: from boss waves, spent in the Armory"><i class="bar-icon silver" aria-hidden="true"></i> <b id="silver">0</b><small>SILVER</small></div>
   <div class="currency gold-currency" title="Gold: earned in battle, spent in the Armory, the mine and the library">${uiSprite("gold")} <b id="gold">0</b><small>GOLD</small></div>
-  <div class="currency knowledge-currency" title="Knowledge: earned every hour by the Library (shelves × librarians) and for each wave held past your best, spent on the skill trees"><i class="knowledge-mark" aria-hidden="true">✦</i> <b id="knowledge">0</b><small>KNOWLEDGE</small></div>
-  <div class="currency upgrade-currency" title="Upgrade points: one for every new best wave you hold in Defend">${uiSprite("upgrades")} <b id="upgrade-points">0</b><small>UPGRADE</small></div>
+  <div class="currency knowledge-currency" title="Knowledge: earned every hour by the Library (shelves × librarians) and for each wave held past your best, spent on the skill trees">${uiSprite("knowledge")} <b id="knowledge">0</b><small>KNOWLEDGE</small></div>
+  <div class="currency upgrade-currency" title="Upgrade points: one for every new best wave you hold in Defend">${uiSprite("upgrade-point")} <b id="upgrade-points">0</b><small>UPGRADE</small></div>
   <div class="currency secret-currency" title="Not yet discovered" aria-label="An undiscovered resource"><i class="secret-mark" aria-hidden="true">?</i><small>???</small></div>
   <div class="currency secret-currency" title="Not yet discovered" aria-label="An undiscovered resource"><i class="secret-mark" aria-hidden="true">?</i><small>???</small></div>
 </div>`;

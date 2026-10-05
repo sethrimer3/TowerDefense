@@ -1,5 +1,6 @@
 import { journalHTML, paintJournal } from "./journal.ts";
 import { wavePickerHTML } from "./wave-picker.ts";
+import { uiSprite } from "../ui/dom.ts";
 import { KeepBricks } from "./keep-bricks.ts";
 /** The DEFEND page: a City tab (palette + board) and an Armory tab (buy
  * city elements, bombs and universal upgrades with what battles earn).
@@ -295,7 +296,7 @@ export class DefendPage {
       el.innerHTML = `<button data-dtab="city" aria-pressed="${this.tab === "city"}">City</button>
         <button data-dtab="armory" aria-pressed="${this.tab === "armory"}">Armory</button>
         <button class="defend-go" id="defend-start">Start<span class="defend-wide"> the defense</span></button>
-        <button class="defend-wave" id="defend-wave" title="Choose the starting wave" aria-haspopup="dialog"><small>Wave </small><b>${startingWave(this.save)}</b></button>${this.tab === "city" ? this.sideToggle("Build") : ""}`;
+        <button class="defend-wave" id="defend-wave" title="Choose the starting wave" aria-haspopup="dialog">${uiSprite("stage-select")}<small>Wave </small><b>${startingWave(this.save)}</b></button>${this.tab === "city" ? this.sideToggle("Build") : ""}`;
       el.querySelectorAll<HTMLButtonElement>("[data-dtab]").forEach((b) => {
         b.onclick = () => {
           this.tab = b.dataset.dtab as "city" | "armory";
