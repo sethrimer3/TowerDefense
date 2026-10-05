@@ -234,8 +234,9 @@ test("a fire burns the shelves, kills those caught in it, and the survivors flee
   run(sim, 20);
   assert.ok(sim.ignite(0));
   assert.ok(sim.fire.active);
-  let fled = false, fought = false, threw = false;
+  let fled = false, fought = false, threw = false, ash = false;
   run(sim, 600, () => {
+    if (sim.fire.ash.some((v) => v > 0)) ash = true;
     for (const l of sim.librarians) {
       if (l.mode === "flee" && (l.x < 0 || l.x > W)) fled = true;
       if (l.mode === "fight" && l.hand === "bucket") fought = true;
@@ -262,6 +263,8 @@ test("a fire burns the shelves, kills those caught in it, and the survivors flee
   assert.equal(sim.shelves, standing, "no burnt shelf comes back by itself");
   assert.equal(sim.built, standing, "every damaged shelf was rebuilt");
   assert.ok(sim.buildShelf(), "new shelves can still be bought");
+  assert.ok(ash, "burnt wood fell as ash");
+  assert.ok(!sim.fire.ash.some((v) => v > 0) && !sim.fire.smoke.some((v) => v > 0), "no ash or smoke outlasts the fire");
 });
 
 test("Fire Training puts fires out sooner, saving more", () => {

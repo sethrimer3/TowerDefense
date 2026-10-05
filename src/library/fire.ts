@@ -9,6 +9,7 @@
  * when the fire is out is how much of it survived.
  *
  * Nothing here draws from `Math.random`: the library passes its own stream. */
+import { h01 } from "./ashlar.ts";
 import { FLOOR, H, W } from "./geometry.ts";
 
 export const CELL = 2;
@@ -25,6 +26,8 @@ const UP = 0.42, UP_SIDE = 0.12, SIDE = 0.1, DOWN = 0.03;
 /** Air carries its heat upward, and cools; unburnt wood cools slower. */
 const RISE = 0.9, AIR_COOL = 0.75, WOOD_COOL = 0.3;
 const GRAVITY = 160;
+/** Seconds the ash lies after a fire before the last of it is gone. */
+const ASH_CLEAR = 20;
 
 /** Something that burns: a rectangle of pixels, its fuel per cell, and the
  * heat it catches at. Later objects stand in front of earlier ones. */
@@ -53,6 +56,8 @@ export class Fire {
   readonly smoke = new Uint8Array(N);
   readonly ash = new Uint8Array(N);
   private movingParticles = false;
+  /** Steps since the fire went out, by which the ash left is cleared away. */
+  private ashAge = 0;
   private smokeNext = new Uint8Array(N);
   drops: Drop[] = [];
   /** Cells burning after the last step. */
@@ -192,7 +197,11 @@ export class Fire {
       this.sooty = any;
     }
     this.stepParticles();
-    if (!this.active) return;
+    if (!this.active) {
+      this.clearAsh(dt);
+      return;
+    }
+    this.ashAge = 0;
     this.version++;
     this.flyDrops(dt, rng, douse);
     next.set(heat);
@@ -243,6 +252,15 @@ export class Fire {
       heat.fill(0);
       wet.fill(0);
     }
+  }
+
+  /** Once the fire is out, the ash it left settles and is swept away, a
+   * cell at a time, so none of it outlasts ASH_CLEAR seconds. */
+  private clearAsh(dt: number) {
+    if (!this.ash.some((v) => v > 0)) return;
+    this.ashAge += dt;
+    const cut = this.ashAge / ASH_CLEAR;
+    for (let i = 0; i < N; i++) if (this.ash[i] && h01(i, 77) < cut) this.ash[i] = 0;
   }
 
   /** Falling-sand rules, with an empty destination required for every move. */
