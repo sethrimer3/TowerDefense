@@ -4,12 +4,16 @@ import { DefendSim, type Enemy, type Soldier } from '../src/defend/sim.ts';
 import { defaultLayout, fitLayout, placeCityTile } from '../src/defend/layout.ts';
 import { generateCity } from '../src/defend/citygen.ts';
 import { ENEMIES, UPGRADES, type EnemyKind } from '../src/defend/catalog.ts';
-import { FLOOD_LIFE, MAGE_SOAK, floodRadius, wetAt } from '../src/defend/boats.ts';
+import { FLOOD_LIFE, MAGE_SOAK, floodRadius, wetAt, stepBoat, stepFloods, sinks, fizzles, sheltered } from '../src/defend/boats.ts';
 import { center, rectDist } from '../src/defend/pathing.ts';
 import { buildDifficultyWave } from '../src/defend/waves.ts';
 import { journalHTML } from '../src/defend/journal.ts';
+import { defaultDefendSave, decodeDefendSave } from '../src/defend/progress.ts';
+import { defaults } from '../src/save.ts';
+import { KILL_GOLD, payKills } from '../src/progression.ts';
 
 const BOATS: EnemyKind[] = ['boatLesser', 'boat', 'boatGreater', 'boatSovereign'];
+const SMALL_BOATS: EnemyKind[] = ['boatDinghy', 'boatSailboat', 'boatCutter', 'boatCog'];
 
 function sim() {
   let l = defaultLayout();
@@ -25,6 +29,98 @@ const create = (s: DefendSim, kind: EnemyKind, x: number, y: number): Enemy => {
 const run = (s: DefendSim, seconds: number) => { for (let n = 0; n < seconds * 30 && !s.lost; n++) s.step(1 / 30); };
 const mage = (id: number, x: number, y: number): Soldier => ({ id, kind: 'mage', home: 0, x, y, hp: 22, maxHp: 22, damage: 1, cd: 99, target: -1, path: [], thinkT: 99, flash: 0 });
 const sword = (id: number, x: number, y: number): Soldier => ({ ...mage(id, x, y), kind: 'sword', hp: 40, maxHp: 40 });
+
+test('small boats have exact costs, growing hulls and harmless water, and enter ordinary waves', () => {
+  for (const [n, kind] of SMALL_BOATS.entries()) {
+    const def = ENEMIES[kind];
+    assert.equal(def.cost, [5, 10, 50, 100][n]);
+    assert.ok(def.boat!.decorativeWater && def.boat!.water > def.size / 2);
+    assert.ok(def.size < ENEMIES.boatLesser.size && !def.flying && !def.hatched);
+    if (n) assert.ok(def.size > ENEMIES[SMALL_BOATS[n - 1]].size);
+    const roster = Object.values(ENEMIES).filter(d => !d.hatched && d.cost <= def.cost);
+    const roll = (roster.findIndex(d => d.kind === kind) + .5) / roster.length;
+    assert.deepEqual(buildDifficultyWave(def.cost, () => roll), [kind]);
+  }
+});
+
+test('small water reaches buildings without sinking or damaging them and does not alter combat', () => {
+  for (const kind of SMALL_BOATS) {
+    const s = sim(), def = ENEMIES[kind], house = s.map.buildings.find(b => b.kind === 'house')!;
+    const e = create(s, kind, house.rect.x - def.boat!.water + .05, house.rect.y + house.rect.h / 2);
+    e.cd = 99; // Isolate water effects from the boat's ordinary bow attack.
+    const hp = [...s.hp], built = [...s.built];
+    stepBoat(s, e, 0);
+    assert.deepEqual([...s.hp], hp);
+    assert.deepEqual([...s.built], built);
+    assert.equal(s.sinkings.length, 0);
+    assert.ok(s.floods.length && s.floods.every(f => f.decorative));
+    assert.ok(s.map.buildings.every(b => !sinks(def.boat!, b)));
+    s.soldiers.length = 0;
+    const m = mage(100, e.x, e.y); s.soldiers.push(m);
+    s.blazes.push({ x: e.x, y: e.y, r: .1, t: 0, life: 9, dps: 5, seed: 1 });
+    stepFloods(s, .1);
+    assert.equal(m.hp, 22);
+    assert.equal(s.blazes.length, 1);
+    assert.equal(wetAt(s, e.x, e.y), false);
+    assert.equal(sheltered(s, e.x, e.y), false);
+    assert.equal(fizzles(s, e.x, e.y, 1), false);
+    const target = create(s, 'ogre', e.x, e.y);
+    s.explode(e.x, e.y, { r: 1, damage: 10, friendlyFire: false });
+    assert.equal(target.hp, target.maxHp - 10);
+    assert.equal(e.hp, e.maxHp - 10);
+  }
+});
+
+test('small boats ram walls and the keep with normal damage and leave a drying visual trail', () => {
+  for (const kind of SMALL_BOATS) {
+    const s = sim(), def = ENEMIES[kind], wall = s.map.buildings.find(b => b.kind === 'wall')!;
+    const at = center(wall.rect), e = create(s, kind, at.x, at.y);
+    e.cd = 0; const wallHp = s.hp[wall.id]; stepBoat(s, e, 0);
+    assert.equal(s.hp[wall.id], wallHp - def.damage);
+    const k = s.keep.rect; e.x = k.x + k.w / 2; e.y = k.y - def.size / 2 - .2;
+    e.cd = 0; const keepHp = s.keepHp(); stepBoat(s, e, 0);
+    assert.equal(s.keepHp(), keepHp - def.damage);
+    assert.equal(s.sinkings.length, 0);
+    e.x = 10; e.y = 10; e.abilityT = 0; stepBoat(s, e, .5);
+    assert.ok(e.y > 10, 'sails toward the keep');
+    const trail = s.floods[0];
+    assert.equal(floodRadius(trail), def.boat!.water);
+    e.hp = 0;
+    stepFloods(s, FLOOD_LIFE * .7);
+    assert.ok(floodRadius(trail) < def.boat!.water);
+    stepFloods(s, FLOOD_LIFE);
+    assert.equal(s.floods.length, 0);
+  }
+});
+
+test('overlapping decorative water never disables the larger boats water effects', () => {
+  const s = sim(); s.soldiers.length = 0;
+  s.floods.push({ x: 10, y: 10, r: 3, t: 0, life: 99, boat: 1, decorative: true });
+  assert.equal(wetAt(s, 10, 10), false);
+  s.floods.push({ x: 10, y: 10, r: 2, t: 0, life: 99, boat: 2 });
+  assert.equal(wetAt(s, 10, 10), true);
+  const m = mage(100, 10, 10); s.soldiers.push(m); stepFloods(s, 1);
+  assert.equal(m.hp, 22 - MAGE_SOAK);
+  assert.equal(sheltered(s, 10, 10), true);
+  assert.equal(fizzles(s, 10, 10, 1), true);
+  s.floods = s.floods.filter(f => f.decorative);
+  assert.equal(wetAt(s, 10, 10), false);
+});
+
+test('small boats pay valid kill rewards and persist journal discoveries with accurate water notes', () => {
+  for (const kind of SMALL_BOATS) {
+    const s = sim(), e = create(s, kind, 10, 10), save = defaults(), gold = save.gold;
+    s.hurtEnemy(e, 1e9, true, 'melee'); (s as any).sweepAway(); payKills(save, s.slain);
+    assert.equal(save.gold - gold, KILL_GOLD[kind]);
+    assert.ok(Number.isFinite(save.gold));
+  }
+  const saved = defaultDefendSave(); saved.discovered = [...SMALL_BOATS]; saved.journalRead = [...SMALL_BOATS];
+  const decoded = decodeDefendSave(saved);
+  assert.deepEqual(decoded.discovered, SMALL_BOATS); assert.deepEqual(decoded.journalRead, SMALL_BOATS);
+  const html = journalHTML(decoded.discovered);
+  for (const kind of SMALL_BOATS) assert.ok(html.includes(ENEMIES[kind].name));
+  assert.match(html, /water is purely visual/); assert.doesNotMatch(html, /Its water sinks/);
+});
 
 test('magic boats come in the four danger tiers', () => {
   assert.deepEqual(BOATS.map(k => ENEMIES[k].cost), [1000, 10000, 100000, 1000000]);

@@ -39,9 +39,13 @@ type Look = {
 };
 
 const LOOK: Partial<Record<EnemyKind, Look>> = {
+  boatDinghy: { hull: ["#c48a52", "#8e5c33", "#5a3920"], deck: ["#a7744a", "#946640"], sail: ["#fbf3d8", "#e6dab4", "#b8a984"], rune: ["#8ff6ff", "#3cc6d8"], trim: null, masts: 1, cabin: false },
   boatLesser: { hull: ["#c48a52", "#8e5c33", "#5a3920"], deck: ["#a7744a", "#946640"], sail: ["#fbf3d8", "#e6dab4", "#b8a984"], rune: ["#8ff6ff", "#3cc6d8"], trim: null, masts: 1, cabin: false },
+  boatSailboat: { hull: ["#b07a48", "#7e5130", "#4e321e"], deck: ["#9a6a42", "#875c38"], sail: ["#c6f0dc", "#8fd2b4", "#5a9e83"], rune: ["#9effe2", "#3ad4a8"], trim: null, masts: 1, cabin: false },
   boat: { hull: ["#b07a48", "#7e5130", "#4e321e"], deck: ["#9a6a42", "#875c38"], sail: ["#c6f0dc", "#8fd2b4", "#5a9e83"], rune: ["#9effe2", "#3ad4a8"], trim: null, masts: 2, cabin: true },
+  boatCutter: { hull: ["#8e5e44", "#5f3c2c", "#3a241b"], deck: ["#7c5440", "#6c4838"], sail: ["#9cc4ff", "#5a86da", "#34529a"], rune: ["#b8e4ff", "#5ab0ff"], trim: "#f2c94c", masts: 1, cabin: true },
   boatGreater: { hull: ["#8e5e44", "#5f3c2c", "#3a241b"], deck: ["#7c5440", "#6c4838"], sail: ["#9cc4ff", "#5a86da", "#34529a"], rune: ["#b8e4ff", "#5ab0ff"], trim: "#f2c94c", masts: 3, cabin: true },
+  boatCog: { hull: ["#5a4a62", "#382c40", "#201a28"], deck: ["#4a3c52", "#3e3246"], sail: ["#e2b8ff", "#a674e0", "#6a3ea8"], rune: ["#ffc8ff", "#d26aff"], trim: "#f2c94c", masts: 2, cabin: true },
   boatSovereign: { hull: ["#5a4a62", "#382c40", "#201a28"], deck: ["#4a3c52", "#3e3246"], sail: ["#e2b8ff", "#a674e0", "#6a3ea8"], rune: ["#ffc8ff", "#d26aff"], trim: "#f2c94c", masts: 4, cabin: true },
 };
 

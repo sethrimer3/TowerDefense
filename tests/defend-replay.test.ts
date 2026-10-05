@@ -123,7 +123,7 @@ function scenarios(): Record<string, Scenario> {
     boats: {
       layout: city(SQUARE, [["mageGuild", 1, 1], ["cannonTower", 0, -2], ["archerTower", -1, -1], ["barracks", 1, -1]]),
       citySeed: 13, levels: maxLevels(), seed: 6, seconds: 160, wave: 1,
-      opening: ['boatLesser', 'boatLesser', 'boat', 'boatGreater'],
+      opening: ['boatDinghy', 'boatSailboat', 'boatCutter', 'boatCog', 'boatLesser', 'boatLesser', 'boat', 'boatGreater'],
     },
     // Monster bait outside the walls and inside: every enemy goes for the
     // nearest stack first (fliers and a siege engine too); fallen stacks
@@ -255,7 +255,7 @@ test("the Defend replays exercise every unit and effect", () => {
     "enemy:shieldLesser", "enemy:shieldGreater", "enemy:poisonLesser", "enemy:poisonBearer", "enemy:poisonGreater", "enemy:poisonSovereign", "enemy:fortressHut", "enemy:fortressOutpost", "enemy:fortressTower", "enemy:fortressKeep", "enemy:fortressLesser", "enemy:fortress", "enemy:fortressGreater", "enemy:fortressSovereign", "enemy:darkKnight", "enemy:bombOrc", "enemy:bombBird", "enemy:voidSparrow", "enemy:snake", "enemy:dragon", "enemy:shieldBearer", "enemy:aegis", "enemy:warlord", "enemy:bat", "enemy:mother", "enemy:broodling", "distracted", "marked", "soldier:sword", "soldier:archer", "path:sword", "path:archer", "hunting",
     "civilian:toJob", "civilian:working", "civilian:home", "arrow", "shell", "flame", "frost", "chilled", "soldier:valkyrie", "stab", "guarded", "soldier:darkWizard", "chained", "lost:bare", "half-rebuilt",
     "enemy:rollingCannon", "enemy:ballista", "enemy:fireworkLauncher", "enemy:trebuchet", "enemy:bombard", "enemy:rocketBattery", "siege:ball", "siege:bolt", "siege:rocket", "siege:stone",
-    "enemy:boatLesser", "enemy:boat", "enemy:boatGreater", "flood", "sunk:house", "sunk:wall", "sunk:structure", "steam",
+    "enemy:boatDinghy", "enemy:boatSailboat", "enemy:boatCutter", "enemy:boatCog", "enemy:boatLesser", "enemy:boat", "enemy:boatGreater", "flood", "sunk:house", "sunk:wall", "sunk:structure", "steam",
     "bait:fell", "bait:restocked", "bait:burning",
   ];
   assert.deepEqual(want.filter((w) => !seen.has(w)), []);

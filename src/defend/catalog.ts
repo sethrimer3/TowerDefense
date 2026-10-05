@@ -495,7 +495,7 @@ export const civilianHp = (l: number) => 8 + l * 5;
 export const rebuildSeconds = (l: number) => 3 * intPow(0.82, l);
 export const HOUSE_HP_PER_CELL = 22;
 
-export type EnemyKind = "roach" | "orc" | "ogre" | "bat" | "warlord" | "mother" | "broodling" | "snake" | "dragon" | "shieldBearer" | "aegis" | "darkKnight" | "bombOrc" | "bombBird" | "voidSparrow" | "shieldLesser" | "shieldGreater" | "poisonLesser" | "poisonBearer" | "poisonGreater" | "poisonSovereign" | "siegeBeetle" | "burrowingMole" | "necromancer" | "skeleton" | "bannerCaptain" | "mirrorKnight" | "leechSwarm" | "ashPhoenix" | "phoenixEgg" | "blinkImp" | "fortressHut" | "fortressOutpost" | "fortressTower" | "fortressKeep" | "fortressLesser" | "fortress" | "fortressGreater" | "fortressSovereign" | "rollingCannon" | "ballista" | "fireworkLauncher" | "trebuchet" | "bombard" | "rocketBattery" | "boatLesser" | "boat" | "boatGreater" | "boatSovereign";
+export type EnemyKind = "roach" | "orc" | "ogre" | "bat" | "warlord" | "mother" | "broodling" | "snake" | "dragon" | "shieldBearer" | "aegis" | "darkKnight" | "bombOrc" | "bombBird" | "voidSparrow" | "shieldLesser" | "shieldGreater" | "poisonLesser" | "poisonBearer" | "poisonGreater" | "poisonSovereign" | "siegeBeetle" | "burrowingMole" | "necromancer" | "skeleton" | "bannerCaptain" | "mirrorKnight" | "leechSwarm" | "ashPhoenix" | "phoenixEgg" | "blinkImp" | "fortressHut" | "fortressOutpost" | "fortressTower" | "fortressKeep" | "fortressLesser" | "fortress" | "fortressGreater" | "fortressSovereign" | "rollingCannon" | "ballista" | "fireworkLauncher" | "trebuchet" | "bombard" | "rocketBattery" | "boatDinghy" | "boatSailboat" | "boatCutter" | "boatCog" | "boatLesser" | "boat" | "boatGreater" | "boatSovereign";
 export type EnemyDef = {
   kind: EnemyKind;
   name: string;
@@ -529,14 +529,15 @@ export type EnemyDef = {
    * stops to bombard whatever stands in its way from `range` cells. */
   siege?: SiegeDef;
   /** A magic boat (`boats.ts`): it sails straight through the ground toward
-   * the keep in a pool of its own water, which sinks what it touches. */
+   * the keep in a pool of its own water. Small boats' water is decorative. */
   boat?: BoatDef;
 };
 
 /** A magic boat's water: its radius in cells around the hull, and what it
  * sinks besides houses and structures: wall stones (`walls`) and the keep
- * (`keep`). Whatever it can't sink, it rams with its own damage. */
-export type BoatDef = { tier: number; water: number; walls?: boolean; keep?: boolean };
+ * (`keep`). Small boats use `decorativeWater` for a purely visual wake.
+ * Whatever it can't sink, it rams with its own damage. */
+export type BoatDef = { tier: number; water: number; walls?: boolean; keep?: boolean; decorativeWater?: boolean };
 
 /** How a siege engine shoots. `ball`: a lobbed iron ball, `stone`: a high
  * lobbed boulder, both bursting in `radius`; `bolt`: a straight bolt that
@@ -598,6 +599,10 @@ export const ENEMIES: Record<EnemyKind, EnemyDef> = {
   bombard: { kind: "bombard", name: "Great Bombard", hp: 2600, speed: 0.6, damage: 220, cooldown: 5, size: 1.4, color: "#4a4e57", distraction: 0, flying: false, siege: { shot: "ball", range: 9, radius: 1.9 }, cost: 12000 },
   rocketBattery: { kind: "rocketBattery", name: "Dragonfire Battery", hp: 2000, speed: 0.7, damage: 35, cooldown: 6, size: 1.4, color: "#8c2a24", distraction: 0, flying: false, siege: { shot: "rocket", range: 10, radius: 0.9, volley: 16, spread: 3 }, cost: 30000 },
 
+  boatDinghy: { kind: "boatDinghy", name: "Runed Dinghy", hp: 20, speed: 1.3, damage: 3, cooldown: 1.2, size: .6, color: "#6d4a2c", distraction: 0, flying: false, boat: { tier: 1, water: .8, decorativeWater: true }, cost: 5 },
+  boatSailboat: { kind: "boatSailboat", name: "Charmbound Sailboat", hp: 35, speed: 1.15, damage: 5, cooldown: 1.2, size: .8, color: "#5a3e28", distraction: 0, flying: false, boat: { tier: 2, water: 1, decorativeWater: true }, cost: 10 },
+  boatCutter: { kind: "boatCutter", name: "Mystic Cutter", hp: 110, speed: 1, damage: 10, cooldown: 1.2, size: 1, color: "#46302a", distraction: 0, flying: false, boat: { tier: 3, water: 1.2, decorativeWater: true }, cost: 50 },
+  boatCog: { kind: "boatCog", name: "Arcane Cog", hp: 210, speed: .9, damage: 16, cooldown: 1.2, size: 1.2, color: "#2a2230", distraction: 0, flying: false, boat: { tier: 4, water: 1.4, decorativeWater: true }, cost: 100 },
   boatLesser: { kind: "boatLesser", name: "Enchanted Skiff", hp: 1500, speed: 0.75, damage: 40, cooldown: 1.2, size: 1.4, color: "#6d4a2c", distraction: 0, flying: false, boat: { tier: 1, water: 1.6 }, cost: 1000 },
   boat: { kind: "boat", name: "Spellbound Sloop", hp: 7000, speed: 0.7, damage: 120, cooldown: 1.2, size: 2, color: "#5a3e28", distraction: 0, flying: false, boat: { tier: 2, water: 2.4 }, cost: 10000 },
   boatGreater: { kind: "boatGreater", name: "Arcane Galleon", hp: 35000, speed: 0.62, damage: 300, cooldown: 1.2, size: 2.8, color: "#46302a", distraction: 0, flying: false, boat: { tier: 3, water: 3.3, walls: true }, cost: 100000 },

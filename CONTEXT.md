@@ -45,10 +45,10 @@ An enemy castle on legs (Walking Watchpost, Walking Outpost, Walking Fortlet, Wa
 An enemy machine with no crew (rolling cannon, ballista, firework launcher, trebuchet, great bombard, dragonfire battery): it drives itself toward the keep and stops to shoot what blocks its way, or the keep, from range.
 
 **Magic boat**:
-An enemy ship (Enchanted Skiff, Spellbound Sloop, Arcane Galleon, Deluge Ark) that sails straight through the ground toward the keep in a pool of conjured water, which dries up in a trail behind it.
+An enemy ship (Runed Dinghy, Charmbound Sailboat, Mystic Cutter, Arcane Cog, Enchanted Skiff, Spellbound Sloop, Arcane Galleon, Deluge Ark) that sails straight through the ground toward the keep in a pool of conjured water, which dries up in a trail behind it.
 
 **Flood**:
-A magic boat's water. It sinks the buildings it reaches (the larger boats also wall stones and the keep), leaving their rubble when it dries; it hurts only fire mages, puts out fires and stops splash damage.
+A magic boat's water. The four small boats have decorative water that dries behind them without affecting combat. Larger boats' water sinks the buildings it reaches (the larger boats also wall stones and the keep), leaving their rubble when it dries; it hurts only fire mages, puts out fires and stops splash damage.
 
 **War banner**:
 A consumable with no limit: planted anywhere on the board mid-defense, it rallies every mobile troop (swordsmen, archers, fire mages, valkyries, the dark wizard) to fight round it. Planting it again moves it; a tap takes it down.

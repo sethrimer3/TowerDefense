@@ -2,7 +2,8 @@
  * Deluge Ark (`BoatDef` in `catalog.ts`). A boat sails straight through the
  * ground toward the keep, conjuring a pool of water round its hull that it
  * leaves behind as a trail (`sim.floods`), each pool holding a while and
- * then drying up from its edge.
+ * then drying up from its edge. The four small boats have decorative
+ * pools only: ordinary bow damage, with no water gameplay effects.
  *
  * - Every house and structure the boat's water reaches is sunk at once
  *   (`sim.sink`), the water spreading over the whole of it: it goes under
@@ -31,7 +32,7 @@ import { chilled } from "./wizard.ts";
 /** A pool of a boat's water, dropped at (x, y) with the boat's water radius
  * `r`: it holds for the first `HOLD` of its `life` seconds, then dries up
  * from its edge. `boat` is the id of the boat that made it. */
-export type Flood = { x: number; y: number; r: number; t: number; life: number; boat: number };
+export type Flood = { x: number; y: number; r: number; t: number; life: number; boat: number; decorative?: boolean };
 /** A building going under, `t` seconds ago (for the renderer). */
 export type Sinking = { building: number; t: number };
 
@@ -70,13 +71,15 @@ function floodIndex(sim: DefendSim) {
   }
   for (; ix.n < sim.floods.length; ix.n++) {
     const f = sim.floods[ix.n];
+    if (f.decorative) continue;
     for (let ty = tileOf(f.y - f.r, TILES_H); ty <= tileOf(f.y + f.r, TILES_H); ty++)
       for (let tx = tileOf(f.x - f.r, TILES_W); tx <= tileOf(f.x + f.r, TILES_W); tx++) ix.tiles[ty * TILES_W + tx].push(f);
   }
   return ix;
 }
 
-/** Whether (x, y) is under any boat's water. */
+/** Whether (x, y) is under gameplay water. Decorative wakes are drawn but
+ * never hurt mages, douse fire, fizzle blasts or shelter units. */
 export function wetAt(sim: DefendSim, x: number, y: number) {
   if (!sim.floods.length) return false;
   for (const f of floodIndex(sim).tiles[tileOf(y, TILES_H) * TILES_W + tileOf(x, TILES_W)]) {
@@ -88,6 +91,7 @@ export function wetAt(sim: DefendSim, x: number, y: number) {
 
 /** Whether a boat's water sinks building `b`. */
 export function sinks(boat: BoatDef, b: Building) {
+  if (boat.decorativeWater) return false;
   if (b.kind === "keep") return !!boat.keep;
   if (b.kind === "wall" || b.kind === "gate" || b.kind === "wallBallista") return !!boat.walls;
   return true;
@@ -97,7 +101,7 @@ export function sinks(boat: BoatDef, b: Building) {
  * sails on toward the keep, or rams what it can't sink. */
 export function stepBoat(sim: DefendSim, e: Enemy, dt: number) {
   const def = ENEMIES[e.kind], boat = def.boat!;
-  for (const b of near(sim, e, boat.water))
+  for (const b of boat.decorativeWater ? [] : near(sim, e, boat.water))
     if (sim.built[b.id] > 0 && sinks(boat, b) && rectDist(b.rect, e.x, e.y) <= boat.water) {
       // The water swallows the whole of it.
       const r = b.rect;
@@ -108,7 +112,7 @@ export function stepBoat(sim: DefendSim, e: Enemy, dt: number) {
   e.abilityT = (e.abilityT ?? 0) - dt;
   if (e.abilityT <= 0) {
     e.abilityT += TRAIL_GAP;
-    sim.floods.push({ x: e.x, y: e.y, r: boat.water, t: 0, life: FLOOD_LIFE, boat: e.id });
+    sim.floods.push({ x: e.x, y: e.y, r: boat.water, t: 0, life: FLOOD_LIFE, boat: e.id, ...(boat.decorativeWater ? { decorative: true } : {}) });
   }
   // Monster bait calls a boat too: the nearest stack while any stands.
   const keep = sim.baits.length ? lureOf(sim, e.x, e.y) : sim.keep, half = def.size / 2;
