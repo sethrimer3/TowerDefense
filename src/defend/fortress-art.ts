@@ -104,8 +104,39 @@ function deck(p: Pix, x: number, y: number, w: number, h: number, look: Look, se
   }
 }
 
+/** Small walkers have a compact courtyard and tower drawn at their native
+ * size, so their hatch, pennant and gate survive even on the watchpost. */
+function compactBody(w: number, h: number, armored: boolean, hurt: boolean, flag: number, seed: number): Uint32Array {
+  const out = new Uint32Array(w * h), p = pixels(out, w, h);
+  const look = LOOKS[0], s = look.stone, face = h - 3;
+  box(p, 0, 1, w, h - 1, OUTLINE);
+  ashlar(p, 1, 2, w - 2, h - 3, s, seed, 3);
+  crenels(p, 1, 1, w - 2, face - 1, s, false);
+  deck(p, 2, 3, w - 4, face - 4, look, seed);
+  const k = w < 12 ? 2 : 4, x = Math.floor((w - k) / 2), y = Math.floor((face - k) / 2) + 1;
+  box(p, x - 1, y - 1, k + 2, k + 2, s[3]);
+  box(p, x, y, k, k, OUTLINE);
+  box(p, x, y, k - 1, k - 1, armored ? IRON[2] : 0xc8242c);
+  p.set(x, y, armored ? IRON[4] : 0xffe2d8);
+  p.set(w - 3, 0, 0x3a2a1c);
+  p.set(w - 2, flag, look.accent);
+  for (let i = 1; i < w - 1; i++) p.set(i, face, s[3]);
+  const gate = Math.floor(w / 2);
+  box(p, gate - 1, face + 1, 2, 2, OUTLINE);
+  p.set(gate - 1, face + 1, IRON[2]);
+  if (hurt) {
+    for (let j = 2; j < h - 1; j++) for (let i = 1; i < w - 1; i++) {
+      if (hash01(seed, i, j) < .15) p.set(i, j, shade(p.get(i, j), .6));
+    }
+    p.set(1, face - 1, OUTLINE);
+    p.set(2, face - 2, OUTLINE);
+  }
+  return out;
+}
+
 /** The walker's body, `w` × `h` sprite pixels (the core's footprint). */
-function bodyPixels(tier: number, w: number, h: number, armored: boolean, hurt: boolean, flag: number, seed: number): Uint32Array {
+export function fortressBodyPixels(tier: number, w: number, h: number, armored: boolean, hurt: boolean, flag: number, seed: number): Uint32Array {
+  if (w < 20) return compactBody(w, h, armored, hurt, flag, seed);
   const out = new Uint32Array(w * h);
   const p = pixels(out, w, h);
   const look = LOOKS[tier - 1], s = look.stone;
@@ -303,7 +334,7 @@ function smoke(c: CanvasRenderingContext2D, x: number, y: number, s: number, t: 
 export function drawFortress({ c, px }: Brush, e: Enemy, sim: DefendSim) {
   if (e.fortressPart) return;
   const def = ENEMIES[e.kind], fort = def.fortress!, look = lookOf(e);
-  const s = px / ART, t = sim.time;
+  const s = px / ART, t = sim.time, ps = s * (fort.partScale ?? 1);
   const w = Math.round(def.size * ART), h = Math.round(fort.height * ART);
   const seed = e.id % 4;
   // How far it has walked, which drives the stride.
@@ -321,30 +352,30 @@ export function drawFortress({ c, px }: Brush, e: Enemy, sim: DefendSim) {
   // Legs first, so the body stands over their hips.
   legs.forEach((leg, n) => {
     const left = leg.fortressPart!.dx < 0;
-    const ly = (e.y + leg.fortressPart!.dy) * px - 4 * s;
-    const lx = left ? x0 - 8 * s : x0 + (w - 3) * s;
+    const ly = (e.y + leg.fortressPart!.dy) * px - 4 * ps;
+    const lx = left ? x0 - 8 * ps : x0 + w * s - 3 * ps;
     if (leg.hp <= 0) {
       // A broken stump under a wisp of smoke.
       c.fillStyle = "#120e12";
-      c.fillRect(Math.round(left ? x0 - 3 * s : x0 + w * s), Math.round(ly + 2 * s), Math.round(3 * s), Math.round(3 * s));
+      c.fillRect(Math.round(left ? x0 - 3 * ps : x0 + w * s), Math.round(ly + 2 * ps), Math.round(3 * ps), Math.round(3 * ps));
       c.fillStyle = "#4c4a58";
-      c.fillRect(Math.round(left ? x0 - 2 * s : x0 + w * s), Math.round(ly + 3 * s), Math.round(2 * s), Math.round(s));
+      c.fillRect(Math.round(left ? x0 - 2 * ps : x0 + w * s), Math.round(ly + 3 * ps), Math.round(2 * ps), Math.round(s));
       return;
     }
     const lifted = Math.sin(phase + (n % 2) * Math.PI + Math.floor(n / 2) * 0.9) > 0.35;
-    draw(c, sprite(`fl:${fort.tier}:${lifted ? 1 : 0}:${left ? 1 : 0}`, 11, 8, () => legPixels(fort.tier, lifted, left)), lx, ly, s);
-    flashOver(c, lx, ly, 11 * s, 8 * s, leg.flash);
+    draw(c, sprite(`fl:${fort.tier}:${lifted ? 1 : 0}:${left ? 1 : 0}`, 11, 8, () => legPixels(fort.tier, lifted, left)), lx, ly, ps);
+    flashOver(c, lx, ly, 11 * ps, 8 * ps, leg.flash);
   });
 
   // The body.
   const armored = parts.some(q => q.hp > 0 && q.fortressPart!.role === "armor");
   const hurt = e.hp / e.maxHp < 0.5;
   const flag = Math.floor(t * 3 + e.id) % 2;
-  draw(c, sprite(`fb:${fort.tier}:${armored ? 1 : 0}:${hurt ? 1 : 0}:${flag}:${seed}`, w, h, () => bodyPixels(fort.tier, w, h, armored, hurt, flag, seed)), x0, y0, s);
+  draw(c, sprite(`fb:${fort.tier}:${w}:${h}:${armored ? 1 : 0}:${hurt ? 1 : 0}:${flag}:${seed}`, w, h, () => fortressBodyPixels(fort.tier, w, h, armored, hurt, flag, seed)), x0, y0, s);
   if (!armored) {
     // The bared heart throbs.
     const a = 0.25 + 0.2 * Math.sin(t * 6 + e.id);
-    const r = (4 + fort.tier) * s;
+    const r = (4 + fort.tier) * ps;
     const top = h - (4 + (fort.tier > 2 ? 1 : 0));
     const hy = y0 + (top / 2) * s;
     c.fillStyle = `rgba(255,70,60,${a})`;
@@ -363,30 +394,30 @@ export function drawFortress({ c, px }: Brush, e: Enemy, sim: DefendSim) {
     const qx = (e.x + q.fortressPart!.dx) * px, qy = (e.y + q.fortressPart!.dy) * px + bob;
     if (q.hp <= 0) {
       // A charred socket with a broken bolt or two.
-      const r = 2 * s;
+      const r = 2 * ps;
       c.fillStyle = "#120e12";
       c.fillRect(Math.round(qx - r), Math.round(qy - r), Math.round(r * 2), Math.round(r * 2));
       c.fillStyle = "#2a2028";
-      c.fillRect(Math.round(qx - r + s), Math.round(qy - r + s), Math.round(r * 2 - 2 * s), Math.round(r * 2 - 2 * s));
+      c.fillRect(Math.round(qx - r + s), Math.round(qy - r + s), Math.round(r * 2 - 2 * ps), Math.round(r * 2 - 2 * ps));
       c.fillStyle = "#76748a";
-      c.fillRect(Math.round(qx - r), Math.round(qy - r), Math.round(s), Math.round(s));
-      c.fillRect(Math.round(qx + r - s), Math.round(qy + r - s), Math.round(s), Math.round(s));
+      c.fillRect(Math.round(qx - r), Math.round(qy - r), Math.round(ps), Math.round(ps));
+      c.fillRect(Math.round(qx + r - s), Math.round(qy + r - s), Math.round(ps), Math.round(ps));
       if (Math.sin(t * 5 + q.id) > 0) {
         c.fillStyle = "#ff8a3a";
-        c.fillRect(Math.round(qx - s), Math.round(qy), Math.round(s), Math.round(s));
+        c.fillRect(Math.round(qx - s), Math.round(qy), Math.round(ps), Math.round(ps));
       }
-      smoke(c, qx, qy - r, s, t, q.id);
+      smoke(c, qx, qy - r, ps, t, q.id);
       continue;
     }
     const qhurt = q.hp / q.maxHp < 0.5;
     if (role === "armor") {
-      const ax = qx - 2 * s, ay = qy - 5 * s;
-      draw(c, sprite(`fa:${fort.tier}:${qhurt ? 1 : 0}:${q.id % 3}`, 4, 10, () => armorPixels(fort.tier, qhurt, q.id % 3)), ax, ay, s);
-      flashOver(c, ax, ay, 4 * s, 10 * s, q.flash);
+      const ax = qx - 2 * ps, ay = qy - 5 * ps;
+      draw(c, sprite(`fa:${fort.tier}:${qhurt ? 1 : 0}:${q.id % 3}`, 4, 10, () => armorPixels(fort.tier, qhurt, q.id % 3)), ax, ay, ps);
+      flashOver(c, ax, ay, 4 * ps, 10 * ps, q.flash);
       continue;
     }
-    const tx = qx - 3.5 * s, ty = qy - 3.5 * s;
-    draw(c, sprite(`ft:${fort.tier}:${qhurt ? 1 : 0}:${q.id % 3}`, 7, 7, () => turretPixels(fort.tier, qhurt, q.id % 3)), tx, ty, s);
+    const tx = qx - 3.5 * ps, ty = qy - 3.5 * ps;
+    draw(c, sprite(`ft:${fort.tier}:${qhurt ? 1 : 0}:${q.id % 3}`, 7, 7, () => turretPixels(fort.tier, qhurt, q.id % 3)), tx, ty, ps);
     // The barrel swings to whatever it last shot at.
     let aim = aims.get(q);
     if (q.cd > 1.5) {
@@ -400,10 +431,10 @@ export function drawFortress({ c, px }: Brush, e: Enemy, sim: DefendSim) {
     }
     const ax = aim?.x ?? 0, ay = aim?.y ?? 1;
     const recoil = q.cd > 1.85 ? 1 : 0;
-    const cx = tx + 3 * s, cy = ty + 3 * s;
+    const cx = tx + 3 * ps, cy = ty + 3 * ps;
     const dot = (i: number, grow: number, color: string) => {
       c.fillStyle = color;
-      c.fillRect(Math.round(cx + Math.round(ax * i) * s - grow * s), Math.round(cy + Math.round(ay * i) * s - grow * s), Math.round(s * (1 + grow * 2)), Math.round(s * (1 + grow * 2)));
+      c.fillRect(Math.round(cx + Math.round(ax * i) * ps - grow * ps), Math.round(cy + Math.round(ay * i) * ps - grow * ps), Math.round(s * (1 + grow * 2)), Math.round(s * (1 + grow * 2)));
     };
     for (let i = 1; i <= 4 - recoil; i++) dot(i, 0.5, "#120e12");
     for (let i = 1; i <= 3 - recoil; i++) dot(i, 0, i === 1 ? "#b4b2c4" : "#4c4a58");
@@ -412,7 +443,7 @@ export function drawFortress({ c, px }: Brush, e: Enemy, sim: DefendSim) {
       dot(5, 0, "#fff0cf");
       dot(6, 0, "#ff7a2a");
     }
-    flashOver(c, tx, ty, 7 * s, 7 * s, q.flash);
+    flashOver(c, tx, ty, 7 * ps, 7 * ps, q.flash);
   }
   if (hurt) smoke(c, x0 + w * s * 0.3, y0 + s * 3, s, t, e.id);
 }

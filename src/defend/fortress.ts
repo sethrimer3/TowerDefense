@@ -10,9 +10,10 @@ export function assembleFortress(sim: DefendSim, core: Enemy) {
   for (const role of ["leg", "armor", "turret"] as const) {
     const count = role === "leg" ? fort.legs : role === "armor" ? fort.armor : fort.turrets;
     for (let n = 0; n < count; n++) {
-      const side = n % 2 ? 1 : -1, row = Math.floor(n / 2), rows = count / 2;
-      const dx = side * (def.size / 2 + (role === "leg" ? .2 : role === "armor" ? -.2 : -.65));
-      const dy = (row - (rows - 1) / 2) * (fort.height - .8) / Math.max(1, rows - 1);
+      const side = n % 2 ? 1 : -1, row = Math.floor(n / 2), rows = Math.ceil(count / 2);
+      const scale = fort.partScale ?? 1;
+      const dx = count === 1 && role === "turret" ? 0 : side * (def.size / 2 + (role === "leg" ? .2 : role === "armor" ? -.2 : -.65) * scale);
+      const dy = count === 1 && role === "turret" ? -fort.height / 4 : (row - (rows - 1) / 2) * (fort.height - .8 * scale) / Math.max(1, rows - 1);
       const part = sim.spawnAuxiliary(core.kind, core.x + dx, core.y + dy);
       if (!part) continue;
       part.fortressPart = { core: core.id, role, dx, dy };

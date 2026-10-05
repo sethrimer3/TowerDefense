@@ -495,7 +495,7 @@ export const civilianHp = (l: number) => 8 + l * 5;
 export const rebuildSeconds = (l: number) => 3 * intPow(0.82, l);
 export const HOUSE_HP_PER_CELL = 22;
 
-export type EnemyKind = "roach" | "orc" | "ogre" | "bat" | "warlord" | "mother" | "broodling" | "snake" | "dragon" | "shieldBearer" | "aegis" | "darkKnight" | "bombOrc" | "bombBird" | "voidSparrow" | "shieldLesser" | "shieldGreater" | "poisonLesser" | "poisonBearer" | "poisonGreater" | "poisonSovereign" | "siegeBeetle" | "burrowingMole" | "necromancer" | "skeleton" | "bannerCaptain" | "mirrorKnight" | "leechSwarm" | "ashPhoenix" | "phoenixEgg" | "blinkImp" | "fortressLesser" | "fortress" | "fortressGreater" | "fortressSovereign" | "rollingCannon" | "ballista" | "fireworkLauncher" | "trebuchet" | "bombard" | "rocketBattery" | "boatLesser" | "boat" | "boatGreater" | "boatSovereign";
+export type EnemyKind = "roach" | "orc" | "ogre" | "bat" | "warlord" | "mother" | "broodling" | "snake" | "dragon" | "shieldBearer" | "aegis" | "darkKnight" | "bombOrc" | "bombBird" | "voidSparrow" | "shieldLesser" | "shieldGreater" | "poisonLesser" | "poisonBearer" | "poisonGreater" | "poisonSovereign" | "siegeBeetle" | "burrowingMole" | "necromancer" | "skeleton" | "bannerCaptain" | "mirrorKnight" | "leechSwarm" | "ashPhoenix" | "phoenixEgg" | "blinkImp" | "fortressHut" | "fortressOutpost" | "fortressTower" | "fortressKeep" | "fortressLesser" | "fortress" | "fortressGreater" | "fortressSovereign" | "rollingCannon" | "ballista" | "fireworkLauncher" | "trebuchet" | "bombard" | "rocketBattery" | "boatLesser" | "boat" | "boatGreater" | "boatSovereign";
 export type EnemyDef = {
   kind: EnemyKind;
   name: string;
@@ -520,7 +520,7 @@ export type EnemyDef = {
   /** Body width and height in the city art's eight-pixels-per-cell grid. */
   bodyPixels?: number;
   summonSlots?: number;
-  fortress?: { tier: number; turrets: number; legs: number; armor: number; height: number; partHp: number };
+  fortress?: { tier: number; turrets: number; legs: number; armor: number; height: number; partHp: number; partScale?: number };
   poison?: { radius: number; damage: number; lethal?: boolean; color: string };
   unyielding?: boolean;
   chainLength?: number;
@@ -582,6 +582,10 @@ export const ENEMIES: Record<EnemyKind, EnemyDef> = {
   phoenixEgg: { kind: "phoenixEgg", name: "Phoenix Egg", hp: 60, speed: 0, damage: 0, cooldown: 1, size: 0.4, color: "#dfac6e", distraction: 0, flying: false, hatched: true, cost: 1 },
   blinkImp: { kind: "blinkImp", name: "Blink Imp", hp: 70, speed: 1.7, damage: 9, cooldown: 1, size: 0.3, color: "#9874bf", distraction: 0, flying: false,  cost: 250 },
 
+  fortressHut: { kind: "fortressHut", name: "Walking Watchpost", hp: 16, speed: 1.1, damage: 2, cooldown: 1.6, size: 1, color: "#80634c", distraction: 0, flying: false, fortress: { tier: 1, turrets: 1, legs: 2, armor: 1, height: 1.25, partHp: 3, partScale: .5 }, cost: 5 },
+  fortressOutpost: { kind: "fortressOutpost", name: "Walking Outpost", hp: 28, speed: 1, damage: 3, cooldown: 1.6, size: 1.25, color: "#80634c", distraction: 0, flying: false, fortress: { tier: 1, turrets: 1, legs: 2, armor: 1, height: 1.5, partHp: 6, partScale: .625 }, cost: 10 },
+  fortressTower: { kind: "fortressTower", name: "Walking Fortlet", hp: 90, speed: .9, damage: 7, cooldown: 1.6, size: 1.75, color: "#80634c", distraction: 0, flying: false, fortress: { tier: 1, turrets: 2, legs: 4, armor: 2, height: 2, partHp: 18, partScale: .75 }, cost: 50 },
+  fortressKeep: { kind: "fortressKeep", name: "Walking Stronghold", hp: 180, speed: .8, damage: 12, cooldown: 1.6, size: 2, color: "#80634c", distraction: 0, flying: false, fortress: { tier: 1, turrets: 2, legs: 4, armor: 2, height: 2.5, partHp: 35, partScale: .875 }, cost: 100 },
   fortressLesser: { kind: "fortressLesser", name: "Walking Bastion", hp: 1200, speed: .7, damage: 25, cooldown: 1.6, size: 2.5, color: "#80634c", distraction: 0, flying: false, fortress: { tier: 1, turrets: 2, legs: 4, armor: 2, height: 3, partHp: 160 }, cost: 1000 },
   fortress: { kind: "fortress", name: "Living Fortress", hp: 6000, speed: .65, damage: 70, cooldown: 1.6, size: 3.5, color: "#7e6662", distraction: 0, flying: false, fortress: { tier: 2, turrets: 4, legs: 6, armor: 4, height: 4, partHp: 700 }, cost: 10000 },
   fortressGreater: { kind: "fortressGreater", name: "Walking Citadel", hp: 30000, speed: .6, damage: 200, cooldown: 1.6, size: 4.5, color: "#625674", distraction: 0, flying: false, fortress: { tier: 3, turrets: 6, legs: 8, armor: 6, height: 5, partHp: 3000 }, cost: 100000 },
@@ -639,4 +643,4 @@ export const CIVILIAN = { speed: 1.9, size: 0.3, color: "#e6d7b4", respawnSecond
 
 /** Multipart forts share a species, but each part has its own hitbox. */
 export const enemySize = (e: { kind: EnemyKind; fortressPart?: { role: string } }) =>
-  e.fortressPart ? (e.fortressPart.role === "leg" ? .4 : .6) : ENEMIES[e.kind].size;
+  e.fortressPart ? (e.fortressPart.role === "leg" ? .4 : .6) * (ENEMIES[e.kind].fortress?.partScale ?? 1) : ENEMIES[e.kind].size;
