@@ -26,7 +26,7 @@ import {
   type Rect,
   type TilePos,
 } from "./grid.ts";
-import { GATE, STRUCTURES, TILE_ROOM, footprint, type StructureKind, type TileSpan } from "./catalog.ts";
+import { BALLISTA, GATE, STRUCTURES, TILE_ROOM, footprint, type StructureKind, type TileSpan } from "./catalog.ts";
 
 export type PlacedKind = Exclude<StructureKind, "keep">;
 /** `spot` seeds where on its tile the structure stands; it is drawn afresh
@@ -39,8 +39,12 @@ export type PlacedStructure = { uid: number; kind: PlacedKind; tx: number; ty: n
 export type Side = "n" | "e" | "s" | "w";
 export const SIDES: readonly Side[] = ["n", "e", "s", "w"];
 const SIDE_STEP: Record<Side, readonly [number, number]> = { n: [0, -1], e: [1, 0], s: [0, 1], w: [-1, 0] };
-/** A city gate: set in the wall on `side` of city tile (tx, ty). */
+/** A city gate: set in the wall on `side` of city tile (tx, ty). Wall
+ * spikes stand on the same kind of spot. */
 export type GateSpot = { tx: number; ty: number; side: Side };
+/** A corner of the city wall: the tile corner (vx, vy), between the four
+ * tiles around it, where the wall turns through a right angle. */
+export type CornerSpot = { vx: number; vy: number };
 
 export type Layout = {
   keep: TilePos;
@@ -55,6 +59,10 @@ export type Layout = {
   compact: PlacedKind[];
   /** City gates, each in the wall along one edge of a city tile. */
   gates: GateSpot[];
+  /** Wall spikes, each along the wall on one edge of a city tile. */
+  spikes: GateSpot[];
+  /** Wall ballistas, each on a corner of the wall. */
+  ballistas: CornerSpot[];
 };
 
 export type FittedStructure = {
@@ -70,9 +78,13 @@ export type FittedStructure = {
 /** A gate's cells in the wall, and the city cells just inside it, kept
  * clear for the street that runs out through it. */
 export type FittedGate = GateSpot & { rect: Rect; inner: Rect };
+/** Wall spikes along the wall's outer row of stones on their edge. */
+export type FittedSpikes = GateSpot & { rect: Rect };
+/** A wall ballista's bastion, in the wall's stones at its corner. */
+export type FittedBallista = CornerSpot & { rect: Rect; out: { x: number; y: number } };
 
 export type Fit =
-  | { ok: true; structures: FittedStructure[]; city: Uint8Array; wall: Uint8Array; gates?: FittedGate[] }
+  | { ok: true; structures: FittedStructure[]; city: Uint8Array; wall: Uint8Array; gates?: FittedGate[]; spikes?: FittedSpikes[]; ballistas?: FittedBallista[] }
   | { ok: false; reason: string };
 
 const KEEP_UID = 0;
@@ -86,6 +98,8 @@ export function defaultLayout(): Layout {
     rolls: 0,
     compact: [],
     gates: [],
+    spikes: [],
+    ballistas: [],
   };
 }
 
@@ -98,6 +112,8 @@ export function cloneLayout(l: Layout): Layout {
     rolls: l.rolls,
     compact: [...l.compact],
     gates: l.gates.map((g) => ({ ...g })),
+    spikes: l.spikes.map((g) => ({ ...g })),
+    ballistas: l.ballistas.map((v) => ({ ...v })),
   };
 }
 
@@ -190,6 +206,8 @@ export function fitLayout(l: Layout): Fit {
   const crowded = [...spanned.values()].find((s) => s.size > TILE_ROOM);
   if (crowded) return { ok: false, reason: `That tile has no room left for the ${STRUCTURES[crowded.kind].name.toLowerCase()}.` };
   const gates = l.gates.filter((g) => gateOk(cityTiles, g)).map(fitGate);
+  const spikes = l.spikes.filter((g) => gateOk(cityTiles, g)).map((g): FittedSpikes => ({ ...g, rect: spikesRect(g) }));
+  const ballistas = l.ballistas.filter((v) => cornerOk(cityTiles, v)).map((v): FittedBallista => ({ ...v, rect: ballistaRect(cityTiles, v), out: cornerOutward(cityTiles, v) }));
   let failure = "";
   for (let pass = 0; pass < PASSES; pass++) {
     const space: FitSpace = { city, wall: wallMask(city), blocked: new Uint8Array(CELL_COUNT), foot: new Uint8Array(CELL_COUNT) };
@@ -202,7 +220,16 @@ export function fitLayout(l: Layout): Fit {
       fitted.push(...f);
     }
     const cut = cutOff(fitted, space);
-    if (!cut) return { ok: true, structures: fitted, city, wall: space.wall, ...(gates.length ? { gates } : {}) };
+    if (!cut)
+      return {
+        ok: true,
+        structures: fitted,
+        city,
+        wall: space.wall,
+        ...(gates.length ? { gates } : {}),
+        ...(spikes.length ? { spikes } : {}),
+        ...(ballistas.length ? { ballistas } : {}),
+      };
     failure ||= `The ${STRUCTURES[cut.kind].name.toLowerCase()} would be cut off from the streets.`;
   }
   return { ok: false, reason: failure };
@@ -393,17 +420,17 @@ function grow(r: Rect, side: Side): Rect {
 
 const fitGate = (g: GateSpot): FittedGate => ({ tx: g.tx, ty: g.ty, side: g.side, rect: gateRect(g), inner: gateInner(g) });
 
-/** Drops the gates whose wall moved away, returning how many went. */
-function keepGates(l: Layout): number {
+/** Drops the gates, spikes and ballistas whose wall moved away. */
+function keepGates(l: Layout) {
   const tiles = cityTileSet(l);
-  const before = l.gates.length;
   l.gates = l.gates.filter((g) => gateOk(tiles, g));
-  return before - l.gates.length;
+  l.spikes = l.spikes.filter((g) => gateOk(tiles, g));
+  l.ballistas = l.ballistas.filter((v) => cornerOk(tiles, v));
 }
 
-/** Sets a new gate into the wall at `g`. */
+/** Sets a new gate into the wall at `g` (not where spikes stand). */
 export function placeGate(l: Layout, g: GateSpot): Layout | null {
-  if (!gateOk(cityTileSet(l), g) || l.gates.some((o) => sameGate(o, g))) return null;
+  if (!gateOk(cityTileSet(l), g) || l.gates.some((o) => sameGate(o, g)) || l.spikes.some((o) => sameGate(o, g))) return null;
   const next = cloneLayout(l);
   next.gates.push({ tx: g.tx, ty: g.ty, side: g.side });
   return fitLayout(next).ok ? next : null;
@@ -420,6 +447,106 @@ export function removeGate(l: Layout, g: GateSpot): Layout {
 export function moveGate(l: Layout, from: GateSpot, to: GateSpot): Layout | null {
   if (sameGate(from, to)) return l;
   return placeGate(removeGate(l, from), to);
+}
+
+// ── Wall spikes ──────────────────────────────────────────────────────────
+
+/** The wall's outer row of stones along `side` of tile (tx, ty), where the
+ * spikes stand, pointing out. */
+export function spikesRect({ tx, ty, side }: GateSpot): Rect {
+  const x0 = tx * SUB, y0 = ty * SUB;
+  const out = GATE.deep - 1;
+  if (side === "n") return { x: x0, y: y0 - 1 - out, w: SUB, h: 1 };
+  if (side === "s") return { x: x0, y: y0 + SUB + out, w: SUB, h: 1 };
+  if (side === "w") return { x: x0 - 1 - out, y: y0, w: 1, h: SUB };
+  return { x: x0 + SUB + out, y: y0, w: 1, h: SUB };
+}
+
+/** The whole depth of the wall along `side` of tile (tx, ty): what a
+ * carried set of spikes is shown over. */
+export function edgeWallRect(g: GateSpot): Rect {
+  const r = spikesRect(g);
+  if (g.side === "n") return { ...r, h: GATE.deep };
+  if (g.side === "s") return { ...r, y: r.y - GATE.deep + 1, h: GATE.deep };
+  if (g.side === "w") return { ...r, w: GATE.deep };
+  return { ...r, x: r.x - GATE.deep + 1, w: GATE.deep };
+}
+
+/** Sets spikes along the wall at `g` (not where a gate stands). */
+export function placeSpikes(l: Layout, g: GateSpot): Layout | null {
+  if (!gateOk(cityTileSet(l), g) || l.spikes.some((o) => sameGate(o, g)) || l.gates.some((o) => sameGate(o, g))) return null;
+  const next = cloneLayout(l);
+  next.spikes.push({ tx: g.tx, ty: g.ty, side: g.side });
+  return fitLayout(next).ok ? next : null;
+}
+
+export function removeSpikes(l: Layout, g: GateSpot): Layout {
+  const next = cloneLayout(l);
+  next.spikes = next.spikes.filter((o) => !sameGate(o, g));
+  return next;
+}
+
+export function moveSpikes(l: Layout, from: GateSpot, to: GateSpot): Layout | null {
+  if (sameGate(from, to)) return l;
+  return placeSpikes(removeSpikes(l, from), to);
+}
+
+// ── Wall ballistas ───────────────────────────────────────────────────────
+
+export const cornerKey = (v: CornerSpot) => `${v.vx},${v.vy}`;
+export const sameCorner = (a: CornerSpot, b: CornerSpot) => a.vx === b.vx && a.vy === b.vy;
+
+/** The four tiles around corner `v`, as [dx, dy] steps from it: north
+ * west, north east, south west, south east. */
+const QUADS = [[-1, -1], [0, -1], [-1, 0], [0, 0]] as const;
+
+/** Which of the four tiles round corner `v` are city tiles. */
+const quadsIn = (tiles: Set<string>, v: CornerSpot) => QUADS.map(([dx, dy]) => tiles.has(tileKey(v.vx + dx, v.vy + dy)));
+
+/** Whether the wall turns through a right angle at corner `v`: the four
+ * tiles round it are on the board and one of them, or three, are city.
+ * Two (a straight run, or two tiles meeting at a point) don't count. */
+export function cornerOk(tiles: Set<string>, v: CornerSpot) {
+  if (v.vx < 1 || v.vy < 1 || v.vx >= TILES_W || v.vy >= TILES_H) return false;
+  const n = quadsIn(tiles, v).filter(Boolean).length;
+  return n === 1 || n === 3;
+}
+
+/** The ballista's bastion: the corner block of wall stones at `v`, in the
+ * tile across the corner from a lone city tile, or in the one tile round a
+ * bend that isn't city. */
+export function ballistaRect(tiles: Set<string>, v: CornerSpot): Rect {
+  const inside = quadsIn(tiles, v);
+  const lone = inside.filter(Boolean).length === 1;
+  const q = lone ? 3 - inside.indexOf(true) : inside.indexOf(false);
+  const [dx, dy] = QUADS[q];
+  const n = BALLISTA.size;
+  return { x: v.vx * SUB + (dx < 0 ? -n : 0), y: v.vy * SUB + (dy < 0 ? -n : 0), w: n, h: n };
+}
+
+/** The way out of the city at corner `v`, as a diagonal unit step: from
+ * the corner toward its bastion. */
+export function cornerOutward(tiles: Set<string>, v: CornerSpot): { x: number; y: number } {
+  const r = ballistaRect(tiles, v);
+  return { x: Math.sign(r.x + r.w / 2 - v.vx * SUB), y: Math.sign(r.y + r.h / 2 - v.vy * SUB) };
+}
+
+export function placeBallista(l: Layout, v: CornerSpot): Layout | null {
+  if (!cornerOk(cityTileSet(l), v) || l.ballistas.some((o) => sameCorner(o, v))) return null;
+  const next = cloneLayout(l);
+  next.ballistas.push({ vx: v.vx, vy: v.vy });
+  return fitLayout(next).ok ? next : null;
+}
+
+export function removeBallista(l: Layout, v: CornerSpot): Layout {
+  const next = cloneLayout(l);
+  next.ballistas = next.ballistas.filter((o) => !sameCorner(o, v));
+  return next;
+}
+
+export function moveBallista(l: Layout, from: CornerSpot, to: CornerSpot): Layout | null {
+  if (sameCorner(from, to)) return l;
+  return placeBallista(removeBallista(l, from), to);
 }
 
 // ── Edits ────────────────────────────────────────────────────────────────
@@ -511,7 +638,9 @@ export function moveKeep(l: Layout, tx: number, ty: number): Layout | null {
   return fitLayout(next).ok ? next : null;
 }
 
-export function placedCount(l: Layout, kind: PlacedKind | "cityTile" | "cityGate"): number {
+export function placedCount(l: Layout, kind: PlacedKind | "cityTile" | "cityGate" | "wallSpikes" | "wallBallista"): number {
   if (kind === "cityGate") return l.gates.length;
+  if (kind === "wallSpikes") return l.spikes.length;
+  if (kind === "wallBallista") return l.ballistas.length;
   return kind === "cityTile" ? l.cityTiles.length : l.structures.filter((s) => s.kind === kind).length;
 }

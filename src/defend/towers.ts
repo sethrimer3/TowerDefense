@@ -4,6 +4,7 @@
  * when it fired. */
 import { dist, sq } from "../exact.ts";
 import {
+  BALLISTA,
   archerCooldown,
   archerDamage,
   archerRange,
@@ -15,6 +16,7 @@ import {
 } from "./catalog.ts";
 import type { Building } from "./citygen.ts";
 import { center, nearest } from "./pathing.ts";
+import { shootBallista } from "./wall-defenses.ts";
 import type { DefendSim } from "./sim.ts";
 
 /** Cannons won't fire at anything closer than this (cells). */
@@ -31,6 +33,7 @@ export class Towers {
       if (!sim.intact(b)) continue;
       if (b.kind === "cannonTower") this.stepCannon(sim, b, dt);
       else if (b.kind === "archerTower") this.stepArcherTower(sim, b, dt);
+      else if (b.kind === "wallBallista") this.stepBallista(sim, b, dt);
     }
   }
 
@@ -49,6 +52,11 @@ export class Towers {
     if (!target) return this.cooldown.set(b.id, 0);
     this.cooldown.set(b.id, archerCooldown(sim.levels.archerRate) * sim.bonuses.towerReload);
     sim.arrows.push({ x: c.x, y: c.y - 0.6, origin: { x: c.x, y: c.y, building: b.id }, target: target.id, damage: archerDamage(sim.levels.archerDamage) * sim.bonuses.towerDamage, tx: target.x, ty: target.y, life: 2 });
+  }
+
+  private stepBallista(sim: DefendSim, b: Building, dt: number) {
+    if (!this.ready(b, dt)) return;
+    this.cooldown.set(b.id, shootBallista(sim, b) ? BALLISTA.cooldown * sim.bonuses.towerReload : 0);
   }
 
   private stepCannon(sim: DefendSim, b: Building, dt: number) {

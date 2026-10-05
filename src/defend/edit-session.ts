@@ -7,10 +7,10 @@ import { BOMB_RADIUS } from "./catalog.ts";
 import { dist } from "../exact.ts";
 import { RALLY_REACH } from "./war-banner.ts";
 import type { CityMap } from "./citygen.ts";
-import { carriesGate, dragSpan, dropGhost, legalLayouts, liftsCityTile, nearestEdge, parseGateKey, refusal, type Drag } from "./drag-rules.ts";
+import { carriesCorner, carriesGate, dragSpan, dropGhost, legalLayouts, liftsCityTile, nearestCorner, nearestEdge, refusal, wallSpotRect, type Drag } from "./drag-rules.ts";
 import type { Overlay } from "./edit-overlay.ts";
 import { CELLS_W, SUB, tileKey } from "./grid.ts";
-import { gateRect, removeCityTile, removeGate, removeStructure, type Layout } from "./layout.ts";
+import { removeBallista, removeCityTile, removeGate, removeSpikes, removeStructure, type Layout } from "./layout.ts";
 
 /** Where a drag's pointer is: its board position in cells, and whether it is
  * over the board or the palette. */
@@ -29,7 +29,8 @@ export type Drop =
 /** How far (in cells) a press on the planted banner may wander and still
  * count as a tap. */
 const TAP = 0.75;
-/** How near (in cells) a carried gate snaps to an edge that takes it. */
+/** How near (in cells) a carried gate, spikes or ballista snaps to a spot
+ * that takes it. */
 const SNAP = 3.5;
 
 export class EditSession {
@@ -55,6 +56,10 @@ export class EditSession {
     const b = owner >= 0 ? map.buildings[owner] : null;
     if (b?.kind === "keep") return new EditSession({ from: "keep" }, layout);
     if (b?.kind === "gate" && b.gate) return new EditSession({ from: "gate", gate: b.gate }, layout);
+    if (b?.kind === "wallBallista" && b.corner) return new EditSession({ from: "ballista", corner: { vx: b.corner.vx, vy: b.corner.vy } }, layout);
+    const cell = cy * CELLS_W + cx;
+    const row = b?.kind === "wall" ? map.spikes?.find((r) => r.cells.includes(cell)) : undefined;
+    if (row) return new EditSession({ from: "spikes", spikes: { tx: row.tx, ty: row.ty, side: row.side } }, layout);
     const s = b?.structureUid ? layout.structures.find((p) => p.uid === b.structureUid) : undefined;
     if (s) return new EditSession({ from: "structure", uid: s.uid, kind: s.kind }, layout);
     const tile = { tx: Math.floor(cx / SUB), ty: Math.floor(cy / SUB) };
@@ -78,14 +83,14 @@ export class EditSession {
     return tileKey(Math.floor(at.cellX / SUB - half), Math.floor(at.cellY / SUB - half));
   }
 
-  /** For a gate: the tile edge nearest the pointer, or failing that one
-   * that takes the gate within reach of it. */
+  /** For a piece of the wall: the tile edge (or, for a ballista, corner)
+   * nearest the pointer, or failing that one that takes it within reach. */
   private edge(at: DragAt): string {
-    const near = nearestEdge(this.layout, at.cellX, at.cellY);
+    const near = carriesCorner(this.drag) ? nearestCorner(at.cellX, at.cellY) : nearestEdge(this.layout, at.cellX, at.cellY);
     if (this.legal.has(near)) return near;
     let best = near, bd = SNAP;
     for (const key of this.legal.keys()) {
-      const r = gateRect(parseGateKey(key));
+      const r = wallSpotRect(this.drag, this.legal.get(key)!, key);
       const d = dist(r.x + r.w / 2 - at.cellX, r.y + r.h / 2 - at.cellY);
       if (d < bd) {
         bd = d;
@@ -112,9 +117,23 @@ export class EditSession {
         legal: new Set(),
         hover: null,
         ghost: next ? dropGhost(this.drag, next, hover!) : null,
-        gates: { legal: [...this.legal.keys()].map((k) => gateRect(parseGateKey(k))), hover: hover ? gateRect(parseGateKey(hover)) : null, fits: !!next },
+        gates: {
+          legal: [...this.legal].map(([k, l]) => wallSpotRect(this.drag, l, k)),
+          hover: hover ? this.spotRect(hover) : null,
+          fits: !!next,
+        },
       };
     return { legal: new Set(this.legal.keys()), hover, ghost: next ? dropGhost(this.drag, next, hover!) : null, ...(this.span > 1 ? { span: this.span } : {}) };
+  }
+
+  /** The cells the carried piece of wall would take at `key`, or null for
+   * a corner where the wall doesn't turn. */
+  private spotRect(key: string) {
+    const l = this.legal.get(key);
+    if (l) return wallSpotRect(this.drag, l, key);
+    if (!carriesCorner(this.drag)) return wallSpotRect(this.drag, this.layout, key);
+    const [vx, vy] = key.split(",").map(Number);
+    return { x: vx * SUB - 1, y: vy * SUB - 1, w: 2, h: 2 };
   }
 
   /** Releasing the item at `at`: a city element takes the legal tile under
@@ -136,6 +155,8 @@ export class EditSession {
       if (d.from === "structure") return { kind: "build", layout: removeStructure(layout, d.uid), message: null };
       if (d.from === "cityTile") return { kind: "build", layout: removeCityTile(layout, d.tile.tx, d.tile.ty)?.layout ?? layout, message: null };
       if (d.from === "gate") return { kind: "build", layout: removeGate(layout, d.gate), message: null };
+      if (d.from === "spikes") return { kind: "build", layout: removeSpikes(layout, d.spikes), message: null };
+      if (d.from === "ballista") return { kind: "build", layout: removeBallista(layout, d.corner), message: null };
       return { kind: "build", layout, message: d.from === "keep" ? "The keep can be moved, but never removed." : null };
     }
     return { kind: "build", layout, message: refusal(d, layout, hover!) };

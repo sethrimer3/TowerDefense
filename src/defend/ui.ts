@@ -16,6 +16,8 @@ import {
   PALETTE_ITEMS,
   PALETTE_CATEGORIES,
   GATE_DESCRIPTION,
+  SPIKES_DESCRIPTION,
+  BALLISTA_DESCRIPTION,
   STRUCTURES,
   inCategory,
   UPGRADES,
@@ -68,6 +70,8 @@ export type DefendHost = {
 const ITEM_NAMES: Record<PaletteItem, string> = {
   cityTile: "City tile",
   cityGate: "City gate",
+  wallSpikes: "Wall spikes",
+  wallBallista: "Wall ballista",
   barracks: STRUCTURES.barracks.name,
   archerBarracks: STRUCTURES.archerBarracks.name,
   archerTower: STRUCTURES.archerTower.name,
@@ -781,6 +785,10 @@ export class DefendPage {
           ? "Expands the city limits. New tiles must touch the city; the wall moves out to enclose them."
           : item === "cityGate"
             ? GATE_DESCRIPTION
+            : item === "wallSpikes"
+              ? SPIKES_DESCRIPTION
+              : item === "wallBallista"
+                ? BALLISTA_DESCRIPTION
             : `${STRUCTURES[item].description} Takes ${shareName(footprint(item, s.layout.compact.includes(item)).size)}.`;
       return `<article class="card defend-card"><canvas width="48" height="48" data-icon="${item}"></canvas><div><small>OWNED ${s.owned[item]} · IN PALETTE ${available(s, item)}</small><h3>${ITEM_NAMES[item]}</h3><p>${desc}</p></div>
         <button data-buy="${item}" ${canAfford(w, p) ? "" : "disabled"}>Buy · ${price(p)}</button></article>`;

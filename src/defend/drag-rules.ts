@@ -6,12 +6,20 @@ import { SUB, TILES_H, TILES_W, tileInBounds, tileKey, type Rect, type TilePos }
 import {
   SIDES,
   across,
+  ballistaRect,
   blockTiles,
+  cornerKey,
+  cornerOk,
+  edgeWallRect,
   gateKey,
   gateOk,
   gateRect,
+  moveBallista,
   moveGate,
+  moveSpikes,
+  placeBallista,
   placeGate,
+  placeSpikes,
   cityTileSet,
   covers,
   fitLayout,
@@ -22,6 +30,7 @@ import {
   placeStructure,
   removeCityTile,
   spanOf,
+  type CornerSpot,
   type GateSpot,
   type Layout,
   type PlacedKind,
@@ -37,6 +46,10 @@ export type Drag =
   | { from: "keep" }
   /** A city gate already set in the wall. */
   | { from: "gate"; gate: GateSpot }
+  /** Wall spikes already along the wall. */
+  | { from: "spikes"; spikes: GateSpot }
+  /** A wall ballista already on a corner of the wall. */
+  | { from: "ballista"; corner: CornerSpot }
   | { from: "bomb" }
   /** The war banner, from the palette or (`placed`) where it stands. */
   | { from: "banner"; placed?: boolean };
@@ -49,11 +62,31 @@ export function dragIcon(drag: Drag): IconItem {
   if (drag.from === "palette") return drag.item;
   if (drag.from === "structure") return drag.kind;
   if (drag.from === "gate") return "cityGate";
+  if (drag.from === "spikes") return "wallSpikes";
+  if (drag.from === "ballista") return "wallBallista";
   return drag.from;
 }
 
-/** Whether `drag` carries a city gate, which goes on a tile's edge. */
-export const carriesGate = (drag: Drag) => dragIcon(drag) === "cityGate";
+/** Whether `drag` carries something set into the wall: a city gate or
+ * spikes, on a tile's edge, or a ballista, on a corner of the wall. */
+export const carriesGate = (drag: Drag) => carriesEdge(drag) || carriesCorner(drag);
+/** Whether `drag` carries a city gate or spikes, which go on a tile's edge. */
+export const carriesEdge = (drag: Drag) => dragIcon(drag) === "cityGate" || dragIcon(drag) === "wallSpikes";
+/** Whether `drag` carries a wall ballista, which goes on a wall corner. */
+export const carriesCorner = (drag: Drag) => dragIcon(drag) === "wallBallista";
+
+/** The corner a key ("vx,vy") names. */
+export function parseCornerKey(key: string): CornerSpot {
+  const [vx, vy] = key.split(",").map(Number);
+  return { vx, vy };
+}
+
+/** The cells a wall piece carried by `drag` takes at spot `key` in
+ * `layout`: a gate's, the stretch of wall spikes line, or a bastion. */
+export function wallSpotRect(drag: Drag, layout: Layout, key: string): Rect {
+  if (carriesCorner(drag)) return ballistaRect(cityTileSet(layout), parseCornerKey(key));
+  return dragIcon(drag) === "wallSpikes" ? edgeWallRect(parseGateKey(key)) : gateRect(parseGateKey(key));
+}
 
 /** The gate spot a key ("tx,ty,side") names. */
 export function parseGateKey(key: string): GateSpot {
@@ -65,19 +98,33 @@ export function parseGateKey(key: string): GateSpot {
  * structure spanning a 2 × 2 block, else 1. */
 export function dragSpan(drag: Drag, layout: Layout) {
   const kind = dragIcon(drag);
-  return kind === "cityTile" || kind === "cityGate" || kind === "keep" || consumable(kind) ? 1 : spanOf(layout, kind);
+  return kind === "cityTile" || kind === "cityGate" || kind === "wallSpikes" || kind === "wallBallista" || kind === "keep" || consumable(kind) ? 1 : spanOf(layout, kind);
 }
 
 /** Every layout dropping `drag` could make, keyed by the tile it lands on
  * (the top left tile of the block it would take). */
 export function legalLayouts(drag: Drag, layout: Layout): Map<string, Layout> {
   const out = new Map<string, Layout>();
-  if (carriesGate(drag)) {
+  if (carriesCorner(drag)) {
+    for (let vy = 1; vy < TILES_H; vy++)
+      for (let vx = 1; vx < TILES_W; vx++) {
+        const v = { vx, vy };
+        const next = drag.from === "ballista" ? moveBallista(layout, drag.corner, v) : placeBallista(layout, v);
+        if (next) out.set(cornerKey(v), next);
+      }
+    return out;
+  }
+  if (carriesEdge(drag)) {
+    const spikes = dragIcon(drag) === "wallSpikes";
     for (let ty = 0; ty < TILES_H; ty++)
       for (let tx = 0; tx < TILES_W; tx++)
         for (const side of SIDES) {
           const g = { tx, ty, side };
-          const next = drag.from === "gate" ? moveGate(layout, drag.gate, g) : placeGate(layout, g);
+          const next =
+            drag.from === "gate" ? moveGate(layout, drag.gate, g)
+            : drag.from === "spikes" ? moveSpikes(layout, drag.spikes, g)
+            : spikes ? placeSpikes(layout, g)
+            : placeGate(layout, g);
           if (next) out.set(gateKey(g), next);
         }
     return out;
@@ -95,7 +142,7 @@ export function legalLayouts(drag: Drag, layout: Layout): Map<string, Layout> {
 function layoutAfter(drag: Drag, layout: Layout, tx: number, ty: number): Layout | null {
   switch (drag.from) {
     case "palette":
-      if (drag.item === "cityGate") return null;
+      if (drag.item === "cityGate" || drag.item === "wallSpikes" || drag.item === "wallBallista") return null;
       return drag.item === "cityTile" ? placeCityTile(layout, tx, ty) : placeStructure(layout, drag.item, tx, ty);
     case "structure":
       return moveStructure(layout, drag.uid, tx, ty);
@@ -113,7 +160,7 @@ const isTile = (t: TilePos, tx: number, ty: number) => t.tx === tx && t.ty === t
 /** The outline shown where `drag` would land, in `next`, the layout it makes
  * on tile `key`: the tile itself for a city tile, else the fitted structure. */
 export function dropGhost(drag: Drag, next: Layout, key: string): Overlay["ghost"] {
-  if (carriesGate(drag)) return { rect: gateRect(parseGateKey(key)), kind: "cityGate" };
+  if (carriesGate(drag)) return { rect: wallSpotRect(drag, next, key), kind: dragIcon(drag) as "cityGate" | "wallSpikes" | "wallBallista" };
   const [tx, ty] = key.split(",").map(Number);
   if (dragIcon(drag) === "cityTile") return { rect: { x: tx * SUB, y: ty * SUB, w: SUB, h: SUB }, kind: "cityTile" };
   const fit = fitLayout(next);
@@ -131,6 +178,19 @@ export function refusal(drag: Drag, layout: Layout, key: string): string {
     if (layout.gates.some((o) => gateKey(o) === key)) return "There's already a gate there.";
     if (gateOk(cityTileSet(layout), g)) return "There isn't room for a gate there.";
     return "A city gate goes in the city wall, on the edge of a city tile.";
+  }
+  if (kind === "wallSpikes") {
+    const g = parseGateKey(key);
+    if (layout.spikes.some((o) => gateKey(o) === key)) return "There are already spikes there.";
+    if (layout.gates.some((o) => gateKey(o) === key)) return "Spikes can't line the wall across a gate.";
+    if (gateOk(cityTileSet(layout), g)) return "There isn't room for spikes there.";
+    return "Wall spikes go along the city wall, on the edge of a city tile.";
+  }
+  if (kind === "wallBallista") {
+    const v = parseCornerKey(key);
+    if (layout.ballistas.some((o) => cornerKey(o) === key)) return "There's already a ballista on that corner.";
+    if (cornerOk(cityTileSet(layout), v)) return "There isn't room for a ballista there.";
+    return "A wall ballista goes on a corner of the city wall, where it turns at a right angle.";
   }
   const ty = Number(key.split(",")[1]);
   if (ty === 0) return "Nothing can be built on the top row — that's where the enemy gathers.";
@@ -169,6 +229,11 @@ export function nearestEdge(layout: Layout, x: number, y: number): string {
   const o = across(g);
   const back: Record<Side, Side> = { n: "s", s: "n", e: "w", w: "e" };
   return tileInBounds(o.tx, o.ty) && tiles.has(tileKey(o.tx, o.ty)) ? gateKey({ ...o, side: back[side] }) : gateKey(g);
+}
+
+/** The tile corner nearest (x, y) (in cells), keyed "vx,vy". */
+export function nearestCorner(x: number, y: number): string {
+  return cornerKey({ vx: Math.round(x / SUB), vy: Math.round(y / SUB) });
 }
 
 /** Whether pressing city tile `tile` lifts it: only an empty tile whose

@@ -4,6 +4,7 @@
  * the shared palette. */
 import { GATE, STRUCTURES, type StructureKind } from "./catalog.ts";
 import { gatePixels } from "./gate-art.ts";
+import { BALLISTA_ART, BALLISTA_DIRS, ballistaPixels, bastionPixels, spikePixels } from "./wall-defense-art.ts";
 import { TILE_ICON_CELLS, cityTilePixels } from "./tile-art.ts";
 import { hash, hash01 } from "./grid.ts";
 import { ART } from "./park-art.ts";
@@ -45,7 +46,7 @@ function disc(c: CanvasRenderingContext2D, x: number, y: number, r: number) {
   c.fill();
 }
 
-export type IconItem = StructureKind | "cityTile" | "cityGate" | "bomb" | "banner";
+export type IconItem = StructureKind | "cityTile" | "cityGate" | "wallSpikes" | "wallBallista" | "bomb" | "banner";
 
 /** Palette icon for an item, drawn into a small square canvas. */
 export function paintIcon(canvas: HTMLCanvasElement, item: IconItem) {
@@ -55,6 +56,8 @@ export function paintIcon(canvas: HTMLCanvasElement, item: IconItem) {
   c.imageSmoothingEnabled = false;
   if (item === "cityTile") return paintCityIcon(c, n);
   if (item === "cityGate") return paintGateIcon(c, n);
+  if (item === "wallSpikes") return paintSpikesIcon(c, n);
+  if (item === "wallBallista") return paintBallistaIcon(c, n);
   if (item === "bomb") return paintBombIcon(c, n);
   if (item === "banner") return paintBannerIcon(c, n);
   const def = [STRUCTURES[item].w, STRUCTURES[item].h];
@@ -82,6 +85,32 @@ function paintGateIcon(c: CanvasRenderingContext2D, n: number) {
   c.fillRect(0, y, n, k);
   c.fillRect(0, y + h * k - k, n, k);
   drawSprite(c, sprite("icon:cityGate", w, h, () => gatePixels("s")), x, y, w * k, h * k);
+}
+
+/** A stretch of wall two stones long, its stakes pointing up and out. */
+function paintSpikesIcon(c: CanvasRenderingContext2D, n: number) {
+  const k = Math.floor(n / (2 * ART)) || 1, s = ART * k;
+  const x = Math.round((n - 2 * s) / 2), y = Math.round((n - s) / 2 + (5 / ART) * s / 2);
+  c.fillStyle = "#8f897d";
+  c.fillRect(x, y, 2 * s, s);
+  c.fillStyle = "#b7b0a2";
+  c.fillRect(x + k, y + k, 2 * s - 2 * k, k);
+  c.fillStyle = OUTLINE;
+  c.fillRect(x, y + s - k, 2 * s, k);
+  c.fillRect(x, y, k, s);
+  c.fillRect(x + 2 * s - k, y, k, s);
+  c.fillRect(x + s - k, y + 2 * k, k, s - 2 * k);
+  for (let i = 0; i < 2; i++) drawSprite(c, sprite(`icon:spikes:${i}`, ART, ART, () => spikePixels("n", i)), x + i * s, y - Math.round((5 / ART) * s), s, s);
+}
+
+/** The bastion with its ballista aimed up and to the right, loaded. */
+function paintBallistaIcon(c: CanvasRenderingContext2D, n: number) {
+  const b = 2 * ART, k = Math.max(1, Math.floor(n / BALLISTA_ART));
+  const x = Math.round((n - b * k) / 2), y = Math.round((n - b * k) / 2);
+  drawSprite(c, sprite("icon:bastion", b, b, () => bastionPixels()), x, y, b * k, b * k);
+  const w = BALLISTA_ART * k, o = Math.round((n - w) / 2);
+  const dir = Math.round(BALLISTA_DIRS * 7 / 8);
+  drawSprite(c, sprite(`ballista:${dir}:1`, BALLISTA_ART, BALLISTA_ART, () => ballistaPixels(dir, true)), o, o, w, w);
 }
 
 function paintBombIcon(c: CanvasRenderingContext2D, n: number) {

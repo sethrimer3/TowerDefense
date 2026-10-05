@@ -30,6 +30,8 @@ import {
   HOUSE_HP_PER_CELL,
   STRUCTURES,
   GATE,
+  BALLISTA,
+  SPIKES,
   keepHp,
   wallHp,
   watchRadius,
@@ -51,6 +53,7 @@ import { DarkKeeps, stepBolts, stepDarkWizard, type Bolt } from "./dark-wizards.
 import { WarBanner } from "./war-banner.ts";
 import { sheltered, fizzles, stepFloods, type Flood, type Sinking } from "./boats.ts";
 import { baitFell, baitStanding } from "./bait.ts";
+import { stepBallistaBolts, stepSpikes, type BallistaBolt } from "./wall-defenses.ts";
 
 export type Levels = Record<UpgradeId, number>;
 
@@ -212,6 +215,12 @@ export class DefendSim {
   stabs: Stab[] = [];
   /** Black lightning from dark keeps' turrets and dark wizards, fading. */
   bolts: Bolt[] = [];
+  /** Wall ballistas' bolts in flight, and which way each ballista last
+   * shot (a unit vector, by building id). */
+  ballistaBolts: BallistaBolt[] = [];
+  readonly ballistaAim = new Map<number, { x: number; y: number }>();
+  /** Seconds until the wall spikes next cut whoever is against them. */
+  spikeT = SPIKES.every;
   scorches: Scorch[] = [];
   effects: Effect[] = [];
   /** The war banner the player planted, rallying the troops; null when none
@@ -352,6 +361,8 @@ export class DefendSim {
     for (const e of this.enemies) if (e.fortressParts) syncFortress(e);
     this.towers.step(this, dt);
     stepArrows(this, dt);
+    stepBallistaBolts(this, dt);
+    stepSpikes(this, dt);
     stepShells(this, dt);
     stepSiegeShots(this, dt);
     this.wizards.step(this, dt);
@@ -784,6 +795,7 @@ export class DefendSim {
 function maxHpOf(b: Building, levels: Levels, bonuses: Readonly<Bonuses>) {
   if (b.kind === "wall") return wallHp(levels.wallStrength) * bonuses.wallHp;
   if (b.kind === "gate") return wallHp(levels.wallStrength) * bonuses.wallHp * GATE.hpPerCell * b.cells.length;
+  if (b.kind === "wallBallista") return wallHp(levels.wallStrength) * bonuses.wallHp * BALLISTA.hpPerCell * b.cells.length;
   if (b.kind === "house") return HOUSE_HP_PER_CELL * b.cells.length;
   if (b.kind === "keep") return keepHp(levels.keepStrength) * bonuses.keepHp;
   return STRUCTURES[b.kind].maxHp;
