@@ -359,7 +359,7 @@ export function drawFortress({ c, px }: Brush, e: Enemy, sim: DefendSim) {
       c.fillStyle = "#120e12";
       c.fillRect(Math.round(left ? x0 - 3 * ps : x0 + w * s), Math.round(ly + 2 * ps), Math.round(3 * ps), Math.round(3 * ps));
       c.fillStyle = "#4c4a58";
-      c.fillRect(Math.round(left ? x0 - 2 * ps : x0 + w * s), Math.round(ly + 3 * ps), Math.round(2 * ps), Math.round(s));
+      c.fillRect(Math.round(left ? x0 - 2 * ps : x0 + w * s), Math.round(ly + 3 * ps), Math.round(2 * ps), Math.round(ps));
       return;
     }
     const lifted = Math.sin(phase + (n % 2) * Math.PI + Math.floor(n / 2) * 0.9) > 0.35;
@@ -398,13 +398,13 @@ export function drawFortress({ c, px }: Brush, e: Enemy, sim: DefendSim) {
       c.fillStyle = "#120e12";
       c.fillRect(Math.round(qx - r), Math.round(qy - r), Math.round(r * 2), Math.round(r * 2));
       c.fillStyle = "#2a2028";
-      c.fillRect(Math.round(qx - r + s), Math.round(qy - r + s), Math.round(r * 2 - 2 * ps), Math.round(r * 2 - 2 * ps));
+      c.fillRect(Math.round(qx - r + ps), Math.round(qy - r + ps), Math.round(r * 2 - 2 * ps), Math.round(r * 2 - 2 * ps));
       c.fillStyle = "#76748a";
       c.fillRect(Math.round(qx - r), Math.round(qy - r), Math.round(ps), Math.round(ps));
-      c.fillRect(Math.round(qx + r - s), Math.round(qy + r - s), Math.round(ps), Math.round(ps));
+      c.fillRect(Math.round(qx + r - ps), Math.round(qy + r - ps), Math.round(ps), Math.round(ps));
       if (Math.sin(t * 5 + q.id) > 0) {
         c.fillStyle = "#ff8a3a";
-        c.fillRect(Math.round(qx - s), Math.round(qy), Math.round(ps), Math.round(ps));
+        c.fillRect(Math.round(qx - ps), Math.round(qy), Math.round(ps), Math.round(ps));
       }
       smoke(c, qx, qy - r, ps, t, q.id);
       continue;
@@ -434,7 +434,7 @@ export function drawFortress({ c, px }: Brush, e: Enemy, sim: DefendSim) {
     const cx = tx + 3 * ps, cy = ty + 3 * ps;
     const dot = (i: number, grow: number, color: string) => {
       c.fillStyle = color;
-      c.fillRect(Math.round(cx + Math.round(ax * i) * ps - grow * ps), Math.round(cy + Math.round(ay * i) * ps - grow * ps), Math.round(s * (1 + grow * 2)), Math.round(s * (1 + grow * 2)));
+      c.fillRect(Math.round(cx + Math.round(ax * i) * ps - grow * ps), Math.round(cy + Math.round(ay * i) * ps - grow * ps), Math.round(ps * (1 + grow * 2)), Math.round(ps * (1 + grow * 2)));
     };
     for (let i = 1; i <= 4 - recoil; i++) dot(i, 0.5, "#120e12");
     for (let i = 1; i <= 3 - recoil; i++) dot(i, 0, i === 1 ? "#b4b2c4" : "#4c4a58");

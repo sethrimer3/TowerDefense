@@ -38,6 +38,9 @@ A black enemy that splits into three broodlings when she dies.
 **Broodling**:
 A small, quick enemy hatched only from a fallen Mother.
 
+**Walking fortress**:
+An enemy castle on legs (Walking Watchpost, Walking Outpost, Walking Fortlet, Walking Stronghold, Walking Bastion, Living Fortress, Walking Citadel, Dread Colossus). Its turrets, legs and armor are separately destructible; lost legs slow it, and destroying all armor exposes its core.
+
 **Siege engine**:
 An enemy machine with no crew (rolling cannon, ballista, firework launcher, trebuchet, great bombard, dragonfire battery): it drives itself toward the keep and stops to shoot what blocks its way, or the keep, from range.
 

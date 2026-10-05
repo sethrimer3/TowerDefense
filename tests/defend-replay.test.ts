@@ -56,7 +56,7 @@ function scenarios(): Record<string, Scenario> {
     newEnemies: {
       layout: city(SQUARE, [["barracks", 1, 1], ["archerTower", -1, -1], ["wizardTower", 0, -2]]),
       citySeed: 13, levels: maxLevels(), seed: 6, seconds: 100, wave: 1,
-      opening: ['snake', 'dragon', 'shieldBearer', 'aegis', 'darkKnight', 'bombOrc', 'bombBird', 'voidSparrow', 'shieldLesser', 'shieldGreater', 'poisonLesser', 'poisonBearer', 'poisonGreater', 'poisonSovereign', 'siegeBeetle', 'burrowingMole', 'necromancer', 'bannerCaptain', 'mirrorKnight', 'leechSwarm', 'ashPhoenix', 'blinkImp', 'fortressLesser', 'fortress', 'fortressGreater', 'fortressSovereign'],
+      opening: ['snake', 'dragon', 'shieldBearer', 'aegis', 'darkKnight', 'bombOrc', 'bombBird', 'voidSparrow', 'shieldLesser', 'shieldGreater', 'poisonLesser', 'poisonBearer', 'poisonGreater', 'poisonSovereign', 'siegeBeetle', 'burrowingMole', 'necromancer', 'bannerCaptain', 'mirrorKnight', 'leechSwarm', 'ashPhoenix', 'blinkImp', 'fortressHut', 'fortressOutpost', 'fortressTower', 'fortressKeep', 'fortressLesser', 'fortress', 'fortressGreater', 'fortressSovereign'],
     },
     // Self-driving siege engines shelling the wall, the houses in their way
     // and the keep, under fire from towers.
@@ -252,7 +252,7 @@ test("the Defend replays exercise every unit and effect", () => {
       if (sim.baits.length && sim.blazes.length) seen.add("bait:burning");
     });
   const want = [
-    "enemy:shieldLesser", "enemy:shieldGreater", "enemy:poisonLesser", "enemy:poisonBearer", "enemy:poisonGreater", "enemy:poisonSovereign", "enemy:fortressLesser", "enemy:fortress", "enemy:fortressGreater", "enemy:fortressSovereign", "enemy:darkKnight", "enemy:bombOrc", "enemy:bombBird", "enemy:voidSparrow", "enemy:snake", "enemy:dragon", "enemy:shieldBearer", "enemy:aegis", "enemy:warlord", "enemy:bat", "enemy:mother", "enemy:broodling", "distracted", "marked", "soldier:sword", "soldier:archer", "path:sword", "path:archer", "hunting",
+    "enemy:shieldLesser", "enemy:shieldGreater", "enemy:poisonLesser", "enemy:poisonBearer", "enemy:poisonGreater", "enemy:poisonSovereign", "enemy:fortressHut", "enemy:fortressOutpost", "enemy:fortressTower", "enemy:fortressKeep", "enemy:fortressLesser", "enemy:fortress", "enemy:fortressGreater", "enemy:fortressSovereign", "enemy:darkKnight", "enemy:bombOrc", "enemy:bombBird", "enemy:voidSparrow", "enemy:snake", "enemy:dragon", "enemy:shieldBearer", "enemy:aegis", "enemy:warlord", "enemy:bat", "enemy:mother", "enemy:broodling", "distracted", "marked", "soldier:sword", "soldier:archer", "path:sword", "path:archer", "hunting",
     "civilian:toJob", "civilian:working", "civilian:home", "arrow", "shell", "flame", "frost", "chilled", "soldier:valkyrie", "stab", "guarded", "soldier:darkWizard", "chained", "lost:bare", "half-rebuilt",
     "enemy:rollingCannon", "enemy:ballista", "enemy:fireworkLauncher", "enemy:trebuchet", "enemy:bombard", "enemy:rocketBattery", "siege:ball", "siege:bolt", "siege:rocket", "siege:stone",
     "enemy:boatLesser", "enemy:boat", "enemy:boatGreater", "flood", "sunk:house", "sunk:wall", "sunk:structure", "steam",

@@ -625,7 +625,9 @@ test('a Mother splits into three broodlings when she dies, and they do not split
 
 test('Mothers appear by affordability; broodlings only hatch', () => {
   assert.ok(!buildDifficultyWave(9, () => .999).includes('mother'));
-  assert.deepEqual(buildDifficultyWave(10, () => .7), ['mother']);
+  const affordable = Object.values(ENEMIES).filter(d => !d.hatched && d.cost <= 10);
+  const motherRoll = (affordable.findIndex(d => d.kind === 'mother') + .5) / affordable.length;
+  assert.deepEqual(buildDifficultyWave(10, () => motherRoll), ['mother']);
   assert.ok(!buildWave(100, () => .5).includes('broodling'));
 });
 
