@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { roofPixels } from "../src/defend/roof-art.ts";
+import { chimneyFlue, roofPixels } from "../src/defend/roof-art.ts";
 import { ART } from "../src/defend/park-art.ts";
 
 const OUTLINE = 0xff07090b; // 0x0b0907 as little-endian RGBA
@@ -21,4 +21,20 @@ test("each house keeps its own roof: the same seed paints the same pixels, other
   let differ = 0;
   for (let s = 0; s < 20; s++) if (roofPixels(3, 2, 1, s).some((v, i) => v !== roofPixels(3, 2, 1, s + 100)[i])) differ++;
   assert.equal(differ, 20);
+});
+
+test("a chimney's smoke rises from its flue: chimneyFlue names the stack's dark flue pixel", () => {
+  const FLUE = 0xff1c222a; // 0x2a221c as little-endian RGBA
+  let found = 0;
+  for (const [cw, ch] of [[2, 1], [1, 2], [3, 2], [2, 3], [1, 1]])
+    for (let s = 0; s < 60; s++) {
+      const at = chimneyFlue(cw, ch, s), px = roofPixels(cw, ch, 0, s), W = cw * ART;
+      if (!at) {
+        assert.ok(!px.includes(FLUE), `no flue drawn without a chimney ${cw}x${ch} seed ${s}`);
+        continue;
+      }
+      found++;
+      assert.equal(px[at.y * W + at.x], FLUE, `flue at ${cw}x${ch} seed ${s}`);
+    }
+  assert.ok(found > 10);
 });
