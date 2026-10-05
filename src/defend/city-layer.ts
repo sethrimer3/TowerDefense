@@ -17,6 +17,7 @@ import { GRASS, grassPatch, groundArt } from "./ground-art.ts";
 import { heights, shadowCanvas, shadowMask } from "./shadow-art.ts";
 import { gatePixels, gateRubblePixels } from "./gate-art.ts";
 import { gateRect, type Side } from "./layout.ts";
+import { SPIKE_REACH, bastionPixels, bastionRubblePixels, spikePixels } from "./wall-defense-art.ts";
 
 export { POND, POND_WATER, hasTree, pondDisc, pondPath, treeCanopy } from "./park-geometry.ts";
 
@@ -100,6 +101,7 @@ export function paintCityLayer(c: CanvasRenderingContext2D, px: number, scene: C
   // structure standing there is in front of the face, so it covers it.
   for (const b of map.buildings) if (b.kind === "wall") paintBuilding(p, b);
   for (const b of map.buildings) if (b.kind !== "wall") paintBuilding(p, b);
+  paintSpikes(p);
   paintPixelArt(p, cityShadows(map, sim));
   paintLanternBrackets(p, scene.lights);
 }
@@ -253,6 +255,13 @@ function paintBuilding(p: Paint, b: Building) {
     }
     return paintArt(p, gateSprite(side, 0, stageOf(sim, b), lotSeed(b)), box);
   }
+  if (b.kind === "wallBallista") {
+    if (sim && !sim.intact(b)) {
+      paintArt(p, sprite(`bastion:rubble:${lotSeed(b)}`, r.w * ART, r.h * ART, () => bastionRubblePixels(lotSeed(b))), box);
+      return paintRebuilding(p, b);
+    }
+    return paintArt(p, bastionSprite(stageOf(sim, b), lotSeed(b)), box);
+  }
   if (sim && !sim.intact(b)) {
     if (b.kind === "keep") return paintKeepRubble(c, box);
     if (b.kind === "house") paintArt(p, houseRubbleSprite(r.w, r.h, b.variant, roofSeed(r.x, r.y, r.w, r.h)), box);
@@ -305,6 +314,27 @@ function paintRebuilding({ c, px, solid }: Paint, b: Building) {
 /** A cached sprite of art pixels drawn up over `box` (canvas pixels). */
 function paintArt({ c }: Paint, art: HTMLCanvasElement | null, box: { x: number; y: number; w: number; h: number }) {
   drawSprite(c, art, box.x, box.y, box.w, box.h);
+}
+
+/** A wall ballista's bastion at damage `stage`. */
+export const bastionSprite = (stage: number, seed: number) => sprite(`bastion:${stage}:${seed}`, 2 * ART, 2 * ART, () => bastionPixels(stage, seed));
+
+const SPIKE_OUT: Record<Side, readonly [number, number]> = { n: [0, -1], e: [1, 0], s: [0, 1], w: [-1, 0] };
+
+/** The wall spikes on every standing stone they line, their tips reaching
+ * out past the wall's face. */
+function paintSpikes({ c, px, map, solid }: Paint) {
+  for (const row of map.spikes ?? []) {
+    const [dx, dy] = SPIKE_OUT[row.side];
+    const reach = SPIKE_REACH / ART;
+    for (const i of row.cells) {
+      if (!solid(i)) continue;
+      const cx = i % CELLS_W, cy = (i - cx) / CELLS_W;
+      const x = Math.round((cx + dx * reach) * px), y = Math.round((cy + dy * reach) * px);
+      const w = Math.round((cx + dx * reach + 1) * px) - x, h = Math.round((cy + dy * reach + 1) * px) - y;
+      drawSprite(c, sprite(`spikes:${row.side}:${hash(cx, cy, 31) % 8}`, ART, ART, () => spikePixels(row.side, hash(cx, cy, 31) % 8)), x, y, w, h);
+    }
+  }
 }
 
 /** A city gate's sprite with its doors at `frame`, and its rubble. */

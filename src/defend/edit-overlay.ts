@@ -8,9 +8,10 @@ export type Overlay = {
   /** Tile keys that accept the dragged item. */
   legal: Set<string>;
   hover: string | null;
-  ghost: { rect: Rect; kind: StructureKind | "cityTile" | "cityGate" } | null;
-  /** A city gate being carried: the wall edges that take it, the one under
-   * the pointer and whether it fits there. */
+  ghost: { rect: Rect; kind: StructureKind | "cityTile" | "cityGate" | "wallSpikes" | "wallBallista" } | null;
+  /** A piece of the wall being carried (a gate, spikes or a ballista): the
+   * stretches or corners of wall that take it, the one under the pointer
+   * and whether it fits there. */
   gates?: { legal: Rect[]; hover: Rect | null; fits: boolean };
   /** A bomb being aimed: centre in cells. */
   bomb?: { x: number; y: number; r: number } | null;
@@ -123,8 +124,8 @@ function drawBlockTargets(c: CanvasRenderingContext2D, px: number, o: Overlay, s
   c.setLineDash([]);
 }
 
-/** For a city gate: dims the board and frames every stretch of wall that
- * takes it, the one under the pointer brightest (red where it won't go). */
+/** For a piece of the wall: dims the board and frames every stretch or
+ * corner of wall that takes it, the one under the pointer brightest (red where it won't go). */
 function drawGateTargets(c: CanvasRenderingContext2D, px: number, g: NonNullable<Overlay["gates"]>) {
   const { W, H } = boardSize(px);
   c.fillStyle = "rgba(0,0,0,0.3)";

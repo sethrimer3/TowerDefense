@@ -28,7 +28,7 @@ import {
 } from "./grid.ts";
 import { MinHeap } from "./heap.ts";
 import type { StructureKind } from "./catalog.ts";
-import type { FittedGate, FittedStructure, GateSpot } from "./layout.ts";
+import type { CornerSpot, FittedBallista, FittedGate, FittedSpikes, FittedStructure, GateSpot } from "./layout.ts";
 
 export const CellType = {
   OUT: 0,
@@ -43,7 +43,7 @@ export const CellType = {
 export type CellType = (typeof CellType)[keyof typeof CellType];
 const FREE = 9;
 
-export type BuildingKind = "house" | "wall" | "gate" | StructureKind;
+export type BuildingKind = "house" | "wall" | "gate" | "wallBallista" | StructureKind;
 export type Building = {
   id: number;
   kind: BuildingKind;
@@ -55,7 +55,14 @@ export type Building = {
   variant: number;
   /** Set for a city gate: where it stands in the wall. */
   gate?: GateSpot;
+  /** Set for a wall ballista: its corner, and the way out of the city
+   * there (a diagonal unit step), which it faces until it first shoots. */
+  corner?: CornerSpot & { out: { x: number; y: number } };
 };
+
+/** Wall spikes on the wall stones `cells` (those facing open ground) along
+ * `side` of tile (tx, ty), pointing out that way. */
+export type SpikeRow = GateSpot & { cells: number[] };
 
 export type CityMap = {
   type: Uint8Array;
@@ -65,6 +72,8 @@ export type CityMap = {
   city: Uint8Array;
   wall: Uint8Array;
   structures: FittedStructure[];
+  /** The wall spikes (unset when there are none). */
+  spikes?: SpikeRow[];
 };
 
 /** House footprints and how often each is tried first: mostly chunky
@@ -83,11 +92,12 @@ const HOUSE_SHAPES: [number, number, number][] = [
 ];
 
 export function generateCity(
-  fit: { structures: FittedStructure[]; city: Uint8Array; wall: Uint8Array; gates?: FittedGate[] },
+  fit: { structures: FittedStructure[]; city: Uint8Array; wall: Uint8Array; gates?: FittedGate[]; spikes?: FittedSpikes[]; ballistas?: FittedBallista[] },
   seed: number,
 ): CityMap {
   const { city, wall, structures } = fit;
   const gates = fit.gates ?? [];
+  const ballistas = fit.ballistas ?? [];
   const t = new Uint8Array(CELL_COUNT);
   for (let i = 0; i < CELL_COUNT; i++) t[i] = city[i] ? FREE : wall[i] ? CellType.WALL : CellType.OUT;
   for (const s of structures) fillRect(t, s.rect, CellType.STRUCT);
@@ -106,11 +116,28 @@ export function generateCity(
   buildHouses(t, lots, seed);
   digPonds(t, seed);
   // Every wall cell is its own stone that can be knocked out, but for the
-  // gates, which come last.
-  const gated = new Set(gates.flatMap((g) => rectCells(g.rect)));
+  // gates and ballistas' bastions, which come last.
+  const gated = new Set([...gates, ...ballistas].flatMap((g) => rectCells(g.rect)));
   for (let i = 0; i < CELL_COUNT; i++) if (t[i] === CellType.WALL && !gated.has(i)) lots.add("wall", { x: cellX(i), y: cellY(i), w: 1, h: 1 });
   for (const g of gates) lots.add("gate", g.rect, { gate: { tx: g.tx, ty: g.ty, side: g.side } });
-  return { type: t, owner: lots.owner, buildings: lots.buildings, city, wall, structures };
+  for (const b of ballistas) lots.add("wallBallista", b.rect, { corner: { vx: b.vx, vy: b.vy, out: b.out } });
+  const spikes = (fit.spikes ?? []).map((g) => spikeRow(t, lots.owner, lots.buildings, g)).filter((r) => r.cells.length);
+  return { type: t, owner: lots.owner, buildings: lots.buildings, city, wall, structures, ...(spikes.length ? { spikes } : {}) };
+}
+
+const OUT_STEP: Record<GateSpot["side"], readonly [number, number]> = { n: [0, -1], e: [1, 0], s: [0, 1], w: [-1, 0] };
+
+/** The wall stones along spikes' edge that face open ground outside: not
+ * a bastion's, and with no more wall beyond them (as where the wall bends
+ * into a corner). */
+function spikeRow(t: Uint8Array, owner: Int32Array, buildings: Building[], g: FittedSpikes): SpikeRow {
+  const [dx, dy] = OUT_STEP[g.side];
+  const cells = rectCells(g.rect).filter((i) => {
+    if (owner[i] < 0 || buildings[owner[i]].kind !== "wall") return false;
+    const x = cellX(i) + dx, y = cellY(i) + dy;
+    return cellInBounds(x, y) && t[cellIndex(x, y)] !== CellType.WALL;
+  });
+  return { tx: g.tx, ty: g.ty, side: g.side, cells };
 }
 
 /** The buildings placed so far and which cells each one owns. */

@@ -133,6 +133,6 @@ test("the palette's categories split everything between towers, units and the ci
   const of = (c: "towers" | "units" | "city") => PALETTE_ITEMS.filter((i) => inCategory(i, c));
   assert.deepEqual(of("towers"), ["archerTower", "cannonTower", "watchTower", "wizardTower"]);
   assert.deepEqual(of("units"), ["barracks", "archerBarracks", "mageGuild", "valkyriePalace", "darkKeep"]);
-  assert.deepEqual(of("city"), ["cityTile", "monsterBait", "cityGate"]);
+  assert.deepEqual(of("city"), ["cityTile", "monsterBait", "cityGate", "wallSpikes", "wallBallista"]);
   assert.deepEqual(PALETTE_ITEMS.filter((i) => inCategory(i, "all")), PALETTE_ITEMS);
 });

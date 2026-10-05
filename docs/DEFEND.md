@@ -48,12 +48,13 @@ Recent rows are available as `window.defendPerformance`; they are not saved.
 ## Building (before a run)
 
 - The **palette** (left by default; the ⚙ settings move it to the right) lists
-  city tiles, barracks, archer barracks, Mage Guilds, Valkyrie palaces, dark wizard keeps, monster bait, city gates and the towers with an `×N` count of
+  city tiles, barracks, archer barracks, Mage Guilds, Valkyrie palaces, dark wizard keeps, monster bait, city gates, wall spikes, wall ballistas and the towers with an `×N` count of
   what is owned but not yet placed; it greys out at `×0`. The button at its
   head (`☰ All`) opens a list of categories, and the palette shows only the
   one picked: **All**, **Towers** (archer, cannon, watch and wizard towers),
   **Units** (barracks, archer barracks, Mage Guild, Valkyrie palace, dark
-  wizard keep) or **City** (city tiles, monster bait, city gates;
+  wizard keep) or **City** (city tiles, monster bait, city gates, wall
+  spikes and wall ballistas;
   `ITEM_CATEGORY` in `catalog.ts`). The city tile's icon is a corner of the
   city in the board's own pixel art (`tile-art.ts`): two dirt streets
   crossing, shingled roofs and a park with a tree.
@@ -66,6 +67,21 @@ Recent rows are available as `window.defendPerformance`; they are not saved.
   (`gateRect`); `fitLayout` keeps the 3 × 2 cells inside it clear, and the
   city paves them and joins them to the streets. Adding a city tile across a
   gate, or taking its own tile away, drops it back to the palette.
+- **Wall spikes** go on the same edges as a gate (not one with a gate, nor a
+  gate on one with spikes), saved in the layout's `spikes`: they line the
+  wall's outer row of stones along the whole edge (`spikesRect`; carried,
+  the edge's whole depth of wall is framed, `edgeWallRect`). A set row lifts
+  from any of its stones.
+- A **wall ballista** goes on a corner of the wall: a tile corner whose four
+  tiles are on the board and one or three of them city (`cornerOk`), so the
+  wall turns through a right angle there; straight runs, and two tiles
+  meeting only at a point, don't take one. It is saved in the layout's
+  `ballistas` as the corner (`CornerSpot`, `vx, vy` in tiles). Its bastion
+  takes the 2 x 2 block of wall stones at the corner (`ballistaRect`): in
+  the tile across the corner from a lone city tile, or in the one tile
+  round an inner bend that isn't city. Carried, it snaps to the nearest
+  corner (`nearestCorner`). Either goes back to the palette when its wall
+  stops running there.
 - Drag from the palette onto the board. While dragging, every tile that would
   accept the item gets a faint gold outline and every other tile darkens; the
   hovered tile shows exactly where the building will be fitted.
@@ -304,6 +320,29 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   leaves rubble. The doors swing inward over `GATE_FRAMES` while a soldier
   or civilian is within 1.6 cells and close behind them (`DefendRenderer`,
   presentation only).
+- **Wall spikes** (`wall-defenses.ts`, `stepSpikes`) stand on the stones
+  `citygen.ts` lists in `map.spikes` (each row's stones that face open
+  ground). Every `SPIKES.every` seconds (`sim.spikeT`) each enemy on foot
+  (not fliers, boats or a burrowed mole) within the stakes' reach of a
+  standing stone takes `SPIKES.damage`, once a pulse, as a melee blow. A
+  knocked-out stone's stakes go with it and come back when it is rebuilt.
+- **Wall ballistas** are buildings (`kind: "wallBallista"`, numbered after
+  the gates) with twice the HP of the stones they replace; they are solid,
+  battered and rebuilt like the wall. Each shoots (`Towers`,
+  `shootBallista`) the nearest enemy within `BALLISTA.range` every
+  `BALLISTA.cooldown` seconds (Smithy reload and damage apply): a bolt
+  (`sim.ballistaBolts`, `stepBallistaBolts`) flies straight on at
+  `BALLISTA.speed`, hurting each enemy it passes within reach of once,
+  nearest first, until it has pierced `BALLISTA.pierce` or flown its range.
+  `sim.ballistaAim` keeps where each last shot. A city without spikes or
+  ballistas has no `map.spikes`, bolts or aims, so it replays as before.
+  Drawn by `wall-defense-art.ts`: the stakes on an oak beam per stone,
+  their tips past the wall's face (`spikePixels`, in the city layer); the
+  bastion with its parapet and turntable (`bastionPixels`, damage stages
+  and rubble); and the crossbow baked at `BALLISTA_DIRS` headings, drawn
+  back with a bolt on or slack just after a shot (`ballistaPixels`,
+  `drawBallistas`, live each frame, facing out of the city until it first
+  shoots), with its bolts in flight.
 - **Monster bait** (`bait.ts`) is a stack of crates, one open and heaped
   with raw meat, a haunch lashed to another stacked on top, green slime
   seeping from the seams. While any stack stands, every enemy goes for the

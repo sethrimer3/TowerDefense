@@ -89,7 +89,7 @@ export function wetAt(sim: DefendSim, x: number, y: number) {
 /** Whether a boat's water sinks building `b`. */
 export function sinks(boat: BoatDef, b: Building) {
   if (b.kind === "keep") return !!boat.keep;
-  if (b.kind === "wall" || b.kind === "gate") return !!boat.walls;
+  if (b.kind === "wall" || b.kind === "gate" || b.kind === "wallBallista") return !!boat.walls;
   return true;
 }
 

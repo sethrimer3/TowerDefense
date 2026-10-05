@@ -17,6 +17,7 @@ import { Fences } from "./fences.ts";
 import { Rain, ambientFor, type Weather } from "./weather.ts";
 import { damageKey, gateSprite, lotSeed, onCityArtLoaded, paintCityLayer, stageOf } from "./city-layer.ts";
 import { GATE_FRAMES } from "./gate-art.ts";
+import { drawBallistas } from "./wall-defense-art.ts";
 import { rectDist } from "./pathing.ts";
 import { carriedLights, drawDamage, drawScorches, drawUnits, shadowCasters, type Brush, type Burning } from "./battle-art.ts";
 import { drawGrid, drawOverlay, type Overlay } from "./edit-overlay.ts";
@@ -218,6 +219,7 @@ export class DefendRenderer {
     ctx.drawImage(this.layer, 0, 0, W, H);
     ctx.imageSmoothingEnabled = false;
     if (sim) this.drawGates(map, sim, opts, dt);
+    drawBallistas(ctx, this.px, map, sim);
     if (opts.effects ?? true) this.drawParkLife(map, sim, opts, dt);
     // Park fences sit on the ground layer, under the lighting and units.
     this.fences.sync(map);

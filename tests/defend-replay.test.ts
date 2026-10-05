@@ -157,6 +157,8 @@ function state(sim: DefendSim) {
     sim.corpses, sim.blackHoles, sim.enemies, sim.soldiers, sim.civilians, sim.arrows, sim.shells, sim.flames, sim.frosts, sim.stabs, sim.scorches, sim.effects, sim.events,
     sim.solid, sim.hp, sim.built, sim.flash, sim.field,
     [...(s.towers as { cooldown: Map<number, number> }).cooldown], [...(s.barracks as { training: Map<number, number> }).training], (s.builders as { respawn: number[] }).respawn,
+    // Only runs with wall spikes or ballistas have their bolts, aims and pulses.
+    ...(sim.map.spikes || sim.ballistaAim.size || sim.ballistaBolts.length ? [sim.ballistaBolts, [...sim.ballistaAim], sim.spikeT] : []),
     // Only runs with a dark keep have bolts or turrets, so the others hash as before.
     ...(sim.bolts.length || dark.size ? [sim.bolts, [...dark]] : []),
     // Likewise only siege engines shoot siege shots.

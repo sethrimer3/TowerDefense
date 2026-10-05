@@ -7,8 +7,8 @@ import { intPow } from "../exact.ts";
 export type StructureKind = "keep" | "barracks" | "archerBarracks" | "archerTower" | "cannonTower" | "watchTower" | "wizardTower" | "mageGuild" | "valkyriePalace" | "darkKeep" | "monsterBait";
 /** Everything that appears in the build palette (the keep is placed from the
  * start and can only be moved, so it is not a palette item). */
-export type PaletteItem = "cityTile" | "cityGate" | Exclude<StructureKind, "keep">;
-export const PALETTE_ITEMS: PaletteItem[] = ["cityTile", "barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "cityGate"];
+export type PaletteItem = "cityTile" | "cityGate" | "wallSpikes" | "wallBallista" | Exclude<StructureKind, "keep">;
+export const PALETTE_ITEMS: PaletteItem[] = ["cityTile", "barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "cityGate", "wallSpikes", "wallBallista"];
 
 /** The build palette's categories: what each shows (All shows everything). */
 export type PaletteCategory = "all" | "towers" | "units" | "city";
@@ -23,6 +23,8 @@ export const PALETTE_CATEGORIES: { id: PaletteCategory; name: string }[] = [
 export const ITEM_CATEGORY: Record<PaletteItem, Exclude<PaletteCategory, "all">> = {
   cityTile: "city",
   cityGate: "city",
+  wallSpikes: "city",
+  wallBallista: "city",
   monsterBait: "city",
   archerTower: "towers",
   cannonTower: "towers",
@@ -41,6 +43,20 @@ export const inCategory = (item: PaletteItem, category: PaletteCategory) => cate
 export const GATE = { long: 3, deep: 2, hpPerCell: 1.5 };
 export const GATE_DESCRIPTION =
   "A gatehouse set into the city wall on the edge of a city tile. It swings open to let your soldiers, archers, mages and townsfolk out and in, and stays barred against the enemy, who must batter it down.";
+
+/** Wall spikes: a row of iron-shod stakes along the outer face of one
+ * tile's stretch of wall, pointing out of the city. Every `every` seconds
+ * each ground enemy touching a standing stone's stakes takes `damage`. */
+export const SPIKES = { damage: 4, every: 0.5 };
+export const SPIKES_DESCRIPTION =
+  "A row of iron-shod stakes set along the outside of one city tile's stretch of wall, pointing out of the city. Every enemy on foot that presses against them is cut, again and again, while the stones behind them stand.";
+
+/** The wall ballista: a bastion of `size` × `size` cells on a corner of the
+ * wall, standing in for its stones, with a great crossbow on top. Its bolt
+ * flies `range` cells at `speed`, piercing up to `pierce` enemies. */
+export const BALLISTA = { size: 2, hpPerCell: 2, range: 13, cooldown: 2.6, damage: 24, speed: 22, pierce: 4, width: 0.45 };
+export const BALLISTA_DESCRIPTION =
+  "A great crossbow on a bastion at a corner of the city wall, where the wall turns at a right angle. Its long bolts fly far and pierce a whole file of enemies, and it turns to shoot whatever comes nearest.";
 
 export type StructureDef = {
   kind: StructureKind;
@@ -201,6 +217,8 @@ export const shareName = (size: TileShare) => (size === TILE_ROOM ? "a whole til
 export const STARTING_OWNED: Record<PaletteItem, number> = {
   cityTile: 8,
   cityGate: 0,
+  wallSpikes: 0,
+  wallBallista: 0,
   barracks: 1,
   archerBarracks: 0,
   archerTower: 1,
@@ -222,6 +240,8 @@ export function purchasePrice(item: PaletteItem, owned: number): Price {
   const base: Record<PaletteItem, Price> = {
     cityTile: { gold: 120, copper: 1 },
     cityGate: { gold: 250, copper: 3 },
+    wallSpikes: { gold: 150, copper: 2 },
+    wallBallista: { gold: 420, copper: 5 },
     barracks: { gold: 300, copper: 3 },
     archerBarracks: { gold: 330, copper: 4 },
     archerTower: { gold: 220, copper: 2 },
