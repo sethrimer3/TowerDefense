@@ -89,6 +89,28 @@ test("streets are dirt, with grass growing unevenly over their park edges", () =
     assert.equal(map.type[cellIndex(Math.floor(x / ART), Math.floor(y / ART))], CellType.PARK);
   }
   assert.ok(bare > 0, "some park edges are worn bare");
+  // Turf lies on streets only, and some street pixels are grassed over.
+  let turf = 0;
+  for (let i = 0; i < art.turf.length; i++) {
+    if (!art.turf[i]) continue;
+    turf++;
+    const x = i % W, y = (i - x) / W;
+    assert.equal(map.type[cellIndex(Math.floor(x / ART), Math.floor(y / ART))], CellType.ROAD);
+  }
+  assert.ok(turf > 0, "grass grows out over the streets");
+  // Grass and dirt meet at one wavering line: a park's bare dirt never
+  // touches a street's turf across the cells' boundary, where it would
+  // draw a ruled line of dirt inside the green.
+  const type = (x: number, y: number) => map.type[cellIndex(Math.floor(x / ART), Math.floor(y / ART))];
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      if (!art.bare[y * W + x]) continue;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = x + dx, ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= W || ny >= H || type(nx, ny) !== CellType.ROAD) continue;
+        assert.equal(art.turf[ny * W + nx], 0, `bare park pixel ${x},${y} against turf at ${nx},${ny}`);
+      }
+    }
   assert.deepEqual(groundArt(map), art, "baked once per city");
 });
 

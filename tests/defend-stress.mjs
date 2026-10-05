@@ -39,7 +39,7 @@ try {
         object[name] = function(...args) { const start = performance.now(); const result = original.apply(this, args); costs[key] = (costs[key] || 0) + performance.now() - start; return result; };
       }
     }
-    const opts = { grid:false, weather:{rain:true}, night:1, now:0, reduceMotion:false, effects:true, healthbars:true, timings:true };
+    const opts = { grid:0, weather:{rain:true}, night:1, now:0, reduceMotion:false, effects:true, healthbars:true, timings:true };
     window.bench = { map, sim, renderer, costs, opts };
     for (let i=0;i<30;i++) { await new Promise(requestAnimationFrame); sim.update(1/60); opts.now=sim.time*1000; renderer.draw(map,sim,null,opts); }
     console.log('[stress] warmup complete');

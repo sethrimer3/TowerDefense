@@ -59,7 +59,7 @@ try {
         const start = performance.now();
         sim.update(realtime && last ? (now - last) / 1000 : 1 / 60);
         const mid = performance.now();
-        renderer.draw(map, sim, null, { grid: false, weather: { rain: true }, night: 1, now, reduceMotion: false, effects: true });
+        renderer.draw(map, sim, null, { grid: 0, weather: { rain: true }, night: 1, now, reduceMotion: false, effects: true });
         const end = performance.now();
         if (i >= 30) { step.push(mid-start); draw.push(end-mid); frame.push(now-last); population.push(sim.enemies.length); }
         last = now;

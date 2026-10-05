@@ -17,6 +17,9 @@ export const SETTINGS = {
   /** The city's live dressing: wind-blown park grass, and drips, ripples
    * and reflections on the ponds. */
   effectsOff: { kind: "toggle", default: false, page: { id: "effects", label: "Grass and water effects", invert: true } },
+  /** Faint lines round the Defend board's tiles, and how strong, in percent. */
+  tileGrid: { kind: "toggle", default: false, page: { id: "tile-grid", label: "Tile grid lines" } },
+  gridOpacity: { kind: "range", default: 15, min: 5, max: 60, step: 1, page: { id: "grid-opacity", label: "Grid line opacity", aria: "Tile grid line opacity, percent" } },
   /** The synthesized knocks, chimes, horns and bells. */
   soundOff: { kind: "toggle", default: false, page: { id: "sound", label: "Sound", invert: true } },
   /** Alembic, the game's own pixel font, for every word on the page; off, Cinzel. */

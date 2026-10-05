@@ -861,6 +861,24 @@ span.training-timer {
   align-items: center;
   gap: 6px;
 }
+/* The tile grid's opacity: a brass slider with its percent beside it. */
+.setting-range[hidden] {
+  display: none;
+}
+.range-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.range-control input[type="range"] {
+  width: min(180px, 40vw);
+  accent-color: var(--brass);
+}
+.range-control output {
+  min-width: 3.5em;
+  color: #f2d48a;
+  text-align: right;
+}
 #dev-idle {
   margin-top: 16px;
 }

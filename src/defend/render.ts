@@ -35,8 +35,9 @@ import { ParkTrees, type Under } from "./park-trees.ts";
 import { FloodArt } from "./flood-art.ts";
 
 export type DrawOptions = {
-  /** Show the (dim, gold) tile grid — while the player is editing. */
-  grid: boolean;
+  /** The (dim, gold) tile grid's opacity, 0 to hide it: shown while the
+   * player is editing, if they turned it on. */
+  grid: number;
   weather: Weather | null;
   /** How far night has fallen, 0–1 (boss waves). */
   night: number;
@@ -204,8 +205,8 @@ export class DefendRenderer {
   }
 
   /** The building grid (brighter during a drag) and the drag's overlay. */
-  private drawEditing(overlay: Overlay | null, grid: boolean) {
-    if (grid) drawGrid(this.ctx, this.px, overlay ? 0.2 : 0.11);
+  private drawEditing(overlay: Overlay | null, grid: number) {
+    if (grid > 0) drawGrid(this.ctx, this.px, overlay ? Math.min(1, grid * 1.8) : grid);
     if (overlay) drawOverlay(this.ctx, this.px, overlay);
   }
 
