@@ -4,6 +4,12 @@
 /** Longest time away the Mine and the Library are paid for. */
 export const MAX_AWAY_MS = 24 * 60 * 60 * 1000;
 export const HOUR_MS = 60 * 60 * 1000;
+/** Maximum simulation speed while spending banked idle time. */
+export const IDLE_SPEED = 120;
+export const countdown = (ms: number) => {
+  const seconds = Math.ceil(Math.max(0, ms) / 1000);
+  return `${Math.floor(seconds / 3600)}:${String(Math.floor(seconds / 60) % 60).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+};
 
 /** A stretch of time in words: "3 h 12 min", "45 min", "under a minute". */
 export function span(ms: number) {

@@ -32,6 +32,7 @@ export type Burnable = { x0: number; y0: number; x1: number; y1: number; fuel: n
 /** A droplet of thrown water: it flies in front of the shelves until it
  * meets a flame's heat or comes down where it was aimed (`t` seconds on). */
 export type Drop = { x: number; y: number; vx: number; vy: number; w: number; t: number };
+export type FireSave = { active: boolean; cells: number[][]; drops: Drop[] };
 
 export const cellAt = (x: number, y: number) => {
   const cx = Math.floor(x / CELL), cy = Math.floor(y / CELL);
@@ -48,6 +49,11 @@ export class Fire {
   readonly char = new Float32Array(N);
   /** Soot on the stone where hot air rose; it fades as it is cleaned. */
   readonly soot = new Float32Array(N);
+  /** Cellular particles: smoke rises through gaps; ash falls and piles up. */
+  readonly smoke = new Uint8Array(N);
+  readonly ash = new Uint8Array(N);
+  private movingParticles = false;
+  private smokeNext = new Uint8Array(N);
   drops: Drop[] = [];
   /** Cells burning after the last step. */
   burning = 0;
@@ -72,7 +78,8 @@ export class Fire {
           const i = cellAt(x, y);
           if (i < 0) continue;
           this.owner[i] = id;
-          this.fuel[i] = this.fuel0[i] = o.fuel;
+          this.fuel0[i] = o.fuel;
+          this.fuel[i] = o.fuel * (1 - this.char[i]);
         }
     });
     this.objects = objects.length;
@@ -102,6 +109,43 @@ export class Fire {
   left(x: number, y: number) {
     const i = cellAt(x, y);
     return i < 0 || this.fuel0[i] <= 0 ? 1 : this.fuel[i] / this.fuel0[i];
+  }
+  /** Each cell's four artwork pixels disappear separately as fuel is eaten. */
+  missing(x: number, y: number) {
+    const i = cellAt(x, y);
+    if (i < 0) return false;
+    const pixel = ((x & 1) + (y & 1) * 2 + (i % 3)) % 4;
+    return this.char[i] >= (pixel + 1) / 4;
+  }
+  repair(x0: number, y0: number, x1: number, y1: number, fraction: number) {
+    for (let y = y0; y < y1; y += CELL) for (let x = x0; x < x1; x += CELL) {
+      const i = cellAt(x, y);
+      if (i < 0) continue;
+      this.char[i] = Math.max(0, this.char[i] - fraction);
+      this.fuel[i] = this.fuel0[i] * (1 - this.char[i]);
+    }
+    this.version++;
+  }
+  save(): FireSave {
+    const cells: number[][] = [];
+    for (let i = 0; i < N; i++) {
+      if (!(this.fuel0[i] || this.char[i] || this.soot[i] || this.heat[i] || this.smoke[i] || this.ash[i])) continue;
+      cells.push([i, this.heat[i], this.fuel[i], this.fuel0[i], this.wet[i], this.char[i], this.soot[i], this.smoke[i], this.ash[i], this.owner[i]]);
+    }
+    return { active: this.active, cells, drops: this.drops.map((d) => ({ ...d })) };
+  }
+  restore(saved: FireSave, objects: number) {
+    this.objects = objects;
+    for (const [i, heat, fuel, full, wet, char, soot, smoke, ash, owner] of saved.cells) {
+      this.heat[i] = heat; this.fuel[i] = fuel; this.fuel0[i] = full;
+      this.wet[i] = wet; this.char[i] = char; this.soot[i] = soot;
+      this.smoke[i] = smoke; this.ash[i] = ash; this.owner[i] = owner;
+    }
+    this.active = saved.active;
+    this.sooty = this.soot.some((v) => v > 0);
+    this.movingParticles = this.smoke.some((v) => v > 0) || this.ash.some((v) => v > 0);
+    this.drops = saved.drops.map((d) => ({ ...d }));
+    this.version++;
   }
   burningAt(i: number) {
     return i >= 0 && this.fuel[i] > 0 && this.heat[i] >= IGNITE && this.wet[i] < 0.3;
@@ -147,6 +191,7 @@ export class Fire {
       }
       this.sooty = any;
     }
+    this.stepParticles();
     if (!this.active) return;
     this.version++;
     this.flyDrops(dt, rng, douse);
@@ -165,6 +210,9 @@ export class Fire {
           burning++;
           fuel[i] = Math.max(0, fuel[i] - BURN * dt * (0.6 + rng() * 0.8));
           this.char[i] = Math.max(this.char[i], 1 - fuel[i] / this.fuel0[i]);
+          if ((i + this.version) % 4 === 0) this.smoke[i] = Math.min(255, this.smoke[i] + 48);
+          if (fuel[i] === 0) this.ash[i] = 1;
+          this.movingParticles = true;
           next[i] = Math.min(MAXH, next[i] + GEN * dt);
           const g = h * dt * (0.5 + rng());
           if (y > 0) {
@@ -195,6 +243,41 @@ export class Fire {
       heat.fill(0);
       wet.fill(0);
     }
+  }
+
+  /** Falling-sand rules, with an empty destination required for every move. */
+  private stepParticles() {
+    if (!this.movingParticles) return;
+    const next = this.smokeNext;
+    next.fill(0);
+    let moving = false;
+    const solid = (i: number) => this.fuel[i] > 0.15 && this.char[i] < 0.75;
+    for (let y = 0; y < FH; y++) for (let x = 0; x < FW; x++) {
+      const i = y * FW + x, density = this.smoke[i];
+      if (!density) continue;
+      moving = true;
+      if (y === 0) continue;
+      const dir = (x + y + this.version) % 2 ? 1 : -1;
+      let to = i;
+      for (const dx of [0, dir, -dir]) {
+        const j = i - FW + dx;
+        if (x + dx >= 0 && x + dx < FW && !solid(j) && next[j] < 128) { to = j; break; }
+      }
+      if (to === i && x + dir >= 0 && x + dir < FW && !solid(i + dir)) to = i + dir;
+      next[to] = Math.min(255, next[to] + Math.max(0, density - 3));
+    }
+    this.smoke.set(next);
+    for (let y = Math.floor(FLOOR / CELL) - 2; y >= 0; y--) for (let x = 0; x < FW; x++) {
+      const i = y * FW + x;
+      if (!this.ash[i]) continue;
+      const dir = (x + y + this.version) % 2 ? 1 : -1;
+      for (const dx of [0, dir, -dir]) {
+        const j = i + FW + dx;
+        if (x + dx < 0 || x + dx >= FW || solid(j) || this.ash[j]) continue;
+        this.ash[j] = 1; this.ash[i] = 0; moving = true; break;
+      }
+    }
+    this.movingParticles = moving;
   }
 
   private flyDrops(dt: number, rng: () => number, douse: number) {
@@ -228,4 +311,18 @@ export class Fire {
         if (this.fuel[j] > 0 && this.heat[j] >= IGNITE && rng() < douse * share) this.heat[j] = 0;
       }
   }
+}
+
+/** Optional new save data is accepted only within this bounded grid. */
+export function decodeFireSave(s: any): FireSave | null {
+  if (!s || typeof s.active !== "boolean" || !Array.isArray(s.cells) || s.cells.length > N || !Array.isArray(s.drops) || s.drops.length > 512) return null;
+  const seen = new Set<number>();
+  for (const c of s.cells) {
+    if (!Array.isArray(c) || c.length !== 10 || !Number.isInteger(c[0]) || c[0] < 0 || c[0] >= N || seen.has(c[0])) return null;
+    seen.add(c[0]);
+    if (!c.slice(1, 7).every((v: unknown) => typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 2)) return null;
+    if (c[4] > 1 || c[5] > 1 || c[6] > 1 || !Number.isInteger(c[7]) || c[7] < 0 || c[7] > 255 || (c[8] !== 0 && c[8] !== 1) || !Number.isInteger(c[9]) || c[9] < -1 || c[9] > 1000) return null;
+  }
+  if (!s.drops.every((d: any) => d && [d.x, d.y, d.vx, d.vy, d.w, d.t].every((v) => Number.isFinite(v) && Math.abs(v) <= 10000) && d.w >= 0)) return null;
+  return { active: s.active, cells: s.cells.map((c: number[]) => [...c]), drops: s.drops.map((d: Drop) => ({ ...d })) };
 }

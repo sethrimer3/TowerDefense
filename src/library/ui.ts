@@ -9,19 +9,19 @@
  * with Night watch), after which it is a new, empty library. The librarians
  * themselves only move while the game is open. */
 import { play } from "../sound.ts";
-import { HOUR_MS, MAX_AWAY_MS } from "../away.ts";
-import { random } from "../random.ts";
-import { H, LAB_FLOOR, LAB_MAX_LEVEL, MAX_LIBRARIANS, labPrice, MAX_SHELVES, LibrarySim, ROLES, RETURN_BOOKS, idleFireChance, idleHours, librarianPrice, shelfPrice, type Librarian, type LibrarySave, type Role } from "./sim.ts";
+import { countdown, HOUR_MS, IDLE_SPEED, MAX_AWAY_MS } from "../away.ts";
+import { H, LAB_FLOOR, LAB_MAX_LEVEL, MAX_LIBRARIANS, labPrice, MAX_SHELVES, LibrarySim, ROLES, RETURN_BOOKS, librarianPrice, shelfPrice, type Librarian, type LibrarySave, type Role } from "./sim.ts";
 
 import { LibraryRenderer, daylight } from "./render.ts";
 
 /** What became of the library over time away, for the welcome-back screen. */
 export interface LibraryAway {
-  /** Ms into the time away at which the hour it burnt down in began (null
-   * when it stood), and the shelves and librarians lost with it. */
-  burntAt: number | null;
-  shelves: number;
+  ms: number;
+  owedMs: number;
+  catchingUp: boolean;
+  knowledge: number;
   librarians: number;
+  books: number;
 }
 
 export interface LibraryHost {
@@ -58,7 +58,9 @@ export class LibraryPage {
   private shown = "";
   /** Wall-clock ms the library last advanced to, and paid Knowledge up to. */
   private ranTo = 0;
-  private paidTo = 0;
+  private owed = 0;
+  private deathsBefore = 0;
+  private booksBefore = 0;
   private burning = false;
   private shownStaff = "";
   /** A name being dragged in the staff's list (the list holds still). */
@@ -66,7 +68,6 @@ export class LibraryPage {
   /** Knowledge earned over the time away (paid by the next `advance`), and
    * what became of the library, for the welcome-back screen. */
   awayKnowledge = 0;
-  private owedKnowledge = 0;
   away: LibraryAway | null = null;
 
   constructor(root: HTMLElement, host: LibraryHost) {
@@ -76,62 +77,65 @@ export class LibraryPage {
 
   load(saved: LibrarySave | null, now: number) {
     this.sim = saved ? new LibrarySim(saved.seed, saved) : new LibrarySim(this.host.newSeed());
-    this.ranTo = this.paidTo = now;
-    this.awayKnowledge = this.owedKnowledge = 0;
+    this.ranTo = now;
+    this.owed = 0;
+    this.awayKnowledge = 0;
     this.away = null;
-    if (saved?.savedAt) this.idle(Math.min(MAX_AWAY_MS, Math.max(0, now - saved.savedAt)), saved.savedAt);
+    this.burning = this.sim.fire.active;
+    if (saved) this.addAway(Math.min(MAX_AWAY_MS, Math.max(0, now - saved.savedAt) + (saved.idleMs ?? 0)));
   }
   snapshot(now: number): LibrarySave {
-    return this.sim.save(now);
+    return { ...this.sim.save(now), idleMs: Math.min(MAX_AWAY_MS, this.owed + Math.max(0, now - this.ranTo)) };
   }
+  get owedMs() { return this.owed; }
 
-  /** Reckons `ms` of time away an hour at a time (rolls drawn from the
-   * library's seed and `stamp`): Knowledge for the hours it stood, and a new
-   * library if it burnt down. An empty library has nothing to burn. */
-  private idle(ms: number, stamp: number) {
-    const sim = this.sim, chance = sim.shelves > 0 ? idleFireChance(this.host.upgrades().nightWatch) : 0;
-    const r = idleHours(ms, sim.rate, chance, random(sim.seed ^ (stamp >>> 0) ^ 0x1d1e));
-    this.awayKnowledge += r.knowledge;
-    this.owedKnowledge += r.knowledge;
-    this.away = { burntAt: r.burntAt, shelves: 0, librarians: 0 };
-    if (r.burntAt !== null) {
-      this.away.shelves = sim.shelves;
-      this.away.librarians = sim.librarians.length;
-      this.sim = new LibrarySim(this.host.newSeed());
-      this.burning = false;
-    }
-  }
-
-  /** Runs the library up to wall-clock time `now` (a second at most: time
-   * the page was hidden isn't simulated) and pays its Knowledge. */
+  /** Spend queued time in ordinary simulation steps, within a frame budget.
+   * Knowledge is paid for those steps only, at the rate they actually had. */
   advance(now: number) {
+    const gap = Math.max(0, now - this.ranTo);
+    this.ranTo = now;
+    this.owed = Math.min(MAX_AWAY_MS, this.owed + gap);
     const up = this.host.upgrades();
     this.sim.fireproof = up.fireproof;
     this.sim.fireTraining = up.fireTraining;
-    this.sim.night = 1 - daylight(this.host.clock());
-    let left = Math.min(1, Math.max(0, now - this.ranTo) / 1000);
-    this.ranTo = now;
-    while (left > 1e-6) {
-      const dt = Math.min(0.1, left);
-      this.sim.step(dt);
-      left -= dt;
+    this.sim.nightWatch = up.nightWatch;
+    const start = performance.now();
+    const limit = Math.max(100, Math.min(1000, gap) * IDLE_SPEED);
+    let spent = 0, earned = 0, n = 0;
+    while (this.owed >= 100 - 1e-6 && spent + 100 <= limit + 1e-6) {
+      this.sim.night = 1 - daylight(this.host.clock() - this.owed);
+      const rate = this.sim.rate;
+      this.sim.step(0.1);
+      this.owed = Math.max(0, this.owed - 100);
+      spent += 100;
+      const pay = rate * 100 / HOUR_MS;
+      earned += pay;
+      if (this.away?.catchingUp) {
+        this.awayKnowledge += pay;
+        this.away.knowledge += pay;
+      }
+      if (++n % 8 === 0 && performance.now() - start > 6) break;
     }
-    const gap = Math.min(MAX_AWAY_MS, Math.max(0, now - this.paidTo));
-    this.paidTo = now;
-    const earned = (this.sim.rate * gap) / HOUR_MS + this.owedKnowledge;
-    this.owedKnowledge = 0;
     if (earned > 0) this.host.earnKnowledge(earned);
+    if (this.away?.catchingUp) {
+      this.away.owedMs = this.owed;
+      this.away.librarians = this.sim.deaths - this.deathsBefore;
+      this.away.books = this.sim.booksBurnt - this.booksBefore;
+      this.away.catchingUp = this.owed >= 100;
+    }
     if (this.sim.fire.active !== this.burning) {
       this.burning = this.sim.fire.active;
       if (this.burning && this.host.showing()) play("horn");
     }
   }
 
-  /** Dev: adds `ms` of time away, reckoned as if the game had been closed
-   * that long. */
+  /** Bank time; earnings and hazards happen as it is simulated. */
   addAway(ms: number) {
+    this.owed = Math.min(MAX_AWAY_MS, this.owed + Math.max(0, ms));
     this.awayKnowledge = 0;
-    this.idle(ms, this.host.clock());
+    this.deathsBefore = this.sim.deaths;
+    this.booksBefore = this.sim.booksBurnt;
+    this.away = { ms: this.owed, owedMs: this.owed, catchingUp: this.owed >= 100, knowledge: 0, librarians: 0, books: 0 };
   }
 
   show() {
@@ -157,7 +161,7 @@ export class LibraryPage {
           ${ROLES.map((r) => `<section class="crew-box" data-role="${r}" title="${ROLE[r].hint}"><h3><i class="job-mark job-${r}"></i>${ROLE[r].name} <b data-count="${r}">0</b></h3><ul></ul></section>`).join("")}
           <p class="crew-hint">Drag a name to another role. Tap one to follow them. Researchers work the lab below the nave: with none, Knowledge research in the Upgrades tab can't be bought. The lab has room for one researcher a level: expand it for more.</p>
         </aside>
-        <div class="mine-view library-view"><canvas id="library-canvas" aria-label="The library"></canvas><p id="library-alert" class="mine-away library-alert" role="status" hidden></p></div>
+        <div class="mine-view library-view"><canvas id="library-canvas" aria-label="The library"></canvas><p id="library-away" class="mine-away" role="status" hidden></p><p id="library-alert" class="mine-away library-alert" role="status" hidden></p></div>
       </div>`;
     const canvas = this.root.querySelector<HTMLCanvasElement>("#library-canvas")!;
     this.renderer = new LibraryRenderer(canvas);
@@ -318,6 +322,9 @@ export class LibraryPage {
 
   refresh() {
     if (!this.built) return;
+    const idle = this.root.querySelector<HTMLElement>("#library-away")!;
+    idle.hidden = this.owed < 5000;
+    idle.textContent = `Fast-forwarding · ${countdown(this.owed)} idle time remaining`;
     const sim = this.sim, free = this.host.free(), gold = this.host.gold();
     const sp = shelfPrice(sim.shelves), lp = librarianPrice(sim.hired), level = sim.labLevel, up = labPrice(level), labFull = level >= LAB_MAX_LEVEL;
     const shelvesFull = sim.shelves >= MAX_SHELVES, crewFull = sim.librarians.length >= MAX_LIBRARIANS;
@@ -354,9 +361,9 @@ export class LibraryPage {
   }
 
   /** Draws the nave (while the tab shows). */
-  frame(time: number) {
+  frame(_time: number) {
     if (!this.renderer) return;
-    this.renderer.draw(this.sim, this.host.clock(), time / 1000, this.host.effects());
+    this.renderer.draw(this.sim, this.host.clock() - this.owed, this.sim.time, this.host.effects());
     this.refresh();
   }
 }

@@ -5,7 +5,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  idleFireChance, idleHours,
   BAYS, EXITS, FLOOR, H, HALL, LAB_FLOOR, LAB_MAX_LEVEL, LibrarySim, labPrice, RETURN_BOOKS, ROLES, STAIR_X, librarianName, roleFor, MAX_LIBRARIANS, MAX_SHELVES, MAX_UNITS, PLANKS, SHELF_ORDER, SHELF_TOP, SLOTS, W, WINDOW,
   BUTT_FULL, accidentChance, decodeLibrarySave, homeBay, fireDrill, knowledgeRate, librarianPrice, shelfPrice, slotPlace, unitTop,
 } from "../src/library/sim.ts";
@@ -246,7 +245,7 @@ test("a fire burns the shelves, kills those caught in it, and the survivors flee
   assert.ok(!sim.fire.active, "the fire burnt out");
   assert.ok(fled, "librarians fled down the hallways");
   assert.ok(fought && threw, "some fetched buckets and threw them");
-  assert.ok(sim.built < 40, "shelves burnt");
+  assert.equal(sim.shelves, 40, "all purchased shelves are retained for repair");
   assert.ok(sim.booksBurnt > 0, "books burnt");
   assert.ok(sim.lost, "what the fire cost is told");
   assert.equal(sim.lost.librarians, sim.deaths);
@@ -256,12 +255,13 @@ test("a fire burns the shelves, kills those caught in it, and the survivors flee
     const h = sim.bayHeight(b);
     for (let u = h; u < MAX_UNITS; u++) assert.equal(sim.units[b * MAX_UNITS + u], -1, "nothing stands on a burnt-out shelf");
   }
-  // Survivors are rebuilt for free; the burnt-out must be bought again.
+  // Damaged shelves are repaired in place for free.
   const standing = sim.shelves;
-  run(sim, 900);
+  sim.fireproof = Infinity;
+  run(sim, 6000);
   assert.equal(sim.shelves, standing, "no burnt shelf comes back by itself");
   assert.equal(sim.built, standing, "every damaged shelf was rebuilt");
-  assert.ok(sim.buildShelf(), "burnt shelves can be bought again");
+  assert.ok(sim.buildShelf(), "new shelves can still be bought");
 });
 
 test("Fire Training puts fires out sooner, saving more", () => {
@@ -304,6 +304,7 @@ test("accidents: 1% a minute, 10% less for each rank of Fireproof Wood", () => {
       run(sim, 1);
     }
     while (sim.tables.some((p) => p < 3)) sim.tables.fill(3);
+    sim.fire.char.fill(0);
   }
   assert.ok(fires > 15 && fires < 50, `${fires} fires in 3000 minutes`);
 });
@@ -371,20 +372,6 @@ test("day and night come round, and prices climb", () => {
   }
 });
 
-test("time away: the library burns down 50% of hours, 5% less a rank of Night watch, never under 5%", () => {
-  assert.equal(idleFireChance(0), 0.5);
-  assert.ok(Math.abs(idleFireChance(4) - 0.3) < 1e-9);
-  assert.equal(idleFireChance(9), 0.05);
-  assert.equal(idleFireChance(20), 0.05);
-  const HOUR = 3600000, rolls = (...r: number[]) => () => r.shift()!;
-  assert.deepEqual(idleHours(3 * HOUR, 10, 0.5, rolls(0.9, 0.9, 0.9)), { knowledge: 30, burntAt: null }, "it stood: every hour pays");
-  assert.deepEqual(idleHours(3 * HOUR, 10, 0.5, rolls(0.9, 0.1)), { knowledge: 10, burntAt: HOUR }, "burnt in the second hour: only the first pays");
-  assert.deepEqual(idleHours(1.5 * HOUR, 10, 0.5, rolls(0.9, 0.3)), { knowledge: 15, burntAt: null }, "a half hour rolls half the chance");
-  // Over many hours, the share that burns is the chance.
-  let burnt = 0, rng = Math.random;
-  for (let i = 0; i < 4000; i++) if (idleHours(HOUR, 1, 0.3, rng).burntAt !== null) burnt++;
-  assert.ok(Math.abs(burnt / 4000 - 0.3) < 0.03, `${burnt}`);
-});
 
 test("the lab has room for a researcher a level; expanding it opens annexes and their errands, and the level is saved", () => {
   const sim = new LibrarySim(31);

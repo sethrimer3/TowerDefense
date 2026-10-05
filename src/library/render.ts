@@ -92,7 +92,6 @@ function h01(a: number, b: number, c = 0) {
 
 type Mote = { x: number; y: number; vx: number; vy: number; life: number };
 /** Smoke and embers off the flames. */
-type Puff = { x: number; y: number; vx: number; vy: number; age: number; life: number; ember: boolean };
 /** How far in the view zooms. */
 const MAX_ZOOM = 6;
 /** How much of the hallways the view shows at the widest zoom: all the
@@ -118,7 +117,6 @@ export class LibraryRenderer {
   private sceneKey = "";
   private glow: HTMLCanvasElement;
   private motes: Mote[] = [];
-  private puffs: Puff[] = [];
   /** The hallways: baked colour, each frame's picture, and how much of each
    * column (door and hallway, from the outer end in) has lately been seen. */
   private hallBase = [new Float32Array(HALL * HALL_ROWS * 3), new Float32Array(HALL * HALL_ROWS * 3)];
@@ -334,8 +332,9 @@ export class LibraryRenderer {
     const scene = this.scene, base = this.base;
     scene.set(base);
     for (let i = 0; i < W * H; i++) this.relief[i] = this.kind[i] === Kind.Wall || this.kind[i] === Kind.Floor ? 1 : 0;
-    const put = (x: number, y: number, c: RGB) => {
+    const put = (x: number, y: number, c: RGB, debris = false) => {
       if (x < 0 || x >= W || y < 0 || y >= H) return;
+      if (!debris && sim.fire.missing(x, y)) return;
       const i = y * W + x;
       scene[i * 3] = c[0];
       scene[i * 3 + 1] = c[1];
@@ -344,7 +343,8 @@ export class LibraryRenderer {
     };
     for (let bay = 0; bay < BAYS; bay++)
       for (let unit = 0; unit < MAX_UNITS; unit++) {
-        const p = sim.units[bay * MAX_UNITS + unit];
+        const key = bay * MAX_UNITS + unit;
+        const p = sim.damaged.has(key) ? PLANKS : sim.units[key];
         if (p < 0) break;
         const x0 = bayX(bay), y0 = unitTop(unit);
         if (p === 0) {
@@ -365,13 +365,14 @@ export class LibraryRenderer {
           }
         for (let row = 0; row < 2; row++)
           for (let i = 0; i < BOOKS_PER_ROW; i++) {
-            const c = sim.slots[slotIndex(bay, unit, row, i)];
+            const slot = slotIndex(bay, unit, row, i), burnt = !!sim.burntSlots[slot];
+            const c = sim.slots[slot] || sim.burntSlots[slot];
             if (!c) continue;
-            const rgb = hex(BOOK_COLORS[c]), tall = 4 + Math.floor(h01(bay * 31 + unit, row * 7 + i, 4) * 3), band = h01(bay * 31 + unit, row * 7 + i, 6) < 0.4 ? 2 + (c % 2) : -1;
+            const rgb: RGB = burnt ? [30, 24, 20] : hex(BOOK_COLORS[c]), tall = 4 + Math.floor(h01(bay * 31 + unit, row * 7 + i, 4) * 3), band = h01(bay * 31 + unit, row * 7 + i, 6) < 0.4 ? 2 + (c % 2) : -1;
             const bx = x0 + 1 + i * 2, by = y0 + row * ROW_H + ROW_H - 1;
             for (let k = 1; k <= tall && k < ROW_H; k++) {
-              put(bx, by - k, rgb);
-              put(bx + 1, by - k, k === band ? [190, 160, 84] : [rgb[0] * 0.75, rgb[1] * 0.75, rgb[2] * 0.75]);
+              put(bx, by - k, rgb, burnt);
+              put(bx + 1, by - k, k === band && !burnt ? [190, 160, 84] : [rgb[0] * 0.75, rgb[1] * 0.75, rgb[2] * 0.75], burnt);
             }
           }
       }
@@ -425,6 +426,10 @@ export class LibraryRenderer {
         put(bx + 1, by - k, [rgb[0] * 0.75, rgb[1] * 0.75, rgb[2] * 0.75]);
       }
     });
+    for (const b of sim.burntLoose) {
+      put(Math.floor(b.x), FLOOR - 1, [30, 24, 20], true);
+      put(Math.floor(b.x) + 1, FLOOR - 1, [42, 32, 24], true);
+    }
     // Charred wood, and soot on the stone above where it burnt.
     const { char, soot } = sim.fire;
     for (let y = 0; y < H; y++)
@@ -531,7 +536,7 @@ export class LibraryRenderer {
     this.gatherFire(sim);
     this.candles = sim.tables.map((p) => p === TABLE_PLANKS);
     const f = sim.fire;
-    const key = `${sim.units.join(",")}|${sim.tables.join(",")}|${sim.ladders.join(",")}|${slotsKey(sim)}|${sim.returns.join("")}|${f.active ? f.version : 0}|${f.sooty ? Math.floor(sim.time / 3) : 0}`;
+    const key = `${sim.units.join(",")}|${sim.tables.join(",")}|${sim.ladders.join(",")}|${slotsKey(sim)}|${sim.returns.join("")}|${f.version}|${sim.burntSlots.join("")}|${sim.burntLoose.map((b) => b.x).join(",")}|${f.sooty ? Math.floor(sim.time / 3) : 0}`;
     if (key !== this.sceneKey) {
       this.sceneKey = key;
       this.paintScene(sim);
@@ -597,7 +602,7 @@ export class LibraryRenderer {
       ctx.fillRect(Math.round(t.x) - 1, y + 1, 1, 1);
     }
     this.drawFlames(time, effects);
-    if (f.active || this.puffs.length) this.drawFire(sim, time, dt, effects);
+    if (f.active || f.smoke.some((v) => v > 0) || f.ash.some((v) => v > 0)) this.drawFire(sim, time, dt, effects);
   }
 
   // ── The hallways ────────────────────────────────────────────────────
@@ -759,24 +764,21 @@ export class LibraryRenderer {
         ctx.fillStyle = r < 0.15 ? "#fff0b8" : "#ff8a2a";
         ctx.fillRect(x + (r < 0.3 ? 0 : 1), y - up, 1, up);
       }
-      if (effects && this.fx() < 0.012 && this.puffs.length < 260) {
-        const ember = this.fx() < 0.3;
-        this.puffs.push({ x: x + 1, y: y - 2, vx: (this.fx() - 0.5) * 6, vy: ember ? -14 - this.fx() * 12 : -6 - this.fx() * 6, age: 0, life: ember ? 1 + this.fx() * 1.5 : 3 + this.fx() * 3, ember });
+    }
+    // Smoke and ash come from simulation cells, including during fast-forward.
+    for (let i = 0; i < f.smoke.length; i++) {
+      const x = (i % FW) * CELL, y = Math.floor(i / FW) * CELL;
+      if (f.smoke[i]) {
+        ctx.globalAlpha = f.smoke[i] / 255 * 0.65;
+        ctx.fillStyle = "#383230";
+        ctx.fillRect(x, y, CELL, CELL);
+      }
+      if (f.ash[i]) {
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = "#70665c";
+        ctx.fillRect(x, y, CELL, CELL);
       }
     }
-    this.puffs = this.puffs.filter((p) => {
-      p.age += dt;
-      p.x += p.vx * dt;
-      p.y += p.vy * dt;
-      p.vx += (this.fx() - 0.5) * 8 * dt;
-      const a = 1 - p.age / p.life;
-      if (a <= 0 || p.y < 0) return false;
-      const s = p.ember ? 1 : 1 + p.age * 1.3;
-      ctx.globalAlpha = p.ember ? a : a * 0.32;
-      ctx.fillStyle = p.ember ? (a > 0.5 ? "#ffd070" : "#ff7a2a") : "#2a2624";
-      ctx.fillRect(p.x - s / 2, p.y - s / 2, s, s);
-      return true;
-    });
     ctx.globalAlpha = 1;
     ctx.fillStyle = "#9ad0ff";
     for (const d of f.drops) ctx.fillRect(d.x, d.y, 1, 1);
@@ -877,7 +879,7 @@ export class LibraryRenderer {
       }
     }
     if (l.carrying && l.action !== "read") {
-      ctx.fillStyle = BOOK_COLORS[l.carrying];
+      ctx.fillStyle = l.burntFrom >= 0 ? "#2c2420" : BOOK_COLORS[l.carrying];
       ctx.fillRect(l.facing > 0 ? x + 2 : x - 1, y - 2 - bob, 1, 2);
     }
     if ((l.action === "build" || l.action === "grab" || l.action === "place") && Math.floor(time * 5) % 2) {
@@ -1047,7 +1049,7 @@ export class LibraryRenderer {
       // The book held open: its pages and its cover's colour.
       ctx.fillStyle = shade([239, 230, 204], lum);
       ctx.fillRect(l.facing > 0 ? x + 2 : x - 2, y - 3, 2, 1);
-      ctx.fillStyle = BOOK_COLORS[l.carrying];
+      ctx.fillStyle = l.burntFrom >= 0 ? "#2c2420" : BOOK_COLORS[l.carrying];
       ctx.fillRect(l.facing > 0 ? x + 2 : x - 2, y - 2, 2, 1);
     }
   }

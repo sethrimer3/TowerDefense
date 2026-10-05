@@ -232,6 +232,8 @@ export type MineSave = {
   smelted: Metals;
   mined: Metals;
   savedAt: number;
+  /** Unused simulation time; awarded only when stepped after loading. */
+  idleMs?: number;
   /** Added with the weather (absent from older saves): the water layer,
    * burning cells as [cell, ticks left], miners lost by cause, and the
    * ticks left before another can die. */
@@ -2013,6 +2015,7 @@ export function decodeMineSave(s: any): MineSave | null {
     ...(s.lost !== undefined ? { lost: Object.fromEntries(CAUSES.filter((c) => s.lost[c] !== undefined).map((c) => [c, s.lost[c]])) } : {}),
     ...(s.mercy !== undefined ? { mercy: s.mercy } : {}),
     seed: s.seed, tick: s.tick, cells: s.cells, plan: s.plan, shaftLevel: s.shaftLevel, hired: s.hired, smelted, savedAt: s.savedAt, mined,
+    ...(Number.isFinite(s.idleMs) && s.idleMs >= 0 && s.idleMs <= 86400000 ? { idleMs: s.idleMs } : {}),
     miners: s.miners.map((m: any) => ({
       x: m.x, y: m.y, ...metals(m, 1000)!, spoil: m.spoil, ...(m.name !== undefined ? { name: m.name } : {}),
       ...(m.fed !== undefined ? { fed: m.fed } : {}), ...(m.job !== undefined ? { job: m.job } : {}), ...(m.kit !== undefined ? { kit: m.kit } : {}),

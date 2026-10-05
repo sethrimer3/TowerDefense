@@ -2,7 +2,7 @@
  * `MAX_AWAY_MS`) and what the Library and the Mine made of it, on the
  * shared parchment dialog. The rewards are paid whether or not it shows;
  * the Mine's figures climb while its catch-up runs. */
-import { MAX_AWAY_MS, span } from "../away.ts";
+import { countdown, MAX_AWAY_MS, span } from "../away.ts";
 import type { MineAway } from "../mine/ui.ts";
 import type { LibraryAway } from "../library/ui.ts";
 import { METALS, type Metals } from "../mine/sim.ts";
@@ -36,7 +36,7 @@ const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? o
 /** Whether the time away earned anything worth a welcome. */
 export function worthWelcome(a: Away) {
   if (a.ms < WELCOME_MS) return false;
-  return whole(a.knowledge) > 0 || (a.mine !== null && a.crew > 0) || (a.library?.burntAt ?? null) !== null;
+  return whole(a.knowledge) > 0 || (a.mine !== null && a.crew > 0) || (a.library !== null && a.librarians > 0);
 }
 
 /** The ledger of the Library and the Mine, as shown. */
@@ -44,18 +44,15 @@ function ledger(a: Away) {
   const library = a.shelves > 0 || a.librarians > 0
     ? `${plural(a.shelves, "shelf", "shelves")} and ${plural(a.librarians, "librarian")} at work`
     : "Nobody at the desks yet";
-  const l = a.library, burnt = l && l.burntAt !== null
-    ? `<p class="away-note"><span class="away-loss">The library burnt down ${l.burntAt ? `after ${span(l.burntAt)}` : "in the first hour"}${l.shelves || l.librarians ? `: ${[l.shelves && plural(l.shelves, "shelf", "shelves"), l.librarians && plural(l.librarians, "librarian")].filter(Boolean).join(" and ")} lost` : ""}</span></p>`
-    : "";
+  const l = a.library;
+  const libraryNote = l ? `<p class="away-note">${l.catchingUp ? `Fast-forwarding: ${countdown(l.owedMs)} idle time remaining` : "Idle time simulated"}${l.librarians || l.books ? `<br><span class="away-loss">${plural(l.librarians, "librarian")} and ${plural(l.books, "book")} lost in fires</span>` : ""}</p>` : "";
   let mine = "";
   if (a.mine) {
     const m = a.mine;
     const metals = METALS.map((k) => `<li><i class="away-bar ${k}" aria-hidden="true"></i><b class="metal-${k}">+${m.paid[k]}</b><small>${METAL_NAME[k]}</small></li>`).join("");
     const note = m.catchingUp
-      ? `The crew is still at work: ${span(a.owedMs)} to catch up`
-      : m.simulatedMs < m.ms
-        ? `${span(m.simulatedMs)} worked through, the rest paid at the smithy's pace`
-        : `${plural(a.crew, "miner")} worked on while you were away`;
+      ? `Fast-forwarding: ${countdown(a.owedMs)} idle time remaining`
+      : `${plural(a.crew, "miner")} finished simulating idle time`;
     mine = `<section class="away-row away-mine">
       <h3>⛏ The Mine</h3>
       <p>Smithy points from the smithy</p>
@@ -66,7 +63,7 @@ function ledger(a: Away) {
   return `<section class="away-row away-library">
       <h3>✦ The Library</h3>
       <p>${library}</p>
-      <b class="away-gain">+${whole(a.knowledge)} <small>Knowledge</small></b>${burnt}
+      <b class="away-gain">+${whole(a.knowledge)} <small>Knowledge</small></b>${libraryNote}
     </section>${mine}`;
 }
 
@@ -96,7 +93,7 @@ export class WelcomeBack {
       <p class="away-time">You were gone <b>${span(a.ms)}</b>.${capped ? ` The city keeps account of the last ${span(MAX_AWAY_MS)}.` : ""}</p>`;
     this.modal.innerHTML = `${head}
       <div class="away-ledger" id="away-ledger"></div>
-      <div class="dialog-actions"><button id="away-collect" class="away-collect">${uiSprite("gold")} Collect</button></div>`;
+      <div class="dialog-actions"><button id="away-collect" class="away-collect">${uiSprite("gold")} Continue</button></div>`;
     this.modal.classList.add("welcome");
     this.shown = "";
     this.open = true;
@@ -118,8 +115,7 @@ export class WelcomeBack {
    * the ledger is redrawn only when what it says changes). */
   refresh() {
     if (!this.open) return;
-    const minute = (ms: number) => Math.ceil(ms / 60000) * 60000;
-    const a = this.read(), html = ledger({ ...a, owedMs: minute(a.owedMs) });
+    const a = this.read(), html = ledger(a);
     if (html === this.shown) return;
     this.shown = html;
     this.modal.querySelector("#away-ledger")!.innerHTML = html;

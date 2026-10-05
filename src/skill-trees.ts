@@ -43,7 +43,7 @@ export const SKILLS: Record<SkillId, Skill> = {
   fireproofWood: { id: "fireproofWood", name: "Fireproof wood", icon: "▤", max: 10, base: 5, effect: { target: "fireproof", per: 1 }, text: "The library's tables catch fire 10% less often a rank (1% a minute to start, then 0.9%, 0.81%…)" },
   coffee: { id: "coffee", name: "Coffee", icon: "♨", max: 12, base: 2, effect: { target: "coffee", per: 5 }, text: "5% more of the mine's crew work the night shift a rank (20% to start, up to 80%)" },
   waterproofing: { id: "waterproofing", name: "Waterproofing", icon: "☂", max: 4, base: 4, effect: { target: "waterproof", per: 15 }, text: "The shaft house keeps 15% more of the rain's runoff out of the shaft a rank (20% to start, up to 80%)" },
-  nightWatch: { id: "nightWatch", name: "Night watch", icon: "☾", max: 9, base: 4, effect: { target: "nightWatch", per: 5 }, text: "While the game is closed, the library burns down 5% less often an hour a rank (50% an hour to start, down to 5%)" },
+  nightWatch: { id: "nightWatch", name: "Night watch", icon: "☾", max: 9, base: 4, effect: { target: "nightWatch", per: 5 }, text: "At night, librarians detect fires sooner and fill, carry and throw buckets 15% faster per rank" },
   fireTraining: { id: "fireTraining", name: "Fire training", icon: "♒", max: 5, base: 8, effect: { target: "fireTraining", per: 1 }, text: "More librarians fight a fire, fetching and throwing water faster and further, and each splash more likely to douse the flames" },
 };
 
