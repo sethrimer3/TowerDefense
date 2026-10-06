@@ -75,6 +75,7 @@ export function journalHTML(discovered: EnemyKind[]): string {
       if (d.siege) notes.push(`Self-driving siege engine: no crew, it rolls toward the keep and stops to shoot whatever blocks its way from ${d.siege.range} cells, the keep once it is in range${d.siege.people ? ", and your people before either" : ", or your people when nothing else is"}. It never fights hand to hand.`);
       if (d.boat) {
         notes.push(`Magic boat: sails toward the keep in a pool of conjured water ${d.boat.water} cells round its hull, which dries up in a trail behind it.`);
+        notes.push("In winter its wake freezes. Ice persists until fire or explosions melt it, blocks rebuilding, and makes those on foot slide and skid farther from blasts. Meltwater then dries away.");
         notes.push(d.boat.decorativeWater
           ? "Its water is purely visual: it does not sink buildings, hurt units, extinguish fires or block splash damage. The boat rams buildings and walls in its way, and the keep, with ordinary damage."
           : `Its water sinks every house and structure it reaches${d.boat.keep ? ", every wall stone, and the keep itself, ending the defense at once" : d.boat.walls ? " and every wall stone; it rams the keep" : "; it rams the walls and the keep"}. The water hurts only fire mages, puts out fires and stops splash damage: blasts in it fizzle, and anyone standing in it is safe from blasts. Bring arrows, blades and lightning.`);

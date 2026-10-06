@@ -236,7 +236,8 @@ export class DefendSim {
   snowOverride?: boolean;
   get cold() { return this.snowOverride ?? areaForWave(this.wave).climate === "cold"; }
   readonly iceMotion = new IceMotion();
-  iceBlast(x: number, y: number, r: number) { if (this.floods.length) this.iceMotion.blast(this, x, y, r); }
+  readonly thawedPonds = new Set<number>();
+  iceBlast(x: number, y: number, r: number) { if (this.cold || this.floods.length) this.iceMotion.blast(this, x, y, r); }
   sinkings: Sinking[] = [];
   events: SimEvent[] = [];
   wave = 0;

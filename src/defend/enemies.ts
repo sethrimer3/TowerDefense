@@ -2,7 +2,7 @@ import { enemySize } from "./catalog.ts";
 import { stepAbilities, enemyDamage, enemySpeed } from "./enemy-abilities.ts";
 import { hostileSpecial } from "./hostile-attacks.ts";
 import { stepSiege } from "./siege.ts";
-import { stepBoat } from "./boats.ts";
+import { stepBoat, meltIceCone } from "./boats.ts";
 import { baitStanding, lureOf } from "./bait.ts";
 /** How a DEFEND enemy spends one step. In order: fight any defender in
  * reach; bats fly straight at the keep; a house that caught its eye is
@@ -160,6 +160,7 @@ function breathe(sim: DefendSim, e: Enemy, _dt: number): boolean {
   const length = dist(dx, dy);
   if (length > 0) { dx /= length; dy /= length; } else { dx = 0; dy = 1; }
   e.breath = { dx, dy, t: 0.45 };
+  meltIceCone(sim, e.x, e.y, dx, dy, 5, .45);
   const inside = (x: number, y: number) => {
     const ux = x - e.x, uy = y - e.y;
     const along = ux * dx + uy * dy;

@@ -24,7 +24,7 @@ import { ENEMIES, type BoatDef } from "./catalog.ts";
 import { enemyDamage, enemySpeed } from "./enemy-abilities.ts";
 import { CELLS_H, CELLS_W, SUB, cellIndex } from "./grid.ts";
 import { cellAt, center, rectDist } from "./pathing.ts";
-import type { Building } from "./citygen.ts";
+import { CellType, type Building } from "./citygen.ts";
 import { lureOf } from "./bait.ts";
 import type { DefendSim, Enemy } from "./sim.ts";
 import { chilled } from "./wizard.ts";
@@ -96,6 +96,7 @@ export function wetAt(sim: DefendSim, x: number, y: number) {
 /** Ice includes the small boats' wakes, but never standing masonry. */
 export function iceAt(sim: DefendSim, x: number, y: number) {
   if (x < 0 || y < 0 || x >= CELLS_W || y >= CELLS_H || sim.solid[cellAt(x, y)]) return false;
+  if (sim.cold && sim.map.type[cellAt(x, y)] === CellType.WATER && !sim.thawedPonds.has(cellAt(x, y))) return true;
   return sim.floods.length > 0 && floodIndex(sim).tiles[tileOf(y, TILES_H) * TILES_W + tileOf(x, TILES_W)]
     .some(f => f.frozen && sq(f.x - x) + sq(f.y - y) <= sq(f.r));
 }
@@ -111,12 +112,24 @@ export function icyCell(sim: DefendSim, cell: number) {
  * and never immediately refreezes, even while it is still snowing. */
 export function meltIce(sim: DefendSim, x: number, y: number, r: number) {
   let melted = false;
+  if (sim.cold) for (let cy = Math.max(0, Math.floor(y - r)); cy <= Math.min(CELLS_H - 1, Math.ceil(y + r)); cy++)
+    for (let cx = Math.max(0, Math.floor(x - r)); cx <= Math.min(CELLS_W - 1, Math.ceil(x + r)); cx++) {
+      const cell = cellIndex(cx, cy);
+      if (sim.map.type[cell] === CellType.WATER && !sim.thawedPonds.has(cell) && sq(cx + .5 - x) + sq(cy + .5 - y) <= sq(r + .5)) {
+        sim.thawedPonds.add(cell); melted = true;
+      }
+    }
   for (const f of sim.floods) if (f.frozen && sq(f.x - x) + sq(f.y - y) < sq(f.r + r)) {
     f.frozen = false; f.melted = true; f.t = 0; f.life = FLOOD_LIFE;
     melted = true;
   }
   if (melted) douse(sim, x, y, r);
   return melted;
+}
+
+/** Sample a flame cone along its length, including its widening edges. */
+export function meltIceCone(sim: DefendSim, x: number, y: number, dx: number, dy: number, reach: number, spread: number) {
+  for (let d = .5; d <= reach; d += .5) meltIce(sim, x + dx * d, y + dy * d, .25 + d * spread);
 }
 
 function addPool(sim: DefendSim, pool: Flood) {
@@ -213,8 +226,8 @@ function ram(sim: DefendSim, e: Enemy, id: number) {
  * goes out; sinking buildings settle. */
 export function stepFloods(sim: DefendSim, dt: number) {
   ageWater(sim, dt);
-  if (!sim.floods.length) return;
   for (const b of sim.blazes) meltIce(sim, b.x, b.y, b.r);
+  if (!sim.floods.length) return;
   for (const s of sim.soldiers)
     if (s.kind === "mage" && s.hp > 0 && wetAt(sim, s.x, s.y)) {
       s.hp -= MAGE_SOAK * dt;

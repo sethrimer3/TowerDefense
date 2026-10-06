@@ -56,9 +56,9 @@ export function parkArt(map: CityMap): ParkArt {
 
 /** Pond bands, darkest edge first. */
 const BANDS = [
-  { scale: POND.outline, color: 0x0b0907 },
-  { scale: POND.bank, color: 0x3a3524 },
-  { scale: POND.shallows, color: 0x2a4f45 },
+  { scale: POND.outline, color: 0x354943 },
+  { scale: POND.bank, color: 0x45665e },
+  { scale: POND.shallows, color: 0x397481 },
   { scale: POND.open, color: 0x2b5d71 },
   { scale: 0.42, color: 0x244f66 },
 ];

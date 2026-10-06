@@ -34,7 +34,7 @@ const CURVE = Array.from({ length: 8 }, (_, h) => Float32Array.from({ length: h 
 const WIND = { calm: 0.8, cloud: 1.1, rain: 1.7 };
 
 /** Someone standing or walking in the parks: position and size in cells. */
-export type Walker = { x: number; y: number; size: number };
+export type Walker = { x: number; y: number; size: number; id?: number };
 
 export type GrassFrame = {
   c: CanvasRenderingContext2D;

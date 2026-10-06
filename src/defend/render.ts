@@ -299,7 +299,7 @@ export class DefendRenderer {
     const rain = !!(sim && opts.weather?.rain);
     this.water.sync(map);
     const feet = sim ? walkers(sim) : [];
-    this.water.draw({ c: this.ctx, px: this.px, now: opts.now, rain, night: opts.night, walkers: feet, reduceMotion: opts.reduceMotion, layer: this.layer, layerScale: this.layerScale });
+    this.water.draw({ c: this.ctx, px: this.px, now: opts.now, rain, cold: sim?.cold ?? !!opts.weather?.snow, thawedPonds: sim?.thawedPonds, night: opts.night, walkers: feet, reduceMotion: opts.reduceMotion, layer: this.layer, layerScale: this.layerScale });
     this.grass.sync(map);
     this.grass.draw({
       c: this.ctx, px: this.px, now: opts.now, dt, reduceMotion: opts.reduceMotion,
@@ -536,9 +536,9 @@ function standingKeep(map: CityMap, sim: DefendSim | null) {
 /** Everyone on foot, for the grass to part around. */
 function walkers(sim: DefendSim): Walker[] {
   const out: Walker[] = [];
-  for (const e of sim.enemies) if (!ENEMIES[e.kind].flying) out.push({ x: e.x, y: e.y, size: enemySize(e) });
-  for (const s of sim.soldiers) out.push({ x: s.x, y: s.y, size: 0.4 });
-  for (const c of sim.civilians) out.push({ x: c.x, y: c.y, size: 0.3 });
+  for (const e of sim.enemies) if (!ENEMIES[e.kind].flying) out.push({ id: e.id, x: e.x, y: e.y, size: enemySize(e) });
+  for (const s of sim.soldiers) out.push({ id: s.id, x: s.x, y: s.y, size: 0.4 });
+  for (const c of sim.civilians) out.push({ id: c.id, x: c.x, y: c.y, size: 0.3 });
   return out;
 }
 

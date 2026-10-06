@@ -12,7 +12,7 @@
  * decided by the renderer, so a battle with a wizard tower still replays
  * exactly from its seed. Aim is a unit vector, not an angle, and cones are
  * tested by slope, so every engine plays them alike (no trigonometry). */
-import { sheltered, meltIce } from "./boats.ts";
+import { sheltered, meltIceCone } from "./boats.ts";
 import { ENEMIES,
   CHILL_SPEED,
   FLAME_SECONDS,
@@ -97,7 +97,7 @@ export class Wizards {
 
 /** Whether `e` stands in the fan from (x, y) along (dx, dy), widening by
  * `spread` a cell, within `reach`, with a little leeway for its bulk. */
-function inFan(e: Enemy, x: number, y: number, dx: number, dy: number, spread: number, reach: number) {
+function inFan(e: Pick<Enemy, "x" | "y">, x: number, y: number, dx: number, dy: number, spread: number, reach: number) {
   const ox = e.x - x, oy = e.y - y;
   if (ox * ox + oy * oy > reach * reach) return false;
   const along = ox * dx + oy * dy, across = Math.abs(ox * dy - oy * dx);
@@ -128,7 +128,7 @@ export function stepFlames(sim: DefendSim, wizards: Wizards, dt: number) {
     }
     // The fire takes a moment to reach full length.
     const reach = f.range * Math.min(1, f.t / 0.25);
-    for (const pool of sim.floods) if (pool.frozen && inFan(pool, f.x, f.y, f.dx, f.dy, FLAME_SPREAD, reach)) meltIce(sim, pool.x, pool.y, .1);
+    meltIceCone(sim, f.x, f.y, f.dx, f.dy, reach, FLAME_SPREAD);
     const dps = flameDps(sim.levels.wizardFlame ?? 0) * sim.bonuses.towerDamage;
     for (const e of sim.enemiesNear(f.x, f.y, reach)) if (inFan(e, f.x, f.y, f.dx, f.dy, FLAME_SPREAD, reach) && !sheltered(sim, e.x, e.y)) sim.hurtEnemy(e, dps * dt, true, "ranged", f);
     if (f.t >= f.dur) wizards.ended(f.tower);

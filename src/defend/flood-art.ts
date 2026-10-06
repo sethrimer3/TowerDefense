@@ -16,6 +16,7 @@ import type { AreaId } from "./areas.ts";
 import { HOLD, SINK_SECONDS, floodRadius } from "./boats.ts";
 import type { DefendSim } from "./sim.ts";
 import { ENEMIES } from "./catalog.ts";
+import { parkArt } from "./park-art.ts";
 
 /** Art pixels a cell (the ponds' scale). */
 const ART = 8;
@@ -285,6 +286,8 @@ export class FloodArt {
         if (sh <= 0) continue;
         m.setTransform(1, 0, 0, -1, -box.x, 2 * top - box.y);
         m.drawImage(f.layer, x * k, sy * k, k, sh * k, x, sy, 1, sh);
+        const trees = parkArt(f.sim.map).canopies;
+        if (trees) m.drawImage(trees, x, sy, 1, sh, x, sy, 1, sh);
       }
     }
     m.setTransform(1, 0, 0, 1, 0, 0);
@@ -293,7 +296,12 @@ export class FloodArt {
     o.clearRect(0, 0, box.w, box.h);
     o.imageSmoothingEnabled = false;
     for (let j = 0; j < box.h; j++) {
-      const shift = t ? Math.round(Math.sin(t * 2.3 + (box.y + j) * 0.65) * 0.7 + Math.sin(t * 3.7 + (box.y + j) * 1.2) * 0.4) : 0;
+      let ripple = 0;
+      if (t) for (const w of this.wakes) {
+        const age = t - w.t, dy = Math.abs((box.y + j) / ART - w.y);
+        if (Math.abs(dy - (w.size + age * .85) * .62) < .2) ripple += Math.sin(age * 15) * (1 - age / 1.5);
+      }
+      const shift = t ? Math.round(Math.sin(t * 2.3 + (box.y + j) * 0.65) * 0.7 + Math.max(-2, Math.min(2, ripple))) : 0;
       o.drawImage(mirror, 0, j, box.w, 1, shift, j, box.w, 1);
     }
     o.globalCompositeOperation = "source-atop";
