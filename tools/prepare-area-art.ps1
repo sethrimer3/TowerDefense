@@ -1,6 +1,7 @@
-param([string]$SourceDirectory = 'C:\Users\srime\Desktop', [string]$WallManifest)
-# Asset preparation only: preserve the supplied floor artwork and split the
-# generated cap/face material sheet into the renderer's repeating textures.
+param([string]$SourceDirectory = 'C:\Users\srime\Desktop')
+# Asset preparation only: crop the supplied floor artwork into the renderer's
+# tiles (then run tools/even-area-floors.py once). The areas' walls are pixel
+# art drawn in code (src/defend/area-wall-art.ts).
 Add-Type -AssemblyName System.Drawing
 $areaSources = @(
   @('astral','exec-e3ce26d6-de23-4995-8b9a-e084d6f5b2bb',28,30,309,30,585,30,864,30,230),
@@ -31,15 +32,4 @@ foreach ($row in $areaSources) {
     Save-Texture $source $rect 80 80 (Join-Path $destination ('floor-'+($i+1)+'.png'))
   }
   $source.Dispose()
-}
-if ($WallManifest) {
-  $walls = Get-Content -LiteralPath $WallManifest -Raw | ConvertFrom-Json
-  foreach ($wall in $walls) {
-    $source = [System.Drawing.Bitmap]::new($wall.path)
-    $half = [int]($source.Height/2)
-    $destination = Join-Path $assetRoot $wall.id
-    Save-Texture $source ([System.Drawing.Rectangle]::new(0,0,$source.Width,$half)) 64 64 (Join-Path $destination 'wall-cap.png')
-    Save-Texture $source ([System.Drawing.Rectangle]::new(0,$half,$source.Width,$half)) 64 32 (Join-Path $destination 'wall-face.png')
-    $source.Dispose()
-  }
 }

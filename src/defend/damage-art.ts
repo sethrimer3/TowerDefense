@@ -332,21 +332,23 @@ export function wallDamagePixels(stage: number, seed: number, size: number): Uin
   return out;
 }
 
+const MOSSY = [0x46542b, 0x5b6a35, 0x71803f];
+
 /** A fallen wall stone as `size × size` RGBA pixels: broken blocks lying
- * on the gravel, with grit and a tuft of the cap's moss. */
-export function wallRubblePixels(seed: number, size: number): Uint32Array {
+ * on the gravel, with grit and a tuft of the cap's moss (or, in another
+ * area, its own `stone` and `accent` tones). */
+export function wallRubblePixels(seed: number, size: number, stone: readonly number[] = STONE, accent: readonly number[] = MOSSY): Uint32Array {
   const out = new Uint32Array(size * size), p = pixels(out, size, size);
-  const MOSSY = [0x46542b, 0x5b6a35, 0x71803f];
   const n = 2 + (hash(seed, 31) % 2);
   const chunks: Chunk[] = Array.from({ length: n }, (_, k) => [
     1.5 + hash01(seed, k, 32) * (size - 3),
     1.5 + hash01(seed, k, 33) * (size - 3),
     1.2 + hash01(seed, k, 34) * 0.9,
-    k === 0 && hash01(seed, 35) < 0.5 ? MOSSY : STONE,
+    k === 0 && hash01(seed, 35) < 0.5 ? accent : stone,
   ]);
   for (let k = 0; k < 5; k++) {
     const x = Math.floor(hash01(seed, k, 36) * size), y = Math.floor(hash01(seed, k, 37) * size);
-    p.set(x, y, STONE[hash(seed, k, 38) % 2]);
+    p.set(x, y, stone[hash(seed, k, 38) % 2]);
   }
   pile(p, chunks);
   return out;
