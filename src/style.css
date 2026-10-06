@@ -1481,6 +1481,22 @@ nav button { position: relative; }
 .library-head .mine-hire {
   min-width: 96px;
 }
+/* The tally: a fixed grid of one-line stats, its rows set by the header's
+ * width alone, so changing numbers never move the view. */
+#library-tally {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(11em, 100%), 1fr));
+  column-gap: 1em;
+}
+@media (max-width: 480px) {
+  .library-head .mine-hire { min-width: 0; padding: 6px 5px; }
+  .library-head { gap: 6px; }
+}
+#library-tally span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
 /* A fire's alarm, and afterwards what it cost (tap to put it away). */
 .library-alert {
   top: 10px;
