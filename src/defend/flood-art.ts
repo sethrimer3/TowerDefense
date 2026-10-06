@@ -15,6 +15,7 @@ import { paintStanding } from "./city-layer.ts";
 import type { AreaId } from "./areas.ts";
 import { HOLD, SINK_SECONDS, floodRadius } from "./boats.ts";
 import type { DefendSim } from "./sim.ts";
+import { ENEMIES } from "./catalog.ts";
 
 /** Art pixels a cell (the ponds' scale). */
 const ART = 8;
@@ -22,10 +23,11 @@ const W = CELLS_W * ART, H = CELLS_H * ART;
 
 const abgr = (hex: number, a = 255) => ((a << 24) | ((hex & 0xff) << 16) | (hex & 0xff00) | ((hex >> 16) & 0xff)) >>> 0;
 /** Bands by depth in art pixels, edge first, as the ponds'. */
-const OUTLINE = abgr(0x0b0907), BANK = abgr(0x3a3524), SHALLOWS = abgr(0x2a5550), OPEN = abgr(0x2b5d71), DEEP = abgr(0x244f66);
+const OUTLINE = abgr(0x385957, 145), BANK = abgr(0x427675, 215), SHALLOWS = abgr(0x397481), OPEN = abgr(0x306579), DEEP = abgr(0x285a70);
+const ICE_EDGE = abgr(0xc2e6ee), ICE = abgr(0x86b9ce), ICE_DARK = abgr(0x72a5bf), ICE_CRACK = abgr(0xd7eef3);
 const CREST = abgr(0x4f8fa8), GLINT = abgr(0x9cc8d6), SPARK = abgr(0xe4f8ff), ARCANE = abgr(0xb9a6ff);
 /** Where each band begins, in art pixels from the edge. */
-const BANDS = { bank: 1, shallows: 2.2, open: 4.5, deep: 10 };
+const BANDS = { bank: .6, shallows: 1.3, open: 3, deep: 9 };
 const REFLECTION = { alpha: 0.5, tint: 0.4 };
 
 export type FloodFrame = {
@@ -48,6 +50,10 @@ type Raster = { pixels: Uint32Array<ArrayBuffer>; image: ImageData };
 
 export class FloodArt {
   private depth = new Float32Array(W * H);
+  private ice = new Uint8Array(W * H);
+  private tracks = new WeakMap<object, { x: number; y: number; t: number }>();
+  private wakes: { x: number; y: number; t: number; size: number }[] = [];
+  private lastSim: DefendSim | null = null;
   private rasters: Partial<Record<"base" | "top" | "mask", Raster>> = {};
   private base: HTMLCanvasElement | null = null;
   private top: HTMLCanvasElement | null = null;
@@ -59,6 +65,8 @@ export class FloodArt {
     const { sim } = f;
     if ((!sim.floods.length && !sim.sinkings.length) || typeof document === "undefined") return;
     const t = f.reduceMotion ? 0 : sim.time;
+    if (this.lastSim !== sim) { this.lastSim = sim; this.wakes = []; this.tracks = new WeakMap(); }
+    this.track(f);
     const box = this.box(sim);
     if (box) {
       this.fill(sim, box);
@@ -89,7 +97,10 @@ export class FloodArt {
    * outside it): the deepest of the pools over it. */
   private fill(sim: DefendSim, box: Box) {
     const d = this.depth;
-    for (let y = box.y; y < box.y + box.h; y++) d.fill(-1, y * W + box.x, y * W + box.x + box.w);
+    for (let y = box.y; y < box.y + box.h; y++) {
+      d.fill(-1, y * W + box.x, y * W + box.x + box.w);
+      this.ice.fill(0, y * W + box.x, y * W + box.x + box.w);
+    }
     for (const fl of sim.floods) {
       const r = floodRadius(fl) * ART;
       if (r <= 0) continue;
@@ -101,6 +112,7 @@ export class FloodArt {
         for (let x = xa; x <= xb; x++) {
           const ox = x + 0.5 - cx, v = r - Math.sqrt(ox * ox + oy * oy), i = y * W + x;
           if (v > d[i]) d[i] = v;
+          if (fl.frozen && v >= 0) this.ice[i] = 1;
         }
       }
     }
@@ -129,7 +141,14 @@ export class FloodArt {
         if (cy < CELLS_H - 1 && solid[(cy + 1) * CELLS_W + cx]) d = Math.min(d, ART - oy - 0.5);
         this.depth[y * W + x] = d;
         // Band edges broken by a checker dither, as on the ponds.
-        const e = d + ((x + y) & 1 ? 0.35 : -0.35);
+        const e = d + (hash01(x >> 1, y >> 1, 31) - .5) * .6;
+        if (this.ice[y * W + x]) {
+          // Wide translucent blue facets, sparse connected fissures and a
+          // pale rim. All marks are fixed to the ground, never shimmering.
+          const seam = (x + Math.floor(y / 3) + Math.floor(y / 19) * 7) % 37;
+          base[k] = d < 1 ? ICE_EDGE : seam === 0 ? ICE_CRACK : (Math.floor(x / 17) + Math.floor(y / 13)) % 3 ? ICE : ICE_DARK;
+          continue;
+        }
         base[k] = e < BANDS.bank ? OUTLINE : e < BANDS.shallows ? BANK : e < BANDS.open ? SHALLOWS : e < BANDS.deep ? OPEN : DEEP;
         if (d < BANDS.shallows) continue;
         mask[k] = 0xffffffff;
@@ -137,7 +156,7 @@ export class FloodArt {
           const s = Math.sin(x * 0.45 + t * 1.7) + Math.sin(y * 0.6 - t * 1.3 + x * 0.15);
           if (s > 1.72 && d > BANDS.open) top[k] = CREST;
           const h = hash01(x, y, tick);
-          if (h < 0.0025) top[k] = h < 0.0007 ? ARCANE : SPARK;
+          if (h < 0.0005) top[k] = GLINT;
         }
       }
     const ring = (x: number, y: number, r: number, alpha: number, color = GLINT) => {
@@ -155,8 +174,12 @@ export class FloodArt {
   /** Rings: the boat's wake, raindrops, and the burst where something sank. */
   private rings(f: FloodFrame, ring: (x: number, y: number, r: number, alpha: number, color?: number) => void, t: number) {
     const { sim } = f;
+    for (const w of this.wakes) {
+      const age = t - w.t;
+      ring(w.x, w.y, w.size + age * .85, .5 * (1 - age / 1.5));
+    }
     for (const fl of sim.floods)
-      if (fl.t < 1.6 && hash01(fl.boat, Math.round(fl.x * 64), Math.round(fl.y * 64)) < 0.3) ring(fl.x, fl.y, fl.t * 0.9, 0.55 * (1 - fl.t / 1.6));
+      if (!fl.frozen && fl.t < 1.6 && hash01(fl.boat, Math.round(fl.x * 64), Math.round(fl.y * 64)) < 0.3) ring(fl.x, fl.y, fl.t * 0.9, 0.55 * (1 - fl.t / 1.6));
     for (const s of sim.sinkings) {
       const r = sim.map.buildings[s.building].rect;
       // Rings rolling out from where it went down, then many small ones
@@ -185,6 +208,23 @@ export class FloodArt {
           if (age < 0.85) ring(x + hash01(cell, n, 1), y + hash01(cell, n, 2), age * 0.6, 0.5 * (1 - age / 0.85));
         }
     }
+  }
+
+  /** Actual movement leaves rings; idle feet do not churn the water.
+   * Both history and emitted rings are bounded independently of crowd size. */
+  private track(f: FloodFrame) {
+    const t = f.sim.time;
+    this.wakes = f.reduceMotion ? [] : this.wakes.filter(w => t >= w.t && t - w.t < 1.5);
+    for (const list of [f.sim.enemies, f.sim.soldiers, f.sim.civilians]) for (const u of list) {
+      const def = "kind" in u ? ENEMIES[u.kind as keyof typeof ENEMIES] : undefined;
+      if (u.hp <= 0 || def?.flying) continue;
+      const old = this.tracks.get(u);
+      if (old && t - old.t < .22) continue;
+      if (old && !f.reduceMotion && Math.abs(u.x - old.x) + Math.abs(u.y - old.y) > .04)
+        this.wakes.push({ x: u.x, y: u.y, t, size: def?.boat ? def.size * .35 : .08 });
+      this.tracks.set(u, { x: u.x, y: u.y, t });
+    }
+    if (this.wakes.length > 256) this.wakes.splice(0, this.wakes.length - 256);
   }
 
   /** Write straight into reusable ImageData storage, without a second RGBA
@@ -234,13 +274,18 @@ export class FloodArt {
     m.imageSmoothingEnabled = false;
     for (let i = 0; i < box.w; i++) {
       const x = box.x + i;
-      let top = -1;
-      for (let y = box.y; y < box.y + box.h; y++) if (this.depth[y * W + x] >= BANDS.shallows) { top = y; break; }
-      if (top < 0) continue;
-      const depth = box.y + box.h - top, sy = Math.max(0, top - depth), sh = top - sy;
-      if (sh <= 0) continue;
-      m.setTransform(1, 0, 0, -1, -box.x, 2 * top - box.y);
-      m.drawImage(f.layer, x * k, sy * k, k, sh * k, x, sy, 1, sh);
+      // Each disconnected span has its own shore: never mirror an upper
+      // pool's bank all the way down into an unrelated lower pool.
+      let y = box.y;
+      while (y < box.y + box.h) {
+        while (y < box.y + box.h && this.at(x, y) < BANDS.shallows) y++;
+        const top = y;
+        while (y < box.y + box.h && this.at(x, y) >= BANDS.shallows) y++;
+        const sy = Math.max(0, top - (y - top)), sh = top - sy;
+        if (sh <= 0) continue;
+        m.setTransform(1, 0, 0, -1, -box.x, 2 * top - box.y);
+        m.drawImage(f.layer, x * k, sy * k, k, sh * k, x, sy, 1, sh);
+      }
     }
     m.setTransform(1, 0, 0, 1, 0, 0);
     const o = out.getContext("2d")!;
@@ -312,7 +357,7 @@ export class FloodArt {
     if (!t) return;
     const { c, px, sim } = f, p = Math.max(1, Math.round(px / ART));
     for (const fl of sim.floods) {
-      if (fl.t < fl.life * HOLD || hash01(fl.boat, Math.round(fl.x * 64), Math.round(fl.y * 64), 9) > 0.35) continue;
+      if (fl.frozen || fl.t < fl.life * HOLD || hash01(fl.boat, Math.round(fl.x * 64), Math.round(fl.y * 64), 9) > 0.35) continue;
       const r = floodRadius(fl), dry = (fl.t - fl.life * HOLD) / (fl.life * (1 - HOLD));
       for (let n = 0; n < 3; n++) {
         const a = hash01(fl.boat, n, Math.round(fl.x * 64)) * Math.PI * 2, rise = ((t * 0.6 + n / 3) % 1);

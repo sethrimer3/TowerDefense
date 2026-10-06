@@ -32,7 +32,7 @@ import { chilled } from "./wizard.ts";
 /** A pool of a boat's water, dropped at (x, y) with the boat's water radius
  * `r`: it holds for the first `HOLD` of its `life` seconds, then dries up
  * from its edge. `boat` is the id of the boat that made it. */
-export type Flood = { x: number; y: number; r: number; t: number; life: number; boat: number; decorative?: boolean };
+export type Flood = { x: number; y: number; r: number; t: number; life: number; boat: number; decorative?: boolean; frozen?: boolean; melted?: boolean };
 /** A building going under, `t` seconds ago (for the renderer). */
 export type Sinking = { building: number; t: number };
 
@@ -50,6 +50,7 @@ export const MAGE_SOAK = 10;
 
 /** A pool's radius now: whole while it holds, then shrinking to nothing. */
 export function floodRadius(f: Flood) {
+  if (f.frozen) return f.r;
   const hold = f.life * HOLD;
   return f.t <= hold ? f.r : f.r * Math.max(0, (f.life - f.t) / (f.life - hold));
 }
@@ -74,7 +75,6 @@ function floodIndex(sim: DefendSim) {
   }
   for (; ix.n < sim.floods.length; ix.n++) {
     const f = sim.floods[ix.n];
-    if (f.decorative) continue;
     for (let ty = tileOf(f.y - f.r, TILES_H); ty <= tileOf(f.y + f.r, TILES_H); ty++)
       for (let tx = tileOf(f.x - f.r, TILES_W); tx <= tileOf(f.x + f.r, TILES_W); tx++) ix.tiles[ty * TILES_W + tx].push(f);
   }
@@ -86,10 +86,50 @@ function floodIndex(sim: DefendSim) {
 export function wetAt(sim: DefendSim, x: number, y: number) {
   if (!sim.floods.length) return false;
   for (const f of floodIndex(sim).tiles[tileOf(y, TILES_H) * TILES_W + tileOf(x, TILES_W)]) {
+    if (f.frozen || f.decorative) continue;
     const r = floodRadius(f);
     if (sq(f.x - x) + sq(f.y - y) <= r * r) return true;
   }
   return false;
+}
+
+/** Ice includes the small boats' wakes, but never standing masonry. */
+export function iceAt(sim: DefendSim, x: number, y: number) {
+  if (x < 0 || y < 0 || x >= CELLS_W || y >= CELLS_H || sim.solid[cellAt(x, y)]) return false;
+  return sim.floods.length > 0 && floodIndex(sim).tiles[tileOf(y, TILES_H) * TILES_W + tileOf(x, TILES_W)]
+    .some(f => f.frozen && sq(f.x - x) + sq(f.y - y) <= sq(f.r));
+}
+
+/** Any ice overlapping the cell prevents rebuilding, including a thin edge. */
+export function icyCell(sim: DefendSim, cell: number) {
+  const x = cell % CELLS_W, y = Math.floor(cell / CELLS_W);
+  return sim.floods.length > 0 && floodIndex(sim).tiles[tileOf(y + .5, TILES_H) * TILES_W + tileOf(x + .5, TILES_W)]
+    .some(f => f.frozen && sq(Math.max(x - f.x, 0, f.x - x - 1)) + sq(Math.max(y - f.y, 0, f.y - y - 1)) < sq(f.r));
+}
+
+/** Heat thaws intersecting sheets. Meltwater gets a fresh drying lifetime
+ * and never immediately refreezes, even while it is still snowing. */
+export function meltIce(sim: DefendSim, x: number, y: number, r: number) {
+  let melted = false;
+  for (const f of sim.floods) if (f.frozen && sq(f.x - x) + sq(f.y - y) < sq(f.r + r)) {
+    f.frozen = false; f.melted = true; f.t = 0; f.life = FLOOD_LIFE;
+    melted = true;
+  }
+  if (melted) douse(sim, x, y, r);
+  return melted;
+}
+
+function addPool(sim: DefendSim, pool: Flood) {
+  if (sim.cold) {
+    pool.frozen = true;
+    // Ice is permanent: stationary and tightly overlapping wakes must not
+    // accumulate forever. Quantized positions bound retained sheets per boat size.
+    pool.x = Math.round(pool.x * 2) / 2;
+    pool.y = Math.round(pool.y * 2) / 2;
+    const nearby = floodIndex(sim).tiles[tileOf(pool.y, TILES_H) * TILES_W + tileOf(pool.x, TILES_W)];
+    if (nearby.some(f => f.frozen && f.x === pool.x && f.y === pool.y && f.r >= pool.r)) return;
+  }
+  sim.floods.push(pool);
 }
 
 /** Whether a boat's water sinks building `b`. */
@@ -108,7 +148,7 @@ export function stepBoat(sim: DefendSim, e: Enemy, dt: number) {
     if (sim.built[b.id] > 0 && sinks(boat, b) && rectDist(b.rect, e.x, e.y) <= boat.water) {
       // The water swallows the whole of it.
       const r = b.rect;
-      sim.floods.push({ x: r.x + r.w / 2, y: r.y + r.h / 2, r: dist(r.w, r.h) / 2 + 0.3, t: 0, life: FLOOD_LIFE, boat: e.id });
+      addPool(sim, { x: r.x + r.w / 2, y: r.y + r.h / 2, r: dist(r.w, r.h) / 2 + 0.3, t: 0, life: FLOOD_LIFE, boat: e.id });
       sim.sink(b.id);
     }
   if (sim.lost || sim.hp[sim.keepId] <= 0) return;
@@ -119,7 +159,7 @@ export function stepBoat(sim: DefendSim, e: Enemy, dt: number) {
     if (previous && previous.t < previous.life && previous.x === e.x && previous.y === e.y) previous.t = 0;
     else {
       const pool: Flood = { x: e.x, y: e.y, r: boat.water, t: 0, life: FLOOD_LIFE, boat: e.id, ...(boat.decorativeWater ? { decorative: true } : {}) };
-      sim.floods.push(pool);
+      addPool(sim, pool);
       if (boat.decorativeWater) decorativePools.set(e, pool);
     }
   }
@@ -174,6 +214,7 @@ function ram(sim: DefendSim, e: Enemy, id: number) {
 export function stepFloods(sim: DefendSim, dt: number) {
   ageWater(sim, dt);
   if (!sim.floods.length) return;
+  for (const b of sim.blazes) meltIce(sim, b.x, b.y, b.r);
   for (const s of sim.soldiers)
     if (s.kind === "mage" && s.hp > 0 && wetAt(sim, s.x, s.y)) {
       s.hp -= MAGE_SOAK * dt;
@@ -194,8 +235,11 @@ export function ageWater(sim: DefendSim, dt: number) {
     sim.sinkings = sim.sinkings.filter((s) => s.t < SINK_KEEP);
   }
   if (!sim.floods.length) return;
-  for (const f of sim.floods) f.t += dt;
-  sim.floods = sim.floods.filter((f) => f.t < f.life);
+  for (const f of sim.floods) {
+    if (sim.cold && !f.frozen && !f.melted) { f.r = floodRadius(f); f.frozen = true; }
+    if (!f.frozen) f.t += dt;
+  }
+  sim.floods = sim.floods.filter((f) => f.frozen || f.t < f.life);
 }
 
 /** A hiss of steam where fire or a blast met the water. */
@@ -205,6 +249,8 @@ export function douse(sim: DefendSim, x: number, y: number, r: number) {
 
 /** Whether a blast at (x, y) fizzles in the water (and hisses if so). */
 export function fizzles(sim: DefendSim, x: number, y: number, r: number) {
+  sim.iceBlast(x, y, r);
+  meltIce(sim, x, y, r);
   if (!sim.floods.length || !wetAt(sim, x, y)) return false;
   douse(sim, x, y, r);
   return true;
