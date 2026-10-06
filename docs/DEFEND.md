@@ -32,11 +32,11 @@ Recent rows are available as `window.defendPerformance`; they are not saved.
 
 ## Layout of the page
 
-- One header row, never two. Building: City · Armory · Start the defense on
+- One header row, never two. Building: Upgrades (opens the Upgrades tab) · Start the defense on
   the left; best wave and the ⚙ DEFEND settings (palette side, reset zoom) on
   the right. During a battle: Abandon (click twice — it asks "Confirm?") and
-  the speed toggle (1× ⇄ 2×, plus 3× once War drums is bought in the
-  Armory) on the left; weather, wave, best, keep health and foes on the right.
+  the speed toggle (1× ⇄ 2×, plus 3× once War drums is bought in
+  Upgrades) on the left; weather, wave, best, keep health and foes on the right.
 - The board's view fills the room under the header, so the page never
   scrolls; unzoomed it fits the whole city, centred on dark ground. `☰ Build`
   (building) and `☰ Items` (in battle) slide the palette in beside the view,
@@ -511,9 +511,9 @@ from its seed; `tests/defend-replay.test.ts` pins it.
     anyone walking close by sends them to the far side; at night they sleep,
     heads tucked. Each has a faint reflection.
 
-## Economy (`progress.ts`, Armory tab; `src/progression.ts`)
+## Economy (`progress.ts`, the Upgrades tab's Forge; `src/progression.ts`)
 
-- The Armory sells with copper, silver and Gold, all earned in battle: each
+- The Armory (now the Upgrades tab's Forge) sells with copper, silver and Gold, all earned in battle: each
   kill pays Gold (`KILL_GOLD`), each wave held pays Gold (10 + 5 × the wave)
   and copper, and each boss wave held pays a silver for every ten waves. Gold is paid as enemies fall, so an
   abandoned defense keeps what it earned.
@@ -523,13 +523,13 @@ from its seed; `tests/defend-replay.test.ts` pins it.
 - Reaching a **new best wave** is recorded (`bestWave`) and pays Knowledge: one
   for each wave held past the best before it, three for a boss wave, and an
   upgrade point for each.
-- **Smithy** (Upgrades tab; Training in code): a Smithy point (copper,
+- **Smithy** (rows in the Upgrades tab's Forge; Training in code): a Smithy point (copper,
   silver or gold, from the mine's smithy) buys one rank of a row (a few
   percent on troop HP or damage, drill speed, tower damage or reload, bomb
   damage, wall or keep HP, rebuild speed, or Gold found). The mine's smiths
   work it: a minute of one smith for the first, each after 50% longer, shared
   by every smith on it.
-- **Skill trees** (Upgrades tab): Command (garrison and towers) and
+- **Skills** (the Upgrades tab's Study): Command (garrison and towers) and
   Stewardship (walls, keep, builders, Gold, copper, faster smithing, room for
   another smith), ranked skills bought with Knowledge.
 - The Smithy and the skills fold into the run's `Bonuses`, fixed when the

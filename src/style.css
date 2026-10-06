@@ -795,33 +795,14 @@ nav {
 .tree-tabs span img { width: 24px; height: 24px; }
 .tree-tabs small { font-size: 6px; letter-spacing: .5px; margin-top: 3px; color: #9ba8b7; }
 .tree-tabs [aria-pressed="true"] { border-color: #d8b572; background: #343021; color: #ffe1a1; }
-.skill-tree { --tree-color: #e5bf75; display: flex; flex: 1; min-height: 0; flex-direction: column; border: 1px solid #63543a; background: radial-gradient(ellipse at 50% 36%, #74552326, transparent 65%), #0a1016; padding: 8px; border-radius: 9px; }
 
-.tree-heading { text-align: center; }
-.tree-heading small { color: var(--tree-color); letter-spacing: 2px; font-size: 11px; }
-.tree-heading h3 { font-size: 16px; margin: 1px 0 6px; }
+.ledger-heading { text-align: center; }
+.ledger-heading small { color: var(--tree-color); letter-spacing: 2px; font-size: 11px; }
+.ledger-heading h3 { font-size: 16px; margin: 1px 0 6px; }
 
-.tree-heading p { font-size: 11px; color: #a3afbc; text-align: center; line-height: 1.7; }
+.ledger-heading p { font-size: 11px; color: #a3afbc; text-align: center; line-height: 1.7; }
 
-.tree-viewport { position: relative; flex: 1; min-height: 0; margin: 0; overflow: hidden; border: 1px solid #232b33; border-radius: 6px; touch-action: none; cursor: grab; background: #070a0e; }
-.tree-viewport:active { cursor: grabbing; }
-.tree-map { position: absolute; inset: 0; transform-origin: 0 0; width: 100%; height: 100%; }
-.tree-map svg { position: absolute; width: 100%; height: 100%; overflow: visible; }
-.tree-map line { stroke: #46505b; stroke-width: 1; vector-effect: non-scaling-stroke; }
-.tree-map line.lit { stroke: var(--tree-color); stroke-width: 2; }
-.skill-node { position: absolute; transform: translate(-50%, -50%); display: flex; align-items: center; flex-direction: column; width: 96px; border: 0; background: none; padding: 0; gap: 5px; touch-action: none; }
-.skill-node:hover { background: none; color: var(--tree-color); }
-.node-icon { display: grid; place-items: center; width: 44px; height: 44px; font-size: 23px; background: #121c25; border: 1px solid #6a7480; box-shadow: 0 0 0 4px #0a1016; }
 
-.node-name { font-size: 10px; line-height: 1.35; background: #0a1016e8; padding: 0 2px; }
-.skill-node small { font-size: 9px; color: #9aa7b5; background: #0a1016; }
-.skill-node.locked .node-icon { color: #75808b; border-style: dashed; }
-.skill-node.owned .node-icon { background: #263831; border-color: var(--tree-color); color: var(--tree-color); }
-.skill-node.available .node-icon { border-color: var(--tree-color); }
-.skill-node.chosen .node-icon { outline: 2px solid var(--tree-color); outline-offset: 4px; color: var(--tree-color); }
-.tree-tooltip { max-width: 200px; z-index: 6; }
-.tree-tooltip .safe { color: #8fab79; }
-@media (min-width: 700px) { .node-icon { width: 50px; height: 50px; } .node-name { font-size: 12px; } .skill-node { width: 130px; } }
 @media (max-width: 440px) {
   nav { gap: 3px; }
   nav button { font-size: 10px; padding: 6px 1px; min-height: 60px; }
@@ -863,8 +844,6 @@ nav {
 nav button > span img { display: block; width: 42px; height: 42px; max-width: 100%; object-fit: contain; }
 
 .tree-tabs span img { width: 34px; height: 34px; margin-inline: auto; }
-.node-icon img { width: 38px; height: 38px; }
-.skill-node.locked .node-icon img { filter: grayscale(1); opacity: .48; }
 
 #log img { width: 22px; height: 22px; margin-right: 4px; }
 
@@ -1259,10 +1238,8 @@ nav button > span img { display: block; width: 42px; height: 42px; max-width: 10
   }
 }
 
-.tree-particles { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 
 /* Training: a table of stats, each current value → trained value, and its cost. */
-.training { position: relative; display: flex; flex: 1; min-height: 0; flex-direction: column; border: 1px solid #63543a; background: radial-gradient(ellipse at 50% 30%, #74552326, transparent 65%), #0a1016; padding: 8px 10px 12px; border-radius: 9px; }
 .training-points { margin: 2px 0 10px; font-size: 11px; letter-spacing: 1px; color: #c9d0da; }
 .training-points b { color: var(--gold); font-size: 15px; }
 .training-points small { color: #8793a2; font-size: 9px; }
@@ -1272,7 +1249,6 @@ nav button > span img { display: block; width: 42px; height: 42px; max-width: 10
 .training-row { display: grid; grid-template-columns: minmax(52px, 1fr) minmax(42px, auto) 18px minmax(42px, auto) minmax(64px, auto) 30px; align-items: center; gap: 6px; }
 /* The Training tab's specks sit behind the rows. */
 .training-particles { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; border-radius: inherit; }
-.training > :not(.training-particles) { position: relative; }
 .training-row.active .training-box.next { border-color: #c0483c; color: #ffb3a6; }
 /* A rank in work: its time left, and its smiths, one fewer or one more. */
 .training-work { display: flex; flex-direction: column; gap: 4px; align-items: stretch; }
@@ -1385,9 +1361,49 @@ nav button { position: relative; }
   .td-currencies .secret-mark { width: 13px; height: 13px; font-size: 8px; }
 }
 .tree-tabs { grid-template-columns: repeat(5, minmax(0, 1fr)); }
-.tree-empty { position: absolute; inset: 40% 10% auto; margin: 0; text-align: center; font-size: 12px; color: #b3a282; pointer-events: none; }
-.skill-tree.stewardship { --tree-color: #82c9b3; border-color: #355e55; background: radial-gradient(ellipse at 50% 36%, #2b92782a, transparent 65%), #090f15; }
-.tree-heading small { display: block; margin-top: 4px; letter-spacing: 1px; font-size: 10px; text-transform: none; }
+/* The Upgrades ledger: subjects, then a subject's topics, then its Forge
+   and Study side by side (stacked on a narrow screen, where the two scroll
+   together). */
+.ledger-subjects { grid-template-columns: repeat(6, minmax(0, 1fr)); margin-bottom: 6px; }
+.ledger-subjects button { min-height: 58px; }
+.ledger-topics { display: flex; flex-wrap: wrap; gap: 5px; margin: 0 0 8px; flex-shrink: 0; }
+.ledger-topics button { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; font-size: 10px; }
+@media (max-width: 480px) { .ledger-topics button { font-size: 9px; padding: 3px 6px; } }
+.ledger-topics canvas { width: 22px; height: 22px; image-rendering: pixelated; }
+.ledger-body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+.ledger-half { position: relative; min-height: 0; overflow-y: auto; padding: 8px 8px 12px; display: flex; flex-direction: column; gap: 8px; }
+.ledger-half > :not(.training-particles) { position: relative; }
+.ledger-half .training-particles { position: absolute; }
+.ledger-heading h3 { margin-bottom: 0; }
+.ledger-note { margin: 0; font-size: 10px; letter-spacing: .5px; line-height: 1.6; }
+.ledger-note small { font-size: 9px; }
+.ledger-empty { margin: 24px 0; text-align: center; font-size: 11px; }
+.ledger-card { gap: 8px; padding: 9px 8px; margin: 0; }
+.ledger-card > div { min-width: 0; }
+.ledger-next { display: block; margin-top: 3px; }
+.ledger-card h3, .ledger-skill h3, .ledger-path h3 { margin: 2px 0 3px; font-size: 13px; }
+.ledger-card p, .ledger-skill p, .ledger-path p { margin: 0; font-size: 10px; line-height: 1.5; }
+.ledger-card > canvas { width: 32px; height: 32px; }
+.ledger-card button, .ledger-skill button { flex: none; width: 78px; max-width: 78px; padding: 6px 3px; font-size: 11px; line-height: 1.3; }
+.ledger-card button small, .ledger-skill button small { display: block; font-size: 8px; letter-spacing: 0; margin-top: 2px; }
+.ledger-skill, .ledger-path { display: flex; align-items: center; gap: 8px; padding: 8px; }
+.ledger-skill > div, .ledger-path > div { flex: 1; min-width: 0; }
+.ledger-skill small { font-size: 8px; letter-spacing: 1px; }
+.ledger-glyph { flex: none; display: grid; place-items: center; width: 30px; height: 30px; font-size: 15px; }
+.ledger-stamp { flex: none; font-size: 8px; letter-spacing: 1px; text-transform: uppercase; padding: 3px 5px; }
+.ledger-half .training-group { margin: 6px 0 0; }
+.ledger-half .training-row { grid-template-columns: minmax(52px, 1fr) minmax(40px, auto) 14px minmax(40px, auto) minmax(64px, auto); gap: 5px; }
+@media (max-width: 760px) {
+  .ledger-body { display: block; overflow-y: auto; }
+  .ledger-half { overflow: visible; margin-bottom: 8px; }
+}
+@media (max-width: 480px) {
+  .ledger-subjects { gap: 3px; }
+  .ledger-subjects button { min-height: 50px; font-size: 8px; }
+  .ledger-subjects span img { width: 26px; height: 26px; }
+  .ledger-card > canvas { display: none; }
+}
+.ledger-heading small { display: block; margin-top: 4px; letter-spacing: 1px; font-size: 10px; text-transform: none; }
 .training-row { grid-template-columns: minmax(52px, 1fr) minmax(42px, auto) 18px minmax(42px, auto) minmax(64px, auto); }
 
 /* ── MINE ───────────────────────────────────────────────────────────── */

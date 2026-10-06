@@ -1,11 +1,10 @@
-/** The Upgrades page's skill trees, bought with Knowledge (which the Library
- * earns by the hour, and each wave a defense holds past the best before it
- * pays). Each skill has ranks; every rank applies its effect once more:
- * Command's and Stewardship's to every defense from the next one on, the
- * Library's and the Mine's to the library and the mine at once.
- * Node positions are percentages of the tree's view: x of its width, y of
- * its height, so a tree taller than one screen (`height`, in the same
- * units, 100 by default) scrolls. */
+/** The skills, bought with Knowledge (which the Library earns by the hour,
+ * and each wave a defense holds past the best before it pays) in the
+ * Upgrades page's Study (`upgrade-subjects.ts` says where each is shown).
+ * Each skill has ranks; every rank applies its effect once more: Command's
+ * and Stewardship's to every defense from the next one on, the Library's
+ * and the Mine's to the library and the mine at once. The trees group them
+ * for their requirements and the dev research settings. */
 import type { BonusTarget } from "./progression.ts";
 
 export type SkillId =
@@ -22,8 +21,8 @@ export type TreeId = "command" | "stewardship" | "mine" | "library";
  * `extraSmiths`). */
 export type SkillEffect = { target: BonusTarget | "smiths" | "copperPerWave" | "fireproof" | "fireTraining" | "nightWatch" | "coffee" | "waterproof"; per: number };
 export type Skill = { id: SkillId; name: string; icon: string; max: number; base: number; effect: SkillEffect; text: string };
-export type SkillNode = { id: SkillId; x: number; y: number; requires: SkillId[] };
-export type SkillTree = { id: TreeId; name: string; description: string; height?: number; nodes: SkillNode[] };
+export type SkillNode = { id: SkillId; requires: SkillId[] };
+export type SkillTree = { id: TreeId; name: string; description: string; nodes: SkillNode[] };
 
 export const SKILLS: Record<SkillId, Skill> = {
   drillSergeant: { id: "drillSergeant", name: "Drill sergeant", icon: "⚑", max: 3, base: 1, effect: { target: "drill", per: 10 }, text: "Barracks train recruits 10% faster a rank" },
@@ -49,31 +48,31 @@ export const SKILLS: Record<SkillId, Skill> = {
 
 export const TREES: SkillTree[] = [
   { id: "command", name: "Command", description: "Earn Knowledge in the Library and by holding past your best wave. Command sharpens the garrison and its towers.", nodes: [
-    { id: "drillSergeant", x: 50, y: 10, requires: [] },
-    { id: "veterans", x: 22, y: 32, requires: ["drillSergeant"] },
-    { id: "bladework", x: 78, y: 32, requires: ["drillSergeant"] },
-    { id: "fletchers", x: 78, y: 56, requires: ["bladework"] },
-    { id: "gunpowder", x: 22, y: 56, requires: ["veterans"] },
-    { id: "ballistics", x: 50, y: 70, requires: ["fletchers", "gunpowder"] },
-    { id: "warBanner", x: 50, y: 90, requires: ["ballistics"] },
+    { id: "drillSergeant", requires: [] },
+    { id: "veterans", requires: ["drillSergeant"] },
+    { id: "bladework", requires: ["drillSergeant"] },
+    { id: "fletchers", requires: ["bladework"] },
+    { id: "gunpowder", requires: ["veterans"] },
+    { id: "ballistics", requires: ["fletchers", "gunpowder"] },
+    { id: "warBanner", requires: ["ballistics"] },
   ] },
   { id: "stewardship", name: "Stewardship", description: "Earn Knowledge in the Library and by holding past your best wave. Stewardship strengthens the city and fills its coffers.", nodes: [
-    { id: "masonry", x: 50, y: 10, requires: [] },
-    { id: "bastions", x: 22, y: 32, requires: ["masonry"] },
-    { id: "guilds", x: 78, y: 32, requires: ["masonry"] },
-    { id: "plunder", x: 78, y: 56, requires: ["guilds"] },
-    { id: "scholars", x: 22, y: 56, requires: ["bastions"] },
-    { id: "ironworks", x: 78, y: 80, requires: ["plunder"] },
-    { id: "tactician", x: 30, y: 84, requires: ["scholars", "plunder"] },
+    { id: "masonry", requires: [] },
+    { id: "bastions", requires: ["masonry"] },
+    { id: "guilds", requires: ["masonry"] },
+    { id: "plunder", requires: [] },
+    { id: "scholars", requires: [] },
+    { id: "ironworks", requires: ["plunder"] },
+    { id: "tactician", requires: ["scholars"] },
   ] },
   { id: "mine", name: "Mine", description: "Earn Knowledge in the Library. Mine skills keep the crew working and the shaft dry.", nodes: [
-    { id: "coffee", x: 28, y: 30, requires: [] },
-    { id: "waterproofing", x: 72, y: 30, requires: [] },
+    { id: "coffee", requires: [] },
+    { id: "waterproofing", requires: [] },
   ] },
   { id: "library", name: "Library", description: "Earn Knowledge in the Library: shelves × librarians an hour. Library skills guard it from fire, while you play and while you are away.", nodes: [
-    { id: "fireproofWood", x: 28, y: 30, requires: [] },
-    { id: "fireTraining", x: 72, y: 30, requires: [] },
-    { id: "nightWatch", x: 50, y: 66, requires: [] },
+    { id: "fireproofWood", requires: [] },
+    { id: "fireTraining", requires: [] },
+    { id: "nightWatch", requires: [] },
   ] },
 ];
 
@@ -87,8 +86,3 @@ export function skillAvailable(id: SkillId, levels: Record<SkillId, number>) {
   const node = TREES.flatMap((t) => t.nodes).find((n) => n.id === id);
   return !!node && node.requires.every((key) => levels[key] > 0);
 }
-/** How tall `tree` is, in view heights × 100. */
-export const treeHeight = (tree: SkillTree) => tree.height ?? 100;
-/** `tree`'s nodes placed on its map: y as a percentage of the map's height. */
-export const mapNodes = (tree: SkillTree): SkillNode[] =>
-  tree.nodes.map((n) => ({ ...n, y: (n.y * 100) / treeHeight(tree) }));

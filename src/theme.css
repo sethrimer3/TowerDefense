@@ -172,7 +172,7 @@ input[type="checkbox"] {
 /* ── Headings: engraved, between two flourishes ── */
 .page-title h2,
 dialog h2,
-.tree-heading h3,
+.ledger-heading h3,
 .card h3,
 .upgrade h3 {
   color: #f0d9a8;
@@ -182,7 +182,7 @@ dialog h2,
 .defend-section,
 .training-group,
 .page-title h2,
-.tree-heading h3 {
+.ledger-heading h3 {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -194,8 +194,8 @@ dialog h2,
 .training-group::after,
 .page-title h2::before,
 .page-title h2::after,
-.tree-heading h3::before,
-.tree-heading h3::after {
+.ledger-heading h3::before,
+.ledger-heading h3::after {
   content: "";
   flex: 1;
   max-width: 120px;
@@ -205,7 +205,7 @@ dialog h2,
 .defend-section::after,
 .training-group::after,
 .page-title h2::after,
-.tree-heading h3::after {
+.ledger-heading h3::after {
   transform: scaleX(-1);
 }
 .defend-section {
@@ -560,25 +560,11 @@ dialog {
   color: var(--ink);
   border-radius: 2px;
 }
-.inspect-box .safe,
-.tree-tooltip .safe {
+.inspect-box .safe {
   color: #2f5a1e;
 }
 .inspect-box .danger {
   color: #8a1a12 !important;
-}
-/* The skill's name is inked, not lit, on parchment. */
-.tree-tooltip {
-  --tree-color: #7a3e10;
-}
-.skill-tree.stewardship .tree-tooltip {
-  --tree-color: #1f5a4a;
-}
-.skill-tree.library .tree-tooltip {
-  --tree-color: #3a2a6a;
-}
-.skill-tree.mine .tree-tooltip {
-  --tree-color: #5a3a1a;
 }
 
 /* ── The Armory: notices nailed to dark oak ── */
@@ -627,7 +613,7 @@ dialog {
   color: #b3a282;
 }
 
-/* ── Upgrades: Training is a ledger, the trees are alchemical charts ── */
+/* ── Upgrades: the Forge is a smithy's ledger, the Study an alchemical chart ── */
 .tree-tabs small {
   color: #b59a6c;
 }
@@ -637,8 +623,7 @@ dialog {
 .tree-tabs span img {
   filter: drop-shadow(0 2px 0 #000);
 }
-.skill-tree,
-.training {
+.ledger-half {
   border: 2px solid #120d09;
   border-radius: 4px;
   background:
@@ -652,117 +637,9 @@ dialog {
     inset 0 0 30px #000,
     0 4px 14px #000000a0;
 }
-.skill-tree.stewardship {
-  border-color: #0b1210;
-  background:
-    radial-gradient(ellipse at 50% 30%, #3cc29a14, transparent 65%),
-    linear-gradient(#000000c8, #000000d0),
-    var(--wood),
-    #1a110b;
-  box-shadow:
-    inset 0 0 0 3px #1a120c,
-    inset 0 0 0 4px #5aa08a55,
-    inset 0 0 30px #000,
-    0 4px 14px #000000a0;
-}
-/* The Library's tree is lit violet like its Knowledge; the Mine's, iron-red. */
-.skill-tree.library {
-  --tree-color: #c9a8ff;
-  border-color: #0e0b14;
-  background:
-    radial-gradient(ellipse at 50% 30%, #9a6cff14, transparent 65%),
-    linear-gradient(#000000c8, #000000d0),
-    var(--wood),
-    #1a110b;
-  box-shadow:
-    inset 0 0 0 3px #1a120c,
-    inset 0 0 0 4px #8a6ac055,
-    inset 0 0 30px #000,
-    0 4px 14px #000000a0;
-}
-.skill-tree.mine {
-  --tree-color: #e09a6a;
-}
-.tree-heading small {
+.ledger-heading small {
   color: var(--tree-color);
   text-shadow: 0 1px 0 #000;
-}
-.tree-viewport {
-  border: 1px solid #3a2a18;
-  border-radius: 3px;
-  background:
-    url("../assets/theme/sigil.svg") center / min(92%, 440px) no-repeat,
-    radial-gradient(ellipse at 50% 45%, #1a1712, #08090a 75%);
-  box-shadow: inset 0 0 24px #000;
-}
-.skill-tree.stewardship .tree-viewport {
-  background:
-    url("../assets/theme/sigil.svg") center / min(92%, 440px) no-repeat,
-    radial-gradient(ellipse at 50% 45%, #111916, #08090a 75%);
-}
-.tree-map line {
-  stroke: #4a3e2e;
-}
-.tree-map line.lit {
-  filter: drop-shadow(0 0 3px var(--tree-color));
-}
-/* Each skill is a round brass medallion. */
-.skill-node {
-  box-shadow: none;
-  text-shadow: 0 1px 0 #000;
-  color: #d9c9a6;
-}
-.skill-node,
-.skill-node[aria-pressed],
-.skill-node:hover,
-.skill-node:active:not(:disabled) {
-  background: none;
-  border: 0;
-  box-shadow: none;
-  transform: translate(-50%, -50%);
-}
-.node-icon {
-  border-radius: 50%;
-  color: #c7b48e;
-  border: 2px solid #6b5636;
-  background: radial-gradient(circle at 40% 35%, #2e261b, #0e0c09 75%);
-  box-shadow:
-    0 0 0 3px #0a0908,
-    0 0 0 4px #4a3a24,
-    inset 0 2px 6px #000;
-}
-.skill-node.locked .node-icon {
-  border-style: dashed;
-  border-color: #4a4034;
-  color: #6f6555;
-  box-shadow:
-    0 0 0 3px #0a0908,
-    inset 0 2px 6px #000;
-}
-.skill-node.available .node-icon {
-  border-color: var(--tree-color);
-}
-.skill-node.owned .node-icon {
-  background: radial-gradient(circle at 40% 35%, #3a3020, #14100a 75%);
-  border-color: var(--tree-color);
-  color: var(--tree-color);
-  box-shadow:
-    0 0 0 3px #0a0908,
-    0 0 0 4px var(--tree-color),
-    0 0 16px color-mix(in srgb, var(--tree-color) 55%, transparent),
-    inset 0 2px 6px #000;
-}
-.skill-node.chosen .node-icon {
-  outline: 1px dashed var(--tree-color);
-  outline-offset: 7px;
-}
-.node-name,
-.skill-node small {
-  background: #0b0a09d8;
-  border-radius: 2px;
-}
-.skill-node small {
-  color: #a8987a;
 }
 
 .training-points {
@@ -1404,4 +1281,102 @@ dialog .away-row .away-note {
   pointer-events: none;
   border: 1px solid #b69352;
   font-size: 12px;
+}
+
+/* ── The ledger's two halves: the Forge burns in the smithy's ember, the
+   Study is chalked over the alchemists' sigil in Knowledge's violet. ── */
+.ledger-forge {
+  --tree-color: #ffb46a;
+}
+.ledger-study {
+  --tree-color: #c9a8ff;
+  border-color: #0e0b14;
+  background:
+    url("../assets/theme/sigil.svg") center 120px / min(92%, 420px) no-repeat,
+    radial-gradient(ellipse at 50% 30%, #9a6cff18, transparent 65%),
+    linear-gradient(#000000c8, #000000d8),
+    var(--wood),
+    #15101a;
+  box-shadow:
+    inset 0 0 0 3px #1a120c,
+    inset 0 0 0 4px #8a6ac055,
+    inset 0 0 30px #000,
+    0 4px 14px #000000a0;
+}
+.ledger-note {
+  color: #cdbd9c;
+}
+.ledger-note b {
+  color: #ffd98f;
+}
+.ledger-note b.knowledge {
+  color: #e6c8ff;
+}
+.ledger-note small,
+.ledger-empty {
+  color: #9c8b6b;
+}
+.ledger-topics canvas {
+  border: 1px solid #3a2a18;
+  background: #0d0b09;
+}
+/* Skills are medallions on a chalked slate; owned ones glow violet. */
+.ledger-skill,
+.ledger-path {
+  border: 1px solid #3a2e4a;
+  border-radius: 3px;
+  background: linear-gradient(#ffffff06, #00000030), #0d0a12d8;
+  box-shadow: inset 0 1px 0 #c9a8ff12, 0 2px 0 #000;
+}
+.ledger-skill h3,
+.ledger-path h3 {
+  color: #eadcff;
+  text-shadow: 0 1px 0 #000;
+}
+.ledger-skill p,
+.ledger-path p {
+  color: #bfb2cf;
+}
+.ledger-skill p em {
+  color: #9a8bb0;
+  font-style: normal;
+}
+.ledger-skill small {
+  color: #a58fd0;
+}
+.ledger-glyph {
+  border-radius: 50%;
+  color: #c7b48e;
+  border: 2px solid #6b5636;
+  background: radial-gradient(circle at 40% 35%, #2e261b, #0e0c09 75%);
+  box-shadow: 0 0 0 2px #0a0908, 0 0 0 3px #4a3a24, inset 0 2px 6px #000;
+}
+.ledger-skill.locked .ledger-glyph {
+  border-style: dashed;
+  border-color: #4a4034;
+  color: #6f6555;
+}
+.ledger-skill.owned {
+  border-color: #6a54a0;
+}
+.ledger-skill.owned .ledger-glyph {
+  border-color: var(--tree-color);
+  color: var(--tree-color);
+  box-shadow: 0 0 0 2px #0a0908, 0 0 0 3px var(--tree-color), 0 0 14px #9a6cff80, inset 0 2px 6px #000;
+}
+/* Paths not yet written are drawn in faint chalk, stamped "to come". */
+.ledger-path {
+  border-style: dashed;
+  opacity: 0.72;
+}
+.ledger-path .ledger-glyph {
+  border-style: dashed;
+  border-color: #5a4a78;
+  color: #a58fd0;
+}
+.ledger-stamp {
+  color: #c9a8ff;
+  border: 1px solid #6a54a0;
+  border-radius: 2px;
+  transform: rotate(-6deg);
 }

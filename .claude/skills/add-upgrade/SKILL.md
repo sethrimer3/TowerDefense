@@ -39,7 +39,7 @@ Don't start editing code before the user has approved the spec.
 - **Effect in code:** <stat curve / Bonuses field / new behaviour read from levels or skills>
 - **Levels:** <max>
 - **Cost:** <formula and currency>, per level: <…>
-- **Placement:** <Armory group order / Training row order / tree node x,y and requires>
+- **Placement:** <Armory group order / Training row order / tree node requires; and its Upgrades topic in `upgrade-subjects.ts`>
 - **Affordable around:** <wave>
 - **Open questions:** <only what you couldn't infer>
 ```

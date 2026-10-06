@@ -62,7 +62,7 @@ The multipliers the Smithy and the skill trees lay over a defense (troops, tower
 ### Progress
 
 **Armory**:
-The Defend tab's shop: city elements, bombs, battle speed and the universal upgrades (one level for every building of a type), bought with copper, silver and Gold.
+The upgrades bought with copper, silver and Gold: city elements, bombs, battle speed and levels for every building of a type. Now sold in the Upgrades tab's Forge; `UPGRADES` in code.
 
 **Gold**:
 Paid by kills, by every wave held and by gold the mine digs; spent in the Armory and on hiring miners.
@@ -91,7 +91,16 @@ Shelvers filling the burned holes in a purchased bookshelf with new planks, keep
 **Upgrade point**:
 One for every new best wave held in Defend, shown in the currency bar; banked for what the meta game brings later. (It replaced the Commander level and its experience.)
 
-**Smithy** (the Upgrades tab; Training in code):
+**Upgrades tab**:
+One ledger for every upgrade, by **subject** (Realm, City, Towers, Units, Mine, Library) and within it by **topic** (one tower, one unit building…). Each topic has a **Forge** and a **Study**.
+
+**Forge**:
+A topic's permanent upgrades: more copies of its building, its Armory levels and its Smithy rows.
+
+**Study**:
+What Knowledge buys for a topic: its skills, and its **paths** (exclusive choices that change how a building works, refundable; still to come).
+
+**Smithy** (rows in the Upgrades tab's Forge; Training in code):
 Ranks of a few percent each on one row (troop HP, tower damage, Gold found…). A rank costs one Smithy point and is worked by the mine's smiths: one smith takes its whole time, more smiths share it. A smith on a rank stays at the smithy until it's done; taking the last one off cancels the rank and returns its point.
 
 **Smithy point**:

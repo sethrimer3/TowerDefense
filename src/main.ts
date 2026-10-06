@@ -6,7 +6,7 @@ import { bonuses, busySmiths, payKills, payWave, settleTraining, skillRank, skil
 import type { AppContext } from "./ui/app.ts";
 import { el, type Tab } from "./ui/dom.ts";
 import { buildShell } from "./ui/shell.ts";
-import { SkillTreePage } from "./ui/skill-tree-page.ts";
+import { UpgradesPage } from "./ui/upgrades-page.ts";
 import { renderSettingsPage } from "./ui/settings-page.ts";
 import type { Weather } from "./defend/weather.ts";
 import { play, soundEnabledBy } from "./sound.ts";
@@ -48,7 +48,7 @@ const ctx: AppContext = {
     store();
   },
 };
-const skillTree = new SkillTreePage(ctx);
+const upgradesPage = new UpgradesPage(ctx);
 const defendPage = new DefendPage(el("defend"), {
   save: () => save.defend,
   wallet: () => ({ gold: save.gold, copper: save.copper, silver: save.silver, free: save.settings.devMode }),
@@ -80,6 +80,7 @@ const defendPage = new DefendPage(el("defend"), {
   gridLines: () => (save.settings.tileGrid ? save.settings.gridOpacity / 100 : 0),
   effects: () => !save.settings.effectsOff,
   devMode: () => save.settings.devMode,
+  openUpgrades: () => navigate("upgrades"),
 });
 
 const minePage = new MinePage(el("mine"), {
@@ -92,7 +93,7 @@ const minePage = new MinePage(el("mine"), {
   earn: (points) => {
     for (const k of METALS) save.smithy[k] += points[k];
     mineDirty = true;
-    if (tab === "upgrades") skillTree.render();
+    if (tab === "upgrades") upgradesPage.render();
   },
   upgrades: () => ({ coffee: skillRank(save, "coffee"), waterproof: skillRank(save, "waterproofing"), smiths: skillTotal(save, "smiths") }),
   busySmiths: () => busySmiths(save),
@@ -209,7 +210,7 @@ function renderPage() {
   if (tab === "defend") defendPage.show();
   if (tab === "mine") minePage.show();
   if (tab === "library") libraryPage.show();
-  if (tab === "upgrades") skillTree.render();
+  if (tab === "upgrades") upgradesPage.render();
   if (tab === "settings") renderSettingsPage(ctx);
 }
 function navigate(id: Tab) {
@@ -239,7 +240,7 @@ function frame(time: number) {
     store();
   }
   welcome.refresh();
-  if (tab === "upgrades") skillTree.drawParticles(time);
+  if (tab === "upgrades") upgradesPage.drawParticles(time);
   if (time - lastTick >= 1000) {
     lastTick = time;
     const done = settleTraining(save, clock(), new Set(smithNames())) > 0;
@@ -247,7 +248,7 @@ function frame(time: number) {
       update();
       play("trained");
     }
-    if (tab === "upgrades") skillTree.tick(done);
+    if (tab === "upgrades") upgradesPage.tick(done);
   }
   requestAnimationFrame(frame);
 }

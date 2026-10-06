@@ -261,6 +261,24 @@ export function purchasePrice(item: PaletteItem, owned: number): Price {
   return price;
 }
 
+/** What each palette item is called on the page. */
+export const ITEM_NAMES: Record<PaletteItem, string> = {
+  cityTile: "City tile",
+  cityGate: "City gate",
+  wallSpikes: "Wall spikes",
+  wallBallista: "Wall ballista",
+  barracks: STRUCTURES.barracks.name,
+  archerBarracks: STRUCTURES.archerBarracks.name,
+  archerTower: STRUCTURES.archerTower.name,
+  cannonTower: STRUCTURES.cannonTower.name,
+  watchTower: STRUCTURES.watchTower.name,
+  wizardTower: STRUCTURES.wizardTower.name,
+  mageGuild: STRUCTURES.mageGuild.name,
+  valkyriePalace: STRUCTURES.valkyriePalace.name,
+  darkKeep: STRUCTURES.darkKeep.name,
+  monsterBait: STRUCTURES.monsterBait.name,
+};
+
 export type UpgradeId =
   | "barracksCapacity"
   | "barracksTraining"

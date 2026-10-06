@@ -3,8 +3,8 @@ import { wavePickerHTML } from "./wave-picker.ts";
 import { areaForWave, areaStyle, type AreaId } from "./areas.ts";
 import { uiSprite } from "../ui/dom.ts";
 import { KeepBricks } from "./keep-bricks.ts";
-/** The DEFEND page: a City tab (palette + board) and an Armory tab (buy
- * city elements, bombs and universal upgrades with what battles earn).
+/** The DEFEND page: the palette and the board (everything the palette
+ * holds, and every upgrade, is bought on the Upgrades page).
  *
  * Build phase: drag city elements from the palette (a side panel that
  * slides in beside the board's view) onto gold-outlined
@@ -13,26 +13,14 @@ import { KeepBricks } from "./keep-bricks.ts";
  * waves roll in without stopping until the keep falls. */
 import {
   ENEMIES,
-  BOMB_PRICE,
-  BOMB_RADIUS,
-  SPEED3_PRICE,
   PALETTE_ITEMS,
   PALETTE_CATEGORIES,
-  GATE_DESCRIPTION,
-  SPIKES_DESCRIPTION,
-  BALLISTA_DESCRIPTION,
-  STRUCTURES,
   inCategory,
-  UPGRADES,
-  footprint,
-  purchasePrice,
-  shareName,
-  upgradePrice,
   type Bonuses,
   type EnemyKind,
+  ITEM_NAMES,
   type PaletteCategory,
   type PaletteItem,
-  type Price,
 } from "./catalog.ts";
 import { TILES_H, TILES_W, defendRandom } from "./grid.ts";
 import { fitLayout, type Layout } from "./layout.ts";
@@ -48,7 +36,7 @@ import { EditSession, type Drop } from "./edit-session.ts";
 import { NIGHT_FADE_SECONDS, isBossWave, rollWeather, skyLabel, type Weather } from "./weather.ts";
 import { play } from "../sound.ts";
 import { replay, sparksOver } from "../ui/flourish.ts";
-import { available, buyBomb, buyItem, buySpeed3, buyUpgrade, canAfford, startingWave, type DefendSave, type Wallet } from "./progress.ts";
+import { available, startingWave, type DefendSave, type Wallet } from "./progress.ts";
 import { ageWater } from "./boats.ts";
 
 export type DefendHost = {
@@ -70,23 +58,8 @@ export type DefendHost = {
   /** The tile grid's opacity while building, 0 when it's hidden. */
   gridLines?(): number;
   setHealthbars?(value: boolean): void;
-};
-
-const ITEM_NAMES: Record<PaletteItem, string> = {
-  cityTile: "City tile",
-  cityGate: "City gate",
-  wallSpikes: "Wall spikes",
-  wallBallista: "Wall ballista",
-  barracks: STRUCTURES.barracks.name,
-  archerBarracks: STRUCTURES.archerBarracks.name,
-  archerTower: STRUCTURES.archerTower.name,
-  cannonTower: STRUCTURES.cannonTower.name,
-  watchTower: STRUCTURES.watchTower.name,
-  wizardTower: STRUCTURES.wizardTower.name,
-  mageGuild: STRUCTURES.mageGuild.name,
-  valkyriePalace: STRUCTURES.valkyriePalace.name,
-  darkKeep: STRUCTURES.darkKeep.name,
-  monsterBait: STRUCTURES.monsterBait.name,
+  /** Opens the Upgrades page, where buildings and upgrades are bought. */
+  openUpgrades?(): void;
 };
 
 const plural = (name: string) => (name.endsWith("s") ? name : `${name}s`);
@@ -94,7 +67,6 @@ const plural = (name: string) => (name.endsWith("s") ? name : `${name}s`);
 export class DefendPage {
   private host: DefendHost;
   private root: HTMLElement;
-  private tab: "city" | "armory" = "city";
   private phase: "build" | "sim" | "over" = "build";
   private map: CityMap | null = null;
   private mapLayout: Layout | null = null;
@@ -153,7 +125,7 @@ export class DefendPage {
   frame(time: number) {
     const dt = this.lastTime ? (time - this.lastTime) / 1000 : 0;
     this.lastTime = time;
-    if (!this.built || this.tab !== "city") return;
+    if (!this.built) return;
     const measuring = this.sim && this.phase === "sim";
     const start = performance.now();
     if (this.sim && this.phase === "sim") {
@@ -238,7 +210,6 @@ export class DefendPage {
             <div class="defend-message" id="defend-message" aria-live="polite"></div></div>
         </div>
       </div>
-      <div class="defend-armory" id="defend-armory" hidden></div>
       <dialog class="defend-journal-dialog" aria-labelledby="defend-journal-title"></dialog>
       <dialog class="defend-wave-dialog" aria-labelledby="defend-wave-title"></dialog>`;
     this.keepBricks = new KeepBricks();
@@ -279,8 +250,6 @@ export class DefendPage {
   }
 
   private renderChrome() {
-    this.root.querySelector<HTMLElement>("#defend-city")!.hidden = this.tab !== "city";
-    this.root.querySelector<HTMLElement>("#defend-armory")!.hidden = this.tab !== "armory";
     this.root.querySelector("#defend-stage")!.classList.toggle("palette-right", this.save.paletteSide === "right");
     this.refreshJournal();
     this.renderControls();
@@ -288,28 +257,19 @@ export class DefendPage {
     this.renderSide();
     this.renderSettings();
     this.updateHud();
-    if (this.tab === "armory") this.renderArmory();
   }
 
   /** The single row of controls on the left of the header. */
   private renderControls() {
     const el = this.root.querySelector<HTMLElement>("#defend-left")!;
     if (this.phase === "build") {
-      el.innerHTML = `<button data-dtab="city" aria-pressed="${this.tab === "city"}">City</button>
-        <button data-dtab="armory" aria-pressed="${this.tab === "armory"}">Armory</button>
+      el.innerHTML = `<button id="defend-upgrades" title="Buy buildings and upgrades">Upgrades</button>
         <button class="defend-go" id="defend-start">Start<span class="defend-wide"> the defense</span></button>
-        <button class="defend-wave" id="defend-wave" style="${areaStyle(areaForWave(startingWave(this.save)))}" title="Choose the starting wave · ${areaForWave(startingWave(this.save)).name}" aria-haspopup="dialog">${uiSprite("stage-select")}<small>Wave </small><b>${startingWave(this.save)}</b></button>${this.tab === "city" ? this.sideToggle("Build") : ""}`;
-      el.querySelectorAll<HTMLButtonElement>("[data-dtab]").forEach((b) => {
-        b.onclick = () => {
-          this.tab = b.dataset.dtab as "city" | "armory";
-          this.renderChrome();
-          this.relayout();
-        };
-      });
+        <button class="defend-wave" id="defend-wave" style="${areaStyle(areaForWave(startingWave(this.save)))}" title="Choose the starting wave · ${areaForWave(startingWave(this.save)).name}" aria-haspopup="dialog">${uiSprite("stage-select")}<small>Wave </small><b>${startingWave(this.save)}</b></button>${this.sideToggle("Build")}`;
+      el.querySelector<HTMLButtonElement>("#defend-upgrades")!.onclick = () => this.host.openUpgrades?.();
       this.bindSideToggle(el);
       el.querySelector<HTMLButtonElement>("#defend-wave")!.onclick = () => this.pickWave();
       el.querySelector<HTMLButtonElement>("#defend-start")!.onclick = () => {
-        this.tab = "city";
         this.startRun();
         this.relayout();
       };
@@ -457,12 +417,12 @@ export class DefendPage {
     if (id === "bomb") return this.pressBomb(e);
     if (id === "banner") return this.phase === "sim" ? this.beginDrag({ from: "banner" }, e) : undefined;
     const item = id as PaletteItem;
-    if (!available(this.save, item)) return this.setMessage(`No ${plural(ITEM_NAMES[item].toLowerCase())} left — buy more in the Armory.`);
+    if (!available(this.save, item)) return this.setMessage(`No ${plural(ITEM_NAMES[item].toLowerCase())} left — buy more in Upgrades.`);
     this.beginDrag({ from: "palette", item }, e);
   }
 
   private pressBomb(e: PointerEvent) {
-    if (!this.save.bombs || this.phase !== "sim") return this.setMessage("No bombs left — buy more in the Armory.");
+    if (!this.save.bombs || this.phase !== "sim") return this.setMessage("No bombs left — buy more in Upgrades.");
     this.beginDrag({ from: "bomb" }, e);
   }
 
@@ -536,7 +496,6 @@ export class DefendPage {
   private layoutBoard() {
     if (!this.renderer) return;
     this.fitHud();
-    if (this.tab === "armory") return this.layoutArmory();
     const stage = this.root.querySelector<HTMLElement>("#defend-stage")!;
     if (!stage.offsetParent) return;
     const top = stage.getBoundingClientRect().top + window.scrollY;
@@ -567,14 +526,6 @@ export class DefendPage {
   private relayout() {
     this.layoutBoard();
     requestAnimationFrame(() => this.layoutBoard());
-  }
-
-  /** The Armory list scrolls inside its own panel, so the page doesn't. */
-  private layoutArmory() {
-    const el = this.root.querySelector<HTMLElement>("#defend-armory")!;
-    if (!el.offsetParent) return;
-    const top = el.getBoundingClientRect().top + window.scrollY;
-    el.style.maxHeight = `${Math.max(120, window.innerHeight - top - this.navHeight() - 16)}px`;
   }
 
   private navHeight() {
@@ -643,7 +594,7 @@ export class DefendPage {
     const cleared = Math.max(0, wave - 1);
     this.showBanner(
       `<strong>The keep has fallen</strong><span>Fell during wave ${wave} · best ${this.save.bestWave}</span>${
-        this.newRecord ? `<em>New record this run: wave ${this.newRecord}</em>` : cleared < this.save.bestWave ? `<em>Strengthen the city in the Armory, Training and skill trees, then try again.</em>` : ""
+        this.newRecord ? `<em>New record this run: wave ${this.newRecord}</em>` : cleared < this.save.bestWave ? `<em>Strengthen the city in Upgrades, then try again.</em>` : ""
       }`,
     );
     this.renderChrome();
@@ -805,71 +756,5 @@ export class DefendPage {
   /** Whether a bomb can go off: in battle, with one left. */
   private bombsLive() {
     return !!this.sim && this.phase === "sim" && this.save.bombs > 0;
-  }
-
-  // ── Armory ────────────────────────────────────────────────────────────
-  private renderArmory() {
-    const el = this.root.querySelector<HTMLElement>("#defend-armory")!;
-    const s = this.save;
-    const w = this.host.wallet();
-    const price = (p: Price) =>
-      [`${p.gold} gold`, p.copper ? `${p.copper} copper` : "", p.silver ? `${p.silver} silver` : ""].filter(Boolean).join(" · ");
-    const items = PALETTE_ITEMS.map((item) => {
-      const p = purchasePrice(item, s.owned[item]);
-      const desc =
-        item === "cityTile"
-          ? "Expands the city limits. New tiles must touch the city; the wall moves out to enclose them."
-          : item === "cityGate"
-            ? GATE_DESCRIPTION
-            : item === "wallSpikes"
-              ? SPIKES_DESCRIPTION
-              : item === "wallBallista"
-                ? BALLISTA_DESCRIPTION
-            : `${STRUCTURES[item].description} Takes ${shareName(footprint(item, s.layout.compact.includes(item)).size)}.`;
-      return `<article class="card defend-card"><canvas width="48" height="48" data-icon="${item}"></canvas><div><small>OWNED ${s.owned[item]} · IN PALETTE ${available(s, item)}</small><h3>${ITEM_NAMES[item]}</h3><p>${desc}</p></div>
-        <button data-buy="${item}" ${canAfford(w, p) ? "" : "disabled"}>Buy · ${price(p)}</button></article>`;
-    }).join("");
-    const bomb = `<article class="card defend-card"><canvas width="48" height="48" data-icon="bomb"></canvas><div><small>OWNED ${s.bombs}</small><h3>Bomb</h3><p>Drag onto the battlefield mid-defense to blast everything within ${BOMB_RADIUS.toFixed(0)} cells — your own people too, until you buy Shaped charges.</p></div>
-      <button data-buy-bomb ${canAfford(w, BOMB_PRICE) ? "" : "disabled"}>Buy · ${price(BOMB_PRICE)}</button></article>`;
-    const speed = `<article class="card defend-card"><div><small>${s.speed3 ? "UNLOCKED" : "ONE-TIME UNLOCK"}</small><h3>War drums</h3><p>Adds 3× to the battle speed button.</p></div>
-      <button data-buy-speed3 ${s.speed3 || !canAfford(w, SPEED3_PRICE) ? "disabled" : ""}>${s.speed3 ? "Owned" : `Buy · ${price(SPEED3_PRICE)}`}</button></article>`;
-    const groups = [...new Set(UPGRADES.map((u) => u.group))];
-    const upgrades = groups
-      .map(
-        (g) =>
-          `<h4>${g}</h4>` +
-          UPGRADES.filter((u) => u.group === g)
-            .map((u) => {
-              const lvl = s.levels[u.id];
-              const maxed = lvl >= u.maxLevel;
-              const p = u.price ? u.price(lvl) : upgradePrice(lvl);
-              return `<article class="card defend-card defend-upgrade"><div><small>LEVEL ${lvl} / ${u.maxLevel}</small><h3>${u.name}</h3><p>${u.describe(lvl)}${maxed ? "" : ` → <b>${u.describe(lvl + 1)}</b>`}</p></div>
-                <button data-upgrade="${u.id}" ${maxed || !canAfford(w, p) ? "disabled" : ""}>${maxed ? "Maxed" : `Upgrade · ${price(p)}`}</button></article>`;
-            })
-            .join(""),
-      )
-      .join("");
-    const balance = (amount: number) => this.host.devMode() ? "∞" : Math.floor(amount + 1e-9);
-    el.innerHTML = `<p class="hint defend-wallet">Spend what you earn in battle: kills pay Gold, every wave held pays Gold and copper, boss waves silver. <b>${balance(w.copper)}</b> copper · <b>${balance(w.silver)}</b> silver · <b>${balance(w.gold)}</b> gold${this.phase === "sim" ? " · upgrades apply from the next defense" : ""}</p>
-      <h3 class="defend-section">City elements</h3>${items}
-      <h3 class="defend-section">Consumables</h3>${bomb}
-      <h3 class="defend-section">Battle</h3>${speed}
-      <h3 class="defend-section">Upgrades</h3><p class="hint">Upgrades apply to every building of that type.</p>${upgrades}`;
-    el.querySelectorAll<HTMLCanvasElement>("canvas[data-icon]").forEach((c) => paintIcon(c, c.dataset.icon as IconItem));
-    /** A purchase rings like coins and stamps its card once the list is redrawn. */
-    const commit = (ok: boolean, card: string) => {
-      if (!ok) return;
-      this.host.setWallet(w);
-      this.host.persist();
-      play("coin");
-      this.renderArmory();
-      const bought = el.querySelector(card)?.closest(".card") ?? null;
-      replay(bought, "bought");
-      sparksOver(bought?.querySelector("button") ?? null, "gold");
-    };
-    el.querySelectorAll<HTMLButtonElement>("[data-buy]").forEach((b) => (b.onclick = () => commit(buyItem(s, w, b.dataset.buy as PaletteItem), `[data-buy="${b.dataset.buy}"]`)));
-    el.querySelector<HTMLButtonElement>("[data-buy-bomb]")!.onclick = () => commit(buyBomb(s, w), "[data-buy-bomb]");
-    el.querySelector<HTMLButtonElement>("[data-buy-speed3]")!.onclick = () => commit(buySpeed3(s, w), "[data-buy-speed3]");
-    el.querySelectorAll<HTMLButtonElement>("[data-upgrade]").forEach((b) => (b.onclick = () => commit(buyUpgrade(s, w, b.dataset.upgrade as (typeof UPGRADES)[number]["id"]), `[data-upgrade="${b.dataset.upgrade}"]`)));
   }
 }
