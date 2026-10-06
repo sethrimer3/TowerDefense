@@ -71,6 +71,50 @@ const ICONS: Record<PathIcon, string[]> = {
     "...........", "o....o....o", "oo..olo..oo", "olo.olo.olo", "ollooloollo", "olllllllllo",
     "olldlldllmo", "olllllllmmo", "ommmmmmmmdo", "ooooooooooo", "...........",
   ],
+  arrow: [
+    "......ooooo", "......owllo", ".......olmo", "......odomo", ".....odo.oo", "....odo....",
+    "...odo.....", "o.odo......", "oodo.......", "ommo.......", "ooo........",
+  ],
+  fireArrow: [
+    "......ooooo", "......owllo", ".......olmo", "......odomo", ".....odo.oo", "....odo....",
+    "...odo.....", "olodo......", "wldo.......", "lwlo.......", ".ll........",
+  ],
+  volley: [
+    "...........", ".o...o...o.", "olo.olo.olo", "owo.owo.owo", ".d...d...d.", ".d...d...d.",
+    ".d...d...d.", ".d...d...d.", "odo.odo.odo", "o.o.o.o.o.o", "...........",
+  ],
+  eye: [
+    "...........", "...........", "...ooooo...", ".oollllloo.", "olllooolllo", "olloddwollo",
+    "olllooolllo", ".oollllloo.", "...ooooo...", "...........", "...........",
+  ],
+  crosshair: [
+    "...ooooo...", "..olllllo..", ".ol..w..lo.", "ol...w...lo", "ol...w...lo", "olwwwdwwwlo",
+    "ol...w...lo", "ol...w...lo", ".ol..w..lo.", "..olllllo..", "...ooooo...",
+  ],
+  gear: [
+    "....ooo....", ".oo.olo.oo.", ".olooloolo.", "..olllllo..", "oooldddlooo", "ollldodlllo",
+    "oooldddlooo", "..olllllo..", ".olooloolo.", ".oo.olo.oo.", "....ooo....",
+  ],
+  grape: [
+    "...........", ".ooo...ooo.", "owlmo.owlmo", "olmdo.olmdo", ".ooo...ooo.", "....ooo....",
+    "...owlmo...", "...olmdo...", "....ooo....", "...........", "...........",
+  ],
+  cannonball: [
+    "...ooooo...", ".oowllllmo.", ".owllllmmo.", "owlllllmmdo", "olllllmmmdo", "ollllmmmddo",
+    "olllmmmmddo", ".olmmmmddo.", ".ommmddddo.", "..oodddoo..", "...ooooo...",
+  ],
+  blast: [
+    ".....o.....", "o...olo...o", ".o.ollmo.o.", "..olllllo..", "ooolwwwlooo", "ollwwwwwllo",
+    "ooolwwwlooo", "..olllmlo..", ".o.ollmo.o.", "o...omo...o", ".....o.....",
+  ],
+  bow: [
+    "...oo......", "...w.oo....", "...w..olo..", "...w...olo.", "...w....olo", "ooommmmmolo",
+    "...w....olo", "...w...olo.", "...w..olo..", "...w.oo....", "...oo......",
+  ],
+  leaf: [
+    "......oooo.", "....oolllo.", "...ollwlmo.", "..ollwlmmo.", ".ollwlmmdo.", ".olwlmmdo..",
+    ".owlmmdo...", ".olmdoo....", ".ooo.......", "od.........", "o..........",
+  ],
 };
 
 const OUTLINE = "#140c08";
@@ -81,6 +125,7 @@ export const HUES: Record<PathHue | "gold", [string, string, string, string]> = 
   storm: ["#3b1f6e", "#7b4fd6", "#c7a8ff", "#fff6ff"],
   steel: ["#4b5563", "#8b97a6", "#cfd6de", "#ffffff"],
   shadow: ["#2a0f14", "#6b1d2a", "#c0475a", "#f6cdd2"],
+  verdant: ["#1f4a1c", "#3f8a34", "#8fd16a", "#e8ffd0"],
   gold: ["#7a5212", "#c08a2a", "#f2c95a", "#fff3c4"],
 };
 

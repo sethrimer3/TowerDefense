@@ -5,7 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { defaults, decode } from "../src/save.ts";
 import { bonuses } from "../src/progression.ts";
-import { PATHS, PATH_TOPICS, RIME, STORM, ASSASSIN, CRUSADE, decodePaths, learnPath, pathState, unlearnPath } from "../src/knowledge-paths.ts";
+import { PATHS, PATH_TOPICS, RIME, STORM, ASSASSIN, CRUSADE, FIRE_ARROWS, SHARP, GUNNERY, SIEGE_SHOT, SKIRMISH, decodePaths, learnPath, pathState, unlearnPath } from "../src/knowledge-paths.ts";
 import { ICON_ROWS, ICON_SIZE } from "../src/ui/path-icons.ts";
 import { defaultLayout, fitLayout, placeCityTile, placeStructure } from "../src/defend/layout.ts";
 import { generateCity } from "../src/defend/citygen.ts";
@@ -13,7 +13,8 @@ import { DefendSim, type Enemy, type Levels } from "../src/defend/sim.ts";
 import { NO_BONUSES, UPGRADES, type Bonuses, type PaletteItem } from "../src/defend/catalog.ts";
 import { center } from "../src/defend/pathing.ts";
 import { chilled, stepFlames, stepFrosts, Wizards } from "../src/defend/wizard.ts";
-import { Barracks, stepSwordsman } from "../src/defend/troops.ts";
+import { Barracks, stepArcher, stepSwordsman } from "../src/defend/troops.ts";
+import { Towers, stepArrows, stepShells } from "../src/defend/towers.ts";
 
 const rich = () => {
   const s = defaults();
@@ -94,7 +95,8 @@ function battle(kind: PaletteItem, paths?: Bonuses["paths"]) {
   let l = defaultLayout();
   const { tx, ty } = l.keep;
   for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) l = placeCityTile(l, tx + dx, ty + dy) ?? assert.fail("tile");
-  l = placeStructure(l, kind, tx, kind === "barracks" ? ty - 1 : ty - 3) ?? assert.fail(kind);
+  const inside = kind === "barracks" || kind === "archerBarracks";
+  l = placeStructure(l, kind, tx, inside ? ty - 1 : ty - 3) ?? assert.fail(kind);
   const fit = fitLayout(l);
   assert.ok(fit.ok);
   const sim = new DefendSim(generateCity(fit, 4), { ...LEVELS }, 1, paths ? { ...NO_BONUSES, paths } : NO_BONUSES);
@@ -194,4 +196,84 @@ test("Crusaders are heartier and heal; Assassins are frailer and strike critical
     hits.push(hp - e.hp);
   }
   assert.deepEqual(hits, [s.damage, s.damage, s.damage, s.damage * ASSASSIN.crit], "every 4th is critical");
+});
+
+/** One volley from a lone tower at whatever stands in reach. */
+function volley(kind: PaletteItem, paths: Bonuses["paths"], foes: [number, number, number?][]) {
+  const { sim, b, at } = battle(kind, paths);
+  const enemies = foes.map(([dx, dy, hp]) => {
+    const e = orc(sim, at.x + dx, at.y + dy);
+    if (hp) e.hp = e.maxHp = hp;
+    return e;
+  });
+  const towers = new Towers();
+  towers.step(sim, 1 / 30);
+  return { sim, b, towers, enemies };
+}
+
+test("Fire arrows set what they hit burning, and at III loose a volley", () => {
+  const { sim, enemies: [e] } = volley("archerTower", { archerTower: { path: "fireArrows", rank: 1 } }, [[0, -3]]);
+  assert.equal(sim.arrows.length, 1);
+  const arrow = sim.arrows[0];
+  assert.equal(arrow.burn, arrow.damage * FIRE_ARROWS.share[1]);
+  for (let t = 0; t < 1 && !e.burn; t += 1 / 30) stepArrows(sim, 1 / 30);
+  assert.equal(e.burn, FIRE_ARROWS.burn[1]);
+  const hp = e.hp;
+  (sim as unknown as { tick(dt: number): void }).tick(1);
+  assert.ok(Math.abs(hp - e.hp - arrow.burn!) < 1e-9, "a second's burn");
+  (sim as unknown as { tick(dt: number): void }).tick(FIRE_ARROWS.burn[1]);
+  assert.equal(e.burn, undefined, "burnt out");
+
+  const plain = volley("archerTower", undefined, [[0, -3]]);
+  assert.equal(plain.sim.arrows[0].burn, undefined, "no path, no burn");
+  const three = volley("archerTower", { archerTower: { path: "fireArrows", rank: 3 } }, [[0, -3], [1, -3], [-1, -3], [0, -4]]);
+  assert.equal(three.sim.arrows.length, FIRE_ARROWS.volley);
+});
+
+test("Sharpshooters crit every 3rd arrow, and at III aim at the strongest", () => {
+  const { sim, b, towers } = volley("archerTower", { archerTower: { path: "sharpshooters", rank: 2 } }, [[0, -3]]);
+  for (let k = 0; k < 2; k++) {
+    towers.cooldown.set(b.id, 0);
+    towers.step(sim, 1 / 30);
+  }
+  const [a, b2, c] = sim.arrows.map((a) => a.damage);
+  assert.equal(a, b2);
+  assert.equal(c, a * SHARP.crit);
+  const deadeye = volley("archerTower", { archerTower: { path: "sharpshooters", rank: 3 } }, [[0, -2], [0, -4, 5e6]]);
+  assert.equal(deadeye.sim.arrows[0].target, deadeye.enemies[1].id, "the stronger, further one");
+});
+
+test("Gun crews reload faster and burst into grapeshot; Siege shot hits harder and wider", () => {
+  const plain = volley("cannonTower", undefined, [[0, -4]]);
+  const drilled = volley("cannonTower", { cannonTower: { path: "gunnery", rank: 3 } }, [[0, -4]]);
+  assert.equal(drilled.towers.cooldown.get(drilled.b.id)!, plain.towers.cooldown.get(plain.b.id)! * GUNNERY.reload[3]);
+  assert.equal(plain.sim.shells[0].grape, undefined);
+  assert.ok(drilled.sim.shells[0].grape);
+  const near = orc(drilled.sim, drilled.sim.shells[0].x1 + drilled.sim.shells[0].r * 0.8, drilled.sim.shells[0].y1);
+  const lone = orc(plain.sim, plain.sim.shells[0].x1 + plain.sim.shells[0].r * 0.8, plain.sim.shells[0].y1);
+  for (const { sim } of [plain, drilled]) for (let t = 0; t < 2; t += 1 / 30) stepShells(sim, 1 / 30);
+  assert.ok(near.maxHp - near.hp > lone.maxHp - lone.hp, "grapeshot hits round the landing harder");
+
+  const siege = volley("cannonTower", { cannonTower: { path: "siegeShot", rank: 2 } }, [[0, -4]]);
+  const base = volley("cannonTower", undefined, [[0, -4]]);
+  assert.equal(siege.sim.shells[0].damage, base.sim.shells[0].damage * SIEGE_SHOT.damage[2]);
+  assert.equal(siege.sim.shells[0].r, base.sim.shells[0].r * SIEGE_SHOT.radius);
+  assert.equal(siege.towers.cooldown.get(siege.b.id)!, base.towers.cooldown.get(base.b.id)! * SIEGE_SHOT.reload);
+});
+
+test("Rangers loose twin shots; Skirmishers draw faster", () => {
+  const archer = (paths: Bonuses["paths"]) => {
+    const { sim, b } = battle("archerBarracks", paths);
+    new Barracks().step(sim, 1 / 30);
+    const s = sim.soldiers.find((s) => s.home === b.id)!;
+    orc(sim, s.x + 2, s.y);
+    orc(sim, s.x - 2, s.y);
+    stepArcher(sim, s, 1 / 30);
+    return { sim, s };
+  };
+  const plain = archer(undefined);
+  assert.equal(plain.sim.arrows.length, 1);
+  assert.equal(archer({ archerBarracks: { path: "rangers", rank: 3 } }).sim.arrows.length, 2);
+  const quick = archer({ archerBarracks: { path: "skirmishers", rank: 1 } });
+  assert.ok(Math.abs(quick.s.cd - plain.s.cd * SKIRMISH.reload[1]) < 1e-9);
 });

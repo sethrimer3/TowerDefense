@@ -27,12 +27,15 @@ import { CELL_COUNT, cellX, cellY } from "./grid.ts";
 import { cellAt, cellCenter, center, findPath, nearest, type PathLimits, type Point } from "./pathing.ts";
 import type { DefendSim, Enemy, Soldier } from "./sim.ts";
 import { answerBanner, MARCH_SIGHT } from "./war-banner.ts";
-import { ASSASSIN, CRUSADE, pathRank } from "../knowledge-paths.ts";
+import { ASSASSIN, CRUSADE, RANGERS, SKIRMISH, pathRank } from "../knowledge-paths.ts";
 
 /** The barracks' Study path and rank (`knowledge-paths.ts`): each 0 unless chosen. */
 const paths = (sim: DefendSim) => {
   const p = sim.bonuses.paths;
-  return { crusade: pathRank(p, "barracks", "crusaders"), assassin: pathRank(p, "barracks", "assassins") };
+  return {
+    crusade: pathRank(p, "barracks", "crusaders"), assassin: pathRank(p, "barracks", "assassins"),
+    ranger: pathRank(p, "archerBarracks", "rangers"), skirmish: pathRank(p, "archerBarracks", "skirmishers"),
+  };
 };
 /** A swordsman's HP and damage, as shares of his own, by his barracks' path. */
 function swordStats(sim: DefendSim) {
@@ -224,22 +227,36 @@ function returnToDoor(sim: DefendSim, s: Soldier, home: Building) {
 export function stepArcher(sim: DefendSim, s: Soldier, dt: number) {
   s.cd -= dt;
   s.thinkT -= dt;
-  const range = archerUnitRange(sim.levels.archerSight ?? 0);
+  const { ranger, skirmish } = paths(sim);
+  const range = archerUnitRange(sim.levels.archerSight ?? 0) + (ranger ? RANGERS.sight : 0);
+  const speed = ARCHER_UNIT.speed * (skirmish >= 2 ? SKIRMISH.speed : 1);
   const near = nearest(sim.enemiesNear(s.x, s.y, range), s, range * range, true);
-  if (near) return shoot(sim, s, near);
-  if (sim.warBanner) return answerBanner(sim, sim.warBanner, s, ARCHER_UNIT.speed, dt);
+  if (near) {
+    shoot(sim, s, near, range);
+    // Skirmishers keep walking while they shoot.
+    if (skirmish < 2) return;
+  }
+  if (sim.warBanner) return answerBanner(sim, sim.warBanner, s, speed, dt);
   if ((sim.levels.archerHunt ?? 0) > 0 && s.thinkT <= 0) hunt(sim, s);
   if (idle(s) && sim.streets.length) stroll(sim, s);
-  sim.followPath(s, null, ARCHER_UNIT.speed, dt);
+  sim.followPath(s, null, speed, dt);
 }
 
 /** No route to walk and done thinking. */
 const idle = (s: Soldier) => !s.path.length && s.thinkT <= 0;
 
-function shoot(sim: DefendSim, s: Soldier, e: Enemy) {
+function shoot(sim: DefendSim, s: Soldier, e: Enemy, range: number) {
   if (s.cd > 0) return;
-  s.cd = ARCHER_UNIT.cooldown;
-  sim.arrows.push({ x: s.x, y: s.y, origin: { x: s.x, y: s.y, attacker: s.id }, target: e.id, damage: s.damage, tx: e.x, ty: e.y, life: 2 });
+  const { ranger, skirmish } = paths(sim);
+  s.cd = ARCHER_UNIT.cooldown * SKIRMISH.reload[skirmish];
+  const damage = ranger >= 2 ? s.damage * RANGERS.damage : s.damage;
+  const loose = (t: Enemy) => sim.arrows.push({ x: s.x, y: s.y, origin: { x: s.x, y: s.y, attacker: s.id }, target: t.id, damage, tx: t.x, ty: t.y, life: 2 });
+  loose(e);
+  // Rangers' twin shot: a second arrow at the next nearest in sight.
+  if (ranger >= 3) {
+    const next = sim.enemiesNear(s.x, s.y, range).filter((o) => o !== e && o.hp > 0 && sq(o.x - s.x) + sq(o.y - s.y) <= range * range).sort(byDistanceFrom(s))[0];
+    if (next) loose(next);
+  }
 }
 
 /** Path toward the nearest of up to three enemies in the city. */

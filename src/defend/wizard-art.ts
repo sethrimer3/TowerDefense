@@ -255,8 +255,19 @@ export class WizardArt {
     const dot = artPen(c, px);
     c.save();
     for (const e of sim.enemies) {
-      if (!e.chill) continue;
       const n = Math.max(2, Math.round(enemySize(e) * ART)), x0 = Math.round(e.x * ART - n / 2), y0 = Math.round(e.y * ART - n / 2);
+      // A fire arrow's burn: a few tongues licking up off it, flickering.
+      if (e.burn) {
+        c.globalAlpha = 1;
+        for (let k = 0; k < 3; k++) {
+          const fx = x0 + Math.round(((k + 0.5) * n) / 3) - 1, lick = Math.floor(now / 90 + e.id * 3 + k * 5) % 3;
+          c.fillStyle = FLAME[1];
+          dot(fx, y0 - 1 - lick, 2, 2 + lick);
+          c.fillStyle = FLAME[3];
+          dot(fx, y0 - lick, 1, 1 + lick);
+        }
+      }
+      if (!e.chill) continue;
       c.fillStyle = ICE[3];
       c.globalAlpha = 0.55;
       for (let y = 1; y < n; y++) for (let x = (y + e.id) & 1; x < n; x += 2) dot(x0 + x, y0 + y);

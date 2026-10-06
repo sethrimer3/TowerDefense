@@ -936,6 +936,7 @@ dialog .away-row .away-note {
 .hue-storm { --hue: #c7a8ff; --hue-deep: #3b1f6e; }
 .hue-steel { --hue: #dfe5ec; --hue-deep: #4b5563; }
 .hue-shadow { --hue: #e0707e; --hue-deep: #4a1019; }
+.hue-verdant { --hue: #8fd16a; --hue-deep: #1f4a1c; }
 .hue-gold { --hue: #f2c95a; --hue-deep: #7a5212; }
 .path-root {
   color: #e6c8ff;

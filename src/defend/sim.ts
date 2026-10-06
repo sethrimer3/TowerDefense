@@ -78,6 +78,10 @@ export type Enemy = {
   chill?: number;
   /** Seconds left frozen solid by Rime's deep freeze (stopped); absent when not. */
   freeze?: number;
+  /** Seconds left burning from a fire arrow, and the burn's damage a
+   * second; absent when not burning. */
+  burn?: number;
+  burnDps?: number;
   fortressPart?: { core: number; role: "turret" | "leg" | "armor"; dx: number; dy: number };
   fortressParts?: Enemy[];
   facing?: { x: number; y: number };
@@ -140,10 +144,18 @@ export type Civilian = {
   stand?: number;
 };
 
-export type Arrow = { x: number; y: number; target: number; damage: number; tx: number; ty: number; life: number; origin?: Point & { attacker?: number; building?: number } };
+export type Arrow = {
+  x: number; y: number; target: number; damage: number; tx: number; ty: number; life: number; origin?: Point & { attacker?: number; building?: number };
+  /** A fire arrow's burn: damage a second, and for how long; absent otherwise. */
+  burn?: number; burnFor?: number;
+};
 export type Effect = { kind: "boom" | "dust" | "spark" | "firework" | "steam"; x: number; y: number; t: number; r: number; seed?: number };
 /** A cannon shell in flight: lobbed from the tower to where the target was. */
-export type Shell = { x0: number; y0: number; x1: number; y1: number; t: number; dur: number; damage: number; r: number; origin?: Arrow["origin"] };
+export type Shell = {
+  x0: number; y0: number; x1: number; y1: number; t: number; dur: number; damage: number; r: number; origin?: Arrow["origin"];
+  /** Gun crews (a Study path): bursting into grapeshot; absent otherwise. */
+  grape?: boolean;
+};
 /** Glowing cracks left where something exploded; they cool and fade. */
 export type Scorch = { x: number; y: number; r: number; seed: number; t: number; life: number };
 export type SimEvent = { type: "waveStart" | "waveCleared" | "lost"; wave: number };
@@ -418,6 +430,14 @@ export class DefendSim {
       if (e.chill !== undefined && (e.chill -= dt) <= 0) delete e.chill;
     for (const e of this.enemies)
       if (e.freeze !== undefined && (e.freeze -= dt) <= 0) delete e.freeze;
+    for (const e of this.enemies) {
+      if (e.burn === undefined) continue;
+      if (e.hp > 0 && !sheltered(this, e.x, e.y)) this.hurtEnemy(e, e.burnDps! * Math.min(dt, e.burn), false);
+      if ((e.burn -= dt) <= 0) {
+        delete e.burn;
+        delete e.burnDps;
+      }
+    }
     for (const s of this.soldiers)
       if (s.guard !== undefined && (s.guard -= dt) <= 0) delete s.guard;
     stepStabs(this, dt);

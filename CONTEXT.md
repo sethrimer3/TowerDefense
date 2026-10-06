@@ -101,7 +101,7 @@ A topic's permanent upgrades: more copies of its building, its Armory levels and
 What Knowledge buys for a topic: its skills, and its **paths**, drawn as a tree.
 
 **Path** (in a topic's Study):
-One way a building can grow, in ranks learned in order with Knowledge: the Wizard tower's Pyromancy (flames only), Rime (ice only, then freezing solid) or Stormcalling (lightning in place of flames), the Barracks' Crusaders (hearty, healing) or Assassins (swift, with critical strikes). Choosing a path's first rank **seals** the topic's other paths; **unlearning** it returns every point of Knowledge spent and opens them again.
+One way a building can grow, in ranks learned in order with Knowledge: the Wizard tower's Pyromancy (flames only), Rime (ice only, then freezing solid) or Stormcalling (lightning in place of flames), the Barracks' Crusaders (hearty, healing) or Assassins (swift, with critical strikes), the Archer tower's Fire arrows (setting enemies **burning**) or Sharpshooters, the Cannon tower's Gun crews (with **grapeshot**) or Siege shot, the Archer barracks' Rangers or Skirmishers. Choosing a path's first rank **seals** the topic's other paths; **unlearning** it returns every point of Knowledge spent and opens them again.
 
 **Evolution**:
 A path's crown, turning its building into a greater one (Stormcalling's Wizard tower into the Dark wizard keep, Crusaders' Barracks into the Valkyrie palace), placed in place of the base building. Shown on the tree, still to come.

@@ -62,17 +62,9 @@ export const SUBJECTS: Subject[] = [
     topics: [
       {
         id: "archerTower", name: "Archer tower", item: "archerTower", upgrades: ["archerDamage", "archerRange", "archerRate"],
-        paths: [
-          { name: "Fire arrows", text: "Arrows set their targets burning." },
-          { name: "Sharpshooters", text: "Longer range and critical hits." },
-        ],
       },
       {
         id: "cannonTower", name: "Cannon tower", item: "cannonTower", upgrades: ["cannonDamage", "cannonRate", "cannonSafe"],
-        paths: [
-          { name: "Gunnery drills", text: "Shells spare your own people, then grapeshot." },
-          { name: "Siege shot", text: "Slow, enormous single blasts." },
-        ],
       },
       {
         id: "watchTower", name: "Watch tower", item: "watchTower", upgrades: ["watchRadius"],
@@ -95,10 +87,6 @@ export const SUBJECTS: Subject[] = [
       },
       {
         id: "archerBarracks", name: "Archer barracks", item: "archerBarracks", upgrades: ["archerSight", "archerHunt"],
-        paths: [
-          { name: "Rangers", text: "Long sight; they track enemies through the streets." },
-          { name: "Skirmishers", text: "They shoot on the move, in volleys." },
-        ],
       },
       {
         id: "mageGuild", name: "Mage Guild", item: "mageGuild", upgrades: ["mageFireball", "mageEmbers"],

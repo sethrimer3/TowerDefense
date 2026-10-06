@@ -253,6 +253,8 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   streets and stop to shoot anything within their short sight (3 cells,
   widened by Keen eyes). The pricey one-off Hunter's instinct makes them
   path toward the nearest enemy in the city instead, stopping at bow range.
+  Study paths: Rangers (sight, heavier arrows, twin shots) or Skirmishers
+  (faster draws, shooting on the move).
 - **Mage Guilds** (`mages.ts`) train fire mages (same garrison size, drill
   speed and arms upgrades as the barracks). Mages wander the streets like
   archers and, when an enemy comes within 4.5 cells, stop and hurl a
@@ -291,6 +293,8 @@ from its seed; `tests/defend-replay.test.ts` pins it.
 - **Cannon towers** fire slowly at the nearest ground enemy (not bats),
   lobbing a shell in an arc that bursts with splash damage (full at the
   centre, 40% at the edge).
+  Study paths: Gun crews (faster reloads, then grapeshot: four smaller
+  blasts round each landing) or Siege shot (harder, slower, wider, further).
 - **Explosions** (cannon shells and bombs) are ragged, layered fireballs —
   smoke, flame, white-hot core, flung sparks — that briefly light up their
   surroundings, then leave glowing, branching cracks that cool and fade over
@@ -306,7 +310,9 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   speed for a few seconds). Its Forge raises the Flamethrower and the Ice wave; its Study paths (Pyromancy, Rime, Stormcalling) change what it casts.
   Neither draws from the run's random stream; how they look is the
   renderer's (`wizard-art.ts`).
-- **Archer towers** shoot the nearest enemy in range. **Watch towers** mark
+- **Archer towers** shoot the nearest enemy in range. Study paths: Fire arrows (what
+  they hit burns, then a volley of three) or Sharpshooters (reach, every 3rd
+  arrow critical, then aimed at the strongest). **Watch towers** mark
   enemies in their radius with a gold outline; marked enemies take ×2 damage.
 - **City gates** are buildings (`kind: "gate"`, numbered after the wall
   stones) with the HP of the stones they stand in for, half again: enemies

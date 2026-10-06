@@ -9,14 +9,17 @@
 import type { PaletteItem } from "./defend/catalog.ts";
 import type { Save } from "./save.ts";
 
-export type PathTopic = "wizardTower" | "barracks";
-export type PathId = "pyromancy" | "rime" | "storm" | "crusaders" | "assassins";
+export type PathTopic = "wizardTower" | "barracks" | "archerTower" | "cannonTower" | "archerBarracks";
+export type PathId =
+  | "pyromancy" | "rime" | "storm" | "crusaders" | "assassins"
+  | "fireArrows" | "sharpshooters" | "gunnery" | "siegeShot" | "rangers" | "skirmishers";
 /** The pixel icons `ui/path-icons.ts` draws, one a rank. */
 export type PathIcon =
   | "flame" | "tongue" | "inferno" | "snowflake" | "shard" | "iceBlock" | "bolt" | "fork" | "thunderhead"
-  | "mail" | "heart" | "cross" | "boot" | "dagger" | "skull" | "crown";
+  | "mail" | "heart" | "cross" | "boot" | "dagger" | "skull" | "crown"
+  | "arrow" | "fireArrow" | "volley" | "eye" | "crosshair" | "gear" | "grape" | "cannonball" | "blast" | "bow" | "leaf";
 /** Each path's colours, as `ui/path-icons.ts` and the page's CSS name them. */
-export type PathHue = "ember" | "frost" | "storm" | "steel" | "shadow";
+export type PathHue = "ember" | "frost" | "storm" | "steel" | "shadow" | "verdant";
 export type PathRank = { name: string; icon: PathIcon; cost: number; text: string };
 export type KnowledgePath = {
   id: PathId;
@@ -46,6 +49,27 @@ export const CRUSADE = { hp: [1, 1.5, 1.5, 2.2], speed: 0.85, heal: 3, damage: 1
  * `crit` times the damage; quicker strokes from II, the whole city their
  * hunting ground at III. */
 export const ASSASSIN = { speed: 1.3, hp: 0.8, every: [0, 4, 3, 2], crit: 3, cooldown: 0.75 };
+/** Fire arrows: an archer tower's arrows set what they hit burning for
+ * `burn[rank]` seconds at `share[rank]` of the arrow's damage a second; at
+ * III it looses `volley` arrows at once, each at another of the nearest. */
+export const FIRE_ARROWS = { burn: [0, 3, 4, 4], share: [0, 0.4, 0.8, 0.8], volley: 3 };
+/** Sharpshooters: `range` more cells; from II every `every`th arrow is
+ * critical for `crit` times the damage; at III `damage` times the damage,
+ * aimed at the strongest enemy in reach. */
+export const SHARP = { range: 2, every: 3, crit: 3, damage: 1.6 };
+/** Gun crews: a cannon reloads in `reload[rank]` of the time; from II each
+ * shell bursts into `grape` bomblets round it (`grapeShare` of the damage,
+ * `grapeR` of the radius). */
+export const GUNNERY = { reload: [1, 0.75, 0.75, 0.5], grape: 4, grapeShare: 0.35, grapeR: 0.5 };
+/** Siege shot: `damage[rank]` times the damage and `reload` times the time
+ * between shots; from II `radius` times the blast; at III `range` more cells. */
+export const SIEGE_SHOT = { damage: [1, 1.8, 1.8, 3], reload: 1.5, radius: 1.5, range: 3 };
+/** Rangers: archers see `sight` more cells, hit `damage` times as hard from
+ * II, and at III loose a second arrow at the next nearest enemy. */
+export const RANGERS = { sight: 2, damage: 1.5 };
+/** Skirmishers: archers draw in `reload[rank]` of the time; from II they
+ * walk `speed` times as fast and keep walking while they shoot. */
+export const SKIRMISH = { reload: [1, 0.7, 0.7, 0.45], speed: 1.3 };
 
 export const PATHS: KnowledgePath[] = [
   {
@@ -88,6 +112,54 @@ export const PATHS: KnowledgePath[] = [
       { name: "Light feet", icon: "boot", cost: 4, text: "Swordsmen run 30% faster with 20% less HP; every 4th strike is critical, 3× damage" },
       { name: "Cutthroats", icon: "dagger", cost: 8, text: "Every 3rd strike is critical, and they strike 33% faster" },
       { name: "Shadows", icon: "skull", cost: 14, text: "Every other strike is critical, and they hunt anywhere in the city" },
+    ],
+  },
+  {
+    id: "fireArrows", topic: "archerTower", name: "Fire arrows", motto: "Every arrow sets them alight", hue: "ember",
+    ranks: [
+      { name: "Pitch arrows", icon: "fireArrow", cost: 4, text: "Arrows set what they hit burning for 3 seconds" },
+      { name: "Wildfire", icon: "flame", cost: 8, text: "Burns last 4 seconds and burn twice as hot" },
+      { name: "Fire volley", icon: "volley", cost: 14, text: "The tower looses 3 burning arrows at once, at the 3 nearest enemies" },
+    ],
+  },
+  {
+    id: "sharpshooters", topic: "archerTower", name: "Sharpshooters", motto: "Far sight, deadly aim", hue: "verdant",
+    ranks: [
+      { name: "Hawk eyes", icon: "eye", cost: 4, text: "The tower reaches 2 cells further" },
+      { name: "Called shots", icon: "crosshair", cost: 8, text: "Every 3rd arrow is critical, 3× damage" },
+      { name: "Deadeye", icon: "skull", cost: 14, text: "Arrows hit 60% harder, aimed at the strongest enemy in reach" },
+    ],
+  },
+  {
+    id: "gunnery", topic: "cannonTower", name: "Gun crews", motto: "Fast crews, scattering shot", hue: "steel",
+    ranks: [
+      { name: "Drilled crews", icon: "gear", cost: 4, text: "The cannon reloads 25% faster" },
+      { name: "Grapeshot", icon: "grape", cost: 8, text: "Each shell bursts into 4 smaller blasts round where it lands" },
+      { name: "Master gunners", icon: "mail", cost: 14, text: "It reloads twice as fast as at first" },
+    ],
+  },
+  {
+    id: "siegeShot", topic: "cannonTower", name: "Siege shot", motto: "Slow, enormous blasts", hue: "ember",
+    ranks: [
+      { name: "Iron shot", icon: "cannonball", cost: 4, text: "Shells hit 80% harder, but the cannon takes half again as long to reload" },
+      { name: "Powder charge", icon: "blast", cost: 8, text: "Blasts are half again as wide" },
+      { name: "Earthshaker", icon: "fork", cost: 14, text: "Shells hit three times as hard in all and the cannon reaches 3 cells further" },
+    ],
+  },
+  {
+    id: "rangers", topic: "archerBarracks", name: "Rangers", motto: "Long sight, heavy arrows", hue: "verdant",
+    ranks: [
+      { name: "Woodcraft", icon: "leaf", cost: 4, text: "Archers see 2 cells further" },
+      { name: "Broadheads", icon: "arrow", cost: 8, text: "Their arrows hit 50% harder" },
+      { name: "Twin shot", icon: "volley", cost: 14, text: "Each loosing sends a second arrow at the next nearest enemy" },
+    ],
+  },
+  {
+    id: "skirmishers", topic: "archerBarracks", name: "Skirmishers", motto: "Quick draws, always moving", hue: "shadow",
+    ranks: [
+      { name: "Quick draw", icon: "bow", cost: 4, text: "Archers shoot 30% faster" },
+      { name: "Running shots", icon: "boot", cost: 8, text: "They walk 30% faster and keep moving while they shoot" },
+      { name: "Hail of arrows", icon: "bolt", cost: 14, text: "They shoot more than twice as fast as at first" },
     ],
   },
 ];
