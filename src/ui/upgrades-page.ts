@@ -2,7 +2,7 @@ import { play } from "../sound.ts";
 import { TRAINING, addSmith, busySmiths, whole, buySkill, cancelTraining, removeSmith, skillPurchase, skillRank, startTraining, trainingLeft, trainingStep, type TrainingId } from "../progression.ts";
 import { BARS_PER_POINT, METALS } from "../mine/sim.ts";
 import { SKILLS, TREES, type SkillId } from "../skill-trees.ts";
-import { learnPath, pathById, pathState, pathsOf, unlearnPath, type KnowledgePath, type PathId, type PathTopic } from "../knowledge-paths.ts";
+import { crownBought, crownedFrom, evolve, evolvedBy, learnPath, pathById, pathState, pathsOf, unlearnPath, type KnowledgePath, type PathId, type PathTopic } from "../knowledge-paths.ts";
 import { paintPathIcon } from "./path-icons.ts";
 import { TrainingParticles } from "../training-particles.ts";
 import { trainingSeconds } from "../training-jobs.ts";
@@ -100,6 +100,7 @@ export class UpgradesPage {
       this.render();
     }));
     root.querySelectorAll<HTMLButtonElement>("[data-learn-path]").forEach((b) => (b.onclick = () => this.learnPath(b.dataset.learnPath as PathId)));
+    root.querySelectorAll<HTMLButtonElement>("[data-evolve]").forEach((b) => (b.onclick = () => this.evolve(b.dataset.evolve as PathId)));
     root.querySelectorAll<HTMLButtonElement>("[data-unlearn]").forEach((b) => (b.onclick = () => this.unlearn(b.dataset.unlearn as PathTopic)));
     root.querySelectorAll<HTMLButtonElement>("[data-goto]").forEach((b) => (b.onclick = () => this.ctx.navigate(b.dataset.goto as "mine" | "library")));
   }
@@ -113,10 +114,16 @@ export class UpgradesPage {
 
   private forgeHtml(t: Topic) {
     const s = this.save, d = s.defend, w = this.wallet();
-    const copies = topicItems(t).map((item) => {
-      const p = purchasePrice(item, d.owned[item]);
-      return `<article class="card defend-card ledger-card"><canvas width="44" height="44" data-icon="${item}"></canvas><div><small>OWNED ${d.owned[item]} · ${available(d, item)} TO PLACE</small><h3>${ITEM_NAMES[item]}</h3><p>${this.itemText(item)}</p></div>
-        <button data-buy="${item}" ${canAfford(w, p) ? "" : "disabled"}>Buy one<small>${priceText(p)}</small></button></article>`;
+    const copies = topicItems(t).map((base) => {
+      // Crowned, the building's copies are its greater building, bought here.
+      const crown = crownedFrom(s, base)?.evolves, item = crown?.item ?? base;
+      const p = purchasePrice(item, d.owned[item]), grown = evolvedBy(item);
+      const buy = grown && !crown
+        ? `<em class="ledger-evolves">${crownedFrom(s, grown.evolves!.from) ? `Bought in the ${ITEM_NAMES[grown.evolves!.from]}'s Forge while crowned.` : `Not sold: ${grown.name}'s crown turns every ${ITEM_NAMES[grown.evolves!.from]} into one.`}</em>`
+        : `<button data-buy="${item}" ${canAfford(w, p) ? "" : "disabled"}>Buy one<small>${priceText(p)}</small></button>`;
+      const note = crown ? `<b class="ledger-next">Crowned: the ${ITEM_NAMES[base]} is now a ${crown.name}.</b>` : "";
+      return `<article class="card defend-card ledger-card"><canvas width="44" height="44" data-icon="${item}"></canvas><div><small>OWNED ${d.owned[item]} · ${available(d, item)} TO PLACE</small><h3>${ITEM_NAMES[item]}</h3><p>${this.itemText(item)}${note}</p></div>
+        ${buy}</article>`;
     });
     const extras = (t.extras ?? []).map((x) => this.extraHtml(x, w));
     const levels = (t.upgrades ?? []).map((id) => {
@@ -168,7 +175,12 @@ export class UpgradesPage {
       replay(bought, "bought");
       sparksOver(bought?.querySelector("button") ?? null, "gold");
     };
-    root.querySelectorAll<HTMLButtonElement>("[data-buy]").forEach((b) => (b.onclick = () => commit((w) => buyItem(d, w, b.dataset.buy as PaletteItem), `[data-buy="${b.dataset.buy}"]`)));
+    root.querySelectorAll<HTMLButtonElement>("[data-buy]").forEach((b) => (b.onclick = () => commit((w) => {
+      const item = b.dataset.buy as PaletteItem, grown = evolvedBy(item);
+      if (!buyItem(d, w, item)) return false;
+      if (grown) crownBought(s, grown.evolves!.from);
+      return true;
+    }, `[data-buy="${b.dataset.buy}"]`)));
     root.querySelectorAll<HTMLButtonElement>("[data-upgrade]").forEach((b) => (b.onclick = () => commit((w) => buyUpgrade(d, w, b.dataset.upgrade as UpgradeId), `[data-upgrade="${b.dataset.upgrade}"]`)));
     root.querySelector<HTMLButtonElement>("[data-buy-bomb]")?.addEventListener("click", () => commit(() => buyBomb(d, s.settings.devMode ? { gold: 0, free: true } : s), "[data-buy-bomb]"));
     root.querySelector<HTMLButtonElement>("[data-buy-speed3]")?.addEventListener("click", () => commit((w) => buySpeed3(d, w), "[data-buy-speed3]"));
@@ -284,16 +296,17 @@ export class UpgradesPage {
           <button class="path-node ${cls} ${this.picked[t.id] === key ? "picked" : ""}" data-pick="${key}" aria-label="${p.name} ${ROMAN[i]}: ${r.name}${cls === "learned" ? ", learned" : ""}">
             <span class="path-medal"><canvas data-path-icon="${r.icon}:${p.hue}"></canvas></span><b>${ROMAN[i]}</b><span class="path-name">${r.name}</span></button>`;
       }).join("");
+      const cstate = st.crowned ? "learned" : st.maxed && !st.sealed ? "next" : "later";
       const crown = p.evolves
-        ? `<span class="path-link crown-link" aria-hidden="true"></span>
-          <button class="path-node crown ${this.picked[t.id] === `${p.id}:crown` ? "picked" : ""}" data-pick="${p.id}:crown" aria-label="Evolution: ${p.evolves.name}">
+        ? `<span class="path-link crown-link ${st.crowned ? "lit" : ""}" aria-hidden="true"></span>
+          <button class="path-node crown ${cstate} ${this.picked[t.id] === `${p.id}:crown` ? "picked" : ""}" data-pick="${p.id}:crown" aria-label="Evolution: ${p.evolves.name}${st.crowned ? ", learned" : ""}">
             <span class="path-medal"><canvas data-path-icon="crown:gold"></canvas></span><b>♛</b><span class="path-name">${p.evolves.name}</span></button>`
         : "";
       return `<div class="path-col hue-${p.hue} ${state}"><header class="path-banner"><h4>${p.name}</h4><small>${st.sealed ? "Sealed" : p.motto}</small></header>${ranks}${crown}</div>`;
     }).join("");
     const following = choice
-      ? `<div class="path-following hue-${pathById(choice.path).hue}"><span>Following <b>${pathById(choice.path).name}</b>, ${choice.rank} of ${pathById(choice.path).ranks.length}</span>
-          <button data-unlearn="${topic}" class="danger">Unlearn<small>returns ${whole(choice.spent)} Knowledge</small></button></div>`
+      ? `<div class="path-following hue-${pathById(choice.path).hue}"><span>Following <b>${pathById(choice.path).name}</b>, ${choice.rank} of ${pathById(choice.path).ranks.length}${choice.crowned !== undefined ? `, crowned` : ""}</span>
+          <button data-unlearn="${topic}" class="danger">Unlearn<small>returns ${whole(choice.spent)} Knowledge${choice.crowned !== undefined ? ` · turns them back` : ""}</small></button></div>`
       : "";
     return `<div class="path-tree" style="--paths:${n}">
         <div class="path-root"><span class="path-medal root"><canvas width="44" height="44" data-icon="${t.item}"></canvas></span><span>${t.name}</span></div>
@@ -309,7 +322,17 @@ export class UpgradesPage {
     if (!p) return `<p class="path-detail path-hint">Tap a rank to read it. Learning a path's first rank chooses that path and seals the others; unlearning returns all its Knowledge.</p>`;
     const save = this.save, st = pathState(save, p.id), researchers = this.ctx.researchers();
     if (at === "crown" && p.evolves) {
-      return `<div class="path-detail hue-gold"><span class="path-medal"><canvas data-path-icon="crown:gold"></canvas></span><div><small>${p.name.toUpperCase()} · EVOLUTION</small><h3>${p.evolves.name}</h3><p>${p.evolves.text}: you place it in place of the base building.</p></div><span class="ledger-stamp">To come</span></div>`;
+      const e = p.evolves, from = ITEM_NAMES[e.from], owned = save.defend.owned[e.from];
+      let action: string;
+      if (st.crowned) action = `<span class="path-done">Evolved</span><em>Unlearning ${p.name} turns them back.</em>`;
+      else if (st.sealed) action = `<em>Sealed while you follow ${pathById(save.paths[p.topic]!.path).name}. Unlearn it to choose this path.</em>`;
+      else if (!st.maxed) action = `<em>Learn ${p.ranks[p.ranks.length - 1].name} first.</em>`;
+      else {
+        const why = !researchers ? "Put a librarian to the alchemy lab to research" : !st.crownAffordable ? `Needs ${e.cost} Knowledge, have ${whole(save.knowledge)}` : "";
+        action = `<button data-evolve="${p.id}" ${why ? "disabled" : ""}>Evolve<small>${e.cost} Knowledge</small></button>${why ? `<em>${why}.</em>` : ""}`;
+      }
+      const copies = st.crowned ? "" : ` Your ${owned} ${owned === 1 ? from : `${from}s`} go back to the palette as ${e.name}s, to place again; copies bought later are ${e.name}s too.`;
+      return `<div class="path-detail hue-gold"><span class="path-medal"><canvas data-path-icon="crown:gold"></canvas></span><div><small>${p.name.toUpperCase()} · EVOLUTION</small><h3>${e.name}</h3><p>${e.text}.${copies}</p></div><div class="path-act">${action}</div></div>`;
     }
     const i = Number(at), r = p.ranks[i];
     if (!r) return "";
@@ -333,11 +356,22 @@ export class UpgradesPage {
     this.ctx.update();
     const rank = this.save.paths[p.topic]!.rank;
     // Read on to the next rank, so the next tap learns it.
-    this.picked[p.topic] = `${id}:${rank < p.ranks.length ? rank : rank - 1}`;
+    this.picked[p.topic] = `${id}:${rank < p.ranks.length ? rank : p.evolves ? "crown" : rank - 1}`;
     this.render();
     const node = el("upgrades").querySelector(`[data-pick="${id}:${rank - 1}"]`);
     replay(node, "bought");
     sparksOver(node as HTMLElement | null, "arcane");
+  }
+
+  private evolve(id: PathId) {
+    if (!this.ctx.researchers() || !evolve(this.save, id)) return;
+    this.ctx.researched();
+    play("levelUp");
+    this.ctx.update();
+    this.render();
+    const node = el("upgrades").querySelector(`[data-pick="${id}:crown"]`);
+    replay(node, "bought");
+    sparksOver(node as HTMLElement | null, "gold");
   }
 
   private unlearn(topic: PathTopic) {

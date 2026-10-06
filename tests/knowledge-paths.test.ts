@@ -5,9 +5,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { defaults, decode } from "../src/save.ts";
 import { bonuses } from "../src/progression.ts";
-import { PATHS, PATH_TOPICS, RIME, STORM, ASSASSIN, CRUSADE, FIRE_ARROWS, SHARP, GUNNERY, SIEGE_SHOT, SKIRMISH, SPOTTERS, SIGNAL, PYROCLASM, CINDERS, OIL, FORTIFY, decodePaths, learnPath, pathState, unlearnPath } from "../src/knowledge-paths.ts";
+import { PATHS, PATH_TOPICS, RIME, STORM, ASSASSIN, CRUSADE, FIRE_ARROWS, SHARP, GUNNERY, SIEGE_SHOT, SKIRMISH, SPOTTERS, SIGNAL, PYROCLASM, CINDERS, OIL, FORTIFY, crownBought, crownedFrom, decodePaths, evolve, evolvedBy, learnPath, pathState, unlearnPath } from "../src/knowledge-paths.ts";
 import { ICON_ROWS, ICON_SIZE } from "../src/ui/path-icons.ts";
-import { defaultLayout, fitLayout, placeCityTile, placeStructure } from "../src/defend/layout.ts";
+import { defaultLayout, fitLayout, placeCityTile, placeStructure, placedCount } from "../src/defend/layout.ts";
+import { available } from "../src/defend/progress.ts";
 import { generateCity } from "../src/defend/citygen.ts";
 import { DefendSim, type Enemy, type Levels } from "../src/defend/sim.ts";
 import { NO_BONUSES, UPGRADES, watchRadius, type Bonuses, type PaletteItem } from "../src/defend/catalog.ts";
@@ -388,4 +389,64 @@ test("Oil-soaked bait sets its biters alight; fortified crates hold out and, spi
   const spiked = bait({ bait: { path: "fortified", rank: 3 } });
   baitBitten(spiked.sim, spiked.e, 5);
   assert.equal(spiked.e.maxHp - spiked.e.hp, 5 * FORTIFY.thorns);
+});
+
+// ── Evolutions ────────────────────────────────────────────────────────────
+test("a crown turns every copy into the greater building, and unlearning turns them back", () => {
+  const s = rich();
+  s.knowledge = 200;
+  const d = s.defend;
+  let l = d.layout;
+  for (const [dx, dy] of [[-1, 0], [0, -1]]) l = placeCityTile(l, l.keep.tx + dx, l.keep.ty + dy) ?? assert.fail("tile");
+  d.owned.barracks = 2;
+  d.layout = placeStructure(l, "barracks", l.keep.tx, l.keep.ty - 1) ?? assert.fail("barracks");
+  assert.equal(placedCount(d.layout, "barracks"), 1);
+
+  assert.equal(evolve(s, "crusaders"), false, "not before the path is chosen");
+  for (let i = 0; i < 3; i++) {
+    assert.ok(!pathState(s, "crusaders").canEvolve, "not before its last rank");
+    learnPath(s, "crusaders");
+  }
+  assert.ok(pathState(s, "crusaders").canEvolve);
+  const before = s.knowledge;
+  assert.ok(evolve(s, "crusaders"));
+  assert.equal(s.knowledge, before - 25);
+  assert.equal(d.owned.barracks, 0);
+  assert.equal(d.owned.valkyriePalace, 2);
+  assert.equal(placedCount(d.layout, "barracks"), 0, "lifted back to the palette");
+  assert.equal(available(d, "valkyriePalace"), 2);
+  assert.equal(evolve(s, "crusaders"), false, "once");
+  assert.equal(crownedFrom(s, "barracks")?.id, "crusaders");
+  assert.equal(evolvedBy("valkyriePalace")?.id, "crusaders");
+
+  // A copy bought while crowned is a palace, and turns back with the rest.
+  d.owned.valkyriePalace++;
+  crownBought(s, "barracks");
+  assert.equal(s.paths.barracks!.crowned, 3);
+  assert.deepEqual(decode(JSON.stringify(s)).paths.barracks, s.paths.barracks, "the save keeps the crown");
+
+  let pl = d.layout;
+  for (const [dx, dy] of [[1, 0], [0, 1]]) pl = placeCityTile(pl, pl.keep.tx + dx, pl.keep.ty + dy) ?? assert.fail("tile");
+  d.layout = placeStructure(pl, "valkyriePalace", pl.keep.tx + 1, pl.keep.ty) ?? assert.fail("palace");
+  d.owned.valkyriePalace++; // one bought before any crown stays a palace
+  const spent = s.paths.barracks!.spent;
+  assert.equal(unlearnPath(s, "barracks"), spent);
+  assert.equal(d.owned.barracks, 3);
+  assert.equal(d.owned.valkyriePalace, 1);
+  assert.equal(placedCount(d.layout, "valkyriePalace"), 1, "what is still owned stays placed");
+  assert.equal(crownedFrom(s, "barracks"), undefined);
+});
+
+test("a crowned wizard tower becomes a Dark wizard keep; saves keep only a crown on a finished path", () => {
+  const s = rich();
+  s.knowledge = 200;
+  s.defend.owned.wizardTower = 1;
+  for (let i = 0; i < 3; i++) learnPath(s, "storm");
+  assert.ok(evolve(s, "storm"));
+  assert.equal(s.defend.owned.darkKeep, 1);
+  assert.equal(s.defend.owned.wizardTower, 0);
+  assert.equal(evolve(s, "pyromancy"), false, "sealed and crownless");
+  assert.deepEqual(decodePaths({ wizardTower: { path: "storm", rank: 2, spent: 14, crowned: 1 } }), { wizardTower: { path: "storm", rank: 2, spent: 14 } });
+  assert.deepEqual(decodePaths({ wizardTower: { path: "pyromancy", rank: 3, spent: 26, crowned: 1 } }), { wizardTower: { path: "pyromancy", rank: 3, spent: 26 } });
+  assert.deepEqual(decodePaths({ wizardTower: { path: "storm", rank: 3, spent: 59, crowned: 0 } }), { wizardTower: { path: "storm", rank: 3, spent: 59, crowned: 0 } });
 });

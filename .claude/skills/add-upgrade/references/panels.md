@@ -31,5 +31,6 @@
 
 - Path: `{ id, topic, name, motto, hue, ranks, evolves? }` in `PATHS`; `topic` is the Upgrades topic's id (one tower or troop building), which puts the path on that topic's tree in the Study. Add the id to `PathId` (and a new topic to `PathTopic`).
 - Ranks: `{ name, icon, cost, text }`, learned in order with Knowledge; an icon is an 11 × 11 pixel drawing in `src/ui/path-icons.ts` painted in the path's `hue`.
+- Evolution: `evolves: { from, item, name, cost, text }` puts a crown after the last rank; `evolve` turns every owned `from` into `item` (placed ones lifted to the palette), `unlearnPath` turns them back, and the Forge stops selling `item` on its own.
 - Exclusive: the first rank chooses the path and seals the topic's others; unlearning returns all the Knowledge spent (`spent` in `save.paths`).
 - Effect: the battle reads `Bonuses.paths` with `pathRank(paths, topic, id)`; keep the numbers in an exported table beside the paths, keep any new unit or enemy state absent when the path isn't chosen, and use exact math only, so replays don't move.

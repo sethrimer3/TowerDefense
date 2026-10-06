@@ -1006,6 +1006,16 @@ dialog .away-row .away-note {
 .path-tree .path-node.crown { color: #f2c95a; }
 .path-tree .path-node.crown b { color: #c08a2a; }
 .path-link.crown-link { background: repeating-linear-gradient(#c08a2a 0 3px, transparent 3px 6px); }
+/* Crown in reach: ringed in gold. Crowned: the lozenge blazes. */
+.path-tree .path-node.crown.later { color: #8a7650; }
+.path-node.crown.next .path-medal { box-shadow: 0 0 0 1px #000, 0 0 0 3px #f2c95a, 0 0 14px #f2c95a80; }
+.path-node.crown.learned .path-medal {
+  background: radial-gradient(circle at 40% 35%, #fff3c4, #c08a2a 70%);
+  box-shadow: 0 0 0 1px #000, 0 0 18px #f2c95a;
+}
+.path-link.crown-link.lit { background: #f2c95a; box-shadow: 0 0 6px #f2c95a; }
+/* A building that is grown, not bought, says how in place of a price. */
+.ledger-evolves { font-size: 11px; color: #e6c98a; max-width: 140px; text-align: right; }
 /* Sealed: the branch turns to cold stone. */
 .path-col.sealed { filter: grayscale(0.95) brightness(0.6); }
 .path-col.sealed .path-banner small { color: #9c9c9c; letter-spacing: 2px; text-transform: uppercase; }

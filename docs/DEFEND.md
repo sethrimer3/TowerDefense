@@ -266,7 +266,8 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   the ground burns) in the Forge. Study paths: Pyroclasm (heavier, wider
   fireballs, then two more bursting either side) or Cinders (longer, hotter
   blazes, then fire that clings to whoever walks through).
-- **Valkyrie palaces** (`valkyries.ts`) train valkyries (same garrison
+- **Valkyrie palaces** (`valkyries.ts`), grown from barracks by the
+  Crusaders path's crown rather than bought, train valkyries (same garrison
   size, drill speed and arms upgrades as the barracks): armoured angels with
   spears who path toward the nearest enemy in the city, or stroll the
   streets. When an enemy comes within her reach she makes a **charge stab**:
@@ -275,7 +276,8 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   the board's edge stops her, and her spear hurts every enemy on that line,
   fliers too. For a second after each charge nothing can hurt her
   (`guard`), blasts included.
-- **Dark wizard keeps** (`dark-wizards.ts`) each summon one **dark
+- **Dark wizard keeps** (`dark-wizards.ts`), grown from wizard towers by
+  the Stormcalling path's crown rather than bought, each summon one **dark
   wizard**, the ultimate unit, on three times a barracks' drill (arms
   upgrades apply). He hunts the nearest enemy in the city like a valkyrie
   and, when one comes within 6 cells, holds his ground and casts **black

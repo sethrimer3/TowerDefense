@@ -76,6 +76,17 @@ export function available(save: DefendSave, item: PaletteItem): number {
   return Math.max(0, save.owned[item] - placedCount(save.layout, item));
 }
 
+/** Returns the newest placed `kind` to the palette until no more stand than
+ * are owned (an evolution taking or giving back copies). */
+export function trimPlaced(save: DefendSave, kind: PlacedKind) {
+  const over = placedCount(save.layout, kind) - save.owned[kind];
+  if (over <= 0) return;
+  const next = cloneLayout(save.layout);
+  const drop = new Set(next.structures.filter((s) => s.kind === kind).sort((a, b) => b.uid - a.uid).slice(0, over).map((s) => s.uid));
+  next.structures = next.structures.filter((s) => !drop.has(s.uid));
+  save.layout = next;
+}
+
 /** Dev (All towers unlocked): at least one of every structure owned. */
 export function unlockAllTowers(save: DefendSave) {
   for (const item of PALETTE_ITEMS) if (item !== "cityTile") save.owned[item] = Math.max(save.owned[item], 1);
