@@ -1,6 +1,6 @@
 /** The magic boats' water as it is drawn: pixel art at `ART` pixels a cell,
- * like the parks' ponds, in the same bands (a black outline, a wet muddy
- * bank, shallows, open water and a deeper heart), with the bank mirrored
+ * like the parks' ponds, in soft pixel bands (a translucent wet edge,
+ * shallows, open water and a deeper heart), with the bank mirrored
  * into it as on the ponds, wavering with the shimmer.
  *
  * Over the water: rings spreading from the boat's wake, raindrops' rings
@@ -26,7 +26,7 @@ const abgr = (hex: number, a = 255) => ((a << 24) | ((hex & 0xff) << 16) | (hex 
 /** Bands by depth in art pixels, edge first, as the ponds'. */
 const OUTLINE = abgr(0x385957, 145), BANK = abgr(0x427675, 215), SHALLOWS = abgr(0x397481), OPEN = abgr(0x306579), DEEP = abgr(0x285a70);
 const ICE_EDGE = abgr(0xc2e6ee), ICE = abgr(0x86b9ce), ICE_DARK = abgr(0x72a5bf), ICE_CRACK = abgr(0xd7eef3);
-const CREST = abgr(0x4f8fa8), GLINT = abgr(0x9cc8d6), SPARK = abgr(0xe4f8ff), ARCANE = abgr(0xb9a6ff);
+const CREST = abgr(0x4f8fa8), GLINT = abgr(0x9cc8d6), SPARK = abgr(0xe4f8ff);
 /** Where each band begins, in art pixels from the edge. */
 const BANDS = { bank: .6, shallows: 1.3, open: 3, deep: 9 };
 const REFLECTION = { alpha: 0.5, tint: 0.4 };
