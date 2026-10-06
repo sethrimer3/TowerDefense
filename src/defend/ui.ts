@@ -158,7 +158,7 @@ export class DefendPage {
   fastForward(seconds: number, weather?: Weather) {
     if (!this.sim || this.phase !== "sim") return;
     this.performance.finish('fast-forward');
-    if (weather) this.weather = weather;
+    if (weather) { this.weather = weather; this.sim.snowOverride = !!weather.snow; }
     for (let t = 0; t < seconds && this.phase === "sim"; t += 0.25) {
       this.sim.update(0.25 / this.sim.speed);
       this.handleEvents();
@@ -657,6 +657,7 @@ export class DefendPage {
           const area = areaForWave(ev.wave);
           this.weatherArea = area.id;
           this.weather = rollWeather(undefined, area);
+          this.sim!.snowOverride = undefined;
           this.setMessage(`${area.name} · Wave ${ev.wave}`, 3);
         }
         if (isBossWave(ev.wave)) {

@@ -39,6 +39,8 @@ export type WaterFrame = {
   now: number;
   /** Rain falling on the city. */
   rain: boolean;
+  cold?: boolean;
+  thawedPonds?: ReadonlySet<number>;
   /** How far night has fallen (0..1): ducks sleep at night. */
   night: number;
   /** People and enemies on foot, whom the ducks keep away from. */
@@ -64,6 +66,9 @@ export class PondWater {
   private maskKey = "";
   private builtAt = -Infinity;
   private builtKey = "";
+  private tracks = new Map<number, { x: number; y: number; t: number }>();
+  private frozen: HTMLCanvasElement | null = null;
+  private thawCount = 0;
 
   sync(map: CityMap) {
     if (map === this.map) return;
@@ -74,6 +79,8 @@ export class PondWater {
     this.rings = [];
     this.maskKey = "";
     this.builtKey = "";
+    this.tracks.clear();
+    this.frozen = null;
   }
 
   get pondCount() {
@@ -85,6 +92,12 @@ export class PondWater {
     const t = f.now / 1000;
     const dt = this.lastNow ? Math.min(0.1, Math.max(0, t - this.lastNow)) : 0;
     this.lastNow = t;
+    if (f.cold) {
+      this.rings = []; this.tracks.clear();
+      this.drawFrozen(f);
+      return;
+    }
+    this.footsteps(f, t);
     this.rings = this.rings.filter((r) => t >= r.t0 && t - r.t0 < (r.kind === "rain" ? RAIN.life : WAKE.life));
     if (f.rain) this.rainOn(f, t);
     else this.rainDue = 0;
@@ -92,8 +105,44 @@ export class PondWater {
     if (!f.rain) this.ducks.update(dt, f, (x, y, k) => this.rings.push({ x, y, t0: t, kind: "wake", k }));
     const waves = f.reduceMotion ? [] : this.waves(t);
     this.drawReflections(f, t, waves);
-    this.drawRings(f, t);
+    if (!f.reduceMotion) this.drawRings(f, t);
     if (!f.rain) this.ducks.draw(f.c, f.px, f.now, this.art);
+  }
+
+  private footsteps(f: WaterFrame, t: number) {
+    const live = new Set<number>();
+    for (const u of f.walkers) {
+      if (u.id === undefined) continue;
+      live.add(u.id);
+      const old = this.tracks.get(u.id);
+      if (old && t - old.t < .25) continue;
+      if (!f.reduceMotion && old && Math.abs(u.x - old.x) + Math.abs(u.y - old.y) > .04 && openAt(this.art!, Math.floor(u.x * ART), Math.floor(u.y * ART)))
+        this.rings.push({ x: u.x, y: u.y, t0: t, kind: "wake", k: 1 });
+      this.tracks.set(u.id, { x: u.x, y: u.y, t });
+    }
+    for (const id of this.tracks.keys()) if (!live.has(id)) this.tracks.delete(id);
+    if (this.rings.length > 220) this.rings.splice(0, this.rings.length - 220);
+  }
+
+  private drawFrozen(f: WaterFrame) {
+    const count = f.thawedPonds?.size ?? 0;
+    if (count !== this.thawCount) { this.thawCount = count; this.frozen = null; }
+    if (!this.frozen) {
+      const art = this.art!;
+      this.frozen = document.createElement("canvas");
+      this.frozen.width = art.width; this.frozen.height = art.open.length / art.width;
+      const c = this.frozen.getContext("2d")!;
+      for (let i = 0; i < art.open.length; i++) if (art.open[i]) {
+        const x = i % art.width, y = Math.floor(i / art.width);
+        if (f.thawedPonds?.has(cellIndex(Math.floor(x / ART), Math.floor(y / ART)))) continue;
+        const edge = !openAt(art, x - 1, y) || !openAt(art, x, y - 1);
+        c.fillStyle = edge || (x + Math.floor(y / 3)) % 37 === 0 ? "#d7eef3" : (Math.floor(x / 17) + Math.floor(y / 13)) % 3 ? "#86b9ce" : "#72a5bf";
+        c.fillRect(x, y, 1, 1);
+      }
+    }
+    f.c.save(); f.c.imageSmoothingEnabled = false;
+    f.c.drawImage(this.frozen, 0, 0, this.frozen.width * f.px / ART, this.frozen.height * f.px / ART);
+    f.c.restore();
   }
 
   // ── Rings ─────────────────────────────────────────────────────────────

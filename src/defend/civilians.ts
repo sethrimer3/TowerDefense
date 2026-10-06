@@ -10,6 +10,7 @@ import { cellCenter, center, findPath, rectDist, type Point } from "./pathing.ts
 import { cellInBounds, cellIndex, cellX, cellY } from "./grid.ts";
 import type { Civilian, DefendSim } from "./sim.ts";
 import { restockable } from "./bait.ts";
+import { icyCell } from "./boats.ts";
 
 /** Paths for civilians give up beyond this many cells. */
 const ERRAND = { maxCost: 400 };
@@ -96,7 +97,7 @@ function standBeside(sim: DefendSim, c: Civilian): boolean {
 }
 
 function work(sim: DefendSim, c: Civilian, dt: number) {
-  if (sim.solid[c.job]) return assignNext(sim, c);
+  if (sim.solid[c.job] || icyCell(sim, c.job)) return assignNext(sim, c);
   // Too dangerous: come back to it later.
   if (sim.enemiesNear(c.x, c.y, 2.5).length) return assignNext(sim, c, c.job);
   c.work += dt;
@@ -125,6 +126,7 @@ export function atHome(sim: DefendSim, c: Civilian): boolean {
 
 /** No other civilian out and about has already taken this cell. */
 function jobOpen(sim: DefendSim, cell: number, self?: Civilian): boolean {
+  if (icyCell(sim, cell)) return false;
   return !sim.civilians.some((o) => o !== self && o.hp > 0 && o.state !== "home" && o.job === cell);
 }
 

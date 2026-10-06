@@ -33,8 +33,9 @@ try {
     };
     const reports=[];
     const {FloodArt}=await import('/src/defend/flood-art.ts');
-    const {FloodArt:OriginalFlood}=await import(`${referenceRoot}/flood-art.ts`);
-    const flood=new FloodArt(), originalFlood=new OriginalFlood();
+    // Water's appearance deliberately changed. Compare reused raster storage
+    // with a fresh renderer; the water fixture separately checks the artwork.
+    const flood=new FloodArt();
     const waterSim={...sim,floods:[],sinkings:[]};
     const waterLayer=make();
     const waterBrush=waterLayer.getContext('2d');
@@ -47,7 +48,7 @@ try {
         const a=make(),b=make();
         const frame={px:6,sim:waterSim,rain,reduceMotion,reflections:true,layer:waterLayer,layerScale:1};
         for(const cv of [a,b]){const c=cv.getContext('2d');c.fillStyle='#73615a';c.fillRect(0,0,cv.width,cv.height);}
-        originalFlood.draw({...frame,c:a.getContext('2d')});
+        new FloodArt().draw({...frame,c:a.getContext('2d')});
         flood.draw({...frame,c:b.getContext('2d')});
         reports.push({check:`water buffers ${n}, rain ${rain}, motion ${!reduceMotion}`,...compare(a,b)});
       }

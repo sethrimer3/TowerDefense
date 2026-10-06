@@ -17,7 +17,7 @@
 import { ART, openAt, type ParkArt } from "./park-art.ts";
 import type { Pond } from "./pond-water.ts";
 
-export type Walker = { x: number; y: number };
+export type Walker = { x: number; y: number; id?: number };
 type Kind = "drake" | "hen" | "duckling";
 type State = "drift" | "paddle" | "dabble" | "preen" | "follow" | "flee" | "sleep";
 type Duck = {

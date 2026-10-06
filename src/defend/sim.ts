@@ -1,4 +1,7 @@
 import { DefenderIndex } from "./defender-index.ts";
+import { areaForWave } from "./areas.ts";
+import { IceMotion } from "./ice-motion.ts";
+import { icyCell } from "./boats.ts";
 import { enemySize } from "./catalog.ts";
 import { assembleFortress, syncFortress } from "./fortress.ts";
 import { damageModifier } from "./enemy-abilities.ts";
@@ -250,6 +253,12 @@ export class DefendSim {
   /** Magic boats' water, drying up behind them, and the buildings it sank
    * going under; both empty in every run without boats. */
   floods: Flood[] = [];
+  /** Explicit debug weather, otherwise the current area's climate. */
+  snowOverride?: boolean;
+  get cold() { return this.snowOverride ?? areaForWave(this.wave).climate === "cold"; }
+  readonly iceMotion = new IceMotion();
+  readonly thawedPonds = new Set<number>();
+  iceBlast(x: number, y: number, r: number) { if (this.cold || this.floods.some(f => f.frozen)) this.iceMotion.blast(this, x, y, r); }
   sinkings: Sinking[] = [];
   events: SimEvent[] = [];
   wave = 0;
@@ -398,6 +407,7 @@ export class DefendSim {
     stepBlazes(this, dt);
     stepFloods(this, dt);
     this.builders.step(this, dt);
+    this.iceMotion.step(this, dt);
   }
 
   /** The dead, and civilians who made it indoors, leave the board; a
@@ -699,7 +709,7 @@ export class DefendSim {
    * function once the last cell is back. */
   rebuildCell(cell: number) {
     const id = this.map.owner[cell];
-    if (id < 0 || this.solid[cell]) return;
+    if (id < 0 || this.solid[cell] || icyCell(this, cell)) return;
     const b = this.map.buildings[id];
     this.solid[cell] = 1;
     if (b.kind !== "gate") this.ownSolid[cell] = 1;
@@ -773,9 +783,8 @@ export class DefendSim {
     }
     const ox = u.x,
       oy = u.y;
-    const solid = own ? this.ownSolid : this.solid;
-    if (!blocked(solid, u.x + mx, u.y)) u.x += mx;
-    if (!blocked(solid, u.x, u.y + my)) u.y += my;
+    const [ix, iy] = this.iceMotion.move(this, u, mx, my, dt, own);
+    this.iceMotion.slide(this, u, ix, iy, own);
     return Math.abs(u.x - ox) + Math.abs(u.y - oy) > step * 0.1;
   }
 

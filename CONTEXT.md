@@ -295,6 +295,9 @@ A librarian who keeps the stacks: builds shelves and ladders, wheels the carts, 
 **Professor**:
 A librarian who reads. Each book can be read once; a book read has had its knowledge used up and goes on the **return shelf**. Knowledge an hour is built shelves times professors.
 
+**Winter ice**:
+Frozen water that makes those on foot slide. A boat's frozen wake blocks rebuilding and stays until fire or explosions melt it into water, which then dries away.
+
 **Return shelf**:
 A low stand on the nave's floor for the books the professors have read. When it fills, a shelver loads them into the cart and wheels them out, bringing back fresh books for the gaps.
 
