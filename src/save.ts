@@ -2,29 +2,29 @@
  * from the same site never shares it). Loading is defensive: `defaults()`
  * defines every field, and `decode()` keeps only what is well formed. */
 import { decodeDefendSave, defaultDefendSave, type DefendSave } from "./defend/progress.ts";
-import { TRAINING, TRAINING_IDS, type TrainingId } from "./progression.ts";
+import { STARTING_METAL, TRAINING, TRAINING_IDS, type TrainingId } from "./progression.ts";
 import { SKILLS, SKILL_IDS, type SkillId } from "./skill-trees.ts";
 import type { TrainingJob } from "./training-jobs.ts";
 import { decodeSettings, defaultSettings, type Settings } from "./settings.ts";
-import { METALS, decodeMineSave, noMetals, type MineSave, type Metals } from "./mine/sim.ts";
+import { METALS, decodeMineSave, type MineSave, type Metals } from "./mine/sim.ts";
 import { decodeLibrarySave, type LibrarySave } from "./library/sim.ts";
 
 export const SAVE_KEY = "towerdefense.v1";
-export const SAVE_VERSION = 1;
+/** 2: copper and silver became the mine's metal (`smithy`), and a point
+ * of it ten bars, not a hundred. */
+export const SAVE_VERSION = 2;
 
 export type Save = {
   version: number;
-  /** Earned in battle, spent in the Armory (and Gold on the mine and the
-   * library). Gold keeps its fractions (bonuses). Saves from before copper
-   * and silver called them `ironBar` and `steelBar`. */
+  /** Earned in battle, spent on the mine, the library and bombs. Keeps its
+   * fractions (bonuses). */
   gold: number;
-  copper: number;
-  silver: number;
   /** One for each new best wave held; banked for what is to come. Saves
    * from before them start with one for each wave of the best. */
   upgradePoints: number;
-  /** Smithy points the mine's smithy has made (every hundred bars of a
-   * metal), spent on the Smithy's upgrades. */
+  /** The mine's metal: copper, silver and gold points its smithy has made
+   * (every `BARS_PER_POINT` bars of a metal), spent in the Upgrades tab's
+   * Forge. A new game starts with `STARTING_METAL`. */
   smithy: Metals;
   /** Earned in the Library (shelves × librarians an hour, idle too) and by
    * holding past the best wave; spent on the skill trees. Keeps its fractions.
@@ -48,10 +48,8 @@ export function defaults(): Save {
   return {
     version: SAVE_VERSION,
     gold: 0,
-    copper: 0,
-    silver: 0,
     upgradePoints: 0,
-    smithy: noMetals(),
+    smithy: { ...STARTING_METAL },
     knowledge: 0,
     skills: Object.fromEntries(SKILL_IDS.map((id) => [id, 0])) as Record<SkillId, number>,
     training: Object.fromEntries(TRAINING_IDS.map((id) => [id, 0])) as Record<TrainingId, number>,
@@ -81,9 +79,14 @@ export function decode(raw: string | null): Save {
   }
   if (!s || typeof s !== "object" || !Number.isInteger(s.version) || s.version > SAVE_VERSION) return d;
   d.gold = num(s.gold, 0);
-  d.copper = int(s.copper ?? s.ironBar, 0);
-  d.silver = int(s.silver ?? s.steelBar, 0);
   for (const k of METALS) d.smithy[k] = int(s.smithy?.[k], 0);
+  if (s.version < 2) {
+    // A point was a hundred bars, and copper and silver were battle coins
+    // (once `ironBar` and `steelBar`): both become the mine's metal.
+    for (const k of METALS) d.smithy[k] *= 10;
+    d.smithy.copper += int(s.copper ?? s.ironBar, 0);
+    d.smithy.silver += int(s.silver ?? s.steelBar, 0);
+  }
   d.knowledge = num(s.knowledge ?? s.valor, 0);
   for (const id of SKILL_IDS) d.skills[id] = int(s.skills?.[id], 0, 0, SKILLS[id].max);
   for (const t of TRAINING) d.training[t.id] = int(s.training?.[t.id], 0, 0, t.max);

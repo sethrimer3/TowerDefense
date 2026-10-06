@@ -4,7 +4,7 @@
 import {
   ENEMIES,
   type EnemyKind,
-  BOMB_PRICE,
+  BOMB_GOLD,
   STRUCTURES,
   SPEED3_PRICE,
   PALETTE_ITEMS,
@@ -81,18 +81,18 @@ export function unlockAllTowers(save: DefendSave) {
   for (const item of PALETTE_ITEMS) if (item !== "cityTile") save.owned[item] = Math.max(save.owned[item], 1);
 }
 
-/** The wallet DEFEND spends from: main-game gold and metal bars; `free`
- * (Dev free purchases) buys anything for nothing. */
-export type Wallet = { gold: number; copper: number; silver: number; free?: boolean };
+/** The wallet the Forge spends from: the mine's copper, silver and gold
+ * points; `free` (Dev free purchases) buys anything for nothing. */
+export type Wallet = { copper: number; silver: number; gold: number; free?: boolean };
 
 export const canAfford = (w: Wallet, p: Price) =>
-  !!w.free || (w.gold >= p.gold && w.copper >= (p.copper ?? 0) && w.silver >= (p.silver ?? 0));
+  !!w.free || (w.copper >= (p.copper ?? 0) && w.silver >= (p.silver ?? 0) && w.gold >= (p.gold ?? 0));
 
 export function pay(w: Wallet, p: Price) {
   if (w.free) return;
-  w.gold -= p.gold;
   w.copper -= p.copper ?? 0;
   w.silver -= p.silver ?? 0;
+  w.gold -= p.gold ?? 0;
 }
 
 export function buyItem(save: DefendSave, w: Wallet, item: PaletteItem): boolean {
@@ -178,9 +178,10 @@ export function unlockWaves(save: DefendSave): number {
   return save.unlockedWave;
 }
 
-export function buyBomb(save: DefendSave, w: Wallet): boolean {
-  if (!canAfford(w, BOMB_PRICE)) return false;
-  pay(w, BOMB_PRICE);
+/** Buys a bomb with battle Gold (`coins`, spent in place). */
+export function buyBomb(save: DefendSave, coins: { gold: number; free?: boolean }): boolean {
+  if (!coins.free && coins.gold < BOMB_GOLD) return false;
+  if (!coins.free) coins.gold -= BOMB_GOLD;
   save.bombs++;
   return true;
 }

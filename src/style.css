@@ -1349,6 +1349,7 @@ nav button { position: relative; }
 .td-currencies .bar-icon { display: block; width: 16px; height: 8px; border-radius: 2px; border: 1px solid #000a; }
 .td-currencies .bar-icon.copper { background: linear-gradient(#f0a272, #9a4e26); }
 .td-currencies .bar-icon.silver { background: linear-gradient(#f4f6fa, #8e98a8); }
+.td-currencies .bar-icon.gold { background: linear-gradient(#ffe08a, #b07a1c); }
 .td-currencies .knowledge-currency { color: #e6c8ff; }
 .td-currencies .secret-currency { flex: 0 1 auto; opacity: 0.75; grid-template-columns: auto; }
 .td-currencies .secret-mark { display: grid; place-items: center; justify-self: center; width: 18px; height: 18px; border: 1px dashed currentColor; border-radius: 50%; font-style: normal; font-size: 11px; }

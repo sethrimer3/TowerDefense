@@ -5,7 +5,7 @@ import { SKILLS, TREES, type SkillId } from "../skill-trees.ts";
 import { TrainingParticles } from "../training-particles.ts";
 import { trainingSeconds } from "../training-jobs.ts";
 import {
-  BALLISTA_DESCRIPTION, BOMB_PRICE, ITEM_NAMES, BOMB_RADIUS, GATE_DESCRIPTION, SPEED3_PRICE, SPIKES_DESCRIPTION, STRUCTURES, UPGRADES,
+  BALLISTA_DESCRIPTION, BOMB_GOLD, ITEM_NAMES, BOMB_RADIUS, GATE_DESCRIPTION, SPEED3_PRICE, SPIKES_DESCRIPTION, STRUCTURES, UPGRADES,
   footprint, purchasePrice, shareName, upgradePrice, type PaletteItem, type Price, type UpgradeId,
 } from "../defend/catalog.ts";
 
@@ -81,10 +81,10 @@ export class UpgradesPage {
   }
 
   // ── Forge ───────────────────────────────────────────────────────────────
-  /** The wallet battle earnings fill: Gold, copper and silver. */
+  /** The Forge's wallet: the mine's copper, silver and gold. */
   private wallet(): Wallet {
     const s = this.save;
-    return { gold: s.gold, copper: s.copper, silver: s.silver, free: s.settings.devMode };
+    return { ...s.smithy, free: s.settings.devMode };
   }
 
   private forgeHtml(t: Topic) {
@@ -106,7 +106,7 @@ export class UpgradesPage {
       ? `<article class="card defend-card ledger-card"><div><small>${t.elsewhere === "mine" ? "BUILDINGS, CREW AND TRADES" : "SHELVES, STAFF AND THE LAB"}</small><h3>Raised in the ${t.name}</h3><p>${t.elsewhere === "mine" ? "Tap a building in the Mine to raise its level with Gold, and hire miners there." : "Buy shelves, hire librarians and raise the alchemy lab in the Library."}</p></div><button data-goto="${t.elsewhere}">Open the ${t.name}</button></article>`
       : "";
     const wallet = copies.length || extras.length || levels.length
-      ? `<p class="ledger-note">Paid with what battles earn: <b>${bal(s, w.gold)}</b> gold · <b>${bal(s, w.copper)}</b> copper · <b>${bal(s, w.silver)}</b> silver</p>`
+      ? `<p class="ledger-note">Paid with the mine's metal: ${METALS.map((k) => `<b class="metal-${k}">${bal(s, w[k])}</b> ${k}`).join(" · ")}<small> · the smiths make a point of a metal from every ${BARS_PER_POINT} bars</small></p>`
       : "";
     const body = [wallet, ...copies, ...extras, ...levels, smithy, elsewhere].join("");
     return body || `<p class="ledger-empty">Nothing to forge here.</p>`;
@@ -125,7 +125,7 @@ export class UpgradesPage {
     const d = this.save.defend;
     if (x === "bomb")
       return `<article class="card defend-card ledger-card"><canvas width="44" height="44" data-icon="bomb"></canvas><div><small>OWNED ${d.bombs}</small><h3>Bomb</h3><p>Drag onto the battlefield mid-defense to blast everything within ${BOMB_RADIUS.toFixed(0)} cells, your own people too until Shaped charges.</p></div>
-        <button data-buy-bomb ${canAfford(w, BOMB_PRICE) ? "" : "disabled"}>Buy one<small>${priceText(BOMB_PRICE)}</small></button></article>`;
+        <button data-buy-bomb ${this.save.settings.devMode || this.save.gold >= BOMB_GOLD ? "" : "disabled"}>Buy one<small>${BOMB_GOLD} Gold</small></button></article>`;
     return `<article class="card defend-card ledger-card"><div><small>${d.speed3 ? "UNLOCKED" : "ONE-TIME UNLOCK"}</small><h3>War drums</h3><p>Adds 3× to the battle speed button.</p></div>
       <button data-buy-speed3 ${d.speed3 || !canAfford(w, SPEED3_PRICE) ? "disabled" : ""}>${d.speed3 ? "Owned" : `Buy<small>${priceText(SPEED3_PRICE)}</small>`}</button></article>`;
   }
@@ -136,11 +136,7 @@ export class UpgradesPage {
     const commit = (buy: (w: Wallet) => boolean, card: string) => {
       const w = this.wallet();
       if (!buy(w)) return;
-      if (!s.settings.devMode) {
-        s.gold = w.gold;
-        s.copper = w.copper;
-        s.silver = w.silver;
-      }
+      if (!s.settings.devMode) for (const k of METALS) s.smithy[k] = w[k];
       this.ctx.update();
       play("coin");
       this.render();
@@ -150,7 +146,7 @@ export class UpgradesPage {
     };
     root.querySelectorAll<HTMLButtonElement>("[data-buy]").forEach((b) => (b.onclick = () => commit((w) => buyItem(d, w, b.dataset.buy as PaletteItem), `[data-buy="${b.dataset.buy}"]`)));
     root.querySelectorAll<HTMLButtonElement>("[data-upgrade]").forEach((b) => (b.onclick = () => commit((w) => buyUpgrade(d, w, b.dataset.upgrade as UpgradeId), `[data-upgrade="${b.dataset.upgrade}"]`)));
-    root.querySelector<HTMLButtonElement>("[data-buy-bomb]")?.addEventListener("click", () => commit((w) => buyBomb(d, w), "[data-buy-bomb]"));
+    root.querySelector<HTMLButtonElement>("[data-buy-bomb]")?.addEventListener("click", () => commit(() => buyBomb(d, s.settings.devMode ? { gold: 0, free: true } : s), "[data-buy-bomb]"));
     root.querySelector<HTMLButtonElement>("[data-buy-speed3]")?.addEventListener("click", () => commit((w) => buySpeed3(d, w), "[data-buy-speed3]"));
     root.querySelectorAll<HTMLButtonElement>("[data-train]").forEach((b) => (b.onclick = () => {
       const smith = this.freeSmiths()[0];
@@ -220,9 +216,8 @@ export class UpgradesPage {
         : `<button class="training-box training-cost metal-${metal}" data-train="${t.id}" ${affordable && (free.length || devFree) ? "" : "disabled"} aria-label="Upgrade ${t.name} to ${shown(next)} for ${price} Smithy point, taking one smith ${takes}" title="${why}">${price}</button>`;
       return `<div class="training-row${job ? " active" : ""}" role="listitem" data-training-row="${t.id}"><span class="training-label">${t.name}<small>+${t.per}% a rank, up to ${t.max * t.per}%${maxed ? "" : ` · one smith takes ${takes}`}</small></span><span class="training-box">${shown(now)}</span><span class="training-arrow" aria-hidden="true">→</span><span class="training-box next">${shown(next)}</span>${buy}</div>`;
     };
-    const points = METALS.map((k) => `<b class="metal-${k}">${save.smithy[k]}</b> ${k}`).join(" · ");
     return `<h4 class="training-group">At the smithy</h4>
-      <p class="ledger-note">Smithy points: ${points} · smiths <b id="training-slots">${smiths.length - free.length} / ${smiths.length}</b> busy<small> · every ${BARS_PER_POINT} bars of a metal the mine's smiths work make a point of it</small></p>
+      <p class="ledger-note">Smiths <b id="training-slots">${smiths.length - free.length} / ${smiths.length}</b> busy<small> · each rank costs one point and a smith's time</small></p>
       <div class="training-table" role="list" aria-label="Smithy upgrades">${ids.map((id) => row(TRAINING.find((t) => t.id === id)!)).join("")}</div>`;
   }
 
@@ -282,5 +277,5 @@ export class UpgradesPage {
   }
 }
 
-const priceText = (p: Price) => [`${p.gold} gold`, p.copper ? `${p.copper} copper` : "", p.silver ? `${p.silver} silver` : ""].filter(Boolean).join(" · ");
+const priceText = (p: Price) => METALS.filter((k) => p[k]).map((k) => `${p[k]} ${k}`).join(" · ");
 const bal = (s: { settings: { devMode: boolean } }, n: number) => (s.settings.devMode ? "∞" : Math.floor(n + 1e-9));

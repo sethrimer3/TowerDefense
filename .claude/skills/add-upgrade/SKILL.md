@@ -26,7 +26,7 @@ Don't start editing code before the user has approved the spec.
 
 | The upgrade… | Panel |
 |---|---|
-| changes one kind of building or unit in a stepwise, Gold-and-bars way (more troops, a longer range, a one-off behaviour) | Armory |
+| changes one kind of building or unit in a stepwise way paid in the mine's metal (more troops, a longer range, a one-off behaviour) | Armory |
 | is a small percent on a broad number that players pour time into | Training |
 | is a bigger ranked percent, or an unlock, earned by pushing the best wave | Skill tree (Command for the garrison and towers, Stewardship for the city and economy) |
 

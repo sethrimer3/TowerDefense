@@ -231,33 +231,33 @@ export const STARTING_OWNED: Record<PaletteItem, number> = {
   monsterBait: 0,
 };
 
-/** A price in Gold and metal bars (all earned in battle). */
-export type Price = { gold: number; copper?: number; silver?: number };
+/** A Forge price in the mine's metal: copper, silver and gold points (the
+ * smithy makes one of a metal from every `BARS_PER_POINT` bars). */
+export type Price = { copper?: number; silver?: number; gold?: number };
 
 /** Price of buying one more of a palette item, given how many are owned. */
 export function purchasePrice(item: PaletteItem, owned: number): Price {
   const extra = Math.max(0, owned - STARTING_OWNED[item]);
   const base: Record<PaletteItem, Price> = {
-    cityTile: { gold: 120, copper: 1 },
-    cityGate: { gold: 250, copper: 3 },
-    wallSpikes: { gold: 150, copper: 2 },
-    wallBallista: { gold: 420, copper: 5 },
-    barracks: { gold: 300, copper: 3 },
-    archerBarracks: { gold: 330, copper: 4 },
-    archerTower: { gold: 220, copper: 2 },
-    cannonTower: { gold: 340, copper: 5 },
-    watchTower: { gold: 180, copper: 2 },
-    wizardTower: { gold: 450, copper: 6 },
-    mageGuild: { gold: 520, copper: 7 },
-    valkyriePalace: { gold: 800, copper: 10, silver: 1 },
-    darkKeep: { gold: 3000, copper: 25, silver: 8 },
-    monsterBait: { gold: 160, copper: 2 },
+    cityTile: { copper: 2 },
+    cityGate: { copper: 4 },
+    wallSpikes: { copper: 3 },
+    wallBallista: { copper: 6 },
+    barracks: { copper: 4 },
+    archerBarracks: { copper: 5 },
+    archerTower: { copper: 3 },
+    cannonTower: { copper: 6 },
+    watchTower: { copper: 3 },
+    wizardTower: { copper: 8 },
+    mageGuild: { copper: 9 },
+    valkyriePalace: { copper: 12, silver: 2 },
+    darkKeep: { copper: 25, silver: 8, gold: 2 },
+    monsterBait: { copper: 3 },
   };
-  const growth = item === "cityTile" ? 1.3 : 1.5;
-  const m = intPow(growth, extra);
-  const b = base[item];
-  const price: Price = { gold: Math.round(b.gold * m), copper: Math.ceil((b.copper ?? 0) * intPow(1.25, extra)) };
-  if (b.silver) price.silver = Math.ceil(b.silver * intPow(1.25, extra));
+  const b = base[item], up = (n = 0, growth = 1.25) => Math.ceil(n * intPow(growth, extra));
+  const price: Price = { copper: up(b.copper, item === "cityTile" ? 1.2 : 1.3) };
+  if (b.silver) price.silver = up(b.silver);
+  if (b.gold) price.gold = up(b.gold);
   return price;
 }
 
@@ -345,7 +345,7 @@ export const UPGRADES: UpgradeDef[] = [
     name: "Hunter's instinct",
     maxLevel: 1,
     describe: (l) => (l ? "Archers track enemies through the streets" : "Archers wander the streets at random"),
-    price: () => ({ gold: 1500, copper: 12, silver: 4 }),
+    price: () => ({ copper: 12, silver: 4 }),
   },
   { id: "archerDamage", group: "Archer tower", name: "Bodkin points", maxLevel: 6, describe: (l) => `${archerDamage(l)} damage per arrow` },
   { id: "archerRange", group: "Archer tower", name: "Longbows", maxLevel: 4, describe: (l) => `${archerRange(l)} cell range` },
@@ -365,7 +365,7 @@ export const UPGRADES: UpgradeDef[] = [
     name: "Folded halls",
     maxLevel: 1,
     describe: (l) => `The palace takes ${shareName(l ? 8 : 16)}`,
-    price: () => ({ gold: 1200, copper: 10, silver: 3 }),
+    price: () => ({ copper: 10, silver: 3 }),
   },
   { id: "valkyrieReach", group: "Valkyrie palace", name: "Long spears", maxLevel: 5, describe: (l) => `Valkyries charge ${stabLength(l).toFixed(1)} cells` },
   {
@@ -374,7 +374,7 @@ export const UPGRADES: UpgradeDef[] = [
     name: "Folded sanctum",
     maxLevel: 1,
     describe: (l) => (l ? "The keep takes a single tile" : "The keep takes a 2 × 2 block of tiles"),
-    price: () => ({ gold: 9000, copper: 45, silver: 20 }),
+    price: () => ({ copper: 45, silver: 20, gold: 3 }),
   },
   { id: "chainReach", group: "Dark wizard keep", name: "Arc span", maxLevel: 5, describe: (l) => `Black lightning leaps ${chainJump(l).toFixed(2)} cells between enemies` },
   {
@@ -383,7 +383,7 @@ export const UPGRADES: UpgradeDef[] = [
     name: "Conduit of night",
     maxLevel: CHAIN_COUNT_MAX,
     describe: (l) => `The dark wizard's bolts chain to ${wizardChain(l)} enemies, the turrets' to ${turretChain(l)}`,
-    price: (l) => ({ gold: 600 + 300 * l * l, copper: 4 + l, silver: 1 + Math.floor(l / 3) }),
+    price: (l) => ({ copper: 4 + l, silver: 1 + Math.floor(l / 3), gold: Math.floor(l / 5) }),
   },
   {
     id: "baitRestock",
@@ -407,17 +407,20 @@ export const UPGRADES: UpgradeDef[] = [
   { id: "rebuildSpeed", group: "Civilians", name: "Master masons", maxLevel: 5, describe: (l) => `${rebuildSeconds(l).toFixed(1)}s to rebuild each section` },
 ];
 
+/** A level's usual Forge price: copper, then silver from the fourth level
+ * and gold from the sixth. */
 export function upgradePrice(level: number): Price {
   return {
-    gold: Math.round(200 * intPow(1.6, level)),
     copper: 2 + level * 2,
     silver: level >= 3 ? level - 2 : 0,
+    gold: level >= 5 ? level - 4 : 0,
   };
 }
 
-export const BOMB_PRICE: Price = { gold: 60 };
+/** A bomb costs battle Gold, not metal: it is spent, not kept. */
+export const BOMB_GOLD = 60;
 /** One-off unlock of the 3× battle speed. */
-export const SPEED3_PRICE: Price = { gold: 400, copper: 4 };
+export const SPEED3_PRICE: Price = { copper: 4 };
 export const BOMB_RADIUS = 3.2;
 export const BOMB_DAMAGE = 45;
 

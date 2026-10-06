@@ -322,18 +322,18 @@ test('bombs and watch-tower marks hurt enemies', () => {
   assert.ok(e.hp <= 0);
 });
 
-test('shop: palette counts, purchases and upgrades use the wallet', () => {
+test('shop: palette counts, purchases and upgrades use the wallet of mine metal', () => {
   const save = defaultDefendSave();
   assert.equal(available(save, 'cityTile'), STARTING_OWNED.cityTile);
-  const wallet = { gold: 10_000, copper: 100, silver: 100 };
+  const wallet = { copper: 100, silver: 100, gold: 100 };
   const price = purchasePrice('watchTower', save.owned.watchTower);
   assert.ok(buyItem(save, wallet, 'watchTower'));
   assert.equal(available(save, 'watchTower'), 1);
-  assert.equal(wallet.gold, 10_000 - price.gold);
-  assert.ok(purchasePrice('watchTower', save.owned.watchTower).gold > price.gold, 'each extra costs more');
+  assert.equal(wallet.copper, 100 - price.copper!);
+  assert.ok(purchasePrice('watchTower', save.owned.watchTower).copper! > price.copper!, 'each extra costs more');
   assert.ok(buyUpgrade(save, wallet, 'barracksCapacity'));
   assert.equal(save.levels.barracksCapacity, 1);
-  const broke = { gold: 0, copper: 0, silver: 0 };
+  const broke = { copper: 0, silver: 0, gold: 0 };
   assert.equal(buyItem(save, broke, 'barracks'), false);
 });
 

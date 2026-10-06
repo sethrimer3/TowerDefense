@@ -36,19 +36,17 @@ import { EditSession, type Drop } from "./edit-session.ts";
 import { NIGHT_FADE_SECONDS, isBossWave, rollWeather, skyLabel, type Weather } from "./weather.ts";
 import { play } from "../sound.ts";
 import { replay, sparksOver } from "../ui/flourish.ts";
-import { available, startingWave, type DefendSave, type Wallet } from "./progress.ts";
+import { available, startingWave, type DefendSave } from "./progress.ts";
 import { ageWater } from "./boats.ts";
 
 export type DefendHost = {
   save(): DefendSave;
-  wallet(): Wallet;
-  setWallet(w: Wallet): void;
   /** The Smithy's and the skill trees' multipliers for the next defense. */
   bonuses(): Bonuses;
   /** Pays Gold for enemies slain. */
   earnKills(slain: Partial<Record<EnemyKind, number>>): void;
   /** Pays for holding `wave` (called before the best wave is raised). */
-  earnWave(wave: number): { gold: number; copper: number; silver: number; knowledge: number; upgrade: number };
+  earnWave(wave: number): { gold: number; copper: number; knowledge: number; upgrade: number };
   persist(): void;
   reduceMotion(): boolean;
   /** The park grass and pond effects are on. */
@@ -643,7 +641,7 @@ export class DefendPage {
       if (ev.type === "waveCleared") {
         this.performanceEnd = 'cleared';
         const r = this.host.earnWave(ev.wave);
-        const pay = `+${Math.floor(r.gold)} gold · +${r.copper} copper${r.silver ? ` · +${r.silver} silver` : ""}${r.knowledge ? ` · +${r.knowledge} Knowledge` : ""}${r.upgrade ? ` · +${r.upgrade} upgrade point` : ""}`;
+        const pay = `+${Math.floor(r.gold)} gold${r.copper ? ` · +${r.copper} copper` : ""}${r.knowledge ? ` · +${r.knowledge} Knowledge` : ""}${r.upgrade ? ` · +${r.upgrade} upgrade point` : ""}`;
         if (ev.wave > this.save.bestWave) {
           this.save.bestWave = ev.wave;
           this.newRecord = ev.wave;

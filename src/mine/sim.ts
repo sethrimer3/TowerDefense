@@ -74,7 +74,10 @@ export const metalSum = (m: Metals) => m.copper + m.silver + m.gold;
 export const oreMetal = (m: Material): Metal | null => (m === COPPER ? "copper" : m === SILVER ? "silver" : m === GOLD ? "gold" : null);
 /** Ore smelted into one bar, and bars worked into one Smithy point. */
 export const ORE_PER_BAR: Metals = { copper: 4, silver: 2, gold: 1 };
-export const BARS_PER_POINT = 100;
+export const BARS_PER_POINT = 10;
+/** What a point took before saves version 2, which a saved mine's bars
+ * toward the next point may still be counted in. */
+const OLD_BARS_PER_POINT = 100;
 /** Minutes the smithy's `pace` takes to follow its work. */
 export const PACE_MINUTES = 30;
 const MINUTE_TICKS = 60 * TICK_HZ;
@@ -1144,10 +1147,8 @@ export class MineSim {
     if (!metal) return;
     this.bars[metal]--;
     this.paceBars[metal]++;
-    if (++this.worked[metal] >= BARS_PER_POINT) {
-      this.worked[metal] -= BARS_PER_POINT;
-      this.owed[metal]++;
-    }
+    // A save from when a point took more bars may hold several points' worth.
+    for (this.worked[metal]++; this.worked[metal] >= BARS_PER_POINT; this.worked[metal] -= BARS_PER_POINT) this.owed[metal]++;
   }
   /** A stage nobody is put to still gets done, slowly. */
   private stepIdleTrades() {
@@ -1993,7 +1994,7 @@ export function decodeMineSave(s: any): MineSave | null {
   const pair = (v: any, a: string, b: string, max: number) => v && typeof v === "object" && int(v[a], 0, max) && int(v[b], 0, max);
   if (s.jobs !== undefined && !pair(s.jobs, "forge", "smith", MAX_MINERS)) return null;
   for (const k of ["ore", "bars", "yard"]) if (s[k] !== undefined && !metals(s[k], 1e9)) return null;
-  if (s.worked !== undefined && !metals(s.worked, BARS_PER_POINT)) return null;
+  if (s.worked !== undefined && !metals(s.worked, OLD_BARS_PER_POINT)) return null;
   // And the prospects'.
   if (s.prospect !== undefined && !int(s.prospect, 1, 1e6)) return null;
   if (s.fallen !== undefined && !(Array.isArray(s.fallen) && s.fallen.length <= MAX_MINERS && s.fallen.every((f: any) => name(f?.name) && JOBS.includes(f.job) && CAUSES.includes(f.cause)))) return null;
@@ -2008,7 +2009,7 @@ export function decodeMineSave(s: any): MineSave | null {
     ...(s.jobs !== undefined ? { jobs: { forge: s.jobs.forge, smith: s.jobs.smith } } : {}),
     ...(s.ore !== undefined ? { ore: metals(s.ore, 1e9)! } : {}),
     ...(s.bars !== undefined ? { bars: metals(s.bars, 1e9)! } : {}),
-    ...(s.worked !== undefined ? { worked: metals(s.worked, BARS_PER_POINT)! } : {}),
+    ...(s.worked !== undefined ? { worked: metals(s.worked, OLD_BARS_PER_POINT)! } : {}),
     ...(s.yard !== undefined ? { yard: metals(s.yard, 1e9)! } : {}),
     ...(s.water !== undefined ? { water: s.water } : {}),
     ...(s.burning !== undefined ? { burning: s.burning.map((b: number[]) => [b[0], b[1]] as [number, number]) } : {}),

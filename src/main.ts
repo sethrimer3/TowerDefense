@@ -51,13 +51,6 @@ const ctx: AppContext = {
 const upgradesPage = new UpgradesPage(ctx);
 const defendPage = new DefendPage(el("defend"), {
   save: () => save.defend,
-  wallet: () => ({ gold: save.gold, copper: save.copper, silver: save.silver, free: save.settings.devMode }),
-  setWallet: (w) => {
-    if (save.settings.devMode) return;
-    save.gold = w.gold;
-    save.copper = w.copper;
-    save.silver = w.silver;
-  },
   bonuses: () => bonuses(save),
   earnKills: (slain) => {
     payKills(save, slain);
@@ -93,6 +86,7 @@ const minePage = new MinePage(el("mine"), {
   earn: (points) => {
     for (const k of METALS) save.smithy[k] += points[k];
     mineDirty = true;
+    refreshCurrencies();
     if (tab === "upgrades") upgradesPage.render();
   },
   upgrades: () => ({ coffee: skillRank(save, "coffee"), waterproof: skillRank(save, "waterproofing"), smiths: skillTotal(save, "smiths") }),
@@ -195,8 +189,9 @@ function refreshCurrencies() {
     shown.set(id, value);
     if (!dev && before !== undefined && value > before) replay(el(id).closest(".currency"), "gain");
   };
-  show("copper", save.copper);
-  show("silver", save.silver);
+  show("copper", save.smithy.copper);
+  show("silver", save.smithy.silver);
+  show("gold-bars", save.smithy.gold);
   show("gold", save.gold);
   show("knowledge", save.knowledge);
   show("upgrade-points", save.upgradePoints);

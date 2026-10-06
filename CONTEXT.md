@@ -62,13 +62,13 @@ The multipliers the Smithy and the skill trees lay over a defense (troops, tower
 ### Progress
 
 **Armory**:
-The upgrades bought with copper, silver and Gold: city elements, bombs, battle speed and levels for every building of a type. Now sold in the Upgrades tab's Forge; `UPGRADES` in code.
+The levels for every building of a type, and the city elements and battle speed, now sold in the Upgrades tab's Forge for the mine's metal; `UPGRADES` in code.
 
 **Gold**:
-Paid by kills, by every wave held and by gold the mine digs; spent in the Armory and on hiring miners.
+Battle Gold, the coin: paid by kills and every wave held; spent on the mine's and the library's buildings and hires, and on bombs. Not the mine's gold bars.
 
 **Copper** and **silver**:
-Paid for each wave held (copper) and each boss wave held (silver). Spent, with Gold, in the Armory. (They were once iron and steel bars.)
+The mine's metal, as Smithy points: every ten bars the smiths work make a point. Spent in the Forge. (They were once battle coins, and before that iron and steel bars.)
 
 **Time away** (welcome back):
 The time since the game was last saved, up to a day, banked for each of the Mine and Library. On returning, both automatically fast-forward their work, earning gains as they go. Remaining idle time survives closing the game, and the welcome-back screen shows the running gains.
@@ -104,7 +104,7 @@ What Knowledge buys for a topic: its skills, and its **paths** (exclusive choice
 Ranks of a few percent each on one row (troop HP, tower damage, Gold found…). A rank costs one Smithy point and is worked by the mine's smiths: one smith takes its whole time, more smiths share it. A smith on a rank stays at the smithy until it's done; taking the last one off cancels the rank and returns its point.
 
 **Smithy point**:
-Copper, silver or gold: every hundred bars of a metal the mine's smiths work make a point of it. A row's first ten ranks cost copper, the next fifteen silver, the rest gold.
+Copper, silver or gold: every ten bars of a metal the mine's smiths work make a point of it. A row's first ten ranks cost copper, the next fifteen silver, the rest gold.
 
 **Smith**:
 A miner put to the smithy. The smiths are the Smithy's hands: how many ranks can be worked at once, and how fast.

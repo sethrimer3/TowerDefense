@@ -513,9 +513,10 @@ from its seed; `tests/defend-replay.test.ts` pins it.
 
 ## Economy (`progress.ts`, the Upgrades tab's Forge; `src/progression.ts`)
 
-- The Armory (now the Upgrades tab's Forge) sells with copper, silver and Gold, all earned in battle: each
-  kill pays Gold (`KILL_GOLD`), each wave held pays Gold (10 + 5 × the wave)
-  and copper, and each boss wave held pays a silver for every ten waves. Gold is paid as enemies fall, so an
+- The Armory (now the Upgrades tab's Forge) sells for the mine's metal:
+  copper, silver and gold points (`Price`). Battle pays Gold: each
+  kill (`KILL_GOLD`) and each wave held (10 + 5 × the wave), spent on the
+  mine, the library and bombs (`BOMB_GOLD`). Gold is paid as enemies fall, so an
   abandoned defense keeps what it earned.
 - City elements get more expensive with each one owned. Upgrades are
   universal (they apply to every building of that type) and take effect from

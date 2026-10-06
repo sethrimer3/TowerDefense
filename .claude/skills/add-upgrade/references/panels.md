@@ -3,7 +3,7 @@
 ## Armory (`src/defend/catalog.ts`)
 
 - Row: `{ id, group, name, maxLevel, describe(level), price?(level) }` in `UPGRADES`; add the id to `UpgradeId`.
-- Price: `upgradePrice(level)` (Gold ×1.6 a level, copper, silver from level 3) unless `price` overrides it (one-offs).
+- Price: `upgradePrice(level)` in the mine's metal points (copper 2 + 2 a level, silver from level 3, gold from level 5) unless `price` overrides it (one-offs).
 - Effect: a stat curve beside the others (`archerRange(l)`, `wallHp(l)`…) read by the sim from `sim.levels.<id>`.
 - Shown in the Upgrades page's Forge (`src/ui/upgrades-page.ts`): list the id in its topic's `upgrades` in `src/upgrade-subjects.ts` (`tests/upgrade-subjects.test.ts` fails until every upgrade is listed once).
 - Saved in `save.defend.levels` (`decodeDefendSave` clamps to `maxLevel`).

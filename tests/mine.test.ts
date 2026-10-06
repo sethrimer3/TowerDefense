@@ -141,6 +141,9 @@ test("a mine saves and loads whole; a malformed save is dropped", () => {
   assert.equal(decodeMineSave({ ...saved, cells: "AAAA" }), null);
   assert.equal(decodeMineSave({ ...saved, miners: [{ x: -1, y: 5, copper: 0, silver: 0, gold: 0, spoil: 0 }] }), null);
   assert.equal(decodeMineSave(null), null);
+  // From when a point took a hundred bars: kept, and paid out as points.
+  const old = decodeMineSave({ ...saved, worked: { copper: 95, silver: 0, gold: 0 } });
+  assert.equal(old?.worked?.copper, 95);
   // The game save keeps the mine alongside everything else.
   assert.equal(decode(JSON.stringify({ version: 1, mine: saved })).mine?.seed, 321);
   assert.equal(decode(JSON.stringify({ version: 1, mine: { seed: "x" } })).mine, null);
@@ -390,7 +393,7 @@ test("each building grows with its level (a bay of bunks, two forge hands, an an
   }
 });
 
-test("the forge smelts copper, silver and gold ore into bars, and every hundred bars the smiths work make a Smithy point; a trade nobody works goes slowly", () => {
+test("the forge smelts copper, silver and gold ore into bars, and every BARS_PER_POINT bars the smiths work make a Smithy point; a trade nobody works goes slowly", () => {
   const run = (forge: number, smith: number) => {
     const sim = new MineSim(8);
     for (let i = 0; i < 4; i++) sim.hire();
@@ -408,7 +411,7 @@ test("the forge smelts copper, silver and gold ore into bars, and every hundred 
   assert.equal(busy.sim.miners.filter((m) => m.job === "forge").length, 2);
   assert.equal(busy.sim.miners.filter((m) => m.job === "smith").length, 1);
   assert.equal(busy.sim.miners.filter((m) => m.job === "mine").length, 2);
-  assert.deepEqual(busy.paid, { copper: 1, silver: 0, gold: 1 }, "a hundredth bar of copper and of gold made a point each");
+  assert.deepEqual(busy.paid, { copper: 1, silver: 0, gold: 1 }, "the last bar of a point of copper and of gold made a point each");
   assert.equal(busy.sim.worked.silver, 3, "three silver bars worked");
   // Nobody at the forge or anvil: the work still trickles through, slower.
   const idle = run(0, 0);
