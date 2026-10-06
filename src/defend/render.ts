@@ -262,7 +262,7 @@ export class DefendRenderer {
     ctx.imageSmoothingEnabled = false;
     if (sim) this.drawGates(map, sim, opts, dt);
     drawBallistas(ctx, this.px, map, sim);
-    if (opts.effects ?? true) this.drawParkLife(map, sim, opts, dt);
+    this.drawParkLife(map, sim, opts, dt);
     // Park fences sit on the ground layer, under the lighting and units.
     this.fences.sync(map);
     if (sim) this.fences.update(sim);
@@ -299,7 +299,8 @@ export class DefendRenderer {
     const rain = !!(sim && opts.weather?.rain);
     this.water.sync(map);
     const feet = sim ? walkers(sim) : [];
-    this.water.draw({ c: this.ctx, px: this.px, now: opts.now, rain, cold: sim?.cold ?? !!opts.weather?.snow, thawedPonds: sim?.thawedPonds, night: opts.night, walkers: feet, reduceMotion: opts.reduceMotion, layer: this.layer, layerScale: this.layerScale });
+    if (sim?.cold || opts.weather?.snow || (opts.effects ?? true)) this.water.draw({ c: this.ctx, px: this.px, now: opts.now, rain, cold: sim?.cold ?? !!opts.weather?.snow, thawedPonds: sim?.thawedPonds, night: opts.night, walkers: feet, reduceMotion: opts.reduceMotion, layer: this.layer, layerScale: this.layerScale });
+    if (!(opts.effects ?? true)) return;
     this.grass.sync(map);
     this.grass.draw({
       c: this.ctx, px: this.px, now: opts.now, dt, reduceMotion: opts.reduceMotion,

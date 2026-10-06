@@ -42,6 +42,8 @@ The city is alive between and during battles: park grass sways in the wind (hard
 
 ## How it's built
 
+Winter freezes boat wakes into persistent ice. Fire and explosions thaw it into drying water; ice blocks rebuilding and makes ground troops slide and recoil from blasts (`ice-motion.ts`). Ponds also freeze in cold weather. Water keeps pixel edges, reflected scenery, rain rings, and walking/sailing wakes. `tests/defend-ice.test.ts` covers gameplay and `node tests/defend-water.mjs` checks visuals without player saves.
+
 `src/defend/areas.ts` defines area identities, wave ranges, climate and colors. `city-layer.ts` uses area floor and cap/face textures, while the renderer crossfades city layers and invalidates ground relief on area changes. Areas can gain separate enemy rosters later; all currently use the existing roster.
 
 The current stress-test measurements and reproduction steps are in [docs/PERFORMANCE.md](docs/PERFORMANCE.md).

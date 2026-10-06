@@ -18,6 +18,10 @@ export class IceMotion {
     const grip = Math.min(1, dt * (ice ? 2.5 : 18));
     v.x += (dx / dt - v.x) * grip;
     v.y += (dy / dt - v.y) * grip;
+    if (!ice && Math.abs(v.x - dx / dt) + Math.abs(v.y - dy / dt) < .02) {
+      this.velocity.delete(u);
+      return [dx, dy];
+    }
     v.moved = true; v.own = own;
     this.velocity.set(u, v);
     return [v.x * dt, v.y * dt];
@@ -39,7 +43,7 @@ export class IceMotion {
 
   step(sim: DefendSim, dt: number) {
     for (const [u, v] of this.velocity) {
-      if ((u as Enemy).hp <= 0) { this.velocity.delete(u); continue; }
+      if ((u as Enemy).hp <= 0 || (v.own && !sim.soldiers.includes(u as never) && !sim.civilians.includes(u as never))) { this.velocity.delete(u); continue; }
       if (!v.moved) {
         this.slide(sim, u, v.x * dt, v.y * dt, v.own);
         const drag = Math.max(0, 1 - dt * (iceAt(sim, u.x, u.y) ? 1.6 : 18));
