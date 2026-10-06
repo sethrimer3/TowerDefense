@@ -8,6 +8,7 @@ import { fizzles, sheltered } from "./boats.ts";
 
 /** Enemy attacks spare other enemies and deal full damage to the city. */
 export function hostileBurst(sim: DefendSim, x: number, y: number, radius: number, damage: number) {
+  sim.atmosphere?.disturb(x, y, radius * 1.6 + .5, 0, 0, true);
   // A burst in a magic boat's water fizzles, and spares whoever stands in it.
   if (fizzles(sim, x, y, radius)) return;
   for (const u of [...sim.soldiers, ...sim.civilians]) {

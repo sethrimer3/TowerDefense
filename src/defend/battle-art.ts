@@ -112,6 +112,13 @@ function drawCivilians(b: Brush, sim: DefendSim, torches: Burning | null) {
     c.fillRect(u.x * px - s / 2, u.y * px - s / 2, s, s);
     if (torches) drawHandTorch(b, { x: u.x + CIVILIAN.size * 0.6, y: u.y - CIVILIAN.size * 0.4, id: u.id }, sim.time, torches(u.x, u.y, u.id));
     if (u.state === "working" && Math.floor(sim.time * 6) % 2) {
+      if (u.jobKind === "sand") {
+        c.fillStyle = "#b8874c";
+        c.fillRect(u.x * px + s / 2, u.y * px - s / 2, Math.max(1, s / 4), s * 1.4);
+        c.fillStyle = "#d8ba71";
+        c.fillRect(u.x * px + s / 4, u.y * px + s / 2, Math.max(2, s), Math.max(1, s / 3));
+        continue;
+      }
       c.fillStyle = "#f2d27a";
       c.fillRect(u.x * px + s / 2, u.y * px - s, Math.max(1, s / 2), Math.max(1, s / 2));
     }

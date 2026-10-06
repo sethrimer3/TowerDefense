@@ -8,11 +8,13 @@ import { AREAS, type Area } from "./areas.ts";
 
 const fx = defendRandom("effects");
 
-export type Weather = { rain: boolean; snow?: boolean; clear?: boolean };
+export type Weather = { rain: boolean; snow?: boolean; clear?: boolean; sand?: boolean; mist?: boolean; blizzard?: boolean };
 
 export function rollWeather(rand = defendRandom("rolls"), area: Area = AREAS[0]): Weather {
   const roll = rand();
   if (area.climate === "cold") return { rain: false, snow: true };
+  if (area.id === "desert") return { rain: false, sand: true, clear: true };
+  if (area.id === "fungal") return { rain: false, mist: true };
   return { rain: roll < area.rainChance, clear: area.climate === "dry" };
 }
 
@@ -46,7 +48,9 @@ export function ambientFor(w: Weather, night: number, previous?: Weather | null,
 
 /** Name for the HUD. */
 export function skyLabel(w: Weather, night: number) {
-  if (w.snow) return night > .5 ? "Snow · Night" : "Snow";
+  if (w.snow) return w.blizzard || night > .5 ? "Blizzard" : "Snow";
+  if (w.sand) return night > .5 ? "Sandstorm · Night" : "Sandstorm";
+  if (w.mist) return night > .5 ? "Mist · Night" : "Mist";
   if (w.clear && night <= .5) return "Clear";
   return night > 0.5 ? (w.rain ? "Storm" : "Night") : w.rain ? "Rain" : "Cloudy";
 }
@@ -57,22 +61,27 @@ export class Snow {
   private w = 0;
   private h = 0;
   private time = 0;
-  update(dt: number, w: number, h: number) {
-    if (w !== this.w || h !== this.h) {
+  private intensity = 0;
+  update(dt: number, w: number, h: number, intensity = 0) {
+    this.intensity = Math.max(0, Math.min(1, intensity));
+    const count = Math.min(700, Math.round(w * h / 4500 * (1 + this.intensity * 3)));
+    if (w !== this.w || h !== this.h || count !== this.flakes.length) {
       this.w = w; this.h = h;
-      this.flakes = Array.from({ length: Math.min(250, Math.round(w * h / 4500)) }, () => ({ x: fx() * w, y: fx() * h, speed: 18 + fx() * 35, phase: fx() * Math.PI * 2 }));
+      // Preserve existing flakes while density changes during the night fade.
+      this.flakes.length = Math.min(this.flakes.length, count);
+      while (this.flakes.length < count) this.flakes.push({ x: fx() * w, y: fx() * h, speed: 18 + fx() * 35, phase: fx() * Math.PI * 2 });
     }
     dt = Math.max(0, Math.min(dt, .1));
     this.time += dt;
     for (const f of this.flakes) {
-      f.y = (f.y + f.speed * dt) % Math.max(1, h);
-      f.x = (f.x + Math.sin(this.time + f.phase) * dt * 9 + w) % Math.max(1, w);
+      f.y = (f.y + f.speed * dt * (1 + this.intensity)) % Math.max(1, h);
+      f.x = (f.x + (Math.sin(this.time + f.phase) * 9 + this.intensity * (90 + 35 * Math.sin(this.time * .25))) * dt + w) % Math.max(1, w);
     }
   }
   draw(c: CanvasRenderingContext2D, px: number) {
-    c.fillStyle = "rgba(225,242,255,.7)";
+    c.fillStyle = "rgba(225,242,255,.65)";
     const size = Math.max(1, Math.round(px * .12));
-    for (const f of this.flakes) c.fillRect(Math.round(f.x), Math.round(f.y), size, size);
+    for (const f of this.flakes) c.fillRect(Math.round(f.x), Math.round(f.y), size * (1 + Math.round(this.intensity)), size);
   }
 }
 

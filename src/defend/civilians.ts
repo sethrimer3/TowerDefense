@@ -11,6 +11,7 @@ import { cellInBounds, cellIndex, cellX, cellY } from "./grid.ts";
 import type { Civilian, DefendSim } from "./sim.ts";
 import { restockable } from "./bait.ts";
 import { icyCell } from "./boats.ts";
+import { CLEANUP_DEPTH } from "./atmosphere.ts";
 
 /** Paths for civilians give up beyond this many cells. */
 const ERRAND = { maxCost: 400 };
@@ -50,6 +51,13 @@ export class Builders {
 }
 
 function stepCivilian(sim: DefendSim, c: Civilian, dt: number) {
+  if (c.jobKind === "sand") {
+    c.cleanupCheck = (c.cleanupCheck ?? 0) - dt;
+    if (c.cleanupCheck <= 0) {
+      c.cleanupCheck = .5;
+      if (!openRepairs(sim, -1).next().done) assignNext(sim, c);
+    }
+  }
   c.thinkT -= dt;
   if (c.state === "toJob") goToJob(sim, c, dt);
   else if (c.state === "working") work(sim, c, dt);
@@ -57,6 +65,7 @@ function stepCivilian(sim: DefendSim, c: Civilian, dt: number) {
 }
 
 function goToJob(sim: DefendSim, c: Civilian, dt: number) {
+  if (c.jobKind === "sand" && (sim.atmosphere?.sand[c.job] ?? 0) < CLEANUP_DEPTH) return assignNext(sim, c);
   if (sim.solid[c.job] || !jobOpen(sim, c.job, c)) return assignNext(sim, c);
   const j = cellCenter(c.stand ?? c.job);
   if (dist(j.x - c.x, j.y - c.y) < 0.35) {
@@ -100,6 +109,12 @@ function work(sim: DefendSim, c: Civilian, dt: number) {
   if (sim.solid[c.job] || icyCell(sim, c.job)) return assignNext(sim, c);
   // Too dangerous: come back to it later.
   if (sim.enemiesNear(c.x, c.y, 2.5).length) return assignNext(sim, c, c.job);
+  if (c.jobKind === "sand") {
+    sim.atmosphere?.clean(c.job, dt * .35);
+    c.work += dt;
+    if ((sim.atmosphere?.sand[c.job] ?? 0) < CLEANUP_DEPTH) assignNext(sim, c);
+    return;
+  }
   c.work += dt;
   if (c.work < rebuildSeconds(sim.levels.rebuildSpeed) * sim.bonuses.rebuild) return;
   sim.rebuildCell(c.job);
@@ -148,6 +163,12 @@ function pickJob(sim: DefendSim, from: Point, skip = -1): number {
 
 /** Every rubble cell a civilian could take, with its building's tier. */
 function* openJobs(sim: DefendSim, skip: number) {
+  yield* openRepairs(sim, skip);
+  for (const cell of sim.atmosphere?.cleanup ?? [])
+    if (jobAvailable(sim, cell, skip)) yield { cell, tier: 3 };
+}
+
+function* openRepairs(sim: DefendSim, skip: number) {
   for (const b of sim.map.buildings) {
     if (sim.intact(b) || b.kind === "keep") continue;
     // Fallen bait waits for Restocking.
@@ -173,8 +194,11 @@ function assignNext(sim: DefendSim, c: Civilian, skip = -1) {
   const job = pickJob(sim, c, skip);
   if (job >= 0) {
     c.job = job;
+    if (sim.map.owner[job] < 0) c.jobKind = "sand";
+    else { delete c.jobKind; delete c.cleanupCheck; }
     c.state = "toJob";
   } else {
+    delete c.jobKind; delete c.cleanupCheck;
     c.job = -1;
     c.state = "home";
     c.home = nearestHouse(sim, c);
@@ -210,6 +234,7 @@ function spawnCivilian(sim: DefendSim, job: number) {
     hp,
     maxHp: hp,
     job,
+    ...(sim.map.owner[job] < 0 ? { jobKind: "sand" as const } : {}),
     state: "toJob",
     work: 0,
     path: [],

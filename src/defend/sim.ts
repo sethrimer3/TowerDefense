@@ -1,4 +1,5 @@
 import { DefenderIndex } from "./defender-index.ts";
+import { Atmosphere, groundWeather } from "./atmosphere.ts";
 import { areaForWave } from "./areas.ts";
 import { IceMotion } from "./ice-motion.ts";
 import { icyCell } from "./boats.ts";
@@ -140,6 +141,9 @@ export type Civilian = {
   hp: number;
   maxHp: number;
   job: number;
+  /** Absent for ordinary rebuilding. Sand is always the lowest priority. */
+  jobKind?: "sand";
+  cleanupCheck?: number;
   state: "toJob" | "working" | "home";
   work: number;
   path: number[];
@@ -255,6 +259,8 @@ export class DefendSim {
   /** Magic boats' water, drying up behind them, and the buildings it sank
    * going under; both empty in every run without boats. */
   floods: Flood[] = [];
+  /** Local, transient mist and sand. Allocated only in the affected areas. */
+  atmosphere: Atmosphere | null = null;
   /** Explicit debug weather, otherwise the current area's climate. */
   snowOverride?: boolean;
   get cold() { return this.snowOverride ?? areaForWave(this.wave).climate === "cold"; }
@@ -368,6 +374,8 @@ export class DefendSim {
     this.fieldT -= dt;
     if (this.fieldDirty && this.fieldT <= 0) this.computeField();
     this.runWaves(dt);
+    if (!this.atmosphere && groundWeather(areaForWave(this.wave).id)) this.atmosphere = new Atmosphere();
+    this.atmosphere?.step(this, dt);
     this.indexEnemies();
     this.markEnemies();
     this.stepUnits(dt);
@@ -790,6 +798,7 @@ export class DefendSim {
   /** A blast: full damage at the centre falling to 40% at the edge. Returns
    * the seed its fireball and scorch are drawn from. */
   explode(x: number, y: number, { r, damage, friendlyFire, origin }: Blast): number {
+    this.atmosphere?.disturb(x, y, r * 1.6 + .5, 0, 0, true);
     // A blast in a magic boat's water fizzles.
     if (fizzles(this, x, y, r)) return 0;
     if (!this.stationaryAttacks || !this.blastIndexReady) {
