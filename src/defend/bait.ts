@@ -7,13 +7,16 @@
  * A fallen stack stays fallen unless Restocking lets civilians rebuild it,
  * once a level, each stack counted alone (`sim.baitFalls`). With Powder
  * kegs a stack bursts as it falls (sparing your own people) and leaves the
- * ground burning (a `Blaze`, like a fire mage's). A run with no bait plays
- * exactly as before. */
+ * ground burning (a `Blaze`, like a fire mage's). Its Study paths: oil-soaked
+ * bait sets biters alight, fortified crates hold out and, spiked, bite back
+ * (`baitBitten`). A run with no bait plays exactly as before. */
 import { baitBlastDamage, baitBlastRadius, baitFireDps, baitFireSeconds } from "./catalog.ts";
 import { fizzles } from "./boats.ts";
 import type { Building } from "./citygen.ts";
 import { center, rectDist, type Point } from "./pathing.ts";
-import type { DefendSim } from "./sim.ts";
+import type { DefendSim, Enemy } from "./sim.ts";
+import { FORTIFY, OIL, pathRank } from "../knowledge-paths.ts";
+import { ignite } from "./towers.ts";
 
 /** True while some stack of bait stands whole. */
 export function baitStanding(sim: DefendSim): boolean {
@@ -60,4 +63,12 @@ export function baitFell(sim: DefendSim, b: Building, burst: boolean) {
   if (fizzles(sim, c.x, c.y, r)) return;
   const seed = sim.explode(c.x, c.y, { r, damage: baitBlastDamage(level) * sim.bonuses.bombDamage, friendlyFire: false });
   sim.blazes.push({ x: c.x, y: c.y, r, t: 0, life: baitFireSeconds(level), dps: baitFireDps(level), seed });
+}
+
+/** An enemy has bitten a stack for `bite`: oil-soaked bait sets it alight,
+ * and spiked crates give the bite back. Nothing without those paths. */
+export function baitBitten(sim: DefendSim, e: Enemy, bite: number) {
+  const oil = pathRank(sim.bonuses.paths, "bait", "oilSoaked"), fort = pathRank(sim.bonuses.paths, "bait", "fortified");
+  if (oil) ignite(e, OIL.dps[oil], OIL.burn[oil]);
+  if (fort >= 3) sim.hurtEnemy(e, bite * FORTIFY.thorns, true, "melee");
 }

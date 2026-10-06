@@ -1430,20 +1430,17 @@ dialog .away-row .away-note {
   background: #0d0b09;
 }
 /* Skills are medallions on a chalked slate; owned ones glow violet. */
-.ledger-skill,
-.ledger-path {
+.ledger-skill {
   border: 1px solid #3a2e4a;
   border-radius: 3px;
   background: linear-gradient(#ffffff06, #00000030), #0d0a12d8;
   box-shadow: inset 0 1px 0 #c9a8ff12, 0 2px 0 #000;
 }
-.ledger-skill h3,
-.ledger-path h3 {
+.ledger-skill h3 {
   color: #eadcff;
   text-shadow: 0 1px 0 #000;
 }
-.ledger-skill p,
-.ledger-path p {
+.ledger-skill p {
   color: #bfb2cf;
 }
 .ledger-skill p em {
@@ -1473,16 +1470,7 @@ dialog .away-row .away-note {
   color: var(--tree-color);
   box-shadow: 0 0 0 2px #0a0908, 0 0 0 3px var(--tree-color), 0 0 14px #9a6cff80, inset 0 2px 6px #000;
 }
-/* Paths not yet written are drawn in faint chalk, stamped "to come". */
-.ledger-path {
-  border-style: dashed;
-  opacity: 0.72;
-}
-.ledger-path .ledger-glyph {
-  border-style: dashed;
-  border-color: #5a4a78;
-  color: #a58fd0;
-}
+/* What is still to come (an evolution) is stamped so. */
 .ledger-stamp {
   color: #c9a8ff;
   border: 1px solid #6a54a0;

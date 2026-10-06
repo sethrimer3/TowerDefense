@@ -5,16 +5,18 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { defaults, decode } from "../src/save.ts";
 import { bonuses } from "../src/progression.ts";
-import { PATHS, PATH_TOPICS, RIME, STORM, ASSASSIN, CRUSADE, FIRE_ARROWS, SHARP, GUNNERY, SIEGE_SHOT, SKIRMISH, decodePaths, learnPath, pathState, unlearnPath } from "../src/knowledge-paths.ts";
+import { PATHS, PATH_TOPICS, RIME, STORM, ASSASSIN, CRUSADE, FIRE_ARROWS, SHARP, GUNNERY, SIEGE_SHOT, SKIRMISH, SPOTTERS, SIGNAL, PYROCLASM, CINDERS, OIL, FORTIFY, decodePaths, learnPath, pathState, unlearnPath } from "../src/knowledge-paths.ts";
 import { ICON_ROWS, ICON_SIZE } from "../src/ui/path-icons.ts";
 import { defaultLayout, fitLayout, placeCityTile, placeStructure } from "../src/defend/layout.ts";
 import { generateCity } from "../src/defend/citygen.ts";
 import { DefendSim, type Enemy, type Levels } from "../src/defend/sim.ts";
-import { NO_BONUSES, UPGRADES, type Bonuses, type PaletteItem } from "../src/defend/catalog.ts";
+import { NO_BONUSES, UPGRADES, watchRadius, type Bonuses, type PaletteItem } from "../src/defend/catalog.ts";
 import { center } from "../src/defend/pathing.ts";
 import { chilled, stepFlames, stepFrosts, Wizards } from "../src/defend/wizard.ts";
 import { Barracks, stepArcher, stepSwordsman } from "../src/defend/troops.ts";
 import { Towers, stepArrows, stepShells } from "../src/defend/towers.ts";
+import { stepBlazes, stepFireballs, stepMage } from "../src/defend/mages.ts";
+import { baitBitten } from "../src/defend/bait.ts";
 
 const rich = () => {
   const s = defaults();
@@ -95,7 +97,7 @@ function battle(kind: PaletteItem, paths?: Bonuses["paths"]) {
   let l = defaultLayout();
   const { tx, ty } = l.keep;
   for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) l = placeCityTile(l, tx + dx, ty + dy) ?? assert.fail("tile");
-  const inside = kind === "barracks" || kind === "archerBarracks";
+  const inside = kind === "barracks" || kind === "archerBarracks" || kind === "mageGuild";
   l = placeStructure(l, kind, tx, inside ? ty - 1 : ty - 3) ?? assert.fail(kind);
   const fit = fitLayout(l);
   assert.ok(fit.ok);
@@ -276,4 +278,114 @@ test("Rangers loose twin shots; Skirmishers draw faster", () => {
   assert.equal(archer({ archerBarracks: { path: "rangers", rank: 3 } }).sim.arrows.length, 2);
   const quick = archer({ archerBarracks: { path: "skirmishers", rank: 1 } });
   assert.ok(Math.abs(quick.s.cd - plain.s.cd * SKIRMISH.reload[1]) < 1e-9);
+});
+
+/** Marks whatever stands in a lone watch tower's radius, as each step does. */
+const mark = (sim: DefendSim) => (sim as unknown as { markEnemies(): void }).markEnemies();
+
+test("Spotters' marks hit harder and reach further; Signal fires slow the marked, then set them burning", () => {
+  const watch = (paths?: Bonuses["paths"]) => {
+    const { sim, at } = battle("watchTower", paths);
+    const near = orc(sim, at.x, at.y - 3), far = orc(sim, at.x, at.y - watchRadius(0) - 1);
+    mark(sim);
+    return { sim, near, far };
+  };
+  const plain = watch();
+  assert.ok(plain.near.marked && !plain.far.marked);
+  plain.sim.hurtEnemy(plain.near, 10);
+  assert.equal(plain.near.maxHp - plain.near.hp, 20, "a mark doubles damage");
+  assert.equal(plain.near.slowed, undefined);
+
+  const spot = watch({ watchTower: { path: "spotters", rank: 2 } });
+  assert.ok(spot.far.marked, "a wider radius");
+  spot.sim.hurtEnemy(spot.near, 10);
+  assert.equal(spot.near.maxHp - spot.near.hp, 10 * SPOTTERS.mark[2]);
+
+  const signal = watch({ watchTower: { path: "signalFires", rank: 1 } });
+  assert.equal(signal.near.slowed, SIGNAL.slow[1]);
+  assert.equal(chilled(signal.near), SIGNAL.slow[1]);
+  assert.equal(signal.far.slowed, undefined);
+  assert.equal(signal.near.burn, undefined);
+  signal.near.x = signal.far.x;
+  signal.near.y = signal.far.y;
+  (signal.sim as unknown as { indexEnemies(): void }).indexEnemies();
+  mark(signal.sim);
+  assert.equal(signal.near.slowed, undefined, "out of the radius, back to its pace");
+
+  const pyre = watch({ watchTower: { path: "signalFires", rank: 3 } });
+  assert.ok(pyre.far.marked, "beacon chain reaches further");
+  assert.equal(pyre.near.burnDps, SIGNAL.burn);
+});
+
+/** A fire mage fresh from its guild, with an orc 3 cells off, after one throw. */
+function mage(paths?: Bonuses["paths"]) {
+  const { sim, b } = battle("mageGuild", paths);
+  new Barracks().step(sim, 1 / 30);
+  const s = sim.soldiers.find((s) => s.home === b.id);
+  assert.ok(s);
+  const e = orc(sim, s.x + 3, s.y);
+  s.cd = 0;
+  stepMage(sim, s, 1 / 30);
+  assert.equal(sim.fireballs.length, 1);
+  return { sim, s, e, f: sim.fireballs[0] };
+}
+
+test("Pyroclasm throws heavier, wider fireballs, and at III two more burst beside them", () => {
+  const plain = mage(), hot = mage({ mageGuild: { path: "pyroclasm", rank: 2 } });
+  assert.equal(hot.f.damage, plain.f.damage * PYROCLASM.damage);
+  assert.ok(Math.abs(hot.f.r - plain.f.r * PYROCLASM.splash) < 1e-9);
+
+  const hurtBeside = (m: ReturnType<typeof mage>) => {
+    const side = orc(m.sim, m.f.x1 + m.f.r * 1.3, m.f.y1);
+    m.f.t = m.f.dur;
+    stepFireballs(m.sim, 1 / 30);
+    return side.maxHp - side.hp;
+  };
+  assert.equal(hurtBeside(mage({ mageGuild: { path: "pyroclasm", rank: 2 } })), 0, "beyond the burst");
+  assert.ok(hurtBeside(mage({ mageGuild: { path: "pyroclasm", rank: 3 } })) > 0, "a meteor lands beside it");
+});
+
+test("Cinders burn longer and hotter, and at III the fire clings to whoever walks through", () => {
+  const blaze = (paths?: Bonuses["paths"]) => {
+    const m = mage(paths);
+    m.f.t = m.f.dur;
+    stepFireballs(m.sim, 1 / 30);
+    assert.equal(m.sim.blazes.length, 1);
+    return { ...m, b: m.sim.blazes[0] };
+  };
+  const plain = blaze(), hot = blaze({ mageGuild: { path: "cinders", rank: 2 } });
+  assert.ok(Math.abs(hot.b.life - plain.b.life * CINDERS.life) < 1e-9);
+  assert.ok(Math.abs(hot.b.dps - plain.b.dps * CINDERS.dps) < 1e-9);
+
+  const cling = blaze({ mageGuild: { path: "cinders", rank: 3 } });
+  const walker = orc(cling.sim, cling.b.x, cling.b.y);
+  stepBlazes(cling.sim, 1 / 30);
+  assert.equal(walker.burn, CINDERS.cling);
+  assert.equal(walker.burnDps, cling.b.dps);
+  stepBlazes(hot.sim, 1 / 30);
+  assert.equal(orc(hot.sim, hot.b.x, hot.b.y).burn, undefined);
+});
+
+test("Oil-soaked bait sets its biters alight; fortified crates hold out and, spiked, bite back", () => {
+  const bait = (paths?: Bonuses["paths"]) => {
+    const { sim, b, at } = battle("monsterBait", paths);
+    return { sim, b, e: orc(sim, at.x, at.y - 1) };
+  };
+  const plain = bait();
+  baitBitten(plain.sim, plain.e, 5);
+  assert.equal(plain.e.burn, undefined);
+  assert.equal(plain.e.hp, plain.e.maxHp);
+
+  const oil = bait({ bait: { path: "oilSoaked", rank: 2 } });
+  baitBitten(oil.sim, oil.e, 5);
+  assert.equal(oil.e.burn, OIL.burn[2]);
+  assert.equal(oil.e.burnDps, OIL.dps[2]);
+
+  const fort = bait({ bait: { path: "fortified", rank: 2 } });
+  assert.equal(fort.sim.maxHp[fort.b.id], plain.sim.maxHp[plain.b.id] * FORTIFY.hp[2]);
+  baitBitten(fort.sim, fort.e, 5);
+  assert.equal(fort.e.hp, fort.e.maxHp, "no spikes before III");
+  const spiked = bait({ bait: { path: "fortified", rank: 3 } });
+  baitBitten(spiked.sim, spiked.e, 5);
+  assert.equal(spiked.e.maxHp - spiked.e.hp, 5 * FORTIFY.thorns);
 });

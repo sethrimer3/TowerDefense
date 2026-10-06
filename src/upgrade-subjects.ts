@@ -1,9 +1,8 @@
 /** How the Upgrades page is organized: every upgrade in the game sits in
  * exactly one topic of one subject. Each topic's Forge holds its plain,
  * permanent numbers (more copies of a building, the Armory's levels, the
- * Smithy's rows); its Study holds what Knowledge buys (the skills, the
- * paths of `knowledge-paths.ts` drawn as a tree), and the paths still to be
- * written, shown as drafts. Pure data, so a test can
+ * Smithy's rows); its Study holds what Knowledge buys (the skills, and the
+ * paths of `knowledge-paths.ts`, found by the topic's id and drawn as a tree). Pure data, so a test can
  * check nothing is left out or listed twice. */
 import type { PaletteItem, UpgradeId } from "./defend/catalog.ts";
 import type { TrainingId } from "./progression.ts";
@@ -13,9 +12,6 @@ import type { UiSprite } from "./ui/dom.ts";
 export type SubjectId = "realm" | "city" | "towers" | "units" | "mine" | "library";
 /** One-off buys that aren't palette items or levels. */
 export type Extra = "bomb" | "speed3";
-/** A path planned for a topic's Study, not built yet (the built ones are
- * `knowledge-paths.ts`'s, found by the topic's id). */
-export type DraftPath = { name: string; text: string };
 export type Topic = {
   id: string;
   name: string;
@@ -29,7 +25,6 @@ export type Topic = {
   skills?: SkillId[];
   /** A tab elsewhere where more of it is raised (the mine's and library's buildings). */
   elsewhere?: "mine" | "library";
-  paths?: DraftPath[];
 };
 export type Subject = { id: SubjectId; name: string; sprite: UiSprite; blurb: string; topics: Topic[] };
 
@@ -50,10 +45,6 @@ export const SUBJECTS: Subject[] = [
       { id: "civilians", name: "Civilians", upgrades: ["civilianCount", "civilianHealth", "rebuildSpeed"], training: ["rebuild"], skills: ["guilds"] },
       {
         id: "bait", name: "Monster bait", item: "monsterBait", upgrades: ["baitRestock", "baitBlast"],
-        paths: [
-          { name: "Powder kegs", text: "Fallen bait explodes and sets the ground alight." },
-          { name: "Restocking", text: "Civilians rebuild fallen bait again and again." },
-        ],
       },
     ],
   },
@@ -68,10 +59,6 @@ export const SUBJECTS: Subject[] = [
       },
       {
         id: "watchTower", name: "Watch tower", item: "watchTower", upgrades: ["watchRadius"],
-        paths: [
-          { name: "Spotters", text: "Marked enemies take more damage." },
-          { name: "Signal fires", text: "Marked enemies are slowed." },
-        ],
       },
       {
         id: "wizardTower", name: "Wizard tower", item: "wizardTower", upgrades: ["wizardFlame", "wizardIce"],
@@ -90,10 +77,6 @@ export const SUBJECTS: Subject[] = [
       },
       {
         id: "mageGuild", name: "Mage Guild", item: "mageGuild", upgrades: ["mageFireball", "mageEmbers"],
-        paths: [
-          { name: "Pyroclasm", text: "Bigger, harder fireballs." },
-          { name: "Cinders", text: "The ground burns longer and hotter." },
-        ],
       },
       { id: "valkyriePalace", name: "Valkyrie palace", item: "valkyriePalace", upgrades: ["palaceCompact", "valkyrieReach"] },
     ],

@@ -188,5 +188,5 @@ export function stepFrosts(sim: DefendSim, dt: number) {
   sim.frosts = sim.frosts.filter((w) => w.r < w.range || w.t < w.range / ICE_SPEED + FROST_LINGER);
 }
 
-/** How fast a chilled enemy moves, as a share of its pace. */
-export const chilled = (e: Enemy) => (ENEMIES[e.kind].unyielding ? 1 : e.freeze ? 0 : e.chill ? CHILL_SPEED : 1);
+/** How fast a chilled (or frozen, or signal-slowed) enemy moves, as a share of its pace. */
+export const chilled = (e: Enemy) => (ENEMIES[e.kind].unyielding ? 1 : e.freeze ? 0 : (e.chill ? CHILL_SPEED : 1) * (e.slowed ?? 1));

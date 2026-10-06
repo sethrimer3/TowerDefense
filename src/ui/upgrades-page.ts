@@ -34,7 +34,7 @@ const TREE_OF = Object.fromEntries(TREES.flatMap((t) => t.nodes.map((n) => [n.id
  * tower, one unit building…). Each topic has a Forge, its permanent
  * numbers (copies of the building, the Armory's levels, the Smithy's rows
  * worked by the mine's smiths), and a Study, what Knowledge buys there and
- * the paths still to come. */
+ * its paths, drawn as a tree. */
 export class UpgradesPage {
   private subject: SubjectId = "realm";
   private topics: Partial<Record<SubjectId, string>> = {};
@@ -257,13 +257,9 @@ export class UpgradesPage {
         <button data-learn="${id}" ${maxed || !canBuy || !researchers ? "disabled" : ""}>${maxed ? "Mastered" : `Learn<small>${price} Knowledge</small>`}</button></article>`;
     });
     const tree = pathsOf(t.id).length ? this.treeHtml(t) : "";
-    const paths = (t.paths ?? []).map((p) => `<article class="ledger-path"><span class="ledger-glyph" aria-hidden="true">✧</span><div><h3>${p.name}</h3><p>${p.text}</p></div><span class="ledger-stamp">To come</span></article>`);
     const note = `<p class="ledger-note">You have <b class="knowledge">${whole(save.knowledge)}</b> Knowledge${researchers ? ` · ${researchers} ${researchers === 1 ? "researcher" : "researchers"} in the lab` : " · put a librarian to the alchemy lab to research"}</p>`;
-    const pathsHtml = paths.length
-      ? `<h4 class="training-group">Paths</h4><p class="ledger-note"><small>Choose one; it shuts the others until you unlearn it, which returns every point of Knowledge.</small></p>${paths.join("")}`
-      : "";
-    if (!skills.length && !paths.length && !tree) return `${note}<p class="ledger-empty">Nothing to study here yet.</p>`;
-    return note + tree + skills.join("") + pathsHtml;
+    if (!skills.length && !tree) return `${note}<p class="ledger-empty">Nothing to study here yet.</p>`;
+    return note + tree + skills.join("");
   }
 
   /** A topic's paths as a tree: the building at the root, a branch to each

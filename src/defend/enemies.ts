@@ -3,7 +3,7 @@ import { stepAbilities, enemyDamage, enemySpeed } from "./enemy-abilities.ts";
 import { hostileSpecial } from "./hostile-attacks.ts";
 import { stepSiege } from "./siege.ts";
 import { stepBoat } from "./boats.ts";
-import { baitStanding, lureOf } from "./bait.ts";
+import { baitBitten, baitStanding, lureOf } from "./bait.ts";
 /** How a DEFEND enemy spends one step. In order: fight any defender in
  * reach; bats fly straight at the keep; a house that caught its eye is
  * wrecked; otherwise it walks the flow field downhill toward the keep,
@@ -145,7 +145,9 @@ const isHouse = (sim: DefendSim, bid: number) => bid >= 0 && sim.map.buildings[b
 function hitBuilding({ sim, e, def }: Turn, id: number) {
   if (e.cd > 0) return;
   e.cd = def.cooldown;
-  sim.damageBuilding(id, enemyDamage(sim, e));
+  const bite = enemyDamage(sim, e);
+  sim.damageBuilding(id, bite);
+  if (sim.map.buildings[id].kind === "monsterBait") baitBitten(sim, e, bite);
 }
 
 /** Deterministic cone breath; only chain heads attack. */

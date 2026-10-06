@@ -11,6 +11,11 @@ import type { DefendSim, Soldier, Arrow } from "./sim.ts";
 import { answerBanner } from "./war-banner.ts";
 import { CELL_COUNT } from "./grid.ts";
 import { fizzles, sheltered } from "./boats.ts";
+import { CINDERS, PYROCLASM, pathRank } from "../knowledge-paths.ts";
+import { ignite } from "./towers.ts";
+
+/** The Mage Guild's Study path and rank (`knowledge-paths.ts`): each 0 unless chosen. */
+const paths = (sim: DefendSim) => ({ pyro: pathRank(sim.bonuses.paths, "mageGuild", "pyroclasm"), cinders: pathRank(sim.bonuses.paths, "mageGuild", "cinders") });
 
 /** A fireball in flight from (x0, y0) to where its target stood (x1, y1):
  * `t` of `dur` seconds along, with the burst it makes on landing. */
@@ -36,11 +41,11 @@ export function stepMage(sim: DefendSim, s: Soldier, dt: number) {
 
 function throwFireball(sim: DefendSim, s: Soldier, e: { x: number; y: number }) {
   s.cd = FIRE_MAGE.cooldown;
-  const d = dist(e.x - s.x, e.y - s.y);
+  const d = dist(e.x - s.x, e.y - s.y), { pyro } = paths(sim);
   sim.fireballs.push({
     origin: { x: s.x, y: s.y, attacker: s.id },
     x0: s.x, y0: s.y - 0.2, x1: e.x, y1: e.y, t: 0, dur: 0.15 + d / FIREBALL_SPEED,
-    damage: s.damage, r: fireballSplash(sim.levels.mageFireball ?? 0),
+    damage: pyro ? s.damage * PYROCLASM.damage : s.damage, r: fireballSplash(sim.levels.mageFireball ?? 0) * (pyro >= 2 ? PYROCLASM.splash : 1),
   });
 }
 
@@ -59,17 +64,27 @@ export function stepFireballs(sim: DefendSim, dt: number) {
     // A fireball landing in a magic boat's water goes out with a hiss.
     if (fizzles(sim, f.x1, f.y1, f.r)) continue;
     const seed = sim.explode(f.x1, f.y1, { r: f.r, damage: f.damage, friendlyFire: false, origin: f.origin });
-    const level = sim.levels.mageEmbers ?? 0;
-    sim.blazes.push({ x: f.x1, y: f.y1, r: f.r * EMBER_SHARE, t: 0, life: emberSeconds(level), dps: emberDps(level) * sim.bonuses.troopDamage, seed });
+    const level = sim.levels.mageEmbers ?? 0, { pyro, cinders } = paths(sim);
+    // Meteor shower: smaller bursts either side of the landing.
+    if (pyro >= 3)
+      for (const side of [-1, 1]) sim.explode(f.x1 + side * f.r * 0.9, f.y1, { r: f.r / 2, damage: f.damage * PYROCLASM.shardShare, friendlyFire: false, origin: f.origin });
+    const life = emberSeconds(level) * (cinders ? CINDERS.life : 1), dps = emberDps(level) * sim.bonuses.troopDamage * (cinders >= 2 ? CINDERS.dps : 1);
+    sim.blazes.push({ x: f.x1, y: f.y1, r: f.r * EMBER_SHARE, t: 0, life, dps, seed });
   }
   sim.fireballs = sim.fireballs.filter((f) => f.t < f.dur);
 }
 
 /** Burning ground scorches every ground enemy inside it, and dies down. */
 export function stepBlazes(sim: DefendSim, dt: number) {
+  const cling = paths(sim).cinders >= 3;
   for (const b of sim.blazes) {
     b.t += dt;
-    for (const e of sim.enemiesNear(b.x, b.y, b.r)) if (!ENEMIES[e.kind].flying && !sheltered(sim, e.x, e.y)) sim.hurtEnemy(e, b.dps * dt, false, "ranged", b);
+    for (const e of sim.enemiesNear(b.x, b.y, b.r)) {
+      if (ENEMIES[e.kind].flying || sheltered(sim, e.x, e.y)) continue;
+      sim.hurtEnemy(e, b.dps * dt, false, "ranged", b);
+      // Clinging fire: it keeps burning after it walks out.
+      if (cling) ignite(e, b.dps, CINDERS.cling);
+    }
   }
   sim.blazes = sim.blazes.filter((b) => b.t < b.life);
 }

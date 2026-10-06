@@ -44,7 +44,8 @@ import { CellType, type Building, type CityMap } from "./citygen.ts";
 import { atHome, Builders } from "./civilians.ts";
 import { stepEnemy } from "./enemies.ts";
 import { blocked, cellAt, cellCenter, center, fillFlowField, nearestOpen, type FieldTerrain, type Point } from "./pathing.ts";
-import { stepArrows, stepShells, Towers } from "./towers.ts";
+import { ignite, stepArrows, stepShells, Towers } from "./towers.ts";
+import { FORTIFY, SIGNAL, SPOTTERS, pathRank } from "../knowledge-paths.ts";
 import { Barracks, stepArcher, stepSwordsman } from "./troops.ts";
 import { stepBlazes, stepFireballs, stepMage, type Blaze, type Fireball } from "./mages.ts";
 import { stepStabs, stepValkyrie, type Stab } from "./valkyries.ts";
@@ -82,6 +83,8 @@ export type Enemy = {
    * second; absent when not burning. */
   burn?: number;
   burnDps?: number;
+  /** The share of its pace a signal fire leaves it while marked; absent otherwise. */
+  slowed?: number;
   fortressPart?: { core: number; role: "turret" | "leg" | "armor"; dx: number; dy: number };
   fortressParts?: Enemy[];
   facing?: { x: number; y: number };
@@ -191,6 +194,8 @@ export class DefendSim {
   readonly levels: Levels;
   /** Training and skill-tree multipliers (all 1 without them). */
   readonly bonuses: Readonly<Bonuses>;
+  /** How many times the damage a marked enemy takes (Spotters raise it). */
+  private readonly markDamage: number;
   /** Enemies slain this run, by kind: what the run pays out. Not part of
    * the replayed state. */
   readonly slain: Record<EnemyKind, number> = { roach: 0, orc: 0, ogre: 0, bat: 0, warlord: 0, mother: 0, broodling: 0, snake: 0, dragon: 0, shieldBearer: 0, aegis: 0, darkKnight: 0, bombOrc: 0, bombBird: 0, voidSparrow: 0, shieldLesser: 0, shieldGreater: 0, poisonLesser: 0, poisonBearer: 0, poisonGreater: 0, poisonSovereign: 0, siegeBeetle: 0, burrowingMole: 0, necromancer: 0, skeleton: 0, bannerCaptain: 0, mirrorKnight: 0, leechSwarm: 0, ashPhoenix: 0, phoenixEgg: 0, blinkImp: 0, fortressHut: 0, fortressOutpost: 0, fortressTower: 0, fortressKeep: 0, fortressLesser: 0, fortress: 0, fortressGreater: 0, fortressSovereign: 0, rollingCannon: 0, ballista: 0, fireworkLauncher: 0, trebuchet: 0, bombard: 0, rocketBattery: 0, boatDinghy: 0, boatSailboat: 0, boatCutter: 0, boatCog: 0, boatLesser: 0, boat: 0, boatGreater: 0, boatSovereign: 0 };
@@ -287,6 +292,7 @@ export class DefendSim {
     this.map = map;
     this.levels = levels;
     this.bonuses = bonuses;
+    this.markDamage = SPOTTERS.mark[pathRank(bonuses.paths, "watchTower", "spotters")];
     this.rand = rng(seed);
     const n = map.buildings.length;
     this.solid = new Uint8Array(CELL_COUNT);
@@ -596,12 +602,20 @@ export class DefendSim {
   }
 
   private markEnemies() {
+    const spot = pathRank(this.bonuses.paths, "watchTower", "spotters"), signal = pathRank(this.bonuses.paths, "watchTower", "signalFires");
     for (const e of this.enemies) e.marked = false;
-    const r = watchRadius(this.levels.watchRadius);
+    // Signal fires slow only the marked: last step's slowing is lifted first.
+    if (signal) for (const e of this.enemies) delete e.slowed;
+    const r = watchRadius(this.levels.watchRadius) + (spot >= 2 ? SPOTTERS.radius : 0) + (signal >= 2 ? SIGNAL.radius : 0);
     for (const b of this.map.buildings) {
       if (b.kind !== "watchTower" || !this.intact(b)) continue;
       const c = center(b.rect);
-      for (const e of this.enemiesNear(c.x, c.y, r)) e.marked = true;
+      for (const e of this.enemiesNear(c.x, c.y, r)) {
+        e.marked = true;
+        if (!signal) continue;
+        e.slowed = SIGNAL.slow[signal];
+        if (signal >= 3) ignite(e, SIGNAL.burn, 0.5);
+      }
     }
   }
 
@@ -644,7 +658,7 @@ export class DefendSim {
     }
     amount *= damageModifier(this, e, origin, source, projectile);
     if (amount <= 0) return false;
-    e.hp -= e.marked ? amount * 2 : amount;
+    e.hp -= e.marked ? amount * this.markDamage : amount;
     if (flash) e.flash = 0.12;
     if (e.hp <= 0) this.effects.push({ kind: "spark", x: e.x, y: e.y, t: 0, r: enemySize(e) });
     return true;
@@ -831,6 +845,7 @@ function maxHpOf(b: Building, levels: Levels, bonuses: Readonly<Bonuses>) {
   if (b.kind === "wallBallista") return wallHp(levels.wallStrength) * bonuses.wallHp * BALLISTA.hpPerCell * b.cells.length;
   if (b.kind === "house") return HOUSE_HP_PER_CELL * b.cells.length;
   if (b.kind === "keep") return keepHp(levels.keepStrength) * bonuses.keepHp;
+  if (b.kind === "monsterBait") return STRUCTURES[b.kind].maxHp * FORTIFY.hp[pathRank(bonuses.paths, "bait", "fortified")];
   return STRUCTURES[b.kind].maxHp;
 }
 

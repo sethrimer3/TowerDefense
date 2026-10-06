@@ -115,6 +115,26 @@ const ICONS: Record<PathIcon, string[]> = {
     "......oooo.", "....oolllo.", "...ollwlmo.", "..ollwlmmo.", ".ollwlmmdo.", ".olwlmmdo..",
     ".owlmmdo...", ".olmdoo....", ".ooo.......", "od.........", "o..........",
   ],
+  spyglass: [
+    "........ooo", ".......owlo", "......owlmo", ".....owlmo.", "....oolmo..", "...odomo...",
+    "..odmoo....", ".odmo......", "odmo.......", "odo........", "oo.........",
+  ],
+  beacon: [
+    ".....o.....", "....olo....", "...olwlo...", "...olwlo...", "..ooooooo..", "..odmmmdo..",
+    "...odmdo...", "....odo....", "....odo....", "....odo....", "...ooooo...",
+  ],
+  crate: [
+    "ooooooooooo", "odddddddddo", "odolllllodo", "odlollloldo", "odllololldo", "odlllollldo",
+    "odllololldo", "odlollloldo", "odolllllodo", "odddddddddo", "ooooooooooo",
+  ],
+  fireball: [
+    "...........", ".....oooo..", "....owwllo.", "...owllllmo", "...olllmmmo", "..oollmmmdo",
+    ".oddommmdo.", "omdo.oddo..", "odo..ooo...", "oo.........", "...........",
+  ],
+  embers: [
+    "...........", "..o.....o..", ".olo...owo.", "..o.....o..", "....o......", "...owo..o..",
+    "....o..olo.", ".o......o..", "olo..o.....", ".o..olo....", ".....o.....",
+  ],
 };
 
 const OUTLINE = "#140c08";

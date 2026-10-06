@@ -263,7 +263,9 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   leaves a **blaze**: burning ground that hurts every ground enemy inside it
   each second until it dies down (fliers pass over). Upgraded by Pyroclasm
   (fireball damage and burst) and Lingering embers (how long and how hot
-  the ground burns) in the Armory.
+  the ground burns) in the Forge. Study paths: Pyroclasm (heavier, wider
+  fireballs, then two more bursting either side) or Cinders (longer, hotter
+  blazes, then fire that clings to whoever walks through).
 - **Valkyrie palaces** (`valkyries.ts`) train valkyries (same garrison
   size, drill speed and arms upgrades as the barracks): armoured angels with
   spears who path toward the nearest enemy in the city, or stroll the
@@ -314,6 +316,8 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   they hit burns, then a volley of three) or Sharpshooters (reach, every 3rd
   arrow critical, then aimed at the strongest). **Watch towers** mark
   enemies in their radius with a gold outline; marked enemies take ×2 damage.
+  Study paths: Spotters (marks hit harder, wider radius) or Signal fires
+  (marked enemies slowed, more at rank II, and set burning at III).
 - **City gates** are buildings (`kind: "gate"`, numbered after the wall
   stones) with the HP of the stones they stand in for, half again: enemies
   find them solid and batter them down like the wall, and civilians rebuild
@@ -365,6 +369,9 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   stack once a level, a defense. **Powder kegs** make a stack burst as it
   falls (sparing your own people; a stack sunk by a boat's water only
   sinks) and set the ground round it burning, a blaze like a fire mage's.
+  Study paths: Oil-soaked (whoever bites a stack catches fire, hotter each
+  rank) or Fortified crates (more HP, then spikes hurting each biter
+  thrice its bite).
 - Civilians work a rubble cell standing in it; when its building's own
   rebuilt cells have walled it in, they work it from an open cell beside
   it (a corner will do).

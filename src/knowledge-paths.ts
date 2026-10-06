@@ -9,15 +9,17 @@
 import type { PaletteItem } from "./defend/catalog.ts";
 import type { Save } from "./save.ts";
 
-export type PathTopic = "wizardTower" | "barracks" | "archerTower" | "cannonTower" | "archerBarracks";
+export type PathTopic = "wizardTower" | "barracks" | "archerTower" | "cannonTower" | "archerBarracks" | "watchTower" | "mageGuild" | "bait";
 export type PathId =
   | "pyromancy" | "rime" | "storm" | "crusaders" | "assassins"
-  | "fireArrows" | "sharpshooters" | "gunnery" | "siegeShot" | "rangers" | "skirmishers";
+  | "fireArrows" | "sharpshooters" | "gunnery" | "siegeShot" | "rangers" | "skirmishers"
+  | "spotters" | "signalFires" | "pyroclasm" | "cinders" | "oilSoaked" | "fortified";
 /** The pixel icons `ui/path-icons.ts` draws, one a rank. */
 export type PathIcon =
   | "flame" | "tongue" | "inferno" | "snowflake" | "shard" | "iceBlock" | "bolt" | "fork" | "thunderhead"
   | "mail" | "heart" | "cross" | "boot" | "dagger" | "skull" | "crown"
-  | "arrow" | "fireArrow" | "volley" | "eye" | "crosshair" | "gear" | "grape" | "cannonball" | "blast" | "bow" | "leaf";
+  | "arrow" | "fireArrow" | "volley" | "eye" | "crosshair" | "gear" | "grape" | "cannonball" | "blast" | "bow" | "leaf"
+  | "spyglass" | "beacon" | "crate" | "fireball" | "embers";
 /** Each path's colours, as `ui/path-icons.ts` and the page's CSS name them. */
 export type PathHue = "ember" | "frost" | "storm" | "steel" | "shadow" | "verdant";
 export type PathRank = { name: string; icon: PathIcon; cost: number; text: string };
@@ -70,6 +72,27 @@ export const RANGERS = { sight: 2, damage: 1.5 };
 /** Skirmishers: archers draw in `reload[rank]` of the time; from II they
  * walk `speed` times as fast and keep walking while they shoot. */
 export const SKIRMISH = { reload: [1, 0.7, 0.7, 0.45], speed: 1.3 };
+/** Spotters: marked enemies take `mark[rank]` times the damage (2 without);
+ * from II the tower marks `radius` cells further. */
+export const SPOTTERS = { mark: [2, 2.5, 2.5, 3], radius: 2 };
+/** Signal fires: marked enemies move at `slow[rank]` of their pace; from II
+ * the tower marks `radius` cells further; at III marked enemies burn for
+ * `burn` a second. */
+export const SIGNAL = { slow: [1, 0.7, 0.55, 0.55], radius: 3, burn: 6 };
+/** Pyroclasm: fireballs hit `damage` times as hard; from II burst `splash`
+ * times as wide; at III each throws `shards` smaller bursts beside it, at
+ * `shardShare` of the damage. */
+export const PYROCLASM = { damage: 1.4, splash: 1.4, shards: 2, shardShare: 0.5 };
+/** Cinders: the burning ground lasts `life` times as long; from II burns
+ * `dps` times as hot; at III what walks through it keeps burning `cling`
+ * seconds after. */
+export const CINDERS = { life: 1.6, dps: 1.8, cling: 2 };
+/** Oil-soaked bait: whatever bites a stack catches fire for `burn[rank]`
+ * seconds at `dps[rank]` a second. */
+export const OIL = { burn: [0, 3, 4, 6], dps: [0, 8, 20, 50] };
+/** Fortified crates: bait has `hp[rank]` times its HP; at III each bite
+ * comes back on the biter `thorns` times over. */
+export const FORTIFY = { hp: [1, 2, 3.5, 3.5], thorns: 3 };
 
 export const PATHS: KnowledgePath[] = [
   {
@@ -160,6 +183,54 @@ export const PATHS: KnowledgePath[] = [
       { name: "Quick draw", icon: "bow", cost: 4, text: "Archers shoot 30% faster" },
       { name: "Running shots", icon: "boot", cost: 8, text: "They walk 30% faster and keep moving while they shoot" },
       { name: "Hail of arrows", icon: "bolt", cost: 14, text: "They shoot more than twice as fast as at first" },
+    ],
+  },
+  {
+    id: "spotters", topic: "watchTower", name: "Spotters", motto: "Marked enemies suffer more", hue: "verdant",
+    ranks: [
+      { name: "Spyglasses", icon: "spyglass", cost: 4, text: "Marked enemies take 2.5× damage instead of 2×" },
+      { name: "Lookout posts", icon: "eye", cost: 8, text: "The tower marks 2 cells further" },
+      { name: "Marked for death", icon: "crosshair", cost: 14, text: "Marked enemies take 3× damage" },
+    ],
+  },
+  {
+    id: "signalFires", topic: "watchTower", name: "Signal fires", motto: "Marked enemies are hindered", hue: "ember",
+    ranks: [
+      { name: "Signal fires", icon: "beacon", cost: 4, text: "Marked enemies move at 70% of their pace" },
+      { name: "Beacon chain", icon: "tongue", cost: 8, text: "The tower marks 3 cells further, and marked enemies slow to 55%" },
+      { name: "Pyre signal", icon: "inferno", cost: 14, text: "Marked enemies burn while they stay marked" },
+    ],
+  },
+  {
+    id: "pyroclasm", topic: "mageGuild", name: "Pyroclasm", motto: "Bigger, harder fireballs", hue: "ember",
+    ranks: [
+      { name: "White heat", icon: "fireball", cost: 4, text: "Fireballs hit 40% harder" },
+      { name: "Wide bursts", icon: "blast", cost: 8, text: "Their bursts are 40% wider" },
+      { name: "Meteor shower", icon: "volley", cost: 14, text: "Each fireball throws two smaller bursts beside it" },
+    ],
+  },
+  {
+    id: "cinders", topic: "mageGuild", name: "Cinders", motto: "The ground burns longer and hotter", hue: "shadow",
+    ranks: [
+      { name: "Smoulder", icon: "embers", cost: 4, text: "Burning ground lasts 60% longer" },
+      { name: "Hot coals", icon: "flame", cost: 8, text: "It burns 80% hotter" },
+      { name: "Clinging fire", icon: "inferno", cost: 14, text: "Whatever walks through it keeps burning for 2 seconds after" },
+    ],
+  },
+  {
+    id: "oilSoaked", topic: "bait", name: "Oil-soaked", motto: "Biters catch fire", hue: "ember",
+    ranks: [
+      { name: "Lamp oil", icon: "flame", cost: 3, text: "Enemies that bite the bait catch fire for 3 seconds" },
+      { name: "Pitch", icon: "tongue", cost: 6, text: "They burn hotter, for 4 seconds" },
+      { name: "Greek fire", icon: "inferno", cost: 12, text: "They burn far hotter, for 6 seconds" },
+    ],
+  },
+  {
+    id: "fortified", topic: "bait", name: "Fortified crates", motto: "Bait that holds out", hue: "steel",
+    ranks: [
+      { name: "Iron bands", icon: "crate", cost: 3, text: "Bait has twice the HP" },
+      { name: "Stone cellar", icon: "mail", cost: 6, text: "Bait has 3.5× the HP" },
+      { name: "Spiked crates", icon: "dagger", cost: 12, text: "Every bite comes back on the biter three times over" },
     ],
   },
 ];
