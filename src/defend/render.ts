@@ -36,6 +36,7 @@ import { DarkArt, darkLights } from "./dark-art.ts";
 import { ParkTrees, type Under } from "./park-trees.ts";
 import { FloodArt } from "./flood-art.ts";
 import { ChimneySmoke } from "./chimney-smoke.ts";
+import { AtmosphereArt } from "./atmosphere-art.ts";
 
 export type DrawOptions = {
   area?: AreaId;
@@ -75,6 +76,7 @@ export class DefendRenderer {
   readonly dark = new DarkArt();
   readonly floods = new FloodArt();
   readonly smoke = new ChimneySmoke();
+  readonly atmosphere = new AtmosphereArt();
   /** The battle time the wizard art last advanced to. */
   private wizardTime = 0;
   private rain = new Rain();
@@ -218,6 +220,18 @@ export class DefendRenderer {
     if (opts.timings) this.timings.terrainMs += performance.now() - cityStart;
     if (sim) this.advanceWizard(sim);
     if (sim) this.drawBattle(map, sim, opts);
+    if (sim) this.atmosphere.draw(this.ctx, this.px, sim, opts.reduceMotion, opts.effects ?? true);
+    // Snow sits above terrain but below enemies, defenders, projectiles and
+    // health bars: blizzards are dense without erasing combat silhouettes.
+    if (sim && !opts.reduceMotion && (opts.effects ?? true)) {
+      const old = this.previousArea ? this.previousWeather : null;
+      const alpha = (opts.weather?.snow ? this.areaMix : 0) + (old?.snow ? 1 - this.areaMix : 0);
+      if (alpha) {
+        this.ctx.save(); this.ctx.setTransform(1, 0, 0, 1, 0, 0); this.ctx.globalAlpha = alpha;
+        this.snow.update(dt, this.canvas.width, this.canvas.height, opts.weather?.blizzard ? 1 : opts.night);
+        this.snow.draw(this.ctx, this.px); this.ctx.restore();
+      }
+    }
     this.drawKeepFlag(map, sim, opts);
     if (sim) this.drawBattleUnits(sim, opts.weather ? this.burning ?? (() => 1) : null, opts);
     this.drawTrees(map, sim, opts, dt);
@@ -230,10 +244,8 @@ export class DefendRenderer {
     if (sim && !opts.reduceMotion) {
       const old = this.previousArea ? this.previousWeather : null;
       const rainAlpha = (opts.weather?.rain ? this.areaMix : 0) + (old?.rain ? 1 - this.areaMix : 0);
-      const snowAlpha = (opts.weather?.snow ? this.areaMix : 0) + (old?.snow ? 1 - this.areaMix : 0);
       this.ctx.save();
       if (rainAlpha) { this.ctx.globalAlpha = rainAlpha; this.drawRain(dt); }
-      if (snowAlpha) { this.ctx.globalAlpha = snowAlpha; this.snow.update(dt, this.canvas.width, this.canvas.height); this.snow.draw(this.ctx, this.px); }
       this.ctx.restore();
     }
     if (opts.timings) this.timings.effectsMs = performance.now() - start - this.timings.terrainMs - this.timings.entityMs;
