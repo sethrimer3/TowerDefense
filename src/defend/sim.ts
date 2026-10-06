@@ -91,6 +91,8 @@ export type Enemy = {
   fortressPart?: { core: number; role: "turret" | "leg" | "armor"; dx: number; dy: number };
   fortressParts?: Enemy[];
   facing?: { x: number; y: number };
+  /** Locked, axis-aligned destination for a sliding cube. */
+  iceSlide?: { x: number; y: number; cell: number };
   burrow?: number;
   blink?: { x: number; y: number; t: number };
   abilityT?: number;
@@ -201,7 +203,7 @@ export class DefendSim {
   private readonly markDamage: number;
   /** Enemies slain this run, by kind: what the run pays out. Not part of
    * the replayed state. */
-  readonly slain: Record<EnemyKind, number> = { roach: 0, orc: 0, ogre: 0, bat: 0, warlord: 0, mother: 0, broodling: 0, snake: 0, dragon: 0, shieldBearer: 0, aegis: 0, darkKnight: 0, bombOrc: 0, bombBird: 0, voidSparrow: 0, shieldLesser: 0, shieldGreater: 0, poisonLesser: 0, poisonBearer: 0, poisonGreater: 0, poisonSovereign: 0, siegeBeetle: 0, burrowingMole: 0, necromancer: 0, skeleton: 0, bannerCaptain: 0, mirrorKnight: 0, leechSwarm: 0, ashPhoenix: 0, phoenixEgg: 0, blinkImp: 0, fortressHut: 0, fortressOutpost: 0, fortressTower: 0, fortressKeep: 0, fortressLesser: 0, fortress: 0, fortressGreater: 0, fortressSovereign: 0, rollingCannon: 0, ballista: 0, fireworkLauncher: 0, trebuchet: 0, bombard: 0, rocketBattery: 0, boatDinghy: 0, boatSailboat: 0, boatCutter: 0, boatCog: 0, boatLesser: 0, boat: 0, boatGreater: 0, boatSovereign: 0 };
+  readonly slain: Record<EnemyKind, number> = { roach: 0, orc: 0, ogre: 0, bat: 0, warlord: 0, mother: 0, broodling: 0, snake: 0, dragon: 0, shieldBearer: 0, aegis: 0, darkKnight: 0, bombOrc: 0, bombBird: 0, voidSparrow: 0, shieldLesser: 0, shieldGreater: 0, poisonLesser: 0, poisonBearer: 0, poisonGreater: 0, poisonSovereign: 0, siegeBeetle: 0, burrowingMole: 0, necromancer: 0, skeleton: 0, bannerCaptain: 0, mirrorKnight: 0, leechSwarm: 0, ashPhoenix: 0, phoenixEgg: 0, blinkImp: 0, fortressHut: 0, fortressOutpost: 0, fortressTower: 0, fortressKeep: 0, fortressLesser: 0, fortress: 0, fortressGreater: 0, fortressSovereign: 0, rollingCannon: 0, ballista: 0, fireworkLauncher: 0, trebuchet: 0, bombard: 0, rocketBattery: 0, boatDinghy: 0, boatSailboat: 0, boatCutter: 0, boatCog: 0, boatLesser: 0, boat: 0, boatGreater: 0, boatSovereign: 0, iceGolem: 0, iceCube: 0 };
   /** 1 while a cell is part of a standing (built) building. */
   readonly solid: Uint8Array;
   /** What blocks the city's own people: `solid`, but for the standing city
@@ -471,7 +473,7 @@ export class DefendSim {
       if (e.freeze !== undefined && (e.freeze -= dt) <= 0) delete e.freeze;
     for (const e of this.enemies) {
       if (e.burn === undefined) continue;
-      if (e.hp > 0 && !sheltered(this, e.x, e.y)) this.hurtEnemy(e, e.burnDps! * Math.min(dt, e.burn), false);
+      if (e.hp > 0 && !sheltered(this, e.x, e.y)) this.hurtEnemy(e, e.burnDps! * Math.min(dt, e.burn), false, "ranged", undefined, false, "fire");
       if ((e.burn -= dt) <= 0) {
         delete e.burn;
         delete e.burnDps;
@@ -694,7 +696,7 @@ export class DefendSim {
   // ── Damage and rebuilding ─────────────────────────────────────────────
   /** Hurts `e` (double when marked); a steady burn hurts it without the
    * flash of a blow. */
-  hurtEnemy(e: Enemy, amount: number, flash = true, source: "ranged" | "melee" = "ranged", origin?: Point & { attacker?: number; building?: number }, projectile = false) {
+  hurtEnemy(e: Enemy, amount: number, flash = true, source: "ranged" | "melee" = "ranged", origin?: Point & { attacker?: number; building?: number }, projectile = false, element: "physical" | "fire" | "explosion" = "physical") {
     if (e.hp <= 0 || !Number.isFinite(amount) || amount <= 0) return false;
     if (source === "ranged") {
       let shield: Enemy | undefined;
@@ -717,6 +719,7 @@ export class DefendSim {
       } else if (origin.building !== undefined) this.damageBuilding(origin.building, reflected);
     }
     amount *= damageModifier(this, e, origin, source, projectile);
+    if (e.kind === "iceGolem" && element !== "physical") amount *= 2;
     if (amount <= 0) return false;
     e.hp -= e.marked ? amount * this.markDamage : amount;
     if (flash) e.flash = 0.12;
@@ -794,7 +797,7 @@ export class DefendSim {
       this.blastIndexReady = this.stationaryAttacks;
     }
     const hit = (d: number) => damage * (1 - 0.6 * Math.min(1, d / r));
-    for (const e of this.enemiesNear(x, y, r)) if (!sheltered(this, e.x, e.y)) this.hurtEnemy(e, hit(dist(e.x - x, e.y - y)), true, "ranged", origin ?? { x, y }, !!origin);
+    for (const e of this.enemiesNear(x, y, r)) if (!sheltered(this, e.x, e.y)) this.hurtEnemy(e, hit(dist(e.x - x, e.y - y)), true, "ranged", origin ?? { x, y }, !!origin, "explosion");
     if (friendlyFire)
       for (const u of [...this.soldiers, ...this.civilians]) {
         const d = dist(u.x - x, u.y - y);

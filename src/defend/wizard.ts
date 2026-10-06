@@ -162,7 +162,7 @@ export function stepFlames(sim: DefendSim, wizards: Wizards, dt: number) {
     const reach = f.range * Math.min(1, f.t / 0.25);
     meltIceCone(sim, f.x, f.y, f.dx, f.dy, reach, FLAME_SPREAD);
     const dps = flameDps(sim.levels.wizardFlame ?? 0) * sim.bonuses.towerDamage * PYRO.damage[paths(sim).pyro];
-    for (const e of sim.enemiesNear(f.x, f.y, reach)) if (inFan(e, f.x, f.y, f.dx, f.dy, FLAME_SPREAD, reach) && !sheltered(sim, e.x, e.y)) sim.hurtEnemy(e, dps * dt, true, "ranged", f);
+    for (const e of sim.enemiesNear(f.x, f.y, reach)) if (inFan(e, f.x, f.y, f.dx, f.dy, FLAME_SPREAD, reach) && !sheltered(sim, e.x, e.y)) sim.hurtEnemy(e, dps * dt, true, "ranged", f, false, "fire");
     if (f.t >= f.dur) wizards.ended(f.tower);
   }
   sim.flames = sim.flames.filter((f) => f.t < f.dur);

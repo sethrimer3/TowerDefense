@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { AREAS, AREA_FADE_MS, WAVES_PER_AREA, areaFade, areaForWave } from '../src/defend/areas.ts';
+import { AREAS, AREA_FADE_MS, WAVES_PER_AREA, areaFade, areaForWave, areaArtId } from '../src/defend/areas.ts';
 import { rollWeather, ambientFor, skyLabel } from '../src/defend/weather.ts';
 import { wavePickerHTML } from '../src/defend/wave-picker.ts';
 import { defaultDefendSave } from '../src/defend/progress.ts';
@@ -11,7 +11,7 @@ test('areas change only across twenty-wave boundaries and repeat for endless wav
   assert.equal(areaForWave(20).id, 'moss');
   assert.equal(areaForWave(21).id, 'desert');
   assert.equal(areaForWave(40).id, 'desert');
-  assert.equal(areaForWave(41).id, 'frozen');
+  assert.equal(areaForWave(41).id, 'ember');
   for (let i = 0; i < AREAS.length * 3; i++) {
     assert.equal(areaForWave(i * WAVES_PER_AREA + 1), AREAS[i % AREAS.length]);
     assert.equal(areaForWave((i + 1) * WAVES_PER_AREA), AREAS[i % AREAS.length]);
@@ -27,7 +27,7 @@ test('dry and underground areas never rain, cold areas snow, wet areas rain more
       assert.equal(!!w.snow, area.climate === 'cold');
     }
   }
-  assert.equal(skyLabel(rollWeather(() => 0, areaForWave(41)), 0), 'Snow');
+  assert.equal(skyLabel(rollWeather(() => 0, areaForWave(101)), 0), 'Snow');
   assert.equal(skyLabel(rollWeather(() => 0, areaForWave(21)), 0), 'Clear');
 });
 
@@ -48,7 +48,7 @@ test('each new area ships four opaque square floors and the cap/face texture pai
   for (const area of AREAS.slice(1)) for (const [file, w, h] of [
     ...[1, 2, 3, 4].map(i => [`floor-${i}`, 80, 80]), ['wall-cap', 64, 64], ['wall-face', 64, 32],
   ] as [string, number, number][]) {
-    const png = readFileSync(new URL(`../public/assets/defend/areas/${area.id}/${file}.png`, import.meta.url));
+    const png = readFileSync(new URL(`../public/assets/defend/areas/${areaArtId(area.id)}/${file}.png`, import.meta.url));
     assert.equal(png.readUInt32BE(16), w, `${area.id}/${file} width`);
     assert.equal(png.readUInt32BE(20), h, `${area.id}/${file} height`);
   }

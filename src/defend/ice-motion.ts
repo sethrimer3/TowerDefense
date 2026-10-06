@@ -30,7 +30,7 @@ export class IceMotion {
   blast(sim: DefendSim, x: number, y: number, r: number) {
     for (const list of [sim.enemies, sim.soldiers, sim.civilians]) for (const u of list) {
       const e = u as Enemy, def = ENEMIES[e.kind];
-      if (u.hp <= 0 || def?.flying || def?.boat || def?.fortress || e.fortressPart || def?.unyielding || !iceAt(sim, u.x, u.y)) continue;
+      if (u.hp <= 0 || e.kind === "iceCube" || def?.flying || def?.boat || def?.fortress || e.fortressPart || def?.unyielding || !iceAt(sim, u.x, u.y)) continue;
       const d = dist(u.x - x, u.y - y);
       if (d > r) continue;
       const force = 6 * (1 - .5 * d / Math.max(.01, r));

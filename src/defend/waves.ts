@@ -1,4 +1,6 @@
 import { ENEMIES, type EnemyDef, type EnemyKind } from "./catalog.ts";
+import { areaForWave } from "./areas.ts";
+import { AREA_ENEMIES } from "./area-enemies.ts";
 
 export const MAX_WAVE_ENEMIES = 5000;
 export const STARTING_DIFFICULTY = 20;
@@ -31,16 +33,16 @@ function slots(def: EnemyDef, seen = new Set<EnemyKind>()): number {
 }
 
 export function buildWave(wave: number, rand: () => number): EnemyKind[] {
-  return buildDifficultyWave(waveDifficulty(wave), rand);
+  return buildDifficultyWave(waveDifficulty(wave), rand, AREA_ENEMIES[areaForWave(wave).id]);
 }
 
 /** Random affordable mixes, favouring expensive units when space is tight.
  * Unspendable budget is discarded; no overspending or unbounded retry loop. */
-export function buildDifficultyWave(budget: number, rand: () => number): EnemyKind[] {
+export function buildDifficultyWave(budget: number, rand: () => number, kinds?: readonly EnemyKind[]): EnemyKind[] {
   if (!Number.isFinite(budget) || budget < 1) return [];
   let remaining = Math.min(Number.MAX_SAFE_INTEGER, Math.floor(budget));
   let room = MAX_WAVE_ENEMIES;
-  const roster = Object.values(ENEMIES)
+  const roster = (kinds ? kinds.map(k => ENEMIES[k]) : Object.values(ENEMIES))
     .filter(d => !d.hatched && Number.isSafeInteger(d.cost) && d.cost > 0)
     .map(def => ({ def, slots: slots(def) }));
   const out: EnemyKind[] = [];

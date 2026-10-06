@@ -81,7 +81,7 @@ export function stepBlazes(sim: DefendSim, dt: number) {
     b.t += dt;
     for (const e of sim.enemiesNear(b.x, b.y, b.r)) {
       if (ENEMIES[e.kind].flying || sheltered(sim, e.x, e.y)) continue;
-      sim.hurtEnemy(e, b.dps * dt, false, "ranged", b);
+      sim.hurtEnemy(e, b.dps * dt, false, "ranged", b, false, "fire");
       // Clinging fire: it keeps burning after it walks out.
       if (cling) ignite(e, b.dps, CINDERS.cling);
     }

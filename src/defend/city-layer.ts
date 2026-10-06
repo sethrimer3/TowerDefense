@@ -18,7 +18,7 @@ import { heights, shadowCanvas, shadowMask } from "./shadow-art.ts";
 import { gatePixels, gateRubblePixels } from "./gate-art.ts";
 import { gateRect, type Side } from "./layout.ts";
 import { SPIKE_REACH, bastionPixels, bastionRubblePixels, spikePixels } from "./wall-defense-art.ts";
-import { AREAS, type AreaId } from "./areas.ts";
+import { AREAS, areaArtId, type AreaId } from "./areas.ts";
 
 export { POND, POND_WATER, hasTree, pondDisc, pondPath, treeCanopy } from "./park-geometry.ts";
 
@@ -43,8 +43,8 @@ export function onCityArtLoaded(repaint: () => void) {
   wallArt.cap = loadImage("wall-cap");
   wallArt.face = loadImage("wall-face");
   for (const area of AREAS.slice(1)) themedArt.set(area.id, {
-    floors: [1, 2, 3, 4].map(i => loadImage(`areas/${area.id}/floor-${i}`)),
-    cap: loadImage(`areas/${area.id}/wall-cap`), face: loadImage(`areas/${area.id}/wall-face`),
+    floors: [1, 2, 3, 4].map(i => loadImage(`areas/${areaArtId(area.id)}/floor-${i}`)),
+    cap: loadImage(`areas/${areaArtId(area.id)}/wall-cap`), face: loadImage(`areas/${areaArtId(area.id)}/wall-face`),
   });
 }
 const ready = (img?: HTMLImageElement): img is HTMLImageElement => !!img?.complete && !!img.naturalWidth;
@@ -164,6 +164,10 @@ export function paintFloor(c: CanvasRenderingContext2D, px: number, area: AreaId
         c.fillRect(x, y, w, h);
       }
     }
+  if (area === "nadir") {
+    c.fillStyle = "rgba(17,8,32,0.48)";
+    c.fillRect(0, 0, width, height);
+  }
 }
 
 /** How many of the floor images have loaded (the bump map waits for all). */

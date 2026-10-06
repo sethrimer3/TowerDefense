@@ -82,6 +82,8 @@ export function journalHTML(discovered: EnemyKind[]): string {
       }
       if (d.unyielding) notes.push("Cannot be frozen or pushed back. Sweeps a wide crescent with its sword.");
       const tactics: Partial<Record<EnemyKind, string>> = {
+        iceGolem: "A slow, heavy ice guardian. Takes double damage from fire, burning ground and explosions; arrows, melee and lightning deal normal damage.",
+        iceCube: "Slides only horizontally or vertically, turning sharply. Leaves persistent ice that makes ground units skid and blocks rebuilding. Fire and explosions melt the trail. Its own slide cannot be bent by blast impulses.",
         siegeBeetle: "Front armor takes only 25% damage; attacks from behind deal 150%. Surround it.",
         burrowingMole: "Tunnels beneath walls as a dirt mound, then surfaces on a city street. Cannot be hurt underground; maintain an interior garrison.",
         necromancer: "Raises up to four nearby corpses as weaker skeletons, one every three seconds. Kill the necromancer first.",

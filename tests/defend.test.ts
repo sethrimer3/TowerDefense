@@ -155,12 +155,13 @@ test('the same layout and seed always generate the same city', () => {
   assert.deepEqual([...a.type], [...b.type]);
 });
 
-test('waves spend their difficulty budget and keep fixed enemy HP', () => {
+test('area waves stay within their difficulty budget and keep fixed enemy HP', () => {
   let seed = 1;
   const rand = () => ((seed = seed * 16807 % 2147483647) / 2147483647);
   for (let wave = 1; wave <= 180; wave++) {
     const enemies = buildWave(wave, rand);
-    assert.equal(enemies.reduce((sum, k) => sum + ENEMIES[k].cost, 0), waveDifficulty(wave));
+    const spent = enemies.reduce((sum, k) => sum + ENEMIES[k].cost, 0);
+    assert.ok(enemies.length > 0 && spent <= waveDifficulty(wave));
     assert.ok(enemies.reduce((sum, k) => sum + (ENEMIES[k].fortress ? 1 + ENEMIES[k].fortress!.turrets + ENEMIES[k].fortress!.legs + ENEMIES[k].fortress!.armor : (ENEMIES[k].chainLength ?? (1 + (ENEMIES[k].splits?.count ?? 0)))), 0) <= MAX_WAVE_ENEMIES);
   }
   const sim = new DefendSim(mapOf(defaultLayout()), zeroLevels(), 5);

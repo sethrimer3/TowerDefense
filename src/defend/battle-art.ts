@@ -1,4 +1,5 @@
 import { drawFortress } from "./fortress-art.ts";
+import { drawIceEnemy } from "./ice-enemy-art.ts";
 import { enemySize } from "./catalog.ts";
 import { drawEnemyHealthbars, trackHealthbarPeak } from "./healthbars.ts";
 import { drawBlackHoles, drawHostileMarks, drawPoisonClouds } from "./hostile-art.ts";
@@ -294,6 +295,7 @@ function drawEnemy(b: Brush, e: Enemy, sim: DefendSim) {
   const { c, px } = b;
   const def = ENEMIES[e.kind];
   if (def.fortress) { drawFortress(b, e, sim); return; }
+  if (e.kind === "iceGolem" || e.kind === "iceCube") { drawIceEnemy(b, e); return; }
   const s = Math.max(2, Math.round(enemySize(e) * px));
   const x = Math.round(e.x * px - s / 2),
     y = Math.round(e.y * px - s / 2 - (e.kind === "bombBird" ? (e.dive === undefined ? 1 : Math.max(0, e.dive / 0.6)) * px * 1.5 : 0));

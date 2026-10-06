@@ -424,11 +424,11 @@ from its seed; `tests/defend-replay.test.ts` pins it.
 ## Weather and light (`weather.ts`, `lighting.ts`)
 
 - Areas (`areas.ts`) change every twenty waves: Mossbound Ruins, Amber
-  Desert, Frozen Vault, Ember Forge, Violet Geode, Drowned Temple, Fungal
-  Hollow, Obsidian Crypt and Astral Sanctuary, then repeat. Selected starting
+  Desert, Ember Forge, Drowned Temple, Fungal Hollow, Frozen Vault, Violet
+  Geode, Obsidian Crypt, Astral Sanctuary and Nadir, repeating after wave 200. Selected starting
   waves preview their own area. Ground and connected wall cap/face textures
   crossfade over three seconds, with matching wave button and list colors.
-  Enemy rosters remain shared until area enemies are added.
+  `area-enemies.ts` supplies themed pools; Nadir permits every normal wave species. Offspring remain parent-only. Unspendable area-budget remainders are discarded. Nadir uses crypt masonry with a dark violet floor wash. Frozen Vault (101-120) includes all ship tiers, Ice Golems (240 HP, cost 80, double fire/explosion damage) and Sliding Ice Cubes (45 HP, cost 10, cardinal slides at 3.6 cells/second, meltable ice trails, immune to blast deflection). The new enemies pay 12/3 Gold and have journal entries.
 - Weather rolls at the start and on entering an area: Mossbound Ruins has
   30% rain, Drowned Temple 75%, Frozen Vault snow, and dry or underground
   areas no rain. Ambient light and precipitation fade with the terrain.

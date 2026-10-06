@@ -517,7 +517,7 @@ export const civilianHp = (l: number) => 8 + l * 5;
 export const rebuildSeconds = (l: number) => 3 * intPow(0.82, l);
 export const HOUSE_HP_PER_CELL = 22;
 
-export type EnemyKind = "roach" | "orc" | "ogre" | "bat" | "warlord" | "mother" | "broodling" | "snake" | "dragon" | "shieldBearer" | "aegis" | "darkKnight" | "bombOrc" | "bombBird" | "voidSparrow" | "shieldLesser" | "shieldGreater" | "poisonLesser" | "poisonBearer" | "poisonGreater" | "poisonSovereign" | "siegeBeetle" | "burrowingMole" | "necromancer" | "skeleton" | "bannerCaptain" | "mirrorKnight" | "leechSwarm" | "ashPhoenix" | "phoenixEgg" | "blinkImp" | "fortressHut" | "fortressOutpost" | "fortressTower" | "fortressKeep" | "fortressLesser" | "fortress" | "fortressGreater" | "fortressSovereign" | "rollingCannon" | "ballista" | "fireworkLauncher" | "trebuchet" | "bombard" | "rocketBattery" | "boatDinghy" | "boatSailboat" | "boatCutter" | "boatCog" | "boatLesser" | "boat" | "boatGreater" | "boatSovereign";
+export type EnemyKind = "iceGolem" | "iceCube" | "roach" | "orc" | "ogre" | "bat" | "warlord" | "mother" | "broodling" | "snake" | "dragon" | "shieldBearer" | "aegis" | "darkKnight" | "bombOrc" | "bombBird" | "voidSparrow" | "shieldLesser" | "shieldGreater" | "poisonLesser" | "poisonBearer" | "poisonGreater" | "poisonSovereign" | "siegeBeetle" | "burrowingMole" | "necromancer" | "skeleton" | "bannerCaptain" | "mirrorKnight" | "leechSwarm" | "ashPhoenix" | "phoenixEgg" | "blinkImp" | "fortressHut" | "fortressOutpost" | "fortressTower" | "fortressKeep" | "fortressLesser" | "fortress" | "fortressGreater" | "fortressSovereign" | "rollingCannon" | "ballista" | "fireworkLauncher" | "trebuchet" | "bombard" | "rocketBattery" | "boatDinghy" | "boatSailboat" | "boatCutter" | "boatCog" | "boatLesser" | "boat" | "boatGreater" | "boatSovereign";
 export type EnemyDef = {
   kind: EnemyKind;
   name: string;
@@ -570,6 +570,8 @@ export type BoatDef = { tier: number; water: number; walls?: boolean; keep?: boo
 export type SiegeDef = { shot: "ball" | "stone" | "bolt" | "rocket"; range: number; radius: number; volley?: number; spread?: number; people?: boolean };
 
 export const ENEMIES: Record<EnemyKind, EnemyDef> = {
+  iceGolem: { kind: "iceGolem", name: "Ice Golem", hp: 240, speed: .65, damage: 16, cooldown: 1.5, size: .9, color: "#a4def1", distraction: 0, flying: false, cost: 80 },
+  iceCube: { kind: "iceCube", name: "Sliding Ice Cube", hp: 45, speed: 3.6, damage: 8, cooldown: .9, size: .65, color: "#7fcae5", distraction: 0, flying: false, cost: 10 },
   roach: { kind: "roach", name: "Roach", hp: 10, speed: 2.6, damage: 2, cooldown: 0.6, size: 0.34, color: "#b0643a", distraction: 0.15, flying: false, cost: 1 },
   orc: { kind: "orc", name: "Orc", hp: 34, speed: 1.6, damage: 6, cooldown: 0.9, size: 0.46, color: "#6fa04a", distraction: 0.6, flying: false, cost: 4 },
   ogre: { kind: "ogre", name: "Ogre", hp: 120, speed: 1.0, damage: 18, cooldown: 1.4, size: 0.62, color: "#a08a6a", distraction: 0.35, flying: false, cost: 8 },

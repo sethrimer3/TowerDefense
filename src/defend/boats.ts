@@ -132,8 +132,8 @@ export function meltIceCone(sim: DefendSim, x: number, y: number, dx: number, dy
   for (let d = .5; d <= reach; d += .5) meltIce(sim, x + dx * d, y + dy * d, .25 + d * spread);
 }
 
-function addPool(sim: DefendSim, pool: Flood) {
-  if (sim.cold) {
+export function addPool(sim: DefendSim, pool: Flood) {
+  if (sim.cold || pool.frozen) {
     pool.frozen = true;
     // Ice is permanent: stationary and tightly overlapping wakes must not
     // accumulate forever. Quantized positions bound retained sheets per boat size.

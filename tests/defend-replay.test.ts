@@ -53,6 +53,11 @@ type Scenario = {
 
 function scenarios(): Record<string, Scenario> {
   return {
+    frozenFleet: {
+      layout: city(SQUARE, [["wizardTower", 0, -2], ["barracks", 1, 1], ["cannonTower", -1, -1]]),
+      citySeed: 13, levels: maxLevels(), seed: 7, seconds: 60, wave: 101,
+      opening: ['iceGolem', 'iceCube', 'iceCube', 'boatDinghy', 'boatSailboat'],
+    },
     newEnemies: {
       layout: city(SQUARE, [["barracks", 1, 1], ["archerTower", -1, -1], ["wizardTower", 0, -2]]),
       citySeed: 13, levels: maxLevels(), seed: 6, seconds: 100, wave: 1,
@@ -252,6 +257,7 @@ test("the Defend replays exercise every unit and effect", () => {
       if (sim.baits.length && sim.blazes.length) seen.add("bait:burning");
     });
   const want = [
+    "enemy:iceGolem", "enemy:iceCube",
     "enemy:shieldLesser", "enemy:shieldGreater", "enemy:poisonLesser", "enemy:poisonBearer", "enemy:poisonGreater", "enemy:poisonSovereign", "enemy:fortressHut", "enemy:fortressOutpost", "enemy:fortressTower", "enemy:fortressKeep", "enemy:fortressLesser", "enemy:fortress", "enemy:fortressGreater", "enemy:fortressSovereign", "enemy:darkKnight", "enemy:bombOrc", "enemy:bombBird", "enemy:voidSparrow", "enemy:snake", "enemy:dragon", "enemy:shieldBearer", "enemy:aegis", "enemy:warlord", "enemy:bat", "enemy:mother", "enemy:broodling", "distracted", "marked", "soldier:sword", "soldier:archer", "path:sword", "path:archer", "hunting",
     "civilian:toJob", "civilian:working", "civilian:home", "arrow", "shell", "flame", "frost", "chilled", "soldier:valkyrie", "stab", "guarded", "soldier:darkWizard", "chained", "lost:bare", "half-rebuilt",
     "enemy:rollingCannon", "enemy:ballista", "enemy:fireworkLauncher", "enemy:trebuchet", "enemy:bombard", "enemy:rocketBattery", "siege:ball", "siege:bolt", "siege:rocket", "siege:stone",

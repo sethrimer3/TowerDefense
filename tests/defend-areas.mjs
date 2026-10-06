@@ -25,7 +25,7 @@ try {
     draw('frozen',5100,true);const reduced=r.areaMix;
     return {hashes,old,start,middle,end,startMix,midMix,endMix,reduced};
   });
-  assert.equal(new Set(result.hashes).size,9,'every area renders distinct terrain');
+  assert.equal(new Set(result.hashes).size,10,'every area renders distinct terrain');
   assert.deepEqual(result.start,result.old,'fade starts on old terrain exactly');
   assert.equal(result.startMix,0);assert.equal(result.midMix,.5);assert.equal(result.endMix,1);assert.equal(result.reduced,1);
   assert.notDeepEqual(result.old,result.end,'new terrain has different pixels');
@@ -38,14 +38,14 @@ try {
     const p=window.stressPage,sim=window.stressSim;
     sim.events.length=0;sim.wave=21;sim.events.push({type:'waveStart',wave:21});p.handleEvents();
     const desert={...p.weather};
-    sim.wave=41;sim.events.push({type:'waveStart',wave:41});p.handleEvents();
+    sim.wave=101;sim.events.push({type:'waveStart',wave:101});p.handleEvents();
     const frozen={...p.weather};
-    p.save.startWave=41;p.save.unlockedWave=180;p.phase='build';p.sim=null;p.renderChrome();p.relayout();
+    p.save.startWave=101;p.save.unlockedWave=200;p.phase='build';p.sim=null;p.renderChrome();p.relayout();
     return {desert,frozen};
   });
   assert.equal(weather.desert.rain,false);assert.equal(weather.frozen.snow,true);assert.equal(weather.frozen.rain,false);
   await page.locator('#defend-wave').click();
-  const rows=await page.evaluate(()=>[1,21,41].map(w=>{
+  const rows=await page.evaluate(()=>[1,21,101].map(w=>{
     const row=document.querySelector(`[data-wave="${w}"]`),s=getComputedStyle(row);
     return {color:s.color,background:s.backgroundColor,area:row.title};
   }));
@@ -61,5 +61,5 @@ try {
   await page.evaluate(()=>window.stressPage.fastForward(5));
   assert.equal(await page.evaluate(()=>window.stressPage.sim.wave),21);
   assert.deepEqual(errors,[]);
-  console.log('Nine area renders, terrain fade pixels, reduced motion and asset loading passed.');
+  console.log('Ten area renders, terrain fade pixels, reduced motion and asset loading passed.');
 } finally {await browser.close();}

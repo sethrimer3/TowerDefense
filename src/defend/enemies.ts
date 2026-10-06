@@ -16,6 +16,7 @@ import { CELLS_H, CELLS_W, cellIndex, sideCells } from "./grid.ts";
 import { cellCenter, center, clampCell, downhill, nearestPoint, rectDist } from "./pathing.ts";
 import type { DefendSim, Enemy } from "./sim.ts";
 import { chilled } from "./wizard.ts";
+import { stepIceCube } from "./ice-enemies.ts";
 
 /** One enemy's step: the sim, the enemy, its kind and how close it must be
  * to strike. */
@@ -42,6 +43,7 @@ export function stepEnemy(sim: DefendSim, e: Enemy, dt: number) {
   if (e.kind === "dragon" && breathe(sim, e, dt)) return;
   const t: Turn = { sim, e, def, reach: enemySize(e) / 2 + 0.4, dt };
   if (fightDefender(t)) return;
+  if (e.kind === "iceCube") return stepIceCube(sim, e, dt);
   if (def.flying) return flyAtKeep(t);
   if (e.distract >= 0 && (sim.baits.length === 0 || !baitStanding(sim)) && chaseDistraction(t)) return;
   march(t);
