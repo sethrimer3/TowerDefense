@@ -272,6 +272,10 @@ export class DefendSim {
   bannerCarriers: Enemy[] = [];
   private waveSpawned = 0;
   private shieldGenerators: Enemy[] = [];
+  private enemyLookup = new Map<number, Enemy>();
+  private enemyLookupActive = false;
+  private stationaryAttacks = false;
+  private blastIndexReady = false;
   spawnT = 0;
   /** Bumped whenever a building is destroyed or rebuilt (static art changes). */
   mapVersion = 0;
@@ -385,11 +389,32 @@ export class DefendSim {
     this.defenderIndexActive = this.enemies.length >= 32 && this.soldiers.length + this.civilians.length >= 16;
     if (this.defenderIndexActive) this.defenders.rebuild(this.soldiers, this.civilians);
     try {
+      this.enemyLookup.clear();
+      this.enemyLookupActive = this.enemies.some(e => e.fortressPart);
+      if (this.enemyLookupActive) for (const e of this.enemies) this.enemyLookup.set(e.id, e);
       for (const e of this.enemies) if (e.hp > 0) stepEnemy(this, e, dt);
     } finally {
       this.defenderIndexActive = false;
+      this.enemyLookupActive = false;
+      this.enemyLookup.clear();
     }
     for (const e of this.enemies) if (e.fortressParts) syncFortress(e);
+    // Projectiles and friendly attacks do not move/spawn enemies. Preserve
+    // the first blast's reindex timing, then share that snapshot until
+    // builders push enemies out or ice slides them at the end of the tick.
+    this.stationaryAttacks = true;
+    this.blastIndexReady = false;
+    try {
+      this.stepAttacks(dt);
+    } finally {
+      this.stationaryAttacks = false;
+      this.blastIndexReady = false;
+    }
+    this.builders.step(this, dt);
+    this.iceMotion.step(this, dt);
+  }
+
+  private stepAttacks(dt: number) {
     this.towers.step(this, dt);
     stepArrows(this, dt);
     stepBallistaBolts(this, dt);
@@ -406,8 +431,6 @@ export class DefendSim {
     stepFireballs(this, dt);
     stepBlazes(this, dt);
     stepFloods(this, dt);
-    this.builders.step(this, dt);
-    this.iceMotion.step(this, dt);
   }
 
   /** The dead, and civilians who made it indoors, leave the board; a
@@ -561,6 +584,7 @@ export class DefendSim {
       ...(ENEMIES[kind].shield ? { shieldHp: ENEMIES[kind].shield!.hp } : {}),
     };
     if (ENEMIES[kind].shield) this.shieldGenerators.push(enemy);
+    if (this.enemyLookupActive) this.enemyLookup.set(enemy.id, enemy);
     return enemy;
   }
 
@@ -588,6 +612,28 @@ export class DefendSim {
   }
 
   // ── Enemy index ───────────────────────────────────────────────────────
+  /** During enemy movement, IDs are stable but positions are not. Direct
+   * callers outside that phase still see the current enemy array. */
+  livingEnemy(id: number): Enemy | undefined {
+    const e = this.enemyLookupActive ? this.enemyLookup.get(id) : this.enemies.find(e => e.id === id);
+    return e && e.hp > 0 ? e : undefined;
+  }
+
+  /** Same cell-order ties as enemiesNear, without a candidate array per
+   * lightning hop. Only test the struck set for improving candidates. */
+  chainTarget(x: number, y: number, r: number, struck: Set<number>): Enemy | null {
+    let best: Enemy | null = null, bd = r * r;
+    const x0 = Math.max(0, Math.floor(x - r)), x1 = Math.min(CELLS_W - 1, Math.floor(x + r));
+    const y0 = Math.max(0, Math.floor(y - r)), y1 = Math.min(CELLS_H - 1, Math.floor(y + r));
+    for (let cy = y0; cy <= y1; cy++) for (let cx = x0; cx <= x1; cx++)
+      for (const e of this.grid[cellIndex(cx, cy)]) {
+        if (e.hp <= 0) continue;
+        const d = sq(e.x - x) + sq(e.y - y);
+        if ((d < bd || (d === bd && !best)) && !struck.has(e.id)) { best = e; bd = d; }
+      }
+    return best;
+  }
+
   private indexEnemies() {
     for (const i of this.gridUsed) this.grid[i].length = 0;
     this.gridUsed.length = 0;
@@ -651,9 +697,13 @@ export class DefendSim {
   hurtEnemy(e: Enemy, amount: number, flash = true, source: "ranged" | "melee" = "ranged", origin?: Point & { attacker?: number; building?: number }, projectile = false) {
     if (e.hp <= 0 || !Number.isFinite(amount) || amount <= 0) return false;
     if (source === "ranged") {
-      const shields = this.shieldGenerators.filter(g => g.hp > 0 && (g.shieldHp ?? 0) > 0 &&
-        sq(g.x - e.x) + sq(g.y - e.y) <= sq(ENEMIES[g.kind].shield!.radius));
-      const shield = shields.find(g => g.shieldHp === Infinity) ?? shields[0];
+      let shield: Enemy | undefined;
+      for (const g of this.shieldGenerators) {
+        if (g.hp <= 0 || !((g.shieldHp ?? 0) > 0) ||
+          sq(g.x - e.x) + sq(g.y - e.y) > sq(ENEMIES[g.kind].shield!.radius)) continue;
+        if (!shield || g.shieldHp === Infinity) shield = g;
+        if (g.shieldHp === Infinity) break;
+      }
       if (shield) {
         if (shield.shieldHp !== Infinity) shield.shieldHp = Math.max(0, shield.shieldHp! - amount);
         return false;
@@ -739,7 +789,10 @@ export class DefendSim {
   explode(x: number, y: number, { r, damage, friendlyFire, origin }: Blast): number {
     // A blast in a magic boat's water fizzles.
     if (fizzles(this, x, y, r)) return 0;
-    this.indexEnemies();
+    if (!this.stationaryAttacks || !this.blastIndexReady) {
+      this.indexEnemies();
+      this.blastIndexReady = this.stationaryAttacks;
+    }
     const hit = (d: number) => damage * (1 - 0.6 * Math.min(1, d / r));
     for (const e of this.enemiesNear(x, y, r)) if (!sheltered(this, e.x, e.y)) this.hurtEnemy(e, hit(dist(e.x - x, e.y - y)), true, "ranged", origin ?? { x, y }, !!origin);
     if (friendlyFire)

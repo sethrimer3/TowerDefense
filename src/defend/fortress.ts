@@ -34,7 +34,7 @@ export function syncFortress(core: Enemy) {
 
 export function stepFortress(sim: DefendSim, part: Enemy, _dt: number): boolean {
   const data = part.fortressPart!;
-  const core = sim.enemies.find(e => e.id === data.core && e.hp > 0);
+  const core = sim.livingEnemy(data.core);
   if (!core) { part.hp = 0; return true; }
   part.x = core.x + data.dx; part.y = core.y + data.dy;
   if (data.role !== "turret" || part.cd > 0) return true;

@@ -8,7 +8,6 @@
  * too. Where it runs out of enemies to leap to, it forks back from the
  * latest enemy it struck that still has one. How it looks is
  * `dark-art.ts`'s. */
-import { sq } from "../exact.ts";
 import { DARK_WIZARD, TURRET, chainJump, turretChain, turretSpots, wizardChain } from "./catalog.ts";
 import type { Building } from "./citygen.ts";
 import { nearest, type Point } from "./pathing.ts";
@@ -91,7 +90,7 @@ export function chainBolt(sim: DefendSim, cast: Point, first: Enemy, damage: num
     at = null;
     while (struck.size < links && live.length && !at) {
       const [e, k] = live[live.length - 1];
-      at = nextLink(sim, e, jump, struck);
+      at = sim.chainTarget(e.x, e.y, jump, struck);
       if (at) parent = k;
       else live.pop();
     }
@@ -99,21 +98,6 @@ export function chainBolt(sim: DefendSim, cast: Point, first: Enemy, damage: num
   const bolt: Bolt = { pts, from, t: 0, life: BOLT_LIFE, seed: Math.imul(first.id, 0x9e3779b1) >>> 0 };
   sim.bolts.push(bolt);
   return bolt;
-}
-
-/** The nearest enemy within `jump` of `e` the bolt hasn't struck (the
- * earliest of equals). */
-function nextLink(sim: DefendSim, e: Enemy, jump: number, struck: Set<number>): Enemy | null {
-  let best: Enemy | null = null, bd = jump * jump;
-  for (const o of sim.enemiesNear(e.x, e.y, jump)) {
-    if (struck.has(o.id)) continue;
-    const d = sq(o.x - e.x) + sq(o.y - e.y);
-    if (d < bd || (d === bd && !best)) {
-      bd = d;
-      best = o;
-    }
-  }
-  return best;
 }
 
 /** Bolts fade. */
