@@ -267,6 +267,21 @@ export class WizardArt {
         c.fillStyle = ICE[5];
         dot(x0 + n - 2, y0 + 1);
       }
+      // Frozen solid (Rime's deep freeze): a block of ice around it, outlined.
+      if (e.freeze) {
+        c.globalAlpha = 0.5;
+        c.fillStyle = ICE[2];
+        dot(x0 - 1, y0 - 1, n + 2, n + 2);
+        c.globalAlpha = 1;
+        c.fillStyle = ICE[4];
+        dot(x0 - 1, y0 - 1, n + 2, 1);
+        dot(x0 - 1, y0 - 1, 1, n + 2);
+        c.fillStyle = OUTLINE_ICE;
+        dot(x0 - 2, y0 - 2, n + 4, 1);
+        dot(x0 - 2, y0 + n + 1, n + 4, 1);
+        dot(x0 - 2, y0 - 1, 1, n + 2);
+        dot(x0 + n + 1, y0 - 1, 1, n + 2);
+      }
     }
     c.restore();
   }

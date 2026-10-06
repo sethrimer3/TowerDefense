@@ -7,6 +7,7 @@
  * page. */
 import { NO_BONUSES, type Bonuses, type EnemyKind } from "./defend/catalog.ts";
 import { SKILLS, SKILL_IDS, TREES, skillAvailable, skillCost, type SkillId, type TreeId } from "./skill-trees.ts";
+import { battlePaths } from "./knowledge-paths.ts";
 import { trainingJob, trainingSeconds, type TrainingJob } from "./training-jobs.ts";
 import type { Metal, Metals } from "./mine/sim.ts";
 import type { Save } from "./save.ts";
@@ -179,7 +180,9 @@ export function multiplier(save: Save, target: BonusTarget) {
 /** What the next defense fights with. */
 export function bonuses(save: Save): Bonuses {
   const out = { ...NO_BONUSES } as Bonuses;
-  for (const k of Object.keys(out) as (keyof Bonuses)[]) out[k] = multiplier(save, k);
+  for (const k of Object.keys(out) as Exclude<keyof Bonuses, "paths">[]) out[k] = multiplier(save, k);
+  const paths = battlePaths(save);
+  if (paths) out.paths = paths;
   return out;
 }
 

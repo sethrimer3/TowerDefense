@@ -2,6 +2,8 @@ import { play } from "../sound.ts";
 import { TRAINING, addSmith, busySmiths, whole, buySkill, cancelTraining, removeSmith, skillPurchase, skillRank, startTraining, trainingLeft, trainingStep, type TrainingId } from "../progression.ts";
 import { BARS_PER_POINT, METALS } from "../mine/sim.ts";
 import { SKILLS, TREES, type SkillId } from "../skill-trees.ts";
+import { learnPath, pathById, pathState, pathsOf, unlearnPath, type KnowledgePath, type PathId, type PathTopic } from "../knowledge-paths.ts";
+import { paintPathIcon } from "./path-icons.ts";
 import { TrainingParticles } from "../training-particles.ts";
 import { trainingSeconds } from "../training-jobs.ts";
 import {
@@ -37,6 +39,10 @@ export class UpgradesPage {
   private subject: SubjectId = "realm";
   private topics: Partial<Record<SubjectId, string>> = {};
   private trainingParticles = new TrainingParticles();
+  /** The rank picked in each topic's path tree ("path:index", or "path:crown"). */
+  private picked: Record<string, string> = {};
+  /** The subject and topic last drawn. */
+  private shown = "";
 
   constructor(private ctx: AppContext) {}
 
@@ -54,6 +60,10 @@ export class UpgradesPage {
 
   render() {
     const subject = this.current(), topic = this.topic();
+    // Redrawn in place (a purchase, a tapped rank): keep where each part was scrolled to.
+    const same = this.shown === `${subject.id}:${topic.id}`;
+    const scrolls = SCROLLERS.map((sel) => (same ? (el("upgrades").querySelector(sel)?.scrollTop ?? 0) : 0));
+    this.shown = `${subject.id}:${topic.id}`;
     const subjects = SUBJECTS.map((s) => `<button data-subject="${s.id}" aria-pressed="${s.id === subject.id}"><span>${uiSprite(s.sprite)}</span>${s.name}</button>`).join("");
     const topics = subject.topics.length > 1
       ? `<div class="ledger-topics" role="group" aria-label="${subject.name}">${subject.topics.map((t) => `<button data-topic="${t.id}" aria-pressed="${t.id === topic.id}">${t.item ? `<canvas width="22" height="22" data-icon="${t.item}"></canvas>` : ""}${t.name}</button>`).join("")}</div>`
@@ -66,7 +76,15 @@ export class UpgradesPage {
           <header class="ledger-heading"><h3>Study</h3><small>Knowledge: change how it works</small></header>${this.studyHtml(topic)}</section>
       </div>`;
     const root = el("upgrades");
+    SCROLLERS.forEach((sel, i) => {
+      const box = root.querySelector(sel);
+      if (box) box.scrollTop = scrolls[i];
+    });
     root.querySelectorAll<HTMLCanvasElement>("canvas[data-icon]").forEach((c) => paintIcon(c, c.dataset.icon as IconItem));
+    root.querySelectorAll<HTMLCanvasElement>("canvas[data-path-icon]").forEach((c) => {
+      const [icon, hue] = c.dataset.pathIcon!.split(":");
+      paintPathIcon(c, icon as never, hue as never);
+    });
     root.querySelectorAll<HTMLButtonElement>("[data-subject]").forEach((b) => (b.onclick = () => {
       this.subject = b.dataset.subject as SubjectId;
       this.render();
@@ -77,6 +95,12 @@ export class UpgradesPage {
     }));
     this.bindForge(root);
     root.querySelectorAll<HTMLButtonElement>("[data-learn]").forEach((b) => (b.onclick = () => this.learn(b.dataset.learn as SkillId)));
+    root.querySelectorAll<HTMLButtonElement>("[data-pick]").forEach((b) => (b.onclick = () => {
+      this.picked[topic.id] = b.dataset.pick!;
+      this.render();
+    }));
+    root.querySelectorAll<HTMLButtonElement>("[data-learn-path]").forEach((b) => (b.onclick = () => this.learnPath(b.dataset.learnPath as PathId)));
+    root.querySelectorAll<HTMLButtonElement>("[data-unlearn]").forEach((b) => (b.onclick = () => this.unlearn(b.dataset.unlearn as PathTopic)));
     root.querySelectorAll<HTMLButtonElement>("[data-goto]").forEach((b) => (b.onclick = () => this.ctx.navigate(b.dataset.goto as "mine" | "library")));
   }
 
@@ -232,13 +256,101 @@ export class UpgradesPage {
       return `<article class="ledger-skill ${level ? "owned" : ""} ${available ? "" : "locked"}"><span class="ledger-glyph" aria-hidden="true">${skill.icon}</span><div><small>${level} / ${skill.max} RANKS</small><h3>${skill.name}</h3><p>${skill.text}.${why ? ` <em>${why}.</em>` : ""}</p></div>
         <button data-learn="${id}" ${maxed || !canBuy || !researchers ? "disabled" : ""}>${maxed ? "Mastered" : `Learn<small>${price} Knowledge</small>`}</button></article>`;
     });
+    const tree = pathsOf(t.id).length ? this.treeHtml(t) : "";
     const paths = (t.paths ?? []).map((p) => `<article class="ledger-path"><span class="ledger-glyph" aria-hidden="true">✧</span><div><h3>${p.name}</h3><p>${p.text}</p></div><span class="ledger-stamp">To come</span></article>`);
     const note = `<p class="ledger-note">You have <b class="knowledge">${whole(save.knowledge)}</b> Knowledge${researchers ? ` · ${researchers} ${researchers === 1 ? "researcher" : "researchers"} in the lab` : " · put a librarian to the alchemy lab to research"}</p>`;
     const pathsHtml = paths.length
       ? `<h4 class="training-group">Paths</h4><p class="ledger-note"><small>Choose one; it shuts the others until you unlearn it, which returns every point of Knowledge.</small></p>${paths.join("")}`
       : "";
-    if (!skills.length && !paths.length) return `${note}<p class="ledger-empty">Nothing to study here yet.</p>`;
-    return note + skills.join("") + pathsHtml;
+    if (!skills.length && !paths.length && !tree) return `${note}<p class="ledger-empty">Nothing to study here yet.</p>`;
+    return note + tree + skills.join("") + pathsHtml;
+  }
+
+  /** A topic's paths as a tree: the building at the root, a branch to each
+   * path, its ranks down the branch in order and, on a path that has one,
+   * the evolution's crown at its tip. The chosen branch burns in its
+   * colours, the others are sealed in grey until it is unlearned; a tapped
+   * rank is read out (and learned) below. */
+  private treeHtml(t: Topic) {
+    const save = this.save, paths = pathsOf(t.id), n = paths.length, topic = paths[0].topic;
+    const choice = save.paths[topic];
+    const w = 100 * n, mid = w / 2;
+    const fan = paths.map((p, i) => {
+      const x = 100 * i + 50, cls = choice?.path === p.id ? "lit" : choice ? "sealed" : "open";
+      return `<path class="${cls} hue-${p.hue}" d="M ${mid} 0 C ${mid} 26, ${x} 14, ${x} 40" />`;
+    }).join("");
+    const cols = paths.map((p) => {
+      const st = pathState(save, p.id), state = st.rank ? "chosen" : st.sealed ? "sealed" : "open";
+      const ranks = p.ranks.map((r, i) => {
+        const cls = i < st.rank ? "learned" : i === st.rank && !st.sealed ? "next" : "later";
+        const key = `${p.id}:${i}`;
+        return `${i ? `<span class="path-link ${i <= st.rank - 1 ? "lit" : ""}" aria-hidden="true"></span>` : ""}
+          <button class="path-node ${cls} ${this.picked[t.id] === key ? "picked" : ""}" data-pick="${key}" aria-label="${p.name} ${ROMAN[i]}: ${r.name}${cls === "learned" ? ", learned" : ""}">
+            <span class="path-medal"><canvas data-path-icon="${r.icon}:${p.hue}"></canvas></span><b>${ROMAN[i]}</b><span class="path-name">${r.name}</span></button>`;
+      }).join("");
+      const crown = p.evolves
+        ? `<span class="path-link crown-link" aria-hidden="true"></span>
+          <button class="path-node crown ${this.picked[t.id] === `${p.id}:crown` ? "picked" : ""}" data-pick="${p.id}:crown" aria-label="Evolution: ${p.evolves.name}">
+            <span class="path-medal"><canvas data-path-icon="crown:gold"></canvas></span><b>♛</b><span class="path-name">${p.evolves.name}</span></button>`
+        : "";
+      return `<div class="path-col hue-${p.hue} ${state}"><header class="path-banner"><h4>${p.name}</h4><small>${st.sealed ? "Sealed" : p.motto}</small></header>${ranks}${crown}</div>`;
+    }).join("");
+    const following = choice
+      ? `<div class="path-following hue-${pathById(choice.path).hue}"><span>Following <b>${pathById(choice.path).name}</b>, ${choice.rank} of ${pathById(choice.path).ranks.length}</span>
+          <button data-unlearn="${topic}" class="danger">Unlearn<small>returns ${whole(choice.spent)} Knowledge</small></button></div>`
+      : "";
+    return `<div class="path-tree" style="--paths:${n}">
+        <div class="path-root"><span class="path-medal root"><canvas width="44" height="44" data-icon="${t.item}"></canvas></span><span>${t.name}</span></div>
+        <svg class="path-fan" viewBox="0 0 ${w} 40" preserveAspectRatio="none" aria-hidden="true">${fan}</svg>
+        <div class="path-cols">${cols}</div>
+      </div>${following}${this.pickedHtml(t, paths)}`;
+  }
+
+  /** What the tapped rank does, and learning it (or why not). */
+  private pickedHtml(t: Topic, paths: KnowledgePath[]) {
+    const [id, at] = (this.picked[t.id] ?? "").split(":");
+    const p = paths.find((p) => p.id === id);
+    if (!p) return `<p class="path-detail path-hint">Tap a rank to read it. Learning a path's first rank chooses that path and seals the others; unlearning returns all its Knowledge.</p>`;
+    const save = this.save, st = pathState(save, p.id), researchers = this.ctx.researchers();
+    if (at === "crown" && p.evolves) {
+      return `<div class="path-detail hue-gold"><span class="path-medal"><canvas data-path-icon="crown:gold"></canvas></span><div><small>${p.name.toUpperCase()} · EVOLUTION</small><h3>${p.evolves.name}</h3><p>${p.evolves.text}: you place it in place of the base building.</p></div><span class="ledger-stamp">To come</span></div>`;
+    }
+    const i = Number(at), r = p.ranks[i];
+    if (!r) return "";
+    let action: string;
+    if (i < st.rank) action = `<span class="path-done">Learned</span>`;
+    else if (st.sealed) action = `<em>Sealed while you follow ${pathById(save.paths[p.topic]!.path).name}. Unlearn it to choose this path.</em>`;
+    else if (i > st.rank) action = `<em>Learn ${p.ranks[st.rank].name} first.</em>`;
+    else {
+      const why = !researchers ? "Put a librarian to the alchemy lab to research" : !st.affordable ? `Needs ${r.cost} Knowledge, have ${whole(save.knowledge)}` : "";
+      action = `<button data-learn-path="${p.id}" ${why ? "disabled" : ""}>${i === 0 ? "Choose" : "Learn"}<small>${r.cost} Knowledge</small></button>${why ? `<em>${why}.</em>` : i === 0 ? `<em>Seals the other paths until you unlearn it.</em>` : ""}`;
+    }
+    return `<div class="path-detail hue-${p.hue}"><span class="path-medal"><canvas data-path-icon="${r.icon}:${p.hue}"></canvas></span>
+      <div><small>${p.name.toUpperCase()} · RANK ${ROMAN[i]} OF ${ROMAN[p.ranks.length - 1]}</small><h3>${r.name}</h3><p>${r.text}.</p></div><div class="path-act">${action}</div></div>`;
+  }
+
+  private learnPath(id: PathId) {
+    const p = pathById(id), first = !this.save.paths[p.topic];
+    if (!this.ctx.researchers() || !learnPath(this.save, id)) return;
+    this.ctx.researched();
+    play(first ? "unlock" : "chime");
+    this.ctx.update();
+    const rank = this.save.paths[p.topic]!.rank;
+    // Read on to the next rank, so the next tap learns it.
+    this.picked[p.topic] = `${id}:${rank < p.ranks.length ? rank : rank - 1}`;
+    this.render();
+    const node = el("upgrades").querySelector(`[data-pick="${id}:${rank - 1}"]`);
+    replay(node, "bought");
+    sparksOver(node as HTMLElement | null, "arcane");
+  }
+
+  private unlearn(topic: PathTopic) {
+    if (!this.save.paths[topic]) return;
+    unlearnPath(this.save, topic);
+    play("stone");
+    this.ctx.update();
+    delete this.picked[topic];
+    this.render();
   }
 
   private learn(id: SkillId) {
@@ -277,5 +389,8 @@ export class UpgradesPage {
   }
 }
 
+/** The page's scrolling parts: the halves side by side, or the body when stacked. */
+const SCROLLERS = [".ledger-body", ".ledger-forge", ".ledger-study"];
+const ROMAN = ["I", "II", "III", "IV", "V"];
 const priceText = (p: Price) => METALS.filter((k) => p[k]).map((k) => `${p[k]} ${k}`).join(" · ");
 const bal = (s: { settings: { devMode: boolean } }, n: number) => (s.settings.devMode ? "∞" : Math.floor(n + 1e-9));

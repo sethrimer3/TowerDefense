@@ -76,6 +76,8 @@ export type Enemy = {
   /** Seconds left chilled by a wizard's ice (slowed); absent when not, so
    * a run without ice keeps its state exactly as before. */
   chill?: number;
+  /** Seconds left frozen solid by Rime's deep freeze (stopped); absent when not. */
+  freeze?: number;
   fortressPart?: { core: number; role: "turret" | "leg" | "armor"; dx: number; dy: number };
   fortressParts?: Enemy[];
   facing?: { x: number; y: number };
@@ -115,6 +117,8 @@ export type Soldier = {
   /** Seconds left that nothing can hurt her (a valkyrie after a charge);
    * absent otherwise, so runs without valkyries keep their state as before. */
   guard?: number;
+  /** Strikes an assassin has made, every few critical; absent for everyone else. */
+  strikes?: number;
 };
 
 export type Civilian = {
@@ -412,6 +416,8 @@ export class DefendSim {
     for (const e of this.enemies) if (e.breath && (e.breath.t -= dt) <= 0) delete e.breath;
     for (const e of this.enemies)
       if (e.chill !== undefined && (e.chill -= dt) <= 0) delete e.chill;
+    for (const e of this.enemies)
+      if (e.freeze !== undefined && (e.freeze -= dt) <= 0) delete e.freeze;
     for (const s of this.soldiers)
       if (s.guard !== undefined && (s.guard -= dt) <= 0) delete s.guard;
     stepStabs(this, dt);

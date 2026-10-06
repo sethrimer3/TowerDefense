@@ -245,6 +245,9 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   whatever gets in (troops can't pass walls — a palisade gate is a future
   upgrade; troop pathing is plain A* over open cells, so gates only need to
   change what counts as open).
+  Their Study paths: Crusaders (more HP and slower, healing from rank II,
+  harder hitting at III) or Assassins (faster and frailer, every 4th, 3rd,
+  then 2nd strike critical, quicker strokes, the whole city their ground).
 - **Archer barracks** train archers (same garrison size, drill speed and
   arms upgrades as the swordsmen's barracks). Archers wander random city
   streets and stop to shoot anything within their short sight (3 cells,
@@ -300,7 +303,7 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   that swings after it for 1.6 s, burning everything inside (flyers too),
   and an **ice wave**, a fan-shaped front of ice shards spreading toward the
   nearest enemy that hits everything it crosses once and chills it (half
-  speed for a few seconds). Upgraded by Pyromancy and Rime in the Armory.
+  speed for a few seconds). Its Forge raises the Flamethrower and the Ice wave; its Study paths (Pyromancy, Rime, Stormcalling) change what it casts.
   Neither draws from the run's random stream; how they look is the
   renderer's (`wizard-art.ts`).
 - **Archer towers** shoot the nearest enemy in range. **Watch towers** mark

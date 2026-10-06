@@ -4,6 +4,7 @@
 import { decodeDefendSave, defaultDefendSave, type DefendSave } from "./defend/progress.ts";
 import { STARTING_METAL, TRAINING, TRAINING_IDS, type TrainingId } from "./progression.ts";
 import { SKILLS, SKILL_IDS, type SkillId } from "./skill-trees.ts";
+import { decodePaths, type PathChoices } from "./knowledge-paths.ts";
 import type { TrainingJob } from "./training-jobs.ts";
 import { decodeSettings, defaultSettings, type Settings } from "./settings.ts";
 import { METALS, decodeMineSave, type MineSave, type Metals } from "./mine/sim.ts";
@@ -31,6 +32,9 @@ export type Save = {
    * Saves from before it was renamed call it `valor`. */
   knowledge: number;
   skills: Record<SkillId, number>;
+  /** The Study's paths: each topic's chosen path, its ranks and the
+   * Knowledge spent on it (`knowledge-paths.ts`). */
+  paths: PathChoices;
   /** The Smithy's upgrades: ranks completed per row, the ranks in work, and
    * when their work was last settled (ms). */
   training: Record<TrainingId, number>;
@@ -52,6 +56,7 @@ export function defaults(): Save {
     smithy: { ...STARTING_METAL },
     knowledge: 0,
     skills: Object.fromEntries(SKILL_IDS.map((id) => [id, 0])) as Record<SkillId, number>,
+    paths: {},
     training: Object.fromEntries(TRAINING_IDS.map((id) => [id, 0])) as Record<TrainingId, number>,
     trainingJobs: [],
     trainingClock: 0,
@@ -89,6 +94,7 @@ export function decode(raw: string | null): Save {
   }
   d.knowledge = num(s.knowledge ?? s.valor, 0);
   for (const id of SKILL_IDS) d.skills[id] = int(s.skills?.[id], 0, 0, SKILLS[id].max);
+  d.paths = decodePaths(s.paths);
   for (const t of TRAINING) d.training[t.id] = int(s.training?.[t.id], 0, 0, t.max);
   d.trainingJobs = decodeJobs(s.trainingJobs, d.training);
   d.trainingClock = num(s.trainingClock, 0);

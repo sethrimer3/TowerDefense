@@ -1,8 +1,9 @@
 /** How the Upgrades page is organized: every upgrade in the game sits in
  * exactly one topic of one subject. Each topic's Forge holds its plain,
  * permanent numbers (more copies of a building, the Armory's levels, the
- * Smithy's rows); its Study holds what Knowledge buys (the skills), and
- * the paths still to be written, shown as drafts. Pure data, so a test can
+ * Smithy's rows); its Study holds what Knowledge buys (the skills, the
+ * paths of `knowledge-paths.ts` drawn as a tree), and the paths still to be
+ * written, shown as drafts. Pure data, so a test can
  * check nothing is left out or listed twice. */
 import type { PaletteItem, UpgradeId } from "./defend/catalog.ts";
 import type { TrainingId } from "./progression.ts";
@@ -12,7 +13,8 @@ import type { UiSprite } from "./ui/dom.ts";
 export type SubjectId = "realm" | "city" | "towers" | "units" | "mine" | "library";
 /** One-off buys that aren't palette items or levels. */
 export type Extra = "bomb" | "speed3";
-/** A path planned for a topic's Study, not built yet. */
+/** A path planned for a topic's Study, not built yet (the built ones are
+ * `knowledge-paths.ts`'s, found by the topic's id). */
 export type DraftPath = { name: string; text: string };
 export type Topic = {
   id: string;
@@ -81,11 +83,6 @@ export const SUBJECTS: Subject[] = [
       },
       {
         id: "wizardTower", name: "Wizard tower", item: "wizardTower", upgrades: ["wizardFlame", "wizardIce"],
-        paths: [
-          { name: "Pyromancy", text: "Flames only, far stronger." },
-          { name: "Rime", text: "Ice only: slows, then freezes solid." },
-          { name: "Stormcalling", text: "Lightning instead of flames; at its peak it becomes the Dark wizard keep." },
-        ],
       },
       { id: "darkKeep", name: "Dark wizard keep", item: "darkKeep", upgrades: ["darkKeepCompact", "chainReach", "chainCount"] },
     ],
@@ -95,10 +92,6 @@ export const SUBJECTS: Subject[] = [
     topics: [
       {
         id: "barracks", name: "Barracks", item: "barracks", upgrades: ["soldierReach"],
-        paths: [
-          { name: "Crusaders", text: "Immovable and heavily armoured; at its peak the barracks becomes the Valkyrie palace." },
-          { name: "Assassins", text: "Fast, with critical strikes, hunting across the city." },
-        ],
       },
       {
         id: "archerBarracks", name: "Archer barracks", item: "archerBarracks", upgrades: ["archerSight", "archerHunt"],

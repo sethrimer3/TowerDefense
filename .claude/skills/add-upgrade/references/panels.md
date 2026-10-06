@@ -26,3 +26,10 @@
 - Cost: `skillCost = base × (rank + 1)` Knowledge.
 - Effect: `per` on a `BonusTarget` (as Training), or `smiths` (room for more smiths, read by the mine as `extraSmiths`) or `copperPerWave` (copper per wave held), summed in `progression.ts`; or `fireproof` / `fireTraining`, which the Library reads as ranks (`main.ts` passes `save.skills` to the page; `accidentChance`, `fireDrill` in `library/sim.ts`), or `coffee` / `waterproof`, which the Mine reads as ranks the same way (`nightShift` and the shaft house's `seal` in `mine/sim.ts`).
 - Saved in `save.skills` (decoded against `max`).
+
+## Knowledge paths (`src/knowledge-paths.ts`)
+
+- Path: `{ id, topic, name, motto, hue, ranks, evolves? }` in `PATHS`; `topic` is the Upgrades topic's id (one tower or troop building), which puts the path on that topic's tree in the Study. Add the id to `PathId` (and a new topic to `PathTopic`).
+- Ranks: `{ name, icon, cost, text }`, learned in order with Knowledge; an icon is an 11 × 11 pixel drawing in `src/ui/path-icons.ts` painted in the path's `hue`.
+- Exclusive: the first rank chooses the path and seals the topic's others; unlearning returns all the Knowledge spent (`spent` in `save.paths`).
+- Effect: the battle reads `Bonuses.paths` with `pathRank(paths, topic, id)`; keep the numbers in an exported table beside the paths, keep any new unit or enemy state absent when the path isn't chosen, and use exact math only, so replays don't move.

@@ -1,4 +1,5 @@
 import { intPow } from "../exact.ts";
+import type { BattlePaths } from "../knowledge-paths.ts";
 
 /** Data tables for DEFEND: what the player can place, what it costs in
  * copper, silver and Gold, the universal upgrades, the bonuses the Smithy and the
@@ -355,8 +356,8 @@ export const UPGRADES: UpgradeDef[] = [
   { id: "cannonSafe", group: "Cannon tower", name: "Gunnery drills", maxLevel: 1, describe: (l) => (l ? "Shells spare your own people" : "Shells hurt your own people too") },
   { id: "bombSafe", group: "Consumables", name: "Shaped charges", maxLevel: 1, describe: (l) => (l ? "Bombs spare your own people" : "Bombs hurt your own people too") },
   { id: "watchRadius", group: "Watch tower", name: "Lookouts", maxLevel: 4, describe: (l) => `${watchRadius(l)} cell marking radius` },
-  { id: "wizardFlame", group: "Wizard tower", name: "Pyromancy", maxLevel: 5, describe: (l) => `${flameDps(l)} flame damage a second, ${flameRange(l).toFixed(1)} cell reach` },
-  { id: "wizardIce", group: "Wizard tower", name: "Rime", maxLevel: 5, describe: (l) => `${iceDamage(l)} ice damage, chills for ${iceChill(l).toFixed(1)}s` },
+  { id: "wizardFlame", group: "Wizard tower", name: "Flamethrower", maxLevel: 5, describe: (l) => `${flameDps(l)} flame damage a second, ${flameRange(l).toFixed(1)} cell reach` },
+  { id: "wizardIce", group: "Wizard tower", name: "Ice wave", maxLevel: 5, describe: (l) => `${iceDamage(l)} ice damage, chills for ${iceChill(l).toFixed(1)}s` },
   { id: "mageFireball", group: "Mage Guild", name: "Pyroclasm", maxLevel: 5, describe: (l) => `${fireballDamage(l)} fireball damage, ${fireballSplash(l).toFixed(1)} cell burst` },
   { id: "mageEmbers", group: "Mage Guild", name: "Lingering embers", maxLevel: 5, describe: (l) => `The ground burns for ${emberSeconds(l).toFixed(1)}s, ${emberDps(l)} damage a second` },
   {
@@ -652,6 +653,9 @@ export type Bonuses = {
   rebuild: number;
   /** Bomb damage. */
   bombDamage: number;
+  /** The Study's paths each topic follows (`knowledge-paths.ts`); absent
+   * with none chosen, so such a run plays exactly as before. */
+  paths?: BattlePaths;
 };
 export const NO_BONUSES: Readonly<Bonuses> = Object.freeze({
   troopHp: 1, troopDamage: 1, drill: 1, towerDamage: 1, towerReload: 1, wallHp: 1, keepHp: 1, rebuild: 1, bombDamage: 1,

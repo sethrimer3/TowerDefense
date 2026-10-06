@@ -1707,3 +1707,43 @@ nav button { position: relative; }
   font-size: 9px;
   font-style: italic;
 }
+
+/* The Study's path tree: the building at the root, a branch fanning to each
+   path, each path's ranks down its column, and the tapped rank read out below. */
+.path-tree { display: flex; flex-direction: column; align-items: stretch; margin-top: 2px; }
+.path-root { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 10px; letter-spacing: 1px; }
+.path-root canvas { width: 34px; height: 34px; image-rendering: pixelated; }
+.path-fan { display: block; width: 100%; height: 30px; margin-top: -2px; }
+.path-fan path { fill: none; vector-effect: non-scaling-stroke; }
+.path-cols { display: grid; grid-template-columns: repeat(var(--paths), minmax(0, 1fr)); gap: 4px; }
+.path-col { display: flex; flex-direction: column; align-items: center; min-width: 0; padding: 0 2px 6px; }
+.path-banner { text-align: center; padding: 4px 3px 5px; width: 100%; box-sizing: border-box; margin-bottom: 6px; }
+.path-banner h4 { margin: 0; font-size: 11px; letter-spacing: .5px; }
+.path-banner small { display: block; margin-top: 2px; font-size: 8px; line-height: 1.35; }
+.path-tree .path-node { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 0; min-width: 0; width: 100%; font-size: 9px; line-height: 1.25; }
+.path-node b { font-size: 9px; letter-spacing: 1px; }
+.path-name { display: block; max-width: 100%; overflow-wrap: anywhere; }
+.path-medal { display: grid; place-items: center; width: 38px; height: 38px; box-sizing: border-box; }
+.path-medal canvas { width: 22px; height: 22px; image-rendering: pixelated; }
+.path-medal.root { width: 46px; height: 46px; }
+.path-link { display: block; width: 3px; height: 12px; margin: 2px 0; }
+.path-following { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 8px; font-size: 10px; }
+.path-following button { flex: none; padding: 5px 8px; font-size: 10px; line-height: 1.25; }
+.path-following button small { display: block; font-size: 8px; }
+.path-detail { display: flex; align-items: center; gap: 8px; padding: 8px; }
+.path-detail > div:not(.path-act) { flex: 1; min-width: 0; }
+.path-detail small { font-size: 8px; letter-spacing: 1px; }
+.path-detail h3 { margin: 2px 0 3px; font-size: 13px; }
+.path-detail p, .path-detail em { margin: 0; font-size: 10px; line-height: 1.5; }
+.path-detail.path-hint { display: block; text-align: center; font-size: 10px; line-height: 1.6; }
+.path-act { flex: none; display: flex; flex-direction: column; align-items: center; gap: 3px; width: 92px; text-align: center; }
+.path-act em { font-size: 9px; }
+.path-act button { width: 84px; padding: 6px 3px; font-size: 11px; line-height: 1.3; }
+.path-act button small { display: block; font-size: 8px; margin-top: 2px; }
+@media (max-width: 480px) {
+  .path-medal { width: 32px; height: 32px; }
+  .path-medal canvas { width: 22px; height: 22px; }
+  .path-banner h4 { font-size: 10px; }
+  .path-detail { flex-wrap: wrap; }
+  .path-act { width: 100%; flex-direction: row; justify-content: center; }
+}

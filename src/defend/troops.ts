@@ -27,6 +27,23 @@ import { CELL_COUNT, cellX, cellY } from "./grid.ts";
 import { cellAt, cellCenter, center, findPath, nearest, type PathLimits, type Point } from "./pathing.ts";
 import type { DefendSim, Enemy, Soldier } from "./sim.ts";
 import { answerBanner, MARCH_SIGHT } from "./war-banner.ts";
+import { ASSASSIN, CRUSADE, pathRank } from "../knowledge-paths.ts";
+
+/** The barracks' Study path and rank (`knowledge-paths.ts`): each 0 unless chosen. */
+const paths = (sim: DefendSim) => {
+  const p = sim.bonuses.paths;
+  return { crusade: pathRank(p, "barracks", "crusaders"), assassin: pathRank(p, "barracks", "assassins") };
+};
+/** A swordsman's HP and damage, as shares of his own, by his barracks' path. */
+function swordStats(sim: DefendSim) {
+  const { crusade, assassin } = paths(sim);
+  return { hp: assassin ? ASSASSIN.hp : CRUSADE.hp[crusade], damage: crusade >= 3 ? CRUSADE.damage : 1 };
+}
+/** How fast a swordsman walks. */
+function swordSpeed(sim: DefendSim) {
+  const { crusade, assassin } = paths(sim);
+  return SOLDIER.speed * (crusade ? CRUSADE.speed : assassin ? ASSASSIN.speed : 1);
+}
 
 /** Trains one troop at a time per barracks, while it's standing and below
  * its garrison cap. */
@@ -68,15 +85,16 @@ export class Barracks {
     const scale = soldierScale(sim.levels.soldierArms);
     const stats = kind === "archer" ? ARCHER_UNIT : kind === "mage" ? { ...FIRE_MAGE, damage: fireballDamage(sim.levels.mageFireball ?? 0) } : kind === "valkyrie" ? VALKYRIE : kind === "darkWizard" ? DARK_WIZARD : SOLDIER;
     const at = cellCenter(door);
+    const path = kind === "sword" ? swordStats(sim) : { hp: 1, damage: 1 };
     sim.soldiers.push({
       id: sim.newId(),
       kind,
       home: b.id,
       x: at.x,
       y: at.y,
-      hp: stats.hp * scale * sim.bonuses.troopHp,
-      maxHp: stats.hp * scale * sim.bonuses.troopHp,
-      damage: stats.damage * scale * sim.bonuses.troopDamage,
+      hp: stats.hp * scale * sim.bonuses.troopHp * path.hp,
+      maxHp: stats.hp * scale * sim.bonuses.troopHp * path.hp,
+      damage: stats.damage * scale * sim.bonuses.troopDamage * path.damage,
       cd: 0,
       target: -1,
       path: [],
@@ -111,7 +129,8 @@ class Patrol {
   ) {
     this.home = sim.map.buildings[s.home];
     this.hc = center(this.home.rect);
-    this.leash = soldierLeash(sim.levels.soldierReach ?? 0);
+    // Shadows (Assassins III) hunt anywhere in the city.
+    this.leash = paths(sim).assassin >= 3 ? Infinity : soldierLeash(sim.levels.soldierReach ?? 0);
     this.citywide = !Number.isFinite(this.leash);
   }
 
@@ -134,13 +153,15 @@ class Patrol {
 export function stepSwordsman(sim: DefendSim, s: Soldier, dt: number) {
   s.cd -= dt;
   s.thinkT -= dt;
+  // Crusaders' field dressing.
+  if (paths(sim).crusade >= 2) s.hp = Math.min(s.maxHp, s.hp + CRUSADE.heal * dt);
   if (sim.warBanner) return rally(sim, s, dt);
   const patrol = new Patrol(sim, s);
   let target = sim.enemies.find((e) => e.id === s.target && e.hp > 0) ?? null;
   if (target && !patrol.covers(target)) target = null;
   if (target && inSwordReach(s, target)) return strike(sim, s, target);
   if (s.thinkT <= 0) target = replan(sim, s, patrol);
-  sim.followPath(s, target, SOLDIER.speed, dt);
+  sim.followPath(s, target, swordSpeed(sim), dt);
 }
 
 /** Answering the war banner: strike whatever is in reach, else close on
@@ -148,15 +169,22 @@ export function stepSwordsman(sim: DefendSim, s: Soldier, dt: number) {
 function rally(sim: DefendSim, s: Soldier, dt: number) {
   const near = sim.enemiesNear(s.x, s.y, SOLDIER.reach + 1).find((e) => inSwordReach(s, e));
   if (near) return strike(sim, s, near);
-  answerBanner(sim, sim.warBanner!, s, SOLDIER.speed, dt, MARCH_SIGHT);
+  answerBanner(sim, sim.warBanner!, s, swordSpeed(sim), dt, MARCH_SIGHT);
 }
 
 const inSwordReach = (s: Soldier, e: Enemy) => dist(e.x - s.x, e.y - s.y) <= SOLDIER.reach + enemySize(e) / 2;
 
 function strike(sim: DefendSim, s: Soldier, e: Enemy) {
   if (s.cd > 0) return;
-  s.cd = SOLDIER.cooldown;
-  sim.hurtEnemy(e, s.damage, true, "melee", s);
+  const assassin = paths(sim).assassin;
+  s.cd = assassin >= 2 ? SOLDIER.cooldown * ASSASSIN.cooldown : SOLDIER.cooldown;
+  if (!assassin) return void sim.hurtEnemy(e, s.damage, true, "melee", s);
+  // Assassins count their strikes: every few is critical (no dice, so a
+  // replay still plays the same).
+  s.strikes = (s.strikes ?? 0) + 1;
+  const crit = s.strikes % ASSASSIN.every[assassin] === 0;
+  sim.hurtEnemy(e, crit ? s.damage * ASSASSIN.crit : s.damage, true, "melee", s);
+  if (crit) sim.effects.push({ kind: "spark", x: e.x, y: e.y, t: 0, r: 0.5 });
 }
 
 /** Twice a second: path to the nearest of up to three reachable enemies, or

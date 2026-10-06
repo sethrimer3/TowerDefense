@@ -30,6 +30,19 @@ import type { Building } from "./citygen.ts";
 import { center, nearest } from "./pathing.ts";
 import type { DefendSim, Enemy } from "./sim.ts";
 import { dist } from "../exact.ts";
+import { PYRO, RIME, STORM, pathRank } from "../knowledge-paths.ts";
+import { chainBolt } from "./dark-wizards.ts";
+
+/** The wizard tower's Study path and rank (`knowledge-paths.ts`): each 0
+ * unless chosen. */
+const paths = (sim: DefendSim) => {
+  const p = sim.bonuses.paths;
+  return { pyro: pathRank(p, "wizardTower", "pyromancy"), rime: pathRank(p, "wizardTower", "rime"), storm: pathRank(p, "wizardTower", "storm") };
+};
+/** How far a tower's flame (or bolt) reaches. */
+const fireReach = (sim: DefendSim) => flameRange(sim.levels.wizardFlame ?? 0) + (paths(sim).pyro >= 2 ? PYRO.reach : 0);
+/** How far its ice runs. */
+const iceReach = (sim: DefendSim) => ICE_RANGE + (paths(sim).rime >= 2 ? RIME.reach : 0);
 
 /** A burst of fire from a wizard tower: where it leaves the tower, which
  * way it points (`dx`, `dy`, a unit vector turning after its target), how
@@ -64,29 +77,48 @@ export class Wizards {
       const rest = (this.rest.get(b.id) ?? 0) - dt;
       this.rest.set(b.id, Math.max(0, rest));
       if (rest > 0 || sim.flames.some((f) => f.tower === b.id)) continue;
-      if ((this.next.get(b.id) ?? "flame") === "flame") this.flame(sim, b);
-      else this.ice(sim, b);
+      // Pyromancy gives up the ice, Rime the flames; Stormcalling casts a bolt for each flame.
+      const { pyro, rime, storm } = paths(sim);
+      const turn = pyro ? "flame" : rime ? "ice" : (this.next.get(b.id) ?? "flame");
+      if (turn === "ice") this.ice(sim, b);
+      else if (storm) this.bolt(sim, b, storm);
+      else this.flame(sim, b);
     }
   }
 
   private flame(sim: DefendSim, b: Building) {
-    const c = center(b.rect), range = flameRange(sim.levels.wizardFlame ?? 0);
+    const c = center(b.rect), range = fireReach(sim);
     const target = nearest(sim.enemiesNear(c.x, c.y, range), c);
     if (!target) return;
-    sim.flames.push({ tower: b.id, x: c.x, y: c.y - 0.4, ...toward(c.x, c.y - 0.4, target.x, target.y), t: 0, dur: FLAME_SECONDS, range, target: target.id });
+    const dur = paths(sim).pyro >= 3 ? FLAME_SECONDS * PYRO.burn : FLAME_SECONDS;
+    sim.flames.push({ tower: b.id, x: c.x, y: c.y - 0.4, ...toward(c.x, c.y - 0.4, target.x, target.y), t: 0, dur, range, target: target.id });
     this.next.set(b.id, "ice");
+  }
+
+  /** Stormcalling: a chain bolt from the tower's top where a flame would be. */
+  private bolt(sim: DefendSim, b: Building, rank: number) {
+    const c = center(b.rect), range = fireReach(sim);
+    const target = nearest(sim.enemiesNear(c.x, c.y, range), c);
+    if (!target) return;
+    const surge = rank >= 3 ? STORM.surge : 1;
+    const damage = flameDps(sim.levels.wizardFlame ?? 0) * STORM.damage * surge * sim.bonuses.towerDamage;
+    chainBolt(sim, { x: c.x, y: c.y - 0.9 }, target, damage, STORM.links[rank], STORM.jump[rank]);
+    this.next.set(b.id, "ice");
+    this.rest.set(b.id, WIZARD_REST);
   }
 
   private ice(sim: DefendSim, b: Building) {
     const c = center(b.rect);
-    const target = nearest(sim.enemiesNear(c.x, c.y, ICE_RANGE), c);
+    const range = iceReach(sim);
+    const target = nearest(sim.enemiesNear(c.x, c.y, range), c);
     if (!target) return;
     sim.frosts.push({
       x: c.x, y: c.y, ...toward(c.x, c.y, target.x, target.y), spread: ICE_SPREAD,
-      r: 0.6, range: ICE_RANGE, t: 0, seed: b.id * 7919 + this.waves++ * 104729, hit: [],
+      r: 0.6, range, t: 0, seed: b.id * 7919 + this.waves++ * 104729, hit: [],
     });
     this.next.set(b.id, "flame");
-    this.rest.set(b.id, WIZARD_REST);
+    // Rime's ice comes twice as often, with no flames between.
+    this.rest.set(b.id, paths(sim).rime ? WIZARD_REST / 2 : WIZARD_REST);
   }
 
   /** A flame that has burned out leaves its tower resting. */
@@ -128,7 +160,7 @@ export function stepFlames(sim: DefendSim, wizards: Wizards, dt: number) {
     }
     // The fire takes a moment to reach full length.
     const reach = f.range * Math.min(1, f.t / 0.25);
-    const dps = flameDps(sim.levels.wizardFlame ?? 0) * sim.bonuses.towerDamage;
+    const dps = flameDps(sim.levels.wizardFlame ?? 0) * sim.bonuses.towerDamage * PYRO.damage[paths(sim).pyro];
     for (const e of sim.enemiesNear(f.x, f.y, reach)) if (inFan(e, f.x, f.y, f.dx, f.dy, FLAME_SPREAD, reach) && !sheltered(sim, e.x, e.y)) sim.hurtEnemy(e, dps * dt, true, "ranged", f);
     if (f.t >= f.dur) wizards.ended(f.tower);
   }
@@ -137,7 +169,9 @@ export function stepFlames(sim: DefendSim, wizards: Wizards, dt: number) {
 
 /** Ice fronts spread, hitting and chilling each enemy once as they pass. */
 export function stepFrosts(sim: DefendSim, dt: number) {
-  const damage = iceDamage(sim.levels.wizardIce ?? 0) * sim.bonuses.towerDamage, chill = iceChill(sim.levels.wizardIce ?? 0);
+  const rime = paths(sim).rime;
+  const damage = iceDamage(sim.levels.wizardIce ?? 0) * sim.bonuses.towerDamage * (rime >= 2 ? RIME.damage : 1);
+  const chill = iceChill(sim.levels.wizardIce ?? 0) * (rime ? RIME.chill : 1);
   for (const w of sim.frosts) {
     w.t += dt;
     if (w.r >= w.range) continue;
@@ -145,11 +179,14 @@ export function stepFrosts(sim: DefendSim, dt: number) {
     for (const e of sim.enemiesNear(w.x, w.y, w.r)) {
       if (w.hit.includes(e.id) || !inFan(e, w.x, w.y, w.dx, w.dy, w.spread, w.r)) continue;
       w.hit.push(e.id);
-      if (sim.hurtEnemy(e, damage, true, "ranged", w) && !ENEMIES[e.kind].unyielding) e.chill = Math.max(e.chill ?? 0, chill);
+      if (sim.hurtEnemy(e, damage, true, "ranged", w) && !ENEMIES[e.kind].unyielding) {
+        e.chill = Math.max(e.chill ?? 0, chill);
+        if (rime >= 3) e.freeze = Math.max(e.freeze ?? 0, RIME.freeze);
+      }
     }
   }
   sim.frosts = sim.frosts.filter((w) => w.r < w.range || w.t < w.range / ICE_SPEED + FROST_LINGER);
 }
 
 /** How fast a chilled enemy moves, as a share of its pace. */
-export const chilled = (e: Enemy) => (!ENEMIES[e.kind].unyielding && e.chill ? CHILL_SPEED : 1);
+export const chilled = (e: Enemy) => (ENEMIES[e.kind].unyielding ? 1 : e.freeze ? 0 : e.chill ? CHILL_SPEED : 1);
