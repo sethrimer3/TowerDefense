@@ -64,15 +64,16 @@ function inWindow(x: number, y: number) {
   return y + 0.5 >= HEAD - Math.sqrt(r * r - dx * dx);
 }
 
-const enum Kind { Outside, Wall, Floor, Glass, Lead, Clear, Door }
+const enum Kind { Outside, Wall, Floor, Glass, Lead, Clear }
 /** The oak frame round the window: how far it reaches out from the glass,
  * and the sill under it. */
 const FRAME = 3, SILL = { x0: WINDOW.x0 - 6, x1: WINDOW.x1 + 6, top: WINDOW.bottom, bottom: WINDOW.bottom + 4 };
 /** The hallways' pictures: from the lintel over them to the bottom of the
  * floor, and how far the light of a librarian walking them reaches. */
 const HALL_TOP = FLOOR - HALL_H - 4, HALL_ROWS = H - HALL_TOP, LANTERN = 20;
-/** The doorways through the piers into the hallways. */
-const inDoor = (x: number, y: number) => (x < BAY_X0 || x >= W - BAY_X0) && y < FLOOR && y >= FLOOR - HALL_H;
+/** How far up the piers stand in front of whoever walks behind them on
+ * the way to and from the hallways: a librarian with a hat and a load. */
+const PIER_FRONT = FLOOR - 24;
 /** Chebyshev distance from (x, y) to the nearest pane, up to `max`. */
 function windowDistance(x: number, y: number, max: number) {
   let d = max + 1;
@@ -102,6 +103,11 @@ export class LibraryRenderer {
   readonly canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
   private off: HTMLCanvasElement;
+  /** The fire's smoke and ash, painted a pixel at a time. */
+  private sootCanvas = document.createElement("canvas");
+  private sootCtx: CanvasRenderingContext2D;
+  private sootImage: ImageData;
+  private sootPx: Uint32Array;
   private offCtx: CanvasRenderingContext2D;
   private image: ImageData;
   private px: Uint32Array;
@@ -145,6 +151,11 @@ export class LibraryRenderer {
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d")!;
+    this.sootCanvas.width = W;
+    this.sootCanvas.height = H;
+    this.sootCtx = this.sootCanvas.getContext("2d")!;
+    this.sootImage = this.sootCtx.createImageData(W, H);
+    this.sootPx = new Uint32Array(this.sootImage.data.buffer);
     this.off = document.createElement("canvas");
     this.off.width = W;
     this.off.height = H;
@@ -195,22 +206,11 @@ export class LibraryRenderer {
             kind = lead ? Kind.Lead : clear ? Kind.Clear : Kind.Glass;
             rgb = lead ? [20, 18, 16] : clear ? [150, 170, 190] : GLASS[Math.floor(h01(col, row, 3) * GLASS.length)];
           }
-        } else if (inDoor(x, y)) {
-          // The passage through the pier: dark stone, lit by the hallway.
-          kind = Kind.Door;
-          const lx = x % 6, ly = (FLOOR - y) % 5;
-          rgb = lx === 0 || ly === 0 ? [20, 18, 18] : [58, 52, 48];
         } else {
           // Ashlar: courses of blocks, bigger on the piers at either side.
           const stone = ashlar(x, y, x < BAYS_EDGE || x >= W - BAYS_EDGE);
           rgb = stone.rgb;
           hgt = stone.hgt;
-        }
-        // The lintel over each doorway: three wedged stones.
-        if (kind === Kind.Wall && (x < BAY_X0 || x >= W - BAY_X0) && y >= FLOOR - HALL_H - 4 && y < FLOOR - HALL_H) {
-          const lx = (x < BAY_X0 ? x : x - (W - BAY_X0)) % 6, ly = y - (FLOOR - HALL_H - 4);
-          rgb = lx === 0 || ly === 0 ? [26, 23, 22] : [104 - ly * 6, 96 - ly * 6, 88 - ly * 6];
-          hgt = lx === 0 || ly === 0 ? 0 : 1 - ly * 0.2;
         }
         // A carved rib along the vault's edge.
         if (kind === Kind.Wall && y - vaultY(x) < 3) {
@@ -547,13 +547,7 @@ export class LibraryRenderer {
     for (let i = 0; i < W * H; i++) {
       const k = kind[i];
       let r: number, g: number, b: number;
-      if (k === Kind.Door) {
-        // The doorways: dark, but for the hallway's light from beyond.
-        const x = i % W, side = x < W / 2 ? 0 : 1, v = this.seen[side][side ? x - (W - BAY_X0) : x + HALL];
-        r = S[i * 3] * (L[i * 3] * 0.3 + v);
-        g = S[i * 3 + 1] * (L[i * 3 + 1] * 0.3 + v * 0.82);
-        b = S[i * 3 + 2] * (L[i * 3 + 2] * 0.3 + v * 0.6);
-      } else if (k === Kind.Glass || k === Kind.Clear) {
+      if (k === Kind.Glass || k === Kind.Clear) {
         // Glass glows with the sky behind it.
         const lum = (0.1 + day * 0.85) * (0.85 + h01(i % W >> 2, (i / W) >> 2, 21) * 0.3);
         r = S[i * 3] * lum + (k === Kind.Clear ? sky[0] * 0.5 : 0);
@@ -593,6 +587,9 @@ export class LibraryRenderer {
     ctx.clip();
     for (const l of sim.librarians) if (!l.away) this.drawLibrarian(l, time);
     ctx.restore();
+    // The piers' feet stand in front, so those going to and from the
+    // hallways pass behind them.
+    for (const x of [0, W - BAY_X0]) ctx.drawImage(this.off, x, PIER_FRONT, BAY_X0, FLOOR - PIER_FRONT, x, PIER_FRONT, BAY_X0, FLOOR - PIER_FRONT);
     if (labShown) this.lab.drawOver(ctx, sim, time, dt, effects);
     if (this.target && !this.target.away) {
       // A brass marker over whoever is followed.
@@ -751,6 +748,51 @@ export class LibraryRenderer {
   }
 
   /** The flames cell by cell, licking upward, with smoke, embers and thrown water. */
+  /** The fire's smoke and ash, a pixel at a time into one image, so cells
+   * meet without seams at any zoom. Ash is a mottle of grey-browns with
+   * white flecks and bits of charcoal, its crust catching the light and
+   * the heap darker deeper down, embers winking in it while it is hot;
+   * smoke drifts through in uneven greys. All lit like the nave. */
+  private drawSoot(sim: LibrarySim, tick: number) {
+    const f = sim.fire, px = this.sootPx, L = this.light;
+    px.fill(0);
+    for (let i = 0; i < f.ash.length; i++) {
+      const smoke = f.smoke[i], ash = f.ash[i];
+      if (!smoke && !ash) continue;
+      const cx = i % FW, cy = (i / FW) | 0, hot = f.heat[i];
+      // How deep in the heap this cell lies, for its shade.
+      let depth = 0;
+      if (ash) for (let a = i - FW; a >= 0 && depth < 4 && f.ash[a]; a -= FW) depth++;
+      for (let dy = 0; dy < CELL; dy++)
+        for (let dx = 0; dx < CELL; dx++) {
+          const x = cx * CELL + dx, y = cy * CELL + dy, j = y * W + x;
+          if (x >= W || y >= H) continue;
+          const n = h01(x, y, 61), lr = Math.max(0.3, L[j * 3]), lg = Math.max(0.3, L[j * 3 + 1]), lb = Math.max(0.3, L[j * 3 + 2]);
+          let r: number, g: number, b: number, a = 255;
+          if (ash) {
+            // Clumps a few cells across, each cell its own shade, a little
+            // grain within; now and then a pale fleck or a bit of charcoal.
+            const clump = h01(x >> 3, y >> 3, 62), cell = h01(cx, cy, 63);
+            const t = 0.58 + clump * 0.22 + cell * 0.14 + n * 0.08;
+            r = 120 * t; g = 112 * t; b = 102 * t;
+            if (cell > 0.9 && n > 0.6) { r = 168; g = 162; b = 152; } // pale flecks
+            else if (cell < 0.08 && n < 0.6) { r = 34; g = 30; b = 28; } // charcoal
+            const top = depth === 0 && dy === 0, side = (dx === 0 && cx > 0 && !f.ash[i - 1]) || (dx === CELL - 1 && cx < FW - 1 && !f.ash[i + 1]);
+            const k = (top ? 1.25 : 1) * (side ? 0.85 : 1) * (1 - depth * 0.1);
+            r *= k * lr; g *= k * lg; b *= k * lb;
+            if (hot > 0.15 && h01(x, y, tick) < hot * 0.25) { r = 255; g = 120 + hot * 60; b = 40; } // embers
+          } else {
+            const t = 0.8 + n * 0.4;
+            r = 56 * t * lr; g = 50 * t * lg; b = 48 * t * lb;
+            a = Math.min(255, (smoke / 255) * 0.65 * 255 * (0.85 + h01(x, y, tick >> 2) * 0.3));
+          }
+          px[j] = (a << 24) | (c255(b) << 16) | (c255(g) << 8) | c255(r);
+        }
+    }
+    this.sootCtx.putImageData(this.sootImage, 0, 0);
+    this.ctx.drawImage(this.sootCanvas, 0, 0);
+  }
+
   private drawFire(sim: LibrarySim, time: number, dt: number, effects: boolean) {
     const ctx = this.ctx, f = sim.fire, tick = Math.floor(time * 12);
     for (let i = 0; i < f.heat.length; i++) {
@@ -766,19 +808,7 @@ export class LibraryRenderer {
       }
     }
     // Smoke and ash come from simulation cells, including during fast-forward.
-    for (let i = 0; i < f.smoke.length; i++) {
-      const x = (i % FW) * CELL, y = Math.floor(i / FW) * CELL;
-      if (f.smoke[i]) {
-        ctx.globalAlpha = f.smoke[i] / 255 * 0.65;
-        ctx.fillStyle = "#383230";
-        ctx.fillRect(x, y, CELL, CELL);
-      }
-      if (f.ash[i]) {
-        ctx.globalAlpha = 1;
-        ctx.fillStyle = "#70665c";
-        ctx.fillRect(x, y, CELL, CELL);
-      }
-    }
+    this.drawSoot(sim, tick);
     ctx.globalAlpha = 1;
     ctx.fillStyle = "#9ad0ff";
     for (const d of f.drops) ctx.fillRect(d.x, d.y, 1, 1);

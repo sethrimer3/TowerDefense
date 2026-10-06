@@ -341,8 +341,15 @@ export class LibraryPage {
     labUp.innerHTML = labFull ? `Lab complete<small>level ${level}</small>` : `Expand lab ${level + 1}<small>${up} gold</small>`;
     labUp.disabled = labFull || !(free || gold >= up);
     const n = sim.librarians.length, planned = sim.shelves - sim.built;
-    this.root.querySelector("#library-tally")!.innerHTML =
-      `<b>${sim.built}</b>/${MAX_SHELVES} shelves${planned ? ` (+${planned} to build)` : ""} · <b>${n}</b> ${n === 1 ? "librarian" : "librarians"}${home ? ` (${home} home for the night)` : ""}<br><b>${sim.fresh}</b> books to read · <b>${sim.returns.length}</b>/${RETURN_BOOKS} read · <b>${sim.rate}</b> Knowledge an hour`;
+    // One stat to a cell, each kept to its line, so the numbers changing
+    // never reflow the header and shift the view below it.
+    this.root.querySelector("#library-tally")!.innerHTML = [
+      [`<b>${sim.built}</b>/${MAX_SHELVES} shelves${planned ? ` (+${planned})` : ""}`, planned ? `${planned} more to build` : ""],
+      [`<b>${n}</b> ${n === 1 ? "librarian" : "librarians"}${home ? ` (${home} home)` : ""}`, home ? `${home} home for the night` : ""],
+      [`<b>${sim.fresh}</b> books to read`, ""],
+      [`<b>${sim.returns.length}</b>/${RETURN_BOOKS} read`, "Read books on the return shelf"],
+      [`<b>${sim.rate}</b> Knowledge/hr`, "Knowledge an hour"],
+    ].map(([html, title]) => `<span${title ? ` title="${title}"` : ""}>${html}</span>`).join("");
     this.root.querySelector("#library-roles")!.innerHTML = ROLES.map((r) => `<b>${roles[r]}</b> ${roles[r] === 1 ? ROLE[r].one : ROLE[r].name.toLowerCase()}`).join(" · ");
     const alert = this.root.querySelector<HTMLElement>("#library-alert")!;
     if (fire) alert.textContent = "Fire! A candle has caught a table. The librarians are fighting it with buckets from the water butts.";
