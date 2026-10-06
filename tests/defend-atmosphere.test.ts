@@ -6,8 +6,10 @@ import { defaultLayout, fitLayout, placeCityTile } from '../src/defend/layout.ts
 import { generateCity } from '../src/defend/citygen.ts';
 import { UPGRADES } from '../src/defend/catalog.ts';
 import { CELLS_W, CELLS_H, CELL_COUNT } from '../src/defend/grid.ts';
-import { rollWeather, skyLabel, Snow } from '../src/defend/weather.ts';
+import { SNOW_CAP, STORM_CHANCE, rollWeather, skyLabel, Snow } from '../src/defend/weather.ts';
 import { areaForWave } from '../src/defend/areas.ts';
+import { tumbleweedPixels } from '../src/defend/atmosphere-art.ts';
+import { OUTLINE } from '../src/defend/pixel-fx.ts';
 
 function scene(wave = 21) {
   const layout = defaultLayout();
@@ -33,14 +35,18 @@ function corridor(sim: DefendSim) {
 
 test('area precipitation selects snow/blizzards, sandstorms and mist without rain', () => {
   for (const wave of [21, 81, 101]) assert.equal(rollWeather(() => 0, areaForWave(wave)).rain, false);
-  assert.equal(skyLabel(rollWeather(() => 0, areaForWave(101)), 0), 'Snow');
-  assert.equal(skyLabel(rollWeather(() => 0, areaForWave(101)), 1), 'Blizzard');
+  assert.equal(skyLabel(rollWeather(() => .5, areaForWave(101)), 0), 'Snow');
+  assert.equal(skyLabel(rollWeather(() => .5, areaForWave(101)), 1), 'Blizzard');
+  // A stormy roll in the cold is a blizzard by day too.
+  assert.equal(rollWeather(() => 0, areaForWave(101)).blizzard, true);
+  assert.equal(rollWeather(() => STORM_CHANCE, areaForWave(101)).blizzard, undefined);
+  assert.equal(skyLabel(rollWeather(() => 0, areaForWave(101)), 0), 'Blizzard');
   assert.equal(skyLabel(rollWeather(() => 0, areaForWave(21)), 0), 'Sandstorm');
   assert.equal(skyLabel(rollWeather(() => 0, areaForWave(81)), 0), 'Mist');
   const snow = new Snow() as any;
   snow.update(0, 720, 840, 0); const normal = snow.flakes.length;
   snow.update(.1, 720, 840, 1);
-  assert.ok(snow.flakes.length > normal * 2 && snow.flakes.length <= 700);
+  assert.ok(snow.flakes.length > normal * 2 && snow.flakes.length <= SNOW_CAP);
 });
 
 test('intact walls exclude mist, cracks leak, and repaired masonry seals again', () => {
@@ -122,4 +128,32 @@ test('civilians sweep only after repairs, preempt cleanup, and stop near enemies
   sim.spawnAuxiliary('orc', c.x, c.y); (sim as any).indexEnemies();
   const sand = env.sand[i]; builders.step(sim, .1); assert.equal(env.sand[i], sand);
   env.clean(i, 1); assert.ok(env.sand[i] < CLEANUP_DEPTH); assert.equal(env.cleanup.has(i), false);
+});
+
+test('the dunes blow away once the battle leaves the desert', () => {
+  const sim = scene(), env = sim.atmosphere!;
+  run(sim, 2);
+  assert.ok(env.sand.some(v => v > 0));
+  sim.wave = 41; env.step(sim, .1);
+  assert.equal(env.mode, null);
+  assert.ok(env.sand.every(v => v === 0)); assert.equal(env.cleanup.size, 0);
+  sim.wave = 21; env.step(sim, .1);
+  assert.ok(env.sand.some(v => v > 0), 'returning to the desert lays fresh dunes');
+});
+
+test('tumbleweeds are twigs in a black outline, turning frame to frame', () => {
+  const a = tumbleweedPixels(0), b = tumbleweedPixels(.4);
+  assert.equal(a.px.length, a.size * a.size);
+  const twigs = a.px.filter(p => p && p !== OUTLINE).length;
+  assert.ok(twigs > 20 && a.px.includes(OUTLINE));
+  // Every twig touching the air is outlined: no twig borders a clear pixel.
+  for (let i = 0; i < a.px.length; i++) {
+    if (!a.px[i] || a.px[i] === OUTLINE) continue;
+    const x = i % a.size, y = Math.floor(i / a.size);
+    for (const [ox, oy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + ox, ny = y + oy;
+      if (nx >= 0 && ny >= 0 && nx < a.size && ny < a.size) assert.ok(a.px[ny * a.size + nx], 'outlined');
+    }
+  }
+  assert.notDeepEqual(a.px, b.px);
 });
