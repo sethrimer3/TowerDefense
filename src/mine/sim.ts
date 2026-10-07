@@ -130,6 +130,9 @@ export const WEATHER_TICKS = 4 * 60 * TICK_HZ;
 export const MEAL_TICKS = 9 * 60 * TICK_HZ, STARVE_TICKS = 25 * 60 * TICK_HZ, BREATH_TICKS = 15 * TICK_HZ;
 /** After a miner dies, the next one to come to harm this soon gets out alive. */
 export const DEATH_GAP = 20 * 60 * TICK_HZ;
+/** The crew may move on to a new prospect once less than this share of its
+ * ore is left in the ground (or the work there is done). */
+export const MOVE_ON_SHARE = 0.2;
 const FIRE_TICKS = 240, BAIL_TICKS = 24, DOUSE_TICKS = 30, SCORCH_TICKS = 2 * TICK_HZ;
 
 export type Weather = "clear" | "cloudy" | "rain" | "storm";
@@ -301,6 +304,11 @@ export class MineSim {
   readonly oreFound: number;
   oreLeft: number;
   workedOut = false;
+  /** The crew may move on to a new prospect: less than `MOVE_ON_SHARE` of
+   * its ore is left, or it is worked out. */
+  get canMoveOn() {
+    return this.workedOut || this.oreLeft < this.oreFound * MOVE_ON_SHARE;
+  }
   /** Surveys since the work planned last shrank, with the shaft at the
    * bottom (a few cells out of reach don't keep a prospect open). */
   private stalled = 0;
