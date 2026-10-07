@@ -5,6 +5,7 @@
  * the app's frame loop). Time away is banked, then spent in ordinary
  * simulation steps at up to 120 times speed. Knowledge, fires, deaths,
  * firefighting and repairs happen as those steps run. */
+import { canAffordMetals, metalPriceText, type MetalHost, type MetalPrice } from "../metals.ts";
 import { play } from "../sound.ts";
 import type { Scene } from "../ambience.ts";
 import { countdown, HOUR_MS, IDLE_LEAD, IDLE_SPEED, idleDrain, MAX_AWAY_MS } from "../away.ts";
@@ -22,10 +23,7 @@ export interface LibraryAway {
   books: number;
 }
 
-export interface LibraryHost {
-  gold(): number;
-  free(): boolean;
-  spendGold(n: number): void;
+export interface LibraryHost extends MetalHost {
   effects(): boolean;
   /** A fresh seed for a new library. */
   newSeed(): number;
@@ -317,11 +315,11 @@ export class LibraryPage {
     };
   }
 
-  private buy(price: number, act: () => boolean) {
+  private buy(price: MetalPrice, act: () => boolean) {
     const free = this.host.free();
-    if (!free && this.host.gold() < price) return;
+    if (!free && !canAffordMetals(this.host.metals(), price)) return;
     if (!act()) return;
-    if (!free) this.host.spendGold(price);
+    if (!free) this.host.spendMetals(price);
     play("coin");
     this.refresh();
   }
@@ -331,7 +329,7 @@ export class LibraryPage {
     const idle = this.root.querySelector<HTMLElement>("#library-away")!;
     idle.hidden = this.owed < 5000;
     idle.textContent = `Fast-forwarding · ${countdown(this.owed)} idle time remaining`;
-    const sim = this.sim, free = this.host.free(), gold = this.host.gold();
+    const sim = this.sim, free = this.host.free(), wallet = this.host.metals();
     const sp = shelfPrice(sim.shelves), lp = librarianPrice(sim.hired), level = sim.labLevel, up = labPrice(level), labFull = level >= LAB_MAX_LEVEL;
     const shelvesFull = sim.shelves >= MAX_SHELVES, crewFull = sim.librarians.length >= MAX_LIBRARIANS;
     const fire = sim.fire.active, lost = sim.lost;
@@ -339,17 +337,17 @@ export class LibraryPage {
     this.refreshStaff();
     const lab = this.root.querySelector<HTMLButtonElement>("#library-lab")!, inLab = this.renderer?.inLab ?? false;
     lab.textContent = inLab ? "⤒ Nave" : "⤓ Lab";
-    const key = `${home}|${sim.shelves}|${sim.built}|${sim.librarians.length}|${ROLES.map((r) => roles[r]).join(",")}|${free || gold >= sp}|${free || gold >= lp}|${level}|${free || gold >= up}|${sim.fresh}|${sim.returns.length}|${fire}|${lost ? `${lost.shelves},${lost.librarians},${lost.books}` : ""}`;
+    const key = `${home}|${sim.shelves}|${sim.built}|${sim.librarians.length}|${ROLES.map((r) => roles[r]).join(",")}|${free || canAffordMetals(wallet, sp)}|${free || canAffordMetals(wallet, lp)}|${level}|${free || canAffordMetals(wallet, up)}|${sim.fresh}|${sim.returns.length}|${fire}|${lost ? `${lost.shelves},${lost.librarians},${lost.books}` : ""}`;
     if (key === this.shown) return;
     this.shown = key;
     const shelf = this.root.querySelector<HTMLButtonElement>("#library-shelf")!, hire = this.root.querySelector<HTMLButtonElement>("#library-hire")!;
-    shelf.innerHTML = shelvesFull ? `Shelves full<small>${sim.shelves} shelves</small>` : `Bookshelf<small>${sp} gold</small>`;
-    shelf.disabled = shelvesFull || !(free || gold >= sp);
-    hire.innerHTML = crewFull ? `Librarians full<small>${sim.librarians.length}</small>` : `Librarian<small>${lp} gold</small>`;
-    hire.disabled = crewFull || !(free || gold >= lp);
+    shelf.innerHTML = shelvesFull ? `Shelves full<small>${sim.shelves} shelves</small>` : `Bookshelf<small>${metalPriceText(sp)}</small>`;
+    shelf.disabled = shelvesFull || !(free || canAffordMetals(wallet, sp));
+    hire.innerHTML = crewFull ? `Librarians full<small>${sim.librarians.length}</small>` : `Librarian<small>${metalPriceText(lp)}</small>`;
+    hire.disabled = crewFull || !(free || canAffordMetals(wallet, lp));
     const labUp = this.root.querySelector<HTMLButtonElement>("#library-lab-up")!;
-    labUp.innerHTML = labFull ? `Lab complete<small>level ${level}</small>` : `Expand lab ${level + 1}<small>${up} gold</small>`;
-    labUp.disabled = labFull || !(free || gold >= up);
+    labUp.innerHTML = labFull ? `Lab complete<small>level ${level}</small>` : `Expand lab ${level + 1}<small>${metalPriceText(up)}</small>`;
+    labUp.disabled = labFull || !(free || canAffordMetals(wallet, up));
     const n = sim.librarians.length, planned = sim.shelves - sim.built;
     // One stat to a cell, each kept to its line, so the numbers changing
     // never reflow the header and shift the view below it.

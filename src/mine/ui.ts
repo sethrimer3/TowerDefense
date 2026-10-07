@@ -6,6 +6,7 @@
  * shows (`advance`, from the app's frame loop), and works on while the game
  * is closed: time away is banked (up to 24 hours), then spent tick by tick
  * a slice each frame. Only simulated work pays Smithy points. */
+import { canAffordMetals, metalPriceText, type MetalHost, type MetalPrice } from "../metals.ts";
 import { play } from "../sound.ts";
 import { QUIET, thunder, type Scene } from "../ambience.ts";
 import { countdown, IDLE_LEAD, IDLE_SPEED, idleDrain, MAX_AWAY_MS } from "../away.ts";
@@ -42,11 +43,7 @@ function tell(n: MineNews) {
   return null;
 }
 
-export interface MineHost {
-  /** Gold the player holds, and whether purchases are free (Dev). */
-  gold(): number;
-  free(): boolean;
-  spendGold(n: number): void;
+export interface MineHost extends MetalHost {
   /** The smithy turned out Smithy points (copper, silver, gold). */
   earn(points: Metals): void;
   /** Ranks of the skills the mine reads: Coffee, Waterproofing, and Master
@@ -473,15 +470,15 @@ export class MinePage {
     if (block === "top") return html + `<p class="info-note">Built as big as it goes</p>`;
     const next = level + 1, gain = levelGain(id, next);
     if (block === "warehouse") return html + `<button class="info-upgrade" disabled>⬆ Level ${next}<small>Raise the warehouse to level ${level} first</small></button>`;
-    const cost = sim.upgradeCost(id), afford = this.host.free() || this.host.gold() >= cost;
-    return html + `<button class="info-upgrade" data-upgrade="${id}"${afford ? "" : " disabled"} title="${gain}">⬆ Level ${next} · ${cost} gold<small>${gain}</small></button>`;
+    const cost = sim.upgradeCost(id), afford = this.host.free() || canAffordMetals(this.host.metals(), cost);
+    return html + `<button class="info-upgrade" data-upgrade="${id}"${afford ? "" : " disabled"} title="${gain}">⬆ Level ${next} · ${metalPriceText(cost)}<small>${gain}</small></button>`;
   }
   /** Raises a building a level, if the player can pay for it. */
   private upgrade(id: BuildingId) {
     const cost = this.sim.upgradeCost(id), free = this.host.free();
-    if (!free && this.host.gold() < cost) return;
+    if (!free && !canAffordMetals(this.host.metals(), cost)) return;
     if (!this.sim.upgrade(id)) return;
-    if (!free) this.host.spendGold(cost);
+    if (!free) this.host.spendMetals(cost);
     play("coin");
     this.shownCrew = "";
     this.refresh();
@@ -542,9 +539,9 @@ export class MinePage {
 
   private hire() {
     const price = this.sim.price, free = this.host.free();
-    if (this.sim.miners.length >= this.sim.crewCap || (!free && this.host.gold() < price)) return;
+    if (this.sim.miners.length >= this.sim.crewCap || (!free && !canAffordMetals(this.host.metals(), price))) return;
     if (!this.sim.hire()) return;
-    if (!free) this.host.spendGold(price);
+    if (!free) this.host.spendMetals(price);
     play("coin");
     this.refresh();
   }
@@ -553,7 +550,7 @@ export class MinePage {
   refresh() {
     if (!this.built) return;
     const sim = this.sim, price = sim.price, full = sim.miners.length >= sim.crewCap;
-    const afford = this.host.free() || this.host.gold() >= price;
+    const afford = this.host.free() || canAffordMetals(this.host.metals(), price);
     const crew = sim.miners.length, sky = sim.sky, lost = sim.lostTotal;
     const hour = sky.daylight > 0.6 ? "☀ Day" : sky.daylight > 0.05 ? (Math.abs(((sim.tick / DAY_TICKS + 0.1) % 1) - 0.5) < 0.25 ? "◐ Dusk" : "◐ Dawn") : "☾ Night";
     const latest = [...sim.news].reverse().find((n) => tell(n) && sim.tick - n.tick < 90 * TICK_HZ);
@@ -562,11 +559,11 @@ export class MinePage {
     this.refreshCrew();
     this.refreshInfo();
     const left = Math.min(100, Math.round((100 * sim.oreLeft) / Math.max(1, sim.oreFound)));
-    const tally = `${crew}|${sim.crewCap}|${price}|${afford}|${sim.depth}|${ore}|${bars}|${Math.ceil(this.owed / TICK_HZ)}|${hour}|${sky.weather}|${lost}|${news}|${left}|${sim.workedOut}|${sim.canMoveOn}|${sim.prospect}`;
+    const tally = `${crew}|${sim.crewCap}|${metalPriceText(price)}|${afford}|${sim.depth}|${ore}|${bars}|${Math.ceil(this.owed / TICK_HZ)}|${hour}|${sky.weather}|${lost}|${news}|${left}|${sim.workedOut}|${sim.canMoveOn}|${sim.prospect}`;
     if (tally === this.shownTally) return;
     this.shownTally = tally;
     const hire = this.root.querySelector<HTMLButtonElement>("#mine-hire")!;
-    hire.innerHTML = !full ? `⛏ Hire a miner<small>${price} gold</small>` : crew >= MAX_MINERS ? `Crew full<small>${crew} miners</small>` : `Barracks full<small>upgrade it to hire more</small>`;
+    hire.innerHTML = !full ? `⛏ Hire a miner<small>${metalPriceText(price)}</small>` : crew >= MAX_MINERS ? `Crew full<small>${crew} miners</small>` : `Barracks full<small>upgrade it to hire more</small>`;
     hire.disabled = full || !afford;
     this.root.querySelector("#mine-tally")!.innerHTML =
       `<b>${crew}</b> ${crew === 1 ? "miner" : "miners"} · <b>${sim.depth}</b> ft deep · ${hour}, ${WEATHER_NAME[sky.weather].toLowerCase()}<br>` +

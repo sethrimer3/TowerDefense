@@ -5,7 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { decode, defaults } from "../src/save.ts";
 import {
-  STARTING_METAL, TRAINING, addSmith, bonuses, busySmiths, buySkill, cancelTraining, multiplier, payKills, payWave, rankPrice, removeSmith, settleTraining, skillPurchase,
+  STARTING_METAL, TRAINING, addSmith, bonuses, busySmiths, buySkill, cancelTraining, multiplier, payWave, rankPrice, removeSmith, settleTraining, skillPurchase,
   skillRank, skillTotal, startTraining, trainingLeft, trainingRank, trainingStep,
 } from "../src/progression.ts";
 import { SKILLS, TREES, skillCost, type SkillId } from "../src/skill-trees.ts";
@@ -121,14 +121,14 @@ test("dev options: unlimited money spends nothing, instant research needs no smi
   assert.equal(skillRank(d, "fireproofWood"), 0, "only the Mine tree");
   assert.equal(skillPurchase(d, "coffee").maxed, true);
   d.settings.devSmithy = true;
-  assert.equal(trainingRank(d, "gold"), TRAINING.find((t) => t.id === "gold")!.max);
-  assert.equal(trainingStep(d, "gold").maxed, true);
-  assert.ok(multiplier(d, "gold") > 1);
+  assert.equal(trainingRank(d, "keepHp"), TRAINING.find((t) => t.id === "keepHp")!.max);
+  assert.equal(trainingStep(d, "keepHp").maxed, true);
+  assert.ok(multiplier(d, "keepHp") > 1);
   d.settings.devCommand = true;
   assert.equal(skillPurchase(d, "warBanner").maxed, true, "the deepest node counts too");
   d.settings.devMine = d.settings.devSmithy = d.settings.devCommand = false;
   assert.equal(skillRank(d, "coffee"), 2, "the ranks bought count again once off");
-  assert.equal(multiplier(d, "gold"), 1);
+  assert.equal(multiplier(d, "keepHp"), 1);
 });
 
 test("every tree node is a skill, each listed once, its requirements in the same tree", () => {
@@ -137,23 +137,21 @@ test("every tree node is a skill, each listed once, its requirements in the same
   for (const t of TREES) for (const n of t.nodes) for (const r of n.requires) assert.ok(t.nodes.some((m) => m.id === r), `${n.id} needs ${r}`);
 });
 
-test("kills pay Gold; waves pay Gold, copper only with Copperworks, and Knowledge and an upgrade point past the best", () => {
+test("DEFEND pays exactly one upgrade point per new highest wave and no resources", () => {
   const s = defaults();
-  payKills(s, { roach: 3, orc: 1 });
-  assert.equal(s.gold, 3 * 2 + 5);
   s.defend.bestWave = 4;
-  const held = payWave(s, 4);
-  assert.deepEqual({ copper: held.copper, knowledge: held.knowledge, upgrade: held.upgrade }, { copper: 0, knowledge: 0, upgrade: 0 });
-  const boss = payWave(s, 10);
-  assert.deepEqual({ copper: boss.copper, knowledge: boss.knowledge, upgrade: boss.upgrade }, { copper: 0, knowledge: 3, upgrade: 1 });
-  assert.equal(s.upgradePoints, 1);
-  assert.deepEqual(s.smithy, STARTING_METAL, "battle pays no metal");
-  s.skills.plunder = 2;
-  s.skills.ironworks = 1;
-  const rich = payWave(s, 5);
-  assert.equal(rich.gold, (10 + 25) * 1.2);
-  assert.equal(rich.copper, 1);
-  assert.equal(s.smithy.copper, STARTING_METAL.copper + 1, "Copperworks pays the mine's copper");
+  assert.deepEqual(payWave(s, 4), { upgrade: 0 });
+  assert.deepEqual(payWave(s, 5), { upgrade: 1 });
+  assert.deepEqual(payWave(s, 5), { upgrade: 0 }, "duplicate event cannot pay twice");
+  assert.deepEqual(payWave(s, 3), { upgrade: 0 });
+  assert.deepEqual(payWave(s, 10), { upgrade: 1 }, "a direct start pays one point, not skipped waves");
+  assert.deepEqual(payWave(s, NaN), { upgrade: 0 });
+  assert.deepEqual(payWave(s, 10.5), { upgrade: 0 });
+  assert.equal(s.defend.bestWave, 10);
+  assert.equal(s.upgradePoints, 2);
+  assert.deepEqual(s.smithy, STARTING_METAL, "no metals from battle");
+  assert.equal(s.knowledge, 0, "no Knowledge from battle, including boss waves");
+  assert.equal("gold" in s, false, "no battle currency in the save");
 });
 
 test("bonuses reach the battle: troops, walls and the keep", () => {
@@ -173,10 +171,9 @@ test("bonuses reach the battle: troops, walls and the keep", () => {
 
 test("saves keep what is well formed and default the rest", () => {
   const s = defaults();
-  s.gold = 12.5;
   s.knowledge = 3;
   s.skills.masonry = 2;
-  s.training.gold = 4;
+  s.training.keepHp = 4;
   s.smithy = { copper: 3, silver: 1, gold: 0 };
   s.upgradePoints = 7;
   s.trainingJobs = [{ id: "keepHp", left: 5000, smiths: ["Ada Stone", "Bram Hale"] }];
@@ -184,10 +181,10 @@ test("saves keep what is well formed and default the rest", () => {
   const back = decode(JSON.stringify(s));
   assert.deepEqual(back, s);
   const job = { id: "keepHp", left: 5, smiths: ["Ada Stone"] };
-  const bad = decode(JSON.stringify({ ...s, gold: "lots", skills: { masonry: 99 }, training: { gold: -2 }, trainingJobs: [{ id: "nope" }, job, job, { id: "wallHp", left: 5, smiths: ["Ada Stone", 7] }] }));
-  assert.equal(bad.gold, 0);
+  const bad = decode(JSON.stringify({ ...s, gold: "lots", skills: { masonry: 99 }, training: { keepHp: -2 }, trainingJobs: [{ id: "nope" }, job, job, { id: "wallHp", left: 5, smiths: ["Ada Stone", 7] }] }));
+  assert.equal("gold" in bad, false);
   assert.equal(bad.skills.masonry, SKILLS.masonry.max);
-  assert.equal(bad.training.gold, 0);
+  assert.equal(bad.training.keepHp, 0);
   assert.deepEqual(bad.trainingJobs, [job, { id: "wallHp", left: 5, smiths: [] }], "one per row, each smith on one");
   // A save from before copper and silver, the Smithy and upgrade points:
   // its battle coins become the mine's metal.
@@ -202,6 +199,6 @@ test("saves keep what is well formed and default the rest", () => {
   assert.deepEqual(v1.smithy, { copper: 25, silver: 11, gold: 10 });
   const fresh = decode("not json");
   assert.deepEqual({ ...fresh, defend: null }, { ...defaults(), defend: null }, "unreadable JSON starts afresh");
-  assert.equal(decode(JSON.stringify({ version: 99, gold: 5 })).gold, 0, "a newer save starts afresh");
+  assert.equal(decode(JSON.stringify({ version: 99 })).upgradePoints, 0, "a newer save starts afresh");
   assert.ok(TRAINING.every((t) => back.training[t.id] !== undefined));
 });

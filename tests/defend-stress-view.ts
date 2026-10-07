@@ -10,7 +10,7 @@ const { sim, layout } = stressScene(Math.max(100, Math.min(10000, Number(params.
 const save = { ...defaultDefendSave(), layout, levels: sim.levels };
 const page = new DefendPage(document.querySelector('#stress')!, {
   save: () => save, wallet: () => ({ gold:0,copper:0,silver:0,free:true }), setWallet: () => {},
-  bonuses: () => NO_BONUSES, earnKills: () => {}, earnWave: () => ({gold:0,copper:0,silver:0,knowledge:0,upgrade:0}),
+  bonuses: () => NO_BONUSES, earnWave: () => ({upgrade:0}),
   persist: () => {}, reduceMotion: () => false, effects: () => true, devMode: () => false,
 });
 page.show();

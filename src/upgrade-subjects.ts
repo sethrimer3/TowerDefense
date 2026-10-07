@@ -35,7 +35,6 @@ export const SUBJECTS: Subject[] = [
       { id: "warBanner", name: "War banner", skills: ["warBanner", "bannerCooldown", "bannerDefense", "bannerReach", "bannerDamage", "bannerMarch", "bannerLife", "bannerRegen"] },
       { id: "towers", name: "All towers", training: ["towerDamage", "towerReload"], skills: ["fletchers", "ballistics"] },
       { id: "battle", name: "Battle", upgrades: ["bombSafe"], training: ["bombDamage"], extras: ["bomb", "speed3"], skills: ["gunpowder"] },
-      { id: "spoils", name: "Spoils", training: ["gold"], skills: ["plunder", "ironworks"] },
     ],
   },
   {

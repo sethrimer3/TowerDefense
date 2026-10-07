@@ -5,7 +5,7 @@
  * wave), and what a defense pays out. All of it folds into one `Bonuses` the
  * battle reads. Pure functions over the save, so tests drive them without a
  * page. */
-import { NO_BONUSES, type Bonuses, type EnemyKind } from "./defend/catalog.ts";
+import { NO_BONUSES, type Bonuses } from "./defend/catalog.ts";
 import { SKILLS, SKILL_IDS, TREES, skillAvailable, skillCost, type SkillId, type TreeId } from "./skill-trees.ts";
 import { battlePaths } from "./knowledge-paths.ts";
 import { trainingJob, trainingSeconds, type TrainingJob } from "./training-jobs.ts";
@@ -14,8 +14,8 @@ import type { Save } from "./save.ts";
 import type { SettingKey } from "./settings.ts";
 
 /** What the Smithy and the skill trees can raise: the battle's `Bonuses`,
- * the Gold a defense pays, and how fast the Smithy's upgrades are worked. */
-export type BonusTarget = Exclude<keyof Bonuses, "paths" | "banner"> | "gold" | "smithing";
+ * and how fast the Smithy's upgrades are worked. */
+export type BonusTarget = Exclude<keyof Bonuses, "paths" | "banner"> | "smithing";
 /** Bonuses that shorten a time: their percent divides instead of multiplies. */
 const TIMES = new Set<BonusTarget>(["drill", "towerReload", "rebuild", "smithing"]);
 
@@ -23,7 +23,7 @@ const TIMES = new Set<BonusTarget>(["drill", "towerReload", "rebuild", "smithing
 export const STARTING_METAL: Metals = { copper: 10, silver: 0, gold: 0 };
 
 // ── The Smithy's upgrades (Training) ───────────────────────────────────
-export type TrainingId = "troopHp" | "troopDamage" | "drill" | "towerDamage" | "towerReload" | "wallHp" | "keepHp" | "rebuild" | "bombDamage" | "gold";
+export type TrainingId = "troopHp" | "troopDamage" | "drill" | "towerDamage" | "towerReload" | "wallHp" | "keepHp" | "rebuild" | "bombDamage";
 export type TrainingRow = { id: TrainingId; group: keyof typeof TRAINING_GROUPS; name: string; per: number; max: number };
 export const TRAINING_GROUPS = { army: "Army", towers: "Towers", city: "City" } as const;
 /** Each rank adds `per` percent to its target, and costs a Smithy point
@@ -38,7 +38,6 @@ export const TRAINING: TrainingRow[] = [
   { id: "wallHp", group: "city", name: "Wall HP", per: 5, max: 50 },
   { id: "keepHp", group: "city", name: "Keep HP", per: 5, max: 50 },
   { id: "rebuild", group: "city", name: "Rebuild speed", per: 4, max: 30 },
-  { id: "gold", group: "city", name: "Gold found", per: 3, max: 50 },
 ];
 export const TRAINING_IDS = TRAINING.map((t) => t.id);
 
@@ -188,37 +187,15 @@ export function bonuses(save: Save): Bonuses {
 }
 
 // ── Rewards ────────────────────────────────────────────────────────────
-/** Gold a kill pays, before bonuses. */
-export const KILL_GOLD: Record<EnemyKind, number> = { roach: 2, orc: 5, ogre: 14, bat: 4, warlord: 150, mother: 10, broodling: 2, snake: 3, dragon: 30, shieldBearer: 500, aegis: 10000, darkKnight: 60, bombOrc: 20, bombBird: 40, voidSparrow: 50000, shieldLesser: 100, shieldGreater: 2500, poisonLesser: 100, poisonBearer: 500, poisonGreater: 2500, poisonSovereign: 10000, siegeBeetle: 50, burrowingMole: 25, necromancer: 80, skeleton: 0, bannerCaptain: 70, mirrorKnight: 60, leechSwarm: 20, ashPhoenix: 100, phoenixEgg: 0, blinkImp: 30, fortressHut: 2, fortressOutpost: 3, fortressTower: 8, fortressKeep: 12, fortressLesser: 100, fortress: 500, fortressGreater: 2500, fortressSovereign: 10000, rollingCannon: 12, ballista: 18, fireworkLauncher: 30, trebuchet: 300, bombard: 1200, rocketBattery: 3000, boatDinghy: 2, boatSailboat: 3, boatCutter: 8, boatCog: 12, boatLesser: 100, boat: 500, boatGreater: 2500, boatSovereign: 10000, iceGolem: 12, iceCube: 3 };
-/** Gold for holding a wave. */
-export const waveGold = (wave: number) => 10 + 5 * wave;
-/** What holding a wave pays: Gold, copper (the mine's metal) only with
- * Copperworks, and for each wave past the best before it Knowledge and an
- * upgrade point. */
-export function waveReward(save: Save, wave: number, best: number) {
-  return {
-    gold: waveGold(wave) * multiplier(save, "gold"),
-    copper: skillTotal(save, "copperPerWave"),
-    knowledge: wave > best ? (wave % 10 === 0 ? 3 : 1) : 0,
-    upgrade: wave > best ? 1 : 0,
-  };
-}
-
-/** Pays `slain` (kills since the last payment) in Gold. */
-export function payKills(save: Save, slain: Partial<Record<EnemyKind, number>>) {
-  let gold = 0;
-  for (const [kind, n] of Object.entries(slain) as [EnemyKind, number][]) gold += KILL_GOLD[kind] * n;
-  save.gold += gold * multiplier(save, "gold");
-  return { gold };
-}
-
+/** DEFEND pays only one upgrade point for clearing a new highest wave.
+ * Record it with the payment so retries cannot award the same wave twice. */
 export function payWave(save: Save, wave: number) {
-  const r = waveReward(save, wave, save.defend.bestWave);
-  save.gold += r.gold;
-  save.smithy.copper += r.copper;
-  save.knowledge += r.knowledge;
-  save.upgradePoints += r.upgrade;
-  return r;
+  const upgrade = Number.isInteger(wave) && wave > save.defend.bestWave ? 1 : 0;
+  if (upgrade) {
+    save.defend.bestWave = wave;
+    save.upgradePoints++;
+  }
+  return { upgrade };
 }
 
 /** Shown as a whole number, rounded down. */

@@ -13,7 +13,6 @@ import { stepBlazes } from '../src/defend/mages.ts';
 import { iceAt, meltIce, ageWater, stepBoat } from '../src/defend/boats.ts';
 import { journalHTML } from '../src/defend/journal.ts';
 import { defaultDefendSave, decodeDefendSave } from '../src/defend/progress.ts';
-import { KILL_GOLD } from '../src/progression.ts';
 
 function fixture() {
   const sim = new DefendSim(generateCity(fitLayout(defaultLayout()), 3), Object.fromEntries(UPGRADES.map(u => [u.id, 0])) as any, 4);
@@ -107,7 +106,6 @@ test('cubes smash blocking walls instead of sliding through them; frozen-zone sh
 test('new enemies have rewards and journal discovery survives decoding', () => {
   const save = defaultDefendSave(); save.discovered = ['iceGolem', 'iceCube'];
   assert.deepEqual(decodeDefendSave(save).discovered, save.discovered);
-  assert.ok(KILL_GOLD.iceGolem > 0 && KILL_GOLD.iceCube > 0);
   const html = journalHTML(save.discovered);
   assert.match(html, /double damage/); assert.match(html, /horizontally or vertically/);
 });

@@ -43,6 +43,7 @@
  * A prospect's ore runs out: once the shaft is at the bottom and the work
  * planned is done (`workedOut`), the player takes the crew, the buildings
  * and the stock to a new prospect (`prospectNext`), a fresh world. */
+import type { MetalPrice } from "../metals.ts";
 import {
   AIR, BEDROCK, CELLS, COPPER, DIG_TICKS, DIRT, GOLD, GRAVEL, H, LADDER, LAMP, LAVA, LOOSE, MATERIAL_COUNT, RAIL, ROCK, RUBBLE, SILVER, STONE, TIMBER, TORCH, WORK_LAMP, W, World,
   decodeGrid, encodeGrid, generate, hash01, idx, inBounds, isLoose, isOre, isPassable, isSoil, isSolid, isStone, isWood, stoneAtDepth, strata, type Material, type Strata,
@@ -94,9 +95,13 @@ export const STOCK_PER_LEVEL = 120, STOCK_RATE = 30;
 export const REBUILD_TICKS = 40 * TICK_HZ, MOVE_TICKS = 25 * TICK_HZ, REBUILD_SUPPLIES = 15, MOVE_SUPPLIES = 5;
 /** Each level of the shaft house keeps out this much more of the rain. */
 export const SEAL_LEVEL = 0.1;
-const UPGRADE_BASE: Record<BuildingId, number> = { shaft: 250, barracks: 300, warehouse: 400, forge: 350, smithy: 350 };
-/** Price in Gold of raising building `id` from `level` to the next. */
-export const upgradePrice = (id: BuildingId, level: number) => Math.round(UPGRADE_BASE[id] * Math.pow(2.5, level - 1));
+const UPGRADE_BASE: Record<BuildingId, number> = { shaft: 4, barracks: 5, warehouse: 6, forge: 5, smithy: 5 };
+/** Early buildings cost Copper; later levels add Silver, then Gold. */
+export const upgradePrice = (id: BuildingId, level: number): MetalPrice => ({
+  copper: UPGRADE_BASE[id] * level,
+  ...(level >= 2 ? { silver: level - 1 } : {}),
+  ...(level >= 3 ? { gold: level - 2 } : {}),
+});
 /** Supplies a miner fetches from the warehouse: each fitting and each
  * timber shoring uses one. */
 export const KIT = 12;
@@ -287,9 +292,13 @@ export type Fallen = { name: string; job: Job; cause: Cause };
 /** The job each `jobAt` value stands for. */
 const JOB_KIND = ["", "dig", "build", "bail", "douse"] as const;
 
-/** Price in Gold of the next miner for a crew of `crew` (the first is free,
- * so a crew of one pays the base price): a smaller crew hires cheaper. */
-export const hirePrice = (crew: number) => Math.round(120 * Math.pow(1.6, crew - 1));
+/** The first miner is supplied free. Growing crews cost Copper, adding
+ * Silver after five workers and Gold after fifteen. */
+export const hirePrice = (crew: number): MetalPrice => ({
+  copper: Math.max(1, crew + 1),
+  ...(crew >= 5 ? { silver: Math.floor(crew / 5) } : {}),
+  ...(crew >= 15 ? { gold: Math.floor(crew / 15) } : {}),
+});
 
 export class MineSim {
   readonly seed: number;
@@ -968,7 +977,7 @@ export class MineSim {
     if (level >= this.maxLevel(id)) return "warehouse";
     return this.rebuilding(id) ? "rebuilding" : null;
   }
-  /** The Gold the next level of building `id` costs. */
+  /** The metals the next level of building `id` costs. */
   upgradeCost(id: BuildingId) {
     return upgradePrice(id, this.buildingLevels[id]);
   }

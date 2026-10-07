@@ -4,7 +4,7 @@
 import {
   ENEMIES,
   type EnemyKind,
-  BOMB_GOLD,
+  BOMB_PRICE,
   STRUCTURES,
   SPEED3_PRICE,
   PALETTE_ITEMS,
@@ -202,10 +202,10 @@ export function unlockWaves(save: DefendSave): number {
   return save.unlockedWave;
 }
 
-/** Buys a bomb with battle Gold (`coins`, spent in place). */
-export function buyBomb(save: DefendSave, coins: { gold: number; free?: boolean }): boolean {
-  if (!coins.free && coins.gold < BOMB_GOLD) return false;
-  if (!coins.free) coins.gold -= BOMB_GOLD;
+/** Buys a bomb from the same metal wallet as every other tile. */
+export function buyBomb(save: DefendSave, wallet: Wallet): boolean {
+  if (!canAfford(wallet, BOMB_PRICE)) return false;
+  pay(wallet, BOMB_PRICE);
   save.bombs++;
   return true;
 }

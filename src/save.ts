@@ -17,9 +17,6 @@ export const SAVE_VERSION = 2;
 
 export type Save = {
   version: number;
-  /** Earned in battle, spent on the mine, the library and bombs. Keeps its
-   * fractions (bonuses). */
-  gold: number;
   /** One for each new best wave held; banked for what is to come. Saves
    * from before them start with one for each wave of the best. */
   upgradePoints: number;
@@ -51,7 +48,6 @@ export type Save = {
 export function defaults(): Save {
   return {
     version: SAVE_VERSION,
-    gold: 0,
     upgradePoints: 0,
     smithy: { ...STARTING_METAL },
     knowledge: 0,
@@ -83,7 +79,6 @@ export function decode(raw: string | null): Save {
     return d;
   }
   if (!s || typeof s !== "object" || !Number.isInteger(s.version) || s.version > SAVE_VERSION) return d;
-  d.gold = num(s.gold, 0);
   for (const k of METALS) d.smithy[k] = int(s.smithy?.[k], 0);
   if (s.version < 2) {
     // A point was a hundred bars, and copper and silver were battle coins

@@ -422,8 +422,8 @@ export function upgradePrice(level: number): Price {
   };
 }
 
-/** A bomb costs battle Gold, not metal: it is spent, not kept. */
-export const BOMB_GOLD = 60;
+/** A bomb is a consumable bought with the Mine's Copper. */
+export const BOMB_PRICE: Price = { copper: 1 };
 /** One-off unlock of the 3× battle speed. */
 export const SPEED3_PRICE: Price = { copper: 4 };
 export const BOMB_RADIUS = 3.2;

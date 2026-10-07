@@ -3,7 +3,8 @@ import "./theme.css";
 import { defaults, load, persist, type Save } from "./save.ts";
 import { countdown } from "./away.ts";
 import { DefendPage } from "./defend/ui.ts";
-import { bonuses, busySmiths, payKills, payWave, settleTraining, skillRank, skillTotal, whole } from "./progression.ts";
+import { spendMetals } from "./metals.ts";
+import { bonuses, busySmiths, payWave, settleTraining, skillRank, skillTotal, whole } from "./progression.ts";
 import type { AppContext } from "./ui/app.ts";
 import { el, type Tab } from "./ui/dom.ts";
 import { buildShell } from "./ui/shell.ts";
@@ -74,10 +75,6 @@ const defendPage = new DefendPage(el("defend"), {
   save: () => save.defend,
   bonuses: () => bonuses(save),
   outskirts: () => skillRank(save, "outskirts") > 0,
-  earnKills: (slain) => {
-    payKills(save, slain);
-    refreshCurrencies();
-  },
   earnWave: (wave) => {
     const r = payWave(save, wave);
     store();
@@ -100,10 +97,10 @@ const defendPage = new DefendPage(el("defend"), {
 });
 
 const minePage = new MinePage(el("mine-world"), {
-  gold: () => save.gold,
+  metals: () => save.smithy,
   free: () => save.settings.devMode,
-  spendGold: (n) => {
-    save.gold = Math.max(0, save.gold - n);
+  spendMetals: (price) => {
+    spendMetals(save.smithy, price, save.settings.devMode);
     update();
   },
   earn: (points) => {
@@ -122,10 +119,10 @@ const minePage = new MinePage(el("mine-world"), {
   descend: () => openChamber("smithy"),
 });
 const libraryPage = new LibraryPage(el("library-world"), {
-  gold: () => save.gold,
+  metals: () => save.smithy,
   free: () => save.settings.devMode,
-  spendGold: (n) => {
-    save.gold = Math.max(0, save.gold - n);
+  spendMetals: (price) => {
+    spendMetals(save.smithy, price, save.settings.devMode);
     update();
   },
   effects: () => !save.settings.effectsOff,
@@ -217,8 +214,7 @@ function refreshCurrencies() {
   };
   show("copper", save.smithy.copper);
   show("silver", save.smithy.silver);
-  show("gold-bars", save.smithy.gold);
-  show("gold", save.gold);
+  show("gold", save.smithy.gold);
   show("knowledge", save.knowledge);
   show("upgrade-points", save.upgradePoints);
 }

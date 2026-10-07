@@ -9,8 +9,6 @@ import { center, rectDist } from '../src/defend/pathing.ts';
 import { buildDifficultyWave } from '../src/defend/waves.ts';
 import { journalHTML } from '../src/defend/journal.ts';
 import { defaultDefendSave, decodeDefendSave } from '../src/defend/progress.ts';
-import { defaults } from '../src/save.ts';
-import { KILL_GOLD, payKills } from '../src/progression.ts';
 
 const BOATS: EnemyKind[] = ['boatLesser', 'boat', 'boatGreater', 'boatSovereign'];
 const SMALL_BOATS: EnemyKind[] = ['boatDinghy', 'boatSailboat', 'boatCutter', 'boatCog'];
@@ -123,12 +121,11 @@ test('a stopped small boat refreshes one pool; moving, death and expiry still le
   assert.equal(s.floods.length, 1, 'expired pool is replaced');
 });
 
-test('small boats pay valid kill rewards and persist journal discoveries with accurate water notes', () => {
+test('small boat kills count once and journal discoveries persist with accurate water notes', () => {
   for (const kind of SMALL_BOATS) {
-    const s = sim(), e = create(s, kind, 10, 10), save = defaults(), gold = save.gold;
-    s.hurtEnemy(e, 1e9, true, 'melee'); (s as any).sweepAway(); payKills(save, s.slain);
-    assert.equal(save.gold - gold, KILL_GOLD[kind]);
-    assert.ok(Number.isFinite(save.gold));
+    const s = sim(), e = create(s, kind, 10, 10);
+    s.hurtEnemy(e, 1e9, true, 'melee'); (s as any).sweepAway();
+    assert.equal(s.slain[kind], 1);
   }
   const saved = defaultDefendSave(); saved.discovered = [...SMALL_BOATS]; saved.journalRead = [...SMALL_BOATS];
   const decoded = decodeDefendSave(saved);

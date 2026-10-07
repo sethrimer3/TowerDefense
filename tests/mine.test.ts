@@ -150,7 +150,7 @@ test("a mine saves and loads whole; a malformed save is dropped", () => {
 });
 
 test("each miner hired costs more than the last", () => {
-  for (let n = 0; n < 10; n++) assert.ok(hirePrice(n + 1) > hirePrice(n));
+  for (let n = 0; n < 10; n++) assert.ok(hirePrice(n + 1).copper! > hirePrice(n).copper!);
 });
 
 // ── Water, loose ground and lava ──────────────────────────────────────
@@ -275,7 +275,7 @@ test("miners drown, burn and starve; each loss makes the next hire cheaper", () 
   assert.equal(sim.lost.drowned, 1);
   assert.equal(sim.miners.length, 2);
   assert.ok(!sim.miners.includes(m));
-  assert.ok(sim.price < price, "a smaller crew hires cheaper");
+  assert.ok(sim.price.copper! < price.copper!, "a smaller crew hires cheaper");
   assert.equal(sim.mercy, DEATH_GAP - BREATH_TICKS - 10 + (sim.mercy - (DEATH_GAP - BREATH_TICKS - 10)), "deaths are spaced");
   assert.ok(sim.news.some((n) => n.kind === "lost" && n.cause === "drowned"));
 
@@ -696,9 +696,9 @@ test("the barracks bunks five a level, the forge two hands and the smithy one sm
   sim.setLevel("warehouse", MAX_LEVEL);
   assert.equal(sim.upgradeBlock("warehouse"), "top");
   assert.equal(sim.maxLevel("forge"), MAX_LEVEL);
-  assert.ok(sim.upgradeCost("forge") > 0);
+  assert.ok(sim.upgradeCost("forge").copper! > 0);
   sim.setLevel("forge", 2);
-  assert.ok(sim.upgradeCost("forge") > sim.upgradeCost("smithy"), "each level costs more");
+  assert.ok(sim.upgradeCost("forge").copper! > sim.upgradeCost("smithy").copper!, "each level costs more");
   for (let i = 0; i < 10; i++) sim.hire();
   assert.equal(sim.miners.length, 10);
 });

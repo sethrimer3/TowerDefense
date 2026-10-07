@@ -8,7 +8,8 @@
  * the Mine's Smithy and the Library's Study (`tileTopic`); a kind's higher
  * tier is its Knowledge path's crown (`higherTier`). Pure functions over the
  * save, so the page and the tests share them. */
-import { BOMB_GOLD, ITEM_CATEGORY, ITEM_NAMES, PALETTE_ITEMS, purchasePrice, type PaletteItem, type Price } from "./defend/catalog.ts";
+import { metalPriceText } from "./metals.ts";
+import { BOMB_PRICE, ITEM_CATEGORY, ITEM_NAMES, PALETTE_ITEMS, purchasePrice, type PaletteItem, type Price } from "./defend/catalog.ts";
 import { available, buyBomb, buyItem, canAfford, type Wallet } from "./defend/progress.ts";
 import { crownBought, crownedFrom, evolvedBy, PATHS, type KnowledgePath } from "./knowledge-paths.ts";
 import { METALS } from "./mine/sim.ts";
@@ -76,11 +77,10 @@ export function tileCopies(stack: TileStack, limit = Infinity): TileCopy[] {
   return Array.from({ length: n }, (_, index) => ({ key: `${stack.id}#${index}`, id: stack.id, index, placed: index < stack.placed }));
 }
 
-/** The shop's offer for a kind: its price (the mine's metal, or battle Gold
- * for bombs), or why it isn't sold. */
-export type ShopOffer = { price: Price; gold?: undefined } | { gold: number; price?: undefined } | { reason: string };
+/** The shop's metal price, or why a kind isn't sold. */
+export type ShopOffer = { price: Price } | { reason: string };
 export function shopOffer(save: Save, id: TileId): ShopOffer {
-  if (id === "bomb") return { gold: BOMB_GOLD };
+  if (id === "bomb") return { price: BOMB_PRICE };
   if (id === "warBanner") return { reason: "Always at hand in battle: one banner, never used up." };
   const crown = crownedFrom(save, id)?.evolves;
   if (crown) return { reason: `Crowned: every ${ITEM_NAMES[id]} is now a ${crown.name}. Buy those instead.` };
@@ -94,23 +94,20 @@ export function shopOffer(save: Save, id: TileId): ShopOffer {
 export function canBuyTile(save: Save, id: TileId): boolean {
   const offer = shopOffer(save, id);
   if (save.settings.devMode) return !("reason" in offer);
-  if ("gold" in offer && offer.gold !== undefined) return save.gold >= offer.gold;
   if ("price" in offer && offer.price) return canAfford({ ...save.smithy }, offer.price);
   return false;
 }
 
-/** Buys one more tile of a kind, paying with the mine's metal (or Gold, for
- * a bomb); free with Unlimited money. A building bought while its kind is
+/** Buys one more tile of a kind, paying with the mine's metal; free with Unlimited money. A building bought while its kind is
  * crowned counts with the crown, so unlearning turns it back too. */
 export function buyTile(save: Save, id: TileId): boolean {
   const offer = shopOffer(save, id), free = save.settings.devMode;
   if ("reason" in offer) return false;
-  if (id === "bomb") return buyBomb(save.defend, free ? { gold: 0, free: true } : save);
   if (id === "warBanner") return false;
   const w: Wallet = { ...save.smithy, free };
-  if (!buyItem(save.defend, w, id)) return false;
+  if (!(id === "bomb" ? buyBomb(save.defend, w) : buyItem(save.defend, w, id))) return false;
   if (!free) for (const k of METALS) save.smithy[k] = w[k];
-  const grown = evolvedBy(id);
+  const grown = id === "bomb" ? undefined : evolvedBy(id);
   if (grown) crownBought(save, grown.evolves!.from);
   return true;
 }
@@ -132,9 +129,8 @@ export function higherTier(id: TileId): { into?: KnowledgePath; from?: Knowledge
   return { into: PATHS.find((p) => p.evolves?.from === id), from: evolvedBy(id) };
 }
 
-/** A price in words: "3 copper · 1 silver", or "60 Gold". */
+/** A metal price in words, including consumables. */
 export function offerText(offer: ShopOffer): string {
   if ("reason" in offer) return "";
-  if (offer.gold !== undefined) return `${offer.gold} Gold`;
-  return METALS.filter((k) => offer.price![k]).map((k) => `${offer.price![k]} ${k}`).join(" · ");
+  return metalPriceText(offer.price);
 }

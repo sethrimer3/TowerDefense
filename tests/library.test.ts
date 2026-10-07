@@ -251,7 +251,7 @@ test("a fire burns the shelves, kills those caught in it, and the survivors flee
   assert.ok(sim.lost, "what the fire cost is told");
   assert.equal(sim.lost.librarians, sim.deaths);
   assert.equal(sim.librarians.length, 8 - sim.deaths, "the dead are gone until hired again");
-  assert.equal(librarianPrice(sim.hired), librarianPrice(8 - sim.deaths), "and cost as much as hiring new");
+  assert.deepEqual(librarianPrice(sim.hired), librarianPrice(8 - sim.deaths), "and cost as much as hiring new");
   for (let b = 0; b < BAYS; b++) {
     const h = sim.bayHeight(b);
     for (let u = h; u < MAX_UNITS; u++) assert.equal(sim.units[b * MAX_UNITS + u], -1, "nothing stands on a burnt-out shelf");
@@ -387,8 +387,8 @@ test("day and night come round, and prices climb", () => {
   assert.equal(daylight(DAY_MS / 4), 1);
   assert.equal(daylight((3 * DAY_MS) / 4), 0);
   for (let n = 0; n < 20; n++) {
-    assert.ok(shelfPrice(n + 1) > shelfPrice(n));
-    assert.ok(librarianPrice(n + 1) > librarianPrice(n));
+    assert.ok(shelfPrice(n + 1).copper! > shelfPrice(n).copper!);
+    assert.ok(librarianPrice(n + 1).copper! > librarianPrice(n).copper!);
   }
 });
 
@@ -403,8 +403,8 @@ test("the lab has room for a researcher a level; expanding it opens annexes and 
   const other = sim.librarians.find((l) => l.role !== "researcher")!;
   assert.equal(sim.setRole(other, "researcher"), false, "no room for a second");
   assert.equal(roleFor({ shelver: 1, professor: 1, researcher: 0 }, 0), "professor", "no room, no researcher");
-  assert.equal(labPrice(1), 1500);
-  assert.ok(labPrice(2) > labPrice(1));
+  assert.deepEqual(labPrice(1), { copper: 10 });
+  assert.ok(labPrice(2).copper! > labPrice(1).copper!);
   for (let level = 2; level <= LAB_MAX_LEVEL; level++) assert.ok(sim.upgradeLab());
   assert.equal(sim.upgradeLab(), false, "no further than the top");
   assert.equal(sim.researcherCap, LAB_MAX_LEVEL);

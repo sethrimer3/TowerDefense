@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { defaults } from "../src/save.ts";
-import { BOMB_GOLD, PALETTE_ITEMS, purchasePrice } from "../src/defend/catalog.ts";
+import { BOMB_PRICE, PALETTE_ITEMS, purchasePrice } from "../src/defend/catalog.ts";
 import { placeCityTile, placeStructure } from "../src/defend/layout.ts";
 import { evolve, learnPath } from "../src/knowledge-paths.ts";
 import { CONSUMABLES, TILE_FILTERS, TILE_IDS, TILE_TYPE, buyTile, canBuyTile, higherTier, shopOffer, tileCopies, tileStack, tileStacks, tileTopic } from "../src/tiles.ts";
@@ -40,14 +40,14 @@ test("identical tiles stack, counted with those standing in the city; filters sh
   assert.ok(tileStack(s, "warBanner").lasting);
 });
 
-test("the shop sells every kind for sale, in metal (bombs in Gold), and refuses what can't be paid", () => {
+test("the shop sells every kind for sale, in metal, including bombs, and refuses what can't be paid", () => {
   const s = defaults();
   s.smithy = { copper: 3, silver: 0, gold: 0 };
   const shop = tileStacks(s, "all", true).map((t) => t.id);
   assert.ok(shop.includes("wizardTower") && shop.includes("bomb"), "unowned kinds are sold");
   assert.ok(!shop.includes("warBanner"), "the banner isn't sold");
   assert.ok(!shop.includes("darkKeep") && !shop.includes("valkyriePalace"), "crowns' buildings aren't sold");
-  assert.deepEqual(shopOffer(s, "bomb"), { gold: BOMB_GOLD });
+  assert.deepEqual(shopOffer(s, "bomb"), { price: BOMB_PRICE });
   assert.deepEqual(shopOffer(s, "archerTower"), { price: purchasePrice("archerTower", s.defend.owned.archerTower) });
   assert.ok(canBuyTile(s, "archerTower"));
   const owned = s.defend.owned.archerTower;
@@ -56,14 +56,14 @@ test("the shop sells every kind for sale, in metal (bombs in Gold), and refuses 
   assert.equal(s.smithy.copper, 0);
   assert.ok(!canBuyTile(s, "archerTower"));
   assert.equal(buyTile(s, "archerTower"), false);
-  s.gold = BOMB_GOLD;
+  s.smithy.copper = BOMB_PRICE.copper!;
   assert.ok(buyTile(s, "bomb"));
-  assert.deepEqual([s.gold, s.defend.bombs], [0, 1]);
+  assert.deepEqual([s.smithy.copper, s.defend.bombs], [0, 1]);
   assert.equal(buyTile(s, "bomb"), false);
   assert.equal(buyTile(s, "warBanner"), false);
   s.settings.devMode = true;
   assert.ok(buyTile(s, "bomb") && buyTile(s, "cannonTower"), "unlimited money buys for nothing");
-  assert.equal(s.gold, 0);
+  assert.equal(s.smithy.copper, 0);
 });
 
 test("crowned, a kind's tiles are its greater building's, bought in its place, and counted with the crown", () => {

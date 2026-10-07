@@ -130,7 +130,7 @@ export class TilesPage {
     grid.querySelectorAll<HTMLCanvasElement>("canvas[data-icon]").forEach((cv) => paintIcon(cv, cv.dataset.icon as IconItem));
     const all = tileStacks(s, "all"), placed = all.reduce((a, t) => a + t.placed, 0), count = all.reduce((a, t) => a + (t.lasting ? 0 : t.count), 0);
     c.querySelector(".tiles-foot")!.innerHTML = shop
-      ? `Paid with the mine's metal (bombs with Gold) · tap a tile to buy`
+      ? `Paid with Copper, Silver and Gold from the Mine · tap a tile to buy`
       : `<b>${count}</b> tiles · <b>${placed}</b> standing in the city · tap a stack to open it`;
   }
 

@@ -429,7 +429,7 @@ test('patrol routes: max level sends swordsmen after enemies anywhere in the cit
 test('3× speed unlock is bought once and saved', async () => {
   const { buySpeed3 } = await import('../src/defend/progress.ts');
   const save = defaultDefendSave();
-  const wallet = { gold: 10_000, copper: 100, silver: 0 };
+  const wallet = { gold: 0, copper: 100, silver: 0 };
   assert.ok(buySpeed3(save, wallet));
   assert.equal(buySpeed3(save, wallet), false);
   assert.equal(decodeDefendSave(JSON.parse(JSON.stringify(save))).speed3, true);

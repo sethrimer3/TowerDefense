@@ -54,10 +54,8 @@ export type DefendHost = {
   /** Whether city tiles may stand apart from the keep's (the Study's
    * Outlying districts). */
   outskirts?(): boolean;
-  /** Pays Gold for enemies slain. */
-  earnKills(slain: Partial<Record<EnemyKind, number>>): void;
   /** Pays for holding `wave` (called before the best wave is raised). */
-  earnWave(wave: number): { gold: number; copper: number; knowledge: number; upgrade: number };
+  earnWave(wave: number): { upgrade: number };
   persist(): void;
   reduceMotion(): boolean;
   /** The park grass and pond effects are on. */
@@ -119,8 +117,6 @@ export class DefendPage {
   /** Whether the side panel is open in each phase: the build palette starts
    * open, the battle's items closed so the battle has the whole view. */
   private sideOpen = { build: true, sim: false };
-  /** Kills already paid for this run, by kind. */
-  private paid: Record<EnemyKind, number> = { roach: 0, orc: 0, ogre: 0, bat: 0, warlord: 0, mother: 0, broodling: 0, snake: 0, dragon: 0, shieldBearer: 0, aegis: 0, darkKnight: 0, bombOrc: 0, bombBird: 0, voidSparrow: 0, shieldLesser: 0, shieldGreater: 0, poisonLesser: 0, poisonBearer: 0, poisonGreater: 0, poisonSovereign: 0, siegeBeetle: 0, burrowingMole: 0, necromancer: 0, skeleton: 0, bannerCaptain: 0, mirrorKnight: 0, leechSwarm: 0, ashPhoenix: 0, phoenixEgg: 0, blinkImp: 0, fortressHut: 0, fortressOutpost: 0, fortressTower: 0, fortressKeep: 0, fortressLesser: 0, fortress: 0, fortressGreater: 0, fortressSovereign: 0, rollingCannon: 0, ballista: 0, fireworkLauncher: 0, trebuchet: 0, bombard: 0, rocketBattery: 0, boatDinghy: 0, boatSailboat: 0, boatCutter: 0, boatCog: 0, boatLesser: 0, boat: 0, boatGreater: 0, boatSovereign: 0, iceGolem: 0, iceCube: 0 };
 
   constructor(root: HTMLElement, host: DefendHost) {
     this.root = root;
@@ -685,7 +681,6 @@ export class DefendPage {
     this.sim = new DefendSim(map, { ...this.save.levels }, (defendRandom("rolls")() * 2147483648) | 0, this.host.bonuses());
     this.sim.speed = Math.min(this.save.battleSpeed, this.save.speed3 ? 3 : 2);
     this.sim.startAt(startingWave(this.save));
-    this.paid = { roach: 0, orc: 0, ogre: 0, bat: 0, warlord: 0, mother: 0, broodling: 0, snake: 0, dragon: 0, shieldBearer: 0, aegis: 0, darkKnight: 0, bombOrc: 0, bombBird: 0, voidSparrow: 0, shieldLesser: 0, shieldGreater: 0, poisonLesser: 0, poisonBearer: 0, poisonGreater: 0, poisonSovereign: 0, siegeBeetle: 0, burrowingMole: 0, necromancer: 0, skeleton: 0, bannerCaptain: 0, mirrorKnight: 0, leechSwarm: 0, ashPhoenix: 0, phoenixEgg: 0, blinkImp: 0, fortressHut: 0, fortressOutpost: 0, fortressTower: 0, fortressKeep: 0, fortressLesser: 0, fortress: 0, fortressGreater: 0, fortressSovereign: 0, rollingCannon: 0, ballista: 0, fireworkLauncher: 0, trebuchet: 0, bombard: 0, rocketBattery: 0, boatDinghy: 0, boatSailboat: 0, boatCutter: 0, boatCog: 0, boatLesser: 0, boat: 0, boatGreater: 0, boatSovereign: 0, iceGolem: 0, iceCube: 0 };
     this.phase = "sim";
     this.newRecord = 0;
     const area = areaForWave(startingWave(this.save));
@@ -699,7 +694,6 @@ export class DefendPage {
 
   private endRun() {
     if (!this.sim) return;
-    this.payKills();
     this.performanceEnd = this.sim.lost ? 'lost' : 'abandoned';
     this.phase = "over";
     play("fallen");
@@ -727,40 +721,23 @@ export class DefendPage {
     if (changed) { this.host.persist(); this.refreshJournal(); }
   }
 
-  /** Pays for the kills since the last frame. */
-  private payKills() {
-    const sim = this.sim!;
-    const fresh: Partial<Record<EnemyKind, number>> = {};
-    let any = false;
-    for (const kind of Object.keys(ENEMIES) as EnemyKind[]) {
-      const n = sim.slain[kind] - this.paid[kind];
-      if (n > 0) {
-        fresh[kind] = n;
-        this.paid[kind] = sim.slain[kind];
-        any = true;
-      }
-    }
-    if (!any) return;
-    this.host.earnKills(fresh);
-  }
-
   private handleEvents() {
     this.discoverEnemies();
     const sim = this.sim!;
-    this.payKills();
     for (const ev of sim.events.splice(0)) {
       if (ev.type === "waveCleared") {
         this.performanceEnd = 'cleared';
+        const record = ev.wave > this.save.bestWave;
         const r = this.host.earnWave(ev.wave);
-        const pay = `+${Math.floor(r.gold)} gold${r.copper ? ` · +${r.copper} copper` : ""}${r.knowledge ? ` · +${r.knowledge} Knowledge` : ""}${r.upgrade ? ` · +${r.upgrade} upgrade point` : ""}`;
-        if (ev.wave > this.save.bestWave) {
+        const pay = r.upgrade ? " +1 upgrade point" : "";
+        if (record) {
           this.save.bestWave = ev.wave;
           this.newRecord = ev.wave;
           this.host.persist();
-          this.proclaim(`New record — wave ${ev.wave} survived! ${pay}`, 3, "win");
+          this.proclaim(`New record — wave ${ev.wave} survived!${pay}`, 3, "win");
           play("record");
         } else {
-          this.proclaim(`Wave ${ev.wave} cleared. ${pay}`, 2, "win");
+          this.proclaim(`Wave ${ev.wave} cleared.${pay}`, 2, "win");
           play("wave");
         }
       } else if (ev.type === "waveStart") {

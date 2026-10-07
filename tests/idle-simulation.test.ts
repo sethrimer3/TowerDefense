@@ -9,7 +9,7 @@ import { Fire, cellAt, CELL, FW, decodeFireSave } from "../src/library/fire.ts";
 
 function library() {
   let now = 100000, earned = 0;
-  const host: LibraryHost = { gold: () => 0, free: () => false, spendGold() {}, effects: () => false,
+  const host: LibraryHost = { metals: () => ({ copper: 0, silver: 0, gold: 0 }), free: () => false, spendMetals() {}, effects: () => false,
     newSeed: () => 5, clock: () => now, earnKnowledge: (n) => earned += n,
     upgrades: () => ({ fireproof: 1000, fireTraining: 0, nightWatch: 0 }), showing: () => false };
   const page = new LibraryPage({} as HTMLElement, host);
@@ -46,7 +46,7 @@ test("Library queues the full capped absence without paying or replacing the lib
 
 test("Mine banks more than two hours, preserves the queue, and does not pay its historical pace", () => {
   let paid = 0, now = 100000;
-  const host: MineHost = { gold: () => 0, free: () => false, spendGold() {}, earn: (p) => paid += p.copper + p.silver + p.gold,
+  const host: MineHost = { metals: () => ({ copper: 0, silver: 0, gold: 0 }), free: () => false, spendMetals() {}, earn: (p) => paid += p.copper + p.silver + p.gold,
     upgrades: () => ({ coffee: 0, waterproof: 0, smiths: 0 }), busySmiths: () => new Set(), effects: () => false,
     newSeed: () => 9, modal: {} as HTMLDialogElement, store() {} };
   const sim = new MineSim(9), saved = sim.save(now - 4 * HOUR_MS);

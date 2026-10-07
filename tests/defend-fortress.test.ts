@@ -11,8 +11,6 @@ import { buildDifficultyWave, MAX_WAVE_ENEMIES } from '../src/defend/waves.ts';
 import { fortressBodyPixels } from '../src/defend/fortress-art.ts';
 import { journalHTML } from '../src/defend/journal.ts';
 import { decodeDefendSave, defaultDefendSave } from '../src/defend/progress.ts';
-import { KILL_GOLD, payKills } from '../src/progression.ts';
-import { defaults } from '../src/save.ts';
 
 function simulation() {
   const fit = fitLayout(defaultLayout()); assert.ok(fit.ok);
@@ -67,10 +65,6 @@ test('each small walker retains armor, leg damage, independent guns and a single
     sim.hurtEnemy(core, 1e9, true, 'melee'); (sim as any).sweepAway();
     assert.equal(sim.enemies.length, 0);
     assert.equal(sim.slain[kind], 1);
-    const save = defaults(), before = save.gold;
-    payKills(save, sim.slain);
-    assert.equal(save.gold - before, KILL_GOLD[kind]);
-    assert.ok(Number.isFinite(save.gold));
   }
 });
 

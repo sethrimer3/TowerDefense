@@ -4,7 +4,7 @@
  * return to building. Pure HTML strings, so a test can read them. */
 import type { BattleStats, WaveStats } from "./battle-stats.ts";
 
-export type DefeatSummary = { wave: number; best: number; record: number; stats: BattleStats; gold?: number };
+export type DefeatSummary = { wave: number; best: number; record: number; stats: BattleStats };
 
 /** 12,400 → "12.4k", 1,200,000 → "1.2M". */
 export function short(n: number) {

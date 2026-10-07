@@ -28,6 +28,7 @@
  *
  * Side view in pixels (`geometry.ts`). Everything random draws from the
  * library's own seeded stream. */
+import type { MetalPrice } from "../metals.ts";
 import { random } from "../random.ts";
 import { decodeGrid, encodeGrid } from "../mine/world.ts";
 import { Fire, cellAt, decodeFireSave, type FireSave, type Burnable } from "./fire.ts";
@@ -182,10 +183,23 @@ export type LibrarySave = {
   lab?: number;
 };
 
-export const shelfPrice = (built: number) => Math.round(40 * Math.pow(1.06, built));
-export const librarianPrice = (hired: number) => Math.round(100 * Math.pow(1.5, hired));
-/** Gold to raise the alchemy lab from `level` to the next. */
-export const labPrice = (level: number) => 1500 * Math.pow(4, level - 1);
+/** Early shelving costs Copper; large collections add Silver and Gold. */
+export const shelfPrice = (built: number): MetalPrice => ({
+  copper: built + 1,
+  ...(built >= 20 ? { silver: Math.floor(built / 20) } : {}),
+  ...(built >= 60 ? { gold: Math.floor(built / 60) } : {}),
+});
+export const librarianPrice = (hired: number): MetalPrice => ({
+  copper: hired + 2,
+  ...(hired >= 4 ? { silver: Math.floor(hired / 4) } : {}),
+  ...(hired >= 12 ? { gold: Math.floor(hired / 12) } : {}),
+});
+/** Copper opens the first annex; later expansions add Silver and Gold. */
+export const labPrice = (level: number): MetalPrice => ({
+  copper: 10 * level,
+  ...(level >= 2 ? { silver: 3 * (level - 1) } : {}),
+  ...(level >= 3 ? { gold: level - 2 } : {}),
+});
 /** The chance a minute that a table catches fire, with Fireproof Wood's ranks. */
 /** The chance a minute that one shelved book becomes enchanted, with
  * `ranks` of Enchanted ink: 1 in `ENCHANT_ODDS` a rank. */
