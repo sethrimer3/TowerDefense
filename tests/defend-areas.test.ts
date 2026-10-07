@@ -27,8 +27,10 @@ test('dry and underground areas never rain, cold areas snow, wet areas rain more
       assert.equal(!!w.snow, area.climate === 'cold');
     }
   }
-  assert.equal(skyLabel(rollWeather(() => 0, areaForWave(101)), 0), 'Snow');
-  assert.equal(skyLabel(rollWeather(() => 0, areaForWave(21)), 0), 'Clear');
+  assert.equal(skyLabel(rollWeather(() => .5, areaForWave(101)), 0), 'Snow');
+  assert.equal(skyLabel(rollWeather(() => 0, areaForWave(101)), 0), 'Blizzard');
+  assert.equal(skyLabel(rollWeather(() => 0, areaForWave(21)), 0), 'Sandstorm');
+  assert.equal(skyLabel(rollWeather(() => 0, areaForWave(41)), 0), 'Clear');
 });
 
 test('terrain and ambient fades have exact endpoints and a smooth midpoint', () => {

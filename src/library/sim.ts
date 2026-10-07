@@ -96,6 +96,8 @@ export type Librarian = {
    * read (bound for the return shelf). */
   carrying: number;
   spent: boolean;
+  /** Whether the book in hand (or open on the table) is enchanted. */
+  rune: boolean;
   /** Original shelf slot of a charred book being carried out, or -1. */
   burntFrom: number;
   /** A plank or a bucket in hand (a book is `carrying`); in the lab, a flask
@@ -158,6 +160,10 @@ export type LibrarySave = {
   burnables?: { kind: "unit" | "ladder" | "table" | "cart" | "return"; k: number }[];
   damaged?: number[];
   burntSlots?: string;
+  /** Which shelved books are enchanted (1) or not (0), as `slots`. */
+  enchanted?: string;
+  /** Knowledge enchanted books have given, all told. */
+  runesRead?: number;
   butts?: number[];
   looseBooks?: number[];
   burntLoose?: { color: number; x: number }[];
@@ -181,6 +187,14 @@ export const librarianPrice = (hired: number) => Math.round(100 * Math.pow(1.5, 
 /** Gold to raise the alchemy lab from `level` to the next. */
 export const labPrice = (level: number) => 1500 * Math.pow(4, level - 1);
 /** The chance a minute that a table catches fire, with Fireproof Wood's ranks. */
+/** The chance a minute that one shelved book becomes enchanted, with
+ * `ranks` of Enchanted ink: 1 in `ENCHANT_ODDS` a rank. */
+export const ENCHANT_ODDS = 10000;
+export const enchantChance = (ranks: number) => ranks / ENCHANT_ODDS;
+/** Knowledge an enchanted book gives when read: two hours of the library's
+ * rate at the time, and never less than 25. */
+export const enchantedGift = (rate: number) => Math.max(25, rate * 2);
+
 export const accidentChance = (fireproof: number) => 0.01 * Math.pow(0.9, fireproof);
 /** What Fire Training's ranks do: the share of librarians who fight a fire,
  * how fast they move, the water each throws, and each droplet's chance of
@@ -284,6 +298,15 @@ export class LibrarySim {
   /** Each slot's book colour (0 empty). */
   readonly slots = new Uint8Array(SLOTS);
   readonly burntSlots = new Uint8Array(SLOTS);
+  /** Enchanted books on the shelves (1 where the slot's book is). */
+  readonly enchanted = new Uint8Array(SLOTS);
+  /** Enchanted ink's ranks: each a 1 in `ENCHANT_ODDS` chance a minute
+   * that a shelved book takes on runes (the page keeps it current). */
+  enchant = 0;
+  /** Knowledge an enchanted book gave when read, waiting for the page to
+   * pay it (`takeBonus`), and all such Knowledge so far. */
+  private bonus = 0;
+  runesRead = 0;
   readonly damaged = new Set<number>();
   /** Ladder height per bay, in shelf units. */
   readonly ladders = new Array<number>(BAYS).fill(0);
@@ -382,6 +405,9 @@ export class LibrarySim {
     this.minute = saved.minute ?? this.time % 60;
     for (const k of saved.damaged ?? []) this.damaged.add(k);
     if (saved.burntSlots) this.burntSlots.set(decodeGrid(saved.burntSlots, SLOTS, BOOK_COLORS.length)!);
+    if (saved.enchanted) this.enchanted.set(decodeGrid(saved.enchanted, SLOTS, 2)!);
+    for (let s = 0; s < SLOTS; s++) if (!this.slots[s]) this.enchanted[s] = 0;
+    this.runesRead = saved.runesRead ?? 0;
     if (saved.butts) saved.butts.forEach((v, i) => this.butts[i] = v);
     if (saved.counters) Object.assign(this, saved.counters);
     saved.crewState?.forEach((c, i) => Object.assign(this.librarians[i], c));
@@ -392,6 +418,8 @@ export class LibrarySim {
       this.before = { shelves: this.shelves, librarians: this.librarians.length, books: this.booksBurnt };
       this.chooseFighters();
     }
+    // Saves from before charred books fell with their shelves.
+    if (saved.fire && saved.burnables) this.dropBurnt();
     // Read books already loaded for export must go outside, not back to
     // the unread shelves, when a save interrupts the cart's trip.
     if (saved.exportedBooks?.length) {
@@ -489,7 +517,7 @@ export class LibrarySim {
     const tints = ["#1a1a22", "#3a2a6a", "#7a2222", "#2a4a3a", "#5a3a1a", "#20304a"];
     const l: Librarian = {
       id, name: name ?? librarianName(this.hires++, this.seed, this.librarians.map((o) => o.name)), hat: HATS[0], tint: tints[Math.floor(r() * tints.length)],
-      role, x, y: FLOOR, facing: 1, carrying: 0, spent: false, burntFrom: -1, hand: "", vial: 0, soot: 0, water: 0, pushing: null, away: false,
+      role, x, y: FLOOR, facing: 1, carrying: 0, spent: false, rune: false, burntFrom: -1, hand: "", vial: 0, soot: 0, water: 0, pushing: null, away: false,
       mode: "work", scorched: 0, action: "idle", steps: [], seat: -1, reading: 0, held: [], site: "", plankClaim: false, bookClaim: false,
       energy: 0.6 + r() * 0.4, home: false, with: 0,
     };
@@ -601,7 +629,9 @@ export class LibrarySim {
     return [...this.reach(from), {
       kind: "work", t: 0.8, action: "grab", done: () => {
         l.carrying = this.slots[from];
+        l.rune = !!this.enchanted[from];
         this.slots[from] = 0;
+        this.enchanted[from] = 0;
         this.unhold(l, from);
       },
     }, this.down()];
@@ -612,7 +642,9 @@ export class LibrarySim {
       kind: "work", t: 0.8, action: "place", done: () => {
         if (l.carrying && !this.slots[to] && !this.burntSlots[to]) {
           this.slots[to] = l.carrying;
+          this.enchanted[to] = l.rune ? 1 : 0;
           l.carrying = 0;
+          l.rune = false;
         }
         this.unhold(l, to);
       },
@@ -807,6 +839,7 @@ export class LibrarySim {
       return [{ kind: "walk", x: RETURN.x + RETURN.w / 2 }, {
         kind: "work", t: 0.5, action: "grab", done: () => {
           l.carrying = this.returns.pop() ?? 0;
+          l.rune = false;
           l.spent = true;
         },
       }, { kind: "walk", x: cart.x + (RETURN.x < cart.x ? -5 : 5) }, {
@@ -893,7 +926,10 @@ export class LibrarySim {
         return;
       }
     }
-    const job = (shelving ? (this.burntJob(l) ?? this.buildJob(l) ?? this.cartJob(l) ?? this.unloadCart(l)) : null) ?? (l.role === "professor" ? this.readJob(l) : null);
+    // Building comes first, then fetching planks and books, then carrying
+    // charred books out: after a big fire there can be hundreds, one a trip,
+    // and the shelves mustn't wait on them all.
+    const job = (shelving ? (this.buildJob(l) ?? this.cartJob(l) ?? this.burntJob(l) ?? this.unloadCart(l)) : null) ?? (l.role === "professor" ? this.readJob(l) : null);
     if (job) {
       l.steps = job;
       return;
@@ -964,6 +1000,7 @@ export class LibrarySim {
         this.cartClaims--;
         l.bookClaim = false;
         l.carrying = cart.books.pop() ?? 0;
+        l.rune = false;
         l.spent = false;
       },
     }];
@@ -979,6 +1016,13 @@ export class LibrarySim {
       if (!l.carrying) return;
       l.spent = true;
       this.read++;
+      if (l.rune) {
+        // An enchanted book's runes give up their knowledge at once.
+        const gift = enchantedGift(this.rate);
+        this.bonus += gift;
+        this.runesRead += gift;
+        l.rune = false;
+      }
     };
     const seat = this.seats.findIndex((id, k) => id === 0 && this.tables[k >> 1] === TABLE_PLANKS);
     if (seat < 0) return [...this.fetch(l, from), { kind: "walk", x: 20 + r() * (W - 40) }, { kind: "work", t: 18 + r() * 14, action: "read", done: finish }];
@@ -1407,8 +1451,21 @@ export class LibrarySim {
       if (this.fire.left(p.x, p.y) < 0.6) {
         this.burntSlots[s] = this.slots[s];
         this.slots[s] = 0;
+        this.enchanted[s] = 0;
         this.booksBurnt++;
       }
+    }
+    this.dropBurnt();
+  }
+  /** Charred books whose shelf has burnt away under them fall to the floor,
+   * to be swept up there, rather than hang where the shelf was. */
+  private dropBurnt() {
+    for (let s = 0; s < SLOTS; s++) {
+      if (!this.burntSlots[s]) continue;
+      const p = slotPixel(s);
+      if (this.fire.left(p.x, p.y + 1) >= 0.3) continue;
+      this.burntLoose.push({ color: this.burntSlots[s], x: p.x });
+      this.burntSlots[s] = 0;
     }
   }
 
@@ -1424,6 +1481,12 @@ export class LibrarySim {
       this.minute -= 60;
       const whole = this.tables.map((p, t) => (p === TABLE_PLANKS ? t : -1)).filter((t) => t >= 0);
       if (!this.fire.active && whole.length && this.rng() < accidentChance(this.fireproof)) this.ignite(whole[Math.floor(this.rng() * whole.length)]);
+      // Now and then a shelved book takes on runes: the more books on the
+      // shelves, the likelier one somewhere does.
+      if (this.enchant > 0) {
+        const odds = enchantChance(this.enchant);
+        for (let s = 0; s < SLOTS; s++) if (this.slots[s] && !this.enchanted[s] && this.rng() < odds) this.enchanted[s] = 1;
+      }
     }
     this.fireClock += dt;
     while (this.fireClock >= FIRE_DT) {
@@ -1543,6 +1606,13 @@ export class LibrarySim {
     l.pushing.facing = l.facing;
   }
 
+  /** Knowledge enchanted books have given since last asked. */
+  takeBonus() {
+    const b = this.bonus;
+    this.bonus = 0;
+    return b;
+  }
+
   save(now: number): LibrarySave {
     // Books read and in hand go on the return shelf; the rest in hand, on the
     // tables and in the cart are put back where there's room.
@@ -1559,9 +1629,19 @@ export class LibrarySim {
       else if (l.carrying) loose.push(l.carrying);
       if (l.reading) loose.push(l.reading);
     }
+    // Enchanted books in hand, unread, go back first (they are popped first).
+    const enchanted = new Uint8Array(this.enchanted);
+    let runes = 0;
+    for (const l of this.librarians) if (l.rune && !l.spent && l.burntFrom < 0 && (l.carrying || l.reading)) {
+      const at = loose.lastIndexOf(l.reading || l.carrying);
+      if (at >= 0) { loose.push(loose.splice(at, 1)[0]); runes++; }
+    }
     for (let s = 0; s < SLOTS && loose.length; s++) {
       const { bay, unit } = slotPlace(s);
-      if (!slots[s] && !burnt[s] && this.units[unitKey(bay, unit)] === PLANKS) slots[s] = loose.pop()!;
+      if (!slots[s] && !burnt[s] && this.units[unitKey(bay, unit)] === PLANKS) {
+        slots[s] = loose.pop()!;
+        if (runes > 0) { enchanted[s] = 1; runes--; }
+      }
     }
     // Keep active heat, consumed fuel and debris for the next catch-up.
     return {
@@ -1571,6 +1651,7 @@ export class LibrarySim {
       time: this.time, fire: this.fire.save(), burnables: this.burnables.map((b) => ({ ...b })),
       rngState: this.rngState, minute: this.minute, firedAt: this.firedAt,
       damaged: [...this.damaged], burntSlots: encodeGrid(burnt), butts: [...this.butts],
+      enchanted: encodeGrid(enchanted), runesRead: this.runesRead,
       looseBooks: loose, burntLoose: debris, returnPlanks: this.returnPlanks,
       exportedBooks,
       crewState: this.librarians.map((l) => ({ x: l.x, y: l.y, scorched: l.scorched, energy: l.energy })),
@@ -1631,6 +1712,8 @@ export function decodeLibrarySave(s: any): LibrarySave | null {
   if (Number.isFinite(s.firedAt) && s.firedAt >= 0 && s.firedAt <= (out.time ?? 0)) out.firedAt = s.firedAt;
   if (Array.isArray(s.damaged) && s.damaged.length <= MAX_SHELVES && s.damaged.every((k: unknown) => int(k, 0, BAYS * MAX_UNITS - 1))) out.damaged = [...s.damaged];
   if (decodeGrid(s.burntSlots, SLOTS, BOOK_COLORS.length)) out.burntSlots = s.burntSlots;
+  if (decodeGrid(s.enchanted, SLOTS, 2)) out.enchanted = s.enchanted;
+  if (Number.isFinite(s.runesRead) && s.runesRead >= 0) out.runesRead = s.runesRead;
   if (int(s.returnPlanks, 0, TABLE_PLANKS)) out.returnPlanks = s.returnPlanks;
   if (Array.isArray(s.looseBooks) && s.looseBooks.length <= SLOTS && s.looseBooks.every((c: unknown) => int(c, 1, BOOK_COLORS.length - 1))) out.looseBooks = [...s.looseBooks];
   if (Array.isArray(s.exportedBooks) && s.exportedBooks.length <= CART_BOOKS + MAX_LIBRARIANS && s.exportedBooks.every((c: unknown) => int(c, 1, BOOK_COLORS.length - 1))) out.exportedBooks = [...s.exportedBooks];

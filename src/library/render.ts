@@ -24,7 +24,7 @@
 import { stream } from "../random.ts";
 import {
   BAYS, BAY_W, BAY_X0, BOOKS_PER_ROW, BOOK_COLORS, BUTTS, BUTT_FULL, FLOOR, H, HALL, HALL_H, MAX_UNITS, PLANKS, RETURN, RETURN_PER_ROW, ROW_H, STAIR_X, TABLES, TABLE_PLANKS,
-  TABLE_TOP, W, WINDOW, WORLD_H, bayX, ladderX, slotIndex, unitTop, type Cart, type Librarian, type LibrarySim, type Role,
+  TABLE_TOP, W, WINDOW, WORLD_H, bayX, ladderX, slotIndex, slotPlace, unitTop, type Cart, type Librarian, type LibrarySim, type Role,
 } from "./sim.ts";
 import { CELL, FW } from "./fire.ts";
 import { ELIXIRS } from "./lab.ts";
@@ -103,6 +103,8 @@ export class LibraryRenderer {
   readonly canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
   private off: HTMLCanvasElement;
+  /** Wall-clock seconds, for the flames' flicker. */
+  private flame = 0;
   /** The fire's smoke and ash, painted a pixel at a time. */
   private sootCanvas = document.createElement("canvas");
   private sootCtx: CanvasRenderingContext2D;
@@ -133,6 +135,7 @@ export class LibraryRenderer {
   private hallSy = [new Float32Array(HALL * HALL_ROWS), new Float32Array(HALL * HALL_ROWS)];
   private hallRelief = [new Uint8Array(HALL * HALL_ROWS), new Uint8Array(HALL * HALL_ROWS)];
   private lastTime = -1;
+  private lastWall = -1;
   /** Which tables stand whole, their candles lit. */
   private candles = TABLES.map(() => true);
   /** This frame's fire, gathered into blocks of 24 pixels: centres and sizes. */
@@ -474,9 +477,9 @@ export class LibraryRenderer {
           L[i * 3 + 2] += v * cb;
         }
     };
-    TORCHES.forEach((t, n) => shine(t.x, t.y - 3, 70, flicker(time, n) * 1.25, 1, 0.62, 0.3));
-    this.blazes.forEach((b, n) => shine(b.x, b.y, 26 + Math.min(44, b.n * 0.9), Math.min(1.9, 0.35 + b.n * 0.03) * flicker(time * 2.3, n + 20), 1, 0.52, 0.22));
-    CANDLES.forEach((c, n) => this.candles[n] && shine(c.x, c.y, 28, flicker(time * 1.7, n + 9) * 0.75, 1, 0.75, 0.45));
+    TORCHES.forEach((t, n) => shine(t.x, t.y - 3, 70, flicker(this.flame, n) * 1.25, 1, 0.62, 0.3));
+    this.blazes.forEach((b, n) => shine(b.x, b.y, 26 + Math.min(44, b.n * 0.9), Math.min(1.9, 0.35 + b.n * 0.03) * flicker(this.flame * 2.3, n + 20), 1, 0.52, 0.22));
+    CANDLES.forEach((c, n) => this.candles[n] && shine(c.x, c.y, 28, flicker(this.flame * 1.7, n + 9) * 0.75, 1, 0.75, 0.45));
   }
 
   // ── A frame ─────────────────────────────────────────────────────────
@@ -522,9 +525,16 @@ export class LibraryRenderer {
   }
 
   draw(sim: LibrarySim, now: number, time: number, effects: boolean) {
+    // Flames flicker on the wall clock, so they stay calm while the library
+    // fast-forwards through idle time.
+    this.flame = this.lab.flame = performance.now() / 1000;
     const day = daylight(now);
     const dt = this.lastTime < 0 ? 0 : Math.min(0.2, Math.max(0, time - this.lastTime));
     this.lastTime = time;
+    // The lab's apparatus animates on the wall clock too, so it keeps its
+    // pace while idle time fast-forwards the researchers.
+    const wallDt = this.lastWall < 0 ? 0 : Math.min(0.2, Math.max(0, this.flame - this.lastWall));
+    this.lastWall = this.flame;
     if (this.target && !sim.librarians.includes(this.target)) this.target = null;
     if (this.goal !== null) {
       // Glide down to the lab, or back up to the nave.
@@ -571,11 +581,12 @@ export class LibraryRenderer {
     this.drawHalls(sim, dt);
     ctx.drawImage(this.off, 0, 0);
     const top = -oy / scale, bottom = (this.canvas.height - oy) / scale, labShown = LabRenderer.visible(top, bottom);
-    if (labShown) this.lab.draw(ctx, sim, time, dt, effects);
+    if (labShown) this.lab.draw(ctx, sim, this.flame, wallDt, effects);
     this.drawTrapdoor();
     if (day < 0.6) this.drawStars(now, 1 - day / 0.6);
     if (effects && day > 0.02) this.drawRays(now, day);
     for (const r of sim.remains) this.drawRemains(r.x, Math.min(1, (600 - (sim.time - r.at)) / 30));
+    this.drawRunes(sim);
     this.drawButts(sim);
     for (const c of [sim.barrow, sim.bookCart]) if (c.here) this.drawCart(c);
     // Whoever is on the ladder between the nave's floor and the lab's vault
@@ -590,7 +601,7 @@ export class LibraryRenderer {
     // The piers' feet stand in front, so those going to and from the
     // hallways pass behind them.
     for (const x of [0, W - BAY_X0]) ctx.drawImage(this.off, x, PIER_FRONT, BAY_X0, FLOOR - PIER_FRONT, x, PIER_FRONT, BAY_X0, FLOOR - PIER_FRONT);
-    if (labShown) this.lab.drawOver(ctx, sim, time, dt, effects);
+    if (labShown) this.lab.drawOver(ctx, sim, this.flame, wallDt, effects);
     if (this.target && !this.target.away) {
       // A brass marker over whoever is followed.
       const t = this.target, y = Math.round(t.y) - 12 - (Math.floor(time * 2) % 2);
@@ -748,6 +759,30 @@ export class LibraryRenderer {
   }
 
   /** The flames cell by cell, licking upward, with smoke, embers and thrown water. */
+  /** Enchanted books: tiny runes glowing up their spines, one pixel each,
+   * slowly cycling between arcane blue and violet, with a faint halo. */
+  private drawRunes(sim: LibrarySim) {
+    const ctx = this.ctx, t = this.flame;
+    for (let s = 0; s < sim.enchanted.length; s++) {
+      if (!sim.enchanted[s] || !sim.slots[s]) continue;
+      const { bay, unit, row, i } = slotPlace(s);
+      const x0 = bayX(bay), y0 = unitTop(unit);
+      if (sim.fire.missing(x0 + 1 + i * 2, y0 + row * ROW_H + ROW_H - 2)) continue;
+      const tall = 4 + Math.floor(h01(bay * 31 + unit, row * 7 + i, 4) * 3), bx = x0 + 1 + i * 2, by = y0 + row * ROW_H + ROW_H - 1;
+      const pulse = 0.65 + 0.35 * Math.sin(t * 1.6 + s * 0.7);
+      ctx.globalAlpha = 0.15 * pulse;
+      ctx.fillStyle = "#8fb8ff";
+      ctx.fillRect(bx - 1, by - tall - 1, 4, tall + 1);
+      ctx.globalAlpha = 1;
+      for (let k = 2; k < tall; k += 2) {
+        const phase = Math.sin(t * 2.2 + s + k);
+        ctx.fillStyle = phase > 0.3 ? "#c9e6ff" : phase > -0.3 ? "#7fb0ff" : "#c08cff";
+        ctx.fillRect(bx + ((k >> 1) % 2), by - k, 1, 1);
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
   /** The fire's smoke and ash, a pixel at a time into one image, so cells
    * meet without seams at any zoom. Ash is a mottle of grey-browns with
    * white flecks and bits of charcoal, its crust catching the light and
@@ -817,7 +852,7 @@ export class LibraryRenderer {
     ctx.globalCompositeOperation = "lighter";
     this.blazes.forEach((b, n) => {
       const r = 10 + Math.min(40, b.n * 0.8);
-      ctx.globalAlpha = Math.min(0.85, 0.25 + b.n * 0.012) * flicker(time * 2.3, n + 20);
+      ctx.globalAlpha = Math.min(0.85, 0.25 + b.n * 0.012) * flicker(this.flame * 2.3, n + 20);
       ctx.drawImage(this.glow, b.x - r, b.y - r, r * 2, r * 2);
     });
     ctx.restore();
@@ -1090,7 +1125,7 @@ export class LibraryRenderer {
       ctx.fillStyle = "#2a2622";
       ctx.fillRect(t.x - 1, t.y, 3, 1);
       ctx.fillRect(t.x, t.y - 1, 1, 3);
-      const f = flicker(time, n);
+      const f = flicker(this.flame, n);
       ctx.fillStyle = "#ff8a2a";
       ctx.fillRect(t.x - (f > 1 ? 1 : 0), t.y - 3, f > 1 ? 3 : 1, 2);
       ctx.fillStyle = "#ffe08a";
@@ -1098,19 +1133,19 @@ export class LibraryRenderer {
     });
     CANDLES.forEach((c, n) => {
       if (!this.candles[n]) return;
-      ctx.fillStyle = flicker(time * 1.7, n + 9) > 1 ? "#ffe9a0" : "#ffb24a";
+      ctx.fillStyle = flicker(this.flame * 1.7, n + 9) > 1 ? "#ffe9a0" : "#ffb24a";
       ctx.fillRect(c.x, c.y, 1, 1);
     });
     if (!effects) return;
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
     TORCHES.forEach((t, n) => {
-      ctx.globalAlpha = 0.35 * flicker(time, n);
+      ctx.globalAlpha = 0.35 * flicker(this.flame, n);
       ctx.drawImage(this.glow, t.x + 0.5 - 14, t.y - 2.5 - 14, 28, 28);
     });
     CANDLES.forEach((c, n) => {
       if (!this.candles[n]) return;
-      ctx.globalAlpha = 0.3 * flicker(time * 1.7, n + 9);
+      ctx.globalAlpha = 0.3 * flicker(this.flame * 1.7, n + 9);
       ctx.drawImage(this.glow, c.x + 0.5 - 7, c.y + 0.5 - 7, 14, 14);
     });
     ctx.restore();

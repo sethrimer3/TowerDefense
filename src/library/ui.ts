@@ -6,7 +6,8 @@
  * simulation steps at up to 120 times speed. Knowledge, fires, deaths,
  * firefighting and repairs happen as those steps run. */
 import { play } from "../sound.ts";
-import { countdown, HOUR_MS, IDLE_SPEED, MAX_AWAY_MS } from "../away.ts";
+import type { Scene } from "../ambience.ts";
+import { countdown, HOUR_MS, IDLE_LEAD, IDLE_SPEED, idleDrain, MAX_AWAY_MS } from "../away.ts";
 import { H, LAB_FLOOR, LAB_MAX_LEVEL, MAX_LIBRARIANS, labPrice, MAX_SHELVES, LibrarySim, ROLES, RETURN_BOOKS, librarianPrice, shelfPrice, type Librarian, type LibrarySave, type Role } from "./sim.ts";
 
 import { LibraryRenderer, daylight } from "./render.ts";
@@ -32,8 +33,8 @@ export interface LibraryHost {
   clock(): number;
   /** The library earned Knowledge (fractions included). */
   earnKnowledge(n: number): void;
-  /** Fireproof Wood's, Fire Training's and Night watch's ranks. */
-  upgrades(): { fireproof: number; fireTraining: number; nightWatch: number };
+  /** Fireproof Wood's, Fire Training's, Night watch's and Enchanted ink's ranks. */
+  upgrades(): { fireproof: number; fireTraining: number; nightWatch: number; enchant: number };
   /** Whether the Library tab shows. */
   showing(): boolean;
 }
@@ -87,7 +88,7 @@ export class LibraryPage {
 
   /** Spend queued time in ordinary simulation steps, within a frame budget.
    * Knowledge is paid for those steps only, at the rate they actually had. */
-  advance(now: number) {
+  advance(now: number, keepWith = 0) {
     const gap = Math.max(0, now - this.ranTo);
     this.ranTo = now;
     this.owed = Math.min(MAX_AWAY_MS, this.owed + gap);
@@ -95,16 +96,22 @@ export class LibraryPage {
     this.sim.fireproof = up.fireproof;
     this.sim.fireTraining = up.fireTraining;
     this.sim.nightWatch = up.nightWatch;
+    this.sim.enchant = up.enchant;
     const start = performance.now();
     const limit = Math.max(100, Math.min(1000, gap) * IDLE_SPEED);
     let spent = 0, earned = 0, n = 0;
-    while (this.owed >= 100 - 1e-6 && spent + 100 <= limit + 1e-6) {
+    // Keep pace with the mine's idle time (`keepWith`), never more than
+    // IDLE_LEAD ahead of it, so both spend it together.
+    while (this.owed >= 100 - 1e-6 && spent + 100 <= limit + 1e-6 && this.owed - idleDrain(this.owed, 100) >= keepWith - IDLE_LEAD) {
       this.sim.night = 1 - daylight(this.host.clock() - this.owed);
       const rate = this.sim.rate;
+      // Catching up, a step spends (and pays for) ten steps of idle time.
+      const drain = Math.min(this.owed, idleDrain(this.owed, 100)), boost = drain / 100;
       this.sim.step(0.1);
-      this.owed = Math.max(0, this.owed - 100);
+      this.owed = Math.max(0, this.owed - drain);
       spent += 100;
-      const pay = rate * 100 / HOUR_MS;
+      // Enchanted books read pay their gift on top.
+      const pay = (rate * 100 / HOUR_MS + this.sim.takeBonus()) * boost;
       earned += pay;
       if (this.away?.catchingUp) {
         this.awayKnowledge += pay;
@@ -361,6 +368,13 @@ export class LibraryPage {
     }
     alert.hidden = !fire && !lost;
     alert.classList.toggle("burning", fire);
+  }
+
+  /** What can be heard in the nave: birdsong by day and crickets by night
+   * through the stone, and a fire, when one burns, right there. */
+  ambience(): Scene {
+    const night = this.sim.night;
+    return { rain: 0, wind: 0.1, howl: 0, sand: 0, thunder: 0, birds: (1 - night) * 0.7, night, drips: 0, fire: this.sim.fire.active ? 1 : 0, muffle: 0.75 };
   }
 
   /** Draws the nave (while the tab shows). */

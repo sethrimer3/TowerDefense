@@ -4,7 +4,8 @@
  * file of enemies along its line. Neither exists in a city without them,
  * so such runs replay exactly as before. */
 import { dist, sq } from "../exact.ts";
-import { BALLISTA, ENEMIES, SPIKES, enemySize } from "./catalog.ts";
+import { BLAST_STAKES, RIME_STAKES, SPRING_STAKES, pathRank } from "../knowledge-paths.ts";
+import { BALLISTA, ENEMIES, enemySize, spikeDamage, spikeEvery } from "./catalog.ts";
 import type { Building } from "./citygen.ts";
 import { cellX, cellY } from "./grid.ts";
 import { center, nearest } from "./pathing.ts";
@@ -25,30 +26,90 @@ export type BallistaBolt = {
 
 const SIDE_STEP = { n: [0, -1], e: [1, 0], s: [0, 1], w: [-1, 0] } as const;
 
-/** Every `SPIKES.every` seconds, each ground enemy touching the stakes on a
- * standing wall stone takes `SPIKES.damage` (once a pulse, however many
- * stakes it touches). */
+/** A row of spring stakes shooting out: which row (its index in
+ * `map.spikes`), how far, and how long ago. */
+export type SpikeThrust = { row: number; reach: number; t: number };
+
+/** Every `spikeEvery` seconds, each ground enemy touching the stakes on a
+ * standing wall stone takes `spikeDamage` (once a pulse, however many
+ * stakes it touches). The Study's paths add to the cut: blasting stakes
+ * blow up the stone's stakes, spring stakes shoot the whole row out, and
+ * rimed stakes chill. */
 export function stepSpikes(sim: DefendSim, dt: number) {
   const rows = sim.map.spikes;
   if (!rows) return;
+  if (sim.spikeArm.size)
+    for (const [k, t] of sim.spikeArm) if (t - dt <= 0) sim.spikeArm.delete(k); else sim.spikeArm.set(k, t - dt);
+  if (sim.spikeThrusts.length) {
+    for (const t of sim.spikeThrusts) t.t += dt;
+    sim.spikeThrusts = sim.spikeThrusts.filter((t) => t.t < SPRING_STAKES.show);
+  }
   sim.spikeT -= dt;
   if (sim.spikeT > 0) return;
-  sim.spikeT += SPIKES.every;
+  sim.spikeT += spikeEvery(sim.levels.spikeRate ?? 0);
+  const paths = sim.bonuses.paths;
+  const blast = pathRank(paths, "spikes", "blastStakes"), spring = pathRank(paths, "spikes", "springStakes"), rime = pathRank(paths, "spikes", "rimeStakes");
+  const cut = spikeDamage(sim.levels.spikeDamage ?? 0);
   const struck = new Set<number>();
-  for (const row of rows) {
+  const sprung: number[] = [];
+  rows.forEach((row, r) => {
     const [dx, dy] = SIDE_STEP[row.side];
     for (const cell of row.cells) {
       if (!sim.solid[cell]) continue;
       // The stakes reach half a cell out from the stone's outer face.
       const cx = cellX(cell) + 0.5 + dx * 0.75, cy = cellY(cell) + 0.5 + dy * 0.75;
+      let touched = false;
       for (const e of sim.enemiesNear(cx, cy, 1.5)) {
-        if (struck.has(e.id) || !onFoot(e)) continue;
-        const r = enemySize(e) / 2;
+        if (!onFoot(e) || e.hp <= 0) continue;
+        const rad = enemySize(e) / 2;
         const hx = dx ? 0.25 : 0.5, hy = dy ? 0.25 : 0.5;
-        if (Math.abs(e.x - cx) > hx + r || Math.abs(e.y - cy) > hy + r) continue;
+        if (Math.abs(e.x - cx) > hx + rad || Math.abs(e.y - cy) > hy + rad) continue;
+        touched = true;
+        if (struck.has(e.id)) continue;
         struck.add(e.id);
-        sim.hurtEnemy(e, SPIKES.damage, true, "melee");
+        const bite = rime >= 2 && e.chill ? RIME_STAKES.bite : 1;
+        if (rime) e.chill = Math.max(e.chill ?? 0, RIME_STAKES.chill[rime]);
+        sim.hurtEnemy(e, cut * bite, true, "melee");
       }
+      if (!touched) continue;
+      if (blast && !sim.spikeArm.has(cell)) {
+        sim.spikeArm.set(cell, BLAST_STAKES.rearm[blast]);
+        sim.explode(cx, cy, { r: BLAST_STAKES.radius[blast], damage: cut * BLAST_STAKES.damage[blast], friendlyFire: false });
+      }
+      if (spring && !sprung.includes(r) && !sim.spikeArm.has(-1 - r)) sprung.push(r);
+      if (rime >= 3) {
+        for (const e of sim.enemiesNear(cx, cy, RIME_STAKES.aura + 1)) {
+          if (!onFoot(e) || e.hp <= 0 || sq(e.x - cx) + sq(e.y - cy) > sq(RIME_STAKES.aura + enemySize(e) / 2)) continue;
+          e.chill = Math.max(e.chill ?? 0, RIME_STAKES.chill[rime]);
+        }
+      }
+    }
+  });
+  for (const r of sprung) springRow(sim, r, spring, cut);
+}
+
+/** Every standing stone's stakes in row `r` shoot out, striking each enemy
+ * on foot in front of the row (once, however many stones reach it). Spring
+ * rows are armed under negative keys, so they never meet a stone's. */
+function springRow(sim: DefendSim, r: number, rank: number, cut: number) {
+  const row = sim.map.spikes![r];
+  const [dx, dy] = SIDE_STEP[row.side];
+  const reach = SPRING_STAKES.reach[rank];
+  sim.spikeArm.set(-1 - r, SPRING_STAKES.rearm[rank]);
+  sim.spikeThrusts.push({ row: r, reach, t: 0 });
+  const hit = new Set<number>();
+  for (const cell of row.cells) {
+    if (!sim.solid[cell]) continue;
+    // The zone in front of this stone: its width along the wall, and from
+    // its outer face out to the stakes' reach.
+    const cx = cellX(cell) + 0.5 + dx * (0.5 + reach / 2), cy = cellY(cell) + 0.5 + dy * (0.5 + reach / 2);
+    const hx = dx ? reach / 2 : 0.5, hy = dy ? reach / 2 : 0.5;
+    for (const e of sim.enemiesNear(cx, cy, reach / 2 + 1.5)) {
+      if (hit.has(e.id) || !onFoot(e) || e.hp <= 0) continue;
+      const rad = enemySize(e) / 2;
+      if (Math.abs(e.x - cx) > hx + rad || Math.abs(e.y - cy) > hy + rad) continue;
+      hit.add(e.id);
+      sim.hurtEnemy(e, cut * SPRING_STAKES.damage[rank], true, "melee");
     }
   }
 }

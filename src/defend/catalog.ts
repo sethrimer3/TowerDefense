@@ -306,6 +306,8 @@ export type UpgradeId =
   | "chainCount"
   | "baitRestock"
   | "baitBlast"
+  | "spikeDamage"
+  | "spikeRate"
   | "wallStrength"
   | "keepStrength"
   | "civilianCount"
@@ -401,6 +403,8 @@ export const UPGRADES: UpgradeDef[] = [
     describe: (l) =>
       l ? `Fallen bait bursts for ${baitBlastDamage(l)} damage over ${baitBlastRadius(l).toFixed(1)} cells, the ground burning ${baitFireSeconds(l).toFixed(1)}s` : "Fallen bait just falls",
   },
+  { id: "spikeDamage", group: "Wall spikes", name: "Iron-shod stakes", maxLevel: 6, describe: (l) => `The stakes cut for ${spikeDamage(l)} damage` },
+  { id: "spikeRate", group: "Wall spikes", name: "Barbed edges", maxLevel: 4, describe: (l) => `The stakes cut every ${spikeEvery(l).toFixed(2)}s` },
   { id: "wallStrength", group: "City", name: "Masonry", maxLevel: 6, describe: (l) => `${wallHp(l)} HP per wall stone` },
   { id: "keepStrength", group: "City", name: "Keep bastions", maxLevel: 6, describe: (l) => `${keepHp(l)} keep HP` },
   { id: "civilianCount", group: "Civilians", name: "Guild of builders", maxLevel: 5, describe: (l) => `${civilianCount(l)} civilians repair the city` },
@@ -435,6 +439,9 @@ export const archerDamage = (l: number) => 6 + l * 3;
 export const archerRange = (l: number) => 10 + l * 2;
 export const archerCooldown = (l: number) => 1.1 * intPow(0.85, l);
 export const watchRadius = (l: number) => 8 + l * 2;
+/** What wall spikes cut for, and how often they cut. */
+export const spikeDamage = (l: number) => SPIKES.damage + l * 3;
+export const spikeEvery = (l: number) => SPIKES.every * intPow(0.85, l);
 export const archerUnitRange = (l: number) => 3 + l;
 export const cannonDamage = (l: number) => 20 + l * 9;
 export const cannonSplash = (l: number) => 1.7 + l * 0.15;

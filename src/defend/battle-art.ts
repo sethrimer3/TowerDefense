@@ -73,12 +73,7 @@ export function drawUnits(b: Brush, sim: DefendSim, torches: Burning | null, hea
   const start = timing ? performance.now() : 0;
   drawCivilians(b, sim, torches);
   const swords = drawSoldiers(b, sim, torches);
-  for (const e of sim.enemies) {
-    const def = ENEMIES[e.kind];
-    if (def.siege) drawSiegeEngine(b, e, sim.time);
-    else if (def.boat) drawBoat(b, e, sim.time);
-    else drawEnemy(b, e, sim);
-  }
+  for (const e of sim.enemies) drawEnemyArt(b, e, sim);
   drawSwords(b, swords);
   if (timing) timing.entityMs += performance.now() - start;
   drawArrows(b.c, b.px, sim);
@@ -293,6 +288,16 @@ function drawHandTorch({ c, px }: Brush, at: { x: number; y: number; id: number 
   c.fillStyle = f > 0.5 ? "#ffe6a8" : "#ffb35c";
   c.fillRect(at.x * px - s / 2, at.y * px - s * (1 + f * 0.5), s, s * (1 + f * 0.5));
   c.globalAlpha = 1;
+}
+
+/** One enemy as the battle draws it: a siege engine, a boat or a body.
+ * The journal's portraits draw through it too, with a stand-in sim that
+ * has only `time` and `effects`. */
+export function drawEnemyArt(b: Brush, e: Enemy, sim: DefendSim) {
+  const def = ENEMIES[e.kind];
+  if (def.siege) drawSiegeEngine(b, e, sim.time);
+  else if (def.boat) drawBoat(b, e, sim.time);
+  else drawEnemy(b, e, sim);
 }
 
 /** Enemies: tiny squares, gold-outlined when marked, with a shadow under

@@ -10,9 +10,13 @@ const fx = defendRandom("effects");
 
 export type Weather = { rain: boolean; snow?: boolean; clear?: boolean; sand?: boolean; mist?: boolean; blizzard?: boolean };
 
+/** How often a cold area's snow comes as a blizzard. */
+export const STORM_CHANCE = .3;
+
 export function rollWeather(rand = defendRandom("rolls"), area: Area = AREAS[0]): Weather {
   const roll = rand();
-  if (area.climate === "cold") return { rain: false, snow: true };
+  // Where other areas would storm, the cold whips the snow into a blizzard.
+  if (area.climate === "cold") return roll < STORM_CHANCE ? { rain: false, snow: true, blizzard: true } : { rain: false, snow: true };
   if (area.id === "desert") return { rain: false, sand: true, clear: true };
   if (area.id === "fungal") return { rain: false, mist: true };
   return { rain: roll < area.rainChance, clear: area.climate === "dry" };
@@ -56,6 +60,9 @@ export function skyLabel(w: Weather, night: number) {
 }
 
 /** Slow drifting flakes, bounded by view size, presentation only. */
+/** The most flakes a view holds, at a blizzard's height. */
+export const SNOW_CAP = 1400;
+
 export class Snow {
   private flakes: { x: number; y: number; speed: number; phase: number }[] = [];
   private w = 0;
@@ -64,7 +71,7 @@ export class Snow {
   private intensity = 0;
   update(dt: number, w: number, h: number, intensity = 0) {
     this.intensity = Math.max(0, Math.min(1, intensity));
-    const count = Math.min(700, Math.round(w * h / 4500 * (1 + this.intensity * 3)));
+    const count = Math.min(SNOW_CAP, Math.round(w * h / 4500 * (1 + this.intensity * 5)));
     if (w !== this.w || h !== this.h || count !== this.flakes.length) {
       this.w = w; this.h = h;
       // Preserve existing flakes while density changes during the night fade.
@@ -79,9 +86,15 @@ export class Snow {
     }
   }
   draw(c: CanvasRenderingContext2D, px: number) {
-    c.fillStyle = "rgba(225,242,255,.65)";
-    const size = Math.max(1, Math.round(px * .12));
-    for (const f of this.flakes) c.fillRect(Math.round(f.x), Math.round(f.y), size * (1 + Math.round(this.intensity)), size);
+    // Flakes are whole pixel squares; in a blizzard each drags a fading
+    // streak behind it along the wind, dense but thin enough to see through.
+    const size = Math.max(2, Math.round(px * .18)), streak = Math.round(this.intensity * 3);
+    if (streak) {
+      c.fillStyle = "rgba(200,226,250,.35)";
+      for (const f of this.flakes) c.fillRect(Math.round(f.x) - size * streak, Math.round(f.y) - Math.round(size * streak / 3), size * streak, size);
+    }
+    c.fillStyle = "rgba(236,246,255,.85)";
+    for (const f of this.flakes) c.fillRect(Math.round(f.x), Math.round(f.y), size, size);
   }
 }
 

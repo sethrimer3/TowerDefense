@@ -1,6 +1,7 @@
 import "./style.css";
 import "./theme.css";
 import { defaults, load, persist, type Save } from "./save.ts";
+import { countdown } from "./away.ts";
 import { DefendPage } from "./defend/ui.ts";
 import { bonuses, busySmiths, payKills, payWave, settleTraining, skillRank, skillTotal, whole } from "./progression.ts";
 import type { AppContext } from "./ui/app.ts";
@@ -10,6 +11,7 @@ import { UpgradesPage } from "./ui/upgrades-page.ts";
 import { renderSettingsPage } from "./ui/settings-page.ts";
 import type { Weather } from "./defend/weather.ts";
 import { play, soundEnabledBy } from "./sound.ts";
+import { hear, QUIET } from "./ambience.ts";
 import { flourishesEnabledBy, replay, sparks, sparksOver } from "./ui/flourish.ts";
 import { MinePage } from "./mine/ui.ts";
 import { METALS, type Weather as MineWeather } from "./mine/sim.ts";
@@ -70,6 +72,7 @@ const defendPage = new DefendPage(el("defend"), {
   reduceMotion: () => save.settings.reduceMotion,
   healthbars: () => save.settings.showHealthbars,
   setHealthbars: (value) => { save.settings.showHealthbars = value; store(); },
+  showEmpty: () => save.settings.showEmpty,
   gridLines: () => (save.settings.tileGrid ? save.settings.gridOpacity / 100 : 0),
   effects: () => !save.settings.effectsOff,
   devMode: () => save.settings.devMode,
@@ -114,7 +117,7 @@ const libraryPage = new LibraryPage(el("library"), {
       mineDirty = true;
     }
   },
-  upgrades: () => ({ fireproof: skillRank(save, "fireproofWood"), fireTraining: skillRank(save, "fireTraining"), nightWatch: skillRank(save, "nightWatch") }),
+  upgrades: () => ({ fireproof: skillRank(save, "fireproofWood"), fireTraining: skillRank(save, "fireTraining"), nightWatch: skillRank(save, "nightWatch"), enchant: skillRank(save, "enchantedInk") }),
   showing: () => tab === "library",
 });
 /** The mine or the library has paid out since the last save. */
@@ -221,12 +224,33 @@ function navigate(id: Tab) {
 }
 document.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach((b) => (b.onclick = () => navigate(b.dataset.tab as Tab)));
 
+/** A golden countdown on the Mine's and the Library's tab buttons while
+ * they spend idle time, hidden on the tab that is showing. Both show the
+ * longer of the two, since they run it down together. */
+const idleTabs = (["mine", "library"] as const).map((id) => {
+  const button = document.querySelector<HTMLElement>(`nav [data-tab="${id}"]`)!;
+  const span = document.createElement("small");
+  span.className = "tab-idle";
+  span.hidden = true;
+  button.prepend(span);
+  return { id, span };
+});
+function idleTimers() {
+  const left = Math.max(minePage.owedMs, libraryPage.owedMs), text = left >= 1000 ? countdown(left) : "";
+  for (const { id, span } of idleTabs) {
+    const hide = !text || tab === id;
+    if (span.hidden !== hide) span.hidden = hide;
+    if (!hide && span.textContent !== text) span.textContent = text;
+  }
+}
+
 /** The Smithy's upgrades are worked on the wall clock, whatever page shows; so do the
  * mine's and the library's work, saved every half minute they pay. */
 let lastTick = 0, lastMineSave = 0;
 function frame(time: number) {
-  minePage.advance(clock());
-  libraryPage.advance(clock());
+  minePage.advance(clock(), libraryPage.owedMs);
+  libraryPage.advance(clock(), minePage.owedMs);
+  idleTimers();
   if (tab === "defend") defendPage.frame(time);
   if (tab === "mine") minePage.frame(time);
   if (tab === "library") libraryPage.frame(time);
@@ -236,6 +260,7 @@ function frame(time: number) {
   }
   welcome.refresh();
   if (tab === "upgrades") upgradesPage.drawParticles(time);
+  hear(save.settings.ambienceOff ? QUIET : tab === "defend" ? defendPage.ambience() : tab === "mine" ? minePage.ambience() : tab === "library" ? libraryPage.ambience() : QUIET);
   if (time - lastTick >= 1000) {
     lastTick = time;
     const done = settleTraining(save, clock(), new Set(smithNames())) > 0;
@@ -265,6 +290,11 @@ window.addEventListener("pagehide", store);
   const sim = libraryPage.sim;
   while (sim.labLevel < level && sim.upgradeLab());
   for (const l of [...sim.librarians].reverse()) if (sim.count("researcher") < sim.researcherCap && l.role !== "researcher") sim.setRole(l, "researcher");
+};
+// Console helper: enchant `n` of the books on the library's shelves.
+(globalThis as { libraryEnchant?: unknown }).libraryEnchant = (n = 10) => {
+  const sim = libraryPage.sim, shelved = [...sim.slots.keys()].filter((s) => sim.slots[s] && !sim.enchanted[s]);
+  for (let k = 0; k < n && shelved.length; k++) sim.enchanted[shelved.splice(Math.floor(shelved.length * ((k * 0.618) % 1)), 1)[0]] = 1;
 };
 // Console helper: look closely at one of the mine's buildings, picked.
 (globalThis as { mineLook?: unknown }).mineLook = (id: "shaft" | "barracks" | "warehouse" | "forge" | "smithy" = "forge", zoom = 4) => minePage.look(id, zoom);

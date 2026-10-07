@@ -101,7 +101,7 @@ A topic's permanent upgrades: more copies of its building, its Armory levels and
 What Knowledge buys for a topic: its skills, and its **paths**, drawn as a tree.
 
 **Path** (in a topic's Study):
-One way a building can grow, in ranks learned in order with Knowledge: the Wizard tower's Pyromancy (flames only), Rime (ice only, then freezing solid) or Stormcalling (lightning in place of flames), the Barracks' Crusaders (hearty, healing) or Assassins (swift, with critical strikes), the Archer tower's Fire arrows (setting enemies **burning**) or Sharpshooters, the Cannon tower's Gun crews (with **grapeshot**) or Siege shot, the Archer barracks' Rangers or Skirmishers, the Watch tower's Spotters or Signal fires, the Mage Guild's Pyroclasm or Cinders, Monster bait's Oil-soaked or Fortified crates. Choosing a path's first rank **seals** the topic's other paths; **unlearning** it returns every point of Knowledge spent and opens them again.
+One way a building can grow, in ranks learned in order with Knowledge: the Wizard tower's Pyromancy (flames only), Rime (ice only, then freezing solid) or Stormcalling (lightning in place of flames), the Barracks' Crusaders (hearty, healing) or Assassins (swift, with critical strikes), the Archer tower's Fire arrows (setting enemies **burning**) or Sharpshooters, the Cannon tower's Gun crews (with **grapeshot**) or Siege shot, the Archer barracks' Rangers or Skirmishers, the Watch tower's Spotters or Signal fires, the Mage Guild's Pyroclasm or Cinders, Monster bait's Oil-soaked or Fortified crates, Wall spikes' Blasting stakes (blowing up on contact), Spring stakes (the whole row shooting out) or Rimed stakes (chilling). Choosing a path's first rank **seals** the topic's other paths; **unlearning** it returns every point of Knowledge spent and opens them again.
 
 **Evolution**:
 A path's crown, turning its building into a greater one (Stormcalling's Wizard tower into the Dark wizard keep, Crusaders' Barracks into the Valkyrie palace), learned with Knowledge after the path's last rank. Every copy owned, placed or not, becomes the greater building, back in the palette to place again, and copies bought while crowned are greater ones too; unlearning the path turns them back. The greater buildings are no longer sold on their own.
@@ -201,7 +201,7 @@ A flame's flickering, swaying, occlusion-aware glow: lanterns, braziers, tower f
 The idle side view of the ground under the city, worked by miners whatever tab is open and while the game is closed. Its world comes from a seed.
 
 **Prospect**:
-One world the mine works, with only so much ore in it. Once the shaft is at the bottom and the work there is done it is **worked out**, and the player moves the crew, the buildings and the stock to a **new prospect**: fresh ground from a new seed.
+One world the mine works, with only so much ore in it. Once less than a fifth of its ore is left (or the shaft is at the bottom and the work there is done, **worked out**) the player can move the crew, the buildings and the stock to a **new prospect**: fresh ground from a new seed.
 
 **Miner**:
 A worker the player hires with Gold and puts to one of three **trades**: the face (digging, shoring, laying track, hanging torches and lamps, building carts, carrying ore up), the forge, or the smithy. A miner at the face wears a yellow hat, a forge hand a grey welder's mask, a smith a brown leather apron. Each miner has a name for life.
@@ -303,6 +303,10 @@ A low stand on the nave's floor for the books the professors have read. When it 
 
 **Researcher**:
 A librarian who works the **alchemy lab**, a vaulted cellar under the nave reached by a ladder from a trapdoor: stoking the athanor, brewing at the cauldron, distilling, studying, chanting at the transmutation circle. With no researcher, the skill trees' Knowledge research can't be bought.
+
+**Enchanted book**:
+A book on the library's shelves that has taken on glowing runes along its spine. With the Enchanted ink skill each shelved book has a small chance a minute of becoming one; a professor who reads it gains a burst of Knowledge.
+_Avoid_: magic book, rune book
 
 **Lab level**:
 How far the alchemy lab has been dug out, 1 to 5, raised with Gold. The lab has room for one researcher a level. Level 2 opens the west **annex** (a mandrake garden and a lectern), level 3 the east annex (a crucible that casts gold and an orrery), level 4 adds a salamander in its cage and level 5 a scrying orb.

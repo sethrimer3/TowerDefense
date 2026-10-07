@@ -1,4 +1,5 @@
 import { journalHTML, paintJournal } from "./journal.ts";
+import { paintPortraits } from "./journal-portrait.ts";
 import { wavePickerHTML } from "./wave-picker.ts";
 import { areaForWave, areaStyle, type AreaId } from "./areas.ts";
 import { uiSprite } from "../ui/dom.ts";
@@ -33,6 +34,8 @@ import { paintIcon, type IconItem } from "./structure-art.ts";
 import { BoardPointers, eventCell } from "./board-pointers.ts";
 import type { Drag } from "./drag-rules.ts";
 import { EditSession, type Drop } from "./edit-session.ts";
+import { BattleSound } from "./battle-sound.ts";
+import { QUIET, type Scene } from "../ambience.ts";
 import { NIGHT_FADE_SECONDS, isBossWave, rollWeather, skyLabel, type Weather } from "./weather.ts";
 import { play } from "../sound.ts";
 import { replay, sparksOver } from "../ui/flourish.ts";
@@ -56,6 +59,8 @@ export type DefendHost = {
   /** The tile grid's opacity while building, 0 when it's hidden. */
   gridLines?(): number;
   setHealthbars?(value: boolean): void;
+  /** Whether the palette lists items the player has none of. */
+  showEmpty?(): boolean;
   /** Opens the Upgrades page, where buildings and upgrades are bought. */
   openUpgrades?(): void;
 };
@@ -87,6 +92,8 @@ export class DefendPage {
   private weatherArea: AreaId = "moss";
   /** How far night has fallen (0–1); it follows boss waves. */
   private night = 0;
+  /** The battle's sounds, cued from what each frame brings. */
+  private sounds = new BattleSound();
   /** Abandon needs a second click within a few seconds. */
   private abandonArmed = 0;
   private settingsOpen = false;
@@ -130,7 +137,10 @@ export class DefendPage {
       if (!this.journal?.open) this.sim.update(dt);
     } else if (this.sim && this.phase === "over" && (this.sim.floods.length || this.sim.sinkings.length)) ageWater(this.sim, Math.min(dt, 0.25));
     const updated = performance.now();
-    if (this.sim && this.phase === 'sim') this.handleEvents();
+    if (this.sim && this.phase === 'sim') {
+      this.handleEvents();
+      if (dt > 0) this.sounds.hear(this.sim);
+    }
     this.fadeNight(dt);
     this.keepBricks?.step(dt);
     if (this.messageT > 0) {
@@ -176,6 +186,29 @@ export class DefendPage {
     const target = fighting ? 1 : 0;
     const step = dt / NIGHT_FADE_SECONDS;
     this.night = target > this.night ? Math.min(target, this.night + step) : Math.max(target, this.night - step);
+  }
+
+  /** What can be heard over the city: the area's weather and the boss
+   * waves' night outdoors, drips underground, the forge's fires, and the
+   * battle's own blazes. */
+  ambience(): Scene {
+    if (!this.built) return QUIET;
+    const area = areaForWave(Math.max(this.sim?.wave ?? 1, startingWave(this.save)));
+    const w = this.weather, night = this.night, under = area.climate === "underground", cold = area.climate === "cold";
+    const green = area.id === "moss" || area.id === "drowned";
+    const blazes = this.phase === "sim" ? Math.min(1, (this.sim?.blazes.length ?? 0) / 10) : 0;
+    return {
+      rain: w?.rain ? (night > 0.5 ? 1 : 0.55) : 0,
+      wind: w?.blizzard ? 0.95 : w?.snow ? 0.5 : w?.sand ? 0.75 : under ? 0.05 : w?.rain ? 0.35 : cold ? 0.4 : 0.18,
+      howl: w?.blizzard ? 1 : w?.snow || (cold && !w) ? 0.25 : 0,
+      sand: w?.sand || (area.id === "desert" && !w) ? 1 : 0,
+      thunder: w?.rain ? (night > 0.5 ? 4 : 0.8) : 0,
+      birds: green && !w?.rain ? (1 - night) * 0.9 : 0,
+      night: !under && !cold ? night : 0,
+      drips: under ? 0.8 : area.id === "drowned" ? 0.3 : 0,
+      fire: Math.max(area.id === "ember" ? 0.4 : 0, blazes * 0.7),
+      muffle: 0,
+    };
   }
 
   /** Pause bookkeeping when the tab is hidden, so time doesn't jump. */
@@ -226,6 +259,7 @@ export class DefendPage {
     this.journal.addEventListener("close", () => { this.lastTime = 0; this.root.querySelector<HTMLButtonElement>("#defend-journal")!.focus(); });
     this.root.querySelector<HTMLButtonElement>("#defend-journal")!.onclick = () => {
       this.journal!.innerHTML = journalHTML(this.save.discovered);
+      paintPortraits(this.journal!);
       this.journal!.querySelector<HTMLButtonElement>("[data-journal-close]")!.onclick = () => this.journal!.close();
       this.journal!.showModal();
       this.save.journalRead = [...this.save.discovered];
@@ -360,13 +394,14 @@ export class DefendPage {
   private renderPalette() {
     const el = this.root.querySelector<HTMLElement>("#defend-palette")!;
     const s = this.save;
-    const entries: { id: string; name: string; count: number; icon: IconItem }[] =
+    const all: { id: string; name: string; count: number; icon: IconItem }[] =
       this.phase === "build"
         ? PALETTE_ITEMS.filter((item) => inCategory(item, this.category)).map((item) => ({ id: item, name: ITEM_NAMES[item], count: available(s, item), icon: item as IconItem }))
         : [
             { id: "bomb", name: "Bomb", count: s.bombs, icon: "bomb" },
             { id: "banner", name: "War banner", count: Infinity, icon: "banner" },
           ];
+    const entries = this.host.showEmpty?.() ? all : all.filter((e) => e.count > 0);
     el.innerHTML =
       (this.phase === "build" ? this.categoryPicker() : `<small class="defend-palette-title">ITEMS</small>`) +
       entries
@@ -375,7 +410,8 @@ export class DefendPage {
             `<button class="defend-item ${e.count ? "" : "empty"}" data-item="${e.id}" title="${e.name}" aria-label="${e.name}, ${e.count === Infinity ? "unlimited" : `${e.count} left`}">
               <canvas width="48" height="48" data-icon="${e.icon}"></canvas><span>${e.name}</span><b>×${e.count === Infinity ? "∞" : e.count}</b></button>`,
         )
-        .join("");
+        .join("") +
+      (entries.length ? "" : `<small class="defend-palette-none">None owned. Buy more in Upgrades.</small>`);
     el.querySelectorAll<HTMLCanvasElement>("canvas[data-icon]").forEach((c) => paintIcon(c, c.dataset.icon as IconItem));
     el.querySelectorAll<HTMLButtonElement>("[data-item]").forEach((b) => {
       b.onpointerdown = (e) => this.pressPalette(b.dataset.item!, e);
@@ -577,7 +613,7 @@ export class DefendPage {
     this.weather = rollWeather(undefined, area);
     this.night = 0;
     this.renderChrome();
-    const sky = this.weather.snow ? "Snow drifts in. " : this.weather.rain ? "Rain rolls in. " : "";
+    const w = this.weather, sky = w.blizzard ? "A blizzard howls in. " : w.snow ? "Snow drifts in. " : w.sand ? "A sandstorm blows in. " : w.mist ? "Mist creeps over the ground. " : w.rain ? "Rain rolls in. " : "";
     this.setMessage(`${sky}Here they come! ${this.sideOpen.sim ? "Drag" : "Open Items and drag"} a bomb onto the field, or plant the war banner to rally your troops.`, 4);
   }
 
@@ -733,11 +769,15 @@ export class DefendPage {
       const sim = this.phase === "sim" ? this.sim : null;
       const drag = this.pointers.session?.drag;
       if (!sim) return;
-      if (drop.at) sim.plantBanner(drop.at);
+      if (drop.at) {
+        sim.plantBanner(drop.at);
+        play("banner");
+      }
       else if (drop.tap || (drag?.from === "banner" && drag.placed)) sim.plantBanner(null);
       return;
     }
     const s = this.save;
+    if (drop.layout !== s.layout) play("place");
     s.layout = drop.layout;
     if (drop.message) this.setMessage(drop.message);
     if (s.layout !== this.mapLayout) this.host.persist();

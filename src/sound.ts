@@ -28,10 +28,46 @@ export type Cue =
   /** A boss wave: a low war horn. */
   | "horn"
   /** The keep falls: a tolling bell. */
-  | "fallen";
+  | "fallen"
+  // ── The battle, heard from the walls ──
+  /** A bow loosed: a string's thrum and the arrow's hiss. */
+  | "arrow"
+  /** A cannon or siege engine fires: a deep boom with a crack on top. */
+  | "cannon"
+  /** Something explodes: a roar of noise over a falling thump. */
+  | "blast"
+  /** A fire mage's fireball, or a wizard tower's flame: a rushing whoosh. */
+  | "fireball"
+  /** A wizard tower's ice: glassy shards tinkling over a cold hiss. */
+  | "frost"
+  /** Black lightning: crackles over a low electric buzz. */
+  | "zap"
+  /** A valkyrie's charge: a quick rising swish. */
+  | "swish"
+  /** A wall ballista's bolt: a heavy wooden thunk and a twang. */
+  | "thunk"
+  /** A building falls: stones tumbling over a thud. */
+  | "crumble"
+  /** The city's people rebuilding: a mallet's light taps. */
+  | "hammer"
+  /** Boat water on fire, a blaze put out: a hiss of steam. */
+  | "hiss"
+  /** A rocket bursts: a scatter of crackling pops. */
+  | "firework"
+  /** Setting a piece of the city down while building: a solid thump. */
+  | "place"
+  /** The war banner planted: cloth snapping in the wind. */
+  | "banner";
 
 const rand = stream("effects");
 let enabled: () => boolean = () => true;
+/** Whether the player has pressed anything yet: until then browsers keep a
+ * page silent, and an audio context made sooner only starts suspended. */
+let pressed = false;
+if (typeof document !== "undefined")
+  for (const type of ["pointerdown", "keydown"]) document.addEventListener(type, () => (pressed = true), { capture: true, once: true });
+/** How loud the cue being built plays (its `play` level). */
+let level = 1;
 let ctx: AudioContext | null = null;
 let out: GainNode, hall: GainNode, noiseBuf: AudioBuffer;
 /** When each cue last played, so a burst of the same event stays one sound. */
@@ -40,6 +76,17 @@ const lastAt = new Map<Cue, number>();
 /** Which setting turns sound off; checked at every cue. */
 export function soundEnabledBy(isOn: () => boolean) {
   enabled = isOn;
+}
+
+/** Whether sound is on now. */
+export const soundOn = () => enabled();
+
+/** The audio graph for other voices (the ambience), once the player has
+ * pressed something and sound is on; null until then. */
+export function audioGraph(): { ctx: AudioContext; out: GainNode; hall: GainNode } | null {
+  if (!pressed || !enabled()) return null;
+  const ac = audio();
+  return ac ? { ctx: ac, out, hall } : null;
 }
 
 /** The audio graph, built on first use: voices → dry out and a hall send →
@@ -62,7 +109,7 @@ function audio(): AudioContext | null {
     hall.gain.value = 0.28;
     hall.connect(verb);
     verb.connect(out);
-    noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+    noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
     const d = noiseBuf.getChannelData(0);
     for (let i = 0; i < d.length; i++) d[i] = rand() * 2 - 1;
   }
@@ -101,7 +148,7 @@ function route(node: AudioNode, wet = 1) {
 function envelope(at: number, peak: number, attack: number, end: number) {
   const g = ctx!.createGain();
   g.gain.setValueAtTime(0.0001, at);
-  g.gain.exponentialRampToValueAtTime(peak, at + attack);
+  g.gain.exponentialRampToValueAtTime(Math.max(0.0002, peak * level), at + attack);
   g.gain.exponentialRampToValueAtTime(0.0001, at + end);
   return g;
 }
@@ -134,16 +181,18 @@ function tone({ type = "sine", freq, to, at, peak, attack = 0.005, end, wet = 1,
   osc.stop(at + end + 0.05);
 }
 
-/** A burst of noise through a band-pass: the grain of wood or stone. */
-function noise(at: number, end: number, peak: number, freq: number, q: number, wet = 1) {
+/** A burst of noise through a band-pass: the grain of wood or stone. It may
+ * swell in over `attack` and sweep its band to `to`. */
+function noise(at: number, end: number, peak: number, freq: number, q: number, wet = 1, attack = 0.002, to?: number) {
   const src = ctx!.createBufferSource();
   src.buffer = noiseBuf;
   const f = ctx!.createBiquadFilter();
   f.type = "bandpass";
-  f.frequency.value = freq;
+  f.frequency.setValueAtTime(freq, at);
+  if (to) f.frequency.exponentialRampToValueAtTime(to, at + end);
   f.Q.value = q;
-  route(src.connect(f).connect(envelope(at, peak, 0.002, end)), wet);
-  src.start(at, rand() * 0.5);
+  route(src.connect(f).connect(envelope(at, peak, attack, end)), wet);
+  src.start(at, rand() * 0.8);
   src.stop(at + end + 0.05);
 }
 
@@ -221,16 +270,104 @@ const CUES: Record<Cue, (t: number) => void> = {
     bell(165, t, 0.2, 3.2, 1.4);
     bell(147, t + 1.1, 0.16, 3.6, 1.4);
   },
+  arrow(t) {
+    const v = vary(120);
+    tone({ type: "triangle", freq: 330 * v, to: 250 * v, at: t, peak: 0.12, end: 0.07, wet: 0.2 });
+    noise(t + 0.01, 0.13, 0.16, 3200 * v, 3, 0.25, 0.01, 1200 * v);
+  },
+  cannon(t) {
+    const v = vary(80);
+    tone({ freq: 95 * v, to: 38 * v, at: t, peak: 0.45, attack: 0.004, end: 0.45, wet: 0.6 });
+    noise(t, 0.4, 0.35, 260 * v, 0.7, 0.8, 0.003, 120);
+    noise(t, 0.035, 0.25, 2200 * v, 1.5, 0.4);
+  },
+  blast(t) {
+    const v = vary(100);
+    tone({ freq: 70 * v, to: 28 * v, at: t, peak: 0.42, attack: 0.006, end: 0.7, wet: 0.8 });
+    noise(t, 0.9, 0.4, 420 * v, 0.6, 1, 0.008, 90);
+    noise(t, 0.08, 0.22, 1800 * v, 1, 0.5);
+    for (let i = 0; i < 5; i++) noise(t + 0.1 + rand() * 0.45, 0.05, 0.06, 900 + rand() * 2500, 4, 0.6);
+  },
+  fireball(t) {
+    const v = vary(150);
+    noise(t, 0.42, 0.22, 500 * v, 1.1, 0.5, 0.09, 1400 * v);
+    noise(t + 0.05, 0.3, 0.07, 2600 * v, 2, 0.4, 0.05);
+  },
+  frost(t) {
+    for (let i = 0; i < 4; i++) {
+      const f = 2400 + rand() * 2600;
+      tone({ freq: f, at: t + i * 0.035 + rand() * 0.02, peak: 0.035, end: 0.22 + rand() * 0.2, wet: 1.2 });
+    }
+    noise(t, 0.35, 0.06, 6500, 1.2, 0.8, 0.03);
+  },
+  zap(t) {
+    const v = vary(60);
+    tone({ type: "square", freq: 110 * v, to: 70 * v, at: t, peak: 0.07, end: 0.2, lowpass: 1600, wet: 0.5 });
+    for (let i = 0; i < 6; i++) noise(t + rand() * 0.16, 0.025, 0.14, 3000 + rand() * 4000, 2, 0.5);
+  },
+  swish(t) {
+    const v = vary(100);
+    noise(t, 0.16, 0.18, 900 * v, 2.5, 0.4, 0.04, 4200 * v);
+    tone({ freq: 2100 * v, at: t + 0.12, peak: 0.02, end: 0.3, wet: 1 });
+  },
+  thunk(t) {
+    const v = vary(60);
+    tone({ type: "triangle", freq: 150 * v, to: 75 * v, at: t, peak: 0.3, end: 0.14, wet: 0.5 });
+    noise(t, 0.06, 0.25, 800 * v, 2, 0.4);
+    tone({ type: "triangle", freq: 196 * v, to: 185 * v, at: t + 0.01, peak: 0.06, end: 0.35, wet: 0.6 });
+  },
+  crumble(t) {
+    const v = vary(80);
+    tone({ freq: 80 * v, to: 40 * v, at: t, peak: 0.35, attack: 0.01, end: 0.5, wet: 0.7 });
+    noise(t, 0.7, 0.2, 350 * v, 0.8, 0.8, 0.02, 160);
+    for (let i = 0; i < 9; i++) noise(t + 0.04 + rand() * 0.7, 0.05 + rand() * 0.05, 0.08 + rand() * 0.08, 500 + rand() * 1500, 3, 0.6);
+  },
+  hammer(t) {
+    for (const dt of [0, 0.16 + rand() * 0.05]) {
+      const v = vary(90);
+      tone({ type: "triangle", freq: 620 * v, to: 480 * v, at: t + dt, peak: 0.07, end: 0.06, wet: 0.5 });
+      noise(t + dt, 0.03, 0.08, 2000 * v, 3, 0.4);
+    }
+  },
+  hiss(t) {
+    noise(t, 0.6, 0.1, 5200 * vary(100), 0.9, 0.5, 0.04, 3000);
+  },
+  firework(t) {
+    noise(t, 0.12, 0.25, 900, 0.8, 0.8);
+    for (let i = 0; i < 12; i++) noise(t + 0.08 + rand() * 0.6, 0.02, 0.1 + rand() * 0.1, 2500 + rand() * 5000, 3, 0.8);
+  },
+  place(t) {
+    const v = vary(70);
+    tone({ type: "triangle", freq: 130 * v, to: 70 * v, at: t, peak: 0.35, end: 0.16, wet: 0.5 });
+    noise(t, 0.1, 0.3, 700 * v, 1.4, 0.5);
+    noise(t + 0.05, 0.12, 0.08, 2400 * v, 2, 0.4);
+  },
+  banner(t) {
+    for (const dt of [0, 0.09, 0.2]) noise(t + dt, 0.08, 0.16, 1100 * vary(150), 0.9, 0.4, 0.01);
+    tone({ type: "triangle", freq: 160, to: 90, at: t + 0.22, peak: 0.25, end: 0.12, wet: 0.5 });
+  },
 };
 
-/** Plays a cue now, unless sound is off, the browser has none, or the same
- * cue just played. */
-export function play(cue: Cue) {
+/** How long after a cue the same cue may sound again, in ms: the battle's
+ * sounds come in crowds, so each is heard as a steady patter, not a roar. */
+const GAP: Partial<Record<Cue, number>> = {
+  arrow: 70, cannon: 140, blast: 150, fireball: 110, frost: 160, zap: 120, swish: 120, thunk: 130,
+  crumble: 220, hammer: 380, hiss: 300, firework: 200,
+};
+
+/** Plays a cue now, at `loudness` (1 as made), unless sound is off, the
+ * browser has none, or the same cue just played. */
+export function play(cue: Cue, loudness = 1) {
   if (!enabled()) return;
   const now = performance.now();
-  if (now - (lastAt.get(cue) ?? -Infinity) < 60) return;
+  if (now - (lastAt.get(cue) ?? -Infinity) < (GAP[cue] ?? 60)) return;
   lastAt.set(cue, now);
   const ac = audio();
   if (!ac) return;
-  CUES[cue](ac.currentTime + 0.01);
+  level = loudness;
+  try {
+    CUES[cue](ac.currentTime + 0.01);
+  } finally {
+    level = 1;
+  }
 }

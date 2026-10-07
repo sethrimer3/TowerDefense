@@ -6,6 +6,18 @@ export const MAX_AWAY_MS = 24 * 60 * 60 * 1000;
 export const HOUR_MS = 60 * 60 * 1000;
 /** Maximum simulation speed while spending banked idle time. */
 export const IDLE_SPEED = 120;
+/** How far ahead (ms of idle time, a boosted second of each) the Mine or the
+ * Library may spend its idle time before waiting for the other, so the two
+ * run down together. */
+export const IDLE_LEAD = 1000 * 10;
+/** While catching up (more than `BOOST_FROM` ms of idle time owed), each
+ * simulated step spends `IDLE_BOOST` steps' worth of idle time and pays
+ * `IDLE_BOOST` times what it earned: the simulation runs no faster, but
+ * the bank runs down, and pays out, ten times as fast. */
+export const IDLE_BOOST = 10;
+export const BOOST_FROM = 2000;
+/** The idle time (ms) one simulated step of `stepMs` spends from `owedMs`. */
+export const idleDrain = (owedMs: number, stepMs: number) => (owedMs >= BOOST_FROM ? stepMs * IDLE_BOOST : stepMs);
 export const countdown = (ms: number) => {
   const seconds = Math.ceil(Math.max(0, ms) / 1000);
   return `${Math.floor(seconds / 3600)}:${String(Math.floor(seconds / 60) % 60).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;

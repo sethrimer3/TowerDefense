@@ -1,14 +1,15 @@
 /** The Mine tab: the mine's view, the crew's tally, hiring miners, the
  * crew's list (each miner by name, dragged between the three trades: the
  * face, the forge, the smithy; tapped to follow), and moving on to a new
- * prospect when this one is worked out. A building tapped shows its stats
+ * prospect once less than a fifth of this one's ore is left. A building tapped shows its stats
  * and the button that raises it a level. The mine itself runs whatever tab
  * shows (`advance`, from the app's frame loop), and works on while the game
  * is closed: time away is banked (up to 24 hours), then spent tick by tick
  * a slice each frame. Only simulated work pays Smithy points. */
 import { play } from "../sound.ts";
-import { countdown, IDLE_SPEED, MAX_AWAY_MS } from "../away.ts";
-import { BARS_PER_POINT, CREW_PER_LEVEL, METALS, metalSum, type Metals, DAY_TICKS, FORGE_PER_LEVEL, JOBS, KIT, MAX_MINERS, MineSim, SEAL_LEVEL, SMITHS_PER_LEVEL, STOCK_PER_LEVEL, STOCK_RATE, TICK_HZ, type Cause, type Job, type Miner, type MineNews, type MineSave, type Weather } from "./sim.ts";
+import { QUIET, thunder, type Scene } from "../ambience.ts";
+import { countdown, IDLE_LEAD, IDLE_SPEED, idleDrain, MAX_AWAY_MS } from "../away.ts";
+import { BARS_PER_POINT, CREW_PER_LEVEL, METALS, metalSum, noMetals, type Metals, DAY_TICKS, FORGE_PER_LEVEL, JOBS, KIT, MAX_MINERS, MineSim, MOVE_ON_SHARE, SEAL_LEVEL, SMITHS_PER_LEVEL, STOCK_PER_LEVEL, STOCK_RATE, TICK_HZ, type Cause, type Job, type Miner, type MineNews, type MineSave, type Weather } from "./sim.ts";
 import { MAX_LEVEL, type BuildingId } from "./buildings.ts";
 import { MineRenderer } from "./render.ts";
 
@@ -122,7 +123,7 @@ export class MinePage {
 
   /** Runs the mine up to wall-clock time `now`, within a slice of the frame
    * (a bigger one while catching up), and pays what it earned. */
-  advance(now: number) {
+  advance(now: number, keepWith = 0) {
     const gap = Math.max(0, now - this.last);
     this.last = now;
     this.owed = Math.min((SIM_AWAY_MS * TICK_HZ) / 1000, this.owed + (gap * TICK_HZ) / 1000);
@@ -134,13 +135,20 @@ export class MinePage {
     this.sim.coffee = up.coffee;
     this.sim.waterproof = up.waterproof;
     this.sim.extraSmiths = up.smiths;
-    let n = 0;
-    while (this.owed >= 1) {
+    let n = 0, drained = 0;
+    // Keep pace with the library's idle time (`keepWith`), never more than
+    // IDLE_LEAD ahead of it, so both spend it together.
+    const floor = ((keepWith - IDLE_LEAD) * TICK_HZ) / 1000;
+    // Catching up, a tick spends (and pays for) ten ticks of idle time.
+    const drain = () => Math.min(this.owed, idleDrain((this.owed / TICK_HZ) * 1000, 1));
+    while (this.owed >= 1 && this.owed - drain() >= floor) {
       this.sim.step();
-      this.owed--;
+      const d = drain();
+      this.owed -= d;
+      drained += d;
       if (++n >= limit || (n % 8 === 0 && performance.now() - start > budget)) break;
     }
-    const pay = this.sim.collect();
+    const pay = this.boosted(this.sim.collect(), n ? drained / n : 1);
     if (metalSum(pay) > 0) this.host.earn(pay);
     const away = this.away;
     if (away?.catchingUp) {
@@ -149,6 +157,18 @@ export class MinePage {
       // Finish the account after all whole simulation ticks are spent.
       if (this.owed < 1) away.catchingUp = false;
     }
+  }
+  /** Whole points' share of the catch-up's boost, the fractions carried. */
+  private boostCarry = noMetals();
+  private boosted(pay: Metals, boost: number) {
+    if (boost === 1) return pay;
+    const out = noMetals();
+    for (const k of METALS) {
+      const v = pay[k] * boost + this.boostCarry[k];
+      out[k] = Math.floor(v + 1e-9);
+      this.boostCarry[k] = v - out[k];
+    }
+    return out;
   }
   /** Adds `ms` of time away (the dev option), as if the game had been
    * closed that long: worked through tick by tick, like the catch-up on
@@ -458,14 +478,17 @@ export class MinePage {
     this.refresh();
   }
 
-  /** Asks before leaving a prospect with ore still to work (a worked-out
-   * one is left at once). */
+  /** Once the prospect is nearly worked (under `MOVE_ON_SHARE` of its ore
+   * left), says so and lets the crew move on to better ground. */
   private askProspect() {
-    if (this.sim.workedOut) return this.newProspect();
+    if (!this.sim.canMoveOn) return;
     const left = Math.min(100, Math.round((100 * this.sim.oreLeft) / Math.max(1, this.sim.oreFound)));
+    const why = this.sim.workedOut
+      ? `The work here is done, with about ${left}% of the ore still in the ground out of reach.`
+      : `Less than ${Math.round(MOVE_ON_SHARE * 100)}% of this prospect's ore is left in the ground (about ${left}%).`;
     const modal = this.host.modal;
-    modal.innerHTML = `<small>MINE</small><h2>Leave this prospect?</h2><p>About ${left}% of its ore is still in the ground. The crew, the buildings and the stock at the forge and smithy go with you to fresh ground, and the workings here are left behind.</p>
-      <div class="dialog-actions"><button id="prospect-stay">Stay</button><button id="prospect-go" class="danger">Move on</button></div>`;
+    modal.innerHTML = `<small>MINE</small><h2>Seek a new prospect?</h2><p>${why} The crew can move on to fresh ground with better prospects, taking the buildings and the stock at the forge and smithy with them; the workings here are left behind.</p>
+      <div class="dialog-actions"><button id="prospect-stay">Stay</button><button id="prospect-go">Move on</button></div>`;
     modal.showModal();
     modal.querySelector<HTMLButtonElement>("#prospect-stay")!.onclick = () => modal.close();
     modal.querySelector<HTMLButtonElement>("#prospect-go")!.onclick = () => {
@@ -519,7 +542,7 @@ export class MinePage {
     this.refreshCrew();
     this.refreshInfo();
     const left = Math.min(100, Math.round((100 * sim.oreLeft) / Math.max(1, sim.oreFound)));
-    const tally = `${crew}|${sim.crewCap}|${price}|${afford}|${sim.depth}|${ore}|${bars}|${Math.ceil(this.owed / TICK_HZ)}|${hour}|${sky.weather}|${lost}|${news}|${left}|${sim.workedOut}|${sim.prospect}`;
+    const tally = `${crew}|${sim.crewCap}|${price}|${afford}|${sim.depth}|${ore}|${bars}|${Math.ceil(this.owed / TICK_HZ)}|${hour}|${sky.weather}|${lost}|${news}|${left}|${sim.workedOut}|${sim.canMoveOn}|${sim.prospect}`;
     if (tally === this.shownTally) return;
     this.shownTally = tally;
     const hire = this.root.querySelector<HTMLButtonElement>("#mine-hire")!;
@@ -531,8 +554,12 @@ export class MinePage {
       (news || lost ? `<br><span class="mine-news">${lost ? `${lost} lost${news ? " · " : ""}` : ""}${news ?? ""}</span>` : "");
     this.root.querySelector("#mine-prospect")!.innerHTML = sim.workedOut
       ? `Prospect ${sim.prospect} is <b>worked out</b>: time to move on`
-      : `Prospect ${sim.prospect} · <b>${left}%</b> of its ore left`;
-    this.root.querySelector("#mine-prospect-new")!.classList.toggle("ready", sim.workedOut);
+      : sim.canMoveOn
+        ? `Prospect ${sim.prospect} · only <b>${left}%</b> of its ore left`
+        : `Prospect ${sim.prospect} · <b>${left}%</b> of its ore left`;
+    const move = this.root.querySelector<HTMLButtonElement>("#mine-prospect-new")!;
+    move.hidden = !sim.canMoveOn;
+    move.classList.toggle("ready", sim.canMoveOn);
     const away = this.root.querySelector<HTMLElement>("#mine-away")!;
     away.hidden = this.owed < TICK_HZ * 5;
     away.textContent = `Fast-forwarding · ${countdown(this.owedMs)} idle time remaining`;
@@ -562,6 +589,34 @@ export class MinePage {
           .join("") +
         lost.map((f) => `<li class="crew-member fallen" data-fallen="${escape(f.name)}" title="Lost: ${f.cause}. Tap to let them go."><i class="skull" aria-hidden="true">☠</i><s>${escape(f.name)}</s></li>`).join("");
     }
+  }
+
+  /** The newest strike already heard. */
+  private thunderTick = -1;
+
+  /** What can be heard at the mine: its sky's rain and wind, birds on fine
+   * days and crickets at night, drips in the workings, any fire; and each
+   * fresh lightning strike's thunder. */
+  ambience(): Scene {
+    if (!this.sim) return QUIET;
+    const sim = this.sim, sky = sim.sky, day = sky.daylight, storm = sky.weather === "storm";
+    for (const n of sim.news)
+      if (n.kind === "strike" && n.tick > this.thunderTick) {
+        this.thunderTick = n.tick;
+        if (sim.tick - n.tick < 3 * TICK_HZ) thunder(0.7 + (n.tick % 3) * 0.1);
+      }
+    return {
+      rain: sky.rain,
+      wind: 0.12 + sky.clouds * 0.2 + (storm ? 0.45 : 0),
+      howl: 0,
+      sand: 0,
+      thunder: storm ? 0.6 : 0,
+      birds: day * (sky.weather === "clear" ? 1 : sky.weather === "cloudy" ? 0.45 : 0),
+      night: 1 - day,
+      drips: 0.25,
+      fire: Math.min(1, sim.fires / 12),
+      muffle: 0,
+    };
   }
 
   /** Draws the mine (when the tab shows). */

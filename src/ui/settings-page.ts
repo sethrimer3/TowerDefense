@@ -5,13 +5,15 @@ import type { AppContext } from "./app.ts";
 import { el } from "./dom.ts";
 
 /** The settings on the page, in order; each control comes from its row in SETTINGS. */
-const PAGE = ["reduceMotion", "effectsOff", "tileGrid", "soundOff", "pixelFont"] as const satisfies readonly SettingKey[];
+/** Gameplay settings, under their own heading first. */
+const GAMEPLAY = ["showEmpty"] as const satisfies readonly SettingKey[];
+const PAGE = ["reduceMotion", "effectsOff", "tileGrid", "soundOff", "ambienceOff", "pixelFont"] as const satisfies readonly SettingKey[];
 /** The dev options, under ALL ON. */
 const DEV = ["devMode", "devTowers", "instantResearch"] as const satisfies readonly SettingKey[];
 /** All research unlocked: one per tab of the Upgrades page. */
 const RESEARCH = ["devSmithy", "devCommand", "devStewardship", "devMine", "devLibrary"] as const satisfies readonly SettingKey[];
 const ALL_DEV = [...DEV, ...RESEARCH];
-type PageKey = (typeof PAGE)[number] | (typeof ALL_DEV)[number];
+type PageKey = (typeof GAMEPLAY)[number] | (typeof PAGE)[number] | (typeof ALL_DEV)[number];
 
 /** One toggle's checkbox, showing its current value. */
 function checkbox(key: PageKey, ctx: AppContext): string {
@@ -35,6 +37,9 @@ export function renderSettingsPage(ctx: AppContext) {
   const settings = ctx.save().settings, allOn = ALL_DEV.every((k) => settings[k]);
   el("settings").innerHTML =
     `<div class="page-title"><small>THE CITY AWAITS ITS ORDERS</small><h2>Settings</h2></div>` +
+    `<h3 class="settings-group">Gameplay</h3>` +
+    GAMEPLAY.map((key) => control(key, ctx)).join("") +
+    `<h3 class="settings-group">Display and sound</h3>` +
     PAGE.map((key) => control(key, ctx) + (key === "tileGrid" ? gridOpacity(ctx) : "")).join("") +
     `<h3 class="settings-group">Dev options</h3>` +
     `<label class="setting setting-all">ALL ON<input type="checkbox" id="dev-all" ${allOn ? "checked" : ""}></label>` +
@@ -44,7 +49,7 @@ export function renderSettingsPage(ctx: AppContext) {
     `<button class="wide" id="dev-waves">Unlock ${UNLOCK_WAVES} more waves</button>` +
     `<p class="hint" id="dev-waves-reach">Defenses can start on any wave up to ${waveReach(ctx.save().defend)}; choose it with the Wave button on the Defend tab.</p>` +
     `<p class="hint">Progress saves after each action. A defense in progress is never saved: reloading ends it.</p><button class="wide danger" id="erase">Erase all progress</button>`;
-  for (const key of [...PAGE, ...ALL_DEV]) {
+  for (const key of [...GAMEPLAY, ...PAGE, ...ALL_DEV]) {
     const row = SETTINGS[key], input = el(row.page.id) as HTMLInputElement;
     input.onchange = () => {
       settings[key] = "invert" in row.page ? !input.checked : input.checked;
