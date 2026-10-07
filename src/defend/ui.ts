@@ -59,6 +59,8 @@ export type DefendHost = {
   /** The tile grid's opacity while building, 0 when it's hidden. */
   gridLines?(): number;
   setHealthbars?(value: boolean): void;
+  /** Whether the palette lists items the player has none of. */
+  showEmpty?(): boolean;
   /** Opens the Upgrades page, where buildings and upgrades are bought. */
   openUpgrades?(): void;
 };
@@ -392,13 +394,14 @@ export class DefendPage {
   private renderPalette() {
     const el = this.root.querySelector<HTMLElement>("#defend-palette")!;
     const s = this.save;
-    const entries: { id: string; name: string; count: number; icon: IconItem }[] =
+    const all: { id: string; name: string; count: number; icon: IconItem }[] =
       this.phase === "build"
         ? PALETTE_ITEMS.filter((item) => inCategory(item, this.category)).map((item) => ({ id: item, name: ITEM_NAMES[item], count: available(s, item), icon: item as IconItem }))
         : [
             { id: "bomb", name: "Bomb", count: s.bombs, icon: "bomb" },
             { id: "banner", name: "War banner", count: Infinity, icon: "banner" },
           ];
+    const entries = this.host.showEmpty?.() ? all : all.filter((e) => e.count > 0);
     el.innerHTML =
       (this.phase === "build" ? this.categoryPicker() : `<small class="defend-palette-title">ITEMS</small>`) +
       entries
@@ -407,7 +410,8 @@ export class DefendPage {
             `<button class="defend-item ${e.count ? "" : "empty"}" data-item="${e.id}" title="${e.name}" aria-label="${e.name}, ${e.count === Infinity ? "unlimited" : `${e.count} left`}">
               <canvas width="48" height="48" data-icon="${e.icon}"></canvas><span>${e.name}</span><b>×${e.count === Infinity ? "∞" : e.count}</b></button>`,
         )
-        .join("");
+        .join("") +
+      (entries.length ? "" : `<small class="defend-palette-none">None owned. Buy more in Upgrades.</small>`);
     el.querySelectorAll<HTMLCanvasElement>("canvas[data-icon]").forEach((c) => paintIcon(c, c.dataset.icon as IconItem));
     el.querySelectorAll<HTMLButtonElement>("[data-item]").forEach((b) => {
       b.onpointerdown = (e) => this.pressPalette(b.dataset.item!, e);

@@ -17,6 +17,8 @@ export const SETTINGS = {
   /** The city's live dressing: wind-blown park grass, and drips, ripples
    * and reflections on the ponds. */
   effectsOff: { kind: "toggle", default: false, page: { id: "effects", label: "Grass and water effects", invert: true } },
+  /** The Defend palette lists items the player has none of (greyed); off, only those owned. */
+  showEmpty: { kind: "toggle", default: false, page: { id: "show-empty", label: "Show items you have none of" } },
   /** Faint lines round the Defend board's tiles, and how strong, in percent. */
   tileGrid: { kind: "toggle", default: false, page: { id: "tile-grid", label: "Tile grid lines" } },
   gridOpacity: { kind: "range", default: 15, min: 5, max: 60, step: 1, page: { id: "grid-opacity", label: "Grid line opacity", aria: "Tile grid line opacity, percent" } },
