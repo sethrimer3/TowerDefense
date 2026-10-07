@@ -549,6 +549,106 @@ dialog {
   color: #6a4510;
   font-weight: 600;
 }
+/* The fallen keep's summary: a few numbers and a chart a measure, inked on
+ * the parchment. A tap anywhere closes it. */
+.defend-banner.defeat {
+  inset: 12px;
+  margin: auto;
+  width: min(440px, calc(100% - 24px));
+  height: fit-content;
+  max-height: calc(100% - 24px);
+  box-sizing: border-box;
+  overflow-y: auto;
+  cursor: pointer;
+  overscroll-behavior: contain;
+}
+.defeat-close {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  color: #f4e3b8;
+  top: 6px;
+  right: 6px;
+  width: 26px;
+  height: 26px;
+  min-height: 0;
+  padding: 0;
+  line-height: 1;
+  font-size: 16px;
+}
+.defeat-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  margin-top: 4px;
+}
+.defeat-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px 2px;
+  border: 1px solid #4a321850;
+  background: #f4e6c230;
+}
+.defeat-stat b {
+  font-size: 14px;
+  color: var(--ink);
+}
+.defeat-stat small,
+.defeat-hint,
+.defeat-chart figcaption small {
+  font-size: 9px;
+  color: var(--ink-soft);
+}
+.defeat-charts {
+  display: grid;
+  gap: 6px;
+  margin-top: 4px;
+}
+.defeat-chart {
+  margin: 0;
+  text-align: left;
+}
+.defeat-chart figcaption {
+  font-size: 10px;
+  color: var(--ink);
+}
+.defeat-chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.defeat-close svg {
+  fill: currentColor;
+}
+.defeat-chart text {
+  font: 6px var(--font);
+  fill: var(--ink-soft);
+}
+.defeat-axis {
+  stroke: #4a321880;
+  stroke-width: 1;
+}
+.defeat-hit {
+  fill: transparent;
+}
+.defeat-bar {
+  fill: #8a5a14;
+}
+.defeat-taken .defeat-bar {
+  fill: #8b2a1a;
+}
+.defeat-difficulty .defeat-bar {
+  fill: #4a3a5a;
+}
+.defeat-chart g:hover .defeat-bar {
+  filter: brightness(1.35);
+}
+@media (max-width: 480px) {
+  .defeat-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
 .defend-settings small,
 .defend-settings .hint {
   color: var(--ink-soft);

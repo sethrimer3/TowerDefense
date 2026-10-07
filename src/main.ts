@@ -73,6 +73,7 @@ function openChamber(where: "smithy" | "study", topic?: string) {
 const defendPage = new DefendPage(el("defend"), {
   save: () => save.defend,
   bonuses: () => bonuses(save),
+  outskirts: () => skillRank(save, "outskirts") > 0,
   earnKills: (slain) => {
     payKills(save, slain);
     refreshCurrencies();

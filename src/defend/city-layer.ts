@@ -67,6 +67,8 @@ const FLOOR_SIZE = 80;
  * brick face, hung below any wall stone with open ground to its south. */
 const CAP = { x: 38, w: 16, y0: 1, span: 62 };
 const FACE = { x0: 8, span: 64, y: 44, h: 14 };
+/** How far a wall stone's brick face hangs over the cell below, in cells. */
+const FACE_HANG = 0.45;
 
 const RUBBLE = "#4a443d";
 const WALL = "#8e897c";
@@ -104,11 +106,12 @@ export function paintCityLayer(c: CanvasRenderingContext2D, px: number, scene: C
   paintRoadStones(p, scene.stones);
   // Ponds over the park grass, as pixel art.
   paintPixelArt(p, parkArt(map).canvas);
-  // Walls first: a wall's face hangs over the cell below it, and a house or
-  // structure standing there is in front of the face, so it covers it.
+  // The spikes' beams lie under the stones, so only the stakes show past
+  // the wall. Walls next: a wall's face hangs over the cell below it, and a
+  // house or structure standing there is in front of the face, so it covers it.
+  paintSpikes(p);
   for (const b of map.buildings) if (b.kind === "wall") paintBuilding(p, b);
   for (const b of map.buildings) if (b.kind !== "wall") paintBuilding(p, b);
-  paintSpikes(p);
   paintPixelArt(p, cityShadows(map, sim));
   paintLanternBrackets(p, scene.lights);
 }
@@ -333,15 +336,17 @@ export const bastionSprite = (stage: number, seed: number) => sprite(`bastion:${
 
 const SPIKE_OUT: Record<Side, readonly [number, number]> = { n: [0, -1], e: [1, 0], s: [0, 1], w: [-1, 0] };
 
-/** The wall spikes on every standing stone they line, their tips reaching
- * out past the wall's face. */
+/** The wall spikes on every standing stone they line, painted under the
+ * stones, their tips reaching out past the wall's face (on the south, past
+ * the brick face hanging below the stone). */
 function paintSpikes({ c, px, map, solid }: Paint) {
   for (const row of map.spikes ?? []) {
     const [dx, dy] = SPIKE_OUT[row.side];
-    const reach = SPIKE_REACH / ART;
     for (const i of row.cells) {
       if (!solid(i)) continue;
       const cx = i % CELLS_W, cy = (i - cx) / CELLS_W;
+      const hung = row.side === "s" && cy + 1 < CELLS_H && !solid(i + CELLS_W);
+      const reach = SPIKE_REACH / ART + (hung ? FACE_HANG : 0);
       const x = Math.round((cx + dx * reach) * px), y = Math.round((cy + dy * reach) * px);
       const w = Math.round((cx + dx * reach + 1) * px) - x, h = Math.round((cy + dy * reach + 1) * px) - y;
       drawSprite(c, sprite(`spikes:${row.side}:${hash(cx, cy, 31) % 8}`, ART, ART, () => spikePixels(row.side, hash(cx, cy, 31) % 8)), x, y, w, h);
@@ -406,7 +411,7 @@ function paintWallOutline(
   face: boolean,
 ) {
   const o = Math.max(1, Math.round(px / ART));
-  const foot = face ? y + h + Math.round(px * 0.45) : y + h;
+  const foot = face ? y + h + Math.round(px * FACE_HANG) : y + h;
   // A neighbour's face carries this one's on to the side.
   const faced = (dx: number) => standing(dx, 0) && !standing(dx, 1);
   c.fillStyle = "#000";
@@ -436,7 +441,7 @@ function paintWallEdges({ c, px }: Paint, at: { x: number; y: number }, standing
  * in column `cx` whose top-left is `at` (canvas pixels). */
 function paintWallFace({ c, px, area }: Paint, cx: number, { x, y }: { x: number; y: number }) {
   const e = Math.max(1, px * 0.12);
-  const h = px * 0.45;
+  const h = px * FACE_HANG;
   const face = wallArt.face;
   if (hasWallArt(area)) drawSprite(c, wallFaceSprite(area, cx), x, y + px, px + 0.5, h);
   else if (ready(face)) {

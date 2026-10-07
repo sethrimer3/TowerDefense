@@ -108,7 +108,7 @@ export function generateCity(
   layDoorStreets(t, structures, seed);
   layGateStreets(t, gates, seed);
   subdivideBlocks(t, seed);
-  connectRoads(t, keep, seed);
+  connectRoads(t, city, keep, seed);
   plantParks(t, seed);
   // Buildings are numbered structures first, then houses, then wall stones.
   const lots = new Lots(seed);
@@ -381,13 +381,23 @@ function pave(t: Uint8Array, cells: number[]) {
   for (const i of cells) if (t[i] === FREE) t[i] = CellType.ROAD;
 }
 
-/** Join every road fragment to the component touching the keep plaza. */
-function connectRoads(t: Uint8Array, keep: Rect, seed: number) {
+/** Join every road fragment to the component touching the keep plaza; in
+ * an outlying district (walled apart from the keep's), to the district's
+ * first street. */
+function connectRoads(t: Uint8Array, city: Uint8Array, keep: Rect, seed: number) {
+  const district = districts(city);
+  const home = district[cellIndex(keep.x, keep.y)];
   for (let guard = 0; guard < 50; guard++) {
     const plaza = sideCells(keep).find((i) => isRoad(t[i]));
     if (plaza === undefined) return;
     const main = new Uint8Array(CELL_COUNT);
     flood(t, plaza, CellType.ROAD, main);
+    const hubs = new Set([home]);
+    for (let i = 0; i < CELL_COUNT; i++)
+      if (isRoad(t[i]) && !main[i] && district[i] >= 0 && !hubs.has(district[i])) {
+        hubs.add(district[i]);
+        flood(t, i, CellType.ROAD, main);
+      }
     const stray = t.findIndex((v, i) => isRoad(v) && !main[i]);
     if (stray < 0) return;
     const frag = flood(t, stray, CellType.ROAD, new Uint8Array(CELL_COUNT));
@@ -396,6 +406,25 @@ function connectRoads(t: Uint8Array, keep: Rect, seed: number) {
     if (path) pave(t, path);
     else for (const i of frag) t[i] = CellType.PARK;
   }
+}
+
+/** Each city cell's district: the city cells joined to it (-1 outside). */
+function districts(city: Uint8Array): Int32Array {
+  const out = new Int32Array(CELL_COUNT).fill(-1);
+  let n = 0;
+  for (let i = 0; i < CELL_COUNT; i++) {
+    if (!city[i] || out[i] >= 0) continue;
+    const stack = [i];
+    out[i] = n;
+    while (stack.length)
+      for (const j of neighbours(stack.pop()!))
+        if (city[j] && out[j] < 0) {
+          out[j] = n;
+          stack.push(j);
+        }
+    n++;
+  }
+  return out;
 }
 
 /** The cheapest way from a road fragment to the main network, or null. */

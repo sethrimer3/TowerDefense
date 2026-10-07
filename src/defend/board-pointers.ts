@@ -1,6 +1,7 @@
 /** Pointer gestures on the DEFEND board, as a small state machine:
  * - idle: nothing is held.
  * - viewing: board pointers move the camera, one panning, two pinch-zooming.
+ * - a lone press that lets go without moving the view is a tap.
  * - dragging: a palette item, placed structure, keep, city tile, bomb or
  *   the war banner follows the pointer under a ghost icon until it is released (dropped
  *   where it is) or cancelled.
@@ -22,7 +23,12 @@ export type PointerHost = {
   pickUp(e: PointerEvent): boolean;
   /** A drag was released, doing `drop`. */
   drop(drop: Drop): void;
+  /** A press on the board that let go without moving the view: a tap. */
+  tap?(e: PointerEvent): void;
 };
+
+/** How far (CSS pixels) a pointer may move and still tap. */
+const TAP_SLOP = 8;
 
 type Point = { x: number; y: number };
 
@@ -31,6 +37,8 @@ export class BoardPointers {
   private touches = new Map<number, Point>();
   /** The drag in progress, if any, and the icon following its pointer. */
   private held: { edit: EditSession; ghost: HTMLCanvasElement } | null = null;
+  /** A lone press that may yet be a tap, where it went down. */
+  private tapping: { id: number; x: number; y: number } | null = null;
 
   constructor(private host: PointerHost) {
     window.addEventListener("pointermove", (e) => this.move(e));
@@ -49,10 +57,12 @@ export class BoardPointers {
     if (this.touches.size || this.held) return this.join(e);
     if (this.host.pickUp(e)) return;
     this.touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    this.tapping = { id: e.pointerId, x: e.clientX, y: e.clientY };
   }
 
   /** A second pointer turns whatever was happening into a pinch. */
   private join(e: PointerEvent) {
+    this.tapping = null;
     if (this.held && !consumable(dragIcon(this.held.edit.drag))) this.end();
     this.touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
   }
@@ -66,6 +76,8 @@ export class BoardPointers {
 
   private move(e: PointerEvent) {
     const h = this.held;
+    const t = this.tapping;
+    if (t?.id === e.pointerId && Math.hypot(e.clientX - t.x, e.clientY - t.y) > TAP_SLOP) this.tapping = null;
     if (!h && this.touches.has(e.pointerId)) return this.view(e);
     const at = h && this.at(e);
     if (at) h.edit.hover(at);
@@ -88,6 +100,10 @@ export class BoardPointers {
 
   private up(e: PointerEvent) {
     this.touches.delete(e.pointerId);
+    if (this.tapping?.id === e.pointerId) {
+      this.tapping = null;
+      if (!this.held) this.host.tap?.(e);
+    }
     const h = this.held;
     if (!h) return;
     const at = this.at(e);
@@ -97,6 +113,7 @@ export class BoardPointers {
 
   private cancel(e: PointerEvent) {
     this.touches.delete(e.pointerId);
+    this.tapping = null;
     this.end();
   }
 

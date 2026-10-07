@@ -23,6 +23,7 @@ import { drawBallistas, drawSpikeThrusts } from "./wall-defense-art.ts";
 import { rectDist } from "./pathing.ts";
 import { carriedLights, drawDamage, drawScorches, drawUnits, shadowCasters, type Brush, type Burning } from "./battle-art.ts";
 import { drawGrid, drawOverlay, type Overlay } from "./edit-overlay.ts";
+import { drawInspect, type Armed } from "./inspect.ts";
 import { drawFlag, drawWarBanner } from "./structure-art.ts";
 import { RALLY_REACH } from "./war-banner.ts";
 import { ParkGrass, type Walker } from "./park-grass.ts";
@@ -58,6 +59,9 @@ export type DrawOptions = {
   hideBanner?: boolean;
   /** Developer timing, disabled by default. */
   timings?: boolean;
+  /** The building the player tapped (its id in the map), outlined with its
+   * reach and troops. */
+  inspect?: { id: number; armed: Armed };
 };
 
 /** The torches going out after a lost run: seconds before the first, then
@@ -242,6 +246,7 @@ export class DefendRenderer {
     if (opts.effects ?? true) this.drawSmoke(map, sim, opts);
     if (sim?.warBanner && !opts.hideBanner) drawWarBanner(this.ctx, this.px, sim.warBanner, RALLY_REACH, { t: opts.now / 1000, reduceMotion: opts.reduceMotion });
     if (sim) this.wizard.drawFire(this.ctx, this.px);
+    if (opts.inspect) drawInspect(this.ctx, this.px, map, sim, opts.inspect.id, opts.inspect.armed, opts.now, opts.reduceMotion);
     this.drawEditing(overlay, opts.grid);
     // Rain falls in screen space, in front of the camera.
     this.ctx.setTransform(1, 0, 0, 1, 0, 0);

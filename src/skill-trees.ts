@@ -9,7 +9,7 @@ import type { BonusTarget } from "./progression.ts";
 
 export type SkillId =
   | "drillSergeant" | "veterans" | "bladework" | "fletchers" | "gunpowder" | "ballistics" | "warBanner"
-  | "masonry" | "bastions" | "guilds" | "plunder" | "ironworks" | "scholars" | "tactician"
+  | "masonry" | "bastions" | "outskirts" | "guilds" | "plunder" | "ironworks" | "scholars" | "tactician"
   | "fireproofWood" | "fireTraining" | "nightWatch" | "enchantedInk" | "coffee" | "waterproofing";
 export type TreeId = "command" | "stewardship" | "mine" | "library";
 
@@ -18,8 +18,9 @@ export type TreeId = "command" | "stewardship" | "mine" | "library";
  * smithy) and `copperPerWave`, a whole number added. The Library's and the
  * Mine's skills are read as ranks (`library/sim.ts`: `accidentChance`,
  * `fireDrill`; `mine/sim.ts`: `nightShift`, the shaft house's seal,
- * `extraSmiths`). */
-export type SkillEffect = { target: BonusTarget | "smiths" | "copperPerWave" | "fireproof" | "fireTraining" | "nightWatch" | "enchant" | "coffee" | "waterproof"; per: number };
+ * `extraSmiths`); Outlying districts by the Defend page, as whether city
+ * tiles may stand apart (`withOutskirts`). */
+export type SkillEffect = { target: BonusTarget | "smiths" | "copperPerWave" | "fireproof" | "fireTraining" | "nightWatch" | "enchant" | "coffee" | "waterproof" | "outskirts"; per: number };
 export type Skill = { id: SkillId; name: string; icon: string; max: number; base: number; effect: SkillEffect; text: string };
 export type SkillNode = { id: SkillId; requires: SkillId[] };
 export type SkillTree = { id: TreeId; name: string; description: string; nodes: SkillNode[] };
@@ -34,6 +35,7 @@ export const SKILLS: Record<SkillId, Skill> = {
   warBanner: { id: "warBanner", name: "War banner", icon: "♛", max: 3, base: 5, effect: { target: "troopDamage", per: 15 }, text: "+15% swordsman and archer damage a rank" },
   masonry: { id: "masonry", name: "Masonry", icon: "▦", max: 3, base: 1, effect: { target: "wallHp", per: 10 }, text: "+10% wall HP a rank" },
   bastions: { id: "bastions", name: "Bastions", icon: "♜", max: 3, base: 2, effect: { target: "keepHp", per: 10 }, text: "+10% keep HP a rank" },
+  outskirts: { id: "outskirts", name: "Outlying districts", icon: "⌂", max: 1, base: 8, effect: { target: "outskirts", per: 1 }, text: "City tiles can be placed anywhere but the top row, not only against the city: each district apart from the keep's is walled on its own" },
   guilds: { id: "guilds", name: "Builders' guilds", icon: "⚒", max: 3, base: 2, effect: { target: "rebuild", per: 10 }, text: "Civilians rebuild 10% faster a rank" },
   plunder: { id: "plunder", name: "Plunder", icon: "¤", max: 3, base: 2, effect: { target: "gold", per: 10 }, text: "+10% Gold from every defense a rank" },
   ironworks: { id: "ironworks", name: "Copperworks", icon: "▬", max: 2, base: 3, effect: { target: "copperPerWave", per: 1 }, text: "+1 copper for every wave held a rank" },
@@ -61,6 +63,7 @@ export const TREES: SkillTree[] = [
     { id: "masonry", requires: [] },
     { id: "bastions", requires: ["masonry"] },
     { id: "guilds", requires: ["masonry"] },
+    { id: "outskirts", requires: ["masonry"] },
     { id: "plunder", requires: [] },
     { id: "scholars", requires: [] },
     { id: "ironworks", requires: ["plunder"] },

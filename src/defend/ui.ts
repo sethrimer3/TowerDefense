@@ -24,7 +24,7 @@ import {
   type PaletteCategory,
   type PaletteItem,
 } from "./catalog.ts";
-import { TILES_H, TILES_W, defendRandom } from "./grid.ts";
+import { CELLS_W, TILES_H, TILES_W, defendRandom } from "./grid.ts";
 import { fitLayout, type Layout } from "./layout.ts";
 import { generateCity, type CityMap } from "./citygen.ts";
 import { DefendSim } from "./sim.ts";
@@ -40,13 +40,18 @@ import { QUIET, type Scene } from "../ambience.ts";
 import { NIGHT_FADE_SECONDS, isBossWave, rollWeather, skyLabel, type Weather } from "./weather.ts";
 import { play } from "../sound.ts";
 import { replay, sparksOver } from "../ui/flourish.ts";
-import { available, startingWave, type DefendSave } from "./progress.ts";
+import { available, startingWave, withOutskirts, type DefendSave } from "./progress.ts";
 import { ageWater } from "./boats.ts";
+import { defeatHTML } from "./defeat.ts";
+import { inspectable, type Armed } from "./inspect.ts";
 
 export type DefendHost = {
   save(): DefendSave;
   /** The Smithy's and the skill trees' multipliers for the next defense. */
   bonuses(): Bonuses;
+  /** Whether city tiles may stand apart from the keep's (the Study's
+   * Outlying districts). */
+  outskirts?(): boolean;
   /** Pays Gold for enemies slain. */
   earnKills(slain: Partial<Record<EnemyKind, number>>): void;
   /** Pays for holding `wave` (called before the best wave is raised). */
@@ -80,7 +85,11 @@ export class DefendPage {
     renderer: () => this.renderer,
     pickUp: (e) => this.pickUp(e),
     drop: (drop) => this.drop(drop),
+    tap: (e) => this.tap(e),
   });
+  /** The building the player tapped (its id in the map), outlined with its
+   * reach and troops, and what its reach is reckoned from before a battle. */
+  private picked: { id: number; armed: Armed } | null = null;
   private lastTime = 0;
   private performance = new BattlePerformance();
   private frameTimes = new FrameTimeOverlay();
@@ -238,13 +247,16 @@ export class DefendPage {
         <div class="defend-stage" id="defend-stage">
           <aside class="defend-side" id="defend-side" aria-label="Palette"><div class="defend-palette" id="defend-palette"></div></aside>
           <div class="defend-board" id="defend-board"><canvas id="defend-canvas" aria-label="City defense board. Scroll or pinch to zoom, drag to pan."></canvas>
-            <div class="defend-banner" id="defend-banner" hidden></div>
+            <div class="defend-banner" id="defend-banner" role="dialog" aria-label="The keep has fallen" hidden></div>
             <div class="defend-message" id="defend-message" aria-live="polite"></div></div>
         </div>
       </div>
       <dialog class="defend-journal-dialog" aria-labelledby="defend-journal-title"></dialog>
       <dialog class="defend-wave-dialog" aria-labelledby="defend-wave-title"></dialog>`;
     this.keepBricks = new KeepBricks();
+    // The fallen keep's summary closes, and rebuilding starts, at a tap
+    // anywhere on it (its × too); a drag on its charts still scrolls it.
+    this.root.querySelector<HTMLElement>("#defend-banner")!.addEventListener("click", () => this.rebuild());
     this.renderer = new DefendRenderer(this.root.querySelector("#defend-canvas")!);
     const canvas = this.renderer.canvas;
     canvas.addEventListener("pointerdown", (e) => this.pointers.down(e));
@@ -283,6 +295,14 @@ export class DefendPage {
   }
 
   private renderChrome() {
+    if (this.phase === "build") {
+      // Outlying districts learned or unlearned since: the layout follows.
+      const next = withOutskirts(this.save.layout, !!this.host.outskirts?.());
+      if (next !== this.save.layout) {
+        this.save.layout = next;
+        this.host.persist();
+      }
+    }
     this.root.querySelector("#defend-stage")!.classList.toggle("palette-right", this.save.paletteSide === "right");
     this.refreshJournal();
     this.renderControls();
@@ -328,18 +348,22 @@ export class DefendPage {
         this.sim.speed = this.sim.speed >= top ? 1 : this.sim.speed + 1;
         this.renderControls();
       };
-    } else {
-      el.innerHTML = `<button class="defend-go" id="defend-rebuild">Rebuild the city</button>`;
-      el.querySelector<HTMLButtonElement>("#defend-rebuild")!.onclick = () => {
-        this.phase = "build";
-        this.sim = null;
-        this.map = null;
-        this.weather = null;
-        this.night = 0;
-        this.hideBanner();
-        this.renderChrome();
-      };
-    }
+    } else el.innerHTML = "";
+  }
+
+  /** Leaves the fallen city for the build phase: the summary closes and the
+   * palette comes back. */
+  private rebuild() {
+    if (this.phase !== "over") return;
+    this.phase = "build";
+    this.sim = null;
+    this.map = null;
+    this.weather = null;
+    this.night = 0;
+    this.picked = null;
+    this.hideBanner();
+    this.renderChrome();
+    this.relayout();
   }
 
   /** The button that slides the side panel (the palette) in and out. */
@@ -515,9 +539,10 @@ export class DefendPage {
     if (mood === "win") sparksOver(el, "gold");
   }
 
-  private showBanner(html: string) {
+  private showBanner(html: string, kind = "") {
     const b = this.root.querySelector<HTMLElement>("#defend-banner")!;
     b.innerHTML = html;
+    b.className = `defend-banner ${kind}`.trim();
     b.hidden = false;
   }
   private hideBanner() {
@@ -625,13 +650,8 @@ export class DefendPage {
     this.phase = "over";
     play("fallen");
     replay(this.root.querySelector("#defend-board"), "quake");
-    const wave = this.sim.wave;
-    const cleared = Math.max(0, wave - 1);
-    this.showBanner(
-      `<strong>The keep has fallen</strong><span>Fell during wave ${wave} · best ${this.save.bestWave}</span>${
-        this.newRecord ? `<em>New record this run: wave ${this.newRecord}</em>` : cleared < this.save.bestWave ? `<em>Strengthen the city in the Smithy and the Study, then try again.</em>` : ""
-      }`,
-    );
+    this.picked = null;
+    this.showBanner(defeatHTML({ wave: this.sim.wave, best: this.save.bestWave, record: this.newRecord, stats: this.sim.stats }), "defeat");
     this.renderChrome();
   }
 
@@ -722,6 +742,7 @@ export class DefendPage {
       effects: this.host.effects(),
       healthbars: this.host.healthbars?.() ?? true,
       over: this.phase === "over",
+      ...(this.picked ? { inspect: { id: this.picked.id, armed: this.sim ?? this.picked.armed } } : {}),
       hideBanner: this.phase === "over" || (this.pointers.session?.drag.from === "banner" && !!this.pointers.session.drag.placed),
     });
   }
@@ -777,12 +798,42 @@ export class DefendPage {
       else if (drop.tap || (drag?.from === "banner" && drag.placed)) sim.plantBanner(null);
       return;
     }
+    if (drop.tap) return this.pickLifted();
     const s = this.save;
-    if (drop.layout !== s.layout) play("place");
+    if (drop.layout !== s.layout) {
+      play("place");
+      this.picked = null;
+    }
     s.layout = drop.layout;
     if (drop.message) this.setMessage(drop.message);
     if (s.layout !== this.mapLayout) this.host.persist();
     this.renderPalette();
+  }
+
+  /** A tap on the board: after a lost run it starts the rebuilding;
+   * otherwise it picks out the tower or troop building under it (a second
+   * tap, or a tap on anything else, puts it down). */
+  private tap(e: PointerEvent) {
+    if (this.phase === "over") return this.rebuild();
+    const { cx, cy, inside } = eventCell(this.renderer!, e);
+    const map = this.sim ? this.sim.map : this.currentMap();
+    const b = inside ? map.buildings[map.owner[cy * CELLS_W + cx]] : undefined;
+    this.pick(inspectable(b) && this.picked?.id !== b.id ? b.id : null);
+  }
+
+  /** A tapped structure or ballista, lifted in the build phase and let go
+   * where it stood, is picked out. */
+  private pickLifted() {
+    const drag = this.pointers.session?.drag, map = this.currentMap();
+    const b =
+      drag?.from === "structure" ? map.buildings.find((o) => o.structureUid === drag.uid)
+      : drag?.from === "ballista" ? map.buildings.find((o) => o.corner?.vx === drag.corner.vx && o.corner.vy === drag.corner.vy)
+      : undefined;
+    this.pick(inspectable(b) && this.picked?.id !== b.id ? b.id : null);
+  }
+
+  private pick(id: number | null) {
+    this.picked = id === null ? null : { id, armed: { levels: { ...this.save.levels }, bonuses: this.host.bonuses() } };
   }
 
   private dropBomb(at: { x: number; y: number }) {

@@ -196,7 +196,7 @@ export function refusal(drag: Drag, layout: Layout, key: string): string {
   if (ty === 0) return "Nothing can be built on the top row — that's where the enemy gathers.";
   const inCity = cityTileSet(layout).has(key);
   if (kind === "cityTile")
-    return inCity && drag.from === "palette" ? "That tile is already part of the city." : "City tiles must touch the city along an edge.";
+    return inCity && drag.from === "palette" ? "That tile is already part of the city." : layout.outskirts ? "There isn't room for a city tile there." : "City tiles must touch the city along an edge.";
   if (kind === "keep") return "The keep can only move onto another city tile.";
   if (!consumable(kind) && dragSpan(drag, layout) > 1) {
     const [tx] = key.split(",").map(Number);

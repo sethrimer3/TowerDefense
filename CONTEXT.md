@@ -18,6 +18,9 @@ The player's design: the keep's tile, the city tiles and the placed structures. 
 **City**:
 The procedural town generated from the layout and the save's seed: wall, streets, houses, parks and ponds around the structures.
 
+**Outlying district**:
+A group of city tiles standing apart from the keep's, walled and streeted on its own. Allowed by the Study's Outlying districts skill.
+
 **Park**:
 A small block of grass the city leaves unbuilt; larger ones hold a pond, many have trees and a fence.
 
