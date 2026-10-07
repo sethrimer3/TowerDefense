@@ -819,7 +819,9 @@ export class LibraryRenderer {
           } else {
             const t = 0.8 + n * 0.4;
             r = 56 * t * lr; g = 50 * t * lg; b = 48 * t * lb;
-            a = Math.min(255, (smoke / 255) * 0.65 * 255 * (0.85 + h01(x, y, tick >> 2) * 0.3));
+            // Thick smoke hides the wall behind it; only its thin edges
+            // let the stones (and their lit bevels) show through.
+            a = 255 * Math.min(1, (smoke / 255) * 1.6) * (0.92 + h01(x, y, tick >> 2) * 0.08);
           }
           px[j] = (a << 24) | (c255(b) << 16) | (c255(g) << 8) | c255(r);
         }
