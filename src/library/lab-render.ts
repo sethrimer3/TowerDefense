@@ -99,6 +99,10 @@ const c255 = (v: number) => (v >= 255 ? 255 : v <= 0 ? 0 : v | 0);
 const hex = (s: string): RGB => [parseInt(s.slice(1, 3), 16), parseInt(s.slice(3, 5), 16), parseInt(s.slice(5, 7), 16)];
 const flicker = (t: number, n: number) => 0.88 + 0.08 * Math.sin(t * 2.3 + n * 1.7) + 0.06 * Math.sin(t * 9.1 + n * 4.3) + 0.03 * Math.sin(t * 23 + n);
 
+/** How many sim seconds old a lab moment may be when first drawn and still
+ * count as just happened: more than one fast-forwarded frame covers. */
+const FRESH = 3;
+
 type Spark = { x: number; y: number; vx: number; vy: number; life: number; color: string; up?: number };
 /** The lab's black cat: where it is, where it is going, what it is doing
  * and until when (seconds of the renderer's time). */
@@ -140,6 +144,13 @@ export class LabRenderer {
   private level = 0;
   private orreryAngle = 0;
   private clock = 0;
+  /** When the renderer first saw each of the lab's moments (a shriek, a
+   * breath, a casting), so they play out on the wall clock. */
+  private moments = new Map<string, { at: number; wall: number }>();
+  /** The clouds of smoke on show, timed on the wall clock (`wall`), and the
+   * sim's puffs already taken up. */
+  private clouds: { x: number; color: number; at: number; big: boolean; wall: number }[] = [];
+  private seenPuffs = new WeakSet<object>();
   private cat: Cat = { x: 140, to: 140, facing: -1, act: "sit", until: 4 };
 
   constructor() {
@@ -589,10 +600,10 @@ export class LabRenderer {
     if (open("west", level)) {
       out.push({ x: ANNEX_LANTERNS.west.x, y: ANNEX_LANTERNS.west.y + 2, r: 56, k: 0.8 * flicker(this.flame * 1.4, 20), c: [1, 0.72, 0.42] });
       out.push({ x: LECTERN.x, y: LECTERN.top - 5, r: 22, k: 0.4 + 0.1 * Math.sin(time * 1.7), c: [0.75, 0.6, 1] });
-      if (level >= 4) out.push({ x: (CAGE.x0 + CAGE.x1) / 2, y: F - 6, r: 30, k: 0.6 * flicker(this.flame * 2.4, 21) + (sim.time - lab.breath < 2 ? 1.2 : 0), c: [1, 0.45, 0.15] });
+      if (level >= 4) out.push({ x: (CAGE.x0 + CAGE.x1) / 2, y: F - 6, r: 30, k: 0.6 * flicker(this.flame * 2.4, 21) + (this.since("breath", lab.breath, sim) < 2 ? 1.2 : 0), c: [1, 0.45, 0.15] });
     }
     if (open("east", level)) {
-      const hot = Math.max(0, 1 - (sim.time - lab.cast) / 8);
+      const hot = Math.max(0, 1 - (this.since("cast", lab.cast, sim)) / 8);
       out.push({ x: ANNEX_LANTERNS.east.x, y: ANNEX_LANTERNS.east.y + 2, r: 56, k: 0.8 * flicker(this.flame * 1.4, 22), c: [1, 0.72, 0.42] });
       out.push({ x: FURNACE.x0 + 6, y: F - 4, r: 40, k: 0.9 * flicker(this.flame * 1.8, 23), c: [1, 0.5, 0.18] });
       out.push({ x: FURNACE.x0 + 6, y: FURNACE.top - 4, r: 26, k: 0.5 + hot * 0.6, c: [1, 0.62, 0.2] });
@@ -622,6 +633,19 @@ export class LabRenderer {
   /** Lights the baked lab and draws it, with what moves in it, on `ctx`
    * (already in world pixels). Librarians are drawn after, by the caller,
    * then `drawOver`. */
+  /** Wall-clock seconds since a moment the sim timed at `at`: one seen fresh
+   * (within the few sim seconds a fast-forwarded frame covers) starts now,
+   * so a fast-forward doesn't race through it; an old one stays old. */
+  private since(key: string, at: number, sim: LibrarySim) {
+    let m = this.moments.get(key);
+    if (!m || m.at !== at) {
+      const ago = sim.time - at;
+      m = { at, wall: this.clock - (ago > FRESH ? ago : 0) };
+      this.moments.set(key, m);
+    }
+    return this.clock - m.wall;
+  }
+
   draw(ctx: CanvasRenderingContext2D, sim: LibrarySim, time: number, dt: number, effects: boolean) {
     if (sim.lab.level !== this.level) this.bake(sim.lab.level);
     this.clock = time;
@@ -800,8 +824,15 @@ export class LabRenderer {
     };
     // Clouds of smoke: a brew poured, a distillate placed, a brew gone wrong.
     for (const p of lab.puffs) {
-      const age = sim.time - p.at, life = p.big ? 5 : 2.5;
-      if (age < 0 || age > life) continue;
+      if (this.seenPuffs.has(p)) continue;
+      this.seenPuffs.add(p);
+      const ago = sim.time - p.at;
+      if (ago < (p.big ? 5 : 2.5) && this.clouds.length < 12) this.clouds.push({ ...p, wall: this.clock - (ago > FRESH ? ago : 0) });
+    }
+    this.clouds = this.clouds.filter((p) => this.clock - p.wall < (p.big ? 5 : 2.5));
+    for (const p of this.clouds) {
+      const age = this.clock - p.wall, life = p.big ? 5 : 2.5;
+      if (age < 0) continue;
       const a = 1 - age / life, c = ELIXIRS[p.color];
       ctx.globalAlpha = a * (p.big ? 0.55 : 0.4);
       const n = p.big ? 14 : 5;
@@ -858,7 +889,7 @@ export class LabRenderer {
         dot(px + 1 + sw, GARDEN.top - 6, "#78b850");
       });
       // Its shriek: rings off the pulled root.
-      const age = sim.time - lab.shriek;
+      const age = this.since("shriek", lab.shriek, sim);
       if (age >= 0 && age < 2.2) {
         ctx.strokeStyle = "#f0e8c8";
         ctx.lineWidth = 0.5;
@@ -893,7 +924,7 @@ export class LabRenderer {
         dot(sx + 2 + (Math.floor(time * 4 + 1) % 2), F - 6, "#a83010", 1, 1);
         const tail = dir > 0 ? sx - 1 : sx + 4, fl = flicker(this.flame * 3, 31);
         dot(tail, F - 8 - (fl > 1 ? 1 : 0), "#ffb040", 1, 1 + (fl > 1 ? 1 : 0));
-        const age2 = sim.time - lab.breath;
+        const age2 = this.since("breath", lab.breath, sim);
         if (age2 >= 0 && age2 < 1.6) {
           // A jet of flame out through the bars, toward whoever fed it.
           const len = Math.round(Math.min(1, age2 * 3) * 12 * (1 - Math.max(0, age2 - 1.2) / 0.4));
@@ -902,7 +933,7 @@ export class LabRenderer {
       }
     }
     if (open("east", level)) {
-      const U = FURNACE, hot = Math.max(0, 1 - (sim.time - lab.cast) / 8);
+      const U = FURNACE, hot = Math.max(0, 1 - (this.since("cast", lab.cast, sim)) / 8);
       // Fire in the firebox; the melt in the crucible.
       for (let x = U.x0 + 3; x < U.x0 + 9; x++) {
         const h = 1 + Math.round(h01(x, Math.floor(time * 10), 75) * 3);
@@ -1071,10 +1102,10 @@ export class LabRenderer {
     if (open("west", level)) {
       glow(ANNEX_LANTERNS.west.x, ANNEX_LANTERNS.west.y + 3, 11, "#ffc070", 0.5 * flicker(this.flame * 1.4, 20));
       glow(LECTERN.x, LECTERN.top - 6, 8, "#c8a8ff", 0.35 + 0.15 * Math.sin(time * 1.7));
-      if (level >= 4) glow((CAGE.x0 + CAGE.x1) / 2, F - 6, sim.time - lab.breath < 1.6 ? 18 : 8, "#ff7a2a", (sim.time - lab.breath < 1.6 ? 0.8 : 0.4) * flicker(this.flame * 2.4, 21));
+      if (level >= 4) glow((CAGE.x0 + CAGE.x1) / 2, F - 6, this.since("breath", lab.breath, sim) < 1.6 ? 18 : 8, "#ff7a2a", (this.since("breath", lab.breath, sim) < 1.6 ? 0.8 : 0.4) * flicker(this.flame * 2.4, 21));
     }
     if (open("east", level)) {
-      const hot = Math.max(0, 1 - (sim.time - lab.cast) / 8);
+      const hot = Math.max(0, 1 - (this.since("cast", lab.cast, sim)) / 8);
       glow(ANNEX_LANTERNS.east.x, ANNEX_LANTERNS.east.y + 3, 11, "#ffc070", 0.5 * flicker(this.flame * 1.4, 22));
       glow(FURNACE.x0 + 6, F - 3, 9, "#ff8030", 0.5 * flicker(this.flame * 1.8, 23));
       glow(FURNACE.x0 + 6, FURNACE.top - 3, 7, "#ffb040", 0.35 + hot * 0.4);

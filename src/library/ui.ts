@@ -7,7 +7,7 @@
  * firefighting and repairs happen as those steps run. */
 import { play } from "../sound.ts";
 import type { Scene } from "../ambience.ts";
-import { countdown, HOUR_MS, IDLE_LEAD, IDLE_SPEED, MAX_AWAY_MS } from "../away.ts";
+import { countdown, HOUR_MS, IDLE_LEAD, IDLE_SPEED, idleDrain, MAX_AWAY_MS } from "../away.ts";
 import { H, LAB_FLOOR, LAB_MAX_LEVEL, MAX_LIBRARIANS, labPrice, MAX_SHELVES, LibrarySim, ROLES, RETURN_BOOKS, librarianPrice, shelfPrice, type Librarian, type LibrarySave, type Role } from "./sim.ts";
 
 import { LibraryRenderer, daylight } from "./render.ts";
@@ -102,26 +102,22 @@ export class LibraryPage {
     let spent = 0, earned = 0, n = 0;
     // Keep pace with the mine's idle time (`keepWith`), never more than
     // IDLE_LEAD ahead of it, so both spend it together.
-    while (this.owed >= 100 - 1e-6 && spent + 100 <= limit + 1e-6 && this.owed - 100 >= keepWith - IDLE_LEAD) {
+    while (this.owed >= 100 - 1e-6 && spent + 100 <= limit + 1e-6 && this.owed - idleDrain(this.owed, 100) >= keepWith - IDLE_LEAD) {
       this.sim.night = 1 - daylight(this.host.clock() - this.owed);
       const rate = this.sim.rate;
+      // Catching up, a step spends (and pays for) ten steps of idle time.
+      const drain = Math.min(this.owed, idleDrain(this.owed, 100)), boost = drain / 100;
       this.sim.step(0.1);
-      this.owed = Math.max(0, this.owed - 100);
+      this.owed = Math.max(0, this.owed - drain);
       spent += 100;
-      const pay = rate * 100 / HOUR_MS;
+      // Enchanted books read pay their gift on top.
+      const pay = (rate * 100 / HOUR_MS + this.sim.takeBonus()) * boost;
       earned += pay;
       if (this.away?.catchingUp) {
         this.awayKnowledge += pay;
         this.away.knowledge += pay;
       }
       if (++n % 8 === 0 && performance.now() - start > 6) break;
-    }
-    // Enchanted books read pay their gift on top.
-    const gift = this.sim.takeBonus();
-    earned += gift;
-    if (gift > 0 && this.away?.catchingUp) {
-      this.awayKnowledge += gift;
-      this.away.knowledge += gift;
     }
     if (earned > 0) this.host.earnKnowledge(earned);
     if (this.away?.catchingUp) {

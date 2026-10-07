@@ -135,6 +135,7 @@ export class LibraryRenderer {
   private hallSy = [new Float32Array(HALL * HALL_ROWS), new Float32Array(HALL * HALL_ROWS)];
   private hallRelief = [new Uint8Array(HALL * HALL_ROWS), new Uint8Array(HALL * HALL_ROWS)];
   private lastTime = -1;
+  private lastWall = -1;
   /** Which tables stand whole, their candles lit. */
   private candles = TABLES.map(() => true);
   /** This frame's fire, gathered into blocks of 24 pixels: centres and sizes. */
@@ -530,6 +531,10 @@ export class LibraryRenderer {
     const day = daylight(now);
     const dt = this.lastTime < 0 ? 0 : Math.min(0.2, Math.max(0, time - this.lastTime));
     this.lastTime = time;
+    // The lab's apparatus animates on the wall clock too, so it keeps its
+    // pace while idle time fast-forwards the researchers.
+    const wallDt = this.lastWall < 0 ? 0 : Math.min(0.2, Math.max(0, this.flame - this.lastWall));
+    this.lastWall = this.flame;
     if (this.target && !sim.librarians.includes(this.target)) this.target = null;
     if (this.goal !== null) {
       // Glide down to the lab, or back up to the nave.
@@ -576,7 +581,7 @@ export class LibraryRenderer {
     this.drawHalls(sim, dt);
     ctx.drawImage(this.off, 0, 0);
     const top = -oy / scale, bottom = (this.canvas.height - oy) / scale, labShown = LabRenderer.visible(top, bottom);
-    if (labShown) this.lab.draw(ctx, sim, time, dt, effects);
+    if (labShown) this.lab.draw(ctx, sim, this.flame, wallDt, effects);
     this.drawTrapdoor();
     if (day < 0.6) this.drawStars(now, 1 - day / 0.6);
     if (effects && day > 0.02) this.drawRays(now, day);
@@ -596,7 +601,7 @@ export class LibraryRenderer {
     // The piers' feet stand in front, so those going to and from the
     // hallways pass behind them.
     for (const x of [0, W - BAY_X0]) ctx.drawImage(this.off, x, PIER_FRONT, BAY_X0, FLOOR - PIER_FRONT, x, PIER_FRONT, BAY_X0, FLOOR - PIER_FRONT);
-    if (labShown) this.lab.drawOver(ctx, sim, time, dt, effects);
+    if (labShown) this.lab.drawOver(ctx, sim, this.flame, wallDt, effects);
     if (this.target && !this.target.away) {
       // A brass marker over whoever is followed.
       const t = this.target, y = Math.round(t.y) - 12 - (Math.floor(time * 2) % 2);
