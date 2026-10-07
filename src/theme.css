@@ -1288,7 +1288,11 @@ dialog .away-row .away-note {
 .defend-journal-button canvas { display: block; width: 40px; height: 40px; image-rendering: pixelated; filter: drop-shadow(0 2px 0 #000a); }
 .defend-journal-dialog { width: min(640px, calc(100vw - 32px)); max-height: 85dvh; }
 .defend-journal-entries { max-height: 58dvh; overflow-y: auto; overscroll-behavior: contain; }
-.defend-journal-entries article { padding: 10px 0; border-bottom: 1px solid #73524155; }
+.defend-journal-entries article { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid #73524155; }
+.defend-journal-entries article > div { flex: 1; min-width: 0; text-align: left; }
+/* Each entry's portrait: the enemy's sprite in an oak frame, painted as
+   pixel art by journal-portrait.ts. */
+.defend-journal-portrait { flex: 0 0 auto; width: 80px; height: 80px; image-rendering: pixelated; filter: drop-shadow(0 2px 0 #0007); }
 .defend-journal-entries h3 { margin: 0 0 5px; }
 .defend-journal-entries p { margin: 4px 0; }
 .defend-journal-stats { font-size: .85em; }

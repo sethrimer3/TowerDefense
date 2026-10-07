@@ -1,4 +1,5 @@
 import { journalHTML, paintJournal } from "./journal.ts";
+import { paintPortraits } from "./journal-portrait.ts";
 import { wavePickerHTML } from "./wave-picker.ts";
 import { areaForWave, areaStyle, type AreaId } from "./areas.ts";
 import { uiSprite } from "../ui/dom.ts";
@@ -226,6 +227,7 @@ export class DefendPage {
     this.journal.addEventListener("close", () => { this.lastTime = 0; this.root.querySelector<HTMLButtonElement>("#defend-journal")!.focus(); });
     this.root.querySelector<HTMLButtonElement>("#defend-journal")!.onclick = () => {
       this.journal!.innerHTML = journalHTML(this.save.discovered);
+      paintPortraits(this.journal!);
       this.journal!.querySelector<HTMLButtonElement>("[data-journal-close]")!.onclick = () => this.journal!.close();
       this.journal!.showModal();
       this.save.journalRead = [...this.save.discovered];
