@@ -101,7 +101,7 @@ export class Ledger {
       ? `<div class="ledger-strip ledger-topics" role="group" aria-label="${subject.name}">${subject.topics.map((t) => `<button data-topic="${t.id}" aria-pressed="${t.id === topic.id}">${t.item ? `<canvas width="22" height="22" data-icon="${t.item}"></canvas>` : ""}${t.name}</button>`).join("")}</div>`
       : "";
     this.root.innerHTML = `<header class="chamber-head">
-        <button class="chamber-up" data-up title="${c.up}"><span aria-hidden="true">⤒</span> ${c.up}</button>
+        <button class="chamber-up" data-up title="${c.up}"><span aria-hidden="true">⤒</span> ${smithy ? "Mine" : "Library"}</button>
         <div class="chamber-title"><h2>${c.title}</h2><small>${c.blurb}</small></div>
       </header>
       ${smithy ? this.walletHtml() : this.knowledgeHtml()}
@@ -115,7 +115,15 @@ export class Ledger {
     }
     root.querySelector(".chamber-list")!.scrollTop = scroll;
     root.querySelectorAll(".ledger-strip").forEach((s, i) => (s.scrollLeft = strips[i] ?? 0));
-    root.querySelector('.ledger-strip [aria-pressed="true"]')?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+    // Scroll only the strip: scrollIntoView also scrolls the offscreen
+    // chamber's ancestors, jumping the whole scene before descent starts.
+    const selected = root.querySelector<HTMLElement>('.ledger-strip [aria-pressed="true"]');
+    if (selected) {
+      const strip = selected.parentElement!;
+      const itemBox = selected.getBoundingClientRect(), stripBox = strip.getBoundingClientRect();
+      if (itemBox.left < stripBox.left) strip.scrollLeft += itemBox.left - stripBox.left;
+      else if (itemBox.right > stripBox.right) strip.scrollLeft += itemBox.right - stripBox.right;
+    }
     root.querySelectorAll<HTMLCanvasElement>("canvas[data-icon]").forEach((c) => paintIcon(c, c.dataset.icon as IconItem));
     root.querySelectorAll<HTMLCanvasElement>("canvas[data-path-icon]").forEach((c) => {
       const [icon, hue] = c.dataset.pathIcon!.split(":");

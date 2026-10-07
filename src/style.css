@@ -1837,6 +1837,33 @@ nav button > .tab-idle[hidden] { display: none; }
   .descent-world, .descent-strata, .descent-chamber, .strata-far { transition: none; }
 }
 .chamber-door { white-space: nowrap; }
+/* Both directions occupy the same corner of the page. */
+.descent-world > .mine-head { padding-right: 94px; }
+.descent-world .chamber-door,
+.descent-chamber .chamber-up {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 88px;
+  height: 34px;
+  min-height: 0;
+  padding: 0 5px;
+  font-size: 11px;
+}
+.descent-chamber .chamber-head { padding-right: 94px; min-height: 34px; }
+.mine-body.crew-open .mine-buildings { width: 0; margin-right: 0; opacity: 0; }
+.mine-body.buildings-open .mine-buildings {
+  width: clamp(132px, 34%, 210px);
+  margin-right: 6px;
+  opacity: 1;
+}
+.mine-buildings button { width: 100%; padding: 8px 4px; font-size: 11px; text-align: left; }
+@media (max-width: 440px) {
+  .mine-tools { gap: 4px; }
+  .mine-tools button { padding: 0 6px; font-size: 10px; }
+  .library-head { flex-wrap: wrap; }
+  .library-head #library-tally { flex-basis: 100%; }
+}
 
 /* ── Chambers: a menu in a lit room, a torch on each side ─────────────── */
 /* (Positioned by its page: the tab's own section, or the room below a tab.) */

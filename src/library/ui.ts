@@ -8,7 +8,7 @@
 import { play } from "../sound.ts";
 import type { Scene } from "../ambience.ts";
 import { countdown, HOUR_MS, IDLE_LEAD, IDLE_SPEED, idleDrain, MAX_AWAY_MS } from "../away.ts";
-import { H, LAB_FLOOR, LAB_MAX_LEVEL, MAX_LIBRARIANS, labPrice, MAX_SHELVES, LibrarySim, ROLES, RETURN_BOOKS, librarianPrice, shelfPrice, type Librarian, type LibrarySave, type Role } from "./sim.ts";
+import { LAB_MAX_LEVEL, MAX_LIBRARIANS, labPrice, MAX_SHELVES, LibrarySim, ROLES, RETURN_BOOKS, librarianPrice, shelfPrice, type Librarian, type LibrarySave, type Role } from "./sim.ts";
 
 import { LibraryRenderer, daylight } from "./render.ts";
 
@@ -187,8 +187,7 @@ export class LibraryPage {
     };
     this.root.querySelector<HTMLButtonElement>("#library-lab")!.onclick = () => {
       const r = this.renderer!;
-      r.target = null;
-      r.goal = r.inLab ? H / 2 : LAB_FLOOR - 52;
+      r.frameRoom(!r.inLab);
       this.shownStaff = "";
     };
     this.root.querySelector<HTMLButtonElement>("#library-study")!.onclick = () => this.host.descend?.();
@@ -239,7 +238,7 @@ export class LibraryPage {
       }
       if (cancel || !this.renderer) return;
       this.renderer.target = l && l !== this.renderer.target ? l : null;
-      this.renderer.goal = null;
+      this.renderer.clearFrame();
       this.refresh();
     };
     panel.onpointerup = (e) => finish(e, false);
@@ -338,7 +337,7 @@ export class LibraryPage {
     const fire = sim.fire.active, lost = sim.lost;
     const home = sim.librarians.filter((l) => l.home).length, roles = sim.roles;
     this.refreshStaff();
-    const lab = this.root.querySelector<HTMLButtonElement>("#library-lab")!, inLab = this.renderer ? (this.renderer.goal ?? this.renderer.focus.y) > H : false;
+    const lab = this.root.querySelector<HTMLButtonElement>("#library-lab")!, inLab = this.renderer?.inLab ?? false;
     lab.textContent = inLab ? "⤒ Nave" : "⤓ Lab";
     const key = `${home}|${sim.shelves}|${sim.built}|${sim.librarians.length}|${ROLES.map((r) => roles[r]).join(",")}|${free || gold >= sp}|${free || gold >= lp}|${level}|${free || gold >= up}|${sim.fresh}|${sim.returns.length}|${fire}|${lost ? `${lost.shelves},${lost.librarians},${lost.books}` : ""}`;
     if (key === this.shown) return;

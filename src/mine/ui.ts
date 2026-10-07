@@ -10,7 +10,7 @@ import { play } from "../sound.ts";
 import { QUIET, thunder, type Scene } from "../ambience.ts";
 import { countdown, IDLE_LEAD, IDLE_SPEED, idleDrain, MAX_AWAY_MS } from "../away.ts";
 import { BARS_PER_POINT, CREW_PER_LEVEL, METALS, metalSum, noMetals, type Metals, DAY_TICKS, FORGE_PER_LEVEL, JOBS, KIT, MAX_MINERS, MineSim, MOVE_ON_SHARE, SEAL_LEVEL, SMITHS_PER_LEVEL, STOCK_PER_LEVEL, STOCK_RATE, TICK_HZ, type Cause, type Job, type Miner, type MineNews, type MineSave, type Weather } from "./sim.ts";
-import { MAX_LEVEL, type BuildingId } from "./buildings.ts";
+import { BUILDINGS, MAX_LEVEL, type BuildingId } from "./buildings.ts";
 import { MineRenderer } from "./render.ts";
 
 /** Longest bank of unused simulation time. */
@@ -209,15 +209,18 @@ export class MinePage {
     this.root.innerHTML = `<div class="mine-head">
         <button id="mine-hire" class="mine-hire"></button>
         <p id="mine-tally" class="mine-tally"></p>
-        <button id="mine-follow" class="mine-follow" aria-pressed="false" title="Follow the crew down">⤓ Follow</button>
       </div>
       <div class="mine-tools">
         <button id="mine-crew-toggle" class="mine-crew-toggle" aria-pressed="false" aria-controls="mine-crew">☰ Crew</button>
+        <button id="mine-buildings-toggle" aria-pressed="false" aria-controls="mine-buildings">☰ Buildings</button>
         <p id="mine-prospect" class="mine-prospect"></p>
         <button id="mine-prospect-new" class="mine-prospect-new">⚑ New Prospect</button>
         <button id="mine-smithy" class="chamber-door smithy-door" title="Climb down to the Smithy, where the mine's metal makes the realm stronger">⚒ Smithy</button>
       </div>
       <div class="mine-body" id="mine-body">
+        <aside class="mine-crew mine-buildings" id="mine-buildings" aria-label="Buildings" aria-hidden="true">
+          <section class="crew-box"><h3>Buildings</h3><ul>${BUILDINGS.map(id => `<li><button data-building="${id}">${{ shaft: "Shaft house", barracks: "Barracks", warehouse: "Warehouse", forge: "Forge", smithy: "Smithy" }[id]}</button></li>`).join("")}</ul></section>
+        </aside>
         <aside class="mine-crew" id="mine-crew" aria-label="The crew" aria-hidden="true">
           ${JOBS.map((j) => `<section class="crew-box" data-job="${j}" title="${TRADE[j].hint}"><h3><i class="job-mark job-${j}"></i>${TRADE[j].name} <b data-count="${j}">0</b></h3><ul></ul></section>`).join("")}
           <p class="crew-hint">Drag a name to another trade. Tap one to follow them. Smiths on a Smithy upgrade stay put.</p>
@@ -230,20 +233,27 @@ export class MinePage {
     this.renderer.resize();
     this.renderer.home(this.sim);
     this.root.querySelector<HTMLButtonElement>("#mine-hire")!.onclick = () => this.hire();
-    const follow = this.root.querySelector<HTMLButtonElement>("#mine-follow")!;
-    follow.onclick = () => {
-      this.renderer!.follow = !this.renderer!.follow;
-      if (this.renderer!.follow) this.select(null);
-      follow.setAttribute("aria-pressed", String(this.renderer!.follow));
-      follow.classList.toggle("selected", this.renderer!.follow);
-    };
     const toggle = this.root.querySelector<HTMLButtonElement>("#mine-crew-toggle")!;
     toggle.onclick = () => {
       const open = toggle.getAttribute("aria-pressed") !== "true";
       toggle.setAttribute("aria-pressed", String(open));
       this.root.querySelector("#mine-body")!.classList.toggle("crew-open", open);
       this.root.querySelector("#mine-crew")!.setAttribute("aria-hidden", String(!open));
+      this.toggleBuildings(false);
     };
+    this.root.querySelector<HTMLButtonElement>("#mine-buildings-toggle")!.onclick = () => {
+      const open = this.root.querySelector("#mine-buildings-toggle")!.getAttribute("aria-pressed") !== "true";
+      this.toggleBuildings(open);
+      toggle.setAttribute("aria-pressed", "false");
+      this.root.querySelector("#mine-body")!.classList.remove("crew-open");
+      this.root.querySelector("#mine-crew")!.setAttribute("aria-hidden", "true");
+    };
+    this.root.querySelectorAll<HTMLButtonElement>("[data-building]").forEach(button => {
+      button.onclick = () => {
+        this.toggleBuildings(false);
+        this.look(button.dataset.building as BuildingId);
+      };
+    });
     this.root.querySelector<HTMLButtonElement>("#mine-prospect-new")!.onclick = () => this.askProspect();
     this.root.querySelector<HTMLButtonElement>("#mine-smithy")!.onclick = () => this.host.descend?.();
     this.root.querySelector<HTMLElement>("#mine-info")!.onclick = (e) => {
@@ -252,6 +262,12 @@ export class MinePage {
     };
     this.bindView(canvas);
     this.bindCrew(this.root.querySelector<HTMLElement>("#mine-crew")!);
+  }
+
+  private toggleBuildings(open: boolean) {
+    this.root.querySelector("#mine-buildings-toggle")!.setAttribute("aria-pressed", String(open));
+    this.root.querySelector("#mine-body")!.classList.toggle("buildings-open", open);
+    this.root.querySelector("#mine-buildings")!.setAttribute("aria-hidden", String(!open));
   }
 
   /** Drag pans; the wheel, a pinch or a double-tap zooms; a tap on a

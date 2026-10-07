@@ -99,6 +99,7 @@ export class MineRenderer {
   /** Fills a rectangle in cells, snapped to whole screen pixels (set each
    * frame, for the half-cell figures and the effects). */
   private fine: Fine = () => {};
+  private surfaceOffsetY = 0;
   /** Where the hoist's bucket is drawn, eased after the sim's. */
   private hoistY = -1;
   /** The building the player tapped, shown open and outlined. */
@@ -255,13 +256,18 @@ export class MineRenderer {
     const { surface, stoneTop } = sim.strata;
     const { daylight, clouds } = this.skyNow, night = 1 - daylight, starlight = night * (1 - clouds), open = this.skyLight();
     const flicker = Math.floor(time / 110), W2 = W * 2, lr = this.lr, lg = this.lg, lb = this.lb;
+    const builtGround = new Uint8Array(W);
+    for (const id of BUILDINGS) {
+      const b = sim.buildings[id];
+      for (let x = Math.max(0, b.x0); x <= Math.min(W - 1, b.x1); x++) builtGround[x] = 1;
+    }
     for (let y = y0; y < y1; y++) {
       const t = Math.min(1, Math.max(0, y / 50));
       let skyRgb = mix(mix(NIGHT_TOP, NIGHT_LOW, t), mix(SKY_TOP, SKY_LOW, t * t), daylight);
       skyRgb = mix(skyRgb, mix(NIGHT_TOP, OVERCAST, daylight), clouds * 0.65);
       const skyPx = pack(skyRgb, 1), up = y > 0 ? -W : 0, down = y < H - 1 ? W : 0;
       for (let x = 0; x < W; x++) {
-        const i = idx(x, y), m = cells[i], o = 2 * y * W2 + 2 * x, g4 = 4 * i;
+        const i = idx(x, y), m = cells[i] === GRASS && builtGround[x] ? DIRT : cells[i], o = 2 * y * W2 + 2 * x, g4 = 4 * i;
         if (m === TORCH && !burn[i]) {
           // A flame flickering on its stick.
           const f = (flicker + shade[i]) % 3;
@@ -483,11 +489,12 @@ export class MineRenderer {
     ctx.fillRect(0, 0, w, h);
     const ox = Math.round(-this.camX * scale), oy = Math.round(-this.camY * scale);
     this.fine = (x, y, fw, fh, color) => {
+      y += this.surfaceOffsetY;
       const x0 = Math.round(ox + x * scale), y0 = Math.round(oy + y * scale);
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.fillStyle = color;
       ctx.fillRect(x0, y0, Math.round(ox + (x + fw) * scale) - x0, Math.round(oy + (y + fh) * scale) - y0);
-      ctx.setTransform(scale, 0, 0, scale, ox, oy);
+      ctx.setTransform(scale, 0, 0, scale, ox, oy + this.surfaceOffsetY * scale);
     };
     ctx.setTransform(scale, 0, 0, scale, ox, oy);
     ctx.drawImage(this.off, 0, y0 * 2, W * 2, (y1 - y0) * 2, 0, y0, W, y1 - y0);
@@ -633,8 +640,14 @@ export class MineRenderer {
       this.open[id] += (want - this.open[id]) * 0.12;
       if (Math.abs(want - this.open[id]) < 0.01) this.open[id] = want;
       const rebuild = sim.rebuilding(id);
+      // One native art pixel beds the walls into the cleared ground.
+      this.surfaceOffsetY = 0.5;
+      ctx.save();
+      ctx.translate(0, 0.5);
       if (rebuild) this.drawRebuild(sim, sim.buildings[id], rebuild, time, k);
       else this.drawBuilding(sim, sim.buildings[id], inside[id], time, k, night, effects);
+      ctx.restore();
+      this.surfaceOffsetY = 0;
     }
     const graves = Math.min(10, sim.lostTotal);
     for (let g = 0; g < graves; g++) {
@@ -727,7 +740,7 @@ export class MineRenderer {
   /** The building picked: an outline of brass, gently pulsing, from the
    * roof's row `roof` down to its floor. */
   private outline(b: Footprint, roof: number, time: number) {
-    const ctx = this.ctx, { scale } = this.size, ox = Math.round(-this.camX * scale), oy = Math.round(-this.camY * scale);
+    const ctx = this.ctx, { scale } = this.size, ox = Math.round(-this.camX * scale), oy = Math.round(-this.camY * scale) + this.surfaceOffsetY * scale;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.strokeStyle = `rgba(240,207,134,${0.65 + 0.35 * Math.sin(time / 260)})`;
     ctx.lineWidth = Math.max(1, Math.round(scale / 3));

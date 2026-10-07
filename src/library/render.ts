@@ -29,6 +29,7 @@ import {
 import { CELL, FW } from "./fire.ts";
 import { ELIXIRS } from "./lab.ts";
 import { HATCH_Y, LabRenderer } from "./lab-render.ts";
+import { LAB_TOP } from "./geometry.ts";
 import { ashlar, facing } from "./ashlar.ts";
 
 /** Each role's robe. */
@@ -149,6 +150,8 @@ export class LibraryRenderer {
    * is gliding to (null for none). */
   target: Librarian | null = null;
   goal: number | null = null;
+  private goalZoom = 1;
+  private framedRoom: boolean | null = null;
   private lab = new LabRenderer();
 
   constructor(canvas: HTMLCanvasElement) {
@@ -497,24 +500,44 @@ export class LibraryRenderer {
       this.focus.x = this.target.x;
       this.focus.y = this.target.y - 12;
     }
-    this.focus.x = half.x * 2 >= W + 2 * HALL ? W / 2 : Math.max(half.x - HALL, Math.min(W + HALL - half.x, this.focus.x));
-    this.focus.y = half.y * 2 >= WORLD_H ? WORLD_H / 2 : Math.max(half.y, Math.min(WORLD_H - half.y, this.focus.y));
+    // Room framing may leave space beyond the world: the selected room
+    // stays centred even in a tall view that fits both storeys at once.
+    if (this.framedRoom === null) {
+      this.focus.x = half.x * 2 >= W + 2 * HALL ? W / 2 : Math.max(half.x - HALL, Math.min(W + HALL - half.x, this.focus.x));
+      this.focus.y = half.y * 2 >= WORLD_H ? WORLD_H / 2 : Math.max(half.y, Math.min(WORLD_H - half.y, this.focus.y));
+    }
     this.view = { scale, ox: Math.round(w / 2 - this.focus.x * scale), oy: Math.round(h / 2 - this.focus.y * scale) };
   }
   /** Pans by a drag of device pixels (letting go of whoever was followed). */
   pan(dx: number, dy: number) {
     this.target = null;
-    this.goal = null;
+    this.clearFrame();
     this.focus.x -= dx / this.view.scale;
     this.focus.y -= dy / this.view.scale;
   }
   /** Whether the view looks mostly at the lab. */
   get inLab() {
-    return this.focus.y > H;
+    return this.framedRoom ?? ((this.goal ?? this.focus.y) > H);
+  }
+  clearFrame() {
+    this.goal = null;
+    this.framedRoom = null;
+  }
+  /** Frame a whole room, including the lab's open annexes. */
+  frameRoom(lab: boolean) {
+    this.resize();
+    this.target = null;
+    this.framedRoom = lab;
+    this.goal = lab ? (LAB_TOP + WORLD_H) / 2 : H / 2;
+    const w = this.canvas.width, h = this.canvas.height;
+    const base = Math.min(w / FIT_W, h / H);
+    const fit = Math.min(w / (lab ? W + 2 * HALL : FIT_W), h / (lab ? WORLD_H - LAB_TOP : H));
+    this.goalZoom = Math.min(MAX_ZOOM, fit / base);
   }
   /** Zooms by `factor` (above 1 in), from the whole nave in to `MAX_ZOOM`,
    * keeping the world point under device pixel (px, py) where it is. */
   zoomBy(factor: number, px: number, py: number) {
+    this.clearFrame();
     const { scale, ox, oy } = this.view, wx = (px - ox) / scale, wy = (py - oy) / scale;
     const zoom = Math.max(1, Math.min(MAX_ZOOM, this.zoom * factor));
     if (zoom === this.zoom) return;
@@ -538,9 +561,16 @@ export class LibraryRenderer {
     if (this.target && !sim.librarians.includes(this.target)) this.target = null;
     if (this.goal !== null) {
       // Glide down to the lab, or back up to the nave.
-      const d = this.goal - this.focus.y;
+      const destination = this.goal;
+      const d = destination - this.focus.y;
       this.focus.y += d * Math.min(1, dt * 5);
-      if (Math.abs(d) < 0.5) this.goal = null;
+      this.focus.x += (W / 2 - this.focus.x) * Math.min(1, dt * 5);
+      this.zoom += (this.goalZoom - this.zoom) * Math.min(1, dt * 5);
+      if (Math.abs(d) < 0.5 && Math.abs(this.zoom - this.goalZoom) < 0.005) {
+        this.focus = { x: W / 2, y: destination };
+        this.zoom = this.goalZoom;
+        this.goal = null;
+      }
     }
     this.resize();
     this.gatherFire(sim);

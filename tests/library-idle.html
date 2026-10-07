@@ -10,12 +10,12 @@ import { LibraryPage } from '../src/library/ui.ts';
 import { MinePage } from '../src/mine/ui.ts';
 buildShell(document.querySelector('#app'));
 let clock = 960000, knowledge = 0, points = 0, showing = 'library';
-const library = new LibraryPage(document.querySelector('#library'), {
+const library = new LibraryPage(document.querySelector('#library-world'), {
   gold: () => 0, free: () => true, spendGold() {}, effects: () => true, newSeed: () => 5,
   clock: () => clock, earnKnowledge: n => knowledge += n,
   upgrades: () => ({ fireproof: 1000, fireTraining: 0, nightWatch: 0 }), showing: () => showing === 'library',
 });
-const mine = new MinePage(document.querySelector('#mine'), {
+const mine = new MinePage(document.querySelector('#mine-world'), {
   gold: () => 0, free: () => true, spendGold() {}, effects: () => true, newSeed: () => 9,
   earn: p => points += p.copper + p.silver + p.gold, upgrades: () => ({ coffee: 0, waterproof: 0, smiths: 0 }),
   busySmiths: () => new Set(), modal: document.querySelector('#modal'), store() {},

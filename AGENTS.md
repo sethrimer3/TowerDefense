@@ -24,6 +24,7 @@ npm run test:render-cache # Original-vs-cached pixels, invalidation and memory b
 node tests/defend-small-boats.mjs # Compact boats, visual water and heading sprites (needs dev server)
 node tests/defend-small-fortress.mjs # Compact walkers, damage states and body cache dimensions (needs dev server)
 node tests/library-idle.mjs # Library/Mine catch-up, fire pixels and mobile countdowns (needs dev server)
+node tests/library-navigation.mjs # Whole-room Lab/Nave framing, Mine building picker and research/back transitions (needs dev server)
 npm run font           # Rebuild the Alembic pixel font from scripts/pixel-font/glyphs.txt
 ```
 
