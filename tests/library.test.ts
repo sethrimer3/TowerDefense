@@ -6,7 +6,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   BAYS, EXITS, FLOOR, H, HALL, LAB_FLOOR, LAB_MAX_LEVEL, LibrarySim, labPrice, RETURN_BOOKS, ROLES, STAIR_X, librarianName, roleFor, MAX_LIBRARIANS, MAX_SHELVES, MAX_UNITS, PLANKS, SHELF_ORDER, SHELF_TOP, SLOTS, W, WINDOW,
-  BUTT_FULL, accidentChance, decodeLibrarySave, homeBay, fireDrill, knowledgeRate, librarianPrice, shelfPrice, slotPlace, unitTop,
+  BUTT_FULL, accidentChance, decodeLibrarySave, enchantChance, slotPixel, homeBay, fireDrill, knowledgeRate, librarianPrice, shelfPrice, slotPlace, unitTop,
 } from "../src/library/sim.ts";
 import { DAY_MS, daylight } from "../src/library/render.ts";
 import { decode } from "../src/save.ts";
@@ -416,4 +416,50 @@ test("the lab has room for a researcher a level; expanding it opens annexes and 
   const older = new LibrarySim(old.seed, decodeLibrarySave(JSON.parse(JSON.stringify(old)))!);
   assert.equal(older.labLevel, older.count("researcher"));
   assert.ok(older.labLevel >= 3);
+});
+
+test("enchanted ink: shelved books take on runes, keep them on the move, and give Knowledge when read", () => {
+  const none = new LibrarySim(3);
+  none.furnish(20);
+  run(none, 600);
+  assert.equal(none.enchanted.reduce((a, b) => a + b, 0), 0, "no runes without Enchanted ink");
+  assert.equal(enchantChance(1), 1 / 10000);
+
+  const sim = new LibrarySim(3);
+  sim.furnish(20);
+  for (let i = 0; i < 4; i++) sim.hire();
+  sim.enchant = 10000; // a certainty, for the test
+  const only = () => {
+    for (let s = 0; s < SLOTS; s++) if (sim.enchanted[s]) assert.ok(sim.slots[s], "only a shelved book carries runes");
+  };
+  run(sim, 61, only);
+  const shelved = sim.slots.reduce((n, c) => n + (c ? 1 : 0), 0);
+  assert.ok(shelved > 0 && sim.enchanted.reduce((a, b) => a + b, 0) >= shelved - 4, "nearly every shelved book took on runes");
+  sim.enchant = 0;
+  let gift = 0;
+  run(sim, 400, () => { only(); gift += sim.takeBonus(); });
+  assert.ok(gift >= 25 && sim.runesRead === gift, "reading an enchanted book gave Knowledge");
+  const save = decodeLibrarySave(JSON.parse(JSON.stringify(sim.save(0))))!;
+  assert.ok(save.enchanted);
+  const again = new LibrarySim(3, save);
+  const runes = again.enchanted.reduce((a, b) => a + b, 0);
+  assert.ok(runes > 0, "runes survive a save");
+  for (let s = 0; s < SLOTS; s++) if (again.enchanted[s]) assert.ok(again.slots[s]);
+  assert.equal(again.runesRead, sim.runesRead);
+});
+
+test("charred books fall with the shelf burnt away under them rather than hang in the air", () => {
+  const sim = new LibrarySim(5);
+  sim.furnish(40);
+  for (let i = 0; i < 6; i++) sim.hire();
+  run(sim, 20);
+  sim.ignite(0);
+  run(sim, 600, () => {
+    for (let s = 0; s < SLOTS; s++) {
+      if (!sim.burntSlots[s] || sim.fire.active) continue;
+      const p = slotPixel(s);
+      assert.ok(sim.fire.left(p.x, p.y + 1) >= 0.3, "a charred book stays only on a shelf that still stands");
+    }
+  });
+  assert.ok(sim.booksBurnt > 0);
 });

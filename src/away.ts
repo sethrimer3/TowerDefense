@@ -6,6 +6,9 @@ export const MAX_AWAY_MS = 24 * 60 * 60 * 1000;
 export const HOUR_MS = 60 * 60 * 1000;
 /** Maximum simulation speed while spending banked idle time. */
 export const IDLE_SPEED = 120;
+/** How far ahead (ms of idle time) the Mine or the Library may spend its
+ * idle time before waiting for the other, so the two run down together. */
+export const IDLE_LEAD = 1000;
 export const countdown = (ms: number) => {
   const seconds = Math.ceil(Math.max(0, ms) / 1000);
   return `${Math.floor(seconds / 3600)}:${String(Math.floor(seconds / 60) % 60).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
