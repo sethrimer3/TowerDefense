@@ -6,6 +6,7 @@
  * simulation steps at up to 120 times speed. Knowledge, fires, deaths,
  * firefighting and repairs happen as those steps run. */
 import { play } from "../sound.ts";
+import type { Scene } from "../ambience.ts";
 import { countdown, HOUR_MS, IDLE_LEAD, IDLE_SPEED, MAX_AWAY_MS } from "../away.ts";
 import { H, LAB_FLOOR, LAB_MAX_LEVEL, MAX_LIBRARIANS, labPrice, MAX_SHELVES, LibrarySim, ROLES, RETURN_BOOKS, librarianPrice, shelfPrice, type Librarian, type LibrarySave, type Role } from "./sim.ts";
 
@@ -371,6 +372,13 @@ export class LibraryPage {
     }
     alert.hidden = !fire && !lost;
     alert.classList.toggle("burning", fire);
+  }
+
+  /** What can be heard in the nave: birdsong by day and crickets by night
+   * through the stone, and a fire, when one burns, right there. */
+  ambience(): Scene {
+    const night = this.sim.night;
+    return { rain: 0, wind: 0.1, howl: 0, sand: 0, thunder: 0, birds: (1 - night) * 0.7, night, drips: 0, fire: this.sim.fire.active ? 1 : 0, muffle: 0.75 };
   }
 
   /** Draws the nave (while the tab shows). */

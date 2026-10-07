@@ -22,6 +22,8 @@ export const SETTINGS = {
   gridOpacity: { kind: "range", default: 15, min: 5, max: 60, step: 1, page: { id: "grid-opacity", label: "Grid line opacity", aria: "Tile grid line opacity, percent" } },
   /** The synthesized knocks, chimes, horns and bells. */
   soundOff: { kind: "toggle", default: false, page: { id: "sound", label: "Sound", invert: true } },
+  /** The world's background: rain, wind, thunder, birdsong, crickets. */
+  ambienceOff: { kind: "toggle", default: false, page: { id: "ambience", label: "Ambient sound", invert: true } },
   /** Alembic, the game's own pixel font, for every word on the page; off, Cinzel. */
   pixelFont: { kind: "toggle", default: true, page: { id: "pixel-font", label: "Use Custom Font" } },
   /** Dev: unlimited money. Every currency shows ∞, and every purchase

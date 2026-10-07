@@ -34,6 +34,8 @@ import { paintIcon, type IconItem } from "./structure-art.ts";
 import { BoardPointers, eventCell } from "./board-pointers.ts";
 import type { Drag } from "./drag-rules.ts";
 import { EditSession, type Drop } from "./edit-session.ts";
+import { BattleSound } from "./battle-sound.ts";
+import { QUIET, type Scene } from "../ambience.ts";
 import { NIGHT_FADE_SECONDS, isBossWave, rollWeather, skyLabel, type Weather } from "./weather.ts";
 import { play } from "../sound.ts";
 import { replay, sparksOver } from "../ui/flourish.ts";
@@ -88,6 +90,8 @@ export class DefendPage {
   private weatherArea: AreaId = "moss";
   /** How far night has fallen (0–1); it follows boss waves. */
   private night = 0;
+  /** The battle's sounds, cued from what each frame brings. */
+  private sounds = new BattleSound();
   /** Abandon needs a second click within a few seconds. */
   private abandonArmed = 0;
   private settingsOpen = false;
@@ -131,7 +135,10 @@ export class DefendPage {
       if (!this.journal?.open) this.sim.update(dt);
     } else if (this.sim && this.phase === "over" && (this.sim.floods.length || this.sim.sinkings.length)) ageWater(this.sim, Math.min(dt, 0.25));
     const updated = performance.now();
-    if (this.sim && this.phase === 'sim') this.handleEvents();
+    if (this.sim && this.phase === 'sim') {
+      this.handleEvents();
+      if (dt > 0) this.sounds.hear(this.sim);
+    }
     this.fadeNight(dt);
     this.keepBricks?.step(dt);
     if (this.messageT > 0) {
@@ -177,6 +184,29 @@ export class DefendPage {
     const target = fighting ? 1 : 0;
     const step = dt / NIGHT_FADE_SECONDS;
     this.night = target > this.night ? Math.min(target, this.night + step) : Math.max(target, this.night - step);
+  }
+
+  /** What can be heard over the city: the area's weather and the boss
+   * waves' night outdoors, drips underground, the forge's fires, and the
+   * battle's own blazes. */
+  ambience(): Scene {
+    if (!this.built) return QUIET;
+    const area = areaForWave(Math.max(this.sim?.wave ?? 1, startingWave(this.save)));
+    const w = this.weather, night = this.night, under = area.climate === "underground", cold = area.climate === "cold";
+    const green = area.id === "moss" || area.id === "drowned";
+    const blazes = this.phase === "sim" ? Math.min(1, (this.sim?.blazes.length ?? 0) / 10) : 0;
+    return {
+      rain: w?.rain ? (night > 0.5 ? 1 : 0.55) : 0,
+      wind: w?.blizzard ? 0.95 : w?.snow ? 0.5 : w?.sand ? 0.75 : under ? 0.05 : w?.rain ? 0.35 : cold ? 0.4 : 0.18,
+      howl: w?.blizzard ? 1 : w?.snow || (cold && !w) ? 0.25 : 0,
+      sand: w?.sand || (area.id === "desert" && !w) ? 1 : 0,
+      thunder: w?.rain ? (night > 0.5 ? 4 : 0.8) : 0,
+      birds: green && !w?.rain ? (1 - night) * 0.9 : 0,
+      night: !under && !cold ? night : 0,
+      drips: under ? 0.8 : area.id === "drowned" ? 0.3 : 0,
+      fire: Math.max(area.id === "ember" ? 0.4 : 0, blazes * 0.7),
+      muffle: 0,
+    };
   }
 
   /** Pause bookkeeping when the tab is hidden, so time doesn't jump. */
@@ -735,11 +765,15 @@ export class DefendPage {
       const sim = this.phase === "sim" ? this.sim : null;
       const drag = this.pointers.session?.drag;
       if (!sim) return;
-      if (drop.at) sim.plantBanner(drop.at);
+      if (drop.at) {
+        sim.plantBanner(drop.at);
+        play("banner");
+      }
       else if (drop.tap || (drag?.from === "banner" && drag.placed)) sim.plantBanner(null);
       return;
     }
     const s = this.save;
+    if (drop.layout !== s.layout) play("place");
     s.layout = drop.layout;
     if (drop.message) this.setMessage(drop.message);
     if (s.layout !== this.mapLayout) this.host.persist();

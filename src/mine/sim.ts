@@ -1361,6 +1361,11 @@ export class MineSim {
     m.path = path;
   }
 
+  /** How many cells are burning. */
+  get fires() {
+    return this.burning.length;
+  }
+
   /** It's raining (or storming) hard enough to shelter from. */
   get raining() {
     return this.sky.rain > 0.2;
