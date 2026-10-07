@@ -13,7 +13,7 @@
  * (`particles.ts`). Water is tinted into the cells it fills; stars glint in
  * the night sky. */
 import { stream } from "../random.ts";
-import { CART_LOAD, MEAL_TICKS, metalSum, type Footprint, type Metals, type Inside, type Miner, type MineSim, type Rebuild, type Sky } from "./sim.ts";
+import { CART_LOAD, MEAL_TICKS, metalSum, type Cart, type Footprint, type Metals, type Inside, type Miner, type MineSim, type Rebuild, type Sky } from "./sim.ts";
 import { drawFigure, drawSleeper, outfit, type Fine, type Pose } from "./figures.ts";
 import { Particles } from "./particles.ts";
 import { habitAt, habitPose, hammerAt, shovelAt } from "./acts.ts";
@@ -503,22 +503,7 @@ export class MineRenderer {
     this.drawFittings(sim, y0, y1);
     for (const c of sim.carts) {
       if (c.y < y0 - 3 || c.y > y1 + 1) continue;
-      // A tapered iron tub: rolled rim, shaded panels, rivets, axle and
-      // distinct wheels, all on the same half-cell pixel grid as the crew.
-      fine(c.x - 1.5, c.y - 2, 4, 0.5, "#a0a6b2");
-      fine(c.x - 1.5, c.y - 1.5, 4, 0.5, "#606875");
-      fine(c.x - 1, c.y - 1, 3, 0.5, "#414853");
-      fine(c.x - 0.5, c.y - 0.5, 2, 0.5, "#292e38");
-      fine(c.x - 1, c.y - 1.5, 0.5, 0.5, "#858e9c");
-      fine(c.x + 1.5, c.y - 1, 0.5, 0.5, "#77818e");
-      fine(c.x, c.y - 1.5, 0.5, 1, "#343a46");
-      fine(c.x - 1, c.y, 3, 0.5, "#313039");
-      for (const wx of [c.x - 1, c.x + 1]) {
-        fine(wx, c.y, 1, 0.5, "#15151b");
-        fine(wx + 0.5, c.y, 0.5, 0.5, "#8a909a");
-      }
-      const load = metalSum(c);
-      if (load > 0) oreHeap(fine, c.x + 0.5, c.y - 2, [6, 4, 2], Math.min(12, Math.ceil((12 * load) / CART_LOAD)), Math.round((12 * c.gold) / Math.max(1, load)), 1, Math.round((12 * c.silver) / Math.max(1, load)));
+      this.drawCart(sim, c);
     }
     const waiting = sim.miners.filter((m) => !m.inside && (m.action === "idle" || m.action === "rest"));
     for (const m of sim.miners) {
@@ -537,6 +522,32 @@ export class MineRenderer {
       this.fx2.draw(ctx, fine);
     }
     this.drawLightning(sim, time);
+  }
+
+  /** Three art-pixel rows including the load, with the wheels implied.
+   * Sample the same daylight/warm colour channels as the cave per pixel. */
+  private drawCart(sim: MineSim, cart: Cart) {
+    const pixel = (x: number, y: number, rgb: RGB) => {
+      const cx = Math.max(0, Math.min(W - 1, Math.floor(x))), cy = Math.max(0, Math.min(H - 1, Math.floor(y)));
+      const i = idx(cx, cy), h = x - Math.floor(x) >= 0.5 ? Math.min(W - 1, cx + 1) : Math.max(0, cx - 1);
+      const v = y - Math.floor(y) >= 0.5 ? Math.min(H - 1, cy + 1) : Math.max(0, cy - 1);
+      const near = (0.5 - (cy - sim.strata.surface[cx]) * 0.022) * this.skyLight();
+      const sky = Math.max(0, near, this.sky[i] * 0.5 + this.sky[idx(h, cy)] * 0.25 + this.sky[idx(cx, v)] * 0.25);
+      const warm = this.warm[i] * 0.5 + this.warm[idx(h, cy)] * 0.25 + this.warm[idx(cx, v)] * 0.25;
+      this.fine(x, y, 0.5, 0.5, `rgb(${clamp255(rgb[0] * (sky * 0.98 + warm * 1.15 + 0.025))},${clamp255(rgb[1] * (sky * 0.96 + warm * 0.8 + 0.025))},${clamp255(rgb[2] * (sky * 0.94 + warm * 0.5 + 0.03))})`);
+    };
+    const load = metalSum(cart), lumps = Math.min(6, Math.ceil(6 * load / CART_LOAD));
+    const gold = Math.round(lumps * cart.gold / Math.max(1, load)), silver = Math.round(lumps * cart.silver / Math.max(1, load));
+    for (let row = 0; row < 3; row++) for (let col = 0; col < 8; col++) {
+      if (row === 2 && (col === 0 || col === 7)) continue;
+      let rgb: RGB = row === 0 ? [160, 166, 178] : row === 1 ? [74, 82, 96] : [41, 46, 56];
+      if (row === 1 && (col === 1 || col === 6)) rgb = [116, 126, 142];
+      if (row === 0 && col > 0 && col <= lumps) {
+        const material = col <= gold ? GOLD : col <= gold + silver ? SILVER : COPPER;
+        rgb = SHADES[material][col % SHADES[material].length];
+      }
+      pixel(cart.x - 1.5 + col * 0.5, cart.y - 1 + row * 0.5, rgb);
+    }
   }
 
   /** True once each time `n` moves on for the key: a beat's one-off effect. */

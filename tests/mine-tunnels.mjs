@@ -39,6 +39,27 @@ try {
     assert.deepEqual(pixels.stick, [120,78,38]);
     assert.equal(pixels.maxRamp, 1);
     assert.ok(pixels.width > 0 && pixels.height > 0);
+    const cartArt = await page.evaluate(() => {
+      const f=window.mineTunnels,r=f.renderer,cart=f.sim.carts[0],original=r.fine,rects=[];
+      r.fine=(...args)=>rects.push(args);
+      r.drawCart(f.sim,cart); r.fine=original;
+      const rows=[...new Set(rects.map(p=>p[1]))];
+      const brightness=()=>{
+        const x=Math.round((cart.x-1.5-r.camX)*r.scale),y=Math.round((cart.y-1-r.camY)*r.scale);
+        const data=r.ctx.getImageData(x,y,Math.round(4*r.scale),Math.round(1.5*r.scale)).data;
+        let sum=0;for(let i=0;i<data.length;i+=4)sum+=data[i]+data[i+1]+data[i+2];return sum/(data.length/4);
+      };
+      f.draw(2000,false); const lit=brightness(),cells=[];
+      f.sim.world.cells.forEach((m,i)=>{if(m===f.materials.LAMP||m===f.materials.TORCH||m===f.materials.WORK_LAMP){cells.push([i,m]);f.sim.world.cells[i]=0;}});
+      const miners=f.sim.miners;f.sim.miners=[];r.paintedVersion=-1;
+      f.draw(2400,false);const dark=brightness();
+      for(const [i,m]of cells)f.sim.world.cells[i]=m;f.sim.miners=miners;r.paintedVersion=-1;f.draw(2800,true);
+      return {rows:rows.length,bottom:Math.max(...rects.map(p=>p[1]+p[3])),expectedBottom:cart.y+0.5,lit,dark};
+    });
+    assert.equal(cartArt.rows,3);
+    assert.equal(cartArt.bottom,cartArt.expectedBottom);
+    assert.ok(cartArt.lit>cartArt.dark*4,JSON.stringify(cartArt));
+    console.log(`${viewport.width}: three-row carts dim from ${cartArt.lit.toFixed(1)} to ${cartArt.dark.toFixed(1)} without cave lights`);
     await page.screenshot({ path: `test-results/mine-tunnels-${viewport.width}.png` });
     if (viewport.width === 1280) {
       const natural = await page.evaluate(() => window.mineTunnels.natural());
