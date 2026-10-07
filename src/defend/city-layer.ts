@@ -19,14 +19,16 @@ import { gatePixels, gateRubblePixels } from "./gate-art.ts";
 import { gateRect, type Side } from "./layout.ts";
 import { SPIKE_REACH, bastionPixels, bastionRubblePixels, spikePixels } from "./wall-defense-art.ts";
 import { AREAS, areaArtId, type AreaId } from "./areas.ts";
+import { hasWallArt, wallCapSprite, wallFaceSprite, wallRubbleTones } from "./area-wall-art.ts";
 
 export { POND, POND_WATER, hasTree, pondDisc, pondPath, treeCanopy } from "./park-geometry.ts";
 
 const ASSET_BASE = (import.meta as ImportMeta & { env?: { BASE_URL?: string } }).env?.BASE_URL ?? "/";
 const floorImages: HTMLImageElement[] = [];
-const themedArt = new Map<AreaId, { floors: HTMLImageElement[]; cap: HTMLImageElement; face: HTMLImageElement }>();
+const themedFloors = new Map<AreaId, HTMLImageElement[]>();
 const artListeners = new Set<() => void>();
-/** Wall art is cut from two hand-drawn sprites (see paintWall). */
+/** Mossbound Ruins' wall is cut from two hand-drawn sprites (see paintWall);
+ * the other areas' walls are pixel art from `area-wall-art.ts`. */
 const wallArt: { cap?: HTMLImageElement; face?: HTMLImageElement } = {};
 function loadImage(name: string) {
   const img = new Image();
@@ -42,10 +44,7 @@ export function onCityArtLoaded(repaint: () => void) {
   for (let i = 1; i <= 4; i++) floorImages.push(loadImage(`floor-${i}`));
   wallArt.cap = loadImage("wall-cap");
   wallArt.face = loadImage("wall-face");
-  for (const area of AREAS.slice(1)) themedArt.set(area.id, {
-    floors: [1, 2, 3, 4].map(i => loadImage(`areas/${areaArtId(area.id)}/floor-${i}`)),
-    cap: loadImage(`areas/${areaArtId(area.id)}/wall-cap`), face: loadImage(`areas/${areaArtId(area.id)}/wall-face`),
-  });
+  for (const area of AREAS.slice(1)) themedFloors.set(area.id, [1, 2, 3, 4].map(i => loadImage(`areas/${areaArtId(area.id)}/floor-${i}`)));
 }
 const ready = (img?: HTMLImageElement): img is HTMLImageElement => !!img?.complete && !!img.naturalWidth;
 
@@ -149,7 +148,7 @@ export function paintFloor(c: CanvasRenderingContext2D, px: number, area: AreaId
   for (let ty = 0; ty < TILES_H; ty++)
     for (let tx = 0; tx < TILES_W; tx++) {
       const k = hash(tx, ty, 3) % 4;
-      const img = area === "moss" ? floorImages[k] : themedArt.get(area)?.floors[k];
+      const img = area === "moss" ? floorImages[k] : themedFloors.get(area)?.[k];
       // Whole pixels, each tile ending where the next begins.
       const x = Math.round(tx * T),
         y = Math.round(ty * T),
@@ -171,7 +170,7 @@ export function paintFloor(c: CanvasRenderingContext2D, px: number, area: AreaId
 }
 
 /** How many of the floor images have loaded (the bump map waits for all). */
-export const floorArtLoaded = (area: AreaId = "moss") => (area === "moss" ? floorImages : themedArt.get(area)?.floors ?? []).filter(ready).length;
+export const floorArtLoaded = (area: AreaId = "moss") => (area === "moss" ? floorImages : themedFloors.get(area) ?? []).filter(ready).length;
 
 /** City ground: park grass, and gravel under the streets' dirt and for
  * cleared rubble and breached wall. */
@@ -257,7 +256,7 @@ function paintBuilding(p: Paint, b: Building) {
   const box = { x, y, w, h, px };
   if (b.kind === "wall") {
     if (solid(b.cells[0])) paintWall(p, b);
-    else paintArt(p, wallRubbleSprite(lotSeed(b)), box);
+    else paintArt(p, wallRubbleSprite(lotSeed(b), p.area), box);
     return;
   }
   if (b.kind === "gate") {
@@ -359,7 +358,10 @@ const gateRubbleSprite = (side: Side, seed: number) => {
   const r = gateRect({ tx: 0, ty: 0, side });
   return sprite(`gate:${side}:rubble:${seed}`, r.w * ART, r.h * ART, () => gateRubblePixels(side, seed));
 };
-const wallRubbleSprite = (seed: number) => sprite(`wall:rubble:${seed}`, ART, ART, () => wallRubblePixels(seed, ART));
+const wallRubbleSprite = (seed: number, area: AreaId) => {
+  const tones = wallRubbleTones(area);
+  return sprite(`wall:rubble:${tones ? area : "moss"}:${seed}`, ART, ART, () => wallRubblePixels(seed, ART, tones?.stone, tones?.accent));
+};
 const wallDamageSprite = (stage: number, seed: number) => sprite(`wall:${stage}:${seed}`, ART, ART, () => wallDamagePixels(stage, seed, ART));
 
 /** One wall stone. Edges and the hanging brick face follow the *standing*
@@ -377,11 +379,11 @@ function paintWall(p: Paint, b: Building) {
     const i = cellIndex(nx, ny);
     return map.wall[i] === 1 && solid(i);
   };
-  const cap = p.area === "moss" ? wallArt.cap : themedArt.get(p.area)?.cap;
-  if (ready(cap)) {
+  const cap = wallArt.cap;
+  if (hasWallArt(p.area)) drawSprite(c, wallCapSprite(p.area, cx, cy), x, y, Math.round((cx + 1) * px) - x, Math.round((cy + 1) * px) - y);
+  else if (ready(cap)) {
     const sy = CAP.y0 + ((cy * CAP.w + cx * 37) % CAP.span);
-    if (p.area === "moss") c.drawImage(cap, CAP.x, sy, CAP.w, CAP.w, x, y, Math.round((cx + 1) * px) - x, Math.round((cy + 1) * px) - y);
-    else c.drawImage(cap, (cx % 4) * 16, (cy % 4) * 16, 16, 16, x, y, Math.round((cx + 1) * px) - x, Math.round((cy + 1) * px) - y);
+    c.drawImage(cap, CAP.x, sy, CAP.w, CAP.w, x, y, Math.round((cx + 1) * px) - x, Math.round((cy + 1) * px) - y);
   } else {
     c.fillStyle = WALL;
     c.fillRect(x, y, px + 0.5, px + 0.5);
@@ -435,10 +437,11 @@ function paintWallEdges({ c, px }: Paint, at: { x: number; y: number }, standing
 function paintWallFace({ c, px, area }: Paint, cx: number, { x, y }: { x: number; y: number }) {
   const e = Math.max(1, px * 0.12);
   const h = px * 0.45;
-  const face = area === "moss" ? wallArt.face : themedArt.get(area)?.face;
-  if (ready(face)) {
+  const face = wallArt.face;
+  if (hasWallArt(area)) drawSprite(c, wallFaceSprite(area, cx), x, y + px, px + 0.5, h);
+  else if (ready(face)) {
     const sx = FACE.x0 + ((cx * CAP.w) % FACE.span);
-    c.drawImage(face, area === "moss" ? sx : (cx % 4) * 16, area === "moss" ? FACE.y : 16, CAP.w, FACE.h, x, y + px, px + 0.5, h);
+    c.drawImage(face, sx, FACE.y, CAP.w, FACE.h, x, y + px, px + 0.5, h);
   } else {
     c.fillStyle = "#3a3a33";
     c.fillRect(x, y + px, px + 0.5, h);

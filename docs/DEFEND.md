@@ -125,11 +125,13 @@ Recent rows are available as `window.defendPerformance`; they are not saved.
 - The **wall** is 2 cells thick and sits just *outside* the city tiles, so
   every city tile keeps its full 7 × 7 interior. The board edge is
   impassable, so no wall is built along it.
-- Wall art is cut from two sprites: each wall cell shows a 16 px window of
-  the mossy cap-stone run in `wall-cap.png` (x 38–54, continuing down the
-  run), and any stone with open ground or a breach to its south hangs a strip
-  of the brick face from `wall-face.png`. Because it is per cell, breaches
-  just show rubble with broken edges around them.
+- Wall art is per cell. In Mossbound Ruins each wall cell shows a 16 px
+  window of the mossy cap-stone run in `wall-cap.png` (x 38–54, continuing
+  down the run), and any stone with open ground or a breach to its south
+  hangs a strip of the brick face from `wall-face.png`. Every later area
+  draws both as pixel art in code (`area-wall-art.ts`): a dressed cap stone
+  a cell and two courses of face, in the area's stone and dressing. Because
+  it is per cell, breaches just show rubble with broken edges around them.
 - A plaza rings the keep, avenues run to the city edge, every structure gets
   a street to its door, then deep blocks are split by straight streets until
   nothing is more than 2 cells from a road. Some small blocks become parks;

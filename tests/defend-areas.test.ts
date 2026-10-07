@@ -46,9 +46,9 @@ test('terrain and ambient fades have exact endpoints and a smooth midpoint', () 
   assert.ok(mid.alpha > ambientFor(next, .5).alpha && mid.alpha < ambientFor(old, .5).alpha);
 });
 
-test('each new area ships four opaque square floors and the cap/face texture pair', () => {
+test('each new area ships four opaque square floors', () => {
   for (const area of AREAS.slice(1)) for (const [file, w, h] of [
-    ...[1, 2, 3, 4].map(i => [`floor-${i}`, 80, 80]), ['wall-cap', 64, 64], ['wall-face', 64, 32],
+    ...[1, 2, 3, 4].map(i => [`floor-${i}`, 80, 80]),
   ] as [string, number, number][]) {
     const png = readFileSync(new URL(`../public/assets/defend/areas/${areaArtId(area.id)}/${file}.png`, import.meta.url));
     assert.equal(png.readUInt32BE(16), w, `${area.id}/${file} width`);
