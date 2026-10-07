@@ -184,8 +184,8 @@ export class HallBackdrop {
     };
   }
 
-  /** Lights the wall (at most every `FRAME_MS`, or once with Reduce
-   * motion) for wall-clock `now`, its torches and, in the keep, `day` in [0, 1]. */
+  /** Lights the wall at most every `FRAME_MS` (every three seconds with
+   * Reduce Motion), using wall-clock `now` and daylight in [0, 1]. */
   draw(now: number, torches: TorchSpot[], day: number, reduced: boolean) {
     const resized = this.fit();
     if (!resized && now - this.last < (reduced ? 3000 : FRAME_MS)) return;
@@ -196,14 +196,14 @@ export class HallBackdrop {
     const lights = torches.map((t, k) => {
       const seed = k ? 5 : 2;
       const f = getTorchFlicker({ x: seed, y: 9 }, now, reduced), sway = getTorchSway({ x: seed, y: 9 }, now, reduced);
-      return { x: t.x / ART + sway.x * 35, y: t.y / ART, r: Math.min(w, h) * 0.5 + 40 * f, k: 1.25 * f, rgb: [1, 0.62, 0.3] as RGB };
+      return { x: t.x / ART + sway.x * 35 * (k ? -1 : 1), y: t.y / ART, r: Math.min(w, h) * 0.5 + 40 * f, k: 1.25 * f, rgb: [1, 0.62, 0.3] as RGB };
     });
     const amb: RGB = this.look === "planks" ? [0.2, 0.15, 0.12] : this.look === "vault" ? [0.25, 0.21, 0.32] : [0.16 + day * 0.14, 0.16 + day * 0.15, 0.2 + day * 0.15];
     const sky = skyColours(day), win = this.win, sun = keep ? day : 0;
     // Same solar heading as the Library. Reduce Motion keeps a steady heading.
     const tilt = reduced ? 0.2 : Math.sin(((now % DAY_MS) / DAY_MS) * Math.PI * 2 - Math.PI / 2) * 0.55;
     const lit = Math.max(0, Math.min(1, (0.55 - day) / 0.35));
-    const exterior = this.outside.map((l) => ({ ...l, f: getTorchFlicker({ x: l.seed, y: 31 }, now, reduced) * lit }));
+    const exterior = this.outside.map((l) => ({ ...l, f: getTorchFlicker({ x: l.seed, y: 9 }, now, reduced) * lit }));
     for (let y = 0; y < h; y++)
       for (let x = 0; x < w; x++) {
         const i = y * w + x, o = i * 4, p = part[i];
@@ -238,7 +238,7 @@ export class HallBackdrop {
         }
         if (sun > 0) {
           // The sun through the window: its glow on the stone round it, and a
-          // shaft of light falling down and to the right across the wall.
+          // shafts of light turning across the wall with the sun.
           const mx = (win.x0 + win.x1) / 2, my = (win.y0 + win.y1) / 2, dx = mx - x, dy = my - y, d = Math.hypot(dx, dy);
           const glow = Math.max(0, 1 - d / ((win.x1 - win.x0) * 1.3)) ** 2 * 0.55 * sun * facing(sx[i], sy[i], dx, dy, d);
           let shaft = 0;
