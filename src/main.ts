@@ -10,6 +10,7 @@ import { UpgradesPage } from "./ui/upgrades-page.ts";
 import { renderSettingsPage } from "./ui/settings-page.ts";
 import type { Weather } from "./defend/weather.ts";
 import { play, soundEnabledBy } from "./sound.ts";
+import { hear, QUIET } from "./ambience.ts";
 import { flourishesEnabledBy, replay, sparks, sparksOver } from "./ui/flourish.ts";
 import { MinePage } from "./mine/ui.ts";
 import { METALS, type Weather as MineWeather } from "./mine/sim.ts";
@@ -236,6 +237,7 @@ function frame(time: number) {
   }
   welcome.refresh();
   if (tab === "upgrades") upgradesPage.drawParticles(time);
+  hear(save.settings.ambienceOff ? QUIET : tab === "defend" ? defendPage.ambience() : tab === "mine" ? minePage.ambience() : tab === "library" ? libraryPage.ambience() : QUIET);
   if (time - lastTick >= 1000) {
     lastTick = time;
     const done = settleTraining(save, clock(), new Set(smithNames())) > 0;
