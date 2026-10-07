@@ -24,10 +24,10 @@ export type DragAt = { cellX: number; cellY: number; overBoard: boolean; overPal
 export type Drop =
   | { kind: "bomb"; at: { x: number; y: number } | null }
   | { kind: "banner"; at: { x: number; y: number } | null; tap: boolean }
-  | { kind: "build"; layout: Layout; message: string | null };
+  | { kind: "build"; layout: Layout; message: string | null; tap?: true };
 
-/** How far (in cells) a press on the planted banner may wander and still
- * count as a tap. */
+/** How far (in cells) a press on the planted banner, or anything lifted
+ * off the board, may wander and still count as a tap. */
 const TAP = 0.75;
 /** How near (in cells) a carried gate, spikes or ballista snaps to a spot
  * that takes it. */
@@ -140,6 +140,7 @@ export class EditSession {
    * it, goes back to the palette when released off the board or over the
    * palette, and otherwise stays put and says why the tile refused it. */
   release(at: DragAt): Drop {
+    const pressed = this.start;
     this.hover(at);
     const d = this.drag, layout = this.layout;
     if (d.from === "bomb") return { kind: "bomb", at: at.overBoard ? { x: at.cellX, y: at.cellY } : null };
@@ -148,6 +149,10 @@ export class EditSession {
       const tap = !!d.placed && dist(at.cellX - s.cellX, at.cellY - s.cellY) < TAP;
       return { kind: "banner", at: at.overBoard && !tap ? { x: at.cellX, y: at.cellY } : null, tap };
     }
+    // Something on the board pressed and let go where it stood was tapped:
+    // it stays as it is (dropping it there would reshuffle its tile).
+    if (pressed && d.from !== "palette" && at.overBoard && !at.overPalette && dist(at.cellX - pressed.cellX, at.cellY - pressed.cellY) < TAP)
+      return { kind: "build", layout, message: null, tap: true };
     const hover = this.tile;
     const target = hover ? this.legal.get(hover) : undefined;
     if (target) return { kind: "build", layout: target, message: null };

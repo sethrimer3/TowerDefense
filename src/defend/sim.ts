@@ -22,7 +22,8 @@ import { stepSiegeShots, type SiegeAim, type SiegeShot } from "./siege.ts";
  * kind of unit decides to do lives beside it: `enemies.ts`, `troops.ts`,
  * `mages.ts`, `valkyries.ts`, `dark-wizards.ts`, `civilians.ts` and
  * `towers.ts`, with grid pathing in `pathing.ts`. */
-import { MAX_WAVE_ENEMIES, buildWave } from "./waves.ts";
+import { MAX_WAVE_ENEMIES, buildWave, waveDifficulty } from "./waves.ts";
+import { BattleStats } from "./battle-stats.ts";
 export { buildWave } from "./waves.ts";
 import { dist, sq } from "../exact.ts";
 import { CELL_COUNT, CELLS_H, CELLS_W, cellIndex, cellX, cellY, rng, sideCells } from "./grid.ts";
@@ -207,6 +208,9 @@ export class DefendSim {
   private readonly markDamage: number;
   /** Enemies slain this run, by kind: what the run pays out. Not part of
    * the replayed state. */
+  /** The run's tally for the summary when the keep falls; not part of the
+   * replayed state. */
+  readonly stats = new BattleStats();
   readonly slain: Record<EnemyKind, number> = { roach: 0, orc: 0, ogre: 0, bat: 0, warlord: 0, mother: 0, broodling: 0, snake: 0, dragon: 0, shieldBearer: 0, aegis: 0, darkKnight: 0, bombOrc: 0, bombBird: 0, voidSparrow: 0, shieldLesser: 0, shieldGreater: 0, poisonLesser: 0, poisonBearer: 0, poisonGreater: 0, poisonSovereign: 0, siegeBeetle: 0, burrowingMole: 0, necromancer: 0, skeleton: 0, bannerCaptain: 0, mirrorKnight: 0, leechSwarm: 0, ashPhoenix: 0, phoenixEgg: 0, blinkImp: 0, fortressHut: 0, fortressOutpost: 0, fortressTower: 0, fortressKeep: 0, fortressLesser: 0, fortress: 0, fortressGreater: 0, fortressSovereign: 0, rollingCannon: 0, ballista: 0, fireworkLauncher: 0, trebuchet: 0, bombard: 0, rocketBattery: 0, boatDinghy: 0, boatSailboat: 0, boatCutter: 0, boatCog: 0, boatLesser: 0, boat: 0, boatGreater: 0, boatSovereign: 0, iceGolem: 0, iceCube: 0 };
   /** 1 while a cell is part of a standing (built) building. */
   readonly solid: Uint8Array;
@@ -376,6 +380,7 @@ export class DefendSim {
 
   step(dt: number) {
     this.time += dt;
+    if (this.wave > 0) this.stats.current.seconds += dt;
     this.fieldT -= dt;
     if (this.fieldDirty && this.fieldT <= 0) this.computeField();
     this.runWaves(dt);
@@ -454,7 +459,10 @@ export class DefendSim {
     const hatched: Enemy[] = [];
     for (const e of this.enemies) {
       if (e.hp > 0) continue;
-      if (!e.fortressPart) this.slain[e.kind]++;
+      if (!e.fortressPart) {
+        this.slain[e.kind]++;
+        this.stats.current.slain++;
+      }
       if (e.fortressParts) for (const part of e.fortressParts) part.hp = 0;
       if (!e.fortressPart && !ENEMIES[e.kind].fortress && !ENEMIES[e.kind].hatched && e.kind !== "ashPhoenix" && this.corpses.length < MAX_WAVE_ENEMIES) this.corpses.push({ x: e.x, y: e.y, life: 10, hp: Math.max(1, e.maxHp * .4), damage: ENEMIES[e.kind].damage * .4 });
       if (e.kind === "ashPhoenix" && !e.reborn) {
@@ -467,6 +475,8 @@ export class DefendSim {
     this.enemies = this.enemies.filter((e) => e.hp > 0);
     this.shieldGenerators = this.shieldGenerators.filter(e => e.hp > 0);
     this.enemies.push(...hatched);
+    for (const s of this.soldiers) if (s.hp <= 0) this.stats.current.troopsLost++;
+    for (const c of this.civilians) if (c.hp <= 0) this.stats.current.civiliansLost++;
     this.soldiers = this.soldiers.filter((s) => s.hp > 0);
     this.civilians = this.civilians.filter((c) => c.hp > 0 && !atHome(this, c));
   }
@@ -528,6 +538,7 @@ export class DefendSim {
       this.spawnInterval = 0;
       this.waveSpawned = 0;
       this.spawnT = 0;
+      this.stats.begin(this.wave, waveDifficulty(this.wave), this.spawnQueue.length);
       this.events.push({ type: "waveStart", wave: this.wave });
     }
   }
@@ -673,11 +684,11 @@ export class DefendSim {
   }
 
   private markEnemies() {
-    const spot = pathRank(this.bonuses.paths, "watchTower", "spotters"), signal = pathRank(this.bonuses.paths, "watchTower", "signalFires");
+    const signal = pathRank(this.bonuses.paths, "watchTower", "signalFires");
     for (const e of this.enemies) e.marked = false;
     // Signal fires slow only the marked: last step's slowing is lifted first.
     if (signal) for (const e of this.enemies) delete e.slowed;
-    const r = watchRadius(this.levels.watchRadius) + (spot >= 2 ? SPOTTERS.radius : 0) + (signal >= 2 ? SIGNAL.radius : 0);
+    const r = watchReach(this);
     for (const b of this.map.buildings) {
       if (b.kind !== "watchTower" || !this.intact(b)) continue;
       const c = center(b.rect);
@@ -734,7 +745,9 @@ export class DefendSim {
     amount *= damageModifier(this, e, origin, source, projectile);
     if (e.kind === "iceGolem" && element !== "physical") amount *= 2;
     if (amount <= 0) return false;
-    e.hp -= e.marked ? amount * this.markDamage : amount;
+    const hit = e.marked ? amount * this.markDamage : amount;
+    this.stats.current.dealt += Math.min(e.hp, hit);
+    e.hp -= hit;
     if (flash) e.flash = 0.12;
     if (e.hp <= 0) this.effects.push({ kind: "spark", x: e.x, y: e.y, t: 0, r: enemySize(e) });
     return true;
@@ -742,6 +755,7 @@ export class DefendSim {
 
   damageBuilding(id: number, amount: number) {
     if (this.hp[id] <= 0) return;
+    if (Number.isFinite(amount) && amount > 0) this.stats.current[id === this.keepId ? "keep" : "city"] += Math.min(this.hp[id], amount);
     this.hp[id] -= amount;
     this.flash[id] = BUILDING_FLASH;
     if (this.hp[id] <= 0) this.collapse(this.map.buildings[id]);
@@ -756,6 +770,7 @@ export class DefendSim {
 
   private collapse(b: Building, dust = true) {
     const whole = this.intact(b);
+    if (this.built[b.id] > 0) this.stats.current.fell++;
     this.hp[b.id] = 0;
     this.built[b.id] = 0;
     for (const c of b.cells) this.solid[c] = this.ownSolid[c] = 0;
@@ -916,6 +931,12 @@ export class DefendSim {
       s.target = -1;
     }
   }
+}
+
+/** How far a watch tower marks enemies. */
+export function watchReach(sim: Pick<DefendSim, "levels" | "bonuses">) {
+  const spot = pathRank(sim.bonuses.paths, "watchTower", "spotters"), signal = pathRank(sim.bonuses.paths, "watchTower", "signalFires");
+  return watchRadius(sim.levels.watchRadius) + (spot >= 2 ? SPOTTERS.radius : 0) + (signal >= 2 ? SIGNAL.radius : 0);
 }
 
 function maxHpOf(b: Building, levels: Levels, bonuses: Readonly<Bonuses>) {

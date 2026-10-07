@@ -35,14 +35,22 @@ import { chainBolt } from "./dark-wizards.ts";
 
 /** The wizard tower's Study path and rank (`knowledge-paths.ts`): each 0
  * unless chosen. */
-const paths = (sim: DefendSim) => {
+const paths = (sim: Armed) => {
   const p = sim.bonuses.paths;
   return { pyro: pathRank(p, "wizardTower", "pyromancy"), rime: pathRank(p, "wizardTower", "rime"), storm: pathRank(p, "wizardTower", "storm") };
 };
+/** What a tower's reach depends on: the levels and the Study's paths. */
+type Armed = Pick<DefendSim, "levels" | "bonuses">;
 /** How far a tower's flame (or bolt) reaches. */
-const fireReach = (sim: DefendSim) => flameRange(sim.levels.wizardFlame ?? 0) + (paths(sim).pyro >= 2 ? PYRO.reach : 0);
+export const fireReach = (sim: Armed) => flameRange(sim.levels.wizardFlame ?? 0) + (paths(sim).pyro >= 2 ? PYRO.reach : 0);
 /** How far its ice runs. */
-const iceReach = (sim: DefendSim) => ICE_RANGE + (paths(sim).rime >= 2 ? RIME.reach : 0);
+export const iceReach = (sim: Armed) => ICE_RANGE + (paths(sim).rime >= 2 ? RIME.reach : 0);
+/** How far a wizard tower reaches with what it casts: Rime casts only ice,
+ * Pyromancy only flames, otherwise it alternates. */
+export const wizardReach = (sim: Armed) => {
+  const { pyro, rime } = paths(sim);
+  return rime ? iceReach(sim) : pyro ? fireReach(sim) : Math.max(fireReach(sim), iceReach(sim));
+};
 
 /** A burst of fire from a wizard tower: where it leaves the tower, which
  * way it points (`dx`, `dy`, a unit vector turning after its target), how

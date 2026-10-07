@@ -21,7 +21,7 @@ import type { DefendSim, Enemy } from "./sim.ts";
 import { FIRE_ARROWS, GUNNERY, SHARP, SIEGE_SHOT, pathRank } from "../knowledge-paths.ts";
 
 /** The towers' Study paths and ranks (`knowledge-paths.ts`): each 0 unless chosen. */
-const paths = (sim: DefendSim) => {
+const paths = (sim: Pick<DefendSim, "bonuses">) => {
   const p = sim.bonuses.paths;
   return {
     fire: pathRank(p, "archerTower", "fireArrows"), sharp: pathRank(p, "archerTower", "sharpshooters"),
@@ -29,6 +29,11 @@ const paths = (sim: DefendSim) => {
   };
 };
 const byDistanceFrom = (c: { x: number; y: number }) => (a: Enemy, b: Enemy) => sq(a.x - c.x) + sq(a.y - c.y) - (sq(b.x - c.x) + sq(b.y - c.y));
+
+/** How far an archer tower shoots. */
+export const archerTowerRange = (sim: Pick<DefendSim, "levels" | "bonuses">) => archerRange(sim.levels.archerRange) + (paths(sim).sharp ? SHARP.range : 0);
+/** How far a cannon tower lobs its shells. */
+export const cannonTowerRange = (sim: Pick<DefendSim, "bonuses">) => CANNON_RANGE + (paths(sim).siege >= 3 ? SIEGE_SHOT.range : 0);
 
 /** Cannons won't fire at anything closer than this (cells). */
 const CANNON_MIN = 1.5;
@@ -61,7 +66,7 @@ export class Towers {
   private stepArcherTower(sim: DefendSim, b: Building, dt: number) {
     if (!this.ready(b, dt)) return;
     const c = center(b.rect), { fire, sharp } = paths(sim);
-    const range = archerRange(sim.levels.archerRange) + (sharp ? SHARP.range : 0);
+    const range = archerTowerRange(sim);
     const near = sim.enemiesNear(c.x, c.y, range);
     const target = sharp >= 3 ? strongest(near, c, range) : nearest(near, c);
     if (!target) return this.cooldown.set(b.id, 0);
@@ -89,7 +94,7 @@ export class Towers {
   private stepCannon(sim: DefendSim, b: Building, dt: number) {
     if (!this.ready(b, dt)) return;
     const c = center(b.rect), { gunnery, siege } = paths(sim);
-    const range = CANNON_RANGE + (siege >= 3 ? SIEGE_SHOT.range : 0);
+    const range = cannonTowerRange(sim);
     const ground = sim.enemiesNear(c.x, c.y, range).filter(
       (e) => !ENEMIES[e.kind].flying && sq(e.x - c.x) + sq(e.y - c.y) > CANNON_MIN * CANNON_MIN,
     );

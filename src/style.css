@@ -863,6 +863,10 @@ nav button > span img { display: block; width: 42px; height: 42px; max-width: 10
   flex: 1;
   min-height: 0;
   overflow: hidden;
+  /* Bleed into the shell's gutters so the board frame's brackets, which
+     stand 7px out from the board, aren't clipped on either side. */
+  margin-inline: -8px;
+  padding-inline: 8px;
 }
 /* One row only: controls on the left, status + settings cog on the right. */
 .defend-head {
