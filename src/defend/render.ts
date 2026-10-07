@@ -7,7 +7,7 @@ import { enemySize } from "./catalog.ts";
  * fire mages' burning ground (mage-art.ts), units and effects
  * (battle-art.ts, with the valkyries' charges from valkyrie-art.ts), the
  * black lightning (dark-art.ts), the trees over them (park-trees.ts), the
- * chimneys' smoke (chimney-smoke.ts), the
+ * fallen defenders' ghosts rising (ghosts.ts), the chimneys' smoke (chimney-smoke.ts), the
  * planted war banner, the magic boats' water (flood-art.ts) over the ground, the wizards' fire, the building grid and drag overlay (edit-overlay.ts), then
  * rain in screen space. */
 import { CELLS_H, CELLS_W, boardSize, hash01 } from "./grid.ts";
@@ -36,6 +36,7 @@ import { DarkArt, darkLights } from "./dark-art.ts";
 import { ParkTrees, type Under } from "./park-trees.ts";
 import { FloodArt } from "./flood-art.ts";
 import { ChimneySmoke } from "./chimney-smoke.ts";
+import { Ghosts } from "./ghosts.ts";
 import { AtmosphereArt } from "./atmosphere-art.ts";
 
 export type DrawOptions = {
@@ -76,6 +77,7 @@ export class DefendRenderer {
   readonly dark = new DarkArt();
   readonly floods = new FloodArt();
   readonly smoke = new ChimneySmoke();
+  readonly ghosts = new Ghosts();
   readonly atmosphere = new AtmosphereArt();
   /** The battle time the wizard art last advanced to. */
   private wizardTime = 0;
@@ -235,6 +237,8 @@ export class DefendRenderer {
     this.drawKeepFlag(map, sim, opts);
     if (sim) this.drawBattleUnits(sim, opts.weather ? this.burning ?? (() => 1) : null, opts);
     this.drawTrees(map, sim, opts, dt);
+    this.ghosts.watch(sim, opts.now / 1000);
+    this.ghosts.draw(this.ctx, this.px, opts.now / 1000, opts.reduceMotion);
     if (opts.effects ?? true) this.drawSmoke(map, sim, opts);
     if (sim?.warBanner && !opts.hideBanner) drawWarBanner(this.ctx, this.px, sim.warBanner, RALLY_REACH, { t: opts.now / 1000, reduceMotion: opts.reduceMotion });
     if (sim) this.wizard.drawFire(this.ctx, this.px);
