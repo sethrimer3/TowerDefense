@@ -17,6 +17,7 @@ import { SUBJECTS, topicItems, type Extra, type Subject, type SubjectId, type To
 import { replay, sparksOver } from "./flourish.ts";
 import type { AppContext } from "./app.ts";
 import { el, uiSprite } from "./dom.ts";
+import { holdToRepeat } from "./hold-repeat.ts";
 
 /** Hours, minutes and seconds left, as the timers show them. */
 export function formatDuration(ms: number) {
@@ -43,6 +44,8 @@ export class UpgradesPage {
   private picked: Record<string, string> = {};
   /** The subject and topic last drawn. */
   private shown = "";
+  /** Whether holding a buy button repeats it yet (bound on the first draw). */
+  private holding = false;
 
   constructor(private ctx: AppContext) {}
 
@@ -76,6 +79,10 @@ export class UpgradesPage {
           <header class="ledger-heading"><h3>Study</h3><small>Knowledge: change how it works</small></header>${this.studyHtml(topic)}</section>
       </div>`;
     const root = el("upgrades");
+    if (!this.holding) {
+      this.holding = true;
+      holdToRepeat(root, ["data-buy", "data-upgrade", "data-buy-bomb"]);
+    }
     SCROLLERS.forEach((sel, i) => {
       const box = root.querySelector(sel);
       if (box) box.scrollTop = scrolls[i];
