@@ -2,6 +2,7 @@ import { journalHTML, paintJournal } from "./journal.ts";
 import { paintPortraits } from "./journal-portrait.ts";
 import { wavePickerHTML } from "./wave-picker.ts";
 import { areaForWave, areaStyle, type AreaId } from "./areas.ts";
+import { hasWallArt, wallCapSprite } from "./area-wall-art.ts";
 import { uiSprite } from "../ui/dom.ts";
 import { KeepBricks } from "./keep-bricks.ts";
 /** The DEFEND page: the palette and the board (everything the palette
@@ -238,10 +239,11 @@ export class DefendPage {
     this.root.innerHTML = `
       <div class="defend-head">
         <div class="defend-left" id="defend-left"></div>
-        <div class="defend-hud" id="defend-hud"></div>
+        <div class="defend-center" id="defend-center"><div class="defend-hud" id="defend-hud"></div></div>
+        <div class="defend-right"><div class="defend-left" id="defend-extra"></div>
         <button class="defend-journal-button" id="defend-journal" aria-label="Enemy journal" aria-haspopup="dialog"><canvas width="20" height="20"></canvas></button>
         <button class="defend-cog" id="defend-cog" aria-label="Defend settings" aria-expanded="false">⚙</button>
-        <div class="defend-settings" id="defend-settings" hidden></div>
+        </div><div class="defend-settings" id="defend-settings" hidden></div>
       </div>
       <div class="defend-city" id="defend-city">
         <div class="defend-stage" id="defend-stage">
@@ -312,23 +314,32 @@ export class DefendPage {
     this.updateHud();
   }
 
-  /** The single row of controls on the left of the header. */
+  /** Left actions, a centered start/status, and wave/speed beside the journal. */
   private renderControls() {
     const el = this.root.querySelector<HTMLElement>("#defend-left")!;
+    const center = this.root.querySelector<HTMLElement>("#defend-center")!;
+    const extra = this.root.querySelector<HTMLElement>("#defend-extra")!;
+    center.querySelector("#defend-start")?.remove();
+    extra.innerHTML = "";
+    this.root.querySelector(".defend-head")!.classList.toggle("defend-building", this.phase === "build");
     if (this.phase === "build") {
-      el.innerHTML = `<button id="defend-upgrades" title="Your tiles: buy more buildings and bombs">Tiles</button>
-        <button class="defend-go" id="defend-start">Start<span class="defend-wide"> the defense</span></button>
-        <button class="defend-wave" id="defend-wave" style="${areaStyle(areaForWave(startingWave(this.save)))}" title="Choose the starting wave · ${areaForWave(startingWave(this.save)).name}" aria-haspopup="dialog">${uiSprite("stage-select")}<small>Wave </small><b>${startingWave(this.save)}</b></button>${this.sideToggle("Build")}`;
+      el.innerHTML = `${this.sideToggle("Build")}<button id="defend-upgrades" title="Your tiles: buy more buildings and bombs"><canvas class="ui-sprite" width="48" height="48" aria-hidden="true"></canvas>Tiles</button>
+        <button class="defend-go" id="defend-start">Start Defense</button>
+        <button class="defend-wave" id="defend-wave" style="${areaStyle(areaForWave(startingWave(this.save)))}" title="Choose the starting wave · ${areaForWave(startingWave(this.save)).name}" aria-haspopup="dialog"><canvas class="defend-wave-wall" aria-hidden="true" width="64" height="16"></canvas>${uiSprite("stage-select")}<small>Wave </small><b>${startingWave(this.save)}</b></button>`;
       el.querySelector<HTMLButtonElement>("#defend-upgrades")!.onclick = () => this.host.openTiles?.();
+      paintIcon(el.querySelector<HTMLCanvasElement>("#defend-upgrades canvas")!, "cityTile");
       this.bindSideToggle(el);
       el.querySelector<HTMLButtonElement>("#defend-wave")!.onclick = () => this.pickWave();
       el.querySelector<HTMLButtonElement>("#defend-start")!.onclick = () => {
         this.startRun();
         this.relayout();
       };
+      center.prepend(el.querySelector("#defend-start")!);
+      extra.append(el.querySelector("#defend-wave")!);
+      this.paintWaveWall();
     } else if (this.phase === "sim") {
       const armed = performance.now() < this.abandonArmed;
-      el.innerHTML = `<button id="defend-abandon" class="defend-danger ${armed ? "armed" : ""}">${armed ? "Confirm?" : "Abandon"}</button>
+      el.innerHTML = `${this.sideToggle("Items")}<button id="defend-abandon" class="defend-danger ${armed ? "armed" : ""}">${armed ? "Confirm?" : "Abandon"}</button>
         <button id="defend-speed" title="Battle speed">${this.sim?.speed ?? 1}×</button>${this.sideToggle("Items")}`;
       el.querySelector<HTMLButtonElement>("#defend-abandon")!.onclick = () => {
         if (performance.now() < this.abandonArmed) {
@@ -346,9 +357,29 @@ export class DefendPage {
         if (!this.sim) return;
         const top = this.save.speed3 ? 3 : 2;
         this.sim.speed = this.sim.speed >= top ? 1 : this.sim.speed + 1;
+        this.save.battleSpeed = this.sim.speed as 1 | 2 | 3;
+        this.host.persist();
         this.renderControls();
       };
+      extra.append(el.querySelector("#defend-speed")!);
     } else el.innerHTML = "";
+  }
+
+  /** Reuse the selected area's native city-wall cap art. */
+  private paintWaveWall() {
+    const canvas = this.root.querySelector<HTMLCanvasElement>(".defend-wave-wall")!;
+    const c = canvas.getContext("2d")!;
+    const area = areaForWave(startingWave(this.save)).id;
+    c.imageSmoothingEnabled = false;
+    if (hasWallArt(area)) {
+      for (let x = 0; x < 4; x++) c.drawImage(wallCapSprite(area, x, 0), x * 16, 0);
+    } else {
+      const img = new Image();
+      img.onload = () => {
+        for (let x = 0; x < 4; x++) c.drawImage(img, 38, 1 + x * 16, 16, 16, x * 16, 0, 16, 16);
+      };
+      img.src = `${import.meta.env.BASE_URL}assets/defend/wall-cap.png`;
+    }
   }
 
   /** Leaves the fallen city for the build phase: the summary closes and the
@@ -630,6 +661,7 @@ export class DefendPage {
     this.map = null;
     const map = this.currentMap();
     this.sim = new DefendSim(map, { ...this.save.levels }, (defendRandom("rolls")() * 2147483648) | 0, this.host.bonuses());
+    this.sim.speed = Math.min(this.save.battleSpeed, this.save.speed3 ? 3 : 2);
     this.sim.startAt(startingWave(this.save));
     this.paid = { roach: 0, orc: 0, ogre: 0, bat: 0, warlord: 0, mother: 0, broodling: 0, snake: 0, dragon: 0, shieldBearer: 0, aegis: 0, darkKnight: 0, bombOrc: 0, bombBird: 0, voidSparrow: 0, shieldLesser: 0, shieldGreater: 0, poisonLesser: 0, poisonBearer: 0, poisonGreater: 0, poisonSovereign: 0, siegeBeetle: 0, burrowingMole: 0, necromancer: 0, skeleton: 0, bannerCaptain: 0, mirrorKnight: 0, leechSwarm: 0, ashPhoenix: 0, phoenixEgg: 0, blinkImp: 0, fortressHut: 0, fortressOutpost: 0, fortressTower: 0, fortressKeep: 0, fortressLesser: 0, fortress: 0, fortressGreater: 0, fortressSovereign: 0, rollingCannon: 0, ballista: 0, fireworkLauncher: 0, trebuchet: 0, bombard: 0, rocketBattery: 0, boatDinghy: 0, boatSailboat: 0, boatCutter: 0, boatCog: 0, boatLesser: 0, boat: 0, boatGreater: 0, boatSovereign: 0, iceGolem: 0, iceCube: 0 };
     this.phase = "sim";

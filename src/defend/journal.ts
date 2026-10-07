@@ -1,3 +1,5 @@
+import { AREAS } from "./areas.ts";
+import { AREA_ENEMIES } from "./area-enemies.ts";
 import { ENEMIES, type EnemyKind } from "./catalog.ts";
 
 /** The enemy journal's button: a bestiary bound in oxblood leather, a
@@ -63,8 +65,19 @@ export function paintJournal(canvas: HTMLCanvasElement, unread: boolean) {
 
 export function journalHTML(discovered: EnemyKind[]): string {
   const entries = [...discovered].sort((a, b) => ENEMIES[a].cost - ENEMIES[b].cost || ENEMIES[a].name.localeCompare(ENEMIES[b].name));
+  const groups = AREAS.map(area => {
+    const roster = new Set(AREA_ENEMIES[area.id]);
+    // Raised and hatched enemies belong beside their parent species.
+    if (roster.has("necromancer")) roster.add("skeleton");
+    if (roster.has("ashPhoenix")) roster.add("phoenixEgg");
+    for (const kind of [...roster]) {
+      const child = ENEMIES[kind].splits?.into;
+      if (child) roster.add(child);
+    }
+    return { area, entries: entries.filter(k => roster.has(k)) };
+  }).filter(group => group.entries.length);
   return `<h2 id="defend-journal-title">Enemy journal</h2><p>${entries.length} enemies discovered</p>
-    <div class="defend-journal-entries">${entries.length ? entries.map(k => {
+    <div class="defend-journal-entries">${entries.length ? groups.map(({ area, entries }) => `<section class="defend-journal-zone" style="--area-dark:${area.dark}" data-zone="${area.id}"><h3 class="defend-journal-zone-title">${area.name}</h3>${entries.map(k => {
       const d = ENEMIES[k];
       const notes: string[] = [d.flying ? "Flies over walls." : "Travels on the ground."];
       if (d.fortress) notes.push(`Walking structure with ${d.fortress.turrets} independently destroyable turrets, ${d.fortress.legs} legs and ${d.fortress.armor} armor plates. Destroy every armor plate to expose the core. Each lost leg slows movement, down to 25% speed with all legs gone. Destroyed turrets stop firing. Dismantle its parts before attacking the core.`);
@@ -107,6 +120,6 @@ export function journalHTML(discovered: EnemyKind[]): string {
       if (k === "bombBird") notes.push("Dives for 0.6 seconds, then explodes in a 2.5-cell radius. Kill it before it lands.");
       if (k === "voidSparrow") notes.push("Creates a black hole 1.5 tiles across: 300 damage every half-second for eight seconds.");
       return `<article><canvas class="defend-journal-portrait" data-portrait="${k}" width="80" height="80" aria-hidden="true"></canvas><div><h3>${d.name}</h3><p class="defend-journal-stats">Difficulty ${d.cost.toLocaleString()} · HP ${d.hp.toLocaleString()} · Attack ${d.damage} · Speed ${d.speed}</p><p>${notes.join(" ")}</p></div></article>`;
-    }).join("") : "<p>Encounter enemies during a defense to record them here.</p>"}</div>
+    }).join("")}</section>`).join("") : "<p>Encounter enemies during a defense to record them here.</p>"}</div>
     <div class="dialog-actions"><button data-journal-close autofocus>Close journal</button></div>`;
 }

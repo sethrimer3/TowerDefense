@@ -1,7 +1,7 @@
 /** The summary when the keep falls: how the run went in a few numbers and
  * three small charts, one bar a wave (damage dealt, damage the city took,
- * the enemies' difficulty), drawn as SVG on the parchment. A tap anywhere
- * closes it. Pure HTML strings, so a test can read them. */
+ * the enemies' difficulty), drawn as SVG on the parchment. Explicit close buttons
+ * return to building. Pure HTML strings, so a test can read them. */
 import type { BattleStats, WaveStats } from "./battle-stats.ts";
 
 export type DefeatSummary = { wave: number; best: number; record: number; stats: BattleStats; gold?: number };
@@ -33,7 +33,7 @@ export function defeatHTML({ wave, best, record, stats }: DefeatSummary): string
   const charts = waves.length
     ? `<div class="defeat-charts">${chart("Damage dealt", waves, (w) => w.dealt, "dealt")}${chart("Damage taken", waves, (w) => w.city + w.keep, "taken")}${chart("Enemy difficulty", waves, (w) => w.difficulty, "difficulty")}</div>`
     : "";
-  return `<button class="defeat-close" type="button" aria-label="Close and rebuild the city">${CROSS}</button>
+  return `<button class="defeat-close" data-defeat-close type="button" aria-label="Close and rebuild the city">${CROSS}</button>
     <strong>The keep has fallen</strong>
     <span>Fell during wave ${wave} · best ${best}</span>${note}
     <div class="defeat-stats">${[
@@ -46,14 +46,14 @@ export function defeatHTML({ wave, best, record, stats }: DefeatSummary): string
       tile("civilians lost", short(t.civiliansLost)),
       tile("time", clock(t.seconds)),
     ].join("")}</div>${charts}
-    <small class="defeat-hint">Tap anywhere to rebuild the city</small>`;
+    <div class="defeat-actions"><button type="button" data-defeat-close>Close</button></div>`;
 }
 
 /** One measure as a bar a wave, scaled to its own largest; the latest
  * waves when there are more than fit. */
 function chart(title: string, all: WaveStats[], value: (w: WaveStats) => number, kind: string) {
   const waves = all.slice(-30);
-  const W = 320, H = 52, gap = 2, base = H - 10;
+  const W = 320, H = 34, gap = 2, base = H - 10;
   const top = Math.max(1, ...waves.map(value));
   // Thin bars: a few waves don't swell into blocks.
   const bw = Math.min(16, Math.max(2, (W - gap * (waves.length - 1)) / waves.length));

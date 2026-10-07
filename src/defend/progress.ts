@@ -51,6 +51,8 @@ export type DefendSave = {
   paletteSide: "left" | "right";
   /** 3× battle speed has been bought in the Armory. */
   speed3: boolean;
+  /** Preferred battle speed, restored for each run and after reopening. */
+  battleSpeed: 1 | 2 | 3;
   /** Seed for the filler city, so the same layout always looks the same. */
   seed: number;
 };
@@ -68,6 +70,7 @@ export function defaultDefendSave(): DefendSave {
     journalRead: [],
     paletteSide: "left",
     speed3: false,
+    battleSpeed: 1,
     seed: 1 + Math.floor(defendRandom("rolls")() * 1e9),
   };
 }
@@ -222,6 +225,7 @@ export function decodeDefendSave(s: any): DefendSave {
   d.startWave = intOr(s.startWave, 1, MAX_START_WAVE, d.startWave);
   d.paletteSide = s.paletteSide === "right" ? "right" : "left";
   d.speed3 = s.speed3 === true;
+  d.battleSpeed = intOr(s.battleSpeed, 1, d.speed3 ? 3 : 2, 1) as 1 | 2 | 3;
   d.seed = intOr(s.seed, 0, 2 ** 32, d.seed);
   const kinds = Object.keys(ENEMIES) as EnemyKind[];
   d.discovered = kinds.filter(k => Array.isArray(s.discovered) && s.discovered.includes(k));
