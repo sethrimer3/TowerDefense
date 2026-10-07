@@ -43,7 +43,7 @@ export const TRAINING: TrainingRow[] = [
 export const TRAINING_IDS = TRAINING.map((t) => t.id);
 
 // ── Dev research ───────────────────────────────────────────────────────
-/** The dev setting that counts every rank of a tab of the Upgrades page as bought. */
+/** The dev setting that counts every rank of the Smithy's rows (or of one skill tree) as bought. */
 export const DEV_RESEARCH = {
   training: "devSmithy", command: "devCommand", stewardship: "devStewardship", mine: "devMine", library: "devLibrary",
 } as const satisfies Record<TreeId | "training", SettingKey>;

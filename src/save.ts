@@ -24,8 +24,8 @@ export type Save = {
    * from before them start with one for each wave of the best. */
   upgradePoints: number;
   /** The mine's metal: copper, silver and gold points its smithy has made
-   * (every `BARS_PER_POINT` bars of a metal), spent in the Upgrades tab's
-   * Forge. A new game starts with `STARTING_METAL`. */
+   * (every `BARS_PER_POINT` bars of a metal), spent in the Smithy
+   * below the Mine and the Tiles shop. A new game starts with `STARTING_METAL`. */
   smithy: Metals;
   /** Earned in the Library (shelves × librarians an hour, idle too) and by
    * holding past the best wave; spent on the skill trees. Keeps its fractions.

@@ -19,6 +19,8 @@ export interface AppContext {
   /** The Library's researchers: with none, the skill trees' Knowledge
    * research can't be bought. */
   researchers(): number;
+  /** Goes to the Mine's Smithy or the Library's Study, open at a topic. */
+  openChamber(where: "smithy" | "study", topic?: string): void;
   /** A research was bought: the Library's lab celebrates. */
   researched(): void;
   /** A dev option changed: applies what it grants, saves and refreshes. */

@@ -10,7 +10,7 @@ const GAMEPLAY = ["showEmpty"] as const satisfies readonly SettingKey[];
 const PAGE = ["reduceMotion", "effectsOff", "tileGrid", "soundOff", "ambienceOff", "pixelFont"] as const satisfies readonly SettingKey[];
 /** The dev options, under ALL ON. */
 const DEV = ["devMode", "devTowers", "instantResearch"] as const satisfies readonly SettingKey[];
-/** All research unlocked: one per tab of the Upgrades page. */
+/** All research unlocked: the Smithy's rows and each skill tree. */
 const RESEARCH = ["devSmithy", "devCommand", "devStewardship", "devMine", "devLibrary"] as const satisfies readonly SettingKey[];
 const ALL_DEV = [...DEV, ...RESEARCH];
 type PageKey = (typeof GAMEPLAY)[number] | (typeof PAGE)[number] | (typeof ALL_DEV)[number];

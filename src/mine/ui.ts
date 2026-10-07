@@ -57,6 +57,8 @@ export interface MineHost {
   effects(): boolean;
   /** Fresh seeds for a new mine. */
   newSeed(): number;
+  /** Climbs down to the Smithy below the mine, where its metal is spent. */
+  descend?(): void;
   /** The shared dialog, to ask before leaving a prospect early. */
   modal: HTMLDialogElement;
   /** Saves the game (after moving to a new prospect). */
@@ -213,6 +215,7 @@ export class MinePage {
         <button id="mine-crew-toggle" class="mine-crew-toggle" aria-pressed="false" aria-controls="mine-crew">☰ Crew</button>
         <p id="mine-prospect" class="mine-prospect"></p>
         <button id="mine-prospect-new" class="mine-prospect-new">⚑ New Prospect</button>
+        <button id="mine-smithy" class="chamber-door smithy-door" title="Climb down to the Smithy, where the mine's metal makes the realm stronger">⚒ Smithy</button>
       </div>
       <div class="mine-body" id="mine-body">
         <aside class="mine-crew" id="mine-crew" aria-label="The crew" aria-hidden="true">
@@ -242,6 +245,7 @@ export class MinePage {
       this.root.querySelector("#mine-crew")!.setAttribute("aria-hidden", String(!open));
     };
     this.root.querySelector<HTMLButtonElement>("#mine-prospect-new")!.onclick = () => this.askProspect();
+    this.root.querySelector<HTMLButtonElement>("#mine-smithy")!.onclick = () => this.host.descend?.();
     this.root.querySelector<HTMLElement>("#mine-info")!.onclick = (e) => {
       const up = (e.target as Element).closest<HTMLButtonElement>("[data-upgrade]");
       if (up && !up.disabled) this.upgrade(up.dataset.upgrade as BuildingId);

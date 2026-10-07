@@ -5,7 +5,8 @@ import { areaForWave, areaStyle, type AreaId } from "./areas.ts";
 import { uiSprite } from "../ui/dom.ts";
 import { KeepBricks } from "./keep-bricks.ts";
 /** The DEFEND page: the palette and the board (everything the palette
- * holds, and every upgrade, is bought on the Upgrades page).
+ * holds is bought in the Tiles tab; upgrades in the Mine's Smithy and the
+ * Library's Study).
  *
  * Build phase: drag city elements from the palette (a side panel that
  * slides in beside the board's view) onto gold-outlined
@@ -61,8 +62,8 @@ export type DefendHost = {
   setHealthbars?(value: boolean): void;
   /** Whether the palette lists items the player has none of. */
   showEmpty?(): boolean;
-  /** Opens the Upgrades page, where buildings and upgrades are bought. */
-  openUpgrades?(): void;
+  /** Opens the Tiles tab, where tiles (buildings and consumables) are bought. */
+  openTiles?(): void;
 };
 
 const plural = (name: string) => (name.endsWith("s") ? name : `${name}s`);
@@ -295,10 +296,10 @@ export class DefendPage {
   private renderControls() {
     const el = this.root.querySelector<HTMLElement>("#defend-left")!;
     if (this.phase === "build") {
-      el.innerHTML = `<button id="defend-upgrades" title="Buy buildings and upgrades">Upgrades</button>
+      el.innerHTML = `<button id="defend-upgrades" title="Your tiles: buy more buildings and bombs">Tiles</button>
         <button class="defend-go" id="defend-start">Start<span class="defend-wide"> the defense</span></button>
         <button class="defend-wave" id="defend-wave" style="${areaStyle(areaForWave(startingWave(this.save)))}" title="Choose the starting wave · ${areaForWave(startingWave(this.save)).name}" aria-haspopup="dialog">${uiSprite("stage-select")}<small>Wave </small><b>${startingWave(this.save)}</b></button>${this.sideToggle("Build")}`;
-      el.querySelector<HTMLButtonElement>("#defend-upgrades")!.onclick = () => this.host.openUpgrades?.();
+      el.querySelector<HTMLButtonElement>("#defend-upgrades")!.onclick = () => this.host.openTiles?.();
       this.bindSideToggle(el);
       el.querySelector<HTMLButtonElement>("#defend-wave")!.onclick = () => this.pickWave();
       el.querySelector<HTMLButtonElement>("#defend-start")!.onclick = () => {
@@ -411,7 +412,7 @@ export class DefendPage {
               <canvas width="48" height="48" data-icon="${e.icon}"></canvas><span>${e.name}</span><b>×${e.count === Infinity ? "∞" : e.count}</b></button>`,
         )
         .join("") +
-      (entries.length ? "" : `<small class="defend-palette-none">None owned. Buy more in Upgrades.</small>`);
+      (entries.length ? "" : `<small class="defend-palette-none">None owned. Buy more in the Tiles tab.</small>`);
     el.querySelectorAll<HTMLCanvasElement>("canvas[data-icon]").forEach((c) => paintIcon(c, c.dataset.icon as IconItem));
     el.querySelectorAll<HTMLButtonElement>("[data-item]").forEach((b) => {
       b.onpointerdown = (e) => this.pressPalette(b.dataset.item!, e);
@@ -451,12 +452,12 @@ export class DefendPage {
     if (id === "bomb") return this.pressBomb(e);
     if (id === "banner") return this.phase === "sim" ? this.beginDrag({ from: "banner" }, e) : undefined;
     const item = id as PaletteItem;
-    if (!available(this.save, item)) return this.setMessage(`No ${plural(ITEM_NAMES[item].toLowerCase())} left — buy more in Upgrades.`);
+    if (!available(this.save, item)) return this.setMessage(`No ${plural(ITEM_NAMES[item].toLowerCase())} left — buy more in the Tiles tab.`);
     this.beginDrag({ from: "palette", item }, e);
   }
 
   private pressBomb(e: PointerEvent) {
-    if (!this.save.bombs || this.phase !== "sim") return this.setMessage("No bombs left — buy more in Upgrades.");
+    if (!this.save.bombs || this.phase !== "sim") return this.setMessage("No bombs left — buy more in the Tiles tab.");
     this.beginDrag({ from: "bomb" }, e);
   }
 
@@ -628,7 +629,7 @@ export class DefendPage {
     const cleared = Math.max(0, wave - 1);
     this.showBanner(
       `<strong>The keep has fallen</strong><span>Fell during wave ${wave} · best ${this.save.bestWave}</span>${
-        this.newRecord ? `<em>New record this run: wave ${this.newRecord}</em>` : cleared < this.save.bestWave ? `<em>Strengthen the city in Upgrades, then try again.</em>` : ""
+        this.newRecord ? `<em>New record this run: wave ${this.newRecord}</em>` : cleared < this.save.bestWave ? `<em>Strengthen the city in the Smithy and the Study, then try again.</em>` : ""
       }`,
     );
     this.renderChrome();

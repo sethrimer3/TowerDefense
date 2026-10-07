@@ -14,7 +14,7 @@
  * fresh ones for the gaps, so the stacks are always turning over. With no
  * shelvers the professors shelve too. **Researchers** work in the alchemy
  * lab under the nave (`lab.ts`), down the stair from a trapdoor in the
- * floor; with none, the Upgrades tab's Knowledge research can't be bought.
+ * floor; with none, the Study's Knowledge research can't be bought.
  * Every book is carried in hand.
  *
  * Once a minute there is a small chance a table's candle tips over and the
@@ -1674,7 +1674,7 @@ export class LibrarySim {
     return n;
   }
 
-  /** A research bought in the Upgrades tab: the circle in the lab flares. */
+  /** A research bought in the Study: the circle in the lab flares. */
   researched() {
     this.lab.glow = 1;
     this.lab.puffs.push({ x: LAB.circle.x + 6, color: 2, at: this.time, big: true });

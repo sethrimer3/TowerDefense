@@ -1503,3 +1503,159 @@ dialog .away-row .away-note {
     box-shadow: 0 0 0 2px #fff, 0 0 30px var(--hue);
   }
 }
+
+/* ── The rooms: the Smithy's boards, the Study's vault, the keep's hall ──
+   The walls themselves are lit pixel art (src/ui/hall-art.ts); these veils
+   keep the menus easy to read over them. */
+.chamber {
+  background: #0b0908;
+}
+.chamber-planks .chamber-dim {
+  background:
+    radial-gradient(ellipse 70% 60% at 50% 45%, transparent 35%, #0000008a 100%),
+    linear-gradient(#00000026, #00000040);
+}
+.chamber-vault .chamber-dim {
+  background:
+    url("../assets/theme/sigil.svg") center 62% / min(80%, 420px) no-repeat,
+    radial-gradient(ellipse 70% 60% at 50% 45%, #9a6cff10, #00000090 100%),
+    linear-gradient(#00000030, #00000050);
+  opacity: 0.95;
+}
+/* Inside the keep: a slight darkness over everything, so neither the sun
+   through the window nor the torches wash out the tiles. */
+.chamber-keep .chamber-dim {
+  background:
+    radial-gradient(ellipse 80% 70% at 50% 40%, transparent 30%, #00000080 100%),
+    linear-gradient(#0000004a, #00000066);
+}
+.chamber-title h2 {
+  color: #f6dca4;
+  text-shadow: 0 2px 0 #000, 0 0 12px #ff9a3c40;
+}
+.chamber-title small {
+  color: #c8b083;
+  text-shadow: 0 1px 0 #000;
+}
+.chamber-vault .chamber-title h2 { text-shadow: 0 2px 0 #000, 0 0 12px #9a6cff50; }
+/* The ledger's list sits in the room, its wall showing through. */
+.chamber .ledger-half {
+  border-color: #0d0906;
+  background: linear-gradient(#00000055, #00000075);
+  box-shadow:
+    inset 0 0 0 1px #8a6a3a40,
+    inset 0 0 24px #000000b0,
+    0 4px 14px #00000080;
+}
+.chamber .ledger-study {
+  background: linear-gradient(#08060c70, #08060c90);
+  box-shadow:
+    inset 0 0 0 1px #8a6ac040,
+    inset 0 0 24px #000000b0,
+    0 4px 14px #00000080;
+}
+.chamber-wallet {
+  padding: 5px 9px;
+  border: 1px solid #00000080;
+  border-radius: 3px;
+  background: linear-gradient(#000000a0, #00000080);
+  box-shadow: inset 0 1px 0 #ffd9a014;
+}
+.chamber .ledger-strip button[aria-pressed="false"] { opacity: 0.88; }
+/* The doors down: the Smithy's hot iron, the Study's violet. */
+.smithy-door {
+  color: #ffe1b0;
+  background: radial-gradient(ellipse at 50% 130%, #ff7a2c66, transparent 70%), linear-gradient(#ffffff10, #00000040), var(--wood), #3a2414;
+}
+.study-door {
+  color: #eadcff;
+  background: radial-gradient(ellipse at 50% 130%, #9a6cff66, transparent 70%), linear-gradient(#ffffff10, #00000040), var(--wood), #2a1c2a;
+}
+
+/* ── Tiles: real tiles on the keep's table ── */
+.tiles-shelf {
+  border: 2px solid #0d0906;
+  border-radius: 4px;
+  background: linear-gradient(#0a080630, #0a080670 45%, #0a0806a0);
+  box-shadow: inset 0 0 0 1px #8a6a3a40, inset 0 0 30px #000000c0, 0 6px 18px #000000a0;
+}
+.tiles-filters button b {
+  color: #f0cf86;
+}
+.tiles-foot {
+  color: #c8b083;
+  text-shadow: 0 1px 0 #000;
+}
+.tiles-foot b { color: #ffd98f; }
+.tiles-empty { color: #b3a282; }
+.tile {
+  --tile-hue: #a08458;
+  color: #f0d9a8;
+  border: 2px solid #120d09;
+  border-top: 3px solid var(--tile-hue);
+  border-radius: 4px;
+  background:
+    radial-gradient(ellipse at 50% 0%, #ffffff12, transparent 70%),
+    linear-gradient(#ffffff0c, #00000050),
+    var(--wood),
+    #2a1c12;
+  box-shadow: 0 2px 0 #000, inset 0 1px 0 #ffd9a020;
+  text-shadow: 0 1px 0 #000;
+}
+/* A stack shows the tiles under it, offset, each in its black outline. */
+.tile.layers-1 { box-shadow: 0 2px 0 #000, inset 0 1px 0 #ffd9a020, 4px 4px 0 -2px #3a2818, 4px 4px 0 0 #000; }
+.tile.layers-2 { box-shadow: 0 2px 0 #000, inset 0 1px 0 #ffd9a020, 4px 4px 0 -2px #3a2818, 4px 4px 0 0 #000, 8px 8px 0 -2px #2a1c12, 8px 8px 0 0 #000; }
+.tile.type-city { --tile-hue: #7fa44e; }
+.tile.type-units { --tile-hue: #c0563c; }
+.tile.type-towers { --tile-hue: #7896c0; }
+.tile.type-consumables { --tile-hue: #e0a640; }
+.tile-face {
+  border: 1px solid #000;
+  border-radius: 3px;
+  background:
+    radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--tile-hue) 26%, transparent), transparent 70%),
+    #0d0b09;
+  box-shadow: inset 0 2px 5px #000, 0 1px 0 #ffd9a01c;
+}
+.tile-sub { color: #b8a684; }
+.tile-count {
+  color: #2e1f10;
+  border: 1px solid #000;
+  border-radius: 3px;
+  background: linear-gradient(#ffe3a0, #c08f3e);
+  box-shadow: 0 2px 0 #000, inset 0 1px 0 #fff5d0;
+  text-shadow: 0 1px 0 #ffeec0;
+}
+.tile.open {
+  border-color: #f0cf86;
+  border-top-color: var(--tile-hue);
+  box-shadow: 0 2px 0 #000, 0 0 0 1px #000, 0 0 14px #ffb44a70;
+}
+.tile.dear { opacity: 0.7; }
+.tile.placed .tile-face { box-shadow: inset 0 2px 5px #000, 0 0 0 1px var(--tile-hue); }
+.tile.placed .tile-sub { color: #d8c79a; }
+.tile.mini { --tile-hue: inherit; border-top-width: 2px; }
+.tile-detail {
+  color: #e6d6b4;
+  border: 2px solid #120d09;
+  border-top: 3px solid var(--tile-hue, #a08458);
+  border-radius: 4px;
+  background:
+    linear-gradient(#00000060, #00000080),
+    var(--wood),
+    #1a110b;
+  box-shadow: inset 0 0 0 1px #8a6a3a40, inset 0 0 26px #000, 0 4px 12px #000000a0;
+}
+.tile-detail.type-city { --tile-hue: #7fa44e; }
+.tile-detail.type-units { --tile-hue: #c0563c; }
+.tile-detail.type-towers { --tile-hue: #7896c0; }
+.tile-detail.type-consumables { --tile-hue: #e0a640; }
+.tile-detail small { color: #c79f5c; }
+.tile-detail h3 { color: #f6dca4; text-shadow: 0 1px 0 #000; }
+.tile-detail p { color: #cdbd9c; }
+.tile-detail .tile-face.big canvas { width: 44px; height: 44px; }
+.tile-reason, .tile-more { color: #b3a282; }
+.tile-tier { color: #e6c98a; }
+.tile-tier b { color: #ffe1a0; }
+.tile-go.go-smithy { color: #ffe1b0; }
+.tile-go.go-study { color: #eadcff; }

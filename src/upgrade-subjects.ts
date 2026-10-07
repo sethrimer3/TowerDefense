@@ -1,9 +1,10 @@
-/** How the Upgrades page is organized: every upgrade in the game sits in
- * exactly one topic of one subject. Each topic's Forge holds its plain,
- * permanent numbers (more copies of a building, the Armory's levels, the
- * Smithy's rows); its Study holds what Knowledge buys (the skills, and the
- * paths of `knowledge-paths.ts`, found by the topic's id and drawn as a tree). Pure data, so a test can
- * check nothing is left out or listed twice. */
+/** How every upgrade is filed: in exactly one topic of one subject. The
+ * Smithy below the Mine shows a topic's plain, permanent numbers (the
+ * Armory's levels, the Smithy's rows); the Study beneath the Library shows
+ * what Knowledge buys (the skills, and the paths of `knowledge-paths.ts`,
+ * found by the topic's id and drawn as a tree); the Tiles tab sells the
+ * copies of its palette items and links each to its topic. Pure data, so a
+ * test can check nothing is left out or listed twice. */
 import type { PaletteItem, UpgradeId } from "./defend/catalog.ts";
 import type { TrainingId } from "./progression.ts";
 import type { SkillId } from "./skill-trees.ts";
@@ -15,16 +16,14 @@ export type Extra = "bomb" | "speed3";
 export type Topic = {
   id: string;
   name: string;
-  /** The palette item it is about: its icon, and copies bought in the Forge. */
+  /** The palette item it is about: its icon, and the tile whose upgrades these are. */
   item?: PaletteItem;
-  /** Further palette items whose copies its Forge sells. */
+  /** Further palette items filed here. */
   items?: PaletteItem[];
   upgrades?: UpgradeId[];
   training?: TrainingId[];
   extras?: Extra[];
   skills?: SkillId[];
-  /** A tab elsewhere where more of it is raised (the mine's and library's buildings). */
-  elsewhere?: "mine" | "library";
 };
 export type Subject = { id: SubjectId; name: string; sprite: UiSprite; blurb: string; topics: Topic[] };
 
@@ -84,11 +83,11 @@ export const SUBJECTS: Subject[] = [
   },
   {
     id: "mine", name: "Mine", sprite: "mine", blurb: "The crew, the shaft and the smithy.",
-    topics: [{ id: "mine", name: "Mine", elsewhere: "mine", skills: ["coffee", "waterproofing", "scholars", "tactician"] }],
+    topics: [{ id: "mine", name: "Mine", skills: ["coffee", "waterproofing", "scholars", "tactician"] }],
   },
   {
     id: "library", name: "Library", sprite: "library", blurb: "Its shelves, its staff and its fires.",
-    topics: [{ id: "library", name: "Library", elsewhere: "library", skills: ["fireproofWood", "fireTraining", "nightWatch", "enchantedInk"] }],
+    topics: [{ id: "library", name: "Library", skills: ["fireproofWood", "fireTraining", "nightWatch", "enchantedInk"] }],
   },
 ];
 

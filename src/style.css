@@ -791,7 +791,6 @@ nav {
 }
 
 /* Branching progression maps */
-.page#upgrades.active { display: flex; flex-direction: column; overflow: hidden; }
 .tree-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; margin: 6px 0 8px; flex-shrink: 0; }
 .tree-tabs button { min-width: 0; min-height: 64px; padding: 6px 2px; font-size: 9px; overflow: hidden; }
 .tree-tabs span, .tree-tabs small { display: block; }
@@ -1778,3 +1777,314 @@ nav button > .tab-idle {
   pointer-events: none;
 }
 nav button > .tab-idle[hidden] { display: none; }
+
+/* ── Descent: the Mine and the Library over the rooms below them ──────── */
+/* The tab's scene, the earth under it and the room below stand one above
+   another; going down slides all three up two heights, so the scene leaves
+   upward, the earth rushes past and the room rises into place. */
+#mine.active,
+#library.active {
+  position: relative;
+  display: block;
+  overflow: hidden;
+}
+.descent-world,
+.descent-strata,
+.descent-chamber {
+  position: absolute;
+  inset: 0;
+  transition: transform 1.1s cubic-bezier(0.65, 0, 0.35, 1);
+}
+.descent-world {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.descent-strata {
+  overflow: hidden;
+  transform: translateY(100%);
+}
+.descent-chamber {
+  transform: translateY(200%);
+}
+.descended .descent-world { transform: translateY(-200%); }
+.descended .descent-strata { transform: translateY(-100%); }
+.descended .descent-chamber { transform: none; }
+/* The far earth moves slower than the near ladder: depth. */
+.descent-strata canvas {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  image-rendering: pixelated;
+}
+.strata-far {
+  top: -25%;
+  height: 150%;
+  transform: translateY(-12%);
+  transition: transform 1.1s cubic-bezier(0.65, 0, 0.35, 1);
+}
+.descended .strata-far { transform: translateY(12%); }
+.strata-near { top: 0; height: 100%; }
+:root.reduce-motion .descent-world,
+:root.reduce-motion .descent-strata,
+:root.reduce-motion .descent-chamber,
+:root.reduce-motion .strata-far { transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  .descent-world, .descent-strata, .descent-chamber, .strata-far { transition: none; }
+}
+.chamber-door { white-space: nowrap; }
+
+/* ── Chambers: a menu in a lit room, a torch on each side ─────────────── */
+/* (Positioned by its page: the tab's own section, or the room below a tab.) */
+.chamber {
+  overflow: hidden;
+  isolation: isolate;
+}
+.chamber-wall {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+.chamber-dim {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.sconce {
+  position: absolute;
+  z-index: 3;
+  top: 22%;
+  width: 33px;
+  height: 72px;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+.sconce.left { left: 0; }
+.sconce.right { right: 0; }
+.chamber-content {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 8px 32px;
+}
+@media (max-width: 480px) {
+  .sconce { width: 22px; height: 48px; }
+  .chamber-content { padding: 6px 22px; }
+}
+/* The ledger in its room: a head, two strips that scroll sideways (so the
+   page never grows long) and the topic's list, which alone scrolls. */
+.chamber-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+  flex-shrink: 0;
+}
+.chamber-up {
+  flex: none;
+  min-height: 0;
+  height: 34px;
+  padding: 0 10px;
+  font-size: 11px;
+}
+.chamber-title { min-width: 0; }
+.chamber-title h2 { margin: 0; font-size: 17px; }
+.chamber-title small { display: block; margin-top: 2px; font-size: 9px; letter-spacing: 0.5px; }
+.chamber-wallet { flex-shrink: 0; margin-bottom: 6px; }
+.ledger-strip {
+  display: flex;
+  gap: 5px;
+  flex-shrink: 0;
+  margin: 0 0 6px;
+  padding-bottom: 2px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+.ledger-strip::-webkit-scrollbar { display: none; }
+.ledger-strip button { flex: none; }
+.chamber .ledger-subjects button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 0;
+  height: 36px;
+  padding: 0 10px;
+  font-size: 10px;
+}
+.chamber .ledger-subjects span img { width: 20px; height: 20px; display: block; }
+.chamber .chamber-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  margin-bottom: 0;
+}
+@media (max-width: 480px) {
+  .chamber-head { gap: 6px; }
+  .chamber-up { padding: 0 7px; font-size: 10px; }
+  .chamber-title h2 { font-size: 14px; }
+  .chamber-title small { display: none; }
+}
+
+/* ── TILES: the keep's hall and the player's tiles ─────────────────────── */
+#tiles.active {
+  display: block;
+  position: relative;
+  overflow: hidden;
+}
+.tiles-hall {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  height: 100%;
+  min-height: 0;
+}
+.tiles-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.tiles-modes { display: flex; }
+.tiles-modes button,
+.tiles-stacking {
+  min-height: 0;
+  height: 34px;
+  padding: 0 12px;
+  font-size: 11px;
+}
+.tiles-modes button:first-child { border-radius: 4px 0 0 4px; }
+.tiles-modes button:last-child { border-radius: 0 4px 4px 0; margin-left: -2px; }
+.tiles-filters {
+  display: flex;
+  gap: 5px;
+  flex-shrink: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+.tiles-filters::-webkit-scrollbar { display: none; }
+.tiles-filters button {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 0;
+  height: 30px;
+  padding: 0 10px;
+  font-size: 10px;
+}
+.tiles-filters b { font-size: 9px; }
+.tiles-shelf {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 12px 10px 16px;
+}
+.tiles-grid {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(82px, 1fr));
+  grid-auto-flow: row dense;
+  gap: 14px 10px;
+  align-items: start;
+}
+.tiles-ghosts {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+}
+.tiles-empty { grid-column: 1 / -1; margin: 30px 0; text-align: center; font-size: 11px; }
+.tiles-foot { flex-shrink: 0; margin: 0; font-size: 9px; text-align: center; letter-spacing: 0.5px; }
+.tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  min-height: 0;
+  margin: 0 6px 6px 0;
+  padding: 7px 4px 5px;
+  font-size: 9px;
+  line-height: 1.2;
+  text-align: center;
+}
+.tile-face {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  flex: none;
+}
+.tile-face canvas { width: 44px; height: 44px; image-rendering: pixelated; }
+.tile-name {
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.tile-sub { font-size: 7px; letter-spacing: 0.3px; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.tile-count {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  min-width: 26px;
+  padding: 2px 5px;
+  font-size: 11px;
+  line-height: 1.2;
+}
+.tile.more { justify-content: center; min-height: 92px; }
+.tile.more .tile-count { position: static; }
+.tile.mini {
+  width: 48px;
+  margin: 0;
+  padding: 3px 2px;
+  font-size: 7px;
+}
+.tile.mini .tile-face { width: 36px; height: 36px; }
+.tile.mini canvas { width: 30px; height: 30px; }
+.tile-detail {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 10px;
+  margin-right: 6px;
+}
+.tile-detail header { display: flex; align-items: flex-start; gap: 10px; }
+.tile-detail header > div { flex: 1; min-width: 0; }
+.tile-detail small { font-size: 8px; letter-spacing: 1px; }
+.tile-detail h3 { margin: 2px 0 3px; font-size: 14px; }
+.tile-detail p { margin: 0; font-size: 10px; line-height: 1.5; }
+.tile-close { flex: none; min-height: 0; width: 30px; height: 30px; padding: 0; font-size: 15px; }
+.tile-copies { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.tile-more { font-size: 9px; }
+.tile-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.tile-actions button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 0;
+  padding: 6px 12px;
+  font-size: 11px;
+}
+.tile-actions small { font-size: 8px; margin-top: 2px; }
+.tile-reason { font-size: 10px; max-width: 220px; }
+.tile-tier { font-size: 10px; }
+@media (max-width: 480px) {
+  .tiles-grid { grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap: 12px 6px; }
+  .tile-face { width: 44px; height: 44px; }
+  .tile-face canvas { width: 38px; height: 38px; }
+  .tiles-modes button, .tiles-stacking { padding: 0 9px; font-size: 10px; }
+  .tiles-shelf { padding: 10px 4px 14px; }
+}
