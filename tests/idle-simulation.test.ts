@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { MAX_AWAY_MS, HOUR_MS } from "../src/away.ts";
+import { MAX_AWAY_MS, HOUR_MS, IDLE_BOOST } from "../src/away.ts";
 import { LibraryPage, type LibraryHost } from "../src/library/ui.ts";
 import { MinePage, type MineHost } from "../src/mine/ui.ts";
 import { LibrarySim, decodeLibrarySave, FLOOR, LAB_FLOOR, SLOTS, slotPixel, slotIndex, bayX, unitTop, BAY_W, UNIT_H, MAX_UNITS, PLANKS } from "../src/library/sim.ts";
@@ -16,7 +16,7 @@ function library() {
   return { page, earned: () => earned, tick: () => { now += 16; page.advance(now); }, now: () => now };
 }
 
-test("Library queues the full capped absence without paying or replacing the library; only simulated time earns", () => {
+test("Library queues the full capped absence without paying or replacing the library; simulated time earns, boosted while catching up", () => {
   const l = library(), sim = new LibrarySim(5);
   sim.furnish(6); sim.hire("professor");
   const stamp = l.now() - MAX_AWAY_MS * 2;
@@ -29,8 +29,10 @@ test("Library queues the full capped absence without paying or replacing the lib
   l.tick();
   const simulated = l.page.sim.time - before;
   assert.ok(simulated > 0 && simulated < 3);
-  assert.ok(Math.abs(l.earned() - 6 * simulated / 3600) < 1e-10);
-  assert.equal(l.page.owedMs, MAX_AWAY_MS - simulated * 1000);
+  // Catching up, idle time runs down, and pays, ten times as fast as the
+  // simulation runs.
+  assert.ok(Math.abs(l.earned() - IDLE_BOOST * 6 * simulated / 3600) < 1e-9);
+  assert.ok(Math.abs(l.page.owedMs - (MAX_AWAY_MS - IDLE_BOOST * simulated * 1000)) < 1e-6);
   const saved = decodeLibrarySave(JSON.parse(JSON.stringify(l.page.snapshot(l.now()))))!;
   const reloaded = library();
   reloaded.page.load(saved, l.now() + HOUR_MS);
@@ -56,7 +58,7 @@ test("Mine banks more than two hours, preserves the queue, and does not pay its 
   const before = page.sim.tick;
   now += 16; page.advance(now);
   assert.ok(page.sim.tick > before);
-  assert.ok(page.owedMs < 4 * HOUR_MS);
+  assert.ok(Math.abs(page.owedMs - (4 * HOUR_MS + 16 - IDLE_BOOST * (page.sim.tick - before) * 1000 / 30)) < 1e-6, "ten ticks of idle time a tick");
   const kept = decodeMineSave(JSON.parse(JSON.stringify(page.snapshot(now))))!;
   const back = new MinePage({} as HTMLElement, host);
   back.load(kept, now + 1000);
@@ -65,6 +67,15 @@ test("Mine banks more than two hours, preserves the queue, and does not pay its 
   back.addAway(MAX_AWAY_MS * 2);
   assert.equal(paid, beforePay);
   assert.equal(back.owedMs, MAX_AWAY_MS);
+});
+
+test("idle time near its end is spent at plain pace, and library", () => {
+  const l = library(), sim = new LibrarySim(5);
+  sim.furnish(6); sim.hire("professor");
+  l.page.load(sim.save(l.now() - 1500), l.now());
+  const before = l.page.sim.time;
+  l.tick();
+  assert.ok(Math.abs(l.earned() - 6 * (l.page.sim.time - before) / 3600) < 1e-12, "no boost under two seconds owed");
 });
 
 test("cell fire consumes artwork pixels, produces buoyant smoke and falling ash, and water cools local fuel", () => {

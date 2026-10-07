@@ -8,8 +8,8 @@
  * a slice each frame. Only simulated work pays Smithy points. */
 import { play } from "../sound.ts";
 import { QUIET, thunder, type Scene } from "../ambience.ts";
-import { countdown, IDLE_LEAD, IDLE_SPEED, MAX_AWAY_MS } from "../away.ts";
-import { BARS_PER_POINT, CREW_PER_LEVEL, METALS, metalSum, type Metals, DAY_TICKS, FORGE_PER_LEVEL, JOBS, KIT, MAX_MINERS, MineSim, SEAL_LEVEL, SMITHS_PER_LEVEL, STOCK_PER_LEVEL, STOCK_RATE, TICK_HZ, type Cause, type Job, type Miner, type MineNews, type MineSave, type Weather } from "./sim.ts";
+import { countdown, IDLE_LEAD, IDLE_SPEED, idleDrain, MAX_AWAY_MS } from "../away.ts";
+import { BARS_PER_POINT, CREW_PER_LEVEL, METALS, metalSum, noMetals, type Metals, DAY_TICKS, FORGE_PER_LEVEL, JOBS, KIT, MAX_MINERS, MineSim, SEAL_LEVEL, SMITHS_PER_LEVEL, STOCK_PER_LEVEL, STOCK_RATE, TICK_HZ, type Cause, type Job, type Miner, type MineNews, type MineSave, type Weather } from "./sim.ts";
 import { MAX_LEVEL, type BuildingId } from "./buildings.ts";
 import { MineRenderer } from "./render.ts";
 
@@ -135,16 +135,20 @@ export class MinePage {
     this.sim.coffee = up.coffee;
     this.sim.waterproof = up.waterproof;
     this.sim.extraSmiths = up.smiths;
-    let n = 0;
+    let n = 0, drained = 0;
     // Keep pace with the library's idle time (`keepWith`), never more than
     // IDLE_LEAD ahead of it, so both spend it together.
     const floor = ((keepWith - IDLE_LEAD) * TICK_HZ) / 1000;
-    while (this.owed >= 1 && this.owed - 1 >= floor) {
+    // Catching up, a tick spends (and pays for) ten ticks of idle time.
+    const drain = () => Math.min(this.owed, idleDrain((this.owed / TICK_HZ) * 1000, 1));
+    while (this.owed >= 1 && this.owed - drain() >= floor) {
       this.sim.step();
-      this.owed--;
+      const d = drain();
+      this.owed -= d;
+      drained += d;
       if (++n >= limit || (n % 8 === 0 && performance.now() - start > budget)) break;
     }
-    const pay = this.sim.collect();
+    const pay = this.boosted(this.sim.collect(), n ? drained / n : 1);
     if (metalSum(pay) > 0) this.host.earn(pay);
     const away = this.away;
     if (away?.catchingUp) {
@@ -153,6 +157,18 @@ export class MinePage {
       // Finish the account after all whole simulation ticks are spent.
       if (this.owed < 1) away.catchingUp = false;
     }
+  }
+  /** Whole points' share of the catch-up's boost, the fractions carried. */
+  private boostCarry = noMetals();
+  private boosted(pay: Metals, boost: number) {
+    if (boost === 1) return pay;
+    const out = noMetals();
+    for (const k of METALS) {
+      const v = pay[k] * boost + this.boostCarry[k];
+      out[k] = Math.floor(v + 1e-9);
+      this.boostCarry[k] = v - out[k];
+    }
+    return out;
   }
   /** Adds `ms` of time away (the dev option), as if the game had been
    * closed that long: worked through tick by tick, like the catch-up on
