@@ -44,13 +44,15 @@
  * planned is done (`workedOut`), the player takes the crew, the buildings
  * and the stock to a new prospect (`prospectNext`), a fresh world. */
 import {
-  AIR, BEDROCK, CELLS, COPPER, DIG_TICKS, DIRT, GOLD, GRAVEL, H, LADDER, LAMP, LAVA, LOOSE, MATERIAL_COUNT, RAIL, ROCK, RUBBLE, SILVER, STONE, TIMBER, TORCH, W, World,
-  decodeGrid, encodeGrid, generate, hash01, idx, inBounds, isLoose, isOre, isPassable, isSoil, isSolid, isWood, strata, type Material, type Strata,
+  AIR, BEDROCK, CELLS, COPPER, DIG_TICKS, DIRT, GOLD, GRAVEL, H, LADDER, LAMP, LAVA, LOOSE, MATERIAL_COUNT, RAIL, ROCK, RUBBLE, SILVER, STONE, TIMBER, TORCH, WORK_LAMP, W, World,
+  decodeGrid, encodeGrid, generate, hash01, idx, inBounds, isLoose, isOre, isPassable, isSoil, isSolid, isStone, isWood, strata, type Material, type Strata,
 } from "./world.ts";
 import { BUILDINGS, FIRST_LEVELS, MAX_LEVEL, layout, pathTicks, type BuildingId, type Layout, type Levels, type Purpose, type Spot } from "./buildings.ts";
 import { minerName } from "./names.ts";
 
 export const TICK_HZ = 30;
+export const WORK_LIGHT_TICKS = 90 * TICK_HZ;
+export const TORCH_MIN_TICKS = 120 * TICK_HZ;
 /** Plan marks: dig out, or dig out and fit; a beam is timber laid into
  * open air under a track crossing a cave, a trestle to carry it. */
 export const P_NONE = 0, P_DIG = 1, P_LADDER = 2, P_RAIL = 3, P_TORCH = 4, P_LAMP = 5, P_BEAM = 6;
@@ -230,7 +232,9 @@ export type MineSave = {
   cells?: string;
   plan?: string;
   miners: (Metals & { x: number; y: number; spoil: number; fed?: number; job?: Job; kit?: number; name?: string })[];
-  carts: (Metals & { level: number; side: number; x: number })[];
+  carts: (Metals & { level: number; side: number; x: number; y?: number })[];
+  /** Temporary fittings, with their remaining simulated burn time. */
+  lights?: [number, number][];
   buckets: Bucket[];
   shaftLevel: number;
   hired: number;
@@ -338,6 +342,9 @@ export class MineSim {
   private turn = 0;
   /** Each tunnel level's floor row (the row its rails run along). */
   readonly levels: number[] = [];
+  /** Rail feet by column, including planned inclines; older saves stay flat. */
+  readonly tunnelRows: Int16Array[] = [];
+  readonly lightLife = new Map<number, number>();
   miners: Miner[] = [];
   carts: Cart[] = [];
   buckets: Bucket[] = [];
@@ -395,6 +402,15 @@ export class MineSim {
     this.world = new World(cells && plan ? cells : found, (cells && plan && water) || undefined);
     this.oreLeft = countOre(this.world.cells);
     this.plan = (cells && plan) || new Uint8Array(CELLS);
+    for (const y of this.levels) {
+      const rows = new Int16Array(W).fill(y);
+      if (cells && plan) for (let x = 0; x < W; x++)
+        for (let yy = y - 3; yy <= y + 3; yy++) if (this.plan[idx(x, yy)] === P_RAIL) rows[x] = yy;
+      this.tunnelRows.push(rows);
+    }
+    const savedLights = new Map(saved?.lights ?? []);
+    for (let c = 0; c < CELLS; c++) if (this.world.cells[c] === TORCH || this.world.cells[c] === WORK_LAMP)
+      this.lightLife.set(c, savedLights.get(c) ?? (this.world.cells[c] === WORK_LAMP ? WORK_LIGHT_TICKS : this.torchLife(c)));
     if (saved) {
       // What goes with the crew from prospect to prospect.
       this.tick = saved.tick;
@@ -419,8 +435,8 @@ export class MineSim {
       for (const [c, t] of saved.burning ?? []) this.ignite(c, t);
       for (const m of saved.miners) this.addMiner(m.x, m.y, m);
       for (const c of saved.carts) {
-        const y = this.levels[c.level];
-        if (y !== undefined) this.carts.push({ level: c.level, side: c.side, x: c.x, y, copper: c.copper, silver: c.silver, gold: c.gold, state: "back", timer: 0 });
+        const rows = this.tunnelRows[c.level];
+        if (rows) this.carts.push({ level: c.level, side: c.side, x: c.x, y: rows[c.x], copper: c.copper, silver: c.silver, gold: c.gold, state: "back", timer: 0 });
       }
       this.buckets = saved.buckets.map((b) => ({ ...b }));
       this.rebuilds = (saved.rebuilds ?? []).map((r) => ({ ...r, from: r.from && { ...r.from } }));
@@ -619,6 +635,41 @@ export class MineSim {
     if (inBounds(x, y) && this.cell(x, y) !== BEDROCK) this.plan[idx(x, y)] = p;
   }
 
+  /** Pick a narrow, gently graded route through the easiest ground. Small
+   * seeded bends break ties in uniform stone; excavation cost wins at seams. */
+  private routeTunnel(k: number, side: number) {
+    const base = this.levels[k], rows = this.tunnelRows[k], xs: number[] = [];
+    for (let x = this.shaftX + side; x >= 2 && x <= W - 3; x += side) xs.push(x);
+    const parents: Int8Array[] = [];
+    let costs = new Float64Array(7).fill(Infinity);
+    costs[3] = 0;
+    for (let n = 0; n < xs.length; n++) {
+      const x = xs[n], next = new Float64Array(7).fill(Infinity), prev = new Int8Array(7).fill(-1);
+      const block = Math.floor(n / 9), f = (n % 9) / 9;
+      const bend = ((1 - f) * hash01(block, k * 2 + side, this.seed + 411) + f * hash01(block + 1, k * 2 + side, this.seed + 411) - 0.5) * 6;
+      for (let r = 0; r < 7; r++) {
+        const y = base + r - 3;
+        if ((n < 3 && r !== 3) || y - 3 <= this.strata.stoneTop[x] || y >= H - 10) continue;
+        let dig = 0;
+        for (let dy = 0; dy < 3; dy++) {
+          const m = this.cell(x, y - dy);
+          dig += m === BEDROCK || m === LAVA ? 1e6 : m === ROCK || isLoose(m) ? 35 : isOre(m) ? 0.3 : (DIG_TICKS[m] ?? 0) / DIG_TICKS[ROCK];
+        }
+        for (let p = Math.max(0, r - 1); p <= Math.min(6, r + 1); p++) {
+          const score = costs[p] + dig + Math.abs(r - p) * 0.7 + Math.abs(r - 3 - bend) * 0.45;
+          if (score < next[r]) { next[r] = score; prev[r] = p; }
+        }
+      }
+      costs = next;
+      parents.push(prev);
+    }
+    let r = costs.indexOf(Math.min(...costs));
+    for (let n = xs.length - 1; n >= 0; n--) {
+      rows[xs[n]] = base + r - 3;
+      r = parents[n][r];
+    }
+  }
+
   /** Sinks the shaft (laddered all the way) to level `k`'s floor, opens that
    * level's tunnels, and hangs a lamp in the shaft above it. */
   private planShaft(k: number) {
@@ -626,14 +677,19 @@ export class MineSim {
     for (let y = from; y <= to; y++) this.mark(x0, y, P_LADDER);
     const lampY = k === 0 ? Math.max(this.strata.stoneTop[x0] + 3, to - 8) : to - 7;
     if (lampY > this.strata.stoneTop[x0]) this.mark(x0 + 1, lampY, P_LAMP);
-    for (const side of [-1, 1])
+    for (const side of [-1, 1]) {
+      this.routeTunnel(k, side);
       for (let x = x0 + side; x >= 2 && x <= W - 3; x += side) {
-        this.mark(x, to - 2, P_DIG);
-        this.mark(x, to - 1, (x - x0) % 8 === 4 * side ? P_TORCH : P_DIG);
-        this.mark(x, to, P_RAIL);
+        const y = this.tunnelRows[k][x];
+        this.mark(x, y - 2, P_DIG);
+        this.mark(x, y - 1, P_DIG);
+        this.mark(x, y, P_RAIL);
+        // Occasional taller roof pockets, leaving an irregular silhouette.
+        if (hash01(Math.floor(x / 3), k, this.seed + 413) < 0.3) this.mark(x, y - 3, P_DIG);
         // Across a cave the track runs on a trestle of beams.
-        if (this.passable(x, to) && this.passable(x, to + 1)) this.mark(x, to + 1, P_BEAM);
+        if (this.passable(x, y + 1)) this.mark(x, y + 1, P_BEAM);
       }
+    }
     // Off the tunnels, now and then, a drift slanting up or down after
     // whatever lies there, reached by a few rungs of ladder through the
     // tunnel's roof or floor; and from the second level down, a winze
@@ -642,18 +698,18 @@ export class MineSim {
       let x = x0 + side * (10 + Math.floor(hash01(k, side, this.seed + 21) * 14));
       for (let n = 0; Math.abs(x - x0) < W / 2 - 12; n++) {
         const r = hash01(k * 7 + n, side, this.seed + 23), down = r < 0.5, len = 6 + Math.floor(hash01(n, k, this.seed + 25) * 8);
-        if ((x - x0) % 8 !== 4 * side) {
-          const rungs: number[] = down ? [to + 1, to + 2, to + 3, to + 4] : [to - 1, to - 2, to - 3, to - 4];
-          if (rungs.every((y) => (!this.plan[idx(x, y)] || this.plan[idx(x, y)] === P_DIG) && !this.unsound(idx(x, y))) && this.planDrift(x, down ? to + 4 : to - 4, side, down ? "down" : "up", len))
+        {
+          const floor = this.tunnelRows[k][x];
+          const rungs: number[] = down ? [floor + 1, floor + 2, floor + 3, floor + 4] : [floor - 1, floor - 2, floor - 3, floor - 4];
+          if (rungs.every((y) => (!this.plan[idx(x, y)] || this.plan[idx(x, y)] === P_DIG) && !this.unsound(idx(x, y))) && this.planDrift(x, down ? floor + 4 : floor - 4, side, down ? "down" : "up", len))
             for (const y of rungs) this.mark(x, y, P_LADDER);
         }
         x += side * (26 + Math.floor(hash01(n, k * 3 + side, this.seed + 27) * 30));
       }
       if (k > 0) {
         let wx = x0 + side * (24 + Math.floor(hash01(k, side, this.seed + 29) * 80));
-        if ((wx - x0) % 8 === 4 * side) wx += side;
-        const above = this.levels[k - 1];
-        if (wx >= 4 && wx <= W - 5) for (let y = above + 1; y <= to - 3; y++) if (!this.plan[idx(wx, y)] || this.plan[idx(wx, y)] === P_DIG) this.mark(wx, y, P_LADDER);
+        const above = this.tunnelRows[k - 1][wx], floor = this.tunnelRows[k][wx];
+        if (wx >= 4 && wx <= W - 5) for (let y = above + 1; y <= floor - 3; y++) if (!this.plan[idx(wx, y)] || this.plan[idx(wx, y)] === P_DIG) this.mark(wx, y, P_LADDER);
       }
     }
     this.shaftLevel = k;
@@ -689,7 +745,7 @@ export class MineSim {
         if (this.plan[c] && isSolid(this.world.cells[c])) stop = true;
       }
       if (stop) break;
-      for (let r = 0; r < rows; r++) marks.push([fx, fy - r, r === 1 && i % 8 === 0 ? P_TORCH : P_DIG]);
+      for (let r = 0; r < rows; r++) marks.push([fx, fy - r, r === 1 && hash01(fx, fy, this.seed + 415) < 0.12 ? P_TORCH : P_DIG]);
     }
     if (marks.length < 6) return false;
     // The end: a chamber a little wider and taller, with a torch.
@@ -735,11 +791,13 @@ export class MineSim {
       for (const [ex, ey] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) if (isOre(this.cell(cx + ex, cy + ey)) && !this.plan[idx(cx + ex, cy + ey)]) this.markVein(cx + ex, cy + ey);
     }
     if (!floors.length) return;
-    // Torches along the floors, spaced out, at head height.
+    // Surveyed caves get irregularly spaced light plans; workers also light
+    // their own dark faces immediately when they arrive.
     const lit: [number, number][] = [];
     floors.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
     for (const [fx, fy] of floors) {
-      if (lit.some(([lx, ly]) => Math.abs(lx - fx) + Math.abs(ly - fy) < 7)) continue;
+      const gap = 7 + Math.floor(hash01(fx, fy, this.seed + 417) * 7);
+      if (lit.some(([lx, ly]) => Math.abs(lx - fx) + Math.abs(ly - fy) < gap)) continue;
       if (this.cell(fx, fy - 1) !== AIR) continue;
       lit.push([fx, fy]);
       this.plan[idx(fx, fy - 1)] = P_TORCH;
@@ -772,9 +830,9 @@ export class MineSim {
 
   /** Cells of track laid outward from the shaft along level `k` on `side`. */
   railReach(k: number, side: number) {
-    const y = this.levels[k];
+    const rows = this.tunnelRows[k];
     let n = 0;
-    for (let x = this.shaftX + side; x >= 0 && x < W && this.cell(x, y) === RAIL; x += side) n++;
+    for (let x = this.shaftX + side; x >= 0 && x < W && this.cell(x, rows[x]) === RAIL; x += side) n++;
     return n;
   }
 
@@ -789,7 +847,8 @@ export class MineSim {
     const reach = (side: number) => {
       let n = 0;
       for (let x = this.shaftX + side; x >= 2 && x <= W - 3; x += side) {
-        if (!this.passable(x, y - 1)) return this.plan[idx(x, y - 1)] ? n : W;
+        const row = this.tunnelRows[k][x];
+        if (!this.passable(x, row - 1)) return this.plan[idx(x, row - 1)] ? n : W;
         n++;
       }
       return n;
@@ -826,11 +885,11 @@ export class MineSim {
             const cx = x + dx * k, cy = y + dy * k;
             if (!this.plan[idx(cx, cy)]) this.mark(cx, cy, P_DIG);
             // A side drift is dug two tall, so a miner fits along it.
-            if (dy === 0 && k < d && !this.plan[idx(cx, cy - 1)] && this.cell(cx, cy - 1) === STONE) this.mark(cx, cy - 1, P_DIG);
+            if (dy === 0 && k < d && !this.plan[idx(cx, cy - 1)] && isStone(this.cell(cx, cy - 1))) this.mark(cx, cy - 1, P_DIG);
           }
           break;
         }
-        if (m !== STONE) break;
+        if (!isStone(m)) break;
       }
     }
   }
@@ -1217,7 +1276,7 @@ export class MineSim {
 
   /** Cells a miner standing at (x, y) can work on, with how they're reached. */
   private static readonly REACH: readonly [number, number, boolean][] = [
-    [-1, 0, true], [1, 0, true], [-1, -1, true], [1, -1, true], [-1, -2, true], [1, -2, true], [0, 1, true], [0, -2, true], [0, 0, false], [0, -1, false],
+    [-1, 0, true], [1, 0, true], [-1, -1, true], [1, -1, true], [-1, -2, true], [1, -2, true], [-1, 1, true], [1, 1, true], [0, 1, true], [0, -2, true], [0, 0, false], [0, -1, false],
   ];
   /** Water and fire are also reached down a step to either side (a bucket
    * dipped into a flooded hole beside one's feet), and so is a beam laid
@@ -1294,7 +1353,7 @@ export class MineSim {
       // Sinking the shaft wants supplies to ladder and shore it (one cut off
       // below digs out regardless).
       if (job === 1 && cx === this.shaftX && cy > this.strata.surface[cx] && kit <= 0 && !cutOff) continue;
-      const score = cutOff && cx === this.shaftX && job <= 2 ? -60 : job === 4 ? -40 : job === 1 && isOre(this.world.cells[c]) ? -30 : job === 3 ? -1 : job === 2 ? -2 : 0;
+      const score = cutOff && cx === this.shaftX && job <= 2 ? -60 : job === 4 ? -40 : job === 1 && isOre(this.world.cells[c]) ? -30 : job === 3 ? -1 : job === 2 ? -2 : (DIG_TICKS[this.world.cells[c]] ?? 0) / 110;
       if (!best || score < best.score) best = { score, cell: c, cart: null };
     }
     for (const [dx, dy] of MineSim.WET_REACH) {
@@ -1311,6 +1370,63 @@ export class MineSim {
   }
 
   private cartClaims = new Set<string>();
+
+  private torchLife(c: number) {
+    return TORCH_MIN_TICKS + Math.floor(hash01(c, 0, this.seed + 421) * TORCH_MIN_TICKS);
+  }
+
+  /** Find illumination through open cells, never through a wall. */
+  private nearbyLight(x: number, y: number, radius: number, permanent = false) {
+    const todo: [number, number, number][] = [[x, y, 0]], seen = new Set<number>();
+    for (let n = 0; n < todo.length; n++) {
+      const [cx, cy, d] = todo[n], c = idx(cx, cy);
+      if (!inBounds(cx, cy) || seen.has(c)) continue;
+      seen.add(c);
+      const mat = this.cell(cx, cy);
+      if (permanent ? mat === LAMP || this.plan[c] === P_LAMP : mat === LAMP || mat === TORCH || mat === WORK_LAMP || mat === LAVA || this.burn[c]) return true;
+      if (d >= radius || !isPassable(mat)) continue;
+      for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) todo.push([cx + dx, cy + dy, d + 1]);
+    }
+    return false;
+  }
+
+  private workLight(m: Miner) {
+    if (m.y <= this.strata.surface[m.x] + 4 || this.nearbyLight(m.x, m.y - 1, 6)) return;
+    // Set an oil lamp beside the face without replacing track or ladders.
+    for (const [x, y] of [[m.x - m.facing, m.y - 1], [m.x, m.y - 1], [m.x, m.y]]) {
+      if (!inBounds(x, y)) continue;
+      const c = idx(x, y);
+      if (this.cell(x, y) !== AIR || this.world.water[c] || this.plan[c] > P_DIG || this.burn[c]) continue;
+      this.world.set(x, y, WORK_LAMP);
+      this.lightLife.set(c, WORK_LIGHT_TICKS);
+      return;
+    }
+  }
+
+  /** Miners hang lasting lanterns along completed track with varied gaps. */
+  private planLantern(x: number, y: number) {
+    const gap = 9 + Math.floor(hash01(x, y, this.seed + 423) * 8);
+    if (this.nearbyLight(x, y - 1, gap, true)) return;
+    for (const xx of [x, x - 1, x + 1]) {
+      let ceiling = y - 2;
+      while (ceiling > y - 9 && this.passable(xx, ceiling)) ceiling--;
+      const c = idx(xx, y - 1);
+      if (!isSolid(this.cell(xx, ceiling)) || this.cell(xx, y - 1) !== AIR || this.plan[c] > P_DIG) continue;
+      this.mark(xx, y - 1, P_LAMP);
+      return;
+    }
+  }
+
+  private stepLights() {
+    for (const [c, left] of this.lightLife) {
+      const mat = this.world.cells[c];
+      if (mat !== TORCH && mat !== WORK_LAMP) { this.lightLife.delete(c); continue; }
+      if (left > 1 && !this.world.water[c]) { this.lightLife.set(c, left - 1); continue; }
+      this.world.set(c % W, Math.floor(c / W), AIR);
+      if (this.plan[c] === P_TORCH) this.plan[c] = P_DIG;
+      this.lightLife.delete(c);
+    }
+  }
   /** Levels whose track is long enough for a cart and that have none yet. */
   private cartJobs() {
     const out: { level: number; side: number }[] = [];
@@ -1417,6 +1533,7 @@ export class MineSim {
       return;
     }
     m.fall = 0;
+    if (m.working && (m.action === "dig" || m.action === "build") && this.tick % TICK_HZ === 0) this.workLight(m);
     if (m.timer > 0) {
       if (--m.timer === 0 && m.working) {
         m.working = false;
@@ -1495,6 +1612,7 @@ export class MineSim {
       m.action = t.kind;
       m.work = t.cell;
       m.facing = t.cell % W > m.x ? 1 : t.cell % W < m.x ? -1 : m.facing;
+      if (t.kind === "dig" || t.kind === "build") this.workLight(m);
       m.timer = t.kind === "dig" ? DIG_TICKS[m2] ?? 120 : t.kind === "bail" ? BAIL_TICKS : t.kind === "douse" ? DOUSE_TICKS : BUILD_TICKS[FIXTURE[this.plan[t.cell]]];
       m.working = true;
       return;
@@ -1608,7 +1726,10 @@ export class MineSim {
     } else if (t.kind === "build") {
       const c = t.cell, x = c % W, y = (c - x) / W;
       if (this.jobAt(c) === 2) {
-        this.world.set(x, y, FIXTURE[this.plan[c]]);
+        const fixture = FIXTURE[this.plan[c]];
+        this.world.set(x, y, fixture);
+        if (fixture === TORCH) this.lightLife.set(c, this.torchLife(c));
+        if (fixture === RAIL) this.planLantern(x, y);
         m.kit = Math.max(0, m.kit - 1);
       }
     } else if (t.kind === "bail") {
@@ -1618,7 +1739,7 @@ export class MineSim {
       this.burn[t.cell] = 0;
     } else if (t.kind === "cart") {
       this.cartClaims.delete(`${t.level}:${t.side}`);
-      const y = this.levels[t.level];
+      const y = this.tunnelRows[t.level][this.shaftX + t.side * 2];
       this.carts.push({ level: t.level, side: t.side, x: this.shaftX + t.side * 2, y, ...noMetals(), state: "out", timer: 0 });
     } else if (t.kind === "dump") {
       return this.arrive(m);
@@ -1643,10 +1764,11 @@ export class MineSim {
   private stepCart(c: Cart) {
     if (++c.timer < CART_STEP && c.state !== "parked") return;
     if (c.state !== "parked") c.timer = 0;
-    const home = this.shaftX + c.side * 2, railAt = (x: number) => this.cell(x, c.y) === RAIL;
+    const home = this.shaftX + c.side * 2, rows = this.tunnelRows[c.level];
+    const railAt = (x: number) => x >= 0 && x < W && this.cell(x, rows[x]) === RAIL;
     if (c.state === "out") {
       const ahead = c.x + c.side * 2;
-      if (railAt(ahead) && railAt(c.x + c.side)) c.x += c.side;
+      if (railAt(ahead) && railAt(c.x + c.side)) { c.x += c.side; c.y = rows[c.x]; }
       else {
         c.state = "parked";
         c.timer = 0;
@@ -1661,7 +1783,11 @@ export class MineSim {
         c.timer = 0;
       }
     } else {
-      if (c.x !== home) c.x -= c.side;
+      if (c.x !== home) {
+        if (!railAt(c.x - c.side)) return;
+        c.x -= c.side;
+        c.y = rows[c.x];
+      }
       else {
         if (metalSum(c) > 0) this.buckets.push({ y: c.y, copper: c.copper, silver: c.silver, gold: c.gold });
         c.copper = c.silver = c.gold = 0;
@@ -1874,6 +2000,7 @@ export class MineSim {
     if (this.mercy > 0) this.mercy--;
     if (!this.catchingUp) this.lostCatchingUp = 0;
     this.weather();
+    this.stepLights();
     const occ = this.occupied;
     for (const m of this.miners) {
       occ[idx(m.x, m.y)] = 1;
@@ -1922,7 +2049,8 @@ export class MineSim {
       cells: encodeGrid(this.world.cells),
       plan: encodeGrid(this.plan),
       miners: this.miners.map((m) => ({ x: m.x, y: m.y, copper: m.copper, silver: m.silver, gold: m.gold, spoil: m.spoil, fed: m.fed, job: m.job, kit: m.kit, name: m.name })),
-      carts: this.carts.map((c) => ({ level: c.level, side: c.side, x: c.x, copper: c.copper, silver: c.silver, gold: c.gold })),
+      carts: this.carts.map((c) => ({ level: c.level, side: c.side, x: c.x, y: c.y, copper: c.copper, silver: c.silver, gold: c.gold })),
+      lights: [...this.lightLife.entries()],
       buckets: [...(metalSum(this.hoist) > 0 ? [{ y: this.hoist.y, copper: this.hoist.copper, silver: this.hoist.silver, gold: this.hoist.gold }] : []), ...this.buckets.map((b) => ({ ...b }))],
       yard: { ...this.yard },
       shaftLevel: this.shaftLevel,
@@ -1997,6 +2125,8 @@ export function decodeMineSave(s: any): MineSave | null {
     (m.job === undefined || JOBS.includes(m.job)) && (m.kit === undefined || int(m.kit, 0, KIT)) && (m.name === undefined || name(m.name));
   if (!Array.isArray(s.miners) || s.miners.length > MAX_MINERS || !s.miners.every((m: any) => int(m?.x, 0, W - 1) && int(m?.y, 1, H - 1) && pack(m))) return null;
   if (!Array.isArray(s.carts) || !s.carts.every((c: any) => int(c?.level, 0, 100) && (c.side === 1 || c.side === -1) && int(c.x, 0, W - 1) && metals(c, 1e4))) return null;
+  if (s.carts.some((c: any) => c.y !== undefined && !int(c.y, 1, H - 1))) return null;
+  if (s.lights !== undefined && !(Array.isArray(s.lights) && s.lights.length <= CELLS && s.lights.every((p: any) => Array.isArray(p) && p.length === 2 && int(p[0], 0, CELLS - 1) && int(p[1], 1, TORCH_MIN_TICKS * 2)))) return null;
   if (!Array.isArray(s.buckets) || !s.buckets.every((b: any) => int(b?.y, 0, H) && metals(b, 1e4))) return null;
   // The weather's additions may be missing (an older save), never malformed.
   if (s.water !== undefined && !narrow && !decodeGrid(s.water, CELLS, 2)) return null;
@@ -2034,7 +2164,8 @@ export function decodeMineSave(s: any): MineSave | null {
       x: m.x, y: m.y, ...metals(m, 1000)!, spoil: m.spoil, ...(m.name !== undefined ? { name: m.name } : {}),
       ...(m.fed !== undefined ? { fed: m.fed } : {}), ...(m.job !== undefined ? { job: m.job } : {}), ...(m.kit !== undefined ? { kit: m.kit } : {}),
     })),
-    carts: s.carts.map((c: any) => ({ level: c.level, side: c.side, x: c.x, ...metals(c, 1e4)! })),
+    carts: s.carts.map((c: any) => ({ level: c.level, side: c.side, x: c.x, ...(c.y !== undefined ? { y: c.y } : {}), ...metals(c, 1e4)! })),
+    ...(s.lights !== undefined && !narrow ? { lights: s.lights.map((p: number[]) => [p[0], p[1]] as [number, number]) } : {}),
     buckets: s.buckets.map((b: any) => ({ y: b.y, ...metals(b, 1e4)! })),
     ...(s.prospect !== undefined ? { prospect: s.prospect } : {}),
     ...(s.fallen !== undefined ? { fallen: s.fallen.map((f: any) => ({ name: f.name, job: f.job, cause: f.cause })) } : {}),

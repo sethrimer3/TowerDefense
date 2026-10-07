@@ -1798,6 +1798,7 @@ dialog .away-row .away-note {
 /* Skill cooldown follows battle time, including speed and pause. */
 .defend-item.skill-ready { outline: 2px solid #e7ba52; outline-offset: -2px; }
 .defend-item.skill-loading { position: relative; isolation: isolate; }
+.defend-item.skill-loading:disabled { opacity: 1; filter: none; }
 .defend-item.skill-loading::after { content: ""; position: absolute; inset: 0; background: #000b; clip-path: inset(0 0 var(--skill-fill) 0); pointer-events: none; border-radius: inherit; }
 
  .banner-research h4 { color: #e7ba52; }

@@ -764,7 +764,7 @@ export class DefendSim {
   hurtDefender(unit: Soldier | Civilian, amount: number) {
     if (unit.hp <= 0 || ("guard" in unit && unit.guard)) return 0;
     if ("kind" in unit) stepBannerLife(this, unit, 0);
-    const damage = amount * ("kind" in unit && bannerInfluence(this, unit) ? 1 - (this.bonuses.banner?.defense ?? 0) : 1);
+    const damage = amount * (this.bonuses.banner?.defense && "kind" in unit && bannerInfluence(this, unit) ? 1 - this.bonuses.banner.defense : 1);
     const dealt = Math.min(unit.hp, damage);
     unit.hp -= damage;
     return dealt;

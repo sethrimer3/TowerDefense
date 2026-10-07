@@ -23,7 +23,7 @@ import {
 } from "./art.ts";
 import { BUILDINGS, along, anvils, pathTicks, type Building, type BuildingId } from "./buildings.ts";
 import {
-  AIR, BEDROCK, CELLS, COPPER, DIRT, GOLD, GRASS, GRAVEL, H, LADDER, LAMP, LAVA, LOOSE, RAIL, ROCK, RUBBLE, SILVER, STONE, TIMBER, TORCH, W, hash01, idx, isPassable,
+  AIR, BEDROCK, CELLS, COPPER, DENSE_STONE, DIRT, GOLD, GRASS, GRAVEL, H, HARD_STONE, LADDER, LAMP, LAVA, LOOSE, RAIL, ROCK, RUBBLE, SILVER, STONE, TIMBER, TORCH, WORK_LAMP, W, hash01, idx, isPassable,
   type Material,
 } from "./world.ts";
 
@@ -35,6 +35,8 @@ const SHADES: Record<number, RGB[]> = {
   [DIRT]: [[110, 76, 46], [98, 67, 40], [121, 85, 52], [90, 61, 37]],
   [ROCK]: [[124, 118, 110], [106, 101, 95], [138, 132, 122]],
   [STONE]: [[78, 78, 86], [70, 70, 79], [86, 85, 92], [64, 64, 72]],
+  [HARD_STONE]: [[70, 82, 94], [58, 68, 80], [84, 94, 106], [50, 62, 76]],
+  [DENSE_STONE]: [[60, 50, 70], [48, 40, 58], [74, 62, 84], [42, 36, 50]],
   [COPPER]: [[184, 104, 62], [212, 136, 88], [150, 82, 52]],
   [SILVER]: [[176, 182, 194], [214, 220, 230], [142, 148, 160]],
   [GOLD]: [[236, 190, 72], [255, 226, 120], [205, 158, 52]],
@@ -230,6 +232,7 @@ export class MineRenderer {
       const m = cells[i];
       if (m === TORCH) warm[i] = 1.05;
       else if (m === LAMP) warm[i] = 1.3;
+      else if (m === WORK_LAMP) warm[i] = 1.2;
       else if (m === LAVA) warm[i] = 1.15;
       if (burn[i]) warm[i] = 1.4;
     }
@@ -269,19 +272,21 @@ export class MineRenderer {
       for (let x = 0; x < W; x++) {
         const i = idx(x, y), m = cells[i] === GRASS && builtGround[x] ? DIRT : cells[i], o = 2 * y * W2 + 2 * x, g4 = 4 * i;
         if (m === TORCH && !burn[i]) {
-          // A flame flickering on its stick.
+          // Only the right column: one flame pixel over one wooden pixel.
           const f = (flicker + shade[i]) % 3;
-          px[o] = pack(f === 0 ? TORCH_HOT : TORCH_RGB, 1);
+          const background = pack(y < stoneTop[x] ? DIRT_BACK : STONE_BACK, Math.min(1, warm[i] * 0.75));
+          px[o] = px[o + W2] = background;
           px[o + 1] = pack(f === 1 ? TORCH_HOT : f === 2 ? TORCH_RGB : TORCH_DIM, 1);
-          px[o + W2] = pack(TORCH_STICK, 1);
-          px[o + W2 + 1] = pack(TORCH_DIM, 0.7);
+          px[o + W2 + 1] = pack(TORCH_STICK, 1);
           continue;
         }
-        if (m === LAMP) {
-          // A lamp: its iron cap over the glass.
-          px[o] = px[o + 1] = pack(LAMP_CAP, 1);
-          px[o + W2] = pack(LAMP_RGB, 1);
-          px[o + W2 + 1] = pack(LAMP_RGB, 0.9);
+        if (m === LAMP || m === WORK_LAMP) {
+          const background = pack(y < stoneTop[x] ? DIRT_BACK : STONE_BACK, Math.min(1, warm[i] * 0.75));
+          px[o] = px[o + W2] = background;
+          // A narrow metal cap over a living amber flame; lantern chains
+          // are drawn over the cave's lit background below.
+          px[o + 1] = pack(LAMP_CAP, 1);
+          px[o + W2 + 1] = pack((flicker + shade[i]) % 3 ? LAMP_RGB : TORCH_HOT, 1);
           continue;
         }
         // Lava and fire give their own light, each pixel flickering apart.
@@ -362,11 +367,9 @@ export class MineRenderer {
               continue;
             }
           } else if (m === RAIL) {
-            if (sy === 1) c = x % 3 === 0 && sx === 0 ? SLEEPER : sx ? RAIL_LO : RAIL_HI;
-            else if (inSky) {
-              px[o + sx] = skyPx;
-              continue;
-            } else k = 0.86 + g * 0.0011;
+            // Rails are drawn separately at half-cell increments, including
+            // the connecting pixel between two different floor rows.
+            k = 0.86 + g * 0.0011;
           } else {
             switch (m) {
               case GRAVEL:
@@ -379,6 +382,8 @@ export class MineRenderer {
                 k = 0.93 + g * 0.0005;
                 break;
               case STONE:
+              case HARD_STONE:
+              case DENSE_STONE:
               case BEDROCK:
                 c = shades[shade[i] % shades.length];
                 k = g < 16 ? 0.72 : g > 246 ? 1.18 : 0.94 + g * 0.0003;
@@ -504,19 +509,25 @@ export class MineRenderer {
     if (effects) this.drawGlow(sim, time, y0, y1);
     this.drawHoist(sim);
     const fine = this.fine;
+    this.drawFittings(sim, y0, y1);
     for (const c of sim.carts) {
       if (c.y < y0 - 3 || c.y > y1 + 1) continue;
-      // A tub with an iron rim and rivets on two spoked wheels.
-      fine(c.x - 1, c.y - 1, 3, 0.25, "#8a8a96");
-      fine(c.x - 1, c.y - 0.75, 3, 0.75, "#4a4a52");
-      fine(c.x - 0.5, c.y - 0.5, 0.25, 0.25, "#6e6e7a");
-      fine(c.x + 1.25, c.y - 0.5, 0.25, 0.25, "#6e6e7a");
-      for (const wx of [c.x - 0.75, c.x + 1.25]) {
-        fine(wx, c.y, 0.5, 0.5, "#16141a");
-        fine(wx + 0.125, c.y + 0.125, 0.25, 0.25, "#5a5a64");
+      // A tapered iron tub: rolled rim, shaded panels, rivets, axle and
+      // distinct wheels, all on the same half-cell pixel grid as the crew.
+      fine(c.x - 1.5, c.y - 2, 4, 0.5, "#a0a6b2");
+      fine(c.x - 1.5, c.y - 1.5, 4, 0.5, "#606875");
+      fine(c.x - 1, c.y - 1, 3, 0.5, "#414853");
+      fine(c.x - 0.5, c.y - 0.5, 2, 0.5, "#292e38");
+      fine(c.x - 1, c.y - 1.5, 0.5, 0.5, "#858e9c");
+      fine(c.x + 1.5, c.y - 1, 0.5, 0.5, "#77818e");
+      fine(c.x, c.y - 1.5, 0.5, 1, "#343a46");
+      fine(c.x - 1, c.y, 3, 0.5, "#313039");
+      for (const wx of [c.x - 1, c.x + 1]) {
+        fine(wx, c.y, 1, 0.5, "#15151b");
+        fine(wx + 0.5, c.y, 0.5, 0.5, "#8a909a");
       }
       const load = metalSum(c);
-      if (load > 0) oreHeap(fine, c.x + 0.5, c.y - 0.75, [6, 4, 2], Math.min(12, Math.ceil((12 * load) / CART_LOAD)), Math.round((12 * c.gold) / Math.max(1, load)), 1, Math.round((12 * c.silver) / Math.max(1, load)));
+      if (load > 0) oreHeap(fine, c.x + 0.5, c.y - 2, [6, 4, 2], Math.min(12, Math.ceil((12 * load) / CART_LOAD)), Math.round((12 * c.gold) / Math.max(1, load)), 1, Math.round((12 * c.silver) / Math.max(1, load)));
     }
     const waiting = sim.miners.filter((m) => !m.inside && (m.action === "idle" || m.action === "rest"));
     for (const m of sim.miners) {
@@ -1231,6 +1242,28 @@ export class MineRenderer {
     return null;
   }
 
+  private drawFittings(sim: MineSim, y0: number, y1: number) {
+    for (let y = Math.max(1, y0 - 10); y < Math.min(H - 1, y1 + 1); y++) for (let x = 1; x < W - 1; x++) {
+      const c = idx(x, y), m = sim.world.cells[c], k = Math.min(1, 0.04 + this.warm[c] * 0.9 + this.sky[c]);
+      const color = (rgb: RGB, boost = 1) => `rgb(${rgb.map(v => Math.round(v * k * boost)).join(",")})`;
+      if (m === RAIL) {
+        let dy = 0;
+        for (const d of [0, -1, 1]) if (sim.world.get(x + 1, y + d) === RAIL) { dy = d; break; }
+        if (x % 3 === 0) this.fine(x, y + 0.5, 0.5, 0.5, color(SLEEPER));
+        this.fine(x, y + 0.5, 0.5, 0.5, color(RAIL_HI));
+        this.fine(x + 0.5, y + 0.5 + dy * 0.5, 0.5, 0.5, color(RAIL_LO));
+      } else if (m === LAMP) {
+        let ceiling = y - 1;
+        while (ceiling > y - 10 && isPassable(sim.world.get(x, ceiling))) ceiling--;
+        if (isPassable(sim.world.get(x, ceiling))) continue;
+        for (let yy = ceiling + 1; yy < y; yy += 0.5)
+          this.fine(x + 0.5, yy, 0.5, 0.5, color(Math.round(yy * 2) % 2 ? [96, 88, 70] : [154, 140, 106]));
+        // One chain pixel connects the ceiling to the cap, even at a low roof.
+        this.fine(x + 0.5, y - 0.5, 0.5, 0.5, color([154, 140, 106]));
+      }
+    }
+  }
+
   private drawGlow(sim: MineSim, time: number, y0: number, y1: number) {
     const ctx = this.ctx, cells = sim.world.cells;
     ctx.save();
@@ -1238,8 +1271,8 @@ export class MineRenderer {
     for (let y = Math.max(0, y0 - 8); y < Math.min(H, y1 + 8); y++)
       for (let x = 0; x < W; x++) {
         const m = cells[idx(x, y)];
-        if (m !== TORCH && m !== LAMP) continue;
-        const r = m === LAMP ? 9 : 7;
+        if (m !== TORCH && m !== LAMP && m !== WORK_LAMP) continue;
+        const r = m === LAMP ? 10 : m === WORK_LAMP ? 8 : 7;
         const flicker = m === TORCH ? 0.75 + 0.25 * Math.sin(time / 90 + x * 7.3 + y) * Math.sin(time / 230 + y * 3.1) : 0.9;
         ctx.globalAlpha = (m === LAMP ? 0.32 : 0.38) * flicker;
         ctx.drawImage(this.glow, x + 0.5 - r, y + 0.5 - r, r * 2, r * 2);

@@ -17,17 +17,18 @@ export const CELLS = W * H;
 /** Materials. Solid ones block miners and can be dug; fixtures (LADDER..LAMP)
  * are built in open air and can be walked through; lava is neither. */
 export const AIR = 0, GRASS = 1, DIRT = 2, ROCK = 3, STONE = 4, COPPER = 5, GOLD = 6, BEDROCK = 7, TIMBER = 8, RUBBLE = 9,
-  LADDER = 10, RAIL = 11, TORCH = 12, LAMP = 13, GRAVEL = 14, LOOSE = 15, LAVA = 16, SILVER = 17;
+  LADDER = 10, RAIL = 11, TORCH = 12, LAMP = 13, GRAVEL = 14, LOOSE = 15, LAVA = 16, SILVER = 17,
+  HARD_STONE = 18, DENSE_STONE = 19, WORK_LAMP = 20;
 export type Material = number;
-export const MATERIAL_COUNT = 18;
+export const MATERIAL_COUNT = 21;
 
 const table = (...ms: Material[]) => {
   const t = new Uint8Array(MATERIAL_COUNT);
   for (const m of ms) t[m] = 1;
   return t;
 };
-const SOLID = table(GRASS, DIRT, ROCK, STONE, COPPER, SILVER, GOLD, BEDROCK, TIMBER, RUBBLE, GRAVEL, LOOSE);
-const FIXTURE = table(LADDER, RAIL, TORCH, LAMP);
+const SOLID = table(GRASS, DIRT, ROCK, STONE, HARD_STONE, DENSE_STONE, COPPER, SILVER, GOLD, BEDROCK, TIMBER, RUBBLE, GRAVEL, LOOSE);
+const FIXTURE = table(LADDER, RAIL, TORCH, LAMP, WORK_LAMP);
 const LOOSE_SET = table(GRASS, DIRT, RUBBLE, GRAVEL, LOOSE);
 /** Loose ground that slides on a drop of one, not two. */
 const RUNNY = table(GRAVEL, LOOSE);
@@ -40,6 +41,7 @@ export const isPassable = (m: Material) => m === AIR || FIXTURE[m] === 1;
 /** Falls and slides like sand. */
 export const isLoose = (m: Material) => LOOSE_SET[m] === 1;
 export const isOre = (m: Material) => m === COPPER || m === SILVER || m === GOLD;
+export const isStone = (m: Material) => m === STONE || m === HARD_STONE || m === DENSE_STONE;
 /** Burns: shoring, ladders, the ties under the rails, torches. */
 export const isWood = (m: Material) => WOOD[m] === 1;
 /** Drinks up water lying on it. */
@@ -47,8 +49,15 @@ export const isSoil = (m: Material) => SOIL[m] === 1;
 
 /** Simulation ticks a miner spends digging out each material. */
 export const DIG_TICKS: Record<number, number> = {
-  [GRASS]: 40, [DIRT]: 45, [RUBBLE]: 40, [ROCK]: 110, [STONE]: 150, [COPPER]: 180, [SILVER]: 190, [GOLD]: 200, [TIMBER]: 60, [GRAVEL]: 50, [LOOSE]: 35,
+  [GRASS]: 40, [DIRT]: 45, [RUBBLE]: 40, [ROCK]: 110, [STONE]: 330, [HARD_STONE]: 990, [DENSE_STONE]: 2970,
+  [COPPER]: 180, [SILVER]: 190, [GOLD]: 200, [TIMBER]: 60, [GRAVEL]: 50, [LOOSE]: 35,
 };
+
+/** Depth below the surface, as a share of the mine's diggable ground. */
+export function stoneAtDepth(y: number, surface: number): Material {
+  const depth = (y - surface) / (H - 8 - surface);
+  return depth >= 0.6 ? DENSE_STONE : depth >= 0.3 ? HARD_STONE : STONE;
+}
 
 const CHUNK = 16;
 const CW = W / CHUNK, CH = H / CHUNK;
@@ -101,7 +110,7 @@ export function generate(seed: number): Uint8Array {
     for (let y = 0; y < H; y++) {
       let m = AIR;
       if (y >= bedrock(x)) m = BEDROCK;
-      else if (y >= stoneTop[x]) m = STONE;
+      else if (y >= stoneTop[x]) m = stoneAtDepth(y, surface[x]);
       else if (y > surface[x]) m = DIRT;
       else if (y === surface[x]) m = GRASS;
       cells[idx(x, y)] = m;
@@ -122,7 +131,7 @@ export function generate(seed: number): Uint8Array {
       let x = Math.floor(r(0) * W), y = minDepth + Math.floor(r(1) * (H - 8 - minDepth));
       const steps = 3 + Math.floor(r(2) * length);
       for (let s = 0; s < steps; s++) {
-        blob(cells, x, y, r(10 + s) < 0.3 ? 2 : 1, ore, seed + salt + i * 31 + s, (m) => m === STONE);
+        blob(cells, x, y, r(10 + s) < 0.3 ? 2 : 1, ore, seed + salt + i * 31 + s, isStone);
         x += Math.floor(r(40 + s) * 3) - 1;
         y += Math.floor(r(80 + s) * 3) - 1;
       }
@@ -139,11 +148,19 @@ export function generate(seed: number): Uint8Array {
       const r = (k: number) => hash01(i, k, seed + salt);
       const x = Math.floor(r(0) * W), t = top(x), depth = bottom(x) - t;
       if (depth <= 2) continue;
-      blob(cells, x, t + Math.floor(r(1) * depth), 1 + Math.floor(r(2) * 3), m, seed + salt + i, (c) => c === over);
+      blob(cells, x, t + Math.floor(r(1) * depth), 1 + Math.floor(r(2) * 3), m, seed + salt + i, (c) => over === STONE ? isStone(c) : c === over);
     }
   };
   pockets(78, LOOSE, (x) => surface[x] + 4, (x) => stoneTop[x] - 1, DIRT, 303);
   pockets(210, GRAVEL, (x) => stoneTop[x] + 2, () => H - 12, STONE, 404);
+  // Softer seams and harder lenses give the crew a reason to bend a tunnel.
+  for (let i = 0; i < 440; i++) {
+    const x = Math.floor(hash01(i, 1, seed + 419) * W);
+    const y = stoneTop[x] + 5 + Math.floor(hash01(i, 2, seed + 419) * (H - 16 - stoneTop[x]));
+    const host = stoneAtDepth(y, surface[x]);
+    const softer = host === DENSE_STONE ? HARD_STONE : host === HARD_STONE ? STONE : HARD_STONE;
+    blob(cells, x, y, 2 + Math.floor(hash01(i, 3, seed + 419) * 4), softer, seed + 419 + i, isStone);
+  }
   caves(cells, seed, stoneTop);
   // Deep down, sealed pools of lava (never under the shaft, nor open to a
   // cave).
@@ -153,7 +170,7 @@ export function generate(seed: number): Uint8Array {
     if (Math.abs(x - W / 2) < 8) continue;
     const y = H - 150 + Math.floor(r(1) * 132), radius = 2 + Math.floor(r(2) * 3);
     if (openNear(cells, x, y, radius + 2)) continue;
-    blob(cells, x, y, radius, LAVA, seed + 505 + i, (c) => c === STONE || isOre(c) || c === GRAVEL);
+    blob(cells, x, y, radius, LAVA, seed + 505 + i, (c) => isStone(c) || isOre(c) || c === GRAVEL);
   }
   return cells;
 }
@@ -172,6 +189,7 @@ function openNear(cells: Uint8Array, cx: number, cy: number, radius: number) {
  * (which would fall in), the bedrock and the shaft's column. */
 export function caves(cells: Uint8Array, seed: number, stoneTop: ArrayLike<number>) {
   const top = (x: number) => stoneTop[x] + 6, bottom = H - 12, shaft = W / 2;
+  const surface = strata(seed).surface;
   const carve = (cx: number, cy: number, rx: number, ry: number, rough: number, salt: number) => {
     const x0 = Math.floor(cx - rx - 1), x1 = Math.ceil(cx + rx + 1), y0 = Math.floor(cy - ry - 1), y1 = Math.ceil(cy + ry + 1);
     for (let y = y0; y <= y1; y++)
@@ -180,7 +198,7 @@ export function caves(cells: Uint8Array, seed: number, stoneTop: ArrayLike<numbe
         const dx = (x + 0.5 - cx) / rx, dy = (y + 0.5 - cy) / ry;
         if (dx * dx + dy * dy > 1 - rough * hash01(x, y, salt)) continue;
         const i = idx(x, y), m = cells[i];
-        if (m === STONE || isOre(m) || m === GRAVEL) cells[i] = AIR;
+        if (isStone(m) || isOre(m) || m === GRAVEL) cells[i] = AIR;
       }
   };
   // Passages: walks that wander, swelling into chambers now and then.
@@ -224,7 +242,7 @@ export function caves(cells: Uint8Array, seed: number, stoneTop: ArrayLike<numbe
       if (cells[i] !== GRAVEL) continue;
       let open = false;
       for (let dy = -1; dy <= 1 && !open; dy++) for (let dx = -1; dx <= 1; dx++) if (cells[i + dy * W + dx] === AIR) open = true;
-      if (open) cells[i] = STONE;
+      if (open) cells[i] = stoneAtDepth(y, surface[x]);
     }
   // Stalactites hang from cave roofs, stalagmites rise from their floors.
   for (let y = 2; y < H - 2; y++)
@@ -232,10 +250,10 @@ export function caves(cells: Uint8Array, seed: number, stoneTop: ArrayLike<numbe
       const i = idx(x, y);
       if (cells[i] !== AIR || y < stoneTop[x] + 4) continue;
       const h = hash01(x, y, seed + 909);
-      if (cells[i - W] === STONE && cells[i + W] === AIR && cells[i + 2 * W] === AIR && h < 0.12) {
-        cells[i] = STONE;
-        if (h < 0.04 && cells[i + 2 * W] === AIR && cells[i + 3 * W] === AIR) cells[i + W] = STONE;
-      } else if (cells[i + W] === STONE && cells[i - W] === AIR && cells[i - 2 * W] === AIR && h > 0.93) cells[i] = STONE;
+      if (isStone(cells[i - W]) && cells[i + W] === AIR && cells[i + 2 * W] === AIR && h < 0.12) {
+        cells[i] = cells[i - W];
+        if (h < 0.04 && cells[i + 2 * W] === AIR && cells[i + 3 * W] === AIR) cells[i + W] = cells[i];
+      } else if (isStone(cells[i + W]) && cells[i - W] === AIR && cells[i - 2 * W] === AIR && h > 0.93) cells[i] = cells[i + W];
     }
 }
 

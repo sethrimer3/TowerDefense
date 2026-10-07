@@ -54,7 +54,7 @@ An enemy ship (Runed Dinghy, Charmbound Sailboat, Mystic Cutter, Arcane Cog, Enc
 A magic boat's water. The four small boats have decorative water that dries behind them without affecting combat. Larger boats' water sinks the buildings it reaches (the larger boats also wall stones and the keep), leaving their rubble when it dries; it hurts only fire mages, puts out fires and stops splash damage.
 
 **War banner**:
-A consumable with no limit: planted anywhere on the board mid-defense, it rallies every mobile troop (swordsmen, archers, fire mages, valkyries, the dark wizard) to fight round it. Planting it again moves it; a tap takes it down.
+A reusable Skill: planted anywhere on the board mid-defense, it rallies every mobile troop (swordsmen, archers, fire mages, valkyries, the dark wizard) to fight round it. Planting it again moves it; a tap takes it down.
 
 **Best wave**:
 The highest wave the player has held.
@@ -325,3 +325,9 @@ _Avoid_: magic book, rune book
 
 **Lab level**:
 How far the alchemy lab has been dug out, 1 to 5, raised with Gold. The lab has room for one researcher a level. Level 2 opens the west **annex** (a mandrake garden and a lectern), level 3 the east annex (a crucible that casts gold and an orrery), level 4 adds a salamander in its cage and level 5 a scrying orb.
+
+**Skills**:
+The battle's bomb and reusable war banner, placed by the player from the side panel.
+
+**Banner influence**:
+The circle around a planted war banner where researched damage, life, defense and regeneration bonuses apply. Troops marching toward the banner can receive its researched speed bonus before entering the circle.

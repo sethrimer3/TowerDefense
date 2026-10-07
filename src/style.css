@@ -2126,3 +2126,10 @@ nav button > .tab-idle[hidden] { display: none; }
 .banner-research-branches section { min-width: 0; }
 .banner-research-branches .ledger-skill { flex-wrap: wrap; }
 @media (max-width: 760px) { .banner-research-branches { grid-template-columns: 1fr; } }
+
+.banner-research-shared { max-width: 640px; margin: auto; }
+.banner-research h4 { text-align: center; }
+.banner-research-branches { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding-top: 12px; }
+.banner-research-branches section { min-width: 0; }
+.banner-research-branches .ledger-skill { flex-wrap: wrap; }
+@media (max-width: 760px) { .banner-research-branches { grid-template-columns: 1fr; } }

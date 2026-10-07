@@ -28,10 +28,11 @@ export const MARCH_SIGHT = 2.5;
 
 export const bannerReach = (sim: DefendSim) => sim.bonuses.banner?.reach ?? RALLY_REACH;
 export const bannerInfluence = (sim: DefendSim, at: Point) => !!sim.warBanner && sq(at.x - sim.warBanner.x) + sq(at.y - sim.warBanner.y) <= sq(bannerReach(sim));
-export const bannerDamage = (sim: DefendSim, s: Soldier) => s.damage * (bannerInfluence(sim, s) ? sim.bonuses.banner?.damage ?? 1 : 1);
+export const bannerDamage = (sim: DefendSim, s: Soldier) => s.damage * (sim.bonuses.banner && sim.bonuses.banner.damage !== 1 && bannerInfluence(sim, s) ? sim.bonuses.banner.damage : 1);
 /** Preserve health percentage on both transitions; moving the banner cannot heal. */
 export function stepBannerLife(sim: DefendSim, s: Soldier, dt: number) {
   if (s.hp <= 0) return;
+  if (!s.bannerLife && (!sim.bonuses.banner || (sim.bonuses.banner.life === 1 && !sim.bonuses.banner.regen))) return;
   const inside = bannerInfluence(sim, s), old = s.bannerLife ?? 1;
   const next = inside ? sim.bonuses.banner?.life ?? 1 : 1;
   if (old !== next) { s.maxHp = s.maxHp / old * next; s.hp = s.hp / old * next; }

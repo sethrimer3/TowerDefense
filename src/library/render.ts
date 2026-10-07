@@ -560,12 +560,15 @@ export class LibraryRenderer {
     this.lastWall = this.flame;
     if (this.target && !sim.librarians.includes(this.target)) this.target = null;
     if (this.goal !== null) {
-      // Glide down to the lab, or back up to the nave.
+      // Camera movement follows rendered frames, not the 10 Hz simulation
+      // or its accelerated idle catch-up. Exponential easing also keeps
+      // the glide's pace consistent across display refresh rates.
+      const ease = 1 - Math.exp(-wallDt * 5);
       const destination = this.goal;
       const d = destination - this.focus.y;
-      this.focus.y += d * Math.min(1, dt * 5);
-      this.focus.x += (W / 2 - this.focus.x) * Math.min(1, dt * 5);
-      this.zoom += (this.goalZoom - this.zoom) * Math.min(1, dt * 5);
+      this.focus.y += d * ease;
+      this.focus.x += (W / 2 - this.focus.x) * ease;
+      this.zoom += (this.goalZoom - this.zoom) * ease;
       if (Math.abs(d) < 0.5 && Math.abs(this.zoom - this.goalZoom) < 0.005) {
         this.focus = { x: W / 2, y: destination };
         this.zoom = this.goalZoom;

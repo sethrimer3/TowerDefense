@@ -14,7 +14,14 @@ try {
     page.on('pageerror', e => errors.push(e.message));
     await page.goto(new URL('tests/library-idle.html', base).href);
     await page.waitForFunction(() => window.idleFixture);
-    const settle = () => page.evaluate(() => { for (let n = 0; n < 180; n++) window.idleFixture.step(); });
+    const settle = () => page.evaluate(async () => {
+      for (let n = 0; n < 360; n++) {
+        await new Promise(requestAnimationFrame);
+        window.idleFixture.step();
+        if (window.idleFixture.library.renderer.goal === null) return;
+      }
+      throw new Error('Camera glide did not finish');
+    });
     await page.evaluate(() => {
       const f = window.idleFixture, r = f.library.renderer;
       r.zoomBy(6, r.canvas.width / 2, r.canvas.height / 2);

@@ -496,12 +496,16 @@ export class DefendPage {
     for (const button of Array.from(this.root.querySelectorAll<HTMLButtonElement>("#defend-palette [data-item]"))) {
       const banner = button.dataset.item === "banner", left = banner ? this.sim.bannerRemaining : 0;
       const ready = left === 0 && (banner || this.save.bombs > 0);
+      const fill = banner ? Math.floor((1 - left / this.sim.bannerCooldown) * 100) : ready ? 100 : 0;
+      const key = `${fill}:${Math.ceil(left)}:${ready}:${this.save.bombs}`;
+      if (button.dataset.cooldown === key) continue;
+      button.dataset.cooldown = key;
       button.classList.toggle("skill-ready", ready);
       button.classList.toggle("skill-loading", left > 0);
-      button.style.setProperty("--skill-fill", `${banner ? (1 - left / this.sim.bannerCooldown) * 100 : ready ? 100 : 0}%`);
+      button.style.setProperty("--skill-fill", `${fill}%`);
       button.disabled = !ready;
       const name = banner ? "War banner" : "Bomb";
-      const status = left > 0 ? `Ready in ${Math.ceil(left)} seconds` : ready ? "Ready" : "None owned";
+      const status = left > 0 ? `Ready in ${Math.ceil(left)} seconds` : ready ? banner ? "Ready" : `Ready, ${this.save.bombs} left` : "None owned";
       button.title = `${name}: ${status}`;
       button.setAttribute("aria-label", `${name}: ${status}`);
     }
