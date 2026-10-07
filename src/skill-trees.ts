@@ -10,7 +10,7 @@ import type { BonusTarget } from "./progression.ts";
 export type SkillId =
   | "drillSergeant" | "veterans" | "bladework" | "fletchers" | "gunpowder" | "ballistics" | "warBanner"
   | "masonry" | "bastions" | "guilds" | "plunder" | "ironworks" | "scholars" | "tactician"
-  | "fireproofWood" | "fireTraining" | "nightWatch" | "coffee" | "waterproofing";
+  | "fireproofWood" | "fireTraining" | "nightWatch" | "enchantedInk" | "coffee" | "waterproofing";
 export type TreeId = "command" | "stewardship" | "mine" | "library";
 
 /** What one rank of a skill does: `per` added to a target's percent (a
@@ -19,7 +19,7 @@ export type TreeId = "command" | "stewardship" | "mine" | "library";
  * Mine's skills are read as ranks (`library/sim.ts`: `accidentChance`,
  * `fireDrill`; `mine/sim.ts`: `nightShift`, the shaft house's seal,
  * `extraSmiths`). */
-export type SkillEffect = { target: BonusTarget | "smiths" | "copperPerWave" | "fireproof" | "fireTraining" | "nightWatch" | "coffee" | "waterproof"; per: number };
+export type SkillEffect = { target: BonusTarget | "smiths" | "copperPerWave" | "fireproof" | "fireTraining" | "nightWatch" | "enchant" | "coffee" | "waterproof"; per: number };
 export type Skill = { id: SkillId; name: string; icon: string; max: number; base: number; effect: SkillEffect; text: string };
 export type SkillNode = { id: SkillId; requires: SkillId[] };
 export type SkillTree = { id: TreeId; name: string; description: string; nodes: SkillNode[] };
@@ -43,6 +43,7 @@ export const SKILLS: Record<SkillId, Skill> = {
   coffee: { id: "coffee", name: "Coffee", icon: "♨", max: 12, base: 2, effect: { target: "coffee", per: 5 }, text: "5% more of the mine's crew work the night shift a rank (20% to start, up to 80%)" },
   waterproofing: { id: "waterproofing", name: "Waterproofing", icon: "☂", max: 4, base: 4, effect: { target: "waterproof", per: 15 }, text: "The shaft house keeps 15% more of the rain's runoff out of the shaft a rank (20% to start, up to 80%)" },
   nightWatch: { id: "nightWatch", name: "Night watch", icon: "☾", max: 9, base: 4, effect: { target: "nightWatch", per: 5 }, text: "At night, librarians detect fires sooner and fill, carry and throw buckets 15% faster per rank" },
+  enchantedInk: { id: "enchantedInk", name: "Enchanted ink", icon: "✧", max: 10, base: 10, effect: { target: "enchant", per: 1 }, text: "Each book on the library's shelves has a 1 in 10,000 chance a minute a rank of taking on glowing runes along its spine; read, an enchanted book gives two hours of the library's Knowledge at once" },
   fireTraining: { id: "fireTraining", name: "Fire training", icon: "♒", max: 5, base: 8, effect: { target: "fireTraining", per: 1 }, text: "More librarians fight a fire, fetching and throwing water faster and further, and each splash more likely to douse the flames" },
 };
 
@@ -73,6 +74,7 @@ export const TREES: SkillTree[] = [
     { id: "fireproofWood", requires: [] },
     { id: "fireTraining", requires: [] },
     { id: "nightWatch", requires: [] },
+    { id: "enchantedInk", requires: [] },
   ] },
 ];
 

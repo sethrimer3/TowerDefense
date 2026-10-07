@@ -7,7 +7,7 @@
  * is closed: time away is banked (up to 24 hours), then spent tick by tick
  * a slice each frame. Only simulated work pays Smithy points. */
 import { play } from "../sound.ts";
-import { countdown, IDLE_SPEED, MAX_AWAY_MS } from "../away.ts";
+import { countdown, IDLE_LEAD, IDLE_SPEED, MAX_AWAY_MS } from "../away.ts";
 import { BARS_PER_POINT, CREW_PER_LEVEL, METALS, metalSum, type Metals, DAY_TICKS, FORGE_PER_LEVEL, JOBS, KIT, MAX_MINERS, MineSim, SEAL_LEVEL, SMITHS_PER_LEVEL, STOCK_PER_LEVEL, STOCK_RATE, TICK_HZ, type Cause, type Job, type Miner, type MineNews, type MineSave, type Weather } from "./sim.ts";
 import { MAX_LEVEL, type BuildingId } from "./buildings.ts";
 import { MineRenderer } from "./render.ts";
@@ -122,7 +122,7 @@ export class MinePage {
 
   /** Runs the mine up to wall-clock time `now`, within a slice of the frame
    * (a bigger one while catching up), and pays what it earned. */
-  advance(now: number) {
+  advance(now: number, keepWith = 0) {
     const gap = Math.max(0, now - this.last);
     this.last = now;
     this.owed = Math.min((SIM_AWAY_MS * TICK_HZ) / 1000, this.owed + (gap * TICK_HZ) / 1000);
@@ -135,7 +135,10 @@ export class MinePage {
     this.sim.waterproof = up.waterproof;
     this.sim.extraSmiths = up.smiths;
     let n = 0;
-    while (this.owed >= 1) {
+    // Keep pace with the library's idle time (`keepWith`), never more than
+    // IDLE_LEAD ahead of it, so both spend it together.
+    const floor = ((keepWith - IDLE_LEAD) * TICK_HZ) / 1000;
+    while (this.owed >= 1 && this.owed - 1 >= floor) {
       this.sim.step();
       this.owed--;
       if (++n >= limit || (n % 8 === 0 && performance.now() - start > budget)) break;

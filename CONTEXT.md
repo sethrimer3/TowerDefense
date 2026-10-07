@@ -304,5 +304,9 @@ A low stand on the nave's floor for the books the professors have read. When it 
 **Researcher**:
 A librarian who works the **alchemy lab**, a vaulted cellar under the nave reached by a ladder from a trapdoor: stoking the athanor, brewing at the cauldron, distilling, studying, chanting at the transmutation circle. With no researcher, the skill trees' Knowledge research can't be bought.
 
+**Enchanted book**:
+A book on the library's shelves that has taken on glowing runes along its spine. With the Enchanted ink skill each shelved book has a small chance a minute of becoming one; a professor who reads it gains a burst of Knowledge.
+_Avoid_: magic book, rune book
+
 **Lab level**:
 How far the alchemy lab has been dug out, 1 to 5, raised with Gold. The lab has room for one researcher a level. Level 2 opens the west **annex** (a mandrake garden and a lectern), level 3 the east annex (a crucible that casts gold and an orrery), level 4 adds a salamander in its cage and level 5 a scrying orb.

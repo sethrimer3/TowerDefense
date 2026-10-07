@@ -87,7 +87,7 @@ export const SUBJECTS: Subject[] = [
   },
   {
     id: "library", name: "Library", sprite: "library", blurb: "Its shelves, its staff and its fires.",
-    topics: [{ id: "library", name: "Library", elsewhere: "library", skills: ["fireproofWood", "fireTraining", "nightWatch"] }],
+    topics: [{ id: "library", name: "Library", elsewhere: "library", skills: ["fireproofWood", "fireTraining", "nightWatch", "enchantedInk"] }],
   },
 ];
 
