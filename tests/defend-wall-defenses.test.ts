@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { BALLISTA, SPIKES } from "../src/defend/catalog.ts";
+import { BALLISTA, NO_BONUSES, SPIKES, spikeDamage, spikeEvery, type Bonuses } from "../src/defend/catalog.ts";
+import { BLAST_STAKES, RIME_STAKES, SPRING_STAKES } from "../src/knowledge-paths.ts";
 import { generateCity } from "../src/defend/citygen.ts";
 import { legalLayouts, refusal } from "../src/defend/drag-rules.ts";
 import { EditSession, type DragAt } from "../src/defend/edit-session.ts";
@@ -87,8 +88,8 @@ test("spikes line one tile's stretch of wall, not across a gate", () => {
 });
 
 /** A battle with no wave coming while enemies are on the board. */
-function battle(l: Layout) {
-  const sim = new DefendSim(map(l), defaultDefendSave().levels, 5);
+function battle(l: Layout, paths?: Bonuses["paths"], levels = defaultDefendSave().levels) {
+  const sim = new DefendSim(map(l), levels, 5, paths ? { ...NO_BONUSES, paths } : NO_BONUSES);
   sim.breakT = 1e9;
   return sim;
 }
@@ -106,6 +107,76 @@ test("spikes cut the enemies on foot pressing against them", () => {
   const other = plain.spawnAuxiliary("orc", cellX(cell) + 0.5, cellY(cell) - 0.4)!;
   for (let i = 0; i < 30; i++) plain.step(1 / 30);
   assert.equal(other.hp, other.maxHp);
+});
+
+test("the Forge sharpens the stakes and quickens their cuts", () => {
+  assert.equal(spikeDamage(0), SPIKES.damage);
+  assert.equal(spikeEvery(0), SPIKES.every);
+  const levels = { ...defaultDefendSave().levels, spikeDamage: 2, spikeRate: 2 };
+  const sim = battle(placeSpikes(L, NORTH)!, undefined, levels);
+  const cell = sim.map.spikes![0].cells[3];
+  const ogre = sim.spawnAuxiliary("ogre", cellX(cell) + 0.5, cellY(cell) - 0.4)!;
+  for (let i = 0; i < 30; i++) sim.step(1 / 30);
+  const cuts = Math.round((ogre.maxHp - ogre.hp) / spikeDamage(2));
+  assert.ok(cuts >= 2, `quicker cuts land (${cuts})`);
+  assert.ok(Math.abs(ogre.maxHp - ogre.hp - cuts * spikeDamage(2)) < 1e-6, "each cut the sharper damage");
+});
+
+/** An enemy pressed against the north spikes' fourth stone, and a second
+ * standing a little out in front of the row. */
+function pressed(sim: DefendSim, kind = "ogre") {
+  const cells = sim.map.spikes![0].cells;
+  const near = sim.spawnAuxiliary(kind, cellX(cells[3]) + 0.5, cellY(cells[3]) - 0.4)!;
+  const far = sim.spawnAuxiliary(kind, cellX(cells[6]) + 0.5, cellY(cells[6]) - 1.9)!;
+  return { near, far };
+}
+
+test("blasting stakes blow up on contact, then wait to be ready again", () => {
+  const sim = battle(placeSpikes(L, NORTH)!, { spikes: { path: "blastStakes", rank: 1 } });
+  const { near } = pressed(sim);
+  let blasts = 0;
+  const explode = sim.explode.bind(sim);
+  sim.explode = (...a) => (blasts++, explode(...a));
+  for (let i = 0; i < 20 && !blasts; i++) sim.step(1 / 30);
+  assert.equal(blasts, 1, "one blast on contact");
+  assert.ok(near.maxHp - near.hp > SPIKES.damage * BLAST_STAKES.damage[1] * 0.5, `the blast hurt it (${near.maxHp - near.hp})`);
+  assert.ok(sim.spikeArm.size >= 1, "the stone winds back");
+  for (let i = 0; i < 30; i++) sim.step(1 / 30);
+  assert.equal(blasts, 1, "no second blast before it is ready");
+  for (let i = 0; i < 30 * BLAST_STAKES.rearm[1]; i++) sim.step(1 / 30);
+  assert.ok(blasts > 1, "and again once ready");
+});
+
+test("spring stakes shoot the row out at everyone in front of it", () => {
+  const plain = battle(placeSpikes(L, NORTH)!);
+  const a = pressed(plain);
+  for (let i = 0; i < 20; i++) plain.step(1 / 30);
+  assert.equal(a.far.hp, a.far.maxHp, "plain stakes don't reach out");
+  const sim = battle(placeSpikes(L, NORTH)!, { spikes: { path: "springStakes", rank: 1 } });
+  const { near, far } = pressed(sim);
+  for (let i = 0; i < 20 && !sim.spikeThrusts.length; i++) sim.step(1 / 30);
+  assert.equal(sim.spikeThrusts.length, 1, "the row thrusts");
+  assert.ok(far.maxHp - far.hp >= SPIKES.damage * SPRING_STAKES.damage[1] - 1e-6, `the one in front is struck (${far.maxHp - far.hp})`);
+  assert.ok(near.hp < near.maxHp);
+  for (let i = 0; i < 30; i++) sim.step(1 / 30);
+  assert.equal(sim.spikeThrusts.length, 0, "the thrust is drawn back");
+  assert.ok(sim.spikeArm.has(-1), "and the row winds back");
+});
+
+test("rimed stakes chill, bite the chilled harder, and at III chill all nearby", () => {
+  const sim = battle(placeSpikes(L, NORTH)!, { spikes: { path: "rimeStakes", rank: 2 } });
+  const { near, far } = pressed(sim);
+  for (let i = 0; i < 40; i++) sim.step(1 / 30);
+  assert.ok(near.chill && near.chill > 0, "the cut chills");
+  assert.equal(far.chill, undefined, "only what it cuts below III");
+  const lost = near.maxHp - near.hp;
+  assert.ok(lost >= SPIKES.damage + SPIKES.damage * RIME_STAKES.bite - 1e-6, `the second cut bites harder (${lost})`);
+  const deep = battle(placeSpikes(L, NORTH)!, { spikes: { path: "rimeStakes", rank: 3 } });
+  pressed(deep);
+  const cell = deep.map.spikes![0].cells[3];
+  const behind = deep.spawnAuxiliary("ogre", cellX(cell) + 0.5, cellY(cell) - 1.9)!;
+  for (let i = 0; i < 20; i++) deep.step(1 / 30);
+  assert.ok(behind.chill && behind.chill > 0, "winter's breath reaches the one behind");
 });
 
 test("a ballista shoots the nearest enemy and its bolt pierces the file behind", () => {

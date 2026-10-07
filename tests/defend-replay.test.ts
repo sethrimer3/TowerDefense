@@ -164,6 +164,8 @@ function state(sim: DefendSim) {
     [...(s.towers as { cooldown: Map<number, number> }).cooldown], [...(s.barracks as { training: Map<number, number> }).training], (s.builders as { respawn: number[] }).respawn,
     // Only runs with wall spikes or ballistas have their bolts, aims and pulses.
     ...(sim.map.spikes || sim.ballistaAim.size || sim.ballistaBolts.length ? [sim.ballistaBolts, [...sim.ballistaAim], sim.spikeT] : []),
+    // Only spikes with a Study path go off, wind back and thrust.
+    ...(sim.spikeArm.size || sim.spikeThrusts.length ? [[...sim.spikeArm], sim.spikeThrusts] : []),
     // Only runs with a dark keep have bolts or turrets, so the others hash as before.
     ...(sim.bolts.length || dark.size ? [sim.bolts, [...dark]] : []),
     // Likewise only siege engines shoot siege shots.

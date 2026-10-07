@@ -12,17 +12,18 @@ import type { PlacedKind } from "./defend/layout.ts";
 import { trimPlaced } from "./defend/progress.ts";
 import type { Save } from "./save.ts";
 
-export type PathTopic = "wizardTower" | "barracks" | "archerTower" | "cannonTower" | "archerBarracks" | "watchTower" | "mageGuild" | "bait";
+export type PathTopic = "wizardTower" | "barracks" | "archerTower" | "cannonTower" | "archerBarracks" | "watchTower" | "mageGuild" | "bait" | "spikes";
 export type PathId =
   | "pyromancy" | "rime" | "storm" | "crusaders" | "assassins"
   | "fireArrows" | "sharpshooters" | "gunnery" | "siegeShot" | "rangers" | "skirmishers"
-  | "spotters" | "signalFires" | "pyroclasm" | "cinders" | "oilSoaked" | "fortified";
+  | "spotters" | "signalFires" | "pyroclasm" | "cinders" | "oilSoaked" | "fortified"
+  | "blastStakes" | "springStakes" | "rimeStakes";
 /** The pixel icons `ui/path-icons.ts` draws, one a rank. */
 export type PathIcon =
   | "flame" | "tongue" | "inferno" | "snowflake" | "shard" | "iceBlock" | "bolt" | "fork" | "thunderhead"
   | "mail" | "heart" | "cross" | "boot" | "dagger" | "skull" | "crown"
   | "arrow" | "fireArrow" | "volley" | "eye" | "crosshair" | "gear" | "grape" | "cannonball" | "blast" | "bow" | "leaf"
-  | "spyglass" | "beacon" | "crate" | "fireball" | "embers";
+  | "spyglass" | "beacon" | "crate" | "fireball" | "embers" | "stake" | "spring";
 /** Each path's colours, as `ui/path-icons.ts` and the page's CSS name them. */
 export type PathHue = "ember" | "frost" | "storm" | "steel" | "shadow" | "verdant";
 export type PathRank = { name: string; icon: PathIcon; cost: number; text: string };
@@ -97,6 +98,21 @@ export const OIL = { burn: [0, 3, 4, 6], dps: [0, 8, 20, 50] };
 /** Fortified crates: bait has `hp[rank]` times its HP; at III each bite
  * comes back on the biter `thorns` times over. */
 export const FORTIFY = { hp: [1, 2, 3.5, 3.5], thorns: 3 };
+/** Blasting stakes: a stone's stakes blow up when an enemy on foot touches
+ * them, a blast `radius[rank]` cells wide for `damage[rank]` times the cut,
+ * sparing your own people; that stone's stakes are ready again after
+ * `rearm[rank]` seconds. */
+export const BLAST_STAKES = { radius: [0, 1.2, 1.8, 1.8], damage: [0, 3, 3, 7.5], rearm: [0, 4, 3, 2] };
+/** Spring stakes: when an enemy on foot touches a row, every standing
+ * stone's stakes in it shoot out `reach[rank]` cells past the wall, striking
+ * every enemy on foot in front of the row for `damage[rank]` times the cut;
+ * the row winds back for `rearm[rank]` seconds. `show` is how long the
+ * thrust is drawn. */
+export const SPRING_STAKES = { reach: [0, 1.5, 2.5, 2.5], damage: [0, 3, 3, 5], rearm: [0, 3, 3, 1.5], show: 0.35 };
+/** Rimed stakes: every cut chills for `chill[rank]` seconds; from II a cut
+ * on an enemy already chilled bites `bite` times as hard; at III the cold
+ * reaches every enemy on foot within `aura` cells of the stakes each cut. */
+export const RIME_STAKES = { chill: [0, 1.5, 2.5, 2.5], bite: 2, aura: 2 };
 
 export const PATHS: KnowledgePath[] = [
   {
@@ -235,6 +251,30 @@ export const PATHS: KnowledgePath[] = [
       { name: "Iron bands", icon: "crate", cost: 3, text: "Bait has twice the HP" },
       { name: "Stone cellar", icon: "mail", cost: 6, text: "Bait has 3.5× the HP" },
       { name: "Spiked crates", icon: "dagger", cost: 12, text: "Every bite comes back on the biter three times over" },
+    ],
+  },
+  {
+    id: "blastStakes", topic: "spikes", name: "Blasting stakes", motto: "Stakes that blow up on contact", hue: "ember",
+    ranks: [
+      { name: "Powder stakes", icon: "blast", cost: 4, text: "A stone's stakes blow up when an enemy touches them, then are ready again after 4 seconds" },
+      { name: "Black powder", icon: "inferno", cost: 8, text: "The blasts are half again as wide, and ready again after 3 seconds" },
+      { name: "Thunder stakes", icon: "cannonball", cost: 14, text: "The blasts hit 2.5× as hard, and are ready again after 2 seconds" },
+    ],
+  },
+  {
+    id: "springStakes", topic: "spikes", name: "Spring stakes", motto: "The whole row shoots out at once", hue: "steel",
+    ranks: [
+      { name: "Spring stakes", icon: "spring", cost: 4, text: "When an enemy touches a row, all its stakes shoot out 1.5 cells, striking every enemy in front of it" },
+      { name: "Long pikes", icon: "stake", cost: 8, text: "The stakes shoot out 2.5 cells" },
+      { name: "Hair trigger", icon: "dagger", cost: 14, text: "The row winds back twice as fast, and strikes 5× as hard as a cut" },
+    ],
+  },
+  {
+    id: "rimeStakes", topic: "spikes", name: "Rimed stakes", motto: "Cold iron that holds them fast", hue: "frost",
+    ranks: [
+      { name: "Cold iron", icon: "snowflake", cost: 4, text: "Every cut chills the enemy for 1.5 seconds" },
+      { name: "Frostbite", icon: "shard", cost: 8, text: "Chills last 2.5 seconds, and the stakes cut a chilled enemy twice as hard" },
+      { name: "Winter's breath", icon: "iceBlock", cost: 14, text: "Each cut chills every enemy on foot within 2 cells of the stakes" },
     ],
   },
 ];

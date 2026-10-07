@@ -58,7 +58,7 @@ import { DarkKeeps, stepBolts, stepDarkWizard, type Bolt } from "./dark-wizards.
 import { WarBanner } from "./war-banner.ts";
 import { sheltered, fizzles, stepFloods, type Flood, type Sinking } from "./boats.ts";
 import { baitFell, baitStanding } from "./bait.ts";
-import { stepBallistaBolts, stepSpikes, type BallistaBolt } from "./wall-defenses.ts";
+import { stepBallistaBolts, stepSpikes, type BallistaBolt, type SpikeThrust } from "./wall-defenses.ts";
 
 export type Levels = Record<UpgradeId, number>;
 
@@ -251,6 +251,11 @@ export class DefendSim {
   readonly ballistaAim = new Map<number, { x: number; y: number }>();
   /** Seconds until the wall spikes next cut whoever is against them. */
   spikeT = SPIKES.every;
+  /** Seconds until spikes that went off are ready again, keyed by wall stone
+   * (blasting stakes) or row (spring stakes); and the rows' thrusts being
+   * drawn. Both empty without those Study paths. */
+  readonly spikeArm = new Map<number, number>();
+  spikeThrusts: SpikeThrust[] = [];
   scorches: Scorch[] = [];
   effects: Effect[] = [];
   /** The war banner the player planted, rallying the troops; null when none

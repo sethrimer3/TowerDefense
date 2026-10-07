@@ -337,10 +337,20 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   presentation only).
 - **Wall spikes** (`wall-defenses.ts`, `stepSpikes`) stand on the stones
   `citygen.ts` lists in `map.spikes` (each row's stones that face open
-  ground). Every `SPIKES.every` seconds (`sim.spikeT`) each enemy on foot
+  ground). Every `spikeEvery` seconds (`sim.spikeT`) each enemy on foot
   (not fliers, boats or a burrowed mole) within the stakes' reach of a
-  standing stone takes `SPIKES.damage`, once a pulse, as a melee blow. A
-  knocked-out stone's stakes go with it and come back when it is rebuilt.
+  standing stone takes `spikeDamage`, once a pulse, as a melee blow; the
+  Forge's Iron-shod stakes (`spikeDamage`) and Barbed edges (`spikeRate`)
+  raise both. A knocked-out stone's stakes go with it and come back when it
+  is rebuilt. Study paths (`BLAST_STAKES`, `SPRING_STAKES`, `RIME_STAKES`):
+  Blasting stakes blow up a touched stone's stakes (`sim.explode`, sparing
+  your own people), ready again after a few seconds (`sim.spikeArm`, keyed
+  by stone); Spring stakes shoot the whole touched row out, striking every
+  enemy on foot in front of it (`sim.spikeArm` under `-1 - row`,
+  `sim.spikeThrusts` drawn by `drawSpikeThrusts`); Rimed stakes chill what
+  they cut, bite the chilled twice as hard from II, and at III chill every
+  enemy on foot near a touched stone. All three are empty or absent in runs
+  without them.
 - **Wall ballistas** are buildings (`kind: "wallBallista"`, numbered after
   the gates) with twice the HP of the stones they replace; they are solid,
   battered and rebuilt like the wall. Each shoots (`Towers`,
