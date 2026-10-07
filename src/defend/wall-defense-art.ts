@@ -7,9 +7,10 @@
  * (drawn live by the renderer, baked per heading and string): an oak stock
  * with a winch at its tail, a bow of iron-banded horn and its string,
  * drawn back with a bolt laid on, or slack once loosed. */
+import { SPRING_STAKES } from "../knowledge-paths.ts";
 import { BALLISTA } from "./catalog.ts";
 import type { CityMap } from "./citygen.ts";
-import { hash } from "./grid.ts";
+import { CELLS_W, hash } from "./grid.ts";
 import type { Side } from "./layout.ts";
 import type { DefendSim } from "./sim.ts";
 import { OUTLINE, STONE, damage, drawSprite, pixels, rgba, rubblePixels, shade, sprite } from "./damage-art.ts";
@@ -82,6 +83,41 @@ function turn(side: Side, u: number, v: number): [number, number] {
   if (side === "w") return [v, L - u];
   return [L - v, u];
 }
+
+/** Spring stakes shooting out of a row: on each standing stone, two long
+ * iron pikes thrust out past the stakes' tips and drawn back, outlined, in
+ * art pixels snapped to whole screen pixels. `c` is in board space. */
+export function drawSpikeThrusts(c: CanvasRenderingContext2D, px: number, map: CityMap, sim: DefendSim | null) {
+  if (!sim?.spikeThrusts.length || !map.spikes) return;
+  const p = Math.max(1, Math.round(px / ART));
+  const dot = (x: number, y: number, grow = 0) =>
+    c.fillRect(Math.round((x * px) / p) * p - grow * p, Math.round((y * px) / p) * p - grow * p, p * (1 + 2 * grow), p * (1 + 2 * grow));
+  for (const t of sim.spikeThrusts) {
+    const row = map.spikes[t.row];
+    if (!row) continue;
+    const [dx, dy] = SPIKE_OUT[row.side];
+    // Out fast, back slower.
+    const f = t.t / SPRING_STAKES.show, out = f < 0.3 ? f / 0.3 : 1 - (f - 0.3) / 0.7;
+    const len = Math.round(out * t.reach * ART);
+    if (len <= 0) continue;
+    for (const cell of row.cells) {
+      if (!sim.solid[cell]) continue;
+      const x0 = (cell % CELLS_W) + 0.5, y0 = Math.floor(cell / CELLS_W) + 0.5;
+      for (const u of [-2, 2]) {
+        // Along the wall `u` art pixels from the stone's middle; out from its face.
+        const at = (a: number): [number, number] => [x0 + (dy ? u : 0) / ART + (dx * (ART / 2 + a)) / ART, y0 + (dx ? u : 0) / ART + (dy * (ART / 2 + a)) / ART];
+        c.fillStyle = "#0b0907";
+        for (let a = 0; a <= len + 1; a++) dot(...at(a), 1);
+        for (let a = 0; a <= len + 1; a++) {
+          c.fillStyle = a >= len - 1 ? "#cfcfd6" : a % 3 === 0 ? "#4a4a52" : "#7a7a84";
+          dot(...at(a));
+        }
+      }
+    }
+  }
+}
+
+const SPIKE_OUT: Record<Side, readonly [number, number]> = { n: [0, -1], e: [1, 0], s: [0, 1], w: [-1, 0] };
 
 // ── The ballista's bastion ───────────────────────────────────────────────
 

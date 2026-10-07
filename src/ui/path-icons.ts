@@ -123,6 +123,14 @@ const ICONS: Record<PathIcon, string[]> = {
     ".....o.....", "....olo....", "...olwlo...", "...olwlo...", "..ooooooo..", "..odmmmdo..",
     "...odmdo...", "....odo....", "....odo....", "....odo....", "...ooooo...",
   ],
+  stake: [
+    ".....o.....", "....owo....", "....olo....", "...olwmo...", "...olmdo...", "...olmdo...",
+    "...olmdo...", "...omddo...", ".ooooooooo.", ".odmmmmmdo.", ".ooooooooo.",
+  ],
+  spring: [
+    ".....o.....", "....olo....", "....omo....", "..ooooooo..", "..odmmmlo..", "...ooooo...",
+    "..olmmmdo..", "...ooooo...", "..odmmmlo..", "..ooooooo..", "...........",
+  ],
   crate: [
     "ooooooooooo", "odddddddddo", "odolllllodo", "odlollloldo", "odllololldo", "odlllollldo",
     "odllololldo", "odlollloldo", "odolllllodo", "odddddddddo", "ooooooooooo",
