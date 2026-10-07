@@ -577,7 +577,7 @@ export class DefendPage {
     this.weather = rollWeather(undefined, area);
     this.night = 0;
     this.renderChrome();
-    const sky = this.weather.snow ? "Snow drifts in. " : this.weather.rain ? "Rain rolls in. " : "";
+    const w = this.weather, sky = w.blizzard ? "A blizzard howls in. " : w.snow ? "Snow drifts in. " : w.sand ? "A sandstorm blows in. " : w.mist ? "Mist creeps over the ground. " : w.rain ? "Rain rolls in. " : "";
     this.setMessage(`${sky}Here they come! ${this.sideOpen.sim ? "Drag" : "Open Items and drag"} a bomb onto the field, or plant the war banner to rally your troops.`, 4);
   }
 

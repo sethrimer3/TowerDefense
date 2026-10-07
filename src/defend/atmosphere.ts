@@ -62,6 +62,8 @@ export class Atmosphere {
       this.air.fill(0);
       this.source.fill(0);
       this.grains.length = this.weeds.length = 0;
+      // Dunes belong to the desert: past it, the sand is gone with the wind.
+      if (next !== "sand") { this.sand.fill(0); this.cleanup.clear(); this.sandSeeded = false; }
       this.syncWalls(sim);
       for (let i = 0; i < CELL_COUNT; i++) if (!sim.map.city[i] && !sim.map.wall[i] && !sim.solid[i]) {
         const noise = weatherNoise((i % CELLS_W) / 6, Math.floor(i / CELLS_W) / 6);
@@ -127,8 +129,10 @@ export class Atmosphere {
     };
     for (let y = 0; y < CELLS_H; y++) for (let x = 0; x < CELLS_W; x++) {
       const i = cellIndex(x, y);
-      if (x + 1 < CELLS_W) pair(i, i + 1, 1, 0);
-      if (y + 1 < CELLS_H) pair(i, i + CELLS_W, 0, 1);
+      // The board wraps, so dunes march off one edge and back in at the
+      // other rather than piling up against the downwind side.
+      pair(i, x + 1 < CELLS_W ? i + 1 : i + 1 - CELLS_W, 1, 0);
+      pair(i, y + 1 < CELLS_H ? i + CELLS_W : x, 0, 1);
     }
     for (let i = 0; i < CELL_COUNT; i++) {
       const feed = this.source[i] ? (this.source[i] - a[i]) * .065 : -a[i] * .001;

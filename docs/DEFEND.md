@@ -430,8 +430,23 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   crossfade over three seconds, with matching wave button and list colors.
   `area-enemies.ts` supplies themed pools; Nadir permits every normal wave species. Offspring remain parent-only. Unspendable area-budget remainders are discarded. Nadir uses crypt masonry with a dark violet floor wash. Frozen Vault (101-120) includes all ship tiers, Ice Golems (240 HP, cost 80, double fire/explosion damage) and Sliding Ice Cubes (45 HP, cost 10, cardinal slides at 3.6 cells/second, meltable ice trails, immune to blast deflection). The new enemies pay 12/3 Gold and have journal entries.
 - Weather rolls at the start and on entering an area: Mossbound Ruins has
-  30% rain, Drowned Temple 75%, Frozen Vault snow, and dry or underground
-  areas no rain. Ambient light and precipitation fade with the terrain.
+  30% rain, Drowned Temple 75%, Frozen Vault snow (a 30% stormy roll, and
+  every boss night, make it a blizzard: dense wind-streaked flakes drawn
+  under the units, so enemies stay clear), Amber Desert a sandstorm, Fungal
+  Hollow mist, and the other dry or underground areas no rain.
+- Ground weather (`atmosphere.ts`, drawn by `atmosphere-art.ts`): in the
+  desert and the Fungal Hollow a per-cell field steps ten times a second.
+  The wind (`windAt`) holds a compass heading, then eases to the next.
+  Mist is fed outside the walls, drifts with the wind, swirls round blasts
+  and moving projectiles (blasts also blow holes in it), and seeps through
+  wall stones below 75% HP. Sand lies in dunes that the wind and walking
+  units push about (the board wraps, so dunes march off one edge and in at
+  the other); it never passes standing wall, but pours through a breach.
+  Sand in the city at `CLEANUP_DEPTH` or more is a civilian job of the
+  lowest priority, dropped whenever repairs are waiting. Grains and
+  tumbleweeds (black-outlined pixel sprites) blow along the wind. Leaving
+  the desert clears its sand. The field uses only exact arithmetic and no
+  battle random draws; it is not saved. Ambient light and precipitation fade with the terrain.
   Reduce Motion snaps the transition and suppresses rain/snow animation.
   The city's lanterns and fires stay lit in all areas.
 - **Every 10th wave is a boss wave**, for weather and rewards; Warlords spawn by affordability (a huge,
