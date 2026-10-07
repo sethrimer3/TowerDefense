@@ -86,6 +86,10 @@ select {
 }
 button {
   cursor: pointer;
+  /* A held press repeats (or is just held): never select the label. */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
   color: #bec6d3;
   border: 1px solid #36404f;
   background: linear-gradient(#222b38, #171e29);
