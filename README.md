@@ -1,6 +1,6 @@
 # Tower Defense
 
-A mobile-first city-defense game. You lay out a walled city on a 9 × 13 board, then hold it against waves that keep coming until the keep falls. Between defenses you spend what the battles earned: city elements and upgrades in the Armory, the Smithy's timed upgrades (worked by the mine's smiths), and the skill trees. Canvas draws the board; plain DOM provides the pages. No backend, no game engine, no framework; progress is kept in `localStorage`.
+A mobile-first city-defense game. You lay out a walled city on a 9 × 13 board, then hold it against waves that keep coming until the keep falls. The Mine produces metals for city elements and upgrades; the Library produces Knowledge for research. The mine's smiths work timed upgrades. Canvas draws the board; plain DOM provides the pages. No backend, no game engine, no framework; progress is kept in `localStorage`.
 
 Play it on GitHub Pages: <https://sethrimer3.github.io/TowerDefense/>
 
@@ -43,6 +43,8 @@ npm run preview
 The city is alive between and during battles: park grass sways in the wind (harder in the rain) and parts around anyone walking through it; ponds, trees, roofs and dirt streets are drawn as pixel art, with grass growing unevenly over the street edges and crisp shadows cast from a height map (the city wall's falling across the roofs beside it); trees stand over the units and fade while anyone is under them; ponds reflect their banks, trees and houses and ripple faintly all over when it rains, and in dry weather a few ducks paddle, dabble, preen and shy away from passers-by; lanterns, braziers and hand torches light the streets under cloud and at night (and when the keep falls, crumbling through four damaged stages to rubble, they go out one by one in a wave from it), and outside the walls the flagstones have a bump map, so every fire, blast and ice wave catches their edges.
 
 ## How it's built
+
+Current upgrade costs, per-rank acquisition estimates, production samples and two-year pacing options are in [docs/UPGRADE_TIMING.md](docs/UPGRADE_TIMING.md). The report and [rank-by-rank CSV](docs/upgrade-estimates.csv) are generated from the catalogs by `tools/estimate-upgrades.ts`; `tools/measure-upgrade-production.ts` samples ordinary Mine and Library simulation without player saves. These are planning estimates, with setup and sampling limits documented in the report.
 
 Mine crews favor easier ground, digging uneven tunnels and laying rails with one-pixel ramps. Stone takes three times as long as rock, harder stone around 30% down takes another three times as long, and dense stone around 60% down takes another three times. Miners set temporary lamps at dark working faces and hang lasting ceiling lanterns along established tracks; small 1×2 torches burn out. Light lifetimes and graded cart routes survive saves. `node tests/mine-tunnels.mjs` checks the desktop/mobile art and a simulated mining run without player saves (requires the dev server).
 

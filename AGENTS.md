@@ -26,6 +26,8 @@ node tests/defend-small-boats.mjs # Compact boats, visual water and heading spri
 node tests/defend-small-fortress.mjs # Compact walkers, damage states and body cache dimensions (needs dev server)
 node tests/library-idle.mjs # Library/Mine catch-up, fire pixels and mobile countdowns (needs dev server)
 node tests/library-navigation.mjs # Whole-room Lab/Nave framing, Mine building picker and research/back transitions (needs dev server)
+node --experimental-transform-types --import ./tests/pin-random.ts tools/measure-upgrade-production.ts # Bounded 1x Mine/Library scenarios, no player saves
+node --experimental-transform-types --import ./tests/pin-random.ts tools/estimate-upgrades.ts # Catalog costs, rank CSV and docs/UPGRADE_TIMING.md (uses measured JSON)
 npm run font           # Rebuild the Alembic pixel font from scripts/pixel-font/glyphs.txt
 ```
 
@@ -87,6 +89,7 @@ npm run font           # Rebuild the Alembic pixel font from scripts/pixel-font/
 
 ## Conventions
 
+- Upgrade timing analysis: `tools/measure-upgrade-production.ts` writes `docs/upgrade-production.json` from six preset scenarios (three setups, two seeds), with `ESTIMATE_HOURS` (default 6) and `ESTIMATE_CPU_SECONDS` (default 30 per Mine). `tools/estimate-upgrades.ts` reads those samples and current catalogs, writes `docs/upgrade-estimates.csv` and `docs/UPGRADE_TIMING.md`, and separates exact Smithy work from resource scenarios. Neither tool changes balance or reads player saves; infrastructure setup, replacement costs, offline distributions and shared budgets must remain explicit limitations.
 - Keep this file current. When a change adds, renames, or removes modules, alters architecture, changes commands/scripts or test setup, or changes save rules, update AGENTS.md in the same change, and keep the README's "How it's built" accurate. `CLAUDE.md` only imports this file; don't add content there.
 - `CONTEXT.md` is the domain glossary (terms only, no implementation). Use its words in code, comments and docs, and add a term there when a change names a new domain concept.
 - All text uses a bundled font, no remote fonts: Alembic, the game's own pixel font (`assets/fonts/Alembic/`, regular and bold), while the Use Custom Font setting (`pixelFont`, on by default, the root's `.pixel-font` class) is on, otherwise Cinzel (`assets/fonts/Cinzel/`). CSS sets text in `var(--font)`, never a font by name. Alembic's glyphs are pixel rows in `scripts/pixel-font/glyphs.txt`; `npm run font` rebuilds the files (`scripts/pixel-font/build.ts` traces each glyph's pixels into TrueType outlines; the bold thickens each stroke a pixel), and `tests/pixel-font.test.ts` fails until the committed files match. Draw a glyph there when text needs a character it lacks.
