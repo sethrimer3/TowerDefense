@@ -24,7 +24,7 @@
       "mine": {
         "simulatedHours": 6,
         "requestedHours": 6,
-        "cpuSeconds": 23.600997099999997,
+        "cpuSeconds": 23.4237396,
         "complete": true,
         "paid": {
           "copper": 10,
@@ -298,7 +298,7 @@
         "fires": 6,
         "runesRead": 0,
         "finalShelves": 4,
-        "cpuSeconds": 15.097749799999997
+        "cpuSeconds": 15.305266000000003
       }
     },
     {
@@ -324,7 +324,7 @@
       "mine": {
         "simulatedHours": 6,
         "requestedHours": 6,
-        "cpuSeconds": 22.930605000000003,
+        "cpuSeconds": 22.805777000000003,
         "complete": true,
         "paid": {
           "copper": 14,
@@ -598,7 +598,7 @@
         "fires": 6,
         "runesRead": 0,
         "finalShelves": 4,
-        "cpuSeconds": 15.699250900000006
+        "cpuSeconds": 15.4535602
       }
     },
     {
@@ -624,7 +624,7 @@
       "mine": {
         "simulatedHours": 6,
         "requestedHours": 6,
-        "cpuSeconds": 29.4450028,
+        "cpuSeconds": 29.295690899999986,
         "complete": true,
         "paid": {
           "copper": 28,
@@ -898,7 +898,7 @@
         "fires": 4,
         "runesRead": 0,
         "finalShelves": 40,
-        "cpuSeconds": 15.5340141
+        "cpuSeconds": 15.650189399999988
       }
     },
     {
@@ -924,7 +924,7 @@
       "mine": {
         "simulatedHours": 6,
         "requestedHours": 6,
-        "cpuSeconds": 24.838402900000016,
+        "cpuSeconds": 24.948923999999998,
         "complete": true,
         "paid": {
           "copper": 51,
@@ -1198,7 +1198,7 @@
         "fires": 4,
         "runesRead": 0,
         "finalShelves": 40,
-        "cpuSeconds": 15.298964899999993
+        "cpuSeconds": 15.379493900000002
       }
     },
     {
@@ -1210,7 +1210,7 @@
         "smiths": 6,
         "coffee": 12,
         "waterproof": 4,
-        "shelves": 120,
+        "shelves": 110,
         "professors": 10,
         "shelvers": 4,
         "researchers": 2,
@@ -1224,7 +1224,7 @@
       "mine": {
         "simulatedHours": 6,
         "requestedHours": 6,
-        "cpuSeconds": 25.476876700000023,
+        "cpuSeconds": 25.105487900000007,
         "complete": true,
         "paid": {
           "copper": 26,
@@ -1493,12 +1493,12 @@
         "base": 6599.999999964868,
         "bonuses": 349800,
         "perHour": 59399.99999999414,
-        "nominalPerHour": 1200,
+        "nominalPerHour": 1100,
         "deaths": 0,
         "fires": 0,
         "runesRead": 349800,
         "finalShelves": 110,
-        "cpuSeconds": 16.219585300000006
+        "cpuSeconds": 15.8202359
       }
     },
     {
@@ -1510,7 +1510,7 @@
         "smiths": 6,
         "coffee": 12,
         "waterproof": 4,
-        "shelves": 120,
+        "shelves": 110,
         "professors": 10,
         "shelvers": 4,
         "researchers": 2,
@@ -1524,7 +1524,7 @@
       "mine": {
         "simulatedHours": 6,
         "requestedHours": 6,
-        "cpuSeconds": 25.028882299999996,
+        "cpuSeconds": 25.2197077,
         "complete": true,
         "paid": {
           "copper": 89,
@@ -1793,12 +1793,12 @@
         "base": 6599.999999964868,
         "bonuses": 316800,
         "perHour": 53899.99999999414,
-        "nominalPerHour": 1200,
+        "nominalPerHour": 1100,
         "deaths": 0,
         "fires": 0,
         "runesRead": 316800,
         "finalShelves": 110,
-        "cpuSeconds": 15.980080499999982
+        "cpuSeconds": 15.421898199999996
       }
     }
   ]
