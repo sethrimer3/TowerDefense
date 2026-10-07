@@ -7,7 +7,7 @@
  * firefighting and repairs happen as those steps run. */
 import { play } from "../sound.ts";
 import type { Scene } from "../ambience.ts";
-import { countdown, HOUR_MS, IDLE_SPEED, MAX_AWAY_MS } from "../away.ts";
+import { countdown, HOUR_MS, IDLE_LEAD, IDLE_SPEED, MAX_AWAY_MS } from "../away.ts";
 import { H, LAB_FLOOR, LAB_MAX_LEVEL, MAX_LIBRARIANS, labPrice, MAX_SHELVES, LibrarySim, ROLES, RETURN_BOOKS, librarianPrice, shelfPrice, type Librarian, type LibrarySave, type Role } from "./sim.ts";
 
 import { LibraryRenderer, daylight } from "./render.ts";
@@ -33,8 +33,8 @@ export interface LibraryHost {
   clock(): number;
   /** The library earned Knowledge (fractions included). */
   earnKnowledge(n: number): void;
-  /** Fireproof Wood's, Fire Training's and Night watch's ranks. */
-  upgrades(): { fireproof: number; fireTraining: number; nightWatch: number };
+  /** Fireproof Wood's, Fire Training's, Night watch's and Enchanted ink's ranks. */
+  upgrades(): { fireproof: number; fireTraining: number; nightWatch: number; enchant: number };
   /** Whether the Library tab shows. */
   showing(): boolean;
 }
@@ -88,7 +88,7 @@ export class LibraryPage {
 
   /** Spend queued time in ordinary simulation steps, within a frame budget.
    * Knowledge is paid for those steps only, at the rate they actually had. */
-  advance(now: number) {
+  advance(now: number, keepWith = 0) {
     const gap = Math.max(0, now - this.ranTo);
     this.ranTo = now;
     this.owed = Math.min(MAX_AWAY_MS, this.owed + gap);
@@ -96,10 +96,13 @@ export class LibraryPage {
     this.sim.fireproof = up.fireproof;
     this.sim.fireTraining = up.fireTraining;
     this.sim.nightWatch = up.nightWatch;
+    this.sim.enchant = up.enchant;
     const start = performance.now();
     const limit = Math.max(100, Math.min(1000, gap) * IDLE_SPEED);
     let spent = 0, earned = 0, n = 0;
-    while (this.owed >= 100 - 1e-6 && spent + 100 <= limit + 1e-6) {
+    // Keep pace with the mine's idle time (`keepWith`), never more than
+    // IDLE_LEAD ahead of it, so both spend it together.
+    while (this.owed >= 100 - 1e-6 && spent + 100 <= limit + 1e-6 && this.owed - 100 >= keepWith - IDLE_LEAD) {
       this.sim.night = 1 - daylight(this.host.clock() - this.owed);
       const rate = this.sim.rate;
       this.sim.step(0.1);
@@ -112,6 +115,13 @@ export class LibraryPage {
         this.away.knowledge += pay;
       }
       if (++n % 8 === 0 && performance.now() - start > 6) break;
+    }
+    // Enchanted books read pay their gift on top.
+    const gift = this.sim.takeBonus();
+    earned += gift;
+    if (gift > 0 && this.away?.catchingUp) {
+      this.awayKnowledge += gift;
+      this.away.knowledge += gift;
     }
     if (earned > 0) this.host.earnKnowledge(earned);
     if (this.away?.catchingUp) {

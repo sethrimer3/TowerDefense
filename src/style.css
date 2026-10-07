@@ -1747,3 +1747,20 @@ nav button { position: relative; }
   .path-detail { flex-wrap: wrap; }
   .path-act { width: 100%; flex-direction: row; justify-content: center; }
 }
+
+/* The golden countdown on the Mine's and the Library's tab buttons while
+ * they spend idle time. */
+nav button { position: relative; }
+nav button > .tab-idle {
+  position: absolute;
+  top: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 9px;
+  line-height: 1;
+  color: #ffd76a;
+  text-shadow: 0 0 4px rgba(255, 190, 70, 0.7), 0 1px 0 #000;
+  white-space: nowrap;
+  pointer-events: none;
+}
+nav button > .tab-idle[hidden] { display: none; }

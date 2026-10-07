@@ -119,6 +119,8 @@ const ORB = { x: 236, y: F - 17 };
 const ANNEX_LANTERNS = { west: { x: -25, y: ANNEX_TOP + 22 }, east: { x: 217, y: ANNEX_TOP + 22 } };
 
 export class LabRenderer {
+  /** Wall-clock seconds, for the flames' flicker (set by the nave's renderer). */
+  flame = 0;
   private off: HTMLCanvasElement;
   private offCtx: CanvasRenderingContext2D;
   private image: ImageData;
@@ -570,29 +572,29 @@ export class LabRenderer {
   private lights(sim: LibrarySim, time: number) {
     const lab = sim.lab, brew = hex(ELIXIRS[lab.brew]), level = lab.level;
     const out: { x: number; y: number; r: number; k: number; c: RGB }[] = [
-      { x: (ATHANOR.mouth.x0 + ATHANOR.mouth.x1) / 2, y: F - 5, r: 64, k: (0.5 + lab.furnace * 1.1) * flicker(time * 1.3, 1), c: [1, 0.55, 0.25] },
+      { x: (ATHANOR.mouth.x0 + ATHANOR.mouth.x1) / 2, y: F - 5, r: 64, k: (0.5 + lab.furnace * 1.1) * flicker(this.flame * 1.3, 1), c: [1, 0.55, 0.25] },
       { x: ATHANOR.egg.x, y: ATHANOR.egg.y, r: 18, k: 0.3 + lab.furnace * 0.4, c: [1, 0.7, 0.3] },
-      { x: BRAZIER.x, y: BRAZIER.y - 1, r: 28, k: 0.6 * flicker(time * 1.7, 2), c: [1, 0.5, 0.2] },
-      { x: (CAULDRON.x0 + CAULDRON.x1) / 2, y: F - 2, r: 38, k: 0.8 * flicker(time * 1.5, 3), c: [1, 0.55, 0.25] },
+      { x: BRAZIER.x, y: BRAZIER.y - 1, r: 28, k: 0.6 * flicker(this.flame * 1.7, 2), c: [1, 0.5, 0.2] },
+      { x: (CAULDRON.x0 + CAULDRON.x1) / 2, y: F - 2, r: 38, k: 0.8 * flicker(this.flame * 1.5, 3), c: [1, 0.55, 0.25] },
       { x: (CAULDRON.x0 + CAULDRON.x1) / 2, y: CAULDRON.top - 1, r: 30, k: 0.55, c: [brew[0] / 255, brew[1] / 255, brew[2] / 255] },
-      { x: CANDLE.x, y: CANDLE.y - 1, r: 34, k: 0.65 * flicker(time * 1.9, 4), c: [1, 0.78, 0.48] },
-      ...SCONCES.map((s, n) => ({ x: s.x, y: s.y - 2, r: 52, k: 0.75 * flicker(time * 1.6, 5 + n), c: [1, 0.7, 0.4] as RGB })),
-      ...LANTERNS.map((s, n) => ({ x: s.x, y: s.y + 2, r: 70, k: 0.9 * flicker(time * 1.4, 8 + n), c: [1, 0.72, 0.42] as RGB })),
-      ...FLOOR_CANDLES.filter((_, n) => n % 2 === 0).map((c, n) => ({ x: c.x + 1, y: c.y - 2, r: 22, k: 0.45 * flicker(time * 2.1, 12 + n), c: [1, 0.74, 0.44] as RGB })),
+      { x: CANDLE.x, y: CANDLE.y - 1, r: 34, k: 0.65 * flicker(this.flame * 1.9, 4), c: [1, 0.78, 0.48] },
+      ...SCONCES.map((s, n) => ({ x: s.x, y: s.y - 2, r: 52, k: 0.75 * flicker(this.flame * 1.6, 5 + n), c: [1, 0.7, 0.4] as RGB })),
+      ...LANTERNS.map((s, n) => ({ x: s.x, y: s.y + 2, r: 70, k: 0.9 * flicker(this.flame * 1.4, 8 + n), c: [1, 0.72, 0.42] as RGB })),
+      ...FLOOR_CANDLES.filter((_, n) => n % 2 === 0).map((c, n) => ({ x: c.x + 1, y: c.y - 2, r: 22, k: 0.45 * flicker(this.flame * 2.1, 12 + n), c: [1, 0.74, 0.44] as RGB })),
       ...RUNES.map((r, n) => ({ x: r.x + 1, y: r.y + 1, r: 14, k: 0.25 * this.runeGlow(time, n), c: [0.7, 0.45, 1] as RGB })),
       { x: STONE.x, y: STONE.y, r: 34, k: 0.2 + lab.stone * 0.9, c: [1, 0.2, 0.25] },
       { x: (JAR.x0 + JAR.x1) / 2, y: F - 12, r: 24, k: 0.35 + 0.08 * Math.sin(time * 1.3), c: [0.4, 1, 0.6] },
     ];
     if (lab.glow > 0.02) out.push({ x: CIRCLE.x, y: CIRCLE.y, r: 60, k: lab.glow * 1.3, c: [0.7, 0.45, 1] });
     if (open("west", level)) {
-      out.push({ x: ANNEX_LANTERNS.west.x, y: ANNEX_LANTERNS.west.y + 2, r: 56, k: 0.8 * flicker(time * 1.4, 20), c: [1, 0.72, 0.42] });
+      out.push({ x: ANNEX_LANTERNS.west.x, y: ANNEX_LANTERNS.west.y + 2, r: 56, k: 0.8 * flicker(this.flame * 1.4, 20), c: [1, 0.72, 0.42] });
       out.push({ x: LECTERN.x, y: LECTERN.top - 5, r: 22, k: 0.4 + 0.1 * Math.sin(time * 1.7), c: [0.75, 0.6, 1] });
-      if (level >= 4) out.push({ x: (CAGE.x0 + CAGE.x1) / 2, y: F - 6, r: 30, k: 0.6 * flicker(time * 2.4, 21) + (sim.time - lab.breath < 2 ? 1.2 : 0), c: [1, 0.45, 0.15] });
+      if (level >= 4) out.push({ x: (CAGE.x0 + CAGE.x1) / 2, y: F - 6, r: 30, k: 0.6 * flicker(this.flame * 2.4, 21) + (sim.time - lab.breath < 2 ? 1.2 : 0), c: [1, 0.45, 0.15] });
     }
     if (open("east", level)) {
       const hot = Math.max(0, 1 - (sim.time - lab.cast) / 8);
-      out.push({ x: ANNEX_LANTERNS.east.x, y: ANNEX_LANTERNS.east.y + 2, r: 56, k: 0.8 * flicker(time * 1.4, 22), c: [1, 0.72, 0.42] });
-      out.push({ x: FURNACE.x0 + 6, y: F - 4, r: 40, k: 0.9 * flicker(time * 1.8, 23), c: [1, 0.5, 0.18] });
+      out.push({ x: ANNEX_LANTERNS.east.x, y: ANNEX_LANTERNS.east.y + 2, r: 56, k: 0.8 * flicker(this.flame * 1.4, 22), c: [1, 0.72, 0.42] });
+      out.push({ x: FURNACE.x0 + 6, y: F - 4, r: 40, k: 0.9 * flicker(this.flame * 1.8, 23), c: [1, 0.5, 0.18] });
       out.push({ x: FURNACE.x0 + 6, y: FURNACE.top - 4, r: 26, k: 0.5 + hot * 0.6, c: [1, 0.62, 0.2] });
       out.push({ x: ORRERY.x, y: ORRERY.y, r: 18, k: 0.3, c: [1, 0.85, 0.5] });
       if (level >= 5) out.push({ x: ORB.x, y: ORB.y, r: 46, k: 0.35 + lab.orb * 0.9, c: [0.45, 0.75, 1] });
@@ -710,7 +712,7 @@ export class LabRenderer {
       ctx.globalAlpha = 1;
     }
     // Candles.
-    for (const c of [CANDLE, ...SCONCES.map((s) => ({ x: s.x, y: s.y - 1 })), ...LANTERNS.map((l) => ({ x: l.x, y: l.y + 4 }))]) dot(c.x, c.y - 1 - (flicker(time * 2, c.x) > 1 ? 1 : 0), flicker(time * 2, c.x) > 0.95 ? "#ffe9a0" : "#ffb24a", 1, 1 + (flicker(time * 2, c.x) > 1 ? 1 : 0));
+    for (const c of [CANDLE, ...SCONCES.map((s) => ({ x: s.x, y: s.y - 1 })), ...LANTERNS.map((l) => ({ x: l.x, y: l.y + 4 }))]) dot(c.x, c.y - 1 - (flicker(this.flame * 2, c.x) > 1 ? 1 : 0), flicker(this.flame * 2, c.x) > 0.95 ? "#ffe9a0" : "#ffb24a", 1, 1 + (flicker(this.flame * 2, c.x) > 1 ? 1 : 0));
     // The philosopher's stone, glowing as it has been fed.
     const pulse = 0.6 + 0.4 * Math.sin(time * 2.1);
     dot(STONE.x - 1, STONE.y, "#5a0a14", 3, 2);
@@ -758,7 +760,7 @@ export class LabRenderer {
     });
     ctx.globalAlpha = 1;
     // The floor candles.
-    FLOOR_CANDLES.forEach((c, n) => dot(c.x, c.y - 1, flicker(time * 2.1, 12 + n) > 0.95 ? "#ffe9a0" : "#ffb24a"));
+    FLOOR_CANDLES.forEach((c, n) => dot(c.x, c.y - 1, flicker(this.flame * 2.1, 12 + n) > 0.95 ? "#ffe9a0" : "#ffb24a"));
     // Soot and spilt brew by the cauldron after a mishap, till it's swept.
     if (lab.mess > 0.05) {
       ctx.globalAlpha = Math.min(1, lab.mess) * 0.8;
@@ -842,7 +844,7 @@ export class LabRenderer {
       dot(l.x - 2, l.y + 1, "#323034", 1, 4);
       dot(l.x + 2, l.y + 1, "#323034", 1, 4);
       dot(l.x - 1, l.y + 1, "#e8c070", 3, 4);
-      dot(l.x, l.y + 3 - (flicker(time * 2, l.x) > 1 ? 1 : 0), "#fff0b0");
+      dot(l.x, l.y + 3 - (flicker(this.flame * 2, l.x) > 1 ? 1 : 0), "#fff0b0");
     }
     if (open("west", level)) {
       // The mandrakes' leaves, swaying; a gap where one has been pulled.
@@ -889,7 +891,7 @@ export class LabRenderer {
         dot(dir > 0 ? sx + 4 : sx - 1, F - 8, "#ffe060");
         dot(sx + (Math.floor(time * 4) % 2), F - 6, "#a83010", 1, 1);
         dot(sx + 2 + (Math.floor(time * 4 + 1) % 2), F - 6, "#a83010", 1, 1);
-        const tail = dir > 0 ? sx - 1 : sx + 4, fl = flicker(time * 3, 31);
+        const tail = dir > 0 ? sx - 1 : sx + 4, fl = flicker(this.flame * 3, 31);
         dot(tail, F - 8 - (fl > 1 ? 1 : 0), "#ffb040", 1, 1 + (fl > 1 ? 1 : 0));
         const age2 = sim.time - lab.breath;
         if (age2 >= 0 && age2 < 1.6) {
@@ -1051,30 +1053,30 @@ export class LabRenderer {
     };
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
-    glow((ATHANOR.mouth.x0 + ATHANOR.mouth.x1) / 2, F - 3, 12, "#ff8a30", (0.35 + lab.furnace * 0.45) * flicker(time * 1.3, 1));
+    glow((ATHANOR.mouth.x0 + ATHANOR.mouth.x1) / 2, F - 3, 12, "#ff8a30", (0.35 + lab.furnace * 0.45) * flicker(this.flame * 1.3, 1));
     glow(ATHANOR.egg.x, ATHANOR.egg.y, 6, "#ffc060", 0.3 + lab.furnace * 0.4);
-    glow(BRAZIER.x, BRAZIER.y - 1, 7, "#ff8030", 0.45 * flicker(time * 1.7, 2));
+    glow(BRAZIER.x, BRAZIER.y - 1, 7, "#ff8030", 0.45 * flicker(this.flame * 1.7, 2));
     glow(BRAZIER.x, BRAZIER.y - 5, 6, "#70d0f0", 0.25);
-    glow((CAULDRON.x0 + CAULDRON.x1) / 2, F - 3, 9, "#ff8030", 0.45 * flicker(time * 1.5, 3));
+    glow((CAULDRON.x0 + CAULDRON.x1) / 2, F - 3, 9, "#ff8030", 0.45 * flicker(this.flame * 1.5, 3));
     glow((CAULDRON.x0 + CAULDRON.x1) / 2, CAULDRON.top, 10, ELIXIRS[lab.brew], 0.45 + 0.1 * Math.sin(time * 2));
-    glow(CANDLE.x, CANDLE.y - 1, 6, "#ffc070", 0.4 * flicker(time * 1.9, 4));
-    for (const [n, s] of SCONCES.entries()) glow(s.x, s.y - 2, 9, "#ffb060", 0.45 * flicker(time * 1.6, 5 + n));
-    for (const [n, l] of LANTERNS.entries()) glow(l.x, l.y + 3, 11, "#ffc070", 0.5 * flicker(time * 1.4, 8 + n));
-    for (const [n, c] of FLOOR_CANDLES.entries()) glow(c.x, c.y - 1, 5, "#ffc070", 0.35 * flicker(time * 2.1, 12 + n));
+    glow(CANDLE.x, CANDLE.y - 1, 6, "#ffc070", 0.4 * flicker(this.flame * 1.9, 4));
+    for (const [n, s] of SCONCES.entries()) glow(s.x, s.y - 2, 9, "#ffb060", 0.45 * flicker(this.flame * 1.6, 5 + n));
+    for (const [n, l] of LANTERNS.entries()) glow(l.x, l.y + 3, 11, "#ffc070", 0.5 * flicker(this.flame * 1.4, 8 + n));
+    for (const [n, c] of FLOOR_CANDLES.entries()) glow(c.x, c.y - 1, 5, "#ffc070", 0.35 * flicker(this.flame * 2.1, 12 + n));
     RUNES.forEach((r, n) => glow(r.x + 1, r.y + 1, 6, "#b080ff", 0.4 * this.runeGlow(time, n)));
     glow(STONE.x, STONE.y, 8 + lab.stone * 6, "#ff3040", 0.3 + lab.stone * 0.5 * (0.6 + 0.4 * Math.sin(time * 2.1)));
     glow((JAR.x0 + JAR.x1) / 2, F - 12, 10, "#60ffa0", 0.3 + 0.08 * Math.sin(time * 1.3));
     glow(RECEIVER.x0 + 2, RECEIVER.bottom - 1, 4, "#70c8f0", lab.still * 0.4);
     if (lab.glow > 0.02) glow(CIRCLE.x, CIRCLE.y, CIRCLE.r + 10, "#b080ff", lab.glow * 0.6);
     if (open("west", level)) {
-      glow(ANNEX_LANTERNS.west.x, ANNEX_LANTERNS.west.y + 3, 11, "#ffc070", 0.5 * flicker(time * 1.4, 20));
+      glow(ANNEX_LANTERNS.west.x, ANNEX_LANTERNS.west.y + 3, 11, "#ffc070", 0.5 * flicker(this.flame * 1.4, 20));
       glow(LECTERN.x, LECTERN.top - 6, 8, "#c8a8ff", 0.35 + 0.15 * Math.sin(time * 1.7));
-      if (level >= 4) glow((CAGE.x0 + CAGE.x1) / 2, F - 6, sim.time - lab.breath < 1.6 ? 18 : 8, "#ff7a2a", (sim.time - lab.breath < 1.6 ? 0.8 : 0.4) * flicker(time * 2.4, 21));
+      if (level >= 4) glow((CAGE.x0 + CAGE.x1) / 2, F - 6, sim.time - lab.breath < 1.6 ? 18 : 8, "#ff7a2a", (sim.time - lab.breath < 1.6 ? 0.8 : 0.4) * flicker(this.flame * 2.4, 21));
     }
     if (open("east", level)) {
       const hot = Math.max(0, 1 - (sim.time - lab.cast) / 8);
-      glow(ANNEX_LANTERNS.east.x, ANNEX_LANTERNS.east.y + 3, 11, "#ffc070", 0.5 * flicker(time * 1.4, 22));
-      glow(FURNACE.x0 + 6, F - 3, 9, "#ff8030", 0.5 * flicker(time * 1.8, 23));
+      glow(ANNEX_LANTERNS.east.x, ANNEX_LANTERNS.east.y + 3, 11, "#ffc070", 0.5 * flicker(this.flame * 1.4, 22));
+      glow(FURNACE.x0 + 6, F - 3, 9, "#ff8030", 0.5 * flicker(this.flame * 1.8, 23));
       glow(FURNACE.x0 + 6, FURNACE.top - 3, 7, "#ffb040", 0.35 + hot * 0.4);
       if (hot > 0) glow(FURNACE.x1 + 2, F - Math.min(6, lab.casts), 6, "#ff9040", hot * 0.6);
       glow(ORRERY.x, ORRERY.y, 5, "#ffd860", 0.4);
