@@ -201,7 +201,7 @@ A flame's flickering, swaying, occlusion-aware glow: lanterns, braziers, tower f
 The idle side view of the ground under the city, worked by miners whatever tab is open and while the game is closed. Its world comes from a seed.
 
 **Prospect**:
-One world the mine works, with only so much ore in it. Once the shaft is at the bottom and the work there is done it is **worked out**, and the player moves the crew, the buildings and the stock to a **new prospect**: fresh ground from a new seed.
+One world the mine works, with only so much ore in it. Once less than a fifth of its ore is left (or the shaft is at the bottom and the work there is done, **worked out**) the player can move the crew, the buildings and the stock to a **new prospect**: fresh ground from a new seed.
 
 **Miner**:
 A worker the player hires with Gold and puts to one of three **trades**: the face (digging, shoring, laying track, hanging torches and lamps, building carts, carrying ore up), the forge, or the smithy. A miner at the face wears a yellow hat, a forge hand a grey welder's mask, a smith a brown leather apron. Each miner has a name for life.

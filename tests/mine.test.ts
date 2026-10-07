@@ -619,6 +619,18 @@ test("a prospect is worked out once the shaft is at the bottom and its work is d
   assert.equal(loaded.workedOut, true);
 });
 
+test("the crew may move on once less than a fifth of a prospect's ore is left", () => {
+  const sim = new MineSim(77);
+  assert.equal(sim.canMoveOn, false);
+  sim.oreLeft = Math.ceil(sim.oreFound * 0.2);
+  assert.equal(sim.canMoveOn, false, "a fifth left");
+  sim.oreLeft = Math.floor(sim.oreFound * 0.2) - 1;
+  assert.equal(sim.canMoveOn, true, "under a fifth left");
+  const fresh = new MineSim(78);
+  fresh.workedOut = true;
+  assert.equal(fresh.canMoveOn, true, "worked out");
+});
+
 test("a mine from before the world was widened moves its crew to a fresh prospect of the same seed", () => {
   const sim = new MineSim(31);
   for (let i = 0; i < 2; i++) sim.hire();

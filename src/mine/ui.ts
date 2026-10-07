@@ -1,7 +1,7 @@
 /** The Mine tab: the mine's view, the crew's tally, hiring miners, the
  * crew's list (each miner by name, dragged between the three trades: the
  * face, the forge, the smithy; tapped to follow), and moving on to a new
- * prospect when this one is worked out. A building tapped shows its stats
+ * prospect once less than a fifth of this one's ore is left. A building tapped shows its stats
  * and the button that raises it a level. The mine itself runs whatever tab
  * shows (`advance`, from the app's frame loop), and works on while the game
  * is closed: time away is banked (up to 24 hours), then spent tick by tick
@@ -9,7 +9,7 @@
 import { play } from "../sound.ts";
 import { QUIET, thunder, type Scene } from "../ambience.ts";
 import { countdown, IDLE_LEAD, IDLE_SPEED, MAX_AWAY_MS } from "../away.ts";
-import { BARS_PER_POINT, CREW_PER_LEVEL, METALS, metalSum, type Metals, DAY_TICKS, FORGE_PER_LEVEL, JOBS, KIT, MAX_MINERS, MineSim, SEAL_LEVEL, SMITHS_PER_LEVEL, STOCK_PER_LEVEL, STOCK_RATE, TICK_HZ, type Cause, type Job, type Miner, type MineNews, type MineSave, type Weather } from "./sim.ts";
+import { BARS_PER_POINT, CREW_PER_LEVEL, METALS, metalSum, type Metals, DAY_TICKS, FORGE_PER_LEVEL, JOBS, KIT, MAX_MINERS, MineSim, MOVE_ON_SHARE, SEAL_LEVEL, SMITHS_PER_LEVEL, STOCK_PER_LEVEL, STOCK_RATE, TICK_HZ, type Cause, type Job, type Miner, type MineNews, type MineSave, type Weather } from "./sim.ts";
 import { MAX_LEVEL, type BuildingId } from "./buildings.ts";
 import { MineRenderer } from "./render.ts";
 
@@ -462,14 +462,17 @@ export class MinePage {
     this.refresh();
   }
 
-  /** Asks before leaving a prospect with ore still to work (a worked-out
-   * one is left at once). */
+  /** Once the prospect is nearly worked (under `MOVE_ON_SHARE` of its ore
+   * left), says so and lets the crew move on to better ground. */
   private askProspect() {
-    if (this.sim.workedOut) return this.newProspect();
+    if (!this.sim.canMoveOn) return;
     const left = Math.min(100, Math.round((100 * this.sim.oreLeft) / Math.max(1, this.sim.oreFound)));
+    const why = this.sim.workedOut
+      ? `The work here is done, with about ${left}% of the ore still in the ground out of reach.`
+      : `Less than ${Math.round(MOVE_ON_SHARE * 100)}% of this prospect's ore is left in the ground (about ${left}%).`;
     const modal = this.host.modal;
-    modal.innerHTML = `<small>MINE</small><h2>Leave this prospect?</h2><p>About ${left}% of its ore is still in the ground. The crew, the buildings and the stock at the forge and smithy go with you to fresh ground, and the workings here are left behind.</p>
-      <div class="dialog-actions"><button id="prospect-stay">Stay</button><button id="prospect-go" class="danger">Move on</button></div>`;
+    modal.innerHTML = `<small>MINE</small><h2>Seek a new prospect?</h2><p>${why} The crew can move on to fresh ground with better prospects, taking the buildings and the stock at the forge and smithy with them; the workings here are left behind.</p>
+      <div class="dialog-actions"><button id="prospect-stay">Stay</button><button id="prospect-go">Move on</button></div>`;
     modal.showModal();
     modal.querySelector<HTMLButtonElement>("#prospect-stay")!.onclick = () => modal.close();
     modal.querySelector<HTMLButtonElement>("#prospect-go")!.onclick = () => {
@@ -523,7 +526,7 @@ export class MinePage {
     this.refreshCrew();
     this.refreshInfo();
     const left = Math.min(100, Math.round((100 * sim.oreLeft) / Math.max(1, sim.oreFound)));
-    const tally = `${crew}|${sim.crewCap}|${price}|${afford}|${sim.depth}|${ore}|${bars}|${Math.ceil(this.owed / TICK_HZ)}|${hour}|${sky.weather}|${lost}|${news}|${left}|${sim.workedOut}|${sim.prospect}`;
+    const tally = `${crew}|${sim.crewCap}|${price}|${afford}|${sim.depth}|${ore}|${bars}|${Math.ceil(this.owed / TICK_HZ)}|${hour}|${sky.weather}|${lost}|${news}|${left}|${sim.workedOut}|${sim.canMoveOn}|${sim.prospect}`;
     if (tally === this.shownTally) return;
     this.shownTally = tally;
     const hire = this.root.querySelector<HTMLButtonElement>("#mine-hire")!;
@@ -535,8 +538,12 @@ export class MinePage {
       (news || lost ? `<br><span class="mine-news">${lost ? `${lost} lost${news ? " · " : ""}` : ""}${news ?? ""}</span>` : "");
     this.root.querySelector("#mine-prospect")!.innerHTML = sim.workedOut
       ? `Prospect ${sim.prospect} is <b>worked out</b>: time to move on`
-      : `Prospect ${sim.prospect} · <b>${left}%</b> of its ore left`;
-    this.root.querySelector("#mine-prospect-new")!.classList.toggle("ready", sim.workedOut);
+      : sim.canMoveOn
+        ? `Prospect ${sim.prospect} · only <b>${left}%</b> of its ore left`
+        : `Prospect ${sim.prospect} · <b>${left}%</b> of its ore left`;
+    const move = this.root.querySelector<HTMLButtonElement>("#mine-prospect-new")!;
+    move.hidden = !sim.canMoveOn;
+    move.classList.toggle("ready", sim.canMoveOn);
     const away = this.root.querySelector<HTMLElement>("#mine-away")!;
     away.hidden = this.owed < TICK_HZ * 5;
     away.textContent = `Fast-forwarding · ${countdown(this.owedMs)} idle time remaining`;
