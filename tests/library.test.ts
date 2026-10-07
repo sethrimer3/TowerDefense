@@ -267,6 +267,23 @@ test("a fire burns the shelves, kills those caught in it, and the survivors flee
   assert.ok(!sim.fire.ash.some((v) => v > 0) && !sim.fire.smoke.some((v) => v > 0), "no ash or smoke outlasts the fire");
 });
 
+test("after a fire, rebuilding starts at once rather than waiting on every charred book carried out", () => {
+  const sim = new LibrarySim(7);
+  for (let i = 0; i < 16; i++) sim.hire(i < 13 ? "shelver" : "professor");
+  for (let i = 0; i < 110; i++) sim.buildShelf();
+  // Built up, until the first fire (this seed's burns most of the stacks).
+  for (let t = 0; t < 72000 && !sim.fire.active; t++) sim.step(0.1);
+  for (let t = 0; t < 6000 && sim.fire.active; t++) sim.step(0.1);
+  assert.ok(!sim.fire.active);
+  sim.fireproof = Infinity;
+  const built = sim.built, charred = () => sim.burntSlots.reduce((n, c) => n + (c ? 1 : 0), 0) + sim.burntLoose.length;
+  assert.ok(charred() > 50, `plenty of charred books to carry out (${charred()})`);
+  run(sim, 300);
+  assert.ok(sim.built > built, `shelves rebuilt while the charred books go out (${built} -> ${sim.built})`);
+  run(sim, 7200);
+  assert.equal(charred(), 0, "and every charred book is carried out in the end");
+});
+
 test("Fire Training puts fires out sooner, saving more", () => {
   const burn = (rank: number) => {
     const sim = new LibrarySim(5);

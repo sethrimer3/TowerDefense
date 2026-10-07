@@ -926,7 +926,10 @@ export class LibrarySim {
         return;
       }
     }
-    const job = (shelving ? (this.burntJob(l) ?? this.buildJob(l) ?? this.cartJob(l) ?? this.unloadCart(l)) : null) ?? (l.role === "professor" ? this.readJob(l) : null);
+    // Building comes first, then fetching planks and books, then carrying
+    // charred books out: after a big fire there can be hundreds, one a trip,
+    // and the shelves mustn't wait on them all.
+    const job = (shelving ? (this.buildJob(l) ?? this.cartJob(l) ?? this.burntJob(l) ?? this.unloadCart(l)) : null) ?? (l.role === "professor" ? this.readJob(l) : null);
     if (job) {
       l.steps = job;
       return;
