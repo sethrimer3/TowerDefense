@@ -46,6 +46,7 @@ export function renderSettingsPage(ctx: AppContext) {
     DEV.map((key) => control(key, ctx)).join("") +
     `<div class="setting setting-research"><span>All research unlocked</span><span class="research-checks">${RESEARCH.map((key) => `<label>${SETTINGS[key].page.label}${checkbox(key, ctx)}</label>`).join("")}</span></div>` +
     `<button class="wide" id="dev-idle">Add 1 hour of idle time</button>` +
+    `<button class="wide" id="dev-idle-day">Add 24 hours of idle time</button>` +
     `<button class="wide" id="dev-waves">Unlock ${UNLOCK_WAVES} more waves</button>` +
     `<p class="hint" id="dev-waves-reach">Defenses can start on any wave up to ${waveReach(ctx.save().defend)}; choose it with the Wave button on the Defend tab.</p>` +
     `<p class="hint">Progress saves after each action. A defense in progress is never saved: reloading ends it.</p><button class="wide danger" id="erase">Erase all progress</button>`;
@@ -74,6 +75,7 @@ export function renderSettingsPage(ctx: AppContext) {
     ctx.devChanged();
   };
   el("dev-idle").onclick = () => ctx.addIdle(HOUR_MS);
+  el("dev-idle-day").onclick = () => ctx.addIdle(24 * HOUR_MS);
   el("dev-waves").onclick = () => {
     const defend = ctx.save().defend;
     unlockWaves(defend);
