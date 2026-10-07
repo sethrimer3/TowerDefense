@@ -6,7 +6,7 @@
  * shows (`advance`, from the app's frame loop), and works on while the game
  * is closed: time away is banked (up to 24 hours), then spent tick by tick
  * a slice each frame. Only simulated work pays Smithy points. */
-import { canAffordMetals, metalPriceText, type MetalHost, type MetalPrice } from "../metals.ts";
+import { canAffordMetals, metalPriceText, type MetalHost } from "../metals.ts";
 import { play } from "../sound.ts";
 import { QUIET, thunder, type Scene } from "../ambience.ts";
 import { countdown, IDLE_LEAD, IDLE_SPEED, idleDrain, MAX_AWAY_MS } from "../away.ts";

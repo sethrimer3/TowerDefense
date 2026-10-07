@@ -5,7 +5,7 @@ export function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
 
-export type UiSprite = "defend" | "mine" | "library" | "upgrades" | "settings" | "health" | "attack" | "defense" | "undo" | "log" | "gold" | "knowledge" | "stage-select" | "upgrade-point";
+export type UiSprite = "defend" | "mine" | "library" | "upgrades" | "settings" | "health" | "attack" | "defense" | "undo" | "log" | "knowledge" | "stage-select" | "upgrade-point";
 const UI_ASSET_BASE = (import.meta as ImportMeta & { env?: { BASE_URL?: string } }).env?.BASE_URL ?? "/";
 export const uiSprite = (name: UiSprite, className = "ui-sprite") =>
   `<img class="${className}" src="${UI_ASSET_BASE}assets/ui/${name}.png" alt="" aria-hidden="true">`;

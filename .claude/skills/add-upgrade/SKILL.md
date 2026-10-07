@@ -18,7 +18,7 @@ Don't start editing code before the user has approved the spec.
 - Smithy (Training in code): `TRAINING`, `TRAINING_GROUPS` in `src/progression.ts`; durations in `src/training-jobs.ts`.
 - Skill trees: `SKILLS`, `TREES`, `skillCost` in `src/skill-trees.ts`.
 - What the battle can be changed by: `Bonuses` in `src/defend/catalog.ts`, read in `sim.ts`, `troops.ts`, `towers.ts`, `civilians.ts`.
-- Income: `KILL_GOLD`, `waveGold`, `waveReward` in `src/progression.ts`.
+- Income: the Mine earns Copper/Silver/Gold (`save.smithy`), the Library earns Knowledge, and DEFEND awards only one upgrade point per new highest wave (`payWave` in `src/progression.ts`).
 
 `references/panels.md` has, for each panel, the fields a row takes, how its price works, how its effect reaches the game, and the files and tests a new row touches.
 

@@ -68,16 +68,16 @@ The multipliers the Smithy and the skill trees lay over a defense (troops, tower
 The levels for every building of a type, and the city elements and battle speed, now sold in the Smithy below the Mine for the mine's metal; `UPGRADES` in code.
 
 **Gold**:
-Battle Gold, the coin: paid by kills and every wave held; spent on the mine's and the library's buildings and hires, and on bombs. Not the mine's gold bars.
+The Mine's rarest spendable metal, displayed with an ingot and named Gold. Every ten gold bars worked by smiths make one unit; spent on advanced purchases and Smithy upgrades. There is no separate battle coin currency.
 
 **Copper** and **silver**:
-The mine's metal, as Smithy points: every ten bars the smiths work make a point. Spent in the Smithy and the Tiles shop. (They were once battle coins, and before that iron and steel bars.)
+The mine's metal, as Smithy points: every ten bars the smiths work make a point. Spent on Smithy upgrades, tiles, bombs, Mine hires and buildings, and Library shelves, staff and lab expansions. (They were once battle coins, and before that iron and steel bars.)
 
 **Time away** (welcome back):
 The time since the game was last saved, up to a day, banked for each of the Mine and Library. On returning, both automatically fast-forward their work, earning gains as they go. Remaining idle time survives closing the game, and the welcome-back screen shows the running gains.
 
 **Knowledge**:
-Earned by the Library, an hour's worth being its built bookshelves times its professors (idle too), and paid for each wave held past the best wave; spent on the skill trees. Once called Valor.
+Earned by the Library, an hour's worth being its built bookshelves times its professors (idle too); spent on the skill trees. Once called Valor.
 
 **Freak accident** (Library):
 A table's candle catching it alight: a small chance each minute, lowered by Fireproof Wood. The fire burns whatever it reaches until it burns out or the librarians put it out (Fire Training).
@@ -122,7 +122,7 @@ One way a building can grow, in ranks learned in order with Knowledge: the Wizar
 A path's crown, turning its building into a greater one (Stormcalling's Wizard tower into the Dark wizard keep, Crusaders' Barracks into the Valkyrie palace), learned with Knowledge after the path's last rank. Every copy owned, placed or not, becomes the greater building, back in the palette to place again, and copies bought while crowned are greater ones too; unlearning the path turns them back. The greater buildings are no longer sold on their own.
 
 **Smithy rows** (in the Smithy; Training in code):
-Ranks of a few percent each on one row (troop HP, tower damage, Gold found…). A rank costs one Smithy point and is worked by the mine's smiths: one smith takes its whole time, more smiths share it. A smith on a rank stays at the smithy until it's done; taking the last one off cancels the rank and returns its point.
+Ranks of a few percent each on one row (troop HP, tower damage, rebuild speed…). A rank costs one Smithy point and is worked by the mine's smiths: one smith takes its whole time, more smiths share it. A smith on a rank stays at the smithy until it's done; taking the last one off cancels the rank and returns its point.
 
 **Smithy point**:
 Copper, silver or gold: every ten bars of a metal the mine's smiths work make a point of it. A row's first ten ranks cost copper, the next fifteen silver, the rest gold.
@@ -228,7 +228,7 @@ The idle side view of the ground under the city, worked by miners whatever tab i
 One world the mine works, with only so much ore in it. Once less than a fifth of its ore is left (or the shaft is at the bottom and the work there is done, **worked out**) the player can move the crew, the buildings and the stock to a **new prospect**: fresh ground from a new seed.
 
 **Miner**:
-A worker the player hires with Gold and puts to one of three **trades**: the face (digging, shoring, laying track, hanging torches and lamps, building carts, carrying ore up), the forge, or the smithy. A miner at the face wears a yellow hat, a forge hand a grey welder's mask, a smith a brown leather apron. Each miner has a name for life.
+A worker the player hires with the Mine's metals and puts to one of three **trades**: the face (digging, shoring, laying track, hanging torches and lamps, building carts, carrying ore up), the forge, or the smithy. A miner at the face wears a yellow hat, a forge hand a grey welder's mask, a smith a brown leather apron. Each miner has a name for life.
 
 **Temperament** and **habits** (Mine):
 What a miner does with itself while it waits: looking about, stretching, sitting down, whistling, yawning, tapping a foot or sifting the ground. Its temperament is the two habits it falls into most, from its name, so each miner idles in its own way. Two miners waiting side by side chat instead.
@@ -270,7 +270,7 @@ What the miners dig: copper near the top of the stone, silver lower, gold deepes
 Along the surface: the **shaft house** over the shaft's mouth, with a lantern by its door; the **barracks**, where the crew sleeps in bunks (a bay of six a level) and sits in the **lounge** to eat or wait out a storm; the **warehouse** of supplies; the **forge**; and the **smithy**. A building's front wall fades to show whoever is inside.
 
 **Building level**:
-Each building has five, bought with Gold, and grows wider with each: the barracks bunks five more of the crew a level, the forge makes room for two more hands, the smithy for another smith, the shaft house keeps out more rain, and the warehouse holds and brings in more supplies. No other building rises more than one level past the warehouse.
+Each building has five, bought with the Mine's metals, and grows wider with each: the barracks bunks five more of the crew a level, the forge makes room for two more hands, the smithy for another smith, the shaft house keeps out more rain, and the warehouse holds and brings in more supplies. No other building rises more than one level past the warehouse.
 
 **Rebuild**:
 An upgraded building is rebuilt, and so is any it pushes along: taken down where it stood, then raised in its new place, inside scaffolding. It is shut while the work goes on, and the work uses supplies.
@@ -279,7 +279,7 @@ An upgraded building is rebuilt, and so is any it pushes along: taken down where
 Timber, rails and lights the warehouse brings in over time, up to what it holds. A miner fetches them before fitting out the workings or shoring them, and rebuilds use them too; with none, the shaft can't be sunk further.
 
 **Forge** and **smithy**:
-Forge hands smelt the ore piles into copper, silver and gold bars (four copper ore, two silver or one gold to a bar); smiths work the bars, and every hundred of a metal make a Smithy point of it. Too few at the forge leaves a backlog of ore; too few smiths leaves bars waiting. A trade nobody is put to still gets done, slowly.
+Forge hands smelt the ore piles into copper, silver and gold bars (four copper ore, two silver or one gold to a bar); smiths work the bars, and every ten bars of a metal make a Smithy point of it. Too few at the forge leaves a backlog of ore; too few smiths leaves bars waiting. A trade nobody is put to still gets done, slowly.
 
 **Night shift**:
 The share of the crew who work through the night (a fifth, more with Coffee); the rest sleep in the barracks.
@@ -311,7 +311,7 @@ A dark cathedral nave the player fills with bookshelves and librarians, earning 
 A unit of two rows of books; units stack bay by bay up the nave to just under the stained-glass window.
 
 **Librarian**:
-A scholar the player hires with Gold, put to one of three **roles** in the Staff list, each with a name for life.
+A scholar the player hires with the Mine's metals, put to one of three **roles** in the Staff list, each with a name for life.
 
 **Shelver**:
 A librarian who keeps the stacks: builds shelves and ladders, wheels the carts, shelves and sorts the books, fights fires, refills the water butts and sweeps up. With no shelvers, the professors do it.
@@ -333,7 +333,7 @@ A book on the library's shelves that has taken on glowing runes along its spine.
 _Avoid_: magic book, rune book
 
 **Lab level**:
-How far the alchemy lab has been dug out, 1 to 5, raised with Gold. The lab has room for one researcher a level. Level 2 opens the west **annex** (a mandrake garden and a lectern), level 3 the east annex (a crucible that casts gold and an orrery), level 4 adds a salamander in its cage and level 5 a scrying orb.
+How far the alchemy lab has been dug out, 1 to 5, raised with the Mine's metals. The lab has room for one researcher a level. Level 2 opens the west **annex** (a mandrake garden and a lectern), level 3 the east annex (a crucible that casts gold and an orrery), level 4 adds a salamander in its cage and level 5 a scrying orb.
 
 **Skills**:
 The battle's bomb and reusable war banner, placed by the player from the side panel.

@@ -11,7 +11,7 @@
  * The crew live and work in the buildings on the surface (`buildings.ts`):
  * the player puts each miner to a trade, the face, the forge or the smithy.
  * Forge hands smelt the ore into copper, silver and gold bars; smiths work
- * the bars, and every hundred of a metal make a Smithy point of it for the
+ * the bars, and every ten bars of a metal make a Smithy point of it for the
  * player. Miners fetch supplies from the warehouse
  * for the fittings, eat in the barracks' lounge, and sleep in its bunks at
  * night, all but the night shift.
@@ -31,7 +31,7 @@
  * mine also starts with), the last miner always gets out, and a catch-up
  * after time away loses at most one.
  *
- * Each building has five levels, bought with Gold: the barracks bunks five
+ * Each building has five levels, bought with Copper, Silver and Gold: the barracks bunks five
  * more of the crew a level, the forge makes room for two more hands, the
  * smithy for another smith, the shaft house keeps out more rain, and the
  * warehouse holds and brings in more supplies (`stock`) and lets the others

@@ -14,7 +14,7 @@
 - Row: `{ id, group, name, per, max }` in `TRAINING`; add the id to `TrainingId`.
 - Shown in the Smithy: list the id in its topic's `training` in `src/upgrade-subjects.ts`.
 - Cost: one Smithy point a rank, its metal by rank (`rankPrice`: copper, silver, gold).
-- Effect: `per` percent a rank on the target of the same name: a `Bonuses` field (times in `TIMES` divide), or `gold`, which multiplies rewards.
+- Effect: `per` percent a rank on the target of the same name: a `Bonuses` field (times in `TIMES` divide); battle currency reward upgrades have been removed.
 - Time: `trainingSeconds(ranks)` of one smith in `src/training-jobs.ts`, shared by the smiths on it.
 - Saved in `save.training` (decoded against `max`).
 

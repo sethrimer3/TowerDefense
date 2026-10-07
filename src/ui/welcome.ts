@@ -8,7 +8,6 @@ import type { LibraryAway } from "../library/ui.ts";
 import { METALS, type Metals } from "../mine/sim.ts";
 import { whole } from "../progression.ts";
 import { play } from "../sound.ts";
-import { uiSprite } from "./dom.ts";
 import { sparksOver } from "./flourish.ts";
 
 /** Shorter time away than this gets no welcome. */
@@ -93,7 +92,7 @@ export class WelcomeBack {
       <p class="away-time">You were gone <b>${span(a.ms)}</b>.${capped ? ` The city keeps account of the last ${span(MAX_AWAY_MS)}.` : ""}</p>`;
     this.modal.innerHTML = `${head}
       <div class="away-ledger" id="away-ledger"></div>
-      <div class="dialog-actions"><button id="away-collect" class="away-collect">${uiSprite("gold")} Continue</button></div>`;
+      <div class="dialog-actions"><button id="away-collect" class="away-collect">Continue</button></div>`;
     this.modal.classList.add("welcome");
     this.shown = "";
     this.open = true;

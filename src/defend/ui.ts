@@ -54,7 +54,7 @@ export type DefendHost = {
   /** Whether city tiles may stand apart from the keep's (the Study's
    * Outlying districts). */
   outskirts?(): boolean;
-  /** Pays for holding `wave` (called before the best wave is raised). */
+  /** Awards an upgrade point for a new highest wave, recording it with payment. */
   earnWave(wave: number): { upgrade: number };
   persist(): void;
   reduceMotion(): boolean;

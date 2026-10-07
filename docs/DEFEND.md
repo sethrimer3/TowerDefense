@@ -220,7 +220,7 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   eyes and a swollen brood sac. When one dies she splits into three quick
   **broodlings** at the corners of a small triangle around where she fell
   (on the spot if that is inside a wall); broodlings never come in a wave's
-  mix and don't split again. Each pays its own Gold.
+  mix and don't split again. Each counts as its own kill.
 - **Siege engines** (`siege.ts`) have no crew: each drives itself toward
   the keep like any ground enemy and stops to shoot once something is in
   range: the keep first, else the building its own way runs into (a wall
@@ -440,7 +440,7 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   Geode, Obsidian Crypt, Astral Sanctuary and Nadir, repeating after wave 200. Selected starting
   waves preview their own area. Ground and connected wall cap/face textures
   crossfade over three seconds, with matching wave button and list colors.
-  `area-enemies.ts` supplies themed pools; Nadir permits every normal wave species. Offspring remain parent-only. Unspendable area-budget remainders are discarded. Nadir uses crypt masonry with a dark violet floor wash. Frozen Vault (101-120) includes all ship tiers, Ice Golems (240 HP, cost 80, double fire/explosion damage) and Sliding Ice Cubes (45 HP, cost 10, cardinal slides at 3.6 cells/second, meltable ice trails, immune to blast deflection). The new enemies pay 12/3 Gold and have journal entries.
+  `area-enemies.ts` supplies themed pools; Nadir permits every normal wave species. Offspring remain parent-only. Unspendable area-budget remainders are discarded. Nadir uses crypt masonry with a dark violet floor wash. Frozen Vault (101-120) includes all ship tiers, Ice Golems (240 HP, cost 80, double fire/explosion damage) and Sliding Ice Cubes (45 HP, cost 10, cardinal slides at 3.6 cells/second, meltable ice trails, immune to blast deflection). Both enemies have journal entries; kills award no currency.
 - Weather rolls at the start and on entering an area: Mossbound Ruins has
   30% rain, Drowned Temple 75%, Frozen Vault snow (a 30% stormy roll, and
   every boss night, make it a blizzard: dense wind-streaked flakes drawn
@@ -461,7 +461,7 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   battle random draws; it is not saved. Ambient light and precipitation fade with the terrain.
   Reduce Motion snaps the transition and suppresses rain/snow animation.
   The city's lanterns and fires stay lit in all areas.
-- **Every 10th wave is a boss wave**, for weather and rewards; Warlords spawn by affordability (a huge,
+- **Every 10th wave is a boss wave**, for weather; Warlords spawn by affordability (a huge,
   crowned brute with its own health bar). Night fades in over ~2.5 s as the
   boss wave starts and lifts once it's cleared; a rainy run becomes night
   rain ("Storm").
@@ -558,25 +558,27 @@ from its seed; `tests/defend-replay.test.ts` pins it.
 
 ## Economy (`progress.ts`, the Upgrades tab's Forge; `src/progression.ts`)
 
-- The Armory (now the Upgrades tab's Forge) sells for the mine's metal:
-  copper, silver and gold points (`Price`). Battle pays Gold: each
-  kill (`KILL_GOLD`) and each wave held (10 + 5 Ã— the wave), spent on the
-  mine, the library and bombs (`BOMB_GOLD`). Gold is paid as enemies fall, so an
-  abandoned defense keeps what it earned.
+- The Smithy and Tiles shop sell for the Mine's Copper, Silver and Gold
+  (`Price`), including bombs (`BOMB_PRICE`: one Copper). The Mine's
+  workers/buildings and the Library's shelves/staff/lab also use this wallet
+  (`save.smithy`), with Copper for early purchases and Silver/Gold added later.
+  `src/metals.ts` shares affordability checks, payment and displayed prices.
+  Battle kills award no currency. There is no battle Gold balance.
 - City elements get more expensive with each one owned. Upgrades are
   universal (they apply to every building of that type) and take effect from
   the next run.
-- Reaching a **new best wave** is recorded (`bestWave`) and pays Knowledge: one
-  for each wave held past the best before it, three for a boss wave, and an
-  upgrade point for each.
+- Clearing a **new highest wave** awards exactly one upgrade point.
+  `payWave` records `bestWave` with the payment; duplicate events and replayed
+  waves award nothing, and a direct start never awards points for skipped waves.
+  DEFEND pays no metals or Knowledge. Knowledge comes from the Library.
 - **Smithy** (rows in the Upgrades tab's Forge; Training in code): a Smithy point (copper,
   silver or gold, from the mine's smithy) buys one rank of a row (a few
   percent on troop HP or damage, drill speed, tower damage or reload, bomb
-  damage, wall or keep HP, rebuild speed, or Gold found). The mine's smiths
+  damage, wall or keep HP, rebuild speed). The mine's smiths
   work it: a minute of one smith for the first, each after 50% longer, shared
   by every smith on it.
 - **Skills** (the Upgrades tab's Study): Command (garrison and towers) and
-  Stewardship (walls, keep, builders, Gold, copper, faster smithing, room for
+  Stewardship (walls, keep, builders, faster smithing, room for
   another smith), ranked skills bought with Knowledge.
 - The Smithy and the skills fold into the run's `Bonuses`, fixed when the
   defense starts.
@@ -697,13 +699,13 @@ sails (cream, sea green, blue, violet), gold rails on the two biggest.
 Living Fortresses have four tiers: Walking Bastion (1,000 difficulty; two
 turrets, four legs, two armor plates), Living Fortress (10,000; four/six/four),
 Walking Citadel (100,000; six/eight/six) and Dread Colossus (1,000,000;
-eight/ten/eight). Body dimensions grow from 2.5 × 3 cells to 5.5 × 6, core HP
-from 1,200 to 150,000, and component HP from 160 to 12,000 (armor has 1.5×
+eight/ten/eight). Body dimensions grow from 2.5 ï¿½ 3 cells to 5.5 ï¿½ 6, core HP
+from 1,200 to 150,000, and component HP from 160 to 12,000 (armor has 1.5ï¿½
 component HP). Each part has its own small hitbox and HP, follows the body,
 and is individually targetable by existing attacks. Armor plates must all
 be destroyed before the core takes damage. Every lost leg proportionally
 reduces speed, down to 25% with none; destroyed turrets stop firing. Turrets
 bombard player units and buildings every two seconds. Destroyed parts remain
-charred sockets. Core destruction removes surviving parts; only the core pays
-kill rewards. The wave budget reserves all 9/15/21/27 components and spawning
+charred sockets. Core destruction removes surviving parts; only the core counts
+as a kill. The wave budget reserves all 9/15/21/27 components and spawning
 checks room for the complete fortress before releasing it.
