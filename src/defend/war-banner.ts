@@ -26,6 +26,19 @@ const LEG = 8;
 /** A troop sees enemies this near itself on the march (swordsmen). */
 export const MARCH_SIGHT = 2.5;
 
+export const bannerReach = (sim: DefendSim) => sim.bonuses.banner?.reach ?? RALLY_REACH;
+export const bannerInfluence = (sim: DefendSim, at: Point) => !!sim.warBanner && sq(at.x - sim.warBanner.x) + sq(at.y - sim.warBanner.y) <= sq(bannerReach(sim));
+export const bannerDamage = (sim: DefendSim, s: Soldier) => s.damage * (bannerInfluence(sim, s) ? sim.bonuses.banner?.damage ?? 1 : 1);
+/** Preserve health percentage on both transitions; moving the banner cannot heal. */
+export function stepBannerLife(sim: DefendSim, s: Soldier, dt: number) {
+  if (s.hp <= 0) return;
+  const inside = bannerInfluence(sim, s), old = s.bannerLife ?? 1;
+  const next = inside ? sim.bonuses.banner?.life ?? 1 : 1;
+  if (old !== next) { s.maxHp = s.maxHp / old * next; s.hp = s.hp / old * next; }
+  if (next !== 1) s.bannerLife = next; else delete s.bannerLife;
+  if (inside && sim.bonuses.banner?.regen) s.hp = Math.min(s.maxHp, s.hp + s.maxHp * sim.bonuses.banner.regen * dt);
+}
+
 export class WarBanner {
   /** Each cell's walking cost to the banner. */
   readonly field = new Float64Array(CELL_COUNT);
@@ -90,8 +103,8 @@ export class WarBanner {
   foe(sim: DefendSim, s: Soldier, sight: number): Enemy | null {
     const close = sight > 0 ? nearest(sim.enemiesNear(s.x, s.y, sight), s, sight * sight, true) : null;
     if (close) return close;
-    if (sq(s.x - this.x) + sq(s.y - this.y) > RALLY_REACH * RALLY_REACH) return null;
-    return nearest(sim.enemiesNear(this.x, this.y, RALLY_REACH), s, Infinity, true);
+    if (sq(s.x - this.x) + sq(s.y - this.y) > sq(bannerReach(sim))) return null;
+    return nearest(sim.enemiesNear(this.x, this.y, bannerReach(sim)), s, Infinity, true);
   }
 }
 
@@ -104,7 +117,7 @@ export function answerBanner(sim: DefendSim, banner: WarBanner, s: Soldier, spee
     s.thinkT = 0.5;
     foe = banner.foe(sim, s, sight);
     s.target = foe ? foe.id : -1;
-    s.path = foe ? (findPath(sim.ownSolid, s, foe, { maxCost: RALLY_REACH * 3, maxNodes: 600 }) ?? []) : banner.reached(s) ? [] : banner.route(sim, s);
+    s.path = foe ? (findPath(sim.ownSolid, s, foe, { maxCost: bannerReach(sim) * 3, maxNodes: 600 }) ?? []) : banner.reached(s) ? [] : banner.route(sim, s);
   }
-  sim.followPath(s, foe, speed, dt);
+  sim.followPath(s, foe, speed * (!foe && !banner.reached(s) ? sim.bonuses.banner?.march ?? 1 : 1), dt);
 }

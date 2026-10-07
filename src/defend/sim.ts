@@ -56,7 +56,7 @@ import { stepBlazes, stepFireballs, stepMage, type Blaze, type Fireball } from "
 import { stepStabs, stepValkyrie, type Stab } from "./valkyries.ts";
 import { Wizards, stepFlames, stepFrosts, type Flame, type Frost } from "./wizard.ts";
 import { DarkKeeps, stepBolts, stepDarkWizard, type Bolt } from "./dark-wizards.ts";
-import { WarBanner } from "./war-banner.ts";
+import { WarBanner, bannerInfluence, stepBannerLife } from "./war-banner.ts";
 import { sheltered, fizzles, stepFloods, type Flood, type Sinking } from "./boats.ts";
 import { baitFell, baitStanding } from "./bait.ts";
 import { stepBallistaBolts, stepSpikes, type BallistaBolt, type SpikeThrust } from "./wall-defenses.ts";
@@ -131,6 +131,7 @@ export type Soldier = {
   /** Seconds left that nothing can hurt her (a valkyrie after a charge);
    * absent otherwise, so runs without valkyries keep their state as before. */
   guard?: number;
+  bannerLife?: number;
   /** Strikes an assassin has made, every few critical; absent for everyone else. */
   strikes?: number;
 };
@@ -265,6 +266,9 @@ export class DefendSim {
   /** The war banner the player planted, rallying the troops; null when none
    * stands (and so in every run without one). */
   warBanner: WarBanner | null = null;
+  bannerReadyAt = 0;
+  get bannerCooldown() { return this.bonuses.banner?.cooldown ?? 10; }
+  get bannerRemaining() { return Math.max(0, this.bannerReadyAt - this.time); }
   /** Magic boats' water, drying up behind them, and the buildings it sank
    * going under; both empty in every run without boats. */
   floods: Flood[] = [];
@@ -447,7 +451,11 @@ export class DefendSim {
     this.darkKeeps.step(this, dt);
     this.barracks.step(this, dt);
     this.warBanner?.refresh(this);
-    for (const s of this.soldiers) STEP_SOLDIER[s.kind](this, s, dt);
+    for (const s of this.soldiers) {
+      stepBannerLife(this, s, dt);
+      STEP_SOLDIER[s.kind](this, s, dt);
+      stepBannerLife(this, s, 0);
+    }
     stepFireballs(this, dt);
     stepBlazes(this, dt);
     stepFloods(this, dt);
@@ -739,7 +747,7 @@ export class DefendSim {
       const reflected = amount * .4;
       if (origin.attacker !== undefined) {
         const shooter = this.soldiers.find(s => s.id === origin.attacker && s.hp > 0);
-        if (shooter && !shooter.guard) { shooter.hp -= reflected; shooter.flash = .12; }
+        if (shooter && !shooter.guard) { this.hurtDefender(shooter, reflected); shooter.flash = .12; }
       } else if (origin.building !== undefined) this.damageBuilding(origin.building, reflected);
     }
     amount *= damageModifier(this, e, origin, source, projectile);
@@ -751,6 +759,15 @@ export class DefendSim {
     if (flash) e.flash = 0.12;
     if (e.hp <= 0) this.effects.push({ kind: "spark", x: e.x, y: e.y, t: 0, r: enemySize(e) });
     return true;
+  }
+
+  hurtDefender(unit: Soldier | Civilian, amount: number) {
+    if (unit.hp <= 0 || ("guard" in unit && unit.guard)) return 0;
+    if ("kind" in unit) stepBannerLife(this, unit, 0);
+    const damage = amount * ("kind" in unit && bannerInfluence(this, unit) ? 1 - (this.bonuses.banner?.defense ?? 0) : 1);
+    const dealt = Math.min(unit.hp, damage);
+    unit.hp -= damage;
+    return dealt;
   }
 
   damageBuilding(id: number, amount: number) {
@@ -831,7 +848,7 @@ export class DefendSim {
       for (const u of [...this.soldiers, ...this.civilians]) {
         const d = dist(u.x - x, u.y - y);
         if (d > r || u.hp <= 0 || ("guard" in u && u.guard) || sheltered(this, u.x, u.y)) continue;
-        u.hp -= hit(d) * FRIENDLY_FIRE;
+        this.hurtDefender(u, hit(d) * FRIENDLY_FIRE);
         u.flash = 0.12;
       }
     const seed = (this.rand() * 1e9) | 0;
@@ -924,12 +941,16 @@ export class DefendSim {
   /** Plants the war banner at (x, y), taking down any other, or with null
    * takes it down. Every troop rethinks at once. */
   plantBanner(at: Point | null) {
+    if (at && this.bannerRemaining > 0) return false;
+    if (at) this.bannerReadyAt = this.time + this.bannerCooldown;
     this.warBanner = at ? new WarBanner(at.x, at.y) : null;
     for (const s of this.soldiers) {
+      stepBannerLife(this, s, 0);
       s.thinkT = 0;
       s.path = [];
       s.target = -1;
     }
+    return true;
   }
 }
 

@@ -86,5 +86,5 @@ test("each kind's upgrades are in the Smithy or the Study it links to", () => {
     assert.ok(topicHas(topic, "smithy") || topicHas(topic, "study"), `${id}'s topic ${topic.id} has nothing to upgrade`);
   }
   assert.equal(tileTopic("bomb").topic.id, "battle");
-  assert.equal(tileTopic("warBanner").topic.id, "troops");
+  assert.equal(tileTopic("warBanner").topic.id, "warBanner");
 });

@@ -8,7 +8,7 @@
 import type { BonusTarget } from "./progression.ts";
 
 export type SkillId =
-  | "drillSergeant" | "veterans" | "bladework" | "fletchers" | "gunpowder" | "ballistics" | "warBanner"
+  | "drillSergeant" | "veterans" | "bladework" | "fletchers" | "gunpowder" | "ballistics" | "warBanner" | "bannerCooldown" | "bannerDefense" | "bannerReach" | "bannerDamage" | "bannerMarch" | "bannerLife" | "bannerRegen"
   | "masonry" | "bastions" | "outskirts" | "guilds" | "plunder" | "ironworks" | "scholars" | "tactician"
   | "fireproofWood" | "fireTraining" | "nightWatch" | "enchantedInk" | "coffee" | "waterproofing";
 export type TreeId = "command" | "stewardship" | "mine" | "library";
@@ -20,9 +20,9 @@ export type TreeId = "command" | "stewardship" | "mine" | "library";
  * `fireDrill`; `mine/sim.ts`: `nightShift`, the shaft house's seal,
  * `extraSmiths`); Outlying districts by the Defend page, as whether city
  * tiles may stand apart (`withOutskirts`). */
-export type SkillEffect = { target: BonusTarget | "smiths" | "copperPerWave" | "fireproof" | "fireTraining" | "nightWatch" | "enchant" | "coffee" | "waterproof" | "outskirts"; per: number };
+export type SkillEffect = { target: BonusTarget | "smiths" | "copperPerWave" | "fireproof" | "fireTraining" | "nightWatch" | "enchant" | "coffee" | "waterproof" | "outskirts" | "bannerCooldown" | "bannerDefense" | "bannerReach" | "bannerDamage" | "bannerMarch" | "bannerLife" | "bannerRegen"; per: number };
 export type Skill = { id: SkillId; name: string; icon: string; max: number; base: number; effect: SkillEffect; text: string };
-export type SkillNode = { id: SkillId; requires: SkillId[] };
+export type SkillNode = { id: SkillId; requires: SkillId[]; full?: SkillId[] };
 export type SkillTree = { id: TreeId; name: string; description: string; nodes: SkillNode[] };
 
 export const SKILLS: Record<SkillId, Skill> = {
@@ -33,6 +33,13 @@ export const SKILLS: Record<SkillId, Skill> = {
   ballistics: { id: "ballistics", name: "Ballistics", icon: "◎", max: 3, base: 3, effect: { target: "towerReload", per: 8 }, text: "Towers reload 8% faster a rank" },
   gunpowder: { id: "gunpowder", name: "Gunpowder", icon: "✹", max: 3, base: 2, effect: { target: "bombDamage", per: 20 }, text: "+20% bomb damage a rank" },
   warBanner: { id: "warBanner", name: "War banner", icon: "♛", max: 3, base: 5, effect: { target: "troopDamage", per: 15 }, text: "+15% swordsman and archer damage a rank" },
+  bannerCooldown: { id: "bannerCooldown", name: "Rapid deployment", icon: "⚑", max: 3, base: 3, effect: { target: "bannerCooldown", per: 3 }, text: "Banner placement cooldown: 10 seconds initially, then 7, 4 and 1 seconds" },
+  bannerDefense: { id: "bannerDefense", name: "Sheltering standard", icon: "▦", max: 1, base: 5, effect: { target: "bannerDefense", per: 10 }, text: "Units within banner influence take 10% less damage from every source" },
+  bannerReach: { id: "bannerReach", name: "Broad standard", icon: "◎", max: 1, base: 5, effect: { target: "bannerReach", per: 2 }, text: "Increase banner influence radius from 5 to 7 cells" },
+  bannerDamage: { id: "bannerDamage", name: "Battle standard", icon: "⚔", max: 1, base: 8, effect: { target: "bannerDamage", per: 25 }, text: "Units deal 25% more damage while within banner influence" },
+  bannerMarch: { id: "bannerMarch", name: "Forced march", icon: "⚑", max: 1, base: 8, effect: { target: "bannerMarch", per: 50 }, text: "Units moving toward the banner walk 50% faster, even outside its influence" },
+  bannerLife: { id: "bannerLife", name: "Vital standard", icon: "♥", max: 1, base: 8, effect: { target: "bannerLife", per: 25 }, text: "Units have 25% more maximum life within banner influence; entering and leaving preserve their health percentage" },
+  bannerRegen: { id: "bannerRegen", name: "Restoring standard", icon: "♥", max: 1, base: 12, effect: { target: "bannerRegen", per: 5 }, text: "Living units within banner influence regenerate 5% of maximum life per second" },
   masonry: { id: "masonry", name: "Masonry", icon: "▦", max: 3, base: 1, effect: { target: "wallHp", per: 10 }, text: "+10% wall HP a rank" },
   bastions: { id: "bastions", name: "Bastions", icon: "♜", max: 3, base: 2, effect: { target: "keepHp", per: 10 }, text: "+10% keep HP a rank" },
   outskirts: { id: "outskirts", name: "Outlying districts", icon: "⌂", max: 1, base: 8, effect: { target: "outskirts", per: 1 }, text: "City tiles can be placed anywhere but the top row, not only against the city: each district apart from the keep's is walled on its own" },
@@ -58,6 +65,13 @@ export const TREES: SkillTree[] = [
     { id: "gunpowder", requires: ["veterans"] },
     { id: "ballistics", requires: ["fletchers", "gunpowder"] },
     { id: "warBanner", requires: ["ballistics"] },
+    { id: "bannerCooldown", requires: ["warBanner"] },
+    { id: "bannerDefense", requires: ["bannerCooldown"], full: ["bannerCooldown"] },
+    { id: "bannerReach", requires: ["bannerDefense"] },
+    { id: "bannerDamage", requires: ["bannerReach"] },
+    { id: "bannerMarch", requires: ["bannerReach"] },
+    { id: "bannerLife", requires: ["bannerReach"] },
+    { id: "bannerRegen", requires: ["bannerLife"] },
   ] },
   { id: "stewardship", name: "Stewardship", description: "Earn Knowledge in the Library and by holding past your best wave. Stewardship strengthens the city and fills its coffers.", nodes: [
     { id: "masonry", requires: [] },
@@ -89,5 +103,5 @@ export const skillCost = (id: SkillId, level: number) => SKILLS[id].base * (leve
 /** Whether every skill `id` requires has a rank. */
 export function skillAvailable(id: SkillId, levels: Record<SkillId, number>) {
   const node = TREES.flatMap((t) => t.nodes).find((n) => n.id === id);
-  return !!node && node.requires.every((key) => levels[key] > 0);
+  return !!node && node.requires.every((key) => levels[key] >= (node.full?.includes(key) ? SKILLS[key].max : 1));
 }

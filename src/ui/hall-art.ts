@@ -69,19 +69,21 @@ export class HallBackdrop {
     for (let y = 0; y < h; y++)
       for (let x = 0; x < w; x++) {
         const i = y * w + x;
-        this.sx[i] = (hgt[y * w + Math.min(w - 1, x + 1)] - hgt[y * w + Math.max(0, x - 1)]) / 2;
-        this.sy[i] = (hgt[Math.min(h - 1, y + 1) * w + x] - hgt[Math.max(0, y - 1) * w + x]) / 2;
+        // A raised surface's normal points against its height gradient:
+        // the rising left/top bevel faces left/up, toward a light on that side.
+        this.sx[i] = (hgt[y * w + Math.max(0, x - 1)] - hgt[y * w + Math.min(w - 1, x + 1)]) / 2;
+        this.sy[i] = (hgt[Math.max(0, y - 1) * w + x] - hgt[Math.min(h - 1, y + 1) * w + x]) / 2;
       }
     return true;
   }
 
   /** The keep's window: a tall round-headed opening in a moulded stone
-   * surround and oak frame, its clear glass held by iron roses, curved
-   * tracery and diamond panes, with the city outside below the sky. */
+   * surround and oak frame, with a circular iron flower in clear glass
+   * and the city outside below the sky. */
   private bakeWindow(hgt: Float32Array) {
     const { w, h } = this, ww = Math.round(Math.max(30, Math.min(w * 0.46, 110))), r = ww / 2;
     const cx = w / 2, top = Math.round(h * 0.05), wh = Math.round(Math.max(ww * 1.1, Math.min(h * 0.62, ww * 1.75)));
-    const archY = top + r, bottom = top + wh, transom = archY + (bottom - archY) * 0.42, rose = { x: cx, y: archY - r * 0.08, r: r * 0.5 };
+    const archY = top + r, bottom = top + wh, rose = { x: cx, y: archY - r * 0.08, r: r * 0.5 };
     this.win = { x0: cx - r, x1: cx + r, y0: top, y1: bottom };
     /** How far inside the opening (x, y) is: negative outside. */
     const inside = (x: number, y: number) => (y < archY ? r - Math.hypot(x - cx, y - archY) : Math.min(r - Math.abs(x - cx), bottom - y));
@@ -115,18 +117,11 @@ export class HallBackdrop {
           this.albedo.set([123 * grain, 76 * grain, 39 * grain], i * 3);
           continue;
         }
-        // The iron frame: a rim, a mullion, a transom, the rose and its lobes.
+        // Only the circular rose, its centre and flower-like lobes.
         const ring = (c: { x: number; y: number }, rr: number) => Math.abs(Math.hypot(px - c.x, py - c.y) - rr) < 0.75;
         const lobe = rose.r * 0.46;
-        const iron = d < 1.4 || (Math.abs(px - cx) < 0.9 && py > rose.y + rose.r - 0.5) || (Math.abs(py - transom) < 0.8)
-          || ring(rose, rose.r) || ring(rose, rose.r * 0.18)
-          || [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => ring({ x: rose.x + a * lobe, y: rose.y + b * lobe }, lobe * 0.98))
-          || (py > transom && py < bottom && Math.abs(Math.abs(px - cx) - r * 0.5) < 0.6)
-          || (py > transom && Math.abs(py - (transom + bottom) / 2) < 0.6)
-          || (py > rose.y + rose.r && py < transom && ring({ x: cx - r * 0.48, y: transom }, r * 0.32))
-          || (py > rose.y + rose.r && py < transom && ring({ x: cx + r * 0.48, y: transom }, r * 0.32))
-          || (py > transom && Math.abs(Math.abs(px - cx) / (r * 0.5) + Math.abs(py - (transom + bottom) / 2) / ((bottom - transom) * 0.35) - 1) < 0.045)
-          || (py < rose.y + rose.r && py > archY - r * 0.1 && py > rose.y && Math.abs(Math.abs(px - cx) - (rose.r + (r - rose.r) / 2)) < 0.6);
+        const iron = ring(rose, rose.r) || ring(rose, rose.r * 0.18)
+          || [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => ring({ x: rose.x + a * lobe, y: rose.y + b * lobe }, lobe * 0.98));
         if (iron) {
           this.part[i] = TRACERY;
           hgt[i] = 1;
@@ -145,7 +140,9 @@ export class HallBackdrop {
   /** Elevated view from the keep: a far battlement behind three rows of
    * tiled roofs, timbered stone houses and lanes, echoing Defend's palette. */
   private bakeCity(left: number, top: number, width: number, height: number) {
-    const wallY = top + height * 0.59, wallH = Math.max(5, height * 0.07);
+    // Double the wall upward, keeping its foot behind the same city lanes.
+    const oldWallH = Math.max(5, height * 0.07), wallH = oldWallH * 2;
+    const wallY = top + height * 0.59 - oldWallH;
     const houses: { x: number; y: number; w: number; h: number; roof: RGB; seed: number }[] = [];
     for (let row = 0; row < 3; row++) {
       const size = width * (0.16 + row * 0.025);
@@ -154,16 +151,16 @@ export class HallBackdrop {
         const x = left + col * width / 4.5 + (row % 2) * width * 0.1;
         const y = top + height * (0.7 + row * 0.13) + h01(col, row, 24) * 3;
         houses.push({ x, y, w: size, h: height * 0.075, roof: [[133, 62, 42], [137, 111, 57], [82, 99, 111]][seed % 3] as RGB, seed });
-        if (col >= 0 && col < 5) this.outside.push({ x: x + size * 0.78, y: y + height * 0.07, radius: size * 1.25, seed });
+        // One stable coin flip per house: resizing or drawing never rerolls it.
+        if (h01(col, row, 26) < 0.5) this.outside.push({ x: x + size * 0.78, y: y + height * 0.07, radius: size * 1.25, seed });
       }
     }
-    for (let k = 0; k < 4; k++) this.outside.push({ x: left + width * (0.12 + k * 0.25), y: wallY + 3, radius: width * 0.14, seed: 40 + k });
     return (x: number, y: number): RGB | null => {
       let rgb: RGB | null = null;
       const noise = 0.9 + h01(Math.floor(x), Math.floor(y), 25) * 0.18;
-      if (y >= wallY - (Math.floor((x - left) / 3) % 2 === 0 ? 2 : 0) && y < wallY + wallH) {
+      if (y >= wallY - (Math.floor((x - left) / 3) % 2 === 0 ? 4 : 0) && y < wallY + wallH) {
         const joint = Math.floor(y - wallY) % 3 === 2 || Math.floor(x + Math.floor((y - wallY) / 3) * 3) % 7 === 0;
-        rgb = joint ? [43, 53, 36] : [103 * noise, 111 * noise, 70 * noise];
+        rgb = joint ? [30, 27, 26] : [104 * noise, 100 * noise, 95 * noise];
       } else if (y >= wallY + wallH) rgb = [87 * noise, 80 * noise, 60 * noise];
       for (const b of houses) {
         const dx = x - b.x, dy = y - b.y;

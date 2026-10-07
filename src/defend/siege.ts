@@ -191,7 +191,7 @@ function pierce(sim: DefendSim, s: SiegeShot) {
     if (u.hp <= 0 || ("guard" in u && u.guard)) continue;
     const k = l2 > 0 ? Math.max(0, Math.min(1, ((u.x - s.x0) * lx + (u.y - s.y0) * ly) / l2)) : 1;
     if (sq(s.x0 + lx * k - u.x) + sq(s.y0 + ly * k - u.y) > sq(s.r)) continue;
-    u.hp -= s.damage;
+    sim.hurtDefender(u, s.damage);
     u.flash = 0.12;
   }
 }

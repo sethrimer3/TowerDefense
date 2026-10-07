@@ -13,7 +13,7 @@ export function hostileBurst(sim: DefendSim, x: number, y: number, radius: numbe
   if (fizzles(sim, x, y, radius)) return;
   for (const u of [...sim.soldiers, ...sim.civilians]) {
     if (u.hp <= 0 || ("guard" in u && u.guard) || sq(u.x - x) + sq(u.y - y) > sq(radius) || sheltered(sim, u.x, u.y)) continue;
-    u.hp -= damage;
+    sim.hurtDefender(u, damage);
     u.flash = 0.12;
   }
   for (const b of sim.map.buildings) if (sim.intact(b) && rectDist(b.rect, x, y) <= radius) sim.damageBuilding(b.id, damage);
@@ -47,7 +47,7 @@ export function hostileSpecial(sim: DefendSim, e: Enemy, dt: number): boolean {
   e.slash = { dx, dy, t: 0.35 };
   const inside = (x: number, y: number) => sq(x - e.x) + sq(y - e.y) <= sq(range) && (x - e.x) * dx + (y - e.y) * dy >= 0;
   for (const u of [...sim.soldiers, ...sim.civilians]) if (u.hp > 0 && !("guard" in u && u.guard) && inside(u.x, u.y)) {
-    u.hp -= enemyDamage(sim, e); u.flash = 0.12;
+    sim.hurtDefender(u, enemyDamage(sim, e)); u.flash = 0.12;
   }
   for (const b of sim.map.buildings) {
     const near = nearestPoint(b.rect, e.x, e.y);

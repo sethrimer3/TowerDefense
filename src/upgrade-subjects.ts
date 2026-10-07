@@ -31,7 +31,8 @@ export const SUBJECTS: Subject[] = [
   {
     id: "realm", name: "Realm", sprite: "upgrades", blurb: "Every troop, every tower, every defense.",
     topics: [
-      { id: "troops", name: "All troops", upgrades: ["barracksCapacity", "barracksTraining", "soldierArms"], training: ["troopHp", "troopDamage", "drill"], skills: ["drillSergeant", "veterans", "bladework", "warBanner"] },
+      { id: "troops", name: "All troops", upgrades: ["barracksCapacity", "barracksTraining", "soldierArms"], training: ["troopHp", "troopDamage", "drill"], skills: ["drillSergeant", "veterans", "bladework"] },
+      { id: "warBanner", name: "War banner", skills: ["warBanner", "bannerCooldown", "bannerDefense", "bannerReach", "bannerDamage", "bannerMarch", "bannerLife", "bannerRegen"] },
       { id: "towers", name: "All towers", training: ["towerDamage", "towerReload"], skills: ["fletchers", "ballistics"] },
       { id: "battle", name: "Battle", upgrades: ["bombSafe"], training: ["bombDamage"], extras: ["bomb", "speed3"], skills: ["gunpowder"] },
       { id: "spoils", name: "Spoils", training: ["gold"], skills: ["plunder", "ironworks"] },

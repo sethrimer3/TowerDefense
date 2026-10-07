@@ -43,7 +43,7 @@ export class EditSession {
   /** Where the pointer first was, telling a tap from a drag. */
   private start: DragAt | null = null;
 
-  constructor(readonly drag: Drag, private layout: Layout) {
+  constructor(readonly drag: Drag, private layout: Layout, private bannerRadius = RALLY_REACH) {
     this.legal = drag.from === "bomb" || drag.from === "banner" ? new Map() : legalLayouts(drag, layout);
     this.span = dragSpan(drag, layout);
   }
@@ -109,7 +109,7 @@ export class EditSession {
     if (this.drag.from === "bomb")
       return at.overBoard ? { legal: new Set(), hover: null, ghost: null, bomb: { x: at.cellX, y: at.cellY, r: BOMB_RADIUS } } : null;
     if (this.drag.from === "banner")
-      return at.overBoard ? { legal: new Set(), hover: null, ghost: null, banner: { x: at.cellX, y: at.cellY, r: RALLY_REACH } } : null;
+      return at.overBoard ? { legal: new Set(), hover: null, ghost: null, banner: { x: at.cellX, y: at.cellY, r: this.bannerRadius } } : null;
     const hover = this.tile;
     const next = hover ? this.legal.get(hover) : undefined;
     if (carriesGate(this.drag))

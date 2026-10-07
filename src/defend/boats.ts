@@ -230,7 +230,7 @@ export function stepFloods(sim: DefendSim, dt: number) {
   if (!sim.floods.length) return;
   for (const s of sim.soldiers)
     if (s.kind === "mage" && s.hp > 0 && wetAt(sim, s.x, s.y)) {
-      s.hp -= MAGE_SOAK * dt;
+      sim.hurtDefender(s, MAGE_SOAK * dt);
       s.flash = 0.12;
     }
   sim.blazes = sim.blazes.filter((b) => {

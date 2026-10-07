@@ -1,3 +1,4 @@
+import { bannerDamage } from "./war-banner.ts";
 /** DEFEND fire mages, trained at the Mage Guild: they roam the city's
  * streets like archers and, when an enemy comes within reach, hurl a
  * fireball at where it stands. The fireball bursts with splash damage
@@ -45,7 +46,7 @@ function throwFireball(sim: DefendSim, s: Soldier, e: { x: number; y: number }) 
   sim.fireballs.push({
     origin: { x: s.x, y: s.y, attacker: s.id },
     x0: s.x, y0: s.y - 0.2, x1: e.x, y1: e.y, t: 0, dur: 0.15 + d / FIREBALL_SPEED,
-    damage: pyro ? s.damage * PYROCLASM.damage : s.damage, r: fireballSplash(sim.levels.mageFireball ?? 0) * (pyro >= 2 ? PYROCLASM.splash : 1),
+    damage: pyro ? bannerDamage(sim, s) * PYROCLASM.damage : bannerDamage(sim, s), r: fireballSplash(sim.levels.mageFireball ?? 0) * (pyro >= 2 ? PYROCLASM.splash : 1),
   });
 }
 

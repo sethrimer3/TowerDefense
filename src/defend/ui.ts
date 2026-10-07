@@ -1,3 +1,4 @@
+import { bannerReach } from "./war-banner.ts";
 import { journalHTML, paintJournal } from "./journal.ts";
 import { paintPortraits } from "./journal-portrait.ts";
 import { wavePickerHTML } from "./wave-picker.ts";
@@ -167,7 +168,7 @@ export class DefendPage {
       if (this.performanceEnd) this.performance.finish(this.performanceEnd);
       this.performanceEnd = null;
     }
-    if (this.phase === "sim") this.updateHud();
+    if (this.phase === "sim") { this.updateHud(); this.updateSkillCooldowns(); }
     if (measuring && this.renderer && !document.hidden) this.frameTimes.sample({
       frameMs: dt * 1000, updateMs: updated - start, ...this.renderer.timings,
       uiMs: drawing - updated + performance.now() - drawn,
@@ -340,7 +341,7 @@ export class DefendPage {
       this.paintWaveWall();
     } else if (this.phase === "sim") {
       const armed = performance.now() < this.abandonArmed;
-      el.innerHTML = `${this.sideToggle("Items")}<button id="defend-abandon" class="defend-danger ${armed ? "armed" : ""}">${armed ? "Confirm?" : "Abandon"}</button>
+      el.innerHTML = `${this.sideToggle("Skills")}<button id="defend-abandon" class="defend-danger ${armed ? "armed" : ""}">${armed ? "Confirm?" : "Abandon"}</button>
         <button id="defend-speed" title="Battle speed">${this.sim?.speed ?? 1}×</button>`;
       el.querySelector<HTMLButtonElement>("#defend-abandon")!.onclick = () => {
         if (performance.now() < this.abandonArmed) {
@@ -460,7 +461,7 @@ export class DefendPage {
           ];
     const entries = this.host.showEmpty?.() ? all : all.filter((e) => e.count > 0);
     el.innerHTML =
-      (this.phase === "build" ? this.categoryPicker() : `<small class="defend-palette-title">ITEMS</small>`) +
+      (this.phase === "build" ? this.categoryPicker() : `<small class="defend-palette-title">SKILLS</small>`) +
       entries
         .map(
           (e) =>
@@ -473,6 +474,7 @@ export class DefendPage {
     el.querySelectorAll<HTMLButtonElement>("[data-item]").forEach((b) => {
       b.onpointerdown = (e) => this.pressPalette(b.dataset.item!, e);
     });
+    this.updateSkillCooldowns();
     const picker = el.querySelector<HTMLButtonElement>("#defend-category");
     if (picker)
       picker.onclick = () => {
@@ -487,6 +489,22 @@ export class DefendPage {
         el.scrollTop = 0;
       };
     });
+  }
+
+  private updateSkillCooldowns() {
+    if (this.phase !== "sim" || !this.sim) return;
+    for (const button of Array.from(this.root.querySelectorAll<HTMLButtonElement>("#defend-palette [data-item]"))) {
+      const banner = button.dataset.item === "banner", left = banner ? this.sim.bannerRemaining : 0;
+      const ready = left === 0 && (banner || this.save.bombs > 0);
+      button.classList.toggle("skill-ready", ready);
+      button.classList.toggle("skill-loading", left > 0);
+      button.style.setProperty("--skill-fill", `${banner ? (1 - left / this.sim.bannerCooldown) * 100 : ready ? 100 : 0}%`);
+      button.disabled = !ready;
+      const name = banner ? "War banner" : "Bomb";
+      const status = left > 0 ? `Ready in ${Math.ceil(left)} seconds` : ready ? "Ready" : "None owned";
+      button.title = `${name}: ${status}`;
+      button.setAttribute("aria-label", `${name}: ${status}`);
+    }
   }
 
   /** The palette's head while building: a button naming the category on
@@ -506,6 +524,7 @@ export class DefendPage {
   private pressPalette(id: string, e: PointerEvent) {
     if (e.button !== 0) return;
     if (id === "bomb") return this.pressBomb(e);
+    if (id === "banner" && this.sim?.bannerRemaining) return;
     if (id === "banner") return this.phase === "sim" ? this.beginDrag({ from: "banner" }, e) : undefined;
     const item = id as PaletteItem;
     if (!available(this.save, item)) return this.setMessage(`No ${plural(ITEM_NAMES[item].toLowerCase())} left — buy more in the Tiles tab.`);
@@ -671,7 +690,7 @@ export class DefendPage {
     this.night = 0;
     this.renderChrome();
     const w = this.weather, sky = w.blizzard ? "A blizzard howls in. " : w.snow ? "Snow drifts in. " : w.sand ? "A sandstorm blows in. " : w.mist ? "Mist creeps over the ground. " : w.rain ? "Rain rolls in. " : "";
-    this.setMessage(`${sky}Here they come! ${this.sideOpen.sim ? "Drag" : "Open Items and drag"} a bomb onto the field, or plant the war banner to rally your troops.`, 4);
+    this.setMessage(`${sky}Here they come! ${this.sideOpen.sim ? "Drag" : "Open Skills and drag"} a bomb onto the field, or plant the war banner to rally your troops.`, 4);
   }
 
   private endRun() {
@@ -784,7 +803,7 @@ export class DefendPage {
   }
 
   private beginDrag(d: Drag, e: PointerEvent) {
-    this.pointers.begin(new EditSession(d, this.save.layout), e);
+    this.pointers.begin(new EditSession(d, this.save.layout, this.sim ? bannerReach(this.sim) : undefined), e);
   }
 
   /** Start dragging whatever buildable thing is under the pointer. Only the
@@ -802,7 +821,7 @@ export class DefendPage {
   /** A press on the planted war banner (its pole or cloth) lifts it. */
   private pickUpBanner(e: PointerEvent): boolean {
     const banner = this.sim?.warBanner;
-    if (!banner) return false;
+    if (!banner || this.sim!.bannerRemaining > 0) return false;
     const { fx, fy } = eventCell(this.renderer!, e);
     // The cloth flies to the right of the pole.
     if (fx < banner.x - 1 || fx > banner.x + 2.2 || fy < banner.y - 1.4 || fy > banner.y + 1) return false;
@@ -823,7 +842,7 @@ export class DefendPage {
       const drag = this.pointers.session?.drag;
       if (!sim) return;
       if (drop.at) {
-        sim.plantBanner(drop.at);
+        if (!sim.plantBanner(drop.at)) return;
         play("banner");
       }
       else if (drop.tap || (drag?.from === "banner" && drag.placed)) sim.plantBanner(null);

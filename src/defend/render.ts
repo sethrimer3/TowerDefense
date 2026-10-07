@@ -25,7 +25,7 @@ import { carriedLights, drawDamage, drawScorches, drawUnits, shadowCasters, type
 import { drawGrid, drawOverlay, type Overlay } from "./edit-overlay.ts";
 import { drawInspect, type Armed } from "./inspect.ts";
 import { drawFlag, drawWarBanner } from "./structure-art.ts";
-import { RALLY_REACH } from "./war-banner.ts";
+import { bannerReach } from "./war-banner.ts";
 import { ParkGrass, type Walker } from "./park-grass.ts";
 import { PondWater } from "./pond-water.ts";
 import { ENEMIES } from "./catalog.ts";
@@ -244,7 +244,7 @@ export class DefendRenderer {
     this.ghosts.watch(sim, opts.now / 1000);
     this.ghosts.draw(this.ctx, this.px, opts.now / 1000, opts.reduceMotion);
     if (opts.effects ?? true) this.drawSmoke(map, sim, opts);
-    if (sim?.warBanner && !opts.hideBanner) drawWarBanner(this.ctx, this.px, sim.warBanner, RALLY_REACH, { t: opts.now / 1000, reduceMotion: opts.reduceMotion });
+    if (sim?.warBanner && !opts.hideBanner) drawWarBanner(this.ctx, this.px, sim.warBanner, bannerReach(sim), { t: opts.now / 1000, reduceMotion: opts.reduceMotion });
     if (sim) this.wizard.drawFire(this.ctx, this.px);
     if (opts.inspect) drawInspect(this.ctx, this.px, map, sim, opts.inspect.id, opts.inspect.armed, opts.now, opts.reduceMotion);
     this.drawEditing(overlay, opts.grid);

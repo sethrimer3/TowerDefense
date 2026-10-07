@@ -276,14 +276,24 @@ export class Ledger {
 
   private studyHtml(t: Topic) {
     const save = this.save, researchers = this.ctx.researchers();
-    const skills = (t.skills ?? []).map((id) => {
+    const skillCard = (id: SkillId) => {
       const skill = SKILLS[id], { level, price, maxed, available, canBuy } = skillPurchase(save, id);
       const node = TREE_OF[id].nodes.find((n) => n.id === id)!;
-      const missing = node.requires.filter((r) => !skillRank(save, r)).map((r) => SKILLS[r].name);
+      const missing = node.requires.filter((r) => skillRank(save, r) < (node.full?.includes(r) ? SKILLS[r].max : 1)).map((r) => SKILLS[r].name + (node.full?.includes(r) ? " (all ranks)" : ""));
       const why = maxed ? "" : missing.length ? `Needs ${missing.join(" and ")} first` : !available ? "Locked" : !canBuy ? `Needs ${price} Knowledge, have ${whole(save.knowledge)}` : "";
       return `<article class="ledger-skill ${level ? "owned" : ""} ${available ? "" : "locked"}"><span class="ledger-glyph" aria-hidden="true">${skill.icon}</span><div><small>${level} / ${skill.max} RANKS</small><h3>${skill.name}</h3><p>${skill.text}.${why ? ` <em>${why}.</em>` : ""}</p></div>
         <button data-learn="${id}" ${maxed || !canBuy || !researchers ? "disabled" : ""}>${maxed ? "Mastered" : `Learn<small>${price} Knowledge</small>`}</button></article>`;
-    });
+    };
+    if (t.id === "warBanner") {
+      const shared: SkillId[] = ["warBanner", "bannerCooldown", "bannerDefense", "bannerReach"];
+      const branches: { name: string; ids: SkillId[] }[] = [
+        { name: "Damage", ids: ["bannerDamage"] },
+        { name: "Marching speed", ids: ["bannerMarch"] },
+        { name: "Life & regeneration", ids: ["bannerLife", "bannerRegen"] },
+      ];
+      return `<div class="banner-research"><div class="banner-research-shared"><h4>Shared upgrades</h4>${shared.map(skillCard).join("")}</div><p class="ledger-note">Master Rapid deployment, then learn Sheltering standard and Broad standard to open the three branches. Each branch can be researched.</p><div class="banner-research-branches">${branches.map(branch => `<section><h4>${branch.name}</h4>${branch.ids.map(skillCard).join("")}</section>`).join("")}</div></div>`;
+    }
+    const skills = (t.skills ?? []).map(skillCard);
     const tree = pathsOf(t.id).length ? this.treeHtml(t) : "";
     if (!skills.length && !tree) return `<p class="ledger-empty">Nothing to study here yet.</p>`;
     return tree + skills.join("");

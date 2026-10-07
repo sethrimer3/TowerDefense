@@ -57,8 +57,7 @@ function fightDefender({ sim, e, def, reach }: Turn) {
     // A valkyrie just after her charge can't be hurt.
     if ("guard" in foe && foe.guard) return true;
     const damage = enemyDamage(sim, e);
-    const drained = Math.min(foe.hp, damage);
-    foe.hp -= damage;
+    const drained = sim.hurtDefender(foe, damage);
     if (e.kind === "leechSwarm") e.hp = Math.min(e.maxHp, e.hp + drained);
     foe.flash = 0.12;
   }
@@ -171,7 +170,7 @@ function breathe(sim: DefendSim, e: Enemy, _dt: number): boolean {
     return along >= 0 && along <= 5 && Math.abs(ux * dy - uy * dx) <= 0.35 + along * 0.45;
   };
   for (const soldier of sim.soldiers) if (soldier.hp > 0 && !soldier.guard && inside(soldier.x, soldier.y)) {
-    soldier.hp -= enemyDamage(sim, e);
+    sim.hurtDefender(soldier, enemyDamage(sim, e));
     soldier.flash = 0.12;
   }
   for (const civilian of sim.civilians) if (civilian.hp > 0 && inside(civilian.x, civilian.y)) {

@@ -23,9 +23,9 @@ export const TILE_FILTERS: { id: TileFilter; name: string }[] = [
   { id: "city", name: "City" },
   { id: "units", name: "Barracks" },
   { id: "towers", name: "Towers" },
-  { id: "consumables", name: "Consumables" },
+  { id: "consumables", name: "Skills" },
 ];
-export const TILE_TYPE_NAMES: Record<TileType, string> = { city: "City", units: "Barracks", towers: "Tower", consumables: "Consumable" };
+export const TILE_TYPE_NAMES: Record<TileType, string> = { city: "City", units: "Barracks", towers: "Tower", consumables: "Skill" };
 
 /** Tiles used up (or carried) in battle rather than placed in the city. */
 export type Consumable = "bomb" | "warBanner";
@@ -43,7 +43,7 @@ export const inFilter = (id: TileId, filter: TileFilter) => filter === "all" || 
 /** What a consumable does, as its tile reads. */
 export const CONSUMABLE_TEXT: Record<Consumable, string> = {
   bomb: "Drag onto the battlefield mid-defense to blast everything around where it lands. Used up when it goes off. Shaped charges spare your own people; the Smithy and Gunpowder make it hit harder.",
-  warBanner: "Plant it mid-defense and every troop with nothing in reach marches to it and fights round it. Never used up: lift it and plant it again. The War banner study makes your troops hit harder.",
+  warBanner: "Plant it mid-defense and every troop with nothing in reach marches to it and fights round it. Never used up: lift it and plant it again. Wait 10 seconds between placements; research reduces this to 7, 4 and 1 second, strengthens and enlarges its influence, and unlocks damage, marching speed, life and regeneration upgrades.",
 };
 
 /** One kind's stack: how many there are, how many stand in the city, and
@@ -116,7 +116,7 @@ export function buyTile(save: Save, id: TileId): boolean {
 }
 
 /** Consumables' upgrades live with the battle's and the troops' topics. */
-const CONSUMABLE_TOPIC: Record<Consumable, string> = { bomb: "battle", warBanner: "troops" };
+const CONSUMABLE_TOPIC: Record<Consumable, string> = { bomb: "battle", warBanner: "warBanner" };
 /** The topic a kind's upgrades are filed in, and its subject. */
 export function tileTopic(id: TileId): { subject: Subject; topic: Topic } {
   for (const subject of SUBJECTS)

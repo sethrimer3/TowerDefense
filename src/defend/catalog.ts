@@ -356,7 +356,7 @@ export const UPGRADES: UpgradeDef[] = [
   { id: "cannonDamage", group: "Cannon tower", name: "Heavy shot", maxLevel: 5, describe: (l) => `${cannonDamage(l)} blast damage, ${cannonSplash(l).toFixed(1)} cell burst` },
   { id: "cannonRate", group: "Cannon tower", name: "Powder monkeys", maxLevel: 4, describe: (l) => `A shell every ${cannonCooldown(l).toFixed(1)}s` },
   { id: "cannonSafe", group: "Cannon tower", name: "Gunnery drills", maxLevel: 1, describe: (l) => (l ? "Shells spare your own people" : "Shells hurt your own people too") },
-  { id: "bombSafe", group: "Consumables", name: "Shaped charges", maxLevel: 1, describe: (l) => (l ? "Bombs spare your own people" : "Bombs hurt your own people too") },
+  { id: "bombSafe", group: "Skills", name: "Shaped charges", maxLevel: 1, describe: (l) => (l ? "Bombs spare your own people" : "Bombs hurt your own people too") },
   { id: "watchRadius", group: "Watch tower", name: "Lookouts", maxLevel: 4, describe: (l) => `${watchRadius(l)} cell marking radius` },
   { id: "wizardFlame", group: "Wizard tower", name: "Flamethrower", maxLevel: 5, describe: (l) => `${flameDps(l)} flame damage a second, ${flameRange(l).toFixed(1)} cell reach` },
   { id: "wizardIce", group: "Wizard tower", name: "Ice wave", maxLevel: 5, describe: (l) => `${iceDamage(l)} ice damage, chills for ${iceChill(l).toFixed(1)}s` },
@@ -664,6 +664,7 @@ export type Bonuses = {
   bombDamage: number;
   /** The Study's paths each topic follows (`knowledge-paths.ts`); absent
    * with none chosen, so such a run plays exactly as before. */
+  banner?: { cooldown: number; defense: number; reach: number; damage: number; march: number; life: number; regen: number };
   paths?: BattlePaths;
 };
 export const NO_BONUSES: Readonly<Bonuses> = Object.freeze({

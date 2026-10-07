@@ -1,3 +1,4 @@
+import { bannerDamage } from "./war-banner.ts";
 import { enemySize } from "./catalog.ts";
 /** DEFEND troops: barracks keep their garrison topped up; swordsmen chase
  * enemies within their leash of the barracks (anywhere in the city at the
@@ -181,12 +182,12 @@ function strike(sim: DefendSim, s: Soldier, e: Enemy) {
   if (s.cd > 0) return;
   const assassin = paths(sim).assassin;
   s.cd = assassin >= 2 ? SOLDIER.cooldown * ASSASSIN.cooldown : SOLDIER.cooldown;
-  if (!assassin) return void sim.hurtEnemy(e, s.damage, true, "melee", s);
+  if (!assassin) return void sim.hurtEnemy(e, bannerDamage(sim, s), true, "melee", s);
   // Assassins count their strikes: every few is critical (no dice, so a
   // replay still plays the same).
   s.strikes = (s.strikes ?? 0) + 1;
   const crit = s.strikes % ASSASSIN.every[assassin] === 0;
-  sim.hurtEnemy(e, crit ? s.damage * ASSASSIN.crit : s.damage, true, "melee", s);
+  sim.hurtEnemy(e, crit ? bannerDamage(sim, s) * ASSASSIN.crit : bannerDamage(sim, s), true, "melee", s);
   if (crit) sim.effects.push({ kind: "spark", x: e.x, y: e.y, t: 0, r: 0.5 });
 }
 
@@ -249,7 +250,7 @@ function shoot(sim: DefendSim, s: Soldier, e: Enemy, range: number) {
   if (s.cd > 0) return;
   const { ranger, skirmish } = paths(sim);
   s.cd = ARCHER_UNIT.cooldown * SKIRMISH.reload[skirmish];
-  const damage = ranger >= 2 ? s.damage * RANGERS.damage : s.damage;
+  const damage = ranger >= 2 ? bannerDamage(sim, s) * RANGERS.damage : bannerDamage(sim, s);
   const loose = (t: Enemy) => sim.arrows.push({ x: s.x, y: s.y, origin: { x: s.x, y: s.y, attacker: s.id }, target: t.id, damage, tx: t.x, ty: t.y, life: 2 });
   loose(e);
   // Rangers' twin shot: a second arrow at the next nearest in sight.
