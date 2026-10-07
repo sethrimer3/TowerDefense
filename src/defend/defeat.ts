@@ -34,7 +34,7 @@ export function defeatHTML({ wave, best, record, stats }: DefeatSummary): string
     ? `<div class="defeat-charts">${chart("Damage dealt", waves, (w) => w.dealt, "dealt")}${chart("Damage taken", waves, (w) => w.city + w.keep, "taken")}${chart("Enemy difficulty", waves, (w) => w.difficulty, "difficulty")}</div>`
     : "";
   return `<button class="defeat-close" data-defeat-close type="button" aria-label="Close and rebuild the city">${CROSS}</button>
-    <strong>The keep has fallen</strong>
+    <div class="defeat-body"><strong>The keep has fallen</strong>
     <span>Fell during wave ${wave} · best ${best}</span>${note}
     <div class="defeat-stats">${[
       tile("waves held", String(held)),
@@ -45,7 +45,7 @@ export function defeatHTML({ wave, best, record, stats }: DefeatSummary): string
       tile("buildings fell", short(t.fell)),
       tile("civilians lost", short(t.civiliansLost)),
       tile("time", clock(t.seconds)),
-    ].join("")}</div>${charts}
+    ].join("")}</div>${charts}</div>
     <div class="defeat-actions"><button type="button" data-defeat-close>Close</button></div>`;
 }
 
@@ -53,7 +53,7 @@ export function defeatHTML({ wave, best, record, stats }: DefeatSummary): string
  * waves when there are more than fit. */
 function chart(title: string, all: WaveStats[], value: (w: WaveStats) => number, kind: string) {
   const waves = all.slice(-30);
-  const W = 320, H = 34, gap = 2, base = H - 10;
+  const W = 120, H = 48, gap = 1, base = H - 10;
   const top = Math.max(1, ...waves.map(value));
   // Thin bars: a few waves don't swell into blocks.
   const bw = Math.min(16, Math.max(2, (W - gap * (waves.length - 1)) / waves.length));

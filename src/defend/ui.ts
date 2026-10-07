@@ -38,7 +38,7 @@ import type { Drag } from "./drag-rules.ts";
 import { EditSession, type Drop } from "./edit-session.ts";
 import { BattleSound } from "./battle-sound.ts";
 import { QUIET, type Scene } from "../ambience.ts";
-import { NIGHT_FADE_SECONDS, isBossWave, rollWeather, skyLabel, type Weather } from "./weather.ts";
+import { NIGHT_FADE_SECONDS, isBossWave, rollWeather, type Weather } from "./weather.ts";
 import { play } from "../sound.ts";
 import { replay, sparksOver } from "../ui/flourish.ts";
 import { available, startingWave, withOutskirts, type DefendSave } from "./progress.ts";
@@ -256,9 +256,10 @@ export class DefendPage {
       <dialog class="defend-journal-dialog" aria-labelledby="defend-journal-title"></dialog>
       <dialog class="defend-wave-dialog" aria-labelledby="defend-wave-title"></dialog>`;
     this.keepBricks = new KeepBricks();
-    // The fallen keep's summary closes, and rebuilding starts, at a tap
-    // anywhere on it (its × too); a drag on its charts still scrolls it.
-    this.root.querySelector<HTMLElement>("#defend-banner")!.addEventListener("click", () => this.rebuild());
+    // Only the explicit close buttons dismiss the report.
+    this.root.querySelector<HTMLElement>("#defend-banner")!.addEventListener("click", (event) => {
+      if ((event.target as Element).closest("[data-defeat-close]")) this.rebuild();
+    });
     this.renderer = new DefendRenderer(this.root.querySelector("#defend-canvas")!);
     const canvas = this.renderer.canvas;
     canvas.addEventListener("pointerdown", (e) => this.pointers.down(e));
@@ -340,7 +341,7 @@ export class DefendPage {
     } else if (this.phase === "sim") {
       const armed = performance.now() < this.abandonArmed;
       el.innerHTML = `${this.sideToggle("Items")}<button id="defend-abandon" class="defend-danger ${armed ? "armed" : ""}">${armed ? "Confirm?" : "Abandon"}</button>
-        <button id="defend-speed" title="Battle speed">${this.sim?.speed ?? 1}×</button>${this.sideToggle("Items")}`;
+        <button id="defend-speed" title="Battle speed">${this.sim?.speed ?? 1}×</button>`;
       el.querySelector<HTMLButtonElement>("#defend-abandon")!.onclick = () => {
         if (performance.now() < this.abandonArmed) {
           this.abandonArmed = 0;
@@ -372,13 +373,13 @@ export class DefendPage {
     const area = areaForWave(startingWave(this.save)).id;
     c.imageSmoothingEnabled = false;
     if (hasWallArt(area)) {
-      for (let x = 0; x < 4; x++) c.drawImage(wallCapSprite(area, x, 0), x * 16, 0);
+      for (let x = 0; x < 4; x++) c.drawImage(wallCapSprite(area, x, 0)!, x * 16, 0);
     } else {
       const img = new Image();
       img.onload = () => {
         for (let x = 0; x < 4; x++) c.drawImage(img, 38, 1 + x * 16, 16, 16, x * 16, 0, 16, 16);
       };
-      img.src = `${import.meta.env.BASE_URL}assets/defend/wall-cap.png`;
+      img.src = `${(import.meta as ImportMeta & { env?: { BASE_URL?: string } }).env?.BASE_URL ?? "./"}assets/defend/wall-cap.png`;
     }
   }
 
@@ -531,9 +532,7 @@ export class DefendPage {
     const sim = this.sim;
     const hp = Math.max(0, sim.keepHp()),
       max = sim.keepMaxHp();
-    const sky = this.weather ? skyLabel(this.weather, this.night) : "";
-    // data-drop: the order pieces are left out when the row gets crowded.
-    const html = `${sky ? `<span class="defend-sky" data-drop="1">${sky}</span>` : ""}<span><small data-drop="5">Wave </small><b>${sim.wave}</b></span><span class="defend-best" data-drop="2">Best <b>${best}</b></span><span class="defend-keep" title="Keep ${Math.ceil(hp)} / ${max}"><small data-drop="3">Keep</small><i></i></span><span class="defend-foes"><small data-drop="4">Foes </small><b>${sim.enemies.length + sim.spawnQueue.length}</b></span>`;
+    const html = `<span><small>Wave </small><b>${sim.wave}</b></span><span class="defend-keep" title="Keep ${Math.ceil(hp)} / ${max}"><small>Keep</small><i></i></span>`;
     this.keepBricks?.set(hp / max);
     if (el.dataset.html !== html) {
       el.dataset.html = el.innerHTML = html;
@@ -846,7 +845,7 @@ export class DefendPage {
    * otherwise it picks out the tower or troop building under it (a second
    * tap, or a tap on anything else, puts it down). */
   private tap(e: PointerEvent) {
-    if (this.phase === "over") return this.rebuild();
+    if (this.phase === "over") return;
     const { cx, cy, inside } = eventCell(this.renderer!, e);
     const map = this.sim ? this.sim.map : this.currentMap();
     const b = inside ? map.buildings[map.owner[cy * CELLS_W + cx]] : undefined;

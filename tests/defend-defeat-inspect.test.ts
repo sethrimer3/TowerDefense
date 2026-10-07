@@ -50,7 +50,8 @@ test("the defeat summary shows the numbers and a chart a measure", () => {
   const html = defeatHTML({ wave: sim.wave, best: 4, record: 0, stats: sim.stats });
   assert.match(html, /The keep has fallen/);
   assert.match(html, /aria-label="Close and rebuild the city"/);
-  assert.match(html, /Tap anywhere to rebuild the city/);
+  assert.doesNotMatch(html, /Tap anywhere/);
+  assert.match(html, /data-defeat-close>Close<\/button>/);
   for (const t of ["Damage dealt", "Damage taken", "Enemy difficulty"]) assert.ok(html.includes(`>${t} `), t);
   assert.ok(!html.includes("NaN"));
   assert.equal(short(950), "950");

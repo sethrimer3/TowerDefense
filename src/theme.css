@@ -550,7 +550,7 @@ dialog {
   font-weight: 600;
 }
 /* The fallen keep's summary: a few numbers and a chart a measure, inked on
- * the parchment. A tap anywhere closes it. */
+ * the parchment. Explicit buttons close it. */
 .defend-banner.defeat {
   inset: 12px;
   margin: auto;
@@ -559,7 +559,7 @@ dialog {
   max-height: calc(100% - 24px);
   box-sizing: border-box;
   overflow-y: auto;
-  cursor: pointer;
+  cursor: default;
   overscroll-behavior: contain;
 }
 .defeat-close {
@@ -602,7 +602,8 @@ dialog {
 }
 .defeat-charts {
   display: grid;
-  gap: 6px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
   margin-top: 4px;
 }
 .defeat-chart {
@@ -616,7 +617,7 @@ dialog {
 .defeat-chart svg {
   display: block;
   width: 100%;
-  height: auto;
+  height: 48px;
 }
 .defeat-close svg {
   fill: currentColor;
@@ -646,8 +647,9 @@ dialog {
 }
 @media (max-width: 480px) {
   .defeat-stats {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(4, 1fr);
   }
+  .defeat-stat small { font-size: 8px; }
 }
 .defend-settings small,
 .defend-settings .hint {
@@ -1759,3 +1761,36 @@ dialog .away-row .away-note {
 .tile-tier b { color: #ffe1a0; }
 .tile-go.go-smithy { color: #ffe1b0; }
 .tile-go.go-study { color: #eadcff; }
+
+/* Defend actions stay at the ends; start and keep status share the center. */
+.defend-head { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 6px; }
+.defend-center { min-width: 0; max-width: 240px; display: flex; align-items: center; justify-content: center; }
+.defend-right { display: flex; align-items: center; justify-content: flex-end; gap: 5px; min-width: 0; }
+.defend-center button { padding: 6px 11px; white-space: nowrap; font-size: 12px; }
+.defend-building .defend-hud { display: none; }
+.defend-hud { justify-content: center; gap: 8px; padding: 7px 8px; border: 1px solid #8c7546; background: var(--stone), #201c17; border-radius: 2px; }
+.defend-hud > :first-child { margin-left: 0; }
+.defend-wave { position: relative; isolation: isolate; overflow: hidden; }
+.defend-wave .defend-wave-wall { position: absolute; inset: 0; width: 100%; height: 100%; z-index: -1; image-rendering: pixelated; filter: brightness(.35); }
+#defend-upgrades { display: inline-flex; align-items: center; gap: 4px; }
+#defend-upgrades .ui-sprite { width: 22px; height: 22px; image-rendering: pixelated; }
+.defend-journal-zone-title { padding: 8px; background: var(--area-dark); color: #f4e3b8; text-align: left; }
+.defend-banner.defeat { overflow: hidden; gap: 5px; padding: 12px; }
+.defeat-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 4px; }
+.defeat-body > strong { padding-inline: 24px; }
+.defeat-actions { flex: none; display: flex; justify-content: center; padding-top: 4px; }
+.defeat-actions button { min-width: 90px; padding: 5px 16px; }
+@media (max-width: 600px) {
+  .defend-head { gap: 3px; }
+  .defend-left, .defend-right { gap: 3px; }
+  .defend-left button, .defend-center button, .defend-cog { padding: 5px 5px; font-size: 10px; letter-spacing: 0; }
+  .defend-journal-button { padding: 3px; }
+  .defend-journal-button canvas { width: 30px; height: 30px; }
+  #defend-upgrades .ui-sprite { width: 16px; height: 16px; }
+  .defend-hud { max-width: 128px; padding: 5px 4px; gap: 3px; font-size: 10px; }
+  .defend-keep canvas { width: 48px; height: 24px; margin: -5px 0; }
+  .defend-hud .defend-keep small { display: none; }
+}
+
+.defend-left .defend-danger { margin-left: 0; }
+.defeat-chart figcaption small { display: block; }

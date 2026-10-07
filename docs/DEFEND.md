@@ -629,7 +629,8 @@ protection against ranged attacks. A dead generator loses its cloud.
 
 
 The Defend header's pixel leather journal is available while building and
-fighting. It lists only encountered enemies, including enemies killed between
+fighting. It groups discovered enemies by every zone where they appear (offspring
+with their parent), sorted by difficulty within each zone. It lists only encountered enemies, including enemies killed between
 frames, with stats and special abilities. Discoveries and read entries persist
 in the Defend save; legacy saves start with an empty journal. A red pixel
 exclamation marks unread discoveries. Opening the journal marks its entries
