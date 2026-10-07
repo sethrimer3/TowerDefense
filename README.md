@@ -44,6 +44,8 @@ The city is alive between and during battles: park grass sways in the wind (hard
 
 ## How it's built
 
+Mine crews favor easier ground, digging uneven tunnels and laying rails with one-pixel ramps. Stone takes three times as long as rock, harder stone around 30% down takes another three times as long, and dense stone around 60% down takes another three times. Miners set temporary lamps at dark working faces and hang lasting ceiling lanterns along established tracks; small 1×2 torches burn out. Light lifetimes and graded cart routes survive saves. `node tests/mine-tunnels.mjs` checks the desktop/mobile art and a simulated mining run without player saves (requires the dev server).
+
 Winter freezes boat wakes into persistent ice. Fire and explosions thaw it into drying water; ice blocks rebuilding and makes ground troops slide and recoil from blasts (`ice-motion.ts`). Ponds also freeze in cold weather. Water keeps pixel edges, reflected scenery, rain rings, and walking/sailing wakes. `tests/defend-ice.test.ts` covers gameplay and `node tests/defend-water.mjs` checks visuals without player saves.
 
 `src/defend/progress.ts` saves the selected battle speed for later runs. Defend controls center the start button or keep-health/wave box; `journal.ts` groups discoveries by zone and difficulty, and `defeat.ts` provides compact charts with explicit close buttons.

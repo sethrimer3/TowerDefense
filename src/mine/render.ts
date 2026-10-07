@@ -271,24 +271,6 @@ export class MineRenderer {
       const skyPx = pack(skyRgb, 1), up = y > 0 ? -W : 0, down = y < H - 1 ? W : 0;
       for (let x = 0; x < W; x++) {
         const i = idx(x, y), m = cells[i] === GRASS && builtGround[x] ? DIRT : cells[i], o = 2 * y * W2 + 2 * x, g4 = 4 * i;
-        if (m === TORCH && !burn[i]) {
-          // Only the right column: one flame pixel over one wooden pixel.
-          const f = (flicker + shade[i]) % 3;
-          const background = pack(y < stoneTop[x] ? DIRT_BACK : STONE_BACK, Math.min(1, warm[i] * 0.75));
-          px[o] = px[o + W2] = background;
-          px[o + 1] = pack(f === 1 ? TORCH_HOT : f === 2 ? TORCH_RGB : TORCH_DIM, 1);
-          px[o + W2 + 1] = pack(TORCH_STICK, 1);
-          continue;
-        }
-        if (m === LAMP || m === WORK_LAMP) {
-          const background = pack(y < stoneTop[x] ? DIRT_BACK : STONE_BACK, Math.min(1, warm[i] * 0.75));
-          px[o] = px[o + W2] = background;
-          // A narrow metal cap over a living amber flame; lantern chains
-          // are drawn over the cave's lit background below.
-          px[o + 1] = pack(LAMP_CAP, 1);
-          px[o + W2 + 1] = pack((flicker + shade[i]) % 3 ? LAMP_RGB : TORCH_HOT, 1);
-          continue;
-        }
         // Lava and fire give their own light, each pixel flickering apart.
         if (m === LAVA || burn[i]) {
           const shades = m === LAVA ? SHADES[LAVA] : FIRE_RGB, slow = m === LAVA ? 2 : 0;
@@ -347,7 +329,16 @@ export class MineRenderer {
         for (let q = 0; q < 4; q++) {
           const sx = q & 1, sy = q >> 1, g = grain[g4 + q];
           let c: RGB = back, k = 1;
-          if (m === AIR) {
+          const light = m === TORCH || m === LAMP || m === WORK_LAMP;
+          if (light && sx === 1) {
+            const f = (flicker + shade[i]) % 3;
+            // Paint just the right-hand pixels over the ordinary lit cave.
+            c = m === TORCH ? (sy ? TORCH_STICK : f === 1 ? TORCH_HOT : f === 2 ? TORCH_RGB : TORCH_DIM)
+              : sy ? (f ? LAMP_RGB : TORCH_HOT) : LAMP_CAP;
+            px[o + sy * W2 + sx] = pack(c, 1);
+            continue;
+          }
+          if (m === AIR || light) {
             k = 0.86 + g * 0.0011;
             if (inSky) {
               px[o + sy * W2 + sx] = skyPx;
@@ -1244,12 +1235,14 @@ export class MineRenderer {
 
   private drawFittings(sim: MineSim, y0: number, y1: number) {
     for (let y = Math.max(1, y0 - 10); y < Math.min(H - 1, y1 + 1); y++) for (let x = 1; x < W - 1; x++) {
-      const c = idx(x, y), m = sim.world.cells[c], k = Math.min(1, 0.04 + this.warm[c] * 0.9 + this.sky[c]);
+      const c = idx(x, y), m = sim.world.cells[c];
+      if (m !== RAIL && m !== LAMP) continue;
+      const k = Math.min(1, 0.04 + this.warm[c] * 0.9 + this.sky[c]);
       const color = (rgb: RGB, boost = 1) => `rgb(${rgb.map(v => Math.round(v * k * boost)).join(",")})`;
       if (m === RAIL) {
         let dy = 0;
         for (const d of [0, -1, 1]) if (sim.world.get(x + 1, y + d) === RAIL) { dy = d; break; }
-        if (x % 3 === 0) this.fine(x, y + 0.5, 0.5, 0.5, color(SLEEPER));
+        if (x % 3 === 0) this.fine(x, y + 1, 0.5, 0.5, color(SLEEPER));
         this.fine(x, y + 0.5, 0.5, 0.5, color(RAIL_HI));
         this.fine(x + 0.5, y + 0.5 + dy * 0.5, 0.5, 0.5, color(RAIL_LO));
       } else if (m === LAMP) {

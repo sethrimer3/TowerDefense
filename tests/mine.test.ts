@@ -2,7 +2,7 @@
 // work, its buildings and trades, what it pays, and its save.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { AIR, BEDROCK, CELLS, DIRT, GOLD, GRASS, GRAVEL, H, LAVA, LOOSE, COPPER, LADDER, MATERIAL_COUNT, RAIL, ROCK, SILVER, STONE, TORCH, W, World, decodeGrid, encodeGrid, generate, idx, isPassable, strata } from "../src/mine/world.ts";
+import { AIR, BEDROCK, CELLS, DIRT, GOLD, GRASS, GRAVEL, H, HARD_STONE, LAMP, LAVA, LOOSE, COPPER, LADDER, MATERIAL_COUNT, RAIL, ROCK, SILVER, STONE, TORCH, W, WORK_LAMP, World, decodeGrid, encodeGrid, generate, idx, isPassable, strata } from "../src/mine/world.ts";
 import {
   BARS_PER_POINT, BREATH_TICKS, DAY_TICKS, DEATH_GAP, KIT, MineSim, ORE_PER_BAR, STARVE_TICKS, metalSum, TICK_HZ, WEATHER_TICKS, daylight, decodeMineSave,
   hirePrice, PACE_MINUTES, skyAt, weatherOf,
@@ -58,7 +58,7 @@ test("a seed generates the same world: grass over dirt over stone, with copper, 
     assert.equal(a[idx(x, surface[x] - 1)], AIR);
     assert.equal(a[idx(x, surface[x])], GRASS);
     assert.ok([DIRT, ROCK, LOOSE].includes(a[idx(x, surface[x] + 3)]));
-    assert.ok([STONE, COPPER, SILVER, GOLD, GRAVEL].includes(a[idx(x, stoneTop[x] + 1)]));
+    assert.ok([STONE, HARD_STONE, COPPER, SILVER, GOLD, GRAVEL].includes(a[idx(x, stoneTop[x] + 1)]));
     assert.equal(a[idx(x, H - 1)], BEDROCK);
   }
   assert.ok(a.filter((m) => m === COPPER).length > 500);
@@ -78,21 +78,21 @@ test("a grid survives encoding; a damaged one is refused", () => {
   assert.equal(decodeGrid(42, CELLS, MATERIAL_COUNT), null);
 });
 
-test("one miner sinks a shored, laddered shaft and opens a tunnel with track and torches", () => {
+test("one miner sinks a shored, laddered shaft and opens a graded tunnel with track and lights", () => {
   const sim = new MineSim(12345);
   // Two nights' sleep among it.
-  minutes(sim, 32);
+  // Stone now takes three times its former rock baseline; allow the crew
+  // enough simulated time to fit the new graded route as well as dig it.
+  minutes(sim, 96);
   const x0 = sim.shaftX, { surface, stoneTop } = sim.strata;
   assert.ok(sim.depth >= sim.levels[0] - surface[x0], `shaft reached the first level (${sim.depth})`);
   for (let y = surface[x0] + 1; y < sim.levels[0]; y++) assert.equal(sim.world.get(x0, y), LADDER, `ladder at ${y}`);
   // Where the shaft passes through dirt, its walls are timbered.
   for (let y = surface[x0] + 2; y < stoneTop[x0] - 1; y++)
     for (const side of [-1, 1]) assert.notEqual(sim.world.get(x0 + side, y), DIRT, `shoring at ${side},${y}`);
-  const y = sim.levels[0];
   assert.ok(sim.railReach(0, -1) + sim.railReach(0, 1) > 20, "track laid");
-  let torches = 0;
-  for (let x = 0; x < W; x++) if (sim.world.get(x, y - 1) === TORCH) torches++;
-  assert.ok(torches >= 2, `torches hung (${torches})`);
+  const lights = sim.world.cells.filter(m => m === LAMP || m === TORCH || m === WORK_LAMP).length;
+  assert.ok(lights >= 2, `workings lit (${lights})`);
   assert.ok(metalSum(sim.mined) > 0, "ore found and dug");
 });
 
@@ -101,7 +101,7 @@ test("the crew's ore comes up by pack, cart and hoist to the forge, is smelted i
   sim.setLevel("barracks", 2);
   for (let i = 0; i < 5; i++) sim.hire();
   let points = 0;
-  for (let k = 0; k < 40; k++) {
+  for (let k = 0; k < 80; k++) {
     minutes(sim, 1);
     points += metalSum(sim.collect());
     for (const m of sim.miners) {

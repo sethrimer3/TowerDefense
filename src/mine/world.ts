@@ -153,12 +153,13 @@ export function generate(seed: number): Uint8Array {
   };
   pockets(78, LOOSE, (x) => surface[x] + 4, (x) => stoneTop[x] - 1, DIRT, 303);
   pockets(210, GRAVEL, (x) => stoneTop[x] + 2, () => H - 12, STONE, 404);
-  // Softer seams and harder lenses give the crew a reason to bend a tunnel.
+  // Softer seams in the deeper strata give the crew a reason to bend a tunnel.
   for (let i = 0; i < 440; i++) {
     const x = Math.floor(hash01(i, 1, seed + 419) * W);
     const y = stoneTop[x] + 5 + Math.floor(hash01(i, 2, seed + 419) * (H - 16 - stoneTop[x]));
     const host = stoneAtDepth(y, surface[x]);
-    const softer = host === DENSE_STONE ? HARD_STONE : host === HARD_STONE ? STONE : HARD_STONE;
+    if (host === STONE) continue;
+    const softer = host === DENSE_STONE ? HARD_STONE : STONE;
     blob(cells, x, y, 2 + Math.floor(hash01(i, 3, seed + 419) * 4), softer, seed + 419 + i, isStone);
   }
   caves(cells, seed, stoneTop);

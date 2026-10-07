@@ -45,7 +45,7 @@
  * and the stock to a new prospect (`prospectNext`), a fresh world. */
 import {
   AIR, BEDROCK, CELLS, COPPER, DIG_TICKS, DIRT, GOLD, GRAVEL, H, LADDER, LAMP, LAVA, LOOSE, MATERIAL_COUNT, RAIL, ROCK, RUBBLE, SILVER, STONE, TIMBER, TORCH, WORK_LAMP, W, World,
-  decodeGrid, encodeGrid, generate, hash01, idx, inBounds, isLoose, isOre, isPassable, isSoil, isSolid, isStone, isWood, strata, type Material, type Strata,
+  decodeGrid, encodeGrid, generate, hash01, idx, inBounds, isLoose, isOre, isPassable, isSoil, isSolid, isStone, isWood, stoneAtDepth, strata, type Material, type Strata,
 } from "./world.ts";
 import { BUILDINGS, FIRST_LEVELS, MAX_LEVEL, layout, pathTicks, type BuildingId, type Layout, type Levels, type Purpose, type Spot } from "./buildings.ts";
 import { minerName } from "./names.ts";
@@ -235,6 +235,11 @@ export type MineSave = {
   carts: (Metals & { level: number; side: number; x: number; y?: number })[];
   /** Temporary fittings, with their remaining simulated burn time. */
   lights?: [number, number][];
+  /** Compact floor offsets (-3..3, stored as 0..6), preserving abandoned
+   * stretches as well as the still-marked rail plan. */
+  routes?: string;
+  /** Deep stone strata have been applied; absent on older prospects. */
+  geology?: 1;
   buckets: Bucket[];
   shaftLevel: number;
   hired: number;
@@ -398,13 +403,21 @@ export class MineSim {
     const plan = cells && saved?.plan !== undefined ? decodeGrid(saved.plan, CELLS, PLAN_MARKS) : null;
     const water = saved?.water !== undefined && cells ? decodeGrid(saved.water, CELLS, 2) : null;
     const found = generate(this.seed);
+    if (cells && plan && saved?.geology !== 1) {
+      // Upgrade only untouched stone in old prospects. Excavated passages,
+      // ore, fittings and the crew's existing routes stay where they are.
+      for (let c = 0; c < CELLS; c++) if (cells[c] === STONE)
+        cells[c] = stoneAtDepth(Math.floor(c / W), this.strata.surface[c % W]);
+    }
     this.oreFound = countOre(found);
     this.world = new World(cells && plan ? cells : found, (cells && plan && water) || undefined);
     this.oreLeft = countOre(this.world.cells);
     this.plan = (cells && plan) || new Uint8Array(CELLS);
-    for (const y of this.levels) {
+    const routes = cells && plan ? decodeGrid(saved?.routes, this.levels.length * W, 7) : null;
+    for (const [k, y] of this.levels.entries()) {
       const rows = new Int16Array(W).fill(y);
-      if (cells && plan) for (let x = 0; x < W; x++)
+      if (routes) for (let x = 0; x < W; x++) rows[x] = y + routes[k * W + x] - 3;
+      else if (cells && plan) for (let x = 0; x < W; x++)
         for (let yy = y - 3; yy <= y + 3; yy++) if (this.plan[idx(x, yy)] === P_RAIL) rows[x] = yy;
       this.tunnelRows.push(rows);
     }
@@ -1405,6 +1418,7 @@ export class MineSim {
 
   /** Miners hang lasting lanterns along completed track with varied gaps. */
   private planLantern(x: number, y: number) {
+    if (!this.passable(x, y - 1) || !this.passable(x, y - 2)) return;
     const gap = 9 + Math.floor(hash01(x, y, this.seed + 423) * 8);
     if (this.nearbyLight(x, y - 1, gap, true)) return;
     for (const xx of [x, x - 1, x + 1]) {
@@ -1722,6 +1736,8 @@ export class MineSim {
         if (y === m.y + 1 && x === m.x && this.plan[c] === P_DIG) this.plan[c] = P_LADDER;
         this.afterDig(x, y, m);
         this.discover(x, y);
+        if (this.cell(x, y - 1) === RAIL && this.plan[c] === P_DIG) this.mark(x, y, P_BEAM);
+        for (const row of [y + 1, y + 2]) if (this.cell(x, row) === RAIL) this.planLantern(x, row);
       }
     } else if (t.kind === "build") {
       const c = t.cell, x = c % W, y = (c - x) / W;
@@ -2043,6 +2059,8 @@ export class MineSim {
   }
 
   save(now: number): MineSave {
+    const routes = new Uint8Array(this.levels.length * W);
+    for (const [k, rows] of this.tunnelRows.entries()) for (let x = 0; x < W; x++) routes[k * W + x] = rows[x] - this.levels[k] + 3;
     return {
       seed: this.seed,
       tick: this.tick,
@@ -2051,6 +2069,8 @@ export class MineSim {
       miners: this.miners.map((m) => ({ x: m.x, y: m.y, copper: m.copper, silver: m.silver, gold: m.gold, spoil: m.spoil, fed: m.fed, job: m.job, kit: m.kit, name: m.name })),
       carts: this.carts.map((c) => ({ level: c.level, side: c.side, x: c.x, y: c.y, copper: c.copper, silver: c.silver, gold: c.gold })),
       lights: [...this.lightLife.entries()],
+      routes: encodeGrid(routes),
+      geology: 1,
       buckets: [...(metalSum(this.hoist) > 0 ? [{ y: this.hoist.y, copper: this.hoist.copper, silver: this.hoist.silver, gold: this.hoist.gold }] : []), ...this.buckets.map((b) => ({ ...b }))],
       yard: { ...this.yard },
       shaftLevel: this.shaftLevel,
@@ -2127,6 +2147,9 @@ export function decodeMineSave(s: any): MineSave | null {
   if (!Array.isArray(s.carts) || !s.carts.every((c: any) => int(c?.level, 0, 100) && (c.side === 1 || c.side === -1) && int(c.x, 0, W - 1) && metals(c, 1e4))) return null;
   if (s.carts.some((c: any) => c.y !== undefined && !int(c.y, 1, H - 1))) return null;
   if (s.lights !== undefined && !(Array.isArray(s.lights) && s.lights.length <= CELLS && s.lights.every((p: any) => Array.isArray(p) && p.length === 2 && int(p[0], 0, CELLS - 1) && int(p[1], 1, TORCH_MIN_TICKS * 2)))) return null;
+  const routeLength = Math.ceil((H - 12 - Math.max(...strata(s.seed).stoneTop) - 5) / LEVEL_GAP) * W;
+  if (s.routes !== undefined && !narrow && !decodeGrid(s.routes, routeLength, 7)) return null;
+  if (s.geology !== undefined && s.geology !== 1) return null;
   if (!Array.isArray(s.buckets) || !s.buckets.every((b: any) => int(b?.y, 0, H) && metals(b, 1e4))) return null;
   // The weather's additions may be missing (an older save), never malformed.
   if (s.water !== undefined && !narrow && !decodeGrid(s.water, CELLS, 2)) return null;
@@ -2166,6 +2189,8 @@ export function decodeMineSave(s: any): MineSave | null {
     })),
     carts: s.carts.map((c: any) => ({ level: c.level, side: c.side, x: c.x, ...(c.y !== undefined ? { y: c.y } : {}), ...metals(c, 1e4)! })),
     ...(s.lights !== undefined && !narrow ? { lights: s.lights.map((p: number[]) => [p[0], p[1]] as [number, number]) } : {}),
+    ...(s.routes !== undefined && !narrow ? { routes: s.routes } : {}),
+    ...(s.geology === 1 ? { geology: 1 } : {}),
     buckets: s.buckets.map((b: any) => ({ y: b.y, ...metals(b, 1e4)! })),
     ...(s.prospect !== undefined ? { prospect: s.prospect } : {}),
     ...(s.fallen !== undefined ? { fallen: s.fallen.map((f: any) => ({ name: f.name, job: f.job, cause: f.cause })) } : {}),

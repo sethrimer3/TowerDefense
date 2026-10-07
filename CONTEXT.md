@@ -212,6 +212,15 @@ A flame's flickering, swaying, occlusion-aware glow: lanterns, braziers, tower f
 
 ### The mine
 
+**Work lamp**, **torch** and **lantern**:
+A miner sets a small temporary work lamp beside a dark face. Torches also burn out; lasting lanterns hang from the cave ceiling by a narrow chain. The crew place lighting as the workings expand.
+
+**Stone**, **hard stone** and **dense stone**:
+Three increasingly difficult layers of the mine, with hard stone around a third of the way down and dense stone around three fifths. Softer seams let miners find easier routes.
+
+**Rail incline**:
+A gentle rise or dip in the track through an uneven tunnel, followed by loaded and empty carts alike.
+
 **Mine**:
 The idle side view of the ground under the city, worked by miners whatever tab is open and while the game is closed. Its world comes from a seed.
 
