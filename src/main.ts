@@ -7,7 +7,10 @@ import { bonuses, busySmiths, payKills, payWave, settleTraining, skillRank, skil
 import type { AppContext } from "./ui/app.ts";
 import { el, type Tab } from "./ui/dom.ts";
 import { buildShell } from "./ui/shell.ts";
-import { UpgradesPage } from "./ui/upgrades-page.ts";
+import { Ledger } from "./ui/ledger.ts";
+import { TilesPage } from "./ui/tiles-page.ts";
+import { Chamber, Descent } from "./ui/chamber.ts";
+import { paintIcon } from "./defend/structure-art.ts";
 import { renderSettingsPage } from "./ui/settings-page.ts";
 import type { Weather } from "./defend/weather.ts";
 import { play, soundEnabledBy } from "./sound.ts";
@@ -24,6 +27,7 @@ import { unlockAllTowers } from "./defend/progress.ts";
 // navigation, the currency bar and the frame loop between the pages.
 
 buildShell(document.querySelector<HTMLDivElement>("#app")!);
+document.querySelectorAll<HTMLCanvasElement>("nav canvas[data-icon]").forEach((c) => paintIcon(c, "cityTile"));
 let save: Save = load();
 let tab: Tab = "defend";
 const clock = () => Date.now();
@@ -38,6 +42,7 @@ const ctx: AppContext = {
   smiths: () => smithNames(),
   researchers: () => libraryPage.sim.count("researcher"),
   researched: () => libraryPage.sim.researched(),
+  openChamber,
   devChanged: () => {
     if (save.settings.devTowers) unlockAllTowers(save.defend);
     update();
@@ -50,7 +55,21 @@ const ctx: AppContext = {
     store();
   },
 };
-const upgradesPage = new UpgradesPage(ctx);
+const reduced = () => save.settings.reduceMotion || matchMedia("(prefers-reduced-motion: reduce)").matches;
+const tilesPage = new TilesPage(ctx, el("tiles"));
+/** The rooms below the Mine and the Library, and the way down to each. */
+const smithyRoom = new Chamber(el("mine-chamber"), "planks"), studyRoom = new Chamber(el("library-chamber"), "vault");
+const smithy = new Ledger(ctx, smithyRoom.content, "smithy", () => mineDown.go(false));
+const study = new Ledger(ctx, studyRoom.content, "study", () => libraryDown.go(false));
+const mineDown = new Descent(el("mine"), "mine", reduced), libraryDown = new Descent(el("library"), "library", reduced);
+/** Goes to the Mine's Smithy or the Library's Study, open at a topic. */
+function openChamber(where: "smithy" | "study", topic?: string) {
+  const ledger = where === "smithy" ? smithy : study;
+  if (topic) ledger.focus(topic);
+  navigate(where === "smithy" ? "mine" : "library");
+  ledger.render();
+  (where === "smithy" ? mineDown : libraryDown).go(true);
+}
 const defendPage = new DefendPage(el("defend"), {
   save: () => save.defend,
   bonuses: () => bonuses(save),
@@ -76,10 +95,10 @@ const defendPage = new DefendPage(el("defend"), {
   gridLines: () => (save.settings.tileGrid ? save.settings.gridOpacity / 100 : 0),
   effects: () => !save.settings.effectsOff,
   devMode: () => save.settings.devMode,
-  openUpgrades: () => navigate("upgrades"),
+  openTiles: () => navigate("tiles"),
 });
 
-const minePage = new MinePage(el("mine"), {
+const minePage = new MinePage(el("mine-world"), {
   gold: () => save.gold,
   free: () => save.settings.devMode,
   spendGold: (n) => {
@@ -90,7 +109,8 @@ const minePage = new MinePage(el("mine"), {
     for (const k of METALS) save.smithy[k] += points[k];
     mineDirty = true;
     refreshCurrencies();
-    if (tab === "upgrades") upgradesPage.render();
+    if (tab === "mine" && mineDown.below) smithy.render();
+    if (tab === "tiles") tilesPage.refresh();
   },
   upgrades: () => ({ coffee: skillRank(save, "coffee"), waterproof: skillRank(save, "waterproofing"), smiths: skillTotal(save, "smiths") }),
   busySmiths: () => busySmiths(save),
@@ -98,8 +118,9 @@ const minePage = new MinePage(el("mine"), {
   newSeed: () => Math.floor(stream("game")() * 4294967296),
   modal,
   store: () => store(),
+  descend: () => openChamber("smithy"),
 });
-const libraryPage = new LibraryPage(el("library"), {
+const libraryPage = new LibraryPage(el("library-world"), {
   gold: () => save.gold,
   free: () => save.settings.devMode,
   spendGold: (n) => {
@@ -119,6 +140,7 @@ const libraryPage = new LibraryPage(el("library"), {
   },
   upgrades: () => ({ fireproof: skillRank(save, "fireproofWood"), fireTraining: skillRank(save, "fireTraining"), nightWatch: skillRank(save, "nightWatch"), enchant: skillRank(save, "enchantedInk") }),
   showing: () => tab === "library",
+  descend: () => openChamber("study"),
 });
 /** The mine or the library has paid out since the last save. */
 let mineDirty = false;
@@ -208,7 +230,9 @@ function renderPage() {
   if (tab === "defend") defendPage.show();
   if (tab === "mine") minePage.show();
   if (tab === "library") libraryPage.show();
-  if (tab === "upgrades") upgradesPage.render();
+  if (tab === "mine" && mineDown.below) smithy.render();
+  if (tab === "library" && libraryDown.below) study.render();
+  if (tab === "tiles") tilesPage.render();
   if (tab === "settings") renderSettingsPage(ctx);
 }
 function navigate(id: Tab) {
@@ -252,14 +276,20 @@ function frame(time: number) {
   libraryPage.advance(clock(), minePage.owedMs);
   idleTimers();
   if (tab === "defend") defendPage.frame(time);
-  if (tab === "mine") minePage.frame(time);
-  if (tab === "library") libraryPage.frame(time);
+  // The scene above is drawn only while it is in view, the room below likewise.
+  if (tab === "mine" && mineDown.above) minePage.frame(time);
+  if (tab === "library" && libraryDown.above) libraryPage.frame(time);
+  if (tab === "mine" && mineDown.below) {
+    smithyRoom.draw(clock(), reduced());
+    smithy.drawParticles(time);
+  }
+  if (tab === "library" && libraryDown.below) studyRoom.draw(clock(), reduced());
+  if (tab === "tiles") tilesPage.frame(clock());
   if (mineDirty && time - lastMineSave > 30000) {
     lastMineSave = time;
     store();
   }
   welcome.refresh();
-  if (tab === "upgrades") upgradesPage.drawParticles(time);
   hear(save.settings.ambienceOff ? QUIET : tab === "defend" ? defendPage.ambience() : tab === "mine" ? minePage.ambience() : tab === "library" ? libraryPage.ambience() : QUIET);
   if (time - lastTick >= 1000) {
     lastTick = time;
@@ -268,7 +298,7 @@ function frame(time: number) {
       update();
       play("trained");
     }
-    if (tab === "upgrades") upgradesPage.tick(done);
+    if (tab === "mine" && mineDown.below) smithy.tick(done);
   }
   requestAnimationFrame(frame);
 }

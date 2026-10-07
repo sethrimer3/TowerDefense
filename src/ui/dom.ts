@@ -10,6 +10,7 @@ const UI_ASSET_BASE = (import.meta as ImportMeta & { env?: { BASE_URL?: string }
 export const uiSprite = (name: UiSprite, className = "ui-sprite") =>
   `<img class="${className}" src="${UI_ASSET_BASE}assets/ui/${name}.png" alt="" aria-hidden="true">`;
 
-export const TAB_ICONS = { defend: uiSprite("defend"), mine: uiSprite("mine"), library: uiSprite("library"), upgrades: uiSprite("upgrades"), settings: uiSprite("settings") };
+/** The Tiles tab's icon is a city tile, painted by the board's own art once the shell is built. */
+export const TAB_ICONS = { defend: uiSprite("defend"), mine: uiSprite("mine"), library: uiSprite("library"), tiles: `<canvas class="ui-sprite" width="48" height="48" data-icon="cityTile"></canvas>`, settings: uiSprite("settings") };
 export type Tab = keyof typeof TAB_ICONS;
-export const TAB_NAMES: Record<Tab, string> = { defend: "Defend", mine: "Mine", library: "Library", upgrades: "Upgrades", settings: "Settings" };
+export const TAB_NAMES: Record<Tab, string> = { defend: "Defend", mine: "Mine", library: "Library", tiles: "Tiles", settings: "Settings" };

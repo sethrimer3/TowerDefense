@@ -2,21 +2,17 @@ import { play } from "../sound.ts";
 import { TRAINING, addSmith, busySmiths, whole, buySkill, cancelTraining, removeSmith, skillPurchase, skillRank, startTraining, trainingLeft, trainingStep, type TrainingId } from "../progression.ts";
 import { BARS_PER_POINT, METALS } from "../mine/sim.ts";
 import { SKILLS, TREES, type SkillId } from "../skill-trees.ts";
-import { crownBought, crownedFrom, evolve, evolvedBy, learnPath, pathById, pathState, pathsOf, unlearnPath, type KnowledgePath, type PathId, type PathTopic } from "../knowledge-paths.ts";
+import { evolve, learnPath, pathById, pathState, pathsOf, unlearnPath, type KnowledgePath, type PathId, type PathTopic } from "../knowledge-paths.ts";
 import { paintPathIcon } from "./path-icons.ts";
 import { TrainingParticles } from "../training-particles.ts";
 import { trainingSeconds } from "../training-jobs.ts";
-import {
-  BALLISTA_DESCRIPTION, BOMB_GOLD, ITEM_NAMES, BOMB_RADIUS, GATE_DESCRIPTION, SPEED3_PRICE, SPIKES_DESCRIPTION, STRUCTURES, UPGRADES,
-  footprint, purchasePrice, shareName, upgradePrice, type PaletteItem, type Price, type UpgradeId,
-} from "../defend/catalog.ts";
-
-import { available, buyBomb, buyItem, buySpeed3, buyUpgrade, canAfford, type Wallet } from "../defend/progress.ts";
+import { ITEM_NAMES, SPEED3_PRICE, UPGRADES, upgradePrice, type Price, type UpgradeId } from "../defend/catalog.ts";
+import { buySpeed3, buyUpgrade, canAfford, type Wallet } from "../defend/progress.ts";
 import { paintIcon, type IconItem } from "../defend/structure-art.ts";
-import { SUBJECTS, topicItems, type Extra, type Subject, type SubjectId, type Topic } from "../upgrade-subjects.ts";
+import { SUBJECTS, type Subject, type SubjectId, type Topic } from "../upgrade-subjects.ts";
 import { replay, sparksOver } from "./flourish.ts";
 import type { AppContext } from "./app.ts";
-import { el, uiSprite } from "./dom.ts";
+import { uiSprite } from "./dom.ts";
 import { holdToRepeat } from "./hold-repeat.ts";
 
 /** Hours, minutes and seconds left, as the timers show them. */
@@ -30,14 +26,35 @@ export function formatDuration(ms: number) {
 
 const TREE_OF = Object.fromEntries(TREES.flatMap((t) => t.nodes.map((n) => [n.id, t]))) as Record<SkillId, (typeof TREES)[number]>;
 
-/** The Upgrades page: one ledger for every upgrade in the game, by subject
- * (Realm, City, Towers, Units, Mine, Library) and within it by topic (one
- * tower, one unit building…). Each topic has a Forge, its permanent
- * numbers (copies of the building, the Armory's levels, the Smithy's rows
- * worked by the mine's smiths), and a Study, what Knowledge buys there and
- * its paths, drawn as a tree. */
-export class UpgradesPage {
-  private subject: SubjectId = "realm";
+/** The two underground chambers that hold the upgrades: the Smithy under
+ * the Mine (the Armory's levels and the Smithy's rows, paid with the mine's
+ * metal and worked by its smiths) and the Study under the Library (skills
+ * and Knowledge paths, bought with Knowledge while a researcher is in the
+ * lab). Copies of buildings and consumables are bought in the Tiles tab. */
+export type LedgerKind = "smithy" | "study";
+
+/** Whether a topic has anything for one chamber. */
+export function topicHas(t: Topic, kind: LedgerKind) {
+  if (kind === "smithy") return !!(t.upgrades?.length || t.training?.length || t.extras?.includes("speed3"));
+  return !!(t.skills?.length || pathsOf(t.id).length);
+}
+/** The subjects with something for a chamber, each with only those topics. */
+export function ledgerSubjects(kind: LedgerKind): Subject[] {
+  return SUBJECTS.map((s) => ({ ...s, topics: s.topics.filter((t) => topicHas(t, kind)) })).filter((s) => s.topics.length);
+}
+
+const CHAMBER = {
+  smithy: { title: "The Smithy", blurb: "Below the mine, by the forge's heat: what the smiths make stronger", up: "Up to the mine" },
+  study: { title: "The Study", blurb: "Beneath the library, by candle and sigil: what Knowledge changes", up: "Up to the library" },
+};
+
+/** One chamber's ledger: its subjects and their topics along two strips
+ * (each scrolling sideways, so the page never grows long), and the chosen
+ * topic's upgrades below. The Smithy's are the Armory's levels and the
+ * Smithy's rows; the Study's are the skills and the paths, drawn as a tree. */
+export class Ledger {
+  private subjects: Subject[];
+  private subject: SubjectId;
   private topics: Partial<Record<SubjectId, string>> = {};
   private trainingParticles = new TrainingParticles();
   /** The rank picked in each topic's path tree ("path:index", or "path:crown"). */
@@ -47,51 +64,64 @@ export class UpgradesPage {
   /** Whether holding a buy button repeats it yet (bound on the first draw). */
   private holding = false;
 
-  constructor(private ctx: AppContext) {}
+  constructor(private ctx: AppContext, readonly root: HTMLElement, readonly kind: LedgerKind, private up: () => void) {
+    this.subjects = ledgerSubjects(kind);
+    this.subject = this.subjects[0].id;
+  }
 
   private get save() {
     return this.ctx.save();
   }
 
   private current(): Subject {
-    return SUBJECTS.find((s) => s.id === this.subject)!;
+    return this.subjects.find((s) => s.id === this.subject)!;
   }
   private topic(): Topic {
     const s = this.current();
     return s.topics.find((t) => t.id === this.topics[s.id]) ?? s.topics[0];
   }
 
+  /** Opens at a topic (by id), when this chamber has it. */
+  focus(topicId: string) {
+    const s = this.subjects.find((s) => s.topics.some((t) => t.id === topicId));
+    if (!s) return;
+    this.subject = s.id;
+    this.topics[s.id] = topicId;
+  }
+
   render() {
-    const subject = this.current(), topic = this.topic();
-    // Redrawn in place (a purchase, a tapped rank): keep where each part was scrolled to.
+    const subject = this.current(), topic = this.topic(), smithy = this.kind === "smithy", c = CHAMBER[this.kind];
+    // Redrawn in place (a purchase, a tapped rank): keep where the list was scrolled to.
     const same = this.shown === `${subject.id}:${topic.id}`;
-    const scrolls = SCROLLERS.map((sel) => (same ? (el("upgrades").querySelector(sel)?.scrollTop ?? 0) : 0));
+    const list = this.root.querySelector(".chamber-list"), scroll = same ? (list?.scrollTop ?? 0) : 0;
+    const strips = Array.from(this.root.querySelectorAll(".ledger-strip")).map((s) => s.scrollLeft);
     this.shown = `${subject.id}:${topic.id}`;
-    const subjects = SUBJECTS.map((s) => `<button data-subject="${s.id}" aria-pressed="${s.id === subject.id}"><span>${uiSprite(s.sprite)}</span>${s.name}</button>`).join("");
+    const subjects = this.subjects.map((s) => `<button data-subject="${s.id}" aria-pressed="${s.id === subject.id}"><span>${uiSprite(s.sprite)}</span>${s.name}</button>`).join("");
     const topics = subject.topics.length > 1
-      ? `<div class="ledger-topics" role="group" aria-label="${subject.name}">${subject.topics.map((t) => `<button data-topic="${t.id}" aria-pressed="${t.id === topic.id}">${t.item ? `<canvas width="22" height="22" data-icon="${t.item}"></canvas>` : ""}${t.name}</button>`).join("")}</div>`
+      ? `<div class="ledger-strip ledger-topics" role="group" aria-label="${subject.name}">${subject.topics.map((t) => `<button data-topic="${t.id}" aria-pressed="${t.id === topic.id}">${t.item ? `<canvas width="22" height="22" data-icon="${t.item}"></canvas>` : ""}${t.name}</button>`).join("")}</div>`
       : "";
-    el("upgrades").innerHTML = `<div class="tree-tabs ledger-subjects" role="group" aria-label="Subjects">${subjects}</div>${topics}
-      <div class="ledger-body">
-        <section class="ledger-half ledger-forge" aria-label="Forge"><canvas class="training-particles" aria-hidden="true"></canvas>
-          <header class="ledger-heading"><h3>Forge</h3><small>Permanent: more of it, and stronger</small></header>${this.forgeHtml(topic)}</section>
-        <section class="ledger-half ledger-study" aria-label="Study">
-          <header class="ledger-heading"><h3>Study</h3><small>Knowledge: change how it works</small></header>${this.studyHtml(topic)}</section>
-      </div>`;
-    const root = el("upgrades");
+    this.root.innerHTML = `<header class="chamber-head">
+        <button class="chamber-up" data-up title="${c.up}"><span aria-hidden="true">⤒</span> ${c.up}</button>
+        <div class="chamber-title"><h2>${c.title}</h2><small>${c.blurb}</small></div>
+      </header>
+      ${smithy ? this.walletHtml() : this.knowledgeHtml()}
+      <div class="ledger-strip ledger-subjects" role="group" aria-label="Subjects">${subjects}</div>${topics}
+      <section class="chamber-list ledger-half ${smithy ? "ledger-forge" : "ledger-study"}" aria-label="${topic.name}">${smithy ? `<canvas class="training-particles" aria-hidden="true"></canvas>` : ""}
+        ${smithy ? this.forgeHtml(topic) : this.studyHtml(topic)}</section>`;
+    const root = this.root;
     if (!this.holding) {
       this.holding = true;
-      holdToRepeat(root, ["data-buy", "data-upgrade", "data-buy-bomb"]);
+      holdToRepeat(root, ["data-upgrade"]);
     }
-    SCROLLERS.forEach((sel, i) => {
-      const box = root.querySelector(sel);
-      if (box) box.scrollTop = scrolls[i];
-    });
+    root.querySelector(".chamber-list")!.scrollTop = scroll;
+    root.querySelectorAll(".ledger-strip").forEach((s, i) => (s.scrollLeft = strips[i] ?? 0));
+    root.querySelector('.ledger-strip [aria-pressed="true"]')?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
     root.querySelectorAll<HTMLCanvasElement>("canvas[data-icon]").forEach((c) => paintIcon(c, c.dataset.icon as IconItem));
     root.querySelectorAll<HTMLCanvasElement>("canvas[data-path-icon]").forEach((c) => {
       const [icon, hue] = c.dataset.pathIcon!.split(":");
       paintPathIcon(c, icon as never, hue as never);
     });
+    root.querySelector<HTMLButtonElement>("[data-up]")!.onclick = () => this.up();
     root.querySelectorAll<HTMLButtonElement>("[data-subject]").forEach((b) => (b.onclick = () => {
       this.subject = b.dataset.subject as SubjectId;
       this.render();
@@ -109,30 +139,27 @@ export class UpgradesPage {
     root.querySelectorAll<HTMLButtonElement>("[data-learn-path]").forEach((b) => (b.onclick = () => this.learnPath(b.dataset.learnPath as PathId)));
     root.querySelectorAll<HTMLButtonElement>("[data-evolve]").forEach((b) => (b.onclick = () => this.evolve(b.dataset.evolve as PathId)));
     root.querySelectorAll<HTMLButtonElement>("[data-unlearn]").forEach((b) => (b.onclick = () => this.unlearn(b.dataset.unlearn as PathTopic)));
-    root.querySelectorAll<HTMLButtonElement>("[data-goto]").forEach((b) => (b.onclick = () => this.ctx.navigate(b.dataset.goto as "mine" | "library")));
   }
 
-  // ── Forge ───────────────────────────────────────────────────────────────
-  /** The Forge's wallet: the mine's copper, silver and gold. */
+  // ── The Smithy ──────────────────────────────────────────────────────────
+  /** The Smithy's wallet: the mine's copper, silver and gold. */
   private wallet(): Wallet {
     const s = this.save;
     return { ...s.smithy, free: s.settings.devMode };
   }
 
+  private walletHtml() {
+    const s = this.save, w = this.wallet(), smiths = this.ctx.smiths(), free = this.freeSmiths();
+    return `<p class="ledger-note chamber-wallet">${METALS.map((k) => `<b class="metal-${k}">${bal(s, w[k])}</b> ${k}`).join(" · ")}
+      <span>· smiths <b id="training-slots">${smiths.length - free.length} / ${smiths.length}</b> busy</span><small> · a point of a metal from every ${BARS_PER_POINT} bars</small></p>`;
+  }
+
   private forgeHtml(t: Topic) {
-    const s = this.save, d = s.defend, w = this.wallet();
-    const copies = topicItems(t).map((base) => {
-      // Crowned, the building's copies are its greater building, bought here.
-      const crown = crownedFrom(s, base)?.evolves, item = crown?.item ?? base;
-      const p = purchasePrice(item, d.owned[item]), grown = evolvedBy(item);
-      const buy = grown && !crown
-        ? `<em class="ledger-evolves">${crownedFrom(s, grown.evolves!.from) ? `Bought in the ${ITEM_NAMES[grown.evolves!.from]}'s Forge while crowned.` : `Not sold: ${grown.name}'s crown turns every ${ITEM_NAMES[grown.evolves!.from]} into one.`}</em>`
-        : `<button data-buy="${item}" ${canAfford(w, p) ? "" : "disabled"}>Buy one<small>${priceText(p)}</small></button>`;
-      const note = crown ? `<b class="ledger-next">Crowned: the ${ITEM_NAMES[base]} is now a ${crown.name}.</b>` : "";
-      return `<article class="card defend-card ledger-card"><canvas width="44" height="44" data-icon="${item}"></canvas><div><small>OWNED ${d.owned[item]} · ${available(d, item)} TO PLACE</small><h3>${ITEM_NAMES[item]}</h3><p>${this.itemText(item)}${note}</p></div>
-        ${buy}</article>`;
-    });
-    const extras = (t.extras ?? []).map((x) => this.extraHtml(x, w));
+    const d = this.save.defend, w = this.wallet();
+    const extras = t.extras?.includes("speed3")
+      ? [`<article class="card defend-card ledger-card"><div><small>${d.speed3 ? "UNLOCKED" : "ONE-TIME UNLOCK"}</small><h3>War drums</h3><p>Adds 3× to the battle speed button.</p></div>
+      <button data-buy-speed3 ${d.speed3 || !canAfford(w, SPEED3_PRICE) ? "disabled" : ""}>${d.speed3 ? "Owned" : `Buy<small>${priceText(SPEED3_PRICE)}</small>`}</button></article>`]
+      : [];
     const levels = (t.upgrades ?? []).map((id) => {
       const u = UPGRADES.find((u) => u.id === id)!, lvl = d.levels[id], maxed = lvl >= u.maxLevel;
       const p = u.price ? u.price(lvl) : upgradePrice(lvl);
@@ -140,32 +167,9 @@ export class UpgradesPage {
         <button data-upgrade="${id}" ${maxed || !canAfford(w, p) ? "disabled" : ""}>${maxed ? "Maxed" : `Upgrade<small>${priceText(p)}</small>`}</button></article>`;
     });
     const smithy = t.training?.length ? this.smithyHtml(t.training) : "";
-    const elsewhere = t.elsewhere
-      ? `<article class="card defend-card ledger-card"><div><small>${t.elsewhere === "mine" ? "BUILDINGS, CREW AND TRADES" : "SHELVES, STAFF AND THE LAB"}</small><h3>Raised in the ${t.name}</h3><p>${t.elsewhere === "mine" ? "Tap a building in the Mine to raise its level with Gold, and hire miners there." : "Buy shelves, hire librarians and raise the alchemy lab in the Library."}</p></div><button data-goto="${t.elsewhere}">Open the ${t.name}</button></article>`
-      : "";
-    const wallet = copies.length || extras.length || levels.length
-      ? `<p class="ledger-note">Paid with the mine's metal: ${METALS.map((k) => `<b class="metal-${k}">${bal(s, w[k])}</b> ${k}`).join(" · ")}<small> · the smiths make a point of a metal from every ${BARS_PER_POINT} bars</small></p>`
-      : "";
-    const body = [wallet, ...copies, ...extras, ...levels, smithy, elsewhere].join("");
+    const forged = levels.length || extras.length ? `<h4 class="training-group">On the anvil</h4>` : "";
+    const body = [forged, ...levels, ...extras, smithy].join("");
     return body || `<p class="ledger-empty">Nothing to forge here.</p>`;
-  }
-
-  private itemText(item: PaletteItem) {
-    if (item === "cityTile") return "Expands the city limits. New tiles must touch the city; the wall moves out to enclose them.";
-    if (item === "cityGate") return GATE_DESCRIPTION;
-    if (item === "wallSpikes") return SPIKES_DESCRIPTION;
-    if (item === "wallBallista") return BALLISTA_DESCRIPTION;
-    const d = this.save.defend;
-    return `${STRUCTURES[item].description} Takes ${shareName(footprint(item, d.layout.compact.includes(item)).size)}.`;
-  }
-
-  private extraHtml(x: Extra, w: Wallet) {
-    const d = this.save.defend;
-    if (x === "bomb")
-      return `<article class="card defend-card ledger-card"><canvas width="44" height="44" data-icon="bomb"></canvas><div><small>OWNED ${d.bombs}</small><h3>Bomb</h3><p>Drag onto the battlefield mid-defense to blast everything within ${BOMB_RADIUS.toFixed(0)} cells, your own people too until Shaped charges.</p></div>
-        <button data-buy-bomb ${this.save.settings.devMode || this.save.gold >= BOMB_GOLD ? "" : "disabled"}>Buy one<small>${BOMB_GOLD} Gold</small></button></article>`;
-    return `<article class="card defend-card ledger-card"><div><small>${d.speed3 ? "UNLOCKED" : "ONE-TIME UNLOCK"}</small><h3>War drums</h3><p>Adds 3× to the battle speed button.</p></div>
-      <button data-buy-speed3 ${d.speed3 || !canAfford(w, SPEED3_PRICE) ? "disabled" : ""}>${d.speed3 ? "Owned" : `Buy<small>${priceText(SPEED3_PRICE)}</small>`}</button></article>`;
   }
 
   private bindForge(root: HTMLElement) {
@@ -182,14 +186,7 @@ export class UpgradesPage {
       replay(bought, "bought");
       sparksOver(bought?.querySelector("button") ?? null, "gold");
     };
-    root.querySelectorAll<HTMLButtonElement>("[data-buy]").forEach((b) => (b.onclick = () => commit((w) => {
-      const item = b.dataset.buy as PaletteItem, grown = evolvedBy(item);
-      if (!buyItem(d, w, item)) return false;
-      if (grown) crownBought(s, grown.evolves!.from);
-      return true;
-    }, `[data-buy="${b.dataset.buy}"]`)));
     root.querySelectorAll<HTMLButtonElement>("[data-upgrade]").forEach((b) => (b.onclick = () => commit((w) => buyUpgrade(d, w, b.dataset.upgrade as UpgradeId), `[data-upgrade="${b.dataset.upgrade}"]`)));
-    root.querySelector<HTMLButtonElement>("[data-buy-bomb]")?.addEventListener("click", () => commit(() => buyBomb(d, s.settings.devMode ? { gold: 0, free: true } : s), "[data-buy-bomb]"));
     root.querySelector<HTMLButtonElement>("[data-buy-speed3]")?.addEventListener("click", () => commit((w) => buySpeed3(d, w), "[data-buy-speed3]"));
     root.querySelectorAll<HTMLButtonElement>("[data-train]").forEach((b) => (b.onclick = () => {
       const smith = this.freeSmiths()[0];
@@ -259,12 +256,16 @@ export class UpgradesPage {
         : `<button class="training-box training-cost metal-${metal}" data-train="${t.id}" ${affordable && (free.length || devFree) ? "" : "disabled"} aria-label="Upgrade ${t.name} to ${shown(next)} for ${price} Smithy point, taking one smith ${takes}" title="${why}">${price}</button>`;
       return `<div class="training-row${job ? " active" : ""}" role="listitem" data-training-row="${t.id}"><span class="training-label">${t.name}<small>+${t.per}% a rank, up to ${t.max * t.per}%${maxed ? "" : ` · one smith takes ${takes}`}</small></span><span class="training-box">${shown(now)}</span><span class="training-arrow" aria-hidden="true">→</span><span class="training-box next">${shown(next)}</span>${buy}</div>`;
     };
-    return `<h4 class="training-group">At the smithy</h4>
-      <p class="ledger-note">Smiths <b id="training-slots">${smiths.length - free.length} / ${smiths.length}</b> busy<small> · each rank costs one point and a smith's time</small></p>
+    return `<h4 class="training-group">At the smithy</h4><p class="ledger-note"><small>Each rank costs one Smithy point and a smith's time.</small></p>
       <div class="training-table" role="list" aria-label="Smithy upgrades">${ids.map((id) => row(TRAINING.find((t) => t.id === id)!)).join("")}</div>`;
   }
 
-  // ── Study ───────────────────────────────────────────────────────────────
+  // ── The Study ───────────────────────────────────────────────────────────
+  private knowledgeHtml() {
+    const save = this.save, researchers = this.ctx.researchers();
+    return `<p class="ledger-note chamber-wallet">You have <b class="knowledge">${whole(save.knowledge)}</b> Knowledge${researchers ? ` · ${researchers} ${researchers === 1 ? "researcher" : "researchers"} in the lab` : " · put a librarian to the alchemy lab to research"}</p>`;
+  }
+
   private studyHtml(t: Topic) {
     const save = this.save, researchers = this.ctx.researchers();
     const skills = (t.skills ?? []).map((id) => {
@@ -276,9 +277,8 @@ export class UpgradesPage {
         <button data-learn="${id}" ${maxed || !canBuy || !researchers ? "disabled" : ""}>${maxed ? "Mastered" : `Learn<small>${price} Knowledge</small>`}</button></article>`;
     });
     const tree = pathsOf(t.id).length ? this.treeHtml(t) : "";
-    const note = `<p class="ledger-note">You have <b class="knowledge">${whole(save.knowledge)}</b> Knowledge${researchers ? ` · ${researchers} ${researchers === 1 ? "researcher" : "researchers"} in the lab` : " · put a librarian to the alchemy lab to research"}</p>`;
-    if (!skills.length && !tree) return `${note}<p class="ledger-empty">Nothing to study here yet.</p>`;
-    return note + tree + skills.join("");
+    if (!skills.length && !tree) return `<p class="ledger-empty">Nothing to study here yet.</p>`;
+    return tree + skills.join("");
   }
 
   /** A topic's paths as a tree: the building at the root, a branch to each
@@ -365,7 +365,7 @@ export class UpgradesPage {
     // Read on to the next rank, so the next tap learns it.
     this.picked[p.topic] = `${id}:${rank < p.ranks.length ? rank : p.evolves ? "crown" : rank - 1}`;
     this.render();
-    const node = el("upgrades").querySelector(`[data-pick="${id}:${rank - 1}"]`);
+    const node = this.root.querySelector(`[data-pick="${id}:${rank - 1}"]`);
     replay(node, "bought");
     sparksOver(node as HTMLElement | null, "arcane");
   }
@@ -376,7 +376,7 @@ export class UpgradesPage {
     play("levelUp");
     this.ctx.update();
     this.render();
-    const node = el("upgrades").querySelector(`[data-pick="${id}:crown"]`);
+    const node = this.root.querySelector(`[data-pick="${id}:crown"]`);
     replay(node, "bought");
     sparksOver(node as HTMLElement | null, "gold");
   }
@@ -397,28 +397,28 @@ export class UpgradesPage {
     play(level === 0 ? "unlock" : "chime");
     this.ctx.update();
     this.render();
-    const card = el("upgrades").querySelector(`[data-learn="${id}"]`)?.closest(".ledger-skill") ?? null;
+    const card = this.root.querySelector(`[data-learn="${id}"]`)?.closest(".ledger-skill") ?? null;
     replay(card, "bought");
     sparksOver(card?.querySelector("button") ?? null, "arcane");
   }
 
   // ── Each frame and each second ──────────────────────────────────────────
-  /** Once a second while the page shows: the whole page once a rank
+  /** Once a second while the chamber shows: the whole chamber once a rank
    * completes, else the countdowns. */
   tick(completed: boolean) {
     if (completed) return this.render();
     for (const job of this.save.trainingJobs) {
-      const span = document.querySelector<HTMLElement>(`[data-training-timer="${job.id}"]`);
+      const span = this.root.querySelector<HTMLElement>(`[data-training-timer="${job.id}"]`);
       if (span) span.textContent = this.timeLeft(job.id);
     }
   }
 
-  /** The Forge's backdrop of drifting specks, streaming along rows in work. */
+  /** The Smithy's backdrop of drifting specks, streaming along rows in work. */
   drawParticles(time: number) {
-    const canvas = document.querySelector<HTMLCanvasElement>(".ledger-forge .training-particles");
+    const canvas = this.root.querySelector<HTMLCanvasElement>(".ledger-forge .training-particles");
     if (!canvas) return;
     const top = canvas.getBoundingClientRect().top;
-    const lanes = Array.from(document.querySelectorAll<HTMLElement>(".training-row.active")).map((row) => {
+    const lanes = Array.from(this.root.querySelectorAll<HTMLElement>(".training-row.active")).map((row) => {
       const r = row.getBoundingClientRect();
       return r.top + r.height / 2 - top;
     });
@@ -426,8 +426,6 @@ export class UpgradesPage {
   }
 }
 
-/** The page's scrolling parts: the halves side by side, or the body when stacked. */
-const SCROLLERS = [".ledger-body", ".ledger-forge", ".ledger-study"];
 const ROMAN = ["I", "II", "III", "IV", "V"];
 const priceText = (p: Price) => METALS.filter((k) => p[k]).map((k) => `${p[k]} ${k}`).join(" · ");
 const bal = (s: { settings: { devMode: boolean } }, n: number) => (s.settings.devMode ? "∞" : Math.floor(n + 1e-9));

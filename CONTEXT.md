@@ -62,13 +62,13 @@ The multipliers the Smithy and the skill trees lay over a defense (troops, tower
 ### Progress
 
 **Armory**:
-The levels for every building of a type, and the city elements and battle speed, now sold in the Upgrades tab's Forge for the mine's metal; `UPGRADES` in code.
+The levels for every building of a type, and the city elements and battle speed, now sold in the Smithy below the Mine for the mine's metal; `UPGRADES` in code.
 
 **Gold**:
 Battle Gold, the coin: paid by kills and every wave held; spent on the mine's and the library's buildings and hires, and on bombs. Not the mine's gold bars.
 
 **Copper** and **silver**:
-The mine's metal, as Smithy points: every ten bars the smiths work make a point. Spent in the Forge. (They were once battle coins, and before that iron and steel bars.)
+The mine's metal, as Smithy points: every ten bars the smiths work make a point. Spent in the Smithy and the Tiles shop. (They were once battle coins, and before that iron and steel bars.)
 
 **Time away** (welcome back):
 The time since the game was last saved, up to a day, banked for each of the Mine and Library. On returning, both automatically fast-forward their work, earning gains as they go. Remaining idle time survives closing the game, and the welcome-back screen shows the running gains.
@@ -91,14 +91,26 @@ Shelvers filling the burned holes in a purchased bookshelf with new planks, keep
 **Upgrade point**:
 One for every new best wave held in Defend, shown in the currency bar; banked for what the meta game brings later. (It replaced the Commander level and its experience.)
 
-**Upgrades tab**:
-One ledger for every upgrade, by **subject** (Realm, City, Towers, Units, Mine, Library) and within it by **topic** (one tower, one unit building…). Each topic has a **Forge** and a **Study**.
+**Subject** and **topic**:
+How every upgrade is filed: by subject (Realm, City, Towers, Units, Mine, Library) and within it by topic (one tower, one unit building…). The Smithy and the Study each show the topics they have something for. (They were once the Upgrades tab's, each topic with a Forge and a Study.)
 
-**Forge**:
-A topic's permanent upgrades: more copies of its building, its Armory levels and its Smithy rows.
+**Smithy** (the room):
+The workshop below the Mine, reached by its ⚒ Smithy button: a topic's permanent upgrades paid with the mine's metal, its Armory levels and its Smithy rows.
 
 **Study**:
-What Knowledge buys for a topic: its skills, and its **paths**, drawn as a tree.
+The vault beneath the Library, reached by its ✦ Study button: what Knowledge buys for a topic, its skills, and its **paths**, drawn as a tree.
+
+**Descent**:
+The way down from the Mine or the Library to the room below it: the scene slides up, the earth and a ladder rush past, and the room rises into place.
+
+**Tile**:
+Anything owned to put into a defense: a City tile or a piece of the wall (City), a unit building (Barracks), a tower (Tower), or a **consumable** (a bomb, used up when it goes off, or the war banner, never used up). Shown in the **Tiles tab**, the keep's hall.
+
+**Stack**:
+All the tiles of one kind, shown as one tile marked with its quantity (×4); opened, it shows each copy, whether it stands in the city or waits in the palette.
+
+**Higher tier**:
+The greater building a tile becomes through its path's crown (an **evolution**): Wizard tower into Dark wizard keep, Barracks into Valkyrie palace.
 
 **Path** (in a topic's Study):
 One way a building can grow, in ranks learned in order with Knowledge: the Wizard tower's Pyromancy (flames only), Rime (ice only, then freezing solid) or Stormcalling (lightning in place of flames), the Barracks' Crusaders (hearty, healing) or Assassins (swift, with critical strikes), the Archer tower's Fire arrows (setting enemies **burning**) or Sharpshooters, the Cannon tower's Gun crews (with **grapeshot**) or Siege shot, the Archer barracks' Rangers or Skirmishers, the Watch tower's Spotters or Signal fires, the Mage Guild's Pyroclasm or Cinders, Monster bait's Oil-soaked or Fortified crates, Wall spikes' Blasting stakes (blowing up on contact), Spring stakes (the whole row shooting out) or Rimed stakes (chilling). Choosing a path's first rank **seals** the topic's other paths; **unlearning** it returns every point of Knowledge spent and opens them again.
@@ -106,7 +118,7 @@ One way a building can grow, in ranks learned in order with Knowledge: the Wizar
 **Evolution**:
 A path's crown, turning its building into a greater one (Stormcalling's Wizard tower into the Dark wizard keep, Crusaders' Barracks into the Valkyrie palace), learned with Knowledge after the path's last rank. Every copy owned, placed or not, becomes the greater building, back in the palette to place again, and copies bought while crowned are greater ones too; unlearning the path turns them back. The greater buildings are no longer sold on their own.
 
-**Smithy** (rows in the Upgrades tab's Forge; Training in code):
+**Smithy rows** (in the Smithy; Training in code):
 Ranks of a few percent each on one row (troop HP, tower damage, Gold found…). A rank costs one Smithy point and is worked by the mine's smiths: one smith takes its whole time, more smiths share it. A smith on a rank stays at the smithy until it's done; taking the last one off cancels the rank and returns its point.
 
 **Smithy point**:

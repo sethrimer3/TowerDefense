@@ -1,6 +1,6 @@
 /** The skills, bought with Knowledge (which the Library earns by the hour,
  * and each wave a defense holds past the best before it pays) in the
- * Upgrades page's Study (`upgrade-subjects.ts` says where each is shown).
+ * Study beneath the Library (`upgrade-subjects.ts` says where each is shown).
  * Each skill has ranks; every rank applies its effect once more: Command's
  * and Stewardship's to every defense from the next one on, the Library's
  * and the Mine's to the library and the mine at once. The trees group them

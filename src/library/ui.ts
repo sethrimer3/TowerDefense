@@ -37,12 +37,14 @@ export interface LibraryHost {
   upgrades(): { fireproof: number; fireTraining: number; nightWatch: number; enchant: number };
   /** Whether the Library tab shows. */
   showing(): boolean;
+  /** Climbs down to the Study beneath the library, where Knowledge is spent. */
+  descend?(): void;
 }
 
 const ROLE: Record<Role, { name: string; one: string; hint: string }> = {
   shelver: { name: "Shelvers", one: "shelver", hint: "Shelvers build shelves and ladders, wheel the carts, shelve and sort the books, and fight fires" },
   professor: { name: "Professors", one: "professor", hint: "Professors read the books, a book once each, for Knowledge: built shelves times professors an hour" },
-  researcher: { name: "Researchers", one: "researcher", hint: "Researchers work the alchemy lab below, one a lab level; with none, the Upgrades tab's Knowledge research can't be bought" },
+  researcher: { name: "Researchers", one: "researcher", hint: "Researchers work the alchemy lab below, one a lab level; with none, the Study's Knowledge research can't be bought" },
 };
 const escape = (s: string) => s.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 const plural = (k: number, one: string) => `${k} ${one}${k === 1 ? "" : "s"}`;
@@ -158,11 +160,12 @@ export class LibraryPage {
         <button id="library-staff-toggle" class="mine-crew-toggle" aria-pressed="false" aria-controls="library-staff">☰ Staff</button>
         <p id="library-roles" class="mine-prospect"></p>
         <button id="library-lab" class="library-lab" title="Pan down to the alchemy lab, or back up">⤓ Lab</button>
+        <button id="library-study" class="chamber-door study-door" title="Climb down beneath the library to the Study, where Knowledge is spent">✦ Study</button>
       </div>
       <div class="mine-body" id="library-body">
         <aside class="mine-crew" id="library-staff" aria-label="The staff" aria-hidden="true">
           ${ROLES.map((r) => `<section class="crew-box" data-role="${r}" title="${ROLE[r].hint}"><h3><i class="job-mark job-${r}"></i>${ROLE[r].name} <b data-count="${r}">0</b></h3><ul></ul></section>`).join("")}
-          <p class="crew-hint">Drag a name to another role. Tap one to follow them. Researchers work the lab below the nave: with none, Knowledge research in the Upgrades tab can't be bought. The lab has room for one researcher a level: expand it for more.</p>
+          <p class="crew-hint">Drag a name to another role. Tap one to follow them. Researchers work the lab below the nave: with none, Knowledge research in the Study can't be bought. The lab has room for one researcher a level: expand it for more.</p>
         </aside>
         <div class="mine-view library-view"><canvas id="library-canvas" aria-label="The library"></canvas><p id="library-away" class="mine-away" role="status" hidden></p><p id="library-alert" class="mine-away library-alert" role="status" hidden></p></div>
       </div>`;
@@ -188,6 +191,7 @@ export class LibraryPage {
       r.goal = r.inLab ? H / 2 : LAB_FLOOR - 52;
       this.shownStaff = "";
     };
+    this.root.querySelector<HTMLButtonElement>("#library-study")!.onclick = () => this.host.descend?.();
     this.bindView(canvas);
     this.bindStaff(this.root.querySelector<HTMLElement>("#library-staff")!);
   }

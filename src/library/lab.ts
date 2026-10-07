@@ -6,7 +6,7 @@
  * under it; the alembic drips distillate into its receiver, which, full, is
  * carried to the philosopher's stone on its pedestal and makes it glow; a
  * chant lights the transmutation circle on the wall (so does a research
- * bought in the Upgrades tab). Now and then a brew goes wrong in a cloud of
+ * bought in the Study beneath the library). Now and then a brew goes wrong in a cloud of
  * coloured smoke and leaves its brewer sooty, and its mess on the floor
  * until someone sweeps it up. A researcher may taste the brew (and float a
  * moment, or hiccup bubbles), read a scroll, feed the homunculus, or look
