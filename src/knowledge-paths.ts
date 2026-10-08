@@ -1,3 +1,4 @@
+/** Collection-wide Knowledge unlocks; persistent cards equip researched ranks independently. */
 import type { PaletteItem } from "./defend/catalog.ts";
 import type { PlacedKind } from "./defend/layout.ts";
 import { syncCards } from "./cards.ts";
@@ -27,8 +28,7 @@ export type KnowledgePath = {
   motto: string;
   hue: PathHue;
   ranks: PathRank[];
-  /** The greater building the path's crown turns `from` into, for `cost`
-   * Knowledge. */
+  /** The evolution unlocked by this path's crown research. */
   evolves?: { from: PlacedKind; item: PlacedKind; name: string; cost: number; text: string };
 };
 
@@ -275,10 +275,7 @@ export const PATH_TOPICS = [...new Set(PATHS.map((p) => p.topic))];
 export const pathById = (id: PathId) => PATHS.find((p) => p.id === id)!;
 export const pathsOf = (topic: string) => PATHS.filter((p) => p.topic === topic);
 
-/** A topic's chosen path, how many of its ranks are learned, and the
- * Knowledge they cost (what unlearning returns). `crowned`, once its
- * evolution is learned, counts the copies of the building it turned (and
- * that unlearning turns back); absent before. */
+/** Legacy topic-wide choices retained solely for old-save migration. */
 export type PathChoice = { path: PathId; rank: number; spent: number; crowned?: number };
 export type PathChoices = Partial<Record<PathTopic, PathChoice>>;
 /** What the battle reads: each topic's path and rank. */
@@ -302,9 +299,7 @@ export function pathState(save: Save, id: PathId) {
 }
 
 /** Base cards stay for sale after a crown is researched. */
-export const crownedFrom = (_save: Save, _item: PaletteItem): KnowledgePath | undefined => undefined;
 export const evolvedBy = (item: PaletteItem): KnowledgePath | undefined => PATHS.find(p => p.evolves?.item === item);
-export function crownBought(_save: Save, _item: PaletteItem) {}
 
 /** Unlock a crown. Transforming a specific card is a separate, free choice. */
 export function evolve(save: Save, id: PathId, prepaid?: number): boolean {
@@ -357,13 +352,6 @@ export function decodePathResearch(raw: unknown): PathResearch {
     out[p.id] = { rank: r.rank, spent: r.spent, ...(r.crowned === true && p.evolves && r.rank === p.ranks.length ? { crowned: true } : {}) };
   }
   return out;
-}
-
-/** Legacy topic-wide choices exist only for decoding old saves. */
-export function battlePaths(save: Save): BattlePaths | undefined {
-  const out: BattlePaths = {};
-  for (const [topic, c] of Object.entries(save.paths) as [PathTopic, PathChoice][]) out[topic] = { path: c.path, rank: c.rank };
-  return Object.keys(out).length ? out : undefined;
 }
 
 /** Keeps only well formed choices: a known topic, its own path, a rank it

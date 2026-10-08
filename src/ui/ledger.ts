@@ -1,4 +1,4 @@
-import { syncCards, cardTopic, cardLabel, equipCard, evolveCard, type OwnedCard } from "../cards.ts";
+import { syncCards, cardTopic, cardLabel, equipCard, evolveCard, unevolveCard, type OwnedCard } from "../cards.ts";
 import { TILE_TYPE, TILE_NAMES } from "../tiles.ts";
 import { cardDetailHtml } from "./card-detail.ts";
 import { flip } from "./flip.ts";
@@ -105,6 +105,8 @@ export class Ledger {
   }
 
   render() {
+    const active = document.activeElement instanceof HTMLElement && this.root.contains(document.activeElement) ? document.activeElement : null;
+    const focusAttrs = active ? Array.from(active.attributes).filter(a => a.name.startsWith("data-")).map(a => `[${a.name}="${CSS.escape(a.value)}"]`).join("") : "";
     syncCards(this.save.defend);
     this.researchCrew = this.ctx.researchers();
     this.smithCrew = this.ctx.smiths().join("\n");
@@ -170,6 +172,7 @@ export class Ledger {
       this.topics[this.subject] = b.dataset.topic;
       this.render();
     }));
+    if (focusAttrs) root.querySelector<HTMLElement>(focusAttrs)?.focus({ preventScroll: true });
     this.bindForge(root);
     root.querySelectorAll<HTMLButtonElement>("[data-learn]").forEach((b) => (b.onclick = () => this.learn(b.dataset.learn as SkillId)));
     root.querySelectorAll<HTMLButtonElement>("[data-pick]").forEach((b) => (b.onclick = () => {
@@ -192,23 +195,23 @@ export class Ledger {
   private galleryHtml(subject: Subject) {
     const study = this.kind === "study";
     const cards = subject.topics.map(t => {
-      const copies = this.cardsFor(t), expanded = study && this.expanded.has(t.id) && copies.length > 0;
+      const copies = this.cardsFor(t), individual = pathsOf(t.id).length > 0, expanded = study && individual && this.expanded.has(t.id) && copies.length > 0;
       const type = t.item ? TILE_TYPE[t.item] : "consumables";
       const face = (item = t.item) => `<span class="tile-face">${item ? `<canvas width="48" height="48" data-icon="${item}"></canvas>` : uiSprite(subject.sprite)}</span>`;
       if (expanded) return copies.map(c => `<button class="tile single type-${TILE_TYPE[c.kind]} ${c.placement ? "placed" : ""} ${this.selectedCard === c.id ? "open" : ""}"
         data-key="${t.id}#${c.id}" data-ledger-card="${c.id}" data-card-topic="${t.id}" aria-pressed="${this.selectedCard === c.id}" title="${TILE_NAMES[c.kind]} card ${c.id}: ${cardLabel(c)}">
         ${face(c.kind)}<span class="tile-name">${TILE_NAMES[c.kind]}</span><small class="tile-sub">Card #${c.id} · ${c.placement ? "City" : "Ready"}</small><small class="card-specialization">${cardLabel(c)}</small></button>`).join("");
       const layers = copies.length > 2 ? "layers-2" : copies.length > 1 ? "layers-1" : "";
-      return `<button class="tile type-${type} ${layers}" data-key="${t.id}" data-ledger-stack="${t.id}" aria-expanded="${expanded}" aria-label="${t.name}, ${copies.length} cards. ${study && copies.length ? "Spread individual cards" : "Shared upgrades"}">
-        ${face()}<span class="tile-name">${t.name}</span>${t.item ? `<b class="tile-count">x${copies.length}</b>` : ""}<small class="tile-sub">${study ? copies.length ? "Tap to spread cards" : "Shared research" : "Upgrades all cards"}</small></button>`;
+      return `<button class="tile type-${type} ${layers}" data-key="${t.id}" data-ledger-stack="${t.id}" aria-expanded="${expanded}" aria-label="${t.name}, ${copies.length} cards. ${study && individual && copies.length ? "Spread individual cards" : "Shared upgrades"}">
+        ${face()}<span class="tile-name">${t.name}</span>${t.item ? `<b class="tile-count">x${copies.length}</b>` : ""}<small class="tile-sub">${study ? individual ? copies.length ? "Tap to spread cards" : "Research paths" : "Shared research" : "Upgrades all cards"}</small></button>`;
     }).join("");
     return `<div class="ledger-collection"><p class="ledger-note">${study ? "Tap a stack to spread every card. Choose a card to equip its path. Research unlocks are shared." : "Select a type. Smithy equipment improves every card of that type."}</p><div class="tiles-grid ledger-tiles">${cards}</div>
-      ${study ? [...this.expanded].filter(id => subject.topics.some(t => t.id === id)).map(id => `<button class="study-gather" data-gather="${id}">Gather ${subject.topics.find(t => t.id === id)!.name} cards</button>`).join("") : ""}</div>`;
+      ${study ? [...this.expanded].filter(id => pathsOf(id).length && subject.topics.some(t => t.id === id)).map(id => `<button class="study-gather" data-gather="${id}">Gather ${subject.topics.find(t => t.id === id)!.name} cards</button>`).join("") : ""}</div>`;
   }
 
   private studyBody(t: Topic) {
     const card = this.save.defend.cards.find(c => c.id === this.selectedCard);
-    if (t.item && this.cardsFor(t).length && (!card || !this.cardsFor(t).includes(card)))
+    if (pathsOf(t.id).length && this.cardsFor(t).length && (!card || !this.cardsFor(t).includes(card)))
       return `<p class="ledger-empty">Spread the stack, then select an individual card.</p>`;
     return `${card && this.cardsFor(t).includes(card) ? cardDetailHtml(this.save, card, true) : `<p class="ledger-scope">SHARED RESEARCH · ${t.name}</p>`}${this.studyHtml(t)}`;
   }
@@ -217,9 +220,12 @@ export class Ledger {
     const parent = this.root.parentElement!;
     let ghosts = parent.querySelector<HTMLElement>(".ledger-ghosts");
     if (!ghosts) { ghosts = document.createElement("div"); ghosts.className = "tiles-ghosts ledger-ghosts"; ghosts.setAttribute("aria-hidden", "true"); parent.append(ghosts); }
+    const focused = document.activeElement instanceof HTMLElement ? document.activeElement.dataset.key : undefined;
     change();
     flip(this.root, () => this.render(), { ghosts, reduced: this.save.settings.reduceMotion || matchMedia("(prefers-reduced-motion: reduce)").matches,
       alias: key => key.includes("#") ? key.split("#")[0] : `${key}#${this.cardsFor(this.current().topics.find(t => t.id === key) ?? this.topic())[0]?.id}` });
+    if (focused) (this.root.querySelector<HTMLElement>(`[data-key="${CSS.escape(focused)}"]`)
+      ?? this.root.querySelector<HTMLElement>(`[data-key^="${CSS.escape(focused.split("#")[0])}#"]`))?.focus({ preventScroll: true });
   }
 
   private bindCards() {
@@ -230,6 +236,9 @@ export class Ledger {
     });
     this.root.querySelectorAll<HTMLButtonElement>("[data-evolve-card]").forEach(b => b.onclick = () => {
       if (evolveCard(this.save, Number(b.dataset.evolveCard))) { this.ctx.update(); play("levelUp"); this.relayout(() => {}); }
+    });
+    this.root.querySelectorAll<HTMLButtonElement>("[data-unevolve-card]").forEach(b => b.onclick = () => {
+      if (unevolveCard(this.save, Number(b.dataset.unevolveCard))) { this.ctx.update(); this.relayout(() => {}); }
     });
     this.root.querySelectorAll<HTMLButtonElement>("[data-card-go]").forEach(b => b.onclick = () => this.ctx.openChamber(b.dataset.cardGo as LedgerKind, b.dataset.cardTopic));
   }
@@ -423,12 +432,10 @@ export class Ledger {
   /** A topic's paths as a tree: the building at the root, a branch to each
    * path, its ranks down the branch in order and, on a path that has one,
    * the evolution's crown at its tip. The chosen branch burns in its
-   * colours, the others are sealed in grey until it is unlearned; a tapped
-   * rank is read out (and learned) below. */
+   * colours when researched. A tapped rank is read out below; unlocking it
+   * makes it available for individual cards to equip. */
   private treeHtml(t: Topic) {
-    const save = this.save, paths = pathsOf(t.id), n = paths.length, topic = paths[0].topic;
-    const card = save.defend.cards.find(c => c.id === this.selectedCard);
-    const choice = card?.path ? { path: card.path, rank: card.rank ?? 0 } : undefined;
+    const save = this.save, paths = pathsOf(t.id), n = paths.length;
     const w = 100 * n, mid = w / 2;
     const fan = paths.map((p, i) => {
       const x = 100 * i + 50, cls = pathState(save, p.id).rank ? "lit" : "open";
@@ -452,11 +459,11 @@ export class Ledger {
       return `<div class="path-col hue-${p.hue} ${state}"><header class="path-banner"><h4>${p.name}</h4><small>${st.sealed ? "Sealed" : p.motto}</small></header>${ranks}${crown}</div>`;
     }).join("");
     const following = `<p class="ledger-scope">RESEARCH ONCE · unlocks are available to every card. Equip them above.</p>`;
-    return `<div class="path-tree" style="--paths:${n}">
+    return `${following}<div class="path-tree" style="--paths:${n}">
         <div class="path-root"><span class="path-medal root"><canvas width="44" height="44" data-icon="${t.item}"></canvas></span><span>${t.name}</span></div>
         <svg class="path-fan" viewBox="0 0 ${w} 40" preserveAspectRatio="none" aria-hidden="true">${fan}</svg>
         <div class="path-cols">${cols}</div>
-      </div>${following}${this.pickedHtml(t, paths)}`;
+      </div>${this.pickedHtml(t, paths)}`;
   }
 
   /** What the tapped rank does, and learning it (or why not). */
@@ -477,7 +484,6 @@ export class Ledger {
     if (!r) return "";
     let action: string;
     if (i < st.rank) action = `<span class="path-done">Learned</span>`;
-    else if (st.sealed) action = `<em>Sealed while you follow ${pathById(save.paths[p.topic]!.path).name}. Unlearn it to choose this path.</em>`;
     else if (i > st.rank) action = `<em>Learn ${p.ranks[st.rank].name} first.</em>`;
     else {
       const active = save.researchJob?.kind === "path" && save.researchJob.id === p.id;

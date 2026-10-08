@@ -75,13 +75,46 @@ try {
     s = await state(page); assert.equal(s.defend.owned.wizardTower, 2); assert.equal(s.defend.owned.darkKeep, 1);
     await page.locator('nav [data-tab="defend"]').click();
     assert.ok(await page.locator('#defend-palette [data-item^="archerTower#"]').count() >= 2, 'build palette distinguishes specialized copies');
+    await page.evaluate(async () => {
+      const urls = new Set(['/src/defend/ui.ts']);
+      for (const e of performance.getEntriesByType('resource')) if (new URL(e.name).pathname === '/src/defend/ui.ts') urls.add(e.name);
+      for (const url of urls) {
+        const { DefendPage } = await import(url), real = DefendPage.prototype.frame;
+        DefendPage.prototype.frame = function(t) { window.__cardsDp = this; return real.call(this, t); };
+      }
+    });
+    await page.waitForFunction(() => window.__cardsDp);
+    const palette = await page.locator(`#defend-palette [data-item="archerTower#${first}"]`).boundingBox();
+    await page.mouse.move(palette.x + palette.width / 2, palette.y + palette.height / 2); await page.mouse.down();
+    const destination = await page.evaluate(() => {
+      const dp = window.__cardsDp, r = dp.renderer, box = r.canvas.getBoundingClientRect();
+      const entries = [...dp.pointers.session.legal].sort((a, b) => {
+        const [ax, ay] = a[0].split(',').map(Number), [bx, by] = b[0].split(',').map(Number), k = dp.host.save().layout.keep;
+        return Math.abs(ax - k.tx) + Math.abs(ay - k.ty + 2) - Math.abs(bx - k.tx) - Math.abs(by - k.ty + 2);
+      });
+      for (const [key] of entries) {
+        const [tx, ty] = key.split(',').map(Number);
+        const x = box.left + (((tx + 0.5) * 7 * r.px * r.cam.s + r.cam.x) / r.canvas.width) * box.width;
+        const y = box.top + (((ty + 0.5) * 7 * r.px * r.cam.s + r.cam.y) / r.canvas.height) * box.height;
+        if (x > box.left && x < box.right && y > box.top && y < box.bottom) return { x, y };
+      }
+      throw new Error('No visible legal tower destination');
+    });
+    await page.mouse.move(destination.x, destination.y, { steps: 5 }); await page.mouse.up();
+    s = await state(page);
+    assert.ok(s.defend.cards.find(c => c.id === first).placement?.startsWith('structure:'), 'drag places the chosen specialized identity');
+    assert.equal(s.defend.cards.find(c => c.id === second).placement, undefined, 'other specialization stays ready');
     await page.locator('nav [data-tab="mine"]').click(); await page.locator('#mine-smithy').click();
     await page.locator('#mine-chamber [data-subject="towers"]').click();
     await page.locator('#mine-chamber [data-ledger-stack="archerTower"]').click();
     assert.match(await page.locator('#mine-chamber .ledger-scope').textContent(), /GLOBAL EQUIPMENT.*Every Archer tower card/);
     assert.equal(await page.locator('#mine-chamber .ledger-tiles [data-ledger-card]').count(), 0);
     await page.screenshot({ path: `test-results/cards-${width}-smithy.png` });
-    await page.locator('nav [data-tab="tiles"]').click(); await page.locator('[data-stacking]').click();
+    await page.locator('nav [data-tab="tiles"]').click();
+    await page.locator('.tiles-hall [data-key="archerTower"]').click();
+    await page.locator(`.tile-copies [data-copy-card="${first}"]`).click();
+    assert.match(await page.locator(`[data-card-detail="${first}"]`).textContent(), /Fire arrows III/);
+    await page.locator('[data-stacking]').click();
     await page.locator(`[data-copy-card="${first}"]`).click();
     assert.match(await page.locator(`[data-card-detail="${first}"]`).textContent(), /Fire arrows III/);
     await page.reload(); await page.waitForSelector('#defend-start');

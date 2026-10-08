@@ -2152,4 +2152,6 @@ nav button > .tab-idle[hidden] { display: none; }
 .card-ranks button small { font-size: 7px; }
 .card-global { padding-top: 9px; }
 .ledger-ghosts { overflow: hidden; }
-.chamber-inner { position: relative; }
+
+.card-global summary, .card-global li { font-size: 9px; line-height: 1.6; }
+.card-global ul { padding-left: 18px; }

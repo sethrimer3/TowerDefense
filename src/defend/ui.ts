@@ -449,11 +449,11 @@ export class DefendPage {
 
   private renderPalette() {
     const el = this.root.querySelector<HTMLElement>("#defend-palette")!;
-    const s = this.save;
+    const s = this.save, inventory = this.host.cards?.() ?? [];
     const all: { id: string; name: string; count: number; icon: IconItem }[] =
       this.phase === "build"
         ? PALETTE_ITEMS.filter((item) => inCategory(item, this.category)).flatMap((item) => {
-          const cards = this.host.cards?.().filter(c => c.kind === item) ?? [];
+          const cards = inventory.filter(c => c.kind === item);
           if (!cards.some(c => c.path) || ["cityTile", "cityGate", "wallBallista"].includes(item))
             return [{ id: item, name: ITEM_NAMES[item], count: available(s, item), icon: item as IconItem }];
           const groups = new Map<string, OwnedCard[]>();

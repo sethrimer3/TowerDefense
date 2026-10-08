@@ -69,6 +69,19 @@ export function evolveCard(save: Save, id: number): boolean {
   return true;
 }
 
+/** Returning an evolved card to its base form permits another free build choice. */
+export function unevolveCard(save: Save, id: number): boolean {
+  syncCards(save.defend);
+  const c = save.defend.cards.find(c => c.id === id);
+  const e = c?.evolved ? pathById(c.evolved).evolves : undefined;
+  if (!c || !e) return false;
+  if (c.placement) save.defend.layout = { ...save.defend.layout,
+    structures: save.defend.layout.structures.filter(s => `structure:${s.uid}` !== c.placement) };
+  save.defend.owned[c.kind]--; save.defend.owned[e.from]++;
+  c.kind = e.from; delete c.evolved; delete c.placement;
+  return true;
+}
+
 export const cardLabel = (c: OwnedCard) => c.evolved ? pathById(c.evolved).evolves!.name
   : c.path ? `${pathById(c.path).name} ${["", "I", "II", "III"][c.rank ?? 0]}` : "Unspecialized";
 
@@ -92,7 +105,7 @@ export function cardBattlePaths(save: Save): Pick<Bonuses, "cardPaths" | "spikeP
 export function decodeCards(raw: unknown, save: Save) {
   const seen = new Set<number>();
   save.defend.cards = Array.isArray(raw) ? raw.flatMap((v): OwnedCard[] => {
-    if (!v || !Number.isSafeInteger(v.id) || v.id < 1 || seen.has(v.id) || !PALETTE_ITEMS.includes(v.kind)) return [];
+    if (!v || !Number.isSafeInteger(v.id) || v.id < 1 || v.id >= 1e9 || seen.has(v.id) || !PALETTE_ITEMS.includes(v.kind)) return [];
     seen.add(v.id);
     const c: OwnedCard = { id: v.id, kind: v.kind };
     if (typeof v.placement === "string") c.placement = v.placement;

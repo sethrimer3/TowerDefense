@@ -134,10 +134,19 @@ All the tiles of one kind, shown as one tile marked with its quantity (×4); ope
 The greater building a tile becomes through its path's crown (an **evolution**): Wizard tower into Dark wizard keep, Barracks into Valkyrie palace.
 
 **Path** (in a topic's Study):
-One way a building can grow, in ranks learned in order with Knowledge: the Wizard tower's Pyromancy (flames only), Rime (ice only, then freezing solid) or Stormcalling (lightning in place of flames), the Barracks' Crusaders (hearty, healing) or Assassins (swift, with critical strikes), the Archer tower's Fire arrows (setting enemies **burning**) or Sharpshooters, the Cannon tower's Gun crews (with **grapeshot**) or Siege shot, the Archer barracks' Rangers or Skirmishers, the Watch tower's Spotters or Signal fires, the Mage Guild's Pyroclasm or Cinders, Monster bait's Oil-soaked or Fortified crates, Wall spikes' Blasting stakes (blowing up on contact), Spring stakes (the whole row shooting out) or Rimed stakes (chilling). Choosing a path's first rank **seals** the topic's other paths; **unlearning** it returns every point of Knowledge spent and opens them again.
+One way a building can grow, in ranks learned in order with Knowledge: the Wizard tower's Pyromancy (flames only), Rime (ice only, then freezing solid) or Stormcalling (lightning in place of flames), the Barracks' Crusaders (hearty, healing) or Assassins (swift, with critical strikes), the Archer tower's Fire arrows (setting enemies **burning**) or Sharpshooters, the Cannon tower's Gun crews (with **grapeshot**) or Siege shot, the Archer barracks' Rangers or Skirmishers, the Watch tower's Spotters or Signal fires, the Mage Guild's Pyroclasm or Cinders, Monster bait's Oil-soaked or Fortified crates, Wall spikes' Blasting stakes (blowing up on contact), Spring stakes (the whole row shooting out) or Rimed stakes (chilling). Research unlocks paths independently for the collection. Each owned card equips one researched path and rank, allowing different builds together.
 
 **Evolution**:
-A path's crown, turning its building into a greater one (Stormcalling's Wizard tower into the Dark wizard keep, Crusaders' Barracks into the Valkyrie palace), learned with Knowledge after the path's last rank. Every copy owned, placed or not, becomes the greater building, back in the palette to place again, and copies bought while crowned are greater ones too; unlearning the path turns them back. The greater buildings are no longer sold on their own.
+A path's crown unlocks a greater form (Stormcalling's Wizard tower into the Dark wizard keep, Crusaders' Barracks into the Valkyrie palace). The player evolves a selected card after researching the crown. Other copies retain their forms and builds. Returning a card to its base form is free.
+
+**Card**:
+An individual owned copy of a tower, troop building or defense, retaining its identity and specialization in the city or in the palette.
+
+**Specialization**:
+The one researched path and rank equipped on a card. Changing it is free; recruits share their home building's specialization.
+
+**Research unlock**:
+A path rank or crown learned once with Knowledge, available for matching cards to equip or evolve.
 
 **Smithy rows** (in the Smithy; Training in code):
 Ranks of a few percent each on one row (troop HP, tower damage, rebuild speed…). A rank costs a quadratic bill of metal and is worked by the mine's smiths: one smith takes its whole time, more smiths share it. A smith on a rank stays at the smithy until it's done; taking the last one off cancels the rank and returns its paid metal.

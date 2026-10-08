@@ -12,7 +12,7 @@ import { syncCards } from "./cards.ts";
 import { metalPriceText } from "./metals.ts";
 import { BOMB_PRICE, ITEM_CATEGORY, ITEM_NAMES, PALETTE_ITEMS, purchasePrice, type PaletteItem, type Price } from "./defend/catalog.ts";
 import { available, buyBomb, buyItem, canAfford, type Wallet } from "./defend/progress.ts";
-import { crownBought, crownedFrom, evolvedBy, PATHS, type KnowledgePath } from "./knowledge-paths.ts";
+import { evolvedBy, PATHS, type KnowledgePath } from "./knowledge-paths.ts";
 import { METALS } from "./mine/sim.ts";
 import type { Save } from "./save.ts";
 import { SUBJECTS, topicItems, type Subject, type Topic } from "./upgrade-subjects.ts";
@@ -101,8 +101,7 @@ export function canBuyTile(save: Save, id: TileId): boolean {
   return false;
 }
 
-/** Buys one more tile of a kind, paying with the mine's metal; free with Unlimited money. A building bought while its kind is
- * crowned counts with the crown, so unlearning turns it back too. */
+/** Buys an unspecialized card with mine metal; free with Unlimited money. */
 export function buyTile(save: Save, id: TileId): boolean {
   const offer = shopOffer(save, id), free = save.settings.devMode;
   if ("reason" in offer) return false;
@@ -110,8 +109,6 @@ export function buyTile(save: Save, id: TileId): boolean {
   const w: Wallet = { ...save.smithy, free };
   if (!(id === "bomb" ? buyBomb(save.defend, w) : buyItem(save.defend, w, id))) return false;
   if (!free) for (const k of METALS) save.smithy[k] = w[k];
-  const grown = id === "bomb" ? undefined : evolvedBy(id);
-  if (grown) crownBought(save, grown.evolves!.from);
   syncCards(save.defend);
   return true;
 }

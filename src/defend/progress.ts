@@ -236,7 +236,7 @@ export function decodeDefendSave(s: any): DefendSave {
   d.discovered = kinds.filter(k => Array.isArray(s.discovered) && s.discovered.includes(k));
   d.journalRead = d.discovered.filter(k => Array.isArray(s.journalRead) && s.journalRead.includes(k));
   d.layout = decodeLayout(s.layout, d.owned, d.levels) ?? d.layout;
-  d.nextCardId = intOr(s.nextCardId, 1, Number.MAX_SAFE_INTEGER, 1);
+  d.nextCardId = intOr(s.nextCardId, 1, 1e9, 1);
   return d;
 }
 

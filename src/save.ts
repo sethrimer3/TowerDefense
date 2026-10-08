@@ -15,9 +15,8 @@ import { decodeForgeJob, type ForgeJob } from "./forge-jobs.ts";
 import { decodeCards, syncCards, cardTopic } from "./cards.ts";
 
 export const SAVE_KEY = "towerdefense.v1";
-/** 2: copper and silver became the mine's metal (`smithy`), and a point
- * of it ten bars, not a hundred. */
-export const SAVE_VERSION = 2;
+/** 2: the mine's metal wallet. 3: research unlocks and persistent individual cards. */
+export const SAVE_VERSION = 3;
 
 export type Save = {
   version: number;
@@ -33,8 +32,7 @@ export type Save = {
    * Saves from before it was renamed call it `valor`. */
   knowledge: number;
   skills: Record<SkillId, number>;
-  /** The Study's paths: each topic's chosen path, its ranks and the
-   * Knowledge spent on it (`knowledge-paths.ts`). */
+  /** Legacy paths, accepted during migration and cleared before new saves. */
   paths: PathChoices;
   pathResearch: PathResearch;
   /** The Smithy's upgrades: ranks completed per row, the ranks in work, and

@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { defaults, decode } from "../src/save.ts";
-import { syncCards, equipCard, evolveCard, spikeKey, decodeCards } from "../src/cards.ts";
+import { syncCards, equipCard, evolveCard, unevolveCard, spikeKey, decodeCards } from "../src/cards.ts";
 import { learnPath, evolve } from "../src/knowledge-paths.ts";
 import { bonuses } from "../src/progression.ts";
 import { placeStructure, removeStructure, moveStructure, placeCityTile, defaultLayout, fitLayout } from "../src/defend/layout.ts";
@@ -10,6 +10,8 @@ import { generateCity } from "../src/defend/citygen.ts";
 import { Wizards, stepFrosts } from "../src/defend/wizard.ts";
 import { Barracks } from "../src/defend/troops.ts";
 import { Towers } from "../src/defend/towers.ts";
+import { stepMage, stepFireballs, stepBlazes } from "../src/defend/mages.ts";
+import { baitBitten } from "../src/defend/bait.ts";
 import { center } from "../src/defend/pathing.ts";
 import { NO_BONUSES, UPGRADES, type PaletteItem } from "../src/defend/catalog.ts";
 import { buyTile } from "../src/tiles.ts";
@@ -19,7 +21,7 @@ function fixture(kind: PaletteItem, count = 3) {
   s.defend.owned[kind] = count;
   let l = defaultLayout();
   for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) l = placeCityTile(l, l.keep.tx + dx, l.keep.ty + dy)!;
-  const inside = kind === "barracks" || kind === "mageGuild";
+  const inside = kind === "barracks" || kind === "mageGuild" || kind === "archerBarracks";
   for (let i = 0; i < count; i++) { const [dx, dy] = inside ? [[0, -1], [-1, 0], [1, 0]][i] : [i - 1, -3]; l = placeStructure(l, kind, l.keep.tx + dx, l.keep.ty + dy) ?? assert.fail("placement"); }
   s.defend.layout = l;
   syncCards(s.defend);
@@ -124,4 +126,51 @@ test("malformed cards, repeated IDs and wrong placement bindings cannot duplicat
   const cards = s.defend.cards.filter(c => c.kind === "wizardTower");
   assert.equal(cards.length, 1); assert.equal(cards[0].path, undefined);
   assert.equal(cards[0].placement, `structure:${s.defend.layout.structures[0].uid}`);
+});
+
+test("Pyroclasm and Cinders effects retain their own origin after the caster dies", () => {
+  const s = fixture("mageGuild", 2), cards = s.defend.cards.filter(c => c.kind === "mageGuild");
+  for (const p of ["pyroclasm", "cinders"] as const) for (let n = 0; n < 3; n++) learnPath(s, p);
+  equipCard(s, cards[0].id, "pyroclasm"); equipCard(s, cards[1].id, "cinders");
+  const sim = simulation(s); new Barracks().step(sim, 0.01);
+  for (const troop of sim.soldiers) enemy(sim, troop.x, troop.y - 1);
+  for (const troop of sim.soldiers) stepMage(sim, troop, 0.01);
+  assert.equal(sim.fireballs.length, 2);
+  assert.ok(sim.fireballs[0].damage > sim.fireballs[1].damage);
+  sim.soldiers = []; stepFireballs(sim, 10);
+  assert.equal(sim.blazes.length, 2); assert.equal(sim.blazes[0].cling, undefined); assert.equal(sim.blazes[1].cling, true);
+  assert.ok(sim.blazes[1].life > sim.blazes[0].life);
+  sim.enemies = [];
+  const b = sim.blazes[0], e = enemy(sim, b.x, b.y); stepBlazes(sim, 0.01);
+  assert.equal(e.burn, undefined, "other guild's clinging fire must not leak into this blaze");
+});
+
+test("overlapping watch cards combine their strongest mark and slow without multiplying duplicates", () => {
+  const s = fixture("watchTower", 2), cards = s.defend.cards.filter(c => c.kind === "watchTower");
+  for (const p of ["spotters", "signalFires"] as const) for (let n = 0; n < 3; n++) learnPath(s, p);
+  equipCard(s, cards[0].id, "spotters"); equipCard(s, cards[1].id, "signalFires");
+  const sim = simulation(s), b = sim.map.buildings.find(b => b.kind === "watchTower")!, at = center(b.rect);
+  const e = enemy(sim, at.x + 2, at.y); (sim as any).markEnemies();
+  assert.equal(e.markDamage, 3); assert.equal(e.slowed, 0.55);
+  const hp = e.hp; sim.hurtEnemy(e, 10, true, "ranged"); assert.equal(hp - e.hp, 30);
+});
+
+test("oil-soaked bait and fortified bait retain separate hit reactions and health", () => {
+  const s = fixture("monsterBait", 2), cards = s.defend.cards.filter(c => c.kind === "monsterBait");
+  for (const p of ["oilSoaked", "fortified"] as const) for (let n = 0; n < 3; n++) learnPath(s, p);
+  equipCard(s, cards[0].id, "oilSoaked"); equipCard(s, cards[1].id, "fortified");
+  const sim = simulation(s), b = sim.map.buildings.filter(b => b.kind === "monsterBait");
+  const a = enemy(sim, 1, 1), other = enemy(sim, 2, 1);
+  baitBitten(sim, a, 5, b[0]); baitBitten(sim, other, 5, b[1]);
+  assert.ok(a.burn); assert.equal(a.hp, a.maxHp); assert.equal(other.burn, undefined);
+  assert.equal(other.maxHp - other.hp, 15); assert.ok(sim.maxHp[b[1].id] > sim.maxHp[b[0].id]);
+});
+
+test("returning an evolved card to base preserves its identity and researched options", () => {
+  const s = fixture("wizardTower", 2), cards = s.defend.cards.filter(c => c.kind === "wizardTower");
+  for (let n = 0; n < 3; n++) learnPath(s, "storm"); learnPath(s, "rime");
+  equipCard(s, cards[0].id, "storm"); evolve(s, "storm"); evolveCard(s, cards[0].id);
+  assert.ok(unevolveCard(s, cards[0].id)); assert.equal(cards[0].kind, "wizardTower");
+  assert.ok(equipCard(s, cards[0].id, "rime")); assert.equal(s.pathResearch.storm!.crowned, true);
+  assert.equal(s.defend.owned.wizardTower, 2); assert.equal(cards[1].path, undefined);
 });
