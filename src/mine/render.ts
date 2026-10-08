@@ -49,6 +49,8 @@ const SHADES: Record<number, RGB[]> = {
 };
 const DIRT_BACK: RGB = [44, 31, 21], STONE_BACK: RGB = [30, 30, 36];
 const TORCH_RGB: RGB = [255, 196, 96], LAMP_RGB: RGB = [255, 238, 176];
+/** A lantern's flame between its dimmest and brightest flicker. */
+const LANTERN_DIM: RGB = [236, 140, 56], LANTERN_HOT: RGB = [255, 222, 132];
 const SKY_TOP: RGB = [70, 104, 156], SKY_LOW: RGB = [206, 188, 160];
 const NIGHT_TOP: RGB = [8, 11, 26], NIGHT_LOW: RGB = [28, 30, 50], OVERCAST: RGB = [96, 100, 108];
 const WATER_RGB: RGB = [44, 104, 196], FIRE_RGB: RGB[] = [[255, 136, 40], [255, 204, 84], [240, 90, 30]];
@@ -78,6 +80,8 @@ export class MineRenderer {
   private image: ImageData;
   private pixels: Uint32Array;
   private sky = new Float32Array(CELLS);
+  /** How much each cell of the back wall bulges (0 flat), for its bevel. */
+  private bump = new Float32Array(CELLS);
   private warm = new Float32Array(CELLS);
   private shade = new Uint8Array(CELLS);
   /** A fixed number (0 to 255) for each of the four pixels of every cell,
@@ -89,6 +93,8 @@ export class MineRenderer {
   private sprites = new Sprites();
   private glow: HTMLCanvasElement;
   private litAt = -1e9;
+  private paintedOpen = -1;
+  private paintedDay = -1;
   private paintedVersion = -1;
   private paintedAt = -1e9;
   private paintedRows = "";
@@ -221,17 +227,24 @@ export class MineRenderer {
     const s = this.skyNow;
     return 0.1 + 0.9 * s.daylight * (1 - 0.45 * s.clouds);
   }
+  /** Daylight reaching cell i now. Light spreads by losing a fixed amount
+   * a cell, so it is the full day's spread less what the moment lacks. */
+  private skyAt(i: number) {
+    const v = this.sky[i] + this.skyLight() - 1;
+    return v > 0 ? v : 0;
+  }
 
   private light(sim: MineSim) {
     const cells = sim.world.cells, sky = this.sky, warm = this.warm, surface = sim.strata.surface, burn = sim.burn;
     sky.fill(0);
     warm.fill(0);
-    const open = this.skyLight();
-    for (let x = 0; x < W; x++) for (let y = 0; y < surface[x]; y++) if (isPassable(cells[idx(x, y)])) sky[idx(x, y)] = open;
+    // The sky's light is spread from full day; `skyAt` takes the light of
+    // the moment off it, so day and night turn without relighting.
+    for (let x = 0; x < W; x++) for (let y = 0; y < surface[x]; y++) if (isPassable(cells[idx(x, y)])) sky[idx(x, y)] = 1;
     for (let i = 0; i < CELLS; i++) {
       const m = cells[i];
       if (m === TORCH) warm[i] = 1.05;
-      else if (m === LAMP) warm[i] = 1.3;
+      else if (m === LAMP) warm[idx(i % W, lanternRow(cells, i % W, (i / W) | 0))] = 1.3;
       else if (m === WORK_LAMP) warm[i] = 1.2;
       else if (m === LAVA) warm[i] = 1.15;
       if (burn[i]) warm[i] = 1.4;
@@ -255,7 +268,7 @@ export class MineRenderer {
    * shadow under it, and a light blended from the cell's and its
    * neighbours'. */
   private paint(sim: MineSim, y0: number, y1: number, time: number) {
-    const cells = sim.world.cells, water = sim.world.water, burn = sim.burn, px = this.pixels, sky = this.sky, warm = this.warm, shade = this.shade, grain = this.grain;
+    const cells = sim.world.cells, water = sim.world.water, burn = sim.burn, px = this.pixels, sky = this.sky, warm = this.warm, shade = this.shade, grain = this.grain, bump = this.bump;
     const { surface, stoneTop } = sim.strata;
     const { daylight, clouds } = this.skyNow, night = 1 - daylight, starlight = night * (1 - clouds), open = this.skyLight();
     const flicker = Math.floor(time / 110), W2 = W * 2, lr = this.lr, lg = this.lg, lb = this.lb;
@@ -299,7 +312,9 @@ export class MineRenderer {
         // The light at each of the cell's pixels: half its own, a quarter
         // each from its neighbours beside and above or below that pixel.
         const near = (0.5 - (y - surface[x]) * 0.022) * open, l = x > 0 ? -1 : 0, r = x < W - 1 ? 1 : 0;
-        if (near <= 0 && !water[i] && sky[i] + warm[i] + sky[i + l] + warm[i + l] + sky[i + r] + warm[i + r] + sky[i + up] + warm[i + up] + sky[i + down] + warm[i + down] === 0) {
+        const dim = open - 1, si = Math.max(0, sky[i] + dim), sl = Math.max(0, sky[i + l] + dim), sr = Math.max(0, sky[i + r] + dim);
+        const su = Math.max(0, sky[i + up] + dim), sd = Math.max(0, sky[i + down] + dim);
+        if (near <= 0 && !water[i] && si + warm[i] + sl + warm[i + l] + sr + warm[i + r] + su + warm[i + up] + sd + warm[i + down] === 0) {
           // Unlit: too dark for any detail to show.
           const shades = SHADES[m], c = shades ? shades[shade[i] % shades.length] : y < stoneTop[x] ? DIRT_BACK : STONE_BACK;
           px[o] = px[o + 1] = px[o + W2] = px[o + W2 + 1] = pack3(c[0] * 0.025, c[1] * 0.025, c[2] * 0.03);
@@ -307,7 +322,7 @@ export class MineRenderer {
         }
         for (let q = 0; q < 4; q++) {
           const h = q & 1 ? r : l, v = q >> 1 ? down : up;
-          const s = Math.max(sky[i] * 0.5 + sky[i + h] * 0.25 + sky[i + v] * 0.25, near), w = warm[i] * 0.5 + warm[i + h] * 0.25 + warm[i + v] * 0.25;
+          const s = Math.max(si * 0.5 + (q & 1 ? sr : sl) * 0.25 + (q >> 1 ? sd : su) * 0.25, near), w = warm[i] * 0.5 + warm[i + h] * 0.25 + warm[i + v] * 0.25;
           lr[q] = s * 0.98 + w * 1.15 + 0.025;
           lg[q] = s * 0.96 + w * 0.8 + 0.025;
           lb[q] = s * 0.94 + w * 0.5 + 0.03;
@@ -326,20 +341,27 @@ export class MineRenderer {
         const solid = !passable, openUp = solid && up !== 0 && isPassable(cells[i + up]), openDown = solid && down !== 0 && isPassable(cells[i + down]);
         const openL = solid && l !== 0 && isPassable(cells[i - 1]), openR = solid && r !== 0 && isPassable(cells[i + 1]);
         const shades = SHADES[m];
+        // Which way the warm light falls here, and how strongly.
+        const gx = warm[i + r] - warm[i + l], gy = warm[i + down] - warm[i + up];
+        const glen = Math.sqrt(gx * gx + gy * gy), lit = glen > 0.01 ? Math.min(1, warm[i] * 1.4) : 0, ldx = lit ? gx / glen : 0, ldy = lit ? gy / glen : 0;
         for (let q = 0; q < 4; q++) {
           const sx = q & 1, sy = q >> 1, g = grain[g4 + q];
           let c: RGB = back, k = 1;
-          const light = m === TORCH || m === LAMP || m === WORK_LAMP;
+          // Torches and lanterns are drawn each frame over the cave behind
+          // them (`drawFittings`), each flickering in its own time.
+          const light = m === WORK_LAMP;
           if (light && sx === 1) {
             const f = (flicker + shade[i]) % 3;
             // Paint just the right-hand pixels over the ordinary lit cave.
-            c = m === TORCH ? (sy ? TORCH_STICK : f === 1 ? TORCH_HOT : f === 2 ? TORCH_RGB : TORCH_DIM)
-              : sy ? (f ? LAMP_RGB : TORCH_HOT) : LAMP_CAP;
+            c = sy ? (f ? LAMP_RGB : TORCH_HOT) : LAMP_CAP;
             px[o + sy * W2 + sx] = pack(c, 1);
             continue;
           }
-          if (m === AIR || light) {
+          if (m === AIR || light || m === TORCH || m === LAMP) {
             k = 0.86 + g * 0.0011;
+            // The back wall's lumps catch the lights' glow on the side
+            // facing them.
+            if (lit > 0 && !inSky && bump[i] > 0) k *= 1 + bump[i] * ((sx * 2 - 1) * ldx + (sy * 2 - 1) * ldy) * lit;
             if (inSky) {
               px[o + sy * W2 + sx] = skyPx;
               continue;
@@ -427,6 +449,17 @@ export class MineRenderer {
             else if (openDown && sy === 1) k *= 0.74;
             if (openL && sx === 0) k *= 1.08;
             else if (openR && sx === 1) k *= 0.88;
+            // A thin warm sheen on edges facing a torch or lantern nearby.
+            let sheen = 0;
+            if (openUp && sy === 0) sheen = Math.max(sheen, warm[i + up] * Math.max(0.25, -ldy));
+            if (openDown && sy === 1) sheen = Math.max(sheen, warm[i + down] * Math.max(0.25, ldy));
+            if (openL && sx === 0) sheen = Math.max(sheen, warm[i - 1] * Math.max(0.25, -ldx));
+            if (openR && sx === 1) sheen = Math.max(sheen, warm[i + 1] * Math.max(0.25, ldx));
+            if (sheen > 0.05) {
+              const e = Math.min(1, sheen) * 0.5;
+              px[o + sy * W2 + sx] = pack3(c[0] * k * lr[q] + 110 * e, c[1] * k * lg[q] + 70 * e, c[2] * k * lb[q] + 32 * e);
+              continue;
+            }
           }
           px[o + sy * W2 + sx] = pack3(c[0] * k * lr[q], c[1] * k * lg[q], c[2] * k * lb[q]);
         }
@@ -442,6 +475,8 @@ export class MineRenderer {
       for (let i = 0; i < CELLS; i++) {
         const x = i % W, y = (i / W) | 0;
         this.shade[i] = Math.floor(hash01(x, y, sim.seed + 77) * 12);
+        const b = hash01(x >> 1, y >> 1, sim.seed + 79);
+        this.bump[i] = b < 0.3 ? 0 : 0.18 + 0.32 * hash01(x, y, sim.seed + 80);
         for (let q = 0; q < 4; q++) this.grain[i * 4 + q] = Math.floor(hash01(2 * x + (q & 1), 2 * y + (q >> 1), sim.seed + 78) * 256);
       }
       this.paintedVersion = -1;
@@ -462,19 +497,24 @@ export class MineRenderer {
       this.clamp();
     }
     const y0 = Math.max(0, Math.floor(this.camY)), y1 = Math.min(H, Math.ceil(this.camY + h / scale) + 1);
+    // The sky changes every frame, smoothly, however fast the mine runs;
+    // the light's spread through the workings is refreshed now and then.
+    this.skyNow = sim.sky;
     const relight = time - this.litAt > 120;
     if (relight) {
-      this.skyNow = sim.sky;
       this.light(sim);
       this.litAt = time;
     }
+    const open = this.skyLight(), turned = Math.abs(open - this.paintedOpen) > 0.002 || Math.abs(this.skyNow.daylight - this.paintedDay) > 0.002;
     this.readNews(sim, time, effects);
     const rows = `${y0}:${y1}`;
     // The world changes most frames while the crew works: repaint for it at
     // most every 60 ms (each cell is four pixels now).
-    if (relight || rows !== this.paintedRows || (sim.world.version !== this.paintedVersion && time - this.paintedAt > 60)) {
+    if (relight || turned || rows !== this.paintedRows || (sim.world.version !== this.paintedVersion && time - this.paintedAt > 60)) {
       this.paint(sim, y0, y1, time);
       this.paintedAt = time;
+      this.paintedOpen = open;
+      this.paintedDay = this.skyNow.daylight;
       this.paintedVersion = sim.world.version;
       this.paintedRows = rows;
     }
@@ -500,7 +540,7 @@ export class MineRenderer {
     if (effects) this.drawGlow(sim, time, y0, y1);
     this.drawHoist(sim);
     const fine = this.fine;
-    this.drawFittings(sim, y0, y1);
+    this.drawFittings(sim, y0, y1, time);
     for (const c of sim.carts) {
       if (c.y < y0 - 3 || c.y > y1 + 1) continue;
       this.drawCart(sim, c);
@@ -532,7 +572,7 @@ export class MineRenderer {
       const i = idx(cx, cy), h = x - Math.floor(x) >= 0.5 ? Math.min(W - 1, cx + 1) : Math.max(0, cx - 1);
       const v = y - Math.floor(y) >= 0.5 ? Math.min(H - 1, cy + 1) : Math.max(0, cy - 1);
       const near = (0.5 - (cy - sim.strata.surface[cx]) * 0.022) * this.skyLight();
-      const sky = Math.max(0, near, this.sky[i] * 0.5 + this.sky[idx(h, cy)] * 0.25 + this.sky[idx(cx, v)] * 0.25);
+      const sky = Math.max(0, near, this.skyAt(i) * 0.5 + this.skyAt(idx(h, cy)) * 0.25 + this.skyAt(idx(cx, v)) * 0.25);
       const warm = this.warm[i] * 0.5 + this.warm[idx(h, cy)] * 0.25 + this.warm[idx(cx, v)] * 0.25;
       this.fine(x, y, 0.5, 0.5, `rgb(${clamp255(rgb[0] * (sky * 0.98 + warm * 1.15 + 0.025))},${clamp255(rgb[1] * (sky * 0.96 + warm * 0.8 + 0.025))},${clamp255(rgb[2] * (sky * 0.94 + warm * 0.5 + 0.03))})`);
     };
@@ -1244,11 +1284,12 @@ export class MineRenderer {
     return null;
   }
 
-  private drawFittings(sim: MineSim, y0: number, y1: number) {
+  private drawFittings(sim: MineSim, y0: number, y1: number, time: number) {
+    const hex = (rgb: RGB) => `rgb(${rgb.map((v) => clamp255(v)).join(",")})`;
     for (let y = Math.max(1, y0 - 10); y < Math.min(H - 1, y1 + 1); y++) for (let x = 1; x < W - 1; x++) {
       const c = idx(x, y), m = sim.world.cells[c];
-      if (m !== RAIL && m !== LAMP) continue;
-      const k = Math.min(1, 0.04 + this.warm[c] * 0.9 + this.sky[c]);
+      if (m !== RAIL && m !== LAMP && m !== TORCH) continue;
+      const k = Math.min(1, 0.04 + this.warm[c] * 0.9 + this.skyAt(c));
       const color = (rgb: RGB, boost = 1) => `rgb(${rgb.map(v => Math.round(v * k * boost)).join(",")})`;
       if (m === RAIL) {
         let dy = 0;
@@ -1256,14 +1297,23 @@ export class MineRenderer {
         if (x % 3 === 0) this.fine(x, y + 1, 0.5, 0.5, color(SLEEPER));
         this.fine(x, y + 0.5, 0.5, 0.5, color(RAIL_HI));
         this.fine(x + 0.5, y + 0.5 + dy * 0.5, 0.5, 0.5, color(RAIL_LO));
-      } else if (m === LAMP) {
-        let ceiling = y - 1;
-        while (ceiling > y - 10 && isPassable(sim.world.get(x, ceiling))) ceiling--;
-        if (isPassable(sim.world.get(x, ceiling))) continue;
-        for (let yy = ceiling + 1; yy < y; yy += 0.5)
-          this.fine(x + 0.5, yy, 0.5, 0.5, color(Math.round(yy * 2) % 2 ? [96, 88, 70] : [154, 140, 106]));
-        // One chain pixel connects the ceiling to the cap, even at a low roof.
-        this.fine(x + 0.5, y - 0.5, 0.5, 0.5, color([154, 140, 106]));
+      } else if (m === TORCH) {
+        // The stick, and its flame flickering in its own time.
+        const f = flickerAt(x, y, time);
+        this.fine(x + 0.5, y + 0.5, 0.5, 0.5, color(TORCH_STICK));
+        this.fine(x + 0.5, y, 0.5, 0.5, hex(f > 0.66 ? TORCH_HOT : f > 0.33 ? TORCH_RGB : TORCH_DIM));
+      } else {
+        // A lantern on its chain, a cell higher where there's room, its
+        // flame warm and flickering like a torch's.
+        const ly = lanternRow(sim.world.cells, x, y);
+        let ceiling = ly - 1;
+        while (ceiling > ly - 10 && isPassable(sim.world.get(x, ceiling))) ceiling--;
+        if (!isPassable(sim.world.get(x, ceiling)))
+          for (let yy = ceiling + 1; yy < ly; yy += 0.5)
+            this.fine(x + 0.5, yy, 0.5, 0.5, color(Math.round(yy * 2) % 2 ? [96, 88, 70] : [154, 140, 106]));
+        const f = flickerAt(x, y, time);
+        this.fine(x + 0.5, ly, 0.5, 0.5, color(LAMP_CAP));
+        this.fine(x + 0.5, ly + 0.5, 0.5, 0.5, hex(mix(LANTERN_DIM, LANTERN_HOT, f)));
       }
     }
   }
@@ -1276,10 +1326,11 @@ export class MineRenderer {
       for (let x = 0; x < W; x++) {
         const m = cells[idx(x, y)];
         if (m !== TORCH && m !== LAMP && m !== WORK_LAMP) continue;
-        const r = m === LAMP ? 10 : m === WORK_LAMP ? 8 : 7;
-        const flicker = m === TORCH ? 0.75 + 0.25 * Math.sin(time / 90 + x * 7.3 + y) * Math.sin(time / 230 + y * 3.1) : 0.9;
-        ctx.globalAlpha = (m === LAMP ? 0.32 : 0.38) * flicker;
-        ctx.drawImage(this.glow, x + 0.5 - r, y + 0.5 - r, r * 2, r * 2);
+        const r = m === LAMP ? 10 : m === WORK_LAMP ? 8 : 7, f = flickerAt(x, y, time);
+        const flicker = m === WORK_LAMP ? 0.85 + 0.15 * f : 0.72 + 0.28 * f;
+        const gy = m === LAMP ? lanternRow(cells, x, y) + 0.75 : m === TORCH ? y + 0.25 : y + 0.5;
+        ctx.globalAlpha = (m === LAMP ? 0.36 : 0.38) * flicker;
+        ctx.drawImage(this.glow, x + 0.75 - r, gy - r, r * 2, r * 2);
       }
     ctx.restore();
   }
@@ -1346,4 +1397,17 @@ function makeGlow() {
   g.fillStyle = grad;
   g.fillRect(0, 0, 64, 64);
   return c;
+}
+
+/** A flame's brightness (0 to 1) at `time`: two waves of its own lengths and
+ * offsets, from where it hangs, so no two lights flicker alike. */
+export function flickerAt(x: number, y: number, time: number) {
+  const a = 70 + hash01(x, y, 611) * 70, b = 190 + hash01(x, y, 612) * 190, c = 37 + hash01(x, y, 613) * 23;
+  const v = 0.5 * Math.sin(time / a + hash01(x, y, 614) * 6.283) + 0.3 * Math.sin(time / b + hash01(x, y, 615) * 6.283) + 0.2 * Math.sin(time / c + hash01(x, y, 616) * 6.283);
+  return 0.5 + 0.5 * v;
+}
+/** The row a lantern hung in cell (x, y) is drawn at: a cell higher, on a
+ * shorter chain, when there's room under the roof. */
+function lanternRow(cells: Uint8Array, x: number, y: number) {
+  return y > 0 && isPassable(cells[idx(x, y - 1)]) ? y - 1 : y;
 }
