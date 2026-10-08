@@ -10,7 +10,6 @@ import { SKILLS, skillCost } from "../src/skill-trees.ts";
 import { UPGRADES, purchasePrice, upgradePrice } from "../src/defend/catalog.ts";
 import { enchantedGift, MAX_SHELVES } from "../src/library/sim.ts";
 import { trainingSeconds } from "../src/training-jobs.ts";
-import { forgeSeconds } from "../src/forge-jobs.ts";
 import { planProgression, sampledRates, type Budget } from "../tools/plan-upgrade-progression.ts";
 
 test("research reserves Knowledge, shares a single project, and only applies the finished rank", () => {
