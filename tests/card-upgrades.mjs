@@ -115,7 +115,7 @@ try {
     await page.locator(`.tile-copies [data-copy-card="${first}"]`).click();
     assert.match(await page.locator(`[data-card-detail="${first}"]`).textContent(), /Fire arrows III/);
     await page.locator('[data-stacking]').click();
-    await page.locator(`[data-copy-card="${first}"]`).click();
+    await page.locator(`.tiles-grid > [data-copy-card="${first}"]`).click();
     assert.match(await page.locator(`[data-card-detail="${first}"]`).textContent(), /Fire arrows III/);
     await page.reload(); await page.waitForSelector('#defend-start');
     s = await state(page); assert.equal(s.defend.cards.find(c => c.id === first).path, 'fireArrows');

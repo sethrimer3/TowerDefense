@@ -15,7 +15,7 @@ import { trainingSeconds } from "../training-jobs.ts";
 import { ITEM_NAMES, SPEED3_PRICE, UPGRADES, upgradePrice, type Price, type UpgradeId } from "../defend/catalog.ts";
 import { canAfford, type Wallet } from "../defend/progress.ts";
 import { paintIcon, type IconItem } from "../defend/structure-art.ts";
-import { SUBJECTS, type Subject, type SubjectId, type Topic } from "../upgrade-subjects.ts";
+import { SUBJECTS, topicItems, type Subject, type SubjectId, type Topic } from "../upgrade-subjects.ts";
 import { replay, sparksOver } from "./flourish.ts";
 import type { AppContext } from "./app.ts";
 import { uiSprite } from "./dom.ts";
@@ -54,10 +54,9 @@ const CHAMBER = {
   study: { title: "The Study", blurb: "Beneath the library, by candle and sigil: what Knowledge changes", up: "Up to the library" },
 };
 
-/** One chamber's ledger: its subjects and their topics along two strips
- * (each scrolling sideways, so the page never grows long), and the chosen
- * topic's upgrades below. The Smithy's are the Armory's levels and the
- * Smithy's rows; the Study's are the skills and the paths, drawn as a tree. */
+/** One chamber's upgrades: a subject strip, a Tiles-style collection, and
+ * the selected type or card's details. Smithy equipment is shared; Study
+ * cards equip paths independently from the collection's research tree. */
 export class Ledger {
   private subjects: Subject[];
   private subject: SubjectId;
@@ -188,7 +187,7 @@ export class Ledger {
   }
 
   private cardsFor(t: Topic): OwnedCard[] {
-    return this.save.defend.cards.filter(c => cardTopic(c) === t.id || c.kind === t.item)
+    return this.save.defend.cards.filter(c => this.kind === "smithy" ? topicItems(t).includes(c.kind) : cardTopic(c) === t.id || c.kind === t.item)
       .sort((a, b) => Number(!!b.placement) - Number(!!a.placement) || a.id - b.id);
   }
 
@@ -198,12 +197,15 @@ export class Ledger {
       const copies = this.cardsFor(t), individual = pathsOf(t.id).length > 0, expanded = study && individual && this.expanded.has(t.id) && copies.length > 0;
       const type = t.item ? TILE_TYPE[t.item] : "consumables";
       const face = (item = t.item) => `<span class="tile-face">${item ? `<canvas width="48" height="48" data-icon="${item}"></canvas>` : uiSprite(subject.sprite)}</span>`;
-      if (expanded) return copies.map(c => `<button class="tile single type-${TILE_TYPE[c.kind]} ${c.placement ? "placed" : ""} ${this.selectedCard === c.id ? "open" : ""}"
+      const single = (c: OwnedCard) => `<button class="tile single type-${TILE_TYPE[c.kind]} ${c.placement ? "placed" : ""} ${this.selectedCard === c.id ? "open" : ""}"
         data-key="${t.id}#${c.id}" data-ledger-card="${c.id}" data-card-topic="${t.id}" aria-pressed="${this.selectedCard === c.id}" title="${TILE_NAMES[c.kind]} card ${c.id}: ${cardLabel(c)}">
-        ${face(c.kind)}<span class="tile-name">${TILE_NAMES[c.kind]}</span><small class="tile-sub">Card #${c.id} · ${c.placement ? "City" : "Ready"}</small><small class="card-specialization">${cardLabel(c)}</small></button>`).join("");
-      const layers = copies.length > 2 ? "layers-2" : copies.length > 1 ? "layers-1" : "";
-      return `<button class="tile type-${type} ${layers}" data-key="${t.id}" data-ledger-stack="${t.id}" aria-expanded="${expanded}" aria-label="${t.name}, ${copies.length} cards. ${study && individual && copies.length ? "Spread individual cards" : "Shared upgrades"}">
-        ${face()}<span class="tile-name">${t.name}</span>${t.item ? `<b class="tile-count">x${copies.length}</b>` : ""}<small class="tile-sub">${study ? individual ? copies.length ? "Tap to spread cards" : "Research paths" : "Shared research" : "Upgrades all cards"}</small></button>`;
+        ${face(c.kind)}<span class="tile-name">${TILE_NAMES[c.kind]}</span><small class="tile-sub">Card #${c.id} · ${c.placement ? "City" : "Ready"}</small><small class="card-specialization">${cardLabel(c)}</small></button>`;
+      if (expanded) return copies.map(single).join("");
+      const evolved = study ? copies.filter(c => c.evolved) : [];
+      const count = copies.length - evolved.length;
+      const layers = count > 2 ? "layers-2" : count > 1 ? "layers-1" : "";
+      return `<button class="tile type-${type} ${layers}" data-key="${t.id}" data-ledger-stack="${t.id}" aria-expanded="${expanded}" aria-label="${t.name}, ${count} cards. ${study && individual && copies.length ? "Spread individual cards" : "Shared upgrades"}">
+        ${face()}<span class="tile-name">${t.name}</span>${t.item ? `<b class="tile-count">×${count}</b>` : ""}<small class="tile-sub">${study ? individual ? count ? "Tap to spread cards" : "Research paths" : "Shared research" : "Upgrades all cards"}</small></button>` + evolved.map(single).join("");
     }).join("");
     return `<div class="ledger-collection"><p class="ledger-note">${study ? "Tap a stack to spread every card. Choose a card to equip its path. Research unlocks are shared." : "Select a type. Smithy equipment improves every card of that type."}</p><div class="tiles-grid ledger-tiles">${cards}</div>
       ${study ? [...this.expanded].filter(id => pathsOf(id).length && subject.topics.some(t => t.id === id)).map(id => `<button class="study-gather" data-gather="${id}">Gather ${subject.topics.find(t => t.id === id)!.name} cards</button>`).join("") : ""}</div>`;

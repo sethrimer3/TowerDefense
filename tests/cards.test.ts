@@ -1,19 +1,19 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { defaults, decode } from "../src/save.ts";
-import { syncCards, equipCard, evolveCard, unevolveCard, spikeKey, decodeCards } from "../src/cards.ts";
+import { syncCards, equipCard, evolveCard, unevolveCard, decodeCards } from "../src/cards.ts";
 import { learnPath, evolve } from "../src/knowledge-paths.ts";
 import { bonuses } from "../src/progression.ts";
 import { placeStructure, removeStructure, moveStructure, placeCityTile, defaultLayout, fitLayout } from "../src/defend/layout.ts";
 import { DefendSim, type Enemy } from "../src/defend/sim.ts";
 import { generateCity } from "../src/defend/citygen.ts";
-import { Wizards, stepFrosts } from "../src/defend/wizard.ts";
+import { Wizards } from "../src/defend/wizard.ts";
 import { Barracks } from "../src/defend/troops.ts";
 import { Towers } from "../src/defend/towers.ts";
 import { stepMage, stepFireballs, stepBlazes } from "../src/defend/mages.ts";
 import { baitBitten } from "../src/defend/bait.ts";
 import { center } from "../src/defend/pathing.ts";
-import { NO_BONUSES, UPGRADES, type PaletteItem } from "../src/defend/catalog.ts";
+import { type PaletteItem } from "../src/defend/catalog.ts";
 import { buyTile } from "../src/tiles.ts";
 
 function fixture(kind: PaletteItem, count = 3) {
