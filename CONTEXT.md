@@ -53,6 +53,9 @@ Amber Desert creatures: a scorpion with close-reaching venom, a scarab shielding
 **Sporeling**, **Fungal Brute** and **Spore Moth**:
 Fungal Hollow creatures: a small poisonous mushroom, a heavy fungus that releases three sporelings and a flying moth carrying a spore cloud.
 
+**Brine Crab**, **Lantern Jelly** and **Coral Guardian**:
+Drowned Temple creatures: a tough clawed crawler, a floating jellyfish with a stinging cloud and a coral-covered guardian shielding the creatures around it.
+
 **Shardling**, **Crystal Sentinel** and **Prism Ray**:
 Violet Geode creatures: a swift living crystal, a shield-bearing guardian and a hovering ray with a smaller shield.
 

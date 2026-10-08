@@ -69,17 +69,54 @@ try {
         }
       }
       const journal = document.createElement('div'); journal.innerHTML = journalHTML(kinds);
-      for (const area of AREAS.filter(a => ['moss', 'desert', 'fungal', 'crystal', 'astral'].includes(a.id))) {
+      for (const area of AREAS.filter(a => ['moss', 'desert', 'drowned', 'fungal', 'crystal', 'astral'].includes(a.id))) {
         if (journal.querySelectorAll(`[data-zone="${area.id}"] article`).length !== 3) throw Error(`${area.id} journal roster incomplete`);
       }
-      if (journal.querySelectorAll('[data-zone="nadir"] article').length !== 15) throw Error('Nadir journal incomplete');
+      if (journal.querySelectorAll('[data-zone="nadir"] article').length !== 18) throw Error('Nadir journal incomplete');
       const overflow = [...document.querySelectorAll('main,section,canvas')].filter(el => el.getBoundingClientRect().right > innerWidth + 1).length;
       return { species: kinds.length, checks: checks.length, overflow };
     });
-    assert.equal(result.species, 15); assert.equal(result.checks, 180); assert.equal(result.overflow, 0);
+    assert.equal(result.species, 18); assert.equal(result.checks, 216); assert.equal(result.overflow, 0);
     assert.deepEqual(errors, []);
     await page.screenshot({ path: `test-results/defend-zone-expansion-${label}.png`, fullPage: true });
     console.log(label, result);
+    await page.close();
+  }
+  // Exercise the real page's discovery, persistence, unread badge and modal.
+  for (const [label, width] of [['desktop', 1100], ['mobile', 390]]) {
+    const page = await browser.newPage({ viewport: { width, height: 844 } });
+    const errors = []; page.on('pageerror', e => errors.push(e.message));
+    await page.goto((process.env.TEST_URL || 'http://127.0.0.1:5173/') + 'tests/defend-stress.html?manual&enemies=100');
+    await page.waitForFunction(() => window.stressPage);
+    const discovered = await page.evaluate(async () => {
+      const { ENEMIES } = await import('/src/defend/catalog.ts');
+      const { zoneEnemyRows } = await import('/src/defend/zone-enemy-art.ts');
+      const { decodeDefendSave } = await import('/src/defend/progress.ts');
+      const p = window.stressPage, sim = p.sim;
+      const kinds = Object.keys(ENEMIES).filter(k => zoneEnemyRows(k));
+      sim.enemies.length = sim.events.length = 0; sim.waveSpawned = 0;
+      for (const kind of Object.keys(sim.slain)) sim.slain[kind] = 0;
+      p.save.discovered = []; p.save.journalRead = [];
+      p.host.persist = () => { window.savedZoneDefend = JSON.stringify(p.save); };
+      for (const kind of kinds) sim.spawnAuxiliary(kind, 10, 10);
+      for (const kind of ['mossBoar', 'brineCrab', 'astralWarden']) {
+        const e = sim.enemies.find(e => e.kind === kind);
+        sim.hurtEnemy(e, e.maxHp + 1, true, 'melee');
+      }
+      sim.sweepAway(); p.handleEvents();
+      const loaded = decodeDefendSave(JSON.parse(window.savedZoneDefend));
+      return loaded.discovered.length;
+    });
+    assert.equal(discovered, 18);
+    await page.locator('#defend-journal').click();
+    assert.equal(await page.locator('.defend-journal-dialog article').count(), 36);
+    const read = await page.evaluate(() => JSON.parse(window.savedZoneDefend).journalRead.length);
+    assert.equal(read, 18);
+    await page.screenshot({ path: `test-results/defend-zone-journal-${label}.png` });
+    await page.locator('[data-journal-close]').click();
+    assert.equal(await page.locator('.defend-journal-dialog').evaluate(el => el.open), false);
+    assert.deepEqual(errors, []);
+    console.log(`${label} live journal: 18 discoveries persisted, 36 entries rendered`);
     await page.close();
   }
 } finally { await browser.close(); }

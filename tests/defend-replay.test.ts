@@ -55,8 +55,8 @@ function scenarios(): Record<string, Scenario> {
   return {
     zoneExpansion: {
       layout: city(SQUARE, [["barracks", 1, 1], ["archerTower", -1, -1], ["wizardTower", 0, -2]]),
-      citySeed: 13, levels: maxLevels(), seed: 6, seconds: 80, wave: 181,
-      opening: ['briarling', 'mossBoar', 'rootTreant', 'duneScorpion', 'sunScarab', 'sandVulture', 'sporeling', 'fungalBrute', 'sporeMoth', 'shardling', 'crystalSentinel', 'prismRay', 'starWisp', 'cometHound', 'astralWarden'],
+      citySeed: 13, levels: maxLevels(), seed: 6, seconds: 80, wave: 181, breakSeconds: 90,
+      opening: ['briarling', 'mossBoar', 'rootTreant', 'duneScorpion', 'sunScarab', 'sandVulture', 'brineCrab', 'lanternJelly', 'coralGuardian', 'sporeling', 'fungalBrute', 'sporeMoth', 'shardling', 'crystalSentinel', 'prismRay', 'starWisp', 'cometHound', 'astralWarden'],
     },
     frozenFleet: {
       layout: city(SQUARE, [["wizardTower", 0, -2], ["barracks", 1, 1], ["cannonTower", -1, -1]]),
@@ -264,6 +264,7 @@ test("the Defend replays exercise every unit and effect", () => {
       if (sim.baits.length && sim.blazes.length) seen.add("bait:burning");
     });
   const want = [
+    "enemy:brineCrab", "enemy:lanternJelly", "enemy:coralGuardian",
     "enemy:briarling", "enemy:mossBoar", "enemy:rootTreant", "enemy:duneScorpion", "enemy:sunScarab", "enemy:sandVulture", "enemy:sporeling", "enemy:fungalBrute", "enemy:sporeMoth", "enemy:shardling", "enemy:crystalSentinel", "enemy:prismRay", "enemy:starWisp", "enemy:cometHound", "enemy:astralWarden",
     "enemy:iceGolem", "enemy:iceCube",
     "enemy:shieldLesser", "enemy:shieldGreater", "enemy:poisonLesser", "enemy:poisonBearer", "enemy:poisonGreater", "enemy:poisonSovereign", "enemy:fortressHut", "enemy:fortressOutpost", "enemy:fortressTower", "enemy:fortressKeep", "enemy:fortressLesser", "enemy:fortress", "enemy:fortressGreater", "enemy:fortressSovereign", "enemy:darkKnight", "enemy:bombOrc", "enemy:bombBird", "enemy:voidSparrow", "enemy:snake", "enemy:dragon", "enemy:shieldBearer", "enemy:aegis", "enemy:warlord", "enemy:bat", "enemy:mother", "enemy:broodling", "distracted", "marked", "soldier:sword", "soldier:archer", "path:sword", "path:archer", "hunting",

@@ -16,6 +16,7 @@ import { zoneEnemyRows, zoneEnemyPixels } from '../src/defend/zone-enemy-art.ts'
 const additions: Partial<Record<AreaId, ZoneEnemyKind[]>> = {
   moss: ['briarling', 'mossBoar', 'rootTreant'],
   desert: ['duneScorpion', 'sunScarab', 'sandVulture'],
+  drowned: ['brineCrab', 'lanternJelly', 'coralGuardian'],
   fungal: ['sporeling', 'fungalBrute', 'sporeMoth'],
   crystal: ['shardling', 'crystalSentinel', 'prismRay'],
   astral: ['starWisp', 'cometHound', 'astralWarden'],
@@ -27,7 +28,7 @@ function fixture() {
   return sim;
 }
 
-test('five sparse zones gain three exclusive species that can appear on their first visit', () => {
+test('six sparse zones gain three exclusive species that can appear on their first visit', () => {
   for (const area of AREAS) {
     const expected = additions[area.id];
     assert.equal(new Set(AREA_ENEMIES[area.id]).size, AREA_ENEMIES[area.id].length);
@@ -73,7 +74,7 @@ test('new splitting enemies reserve their entire brood and respect the runtime c
 });
 
 test('new shield supports protect only within reach and remain vulnerable to melee', () => {
-  for (const kind of ['sunScarab', 'crystalSentinel', 'prismRay', 'astralWarden'] as const) {
+  for (const kind of ['sunScarab', 'coralGuardian', 'crystalSentinel', 'prismRay', 'astralWarden'] as const) {
     const sim = fixture(), def = ENEMIES[kind];
     const shield = sim.spawnAuxiliary(kind, 10, 10)!;
     const nearby = sim.spawnAuxiliary('briarling', 10.5, 10)!;
@@ -87,8 +88,8 @@ test('new shield supports protect only within reach and remain vulnerable to mel
   }
 });
 
-test('scorpions and fungal spores harm nearby people while sparing distant archers and buildings', () => {
-  for (const kind of ['duneScorpion', 'sporeling', 'sporeMoth'] as const) {
+test('venom and spore carriers harm nearby people while sparing distant archers and buildings', () => {
+  for (const kind of ['duneScorpion', 'lanternJelly', 'sporeling', 'sporeMoth'] as const) {
     const sim = fixture(), def = ENEMIES[kind];
     sim.spawnAuxiliary(kind, 10, 10);
     sim.soldiers.push({ id: 100, x: 10.1, y: 10, hp: 100, kind: 'sword', flash: 0 } as any,
@@ -104,7 +105,7 @@ test('scorpions and fungal spores harm nearby people while sparing distant arche
 });
 
 test('new fliers cross standing walls and strike the keep', () => {
-  for (const kind of ['sandVulture', 'sporeMoth', 'prismRay', 'starWisp'] as const) {
+  for (const kind of ['sandVulture', 'lanternJelly', 'sporeMoth', 'prismRay', 'starWisp'] as const) {
     const sim = fixture(); sim.soldiers.length = sim.civilians.length = 0;
     // Solid cells everywhere: flying movement must ignore this obstruction.
     sim.solid.fill(1);

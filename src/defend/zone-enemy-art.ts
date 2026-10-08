@@ -1,4 +1,4 @@
-/** Native silhouettes for the forest, desert, fungal, crystal and astral species.
+/** Native silhouettes for the forest, desert, drowned, fungal, crystal and astral species.
  * Battle bodies and journal portraits share the same bounded sprite cache. */
 import { ENEMIES, type EnemyKind, type ZoneEnemyKind } from "./catalog.ts";
 import { pixels, shade, sprite } from "./damage-art.ts";
@@ -35,6 +35,21 @@ const ROWS: Record<ZoneEnemyKind, readonly string[]> = {
     "OO        OO", "OHOO    OOMO", "OHMMO  OMMDO", " OMMOOOO MDO",
     "  OMMMAMMDO ", "   OMAEMDO  ", "    OMMDO   ", "    ODDO    ",
     "   ODOODO   ", "   OO  OO   ",
+  ],
+  brineCrab: [
+    " OO      OO ", "OHHO    OHHO", "OMDO OO OMDO", " OOOHEEHOOO ",
+    "  OHHHHMMO  ", " OOMMMMDDOO ", "O ODDDDDDO O", " O OOOOOO O ",
+    "O O      O O",
+  ],
+  lanternJelly: [
+    "    OOOO    ", "  OOHHHHOO  ", " OHHAHHAMMO ", "OHHHAAAMMMDO",
+    "OHMMMAAMMDDO", " OOOOOOOOOO ", "  OA OA OA  ", "  OA OA OA  ",
+    " OAO  OA OAO", " OO   OO  OO",
+  ],
+  coralGuardian: [
+    " O O    O O ", " OHO OO OHO ", "  OHOHHOHO  ", "   OHEEHO   ",
+    " OOHHMMHHOO ", "OHOMMMMDMOHO", " OOMMAMMDOO ", "   ODDDDO   ",
+    "  ODO  ODO  ", "  OOO  OOO  ",
   ],
   sporeling: [
     "    OOOO    ", "  OOHHHHOO  ", " OHHAHHAMMO ", "OHHHMMHMMMDO",
