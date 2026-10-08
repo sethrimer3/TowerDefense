@@ -96,7 +96,7 @@ const defendPage = new DefendPage(el("defend"), {
   showEmpty: () => save.settings.showEmpty,
   gridLines: () => (save.settings.tileGrid ? save.settings.gridOpacity / 100 : 0),
   effects: () => !save.settings.effectsOff,
-  devMode: () => save.settings.devMode,
+  devMode: () => save.settings.developerMode,
   openTiles: () => navigate("tiles"),
 });
 

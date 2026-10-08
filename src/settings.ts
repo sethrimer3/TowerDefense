@@ -28,6 +28,8 @@ export const SETTINGS = {
   ambienceOff: { kind: "toggle", default: false, page: { id: "ambience", label: "Ambient sound", invert: true } },
   /** Alembic, the game's own pixel font, for every word on the page; off, Cinzel. */
   pixelFont: { kind: "toggle", default: true, page: { id: "pixel-font", label: "Use Custom Font" } },
+  /** Master switch for developer controls, including the enemy tester. */
+  developerMode: { kind: "toggle", default: false, page: { id: "developer-mode", label: "Developer mode" } },
   /** Dev: unlimited money. Every currency shows ∞, and every purchase
    * (Armory, Mine, Library, Smithy points, Knowledge) costs nothing. */
   devMode: { kind: "toggle", default: false, page: { id: "dev-mode", label: "Unlimited money" } },
@@ -46,6 +48,7 @@ export const SETTINGS = {
 } as const satisfies Record<string, Setting>;
 
 export type SettingKey = keyof typeof SETTINGS;
+export const DEV_OPTIONS = ["devMode", "devTowers", "instantResearch", "devSmithy", "devCommand", "devStewardship", "devMine", "devLibrary"] as const satisfies readonly SettingKey[];
 type ValueOf<S> = S extends { kind: "toggle" } ? boolean
   : S extends { choices: readonly (readonly [infer V, string])[] } ? V
   : number;
@@ -70,5 +73,8 @@ export function settingValue(setting: Setting, v: unknown): boolean | string | n
 export function decodeSettings(raw: any): Settings {
   const s = raw ?? {}, out = defaultSettings() as Record<SettingKey, unknown>;
   for (const k of KEYS) out[k] = settingValue(SETTINGS[k], s[k]) ?? out[k];
+  // Existing saves with enabled cheats keep them when acquiring the master switch.
+  if (typeof s.developerMode !== "boolean") out.developerMode = DEV_OPTIONS.some(k => out[k] === true);
+  if (!out.developerMode) for (const k of DEV_OPTIONS) out[k] = false;
   return out as Settings;
 }

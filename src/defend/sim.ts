@@ -285,6 +285,9 @@ export class DefendSim {
   sinkings: Sinking[] = [];
   events: SimEvent[] = [];
   wave = 0;
+  /** Manual enemy testing: no automatic waves or wave-clear rewards. */
+  private tester = false;
+  get unitTester() { return this.tester; }
   time = 0;
   lost = false;
   breakT = 1.5;
@@ -526,7 +529,26 @@ export class DefendSim {
     if (this.time === 0 && this.wave === 0) this.wave = Math.max(1, Math.floor(wave)) - 1;
   }
 
+  startUnitTester() {
+    if (this.time !== 0 || this.wave !== 0) return;
+    this.tester = true;
+    this.wave = 1;
+    this.stats.begin(1, 0, 0);
+  }
+
+  /** Uses ordinary enemy assembly, including chain segments and fortress parts. */
+  summonEnemy(kind: EnemyKind): boolean {
+    if (!this.tester || this.lost || !ENEMIES[kind]) return false;
+    this.waveSpawned = this.enemies.length;
+    const before = this.enemies.length;
+    this.spawnEnemy(kind);
+    if (this.enemies.length === before) return false;
+    this.stats.current.spawned++;
+    return true;
+  }
+
   private runWaves(dt: number) {
+    if (this.tester) { this.waveSpawned = this.enemies.length; return; }
     if (this.spawnQueue.length) {
       this.spawnT -= dt;
       while (this.spawnT <= 0 && this.spawnQueue.length) {

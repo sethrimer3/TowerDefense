@@ -1128,6 +1128,21 @@ nav button > span img { display: block; width: 42px; height: 42px; max-width: 10
   filter: grayscale(1);
   cursor: not-allowed;
 }
+.unit-testing .defend-palette,
+.defend-stage.unit-testing.side-open .defend-side {
+  width: 112px;
+}
+.defend-item.defend-enemy {
+  cursor: pointer;
+}
+.defend-item.defend-enemy span {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.defend-item.defend-enemy canvas {
+  width: 64px;
+  height: 64px;
+}
 .defend-board {
   position: relative;
   flex: 1;

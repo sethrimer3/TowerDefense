@@ -1,6 +1,6 @@
 import { HOUR_MS } from "../away.ts";
 import { UNLOCK_WAVES, unlockWaves, waveReach } from "../defend/progress.ts";
-import { SETTINGS, type SettingKey } from "../settings.ts";
+import { DEV_OPTIONS, SETTINGS, type SettingKey } from "../settings.ts";
 import type { AppContext } from "./app.ts";
 import { el } from "./dom.ts";
 
@@ -12,8 +12,8 @@ const PAGE = ["reduceMotion", "effectsOff", "tileGrid", "soundOff", "ambienceOff
 const DEV = ["devMode", "devTowers", "instantResearch"] as const satisfies readonly SettingKey[];
 /** All research unlocked: the Smithy's rows and each skill tree. */
 const RESEARCH = ["devSmithy", "devCommand", "devStewardship", "devMine", "devLibrary"] as const satisfies readonly SettingKey[];
-const ALL_DEV = [...DEV, ...RESEARCH];
-type PageKey = (typeof GAMEPLAY)[number] | (typeof PAGE)[number] | (typeof ALL_DEV)[number];
+const ALL_DEV = DEV_OPTIONS;
+type PageKey = (typeof GAMEPLAY)[number] | (typeof PAGE)[number] | (typeof ALL_DEV)[number] | "developerMode";
 
 /** One toggle's checkbox, showing its current value. */
 function checkbox(key: PageKey, ctx: AppContext): string {
@@ -41,23 +41,31 @@ export function renderSettingsPage(ctx: AppContext) {
     GAMEPLAY.map((key) => control(key, ctx)).join("") +
     `<h3 class="settings-group">Display and sound</h3>` +
     PAGE.map((key) => control(key, ctx) + (key === "tileGrid" ? gridOpacity(ctx) : "")).join("") +
-    `<h3 class="settings-group">Dev options</h3>` +
+    control("developerMode", ctx) +
+    (settings.developerMode ? `<h3 class="settings-group">Dev options</h3>` +
     `<label class="setting setting-all">ALL ON<input type="checkbox" id="dev-all" ${allOn ? "checked" : ""}></label>` +
     DEV.map((key) => control(key, ctx)).join("") +
     `<div class="setting setting-research"><span>All research unlocked</span><span class="research-checks">${RESEARCH.map((key) => `<label>${SETTINGS[key].page.label}${checkbox(key, ctx)}</label>`).join("")}</span></div>` +
     `<button class="wide" id="dev-idle">Add 1 hour of idle time</button>` +
     `<button class="wide" id="dev-idle-day">Add 24 hours of idle time</button>` +
     `<button class="wide" id="dev-waves">Unlock ${UNLOCK_WAVES} more waves</button>` +
-    `<p class="hint" id="dev-waves-reach">Defenses can start on any wave up to ${waveReach(ctx.save().defend)}; choose it with the Wave button on the Defend tab.</p>` +
+    `<p class="hint" id="dev-waves-reach">Defenses can start on any wave up to ${waveReach(ctx.save().defend)}; choose it with the Wave button on the Defend tab. Unit tester is also available there. Turning Developer mode off turns off these dev options.</p>` : "") +
     `<p class="hint">Progress saves after each action. A defense in progress is never saved: reloading ends it.</p><button class="wide danger" id="erase">Erase all progress</button>`;
-  for (const key of [...GAMEPLAY, ...PAGE, ...ALL_DEV]) {
+  el("developer-mode").onchange = (event) => {
+    settings.developerMode = (event.target as HTMLInputElement).checked;
+    if (!settings.developerMode) for (const key of ALL_DEV) settings[key] = false;
+    ctx.devChanged();
+    renderSettingsPage(ctx);
+  };
+  for (const key of [...GAMEPLAY, ...PAGE, ...(settings.developerMode ? ALL_DEV : [])]) {
     const row = SETTINGS[key], input = el(row.page.id) as HTMLInputElement;
     input.onchange = () => {
       settings[key] = "invert" in row.page ? !input.checked : input.checked;
       if ((ALL_DEV as readonly SettingKey[]).includes(key)) ctx.devChanged();
       else ctx.update();
       if (key === "tileGrid") el("grid-opacity-row").hidden = !input.checked;
-      (el("dev-all") as HTMLInputElement).checked = ALL_DEV.every((k) => settings[k]);
+      const all = document.getElementById("dev-all") as HTMLInputElement | null;
+      if (all) all.checked = ALL_DEV.every((k) => settings[k]);
     };
   }
   const opacity = el(SETTINGS.gridOpacity.page.id) as HTMLInputElement;
@@ -66,6 +74,8 @@ export function renderSettingsPage(ctx: AppContext) {
     el("grid-opacity-value").textContent = `${opacity.value}%`;
   };
   opacity.onchange = () => ctx.update();
+  el("erase").onclick = () => confirmErase(ctx);
+  if (!settings.developerMode) return;
   const all = el("dev-all") as HTMLInputElement;
   all.onchange = () => {
     for (const key of ALL_DEV) {
@@ -82,7 +92,6 @@ export function renderSettingsPage(ctx: AppContext) {
     el("dev-waves-reach").textContent = `Defenses can start on any wave up to ${waveReach(defend)}; choose it with the Wave button on the Defend tab.`;
     ctx.update();
   };
-  el("erase").onclick = () => confirmErase(ctx);
 }
 
 function confirmErase(ctx: AppContext) {

@@ -119,18 +119,26 @@ export class DefendPage {
   /** Whether the side panel is open in each phase: the build palette starts
    * open, the battle's items closed so the battle has the whole view. */
   private sideOpen = { build: true, sim: false };
+  private testerSelected = false;
+  private summonHold: { kind: EnemyKind; button: HTMLButtonElement; pointerId: number; next: number } | null = null;
 
   constructor(root: HTMLElement, host: DefendHost) {
     this.root = root;
     this.host = host;
     Object.assign(window, { defendFrameTimes: (enabled?: boolean) => this.frameTimes.toggle(enabled) });
     window.addEventListener("resize", () => this.layoutBoard());
-    document.addEventListener('visibilitychange', () => { this.lastTime = 0; });
+    document.addEventListener('visibilitychange', () => { this.lastTime = 0; this.stopSummoning(); });
+    window.addEventListener("blur", () => this.stopSummoning());
   }
 
   /** Called when the DEFEND tab is shown (or its data changed elsewhere). */
   show() {
     this.lastTime = 0;
+    this.stopSummoning();
+    if (!this.host.devMode()) {
+      this.testerSelected = false;
+      if (this.sim?.unitTester) { this.phase = "build"; this.sim = null; this.map = null; this.weather = null; this.night = 0; this.hideBanner(); }
+    }
     if (!this.built) this.build();
     this.renderChrome();
     this.relayout();
@@ -144,6 +152,7 @@ export class DefendPage {
     const measuring = this.sim && this.phase === "sim";
     const start = performance.now();
     if (this.sim && this.phase === "sim") {
+      this.repeatSummon(time);
       if (!this.journal?.open) this.sim.update(dt);
     } else if (this.sim && this.phase === "over" && (this.sim.floods.length || this.sim.sinkings.length)) ageWater(this.sim, Math.min(dt, 0.25));
     const updated = performance.now();
@@ -224,6 +233,7 @@ export class DefendPage {
   /** Pause bookkeeping when the tab is hidden, so time doesn't jump. */
   pause() {
     this.lastTime = 0;
+    this.stopSummoning();
     this.pointers.end();
     this.frameTimes.toggle(this.frameTimes.enabled);
   }
@@ -324,8 +334,8 @@ export class DefendPage {
     this.root.querySelector(".defend-head")!.classList.toggle("defend-building", this.phase === "build");
     if (this.phase === "build") {
       el.innerHTML = `${this.sideToggle("Build")}<button id="defend-upgrades" title="Your tiles: buy more buildings and bombs"><canvas class="ui-sprite" width="48" height="48" aria-hidden="true"></canvas>Tiles</button>
-        <button class="defend-go" id="defend-start">Start Defense</button>
-        <button class="defend-wave" id="defend-wave" style="${areaStyle(areaForWave(startingWave(this.save)))}" title="Choose the starting wave · ${areaForWave(startingWave(this.save)).name}" aria-haspopup="dialog"><canvas class="defend-wave-wall" aria-hidden="true" width="64" height="16"></canvas>${uiSprite("stage-select")}<small>Wave </small><b>${startingWave(this.save)}</b></button>`;
+        <button class="defend-go" id="defend-start">${this.testerSelected ? "Start Tester" : "Start Defense"}</button>
+        <button class="defend-wave" id="defend-wave" style="${areaStyle(areaForWave(startingWave(this.save)))}" title="Choose the starting wave · ${this.testerSelected ? "Unit tester" : areaForWave(startingWave(this.save)).name}" aria-haspopup="dialog"><canvas class="defend-wave-wall" aria-hidden="true" width="64" height="16"></canvas>${uiSprite("stage-select")}<small>Wave </small><b>${this.testerSelected ? "Tester" : startingWave(this.save)}</b></button>`;
       el.querySelector<HTMLButtonElement>("#defend-upgrades")!.onclick = () => this.host.openTiles?.();
       paintIcon(el.querySelector<HTMLCanvasElement>("#defend-upgrades canvas")!, "cityTile");
       this.bindSideToggle(el);
@@ -339,7 +349,7 @@ export class DefendPage {
       this.paintWaveWall();
     } else if (this.phase === "sim") {
       const armed = performance.now() < this.abandonArmed;
-      el.innerHTML = `${this.sideToggle("Skills")}<button id="defend-abandon" class="defend-danger ${armed ? "armed" : ""}">${armed ? "Confirm?" : "Abandon"}</button>
+      el.innerHTML = `${this.sideToggle(this.sim?.unitTester ? "Enemies" : "Skills")}<button id="defend-abandon" class="defend-danger ${armed ? "armed" : ""}">${armed ? "Confirm?" : "Abandon"}</button>
         <button id="defend-speed" title="Battle speed">${this.sim?.speed ?? 1}×</button>`;
       el.querySelector<HTMLButtonElement>("#defend-abandon")!.onclick = () => {
         if (performance.now() < this.abandonArmed) {
@@ -386,6 +396,7 @@ export class DefendPage {
    * palette comes back. */
   private rebuild() {
     if (this.phase !== "over") return;
+    this.stopSummoning();
     this.phase = "build";
     this.sim = null;
     this.map = null;
@@ -408,6 +419,7 @@ export class DefendPage {
     toggle.onclick = () => {
       if (this.phase === "over") return;
       this.sideOpen[this.phase] = !this.sideOpen[this.phase];
+      if (!this.sideOpen[this.phase]) this.stopSummoning();
       toggle.setAttribute("aria-pressed", String(this.sideOpen[this.phase]));
       this.renderSide();
     };
@@ -418,6 +430,7 @@ export class DefendPage {
   private renderSide() {
     const open = this.phase !== "over" && this.sideOpen[this.phase];
     this.root.querySelector("#defend-stage")!.classList.toggle("side-open", open);
+    this.root.querySelector("#defend-stage")!.classList.toggle("unit-testing", !!this.sim?.unitTester);
     this.root.querySelector("#defend-side")!.setAttribute("aria-hidden", String(!open));
   }
 
@@ -448,7 +461,29 @@ export class DefendPage {
   }
 
   private renderPalette() {
+    this.stopSummoning();
     const el = this.root.querySelector<HTMLElement>("#defend-palette")!;
+    if (this.sim?.unitTester && this.host.devMode()) {
+      el.innerHTML = `<small class="defend-palette-title">ENEMIES</small><small class="defend-palette-none">Tap to summon one. Hold to summon more.</small>` +
+        (Object.keys(ENEMIES) as EnemyKind[]).map(kind => `<button class="defend-item defend-enemy" data-enemy="${kind}" aria-label="Summon ${ENEMIES[kind].name}" title="Summon ${ENEMIES[kind].name}"><canvas data-portrait="${kind}" width="80" height="80" aria-hidden="true"></canvas><span>${ENEMIES[kind].name}</span></button>`).join("");
+      paintPortraits(el);
+      el.querySelectorAll<HTMLButtonElement>("[data-enemy]").forEach(button => {
+        const kind = button.dataset.enemy as EnemyKind;
+        button.onpointerdown = event => {
+          if (event.button !== 0 || !event.isPrimary || this.phase !== "sim") return;
+          event.preventDefault();
+          this.stopSummoning();
+          button.focus({ preventScroll: true });
+          button.setPointerCapture(event.pointerId);
+          this.summon(kind);
+          this.summonHold = { kind, button, pointerId: event.pointerId, next: performance.now() + 350 };
+        };
+        button.onpointerup = button.onpointercancel = button.onlostpointercapture = () => this.stopSummoning();
+        button.onclick = event => { if (event.detail === 0) this.summon(kind); };
+        button.oncontextmenu = event => event.preventDefault();
+      });
+      return;
+    }
     const s = this.save, inventory = this.host.cards?.() ?? [];
     const all: { id: string; name: string; count: number; icon: IconItem }[] =
       this.phase === "build"
@@ -494,6 +529,24 @@ export class DefendPage {
         el.scrollTop = 0;
       };
     });
+  }
+
+  private summon(kind: EnemyKind) {
+    if (this.phase !== "sim" || !this.host.devMode() || this.journal?.open) return;
+    if (!this.sim?.summonEnemy(kind)) this.setMessage("Enemy limit reached. Clear enemies before summoning more.");
+  }
+
+  private repeatSummon(now: number) {
+    const hold = this.summonHold;
+    if (!hold) return;
+    if (!this.host.devMode() || !this.sim?.unitTester || this.sim.lost || this.journal?.open || !this.sideOpen.sim) { this.stopSummoning(); return; }
+    if (now >= hold.next) { this.summon(hold.kind); hold.next = now + 100; }
+  }
+
+  private stopSummoning() {
+    const hold = this.summonHold;
+    this.summonHold = null;
+    if (hold?.button.hasPointerCapture(hold.pointerId)) hold.button.releasePointerCapture(hold.pointerId);
   }
 
   private updateSkillCooldowns() {
@@ -561,7 +614,7 @@ export class DefendPage {
     const sim = this.sim;
     const hp = Math.max(0, sim.keepHp()),
       max = sim.keepMaxHp();
-    const html = `<span><small>Wave </small><b>${sim.wave}</b></span><span class="defend-keep" title="Keep ${Math.ceil(hp)} / ${max}"><small>Keep</small><i></i></span>`;
+    const html = `<span>${sim.unitTester ? `<b title="Unit tester">Tester</b>` : `<small>Wave </small><b>${sim.wave}</b>`}</span><span class="defend-keep" title="Keep ${Math.ceil(hp)} / ${max}"><small>Keep</small><i></i></span>`;
     this.keepBricks?.set(hp / max);
     if (el.dataset.html !== html) {
       el.dataset.html = el.innerHTML = html;
@@ -666,11 +719,17 @@ export class DefendPage {
   /** The starting wave picker: a tap on a wave starts the next defense there. */
   private pickWave() {
     const dialog = this.root.querySelector<HTMLDialogElement>(".defend-wave-dialog")!;
-    dialog.innerHTML = wavePickerHTML(this.save);
+    dialog.innerHTML = wavePickerHTML(this.save, this.host.devMode(), this.testerSelected);
+    dialog.querySelector<HTMLButtonElement>("[data-unit-tester]")?.addEventListener("click", () => {
+      this.testerSelected = true;
+      dialog.close();
+      this.renderControls();
+    });
     dialog.querySelector<HTMLButtonElement>("[data-wave-close]")!.onclick = () => dialog.close();
     dialog.querySelectorAll<HTMLButtonElement>("[data-wave]").forEach((b) => {
       b.onclick = () => {
         this.save.startWave = Number(b.dataset.wave);
+        this.testerSelected = false;
         this.host.persist();
         dialog.close();
         this.renderControls();
@@ -681,6 +740,7 @@ export class DefendPage {
   }
 
   private startRun() {
+    this.stopSummoning();
     this.performance.finish('restarted');
     this.performance = new BattlePerformance();
     this.performanceEnd = null;
@@ -690,20 +750,26 @@ export class DefendPage {
     const map = this.currentMap();
     this.sim = new DefendSim(map, { ...this.save.levels }, (defendRandom("rolls")() * 2147483648) | 0, this.host.bonuses());
     this.sim.speed = Math.min(this.save.battleSpeed, this.save.speed3 ? 3 : 2);
-    this.sim.startAt(startingWave(this.save));
+    if (this.testerSelected && this.host.devMode()) this.sim.startUnitTester();
+    else this.sim.startAt(startingWave(this.save));
     this.phase = "sim";
     this.newRecord = 0;
-    const area = areaForWave(startingWave(this.save));
+    const area = areaForWave(this.sim.unitTester ? 1 : startingWave(this.save));
     this.weatherArea = area.id;
     this.weather = rollWeather(undefined, area);
     this.night = 0;
     this.renderChrome();
+    if (this.sim.unitTester) {
+      this.setMessage("Unit tester: open Enemies, then tap or hold an enemy to summon it.", 6);
+      return;
+    }
     const w = this.weather, sky = w.blizzard ? "A blizzard howls in. " : w.snow ? "Snow drifts in. " : w.sand ? "A sandstorm blows in. " : w.mist ? "Mist creeps over the ground. " : w.rain ? "Rain rolls in. " : "";
     this.setMessage(`${sky}Here they come! ${this.sideOpen.sim ? "Drag" : "Open Skills and drag"} a bomb onto the field, or plant the war banner to rally your troops.`, 4);
   }
 
   private endRun() {
     if (!this.sim) return;
+    this.stopSummoning();
     this.performanceEnd = this.sim.lost ? 'lost' : 'abandoned';
     this.phase = "over";
     play("fallen");
@@ -723,7 +789,7 @@ export class DefendPage {
   }
 
   private discoverEnemies() {
-    if (!this.sim) return;
+    if (!this.sim || this.sim.unitTester) return;
     const encountered = new Set(this.sim.enemies.map(e => e.kind));
     for (const k of Object.keys(ENEMIES) as EnemyKind[]) if (this.sim.slain[k] > 0) encountered.add(k);
     let changed = false;
@@ -773,7 +839,7 @@ export class DefendPage {
     if (!this.renderer.canvas.width) return;
     const map = this.sim ? this.sim.map : this.currentMap();
     this.renderer.draw(map, this.sim, this.overlay(), {
-      area: areaForWave(Math.max(this.sim?.wave ?? 1, startingWave(this.save))).id,
+      area: areaForWave(this.sim?.unitTester ? 1 : Math.max(this.sim?.wave ?? 1, startingWave(this.save))).id,
       grid: this.phase === "build" ? (this.host.gridLines?.() ?? 0) : 0,
       timings: this.frameTimes.enabled,
       weather: this.weather,

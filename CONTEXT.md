@@ -35,6 +35,9 @@ One battle from the layout, wave after wave until the keep falls or the player a
 **Wave**:
 One group of enemies. Every 10th is a boss wave, fought at night, with warlords.
 
+**Unit tester**:
+A developer defense with manually summoned enemies and no automatic waves or progression rewards.
+
 **Mother**:
 A black enemy that splits into three broodlings when she dies.
 
