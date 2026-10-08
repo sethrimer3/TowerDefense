@@ -62,6 +62,30 @@ Violet Geode creatures: a swift living crystal, a shield-bearing guardian and a 
 **Star Wisp**, **Comet Hound** and **Astral Warden**:
 Astral Sanctuary creatures: a flying star spirit, a swift celestial hunter and a slow guardian shielding its escort.
 
+**Fern Mantis**, **Moss Troll** and **Lantern Hornet**:
+Mossbound creatures: a swift clawed hunter, a troll that regenerates lost health and a flying hornet carrying venom.
+
+**Glass Jackal**, **Dune Tortoise** and **Dust Djinn**:
+Amber Desert creatures: a swift jackal, a tortoise whose shell resists physical attacks but is vulnerable to explosions and a flying sand spirit shielding its companions.
+
+**Cinder Imp**, **Slag Golem** and **Ember Moth**:
+Ember Forge creatures: a fire-resistant imp, a heavy golem immune to fire but vulnerable to explosions and a flying moth resistant to fire.
+
+**Kelp Stalker**:
+A Drowned Temple hunter wrapped in kelp that regenerates lost health.
+
+**Cap Crawler**, **Mycelium Hulk** and **Rot Mite**:
+Fungal Hollow creatures: a crawler trailing spores, a heavy fungus that regenerates lost health and a quick venomous mite.
+
+**Geode Crab**, **Prism Moth** and **Shard Brood**:
+Violet Geode creatures: a crab whose crystal shell resists physical attacks but is vulnerable to explosions, a swift flying moth and a brood that releases three shardlings when destroyed.
+
+**Crypt Hound** and **Grave Wisp**:
+Obsidian Crypt creatures: a swift ground hunter and a flying spirit that regenerates lost health.
+
+**Nova Moth**:
+A luminous Astral Sanctuary flier that releases two star wisps when destroyed.
+
 **Siege engine**:
 An enemy machine with no crew (rolling cannon, ballista, firework launcher, trebuchet, great bombard, dragonfire battery): it drives itself toward the keep and stops to shoot what blocks its way, or the keep, from range.
 

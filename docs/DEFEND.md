@@ -441,8 +441,9 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   waves preview their own area. Ground and connected wall cap/face textures
   crossfade over three seconds, with matching wave button and list colors.
   `area-enemies.ts` supplies themed pools; Nadir permits every normal wave species. Offspring remain parent-only. Unspendable area-budget remainders are discarded. Nadir uses crypt masonry with a dark violet floor wash. Frozen Vault (101-120) includes all ship tiers, Ice Golems (240 HP, cost 80, double fire/explosion damage) and Sliding Ice Cubes (45 HP, cost 10, cardinal slides at 3.6 cells/second, meltable ice trails, immune to blast deflection). Both enemies have journal entries; kills award no currency.
-- The six smaller zone rosters add three species each, all affordable during
-  their first visit and also eligible in Nadir. Costs are fixed difficulty:
+- Every themed roster has at least 15 species; Frozen Vault has 20. The native
+  additions below are affordable during their first visit and also eligible in
+  Nadir. Costs are fixed difficulty:
 
   | Zone | Species and cost | Behavior |
   | --- | --- | --- |
@@ -452,11 +453,26 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   | Fungal Hollow | Sporeling 30, Fungal Brute 180, Spore Moth 80 | Small poison clouds, brutes releasing three sporelings, airborne spores |
   | Violet Geode | Shardling 40, Crystal Sentinel 600, Prism Ray 200 | Fast crystals, shield support, flying shield support |
   | Astral Sanctuary | Star Wisp 150, Comet Hound 500, Astral Warden 5,000 | Fast fliers, fast ground hunters, heavy shield support |
+  | Mossbound Ruins | Fern Mantis 3, Moss Troll 18, Lantern Hornet 9 | Fast melee hunter, regeneration, flying venom |
+  | Amber Desert | Glass Jackal 10, Dune Tortoise 40, Dust Djinn 45 | Fast hunter, armored shell vulnerable to explosions, flying shield support |
+  | Ember Forge | Cinder Imp 8, Slag Golem 60, Ember Moth 12 | Fire resistance, fire immunity with explosion weakness, flying fire resistance |
+  | Drowned Temple | Kelp Stalker 80 | Regenerating kelp hunter |
+  | Fungal Hollow | Cap Crawler 50, Mycelium Hulk 400, Rot Mite 10 | Spore clouds, regenerating heavy fungus, fast venomous mites |
+  | Violet Geode | Geode Crab 300, Prism Moth 100, Shard Brood 450 | Armored shell vulnerable to explosions, fast flier, brood releasing three shardlings |
+  | Obsidian Crypt | Crypt Hound 350, Grave Wisp 500 | Fast ground hunter, regenerating flying spirit |
+  | Astral Sanctuary | Nova Moth 800 | Flying brood releasing two star wisps |
 
-  Split parents reserve their three children against the wave cap. The small
+  Split parents reserve all their children against the wave cap. The small
   species can also appear directly in their zone's waves. Poison harms people,
   sparing buildings; finite shields absorb ranged hits within their radius,
-  while melee bypasses them. Each has distinct native pixel art, a journal
+  while melee bypasses them. Moss Trolls and Kelp Stalkers regenerate 3 HP per
+  battle second, Grave Wisps 4 and Mycelium Hulks 6, up to their maximum health.
+  Dune Tortoises and Geode Crabs halve physical damage, including lightning;
+  explosions deal 1.5 times damage to tortoises and slag golems, twice to crabs.
+  Cinder Imps take one quarter fire damage, Ember Moths half and Slag Golems
+  none. These multipliers apply after ranged shields. An unspendable budget
+  remainder is discarded without preventing random species selection.
+  Each has distinct native pixel art, a journal
   portrait, counterplay notes and persistent discovery. No kill currency is added.
 - Weather rolls at the start and on entering an area: Mossbound Ruins has
   30% rain, Drowned Temple 75%, Frozen Vault snow (a 30% stormy roll, and

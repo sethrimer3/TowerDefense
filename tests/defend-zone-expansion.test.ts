@@ -57,6 +57,18 @@ test('every themed zone has at least fifteen species and all native additions ap
   }
 });
 
+test('unspendable Astral remainders retain random choice instead of excluding brood enemies', () => {
+  const wave = 161, budget = waveDifficulty(wave);
+  assert.notEqual(budget % 50, 0);
+  const affordable = AREA_ENEMIES.astral.filter(k => ENEMIES[k].cost <= budget);
+  const roll = (affordable.indexOf('novaMoth') + .5) / affordable.length;
+  const mix = buildWave(wave, () => roll);
+  assert.equal(mix[0], 'novaMoth');
+  assert.notEqual(buildWave(wave, () => 0)[0], mix[0]);
+  const spent = mix.reduce((sum, k) => sum + ENEMIES[k].cost, 0);
+  assert.ok(spent <= budget && budget - spent < 150);
+});
+
 test('new splitting enemies reserve their entire brood and respect the runtime cap', () => {
   for (const kind of ['rootTreant', 'fungalBrute', 'shardBrood', 'novaMoth'] as const) {
     const def = ENEMIES[kind], child = def.splits!.into;
@@ -122,14 +134,14 @@ test('new fliers cross standing walls and strike the keep', () => {
 
 test('every addition persists discovery and has journal counterplay and finite kill counts', () => {
   const save = defaultDefendSave(); save.discovered = kinds;
-  assert.deepEqual(decodeDefendSave(save).discovered, kinds);
+  assert.deepEqual([...decodeDefendSave(save).discovered].sort(), [...kinds].sort());
   const html = journalHTML(kinds);
   for (const kind of kinds) {
     assert.ok(html.includes(ENEMIES[kind].name));
     assert.ok(html.includes(ENEMIES[kind].description!));
     const sim = fixture(), e = sim.spawnAuxiliary(kind, 10, 10)!;
-    sim.hurtEnemy(e, e.maxHp + 1, true, 'melee'); (sim as any).sweepAway();
-    assert.equal(sim.slain[kind], 1);
+    sim.hurtEnemy(e, e.maxHp * 2 + 1, true, 'melee'); (sim as any).sweepAway();
+    assert.equal(sim.slain[kind], 1, kind);
   }
 });
 

@@ -55,7 +55,10 @@ export function buildDifficultyWave(budget: number, rand: () => number, kinds?: 
       needed += count * d.slots;
       value -= count * d.def.cost;
     }
-    return value === 0 ? needed : Infinity;
+    // A themed roster need not contain a one-point enemy. Its final remainder
+    // can be discarded; treating that remainder as an impossible completion
+    // suppresses every random choice and starves less-efficient species.
+    return needed;
   };
   while (room > 0 && remaining > 0) {
     const affordable = roster.filter(d => d.def.cost <= remaining && d.slots <= room);

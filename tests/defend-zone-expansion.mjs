@@ -69,14 +69,15 @@ try {
         }
       }
       const journal = document.createElement('div'); journal.innerHTML = journalHTML(kinds);
-      for (const area of AREAS.filter(a => ['moss', 'desert', 'drowned', 'fungal', 'crystal', 'astral'].includes(a.id))) {
-        if (journal.querySelectorAll(`[data-zone="${area.id}"] article`).length !== 3) throw Error(`${area.id} journal roster incomplete`);
+      for (const area of AREAS.filter(a => a.id !== 'nadir')) {
+        const expected = kinds.filter(k => AREA_ENEMIES[area.id].includes(k)).length;
+        if (journal.querySelectorAll(`[data-zone="${area.id}"] article`).length !== expected) throw Error(`${area.id} journal roster incomplete`);
       }
-      if (journal.querySelectorAll('[data-zone="nadir"] article').length !== 18) throw Error('Nadir journal incomplete');
+      if (journal.querySelectorAll('[data-zone="nadir"] article').length !== 37) throw Error('Nadir journal incomplete');
       const overflow = [...document.querySelectorAll('main,section,canvas')].filter(el => el.getBoundingClientRect().right > innerWidth + 1).length;
       return { species: kinds.length, checks: checks.length, overflow };
     });
-    assert.equal(result.species, 18); assert.equal(result.checks, 216); assert.equal(result.overflow, 0);
+    assert.equal(result.species, 37); assert.equal(result.checks, 444); assert.equal(result.overflow, 0);
     assert.deepEqual(errors, []);
     await page.screenshot({ path: `test-results/defend-zone-expansion-${label}.png`, fullPage: true });
     console.log(label, result);
@@ -107,11 +108,11 @@ try {
       const loaded = decodeDefendSave(JSON.parse(window.savedZoneDefend));
       return loaded.discovered.length;
     });
-    assert.equal(discovered, 18);
+    assert.equal(discovered, 37);
     await page.locator('#defend-journal').click();
-    assert.equal(await page.locator('.defend-journal-dialog article').count(), 36);
+    assert.equal(await page.locator('.defend-journal-dialog article').count(), 74);
     const read = await page.evaluate(() => JSON.parse(window.savedZoneDefend).journalRead.length);
-    assert.equal(read, 18);
+    assert.equal(read, 37);
     const fit = await page.locator('.defend-journal-dialog').evaluate(el => {
       for (const animation of el.getAnimations()) animation.finish();
       const r = el.getBoundingClientRect(), close = el.querySelector('[data-journal-close]').getBoundingClientRect();
@@ -122,7 +123,7 @@ try {
     await page.locator('[data-journal-close]').click();
     assert.equal(await page.locator('.defend-journal-dialog').evaluate(el => el.open), false);
     assert.deepEqual(errors, []);
-    console.log(`${label} live journal: 18 discoveries persisted, 36 entries rendered`);
+    console.log(`${label} live journal: 37 discoveries persisted, 74 entries rendered`);
     await page.close();
   }
 } finally { await browser.close(); }

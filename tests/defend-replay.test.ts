@@ -53,6 +53,11 @@ type Scenario = {
 
 function scenarios(): Record<string, Scenario> {
   return {
+    zoneReinforcements: {
+      layout: city(SQUARE, [["barracks", 1, 1], ["archerTower", -1, -1], ["wizardTower", 0, -2]]),
+      citySeed: 13, levels: maxLevels(), seed: 6, seconds: 80, wave: 181, breakSeconds: 90,
+      opening: ['fernMantis', 'mossTroll', 'lanternHornet', 'glassJackal', 'duneTortoise', 'dustDjinn', 'cinderImp', 'slagGolem', 'emberMoth', 'kelpStalker', 'capCrawler', 'myceliumHulk', 'rotMite', 'geodeCrab', 'prismMoth', 'shardBrood', 'cryptHound', 'graveWisp', 'novaMoth'],
+    },
     zoneExpansion: {
       layout: city(SQUARE, [["barracks", 1, 1], ["archerTower", -1, -1], ["wizardTower", 0, -2]]),
       citySeed: 13, levels: maxLevels(), seed: 6, seconds: 80, wave: 181, breakSeconds: 90,
@@ -264,6 +269,7 @@ test("the Defend replays exercise every unit and effect", () => {
       if (sim.baits.length && sim.blazes.length) seen.add("bait:burning");
     });
   const want = [
+    "enemy:fernMantis", "enemy:mossTroll", "enemy:lanternHornet", "enemy:glassJackal", "enemy:duneTortoise", "enemy:dustDjinn", "enemy:cinderImp", "enemy:slagGolem", "enemy:emberMoth", "enemy:kelpStalker", "enemy:capCrawler", "enemy:myceliumHulk", "enemy:rotMite", "enemy:geodeCrab", "enemy:prismMoth", "enemy:shardBrood", "enemy:cryptHound", "enemy:graveWisp", "enemy:novaMoth",
     "enemy:brineCrab", "enemy:lanternJelly", "enemy:coralGuardian",
     "enemy:briarling", "enemy:mossBoar", "enemy:rootTreant", "enemy:duneScorpion", "enemy:sunScarab", "enemy:sandVulture", "enemy:sporeling", "enemy:fungalBrute", "enemy:sporeMoth", "enemy:shardling", "enemy:crystalSentinel", "enemy:prismRay", "enemy:starWisp", "enemy:cometHound", "enemy:astralWarden",
     "enemy:iceGolem", "enemy:iceCube",
