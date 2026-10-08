@@ -13,6 +13,7 @@ import { hash01 } from "./grid.ts";
 import { ARCHER_UNIT, CIVILIAN, DARK_WIZARD, ENEMIES, FIRE_MAGE, SOLDIER, VALKYRIE, watchRadius, type EnemyDef } from "./catalog.ts";
 import type { Building } from "./citygen.ts";
 import { center } from "./pathing.ts";
+import { paintKeepFlash } from "./structure-art.ts";
 import type { CarriedLight } from "./lighting.ts";
 import { drawFireballs, drawMage } from "./mage-art.ts";
 import { drawArrows, drawBreath, drawShells, drawSparks } from "./projectile-art.ts";
@@ -35,6 +36,11 @@ function drawStrikes({ c, px }: Brush, sim: DefendSim) {
     const f = sim.flash[bd.id];
     if (f <= 0 || !sim.intact(bd)) continue;
     const r = bd.rect;
+    if (bd.kind === "keep") {
+      const x = Math.round(r.x * px), y = Math.round(r.y * px);
+      paintKeepFlash(c, { x, y, w: Math.round((r.x + r.w) * px) - x, h: Math.round((r.y + r.h) * px) - y, px }, (f / BUILDING_FLASH) * .55);
+      continue;
+    }
     c.fillStyle = `rgba(255,244,220,${(f / BUILDING_FLASH) * 0.55})`;
     c.fillRect(r.x * px, r.y * px, r.w * px, r.h * px);
   }
@@ -45,7 +51,7 @@ function drawHurt(b: Brush, sim: DefendSim) {
     const hp = sim.hp[bd.id],
       max = sim.maxHp[bd.id];
     // Houses and walls show their hurt only in their art's damage stages.
-    if (!sim.intact(bd) || hp >= max || bd.kind === "house" || bd.kind === "wall" || bd.kind === "gate") continue;
+    if (!sim.intact(bd) || hp >= max || bd.kind === "keep" || bd.kind === "house" || bd.kind === "wall" || bd.kind === "gate") continue;
     healthBar(b, bd, hp / max);
   }
 }
@@ -106,6 +112,12 @@ function drawCivilians(b: Brush, sim: DefendSim, torches: Burning | null) {
     const s = Math.max(2, CIVILIAN.size * px);
     c.fillStyle = u.flash > 0 ? "#fff" : CIVILIAN.color;
     c.fillRect(u.x * px - s / 2, u.y * px - s / 2, s, s);
+    if (u.state === "flee") {
+      const dot = Math.max(1, px * .07);
+      c.fillStyle = "#f2d27a";
+      c.fillRect(u.x * px - dot / 2, u.y * px - s / 2 - dot * 5, dot, dot * 3);
+      c.fillRect(u.x * px - dot / 2, u.y * px - s / 2 - dot, dot, dot);
+    }
     if (torches) drawHandTorch(b, { x: u.x + CIVILIAN.size * 0.6, y: u.y - CIVILIAN.size * 0.4, id: u.id }, sim.time, torches(u.x, u.y, u.id));
     if (u.state === "working" && Math.floor(sim.time * 6) % 2) {
       if (u.jobKind === "sand") {

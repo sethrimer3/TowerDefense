@@ -1768,7 +1768,10 @@ dialog .away-row .away-note {
 .defend-right { display: flex; align-items: center; justify-content: flex-end; gap: 5px; min-width: 0; }
 .defend-center button { padding: 6px 11px; white-space: nowrap; font-size: 12px; }
 .defend-building .defend-hud { display: none; }
-.defend-hud { justify-content: center; gap: 8px; padding: 7px 8px; border: 1px solid #8c7546; background: var(--stone), #201c17; border-radius: 2px; }
+.defend-hud { justify-content: center; gap: 5px; overflow: visible; }
+.defend-wave-status, .defend-keep { display: flex; align-items: center; gap: 5px; padding: 7px 8px; border: 1px solid #8c7546; background: var(--stone), #201c17; border-radius: 2px; }
+.defend-enemies { display: inline-flex; align-items: center; gap: 3px; }
+.defend-enemies svg { width: 12px; height: 12px; shape-rendering: crispEdges; }
 .defend-hud > :first-child { margin-left: 0; }
 .defend-wave { position: relative; isolation: isolate; overflow: hidden; }
 .defend-wave .defend-wave-wall { position: absolute; inset: 0; width: 100%; height: 100%; z-index: -1; image-rendering: pixelated; filter: brightness(.35); }
@@ -1787,7 +1790,9 @@ dialog .away-row .away-note {
   .defend-journal-button { padding: 3px; }
   .defend-journal-button canvas { width: 30px; height: 30px; }
   #defend-upgrades .ui-sprite { width: 16px; height: 16px; }
-  .defend-hud { max-width: 128px; padding: 5px 4px; gap: 3px; font-size: 10px; }
+  .defend-hud { gap: 3px; font-size: 10px; }
+  .defend-wave-status, .defend-keep { padding: 5px 4px; gap: 3px; }
+  .defend-wave-status { flex-direction: column; gap: 2px; }
   .defend-keep canvas { width: 48px; height: 24px; margin: -5px 0; }
   .defend-hud .defend-keep small { display: none; }
 }

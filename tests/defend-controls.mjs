@@ -33,6 +33,13 @@ try {
     await page.screenshot({ path: `test-results/defend-controls-build-${width}.png` });
     await page.locator('#defend-start').click();
     assert.equal(await page.locator('#defend-side-toggle').count(), 1);
+    await page.evaluate(() => { const p = window.stressPage; p.sim.breakT = 0; p.sim.update(1 / 30); p.sim.spawnQueue = Array(500).fill('roach'); p.updateHud(); });
+    assert.equal(await page.locator('.defend-wave-status').count(), 1);
+    assert.equal(await page.locator('.defend-keep').count(), 1);
+    assert.equal(await page.locator('.defend-enemies svg').count(), 1);
+    assert.equal(await page.locator('.defend-enemies').getAttribute('aria-label'), '500 enemies remaining');
+    const boxes = await geometry(['.defend-wave-status', '.defend-keep']);
+    assert.ok(boxes.buttons[1].x > boxes.buttons[0].right, 'wave and keep have separate boxes');
     g = await geometry(['#defend-side-toggle', '#defend-abandon', '#defend-hud', '#defend-speed', '#defend-journal', '#defend-cog']);
     for (let i = 1; i < g.buttons.length; i++) assert.ok(g.buttons[i].x >= g.buttons[i - 1].right - 1, `battle controls overlap at ${width}: ${JSON.stringify(g)}`);
     assert.ok(Math.abs(g.buttons[2].center - g.head.center) < 1, 'keep and wave centered');
@@ -101,6 +108,43 @@ try {
   });
   assert.equal(new Set(wallHashes).size, 9, 'each later zone uses distinct wall artwork');
   await page.screenshot({ path: 'test-results/defend-controls-zone-wall.png' });
+  const damage = await page.evaluate(async () => {
+    const { drawDamage } = await import('/src/defend/battle-art.ts');
+    const { keepPixels } = await import('/src/defend/structure-art.ts');
+    const { ART } = await import('/src/defend/park-art.ts');
+    const { BUILDING_FLASH } = await import('/src/defend/sim.ts');
+    const p = window.stressPage;
+    p.startRun();
+    const sim = Object.create(p.sim), keep = { ...p.sim.keep, rect: { x: 1, y: 2, w: 3, h: 3 } };
+    sim.map = { ...p.sim.map, buildings: [keep] };
+    sim.hp = p.sim.hp.slice(); sim.hp[keep.id] = sim.maxHp[keep.id] * .5;
+    sim.flash = p.sim.flash.slice(); sim.flash.fill(0); sim.flash[keep.id] = BUILDING_FLASH;
+    const canvas = document.createElement('canvas'); canvas.width = 5 * ART; canvas.height = 6 * ART;
+    const c = canvas.getContext('2d');
+    drawDamage({ c, px: ART }, sim);
+    const data = c.getImageData(0, 0, canvas.width, canvas.height).data, sprite = keepPixels();
+    let outside = 0, inside = 0, missing = 0;
+    for (let y = 0; y < canvas.height; y++) for (let x = 0; x < canvas.width; x++) {
+      const sx = x - ART, sy = y - 2 * ART;
+      const visible = sx >= 0 && sy >= 0 && sx < 3 * ART && sy < 3 * ART && sprite[sy * 3 * ART + sx] !== 0;
+      const drawn = data[(y * canvas.width + x) * 4 + 3] > 0;
+      if (visible && drawn) inside++;
+      if (visible && !drawn) missing++;
+      if (!visible && drawn) outside++;
+    }
+    const original = p.sim.enemies;
+    p.sim.enemies = [
+      { hp: 1 }, { hp: 0 }, { hp: 1, fortressPart: { core: 1 } }
+    ];
+    p.sim.spawnQueue = ['roach', 'roach']; p.updateHud();
+    const count = document.querySelector('.defend-enemies').getAttribute('aria-label');
+    p.sim.enemies = original;
+    return { outside, inside, missing, count };
+  });
+  assert.equal(damage.outside, 0, 'no keep health bar or damage flash outside sprite');
+  assert.equal(damage.missing, 0, 'every keep sprite pixel flashes');
+  assert.ok(damage.inside > 0);
+  assert.equal(damage.count, '3 enemies remaining', 'count queued and living enemies, excluding fortress parts');
   // A fresh browser context checks the real shell and actual storage.
   const app = await browser.newPage({ viewport: { width: 390, height: 844 } });
   app.on('pageerror', e => errors.push(e.message));

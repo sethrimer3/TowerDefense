@@ -6,8 +6,9 @@
  * refills after a delay. */
 import { dist } from "../exact.ts";
 import { CIVILIAN, civilianCount, civilianHp, rebuildSeconds, type UpgradeId } from "./catalog.ts";
-import { cellCenter, center, findPath, rectDist, type Point } from "./pathing.ts";
-import { cellInBounds, cellIndex, cellX, cellY } from "./grid.ts";
+import { cellAt, cellCenter, center, findPath, rectDist, type Point } from "./pathing.ts";
+import { CELL_COUNT, CELLS_H, CELLS_W, cellInBounds, cellIndex, cellX, cellY, sideCells } from "./grid.ts";
+import { CellType } from "./citygen.ts";
 import type { Civilian, DefendSim } from "./sim.ts";
 import { restockable } from "./bait.ts";
 import { icyCell } from "./boats.ts";
@@ -19,6 +20,9 @@ const ERRAND = { maxCost: 400 };
 export class Builders {
   /** Per slot: seconds until it can send out a civilian again (0 = ready). */
   readonly respawn: number[];
+  private refugeVersion = -1;
+  private refuge = new Uint8Array(CELL_COUNT);
+  private escapeChecks = new WeakMap<Civilian, number>();
 
   constructor(levels: Record<UpgradeId, number>) {
     this.respawn = Array(civilianCount(levels.civilianCount)).fill(0);
@@ -29,9 +33,42 @@ export class Builders {
       const job = pickJob(sim, center(sim.keep.rect));
       if (job >= 0) spawnCivilian(sim, job);
     }
-    for (const c of sim.civilians) if (c.hp > 0) stepCivilian(sim, c, dt);
+    for (const c of sim.civilians) if (c.hp > 0) {
+      if (c.state !== "flee" && sim.map.type[cellAt(c.x, c.y)] === CellType.OUT && !this.canReturn(sim, c) && this.escapeChecks.get(c) !== sim.mapVersion) {
+        this.escapeChecks.set(c, sim.mapVersion);
+        panic(sim, c);
+      }
+      stepCivilian(sim, c, dt);
+    }
     // Civilians who died free their slot after a delay.
     for (const c of sim.civilians) if (c.hp <= 0) this.startRespawn();
+  }
+
+  /** Flood from intact homes once per city change. Use the citizens' gate
+   * access and the same corner rules as their walking paths. */
+  private canReturn(sim: DefendSim, c: Civilian) {
+    if (this.refugeVersion !== sim.mapVersion) {
+      this.refugeVersion = sim.mapVersion;
+      this.refuge.fill(0);
+      const queue: number[] = [];
+      for (const b of sim.map.buildings) if ((b.kind === "house" || b.kind === "keep") && sim.intact(b))
+        for (const cell of sideCells(b.rect)) if (!sim.ownSolid[cell] && !this.refuge[cell]) {
+          this.refuge[cell] = 1;
+          queue.push(cell);
+        }
+      for (let i = 0; i < queue.length; i++) {
+        const x = cellX(queue[i]), y = cellY(queue[i]);
+        for (const [dx, dy] of AROUND) {
+          if (!cellInBounds(x + dx, y + dy)) continue;
+          const next = cellIndex(x + dx, y + dy);
+          if (this.refuge[next] || sim.ownSolid[next]) continue;
+          if (dx && dy && (sim.ownSolid[cellIndex(x + dx, y)] || sim.ownSolid[cellIndex(x, y + dy)])) continue;
+          this.refuge[next] = 1;
+          queue.push(next);
+        }
+      }
+    }
+    return !!this.refuge[cellAt(c.x, c.y)];
   }
 
   /** Counts slots down; how many are ready beyond the civilians already out. */
@@ -51,6 +88,7 @@ export class Builders {
 }
 
 function stepCivilian(sim: DefendSim, c: Civilian, dt: number) {
+  if (c.state === "flee") return flee(sim, c, dt);
   if (c.jobKind === "sand") {
     c.cleanupCheck = (c.cleanupCheck ?? 0) - dt;
     if (c.cleanupCheck <= 0) {
@@ -62,6 +100,54 @@ function stepCivilian(sim: DefendSim, c: Civilian, dt: number) {
   if (c.state === "toJob") goToJob(sim, c, dt);
   else if (c.state === "working") work(sim, c, dt);
   else goHome(sim, c, dt);
+}
+
+/** Take the nearest reachable board edge, then run beyond it. */
+function panic(sim: DefendSim, c: Civilian) {
+  const edges: { cell: number; exit: Point }[] = [];
+  for (let x = 0; x < CELLS_W; x++) {
+    edges.push({ cell: cellIndex(x, 0), exit: { x: x + .5, y: -2 } });
+    edges.push({ cell: cellIndex(x, CELLS_H - 1), exit: { x: x + .5, y: CELLS_H + 2 } });
+  }
+  for (let y = 0; y < CELLS_H; y++) {
+    edges.push({ cell: cellIndex(0, y), exit: { x: -2, y: y + .5 } });
+    edges.push({ cell: cellIndex(CELLS_W - 1, y), exit: { x: CELLS_W + 2, y: y + .5 } });
+  }
+  edges.sort((a, b) => {
+    const p = cellCenter(a.cell), q = cellCenter(b.cell);
+    return dist(p.x - c.x, p.y - c.y) - dist(q.x - c.x, q.y - c.y);
+  });
+  for (const edge of edges) {
+    const path = findPath(sim.ownSolid, c, cellCenter(edge.cell), { maxCost: CELL_COUNT, maxNodes: CELL_COUNT });
+    if (!path) continue;
+    c.state = "flee";
+    c.job = -1;
+    delete c.jobKind; delete c.cleanupCheck; delete c.stand;
+    c.path = path;
+    c.exit = edge.exit;
+    return;
+  }
+}
+
+function flee(sim: DefendSim, c: Civilian, dt: number) {
+  if (!c.exit) return;
+  if (c.path.length) {
+    sim.followPath(c, null, CIVILIAN.speed * 1.8, dt);
+    return;
+  }
+  const edge = { x: Math.max(.5, Math.min(CELLS_W - .5, c.exit.x)), y: Math.max(.5, Math.min(CELLS_H - .5, c.exit.y)) };
+  const outside = c.x < .5 || c.x > CELLS_W - .5 || c.y < .5 || c.y > CELLS_H - .5;
+  if (!outside && dist(edge.x - c.x, edge.y - c.y) >= .35) { panic(sim, c); return; }
+  // Normal collision keeps units on the board. From the edge cell onward,
+  // continue outside until the sprite has completely left the render.
+  const dx = c.exit.x - c.x, dy = c.exit.y - c.y;
+  const d = dist(dx, dy), step = Math.min(d, CIVILIAN.speed * 1.8 * dt);
+  if (d) { c.x += dx / d * step; c.y += dy / d * step; }
+}
+
+export function escaped(c: Civilian) {
+  const margin = CIVILIAN.size / 2 + .2;
+  return c.state === "flee" && (c.x < -margin || c.y < -margin || c.x > CELLS_W + margin || c.y > CELLS_H + margin);
 }
 
 function goToJob(sim: DefendSim, c: Civilian, dt: number) {
@@ -126,8 +212,20 @@ function goHome(sim: DefendSim, c: Civilian, dt: number) {
   const hx = center(home.rect);
   if (!c.path.length && c.thinkT <= 0) {
     c.thinkT = 1;
-    const door = sim.doorOf(home);
-    if (door >= 0) c.path = findPath(sim.ownSolid, c, cellCenter(door), ERRAND) ?? [];
+    const homes = [home, ...sim.map.buildings.filter(b => b.id !== home.id && (b.kind === "house" || b.kind === "keep") && sim.intact(b))];
+    for (const b of homes) {
+      if (!sim.intact(b)) continue;
+      const preferred = sim.doorOf(b);
+      for (const door of [preferred, ...sideCells(b.rect).filter(cell => cell !== preferred)]) {
+        if (door < 0) continue;
+        const path = findPath(sim.ownSolid, c, cellCenter(door), { maxCost: CELL_COUNT, maxNodes: CELL_COUNT });
+        if (!path) continue;
+        c.home = b.id;
+        c.path = path;
+        sim.followPath(c, center(b.rect), CIVILIAN.speed, dt);
+        return;
+      }
+    }
   }
   sim.followPath(c, hx, CIVILIAN.speed, dt);
 }

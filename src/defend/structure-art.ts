@@ -466,7 +466,18 @@ export function keepRubblePixels(): Uint32Array {
 const ORTHO4: readonly Pt[] = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 
 const keepSprites: (HTMLCanvasElement | undefined)[] = [];
+let keepFlashSprite: HTMLCanvasElement | null = null;
 let rubbleSprite: HTMLCanvasElement | null = null;
+
+/** Pale damage overlay with exactly the keep sprite's silhouette. */
+export function paintKeepFlash(c: CanvasRenderingContext2D, { x, y, w, h }: ArtBox, alpha: number) {
+  keepFlashSprite ??= spriteCanvas(keepPixels().map(v => v ? rgba(0xfff4dc) : 0), KEEP, KEEP);
+  c.save();
+  c.imageSmoothingEnabled = false;
+  c.globalAlpha = alpha;
+  c.drawImage(keepFlashSprite, x, y, w, h);
+  c.restore();
+}
 
 /** The keep's pixels at damage `stage` drawn up to fill its box,
  * smoothing off. */

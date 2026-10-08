@@ -47,7 +47,7 @@ import {
   type UpgradeId,
 } from "./catalog.ts";
 import { CellType, type Building, type CityMap } from "./citygen.ts";
-import { atHome, Builders } from "./civilians.ts";
+import { atHome, escaped, Builders } from "./civilians.ts";
 import { stepEnemy } from "./enemies.ts";
 import { blocked, cellAt, cellCenter, center, fillFlowField, nearestOpen, type FieldTerrain, type Point } from "./pathing.ts";
 import { ignite, stepArrows, stepShells, Towers } from "./towers.ts";
@@ -148,7 +148,9 @@ export type Civilian = {
   /** Absent for ordinary rebuilding. Sand is always the lowest priority. */
   jobKind?: "sand";
   cleanupCheck?: number;
-  state: "toJob" | "working" | "home";
+  state: "toJob" | "working" | "home" | "flee";
+  /** Off-board destination once a stranded builder panics. */
+  exit?: Point;
   work: number;
   path: number[];
   home: number;
@@ -490,7 +492,7 @@ export class DefendSim {
     for (const s of this.soldiers) if (s.hp <= 0) this.stats.current.troopsLost++;
     for (const c of this.civilians) if (c.hp <= 0) this.stats.current.civiliansLost++;
     this.soldiers = this.soldiers.filter((s) => s.hp > 0);
-    this.civilians = this.civilians.filter((c) => c.hp > 0 && !atHome(this, c));
+    this.civilians = this.civilians.filter((c) => c.hp > 0 && !atHome(this, c) && !escaped(c));
   }
 
   /** Effects age, scorches cool, hit flashes fade. */
