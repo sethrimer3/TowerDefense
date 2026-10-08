@@ -87,10 +87,10 @@ test("times shorten: a percent on drill, reload or rebuild divides", () => {
 test("skills need Knowledge and their requirements, and each rank costs more", () => {
   const s = defaults();
   assert.equal(buySkill(s, "drillSergeant"), false, "no Knowledge");
-  s.knowledge = 100;
+  s.knowledge = 100000;
   assert.equal(buySkill(s, "veterans"), false, "needs Drill sergeant");
   assert.ok(buySkill(s, "drillSergeant"));
-  assert.equal(s.knowledge, 100 - skillCost("drillSergeant", 0));
+  assert.equal(s.knowledge, 100000 - skillCost("drillSergeant", 0));
   assert.ok(buySkill(s, "veterans"));
   assert.ok(buySkill(s, "veterans"));
   assert.equal(bonuses(s).troopHp, 1.2);

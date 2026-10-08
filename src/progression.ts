@@ -63,7 +63,7 @@ export const rankPrice = (ranks: number): Metal => (ranks < 10 ? "copper" : rank
 export const rankCost = (ranks: number) => quadraticCost(1, ranks, ECONOMY.training);
 
 /** Smiths working on an upgrade: busy at the smithy until it's done. */
-export const busySmiths = (save: Save) => new Set(save.trainingJobs.flatMap((j) => j.smiths));
+export const busySmiths = (save: Save) => new Set([...save.trainingJobs.flatMap((j) => j.smiths), ...(save.forgeJob?.smiths ?? [])]);
 
 /** Where one row stands: its percent now and after one more rank, the
  * point the rank costs, and whether it is maxed or affordable. */

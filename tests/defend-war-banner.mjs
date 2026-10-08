@@ -46,11 +46,11 @@ try {
     await page.evaluate(async () => {
       const { Ledger } = await import('/src/ui/ledger.ts');
       const { defaults } = await import('/src/save.ts');
-      const s = defaults(); s.knowledge = 1000; s.skills.warBanner = 1;
+      const s = defaults(); s.knowledge = 100000; s.settings.instantResearch = true; s.skills.warBanner = 1;
       const root = document.createElement('div'); root.id = 'banner-study';
       root.style.height = '780px'; document.querySelector('main').append(root);
       document.querySelector('#stress').hidden = true;
-      const ctx = { save: () => s, researchers: () => 1, smiths: () => [], update: () => {}, researched: () => {}, modal: document.createElement('dialog') };
+      const ctx = { clock: () => Date.now(), save: () => s, researchers: () => 1, smiths: () => [], update: () => {}, researched: () => {}, modal: document.createElement('dialog') };
       const ledger = new Ledger(ctx, root, 'study', () => {}); ledger.focus('warBanner'); ledger.render();
       window.bannerStudy = ledger;
     });

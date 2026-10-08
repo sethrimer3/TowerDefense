@@ -24,7 +24,7 @@
       "mine": {
         "simulatedHours": 6,
         "requestedHours": 6,
-        "cpuSeconds": 23.4237396,
+        "cpuSeconds": 23.6155864,
         "complete": true,
         "paid": {
           "copper": 10,
@@ -298,7 +298,7 @@
         "fires": 6,
         "runesRead": 0,
         "finalShelves": 4,
-        "cpuSeconds": 15.305266000000003
+        "cpuSeconds": 15.4665108
       }
     },
     {
@@ -324,7 +324,7 @@
       "mine": {
         "simulatedHours": 6,
         "requestedHours": 6,
-        "cpuSeconds": 22.805777000000003,
+        "cpuSeconds": 22.937594899999997,
         "complete": true,
         "paid": {
           "copper": 14,
@@ -598,7 +598,7 @@
         "fires": 6,
         "runesRead": 0,
         "finalShelves": 4,
-        "cpuSeconds": 15.4535602
+        "cpuSeconds": 15.983591600000008
       }
     },
     {
@@ -624,7 +624,7 @@
       "mine": {
         "simulatedHours": 6,
         "requestedHours": 6,
-        "cpuSeconds": 29.295690899999986,
+        "cpuSeconds": 29.53448849999999,
         "complete": true,
         "paid": {
           "copper": 28,
@@ -898,7 +898,7 @@
         "fires": 4,
         "runesRead": 0,
         "finalShelves": 40,
-        "cpuSeconds": 15.650189399999988
+        "cpuSeconds": 15.40147159999999
       }
     },
     {
@@ -924,7 +924,7 @@
       "mine": {
         "simulatedHours": 6,
         "requestedHours": 6,
-        "cpuSeconds": 24.948923999999998,
+        "cpuSeconds": 25.216778399999995,
         "complete": true,
         "paid": {
           "copper": 51,
@@ -1198,7 +1198,7 @@
         "fires": 4,
         "runesRead": 0,
         "finalShelves": 40,
-        "cpuSeconds": 15.379493900000002
+        "cpuSeconds": 14.806842899999989
       }
     },
     {
@@ -1224,7 +1224,7 @@
       "mine": {
         "simulatedHours": 6,
         "requestedHours": 6,
-        "cpuSeconds": 25.105487900000007,
+        "cpuSeconds": 24.828686800000025,
         "complete": true,
         "paid": {
           "copper": 26,
@@ -1491,14 +1491,14 @@
       "library": {
         "simulatedHours": 6,
         "base": 6599.999999964868,
-        "bonuses": 349800,
-        "perHour": 59399.99999999414,
+        "bonuses": 2915.0000000000036,
+        "perHour": 1585.8333333274786,
         "nominalPerHour": 1100,
         "deaths": 0,
         "fires": 0,
-        "runesRead": 349800,
+        "runesRead": 2915.0000000000036,
         "finalShelves": 110,
-        "cpuSeconds": 15.8202359
+        "cpuSeconds": 15.220108200000016
       }
     },
     {
@@ -1524,7 +1524,7 @@
       "mine": {
         "simulatedHours": 6,
         "requestedHours": 6,
-        "cpuSeconds": 25.2197077,
+        "cpuSeconds": 24.674502399999998,
         "complete": true,
         "paid": {
           "copper": 89,
@@ -1791,14 +1791,14 @@
       "library": {
         "simulatedHours": 6,
         "base": 6599.999999964868,
-        "bonuses": 316800,
-        "perHour": 53899.99999999414,
+        "bonuses": 2640.000000000002,
+        "perHour": 1539.999999994145,
         "nominalPerHour": 1100,
         "deaths": 0,
         "fires": 0,
-        "runesRead": 316800,
+        "runesRead": 2640.0000000000014,
         "finalShelves": 110,
-        "cpuSeconds": 15.421898199999996
+        "cpuSeconds": 15.52762699999998
       }
     }
   ]

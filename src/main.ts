@@ -6,6 +6,7 @@ import { DefendPage } from "./defend/ui.ts";
 import { spendMetals } from "./metals.ts";
 import { bonuses, busySmiths, payWave, settleTraining, skillRank, skillTotal, whole } from "./progression.ts";
 import { settleResearch } from "./research-jobs.ts";
+import { settleForge } from "./forge-jobs.ts";
 import type { AppContext } from "./ui/app.ts";
 import { el, type Tab } from "./ui/dom.ts";
 import { buildShell } from "./ui/shell.ts";
@@ -169,6 +170,7 @@ function addIdle(ms: number) {
   libraryPage.addAway(ms);
   if (save.trainingClock) save.trainingClock -= ms;
   if (save.researchJob) save.researchClock -= ms;
+  if (save.forgeJob) save.forgeClock -= ms;
   update();
   welcome.show(true);
 }
@@ -292,7 +294,10 @@ function frame(time: number) {
   hear(save.settings.ambienceOff ? QUIET : tab === "defend" ? defendPage.ambience() : tab === "mine" ? minePage.ambience() : tab === "library" ? libraryPage.ambience() : QUIET);
   if (time - lastTick >= 1000) {
     lastTick = time;
-    const done = settleTraining(save, clock(), new Set(smithNames())) > 0;
+    const smiths = new Set(smithNames());
+    const trained = settleTraining(save, clock(), smiths) > 0;
+    const forged = settleForge(save, clock(), smiths);
+    const done = trained || forged;
     const researched = settleResearch(save, clock(), libraryPage.sim.count("researcher"));
     if (researched) libraryPage.sim.researched();
     if (done || researched) {
@@ -341,6 +346,7 @@ window.addEventListener("pagehide", store);
 };
 
 settleTraining(save, clock(), new Set(smithNames()));
+settleForge(save, clock(), new Set(smithNames()));
 if (settleResearch(save, clock(), libraryPage.sim.count("researcher"))) libraryPage.sim.researched();
 navigate("defend");
 welcome.show();

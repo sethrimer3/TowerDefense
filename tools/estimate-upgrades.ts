@@ -2,8 +2,11 @@
  * Generate production samples first with measure-upgrade-production.ts. */
 import { readFileSync, writeFileSync } from "node:fs";
 import { UPGRADES, upgradePrice, SPEED3_PRICE, type Price } from "../src/defend/catalog.ts";
-import { TRAINING, rankPrice } from "../src/progression.ts";
-import { trainingSeconds, TRAINING_FIRST_SECONDS, TRAINING_GROWTH } from "../src/training-jobs.ts";
+import { TRAINING, rankPrice, rankCost } from "../src/progression.ts";
+import { trainingSeconds } from "../src/training-jobs.ts";
+import { researchSeconds } from "../src/research-jobs.ts";
+import { forgeSeconds } from "../src/forge-jobs.ts";
+import { ECONOMY } from "../src/economy.ts";
 import { SKILLS, TREES, skillCost, type SkillId } from "../src/skill-trees.ts";
 import { PATHS } from "../src/knowledge-paths.ts";
 import { BUILDINGS, MAX_LEVEL } from "../src/mine/buildings.ts";
@@ -12,7 +15,7 @@ import { shelfPrice, librarianPrice, labPrice, MAX_SHELVES, MAX_LIBRARIANS, LAB_
 
 type Cost = { copper: number; silver: number; gold: number; knowledge: number };
 type Row = { family: string; id: string; name: string; rank: number; max: number; final: boolean;
-  price: Cost; cumulative: Cost; prerequisites: Cost; smithSeconds: number; notes: string };
+  price: Cost; cumulative: Cost; prerequisites: Cost; smithSeconds: number; researchSeconds?: number; notes: string };
 const zero = (): Cost => ({ copper: 0, silver: 0, gold: 0, knowledge: 0 });
 const cost = (p: Price = {}, knowledge = 0): Cost => ({ ...zero(), ...p, knowledge });
 const add = (a: Cost, b: Cost): Cost => Object.fromEntries(Object.keys(a).map(k => [k, a[k as keyof Cost] + b[k as keyof Cost]])) as Cost;
@@ -27,12 +30,12 @@ function ranks(family: string, id: string, name: string, max: number, price: (ra
       price: p, cumulative: { ...cumulative }, prerequisites, smithSeconds, notes });
   }
 }
-for (const u of UPGRADES) ranks("Forge", u.id, u.name, u.maxLevel, rank => cost((u.price ?? upgradePrice)(rank)));
-ranks("Forge", "speed3", "War drums", 1, () => cost(SPEED3_PRICE));
-for (const t of TRAINING) ranks("Smithy", t.id, t.name, t.max, rank => cost({ [rankPrice(rank)]: 1 }), zero(),
+for (const u of UPGRADES) ranks("Forge", u.id, u.name, u.maxLevel, rank => cost((u.price ?? upgradePrice)(rank)), zero(), "Named smiths share work with Training", forgeSeconds);
+ranks("Forge", "speed3", "War drums", 1, () => cost(SPEED3_PRICE), zero(), "Named smiths share work with Training", forgeSeconds);
+for (const t of TRAINING) ranks("Smithy", t.id, t.name, t.max, rank => cost({ [rankPrice(rank)]: rankCost(rank) }), zero(),
   "All smiths dedicated to this row; instantaneous requeue; production and infrastructure setup excluded", trainingSeconds);
 const skillNodes = Object.fromEntries(TREES.flatMap(t => t.nodes).map(n => [n.id, n]));
-function required(id: SkillId) {
+function requiredRanks(id: SkillId) {
   const needed = new Map<SkillId, number>();
   function visit(id: SkillId, rank: number) {
     if ((needed.get(id) ?? 0) >= rank) return;
@@ -40,8 +43,9 @@ function required(id: SkillId) {
     for (const p of skillNodes[id].requires) visit(p, skillNodes[id].full?.includes(p) ? SKILLS[p].max : 1);
   }
   for (const p of skillNodes[id].requires) visit(p, skillNodes[id].full?.includes(p) ? SKILLS[p].max : 1);
-  return cost({}, [...needed].reduce((n, [id, rank]) => n + Array.from({ length: rank }, (_, r) => skillCost(id, r)).reduce((a, b) => a + b, 0), 0));
+  return needed;
 }
+const required = (id: SkillId) => cost({}, [...requiredRanks(id)].reduce((n, [id, rank]) => n + Array.from({ length: rank }, (_, r) => skillCost(id, r)).reduce((a, b) => a + b, 0), 0));
 for (const skill of Object.values(SKILLS)) ranks("Study skill", skill.id, skill.name, skill.max,
   rank => cost({}, skillCost(skill.id, rank)), required(skill.id), "Requires a living lab researcher; minimal skill prerequisites included");
 for (const p of PATHS) {
@@ -63,6 +67,12 @@ ranks("Library", "librarians", "Full Library staff", MAX_LIBRARIANS, n => cost(l
   "Lab research capacity and role allocation excluded; no replacement costs");
 ranks("Library", "lab", "Alchemy lab", LAB_MAX_LEVEL, n => cost(labPrice(n)), zero(),
   "Level 1 is free", () => 0, 1);
+for (const r of rows) {
+  const work = (count: number) => Array.from({ length: count }, (_, rank) => researchSeconds(rank)).reduce((a, b) => a + b, 0);
+  if (r.family === "Study skill") r.researchSeconds = work(r.rank) + [...requiredRanks(r.id as SkillId)].reduce((n, [, rank]) => n + work(rank), 0);
+  else if (r.family === "Study path") r.researchSeconds = work(r.rank);
+  else if (r.family === "Evolution") r.researchSeconds = researchSeconds(0, true) + work(PATHS.find(p => p.id + "Crown" === r.id)!.ranks.length);
+}
 
 const samples = JSON.parse(readFileSync("docs/upgrade-production.json", "utf8")).samples;
 if (!Array.isArray(samples) || !samples.length) throw new Error("No production samples; run measure-upgrade-production.ts first");
@@ -71,23 +81,24 @@ const profiles = ["early", "developed", "late"].map(id => {
   const hours = group.reduce((n: number, s: any) => n + s.mine.simulatedHours, 0);
   const metalRates = Object.fromEntries(METALS.map(k => [k, group.reduce((n: number, s: any) => n + s.mine.paid[k], 0) / hours]));
   return { id, rates: { ...metalRates, knowledge: group[0].library.nominalPerHour } as Cost, smiths: p.smiths,
-    speed: id === "early" ? 1 : id === "developed" ? 1.15 : 1.45 };
+    speed: id === "early" ? 1 : id === "developed" ? 1.15 : 1.45, researchers: p.researchers };
 });
 function estimate(row: Row, p: typeof profiles[number]) {
   const total = add(row.cumulative, row.prerequisites);
   const missing = (Object.keys(total) as (keyof Cost)[]).filter(k => total[k] > 0 && p.rates[k] <= 0);
   const resourceHours = missing.length ? null : Math.max(...Object.keys(total).map(k => total[k as keyof Cost] ? total[k as keyof Cost] / p.rates[k as keyof Cost] : 0));
   const trainingHours = row.smithSeconds / p.smiths / p.speed / 3600;
-  return { resourceHours, trainingHours, combinedFloorHours: resourceHours === null ? null : Math.max(resourceHours, trainingHours), missing };
+  const researchHours = (row.researchSeconds ?? 0) / p.researchers / 3600;
+  return { resourceHours, trainingHours, researchHours, combinedFloorHours: resourceHours === null ? null : Math.max(resourceHours, trainingHours, researchHours), missing };
 }
 const format = (hours: number) => hours < 1 ? `${(hours * 60).toFixed(1)} min` : hours < 24 ? `${hours.toFixed(1)} h` : hours < 365 * 24 ? `${(hours / 24).toFixed(1)} d` : `${(hours / 24 / 365).toFixed(2)} yr`;
 const priceText = (p: Cost) => Object.entries(p).filter(([, n]) => n).map(([k, n]) => `${n} ${k}`).join(" + ") || "—";
 const escape = (v: unknown) => `"${String(v).replaceAll('"', '""')}"`;
 const columns = ["family", "id", "name", "rank", "max", "is_final", "copper_next", "silver_next", "gold_next", "knowledge_next",
-  "copper_total", "silver_total", "gold_total", "knowledge_total", "knowledge_prerequisites", "smith_work_hours",
-  ...profiles.flatMap(p => [`${p.id}_resource_hours`, `${p.id}_training_hours`, `${p.id}_combined_lower_bound_hours`, `${p.id}_unobserved_metals`]), "notes"];
+  "copper_total", "silver_total", "gold_total", "knowledge_total", "knowledge_prerequisites", "smith_work_hours", "research_work_hours",
+  ...profiles.flatMap(p => [`${p.id}_resource_hours`, `${p.id}_training_hours`, `${p.id}_research_hours`, `${p.id}_combined_lower_bound_hours`, `${p.id}_unobserved_metals`]), "notes"];
 const csvRows = rows.map(r => [r.family, r.id, r.name, r.rank, r.max, r.final, ...Object.values(r.price), ...Object.values(r.cumulative),
-  r.prerequisites.knowledge, r.smithSeconds / 3600, ...profiles.flatMap(p => { const e = estimate(r, p); return [e.resourceHours ?? "", e.trainingHours, e.combinedFloorHours ?? "", e.missing.join(";")]; }), r.notes]);
+  r.prerequisites.knowledge, r.smithSeconds / 3600, (r.researchSeconds ?? 0) / 3600, ...profiles.flatMap(p => { const e = estimate(r, p); return [e.resourceHours ?? "", e.trainingHours, e.researchHours, e.combinedFloorHours ?? "", e.missing.join(";")]; }), r.notes]);
 writeFileSync("docs/upgrade-estimates.csv", [columns, ...csvRows].map(r => r.map(escape).join(",")).join("\n") + "\n");
 const finals = rows.filter(r => r.final), smiths = finals.filter(r => r.family === "Smithy");
 const late = profiles[2];

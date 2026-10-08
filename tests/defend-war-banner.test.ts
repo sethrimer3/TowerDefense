@@ -26,7 +26,7 @@ function fixture(upgraded = true) {
 }
 
 test("banner cooldown research gates the shared stem and all three independent branches, and survives saves", () => {
-  const s = defaults(); s.knowledge = 1000; s.skills.warBanner = 1;
+  const s = defaults(); s.knowledge = 100000; s.skills.warBanner = 1;
   assert.equal(bonuses(s).banner?.cooldown ?? 10, 10);
   for (const seconds of [7, 4, 1]) {
     assert.ok(buySkill(s, "bannerCooldown"));

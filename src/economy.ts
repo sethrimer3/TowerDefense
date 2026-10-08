@@ -8,7 +8,7 @@ export const ECONOMY = {
   mineBuilding: 80,
   utilityStudy: 50,
   combatStudy: 1000,
-  enchantedStudy: 5000,
+  enchantedStudy: 4000,
   pathStudy: 1000,
 } as const;
 

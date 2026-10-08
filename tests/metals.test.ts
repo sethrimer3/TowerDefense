@@ -30,16 +30,16 @@ test("starting Copper can fund a new miner, a shelf and the first professor with
 });
 
 test("larger crews, buildings, collections and labs add Silver and then Gold", () => {
-  assert.deepEqual(hirePrice(5), { copper: 6, silver: 1 });
-  assert.deepEqual(hirePrice(15), { copper: 16, silver: 3, gold: 1 });
+  assert.deepEqual(hirePrice(5), { copper: 26, silver: 1 });
+  assert.deepEqual(hirePrice(15), { copper: 226, silver: 8, gold: 1 });
   assert.deepEqual(upgradePrice("warehouse", 1), { copper: 6 });
-  assert.deepEqual(upgradePrice("warehouse", 2), { copper: 12, silver: 1 });
-  assert.deepEqual(upgradePrice("warehouse", 3), { copper: 18, silver: 2, gold: 1 });
-  assert.deepEqual(librarianPrice(4), { copper: 6, silver: 1 });
-  assert.deepEqual(librarianPrice(12), { copper: 14, silver: 3, gold: 1 });
-  assert.deepEqual(shelfPrice(20), { copper: 21, silver: 1 });
-  assert.deepEqual(shelfPrice(60), { copper: 61, silver: 3, gold: 1 });
+  assert.deepEqual(upgradePrice("warehouse", 2), { copper: 486, silver: 1 });
+  assert.deepEqual(upgradePrice("warehouse", 3), { copper: 1926, silver: 4, gold: 1 });
+  assert.deepEqual(librarianPrice(4), { copper: 18, silver: 1 });
+  assert.deepEqual(librarianPrice(12), { copper: 146, silver: 11, gold: 1 });
+  assert.deepEqual(shelfPrice(20), { copper: 41, silver: 1 });
+  assert.deepEqual(shelfPrice(60), { copper: 241, silver: 43, gold: 1 });
   assert.deepEqual(labPrice(1), { copper: 10 });
-  assert.deepEqual(labPrice(2), { copper: 20, silver: 3 });
-  assert.deepEqual(labPrice(3), { copper: 30, silver: 6, gold: 1 });
+  assert.deepEqual(labPrice(2), { copper: 210, silver: 3 });
+  assert.deepEqual(labPrice(3), { copper: 810, silver: 12, gold: 1 });
 });

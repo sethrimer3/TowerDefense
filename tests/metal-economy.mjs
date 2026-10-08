@@ -73,18 +73,18 @@ try {
   }
 
   for (const free of [false, true]) {
-    const initial = { copper: 50, silver: 5, gold: free ? 0 : 1 };
+    const initial = { copper: 2000, silver: 5, gold: free ? 0 : 1 };
     const { context, page, errors } = await app({ width: 390, height: 844 }, initial, free);
     await tab(page, 'mine');
     await page.evaluate(() => window.mineLevel('warehouse', 3));
     await building(page, 'warehouse');
-    assert.match(await page.locator('[data-upgrade="warehouse"]').textContent(), /18 Copper · 2 Silver · 1 Gold/);
+    assert.match(await page.locator('[data-upgrade="warehouse"]').textContent(), /1926 Copper · 4 Silver · 1 Gold/);
     await page.locator('[data-upgrade="warehouse"]').click();
-    assert.deepEqual(await wallet(page), free ? initial : { copper: 32, silver: 3, gold: 0 });
+    assert.deepEqual(await wallet(page), free ? initial : { copper: 74, silver: 1, gold: 0 });
     await tab(page, 'library');
     await page.evaluate(() => window.libraryLab(3));
     await page.locator('#library-lab').click();
-    assert.match(await page.locator('#library-lab-up').textContent(), /30 Copper · 6 Silver · 1 Gold/);
+    assert.match(await page.locator('#library-lab-up').textContent(), /810 Copper · 12 Silver · 1 Gold/);
     assert.equal(await page.evaluate(() => [...document.querySelectorAll('.library-head button')].every(el => {
       const r = el.getBoundingClientRect(); return r.x >= 0 && r.right <= innerWidth && el.scrollWidth <= el.clientWidth + 1;
     })), true, 'mixed prices must fit the mobile Library header');
@@ -94,7 +94,7 @@ try {
       assert.deepEqual(await wallet(page), initial);
     } else {
       assert.equal(await page.locator('#library-lab-up').isDisabled(), true);
-      assert.deepEqual(await wallet(page), { copper: 32, silver: 3, gold: 0 });
+      assert.deepEqual(await wallet(page), { copper: 74, silver: 1, gold: 0 });
     }
     assert.deepEqual(errors, []);
     await context.close();

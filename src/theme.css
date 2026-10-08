@@ -1804,7 +1804,8 @@ dialog .away-row .away-note {
  .banner-research h4 { color: #e7ba52; }
 .banner-research-branches, .banner-research-branches section { border-top: 2px solid #a48040; }
 
-.research-project { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: .35rem .6rem; border-bottom: 2px solid var(--brass-nails); }
+.research-project { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: .35rem .6rem; border-bottom: 2px solid var(--brass); }
 .research-project > div { min-width: 0; overflow-wrap: anywhere; }
 .research-project small, .chamber-wallet > small { display: block; }
 .research-project button { flex: 0 0 auto; font-size: .75rem; }
+@media (max-width: 480px) { .research-project { flex-wrap: wrap; } .research-project > div:first-child { flex-basis: 100%; } }

@@ -4,11 +4,12 @@ import { BARS_PER_POINT, METALS } from "../mine/sim.ts";
 import { SKILLS, TREES, type SkillId } from "../skill-trees.ts";
 import { pathById, pathState, pathsOf, unlearnPath, type KnowledgePath, type PathId, type PathTopic } from "../knowledge-paths.ts";
 import { cancelResearch, researchLeft, researchSeconds, startResearch } from "../research-jobs.ts";
+import { addForgeSmith, cancelForge, forgeLeft, forgeSeconds, removeForgeSmith, startForge, type ForgeRequest } from "../forge-jobs.ts";
 import { paintPathIcon } from "./path-icons.ts";
 import { TrainingParticles } from "../training-particles.ts";
 import { trainingSeconds } from "../training-jobs.ts";
 import { ITEM_NAMES, SPEED3_PRICE, UPGRADES, upgradePrice, type Price, type UpgradeId } from "../defend/catalog.ts";
-import { buySpeed3, buyUpgrade, canAfford, type Wallet } from "../defend/progress.ts";
+import { canAfford, type Wallet } from "../defend/progress.ts";
 import { paintIcon, type IconItem } from "../defend/structure-art.ts";
 import { SUBJECTS, type Subject, type SubjectId, type Topic } from "../upgrade-subjects.ts";
 import { replay, sparksOver } from "./flourish.ts";
@@ -64,6 +65,8 @@ export class Ledger {
   private shown = "";
   /** Whether holding a buy button repeats it yet (bound on the first draw). */
   private holding = false;
+  private researchCrew = -1;
+  private smithCrew = "";
 
   constructor(private ctx: AppContext, readonly root: HTMLElement, readonly kind: LedgerKind, private up: () => void) {
     this.subjects = ledgerSubjects(kind);
@@ -91,6 +94,8 @@ export class Ledger {
   }
 
   render() {
+    this.researchCrew = this.ctx.researchers();
+    this.smithCrew = this.ctx.smiths().join("\n");
     const subject = this.current(), topic = this.topic(), smithy = this.kind === "smithy", c = CHAMBER[this.kind];
     // Redrawn in place (a purchase, a tapped rank): keep where the list was scrolled to.
     const same = this.shown === `${subject.id}:${topic.id}`;
@@ -162,21 +167,30 @@ export class Ledger {
 
   private walletHtml() {
     const s = this.save, w = this.wallet(), smiths = this.ctx.smiths(), free = this.freeSmiths();
+    const job = s.forgeJob;
+    const name = job ? job.kind === "speed" ? "War drums" : UPGRADES.find(u => u.id === job.id)!.name : "";
     return `<p class="ledger-note chamber-wallet">${METALS.map((k) => `<b class="metal-${k}">${bal(s, w[k])}</b> ${k}`).join(" · ")}
-      <span>· smiths <b id="training-slots">${smiths.length - free.length} / ${smiths.length}</b> busy</span><small> · a point of a metal from every ${BARS_PER_POINT} bars</small></p>`;
+      <span>· smiths <b id="training-slots">${smiths.length - free.length} / ${smiths.length}</b> busy</span><small> · a point of a metal from every ${BARS_PER_POINT} bars</small></p>
+      ${job ? `<div class="research-project"><div><b>${name}</b><small data-forge-timer>${this.forgeTimeLeft()}</small></div><div class="smith-count"><button data-less-forge aria-label="One smith fewer on Forge project" ${job.smiths.length <= 1 ? "disabled" : ""}>−</button><b>${job.smiths.length} smiths</b><button data-more-forge aria-label="One more smith on Forge project" ${free.length ? "" : "disabled"}>+</button></div><button data-cancel-forge>Cancel<small>Refund ${priceText(job.paid) || "0 metal"}</small></button></div>` : ""}`;
+  }
+
+  private forgeTimeLeft() {
+    const left = forgeLeft(this.save);
+    return Number.isFinite(left) ? `${formatDuration(left)} remaining` : "Paused: assign a smith";
   }
 
   private forgeHtml(t: Topic) {
     const d = this.save.defend, w = this.wallet();
+    const busy = !!this.save.forgeJob, staffed = this.freeSmiths().length > 0 || this.save.settings.instantResearch;
     const extras = t.extras?.includes("speed3")
       ? [`<article class="card defend-card ledger-card"><div><small>${d.speed3 ? "UNLOCKED" : "ONE-TIME UNLOCK"}</small><h3>War drums</h3><p>Adds 3× to the battle speed button.</p></div>
-      <button data-buy-speed3 ${d.speed3 || !canAfford(w, SPEED3_PRICE) ? "disabled" : ""}>${d.speed3 ? "Owned" : `Buy<small>${priceText(SPEED3_PRICE)}</small>`}</button></article>`]
+      <button data-buy-speed3 ${d.speed3 || busy || !staffed || !canAfford(w, SPEED3_PRICE) ? "disabled" : ""}>${d.speed3 ? "Owned" : `Forge<small>${priceText(SPEED3_PRICE)}</small><small>One smith: ${formatDuration(forgeSeconds(0) * 1000)}</small>`}</button></article>`]
       : [];
     const levels = (t.upgrades ?? []).map((id) => {
       const u = UPGRADES.find((u) => u.id === id)!, lvl = d.levels[id], maxed = lvl >= u.maxLevel;
       const p = u.price ? u.price(lvl) : upgradePrice(lvl);
       return `<article class="card defend-card ledger-card ledger-level"><div><small>LEVEL ${lvl} / ${u.maxLevel}</small><h3>${u.name}</h3><p>${u.describe(lvl)}${maxed ? "" : `<b class="ledger-next">Next: ${u.describe(lvl + 1)}</b>`}</p></div>
-        <button data-upgrade="${id}" ${maxed || !canAfford(w, p) ? "disabled" : ""}>${maxed ? "Maxed" : `Upgrade<small>${priceText(p)}</small>`}</button></article>`;
+        <button data-upgrade="${id}" ${maxed || busy || !staffed || !canAfford(w, p) ? "disabled" : ""}>${maxed ? "Maxed" : `Forge<small>${priceText(p)}</small><small>One smith: ${formatDuration(forgeSeconds(lvl) * 1000)}</small>`}</button></article>`;
     });
     const smithy = t.training?.length ? this.smithyHtml(t.training) : "";
     const forged = levels.length || extras.length ? `<h4 class="training-group">On the anvil</h4>` : "";
@@ -185,12 +199,10 @@ export class Ledger {
   }
 
   private bindForge(root: HTMLElement) {
-    const s = this.save, d = s.defend;
+    const s = this.save;
     /** A purchase rings like coins and stamps its card once the page is redrawn. */
-    const commit = (buy: (w: Wallet) => boolean, card: string) => {
-      const w = this.wallet();
-      if (!buy(w)) return;
-      if (!s.settings.devMode) for (const k of METALS) s.smithy[k] = w[k];
+    const commit = (request: ForgeRequest, card: string) => {
+      if (!startForge(s, request, this.freeSmiths()[0] ?? "", this.ctx.clock())) return;
       this.ctx.update();
       play("coin");
       this.render();
@@ -198,8 +210,21 @@ export class Ledger {
       replay(bought, "bought");
       sparksOver(bought?.querySelector("button") ?? null, "gold");
     };
-    root.querySelectorAll<HTMLButtonElement>("[data-upgrade]").forEach((b) => (b.onclick = () => commit((w) => buyUpgrade(d, w, b.dataset.upgrade as UpgradeId), `[data-upgrade="${b.dataset.upgrade}"]`)));
-    root.querySelector<HTMLButtonElement>("[data-buy-speed3]")?.addEventListener("click", () => commit((w) => buySpeed3(d, w), "[data-buy-speed3]"));
+    root.querySelectorAll<HTMLButtonElement>("[data-upgrade]").forEach((b) => (b.onclick = () => commit({ kind: "upgrade", id: b.dataset.upgrade as UpgradeId }, `[data-upgrade="${b.dataset.upgrade}"]`)));
+    root.querySelector<HTMLButtonElement>("[data-buy-speed3]")?.addEventListener("click", () => commit({ kind: "speed", id: "speed3" }, "[data-buy-speed3]"));
+    root.querySelector<HTMLButtonElement>("[data-more-forge]")?.addEventListener("click", () => {
+      const smith = this.freeSmiths()[0];
+      if (smith && addForgeSmith(s, smith)) this.ctx.update();
+      this.render();
+    });
+    root.querySelector<HTMLButtonElement>("[data-less-forge]")?.addEventListener("click", () => {
+      if (removeForgeSmith(s)) this.ctx.update();
+      this.render();
+    });
+    root.querySelector<HTMLButtonElement>("[data-cancel-forge]")?.addEventListener("click", () => {
+      if (cancelForge(s)) this.ctx.update();
+      this.render();
+    });
     root.querySelectorAll<HTMLButtonElement>("[data-train]").forEach((b) => (b.onclick = () => {
       const smith = this.freeSmiths()[0];
       if ((smith || s.settings.instantResearch) && startTraining(s, b.dataset.train as TrainingId, smith ?? "")) {
@@ -231,7 +256,7 @@ export class Ledger {
    * its point comes back. */
   private askCancel(id: TrainingId) {
     const row = TRAINING.find((t) => t.id === id)!, modal = this.ctx.modal;
-    modal.innerHTML = `<small>SMITHY</small><h2>Cancel this upgrade?</h2><p>Taking the last smith off ${row.name} stops the work on it. Its Smithy point is returned, and the work done so far is lost.</p>
+    modal.innerHTML = `<small>SMITHY</small><h2>Cancel this upgrade?</h2><p>Taking the last smith off ${row.name} stops the work on it. The metal paid is returned, and the work done so far is lost.</p>
       <div class="dialog-actions"><button id="smithy-keep">Keep working</button><button id="smithy-cancel" class="danger">Cancel upgrade</button></div>`;
     modal.showModal();
     modal.querySelector<HTMLButtonElement>("#smithy-keep")!.onclick = () => modal.close();
@@ -449,7 +474,9 @@ export class Ledger {
   /** Once a second while the chamber shows: the whole chamber once a rank
    * completes, else the countdowns. */
   tick(completed: boolean) {
-    if (completed) return this.render();
+    if (completed || (this.kind === "study" && this.researchCrew !== this.ctx.researchers())
+      || (this.kind === "smithy" && this.smithCrew !== this.ctx.smiths().join("\n"))) return this.render();
+    this.root.querySelectorAll<HTMLElement>("[data-forge-timer]").forEach(span => { span.textContent = this.forgeTimeLeft(); });
     this.root.querySelectorAll<HTMLElement>("[data-research-timer]").forEach(span => { span.textContent = this.researchTimeLeft(); });
     for (const job of this.save.trainingJobs) {
       const span = this.root.querySelector<HTMLElement>(`[data-training-timer="${job.id}"]`);

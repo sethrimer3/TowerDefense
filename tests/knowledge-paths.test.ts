@@ -21,7 +21,7 @@ import { baitBitten } from "../src/defend/bait.ts";
 
 const rich = () => {
   const s = defaults();
-  s.knowledge = 100;
+  s.knowledge = 1000000;
   return s;
 };
 
@@ -29,13 +29,13 @@ test("choosing a path seals the others until it is unlearned, which returns its 
   const s = rich();
   assert.ok(learnPath(s, "pyromancy"));
   assert.ok(learnPath(s, "pyromancy"));
-  assert.equal(s.knowledge, 100 - 4 - 8);
-  assert.deepEqual(s.paths.wizardTower, { path: "pyromancy", rank: 2, spent: 12 });
+  assert.equal(s.knowledge, 1000000 - 4 - 4004);
+  assert.deepEqual(s.paths.wizardTower, { path: "pyromancy", rank: 2, spent: 4008 });
   assert.ok(pathState(s, "rime").sealed);
   assert.equal(learnPath(s, "rime"), false, "sealed");
   assert.equal(learnPath(s, "crusaders"), true, "another topic's paths are its own");
-  assert.equal(unlearnPath(s, "wizardTower"), 12);
-  assert.equal(s.knowledge, 100 - 4, "every point back but the barracks'");
+  assert.equal(unlearnPath(s, "wizardTower"), 4008);
+  assert.equal(s.knowledge, 1000000 - 4, "every point back but the barracks'");
   assert.equal(s.paths.wizardTower, undefined);
   assert.ok(learnPath(s, "rime"), "open again");
 });
@@ -44,7 +44,7 @@ test("ranks are learned in order, each for its cost, up to the last", () => {
   const s = defaults();
   s.knowledge = 3;
   assert.equal(learnPath(s, "storm"), false, "too dear");
-  s.knowledge = 1000;
+  s.knowledge = 1000000;
   const storm = PATHS.find((p) => p.id === "storm")!;
   for (const r of storm.ranks) assert.ok(learnPath(s, "storm"), r.name);
   assert.equal(learnPath(s, "storm"), false, "maxed");
@@ -394,7 +394,7 @@ test("Oil-soaked bait sets its biters alight; fortified crates hold out and, spi
 // ── Evolutions ────────────────────────────────────────────────────────────
 test("a crown turns every copy into the greater building, and unlearning turns them back", () => {
   const s = rich();
-  s.knowledge = 200;
+  s.knowledge = 1000000;
   const d = s.defend;
   let l = d.layout;
   for (const [dx, dy] of [[-1, 0], [0, -1]]) l = placeCityTile(l, l.keep.tx + dx, l.keep.ty + dy) ?? assert.fail("tile");
@@ -410,7 +410,7 @@ test("a crown turns every copy into the greater building, and unlearning turns t
   assert.ok(pathState(s, "crusaders").canEvolve);
   const before = s.knowledge;
   assert.ok(evolve(s, "crusaders"));
-  assert.equal(s.knowledge, before - 25);
+  assert.equal(s.knowledge, before - 100000);
   assert.equal(d.owned.barracks, 0);
   assert.equal(d.owned.valkyriePalace, 2);
   assert.equal(placedCount(d.layout, "barracks"), 0, "lifted back to the palette");
@@ -439,7 +439,7 @@ test("a crown turns every copy into the greater building, and unlearning turns t
 
 test("a crowned wizard tower becomes a Dark wizard keep; saves keep only a crown on a finished path", () => {
   const s = rich();
-  s.knowledge = 200;
+  s.knowledge = 1000000;
   s.defend.owned.wizardTower = 1;
   for (let i = 0; i < 3; i++) learnPath(s, "storm");
   assert.ok(evolve(s, "storm"));

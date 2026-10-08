@@ -10,6 +10,7 @@ import { decodeSettings, defaultSettings, type Settings } from "./settings.ts";
 import { METALS, decodeMineSave, type MineSave, type Metals } from "./mine/sim.ts";
 import { decodeLibrarySave, type LibrarySave } from "./library/sim.ts";
 import { decodeResearchJob, type ResearchJob } from "./research-jobs.ts";
+import { decodeForgeJob, type ForgeJob } from "./forge-jobs.ts";
 
 export const SAVE_KEY = "towerdefense.v1";
 /** 2: copper and silver became the mine's metal (`smithy`), and a point
@@ -41,6 +42,8 @@ export type Save = {
   /** One lab project and its most recent wall-clock settlement. */
   researchJob: ResearchJob | null;
   researchClock: number;
+  forgeJob: ForgeJob | null;
+  forgeClock: number;
   defend: DefendSave;
   /** The mine as last saved (null until it first runs). */
   mine: MineSave | null;
@@ -62,6 +65,8 @@ export function defaults(): Save {
     trainingClock: 0,
     researchJob: null,
     researchClock: 0,
+    forgeJob: null,
+    forgeClock: 0,
     defend: defaultDefendSave(),
     mine: null,
     library: null,
@@ -106,6 +111,8 @@ export function decode(raw: string | null): Save {
   d.settings = decodeSettings(s.settings);
   d.researchJob = decodeResearchJob(s.researchJob, d);
   d.researchClock = num(s.researchClock, 0);
+  d.forgeJob = decodeForgeJob(s.forgeJob, d);
+  d.forgeClock = num(s.forgeClock, 0);
   return d;
 }
 
