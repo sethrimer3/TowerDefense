@@ -1,6 +1,38 @@
-# Upgrade timing estimates
+# Upgrade timing and quadratic balance
 
-Current source snapshot: 2026-10-07. Analysis only; no game balance changes.
+Current source snapshot: 2026-10-08. Prices and project timers below are implemented in the game.
+
+## Pacing target and current forecast
+
+The target is about two years to a focused top specialization, with 24-hour normal progress and daily visits. Compatible branches share income, so maxing the whole collection takes longer. This interpretation is explicit rather than silently giving every branch its own income budget.
+
+The forecast first funds a starter Library, Mine level 3 with 15 workers, Mine level 5 with 25 workers, then full Library infrastructure and its fire precautions. Unspent metals and Knowledge carry between every phase; utility research is charged once. Measured phase rates only apply after their infrastructure is funded. This is a capital-budget model, not two years of physical simulation: it excludes replacement bills, construction downtime, battle expenses and delays between manual rank starts; it holds each phase's income until the next setup is complete. Real incremental investments can improve income sooner.
+
+| Focused target | Estimated time from modeled start |
+|---|---:|
+| One 50-rank row, e.g. Troop HP | 2.07 yr (757 days) |
+| Conduit of night, including Stormcalling and its evolution | 2.01 yr (735 days) |
+| Enchanted ink, all ten ranks | 2.00 yr (730 days) |
+
+| Production investment | Modeled completion | Copper / Silver / Gold per hour afterwards | Nominal Knowledge/h |
+|---|---:|---|---:|
+| 5 workers; 6 shelves / 2 professors / 1 researcher | 1.4 d | 2.00 / 1.83 / 1.58 | 12 |
+| Mine level 3 / 15 workers; Coffee 6 / Waterproofing 2 | 64.9 d | 6.58 / 5.67 / 7.00 | 12 |
+| Mine level 5 / 25 workers; Coffee 12 / Waterproofing 4 | 254.4 d | 9.58 / 7.67 / 12.00 | 12 |
+| Library 110 shelves / 10 professors / 4 shelvers / 2 researchers | 1.08 yr | 9.58 / 7.67 / 12.00 | 1100 |
+| Library fire precautions fully researched | 1.09 yr | 9.58 / 7.67 / 12.00 | 1100 |
+
+## Implemented curves
+
+Owned ranks are zero-based. Per-purchase prices are quadratic; their cumulative spending grows roughly cubically. Early prices remain affordable. Production increases through purchased capacity and crew, without an automatic multiplier tied to elapsed calendar time.
+
+- Training: **1 + 5 × owned²** units of the existing Copper/Silver/Gold tier. Work is **60 × next-rank² seconds** per smith.
+- Ordinary Forge levels: **2 + 20 × owned² Copper**; precious-metal tiers also grow quadratically. Conduit's late Gold is **210 × (owned − 6)²**, beginning at rank eight. All Forge levels and War drums require named smiths, shared with Training.
+- Mine buildings: **base × (1 + 80 × (current-level − 1)²)** Copper. Crew hires are **1 + crew²** Copper. Additional capacity therefore needs progressively larger reinvestment.
+- Library shelves: **1 + owned + floor(owned² / 20)** Copper; staff **2 + hired²**; lab **10 + 200 × (current-level − 1)²**. Precious-metal portions also rise quadratically.
+- Study skills: **base × (1 + growth × owned²)**, with growth 50 for production/fire utility, 1000 for ordinary combat research and 4000 for Enchanted ink. Paths use 1000; evolution crowns cost 100,000/150,000 Knowledge.
+- Every Knowledge skill/path rank takes **300 × next-rank² seconds per researcher**; evolution requires **24 researcher-hours**. The lab shares all current researchers on one project. Zero researchers pauses it. Effects apply on completion; cancellation refunds the exact paid bill. Instantaneous research applies to both workshops.
+- Enchanted books now award **one minute of current base Knowledge, at least 1**, so bonuses follow the Library instead of overwhelming it with two-hour gifts.
 
 ## Interpretation and limits
 
@@ -16,17 +48,17 @@ From rank zero, ignoring resource/setup/requeue delays:
 
 | Upgrade | Ranks | Copper / Silver / Gold | One smith, no speed research | Six smiths, max research | Final rank with six |
 |---|---:|---:|---:|---:|---:|
-| Troop HP | 50 | 10 / 15 / 25 | 19.46 yr | 2.24 yr | 42.0 d |
-| Troop damage | 50 | 10 / 15 / 25 | 19.46 yr | 2.24 yr | 42.0 d |
-| Drill speed | 30 | 10 / 15 / 5 | 266.3 d | 30.6 d | 10.2 d |
-| Tower damage | 50 | 10 / 15 / 25 | 19.46 yr | 2.24 yr | 42.0 d |
-| Tower reload | 30 | 10 / 15 / 5 | 266.3 d | 30.6 d | 10.2 d |
-| Bomb damage | 40 | 10 / 15 / 15 | 9.46 yr | 1.09 yr | 42.0 d |
-| Wall HP | 50 | 10 / 15 / 25 | 19.46 yr | 2.24 yr | 42.0 d |
-| Keep HP | 50 | 10 / 15 / 25 | 19.46 yr | 2.24 yr | 42.0 d |
-| Rebuild speed | 30 | 10 / 15 / 5 | 266.3 d | 30.6 d | 10.2 d |
+| Troop HP | 50 | 1435 / 23090 / 177650 | 29.8 d | 3.4 d | 4.8 h |
+| Troop damage | 50 | 1435 / 23090 / 177650 | 29.8 d | 3.4 d | 4.8 h |
+| Drill speed | 30 | 1435 / 23090 / 18280 | 6.6 d | 18.1 h | 1.7 h |
+| Tower damage | 50 | 1435 / 23090 / 177650 | 29.8 d | 3.4 d | 4.8 h |
+| Tower reload | 30 | 1435 / 23090 / 18280 | 6.6 d | 18.1 h | 1.7 h |
+| Bomb damage | 40 | 1435 / 23090 / 78215 | 15.4 d | 1.8 d | 3.1 h |
+| Wall HP | 50 | 1435 / 23090 / 177650 | 29.8 d | 3.4 d | 4.8 h |
+| Keep HP | 50 | 1435 / 23090 / 177650 | 29.8 d | 3.4 d | 4.8 h |
+| Rebuild speed | 30 | 1435 / 23090 / 18280 | 6.6 d | 18.1 h | 1.7 h |
 
-All nine rows require **12.52 yr** of six-smith work at best. One top 50-rank row requires **2.24 yr**. This is why a two-year target must distinguish one focused row from completing the entire collection.
+All nine rows require **21.2 d** of six-smith work at best. One top 50-rank row requires **3.4 d**. Their resource prices govern the long-term finish; these are processing times after materials have been secured.
 
 ## Production scenarios and measurements
 
@@ -42,14 +74,16 @@ All nine rows require **12.52 yr** of six-smith work at best. One top 50-rank ro
 | early / 19 | 2 / 3 | 0.28 / 0.46 / 0.67 | 11.2 | 0 | 0 / 6 |
 | developed / 7 | 3 / 12 | 0.20 / 0.19 / 0.62 | 228.6 | 0 | 0 / 4 |
 | developed / 19 | 2 / 13 | 0.19 / 0.26 / 0.38 | 224.9 | 0 | 0 / 4 |
-| late / 7 | 5 / 20 | 0.13 / 0.17 / 0.31 | 59400.0 | 349800 | 0 / 0 |
-| late / 19 | 3 / 22 | 0.17 / 0.23 / 0.26 | 53900.0 | 316800 | 0 / 0 |
+| late / 7 | 5 / 20 | 0.13 / 0.17 / 0.31 | 1585.8 | 2915 | 0 / 0 |
+| late / 19 | 3 / 22 | 0.17 / 0.23 / 0.26 | 1540.0 | 2640 | 0 / 0 |
 
 ## Shared resource budgets
 
-All Forge tracks together cost **1115 copper + 183 silver + 38 gold**, about **4.8 d** of the late-profile sample income if every metal is saved for them.
+All Forge tracks together cost **26151 copper + 1026 silver + 173243 gold**, about **1.65 yr** of the late-profile sample income if every metal is saved for them.
 
-All Study skills together cost **1549 Knowledge**. Choosing the most expensive fully evolved path in each topic adds **287 Knowledge**, giving **1836 Knowledge** for every compatible Study upgrade: **1.7 h** at late nominal income. Minimal prerequisite prices in individual rows must not be charged again when summing the complete tree. These budgets exclude setup and income growth.
+All Training rows together cost **12915 copper + 207810 silver + 1021305 gold**. Their Gold alone needs **9.72 yr** at the late sampled rate. This balance targets a chosen specialization near two years; it does not promise the entire collection by then.
+
+All Study skills together cost **11717860 Knowledge**. Choosing the most expensive fully evolved path in each topic adds **430108 Knowledge**, giving **12147968 Knowledge** for every compatible Study upgrade: **1.26 yr** at late nominal income. Minimal prerequisite prices in individual rows must not be charged again when summing the complete tree. These budgets exclude setup and income growth.
 
 DEFEND upgrade points currently have no upgrade purchase route. They accumulate one per new highest cleared wave, so there is no point-priced upgrade completion time to calculate yet.
 
@@ -61,152 +95,150 @@ Each cost below is that upgrade's own cumulative price. Study prerequisite Knowl
 
 | Upgrade | Max | Cumulative cost | Prerequisite Knowledge | Late-profile work or resource floor |
 |---|---:|---|---:|---|
-| Garrison | 4 | 20 copper + 1 silver | — | 2.1 h |
-| Drill yard | 5 | 30 copper + 3 silver | — | 3.1 h |
-| Arms & armour | 6 | 42 copper + 6 silver + 1 gold | — | 4.4 h |
-| Patrol routes | 4 | 20 copper + 1 silver | — | 2.1 h |
-| Keen eyes | 4 | 20 copper + 1 silver | — | 2.1 h |
-| Hunter's instinct | 1 | 12 copper + 4 silver | — | 1.3 h |
-| Bodkin points | 6 | 42 copper + 6 silver + 1 gold | — | 4.4 h |
-| Longbows | 4 | 20 copper + 1 silver | — | 2.1 h |
-| Quick nock | 5 | 30 copper + 3 silver | — | 3.1 h |
-| Heavy shot | 5 | 30 copper + 3 silver | — | 3.1 h |
-| Powder monkeys | 4 | 20 copper + 1 silver | — | 2.1 h |
-| Gunnery drills | 1 | 2 copper | — | 12.5 min |
-| Shaped charges | 1 | 2 copper | — | 12.5 min |
-| Lookouts | 4 | 20 copper + 1 silver | — | 2.1 h |
-| Flamethrower | 5 | 30 copper + 3 silver | — | 3.1 h |
-| Ice wave | 5 | 30 copper + 3 silver | — | 3.1 h |
-| Pyroclasm | 5 | 30 copper + 3 silver | — | 3.1 h |
-| Lingering embers | 5 | 30 copper + 3 silver | — | 3.1 h |
-| Folded halls | 1 | 10 copper + 3 silver | — | 1.0 h |
-| Long spears | 5 | 30 copper + 3 silver | — | 3.1 h |
-| Folded sanctum | 1 | 45 copper + 20 silver + 3 gold | — | 4.7 h |
-| Arc span | 5 | 30 copper + 3 silver | — | 3.1 h |
-| Conduit of night | 20 | 270 copper + 77 silver + 30 gold | — | 1.2 d |
-| Restocking | 5 | 30 copper + 3 silver | — | 3.1 h |
-| Powder kegs | 5 | 30 copper + 3 silver | — | 3.1 h |
-| Iron-shod stakes | 6 | 42 copper + 6 silver + 1 gold | — | 4.4 h |
-| Barbed edges | 4 | 20 copper + 1 silver | — | 2.1 h |
-| Masonry | 6 | 42 copper + 6 silver + 1 gold | — | 4.4 h |
-| Keep bastions | 6 | 42 copper + 6 silver + 1 gold | — | 4.4 h |
-| Guild of builders | 5 | 30 copper + 3 silver | — | 3.1 h |
-| Hardy folk | 5 | 30 copper + 3 silver | — | 3.1 h |
-| Master masons | 5 | 30 copper + 3 silver | — | 3.1 h |
-| War drums | 1 | 4 copper | — | 25.0 min |
+| Garrison | 4 | 288 copper + 1 silver | — | 6.9 min smith work; resources 1.3 d |
+| Drill yard | 5 | 610 copper + 5 silver | — | 12.6 min smith work; resources 2.7 d |
+| Arms & armour | 6 | 1112 copper + 14 silver + 250 gold | — | 20.9 min smith work; resources 4.8 d |
+| Patrol routes | 4 | 288 copper + 1 silver | — | 6.9 min smith work; resources 1.3 d |
+| Keen eyes | 4 | 288 copper + 1 silver | — | 6.9 min smith work; resources 1.3 d |
+| Hunter's instinct | 1 | 12 copper + 4 silver | — | 0.2 min smith work; resources 1.3 h |
+| Bodkin points | 6 | 1112 copper + 14 silver + 250 gold | — | 20.9 min smith work; resources 4.8 d |
+| Longbows | 4 | 288 copper + 1 silver | — | 6.9 min smith work; resources 1.3 d |
+| Quick nock | 5 | 610 copper + 5 silver | — | 12.6 min smith work; resources 2.7 d |
+| Heavy shot | 5 | 610 copper + 5 silver | — | 12.6 min smith work; resources 2.7 d |
+| Powder monkeys | 4 | 288 copper + 1 silver | — | 6.9 min smith work; resources 1.3 d |
+| Gunnery drills | 1 | 2 copper | — | 0.2 min smith work; resources 12.5 min |
+| Shaped charges | 1 | 2 copper | — | 0.2 min smith work; resources 12.5 min |
+| Lookouts | 4 | 288 copper + 1 silver | — | 6.9 min smith work; resources 1.3 d |
+| Flamethrower | 5 | 610 copper + 5 silver | — | 12.6 min smith work; resources 2.7 d |
+| Ice wave | 5 | 610 copper + 5 silver | — | 12.6 min smith work; resources 2.7 d |
+| Pyroclasm | 5 | 610 copper + 5 silver | — | 12.6 min smith work; resources 2.7 d |
+| Lingering embers | 5 | 610 copper + 5 silver | — | 12.6 min smith work; resources 2.7 d |
+| Folded halls | 1 | 10 copper + 3 silver | — | 0.2 min smith work; resources 1.0 h |
+| Long spears | 5 | 610 copper + 5 silver | — | 12.6 min smith work; resources 2.7 d |
+| Folded sanctum | 1 | 45 copper + 20 silver + 3 gold | — | 0.2 min smith work; resources 4.7 h |
+| Arc span | 5 | 610 copper + 5 silver | — | 12.6 min smith work; resources 2.7 d |
+| Conduit of night | 20 | 9960 copper + 852 silver + 171990 gold | — | 11.0 h smith work; resources 1.64 yr |
+| Restocking | 5 | 610 copper + 5 silver | — | 12.6 min smith work; resources 2.7 d |
+| Powder kegs | 5 | 610 copper + 5 silver | — | 12.6 min smith work; resources 2.7 d |
+| Iron-shod stakes | 6 | 1112 copper + 14 silver + 250 gold | — | 20.9 min smith work; resources 4.8 d |
+| Barbed edges | 4 | 288 copper + 1 silver | — | 6.9 min smith work; resources 1.3 d |
+| Masonry | 6 | 1112 copper + 14 silver + 250 gold | — | 20.9 min smith work; resources 4.8 d |
+| Keep bastions | 6 | 1112 copper + 14 silver + 250 gold | — | 20.9 min smith work; resources 4.8 d |
+| Guild of builders | 5 | 610 copper + 5 silver | — | 12.6 min smith work; resources 2.7 d |
+| Hardy folk | 5 | 610 copper + 5 silver | — | 12.6 min smith work; resources 2.7 d |
+| Master masons | 5 | 610 copper + 5 silver | — | 12.6 min smith work; resources 2.7 d |
+| War drums | 1 | 4 copper | — | 0.2 min smith work; resources 25.0 min |
 
 ### Smithy
 
 | Upgrade | Max | Cumulative cost | Prerequisite Knowledge | Late-profile work or resource floor |
 |---|---:|---|---:|---|
-| Troop HP | 50 | 10 copper + 15 silver + 25 gold | — | 2.24 yr training; resources 2.1 h |
-| Troop damage | 50 | 10 copper + 15 silver + 25 gold | — | 2.24 yr training; resources 2.1 h |
-| Drill speed | 30 | 10 copper + 15 silver + 5 gold | — | 30.6 d training; resources 2.0 h |
-| Tower damage | 50 | 10 copper + 15 silver + 25 gold | — | 2.24 yr training; resources 2.1 h |
-| Tower reload | 30 | 10 copper + 15 silver + 5 gold | — | 30.6 d training; resources 2.0 h |
-| Bomb damage | 40 | 10 copper + 15 silver + 15 gold | — | 1.09 yr training; resources 2.0 h |
-| Wall HP | 50 | 10 copper + 15 silver + 25 gold | — | 2.24 yr training; resources 2.1 h |
-| Keep HP | 50 | 10 copper + 15 silver + 25 gold | — | 2.24 yr training; resources 2.1 h |
-| Rebuild speed | 30 | 10 copper + 15 silver + 5 gold | — | 30.6 d training; resources 2.0 h |
+| Troop HP | 50 | 1435 copper + 23090 silver + 177650 gold | — | 3.4 d smith work; resources 1.69 yr |
+| Troop damage | 50 | 1435 copper + 23090 silver + 177650 gold | — | 3.4 d smith work; resources 1.69 yr |
+| Drill speed | 30 | 1435 copper + 23090 silver + 18280 gold | — | 18.1 h smith work; resources 125.5 d |
+| Tower damage | 50 | 1435 copper + 23090 silver + 177650 gold | — | 3.4 d smith work; resources 1.69 yr |
+| Tower reload | 30 | 1435 copper + 23090 silver + 18280 gold | — | 18.1 h smith work; resources 125.5 d |
+| Bomb damage | 40 | 1435 copper + 23090 silver + 78215 gold | — | 1.8 d smith work; resources 271.6 d |
+| Wall HP | 50 | 1435 copper + 23090 silver + 177650 gold | — | 3.4 d smith work; resources 1.69 yr |
+| Keep HP | 50 | 1435 copper + 23090 silver + 177650 gold | — | 3.4 d smith work; resources 1.69 yr |
+| Rebuild speed | 30 | 1435 copper + 23090 silver + 18280 gold | — | 18.1 h smith work; resources 125.5 d |
 
 ### Study skill
 
 | Upgrade | Max | Cumulative cost | Prerequisite Knowledge | Late-profile work or resource floor |
 |---|---:|---|---:|---|
-| Drill sergeant | 3 | 6 knowledge | — | 0.3 min |
-| Veterans | 3 | 12 knowledge | 1 | 0.7 min |
-| Bladework | 3 | 12 knowledge | 1 | 0.7 min |
-| Fletchers | 3 | 18 knowledge | 3 | 1.1 min |
-| Ballistics | 3 | 18 knowledge | 10 | 1.5 min |
-| Gunpowder | 3 | 12 knowledge | 3 | 0.8 min |
-| War banner | 3 | 30 knowledge | 13 | 2.3 min |
-| Rapid deployment | 3 | 18 knowledge | 18 | 2.0 min |
-| Sheltering standard | 1 | 5 knowledge | 36 | 2.2 min |
-| Broad standard | 1 | 5 knowledge | 41 | 2.5 min |
-| Battle standard | 1 | 8 knowledge | 46 | 2.9 min |
-| Forced march | 1 | 8 knowledge | 46 | 2.9 min |
-| Vital standard | 1 | 8 knowledge | 46 | 2.9 min |
-| Restoring standard | 1 | 12 knowledge | 54 | 3.6 min |
-| Masonry | 3 | 6 knowledge | — | 0.3 min |
-| Bastions | 3 | 12 knowledge | 1 | 0.7 min |
-| Outlying districts | 1 | 8 knowledge | 1 | 0.5 min |
-| Builders' guilds | 3 | 12 knowledge | 1 | 0.7 min |
-| Smiths' guild | 3 | 12 knowledge | — | 0.7 min |
-| Master smith | 1 | 6 knowledge | 2 | 0.4 min |
-| Fireproof wood | 10 | 275 knowledge | — | 15.0 min |
-| Coffee | 12 | 156 knowledge | — | 8.5 min |
-| Waterproofing | 4 | 40 knowledge | — | 2.2 min |
-| Night watch | 9 | 180 knowledge | — | 9.8 min |
-| Enchanted ink | 10 | 550 knowledge | — | 30.0 min |
-| Fire training | 5 | 120 knowledge | — | 6.5 min |
+| Drill sergeant | 3 | 5003 knowledge | — | 35.0 min research; resources 4.5 h |
+| Veterans | 3 | 10006 knowledge | 1 | 37.5 min research; resources 9.1 h |
+| Bladework | 3 | 10006 knowledge | 1 | 37.5 min research; resources 9.1 h |
+| Fletchers | 3 | 15009 knowledge | 3 | 40.0 min research; resources 13.6 h |
+| Ballistics | 3 | 15009 knowledge | 10 | 47.5 min research; resources 13.7 h |
+| Gunpowder | 3 | 10006 knowledge | 3 | 40.0 min research; resources 9.1 h |
+| War banner | 3 | 25015 knowledge | 13 | 50.0 min research; resources 22.8 h |
+| Rapid deployment | 3 | 15009 knowledge | 18 | 52.5 min research; resources 13.7 h |
+| Sheltering standard | 1 | 5 knowledge | 15027 | 55.0 min research; resources 13.7 h |
+| Broad standard | 1 | 5 knowledge | 15032 | 57.5 min research; resources 13.7 h |
+| Battle standard | 1 | 8 knowledge | 15037 | 1.0 h research; resources 13.7 h |
+| Forced march | 1 | 8 knowledge | 15037 | 1.0 h research; resources 13.7 h |
+| Vital standard | 1 | 8 knowledge | 15037 | 1.0 h research; resources 13.7 h |
+| Restoring standard | 1 | 12 knowledge | 15045 | 1.0 h research; resources 13.7 h |
+| Masonry | 3 | 5003 knowledge | — | 35.0 min research; resources 4.5 h |
+| Bastions | 3 | 10006 knowledge | 1 | 37.5 min research; resources 9.1 h |
+| Outlying districts | 1 | 8 knowledge | 1 | 5.0 min research; resources 0.5 min |
+| Builders' guilds | 3 | 10006 knowledge | 1 | 37.5 min research; resources 9.1 h |
+| Smiths' guild | 3 | 10006 knowledge | — | 35.0 min research; resources 9.1 h |
+| Master smith | 1 | 6 knowledge | 2 | 5.0 min research; resources 0.4 min |
+| Fireproof wood | 10 | 71300 knowledge | — | 16.0 h research; resources 2.7 d |
+| Coffee | 12 | 50624 knowledge | — | 1.1 d research; resources 1.9 d |
+| Waterproofing | 4 | 2816 knowledge | — | 1.3 h research; resources 2.6 h |
+| Night watch | 9 | 40836 knowledge | — | 11.9 h research; resources 1.5 d |
+| Enchanted ink | 10 | 11400100 knowledge | — | 16.0 h research; resources 1.18 yr |
+| Fire training | 5 | 12040 knowledge | — | 2.3 h research; resources 10.9 h |
 
 ### Study path
 
 | Upgrade | Max | Cumulative cost | Prerequisite Knowledge | Late-profile work or resource floor |
 |---|---:|---|---:|---|
-| Pyromancy | 3 | 26 knowledge | — | 1.4 min |
-| Rime | 3 | 26 knowledge | — | 1.4 min |
-| Stormcalling | 3 | 29 knowledge | — | 1.6 min |
-| Crusaders | 3 | 26 knowledge | — | 1.4 min |
-| Assassins | 3 | 26 knowledge | — | 1.4 min |
-| Fire arrows | 3 | 26 knowledge | — | 1.4 min |
-| Sharpshooters | 3 | 26 knowledge | — | 1.4 min |
-| Gun crews | 3 | 26 knowledge | — | 1.4 min |
-| Siege shot | 3 | 26 knowledge | — | 1.4 min |
-| Rangers | 3 | 26 knowledge | — | 1.4 min |
-| Skirmishers | 3 | 26 knowledge | — | 1.4 min |
-| Spotters | 3 | 26 knowledge | — | 1.4 min |
-| Signal fires | 3 | 26 knowledge | — | 1.4 min |
-| Pyroclasm | 3 | 26 knowledge | — | 1.4 min |
-| Cinders | 3 | 26 knowledge | — | 1.4 min |
-| Oil-soaked | 3 | 21 knowledge | — | 1.1 min |
-| Fortified crates | 3 | 21 knowledge | — | 1.1 min |
-| Blasting stakes | 3 | 26 knowledge | — | 1.4 min |
-| Spring stakes | 3 | 26 knowledge | — | 1.4 min |
-| Rimed stakes | 3 | 26 knowledge | — | 1.4 min |
+| Pyromancy | 3 | 20012 knowledge | — | 35.0 min research; resources 18.2 h |
+| Rime | 3 | 20012 knowledge | — | 35.0 min research; resources 18.2 h |
+| Stormcalling | 3 | 25015 knowledge | — | 35.0 min research; resources 22.7 h |
+| Crusaders | 3 | 20012 knowledge | — | 35.0 min research; resources 18.2 h |
+| Assassins | 3 | 20012 knowledge | — | 35.0 min research; resources 18.2 h |
+| Fire arrows | 3 | 20012 knowledge | — | 35.0 min research; resources 18.2 h |
+| Sharpshooters | 3 | 20012 knowledge | — | 35.0 min research; resources 18.2 h |
+| Gun crews | 3 | 20012 knowledge | — | 35.0 min research; resources 18.2 h |
+| Siege shot | 3 | 20012 knowledge | — | 35.0 min research; resources 18.2 h |
+| Rangers | 3 | 20012 knowledge | — | 35.0 min research; resources 18.2 h |
+| Skirmishers | 3 | 20012 knowledge | — | 35.0 min research; resources 18.2 h |
+| Spotters | 3 | 20012 knowledge | — | 35.0 min research; resources 18.2 h |
+| Signal fires | 3 | 20012 knowledge | — | 35.0 min research; resources 18.2 h |
+| Pyroclasm | 3 | 20012 knowledge | — | 35.0 min research; resources 18.2 h |
+| Cinders | 3 | 20012 knowledge | — | 35.0 min research; resources 18.2 h |
+| Oil-soaked | 3 | 15009 knowledge | — | 35.0 min research; resources 13.6 h |
+| Fortified crates | 3 | 15009 knowledge | — | 35.0 min research; resources 13.6 h |
+| Blasting stakes | 3 | 20012 knowledge | — | 35.0 min research; resources 18.2 h |
+| Spring stakes | 3 | 20012 knowledge | — | 35.0 min research; resources 18.2 h |
+| Rimed stakes | 3 | 20012 knowledge | — | 35.0 min research; resources 18.2 h |
 
 ### Evolution
 
 | Upgrade | Max | Cumulative cost | Prerequisite Knowledge | Late-profile work or resource floor |
 |---|---:|---|---:|---|
-| Dark wizard keep | 1 | 30 knowledge | 29 | 3.2 min |
-| Valkyrie palace | 1 | 25 knowledge | 26 | 2.8 min |
+| Dark wizard keep | 1 | 150000 knowledge | 25015 | 12.6 h research; resources 6.6 d |
+| Valkyrie palace | 1 | 100000 knowledge | 20012 | 12.6 h research; resources 4.5 d |
 
 ### Mine building
 
 | Upgrade | Max | Cumulative cost | Prerequisite Knowledge | Late-profile work or resource floor |
 |---|---:|---|---:|---|
-| shaft | 5 | 40 copper + 6 silver + 3 gold | — | 4.2 h |
-| barracks | 5 | 50 copper + 6 silver + 3 gold | — | 5.2 h |
-| warehouse | 5 | 60 copper + 6 silver + 3 gold | — | 6.3 h |
-| forge | 5 | 50 copper + 6 silver + 3 gold | — | 5.2 h |
-| smithy | 5 | 50 copper + 6 silver + 3 gold | — | 5.2 h |
+| shaft | 5 | 4496 copper + 14 silver + 5 gold | — | 19.5 d |
+| barracks | 5 | 5620 copper + 14 silver + 5 gold | — | 24.4 d |
+| warehouse | 5 | 6744 copper + 14 silver + 5 gold | — | 29.3 d |
+| forge | 5 | 5620 copper + 14 silver + 5 gold | — | 24.4 d |
+| smithy | 5 | 5620 copper + 14 silver + 5 gold | — | 24.4 d |
 
 ### Mine staff
 
 | Upgrade | Max | Cumulative cost | Prerequisite Knowledge | Late-profile work or resource floor |
 |---|---:|---|---:|---|
-| Full mine crew | 25 | 324 copper + 50 silver + 10 gold | — | 1.4 d |
+| Full mine crew | 25 | 4924 copper + 190 silver + 30 gold | — | 21.4 d |
 
 ### Library
 
 | Upgrade | Max | Cumulative cost | Prerequisite Knowledge | Late-profile work or resource floor |
 |---|---:|---|---:|---|
-| Full bookshelf collection | 110 | 6105 copper + 250 silver + 50 gold | — | 26.5 d |
-| Full Library staff | 16 | 152 copper + 24 silver + 4 gold | — | 15.9 h |
-| Alchemy lab | 5 | 100 copper + 18 silver + 3 gold | — | 10.4 h |
+| Full bookshelf collection | 110 | 27951 copper + 6232 silver + 242 gold | — | 121.5 d |
+| Full Library staff | 16 | 1272 copper + 88 silver + 30 gold | — | 5.5 d |
+| Alchemy lab | 5 | 2840 copper + 42 silver + 5 gold | — | 12.3 d |
 
-## What two years would require
+## Sensitivity and follow-up tuning
 
-- **One focused 50-rank Smithy row:** keeping the 60-second start and 1.5× growth, reduce the per-rank cap from 365 days of one-smith work to approximately **320.72 days** to produce a 730-day training-only total with six smiths and max speed research. This leaves the whole collection taking much longer.
-- **All Smithy rows in two years:** with the same six-smith budget, a shared cap of approximately **41.29 days** gives 730 days of aggregate training work. Rows must be scheduled, resources secured and every completion immediately requeued; add allowance for setup and daily sessions rather than treating this minimum as a promise.
-- **Knowledge capstones:** at the late nominal rate of 1100 Knowledge/hour, two years generates **19,272,000 Knowledge** before spending. Holding the measured late enchanted rates constant instead would imply **944–1041 million Knowledge**. This is a sensitivity comparison, not a two-year simulation. Current skills cost only hundreds; their linear rank prices cannot create a two-year finish. Keep early ranks affordable and grow later ranks, accounting for enchanted-book income and the time spent building the Library.
-- **Forge capstones:** resource costs are small relative to multi-year manufacturing capacity. To make their highest tiers arrive near two years, tune cumulative resource gates against a long-run Mine model with growth, ore access, losses and prospect resets, or tie the capstone to finite progression milestones. Do not multiply all early prices by a large constant.
-- **Recommended pacing:** first-hour purchases stay accessible; specialize over days/weeks; open advanced branches over months; reserve the strongest final ranks for roughly months 18–24. Specify whether a player should finish one specialization or every compatible upgrade by that point.
+At the late nominal rate of 1100 Knowledge/hour, two years would generate **19,272,000 Knowledge** before spending; measured late enchanted income would imply **27.0–27.8 million**. The capital forecast accounts for setup and applies a proportional measured enchant bonus after each paid rank. It does not grant full late income at the start.
+
+Two seeds per phase are sufficient for an initial balance pass, not a long-run income guarantee. Prospect geology, hazards, crew replacements and player spending can substantially change the finish. Daily visits also leave completed projects waiting for their next manual start. More playthrough seeds and offline-heavy scenarios should refine the coefficients without changing the quadratic form.
 
 ## Offline and check-in effects
 
-The Mine and Library bank at most 24 hours. A daily visit can retain most wall-clock income, but longer absences lose the excess. The 120× catch-up setting controls replay throughput, not a free 120× progression multiplier. The 10× catch-up payout consumes ten seconds of bank for one simulation second: unchanged base Knowledge pays for elapsed bank time, while digging, accidents and rune-reading advance less physical simulation per paid hour. This changes unlock delays and bonus distributions, so offline-heavy play needs its own model. Smithy jobs continue on wall-clock time; only the current rank completes, with no automatic next rank. Daily visits add waiting between completions.
+The Mine and Library bank at most 24 hours. A daily visit can retain most wall-clock income, but longer absences lose the excess. The 120× catch-up setting controls replay throughput, not a free 120× progression multiplier. The 10× catch-up payout consumes ten seconds of bank for one simulation second: unchanged base Knowledge pays for elapsed bank time, while digging, accidents and rune-reading advance less physical simulation per paid hour. This changes unlock delays and bonus distributions, so offline-heavy play needs its own model. Smithy and Study jobs continue on wall-clock time with their current workers; zero workers pause work. Only the current project/rank completes, with no automatic next rank. Daily visits add waiting between completions.
 
 ## Reproduce
 

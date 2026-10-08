@@ -7,6 +7,7 @@ import { trainingSeconds } from "../src/training-jobs.ts";
 import { researchSeconds } from "../src/research-jobs.ts";
 import { forgeSeconds } from "../src/forge-jobs.ts";
 import { ECONOMY } from "../src/economy.ts";
+import { planProgression, sampledRates } from "./plan-upgrade-progression.ts";
 import { SKILLS, TREES, skillCost, type SkillId } from "../src/skill-trees.ts";
 import { PATHS } from "../src/knowledge-paths.ts";
 import { BUILDINGS, MAX_LEVEL } from "../src/mine/buildings.ts";
@@ -109,16 +110,37 @@ const compatiblePathKnowledge = [...new Set(PATHS.map(p => p.topic))].reduce((n,
   .map(p => p.ranks.reduce((n, r) => n + r.cost, 0) + (p.evolves?.cost ?? 0))), 0);
 const lateMeasuredKnowledge = samples.filter((s: any) => s.profile.id === "late").map((s: any) => s.library.perHour);
 const baseKnowledgeBudget = late.rates.knowledge * 730 * 24;
-const targets = { days: 730, individualSeconds: 730 * 86400 * late.smiths * late.speed };
-const capped = (n: number, cap: number) => Array.from({ length: n }, (_, r) => Math.min(cap, Math.round(TRAINING_FIRST_SECONDS * TRAINING_GROWTH ** r))).reduce((a, b) => a + b, 0);
-function solve(objective: (cap: number) => number) {
-  let lo = 0, hi = 365 * 86400;
-  for (let n = 0; n < 80; n++) { const m = (lo + hi) / 2; if (objective(m) > targets.individualSeconds) hi = m; else lo = m; }
-  return (lo + hi) / 2 / 86400;
-}
-const capOne = solve(cap => capped(50, cap)), capAll = solve(cap => TRAINING.reduce((n, t) => n + capped(t.max, cap), 0));
+const enchantedMultiplier = samples.filter((s: any) => s.profile.id === "late").reduce((n: number, s: any) => n + s.library.perHour / s.library.nominalPerHour, 0) / 2;
+const plan = planProgression(sampledRates(samples), MAX_SHELVES, enchantedMultiplier);
+const topRow = smiths.find(r => r.rank === 50)!;
+const conduit = finals.find(r => r.id === "chainCount")!;
+const storm = PATHS.find(p => p.id === "storm")!;
+const conduitBill = add(conduit.cumulative, cost({}, storm.ranks.reduce((n, r) => n + r.cost, 0) + storm.evolves!.cost));
+const forecastTop = plan.focused(topRow.cumulative, topRow.smithSeconds / 3600 / 6 / 1.45);
+const forecastConduit = plan.focused(conduitBill, conduit.smithSeconds / 3600 / 6 / 1.45 + (researchSeconds(3, true) + [0, 1, 2].reduce((n, r) => n + researchSeconds(r), 0)) / 3600 / 2);
+const allTraining = sum(smiths.map(r => r.cumulative));
 const md: string[] = [
-  "# Upgrade timing estimates", "", `Current source snapshot: ${new Date().toISOString().slice(0, 10)}. Analysis only; no game balance changes.`, "",
+  "# Upgrade timing and quadratic balance", "", `Current source snapshot: ${new Date().toISOString().slice(0, 10)}. Prices and project timers below are implemented in the game.`, "",
+  "## Pacing target and current forecast", "",
+  "The target is about two years to a focused top specialization, with 24-hour normal progress and daily visits. Compatible branches share income, so maxing the whole collection takes longer. This interpretation is explicit rather than silently giving every branch its own income budget.", "",
+  "The forecast first funds a starter Library, Mine level 3 with 15 workers, Mine level 5 with 25 workers, then full Library infrastructure and its fire precautions. Unspent metals and Knowledge carry between every phase; utility research is charged once. Measured phase rates only apply after their infrastructure is funded. This is a capital-budget model, not two years of physical simulation: it excludes replacement bills, construction downtime, battle expenses and delays between manual rank starts; it holds each phase's income until the next setup is complete. Real incremental investments can improve income sooner.", "",
+  "| Focused target | Estimated time from modeled start |",
+  "|---|---:|",
+  `| One 50-rank row, e.g. Troop HP | ${format(forecastTop)} (${(forecastTop / 24).toFixed(0)} days) |`,
+  `| Conduit of night, including Stormcalling and its evolution | ${format(forecastConduit)} (${(forecastConduit / 24).toFixed(0)} days) |`,
+  `| Enchanted ink, all ten ranks | ${format(plan.enchantedHours)} (${(plan.enchantedHours / 24).toFixed(0)} days) |`, "",
+  "| Production investment | Modeled completion | Copper / Silver / Gold per hour afterwards | Nominal Knowledge/h |",
+  "|---|---:|---|---:|",
+  ...plan.stages.map(s => `| ${s.name} | ${format(s.hours)} | ${METALS.map(k => s.rates[k].toFixed(2)).join(" / ")} | ${s.rates.knowledge} |`), "",
+  "## Implemented curves", "",
+  "Owned ranks are zero-based. Per-purchase prices are quadratic; their cumulative spending grows roughly cubically. Early prices remain affordable. Production increases through purchased capacity and crew, without an automatic multiplier tied to elapsed calendar time.", "",
+  `- Training: **1 + ${ECONOMY.training} × owned²** units of the existing Copper/Silver/Gold tier. Work is **60 × next-rank² seconds** per smith.`,
+  `- Ordinary Forge levels: **2 + ${ECONOMY.forgeCopper} × owned² Copper**; precious-metal tiers also grow quadratically. Conduit's late Gold is **${ECONOMY.conduitGold} × (owned − 6)²**, beginning at rank eight. All Forge levels and War drums require named smiths, shared with Training.`,
+  `- Mine buildings: **base × (1 + ${ECONOMY.mineBuilding} × (current-level − 1)²)** Copper. Crew hires are **1 + crew²** Copper. Additional capacity therefore needs progressively larger reinvestment.`,
+  "- Library shelves: **1 + owned + floor(owned² / 20)** Copper; staff **2 + hired²**; lab **10 + 200 × (current-level − 1)²**. Precious-metal portions also rise quadratically.",
+  `- Study skills: **base × (1 + growth × owned²)**, with growth ${ECONOMY.utilityStudy} for production/fire utility, ${ECONOMY.combatStudy} for ordinary combat research and ${ECONOMY.enchantedStudy} for Enchanted ink. Paths use ${ECONOMY.pathStudy}; evolution crowns cost 100,000/150,000 Knowledge.`,
+  "- Every Knowledge skill/path rank takes **300 × next-rank² seconds per researcher**; evolution requires **24 researcher-hours**. The lab shares all current researchers on one project. Zero researchers pauses it. Effects apply on completion; cancellation refunds the exact paid bill. Instantaneous research applies to both workshops.",
+  "- Enchanted books now award **one minute of current base Knowledge, at least 1**, so bonuses follow the Library instead of overwhelming it with two-hour gifts.", "",
   "## Interpretation and limits", "",
   "The planning target is 730 days of normal progress with daily check-ins. Exact costs and Smithy work are calculated from current code. Resource waits are **scenario estimates**, not predictions from a new save. Preset infrastructure is already paid for, one upgrade is prioritized, income is held constant, every rank is restarted immediately, and there is no competing spending. Infrastructure construction, repairs, replacements and battle progression are excluded from those waits. Real acquisition from a new game is longer. Lower bounds are not added together as though each upgrade had its own Mine or staff.", "",
   "Mine samples run actual 1x simulation from fresh prospects with preset infrastructure, ordinary hazards and attentive prospect moves. They have a CPU limit and report exactly how much simulated time was reached. Unobserved metal means **unknown**, never zero wait. These short samples are startup averages and must not be extrapolated unchanged for two years. Knowledge wait columns use the exact nominal shelves × professors rate, excluding enchanted bonuses and casualties; measured Library results below show how far outcomes can differ.", "",
@@ -127,7 +149,7 @@ const md: string[] = [
   "| Upgrade | Ranks | Copper / Silver / Gold | One smith, no speed research | Six smiths, max research | Final rank with six |",
   "|---|---:|---:|---:|---:|---:|",
   ...smiths.map(r => `| ${r.name} | ${r.rank} | ${r.cumulative.copper} / ${r.cumulative.silver} / ${r.cumulative.gold} | ${format(r.smithSeconds / 3600)} | ${format(r.smithSeconds / 3600 / 6 / 1.45)} | ${format(trainingSeconds(r.rank - 1) / 3600 / 6 / 1.45)} |`), "",
-  `All nine rows require **${format(totalWork / 3600 / 6 / 1.45)}** of six-smith work at best. One top 50-rank row requires **${format(smiths.find(r => r.rank === 50)!.smithSeconds / 3600 / 6 / 1.45)}**. This is why a two-year target must distinguish one focused row from completing the entire collection.`, "",
+  `All nine rows require **${format(totalWork / 3600 / 6 / 1.45)}** of six-smith work at best. One top 50-rank row requires **${format(topRow.smithSeconds / 3600 / 6 / 1.45)}**. Their resource prices govern the long-term finish; these are processing times after materials have been secured.`, "",
   "## Production scenarios and measurements", "",
   "| Scenario | Setup | Sampled 1x hours (two seeds) | Copper/h | Silver/h | Gold/h | Nominal Knowledge/h |",
   "|---|---|---:|---:|---:|---:|---:|",
@@ -138,6 +160,7 @@ const md: string[] = [
   ...samples.map((s: any) => `| ${s.profile.id} / ${s.seed} | ${s.mine.deaths} / ${s.mine.finalCrew} | ${METALS.map(k => s.mine.firstPaymentHours[k]?.toFixed(2) ?? "unobserved").join(" / ")} | ${s.library.perHour.toFixed(1)} | ${Math.round(s.library.bonuses)} | ${s.library.deaths} / ${s.library.fires} |`), "",
   "## Shared resource budgets", "",
   `All Forge tracks together cost **${priceText(forgeTotal)}**, about **${format(Math.max(forgeTotal.copper / late.rates.copper, forgeTotal.silver / late.rates.silver, forgeTotal.gold / late.rates.gold))}** of the late-profile sample income if every metal is saved for them.`, "",
+  `All Training rows together cost **${priceText(allTraining)}**. Their Gold alone needs **${format(allTraining.gold / late.rates.gold)}** at the late sampled rate. This balance targets a chosen specialization near two years; it does not promise the entire collection by then.`, "",
   `All Study skills together cost **${skillsTotal.knowledge} Knowledge**. Choosing the most expensive fully evolved path in each topic adds **${compatiblePathKnowledge} Knowledge**, giving **${skillsTotal.knowledge + compatiblePathKnowledge} Knowledge** for every compatible Study upgrade: **${format((skillsTotal.knowledge + compatiblePathKnowledge) / late.rates.knowledge)}** at late nominal income. Minimal prerequisite prices in individual rows must not be charged again when summing the complete tree. These budgets exclude setup and income growth.`, "",
   "DEFEND upgrade points currently have no upgrade purchase route. They accumulate one per new highest cleared wave, so there is no point-priced upgrade completion time to calculate yet.", "",
   "## Every finite upgrade: maximum rank", "",
@@ -145,23 +168,21 @@ const md: string[] = [
   ...[...new Set(finals.map(r => r.family))].flatMap(family => [
     `### ${family}`, "", "| Upgrade | Max | Cumulative cost | Prerequisite Knowledge | Late-profile work or resource floor |", "|---|---:|---|---:|---|",
     ...finals.filter(r => r.family === family).map(r => { const e = estimate(r, late);
-      const time = r.family === "Smithy" ? `${format(e.trainingHours)} training; resources ${e.resourceHours === null ? "unknown" : format(e.resourceHours)}` : e.resourceHours === null ? `Unknown: ${e.missing.join(", ")} unobserved` : format(e.resourceHours);
+      const resource = e.resourceHours === null ? `Unknown: ${e.missing.join(", ")} unobserved` : format(e.resourceHours);
+      const time = r.smithSeconds ? `${format(e.trainingHours)} smith work; resources ${resource}` : r.researchSeconds ? `${format(e.researchHours)} research; resources ${resource}` : resource;
       return `| ${r.name} | ${r.rank} | ${priceText(r.cumulative)} | ${r.prerequisites.knowledge || "—"} | ${time} |`; }), "",
   ]),
-  "## What two years would require", "",
-  `- **One focused 50-rank Smithy row:** keeping the 60-second start and 1.5× growth, reduce the per-rank cap from 365 days of one-smith work to approximately **${capOne.toFixed(2)} days** to produce a 730-day training-only total with six smiths and max speed research. This leaves the whole collection taking much longer.`,
-  `- **All Smithy rows in two years:** with the same six-smith budget, a shared cap of approximately **${capAll.toFixed(2)} days** gives 730 days of aggregate training work. Rows must be scheduled, resources secured and every completion immediately requeued; add allowance for setup and daily sessions rather than treating this minimum as a promise.`,
-  `- **Knowledge capstones:** at the late nominal rate of ${late.rates.knowledge} Knowledge/hour, two years generates **${Math.round(baseKnowledgeBudget).toLocaleString("en-US")} Knowledge** before spending. Holding the measured late enchanted rates constant instead would imply **${lateMeasuredKnowledge.slice().sort((a: number, b: number) => a - b).map((n: number) => (n * 730 * 24 / 1e6).toFixed(0)).join("–")} million Knowledge**. This is a sensitivity comparison, not a two-year simulation. Current skills cost only hundreds; their linear rank prices cannot create a two-year finish. Keep early ranks affordable and grow later ranks, accounting for enchanted-book income and the time spent building the Library.`,
-  "- **Forge capstones:** resource costs are small relative to multi-year manufacturing capacity. To make their highest tiers arrive near two years, tune cumulative resource gates against a long-run Mine model with growth, ore access, losses and prospect resets, or tie the capstone to finite progression milestones. Do not multiply all early prices by a large constant.",
-  "- **Recommended pacing:** first-hour purchases stay accessible; specialize over days/weeks; open advanced branches over months; reserve the strongest final ranks for roughly months 18–24. Specify whether a player should finish one specialization or every compatible upgrade by that point.", "",
+  "## Sensitivity and follow-up tuning", "",
+  `At the late nominal rate of ${late.rates.knowledge} Knowledge/hour, two years would generate **${Math.round(baseKnowledgeBudget).toLocaleString("en-US")} Knowledge** before spending; measured late enchanted income would imply **${lateMeasuredKnowledge.slice().sort((a: number, b: number) => a - b).map((n: number) => (n * 730 * 24 / 1e6).toFixed(1)).join("–")} million**. The capital forecast accounts for setup and applies a proportional measured enchant bonus after each paid rank. It does not grant full late income at the start.`, "",
+  "Two seeds per phase are sufficient for an initial balance pass, not a long-run income guarantee. Prospect geology, hazards, crew replacements and player spending can substantially change the finish. Daily visits also leave completed projects waiting for their next manual start. More playthrough seeds and offline-heavy scenarios should refine the coefficients without changing the quadratic form.", "",
   "## Offline and check-in effects", "",
-  "The Mine and Library bank at most 24 hours. A daily visit can retain most wall-clock income, but longer absences lose the excess. The 120× catch-up setting controls replay throughput, not a free 120× progression multiplier. The 10× catch-up payout consumes ten seconds of bank for one simulation second: unchanged base Knowledge pays for elapsed bank time, while digging, accidents and rune-reading advance less physical simulation per paid hour. This changes unlock delays and bonus distributions, so offline-heavy play needs its own model. Smithy jobs continue on wall-clock time; only the current rank completes, with no automatic next rank. Daily visits add waiting between completions.", "",
+  "The Mine and Library bank at most 24 hours. A daily visit can retain most wall-clock income, but longer absences lose the excess. The 120× catch-up setting controls replay throughput, not a free 120× progression multiplier. The 10× catch-up payout consumes ten seconds of bank for one simulation second: unchanged base Knowledge pays for elapsed bank time, while digging, accidents and rune-reading advance less physical simulation per paid hour. This changes unlock delays and bonus distributions, so offline-heavy play needs its own model. Smithy and Study jobs continue on wall-clock time with their current workers; zero workers pause work. Only the current project/rank completes, with no automatic next rank. Daily visits add waiting between completions.", "",
   "## Reproduce", "", "```powershell", "node --experimental-transform-types --import ./tests/pin-random.ts tools/measure-upgrade-production.ts",
   "node --experimental-transform-types --import ./tests/pin-random.ts tools/estimate-upgrades.ts", "```", "",
   "Measurement horizon defaults to 6 simulated hours per sample, with 30 CPU seconds maximum for each Mine. Set ESTIMATE_HOURS and ESTIMATE_CPU_SECONDS to change those limits. Source costs remain exact at the current snapshot. See upgrade-production.json for the full measurements and upgrade-estimates.csv for every individual rank and profile.", "",
 ];
 writeFileSync("docs/UPGRADE_TIMING.md", md.join("\n"));
 console.log(JSON.stringify({ rankRows: rows.length, finalUpgrades: finals.length,
-  focused50Days: smiths.find(r => r.rank === 50)!.smithSeconds / 86400 / 6 / 1.45,
-  allSmithyDays: totalWork / 86400 / 6 / 1.45, capOneDays: capOne, capAllDays: capAll,
+  focused50Days: forecastTop / 24, conduitDays: forecastConduit / 24, enchantedDays: plan.enchantedHours / 24,
+  allSmithyWorkDays: totalWork / 86400 / 6 / 1.45,
   allSkillKnowledge: finals.filter(r => r.family === "Study skill").reduce((n, r) => n + r.cumulative.knowledge, 0) }, null, 2));

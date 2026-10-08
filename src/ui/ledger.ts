@@ -312,6 +312,7 @@ export class Ledger {
   }
 
   private researchHint(rank: number, evolution = false) {
+    if (this.save.settings.instantResearch) return "Instant";
     const count = Math.max(1, this.ctx.researchers());
     return `${formatDuration(researchSeconds(rank, evolution) * 1000 / count)} with ${count} ${count === 1 ? "researcher" : "researchers"}`;
   }
@@ -324,7 +325,7 @@ export class Ledger {
       const missing = node.requires.filter((r) => skillRank(save, r) < (node.full?.includes(r) ? SKILLS[r].max : 1)).map((r) => SKILLS[r].name + (node.full?.includes(r) ? " (all ranks)" : ""));
       const active = save.researchJob?.kind === "skill" && save.researchJob.id === id;
       const busy = !!save.researchJob;
-      const why = maxed ? "" : busy && !active ? "Researchers are working on the current project" : missing.length ? `Needs ${missing.join(" and ")} first` : !available ? "Locked" : !canBuy ? `Needs ${price} Knowledge, have ${whole(save.knowledge)}` : "";
+      const why = maxed || active ? "" : busy ? "Researchers are working on the current project" : missing.length ? `Needs ${missing.join(" and ")} first` : !available ? "Locked" : !canBuy ? `Needs ${price} Knowledge, have ${whole(save.knowledge)}` : "";
       return `<article class="ledger-skill ${level ? "owned" : ""} ${available ? "" : "locked"}"><span class="ledger-glyph" aria-hidden="true">${skill.icon}</span><div><small>${level} / ${skill.max} RANKS</small><h3>${skill.name}</h3><p>${skill.text}.${why ? ` <em>${why}.</em>` : ""}</p></div>
         <button data-learn="${id}" ${maxed || !canBuy || busy || (!researchers && !save.settings.instantResearch) ? "disabled" : ""}>${maxed ? "Mastered" : active ? `Researching<small data-research-timer>${this.researchTimeLeft()}</small>` : `Learn<small>${price} Knowledge</small><small>${this.researchHint(level)}</small>`}</button></article>`;
     };
