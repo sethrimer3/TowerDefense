@@ -66,7 +66,7 @@ try {
     assert.equal(s.defend.cards.filter(c => c.kind === 'archerTower' && !c.path).length, 3);
     await page.screenshot({ path: `test-results/cards-${width}-selected.png` });
     await room.locator('[data-gather="archerTower"]').click();
-    assert.equal(await room.locator('[data-ledger-card][data-card-topic="archerTower"]').count(), 0);
+    assert.equal(await room.locator('.ledger-tiles [data-ledger-card][data-card-topic="archerTower"]').count(), 0);
     await room.locator('[data-ledger-stack="wizardTower"]').click();
     const wizard = room.locator('[data-ledger-card][data-card-topic="wizardTower"]').last();
     const wizardId = Number(await wizard.getAttribute('data-ledger-card')); await wizard.click();
@@ -79,7 +79,7 @@ try {
     await page.locator('#mine-chamber [data-subject="towers"]').click();
     await page.locator('#mine-chamber [data-ledger-stack="archerTower"]').click();
     assert.match(await page.locator('#mine-chamber .ledger-scope').textContent(), /GLOBAL EQUIPMENT.*Every Archer tower card/);
-    assert.equal(await page.locator('#mine-chamber [data-ledger-card]').count(), 0);
+    assert.equal(await page.locator('#mine-chamber .ledger-tiles [data-ledger-card]').count(), 0);
     await page.screenshot({ path: `test-results/cards-${width}-smithy.png` });
     await page.locator('nav [data-tab="tiles"]').click(); await page.locator('[data-stacking]').click();
     await page.locator(`[data-copy-card="${first}"]`).click();

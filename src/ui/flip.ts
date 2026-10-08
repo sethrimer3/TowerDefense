@@ -51,6 +51,7 @@ export function flip(container: HTMLElement, redraw: () => void, opts: FlipOptio
     const r0 = before.get(key)!;
     if (!r0.width || !r0.height) continue;
     old.style.cssText = `position:absolute;left:${r0.left - layer.left}px;top:${r0.top - layer.top}px;width:${r0.width}px;height:${r0.height}px;margin:0;pointer-events:none`;
+    old.inert = true;
     opts.ghosts.append(old);
     const to = after.get(alias(key) ?? "")?.getBoundingClientRect();
     const end = to && to.width

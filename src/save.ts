@@ -56,7 +56,7 @@ export type Save = {
 };
 
 export function defaults(): Save {
-  return {
+  const save: Save = {
     version: SAVE_VERSION,
     upgradePoints: 0,
     smithy: { ...STARTING_METAL },
@@ -76,6 +76,8 @@ export function defaults(): Save {
     library: null,
     settings: defaultSettings(),
   };
+  syncCards(save.defend);
+  return save;
 }
 
 const num = (v: unknown, fallback: number, min = 0, max = 1e15) =>
@@ -115,13 +117,14 @@ export function decode(raw: string | null): Save {
   if (legacy) for (const c of Object.values(d.paths)) d.pathResearch[c.path] = {
     rank: c.rank, spent: c.spent, ...(c.crowned !== undefined ? { crowned: true } : {}) };
   decodeCards(s.defend?.cards, d);
+  const crownsLeft = Object.fromEntries(Object.values(d.paths).map(c => [c.path, c.crowned ?? 0]));
   if (legacy) for (const c of d.defend.cards) {
     const choice = d.paths[cardTopic(c)!];
     if (choice) { c.path = choice.path; c.rank = choice.rank; }
     for (const choice of Object.values(d.paths)) {
       // Old crown conversions already changed owned counts; recover their card identities.
       const p = PATHS.find(p => p.id === choice.path && p.evolves?.item === c.kind);
-      if (p && choice.crowned !== undefined) { c.evolved = p.id; c.path = p.id; c.rank = choice.rank; }
+      if (p && crownsLeft[p.id] > 0) { c.evolved = p.id; c.path = p.id; c.rank = choice.rank; crownsLeft[p.id]--; }
     }
   }
   d.paths = {};
