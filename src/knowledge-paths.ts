@@ -11,6 +11,7 @@ import type { PaletteItem } from "./defend/catalog.ts";
 import type { PlacedKind } from "./defend/layout.ts";
 import { trimPlaced } from "./defend/progress.ts";
 import type { Save } from "./save.ts";
+import { studyPathCost } from "./economy.ts";
 
 export type PathTopic = "wizardTower" | "barracks" | "archerTower" | "cannonTower" | "archerBarracks" | "watchTower" | "mageGuild" | "bait" | "spikes";
 export type PathId =
@@ -118,163 +119,163 @@ export const PATHS: KnowledgePath[] = [
   {
     id: "pyromancy", topic: "wizardTower", name: "Pyromancy", motto: "Flames only, far hotter", hue: "ember",
     ranks: [
-      { name: "Kindling", icon: "flame", cost: 4, text: "The tower gives up its ice and burns 30% hotter" },
-      { name: "Long tongues", icon: "tongue", cost: 8, text: "Its flames reach 1.5 cells further" },
-      { name: "Inferno", icon: "inferno", cost: 14, text: "Flames burn 80% hotter in all and half again as long" },
+      { name: "Kindling", icon: "flame", cost: studyPathCost(4, 0), text: "The tower gives up its ice and burns 30% hotter" },
+      { name: "Long tongues", icon: "tongue", cost: studyPathCost(4, 1), text: "Its flames reach 1.5 cells further" },
+      { name: "Inferno", icon: "inferno", cost: studyPathCost(4, 2), text: "Flames burn 80% hotter in all and half again as long" },
     ],
   },
   {
     id: "rime", topic: "wizardTower", name: "Rime", motto: "Ice only, then frozen solid", hue: "frost",
     ranks: [
-      { name: "Hoarfrost", icon: "snowflake", cost: 4, text: "The tower gives up its flames; ice comes twice as often and chills half again as long" },
-      { name: "Black ice", icon: "shard", cost: 8, text: "Ice waves hit 60% harder and run 1.5 cells further" },
-      { name: "Deep freeze", icon: "iceBlock", cost: 14, text: "Enemies the ice hits freeze solid for a moment" },
+      { name: "Hoarfrost", icon: "snowflake", cost: studyPathCost(4, 0), text: "The tower gives up its flames; ice comes twice as often and chills half again as long" },
+      { name: "Black ice", icon: "shard", cost: studyPathCost(4, 1), text: "Ice waves hit 60% harder and run 1.5 cells further" },
+      { name: "Deep freeze", icon: "iceBlock", cost: studyPathCost(4, 2), text: "Enemies the ice hits freeze solid for a moment" },
     ],
   },
   {
     id: "storm", topic: "wizardTower", name: "Stormcalling", motto: "Lightning in place of flames", hue: "storm",
     ranks: [
-      { name: "Stormcalling", icon: "bolt", cost: 5, text: "Each flame becomes a bolt of lightning leaping through 3 enemies; the ice stays" },
-      { name: "Forked bolts", icon: "fork", cost: 9, text: "Bolts leap through 5 enemies, further apart" },
-      { name: "Thunderhead", icon: "thunderhead", cost: 15, text: "Bolts leap through 7 enemies and strike half again as hard" },
+      { name: "Stormcalling", icon: "bolt", cost: studyPathCost(5, 0), text: "Each flame becomes a bolt of lightning leaping through 3 enemies; the ice stays" },
+      { name: "Forked bolts", icon: "fork", cost: studyPathCost(5, 1), text: "Bolts leap through 5 enemies, further apart" },
+      { name: "Thunderhead", icon: "thunderhead", cost: studyPathCost(5, 2), text: "Bolts leap through 7 enemies and strike half again as hard" },
     ],
-    evolves: { from: "wizardTower", item: "darkKeep", name: "Dark wizard keep", cost: 30, text: "At the storm's height every wizard tower becomes a Dark wizard keep" },
+    evolves: { from: "wizardTower", item: "darkKeep", name: "Dark wizard keep", cost: 150000, text: "At the storm's height every wizard tower becomes a Dark wizard keep" },
   },
   {
     id: "crusaders", topic: "barracks", name: "Crusaders", motto: "Immovable, armoured, enduring", hue: "steel",
     ranks: [
-      { name: "Chain mail", icon: "mail", cost: 4, text: "Swordsmen have 50% more HP, and walk a little slower" },
-      { name: "Field dressing", icon: "heart", cost: 8, text: "They heal 3 HP a second" },
-      { name: "Templars", icon: "cross", cost: 14, text: "120% more HP in all, and 50% more damage" },
+      { name: "Chain mail", icon: "mail", cost: studyPathCost(4, 0), text: "Swordsmen have 50% more HP, and walk a little slower" },
+      { name: "Field dressing", icon: "heart", cost: studyPathCost(4, 1), text: "They heal 3 HP a second" },
+      { name: "Templars", icon: "cross", cost: studyPathCost(4, 2), text: "120% more HP in all, and 50% more damage" },
     ],
-    evolves: { from: "barracks", item: "valkyriePalace", name: "Valkyrie palace", cost: 25, text: "Crowned, every barracks becomes a Valkyrie palace" },
+    evolves: { from: "barracks", item: "valkyriePalace", name: "Valkyrie palace", cost: 100000, text: "Crowned, every barracks becomes a Valkyrie palace" },
   },
   {
     id: "assassins", topic: "barracks", name: "Assassins", motto: "Swift, frail, deadly strikes", hue: "shadow",
     ranks: [
-      { name: "Light feet", icon: "boot", cost: 4, text: "Swordsmen run 30% faster with 20% less HP; every 4th strike is critical, 3× damage" },
-      { name: "Cutthroats", icon: "dagger", cost: 8, text: "Every 3rd strike is critical, and they strike 33% faster" },
-      { name: "Shadows", icon: "skull", cost: 14, text: "Every other strike is critical, and they hunt anywhere in the city" },
+      { name: "Light feet", icon: "boot", cost: studyPathCost(4, 0), text: "Swordsmen run 30% faster with 20% less HP; every 4th strike is critical, 3× damage" },
+      { name: "Cutthroats", icon: "dagger", cost: studyPathCost(4, 1), text: "Every 3rd strike is critical, and they strike 33% faster" },
+      { name: "Shadows", icon: "skull", cost: studyPathCost(4, 2), text: "Every other strike is critical, and they hunt anywhere in the city" },
     ],
   },
   {
     id: "fireArrows", topic: "archerTower", name: "Fire arrows", motto: "Every arrow sets them alight", hue: "ember",
     ranks: [
-      { name: "Pitch arrows", icon: "fireArrow", cost: 4, text: "Arrows set what they hit burning for 3 seconds" },
-      { name: "Wildfire", icon: "flame", cost: 8, text: "Burns last 4 seconds and burn twice as hot" },
-      { name: "Fire volley", icon: "volley", cost: 14, text: "The tower looses 3 burning arrows at once, at the 3 nearest enemies" },
+      { name: "Pitch arrows", icon: "fireArrow", cost: studyPathCost(4, 0), text: "Arrows set what they hit burning for 3 seconds" },
+      { name: "Wildfire", icon: "flame", cost: studyPathCost(4, 1), text: "Burns last 4 seconds and burn twice as hot" },
+      { name: "Fire volley", icon: "volley", cost: studyPathCost(4, 2), text: "The tower looses 3 burning arrows at once, at the 3 nearest enemies" },
     ],
   },
   {
     id: "sharpshooters", topic: "archerTower", name: "Sharpshooters", motto: "Far sight, deadly aim", hue: "verdant",
     ranks: [
-      { name: "Hawk eyes", icon: "eye", cost: 4, text: "The tower reaches 2 cells further" },
-      { name: "Called shots", icon: "crosshair", cost: 8, text: "Every 3rd arrow is critical, 3× damage" },
-      { name: "Deadeye", icon: "skull", cost: 14, text: "Arrows hit 60% harder, aimed at the strongest enemy in reach" },
+      { name: "Hawk eyes", icon: "eye", cost: studyPathCost(4, 0), text: "The tower reaches 2 cells further" },
+      { name: "Called shots", icon: "crosshair", cost: studyPathCost(4, 1), text: "Every 3rd arrow is critical, 3× damage" },
+      { name: "Deadeye", icon: "skull", cost: studyPathCost(4, 2), text: "Arrows hit 60% harder, aimed at the strongest enemy in reach" },
     ],
   },
   {
     id: "gunnery", topic: "cannonTower", name: "Gun crews", motto: "Fast crews, scattering shot", hue: "steel",
     ranks: [
-      { name: "Drilled crews", icon: "gear", cost: 4, text: "The cannon reloads 25% faster" },
-      { name: "Grapeshot", icon: "grape", cost: 8, text: "Each shell bursts into 4 smaller blasts round where it lands" },
-      { name: "Master gunners", icon: "mail", cost: 14, text: "It reloads twice as fast as at first" },
+      { name: "Drilled crews", icon: "gear", cost: studyPathCost(4, 0), text: "The cannon reloads 25% faster" },
+      { name: "Grapeshot", icon: "grape", cost: studyPathCost(4, 1), text: "Each shell bursts into 4 smaller blasts round where it lands" },
+      { name: "Master gunners", icon: "mail", cost: studyPathCost(4, 2), text: "It reloads twice as fast as at first" },
     ],
   },
   {
     id: "siegeShot", topic: "cannonTower", name: "Siege shot", motto: "Slow, enormous blasts", hue: "ember",
     ranks: [
-      { name: "Iron shot", icon: "cannonball", cost: 4, text: "Shells hit 80% harder, but the cannon takes half again as long to reload" },
-      { name: "Powder charge", icon: "blast", cost: 8, text: "Blasts are half again as wide" },
-      { name: "Earthshaker", icon: "fork", cost: 14, text: "Shells hit three times as hard in all and the cannon reaches 3 cells further" },
+      { name: "Iron shot", icon: "cannonball", cost: studyPathCost(4, 0), text: "Shells hit 80% harder, but the cannon takes half again as long to reload" },
+      { name: "Powder charge", icon: "blast", cost: studyPathCost(4, 1), text: "Blasts are half again as wide" },
+      { name: "Earthshaker", icon: "fork", cost: studyPathCost(4, 2), text: "Shells hit three times as hard in all and the cannon reaches 3 cells further" },
     ],
   },
   {
     id: "rangers", topic: "archerBarracks", name: "Rangers", motto: "Long sight, heavy arrows", hue: "verdant",
     ranks: [
-      { name: "Woodcraft", icon: "leaf", cost: 4, text: "Archers see 2 cells further" },
-      { name: "Broadheads", icon: "arrow", cost: 8, text: "Their arrows hit 50% harder" },
-      { name: "Twin shot", icon: "volley", cost: 14, text: "Each loosing sends a second arrow at the next nearest enemy" },
+      { name: "Woodcraft", icon: "leaf", cost: studyPathCost(4, 0), text: "Archers see 2 cells further" },
+      { name: "Broadheads", icon: "arrow", cost: studyPathCost(4, 1), text: "Their arrows hit 50% harder" },
+      { name: "Twin shot", icon: "volley", cost: studyPathCost(4, 2), text: "Each loosing sends a second arrow at the next nearest enemy" },
     ],
   },
   {
     id: "skirmishers", topic: "archerBarracks", name: "Skirmishers", motto: "Quick draws, always moving", hue: "shadow",
     ranks: [
-      { name: "Quick draw", icon: "bow", cost: 4, text: "Archers shoot 30% faster" },
-      { name: "Running shots", icon: "boot", cost: 8, text: "They walk 30% faster and keep moving while they shoot" },
-      { name: "Hail of arrows", icon: "bolt", cost: 14, text: "They shoot more than twice as fast as at first" },
+      { name: "Quick draw", icon: "bow", cost: studyPathCost(4, 0), text: "Archers shoot 30% faster" },
+      { name: "Running shots", icon: "boot", cost: studyPathCost(4, 1), text: "They walk 30% faster and keep moving while they shoot" },
+      { name: "Hail of arrows", icon: "bolt", cost: studyPathCost(4, 2), text: "They shoot more than twice as fast as at first" },
     ],
   },
   {
     id: "spotters", topic: "watchTower", name: "Spotters", motto: "Marked enemies suffer more", hue: "verdant",
     ranks: [
-      { name: "Spyglasses", icon: "spyglass", cost: 4, text: "Marked enemies take 2.5× damage instead of 2×" },
-      { name: "Lookout posts", icon: "eye", cost: 8, text: "The tower marks 2 cells further" },
-      { name: "Marked for death", icon: "crosshair", cost: 14, text: "Marked enemies take 3× damage" },
+      { name: "Spyglasses", icon: "spyglass", cost: studyPathCost(4, 0), text: "Marked enemies take 2.5× damage instead of 2×" },
+      { name: "Lookout posts", icon: "eye", cost: studyPathCost(4, 1), text: "The tower marks 2 cells further" },
+      { name: "Marked for death", icon: "crosshair", cost: studyPathCost(4, 2), text: "Marked enemies take 3× damage" },
     ],
   },
   {
     id: "signalFires", topic: "watchTower", name: "Signal fires", motto: "Marked enemies are hindered", hue: "ember",
     ranks: [
-      { name: "Signal fires", icon: "beacon", cost: 4, text: "Marked enemies move at 70% of their pace" },
-      { name: "Beacon chain", icon: "tongue", cost: 8, text: "The tower marks 3 cells further, and marked enemies slow to 55%" },
-      { name: "Pyre signal", icon: "inferno", cost: 14, text: "Marked enemies burn while they stay marked" },
+      { name: "Signal fires", icon: "beacon", cost: studyPathCost(4, 0), text: "Marked enemies move at 70% of their pace" },
+      { name: "Beacon chain", icon: "tongue", cost: studyPathCost(4, 1), text: "The tower marks 3 cells further, and marked enemies slow to 55%" },
+      { name: "Pyre signal", icon: "inferno", cost: studyPathCost(4, 2), text: "Marked enemies burn while they stay marked" },
     ],
   },
   {
     id: "pyroclasm", topic: "mageGuild", name: "Pyroclasm", motto: "Bigger, harder fireballs", hue: "ember",
     ranks: [
-      { name: "White heat", icon: "fireball", cost: 4, text: "Fireballs hit 40% harder" },
-      { name: "Wide bursts", icon: "blast", cost: 8, text: "Their bursts are 40% wider" },
-      { name: "Meteor shower", icon: "volley", cost: 14, text: "Each fireball throws two smaller bursts beside it" },
+      { name: "White heat", icon: "fireball", cost: studyPathCost(4, 0), text: "Fireballs hit 40% harder" },
+      { name: "Wide bursts", icon: "blast", cost: studyPathCost(4, 1), text: "Their bursts are 40% wider" },
+      { name: "Meteor shower", icon: "volley", cost: studyPathCost(4, 2), text: "Each fireball throws two smaller bursts beside it" },
     ],
   },
   {
     id: "cinders", topic: "mageGuild", name: "Cinders", motto: "The ground burns longer and hotter", hue: "shadow",
     ranks: [
-      { name: "Smoulder", icon: "embers", cost: 4, text: "Burning ground lasts 60% longer" },
-      { name: "Hot coals", icon: "flame", cost: 8, text: "It burns 80% hotter" },
-      { name: "Clinging fire", icon: "inferno", cost: 14, text: "Whatever walks through it keeps burning for 2 seconds after" },
+      { name: "Smoulder", icon: "embers", cost: studyPathCost(4, 0), text: "Burning ground lasts 60% longer" },
+      { name: "Hot coals", icon: "flame", cost: studyPathCost(4, 1), text: "It burns 80% hotter" },
+      { name: "Clinging fire", icon: "inferno", cost: studyPathCost(4, 2), text: "Whatever walks through it keeps burning for 2 seconds after" },
     ],
   },
   {
     id: "oilSoaked", topic: "bait", name: "Oil-soaked", motto: "Biters catch fire", hue: "ember",
     ranks: [
-      { name: "Lamp oil", icon: "flame", cost: 3, text: "Enemies that bite the bait catch fire for 3 seconds" },
-      { name: "Pitch", icon: "tongue", cost: 6, text: "They burn hotter, for 4 seconds" },
-      { name: "Greek fire", icon: "inferno", cost: 12, text: "They burn far hotter, for 6 seconds" },
+      { name: "Lamp oil", icon: "flame", cost: studyPathCost(3, 0), text: "Enemies that bite the bait catch fire for 3 seconds" },
+      { name: "Pitch", icon: "tongue", cost: studyPathCost(3, 1), text: "They burn hotter, for 4 seconds" },
+      { name: "Greek fire", icon: "inferno", cost: studyPathCost(3, 2), text: "They burn far hotter, for 6 seconds" },
     ],
   },
   {
     id: "fortified", topic: "bait", name: "Fortified crates", motto: "Bait that holds out", hue: "steel",
     ranks: [
-      { name: "Iron bands", icon: "crate", cost: 3, text: "Bait has twice the HP" },
-      { name: "Stone cellar", icon: "mail", cost: 6, text: "Bait has 3.5× the HP" },
-      { name: "Spiked crates", icon: "dagger", cost: 12, text: "Every bite comes back on the biter three times over" },
+      { name: "Iron bands", icon: "crate", cost: studyPathCost(3, 0), text: "Bait has twice the HP" },
+      { name: "Stone cellar", icon: "mail", cost: studyPathCost(3, 1), text: "Bait has 3.5× the HP" },
+      { name: "Spiked crates", icon: "dagger", cost: studyPathCost(3, 2), text: "Every bite comes back on the biter three times over" },
     ],
   },
   {
     id: "blastStakes", topic: "spikes", name: "Blasting stakes", motto: "Stakes that blow up on contact", hue: "ember",
     ranks: [
-      { name: "Powder stakes", icon: "blast", cost: 4, text: "A stone's stakes blow up when an enemy touches them, then are ready again after 4 seconds" },
-      { name: "Black powder", icon: "inferno", cost: 8, text: "The blasts are half again as wide, and ready again after 3 seconds" },
-      { name: "Thunder stakes", icon: "cannonball", cost: 14, text: "The blasts hit 2.5× as hard, and are ready again after 2 seconds" },
+      { name: "Powder stakes", icon: "blast", cost: studyPathCost(4, 0), text: "A stone's stakes blow up when an enemy touches them, then are ready again after 4 seconds" },
+      { name: "Black powder", icon: "inferno", cost: studyPathCost(4, 1), text: "The blasts are half again as wide, and ready again after 3 seconds" },
+      { name: "Thunder stakes", icon: "cannonball", cost: studyPathCost(4, 2), text: "The blasts hit 2.5× as hard, and are ready again after 2 seconds" },
     ],
   },
   {
     id: "springStakes", topic: "spikes", name: "Spring stakes", motto: "The whole row shoots out at once", hue: "steel",
     ranks: [
-      { name: "Spring stakes", icon: "spring", cost: 4, text: "When an enemy touches a row, all its stakes shoot out 1.5 cells, striking every enemy in front of it" },
-      { name: "Long pikes", icon: "stake", cost: 8, text: "The stakes shoot out 2.5 cells" },
-      { name: "Hair trigger", icon: "dagger", cost: 14, text: "The row winds back twice as fast, and strikes 5× as hard as a cut" },
+      { name: "Spring stakes", icon: "spring", cost: studyPathCost(4, 0), text: "When an enemy touches a row, all its stakes shoot out 1.5 cells, striking every enemy in front of it" },
+      { name: "Long pikes", icon: "stake", cost: studyPathCost(4, 1), text: "The stakes shoot out 2.5 cells" },
+      { name: "Hair trigger", icon: "dagger", cost: studyPathCost(4, 2), text: "The row winds back twice as fast, and strikes 5× as hard as a cut" },
     ],
   },
   {
     id: "rimeStakes", topic: "spikes", name: "Rimed stakes", motto: "Cold iron that holds them fast", hue: "frost",
     ranks: [
-      { name: "Cold iron", icon: "snowflake", cost: 4, text: "Every cut chills the enemy for 1.5 seconds" },
-      { name: "Frostbite", icon: "shard", cost: 8, text: "Chills last 2.5 seconds, and the stakes cut a chilled enemy twice as hard" },
-      { name: "Winter's breath", icon: "iceBlock", cost: 14, text: "Each cut chills every enemy on foot within 2 cells of the stakes" },
+      { name: "Cold iron", icon: "snowflake", cost: studyPathCost(4, 0), text: "Every cut chills the enemy for 1.5 seconds" },
+      { name: "Frostbite", icon: "shard", cost: studyPathCost(4, 1), text: "Chills last 2.5 seconds, and the stakes cut a chilled enemy twice as hard" },
+      { name: "Winter's breath", icon: "iceBlock", cost: studyPathCost(4, 2), text: "Each cut chills every enemy on foot within 2 cells of the stakes" },
     ],
   },
 ];
@@ -324,11 +325,11 @@ export const evolvedBy = (item: PaletteItem): KnowledgePath | undefined => PATHS
 /** Learns `id`'s crown: every copy of the building, placed or not, becomes
  * its greater building, back in the palette to be placed again (the two
  * don't share a footprint). */
-export function evolve(save: Save, id: PathId): boolean {
+export function evolve(save: Save, id: PathId, prepaid?: number): boolean {
   const st = pathState(save, id), p = pathById(id), e = p.evolves;
-  if (!st.canEvolve || !e) return false;
-  const cost = save.settings.devMode ? 0 : e.cost, choice = save.paths[p.topic]!, d = save.defend;
-  save.knowledge -= cost;
+  if (!e || st.sealed || !st.maxed || st.crowned || (prepaid === undefined && !st.canEvolve)) return false;
+  const cost = prepaid ?? (save.settings.devMode ? 0 : e.cost), choice = save.paths[p.topic]!, d = save.defend;
+  if (prepaid === undefined) save.knowledge -= cost;
   const n = d.owned[e.from];
   d.owned[e.from] = 0;
   d.owned[e.item] += n;
@@ -345,11 +346,11 @@ export function crownBought(save: Save, item: PaletteItem) {
 }
 
 /** Learns `id`'s next rank (choosing the path with its first). */
-export function learnPath(save: Save, id: PathId): boolean {
+export function learnPath(save: Save, id: PathId, prepaid?: number): boolean {
   const st = pathState(save, id), p = pathById(id);
-  if (!st.canLearn) return false;
-  const cost = save.settings.devMode ? 0 : st.next!.cost;
-  save.knowledge -= cost;
+  if (st.sealed || !st.next || (prepaid === undefined && !st.canLearn)) return false;
+  const cost = prepaid ?? (save.settings.devMode ? 0 : st.next.cost);
+  if (prepaid === undefined) save.knowledge -= cost;
   const was = save.paths[p.topic];
   save.paths[p.topic] = { path: id, rank: st.rank + 1, spent: (was?.spent ?? 0) + cost };
   return true;

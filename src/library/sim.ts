@@ -29,6 +29,7 @@
  * Side view in pixels (`geometry.ts`). Everything random draws from the
  * library's own seeded stream. */
 import type { MetalPrice } from "../metals.ts";
+import { quadraticCost } from "../economy.ts";
 import { random } from "../random.ts";
 import { decodeGrid, encodeGrid } from "../mine/world.ts";
 import { Fire, cellAt, decodeFireSave, type FireSave, type Burnable } from "./fire.ts";
@@ -185,29 +186,29 @@ export type LibrarySave = {
 
 /** Early shelving costs Copper; large collections add Silver and Gold. */
 export const shelfPrice = (built: number): MetalPrice => ({
-  copper: built + 1,
-  ...(built >= 20 ? { silver: Math.floor(built / 20) } : {}),
-  ...(built >= 60 ? { gold: Math.floor(built / 60) } : {}),
+  copper: built + 1 + Math.floor(built * built / 20),
+  ...(built >= 20 ? { silver: Math.ceil((built - 19) ** 2 / 40) } : {}),
+  ...(built >= 60 ? { gold: Math.ceil((built - 59) ** 2 / 200) } : {}),
 });
 export const librarianPrice = (hired: number): MetalPrice => ({
-  copper: hired + 2,
-  ...(hired >= 4 ? { silver: Math.floor(hired / 4) } : {}),
-  ...(hired >= 12 ? { gold: Math.floor(hired / 12) } : {}),
+  copper: quadraticCost(2, hired, 1),
+  ...(hired >= 4 ? { silver: Math.ceil((hired - 3) ** 2 / 8) } : {}),
+  ...(hired >= 12 ? { gold: (hired - 11) ** 2 } : {}),
 });
 /** Copper opens the first annex; later expansions add Silver and Gold. */
 export const labPrice = (level: number): MetalPrice => ({
-  copper: 10 * level,
-  ...(level >= 2 ? { silver: 3 * (level - 1) } : {}),
-  ...(level >= 3 ? { gold: level - 2 } : {}),
+  copper: quadraticCost(10, level - 1, 200),
+  ...(level >= 2 ? { silver: 3 * (level - 1) ** 2 } : {}),
+  ...(level >= 3 ? { gold: (level - 2) ** 2 } : {}),
 });
 /** The chance a minute that a table catches fire, with Fireproof Wood's ranks. */
 /** The chance a minute that one shelved book becomes enchanted, with
  * `ranks` of Enchanted ink: 1 in `ENCHANT_ODDS` a rank. */
 export const ENCHANT_ODDS = 10000;
 export const enchantChance = (ranks: number) => ranks / ENCHANT_ODDS;
-/** Knowledge an enchanted book gives when read: two hours of the library's
- * rate at the time, and never less than 25. */
-export const enchantedGift = (rate: number) => Math.max(25, rate * 2);
+/** A minute of current Knowledge production, at least one. A windfall
+ * grows with the Library without dwarfing its ordinary production. */
+export const enchantedGift = (rate: number) => Math.max(1, rate / 60);
 
 export const accidentChance = (fireproof: number) => 0.01 * Math.pow(0.9, fireproof);
 /** What Fire Training's ranks do: the share of librarians who fight a fire,

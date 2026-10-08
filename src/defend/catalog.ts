@@ -1,4 +1,5 @@
 import { intPow } from "../exact.ts";
+import { ECONOMY, quadraticCost } from "../economy.ts";
 import type { BattlePaths } from "../knowledge-paths.ts";
 
 /** Data tables for DEFEND: what the player can place, what it costs in
@@ -255,8 +256,8 @@ export function purchasePrice(item: PaletteItem, owned: number): Price {
     darkKeep: { copper: 25, silver: 8, gold: 2 },
     monsterBait: { copper: 3 },
   };
-  const b = base[item], up = (n = 0, growth = 1.25) => Math.ceil(n * intPow(growth, extra));
-  const price: Price = { copper: up(b.copper, item === "cityTile" ? 1.2 : 1.3) };
+  const b = base[item], up = (n = 0) => quadraticCost(n, extra, n * 0.25);
+  const price: Price = { copper: up(b.copper) };
   if (b.silver) price.silver = up(b.silver);
   if (b.gold) price.gold = up(b.gold);
   return price;
@@ -386,7 +387,8 @@ export const UPGRADES: UpgradeDef[] = [
     name: "Conduit of night",
     maxLevel: CHAIN_COUNT_MAX,
     describe: (l) => `The dark wizard's bolts chain to ${wizardChain(l)} enemies, the turrets' to ${turretChain(l)}`,
-    price: (l) => ({ copper: 4 + l, silver: 1 + Math.floor(l / 3), gold: Math.floor(l / 5) }),
+    price: (l) => ({ copper: quadraticCost(4, l, 4), silver: quadraticCost(1, l, 1 / 3),
+      gold: l >= 7 ? quadraticCost(0, l - 6, ECONOMY.conduitGold) : 0 }),
   },
   {
     id: "baitRestock",
@@ -416,9 +418,9 @@ export const UPGRADES: UpgradeDef[] = [
  * and gold from the sixth. */
 export function upgradePrice(level: number): Price {
   return {
-    copper: 2 + level * 2,
-    silver: level >= 3 ? level - 2 : 0,
-    gold: level >= 5 ? level - 4 : 0,
+    copper: quadraticCost(2, level, ECONOMY.forgeCopper),
+    silver: level >= 3 ? (level - 2) ** 2 : 0,
+    gold: level >= 5 ? 250 * (level - 4) ** 2 : 0,
   };
 }
 

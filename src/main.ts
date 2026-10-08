@@ -5,6 +5,7 @@ import { countdown } from "./away.ts";
 import { DefendPage } from "./defend/ui.ts";
 import { spendMetals } from "./metals.ts";
 import { bonuses, busySmiths, payWave, settleTraining, skillRank, skillTotal, whole } from "./progression.ts";
+import { settleResearch } from "./research-jobs.ts";
 import type { AppContext } from "./ui/app.ts";
 import { el, type Tab } from "./ui/dom.ts";
 import { buildShell } from "./ui/shell.ts";
@@ -167,6 +168,7 @@ function addIdle(ms: number) {
   minePage.addAway(ms);
   libraryPage.addAway(ms);
   if (save.trainingClock) save.trainingClock -= ms;
+  if (save.researchJob) save.researchClock -= ms;
   update();
   welcome.show(true);
 }
@@ -291,11 +293,14 @@ function frame(time: number) {
   if (time - lastTick >= 1000) {
     lastTick = time;
     const done = settleTraining(save, clock(), new Set(smithNames())) > 0;
-    if (done) {
+    const researched = settleResearch(save, clock(), libraryPage.sim.count("researcher"));
+    if (researched) libraryPage.sim.researched();
+    if (done || researched) {
       update();
       play("trained");
     }
     if (tab === "mine" && mineDown.below) smithy.tick(done);
+    if (tab === "library" && libraryDown.below) study.tick(researched);
   }
   requestAnimationFrame(frame);
 }
@@ -336,6 +341,7 @@ window.addEventListener("pagehide", store);
 };
 
 settleTraining(save, clock(), new Set(smithNames()));
+if (settleResearch(save, clock(), libraryPage.sim.count("researcher"))) libraryPage.sim.researched();
 navigate("defend");
 welcome.show();
 requestAnimationFrame(frame);

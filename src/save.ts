@@ -9,6 +9,7 @@ import type { TrainingJob } from "./training-jobs.ts";
 import { decodeSettings, defaultSettings, type Settings } from "./settings.ts";
 import { METALS, decodeMineSave, type MineSave, type Metals } from "./mine/sim.ts";
 import { decodeLibrarySave, type LibrarySave } from "./library/sim.ts";
+import { decodeResearchJob, type ResearchJob } from "./research-jobs.ts";
 
 export const SAVE_KEY = "towerdefense.v1";
 /** 2: copper and silver became the mine's metal (`smithy`), and a point
@@ -37,6 +38,9 @@ export type Save = {
   training: Record<TrainingId, number>;
   trainingJobs: TrainingJob[];
   trainingClock: number;
+  /** One lab project and its most recent wall-clock settlement. */
+  researchJob: ResearchJob | null;
+  researchClock: number;
   defend: DefendSave;
   /** The mine as last saved (null until it first runs). */
   mine: MineSave | null;
@@ -56,6 +60,8 @@ export function defaults(): Save {
     training: Object.fromEntries(TRAINING_IDS.map((id) => [id, 0])) as Record<TrainingId, number>,
     trainingJobs: [],
     trainingClock: 0,
+    researchJob: null,
+    researchClock: 0,
     defend: defaultDefendSave(),
     mine: null,
     library: null,
@@ -98,6 +104,8 @@ export function decode(raw: string | null): Save {
   d.mine = decodeMineSave(s.mine);
   d.library = decodeLibrarySave(s.library);
   d.settings = decodeSettings(s.settings);
+  d.researchJob = decodeResearchJob(s.researchJob, d);
+  d.researchClock = num(s.researchClock, 0);
   return d;
 }
 
@@ -116,7 +124,8 @@ function decodeJobs(list: unknown, training: Record<TrainingId, number>): Traini
     }
     if (!Number.isFinite(j.left) || j.left <= 0 || !Array.isArray(j.smiths)) continue;
     const smiths = j.smiths.filter((n: unknown) => typeof n === "string" && n.length > 0 && n.length <= 32 && !out.some((o) => o.smiths.includes(n)));
-    out.push({ id: row.id, left: j.left, smiths: [...new Set<string>(smiths)] });
+    out.push({ id: row.id, left: j.left, smiths: [...new Set<string>(smiths)],
+      ...(Number.isSafeInteger(j.paid) && j.paid >= 0 ? { paid: j.paid } : {}) });
   }
   return out;
 }

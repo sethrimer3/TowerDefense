@@ -12,6 +12,7 @@ import { trainingJob, trainingSeconds, type TrainingJob } from "./training-jobs.
 import type { Metal, Metals } from "./mine/sim.ts";
 import type { Save } from "./save.ts";
 import type { SettingKey } from "./settings.ts";
+import { ECONOMY, quadraticCost } from "./economy.ts";
 
 /** What the Smithy and the skill trees can raise: the battle's `Bonuses`,
  * and how fast the Smithy's upgrades are worked. */
@@ -58,6 +59,8 @@ const skillRanks = (save: Save) => Object.fromEntries(SKILL_IDS.map((id) => [id,
 /** The Smithy point a row's next rank costs, with `ranks` owned: copper for
  * the first ten, silver to twenty-five, gold after. */
 export const rankPrice = (ranks: number): Metal => (ranks < 10 ? "copper" : ranks < 25 ? "silver" : "gold");
+/** The next rank's metal amount; the metal tier still changes at 10/25. */
+export const rankCost = (ranks: number) => quadraticCost(1, ranks, ECONOMY.training);
 
 /** Smiths working on an upgrade: busy at the smithy until it's done. */
 export const busySmiths = (save: Save) => new Set(save.trainingJobs.flatMap((j) => j.smiths));
@@ -67,7 +70,8 @@ export const busySmiths = (save: Save) => new Set(save.trainingJobs.flatMap((j) 
 export function trainingStep(save: Save, id: TrainingId) {
   const row = TRAINING.find((t) => t.id === id)!, ranks = trainingRank(save, id);
   const maxed = ranks + (trainingJob(save.trainingJobs, id) ? 1 : 0) >= row.max, metal = rankPrice(ranks);
-  return { now: ranks * row.per, next: (ranks + 1) * row.per, maxed, metal, affordable: save.settings.devMode || save.smithy[metal] >= 1 };
+  const amount = rankCost(ranks);
+  return { now: ranks * row.per, next: (ranks + 1) * row.per, maxed, metal, amount, affordable: save.settings.devMode || save.smithy[metal] >= amount };
 }
 
 /** Starts one rank of `id`, worked by `smith` (a smith with no upgrade): its
@@ -78,12 +82,12 @@ export function startTraining(save: Save, id: TrainingId, smith: string): boolea
   const step = trainingStep(save, id);
   if (step.maxed || trainingJob(save.trainingJobs, id) || !step.affordable) return false;
   if (!save.settings.instantResearch && busySmiths(save).has(smith)) return false;
-  if (!save.settings.devMode) save.smithy[step.metal]--;
+  if (!save.settings.devMode) save.smithy[step.metal] -= step.amount;
   if (save.settings.instantResearch) {
     save.training[id]++;
     return true;
   }
-  save.trainingJobs.push({ id, left: trainingSeconds(save.training[id]) * 1000, smiths: [smith] });
+  save.trainingJobs.push({ id, left: trainingSeconds(save.training[id]) * 1000, smiths: [smith], paid: save.settings.devMode ? 0 : step.amount });
   return true;
 }
 
@@ -108,7 +112,7 @@ export function removeSmith(save: Save, id: TrainingId): boolean {
 export function cancelTraining(save: Save, id: TrainingId): boolean {
   const job = trainingJob(save.trainingJobs, id);
   if (!job) return false;
-  save.smithy[rankPrice(save.training[id])]++;
+  save.smithy[rankPrice(save.training[id])] += job.paid ?? rankCost(save.training[id]);
   save.trainingJobs = save.trainingJobs.filter((j) => j !== job);
   return true;
 }
@@ -151,10 +155,10 @@ export function skillPurchase(save: Save, id: SkillId) {
   return { level, price, maxed, available, affordable, canBuy: !maxed && available && affordable };
 }
 
-export function buySkill(save: Save, id: SkillId): boolean {
+export function buySkill(save: Save, id: SkillId, prepaid = false): boolean {
   const p = skillPurchase(save, id);
-  if (!p.canBuy) return false;
-  if (!save.settings.devMode) save.knowledge -= p.price;
+  if (p.maxed || !p.available || (!prepaid && !p.canBuy)) return false;
+  if (!prepaid && !save.settings.devMode) save.knowledge -= p.price;
   save.skills[id]++;
   return true;
 }

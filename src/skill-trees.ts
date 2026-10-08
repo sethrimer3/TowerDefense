@@ -5,6 +5,7 @@
  * and the Mine's to the library and the mine at once. The trees group them
  * for their requirements and the dev research settings. */
 import type { BonusTarget } from "./progression.ts";
+import { ECONOMY, quadraticCost } from "./economy.ts";
 
 export type SkillId =
   | "drillSergeant" | "veterans" | "bladework" | "fletchers" | "gunpowder" | "ballistics" | "warBanner" | "bannerCooldown" | "bannerDefense" | "bannerReach" | "bannerDamage" | "bannerMarch" | "bannerLife" | "bannerRegen"
@@ -49,7 +50,7 @@ export const SKILLS: Record<SkillId, Skill> = {
   coffee: { id: "coffee", name: "Coffee", icon: "♨", max: 12, base: 2, effect: { target: "coffee", per: 5 }, text: "5% more of the mine's crew work the night shift a rank (20% to start, up to 80%)" },
   waterproofing: { id: "waterproofing", name: "Waterproofing", icon: "☂", max: 4, base: 4, effect: { target: "waterproof", per: 15 }, text: "The shaft house keeps 15% more of the rain's runoff out of the shaft a rank (20% to start, up to 80%)" },
   nightWatch: { id: "nightWatch", name: "Night watch", icon: "☾", max: 9, base: 4, effect: { target: "nightWatch", per: 5 }, text: "At night, librarians detect fires sooner and fill, carry and throw buckets 15% faster per rank" },
-  enchantedInk: { id: "enchantedInk", name: "Enchanted ink", icon: "✧", max: 10, base: 10, effect: { target: "enchant", per: 1 }, text: "Each book on the library's shelves has a 1 in 10,000 chance a minute a rank of taking on glowing runes along its spine; read, an enchanted book gives two hours of the library's Knowledge at once" },
+  enchantedInk: { id: "enchantedInk", name: "Enchanted ink", icon: "✧", max: 10, base: 10, effect: { target: "enchant", per: 1 }, text: "Each book on the library's shelves has a 1 in 10,000 chance a minute a rank of taking on glowing runes along its spine; read, an enchanted book gives one minute of the library's Knowledge at once (at least 1)" },
   fireTraining: { id: "fireTraining", name: "Fire training", icon: "♒", max: 5, base: 8, effect: { target: "fireTraining", per: 1 }, text: "More librarians fight a fire, fetching and throwing water faster and further, and each splash more likely to douse the flames" },
 };
 
@@ -93,7 +94,11 @@ export const TREES: SkillTree[] = [
 export const SKILL_IDS = Object.keys(SKILLS) as SkillId[];
 
 /** Knowledge the next rank of `id` costs, with `level` ranks owned. */
-export const skillCost = (id: SkillId, level: number) => SKILLS[id].base * (level + 1);
+export const skillCost = (id: SkillId, level: number) => {
+  const growth = id === "enchantedInk" ? ECONOMY.enchantedStudy
+    : ["coffee", "waterproofing", "fireproofWood", "nightWatch", "fireTraining"].includes(id) ? ECONOMY.utilityStudy : ECONOMY.combatStudy;
+  return quadraticCost(SKILLS[id].base, level, SKILLS[id].base * growth);
+};
 
 /** Whether every skill `id` requires has a rank. */
 export function skillAvailable(id: SkillId, levels: Record<SkillId, number>) {

@@ -44,6 +44,7 @@
  * planned is done (`workedOut`), the player takes the crew, the buildings
  * and the stock to a new prospect (`prospectNext`), a fresh world. */
 import type { MetalPrice } from "../metals.ts";
+import { ECONOMY, quadraticCost } from "../economy.ts";
 import {
   AIR, BEDROCK, CELLS, COPPER, DIG_TICKS, DIRT, GOLD, GRAVEL, H, LADDER, LAMP, LAVA, LOOSE, MATERIAL_COUNT, RAIL, ROCK, RUBBLE, SILVER, STONE, TIMBER, TORCH, WORK_LAMP, W, World,
   decodeGrid, encodeGrid, generate, hash01, idx, inBounds, isLoose, isOre, isPassable, isSoil, isSolid, isStone, isWood, stoneAtDepth, strata, type Material, type Strata,
@@ -98,9 +99,9 @@ export const SEAL_LEVEL = 0.1;
 const UPGRADE_BASE: Record<BuildingId, number> = { shaft: 4, barracks: 5, warehouse: 6, forge: 5, smithy: 5 };
 /** Early buildings cost Copper; later levels add Silver, then Gold. */
 export const upgradePrice = (id: BuildingId, level: number): MetalPrice => ({
-  copper: UPGRADE_BASE[id] * level,
-  ...(level >= 2 ? { silver: level - 1 } : {}),
-  ...(level >= 3 ? { gold: level - 2 } : {}),
+  copper: quadraticCost(UPGRADE_BASE[id], level - 1, UPGRADE_BASE[id] * ECONOMY.mineBuilding),
+  ...(level >= 2 ? { silver: (level - 1) ** 2 } : {}),
+  ...(level >= 3 ? { gold: (level - 2) ** 2 } : {}),
 });
 /** Supplies a miner fetches from the warehouse: each fitting and each
  * timber shoring uses one. */
@@ -295,9 +296,9 @@ const JOB_KIND = ["", "dig", "build", "bail", "douse"] as const;
 /** The first miner is supplied free. Growing crews cost Copper, adding
  * Silver after five workers and Gold after fifteen. */
 export const hirePrice = (crew: number): MetalPrice => ({
-  copper: Math.max(1, crew + 1),
-  ...(crew >= 5 ? { silver: Math.floor(crew / 5) } : {}),
-  ...(crew >= 15 ? { gold: Math.floor(crew / 15) } : {}),
+  copper: quadraticCost(1, crew),
+  ...(crew >= 5 ? { silver: Math.ceil((crew - 4) ** 2 / 16) } : {}),
+  ...(crew >= 15 ? { gold: Math.ceil((crew - 14) ** 2 / 16) } : {}),
 });
 
 export class MineSim {
