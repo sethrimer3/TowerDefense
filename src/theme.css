@@ -1763,15 +1763,22 @@ dialog .away-row .away-note {
 .tile-go.go-study { color: #eadcff; }
 
 /* Defend actions stay at the ends; start and keep status share the center. */
-.defend-head { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 6px; }
+.shell:has(#defend.active) .td-currencies { margin-bottom: 8px; }
+.defend-head { --control-height: 48px; --control-gap: 6px; display: grid; grid-template-columns: minmax(max-content, 1fr) auto minmax(max-content, 1fr); gap: var(--control-gap); margin-bottom: 15px; }
 .defend-center { min-width: 0; max-width: 240px; display: flex; align-items: center; justify-content: center; }
-.defend-right { display: flex; align-items: center; justify-content: flex-end; gap: 5px; min-width: 0; }
+.defend-left, .defend-right { gap: var(--control-gap); align-items: center; }
+.defend-right { display: flex; justify-content: flex-end; min-width: 0; }
+.defend-left button, .defend-center button, .defend-right > button { height: var(--control-height); min-height: var(--control-height); display: inline-flex; align-items: center; justify-content: center; }
 .defend-center button { padding: 6px 11px; white-space: nowrap; font-size: 12px; }
+.defend-right > button { min-width: var(--control-height); padding: 2px; }
 .defend-building .defend-hud { display: none; }
-.defend-hud { justify-content: center; gap: 5px; overflow: visible; }
-.defend-wave-status, .defend-keep { display: flex; align-items: center; gap: 5px; padding: 7px 8px; border: 1px solid #8c7546; background: var(--stone), #201c17; border-radius: 2px; }
-.defend-enemies { display: inline-flex; align-items: center; gap: 3px; }
-.defend-enemies svg { width: 12px; height: 12px; shape-rendering: crispEdges; }
+.defend-hud { justify-content: center; gap: var(--control-gap); overflow: visible; }
+.defend-wave-status, .defend-keep { height: var(--control-height); flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 4px 8px; line-height: 1; border: 1px solid #8c7546; background: var(--stone), #201c17; border-radius: 2px; }
+.defend-enemies { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 400; }
+.defend-enemies svg { width: 10px; height: 10px; shape-rendering: crispEdges; }
+/* The canvas includes space for falling chips. Center the standing bricks. */
+.defend-keep-meter { position: relative; display: block; width: 74px; height: 18px; }
+.defend-keep .defend-keep-meter canvas { position: absolute; left: 0; top: -6px; display: block; width: 74px; height: 36px; margin: 0; }
 .defend-hud > :first-child { margin-left: 0; }
 .defend-wave { position: relative; isolation: isolate; overflow: hidden; }
 .defend-wave .defend-wave-wall { position: absolute; inset: 0; width: 100%; height: 100%; z-index: -1; image-rendering: pixelated; filter: brightness(.35); }
@@ -1784,17 +1791,30 @@ dialog .away-row .away-note {
 .defeat-actions { flex: none; display: flex; justify-content: center; padding-top: 4px; }
 .defeat-actions button { min-width: 90px; padding: 5px 16px; }
 @media (max-width: 600px) {
-  .defend-head { gap: 3px; }
-  .defend-left, .defend-right { gap: 3px; }
+  .defend-head { --control-height: 44px; --control-gap: 4px; }
   .defend-left button, .defend-center button, .defend-cog { padding: 5px 5px; font-size: 10px; letter-spacing: 0; }
-  .defend-journal-button { padding: 3px; }
+  .defend-right > button { min-width: 34px; padding: 2px; }
   .defend-journal-button canvas { width: 30px; height: 30px; }
   #defend-upgrades .ui-sprite { width: 16px; height: 16px; }
-  .defend-hud { gap: 3px; font-size: 10px; }
-  .defend-wave-status, .defend-keep { padding: 5px 4px; gap: 3px; }
-  .defend-wave-status { flex-direction: column; gap: 2px; }
-  .defend-keep canvas { width: 48px; height: 24px; margin: -5px 0; }
-  .defend-hud .defend-keep small { display: none; }
+  .defend-hud { font-size: 10px; }
+  .defend-wave-status, .defend-keep { padding: 4px; gap: 4px; }
+  .defend-enemies { font-size: 8px; }
+  .defend-enemies svg { width: 8px; height: 8px; }
+  .defend-keep-meter { width: 48px; height: 12px; }
+  .defend-keep .defend-keep-meter canvas { width: 48px; height: 24px; top: -4px; }
+}
+@media (max-width: 380px) {
+  .defend-head { --control-gap: 3px; }
+  .defend-left button, .defend-center button { padding-inline: 3px; font-size: 9px; }
+  .defend-right > button { min-width: 28px; padding: 2px; }
+  .defend-journal-button canvas { width: 24px; height: 24px; }
+  #defend-upgrades .ui-sprite { width: 14px; height: 14px; }
+  .defend-left .defend-wave { display: grid; grid-template-columns: 14px auto; column-gap: 2px; }
+  .defend-wave .ui-sprite { width: 14px; height: 14px; margin-right: 0; }
+  .defend-wave small { font-size: 6px; letter-spacing: 0; }
+}
+@media (max-width: 340px) {
+  .defend-left button, .defend-center button { padding-inline: 2px; font-size: 8px; }
 }
 
 .defend-left .defend-danger { margin-left: 0; }

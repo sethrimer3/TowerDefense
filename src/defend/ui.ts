@@ -615,7 +615,7 @@ export class DefendPage {
     const hp = Math.max(0, sim.keepHp()),
       max = sim.keepMaxHp();
     const remaining = sim.spawnQueue.length + sim.enemies.reduce((n, e) => n + Number(e.hp > 0 && !e.fortressPart), 0);
-    const html = `<span class="defend-wave-status"><span>${sim.unitTester ? `<b title="Unit tester">Tester</b>` : `<small>Wave </small><b>${sim.wave}</b>`}</span><span class="defend-enemies" title="${remaining} enemies remaining" aria-label="${remaining} enemies remaining"><svg viewBox="0 0 12 12" aria-hidden="true"><path fill="#ce735a" d="M1 0h2v2h6V0h2v5h-1v4H8v2H4V9H2V5H1z"/><path fill="#241915" d="M3 4h2v2H3zm4 0h2v2H7zM5 8h2v2H5z"/></svg><b>${remaining}</b></span></span><span class="defend-keep" title="Keep ${Math.ceil(hp)} / ${max}"><small>Keep</small><i></i></span>`;
+    const html = `<span class="defend-wave-status"><span>${sim.unitTester ? `<b title="Unit tester">Tester</b>` : `<small>Wave </small><b>${sim.wave}</b>`}</span><span class="defend-enemies" title="${remaining} enemies remaining" aria-label="${remaining} enemies remaining"><svg viewBox="0 0 12 12" aria-hidden="true"><path fill="#ce735a" d="M1 0h2v2h6V0h2v5h-1v4H8v2H4V9H2V5H1z"/><path fill="#241915" d="M3 4h2v2H3zm4 0h2v2H7zM5 8h2v2H5z"/></svg><span>${remaining}</span></span></span><span class="defend-keep" title="Keep ${Math.ceil(hp)} / ${max}"><small>Keep</small><span class="defend-keep-meter"><i></i></span></span>`;
     this.keepBricks?.set(hp / max);
     if (el.dataset.html !== html) {
       el.dataset.html = el.innerHTML = html;
