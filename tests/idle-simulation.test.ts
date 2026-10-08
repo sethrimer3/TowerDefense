@@ -78,6 +78,24 @@ test("idle time near its end is spent at plain pace, and library", () => {
   assert.ok(Math.abs(l.earned() - 6 * (l.page.sim.time - before) / 3600) < 1e-12, "no boost under two seconds owed");
 });
 
+test("Library day and night turn a fifth as fast while fast-forwarding idle time", () => {
+  const l = library(), sim = new LibrarySim(5);
+  sim.furnish(6); sim.hire("professor");
+  l.page.load(sim.save(l.now() - 2 * HOUR_MS), l.now());
+  const day = () => (l.page as unknown as { day: number }).day;
+  const before = day(), owed = l.page.owedMs;
+  for (let i = 0; i < 60; i++) l.tick();
+  const spent = owed + 60 * 16 - l.page.owedMs;
+  assert.ok(spent > 60_000, "idle time is being spent fast");
+  assert.ok(Math.abs(day() - before - spent / 5) < 1e-6, "the day moves a fifth of the idle time spent");
+  // Caught up, the day keeps pace with the clock again.
+  const normal = library();
+  normal.page.load(null, normal.now());
+  const start = (normal.page as unknown as { day: number }).day;
+  for (let i = 0; i < 100; i++) normal.tick();
+  assert.ok(Math.abs((normal.page as unknown as { day: number }).day - start - 1600) <= 100, "real time at its own pace");
+});
+
 test("cell fire consumes artwork pixels, produces buoyant smoke and falling ash, and water cools local fuel", () => {
   const f = new Fire(), rng = () => 0.5;
   f.load([{ x0: 40, y0: 200, x1: 44, y1: 204, fuel: 1 }]);
