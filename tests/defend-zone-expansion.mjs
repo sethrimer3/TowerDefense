@@ -112,7 +112,13 @@ try {
     assert.equal(await page.locator('.defend-journal-dialog article').count(), 36);
     const read = await page.evaluate(() => JSON.parse(window.savedZoneDefend).journalRead.length);
     assert.equal(read, 18);
-    await page.screenshot({ path: `test-results/defend-zone-journal-${label}.png` });
+    const fit = await page.locator('.defend-journal-dialog').evaluate(el => {
+      for (const animation of el.getAnimations()) animation.finish();
+      const r = el.getBoundingClientRect(), close = el.querySelector('[data-journal-close]').getBoundingClientRect();
+      return { left: r.left, right: r.right, closeBottom: close.bottom, width: innerWidth, height: innerHeight };
+    });
+    assert.ok(fit.left >= 0 && fit.right <= fit.width && fit.closeBottom <= fit.height, `${label} journal fits viewport`);
+    await page.screenshot({ path: `test-results/defend-zone-journal-${label}.png`, animations: 'disabled' });
     await page.locator('[data-journal-close]').click();
     assert.equal(await page.locator('.defend-journal-dialog').evaluate(el => el.open), false);
     assert.deepEqual(errors, []);
