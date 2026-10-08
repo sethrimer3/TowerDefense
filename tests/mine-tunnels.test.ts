@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { MineSim, P_DIG, P_LAMP, P_RAIL, P_TORCH, TICK_HZ, WORK_LIGHT_TICKS, decodeMineSave, noMetals } from "../src/mine/sim.ts";
 import { AIR, DENSE_STONE, DIG_TICKS, HARD_STONE, H, LAMP, RAIL, ROCK, STONE, TORCH, WORK_LAMP, W, generate, idx, isSolid, stoneAtDepth } from "../src/mine/world.ts";
+import { lanternBulb } from "../src/mine/render.ts";
 
 test("stone tiers take 3, 9 and 27 times rock and begin at 30 and 60 percent depth", () => {
   assert.equal(DIG_TICKS[STONE], DIG_TICKS[ROCK] * 3);
@@ -154,4 +155,29 @@ test("carts climb and descend graded rails and return their ore at the shaft", (
   for (let n = 0; n < 100; n++) (s as any).stepCart(cart);
   assert.equal(s.buckets[0]?.copper, 18);
   assert.equal(s.buckets[0]?.y, base);
+});
+
+test("lanterns hang only where the open height is at least 8 pixels, their bulbs 5 or 6 pixels over the floor", () => {
+  const room = (height: number, x0: number) => {
+    const s = new MineSim(7);
+    s.plan.fill(0);
+    for (let y = 105; y <= 125; y++) for (let x = 2; x <= 40; x++) s.world.set(x, y, STONE);
+    // Track on row 120, the floor under it, `height` cells open up to the roof.
+    for (let x = 4; x <= 38; x++) {
+      for (let y = 121 - height; y <= 120; y++) s.world.set(x, y, AIR);
+      s.world.set(x, 120, RAIL);
+    }
+    (s as unknown as { planLantern(x: number, y: number): void }).planLantern(x0, 120);
+    return s;
+  };
+  for (let x = 10; x < 30; x++) assert.equal(room(3, x).plan.indexOf(P_LAMP), -1);
+  for (const height of [4, 5, 7]) for (let x = 10; x < 30; x++) {
+    const s = room(height, x), c = s.plan.indexOf(P_LAMP);
+    assert.notEqual(c, -1);
+    const lx = c % W, ly = (c - lx) / W;
+    s.world.set(lx, ly, LAMP);
+    // Pixels clear between the bulb's pixel and the floor's top at row 121.
+    const clear = 121 * 2 - lanternBulb(s.world.cells, lx, ly) * 2 - 1;
+    assert.ok(clear === 5 || clear === 6, `${clear} pixels clear`);
+  }
 });

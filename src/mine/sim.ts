@@ -57,6 +57,8 @@ export const WORK_LIGHT_TICKS = 90 * TICK_HZ;
 export const TORCH_MIN_TICKS = 120 * TICK_HZ;
 /** Plan marks: dig out, or dig out and fit; a beam is timber laid into
  * open air under a track crossing a cave, a trestle to carry it. */
+/** The least open height, in cells, a lantern is hung in: 8 pixels. */
+export const LANTERN_ROOM = 4;
 export const P_NONE = 0, P_DIG = 1, P_LADDER = 2, P_RAIL = 3, P_TORCH = 4, P_LAMP = 5, P_BEAM = 6;
 /** Plan marks there are (for decoding saves). */
 const PLAN_MARKS = 7;
@@ -694,12 +696,10 @@ export class MineSim {
   }
 
   /** Sinks the shaft (laddered all the way) to level `k`'s floor, opens that
-   * level's tunnels, and hangs a lamp in the shaft above it. */
+   * level's tunnels, and hangs a lamp at the shaft's foot. */
   private planShaft(k: number) {
     const x0 = this.shaftX, to = this.levels[k], from = k === 0 ? this.strata.surface[x0] : this.levels[k - 1];
     for (let y = from; y <= to; y++) this.mark(x0, y, P_LADDER);
-    const lampY = k === 0 ? Math.max(this.strata.stoneTop[x0] + 3, to - 8) : to - 7;
-    if (lampY > this.strata.stoneTop[x0]) this.mark(x0 + 1, lampY, P_LAMP);
     for (const side of [-1, 1]) {
       this.routeTunnel(k, side);
       for (let x = x0 + side; x >= 2 && x <= W - 3; x += side) {
@@ -712,6 +712,13 @@ export class MineSim {
         // Across a cave the track runs on a trestle of beams.
         if (this.passable(x, y + 1)) this.mark(x, y + 1, P_BEAM);
       }
+    }
+    // A lantern at the shaft's foot, in a pocket dug over the tunnel's mouth
+    // so it hangs 5 or 6 pixels over the track.
+    const mouth = this.tunnelRows[k][x0 + 1] + 1;
+    if (mouth - LANTERN_ROOM > this.strata.stoneTop[x0]) {
+      this.mark(x0 + 1, mouth - LANTERN_ROOM, P_DIG);
+      this.mark(x0 + 1, mouth - (hash01(x0, k, this.seed + 427) < 0.5 ? 4 : 3), P_LAMP);
     }
     // Off the tunnels, now and then, a drift slanting up or down after
     // whatever lies there, reached by a few rungs of ladder through the
@@ -1426,19 +1433,34 @@ export class MineSim {
     }
   }
 
-  /** Miners hang lasting lanterns along completed track with varied gaps. */
+  /** Miners hang lasting lanterns along completed track with varied gaps,
+   * only where the open space from rock to rock (track, water and fittings
+   * count as open) is at least four cells (8 pixels) tall, the bulb 5 or 6
+   * pixels above the floor. */
   private planLantern(x: number, y: number) {
     if (!this.passable(x, y - 1) || !this.passable(x, y - 2)) return;
     const gap = 9 + Math.floor(hash01(x, y, this.seed + 423) * 8);
     if (this.nearbyLight(x, y - 1, gap, true)) return;
-    for (const xx of [x, x - 1, x + 1]) {
-      let ceiling = y - 2;
-      while (ceiling > y - 9 && this.passable(xx, ceiling)) ceiling--;
-      const c = idx(xx, y - 1);
-      if (!isSolid(this.cell(xx, ceiling)) || this.cell(xx, y - 1) !== AIR || this.plan[c] > P_DIG) continue;
-      this.mark(xx, y - 1, P_LAMP);
+    for (const xx of [x, x - 1, x + 1, x - 2, x + 2]) {
+      const ly = this.lanternSpot(xx, y);
+      if (ly < 0) continue;
+      this.mark(xx, ly, P_LAMP);
       return;
     }
+  }
+
+  /** Where a lantern over the track at (x, y) hangs, or -1 for nowhere. */
+  private lanternSpot(x: number, y: number) {
+    if (!this.passable(x, y)) return -1;
+    let floor = y + 1, ceiling = y - 1;
+    while (floor < y + 8 && this.passable(x, floor)) floor++;
+    while (ceiling > y - 14 && this.passable(x, ceiling)) ceiling--;
+    if (!inBounds(x, floor) || !inBounds(x, ceiling) || !isSolid(this.cell(x, floor)) || !isSolid(this.cell(x, ceiling))) return -1;
+    if (floor - ceiling - 1 < LANTERN_ROOM) return -1;
+    // Its bulb drawn in the cell's lower pixel four cells up (6 pixels
+    // clear), or the upper pixel three up (5 pixels clear).
+    const ly = floor - (hash01(x, floor, this.seed + 427) < 0.5 ? 4 : 3);
+    return this.cell(x, ly) === AIR && this.plan[idx(x, ly)] <= P_DIG ? ly : -1;
   }
 
   private stepLights() {
@@ -1747,7 +1769,9 @@ export class MineSim {
         this.afterDig(x, y, m);
         this.discover(x, y);
         if (this.cell(x, y - 1) === RAIL && this.plan[c] === P_DIG) this.mark(x, y, P_BEAM);
-        for (const row of [y + 1, y + 2]) if (this.cell(x, row) === RAIL) this.planLantern(x, row);
+        // Opening up the roof can make room for a lantern over the track below.
+        for (let row = y + 1; row <= y + LANTERN_ROOM && this.passable(x, row); row++)
+          if (this.cell(x, row) === RAIL) { this.planLantern(x, row); break; }
       }
     } else if (t.kind === "build") {
       const c = t.cell, x = c % W, y = (c - x) / W;
