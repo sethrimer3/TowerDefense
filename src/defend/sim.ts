@@ -540,6 +540,9 @@ export class DefendSim {
   summonEnemy(kind: EnemyKind): boolean {
     if (!this.tester || this.lost || !ENEMIES[kind]) return false;
     this.waveSpawned = this.enemies.length;
+    const def = ENEMIES[kind], fort = def.fortress;
+    const slots = fort ? 1 + fort.turrets + fort.legs + fort.armor : def.chainLength ?? 1;
+    if (this.waveSpawned + slots > MAX_WAVE_ENEMIES) return false;
     const before = this.enemies.length;
     this.spawnEnemy(kind);
     if (this.enemies.length === before) return false;

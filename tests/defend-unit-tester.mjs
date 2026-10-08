@@ -39,11 +39,15 @@ try {
     assert.equal(await page.locator('#defend-start').textContent(), 'Start Tester');
     await page.locator('#defend-start').click();
     await page.locator('#defend-side-toggle').click();
+    await page.waitForTimeout(400); // Let the existing sidebar slide finish before measuring.
     const catalog = await page.evaluate(async () => Object.keys((await import('/src/defend/catalog.ts')).ENEMIES));
     assert.equal(await page.locator('[data-enemy]').count(), catalog.length);
     assert.equal(await page.locator('[data-item]').count(), 0);
     assert.equal(await page.locator('[data-enemy] canvas[data-portrait]').count(), catalog.length);
-    const names = await page.locator('[data-enemy] span').evaluateAll(nodes => nodes.every(el => getComputedStyle(el).display !== 'none' && el.getBoundingClientRect().width > 0));
+    const names = await page.locator('[data-enemy] span').evaluateAll(nodes => nodes.every(el => {
+      const r = el.getBoundingClientRect(), side = document.querySelector('#defend-side').getBoundingClientRect();
+      return getComputedStyle(el).display !== 'none' && r.width > 0 && r.left >= side.left && r.right <= side.right && el.scrollWidth <= el.clientWidth;
+    }));
     assert.equal(names, true, 'enemy names remain visible on mobile');
     await page.locator('[data-enemy="fernMantis"]').click();
     await page.screenshot({ path: `test-results/defend-unit-tester-${width}.png` });
@@ -64,7 +68,7 @@ try {
   }
 
   // Inspect simulation counts through the existing standalone Defend fixture.
-  const context = await browser.newContext({ viewport: { width: 1040, height: 800 } });
+  const context = await browser.newContext({ viewport: { width: 1040, height: 800 }, hasTouch: true });
   const page = await context.newPage(), errors = [];
   page.on('pageerror', e => errors.push(e.message));
   await page.goto(base + 'tests/defend-stress.html?manual&enemies=100');
@@ -97,6 +101,16 @@ try {
   await mantis.focus();
   await page.keyboard.press('Enter');
   assert.equal(await count(), held + 1, 'keyboard activation summons one');
+  await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+  assert.equal(await count(), held + 2, 'touch tap summons exactly one');
+  const touch = await context.newCDPSession(page);
+  await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: box.x + box.width / 2, y: box.y + box.height / 2 }] });
+  await page.waitForTimeout(750);
+  await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  const touchHeld = await count();
+  assert.ok(touchHeld >= held + 6, 'touch hold summons repeatedly');
+  await page.waitForTimeout(250);
+  assert.equal(await count(), touchHeld, 'touch release stops repeats');
   await page.mouse.down();
   await page.evaluate(() => window.stressPage.pause());
   const paused = await count();
