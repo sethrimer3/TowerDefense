@@ -23,7 +23,7 @@ import {
 } from "./art.ts";
 import { BUILDINGS, along, anvils, pathTicks, type Building, type BuildingId } from "./buildings.ts";
 import {
-  AIR, BEDROCK, CELLS, COPPER, DENSE_STONE, DIRT, GOLD, GRASS, GRAVEL, H, HARD_STONE, LADDER, LAMP, LAVA, LOOSE, RAIL, ROCK, RUBBLE, SILVER, STONE, TIMBER, TORCH, WORK_LAMP, W, hash01, idx, isPassable,
+  AIR, BEDROCK, CELLS, COPPER, DENSE_STONE, DIRT, GOLD, GRASS, GRAVEL, H, HARD_STONE, LADDER, LAMP, LAVA, LOOSE, RAIL, ROCK, RUBBLE, SILVER, STONE, TIMBER, TORCH, WORK_LAMP, W, hash01, idx, isPassable, isSolid,
   type Material,
 } from "./world.ts";
 
@@ -244,7 +244,7 @@ export class MineRenderer {
     for (let i = 0; i < CELLS; i++) {
       const m = cells[i];
       if (m === TORCH) warm[i] = 1.05;
-      else if (m === LAMP) warm[idx(i % W, lanternRow(cells, i % W, (i / W) | 0))] = 1.3;
+      else if (m === LAMP) warm[idx(i % W, Math.floor(lanternBulb(cells, i % W, (i / W) | 0)))] = 1.3;
       else if (m === WORK_LAMP) warm[i] = 1.2;
       else if (m === LAVA) warm[i] = 1.15;
       if (burn[i]) warm[i] = 1.4;
@@ -1303,17 +1303,17 @@ export class MineRenderer {
         this.fine(x + 0.5, y + 0.5, 0.5, 0.5, color(TORCH_STICK));
         this.fine(x + 0.5, y, 0.5, 0.5, hex(f > 0.66 ? TORCH_HOT : f > 0.33 ? TORCH_RGB : TORCH_DIM));
       } else {
-        // A lantern on its chain, a cell higher where there's room, its
-        // flame warm and flickering like a torch's.
-        const ly = lanternRow(sim.world.cells, x, y);
-        let ceiling = ly - 1;
-        while (ceiling > ly - 10 && isPassable(sim.world.get(x, ceiling))) ceiling--;
+        // A lantern on its chain from the roof, its cap over a flame warm
+        // and flickering like a torch's.
+        const by = lanternBulb(sim.world.cells, x, y);
+        let ceiling = Math.floor(by) - 1;
+        while (ceiling > by - 16 && isPassable(sim.world.get(x, ceiling))) ceiling--;
         if (!isPassable(sim.world.get(x, ceiling)))
-          for (let yy = ceiling + 1; yy < ly; yy += 0.5)
+          for (let yy = ceiling + 1; yy < by - 0.5; yy += 0.5)
             this.fine(x + 0.5, yy, 0.5, 0.5, color(Math.round(yy * 2) % 2 ? [96, 88, 70] : [154, 140, 106]));
         const f = flickerAt(x, y, time);
-        this.fine(x + 0.5, ly, 0.5, 0.5, color(LAMP_CAP));
-        this.fine(x + 0.5, ly + 0.5, 0.5, 0.5, hex(mix(LANTERN_DIM, LANTERN_HOT, f)));
+        this.fine(x + 0.5, by - 0.5, 0.5, 0.5, color(LAMP_CAP));
+        this.fine(x + 0.5, by, 0.5, 0.5, hex(mix(LANTERN_DIM, LANTERN_HOT, f)));
       }
     }
   }
@@ -1328,7 +1328,7 @@ export class MineRenderer {
         if (m !== TORCH && m !== LAMP && m !== WORK_LAMP) continue;
         const r = m === LAMP ? 10 : m === WORK_LAMP ? 8 : 7, f = flickerAt(x, y, time);
         const flicker = m === WORK_LAMP ? 0.85 + 0.15 * f : 0.72 + 0.28 * f;
-        const gy = m === LAMP ? lanternRow(cells, x, y) + 0.75 : m === TORCH ? y + 0.25 : y + 0.5;
+        const gy = m === LAMP ? lanternBulb(cells, x, y) + 0.25 : m === TORCH ? y + 0.25 : y + 0.5;
         ctx.globalAlpha = (m === LAMP ? 0.36 : 0.38) * flicker;
         ctx.drawImage(this.glow, x + 0.75 - r, gy - r, r * 2, r * 2);
       }
@@ -1406,8 +1406,15 @@ export function flickerAt(x: number, y: number, time: number) {
   const v = 0.5 * Math.sin(time / a + hash01(x, y, 614) * 6.283) + 0.3 * Math.sin(time / b + hash01(x, y, 615) * 6.283) + 0.2 * Math.sin(time / c + hash01(x, y, 616) * 6.283);
   return 0.5 + 0.5 * v;
 }
-/** The row a lantern hung in cell (x, y) is drawn at: a cell higher, on a
- * shorter chain, when there's room under the roof. */
-function lanternRow(cells: Uint8Array, x: number, y: number) {
-  return y > 0 && isPassable(cells[idx(x, y - 1)]) ? y - 1 : y;
+/** Where the bulb of the lantern hung in cell (x, y) is drawn, in cells (a
+ * half-cell pixel): the cell's lower pixel when it hangs four cells over the
+ * floor or more (6 pixels clear, if nobody has dug under it since), its
+ * upper pixel at three (5 pixels clear). A lantern hung before that rule,
+ * over the track, keeps its old place, a cell higher where there's room. */
+export function lanternBulb(cells: Uint8Array, x: number, y: number) {
+  let floor = y + 1;
+  while (floor < H && floor < y + 5 && isPassable(cells[idx(x, floor)])) floor++;
+  if (floor - y === 3 && isSolid(cells[idx(x, floor)])) return y;
+  if (floor - y >= 3) return y + 0.5;
+  return (y > 0 && isPassable(cells[idx(x, y - 1)]) ? y - 1 : y) + 0.5;
 }
