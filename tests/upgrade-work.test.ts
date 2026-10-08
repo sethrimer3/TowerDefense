@@ -1,13 +1,17 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { defaults, decode } from "../src/save.ts";
 import { startResearch, settleResearch, cancelResearch, researchLeft, researchSeconds } from "../src/research-jobs.ts";
 import { startForge, settleForge, cancelForge, addForgeSmith, forgeLeft, forgeSeconds } from "../src/forge-jobs.ts";
-import { startTraining, addSmith, cancelTraining, rankCost, trainingStep, busySmiths } from "../src/progression.ts";
+import { startTraining, addSmith, cancelTraining, rankCost, rankPrice, trainingStep, busySmiths } from "../src/progression.ts";
 import { PATHS, unlearnPath } from "../src/knowledge-paths.ts";
 import { SKILLS, skillCost } from "../src/skill-trees.ts";
-import { UPGRADES, purchasePrice } from "../src/defend/catalog.ts";
-import { enchantedGift } from "../src/library/sim.ts";
+import { UPGRADES, purchasePrice, upgradePrice } from "../src/defend/catalog.ts";
+import { enchantedGift, MAX_SHELVES } from "../src/library/sim.ts";
+import { trainingSeconds } from "../src/training-jobs.ts";
+import { forgeSeconds } from "../src/forge-jobs.ts";
+import { planProgression, sampledRates, type Budget } from "../tools/plan-upgrade-progression.ts";
 
 test("research reserves Knowledge, shares a single project, and only applies the finished rank", () => {
   const s = defaults(); s.knowledge = 100;
@@ -23,6 +27,15 @@ test("research reserves Knowledge, shares a single project, and only applies the
   assert.equal(s.skills.masonry, 1);
   assert.equal(s.knowledge, 99, "completion charges nothing more");
   assert.equal(settleResearch(s, 1e10, 5), false, "one rank, no spill into the next");
+});
+
+test("temporary dev unlocks do not discard paid research", () => {
+  const s = defaults(); s.knowledge = 100;
+  startResearch(s, { kind: "skill", id: "masonry" }, 1000, 1);
+  s.settings.devStewardship = true;
+  assert.ok(settleResearch(s, 301000, 1));
+  assert.equal(s.skills.masonry, 1);
+  assert.equal(s.knowledge, 99);
 });
 
 test("research responds to staffing changes, pauses without banking work, and survives time away", () => {
@@ -150,10 +163,32 @@ test("higher Training ranks require their entire quadratic bill and refund it af
 test("quadratic prices grow steadily, repeat copies avoid exponential overflow, and books follow base income", () => {
   for (let r = 1; r < 49; r++) assert.equal(rankCost(r + 1) - 2 * rankCost(r) + rankCost(r - 1), 10);
   for (const skill of Object.values(SKILLS)) for (let r = 1; r < skill.max; r++) assert.ok(skillCost(skill.id, r) > skillCost(skill.id, r - 1));
-  for (const u of UPGRADES) for (let r = 1; r < u.maxLevel; r++) assert.ok((u.price?.(r).copper ?? 2 + 20 * r * r) > (u.price?.(r - 1).copper ?? 2 + 20 * (r - 1) ** 2));
+  for (const u of UPGRADES) for (let r = 1; r < u.maxLevel; r++) assert.ok((u.price ?? upgradePrice)(r).copper! > (u.price ?? upgradePrice)(r - 1).copper!);
   assert.ok(Number.isSafeInteger(purchasePrice("archerTower", 10000).copper));
   assert.equal(enchantedGift(1100), 1100 / 60);
   assert.equal(enchantedGift(12), 1);
+});
+
+test("funded production growth places focused final targets around two years", () => {
+  const { samples } = JSON.parse(readFileSync(new URL("../docs/upgrade-production.json", import.meta.url), "utf8"));
+  const late = samples.filter((s: any) => s.profile.id === "late");
+  const boost = late.reduce((n: number, s: any) => n + s.library.perHour / s.library.nominalPerHour, 0) / late.length;
+  const plan = planProgression(sampledRates(samples), MAX_SHELVES, boost);
+  assert.ok(plan.stages.every((s, i, stages) => s.hours > (stages[i - 1]?.hours ?? 0)));
+  assert.ok(plan.stages[2].rates.gold > plan.stages[0].rates.gold);
+  const bill = (): Budget => ({ copper: 0, silver: 0, gold: 0, knowledge: 0 });
+  const training = bill(); let work = 0;
+  for (let r = 0; r < 50; r++) { training[rankPrice(r)] += rankCost(r); work += trainingSeconds(r); }
+  const rowDays = plan.focused(training, work / 3600 / 6 / 1.45) / 24;
+  const conduit = UPGRADES.find(u => u.id === "chainCount")!, forge = bill(); work = 0;
+  for (let r = 0; r < conduit.maxLevel; r++) {
+    for (const [metal, amount] of Object.entries((conduit.price ?? upgradePrice)(r))) forge[metal as keyof Budget] += amount!;
+    work += forgeSeconds(r);
+  }
+  const storm = PATHS.find(p => p.id === "storm")!;
+  forge.knowledge = storm.ranks.reduce((n, r) => n + r.cost, 0) + storm.evolves!.cost;
+  const conduitDays = plan.focused(forge, work / 3600 / 6 / 1.45 + (researchSeconds(3, true) + [0, 1, 2].reduce((n, r) => n + researchSeconds(r), 0)) / 3600 / 2) / 24;
+  for (const days of [rowDays, conduitDays, plan.enchantedHours / 24]) assert.ok(days >= 650 && days <= 850, `focused finish ${days} days`);
 });
 
 test("malformed or already-completed projects cannot restore work or duplicate grants", () => {

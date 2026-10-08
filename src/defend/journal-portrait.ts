@@ -2,6 +2,7 @@ import { ENEMIES, type EnemyKind } from "./catalog.ts";
 import { drawEnemyArt } from "./battle-art.ts";
 import { assembleFortress } from "./fortress.ts";
 import { hash01 } from "./grid.ts";
+import { zoneEnemyRows } from "./zone-enemy-art.ts";
 import type { DefendSim, Enemy } from "./sim.ts";
 
 /** The enemy journal's portraits: each discovered enemy drawn by the
@@ -30,6 +31,8 @@ function scaleFor(kind: EnemyKind): number {
   if (def.fortress) return 8;
   if (kind === "iceGolem") return Math.ceil(12 / def.size);
   if (kind === "iceCube") return Math.ceil(10 / def.size);
+  const rows = zoneEnemyRows(kind);
+  if (rows) return Math.ceil(Math.max(...rows.map(row => row.length), rows.length) / def.size);
   return 16;
 }
 
@@ -149,7 +152,7 @@ export function paintPortrait(canvas: HTMLCanvasElement, kind: EnemyKind) {
   const native = scaleFor(kind), def = ENEMIES[kind];
   const first = drawOnScratch(scratch, kind, native);
   if (!first) return;
-  const size = Math.max(first.w, first.h), baked = def.siege || def.boat || kind === "iceGolem" || kind === "iceCube";
+  const size = Math.max(first.w, first.h), baked = def.siege || def.boat || kind === "iceGolem" || kind === "iceCube" || zoneEnemyRows(kind);
   let px = size > FIT || !baked ? Math.max(2, Math.floor((native * FIT) / size)) : native * Math.floor(FIT / size);
   let box = drawOnScratch(scratch, kind, px);
   // Rounding can leave it a pixel or two over: step down until it fits.

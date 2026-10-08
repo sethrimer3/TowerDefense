@@ -80,6 +80,7 @@ export function journalHTML(discovered: EnemyKind[]): string {
     <div class="defend-journal-entries">${entries.length ? groups.map(({ area, entries }) => `<section class="defend-journal-zone" style="--area-dark:${area.dark}" data-zone="${area.id}"><h3 class="defend-journal-zone-title">${area.name}</h3>${entries.map(k => {
       const d = ENEMIES[k];
       const notes: string[] = [d.flying ? "Flies over walls." : "Travels on the ground."];
+      if (d.description) notes.push(d.description);
       if (d.fortress) notes.push(`Walking structure with ${d.fortress.turrets} independently destroyable turrets, ${d.fortress.legs} legs and ${d.fortress.armor} armor plates. Destroy every armor plate to expose the core. Each lost leg slows movement, down to 25% speed with all legs gone. Destroyed turrets stop firing. Dismantle its parts before attacking the core.`);
       if (d.chainLength) notes.push(`${d.chainLength} individually damageable segments; cuts create independent worms.`);
       if (d.splits) notes.push(`Hatches ${d.splits.count} ${ENEMIES[d.splits.into].name}s when killed.`);

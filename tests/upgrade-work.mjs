@@ -10,7 +10,8 @@ mkdirSync('test-results', { recursive: true });
 const state = page => page.evaluate(() => JSON.parse(localStorage.getItem('towerdefense.v1')));
 const tab = (page, id) => page.locator(`nav [data-tab="${id}"]`).click();
 async function study(page, subject = 'city', topic = 'walls') {
-  await tab(page, 'library'); await page.locator('#library-study').click();
+  await tab(page, 'library');
+  if (!await page.locator('#library').evaluate(el => el.classList.contains('descended'))) await page.locator('#library-study').click();
   await page.locator('#library-chamber [data-subject="' + subject + '"]').click();
   const choice = page.locator('#library-chamber [data-topic="' + topic + '"]');
   if (await choice.count()) await choice.click();
@@ -18,10 +19,7 @@ async function study(page, subject = 'city', topic = 'walls') {
 async function smithy(page) { await tab(page, 'mine'); await page.locator('#mine-smithy').click(); }
 async function reloadWith(page, mutate, value) {
   await page.evaluate(({ mutate, value }) => {
-    const s = JSON.parse(localStorage.getItem('towerdefense.v1'));
-    if (mutate === 'research') s.researchClock -= value;
-    if (mutate === 'forge') s.forgeClock -= value;
-    localStorage.setItem('towerdefense.v1', JSON.stringify(s));
+    sessionStorage.setItem('work-clock-adjustment', JSON.stringify({ mutate, value }));
   }, { mutate, value });
   await page.reload(); await page.waitForSelector('#defend-start');
 }
@@ -31,7 +29,7 @@ try {
     const page = await context.newPage(), errors = [];
     page.on('pageerror', e => errors.push(e.message));
     await page.goto(base); await page.waitForSelector('#defend-start');
-    await page.evaluate(async () => {
+    const fixture = await page.evaluate(async () => {
       const { defaults } = await import('/src/save.ts');
       const { MineSim } = await import('/src/mine/sim.ts');
       const { LibrarySim } = await import('/src/library/sim.ts');
@@ -45,8 +43,23 @@ try {
       const library = new LibrarySim(7); library.furnish(40); library.upgradeLab(); library.upgradeLab();
       for (let n = 0; n < 3; n++) library.hire('researcher'); library.hire('professor'); library.hire('shelver');
       s.library = library.save(now); s.training.troopHp = 49;
-      localStorage.setItem('towerdefense.v1', JSON.stringify(s));
+      return s;
     });
+    // Seed after the previous page's pagehide handler saves its live state.
+    await context.addInitScript(fixture => {
+      if (!sessionStorage.getItem('work-fixture-seeded')) {
+        localStorage.setItem('towerdefense.v1', JSON.stringify(fixture));
+        sessionStorage.setItem('work-fixture-seeded', 'yes');
+      }
+      const adjustment = sessionStorage.getItem('work-clock-adjustment');
+      if (adjustment) {
+        const { mutate, value } = JSON.parse(adjustment);
+        const s = JSON.parse(localStorage.getItem('towerdefense.v1'));
+        s[mutate === 'research' ? 'researchClock' : 'forgeClock'] -= value;
+        localStorage.setItem('towerdefense.v1', JSON.stringify(s));
+        sessionStorage.removeItem('work-clock-adjustment');
+      }
+    }, fixture);
     await page.reload(); await page.waitForSelector('#defend-start');
     await study(page);
     assert.match(await page.locator('[data-learn="masonry"]').textContent(), /1m 40s with 3 researchers/);

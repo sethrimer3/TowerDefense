@@ -441,6 +441,22 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   waves preview their own area. Ground and connected wall cap/face textures
   crossfade over three seconds, with matching wave button and list colors.
   `area-enemies.ts` supplies themed pools; Nadir permits every normal wave species. Offspring remain parent-only. Unspendable area-budget remainders are discarded. Nadir uses crypt masonry with a dark violet floor wash. Frozen Vault (101-120) includes all ship tiers, Ice Golems (240 HP, cost 80, double fire/explosion damage) and Sliding Ice Cubes (45 HP, cost 10, cardinal slides at 3.6 cells/second, meltable ice trails, immune to blast deflection). Both enemies have journal entries; kills award no currency.
+- The five smaller zone rosters add three species each, all affordable during
+  their first visit and also eligible in Nadir. Costs are fixed difficulty:
+
+  | Zone | Species and cost | Behavior |
+  | --- | --- | --- |
+  | Mossbound Ruins | Briarling 2, Moss Boar 6, Root Treant 18 | Fast sprouts, sturdy tusked raiders, slow trees releasing three briarlings |
+  | Amber Desert | Dune Scorpion 6, Sun Scarab 12, Sand Vulture 5 | Short-range venom, a finite swarm shield, flying wall bypass |
+  | Fungal Hollow | Sporeling 30, Fungal Brute 180, Spore Moth 80 | Small poison clouds, brutes releasing three sporelings, airborne spores |
+  | Violet Geode | Shardling 40, Crystal Sentinel 600, Prism Ray 200 | Fast crystals, shield support, flying shield support |
+  | Astral Sanctuary | Star Wisp 150, Comet Hound 500, Astral Warden 5,000 | Fast fliers, fast ground hunters, heavy shield support |
+
+  Split parents reserve their three children against the wave cap. The small
+  species can also appear directly in their zone's waves. Poison harms people,
+  sparing buildings; finite shields absorb ranged hits within their radius,
+  while melee bypasses them. Each has distinct native pixel art, a journal
+  portrait, counterplay notes and persistent discovery. No kill currency is added.
 - Weather rolls at the start and on entering an area: Mossbound Ruins has
   30% rain, Drowned Temple 75%, Frozen Vault snow (a 30% stormy roll, and
   every boss night, make it a blizzard: dense wind-streaked flakes drawn

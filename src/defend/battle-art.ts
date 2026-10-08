@@ -2,6 +2,7 @@ import { drawFortress } from "./fortress-art.ts";
 import { drawIceEnemy } from "./ice-enemy-art.ts";
 import { enemySize } from "./catalog.ts";
 import { drawEnemyHealthbars, trackHealthbarPeak } from "./healthbars.ts";
+import { drawZoneEnemyBody, zoneEnemyRows } from "./zone-enemy-art.ts";
 import { drawBlackHoles, drawHostileMarks, drawPoisonClouds } from "./hostile-art.ts";
 import { drawFirework, drawSiegeEngine, drawSiegeShots, siegeLights } from "./siege-art.ts";
 import { boatLights, drawBoat } from "./boat-art.ts";
@@ -308,7 +309,7 @@ function drawEnemy(b: Brush, e: Enemy, sim: DefendSim) {
   const def = ENEMIES[e.kind];
   if (def.fortress) { drawFortress(b, e, sim); return; }
   if (e.kind === "iceGolem" || e.kind === "iceCube") { drawIceEnemy(b, e); return; }
-  const s = Math.max(2, Math.round(enemySize(e) * px));
+  const s = Math.max(zoneEnemyRows(e.kind) ? 3 : 2, Math.round(enemySize(e) * px));
   const x = Math.round(e.x * px - s / 2),
     y = Math.round(e.y * px - s / 2 - (e.kind === "bombBird" ? (e.dive === undefined ? 1 : Math.max(0, e.dive / 0.6)) * px * 1.5 : 0));
   if (e.marked) {
@@ -327,8 +328,10 @@ function drawEnemy(b: Brush, e: Enemy, sim: DefendSim) {
       c.fillRect(x - 1, y - 1, s + 2, s + 2);
     }
   }
-  c.fillStyle = e.flash > 0 ? "#fff" : def.color;
-  c.fillRect(x, y, s, s);
+  if (!drawZoneEnemyBody(b, e, x, y, s)) {
+    c.fillStyle = e.flash > 0 ? "#fff" : def.color;
+    c.fillRect(x, y, s, s);
+  }
   drawHostileMarks(b, e, { x, y, s });
   if (def.boss) drawBossMarks(b, e, { x, y, s });
   if (def.chainLength) {

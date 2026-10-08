@@ -26,8 +26,8 @@ export type Save = {
    * (every `BARS_PER_POINT` bars of a metal), spent in the Smithy
    * below the Mine and the Tiles shop. A new game starts with `STARTING_METAL`. */
   smithy: Metals;
-  /** Earned in the Library (shelves × librarians an hour, idle too) and by
-   * holding past the best wave; spent on the skill trees. Keeps its fractions.
+  /** Earned in the Library (shelves × professors an hour, idle too);
+   * spent on Study projects. Keeps its fractions.
    * Saves from before it was renamed call it `valor`. */
   knowledge: number;
   skills: Record<SkillId, number>;

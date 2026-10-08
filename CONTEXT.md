@@ -44,6 +44,21 @@ A small, quick enemy hatched only from a fallen Mother.
 **Walking fortress**:
 An enemy castle on legs (Walking Watchpost, Walking Outpost, Walking Fortlet, Walking Stronghold, Walking Bastion, Living Fortress, Walking Citadel, Dread Colossus). Its turrets, legs and armor are separately destructible; lost legs slow it, and destroying all armor exposes its core.
 
+**Briarling**, **Moss Boar** and **Root Treant**:
+Mossbound creatures: a quick thorn sprout, a sturdy tusked raider and a slow walking tree that releases three briarlings when felled.
+
+**Dune Scorpion**, **Sun Scarab** and **Sand Vulture**:
+Amber Desert creatures: a scorpion with close-reaching venom, a scarab shielding its swarm and a vulture that flies past walls.
+
+**Sporeling**, **Fungal Brute** and **Spore Moth**:
+Fungal Hollow creatures: a small poisonous mushroom, a heavy fungus that releases three sporelings and a flying moth carrying a spore cloud.
+
+**Shardling**, **Crystal Sentinel** and **Prism Ray**:
+Violet Geode creatures: a swift living crystal, a shield-bearing guardian and a hovering ray with a smaller shield.
+
+**Star Wisp**, **Comet Hound** and **Astral Warden**:
+Astral Sanctuary creatures: a flying star spirit, a swift celestial hunter and a slow guardian shielding its escort.
+
 **Siege engine**:
 An enemy machine with no crew (rolling cannon, ballista, firework launcher, trebuchet, great bombard, dragonfire battery): it drives itself toward the keep and stops to shoot what blocks its way, or the keep, from range.
 
@@ -122,7 +137,7 @@ One way a building can grow, in ranks learned in order with Knowledge: the Wizar
 A path's crown, turning its building into a greater one (Stormcalling's Wizard tower into the Dark wizard keep, Crusaders' Barracks into the Valkyrie palace), learned with Knowledge after the path's last rank. Every copy owned, placed or not, becomes the greater building, back in the palette to place again, and copies bought while crowned are greater ones too; unlearning the path turns them back. The greater buildings are no longer sold on their own.
 
 **Smithy rows** (in the Smithy; Training in code):
-Ranks of a few percent each on one row (troop HP, tower damage, rebuild speed…). A rank costs one Smithy point and is worked by the mine's smiths: one smith takes its whole time, more smiths share it. A smith on a rank stays at the smithy until it's done; taking the last one off cancels the rank and returns its point.
+Ranks of a few percent each on one row (troop HP, tower damage, rebuild speed…). A rank costs a quadratic bill of metal and is worked by the mine's smiths: one smith takes its whole time, more smiths share it. A smith on a rank stays at the smithy until it's done; taking the last one off cancels the rank and returns its paid metal.
 
 **Smithy point**:
 Copper, silver or gold: every ten bars of a metal the mine's smiths work make a point of it. A row's first ten ranks cost copper, the next fifteen silver, the rest gold.
@@ -131,7 +146,10 @@ Copper, silver or gold: every ten bars of a metal the mine's smiths work make a 
 A miner put to the smithy. The smiths are the Smithy's hands: how many ranks can be worked at once, and how fast.
 
 **Skill tree**:
-Command and Stewardship (for Defend), Mine and Library: ranked skills bought with Knowledge, each needing the skills above it, and a researcher in the Library's alchemy lab.
+Command and Stewardship (for Defend), Mine and Library: ranked skills researched with Knowledge, each needing the skills above it and timed work in the Library's alchemy lab.
+
+**Research project**:
+One skill rank, path rank or evolution being worked in the Study. Knowledge is paid at the start; all researchers share the work. It pauses without researchers, applies its effect on completion, and returns its paid Knowledge when cancelled.
 
 ### Presentation
 
@@ -326,7 +344,7 @@ Frozen water that makes those on foot slide. A boat's frozen wake blocks rebuild
 A low stand on the nave's floor for the books the professors have read. When it fills, a shelver loads them into the cart and wheels them out, bringing back fresh books for the gaps.
 
 **Researcher**:
-A librarian who works the **alchemy lab**, a vaulted cellar under the nave reached by a ladder from a trapdoor: stoking the athanor, brewing at the cauldron, distilling, studying, chanting at the transmutation circle. With no researcher, the skill trees' Knowledge research can't be bought.
+A librarian who works the **alchemy lab**, a vaulted cellar under the nave reached by a ladder from a trapdoor: stoking the athanor, brewing at the cauldron, distilling, studying, chanting at the transmutation circle. Researchers share the Study's timed Knowledge project; with none, it cannot start and existing work pauses.
 
 **Enchanted book**:
 A book on the library's shelves that has taken on glowing runes along its spine. With the Enchanted ink skill each shelved book has a small chance a minute of becoming one; a professor who reads it gains a burst of Knowledge.

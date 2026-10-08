@@ -27,8 +27,8 @@ export const STARTING_METAL: Metals = { copper: 10, silver: 0, gold: 0 };
 export type TrainingId = "troopHp" | "troopDamage" | "drill" | "towerDamage" | "towerReload" | "wallHp" | "keepHp" | "rebuild" | "bombDamage";
 export type TrainingRow = { id: TrainingId; group: keyof typeof TRAINING_GROUPS; name: string; per: number; max: number };
 export const TRAINING_GROUPS = { army: "Army", towers: "Towers", city: "City" } as const;
-/** Each rank adds `per` percent to its target, and costs a Smithy point
- * (`rankPrice`). */
+/** Each rank adds `per` percent to its target, with quadratic metal cost
+ * (`rankCost`) in its tier (`rankPrice`). */
 export const TRAINING: TrainingRow[] = [
   { id: "troopHp", group: "army", name: "Troop HP", per: 4, max: 50 },
   { id: "troopDamage", group: "army", name: "Troop damage", per: 4, max: 50 },
@@ -56,7 +56,7 @@ export const skillRank = (save: Save, id: SkillId) => (save.settings[DEV_RESEARC
 /** Every skill's ranks as `skillRank` counts them. */
 const skillRanks = (save: Save) => Object.fromEntries(SKILL_IDS.map((id) => [id, skillRank(save, id)])) as Record<SkillId, number>;
 
-/** The Smithy point a row's next rank costs, with `ranks` owned: copper for
+/** The metal tier a row's next rank costs, with `ranks` owned: copper for
  * the first ten, silver to twenty-five, gold after. */
 export const rankPrice = (ranks: number): Metal => (ranks < 10 ? "copper" : ranks < 25 ? "silver" : "gold");
 /** The next rank's metal amount; the metal tier still changes at 10/25. */
@@ -66,7 +66,7 @@ export const rankCost = (ranks: number) => quadraticCost(1, ranks, ECONOMY.train
 export const busySmiths = (save: Save) => new Set([...save.trainingJobs.flatMap((j) => j.smiths), ...(save.forgeJob?.smiths ?? [])]);
 
 /** Where one row stands: its percent now and after one more rank, the
- * point the rank costs, and whether it is maxed or affordable. */
+ * metal bill the rank costs, and whether it is maxed or affordable. */
 export function trainingStep(save: Save, id: TrainingId) {
   const row = TRAINING.find((t) => t.id === id)!, ranks = trainingRank(save, id);
   const maxed = ranks + (trainingJob(save.trainingJobs, id) ? 1 : 0) >= row.max, metal = rankPrice(ranks);
@@ -75,9 +75,9 @@ export function trainingStep(save: Save, id: TrainingId) {
 }
 
 /** Starts one rank of `id`, worked by `smith` (a smith with no upgrade): its
- * point is spent at once, the rank counts once its work is done
+ * metal bill is spent at once, the rank counts once its work is done
  * (`settleTraining`). Dev: instantaneous research finishes it at once, smith
- * or none, and unlimited money spends no point. */
+ * or none, and unlimited money spends no metal. */
 export function startTraining(save: Save, id: TrainingId, smith: string): boolean {
   const step = trainingStep(save, id);
   if (step.maxed || trainingJob(save.trainingJobs, id) || !step.affordable) return false;
@@ -156,9 +156,15 @@ export function skillPurchase(save: Save, id: SkillId) {
 }
 
 export function buySkill(save: Save, id: SkillId, prepaid = false): boolean {
+  if (prepaid) {
+    // Temporary dev unlocks must not discard a paid project on completion.
+    if (save.skills[id] >= SKILLS[id].max || !skillAvailable(id, save.skills)) return false;
+    save.skills[id]++;
+    return true;
+  }
   const p = skillPurchase(save, id);
-  if (p.maxed || !p.available || (!prepaid && !p.canBuy)) return false;
-  if (!prepaid && !save.settings.devMode) save.knowledge -= p.price;
+  if (p.maxed || !p.available || !p.canBuy) return false;
+  if (!save.settings.devMode) save.knowledge -= p.price;
   save.skills[id]++;
   return true;
 }
