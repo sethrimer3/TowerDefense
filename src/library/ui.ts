@@ -47,6 +47,10 @@ const ROLE: Record<Role, { name: string; one: string; hint: string }> = {
 const escape = (s: string) => s.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 const plural = (k: number, one: string) => `${k} ${one}${k === 1 ? "" : "s"}`;
 
+/** Idle time owed (ms) from which the library shows it is fast-forwarding,
+ * and how many times slower its day and night turn meanwhile. */
+const FAST_FORWARD = 5000, DAY_SLOWDOWN = 5;
+
 export class LibraryPage {
   sim!: LibrarySim;
   private root: HTMLElement;
@@ -57,6 +61,10 @@ export class LibraryPage {
   /** Last frame clock and simulation time still owed. */
   private ranTo = 0;
   private owed = 0;
+  /** The moment the library's day and night show (ms of wall-clock time):
+   * the idle time spent so far, but a fifth as fast while fast-forwarding,
+   * so its days don't race past. */
+  private day = 0;
   private deathsBefore = 0;
   private booksBefore = 0;
   private burning = false;
@@ -80,6 +88,7 @@ export class LibraryPage {
     this.away = null;
     this.burning = this.sim.fire.active;
     if (saved) this.addAway(Math.min(MAX_AWAY_MS, Math.max(0, now - saved.savedAt) + (saved.idleMs ?? 0)));
+    this.day = now - this.owed;
   }
   snapshot(now: number): LibrarySave {
     return { ...this.sim.save(now), idleMs: Math.min(MAX_AWAY_MS, this.owed + Math.max(0, now - this.ranTo)) };
@@ -103,10 +112,11 @@ export class LibraryPage {
     // Keep pace with the mine's idle time (`keepWith`), never more than
     // IDLE_LEAD ahead of it, so both spend it together.
     while (this.owed >= 100 - 1e-6 && spent + 100 <= limit + 1e-6 && this.owed - idleDrain(this.owed, 100) >= keepWith - IDLE_LEAD) {
-      this.sim.night = 1 - daylight(this.host.clock() - this.owed);
+      this.sim.night = 1 - daylight(this.day);
       const rate = this.sim.rate;
       // Catching up, a step spends (and pays for) ten steps of idle time.
       const drain = Math.min(this.owed, idleDrain(this.owed, 100)), boost = drain / 100;
+      this.day += this.owed >= FAST_FORWARD ? drain / DAY_SLOWDOWN : drain;
       this.sim.step(0.1);
       this.owed = Math.max(0, this.owed - drain);
       spent += 100;
@@ -327,7 +337,7 @@ export class LibraryPage {
   refresh() {
     if (!this.built) return;
     const idle = this.root.querySelector<HTMLElement>("#library-away")!;
-    idle.hidden = this.owed < 5000;
+    idle.hidden = this.owed < FAST_FORWARD;
     idle.textContent = `Fast-forwarding · ${countdown(this.owed)} idle time remaining`;
     const sim = this.sim, free = this.host.free(), wallet = this.host.metals();
     const sp = shelfPrice(sim.shelves), lp = librarianPrice(sim.hired), level = sim.labLevel, up = labPrice(level), labFull = level >= LAB_MAX_LEVEL;
@@ -381,7 +391,7 @@ export class LibraryPage {
   /** Draws the nave (while the tab shows). */
   frame(_time: number) {
     if (!this.renderer) return;
-    this.renderer.draw(this.sim, this.host.clock() - this.owed, this.sim.time, this.host.effects());
+    this.renderer.draw(this.sim, this.day, this.sim.time, this.host.effects());
     this.refresh();
   }
 }
