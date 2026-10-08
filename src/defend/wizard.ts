@@ -1,3 +1,4 @@
+import { buildingPaths } from "../cards.ts";
 /** The wizard tower: it alternates between a flamethrower and an ice wave,
  * resting a moment after each.
  *
@@ -35,21 +36,21 @@ import { chainBolt } from "./dark-wizards.ts";
 
 /** The wizard tower's Study path and rank (`knowledge-paths.ts`): each 0
  * unless chosen. */
-const paths = (sim: Armed) => {
-  const p = sim.bonuses.paths;
+const paths = (sim: Armed, b?: Building) => {
+  const p = buildingPaths(sim, b);
   return { pyro: pathRank(p, "wizardTower", "pyromancy"), rime: pathRank(p, "wizardTower", "rime"), storm: pathRank(p, "wizardTower", "storm") };
 };
 /** What a tower's reach depends on: the levels and the Study's paths. */
 type Armed = Pick<DefendSim, "levels" | "bonuses">;
 /** How far a tower's flame (or bolt) reaches. */
-export const fireReach = (sim: Armed) => flameRange(sim.levels.wizardFlame ?? 0) + (paths(sim).pyro >= 2 ? PYRO.reach : 0);
+export const fireReach = (sim: Armed, b?: Building) => flameRange(sim.levels.wizardFlame ?? 0) + (paths(sim, b).pyro >= 2 ? PYRO.reach : 0);
 /** How far its ice runs. */
-export const iceReach = (sim: Armed) => ICE_RANGE + (paths(sim).rime >= 2 ? RIME.reach : 0);
+export const iceReach = (sim: Armed, b?: Building) => ICE_RANGE + (paths(sim, b).rime >= 2 ? RIME.reach : 0);
 /** How far a wizard tower reaches with what it casts: Rime casts only ice,
  * Pyromancy only flames, otherwise it alternates. */
-export const wizardReach = (sim: Armed) => {
-  const { pyro, rime } = paths(sim);
-  return rime ? iceReach(sim) : pyro ? fireReach(sim) : Math.max(fireReach(sim), iceReach(sim));
+export const wizardReach = (sim: Armed, b?: Building) => {
+  const { pyro, rime } = paths(sim, b);
+  return rime ? iceReach(sim, b) : pyro ? fireReach(sim, b) : Math.max(fireReach(sim, b), iceReach(sim, b));
 };
 
 /** A burst of fire from a wizard tower: where it leaves the tower, which
@@ -60,7 +61,7 @@ export type Flame = { tower: number; x: number; y: number; dx: number; dy: numbe
  * spread (half-width as a slope), how far the front has come (`r`, cells)
  * and where it stops, its age, a seed for how its shards look, and who it
  * has hit. */
-export type Frost = { x: number; y: number; dx: number; dy: number; spread: number; r: number; range: number; t: number; seed: number; hit: number[] };
+export type Frost = { tower?: number; x: number; y: number; dx: number; dy: number; spread: number; r: number; range: number; t: number; seed: number; hit: number[] };
 
 /** The unit vector from (x, y) toward (tx, ty), pointing up when they meet. */
 function toward(x: number, y: number, tx: number, ty: number) {
@@ -86,7 +87,7 @@ export class Wizards {
       this.rest.set(b.id, Math.max(0, rest));
       if (rest > 0 || sim.flames.some((f) => f.tower === b.id)) continue;
       // Pyromancy gives up the ice, Rime the flames; Stormcalling casts a bolt for each flame.
-      const { pyro, rime, storm } = paths(sim);
+      const { pyro, rime, storm } = paths(sim, b);
       const turn = pyro ? "flame" : rime ? "ice" : (this.next.get(b.id) ?? "flame");
       if (turn === "ice") this.ice(sim, b);
       else if (storm) this.bolt(sim, b, storm);
@@ -95,17 +96,17 @@ export class Wizards {
   }
 
   private flame(sim: DefendSim, b: Building) {
-    const c = center(b.rect), range = fireReach(sim);
+    const c = center(b.rect), range = fireReach(sim, b);
     const target = nearest(sim.enemiesNear(c.x, c.y, range), c);
     if (!target) return;
-    const dur = paths(sim).pyro >= 3 ? FLAME_SECONDS * PYRO.burn : FLAME_SECONDS;
+    const dur = paths(sim, b).pyro >= 3 ? FLAME_SECONDS * PYRO.burn : FLAME_SECONDS;
     sim.flames.push({ tower: b.id, x: c.x, y: c.y - 0.4, ...toward(c.x, c.y - 0.4, target.x, target.y), t: 0, dur, range, target: target.id });
     this.next.set(b.id, "ice");
   }
 
   /** Stormcalling: a chain bolt from the tower's top where a flame would be. */
   private bolt(sim: DefendSim, b: Building, rank: number) {
-    const c = center(b.rect), range = fireReach(sim);
+    const c = center(b.rect), range = fireReach(sim, b);
     const target = nearest(sim.enemiesNear(c.x, c.y, range), c);
     if (!target) return;
     const surge = rank >= 3 ? STORM.surge : 1;
@@ -117,16 +118,16 @@ export class Wizards {
 
   private ice(sim: DefendSim, b: Building) {
     const c = center(b.rect);
-    const range = iceReach(sim);
+    const range = iceReach(sim, b);
     const target = nearest(sim.enemiesNear(c.x, c.y, range), c);
     if (!target) return;
     sim.frosts.push({
-      x: c.x, y: c.y, ...toward(c.x, c.y, target.x, target.y), spread: ICE_SPREAD,
+      tower: b.id, x: c.x, y: c.y, ...toward(c.x, c.y, target.x, target.y), spread: ICE_SPREAD,
       r: 0.6, range, t: 0, seed: b.id * 7919 + this.waves++ * 104729, hit: [],
     });
     this.next.set(b.id, "flame");
     // Rime's ice comes twice as often, with no flames between.
-    this.rest.set(b.id, paths(sim).rime ? WIZARD_REST / 2 : WIZARD_REST);
+    this.rest.set(b.id, paths(sim, b).rime ? WIZARD_REST / 2 : WIZARD_REST);
   }
 
   /** A flame that has burned out leaves its tower resting. */
@@ -169,7 +170,7 @@ export function stepFlames(sim: DefendSim, wizards: Wizards, dt: number) {
     // The fire takes a moment to reach full length.
     const reach = f.range * Math.min(1, f.t / 0.25);
     meltIceCone(sim, f.x, f.y, f.dx, f.dy, reach, FLAME_SPREAD);
-    const dps = flameDps(sim.levels.wizardFlame ?? 0) * sim.bonuses.towerDamage * PYRO.damage[paths(sim).pyro];
+    const dps = flameDps(sim.levels.wizardFlame ?? 0) * sim.bonuses.towerDamage * PYRO.damage[paths(sim, sim.map.buildings[f.tower]).pyro];
     for (const e of sim.enemiesNear(f.x, f.y, reach)) if (inFan(e, f.x, f.y, f.dx, f.dy, FLAME_SPREAD, reach) && !sheltered(sim, e.x, e.y)) sim.hurtEnemy(e, dps * dt, true, "ranged", f, false, "fire");
     if (f.t >= f.dur) wizards.ended(f.tower);
   }
@@ -178,10 +179,10 @@ export function stepFlames(sim: DefendSim, wizards: Wizards, dt: number) {
 
 /** Ice fronts spread, hitting and chilling each enemy once as they pass. */
 export function stepFrosts(sim: DefendSim, dt: number) {
-  const rime = paths(sim).rime;
-  const damage = iceDamage(sim.levels.wizardIce ?? 0) * sim.bonuses.towerDamage * (rime >= 2 ? RIME.damage : 1);
-  const chill = iceChill(sim.levels.wizardIce ?? 0) * (rime ? RIME.chill : 1);
   for (const w of sim.frosts) {
+    const rime = paths(sim, w.tower === undefined ? undefined : sim.map.buildings[w.tower]).rime;
+    const damage = iceDamage(sim.levels.wizardIce ?? 0) * sim.bonuses.towerDamage * (rime >= 2 ? RIME.damage : 1);
+    const chill = iceChill(sim.levels.wizardIce ?? 0) * (rime ? RIME.chill : 1);
     w.t += dt;
     if (w.r >= w.range) continue;
     w.r = Math.min(w.range, w.r + ICE_SPEED * dt);

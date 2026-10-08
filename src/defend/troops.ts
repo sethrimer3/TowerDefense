@@ -1,3 +1,4 @@
+import { buildingPaths } from "../cards.ts";
 import { bannerDamage } from "./war-banner.ts";
 import { enemySize } from "./catalog.ts";
 /** DEFEND troops: barracks keep their garrison topped up; swordsmen chase
@@ -31,21 +32,21 @@ import { answerBanner, MARCH_SIGHT } from "./war-banner.ts";
 import { ASSASSIN, CRUSADE, RANGERS, SKIRMISH, pathRank } from "../knowledge-paths.ts";
 
 /** The barracks' Study path and rank (`knowledge-paths.ts`): each 0 unless chosen. */
-const paths = (sim: DefendSim) => {
-  const p = sim.bonuses.paths;
+const paths = (sim: DefendSim, home: number) => {
+  const p = buildingPaths(sim, sim.map.buildings[home]);
   return {
     crusade: pathRank(p, "barracks", "crusaders"), assassin: pathRank(p, "barracks", "assassins"),
     ranger: pathRank(p, "archerBarracks", "rangers"), skirmish: pathRank(p, "archerBarracks", "skirmishers"),
   };
 };
 /** A swordsman's HP and damage, as shares of his own, by his barracks' path. */
-function swordStats(sim: DefendSim) {
-  const { crusade, assassin } = paths(sim);
+function swordStats(sim: DefendSim, home: number) {
+  const { crusade, assassin } = paths(sim, home);
   return { hp: assassin ? ASSASSIN.hp : CRUSADE.hp[crusade], damage: crusade >= 3 ? CRUSADE.damage : 1 };
 }
 /** How fast a swordsman walks. */
-function swordSpeed(sim: DefendSim) {
-  const { crusade, assassin } = paths(sim);
+function swordSpeed(sim: DefendSim, home: number) {
+  const { crusade, assassin } = paths(sim, home);
   return SOLDIER.speed * (crusade ? CRUSADE.speed : assassin ? ASSASSIN.speed : 1);
 }
 
@@ -89,7 +90,7 @@ export class Barracks {
     const scale = soldierScale(sim.levels.soldierArms);
     const stats = kind === "archer" ? ARCHER_UNIT : kind === "mage" ? { ...FIRE_MAGE, damage: fireballDamage(sim.levels.mageFireball ?? 0) } : kind === "valkyrie" ? VALKYRIE : kind === "darkWizard" ? DARK_WIZARD : SOLDIER;
     const at = cellCenter(door);
-    const path = kind === "sword" ? swordStats(sim) : { hp: 1, damage: 1 };
+    const path = kind === "sword" ? swordStats(sim, b.id) : { hp: 1, damage: 1 };
     sim.soldiers.push({
       id: sim.newId(),
       kind,
@@ -134,7 +135,7 @@ class Patrol {
     this.home = sim.map.buildings[s.home];
     this.hc = center(this.home.rect);
     // Shadows (Assassins III) hunt anywhere in the city.
-    this.leash = paths(sim).assassin >= 3 ? Infinity : soldierLeash(sim.levels.soldierReach ?? 0);
+    this.leash = paths(sim, s.home).assassin >= 3 ? Infinity : soldierLeash(sim.levels.soldierReach ?? 0);
     this.citywide = !Number.isFinite(this.leash);
   }
 
@@ -158,14 +159,14 @@ export function stepSwordsman(sim: DefendSim, s: Soldier, dt: number) {
   s.cd -= dt;
   s.thinkT -= dt;
   // Crusaders' field dressing.
-  if (paths(sim).crusade >= 2) s.hp = Math.min(s.maxHp, s.hp + CRUSADE.heal * dt);
+  if (paths(sim, s.home).crusade >= 2) s.hp = Math.min(s.maxHp, s.hp + CRUSADE.heal * dt);
   if (sim.warBanner) return rally(sim, s, dt);
   const patrol = new Patrol(sim, s);
   let target = sim.enemies.find((e) => e.id === s.target && e.hp > 0) ?? null;
   if (target && !patrol.covers(target)) target = null;
   if (target && inSwordReach(s, target)) return strike(sim, s, target);
   if (s.thinkT <= 0) target = replan(sim, s, patrol);
-  sim.followPath(s, target, swordSpeed(sim), dt);
+  sim.followPath(s, target, swordSpeed(sim, s.home), dt);
 }
 
 /** Answering the war banner: strike whatever is in reach, else close on
@@ -173,14 +174,14 @@ export function stepSwordsman(sim: DefendSim, s: Soldier, dt: number) {
 function rally(sim: DefendSim, s: Soldier, dt: number) {
   const near = sim.enemiesNear(s.x, s.y, SOLDIER.reach + 1).find((e) => inSwordReach(s, e));
   if (near) return strike(sim, s, near);
-  answerBanner(sim, sim.warBanner!, s, swordSpeed(sim), dt, MARCH_SIGHT);
+  answerBanner(sim, sim.warBanner!, s, swordSpeed(sim, s.home), dt, MARCH_SIGHT);
 }
 
 const inSwordReach = (s: Soldier, e: Enemy) => dist(e.x - s.x, e.y - s.y) <= SOLDIER.reach + enemySize(e) / 2;
 
 function strike(sim: DefendSim, s: Soldier, e: Enemy) {
   if (s.cd > 0) return;
-  const assassin = paths(sim).assassin;
+  const assassin = paths(sim, s.home).assassin;
   s.cd = assassin >= 2 ? SOLDIER.cooldown * ASSASSIN.cooldown : SOLDIER.cooldown;
   if (!assassin) return void sim.hurtEnemy(e, bannerDamage(sim, s), true, "melee", s);
   // Assassins count their strikes: every few is critical (no dice, so a
@@ -228,7 +229,7 @@ function returnToDoor(sim: DefendSim, s: Soldier, home: Building) {
 export function stepArcher(sim: DefendSim, s: Soldier, dt: number) {
   s.cd -= dt;
   s.thinkT -= dt;
-  const { ranger, skirmish } = paths(sim);
+  const { ranger, skirmish } = paths(sim, s.home);
   const range = archerUnitRange(sim.levels.archerSight ?? 0) + (ranger ? RANGERS.sight : 0);
   const speed = ARCHER_UNIT.speed * (skirmish >= 2 ? SKIRMISH.speed : 1);
   const near = nearest(sim.enemiesNear(s.x, s.y, range), s, range * range, true);
@@ -248,7 +249,7 @@ const idle = (s: Soldier) => !s.path.length && s.thinkT <= 0;
 
 function shoot(sim: DefendSim, s: Soldier, e: Enemy, range: number) {
   if (s.cd > 0) return;
-  const { ranger, skirmish } = paths(sim);
+  const { ranger, skirmish } = paths(sim, s.home);
   s.cd = ARCHER_UNIT.cooldown * SKIRMISH.reload[skirmish];
   const damage = ranger >= 2 ? bannerDamage(sim, s) * RANGERS.damage : bannerDamage(sim, s);
   const loose = (t: Enemy) => sim.arrows.push({ x: s.x, y: s.y, origin: { x: s.x, y: s.y, attacker: s.id }, target: t.id, damage, tx: t.x, ty: t.y, life: 2 });

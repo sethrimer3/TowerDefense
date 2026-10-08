@@ -1,3 +1,4 @@
+import { buildingPaths } from "../cards.ts";
 /** DEFEND monster bait: a stack of crates every enemy goes for before the
  * keep. While any stack stands, ground enemies walk the bait's own flow
  * field (`sim.baitField`, filled from every standing stack, so each goes for
@@ -67,8 +68,9 @@ export function baitFell(sim: DefendSim, b: Building, burst: boolean) {
 
 /** An enemy has bitten a stack for `bite`: oil-soaked bait sets it alight,
  * and spiked crates give the bite back. Nothing without those paths. */
-export function baitBitten(sim: DefendSim, e: Enemy, bite: number) {
-  const oil = pathRank(sim.bonuses.paths, "bait", "oilSoaked"), fort = pathRank(sim.bonuses.paths, "bait", "fortified");
+export function baitBitten(sim: DefendSim, e: Enemy, bite: number, b?: Building) {
+  const p = buildingPaths(sim, b);
+  const oil = pathRank(p, "bait", "oilSoaked"), fort = pathRank(p, "bait", "fortified");
   if (oil) ignite(e, OIL.dps[oil], OIL.burn[oil]);
   if (fort >= 3) sim.hurtEnemy(e, bite * FORTIFY.thorns, true, "melee");
 }

@@ -689,6 +689,8 @@ export type Bonuses = {
    * with none chosen, so such a run plays exactly as before. */
   banner?: { cooldown: number; defense: number; reach: number; damage: number; march: number; life: number; regen: number };
   paths?: BattlePaths;
+  cardPaths?: Record<number, BattlePaths>;
+  spikePaths?: Record<string, BattlePaths>;
 };
 export const NO_BONUSES: Readonly<Bonuses> = Object.freeze({
   troopHp: 1, troopDamage: 1, drill: 1, towerDamage: 1, towerReload: 1, wallHp: 1, keepHp: 1, rebuild: 1, bombDamage: 1,

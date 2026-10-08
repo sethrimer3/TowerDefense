@@ -1,3 +1,4 @@
+import { syncCards } from "./cards.ts";
 /** The tile collection, as the Tiles tab shows it: everything the player
  * owns to put into a defense is a tile, a real piece of the realm. City
  * tiles and the wall's pieces, the unit buildings (Barracks), the towers,
@@ -82,11 +83,8 @@ export type ShopOffer = { price: Price } | { reason: string };
 export function shopOffer(save: Save, id: TileId): ShopOffer {
   if (id === "bomb") return { price: BOMB_PRICE };
   if (id === "warBanner") return { reason: "Always at hand in battle: one banner, never used up." };
-  const crown = crownedFrom(save, id)?.evolves;
-  if (crown) return { reason: `Crowned: every ${ITEM_NAMES[id]} is now a ${crown.name}. Buy those instead.` };
   const grown = evolvedBy(id);
-  if (grown && !crownedFrom(save, grown.evolves!.from))
-    return { reason: `Not sold: the crown of ${grown.name} turns every ${ITEM_NAMES[grown.evolves!.from]} into one.` };
+  if (grown) return { reason: `Evolve an individual ${ITEM_NAMES[grown.evolves!.from]} card in the Study after researching its crown.` };
   return { price: purchasePrice(id, save.defend.owned[id]) };
 }
 
@@ -109,6 +107,7 @@ export function buyTile(save: Save, id: TileId): boolean {
   if (!free) for (const k of METALS) save.smithy[k] = w[k];
   const grown = id === "bomb" ? undefined : evolvedBy(id);
   if (grown) crownBought(save, grown.evolves!.from);
+  syncCards(save.defend);
   return true;
 }
 

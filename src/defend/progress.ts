@@ -36,7 +36,11 @@ import {
   type PlacedStructure,
 } from "./layout.ts";
 
+import type { OwnedCard } from "../cards.ts";
+
 export type DefendSave = {
+  cards: OwnedCard[];
+  nextCardId: number;
   layout: Layout;
   owned: Record<PaletteItem, number>;
   levels: Record<UpgradeId, number>;
@@ -59,6 +63,7 @@ export type DefendSave = {
 
 export function defaultDefendSave(): DefendSave {
   return {
+    cards: [], nextCardId: 1,
     layout: defaultLayout(),
     owned: { ...STARTING_OWNED },
     levels: Object.fromEntries(UPGRADES.map((u) => [u.id, 0])) as Record<UpgradeId, number>,
@@ -231,6 +236,7 @@ export function decodeDefendSave(s: any): DefendSave {
   d.discovered = kinds.filter(k => Array.isArray(s.discovered) && s.discovered.includes(k));
   d.journalRead = d.discovered.filter(k => Array.isArray(s.journalRead) && s.journalRead.includes(k));
   d.layout = decodeLayout(s.layout, d.owned, d.levels) ?? d.layout;
+  d.nextCardId = intOr(s.nextCardId, 1, Number.MAX_SAFE_INTEGER, 1);
   return d;
 }
 

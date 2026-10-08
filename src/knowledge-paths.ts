@@ -1,15 +1,6 @@
-/** Knowledge paths: the Study's choices that change how a building works.
- * A topic (one tower or troop building) offers a few paths, each a chain of
- * ranks bought with Knowledge in order. Learning a path's first rank chooses
- * it and shuts the others; unlearning returns every point of Knowledge spent
- * on it and opens them again. The battle reads the choices from `Bonuses`'s
- * optional `paths` (`battlePaths`); with none chosen it plays exactly as
- * before. A path's crown (`evolves`), learned after its last rank, turns
- * every copy of the building into a greater one (`evolve`); unlearning the
- * path turns them back. Pure data and functions over the save. */
 import type { PaletteItem } from "./defend/catalog.ts";
 import type { PlacedKind } from "./defend/layout.ts";
-import { trimPlaced } from "./defend/progress.ts";
+import { syncCards } from "./cards.ts";
 import type { Save } from "./save.ts";
 import { studyPathCost } from "./economy.ts";
 
@@ -139,7 +130,7 @@ export const PATHS: KnowledgePath[] = [
       { name: "Forked bolts", icon: "fork", cost: studyPathCost(5, 1), text: "Bolts leap through 5 enemies, further apart" },
       { name: "Thunderhead", icon: "thunderhead", cost: studyPathCost(5, 2), text: "Bolts leap through 7 enemies and strike half again as hard" },
     ],
-    evolves: { from: "wizardTower", item: "darkKeep", name: "Dark wizard keep", cost: 150000, text: "At the storm's height every wizard tower becomes a Dark wizard keep" },
+    evolves: { from: "wizardTower", item: "darkKeep", name: "Dark wizard keep", cost: 150000, text: "Unlocks the crown: evolve a selected Stormcalling card into a Dark wizard keep" },
   },
   {
     id: "crusaders", topic: "barracks", name: "Crusaders", motto: "Immovable, armoured, enduring", hue: "steel",
@@ -148,7 +139,7 @@ export const PATHS: KnowledgePath[] = [
       { name: "Field dressing", icon: "heart", cost: studyPathCost(4, 1), text: "They heal 3 HP a second" },
       { name: "Templars", icon: "cross", cost: studyPathCost(4, 2), text: "120% more HP in all, and 50% more damage" },
     ],
-    evolves: { from: "barracks", item: "valkyriePalace", name: "Valkyrie palace", cost: 100000, text: "Crowned, every barracks becomes a Valkyrie palace" },
+    evolves: { from: "barracks", item: "valkyriePalace", name: "Valkyrie palace", cost: 100000, text: "Unlocks the crown: evolve a selected Crusaders card into a Valkyrie palace" },
   },
   {
     id: "assassins", topic: "barracks", name: "Assassins", motto: "Swift, frail, deadly strikes", hue: "shadow",
@@ -299,80 +290,76 @@ export const pathRank = (paths: BattlePaths | undefined, topic: PathTopic, path:
   return c && c.path === path ? c.rank : 0;
 };
 
-/** Where one path stands for the page: its ranks learned, whether another
- * path shuts it, and its next rank's cost. */
+/** Paths are researched once for the collection; cards equip them independently. */
+export type PathResearch = Partial<Record<PathId, { rank: number; spent: number; crowned?: boolean }>>;
 export function pathState(save: Save, id: PathId) {
-  const p = pathById(id), choice = save.paths[p.topic];
-  const rank = choice?.path === id ? choice.rank : 0;
-  const sealed = !!choice && choice.path !== id;
-  const next = p.ranks[rank];
-  const affordable = !!next && (save.settings.devMode || save.knowledge >= next.cost);
-  const crowned = choice?.path === id && choice.crowned !== undefined;
+  const p = pathById(id), research = save.pathResearch[id], rank = research?.rank ?? 0;
+  const next = p.ranks[rank], affordable = !!next && (save.settings.devMode || save.knowledge >= next.cost);
+  const crowned = !!research?.crowned;
   const crownAffordable = !!p.evolves && (save.settings.devMode || save.knowledge >= p.evolves.cost);
-  return {
-    rank, sealed, next, maxed: !next, affordable, canLearn: !sealed && !!next && affordable,
-    crowned, crownAffordable, canEvolve: !!p.evolves && !sealed && !next && !crowned && crownAffordable,
-  };
+  return { rank, sealed: false, next, maxed: !next, affordable, canLearn: !!next && affordable,
+    crowned, crownAffordable, canEvolve: !!p.evolves && !next && !crowned && crownAffordable };
 }
 
-/** The topic whose crown has turned `item` into its greater building, if any. */
-export const crownedFrom = (save: Save, item: PaletteItem): KnowledgePath | undefined =>
-  PATHS.find((p) => p.evolves?.from === item && save.paths[p.topic]?.path === p.id && save.paths[p.topic]?.crowned !== undefined);
+/** Base cards stay for sale after a crown is researched. */
+export const crownedFrom = (_save: Save, _item: PaletteItem): KnowledgePath | undefined => undefined;
+export const evolvedBy = (item: PaletteItem): KnowledgePath | undefined => PATHS.find(p => p.evolves?.item === item);
+export function crownBought(_save: Save, _item: PaletteItem) {}
 
-/** The path whose crown makes `item`, if any: such a building isn't sold. */
-export const evolvedBy = (item: PaletteItem): KnowledgePath | undefined => PATHS.find((p) => p.evolves?.item === item);
-
-/** Learns `id`'s crown: every copy of the building, placed or not, becomes
- * its greater building, back in the palette to be placed again (the two
- * don't share a footprint). */
+/** Unlock a crown. Transforming a specific card is a separate, free choice. */
 export function evolve(save: Save, id: PathId, prepaid?: number): boolean {
-  const st = pathState(save, id), p = pathById(id), e = p.evolves;
-  if (!e || st.sealed || !st.maxed || st.crowned || (prepaid === undefined && !st.canEvolve)) return false;
-  const cost = prepaid ?? (save.settings.devMode ? 0 : e.cost), choice = save.paths[p.topic]!, d = save.defend;
+  const st = pathState(save, id), p = pathById(id);
+  if (!p.evolves || !st.maxed || st.crowned || (prepaid === undefined && !st.canEvolve)) return false;
+  const cost = prepaid ?? (save.settings.devMode ? 0 : p.evolves.cost);
   if (prepaid === undefined) save.knowledge -= cost;
-  const n = d.owned[e.from];
-  d.owned[e.from] = 0;
-  d.owned[e.item] += n;
-  trimPlaced(d, e.from);
-  save.paths[p.topic] = { ...choice, spent: choice.spent + cost, crowned: n };
+  const r = save.pathResearch[id]!;
+  r.crowned = true; r.spent += cost;
   return true;
 }
 
-/** While crowned, a copy bought in the building's Forge is its greater
- * building, and turns back with the rest. */
-export function crownBought(save: Save, item: PaletteItem) {
-  const p = crownedFrom(save, item);
-  if (p) save.paths[p.topic]!.crowned! += 1;
-}
-
-/** Learns `id`'s next rank (choosing the path with its first). */
 export function learnPath(save: Save, id: PathId, prepaid?: number): boolean {
-  const st = pathState(save, id), p = pathById(id);
-  if (st.sealed || !st.next || (prepaid === undefined && !st.canLearn)) return false;
+  const st = pathState(save, id);
+  if (!st.next || (prepaid === undefined && !st.canLearn)) return false;
   const cost = prepaid ?? (save.settings.devMode ? 0 : st.next.cost);
   if (prepaid === undefined) save.knowledge -= cost;
-  const was = save.paths[p.topic];
-  save.paths[p.topic] = { path: id, rank: st.rank + 1, spent: (was?.spent ?? 0) + cost };
+  save.pathResearch[id] = { rank: st.rank + 1, spent: (save.pathResearch[id]?.spent ?? 0) + cost };
   return true;
 }
 
-/** Forgets a topic's path, returning the Knowledge spent on it; 0 when none. */
+/** Refund this topic's research and reset its cards, including individual crowns. */
 export function unlearnPath(save: Save, topic: PathTopic): number {
-  const choice = save.paths[topic];
-  if (!choice) return 0;
-  const e = pathById(choice.path).evolves;
-  if (e && choice.crowned !== undefined) {
-    const d = save.defend, n = Math.min(choice.crowned, d.owned[e.item]);
-    d.owned[e.item] -= n;
-    d.owned[e.from] += n;
-    trimPlaced(d, e.item);
+  syncCards(save.defend);
+  let spent = 0;
+  for (const p of pathsOf(topic)) {
+    spent += save.pathResearch[p.id]?.spent ?? 0;
+    delete save.pathResearch[p.id];
+    for (const c of save.defend.cards) {
+      if (c.evolved === p.id && p.evolves) {
+        save.defend.owned[c.kind]--; save.defend.owned[p.evolves.from]++;
+        c.kind = p.evolves.from; delete c.evolved; delete c.placement;
+      }
+      if (c.path === p.id) { delete c.path; delete c.rank; }
+    }
+    if (p.evolves) save.defend.layout = { ...save.defend.layout,
+      structures: save.defend.layout.structures.filter(s => s.kind !== p.evolves!.item || save.defend.cards.some(c => c.placement === `structure:${s.uid}`)) };
   }
-  save.knowledge += choice.spent;
   delete save.paths[topic];
-  return choice.spent;
+  save.knowledge += spent;
+  return spent;
 }
 
-/** Each topic's path and rank, for `bonuses`; undefined with none chosen. */
+export function decodePathResearch(raw: unknown): PathResearch {
+  const out: PathResearch = {};
+  if (!raw || typeof raw !== "object") return out;
+  for (const p of PATHS) {
+    const r = (raw as Record<string, any>)[p.id];
+    if (!r || !Number.isInteger(r.rank) || r.rank < 1 || r.rank > p.ranks.length || !Number.isFinite(r.spent) || r.spent < 0) continue;
+    out[p.id] = { rank: r.rank, spent: r.spent, ...(r.crowned === true && p.evolves && r.rank === p.ranks.length ? { crowned: true } : {}) };
+  }
+  return out;
+}
+
+/** Legacy topic-wide choices exist only for decoding old saves. */
 export function battlePaths(save: Save): BattlePaths | undefined {
   const out: BattlePaths = {};
   for (const [topic, c] of Object.entries(save.paths) as [PathTopic, PathChoice][]) out[topic] = { path: c.path, rank: c.rank };

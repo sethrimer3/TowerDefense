@@ -1,3 +1,4 @@
+import { buildingPaths } from "../cards.ts";
 import { DefenderIndex } from "./defender-index.ts";
 import { Atmosphere, groundWeather } from "./atmosphere.ts";
 import { areaForWave } from "./areas.ts";
@@ -78,6 +79,7 @@ export type Enemy = {
   distractT: number;
   rollT: number;
   marked: boolean;
+  markDamage?: number;
   flash: number;
   /** Seconds left chilled by a wizard's ice (slowed); absent when not, so
    * a run without ice keeps its state exactly as before. */
@@ -206,7 +208,7 @@ export class DefendSim {
   /** Training and skill-tree multipliers (all 1 without them). */
   readonly bonuses: Readonly<Bonuses>;
   /** How many times the damage a marked enemy takes (Spotters raise it). */
-  private readonly markDamage: number;
+
   /** Enemies slain this run, by kind: what the run pays out. Not part of
    * the replayed state. */
   /** The run's tally for the summary when the keep falls; not part of the
@@ -326,7 +328,6 @@ export class DefendSim {
     this.map = map;
     this.levels = levels;
     this.bonuses = bonuses;
-    this.markDamage = SPOTTERS.mark[pathRank(bonuses.paths, "watchTower", "spotters")];
     this.rand = rng(seed);
     const n = map.buildings.length;
     this.solid = new Uint8Array(CELL_COUNT);
@@ -692,18 +693,16 @@ export class DefendSim {
   }
 
   private markEnemies() {
-    const signal = pathRank(this.bonuses.paths, "watchTower", "signalFires");
-    for (const e of this.enemies) e.marked = false;
-    // Signal fires slow only the marked: last step's slowing is lifted first.
-    if (signal) for (const e of this.enemies) delete e.slowed;
-    const r = watchReach(this);
+    for (const e of this.enemies) { e.marked = false; delete e.slowed; delete e.markDamage; }
     for (const b of this.map.buildings) {
       if (b.kind !== "watchTower" || !this.intact(b)) continue;
-      const c = center(b.rect);
+      const p = buildingPaths(this, b), signal = pathRank(p, "watchTower", "signalFires"), spot = pathRank(p, "watchTower", "spotters");
+      const c = center(b.rect), r = watchReach(this, b);
       for (const e of this.enemiesNear(c.x, c.y, r)) {
         e.marked = true;
+        e.markDamage = Math.max(e.markDamage ?? 2, SPOTTERS.mark[spot]);
         if (!signal) continue;
-        e.slowed = SIGNAL.slow[signal];
+        e.slowed = Math.min(e.slowed ?? 1, SIGNAL.slow[signal]);
         if (signal >= 3) ignite(e, SIGNAL.burn, 0.5);
       }
     }
@@ -753,7 +752,7 @@ export class DefendSim {
     amount *= damageModifier(this, e, origin, source, projectile);
     if (e.kind === "iceGolem" && element !== "physical") amount *= 2;
     if (amount <= 0) return false;
-    const hit = e.marked ? amount * this.markDamage : amount;
+    const hit = e.marked ? amount * (e.markDamage ?? SPOTTERS.mark[pathRank(this.bonuses.paths, "watchTower", "spotters")]) : amount;
     this.stats.current.dealt += Math.min(e.hp, hit);
     e.hp -= hit;
     if (flash) e.flash = 0.12;
@@ -955,8 +954,9 @@ export class DefendSim {
 }
 
 /** How far a watch tower marks enemies. */
-export function watchReach(sim: Pick<DefendSim, "levels" | "bonuses">) {
-  const spot = pathRank(sim.bonuses.paths, "watchTower", "spotters"), signal = pathRank(sim.bonuses.paths, "watchTower", "signalFires");
+export function watchReach(sim: Pick<DefendSim, "levels" | "bonuses">, b?: Building) {
+  const p = buildingPaths(sim, b);
+  const spot = pathRank(p, "watchTower", "spotters"), signal = pathRank(p, "watchTower", "signalFires");
   return watchRadius(sim.levels.watchRadius) + (spot >= 2 ? SPOTTERS.radius : 0) + (signal >= 2 ? SIGNAL.radius : 0);
 }
 
@@ -966,7 +966,7 @@ function maxHpOf(b: Building, levels: Levels, bonuses: Readonly<Bonuses>) {
   if (b.kind === "wallBallista") return wallHp(levels.wallStrength) * bonuses.wallHp * BALLISTA.hpPerCell * b.cells.length;
   if (b.kind === "house") return HOUSE_HP_PER_CELL * b.cells.length;
   if (b.kind === "keep") return keepHp(levels.keepStrength) * bonuses.keepHp;
-  if (b.kind === "monsterBait") return STRUCTURES[b.kind].maxHp * FORTIFY.hp[pathRank(bonuses.paths, "bait", "fortified")];
+  if (b.kind === "monsterBait") return STRUCTURES[b.kind].maxHp * FORTIFY.hp[pathRank(buildingPaths({ bonuses }, b), "bait", "fortified")];
   return STRUCTURES[b.kind].maxHp;
 }
 

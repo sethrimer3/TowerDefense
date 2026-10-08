@@ -1,3 +1,4 @@
+import { buildingPaths } from "../cards.ts";
 import { bannerDamage } from "./war-banner.ts";
 /** DEFEND fire mages, trained at the Mage Guild: they roam the city's
  * streets like archers and, when an enemy comes within reach, hurl a
@@ -16,14 +17,17 @@ import { CINDERS, PYROCLASM, pathRank } from "../knowledge-paths.ts";
 import { ignite } from "./towers.ts";
 
 /** The Mage Guild's Study path and rank (`knowledge-paths.ts`): each 0 unless chosen. */
-const paths = (sim: DefendSim) => ({ pyro: pathRank(sim.bonuses.paths, "mageGuild", "pyroclasm"), cinders: pathRank(sim.bonuses.paths, "mageGuild", "cinders") });
+const paths = (sim: DefendSim, home?: number) => {
+  const p = buildingPaths(sim, home === undefined ? undefined : sim.map.buildings[home]);
+  return { pyro: pathRank(p, "mageGuild", "pyroclasm"), cinders: pathRank(p, "mageGuild", "cinders") };
+};
 
 /** A fireball in flight from (x0, y0) to where its target stood (x1, y1):
  * `t` of `dur` seconds along, with the burst it makes on landing. */
-export type Fireball = { x0: number; y0: number; x1: number; y1: number; t: number; dur: number; damage: number; r: number; origin?: Arrow["origin"] };
+export type Fireball = { x0: number; y0: number; x1: number; y1: number; t: number; dur: number; damage: number; r: number; origin?: Arrow["origin"]; home?: number };
 /** Burning ground a fireball left: its centre and radius, how long it has
  * burned of its `life`, its damage a second, and a seed for how it looks. */
-export type Blaze = { x: number; y: number; r: number; t: number; life: number; dps: number; seed: number };
+export type Blaze = { x: number; y: number; r: number; t: number; life: number; dps: number; seed: number; cling?: boolean };
 
 /** Mages throw at the nearest enemy in reach; otherwise they stroll to a
  * random street. */
@@ -42,9 +46,9 @@ export function stepMage(sim: DefendSim, s: Soldier, dt: number) {
 
 function throwFireball(sim: DefendSim, s: Soldier, e: { x: number; y: number }) {
   s.cd = FIRE_MAGE.cooldown;
-  const d = dist(e.x - s.x, e.y - s.y), { pyro } = paths(sim);
+  const d = dist(e.x - s.x, e.y - s.y), { pyro } = paths(sim, s.home);
   sim.fireballs.push({
-    origin: { x: s.x, y: s.y, attacker: s.id },
+    home: s.home, origin: { x: s.x, y: s.y, attacker: s.id },
     x0: s.x, y0: s.y - 0.2, x1: e.x, y1: e.y, t: 0, dur: 0.15 + d / FIREBALL_SPEED,
     damage: pyro ? bannerDamage(sim, s) * PYROCLASM.damage : bannerDamage(sim, s), r: fireballSplash(sim.levels.mageFireball ?? 0) * (pyro >= 2 ? PYROCLASM.splash : 1),
   });
@@ -65,26 +69,26 @@ export function stepFireballs(sim: DefendSim, dt: number) {
     // A fireball landing in a magic boat's water goes out with a hiss.
     if (fizzles(sim, f.x1, f.y1, f.r)) continue;
     const seed = sim.explode(f.x1, f.y1, { r: f.r, damage: f.damage, friendlyFire: false, origin: f.origin });
-    const level = sim.levels.mageEmbers ?? 0, { pyro, cinders } = paths(sim);
+    const level = sim.levels.mageEmbers ?? 0, { pyro, cinders } = paths(sim, f.home);
     // Meteor shower: smaller bursts either side of the landing.
     if (pyro >= 3)
       for (const side of [-1, 1]) sim.explode(f.x1 + side * f.r * 0.9, f.y1, { r: f.r / 2, damage: f.damage * PYROCLASM.shardShare, friendlyFire: false, origin: f.origin });
     const life = emberSeconds(level) * (cinders ? CINDERS.life : 1), dps = emberDps(level) * sim.bonuses.troopDamage * (cinders >= 2 ? CINDERS.dps : 1);
-    sim.blazes.push({ x: f.x1, y: f.y1, r: f.r * EMBER_SHARE, t: 0, life, dps, seed });
+    sim.blazes.push({ x: f.x1, y: f.y1, r: f.r * EMBER_SHARE, t: 0, life, dps, seed, ...(cinders >= 3 ? { cling: true } : {}) });
   }
   sim.fireballs = sim.fireballs.filter((f) => f.t < f.dur);
 }
 
 /** Burning ground scorches every ground enemy inside it, and dies down. */
 export function stepBlazes(sim: DefendSim, dt: number) {
-  const cling = paths(sim).cinders >= 3;
+  const legacyCling = paths(sim).cinders >= 3;
   for (const b of sim.blazes) {
     b.t += dt;
     for (const e of sim.enemiesNear(b.x, b.y, b.r)) {
       if (ENEMIES[e.kind].flying || sheltered(sim, e.x, e.y)) continue;
       sim.hurtEnemy(e, b.dps * dt, false, "ranged", b, false, "fire");
       // Clinging fire: it keeps burning after it walks out.
-      if (cling) ignite(e, b.dps, CINDERS.cling);
+      if (b.cling || legacyCling) ignite(e, b.dps, CINDERS.cling);
     }
   }
   sim.blazes = sim.blazes.filter((b) => b.t < b.life);

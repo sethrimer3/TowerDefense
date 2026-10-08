@@ -1,3 +1,4 @@
+import { spikeKey } from "../cards.ts";
 /** The city wall's own defenses. Wall spikes cut every enemy on foot that
  * presses against the stones they stand on, in pulses; wall ballistas on
  * the wall's corners shoot long bolts at the nearest enemy, each piercing a
@@ -47,12 +48,12 @@ export function stepSpikes(sim: DefendSim, dt: number) {
   sim.spikeT -= dt;
   if (sim.spikeT > 0) return;
   sim.spikeT += spikeEvery(sim.levels.spikeRate ?? 0);
-  const paths = sim.bonuses.paths;
-  const blast = pathRank(paths, "spikes", "blastStakes"), spring = pathRank(paths, "spikes", "springStakes"), rime = pathRank(paths, "spikes", "rimeStakes");
   const cut = spikeDamage(sim.levels.spikeDamage ?? 0);
   const struck = new Set<number>();
   const sprung: number[] = [];
   rows.forEach((row, r) => {
+    const paths = sim.bonuses.spikePaths?.[spikeKey(row)] ?? sim.bonuses.paths;
+    const blast = pathRank(paths, "spikes", "blastStakes"), spring = pathRank(paths, "spikes", "springStakes"), rime = pathRank(paths, "spikes", "rimeStakes");
     const [dx, dy] = SIDE_STEP[row.side];
     for (const cell of row.cells) {
       if (!sim.solid[cell]) continue;
@@ -85,7 +86,7 @@ export function stepSpikes(sim: DefendSim, dt: number) {
       }
     }
   });
-  for (const r of sprung) springRow(sim, r, spring, cut);
+  for (const r of sprung) springRow(sim, r, pathRank(sim.bonuses.spikePaths?.[spikeKey(rows[r])] ?? sim.bonuses.paths, "spikes", "springStakes"), cut);
 }
 
 /** Every standing stone's stakes in row `r` shoot out, striking each enemy

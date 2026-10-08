@@ -4,13 +4,15 @@
 import { decodeDefendSave, defaultDefendSave, type DefendSave } from "./defend/progress.ts";
 import { STARTING_METAL, TRAINING, TRAINING_IDS, type TrainingId } from "./progression.ts";
 import { SKILLS, SKILL_IDS, type SkillId } from "./skill-trees.ts";
-import { decodePaths, type PathChoices } from "./knowledge-paths.ts";
+import { PATHS, decodePaths, decodePathResearch, type PathResearch, type PathChoices } from "./knowledge-paths.ts";
 import type { TrainingJob } from "./training-jobs.ts";
 import { decodeSettings, defaultSettings, type Settings } from "./settings.ts";
 import { METALS, decodeMineSave, type MineSave, type Metals } from "./mine/sim.ts";
 import { decodeLibrarySave, type LibrarySave } from "./library/sim.ts";
 import { decodeResearchJob, type ResearchJob } from "./research-jobs.ts";
 import { decodeForgeJob, type ForgeJob } from "./forge-jobs.ts";
+
+import { decodeCards, syncCards, cardTopic } from "./cards.ts";
 
 export const SAVE_KEY = "towerdefense.v1";
 /** 2: copper and silver became the mine's metal (`smithy`), and a point
@@ -34,6 +36,7 @@ export type Save = {
   /** The Study's paths: each topic's chosen path, its ranks and the
    * Knowledge spent on it (`knowledge-paths.ts`). */
   paths: PathChoices;
+  pathResearch: PathResearch;
   /** The Smithy's upgrades: ranks completed per row, the ranks in work, and
    * when their work was last settled (ms). */
   training: Record<TrainingId, number>;
@@ -60,6 +63,7 @@ export function defaults(): Save {
     knowledge: 0,
     skills: Object.fromEntries(SKILL_IDS.map((id) => [id, 0])) as Record<SkillId, number>,
     paths: {},
+    pathResearch: {},
     training: Object.fromEntries(TRAINING_IDS.map((id) => [id, 0])) as Record<TrainingId, number>,
     trainingJobs: [],
     trainingClock: 0,
@@ -101,10 +105,27 @@ export function decode(raw: string | null): Save {
   d.knowledge = num(s.knowledge ?? s.valor, 0);
   for (const id of SKILL_IDS) d.skills[id] = int(s.skills?.[id], 0, 0, SKILLS[id].max);
   d.paths = decodePaths(s.paths);
+  d.pathResearch = decodePathResearch(s.pathResearch);
   for (const t of TRAINING) d.training[t.id] = int(s.training?.[t.id], 0, 0, t.max);
   d.trainingJobs = decodeJobs(s.trainingJobs, d.training);
   d.trainingClock = num(s.trainingClock, 0);
   d.defend = decodeDefendSave(s.defend);
+  // Migrate existing paths, ranks, paid Knowledge and crowned copies exactly once.
+  const legacy = s.pathResearch === undefined;
+  if (legacy) for (const c of Object.values(d.paths)) d.pathResearch[c.path] = {
+    rank: c.rank, spent: c.spent, ...(c.crowned !== undefined ? { crowned: true } : {}) };
+  decodeCards(s.defend?.cards, d);
+  if (legacy) for (const c of d.defend.cards) {
+    const choice = d.paths[cardTopic(c)!];
+    if (choice) { c.path = choice.path; c.rank = choice.rank; }
+    for (const choice of Object.values(d.paths)) {
+      // Old crown conversions already changed owned counts; recover their card identities.
+      const p = PATHS.find(p => p.id === choice.path && p.evolves?.item === c.kind);
+      if (p && choice.crowned !== undefined) { c.evolved = p.id; c.path = p.id; c.rank = choice.rank; }
+    }
+  }
+  d.paths = {};
+  syncCards(d.defend);
   d.upgradePoints = int(s.upgradePoints, d.defend.bestWave);
   d.mine = decodeMineSave(s.mine);
   d.library = decodeLibrarySave(s.library);
