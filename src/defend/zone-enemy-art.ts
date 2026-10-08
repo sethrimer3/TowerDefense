@@ -1,4 +1,4 @@
-/** Native silhouettes for the forest, desert, drowned, fungal, crystal and astral species.
+/** Native silhouettes for the themed zone species.
  * Battle bodies and journal portraits share the same bounded sprite cache. */
 import { ENEMIES, type EnemyKind, type ZoneEnemyKind } from "./catalog.ts";
 import { pixels, shade, sprite } from "./damage-art.ts";
@@ -6,6 +6,100 @@ import type { Brush } from "./battle-art.ts";
 import type { Enemy } from "./sim.ts";
 
 const ROWS: Record<ZoneEnemyKind, readonly string[]> = {
+  fernMantis: [
+    " O      O ", " OH OO HO ", "  OHHEHO  ", "   OMMO   ",
+    " OHOMMOHO ", "OMO OM OMO", " O ODDO O ", "   ODDO   ",
+    "  ODOODO  ", " OO    OO ",
+  ],
+  mossTroll: [
+    "   OOOOO   ", "  OHHHHHO  ", "  OHMEHMO  ", "  OMAAAMO  ",
+    " OOMMMDDOO ", "OHOMMMMODOO", "OMOHHMMOMDO", " OOMMMDDOO ",
+    "   ODDDO   ", "  ODDODDO  ", "  OOO OOO  ",
+  ],
+  lanternHornet: [
+    "  OO  OO  ", " OAAOOAAO ", "OHAAHHAAHO", " OOHEEHOO ",
+    "   OAAO   ", "   ODDO   ", "   OAAO   ", "    OO    ",
+    "    O     ",
+  ],
+  glassJackal: [
+    " O        O  ", "OHO      OHO ", " OHO   OOHMO ", "  OOOOOHMEMO ",
+    "  OHMMMMMMAO ", "   ODDMMMDO  ", "   OOOOODO   ", "  ODO  ODO   ",
+    "  OO    OO   ",
+  ],
+  duneTortoise: [
+    "    OOOOO    ", "  OOHHHHHOO  ", " OHMHMMHMMDO ", "OHMMDDMDDMMDO",
+    "OHMDDMMMDMMDO", " ODDDDDDDDOO ", "  OOODOOOOMAO", " ODO  ODO OOO",
+    " OOO  OOO    ",
+  ],
+  dustDjinn: [
+    "   OAAAAO  ", "    OHHO   ", "   OHEEMO  ", " OOHHMMHOO ",
+    "OHOMMMMOHMO", " OOMMMMOOO ", "   OMDDO   ", "    ODDO   ",
+    "   ODO     ", "    OOO    ", "      O    ",
+  ],
+  cinderImp: [
+    " O    O ", "OHO  OHO", " OHHHHO ", " OHEEHO ",
+    "  OMDO  ", " OOAMOO ", "OHOMMOHO", " OODDOO ",
+    "  OO OO ", " OAO OAO",
+  ],
+  slagGolem: [
+    "    OOOO    ", "   OHHHDO   ", "   OMAADO   ", "   OMDMDO   ",
+    " OOOHHMMOOO ", "OHHOAMMDOHMO", "OMMOAMADOMDO", " OOOMDDDOOO ",
+    "   ODDDDO   ", "  ODDOODDO  ", "  OAO  OAO  ", "  OOO  OOO  ",
+  ],
+  emberMoth: [
+    " OOO      OOO ", "OHAAO OO OHAAO", "OHMMHOAAOHMMDO", " OHHMOEEOMMDO ",
+    " OHMMOAAMMMDO ", "  OMMODDOMDO  ", "   OOODDOOO   ", "     OAAO     ",
+    "      OO      ",
+  ],
+  kelpStalker: [
+    " O   OO   O ", " OH OHH OHO ", "  OHHHHHHO  ", "   OHEEHO   ",
+    "  OOHHMMOO  ", " OHOMMMMOMO ", " O OMMDDO O ", "   ODDDDO   ",
+    "   ODOODO   ", "  ODO  ODO  ", "  OO    OO  ",
+  ],
+  capCrawler: [
+    "   OOOO OOOO   ", " OOHHHHOMHMMOO ", "OHAAHHHHMMAMMDO",
+    " OOOOOOOOOOOOO ", "  OHMMMEMMMMDO ", " OODDDDDDDDDOO ",
+    "O O O O O O O O", " OO  OO  OO OO ",
+  ],
+  myceliumHulk: [
+    "  OOO OOO OOO  ", " OHHHOHHHOHHHO ", "  OHHHHHHHHHO  ", "   OHMEEMMDO   ",
+    " OOOHHMMDDOOO  ", "OHMOMHMMMDOHMO ", "OMMOMMMMMDOMMDO", " OOOMMDDDDOOO  ",
+    "   ODDDDDDO    ", "   ODO ODDO    ", "  OHDO ODDHO   ", "  OOOO OOOOO   ",
+  ],
+  rotMite: [
+    " O O O O ", "  OHHHO  ", " OHEEHMO ", "OOMMMDDOO",
+    " ODDDDDO ", "  ODDDO  ", " O O O O ", "O       O",
+  ],
+  geodeCrab: [
+    "   OO    OO   ", "  OHHO  OHHO  ", " OHHDOOOOHMDO ", "  OOOMHHMOOO  ",
+    "OO OHMAAHMD OO", "OHOOHMMMMDOOHO", " OOODDDDDDOOO ", "O  OOOOOOO  O ",
+    " O O     O O  ",
+  ],
+  prismMoth: [
+    " O       O ", "OHOO   OOHO", "OHMHO OHHMO", " OMHHOHHMO ",
+    "  OHMEEHO  ", " OMMMAAMMO ", "OHM ODD MHDO", " OO ODDO OO ",
+    "    OOOO    ",
+  ],
+  shardBrood: [
+    "  O   O   O  ", " OH OOHOO HO ", "OHHOHHHHOOHHO", "OMHHHMMHHMMDO",
+    " OHHMMMMMMDO ", "  OMMMEMMDO  ", " OMMDDDDDMDO ", "  ODDDDDDOO  ",
+    "   OO OOO    ", "  ODO ODDO   ", "  OOO OOOO   ",
+  ],
+  cryptHound: [
+    " O         O ", "OHO       OHO", " OHHOOOOOHMO ", "  OHMMDDMEMO ",
+    " OMMDDDDMMAO ", "O ODDDDDDOO  ", "   OOO ODO   ", "  OAO  OAO   ",
+    "  OOO  OOO   ",
+  ],
+  graveWisp: [
+    "    OOO    ", "   OHHHO   ", "  OHAAAHO  ", "  OHAEAHO  ",
+    "   OMMMO   ", "  OMMMDDO  ", " OMDMMDDDO ", "  ODDDDDO  ",
+    "   ODO O   ", "  O O  OO  ", "  O        ",
+  ],
+  novaMoth: [
+    " OO        OO ", "OHHO  OO  OHHO", "OHAAOOAAOOAAMO", "OHMHHHAHHHMMDO",
+    " OMMHOEEOHMDO ", "  OHMOAAOMDO  ", " OHHMOMMOMMDO ", "  OOOODDOOOO  ",
+    "     ODDO     ", "      OO      ",
+  ],
   briarling: [
     " O   O   O ", "  OHOHOHO  ", "   OHHHO   ", "  OHMEMHO  ",
     "   OMMMO   ", " OOOMMMOOO ", "OH OMMMO HO", " O ODDDO O ",

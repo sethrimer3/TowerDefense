@@ -25,6 +25,8 @@ export function damageModifier(sim: DefendSim, e: Enemy, origin: (Point & { atta
 }
 
 export function stepAbilities(sim: DefendSim, e: Enemy, dt: number): boolean {
+  const regeneration = ENEMIES[e.kind].regeneration;
+  if (regeneration && e.hp > 0 && Number.isFinite(dt) && dt > 0) e.hp = Math.min(e.maxHp, e.hp + regeneration * dt);
   if (e.fortressPart) return stepFortress(sim, e, dt);
   if (e.kind === "phoenixEgg") {
     e.abilityT = (e.abilityT ?? 5) - dt;

@@ -12,14 +12,18 @@ import { stepPoison } from '../src/defend/hostile-attacks.ts';
 import { defaultDefendSave, decodeDefendSave } from '../src/defend/progress.ts';
 import { journalHTML } from '../src/defend/journal.ts';
 import { zoneEnemyRows, zoneEnemyPixels } from '../src/defend/zone-enemy-art.ts';
+import { stepAbilities } from '../src/defend/enemy-abilities.ts';
+import { stepBlazes } from '../src/defend/mages.ts';
 
 const additions: Partial<Record<AreaId, ZoneEnemyKind[]>> = {
-  moss: ['briarling', 'mossBoar', 'rootTreant'],
-  desert: ['duneScorpion', 'sunScarab', 'sandVulture'],
-  drowned: ['brineCrab', 'lanternJelly', 'coralGuardian'],
-  fungal: ['sporeling', 'fungalBrute', 'sporeMoth'],
-  crystal: ['shardling', 'crystalSentinel', 'prismRay'],
-  astral: ['starWisp', 'cometHound', 'astralWarden'],
+  moss: ['briarling', 'mossBoar', 'rootTreant', 'fernMantis', 'mossTroll', 'lanternHornet'],
+  desert: ['duneScorpion', 'sunScarab', 'sandVulture', 'glassJackal', 'duneTortoise', 'dustDjinn'],
+  ember: ['cinderImp', 'slagGolem', 'emberMoth'],
+  drowned: ['brineCrab', 'lanternJelly', 'coralGuardian', 'kelpStalker'],
+  fungal: ['sporeling', 'fungalBrute', 'sporeMoth', 'capCrawler', 'myceliumHulk', 'rotMite'],
+  crystal: ['shardling', 'crystalSentinel', 'prismRay', 'geodeCrab', 'prismMoth', 'shardBrood'],
+  obsidian: ['cryptHound', 'graveWisp'],
+  astral: ['starWisp', 'cometHound', 'astralWarden', 'novaMoth'],
 };
 const kinds = Object.values(additions).flat();
 function fixture() {
@@ -28,12 +32,12 @@ function fixture() {
   return sim;
 }
 
-test('six sparse zones gain three exclusive species that can appear on their first visit', () => {
+test('every themed zone has at least fifteen species and all native additions appear on their first visit', () => {
   for (const area of AREAS) {
     const expected = additions[area.id];
     assert.equal(new Set(AREA_ENEMIES[area.id]).size, AREA_ENEMIES[area.id].length);
+    assert.ok(AREA_ENEMIES[area.id].length >= 15, `${area.name} roster remains sparse`);
     if (!expected) continue;
-    assert.ok(AREA_ENEMIES[area.id].length >= 12);
     // Costs must be affordable immediately; selection also depends on the
     // wave's exact spendable remainder, so probe the whole first zone visit.
     for (const kind of expected) {
@@ -54,14 +58,14 @@ test('six sparse zones gain three exclusive species that can appear on their fir
 });
 
 test('new splitting enemies reserve their entire brood and respect the runtime cap', () => {
-  for (const kind of ['rootTreant', 'fungalBrute'] as const) {
+  for (const kind of ['rootTreant', 'fungalBrute', 'shardBrood', 'novaMoth'] as const) {
     const def = ENEMIES[kind], child = def.splits!.into;
     const wave = buildDifficultyWave(def.cost * MAX_WAVE_ENEMIES, () => 0, [kind]);
-    assert.equal(wave.length, MAX_WAVE_ENEMIES / 4);
+    assert.equal(wave.length, Math.floor(MAX_WAVE_ENEMIES / (1 + def.splits!.count)));
     const sim = fixture(), parent = sim.spawnAuxiliary(kind, 10, 10)!;
     sim.hurtEnemy(parent, def.hp + 1, true, 'melee');
     (sim as any).sweepAway();
-    assert.equal(sim.enemies.length, 3);
+    assert.equal(sim.enemies.length, def.splits!.count);
     assert.ok(sim.enemies.every(e => e.kind === child && e.hp === ENEMIES[child].hp));
     assert.equal(sim.slain[kind], 1);
     (sim as any).sweepAway(); assert.equal(sim.slain[kind], 1);
@@ -74,7 +78,7 @@ test('new splitting enemies reserve their entire brood and respect the runtime c
 });
 
 test('new shield supports protect only within reach and remain vulnerable to melee', () => {
-  for (const kind of ['sunScarab', 'coralGuardian', 'crystalSentinel', 'prismRay', 'astralWarden'] as const) {
+  for (const kind of kinds.filter(k => ENEMIES[k].shield)) {
     const sim = fixture(), def = ENEMIES[kind];
     const shield = sim.spawnAuxiliary(kind, 10, 10)!;
     const nearby = sim.spawnAuxiliary('briarling', 10.5, 10)!;
@@ -89,7 +93,7 @@ test('new shield supports protect only within reach and remain vulnerable to mel
 });
 
 test('venom and spore carriers harm nearby people while sparing distant archers and buildings', () => {
-  for (const kind of ['duneScorpion', 'lanternJelly', 'sporeling', 'sporeMoth'] as const) {
+  for (const kind of kinds.filter(k => ENEMIES[k].poison)) {
     const sim = fixture(), def = ENEMIES[kind];
     sim.spawnAuxiliary(kind, 10, 10);
     sim.soldiers.push({ id: 100, x: 10.1, y: 10, hp: 100, kind: 'sword', flash: 0 } as any,
@@ -105,7 +109,7 @@ test('venom and spore carriers harm nearby people while sparing distant archers 
 });
 
 test('new fliers cross standing walls and strike the keep', () => {
-  for (const kind of ['sandVulture', 'lanternJelly', 'sporeMoth', 'prismRay', 'starWisp'] as const) {
+  for (const kind of kinds.filter(k => ENEMIES[k].flying)) {
     const sim = fixture(); sim.soldiers.length = sim.civilians.length = 0;
     // Solid cells everywhere: flying movement must ignore this obstruction.
     sim.solid.fill(1);
@@ -127,6 +131,52 @@ test('every addition persists discovery and has journal counterplay and finite k
     sim.hurtEnemy(e, e.maxHp + 1, true, 'melee'); (sim as any).sweepAway();
     assert.equal(sim.slain[kind], 1);
   }
+});
+
+test('regenerating species recover with battle time, cap at maximum HP, and never revive', () => {
+  for (const kind of kinds.filter(k => ENEMIES[k].regeneration)) {
+    const sim = fixture(), e = sim.spawnAuxiliary(kind, 10, 10)!;
+    e.hp = e.maxHp - 20;
+    stepAbilities(sim, e, .5);
+    assert.equal(e.hp, e.maxHp - 20 + ENEMIES[kind].regeneration! * .5);
+    const before = e.hp;
+    for (const dt of [0, -1, NaN, Infinity]) { stepAbilities(sim, e, dt); assert.equal(e.hp, before); }
+    stepAbilities(sim, e, 100); assert.equal(e.hp, e.maxHp);
+    e.hp = 0; stepAbilities(sim, e, 100); assert.equal(e.hp, 0);
+    assert.ok(journalHTML([kind]).includes(`Regenerates ${ENEMIES[kind].regeneration} HP per battle second`));
+  }
+  const sim = fixture(), normal = sim.spawnAuxiliary('orc', 10, 10)!;
+  normal.hp = 10; stepAbilities(sim, normal, 1); assert.equal(normal.hp, 10);
+});
+
+test('shells and forge creatures apply only their explicit elemental resistance and weakness', () => {
+  for (const kind of kinds.filter(k => ENEMIES[k].damageScale)) {
+    for (const element of ['physical', 'fire', 'explosion'] as const) {
+      const sim = fixture(), e = sim.spawnAuxiliary(kind, 10, 10)!;
+      const scale = ENEMIES[kind].damageScale?.[element] ?? 1;
+      const result = sim.hurtEnemy(e, 10, true, 'melee', undefined, false, element);
+      assert.equal(e.hp, e.maxHp - 10 * scale, `${kind}/${element}`);
+      assert.equal(result, scale > 0);
+      assert.equal(sim.stats.current.dealt, 10 * scale);
+    }
+  }
+});
+
+test('elemental defenses cover real burning ground, lingering burns, explosions and shield ordering', () => {
+  const sim = fixture(), golem = sim.spawnAuxiliary('slagGolem', 10, 10)!;
+  sim.blazes.push({ x: 10, y: 10, r: 1, t: 0, life: 10, dps: 10, seed: 1 });
+  stepBlazes(sim, 1); assert.equal(golem.hp, golem.maxHp);
+  golem.burn = 1; golem.burnDps = 10; (sim as any).tick(.5);
+  assert.equal(golem.hp, golem.maxHp);
+  sim.explode(10, 10, { r: 1, damage: 10, friendlyFire: false });
+  assert.equal(golem.hp, golem.maxHp - 15);
+  const shield = sim.spawnAuxiliary('sunScarab', 10, 10)!;
+  sim.hurtEnemy(golem, 10, true, 'ranged', undefined, false, 'fire');
+  assert.equal(shield.shieldHp, 40); assert.equal(golem.hp, golem.maxHp - 15);
+  shield.hp = 0;
+  const crab = sim.spawnAuxiliary('geodeCrab', 15, 10)!;
+  sim.explode(15, 10, { r: 1, damage: 10, friendlyFire: false });
+  assert.equal(crab.hp, crab.maxHp - 20);
 });
 
 test('all new native sprites have distinct silhouettes and preserve coverage when damaged or hit', () => {
