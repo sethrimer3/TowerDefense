@@ -11,7 +11,7 @@ const SLOP = 12;
  * (`data-buy`, ...). Returns a function that stops any hold. */
 export function holdToRepeat(root: HTMLElement, attrs: string[]) {
   const selector = attrs.map((a) => `button[${a}]`).join(",");
-  let timer = 0, gap = 0, repeats = 0, key = "", x = 0, y = 0, left = 0, top = 0, pointer = -1;
+  let timer = 0, gap = 0, repeats = 0, key = "", x = 0, y = 0, pointer = -1;
   let released: { key: string; pointer: number } | null = null;
   const find = () => root.querySelector<HTMLButtonElement>(key);
   const stop = () => {
@@ -54,7 +54,6 @@ export function holdToRepeat(root: HTMLElement, attrs: string[]) {
     gap = HOLD.first / HOLD.shrink;
     x = e.clientX;
     y = e.clientY;
-    ({ left, top } = b.getBoundingClientRect());
     pointer = e.pointerId;
     timer = window.setTimeout(tick, HOLD.delay);
   });
@@ -68,11 +67,11 @@ export function holdToRepeat(root: HTMLElement, attrs: string[]) {
   document.addEventListener("pointercancel", (e) => { if (e.pointerId === pointer) cancel(); });
   root.addEventListener("lostpointercapture", (e) => { if (e.target === root && e.pointerId === pointer) cancel(); });
   document.addEventListener("wheel", stop, { passive: true });
-  document.addEventListener("scroll", () => {
-    if (pointer < 0) return;
-    const box = find()?.getBoundingClientRect();
-    if (!box || Math.abs(box.left - left) + Math.abs(box.top - top) > 1) stop();
-  }, true);
+  // Redraws restore list scroll positions. Cancel user scrolling rather than
+  // those programmatic scroll events; touch/scrollbar drags cancel above.
+  document.addEventListener("keydown", (e) => {
+    if (["PageUp", "PageDown", "Home", "End", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) stop();
+  });
   document.addEventListener("visibilitychange", cancel);
   window.addEventListener("blur", cancel);
   window.addEventListener("pagehide", cancel);
