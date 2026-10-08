@@ -44,6 +44,8 @@ The city is alive between and during battles: park grass sways in the wind (hard
 
 ## How it's built
 
+`src/ui/hold-repeat.ts` adds accelerating press-and-hold purchases to Mine hires/building upgrades, Library shelves/hires/lab expansion, Tiles purchases and repeatable Smithy/Study upgrades. Holds start after 450 ms, then speed up from 260 ms between purchases to a minimum of 35 ms. Every purchase keeps its current price, capacity and project checks; release, scrolling, cancellation or leaving the controls stops the hold. `node tests/hold-repeat.mjs` checks mouse/touch behavior and persistence with isolated browser contexts (requires the dev server).
+
 Current upgrade costs, per-rank acquisition estimates, production samples and two-year pacing options are in [docs/UPGRADE_TIMING.md](docs/UPGRADE_TIMING.md). The report and [rank-by-rank CSV](docs/upgrade-estimates.csv) are generated from the catalogs by `tools/estimate-upgrades.ts`; `tools/measure-upgrade-production.ts` samples ordinary Mine and Library simulation without player saves. These are planning estimates, with setup and sampling limits documented in the report.
 
 Mine crews favor easier ground, digging uneven tunnels and laying rails with one-pixel ramps. Stone takes three times as long as rock, harder stone around 30% down takes another three times as long, and dense stone around 60% down takes another three times. Miners set temporary lamps at dark working faces and hang lasting ceiling lanterns along established tracks; small 1×2 torches burn out. Light lifetimes and graded cart routes survive saves. `node tests/mine-tunnels.mjs` checks the desktop/mobile art and a simulated mining run without player saves (requires the dev server).

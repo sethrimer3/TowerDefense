@@ -27,6 +27,7 @@ node tests/defend-small-fortress.mjs # Compact walkers, damage states and body c
 node tests/library-idle.mjs # Library/Mine catch-up, fire pixels and mobile countdowns (needs dev server)
 node tests/card-upgrades.mjs # Individual Study cards, spreading, mixed builds, evolution, reload and mobile fit
 node tests/upgrade-work.mjs # Timed Study/Forge purchases, shared staff, refunds, reload completion and mobile fit
+node tests/hold-repeat.mjs # Accelerating purchase holds, mouse/touch, cancellation and Mine/Library persistence (needs dev server)
 node tests/library-navigation.mjs # Whole-room Lab/Nave framing, Mine building picker and research/back transitions (needs dev server)
 node --experimental-transform-types --import ./tests/pin-random.ts tools/measure-upgrade-production.ts # Bounded 1x Mine/Library scenarios, no player saves
 node --experimental-transform-types --import ./tests/pin-random.ts tools/estimate-upgrades.ts # Catalog costs, rank CSV and docs/UPGRADE_TIMING.md (uses measured JSON)
@@ -40,6 +41,8 @@ npm run font           # Rebuild the Alembic pixel font from scripts/pixel-font/
 - CI (`.github/workflows/static.yml`) runs `npm test` and `npm run build` on push to `main`, then deploys `dist/` to GitHub Pages (the repository's Pages source must be **GitHub Actions**). Vite `base: "./"` keeps asset paths relative, so the build works under `/TowerDefense/`; asset URLs must not be root-absolute.
 
 ## Architecture
+
+**Repeated purchases.** `src/ui/hold-repeat.ts` delegates pointer holds by stable purchase attributes so buttons can redraw between purchases. Mine hires/building upgrades, Library shelves/hires/lab expansion, Tiles purchases and repeatable Smithy/Study upgrades share it. The first held purchase waits 450 ms, then gaps shrink from 260 ms by 0.86 per purchase down to 35 ms. Short clicks and keyboard activation remain single purchases; held releases add none. Each purchase uses its normal current price and availability checks. Disabled, removed, hidden or inert controls, pointer movement/cancellation, scrolling, blur and page hiding stop the hold. Timed work and rebuilding retain their existing locks. `tests/hold-repeat.html` is an isolated redraw fixture; `node tests/hold-repeat.mjs` also tests real Mine/Library mouse/touch purchases in fresh browser contexts without player saves.
 
 **Metal economy.** `src/metals.ts` shares prices, affordability, payment and Copper/Silver/Gold labels; `save.smithy` is the sole spendable metal wallet. Mine/Library hosts expose `metals` and `spendMetals`. Starting metal is 10 Copper; a second miner costs 2 Copper, the first shelf 1 and the first librarian 2. Mine level upgrades start at 4–6 Copper; later levels add Silver then Gold. Larger crews/collections add precious metals, and lab expansions start at 10 Copper before adding Silver/Gold. Bombs cost 1 Copper (`BOMB_PRICE`). Unlimited money bypasses affordability and spends nothing. DEFEND awards only one upgrade point per new highest wave; `payWave` records the best with payment so duplicate events cannot pay twice. Knowledge comes only from the Library. There is no battle Gold, Gold found, Plunder, Copperworks or Spoils topic. Run `tests/metals.test.ts`, `tests/progression.test.ts`, `tests/tiles.test.ts` and `node tests/metal-economy.mjs` (isolated desktop/mobile browser fixture).
 

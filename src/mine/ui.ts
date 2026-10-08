@@ -13,6 +13,7 @@ import { countdown, IDLE_LEAD, IDLE_SPEED, idleDrain, MAX_AWAY_MS } from "../awa
 import { BARS_PER_POINT, CREW_PER_LEVEL, METALS, metalSum, noMetals, type Metals, DAY_TICKS, FORGE_PER_LEVEL, JOBS, KIT, MAX_MINERS, MineSim, MOVE_ON_SHARE, SEAL_LEVEL, SMITHS_PER_LEVEL, STOCK_PER_LEVEL, STOCK_RATE, TICK_HZ, type Cause, type Job, type Miner, type MineNews, type MineSave, type Weather } from "./sim.ts";
 import { BUILDINGS, MAX_LEVEL, type BuildingId } from "./buildings.ts";
 import { MineRenderer } from "./render.ts";
+import { holdToRepeat } from "../ui/hold-repeat.ts";
 
 /** Longest bank of unused simulation time. */
 export const SIM_AWAY_MS = MAX_AWAY_MS;
@@ -204,7 +205,7 @@ export class MinePage {
   private build() {
     this.built = true;
     this.root.innerHTML = `<div class="mine-head">
-        <button id="mine-hire" class="mine-hire"></button>
+        <button id="mine-hire" class="mine-hire" data-mine-hire></button>
         <p id="mine-tally" class="mine-tally"></p>
       </div>
       <div class="mine-tools">
@@ -230,6 +231,7 @@ export class MinePage {
     this.renderer.resize();
     this.renderer.home(this.sim);
     this.root.querySelector<HTMLButtonElement>("#mine-hire")!.onclick = () => this.hire();
+    holdToRepeat(this.root, ["data-mine-hire", "data-upgrade"]);
     const toggle = this.root.querySelector<HTMLButtonElement>("#mine-crew-toggle")!;
     toggle.onclick = () => {
       const open = toggle.getAttribute("aria-pressed") !== "true";

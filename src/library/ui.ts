@@ -12,6 +12,7 @@ import { countdown, HOUR_MS, IDLE_LEAD, IDLE_SPEED, idleDrain, MAX_AWAY_MS } fro
 import { LAB_MAX_LEVEL, MAX_LIBRARIANS, labPrice, MAX_SHELVES, LibrarySim, ROLES, RETURN_BOOKS, librarianPrice, shelfPrice, type Librarian, type LibrarySave, type Role } from "./sim.ts";
 
 import { LibraryRenderer, daylight } from "./render.ts";
+import { holdToRepeat } from "../ui/hold-repeat.ts";
 
 /** What became of the library over time away, for the welcome-back screen. */
 export interface LibraryAway {
@@ -159,9 +160,9 @@ export class LibraryPage {
   private build() {
     this.built = true;
     this.root.innerHTML = `<div class="mine-head library-head">
-        <button id="library-shelf" class="mine-hire"></button>
-        <button id="library-hire" class="mine-hire"></button>
-        <button id="library-lab-up" class="mine-hire" title="Dig the alchemy lab out further: each level makes room for another researcher"></button>
+        <button id="library-shelf" class="mine-hire" data-library-buy="shelf"></button>
+        <button id="library-hire" class="mine-hire" data-library-buy="hire"></button>
+        <button id="library-lab-up" class="mine-hire" data-library-buy="lab" title="Dig the alchemy lab out further: each level makes room for another researcher"></button>
         <p id="library-tally" class="mine-tally"></p>
       </div>
       <div class="mine-tools">
@@ -186,6 +187,7 @@ export class LibraryPage {
     };
     this.root.querySelector<HTMLButtonElement>("#library-hire")!.onclick = () => this.buy(librarianPrice(this.sim.hired), () => this.sim.hire());
     this.root.querySelector<HTMLButtonElement>("#library-lab-up")!.onclick = () => this.buy(labPrice(this.sim.labLevel), () => this.sim.upgradeLab());
+    holdToRepeat(this.root, ["data-library-buy"]);
     const toggle = this.root.querySelector<HTMLButtonElement>("#library-staff-toggle")!;
     toggle.onclick = () => {
       const open = toggle.getAttribute("aria-pressed") !== "true";

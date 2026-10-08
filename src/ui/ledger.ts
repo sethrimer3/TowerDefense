@@ -144,7 +144,7 @@ export class Ledger {
     this.bindCards();
     if (!this.holding) {
       this.holding = true;
-      holdToRepeat(root, ["data-upgrade"]);
+      holdToRepeat(root, ["data-upgrade", "data-train", "data-learn", "data-learn-path"]);
     }
     root.querySelector(".chamber-list")!.scrollTop = scroll;
     root.querySelectorAll(".ledger-strip").forEach((s, i) => (s.scrollLeft = strips[i] ?? 0));
