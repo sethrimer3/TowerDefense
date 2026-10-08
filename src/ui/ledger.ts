@@ -1,3 +1,7 @@
+import { syncCards, cardTopic, cardLabel, equipCard, evolveCard, type OwnedCard } from "../cards.ts";
+import { TILE_TYPE, TILE_NAMES } from "../tiles.ts";
+import { cardDetailHtml } from "./card-detail.ts";
+import { flip } from "./flip.ts";
 import { play } from "../sound.ts";
 import { TRAINING, addSmith, busySmiths, whole, cancelTraining, removeSmith, skillPurchase, skillRank, startTraining, trainingLeft, trainingStep, type TrainingId } from "../progression.ts";
 import { BARS_PER_POINT, METALS } from "../mine/sim.ts";
@@ -67,10 +71,12 @@ export class Ledger {
   private holding = false;
   private researchCrew = -1;
   private smithCrew = "";
+  private expanded = new Set<string>();
+  private selectedCard: number | null = null;
 
   constructor(private ctx: AppContext, readonly root: HTMLElement, readonly kind: LedgerKind, private up: () => void) {
     this.subjects = ledgerSubjects(kind);
-    this.subject = this.subjects[0].id;
+    this.subject = kind === "study" ? "towers" : this.subjects[0].id;
   }
 
   private get save() {
@@ -86,14 +92,20 @@ export class Ledger {
   }
 
   /** Opens at a topic (by id), when this chamber has it. */
-  focus(topicId: string) {
+  focus(topicId: string, cardId?: number) {
     const s = this.subjects.find((s) => s.topics.some((t) => t.id === topicId));
     if (!s) return;
     this.subject = s.id;
     this.topics[s.id] = topicId;
+    if (this.kind === "study") {
+      this.expanded.add(topicId);
+      syncCards(this.save.defend);
+      this.selectedCard = cardId ?? this.cardsFor(s.topics.find(t => t.id === topicId)!).at(0)?.id ?? null;
+    }
   }
 
   render() {
+    syncCards(this.save.defend);
     this.researchCrew = this.ctx.researchers();
     this.smithCrew = this.ctx.smiths().join("\n");
     const subject = this.current(), topic = this.topic(), smithy = this.kind === "smithy", c = CHAMBER[this.kind];
@@ -103,18 +115,32 @@ export class Ledger {
     const strips = Array.from(this.root.querySelectorAll(".ledger-strip")).map((s) => s.scrollLeft);
     this.shown = `${subject.id}:${topic.id}`;
     const subjects = this.subjects.map((s) => `<button data-subject="${s.id}" aria-pressed="${s.id === subject.id}"><span>${uiSprite(s.sprite)}</span>${s.name}</button>`).join("");
-    const topics = subject.topics.length > 1
-      ? `<div class="ledger-strip ledger-topics" role="group" aria-label="${subject.name}">${subject.topics.map((t) => `<button data-topic="${t.id}" aria-pressed="${t.id === topic.id}">${t.item ? `<canvas width="22" height="22" data-icon="${t.item}"></canvas>` : ""}${t.name}</button>`).join("")}</div>`
-      : "";
     this.root.innerHTML = `<header class="chamber-head">
         <button class="chamber-up" data-up title="${c.up}"><span aria-hidden="true">⤒</span> ${smithy ? "Mine" : "Library"}</button>
         <div class="chamber-title"><h2>${c.title}</h2><small>${c.blurb}</small></div>
       </header>
       ${smithy ? this.walletHtml() : this.knowledgeHtml()}
-      <div class="ledger-strip ledger-subjects" role="group" aria-label="Subjects">${subjects}</div>${topics}
+      <div class="ledger-strip ledger-subjects" role="group" aria-label="Subjects">${subjects}</div>
       <section class="chamber-list ledger-half ${smithy ? "ledger-forge" : "ledger-study"}" aria-label="${topic.name}">${smithy ? `<canvas class="training-particles" aria-hidden="true"></canvas>` : ""}
-        ${smithy ? this.forgeHtml(topic) : this.studyHtml(topic)}</section>`;
+        ${this.galleryHtml(subject)}
+        ${smithy ? `<p class="ledger-scope">GLOBAL EQUIPMENT · ${topic.item ? `Every ${topic.name} card, owned now or bought later` : topic.name}. No individual card is selected.</p>${this.forgeHtml(topic)}` : this.studyBody(topic)}</section>`;
     const root = this.root;
+    root.querySelectorAll<HTMLButtonElement>("[data-ledger-stack]").forEach(b => b.onclick = () => this.relayout(() => {
+      const id = b.dataset.ledgerStack!;
+      this.topics[this.subject] = id;
+      if (this.kind === "study") {
+        if (this.expanded.has(id)) this.expanded.delete(id); else this.expanded.add(id);
+        this.selectedCard = null;
+      }
+    }));
+    root.querySelectorAll<HTMLButtonElement>("[data-ledger-card]").forEach(b => b.onclick = () => this.relayout(() => {
+      this.selectedCard = Number(b.dataset.ledgerCard);
+      this.topics[this.subject] = b.dataset.cardTopic!;
+    }));
+    root.querySelectorAll<HTMLButtonElement>("[data-gather]").forEach(b => b.onclick = () => this.relayout(() => {
+      this.expanded.delete(b.dataset.gather!); this.selectedCard = null;
+    }));
+    this.bindCards();
     if (!this.holding) {
       this.holding = true;
       holdToRepeat(root, ["data-upgrade"]);
@@ -156,6 +182,56 @@ export class Ledger {
     root.querySelector<HTMLButtonElement>("[data-cancel-research]")?.addEventListener("click", () => {
       if (cancelResearch(this.save)) { this.ctx.update(); this.render(); }
     });
+  }
+
+  private cardsFor(t: Topic): OwnedCard[] {
+    return this.save.defend.cards.filter(c => cardTopic(c) === t.id || c.kind === t.item)
+      .sort((a, b) => Number(!!b.placement) - Number(!!a.placement) || a.id - b.id);
+  }
+
+  private galleryHtml(subject: Subject) {
+    const study = this.kind === "study";
+    const cards = subject.topics.map(t => {
+      const copies = this.cardsFor(t), expanded = study && this.expanded.has(t.id) && copies.length > 0;
+      const type = t.item ? TILE_TYPE[t.item] : "consumables";
+      const face = (item = t.item) => `<span class="tile-face">${item ? `<canvas width="48" height="48" data-icon="${item}"></canvas>` : uiSprite(subject.sprite)}</span>`;
+      if (expanded) return copies.map(c => `<button class="tile single type-${TILE_TYPE[c.kind]} ${c.placement ? "placed" : ""} ${this.selectedCard === c.id ? "open" : ""}"
+        data-key="${t.id}#${c.id}" data-ledger-card="${c.id}" data-card-topic="${t.id}" aria-pressed="${this.selectedCard === c.id}" title="${TILE_NAMES[c.kind]} card ${c.id}: ${cardLabel(c)}">
+        ${face(c.kind)}<span class="tile-name">${TILE_NAMES[c.kind]}</span><small class="tile-sub">Card #${c.id} · ${c.placement ? "City" : "Ready"}</small><small class="card-specialization">${cardLabel(c)}</small></button>`).join("");
+      const layers = copies.length > 2 ? "layers-2" : copies.length > 1 ? "layers-1" : "";
+      return `<button class="tile type-${type} ${layers}" data-key="${t.id}" data-ledger-stack="${t.id}" aria-expanded="${expanded}" aria-label="${t.name}, ${copies.length} cards. ${study && copies.length ? "Spread individual cards" : "Shared upgrades"}">
+        ${face()}<span class="tile-name">${t.name}</span>${t.item ? `<b class="tile-count">x${copies.length}</b>` : ""}<small class="tile-sub">${study ? copies.length ? "Tap to spread cards" : "Shared research" : "Upgrades all cards"}</small></button>`;
+    }).join("");
+    return `<div class="ledger-collection"><p class="ledger-note">${study ? "Tap a stack to spread every card. Choose a card to equip its path. Research unlocks are shared." : "Select a type. Smithy equipment improves every card of that type."}</p><div class="tiles-grid ledger-tiles">${cards}</div>
+      ${study ? [...this.expanded].filter(id => subject.topics.some(t => t.id === id)).map(id => `<button class="study-gather" data-gather="${id}">Gather ${subject.topics.find(t => t.id === id)!.name} cards</button>`).join("") : ""}</div>`;
+  }
+
+  private studyBody(t: Topic) {
+    const card = this.save.defend.cards.find(c => c.id === this.selectedCard);
+    if (t.item && this.cardsFor(t).length && (!card || !this.cardsFor(t).includes(card)))
+      return `<p class="ledger-empty">Spread the stack, then select an individual card.</p>`;
+    return `${card && this.cardsFor(t).includes(card) ? cardDetailHtml(this.save, card, true) : `<p class="ledger-scope">SHARED RESEARCH · ${t.name}</p>`}${this.studyHtml(t)}`;
+  }
+
+  private relayout(change: () => void) {
+    const parent = this.root.parentElement!;
+    let ghosts = parent.querySelector<HTMLElement>(".ledger-ghosts");
+    if (!ghosts) { ghosts = document.createElement("div"); ghosts.className = "tiles-ghosts ledger-ghosts"; ghosts.setAttribute("aria-hidden", "true"); parent.append(ghosts); }
+    change();
+    flip(this.root, () => this.render(), { ghosts, reduced: this.save.settings.reduceMotion || matchMedia("(prefers-reduced-motion: reduce)").matches,
+      alias: key => key.includes("#") ? key.split("#")[0] : `${key}#${this.cardsFor(this.current().topics.find(t => t.id === key) ?? this.topic())[0]?.id}` });
+  }
+
+  private bindCards() {
+    this.root.querySelectorAll<HTMLButtonElement>("[data-equip-card]").forEach(b => b.onclick = () => {
+      if (equipCard(this.save, Number(b.dataset.equipCard), b.dataset.equipPath as PathId | undefined, b.dataset.equipRank ? Number(b.dataset.equipRank) : undefined)) {
+        this.ctx.update(); play("chime"); this.render();
+      }
+    });
+    this.root.querySelectorAll<HTMLButtonElement>("[data-evolve-card]").forEach(b => b.onclick = () => {
+      if (evolveCard(this.save, Number(b.dataset.evolveCard))) { this.ctx.update(); play("levelUp"); this.relayout(() => {}); }
+    });
+    this.root.querySelectorAll<HTMLButtonElement>("[data-card-go]").forEach(b => b.onclick = () => this.ctx.openChamber(b.dataset.cardGo as LedgerKind, b.dataset.cardTopic));
   }
 
   // ── The Smithy ──────────────────────────────────────────────────────────
@@ -351,14 +427,15 @@ export class Ledger {
    * rank is read out (and learned) below. */
   private treeHtml(t: Topic) {
     const save = this.save, paths = pathsOf(t.id), n = paths.length, topic = paths[0].topic;
-    const choice = save.paths[topic];
+    const card = save.defend.cards.find(c => c.id === this.selectedCard);
+    const choice = card?.path ? { path: card.path, rank: card.rank ?? 0 } : undefined;
     const w = 100 * n, mid = w / 2;
     const fan = paths.map((p, i) => {
-      const x = 100 * i + 50, cls = choice?.path === p.id ? "lit" : choice ? "sealed" : "open";
+      const x = 100 * i + 50, cls = pathState(save, p.id).rank ? "lit" : "open";
       return `<path class="${cls} hue-${p.hue}" d="M ${mid} 0 C ${mid} 26, ${x} 14, ${x} 40" />`;
     }).join("");
     const cols = paths.map((p) => {
-      const st = pathState(save, p.id), state = st.rank ? "chosen" : st.sealed ? "sealed" : "open";
+      const st = pathState(save, p.id), state = st.rank ? "chosen" : "open";
       const ranks = p.ranks.map((r, i) => {
         const cls = i < st.rank ? "learned" : i === st.rank && !st.sealed ? "next" : "later";
         const key = `${p.id}:${i}`;
@@ -374,10 +451,7 @@ export class Ledger {
         : "";
       return `<div class="path-col hue-${p.hue} ${state}"><header class="path-banner"><h4>${p.name}</h4><small>${st.sealed ? "Sealed" : p.motto}</small></header>${ranks}${crown}</div>`;
     }).join("");
-    const following = choice
-      ? `<div class="path-following hue-${pathById(choice.path).hue}"><span>Following <b>${pathById(choice.path).name}</b>, ${choice.rank} of ${pathById(choice.path).ranks.length}${choice.crowned !== undefined ? `, crowned` : ""}</span>
-          <button data-unlearn="${topic}" class="danger">Unlearn<small>returns ${whole(choice.spent)} Knowledge${choice.crowned !== undefined ? ` · turns them back` : ""}</small></button></div>`
-      : "";
+    const following = `<p class="ledger-scope">RESEARCH ONCE · unlocks are available to every card. Equip them above.</p>`;
     return `<div class="path-tree" style="--paths:${n}">
         <div class="path-root"><span class="path-medal root"><canvas width="44" height="44" data-icon="${t.item}"></canvas></span><span>${t.name}</span></div>
         <svg class="path-fan" viewBox="0 0 ${w} 40" preserveAspectRatio="none" aria-hidden="true">${fan}</svg>
@@ -389,21 +463,15 @@ export class Ledger {
   private pickedHtml(t: Topic, paths: KnowledgePath[]) {
     const [id, at] = (this.picked[t.id] ?? "").split(":");
     const p = paths.find((p) => p.id === id);
-    if (!p) return `<p class="path-detail path-hint">Tap a rank to read it. Learning a path's first rank chooses that path and seals the others; unlearning returns all its Knowledge.</p>`;
+    if (!p) return `<p class="path-detail path-hint">Tap a rank to research it for your collection. Unlock any number of paths; equip one on each card.</p>`;
     const save = this.save, st = pathState(save, p.id), researchers = this.ctx.researchers();
     if (at === "crown" && p.evolves) {
-      const e = p.evolves, from = ITEM_NAMES[e.from], owned = save.defend.owned[e.from];
-      let action: string;
-      if (st.crowned) action = `<span class="path-done">Evolved</span><em>Unlearning ${p.name} turns them back.</em>`;
-      else if (st.sealed) action = `<em>Sealed while you follow ${pathById(save.paths[p.topic]!.path).name}. Unlearn it to choose this path.</em>`;
-      else if (!st.maxed) action = `<em>Learn ${p.ranks[p.ranks.length - 1].name} first.</em>`;
-      else {
-        const active = save.researchJob?.kind === "evolution" && save.researchJob.id === p.id;
-        const why = save.researchJob ? "Researchers are working on the current project" : !researchers && !save.settings.instantResearch ? "Put a librarian to the alchemy lab to research" : !st.crownAffordable ? `Needs ${e.cost} Knowledge, have ${whole(save.knowledge)}` : "";
-        action = active ? `<span data-research-timer>${this.researchTimeLeft()}</span>` : `<button data-evolve="${p.id}" ${why ? "disabled" : ""}>Evolve<small>${e.cost} Knowledge</small><small>${this.researchHint(st.rank, true)}</small></button>${why ? `<em>${why}.</em>` : ""}`;
-      }
-      const copies = st.crowned ? "" : ` Your ${owned} ${owned === 1 ? from : `${from}s`} go back to the palette as ${e.name}s, to place again; copies bought later are ${e.name}s too.`;
-      return `<div class="path-detail hue-gold"><span class="path-medal"><canvas data-path-icon="crown:gold"></canvas></span><div><small>${p.name.toUpperCase()} · EVOLUTION</small><h3>${e.name}</h3><p>${e.text}.${copies}</p></div><div class="path-act">${action}</div></div>`;
+      const e = p.evolves;
+      const active = save.researchJob?.kind === "evolution" && save.researchJob.id === p.id;
+      const why = !st.maxed ? "Research all three ranks first" : save.researchJob ? "Researchers are working on the current project" : !researchers && !save.settings.instantResearch ? "Assign a researcher in the lab" : !st.crownAffordable ? `Needs ${e.cost} Knowledge` : "";
+      const action = st.crowned ? `<span class="path-done">Crown unlocked</span><em>Evolve a selected card above.</em>`
+        : active ? `<span data-research-timer>${this.researchTimeLeft()}</span>` : `<button data-evolve="${p.id}" ${why ? "disabled" : ""}>Research crown<small>${e.cost} Knowledge</small><small>${this.researchHint(st.rank, true)}</small></button>${why ? `<em>${why}.</em>` : ""}`;
+      return `<div class="path-detail hue-gold"><span class="path-medal"><canvas data-path-icon="crown:gold"></canvas></span><div><small>SHARED CROWN RESEARCH</small><h3>${e.name}</h3><p>Unlock this evolution once. Then transform individual ${ITEM_NAMES[e.from]} cards; each transformed card returns to the palette for placement.</p></div><div class="path-act">${action}</div></div>`;
     }
     const i = Number(at), r = p.ranks[i];
     if (!r) return "";
@@ -414,20 +482,20 @@ export class Ledger {
     else {
       const active = save.researchJob?.kind === "path" && save.researchJob.id === p.id;
       const why = save.researchJob ? "Researchers are working on the current project" : !researchers && !save.settings.instantResearch ? "Put a librarian to the alchemy lab to research" : !st.affordable ? `Needs ${r.cost} Knowledge, have ${whole(save.knowledge)}` : "";
-      action = active ? `<span data-research-timer>${this.researchTimeLeft()}</span>` : `<button data-learn-path="${p.id}" ${why ? "disabled" : ""}>${i === 0 ? "Choose" : "Learn"}<small>${r.cost} Knowledge</small><small>${this.researchHint(st.rank)}</small></button>${why ? `<em>${why}.</em>` : i === 0 ? `<em>Seals the other paths when this research completes.</em>` : ""}`;
+      action = active ? `<span data-research-timer>${this.researchTimeLeft()}</span>` : `<button data-learn-path="${p.id}" ${why ? "disabled" : ""}>Research unlock<small>${r.cost} Knowledge</small><small>${this.researchHint(st.rank)}</small></button>${why ? `<em>${why}.</em>` : i === 0 ? `<em>Unlocks this rank for every card. Equip it on your selected card above.</em>` : ""}`;
     }
     return `<div class="path-detail hue-${p.hue}"><span class="path-medal"><canvas data-path-icon="${r.icon}:${p.hue}"></canvas></span>
       <div><small>${p.name.toUpperCase()} · RANK ${ROMAN[i]} OF ${ROMAN[p.ranks.length - 1]}</small><h3>${r.name}</h3><p>${r.text}.</p></div><div class="path-act">${action}</div></div>`;
   }
 
   private learnPath(id: PathId) {
-    const p = pathById(id), first = !this.save.paths[p.topic];
+    const p = pathById(id), first = !pathState(this.save, id).rank;
     if (!startResearch(this.save, { kind: "path", id }, this.ctx.clock(), this.ctx.researchers())) return;
     if (this.save.researchJob) { this.ctx.update(); this.render(); return; }
     this.ctx.researched();
     play(first ? "unlock" : "chime");
     this.ctx.update();
-    const rank = this.save.paths[p.topic]!.rank;
+    const rank = pathState(this.save, id).rank;
     // Read on to the next rank, so the next tap learns it.
     this.picked[p.topic] = `${id}:${rank < p.ranks.length ? rank : p.evolves ? "crown" : rank - 1}`;
     this.render();
@@ -449,7 +517,7 @@ export class Ledger {
   }
 
   private unlearn(topic: PathTopic) {
-    if (!this.save.paths[topic]) return;
+    if (!pathsOf(topic).some(p => this.save.pathResearch[p.id])) return;
     const job = this.save.researchJob;
     if (job && job.kind !== "skill" && pathById(job.id).topic === topic) cancelResearch(this.save);
     unlearnPath(this.save, topic);

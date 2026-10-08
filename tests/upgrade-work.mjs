@@ -13,8 +13,10 @@ async function study(page, subject = 'city', topic = 'walls') {
   await tab(page, 'library');
   if (!await page.locator('#library').evaluate(el => el.classList.contains('descended'))) await page.locator('#library-study').click();
   await page.locator('#library-chamber [data-subject="' + subject + '"]').click();
-  const choice = page.locator('#library-chamber [data-topic="' + topic + '"]');
+  const choice = page.locator('#library-chamber [data-ledger-stack="' + topic + '"]');
   if (await choice.count()) await choice.click();
+  const card = page.locator('#library-chamber [data-ledger-card][data-card-topic="' + topic + '"]').first();
+  if (await card.count()) await card.click();
 }
 async function smithy(page) { await tab(page, 'mine'); await page.locator('#mine-smithy').click(); }
 async function reloadWith(page, mutate, value) {
@@ -86,10 +88,10 @@ try {
     await study(page, 'towers', 'wizardTower');
     await page.locator('[data-pick="storm:0"]').click();
     await page.locator('[data-learn-path="storm"]').click();
-    assert.equal((await state(page)).paths.wizardTower, undefined);
+    assert.equal((await state(page)).pathResearch.storm, undefined);
     assert.equal((await state(page)).researchJob.kind, 'path');
     await reloadWith(page, 'research', 200000);
-    assert.equal((await state(page)).paths.wizardTower.rank, 1);
+    assert.equal((await state(page)).pathResearch.storm.rank, 1);
 
     await smithy(page);
     const high = page.locator('[data-train="troopHp"]');

@@ -2133,3 +2133,23 @@ nav button > .tab-idle[hidden] { display: none; }
 .banner-research-branches section { min-width: 0; }
 .banner-research-branches .ledger-skill { flex-wrap: wrap; }
 @media (max-width: 760px) { .banner-research-branches { grid-template-columns: 1fr; } }
+
+/* Study cards use the same grid and FLIP spreading as Tiles. */
+.ledger-collection { position: relative; padding: 8px 6px 16px; }
+.ledger-tiles { margin-top: 18px; }
+.ledger-scope { font-size: 10px; line-height: 1.6; padding: 9px; }
+.study-gather { margin: 8px 6px 0 0; font-size: 10px; }
+.card-specialization { max-width: 100%; font-size: 8px; line-height: 1.3; overflow-wrap: anywhere; }
+.individual-card-detail { padding: 10px; margin-bottom: 14px; }
+.individual-card-detail h3 { margin: 4px 0; font-size: 14px; }
+.individual-card-detail p { font-size: 10px; line-height: 1.7; }
+.individual-card-detail small { display: block; font-size: 8px; }
+.card-path-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin: 10px 0; }
+.card-path-option { padding: 7px; min-width: 0; }
+.card-path-option b { font-size: 11px; }
+.card-ranks { display: flex; gap: 3px; margin-top: 8px; }
+.card-ranks button { flex: 1; min-width: 0; padding: 6px 3px; font-size: 11px; }
+.card-ranks button small { font-size: 7px; }
+.card-global { padding-top: 9px; }
+.ledger-ghosts { overflow: hidden; }
+.chamber-inner { position: relative; }

@@ -148,7 +148,7 @@ function hitBuilding({ sim, e, def }: Turn, id: number) {
   e.cd = def.cooldown;
   const bite = enemyDamage(sim, e);
   sim.damageBuilding(id, bite);
-  if (sim.map.buildings[id].kind === "monsterBait") baitBitten(sim, e, bite);
+  if (sim.map.buildings[id].kind === "monsterBait") baitBitten(sim, e, bite, sim.map.buildings[id]);
 }
 
 /** Deterministic cone breath; only chain heads attack. */

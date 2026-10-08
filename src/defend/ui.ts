@@ -1,3 +1,4 @@
+import { syncCards, cardLabel, spikeKey, type OwnedCard } from "../cards.ts";
 import { bannerReach } from "./war-banner.ts";
 import { journalHTML, paintJournal } from "./journal.ts";
 import { paintPortraits } from "./journal-portrait.ts";
@@ -51,6 +52,7 @@ export type DefendHost = {
   save(): DefendSave;
   /** The Smithy's and the skill trees' multipliers for the next defense. */
   bonuses(): Bonuses;
+  cards?(): OwnedCard[];
   /** Whether city tiles may stand apart from the keep's (the Study's
    * Outlying districts). */
   outskirts?(): boolean;
@@ -450,7 +452,14 @@ export class DefendPage {
     const s = this.save;
     const all: { id: string; name: string; count: number; icon: IconItem }[] =
       this.phase === "build"
-        ? PALETTE_ITEMS.filter((item) => inCategory(item, this.category)).map((item) => ({ id: item, name: ITEM_NAMES[item], count: available(s, item), icon: item as IconItem }))
+        ? PALETTE_ITEMS.filter((item) => inCategory(item, this.category)).flatMap((item) => {
+          const cards = this.host.cards?.().filter(c => c.kind === item) ?? [];
+          if (!cards.some(c => c.path) || ["cityTile", "cityGate", "wallBallista"].includes(item))
+            return [{ id: item, name: ITEM_NAMES[item], count: available(s, item), icon: item as IconItem }];
+          const groups = new Map<string, OwnedCard[]>();
+          for (const c of cards.filter(c => !c.placement)) { const name = cardLabel(c); groups.set(name, [...(groups.get(name) ?? []), c]); }
+          return [...groups].map(([name, copies]) => ({ id: `${item}#${copies[0].id}`, name: `${ITEM_NAMES[item]} · ${name}`, count: copies.length, icon: item as IconItem }));
+        })
         : [
             { id: "bomb", name: "Bomb", count: s.bombs, icon: "bomb" },
             { id: "banner", name: "War banner", count: Infinity, icon: "banner" },
@@ -526,9 +535,10 @@ export class DefendPage {
     if (id === "bomb") return this.pressBomb(e);
     if (id === "banner" && this.sim?.bannerRemaining) return;
     if (id === "banner") return this.phase === "sim" ? this.beginDrag({ from: "banner" }, e) : undefined;
-    const item = id as PaletteItem;
+    const [kind, card] = id.split("#");
+    const item = kind as PaletteItem;
     if (!available(this.save, item)) return this.setMessage(`No ${plural(ITEM_NAMES[item].toLowerCase())} left — buy more in the Tiles tab.`);
-    this.beginDrag({ from: "palette", item }, e);
+    this.beginDrag({ from: "palette", item, ...(card ? { cardId: Number(card) } : {}) }, e);
   }
 
   private pressBomb(e: PointerEvent) {
@@ -835,7 +845,19 @@ export class DefendPage {
       play("place");
       this.picked = null;
     }
+    const drag = this.pointers.session?.drag;
+    const cards = this.host.cards?.() ?? [];
+    const carried = drag?.from === "palette" && drag.cardId ? cards.find(c => c.id === drag.cardId)
+      : drag?.from === "spikes" ? cards.find(c => c.placement === spikeKey(drag.spikes)) : undefined;
+    if (carried && drop.layout !== s.layout) {
+      const added = drop.layout.structures.find(p => !s.layout.structures.some(old => old.uid === p.uid));
+      const row = drop.layout.spikes.find(g => !s.layout.spikes.some(old => spikeKey(old) === spikeKey(g)));
+      if (added) carried.placement = `structure:${added.uid}`;
+      else if (row) carried.placement = spikeKey(row);
+      else delete carried.placement;
+    }
     s.layout = drop.layout;
+    if (this.host.cards) syncCards(s);
     if (drop.message) this.setMessage(drop.message);
     if (s.layout !== this.mapLayout) this.host.persist();
     this.renderPalette();

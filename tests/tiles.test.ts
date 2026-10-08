@@ -1,3 +1,4 @@
+import { syncCards, equipCard, evolveCard } from "../src/cards.ts";
 // The tile collection (src/tiles.ts): stacks, types and filters, the shop,
 // where each kind's upgrades live, and higher tiers.
 import { test } from "node:test";
@@ -66,18 +67,19 @@ test("the shop sells every kind for sale, in metal, including bombs, and refuses
   assert.equal(s.smithy.copper, 0);
 });
 
-test("crowned, a kind's tiles are its greater building's, bought in its place, and counted with the crown", () => {
-  const s = defaults();
-  s.settings.devMode = true;
-  s.defend.owned.wizardTower = 1;
+test("base cards remain for sale after individual evolution; evolved cards are made in Study", () => {
+  const s = defaults(); s.settings.devMode = true; s.defend.owned.wizardTower = 1;
   assert.equal(higherTier("wizardTower").into?.evolves?.item, "darkKeep");
-  assert.equal(higherTier("darkKeep").from?.id, "storm");
   for (let i = 0; i < 3; i++) learnPath(s, "storm");
   assert.ok(evolve(s, "storm"));
-  assert.ok("reason" in shopOffer(s, "wizardTower"), "the base isn't sold once crowned");
-  assert.ok(buyTile(s, "darkKeep"));
-  assert.equal(s.defend.owned.darkKeep, 2);
-  assert.equal(s.paths.wizardTower?.crowned, 2);
+  syncCards(s.defend);
+  const c = s.defend.cards.find(c => c.kind === "wizardTower")!;
+  assert.ok(equipCard(s, c.id, "storm")); assert.ok(evolveCard(s, c.id));
+  assert.ok("price" in shopOffer(s, "wizardTower"));
+  assert.ok("reason" in shopOffer(s, "darkKeep"));
+  assert.ok(buyTile(s, "wizardTower"));
+  assert.deepEqual([s.defend.owned.wizardTower, s.defend.owned.darkKeep], [1, 1]);
+  assert.equal(s.defend.cards.find(c => c.kind === "wizardTower")!.path, undefined);
 });
 
 test("each kind's upgrades are in the Smithy or the Study it links to", () => {

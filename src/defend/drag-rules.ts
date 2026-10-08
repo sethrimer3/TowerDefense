@@ -40,7 +40,7 @@ import type { Overlay } from "./edit-overlay.ts";
 import type { IconItem } from "./structure-art.ts";
 
 export type Drag =
-  | { from: "palette"; item: PaletteItem }
+  | { from: "palette"; item: PaletteItem; cardId?: number }
   | { from: "structure"; uid: number; kind: PlacedKind }
   | { from: "cityTile"; tile: TilePos }
   | { from: "keep" }

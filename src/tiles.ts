@@ -72,8 +72,13 @@ export function tileStacks(save: Save, filter: TileFilter, shop = false): TileSt
 
 /** One copy of a stack, as the expanded stack or the spread view lays them
  * out: the city's first, then the palette's. */
-export type TileCopy = { key: string; id: TileId; index: number; placed: boolean };
-export function tileCopies(stack: TileStack, limit = Infinity): TileCopy[] {
+export type TileCopy = { key: string; id: TileId; index: number; placed: boolean; cardId?: number };
+export function tileCopies(stack: TileStack, limit = Infinity, save?: Save): TileCopy[] {
+  if (save && !isConsumable(stack.id) && !["cityTile", "cityGate", "wallBallista"].includes(stack.id)) {
+    syncCards(save.defend);
+    return save.defend.cards.filter(c => c.kind === stack.id).sort((a, b) => Number(!!b.placement) - Number(!!a.placement) || a.id - b.id)
+      .slice(0, limit).map((c, index) => ({ key: `${stack.id}#${c.id}`, id: stack.id, index, placed: !!c.placement, cardId: c.id }));
+  }
   const n = Math.min(stack.count, limit);
   return Array.from({ length: n }, (_, index) => ({ key: `${stack.id}#${index}`, id: stack.id, index, placed: index < stack.placed }));
 }

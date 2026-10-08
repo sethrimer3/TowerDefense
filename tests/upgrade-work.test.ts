@@ -74,17 +74,19 @@ test("all path ranks and crowns require work; a prepaid path retains its correct
   const p = PATHS.find(p => p.id === "storm")!;
   for (let rank = 0; rank < p.ranks.length; rank++) {
     assert.ok(startResearch(s, { kind: "path", id: "storm" }, now, 2));
-    assert.equal(s.paths.wizardTower?.rank ?? 0, rank);
+    assert.equal(s.pathResearch.storm?.rank ?? 0, rank);
     now += researchSeconds(rank) * 1000 / 2;
     assert.ok(settleResearch(s, now, 2));
-    assert.equal(s.paths.wizardTower!.rank, rank + 1);
+    assert.equal(s.pathResearch.storm!.rank, rank + 1);
   }
-  assert.equal(startResearch(s, { kind: "path", id: "rime" }, now, 2), false, "the completed choice seals its alternatives");
+  assert.ok(startResearch(s, { kind: "path", id: "rime" }, now, 2), "other paths remain researchable");
+  assert.ok(cancelResearch(s));
   assert.ok(startResearch(s, { kind: "evolution", id: "storm" }, now, 2));
   assert.equal(s.defend.owned.darkKeep, 0);
   now += researchSeconds(3, true) * 1000 / 2;
   assert.ok(settleResearch(s, now, 2));
-  assert.equal(s.defend.owned.darkKeep, 2);
+  assert.equal(s.defend.owned.darkKeep, 0, "crown research only unlocks evolution");
+  assert.equal(s.pathResearch.storm!.crowned, true);
   const bill = p.ranks.reduce((n, r) => n + r.cost, 0) + p.evolves!.cost;
   assert.equal(s.knowledge, 1000000 - bill);
   assert.equal(unlearnPath(s, "wizardTower"), bill);
@@ -101,7 +103,7 @@ test("instant research bypasses workers and timers but still checks and pays the
   assert.equal(s.skills.coffee, 2); assert.equal(s.knowledge, 0); assert.equal(s.researchJob, null);
   s.settings.devMode = true;
   assert.ok(startResearch(s, { kind: "path", id: "storm" }, 2, 0));
-  assert.equal(s.paths.wizardTower!.spent, 0);
+  assert.equal(s.pathResearch.storm!.spent, 0);
 });
 
 test("Forge and Training share named smiths; Forge levels apply after work, not when paid", () => {

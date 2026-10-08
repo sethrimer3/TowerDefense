@@ -1,3 +1,4 @@
+import { syncCards, equipCard, evolveCard } from "../src/cards.ts";
 // The Study's knowledge paths (src/knowledge-paths.ts): choosing one seals
 // the others, ranks go in order, unlearning returns the Knowledge, saves keep
 // only well formed choices, and each path changes the battle as it says.
@@ -25,18 +26,18 @@ const rich = () => {
   return s;
 };
 
-test("choosing a path seals the others until it is unlearned, which returns its Knowledge", () => {
+test("research unlocks independent paths, and refunding a topic returns their Knowledge", () => {
   const s = rich();
   assert.ok(learnPath(s, "pyromancy"));
   assert.ok(learnPath(s, "pyromancy"));
   assert.equal(s.knowledge, 1000000 - 4 - 4004);
-  assert.deepEqual(s.paths.wizardTower, { path: "pyromancy", rank: 2, spent: 4008 });
-  assert.ok(pathState(s, "rime").sealed);
-  assert.equal(learnPath(s, "rime"), false, "sealed");
+  assert.deepEqual(s.pathResearch.pyromancy, { rank: 2, spent: 4008 });
+  assert.equal(pathState(s, "rime").sealed, false);
+  assert.equal(learnPath(s, "rime"), true, "another path remains available");
   assert.equal(learnPath(s, "crusaders"), true, "another topic's paths are its own");
-  assert.equal(unlearnPath(s, "wizardTower"), 4008);
+  assert.equal(unlearnPath(s, "wizardTower"), 4012);
   assert.equal(s.knowledge, 1000000 - 4, "every point back but the barracks'");
-  assert.equal(s.paths.wizardTower, undefined);
+  assert.equal(s.pathResearch.pyromancy, undefined);
   assert.ok(learnPath(s, "rime"), "open again");
 });
 
@@ -48,7 +49,7 @@ test("ranks are learned in order, each for its cost, up to the last", () => {
   const storm = PATHS.find((p) => p.id === "storm")!;
   for (const r of storm.ranks) assert.ok(learnPath(s, "storm"), r.name);
   assert.equal(learnPath(s, "storm"), false, "maxed");
-  assert.equal(s.paths.wizardTower!.spent, storm.ranks.reduce((n, r) => n + r.cost, 0));
+  assert.equal(s.pathResearch.storm!.spent, storm.ranks.reduce((n, r) => n + r.cost, 0));
 });
 
 test("unlimited money learns for nothing and unlearning returns nothing", () => {
@@ -57,7 +58,7 @@ test("unlimited money learns for nothing and unlearning returns nothing", () => 
   assert.ok(learnPath(s, "assassins"));
   assert.equal(s.knowledge, 0);
   assert.equal(unlearnPath(s, "barracks"), 0);
-  assert.equal(s.paths.barracks, undefined);
+  assert.equal(s.pathResearch.assassins, undefined);
 });
 
 test("saves keep only well formed paths", () => {
@@ -68,16 +69,17 @@ test("saves keep only well formed paths", () => {
   assert.deepEqual(decodePaths("nonsense"), {});
   const s = rich();
   learnPath(s, "crusaders");
-  assert.deepEqual(decode(JSON.stringify(s)).paths, s.paths);
+  assert.deepEqual(decode(JSON.stringify(s)).pathResearch, s.pathResearch);
   assert.deepEqual(defaults().paths, {});
 });
 
-test("the battle hears of paths only once one is chosen", () => {
+test("research alone does not change any card in battle", () => {
   const s = rich();
   assert.equal(bonuses(s).paths, undefined);
   assert.deepEqual(bonuses(s), NO_BONUSES);
   learnPath(s, "storm");
-  assert.deepEqual(bonuses(s).paths, { wizardTower: { path: "storm", rank: 1 } });
+  assert.equal(bonuses(s).paths, undefined);
+  assert.deepEqual(bonuses(s), NO_BONUSES);
 });
 
 test("every topic offers two or more paths of three ranks, with square icons", () => {
@@ -392,61 +394,41 @@ test("Oil-soaked bait sets its biters alight; fortified crates hold out and, spi
 });
 
 // ── Evolutions ────────────────────────────────────────────────────────────
-test("a crown turns every copy into the greater building, and unlearning turns them back", () => {
-  const s = rich();
-  s.knowledge = 1000000;
-  const d = s.defend;
-  let l = d.layout;
-  for (const [dx, dy] of [[-1, 0], [0, -1]]) l = placeCityTile(l, l.keep.tx + dx, l.keep.ty + dy) ?? assert.fail("tile");
+test("a researched crown evolves only a selected card, retaining other copies and refunding correctly", () => {
+  const s = rich(), d = s.defend;
   d.owned.barracks = 2;
+  let l = placeCityTile(d.layout, d.layout.keep.tx, d.layout.keep.ty - 1) ?? assert.fail("tile");
   d.layout = placeStructure(l, "barracks", l.keep.tx, l.keep.ty - 1) ?? assert.fail("barracks");
-  assert.equal(placedCount(d.layout, "barracks"), 1);
-
-  assert.equal(evolve(s, "crusaders"), false, "not before the path is chosen");
-  for (let i = 0; i < 3; i++) {
-    assert.ok(!pathState(s, "crusaders").canEvolve, "not before its last rank");
-    learnPath(s, "crusaders");
-  }
-  assert.ok(pathState(s, "crusaders").canEvolve);
-  const before = s.knowledge;
+  syncCards(d);
+  const card = d.cards.find(c => c.kind === "barracks" && c.placement)!;
+  assert.equal(evolve(s, "crusaders"), false);
+  for (let i = 0; i < 3; i++) learnPath(s, "crusaders");
+  assert.ok(equipCard(s, card.id, "crusaders"));
   assert.ok(evolve(s, "crusaders"));
-  assert.equal(s.knowledge, before - 100000);
-  assert.equal(d.owned.barracks, 0);
-  assert.equal(d.owned.valkyriePalace, 2);
-  assert.equal(placedCount(d.layout, "barracks"), 0, "lifted back to the palette");
-  assert.equal(available(d, "valkyriePalace"), 2);
-  assert.equal(evolve(s, "crusaders"), false, "once");
-  assert.equal(crownedFrom(s, "barracks")?.id, "crusaders");
+  assert.equal(d.owned.barracks, 2, "research does not transform copies");
+  assert.ok(evolveCard(s, card.id));
+  assert.equal(card.id, d.cards.find(c => c.evolved)?.id);
+  assert.deepEqual([d.owned.barracks, d.owned.valkyriePalace], [1, 1]);
+  assert.equal(card.placement, undefined);
+  assert.equal(placedCount(d.layout, "barracks"), 0);
+  assert.equal(evolveCard(s, card.id), false, "cannot evolve twice");
   assert.equal(evolvedBy("valkyriePalace")?.id, "crusaders");
-
-  // A copy bought while crowned is a palace, and turns back with the rest.
-  d.owned.valkyriePalace++;
-  crownBought(s, "barracks");
-  assert.equal(s.paths.barracks!.crowned, 3);
-  assert.deepEqual(decode(JSON.stringify(s)).paths.barracks, s.paths.barracks, "the save keeps the crown");
-
-  let pl = d.layout;
-  for (const [dx, dy] of [[1, 0], [0, 1]]) pl = placeCityTile(pl, pl.keep.tx + dx, pl.keep.ty + dy) ?? assert.fail("tile");
-  d.layout = placeStructure(pl, "valkyriePalace", pl.keep.tx + 1, pl.keep.ty) ?? assert.fail("palace");
-  d.owned.valkyriePalace++; // one bought before any crown stays a palace
-  const spent = s.paths.barracks!.spent;
+  assert.deepEqual(decode(JSON.stringify(s)).defend.cards, d.cards);
+  const spent = s.pathResearch.crusaders!.spent;
   assert.equal(unlearnPath(s, "barracks"), spent);
-  assert.equal(d.owned.barracks, 3);
-  assert.equal(d.owned.valkyriePalace, 1);
-  assert.equal(placedCount(d.layout, "valkyriePalace"), 1, "what is still owned stays placed");
-  assert.equal(crownedFrom(s, "barracks"), undefined);
+  assert.deepEqual([d.owned.barracks, d.owned.valkyriePalace], [2, 0]);
+  assert.equal(card.path, undefined);
 });
 
-test("a crowned wizard tower becomes a Dark wizard keep; saves keep only a crown on a finished path", () => {
-  const s = rich();
-  s.knowledge = 1000000;
-  s.defend.owned.wizardTower = 1;
+test("an individual storm card becomes a Dark wizard keep; old crown decoding remains defensive", () => {
+  const s = rich(); s.defend.owned.wizardTower = 1;
   for (let i = 0; i < 3; i++) learnPath(s, "storm");
-  assert.ok(evolve(s, "storm"));
-  assert.equal(s.defend.owned.darkKeep, 1);
-  assert.equal(s.defend.owned.wizardTower, 0);
-  assert.equal(evolve(s, "pyromancy"), false, "sealed and crownless");
+  syncCards(s.defend);
+  const c = s.defend.cards.find(c => c.kind === "wizardTower")!;
+  assert.ok(equipCard(s, c.id, "storm"));
+  assert.ok(evolve(s, "storm")); assert.ok(evolveCard(s, c.id));
+  assert.deepEqual([s.defend.owned.darkKeep, s.defend.owned.wizardTower], [1, 0]);
+  assert.equal(evolve(s, "pyromancy"), false, "no crown");
   assert.deepEqual(decodePaths({ wizardTower: { path: "storm", rank: 2, spent: 14, crowned: 1 } }), { wizardTower: { path: "storm", rank: 2, spent: 14 } });
   assert.deepEqual(decodePaths({ wizardTower: { path: "pyromancy", rank: 3, spent: 26, crowned: 1 } }), { wizardTower: { path: "pyromancy", rank: 3, spent: 26 } });
-  assert.deepEqual(decodePaths({ wizardTower: { path: "storm", rank: 3, spent: 59, crowned: 0 } }), { wizardTower: { path: "storm", rank: 3, spent: 59, crowned: 0 } });
 });
