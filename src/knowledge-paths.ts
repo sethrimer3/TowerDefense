@@ -1,7 +1,7 @@
 /** Collection-wide Knowledge unlocks; persistent cards equip researched ranks independently. */
 import type { PaletteItem } from "./defend/catalog.ts";
 import type { PlacedKind } from "./defend/layout.ts";
-import { syncCards } from "./cards.ts";
+import { followResearch, syncCards } from "./cards.ts";
 import type { Save } from "./save.ts";
 import { studyPathCost } from "./economy.ts";
 
@@ -318,6 +318,7 @@ export function learnPath(save: Save, id: PathId, prepaid?: number): boolean {
   const cost = prepaid ?? (save.settings.devMode ? 0 : st.next.cost);
   if (prepaid === undefined) save.knowledge -= cost;
   save.pathResearch[id] = { rank: st.rank + 1, spent: (save.pathResearch[id]?.spent ?? 0) + cost };
+  followResearch(save, id);
   return true;
 }
 

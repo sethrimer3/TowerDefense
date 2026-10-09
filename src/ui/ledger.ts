@@ -9,7 +9,7 @@ import { SKILLS, TREES, type SkillId } from "../skill-trees.ts";
 import { pathById, pathState, pathsOf, unlearnPath, type KnowledgePath, type PathId, type PathTopic } from "../knowledge-paths.ts";
 import { cancelResearch, researchLeft, researchSeconds, startResearch } from "../research-jobs.ts";
 import { addForgeSmith, cancelForge, forgeLeft, forgeSeconds, removeForgeSmith, startForge, type ForgeRequest } from "../forge-jobs.ts";
-import { paintPathIcon } from "./path-icons.ts";
+import { cardBadge, cardLook, paintPathIcons } from "./card-badge.ts";
 import { TrainingParticles } from "../training-particles.ts";
 import { trainingSeconds } from "../training-jobs.ts";
 import { ITEM_NAMES, SPEED3_PRICE, UPGRADES, upgradePrice, type Price, type UpgradeId } from "../defend/catalog.ts";
@@ -158,10 +158,7 @@ export class Ledger {
       else if (itemBox.right > stripBox.right) strip.scrollLeft += itemBox.right - stripBox.right;
     }
     root.querySelectorAll<HTMLCanvasElement>("canvas[data-icon]").forEach((c) => paintIcon(c, c.dataset.icon as IconItem));
-    root.querySelectorAll<HTMLCanvasElement>("canvas[data-path-icon]").forEach((c) => {
-      const [icon, hue] = c.dataset.pathIcon!.split(":");
-      paintPathIcon(c, icon as never, hue as never);
-    });
+    paintPathIcons(root);
     root.querySelector<HTMLButtonElement>("[data-up]")!.onclick = () => this.up();
     root.querySelectorAll<HTMLButtonElement>("[data-subject]").forEach((b) => (b.onclick = () => {
       this.subject = b.dataset.subject as SubjectId;
@@ -196,10 +193,10 @@ export class Ledger {
     const cards = subject.topics.map(t => {
       const copies = this.cardsFor(t), individual = pathsOf(t.id).length > 0, expanded = study && individual && this.expanded.has(t.id) && copies.length > 0;
       const type = t.item ? TILE_TYPE[t.item] : "consumables";
-      const face = (item = t.item) => `<span class="tile-face">${item ? `<canvas width="48" height="48" data-icon="${item}"></canvas>` : uiSprite(subject.sprite)}</span>`;
+      const face = (item = t.item, c?: OwnedCard) => `<span class="tile-face">${item ? `<canvas width="48" height="48" data-icon="${item}"${cardLook(c)}></canvas>${cardBadge(c)}` : uiSprite(subject.sprite)}</span>`;
       const single = (c: OwnedCard) => `<button class="tile single type-${TILE_TYPE[c.kind]} ${c.placement ? "placed" : ""} ${this.selectedCard === c.id ? "open" : ""}"
         data-key="${t.id}#${c.id}" data-ledger-card="${c.id}" data-card-topic="${t.id}" aria-pressed="${this.selectedCard === c.id}" title="${TILE_NAMES[c.kind]} card ${c.id}: ${cardLabel(c)}">
-        ${face(c.kind)}<span class="tile-name">${TILE_NAMES[c.kind]}</span><small class="tile-sub">Card #${c.id} · ${c.placement ? "City" : "Ready"}</small><small class="card-specialization">${cardLabel(c)}</small></button>`;
+        ${face(c.kind, c)}<span class="tile-name">${TILE_NAMES[c.kind]}</span><small class="tile-sub">Card #${c.id} · ${c.placement ? "City" : "Ready"}</small><small class="card-specialization">${cardLabel(c)}</small></button>`;
       if (expanded) return copies.map(single).join("");
       const evolved = study ? copies.filter(c => c.evolved) : [];
       const count = copies.length - evolved.length;

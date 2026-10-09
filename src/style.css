@@ -1255,6 +1255,12 @@ nav button > span img { display: block; width: 42px; height: 42px; max-width: 10
   .defend-item span {
     display: none;
   }
+  .defend-item .defend-item-face {
+    display: block;
+  }
+  .defend-item .path-badge {
+    display: grid;
+  }
   .defend-category,
   .defend-categories button {
     font-size: 8px;
@@ -2159,12 +2165,34 @@ nav button > .tab-idle[hidden] { display: none; }
 .individual-card-detail h3 { margin: 4px 0; font-size: 14px; }
 .individual-card-detail p { font-size: 10px; line-height: 1.7; }
 .individual-card-detail small { display: block; font-size: 8px; }
-.card-path-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin: 10px 0; }
-.card-path-option { padding: 7px; min-width: 0; }
-.card-path-option b { font-size: 11px; }
-.card-ranks { display: flex; gap: 3px; margin-top: 8px; }
-.card-ranks button { flex: 1; min-width: 0; padding: 6px 3px; font-size: 11px; }
-.card-ranks button small { font-size: 7px; }
+/* A card's path badge: the equipped rank's icon in a small medallion on the
+   card's face, its rank beside it. */
+.tile-face, .defend-item-face { position: relative; }
+.path-badge { position: absolute; right: -5px; bottom: -5px; display: grid; place-items: center; width: 20px; height: 20px; box-sizing: border-box; pointer-events: none; }
+.path-badge canvas, .tile-face .path-badge canvas, .defend-item .path-badge canvas { width: 11px; height: 11px; image-rendering: pixelated; }
+.path-badge b { position: absolute; left: -7px; bottom: -3px; font-size: 7px; line-height: 1; padding: 1px 2px; }
+.tile.mini .path-badge { width: 16px; height: 16px; right: -4px; bottom: -4px; }
+.individual-card-detail h3 .path-badge { position: relative; right: auto; bottom: auto; display: inline-grid; vertical-align: middle; margin: 0 12px 0 6px; }
+.defend-item .defend-item-face { display: block; line-height: 0; }
+.defend-item .path-badge { display: grid; right: -3px; bottom: -3px; }
+
+/* The specialty circle: the card at the heart of a sigil, each path a
+   medallion spaced evenly round it. */
+.spec-circle { position: relative; width: min(100%, 330px); aspect-ratio: 1; margin: 8px auto 14px; }
+.spec-sigil { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.spec-center { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: grid; justify-items: center; gap: 2px; width: 74px; padding: 6px 2px; }
+.spec-center canvas { width: 44px; height: 44px; image-rendering: pixelated; }
+.individual-card-detail .spec-center small { font-size: 7px; }
+.spec-node { position: absolute; left: calc(50% + var(--x)); top: calc(50% + var(--y)); transform: translate(-50%, -50%); display: grid; justify-items: center; gap: 2px; width: 96px; padding: 0; font-size: 9px; line-height: 1.25; }
+.spec-node .path-medal { position: relative; width: 44px; height: 44px; }
+.spec-node .path-medal canvas { width: 22px; height: 22px; image-rendering: pixelated; }
+.spec-node .path-medal b { position: absolute; bottom: -6px; right: -6px; font-size: 8px; line-height: 1; padding: 2px 3px; }
+.spec-name { font-size: 10px; }
+.individual-card-detail .spec-node small { font-size: 7px; }
+@media (max-width: 420px) {
+  .spec-node { width: 82px; }
+  .spec-node .path-medal { width: 38px; height: 38px; }
+}
 .card-global { padding-top: 9px; }
 .ledger-ghosts { overflow: hidden; }
 

@@ -95,6 +95,17 @@ test("research unlocks do not grant unresearched ranks or allow another building
   const knowledge = s.knowledge; assert.ok(equipCard(s, c.id)); assert.equal(s.knowledge, knowledge);
 });
 
+test("a card wears its path's furthest researched rank, rising with research", () => {
+  const s = fixture("wizardTower", 2), [a, b] = s.defend.cards.filter(c => c.kind === "wizardTower");
+  learnPath(s, "pyromancy"); learnPath(s, "pyromancy");
+  assert.equal(equipCard(s, a.id, "pyromancy", 1), false, "a lower rank than researched can't be worn");
+  assert.ok(equipCard(s, a.id, "pyromancy")); assert.equal(a.rank, 2);
+  learnPath(s, "pyromancy"); assert.equal(a.rank, 3, "research raises cards already wearing the path");
+  assert.equal(b.path, undefined, "unspecialized cards stay unspecialized");
+  const raw = JSON.parse(JSON.stringify(s)); raw.defend.cards.find((c: { id: number }) => c.id === a.id).rank = 1;
+  assert.equal(decode(JSON.stringify(raw)).defend.cards.find(c => c.id === a.id)!.rank, 3, "older saves load at the furthest rank");
+});
+
 test("card choices and shared equipment are snapshotted at battle start", () => {
   const s = fixture("wizardTower", 1), c = s.defend.cards.find(c => c.kind === "wizardTower")!;
   learnPath(s, "rime"); learnPath(s, "storm"); equipCard(s, c.id, "rime");

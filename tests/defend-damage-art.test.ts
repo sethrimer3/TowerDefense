@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { damageStage, wallDamagePixels, wallRubblePixels } from "../src/defend/damage-art.ts";
-import { structurePixels, structureRubblePixels, type PlacedKind } from "../src/defend/tower-art.ts";
+import { artLook, structurePixels, structureRubblePixels, type PlacedKind } from "../src/defend/tower-art.ts";
 import { houseDamagePixels, houseRubblePixels } from "../src/defend/roof-art.ts";
 import { ART } from "../src/defend/park-art.ts";
 
@@ -45,4 +45,17 @@ test("wall stones crack over the stages and fall to rubble", () => {
   assert.ok(drawn(wallDamagePixels(1, 3, ART)) > 0);
   assert.ok(drawn(wallDamagePixels(3, 3, ART)) > drawn(wallDamagePixels(1, 3, ART)));
   assert.ok(drawn(wallRubblePixels(3, ART)) > 8);
+});
+
+test("path looks: Pyromancy re-roofs the wizard tower, other paths keep the base art", () => {
+  const base = structurePixels("wizardTower", 2, 2, 0, 41), pyro = structurePixels("wizardTower", 2, 2, 0, 41, "pyromancy");
+  assert.notDeepEqual(pyro, base, "Pyromancy has its own sprite");
+  assert.deepEqual(structurePixels("wizardTower", 2, 2, 0, 41, "rime"), base, "a path without art draws the base tower");
+  assert.deepEqual(structurePixels("archerTower", 2, 2, 0, 41, "pyromancy"), structurePixels("archerTower", 2, 2, 0, 41));
+  assert.equal(artLook("wizardTower", "pyromancy"), "pyromancy");
+  assert.equal(artLook("wizardTower", "storm"), "");
+  // Red tiles, no slate purple left on the roof.
+  const red = (v: number) => (v & 0xff) > ((v >> 8) & 0xff) * 1.6 && (v & 0xff) > ((v >> 16) & 0xff) * 1.6;
+  assert.ok(pyro.filter(red).length > base.filter(red).length + 20);
+  for (let s = 0; s < 4; s++) assert.equal(structurePixels("wizardTower", 2, 2, s, 41, "pyromancy").length, 2 * ART * 2 * ART);
 });

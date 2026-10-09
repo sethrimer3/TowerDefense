@@ -81,6 +81,8 @@ export type CityScene = {
   sim: DefendSim | null;
   lights: readonly Light[];
   stones: readonly Stone[];
+  /** Each structure's card path by its uid, for the paths with their own look. */
+  looks?: Readonly<Record<number, string>>;
 };
 
 /** Everything the painters share for one repaint. */
@@ -92,13 +94,14 @@ type Paint = {
   sim: DefendSim | null;
   /** The cell holds a standing building or wall stone. */
   solid: (i: number) => boolean;
+  looks?: Readonly<Record<number, string>>;
 };
 
 /** Paints the whole city onto `c` (sized by the caller) at `px` per cell. */
 export function paintCityLayer(c: CanvasRenderingContext2D, px: number, scene: CityScene) {
   const { map, sim } = scene;
   const solid = (i: number) => (sim ? sim.solid[i] === 1 : map.owner[i] >= 0 && map.type[i] !== CellType.ROAD);
-  const p: Paint = { c, px, map, sim, solid, area: scene.area ?? "moss" };
+  const p: Paint = { c, px, map, sim, solid, area: scene.area ?? "moss", looks: scene.looks };
   c.imageSmoothingEnabled = false;
   paintFlagstones(p);
   paintCityGround(p);
@@ -284,7 +287,7 @@ function paintBuilding(p: Paint, b: Building) {
     return paintRebuilding(p, b);
   }
   if (b.kind === "house") return paintArt(p, roofSprite(r.w, r.h, b.variant, roofSeed(r.x, r.y, r.w, r.h), stageOf(sim, b)), box);
-  paintStructureArt(c, b.kind, box, stageOf(sim, b), lotSeed(b));
+  paintStructureArt(c, b.kind, box, stageOf(sim, b), lotSeed(b), b.structureUid !== undefined ? p.looks?.[b.structureUid] : undefined);
 }
 
 /** Paints building `b` whole and undamaged onto `c` at `px` per cell (a

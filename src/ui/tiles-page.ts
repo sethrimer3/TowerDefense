@@ -1,4 +1,5 @@
-import { syncCards, cardLabel, equipCard, evolveCard, unevolveCard } from "../cards.ts";
+import { syncCards, cardLabel, equipCard, evolveCard, unevolveCard, type OwnedCard } from "../cards.ts";
+import { cardBadge, cardLook, paintPathIcons } from "./card-badge.ts";
 import type { PathId } from "../knowledge-paths.ts";
 import { cardDetailHtml } from "./card-detail.ts";
 /** The Tiles tab: the player's tiles laid out in a hall of the keep they
@@ -154,6 +155,7 @@ export class TilesPage {
       : `<p class="tiles-empty">${shop ? "Nothing of this type is for sale." : "No tiles of this type yet. Buy some in the Shop."}</p>`;
     shelf.scrollTop = scroll;
     grid.querySelectorAll<HTMLCanvasElement>("canvas[data-icon]").forEach((cv) => paintIcon(cv, cv.dataset.icon as IconItem));
+    paintPathIcons(grid);
     const all = tileStacks(s, "all"), placed = all.reduce((a, t) => a + t.placed, 0), count = all.reduce((a, t) => a + (t.lasting ? 0 : t.count), 0);
     c.querySelector(".tiles-foot")!.innerHTML = shop
       ? `Paid with Copper, Silver and Gold from the Mine · tap a tile to buy`
@@ -164,7 +166,8 @@ export class TilesPage {
   private stackHtml(t: TileStack) {
     const shop = this.mode === "shop", open = this.open === t.id, offer = shopOffer(this.save, t.id);
     const name = TILE_NAMES[t.id], type = `type-${t.type}`;
-    const face = (cls = "") => `<span class="tile-face ${cls}"><canvas width="48" height="48" data-icon="${iconOf(t.id)}"></canvas></span>`;
+    const card = (id?: number) => id ? this.save.defend.cards.find(c => c.id === id) : undefined;
+    const face = (cls = "", c?: OwnedCard) => `<span class="tile-face ${cls}"><canvas width="48" height="48" data-icon="${iconOf(t.id)}"${cardLook(c)}></canvas>${cardBadge(c)}</span>`;
     let tiles: string;
     if (this.stacked || t.lasting || !t.count) {
       const layers = t.count > 2 ? " layers-2" : t.count > 1 ? " layers-1" : "";
@@ -173,7 +176,7 @@ export class TilesPage {
           ${face()}<span class="tile-name">${name}</span>${t.count ? `<b class="tile-count">${t.lasting ? "∞" : `×${t.count}`}</b>` : ""}<small class="tile-sub">${sub}</small></button>`;
     } else {
       tiles = tileCopies(t, isConsumable(t.id) ? SHOWN : Infinity, this.save).map((copy) => `<button class="tile single ${type}${copy.placed ? " placed" : ""}${open && (!copy.cardId || copy.cardId === this.openCard) ? " open" : ""}" data-key="${copy.key}" data-tile="${t.id}" ${copy.cardId ? `data-copy-card="${copy.cardId}"` : ""} title="${name}${copy.placed ? ", in the city" : ""}">
-          ${face()}<span class="tile-name">${name}</span><small class="tile-sub">${copy.placed ? "In the city" : "Ready"}</small>${copy.cardId ? `<small class="card-specialization">${cardLabel(this.save.defend.cards.find(c => c.id === copy.cardId)!)}</small>` : ""}</button>`).join("")
+          ${face("", card(copy.cardId))}<span class="tile-name">${name}</span><small class="tile-sub">${copy.placed ? "In the city" : "Ready"}</small>${copy.cardId ? `<small class="card-specialization">${cardLabel(card(copy.cardId)!)}</small>` : ""}</button>`).join("")
         + (isConsumable(t.id) && t.count > SHOWN ? `<button class="tile more ${type}" data-key="${t.id}#more" data-tile="${t.id}"><b class="tile-count">+${t.count - SHOWN}</b><small class="tile-sub">more</small></button>` : "");
     }
     return tiles + (open ? this.detailHtml(t) : "");
@@ -185,7 +188,7 @@ export class TilesPage {
     const s = this.save, offer = shopOffer(s, t.id), name = TILE_NAMES[t.id], { topic } = tileTopic(t.id);
     const copies = this.stacked && t.count && !t.lasting
       ? `<div class="tile-copies" aria-label="Each ${name}">${tileCopies(t, isConsumable(t.id) ? SHOWN : Infinity, this.save).map((copy) =>
-        `<button class="tile mini type-${t.type}${copy.placed ? " placed" : ""}" data-key="${copy.key}" data-tile="${t.id}" ${copy.cardId ? `data-copy-card="${copy.cardId}" aria-label="${name} card ${copy.cardId}: ${cardLabel(this.save.defend.cards.find(c => c.id === copy.cardId)!)}"` : ""} title="${copy.placed ? "Standing in the city" : "Waiting in the palette"}"><span class="tile-face"><canvas width="32" height="32" data-icon="${iconOf(t.id)}"></canvas></span><small>${copy.placed ? "City" : "Ready"}</small></button>`).join("")}${isConsumable(t.id) && t.count > SHOWN ? `<span class="tile-more">+${t.count - SHOWN} more</span>` : ""}</div>`
+        `<button class="tile mini type-${t.type}${copy.placed ? " placed" : ""}" data-key="${copy.key}" data-tile="${t.id}" ${copy.cardId ? `data-copy-card="${copy.cardId}" aria-label="${name} card ${copy.cardId}: ${cardLabel(this.save.defend.cards.find(c => c.id === copy.cardId)!)}"` : ""} title="${copy.placed ? "Standing in the city" : "Waiting in the palette"}"><span class="tile-face"><canvas width="32" height="32" data-icon="${iconOf(t.id)}"${cardLook(this.save.defend.cards.find(c => c.id === copy.cardId))}></canvas>${cardBadge(this.save.defend.cards.find(c => c.id === copy.cardId))}</span><small>${copy.placed ? "City" : "Ready"}</small></button>`).join("")}${isConsumable(t.id) && t.count > SHOWN ? `<span class="tile-more">+${t.count - SHOWN} more</span>` : ""}</div>`
       : "";
     const buy = "reason" in offer
       ? `<em class="tile-reason">${offer.reason}</em>`

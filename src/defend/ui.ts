@@ -35,6 +35,8 @@ import { DefendRenderer } from "./render.ts";
 import { BattlePerformance, FrameTimeOverlay } from "./performance.ts";
 import type { Overlay } from "./edit-overlay.ts";
 import { paintIcon, type IconItem } from "./structure-art.ts";
+import { artLook } from "./tower-art.ts";
+import { cardBadge, cardLook, paintPathIcons } from "../ui/card-badge.ts";
 import { BoardPointers, eventCell } from "./board-pointers.ts";
 import type { Drag } from "./drag-rules.ts";
 import { EditSession, type Drop } from "./edit-session.ts";
@@ -485,15 +487,15 @@ export class DefendPage {
       return;
     }
     const s = this.save, inventory = this.host.cards?.() ?? [];
-    const all: { id: string; name: string; count: number; icon: IconItem }[] =
+    const all: { id: string; name: string; count: number; icon: IconItem; card?: OwnedCard }[] =
       this.phase === "build"
-        ? PALETTE_ITEMS.filter((item) => inCategory(item, this.category)).flatMap((item) => {
+        ? PALETTE_ITEMS.filter((item) => inCategory(item, this.category)).flatMap((item): { id: string; name: string; count: number; icon: IconItem; card?: OwnedCard }[] => {
           const cards = inventory.filter(c => c.kind === item);
           if (!cards.some(c => c.path) || ["cityTile", "cityGate", "wallBallista"].includes(item))
             return [{ id: item, name: ITEM_NAMES[item], count: available(s, item), icon: item as IconItem }];
           const groups = new Map<string, OwnedCard[]>();
           for (const c of cards.filter(c => !c.placement)) { const name = cardLabel(c); groups.set(name, [...(groups.get(name) ?? []), c]); }
-          return [...groups].map(([name, copies]) => ({ id: `${item}#${copies[0].id}`, name: `${ITEM_NAMES[item]} · ${name}`, count: copies.length, icon: item as IconItem }));
+          return [...groups].map(([name, copies]) => ({ id: `${item}#${copies[0].id}`, name: `${ITEM_NAMES[item]} · ${name}`, count: copies.length, icon: item as IconItem, card: copies[0] }));
         })
         : [
             { id: "bomb", name: "Bomb", count: s.bombs, icon: "bomb" },
@@ -506,11 +508,12 @@ export class DefendPage {
         .map(
           (e) =>
             `<button class="defend-item ${e.count ? "" : "empty"}" data-item="${e.id}" title="${e.name}" aria-label="${e.name}, ${e.count === Infinity ? "unlimited" : `${e.count} left`}">
-              <canvas width="48" height="48" data-icon="${e.icon}"></canvas><span>${e.name}</span><b>×${e.count === Infinity ? "∞" : e.count}</b></button>`,
+              <span class="defend-item-face"><canvas width="48" height="48" data-icon="${e.icon}"${cardLook(e.card)}></canvas>${cardBadge(e.card)}</span><span>${e.name}</span><b>×${e.count === Infinity ? "∞" : e.count}</b></button>`,
         )
         .join("") +
       (entries.length ? "" : `<small class="defend-palette-none">None owned. Buy more in the Tiles tab.</small>`);
     el.querySelectorAll<HTMLCanvasElement>("canvas[data-icon]").forEach((c) => paintIcon(c, c.dataset.icon as IconItem));
+    paintPathIcons(el);
     el.querySelectorAll<HTMLButtonElement>("[data-item]").forEach((b) => {
       b.onpointerdown = (e) => this.pressPalette(b.dataset.item!, e);
     });
@@ -849,10 +852,31 @@ export class DefendPage {
       reduceMotion: this.host.reduceMotion(),
       effects: this.host.effects(),
       healthbars: this.host.healthbars?.() ?? true,
+      looks: this.looks(),
       over: this.phase === "over",
       ...(this.picked ? { inspect: { id: this.picked.id, armed: this.sim ?? this.picked.armed } } : {}),
       hideBanner: this.phase === "over" || (this.pointers.session?.drag.from === "banner" && !!this.pointers.session.drag.placed),
     });
+  }
+
+  /** Each structure's path look by uid: in battle, the setup it started
+   * with; while building, its card's equipped path. */
+  private looks(): Record<number, string> {
+    const out: Record<number, string> = {}, kinds = new Map(this.save.layout.structures.map((s) => [s.uid, s.kind]));
+    if (this.sim) {
+      for (const [uid, paths] of Object.entries(this.sim.bonuses.cardPaths ?? {})) {
+        const kind = this.sim.map.buildings.find((b) => b.structureUid === Number(uid))?.kind;
+        const look = kind ? artLook(kind, Object.values(paths)[0]?.path) : "";
+        if (look) out[Number(uid)] = look;
+      }
+      return out;
+    }
+    for (const c of this.save.cards ?? []) {
+      if (!c.placement?.startsWith("structure:") || c.evolved) continue;
+      const uid = Number(c.placement.slice(10)), look = artLook(kinds.get(uid) ?? c.kind, c.path);
+      if (look) out[uid] = look;
+    }
+    return out;
   }
 
   // ── Dragging ──────────────────────────────────────────────────────────
