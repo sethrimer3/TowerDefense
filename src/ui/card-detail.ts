@@ -1,6 +1,7 @@
 import type { Save } from "../save.ts";
 import { cardLabel, cardTopic, type OwnedCard } from "../cards.ts";
-import { pathsOf, pathById, pathState, FIRE_ARROWS, SHARP, GUNNERY, SIEGE_SHOT, CRUSADE, ASSASSIN, RANGERS, SKIRMISH, FORTIFY, PYRO, RIME, STORM, PYROCLASM, CINDERS, SPOTTERS, SIGNAL } from "../knowledge-paths.ts";
+import { cardBadge, cardLook } from "./card-badge.ts";
+import { pathsOf, pathById, pathState, type KnowledgePath, FIRE_ARROWS, SHARP, GUNNERY, SIEGE_SHOT, CRUSADE, ASSASSIN, RANGERS, SKIRMISH, FORTIFY, PYRO, RIME, STORM, PYROCLASM, CINDERS, SPOTTERS, SIGNAL } from "../knowledge-paths.ts";
 import { bonuses, TRAINING, trainingRank } from "../progression.ts";
 import { archerDamage, archerCooldown, archerRange, cannonDamage, cannonCooldown, CANNON_RANGE, SOLDIER, ARCHER_UNIT, soldierScale, STRUCTURES, flameDps, flameRange, iceDamage, ICE_RANGE, iceChill, watchRadius, fireballDamage, fireballSplash, emberDps, emberSeconds, FIRE_MAGE, FIREBALL_RANGE, UPGRADES } from "../defend/catalog.ts";
 import { SUBJECTS } from "../upgrade-subjects.ts";
@@ -46,17 +47,65 @@ export function cardStats(save: Save, c: OwnedCard): string {
   return "Uses the shared city upgrades.";
 }
 
+/** The card whose circle last unfolded: it unfolds again only for another card. */
+let unfolded = -1;
+
+/** The paths as a magic circle: the card at its heart, each path a medallion
+ * spaced evenly round the ring, the equipped one lit along its spoke. A path
+ * is equipped at its furthest researched rank; unresearched ones stay dark.
+ * The sigil draws itself and the medallions fan out the first time a card
+ * shows. */
+function specialtyCircle(save: Save, c: OwnedCard, paths: KnowledgePath[]) {
+  const n = paths.length, start = n === 2 ? 180 : -90, R = 37;
+  const unfold = unfolded !== c.id;
+  unfolded = c.id;
+  const at = (i: number, r: number) => {
+    const a = ((start + (360 * i) / n) * Math.PI) / 180;
+    return { x: Math.cos(a) * r, y: Math.sin(a) * r };
+  };
+  const ticks = Array.from({ length: 36 }, (_, i) => {
+    const a = (i * 10 * Math.PI) / 180, r0 = i % 3 ? 88 : 85;
+    return `<line pathLength="1" x1="${(Math.cos(a) * r0).toFixed(1)}" y1="${(Math.sin(a) * r0).toFixed(1)}" x2="${(Math.cos(a) * 92).toFixed(1)}" y2="${(Math.sin(a) * 92).toFixed(1)}" />`;
+  }).join("");
+  const points = paths.map((_, i) => at(i, 74));
+  const polygon = n > 2 ? `<polygon pathLength="1" class="spec-star" points="${points.map(q => `${q.x.toFixed(1)},${q.y.toFixed(1)}`).join(" ")}" />` : "";
+  // A second figure turned half a step, so three paths make a hexagram.
+  const turned = n > 2 ? `<polygon pathLength="1" class="spec-star faint" points="${paths.map((_, i) => at(i + 0.5, 74)).map(q => `${q.x.toFixed(1)},${q.y.toFixed(1)}`).join(" ")}" />` : "";
+  const spokes = paths.map((p, i) => {
+    const q = at(i, 74), on = c.path === p.id;
+    return `<line pathLength="1" class="spec-spoke hue-${p.hue} ${on ? "lit" : ""}" x1="0" y1="0" x2="${q.x.toFixed(1)}" y2="${q.y.toFixed(1)}" />`;
+  }).join("");
+  const nodes = paths.map((p, i) => {
+    const st = pathState(save, p.id), rank = st.rank, on = c.path === p.id;
+    const r = p.ranks[Math.max(0, rank - 1)], q = at(i, R);
+    const label = rank ? `${p.name} ${ROMAN[rank]}` : p.name;
+    const state = on ? "Equipped" : rank ? `${r.name} · Equip free` : "Research first";
+    return `<button class="spec-node hue-${p.hue} ${on ? "on" : ""} ${rank ? "" : "locked"}" style="--x:${q.x.toFixed(2)}%;--y:${q.y.toFixed(2)}%;--i:${i}"
+      data-equip-card="${c.id}" data-equip-path="${p.id}" aria-pressed="${on}" ${rank ? "" : "disabled"} title="${rank ? `${r.name}: ${r.text}` : p.motto}">
+      <span class="path-medal"><canvas data-path-icon="${r.icon}:${p.hue}"></canvas>${rank ? `<b>${ROMAN[rank]}</b>` : ""}</span>
+      <span class="spec-name">${label}</span><small>${state}</small></button>`;
+  }).join("");
+  return `<div class="spec-circle ${unfold ? "unfold" : ""}" style="--paths:${n}" role="group" aria-label="Specialty paths">
+    <svg class="spec-sigil" viewBox="-100 -100 200 200" aria-hidden="true">
+      <circle pathLength="1" class="spec-ring" r="94" /><circle pathLength="1" class="spec-ring faint" r="83" />
+      <g class="spec-ticks">${ticks}</g>
+      ${turned}${polygon}
+      <circle pathLength="1" class="spec-ring faint" r="26" />
+      ${spokes}
+    </svg>
+    <button class="spec-center" data-equip-card="${c.id}" aria-pressed="${!c.path}" title="Wear no path">
+      <canvas width="48" height="48" data-icon="${c.kind}"${cardLook(c)}></canvas><small>${c.path ? "Unspecialize" : "Unspecialized"}</small></button>
+    ${nodes}
+  </div>`;
+}
+
+const ROMAN = ["", "I", "II", "III", "IV", "V"];
+
 /** One card's setup, shared between Tiles and Study. Global research is explicitly
  * labelled; equipping an unlocked rank never spends currency or starts a timer. */
 export function cardDetailHtml(save: Save, c: OwnedCard, study = false) {
   const topic = cardTopic(c), paths = topic ? pathsOf(topic) : [];
   const equipped = c.path ? pathById(c.path) : undefined;
-  const selected = (path: string, rank: number) => c.path === path && c.rank === rank;
-  const options = paths.map(p => {
-    const st = pathState(save, p.id);
-    return `<div class="card-path-option hue-${p.hue}"><b>${p.name}</b><small>${p.motto}</small><div class="card-ranks">${p.ranks.map((r, i) =>
-      `<button data-equip-card="${c.id}" data-equip-path="${p.id}" data-equip-rank="${i + 1}" aria-pressed="${selected(p.id, i + 1)}" ${i >= st.rank || c.evolved ? "disabled" : ""} title="${r.text}">${["I", "II", "III"][i]}<small>${i < st.rank ? "Equip free" : "Research first"}</small></button>`).join("")}</div></div>`;
-  }).join("");
   const crown = equipped?.evolves, unlocked = equipped && save.pathResearch[equipped.id]?.crowned;
   const t = tileTopic(c.kind).topic;
   const type = TILE_TYPE[c.kind];
@@ -66,10 +115,10 @@ export function cardDetailHtml(save: Save, c: OwnedCard, study = false) {
     .map(id => { const u = UPGRADES.find(u => u.id === id)!; return `<li>${u.name}: ${u.describe(save.defend.levels[id])}</li>`; }).join("");
   const next = equipped ? pathState(save, equipped.id).next : undefined;
   return `<section class="individual-card-detail" data-card-detail="${c.id}" aria-label="Card ${c.id} specialization">
-    <header><div><small>INDIVIDUAL CARD #${c.id} · ${c.placement ? "IN THE CITY" : "READY"}</small><h3>${cardLabel(c)}</h3></div></header>
+    <header><div><small>INDIVIDUAL CARD #${c.id} · ${c.placement ? "IN THE CITY" : "READY"}</small><h3>${cardBadge(c)}${cardLabel(c)}</h3></div></header>
     <p class="card-effective">${cardStats(save, c)}</p>
     ${equipped && !c.evolved ? `<p>${equipped.ranks[(c.rank ?? 1) - 1].text}.</p>` : ""}
-    ${c.evolved ? `<p>This card is evolved. Your other cards keep their own builds.</p><button data-unevolve-card="${c.id}">Return to base card<small>Free · returns this card to the palette</small></button>` : paths.length ? `<p class="ledger-note">Equip one path on this card. Switching is free; an active defense keeps its starting setup.</p><button data-equip-card="${c.id}" aria-pressed="${!c.path}">Unspecialized</button><div class="card-path-options">${options}</div>` : ""}
+    ${c.evolved ? `<p>This card is evolved. Your other cards keep their own builds.</p><button data-unevolve-card="${c.id}">Return to base card<small>Free · returns this card to the palette</small></button>` : paths.length ? `<p class="ledger-note">Choose one path for this card. It always wears the path's furthest researched rank. Switching is free; an active defense keeps its starting setup.</p>${specialtyCircle(save, c, paths)}` : ""}
     ${crown && !c.evolved ? `<button data-evolve-card="${c.id}" ${unlocked && c.rank === equipped!.ranks.length ? "" : "disabled"}>Evolve this card<small>${unlocked ? "Free · returns this card to the palette" : "Research the crown first"}</small></button>` : ""}
     ${next ? `<p class="ledger-note">Next unlock: ${next.name} · ${next.cost} Knowledge. Research once, then equip on any card.</p>` : ""}
     <div class="card-global"><small>SHARED SMITHY BONUSES</small><p>${training || "Uses its type equipment"}</p>${equipment ? `<details><summary>Equipment on all ${t.name} cards</summary><ul>${equipment}</ul></details>` : ""}</div>

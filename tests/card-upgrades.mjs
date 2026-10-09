@@ -57,12 +57,26 @@ try {
     const first = Number(await archerCards.first().getAttribute('data-ledger-card'));
     const second = Number(await archerCards.nth(1).getAttribute('data-ledger-card'));
     await archerCards.first().click();
-    await room.locator(`[data-equip-card="${first}"][data-equip-path="fireArrows"][data-equip-rank="3"]`).click();
+    // The specialty circle unfolds: its sigil draws itself and the paths sit evenly round it.
+    assert.equal(await room.locator('.spec-circle.unfold').count(), 1, 'a newly selected card unfolds its circle');
+    const nodes = await room.locator('.spec-node').evaluateAll(els => els.map(e => { const r = e.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; }));
+    await page.waitForTimeout(1500);
+    const settled = await room.locator('.spec-node').evaluateAll(els => els.map(e => { const r = e.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; }));
+    const centre = await room.locator('.spec-center').evaluate(e => { const r = e.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
+    const radii = settled.map(n => Math.hypot(n.x - centre.x, n.y - centre.y));
+    assert.equal(settled.length, 2, 'archer towers have two paths');
+    assert.ok(Math.abs(radii[0] - radii[1]) < 2, `paths are equidistant from the card (${radii})`);
+    assert.ok(nodes.some((n, i) => Math.hypot(n.x - settled[i].x, n.y - settled[i].y) > 5), 'medallions fly out from the centre');
+    await page.screenshot({ path: `test-results/cards-${width}-circle.png` });
+    await room.locator(`[data-equip-card="${first}"][data-equip-path="fireArrows"]`).click();
+    assert.equal(await room.locator('.spec-circle.unfold').count(), 0, 'equipping does not unfold the circle again');
     await room.locator(`[data-ledger-card="${second}"]`).click();
-    await room.locator(`[data-equip-card="${second}"][data-equip-path="sharpshooters"][data-equip-rank="2"]`).click();
+    await room.locator(`[data-equip-card="${second}"][data-equip-path="sharpshooters"]`).click();
     let s = await state(page);
     assert.equal(s.defend.cards.find(c => c.id === first).path, 'fireArrows');
+    assert.equal(s.defend.cards.find(c => c.id === first).rank, 3, 'a path is equipped at its furthest researched rank');
     assert.equal(s.defend.cards.find(c => c.id === second).path, 'sharpshooters');
+    assert.equal(await room.locator(`[data-ledger-card="${first}"] .path-badge canvas[data-path-icon="volley:ember"]`).count(), 1, 'the card shows its rank icon as a badge');
     assert.equal(s.defend.cards.filter(c => c.kind === 'archerTower' && !c.path).length, 3);
     await page.screenshot({ path: `test-results/cards-${width}-selected.png` });
     await room.locator('[data-gather="archerTower"]').click();

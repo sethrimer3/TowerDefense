@@ -9,7 +9,7 @@ import { TILE_ICON_CELLS, cityTilePixels } from "./tile-art.ts";
 import { hash, hash01 } from "./grid.ts";
 import { ART } from "./park-art.ts";
 import { drawSprite, sprite } from "./damage-art.ts";
-import { structurePixels, structureRubblePixels } from "./tower-art.ts";
+import { artLook, structurePixels, structureRubblePixels } from "./tower-art.ts";
 
 /** Medieval roofing: terracotta tile, old brick, weathered timber, thatch,
  * slate and straw. */
@@ -23,12 +23,13 @@ export type ArtBox = { x: number; y: number; w: number; h: number; px: number };
 
 /** Paints a structure into `box`: the keep at its damage `stage` (see
  * `keepStage`), anything else at its `damageStage`, seeded by `seed` (its
- * lot) so each looks its own. */
-export function paintStructureArt(c: CanvasRenderingContext2D, kind: StructureKind, box: ArtBox, stage = 0, seed = 0) {
+ * lot) so each looks its own, in its card's path `look` (`PATH_LOOKS`). */
+export function paintStructureArt(c: CanvasRenderingContext2D, kind: StructureKind, box: ArtBox, stage = 0, seed = 0, path?: string) {
   const x = Math.round(box.x), y = Math.round(box.y), w = Math.round(box.w), h = Math.round(box.h);
   if (kind === "keep") return paintKeep(c, { x, y, w, h, px: box.px }, stage);
   const cw = Math.max(1, Math.round(box.w / box.px)), ch = Math.max(1, Math.round(box.h / box.px));
-  const art = sprite(`${kind}:${cw}x${ch}:${stage}:${seed}`, cw * ART, ch * ART, () => structurePixels(kind, cw, ch, stage, seed));
+  const look = artLook(kind, path);
+  const art = sprite(`${kind}:${cw}x${ch}:${stage}:${seed}${look ? `:${look}` : ""}`, cw * ART, ch * ART, () => structurePixels(kind, cw, ch, stage, seed, look));
   drawSprite(c, art, x, y, w, h);
 }
 
@@ -48,7 +49,8 @@ function disc(c: CanvasRenderingContext2D, x: number, y: number, r: number) {
 
 export type IconItem = StructureKind | "cityTile" | "cityGate" | "wallSpikes" | "wallBallista" | "bomb" | "banner";
 
-/** Palette icon for an item, drawn into a small square canvas. */
+/** Paints `item`'s palette icon into a small square canvas; a structure takes the path look named by
+ * the canvas's `data-look` (a card's equipped path), when it has one. */
 export function paintIcon(canvas: HTMLCanvasElement, item: IconItem) {
   const c = canvas.getContext("2d")!;
   const n = canvas.width;
@@ -64,7 +66,7 @@ export function paintIcon(canvas: HTMLCanvasElement, item: IconItem) {
   const px = n / Math.max(def[0], def[1]) / 1.1;
   const w = def[0] * px,
     h = def[1] * px;
-  paintStructureArt(c, item, { x: (n - w) / 2, y: (n - h) / 2, w, h, px });
+  paintStructureArt(c, item, { x: (n - w) / 2, y: (n - h) / 2, w, h, px }, 0, 0, canvas.dataset.look);
 }
 
 /** A corner of the city: streets, roofs and a park, in the board's own

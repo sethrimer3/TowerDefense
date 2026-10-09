@@ -59,6 +59,9 @@ export type DrawOptions = {
   hideBanner?: boolean;
   /** Developer timing, disabled by default. */
   timings?: boolean;
+  /** Each structure's card path by uid, for the paths with their own look
+   * (`PATH_LOOKS`); presentation only. */
+  looks?: Readonly<Record<number, string>>;
   /** The building the player tapped (its id in the map), outlined with its
    * reach and troops. */
   inspect?: { id: number; armed: Armed };
@@ -212,7 +215,7 @@ export class DefendRenderer {
     if (!sim) { this.areaMix = 1; this.previousArea = null; }
     if (this.areaMix === 1) this.previousArea = null;
     this.lastWeather = opts.weather;
-    this.refreshLayer(map, sim);
+    this.refreshLayer(map, sim, opts.looks);
     if (opts.timings) this.timings.terrainMs = performance.now() - start;
     // Beyond the board's edges: the dark ground the city stands on.
     this.ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -451,19 +454,19 @@ export class DefendRenderer {
   /** Repaints the city layer if the map, size, zoom band, buildings or the
    * buildings' damage stages changed. Zoomed in, the city is painted at 2–4× so edges
    * stay crisp. */
-  private refreshLayer(map: CityMap, sim: DefendSim | null) {
+  private refreshLayer(map: CityMap, sim: DefendSim | null, looks?: Readonly<Record<number, string>>) {
     const { W, H } = this.board;
     let k = this.cam.s >= 4 ? 4 : this.cam.s >= 2.5 ? 3 : this.cam.s >= 1.4 ? 2 : 1;
     while (k > 1 && W * H * k * k > 18e6) k--;
     this.layerScale = k;
     // Every building's damage stage is painted into the layer too.
-    const key = `${W}:${k}:${this.area}:${sim ? `${sim.mapVersion}:${damageKey(sim)}` : -1}`;
+    const key = `${W}:${k}:${this.area}:${sim ? `${sim.mapVersion}:${damageKey(sim)}` : -1}:${looks ? Object.entries(looks).join(",") : ""}`;
     if (this.previousArea && (key !== this.previousKey || !this.layerKey)) {
       this.previousLayer ??= document.createElement("canvas");
       this.previousLayer.width = W * k;
       this.previousLayer.height = H * k;
       this.lighting.setMap(map);
-      paintCityLayer(this.previousLayer.getContext("2d")!, this.px * k, { map, sim, area: this.previousArea, lights: this.lighting.lights, stones: this.lighting.roadStones });
+      paintCityLayer(this.previousLayer.getContext("2d")!, this.px * k, { map, sim, area: this.previousArea, lights: this.lighting.lights, stones: this.lighting.roadStones, looks });
       this.previousKey = key;
     }
     if (map === this.map && key === this.layerKey) return;
@@ -472,7 +475,7 @@ export class DefendRenderer {
     this.lighting.setMap(map);
     this.layer.width = W * k;
     this.layer.height = H * k;
-    paintCityLayer(this.lctx, this.px * k, { map, sim, area: this.area, lights: this.lighting.lights, stones: this.lighting.roadStones });
+    paintCityLayer(this.lctx, this.px * k, { map, sim, area: this.area, lights: this.lighting.lights, stones: this.lighting.roadStones, looks });
   }
 
   /** Folds fallen and rebuilt buildings into the lighting, then draws what

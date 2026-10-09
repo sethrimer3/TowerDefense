@@ -42,17 +42,24 @@ export function cardTopic(c: OwnedCard) {
   return p?.topic;
 }
 
-/** Choosing a researched path is free. Battle snapshots keep their original setup. */
+/** Choosing a researched path is free, and a card always carries the furthest
+ * rank researched on it: Pyromancy II can't be worn once III is unlocked. A
+ * `rank` given must be that rank. Battle snapshots keep their original setup. */
 export function equipCard(save: Save, id: number, path?: PathId, rank?: number): boolean {
   syncCards(save.defend);
   const c = save.defend.cards.find(c => c.id === id);
   if (!c || c.evolved) return false;
   if (!path) { delete c.path; delete c.rank; return true; }
   const p = pathById(path), learned = save.pathResearch[path]?.rank ?? 0;
-  const at = rank ?? learned;
-  if (p.topic !== cardTopic(c) || !Number.isInteger(at) || at < 1 || at > learned) return false;
-  c.path = path; c.rank = at;
+  if (p.topic !== cardTopic(c) || learned < 1 || (rank !== undefined && rank !== learned)) return false;
+  c.path = path; c.rank = learned;
   return true;
+}
+
+/** Every card on `path` takes up its furthest researched rank. */
+export function followResearch(save: Save, path: PathId) {
+  const learned = save.pathResearch[path]?.rank ?? 0;
+  for (const c of save.defend.cards) if (c.path === path && !c.evolved && learned) c.rank = learned;
 }
 
 /** An unlocked crown transforms this one card. Different footprints return it to
@@ -110,8 +117,9 @@ export function decodeCards(raw: unknown, save: Save) {
     const c: OwnedCard = { id: v.id, kind: v.kind };
     if (typeof v.placement === "string") c.placement = v.placement;
     const p = PATHS.find(p => p.id === v.path), r = p ? save.pathResearch[p.id] : undefined;
+    // A card wears its path's furthest researched rank, whatever it was saved at.
     if (p && p.topic === cardTopic(c) && Number.isInteger(v.rank) && v.rank > 0 && v.rank <= (r?.rank ?? 0)) {
-      c.path = p.id; c.rank = v.rank;
+      c.path = p.id; c.rank = r!.rank;
     }
     const evolved = PATHS.find(p => p.id === v.evolved && p.evolves?.item === c.kind);
     if (evolved && save.pathResearch[evolved.id]?.crowned) {

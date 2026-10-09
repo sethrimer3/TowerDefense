@@ -48,6 +48,8 @@ const C = {
   red: 0xa03a2e,
   timber: 0x6e5236,
   slate: [0x46305e, 0x5e4078, 0x7a5694, 0x9a74b4],
+  /** The Pyromancy wizard tower's fired red tiles, dark to light. */
+  kiln: [0x4e0f0c, 0x80201a, 0xb23a22, 0xdc6a32],
   straw: [0x9c7a34, 0xc9a24e, 0xe0c070],
   target: [0xe8dcc0, 0xb3372f, 0xe9c46a],
   fire: [0xc8542a, 0xf0a040, 0xf2d27a, 0xfff4c8],
@@ -90,11 +92,24 @@ const MATERIAL: Record<PlacedKind, { m: Material; ruin: Pick<Ruin, "stone" | "to
  * (where its shadow falls), like the houses. */
 const frame = (w: number, h: number) => ({ x0: 1, y0: 1, x1: w - 3, y1: h - 3 });
 
+/** The Knowledge paths that give a structure its own look, by kind. A card
+ * on one of them is drawn (on the board and on its card) in that look; every
+ * other path keeps the base art. Add a path here and handle it in the kind's
+ * painter to give it a sprite. */
+export const PATH_LOOKS: Partial<Record<PlacedKind, readonly string[]>> = {
+  wizardTower: ["pyromancy"],
+};
+/** The look `kind` takes on `path`: the path when it has art, else "" (the
+ * base art), so cache keys stay shared between looks that draw the same. */
+export const artLook = (kind: string, path?: string): string =>
+  path && PATH_LOOKS[kind as PlacedKind]?.includes(path) ? path : "";
+
 /** A structure of `cw × ch` cells at damage `stage` (0 to 3), seeded by its
- * lot, as `(cw·ART) × (ch·ART)` RGBA pixels. */
-export function structurePixels(kind: PlacedKind, cw: number, ch: number, stage = 0, seed = 0): Uint32Array {
+ * lot, as `(cw·ART) × (ch·ART)` RGBA pixels, in its path's `look` (see
+ * `PATH_LOOKS`; "" for the base art). */
+export function structurePixels(kind: PlacedKind, cw: number, ch: number, stage = 0, seed = 0, look = ""): Uint32Array {
   const w = cw * ART, h = ch * ART, out = new Uint32Array(w * h), p = pixels(out, w, h);
-  PAINT[kind](p);
+  PAINT[kind](p, artLook(kind, look));
   damage(p, stage, hash(seed, KINDS.indexOf(kind)), MATERIAL[kind].m);
   if (kind === "darkKeep") fissures(p, stage, hash(seed, 0xd4));
   return out;
@@ -108,7 +123,7 @@ export function structureRubblePixels(kind: PlacedKind, cw: number, ch: number, 
 
 const KINDS: PlacedKind[] = ["barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait"];
 
-const PAINT: Record<PlacedKind, (p: Pix) => void> = {
+const PAINT: Record<PlacedKind, (p: Pix, look: string) => void> = {
   barracks: paintBarracks,
   archerBarracks: paintArcherBarracks,
   archerTower: paintArcherTower,
@@ -307,33 +322,41 @@ function paintWatchTower(p: Pix) {
   for (const [x, y] of [[f.x0, f.y0], [f.x1, f.y0], [f.x0, f.y1], [f.x1, f.y1]]) p.set(x, y, C.plank[0]);
 }
 
-function paintWizardTower(p: Pix) {
+function paintWizardTower(p: Pix, look: string) {
   const { x0, y0, x1, y1 } = frame(p.w, p.h);
   const cx = (x0 + x1 + 1) / 2, cy = (y0 + y1 + 1) / 2, r = (x1 - x0 + 1) / 2;
   const roof = r - 2.2;
+  // Pyromancy fires the roof red and cuts it to six slopes, a hexagon, with
+  // ember runes in the rim; otherwise eight slate slopes, nearly round.
+  const pyro = look === "pyromancy", sides = pyro ? 6 : 8, tiles = pyro ? C.kiln : C.slate, rune = pyro ? C.ember : C.rune;
+  // How far out a point is in the roof's own shape: its distance on the
+  // round roof, its furthest reach toward a side on the hexagon.
+  const reach = (d: number, dx: number, dy: number) => !pyro ? d
+    : Math.max(Math.abs(dx), Math.abs(dx * 0.5 + dy * 0.866), Math.abs(dx * 0.5 - dy * 0.866)) / 0.866;
   disc(p, cx, cy, r, (x, y, d, dx, dy) => {
     if (d > r - 1) return OUTLINE;
-    if (d > roof + 1) {
+    const e = reach(d, dx, dy);
+    if (e > roof + 1) {
       // The rim of pale stone, a rune glowing every so often round it.
       const a = Math.floor(((Math.atan2(dy, dx) + Math.PI) / (2 * Math.PI)) * 24);
-      return a % 4 === 1 ? C.rune : C.pale[1 + Math.min(2, lit(x, y, dx, dy, d))];
+      return a % 4 === 1 ? rune : C.pale[1 + Math.min(2, lit(x, y, dx, dy, d))];
     }
-    if (d > roof) return OUTLINE;
-    // Eight slate slopes rising to the finial, shaded by which way they
-    // face, the seams between them dark.
-    const ang = Math.atan2(dy, dx) + Math.PI, k = Math.floor((ang / (2 * Math.PI)) * 8 + 0.5) % 8;
-    const mid = (k / 8) * 2 * Math.PI - Math.PI;
-    const seam = Math.abs(((ang / (2 * Math.PI)) * 8 + 0.5) % 1 - 0.5) > 0.44 && d > 1.2;
-    if (seam) return C.slate[0];
+    if (e > roof) return OUTLINE;
+    // The slopes rising to the finial, shaded by which way they face, the
+    // seams between them dark.
+    const ang = Math.atan2(dy, dx) + Math.PI, k = Math.floor((ang / (2 * Math.PI)) * sides + 0.5) % sides;
+    const mid = (k / sides) * 2 * Math.PI - Math.PI;
+    const seam = Math.abs(((ang / (2 * Math.PI)) * sides + 0.5) % 1 - 0.5) > 0.44 && d > 1.2;
+    if (seam) return tiles[0];
     const t = (-(Math.cos(mid) + Math.sin(mid)) / Math.SQRT2) * 1.5 + 1.5;
-    return C.slate[Math.max(0, Math.min(3, Math.floor(t + ((x + y) % 2 ? 0.25 : -0.25))))];
+    return tiles[Math.max(0, Math.min(3, Math.floor(t + ((x + y) % 2 ? 0.25 : -0.25))))];
   });
-  // The finial: gold, lit at its upper left.
-  const fx = Math.floor(cx), fy = Math.floor(cy);
-  p.set(fx - 1, fy - 1, C.gold[2]);
-  p.set(fx, fy - 1, C.gold[1]);
-  p.set(fx - 1, fy, C.gold[1]);
-  p.set(fx, fy, C.gold[0]);
+  // The finial: gold, lit at its upper left (a flame's colours on Pyromancy).
+  const fx = Math.floor(cx), fy = Math.floor(cy), tip = pyro ? [C.fire[1], C.fire[2], C.fire[3]] : C.gold;
+  p.set(fx - 1, fy - 1, tip[2]);
+  p.set(fx, fy - 1, tip[1]);
+  p.set(fx - 1, fy, tip[1]);
+  p.set(fx, fy, tip[0]);
 }
 
 function paintMageGuild(p: Pix) {
