@@ -1,4 +1,4 @@
-import { buildingPaths } from "../cards.ts";
+import { buildingPaths } from "../specializations.ts";
 import { DefenderIndex } from "./defender-index.ts";
 import { Atmosphere, groundWeather } from "./atmosphere.ts";
 import { areaForWave } from "./areas.ts";
@@ -727,7 +727,7 @@ export class DefendSim {
       const c = center(b.rect), r = watchReach(this, b);
       for (const e of this.enemiesNear(c.x, c.y, r)) {
         e.marked = true;
-        if (this.bonuses.cardPaths) e.markDamage = Math.max(e.markDamage ?? 2, SPOTTERS.mark[spot]);
+        if (this.bonuses.structurePaths) e.markDamage = Math.max(e.markDamage ?? 2, SPOTTERS.mark[spot]);
         if (!signal) continue;
         e.slowed = Math.min(e.slowed ?? 1, SIGNAL.slow[signal]);
         if (signal >= 3) ignite(e, SIGNAL.burn, 0.5);

@@ -23,7 +23,7 @@ export type ArtBox = { x: number; y: number; w: number; h: number; px: number };
 
 /** Paints a structure into `box`: the keep at its damage `stage` (see
  * `keepStage`), anything else at its `damageStage`, seeded by `seed` (its
- * lot) so each looks its own, in its card's path `look` (`PATH_LOOKS`). */
+ * lot) so each looks its own, in its path's `look` (`PATH_LOOKS`). */
 export function paintStructureArt(c: CanvasRenderingContext2D, kind: StructureKind, box: ArtBox, stage = 0, seed = 0, path?: string) {
   const x = Math.round(box.x), y = Math.round(box.y), w = Math.round(box.w), h = Math.round(box.h);
   if (kind === "keep") return paintKeep(c, { x, y, w, h, px: box.px }, stage);
@@ -50,7 +50,7 @@ function disc(c: CanvasRenderingContext2D, x: number, y: number, r: number) {
 export type IconItem = StructureKind | "cityTile" | "cityGate" | "wallSpikes" | "wallBallista" | "bomb" | "banner";
 
 /** Paints `item`'s palette icon into a small square canvas; a structure takes the path look named by
- * the canvas's `data-look` (a card's equipped path), when it has one. */
+ * the canvas's `data-look` (the path the building wears), when it has one. */
 export function paintIcon(canvas: HTMLCanvasElement, item: IconItem) {
   const c = canvas.getContext("2d")!;
   const n = canvas.width;

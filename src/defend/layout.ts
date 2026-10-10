@@ -26,14 +26,17 @@ import {
   type Rect,
   type TilePos,
 } from "./grid.ts";
+import type { PathId } from "../knowledge-paths.ts";
 import { BALLISTA, GATE, STRUCTURES, TILE_ROOM, footprint, type StructureKind, type TileSpan } from "./catalog.ts";
 
 export type PlacedKind = Exclude<StructureKind, "keep">;
 /** `spot` seeds where on its tile the structure stands; it is drawn afresh
  * for everything on a tile whenever something is dropped there. A structure
  * spanning a block of tiles (`span`) stands on (tx, ty), its block's top
- * left tile. */
-export type PlacedStructure = { uid: number; kind: PlacedKind; tx: number; ty: number; spot: number };
+ * left tile. `path` is the Knowledge path the player chose for this one
+ * structure when placing it (absent: unspecialized); it moves with the
+ * structure and goes when the structure is taken up. */
+export type PlacedStructure = { uid: number; kind: PlacedKind; tx: number; ty: number; spot: number; path?: PathId };
 
 /** A side of a tile. */
 export type Side = "n" | "e" | "s" | "w";
@@ -42,6 +45,9 @@ const SIDE_STEP: Record<Side, readonly [number, number]> = { n: [0, -1], e: [1, 
 /** A city gate: set in the wall on `side` of city tile (tx, ty). Wall
  * spikes stand on the same kind of spot. */
 export type GateSpot = { tx: number; ty: number; side: Side };
+/** A row of wall spikes, on a gate's kind of spot, with the Knowledge path
+ * chosen for it (absent: unspecialized). */
+export type SpikeSpot = GateSpot & { path?: PathId };
 /** A corner of the city wall: the tile corner (vx, vy), between the four
  * tiles around it, where the wall turns through a right angle. */
 export type CornerSpot = { vx: number; vy: number };
@@ -60,7 +66,7 @@ export type Layout = {
   /** City gates, each in the wall along one edge of a city tile. */
   gates: GateSpot[];
   /** Wall spikes, each along the wall on one edge of a city tile. */
-  spikes: GateSpot[];
+  spikes: SpikeSpot[];
   /** Wall ballistas, each on a corner of the wall. */
   ballistas: CornerSpot[];
   /** Outlying districts (the Study's skill): city tiles may stand apart
@@ -526,10 +532,10 @@ export function edgeWallRect(g: GateSpot): Rect {
 }
 
 /** Sets spikes along the wall at `g` (not where a gate stands). */
-export function placeSpikes(l: Layout, g: GateSpot): Layout | null {
+export function placeSpikes(l: Layout, g: GateSpot, path?: PathId): Layout | null {
   if (!gateOk(cityTileSet(l), g) || l.spikes.some((o) => sameGate(o, g)) || l.gates.some((o) => sameGate(o, g))) return null;
   const next = cloneLayout(l);
-  next.spikes.push({ tx: g.tx, ty: g.ty, side: g.side });
+  next.spikes.push({ tx: g.tx, ty: g.ty, side: g.side, ...(path ? { path } : {}) });
   return fitLayout(next).ok ? next : null;
 }
 
@@ -539,9 +545,10 @@ export function removeSpikes(l: Layout, g: GateSpot): Layout {
   return next;
 }
 
+/** Moves a row of spikes along the wall, keeping its chosen path. */
 export function moveSpikes(l: Layout, from: GateSpot, to: GateSpot): Layout | null {
   if (sameGate(from, to)) return l;
-  return placeSpikes(removeSpikes(l, from), to);
+  return placeSpikes(removeSpikes(l, from), to, l.spikes.find((o) => sameGate(o, from))?.path);
 }
 
 // ── Wall ballistas ───────────────────────────────────────────────────────

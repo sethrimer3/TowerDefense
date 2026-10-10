@@ -713,7 +713,9 @@ export type Bonuses = {
    * with none chosen, so such a run plays exactly as before. */
   banner?: { cooldown: number; defense: number; reach: number; damage: number; march: number; life: number; regen: number };
   paths?: BattlePaths;
-  cardPaths?: Record<number, BattlePaths>;
+  /** Each placed building's own path (by structure uid) and each spike
+   * row's (by wall spot), from `placedBattlePaths`. */
+  structurePaths?: Record<number, BattlePaths>;
   spikePaths?: Record<string, BattlePaths>;
 };
 export const NO_BONUSES: Readonly<Bonuses> = Object.freeze({

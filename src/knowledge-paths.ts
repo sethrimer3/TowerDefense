@@ -1,7 +1,9 @@
-/** Collection-wide Knowledge unlocks; persistent cards equip researched ranks independently. */
+/** Collection-wide Knowledge unlocks. The Study researches a path's ranks
+ * once for every building of its kind; the player chooses which researched
+ * path each placed building wears as they place it in Defend
+ * (`specializations.ts`). */
 import type { PaletteItem } from "./defend/catalog.ts";
-import type { PlacedKind } from "./defend/layout.ts";
-import { followResearch, syncCards } from "./cards.ts";
+import { cloneLayout, type PlacedKind } from "./defend/layout.ts";
 import type { Save } from "./save.ts";
 import { studyPathCost } from "./economy.ts";
 
@@ -130,7 +132,7 @@ export const PATHS: KnowledgePath[] = [
       { name: "Forked bolts", icon: "fork", cost: studyPathCost(5, 1), text: "Bolts leap through 5 enemies, further apart" },
       { name: "Thunderhead", icon: "thunderhead", cost: studyPathCost(5, 2), text: "Bolts leap through 7 enemies and strike half again as hard" },
     ],
-    evolves: { from: "wizardTower", item: "darkKeep", name: "Dark wizard keep", cost: 150000, text: "Unlocks the crown: evolve a selected Stormcalling card into a Dark wizard keep" },
+    evolves: { from: "wizardTower", item: "darkKeep", name: "Dark wizard keep", cost: 150000, text: "Unlocks the crown: evolve any Wizard tower into a Dark wizard keep" },
   },
   {
     id: "crusaders", topic: "barracks", name: "Crusaders", motto: "Immovable, armoured, enduring", hue: "steel",
@@ -139,7 +141,7 @@ export const PATHS: KnowledgePath[] = [
       { name: "Field dressing", icon: "heart", cost: studyPathCost(4, 1), text: "They heal 3 HP a second" },
       { name: "Templars", icon: "cross", cost: studyPathCost(4, 2), text: "120% more HP in all, and 50% more damage" },
     ],
-    evolves: { from: "barracks", item: "valkyriePalace", name: "Valkyrie palace", cost: 100000, text: "Unlocks the crown: evolve a selected Crusaders card into a Valkyrie palace" },
+    evolves: { from: "barracks", item: "valkyriePalace", name: "Valkyrie palace", cost: 100000, text: "Unlocks the crown: evolve any Barracks into a Valkyrie palace" },
   },
   {
     id: "assassins", topic: "barracks", name: "Assassins", motto: "Swift, frail, deadly strikes", hue: "shadow",
@@ -275,6 +277,30 @@ export const PATH_TOPICS = [...new Set(PATHS.map((p) => p.topic))];
 export const pathById = (id: PathId) => PATHS.find((p) => p.id === id)!;
 export const pathsOf = (topic: string) => PATHS.filter((p) => p.topic === topic);
 
+/** The topic whose paths a palette kind can wear: its own (the bait's and
+ * the spikes' by their topic's name). Evolved kinds and everything else
+ * have none. */
+export function pathTopicOf(kind: string): PathTopic | undefined {
+  const topic = kind === "monsterBait" ? "bait" : kind === "wallSpikes" ? "spikes" : kind;
+  return PATHS.some((p) => p.topic === topic) ? (topic as PathTopic) : undefined;
+}
+/** Whether `path` is one of `kind`'s own paths. */
+export const pathFits = (kind: string, path: PathId) => PATHS.some((p) => p.id === path && p.topic === pathTopicOf(kind));
+
+/** What a building of each topic does when it wears no path, as the
+ * placement choice reads it. */
+export const UNSPECIALIZED: Record<PathTopic, string> = {
+  wizardTower: "The original mix of fire and ice",
+  barracks: "Balanced swordsmen",
+  archerTower: "Steady single arrows",
+  cannonTower: "Standard shells and blasts",
+  archerBarracks: "Ordinary archers",
+  watchTower: "Marked enemies take double damage",
+  mageGuild: "Ordinary fire mages",
+  bait: "Plain stacks of bait",
+  spikes: "Plain stakes that cut",
+};
+
 /** Legacy topic-wide choices retained solely for old-save migration. */
 export type PathChoice = { path: PathId; rank: number; spent: number; crowned?: number };
 export type PathChoices = Partial<Record<PathTopic, PathChoice>>;
@@ -287,7 +313,7 @@ export const pathRank = (paths: BattlePaths | undefined, topic: PathTopic, path:
   return c && c.path === path ? c.rank : 0;
 };
 
-/** Paths are researched once for the collection; cards equip them independently. */
+/** Paths are researched once for the collection; each placed building wears one. */
 export type PathResearch = Partial<Record<PathId, { rank: number; spent: number; crowned?: boolean }>>;
 export function pathState(save: Save, id: PathId) {
   const p = pathById(id), research = save.pathResearch[id], rank = research?.rank ?? 0;
@@ -298,10 +324,10 @@ export function pathState(save: Save, id: PathId) {
     crowned, crownAffordable, canEvolve: !!p.evolves && !next && !crowned && crownAffordable };
 }
 
-/** Base cards stay for sale after a crown is researched. */
+/** The path whose crown makes `item` (base kinds stay for sale after it). */
 export const evolvedBy = (item: PaletteItem): KnowledgePath | undefined => PATHS.find(p => p.evolves?.item === item);
 
-/** Unlock a crown. Transforming a specific card is a separate, free choice. */
+/** Unlock a crown. Evolving a copy is a separate, free choice (`evolveOne`). */
 export function evolve(save: Save, id: PathId, prepaid?: number): boolean {
   const st = pathState(save, id), p = pathById(id);
   if (!p.evolves || !st.maxed || st.crowned || (prepaid === undefined && !st.canEvolve)) return false;
@@ -317,28 +343,30 @@ export function learnPath(save: Save, id: PathId, prepaid?: number): boolean {
   if (!st.next || (prepaid === undefined && !st.canLearn)) return false;
   const cost = prepaid ?? (save.settings.devMode ? 0 : st.next.cost);
   if (prepaid === undefined) save.knowledge -= cost;
+  // Buildings wearing the path fight at its new rank from the next defense:
+  // the rank is read from here when a battle starts.
   save.pathResearch[id] = { rank: st.rank + 1, spent: (save.pathResearch[id]?.spent ?? 0) + cost };
-  followResearch(save, id);
   return true;
 }
 
-/** Refund this topic's research and reset its cards, including individual crowns. */
+/** Refund this topic's research: buildings wearing its paths go back to
+ * unspecialized, and every evolved copy back to its base kind (those
+ * standing in the city return to the palette). */
 export function unlearnPath(save: Save, topic: PathTopic): number {
-  syncCards(save.defend);
   let spent = 0;
+  const d = save.defend, layout = cloneLayout(d.layout);
   for (const p of pathsOf(topic)) {
     spent += save.pathResearch[p.id]?.spent ?? 0;
     delete save.pathResearch[p.id];
-    for (const c of save.defend.cards) {
-      if (c.evolved === p.id && p.evolves) {
-        save.defend.owned[c.kind]--; save.defend.owned[p.evolves.from]++;
-        c.kind = p.evolves.from; delete c.evolved; delete c.placement;
-      }
-      if (c.path === p.id) { delete c.path; delete c.rank; }
+    for (const placed of [...layout.structures, ...layout.spikes]) if (placed.path === p.id) delete placed.path;
+    if (p.evolves) {
+      const { from, item } = p.evolves;
+      d.owned[from] += d.owned[item];
+      d.owned[item] = 0;
+      layout.structures = layout.structures.filter((s) => s.kind !== item);
     }
-    if (p.evolves) save.defend.layout = { ...save.defend.layout,
-      structures: save.defend.layout.structures.filter(s => s.kind !== p.evolves!.item || save.defend.cards.some(c => c.placement === `structure:${s.uid}`)) };
   }
+  d.layout = layout;
   delete save.paths[topic];
   save.knowledge += spent;
   return spent;
