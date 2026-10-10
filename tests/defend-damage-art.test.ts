@@ -1,7 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { damageStage, wallDamagePixels, wallRubblePixels } from "../src/defend/damage-art.ts";
-import { artLook, structurePixels, structureRubblePixels, type PlacedKind } from "../src/defend/tower-art.ts";
+import { STRUCTURES } from "../src/defend/catalog.ts";
+import { PATHS } from "../src/knowledge-paths.ts";
+import { PATH_LOOKS, artLook, structurePixels, structureRubblePixels, type PlacedKind } from "../src/defend/tower-art.ts";
 import { houseDamagePixels, houseRubblePixels } from "../src/defend/roof-art.ts";
 import { ART } from "../src/defend/park-art.ts";
 
@@ -47,15 +49,35 @@ test("wall stones crack over the stages and fall to rubble", () => {
   assert.ok(drawn(wallRubblePixels(3, ART)) > 8);
 });
 
-test("path looks: Pyromancy re-roofs the wizard tower, other paths keep the base art", () => {
+test("path looks: Pyromancy re-roofs the wizard tower, another kind's path keeps the base art", () => {
   const base = structurePixels("wizardTower", 2, 2, 0, 41), pyro = structurePixels("wizardTower", 2, 2, 0, 41, "pyromancy");
   assert.notDeepEqual(pyro, base, "Pyromancy has its own sprite");
-  assert.deepEqual(structurePixels("wizardTower", 2, 2, 0, 41, "rime"), base, "a path without art draws the base tower");
   assert.deepEqual(structurePixels("archerTower", 2, 2, 0, 41, "pyromancy"), structurePixels("archerTower", 2, 2, 0, 41));
   assert.equal(artLook("wizardTower", "pyromancy"), "pyromancy");
-  assert.equal(artLook("wizardTower", "storm"), "");
+  assert.equal(artLook("archerTower", "storm"), "");
   // Red tiles, no slate purple left on the roof.
   const red = (v: number) => (v & 0xff) > ((v >> 8) & 0xff) * 1.6 && (v & 0xff) > ((v >> 16) & 0xff) * 1.6;
   assert.ok(pyro.filter(red).length > base.filter(red).length + 20);
   for (let s = 0; s < 4; s++) assert.equal(structurePixels("wizardTower", 2, 2, s, 41, "pyromancy").length, 2 * ART * 2 * ART);
+});
+
+test("path looks: every building path has its own sprite, distinct from the base and its siblings", () => {
+  const topicKind: Record<string, PlacedKind> = { bait: "monsterBait" };
+  for (const p of PATHS) {
+    if (p.topic === "spikes") continue;
+    const kind = topicKind[p.topic] ?? (p.topic as PlacedKind);
+    assert.ok(PATH_LOOKS[kind]?.includes(p.id), `${p.id} has a look on ${kind}`);
+  }
+  for (const [kind, looks] of Object.entries(PATH_LOOKS) as [PlacedKind, string[]][]) {
+    const { w, h } = STRUCTURES[kind];
+    const seen = [structurePixels(kind, w, h, 0, 41)];
+    for (const look of looks) {
+      const art = structurePixels(kind, w, h, 0, 41, look);
+      for (const other of seen) assert.notDeepEqual(art, other, `${kind} ${look} differs`);
+      seen.push(art);
+      for (let s = 0; s < 4; s++) assert.equal(structurePixels(kind, w, h, s, 41, look).length, w * ART * h * ART);
+      // Inside the crisp outline: the frame's corner pixel stays empty.
+      assert.equal(art[0] >>> 24, 0, `${kind} ${look} keeps its border clear`);
+    }
+  }
 });

@@ -31,6 +31,9 @@
  *   raw meat, another crate stacked on top with a haunch lashed to it and
  *   green slime seeping from the seams.
  *
+ * Each building's Knowledge paths dress it in their own look (`PATH_LOOKS`):
+ * new roofs, emblems, guns, fires and crates, described at each painter.
+ *
  * Pure; the city layer and palette draw the cached canvases. */
 import { TURRET_INSET, type StructureKind } from "./catalog.ts";
 import { hash, hash01 } from "./grid.ts";
@@ -50,6 +53,25 @@ const C = {
   slate: [0x46305e, 0x5e4078, 0x7a5694, 0x9a74b4],
   /** The Pyromancy wizard tower's fired red tiles, dark to light. */
   kiln: [0x4e0f0c, 0x80201a, 0xb23a22, 0xdc6a32],
+  /** The Rime wizard tower's ice, dark to light. */
+  ice: [0x2c5878, 0x4f8cb8, 0x8cc8ea, 0xdcf4ff],
+  /** The Stormcalling wizard tower's thundercloud slate, dark to light. */
+  cloud: [0x262c46, 0x3a4466, 0x56628a, 0x7e8cb4],
+  bolt: 0xffe45a,
+  /** The Crusaders' lead roof and the Assassins' soot-black one. */
+  lead: 0x6c7886,
+  dusk: 0x3a3246,
+  /** The Rangers' green-stained shingles and the Skirmishers' tarred ones. */
+  moss: 0x46703a,
+  tar: 0x4a3c34,
+  /** Green waxed canvas, dark to light, and a brass spyglass. */
+  canvas: [0x2a4a24, 0x3e6a32, 0x5a8a42, 0x82b05a],
+  brass: [0x7a5a22, 0xb08a3e, 0xe0c070],
+  /** Pyroclasm's scorched orange roof and the Cinders' charcoal. */
+  scorch: 0xb04a22,
+  char: [0x16120f, 0x2a2420, 0x3e3530],
+  /** Black lamp oil with its rainbow sheen. */
+  oil: [0x0e0c10, 0x1e1a22, 0x3a3048, 0x6a5a8a],
   straw: [0x9c7a34, 0xc9a24e, 0xe0c070],
   target: [0xe8dcc0, 0xb3372f, 0xe9c46a],
   fire: [0xc8542a, 0xf0a040, 0xf2d27a, 0xfff4c8],
@@ -97,7 +119,14 @@ const frame = (w: number, h: number) => ({ x0: 1, y0: 1, x1: w - 3, y1: h - 3 })
  * other path keeps the base art. Add a path here and handle it in the kind's
  * painter to give it a sprite. */
 export const PATH_LOOKS: Partial<Record<PlacedKind, readonly string[]>> = {
-  wizardTower: ["pyromancy"],
+  barracks: ["crusaders", "assassins"],
+  archerBarracks: ["rangers", "skirmishers"],
+  archerTower: ["fireArrows", "sharpshooters"],
+  cannonTower: ["gunnery", "siegeShot"],
+  watchTower: ["spotters", "signalFires"],
+  wizardTower: ["pyromancy", "rime", "storm"],
+  mageGuild: ["pyroclasm", "cinders"],
+  monsterBait: ["oilSoaked", "fortified"],
 };
 /** The look `kind` takes on `path`: the path when it has art, else "" (the
  * base art), so cache keys stay shared between looks that draw the same. */
@@ -223,9 +252,14 @@ function hall(p: Pix, x0: number, y0: number, x1: number, y1: number, roof: numb
   return gable(p, x0 + 3, y0 + 3, x1 - 3, y1 - 3, roof);
 }
 
-function paintBarracks(p: Pix) {
+/** The Assassins' emblem on the ridge: a dagger, point up. */
+const DAGGER = ["..0..", ".030.", ".032.", ".032.", ".032.", "00500", "05450", "00500", ".010.", ".000."];
+
+function paintBarracks(p: Pix, look: string) {
   const { x0, y0, x1, y1 } = frame(p.w, p.h);
-  const { along, ridge } = hall(p, x0, y0, x1, y1, C.red);
+  const crusaders = look === "crusaders", assassins = look === "assassins";
+  // Crusaders hold a lead-roofed hall, the Assassins a soot-black one.
+  const { along, ridge } = hall(p, x0, y0, x1, y1, crusaders ? C.lead : assassins ? C.dusk : C.red);
   // A chimney near one gable end.
   const [chx, chy] = along ? [x0 + 5, ridge - 2] : [ridge - 2, y0 + 5];
   for (let dy = 0; dy < 4; dy++)
@@ -233,21 +267,36 @@ function paintBarracks(p: Pix) {
       const rim = dx === 0 || dy === 0 || dx === 3 || dy === 3;
       p.set(chx + dx, chy + dy, rim ? OUTLINE : dx === 1 && dy === 1 ? C.stone[3] : dx === 2 && dy === 2 ? 0x2a221c : C.stone[1]);
     }
-  // The shield on the ridge, mid-roof: blue with a lit upper left and a
-  // gold boss, pointed at the foot.
   const sx = Math.round((x0 + x1) / 2) - 2, sy = Math.round((y0 + y1) / 2) - 3;
+  if (assassins) {
+    // A dagger in place of the shield: a lit steel blade, a gold guard
+    // round a blood-red stone, a dark grip.
+    DAGGER.forEach((row, j) =>
+      [...row].forEach((ch, i) => {
+        if (ch === ".") return;
+        const c = ch === "0" ? OUTLINE : ch === "1" ? C.iron[1] : ch === "2" ? C.iron[2] : ch === "3" ? C.iron[3] : ch === "4" ? C.ruby[3] : C.gold[1];
+        p.set(sx - 1 + i, sy - 2 + j, c);
+      }),
+    );
+    return;
+  }
+  // The shield on the ridge, mid-roof: blue with a lit upper left and a
+  // gold boss, pointed at the foot; the Crusaders' white with a red cross.
+  const white = [0xa8a49c, 0xdcd8d0, 0xfaf8f2];
   const shape = ["0000000", "0233110", "0231110", "0114110", "0111110", "0011100", "0001000"];
   shape.forEach((row, j) =>
     [...row].forEach((ch, i) => {
       if (j === 6 && i !== 3) return;
       if (j === 5 && (i < 1 || i > 5)) return;
-      const c = ch === "0" ? OUTLINE : ch === "4" ? C.gold[1] : C.shield[+ch - 1];
+      const cross = crusaders && ch !== "0" && (i === 3 || j === 2);
+      const c = ch === "0" ? OUTLINE : cross ? (i === 3 && j < 2 ? C.banner[2] : C.banner[1]) : ch === "4" ? C.gold[1] : (crusaders ? white : C.shield)[+ch - 1];
       p.set(sx - 1 + i, sy + j, c);
     }),
   );
 }
 
-function paintArcherBarracks(p: Pix) {
+function paintArcherBarracks(p: Pix, look: string) {
+  const rangers = look === "rangers", skirmishers = look === "skirmishers";
   const { x0, y0, x1, y1 } = frame(p.w, p.h);
   const split = y0 + Math.round((y1 - y0) * 0.62);
   // The yard: packed earth inside a fence outline.
@@ -255,29 +304,90 @@ function paintArcherBarracks(p: Pix) {
   for (let y = split + 1; y < y1; y++)
     for (let x = x0 + 1; x < x1; x++) p.set(x, y, C.dirt[hash(x, y, 43) % 5 === 0 ? 0 : hash(x, y, 44) % 4 === 0 ? 2 : 1]);
   for (let x = x0 + 1; x < x1; x += 3) p.set(x, y1 - 1, C.plank[2]);
-  hall(p, x0, y0, x1, split, C.timber);
-  // The butt: straw bale under a painted target, toward the yard's east.
-  const tx = x1 - 4.5, ty = (split + y1) / 2 + 0.5;
+  hall(p, x0, y0, x1, split, rangers ? C.moss : skirmishers ? C.tar : C.timber);
+  for (let x = x0 + 2; x < x0 + 7; x++) p.set(x, split + 2, x % 2 ? C.plank[3] : C.plank[1]);
+  const ty = (split + y1) / 2 + 0.5;
+  if (skirmishers) {
+    // Straw dummies on posts scattered over the yard, a trail of scuffed
+    // footprints weaving between them.
+    for (let x = x0 + 2; x < x1 - 1; x++) if ((x + Math.round(Math.sin(x * 0.9) * 1.5)) % 3 === 0) p.set(x, Math.round(ty + Math.sin(x * 0.9) * 1.5), C.dirt[0]);
+    for (const [dx, dy] of [[x0 + 5, ty - 1], [x1 - 9, ty + 1], [x1 - 4, ty - 1]]) {
+      const x = Math.round(dx), y = Math.round(dy);
+      for (const [ox, oy] of [[0, -1], [-1, 0], [0, 0], [1, 0], [0, 1]]) {
+        p.set(x + ox - 1, y + oy, OUTLINE);
+        p.set(x + ox + 1, y + oy, OUTLINE);
+        p.set(x + ox, y + oy - 1, OUTLINE);
+        p.set(x + ox, y + oy + 1, OUTLINE);
+      }
+      for (const [ox, oy] of [[0, -1], [-1, 0], [0, 0], [1, 0], [0, 1]]) p.set(x + ox, y + oy, ox < 0 || oy < 0 ? C.straw[2] : C.straw[1]);
+      p.set(x, y, C.target[1]);
+    }
+    return;
+  }
+  // The butt: straw bale under a painted target, toward the yard's east
+  // (the Rangers' set further off, a green-ringed one beside it).
+  if (rangers) {
+    const gx = x0 + 6.5;
+    disc(p, gx, ty, 2.6, (x, y, d, dx, dy) => (d > 1.8 ? OUTLINE : d > 0.9 ? C.canvas[1 + Math.min(2, lit(x, y, dx, dy, d))] : C.target[2]));
+  }
+  const tx = x1 - 4.5;
   disc(p, tx, ty, 3.4, (x, y, d, dx, dy) => (d > 2.5 ? OUTLINE : d > 1.6 ? C.straw[Math.min(2, lit(x, y, dx, dy, d))] : d > 0.9 ? C.target[1] : C.target[2]));
   // Two arrows in it, and a bow rack by the door.
   p.set(Math.round(tx) - 1, Math.round(ty) - 2, C.plank[3]);
   p.set(Math.round(tx), Math.round(ty) + 1, C.plank[3]);
-  for (let x = x0 + 2; x < x0 + 7; x++) p.set(x, split + 2, x % 2 ? C.plank[3] : C.plank[1]);
 }
 
-function paintArcherTower(p: Pix) {
+/** A pyramid roof over a box: four slopes meeting at a point, the sunny
+ * north and west lighter, dark seams down the hips, inside an outline. */
+function pyramid(p: Pix, x0: number, y0: number, x1: number, y1: number, tones: readonly number[]) {
+  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+  for (let y = y0; y <= y1; y++)
+    for (let x = x0; x <= x1; x++) {
+      if (x === x0 || y === y0 || x === x1 || y === y1) {
+        p.set(x, y, OUTLINE);
+        continue;
+      }
+      const dx = x - cx, dy = y - cy;
+      if (Math.abs(Math.abs(dx) - Math.abs(dy)) < 0.6 && (dx || dy)) p.set(x, y, tones[0]);
+      else if (Math.abs(dy) >= Math.abs(dx)) p.set(x, y, dy < 0 ? tones[3] : tones[1]);
+      else p.set(x, y, dx < 0 ? tones[2] : tones[1]);
+    }
+}
+
+function paintArcherTower(p: Pix, look: string) {
   const f = squareTower(p, true);
+  if (look === "sharpshooters") {
+    // A hide of green waxed canvas pitched over the parapet, a brass
+    // finial at its peak and a long arrow laid along its foot.
+    pyramid(p, f.x0 - 2, f.y0 - 2, f.x1 + 2, f.y1 + 2, C.canvas);
+    const cx = Math.floor((f.x0 + f.x1 + 1) / 2), cy = Math.floor((f.y0 + f.y1 + 1) / 2);
+    p.set(cx - 1, cy - 1, C.brass[2]);
+    p.set(cx, cy - 1, C.brass[1]);
+    p.set(cx - 1, cy, C.brass[1]);
+    p.set(cx, cy, C.brass[0]);
+    return;
+  }
   planks(p, f);
   // The hatch in the floor's corner, and a sheaf of arrows.
   rect(p, f.x0, f.y0, f.x0 + 2, f.y0 + 2, OUTLINE);
   p.set(f.x0 + 1, f.y0 + 1, C.plank[0]);
+  const fire = look === "fireArrows";
   for (let k = 0; k < 3; k++) {
     p.set(f.x1 - k, f.y1 - 2 + (k % 2), C.plank[3]);
-    p.set(f.x1 - k, f.y1 - 3 + (k % 2), 0xd04030);
+    p.set(f.x1 - k, f.y1 - 3 + (k % 2), fire ? C.fire[2 - (k % 2)] : 0xd04030);
   }
+  if (!fire) return;
+  // Fire arrows: a pot of embers in the floor's far corner to light them
+  // at, and the parapet blackened round the merlons.
+  rect(p, f.x1 - 2, f.y0, f.x1, f.y0 + 2, OUTLINE);
+  p.set(f.x1 - 1, f.y0 + 1, C.fire[3]);
+  p.set(f.x1 - 2, f.y0 + 1, C.iron[2]);
+  p.set(f.x1 - 1, f.y0, C.fire[1]);
+  for (let y = 0; y < p.h; y++)
+    for (let x = 0; x < p.w; x++) if (p.get(x, y) === C.stone[0] && hash(x, y, 47) % 2 === 0) p.set(x, y, C.ember);
 }
 
-function paintCannonTower(p: Pix) {
+function paintCannonTower(p: Pix, look: string) {
   const { x0, y0, x1, y1 } = frame(p.w, p.h);
   const cx = (x0 + x1 + 1) / 2, cy = (y0 + y1 + 1) / 2, r = (x1 - x0 + 1) / 2;
   disc(p, cx, cy, r, (x, y, d, dx, dy) => {
@@ -289,9 +399,29 @@ function paintCannonTower(p: Pix) {
     if (d > r - 3.4) return OUTLINE;
     return hash(x, y, 45) % 6 === 0 ? C.stone[1] : hash(x, y, 46) % 5 === 0 ? C.stone[3] : C.stone[2];
   });
+  const gx = Math.round(cx), gy = Math.round(cy);
+  if (look === "siegeShot") {
+    // Siege shot: a squat mortar, its great black bore staring up out of a
+    // lit iron ring, and two huge balls beside it.
+    disc(p, gx - 1, gy - 1, 3.4, (x, y, d, dx, dy) => (d > 2.6 ? OUTLINE : d > 1.4 ? C.iron[1 + Math.min(2, lit(x, y, dx, dy, d))] : C.iron[0]));
+    disc(p, gx + 2.5, gy + 2.5, 2, (x, y, d, dx, dy) => (d > 1.3 ? OUTLINE : C.iron[1 + Math.min(2, lit(x, y, dx, dy, d))]));
+    return;
+  }
+  if (look === "gunnery") {
+    // Gun crews: twin light barrels side by side on one carriage, a powder
+    // keg and a heap of grapeshot beside them.
+    rect(p, gx - 3, gy - 1, gx + 2, gy + 3, OUTLINE);
+    rect(p, gx - 2, gy, gx + 1, gy + 2, C.plank[1]);
+    for (const [bx, top, tone] of [[gx - 3, gy - 6, 3], [gx + 1, gy - 5, 2]]) {
+      rect(p, bx - 1, top, bx + 1, gy + 1, OUTLINE);
+      for (let y = top + 1; y <= gy; y++) p.set(bx, y, y === top + 1 ? C.iron[0] : C.iron[tone]);
+    }
+    disc(p, gx - 3.5, gy + 4, 1.8, (x, y, d) => (d > 1.2 ? OUTLINE : (y % 2 ? C.plank[1] : C.plank[3])));
+    for (const [bx, by] of [[gx + 3, gy + 3], [gx + 4, gy + 3], [gx + 3, gy + 4], [gx + 4, gy + 2]]) p.set(bx, by, (bx + by) % 2 ? C.iron[3] : C.iron[1]);
+    return;
+  }
   // The carriage, then the barrel to the north over it: outlined iron with
   // a lit line down its west side and a dark muzzle.
-  const gx = Math.round(cx), gy = Math.round(cy);
   rect(p, gx - 3, gy - 1, gx + 2, gy + 3, OUTLINE);
   rect(p, gx - 2, gy, gx + 1, gy + 2, C.plank[1]);
   p.set(gx - 2, gy, C.plank[3]);
@@ -310,14 +440,31 @@ function paintCannonTower(p: Pix) {
   p.set(gx + 4, gy + 2, C.iron[3]);
 }
 
-function paintWatchTower(p: Pix) {
+function paintWatchTower(p: Pix, look: string) {
   const f = squareTower(p, false);
   planks(p, f);
-  // The brazier: an iron bowl in an outline, the beacon burning in it,
-  // hottest at the heart.
   const cx = (f.x0 + f.x1 + 1) / 2, cy = (f.y0 + f.y1 + 1) / 2;
-  disc(p, cx, cy, 2.9, (x, y, d, dx, dy) => (d > 2.1 ? OUTLINE : d > 1.5 ? C.iron[1 + Math.min(2, lit(x, y, dx, dy, d))] : null));
-  disc(p, cx, cy, 1.5, (x, y, d) => (d < 0.75 ? C.fire[3] : (x + y) % 2 ? C.fire[2] : C.fire[1]));
+  if (look === "spotters") {
+    // Spotters: a brass spyglass on its stand, trained north-east, its lens
+    // catching the sky, and a green pennant on the parapet's corner.
+    const sx = Math.floor(cx) - 2, sy = Math.floor(cy) + 1;
+    for (let k = 0; k < 4; k++) {
+      p.set(sx + k + 1, sy - k + 1, OUTLINE);
+      p.set(sx + k, sy - k, k === 3 ? C.sky[2] : C.brass[k === 0 ? 0 : k === 1 ? 1 : 2]);
+    }
+    p.set(sx + 4, sy - 3, OUTLINE);
+    p.set(sx + 3, sy - 4, OUTLINE);
+    p.set(sx + 1, sy + 1, C.plank[0]);
+    for (const [x, y, c] of [[f.x1 + 2, f.y0 - 3, OUTLINE], [f.x1 + 1, f.y0 - 2, C.canvas[3]], [f.x1, f.y0 - 2, C.canvas[2]], [f.x1 + 1, f.y0 - 1, C.canvas[1]], [f.x1 - 1, f.y0 - 2, C.canvas[1]]] as const) p.set(x, y, c);
+  } else {
+    // The brazier: an iron bowl in an outline, the beacon burning in it,
+    // hottest at the heart; the signal fire's is a great one filling the
+    // floor, sparks blown out over the parapet.
+    const big = look === "signalFires", br = big ? 3.9 : 2.9, fr = big ? 2.5 : 1.5;
+    disc(p, cx, cy, br, (x, y, d, dx, dy) => (d > br - 0.8 ? OUTLINE : d > fr ? C.iron[1 + Math.min(2, lit(x, y, dx, dy, d))] : null));
+    disc(p, cx, cy, fr, (x, y, d) => (d < fr * 0.5 ? C.fire[3] : (x + y) % 2 ? C.fire[2] : C.fire[1]));
+    if (big) for (const [x, y, c] of [[f.x1 + 2, f.y0 - 2, C.fire[2]], [f.x1 + 1, f.y0 - 3, C.ember], [f.x0 - 2, f.y0 - 1, C.fire[1]], [f.x1 + 2, f.y1, C.ember]] as const) p.set(x, y, c);
+  }
   // Posts at the floor's corners.
   for (const [x, y] of [[f.x0, f.y0], [f.x1, f.y0], [f.x0, f.y1], [f.x1, f.y1]]) p.set(x, y, C.plank[0]);
 }
@@ -327,12 +474,25 @@ function paintWizardTower(p: Pix, look: string) {
   const cx = (x0 + x1 + 1) / 2, cy = (y0 + y1 + 1) / 2, r = (x1 - x0 + 1) / 2;
   const roof = r - 2.2;
   // Pyromancy fires the roof red and cuts it to six slopes, a hexagon, with
-  // ember runes in the rim; otherwise eight slate slopes, nearly round.
-  const pyro = look === "pyromancy", sides = pyro ? 6 : 8, tiles = pyro ? C.kiln : C.slate, rune = pyro ? C.ember : C.rune;
+  // ember runes in the rim; Rime glazes it in ice as a four-pointed
+  // diamond; Stormcalling roofs it in thundercloud slate as a square, its
+  // hips and runes crackling with yellow lightning; otherwise eight
+  // slate slopes, nearly round.
+  const pyro = look === "pyromancy", rime = look === "rime", storm = look === "storm";
+  const sides = pyro ? 6 : rime || storm ? 4 : 8, turn = rime ? Math.PI / 4 : 0;
+  const tiles = pyro ? C.kiln : rime ? C.ice : storm ? C.cloud : C.slate;
+  const rune = pyro ? C.ember : rime ? C.ice[3] : storm ? C.bolt : C.rune;
   // How far out a point is in the roof's own shape: its distance on the
-  // round roof, its furthest reach toward a side on the hexagon.
-  const reach = (d: number, dx: number, dy: number) => !pyro ? d
-    : Math.max(Math.abs(dx), Math.abs(dx * 0.5 + dy * 0.866), Math.abs(dx * 0.5 - dy * 0.866)) / 0.866;
+  // round roof, its furthest reach toward a face on a polygon.
+  const reach = (d: number, dx: number, dy: number) => {
+    if (sides === 8) return d;
+    let m = 0;
+    for (let k = 0; k < sides; k++) {
+      const a = turn + (k / sides) * 2 * Math.PI - Math.PI;
+      m = Math.max(m, dx * Math.cos(a) + dy * Math.sin(a));
+    }
+    return m / Math.cos(Math.PI / sides);
+  };
   disc(p, cx, cy, r, (x, y, d, dx, dy) => {
     if (d > r - 1) return OUTLINE;
     const e = reach(d, dx, dy);
@@ -344,24 +504,30 @@ function paintWizardTower(p: Pix, look: string) {
     if (e > roof) return OUTLINE;
     // The slopes rising to the finial, shaded by which way they face, the
     // seams between them dark.
-    const ang = Math.atan2(dy, dx) + Math.PI, k = Math.floor((ang / (2 * Math.PI)) * sides + 0.5) % sides;
-    const mid = (k / sides) * 2 * Math.PI - Math.PI;
-    const seam = Math.abs(((ang / (2 * Math.PI)) * sides + 0.5) % 1 - 0.5) > 0.44 && d > 1.2;
-    if (seam) return tiles[0];
+    const ang = Math.atan2(dy, dx) + Math.PI, f = (((ang - turn) / (2 * Math.PI)) * sides + 0.5 + sides) % sides, k = Math.floor(f);
+    const mid = (k / sides) * 2 * Math.PI - Math.PI + turn;
+    const seam = Math.abs((f % 1) - 0.5) > (storm ? 0.4 : 0.44) && d > 1.2;
+    if (seam) return storm ? (hash(x, y, 48) % 3 ? C.bolt : 0xfff4c8) : tiles[0];
     const t = (-(Math.cos(mid) + Math.sin(mid)) / Math.SQRT2) * 1.5 + 1.5;
     return tiles[Math.max(0, Math.min(3, Math.floor(t + ((x + y) % 2 ? 0.25 : -0.25))))];
   });
-  // The finial: gold, lit at its upper left (a flame's colours on Pyromancy).
-  const fx = Math.floor(cx), fy = Math.floor(cy), tip = pyro ? [C.fire[1], C.fire[2], C.fire[3]] : C.gold;
+  // The finial: gold, lit at its upper left (a flame's colours on Pyromancy,
+  // an ice crystal on Rime, a lightning rod's spark on Stormcalling).
+  const fx = Math.floor(cx), fy = Math.floor(cy);
+  const tip = pyro ? [C.fire[1], C.fire[2], C.fire[3]] : rime ? [C.ice[1], C.ice[2], 0xffffff] : storm ? [C.iron[2], C.bolt, 0xfffbe0] : C.gold;
   p.set(fx - 1, fy - 1, tip[2]);
   p.set(fx, fy - 1, tip[1]);
   p.set(fx - 1, fy, tip[1]);
   p.set(fx, fy, tip[0]);
 }
 
-function paintMageGuild(p: Pix) {
+function paintMageGuild(p: Pix, look: string) {
   const { x0, y0, x1, y1 } = frame(p.w, p.h);
-  hall(p, x0, y0, x1, y1, C.wine[1]);
+  // Pyroclasm roofs the hall in scorched orange round a greater fire well;
+  // the Cinders' is charcoal over a well of smouldering coals, their
+  // banners black.
+  const pyro = look === "pyroclasm", cinders = look === "cinders";
+  hall(p, x0, y0, x1, y1, pyro ? C.scorch : cinders ? C.char[2] : C.wine[1]);
   // Ember runes glowing on the four slopes, each a lit pixel and its dimmer
   // tail.
   for (const [rx, ry, tx] of [[x0 + 6, y0 + 6, 1], [x1 - 6, y0 + 6, -1], [x0 + 6, y1 - 6, 1], [x1 - 6, y1 - 6, -1]]) {
@@ -370,23 +536,36 @@ function paintMageGuild(p: Pix) {
   }
   // The fire well at the hall's heart: an outlined brass ring lit to the
   // upper left round a fire white-hot in the middle.
-  const cx = (x0 + x1 + 1) / 2, cy = (y0 + y1 + 1) / 2;
-  disc(p, cx, cy, 4.2, (x, y, d, dx, dy) => {
-    if (d > 3.4) return OUTLINE;
-    if (d > 2.4) return C.gold[Math.min(2, lit(x, y, dx, dy, d) >> 1)];
-    if (d > 2) return OUTLINE;
-    return d < 0.8 ? C.fire[3] : d < 1.5 ? C.fire[2] : (x + y) % 2 ? C.fire[1] : C.fire[0];
+  const cx = (x0 + x1 + 1) / 2, cy = (y0 + y1 + 1) / 2, wr = pyro ? 5.4 : 4.2, fr = wr - 2.2;
+  disc(p, cx, cy, wr, (x, y, d, dx, dy) => {
+    if (d > wr - 0.8) return OUTLINE;
+    if (d > fr + 0.4) return C.gold[Math.min(2, lit(x, y, dx, dy, d) >> 1)];
+    if (d > fr) return OUTLINE;
+    if (cinders) return hash(x, y, 93) % 3 === 0 ? (d < 1 ? C.fire[1] : C.ember) : C.char[hash(x, y, 94) % 3];
+    return d < fr * 0.4 ? C.fire[3] : d < fr * 0.75 ? C.fire[2] : (x + y) % 2 ? C.fire[1] : C.fire[0];
   });
+  // The Cinders' roof glows through cracks, embers working into it.
+  if (cinders)
+    for (let k = 0; k < 6; k++) {
+      let x = x0 + 4 + (hash(k, 95) % (x1 - x0 - 8)), y = y0 + 4 + (hash(k, 96) % (y1 - y0 - 8));
+      for (let i = 0; i < 3; i++) {
+        const dx = x - cx, dy = y - cy;
+        if (p.get(x, y) !== OUTLINE && dx * dx + dy * dy > (wr + 1) * (wr + 1)) p.set(x, y, i ? C.fire[0] : C.ember);
+        x += hash(k, i, 97) % 2 ? 1 : -1;
+        y += 1;
+      }
+    }
+  const banner = cinders ? C.char : C.banner;
   // Two swallowtail banners hung over the south wall, red (lit on the west)
   // with a gold flame, their tails notched.
   for (const bx of [x0 + 4, x1 - 6]) {
     for (let y = y1 - 4; y <= y1 + 1; y++) {
       p.set(bx - 1, y, OUTLINE);
       p.set(bx + 3, y, OUTLINE);
-      for (let x = bx; x <= bx + 2; x++) p.set(x, y, y === y1 - 4 ? OUTLINE : C.banner[x === bx ? 2 : x === bx + 2 ? 0 : 1]);
+      for (let x = bx; x <= bx + 2; x++) p.set(x, y, y === y1 - 4 ? OUTLINE : banner[x === bx ? 2 : x === bx + 2 ? 0 : 1]);
     }
-    p.set(bx + 1, y1 - 2, C.gold[1]);
-    p.set(bx + 1, y1 - 1, C.fire[2]);
+    p.set(bx + 1, y1 - 2, cinders ? C.ember : C.gold[1]);
+    p.set(bx + 1, y1 - 1, C.fire[cinders ? 1 : 2]);
     p.set(bx + 1, y1 + 1, OUTLINE);
     for (let x = bx - 1; x <= bx + 3; x++) p.set(x, y1 + 2, OUTLINE);
   }
@@ -582,7 +761,7 @@ function fissures(p: Pix, stage: number, seed: number) {
  * running `across` or down, lit to the upper left, the seams between them
  * a shade darker, an iron corner catching the sun; `lift` lightens a crate
  * stacked higher. */
-function crate(p: Pix, x0: number, y0: number, x1: number, y1: number, across: boolean, lift = 0) {
+function crate(p: Pix, x0: number, y0: number, x1: number, y1: number, across: boolean, lift = 0, tones: readonly number[] = C.crate, bound = false) {
   for (let y = y0; y <= y1; y++)
     for (let x = x0; x <= x1; x++) {
       if (x === x0 || y === y0 || x === x1 || y === y1) {
@@ -593,7 +772,13 @@ function crate(p: Pix, x0: number, y0: number, x1: number, y1: number, across: b
       const edge = x === x0 + 1 || y === y0 + 1 ? 1 : x === x1 - 1 || y === y1 - 1 ? -1 : 0;
       const seam = u % 3 === 2 && edge === 0;
       const grain = hash(x, y, 77) % 9 === 0 ? -1 : 0;
-      p.set(x, y, C.crate[Math.max(0, Math.min(4, 2 + lift + edge + grain - (seam ? 1 : 0)))]);
+      // Iron bands strapped across the boards, riveted where they cross.
+      const v = across ? x - x0 : y - y0;
+      if (bound && (v % 5 === 2 || v % 5 === 3)) {
+        p.set(x, y, v % 5 === 2 ? (u % 2 ? C.iron[3] : C.iron[2]) : C.iron[1]);
+        continue;
+      }
+      p.set(x, y, tones[Math.max(0, Math.min(4, 2 + lift + edge + grain - (seam ? 1 : 0)))]);
     }
   p.set(x0 + 1, y0 + 1, C.iron[3]);
   p.set(x1 - 1, y1 - 1, C.iron[1]);
@@ -609,12 +794,18 @@ function shadow(p: Pix, x0: number, y0: number, x1: number, y1: number) {
     }
 }
 
-function paintMonsterBait(p: Pix) {
+/** Oil-soaked crates' boards, blackened with lamp oil. */
+const OILED = [0x24180e, 0x382616, 0x4c341e, 0x624628, 0x7a5a36];
+
+function paintMonsterBait(p: Pix, look: string) {
   const { x0, y0, x1, y1 } = frame(p.w, p.h);
+  // Oil-soaked bait is stacked in crates blackened with oil, a black pool
+  // shining under them; fortified crates are strapped in riveted iron.
+  const oiled = look === "oilSoaked", bound = look === "fortified", tones = oiled ? OILED : C.crate;
   // On the ground: a long crate along the south, boards across, and an open
   // one to the north-east heaped with raw meat.
-  crate(p, x0, y0 + 6, x1, y1, true);
-  crate(p, x0 + 5, y0, x1, y0 + 6, false);
+  crate(p, x0, y0 + 6, x1, y1, true, 0, tones, bound);
+  crate(p, x0 + 5, y0, x1, y0 + 6, false, 0, tones, bound);
   for (let y = y0 + 2; y <= y0 + 4; y++)
     for (let x = x0 + 8; x <= x1 - 2; x++) {
       const k = hash(x, y, 91) % 4;
@@ -622,14 +813,17 @@ function paintMonsterBait(p: Pix) {
     }
   p.set(x1 - 2, y0 + 2, C.bone[1]);
   p.set(x1 - 1, y0 + 1, C.bone[1]);
-  // Slime seeping from the long crate's seams and pooling below.
-  for (const [x, y, t] of [[x1 - 3, y1 - 1, 2], [x1 - 3, y1, 1], [x1 - 2, y1 + 1, 0], [x1 - 4, y1 + 1, 1], [x1 - 1, y0 + 9, 1]] as const) p.set(x, y, C.slime[t]);
+  // Slime seeping from the long crate's seams and pooling below (oil, its
+  // sheen catching the light, on oil-soaked bait).
+  const ooze = oiled ? C.oil.slice(1) : C.slime;
+  for (const [x, y, t] of [[x1 - 3, y1 - 1, 2], [x1 - 3, y1, 1], [x1 - 2, y1 + 1, 0], [x1 - 4, y1 + 1, 1], [x1 - 1, y0 + 9, 1]] as const) p.set(x, y, ooze[t]);
+  if (oiled) for (const [x, y, c] of [[x0 + 2, y1 + 1, C.oil[0]], [x0 + 3, y1 + 1, C.oil[3]], [x0 + 4, y1 + 1, C.oil[1]], [x1 - 5, y1 + 1, C.oil[0]], [x1 - 2, y1 + 1, C.oil[3]]] as const) p.set(x, y, c);
   // A crate stacked on top to the west, throwing its shadow to the lower
   // right, a haunch of meat lashed across it with rope.
   const tx0 = x0, ty0 = y0 + 1, tx1 = x0 + 7, ty1 = y0 + 8;
   shadow(p, tx1 + 1, ty0 + 1, tx1 + 2, ty1 + 1);
   shadow(p, tx0 + 1, ty1 + 1, tx1 + 2, ty1 + 2);
-  crate(p, tx0, ty0, tx1, ty1, false, 1);
+  crate(p, tx0, ty0, tx1, ty1, false, 1, tones, bound);
   for (let y = ty0 + 1; y < ty1; y++) p.set(tx0 + 5, y, C.straw[0]);
   for (const [dx, dy, c] of [
     [1, 3, C.meat[3]], [2, 3, C.meat[3]], [3, 3, C.meat[2]], [4, 3, C.meat[2]],
@@ -638,6 +832,6 @@ function paintMonsterBait(p: Pix) {
     [5, 3, C.bone[1]], [6, 2, C.bone[1]], [6, 1, C.bone[0]],
   ] as const) p.set(tx0 + dx, ty0 + dy, c);
   // Slime dribbling down the top crate's side.
-  p.set(tx0 + 1, ty1 - 1, C.slime[2]);
-  p.set(tx0 + 1, ty1, C.slime[1]);
+  p.set(tx0 + 1, ty1 - 1, ooze[2]);
+  p.set(tx0 + 1, ty1, ooze[1]);
 }
