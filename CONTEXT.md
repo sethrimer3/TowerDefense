@@ -161,19 +161,16 @@ All the tiles of one kind, shown as one tile marked with its quantity (×4); ope
 The greater building a tile becomes through its path's crown (an **evolution**): Wizard tower into Dark wizard keep, Barracks into Valkyrie palace.
 
 **Path** (in a topic's Study):
-One way a building can grow, in ranks learned in order with Knowledge: the Wizard tower's Pyromancy (flames only), Rime (ice only, then freezing solid) or Stormcalling (lightning in place of flames), the Barracks' Crusaders (hearty, healing) or Assassins (swift, with critical strikes), the Archer tower's Fire arrows (setting enemies **burning**) or Sharpshooters, the Cannon tower's Gun crews (with **grapeshot**) or Siege shot, the Archer barracks' Rangers or Skirmishers, the Watch tower's Spotters or Signal fires, the Mage Guild's Pyroclasm or Cinders, Monster bait's Oil-soaked or Fortified crates, Wall spikes' Blasting stakes (blowing up on contact), Spring stakes (the whole row shooting out) or Rimed stakes (chilling). Research unlocks paths independently for the collection. Each owned card equips one researched path and rank, allowing different builds together.
+One way a building can grow, in ranks learned in order with Knowledge: the Wizard tower's Pyromancy (flames only), Rime (ice only, then freezing solid) or Stormcalling (lightning in place of flames), the Barracks' Crusaders (hearty, healing) or Assassins (swift, with critical strikes), the Archer tower's Fire arrows (setting enemies **burning**) or Sharpshooters, the Cannon tower's Gun crews (with **grapeshot**) or Siege shot, the Archer barracks' Rangers or Skirmishers, the Watch tower's Spotters or Signal fires, the Mage Guild's Pyroclasm or Cinders, Monster bait's Oil-soaked or Fortified crates, Wall spikes' Blasting stakes (blowing up on contact), Spring stakes (the whole row shooting out) or Rimed stakes (chilling). Research unlocks paths independently for the collection. Each placed building wears one researched path (its **specialization**), so different paths fight together in one city.
 
 **Evolution**:
-A path's crown unlocks a greater form (Stormcalling's Wizard tower into the Dark wizard keep, Crusaders' Barracks into the Valkyrie palace). The player evolves a selected card after researching the crown. Other copies retain their forms and builds. Returning a card to its base form is free.
-
-**Card**:
-An individual owned copy of a tower, troop building or defense, retaining its identity and specialization in the city or in the palette.
+A path's crown unlocks a greater form (Stormcalling's Wizard tower into the Dark wizard keep, Crusaders' Barracks into the Valkyrie palace). After researching the crown the player evolves any copy, one at a time, free (one standing in the city is taken up first); the others keep their forms. Returning one to its base form is free.
 
 **Specialization**:
-The one researched path and rank equipped on a card. Changing it is free; recruits share their home building's specialization.
+The one researched path a placed building wears, always at the path's furthest researched rank. Chosen in Defend when the building is placed (the **specialty panel**), changed free by tapping it while building, kept when it moves and across saves, cleared when it goes back to the palette. Copies in the palette are interchangeable and wear nothing. Recruits share their home building's specialization; a battle keeps the specializations it started with.
 
 **Research unlock**:
-A path rank or crown learned once with Knowledge, available for matching cards to equip or evolve.
+A path rank or crown learned once with Knowledge, a choice for every building of its kind or an evolution to make.
 
 **Smithy rows** (in the Smithy; Training in code):
 Ranks of a few percent each on one row (troop HP, tower damage, rebuild speed…). A rank costs a quadratic bill of metal and is worked by the mine's smiths: one smith takes its whole time, more smiths share it. A smith on a rank stays at the smithy until it's done; taking the last one off cancels the rank and returns its paid metal.

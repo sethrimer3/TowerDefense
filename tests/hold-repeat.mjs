@@ -136,8 +136,6 @@ try {
       await page.locator('#library-study').click();
       await page.locator('#library-chamber [data-subject="city"]').click();
       await page.locator('#library-chamber [data-ledger-stack="walls"]').click();
-      const card = page.locator('#library-chamber [data-ledger-card][data-card-topic="walls"]').first();
-      if (await card.count()) await card.click();
     };
     await study();
     await hold('[data-learn="masonry"]');

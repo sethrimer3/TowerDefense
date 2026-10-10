@@ -1,4 +1,4 @@
-import { buildingPaths } from "../cards.ts";
+import { buildingPaths } from "../specializations.ts";
 import { bannerDamage } from "./war-banner.ts";
 import { enemySize } from "./catalog.ts";
 /** DEFEND troops: barracks keep their garrison topped up; swordsmen chase

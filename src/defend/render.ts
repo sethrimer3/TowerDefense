@@ -59,7 +59,7 @@ export type DrawOptions = {
   hideBanner?: boolean;
   /** Developer timing, disabled by default. */
   timings?: boolean;
-  /** Each structure's card path by uid, for the paths with their own look
+  /** Each structure's path by uid, for the paths with their own look
    * (`PATH_LOOKS`); presentation only. */
   looks?: Readonly<Record<number, string>>;
   /** The building the player tapped (its id in the map), outlined with its
@@ -167,6 +167,13 @@ export class DefendRenderer {
   toCell(clientX: number, clientY: number) {
     const p = this.toCanvas(clientX, clientY);
     return { fx: (p.x - this.cam.x) / this.cam.s / this.px, fy: (p.y - this.cam.y) / this.cam.s / this.px };
+  }
+
+  /** Board position in cells → client (CSS) point, through the camera. */
+  toClient(fx: number, fy: number) {
+    const r = this.canvas.getBoundingClientRect();
+    const x = fx * this.px * this.cam.s + this.cam.x, y = fy * this.px * this.cam.s + this.cam.y;
+    return { x: r.left + (x / (this.canvas.width || 1)) * r.width, y: r.top + (y / (this.canvas.height || 1)) * r.height };
   }
 
   /** Zoom by `factor`, keeping the board point under the client point fixed. */

@@ -1,4 +1,4 @@
-import { spikeKey } from "../cards.ts";
+import { spikeKey } from "../specializations.ts";
 /** The city wall's own defenses. Wall spikes cut every enemy on foot that
  * presses against the stones they stand on, in pulses; wall ballistas on
  * the wall's corners shoot long bolts at the nearest enemy, each piercing a

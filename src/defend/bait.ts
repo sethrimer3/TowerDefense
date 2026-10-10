@@ -1,4 +1,4 @@
-import { buildingPaths } from "../cards.ts";
+import { buildingPaths } from "../specializations.ts";
 /** DEFEND monster bait: a stack of crates every enemy goes for before the
  * keep. While any stack stands, ground enemies walk the bait's own flow
  * field (`sim.baitField`, filled from every standing stack, so each goes for

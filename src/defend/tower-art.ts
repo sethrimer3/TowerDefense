@@ -92,8 +92,9 @@ const MATERIAL: Record<PlacedKind, { m: Material; ruin: Pick<Ruin, "stone" | "to
  * (where its shadow falls), like the houses. */
 const frame = (w: number, h: number) => ({ x0: 1, y0: 1, x1: w - 3, y1: h - 3 });
 
-/** The Knowledge paths that give a structure its own look, by kind. A card
- * on one of them is drawn (on the board and on its card) in that look; every
+/** The Knowledge paths that give a structure its own look, by kind. A
+ * building wearing one is drawn (on the board and in its specialty panel)
+ * in that look; every
  * other path keeps the base art. Add a path here and handle it in the kind's
  * painter to give it a sprite. */
 export const PATH_LOOKS: Partial<Record<PlacedKind, readonly string[]>> = {

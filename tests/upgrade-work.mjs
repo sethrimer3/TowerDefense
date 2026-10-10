@@ -15,8 +15,6 @@ async function study(page, subject = 'city', topic = 'walls') {
   await page.locator('#library-chamber [data-subject="' + subject + '"]').click();
   const choice = page.locator('#library-chamber [data-ledger-stack="' + topic + '"]');
   if (await choice.count()) await choice.click();
-  const card = page.locator('#library-chamber [data-ledger-card][data-card-topic="' + topic + '"]').first();
-  if (await card.count()) await card.click();
 }
 async function smithy(page) { await tab(page, 'mine'); await page.locator('#mine-smithy').click(); }
 async function reloadWith(page, mutate, value) {

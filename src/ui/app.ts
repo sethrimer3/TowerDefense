@@ -19,7 +19,7 @@ export interface AppContext {
   /** The Library's researchers: all share one Knowledge project; none pauses it. */
   researchers(): number;
   /** Goes to the Mine's Smithy or the Library's Study, open at a topic. */
-  openChamber(where: "smithy" | "study", topic?: string, cardId?: number): void;
+  openChamber(where: "smithy" | "study", topic?: string): void;
   /** Research finished: the Library's lab celebrates. */
   researched(): void;
   /** A dev option changed: applies what it grants, saves and refreshes. */

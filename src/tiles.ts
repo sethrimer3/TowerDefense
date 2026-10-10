@@ -1,4 +1,3 @@
-import { syncCards } from "./cards.ts";
 /** The tile collection, as the Tiles tab shows it: everything the player
  * owns to put into a defense is a tile, a real piece of the realm. City
  * tiles and the wall's pieces, the unit buildings (Barracks), the towers,
@@ -71,14 +70,10 @@ export function tileStacks(save: Save, filter: TileFilter, shop = false): TileSt
 }
 
 /** One copy of a stack, as the expanded stack or the spread view lays them
- * out: the city's first, then the palette's. */
-export type TileCopy = { key: string; id: TileId; index: number; placed: boolean; cardId?: number };
-export function tileCopies(stack: TileStack, limit = Infinity, save?: Save): TileCopy[] {
-  if (save && !isConsumable(stack.id) && !["cityTile", "cityGate", "wallBallista"].includes(stack.id)) {
-    syncCards(save.defend);
-    return save.defend.cards.filter(c => c.kind === stack.id).sort((a, b) => Number(!!b.placement) - Number(!!a.placement) || a.id - b.id)
-      .slice(0, limit).map((c, index) => ({ key: `${stack.id}#${c.id}`, id: stack.id, index, placed: !!c.placement, cardId: c.id }));
-  }
+ * out: the city's first, then the palette's. Copies are interchangeable:
+ * a building's path is chosen where it is placed, in Defend. */
+export type TileCopy = { key: string; id: TileId; index: number; placed: boolean };
+export function tileCopies(stack: TileStack, limit = Infinity): TileCopy[] {
   const n = Math.min(stack.count, limit);
   return Array.from({ length: n }, (_, index) => ({ key: `${stack.id}#${index}`, id: stack.id, index, placed: index < stack.placed }));
 }
@@ -89,7 +84,7 @@ export function shopOffer(save: Save, id: TileId): ShopOffer {
   if (id === "bomb") return { price: BOMB_PRICE };
   if (id === "warBanner") return { reason: "Always at hand in battle: one banner, never used up." };
   const grown = evolvedBy(id);
-  if (grown) return { reason: `Evolve an individual ${ITEM_NAMES[grown.evolves!.from]} card in the Study after researching its crown.` };
+  if (grown) return { reason: `Research the ${grown.name} crown in the Study, then evolve a ${ITEM_NAMES[grown.evolves!.from]} there.` };
   return { price: purchasePrice(id, save.defend.owned[id]) };
 }
 
@@ -101,7 +96,7 @@ export function canBuyTile(save: Save, id: TileId): boolean {
   return false;
 }
 
-/** Buys an unspecialized card with mine metal; free with Unlimited money. */
+/** Buys another copy with mine metal; free with Unlimited money. */
 export function buyTile(save: Save, id: TileId): boolean {
   const offer = shopOffer(save, id), free = save.settings.devMode;
   if ("reason" in offer) return false;
@@ -109,7 +104,6 @@ export function buyTile(save: Save, id: TileId): boolean {
   const w: Wallet = { ...save.smithy, free };
   if (!(id === "bomb" ? buyBomb(save.defend, w) : buyItem(save.defend, w, id))) return false;
   if (!free) for (const k of METALS) save.smithy[k] = w[k];
-  syncCards(save.defend);
   return true;
 }
 
