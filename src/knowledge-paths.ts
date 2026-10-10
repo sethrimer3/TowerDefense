@@ -11,22 +11,24 @@ export type PathTopic = "wizardTower" | "barracks" | "archerTower" | "cannonTowe
 /** Strike spells: cast from the battle's Skills palette rather than built,
  * so a spell has no cards; it casts with the one path `save.spellPaths`
  * names, at its furthest researched rank. */
-export type SpellId = "necromancy";
-export const SPELLS: SpellId[] = ["necromancy"];
+export type SpellId = "necromancy" | "meteor";
+export const SPELLS: SpellId[] = ["necromancy", "meteor"];
 export const isSpell = (topic: string): topic is SpellId => (SPELLS as string[]).includes(topic);
 export type PathId =
   | "pyromancy" | "rime" | "storm" | "crusaders" | "assassins"
   | "fireArrows" | "sharpshooters" | "gunnery" | "siegeShot" | "rangers" | "skirmishers"
   | "spotters" | "signalFires" | "pyroclasm" | "cinders" | "oilSoaked" | "fortified"
   | "blastStakes" | "springStakes" | "rimeStakes"
-  | "boneArchers" | "soulWeighing" | "amalgam";
+  | "boneArchers" | "soulWeighing" | "amalgam"
+  | "starfall" | "moltenCore" | "frostComet";
 /** The pixel icons `ui/path-icons.ts` draws, one a rank. */
 export type PathIcon =
   | "flame" | "tongue" | "inferno" | "snowflake" | "shard" | "iceBlock" | "bolt" | "fork" | "thunderhead"
   | "mail" | "heart" | "cross" | "boot" | "dagger" | "skull" | "crown"
   | "arrow" | "fireArrow" | "volley" | "eye" | "crosshair" | "gear" | "grape" | "cannonball" | "blast" | "bow" | "leaf"
   | "spyglass" | "beacon" | "crate" | "fireball" | "embers" | "stake" | "spring"
-  | "bone" | "scales" | "tombstone" | "hand";
+  | "bone" | "scales" | "tombstone" | "hand"
+  | "meteor" | "stars" | "crater";
 /** Each path's colours, as `ui/path-icons.ts` and the page's CSS name them. */
 export type PathHue = "ember" | "frost" | "storm" | "steel" | "shadow" | "verdant" | "grave";
 export type PathRank = { name: string; icon: PathIcon; cost: number; text: string };
@@ -130,6 +132,20 @@ export const SOUL_WEIGHT = { floor: 0.25, cap: [0, 3, 6, 12], boost: [1, 1, 1.25
  * warrior's, times `share[rank]`; from II each blow cleaves every enemy
  * within `cleave` cells of its target; at III it never crumbles. */
 export const AMALGAM = { share: [0, 0.6, 0.8, 1], cleave: 1.2 };
+
+/** Starfall: the meteor breaks up into `count[rank]` fragments, one in the
+ * middle and the rest `spread` of the reach out round it, each landing a
+ * moment after the last with `damage[rank]` of the meteor's damage over
+ * `radius` of its reach. */
+export const STARFALL = { count: [1, 3, 5, 7], damage: [1, 0.55, 0.55, 0.7], radius: 0.55, spread: 0.7 };
+/** Molten core: the crater burns for `life[rank]` seconds, `dps[rank]` a
+ * second to every enemy on foot in `share[rank]` of the reach; at III the
+ * fire clings to those who walk out of it. */
+export const MOLTEN_CORE = { life: [0, 5, 8, 12], dps: [0, 10, 16, 16], share: [0, 0.7, 1, 1] };
+/** Frost comet: everything the blast hits is chilled for `chill[rank]`
+ * seconds; from II the blast reaches `reach[rank]` times as far; at III
+ * it first freezes them solid for `freeze` seconds. */
+export const FROST_COMET = { chill: [0, 3, 5, 5], reach: [1, 1, 1.25, 1.25], freeze: 1.5 };
 
 export const PATHS: KnowledgePath[] = [
   {
@@ -318,6 +334,30 @@ export const PATHS: KnowledgePath[] = [
       { name: "Undying colossus", icon: "inferno", cost: studyPathCost(5, 2), text: "All of their strength, and it never crumbles" },
     ],
   },
+  {
+    id: "starfall", topic: "meteor", name: "Starfall", motto: "One stone becomes a storm of them", hue: "storm",
+    ranks: [
+      { name: "Shattered sky", icon: "stars", cost: studyPathCost(4, 0), text: "The meteor breaks into 3 fragments over a wider area, each with 55% of its damage" },
+      { name: "Meteor shower", icon: "volley", cost: studyPathCost(4, 1), text: "It breaks into 5 fragments" },
+      { name: "Falling stars", icon: "meteor", cost: studyPathCost(4, 2), text: "7 fragments, each with 70% of its damage" },
+    ],
+  },
+  {
+    id: "moltenCore", topic: "meteor", name: "Molten core", motto: "The crater burns long after", hue: "ember",
+    ranks: [
+      { name: "Glowing crater", icon: "crater", cost: studyPathCost(4, 0), text: "The impact leaves a burning crater for 5 seconds, 10 damage a second to enemies on foot" },
+      { name: "Lava pool", icon: "embers", cost: studyPathCost(4, 1), text: "The crater fills the whole blast, burning for 8 seconds at 16 damage a second" },
+      { name: "Clinging magma", icon: "inferno", cost: studyPathCost(4, 2), text: "It burns for 12 seconds, and its fire clings to whoever walks out" },
+    ],
+  },
+  {
+    id: "frostComet", topic: "meteor", name: "Frost comet", motto: "A star of ice that stops them cold", hue: "frost",
+    ranks: [
+      { name: "Comet of ice", icon: "snowflake", cost: studyPathCost(4, 0), text: "Everything the blast hits is chilled for 3 seconds" },
+      { name: "Hoarfrost wave", icon: "shard", cost: studyPathCost(4, 1), text: "Chilled for 5 seconds, and the blast reaches 25% farther" },
+      { name: "Frozen heart", icon: "iceBlock", cost: studyPathCost(4, 2), text: "Everything it hits is frozen solid for 1.5 seconds first" },
+    ],
+  },
 ];
 
 export const PATH_TOPICS = [...new Set(PATHS.map((p) => p.topic))];
@@ -347,6 +387,7 @@ export const UNSPECIALIZED: Record<PathTopic, string> = {
   bait: "Plain stacks of bait",
   spikes: "Plain stakes that cut",
   necromancy: "One plain warrior a fallen enemy",
+  meteor: "One great meteor",
 };
 
 /** Legacy topic-wide choices retained solely for old-save migration. */

@@ -31,7 +31,7 @@
 
 ## Knowledge paths (`src/knowledge-paths.ts`)
 
-- Path: `{ id, topic, name, motto, hue, ranks, evolves? }` in `PATHS`; `topic` is the `upgrade-subjects.ts` topic's id (one tower or troop building), which puts the path on that topic's tree in the Study. Add the id to `PathId` (and a new topic to `PathTopic`). A strike spell's topic is a `SpellId` (`SPELLS`): it has no cards, so the battle reads the path `save.spellPaths` equips (`spellPath`) through its own `Bonuses` field.
+- Path: `{ id, topic, name, motto, hue, ranks, evolves? }` in `PATHS`; `topic` is the `upgrade-subjects.ts` topic's id (one tower or troop building), which puts the path on that topic's tree in the Study. Add the id to `PathId` (and a new topic to `PathTopic`). A strike spell's topic is a `SpellId` (`SPELLS`): it has no cards, so the battle reads the path `save.spellPaths` equips (`spellPath`) through its own `Bonuses` field (`necromancy`, `meteor`).
 - Ranks: `{ name, icon, cost, text }`, learned in order with Knowledge; an icon is an 11 × 11 pixel drawing in `src/ui/path-icons.ts` painted in the path's `hue`.
 - Work: same lab project as skills; rank timers are quadratic and evolution crowns take 24 researcher-hours.
 - Evolution: `evolves: { from, item, name, cost, text }` puts a crown after the last rank; `evolve` turns every owned `from` into `item` (placed ones lifted to the palette), `unlearnPath` turns them back, and the Tiles shop stops selling `item` on its own (`shopOffer` in `src/tiles.ts`).

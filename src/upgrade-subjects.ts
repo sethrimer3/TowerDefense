@@ -86,7 +86,10 @@ export const SUBJECTS: Subject[] = [
   },
   {
     id: "spells", name: "Spells", sprite: "knowledge", blurb: "Strike spells cast from the Skills palette in battle.",
-    topics: [{ id: "necromancy", name: "Necromancy", icon: "necromancy", training: ["undeadHp", "undeadDamage"] }],
+    topics: [
+      { id: "necromancy", name: "Necromancy", icon: "necromancy", training: ["undeadHp", "undeadDamage"] },
+      { id: "meteor", name: "Meteor strike", icon: "meteor", training: ["meteorDamage", "meteorRadius"] },
+    ],
   },
   {
     id: "mine", name: "Mine", sprite: "mine", blurb: "The crew, the shaft and the smithy.",

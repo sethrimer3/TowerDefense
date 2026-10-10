@@ -417,6 +417,20 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   from a quarter up to 3×, 6× or 12×) and Amalgam (one giant of all the
   fallen, 60%, 80% or all of their summed difficulty; cleaving from II,
   never crumbling at III).
+- **Meteor strike** (`meteor.ts`, `×∞`), the second strike spell, is
+  dragged from the same palette; its aim shows a dashed ember ring of its
+  reach with a cross where it lands. Let go on the board, a meteor comes
+  down 1.2 seconds later and bursts there: 120 damage at the middle falling
+  to 40% at 2.5 cells (times the Smithy's Meteor damage and blast radius),
+  sparing your own people, and the spell is ready again 40 seconds after
+  the cast. Its Study paths: Starfall (3, then 5, then 7 fragments a
+  little apart, landing one after another, each 55%, then 70%, of the
+  damage over 55% of the reach), Molten core (a crater burning 5 s at 10
+  a second over 70% of the reach, then 8 s at 16 over all of it, then 12 s
+  and clinging) and Frost comet (an ice comet chilling all it hits for 3,
+  then 5 seconds with a 25% wider blast, then freezing them solid for 1.5
+  seconds first). Meteors in flight are drawn falling from the upper right
+  on a trail of fire (or frost) over a growing shadow where they will land.
 
 - **Dark art** (`dark-art.ts`, the keep in `tower-art.ts`): the dark
   wizard keep is black obsidian on a stepped plinth, glassy black curtain

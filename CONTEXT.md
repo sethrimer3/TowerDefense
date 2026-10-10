@@ -107,6 +107,9 @@ A reusable Skill cast onto the board mid-defense, with its own Smithy and Study 
 **Necromancy**:
 The first strike spell: every enemy that fell near where it is cast (a **grave**, raisable for 30 seconds) rises as a friendly **risen** warrior for a minute, then the spell waits 30 seconds.
 
+**Meteor strike**:
+The second strike spell: a meteor falls where it is cast a moment later and blasts every enemy within its reach, sparing the city's own people, then the spell waits 40 seconds. Its paths break it into a shower (**Starfall**), leave a burning crater (**Molten core**) or make it a **Frost comet** that chills and freezes.
+
 **Best wave**:
 The highest wave the player has held.
 
