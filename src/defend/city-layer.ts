@@ -81,7 +81,7 @@ export type CityScene = {
   sim: DefendSim | null;
   lights: readonly Light[];
   stones: readonly Stone[];
-  /** Each structure's card path by its uid, for the paths with their own look. */
+  /** Each structure's path by its uid, for the paths with their own look. */
   looks?: Readonly<Record<number, string>>;
 };
 

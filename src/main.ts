@@ -1,4 +1,3 @@
-import { syncCards } from "./cards.ts";
 import "./style.css";
 import "./theme.css";
 import { defaults, load, persist, type Save } from "./save.ts";
@@ -67,9 +66,9 @@ const smithy = new Ledger(ctx, smithyRoom.content, "smithy", () => mineDown.go(f
 const study = new Ledger(ctx, studyRoom.content, "study", () => libraryDown.go(false));
 const mineDown = new Descent(el("mine"), "mine", reduced), libraryDown = new Descent(el("library"), "library", reduced);
 /** Goes to the Mine's Smithy or the Library's Study, open at a topic. */
-function openChamber(where: "smithy" | "study", topic?: string, cardId?: number) {
+function openChamber(where: "smithy" | "study", topic?: string) {
   const ledger = where === "smithy" ? smithy : study;
-  if (topic) ledger.focus(topic, cardId);
+  if (topic) ledger.focus(topic);
   navigate(where === "smithy" ? "mine" : "library");
   ledger.render();
   (where === "smithy" ? mineDown : libraryDown).go(true);
@@ -77,7 +76,7 @@ function openChamber(where: "smithy" | "study", topic?: string, cardId?: number)
 const defendPage = new DefendPage(el("defend"), {
   save: () => save.defend,
   bonuses: () => bonuses(save),
-  cards: () => { syncCards(save.defend); return save.defend.cards; },
+  research: () => save.pathResearch,
   outskirts: () => skillRank(save, "outskirts") > 0,
   earnWave: (wave) => {
     const r = payWave(save, wave);

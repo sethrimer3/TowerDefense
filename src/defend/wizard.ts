@@ -1,4 +1,4 @@
-import { buildingPaths } from "../cards.ts";
+import { buildingPaths } from "../specializations.ts";
 /** The wizard tower: it alternates between a flamethrower and an ice wave,
  * resting a moment after each.
  *
@@ -122,7 +122,7 @@ export class Wizards {
     const target = nearest(sim.enemiesNear(c.x, c.y, range), c);
     if (!target) return;
     sim.frosts.push({
-      ...(sim.bonuses.cardPaths ? { tower: b.id } : {}), x: c.x, y: c.y, ...toward(c.x, c.y, target.x, target.y), spread: ICE_SPREAD,
+      ...(sim.bonuses.structurePaths ? { tower: b.id } : {}), x: c.x, y: c.y, ...toward(c.x, c.y, target.x, target.y), spread: ICE_SPREAD,
       r: 0.6, range, t: 0, seed: b.id * 7919 + this.waves++ * 104729, hit: [],
     });
     this.next.set(b.id, "flame");

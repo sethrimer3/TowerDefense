@@ -4,7 +4,7 @@
 import { decodeDefendSave, defaultDefendSave, type DefendSave } from "./defend/progress.ts";
 import { STARTING_METAL, TRAINING, TRAINING_IDS, type TrainingId } from "./progression.ts";
 import { SKILLS, SKILL_IDS, type SkillId } from "./skill-trees.ts";
-import { PATHS, decodePaths, decodePathResearch, decodeSpellPaths, type PathId, type PathResearch, type PathChoices, type SpellId } from "./knowledge-paths.ts";
+import { decodePaths, decodePathResearch, decodeSpellPaths, type PathId, type PathResearch, type PathChoices, type SpellId } from "./knowledge-paths.ts";
 import type { TrainingJob } from "./training-jobs.ts";
 import { decodeSettings, defaultSettings, type Settings } from "./settings.ts";
 import { METALS, decodeMineSave, type MineSave, type Metals } from "./mine/sim.ts";
@@ -12,11 +12,12 @@ import { decodeLibrarySave, type LibrarySave } from "./library/sim.ts";
 import { decodeResearchJob, type ResearchJob } from "./research-jobs.ts";
 import { decodeForgeJob, type ForgeJob } from "./forge-jobs.ts";
 
-import { decodeCards, syncCards, cardTopic } from "./cards.ts";
+import { migrateCards, migrateTopicPaths, settlePaths } from "./specializations.ts";
 
 export const SAVE_KEY = "towerdefense.v1";
-/** 2: the mine's metal wallet. 3: research unlocks and persistent individual cards. */
-export const SAVE_VERSION = 3;
+/** 2: the mine's metal wallet. 3: research unlocks and persistent individual
+ * cards. 4: no cards; each placed building keeps its own path in the layout. */
+export const SAVE_VERSION = 4;
 
 export type Save = {
   version: number;
@@ -77,7 +78,6 @@ export function defaults(): Save {
     library: null,
     settings: defaultSettings(),
   };
-  syncCards(save.defend);
   return save;
 }
 
@@ -114,23 +114,17 @@ export function decode(raw: string | null): Save {
   d.trainingJobs = decodeJobs(s.trainingJobs, d.training);
   d.trainingClock = num(s.trainingClock, 0);
   d.defend = decodeDefendSave(s.defend);
-  // Migrate existing paths, ranks, paid Knowledge and crowned copies exactly once.
+  // Migrate existing paths, ranks and paid Knowledge exactly once. Crowned
+  // copies were already counted among the evolved kinds owned.
   const legacy = s.pathResearch === undefined;
   if (legacy) for (const c of Object.values(d.paths)) d.pathResearch[c.path] = {
     rank: c.rank, spent: c.spent, ...(c.crowned !== undefined ? { crowned: true } : {}) };
-  decodeCards(s.defend?.cards, d);
-  const crownsLeft = Object.fromEntries(Object.values(d.paths).map(c => [c.path, c.crowned ?? 0]));
-  if (legacy) for (const c of d.defend.cards) {
-    const choice = d.paths[cardTopic(c)!];
-    if (choice) { c.path = choice.path; c.rank = choice.rank; }
-    for (const choice of Object.values(d.paths)) {
-      // Old crown conversions already changed owned counts; recover their card identities.
-      const p = PATHS.find(p => p.id === choice.path && p.evolves?.item === c.kind);
-      if (p && crownsLeft[p.id] > 0) { c.evolved = p.id; c.path = p.id; c.rank = choice.rank; crownsLeft[p.id]--; }
-    }
-  }
+  // Buildings standing in the city keep the path they wore (version 2: their
+  // topic's; version 3: their card's). Copies in the palette are plain.
+  if (legacy) migrateTopicPaths(d.paths, d);
+  else if (s.version < 4) migrateCards(s.defend?.cards, d);
   d.paths = {};
-  syncCards(d.defend);
+  settlePaths(d.defend, d.pathResearch);
   d.upgradePoints = int(s.upgradePoints, d.defend.bestWave);
   d.mine = decodeMineSave(s.mine);
   d.library = decodeLibrarySave(s.library);

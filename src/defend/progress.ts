@@ -34,13 +34,12 @@ import {
   type Layout,
   type PlacedKind,
   type PlacedStructure,
+  type SpikeSpot,
 } from "./layout.ts";
-
-import type { OwnedCard } from "../cards.ts";
+import { pathFits } from "../knowledge-paths.ts";
 
 export type DefendSave = {
-  cards: OwnedCard[];
-  nextCardId: number;
+  /** The city as built, each placed building with its chosen path. */
   layout: Layout;
   owned: Record<PaletteItem, number>;
   levels: Record<UpgradeId, number>;
@@ -63,7 +62,6 @@ export type DefendSave = {
 
 export function defaultDefendSave(): DefendSave {
   return {
-    cards: [], nextCardId: 1,
     layout: defaultLayout(),
     owned: { ...STARTING_OWNED },
     levels: Object.fromEntries(UPGRADES.map((u) => [u.id, 0])) as Record<UpgradeId, number>,
@@ -236,7 +234,6 @@ export function decodeDefendSave(s: any): DefendSave {
   d.discovered = kinds.filter(k => Array.isArray(s.discovered) && s.discovered.includes(k));
   d.journalRead = d.discovered.filter(k => Array.isArray(s.journalRead) && s.journalRead.includes(k));
   d.layout = decodeLayout(s.layout, d.owned, d.levels) ?? d.layout;
-  d.nextCardId = intOr(s.nextCardId, 1, 1e9, 1);
   return d;
 }
 
@@ -257,7 +254,8 @@ function decodeLayout(s: any, owned: Record<PaletteItem, number>, levels: Record
   // Saves from before city gates, wall spikes and ballistas have none.
   const tiles = new Set([tileKey(keep.tx, keep.ty), ...cityTiles]);
   const gates = s.gates === undefined ? [] : decodeGates(s.gates, tiles);
-  const spikes = s.spikes === undefined ? [] : decodeGates(s.spikes, tiles);
+  const spikes = s.spikes === undefined ? [] : decodeGates(s.spikes, tiles)?.map((g, i): SpikeSpot =>
+    typeof s.spikes[i].path === "string" && pathFits("wallSpikes", s.spikes[i].path) ? { ...g, path: s.spikes[i].path } : g) ?? null;
   const ballistas = s.ballistas === undefined ? [] : decodeCorners(s.ballistas, tiles);
   if (!gates || !spikes || !ballistas || spikes.some((g) => gates.some((o) => sameGate(o, g)))) return null;
   const layout: Layout = { keep, cityTiles, structures, nextUid: s.nextUid, rolls: intOr(s.rolls, 0, 1e9, 0), compact: compactKinds(levels), gates, spikes, ballistas, ...(s.outskirts === true ? { outskirts: true as const } : {}) };
@@ -294,7 +292,10 @@ function decodeStructures(list: unknown, nextUid: number): PlacedStructure[] | n
     if (!structureOk(p, nextUid, uids)) return null;
     uids.add(p.uid);
     // Saves from before random spots have none: draw one from the uid.
-    out.push({ uid: p.uid, kind: p.kind, tx: p.tx, ty: p.ty, spot: int(p.spot, 0, 2 ** 32 - 1) ? p.spot : hash(p.uid, 0x5b07) });
+    // A path is kept only if it is the structure's own (whether it is
+    // researched is settled with the rest of the save, `settlePaths`).
+    out.push({ uid: p.uid, kind: p.kind, tx: p.tx, ty: p.ty, spot: int(p.spot, 0, 2 ** 32 - 1) ? p.spot : hash(p.uid, 0x5b07),
+      ...(typeof p.path === "string" && pathFits(p.kind, p.path) ? { path: p.path } : {}) });
   }
   return out;
 }

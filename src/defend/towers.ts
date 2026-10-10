@@ -1,4 +1,4 @@
-import { buildingPaths } from "../cards.ts";
+import { buildingPaths } from "../specializations.ts";
 /** DEFEND towers and their projectiles. Archer towers shoot the nearest
  * enemy in range with homing arrows; cannon towers lob a shell at the
  * nearest ground enemy (not too close), which bursts where the target stood
