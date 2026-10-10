@@ -58,6 +58,7 @@ import { stepStabs, stepValkyrie, type Stab } from "./valkyries.ts";
 import { Wizards, stepFlames, stepFrosts, type Flame, type Frost } from "./wizard.ts";
 import { DarkKeeps, stepBolts, stepDarkWizard, type Bolt } from "./dark-wizards.ts";
 import { WarBanner, bannerInfluence, stepBannerLife } from "./war-banner.ts";
+import { ageGraves, bury, castNecromancy, NECRO, stepUndead, type Grave, type Raising, type Risen } from "./necromancy.ts";
 import { sheltered, fizzles, stepFloods, type Flood, type Sinking } from "./boats.ts";
 import { baitFell, baitStanding } from "./bait.ts";
 import { stepBallistaBolts, stepSpikes, type BallistaBolt, type SpikeThrust } from "./wall-defenses.ts";
@@ -118,7 +119,7 @@ export type Soldier = {
   /** Swordsmen chase and hack; archers roam and shoot; fire mages roam
    * and hurl fireballs; valkyries hunt and charge-stab; the dark wizard
    * hunts and casts chain lightning. */
-  kind: "sword" | "archer" | "mage" | "valkyrie" | "darkWizard";
+  kind: "sword" | "archer" | "mage" | "valkyrie" | "darkWizard" | "undead";
   home: number;
   x: number;
   y: number;
@@ -136,6 +137,8 @@ export type Soldier = {
   bannerLife?: number;
   /** Strikes an assassin has made, every few critical; absent for everyone else. */
   strikes?: number;
+  /** A warrior the Necromancy spell raised (`home` -1); absent for everyone else. */
+  risen?: Risen;
 };
 
 export type Civilian = {
@@ -192,6 +195,7 @@ const STEP_SOLDIER: Record<Soldier["kind"], (sim: DefendSim, s: Soldier, dt: num
   mage: stepMage,
   valkyrie: stepValkyrie,
   darkWizard: stepDarkWizard,
+  undead: stepUndead,
 };
 /** How long a struck building flashes, in seconds. */
 export const BUILDING_FLASH = 0.14;
@@ -273,6 +277,13 @@ export class DefendSim {
   bannerReadyAt = 0;
   get bannerCooldown() { return this.bonuses.banner?.cooldown ?? 10; }
   get bannerRemaining() { return Math.max(0, this.bannerReadyAt - this.time); }
+  /** Where enemies fell, which the Necromancy spell can raise (`necromancy.ts`),
+   * the casts still flaring, and when it can be cast again. */
+  graves: Grave[] = [];
+  raisings: Raising[] = [];
+  necroReadyAt = 0;
+  get necroCooldown() { return NECRO.cooldown; }
+  get necroRemaining() { return Math.max(0, this.necroReadyAt - this.time); }
   /** Magic boats' water, drying up behind them, and the buildings it sank
    * going under; both empty in every run without boats. */
   floods: Flood[] = [];
@@ -412,6 +423,7 @@ export class DefendSim {
   /** Everyone acts, in a fixed order (it decides the random draws). */
   private stepUnits(dt: number) {
     this.bannerCarriers = this.enemies.filter(e => e.hp > 0 && e.kind === "bannerCaptain");
+    ageGraves(this, dt);
     for (const corpse of this.corpses) corpse.life -= dt;
     this.corpses = this.corpses.filter(c => c.life > 0);
     // Defenders do not move or spawn until after all enemies have acted.
@@ -478,6 +490,7 @@ export class DefendSim {
         this.stats.current.slain++;
       }
       if (e.fortressParts) for (const part of e.fortressParts) part.hp = 0;
+      bury(this, e);
       if (!e.fortressPart && !ENEMIES[e.kind].fortress && !ENEMIES[e.kind].hatched && e.kind !== "ashPhoenix" && this.corpses.length < MAX_WAVE_ENEMIES) this.corpses.push({ x: e.x, y: e.y, life: 10, hp: Math.max(1, e.maxHp * .4), damage: ENEMIES[e.kind].damage * .4 });
       if (e.kind === "ashPhoenix" && !e.reborn) {
         const egg = this.spawnAuxiliary("phoenixEgg", e.x, e.y);
@@ -489,7 +502,7 @@ export class DefendSim {
     this.enemies = this.enemies.filter((e) => e.hp > 0);
     this.shieldGenerators = this.shieldGenerators.filter(e => e.hp > 0);
     this.enemies.push(...hatched);
-    for (const s of this.soldiers) if (s.hp <= 0) this.stats.current.troopsLost++;
+    for (const s of this.soldiers) if (s.hp <= 0 && !s.risen) this.stats.current.troopsLost++;
     for (const c of this.civilians) if (c.hp <= 0) this.stats.current.civiliansLost++;
     this.soldiers = this.soldiers.filter((s) => s.hp > 0);
     this.civilians = this.civilians.filter((c) => c.hp > 0 && !atHome(this, c) && !escaped(c));
@@ -963,6 +976,11 @@ export class DefendSim {
   // ── Consumables ───────────────────────────────────────────────────────
   dropBomb(x: number, y: number) {
     this.explode(x, y, { r: BOMB_RADIUS, damage: BOMB_DAMAGE * this.bonuses.bombDamage, friendlyFire: !this.levels.bombSafe });
+  }
+
+  /** Casts the Necromancy spell at `at`: how many warriors rose, or -1 while it cools down. */
+  castNecromancy(at: Point) {
+    return castNecromancy(this, at);
   }
 
   /** Plants the war banner at (x, y), taking down any other, or with null

@@ -5,20 +5,28 @@ import { followResearch, syncCards } from "./cards.ts";
 import type { Save } from "./save.ts";
 import { studyPathCost } from "./economy.ts";
 
-export type PathTopic = "wizardTower" | "barracks" | "archerTower" | "cannonTower" | "archerBarracks" | "watchTower" | "mageGuild" | "bait" | "spikes";
+export type PathTopic = "wizardTower" | "barracks" | "archerTower" | "cannonTower" | "archerBarracks" | "watchTower" | "mageGuild" | "bait" | "spikes" | SpellId;
+/** Strike spells: cast from the battle's Skills palette rather than built,
+ * so a spell has no cards; it casts with the one path `save.spellPaths`
+ * names, at its furthest researched rank. */
+export type SpellId = "necromancy";
+export const SPELLS: SpellId[] = ["necromancy"];
+export const isSpell = (topic: string): topic is SpellId => (SPELLS as string[]).includes(topic);
 export type PathId =
   | "pyromancy" | "rime" | "storm" | "crusaders" | "assassins"
   | "fireArrows" | "sharpshooters" | "gunnery" | "siegeShot" | "rangers" | "skirmishers"
   | "spotters" | "signalFires" | "pyroclasm" | "cinders" | "oilSoaked" | "fortified"
-  | "blastStakes" | "springStakes" | "rimeStakes";
+  | "blastStakes" | "springStakes" | "rimeStakes"
+  | "boneArchers" | "soulWeighing" | "amalgam";
 /** The pixel icons `ui/path-icons.ts` draws, one a rank. */
 export type PathIcon =
   | "flame" | "tongue" | "inferno" | "snowflake" | "shard" | "iceBlock" | "bolt" | "fork" | "thunderhead"
   | "mail" | "heart" | "cross" | "boot" | "dagger" | "skull" | "crown"
   | "arrow" | "fireArrow" | "volley" | "eye" | "crosshair" | "gear" | "grape" | "cannonball" | "blast" | "bow" | "leaf"
-  | "spyglass" | "beacon" | "crate" | "fireball" | "embers" | "stake" | "spring";
+  | "spyglass" | "beacon" | "crate" | "fireball" | "embers" | "stake" | "spring"
+  | "bone" | "scales" | "tombstone" | "hand";
 /** Each path's colours, as `ui/path-icons.ts` and the page's CSS name them. */
-export type PathHue = "ember" | "frost" | "storm" | "steel" | "shadow" | "verdant";
+export type PathHue = "ember" | "frost" | "storm" | "steel" | "shadow" | "verdant" | "grave";
 export type PathRank = { name: string; icon: PathIcon; cost: number; text: string };
 export type KnowledgePath = {
   id: PathId;
@@ -105,6 +113,21 @@ export const SPRING_STAKES = { reach: [0, 1.5, 2.5, 2.5], damage: [0, 3, 3, 5], 
  * on an enemy already chilled bites `bite` times as hard; at III the cold
  * reaches every enemy on foot within `aura` cells of the stakes each cut. */
 export const RIME_STAKES = { chill: [0, 1.5, 2.5, 2.5], bite: 2, aura: 2 };
+
+/** Bone archers: the risen loose bone arrows from `range[rank]` cells
+ * instead of closing to cut; from II they hit `damage` times as hard; at
+ * III each loosing sends a second arrow at the next nearest enemy. */
+export const BONE_ARCHERS = { range: [0, 4, 5, 5], damage: 1.5 };
+/** Soul weighing: each warrior rises as strong as the enemy it was, its HP
+ * and damage times that enemy's difficulty over a plain warrior's
+ * (`NECRO.difficulty`), never less than `floor` nor more than `cap[rank]`,
+ * then times `boost[rank]`. */
+export const SOUL_WEIGHT = { floor: 0.25, cap: [0, 3, 6, 12], boost: [1, 1, 1.25, 1.5] };
+/** Amalgam: every fallen enemy in reach fuses into one abomination, its HP
+ * and damage a plain warrior's times their summed difficulty over a plain
+ * warrior's, times `share[rank]`; from II each blow cleaves every enemy
+ * within `cleave` cells of its target; at III it never crumbles. */
+export const AMALGAM = { share: [0, 0.6, 0.8, 1], cleave: 1.2 };
 
 export const PATHS: KnowledgePath[] = [
   {
@@ -269,6 +292,30 @@ export const PATHS: KnowledgePath[] = [
       { name: "Winter's breath", icon: "iceBlock", cost: studyPathCost(4, 2), text: "Each cut chills every enemy on foot within 2 cells of the stakes" },
     ],
   },
+  {
+    id: "boneArchers", topic: "necromancy", name: "Bone archers", motto: "The risen shoot from afar", hue: "grave",
+    ranks: [
+      { name: "Bone bows", icon: "bow", cost: studyPathCost(4, 0), text: "The risen loose bone arrows from 4 cells away instead of closing to cut" },
+      { name: "Marrow shafts", icon: "bone", cost: studyPathCost(4, 1), text: "Their arrows hit 50% harder, from 5 cells away" },
+      { name: "Volley of the dead", icon: "volley", cost: studyPathCost(4, 2), text: "Each loosing sends a second arrow at the next nearest enemy" },
+    ],
+  },
+  {
+    id: "soulWeighing", topic: "necromancy", name: "Soul weighing", motto: "The mighty rise mighty, the meek rise meek", hue: "grave",
+    ranks: [
+      { name: "Weighed souls", icon: "scales", cost: studyPathCost(4, 0), text: "Each warrior rises as strong as the enemy it was: weaker from weak enemies, up to 3× from tough ones" },
+      { name: "Heavy hearts", icon: "skull", cost: studyPathCost(4, 1), text: "Tough enemies rise up to 6× as strong, and every warrior 25% stronger" },
+      { name: "Fallen champions", icon: "crown", cost: studyPathCost(4, 2), text: "Tough enemies rise up to 12× as strong, and every warrior 50% stronger" },
+    ],
+  },
+  {
+    id: "amalgam", topic: "necromancy", name: "Amalgam", motto: "One giant of all the fallen", hue: "grave",
+    ranks: [
+      { name: "Bone heap", icon: "hand", cost: studyPathCost(5, 0), text: "All the fallen in reach fuse into one giant warrior, with 60% of their summed difficulty as its strength" },
+      { name: "Grave titan", icon: "tombstone", cost: studyPathCost(5, 1), text: "80% of their strength, and each blow cleaves every enemy beside its target" },
+      { name: "Undying colossus", icon: "inferno", cost: studyPathCost(5, 2), text: "All of their strength, and it never crumbles" },
+    ],
+  },
 ];
 
 export const PATH_TOPICS = [...new Set(PATHS.map((p) => p.topic))];
@@ -319,6 +366,9 @@ export function learnPath(save: Save, id: PathId, prepaid?: number): boolean {
   if (prepaid === undefined) save.knowledge -= cost;
   save.pathResearch[id] = { rank: st.rank + 1, spent: (save.pathResearch[id]?.spent ?? 0) + cost };
   followResearch(save, id);
+  // A spell with no path yet casts with the first one researched.
+  const topic = pathById(id).topic;
+  if (isSpell(topic) && !save.spellPaths[topic]) save.spellPaths[topic] = id;
   return true;
 }
 
@@ -340,6 +390,7 @@ export function unlearnPath(save: Save, topic: PathTopic): number {
       structures: save.defend.layout.structures.filter(s => s.kind !== p.evolves!.item || save.defend.cards.some(c => c.placement === `structure:${s.uid}`)) };
   }
   delete save.paths[topic];
+  if (isSpell(topic)) delete save.spellPaths[topic];
   save.knowledge += spent;
   return spent;
 }
@@ -368,6 +419,32 @@ export function decodePaths(raw: unknown): PathChoices {
     if (typeof c.spent !== "number" || !Number.isFinite(c.spent) || c.spent < 0) continue;
     out[topic] = { path: p.id, rank: c.rank!, spent: c.spent };
     if (p.evolves && c.rank === p.ranks.length && Number.isInteger(c.crowned) && c.crowned! >= 0 && c.crowned! <= 999) out[topic]!.crowned = c.crowned;
+  }
+  return out;
+}
+
+/** The path and rank a spell casts with: the equipped path at its furthest
+ * researched rank, or none. */
+export function spellPath(save: Save, spell: SpellId): { path: PathId; rank: number } | undefined {
+  const path = save.spellPaths[spell], rank = path ? save.pathResearch[path]?.rank ?? 0 : 0;
+  return path && rank ? { path, rank } : undefined;
+}
+
+/** Equips `path` on `spell` (undefined casts it plain); only a researched path of its own. */
+export function equipSpell(save: Save, spell: SpellId, path?: PathId): boolean {
+  if (path && (pathById(path)?.topic !== spell || !save.pathResearch[path]?.rank)) return false;
+  if (path) save.spellPaths[spell] = path;
+  else delete save.spellPaths[spell];
+  return true;
+}
+
+/** Keeps each spell's equipped path when it is one of its own. */
+export function decodeSpellPaths(raw: unknown): Partial<Record<SpellId, PathId>> {
+  const out: Partial<Record<SpellId, PathId>> = {};
+  if (!raw || typeof raw !== "object") return out;
+  for (const spell of SPELLS) {
+    const p = PATHS.find((p) => p.id === (raw as Record<string, unknown>)[spell] && p.topic === spell);
+    if (p) out[spell] = p.id;
   }
   return out;
 }

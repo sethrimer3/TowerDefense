@@ -1,5 +1,6 @@
 import { syncCards, cardLabel, spikeKey, type OwnedCard } from "../cards.ts";
 import { bannerReach } from "./war-banner.ts";
+import { gravesNear } from "./necromancy.ts";
 import { journalHTML, paintJournal } from "./journal.ts";
 import { paintPortraits } from "./journal-portrait.ts";
 import { wavePickerHTML } from "./wave-picker.ts";
@@ -500,6 +501,7 @@ export class DefendPage {
         : [
             { id: "bomb", name: "Bomb", count: s.bombs, icon: "bomb" },
             { id: "banner", name: "War banner", count: Infinity, icon: "banner" },
+            { id: "necromancy", name: "Necromancy", count: Infinity, icon: "necromancy" },
           ];
     const entries = this.host.showEmpty?.() ? all : all.filter((e) => e.count > 0);
     el.innerHTML =
@@ -555,9 +557,11 @@ export class DefendPage {
   private updateSkillCooldowns() {
     if (this.phase !== "sim" || !this.sim) return;
     for (const button of Array.from(this.root.querySelectorAll<HTMLButtonElement>("#defend-palette [data-item]"))) {
-      const banner = button.dataset.item === "banner", left = banner ? this.sim.bannerRemaining : 0;
-      const ready = left === 0 && (banner || this.save.bombs > 0);
-      const fill = banner ? Math.floor((1 - left / this.sim.bannerCooldown) * 100) : ready ? 100 : 0;
+      const item = button.dataset.item, banner = item === "banner", spell = item === "necromancy";
+      const left = banner ? this.sim.bannerRemaining : spell ? this.sim.necroRemaining : 0;
+      const cooldown = banner ? this.sim.bannerCooldown : spell ? this.sim.necroCooldown : 0;
+      const ready = left === 0 && (banner || spell || this.save.bombs > 0);
+      const fill = cooldown ? Math.floor((1 - left / cooldown) * 100) : ready ? 100 : 0;
       const key = `${fill}:${Math.ceil(left)}:${ready}:${this.save.bombs}`;
       if (button.dataset.cooldown === key) continue;
       button.dataset.cooldown = key;
@@ -565,8 +569,8 @@ export class DefendPage {
       button.classList.toggle("skill-loading", left > 0);
       button.style.setProperty("--skill-fill", `${fill}%`);
       button.disabled = !ready;
-      const name = banner ? "War banner" : "Bomb";
-      const status = left > 0 ? `Ready in ${Math.ceil(left)} seconds` : ready ? banner ? "Ready" : `Ready, ${this.save.bombs} left` : "None owned";
+      const name = banner ? "War banner" : spell ? "Necromancy" : "Bomb";
+      const status = left > 0 ? `Ready in ${Math.ceil(left)} seconds` : ready ? banner || spell ? "Ready" : `Ready, ${this.save.bombs} left` : "None owned";
       button.title = `${name}: ${status}`;
       button.setAttribute("aria-label", `${name}: ${status}`);
     }
@@ -591,6 +595,7 @@ export class DefendPage {
     if (id === "bomb") return this.pressBomb(e);
     if (id === "banner" && this.sim?.bannerRemaining) return;
     if (id === "banner") return this.phase === "sim" ? this.beginDrag({ from: "banner" }, e) : undefined;
+    if (id === "necromancy") return this.phase === "sim" && !this.sim?.necroRemaining ? this.beginDrag({ from: "necromancy" }, e) : undefined;
     const [kind, card] = id.split("#");
     const item = kind as PaletteItem;
     if (!available(this.save, item)) return this.setMessage(`No ${plural(ITEM_NAMES[item].toLowerCase())} left — buy more in the Tiles tab.`);
@@ -768,7 +773,7 @@ export class DefendPage {
       return;
     }
     const w = this.weather, sky = w.blizzard ? "A blizzard howls in. " : w.snow ? "Snow drifts in. " : w.sand ? "A sandstorm blows in. " : w.mist ? "Mist creeps over the ground. " : w.rain ? "Rain rolls in. " : "";
-    this.setMessage(`${sky}Here they come! ${this.sideOpen.sim ? "Drag" : "Open Skills and drag"} a bomb onto the field, or plant the war banner to rally your troops.`, 4);
+    this.setMessage(`${sky}Here they come! ${this.sideOpen.sim ? "Drag" : "Open Skills and drag"} a bomb onto the field, plant the war banner to rally your troops, or raise the fallen with Necromancy.`, 4);
   }
 
   private endRun() {
@@ -881,7 +886,10 @@ export class DefendPage {
 
   // ── Dragging ──────────────────────────────────────────────────────────
   private overlay(): Overlay | null {
-    return this.pointers.session?.overlay() ?? null;
+    const o = this.pointers.session?.overlay() ?? null;
+    // An aimed spell marks the fallen it would raise.
+    if (o?.spell && this.sim) o.spell.souls = gravesNear(this.sim, o.spell, o.spell.r);
+    return o;
   }
 
   private beginDrag(d: Drag, e: PointerEvent) {
@@ -917,6 +925,16 @@ export class DefendPage {
   private drop(drop: Drop) {
     if (drop.kind === "bomb") {
       if (drop.at) this.dropBomb(drop.at);
+      return;
+    }
+    if (drop.kind === "spell") {
+      const sim = this.phase === "sim" ? this.sim : null;
+      if (!sim || !drop.at) return;
+      const raised = sim.castNecromancy(drop.at);
+      if (raised < 0) return;
+      play(raised ? "raise" : "hiss");
+      this.setMessage(raised ? `${raised} of the fallen ${raised === 1 ? "rises" : "rise"} to fight for you.` : "No enemy fell there lately: nothing rises.", 3);
+      this.updateSkillCooldowns();
       return;
     }
     if (drop.kind === "banner") {

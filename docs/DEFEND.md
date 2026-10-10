@@ -405,6 +405,18 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   it stands takes it down, as does carrying it off the board, and dragging
   it elsewhere moves it. It draws nothing from the run's random stream, so a
   run without one replays exactly as before.
+- **Necromancy** (`necromancy.ts`, `×∞`), a strike spell, is dragged from
+  the same palette; its aim shows a green ring of 3 cells with a mark over
+  each grave inside. Let go on the board, every enemy that died there in
+  the last 30 seconds (on open ground) rises as a friendly bone warrior
+  (30 HP, 5 damage, times the Smithy's Risen HP and damage) that hunts the
+  nearest enemy anywhere and crumbles after 60 seconds; at most 60 stand
+  at once, and the spell is ready again 30 seconds later. Its Study paths:
+  Bone archers (shooting from 4, then 5 cells, harder, then two at once),
+  Soul weighing (each as strong as its enemy's difficulty over an orc's,
+  from a quarter up to 3×, 6× or 12×) and Amalgam (one giant of all the
+  fallen, 60%, 80% or all of their summed difficulty; cleaving from II,
+  never crumbling at III).
 
 - **Dark art** (`dark-art.ts`, the keep in `tower-art.ts`): the dark
   wizard keep is black obsidian on a stepped plinth, glassy black curtain

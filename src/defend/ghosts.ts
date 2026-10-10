@@ -13,7 +13,7 @@ import { OUTLINE, bake, blit } from "./pixel-fx.ts";
 import { hash01 } from "./grid.ts";
 
 /** Who a ghost was. */
-export type GhostKind = "sword" | "archer" | "mage" | "valkyrie" | "darkWizard" | "civilian";
+export type GhostKind = "sword" | "archer" | "mage" | "valkyrie" | "darkWizard" | "undead" | "civilian";
 
 type Body = { x: number; y: number; hp: number; id: number };
 type Units = { soldiers: readonly (Body & { kind: Exclude<GhostKind, "civilian"> })[]; civilians: readonly Body[] };
@@ -65,6 +65,7 @@ const TINTS: Record<GhostKind, [string, string]> = {
   mage: ["#ffd2ad", "#fff3e6"],
   valkyrie: ["#fff0b0", "#fffbe8"],
   darkWizard: ["#dcc4ff", "#f6eeff"],
+  undead: ["#a9f0b8", "#e8fff0"],
   civilian: ["#f1ece0", "#ffffff"],
 };
 

@@ -52,10 +52,12 @@ export type Drag =
   | { from: "ballista"; corner: CornerSpot }
   | { from: "bomb" }
   /** The war banner, from the palette or (`placed`) where it stands. */
-  | { from: "banner"; placed?: boolean };
+  | { from: "banner"; placed?: boolean }
+  /** A strike spell, cast where it is let go. */
+  | { from: "necromancy" };
 
 /** Consumables are dropped at a point, not built on a tile. */
-export const consumable = (kind: IconItem): kind is "bomb" | "banner" => kind === "bomb" || kind === "banner";
+export const consumable = (kind: IconItem): kind is "bomb" | "banner" | "necromancy" => kind === "bomb" || kind === "banner" || kind === "necromancy";
 
 /** The icon of what `drag` carries. */
 export function dragIcon(drag: Drag): IconItem {

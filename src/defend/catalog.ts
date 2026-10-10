@@ -1,6 +1,6 @@
 import { intPow } from "../exact.ts";
 import { ECONOMY, quadraticCost } from "../economy.ts";
-import type { BattlePaths } from "../knowledge-paths.ts";
+import type { BattlePaths, PathId } from "../knowledge-paths.ts";
 
 /** Data tables for DEFEND: what the player can place, what it costs in
  * copper, silver and Gold, the universal upgrades, the bonuses the Smithy and the
@@ -709,6 +709,11 @@ export type Bonuses = {
   rebuild: number;
   /** Bomb damage. */
   bombDamage: number;
+  /** HP and damage of the warriors the Necromancy spell raises. */
+  undeadHp: number;
+  undeadDamage: number;
+  /** The Necromancy spell's Study path and rank; absent when cast plain. */
+  necromancy?: { path: PathId; rank: number };
   /** The Study's paths each topic follows (`knowledge-paths.ts`); absent
    * with none chosen, so such a run plays exactly as before. */
   banner?: { cooldown: number; defense: number; reach: number; damage: number; march: number; life: number; regen: number };
@@ -717,7 +722,7 @@ export type Bonuses = {
   spikePaths?: Record<string, BattlePaths>;
 };
 export const NO_BONUSES: Readonly<Bonuses> = Object.freeze({
-  troopHp: 1, troopDamage: 1, drill: 1, towerDamage: 1, towerReload: 1, wallHp: 1, keepHp: 1, rebuild: 1, bombDamage: 1,
+  troopHp: 1, troopDamage: 1, drill: 1, towerDamage: 1, towerReload: 1, wallHp: 1, keepHp: 1, rebuild: 1, bombDamage: 1, undeadHp: 1, undeadDamage: 1,
 });
 
 export const SOLDIER = { hp: 40, damage: 6, cooldown: 0.8, speed: 2.4, reach: 0.75, leash: 16, size: 0.4, color: "#5b8fd9" };

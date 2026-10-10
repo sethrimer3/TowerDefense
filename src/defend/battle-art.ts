@@ -19,6 +19,7 @@ import { drawFireballs, drawMage } from "./mage-art.ts";
 import { drawArrows, drawBreath, drawShells, drawSparks } from "./projectile-art.ts";
 import { drawStabs, drawValkyrie } from "./valkyrie-art.ts";
 import { drawDarkWizard } from "./dark-art.ts";
+import { drawRaisings, drawRisen } from "./necro-art.ts";
 import { drawExplosion, drawScorches as drawScorchArt } from "./blast-art.ts";
 import { BUILDING_FLASH, type DefendSim, type Effect, type Enemy, type Soldier } from "./sim.ts";
 
@@ -88,6 +89,7 @@ export function drawUnits(b: Brush, sim: DefendSim, torches: Burning | null, hea
   drawSiegeShots(b, sim);
   drawFireballs(b.c, b.px, sim);
   drawStabs(b.c, b.px, sim);
+  drawRaisings(b.c, b.px, sim);
   for (const fx of sim.effects) drawEffect(b, fx);
   if (healthbars) drawEnemyHealthbars(b, sim);
 }
@@ -153,6 +155,10 @@ function drawSoldiers(b: Brush, sim: DefendSim, torches: Burning | null) {
     }
     if (u.kind === "darkWizard") {
       drawDarkWizard(c, px, u, sim);
+      continue;
+    }
+    if (u.risen) {
+      drawRisen(c, px, u);
       continue;
     }
     const archer = u.kind === "archer";
@@ -433,7 +439,7 @@ export function drawScorches({ c, px }: Brush, sim: DefendSim) {
 export function shadowCasters(sim: DefendSim) {
   const def = (e: Enemy): EnemyDef => ENEMIES[e.kind];
   return [
-    ...sim.soldiers.map((u) => ({ x: u.x, y: u.y, size: u.kind === "archer" ? ARCHER_UNIT.size : u.kind === "mage" ? FIRE_MAGE.size : u.kind === "valkyrie" ? VALKYRIE.size : u.kind === "darkWizard" ? DARK_WIZARD.size : SOLDIER.size })),
+    ...sim.soldiers.map((u) => ({ x: u.x, y: u.y, size: u.kind === "archer" ? ARCHER_UNIT.size : u.kind === "mage" ? FIRE_MAGE.size : u.kind === "valkyrie" ? VALKYRIE.size : u.kind === "darkWizard" ? DARK_WIZARD.size : u.risen ? u.risen.size : SOLDIER.size })),
     ...sim.civilians.map((u) => ({ x: u.x, y: u.y, size: CIVILIAN.size })),
     ...sim.enemies.filter((e) => !def(e).flying).map((e) => ({ x: e.x, y: e.y, size: enemySize(e) })),
   ];

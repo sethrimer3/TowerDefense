@@ -17,6 +17,9 @@ export type Overlay = {
   bomb?: { x: number; y: number; r: number } | null;
   /** The war banner being planted: centre and the reach it rallies to. */
   banner?: { x: number; y: number; r: number } | null;
+  /** A strike spell being aimed: centre, reach, and (filled in by the page)
+   * the fallen it would raise there. */
+  spell?: { x: number; y: number; r: number; souls?: { x: number; y: number }[] } | null;
   /** Tiles across the block the item takes (unset: 1). A larger item's
    * `legal` and `hover` keys are the top left tiles of its blocks. */
   span?: number;
@@ -50,6 +53,7 @@ export function drawOverlay(c: CanvasRenderingContext2D, px: number, o: Overlay)
   if (o.ghost) drawGhost(c, px, o.ghost.rect);
   if (o.bomb) drawBombReach(c, px, o.bomb);
   if (o.banner) drawRallyReach(c, px, o.banner);
+  if (o.spell) drawSpellReach(c, px, o.spell);
 }
 
 /** Shades the tiles that won't take the item and frames those that will,
@@ -168,4 +172,24 @@ function drawRallyReach(c: CanvasRenderingContext2D, px: number, at: { x: number
   c.arc(at.x * px, at.y * px, at.r * px, 0, Math.PI * 2);
   c.fill();
   c.stroke();
+}
+
+/** The Necromancy spell's reach, in grave green, with a pale mark over each
+ * fallen enemy it would raise. */
+function drawSpellReach(c: CanvasRenderingContext2D, px: number, at: NonNullable<Overlay["spell"]>) {
+  c.strokeStyle = "rgba(141,255,166,0.9)";
+  c.fillStyle = "rgba(63,154,92,0.16)";
+  c.lineWidth = Math.max(1, px * 0.12);
+  c.beginPath();
+  c.arc(at.x * px, at.y * px, at.r * px, 0, Math.PI * 2);
+  c.fill();
+  c.stroke();
+  const d = Math.max(2, Math.round(px * 0.25));
+  for (const s of at.souls ?? []) {
+    const x = Math.round(s.x * px - d / 2), y = Math.round(s.y * px - d / 2);
+    c.fillStyle = "#0b0907";
+    c.fillRect(x - 1, y - 1, d + 2, d + 2);
+    c.fillStyle = "#c9ffd4";
+    c.fillRect(x, y, d, d);
+  }
 }

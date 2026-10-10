@@ -149,7 +149,7 @@ const md: string[] = [
   "| Upgrade | Ranks | Copper / Silver / Gold | One smith, no speed research | Six smiths, max research | Final rank with six |",
   "|---|---:|---:|---:|---:|---:|",
   ...smiths.map(r => `| ${r.name} | ${r.rank} | ${r.cumulative.copper} / ${r.cumulative.silver} / ${r.cumulative.gold} | ${format(r.smithSeconds / 3600)} | ${format(r.smithSeconds / 3600 / 6 / 1.45)} | ${format(trainingSeconds(r.rank - 1) / 3600 / 6 / 1.45)} |`), "",
-  `All nine rows require **${format(totalWork / 3600 / 6 / 1.45)}** of six-smith work at best. One top 50-rank row requires **${format(topRow.smithSeconds / 3600 / 6 / 1.45)}**. Their resource prices govern the long-term finish; these are processing times after materials have been secured.`, "",
+  `All ${TRAINING.length} rows require **${format(totalWork / 3600 / 6 / 1.45)}** of six-smith work at best. One top 50-rank row requires **${format(topRow.smithSeconds / 3600 / 6 / 1.45)}**. Their resource prices govern the long-term finish; these are processing times after materials have been secured.`, "",
   "## Production scenarios and measurements", "",
   "| Scenario | Setup | Sampled 1x hours (two seeds) | Copper/h | Silver/h | Gold/h | Nominal Knowledge/h |",
   "|---|---|---:|---:|---:|---:|---:|",

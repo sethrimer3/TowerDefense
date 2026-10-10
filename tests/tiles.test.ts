@@ -35,9 +35,9 @@ test("identical tiles stack, counted with those standing in the city; filters sh
   assert.ok(!all.includes("bomb"), "no bombs owned, no stack");
   assert.ok(!all.includes("wizardTower"));
   assert.deepEqual(tileStacks(s, "units").map((t) => t.type), tileStacks(s, "units").map(() => "units"));
-  assert.deepEqual(tileStacks(s, "consumables").map((t) => t.id), ["warBanner"]);
+  assert.deepEqual(tileStacks(s, "consumables").map((t) => t.id), ["warBanner", "necromancy"]);
   s.defend.bombs = 4;
-  assert.deepEqual(tileStacks(s, "consumables").map((t) => [t.id, t.count]), [["bomb", 4], ["warBanner", 1]]);
+  assert.deepEqual(tileStacks(s, "consumables").map((t) => [t.id, t.count]), [["bomb", 4], ["warBanner", 1], ["necromancy", 1]]);
   assert.ok(tileStack(s, "warBanner").lasting);
 });
 

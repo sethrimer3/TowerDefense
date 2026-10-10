@@ -4,7 +4,7 @@
 import { decodeDefendSave, defaultDefendSave, type DefendSave } from "./defend/progress.ts";
 import { STARTING_METAL, TRAINING, TRAINING_IDS, type TrainingId } from "./progression.ts";
 import { SKILLS, SKILL_IDS, type SkillId } from "./skill-trees.ts";
-import { PATHS, decodePaths, decodePathResearch, type PathResearch, type PathChoices } from "./knowledge-paths.ts";
+import { PATHS, decodePaths, decodePathResearch, decodeSpellPaths, type PathId, type PathResearch, type PathChoices, type SpellId } from "./knowledge-paths.ts";
 import type { TrainingJob } from "./training-jobs.ts";
 import { decodeSettings, defaultSettings, type Settings } from "./settings.ts";
 import { METALS, decodeMineSave, type MineSave, type Metals } from "./mine/sim.ts";
@@ -35,6 +35,8 @@ export type Save = {
   /** Legacy paths, accepted during migration and cleared before new saves. */
   paths: PathChoices;
   pathResearch: PathResearch;
+  /** The path each strike spell casts with (absent: cast plain). */
+  spellPaths: Partial<Record<SpellId, PathId>>;
   /** The Smithy's upgrades: ranks completed per row, the ranks in work, and
    * when their work was last settled (ms). */
   training: Record<TrainingId, number>;
@@ -62,6 +64,7 @@ export function defaults(): Save {
     skills: Object.fromEntries(SKILL_IDS.map((id) => [id, 0])) as Record<SkillId, number>,
     paths: {},
     pathResearch: {},
+    spellPaths: {},
     training: Object.fromEntries(TRAINING_IDS.map((id) => [id, 0])) as Record<TrainingId, number>,
     trainingJobs: [],
     trainingClock: 0,
@@ -106,6 +109,7 @@ export function decode(raw: string | null): Save {
   for (const id of SKILL_IDS) d.skills[id] = int(s.skills?.[id], 0, 0, SKILLS[id].max);
   d.paths = decodePaths(s.paths);
   d.pathResearch = decodePathResearch(s.pathResearch);
+  d.spellPaths = decodeSpellPaths(s.spellPaths);
   for (const t of TRAINING) d.training[t.id] = int(s.training?.[t.id], 0, 0, t.max);
   d.trainingJobs = decodeJobs(s.trainingJobs, d.training);
   d.trainingClock = num(s.trainingClock, 0);

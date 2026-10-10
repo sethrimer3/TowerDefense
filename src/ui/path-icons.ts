@@ -139,6 +139,22 @@ const ICONS: Record<PathIcon, string[]> = {
     "...........", ".....oooo..", "....owwllo.", "...owllllmo", "...olllmmmo", "..oollmmmdo",
     ".oddommmdo.", "omdo.oddo..", "odo..ooo...", "oo.........", "...........",
   ],
+  bone: [
+    "...........", ".oo........", "owlo.......", "olwlo......", ".oolwo.....", "...olwo....",
+    "....olwo...", ".....olwoo.", "......olmlo", ".......omlo", "........oo.",
+  ],
+  scales: [
+    ".....o.....", "ooooolooooo", ".o...l...o.", "o.o..l..o.o", "olwo.l.olwo", "ommo.l.ommo",
+    ".oo..l..oo.", ".....l.....", "....olo....", "...olmmo...", "..ooooooo..",
+  ],
+  tombstone: [
+    "...ooooo...", "..owllllo..", ".owllllmmo.", ".ollldlmmo.", ".olldddmmo.", ".ollldlmmo.",
+    ".ollldlmdo.", ".olllllmdo.", ".ommmmmddo.", "ooooooooooo", "odmmmmmmddo",
+  ],
+  hand: [
+    "...o.o.o...", "..olololo..", "..olololo..", "..olllllo.o", "..olllllolo", "..ollllllo.",
+    "...ollllo..", "...ollmmo..", "...olmmdo..", "ooooddddooo", "odmdmdmdmdo",
+  ],
   embers: [
     "...........", "..o.....o..", ".olo...owo.", "..o.....o..", "....o......", "...owo..o..",
     "....o..olo.", ".o......o..", "olo..o.....", ".o..olo....", ".....o.....",
@@ -154,6 +170,7 @@ export const HUES: Record<PathHue | "gold", [string, string, string, string]> = 
   steel: ["#4b5563", "#8b97a6", "#cfd6de", "#ffffff"],
   shadow: ["#2a0f14", "#6b1d2a", "#c0475a", "#f6cdd2"],
   verdant: ["#1f4a1c", "#3f8a34", "#8fd16a", "#e8ffd0"],
+  grave: ["#1d3326", "#4f8a5e", "#9fdcae", "#effff2"],
   gold: ["#7a5212", "#c08a2a", "#f2c95a", "#fff3c4"],
 };
 
