@@ -8,6 +8,7 @@
 import { NO_BONUSES, type Bonuses } from "./defend/catalog.ts";
 import { SKILLS, SKILL_IDS, TREES, skillAvailable, skillCost, type SkillId, type TreeId } from "./skill-trees.ts";
 import { placedBattlePaths } from "./specializations.ts";
+import { spellPath } from "./knowledge-paths.ts";
 import { trainingJob, trainingSeconds, type TrainingJob } from "./training-jobs.ts";
 import type { Metal, Metals } from "./mine/sim.ts";
 import type { Save } from "./save.ts";
@@ -16,7 +17,7 @@ import { ECONOMY, quadraticCost } from "./economy.ts";
 
 /** What the Smithy and the skill trees can raise: the battle's `Bonuses`,
  * and how fast the Smithy's upgrades are worked. */
-export type BonusTarget = Exclude<keyof Bonuses, "paths" | "banner" | "structurePaths" | "spikePaths"> | "smithing";
+export type BonusTarget = Exclude<keyof Bonuses, "paths" | "banner" | "structurePaths" | "spikePaths" | "necromancy"> | "smithing";
 /** Bonuses that shorten a time: their percent divides instead of multiplies. */
 const TIMES = new Set<BonusTarget>(["drill", "towerReload", "rebuild", "smithing"]);
 
@@ -24,9 +25,9 @@ const TIMES = new Set<BonusTarget>(["drill", "towerReload", "rebuild", "smithing
 export const STARTING_METAL: Metals = { copper: 10, silver: 0, gold: 0 };
 
 // ── The Smithy's upgrades (Training) ───────────────────────────────────
-export type TrainingId = "troopHp" | "troopDamage" | "drill" | "towerDamage" | "towerReload" | "wallHp" | "keepHp" | "rebuild" | "bombDamage";
+export type TrainingId = "troopHp" | "troopDamage" | "drill" | "towerDamage" | "towerReload" | "wallHp" | "keepHp" | "rebuild" | "bombDamage" | "undeadHp" | "undeadDamage";
 export type TrainingRow = { id: TrainingId; group: keyof typeof TRAINING_GROUPS; name: string; per: number; max: number };
-export const TRAINING_GROUPS = { army: "Army", towers: "Towers", city: "City" } as const;
+export const TRAINING_GROUPS = { army: "Army", towers: "Towers", city: "City", spells: "Spells" } as const;
 /** Each rank adds `per` percent to its target, with quadratic metal cost
  * (`rankCost`) in its tier (`rankPrice`). */
 export const TRAINING: TrainingRow[] = [
@@ -39,6 +40,8 @@ export const TRAINING: TrainingRow[] = [
   { id: "wallHp", group: "city", name: "Wall HP", per: 5, max: 50 },
   { id: "keepHp", group: "city", name: "Keep HP", per: 5, max: 50 },
   { id: "rebuild", group: "city", name: "Rebuild speed", per: 4, max: 30 },
+  { id: "undeadHp", group: "spells", name: "Risen HP", per: 5, max: 40 },
+  { id: "undeadDamage", group: "spells", name: "Risen damage", per: 5, max: 40 },
 ];
 export const TRAINING_IDS = TRAINING.map((t) => t.id);
 
@@ -189,9 +192,11 @@ export function multiplier(save: Save, target: BonusTarget) {
 /** What the next defense fights with. */
 export function bonuses(save: Save): Bonuses {
   const out = { ...NO_BONUSES } as Bonuses;
-  for (const k of Object.keys(out) as Exclude<keyof Bonuses, "paths" | "banner" | "structurePaths" | "spikePaths">[]) out[k] = multiplier(save, k);
+  for (const k of Object.keys(out) as Exclude<keyof Bonuses, "paths" | "banner" | "structurePaths" | "spikePaths" | "necromancy">[]) out[k] = multiplier(save, k);
   if (SKILL_IDS.some(id => id.startsWith("banner") && skillRank(save, id) > 0)) out.banner = { cooldown: 10 - skillTotal(save, "bannerCooldown"), defense: skillTotal(save, "bannerDefense") / 100, reach: 5 + skillTotal(save, "bannerReach"), damage: 1 + skillTotal(save, "bannerDamage") / 100, march: 1 + skillTotal(save, "bannerMarch") / 100, life: 1 + skillTotal(save, "bannerLife") / 100, regen: skillTotal(save, "bannerRegen") / 100 };
   Object.assign(out, placedBattlePaths(save));
+  const necromancy = spellPath(save, "necromancy");
+  if (necromancy) out.necromancy = necromancy;
   return out;
 }
 

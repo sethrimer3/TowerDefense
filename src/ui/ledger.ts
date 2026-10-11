@@ -4,7 +4,7 @@ import { play } from "../sound.ts";
 import { TRAINING, addSmith, busySmiths, whole, cancelTraining, removeSmith, skillPurchase, skillRank, startTraining, trainingLeft, trainingStep, type TrainingId } from "../progression.ts";
 import { BARS_PER_POINT, METALS } from "../mine/sim.ts";
 import { SKILLS, TREES, type SkillId } from "../skill-trees.ts";
-import { pathById, pathState, pathsOf, unlearnPath, type KnowledgePath, type PathId, type PathTopic } from "../knowledge-paths.ts";
+import { UNSPECIALIZED, equipSpell, isSpell, pathById, pathState, pathsOf, unlearnPath, type KnowledgePath, type PathId, type PathTopic, type SpellId } from "../knowledge-paths.ts";
 import { cancelResearch, researchLeft, researchSeconds, startResearch } from "../research-jobs.ts";
 import { addForgeSmith, cancelForge, forgeLeft, forgeSeconds, removeForgeSmith, startForge, type ForgeRequest } from "../forge-jobs.ts";
 import { paintPathIcons } from "./path-badge.ts";
@@ -155,6 +155,9 @@ export class Ledger {
       this.picked[topic.id] = b.dataset.pick!;
       this.render();
     }));
+    root.querySelectorAll<HTMLButtonElement>("[data-spell-path]").forEach((b) => (b.onclick = () => {
+      if (equipSpell(this.save, b.dataset.spell as SpellId, (b.dataset.spellPath || undefined) as PathId | undefined)) { this.ctx.update(); play("chime"); this.render(); }
+    }));
     root.querySelectorAll<HTMLButtonElement>("[data-learn-path]").forEach((b) => (b.onclick = () => this.learnPath(b.dataset.learnPath as PathId)));
     root.querySelectorAll<HTMLButtonElement>("[data-evolve]").forEach((b) => (b.onclick = () => this.evolve(b.dataset.evolve as PathId)));
     root.querySelectorAll<HTMLButtonElement>("[data-evolve-one]").forEach((b) => (b.onclick = () => {
@@ -181,7 +184,7 @@ export class Ledger {
       const layers = count > 2 ? "layers-2" : count > 1 ? "layers-1" : "";
       const sub = study ? pathsOf(t.id).length ? "Research paths" : "Shared research" : "Upgrades all";
       return `<button class="tile type-${type} ${layers} ${on ? "open" : ""}" data-key="${t.id}" data-ledger-stack="${t.id}" aria-pressed="${on}" aria-label="${t.name}${t.item ? `, ${count} owned` : ""}">
-        <span class="tile-face">${t.item ? `<canvas width="48" height="48" data-icon="${t.item}"></canvas>` : uiSprite(subject.sprite)}</span><span class="tile-name">${t.name}</span>${t.item ? `<b class="tile-count">×${count}</b>` : ""}<small class="tile-sub">${sub}</small></button>`;
+        <span class="tile-face">${t.item ?? t.icon ? `<canvas width="48" height="48" data-icon="${t.item ?? t.icon}"></canvas>` : uiSprite(subject.sprite)}</span><span class="tile-name">${t.name}</span>${t.item ? `<b class="tile-count">×${count}</b>` : ""}<small class="tile-sub">${sub}</small></button>`;
     }).join("");
     return `<div class="ledger-collection"><p class="ledger-note">${study ? "Research unlocks a path for every building of its type. Choose which path each one wears as you place it in Defend." : "Select a type. Smithy equipment improves every building of that type."}</p><div class="tiles-grid ledger-tiles">${stacks}</div></div>`;
   }
@@ -367,9 +370,20 @@ export class Ledger {
       return `<div class="banner-research"><div class="banner-research-shared"><h4>Shared upgrades</h4>${shared.map(skillCard).join("")}</div><p class="ledger-note">Master Rapid deployment, then learn Sheltering standard and Broad standard to open the three branches. Each branch can be researched.</p><div class="banner-research-branches">${branches.map(branch => `<section><h4>${branch.name}</h4>${branch.ids.map(skillCard).join("")}</section>`).join("")}</div></div>`;
     }
     const skills = (t.skills ?? []).map(skillCard);
-    const tree = pathsOf(t.id).length ? this.treeHtml(t) : "";
+    const tree = pathsOf(t.id).length ? (isSpell(t.id) ? this.spellSetupHtml(t.id) : "") + this.treeHtml(t) : "";
     if (!skills.length && !tree) return `<p class="ledger-empty">Nothing to study here yet.</p>`;
     return tree + skills.join("");
+  }
+
+  /** A strike spell is never placed: it casts with one researched path (or
+   * none), chosen here and used from the next defense on. */
+  private spellSetupHtml(spell: SpellId) {
+    const save = this.save, on = save.spellPaths[spell];
+    const choice = (path: PathId | "", name: string, note: string, hue = "") => `<button class="spell-choice ${hue}" data-spell="${spell}" data-spell-path="${path}" aria-pressed="${(on ?? "") === path}">${name}<small>${note}</small></button>`;
+    const paths = pathsOf(spell).filter((p) => pathState(save, p.id).rank);
+    return `<div class="spell-setup"><p class="ledger-scope">CAST WITH · one path at a time, at its furthest researched rank. Used from the next defense on.</p>
+      <div class="spell-choices" role="group" aria-label="Path the spell casts with">${choice("", "Plain", UNSPECIALIZED[spell])}${paths.map((p) => choice(p.id, p.name, `Rank ${ROMAN[pathState(save, p.id).rank - 1]}`, `hue-${p.hue}`)).join("")}</div>
+      ${paths.length ? "" : `<p class="ledger-note"><small>Research a path below to cast with it.</small></p>`}</div>`;
   }
 
   /** A topic's paths as a tree: the building at the root, a branch to each
@@ -401,9 +415,9 @@ export class Ledger {
         : "";
       return `<div class="path-col hue-${p.hue} ${state}"><header class="path-banner"><h4>${p.name}</h4><small>${st.sealed ? "Sealed" : p.motto}</small></header>${ranks}${crown}</div>`;
     }).join("");
-    const following = `<p class="ledger-scope">RESEARCH ONCE · every ${t.name} can wear what you unlock. Choose a path for each as you place it in Defend.</p>`;
+    const following = `<p class="ledger-scope">${isSpell(t.id) ? "RESEARCH ONCE · then choose above which path the spell casts with." : `RESEARCH ONCE · every ${t.name} can wear what you unlock. Choose a path for each as you place it in Defend.`}</p>`;
     return `${following}<div class="path-tree" style="--paths:${n}">
-        <div class="path-root"><span class="path-medal root"><canvas width="44" height="44" data-icon="${t.item}"></canvas></span><span>${t.name}</span></div>
+        <div class="path-root"><span class="path-medal root"><canvas width="44" height="44" data-icon="${t.item ?? t.icon}"></canvas></span><span>${t.name}</span></div>
         <svg class="path-fan" viewBox="0 0 ${w} 40" preserveAspectRatio="none" aria-hidden="true">${fan}</svg>
         <div class="path-cols">${cols}</div>
       </div>${this.pickedHtml(t, paths)}`;
@@ -432,7 +446,7 @@ export class Ledger {
     else {
       const active = save.researchJob?.kind === "path" && save.researchJob.id === p.id;
       const why = save.researchJob ? "Researchers are working on the current project" : !researchers && !save.settings.instantResearch ? "Put a librarian to the alchemy lab to research" : !st.affordable ? `Needs ${r.cost} Knowledge, have ${whole(save.knowledge)}` : "";
-      action = active ? `<span data-research-timer>${this.researchTimeLeft()}</span>` : `<button data-learn-path="${p.id}" ${why ? "disabled" : ""}>Research unlock<small>${r.cost} Knowledge</small><small>${this.researchHint(st.rank)}</small></button>${why ? `<em>${why}.</em>` : i === 0 ? `<em>Unlocks this rank for every ${t.name}. Choose it as you place one in Defend.</em>` : ""}`;
+      action = active ? `<span data-research-timer>${this.researchTimeLeft()}</span>` : `<button data-learn-path="${p.id}" ${why ? "disabled" : ""}>Research unlock<small>${r.cost} Knowledge</small><small>${this.researchHint(st.rank)}</small></button>${why ? `<em>${why}.</em>` : i === 0 ? `<em>${isSpell(t.id) ? "Unlocks this path for the spell. Choose it to cast with above." : `Unlocks this rank for every ${t.name}. Choose it as you place one in Defend.`}</em>` : ""}`;
     }
     return `<div class="path-detail hue-${p.hue}"><span class="path-medal"><canvas data-path-icon="${r.icon}:${p.hue}"></canvas></span>
       <div><small>${p.name.toUpperCase()} · RANK ${ROMAN[i]} OF ${ROMAN[p.ranks.length - 1]}</small><h3>${r.name}</h3><p>${r.text}.</p></div><div class="path-act">${action}</div></div>`;

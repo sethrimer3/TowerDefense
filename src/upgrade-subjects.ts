@@ -9,8 +9,9 @@ import type { PaletteItem, UpgradeId } from "./defend/catalog.ts";
 import type { TrainingId } from "./progression.ts";
 import type { SkillId } from "./skill-trees.ts";
 import type { UiSprite } from "./ui/dom.ts";
+import type { IconItem } from "./defend/structure-art.ts";
 
-export type SubjectId = "realm" | "city" | "towers" | "units" | "mine" | "library";
+export type SubjectId = "realm" | "city" | "towers" | "units" | "spells" | "mine" | "library";
 /** One-off buys that aren't palette items or levels. */
 export type Extra = "bomb" | "speed3";
 export type Topic = {
@@ -18,6 +19,8 @@ export type Topic = {
   name: string;
   /** The palette item it is about: its icon, and the tile whose upgrades these are. */
   item?: PaletteItem;
+  /** Its icon when it is about no palette item (a strike spell). */
+  icon?: IconItem;
   /** Further palette items filed here. */
   items?: PaletteItem[];
   upgrades?: UpgradeId[];
@@ -80,6 +83,10 @@ export const SUBJECTS: Subject[] = [
       },
       { id: "valkyriePalace", name: "Valkyrie palace", item: "valkyriePalace", upgrades: ["palaceCompact", "valkyrieReach"] },
     ],
+  },
+  {
+    id: "spells", name: "Spells", sprite: "knowledge", blurb: "Strike spells cast from the Skills palette in battle.",
+    topics: [{ id: "necromancy", name: "Necromancy", icon: "necromancy", training: ["undeadHp", "undeadDamage"] }],
   },
   {
     id: "mine", name: "Mine", sprite: "mine", blurb: "The crew, the shaft and the smithy.",

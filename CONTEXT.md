@@ -101,6 +101,12 @@ A magic boat's water. The four small boats have decorative water that dries behi
 **War banner**:
 A reusable Skill: planted anywhere on the board mid-defense, it rallies every mobile troop (swordsmen, archers, fire mages, valkyries, the dark wizard) to fight round it. Planting it again moves it; a tap takes it down.
 
+**Strike spell**:
+A reusable Skill cast onto the board mid-defense, with its own Smithy and Study topic under Spells. It casts with one researched path at a time, chosen in the Study.
+
+**Necromancy**:
+The first strike spell: every enemy that fell near where it is cast (a **grave**, raisable for 30 seconds) rises as a friendly **risen** warrior for a minute, then the spell waits 30 seconds.
+
 **Best wave**:
 The highest wave the player has held.
 
@@ -390,7 +396,7 @@ _Avoid_: magic book, rune book
 How far the alchemy lab has been dug out, 1 to 5, raised with the Mine's metals. The lab has room for one researcher a level. Level 2 opens the west **annex** (a mandrake garden and a lectern), level 3 the east annex (a crucible that casts gold and an orrery), level 4 adds a salamander in its cage and level 5 a scrying orb.
 
 **Skills**:
-The battle's bomb and reusable war banner, placed by the player from the side panel.
+The battle's bomb, reusable war banner and strike spells, placed by the player from the side panel.
 
 **Banner influence**:
 The circle around a planted war banner where researched damage, life, defense and regeneration bonuses apply. Troops marching toward the banner can receive its researched speed bonus before entering the circle.

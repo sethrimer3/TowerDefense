@@ -34,6 +34,7 @@ import { WizardArt, flameLights } from "./wizard-art.ts";
 import { drawBlazes, mageLights } from "./mage-art.ts";
 import { stabLights } from "./valkyrie-art.ts";
 import { DarkArt, darkLights } from "./dark-art.ts";
+import { raisingLights } from "./necro-art.ts";
 import { ParkTrees, type Under } from "./park-trees.ts";
 import { FloodArt } from "./flood-art.ts";
 import { ChimneySmoke } from "./chimney-smoke.ts";
@@ -544,7 +545,7 @@ export class DefendRenderer {
       version: sim.mapVersion,
     });
     this.lighting.drawRelief(this.ctx, this.px, weather.rain ? 0.85 : 0.65);
-    this.drawGroundRelief(map, sim, opts, [...flames.relief, ...mages.relief, ...stabs.relief, ...dark.relief]);
+    this.drawGroundRelief(map, sim, opts, [...flames.relief, ...mages.relief, ...stabs.relief, ...dark.relief, ...raisingLights(sim)]);
     this.lighting.drawFlames(this.ctx, frame);
   }
 

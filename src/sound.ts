@@ -7,6 +7,8 @@ import { stream } from "./random.ts";
  * generated stone-hall echo. Nothing plays until the player's first press,
  * which is when browsers let a page make sound. */
 export type Cue =
+  /** The Necromancy spell: a low hollow moan rising, and bones rattling. */
+  | "raise"
   /** Pressing an oak button. */
   | "knock"
   /** Choosing a page on the stone tab row. */
@@ -341,6 +343,13 @@ const CUES: Record<Cue, (t: number) => void> = {
     tone({ type: "triangle", freq: 130 * v, to: 70 * v, at: t, peak: 0.35, end: 0.16, wet: 0.5 });
     noise(t, 0.1, 0.3, 700 * v, 1.4, 0.5);
     noise(t + 0.05, 0.12, 0.08, 2400 * v, 2, 0.4);
+  },
+  raise(t) {
+    const v = vary(60);
+    tone({ type: "triangle", freq: 70 * v, to: 140 * v, at: t, peak: 0.22, attack: 0.15, end: 0.9, lowpass: 900, wet: 1.2 });
+    tone({ freq: 104 * v, to: 210 * v, at: t + 0.05, peak: 0.08, attack: 0.2, end: 0.8, wet: 1.4 });
+    noise(t, 0.9, 0.06, 600 * v, 0.7, 1, 0.3, 1800 * v);
+    for (let i = 0; i < 7; i++) noise(t + 0.25 + rand() * 0.6, 0.025, 0.1 + rand() * 0.06, 1800 + rand() * 1800, 4, 0.4);
   },
   banner(t) {
     for (const dt of [0, 0.09, 0.2]) noise(t + dt, 0.08, 0.16, 1100 * vary(150), 0.9, 0.4, 0.01);

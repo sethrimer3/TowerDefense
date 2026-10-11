@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { damageStage, wallDamagePixels, wallRubblePixels } from "../src/defend/damage-art.ts";
 import { STRUCTURES } from "../src/defend/catalog.ts";
-import { PATHS } from "../src/knowledge-paths.ts";
+import { PATHS, isSpell } from "../src/knowledge-paths.ts";
 import { PATH_LOOKS, artLook, structurePixels, structureRubblePixels, type PlacedKind } from "../src/defend/tower-art.ts";
 import { houseDamagePixels, houseRubblePixels } from "../src/defend/roof-art.ts";
 import { ART } from "../src/defend/park-art.ts";
@@ -64,7 +64,8 @@ test("path looks: Pyromancy re-roofs the wizard tower, another kind's path keeps
 test("path looks: every building path has its own sprite, distinct from the base and its siblings", () => {
   const topicKind: Record<string, PlacedKind> = { bait: "monsterBait" };
   for (const p of PATHS) {
-    if (p.topic === "spikes") continue;
+    // Wall spikes and strike spells are no building.
+    if (p.topic === "spikes" || isSpell(p.topic)) continue;
     const kind = topicKind[p.topic] ?? (p.topic as PlacedKind);
     assert.ok(PATH_LOOKS[kind]?.includes(p.id), `${p.id} has a look on ${kind}`);
   }

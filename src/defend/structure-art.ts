@@ -47,7 +47,7 @@ function disc(c: CanvasRenderingContext2D, x: number, y: number, r: number) {
   c.fill();
 }
 
-export type IconItem = StructureKind | "cityTile" | "cityGate" | "wallSpikes" | "wallBallista" | "bomb" | "banner";
+export type IconItem = StructureKind | "cityTile" | "cityGate" | "wallSpikes" | "wallBallista" | "bomb" | "banner" | "necromancy";
 
 /** Paints `item`'s palette icon into a small square canvas; a structure takes the path look named by
  * the canvas's `data-look` (the path the building wears), when it has one. */
@@ -62,6 +62,7 @@ export function paintIcon(canvas: HTMLCanvasElement, item: IconItem) {
   if (item === "wallBallista") return paintBallistaIcon(c, n);
   if (item === "bomb") return paintBombIcon(c, n);
   if (item === "banner") return paintBannerIcon(c, n);
+  if (item === "necromancy") return paintNecroIcon(c, n);
   const def = [STRUCTURES[item].w, STRUCTURES[item].h];
   const px = n / Math.max(def[0], def[1]) / 1.1;
   const w = def[0] * px,
@@ -124,6 +125,35 @@ function paintBombIcon(c: CanvasRenderingContext2D, n: number) {
   c.fillRect(n * 0.58, n * 0.18, n * 0.08, n * 0.18);
   c.fillStyle = "#ffb347";
   c.fillRect(n * 0.62, n * 0.1, n * 0.12, n * 0.1);
+}
+
+/** The Necromancy spell: a skull with grave-green eyes over a sigil ring, 14 × 14 art pixels. */
+const NECRO_ICON = [
+  ".....rrrr.....",
+  "...rr....rr...",
+  "..r..oooo..r..",
+  ".r..owwwwo..r.",
+  ".r.owwwwwlo.r.",
+  "r..owwwwwlo..r",
+  "r.owggwggwlo.r",
+  "r.owgowgowlo.r",
+  "r..owwoowlo..r",
+  ".r..owwwlo..r.",
+  ".r..olwlwo..r.",
+  "..r..oooo..r..",
+  "...rr....rr...",
+  ".....rrrr.....",
+];
+const NECRO_COLORS: Record<string, string> = { o: OUTLINE, w: "#e8e2cf", l: "#a39a82", g: "#8dffa6", r: "#3f9a5c" };
+
+function paintNecroIcon(c: CanvasRenderingContext2D, n: number) {
+  const w = 14, h = NECRO_ICON.length, k = Math.max(1, Math.floor(n / w));
+  const x0 = Math.round((n - w * k) / 2), y0 = Math.round((n - h * k) / 2);
+  NECRO_ICON.forEach((row, j) => [...row].forEach((ch, i) => {
+    if (ch === ".") return;
+    c.fillStyle = NECRO_COLORS[ch];
+    c.fillRect(x0 + i * k, y0 + j * k, k, k);
+  }));
 }
 
 // ── The keep ──────────────────────────────────────────────────────────────
