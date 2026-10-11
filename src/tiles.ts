@@ -29,15 +29,15 @@ export const TILE_FILTERS: { id: TileFilter; name: string }[] = [
 export const TILE_TYPE_NAMES: Record<TileType, string> = { city: "City", units: "Barracks", towers: "Tower", consumables: "Skill" };
 
 /** Tiles used up (or carried) in battle rather than placed in the city. */
-export type Consumable = "bomb" | "warBanner" | "necromancy" | "meteor" | "frostNova";
-export const CONSUMABLES: Consumable[] = ["bomb", "warBanner", "necromancy", "meteor", "frostNova"];
+export type Consumable = "bomb" | "warBanner" | "necromancy" | "meteor" | "frostNova" | "reinforcements";
+export const CONSUMABLES: Consumable[] = ["bomb", "warBanner", "necromancy", "meteor", "frostNova", "reinforcements"];
 export type TileId = PaletteItem | Consumable;
 
 const TYPE_ORDER: TileType[] = ["city", "units", "towers", "consumables"];
-export const TILE_TYPE: Record<TileId, TileType> = { ...ITEM_CATEGORY, bomb: "consumables", warBanner: "consumables", necromancy: "consumables", meteor: "consumables", frostNova: "consumables" };
+export const TILE_TYPE: Record<TileId, TileType> = { ...ITEM_CATEGORY, bomb: "consumables", warBanner: "consumables", necromancy: "consumables", meteor: "consumables", frostNova: "consumables", reinforcements: "consumables" };
 /** Every kind of tile, by type and within a type in the palette's order. */
 export const TILE_IDS: TileId[] = TYPE_ORDER.flatMap((type) => [...PALETTE_ITEMS, ...CONSUMABLES].filter((id) => TILE_TYPE[id] === type));
-export const TILE_NAMES: Record<TileId, string> = { ...ITEM_NAMES, bomb: "Bomb", warBanner: "War banner", necromancy: "Necromancy", meteor: "Meteor strike", frostNova: "Frost nova" };
+export const TILE_NAMES: Record<TileId, string> = { ...ITEM_NAMES, bomb: "Bomb", warBanner: "War banner", necromancy: "Necromancy", meteor: "Meteor strike", frostNova: "Frost nova", reinforcements: "Reinforcements" };
 export const isConsumable = (id: TileId): id is Consumable => (CONSUMABLES as string[]).includes(id);
 export const inFilter = (id: TileId, filter: TileFilter) => filter === "all" || TILE_TYPE[id] === filter;
 
@@ -48,6 +48,7 @@ export const CONSUMABLE_TEXT: Record<Consumable, string> = {
   necromancy: "A strike spell: cast it mid-defense and every enemy that fell within 3 cells of where it lands in the last 30 seconds rises as a friendly undead warrior, one for each, for a minute. Never used up; ready again 30 seconds after each cast. The Smithy makes the risen tougher and harder hitting; the Study's paths raise bone archers, warriors as strong as the enemies they were, or one giant of all the fallen.",
   meteor: "A strike spell: cast it mid-defense and a meteor falls where it lands a moment later, blasting every enemy within 2.5 cells (your own people are spared). Never used up; ready again 40 seconds after each cast. The Smithy makes it hit harder and wider; the Study's paths break it into a shower of fragments, leave a burning crater, or turn it into a comet of ice that chills and freezes.",
   frostNova: "A strike spell: cast it mid-defense and ice bursts out where it lands, freezing every enemy within 3 cells solid for 2 seconds, then leaves a patch of rime for 6 seconds that slows and bites whatever walks through it. Never used up; ready again 35 seconds after each cast. The Smithy makes it last longer and reach farther; the Study's paths make the frozen shatter, set the rime wandering after enemies as a blizzard, or turn it into a ward over your own people.",
+  reinforcements: "A strike spell: cast it mid-defense and four soldiers drop out of the sky where it lands, hold that ground against every enemy that comes within 6 cells, and march off after 30 seconds. Never used up; ready again 45 seconds after each cast. The Smithy makes them tougher, harder hitting and slower to leave; the Study's paths land them with shockwaves and a champion, muster a bigger levy with bowmen and reserves, or bind them by oath to hold together, fight longer and make a last stand.",
 };
 
 /** One kind's stack: how many there are, how many stand in the city, and
@@ -59,7 +60,7 @@ export type TileStack = { id: TileId; type: TileType; count: number; placed: num
 export function tileStack(save: Save, id: TileId): TileStack {
   const d = save.defend, type = TILE_TYPE[id];
   if (id === "bomb") return { id, type, count: d.bombs, placed: 0, ready: d.bombs, lasting: false };
-  if (id === "warBanner" || id === "necromancy" || id === "meteor" || id === "frostNova") return { id, type, count: 1, placed: 0, ready: 1, lasting: true };
+  if (id === "warBanner" || id === "necromancy" || id === "meteor" || id === "frostNova" || id === "reinforcements") return { id, type, count: 1, placed: 0, ready: 1, lasting: true };
   const ready = available(d, id);
   return { id, type, count: d.owned[id], placed: d.owned[id] - ready, ready, lasting: false };
 }
@@ -86,7 +87,7 @@ export type ShopOffer = { price: Price } | { reason: string };
 export function shopOffer(save: Save, id: TileId): ShopOffer {
   if (id === "bomb") return { price: BOMB_PRICE };
   if (id === "warBanner") return { reason: "Always at hand in battle: one banner, never used up." };
-  if (id === "necromancy" || id === "meteor" || id === "frostNova") return { reason: "Always at hand in battle: a spell, never used up." };
+  if (id === "necromancy" || id === "meteor" || id === "frostNova" || id === "reinforcements") return { reason: "Always at hand in battle: a spell, never used up." };
   const grown = evolvedBy(id);
   if (grown) return { reason: `Research the ${grown.name} crown in the Study, then evolve a ${ITEM_NAMES[grown.evolves!.from]} there.` };
   return { price: purchasePrice(id, save.defend.owned[id]) };
@@ -104,7 +105,7 @@ export function canBuyTile(save: Save, id: TileId): boolean {
 export function buyTile(save: Save, id: TileId): boolean {
   const offer = shopOffer(save, id), free = save.settings.devMode;
   if ("reason" in offer) return false;
-  if (id === "warBanner" || id === "necromancy" || id === "meteor" || id === "frostNova") return false;
+  if (id === "warBanner" || id === "necromancy" || id === "meteor" || id === "frostNova" || id === "reinforcements") return false;
   const w: Wallet = { ...save.smithy, free };
   if (!(id === "bomb" ? buyBomb(save.defend, w) : buyItem(save.defend, w, id))) return false;
   if (!free) for (const k of METALS) save.smithy[k] = w[k];
@@ -112,7 +113,7 @@ export function buyTile(save: Save, id: TileId): boolean {
 }
 
 /** Consumables' upgrades live with the battle's and the troops' topics. */
-const CONSUMABLE_TOPIC: Record<Consumable, string> = { bomb: "battle", warBanner: "warBanner", necromancy: "necromancy", meteor: "meteor", frostNova: "frostNova" };
+const CONSUMABLE_TOPIC: Record<Consumable, string> = { bomb: "battle", warBanner: "warBanner", necromancy: "necromancy", meteor: "meteor", frostNova: "frostNova", reinforcements: "reinforcements" };
 /** The topic a kind's upgrades are filed in, and its subject. */
 export function tileTopic(id: TileId): { subject: Subject; topic: Topic } {
   for (const subject of SUBJECTS)

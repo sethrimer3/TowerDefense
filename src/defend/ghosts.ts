@@ -13,10 +13,10 @@ import { OUTLINE, bake, blit } from "./pixel-fx.ts";
 import { hash01 } from "./grid.ts";
 
 /** Who a ghost was. */
-export type GhostKind = "sword" | "archer" | "mage" | "valkyrie" | "darkWizard" | "undead" | "civilian";
+export type GhostKind = "sword" | "archer" | "mage" | "valkyrie" | "darkWizard" | "undead" | "reinforcement" | "civilian";
 
 type Body = { x: number; y: number; hp: number; id: number };
-type Units = { soldiers: readonly (Body & { kind: Exclude<GhostKind, "civilian"> })[]; civilians: readonly Body[] };
+type Units = { soldiers: readonly (Body & { kind: Exclude<GhostKind, "civilian">; called?: { left?: true } })[]; civilians: readonly Body[] };
 
 export type Ghost = { kind: GhostKind; x: number; y: number; born: number; seed: number };
 
@@ -66,6 +66,7 @@ const TINTS: Record<GhostKind, [string, string]> = {
   valkyrie: ["#fff0b0", "#fffbe8"],
   darkWizard: ["#dcc4ff", "#f6eeff"],
   undead: ["#a9f0b8", "#e8fff0"],
+  reinforcement: ["#ffe7a6", "#fffaea"],
   civilian: ["#f1ece0", "#ffffff"],
 };
 
@@ -85,7 +86,8 @@ export class Ghosts {
       this.ghosts.length = 0;
       this.seen = new WeakSet();
     } else if (sim) {
-      for (const s of this.soldiers) if (s.hp <= 0) this.raise(s, s.kind, now);
+      // Reinforcements marching off at their time leave no ghost.
+      for (const s of this.soldiers) if (s.hp <= 0 && !s.called?.left) this.raise(s, s.kind, now);
       for (const c of this.civilians) if (c.hp <= 0) this.raise(c, "civilian", now);
     }
     this.soldiers = sim?.soldiers ?? [];

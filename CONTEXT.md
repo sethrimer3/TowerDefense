@@ -110,6 +110,9 @@ The first strike spell: every enemy that fell near where it is cast (a **grave**
 **Frost nova**:
 The third strike spell: ice bursts out where it is cast, freezing every enemy within its reach solid, and leaves a patch of **rime** that slows and bites whatever walks through it until it melts; then the spell waits 35 seconds. Its paths make the frozen **Shatter**, set the rime hunting as a **Wandering blizzard**, or make it a **Rime ward** over the city's own people and walls.
 
+**Reinforcements**:
+The fourth strike spell: a squad of soldiers drops out of the sky where it is cast and holds that ground, their **post**, for 30 seconds before marching off (not counted as lost troops); then the spell waits 45 seconds. Its paths land them with **Hammerfall** shockwaves and a champion, **Muster the levy** for more soldiers with bowmen and reserves, or bind them as **Oathsworn** into a shield wall that kills keep longer and that makes a last stand.
+
 **Meteor strike**:
 The second strike spell: a meteor falls where it is cast a moment later and blasts every enemy within its reach, sparing the city's own people, then the spell waits 40 seconds. Its paths break it into a shower (**Starfall**), leave a burning crater (**Molten core**) or make it a **Frost comet** that chills and freezes.
 

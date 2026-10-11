@@ -90,6 +90,7 @@ export const SUBJECTS: Subject[] = [
       { id: "necromancy", name: "Necromancy", icon: "necromancy", training: ["undeadHp", "undeadDamage"] },
       { id: "meteor", name: "Meteor strike", icon: "meteor", training: ["meteorDamage", "meteorRadius"] },
       { id: "frostNova", name: "Frost nova", icon: "frostNova", training: ["frostTime", "frostRadius"] },
+      { id: "reinforcements", name: "Reinforcements", icon: "reinforcements", training: ["reinforceHp", "reinforceDamage", "reinforceTime"] },
     ],
   },
   {

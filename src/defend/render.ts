@@ -37,6 +37,7 @@ import { DarkArt, darkLights } from "./dark-art.ts";
 import { raisingLights } from "./necro-art.ts";
 import { meteorLights } from "./meteor-art.ts";
 import { drawRime, frostLights } from "./frost-art.ts";
+import { drawLandings, reinforceLights } from "./reinforce-art.ts";
 import { ParkTrees, type Under } from "./park-trees.ts";
 import { FloodArt } from "./flood-art.ts";
 import { ChimneySmoke } from "./chimney-smoke.ts";
@@ -398,6 +399,7 @@ export class DefendRenderer {
     drawScorches(brush, sim);
     drawBlazes(c, this.px, sim);
     drawRime(c, this.px, sim);
+    drawLandings(c, this.px, sim);
     this.wizard.drawIce(c, this.px, sim.frosts, sim.time * 1000, flameLights(sim).relief);
     drawUnits(brush, sim, torches, opts.healthbars === true, opts.timings ? this.timings : undefined);
     this.dark.draw(c, this.px, sim);
@@ -548,7 +550,7 @@ export class DefendRenderer {
       version: sim.mapVersion,
     });
     this.lighting.drawRelief(this.ctx, this.px, weather.rain ? 0.85 : 0.65);
-    this.drawGroundRelief(map, sim, opts, [...flames.relief, ...mages.relief, ...stabs.relief, ...dark.relief, ...raisingLights(sim), ...meteors.relief, ...frostLights(sim)]);
+    this.drawGroundRelief(map, sim, opts, [...flames.relief, ...mages.relief, ...stabs.relief, ...dark.relief, ...raisingLights(sim), ...meteors.relief, ...frostLights(sim), ...reinforceLights(sim)]);
     this.lighting.drawFlames(this.ctx, frame);
   }
 
