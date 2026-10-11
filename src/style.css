@@ -1490,7 +1490,8 @@ nav button { position: relative; }
   padding: 9px 10px;
   font-size: 11px;
 }
-.mine-view {
+.mine-view,
+.tiles-view {
   position: relative;
   flex: 1;
   min-height: 0;
@@ -1984,10 +1985,19 @@ nav button > .tab-idle[hidden] { display: none; }
 }
 
 /* ── TILES: the keep's hall and the player's tiles ─────────────────────── */
+.shell:has(#tiles.active) {
+  min-height: 0;
+}
 #tiles.active {
-  display: block;
-  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
+}
+.tiles-room {
+  position: absolute;
+  inset: 0;
 }
 .tiles-hall {
   display: flex;
