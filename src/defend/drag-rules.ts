@@ -55,10 +55,11 @@ export type Drag =
   | { from: "banner"; placed?: boolean }
   /** A strike spell, cast where it is let go. */
   | { from: "necromancy" }
-  | { from: "meteor" };
+  | { from: "meteor" }
+  | { from: "frostNova" };
 
 /** Consumables are dropped at a point, not built on a tile. */
-export const consumable = (kind: IconItem): kind is "bomb" | "banner" | "necromancy" | "meteor" => kind === "bomb" || kind === "banner" || kind === "necromancy" || kind === "meteor";
+export const consumable = (kind: IconItem): kind is "bomb" | "banner" | "necromancy" | "meteor" | "frostNova" => kind === "bomb" || kind === "banner" || kind === "necromancy" || kind === "meteor" || kind === "frostNova";
 
 /** The icon of what `drag` carries. */
 export function dragIcon(drag: Drag): IconItem {

@@ -19,7 +19,7 @@ export type Overlay = {
   banner?: { x: number; y: number; r: number } | null;
   /** A strike spell being aimed: centre, reach, and (filled in by the page)
    * the fallen it would raise there. */
-  spell?: { x: number; y: number; r: number; souls?: { x: number; y: number }[]; look?: "meteor" } | null;
+  spell?: { x: number; y: number; r: number; souls?: { x: number; y: number }[]; look?: "meteor" | "frost" } | null;
   /** Tiles across the block the item takes (unset: 1). A larger item's
    * `legal` and `hover` keys are the top left tiles of its blocks. */
   span?: number;
@@ -54,6 +54,7 @@ export function drawOverlay(c: CanvasRenderingContext2D, px: number, o: Overlay)
   if (o.bomb) drawBombReach(c, px, o.bomb);
   if (o.banner) drawRallyReach(c, px, o.banner);
   if (o.spell?.look === "meteor") drawMeteorReach(c, px, o.spell);
+  else if (o.spell?.look === "frost") drawFrostReach(c, px, o.spell);
   else if (o.spell) drawSpellReach(c, px, o.spell);
 }
 
@@ -214,4 +215,28 @@ function drawMeteorReach(c: CanvasRenderingContext2D, px: number, at: { x: numbe
   c.fillStyle = "#f6c75a";
   c.fillRect(x - d, y - w, 2 * d, 2 * w);
   c.fillRect(x - w, y - d, 2 * w, 2 * d);
+}
+
+/** The Frost nova's reach, in ice blue, with a six-pointed snowflake where it bursts. */
+function drawFrostReach(c: CanvasRenderingContext2D, px: number, at: { x: number; y: number; r: number }) {
+  c.strokeStyle = "rgba(170,225,255,0.95)";
+  c.fillStyle = "rgba(90,170,230,0.16)";
+  c.lineWidth = Math.max(1, px * 0.12);
+  c.setLineDash([px * 0.25, px * 0.25]);
+  c.beginPath();
+  c.arc(at.x * px, at.y * px, at.r * px, 0, Math.PI * 2);
+  c.fill();
+  c.stroke();
+  c.setLineDash([]);
+  // A pixel snowflake: a plus and an x, outlined in black.
+  const k = Math.max(1, Math.round(px * 0.1)), x = Math.round(at.x * px), y = Math.round(at.y * px);
+  const arms: [number, number][] = [];
+  for (let i = -3; i <= 3; i++) arms.push([i, 0], [0, i]);
+  for (let i = -2; i <= 2; i++) if (i) arms.push([i, i], [i, -i]);
+  c.fillStyle = "#0b1622";
+  for (const [i, j] of arms) c.fillRect(x + i * k - k, y + j * k - k, 3 * k, 3 * k);
+  for (const [i, j] of arms) {
+    c.fillStyle = Math.abs(i) + Math.abs(j) <= 1 ? "#ffffff" : "#bfe8ff";
+    c.fillRect(x + i * k, y + j * k, k, k);
+  }
 }

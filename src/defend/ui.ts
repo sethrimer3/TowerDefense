@@ -4,6 +4,7 @@ import { specialtyChoicesHtml } from "../ui/specialty.ts";
 import { bannerReach } from "./war-banner.ts";
 import { gravesNear } from "./necromancy.ts";
 import { meteorReach } from "./meteor.ts";
+import { frostReach } from "./frost-nova.ts";
 import { journalHTML, paintJournal } from "./journal.ts";
 import { paintPortraits } from "./journal-portrait.ts";
 import { wavePickerHTML } from "./wave-picker.ts";
@@ -517,6 +518,7 @@ export class DefendPage {
             { id: "banner", name: "War banner", count: Infinity, icon: "banner" },
             { id: "necromancy", name: "Necromancy", count: Infinity, icon: "necromancy" },
             { id: "meteor", name: "Meteor strike", count: Infinity, icon: "meteor" },
+            { id: "frostNova", name: "Frost nova", count: Infinity, icon: "frostNova" },
           ];
     const entries = this.host.showEmpty?.() ? all : all.filter((e) => e.count > 0);
     el.innerHTML =
@@ -571,9 +573,9 @@ export class DefendPage {
   private updateSkillCooldowns() {
     if (this.phase !== "sim" || !this.sim) return;
     for (const button of Array.from(this.root.querySelectorAll<HTMLButtonElement>("#defend-palette [data-item]"))) {
-      const item = button.dataset.item, banner = item === "banner", necro = item === "necromancy", meteor = item === "meteor", spell = necro || meteor;
-      const left = banner ? this.sim.bannerRemaining : necro ? this.sim.necroRemaining : meteor ? this.sim.meteorRemaining : 0;
-      const cooldown = banner ? this.sim.bannerCooldown : necro ? this.sim.necroCooldown : meteor ? this.sim.meteorCooldown : 0;
+      const item = button.dataset.item, banner = item === "banner", necro = item === "necromancy", meteor = item === "meteor", frost = item === "frostNova", spell = necro || meteor || frost;
+      const left = banner ? this.sim.bannerRemaining : necro ? this.sim.necroRemaining : meteor ? this.sim.meteorRemaining : frost ? this.sim.frostRemaining : 0;
+      const cooldown = banner ? this.sim.bannerCooldown : necro ? this.sim.necroCooldown : meteor ? this.sim.meteorCooldown : frost ? this.sim.frostCooldown : 0;
       const ready = left === 0 && (banner || spell || this.save.bombs > 0);
       const fill = cooldown ? Math.floor((1 - left / cooldown) * 100) : ready ? 100 : 0;
       const key = `${fill}:${Math.ceil(left)}:${ready}:${this.save.bombs}`;
@@ -583,7 +585,7 @@ export class DefendPage {
       button.classList.toggle("skill-loading", left > 0);
       button.style.setProperty("--skill-fill", `${fill}%`);
       button.disabled = !ready;
-      const name = banner ? "War banner" : necro ? "Necromancy" : meteor ? "Meteor strike" : "Bomb";
+      const name = banner ? "War banner" : necro ? "Necromancy" : meteor ? "Meteor strike" : frost ? "Frost nova" : "Bomb";
       const status = left > 0 ? `Ready in ${Math.ceil(left)} seconds` : ready ? banner || spell ? "Ready" : `Ready, ${this.save.bombs} left` : "None owned";
       button.title = `${name}: ${status}`;
       button.setAttribute("aria-label", `${name}: ${status}`);
@@ -611,6 +613,7 @@ export class DefendPage {
     if (id === "banner") return this.phase === "sim" ? this.beginDrag({ from: "banner" }, e) : undefined;
     if (id === "necromancy") return this.phase === "sim" && !this.sim?.necroRemaining ? this.beginDrag({ from: "necromancy" }, e) : undefined;
     if (id === "meteor") return this.phase === "sim" && !this.sim?.meteorRemaining ? this.beginDrag({ from: "meteor" }, e) : undefined;
+    if (id === "frostNova") return this.phase === "sim" && !this.sim?.frostRemaining ? this.beginDrag({ from: "frostNova" }, e) : undefined;
     const item = id as PaletteItem;
     if (!available(this.save, item)) return this.setMessage(`No ${plural(ITEM_NAMES[item].toLowerCase())} left — buy more in the Tiles tab.`);
     this.beginDrag({ from: "palette", item }, e);
@@ -788,7 +791,7 @@ export class DefendPage {
       return;
     }
     const w = this.weather, sky = w.blizzard ? "A blizzard howls in. " : w.snow ? "Snow drifts in. " : w.sand ? "A sandstorm blows in. " : w.mist ? "Mist creeps over the ground. " : w.rain ? "Rain rolls in. " : "";
-    this.setMessage(`${sky}Here they come! ${this.sideOpen.sim ? "Drag" : "Open Skills and drag"} a bomb onto the field, plant the war banner to rally your troops, raise the fallen with Necromancy, or call down a meteor.`, 4);
+    this.setMessage(`${sky}Here they come! ${this.sideOpen.sim ? "Drag" : "Open Skills and drag"} a bomb onto the field, plant the war banner to rally your troops, raise the fallen with Necromancy, call down a meteor, or freeze them with a Frost nova.`, 4);
   }
 
   private endRun() {
@@ -901,8 +904,9 @@ export class DefendPage {
   // ── Dragging ──────────────────────────────────────────────────────────
   private overlay(): Overlay | null {
     const o = this.pointers.session?.overlay() ?? null;
-    // An aimed meteor shows its researched reach; Necromancy marks the fallen it would raise.
+    // An aimed meteor or nova shows its researched reach; Necromancy marks the fallen it would raise.
     if (o?.spell?.look === "meteor" && this.sim) o.spell.r = meteorReach(this.sim);
+    else if (o?.spell?.look === "frost" && this.sim) o.spell.r = frostReach(this.sim);
     else if (o?.spell && this.sim) o.spell.souls = gravesNear(this.sim, o.spell, o.spell.r);
     return o;
   }
@@ -946,6 +950,12 @@ export class DefendPage {
     if (drop.kind === "spell") {
       const sim = this.phase === "sim" ? this.sim : null;
       if (!sim || !drop.at) return;
+      if (drop.spell === "frostNova") {
+        if (!sim.castFrostNova(drop.at)) return;
+        play("nova");
+        this.updateSkillCooldowns();
+        return;
+      }
       if (drop.spell === "meteor") {
         if (!sim.castMeteor(drop.at)) return;
         play("meteor");

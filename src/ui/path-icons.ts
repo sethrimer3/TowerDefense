@@ -167,6 +167,18 @@ const ICONS: Record<PathIcon, string[]> = {
     "...l...l...", ".l..w.w..l.", "...l.w.l...", "....lwl....", "...........", "oo.......oo",
     "odoo...oodo", "odmdooodmdo", "odmllwllmdo", ".odmmmmmdo.", "..ooooooo..",
   ],
+  shards: [
+    "o....o....o", "olo.olo.olo", ".omoomlomo.", "..olwwlmo..", "ooomwwlmooo", "olllwwwllmo",
+    "ooomllmmooo", "..omlmmdo..", ".omoomdomo.", "odo.odo.odo", "o....o....o",
+  ],
+  whirl: [
+    "...ooooo...", "..ollllmo..", ".ol.....mo.", "ol..ooo..mo", "ol.olllo.do", "ol.ol.wo.do",
+    "ol..o.lo.do", ".o....mo.do", "..oooomo.o.", ".olllmdo.o.", "..ooooo....",
+  ],
+  frostShield: [
+    "ooooooooooo", "owwllllllmo", "owllwlwllmo", "olllowollmo", "olwowwwowmo", "olllowollmo",
+    ".olllwlldo.", ".ollllmmdo.", "..olmmmdo..", "...olmdo...", "....ooo....",
+  ],
   embers: [
     "...........", "..o.....o..", ".olo...owo.", "..o.....o..", "....o......", "...owo..o..",
     "....o..olo.", ".o......o..", "olo..o.....", ".o..olo....", ".....o.....",

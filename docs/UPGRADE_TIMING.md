@@ -1,6 +1,6 @@
 # Upgrade timing and quadratic balance
 
-Current source snapshot: 2026-10-10. Prices and project timers below are implemented in the game.
+Current source snapshot: 2026-10-11. Prices and project timers below are implemented in the game.
 
 ## Pacing target and current forecast
 
@@ -61,8 +61,10 @@ From rank zero, ignoring resource/setup/requeue delays:
 | Risen damage | 40 | 1435 / 23090 / 78215 | 15.4 d | 1.8 d | 3.1 h |
 | Meteor damage | 40 | 1435 / 23090 / 78215 | 15.4 d | 1.8 d | 3.1 h |
 | Meteor blast radius | 30 | 1435 / 23090 / 18280 | 6.6 d | 18.1 h | 1.7 h |
+| Frost nova duration | 40 | 1435 / 23090 / 78215 | 15.4 d | 1.8 d | 3.1 h |
+| Frost nova radius | 30 | 1435 / 23090 / 18280 | 6.6 d | 18.1 h | 1.7 h |
 
-All 13 rows require **27.2 d** of six-smith work at best. One top 50-rank row requires **3.4 d**. Their resource prices govern the long-term finish; these are processing times after materials have been secured.
+All 15 rows require **29.7 d** of six-smith work at best. One top 50-rank row requires **3.4 d**. Their resource prices govern the long-term finish; these are processing times after materials have been secured.
 
 ## Production scenarios and measurements
 
@@ -85,9 +87,9 @@ All 13 rows require **27.2 d** of six-smith work at best. One top 50-rank row re
 
 All Forge tracks together cost **26151 copper + 1026 silver + 173243 gold**, about **1.65 yr** of the late-profile sample income if every metal is saved for them.
 
-All Training rows together cost **18655 copper + 300170 silver + 1274230 gold**. Their Gold alone needs **12.12 yr** at the late sampled rate. This balance targets a chosen specialization near two years; it does not promise the entire collection by then.
+All Training rows together cost **21525 copper + 346350 silver + 1370725 gold**. Their Gold alone needs **13.04 yr** at the late sampled rate. This balance targets a chosen specialization near two years; it does not promise the entire collection by then.
 
-All Study skills together cost **11717860 Knowledge**. Choosing the most expensive fully evolved path in each topic adds **475135 Knowledge**, giving **12192995 Knowledge** for every compatible Study upgrade: **1.27 yr** at late nominal income. Minimal prerequisite prices in individual rows must not be charged again when summing the complete tree. These budgets exclude setup and income growth.
+All Study skills together cost **11717860 Knowledge**. Choosing the most expensive fully evolved path in each topic adds **495147 Knowledge**, giving **12213007 Knowledge** for every compatible Study upgrade: **1.27 yr** at late nominal income. Minimal prerequisite prices in individual rows must not be charged again when summing the complete tree. These budgets exclude setup and income growth.
 
 DEFEND upgrade points currently have no upgrade purchase route. They accumulate one per new highest cleared wave, so there is no point-priced upgrade completion time to calculate yet.
 
@@ -150,6 +152,8 @@ Each cost below is that upgrade's own cumulative price. Study prerequisite Knowl
 | Risen damage | 40 | 1435 copper + 23090 silver + 78215 gold | — | 1.8 d smith work; resources 271.6 d |
 | Meteor damage | 40 | 1435 copper + 23090 silver + 78215 gold | — | 1.8 d smith work; resources 271.6 d |
 | Meteor blast radius | 30 | 1435 copper + 23090 silver + 18280 gold | — | 18.1 h smith work; resources 125.5 d |
+| Frost nova duration | 40 | 1435 copper + 23090 silver + 78215 gold | — | 1.8 d smith work; resources 271.6 d |
+| Frost nova radius | 30 | 1435 copper + 23090 silver + 18280 gold | — | 18.1 h smith work; resources 125.5 d |
 
 ### Study skill
 
@@ -212,6 +216,9 @@ Each cost below is that upgrade's own cumulative price. Study prerequisite Knowl
 | Starfall | 3 | 20012 knowledge | — | 35.0 min research; resources 18.2 h |
 | Molten core | 3 | 20012 knowledge | — | 35.0 min research; resources 18.2 h |
 | Frost comet | 3 | 20012 knowledge | — | 35.0 min research; resources 18.2 h |
+| Shatter | 3 | 20012 knowledge | — | 35.0 min research; resources 18.2 h |
+| Wandering blizzard | 3 | 20012 knowledge | — | 35.0 min research; resources 18.2 h |
+| Rime ward | 3 | 20012 knowledge | — | 35.0 min research; resources 18.2 h |
 
 ### Evolution
 

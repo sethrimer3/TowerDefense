@@ -47,7 +47,7 @@ function disc(c: CanvasRenderingContext2D, x: number, y: number, r: number) {
   c.fill();
 }
 
-export type IconItem = StructureKind | "cityTile" | "cityGate" | "wallSpikes" | "wallBallista" | "bomb" | "banner" | "necromancy" | "meteor";
+export type IconItem = StructureKind | "cityTile" | "cityGate" | "wallSpikes" | "wallBallista" | "bomb" | "banner" | "necromancy" | "meteor" | "frostNova";
 
 /** Paints `item`'s palette icon into a small square canvas; a structure takes the path look named by
  * the canvas's `data-look` (the path the building wears), when it has one. */
@@ -64,6 +64,7 @@ export function paintIcon(canvas: HTMLCanvasElement, item: IconItem) {
   if (item === "banner") return paintBannerIcon(c, n);
   if (item === "necromancy") return paintNecroIcon(c, n);
   if (item === "meteor") return paintMeteorIcon(c, n);
+  if (item === "frostNova") return paintFrostIcon(c, n);
   const def = [STRUCTURES[item].w, STRUCTURES[item].h];
   const px = n / Math.max(def[0], def[1]) / 1.1;
   const w = def[0] * px,
@@ -176,6 +177,36 @@ const METEOR_ICON = [
   "..............",
 ];
 const METEOR_COLORS: Record<string, string> = { o: OUTLINE, d: "#3a2a24", m: "#6b4e3c", l: "#9a7a5a", c: "#f08a34", r: "#c8452a", y: "#f6c75a" };
+
+/** The Frost nova: a six-armed snowflake of ice bursting from a frozen
+ * core, 14 × 14 art pixels. */
+const FROST_ICON = [
+  "......oo......",
+  ".....oiio.....",
+  "...ooiiiioo...",
+  "..oioollooio..",
+  "..oololloloo..",
+  ".oioowwwwooio.",
+  "oiillwccwlliio",
+  "oiillwccwlliio",
+  ".oioowwwwooio.",
+  "..oololloloo..",
+  "..oioollooio..",
+  "...ooiiiioo...",
+  ".....oiio.....",
+  "......oo......",
+];
+const FROST_COLORS: Record<string, string> = { o: OUTLINE, i: "#3f7fb8", l: "#8fd0f0", w: "#d8f4ff", c: "#ffffff" };
+
+function paintFrostIcon(c: CanvasRenderingContext2D, n: number) {
+  const w = 14, h = FROST_ICON.length, k = Math.max(1, Math.floor(n / w));
+  const x0 = Math.round((n - w * k) / 2), y0 = Math.round((n - h * k) / 2);
+  FROST_ICON.forEach((row, j) => [...row].forEach((ch, i) => {
+    if (ch === ".") return;
+    c.fillStyle = FROST_COLORS[ch];
+    c.fillRect(x0 + i * k, y0 + j * k, k, k);
+  }));
+}
 
 function paintMeteorIcon(c: CanvasRenderingContext2D, n: number) {
   const w = 14, h = METEOR_ICON.length, k = Math.max(1, Math.floor(n / w));

@@ -11,8 +11,8 @@ export type PathTopic = "wizardTower" | "barracks" | "archerTower" | "cannonTowe
 /** Strike spells: cast from the battle's Skills palette rather than built,
  * so a spell has no cards; it casts with the one path `save.spellPaths`
  * names, at its furthest researched rank. */
-export type SpellId = "necromancy" | "meteor";
-export const SPELLS: SpellId[] = ["necromancy", "meteor"];
+export type SpellId = "necromancy" | "meteor" | "frostNova";
+export const SPELLS: SpellId[] = ["necromancy", "meteor", "frostNova"];
 export const isSpell = (topic: string): topic is SpellId => (SPELLS as string[]).includes(topic);
 export type PathId =
   | "pyromancy" | "rime" | "storm" | "crusaders" | "assassins"
@@ -20,7 +20,8 @@ export type PathId =
   | "spotters" | "signalFires" | "pyroclasm" | "cinders" | "oilSoaked" | "fortified"
   | "blastStakes" | "springStakes" | "rimeStakes"
   | "boneArchers" | "soulWeighing" | "amalgam"
-  | "starfall" | "moltenCore" | "frostComet";
+  | "starfall" | "moltenCore" | "frostComet"
+  | "shatter" | "blizzard" | "rimeWard";
 /** The pixel icons `ui/path-icons.ts` draws, one a rank. */
 export type PathIcon =
   | "flame" | "tongue" | "inferno" | "snowflake" | "shard" | "iceBlock" | "bolt" | "fork" | "thunderhead"
@@ -28,7 +29,8 @@ export type PathIcon =
   | "arrow" | "fireArrow" | "volley" | "eye" | "crosshair" | "gear" | "grape" | "cannonball" | "blast" | "bow" | "leaf"
   | "spyglass" | "beacon" | "crate" | "fireball" | "embers" | "stake" | "spring"
   | "bone" | "scales" | "tombstone" | "hand"
-  | "meteor" | "stars" | "crater";
+  | "meteor" | "stars" | "crater"
+  | "shards" | "whirl" | "frostShield";
 /** Each path's colours, as `ui/path-icons.ts` and the page's CSS name them. */
 export type PathHue = "ember" | "frost" | "storm" | "steel" | "shadow" | "verdant" | "grave";
 export type PathRank = { name: string; icon: PathIcon; cost: number; text: string };
@@ -146,6 +148,21 @@ export const MOLTEN_CORE = { life: [0, 5, 8, 12], dps: [0, 10, 16, 16], share: [
  * seconds; from II the blast reaches `reach[rank]` times as far; at III
  * it first freezes them solid for `freeze` seconds. */
 export const FROST_COMET = { chill: [0, 3, 5, 5], reach: [1, 1, 1.25, 1.25], freeze: 1.5 };
+
+/** Shatter: whatever the Frost nova freezes takes `brittle[rank]` times the
+ * damage while it stays frozen; from II it bursts as it thaws, `damage[rank]`
+ * to itself and every enemy within `radius[rank]` cells; at III one killed
+ * while frozen (or in the rime) bursts too, and the shards freeze for `freeze`. */
+export const SHATTER = { brittle: [1, 1.5, 1.5, 1.5], damage: [0, 0, 30, 50], radius: [0, 0, 1.2, 1.6], freeze: 1 };
+/** Wandering blizzard: the rime lasts `life[rank]` seconds (rather than the
+ * nova's own) and drifts `speed[rank]` cells a second toward the nearest
+ * enemy; from II it grows by `grow` and refreezes everything inside every
+ * `pulse` seconds for `pulseFreeze`; at III its cold bites `bite` times as hard. */
+export const BLIZZARD = { life: [0, 10, 12, 16], speed: [0, 1, 1, 2], grow: 4 / 3, pulse: 3, pulseFreeze: 1, bite: 3 };
+/** Rime ward: the city's own people in the rime take `guard` less damage;
+ * from II its buildings take `walls` less; at III the troops in it heal
+ * `heal` of their full health a second. */
+export const RIME_WARD = { guard: 0.35, walls: 0.5, heal: 0.06 };
 
 export const PATHS: KnowledgePath[] = [
   {
@@ -358,6 +375,30 @@ export const PATHS: KnowledgePath[] = [
       { name: "Frozen heart", icon: "iceBlock", cost: studyPathCost(4, 2), text: "Everything it hits is frozen solid for 1.5 seconds first" },
     ],
   },
+  {
+    id: "shatter", topic: "frostNova", name: "Shatter", motto: "What freezes, breaks", hue: "frost",
+    ranks: [
+      { name: "Brittle", icon: "iceBlock", cost: studyPathCost(4, 0), text: "Enemies the nova freezes take 50% more damage until they thaw" },
+      { name: "Shatter", icon: "shard", cost: studyPathCost(4, 1), text: "As each thaws it bursts into shards: 30 damage to it and every enemy within 1.2 cells" },
+      { name: "Diamond dust", icon: "shards", cost: studyPathCost(4, 2), text: "50 damage over 1.6 cells; an enemy killed frozen or in the rime bursts too, and the shards freeze what they hit" },
+    ],
+  },
+  {
+    id: "blizzard", topic: "frostNova", name: "Wandering blizzard", motto: "A storm that hunts", hue: "storm",
+    ranks: [
+      { name: "Drifting snow", icon: "snowflake", cost: studyPathCost(4, 0), text: "The rime lasts 10 seconds and drifts toward the nearest enemy, a cell a second" },
+      { name: "Whiteout", icon: "whirl", cost: studyPathCost(4, 1), text: "It lasts 12 seconds, grows by a third and refreezes everything inside every 3 seconds" },
+      { name: "Eye of the storm", icon: "thunderhead", cost: studyPathCost(4, 2), text: "It lasts 16 seconds, hunts twice as fast, and its cold bites three times as hard" },
+    ],
+  },
+  {
+    id: "rimeWard", topic: "frostNova", name: "Rime ward", motto: "Winter shields its own", hue: "steel",
+    ranks: [
+      { name: "Frost mail", icon: "frostShield", cost: studyPathCost(4, 0), text: "Your troops and townsfolk in the rime take 35% less damage" },
+      { name: "Hoarfrost walls", icon: "mail", cost: studyPathCost(4, 1), text: "Buildings in the rime take half damage too" },
+      { name: "Winter's mercy", icon: "heart", cost: studyPathCost(4, 2), text: "Troops in the rime heal 6% of their health a second" },
+    ],
+  },
 ];
 
 export const PATH_TOPICS = [...new Set(PATHS.map((p) => p.topic))];
@@ -388,6 +429,7 @@ export const UNSPECIALIZED: Record<PathTopic, string> = {
   spikes: "Plain stakes that cut",
   necromancy: "One plain warrior a fallen enemy",
   meteor: "One great meteor",
+  frostNova: "A burst of ice and a patch of rime",
 };
 
 /** Legacy topic-wide choices retained solely for old-save migration. */

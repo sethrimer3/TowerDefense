@@ -431,6 +431,23 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   then 5 seconds with a 25% wider blast, then freezing them solid for 1.5
   seconds first). Meteors in flight are drawn falling from the upper right
   on a trail of fire (or frost) over a growing shadow where they will land.
+- **Frost nova** (`frost-nova.ts`, `×∞`), the third strike spell, aims with
+  a dashed ice-blue ring and a pixel snowflake. Let go on the board, ice
+  bursts out: every enemy within 3 cells (times the Smithy's Frost nova
+  radius) except the unyielding is frozen solid for 2 seconds, and a patch
+  of rime stays for 6 seconds (both times the Smithy's Frost nova
+  duration), chilling everything in it and biting for 4 damage a second.
+  Ready again 35 seconds after the cast. Its Study paths: Shatter (the
+  frozen take 50% more damage until they thaw; then each bursts as it
+  thaws, 30 damage over 1.2 cells; then 50 over 1.6, and one killed frozen
+  or in the rime bursts too, its shards freezing what they hit for a
+  second), Wandering blizzard (the rime lasts 10 s and drifts a cell a
+  second toward the nearest enemy; then 12 s, a third wider and refreezing
+  all inside for a second every 3 s; then 16 s, twice as fast, biting three
+  times as hard) and Rime ward (your troops and townsfolk in the rime take
+  35% less damage; then buildings in it take half; then troops in it heal
+  6% of their health a second). Unlike Meteor's Frost comet nothing falls
+  and nothing is blasted: the nova's work is the freeze and the rime.
 
 - **Dark art** (`dark-art.ts`, the keep in `tower-art.ts`): the dark
   wizard keep is black obsidian on a stepped plinth, glassy black curtain
