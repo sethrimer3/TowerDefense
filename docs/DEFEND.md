@@ -448,6 +448,26 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   35% less damage; then buildings in it take half; then troops in it heal
   6% of their health a second). Unlike Meteor's Frost comet nothing falls
   and nothing is blasted: the nova's work is the freeze and the rime.
+- **Reinforcements** (`reinforcements.ts`, `×∞`), the fourth strike
+  spell, aims with a faint gold ring of the ground they will hold and a gold
+  chevron on each spot a soldier will land. Let go on the board, four
+  soldiers drop out of the sky round the spot (0.8 s down a shaft of gold
+  light; a spot inside a building stays empty), each 60 HP and 8 damage
+  (times the Smithy's Reinforcement health and damage). They hold the post:
+  fighting any enemy within 6 cells of it, walking back when none is near,
+  and marching off after 30 seconds (times the Smithy's Reinforcement
+  stay), not counted as lost troops. At most 40 at once. Ready again 45
+  seconds after the cast. Its Study paths: Hammerfall (each lands with a
+  shockwave, 20 damage within a cell; then 35 over 1.4 cells, staggering
+  what it hits still for 1.5 s, the unyielding aside; then a champion lands
+  in the middle too, four times as tough, 2.5 times the damage, cleaving,
+  with an 80-damage quake over 2.5 cells), Muster the levy (seven drop;
+  then nine, every third an archer shooting from 4 cells; then each who
+  falls in battle is replaced once by a fresh one dropping in at the post)
+  and Oathsworn (each takes 10% less damage for every other of its squad
+  within 2 cells, up to 30%; then each kill adds 2 s to the whole squad's
+  stay and heals the slayer 20%; then, when its time runs out or it falls,
+  each fights on unhurtable for 4 more seconds).
 
 - **Dark art** (`dark-art.ts`, the keep in `tower-art.ts`): the dark
   wizard keep is black obsidian on a stepped plinth, glassy black curtain

@@ -19,7 +19,7 @@ export type Overlay = {
   banner?: { x: number; y: number; r: number } | null;
   /** A strike spell being aimed: centre, reach, and (filled in by the page)
    * the fallen it would raise there. */
-  spell?: { x: number; y: number; r: number; souls?: { x: number; y: number }[]; look?: "meteor" | "frost" } | null;
+  spell?: { x: number; y: number; r: number; souls?: { x: number; y: number }[]; look?: "meteor" | "frost" | "reinforce"; spots?: { x: number; y: number; look: string }[] } | null;
   /** Tiles across the block the item takes (unset: 1). A larger item's
    * `legal` and `hover` keys are the top left tiles of its blocks. */
   span?: number;
@@ -55,6 +55,7 @@ export function drawOverlay(c: CanvasRenderingContext2D, px: number, o: Overlay)
   if (o.banner) drawRallyReach(c, px, o.banner);
   if (o.spell?.look === "meteor") drawMeteorReach(c, px, o.spell);
   else if (o.spell?.look === "frost") drawFrostReach(c, px, o.spell);
+  else if (o.spell?.look === "reinforce") drawReinforceReach(c, px, o.spell);
   else if (o.spell) drawSpellReach(c, px, o.spell);
 }
 
@@ -238,5 +239,28 @@ function drawFrostReach(c: CanvasRenderingContext2D, px: number, at: { x: number
   for (const [i, j] of arms) {
     c.fillStyle = Math.abs(i) + Math.abs(j) <= 1 ? "#ffffff" : "#bfe8ff";
     c.fillRect(x + i * k, y + j * k, k, k);
+  }
+}
+
+/** The Reinforcements' aim: the ground they will hold, in faint gold, and a
+ * gold pixel chevron pointing down at each spot a soldier will land on (a
+ * larger one for a champion). */
+function drawReinforceReach(c: CanvasRenderingContext2D, px: number, at: NonNullable<Overlay["spell"]>) {
+  c.strokeStyle = "rgba(246,199,90,0.7)";
+  c.fillStyle = "rgba(246,199,90,0.08)";
+  c.lineWidth = Math.max(1, px * 0.08);
+  c.setLineDash([px * 0.3, px * 0.3]);
+  c.beginPath();
+  c.arc(at.x * px, at.y * px, at.r * px, 0, Math.PI * 2);
+  c.fill();
+  c.stroke();
+  c.setLineDash([]);
+  const chevron: [number, number][] = [[-2, -1], [-1, 0], [0, 1], [1, 0], [2, -1]];
+  for (const s of at.spots ?? []) {
+    const k = Math.max(1, Math.round(px * (s.look === "champion" ? 0.14 : 0.09))), x = Math.round(s.x * px), y = Math.round(s.y * px);
+    c.fillStyle = "#140c0a";
+    for (const [i, j] of chevron) c.fillRect(x + i * k - k, y + j * k - k, 3 * k, 3 * k);
+    c.fillStyle = s.look === "archer" ? "#a8e07a" : "#f6c75a";
+    for (const [i, j] of chevron) c.fillRect(x + i * k, y + j * k, k, k);
   }
 }

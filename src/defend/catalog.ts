@@ -724,6 +724,12 @@ export type Bonuses = {
   frostRadius: number;
   /** The Frost nova's Study path and rank; absent when cast plain. */
   frostNova?: { path: PathId; rank: number };
+  /** The Reinforcements' health, damage and how long they stay. */
+  reinforceHp: number;
+  reinforceDamage: number;
+  reinforceTime: number;
+  /** The Reinforcements' Study path and rank; absent when cast plain. */
+  reinforcements?: { path: PathId; rank: number };
   /** The Study's paths each topic follows (`knowledge-paths.ts`); absent
    * with none chosen, so such a run plays exactly as before. */
   banner?: { cooldown: number; defense: number; reach: number; damage: number; march: number; life: number; regen: number };
@@ -734,7 +740,7 @@ export type Bonuses = {
   spikePaths?: Record<string, BattlePaths>;
 };
 export const NO_BONUSES: Readonly<Bonuses> = Object.freeze({
-  troopHp: 1, troopDamage: 1, drill: 1, towerDamage: 1, towerReload: 1, wallHp: 1, keepHp: 1, rebuild: 1, bombDamage: 1, undeadHp: 1, undeadDamage: 1, meteorDamage: 1, meteorRadius: 1, frostTime: 1, frostRadius: 1,
+  troopHp: 1, troopDamage: 1, drill: 1, towerDamage: 1, towerReload: 1, wallHp: 1, keepHp: 1, rebuild: 1, bombDamage: 1, undeadHp: 1, undeadDamage: 1, meteorDamage: 1, meteorRadius: 1, frostTime: 1, frostRadius: 1, reinforceHp: 1, reinforceDamage: 1, reinforceTime: 1,
 });
 
 export const SOLDIER = { hp: 40, damage: 6, cooldown: 0.8, speed: 2.4, reach: 0.75, leash: 16, size: 0.4, color: "#5b8fd9" };

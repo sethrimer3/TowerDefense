@@ -11,8 +11,8 @@ export type PathTopic = "wizardTower" | "barracks" | "archerTower" | "cannonTowe
 /** Strike spells: cast from the battle's Skills palette rather than built,
  * so a spell has no cards; it casts with the one path `save.spellPaths`
  * names, at its furthest researched rank. */
-export type SpellId = "necromancy" | "meteor" | "frostNova";
-export const SPELLS: SpellId[] = ["necromancy", "meteor", "frostNova"];
+export type SpellId = "necromancy" | "meteor" | "frostNova" | "reinforcements";
+export const SPELLS: SpellId[] = ["necromancy", "meteor", "frostNova", "reinforcements"];
 export const isSpell = (topic: string): topic is SpellId => (SPELLS as string[]).includes(topic);
 export type PathId =
   | "pyromancy" | "rime" | "storm" | "crusaders" | "assassins"
@@ -21,7 +21,8 @@ export type PathId =
   | "blastStakes" | "springStakes" | "rimeStakes"
   | "boneArchers" | "soulWeighing" | "amalgam"
   | "starfall" | "moltenCore" | "frostComet"
-  | "shatter" | "blizzard" | "rimeWard";
+  | "shatter" | "blizzard" | "rimeWard"
+  | "hammerfall" | "muster" | "oathsworn";
 /** The pixel icons `ui/path-icons.ts` draws, one a rank. */
 export type PathIcon =
   | "flame" | "tongue" | "inferno" | "snowflake" | "shard" | "iceBlock" | "bolt" | "fork" | "thunderhead"
@@ -30,7 +31,8 @@ export type PathIcon =
   | "spyglass" | "beacon" | "crate" | "fireball" | "embers" | "stake" | "spring"
   | "bone" | "scales" | "tombstone" | "hand"
   | "meteor" | "stars" | "crater"
-  | "shards" | "whirl" | "frostShield";
+  | "shards" | "whirl" | "frostShield"
+  | "hammer" | "helm" | "oath";
 /** Each path's colours, as `ui/path-icons.ts` and the page's CSS name them. */
 export type PathHue = "ember" | "frost" | "storm" | "steel" | "shadow" | "verdant" | "grave";
 export type PathRank = { name: string; icon: PathIcon; cost: number; text: string };
@@ -163,6 +165,24 @@ export const BLIZZARD = { life: [0, 10, 12, 16], speed: [0, 1, 1, 2], grow: 4 / 
  * from II its buildings take `walls` less; at III the troops in it heal
  * `heal` of their full health a second. */
 export const RIME_WARD = { guard: 0.35, walls: 0.5, heal: 0.06 };
+
+/** Hammerfall: each reinforcement lands with a shockwave, `damage[rank]` to
+ * every enemy within `radius[rank]` cells; from II it staggers them (they
+ * stand still) for `stagger` seconds; at III a champion lands in the middle
+ * too, `hp` and `damage` times a soldier, cleaving `cleave` cells round its
+ * blows, with a `quake`-damage shockwave over `quakeRadius` cells. */
+export const HAMMERFALL = { damage: [0, 20, 35, 35], radius: [0, 1, 1.4, 1.4], stagger: 1.5, hp: 4, damage3: 2.5, cleave: 1, quake: 80, quakeRadius: 2.5 };
+/** Muster the levy: `count[rank]` soldiers drop rather than the spell's
+ * own; from II every `archerEvery`th is an archer shooting from `range`
+ * cells; at III each who falls in battle is replaced once by a fresh one
+ * dropping in at the squad's post. */
+export const MUSTER = { count: [4, 7, 9, 9], archerEvery: 3, range: 4 };
+/** Oathsworn: each takes `wall` less damage for every other of its squad
+ * within `near` cells, up to `wallMax`; from II every enemy one slays adds
+ * `time` seconds to the whole squad's stay and heals the slayer `heal` of
+ * its health; at III, when its time runs out or it falls, it fights on
+ * unhurtable for `stand` seconds first. */
+export const OATH = { wall: 0.1, near: 2, wallMax: 0.3, time: 2, heal: 0.2, stand: 4 };
 
 export const PATHS: KnowledgePath[] = [
   {
@@ -399,6 +419,30 @@ export const PATHS: KnowledgePath[] = [
       { name: "Winter's mercy", icon: "heart", cost: studyPathCost(4, 2), text: "Troops in the rime heal 6% of their health a second" },
     ],
   },
+  {
+    id: "hammerfall", topic: "reinforcements", name: "Hammerfall", motto: "They come down like thunder", hue: "ember",
+    ranks: [
+      { name: "Hard landing", icon: "blast", cost: studyPathCost(4, 0), text: "Each soldier lands with a shockwave: 20 damage to every enemy within a cell" },
+      { name: "Earthshaker", icon: "crater", cost: studyPathCost(4, 1), text: "35 damage over 1.4 cells, and those it hits stagger, standing still for 1.5 seconds" },
+      { name: "Champion's descent", icon: "hammer", cost: studyPathCost(4, 2), text: "A champion lands in the middle too: four times as tough, cleaving, with an 80-damage quake over 2.5 cells" },
+    ],
+  },
+  {
+    id: "muster", topic: "reinforcements", name: "Muster the levy", motto: "Many hands", hue: "verdant",
+    ranks: [
+      { name: "Levy", icon: "helm", cost: studyPathCost(4, 0), text: "Seven soldiers drop rather than four" },
+      { name: "Bowmen", icon: "bow", cost: studyPathCost(4, 1), text: "Nine drop, every third an archer shooting from 4 cells" },
+      { name: "Reserves", icon: "boot", cost: studyPathCost(4, 2), text: "Each who falls in battle is replaced once by a fresh one dropping in at the post" },
+    ],
+  },
+  {
+    id: "oathsworn", topic: "reinforcements", name: "Oathsworn", motto: "Bound to stand", hue: "steel",
+    ranks: [
+      { name: "Shield wall", icon: "mail", cost: studyPathCost(4, 0), text: "Each takes 10% less damage for every other of the squad within 2 cells, up to 30%" },
+      { name: "Blood oath", icon: "dagger", cost: studyPathCost(4, 1), text: "Every enemy they slay adds 2 seconds to the whole squad's stay and heals the slayer 20%" },
+      { name: "Last stand", icon: "oath", cost: studyPathCost(4, 2), text: "When its time runs out or it falls, each fights on unhurtable for 4 more seconds" },
+    ],
+  },
 ];
 
 export const PATH_TOPICS = [...new Set(PATHS.map((p) => p.topic))];
@@ -430,6 +474,7 @@ export const UNSPECIALIZED: Record<PathTopic, string> = {
   necromancy: "One plain warrior a fallen enemy",
   meteor: "One great meteor",
   frostNova: "A burst of ice and a patch of rime",
+  reinforcements: "Four soldiers who hold where they land",
 };
 
 /** Legacy topic-wide choices retained solely for old-save migration. */

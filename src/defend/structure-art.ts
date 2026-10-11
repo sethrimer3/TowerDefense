@@ -47,7 +47,7 @@ function disc(c: CanvasRenderingContext2D, x: number, y: number, r: number) {
   c.fill();
 }
 
-export type IconItem = StructureKind | "cityTile" | "cityGate" | "wallSpikes" | "wallBallista" | "bomb" | "banner" | "necromancy" | "meteor" | "frostNova";
+export type IconItem = StructureKind | "cityTile" | "cityGate" | "wallSpikes" | "wallBallista" | "bomb" | "banner" | "necromancy" | "meteor" | "frostNova" | "reinforcements";
 
 /** Paints `item`'s palette icon into a small square canvas; a structure takes the path look named by
  * the canvas's `data-look` (the path the building wears), when it has one. */
@@ -65,6 +65,7 @@ export function paintIcon(canvas: HTMLCanvasElement, item: IconItem) {
   if (item === "necromancy") return paintNecroIcon(c, n);
   if (item === "meteor") return paintMeteorIcon(c, n);
   if (item === "frostNova") return paintFrostIcon(c, n);
+  if (item === "reinforcements") return paintReinforceIcon(c, n);
   const def = [STRUCTURES[item].w, STRUCTURES[item].h];
   const px = n / Math.max(def[0], def[1]) / 1.1;
   const w = def[0] * px,
@@ -204,6 +205,36 @@ function paintFrostIcon(c: CanvasRenderingContext2D, n: number) {
   FROST_ICON.forEach((row, j) => [...row].forEach((ch, i) => {
     if (ch === ".") return;
     c.fillStyle = FROST_COLORS[ch];
+    c.fillRect(x0 + i * k, y0 + j * k, k, k);
+  }));
+}
+
+/** Reinforcements: a knight's great helm, its visor slit and gold cross,
+ * coming down under gold streaks of its fall, 14 × 14 art pixels. */
+const REINFORCE_ICON = [
+  "..o...oo...o..",
+  ".oyo.oyyo.oyo.",
+  ".oyo.oyyo.oyo.",
+  "..o..oyyo..o..",
+  ".....oyyo.....",
+  "......oo......",
+  "...ooobbooo...",
+  "..omllbbllmo..",
+  ".odmllwwllmdo.",
+  ".odoooooooodo.",
+  ".odmlmllmlmdo.",
+  ".odmmlyylmmdo.",
+  "..odmmyymmdo..",
+  "...oooooooo...",
+];
+const REINFORCE_COLORS: Record<string, string> = { o: OUTLINE, d: "#3c4658", m: "#7d889c", l: "#c3ccd8", w: "#f4f8ff", b: "#3d6fc4", y: "#f6c75a" };
+
+function paintReinforceIcon(c: CanvasRenderingContext2D, n: number) {
+  const w = 14, h = REINFORCE_ICON.length, k = Math.max(1, Math.floor(n / w));
+  const x0 = Math.round((n - w * k) / 2), y0 = Math.round((n - h * k) / 2);
+  REINFORCE_ICON.forEach((row, j) => [...row].forEach((ch, i) => {
+    if (ch === ".") return;
+    c.fillStyle = REINFORCE_COLORS[ch];
     c.fillRect(x0 + i * k, y0 + j * k, k, k);
   }));
 }

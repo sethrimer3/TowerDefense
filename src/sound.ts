@@ -13,6 +13,8 @@ export type Cue =
   | "meteor"
   /** The Frost nova: a crack of ice, a rushing hiss and a cold glassy shimmer. */
   | "nova"
+  /** Reinforcements: a short horn call, then boots thudding down. */
+  | "muster"
   /** Pressing an oak button. */
   | "knock"
   /** Choosing a page on the stone tab row. */
@@ -360,6 +362,12 @@ const CUES: Record<Cue, (t: number) => void> = {
     noise(t + 0.02, 0.7, 0.12, 7000 * v, 1.2, 1, 0.05, 2500 * v);
     bell(1320 * v, t + 0.04, 0.05, 1.4, 1.5);
     for (let i = 0; i < 6; i++) tone({ freq: 2800 + rand() * 3200, at: t + 0.05 + i * 0.05 + rand() * 0.03, peak: 0.03, end: 0.3 + rand() * 0.3, wet: 1.4 });
+  },
+  muster(t) {
+    const v = vary(40);
+    tone({ type: "sawtooth", freq: 233 * v, at: t, peak: 0.07, attack: 0.04, end: 0.22, lowpass: 1400, wet: 1 });
+    tone({ type: "sawtooth", freq: 349 * v, at: t + 0.2, peak: 0.08, attack: 0.04, end: 0.5, lowpass: 1600, wet: 1.2 });
+    for (let i = 0; i < 4; i++) noise(t + 0.8 + i * 0.07 + rand() * 0.03, 0.12, 0.22, 260 * v, 1, 0.5);
   },
   raise(t) {
     const v = vary(60);

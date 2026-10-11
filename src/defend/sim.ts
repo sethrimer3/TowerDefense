@@ -60,6 +60,7 @@ import { DarkKeeps, stepBolts, stepDarkWizard, type Bolt } from "./dark-wizards.
 import { WarBanner, bannerInfluence, stepBannerLife } from "./war-banner.ts";
 import { castMeteor, METEOR, stepMeteors, type Impact, type Meteor } from "./meteor.ts";
 import { castFrostNova, FROST_NOVA, frostDeath, stepFrostNova, wardBuilding, wardDefender, type FrostBurst, type Rime } from "./frost-nova.ts";
+import { calledFell, castReinforcements, REINFORCE, shieldWall, stepReinforcement, stepReinforcements, type Called, type Drop as Descent, type Landing } from "./reinforcements.ts";
 import { ageGraves, bury, castNecromancy, NECRO, stepUndead, type Grave, type Raising, type Risen } from "./necromancy.ts";
 import { sheltered, fizzles, stepFloods, type Flood, type Sinking } from "./boats.ts";
 import { baitFell, baitStanding } from "./bait.ts";
@@ -91,6 +92,8 @@ export type Enemy = {
   freeze?: number;
   /** Frozen by a Frost nova under Shatter: harder hit until it thaws; absent when not. */
   brittle?: true;
+  /** Seconds left staggered by a Hammerfall landing (standing still); absent when not. */
+  stagger?: number;
   /** Seconds left burning from a fire arrow, and the burn's damage a
    * second; absent when not burning. */
   burn?: number;
@@ -123,7 +126,7 @@ export type Soldier = {
   /** Swordsmen chase and hack; archers roam and shoot; fire mages roam
    * and hurl fireballs; valkyries hunt and charge-stab; the dark wizard
    * hunts and casts chain lightning. */
-  kind: "sword" | "archer" | "mage" | "valkyrie" | "darkWizard" | "undead";
+  kind: "sword" | "archer" | "mage" | "valkyrie" | "darkWizard" | "undead" | "reinforcement";
   home: number;
   x: number;
   y: number;
@@ -143,6 +146,8 @@ export type Soldier = {
   strikes?: number;
   /** A warrior the Necromancy spell raised (`home` -1); absent for everyone else. */
   risen?: Risen;
+  /** A soldier the Reinforcements spell dropped (`home` -1); absent for everyone else. */
+  called?: Called;
 };
 
 export type Civilian = {
@@ -200,6 +205,7 @@ const STEP_SOLDIER: Record<Soldier["kind"], (sim: DefendSim, s: Soldier, dt: num
   valkyrie: stepValkyrie,
   darkWizard: stepDarkWizard,
   undead: stepUndead,
+  reinforcement: stepReinforcement,
 };
 /** How long a struck building flashes, in seconds. */
 export const BUILDING_FLASH = 0.14;
@@ -303,6 +309,15 @@ export class DefendSim {
   frostReadyAt = 0;
   get frostCooldown() { return FROST_NOVA.cooldown; }
   get frostRemaining() { return Math.max(0, this.frostReadyAt - this.time); }
+  /** The Reinforcements (`reinforcements.ts`) on their way down, the rings
+   * their landings and departures leave, how many squads have been called,
+   * and when it can be cast again; all empty without a cast. */
+  drops: Descent[] = [];
+  landings: Landing[] = [];
+  squads = 0;
+  reinforceReadyAt = 0;
+  get reinforceCooldown() { return REINFORCE.cooldown; }
+  get reinforceRemaining() { return Math.max(0, this.reinforceReadyAt - this.time); }
   /** Magic boats' water, drying up behind them, and the buildings it sank
    * going under; both empty in every run without boats. */
   floods: Flood[] = [];
@@ -495,6 +510,7 @@ export class DefendSim {
     }
     stepMeteors(this, dt);
     stepFrostNova(this, dt);
+    stepReinforcements(this, dt);
     stepFireballs(this, dt);
     stepBlazes(this, dt);
     stepFloods(this, dt);
@@ -524,7 +540,8 @@ export class DefendSim {
     this.enemies = this.enemies.filter((e) => e.hp > 0);
     this.shieldGenerators = this.shieldGenerators.filter(e => e.hp > 0);
     this.enemies.push(...hatched);
-    for (const s of this.soldiers) if (s.hp <= 0 && !s.risen) this.stats.current.troopsLost++;
+    for (const s of this.soldiers) if (s.hp <= 0 && s.called) calledFell(this, s);
+    for (const s of this.soldiers) if (s.hp <= 0 && !s.risen && !s.called) this.stats.current.troopsLost++;
     for (const c of this.civilians) if (c.hp <= 0) this.stats.current.civiliansLost++;
     this.soldiers = this.soldiers.filter((s) => s.hp > 0);
     this.civilians = this.civilians.filter((c) => c.hp > 0 && !atHome(this, c) && !escaped(c));
@@ -543,6 +560,8 @@ export class DefendSim {
       if (e.chill !== undefined && (e.chill -= dt) <= 0) delete e.chill;
     for (const e of this.enemies)
       if (e.freeze !== undefined && (e.freeze -= dt) <= 0) delete e.freeze;
+    for (const e of this.enemies)
+      if (e.stagger !== undefined && (e.stagger -= dt) <= 0) delete e.stagger;
     for (const e of this.enemies) {
       if (e.burn === undefined) continue;
       if (e.hp > 0 && !sheltered(this, e.x, e.y)) this.hurtEnemy(e, e.burnDps! * Math.min(dt, e.burn), false, "ranged", undefined, false, "fire");
@@ -827,7 +846,7 @@ export class DefendSim {
   hurtDefender(unit: Soldier | Civilian, amount: number) {
     if (unit.hp <= 0 || ("guard" in unit && unit.guard)) return 0;
     if ("kind" in unit) stepBannerLife(this, unit, 0);
-    const damage = amount * (this.bonuses.banner?.defense && "kind" in unit && bannerInfluence(this, unit) ? 1 - this.bonuses.banner.defense : 1) * wardDefender(this, unit);
+    const damage = amount * (this.bonuses.banner?.defense && "kind" in unit && bannerInfluence(this, unit) ? 1 - this.bonuses.banner.defense : 1) * wardDefender(this, unit) * shieldWall(this, unit);
     const dealt = Math.min(unit.hp, damage);
     unit.hp -= damage;
     return dealt;
@@ -1010,6 +1029,11 @@ export class DefendSim {
   /** Casts the Frost nova at `at`; false while it cools down. */
   castFrostNova(at: Point) {
     return castFrostNova(this, at);
+  }
+
+  /** Casts the Reinforcements at `at`; false while it cools down. */
+  castReinforcements(at: Point) {
+    return castReinforcements(this, at);
   }
 
   /** Casts the Necromancy spell at `at`: how many warriors rose, or -1 while it cools down. */

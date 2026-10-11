@@ -22,6 +22,7 @@ import { drawDarkWizard } from "./dark-art.ts";
 import { drawRaisings, drawRisen } from "./necro-art.ts";
 import { drawImpacts, drawMeteors } from "./meteor-art.ts";
 import { drawFrostBursts } from "./frost-art.ts";
+import { drawCalled, drawDrops, drawStaggered } from "./reinforce-art.ts";
 import { drawExplosion, drawScorches as drawScorchArt } from "./blast-art.ts";
 import { BUILDING_FLASH, type DefendSim, type Effect, type Enemy, type Soldier } from "./sim.ts";
 
@@ -96,6 +97,8 @@ export function drawUnits(b: Brush, sim: DefendSim, torches: Burning | null, hea
   drawImpacts(b.c, b.px, sim);
   drawMeteors(b.c, b.px, sim);
   drawFrostBursts(b.c, b.px, sim);
+  drawStaggered(b.c, b.px, sim);
+  drawDrops(b.c, b.px, sim);
   if (healthbars) drawEnemyHealthbars(b, sim);
 }
 
@@ -164,6 +167,10 @@ function drawSoldiers(b: Brush, sim: DefendSim, torches: Burning | null) {
     }
     if (u.risen) {
       drawRisen(c, px, u);
+      continue;
+    }
+    if (u.called) {
+      drawCalled(c, px, u);
       continue;
     }
     const archer = u.kind === "archer";
@@ -444,7 +451,7 @@ export function drawScorches({ c, px }: Brush, sim: DefendSim) {
 export function shadowCasters(sim: DefendSim) {
   const def = (e: Enemy): EnemyDef => ENEMIES[e.kind];
   return [
-    ...sim.soldiers.map((u) => ({ x: u.x, y: u.y, size: u.kind === "archer" ? ARCHER_UNIT.size : u.kind === "mage" ? FIRE_MAGE.size : u.kind === "valkyrie" ? VALKYRIE.size : u.kind === "darkWizard" ? DARK_WIZARD.size : u.risen ? u.risen.size : SOLDIER.size })),
+    ...sim.soldiers.map((u) => ({ x: u.x, y: u.y, size: u.kind === "archer" ? ARCHER_UNIT.size : u.kind === "mage" ? FIRE_MAGE.size : u.kind === "valkyrie" ? VALKYRIE.size : u.kind === "darkWizard" ? DARK_WIZARD.size   : u.risen ? u.risen.size : u.called ? u.called.size : SOLDIER.size })),
     ...sim.civilians.map((u) => ({ x: u.x, y: u.y, size: CIVILIAN.size })),
     ...sim.enemies.filter((e) => !def(e).flying).map((e) => ({ x: e.x, y: e.y, size: enemySize(e) })),
   ];

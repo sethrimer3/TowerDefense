@@ -179,6 +179,18 @@ const ICONS: Record<PathIcon, string[]> = {
     "ooooooooooo", "owwllllllmo", "owllwlwllmo", "olllowollmo", "olwowwwowmo", "olllowollmo",
     ".olllwlldo.", ".ollllmmdo.", "..olmmmdo..", "...olmdo...", "....ooo....",
   ],
+  hammer: [
+    ".ooooooooo.", ".owllllmmo.", ".olllllmdo.", ".ommmmmddo.", ".oooommooo.", "....omdo...",
+    "....omdo...", "....omdo...", "....omdo...", "...ommddo..", "...oooooo..",
+  ],
+  helm: [
+    "...ooooo...", "..owllllo..", ".owlllllmo.", ".olllllmmo.", ".ooooooooo.", ".ollmlmmdo.",
+    ".ollmlmmdo.", ".ollmlmmdo.", ".ommmlmmdo.", "..ommmmdo..", "...ooooo...",
+  ],
+  oath: [
+    ".....o.....", "....owo....", "....owo....", "....olo....", "....olo....", "....olo....",
+    "..ooooooo..", "..ommmmdo..", "..ooodooo..", "....odo....", "....ooo....",
+  ],
   embers: [
     "...........", "..o.....o..", ".olo...owo.", "..o.....o..", "....o......", "...owo..o..",
     "....o..olo.", ".o......o..", "olo..o.....", ".o..olo....", ".....o.....",

@@ -63,8 +63,11 @@ From rank zero, ignoring resource/setup/requeue delays:
 | Meteor blast radius | 30 | 1435 / 23090 / 18280 | 6.6 d | 18.1 h | 1.7 h |
 | Frost nova duration | 40 | 1435 / 23090 / 78215 | 15.4 d | 1.8 d | 3.1 h |
 | Frost nova radius | 30 | 1435 / 23090 / 18280 | 6.6 d | 18.1 h | 1.7 h |
+| Reinforcement health | 40 | 1435 / 23090 / 78215 | 15.4 d | 1.8 d | 3.1 h |
+| Reinforcement damage | 40 | 1435 / 23090 / 78215 | 15.4 d | 1.8 d | 3.1 h |
+| Reinforcement stay | 40 | 1435 / 23090 / 78215 | 15.4 d | 1.8 d | 3.1 h |
 
-All 15 rows require **29.7 d** of six-smith work at best. One top 50-rank row requires **3.4 d**. Their resource prices govern the long-term finish; these are processing times after materials have been secured.
+All 18 rows require **35.0 d** of six-smith work at best. One top 50-rank row requires **3.4 d**. Their resource prices govern the long-term finish; these are processing times after materials have been secured.
 
 ## Production scenarios and measurements
 
@@ -87,9 +90,9 @@ All 15 rows require **29.7 d** of six-smith work at best. One top 50-rank row re
 
 All Forge tracks together cost **26151 copper + 1026 silver + 173243 gold**, about **1.65 yr** of the late-profile sample income if every metal is saved for them.
 
-All Training rows together cost **21525 copper + 346350 silver + 1370725 gold**. Their Gold alone needs **13.04 yr** at the late sampled rate. This balance targets a chosen specialization near two years; it does not promise the entire collection by then.
+All Training rows together cost **25830 copper + 415620 silver + 1605370 gold**. Their Gold alone needs **15.27 yr** at the late sampled rate. This balance targets a chosen specialization near two years; it does not promise the entire collection by then.
 
-All Study skills together cost **11717860 Knowledge**. Choosing the most expensive fully evolved path in each topic adds **495147 Knowledge**, giving **12213007 Knowledge** for every compatible Study upgrade: **1.27 yr** at late nominal income. Minimal prerequisite prices in individual rows must not be charged again when summing the complete tree. These budgets exclude setup and income growth.
+All Study skills together cost **11717860 Knowledge**. Choosing the most expensive fully evolved path in each topic adds **515159 Knowledge**, giving **12233019 Knowledge** for every compatible Study upgrade: **1.27 yr** at late nominal income. Minimal prerequisite prices in individual rows must not be charged again when summing the complete tree. These budgets exclude setup and income growth.
 
 DEFEND upgrade points currently have no upgrade purchase route. They accumulate one per new highest cleared wave, so there is no point-priced upgrade completion time to calculate yet.
 
@@ -154,6 +157,9 @@ Each cost below is that upgrade's own cumulative price. Study prerequisite Knowl
 | Meteor blast radius | 30 | 1435 copper + 23090 silver + 18280 gold | — | 18.1 h smith work; resources 125.5 d |
 | Frost nova duration | 40 | 1435 copper + 23090 silver + 78215 gold | — | 1.8 d smith work; resources 271.6 d |
 | Frost nova radius | 30 | 1435 copper + 23090 silver + 18280 gold | — | 18.1 h smith work; resources 125.5 d |
+| Reinforcement health | 40 | 1435 copper + 23090 silver + 78215 gold | — | 1.8 d smith work; resources 271.6 d |
+| Reinforcement damage | 40 | 1435 copper + 23090 silver + 78215 gold | — | 1.8 d smith work; resources 271.6 d |
+| Reinforcement stay | 40 | 1435 copper + 23090 silver + 78215 gold | — | 1.8 d smith work; resources 271.6 d |
 
 ### Study skill
 
@@ -219,6 +225,9 @@ Each cost below is that upgrade's own cumulative price. Study prerequisite Knowl
 | Shatter | 3 | 20012 knowledge | — | 35.0 min research; resources 18.2 h |
 | Wandering blizzard | 3 | 20012 knowledge | — | 35.0 min research; resources 18.2 h |
 | Rime ward | 3 | 20012 knowledge | — | 35.0 min research; resources 18.2 h |
+| Hammerfall | 3 | 20012 knowledge | — | 35.0 min research; resources 18.2 h |
+| Muster the levy | 3 | 20012 knowledge | — | 35.0 min research; resources 18.2 h |
+| Oathsworn | 3 | 20012 knowledge | — | 35.0 min research; resources 18.2 h |
 
 ### Evolution
 
