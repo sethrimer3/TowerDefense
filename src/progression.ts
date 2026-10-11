@@ -17,7 +17,7 @@ import { ECONOMY, quadraticCost } from "./economy.ts";
 
 /** What the Smithy and the skill trees can raise: the battle's `Bonuses`,
  * and how fast the Smithy's upgrades are worked. */
-export type BonusTarget = Exclude<keyof Bonuses, "paths" | "banner" | "structurePaths" | "spikePaths" | "necromancy" | "meteor"> | "smithing";
+export type BonusTarget = Exclude<keyof Bonuses, "paths" | "banner" | "structurePaths" | "spikePaths" | "necromancy" | "meteor" | "frostNova"> | "smithing";
 /** Bonuses that shorten a time: their percent divides instead of multiplies. */
 const TIMES = new Set<BonusTarget>(["drill", "towerReload", "rebuild", "smithing"]);
 
@@ -25,7 +25,7 @@ const TIMES = new Set<BonusTarget>(["drill", "towerReload", "rebuild", "smithing
 export const STARTING_METAL: Metals = { copper: 10, silver: 0, gold: 0 };
 
 // ── The Smithy's upgrades (Training) ───────────────────────────────────
-export type TrainingId = "troopHp" | "troopDamage" | "drill" | "towerDamage" | "towerReload" | "wallHp" | "keepHp" | "rebuild" | "bombDamage" | "undeadHp" | "undeadDamage" | "meteorDamage" | "meteorRadius";
+export type TrainingId = "troopHp" | "troopDamage" | "drill" | "towerDamage" | "towerReload" | "wallHp" | "keepHp" | "rebuild" | "bombDamage" | "undeadHp" | "undeadDamage" | "meteorDamage" | "meteorRadius" | "frostTime" | "frostRadius";
 export type TrainingRow = { id: TrainingId; group: keyof typeof TRAINING_GROUPS; name: string; per: number; max: number };
 export const TRAINING_GROUPS = { army: "Army", towers: "Towers", city: "City", spells: "Spells" } as const;
 /** Each rank adds `per` percent to its target, with quadratic metal cost
@@ -44,6 +44,8 @@ export const TRAINING: TrainingRow[] = [
   { id: "undeadDamage", group: "spells", name: "Risen damage", per: 5, max: 40 },
   { id: "meteorDamage", group: "spells", name: "Meteor damage", per: 5, max: 40 },
   { id: "meteorRadius", group: "spells", name: "Meteor blast radius", per: 3, max: 30 },
+  { id: "frostTime", group: "spells", name: "Frost nova duration", per: 5, max: 40 },
+  { id: "frostRadius", group: "spells", name: "Frost nova radius", per: 3, max: 30 },
 ];
 export const TRAINING_IDS = TRAINING.map((t) => t.id);
 
@@ -194,13 +196,15 @@ export function multiplier(save: Save, target: BonusTarget) {
 /** What the next defense fights with. */
 export function bonuses(save: Save): Bonuses {
   const out = { ...NO_BONUSES } as Bonuses;
-  for (const k of Object.keys(out) as Exclude<keyof Bonuses, "paths" | "banner" | "structurePaths" | "spikePaths" | "necromancy" | "meteor">[]) out[k] = multiplier(save, k);
+  for (const k of Object.keys(out) as Exclude<keyof Bonuses, "paths" | "banner" | "structurePaths" | "spikePaths" | "necromancy" | "meteor" | "frostNova">[]) out[k] = multiplier(save, k);
   if (SKILL_IDS.some(id => id.startsWith("banner") && skillRank(save, id) > 0)) out.banner = { cooldown: 10 - skillTotal(save, "bannerCooldown"), defense: skillTotal(save, "bannerDefense") / 100, reach: 5 + skillTotal(save, "bannerReach"), damage: 1 + skillTotal(save, "bannerDamage") / 100, march: 1 + skillTotal(save, "bannerMarch") / 100, life: 1 + skillTotal(save, "bannerLife") / 100, regen: skillTotal(save, "bannerRegen") / 100 };
   Object.assign(out, placedBattlePaths(save));
   const necromancy = spellPath(save, "necromancy");
   if (necromancy) out.necromancy = necromancy;
   const meteor = spellPath(save, "meteor");
   if (meteor) out.meteor = meteor;
+  const frostNova = spellPath(save, "frostNova");
+  if (frostNova) out.frostNova = frostNova;
   return out;
 }
 

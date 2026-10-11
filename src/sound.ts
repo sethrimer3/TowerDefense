@@ -11,6 +11,8 @@ export type Cue =
   | "raise"
   /** The Meteor strike: a falling roar sweeping down as it comes in. */
   | "meteor"
+  /** The Frost nova: a crack of ice, a rushing hiss and a cold glassy shimmer. */
+  | "nova"
   /** Pressing an oak button. */
   | "knock"
   /** Choosing a page on the stone tab row. */
@@ -351,6 +353,13 @@ const CUES: Record<Cue, (t: number) => void> = {
     noise(t, 1.25, 0.28, 2600 * v, 0.9, 0.9, 0.5, 260 * v);
     noise(t + 0.2, 1.0, 0.12, 5200 * v, 2.5, 0.6, 0.4, 900 * v);
     tone({ type: "sawtooth", freq: 220 * v, to: 55 * v, at: t, peak: 0.06, attack: 0.6, end: 1.2, lowpass: 700, wet: 0.8 });
+  },
+  nova(t) {
+    const v = vary(60);
+    noise(t, 0.08, 0.3, 3200 * v, 1.5, 0.6);
+    noise(t + 0.02, 0.7, 0.12, 7000 * v, 1.2, 1, 0.05, 2500 * v);
+    bell(1320 * v, t + 0.04, 0.05, 1.4, 1.5);
+    for (let i = 0; i < 6; i++) tone({ freq: 2800 + rand() * 3200, at: t + 0.05 + i * 0.05 + rand() * 0.03, peak: 0.03, end: 0.3 + rand() * 0.3, wet: 1.4 });
   },
   raise(t) {
     const v = vary(60);

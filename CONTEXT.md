@@ -107,6 +107,9 @@ A reusable Skill cast onto the board mid-defense, with its own Smithy and Study 
 **Necromancy**:
 The first strike spell: every enemy that fell near where it is cast (a **grave**, raisable for 30 seconds) rises as a friendly **risen** warrior for a minute, then the spell waits 30 seconds.
 
+**Frost nova**:
+The third strike spell: ice bursts out where it is cast, freezing every enemy within its reach solid, and leaves a patch of **rime** that slows and bites whatever walks through it until it melts; then the spell waits 35 seconds. Its paths make the frozen **Shatter**, set the rime hunting as a **Wandering blizzard**, or make it a **Rime ward** over the city's own people and walls.
+
 **Meteor strike**:
 The second strike spell: a meteor falls where it is cast a moment later and blasts every enemy within its reach, sparing the city's own people, then the spell waits 40 seconds. Its paths break it into a shower (**Starfall**), leave a burning crater (**Molten core**) or make it a **Frost comet** that chills and freezes.
 

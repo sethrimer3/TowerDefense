@@ -8,6 +8,7 @@ import { dist } from "../exact.ts";
 import { RALLY_REACH } from "./war-banner.ts";
 import { NECRO } from "./necromancy.ts";
 import { METEOR } from "./meteor.ts";
+import { FROST_NOVA } from "./frost-nova.ts";
 import type { CityMap } from "./citygen.ts";
 import { carriesCorner, carriesGate, dragSpan, dropGhost, legalLayouts, liftsCityTile, nearestCorner, nearestEdge, refusal, wallSpotRect, type Drag } from "./drag-rules.ts";
 import type { Overlay } from "./edit-overlay.ts";
@@ -26,7 +27,7 @@ export type DragAt = { cellX: number; cellY: number; overBoard: boolean; overPal
 export type Drop =
   | { kind: "bomb"; at: { x: number; y: number } | null }
   | { kind: "banner"; at: { x: number; y: number } | null; tap: boolean }
-  | { kind: "spell"; spell: "necromancy" | "meteor"; at: { x: number; y: number } | null }
+  | { kind: "spell"; spell: "necromancy" | "meteor" | "frostNova"; at: { x: number; y: number } | null }
   | { kind: "build"; layout: Layout; message: string | null; tap?: true };
 
 /** How far (in cells) a press on the planted banner, or anything lifted
@@ -47,7 +48,7 @@ export class EditSession {
   private start: DragAt | null = null;
 
   constructor(readonly drag: Drag, private layout: Layout, private bannerRadius = RALLY_REACH) {
-    this.legal = drag.from === "bomb" || drag.from === "banner" || drag.from === "necromancy" || drag.from === "meteor" ? new Map() : legalLayouts(drag, layout);
+    this.legal = drag.from === "bomb" || drag.from === "banner" || drag.from === "necromancy" || drag.from === "meteor" || drag.from === "frostNova" ? new Map() : legalLayouts(drag, layout);
     this.span = dragSpan(drag, layout);
   }
 
@@ -118,6 +119,8 @@ export class EditSession {
     // The page sets the meteor's reach, which its research changes.
     if (this.drag.from === "meteor")
       return at.overBoard ? { legal: new Set(), hover: null, ghost: null, spell: { x: at.cellX, y: at.cellY, r: METEOR.radius, look: "meteor" } } : null;
+    if (this.drag.from === "frostNova")
+      return at.overBoard ? { legal: new Set(), hover: null, ghost: null, spell: { x: at.cellX, y: at.cellY, r: FROST_NOVA.radius, look: "frost" } } : null;
     const hover = this.tile;
     const next = hover ? this.legal.get(hover) : undefined;
     if (carriesGate(this.drag))
@@ -152,7 +155,7 @@ export class EditSession {
     this.hover(at);
     const d = this.drag, layout = this.layout;
     if (d.from === "bomb") return { kind: "bomb", at: at.overBoard ? { x: at.cellX, y: at.cellY } : null };
-    if (d.from === "necromancy" || d.from === "meteor") return { kind: "spell", spell: d.from, at: at.overBoard ? { x: at.cellX, y: at.cellY } : null };
+    if (d.from === "necromancy" || d.from === "meteor" || d.from === "frostNova") return { kind: "spell", spell: d.from, at: at.overBoard ? { x: at.cellX, y: at.cellY } : null };
     if (d.from === "banner") {
       const s = this.start!;
       const tap = !!d.placed && dist(at.cellX - s.cellX, at.cellY - s.cellY) < TAP;

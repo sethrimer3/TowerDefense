@@ -51,7 +51,7 @@ import { atHome, escaped, Builders } from "./civilians.ts";
 import { stepEnemy } from "./enemies.ts";
 import { blocked, cellAt, cellCenter, center, fillFlowField, nearestOpen, type FieldTerrain, type Point } from "./pathing.ts";
 import { ignite, stepArrows, stepShells, Towers } from "./towers.ts";
-import { FORTIFY, SIGNAL, SPOTTERS, pathRank } from "../knowledge-paths.ts";
+import { FORTIFY, SHATTER, SIGNAL, SPOTTERS, pathRank } from "../knowledge-paths.ts";
 import { Barracks, stepArcher, stepSwordsman } from "./troops.ts";
 import { stepBlazes, stepFireballs, stepMage, type Blaze, type Fireball } from "./mages.ts";
 import { stepStabs, stepValkyrie, type Stab } from "./valkyries.ts";
@@ -59,6 +59,7 @@ import { Wizards, stepFlames, stepFrosts, type Flame, type Frost } from "./wizar
 import { DarkKeeps, stepBolts, stepDarkWizard, type Bolt } from "./dark-wizards.ts";
 import { WarBanner, bannerInfluence, stepBannerLife } from "./war-banner.ts";
 import { castMeteor, METEOR, stepMeteors, type Impact, type Meteor } from "./meteor.ts";
+import { castFrostNova, FROST_NOVA, frostDeath, stepFrostNova, wardBuilding, wardDefender, type FrostBurst, type Rime } from "./frost-nova.ts";
 import { ageGraves, bury, castNecromancy, NECRO, stepUndead, type Grave, type Raising, type Risen } from "./necromancy.ts";
 import { sheltered, fizzles, stepFloods, type Flood, type Sinking } from "./boats.ts";
 import { baitFell, baitStanding } from "./bait.ts";
@@ -88,6 +89,8 @@ export type Enemy = {
   chill?: number;
   /** Seconds left frozen solid by Rime's deep freeze (stopped); absent when not. */
   freeze?: number;
+  /** Frozen by a Frost nova under Shatter: harder hit until it thaws; absent when not. */
+  brittle?: true;
   /** Seconds left burning from a fire arrow, and the burn's damage a
    * second; absent when not burning. */
   burn?: number;
@@ -292,6 +295,14 @@ export class DefendSim {
   meteorReadyAt = 0;
   get meteorCooldown() { return METEOR.cooldown; }
   get meteorRemaining() { return Math.max(0, this.meteorReadyAt - this.time); }
+  /** The Frost nova's rime (`frost-nova.ts`), its bursts, the enemies Shatter
+   * made brittle, and when it can be cast again; all empty without a cast. */
+  rime: Rime[] = [];
+  frostBursts: FrostBurst[] = [];
+  brittle: Enemy[] = [];
+  frostReadyAt = 0;
+  get frostCooldown() { return FROST_NOVA.cooldown; }
+  get frostRemaining() { return Math.max(0, this.frostReadyAt - this.time); }
   /** Magic boats' water, drying up behind them, and the buildings it sank
    * going under; both empty in every run without boats. */
   floods: Flood[] = [];
@@ -483,6 +494,7 @@ export class DefendSim {
       stepBannerLife(this, s, 0);
     }
     stepMeteors(this, dt);
+    stepFrostNova(this, dt);
     stepFireballs(this, dt);
     stepBlazes(this, dt);
     stepFloods(this, dt);
@@ -500,6 +512,7 @@ export class DefendSim {
       }
       if (e.fortressParts) for (const part of e.fortressParts) part.hp = 0;
       bury(this, e);
+      frostDeath(this, e);
       if (!e.fortressPart && !ENEMIES[e.kind].fortress && !ENEMIES[e.kind].hatched && e.kind !== "ashPhoenix" && this.corpses.length < MAX_WAVE_ENEMIES) this.corpses.push({ x: e.x, y: e.y, life: 10, hp: Math.max(1, e.maxHp * .4), damage: ENEMIES[e.kind].damage * .4 });
       if (e.kind === "ashPhoenix" && !e.reborn) {
         const egg = this.spawnAuxiliary("phoenixEgg", e.x, e.y);
@@ -801,6 +814,7 @@ export class DefendSim {
     amount *= damageModifier(this, e, origin, source, projectile);
     if (e.kind === "iceGolem" && element !== "physical") amount *= 2;
     amount *= ENEMIES[e.kind].damageScale?.[element] ?? 1;
+    if (e.brittle && e.freeze) amount *= SHATTER.brittle[1];
     if (amount <= 0) return false;
     const hit = e.marked ? amount * (e.markDamage ?? SPOTTERS.mark[pathRank(this.bonuses.paths, "watchTower", "spotters")]) : amount;
     this.stats.current.dealt += Math.min(e.hp, hit);
@@ -813,7 +827,7 @@ export class DefendSim {
   hurtDefender(unit: Soldier | Civilian, amount: number) {
     if (unit.hp <= 0 || ("guard" in unit && unit.guard)) return 0;
     if ("kind" in unit) stepBannerLife(this, unit, 0);
-    const damage = amount * (this.bonuses.banner?.defense && "kind" in unit && bannerInfluence(this, unit) ? 1 - this.bonuses.banner.defense : 1);
+    const damage = amount * (this.bonuses.banner?.defense && "kind" in unit && bannerInfluence(this, unit) ? 1 - this.bonuses.banner.defense : 1) * wardDefender(this, unit);
     const dealt = Math.min(unit.hp, damage);
     unit.hp -= damage;
     return dealt;
@@ -821,6 +835,7 @@ export class DefendSim {
 
   damageBuilding(id: number, amount: number) {
     if (this.hp[id] <= 0) return;
+    amount *= wardBuilding(this, id);
     if (Number.isFinite(amount) && amount > 0) this.stats.current[id === this.keepId ? "keep" : "city"] += Math.min(this.hp[id], amount);
     this.hp[id] -= amount;
     this.flash[id] = BUILDING_FLASH;
@@ -990,6 +1005,11 @@ export class DefendSim {
   /** Casts the Meteor strike at `at`: how many meteors fall, or 0 while it cools down. */
   castMeteor(at: Point) {
     return castMeteor(this, at);
+  }
+
+  /** Casts the Frost nova at `at`; false while it cools down. */
+  castFrostNova(at: Point) {
+    return castFrostNova(this, at);
   }
 
   /** Casts the Necromancy spell at `at`: how many warriors rose, or -1 while it cools down. */

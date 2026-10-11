@@ -89,6 +89,7 @@ export const SUBJECTS: Subject[] = [
     topics: [
       { id: "necromancy", name: "Necromancy", icon: "necromancy", training: ["undeadHp", "undeadDamage"] },
       { id: "meteor", name: "Meteor strike", icon: "meteor", training: ["meteorDamage", "meteorRadius"] },
+      { id: "frostNova", name: "Frost nova", icon: "frostNova", training: ["frostTime", "frostRadius"] },
     ],
   },
   {

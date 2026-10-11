@@ -21,6 +21,7 @@ import { drawStabs, drawValkyrie } from "./valkyrie-art.ts";
 import { drawDarkWizard } from "./dark-art.ts";
 import { drawRaisings, drawRisen } from "./necro-art.ts";
 import { drawImpacts, drawMeteors } from "./meteor-art.ts";
+import { drawFrostBursts } from "./frost-art.ts";
 import { drawExplosion, drawScorches as drawScorchArt } from "./blast-art.ts";
 import { BUILDING_FLASH, type DefendSim, type Effect, type Enemy, type Soldier } from "./sim.ts";
 
@@ -94,6 +95,7 @@ export function drawUnits(b: Brush, sim: DefendSim, torches: Burning | null, hea
   for (const fx of sim.effects) drawEffect(b, fx);
   drawImpacts(b.c, b.px, sim);
   drawMeteors(b.c, b.px, sim);
+  drawFrostBursts(b.c, b.px, sim);
   if (healthbars) drawEnemyHealthbars(b, sim);
 }
 
