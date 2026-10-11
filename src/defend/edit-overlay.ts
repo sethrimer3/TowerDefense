@@ -19,7 +19,7 @@ export type Overlay = {
   banner?: { x: number; y: number; r: number } | null;
   /** A strike spell being aimed: centre, reach, and (filled in by the page)
    * the fallen it would raise there. */
-  spell?: { x: number; y: number; r: number; souls?: { x: number; y: number }[] } | null;
+  spell?: { x: number; y: number; r: number; souls?: { x: number; y: number }[]; look?: "meteor" } | null;
   /** Tiles across the block the item takes (unset: 1). A larger item's
    * `legal` and `hover` keys are the top left tiles of its blocks. */
   span?: number;
@@ -53,7 +53,8 @@ export function drawOverlay(c: CanvasRenderingContext2D, px: number, o: Overlay)
   if (o.ghost) drawGhost(c, px, o.ghost.rect);
   if (o.bomb) drawBombReach(c, px, o.bomb);
   if (o.banner) drawRallyReach(c, px, o.banner);
-  if (o.spell) drawSpellReach(c, px, o.spell);
+  if (o.spell?.look === "meteor") drawMeteorReach(c, px, o.spell);
+  else if (o.spell) drawSpellReach(c, px, o.spell);
 }
 
 /** Shades the tiles that won't take the item and frames those that will,
@@ -192,4 +193,25 @@ function drawSpellReach(c: CanvasRenderingContext2D, px: number, at: NonNullable
     c.fillStyle = "#c9ffd4";
     c.fillRect(x, y, d, d);
   }
+}
+
+/** The Meteor strike's reach, in ember red, with a cross where it lands. */
+function drawMeteorReach(c: CanvasRenderingContext2D, px: number, at: { x: number; y: number; r: number }) {
+  c.strokeStyle = "rgba(255,150,70,0.95)";
+  c.fillStyle = "rgba(200,69,42,0.16)";
+  c.lineWidth = Math.max(1, px * 0.12);
+  c.setLineDash([px * 0.4, px * 0.25]);
+  c.beginPath();
+  c.arc(at.x * px, at.y * px, at.r * px, 0, Math.PI * 2);
+  c.fill();
+  c.stroke();
+  c.setLineDash([]);
+  const d = Math.max(3, Math.round(px * 0.35)), w = Math.max(1, Math.round(px * 0.1));
+  const x = Math.round(at.x * px), y = Math.round(at.y * px);
+  c.fillStyle = "#140c0a";
+  c.fillRect(x - d - 1, y - w - 1, 2 * d + 2, 2 * w + 2);
+  c.fillRect(x - w - 1, y - d - 1, 2 * w + 2, 2 * d + 2);
+  c.fillStyle = "#f6c75a";
+  c.fillRect(x - d, y - w, 2 * d, 2 * w);
+  c.fillRect(x - w, y - d, 2 * w, 2 * d);
 }

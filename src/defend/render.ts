@@ -35,6 +35,7 @@ import { drawBlazes, mageLights } from "./mage-art.ts";
 import { stabLights } from "./valkyrie-art.ts";
 import { DarkArt, darkLights } from "./dark-art.ts";
 import { raisingLights } from "./necro-art.ts";
+import { meteorLights } from "./meteor-art.ts";
 import { ParkTrees, type Under } from "./park-trees.ts";
 import { FloodArt } from "./flood-art.ts";
 import { ChimneySmoke } from "./chimney-smoke.ts";
@@ -538,14 +539,14 @@ export class DefendRenderer {
   /** Darkness and torchlight, the gravel's lit relief, and the flames. */
   private drawLighting(map: CityMap, sim: DefendSim, weather: Weather, opts: DrawOptions) {
     const frame: LightFrame = { px: this.px, now: opts.now, reduceMotion: opts.reduceMotion, intact: standing(map, sim) };
-    const flames = flameLights(sim), mages = mageLights(sim), stabs = stabLights(sim), dark = darkLights(sim);
+    const flames = flameLights(sim), mages = mageLights(sim), stabs = stabLights(sim), dark = darkLights(sim), meteors = meteorLights(sim);
     this.lighting.drawLight(this.ctx, frame, ambientFor(weather, opts.night, this.previousArea ? this.previousWeather : null, this.areaMix), {
-      torches: [...this.carried(sim), ...flames.carried, ...mages.carried, ...stabs.carried, ...dark.carried],
+      torches: [...this.carried(sim), ...flames.carried, ...mages.carried, ...stabs.carried, ...dark.carried, ...meteors.carried],
       solid: sim.solid,
       version: sim.mapVersion,
     });
     this.lighting.drawRelief(this.ctx, this.px, weather.rain ? 0.85 : 0.65);
-    this.drawGroundRelief(map, sim, opts, [...flames.relief, ...mages.relief, ...stabs.relief, ...dark.relief, ...raisingLights(sim)]);
+    this.drawGroundRelief(map, sim, opts, [...flames.relief, ...mages.relief, ...stabs.relief, ...dark.relief, ...raisingLights(sim), ...meteors.relief]);
     this.lighting.drawFlames(this.ctx, frame);
   }
 

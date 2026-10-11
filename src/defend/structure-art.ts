@@ -47,7 +47,7 @@ function disc(c: CanvasRenderingContext2D, x: number, y: number, r: number) {
   c.fill();
 }
 
-export type IconItem = StructureKind | "cityTile" | "cityGate" | "wallSpikes" | "wallBallista" | "bomb" | "banner" | "necromancy";
+export type IconItem = StructureKind | "cityTile" | "cityGate" | "wallSpikes" | "wallBallista" | "bomb" | "banner" | "necromancy" | "meteor";
 
 /** Paints `item`'s palette icon into a small square canvas; a structure takes the path look named by
  * the canvas's `data-look` (the path the building wears), when it has one. */
@@ -63,6 +63,7 @@ export function paintIcon(canvas: HTMLCanvasElement, item: IconItem) {
   if (item === "bomb") return paintBombIcon(c, n);
   if (item === "banner") return paintBannerIcon(c, n);
   if (item === "necromancy") return paintNecroIcon(c, n);
+  if (item === "meteor") return paintMeteorIcon(c, n);
   const def = [STRUCTURES[item].w, STRUCTURES[item].h];
   const px = n / Math.max(def[0], def[1]) / 1.1;
   const w = def[0] * px,
@@ -152,6 +153,36 @@ function paintNecroIcon(c: CanvasRenderingContext2D, n: number) {
   NECRO_ICON.forEach((row, j) => [...row].forEach((ch, i) => {
     if (ch === ".") return;
     c.fillStyle = NECRO_COLORS[ch];
+    c.fillRect(x0 + i * k, y0 + j * k, k, k);
+  }));
+}
+
+/** The Meteor strike: a cracked rock glowing through its seams, trailing
+ * fire from the upper right, 14 × 14 art pixels. */
+const METEOR_ICON = [
+  "............r.",
+  "..........rryr",
+  ".........ryyr.",
+  "........ryyr..",
+  "...ooooryyr...",
+  "..odmmmoyr....",
+  ".odmllmmo.....",
+  "odmlcllmdo....",
+  "odmlccmmdo....",
+  "odmmlcmmdo....",
+  "oddmmmmddo....",
+  ".oddmmddo.....",
+  "..oooooo......",
+  "..............",
+];
+const METEOR_COLORS: Record<string, string> = { o: OUTLINE, d: "#3a2a24", m: "#6b4e3c", l: "#9a7a5a", c: "#f08a34", r: "#c8452a", y: "#f6c75a" };
+
+function paintMeteorIcon(c: CanvasRenderingContext2D, n: number) {
+  const w = 14, h = METEOR_ICON.length, k = Math.max(1, Math.floor(n / w));
+  const x0 = Math.round((n - w * k) / 2), y0 = Math.round((n - h * k) / 2);
+  METEOR_ICON.forEach((row, j) => [...row].forEach((ch, i) => {
+    if (ch === ".") return;
+    c.fillStyle = METEOR_COLORS[ch];
     c.fillRect(x0 + i * k, y0 + j * k, k, k);
   }));
 }

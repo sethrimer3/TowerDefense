@@ -155,6 +155,18 @@ const ICONS: Record<PathIcon, string[]> = {
     "...o.o.o...", "..olololo..", "..olololo..", "..olllllo.o", "..olllllolo", "..ollllllo.",
     "...ollllo..", "...ollmmo..", "...olmmdo..", "ooooddddooo", "odmdmdmdmdo",
   ],
+  meteor: [
+    ".........oo", ".......oolo", ".....oolmo.", "....odmmo..", "..oooomo...", ".odmmlmo...",
+    "odmllwlmo..", "odmlwwlmo..", "odmmllmdo..", ".oddmmdo...", "..ooooo....",
+  ],
+  stars: [
+    "m....m.....", ".m....m....", "..olo..m...", ".olwlo.olo.", "..olo.olwlo", "...o...olo.",
+    "m.......o..", ".m.........", "..olo......", ".olwlo.....", "..olo......",
+  ],
+  crater: [
+    "...l...l...", ".l..w.w..l.", "...l.w.l...", "....lwl....", "...........", "oo.......oo",
+    "odoo...oodo", "odmdooodmdo", "odmllwllmdo", ".odmmmmmdo.", "..ooooooo..",
+  ],
   embers: [
     "...........", "..o.....o..", ".olo...owo.", "..o.....o..", "....o......", "...owo..o..",
     "....o..olo.", ".o......o..", "olo..o.....", ".o..olo....", ".....o.....",

@@ -58,6 +58,7 @@ import { stepStabs, stepValkyrie, type Stab } from "./valkyries.ts";
 import { Wizards, stepFlames, stepFrosts, type Flame, type Frost } from "./wizard.ts";
 import { DarkKeeps, stepBolts, stepDarkWizard, type Bolt } from "./dark-wizards.ts";
 import { WarBanner, bannerInfluence, stepBannerLife } from "./war-banner.ts";
+import { castMeteor, METEOR, stepMeteors, type Impact, type Meteor } from "./meteor.ts";
 import { ageGraves, bury, castNecromancy, NECRO, stepUndead, type Grave, type Raising, type Risen } from "./necromancy.ts";
 import { sheltered, fizzles, stepFloods, type Flood, type Sinking } from "./boats.ts";
 import { baitFell, baitStanding } from "./bait.ts";
@@ -284,6 +285,13 @@ export class DefendSim {
   necroReadyAt = 0;
   get necroCooldown() { return NECRO.cooldown; }
   get necroRemaining() { return Math.max(0, this.necroReadyAt - this.time); }
+  /** Meteors falling from a Meteor strike (`meteor.ts`), their landings'
+   * rings, and when it can be cast again; both lists empty without a cast. */
+  meteors: Meteor[] = [];
+  impacts: Impact[] = [];
+  meteorReadyAt = 0;
+  get meteorCooldown() { return METEOR.cooldown; }
+  get meteorRemaining() { return Math.max(0, this.meteorReadyAt - this.time); }
   /** Magic boats' water, drying up behind them, and the buildings it sank
    * going under; both empty in every run without boats. */
   floods: Flood[] = [];
@@ -474,6 +482,7 @@ export class DefendSim {
       STEP_SOLDIER[s.kind](this, s, dt);
       stepBannerLife(this, s, 0);
     }
+    stepMeteors(this, dt);
     stepFireballs(this, dt);
     stepBlazes(this, dt);
     stepFloods(this, dt);
@@ -976,6 +985,11 @@ export class DefendSim {
   // ── Consumables ───────────────────────────────────────────────────────
   dropBomb(x: number, y: number) {
     this.explode(x, y, { r: BOMB_RADIUS, damage: BOMB_DAMAGE * this.bonuses.bombDamage, friendlyFire: !this.levels.bombSafe });
+  }
+
+  /** Casts the Meteor strike at `at`: how many meteors fall, or 0 while it cools down. */
+  castMeteor(at: Point) {
+    return castMeteor(this, at);
   }
 
   /** Casts the Necromancy spell at `at`: how many warriors rose, or -1 while it cools down. */

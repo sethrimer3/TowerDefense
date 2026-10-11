@@ -9,6 +9,8 @@ import { stream } from "./random.ts";
 export type Cue =
   /** The Necromancy spell: a low hollow moan rising, and bones rattling. */
   | "raise"
+  /** The Meteor strike: a falling roar sweeping down as it comes in. */
+  | "meteor"
   /** Pressing an oak button. */
   | "knock"
   /** Choosing a page on the stone tab row. */
@@ -343,6 +345,12 @@ const CUES: Record<Cue, (t: number) => void> = {
     tone({ type: "triangle", freq: 130 * v, to: 70 * v, at: t, peak: 0.35, end: 0.16, wet: 0.5 });
     noise(t, 0.1, 0.3, 700 * v, 1.4, 0.5);
     noise(t + 0.05, 0.12, 0.08, 2400 * v, 2, 0.4);
+  },
+  meteor(t) {
+    const v = vary(80);
+    noise(t, 1.25, 0.28, 2600 * v, 0.9, 0.9, 0.5, 260 * v);
+    noise(t + 0.2, 1.0, 0.12, 5200 * v, 2.5, 0.6, 0.4, 900 * v);
+    tone({ type: "sawtooth", freq: 220 * v, to: 55 * v, at: t, peak: 0.06, attack: 0.6, end: 1.2, lowpass: 700, wet: 0.8 });
   },
   raise(t) {
     const v = vary(60);
