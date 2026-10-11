@@ -57,7 +57,9 @@ export class TilesPage {
   }
 
   private build() {
-    this.chamber = new Chamber(this.root, "keep");
+    // The hall hangs in the same oak frame as the Defend board, the mine and the library.
+    this.root.innerHTML = `<div class="tiles-view"><div class="tiles-room"></div></div>`;
+    this.chamber = new Chamber(this.root.querySelector<HTMLElement>(".tiles-room")!, "keep");
     this.chamber.content.innerHTML = `<div class="tiles-hall">
         <header class="tiles-head">
           <div class="tiles-modes" role="group" aria-label="View">

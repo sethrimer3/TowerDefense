@@ -348,7 +348,8 @@ dialog > small {
 .crew-member.fallen s { text-decoration-color: #c04030; text-decoration-thickness: 2px; }
 .crew-member .skull { color: #e8e0d0; text-shadow: 0 1px 0 #000; }
 .crew-hint { color: #b8a888; }
-.mine-view {
+.mine-view,
+.tiles-view {
   border: 2px solid #1a110a;
   background: #0b0908;
   box-shadow:
@@ -357,7 +358,8 @@ dialog > small {
     0 0 0 5px #120c07,
     0 8px 30px #000000c0;
 }
-.mine-view::before {
+.mine-view::before,
+.tiles-view::before {
   content: "";
   position: absolute;
   inset: -7px;
