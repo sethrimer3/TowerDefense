@@ -87,9 +87,12 @@ Recent rows are available as `window.defendPerformance`; they are not saved.
   hovered tile shows exactly where the building will be fitted.
 - Placed things can be dragged to another tile, or back onto the palette /
   off the board to pick them up again.
-- **City tiles** must touch the city orthogonally (the keep counts as one).
-  The player starts with 8 — enough for a 3 × 3 city around the keep. A tile
-  can only be lifted if the city stays connected and it holds no buildings.
+- **City tiles** can go anywhere but the top row, next to the city or apart
+  from it; each group of tiles joined along their edges is walled on its own.
+  The player starts with 8 — enough for a 3 × 3 city around the keep. Pressing
+  a city tile away from its buildings lifts it with everything on it (its
+  gates and spikes too); only the keep's own tile and a tile under the dark
+  wizard keep stay put.
 - **The keep** can be moved onto any other city tile (the two swap) but never
   removed.
 - **Barracks**, **archer barracks**, the **Mage Guild**, the **Valkyrie palace** and the **dark wizard keep** must be inside the city. **Archer**, **cannon**, **watch

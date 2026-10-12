@@ -54,8 +54,8 @@ export class EditSession {
   }
 
   /** The session for whatever a press on cell (cx, cy) of `map`, built from
-   * `layout`, lifts: the keep, a structure, or an empty city tile whose
-   * removal leaves the city whole. Null when the press should move the view. */
+   * `layout`, lifts: the keep, a structure, or a city tile (pressed away from
+   * its buildings, which go with it). Null when the press should move the view. */
   static lift(map: CityMap, layout: Layout, cx: number, cy: number): EditSession | null {
     const owner = map.owner[cy * CELLS_W + cx];
     const b = owner >= 0 ? map.buildings[owner] : null;

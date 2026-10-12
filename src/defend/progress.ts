@@ -27,8 +27,6 @@ import {
   placedCount,
   sameCorner,
   sameGate,
-  tilesConnected,
-  joinedOnly,
   type CornerSpot,
   type GateSpot,
   type Layout,
@@ -149,14 +147,6 @@ export function sized(layout: Layout, levels: Record<UpgradeId, number>): Layout
   return fitted(next);
 }
 
-/** `layout` as outlying districts (`on`, the Study's skill) allow: with
- * them city tiles may stand apart from the keep's; without, any that do are
- * taken up, with whatever stood on them, and the rest made to fit. */
-export function withOutskirts(layout: Layout, on: boolean): Layout {
-  if (!!layout.outskirts === on) return layout;
-  if (on) return { ...cloneLayout(layout), outskirts: true };
-  return fitted(joinedOnly(layout).layout);
-}
 
 /** `l` if it fits; else its structures reshuffled; else with the newest
  * taken off (back to the palette) until it fits. */
@@ -258,7 +248,7 @@ function decodeLayout(s: any, owned: Record<PaletteItem, number>, levels: Record
     typeof s.spikes[i].path === "string" && pathFits("wallSpikes", s.spikes[i].path) ? { ...g, path: s.spikes[i].path } : g) ?? null;
   const ballistas = s.ballistas === undefined ? [] : decodeCorners(s.ballistas, tiles);
   if (!gates || !spikes || !ballistas || spikes.some((g) => gates.some((o) => sameGate(o, g)))) return null;
-  const layout: Layout = { keep, cityTiles, structures, nextUid: s.nextUid, rolls: intOr(s.rolls, 0, 1e9, 0), compact: compactKinds(levels), gates, spikes, ballistas, ...(s.outskirts === true ? { outskirts: true as const } : {}) };
+  const layout: Layout = { keep, cityTiles, structures, nextUid: s.nextUid, rolls: intOr(s.rolls, 0, 1e9, 0), compact: compactKinds(levels), gates, spikes, ballistas };
   if (!legal(layout, owned)) return null;
   const out = fitted(layout);
   return fitLayout(out).ok ? out : null;
@@ -329,11 +319,10 @@ function decodeCorners(list: unknown, cityTiles: Set<string>): CornerSpot[] | nu
 const structureOk = (p: any, nextUid: number, uids: Set<number>) =>
   PLACED.includes(p?.kind) && tileOk(p.tx, p.ty) && int(p.uid, 1, nextUid - 1) && !uids.has(p.uid);
 
-/** The player owns everything the layout places and its tiles join the
- * keep (unless they may stand apart, with outlying districts). */
+/** The player owns everything the layout places. City tiles may stand
+ * anywhere, apart from the keep's or not. */
 function legal(layout: Layout, owned: Record<PaletteItem, number>) {
-  const tiles = new Set([tileKey(layout.keep.tx, layout.keep.ty), ...layout.cityTiles]);
-  return affordable(layout, owned) && (!!layout.outskirts || tilesConnected(tiles, layout.keep));
+  return affordable(layout, owned);
 }
 
 function affordable(layout: Layout, owned: Record<PaletteItem, number>) {

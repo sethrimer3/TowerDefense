@@ -15,7 +15,6 @@ function city(): Layout {
 }
 const L = city();
 const { tx: KX, ty: KY } = L.keep;
-const ORTHO = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 
 test("dragIcon names what a drag carries", () => {
   assert.equal(dragIcon({ from: "palette", item: "watchTower" }), "watchTower");
@@ -33,9 +32,14 @@ test("legalLayouts lists the layouts a drop makes, tile by tile", () => {
   for (const [key, next] of fresh) {
     const [x, y] = key.split(",").map(Number);
     assert.ok(!tiles.has(key) && y !== 0, key);
-    assert.ok(ORTHO.some(([dx, dy]) => tiles.has(tileKey(x + dx, y + dy))), `${key} touches the city`);
     assert.ok(next.cityTiles.includes(key));
   }
+  // City tiles may stand anywhere, apart from the city too.
+  assert.ok(fresh.has(tileKey(0, KY - 4)), "a tile apart from the city");
+  // A tile carried with its barracks takes it along.
+  const carried = legalLayouts({ from: "cityTile", tile: { tx: KX - 1, ty: KY } }, L).get(tileKey(KX - 3, KY - 3));
+  assert.ok(carried, "the barracks' tile lands apart from the city");
+  assert.deepEqual(carried!.structures.map((s) => [s.kind, s.tx, s.ty]), [["barracks", KX - 3, KY - 3]]);
   // Dropping the keep or a city tile back where it was changes nothing.
   assert.equal(legalLayouts({ from: "keep" }, L).get(tileKey(KX, KY)), L);
   assert.equal(legalLayouts({ from: "cityTile", tile: { tx: KX, ty: KY - 2 } }, L).get(tileKey(KX, KY - 2)), L);
@@ -55,8 +59,8 @@ test("refusal explains why a tile turns a drop away", () => {
   const far = tileKey(0, KY - 4);
   assert.match(refusal({ from: "keep" }, L, tileKey(KX, 0)), /top row/);
   assert.equal(refusal({ from: "palette", item: "cityTile" }, L, tileKey(KX, KY)), "That tile is already part of the city.");
-  assert.equal(refusal({ from: "palette", item: "cityTile" }, L, far), "City tiles must touch the city along an edge.");
-  assert.equal(refusal({ from: "cityTile", tile: { tx: KX + 1, ty: KY } }, L, tileKey(KX, KY)), "City tiles must touch the city along an edge.");
+  assert.match(refusal({ from: "palette", item: "cityTile" }, L, tileKey(KX, 0)), /top row/);
+  assert.equal(refusal({ from: "cityTile", tile: { tx: KX + 1, ty: KY } }, L, tileKey(KX, KY)), "That tile is already part of the city.");
   assert.equal(refusal({ from: "keep" }, L, far), "The keep can only move onto another city tile.");
   assert.equal(refusal({ from: "palette", item: "barracks" }, L, far), `The ${STRUCTURES.barracks.name.toLowerCase()} must go inside the city limits.`);
   assert.equal(refusal({ from: "structure", uid: 1, kind: "barracks" }, L, far), `The ${STRUCTURES.barracks.name.toLowerCase()} must go inside the city limits.`);
@@ -64,11 +68,11 @@ test("refusal explains why a tile turns a drop away", () => {
   assert.equal(refusal({ from: "palette", item: "barracks" }, L, tileKey(KX, KY - 1)), "There isn't room for that there.");
 });
 
-test("only an empty city tile the city can do without lifts", () => {
+test("any city tile but the keep's lifts, with what stands on it", () => {
   assert.equal(liftsCityTile(L, { tx: KX + 1, ty: KY }), true);
   assert.equal(liftsCityTile(L, { tx: KX, ty: KY - 2 }), true);
-  assert.equal(liftsCityTile(L, { tx: KX - 1, ty: KY }), false, "holds the barracks");
-  assert.equal(liftsCityTile(L, { tx: KX, ty: KY - 1 }), false, "holds the spur on");
+  assert.equal(liftsCityTile(L, { tx: KX - 1, ty: KY }), true, "holds the barracks, which goes along");
+  assert.equal(liftsCityTile(L, { tx: KX, ty: KY - 1 }), true, "holds the spur on, which may split off");
   assert.equal(liftsCityTile(L, { tx: KX, ty: KY }), false, "the keep's own tile");
   assert.equal(liftsCityTile(L, { tx: 0, ty: KY - 4 }), false, "not a city tile");
 });

@@ -34,13 +34,17 @@ function cellOf(pick: (b: (typeof MAP.buildings)[number]) => boolean) {
 const liftAt = (cx: number, cy: number) => EditSession.lift(MAP, L, cx, cy)?.drag ?? null;
 const liftTile = (tx: number, ty: number) => liftAt(tx * SUB + 3, ty * SUB + 3);
 
-test("a press lifts the keep, a structure, or a city tile the city can spare", () => {
+test("a press lifts the keep, a structure, or a city tile with what stands on it", () => {
   const keep = cellOf((b) => b.kind === "keep");
   assert.deepEqual(liftAt(keep.cx, keep.cy), { from: "keep" });
   const barracks = cellOf((b) => b.structureUid === BARRACKS.uid);
   assert.deepEqual(liftAt(barracks.cx, barracks.cy), { from: "structure", uid: BARRACKS.uid, kind: "barracks" });
   assert.deepEqual(liftTile(KX, KY - 2), { from: "cityTile", tile: { tx: KX, ty: KY - 2 } });
-  assert.equal(liftTile(KX, KY - 1), null, "the spur's lower tile holds the upper one on");
+  assert.deepEqual(liftTile(KX, KY - 1), { from: "cityTile", tile: { tx: KX, ty: KY - 1 } }, "a tile may split the city in districts");
+  // The barracks' own tile, pressed away from the barracks, lifts with it.
+  const yard = Array.from({ length: SUB * SUB }, (_, i) => ({ cx: (KX - 1) * SUB + (i % SUB), cy: KY * SUB + Math.floor(i / SUB) }))
+    .find(({ cx, cy }) => { const o = MAP.owner[cy * CELLS_W + cx]; return o < 0 || !MAP.buildings[o].structureUid; })!;
+  assert.deepEqual(liftAt(yard.cx, yard.cy), { from: "cityTile", tile: { tx: KX - 1, ty: KY } });
   assert.equal(liftTile(0, 1), null, "open ground moves the view");
 });
 

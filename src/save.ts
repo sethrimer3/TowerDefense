@@ -14,6 +14,9 @@ import { decodeForgeJob, type ForgeJob } from "./forge-jobs.ts";
 
 import { migrateCards, migrateTopicPaths, settlePaths } from "./specializations.ts";
 
+/** What the retired Outlying districts skill cost, refunded on load. */
+const OUTSKIRTS_KNOWLEDGE = 8;
+
 export const SAVE_KEY = "towerdefense.v1";
 /** 2: the mine's metal wallet. 3: research unlocks and persistent individual
  * cards. 4: no cards; each placed building keeps its own path in the layout. */
@@ -107,6 +110,10 @@ export function decode(raw: string | null): Save {
   }
   d.knowledge = num(s.knowledge ?? s.valor, 0);
   for (const id of SKILL_IDS) d.skills[id] = int(s.skills?.[id], 0, 0, SKILLS[id].max);
+  // Outlying districts was a skill before city tiles could stand anywhere:
+  // its Knowledge comes back, whether learned or still being researched.
+  if (int(s.skills?.outskirts, 0, 0, 1)) d.knowledge += OUTSKIRTS_KNOWLEDGE;
+  if (s.researchJob?.kind === "skill" && s.researchJob.id === "outskirts") d.knowledge += int(s.researchJob.paid, 0, 0, OUTSKIRTS_KNOWLEDGE);
   d.paths = decodePaths(s.paths);
   d.pathResearch = decodePathResearch(s.pathResearch);
   d.spellPaths = decodeSpellPaths(s.spellPaths);

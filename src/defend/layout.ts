@@ -69,9 +69,6 @@ export type Layout = {
   spikes: SpikeSpot[];
   /** Wall ballistas, each on a corner of the wall. */
   ballistas: CornerSpot[];
-  /** Outlying districts (the Study's skill): city tiles may stand apart
-   * from the keep's, each group walled on its own. Absent without it. */
-  outskirts?: true;
 };
 
 export type FittedStructure = {
@@ -123,30 +120,11 @@ export function cloneLayout(l: Layout): Layout {
     gates: l.gates.map((g) => ({ ...g })),
     spikes: l.spikes.map((g) => ({ ...g })),
     ballistas: l.ballistas.map((v) => ({ ...v })),
-    ...(l.outskirts ? { outskirts: true as const } : {}),
   };
 }
 
 export function cityTileSet(l: Layout): Set<string> {
   return new Set([tileKey(l.keep.tx, l.keep.ty), ...l.cityTiles]);
-}
-
-/** Whether a set of tiles is one orthogonally-connected blob containing `root`. */
-export function tilesConnected(tiles: Set<string>, root: TilePos): boolean {
-  if (!tiles.has(tileKey(root.tx, root.ty))) return false;
-  const seen = new Set([tileKey(root.tx, root.ty)]);
-  const stack = [root];
-  while (stack.length) {
-    const { tx, ty } = stack.pop()!;
-    for (const [dx, dy] of ORTHO) {
-      const k = tileKey(tx + dx, ty + dy);
-      if (tiles.has(k) && !seen.has(k)) {
-        seen.add(k);
-        stack.push({ tx: tx + dx, ty: ty + dy });
-      }
-    }
-  }
-  return seen.size === tiles.size;
 }
 
 /** Each city tile's group of tiles joined along their edges, numbered from
@@ -172,20 +150,6 @@ export function tileGroups(l: Layout): Map<string, number> {
     n++;
   }
   return out;
-}
-
-/** `l` without the city tiles cut off from the keep's, and whatever stood on
- * them or in their walls; and the kinds of structure that were taken off. */
-export function joinedOnly(l: Layout): { layout: Layout; returned: PlacedKind[] } {
-  const groups = tileGroups(l);
-  const next = cloneLayout(l);
-  delete next.outskirts;
-  next.cityTiles = l.cityTiles.filter((k) => groups.get(k) === 0);
-  const off = (s: PlacedStructure) => blockTiles(s.tx, s.ty, spanOf(l, s.kind)).some((k) => (groups.get(k) ?? 0) > 0);
-  const returned = next.structures.filter(off).map((s) => s.kind);
-  next.structures = next.structures.filter((s) => !off(s));
-  keepGates(next);
-  return { layout: next, returned };
 }
 
 /** Cell mask of the city (1 = inside a city tile). */
@@ -368,19 +332,17 @@ function claim(space: FitSpace, rect: Rect, by: 1 | -1) {
 const openSides = (r: Rect, space: FitSpace) => sideCells(r).filter((i) => space.city[i] && !space.foot[i]);
 
 /** The first in-city structure that can't reach the keep through open city
- * cells, if any. With outlying districts, the first structure of each
- * district stands in for the keep there. */
+ * cells, if any. In a district apart from the keep's, its first structure
+ * stands in for the keep. */
 function cutOff(fitted: FittedStructure[], space: FitSpace, l: Layout): FittedStructure | undefined {
   const reach = new Uint8Array(CELL_COUNT);
   const stack = openSides(fitted[0].rect, space);
-  if (l.outskirts) {
-    const groups = tileGroups(l), seeded = new Set([0]);
-    for (const f of fitted) {
-      const g = groups.get(tileKey(f.tx, f.ty));
-      if (g === undefined || seeded.has(g) || !f.inside) continue;
-      seeded.add(g);
-      stack.push(...openSides(f.rect, space));
-    }
+  const groups = tileGroups(l), seeded = new Set([0]);
+  for (const f of fitted) {
+    const g = groups.get(tileKey(f.tx, f.ty));
+    if (g === undefined || seeded.has(g) || !f.inside) continue;
+    seeded.add(g);
+    stack.push(...openSides(f.rect, space));
   }
   for (const i of stack) reach[i] = 1;
   while (stack.length) {
@@ -616,7 +578,6 @@ export function placeCityTile(l: Layout, tx: number, ty: number): Layout | null 
   if (!tileInBounds(tx, ty) || ty === SPAWN_ROW) return null;
   const tiles = cityTileSet(l);
   if (tiles.has(tileKey(tx, ty))) return null;
-  if (!l.outskirts && !ORTHO.some(([dx, dy]) => tiles.has(tileKey(tx + dx, ty + dy)))) return null;
   const next = cloneLayout(l);
   next.cityTiles.push(tileKey(tx, ty));
   // A gate facing the new tile no longer stands in the wall.
@@ -631,7 +592,6 @@ export function removeCityTile(l: Layout, tx: number, ty: number): { layout: Lay
   if (!l.cityTiles.includes(key)) return null;
   const next = cloneLayout(l);
   next.cityTiles = next.cityTiles.filter((k) => k !== key);
-  if (!next.outskirts && !tilesConnected(cityTileSet(next), next.keep)) return null;
   const on = (s: PlacedStructure) => covers(l, s, tx, ty);
   const returned = next.structures.filter(on).map((s) => s.kind);
   next.structures = next.structures.filter((s) => !on(s));
@@ -639,12 +599,38 @@ export function removeCityTile(l: Layout, tx: number, ty: number): { layout: Lay
   return fitLayout(next).ok ? { layout: next, returned } : null;
 }
 
-/** Move a city tile (and whatever stands on it stays behind as returned
- * items — callers only move empty tiles). */
+/** Whether city tile `tile` can be carried somewhere else: anything standing
+ * on it goes with it, but not a structure whose block spans other tiles. */
+export function tileMovable(l: Layout, tile: TilePos) {
+  return l.cityTiles.includes(tileKey(tile.tx, tile.ty)) && !l.structures.some((s) => spanOf(l, s.kind) > 1 && covers(l, s, tile.tx, tile.ty));
+}
+
+/** Move a city tile with everything on it: its structures keep their uids
+ * and paths, and the gates and spikes in its wall go along. Ballistas on its
+ * corners go too where the tile was what made the corner. Whatever no
+ * longer fits the new place's wall is dropped back to the palette. */
 export function moveCityTile(l: Layout, from: TilePos, to: TilePos): Layout | null {
-  const removed = removeCityTile(l, from.tx, from.ty);
-  if (!removed || removed.returned.length) return null;
-  return placeCityTile(removed.layout, to.tx, to.ty);
+  if (!tileMovable(l, from) || !tileInBounds(to.tx, to.ty) || to.ty === SPAWN_ROW) return null;
+  const toKey = tileKey(to.tx, to.ty);
+  if (cityTileSet(l).has(toKey)) return null;
+  const next = cloneLayout(l);
+  const dx = to.tx - from.tx, dy = to.ty - from.ty;
+  const on = (p: TilePos) => p.tx === from.tx && p.ty === from.ty;
+  next.cityTiles = next.cityTiles.map((k) => (k === tileKey(from.tx, from.ty) ? toKey : k));
+  for (const s of next.structures) if (on(s)) { s.tx += dx; s.ty += dy; }
+  for (const g of [...next.gates, ...next.spikes]) if (on(g)) { g.tx += dx; g.ty += dy; }
+  const left = cityTileSet(l);
+  left.delete(tileKey(from.tx, from.ty));
+  for (const v of next.ballistas) {
+    const corner = (v.vx === from.tx || v.vx === from.tx + 1) && (v.vy === from.ty || v.vy === from.ty + 1);
+    if (corner && !cornerOk(left, v)) { v.vx += dx; v.vy += dy; }
+  }
+  keepGates(next);
+  if (fitLayout(next).ok) return next;
+  // The structures' old spots don't fit the new place: draw them fresh ones.
+  next.rolls++;
+  for (const s of next.structures) if (s.tx === to.tx && s.ty === to.ty) s.spot = hash(next.rolls, s.uid, 0x5b07);
+  return fitLayout(next).ok ? next : null;
 }
 
 /** How many tiles across `kind`'s block is in layout `l`. */

@@ -21,15 +21,14 @@ import {
   placeGate,
   placeSpikes,
   cityTileSet,
-  covers,
   fitLayout,
   moveCityTile,
   moveKeep,
   moveStructure,
   placeCityTile,
   placeStructure,
-  removeCityTile,
   spanOf,
+  tileMovable,
   type CornerSpot,
   type GateSpot,
   type Layout,
@@ -201,7 +200,7 @@ export function refusal(drag: Drag, layout: Layout, key: string): string {
   if (ty === 0) return "Nothing can be built on the top row — that's where the enemy gathers.";
   const inCity = cityTileSet(layout).has(key);
   if (kind === "cityTile")
-    return inCity && drag.from === "palette" ? "That tile is already part of the city." : layout.outskirts ? "There isn't room for a city tile there." : "City tiles must touch the city along an edge.";
+    return inCity ? "That tile is already part of the city." : drag.from === "cityTile" ? "What stands on this tile doesn't fit there." : "There isn't room for a city tile there.";
   if (kind === "keep") return "The keep can only move onto another city tile.";
   if (!consumable(kind) && dragSpan(drag, layout) > 1) {
     const [tx] = key.split(",").map(Number);
@@ -241,10 +240,9 @@ export function nearestCorner(x: number, y: number): string {
   return cornerKey({ vx: Math.round(x / SUB), vy: Math.round(y / SUB) });
 }
 
-/** Whether pressing city tile `tile` lifts it: only an empty tile whose
- * removal leaves the city whole does, and any other press pans the view. */
+/** Whether pressing city tile `tile` (away from its buildings) lifts it,
+ * with whatever stands on it: any city tile but the keep's does, unless a
+ * structure spanning several tiles stands on it; any other press pans. */
 export function liftsCityTile(layout: Layout, tile: TilePos) {
-  if (!layout.cityTiles.includes(tileKey(tile.tx, tile.ty))) return false;
-  if (layout.structures.some((s) => covers(layout, s, tile.tx, tile.ty))) return false;
-  return !!removeCityTile(layout, tile.tx, tile.ty);
+  return tileMovable(layout, tile);
 }
