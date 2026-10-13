@@ -1,6 +1,6 @@
 # Upgrade timing and quadratic balance
 
-Current source snapshot: 2026-10-11. Prices and project timers below are implemented in the game.
+Current source snapshot: 2026-10-12. Prices and project timers below are implemented in the game.
 
 ## Pacing target and current forecast
 
@@ -92,7 +92,7 @@ All Forge tracks together cost **26151 copper + 1026 silver + 173243 gold**, abo
 
 All Training rows together cost **25830 copper + 415620 silver + 1605370 gold**. Their Gold alone needs **15.27 yr** at the late sampled rate. This balance targets a chosen specialization near two years; it does not promise the entire collection by then.
 
-All Study skills together cost **11717860 Knowledge**. Choosing the most expensive fully evolved path in each topic adds **515159 Knowledge**, giving **12233019 Knowledge** for every compatible Study upgrade: **1.27 yr** at late nominal income. Minimal prerequisite prices in individual rows must not be charged again when summing the complete tree. These budgets exclude setup and income growth.
+All Study skills together cost **11717852 Knowledge**. Choosing the most expensive fully evolved path in each topic adds **515159 Knowledge**, giving **12233011 Knowledge** for every compatible Study upgrade: **1.27 yr** at late nominal income. Minimal prerequisite prices in individual rows must not be charged again when summing the complete tree. These budgets exclude setup and income growth.
 
 DEFEND upgrade points currently have no upgrade purchase route. They accumulate one per new highest cleared wave, so there is no point-priced upgrade completion time to calculate yet.
 
@@ -181,7 +181,6 @@ Each cost below is that upgrade's own cumulative price. Study prerequisite Knowl
 | Restoring standard | 1 | 12 knowledge | 15045 | 1.0 h research; resources 13.7 h |
 | Masonry | 3 | 5003 knowledge | — | 35.0 min research; resources 4.5 h |
 | Bastions | 3 | 10006 knowledge | 1 | 37.5 min research; resources 9.1 h |
-| Outlying districts | 1 | 8 knowledge | 1 | 5.0 min research; resources 0.5 min |
 | Builders' guilds | 3 | 10006 knowledge | 1 | 37.5 min research; resources 9.1 h |
 | Smiths' guild | 3 | 10006 knowledge | — | 35.0 min research; resources 9.1 h |
 | Master smith | 1 | 6 knowledge | 2 | 5.0 min research; resources 0.4 min |

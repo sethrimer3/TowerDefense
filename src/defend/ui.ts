@@ -54,7 +54,7 @@ import { QUIET, type Scene } from "../ambience.ts";
 import { NIGHT_FADE_SECONDS, isBossWave, rollWeather, type Weather } from "./weather.ts";
 import { play } from "../sound.ts";
 import { replay, sparksOver } from "../ui/flourish.ts";
-import { available, startingWave, withOutskirts, type DefendSave } from "./progress.ts";
+import { available, startingWave, type DefendSave } from "./progress.ts";
 import { ageWater } from "./boats.ts";
 import { defeatHTML } from "./defeat.ts";
 import { inspectable, type Armed } from "./inspect.ts";
@@ -65,9 +65,6 @@ export type DefendHost = {
   bonuses(): Bonuses;
   /** The Study's research: which paths a placed building may wear, at what rank. */
   research?(): PathResearch;
-  /** Whether city tiles may stand apart from the keep's (the Study's
-   * Outlying districts). */
-  outskirts?(): boolean;
   /** Awards an upgrade point for a new highest wave, recording it with payment. */
   earnWave(wave: number): { upgrade: number };
   persist(): void;
@@ -331,14 +328,6 @@ export class DefendPage {
   }
 
   private renderChrome() {
-    if (this.phase === "build") {
-      // Outlying districts learned or unlearned since: the layout follows.
-      const next = withOutskirts(this.save.layout, !!this.host.outskirts?.());
-      if (next !== this.save.layout) {
-        this.save.layout = next;
-        this.host.persist();
-      }
-    }
     this.root.querySelector("#defend-stage")!.classList.toggle("palette-right", this.save.paletteSide === "right");
     this.refreshJournal();
     this.renderControls();

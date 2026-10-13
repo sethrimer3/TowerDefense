@@ -4,9 +4,11 @@ import { CELLS_W, CELL_COUNT, ORTHO, SUB, cellIndex, cellX, cellY, tileKey } fro
 import {
   defaultLayout,
   fitLayout,
+  moveCityTile,
   moveKeep,
   moveStructure,
   placeCityTile,
+  placeGate,
   placeStructure,
   removeCityTile,
   type Layout,
@@ -47,24 +49,42 @@ function mapOf(l: Layout, seed = 3) {
   return generateCity(fit, seed);
 }
 
-test('city tiles must touch the city orthogonally and stay off the spawn row', () => {
+test('city tiles may stand anywhere off the spawn row, apart from the city or not', () => {
   const l = defaultLayout();
   const { tx, ty } = l.keep;
   assert.ok(placeCityTile(l, tx + 1, ty));
-  assert.equal(placeCityTile(l, tx + 1, ty + 1), null, 'diagonal only');
-  assert.equal(placeCityTile(l, tx + 3, ty), null, 'disconnected');
-  let chain = l;
-  for (let y = ty - 1; y >= 1; y--) chain = placeCityTile(chain, tx, y)!;
-  assert.equal(placeCityTile(chain, tx, 0), null, 'spawn row');
+  assert.ok(placeCityTile(l, tx + 1, ty + 1), 'diagonal');
+  assert.ok(placeCityTile(l, tx + 3, ty), 'apart');
+  assert.equal(placeCityTile(l, tx, ty), null, 'already city');
+  assert.equal(placeCityTile(l, tx, 0), null, 'spawn row');
 });
 
-test('removing a city tile may not split the city', () => {
+test('removing a city tile may split the city into districts', () => {
   let l = defaultLayout();
   const { tx, ty } = l.keep;
   l = placeCityTile(l, tx, ty - 1)!;
   l = placeCityTile(l, tx, ty - 2)!;
-  assert.equal(removeCityTile(l, tx, ty - 1), null);
+  assert.ok(removeCityTile(l, tx, ty - 1));
   assert.ok(removeCityTile(l, tx, ty - 2));
+});
+
+test('a city tile moves with everything on it, keeping uids, spots and gates', () => {
+  let l = defaultLayout();
+  const { tx, ty } = l.keep;
+  l = placeCityTile(l, tx, ty - 1)!;
+  l = placeStructure(l, 'barracks', tx, ty - 1)!;
+  l = placeStructure(l, 'archerTower', tx, ty - 1)!;
+  l = placeGate(l, { tx, ty: ty - 1, side: 'n' })!;
+  assert.ok(l);
+  const moved = moveCityTile(l, { tx, ty: ty - 1 }, { tx: tx - 3, ty: ty - 2 });
+  assert.ok(moved, 'moves apart from the keep with its buildings');
+  assert.deepEqual(moved!.cityTiles, [tileKey(tx - 3, ty - 2)]);
+  assert.deepEqual(moved!.structures.map((s) => [s.uid, s.kind, s.tx, s.ty]), l.structures.map((s) => [s.uid, s.kind, tx - 3, ty - 2]));
+  assert.deepEqual(moved!.gates, [{ tx: tx - 3, ty: ty - 2, side: 'n' }]);
+  assert.ok(fitLayout(moved!).ok);
+  assert.equal(moveCityTile(l, { tx, ty: ty - 1 }, { tx, ty }), null, 'not onto the keep');
+  assert.equal(moveCityTile(l, { tx, ty: ty - 1 }, { tx, ty: 0 }), null, 'not onto the spawn row');
+  assert.equal(moveCityTile(l, l.keep, { tx: tx - 3, ty }), null, "the keep's tile moves with the keep");
 });
 
 test('barracks need the city; towers may stand outside', () => {

@@ -9,7 +9,7 @@ import { ECONOMY, quadraticCost } from "./economy.ts";
 
 export type SkillId =
   | "drillSergeant" | "veterans" | "bladework" | "fletchers" | "gunpowder" | "ballistics" | "warBanner" | "bannerCooldown" | "bannerDefense" | "bannerReach" | "bannerDamage" | "bannerMarch" | "bannerLife" | "bannerRegen"
-  | "masonry" | "bastions" | "outskirts" | "guilds" | "scholars" | "tactician"
+  | "masonry" | "bastions" | "guilds" | "scholars" | "tactician"
   | "fireproofWood" | "fireTraining" | "nightWatch" | "enchantedInk" | "coffee" | "waterproofing";
 export type TreeId = "command" | "stewardship" | "mine" | "library";
 
@@ -18,9 +18,8 @@ export type TreeId = "command" | "stewardship" | "mine" | "library";
  * smithy), a whole number added. The Library's and the
  * Mine's skills are read as ranks (`library/sim.ts`: `accidentChance`,
  * `fireDrill`; `mine/sim.ts`: `nightShift`, the shaft house's seal,
- * `extraSmiths`); Outlying districts by the Defend page, as whether city
- * tiles may stand apart (`withOutskirts`). */
-export type SkillEffect = { target: BonusTarget | "smiths" | "fireproof" | "fireTraining" | "nightWatch" | "enchant" | "coffee" | "waterproof" | "outskirts" | "bannerCooldown" | "bannerDefense" | "bannerReach" | "bannerDamage" | "bannerMarch" | "bannerLife" | "bannerRegen"; per: number };
+ * `extraSmiths`). */
+export type SkillEffect = { target: BonusTarget | "smiths" | "fireproof" | "fireTraining" | "nightWatch" | "enchant" | "coffee" | "waterproof" | "bannerCooldown" | "bannerDefense" | "bannerReach" | "bannerDamage" | "bannerMarch" | "bannerLife" | "bannerRegen"; per: number };
 export type Skill = { id: SkillId; name: string; icon: string; max: number; base: number; effect: SkillEffect; text: string };
 export type SkillNode = { id: SkillId; requires: SkillId[]; full?: SkillId[] };
 export type SkillTree = { id: TreeId; name: string; description: string; nodes: SkillNode[] };
@@ -42,7 +41,6 @@ export const SKILLS: Record<SkillId, Skill> = {
   bannerRegen: { id: "bannerRegen", name: "Restoring standard", icon: "♥", max: 1, base: 12, effect: { target: "bannerRegen", per: 5 }, text: "Living units within banner influence regenerate 5% of maximum life per second" },
   masonry: { id: "masonry", name: "Masonry", icon: "▦", max: 3, base: 1, effect: { target: "wallHp", per: 10 }, text: "+10% wall HP a rank" },
   bastions: { id: "bastions", name: "Bastions", icon: "♜", max: 3, base: 2, effect: { target: "keepHp", per: 10 }, text: "+10% keep HP a rank" },
-  outskirts: { id: "outskirts", name: "Outlying districts", icon: "⌂", max: 1, base: 8, effect: { target: "outskirts", per: 1 }, text: "City tiles can be placed anywhere but the top row, not only against the city: each district apart from the keep's is walled on its own" },
   guilds: { id: "guilds", name: "Builders' guilds", icon: "⚒", max: 3, base: 2, effect: { target: "rebuild", per: 10 }, text: "Civilians rebuild 10% faster a rank" },
   scholars: { id: "scholars", name: "Smiths' guild", icon: "✦", max: 3, base: 2, effect: { target: "smithing", per: 15 }, text: "The Smithy's upgrades are worked 15% faster a rank" },
   tactician: { id: "tactician", name: "Master smith", icon: "⚒", max: 1, base: 6, effect: { target: "smiths", per: 1 }, text: "Room for one more smith in the mine's smithy" },
@@ -75,7 +73,6 @@ export const TREES: SkillTree[] = [
     { id: "masonry", requires: [] },
     { id: "bastions", requires: ["masonry"] },
     { id: "guilds", requires: ["masonry"] },
-    { id: "outskirts", requires: ["masonry"] },
     { id: "scholars", requires: [] },
     { id: "tactician", requires: ["scholars"] },
   ] },

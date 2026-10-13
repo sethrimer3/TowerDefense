@@ -77,7 +77,6 @@ const defendPage = new DefendPage(el("defend"), {
   save: () => save.defend,
   bonuses: () => bonuses(save),
   research: () => save.pathResearch,
-  outskirts: () => skillRank(save, "outskirts") > 0,
   earnWave: (wave) => {
     const r = payWave(save, wave);
     store();

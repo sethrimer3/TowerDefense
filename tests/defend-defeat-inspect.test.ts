@@ -7,9 +7,10 @@ import { EditSession, type DragAt } from "../src/defend/edit-session.ts";
 import { SUB, TILES_H, TILES_W } from "../src/defend/grid.ts";
 import { inspectable, reachOf, troopsOf } from "../src/defend/inspect.ts";
 import {
-  cityTileSet, defaultLayout, fitLayout, joinedOnly, placeCityTile, placeStructure, removeCityTile, tileGroups, type Layout,
+  cityTileSet, defaultLayout, fitLayout, placeCityTile, placeStructure, removeCityTile, tileGroups, type Layout,
 } from "../src/defend/layout.ts";
-import { decodeDefendSave, defaultDefendSave, withOutskirts } from "../src/defend/progress.ts";
+import { decodeDefendSave, defaultDefendSave } from "../src/defend/progress.ts";
+import { decode, defaults } from "../src/save.ts";
 import { DefendSim } from "../src/defend/sim.ts";
 import { refusal } from "../src/defend/drag-rules.ts";
 import { SKILLS, TREES } from "../src/skill-trees.ts";
@@ -88,15 +89,12 @@ test("a structure pressed and let go where it stands is tapped, not reshuffled",
   assert.ok(drop.kind === "build" && drop.tap && drop.layout === l);
 });
 
-test("Outlying districts lets city tiles stand apart, but never on the top row", () => {
+test("city tiles stand apart from the start, but never on the top row", () => {
   const l = city(), { tx, ty } = l.keep;
   const far = { tx: 1, ty: 3 };
-  assert.equal(placeCityTile(l, far.tx, far.ty), null, "without it, tiles must touch the city");
-  assert.equal(refusal({ from: "palette", item: "cityTile" }, l, `${far.tx},${far.ty}`), "City tiles must touch the city along an edge.");
-  const open = withOutskirts(l, true);
-  assert.ok(open.outskirts);
-  assert.equal(placeCityTile(open, 2, 0), null, "the spawn row stays closed");
-  const apart = placeCityTile(open, far.tx, far.ty)!;
+  assert.equal(placeCityTile(l, 2, 0), null, "the spawn row stays closed");
+  assert.match(refusal({ from: "palette", item: "cityTile" }, l, "2,0"), /top row/);
+  const apart = placeCityTile(l, far.tx, far.ty)!;
   assert.ok(apart, "a tile apart from the city");
   const built = placeStructure(apart, "cannonTower", far.tx, far.ty)!;
   assert.ok(built, "a structure on an outlying tile");
@@ -107,37 +105,31 @@ test("Outlying districts lets city tiles stand apart, but never on the top row",
   for (let t = 0; t < 30; t += 0.25) sim.update(0.25);
   assert.ok(sim.time > 29);
   // Removing a tile may leave the city in pieces too.
-  const spur = placeCityTile(placeCityTile(open, tx, ty - 1)!, tx, ty - 2)!;
+  const spur = placeCityTile(placeCityTile(l, tx, ty - 1)!, tx, ty - 2)!;
   assert.ok(removeCityTile(spur, tx, ty - 1), "the tile joining a spur can go");
-  // A save keeps it.
+  // A save keeps it, and an old save's outlying flag is ignored.
   const save = defaultDefendSave();
   save.owned.cityTile = 10;
   save.owned.cannonTower = 2;
   save.owned.barracks = 2;
   save.owned.archerTower = 2;
   save.layout = built;
-  const back = decodeDefendSave(JSON.parse(JSON.stringify(save)));
+  const raw = JSON.parse(JSON.stringify(save));
+  raw.layout.outskirts = true;
+  const back = decodeDefendSave(raw);
   assert.deepEqual(back.layout.cityTiles, built.cityTiles);
-  assert.equal(back.layout.outskirts, true);
+  assert.equal("outskirts" in back.layout, false);
+  assert.ok(cityTileSet(back.layout).has("1,3") && fitLayout(back.layout).ok && TILES_W > 2 && TILES_H > 4 && SUB > 0);
 });
 
-test("unlearning Outlying districts takes up the tiles apart from the keep's", () => {
-  const open = withOutskirts(city(), true);
-  const built = placeStructure(placeCityTile(open, 1, 3)!, "cannonTower", 1, 3)!;
-  const { returned } = joinedOnly(built);
-  assert.deepEqual(returned, ["cannonTower"]);
-  const closed = withOutskirts(built, false);
-  assert.equal(closed.outskirts, undefined);
-  assert.ok(!cityTileSet(closed).has("1,3"));
-  assert.ok(!closed.structures.some((s) => s.kind === "cannonTower"));
-  assert.ok(closed.structures.some((s) => s.kind === "archerTower"), "the keep's city stays as it was");
-  assert.ok(fitLayout(closed).ok);
-  assert.equal(withOutskirts(closed, false), closed);
-  assert.ok(TILES_W > 2 && TILES_H > 4 && SUB > 0);
-});
-
-test("Outlying districts is a one-rank Study skill filed with the city's walls", () => {
-  assert.equal(SKILLS.outskirts.max, 1);
-  assert.ok(TREES.find((t) => t.id === "stewardship")!.nodes.some((n) => n.id === "outskirts"));
-  assert.ok(SUBJECTS.find((s) => s.id === "city")!.topics.find((t) => t.id === "walls")!.skills!.includes("outskirts"));
+test("the retired Outlying districts skill gives its Knowledge back", () => {
+  assert.equal("outskirts" in SKILLS, false);
+  assert.ok(!TREES.some((t) => t.nodes.some((n) => (n.id as string) === "outskirts")));
+  assert.ok(!SUBJECTS.find((s) => s.id === "city")!.topics.find((t) => t.id === "walls")!.skills!.includes("outskirts" as never));
+  const old = { ...JSON.parse(JSON.stringify(defaults())), knowledge: 5 };
+  old.skills.outskirts = 1;
+  const back = decode(JSON.stringify(old));
+  assert.equal(back.knowledge, 13);
+  assert.equal("outskirts" in back.skills, false);
+  assert.equal(decode(JSON.stringify(back)).knowledge, 13, "refunded once");
 });
