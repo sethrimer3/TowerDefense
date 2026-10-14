@@ -4,6 +4,10 @@
  * - **Arrows** (archers and archer towers): an iron head, an ash shaft and
  *   red-and-white fletching, baked once per one of `ARROW_DIRS` headings
  *   and drawn on the art lattice where the sim says each flies.
+ * - **Shots** (the ranged guilds' troops): a thrown stone, grey and lit
+ *   from the upper left; a sniper's bullet, a bright brass fleck; a
+ *   musketman's explosive ball, black with a burning fuse spark. Each is
+ *   a small outlined disc baked once.
  * - **Cannon shells:** an outlined iron ball with a glint, lifted along its
  *   arc over a dithered shadow on the ground, trailing three puffs of smoke.
  * - **Dragon breath:** the fire a dragon pours down at the city, puffs of
@@ -129,6 +133,11 @@ export function drawArrows(c: Ctx, px: number, sim: DefendSim) {
   if (!sim.arrows.length) return;
   c.imageSmoothingEnabled = false;
   for (const a of sim.arrows) {
+    if (a.shot) {
+      const s = shotSprite(a.shot);
+      blit(c, px, s.cv, Math.round(a.x * ART - s.size / 2), Math.round(a.y * ART - s.size / 2));
+      continue;
+    }
     let dx = a.tx - a.x, dy = a.ty - a.y;
     if (dx * dx + dy * dy < 1e-4 && a.origin) (dx = a.x - a.origin.x), (dy = a.y - a.origin.y);
     const d = Math.hypot(dx, dy) || 1;
@@ -136,6 +145,38 @@ export function drawArrows(c: Ctx, px: number, sim: DefendSim) {
     const mx = a.x - (dx / d) * ARROW_BACK, my = a.y - (dy / d) * ARROW_BACK;
     blit(c, px, arrowSprite(dir), Math.round(mx * ART - ARROW_BOX / 2), Math.round(my * ART - ARROW_BOX / 2));
   }
+}
+
+/** A shot's pixels: a disc `d` art pixels across in its outline, lit from
+ * the upper left (`hi` the glint, `lo` the shaded side), and an optional
+ * spark on its top right. Pure, for tests. */
+export function shotPixels(shot: "stone" | "bullet" | "ball"): { px: string[]; size: number } {
+  const [d, base, lo, hi] = SHOTS[shot];
+  const size = d + 2, mid = (size - 1) / 2, r = d / 2;
+  const px: string[] = new Array(size * size).fill("");
+  for (let y = 0; y < size; y++)
+    for (let x = 0; x < size; x++) {
+      const ox = x - mid, oy = y - mid;
+      if (ox * ox + oy * oy > r * r + 0.01) continue;
+      px[y * size + x] = ox + oy < -r * 0.5 ? hi : ox + oy > r * 0.4 ? lo : base;
+    }
+  const out = outlined(px, size, size);
+  if (shot === "ball") out[size - 1] = "#ffd060";
+  return { px: out, size };
+}
+const SHOTS: Record<"stone" | "bullet" | "ball", [number, string, string, string]> = {
+  stone: [2, "#8c8577", "#5c574e", "#c9c2b2"],
+  bullet: [1, "#e0c070", "#b08a3e", "#fff4c8"],
+  ball: [3, "#2c2a2e", "#1b1a1d", "#8c8c96"],
+};
+const shotSprites = new Map<string, { cv: HTMLCanvasElement; size: number }>();
+function shotSprite(shot: "stone" | "bullet" | "ball") {
+  let s = shotSprites.get(shot);
+  if (!s) {
+    const p = shotPixels(shot);
+    shotSprites.set(shot, (s = { cv: paint(p.px, p.size, p.size), size: p.size }));
+  }
+  return s;
 }
 
 /** A cannon ball's pixels: an iron disc `d` art pixels across in its

@@ -1891,6 +1891,8 @@ dialog .away-row .away-note {
 .spec-row b { color: var(--hue, #ead8b8); }
 .spec-row .path-medal { border-color: var(--hue-deep, #050308); }
 .spec-stats { color: #f4d999; }
+.spec-cost { color: #f2c95a; }
+.spec-choice.locked .spec-cost { color: #8a7a6a; }
 .spec-note { color: #9c8b6b; }
 .tile-specialties { color: #d9bd87; border-top: 1px solid #79603980; }
 .ledger-scope { color: #d9bd87; border-bottom: 1px solid #79603980; }

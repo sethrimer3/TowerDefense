@@ -37,9 +37,11 @@ import {
 } from "./layout.ts";
 import type { Overlay } from "./edit-overlay.ts";
 import type { IconItem } from "./structure-art.ts";
+import type { PathId } from "../knowledge-paths.ts";
 
 export type Drag =
-  | { from: "palette"; item: PaletteItem }
+  /** A copy from the palette; `wear`, a kept copy's path and rank. */
+  | { from: "palette"; item: PaletteItem; wear?: { path: PathId; rank: number } }
   | { from: "structure"; uid: number; kind: PlacedKind }
   | { from: "cityTile"; tile: TilePos }
   | { from: "keep" }
@@ -127,7 +129,7 @@ export function legalLayouts(drag: Drag, layout: Layout): Map<string, Layout> {
           const next =
             drag.from === "gate" ? moveGate(layout, drag.gate, g)
             : drag.from === "spikes" ? moveSpikes(layout, drag.spikes, g)
-            : spikes ? placeSpikes(layout, g)
+            : spikes ? placeSpikes(layout, g, drag.from === "palette" ? drag.wear : undefined)
             : placeGate(layout, g);
           if (next) out.set(gateKey(g), next);
         }
@@ -147,7 +149,7 @@ function layoutAfter(drag: Drag, layout: Layout, tx: number, ty: number): Layout
   switch (drag.from) {
     case "palette":
       if (drag.item === "cityGate" || drag.item === "wallSpikes" || drag.item === "wallBallista") return null;
-      return drag.item === "cityTile" ? placeCityTile(layout, tx, ty) : placeStructure(layout, drag.item, tx, ty);
+      return drag.item === "cityTile" ? placeCityTile(layout, tx, ty) : placeStructure(layout, drag.item, tx, ty, drag.wear);
     case "structure":
       return moveStructure(layout, drag.uid, tx, ty);
     case "cityTile":

@@ -6,11 +6,15 @@ import type { BattlePaths, PathId } from "../knowledge-paths.ts";
  * copper, silver and Gold, the universal upgrades, the bonuses the Smithy and the
  * skill trees add, and the enemy roster. */
 
-export type StructureKind = "keep" | "barracks" | "archerBarracks" | "archerTower" | "cannonTower" | "watchTower" | "wizardTower" | "mageGuild" | "valkyriePalace" | "darkKeep" | "monsterBait";
+export type StructureKind = "keep" | "meleeGuild" | "rangedGuild" | "barracks" | "archerBarracks" | "sniperLodge" | "musketHall" | "archerTower" | "cannonTower" | "watchTower" | "wizardTower" | "mageGuild" | "valkyriePalace" | "darkKeep" | "monsterBait";
 /** Everything that appears in the build palette (the keep is placed from the
  * start and can only be moved, so it is not a palette item). */
 export type PaletteItem = "cityTile" | "cityGate" | "wallSpikes" | "wallBallista" | Exclude<StructureKind, "keep">;
-export const PALETTE_ITEMS: PaletteItem[] = ["cityTile", "barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "cityGate", "wallSpikes", "wallBallista"];
+export const PALETTE_ITEMS: PaletteItem[] = ["cityTile", "meleeGuild", "rangedGuild", "barracks", "archerBarracks", "sniperLodge", "musketHall", "watchTower", "archerTower", "cannonTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "cityGate", "wallSpikes", "wallBallista"];
+/** The only buildings the shop sells: every other tower or troop building
+ * is one of these upgraded, a building at a time, with Knowledge
+ * (`building-upgrades.ts`). */
+export const BASIC_BUILDINGS: PaletteItem[] = ["watchTower", "meleeGuild", "rangedGuild"];
 
 /** The build palette's categories: what each shows (All shows everything). */
 export type PaletteCategory = "all" | "towers" | "units" | "city";
@@ -32,8 +36,12 @@ export const ITEM_CATEGORY: Record<PaletteItem, Exclude<PaletteCategory, "all">>
   cannonTower: "towers",
   watchTower: "towers",
   wizardTower: "towers",
+  meleeGuild: "units",
+  rangedGuild: "units",
   barracks: "units",
   archerBarracks: "units",
+  sniperLodge: "units",
+  musketHall: "units",
   mageGuild: "units",
   valkyriePalace: "units",
   darkKeep: "units",
@@ -98,6 +106,46 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     maxHp: 600,
     outsideOk: false,
     description: "The heart of the city. Enemies march on it; if it falls, the defense is over.",
+  },
+  meleeGuild: {
+    kind: "meleeGuild",
+    name: "Melee Guild",
+    w: 3,
+    h: 3,
+    size: 4,
+    maxHp: 140,
+    outsideOk: false,
+    description: "Trains brawlers: townsfolk with bare fists who rush out and punch whatever breaches the walls. Upgrade it with Knowledge into a barracks of swordsmen, and on to assassins, crusaders and at last valkyries.",
+  },
+  rangedGuild: {
+    kind: "rangedGuild",
+    name: "Ranged Guild",
+    w: 3,
+    h: 3,
+    size: 4,
+    maxHp: 130,
+    outsideOk: false,
+    description: "Trains stone throwers who wander the streets lobbing rocks at anything near. Upgrade it with Knowledge into archers, fire mages, snipers or explosive musketmen.",
+  },
+  sniperLodge: {
+    kind: "sniperLodge",
+    name: "Sniper lodge",
+    w: 3,
+    h: 3,
+    size: 4,
+    maxHp: 140,
+    outsideOk: false,
+    description: "Trains snipers with long rifles: slow to reload, but they pick off enemies from far across the city with shots that hit very hard.",
+  },
+  musketHall: {
+    kind: "musketHall",
+    name: "Musket hall",
+    w: 3,
+    h: 3,
+    size: 4,
+    maxHp: 150,
+    outsideOk: false,
+    description: "Trains musketmen firing explosive shot: every ball bursts where it hits, hurting everything round it (never your own people).",
   },
   barracks: {
     kind: "barracks",
@@ -221,11 +269,15 @@ export const STARTING_OWNED: Record<PaletteItem, number> = {
   cityGate: 0,
   wallSpikes: 0,
   wallBallista: 0,
-  barracks: 1,
+  meleeGuild: 1,
+  rangedGuild: 1,
+  barracks: 0,
   archerBarracks: 0,
-  archerTower: 1,
+  sniperLodge: 0,
+  musketHall: 0,
+  archerTower: 0,
   cannonTower: 0,
-  watchTower: 0,
+  watchTower: 1,
   wizardTower: 0,
   mageGuild: 0,
   valkyriePalace: 0,
@@ -245,8 +297,12 @@ export function purchasePrice(item: PaletteItem, owned: number): Price {
     cityGate: { copper: 4 },
     wallSpikes: { copper: 3 },
     wallBallista: { copper: 6 },
+    meleeGuild: { copper: 4 },
+    rangedGuild: { copper: 4 },
     barracks: { copper: 4 },
     archerBarracks: { copper: 5 },
+    sniperLodge: { copper: 6 },
+    musketHall: { copper: 7 },
     archerTower: { copper: 3 },
     cannonTower: { copper: 6 },
     watchTower: { copper: 3 },
@@ -269,8 +325,12 @@ export const ITEM_NAMES: Record<PaletteItem, string> = {
   cityGate: "City gate",
   wallSpikes: "Wall spikes",
   wallBallista: "Wall ballista",
+  meleeGuild: STRUCTURES.meleeGuild.name,
+  rangedGuild: STRUCTURES.rangedGuild.name,
   barracks: STRUCTURES.barracks.name,
   archerBarracks: STRUCTURES.archerBarracks.name,
+  sniperLodge: STRUCTURES.sniperLodge.name,
+  musketHall: STRUCTURES.musketHall.name,
   archerTower: STRUCTURES.archerTower.name,
   cannonTower: STRUCTURES.cannonTower.name,
   watchTower: STRUCTURES.watchTower.name,
@@ -745,6 +805,16 @@ export const NO_BONUSES: Readonly<Bonuses> = Object.freeze({
 
 export const SOLDIER = { hp: 40, damage: 6, cooldown: 0.8, speed: 2.4, reach: 0.75, leash: 16, size: 0.4, color: "#5b8fd9" };
 export const ARCHER_UNIT = { hp: 24, damage: 5, cooldown: 1.1, speed: 2.1, size: 0.36, color: "#6cc08a" };
+/** The Melee Guild's brawlers: a swordsman's pace and leash with bare
+ * fists, shorter reach and less of everything. */
+export const BRAWLER = { hp: 30, damage: 3.5, cooldown: 0.7, speed: 2.4, reach: 0.6, size: 0.38, color: "#c99a62" };
+/** The ranged troops: each walks the streets like an archer and shoots
+ * within `range` cells (on top of Keen eyes). The Ranged Guild's stone
+ * throwers lob rocks a short way; snipers shoot far and slowly with
+ * heavy shots; musketmen's balls burst `blast` cells wide where they hit. */
+export const SLINGER = { hp: 20, damage: 3, cooldown: 1.2, speed: 2.1, size: 0.34, range: 2.5, color: "#a3906a" };
+export const SNIPER = { hp: 22, damage: 22, cooldown: 3.6, speed: 1.8, size: 0.36, range: 9, color: "#4f6b3a" };
+export const MUSKETEER = { hp: 30, damage: 9, cooldown: 2.6, speed: 2, size: 0.38, range: 4, blast: 0.9, color: "#7a3b2a" };
 export const VALKYRIE = { hp: 50, damage: 16, cooldown: 1.8, speed: 2.3, size: 0.44, color: "#f2e6c4" };
 /** The dark wizard, the keep's one ultimate unit: slow to summon (`drill`
  * times a barracks' drill), casting a bolt of black lightning within

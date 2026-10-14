@@ -40,6 +40,8 @@ export const cannonTowerRange = (sim: Pick<DefendSim, "bonuses">, b?: Building) 
 const CANNON_MIN = 1.5;
 /** Arrow speed, cells per second. */
 const ARROW_SPEED = 16;
+/** How fast each other shot flies, as a share of an arrow's speed. */
+const SHOT_SPEED = { stone: 0.7, bullet: 2.2, ball: 1.4 };
 
 export class Towers {
   /** Seconds until each tower may fire again. */
@@ -133,13 +135,15 @@ export function stepArrows(sim: DefendSim, dt: number) {
     const dx = a.tx - a.x,
       dy = a.ty - a.y;
     const d = dist(dx, dy);
-    const step = ARROW_SPEED * dt;
+    const step = ARROW_SPEED * (a.shot ? SHOT_SPEED[a.shot] : 1) * dt;
     if (d > step) {
       a.x += (dx / d) * step;
       a.y += (dy / d) * step;
       continue;
     }
-    if (alive && sim.hurtEnemy(t, a.damage, true, "ranged", a.origin ?? { x: a.x, y: a.y }, true) && a.burn) ignite(t, a.burn, a.burnFor!);
+    // An explosive ball bursts where it lands, even if its mark fell.
+    if (a.blast) sim.explode(a.tx, a.ty, { r: a.blast, damage: a.damage, friendlyFire: false, origin: a.origin ?? { x: a.x, y: a.y } });
+    else if (alive && sim.hurtEnemy(t, a.damage, true, "ranged", a.origin ?? { x: a.x, y: a.y }, true) && a.burn) ignite(t, a.burn, a.burnFor!);
     a.life = 0;
   }
   sim.arrows = sim.arrows.filter((a) => a.life > 0);

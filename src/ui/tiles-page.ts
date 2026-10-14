@@ -1,6 +1,6 @@
-import { evolveOne, unevolveOne } from "../specializations.ts";
+import { rootOf, upgradedFrom } from "../specializations.ts";
 import { paintPathIcons } from "./path-badge.ts";
-import { specialtyListHtml } from "./specialty.ts";
+import { upgradeTreeHtml } from "./specialty.ts";
 /** The Tiles tab: the player's tiles laid out in a hall of the keep they
  * defend, under its great window. Identical tiles stack, one stack a kind
  * marked with its quantity (`tileStacks`); a tap opens the stack in place,
@@ -90,16 +90,6 @@ export class TilesPage {
   }
 
   private press(target: Element) {
-    const evolve = target.closest<HTMLButtonElement>("[data-evolve-one]");
-    if (evolve) {
-      if (evolveOne(this.save, evolve.dataset.evolveOne as never)) { play("levelUp"); this.ctx.update(); this.relayout(() => {}); }
-      return;
-    }
-    const reset = target.closest<HTMLButtonElement>("[data-unevolve-one]");
-    if (reset) {
-      if (unevolveOne(this.save, reset.dataset.unevolveOne as PlacedKind)) { this.ctx.update(); this.relayout(() => {}); }
-      return;
-    }
     const buy = target.closest<HTMLButtonElement>("[data-buy-tile]");
     if (buy) return this.buy(buy.dataset.buyTile as TileId);
     const go = target.closest<HTMLButtonElement>("[data-go]");
@@ -186,25 +176,23 @@ export class TilesPage {
     const go = (where: "smithy" | "study") => topicHas(topic, where)
       ? `<button class="tile-go go-${where}" data-go="${where}" data-topic="${topic.id}">${where === "smithy" ? "⚒ Smithy" : "✦ Study"}<small>${where === "smithy" ? "below the Mine" : "below the Library"}</small></button>`
       : "";
+    // Where it stands in its upgrade tree: what it was upgraded from, and
+    // what its paths' crowns evolve it into.
+    const from = isConsumable(t.id) || t.id === "cityTile" ? undefined : upgradedFrom(t.id as PlacedKind);
     const tier = higherTier(t.id);
-    const tierText = tier.into?.evolves
-      ? `Research <b>${tier.into.name}</b> and its crown in the Study, then evolve any ${name} into a <b>${tier.into.evolves.name}</b>, here or there.`
-      : tier.from?.evolves
-      ? `The higher tier of the ${TILE_NAMES[tier.from.evolves.from as PaletteItem]}: made by the crown of <b>${tier.from.name}</b>.`
+    const tierText = from
+      ? `Upgraded from a <b>${ITEM_NAMES[from]}</b>${rootOf(from) !== from ? ` (itself grown from a ${ITEM_NAMES[rootOf(from)]})` : ""}: buy a ${ITEM_NAMES[rootOf(from)]}, place it and tap it in Defend to upgrade it with Knowledge.`
+      : tier.into?.evolves
+      ? `At <b>${tier.into.name} III</b>, one ${name} can evolve into a <b>${tier.into.evolves.name}</b>.`
       : "";
-    const crowned = tier.into?.evolves && s.pathResearch[tier.into.id]?.crowned;
-    const evolve = crowned && t.count
-      ? `<button class="tile-evolve" data-evolve-one="${tier.into!.id}">Evolve one<small>Free · a ${tier.into!.evolves!.name} waits in the palette</small></button>` : "";
-    const unevolve = tier.from?.evolves && t.count
-      ? `<button class="tile-evolve" data-unevolve-one="${t.id}">Return one<small>Free · back to a ${ITEM_NAMES[tier.from.evolves.from]}</small></button>` : "";
     const counts = t.lasting ? "ONE BANNER" : `OWNED ${t.count}${isConsumable(t.id) ? "" : ` · ${t.placed} IN THE CITY · ${t.ready} READY`}`;
     return `<div class="tile-detail type-${t.type}" data-key="detail:${t.id}" data-grow role="region" aria-label="${name}">
         <header><span class="tile-face big"><canvas width="48" height="48" data-icon="${iconOf(t.id)}"></canvas></span>
           <div><small>${TILE_TYPE_NAMES[TILE_TYPE[t.id]].toUpperCase()} TILE · ${counts}</small><h3>${name}</h3><p>${this.describe(t.id)}</p></div>
           <button class="tile-close" data-close aria-label="Close">×</button></header>
         ${copies}
-        ${isConsumable(t.id) ? "" : specialtyListHtml(s, t.id)}
-        <div class="tile-actions">${buy}${evolve}${unevolve}${go("smithy")}${go("study")}</div>
+        ${isConsumable(t.id) ? "" : upgradeTreeHtml(s, t.id)}
+        <div class="tile-actions">${buy}${go("smithy")}${go("study")}</div>
         ${tierText ? `<p class="tile-tier"><span aria-hidden="true">♛</span> ${tierText}</p>` : ""}
       </div>`;
   }

@@ -11,9 +11,10 @@
 import { ART } from "./park-art.ts";
 import { OUTLINE, bake, blit } from "./pixel-fx.ts";
 import { hash01 } from "./grid.ts";
+import type { Soldier } from "./sim.ts";
 
 /** Who a ghost was. */
-export type GhostKind = "sword" | "archer" | "mage" | "valkyrie" | "darkWizard" | "undead" | "reinforcement" | "civilian";
+export type GhostKind = Soldier["kind"] | "civilian";
 
 type Body = { x: number; y: number; hp: number; id: number };
 type Units = { soldiers: readonly (Body & { kind: Exclude<GhostKind, "civilian">; called?: { left?: true } })[]; civilians: readonly Body[] };
@@ -67,6 +68,10 @@ const TINTS: Record<GhostKind, [string, string]> = {
   darkWizard: ["#dcc4ff", "#f6eeff"],
   undead: ["#a9f0b8", "#e8fff0"],
   reinforcement: ["#ffe7a6", "#fffaea"],
+  brawler: ["#f2dcc4", "#fff6ec"],
+  slinger: ["#e6dcc8", "#fbf6ec"],
+  sniper: ["#cfe4c0", "#f2fbea"],
+  musketeer: ["#f2cfc0", "#fff1ea"],
   civilian: ["#f1ece0", "#ffffff"],
 };
 

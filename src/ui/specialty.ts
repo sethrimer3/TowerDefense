@@ -1,18 +1,18 @@
-/** A building kind's Knowledge paths as the player meets them: what each
- * does to the kind's numbers (`kindStats`), the read-only list Tiles shows
- * (`specialtyListHtml`), and the choice Defend offers when a building is
- * placed or tapped (`specialtyChoicesHtml`). Paths, ranks, icons and hues
- * all come from the catalog in `knowledge-paths.ts`. */
+/** A building's upgrades as the player meets them: what a path does to the
+ * kind's numbers (`kindStats`), the read-only tree Tiles shows
+ * (`upgradeTreeHtml`), and the upgrades Defend offers when a placed
+ * building is tapped (`upgradeChoicesHtml`). The tree comes from
+ * `specializations.ts`; paths, ranks, icons and hues from `knowledge-paths.ts`. */
 import type { Save } from "../save.ts";
-import { specialties, type Specialty } from "../specializations.ts";
-import { pathTopicOf, UNSPECIALIZED, type PathId, type PathResearch, FIRE_ARROWS, SHARP, GUNNERY, SIEGE_SHOT, CRUSADE, ASSASSIN, RANGERS, SKIRMISH, FORTIFY, PYRO, RIME, STORM, PYROCLASM, CINDERS, SPOTTERS, SIGNAL } from "../knowledge-paths.ts";
+import { BECOMES, TROOPS, buildingPathsOf, nextSteps, stepName, type UpgradeStep, type Wear } from "../specializations.ts";
+import { pathById, pathTopicOf, UNSPECIALIZED, type PathId, FIRE_ARROWS, SHARP, GUNNERY, SIEGE_SHOT, CRUSADE, ASSASSIN, RANGERS, SKIRMISH, FORTIFY, PYRO, RIME, STORM, PYROCLASM, CINDERS, SPOTTERS, SIGNAL } from "../knowledge-paths.ts";
 import { bonuses } from "../progression.ts";
-import { archerDamage, archerCooldown, archerRange, cannonDamage, cannonCooldown, CANNON_RANGE, SOLDIER, ARCHER_UNIT, soldierScale, STRUCTURES, flameDps, flameRange, iceDamage, ICE_RANGE, iceChill, watchRadius, fireballDamage, fireballSplash, emberDps, emberSeconds, FIRE_MAGE, FIREBALL_RANGE, type PaletteItem } from "../defend/catalog.ts";
+import { ITEM_NAMES, archerDamage, archerCooldown, archerRange, cannonDamage, cannonCooldown, CANNON_RANGE, SOLDIER, ARCHER_UNIT, soldierScale, STRUCTURES, flameDps, flameRange, iceDamage, ICE_RANGE, iceChill, watchRadius, fireballDamage, fireballSplash, emberDps, emberSeconds, FIRE_MAGE, FIREBALL_RANGE, BRAWLER, SLINGER, SNIPER, MUSKETEER, type PaletteItem } from "../defend/catalog.ts";
 
-/** `kind`'s effective numbers wearing `path` at its researched rank (none:
- * unspecialized), with the shared Smithy and skill bonuses. */
-export function kindStats(save: Save, kind: PaletteItem, path?: PathId): string {
-  const l = save.defend.levels, b = bonuses(save), rank = path ? save.pathResearch[path]?.rank ?? 0 : 0;
+/** `kind`'s effective numbers wearing `path` at `rank` (none: plain), with
+ * the shared Smithy and skill bonuses. */
+export function kindStats(save: Save, kind: PaletteItem, path?: PathId, rank = 0): string {
+  const l = save.defend.levels, b = bonuses(save);
   const at = (id: string) => path === id ? rank : 0;
   const n = (v: number) => Number(v.toFixed(2));
   if (kind === "archerTower") {
@@ -45,6 +45,11 @@ export function kindStats(save: Save, kind: PaletteItem, path?: PathId): string 
     const pyro = at("pyroclasm"), cinders = at("cinders");
     return `Recruits: ${n(FIRE_MAGE.hp * soldierScale(l.soldierArms) * b.troopHp)} HP · ${n(fireballDamage(l.mageFireball) * soldierScale(l.soldierArms) * b.troopDamage * (pyro ? PYROCLASM.damage : 1))} fireball damage · ${n(fireballSplash(l.mageFireball) * (pyro >= 2 ? PYROCLASM.splash : 1))} blast radius · ${n(emberDps(l.mageEmbers) * b.troopDamage * (cinders >= 2 ? CINDERS.dps : 1))} ground damage/s · ${n(emberSeconds(l.mageEmbers) * (cinders ? CINDERS.life : 1))}s burning ground`;
   }
+  if (kind === "meleeGuild" || kind === "rangedGuild" || kind === "sniperLodge" || kind === "musketHall") {
+    const u = kind === "meleeGuild" ? BRAWLER : kind === "rangedGuild" ? SLINGER : kind === "sniperLodge" ? SNIPER : MUSKETEER, scale = soldierScale(l.soldierArms);
+    const range = "range" in u ? ` · ${u.range} range` : "";
+    return `Recruits: ${n(u.hp * scale * b.troopHp)} HP · ${n(u.damage * scale * b.troopDamage)} damage every ${u.cooldown}s${range}${kind === "musketHall" ? ` · bursts ${MUSKETEER.blast} cells wide` : ""}`;
+  }
   if (kind === "monsterBait") return `${STRUCTURES.monsterBait.maxHp * FORTIFY.hp[at("fortified")]} HP`;
   if (kind in STRUCTURES) return `${STRUCTURES[kind as keyof typeof STRUCTURES].maxHp} building HP`;
   return "Uses the shared city upgrades.";
@@ -52,43 +57,49 @@ export function kindStats(save: Save, kind: PaletteItem, path?: PathId): string 
 
 const ROMAN = ["", "I", "II", "III", "IV", "V"];
 
-/** One choice's medallion: the worn rank's icon (or the first rank's, dim,
- * while still to research) in the path's colours, its numeral beneath. */
-const medal = (s: Specialty) => {
-  const r = s.path.ranks[Math.max(0, s.rank - 1)];
-  return `<span class="path-medal"><canvas data-path-icon="${r.icon}:${s.path.hue}"></canvas>${s.rank ? `<b>${ROMAN[s.rank]}</b>` : ""}</span>`;
+/** A path rank's medallion: its icon in the path's colours, its numeral beneath. */
+const medal = (path: PathId, rank: number) => {
+  const p = pathById(path), r = p.ranks[Math.max(0, rank - 1)];
+  return `<span class="path-medal"><canvas data-path-icon="${r.icon}:${p.hue}"></canvas>${rank ? `<b>${ROMAN[rank]}</b>` : ""}</span>`;
 };
+/** A building's medallion: its own icon. */
+const buildingMedal = (kind: string) => `<span class="path-medal base"><canvas width="32" height="32" data-icon="${kind}"></canvas></span>`;
 
-/** Tiles' read-only preview of `kind`'s paths: each one researched so far
- * at its rank, with what it does to the numbers, the rest still to research
- * in the Study. Empty for a kind without paths. */
-export function specialtyListHtml(save: Save, kind: PaletteItem): string {
-  const list = specialties(save.pathResearch, kind);
-  if (!list.length) return "";
-  const rows = list.map((s) => {
-    const r = s.path.ranks[s.rank - 1];
-    return `<li class="spec-row hue-${s.path.hue} ${s.rank ? "" : "locked"}">${medal(s)}<div><b>${s.path.name}${s.rank ? ` ${ROMAN[s.rank]}` : ""}</b>
-      <small>${s.rank ? `${r.name}: ${r.text}` : `${s.path.motto} · research it in the Study`}</small>${s.rank ? `<small class="spec-stats">${kindStats(save, kind, s.path.id)}</small>` : ""}</div></li>`;
+/** What a step does, in a line. */
+function stepText(s: UpgradeStep): string {
+  if (s.type === "become") return `${TROOPS[s.to] ? `${TROOPS[s.to]} · ` : ""}${(STRUCTURES[s.to].description.split(". ")[0] ?? "").replace(/\.$/, "")}`;
+  if (s.type === "evolve") return pathById(s.path).evolves!.text;
+  const p = pathById(s.path), r = p.ranks[s.rank - 1];
+  return `${r.name}: ${r.text}`;
+}
+/** A step's hue class (a path's colours; gold for an evolution). */
+const stepHue = (s: UpgradeStep) => (s.type === "path" ? ` hue-${pathById(s.path).hue}` : s.type === "evolve" ? " hue-gold" : "");
+
+/** Defend's upgrade buttons for one placed building of `kind` wearing
+ * `wear`: each step it can take next, its Knowledge price, and whether the
+ * player can pay it. Each is a button with `data-upgrade-step` (its index
+ * in `nextSteps`). */
+export function upgradeChoicesHtml(save: Save, kind: PaletteItem, wear?: Wear): string {
+  const steps = nextSteps(kind as never, wear), free = save.settings.devMode;
+  if (!steps.length) return `<p class="spec-note">This building is fully upgraded.</p>`;
+  return steps.map((s, i) => {
+    const can = free || save.knowledge >= s.cost;
+    const icon = s.type === "path" ? medal(s.path, s.rank) : buildingMedal(s.to);
+    const label = s.type === "evolve" ? `Evolve: ${stepName(s)}` : s.type === "become" ? `Become: ${stepName(s)}` : stepName(s);
+    return `<button class="spec-choice${stepHue(s)} ${can ? "" : "locked"}" data-upgrade-step="${i}" ${can ? "" : `disabled aria-disabled="true"`} title="${stepText(s)}">
+      ${icon}<span class="spec-text"><b>${label}</b><small>${stepText(s)}</small><small class="spec-cost">${free ? "Free" : `${s.cost.toLocaleString("en")} Knowledge`}</small></span></button>`;
   }).join("");
-  return `<div class="tile-specialties"><small>SPECIALIZATIONS · CHOSEN AS YOU PLACE EACH ONE IN DEFEND</small>
-    <ul><li class="spec-row base"><span class="path-medal base"><canvas width="32" height="32" data-icon="${kind}"></canvas></span><div><b>Unspecialized</b><small>${UNSPECIALIZED[pathTopicOf(kind)!]}</small><small class="spec-stats">${kindStats(save, kind)}</small></div></li>${rows}</ul></div>`;
 }
 
-/** Defend's choice for one placed building: unspecialized, then each of
- * its kind's paths at its researched rank, colours and icon from the
- * catalog. Paths still to research show dimmed and can't be chosen.
- * `current` is the path worn now (pressed). Each choice is a button with
- * `data-specialty` (the path id, or "" for none). */
-export function specialtyChoicesHtml(research: PathResearch, kind: string, current?: PathId): string {
+/** Tiles' read-only tree for `kind`: what a plain one can become, and the
+ * paths it can climb, each rank with what it does (empty for a kind with
+ * neither). Upgrades are bought on each building in Defend. */
+export function upgradeTreeHtml(save: Save, kind: PaletteItem): string {
+  const becomes = BECOMES[kind as keyof typeof BECOMES] ?? [], paths = buildingPathsOf(kind);
+  if (!becomes.length && !paths.length) return "";
   const topic = pathTopicOf(kind);
-  if (!topic) return "";
-  const base = `<button class="spec-choice base" data-specialty="" aria-pressed="${!current}">
-      <span class="path-medal base"><canvas width="32" height="32" data-icon="${kind}"></canvas></span>
-      <span class="spec-text"><b>Unspecialized</b><small>${UNSPECIALIZED[topic]}</small></span></button>`;
-  return base + specialties(research, kind).map((s) => {
-    const on = current === s.path.id, r = s.path.ranks[s.rank - 1];
-    return `<button class="spec-choice hue-${s.path.hue} ${s.rank ? "" : "locked"}" data-specialty="${s.path.id}" aria-pressed="${on}" ${s.rank ? "" : `disabled aria-disabled="true"`}
-        title="${s.rank ? `${r.name}: ${r.text}` : "Research it in the Study to choose it"}">
-      ${medal(s)}<span class="spec-text"><b>${s.path.name}${s.rank ? ` ${ROMAN[s.rank]}` : ""}</b><small>${s.rank ? s.path.motto : `Locked · research in the Study`}</small></span></button>`;
-  }).join("");
+  const base = `<li class="spec-row base">${buildingMedal(kind)}<div><b>${ITEM_NAMES[kind]}</b><small>${topic ? UNSPECIALIZED[topic] : TROOPS[kind as keyof typeof TROOPS] ?? ""}</small><small class="spec-stats">${kindStats(save, kind)}</small></div></li>`;
+  const grow = becomes.map((b) => `<li class="spec-row">${buildingMedal(b.to)}<div><b>Becomes ${ITEM_NAMES[b.to]}</b><small>${b.cost} Knowledge · ${TROOPS[b.to] ?? "a tower"}</small></div></li>`).join("");
+  const climb = paths.map((p) => `<li class="spec-row hue-${p.hue}">${medal(p.id, 1)}<div><b>${p.name}</b><small>${p.motto}: ${p.ranks.map((r, i) => `${ROMAN[i + 1]} ${r.name} (${r.cost.toLocaleString("en")})`).join(" · ")}${p.evolves ? ` · then ${p.evolves.name} (${p.evolves.cost.toLocaleString("en")})` : ""}</small></div></li>`).join("");
+  return `<div class="tile-specialties"><small>UPGRADES · KNOWLEDGE, ONE BUILDING AT A TIME: TAP IT IN DEFEND WHILE BUILDING</small><ul>${base}${grow}${climb}</ul></div>`;
 }

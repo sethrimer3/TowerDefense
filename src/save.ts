@@ -4,7 +4,7 @@
 import { decodeDefendSave, defaultDefendSave, type DefendSave } from "./defend/progress.ts";
 import { STARTING_METAL, TRAINING, TRAINING_IDS, type TrainingId } from "./progression.ts";
 import { SKILLS, SKILL_IDS, type SkillId } from "./skill-trees.ts";
-import { decodePaths, decodePathResearch, decodeSpellPaths, type PathId, type PathResearch, type PathChoices, type SpellId } from "./knowledge-paths.ts";
+import { decodePaths, decodePathResearch, decodeSpellPaths, isSpell, PATHS, type PathId, type PathResearch, type PathChoices, type SpellId } from "./knowledge-paths.ts";
 import type { TrainingJob } from "./training-jobs.ts";
 import { decodeSettings, defaultSettings, type Settings } from "./settings.ts";
 import { METALS, decodeMineSave, type MineSave, type Metals } from "./mine/sim.ts";
@@ -12,15 +12,17 @@ import { decodeLibrarySave, type LibrarySave } from "./library/sim.ts";
 import { decodeResearchJob, type ResearchJob } from "./research-jobs.ts";
 import { decodeForgeJob, type ForgeJob } from "./forge-jobs.ts";
 
-import { migrateCards, migrateTopicPaths, settlePaths } from "./specializations.ts";
+import { migrateCards, migrateResearch, migrateTopicPaths } from "./specializations.ts";
 
 /** What the retired Outlying districts skill cost, refunded on load. */
 const OUTSKIRTS_KNOWLEDGE = 8;
 
 export const SAVE_KEY = "towerdefense.v1";
 /** 2: the mine's metal wallet. 3: research unlocks and persistent individual
- * cards. 4: no cards; each placed building keeps its own path in the layout. */
-export const SAVE_VERSION = 4;
+ * cards. 4: no cards; each placed building keeps its own path in the layout.
+ * 5: each building is upgraded on its own, its path's rank kept with it;
+ * the Study researches only the spells. */
+export const SAVE_VERSION = 5;
 
 export type Save = {
   version: number;
@@ -38,6 +40,7 @@ export type Save = {
   skills: Record<SkillId, number>;
   /** Legacy paths, accepted during migration and cleared before new saves. */
   paths: PathChoices;
+  /** The strike spells' researched paths (buildings keep their own ranks). */
   pathResearch: PathResearch;
   /** The path each strike spell casts with (absent: cast plain). */
   spellPaths: Partial<Record<SpellId, PathId>>;
@@ -131,11 +134,15 @@ export function decode(raw: string | null): Save {
   if (legacy) migrateTopicPaths(d.paths, d);
   else if (s.version < 4) migrateCards(s.defend?.cards, d);
   d.paths = {};
-  settlePaths(d.defend, d.pathResearch);
   d.upgradePoints = int(s.upgradePoints, d.defend.bestWave);
   d.mine = decodeMineSave(s.mine);
   d.library = decodeLibrarySave(s.library);
   d.settings = decodeSettings(s.settings);
+  // Buildings are no longer researched in the Study: a project on one is
+  // refunded, and each building keeps the rank of the path it wore.
+  const job = s.researchJob, path = PATHS.find((p) => p.id === job?.id);
+  if ((job?.kind === "path" || job?.kind === "evolution") && path && !isSpell(path.topic) && Number.isSafeInteger(job.paid) && job.paid > 0) d.knowledge += job.paid;
+  migrateResearch(d);
   d.researchJob = decodeResearchJob(s.researchJob, d);
   d.researchClock = num(s.researchClock, 0);
   d.forgeJob = decodeForgeJob(s.forgeJob, d);

@@ -25,7 +25,16 @@ A group of city tiles standing apart from the keep's, walled and streeted on its
 A small block of grass the city leaves unbuilt; larger ones hold a pond, many have trees and a fence.
 
 **Structure**:
-A placed building with a job: the keep, barracks, archer barracks, archer, cannon and watch towers.
+A placed building with a job: the keep, the guilds and the troop buildings upgraded from them, the watch tower and the towers upgraded from it.
+
+**Basic building**:
+One of the three buildings the shop sells: the **Watch tower**, the **Melee Guild** (training **brawlers**, who fight with their fists) and the **Ranged Guild** (training **stone throwers**). Every other tower and troop building is one of these upgraded.
+
+**Upgrade** (of a building):
+One step a single placed building takes with Knowledge, chosen by tapping it in Defend while building: becoming another building (a Watch tower an archer, cannon or wizard tower; a Melee Guild a barracks; a Ranged Guild an archer barracks, Mage Guild, **sniper lodge** or **musket hall**, whose **explosive musketmen** fire bursting balls), a path's next rank, or its crown's **evolution**. The other buildings of its kind are untouched.
+
+**Kept copy**:
+A building on a path taken back to the palette: it keeps its path and rank, waits under its own palette entry, and wears them again when placed.
 
 ### A defense
 
@@ -161,31 +170,31 @@ How every upgrade is filed: by subject (Realm, City, Towers, Units, Mine, Librar
 The workshop below the Mine, reached by its ⚒ Smithy button: a topic's permanent upgrades paid with the mine's metal, its Armory levels and its Smithy rows.
 
 **Study**:
-The vault beneath the Library, reached by its ✦ Study button: what Knowledge buys for a topic, its skills, and its **paths**, drawn as a tree.
+The vault beneath the Library, reached by its ✦ Study button: what Knowledge buys for a topic: its skills, and a strike spell's **paths**, drawn as a tree. Buildings are not researched there; each is **upgraded** on its own.
 
 **Descent**:
 The way down from the Mine or the Library to the room below it: the scene slides up, the earth and a ladder rush past, and the room rises into place.
 
 **Tile**:
-Anything owned to put into a defense: a City tile or a piece of the wall (City), a unit building (Barracks), a tower (Tower), or a **consumable** (a bomb, used up when it goes off, or the war banner, never used up). Shown in the **Tiles tab**, the keep's hall.
+Anything owned to put into a defense: a City tile or a piece of the wall (City), a unit building (Units), a tower (Towers), or a **consumable** (a bomb, used up when it goes off, or the war banner, never used up). Shown in the **Tiles tab**, the keep's hall.
 
 **Stack**:
 All the tiles of one kind, shown as one tile marked with its quantity (×4); opened, it shows each copy, whether it stands in the city or waits in the palette.
 
 **Higher tier**:
-The greater building a tile becomes through its path's crown (an **evolution**): Wizard tower into Dark wizard keep, Barracks into Valkyrie palace.
+What a building can be upgraded into, and the basic building it grows from: a Wizard tower from a Watch tower, and into a Dark wizard keep by its crown.
 
-**Path** (in a topic's Study):
-One way a building can grow, in ranks learned in order with Knowledge: the Wizard tower's Pyromancy (flames only), Rime (ice only, then freezing solid) or Stormcalling (lightning in place of flames), the Barracks' Crusaders (hearty, healing) or Assassins (swift, with critical strikes), the Archer tower's Fire arrows (setting enemies **burning**) or Sharpshooters, the Cannon tower's Gun crews (with **grapeshot**) or Siege shot, the Archer barracks' Rangers or Skirmishers, the Watch tower's Spotters or Signal fires, the Mage Guild's Pyroclasm or Cinders, Monster bait's Oil-soaked or Fortified crates, Wall spikes' Blasting stakes (blowing up on contact), Spring stakes (the whole row shooting out) or Rimed stakes (chilling). Research unlocks paths independently for the collection. Each placed building wears one researched path (its **specialization**), so different paths fight together in one city.
+**Path**:
+One way a building can grow, in ranks it climbs one at a time with Knowledge: the Wizard tower's Pyromancy (flames only), Rime (ice only, then freezing solid) or Stormcalling (lightning in place of flames), the Barracks' Crusaders (hearty, healing) or Assassins (swift, with critical strikes), the Archer tower's Fire arrows (setting enemies **burning**) or Sharpshooters, the Cannon tower's Gun crews (with **grapeshot**) or Siege shot, the Archer barracks' Rangers or Skirmishers, the Watch tower's Spotters or Signal fires, the Mage Guild's Pyroclasm or Cinders, Monster bait's Oil-soaked or Fortified crates, Wall spikes' Blasting stakes (blowing up on contact), Spring stakes (the whole row shooting out) or Rimed stakes (chilling). Each building climbs its own path (its **specialization**), so different paths and ranks fight together in one city. (A strike spell's paths are still researched in the Study.)
 
 **Evolution**:
-A path's crown unlocks a greater form (Stormcalling's Wizard tower into the Dark wizard keep, Crusaders' Barracks into the Valkyrie palace). After researching the crown the player evolves any copy, one at a time, free (one standing in the city is taken up first); the others keep their forms. Returning one to its base form is free.
+A path's crown, past its last rank, turns that one building into a greater form (Stormcalling's Wizard tower into the Dark wizard keep, Crusaders' Barracks into the Valkyrie palace), paid with Knowledge. If it no longer fits its tile it goes to the palette.
 
 **Specialization**:
-The one researched path a placed building wears, always at the path's furthest researched rank. Chosen in Defend when the building is placed (the **specialty panel**), changed free by tapping it while building, kept when it moves and across saves, cleared when it goes back to the palette. Copies in the palette are interchangeable and wear nothing. Recruits share their home building's specialization; a battle keeps the specializations it started with.
+The path a building has climbed and the rank it has reached, bought in Defend's **upgrade panel**, kept when it moves, across saves, and as a **kept copy** when it goes back to the palette. A path is for good: a building can't change it. Recruits share their home building's specialization; a battle keeps the specializations it started with.
 
 **Research unlock**:
-A path rank or crown learned once with Knowledge, a choice for every building of its kind or an evolution to make.
+A strike spell's path rank learned once with Knowledge in the Study. (Building paths were once research unlocks; saves from then keep the paths their buildings wore and refund the rest.)
 
 **Smithy rows** (in the Smithy; Training in code):
 Ranks of a few percent each on one row (troop HP, tower damage, rebuild speed…). A rank costs a quadratic bill of metal and is worked by the mine's smiths: one smith takes its whole time, more smiths share it. A smith on a rank stays at the smithy until it's done; taking the last one off cancels the rank and returns its paid metal.

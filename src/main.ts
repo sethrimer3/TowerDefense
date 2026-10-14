@@ -76,7 +76,8 @@ function openChamber(where: "smithy" | "study", topic?: string) {
 const defendPage = new DefendPage(el("defend"), {
   save: () => save.defend,
   bonuses: () => bonuses(save),
-  research: () => save.pathResearch,
+  game: () => save,
+  spentKnowledge: () => { store(); refreshCurrencies(); },
   earnWave: (wave) => {
     const r = payWave(save, wave);
     store();

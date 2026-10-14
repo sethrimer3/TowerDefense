@@ -1,4 +1,4 @@
-import { evolveOne } from "../src/specializations.ts";
+import { nextSteps, upgradeBuilding } from "../src/specializations.ts";
 // The tile collection (src/tiles.ts): stacks, types and filters, the shop,
 // where each kind's upgrades live, and higher tiers.
 import { test } from "node:test";
@@ -6,7 +6,6 @@ import assert from "node:assert/strict";
 import { defaults } from "../src/save.ts";
 import { BOMB_PRICE, PALETTE_ITEMS, purchasePrice } from "../src/defend/catalog.ts";
 import { placeCityTile, placeStructure } from "../src/defend/layout.ts";
-import { evolve, learnPath } from "../src/knowledge-paths.ts";
 import { CONSUMABLES, TILE_FILTERS, TILE_IDS, TILE_TYPE, buyTile, canBuyTile, higherTier, shopOffer, tileCopies, tileStack, tileStacks, tileTopic } from "../src/tiles.ts";
 import { topicHas } from "../src/ui/ledger.ts";
 
@@ -41,42 +40,39 @@ test("identical tiles stack, counted with those standing in the city; filters sh
   assert.ok(tileStack(s, "warBanner").lasting);
 });
 
-test("the shop sells every kind for sale, in metal, including bombs, and refuses what can't be paid", () => {
+test("the shop sells only the basic buildings and the city's pieces, in metal, including bombs", () => {
   const s = defaults();
-  s.smithy = { copper: 3, silver: 0, gold: 0 };
+  s.smithy = { copper: 4, silver: 0, gold: 0 };
   const shop = tileStacks(s, "all", true).map((t) => t.id);
-  assert.ok(shop.includes("wizardTower") && shop.includes("bomb"), "unowned kinds are sold");
+  assert.deepEqual(shop.filter((id) => TILE_TYPE[id] === "units" || TILE_TYPE[id] === "towers"), ["meleeGuild", "rangedGuild", "watchTower"]);
+  assert.ok(shop.includes("bomb") && shop.includes("cityTile") && shop.includes("monsterBait"));
   assert.ok(!shop.includes("warBanner"), "the banner isn't sold");
-  assert.ok(!shop.includes("darkKeep") && !shop.includes("valkyriePalace"), "crowns' buildings aren't sold");
+  for (const id of ["archerTower", "cannonTower", "wizardTower", "barracks", "archerBarracks", "mageGuild", "sniperLodge", "musketHall", "darkKeep", "valkyriePalace"] as const)
+    assert.match((shopOffer(s, id) as { reason: string }).reason, /upgrade/, id);
+  assert.match((shopOffer(s, "darkKeep") as { reason: string }).reason, /Watch tower/, "named by the basic building it grows from");
   assert.deepEqual(shopOffer(s, "bomb"), { price: BOMB_PRICE });
-  assert.deepEqual(shopOffer(s, "archerTower"), { price: purchasePrice("archerTower", s.defend.owned.archerTower) });
-  assert.ok(canBuyTile(s, "archerTower"));
-  const owned = s.defend.owned.archerTower;
-  assert.ok(buyTile(s, "archerTower"));
-  assert.equal(s.defend.owned.archerTower, owned + 1);
-  assert.equal(s.smithy.copper, 0);
-  assert.ok(!canBuyTile(s, "archerTower"));
-  assert.equal(buyTile(s, "archerTower"), false);
+  assert.deepEqual(shopOffer(s, "watchTower"), { price: purchasePrice("watchTower", s.defend.owned.watchTower) });
+  const owned = s.defend.owned.watchTower;
+  assert.ok(buyTile(s, "watchTower"));
+  assert.equal(s.defend.owned.watchTower, owned + 1);
+  assert.ok(!canBuyTile(s, "watchTower"));
+  assert.equal(buyTile(s, "archerTower"), false, "not sold");
   s.smithy.copper = BOMB_PRICE.copper!;
   assert.ok(buyTile(s, "bomb"));
-  assert.deepEqual([s.smithy.copper, s.defend.bombs], [0, 1]);
-  assert.equal(buyTile(s, "bomb"), false);
   assert.equal(buyTile(s, "warBanner"), false);
   s.settings.devMode = true;
-  assert.ok(buyTile(s, "bomb") && buyTile(s, "cannonTower"), "unlimited money buys for nothing");
-  assert.equal(s.smithy.copper, 0);
+  assert.ok(buyTile(s, "bomb") && buyTile(s, "meleeGuild"), "unlimited money buys for nothing");
 });
 
-test("base kinds remain for sale after evolution; evolved kinds are made, not bought", () => {
-  const s = defaults(); s.settings.devMode = true; s.defend.owned.wizardTower = 1;
+test("an upgraded building's tier: what it grew from, and what its crown evolves it into", () => {
+  const s = defaults(); s.settings.devMode = true;
   assert.equal(higherTier("wizardTower").into?.evolves?.item, "darkKeep");
-  for (let i = 0; i < 3; i++) learnPath(s, "storm");
-  assert.ok(evolve(s, "storm"));
-  assert.ok(evolveOne(s, "storm"));
-  assert.ok("price" in shopOffer(s, "wizardTower"));
-  assert.ok("reason" in shopOffer(s, "darkKeep"));
-  assert.ok(buyTile(s, "wizardTower"));
-  assert.deepEqual([s.defend.owned.wizardTower, s.defend.owned.darkKeep], [1, 1]);
+  let l = placeCityTile(s.defend.layout, s.defend.layout.keep.tx, s.defend.layout.keep.ty - 1) ?? assert.fail("tile");
+  s.defend.layout = placeStructure(l, "watchTower", l.keep.tx, l.keep.ty - 1) ?? assert.fail("tower");
+  const uid = s.defend.layout.structures[0].uid;
+  assert.ok(upgradeBuilding(s, { uid }, nextSteps("watchTower").find((st) => st.type === "become" && st.to === "wizardTower")!).ok);
+  assert.deepEqual([s.defend.owned.watchTower, s.defend.owned.wizardTower], [0, 1]);
+  assert.equal(tileStack(s, "wizardTower").placed, 1);
 });
 
 test("each kind's upgrades are in the Smithy or the Study it links to", () => {

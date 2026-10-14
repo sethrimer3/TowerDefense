@@ -33,10 +33,11 @@ export type PlacedKind = Exclude<StructureKind, "keep">;
 /** `spot` seeds where on its tile the structure stands; it is drawn afresh
  * for everything on a tile whenever something is dropped there. A structure
  * spanning a block of tiles (`span`) stands on (tx, ty), its block's top
- * left tile. `path` is the Knowledge path the player chose for this one
- * structure when placing it (absent: unspecialized); it moves with the
- * structure and goes when the structure is taken up. */
-export type PlacedStructure = { uid: number; kind: PlacedKind; tx: number; ty: number; spot: number; path?: PathId };
+ * left tile. `path` is the Knowledge path this one building was upgraded
+ * along and `rank` how far (both absent: plain); they move with the
+ * structure, and a structure taken up keeps them in the palette
+ * (`DefendSave.kept`). */
+export type PlacedStructure = { uid: number; kind: PlacedKind; tx: number; ty: number; spot: number; path?: PathId; rank?: number };
 
 /** A side of a tile. */
 export type Side = "n" | "e" | "s" | "w";
@@ -46,8 +47,8 @@ const SIDE_STEP: Record<Side, readonly [number, number]> = { n: [0, -1], e: [1, 
  * spikes stand on the same kind of spot. */
 export type GateSpot = { tx: number; ty: number; side: Side };
 /** A row of wall spikes, on a gate's kind of spot, with the Knowledge path
- * chosen for it (absent: unspecialized). */
-export type SpikeSpot = GateSpot & { path?: PathId };
+ * it was upgraded along and how far (absent: plain). */
+export type SpikeSpot = GateSpot & { path?: PathId; rank?: number };
 /** A corner of the city wall: the tile corner (vx, vy), between the four
  * tiles around it, where the wall turns through a right angle. */
 export type CornerSpot = { vx: number; vy: number };
@@ -494,10 +495,10 @@ export function edgeWallRect(g: GateSpot): Rect {
 }
 
 /** Sets spikes along the wall at `g` (not where a gate stands). */
-export function placeSpikes(l: Layout, g: GateSpot, path?: PathId): Layout | null {
+export function placeSpikes(l: Layout, g: GateSpot, wear?: { path?: PathId; rank?: number }): Layout | null {
   if (!gateOk(cityTileSet(l), g) || l.spikes.some((o) => sameGate(o, g)) || l.gates.some((o) => sameGate(o, g))) return null;
   const next = cloneLayout(l);
-  next.spikes.push({ tx: g.tx, ty: g.ty, side: g.side, ...(path ? { path } : {}) });
+  next.spikes.push({ tx: g.tx, ty: g.ty, side: g.side, ...(wear?.path && wear.rank ? { path: wear.path, rank: wear.rank } : {}) });
   return fitLayout(next).ok ? next : null;
 }
 
@@ -507,10 +508,10 @@ export function removeSpikes(l: Layout, g: GateSpot): Layout {
   return next;
 }
 
-/** Moves a row of spikes along the wall, keeping its chosen path. */
+/** Moves a row of spikes along the wall, keeping its path and rank. */
 export function moveSpikes(l: Layout, from: GateSpot, to: GateSpot): Layout | null {
   if (sameGate(from, to)) return l;
-  return placeSpikes(removeSpikes(l, from), to, l.spikes.find((o) => sameGate(o, from))?.path);
+  return placeSpikes(removeSpikes(l, from), to, l.spikes.find((o) => sameGate(o, from)));
 }
 
 // ── Wall ballistas ───────────────────────────────────────────────────────
@@ -643,9 +644,10 @@ export function covers(l: Layout, s: PlacedStructure, tx: number, ty: number) {
   return tx >= s.tx && tx < s.tx + span && ty >= s.ty && ty < s.ty + span;
 }
 
-/** Place a new structure, which takes the next uid. */
-export function placeStructure(l: Layout, kind: PlacedKind, tx: number, ty: number): Layout | null {
-  const next = withStructure(l, { uid: l.nextUid, kind, tx, ty, spot: 0 });
+/** Place a new structure, which takes the next uid (wearing `wear`'s path
+ * and rank: a kept copy placed again). */
+export function placeStructure(l: Layout, kind: PlacedKind, tx: number, ty: number, wear?: { path: PathId; rank: number }): Layout | null {
+  const next = withStructure(l, { uid: l.nextUid, kind, tx, ty, spot: 0, ...(wear ? { path: wear.path, rank: wear.rank } : {}) });
   if (next) next.nextUid++;
   return next;
 }

@@ -1,6 +1,7 @@
-import { canSpecialize, placementOf, specialize, specialtyLabel, specialtyOf, targetKind, type SpecialtyTarget } from "../specializations.ts";
-import { pathById, pathTopicOf, type PathId, type PathResearch } from "../knowledge-paths.ts";
-import { specialtyChoicesHtml } from "../ui/specialty.ts";
+import { nextSteps, specialtyLabel, specialtyOf, stepName, targetKind, upgradeBuilding, type SpecialtyTarget } from "../specializations.ts";
+import { pathById, type PathId } from "../knowledge-paths.ts";
+import { upgradeChoicesHtml } from "../ui/specialty.ts";
+import type { Save } from "../save.ts";
 import { bannerReach } from "./war-banner.ts";
 import { gravesNear } from "./necromancy.ts";
 import { meteorReach } from "./meteor.ts";
@@ -20,9 +21,9 @@ import { KeepBricks } from "./keep-bricks.ts";
  * Build phase: drag city elements from the palette (a side panel that
  * slides in beside the board's view) onto gold-outlined
  * tiles; drag placed ones around, or back to the palette to pick them up.
- * A building with Knowledge paths researched for its kind asks, once it is
- * placed, which path it wears (the specialty panel, `#defend-specialty`);
- * tapping one while building shows the path it wears and changes it.
+ * Tapping a placed building while building opens its upgrade panel
+ * (`#defend-specialty`): what it can become or climb next, paid with
+ * Knowledge, one building at a time (`specializations.ts`).
  * Once the defense starts, the palette becomes the consumables palette and
  * waves roll in without stopping until the keep falls. */
 import {
@@ -54,7 +55,7 @@ import { QUIET, type Scene } from "../ambience.ts";
 import { NIGHT_FADE_SECONDS, isBossWave, rollWeather, type Weather } from "./weather.ts";
 import { play } from "../sound.ts";
 import { replay, sparksOver } from "../ui/flourish.ts";
-import { available, startingWave, type DefendSave } from "./progress.ts";
+import { available, keptGroups, plainAvailable, setLayout, startingWave, type DefendSave } from "./progress.ts";
 import { ageWater } from "./boats.ts";
 import { defeatHTML } from "./defeat.ts";
 import { inspectable, type Armed } from "./inspect.ts";
@@ -63,8 +64,10 @@ export type DefendHost = {
   save(): DefendSave;
   /** The Smithy's and the skill trees' multipliers for the next defense. */
   bonuses(): Bonuses;
-  /** The Study's research: which paths a placed building may wear, at what rank. */
-  research?(): PathResearch;
+  /** The whole save: the Knowledge a building's upgrade spends. */
+  game?(): Save;
+  /** Knowledge was spent on an upgrade: store it and show the new count. */
+  spentKnowledge?(): void;
   /** Awards an upgrade point for a new highest wave, recording it with payment. */
   earnWave(wave: number): { upgrade: number };
   persist(): void;
@@ -132,10 +135,8 @@ export class DefendPage {
    * open, the battle's items closed so the battle has the whole view. */
   private sideOpen = { build: true, sim: false };
   private testerSelected = false;
-  /** The building whose specialty panel shows while building, and whether
-   * it lists the paths to choose from (`choosing`), straight after placing
-   * it (`fresh`) or after Change specialization. */
-  private specialty: { target: SpecialtyTarget; choosing: boolean; fresh: boolean } | null = null;
+  /** The building whose upgrade panel shows while building. */
+  private specialty: { target: SpecialtyTarget } | null = null;
   /** Where the specialty panel was last put, so it only moves when it must. */
   private specialtyAt = "";
   private summonHold: { kind: EnemyKind; button: HTMLButtonElement; pointerId: number; next: number } | null = null;
@@ -498,11 +499,14 @@ export class DefendPage {
       return;
     }
     const s = this.save;
-    // One entry a kind, however its copies stand in the city: a building's
-    // path is chosen once it is placed.
-    const all: { id: string; name: string; count: number; icon: IconItem }[] =
+    // One entry a kind for its plain copies, and one for each path and
+    // rank its upgraded copies waiting here keep.
+    const all: { id: string; name: string; count: number; icon: IconItem; look?: string; badge?: string }[] =
       this.phase === "build"
-        ? PALETTE_ITEMS.filter((item) => inCategory(item, this.category)).map((item) => ({ id: item, name: ITEM_NAMES[item], count: available(s, item), icon: item as IconItem }))
+        ? PALETTE_ITEMS.filter((item) => inCategory(item, this.category)).flatMap((item) => [
+            { id: item, name: ITEM_NAMES[item], count: plainAvailable(s, item), icon: item as IconItem },
+            ...keptGroups(s, item).map((g) => ({ id: `${item}~${g.path}~${g.rank}`, name: `${ITEM_NAMES[item]} · ${specialtyLabel(g)}`, count: g.count, icon: item as IconItem, look: pathLook(item, g.path), badge: pathBadge(g) })),
+          ])
         : [
             { id: "bomb", name: "Bomb", count: s.bombs, icon: "bomb" },
             { id: "banner", name: "War banner", count: Infinity, icon: "banner" },
@@ -518,11 +522,12 @@ export class DefendPage {
         .map(
           (e) =>
             `<button class="defend-item ${e.count ? "" : "empty"}" data-item="${e.id}" title="${e.name}" aria-label="${e.name}, ${e.count === Infinity ? "unlimited" : `${e.count} left`}">
-              <span class="defend-item-face"><canvas width="48" height="48" data-icon="${e.icon}"></canvas></span><span>${e.name}</span><b>×${e.count === Infinity ? "∞" : e.count}</b></button>`,
+              <span class="defend-item-face"><canvas width="48" height="48" data-icon="${e.icon}"${e.look ?? ""}></canvas>${e.badge ?? ""}</span><span>${e.name}</span><b>×${e.count === Infinity ? "∞" : e.count}</b></button>`,
         )
         .join("") +
       (entries.length ? "" : `<small class="defend-palette-none">None owned. Buy more in the Tiles tab.</small>`);
     el.querySelectorAll<HTMLCanvasElement>("canvas[data-icon]").forEach((c) => paintIcon(c, c.dataset.icon as IconItem));
+    paintPathIcons(el);
     el.querySelectorAll<HTMLButtonElement>("[data-item]").forEach((b) => {
       b.onpointerdown = (e) => this.pressPalette(b.dataset.item!, e);
     });
@@ -606,8 +611,13 @@ export class DefendPage {
     if (id === "meteor") return this.phase === "sim" && !this.sim?.meteorRemaining ? this.beginDrag({ from: "meteor" }, e) : undefined;
     if (id === "frostNova") return this.phase === "sim" && !this.sim?.frostRemaining ? this.beginDrag({ from: "frostNova" }, e) : undefined;
     if (id === "reinforcements") return this.phase === "sim" && !this.sim?.reinforceRemaining ? this.beginDrag({ from: "reinforcements" }, e) : undefined;
-    const item = id as PaletteItem;
-    if (!available(this.save, item)) return this.setMessage(`No ${plural(ITEM_NAMES[item].toLowerCase())} left — buy more in the Tiles tab.`);
+    // A kept copy's entry is "kind~path~rank".
+    const [item, path, rank] = id.split("~") as [PaletteItem, PathId | undefined, string | undefined];
+    if (path) {
+      if (!keptGroups(this.save, item).some((g) => g.path === path && g.rank === Number(rank))) return;
+      return this.beginDrag({ from: "palette", item, wear: { path, rank: Number(rank) } }, e);
+    }
+    if (!plainAvailable(this.save, item)) return this.setMessage(`No ${plural(ITEM_NAMES[item].toLowerCase())} left — buy more in the Tiles tab.`);
     this.beginDrag({ from: "palette", item }, e);
   }
 
@@ -986,13 +996,10 @@ export class DefendPage {
       play("place");
       this.picked = null;
     }
-    const drag = this.pointers.session?.drag;
-    // A building placed afresh from the palette (not one moved) chooses its
-    // path, when its kind has one researched; moving keeps the path it wears.
-    const fresh = drag?.from === "palette" && drop.layout !== s.layout ? this.placedAfresh(s.layout, drop.layout) : null;
+    // Moving keeps a building's upgrades; taking one up keeps them in the
+    // palette (`setLayout`).
     const changed = drop.layout !== s.layout;
-    s.layout = drop.layout;
-    if (fresh && canSpecialize(this.research(), targetKind(s.layout, fresh)!)) this.openSpecialty(fresh, true);
+    setLayout(s, drop.layout);
     if (drop.message) this.setMessage(drop.message);
     if (changed) this.host.persist();
     this.renderPalette();
@@ -1026,7 +1033,7 @@ export class DefendPage {
       return this.pick(null);
     }
     this.pick(inspectable(b) ? b.id : null);
-    if (target) this.openSpecialty(target, false);
+    if (target) this.openSpecialty(target);
     else this.closeSpecialty();
   }
 
@@ -1034,27 +1041,14 @@ export class DefendPage {
     this.picked = id === null ? null : { id, armed: { levels: { ...this.save.levels }, bonuses: this.host.bonuses() } };
   }
 
-  // ── Specializations ───────────────────────────────────────────────────
-  private research(): PathResearch {
-    return this.host.research?.() ?? {};
-  }
-
-  /** The building `next` has that `prev` hadn't: a structure by its new uid
-   * or a fresh row of spikes. */
-  private placedAfresh(prev: Layout, next: Layout): SpecialtyTarget | null {
-    const added = next.structures.find((p) => !prev.structures.some((o) => o.uid === p.uid));
-    if (added) return { uid: added.uid };
-    const row = next.spikes.find((g) => !prev.spikes.some((o) => sameGate(o, g)));
-    return row ? { spikes: { tx: row.tx, ty: row.ty, side: row.side } } : null;
-  }
-
-  /** Shows `target`'s specialty panel: its paths to choose from (`choosing`)
-   * or the path it wears, with a way to change it. Only while building, and
-   * only for a kind with paths. */
-  private openSpecialty(target: SpecialtyTarget, choosing: boolean) {
+  // ── Each building's upgrades ──────────────────────────────────────────
+  /** Shows `target`'s upgrade panel: what it is now and what it can take
+   * next. Only while building, and only for a building with upgrades (or
+   * one already upgraded). */
+  private openSpecialty(target: SpecialtyTarget) {
     const kind = targetKind(this.save.layout, target);
-    if (this.phase !== "build" || !kind || !pathTopicOf(kind)) return this.closeSpecialty();
-    this.specialty = { target, choosing, fresh: choosing };
+    if (this.phase !== "build" || !kind || (!nextSteps(kind, specialtyOf(this.save.layout, target)).length && !specialtyOf(this.save.layout, target))) return this.closeSpecialty();
+    this.specialty = { target };
     if ("uid" in target) {
       const b = this.currentMap().buildings.find((o) => o.structureUid === target.uid);
       if (b && inspectable(b)) this.pick(b.id);
@@ -1064,25 +1058,19 @@ export class DefendPage {
 
   private closeSpecialty() {
     if (!this.specialty) return;
-    const fresh = this.specialty.fresh;
     this.specialty = null;
-    if (fresh) this.picked = null;
     this.renderSpecialty();
   }
 
-  /** The panel's one set of listeners: a choice, Change, close, and Escape. */
+  /** The panel's one set of listeners: an upgrade, close, and Escape. */
   private bindSpecialty() {
     const el = this.root.querySelector<HTMLElement>("#defend-specialty")!;
     el.addEventListener("pointerdown", (e) => e.stopPropagation());
     el.addEventListener("click", (e) => {
       const t = e.target as Element;
       if (t.closest("[data-specialty-close]")) return this.closeSpecialty();
-      if (t.closest("[data-specialty-change]") && this.specialty) {
-        this.specialty.choosing = true;
-        return this.renderSpecialty(true);
-      }
-      const choice = t.closest<HTMLButtonElement>("[data-specialty]");
-      if (choice && !choice.disabled) this.choose((choice.dataset.specialty || undefined) as PathId | undefined);
+      const choice = t.closest<HTMLButtonElement>("[data-upgrade-step]");
+      if (choice && !choice.disabled) this.upgrade(Number(choice.dataset.upgradeStep));
     });
     el.addEventListener("keydown", (e) => {
       if (e.key === "Escape") {
@@ -1092,57 +1080,56 @@ export class DefendPage {
     });
   }
 
-  /** The player chose `path` (none: unspecialized) for the panel's building. */
-  private choose(path: PathId | undefined) {
-    const sp = this.specialty;
-    if (!sp || this.phase !== "build") return;
-    const before = placementOf(this.save.layout, sp.target)?.path;
-    if (!specialize(this.save, this.research(), sp.target, path)) return;
+  /** The player bought upgrade `index` (of `nextSteps`) for the panel's building. */
+  private upgrade(index: number) {
+    const sp = this.specialty, game = this.host.game?.();
+    if (!sp || !game || this.phase !== "build") return;
+    const kind = targetKind(this.save.layout, sp.target);
+    const step = kind && nextSteps(kind, specialtyOf(this.save.layout, sp.target))[index];
+    if (!step) return;
+    const r = upgradeBuilding(game, sp.target, step);
+    if (!r.ok) return this.setMessage(r.reason, 2);
+    this.host.spentKnowledge?.();
     this.host.persist();
-    const kind = targetKind(this.save.layout, sp.target)!;
-    const label = specialtyLabel(specialtyOf(this.save.layout, this.research(), sp.target));
-    if (before !== path) play(path ? "chime" : "stone");
-    // The outline's reach follows the path now worn.
-    if (this.picked) this.pick(this.picked.id);
-    if (sp.fresh) {
-      // A fresh placement's choice is made: out of the way, with a word.
+    play(step.type === "path" ? "chime" : "unlock");
+    this.renderPalette();
+    if (r.waiting) {
+      // Too big for where it stood: it waits in the palette.
       this.closeSpecialty();
-      this.setMessage(`${ITEM_NAMES[kind]}: ${label}`, 2);
+      this.picked = null;
+      this.setMessage(`${stepName(step)}: no room where it stood, so it waits in the palette.`, 3);
       return;
     }
-    sp.choosing = false;
+    if (this.picked) this.pick(this.currentMap().buildings.find((o) => "uid" in sp.target && o.structureUid === sp.target.uid)?.id ?? this.picked.id);
     this.renderSpecialty(true);
     const el = this.root.querySelector<HTMLElement>("#defend-specialty");
     replay(el, "bought");
-    if (path) sparksOver(el?.querySelector<HTMLElement>(".spec-current") ?? null, "arcane");
+    sparksOver(el?.querySelector<HTMLElement>(".spec-current") ?? null, "arcane");
   }
 
-  /** Draws the specialty panel (`focus`: move the keyboard into it). */
+  /** Draws the upgrade panel (`focus`: move the keyboard into it). */
   private renderSpecialty(focus = false) {
     const el = this.root.querySelector<HTMLElement>("#defend-specialty");
     if (!el) return;
-    const sp = this.specialty, kind = sp ? targetKind(this.save.layout, sp.target) : undefined;
-    if (!sp || !kind || this.phase !== "build") {
+    const sp = this.specialty, kind = sp ? targetKind(this.save.layout, sp.target) : undefined, game = this.host.game?.();
+    if (!sp || !kind || !game || this.phase !== "build") {
       if (sp) this.specialty = null;
       el.hidden = true;
       el.innerHTML = "";
       this.specialtyAt = "";
       return;
     }
-    const research = this.research(), worn = specialtyOf(this.save.layout, research, sp.target);
+    const worn = specialtyOf(this.save.layout, sp.target);
     const name = ITEM_NAMES[kind], look = pathLook(kind, worn?.path);
     const hue = worn ? ` hue-${pathById(worn.path).hue}` : "";
     const head = `<header><span class="spec-icon"><canvas width="48" height="48" data-icon="${kind}"${look}></canvas>${pathBadge(worn)}</span>
-        <div><small>${sp.choosing ? "CHOOSE SPECIALIZATION" : name.toUpperCase()}</small><b class="spec-current${hue}">${sp.choosing ? name : `Current: ${specialtyLabel(worn)}`}</b></div>
+        <div><small>UPGRADE THIS ${name.toUpperCase()}</small><b class="spec-current${hue}">${worn ? specialtyLabel(worn) : name}</b></div>
         <button class="spec-close" data-specialty-close aria-label="Close">×</button></header>`;
-    const body = sp.choosing
-      ? `<div class="spec-choices" role="group" aria-label="Specializations for this ${name}">${specialtyChoicesHtml(research, kind, worn?.path)}</div>
-        <p class="spec-note">${sp.fresh ? "Close to leave it unspecialized." : "Free to change while building."}</p>`
-      : canSpecialize(research, kind)
-      ? `<button class="spec-change" data-specialty-change>Change specialization</button>`
-      : `<p class="spec-note">Research its paths in the Library's Study to specialize it.</p>`;
-    el.className = `defend-specialty${sp.choosing ? " choosing" : ""}`;
-    el.setAttribute("aria-label", sp.choosing ? `Choose a specialization for this ${name}` : `${name} specialization`);
+    const knowledge = game.settings.devMode ? "Unlimited" : Math.floor(game.knowledge).toLocaleString("en");
+    const body = `<div class="spec-choices" role="group" aria-label="Upgrades for this ${name}">${upgradeChoicesHtml(game, kind, worn)}</div>
+        <p class="spec-note">Knowledge: <b>${knowledge}</b>. Upgrades stay with this building, in the city or the palette.</p>`;
+    el.className = "defend-specialty choosing";
+    el.setAttribute("aria-label", `Upgrade this ${name}`);
     el.innerHTML = head + body;
     el.hidden = false;
     el.querySelectorAll<HTMLCanvasElement>("canvas[data-icon]").forEach((c) => paintIcon(c, c.dataset.icon as IconItem));
@@ -1150,7 +1137,7 @@ export class DefendPage {
     this.specialtyAt = "";
     this.placeSpecialty(false);
     if (!this.host.reduceMotion()) replay(el, "spec-open");
-    if (focus) (el.querySelector<HTMLElement>('[data-specialty][aria-pressed="true"]') ?? el.querySelector<HTMLElement>("[data-specialty-change], [data-specialty]:not(:disabled)"))?.focus({ preventScroll: true });
+    if (focus) el.querySelector<HTMLElement>("[data-upgrade-step]:not(:disabled), [data-specialty-close]")?.focus({ preventScroll: true });
   }
 
   /** Keeps the specialty panel beside its building as the view pans and

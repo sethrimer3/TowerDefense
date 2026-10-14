@@ -10,7 +10,7 @@ import { boatLights, drawBoat } from "./boat-art.ts";
  * damaged buildings, blast scorches, then the units, projectiles and effects.
  * Every painter takes a `Brush`: the board's context and its pixels per cell. */
 import { hash01 } from "./grid.ts";
-import { ARCHER_UNIT, CIVILIAN, DARK_WIZARD, ENEMIES, FIRE_MAGE, SOLDIER, VALKYRIE, watchRadius, type EnemyDef } from "./catalog.ts";
+import { ARCHER_UNIT, BRAWLER, CIVILIAN, DARK_WIZARD, ENEMIES, FIRE_MAGE, MUSKETEER, SLINGER, SNIPER, SOLDIER, VALKYRIE, watchRadius, type EnemyDef } from "./catalog.ts";
 import type { Building } from "./citygen.ts";
 import { center } from "./pathing.ts";
 import { paintKeepFlash } from "./structure-art.ts";
@@ -173,6 +173,11 @@ function drawSoldiers(b: Brush, sim: DefendSim, torches: Burning | null) {
       drawCalled(c, px, u);
       continue;
     }
+    if (u.kind === "brawler" || u.kind === "slinger" || u.kind === "sniper" || u.kind === "musketeer") {
+      drawGuildTroop(b, sim, u);
+      if (torches) drawHandTorch(b, { x: u.x + SOLDIER.size * 0.65, y: u.y - SOLDIER.size * 0.45, id: u.id }, sim.time, torches(u.x, u.y, u.id));
+      continue;
+    }
     const archer = u.kind === "archer";
     const swing = archer ? null : swingOf(sim, u);
     const x = u.x + (swing?.dx ?? 0),
@@ -191,6 +196,80 @@ function drawSoldiers(b: Brush, sim: DefendSim, torches: Burning | null) {
   }
   return swords;
 }
+
+/** The guilds' troops, square bodies in a black outline like the
+ * swordsmen's: a brawler in a tan jerkin jabbing a fist at whatever it
+ * punches; a stone thrower in sackcloth with a stone in hand; a sniper in
+ * green with a long rifle; a musketman in red-brown with a short musket and
+ * a glowing match. */
+function drawGuildTroop(b: Brush, sim: DefendSim, u: Soldier) {
+  const { c, px } = b;
+  const k = u.kind as "brawler" | "slinger" | "sniper" | "musketeer";
+  const def = GUILD_TROOPS[k], s = Math.max(2, def.size * px), unit = Math.max(1, Math.round(s * 0.22));
+  const e = sim.enemies.find((o) => o.id === u.target);
+  let fx = 0, fy = -1;
+  if (e) {
+    const d = Math.hypot(e.x - u.x, e.y - u.y) || 1;
+    fx = (e.x - u.x) / d;
+    fy = (e.y - u.y) / d;
+  }
+  // A brawler leans into a punch for a moment after each one lands.
+  const since = def.cooldown - u.cd, punch = k === "brawler" && since >= 0 && since < 0.16 ? Math.sin((since / 0.16) * Math.PI) : 0;
+  const x = (u.x + fx * punch * 0.12) * px, y = (u.y + fy * punch * 0.12) * px;
+  c.fillStyle = "#0b0907";
+  c.fillRect(Math.round(x - s / 2 - 1), Math.round(y - s / 2 - 1), Math.round(s + 2), Math.round(s + 2));
+  c.fillStyle = u.flash > 0 ? "#fff" : def.color;
+  c.fillRect(Math.round(x - s / 2), Math.round(y - s / 2), Math.round(s), Math.round(s));
+  // A lit upper left, like the city's art.
+  c.fillStyle = "rgba(255,255,255,0.22)";
+  c.fillRect(Math.round(x - s / 2), Math.round(y - s / 2), Math.round(s), unit);
+  if (k === "brawler") {
+    // Fists: one held up, one thrown at the target.
+    const reach = s * (0.55 + punch * 0.45);
+    c.fillStyle = "#0b0907";
+    dot(c, x + fx * reach, y + fy * reach, unit + 2);
+    c.fillStyle = "#e8b88a";
+    dot(c, x + fx * reach, y + fy * reach, unit);
+    c.fillStyle = "#0b0907";
+    dot(c, x - s * 0.55, y - s * 0.1, unit + 2);
+    c.fillStyle = "#e8b88a";
+    dot(c, x - s * 0.55, y - s * 0.1, unit);
+    return;
+  }
+  if (k === "slinger") {
+    c.fillStyle = "#0b0907";
+    dot(c, x + s * 0.6, y - s * 0.3, unit + 2);
+    c.fillStyle = "#b8b2a6";
+    dot(c, x + s * 0.6, y - s * 0.3, unit);
+    return;
+  }
+  // A gun along the facing: a sniper's long, a musket's short and stout.
+  const len = s * (k === "sniper" ? 1.5 : 0.95), w = Math.max(1, Math.round(unit * (k === "sniper" ? 0.8 : 1.2)));
+  const ox = x - fy * s * 0.35, oy = y + fx * s * 0.35;
+  c.strokeStyle = "#0b0907";
+  c.lineWidth = w + 2;
+  c.beginPath();
+  c.moveTo(ox, oy);
+  c.lineTo(ox + fx * len, oy + fy * len);
+  c.stroke();
+  c.strokeStyle = k === "sniper" ? "#3a3a40" : "#5a3d22";
+  c.lineWidth = w;
+  c.stroke();
+  if (k === "musketeer") {
+    // The slow match, glowing.
+    c.fillStyle = (sim.time * 3 + u.id) % 1 < 0.5 ? "#ffd060" : "#ff7a2e";
+    dot(c, ox - fx * s * 0.2, oy - fy * s * 0.2, unit);
+  } else {
+    c.fillStyle = "#e0c070";
+    dot(c, ox + fx * len * 0.3, oy + fy * len * 0.3, unit);
+  }
+}
+const GUILD_TROOPS = {
+  brawler: BRAWLER,
+  slinger: SLINGER,
+  sniper: SNIPER,
+  musketeer: MUSKETEER,
+};
 
 /** Each sword and its swing's trail, over whoever it is cutting. */
 function drawSwords(b: Brush, swords: { x: number; y: number; swing: Swing }[]) {
@@ -451,7 +530,7 @@ export function drawScorches({ c, px }: Brush, sim: DefendSim) {
 export function shadowCasters(sim: DefendSim) {
   const def = (e: Enemy): EnemyDef => ENEMIES[e.kind];
   return [
-    ...sim.soldiers.map((u) => ({ x: u.x, y: u.y, size: u.kind === "archer" ? ARCHER_UNIT.size : u.kind === "mage" ? FIRE_MAGE.size : u.kind === "valkyrie" ? VALKYRIE.size : u.kind === "darkWizard" ? DARK_WIZARD.size   : u.risen ? u.risen.size : u.called ? u.called.size : SOLDIER.size })),
+    ...sim.soldiers.map((u) => ({ x: u.x, y: u.y, size: u.kind === "archer" ? ARCHER_UNIT.size : u.kind === "mage" ? FIRE_MAGE.size : u.kind === "valkyrie" ? VALKYRIE.size : u.kind === "darkWizard" ? DARK_WIZARD.size : u.kind === "brawler" || u.kind === "slinger" || u.kind === "sniper" || u.kind === "musketeer" ? GUILD_TROOPS[u.kind].size : u.risen ? u.risen.size : u.called ? u.called.size : SOLDIER.size })),
     ...sim.civilians.map((u) => ({ x: u.x, y: u.y, size: CIVILIAN.size })),
     ...sim.enemies.filter((e) => !def(e).flying).map((e) => ({ x: e.x, y: e.y, size: enemySize(e) })),
   ];
