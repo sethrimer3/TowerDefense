@@ -6,7 +6,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { defaults, decode } from "../src/save.ts";
-import { allocated, buildingTree, respecBuilding, RESPEC_PRICE, nextSteps, placedBattlePaths, specialtyLabel, specialtyOf, spikeKey, stepName, upgradeBuilding, upgradedFrom, rootOf, type UpgradeStep } from "../src/specializations.ts";
+import { allocated, buildingTree, hasTree, targetKind, respecBuilding, RESPEC_PRICE, nextSteps, placedBattlePaths, specialtyLabel, specialtyOf, spikeKey, stepName, upgradeBuilding, upgradedFrom, rootOf, type UpgradeStep } from "../src/specializations.ts";
 import { learnPath, pathById, type PathId } from "../src/knowledge-paths.ts";
 import { bonuses } from "../src/progression.ts";
 import { placeStructure, removeStructure, moveStructure, moveSpikes, placeCityTile, placeSpikes, removeSpikes, defaultLayout, fitLayout } from "../src/defend/layout.ts";
@@ -222,6 +222,42 @@ test("a respec costs 5 Copper, gives back every point and returns the basic buil
 });
 
 // ── Older saves ────────────────────────────────────────────────────────
+test("a copy still in the palette is upgraded and respecced on its own", () => {
+  const s = defaults(); s.knowledge = 1e5; s.smithy.copper = 20;
+  s.defend.owned.watchTower = 2;
+  const pyro = pathById("pyromancy");
+  // Plain copy into a wizard tower: one copy of each.
+  const tower = { copy: "watchTower" as const };
+  assert.equal(targetKind(s.defend, tower), "watchTower");
+  const step = nextSteps("watchTower").find(st => st.type === "become" && st.to === "wizardTower")!;
+  const r = upgradeBuilding(s, tower, step);
+  assert.ok(r.ok && r.copy && "copy" in r.copy && r.copy.copy === "wizardTower");
+  assert.equal(s.defend.owned.watchTower, 1); assert.equal(s.defend.owned.wizardTower, 1);
+  assert.equal(s.knowledge, 1e5 - step.cost);
+  // Up a path: it waits as a kept copy, rank by rank.
+  let at: any = { copy: "wizardTower" };
+  for (let rank = 1; rank <= 2; rank++) {
+    const r2 = upgradeBuilding(s, at, nextSteps("wizardTower", at.wear).find(st => st.type === "path" && st.path === "pyromancy")!);
+    assert.ok(r2.ok, (r2 as any).reason); at = (r2 as any).copy;
+  }
+  assert.deepEqual(at, { copy: "wizardTower", wear: { path: "pyromancy", rank: 2 } });
+  assert.deepEqual(keptGroups(s.defend, "wizardTower"), [{ path: "pyromancy", rank: 2, count: 1 }]);
+  assert.equal(plainAvailable(s.defend, "wizardTower"), 0);
+  assert.equal(s.knowledge, 1e5 - step.cost - pyro.ranks[0].cost - pyro.ranks[1].cost);
+  // A copy that isn't there can't be upgraded.
+  assert.equal(upgradeBuilding(s, { copy: "wizardTower" }, nextSteps("wizardTower").find(st => st.type === "path" && st.path === "rime")!).ok, false);
+  // Respec: every point back, a plain watch tower again.
+  const back = respecBuilding(s, at);
+  assert.ok(back.ok);
+  assert.equal(s.knowledge, 1e5);
+  assert.equal(s.smithy.copper, 20 - RESPEC_PRICE.copper);
+  assert.equal(s.defend.kept.length, 0);
+  assert.equal(s.defend.owned.watchTower, 2); assert.equal(s.defend.owned.wizardTower, 0);
+  assert.equal(respecBuilding(s, { copy: "watchTower" }).ok, false, "nothing to respec");
+  assert.ok(hasTree("watchTower") && hasTree("sniperLodge") && hasTree("wallSpikes"));
+  assert.ok(!hasTree("cityTile") && !hasTree("cityGate"));
+});
+
 test("version 4: building research all comes back as Knowledge; buildings stand plain; evolved ones turn back", () => {
   const s = fixture("wizardTower", 2); s.settings.devMode = false; s.defend.owned.wizardTower = 3;
   const raw: any = JSON.parse(JSON.stringify(s));

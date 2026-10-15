@@ -22,7 +22,7 @@
 import { ITEM_NAMES, type Bonuses, type PaletteItem } from "./defend/catalog.ts";
 import { cloneLayout, fitLayout, sameGate, type GateSpot, type Layout, type PlacedKind, type PlacedStructure, type SpikeSpot } from "./defend/layout.ts";
 import { hash } from "./defend/grid.ts";
-import type { DefendSave } from "./defend/progress.ts";
+import { keptGroups, plainAvailable, type DefendSave } from "./defend/progress.ts";
 import { PATHS, isSpell, pathById, pathFits, pathTopicOf, pathsOf, type BattlePaths, type KnowledgePath, type PathId } from "./knowledge-paths.ts";
 import type { Save } from "./save.ts";
 import { spendMetals } from "./metals.ts";
@@ -95,24 +95,34 @@ export function stepName(s: UpgradeStep): string {
 }
 
 // ── Where a building stands ────────────────────────────────────────────
-/** A building that can be upgraded: a structure by uid, or a row of wall
- * spikes by its spot (rows have no uid; their spot moves with them). */
-export type SpecialtyTarget = { uid: number } | { spikes: GateSpot };
+/** A building that can be upgraded: a structure by uid, a row of wall
+ * spikes by its spot (rows have no uid; their spot moves with them), or a
+ * copy still in the palette by its kind and the path it keeps, if any. */
+export type SpecialtyTarget = { uid: number } | { spikes: GateSpot } | { copy: PaletteKind; wear?: Wear };
+/** A kind with an upgrade tree, as the palette holds it. */
+export type PaletteKind = PlacedKind | "wallSpikes";
 
-/** The placement `target` names in `layout`, if it stands there. */
+/** The placement `target` names in `layout`, if it stands there (never a palette copy). */
 export function placementOf(layout: Layout, target: SpecialtyTarget): PlacedStructure | SpikeSpot | undefined {
-  return "uid" in target ? layout.structures.find((s) => s.uid === target.uid) : layout.spikes.find((g) => sameGate(g, target.spikes));
+  return "uid" in target ? layout.structures.find((s) => s.uid === target.uid) : "spikes" in target ? layout.spikes.find((g) => sameGate(g, target.spikes)) : undefined;
 }
-/** The palette kind standing at `target`. */
-export function targetKind(layout: Layout, target: SpecialtyTarget): PlacedKind | "wallSpikes" | undefined {
-  const p = placementOf(layout, target);
+/** Whether the palette holds a copy of `kind` wearing exactly `wear` (plain when unset). */
+export function copyWaits(d: DefendSave, kind: PaletteKind, wear?: Wear): boolean {
+  return wear ? keptGroups(d, kind).some((g) => g.path === wear.path && g.rank === wear.rank) : plainAvailable(d, kind) > 0;
+}
+const layoutOf = (where: DefendSave | Layout): Layout => ("layout" in where ? where.layout : where);
+/** The palette kind standing at `target` (in the palette, for a copy: that needs the whole Defend save). */
+export function targetKind(where: DefendSave | Layout, target: SpecialtyTarget): PaletteKind | undefined {
+  if ("copy" in target) return "layout" in where && copyWaits(where, target.copy, target.wear) ? target.copy : undefined;
+  const p = placementOf(layoutOf(where), target);
   return !p ? undefined : "uid" in target ? (p as PlacedStructure).kind : "wallSpikes";
 }
 /** The path a placement wears, at its rank, or undefined while plain. */
 export const wearOf = (p: { path?: PathId; rank?: number } | undefined): Wear | undefined =>
   p?.path && p.rank ? { path: p.path, rank: p.rank } : undefined;
 /** The path `target` wears, at its rank, or undefined while plain. */
-export const specialtyOf = (layout: Layout, target: SpecialtyTarget) => wearOf(placementOf(layout, target));
+export const specialtyOf = (where: DefendSave | Layout, target: SpecialtyTarget) =>
+  "copy" in target ? target.wear : wearOf(placementOf(layoutOf(where), target));
 
 const ROMAN = ["", "I", "II", "III", "IV", "V"];
 /** "Pyromancy III", or "Unspecialized". */
@@ -122,13 +132,14 @@ export const wearFits = (kind: string, path: unknown, rank: unknown): boolean =>
   typeof path === "string" && pathFits(kind, path as PathId) && Number.isInteger(rank) && (rank as number) >= 1 && (rank as number) <= pathById(path as PathId).ranks.length;
 
 // ── Upgrading ──────────────────────────────────────────────────────────
-export type UpgradeResult = { ok: false; reason: string } | { ok: true; kind: PlacedKind | "wallSpikes"; waiting?: boolean };
+export type UpgradeResult = { ok: false; reason: string } | { ok: true; kind: PlacedKind | "wallSpikes"; waiting?: boolean; copy?: SpecialtyTarget };
 
 /** Upgrades the building at `target` by `step`, paying its Knowledge (free
  * with Unlimited money). A building that becomes another stands where it
  * was if the new one fits there (its tile reshuffled if need be), and
  * otherwise waits in the palette. Only while building. */
 export function upgradeBuilding(save: Save, target: SpecialtyTarget, asked: UpgradeStep): UpgradeResult {
+  if ("copy" in target) return upgradeCopy(save, target, asked);
   const d = save.defend, kind = targetKind(d.layout, target), placed = placementOf(d.layout, target);
   if (!kind || !placed) return { ok: false, reason: "That building is no longer there." };
   // The price and result are always the catalog's, never the caller's.
@@ -155,6 +166,34 @@ export function upgradeBuilding(save: Save, target: SpecialtyTarget, asked: Upgr
   d.owned[step.to]++;
   d.layout = standing(next, s.uid);
   return { ok: true, kind: step.to, waiting: !d.layout.structures.some((o) => o.uid === s.uid) };
+}
+
+/** Upgrades one palette copy: a path step keeps it on that path and rank
+ * (a kept copy), a change of kind makes it a plain copy of the new kind.
+ * `copy` in the result names the copy it became. */
+function upgradeCopy(save: Save, target: { copy: PaletteKind; wear?: Wear }, asked: UpgradeStep): UpgradeResult {
+  const d = save.defend, kind = target.copy;
+  if (!copyWaits(d, kind, target.wear)) return { ok: false, reason: "That copy is no longer in the palette." };
+  const step = nextSteps(kind, target.wear).find((s) => sameStep(s, asked));
+  if (!step) return { ok: false, reason: "That upgrade isn't open to it." };
+  const free = save.settings.devMode;
+  if (!free && save.knowledge < step.cost) return { ok: false, reason: `Needs ${step.cost} Knowledge.` };
+  if (!free) save.knowledge -= step.cost;
+  unkeep(d, kind, target.wear);
+  if (step.type === "path") {
+    d.kept.push({ kind, path: step.path, rank: step.rank });
+    return { ok: true, kind, copy: { copy: kind, wear: { path: step.path, rank: step.rank } } };
+  }
+  d.owned[kind as PlacedKind]--;
+  d.owned[step.to]++;
+  return { ok: true, kind: step.to, copy: { copy: step.to } };
+}
+
+/** Takes one kept copy of `kind` wearing `wear` off the list (none when plain). */
+function unkeep(d: DefendSave, kind: PaletteKind, wear?: Wear) {
+  if (!wear) return;
+  const i = d.kept.findIndex((k) => k.kind === kind && k.path === wear.path && k.rank === wear.rank);
+  if (i >= 0) d.kept.splice(i, 1);
 }
 
 /** `l` as it is if it fits; else with the tile under structure `uid`
@@ -204,6 +243,7 @@ export const RESPEC_PRICE = { copper: 5 } as const;
  * with Unlimited money), gives back its allocated Knowledge, and turns it
  * back into its basic building with no path. Only while building. */
 export function respecBuilding(save: Save, target: SpecialtyTarget): UpgradeResult {
+  if ("copy" in target) return respecCopy(save, target);
   const d = save.defend, kind = targetKind(d.layout, target), placed = placementOf(d.layout, target);
   if (!kind || !placed) return { ok: false, reason: "That building is no longer there." };
   const root = kind === "wallSpikes" ? kind : rootOf(kind), refund = allocated(kind, wearOf(placed));
@@ -223,6 +263,21 @@ export function respecBuilding(save: Save, target: SpecialtyTarget): UpgradeResu
   d.owned[root]++;
   d.layout = standing(next, st.uid);
   return { ok: true, kind: root, waiting: !d.layout.structures.some((o) => o.uid === st.uid) };
+}
+
+/** Respecs one palette copy: it becomes a plain copy of its basic building. */
+function respecCopy(save: Save, target: { copy: PaletteKind; wear?: Wear }): UpgradeResult {
+  const d = save.defend, kind = target.copy, root = kind === "wallSpikes" ? kind : rootOf(kind);
+  if (!copyWaits(d, kind, target.wear)) return { ok: false, reason: "That copy is no longer in the palette." };
+  if (root === kind && !target.wear) return { ok: false, reason: "Nothing to respec: it has no upgrades." };
+  if (!spendMetals(save.smithy, RESPEC_PRICE, save.settings.devMode)) return { ok: false, reason: `A respec costs ${RESPEC_PRICE.copper} Copper.` };
+  save.knowledge += allocated(kind, target.wear);
+  unkeep(d, kind, target.wear);
+  if (root !== kind) {
+    d.owned[kind as PlacedKind]--;
+    d.owned[root as PlacedKind]++;
+  }
+  return { ok: true, kind: root, copy: { copy: root } };
 }
 
 /** One node of a building's upgrade tree: a building it is or can become
@@ -282,6 +337,13 @@ export function buildingTree(kind: PlacedKind | "wallSpikes", wear?: Wear): Tree
     for (const p of buildingPathsOf(k)) climb(p, kid(k), 0, true);
   });
   return nodes;
+}
+
+/** Whether a palette item has an upgrade tree worth showing: something it
+ * grew from, can become, or a path it can climb. */
+export function hasTree(kind: string): kind is PaletteKind {
+  if (buildingPathsOf(kind).length) return true;
+  return kind !== "wallSpikes" && (kind in BECOMES || !!upgradedFrom(kind as PlacedKind));
 }
 
 // ── In battle ──────────────────────────────────────────────────────────

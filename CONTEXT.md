@@ -34,7 +34,7 @@ One of the three buildings the shop sells: the **Watch tower**, the **Melee Guil
 One step a single placed building takes with Knowledge, chosen by tapping it in Defend while building: becoming another building (a Watch tower an archer, cannon or wizard tower; a Melee Guild a barracks; a Ranged Guild an archer barracks, Mage Guild, **sniper lodge** or **musket hall**, whose **explosive musketmen** fire bursting balls), a path's next rank, or its crown's **evolution**. The other buildings of its kind are untouched.
 
 **Upgrade tree**:
-A building's own upgrades, opened by tapping it in Defend while building: the buildings it has been, then every branch still open to it, as nodes on branches that can be dragged about and spring back. Choosing one branch makes the ones beside it wither away and opens the upgrades only that branch leads to. Its corner box shows the Knowledge **allocated** to the building.
+A building's own upgrades, opened by tapping it in Defend while building, or by pressing and holding it there or its tile in the palette (a copy in the palette is upgraded on its own): the buildings it has been, then every branch still open to it, as nodes on branches that can be dragged about and spring back. Choosing one branch makes the ones beside it wither away and opens the upgrades only that branch leads to. Its corner box shows the Knowledge **allocated** to the building.
 
 **Respec**:
 Turning one building back into its basic building with no path, for 5 Copper, with every Knowledge point allocated to it given back.

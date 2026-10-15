@@ -3,7 +3,8 @@
 // building opens its living upgrade tree, each node costs Knowledge and
 // changes only that building, a choice withers the branches beside it and
 // sprouts its own, nodes can be dragged and spring back, a respec costs
-// 5 Copper and gives every point back, and the guilds' troops fight. Isolated browser contexts only: never reads or changes a
+// 5 Copper and gives every point back, pressing and holding a placed
+// building or a palette tile opens its tree, and the guilds' troops fight. Isolated browser contexts only: never reads or changes a
 // player's saved game. Needs `npm run dev`. Screenshots go to test-results/.
 import { chromium } from '@playwright/test';
 import assert from 'node:assert/strict';
@@ -177,6 +178,54 @@ try {
     await buy('k:sniperLodge');
     await press(panel.locator('[data-specialty-close]'));
     await place('meleeGuild', 3);
+
+    // Press and hold: on a placed building, or on a palette tile.
+    const hold = async (x, y) => {
+      if (phone) {
+        const cdp = await context.newCDPSession(page);
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+        await page.waitForTimeout(700);
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+        await cdp.detach();
+      } else {
+        await page.mouse.move(x, y); await page.mouse.down();
+        await page.waitForTimeout(700); await page.mouse.up();
+      }
+      await page.waitForSelector('#defend-specialty:not([hidden])');
+    };
+    const centre = b => ({ x: b.x + b.width / 2, y: b.y + b.height / 2 });
+    const layoutBefore = JSON.stringify((await state(page)).defend.layout.structures);
+    const towerAt = await page.evaluate(uid => {
+      const dp = window.__dp, b = dp.currentMap().buildings.find(b => b.structureUid === uid);
+      return dp.renderer.toClient(b.rect.x + b.rect.w / 2, b.rect.y + b.rect.h / 2);
+    }, tower.uid);
+    await hold(towerAt.x, towerAt.y);
+    assert.match(await panel.locator('.ug-title').textContent(), /Wizard tower/, 'holding a placed building opens its tree');
+    assert.equal(JSON.stringify((await state(page)).defend.layout.structures), layoutBefore, 'and leaves it where it stood');
+    await page.waitForTimeout(300);
+    assert.equal(await panel.isHidden(), false, 'letting go keeps it open');
+    await page.screenshot({ path: `${out}/upgrade-${width}-hold-building.png` });
+    await press(panel.locator('[data-specialty-close]'));
+    // The palette's last Watch tower: held, upgraded right there.
+    await page.evaluate(() => { window.__dp.host.game().knowledge += 200; });
+    await hold(...Object.values(centre(await page.locator('#defend-palette [data-item="watchTower"]').boundingBox())));
+    assert.match(await panel.locator('.ug-title').textContent(), /Watch tower/, 'holding a palette tile opens its tree');
+    assert.equal(await panel.locator('.ug-node.next').count(), 5);
+    await page.waitForTimeout(500); await page.screenshot({ path: `${out}/upgrade-${width}-hold-palette.png` });
+    await buy('k:archerTower');
+    await settled();
+    s = await state(page);
+    assert.equal(s.defend.owned.archerTower, 1, 'the copy in the palette became an archer tower');
+    assert.equal(s.defend.owned.watchTower, 0, 'its Watch tower is used up');
+    assert.match(await panel.locator('.ug-title').textContent(), /Archer tower/, 'and its tree goes on from there');
+    assert.ok(await page.locator('#defend-palette [data-item="archerTower"]').count(), 'the palette shows it');
+    const path = (await nodes()).find(n => n.startsWith('p:') && n.endsWith(':1=next')).split('=')[0];
+    await buy(path);
+    await settled();
+    s = await state(page);
+    assert.equal(s.defend.kept.length, 1, `it waits on ${path} as a kept copy`);
+    assert.ok(await page.locator(`#defend-palette [data-item^="archerTower~"]`).count(), 'under its own palette entry');
+    await press(panel.locator('[data-specialty-close]'));
     s = await state(page);
     assert.deepEqual(['wizardTower', 'musketHall', 'sniperLodge', 'meleeGuild'].map(k => s.defend.owned[k] >= 1), [true, true, true, true]);
 

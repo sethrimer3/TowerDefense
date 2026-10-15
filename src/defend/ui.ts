@@ -1,4 +1,4 @@
-import { RESPEC_PRICE, respecBuilding, rootOf, specialtyLabel, specialtyOf, stepName, targetKind, upgradeBuilding, type SpecialtyTarget } from "../specializations.ts";
+import { RESPEC_PRICE, hasTree, respecBuilding, rootOf, specialtyLabel, specialtyOf, stepName, targetKind, upgradeBuilding, type SpecialtyTarget } from "../specializations.ts";
 import { pathById, type PathId } from "../knowledge-paths.ts";
 import { treeAllocated, treeCardHtml, treeGraph, treeStep } from "../ui/specialty.ts";
 import { UpgradeGraph } from "../ui/upgrade-graph.ts";
@@ -89,7 +89,9 @@ export type DefendHost = {
 const plural = (name: string) => (name.endsWith("s") ? name : `${name}s`);
 /** Whether two specialty targets name the same building. */
 const sameTarget = (a: SpecialtyTarget, b: SpecialtyTarget) =>
-  "uid" in a ? "uid" in b && a.uid === b.uid : "spikes" in b && sameGate(a.spikes, b.spikes);
+  "uid" in a ? "uid" in b && a.uid === b.uid
+  : "spikes" in a ? "spikes" in b && sameGate(a.spikes, b.spikes)
+  : "copy" in b && a.copy === b.copy && a.wear?.path === b.wear?.path && a.wear?.rank === b.wear?.rank;
 
 export class DefendPage {
   private host: DefendHost;
@@ -104,6 +106,7 @@ export class DefendPage {
     pickUp: (e) => this.pickUp(e),
     drop: (drop) => this.drop(drop),
     tap: (e) => this.tap(e),
+    hold: (edit) => this.hold(edit.drag),
   });
   /** The building the player tapped (its id in the map), outlined with its
    * reach and troops, and what its reach is reckoned from before a battle. */
@@ -296,6 +299,7 @@ export class DefendPage {
     this.renderer = new DefendRenderer(this.root.querySelector("#defend-canvas")!);
     const canvas = this.renderer.canvas;
     canvas.addEventListener("pointerdown", (e) => this.pointers.down(e));
+    canvas.addEventListener("contextmenu", (e) => e.preventDefault());
     canvas.addEventListener(
       "wheel",
       (e) => {
@@ -532,6 +536,8 @@ export class DefendPage {
     paintPathIcons(el);
     el.querySelectorAll<HTMLButtonElement>("[data-item]").forEach((b) => {
       b.onpointerdown = (e) => this.pressPalette(b.dataset.item!, e);
+      // A long press opens the tile's upgrade tree, not the browser's menu.
+      b.oncontextmenu = (e) => e.preventDefault();
     });
     this.updateSkillCooldowns();
     const picker = el.querySelector<HTMLButtonElement>("#defend-category");
@@ -1039,6 +1045,22 @@ export class DefendPage {
     else this.closeSpecialty();
   }
 
+  /** A press held still on a palette tile or a placed building opens its
+   * upgrade tree (only while building, and only for kinds that have one). */
+  private hold(drag: Drag): boolean {
+    if (this.phase !== "build") return false;
+    const target: SpecialtyTarget | null =
+      drag.from === "structure" ? { uid: drag.uid }
+      : drag.from === "spikes" ? { spikes: drag.spikes }
+      : drag.from === "palette" && hasTree(drag.item) ? { copy: drag.item, ...(drag.wear ? { wear: drag.wear } : {}) }
+      : null;
+    const kind = target && targetKind(this.save, target);
+    if (!target || !kind || !hasTree(kind)) return false;
+    this.openSpecialty(target);
+    play("knock");
+    return true;
+  }
+
   private pick(id: number | null) {
     this.picked = id === null ? null : { id, armed: { levels: { ...this.save.levels }, bonuses: this.host.bonuses() } };
   }
@@ -1047,9 +1069,9 @@ export class DefendPage {
   /** Shows `target`'s upgrade tree: what it has been, and every branch
    * still open to it. Only while building. */
   private openSpecialty(target: SpecialtyTarget) {
-    const kind = targetKind(this.save.layout, target);
+    const kind = targetKind(this.save, target);
     if (this.phase !== "build" || !kind) return this.closeSpecialty();
-    const wear = specialtyOf(this.save.layout, target);
+    const wear = specialtyOf(this.save, target);
     this.specialty = { target, picked: wear ? `p:${wear.path}:${wear.rank}` : `k:${kind}`, respec: false };
     if ("uid" in target) {
       const b = this.currentMap().buildings.find((o) => o.structureUid === target.uid);
@@ -1088,11 +1110,13 @@ export class DefendPage {
   private upgrade(id: string) {
     const sp = this.specialty, game = this.host.game?.();
     if (!sp || !game || this.phase !== "build") return;
-    const kind = targetKind(this.save.layout, sp.target);
-    const step = kind && treeStep(kind, specialtyOf(this.save.layout, sp.target), id);
+    const kind = targetKind(this.save, sp.target);
+    const step = kind && treeStep(kind, specialtyOf(this.save, sp.target), id);
     if (!step) return;
     const r = upgradeBuilding(game, sp.target, step);
     if (!r.ok) return this.setMessage(r.reason, 2);
+    // A palette copy is now another copy (kept on its new rank, or a new kind).
+    if (r.copy) sp.target = r.copy;
     this.afterChange(step.type === "path" ? "chime" : "unlock");
     if (r.waiting) {
       // Too big for where it stood: it waits in the palette.
@@ -1123,6 +1147,7 @@ export class DefendPage {
       this.setMessage(r.reason, 2);
       return this.renderSpecialty();
     }
+    if (r.copy) sp.target = r.copy;
     this.afterChange("coin");
     if (r.waiting) {
       this.closeSpecialty();
@@ -1149,7 +1174,7 @@ export class DefendPage {
   private renderSpecialty(focus = false) {
     const el = this.root.querySelector<HTMLElement>("#defend-specialty");
     if (!el) return;
-    const sp = this.specialty, kind = sp ? targetKind(this.save.layout, sp.target) : undefined, game = this.host.game?.();
+    const sp = this.specialty, kind = sp ? targetKind(this.save, sp.target) : undefined, game = this.host.game?.();
     if (!sp || !kind || !game || this.phase !== "build") {
       if (sp) this.specialty = null;
       this.tree?.destroy();
@@ -1158,7 +1183,7 @@ export class DefendPage {
       el.innerHTML = "";
       return;
     }
-    const wear = specialtyOf(this.save.layout, sp.target), name = kind === "wallSpikes" ? "Wall spikes" : ITEM_NAMES[kind];
+    const wear = specialtyOf(this.save, sp.target), name = kind === "wallSpikes" ? "Wall spikes" : ITEM_NAMES[kind];
     if (!this.tree) {
       el.className = "defend-specialty upgrade-tree";
       el.innerHTML = `<header class="ug-top">
