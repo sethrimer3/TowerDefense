@@ -251,7 +251,11 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   (no weapon, short reach); the Ranged Guild trains **stone throwers**, who
   lob slow stones at short range. Every other tower and troop building is
   one of these upgraded, one building at a time, with Knowledge: tap it
-  while building to open its upgrade panel. A watch tower becomes an archer,
+  while building to open its upgrade tree, nodes on branches you can drag
+  about. Choosing a branch withers the ones beside it and grows the
+  upgrades only it leads to. The box in the tree's corner shows the
+  Knowledge allocated to that building; a respec (5 Copper) gives it all
+  back and turns the building back into its basic one. A watch tower becomes an archer,
   cannon or wizard tower; a Melee Guild a barracks (swordsmen, later
   assassins or crusaders, and by Crusaders' crown a Valkyrie palace); a
   Ranged Guild an archer barracks, a Mage Guild, a **sniper lodge** (snipers:

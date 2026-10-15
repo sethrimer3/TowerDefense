@@ -1,8 +1,9 @@
 // Upgrading buildings one at a time in Defend, on desktop and phones: the
 // palette sells only the basic buildings, tapping a placed one while
-// building opens its upgrade panel, each upgrade costs Knowledge and changes
-// only that building (its kind, or its path and rank), and the guilds'
-// troops fight. Isolated browser contexts only: never reads or changes a
+// building opens its living upgrade tree, each node costs Knowledge and
+// changes only that building, a choice withers the branches beside it and
+// sprouts its own, nodes can be dragged and spring back, a respec costs
+// 5 Copper and gives every point back, and the guilds' troops fight. Isolated browser contexts only: never reads or changes a
 // player's saved game. Needs `npm run dev`. Screenshots go to test-results/.
 import { chromium } from '@playwright/test';
 import assert from 'node:assert/strict';
@@ -89,46 +90,91 @@ try {
       if (phone) await page.touchscreen.tap(p.x, p.y); else await page.mouse.click(p.x, p.y);
       await page.waitForSelector('#defend-specialty:not([hidden])');
     };
-    const buy = async name => press(panel.locator('[data-upgrade-step]', { hasText: name }));
+    /** Picks tree node `id` and buys it. */
+    const buy = async id => {
+      await press(panel.locator(`[data-node="${id}"]`));
+      await press(panel.locator(`[data-ug-buy="${id}"]`));
+    };
     const placed = async uid => (await state(page)).defend.layout.structures.find(s => s.uid === uid);
+    const nodes = () => panel.locator('.ug-node:not(.withering)').evaluateAll(els => els.map(e => `${e.dataset.node}=${['owned', 'next', 'locked'].find(c => e.classList.contains(c))}`));
+    const settled = () => page.waitForFunction(() => !document.querySelector('#defend-specialty .ug-node.withering'), null, { timeout: 5000 });
+    const allocatedText = () => panel.locator('.ug-alloc b').textContent();
 
     // A Watch tower: three towers to become, two paths to climb.
     const tower = await place('watchTower');
     await tapBuilding(tower.uid);
-    assert.match(await panel.textContent(), /UPGRADE THIS WATCH TOWER/);
-    assert.equal(await panel.locator('[data-upgrade-step]').count(), 5);
-    assert.ok(inside(await panel.boundingBox(), await page.locator('#defend-board').boundingBox()), 'the panel stays inside the board');
-    await page.waitForTimeout(400); await page.screenshot({ path: `${out}/upgrade-${width}-watch-tower.png` });
-    await buy('Wizard tower');
-    await page.waitForFunction(() => document.querySelector('#defend-specialty')?.textContent.includes('UPGRADE THIS WIZARD TOWER'));
+    assert.match(await panel.locator('.ug-title').textContent(), /Watch tower/);
+    assert.equal(await panel.locator('.ug-node.next').count(), 5);
+    assert.match(await allocatedText(), /✦ 0/);
+    assert.equal(await panel.locator('.ug-respec').isDisabled(), true, 'nothing to respec yet');
+    assert.ok(inside(await panel.boundingBox(), await page.locator('#defend-board').boundingBox()), 'the tree stays inside the board');
+    await page.waitForTimeout(700); await page.screenshot({ path: `${out}/upgrade-${width}-watch-tower.png` });
+    await buy('k:wizardTower');
+    await page.waitForTimeout(350); await page.screenshot({ path: `${out}/upgrade-${width}-withering.png` });
+    await settled();
     let s = await state(page);
     assert.equal((await placed(tower.uid)).kind, 'wizardTower', 'the same building, now a wizard tower');
     assert.equal(s.knowledge, 92);
     assert.equal(s.defend.owned.watchTower, 1, 'the other Watch tower is untouched');
-    await buy('Stormcalling I');
-    await page.waitForFunction(() => document.querySelector('#defend-specialty')?.textContent.includes('Stormcalling II'));
+    let tree = await nodes();
+    assert.ok(!tree.some(n => n.startsWith('k:archerTower') || n.startsWith('p:spotters')), `the other branches withered: ${tree}`);
+    assert.ok(tree.includes('p:storm:1=next') && tree.includes('p:pyromancy:3=locked'), `the wizard's own paths sprouted: ${tree}`);
+    assert.match(await allocatedText(), /✦ 8/);
+    await buy('p:storm:1');
+    await settled();
     assert.deepEqual([(await placed(tower.uid)).path, (await placed(tower.uid)).rank], ['storm', 1]);
-    assert.ok((await state(page)).knowledge < 92, 'Stormcalling I is paid for');
-    await page.waitForTimeout(400); await page.screenshot({ path: `${out}/upgrade-${width}-wizard-tower.png` });
-    assert.equal(await panel.locator('[data-upgrade-step]:disabled').count(), 1, 'Stormcalling II costs more than is left');
+    tree = await nodes();
+    assert.ok(!tree.some(n => n.startsWith('p:pyromancy') || n.startsWith('p:rime')), 'Pyromancy and Rime are cut off');
+    assert.ok(tree.includes('k:darkKeep=locked'), 'the crown waits at the end of Stormcalling');
+    assert.match(await allocatedText(), new RegExp(`✦ ${100 - (await state(page)).knowledge}`));
+    // Drag a node: it follows, then eases back into the tree.
+    const node = panel.locator('[data-node="p:storm:2"]'), home = await node.boundingBox();
+    await page.mouse.move(home.x + home.width / 2, home.y + home.height / 2); await page.mouse.down();
+    await page.mouse.move(home.x + 90, home.y + 40, { steps: 8 });
+    const pulled = await node.boundingBox();
+    assert.ok(Math.abs(pulled.x - home.x) > 40, 'the node follows the pointer');
+    await page.screenshot({ path: `${out}/upgrade-${width}-dragging.png` });
+    await page.mouse.up();
+    await page.waitForTimeout(1500);
+    const back = await node.boundingBox();
+    assert.ok(Math.abs(back.x - home.x) < 6 && Math.abs(back.y - home.y) < 6, `and springs back (${JSON.stringify(back)} vs ${JSON.stringify(home)})`);
+    await page.screenshot({ path: `${out}/upgrade-${width}-wizard-tower.png` });
+    await press(panel.locator('[data-node="p:storm:2"]'));
+    assert.equal(await panel.locator('[data-ug-buy="p:storm:2"]').isDisabled(), true, 'Stormcalling II costs more than is left');
     await press(panel.locator('[data-specialty-close]'));
 
-    // The guilds and their branches.
+    // A Melee Guild becomes a barracks, then is respecced for 5 Copper.
     const melee = await place('meleeGuild');
     await tapBuilding(melee.uid);
-    await page.waitForTimeout(400); await page.screenshot({ path: `${out}/upgrade-${width}-melee-guild.png` });
+    assert.deepEqual(await nodes(), ['k:meleeGuild=owned', 'k:barracks=next']);
+    const before = await state(page);
+    await buy('k:barracks');
+    await settled();
+    assert.ok((await nodes()).includes('p:crusaders:1=next'));
+    await page.screenshot({ path: `${out}/upgrade-${width}-barracks.png` });
+    await press(panel.locator('.ug-respec'));
+    assert.match(await panel.locator('.ug-respec').textContent(), /Respec for 5 Copper\?/, 'asks once more');
+    await press(panel.locator('.ug-respec'));
+    await settled();
+    s = await state(page);
+    assert.equal((await placed(melee.uid)).kind, 'meleeGuild', 'back to a Melee Guild');
+    assert.equal(s.knowledge, before.knowledge, 'every point back');
+    assert.equal(s.smithy.copper, before.smithy.copper - 5);
+    assert.deepEqual(await nodes(), ['k:meleeGuild=owned', 'k:barracks=next']);
     await press(panel.locator('[data-specialty-close]'));
+
+    // The Ranged Guild's four branches.
     const ranged = await place('rangedGuild', 1);
     await tapBuilding(ranged.uid);
-    assert.equal(await panel.locator('[data-upgrade-step]').count(), 4);
-    await page.waitForTimeout(400); await page.screenshot({ path: `${out}/upgrade-${width}-ranged-guild.png` });
-    await buy('Musket hall');
-    await page.waitForFunction(() => document.querySelector('#defend-specialty')?.textContent.includes('UPGRADE THIS MUSKET HALL'));
+    assert.equal(await panel.locator('.ug-node.next').count(), 4);
+    await page.waitForTimeout(700); await page.screenshot({ path: `${out}/upgrade-${width}-ranged-guild.png` });
+    await buy('k:musketHall');
+    await settled();
     assert.equal((await placed(ranged.uid))?.kind, 'musketHall');
     await press(panel.locator('[data-specialty-close]'));
     const ranged2 = await place('rangedGuild', 2);
     await tapBuilding(ranged2.uid);
-    await buy('Sniper lodge');
+    await buy('k:sniperLodge');
     await press(panel.locator('[data-specialty-close]'));
     await place('meleeGuild', 3);
     s = await state(page);

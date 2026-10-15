@@ -33,6 +33,12 @@ One of the three buildings the shop sells: the **Watch tower**, the **Melee Guil
 **Upgrade** (of a building):
 One step a single placed building takes with Knowledge, chosen by tapping it in Defend while building: becoming another building (a Watch tower an archer, cannon or wizard tower; a Melee Guild a barracks; a Ranged Guild an archer barracks, Mage Guild, **sniper lodge** or **musket hall**, whose **explosive musketmen** fire bursting balls), a path's next rank, or its crown's **evolution**. The other buildings of its kind are untouched.
 
+**Upgrade tree**:
+A building's own upgrades, opened by tapping it in Defend while building: the buildings it has been, then every branch still open to it, as nodes on branches that can be dragged about and spring back. Choosing one branch makes the ones beside it wither away and opens the upgrades only that branch leads to. Its corner box shows the Knowledge **allocated** to the building.
+
+**Respec**:
+Turning one building back into its basic building with no path, for 5 Copper, with every Knowledge point allocated to it given back.
+
 **Kept copy**:
 A building on a path taken back to the palette: it keeps its path and rank, waits under its own palette entry, and wears them again when placed.
 
@@ -191,7 +197,7 @@ One way a building can grow, in ranks it climbs one at a time with Knowledge: th
 A path's crown, past its last rank, turns that one building into a greater form (Stormcalling's Wizard tower into the Dark wizard keep, Crusaders' Barracks into the Valkyrie palace), paid with Knowledge. If it no longer fits its tile it goes to the palette.
 
 **Specialization**:
-The path a building has climbed and the rank it has reached, bought in Defend's **upgrade panel**, kept when it moves, across saves, and as a **kept copy** when it goes back to the palette. A path is for good: a building can't change it. Recruits share their home building's specialization; a battle keeps the specializations it started with.
+The path a building has climbed and the rank it has reached, bought in its **upgrade tree**, kept when it moves, across saves, and as a **kept copy** when it goes back to the palette. A path is for good: a building can't change it. Recruits share their home building's specialization; a battle keeps the specializations it started with.
 
 **Research unlock**:
 A strike spell's path rank learned once with Knowledge in the Study. (Building paths were once research unlocks; saves from then keep the paths their buildings wore and refund the rest.)

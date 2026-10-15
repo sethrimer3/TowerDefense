@@ -6,8 +6,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { defaults, decode } from "../src/save.ts";
-import { nextSteps, placedBattlePaths, specialtyLabel, specialtyOf, spikeKey, stepName, upgradeBuilding, upgradedFrom, rootOf, type UpgradeStep } from "../src/specializations.ts";
-import { learnPath, type PathId } from "../src/knowledge-paths.ts";
+import { allocated, buildingTree, respecBuilding, RESPEC_PRICE, nextSteps, placedBattlePaths, specialtyLabel, specialtyOf, spikeKey, stepName, upgradeBuilding, upgradedFrom, rootOf, type UpgradeStep } from "../src/specializations.ts";
+import { learnPath, pathById, type PathId } from "../src/knowledge-paths.ts";
 import { bonuses } from "../src/progression.ts";
 import { placeStructure, removeStructure, moveStructure, moveSpikes, placeCityTile, placeSpikes, removeSpikes, defaultLayout, fitLayout } from "../src/defend/layout.ts";
 import { available, keptGroups, plainAvailable, setLayout } from "../src/defend/progress.ts";
@@ -20,7 +20,7 @@ import { stepMage, stepFireballs, stepBlazes } from "../src/defend/mages.ts";
 import { baitBitten } from "../src/defend/bait.ts";
 import { center } from "../src/defend/pathing.ts";
 import { BRAWLER, MUSKETEER, SLINGER, SNIPER, STARTING_OWNED, type PaletteItem } from "../src/defend/catalog.ts";
-import { upgradeChoicesHtml } from "../src/ui/specialty.ts";
+import { treeCardHtml, treeGraph } from "../src/ui/specialty.ts";
 
 type S = ReturnType<typeof defaults>;
 const INSIDE = new Set<PaletteItem>(["barracks", "mageGuild", "archerBarracks", "meleeGuild", "rangedGuild", "sniperLodge", "musketHall"]);
@@ -96,11 +96,12 @@ test("each building is upgraded on its own, paying Knowledge rank by rank", () =
   assert.equal(bonuses(s).structurePaths![a].wizardTower!.rank, 3);
   assert.equal(bonuses(s).structurePaths![b], undefined);
   assert.equal(specialtyLabel(specialtyOf(s.defend.layout, { uid: a })), "Pyromancy III");
-  const html = upgradeChoicesHtml(s, "wizardTower");
-  assert.match(html, /Become|Pyromancy I/); assert.match(html, /Stormcalling I/);
+  assert.deepEqual(treeGraph("wizardTower").filter((n) => n.state === "next").map((n) => n.id), ["p:pyromancy:1", "p:rime:1", "p:storm:1"]);
+  assert.match(treeCardHtml(s, "wizardTower", undefined, "p:storm:1"), /Stormcalling I[\s\S]*data-ug-buy="p:storm:1"/);
   s.knowledge = 0;
-  assert.match(upgradeChoicesHtml(s, "wizardTower"), /data-upgrade-step="0"[^>]*disabled/, "unaffordable upgrades show, locked");
-  assert.match(upgradeChoicesHtml(s, "wizardTower", { path: "rime", rank: 3 }), /fully upgraded/);
+  assert.match(treeCardHtml(s, "wizardTower", undefined, "p:storm:1"), /data-ug-buy="p:storm:1" disabled/, "unaffordable upgrades show, locked");
+  assert.match(treeCardHtml(s, "wizardTower", undefined, "p:storm:2"), /Locked/);
+  assert.match(treeCardHtml(s, "wizardTower", undefined, "k:wizardTower"), /This building/);
 });
 
 test("becoming another building swaps one copy: in place when it fits, else it waits in the palette", () => {
@@ -170,15 +171,65 @@ test("upgrades are snapshotted at battle start", () => {
   assert.equal(bonuses(s).structurePaths![uid].wizardTower!.rank, 2); assert.equal(sim.bonuses.towerDamage, 1);
 });
 
+// ── The living tree and respec ──────────────────────────────────────────
+test("a choice cuts off the branches beside it and opens its own", () => {
+  const ids = (kind: Parameters<typeof buildingTree>[0], wear?: Parameters<typeof buildingTree>[1]) => buildingTree(kind, wear).map((n) => `${n.id}=${n.state}`);
+  const plain = ids("rangedGuild");
+  assert.deepEqual(plain, ["k:rangedGuild=owned", "k:archerBarracks=next", "k:mageGuild=next", "k:sniperLodge=next", "k:musketHall=next"]);
+  const mage = ids("mageGuild");
+  assert.ok(!mage.some((n) => n.startsWith("k:archerBarracks")), "the archer branch is gone");
+  assert.ok(mage.includes("p:pyroclasm:1=next") && mage.includes("p:cinders:1=next") && mage.includes("p:pyroclasm:3=locked"), "the mage's own paths appear");
+  const pyro = ids("mageGuild", { path: "pyroclasm", rank: 1 });
+  assert.deepEqual(pyro, ["k:rangedGuild=owned", "k:mageGuild=owned", "p:pyroclasm:1=owned", "p:pyroclasm:2=next", "p:pyroclasm:3=locked"], "Cinders is cut off");
+  const storm = buildingTree("wizardTower", { path: "storm", rank: 3 });
+  const crown = pathById("storm").evolves!.cost;
+  assert.deepEqual(storm.at(-1), { id: "k:darkKeep", parent: "p:storm:3", state: "next", kind: "darkKeep", cost: crown, step: { type: "evolve", path: "storm", to: "darkKeep", cost: crown } });
+  assert.deepEqual(ids("darkKeep"), ["k:watchTower=owned", "k:wizardTower=owned", "p:storm:1=owned", "p:storm:2=owned", "p:storm:3=owned", "k:darkKeep=owned"]);
+  for (const n of buildingTree("watchTower")) if (n.parent) assert.ok(buildingTree("watchTower").some((o) => o.id === n.parent), n.id);
+  // Every buyable node is exactly one of the building's next steps.
+  for (const [k, w] of [["watchTower"], ["wizardTower", { path: "storm", rank: 3 }], ["wallSpikes"], ["barracks", { path: "crusaders", rank: 1 }]] as const)
+    assert.equal(buildingTree(k, w as never).filter((n) => n.state === "next").length, nextSteps(k, w as never).length, k);
+});
+
+test("allocated Knowledge counts every step from the basic building", () => {
+  assert.equal(allocated("watchTower"), 0);
+  assert.equal(allocated("wizardTower"), 8);
+  assert.equal(allocated("wizardTower", { path: "pyromancy", rank: 2 }), 8 + 4 + 4004);
+  const storm = pathById("storm");
+  assert.equal(allocated("darkKeep"), 8 + storm.ranks.reduce((n, r) => n + r.cost, 0) + storm.evolves!.cost);
+  assert.equal(allocated("wallSpikes", { path: "blastStakes", rank: 1 }), pathById("blastStakes").ranks[0].cost);
+});
+
+test("a respec costs 5 Copper, gives back every point and returns the basic building", () => {
+  const s = fixture("rangedGuild", 2); s.settings.devMode = false; s.knowledge = 100; s.smithy = { copper: 5, silver: 0, gold: 0 };
+  const [a, b] = uids(s, "rangedGuild");
+  assert.match((respecBuilding(s, { uid: a }) as { reason: string }).reason, /no upgrades/);
+  assert.ok(upgradeBuilding(s, { uid: a }, { type: "become", to: "mageGuild", cost: 0 }).ok);
+  assert.ok(upgradeBuilding(s, { uid: a }, { type: "path", path: "pyroclasm", rank: 1, cost: 0 }).ok);
+  assert.equal(s.knowledge, 100 - 9 - 4);
+  assert.ok(upgradeBuilding(s, { uid: b }, { type: "become", to: "sniperLodge", cost: 0 }).ok);
+  const r = respecBuilding(s, { uid: a });
+  assert.ok(r.ok && r.kind === "rangedGuild");
+  assert.equal(s.knowledge, 100 - 8, "the mage's 13 come back");
+  assert.deepEqual(RESPEC_PRICE, { copper: 5 });
+  assert.equal(s.smithy.copper, 0);
+  assert.deepEqual([s.defend.owned.rangedGuild, s.defend.owned.mageGuild, s.defend.owned.sniperLodge], [1, 0, 1]);
+  assert.equal(specialtyOf(s.defend.layout, { uid: a }), undefined);
+  assert.equal(s.defend.layout.structures.find((st) => st.uid === b)!.kind, "sniperLodge", "the other building is untouched");
+  assert.match((respecBuilding(s, { uid: b }) as { reason: string }).reason, /5 Copper/, "no copper left");
+  s.settings.devMode = true;
+  assert.ok(respecBuilding(s, { uid: b }).ok, "free with Unlimited money");
+});
+
 // ── Older saves ────────────────────────────────────────────────────────
-test("version 4: buildings keep the path they wore at its researched rank; unworn research is refunded", () => {
+test("version 4: building research all comes back as Knowledge; buildings stand plain; evolved ones turn back", () => {
   const s = fixture("wizardTower", 2); s.settings.devMode = false; s.defend.owned.wizardTower = 3;
-  const [a] = uids(s, "wizardTower"), raw: any = JSON.parse(JSON.stringify(s));
+  const raw: any = JSON.parse(JSON.stringify(s));
   raw.version = 4; raw.knowledge = 100;
   raw.pathResearch = {
-    pyromancy: { rank: 2, spent: 4008 }, // worn by a tower: kept on it at II
-    rime: { rank: 1, spent: 4 }, // worn by nobody: refunded
-    storm: { rank: 3, spent: 175015, crowned: true }, // crown with keeps owned: its crown stays spent
+    pyromancy: { rank: 2, spent: 4008 }, // worn by a tower
+    rime: { rank: 1, spent: 4 }, // worn by nobody
+    storm: { rank: 3, spent: 175015, crowned: true }, // a crown, with a keep made from it
     starfall: { rank: 1, spent: 6 }, // a spell: still researched
   };
   raw.defend.owned.darkKeep = 1;
@@ -186,30 +237,29 @@ test("version 4: buildings keep the path they wore at its researched rank; unwor
   raw.researchJob = { kind: "path", id: "crusaders", rank: 0, left: 1000, paid: 4 };
   const loaded = decode(JSON.stringify(raw));
   assert.equal(loaded.version, 5);
-  assert.deepEqual(specialtyOf(loaded.defend.layout, { uid: a }), { path: "pyromancy", rank: 2 });
-  assert.equal(loaded.defend.layout.structures[1].path, undefined);
+  assert.deepEqual(loaded.defend.layout.structures.map((st) => st.path), [undefined, undefined]);
   assert.deepEqual(Object.keys(loaded.pathResearch), ["starfall"]);
-  assert.equal(loaded.knowledge, 100 + 4 + (175015 - 150000) + 4, "rime, storm's ranks and the research in progress");
+  assert.equal(loaded.knowledge, 100 + 4008 + 4 + 175015 + 4, "every building research back, and the research in progress");
   assert.equal(loaded.researchJob, null);
-  assert.deepEqual(loaded.defend.owned.darkKeep, 1, "evolved buildings stay");
+  assert.deepEqual([loaded.defend.owned.darkKeep, loaded.defend.owned.wizardTower], [0, 4], "the keep is a wizard tower again");
   const again = decode(JSON.stringify(loaded));
   assert.equal(again.knowledge, loaded.knowledge, "migrates once");
   assert.deepEqual(again.defend.layout, loaded.defend.layout);
 });
 
-test("version 3 cards and version 2 topic paths still reach the buildings standing in the city", () => {
+test("version 3 cards and version 2 topic paths come back as Knowledge too", () => {
   const s = fixture("wizardTower", 2); s.defend.owned.wizardTower = 3;
   const raw: any = JSON.parse(JSON.stringify(s));
-  delete raw.pathResearch; raw.version = 2;
+  delete raw.pathResearch; raw.version = 2; raw.knowledge = 0;
   raw.paths = { wizardTower: { path: "rime", rank: 2, spent: 4008 } };
   const loaded = decode(JSON.stringify(raw));
-  assert.deepEqual(loaded.defend.layout.structures.map(st => [st.path, st.rank]), [["rime", 2], ["rime", 2]]);
-  assert.equal(available(loaded.defend, "wizardTower"), 1);
-  const v3: any = JSON.parse(JSON.stringify(s)), [a] = uids(s, "wizardTower");
-  v3.version = 3; v3.pathResearch = { pyromancy: { rank: 1, spent: 4 } };
-  v3.defend.cards = [{ id: 1, kind: "wizardTower", path: "pyromancy", rank: 1, placement: `structure:${a}` }, { id: 2, kind: "wizardTower", path: "rime", rank: 1 }];
+  assert.deepEqual(loaded.defend.layout.structures.map(st => st.path), [undefined, undefined]);
+  assert.equal(loaded.knowledge, 4008);
+  const v3: any = JSON.parse(JSON.stringify(s));
+  v3.version = 3; v3.knowledge = 0; v3.pathResearch = { pyromancy: { rank: 1, spent: 4 } };
+  v3.defend.cards = [{ id: 1, kind: "wizardTower", path: "pyromancy", rank: 1, placement: `structure:${uids(s, "wizardTower")[0]}` }];
   const three = decode(JSON.stringify(v3));
-  assert.deepEqual(specialtyOf(three.defend.layout, { uid: a }), { path: "pyromancy", rank: 1 });
+  assert.equal(three.knowledge, 4);
   assert.equal((three.defend as any).cards, undefined);
 });
 

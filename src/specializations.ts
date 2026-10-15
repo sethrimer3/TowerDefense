@@ -25,6 +25,7 @@ import { hash } from "./defend/grid.ts";
 import type { DefendSave } from "./defend/progress.ts";
 import { PATHS, isSpell, pathById, pathFits, pathTopicOf, pathsOf, type BattlePaths, type KnowledgePath, type PathId } from "./knowledge-paths.ts";
 import type { Save } from "./save.ts";
+import { spendMetals } from "./metals.ts";
 
 export const spikeKey = (g: { tx: number; ty: number; side: string }) => `spikes:${g.tx}:${g.ty}:${g.side}`;
 
@@ -172,6 +173,117 @@ function standing(l: Layout, uid: number): Layout {
   return next;
 }
 
+// ── The tree a building grows ──────────────────────────────────────────
+/** The Knowledge allocated to a building of `kind` wearing `wear`: every
+ * step from its basic building to where it stands now, at today's prices
+ * (what a respec gives back). */
+export function allocated(kind: PlacedKind | "wallSpikes", wear?: Wear): number {
+  let total = 0;
+  if (wear) {
+    const p = pathById(wear.path);
+    for (let r = 0; r < wear.rank; r++) total += p.ranks[r].cost;
+  }
+  if (kind === "wallSpikes") return total;
+  for (let k = kind, up = upgradedFrom(k); up; k = up, up = upgradedFrom(k)) {
+    const become = BECOMES[up]?.find((b) => b.to === k);
+    if (become) total += become.cost;
+    else {
+      // Evolved: the whole crowned path, then its crown.
+      const p = PATHS.find((o) => o.evolves?.item === k)!;
+      total += p.ranks.reduce((n, r) => n + r.cost, 0) + p.evolves!.cost;
+    }
+  }
+  return total;
+}
+
+/** What it costs to respec a building: every Knowledge point in it back,
+ * the building back to its basic form. */
+export const RESPEC_PRICE = { copper: 5 } as const;
+
+/** Respecs the building at `target`: pays `RESPEC_PRICE` in metal (free
+ * with Unlimited money), gives back its allocated Knowledge, and turns it
+ * back into its basic building with no path. Only while building. */
+export function respecBuilding(save: Save, target: SpecialtyTarget): UpgradeResult {
+  const d = save.defend, kind = targetKind(d.layout, target), placed = placementOf(d.layout, target);
+  if (!kind || !placed) return { ok: false, reason: "That building is no longer there." };
+  const root = kind === "wallSpikes" ? kind : rootOf(kind), refund = allocated(kind, wearOf(placed));
+  if (root === kind && !wearOf(placed)) return { ok: false, reason: "Nothing to respec: it has no upgrades." };
+  if (!spendMetals(save.smithy, RESPEC_PRICE, save.settings.devMode)) return { ok: false, reason: `A respec costs ${RESPEC_PRICE.copper} Copper.` };
+  save.knowledge += refund;
+  const next = cloneLayout(d.layout), p = placementOf(next, target)!;
+  delete p.path;
+  delete p.rank;
+  if (root === kind || root === "wallSpikes") {
+    d.layout = next;
+    return { ok: true, kind };
+  }
+  const st = p as PlacedStructure;
+  st.kind = root;
+  d.owned[kind as PlacedKind]--;
+  d.owned[root]++;
+  d.layout = standing(next, st.uid);
+  return { ok: true, kind: root, waiting: !d.layout.structures.some((o) => o.uid === st.uid) };
+}
+
+/** One node of a building's upgrade tree: a building it is or can become
+ * (`k:<kind>`), or one rank of a path (`p:<path>:<rank>`). */
+export type TreeNode = {
+  id: string;
+  /** The node it grows from (none for the basic building at the root). */
+  parent?: string;
+  /** owned: the building has it; next: it can be bought now; locked:
+   * further along a live branch. */
+  state: "owned" | "next" | "locked";
+  /** The step that buys it from its parent. */
+  step?: UpgradeStep;
+  /** What it is: a kind (a building), or a path at a rank. */
+  kind?: PlacedKind | "wallSpikes";
+  path?: PathId;
+  rank?: number;
+  cost: number;
+};
+
+/** The live upgrade tree of one building of `kind` wearing `wear`: the
+ * buildings it has been, then every branch still open to it. A choice cuts
+ * off the branches beside it (a Ranged Guild that becomes a Mage Guild can
+ * no longer become an archer barracks, and a Mage Guild on Pyroclasm no
+ * longer has Cinders), and opens what only that choice leads to (the Mage
+ * Guild's own paths appear once it is one). */
+export function buildingTree(kind: PlacedKind | "wallSpikes", wear?: Wear): TreeNode[] {
+  const nodes: TreeNode[] = [];
+  const lineage: (PlacedKind | "wallSpikes")[] = [kind];
+  if (kind !== "wallSpikes") for (let up = upgradedFrom(kind); up; up = upgradedFrom(up)) lineage.unshift(up);
+  const kid = (k: string) => `k:${k}`, pid = (p: PathId, r: number) => `p:${p}:${r}`;
+  /** A path's ranks from `from`, `have` of them owned, then its crown. */
+  const climb = (p: KnowledgePath, from: string, have: number, cap: boolean) => {
+    let parent = from;
+    p.ranks.forEach((r, i) => {
+      const rank = i + 1, state = rank <= have ? "owned" : rank === have + 1 ? "next" : "locked";
+      nodes.push({ id: pid(p.id, rank), parent, state, path: p.id, rank, cost: r.cost, step: { type: "path", path: p.id, rank, cost: r.cost } });
+      parent = pid(p.id, rank);
+    });
+    if (p.evolves && cap) {
+      const state = have >= p.ranks.length ? "next" : "locked";
+      nodes.push({ id: kid(p.evolves.item), parent, state, kind: p.evolves.item, cost: p.evolves.cost, step: { type: "evolve", path: p.id, to: p.evolves.item, cost: p.evolves.cost } });
+    }
+  };
+  lineage.forEach((k, i) => {
+    const below = lineage[i - 1], cur = i === lineage.length - 1;
+    const via = below && below !== "wallSpikes" ? BECOMES[below]?.find((b) => b.to === k) : undefined;
+    const evolved = below ? PATHS.find((p) => p.evolves?.item === k && p.evolves.from === below) : undefined;
+    if (evolved) {
+      // Its crowned path, all owned, then the crown itself.
+      climb(evolved, kid(below), evolved.ranks.length, false);
+      nodes.push({ id: kid(k), parent: pid(evolved.id, evolved.ranks.length), state: "owned", kind: k, cost: evolved.evolves!.cost, step: { type: "evolve", path: evolved.id, to: k as PlacedKind, cost: evolved.evolves!.cost } });
+    } else nodes.push({ id: kid(k), parent: below ? kid(below) : undefined, state: "owned", kind: k, cost: via?.cost ?? 0, ...(via ? { step: { type: "become" as const, ...via } } : {}) });
+    if (!cur) return;
+    if (wear) return climb(pathById(wear.path), kid(k), wear.rank, true);
+    for (const b of k === "wallSpikes" ? [] : BECOMES[k] ?? []) nodes.push({ id: kid(b.to), parent: kid(k), state: "next", kind: b.to, cost: b.cost, step: { type: "become", ...b } });
+    for (const p of buildingPathsOf(k)) climb(p, kid(k), 0, true);
+  });
+  return nodes;
+}
+
 // ── In battle ──────────────────────────────────────────────────────────
 /** What the next defense's buildings fight with, keyed by structure uid (or
  * a spike row's wall spot): each one's own path at its own rank. A battle
@@ -206,37 +318,36 @@ export const buildingPathsOf = (kind: PaletteItem | string): KnowledgePath[] => 
 
 // ── Older saves ─────────────────────────────────────────────────────────
 /** Before version 5 a path was researched once in the Study for every
- * building of its kind, and each placed building wore it at its researched
- * rank. Now each building owns its rank: those standing in the city keep
- * the path they wore at the rank it had (they play as before); Knowledge
- * spent on a path no building wears comes back, less a crown whose
- * evolved buildings are still owned. Study research is left for the spells.
- * Run on every load: a newer save's buildings already have their ranks. */
+ * building of its kind, and buildings wore it at its researched rank.
+ * Now each building climbs its own path with Knowledge it can be respecced
+ * for, so all that research comes back as Knowledge, the buildings in the
+ * city stand plain to be upgraded again, and evolved buildings (made free
+ * from a researched crown) turn back into the buildings they grew from.
+ * Study research is left for the spells. Run on every load: a newer save's
+ * buildings already have their own ranks, and nothing is left to refund. */
 export function migrateResearch(save: Save) {
-  const d = save.defend, next = cloneLayout(d.layout);
-  const worn = new Set<PathId>();
+  const d = save.defend;
+  let next = cloneLayout(d.layout);
   for (const p of [...next.structures, ...next.spikes]) {
-    if (p.path && p.rank) {
-      worn.add(p.path);
-      continue;
-    }
-    const rank = p.path ? save.pathResearch[p.path]?.rank ?? 0 : 0;
-    if (p.path && rank) {
-      p.rank = rank;
-      worn.add(p.path);
-    } else {
-      delete p.path;
-      delete p.rank;
-    }
+    if (p.path && p.rank) continue;
+    delete p.path;
+    delete p.rank;
   }
-  d.layout = next;
   for (const p of PATHS) {
     const r = save.pathResearch[p.id];
     if (!r || isSpell(p.topic)) continue;
-    const crownKept = r.crowned && p.evolves && d.owned[p.evolves.item] > 0 ? p.evolves.cost : 0;
-    if (!worn.has(p.id)) save.knowledge += Math.max(0, r.spent - crownKept);
+    save.knowledge += Math.max(0, r.spent);
+    if (r.crowned && p.evolves) {
+      const { item, from } = p.evolves;
+      // Those standing are taken up: the base building's footprint differs.
+      next.structures = next.structures.filter((st) => st.kind !== item);
+      d.owned[from] += d.owned[item];
+      d.owned[item] = 0;
+      d.kept = d.kept.filter((k) => k.kind !== item);
+    }
     delete save.pathResearch[p.id];
   }
+  d.layout = next;
 }
 
 /** Version 3 kept a card per owned copy, each with its own path and the
