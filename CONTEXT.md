@@ -194,7 +194,10 @@ The way down from the Mine or the Library to the room below it: the scene slides
 Anything owned to put into a defense: a City tile or a piece of the wall (City), a unit building (Units), a tower (Towers), or a **consumable** (a bomb, used up when it goes off, or the war banner, never used up). Shown in the **Tiles tab**, the keep's hall.
 
 **Stack**:
-All the tiles of one kind, shown as one tile marked with its quantity (×4); opened, it shows each copy, whether it stands in the city or waits in the palette.
+Tiles that are alike, shown as one tile marked with its quantity (×4). A **universal** kind (City tiles, the wall's pieces, skills), whose upgrades every copy shares or which has none, is always one stack. A building upgraded one at a time is spread, a tile a copy, unless the player stacks them, when copies with the same upgrades share a stack. Opened, a kind shows its copies and each set of upgrades they carry.
+
+**Upgrade marks**:
+The Knowledge upgrades a tile carries, in the order taken, on its face in the Tiles tab: a brass diamond for each building it became, a pip in its path's colour for each path rank, and its path's badge; the walls' marks are their shared tree's ranks. Written out, they read "Watch tower → Archer tower → Fire arrows II".
 
 **Higher tier**:
 What a building can be upgraded into, and the basic building it grows from: a Wizard tower from a Watch tower, and into a Dark wizard keep by its crown.

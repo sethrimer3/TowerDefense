@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { defaults } from "../src/save.ts";
 import { BOMB_PRICE, PALETTE_ITEMS, purchasePrice } from "../src/defend/catalog.ts";
 import { placeCityTile, placeStructure } from "../src/defend/layout.ts";
-import { CONSUMABLES, TILE_FILTERS, TILE_IDS, TILE_TYPE, buyTile, canBuyTile, higherTier, shopOffer, tileCopies, tileStack, tileStacks, tileTopic } from "../src/tiles.ts";
+import { CONSUMABLES, TILE_FILTERS, TILE_IDS, TILE_TYPE, buyTile, canBuyTile, higherTier, marksText, shopOffer, tileCopies, tileGroups, tileMarks, tileStack, tileStacks, tileTopic, universal } from "../src/tiles.ts";
 import { topicHas } from "../src/ui/ledger.ts";
 
 test("every palette item and consumable is a tile of one type, filed in one topic", () => {
@@ -27,8 +27,8 @@ test("identical tiles stack, counted with those standing in the city; filters sh
   d.layout = placeStructure(l, "barracks", d.layout.keep.tx, d.layout.keep.ty - 1) ?? assert.fail("barracks");
   const barracks = tileStack(s, "barracks");
   assert.deepEqual([barracks.count, barracks.placed, barracks.ready], [3, 1, 2]);
-  assert.deepEqual(tileCopies(barracks).map((c) => [c.key, c.placed]), [["barracks#0", true], ["barracks#1", false], ["barracks#2", false]]);
-  assert.equal(tileCopies(barracks, 2).length, 2);
+  assert.deepEqual(tileCopies(s, barracks).map((c) => [c.key, c.placed]), [["barracks#0", true], ["barracks#1", false], ["barracks#2", false]]);
+  assert.equal(tileCopies(s, barracks, 2).length, 2);
   const all = tileStacks(s, "all").map((t) => t.id);
   assert.ok(all.includes("barracks") && all.includes("cityTile") && all.includes("warBanner"));
   assert.ok(!all.includes("bomb"), "no bombs owned, no stack");
@@ -82,4 +82,39 @@ test("each kind's upgrades are in the Smithy or the Study it links to", () => {
   }
   assert.equal(tileTopic("bomb").topic.id, "battle");
   assert.equal(tileTopic("warBanner").topic.id, "warBanner");
+});
+
+test("each copy carries its own Knowledge upgrades; copies alike stack, and shared kinds always do", () => {
+  const s = defaults(), d = s.defend;
+  // City pieces, walls and skills are alike in every copy; buildings with a tree are not.
+  for (const id of ["cityTile", "wallBlock", "cityGate", "wallBallista", "bomb", "warBanner"] as const) assert.ok(universal(id), id);
+  for (const id of ["watchTower", "meleeGuild", "rangedGuild", "archerTower", "darkKeep", "wallSpikes"] as const) assert.ok(!universal(id), id);
+  d.owned.archerTower = 4;
+  let l = placeCityTile(d.layout, d.layout.keep.tx, d.layout.keep.ty - 1) ?? assert.fail("tile");
+  l = placeStructure(l, "archerTower", d.layout.keep.tx, d.layout.keep.ty - 1) ?? assert.fail("tower");
+  l.structures[l.structures.length - 1].path = "fireArrows";
+  l.structures[l.structures.length - 1].rank = 2;
+  d.layout = l;
+  d.kept = [{ kind: "archerTower", path: "fireArrows", rank: 2 }];
+  const stack = tileStack(s, "archerTower");
+  const copies = tileCopies(s, stack);
+  assert.deepEqual(copies.map((c) => [c.key, c.placed, c.wear?.rank ?? 0]), [
+    ["archerTower~fireArrows~2#0", true, 2], ["archerTower~fireArrows~2#1", false, 2], ["archerTower#0", false, 0], ["archerTower#1", false, 0],
+  ]);
+  const groups = tileGroups(s, stack);
+  assert.deepEqual(groups.map((g) => [g.key, g.count, g.placed]), [["archerTower", 2, 0], ["archerTower~fireArrows~2", 2, 1]]);
+  // An Archer tower became one from a Watch tower: one diamond, then its two ranks.
+  assert.deepEqual(groups[1].marks.map((m) => m.type), ["became", "rank", "rank"]);
+  assert.equal(marksText("archerTower", groups[1].marks), "Watch tower → Archer tower → Fire arrows II");
+  assert.equal(marksText("archerTower", groups[0].marks), "Watch tower → Archer tower");
+  assert.deepEqual(tileMarks(s, "watchTower"), []);
+  // An evolved building carries its whole crowned path before it became.
+  assert.deepEqual(tileMarks(s, "darkKeep").map((m) => m.type), ["became", "rank", "rank", "rank", "became"]);
+  // The walls carry their one shared tree.
+  assert.deepEqual(tileMarks(s, "wallBlock"), []);
+  d.wallRanks = { stonework: 2, townWalls: 1 };
+  assert.equal(marksText("wallBlock", tileMarks(s, "wallBlock")), "Stonework II → Town walls I");
+  // A universal kind's copies are all plain: one stack.
+  d.owned.cityTile = 3;
+  assert.deepEqual(new Set(tileCopies(s, tileStack(s, "cityTile")).map((c) => c.group)), new Set(["cityTile"]));
 });

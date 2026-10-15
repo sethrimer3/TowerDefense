@@ -1,0 +1,94 @@
+// The Tiles tab's upgrade marks and stacking, in a browser: buildings with
+// their own Knowledge tree spread a tile a copy, each marked with the
+// upgrades it carries (diamonds for buildings it became, pips for path
+// ranks, its path's badge); Stacked gathers copies with the same upgrades;
+// city tiles, walls and skills are always one stack. Uses an isolated
+// fixture, never the player's saved game. Needs `npm run dev`. Screenshots
+// go to test-results/.
+import { chromium } from 'playwright';
+import assert from 'node:assert/strict';
+import { mkdirSync } from 'node:fs';
+
+const base = process.env.TEST_URL ?? 'http://127.0.0.1:5173/';
+const browser = await chromium.launch(process.env.PLAYWRIGHT_EXECUTABLE
+  ? { headless: true, executablePath: process.env.PLAYWRIGHT_EXECUTABLE }
+  : { headless: true, channel: process.env.PLAYWRIGHT_CHANNEL ?? 'msedge' });
+mkdirSync('test-results', { recursive: true });
+try {
+  for (const width of [1280, 390]) {
+    const phone = width < 500;
+    const context = await browser.newContext({ viewport: { width, height: phone ? 780 : 900 }, hasTouch: phone, isMobile: phone });
+    const page = await context.newPage(), errors = [];
+    page.on('pageerror', (e) => errors.push(e.message));
+    await page.goto(base); await page.waitForSelector('#defend-start');
+    const fixture = await page.evaluate(async () => {
+      const { defaults } = await import('/src/save.ts');
+      const { placeCityTile, placeStructure } = await import('/src/defend/layout.ts');
+      const s = defaults(); s.settings.soundOff = true; s.settings.ambienceOff = true;
+      const d = s.defend;
+      Object.assign(d.owned, { cityTile: 6, watchTower: 2, archerTower: 3, wizardTower: 1, meleeGuild: 1, barracks: 1 });
+      d.wallRanks = { stonework: 2, thornwork: 1 };
+      let l = d.layout;
+      for (const [dx, dy] of [[0, -1], [-1, 0], [1, 0]]) l = placeCityTile(l, l.keep.tx + dx, l.keep.ty + dy) ?? l;
+      l = placeStructure(l, 'archerTower', l.keep.tx, l.keep.ty - 1) ?? l;
+      Object.assign(l.structures.at(-1), { path: 'fireArrows', rank: 2 });
+      l = placeStructure(l, 'barracks', l.keep.tx - 1, l.keep.ty) ?? l;
+      Object.assign(l.structures.at(-1), { path: 'crusaders', rank: 1 });
+      d.layout = l;
+      d.kept = [{ kind: 'archerTower', path: 'fireArrows', rank: 2 }, { kind: 'wizardTower', path: 'storm', rank: 3 }];
+      return s;
+    });
+    await context.addInitScript((fixture) => {
+      if (!sessionStorage.getItem('tiles-fixture-seeded')) {
+        localStorage.setItem('towerdefense.v1', JSON.stringify(fixture));
+        sessionStorage.setItem('tiles-fixture-seeded', 'yes');
+      }
+    }, fixture);
+    await page.reload(); await page.waitForSelector('#defend-start');
+    await page.locator('[data-tab="tiles"]').click();
+    await page.waitForSelector('.tiles-grid .tile');
+    await page.waitForTimeout(600);
+
+    // Spread by default: three Archer towers, two on Fire arrows II, one plain.
+    assert.equal(await page.locator('[data-stacking]').getAttribute('aria-pressed'), 'false');
+    const archers = page.locator('.tile[data-tile="archerTower"]');
+    assert.equal(await archers.count(), 3);
+    const marks = await archers.evaluateAll((ts) => ts.map((t) => [t.querySelectorAll('.mark.became').length, t.querySelectorAll('.mark.rank').length, !!t.querySelector('.path-badge')]));
+    assert.deepEqual(marks.sort(), [[1, 0, false], [1, 2, true], [1, 2, true]]);
+    assert.match(await archers.first().getAttribute('title'), /Watch tower → Archer tower → Fire arrows II/);
+    // Plain basic buildings say they have none; universal kinds stay one stack.
+    assert.equal(await page.locator('.tile[data-tile="watchTower"]').count(), 2);
+    assert.equal(await page.locator('.tile[data-tile="watchTower"] .tile-marks.none').count(), 2);
+    assert.equal(await page.locator('.tile[data-tile="cityTile"]').count(), 1);
+    assert.match(await page.locator('.tile[data-tile="cityTile"] .tile-count').textContent(), /^×[2-9]$/);
+    // The Wizard tower kept on Stormcalling III: became, three storm pips.
+    assert.equal(await page.locator('.tile[data-tile="wizardTower"] .mark.rank.hue-storm').count(), 3);
+    await page.screenshot({ path: `test-results/tiles-marks-spread-${width}.png` });
+
+    // Stacked: copies with the same upgrades share a stack.
+    await page.locator('[data-stacking]').click();
+    await page.waitForTimeout(600);
+    assert.deepEqual(await archers.evaluateAll((ts) => ts.map((t) => t.querySelector('.tile-count')?.textContent)), ['×1', '×2']);
+    assert.equal(await page.locator('.tile[data-tile="watchTower"]').count(), 1);
+    await page.screenshot({ path: `test-results/tiles-marks-stacked-${width}.png` });
+
+    // Opening the kind lists each set of upgrades in words.
+    await archers.last().click();
+    await page.waitForSelector('.tile-set');
+    const sets = await page.locator('.tile-set > div > b').allTextContents();
+    assert.deepEqual(sets, ['Watch tower → Archer tower', 'Watch tower → Archer tower → Fire arrows II']);
+    await page.locator('.tile-detail').scrollIntoViewIfNeeded();
+    await page.screenshot({ path: `test-results/tiles-marks-open-${width}.png` });
+
+    // The walls carry their shared tree's ranks.
+    await page.locator('[data-filter="city"]').click();
+    await page.waitForTimeout(600);
+    assert.match(await page.locator('.tile[data-tile="wallBlock"] .tile-marks').getAttribute('title'), /Stonework II → Thornwork I/);
+    assert.equal(await page.locator('.tile[data-tile="wallBlock"]').count(), 1);
+    assert.deepEqual(errors, []);
+    await context.close();
+    console.log(`ok ${width}`);
+  }
+} finally {
+  await browser.close();
+}
