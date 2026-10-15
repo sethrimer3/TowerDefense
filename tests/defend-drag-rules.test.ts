@@ -61,7 +61,7 @@ test("refusal explains why a tile turns a drop away", () => {
   assert.equal(refusal({ from: "palette", item: "cityTile" }, L, tileKey(KX, KY)), "That tile is already part of the city.");
   assert.match(refusal({ from: "palette", item: "cityTile" }, L, tileKey(KX, 0)), /top row/);
   assert.equal(refusal({ from: "cityTile", tile: { tx: KX + 1, ty: KY } }, L, tileKey(KX, KY)), "That tile is already part of the city.");
-  assert.equal(refusal({ from: "keep" }, L, far), "The keep can only move onto another city tile.");
+  assert.equal(refusal({ from: "keep" }, L, far), "What stands on the keep's tile doesn't fit there.");
   assert.equal(refusal({ from: "palette", item: "barracks" }, L, far), `The ${STRUCTURES.barracks.name.toLowerCase()} must go inside the city limits.`);
   assert.equal(refusal({ from: "structure", uid: 1, kind: "barracks" }, L, far), `The ${STRUCTURES.barracks.name.toLowerCase()} must go inside the city limits.`);
   assert.equal(refusal({ from: "palette", item: "archerTower" }, L, far), "There isn't room for that there.");

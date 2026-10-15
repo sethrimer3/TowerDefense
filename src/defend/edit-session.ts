@@ -55,7 +55,7 @@ export class EditSession {
 
   /** The session for whatever a press on cell (cx, cy) of `map`, built from
    * `layout`, lifts: the keep, a structure, or a city tile (pressed away from
-   * its buildings, which go with it). Null when the press should move the view. */
+   * its buildings, which go with it; the keep's tile lifts the keep). Null when the press should move the view. */
   static lift(map: CityMap, layout: Layout, cx: number, cy: number): EditSession | null {
     const owner = map.owner[cy * CELLS_W + cx];
     const b = owner >= 0 ? map.buildings[owner] : null;
@@ -68,6 +68,8 @@ export class EditSession {
     const s = b?.structureUid ? layout.structures.find((p) => p.uid === b.structureUid) : undefined;
     if (s) return new EditSession({ from: "structure", uid: s.uid, kind: s.kind }, layout);
     const tile = { tx: Math.floor(cx / SUB), ty: Math.floor(cy / SUB) };
+    // The keep's tile, pressed away from its buildings, is carried by the keep.
+    if (tile.tx === layout.keep.tx && tile.ty === layout.keep.ty) return new EditSession({ from: "keep" }, layout);
     return liftsCityTile(layout, tile) ? new EditSession({ from: "cityTile", tile }, layout) : null;
   }
 

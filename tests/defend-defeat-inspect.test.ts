@@ -66,7 +66,9 @@ test("a tap picks out towers with their reach and troop buildings with their tro
   const tower = m.buildings.find((b) => b.kind === "archerTower")!;
   const barracks = m.buildings.find((b) => b.kind === "barracks")!;
   assert.ok(inspectable(tower) && inspectable(barracks));
-  assert.ok(!inspectable(m.buildings.find((b) => b.kind === "keep")));
+  const keep = m.buildings.find((b) => b.kind === "keep")!;
+  assert.ok(inspectable(keep), "the keep too: its own defenses have a reach");
+  assert.deepEqual(reachOf(keep, sim), [], "none until it is upgraded");
   assert.ok(!inspectable(m.buildings.find((b) => b.kind === "house")));
   assert.equal(reachOf(tower, sim)[0].r, archerRange(0));
   assert.deepEqual(reachOf(barracks, sim), []);

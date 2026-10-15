@@ -6,7 +6,7 @@ import { BALLISTA, TURRET, turretSpots } from "./catalog.ts";
 import type { Building, CityMap } from "./citygen.ts";
 import { center } from "./pathing.ts";
 import { watchReach, type DefendSim } from "./sim.ts";
-import { archerTowerRange, cannonTowerRange } from "./towers.ts";
+import { archerTowerRange, cannonTowerRange, keepArrowRange, keepOilReach } from "./towers.ts";
 import { wizardReach } from "./wizard.ts";
 
 /** What a reach depends on: the battle, or the levels and paths before it. */
@@ -16,9 +16,9 @@ export type Circle = { x: number; y: number; r: number };
 /** Buildings that train troops, whose troops a tap picks out. */
 const TRAINS = new Set(["meleeGuild", "rangedGuild", "barracks", "archerBarracks", "sniperLodge", "musketHall", "mageGuild", "valkyriePalace", "darkKeep"]);
 
-/** Whether a tap on `b` picks it: the player's structures and the wall's ballistas. */
+/** Whether a tap on `b` picks it: the keep, the player's structures and the wall's ballistas. */
 export const inspectable = (b: Building | undefined): b is Building =>
-  !!b && b.kind !== "keep" && (b.structureUid !== undefined || b.kind === "wallBallista");
+  !!b && (b.kind === "keep" || b.structureUid !== undefined || b.kind === "wallBallista");
 
 /** Where building `b` reaches, as circles in cells; none for what doesn't shoot. */
 export function reachOf(b: Building, armed: Armed): Circle[] {
@@ -30,6 +30,13 @@ export function reachOf(b: Building, armed: Armed): Circle[] {
     case "wizardTower": return at(wizardReach(armed, b));
     case "watchTower": return at(watchReach(armed, b));
     case "wallBallista": return at(BALLISTA.range);
+    case "keep": {
+      // Its arrow loops' reach, and how far out its boiling oil pours.
+      const out: Circle[] = [], arrows = keepArrowRange(armed), oil = keepOilReach(armed);
+      if (arrows) out.push({ x: c.x, y: c.y, r: arrows });
+      if (oil) out.push({ x: c.x, y: c.y, r: Math.max(b.rect.w, b.rect.h) / 2 + oil });
+      return out;
+    }
     case "darkKeep": return turretSpots(b.rect).map((s) => ({ x: s.x, y: s.y, r: TURRET.range }));
     default: return [];
   }

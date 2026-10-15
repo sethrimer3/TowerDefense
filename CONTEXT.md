@@ -36,6 +36,9 @@ One step a single placed building takes with Knowledge, chosen by tapping it in 
 **Upgrade tree**:
 A building's own upgrades, opened by tapping it in Defend while building, or by pressing and holding it there or its tile in the palette (a copy in the palette is upgraded on its own): the buildings it has been, then every branch still open to it, as nodes on branches that can be dragged about and spring back. Choosing one branch makes the ones beside it wither away and opens the upgrades only that branch leads to. Its corner box shows the Knowledge **allocated** to the building.
 
+**Keep branch**:
+One of the keep's own upgrade lines, **Bastions** (more HP), **Arrow loops** (the keep shoots) and **Boiling oil** (it scalds whatever reaches its walls). Unlike a building's paths, the keep climbs all of them side by side.
+
 **Respec**:
 Turning one building back into its basic building with no path, for 5 Copper, with every Knowledge point allocated to it given back.
 

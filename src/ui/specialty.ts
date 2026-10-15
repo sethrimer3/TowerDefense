@@ -7,9 +7,10 @@
 import type { Save } from "../save.ts";
 import { BECOMES, TROOPS, allocated, buildingPathsOf, buildingTree, type TreeNode, type UpgradeStep, type Wear } from "../specializations.ts";
 import type { GraphNode } from "./upgrade-graph.ts";
+import { ARROW_LOOPS, BASTIONS, BOILING_OIL, KEEP_PATHS, keepRank, type KeepPathId, type KeepRanks } from "../keep-upgrades.ts";
 import { pathById, pathTopicOf, UNSPECIALIZED, type PathId, FIRE_ARROWS, SHARP, GUNNERY, SIEGE_SHOT, CRUSADE, ASSASSIN, RANGERS, SKIRMISH, FORTIFY, PYRO, RIME, STORM, PYROCLASM, CINDERS, SPOTTERS, SIGNAL } from "../knowledge-paths.ts";
 import { bonuses } from "../progression.ts";
-import { ITEM_NAMES, archerDamage, archerCooldown, archerRange, cannonDamage, cannonCooldown, CANNON_RANGE, SOLDIER, ARCHER_UNIT, soldierScale, STRUCTURES, flameDps, flameRange, iceDamage, ICE_RANGE, iceChill, watchRadius, fireballDamage, fireballSplash, emberDps, emberSeconds, FIRE_MAGE, FIREBALL_RANGE, BRAWLER, SLINGER, SNIPER, MUSKETEER, type PaletteItem } from "../defend/catalog.ts";
+import { ITEM_NAMES, archerDamage, archerCooldown, archerRange, cannonDamage, cannonCooldown, CANNON_RANGE, SOLDIER, ARCHER_UNIT, soldierScale, STRUCTURES, flameDps, flameRange, iceDamage, ICE_RANGE, iceChill, watchRadius, fireballDamage, fireballSplash, emberDps, emberSeconds, FIRE_MAGE, FIREBALL_RANGE, keepHp, BRAWLER, SLINGER, SNIPER, MUSKETEER, type PaletteItem } from "../defend/catalog.ts";
 
 /** `kind`'s effective numbers wearing `path` at `rank` (none: plain), with
  * the shared Smithy and skill bonuses. */
@@ -125,3 +126,56 @@ export const treeStep = (kind: PaletteItem | "wallSpikes", wear: Wear | undefine
 /** The Knowledge allocated to a building, for the tree's corner box. */
 export const treeAllocated = (kind: PaletteItem | "wallSpikes", wear?: Wear) => allocated(kind as never, wear);
 export type { TreeNode };
+
+// ── The keep's tree ───────────────────────────────────────────────────────
+/** The keep's tree as the graph draws it: the keep at the root, and each
+ * of its branches climbing from it on its own (`keep-upgrades.ts`). Rank
+ * nodes are `q:<branch>:<rank>`. */
+export function keepGraph(ranks: KeepRanks | undefined): GraphNode[] {
+  const nodes: GraphNode[] = [{ id: "k:keep", state: "owned", face: `<canvas width="32" height="32" data-icon="keep"></canvas>` }];
+  for (const p of KEEP_PATHS) {
+    const have = keepRank(ranks, p.id);
+    p.ranks.forEach((r, i) => {
+      const rank = i + 1, state = rank <= have ? "owned" : rank === have + 1 ? "next" : "locked";
+      nodes.push({
+        id: `q:${p.id}:${rank}`, parent: rank === 1 ? "k:keep" : `q:${p.id}:${i}`, state,
+        face: `<canvas data-path-icon="${r.icon}:${p.hue}"></canvas><b>${ROMAN[rank]}</b>`,
+        tag: state === "owned" ? undefined : knowledgeTag(r.cost), hue: `hue-${p.hue}`,
+      });
+    });
+  }
+  return nodes;
+}
+
+/** The keep's numbers with `ranks`, and the shared Smithy and skill bonuses. */
+export function keepStats(save: Save, ranks: KeepRanks | undefined): string {
+  const l = save.defend.levels, b = bonuses(save), n = (v: number) => Number(v.toFixed(2));
+  const loops = keepRank(ranks, "arrowLoops"), oil = keepRank(ranks, "boilingOil");
+  const parts = [`${Math.round(keepHp(l.keepStrength) * b.keepHp * BASTIONS.hp[keepRank(ranks, "bastions")]).toLocaleString("en")} HP`];
+  if (loops) parts.push(`${n(archerDamage(l.archerDamage) * b.towerDamage * ARROW_LOOPS.damage[loops])} arrow damage every ${n(ARROW_LOOPS.reload[loops] * b.towerReload)}s · ${ARROW_LOOPS.range[loops]} range${loops >= 3 ? ` · ${ARROW_LOOPS.volley} arrows` : ""}`);
+  if (oil) parts.push(`${n(BOILING_OIL.damage[oil] * b.towerDamage)} oil damage every ${BOILING_OIL.every[oil]}s · ${BOILING_OIL.reach[oil]} cells out${BOILING_OIL.burn[oil] ? ` · ${BOILING_OIL.burn[oil]}s burn` : ""}`);
+  return parts.join(" · ");
+}
+
+/** What node `id` of the keep's tree buys, if it can be bought now. */
+export function keepStep(ranks: KeepRanks | undefined, id: string): KeepPathId | undefined {
+  const [q, path, rank] = id.split(":");
+  const p = KEEP_PATHS.find((o) => o.id === path);
+  return q === "q" && p && Number(rank) === keepRank(ranks, p.id) + 1 && Number(rank) <= p.ranks.length ? p.id : undefined;
+}
+
+/** The card for node `id` of the keep's tree. */
+export function keepCardHtml(save: Save, ranks: KeepRanks | undefined, id: string): string {
+  const free = save.settings.devMode;
+  if (id === "k:keep")
+    return `<div class="ug-card-head"><b>${STRUCTURES.keep.name}</b></div><p>${STRUCTURES.keep.description} Its branches climb side by side: buy a rank of any of them.</p><p class="ug-stats">${keepStats(save, ranks)}</p><div class="ug-card-foot" data-ug-ignore><b class="ug-owned">This building</b></div>`;
+  const [, path, r] = id.split(":"), p = KEEP_PATHS.find((o) => o.id === path), rank = Number(r);
+  const step = p?.ranks[rank - 1];
+  if (!p || !step) return `<p class="ug-hint">Tap a node to see what it does.</p>`;
+  const have = keepRank(ranks, p.id), cost = step.cost, can = free || save.knowledge >= cost;
+  const state = rank <= have ? `<b class="ug-owned">Owned</b>`
+    : rank === have + 1 ? `<button class="ug-buy" data-ug-buy="${id}" ${can ? "" : "disabled"}>Buy · ${free ? "Free" : `${cost.toLocaleString("en")} Knowledge`}</button>`
+    : `<span class="ug-locked">Locked: buy the one before it · ${cost.toLocaleString("en")} Knowledge</span>`;
+  const at = { ...ranks, [p.id]: rank };
+  return `<div class="ug-card-head"><b>${p.name} ${ROMAN[rank]}: ${step.name}</b><small>Level ${rank} / ${p.ranks.length}</small></div><p>${p.motto}. ${step.text}</p><p class="ug-stats">At this rank: ${keepStats(save, at)}</p><div class="ug-card-foot" data-ug-ignore>${state}</div>`;
+}

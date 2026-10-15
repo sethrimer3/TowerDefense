@@ -120,14 +120,16 @@ test('several structures can share a tile until it is full', () => {
   assert.ok(placed < 10, 'a tile eventually fills up');
 });
 
-test('the keep moves by swapping with another city tile', () => {
+test('the keep swaps with another city tile, or carries its own onto open ground', () => {
   const l = squareCity();
   const { tx, ty } = l.keep;
   const moved = moveKeep(l, tx + 1, ty);
   assert.ok(moved);
   assert.deepEqual(moved!.keep, { tx: tx + 1, ty });
   assert.ok(moved!.cityTiles.includes(tileKey(tx, ty)));
-  assert.equal(moveKeep(l, tx + 3, ty), null, 'not onto open ground');
+  const carried = moveKeep(l, tx + 3, ty);
+  assert.deepEqual(carried?.keep, { tx: tx + 3, ty }, 'onto open ground it carries its tile');
+  assert.ok(!carried!.cityTiles.includes(tileKey(tx, ty)), 'leaving no city tile behind');
 });
 
 test('the wall rings the city just outside its tiles', () => {

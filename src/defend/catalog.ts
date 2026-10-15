@@ -1,3 +1,4 @@
+import type { KeepRanks } from "../keep-upgrades.ts";
 import { intPow } from "../exact.ts";
 import { ECONOMY, quadraticCost } from "../economy.ts";
 import type { BattlePaths, PathId } from "../knowledge-paths.ts";
@@ -798,6 +799,9 @@ export type Bonuses = {
    * row's (by wall spot), from `placedBattlePaths`. */
   structurePaths?: Record<number, BattlePaths>;
   spikePaths?: Record<string, BattlePaths>;
+  /** The keep's own upgrades (`keep-upgrades.ts`); absent with none, so
+   * such a run plays exactly as before. */
+  keep?: KeepRanks;
 };
 export const NO_BONUSES: Readonly<Bonuses> = Object.freeze({
   troopHp: 1, troopDamage: 1, drill: 1, towerDamage: 1, towerReload: 1, wallHp: 1, keepHp: 1, rebuild: 1, bombDamage: 1, undeadHp: 1, undeadDamage: 1, meteorDamage: 1, meteorRadius: 1, frostTime: 1, frostRadius: 1, reinforceHp: 1, reinforceDamage: 1, reinforceTime: 1,

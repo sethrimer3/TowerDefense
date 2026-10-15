@@ -91,10 +91,20 @@ Recent rows are available as `window.defendPerformance`; they are not saved.
   from it; each group of tiles joined along their edges is walled on its own.
   The player starts with 8 — enough for a 3 × 3 city around the keep. Pressing
   a city tile away from its buildings lifts it with everything on it (its
-  gates and spikes too); only the keep's own tile and a tile under the dark
-  wizard keep stay put.
-- **The keep** can be moved onto any other city tile (the two swap) but never
+  gates and spikes too); a tile under the dark wizard keep stays put, and
+  the keep's own tile moves with the keep.
+- **The keep** is placed like a city tile: dragged (by the keep or its
+  tile's open ground) onto open ground it carries its tile and the gates and
+  spikes in its wall, and onto another city tile the two swap. It is never
   removed.
+- **The keep's upgrades** (`keep-upgrades.ts`): tap or hold the keep while
+  building to open its tree. Unlike other buildings its three branches are
+  climbed side by side, each three ranks of Knowledge: Bastions (30%, 70%,
+  140% more HP), Arrow loops (it shoots the nearest enemy within 5 cells;
+  faster, harder and 6.5 cells at II; three arrows at once at III) and
+  Boiling oil (every few seconds it scalds every enemy on foot near its
+  walls, setting them burning from II). A respec gives every point back for
+  5 Copper.
 - The **Melee** and **Ranged Guilds**, **barracks**, **archer barracks**, the **Mage Guild**, the **sniper lodge**, the **musket hall**, the **Valkyrie palace** and the **dark wizard keep** must be inside the city. **Archer**, **cannon**, **watch
   and wizard towers** and **monster bait** may stand inside or outside.
 - Every structure takes a **share of its tile** (`size` in `catalog.ts`, in

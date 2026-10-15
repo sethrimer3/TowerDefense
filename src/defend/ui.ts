@@ -1,6 +1,7 @@
 import { RESPEC_PRICE, hasTree, respecBuilding, rootOf, specialtyLabel, specialtyOf, stepName, targetKind, upgradeBuilding, type SpecialtyTarget } from "../specializations.ts";
 import { pathById, type PathId } from "../knowledge-paths.ts";
-import { treeAllocated, treeCardHtml, treeGraph, treeStep } from "../ui/specialty.ts";
+import { keepCardHtml, keepGraph, keepStep, treeAllocated, treeCardHtml, treeGraph, treeStep } from "../ui/specialty.ts";
+import { keepAllocated, respecKeep, upgradeKeep } from "../keep-upgrades.ts";
 import { UpgradeGraph } from "../ui/upgrade-graph.ts";
 import type { Save } from "../save.ts";
 import { bannerReach } from "./war-banner.ts";
@@ -87,9 +88,12 @@ export type DefendHost = {
 };
 
 const plural = (name: string) => (name.endsWith("s") ? name : `${name}s`);
+/** A building whose upgrade tree shows: one with paths, or the keep. */
+type TreeTarget = SpecialtyTarget | { keep: true };
 /** Whether two specialty targets name the same building. */
-const sameTarget = (a: SpecialtyTarget, b: SpecialtyTarget) =>
-  "uid" in a ? "uid" in b && a.uid === b.uid
+const sameTarget = (a: TreeTarget, b: TreeTarget): boolean =>
+  "keep" in a || "keep" in b ? "keep" in a && "keep" in b
+  : "uid" in a ? "uid" in b && a.uid === b.uid
   : "spikes" in a ? "spikes" in b && sameGate(a.spikes, b.spikes)
   : "copy" in b && a.copy === b.copy && a.wear?.path === b.wear?.path && a.wear?.rank === b.wear?.rank;
 
@@ -142,7 +146,7 @@ export class DefendPage {
   /** The building whose upgrade panel shows while building. */
   /** The upgrade tree's building, the node picked in it, and whether its
    * respec waits on a second press. */
-  private specialty: { target: SpecialtyTarget; picked: string; respec: boolean } | null = null;
+  private specialty: { target: TreeTarget; picked: string; respec: boolean } | null = null;
   private tree: UpgradeGraph | null = null;
   private summonHold: { kind: EnemyKind; button: HTMLButtonElement; pointerId: number; next: number } | null = null;
 
@@ -1029,7 +1033,7 @@ export class DefendPage {
    * where it stood, is picked out. */
   private pickLifted() {
     const drag = this.pointers.session?.drag, map = this.currentMap();
-    const target: SpecialtyTarget | null = drag?.from === "structure" ? { uid: drag.uid } : drag?.from === "spikes" ? { spikes: drag.spikes } : null;
+    const target: TreeTarget | null = drag?.from === "structure" ? { uid: drag.uid } : drag?.from === "spikes" ? { spikes: drag.spikes } : drag?.from === "keep" ? { keep: true } : null;
     const b =
       drag?.from === "structure" ? map.buildings.find((o) => o.structureUid === drag.uid)
       : drag?.from === "ballista" ? map.buildings.find((o) => o.corner?.vx === drag.corner.vx && o.corner.vy === drag.corner.vy)
@@ -1049,6 +1053,11 @@ export class DefendPage {
    * upgrade tree (only while building, and only for kinds that have one). */
   private hold(drag: Drag): boolean {
     if (this.phase !== "build") return false;
+    if (drag.from === "keep") {
+      this.openSpecialty({ keep: true });
+      play("knock");
+      return true;
+    }
     const target: SpecialtyTarget | null =
       drag.from === "structure" ? { uid: drag.uid }
       : drag.from === "spikes" ? { spikes: drag.spikes }
@@ -1068,7 +1077,13 @@ export class DefendPage {
   // ── Each building's upgrades ──────────────────────────────────────────
   /** Shows `target`'s upgrade tree: what it has been, and every branch
    * still open to it. Only while building. */
-  private openSpecialty(target: SpecialtyTarget) {
+  private openSpecialty(target: TreeTarget) {
+    if ("keep" in target) {
+      if (this.phase !== "build") return this.closeSpecialty();
+      this.specialty = { target, picked: "k:keep", respec: false };
+      this.pick(this.currentMap().buildings.find((o) => o.kind === "keep")?.id ?? null);
+      return this.renderSpecialty(true);
+    }
     const kind = targetKind(this.save, target);
     if (this.phase !== "build" || !kind) return this.closeSpecialty();
     const wear = specialtyOf(this.save, target);
@@ -1110,6 +1125,14 @@ export class DefendPage {
   private upgrade(id: string) {
     const sp = this.specialty, game = this.host.game?.();
     if (!sp || !game || this.phase !== "build") return;
+    if ("keep" in sp.target) {
+      const branch = keepStep(this.save.keepRanks, id);
+      if (!branch) return;
+      const r = upgradeKeep(game, branch);
+      if (!r.ok) return this.setMessage(r.reason, 2);
+      this.afterChange("chime");
+      return this.bought(id);
+    }
     const kind = targetKind(this.save, sp.target);
     const step = kind && treeStep(kind, specialtyOf(this.save, sp.target), id);
     if (!step) return;
@@ -1125,6 +1148,12 @@ export class DefendPage {
       this.setMessage(`${stepName(step)}: no room where it stood, so it waits in the palette.`, 3);
       return;
     }
+    this.bought(id);
+  }
+
+  /** Node `id` was just bought: pick it and celebrate. */
+  private bought(id: string) {
+    const sp = this.specialty!;
     sp.picked = id;
     sp.respec = false;
     this.renderSpecialty();
@@ -1141,21 +1170,21 @@ export class DefendPage {
       sp.respec = true;
       return this.renderSpecialty();
     }
-    const r = respecBuilding(game, sp.target);
+    const r = "keep" in sp.target ? respecKeep(game) : respecBuilding(game, sp.target);
     sp.respec = false;
     if (!r.ok) {
       this.setMessage(r.reason, 2);
       return this.renderSpecialty();
     }
-    if (r.copy) sp.target = r.copy;
+    if ("copy" in r && r.copy) sp.target = r.copy as SpecialtyTarget;
     this.afterChange("coin");
-    if (r.waiting) {
+    if ("waiting" in r && r.waiting) {
       this.closeSpecialty();
       this.picked = null;
       this.setMessage("Respecced: no room where it stood, so it waits in the palette.", 3);
       return;
     }
-    sp.picked = `k:${r.kind}`;
+    sp.picked = "kind" in r ? `k:${r.kind}` : "k:keep";
     this.renderSpecialty();
     sparksOver(this.root.querySelector<HTMLElement>("#defend-specialty .ug-alloc"), "gold");
   }
@@ -1174,7 +1203,8 @@ export class DefendPage {
   private renderSpecialty(focus = false) {
     const el = this.root.querySelector<HTMLElement>("#defend-specialty");
     if (!el) return;
-    const sp = this.specialty, kind = sp ? targetKind(this.save, sp.target) : undefined, game = this.host.game?.();
+    const sp = this.specialty, game = this.host.game?.();
+    const keep = !!sp && "keep" in sp.target, kind = !sp ? undefined : "keep" in sp.target ? "keep" as const : targetKind(this.save, sp.target);
     if (!sp || !kind || !game || this.phase !== "build") {
       if (sp) this.specialty = null;
       this.tree?.destroy();
@@ -1183,7 +1213,8 @@ export class DefendPage {
       el.innerHTML = "";
       return;
     }
-    const wear = specialtyOf(this.save, sp.target), name = kind === "wallSpikes" ? "Wall spikes" : ITEM_NAMES[kind];
+    const wear = "keep" in sp.target ? undefined : specialtyOf(this.save, sp.target);
+    const name = kind === "keep" ? "Keep" : kind === "wallSpikes" ? "Wall spikes" : ITEM_NAMES[kind];
     if (!this.tree) {
       el.className = "defend-specialty upgrade-tree";
       el.innerHTML = `<header class="ug-top">
@@ -1208,7 +1239,9 @@ export class DefendPage {
       });
       if (!this.host.reduceMotion()) replay(el, "spec-open");
     }
-    const spent = treeAllocated(kind, wear), plain = spent === 0 && (kind === "wallSpikes" || rootOf(kind) === kind);
+    const ranks = this.save.keepRanks;
+    const spent = kind === "keep" ? keepAllocated(ranks) : treeAllocated(kind, wear);
+    const plain = kind === "keep" ? !ranks : spent === 0 && (kind === "wallSpikes" || rootOf(kind) === kind);
     el.setAttribute("aria-label", `Upgrade tree: ${name}`);
     el.querySelector(".ug-title b")!.textContent = name;
     el.querySelector(".ug-alloc b")!.textContent = `✦ ${spent.toLocaleString("en")}`;
@@ -1217,9 +1250,9 @@ export class DefendPage {
     respec.disabled = plain;
     respec.classList.toggle("confirm", sp.respec);
     respec.textContent = sp.respec ? `Respec for ${RESPEC_PRICE.copper} Copper?` : `Respec · ${RESPEC_PRICE.copper} Copper`;
-    respec.title = plain ? "Nothing allocated yet" : `Get all ${spent.toLocaleString("en")} Knowledge back and turn it back into a ${kind === "wallSpikes" ? "plain row of spikes" : ITEM_NAMES[rootOf(kind)]}`;
-    el.querySelector(".ug-card")!.innerHTML = treeCardHtml(game, kind, wear, sp.picked);
-    this.tree.set(treeGraph(kind, wear), sp.picked);
+    respec.title = plain ? "Nothing allocated yet" : `Get all ${spent.toLocaleString("en")} Knowledge back and turn it back into a ${kind === "keep" ? "plain keep" : kind === "wallSpikes" ? "plain row of spikes" : ITEM_NAMES[rootOf(kind)]}`;
+    el.querySelector(".ug-card")!.innerHTML = kind === "keep" ? keepCardHtml(game, ranks, sp.picked) : treeCardHtml(game, kind, wear, sp.picked);
+    this.tree.set(kind === "keep" ? keepGraph(ranks) : treeGraph(kind, wear), sp.picked);
     if (focus) el.querySelector<HTMLElement>(".ug-buy:not(:disabled), [data-specialty-close]")?.focus({ preventScroll: true });
   }
 
