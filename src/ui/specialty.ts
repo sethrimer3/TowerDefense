@@ -8,9 +8,10 @@ import type { Save } from "../save.ts";
 import { BECOMES, TROOPS, allocated, buildingPathsOf, buildingTree, type TreeNode, type UpgradeStep, type Wear } from "../specializations.ts";
 import type { GraphNode } from "./upgrade-graph.ts";
 import { ARROW_LOOPS, BASTIONS, BOILING_OIL, KEEP_PATHS, keepRank, type KeepPathId, type KeepRanks } from "../keep-upgrades.ts";
+import { STONEWORK, THORNWORK, TOWN_WALLS, WALL_PATHS, wallRank, type WallPathId, type WallRanks } from "../wall-upgrades.ts";
 import { pathById, pathTopicOf, UNSPECIALIZED, type PathId, FIRE_ARROWS, SHARP, GUNNERY, SIEGE_SHOT, CRUSADE, ASSASSIN, RANGERS, SKIRMISH, FORTIFY, PYRO, RIME, STORM, PYROCLASM, CINDERS, SPOTTERS, SIGNAL } from "../knowledge-paths.ts";
 import { bonuses } from "../progression.ts";
-import { ITEM_NAMES, archerDamage, archerCooldown, archerRange, cannonDamage, cannonCooldown, CANNON_RANGE, SOLDIER, ARCHER_UNIT, soldierScale, STRUCTURES, flameDps, flameRange, iceDamage, ICE_RANGE, iceChill, watchRadius, fireballDamage, fireballSplash, emberDps, emberSeconds, FIRE_MAGE, FIREBALL_RANGE, keepHp, BRAWLER, SLINGER, SNIPER, MUSKETEER, type PaletteItem } from "../defend/catalog.ts";
+import { ITEM_NAMES, archerDamage, archerCooldown, archerRange, cannonDamage, cannonCooldown, CANNON_RANGE, SOLDIER, ARCHER_UNIT, soldierScale, STRUCTURES, flameDps, flameRange, iceDamage, ICE_RANGE, iceChill, watchRadius, fireballDamage, fireballSplash, emberDps, emberSeconds, FIRE_MAGE, FIREBALL_RANGE, keepHp, BRAWLER, SLINGER, SNIPER, MUSKETEER, WALL_BLOCK_DESCRIPTION, wallHp, type PaletteItem } from "../defend/catalog.ts";
 
 /** `kind`'s effective numbers wearing `path` at `rank` (none: plain), with
  * the shared Smithy and skill bonuses. */
@@ -127,18 +128,23 @@ export const treeStep = (kind: PaletteItem | "wallSpikes", wear: Wear | undefine
 export const treeAllocated = (kind: PaletteItem | "wallSpikes", wear?: Wear) => allocated(kind as never, wear);
 export type { TreeNode };
 
-// ── The keep's tree ───────────────────────────────────────────────────────
-/** The keep's tree as the graph draws it: the keep at the root, and each
- * of its branches climbing from it on its own (`keep-upgrades.ts`). Rank
- * nodes are `q:<branch>:<rank>`. */
-export function keepGraph(ranks: KeepRanks | undefined): GraphNode[] {
-  const nodes: GraphNode[] = [{ id: "k:keep", state: "owned", face: `<canvas width="32" height="32" data-icon="keep"></canvas>` }];
-  for (const p of KEEP_PATHS) {
-    const have = keepRank(ranks, p.id);
+// ── Trees climbed side by side: the keep's and the walls' ────────────────
+/** A tree whose branches climb side by side from one root (`keep-upgrades.ts`,
+ * `wall-upgrades.ts`), as the graph and the card show it. */
+type SideTree<Id extends string> = { root: string; icon: string; paths: { id: Id; name: string; motto: string; hue: string; ranks: { name: string; icon: string; cost: number; text: string }[] }[] };
+type Ranks<Id extends string> = Partial<Record<Id, number>> | undefined;
+const sideRank = <Id extends string>(ranks: Ranks<Id>, id: Id) => ranks?.[id] ?? 0;
+
+/** The tree as the graph draws it: the root, and each branch climbing from
+ * it on its own. Rank nodes are `q:<branch>:<rank>`. */
+function sideGraph<Id extends string>(tree: SideTree<Id>, ranks: Ranks<Id>): GraphNode[] {
+  const nodes: GraphNode[] = [{ id: tree.root, state: "owned", face: `<canvas width="32" height="32" data-icon="${tree.icon}"></canvas>` }];
+  for (const p of tree.paths) {
+    const have = sideRank(ranks, p.id);
     p.ranks.forEach((r, i) => {
       const rank = i + 1, state = rank <= have ? "owned" : rank === have + 1 ? "next" : "locked";
       nodes.push({
-        id: `q:${p.id}:${rank}`, parent: rank === 1 ? "k:keep" : `q:${p.id}:${i}`, state,
+        id: `q:${p.id}:${rank}`, parent: rank === 1 ? tree.root : `q:${p.id}:${i}`, state,
         face: `<canvas data-path-icon="${r.icon}:${p.hue}"></canvas><b>${ROMAN[rank]}</b>`,
         tag: state === "owned" ? undefined : knowledgeTag(r.cost), hue: `hue-${p.hue}`,
       });
@@ -146,6 +152,38 @@ export function keepGraph(ranks: KeepRanks | undefined): GraphNode[] {
   }
   return nodes;
 }
+
+/** What node `id` buys, if it can be bought now. */
+function sideStep<Id extends string>(tree: SideTree<Id>, ranks: Ranks<Id>, id: string): Id | undefined {
+  const [q, path, rank] = id.split(":");
+  const p = tree.paths.find((o) => o.id === path);
+  return q === "q" && p && Number(rank) === sideRank(ranks, p.id) + 1 && Number(rank) <= p.ranks.length ? p.id : undefined;
+}
+
+/** The card for node `id`: the root's (`name`, `about`) or a rank's, with
+ * the numbers `stats` gives at it. */
+function sideCardHtml<Id extends string>(save: Save, tree: SideTree<Id>, ranks: Ranks<Id>, id: string, name: string, about: string, stats: (ranks: Ranks<Id>) => string): string {
+  const free = save.settings.devMode;
+  if (id === tree.root)
+    return `<div class="ug-card-head"><b>${name}</b></div><p>${about} Its branches climb side by side: buy a rank of any of them.</p><p class="ug-stats">${stats(ranks)}</p><div class="ug-card-foot" data-ug-ignore><b class="ug-owned">${tree.root === "k:keep" ? "This building" : "Every wall you place"}</b></div>`;
+  const [, path, r] = id.split(":"), p = tree.paths.find((o) => o.id === path), rank = Number(r);
+  const step = p?.ranks[rank - 1];
+  if (!p || !step) return `<p class="ug-hint">Tap a node to see what it does.</p>`;
+  const have = sideRank(ranks, p.id), cost = step.cost, can = free || save.knowledge >= cost;
+  const state = rank <= have ? `<b class="ug-owned">Owned</b>`
+    : rank === have + 1 ? `<button class="ug-buy" data-ug-buy="${id}" ${can ? "" : "disabled"}>Buy · ${free ? "Free" : `${cost.toLocaleString("en")} Knowledge`}</button>`
+    : `<span class="ug-locked">Locked: buy the one before it · ${cost.toLocaleString("en")} Knowledge</span>`;
+  const at = { ...ranks, [p.id]: rank } as Ranks<Id>;
+  return `<div class="ug-card-head"><b>${p.name} ${ROMAN[rank]}: ${step.name}</b><small>Level ${rank} / ${p.ranks.length}</small></div><p>${p.motto}. ${step.text}</p><p class="ug-stats">At this rank: ${stats(at)}</p><div class="ug-card-foot" data-ug-ignore>${state}</div>`;
+}
+
+const KEEP_TREE: SideTree<KeepPathId> = { root: "k:keep", icon: "keep", paths: KEEP_PATHS };
+const WALL_TREE: SideTree<WallPathId> = { root: "k:wallBlock", icon: "wallBlock", paths: WALL_PATHS };
+
+/** The keep's tree as the graph draws it. */
+export const keepGraph = (ranks: KeepRanks | undefined) => sideGraph(KEEP_TREE, ranks);
+/** What node `id` of the keep's tree buys, if it can be bought now. */
+export const keepStep = (ranks: KeepRanks | undefined, id: string) => sideStep(KEEP_TREE, ranks, id);
 
 /** The keep's numbers with `ranks`, and the shared Smithy and skill bonuses. */
 export function keepStats(save: Save, ranks: KeepRanks | undefined): string {
@@ -157,25 +195,32 @@ export function keepStats(save: Save, ranks: KeepRanks | undefined): string {
   return parts.join(" · ");
 }
 
-/** What node `id` of the keep's tree buys, if it can be bought now. */
-export function keepStep(ranks: KeepRanks | undefined, id: string): KeepPathId | undefined {
-  const [q, path, rank] = id.split(":");
-  const p = KEEP_PATHS.find((o) => o.id === path);
-  return q === "q" && p && Number(rank) === keepRank(ranks, p.id) + 1 && Number(rank) <= p.ranks.length ? p.id : undefined;
+/** The card for node `id` of the keep's tree. */
+export const keepCardHtml = (save: Save, ranks: KeepRanks | undefined, id: string) =>
+  sideCardHtml(save, KEEP_TREE, ranks, id, STRUCTURES.keep.name, STRUCTURES.keep.description, (r) => keepStats(save, r));
+
+/** The walls' tree as the graph draws it. */
+export const wallGraph = (ranks: WallRanks | undefined) => sideGraph(WALL_TREE, ranks);
+/** What node `id` of the walls' tree buys, if it can be bought now. */
+export const wallStep = (ranks: WallRanks | undefined, id: string) => sideStep(WALL_TREE, ranks, id);
+
+/** A placed wall stone's numbers with `ranks`, and the shared Smithy and
+ * skill bonuses. */
+export function wallStats(save: Save, ranks: WallRanks | undefined): string {
+  const b = bonuses(save), stone = wallRank(ranks, "stonework"), thorns = wallRank(ranks, "thornwork"), town = wallRank(ranks, "townWalls");
+  const parts = [`${Math.round(wallHp(save.defend.levels.wallStrength) * b.wallHp * STONEWORK.hp[stone]).toLocaleString("en")} HP a stone`];
+  if (stone >= 3) parts.push(`mends ${STONEWORK.mend * 100}% a second`);
+  if (thorns) parts.push(`${THORNWORK.damage[thorns]} thorn damage every ${THORNWORK.every[thorns]}s${thorns >= 3 ? ` · ${THORNWORK.chill}s slow` : ""}`);
+  parts.push(town >= TOWN_WALLS.posterns ? "inside or outside the city · your people pass through" : town >= TOWN_WALLS.inside ? "inside or outside the city" : "outside the city");
+  return parts.join(" · ");
 }
 
-/** The card for node `id` of the keep's tree. */
-export function keepCardHtml(save: Save, ranks: KeepRanks | undefined, id: string): string {
-  const free = save.settings.devMode;
-  if (id === "k:keep")
-    return `<div class="ug-card-head"><b>${STRUCTURES.keep.name}</b></div><p>${STRUCTURES.keep.description} Its branches climb side by side: buy a rank of any of them.</p><p class="ug-stats">${keepStats(save, ranks)}</p><div class="ug-card-foot" data-ug-ignore><b class="ug-owned">This building</b></div>`;
-  const [, path, r] = id.split(":"), p = KEEP_PATHS.find((o) => o.id === path), rank = Number(r);
-  const step = p?.ranks[rank - 1];
-  if (!p || !step) return `<p class="ug-hint">Tap a node to see what it does.</p>`;
-  const have = keepRank(ranks, p.id), cost = step.cost, can = free || save.knowledge >= cost;
-  const state = rank <= have ? `<b class="ug-owned">Owned</b>`
-    : rank === have + 1 ? `<button class="ug-buy" data-ug-buy="${id}" ${can ? "" : "disabled"}>Buy · ${free ? "Free" : `${cost.toLocaleString("en")} Knowledge`}</button>`
-    : `<span class="ug-locked">Locked: buy the one before it · ${cost.toLocaleString("en")} Knowledge</span>`;
-  const at = { ...ranks, [p.id]: rank };
-  return `<div class="ug-card-head"><b>${p.name} ${ROMAN[rank]}: ${step.name}</b><small>Level ${rank} / ${p.ranks.length}</small></div><p>${p.motto}. ${step.text}</p><p class="ug-stats">At this rank: ${keepStats(save, at)}</p><div class="ug-card-foot" data-ug-ignore>${state}</div>`;
+/** The card for node `id` of the walls' tree. */
+export const wallCardHtml = (save: Save, ranks: WallRanks | undefined, id: string) =>
+  sideCardHtml(save, WALL_TREE, ranks, id, "Walls", WALL_BLOCK_DESCRIPTION, (r) => wallStats(save, r));
+
+/** Tiles' read-only list of the walls' branches. */
+export function wallTreeHtml(): string {
+  const rows = WALL_PATHS.map((p) => `<li class="spec-row hue-${p.hue}"><span class="path-medal"><canvas data-path-icon="${p.ranks[0].icon}:${p.hue}"></canvas></span><div><b>${p.name}</b><small>${p.motto}: ${p.ranks.map((r, i) => `${ROMAN[i + 1]} ${r.name} (${r.cost.toLocaleString("en")})`).join(" · ")}</small></div></li>`).join("");
+  return `<div class="tile-specialties"><small>UPGRADES · KNOWLEDGE, SHARED BY EVERY WALL: PRESS AND HOLD ONE IN DEFEND WHILE BUILDING</small><ul>${rows}</ul></div>`;
 }

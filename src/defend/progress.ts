@@ -2,6 +2,7 @@
  * own and have upgraded, and their best wave. A run itself is never saved —
  * it always starts fresh from the layout. */
 import { decodeKeepRanks, type KeepRanks } from "../keep-upgrades.ts";
+import { decodeWallRanks, innerWalls, type WallRanks } from "../wall-upgrades.ts";
 import {
   ENEMIES,
   type EnemyKind,
@@ -28,7 +29,10 @@ import {
   placedCount,
   sameCorner,
   sameGate,
+  sameWall,
+  wallSpotOk,
   type CornerSpot,
+  type WallSpot,
   type GateSpot,
   type Layout,
   type PlacedKind,
@@ -68,6 +72,8 @@ export type DefendSave = {
   seed: number;
   /** The keep's own upgrades (`keep-upgrades.ts`); absent while it has none. */
   keepRanks?: KeepRanks;
+  /** The placed walls' upgrades (`wall-upgrades.ts`); absent while they have none. */
+  wallRanks?: WallRanks;
 };
 
 export function defaultDefendSave(): DefendSave {
@@ -209,6 +215,8 @@ function fitted(l: Layout): Layout {
   while (next.gates.length && !fitLayout(next).ok) next.gates.pop();
   while (next.spikes.length && !fitLayout(next).ok) next.spikes.pop();
   while (next.ballistas.length && !fitLayout(next).ok) next.ballistas.pop();
+  while (next.walls?.length && !fitLayout(next).ok) next.walls.pop();
+  if (next.walls && !next.walls.length) delete next.walls;
   return next;
 }
 
@@ -269,7 +277,9 @@ export function decodeDefendSave(s: any): DefendSave {
   const kinds = Object.keys(ENEMIES) as EnemyKind[];
   d.discovered = kinds.filter(k => Array.isArray(s.discovered) && s.discovered.includes(k));
   d.journalRead = d.discovered.filter(k => Array.isArray(s.journalRead) && s.journalRead.includes(k));
-  d.layout = decodeLayout(s.layout, d.owned, d.levels) ?? d.layout;
+  const wallRanks = decodeWallRanks(s.wallRanks);
+  if (wallRanks) d.wallRanks = wallRanks;
+  d.layout = decodeLayout(s.layout, d.owned, d.levels, innerWalls(wallRanks)) ?? d.layout;
   d.kept = Array.isArray(s.kept) ? s.kept.filter((k: any) => isObject(k) && (PLACED.includes(k.kind) || k.kind === "wallSpikes") && wearFits(k.kind, k.path, k.rank))
     .slice(0, 9999).map((k: any): Kept => ({ kind: k.kind, path: k.path, rank: k.rank })) : [];
   trimKept(d);
@@ -294,7 +304,7 @@ const tileOk = (tx: unknown, ty: unknown) => int(tx, 0, TILES_W - 1) && int(ty, 
  * player owns everything on it and its tiles join the keep. Structures that
  * no longer fit (a save from before the tile shares, say) are reshuffled on
  * their tiles, and failing that the newest go back to the palette. */
-function decodeLayout(s: any, owned: Record<PaletteItem, number>, levels: Record<UpgradeId, number>): Layout | null {
+function decodeLayout(s: any, owned: Record<PaletteItem, number>, levels: Record<UpgradeId, number>, inner: boolean): Layout | null {
   if (!isObject(s) || !tileOk(s.keep?.tx, s.keep?.ty) || !int(s.nextUid, 1, 1e9)) return null;
   const keep = { tx: s.keep.tx, ty: s.keep.ty };
   const cityTiles = decodeCityTiles(s.cityTiles, tileKey(keep.tx, keep.ty));
@@ -306,7 +316,10 @@ function decodeLayout(s: any, owned: Record<PaletteItem, number>, levels: Record
   const spikes = s.spikes === undefined ? [] : decodeGates(s.spikes, tiles)?.map((g, i): SpikeSpot => ({ ...g, ...wearOn("wallSpikes", s.spikes[i]) })) ?? null;
   const ballistas = s.ballistas === undefined ? [] : decodeCorners(s.ballistas, tiles);
   if (!gates || !spikes || !ballistas || spikes.some((g) => gates.some((o) => sameGate(o, g)))) return null;
-  const layout: Layout = { keep, cityTiles, structures, nextUid: s.nextUid, rolls: intOr(s.rolls, 0, 1e9, 0), compact: compactKinds(levels), gates, spikes, ballistas };
+  // Saves from before placed walls have none.
+  const walls = s.walls === undefined ? [] : decodeWalls(s.walls);
+  if (!walls) return null;
+  const layout: Layout = { keep, cityTiles, structures, nextUid: s.nextUid, rolls: intOr(s.rolls, 0, 1e9, 0), compact: compactKinds(levels), gates, spikes, ballistas, ...(walls.length ? { walls } : {}), ...(inner ? { innerWalls: true as const } : {}) };
   if (!legal(layout, owned)) return null;
   const out = fitted(layout);
   return fitLayout(out).ok ? out : null;
@@ -372,6 +385,19 @@ function decodeCorners(list: unknown, cityTiles: Set<string>): CornerSpot[] | nu
   return out;
 }
 
+/** Distinct wall sections, each on the board off the spawn row, or null. */
+function decodeWalls(list: unknown): WallSpot[] | null {
+  if (!Array.isArray(list)) return null;
+  const out: WallSpot[] = [];
+  for (const w of list) {
+    if (!isObject(w) || !Number.isInteger(w.qx) || !Number.isInteger(w.qy)) return null;
+    const spot: WallSpot = { qx: w.qx, qy: w.qy };
+    if (!wallSpotOk(spot) || out.some((o) => sameWall(o, spot))) return null;
+    out.push(spot);
+  }
+  return out;
+}
+
 const structureOk = (p: any, nextUid: number, uids: Set<number>) =>
   PLACED.includes(p?.kind) && tileOk(p.tx, p.ty) && int(p.uid, 1, nextUid - 1) && !uids.has(p.uid);
 
@@ -387,6 +413,7 @@ function affordable(layout: Layout, owned: Record<PaletteItem, number>) {
     layout.gates.length <= owned.cityGate &&
     layout.spikes.length <= owned.wallSpikes &&
     layout.ballistas.length <= owned.wallBallista &&
+    (layout.walls?.length ?? 0) <= owned.wallBlock &&
     PLACED.every((k) => placedCount(layout, k) <= owned[k])
   );
 }

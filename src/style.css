@@ -1198,6 +1198,11 @@ nav button > span img { display: block; width: 42px; height: 42px; max-width: 10
   image-rendering: pixelated;
   filter: drop-shadow(0 3px 4px #000);
 }
+.defend-drag-ghost.small {
+  width: 22px;
+  height: 22px;
+  transform: translate(-50%, -160%);
+}
 .defend-wallet b {
   color: #efd496;
 }

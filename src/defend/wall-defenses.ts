@@ -6,6 +6,7 @@ import { spikeKey } from "../specializations.ts";
  * so such runs replay exactly as before. */
 import { dist, sq } from "../exact.ts";
 import { BLAST_STAKES, RIME_STAKES, SPRING_STAKES, pathRank } from "../knowledge-paths.ts";
+import { STONEWORK, THORNWORK, wallRank } from "../wall-upgrades.ts";
 import { BALLISTA, ENEMIES, enemySize, spikeDamage, spikeEvery } from "./catalog.ts";
 import type { Building } from "./citygen.ts";
 import { cellX, cellY } from "./grid.ts";
@@ -111,6 +112,38 @@ function springRow(sim: DefendSim, r: number, rank: number, cut: number) {
       if (Math.abs(e.x - cx) > hx + rad || Math.abs(e.y - cy) > hy + rad) continue;
       hit.add(e.id);
       sim.hurtEnemy(e, cut * SPRING_STAKES.damage[rank], true, "melee");
+    }
+  }
+}
+
+/** The walls the player placed on their own, with the walls' upgrades:
+ * standing stones mend (Stonework III), and every `THORNWORK.every`
+ * seconds each enemy on foot touching one is cut (Thornwork), and from III
+ * slowed. Nothing happens in a run without placed walls or those ranks. */
+export function stepPlacedWalls(sim: DefendSim, dt: number) {
+  const ranks = sim.bonuses.walls;
+  if (!ranks || !sim.pieces.length) return;
+  if (wallRank(ranks, "stonework") >= 3)
+    for (const b of sim.pieces)
+      if (sim.solid[b.cells[0]] && sim.hp[b.id] < sim.maxHp[b.id]) sim.hp[b.id] = Math.min(sim.maxHp[b.id], sim.hp[b.id] + sim.maxHp[b.id] * STONEWORK.mend * dt);
+  const thorns = wallRank(ranks, "thornwork");
+  if (!thorns) return;
+  sim.wallThornT -= dt;
+  if (sim.wallThornT > 0) return;
+  sim.wallThornT += THORNWORK.every[thorns];
+  const struck = new Set<number>();
+  for (const b of sim.pieces) {
+    const cell = b.cells[0];
+    if (!sim.solid[cell]) continue;
+    const cx = cellX(cell) + 0.5, cy = cellY(cell) + 0.5;
+    for (const e of sim.enemiesNear(cx, cy, 1.5)) {
+      if (struck.has(e.id) || !onFoot(e) || e.hp <= 0) continue;
+      // Touching: within a quarter cell of the stone's faces.
+      const reach = 0.75 + enemySize(e) / 2;
+      if (Math.abs(e.x - cx) > reach || Math.abs(e.y - cy) > reach) continue;
+      struck.add(e.id);
+      if (thorns >= 3) e.chill = Math.max(e.chill ?? 0, THORNWORK.chill);
+      sim.hurtEnemy(e, THORNWORK.damage[thorns], true, "melee");
     }
   }
 }

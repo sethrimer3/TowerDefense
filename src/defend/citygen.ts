@@ -58,6 +58,8 @@ export type Building = {
   /** Set for a wall ballista: its corner, and the way out of the city
    * there (a diagonal unit step), which it faces until it first shoots. */
   corner?: CornerSpot & { out: { x: number; y: number } };
+  /** Set for a stone of a wall section the player placed on its own. */
+  piece?: true;
 };
 
 /** Wall spikes on the wall stones `cells` (those facing open ground) along
@@ -92,7 +94,7 @@ const HOUSE_SHAPES: [number, number, number][] = [
 ];
 
 export function generateCity(
-  fit: { structures: FittedStructure[]; city: Uint8Array; wall: Uint8Array; gates?: FittedGate[]; spikes?: FittedSpikes[]; ballistas?: FittedBallista[] },
+  fit: { structures: FittedStructure[]; city: Uint8Array; wall: Uint8Array; gates?: FittedGate[]; spikes?: FittedSpikes[]; ballistas?: FittedBallista[]; pieces?: Uint8Array },
   seed: number,
 ): CityMap {
   const { city, wall, structures } = fit;
@@ -118,7 +120,7 @@ export function generateCity(
   // Every wall cell is its own stone that can be knocked out, but for the
   // gates and ballistas' bastions, which come last.
   const gated = new Set([...gates, ...ballistas].flatMap((g) => rectCells(g.rect)));
-  for (let i = 0; i < CELL_COUNT; i++) if (t[i] === CellType.WALL && !gated.has(i)) lots.add("wall", { x: cellX(i), y: cellY(i), w: 1, h: 1 });
+  for (let i = 0; i < CELL_COUNT; i++) if (t[i] === CellType.WALL && !gated.has(i)) lots.add("wall", { x: cellX(i), y: cellY(i), w: 1, h: 1 }, fit.pieces?.[i] ? { piece: true } : {});
   for (const g of gates) lots.add("gate", g.rect, { gate: { tx: g.tx, ty: g.ty, side: g.side } });
   for (const b of ballistas) lots.add("wallBallista", b.rect, { corner: { vx: b.vx, vy: b.vy, out: b.out } });
   const spikes = (fit.spikes ?? []).map((g) => spikeRow(t, lots.owner, lots.buildings, g)).filter((r) => r.cells.length);
