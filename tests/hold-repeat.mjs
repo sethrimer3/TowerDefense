@@ -155,10 +155,11 @@ try {
     await tab('mine'); await page.locator('#mine-smithy').click();
     const trained = (await state()).training.troopHp;
     await hold('[data-train="troopHp"]');
-    assert.ok((await state()).training.troopHp >= trained + 3, `holding repeats available Training ranks: ${JSON.stringify({ before: trained, after: (await state()).training.troopHp, job: (await state()).trainingJobs, enabled: await page.locator('[data-train="troopHp"]').isEnabled() })}`);
+    assert.equal((await state()).training.troopHp, trained, 'Smithy ranks are never instant, even with instant research');
+    assert.equal((await state()).trainingJobs.filter((j) => j.id === 'troopHp').length, 1, 'held Training starts one timed rank');
     const arms = (await state()).defend.levels.soldierArms;
     await hold('[data-upgrade="soldierArms"]');
-    assert.ok((await state()).defend.levels.soldierArms >= arms + 2, 'existing Forge holds repeat available ranks');
+    assert.equal((await state()).defend.levels.soldierArms, arms, 'Forge levels are never instant either');
     assert.deepEqual(errors, []);
     await context.close();
   }

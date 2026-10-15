@@ -7,7 +7,7 @@ import { startForge, settleForge, cancelForge, addForgeSmith, forgeLeft, forgeSe
 import { startTraining, addSmith, cancelTraining, rankCost, rankPrice, trainingStep, busySmiths } from "../src/progression.ts";
 import { PATHS, unlearnPath } from "../src/knowledge-paths.ts";
 import { SKILLS, skillCost } from "../src/skill-trees.ts";
-import { UPGRADES, purchasePrice, upgradePrice } from "../src/defend/catalog.ts";
+import { SPEED3_PRICE, UPGRADES, purchasePrice, upgradePrice } from "../src/defend/catalog.ts";
 import { enchantedGift, MAX_SHELVES } from "../src/library/sim.ts";
 import { trainingSeconds } from "../src/training-jobs.ts";
 import { planProgression, sampledRates, type Budget } from "../tools/plan-upgrade-progression.ts";
@@ -134,8 +134,22 @@ test("Forge loss of smiths pauses work; mixed-metal cancellation and free projec
   cancelForge(s);
   assert.deepEqual(s.smithy, { copper: 100, silver: 100, gold: 100 });
   s.settings.instantResearch = true;
-  assert.ok(startForge(s, { kind: "speed", id: "speed3" }, "", 10002));
-  assert.equal(s.defend.speed3, true); assert.equal(s.forgeJob, null);
+  assert.equal(startForge(s, { kind: "speed", id: "speed3" }, "", 10002), false, "no Smithy upgrade without a smith, even with instant research");
+  assert.ok(startForge(s, { kind: "speed", id: "speed3" }, "Ada", 10002));
+  assert.equal(s.defend.speed3, false, "still takes its time");
+  assert.ok(s.forgeJob && s.forgeJob.left === forgeSeconds(0, SPEED3_PRICE) * 1000);
+});
+
+test("Smithy work grows with the rank and with the metal it costs", () => {
+  for (let r = 0; r < 49; r++) assert.ok(trainingSeconds(r + 1) > trainingSeconds(r));
+  assert.equal(trainingSeconds(10) / trainingSeconds(9), 11 ** 2 / 10 ** 2 * 2, "silver ranks take twice the work");
+  assert.equal(trainingSeconds(25) / trainingSeconds(24), 26 ** 2 / 25 ** 2 * 2, "gold ranks twice silver's");
+  for (const u of UPGRADES) for (let r = 1; r < u.maxLevel; r++) {
+    const price = (u.price ?? upgradePrice)(r), before = (u.price ?? upgradePrice)(r - 1);
+    assert.ok(forgeSeconds(r, price) > forgeSeconds(r - 1, before), `${u.id} ${r}`);
+  }
+  assert.equal(forgeSeconds(5, { copper: 9, gold: 1 }), forgeSeconds(5) * 4);
+  assert.ok(forgeSeconds(0) > trainingSeconds(0), "a Forge level is a bigger job than a Smithy rank");
 });
 
 test("higher Training ranks require their entire quadratic bill and refund it after reload", () => {
@@ -180,7 +194,7 @@ test("funded production growth places focused final targets around two years", (
   const conduit = UPGRADES.find(u => u.id === "chainCount")!, forge = bill(); work = 0;
   for (let r = 0; r < conduit.maxLevel; r++) {
     for (const [metal, amount] of Object.entries((conduit.price ?? upgradePrice)(r))) forge[metal as keyof Budget] += amount!;
-    work += forgeSeconds(r);
+    work += forgeSeconds(r, (conduit.price ?? upgradePrice)(r));
   }
   const storm = PATHS.find(p => p.id === "storm")!;
   forge.knowledge = storm.ranks.reduce((n, r) => n + r.cost, 0) + storm.evolves!.cost;

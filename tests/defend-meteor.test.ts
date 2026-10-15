@@ -6,11 +6,18 @@ import { DefendSim, type Enemy, type Levels } from "../src/defend/sim.ts";
 import { NO_BONUSES, UPGRADES, type Bonuses, type EnemyKind } from "../src/defend/catalog.ts";
 import { METEOR, meteorReach } from "../src/defend/meteor.ts";
 import { FROST_COMET, MOLTEN_CORE, STARFALL, equipSpell, learnPath, spellPath, unlearnPath } from "../src/knowledge-paths.ts";
-import { bonuses, startTraining } from "../src/progression.ts";
+import { bonuses, settleTraining, startTraining } from "../src/progression.ts";
 import { decode, defaults } from "../src/save.ts";
 import { CONSUMABLES, shopOffer, tileStack, tileTopic } from "../src/tiles.ts";
 import { ledgerSubjects } from "../src/ui/ledger.ts";
 import { cellAt } from "../src/defend/pathing.ts";
+
+/** One Smithy rank, worked through to the end by a smith. */
+function train(s: ReturnType<typeof defaults>, id: Parameters<typeof startTraining>[1]) {
+  assert.ok(startTraining(s, id, "Ada"));
+  s.trainingClock = 1;
+  settleTraining(s, 1e15);
+}
 
 const LEVELS = Object.fromEntries(UPGRADES.map((u) => [u.id, 0])) as Levels;
 
@@ -77,10 +84,9 @@ test("the meteor spares the city's own people", () => {
 test("the Smithy's rows make it hit harder and wider", () => {
   const s = defaults();
   s.settings.devMode = true;
-  s.settings.instantResearch = true;
   for (let i = 0; i < 4; i++) {
-    assert.ok(startTraining(s, "meteorDamage", ""));
-    assert.ok(startTraining(s, "meteorRadius", ""));
+    train(s, "meteorDamage");
+    train(s, "meteorRadius");
   }
   const b = bonuses(s);
   assert.equal(b.meteorDamage, 1.2);

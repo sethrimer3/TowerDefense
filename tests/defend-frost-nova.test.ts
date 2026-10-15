@@ -6,12 +6,19 @@ import { DefendSim, type Enemy, type Levels, type Soldier } from "../src/defend/
 import { NO_BONUSES, UPGRADES, type Bonuses, type EnemyKind } from "../src/defend/catalog.ts";
 import { BURST_SHOW, FROST_NOVA, frostReach } from "../src/defend/frost-nova.ts";
 import { BLIZZARD, RIME_WARD, SHATTER, equipSpell, learnPath, spellPath, unlearnPath } from "../src/knowledge-paths.ts";
-import { bonuses, startTraining } from "../src/progression.ts";
+import { bonuses, settleTraining, startTraining } from "../src/progression.ts";
 import { decode, defaults } from "../src/save.ts";
 import { CONSUMABLES, shopOffer, tileStack, tileTopic } from "../src/tiles.ts";
 import { ledgerSubjects } from "../src/ui/ledger.ts";
 import { cellAt } from "../src/defend/pathing.ts";
 import { dist } from "../src/exact.ts";
+
+/** One Smithy rank, worked through to the end by a smith. */
+function train(s: ReturnType<typeof defaults>, id: Parameters<typeof startTraining>[1]) {
+  assert.ok(startTraining(s, id, "Ada"));
+  s.trainingClock = 1;
+  settleTraining(s, 1e15);
+}
 
 const LEVELS = Object.fromEntries(UPGRADES.map((u) => [u.id, 0])) as Levels;
 
@@ -79,10 +86,9 @@ test("the unyielding are not frozen", () => {
 test("the Smithy's rows make it last longer and reach farther", () => {
   const s = defaults();
   s.settings.devMode = true;
-  s.settings.instantResearch = true;
   for (let i = 0; i < 4; i++) {
-    assert.ok(startTraining(s, "frostTime", ""));
-    assert.ok(startTraining(s, "frostRadius", ""));
+    train(s, "frostTime");
+    train(s, "frostRadius");
   }
   const b = bonuses(s);
   assert.equal(b.frostTime, 1.2);
