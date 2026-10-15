@@ -203,7 +203,7 @@ export function refusal(drag: Drag, layout: Layout, key: string): string {
   const inCity = cityTileSet(layout).has(key);
   if (kind === "cityTile")
     return inCity ? "That tile is already part of the city." : drag.from === "cityTile" ? "What stands on this tile doesn't fit there." : "There isn't room for a city tile there.";
-  if (kind === "keep") return "The keep can only move onto another city tile.";
+  if (kind === "keep") return inCity ? "The keep can't swap with that tile." : "What stands on the keep's tile doesn't fit there.";
   if (!consumable(kind) && dragSpan(drag, layout) > 1) {
     const [tx] = key.split(",").map(Number);
     const block = blockTiles(tx, ty, 2);

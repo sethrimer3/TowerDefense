@@ -601,23 +601,33 @@ export function removeCityTile(l: Layout, tx: number, ty: number): { layout: Lay
 }
 
 /** Whether city tile `tile` can be carried somewhere else: anything standing
- * on it goes with it, but not a structure whose block spans other tiles. */
+ * on it goes with it, but not a structure whose block spans other tiles.
+ * The keep's own tile is carried by the keep (`moveKeep`). */
 export function tileMovable(l: Layout, tile: TilePos) {
-  return l.cityTiles.includes(tileKey(tile.tx, tile.ty)) && !l.structures.some((s) => spanOf(l, s.kind) > 1 && covers(l, s, tile.tx, tile.ty));
+  return l.cityTiles.includes(tileKey(tile.tx, tile.ty)) && !spannedOver(l, tile);
 }
+const spannedOver = (l: Layout, tile: TilePos) => l.structures.some((s) => spanOf(l, s.kind) > 1 && covers(l, s, tile.tx, tile.ty));
 
 /** Move a city tile with everything on it: its structures keep their uids
  * and paths, and the gates and spikes in its wall go along. Ballistas on its
  * corners go too where the tile was what made the corner. Whatever no
  * longer fits the new place's wall is dropped back to the palette. */
 export function moveCityTile(l: Layout, from: TilePos, to: TilePos): Layout | null {
-  if (!tileMovable(l, from) || !tileInBounds(to.tx, to.ty) || to.ty === SPAWN_ROW) return null;
+  if (!tileMovable(l, from)) return null;
+  return carryTile(l, from, to);
+}
+
+/** Carries tile `from` (a city tile, or the keep's) to open ground at `to`
+ * with everything on it. */
+function carryTile(l: Layout, from: TilePos, to: TilePos): Layout | null {
+  if (!tileInBounds(to.tx, to.ty) || to.ty === SPAWN_ROW) return null;
   const toKey = tileKey(to.tx, to.ty);
   if (cityTileSet(l).has(toKey)) return null;
   const next = cloneLayout(l);
   const dx = to.tx - from.tx, dy = to.ty - from.ty;
   const on = (p: TilePos) => p.tx === from.tx && p.ty === from.ty;
-  next.cityTiles = next.cityTiles.map((k) => (k === tileKey(from.tx, from.ty) ? toKey : k));
+  if (on(l.keep)) next.keep = { tx: to.tx, ty: to.ty };
+  else next.cityTiles = next.cityTiles.map((k) => (k === tileKey(from.tx, from.ty) ? toKey : k));
   for (const s of next.structures) if (on(s)) { s.tx += dx; s.ty += dy; }
   for (const g of [...next.gates, ...next.spikes]) if (on(g)) { g.tx += dx; g.ty += dy; }
   const left = cityTileSet(l);
@@ -675,10 +685,12 @@ export function moveStructure(l: Layout, uid: number, tx: number, ty: number): L
   return withStructure(removeStructure(l, uid), { ...s, tx, ty });
 }
 
-/** The keep can move onto any other city tile; the two tiles swap roles. */
+/** The keep's tile is placed like any city tile: onto open ground it
+ * carries its tile with everything on it (`carryTile`), and onto another
+ * city tile the two tiles swap roles. */
 export function moveKeep(l: Layout, tx: number, ty: number): Layout | null {
   const key = tileKey(tx, ty);
-  if (!l.cityTiles.includes(key)) return null;
+  if (!l.cityTiles.includes(key)) return spannedOver(l, l.keep) ? null : carryTile(l, l.keep, { tx, ty });
   const next = cloneLayout(l);
   next.cityTiles = next.cityTiles.filter((k) => k !== key);
   next.cityTiles.push(tileKey(l.keep.tx, l.keep.ty));

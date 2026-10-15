@@ -1,6 +1,7 @@
 /** Persistent DEFEND state: the city layout the player designed, what they
  * own and have upgraded, and their best wave. A run itself is never saved —
  * it always starts fresh from the layout. */
+import { decodeKeepRanks, type KeepRanks } from "../keep-upgrades.ts";
 import {
   ENEMIES,
   type EnemyKind,
@@ -65,6 +66,8 @@ export type DefendSave = {
   battleSpeed: 1 | 2 | 3;
   /** Seed for the filler city, so the same layout always looks the same. */
   seed: number;
+  /** The keep's own upgrades (`keep-upgrades.ts`); absent while it has none. */
+  keepRanks?: KeepRanks;
 };
 
 export function defaultDefendSave(): DefendSave {
@@ -270,6 +273,8 @@ export function decodeDefendSave(s: any): DefendSave {
   d.kept = Array.isArray(s.kept) ? s.kept.filter((k: any) => isObject(k) && (PLACED.includes(k.kind) || k.kind === "wallSpikes") && wearFits(k.kind, k.path, k.rank))
     .slice(0, 9999).map((k: any): Kept => ({ kind: k.kind, path: k.path, rank: k.rank })) : [];
   trimKept(d);
+  const keepRanks = decodeKeepRanks(s.keepRanks);
+  if (keepRanks) d.keepRanks = keepRanks;
   return d;
 }
 

@@ -20,6 +20,7 @@ import { center, nearest } from "./pathing.ts";
 import { shootBallista } from "./wall-defenses.ts";
 import type { DefendSim, Enemy } from "./sim.ts";
 import { FIRE_ARROWS, GUNNERY, SHARP, SIEGE_SHOT, pathRank } from "../knowledge-paths.ts";
+import { ARROW_LOOPS, BOILING_OIL, keepRank } from "../keep-upgrades.ts";
 
 /** The towers' Study paths and ranks (`knowledge-paths.ts`): each 0 unless chosen. */
 const paths = (sim: Pick<DefendSim, "bonuses">, b?: Building) => {
@@ -35,6 +36,11 @@ const byDistanceFrom = (c: { x: number; y: number }) => (a: Enemy, b: Enemy) => 
 export const archerTowerRange = (sim: Pick<DefendSim, "levels" | "bonuses">, b?: Building) => archerRange(sim.levels.archerRange) + (paths(sim, b).sharp ? SHARP.range : 0);
 /** How far a cannon tower lobs its shells. */
 export const cannonTowerRange = (sim: Pick<DefendSim, "bonuses">, b?: Building) => CANNON_RANGE + (paths(sim, b).siege >= 3 ? SIEGE_SHOT.range : 0);
+
+/** How far the keep's arrow loops shoot (0 without them). */
+export const keepArrowRange = (sim: Pick<DefendSim, "bonuses">) => ARROW_LOOPS.range[keepRank(sim.bonuses.keep, "arrowLoops")];
+/** How far out from the keep's walls its boiling oil reaches (0 without it). */
+export const keepOilReach = (sim: Pick<DefendSim, "bonuses">) => BOILING_OIL.reach[keepRank(sim.bonuses.keep, "boilingOil")];
 
 /** Cannons won't fire at anything closer than this (cells). */
 const CANNON_MIN = 1.5;
@@ -55,6 +61,43 @@ export class Towers {
       if (b.kind === "cannonTower") this.stepCannon(sim, b, dt);
       else if (b.kind === "archerTower") this.stepArcherTower(sim, b, dt);
       else if (b.kind === "wallBallista") this.stepBallista(sim, b, dt);
+      else if (b.kind === "keep" && sim.bonuses.keep) this.stepKeep(sim, b, dt);
+    }
+  }
+
+  /** Seconds until the keep pours its boiling oil again. */
+  private oil = 0;
+
+  /** The keep's own defenses (`keep-upgrades.ts`): arrows from its loops
+   * and boiling oil on whatever reaches its walls. */
+  private stepKeep(sim: DefendSim, b: Building, dt: number) {
+    const loops = keepRank(sim.bonuses.keep, "arrowLoops"), oil = keepRank(sim.bonuses.keep, "boilingOil");
+    const c = center(b.rect);
+    if (loops && this.ready(b, dt)) {
+      const range = keepArrowRange(sim);
+      const near = sim.enemiesNear(c.x, c.y, range).filter((e) => sq(e.x - c.x) + sq(e.y - c.y) <= range * range);
+      if (!near.length) this.cooldown.set(b.id, 0);
+      else {
+        this.cooldown.set(b.id, ARROW_LOOPS.reload[loops] * sim.bonuses.towerReload);
+        const damage = archerDamage(sim.levels.archerDamage) * sim.bonuses.towerDamage * ARROW_LOOPS.damage[loops];
+        const targets = loops >= 3 ? near.sort(byDistanceFrom(c)).slice(0, ARROW_LOOPS.volley) : [nearest(near, c)!];
+        for (const t of targets) sim.arrows.push({ x: c.x, y: c.y - 0.8, origin: { x: c.x, y: c.y, building: b.id }, target: t.id, damage, tx: t.x, ty: t.y, life: 2 });
+      }
+    }
+    if (!oil || (this.oil -= dt) > 0) return;
+    const r = b.rect, reach = BOILING_OIL.reach[oil];
+    const scalded = sim.enemiesNear(c.x, c.y, (r.w + r.h) / 2 + reach).filter((e) => {
+      if (ENEMIES[e.kind].flying) return false;
+      const dx = Math.max(r.x - e.x, 0, e.x - (r.x + r.w)), dy = Math.max(r.y - e.y, 0, e.y - (r.y + r.h));
+      return dx * dx + dy * dy <= reach * reach;
+    });
+    // Nothing at the walls: the cauldrons wait, hot, for the next.
+    if (!scalded.length) return void (this.oil = 0);
+    this.oil = BOILING_OIL.every[oil];
+    for (const e of scalded) {
+      sim.hurtEnemy(e, BOILING_OIL.damage[oil] * sim.bonuses.towerDamage, true, "ranged", { x: c.x, y: c.y, building: b.id }, false, "fire");
+      if (BOILING_OIL.burn[oil]) ignite(e, BOILING_OIL.dps[oil] * sim.bonuses.towerDamage, BOILING_OIL.burn[oil]);
+      sim.effects.push({ kind: "steam", x: e.x, y: e.y, t: 0, r: 0.7 });
     }
   }
 
