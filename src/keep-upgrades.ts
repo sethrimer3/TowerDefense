@@ -2,14 +2,12 @@
  * are a choice of one, the keep climbs each of its branches on its own:
  * Bastions (its HP), Arrow loops (it shoots) and Boiling oil (it scalds
  * what reaches its walls). Each rank is paid with Knowledge, and a respec
- * gives it all back for `RESPEC_PRICE`. The ranks are saved on the Defend
+ * gives it all back, free. The ranks are saved on the Defend
  * save (`DefendSave.keepRanks`, absent while it has none: there is only
  * ever one keep, and it never leaves the city) and snapshotted into
  * `Bonuses.keep` when a battle starts. */
 import { studyPathCost } from "./economy.ts";
 import type { PathHue, PathRank } from "./knowledge-paths.ts";
-import { RESPEC_PRICE } from "./specializations.ts";
-import { spendMetals } from "./metals.ts";
 import type { Save } from "./save.ts";
 
 export type KeepPathId = "bastions" | "arrowLoops" | "boilingOil";
@@ -87,12 +85,25 @@ export function upgradeKeep(save: Save, id: KeepPathId): KeepResult {
   return { ok: true };
 }
 
-/** Respecs the keep: pays `RESPEC_PRICE` in metal (free with Unlimited
- * money) and gives back every Knowledge point in it. */
+/** Undoes rank `rank` of branch `id` and the ranks above it, free, giving
+ * back their Knowledge: the branch steps back to rank `rank - 1`. */
+export function undoKeep(save: Save, id: KeepPathId, rank: number): KeepResult {
+  const have = keepRank(save.defend.keepRanks, id);
+  if (rank < 1 || rank > have) return { ok: false, reason: "Nothing to undo there." };
+  const p = keepPathById(id);
+  for (let r = rank; r <= have; r++) save.knowledge += p.ranks[r - 1].cost;
+  const next = { ...save.defend.keepRanks };
+  if (rank > 1) next[id] = rank - 1;
+  else delete next[id];
+  if (Object.keys(next).length) save.defend.keepRanks = next;
+  else delete save.defend.keepRanks;
+  return { ok: true };
+}
+
+/** Respecs the keep, free: every Knowledge point in it comes back. */
 export function respecKeep(save: Save): KeepResult {
   const spent = keepAllocated(save.defend.keepRanks);
   if (!save.defend.keepRanks) return { ok: false, reason: "Nothing to respec: it has no upgrades." };
-  if (!spendMetals(save.smithy, RESPEC_PRICE, save.settings.devMode)) return { ok: false, reason: `A respec costs ${RESPEC_PRICE.copper} Copper.` };
   save.knowledge += spent;
   delete save.defend.keepRanks;
   return { ok: true };

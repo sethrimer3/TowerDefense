@@ -28,7 +28,6 @@ import { DefendSim, type Enemy } from "../src/defend/sim.ts";
 import { bonuses } from "../src/progression.ts";
 import { NO_BONUSES, purchasePrice } from "../src/defend/catalog.ts";
 import { STONEWORK, THORNWORK, WALL_PATHS, respecWalls, upgradeWalls, wallAllocated, withInnerWalls } from "../src/wall-upgrades.ts";
-import { RESPEC_PRICE } from "../src/specializations.ts";
 import { wallCardHtml, wallGraph, wallStep } from "../src/ui/specialty.ts";
 import { available } from "../src/defend/progress.ts";
 
@@ -170,7 +169,7 @@ test("the walls' branches climb side by side, and a respec gives back the Knowle
   assert.equal(wallGraph(s.defend.wallRanks).length, 1 + WALL_PATHS.reduce((n, p) => n + p.ranks.length, 0));
   assert.match(wallCardHtml(s, s.defend.wallRanks, "q:townWalls:2"), /data-ug-buy="q:townWalls:2"/);
   assert.match(wallCardHtml(s, s.defend.wallRanks, "k:wallBlock"), /HP a stone/);
-  s.smithy.copper = RESPEC_PRICE.copper;
+  s.smithy.copper = 0;
   const before = s.knowledge, all = wallAllocated(s.defend.wallRanks);
   assert.ok(respecWalls(s).ok);
   assert.equal(s.knowledge, before + all);

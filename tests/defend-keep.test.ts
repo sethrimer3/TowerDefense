@@ -14,8 +14,7 @@ import { Towers } from "../src/defend/towers.ts";
 import { center } from "../src/defend/pathing.ts";
 import { bonuses } from "../src/progression.ts";
 import { reachOf } from "../src/defend/inspect.ts";
-import { ARROW_LOOPS, BASTIONS, BOILING_OIL, KEEP_PATHS, keepAllocated, respecKeep, upgradeKeep } from "../src/keep-upgrades.ts";
-import { RESPEC_PRICE } from "../src/specializations.ts";
+import { ARROW_LOOPS, BASTIONS, BOILING_OIL, KEEP_PATHS, keepAllocated, respecKeep, undoKeep, upgradeKeep } from "../src/keep-upgrades.ts";
 import { keepCardHtml, keepGraph, keepStep } from "../src/ui/specialty.ts";
 import { NO_BONUSES } from "../src/defend/catalog.ts";
 
@@ -71,12 +70,21 @@ test("the keep's branches are climbed side by side, paid in Knowledge, and respe
   const poor = defaults();
   poor.knowledge = 0;
   assert.deepEqual(upgradeKeep(poor, "arrowLoops"), { ok: false, reason: `Needs ${KEEP_PATHS[1].ranks[0].cost} Knowledge.` });
-  // A respec costs Copper and gives every point back.
-  s.smithy.copper = RESPEC_PRICE.copper;
+  // Undoing a rank takes it and those above it back, free.
+  const ranks = { ...s.defend.keepRanks }, k0 = s.knowledge;
+  assert.ok(undoKeep(s, "bastions", 2).ok);
+  assert.equal(s.defend.keepRanks?.bastions, 1);
+  assert.equal(s.knowledge, k0 + KEEP_PATHS[0].ranks[1].cost + KEEP_PATHS[0].ranks[2].cost);
+  assert.equal(undoKeep(s, "bastions", 2).ok, false, "nothing there to undo");
+  assert.ok(undoKeep(s, "bastions", 1).ok);
+  assert.equal(s.defend.keepRanks?.bastions, undefined, "the branch is gone");
+  s.defend.keepRanks = ranks;
+  s.knowledge = k0;
+  // A respec is free and gives every point back.
+  s.smithy.copper = 0;
   const before = s.knowledge, all = keepAllocated(s.defend.keepRanks);
   assert.ok(respecKeep(s).ok);
   assert.equal(s.knowledge, before + all);
-  assert.equal(s.smithy.copper, 0);
   assert.equal(s.defend.keepRanks, undefined);
   assert.equal(respecKeep(s).ok, false, "nothing left to respec");
 });

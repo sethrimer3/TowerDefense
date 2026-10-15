@@ -103,8 +103,8 @@ Recent rows are available as `window.defendPerformance`; they are not saved.
   140% more HP), Arrow loops (it shoots the nearest enemy within 5 cells;
   faster, harder and 6.5 cells at II; three arrows at once at III) and
   Boiling oil (every few seconds it scalds every enemy on foot near its
-  walls, setting them burning from II). A respec gives every point back for
-  5 Copper.
+  walls, setting them burning from II). A respec gives every point back,
+  free, and any rank can be undone on its own (it and the ranks above it).
 - **Wall sections** (`layout.ts`'s `walls`, `wall-upgrades.ts`): carried
   from the palette, the placing grid turns four times finer, and a section
   takes the quarter tile it is let go over: 2 × 2 cells of wall stone, as
@@ -117,8 +117,8 @@ Recent rows are available as `window.defendPerformance`; they are not saved.
   (every 1.5 s, then every second, enemies on foot touching a section are
   cut for 12, then 25; at III they are slowed) and Town walls (sections may
   stand inside the city, then your own troops and townsfolk slip through
-  them). A respec gives every point back for 5 Copper and takes the
-  sections inside the city back to the palette.
+  them). A respec gives every point back, free, and takes the sections
+  inside the city back to the palette; any rank can be undone on its own.
 - The **Melee** and **Ranged Guilds**, **barracks**, **archer barracks**, the **Mage Guild**, the **sniper lodge**, the **musket hall**, the **Valkyrie palace** and the **dark wizard keep** must be inside the city. **Archer**, **cannon**, **watch
   and wizard towers** and **monster bait** may stand inside or outside.
 - Every structure takes a **share of its tile** (`size` in `catalog.ts`, in
@@ -277,10 +277,15 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   one of these upgraded, one building at a time, with Knowledge: tap it
   while building (or press and hold it, or its tile in the palette, which
   upgrades that copy before it is placed) to open its upgrade tree, nodes on branches you can drag
-  about. Choosing a branch withers the ones beside it and grows the
-  upgrades only it leads to. The box in the tree's corner shows the
-  Knowledge allocated to that building; a respec (5 Copper) gives it all
-  back and turns the building back into its basic one. A watch tower becomes an archer,
+  about. The branch a building is on carries on upward; choosing another
+  building instead sits beside and below it. Choosing a branch withers the
+  ones beside it and grows the upgrades only it leads to. Branches not
+  shown yet trail off as lines breaking into dots (what buying a node
+  would open), and the ones a choice closed off trail off behind it in
+  withered brown. Tapping a node the building has offers Undo: it and every
+  upgrade after it come off, their Knowledge back, free. The box in the
+  tree's corner shows the Knowledge allocated to that building; a respec
+  (free) gives it all back and turns the building back into its basic one. A watch tower becomes an archer,
   cannon or wizard tower; a Melee Guild a barracks (swordsmen, later
   assassins or crusaders, and by Crusaders' crown a Valkyrie palace); a
   Ranged Guild an archer barracks, a Mage Guild, a **sniper lodge** (snipers:
