@@ -2,8 +2,10 @@
 // palette sells only the basic buildings, tapping a placed one while
 // building opens its living upgrade tree, each node costs Knowledge and
 // changes only that building, a choice withers the branches beside it and
-// sprouts its own, nodes can be dragged and spring back, a respec costs
-// 5 Copper and gives every point back, pressing and holding a placed
+// sprouts its own, choices down another branch sit beside and below while
+// the branch carries on upward, hidden and closed-off branches trail off as
+// fading lines, nodes can be dragged and spring back, an owned node can be
+// undone and a respec gives every point back, free, pressing and holding a placed
 // building or a palette tile opens its tree, and the guilds' troops fight. Isolated browser contexts only: never reads or changes a
 // player's saved game. Needs `npm run dev`. Screenshots go to test-results/.
 import { chromium } from '@playwright/test';
@@ -108,6 +110,14 @@ try {
     assert.equal(await panel.locator('.ug-node.next').count(), 5);
     assert.match(await allocatedText(), /✦ 0/);
     assert.equal(await panel.locator('.ug-respec').isDisabled(), true, 'nothing to respec yet');
+    // Becoming another tower sits beside and below; its own paths climb up.
+    const centreOf = id => page.evaluate(id => { const r = document.querySelector(`#defend-specialty [data-node="${id}"]`).getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; }, id);
+    await page.waitForTimeout(1200);
+    const rootAt = await centreOf('k:watchTower');
+    for (const k of ['k:archerTower', 'k:cannonTower', 'k:wizardTower']) assert.ok((await centreOf(k)).y > rootAt.y, `${k} sits below the Watch tower`);
+    assert.ok((await centreOf('p:spotters:1')).y < rootAt.y, 'its own path climbs upward');
+    assert.ok(await panel.locator('.ug-stub.hidden').count() >= 3 * 3, 'what each tower opens trails off');
+    assert.equal(await panel.locator('.ug-stub.closed').count(), 0, 'nothing closed off yet');
     assert.ok(inside(await panel.boundingBox(), await page.locator('#defend-board').boundingBox()), 'the tree stays inside the board');
     await page.waitForTimeout(700); await page.screenshot({ path: `${out}/upgrade-${width}-watch-tower.png` });
     await buy('k:wizardTower');
@@ -121,6 +131,7 @@ try {
     assert.ok(!tree.some(n => n.startsWith('k:archerTower') || n.startsWith('p:spotters')), `the other branches withered: ${tree}`);
     assert.ok(tree.includes('p:storm:1=next') && tree.includes('p:pyromancy:3=locked'), `the wizard's own paths sprouted: ${tree}`);
     assert.match(await allocatedText(), /✦ 8/);
+    assert.ok(await panel.locator('.ug-stub.closed').count() > 0, 'the Watch tower trails the branches it closed off');
     await buy('p:storm:1');
     await settled();
     assert.deepEqual([(await placed(tower.uid)).path, (await placed(tower.uid)).rank], ['storm', 1]);
@@ -140,11 +151,22 @@ try {
     const back = await node.boundingBox();
     assert.ok(Math.abs(back.x - home.x) < 6 && Math.abs(back.y - home.y) < 6, `and springs back (${JSON.stringify(back)} vs ${JSON.stringify(home)})`);
     await page.screenshot({ path: `${out}/upgrade-${width}-wizard-tower.png` });
+    // Undo Stormcalling I: free, its Knowledge back, Pyromancy and Rime open again.
+    const kBefore = (await state(page)).knowledge;
+    await press(panel.locator('[data-node="p:storm:1"]'));
+    await press(panel.locator('[data-ug-undo="p:storm:1"]'));
+    await settled();
+    assert.equal((await placed(tower.uid)).path, undefined, 'back to a plain wizard tower');
+    assert.equal((await state(page)).knowledge, 92, `Stormcalling I's Knowledge back (from ${kBefore})`);
+    assert.ok((await nodes()).includes('p:pyromancy:1=next'), 'Pyromancy opens again');
+    await page.waitForTimeout(700); await page.screenshot({ path: `${out}/upgrade-${width}-undone.png` });
+    await buy('p:storm:1');
+    await settled();
     await press(panel.locator('[data-node="p:storm:2"]'));
     assert.equal(await panel.locator('[data-ug-buy="p:storm:2"]').isDisabled(), true, 'Stormcalling II costs more than is left');
     await press(panel.locator('[data-specialty-close]'));
 
-    // A Melee Guild becomes a barracks, then is respecced for 5 Copper.
+    // A Melee Guild becomes a barracks, then is respecced, free.
     const melee = await place('meleeGuild');
     await tapBuilding(melee.uid);
     assert.deepEqual(await nodes(), ['k:meleeGuild=owned', 'k:barracks=next']);
@@ -154,13 +176,11 @@ try {
     assert.ok((await nodes()).includes('p:crusaders:1=next'));
     await page.screenshot({ path: `${out}/upgrade-${width}-barracks.png` });
     await press(panel.locator('.ug-respec'));
-    assert.match(await panel.locator('.ug-respec').textContent(), /Respec for 5 Copper\?/, 'asks once more');
-    await press(panel.locator('.ug-respec'));
     await settled();
     s = await state(page);
     assert.equal((await placed(melee.uid)).kind, 'meleeGuild', 'back to a Melee Guild');
     assert.equal(s.knowledge, before.knowledge, 'every point back');
-    assert.equal(s.smithy.copper, before.smithy.copper - 5);
+    assert.equal(s.smithy.copper, before.smithy.copper, 'free');
     assert.deepEqual(await nodes(), ['k:meleeGuild=owned', 'k:barracks=next']);
     await press(panel.locator('[data-specialty-close]'));
 

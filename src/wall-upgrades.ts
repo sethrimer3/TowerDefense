@@ -3,13 +3,11 @@
  * keep's (`keep-upgrades.ts`): Stonework (their HP, then mending), Thornwork
  * (they cut whoever presses against them) and Town walls (they may stand
  * inside the city, then let your own people through). Each rank is paid
- * with Knowledge and a respec gives it all back for `RESPEC_PRICE`. The
+ * with Knowledge and a respec gives it all back, free. The
  * ranks are saved on the Defend save (`DefendSave.wallRanks`, absent while
  * it has none) and snapshotted into `Bonuses.walls` when a battle starts. */
 import { studyPathCost } from "./economy.ts";
 import type { PathHue, PathRank } from "./knowledge-paths.ts";
-import { RESPEC_PRICE } from "./specializations.ts";
-import { spendMetals } from "./metals.ts";
 import type { Save } from "./save.ts";
 import { cloneLayout, dropInnerWalls, type Layout } from "./defend/layout.ts";
 
@@ -89,13 +87,27 @@ export function upgradeWalls(save: Save, id: WallPathId): WallResult {
   return { ok: true };
 }
 
-/** Respecs the walls: pays `RESPEC_PRICE` in metal (free with Unlimited
- * money) and gives back every Knowledge point in them. Sections standing
- * inside the city go back to the palette. */
+/** Undoes rank `rank` of branch `id` and the ranks above it, free, giving
+ * back their Knowledge: the branch steps back to rank `rank - 1`. */
+export function undoWalls(save: Save, id: WallPathId, rank: number): WallResult {
+  const have = wallRank(save.defend.wallRanks, id);
+  if (rank < 1 || rank > have) return { ok: false, reason: "Nothing to undo there." };
+  const p = wallPathById(id);
+  for (let r = rank; r <= have; r++) save.knowledge += p.ranks[r - 1].cost;
+  const next = { ...save.defend.wallRanks };
+  if (rank > 1) next[id] = rank - 1;
+  else delete next[id];
+  if (Object.keys(next).length) save.defend.wallRanks = next;
+  else delete save.defend.wallRanks;
+  save.defend.layout = withInnerWalls(save.defend.layout, save.defend.wallRanks);
+  return { ok: true };
+}
+
+/** Respecs the walls, free: every Knowledge point in them comes back.
+ * Sections standing inside the city go back to the palette. */
 export function respecWalls(save: Save): WallResult {
   const spent = wallAllocated(save.defend.wallRanks);
   if (!save.defend.wallRanks) return { ok: false, reason: "Nothing to respec: the walls have no upgrades." };
-  if (!spendMetals(save.smithy, RESPEC_PRICE, save.settings.devMode)) return { ok: false, reason: `A respec costs ${RESPEC_PRICE.copper} Copper.` };
   save.knowledge += spent;
   delete save.defend.wallRanks;
   save.defend.layout = withInnerWalls(save.defend.layout, undefined);

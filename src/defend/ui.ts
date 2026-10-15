@@ -1,8 +1,8 @@
-import { RESPEC_PRICE, hasTree, respecBuilding, rootOf, specialtyLabel, specialtyOf, stepName, targetKind, upgradeBuilding, type SpecialtyTarget } from "../specializations.ts";
+import { hasTree, respecBuilding, undoUpgrade, rootOf, specialtyLabel, specialtyOf, stepName, targetKind, upgradeBuilding, type SpecialtyTarget } from "../specializations.ts";
 import { pathById, type PathId } from "../knowledge-paths.ts";
-import { keepCardHtml, keepGraph, keepStep, treeAllocated, treeCardHtml, treeGraph, treeStep, wallCardHtml, wallGraph, wallStep } from "../ui/specialty.ts";
-import { keepAllocated, respecKeep, upgradeKeep } from "../keep-upgrades.ts";
-import { respecWalls, upgradeWalls, wallAllocated } from "../wall-upgrades.ts";
+import { keepCardHtml, keepGraph, keepStep, keepUndo, treeAllocated, treeCardHtml, treeGraph, treeStep, wallCardHtml, wallGraph, wallStep, wallUndo } from "../ui/specialty.ts";
+import { keepAllocated, respecKeep, undoKeep, upgradeKeep } from "../keep-upgrades.ts";
+import { respecWalls, undoWalls, upgradeWalls, wallAllocated } from "../wall-upgrades.ts";
 import { UpgradeGraph } from "../ui/upgrade-graph.ts";
 import type { Save } from "../save.ts";
 import { bannerReach } from "./war-banner.ts";
@@ -146,10 +146,8 @@ export class DefendPage {
    * open, the battle's items closed so the battle has the whole view. */
   private sideOpen = { build: true, sim: false };
   private testerSelected = false;
-  /** The building whose upgrade panel shows while building. */
-  /** The upgrade tree's building, the node picked in it, and whether its
-   * respec waits on a second press. */
-  private specialty: { target: TreeTarget; picked: string; respec: boolean } | null = null;
+  /** The upgrade tree's building and the node picked in it. */
+  private specialty: { target: TreeTarget; picked: string } | null = null;
   private tree: UpgradeGraph | null = null;
   private summonHold: { kind: EnemyKind; button: HTMLButtonElement; pointerId: number; next: number } | null = null;
 
@@ -1083,20 +1081,20 @@ export class DefendPage {
   private openSpecialty(target: TreeTarget) {
     if ("keep" in target) {
       if (this.phase !== "build") return this.closeSpecialty();
-      this.specialty = { target, picked: "k:keep", respec: false };
+      this.specialty = { target, picked: "k:keep" };
       this.pick(this.currentMap().buildings.find((o) => o.kind === "keep")?.id ?? null);
       return this.renderSpecialty(true);
     }
     if ("walls" in target) {
       if (this.phase !== "build") return this.closeSpecialty();
-      this.specialty = { target, picked: "k:wallBlock", respec: false };
+      this.specialty = { target, picked: "k:wallBlock" };
       this.pick(null);
       return this.renderSpecialty(true);
     }
     const kind = targetKind(this.save, target);
     if (this.phase !== "build" || !kind) return this.closeSpecialty();
     const wear = specialtyOf(this.save, target);
-    this.specialty = { target, picked: wear ? `p:${wear.path}:${wear.rank}` : `k:${kind}`, respec: false };
+    this.specialty = { target, picked: wear ? `p:${wear.path}:${wear.rank}` : `k:${kind}` };
     if ("uid" in target) {
       const b = this.currentMap().buildings.find((o) => o.structureUid === target.uid);
       if (b && inspectable(b)) this.pick(b.id);
@@ -1119,6 +1117,8 @@ export class DefendPage {
       if (t.closest("[data-specialty-close]")) return this.closeSpecialty();
       const buy = t.closest<HTMLButtonElement>("[data-ug-buy]");
       if (buy && !buy.disabled) return this.upgrade(buy.dataset.ugBuy!);
+      const undo = t.closest<HTMLButtonElement>("[data-ug-undo]");
+      if (undo && !undo.disabled) return this.undo(undo.dataset.ugUndo!);
       const respec = t.closest<HTMLButtonElement>("[data-ug-respec]");
       if (respec && !respec.disabled) return this.respec();
     });
@@ -1172,23 +1172,37 @@ export class DefendPage {
   private bought(id: string) {
     const sp = this.specialty!;
     sp.picked = id;
-    sp.respec = false;
     this.renderSpecialty();
     const node = this.root.querySelector<HTMLElement>(`#defend-specialty [data-node="${id}"]`);
     replay(node, "bought");
     sparksOver(node, "arcane");
   }
 
-  /** Respec, on a second press: 5 Copper, every Knowledge point back. */
+  /** Respec, free: every Knowledge point back, the building back to its root. */
   private respec() {
     const sp = this.specialty, game = this.host.game?.();
     if (!sp || !game || this.phase !== "build") return;
-    if (!sp.respec) {
-      sp.respec = true;
-      return this.renderSpecialty();
-    }
     const r = "keep" in sp.target ? respecKeep(game) : "walls" in sp.target ? respecWalls(game) : respecBuilding(game, sp.target);
-    sp.respec = false;
+    this.wentBack(r, "Respecced", "keep" in sp.target ? "k:keep" : "walls" in sp.target ? "k:wallBlock" : undefined);
+  }
+
+  /** Undoes tree node `id` and every upgrade after it, free, their Knowledge back. */
+  private undo(id: string) {
+    const sp = this.specialty, game = this.host.game?.();
+    if (!sp || !game || this.phase !== "build") return;
+    if ("keep" in sp.target || "walls" in sp.target) {
+      const keep = "keep" in sp.target, back = keep ? keepUndo(this.save.keepRanks, id) : wallUndo(this.save.wallRanks, id);
+      if (!back) return;
+      const r = keep ? undoKeep(game, back.id as never, back.rank) : undoWalls(game, back.id as never, back.rank);
+      // Stand on the rank below it, or the root.
+      return this.wentBack(r, "Undone", back.rank > 1 ? `q:${back.id}:${back.rank - 1}` : keep ? "k:keep" : "k:wallBlock");
+    }
+    this.wentBack(undoUpgrade(game, sp.target, id), "Undone");
+  }
+
+  /** After a respec or an undo: save, redraw, and stand on where it went back to. */
+  private wentBack(r: { ok: true; kind?: string; waiting?: boolean; copy?: unknown } | { ok: false; reason: string }, what: string, at?: string) {
+    const sp = this.specialty!;
     if (!r.ok) {
       this.setMessage(r.reason, 2);
       return this.renderSpecialty();
@@ -1198,10 +1212,11 @@ export class DefendPage {
     if ("waiting" in r && r.waiting) {
       this.closeSpecialty();
       this.picked = null;
-      this.setMessage("Respecced: no room where it stood, so it waits in the palette.", 3);
+      this.setMessage(`${what}: no room where it stood, so it waits in the palette.`, 3);
       return;
     }
-    sp.picked = "kind" in r ? `k:${r.kind}` : "walls" in sp.target ? "k:wallBlock" : "k:keep";
+    const wear = "keep" in sp.target || "walls" in sp.target ? undefined : specialtyOf(this.save, sp.target);
+    sp.picked = at ?? (wear ? `p:${wear.path}:${wear.rank}` : `k:${r.kind}`);
     this.renderSpecialty();
     sparksOver(this.root.querySelector<HTMLElement>("#defend-specialty .ug-alloc"), "gold");
   }
@@ -1250,7 +1265,6 @@ export class DefendPage {
         onPick: (id) => {
           if (!this.specialty) return;
           this.specialty.picked = id;
-          this.specialty.respec = false;
           this.renderSpecialty();
         },
       });
@@ -1265,8 +1279,7 @@ export class DefendPage {
     el.querySelector(".ug-alloc")!.setAttribute("title", `${spent.toLocaleString("en")} Knowledge spent on ${kind === "walls" ? "the walls" : "this building"}: all of it comes back with a respec`);
     const respec = el.querySelector<HTMLButtonElement>(".ug-respec")!;
     respec.disabled = plain;
-    respec.classList.toggle("confirm", sp.respec);
-    respec.textContent = sp.respec ? `Respec for ${RESPEC_PRICE.copper} Copper?` : `Respec · ${RESPEC_PRICE.copper} Copper`;
+    respec.textContent = "Respec · free";
     respec.title = plain ? "Nothing allocated yet" : kind === "walls" ? `Get all ${spent.toLocaleString("en")} Knowledge back and turn every wall back into plain stone (walls inside the city go back to the palette)` : `Get all ${spent.toLocaleString("en")} Knowledge back and turn it back into a ${kind === "keep" ? "plain keep" : kind === "wallSpikes" ? "plain row of spikes" : ITEM_NAMES[rootOf(kind)]}`;
     el.querySelector(".ug-card")!.innerHTML = kind === "keep" ? keepCardHtml(game, ranks, sp.picked) : kind === "walls" ? wallCardHtml(game, wallRanks, sp.picked) : treeCardHtml(game, kind, wear, sp.picked);
     this.tree.set(kind === "keep" ? keepGraph(ranks) : kind === "walls" ? wallGraph(wallRanks) : treeGraph(kind, wear), sp.picked);

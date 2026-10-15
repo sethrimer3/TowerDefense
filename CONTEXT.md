@@ -43,7 +43,10 @@ One of the keep's own upgrade lines, **Bastions** (more HP), **Arrow loops** (th
 A piece of stone wall a quarter of a tile across, placed on its own on the board's grid of quarter tiles (the placing grid turns four times finer while one is carried), anywhere outside the city and, with **Town walls**, inside it. Every wall section shares one upgrade tree, the **wall branches**: **Stonework** (more HP, then mending), **Thornwork** (it cuts and then slows whoever presses against it) and **Town walls** (inside the city, then posterns that let your own people through), climbed side by side like the keep's.
 
 **Respec**:
-Turning one building back into its basic building with no path, for 5 Copper, with every Knowledge point allocated to it given back.
+Turning one building back into its basic building with no path, free, with every Knowledge point allocated to it given back.
+
+**Undo**:
+Taking one upgrade a building has, and every upgrade after it, back off, free, with their Knowledge given back: the building steps back down its tree to the node that upgrade grew from.
 
 **Kept copy**:
 A building on a path taken back to the palette: it keeps its path and rank, waits under its own palette entry, and wears them again when placed.

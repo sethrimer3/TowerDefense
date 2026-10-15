@@ -5,7 +5,7 @@
  * `treeCardHtml`, the card of the node picked in it). The tree comes from
  * `specializations.ts`; paths, ranks, icons and hues from `knowledge-paths.ts`. */
 import type { Save } from "../save.ts";
-import { BECOMES, TROOPS, allocated, buildingPathsOf, buildingTree, type TreeNode, type UpgradeStep, type Wear } from "../specializations.ts";
+import { BECOMES, TROOPS, allocated, buildingPathsOf, buildingTree, undoRefund, type TreeNode, type UpgradeStep, type Wear } from "../specializations.ts";
 import type { GraphNode } from "./upgrade-graph.ts";
 import { ARROW_LOOPS, BASTIONS, BOILING_OIL, KEEP_PATHS, keepRank, type KeepPathId, type KeepRanks } from "../keep-upgrades.ts";
 import { STONEWORK, THORNWORK, TOWN_WALLS, WALL_PATHS, wallRank, type WallPathId, type WallRanks } from "../wall-upgrades.ts";
@@ -92,7 +92,7 @@ export function treeGraph(kind: PaletteItem | "wallSpikes", wear?: Wear): GraphN
     const face = n.kind
       ? `<canvas width="32" height="32" data-icon="${n.kind}"></canvas>`
       : `<canvas data-path-icon="${pathById(n.path!).ranks[n.rank! - 1].icon}:${pathById(n.path!).hue}"></canvas><b>${ROMAN[n.rank!]}</b>`;
-    return { id: n.id, parent: n.parent, state: n.state, face, tag: n.state === "owned" ? undefined : knowledgeTag(n.cost), hue };
+    return { id: n.id, parent: n.parent, state: n.state, face, tag: n.state === "owned" ? undefined : knowledgeTag(n.cost), hue, side: n.side, hidden: n.hidden, closed: n.closed };
   });
 }
 
@@ -114,11 +114,16 @@ export function treeCardHtml(save: Save, kind: PaletteItem | "wallSpikes", wear:
     level = `Level ${n.rank} / ${p.ranks.length}`;
     if (kind !== "wallSpikes") stats = `At this rank: ${kindStats(save, kind as PaletteItem, p.id, n.rank)}`;
   }
-  const state = n.state === "owned" ? `<b class="ug-owned">${n.kind === kind ? "This building" : "Owned"}</b>`
+  const back = n.state === "owned" ? undoRefund(kind as never, wear, n.id) : 0;
+  const state = n.state === "owned" ? `<b class="ug-owned">${(n.kind === kind && !wear) || (n.path && n.path === wear?.path && n.rank === wear?.rank) ? "Where it is now" : "Owned"}</b>${n.parent ? undoButton(n.id, back) : ""}`
     : n.state === "next" ? `<button class="ug-buy" data-ug-buy="${n.id}" ${can ? "" : "disabled"}>Buy · ${free ? "Free" : `${n.cost.toLocaleString("en")} Knowledge`}</button>`
     : `<span class="ug-locked">Locked: buy the one before it · ${n.cost.toLocaleString("en")} Knowledge</span>`;
   return `<div class="ug-card-head"><b>${title}</b>${level ? `<small>${level}</small>` : ""}</div><p>${text}</p>${stats ? `<p class="ug-stats">${stats}</p>` : ""}<div class="ug-card-foot" data-ug-ignore>${state}</div>`;
 }
+
+/** Undo for an owned node: it and everything after it, their Knowledge back. */
+const undoButton = (id: string, back: number) =>
+  `<button class="ug-undo" data-ug-undo="${id}" title="Undo this and every upgrade after it">Undo · ${back.toLocaleString("en")} Knowledge back</button>`;
 
 /** The step that buys node `id`, if it can be bought now. */
 export const treeStep = (kind: PaletteItem | "wallSpikes", wear: Wear | undefined, id: string): UpgradeStep | undefined =>
@@ -153,6 +158,13 @@ function sideGraph<Id extends string>(tree: SideTree<Id>, ranks: Ranks<Id>): Gra
   return nodes;
 }
 
+/** The branch and rank undoing node `id` takes back, if it is owned. */
+function sideUndo<Id extends string>(tree: SideTree<Id>, ranks: Ranks<Id>, id: string): { id: Id; rank: number } | undefined {
+  const [q, path, rank] = id.split(":");
+  const p = tree.paths.find((o) => o.id === path);
+  return q === "q" && p && Number(rank) >= 1 && Number(rank) <= sideRank(ranks, p.id) ? { id: p.id, rank: Number(rank) } : undefined;
+}
+
 /** What node `id` buys, if it can be bought now. */
 function sideStep<Id extends string>(tree: SideTree<Id>, ranks: Ranks<Id>, id: string): Id | undefined {
   const [q, path, rank] = id.split(":");
@@ -170,7 +182,9 @@ function sideCardHtml<Id extends string>(save: Save, tree: SideTree<Id>, ranks: 
   const step = p?.ranks[rank - 1];
   if (!p || !step) return `<p class="ug-hint">Tap a node to see what it does.</p>`;
   const have = sideRank(ranks, p.id), cost = step.cost, can = free || save.knowledge >= cost;
-  const state = rank <= have ? `<b class="ug-owned">Owned</b>`
+  let back = 0;
+  for (let i = rank; i <= have; i++) back += p.ranks[i - 1].cost;
+  const state = rank <= have ? `<b class="ug-owned">Owned</b>${undoButton(id, back)}`
     : rank === have + 1 ? `<button class="ug-buy" data-ug-buy="${id}" ${can ? "" : "disabled"}>Buy · ${free ? "Free" : `${cost.toLocaleString("en")} Knowledge`}</button>`
     : `<span class="ug-locked">Locked: buy the one before it · ${cost.toLocaleString("en")} Knowledge</span>`;
   const at = { ...ranks, [p.id]: rank } as Ranks<Id>;
@@ -184,6 +198,8 @@ const WALL_TREE: SideTree<WallPathId> = { root: "k:wallBlock", icon: "wallBlock"
 export const keepGraph = (ranks: KeepRanks | undefined) => sideGraph(KEEP_TREE, ranks);
 /** What node `id` of the keep's tree buys, if it can be bought now. */
 export const keepStep = (ranks: KeepRanks | undefined, id: string) => sideStep(KEEP_TREE, ranks, id);
+/** What undoing node `id` of the keep's tree takes back, if it is owned. */
+export const keepUndo = (ranks: KeepRanks | undefined, id: string) => sideUndo(KEEP_TREE, ranks, id);
 
 /** The keep's numbers with `ranks`, and the shared Smithy and skill bonuses. */
 export function keepStats(save: Save, ranks: KeepRanks | undefined): string {
@@ -203,6 +219,8 @@ export const keepCardHtml = (save: Save, ranks: KeepRanks | undefined, id: strin
 export const wallGraph = (ranks: WallRanks | undefined) => sideGraph(WALL_TREE, ranks);
 /** What node `id` of the walls' tree buys, if it can be bought now. */
 export const wallStep = (ranks: WallRanks | undefined, id: string) => sideStep(WALL_TREE, ranks, id);
+/** What undoing node `id` of the walls' tree takes back, if it is owned. */
+export const wallUndo = (ranks: WallRanks | undefined, id: string) => sideUndo(WALL_TREE, ranks, id);
 
 /** A placed wall stone's numbers with `ranks`, and the shared Smithy and
  * skill bonuses. */
