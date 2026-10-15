@@ -1,11 +1,14 @@
 import { buildingPaths } from "../specializations.ts";
 import { bannerDamage } from "./war-banner.ts";
 import { enemySize } from "./catalog.ts";
-/** DEFEND troops: barracks keep their garrison topped up; swordsmen chase
+/** DEFEND troops: barracks keep their garrison topped up; swordsmen (and
+ * the Melee Guild's brawlers, with their fists) chase
  * enemies within their leash of the barracks (anywhere in the city at the
  * last Patrol routes level) and head home when there's nothing to fight;
  * archers roam the streets, shooting whatever comes within sight, or with
- * Hunter's instinct path toward the nearest enemy in the city. A Mage
+ * Hunter's instinct path toward the nearest enemy in the city; the Ranged
+ * Guild's stone throwers, the snipers and the explosive musketmen roam
+ * the same way with shots of their own. A Mage
  * Guild trains fire mages the same way (`mages.ts`), a Valkyrie palace
  * valkyries (`valkyries.ts`), and a dark wizard keep its one dark wizard
  * (`dark-wizards.ts`). */
@@ -13,6 +16,10 @@ import { dist, sq } from "../exact.ts";
 import {
   ARCHER_UNIT,
   archerUnitRange,
+  BRAWLER,
+  MUSKETEER,
+  SLINGER,
+  SNIPER,
   DARK_WIZARD,
   ENEMIES,
   FIRE_MAGE,
@@ -44,11 +51,17 @@ function swordStats(sim: DefendSim, home: number) {
   const { crusade, assassin } = paths(sim, home);
   return { hp: assassin ? ASSASSIN.hp : CRUSADE.hp[crusade], damage: crusade >= 3 ? CRUSADE.damage : 1 };
 }
-/** How fast a swordsman walks. */
-function swordSpeed(sim: DefendSim, home: number) {
-  const { crusade, assassin } = paths(sim, home);
-  return SOLDIER.speed * (crusade ? CRUSADE.speed : assassin ? ASSASSIN.speed : 1);
+/** How fast a swordsman (or brawler) walks. */
+function swordSpeed(sim: DefendSim, s: Soldier) {
+  const { crusade, assassin } = paths(sim, s.home);
+  return melee(s).speed * (crusade ? CRUSADE.speed : assassin ? ASSASSIN.speed : 1);
 }
+/** A melee troop's own numbers: a brawler's fists, else a swordsman's blade. */
+const melee = (s: Soldier) => (s.kind === "brawler" ? BRAWLER : SOLDIER);
+/** A ranged troop's own numbers, besides an archer's. */
+const RANGED = { slinger: SLINGER, sniper: SNIPER, musketeer: MUSKETEER };
+/** What each ranged troop looses: an arrow (none), a stone, a bullet or a ball. */
+const SHOT = { slinger: "stone", sniper: "bullet", musketeer: "ball" } as const;
 
 /** Trains one troop at a time per barracks, while it's standing and below
  * its garrison cap. */
@@ -88,7 +101,8 @@ export class Barracks {
     if (door < 0) return;
     const kind = TRAINS[b.kind] ?? "sword";
     const scale = soldierScale(sim.levels.soldierArms);
-    const stats = kind === "archer" ? ARCHER_UNIT : kind === "mage" ? { ...FIRE_MAGE, damage: fireballDamage(sim.levels.mageFireball ?? 0) } : kind === "valkyrie" ? VALKYRIE : kind === "darkWizard" ? DARK_WIZARD : SOLDIER;
+    const stats = kind === "archer" ? ARCHER_UNIT : kind === "mage" ? { ...FIRE_MAGE, damage: fireballDamage(sim.levels.mageFireball ?? 0) } : kind === "valkyrie" ? VALKYRIE : kind === "darkWizard" ? DARK_WIZARD
+      : kind === "brawler" ? BRAWLER : kind === "slinger" || kind === "sniper" || kind === "musketeer" ? RANGED[kind] : SOLDIER;
     const at = cellCenter(door);
     const path = kind === "sword" ? swordStats(sim, b.id) : { hp: 1, damage: 1 };
     sim.soldiers.push({
@@ -110,7 +124,10 @@ export class Barracks {
 }
 
 /** What each troop building trains. */
-const TRAINS: Partial<Record<Building["kind"], Soldier["kind"]>> = { barracks: "sword", archerBarracks: "archer", mageGuild: "mage", valkyriePalace: "valkyrie", darkKeep: "darkWizard" };
+const TRAINS: Partial<Record<Building["kind"], Soldier["kind"]>> = {
+  barracks: "sword", archerBarracks: "archer", mageGuild: "mage", valkyriePalace: "valkyrie", darkKeep: "darkWizard",
+  meleeGuild: "brawler", rangedGuild: "slinger", sniperLodge: "sniper", musketHall: "musketeer",
+};
 const isBarracks = (b: Building) => b.kind in TRAINS;
 
 const byDistanceFrom = (p: Point) => (a: Enemy, b: Enemy) => sq(a.x - p.x) + sq(a.y - p.y) - (sq(b.x - p.x) + sq(b.y - p.y));
@@ -166,23 +183,23 @@ export function stepSwordsman(sim: DefendSim, s: Soldier, dt: number) {
   if (target && !patrol.covers(target)) target = null;
   if (target && inSwordReach(s, target)) return strike(sim, s, target);
   if (s.thinkT <= 0) target = replan(sim, s, patrol);
-  sim.followPath(s, target, swordSpeed(sim, s.home), dt);
+  sim.followPath(s, target, swordSpeed(sim, s), dt);
 }
 
 /** Answering the war banner: strike whatever is in reach, else close on
  * what is near or march to the banner (no leash while it stands). */
 function rally(sim: DefendSim, s: Soldier, dt: number) {
-  const near = sim.enemiesNear(s.x, s.y, SOLDIER.reach + 1).find((e) => inSwordReach(s, e));
+  const near = sim.enemiesNear(s.x, s.y, melee(s).reach + 1).find((e) => inSwordReach(s, e));
   if (near) return strike(sim, s, near);
-  answerBanner(sim, sim.warBanner!, s, swordSpeed(sim, s.home), dt, MARCH_SIGHT);
+  answerBanner(sim, sim.warBanner!, s, swordSpeed(sim, s), dt, MARCH_SIGHT);
 }
 
-const inSwordReach = (s: Soldier, e: Enemy) => dist(e.x - s.x, e.y - s.y) <= SOLDIER.reach + enemySize(e) / 2;
+const inSwordReach = (s: Soldier, e: Enemy) => dist(e.x - s.x, e.y - s.y) <= melee(s).reach + enemySize(e) / 2;
 
 function strike(sim: DefendSim, s: Soldier, e: Enemy) {
   if (s.cd > 0) return;
   const assassin = paths(sim, s.home).assassin;
-  s.cd = assassin >= 2 ? SOLDIER.cooldown * ASSASSIN.cooldown : SOLDIER.cooldown;
+  s.cd = assassin >= 2 ? SOLDIER.cooldown * ASSASSIN.cooldown : melee(s).cooldown;
   if (!assassin) return void sim.hurtEnemy(e, bannerDamage(sim, s), true, "melee", s);
   // Assassins count their strikes: every few is critical (no dice, so a
   // replay still plays the same).
@@ -230,8 +247,9 @@ export function stepArcher(sim: DefendSim, s: Soldier, dt: number) {
   s.cd -= dt;
   s.thinkT -= dt;
   const { ranger, skirmish } = paths(sim, s.home);
-  const range = archerUnitRange(sim.levels.archerSight ?? 0) + (ranger ? RANGERS.sight : 0);
-  const speed = ARCHER_UNIT.speed * (skirmish >= 2 ? SKIRMISH.speed : 1);
+  const own = s.kind === "archer" ? null : RANGED[s.kind as keyof typeof RANGED];
+  const range = own ? own.range : archerUnitRange(sim.levels.archerSight ?? 0) + (ranger ? RANGERS.sight : 0);
+  const speed = (own ?? ARCHER_UNIT).speed * (skirmish >= 2 ? SKIRMISH.speed : 1);
   const near = nearest(sim.enemiesNear(s.x, s.y, range), s, range * range, true);
   if (near) {
     shoot(sim, s, near, range);
@@ -239,7 +257,7 @@ export function stepArcher(sim: DefendSim, s: Soldier, dt: number) {
     if (skirmish < 2) return;
   }
   if (sim.warBanner) return answerBanner(sim, sim.warBanner, s, speed, dt);
-  if ((sim.levels.archerHunt ?? 0) > 0 && s.thinkT <= 0) hunt(sim, s);
+  if (!own && (sim.levels.archerHunt ?? 0) > 0 && s.thinkT <= 0) hunt(sim, s);
   if (idle(s) && sim.streets.length) stroll(sim, s);
   sim.followPath(s, null, speed, dt);
 }
@@ -250,6 +268,14 @@ const idle = (s: Soldier) => !s.path.length && s.thinkT <= 0;
 function shoot(sim: DefendSim, s: Soldier, e: Enemy, range: number) {
   if (s.cd > 0) return;
   const { ranger, skirmish } = paths(sim, s.home);
+  if (s.kind !== "archer") {
+    // Stone throwers, snipers and musketmen: one shot of their own.
+    const kind = s.kind as keyof typeof RANGED, own = RANGED[kind];
+    s.cd = own.cooldown;
+    sim.arrows.push({ x: s.x, y: s.y, origin: { x: s.x, y: s.y, attacker: s.id }, target: e.id, damage: bannerDamage(sim, s), tx: e.x, ty: e.y, life: 2, shot: SHOT[kind],
+      ...(kind === "musketeer" ? { blast: MUSKETEER.blast } : {}) });
+    return;
+  }
   s.cd = ARCHER_UNIT.cooldown * SKIRMISH.reload[skirmish];
   const damage = ranger >= 2 ? bannerDamage(sim, s) * RANGERS.damage : bannerDamage(sim, s);
   const loose = (t: Enemy) => sim.arrows.push({ x: s.x, y: s.y, origin: { x: s.x, y: s.y, attacker: s.id }, target: t.id, damage, tx: t.x, ty: t.y, life: 2 });

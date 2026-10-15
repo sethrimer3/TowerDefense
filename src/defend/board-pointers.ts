@@ -8,6 +8,8 @@
  * A pointer landing on the board while a gesture is under way joins the view
  * gesture. It ends a building drag, but a bomb or banner stays held, and while a drag
  * lasts every pointer steers it and the first one lifted drops it.
+ * A drag whose pointer stays put for `HOLD_MS` is a hold: the page may take
+ * it (opening what was pressed) and the drag ends without a drop.
  * What a press picks up and what a drop does are the page's and its
  * `EditSession`'s decisions; this only turns pointers into cells. */
 import { consumable, dragIcon, type Drag } from "./drag-rules.ts";
@@ -25,10 +27,14 @@ export type PointerHost = {
   drop(drop: Drop): void;
   /** A press on the board that let go without moving the view: a tap. */
   tap?(e: PointerEvent): void;
+  /** A drag held still for `HOLD_MS`; true when the page took it, ending the drag. */
+  hold?(edit: EditSession): boolean;
 };
 
 /** How far (CSS pixels) a pointer may move and still tap. */
 const TAP_SLOP = 8;
+/** How long (ms) a press must stay put to be a hold. */
+export const HOLD_MS = 450;
 
 type Point = { x: number; y: number };
 
@@ -39,6 +45,8 @@ export class BoardPointers {
   private held: { edit: EditSession; ghost: HTMLCanvasElement } | null = null;
   /** A lone press that may yet be a tap, where it went down. */
   private tapping: { id: number; x: number; y: number } | null = null;
+  /** A drag that may yet be a hold: its pointer, where it went down, and the timer. */
+  private holding: { id: number; x: number; y: number; timer: number } | null = null;
 
   constructor(private host: PointerHost) {
     window.addEventListener("pointermove", (e) => this.move(e));
@@ -63,6 +71,7 @@ export class BoardPointers {
   /** A second pointer turns whatever was happening into a pinch. */
   private join(e: PointerEvent) {
     this.tapping = null;
+    this.unhold();
     if (this.held && !consumable(dragIcon(this.held.edit.drag))) this.end();
     this.touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
   }
@@ -71,6 +80,14 @@ export class BoardPointers {
   begin(edit: EditSession, e: PointerEvent) {
     e.preventDefault();
     this.held = { edit, ghost: ghostIcon(edit.drag) };
+    this.unhold();
+    if (this.host.hold) {
+      const timer = window.setTimeout(() => {
+        this.holding = null;
+        if (this.held?.edit === edit && this.host.hold?.(edit)) this.end();
+      }, HOLD_MS);
+      this.holding = { id: e.pointerId, x: e.clientX, y: e.clientY, timer };
+    }
     this.move(e);
   }
 
@@ -78,6 +95,8 @@ export class BoardPointers {
     const h = this.held;
     const t = this.tapping;
     if (t?.id === e.pointerId && Math.hypot(e.clientX - t.x, e.clientY - t.y) > TAP_SLOP) this.tapping = null;
+    const o = this.holding;
+    if (o?.id === e.pointerId && Math.hypot(e.clientX - o.x, e.clientY - o.y) > TAP_SLOP) this.unhold();
     if (!h && this.touches.has(e.pointerId)) return this.view(e);
     const at = h && this.at(e);
     if (at) h.edit.hover(at);
@@ -117,8 +136,15 @@ export class BoardPointers {
     this.end();
   }
 
+  /** A hold no longer coming. */
+  private unhold() {
+    if (this.holding) window.clearTimeout(this.holding.timer);
+    this.holding = null;
+  }
+
   /** Drops the drag in progress without placing it. */
   end() {
+    this.unhold();
     this.held?.ghost.remove();
     this.held = null;
   }

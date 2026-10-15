@@ -34,12 +34,21 @@ import {
   type PlacedStructure,
   type SpikeSpot,
 } from "./layout.ts";
-import { pathFits } from "../knowledge-paths.ts";
+import type { PathId } from "../knowledge-paths.ts";
+import { settleKept, wearFits } from "../specializations.ts";
+
+/** A building on a path waiting in the palette: taken up from the city
+ * after it was upgraded, it keeps its path and rank for when it is placed
+ * again (`specializations.ts`). */
+export type Kept = { kind: PlacedKind | "wallSpikes"; path: PathId; rank: number };
 
 export type DefendSave = {
   /** The city as built, each placed building with its chosen path. */
   layout: Layout;
   owned: Record<PaletteItem, number>;
+  /** Copies in the palette that keep the path and rank they were upgraded
+   * to; never more of a kind than wait in the palette. */
+  kept: Kept[];
   levels: Record<UpgradeId, number>;
   bombs: number;
   bestWave: number;
@@ -62,6 +71,7 @@ export function defaultDefendSave(): DefendSave {
   return {
     layout: defaultLayout(),
     owned: { ...STARTING_OWNED },
+    kept: [],
     levels: Object.fromEntries(UPGRADES.map((u) => [u.id, 0])) as Record<UpgradeId, number>,
     bombs: 0,
     bestWave: 0,
@@ -80,6 +90,39 @@ export function defaultDefendSave(): DefendSave {
 export function available(save: DefendSave, item: PaletteItem): number {
   return Math.max(0, save.owned[item] - placedCount(save.layout, item));
 }
+/** How many of those are plain copies (not kept on a path). */
+export function plainAvailable(save: DefendSave, item: PaletteItem): number {
+  return Math.max(0, available(save, item) - save.kept.filter((k) => k.kind === item).length);
+}
+/** The kept copies of `item`, grouped by path and rank. */
+export function keptGroups(save: DefendSave, item: PaletteItem): { path: PathId; rank: number; count: number }[] {
+  const out: { path: PathId; rank: number; count: number }[] = [];
+  for (const k of save.kept) {
+    if (k.kind !== item) continue;
+    const g = out.find((o) => o.path === k.path && o.rank === k.rank);
+    if (g) g.count++;
+    else out.push({ path: k.path, rank: k.rank, count: 1 });
+  }
+  return out.sort((a, b) => a.path.localeCompare(b.path) || b.rank - a.rank);
+}
+
+/** Changes the city to `next`, keeping the palette's kept copies in step:
+ * a building on a path taken up waits there with it, one placed from them
+ * no longer waits. */
+export function setLayout(save: DefendSave, next: Layout) {
+  if (next === save.layout) return;
+  settleKept(save, save.layout, next);
+  save.layout = next;
+  trimKept(save);
+}
+
+/** Never more kept copies of a kind than wait in the palette (the newest kept go first). */
+export function trimKept(save: DefendSave) {
+  for (const item of new Set(save.kept.map((k) => k.kind))) {
+    let over = save.kept.filter((k) => k.kind === item).length - available(save, item);
+    for (let i = save.kept.length - 1; i >= 0 && over > 0; i--) if (save.kept[i].kind === item) { save.kept.splice(i, 1); over--; }
+  }
+}
 
 /** Returns the newest placed `kind` to the palette until no more stand than
  * are owned (an evolution taking or giving back copies). */
@@ -89,7 +132,7 @@ export function trimPlaced(save: DefendSave, kind: PlacedKind) {
   const next = cloneLayout(save.layout);
   const drop = new Set(next.structures.filter((s) => s.kind === kind).sort((a, b) => b.uid - a.uid).slice(0, over).map((s) => s.uid));
   next.structures = next.structures.filter((s) => !drop.has(s.uid));
-  save.layout = next;
+  setLayout(save, next);
 }
 
 /** Dev (All towers unlocked): at least one of every structure owned. */
@@ -127,7 +170,7 @@ export function buyUpgrade(save: DefendSave, w: Wallet, id: UpgradeId): boolean 
   if (!canAfford(w, price)) return false;
   pay(w, price);
   save.levels[id]++;
-  if (PLACED.some((k) => STRUCTURES[k].compact?.upgrade === id)) save.layout = sized(save.layout, save.levels);
+  if (PLACED.some((k) => STRUCTURES[k].compact?.upgrade === id)) setLayout(save, sized(save.layout, save.levels));
   return true;
 }
 
@@ -205,7 +248,7 @@ export function buyBomb(save: DefendSave, wallet: Wallet): boolean {
 
 // ── Decoding untrusted saves ─────────────────────────────────────────────
 const int = (n: unknown, min: number, max: number): n is number => Number.isInteger(n) && (n as number) >= min && (n as number) <= max;
-const PLACED: PlacedKind[] = ["barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait"];
+const PLACED: PlacedKind[] = ["meleeGuild", "rangedGuild", "barracks", "archerBarracks", "sniperLodge", "musketHall", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait"];
 
 export function decodeDefendSave(s: any): DefendSave {
   const d = defaultDefendSave();
@@ -224,7 +267,18 @@ export function decodeDefendSave(s: any): DefendSave {
   d.discovered = kinds.filter(k => Array.isArray(s.discovered) && s.discovered.includes(k));
   d.journalRead = d.discovered.filter(k => Array.isArray(s.journalRead) && s.journalRead.includes(k));
   d.layout = decodeLayout(s.layout, d.owned, d.levels) ?? d.layout;
+  d.kept = Array.isArray(s.kept) ? s.kept.filter((k: any) => isObject(k) && (PLACED.includes(k.kind) || k.kind === "wallSpikes") && wearFits(k.kind, k.path, k.rank))
+    .slice(0, 9999).map((k: any): Kept => ({ kind: k.kind, path: k.path, rank: k.rank })) : [];
+  trimKept(d);
   return d;
+}
+
+/** A placement's saved path and rank, when they are its own. Saves from
+ * before version 5 kept a path without a rank (the Study's researched rank
+ * then; `migrateResearch` settles it): the path is kept for that. */
+function wearOn(kind: string, p: any): { path?: PathId; rank?: number } {
+  if (wearFits(kind, p?.path, p?.rank)) return { path: p.path, rank: p.rank };
+  return p?.rank === undefined && wearFits(kind, p?.path, 1) ? { path: p.path } : {};
 }
 
 const isObject = (s: unknown): s is Record<string, any> => !!s && typeof s === "object";
@@ -244,8 +298,7 @@ function decodeLayout(s: any, owned: Record<PaletteItem, number>, levels: Record
   // Saves from before city gates, wall spikes and ballistas have none.
   const tiles = new Set([tileKey(keep.tx, keep.ty), ...cityTiles]);
   const gates = s.gates === undefined ? [] : decodeGates(s.gates, tiles);
-  const spikes = s.spikes === undefined ? [] : decodeGates(s.spikes, tiles)?.map((g, i): SpikeSpot =>
-    typeof s.spikes[i].path === "string" && pathFits("wallSpikes", s.spikes[i].path) ? { ...g, path: s.spikes[i].path } : g) ?? null;
+  const spikes = s.spikes === undefined ? [] : decodeGates(s.spikes, tiles)?.map((g, i): SpikeSpot => ({ ...g, ...wearOn("wallSpikes", s.spikes[i]) })) ?? null;
   const ballistas = s.ballistas === undefined ? [] : decodeCorners(s.ballistas, tiles);
   if (!gates || !spikes || !ballistas || spikes.some((g) => gates.some((o) => sameGate(o, g)))) return null;
   const layout: Layout = { keep, cityTiles, structures, nextUid: s.nextUid, rolls: intOr(s.rolls, 0, 1e9, 0), compact: compactKinds(levels), gates, spikes, ballistas };
@@ -282,10 +335,8 @@ function decodeStructures(list: unknown, nextUid: number): PlacedStructure[] | n
     if (!structureOk(p, nextUid, uids)) return null;
     uids.add(p.uid);
     // Saves from before random spots have none: draw one from the uid.
-    // A path is kept only if it is the structure's own (whether it is
-    // researched is settled with the rest of the save, `settlePaths`).
-    out.push({ uid: p.uid, kind: p.kind, tx: p.tx, ty: p.ty, spot: int(p.spot, 0, 2 ** 32 - 1) ? p.spot : hash(p.uid, 0x5b07),
-      ...(typeof p.path === "string" && pathFits(p.kind, p.path) ? { path: p.path } : {}) });
+    // A path is kept only if it is the structure's own.
+    out.push({ uid: p.uid, kind: p.kind, tx: p.tx, ty: p.ty, spot: int(p.spot, 0, 2 ** 32 - 1) ? p.spot : hash(p.uid, 0x5b07), ...wearOn(p.kind, p) });
   }
   return out;
 }

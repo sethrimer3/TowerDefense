@@ -1,7 +1,6 @@
-/** Collection-wide Knowledge unlocks. The Study researches a path's ranks
- * once for every building of its kind; the player chooses which researched
- * path each placed building wears as they place it in Defend
- * (`specializations.ts`). */
+/** Knowledge paths. A building's paths are climbed by each building on its
+ * own, rank by rank, from its upgrade panel in Defend (`specializations.ts`);
+ * the Study researches only the strike spells' paths, once for the spell. */
 import type { PaletteItem } from "./defend/catalog.ts";
 import { cloneLayout, type PlacedKind } from "./defend/layout.ts";
 import type { Save } from "./save.ts";
@@ -44,7 +43,7 @@ export type KnowledgePath = {
   motto: string;
   hue: PathHue;
   ranks: PathRank[];
-  /** The evolution unlocked by this path's crown research. */
+  /** What a building at this path's last rank can evolve into, and the Knowledge it costs. */
   evolves?: { from: PlacedKind; item: PlacedKind; name: string; cost: number; text: string };
 };
 
@@ -208,7 +207,7 @@ export const PATHS: KnowledgePath[] = [
       { name: "Forked bolts", icon: "fork", cost: studyPathCost(5, 1), text: "Bolts leap through 5 enemies, further apart" },
       { name: "Thunderhead", icon: "thunderhead", cost: studyPathCost(5, 2), text: "Bolts leap through 7 enemies and strike half again as hard" },
     ],
-    evolves: { from: "wizardTower", item: "darkKeep", name: "Dark wizard keep", cost: 150000, text: "Unlocks the crown: evolve any Wizard tower into a Dark wizard keep" },
+    evolves: { from: "wizardTower", item: "darkKeep", name: "Dark wizard keep", cost: 150000, text: "This Wizard tower becomes a Dark wizard keep" },
   },
   {
     id: "crusaders", topic: "barracks", name: "Crusaders", motto: "Immovable, armoured, enduring", hue: "steel",
@@ -217,7 +216,7 @@ export const PATHS: KnowledgePath[] = [
       { name: "Field dressing", icon: "heart", cost: studyPathCost(4, 1), text: "They heal 3 HP a second" },
       { name: "Templars", icon: "cross", cost: studyPathCost(4, 2), text: "120% more HP in all, and 50% more damage" },
     ],
-    evolves: { from: "barracks", item: "valkyriePalace", name: "Valkyrie palace", cost: 100000, text: "Unlocks the crown: evolve any Barracks into a Valkyrie palace" },
+    evolves: { from: "barracks", item: "valkyriePalace", name: "Valkyrie palace", cost: 100000, text: "This Barracks becomes a Valkyrie palace" },
   },
   {
     id: "assassins", topic: "barracks", name: "Assassins", motto: "Swift, frail, deadly strikes", hue: "shadow",
@@ -496,8 +495,11 @@ export function pathState(save: Save, id: PathId) {
   const next = p.ranks[rank], affordable = !!next && (save.settings.devMode || save.knowledge >= next.cost);
   const crowned = !!research?.crowned;
   const crownAffordable = !!p.evolves && (save.settings.devMode || save.knowledge >= p.evolves.cost);
-  return { rank, sealed: false, next, maxed: !next, affordable, canLearn: !!next && affordable,
-    crowned, crownAffordable, canEvolve: !!p.evolves && !next && !crowned && crownAffordable };
+  // Only the spells are researched: each building is upgraded on its own
+  // (`specializations.ts`).
+  const sealed = !isSpell(p.topic);
+  return { rank, sealed, next, maxed: !next, affordable, canLearn: !!next && affordable && !sealed,
+    crowned, crownAffordable, canEvolve: !!p.evolves && !next && !crowned && crownAffordable && !sealed };
 }
 
 /** The path whose crown makes `item` (base kinds stay for sale after it). */
@@ -506,7 +508,7 @@ export const evolvedBy = (item: PaletteItem): KnowledgePath | undefined => PATHS
 /** Unlock a crown. Evolving a copy is a separate, free choice (`evolveOne`). */
 export function evolve(save: Save, id: PathId, prepaid?: number): boolean {
   const st = pathState(save, id), p = pathById(id);
-  if (!p.evolves || !st.maxed || st.crowned || (prepaid === undefined && !st.canEvolve)) return false;
+  if (!p.evolves || !st.maxed || st.crowned || st.sealed || (prepaid === undefined && !st.canEvolve)) return false;
   const cost = prepaid ?? (save.settings.devMode ? 0 : p.evolves.cost);
   if (prepaid === undefined) save.knowledge -= cost;
   const r = save.pathResearch[id]!;
@@ -516,7 +518,7 @@ export function evolve(save: Save, id: PathId, prepaid?: number): boolean {
 
 export function learnPath(save: Save, id: PathId, prepaid?: number): boolean {
   const st = pathState(save, id);
-  if (!st.next || (prepaid === undefined && !st.canLearn)) return false;
+  if (!st.next || st.sealed || (prepaid === undefined && !st.canLearn)) return false;
   const cost = prepaid ?? (save.settings.devMode ? 0 : st.next.cost);
   if (prepaid === undefined) save.knowledge -= cost;
   // Buildings wearing the path fight at its new rank from the next defense:

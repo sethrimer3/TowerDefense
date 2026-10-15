@@ -3,6 +3,14 @@
  * the upper left, inside a crisp black outline, with damage stages and
  * rubble from `damage-art.ts`.
  *
+ * - Melee Guild: a stone hall under a straw thatch, a raised fist on the
+ *   ridge, and its yard a roped sparring ring with a punching bag.
+ * - Ranged Guild: a stone hall under grey slate, a heap of throwing stones
+ *   in its yard and a clay pot on a post to aim at.
+ * - Sniper lodge: a hall under green waxed canvas with a crosshair on the
+ *   ridge, its yard a long firing lane past sandbags to a far target.
+ * - Musket hall: a hall under a smoke-browned roof with a powder burst on
+ *   the ridge, its yard stacked with iron-bound powder kegs and scorched.
  * - Barracks: a stone hall under a red tiled roof, the swordsmen's blue
  *   shield on its ridge.
  * - Archer barracks: a timber hall, and its yard with a straw target butt.
@@ -98,6 +106,10 @@ const C = {
 
 /** What each structure's damage throws down and its rubble is made of. */
 const MATERIAL: Record<PlacedKind, { m: Material; ruin: Pick<Ruin, "stone" | "top" | "beams" | "round"> }> = {
+  meleeGuild: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.straw, beams: true } },
+  rangedGuild: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: [0x3a3c42, 0x5a5c62, 0x7a7c84], beams: true } },
+  sniperLodge: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.canvas.slice(0, 3), beams: true } },
+  musketHall: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.char, beams: true } },
   barracks: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: [0x6e2a22, C.red, 0xc25a48], beams: true } },
   archerBarracks: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: [0x4a3826, C.timber, 0x8e7048], beams: true } },
   archerTower: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.plank.slice(0, 3), beams: true } },
@@ -151,9 +163,13 @@ export function structureRubblePixels(kind: PlacedKind, cw: number, ch: number, 
   return rubblePixels(w, h, hash(seed, KINDS.indexOf(kind), 3), { ...frame(w, h), ...MATERIAL[kind].ruin });
 }
 
-const KINDS: PlacedKind[] = ["barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait"];
+const KINDS: PlacedKind[] = ["barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "meleeGuild", "rangedGuild", "sniperLodge", "musketHall"];
 
 const PAINT: Record<PlacedKind, (p: Pix, look: string) => void> = {
+  meleeGuild: paintMeleeGuild,
+  rangedGuild: paintRangedGuild,
+  sniperLodge: paintSniperLodge,
+  musketHall: paintMusketHall,
   barracks: paintBarracks,
   archerBarracks: paintArcherBarracks,
   archerTower: paintArcherTower,
@@ -294,6 +310,82 @@ function paintBarracks(p: Pix, look: string) {
       p.set(sx - 1 + i, sy + j, c);
     }),
   );
+}
+
+/** A small sprite from rows of keys into `pal` ("." clear), its top left at (x, y). */
+function glyph(p: Pix, x: number, y: number, rows: readonly string[], pal: Record<string, number>) {
+  rows.forEach((row, j) => [...row].forEach((ch, i) => { if (ch !== ".") p.set(x + i, y + j, pal[ch]); }));
+}
+
+/** A guild's hall on the north of its lot, under a roof of `roof`, with an
+ * emblem centred on it, and its packed-earth yard to the south inside a
+ * fence outline; returns the yard's box. */
+function guild(p: Pix, roof: number, emblem: readonly string[], pal: Record<string, number>) {
+  const { x0, y0, x1, y1 } = frame(p.w, p.h);
+  const split = y0 + Math.round((y1 - y0) * 0.6);
+  rect(p, x0, split, x1, y1, OUTLINE);
+  for (let y = split + 1; y < y1; y++)
+    for (let x = x0 + 1; x < x1; x++) p.set(x, y, C.dirt[hash(x, y, 43) % 5 === 0 ? 0 : hash(x, y, 44) % 4 === 0 ? 2 : 1]);
+  hall(p, x0, y0, x1, split, roof);
+  const w = emblem[0].length, h = emblem.length;
+  glyph(p, Math.round((x0 + x1 - w) / 2), Math.round((y0 + split - h) / 2), emblem, pal);
+  return { x0: x0 + 1, y0: split + 1, x1: x1 - 1, y1: y1 - 1 };
+}
+
+/** A clenched fist, knuckles up, in outline. */
+const FIST = [".0000.", "033330", "032220", "032220", "002220", ".0110.", ".0000."];
+/** A sniper's crosshair. */
+const CROSSHAIR = ["..0..", ".000.", "00300", ".000.", "..0.."];
+/** A burst of powder, white-hot at the heart. */
+const BURST = ["0.0.0", ".010.", "01210", ".010.", "0.0.0"];
+
+function paintMeleeGuild(p: Pix) {
+  const skin = { 0: OUTLINE, 1: 0x8a5a3a, 2: 0xc98e62, 3: 0xe8b88a };
+  const y = guild(p, C.straw[1], FIST, skin);
+  // The sparring ring: rope on corner posts round trodden earth, and a
+  // leather punching bag hung from a post in the corner.
+  const rx0 = y.x0 + 1, rx1 = y.x1 - 6, ry0 = y.y0 + 1, ry1 = y.y1 - 1;
+  for (let x = rx0; x <= rx1; x++) { p.set(x, ry0, C.straw[2]); p.set(x, ry1, C.straw[0]); }
+  for (let yy = ry0; yy <= ry1; yy++) { p.set(rx0, yy, C.straw[2]); p.set(rx1, yy, C.straw[0]); }
+  for (const [x, yy] of [[rx0, ry0], [rx1, ry0], [rx0, ry1], [rx1, ry1]]) p.set(x, yy, C.plank[0]);
+  const bx = y.x1 - 2.5, by = (y.y0 + y.y1) / 2 + 0.5;
+  disc(p, bx, by, 2.4, (x, yy, d, dx, dy) => (d > 1.6 ? OUTLINE : [0x5e3418, 0x7e4a24, 0xa86a3a][Math.min(2, lit(x, yy, dx, dy, d))]));
+  p.set(Math.round(bx) - 1, y.y0, C.plank[1]);
+}
+
+function paintRangedGuild(p: Pix) {
+  const slate = [0x3a3c42, 0x5a5c62, 0x7a7c84, 0x9ea0a8];
+  // A sling's stone on the ridge.
+  const y = guild(p, slate[1], [".000.", "02330", "01230", "01120", ".000."], { 0: OUTLINE, 1: slate[0], 2: slate[1], 3: slate[3] });
+  // A heap of throwing stones by the door, and a clay pot on a post to aim at.
+  for (const [dx, dy, r] of [[2.5, 2.5, 1.6], [4.6, 3.2, 1.4], [3.4, 4.6, 1.3], [5.8, 1.8, 1.1]] as const)
+    disc(p, y.x0 + dx, y.y0 + dy, r, (x, yy, d, ox, oy) => (d > r - 0.7 ? OUTLINE : slate[1 + Math.min(2, lit(x, yy, ox, oy, d))]));
+  const px = y.x1 - 3.5, py = (y.y0 + y.y1) / 2 + 0.5;
+  disc(p, px, py, 2.2, (x, yy, d, dx, dy) => (d > 1.4 ? OUTLINE : [0x7a3a22, 0xa65430, 0xd07a4a][Math.min(2, lit(x, yy, dx, dy, d))]));
+  p.set(Math.round(px) - 1, Math.round(py) - 1, 0x2a1810);
+}
+
+function paintSniperLodge(p: Pix) {
+  const y = guild(p, C.canvas[1], CROSSHAIR, { 0: OUTLINE, 3: C.target[1] });
+  // The firing lane: sandbags across the near end, a trodden lane east to
+  // a small far target.
+  for (let yy = y.y0 + 1; yy < y.y1; yy++) {
+    p.set(y.x0 + 2, yy, yy % 2 ? C.straw[1] : C.straw[0]);
+    p.set(y.x0 + 3, yy, OUTLINE);
+  }
+  const ly = Math.round((y.y0 + y.y1) / 2);
+  for (let x = y.x0 + 5; x < y.x1 - 3; x++) if (x % 2) p.set(x, ly, C.dirt[0]);
+  disc(p, y.x1 - 1.5, ly + 0.5, 1.7, (_x, _y, d) => (d > 1.1 ? OUTLINE : d > 0.5 ? C.target[0] : C.target[1]));
+}
+
+function paintMusketHall(p: Pix) {
+  const y = guild(p, 0x5a3a2a, BURST, { 0: C.ember, 1: C.fire[2], 2: C.fire[3] });
+  // Powder kegs stacked by the door, iron-banded and black-topped, and the
+  // yard scorched where shot has burst.
+  for (const [dx, dy] of [[2.5, 2.5], [5.3, 2.5], [3.9, 5]] as const)
+    disc(p, y.x0 + dx, y.y0 + dy, 1.9, (x, yy, d, ox, oy) => (d > 1.3 ? OUTLINE : d < 0.6 ? C.char[0] : d > 0.95 ? C.iron[2] : C.crate[1 + Math.min(2, lit(x, yy, ox, oy, d))]));
+  const sx = y.x1 - 4, sy = Math.round((y.y0 + y.y1) / 2);
+  for (const [ox, oy] of [[0, 0], [1, 0], [-1, 1], [0, 1], [1, 1], [2, 1], [0, 2], [1, -1]]) p.set(sx + ox, sy + oy, ox === 0 && oy === 1 ? C.char[2] : C.char[0]);
 }
 
 function paintArcherBarracks(p: Pix, look: string) {

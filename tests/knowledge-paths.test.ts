@@ -1,15 +1,14 @@
-import { evolveOne, specialize, unevolveOne } from "../src/specializations.ts";
-// The Study's knowledge paths (src/knowledge-paths.ts): choosing one seals
-// the others, ranks go in order, unlearning returns the Knowledge, saves keep
-// only well formed choices, and each path changes the battle as it says.
+// Knowledge paths (src/knowledge-paths.ts): each building climbs its own
+// paths (src/specializations.ts), the Study researches only the spells',
+// saves keep only well formed legacy choices, and each path changes the
+// battle as it says.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { defaults, decode } from "../src/save.ts";
+import { defaults } from "../src/save.ts";
 import { bonuses } from "../src/progression.ts";
-import { PATHS, PATH_TOPICS, RIME, STORM, ASSASSIN, CRUSADE, FIRE_ARROWS, SHARP, GUNNERY, SIEGE_SHOT, SKIRMISH, SPOTTERS, SIGNAL, PYROCLASM, CINDERS, OIL, FORTIFY, decodePaths, evolve, evolvedBy, learnPath, pathState, unlearnPath } from "../src/knowledge-paths.ts";
+import { PATHS, PATH_TOPICS, RIME, STORM, ASSASSIN, CRUSADE, FIRE_ARROWS, SHARP, GUNNERY, SIEGE_SHOT, SKIRMISH, SPOTTERS, SIGNAL, PYROCLASM, CINDERS, OIL, FORTIFY, decodePaths, evolve, learnPath, pathState } from "../src/knowledge-paths.ts";
 import { ICON_ROWS, ICON_SIZE } from "../src/ui/path-icons.ts";
-import { defaultLayout, fitLayout, placeCityTile, placeStructure, placedCount } from "../src/defend/layout.ts";
-import { available } from "../src/defend/progress.ts";
+import { defaultLayout, fitLayout, placeCityTile, placeStructure } from "../src/defend/layout.ts";
 import { generateCity } from "../src/defend/citygen.ts";
 import { DefendSim, type Enemy, type Levels } from "../src/defend/sim.ts";
 import { NO_BONUSES, UPGRADES, watchRadius, type Bonuses, type PaletteItem } from "../src/defend/catalog.ts";
@@ -26,50 +25,25 @@ const rich = () => {
   return s;
 };
 
-test("research unlocks independent paths, and refunding a topic returns their Knowledge", () => {
+test("the Study no longer researches a building's paths or crowns: each building climbs its own", () => {
   const s = rich();
-  assert.ok(learnPath(s, "pyromancy"));
-  assert.ok(learnPath(s, "pyromancy"));
-  assert.equal(s.knowledge, 1000000 - 4 - 4004);
-  assert.deepEqual(s.pathResearch.pyromancy, { rank: 2, spent: 4008 });
-  assert.equal(pathState(s, "rime").sealed, false);
-  assert.equal(learnPath(s, "rime"), true, "another path remains available");
-  assert.equal(learnPath(s, "crusaders"), true, "another topic's paths are its own");
-  assert.equal(unlearnPath(s, "wizardTower"), 4012);
-  assert.equal(s.knowledge, 1000000 - 4, "every point back but the barracks'");
-  assert.equal(s.pathResearch.pyromancy, undefined);
-  assert.ok(learnPath(s, "rime"), "open again");
+  for (const id of ["pyromancy", "crusaders", "blastStakes", "fortified"] as const) {
+    assert.equal(pathState(s, id).sealed, true, id);
+    assert.equal(learnPath(s, id), false, id);
+  }
+  assert.equal(evolve(s, "storm"), false);
+  assert.equal(s.knowledge, 1000000);
+  assert.equal(pathState(s, "starfall").sealed, false, "the spells are still researched");
+  assert.ok(learnPath(s, "starfall"));
 });
 
-test("ranks are learned in order, each for its cost, up to the last", () => {
-  const s = defaults();
-  s.knowledge = 3;
-  assert.equal(learnPath(s, "storm"), false, "too dear");
-  s.knowledge = 1000000;
-  const storm = PATHS.find((p) => p.id === "storm")!;
-  for (const r of storm.ranks) assert.ok(learnPath(s, "storm"), r.name);
-  assert.equal(learnPath(s, "storm"), false, "maxed");
-  assert.equal(s.pathResearch.storm!.spent, storm.ranks.reduce((n, r) => n + r.cost, 0));
-});
-
-test("unlimited money learns for nothing and unlearning returns nothing", () => {
-  const s = defaults();
-  s.settings.devMode = true;
-  assert.ok(learnPath(s, "assassins"));
-  assert.equal(s.knowledge, 0);
-  assert.equal(unlearnPath(s, "barracks"), 0);
-  assert.equal(s.pathResearch.assassins, undefined);
-});
-
-test("saves keep only well formed paths", () => {
+test("saves keep only well formed legacy paths", () => {
   assert.deepEqual(decodePaths({ wizardTower: { path: "rime", rank: 2, spent: 12 } }), { wizardTower: { path: "rime", rank: 2, spent: 12 } });
   assert.deepEqual(decodePaths({ wizardTower: { path: "crusaders", rank: 1, spent: 4 } }), {}, "another topic's path");
   assert.deepEqual(decodePaths({ wizardTower: { path: "rime", rank: 9, spent: 4 } }), {}, "no such rank");
   assert.deepEqual(decodePaths({ barracks: { path: "assassins", rank: 1, spent: -1 } }), {});
   assert.deepEqual(decodePaths("nonsense"), {});
-  const s = rich();
-  learnPath(s, "crusaders");
-  assert.deepEqual(decode(JSON.stringify(s)).pathResearch, s.pathResearch);
+  assert.deepEqual(decodePaths({ wizardTower: { path: "storm", rank: 2, spent: 14, crowned: 1 } }), { wizardTower: { path: "storm", rank: 2, spent: 14 } });
   assert.deepEqual(defaults().paths, {});
 });
 
@@ -77,9 +51,8 @@ test("research alone does not change any building in battle", () => {
   const s = rich();
   assert.equal(bonuses(s).paths, undefined);
   assert.deepEqual(bonuses(s), NO_BONUSES);
-  learnPath(s, "storm");
-  assert.equal(bonuses(s).paths, undefined);
-  assert.deepEqual(bonuses(s), NO_BONUSES);
+  learnPath(s, "starfall");
+  assert.equal(bonuses(s).structurePaths, undefined);
 });
 
 test("every topic offers two or more paths of three ranks, with square icons", () => {
@@ -391,59 +364,4 @@ test("Oil-soaked bait sets its biters alight; fortified crates hold out and, spi
   const spiked = bait({ bait: { path: "fortified", rank: 3 } });
   baitBitten(spiked.sim, spiked.e, 5);
   assert.equal(spiked.e.maxHp - spiked.e.hp, 5 * FORTIFY.thorns);
-});
-
-// ── Evolutions ────────────────────────────────────────────────────────────
-test("a researched crown evolves one copy at a time, retaining the others and refunding correctly", () => {
-  const s = rich(), d = s.defend;
-  d.owned.barracks = 2;
-  let l = placeCityTile(d.layout, d.layout.keep.tx, d.layout.keep.ty - 1) ?? assert.fail("tile");
-  d.layout = placeStructure(l, "barracks", l.keep.tx, l.keep.ty - 1) ?? assert.fail("barracks");
-  assert.equal(evolve(s, "crusaders"), false);
-  for (let i = 0; i < 3; i++) learnPath(s, "crusaders");
-  assert.ok(specialize(d, s.pathResearch, { uid: d.layout.structures[0].uid }, "crusaders"));
-  assert.equal(evolveOne(s, "crusaders"), false, "the crown first");
-  assert.ok(evolve(s, "crusaders"));
-  assert.equal(d.owned.barracks, 2, "research does not transform copies");
-  assert.ok(evolveOne(s, "crusaders"));
-  assert.deepEqual([d.owned.barracks, d.owned.valkyriePalace], [1, 1]);
-  assert.equal(placedCount(d.layout, "barracks"), 1, "the copy waiting in the palette went first; the city's stands");
-  assert.equal(d.layout.structures[0].path, "crusaders");
-  assert.ok(evolveOne(s, "crusaders"));
-  assert.deepEqual([d.owned.barracks, d.owned.valkyriePalace, placedCount(d.layout, "barracks")], [0, 2, 0], "then the city's is taken up");
-  assert.equal(evolveOne(s, "crusaders"), false, "none left to evolve");
-  assert.equal(evolvedBy("valkyriePalace")?.id, "crusaders");
-  assert.ok(unevolveOne(s, "valkyriePalace"));
-  assert.deepEqual([d.owned.barracks, d.owned.valkyriePalace], [1, 1]);
-  assert.deepEqual(decode(JSON.stringify(s)).defend.owned, d.owned);
-  const spent = s.pathResearch.crusaders!.spent;
-  assert.equal(unlearnPath(s, "barracks"), spent);
-  assert.deepEqual([d.owned.barracks, d.owned.valkyriePalace], [2, 0]);
-});
-
-test("unlearning a topic takes its paths off the city and its evolutions out of it", () => {
-  const s = rich(), d = s.defend;
-  d.owned.wizardTower = 2; d.owned.darkKeep = 1;
-  for (const [dx, dy] of [[0, -1], [1, 0], [2, 0], [1, 1], [2, 1]]) d.layout = placeCityTile(d.layout, d.layout.keep.tx + dx, d.layout.keep.ty + dy) ?? assert.fail("tile");
-  d.layout = placeStructure(d.layout, "wizardTower", d.layout.keep.tx, d.layout.keep.ty - 1) ?? assert.fail("tower");
-  for (let i = 0; i < 3; i++) learnPath(s, "storm");
-  evolve(s, "storm");
-  d.layout = placeStructure(d.layout, "darkKeep", d.layout.keep.tx + 1, d.layout.keep.ty) ?? assert.fail("keep");
-  assert.equal(placedCount(d.layout, "darkKeep"), 1);
-  specialize(d, s.pathResearch, { uid: d.layout.structures[0].uid }, "storm");
-  unlearnPath(s, "wizardTower");
-  assert.equal(d.layout.structures.find(st => st.kind === "wizardTower")!.path, undefined);
-  assert.equal(placedCount(d.layout, "darkKeep"), 0);
-  assert.deepEqual([d.owned.wizardTower, d.owned.darkKeep], [3, 0]);
-});
-
-test("a Wizard tower becomes a Dark wizard keep once the Stormcalling crown is researched; old crown decoding remains defensive", () => {
-  const s = rich(); s.defend.owned.wizardTower = 1;
-  for (let i = 0; i < 3; i++) learnPath(s, "storm");
-  assert.ok(evolve(s, "storm")); assert.ok(evolveOne(s, "storm"));
-  assert.deepEqual([s.defend.owned.darkKeep, s.defend.owned.wizardTower], [1, 0]);
-  assert.equal(evolve(s, "pyromancy"), false, "no crown");
-  assert.equal(evolveOne(s, "pyromancy"), false, "no crown to evolve by");
-  assert.deepEqual(decodePaths({ wizardTower: { path: "storm", rank: 2, spent: 14, crowned: 1 } }), { wizardTower: { path: "storm", rank: 2, spent: 14 } });
-  assert.deepEqual(decodePaths({ wizardTower: { path: "pyromancy", rank: 3, spent: 26, crowned: 1 } }), { wizardTower: { path: "pyromancy", rank: 3, spent: 26 } });
 });

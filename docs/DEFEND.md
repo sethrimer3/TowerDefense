@@ -48,7 +48,7 @@ Recent rows are available as `window.defendPerformance`; they are not saved.
 ## Building (before a run)
 
 - The **palette** (left by default; the ⚙ settings move it to the right) lists
-  city tiles, barracks, archer barracks, Mage Guilds, Valkyrie palaces, dark wizard keeps, monster bait, city gates, wall spikes, wall ballistas and the towers with an `×N` count of
+  city tiles, the Melee and Ranged Guilds, barracks, archer barracks, Mage Guilds, Valkyrie palaces, dark wizard keeps, monster bait, city gates, wall spikes, wall ballistas and the towers with an `×N` count of
   what is owned but not yet placed; it greys out at `×0`. The button at its
   head (`☰ All`) opens a list of categories, and the palette shows only the
   one picked: **All**, **Towers** (archer, cannon, watch and wizard towers),
@@ -95,11 +95,11 @@ Recent rows are available as `window.defendPerformance`; they are not saved.
   wizard keep stay put.
 - **The keep** can be moved onto any other city tile (the two swap) but never
   removed.
-- **Barracks**, **archer barracks**, the **Mage Guild**, the **Valkyrie palace** and the **dark wizard keep** must be inside the city. **Archer**, **cannon**, **watch
+- The **Melee** and **Ranged Guilds**, **barracks**, **archer barracks**, the **Mage Guild**, the **sniper lodge**, the **musket hall**, the **Valkyrie palace** and the **dark wizard keep** must be inside the city. **Archer**, **cannon**, **watch
   and wizard towers** and **monster bait** may stand inside or outside.
 - Every structure takes a **share of its tile** (`size` in `catalog.ts`, in
   sixteenths): 1/16 the archer and watch towers and monster bait, 1/8 the cannon and wizard
-  towers, 1/4 the barracks, archer barracks and Mage Guild, and the Valkyrie
+  towers, 1/4 the guilds, barracks, archer barracks, Mage Guild, sniper lodge and musket hall, and the Valkyrie
   palace a whole tile (1/2 once Folded halls is bought, which also shrinks
   it from 5 × 5 cells to 3 × 5). Several structures share a tile while
   their shares add up to no more than a whole tile and they all fit.
@@ -245,12 +245,33 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   rebuild rubble one cell at a time (walls and structures first); a
   structure only works again once fully rebuilt. They avoid rubble with
   enemies close by and respawn a while after being killed.
+- **Basic buildings and their upgrades.** The shop sells only three
+  buildings: the **watch tower**, the **Melee Guild** and the **Ranged
+  Guild**. The Melee Guild trains **brawlers**, who walk out and punch
+  (no weapon, short reach); the Ranged Guild trains **stone throwers**, who
+  lob slow stones at short range. Every other tower and troop building is
+  one of these upgraded, one building at a time, with Knowledge: tap it
+  while building (or press and hold it, or its tile in the palette, which
+  upgrades that copy before it is placed) to open its upgrade tree, nodes on branches you can drag
+  about. Choosing a branch withers the ones beside it and grows the
+  upgrades only it leads to. The box in the tree's corner shows the
+  Knowledge allocated to that building; a respec (5 Copper) gives it all
+  back and turns the building back into its basic one. A watch tower becomes an archer,
+  cannon or wizard tower; a Melee Guild a barracks (swordsmen, later
+  assassins or crusaders, and by Crusaders' crown a Valkyrie palace); a
+  Ranged Guild an archer barracks, a Mage Guild, a **sniper lodge** (snipers:
+  long range, heavy, slow single shots) or a **musket hall** (explosive
+  musketmen: balls that burst over a small area, sparing your own). A
+  building can also start one of its kind's paths and climb it rank by
+  rank; a crowned path's last step evolves it (Stormcalling's wizard tower
+  into a dark wizard keep). A building taken back to the palette keeps its
+  path and rank and is placed again from its own palette entry.
 - **Barracks** keep up to N swordsmen alive, training a replacement every
   few seconds after one dies. Swordsmen stay inside the walls and fight
   whatever gets in (troops can't pass walls — a palisade gate is a future
   upgrade; troop pathing is plain A* over open cells, so gates only need to
   change what counts as open).
-  Their Study paths: Crusaders (more HP and slower, healing from rank II,
+  Their paths: Crusaders (more HP and slower, healing from rank II,
   harder hitting at III) or Assassins (faster and frailer, every 4th, 3rd,
   then 2nd strike critical, quicker strokes, the whole city their ground).
 - **Archer barracks** train archers (same garrison size, drill speed and
@@ -258,7 +279,7 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   streets and stop to shoot anything within their short sight (3 cells,
   widened by Keen eyes). The pricey one-off Hunter's instinct makes them
   path toward the nearest enemy in the city instead, stopping at bow range.
-  Study paths: Rangers (sight, heavier arrows, twin shots) or Skirmishers
+  Paths: Rangers (sight, heavier arrows, twin shots) or Skirmishers
   (faster draws, shooting on the move).
 - **Mage Guilds** (`mages.ts`) train fire mages (same garrison size, drill
   speed and arms upgrades as the barracks). Mages wander the streets like
@@ -268,7 +289,7 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   leaves a **blaze**: burning ground that hurts every ground enemy inside it
   each second until it dies down (fliers pass over). Upgraded by Pyroclasm
   (fireball damage and burst) and Lingering embers (how long and how hot
-  the ground burns) in the Forge. Study paths: Pyroclasm (heavier, wider
+  the ground burns) in the Forge. Paths: Pyroclasm (heavier, wider
   fireballs, then two more bursting either side) or Cinders (longer, hotter
   blazes, then fire that clings to whoever walks through).
 - **Valkyrie palaces** (`valkyries.ts`), grown from barracks by the
@@ -302,7 +323,7 @@ from its seed; `tests/defend-replay.test.ts` pins it.
 - **Cannon towers** fire slowly at the nearest ground enemy (not bats),
   lobbing a shell in an arc that bursts with splash damage (full at the
   centre, 40% at the edge).
-  Study paths: Gun crews (faster reloads, then grapeshot: four smaller
+  Paths: Gun crews (faster reloads, then grapeshot: four smaller
   blasts round each landing) or Siege shot (harder, slower, wider, further).
 - **Explosions** (cannon shells and bombs) are ragged, layered fireballs —
   smoke, flame, white-hot core, flung sparks — that briefly light up their
@@ -316,14 +337,14 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   that swings after it for 1.6 s, burning everything inside (flyers too),
   and an **ice wave**, a fan-shaped front of ice shards spreading toward the
   nearest enemy that hits everything it crosses once and chills it (half
-  speed for a few seconds). Its Forge raises the Flamethrower and the Ice wave; its Study paths (Pyromancy, Rime, Stormcalling) change what it casts.
+  speed for a few seconds). Its Forge raises the Flamethrower and the Ice wave; its paths (Pyromancy, Rime, Stormcalling) change what it casts.
   Neither draws from the run's random stream; how they look is the
   renderer's (`wizard-art.ts`).
-- **Archer towers** shoot the nearest enemy in range. Study paths: Fire arrows (what
+- **Archer towers** shoot the nearest enemy in range. Paths: Fire arrows (what
   they hit burns, then a volley of three) or Sharpshooters (reach, every 3rd
   arrow critical, then aimed at the strongest). **Watch towers** mark
   enemies in their radius with a gold outline; marked enemies take ×2 damage.
-  Study paths: Spotters (marks hit harder, wider radius) or Signal fires
+  Paths: Spotters (marks hit harder, wider radius) or Signal fires
   (marked enemies slowed, more at rank II, and set burning at III).
 - **City gates** are buildings (`kind: "gate"`, numbered after the wall
   stones) with the HP of the stones they stand in for, half again: enemies
@@ -347,7 +368,7 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   standing stone takes `spikeDamage`, once a pulse, as a melee blow; the
   Forge's Iron-shod stakes (`spikeDamage`) and Barbed edges (`spikeRate`)
   raise both. A knocked-out stone's stakes go with it and come back when it
-  is rebuilt. Study paths (`BLAST_STAKES`, `SPRING_STAKES`, `RIME_STAKES`):
+  is rebuilt. Paths (`BLAST_STAKES`, `SPRING_STAKES`, `RIME_STAKES`):
   Blasting stakes blow up a touched stone's stakes (`sim.explode`, sparing
   your own people), ready again after a few seconds (`sim.spikeArm`, keyed
   by stone); Spring stakes shoot the whole touched row out, striking every
@@ -386,7 +407,7 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   stack once a level, a defense. **Powder kegs** make a stack burst as it
   falls (sparing your own people; a stack sunk by a boat's water only
   sinks) and set the ground round it burning, a blaze like a fire mage's.
-  Study paths: Oil-soaked (whoever bites a stack catches fire, hotter each
+  Paths: Oil-soaked (whoever bites a stack catches fire, hotter each
   rank) or Fortified crates (more HP, then spikes hurting each biter
   thrice its bite).
 - Civilians work a rubble cell standing in it; when its building's own

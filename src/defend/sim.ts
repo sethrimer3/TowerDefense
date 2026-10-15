@@ -126,7 +126,7 @@ export type Soldier = {
   /** Swordsmen chase and hack; archers roam and shoot; fire mages roam
    * and hurl fireballs; valkyries hunt and charge-stab; the dark wizard
    * hunts and casts chain lightning. */
-  kind: "sword" | "archer" | "mage" | "valkyrie" | "darkWizard" | "undead" | "reinforcement";
+  kind: "sword" | "archer" | "mage" | "valkyrie" | "darkWizard" | "undead" | "reinforcement" | "brawler" | "slinger" | "sniper" | "musketeer";
   home: number;
   x: number;
   y: number;
@@ -178,6 +178,12 @@ export type Arrow = {
   x: number; y: number; target: number; damage: number; tx: number; ty: number; life: number; origin?: Point & { attacker?: number; building?: number };
   /** A fire arrow's burn: damage a second, and for how long; absent otherwise. */
   burn?: number; burnFor?: number;
+  /** What flies, when not an arrow: a thrown stone, a sniper's bullet or a
+   * musketman's ball; absent for arrows. */
+  shot?: "stone" | "bullet" | "ball";
+  /** An explosive ball's burst radius where it hits (sparing your own
+   * people); absent otherwise. */
+  blast?: number;
 };
 export type Effect = { kind: "boom" | "dust" | "spark" | "firework" | "steam"; x: number; y: number; t: number; r: number; seed?: number };
 /** A cannon shell in flight: lobbed from the tower to where the target was. */
@@ -206,6 +212,10 @@ const STEP_SOLDIER: Record<Soldier["kind"], (sim: DefendSim, s: Soldier, dt: num
   darkWizard: stepDarkWizard,
   undead: stepUndead,
   reinforcement: stepReinforcement,
+  brawler: stepSwordsman,
+  slinger: stepArcher,
+  sniper: stepArcher,
+  musketeer: stepArcher,
 };
 /** How long a struck building flashes, in seconds. */
 export const BUILDING_FLASH = 0.14;

@@ -1,4 +1,3 @@
-import { evolveOne, unevolveOne } from "../specializations.ts";
 import { TILE_TYPE } from "../tiles.ts";
 import { play } from "../sound.ts";
 import { TRAINING, addSmith, busySmiths, whole, cancelTraining, removeSmith, skillPurchase, skillRank, startTraining, trainingLeft, trainingStep, type TrainingId } from "../progression.ts";
@@ -41,7 +40,9 @@ export type LedgerKind = "smithy" | "study";
 /** Whether a topic has anything for one chamber. */
 export function topicHas(t: Topic, kind: LedgerKind) {
   if (kind === "smithy") return !!(t.upgrades?.length || t.training?.length || t.extras?.includes("speed3"));
-  return !!(t.skills?.length || pathsOf(t.id).length);
+  // Buildings are upgraded one at a time in Defend; the Study researches
+  // the spells' paths and the shared skills.
+  return !!(t.skills?.length || (isSpell(t.id) && pathsOf(t.id).length));
 }
 /** The subjects with something for a chamber, each with only those topics. */
 export function ledgerSubjects(kind: LedgerKind): Subject[] {
@@ -160,12 +161,6 @@ export class Ledger {
     }));
     root.querySelectorAll<HTMLButtonElement>("[data-learn-path]").forEach((b) => (b.onclick = () => this.learnPath(b.dataset.learnPath as PathId)));
     root.querySelectorAll<HTMLButtonElement>("[data-evolve]").forEach((b) => (b.onclick = () => this.evolve(b.dataset.evolve as PathId)));
-    root.querySelectorAll<HTMLButtonElement>("[data-evolve-one]").forEach((b) => (b.onclick = () => {
-      if (evolveOne(this.save, b.dataset.evolveOne as PathId)) { this.ctx.update(); play("levelUp"); this.render(); }
-    }));
-    root.querySelectorAll<HTMLButtonElement>("[data-unevolve-one]").forEach((b) => (b.onclick = () => {
-      if (unevolveOne(this.save, b.dataset.unevolveOne as PlacedKind)) { this.ctx.update(); play("stone"); this.render(); }
-    }));
     root.querySelectorAll<HTMLButtonElement>("[data-unlearn]").forEach((b) => (b.onclick = () => this.unlearn(b.dataset.unlearn as PathTopic)));
     root.querySelector<HTMLButtonElement>("[data-cancel-research]")?.addEventListener("click", () => {
       if (cancelResearch(this.save)) { this.ctx.update(); this.render(); }
@@ -182,11 +177,11 @@ export class Ledger {
     const stacks = subject.topics.map(t => {
       const count = this.owned(t), type = t.item ? TILE_TYPE[t.item] : "consumables", on = t.id === current.id;
       const layers = count > 2 ? "layers-2" : count > 1 ? "layers-1" : "";
-      const sub = study ? pathsOf(t.id).length ? "Research paths" : "Shared research" : "Upgrades all";
+      const sub = study ? pathsOf(t.id).length ? "Spell paths" : "Shared research" : "Upgrades all";
       return `<button class="tile type-${type} ${layers} ${on ? "open" : ""}" data-key="${t.id}" data-ledger-stack="${t.id}" aria-pressed="${on}" aria-label="${t.name}${t.item ? `, ${count} owned` : ""}">
         <span class="tile-face">${t.item ?? t.icon ? `<canvas width="48" height="48" data-icon="${t.item ?? t.icon}"></canvas>` : uiSprite(subject.sprite)}</span><span class="tile-name">${t.name}</span>${t.item ? `<b class="tile-count">×${count}</b>` : ""}<small class="tile-sub">${sub}</small></button>`;
     }).join("");
-    return `<div class="ledger-collection"><p class="ledger-note">${study ? "Research unlocks a path for every building of its type. Choose which path each one wears as you place it in Defend." : "Select a type. Smithy equipment improves every building of that type."}</p><div class="tiles-grid ledger-tiles">${stacks}</div></div>`;
+    return `<div class="ledger-collection"><p class="ledger-note">${study ? "Research the shared skills and the strike spells' paths. Each building is upgraded on its own: tap it in Defend while building." : "Select a type. Smithy equipment improves every building of that type."}</p><div class="tiles-grid ledger-tiles">${stacks}</div></div>`;
   }
 
   // ── The Smithy ──────────────────────────────────────────────────────────
@@ -370,7 +365,7 @@ export class Ledger {
       return `<div class="banner-research"><div class="banner-research-shared"><h4>Shared upgrades</h4>${shared.map(skillCard).join("")}</div><p class="ledger-note">Master Rapid deployment, then learn Sheltering standard and Broad standard to open the three branches. Each branch can be researched.</p><div class="banner-research-branches">${branches.map(branch => `<section><h4>${branch.name}</h4>${branch.ids.map(skillCard).join("")}</section>`).join("")}</div></div>`;
     }
     const skills = (t.skills ?? []).map(skillCard);
-    const tree = pathsOf(t.id).length ? (isSpell(t.id) ? this.spellSetupHtml(t.id) : "") + this.treeHtml(t) : "";
+    const tree = isSpell(t.id) && pathsOf(t.id).length ? this.spellSetupHtml(t.id) + this.treeHtml(t) : "";
     if (!skills.length && !tree) return `<p class="ledger-empty">Nothing to study here yet.</p>`;
     return tree + skills.join("");
   }

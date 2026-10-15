@@ -349,7 +349,7 @@ test('shop: palette counts, purchases and upgrades use the wallet of mine metal'
   const wallet = { copper: 100, silver: 100, gold: 100 };
   const price = purchasePrice('watchTower', save.owned.watchTower);
   assert.ok(buyItem(save, wallet, 'watchTower'));
-  assert.equal(available(save, 'watchTower'), 1);
+  assert.equal(available(save, 'watchTower'), STARTING_OWNED.watchTower + 1);
   assert.equal(wallet.copper, 100 - price.copper!);
   assert.ok(purchasePrice('watchTower', save.owned.watchTower).copper! > price.copper!, 'each extra costs more');
   assert.ok(buyUpgrade(save, wallet, 'barracksCapacity'));
@@ -704,6 +704,8 @@ test('old saves load with their buildings in valid spots, returning what no long
   l = placeStructure(l, 'archerTower', tx + 1, ty - 1)!;
   save.layout = l;
   save.owned.cityTile = 8;
+  save.owned.barracks = 1;
+  save.owned.archerTower = 1;
   save.owned.valkyriePalace = 1;
   // A save from before spots and shares: no spot, and a palace sharing a
   // tile with the barracks (now too full).

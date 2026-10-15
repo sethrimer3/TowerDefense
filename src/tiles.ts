@@ -9,9 +9,11 @@
  * tier is its Knowledge path's crown (`higherTier`). Pure functions over the
  * save, so the page and the tests share them. */
 import { metalPriceText } from "./metals.ts";
-import { BOMB_PRICE, ITEM_CATEGORY, ITEM_NAMES, PALETTE_ITEMS, purchasePrice, type PaletteItem, type Price } from "./defend/catalog.ts";
+import { BASIC_BUILDINGS, BOMB_PRICE, ITEM_CATEGORY, ITEM_NAMES, PALETTE_ITEMS, purchasePrice, type PaletteItem, type Price } from "./defend/catalog.ts";
 import { available, buyBomb, buyItem, canAfford, type Wallet } from "./defend/progress.ts";
 import { evolvedBy, PATHS, type KnowledgePath } from "./knowledge-paths.ts";
+import { rootOf } from "./specializations.ts";
+import type { PlacedKind } from "./defend/layout.ts";
 import { METALS } from "./mine/sim.ts";
 import type { Save } from "./save.ts";
 import { SUBJECTS, topicItems, type Subject, type Topic } from "./upgrade-subjects.ts";
@@ -88,8 +90,10 @@ export function shopOffer(save: Save, id: TileId): ShopOffer {
   if (id === "bomb") return { price: BOMB_PRICE };
   if (id === "warBanner") return { reason: "Always at hand in battle: one banner, never used up." };
   if (id === "necromancy" || id === "meteor" || id === "frostNova" || id === "reinforcements") return { reason: "Always at hand in battle: a spell, never used up." };
-  const grown = evolvedBy(id);
-  if (grown) return { reason: `Research the ${grown.name} crown in the Study, then evolve a ${ITEM_NAMES[grown.evolves!.from]} there.` };
+  // Only the basic buildings are sold: every other tower or troop building
+  // is one of them upgraded, a building at a time.
+  const from = ITEM_CATEGORY[id] !== "city" && !BASIC_BUILDINGS.includes(id) ? rootOf(id as PlacedKind) : undefined;
+  if (from) return { reason: `Not sold: place a ${ITEM_NAMES[from]} and upgrade it into one with Knowledge (tap it in Defend while building).` };
   return { price: purchasePrice(id, save.defend.owned[id]) };
 }
 
