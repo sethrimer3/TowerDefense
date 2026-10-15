@@ -47,7 +47,7 @@ function disc(c: CanvasRenderingContext2D, x: number, y: number, r: number) {
   c.fill();
 }
 
-export type IconItem = StructureKind | "cityTile" | "cityGate" | "wallSpikes" | "wallBallista" | "bomb" | "banner" | "necromancy" | "meteor" | "frostNova" | "reinforcements";
+export type IconItem = StructureKind | "cityTile" | "cityGate" | "wallSpikes" | "wallBallista" | "wallBlock" | "bomb" | "banner" | "necromancy" | "meteor" | "frostNova" | "reinforcements";
 
 /** Paints `item`'s palette icon into a small square canvas; a structure takes the path look named by
  * the canvas's `data-look` (the path the building wears), when it has one. */
@@ -60,6 +60,7 @@ export function paintIcon(canvas: HTMLCanvasElement, item: IconItem) {
   if (item === "cityGate") return paintGateIcon(c, n);
   if (item === "wallSpikes") return paintSpikesIcon(c, n);
   if (item === "wallBallista") return paintBallistaIcon(c, n);
+  if (item === "wallBlock") return paintWallBlockIcon(c, n);
   if (item === "bomb") return paintBombIcon(c, n);
   if (item === "banner") return paintBannerIcon(c, n);
   if (item === "necromancy") return paintNecroIcon(c, n);
@@ -107,6 +108,34 @@ function paintSpikesIcon(c: CanvasRenderingContext2D, n: number) {
   c.fillRect(x + 2 * s - k, y, k, s);
   c.fillRect(x + s - k, y + 2 * k, k, s - 2 * k);
   for (let i = 0; i < 2; i++) drawSprite(c, sprite(`icon:spikes:${i}`, ART, ART, () => spikePixels("n", i)), x + i * s, y - Math.round((5 / ART) * s), s, s);
+}
+
+/** A wall section: a block of four cap stones, lit from the upper left,
+ * on its dark brick face. */
+function paintWallBlockIcon(c: CanvasRenderingContext2D, n: number) {
+  const k = Math.max(1, Math.floor(n / 22)), s = 9 * k, face = 3 * k;
+  const w = 2 * s, x = Math.round((n - w) / 2), y = Math.round((n - w - face) / 2);
+  c.fillStyle = OUTLINE;
+  c.fillRect(x - k, y - k, w + 2 * k, w + face + 2 * k);
+  c.fillStyle = "#4f4a42";
+  c.fillRect(x, y + w, w, face);
+  c.fillStyle = "#3a362f";
+  for (let i = 1; i < 4; i++) c.fillRect(x + Math.round((i * w) / 4) - (i % 2) * 2 * k, y + w, k, face);
+  for (let r = 0; r < 2; r++)
+    for (let q = 0; q < 2; q++) {
+      const sx = x + q * s, sy = y + r * s;
+      c.fillStyle = (q + r) % 2 ? "#8f897d" : "#9c9586";
+      c.fillRect(sx, sy, s, s);
+      c.fillStyle = "#bdb5a5";
+      c.fillRect(sx + k, sy + k, s - 2 * k, k);
+      c.fillRect(sx + k, sy + k, k, s - 2 * k);
+      c.fillStyle = "#6c665b";
+      c.fillRect(sx + k, sy + s - 2 * k, s - 2 * k, k);
+      c.fillRect(sx + s - 2 * k, sy + 2 * k, k, s - 3 * k);
+      c.fillStyle = OUTLINE;
+      c.fillRect(sx + s - k, sy, k, s);
+      c.fillRect(sx, sy + s - k, s, k);
+    }
 }
 
 /** The bastion with its ballista aimed up and to the right, loaded. */

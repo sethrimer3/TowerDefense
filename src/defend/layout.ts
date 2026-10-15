@@ -52,6 +52,10 @@ export type SpikeSpot = GateSpot & { path?: PathId; rank?: number };
 /** A corner of the city wall: the tile corner (vx, vy), between the four
  * tiles around it, where the wall turns through a right angle. */
 export type CornerSpot = { vx: number; vy: number };
+/** A wall section the player placed, a quarter of a tile across: quarter
+ * (qx, qy) of the board's grid of quarter tiles (`QUARTER` to a tile each
+ * way). */
+export type WallSpot = { qx: number; qy: number };
 
 export type Layout = {
   keep: TilePos;
@@ -70,6 +74,12 @@ export type Layout = {
   spikes: SpikeSpot[];
   /** Wall ballistas, each on a corner of the wall. */
   ballistas: CornerSpot[];
+  /** Wall sections placed on their own, anywhere but the spawn row (absent
+   * while there are none, so older layouts fit exactly as before). */
+  walls?: WallSpot[];
+  /** Whether wall sections may stand inside the city (from the walls'
+   * Town walls upgrade, not saved on its own). */
+  innerWalls?: true;
 };
 
 export type FittedStructure = {
@@ -91,7 +101,7 @@ export type FittedSpikes = GateSpot & { rect: Rect };
 export type FittedBallista = CornerSpot & { rect: Rect; out: { x: number; y: number } };
 
 export type Fit =
-  | { ok: true; structures: FittedStructure[]; city: Uint8Array; wall: Uint8Array; gates?: FittedGate[]; spikes?: FittedSpikes[]; ballistas?: FittedBallista[] }
+  | { ok: true; structures: FittedStructure[]; city: Uint8Array; wall: Uint8Array; gates?: FittedGate[]; spikes?: FittedSpikes[]; ballistas?: FittedBallista[]; pieces?: Uint8Array }
   | { ok: false; reason: string };
 
 const KEEP_UID = 0;
@@ -121,6 +131,8 @@ export function cloneLayout(l: Layout): Layout {
     gates: l.gates.map((g) => ({ ...g })),
     spikes: l.spikes.map((g) => ({ ...g })),
     ballistas: l.ballistas.map((v) => ({ ...v })),
+    ...(l.walls ? { walls: l.walls.map((w) => ({ ...w })) } : {}),
+    ...(l.innerWalls ? { innerWalls: true as const } : {}),
   };
 }
 
@@ -215,6 +227,11 @@ const PASSES = 6;
 export function fitLayout(l: Layout): Fit {
   const city = cityMask(l);
   const cityTiles = cityTileSet(l);
+  // The ring of wall round the city, then the sections placed on their own:
+  // each of their cells is wall, and one inside the city is taken out of it.
+  const wall = wallMask(city);
+  const pieces = wallPieces(l, wall);
+  if (typeof pieces === "string") return { ok: false, reason: pieces };
   const order = fitOrder(l, cityTiles);
   const spanned = spannedTiles(order);
   const crowded = [...spanned.values()].find((s) => s.size > TILE_ROOM);
@@ -222,9 +239,13 @@ export function fitLayout(l: Layout): Fit {
   const gates = l.gates.filter((g) => gateOk(cityTiles, g)).map(fitGate);
   const spikes = l.spikes.filter((g) => gateOk(cityTiles, g)).map((g): FittedSpikes => ({ ...g, rect: spikesRect(g) }));
   const ballistas = l.ballistas.filter((v) => cornerOk(cityTiles, v)).map((v): FittedBallista => ({ ...v, rect: ballistaRect(cityTiles, v), out: cornerOutward(cityTiles, v) }));
+  if (pieces) {
+    for (let i = 0; i < CELL_COUNT; i++) if (pieces[i]) { wall[i] = 1; city[i] = 0; }
+    if (gates.some((g) => rectCells(grow(g.inner, g.side)).some((i) => pieces[i]))) return { ok: false, reason: "A wall there would block a city gate." };
+  }
   let failure = "";
   for (let pass = 0; pass < PASSES; pass++) {
-    const space: FitSpace = { city, wall: wallMask(city), blocked: new Uint8Array(CELL_COUNT), foot: new Uint8Array(CELL_COUNT) };
+    const space: FitSpace = { city, wall, blocked: new Uint8Array(CELL_COUNT), foot: new Uint8Array(CELL_COUNT) };
     // The way in through each gate stays clear for its street.
     for (const g of gates) for (const i of rectCells(grow(g.inner, g.side))) if (space.city[i]) space.blocked[i]++;
     const fitted: FittedStructure[] = [];
@@ -243,6 +264,7 @@ export function fitLayout(l: Layout): Fit {
         ...(gates.length ? { gates } : {}),
         ...(spikes.length ? { spikes } : {}),
         ...(ballistas.length ? { ballistas } : {}),
+        ...(pieces ? { pieces } : {}),
       };
     failure ||= `The ${STRUCTURES[cut.kind].name.toLowerCase()} would be cut off from the streets.`;
   }
@@ -442,12 +464,14 @@ function grow(r: Rect, side: Side): Rect {
 
 const fitGate = (g: GateSpot): FittedGate => ({ tx: g.tx, ty: g.ty, side: g.side, rect: gateRect(g), inner: gateInner(g) });
 
-/** Drops the gates, spikes and ballistas whose wall moved away. */
+/** Drops the gates, spikes and ballistas whose wall moved away, and the
+ * wall sections now inside the city where they may not stand. */
 function keepGates(l: Layout) {
   const tiles = cityTileSet(l);
   l.gates = l.gates.filter((g) => gateOk(tiles, g));
   l.spikes = l.spikes.filter((g) => gateOk(tiles, g));
   l.ballistas = l.ballistas.filter((v) => cornerOk(tiles, v));
+  if (!l.innerWalls) dropInnerWalls(l);
 }
 
 /** Sets a new gate into the wall at `g` (not where spikes stand). */
@@ -630,6 +654,7 @@ function carryTile(l: Layout, from: TilePos, to: TilePos): Layout | null {
   else next.cityTiles = next.cityTiles.map((k) => (k === tileKey(from.tx, from.ty) ? toKey : k));
   for (const s of next.structures) if (on(s)) { s.tx += dx; s.ty += dy; }
   for (const g of [...next.gates, ...next.spikes]) if (on(g)) { g.tx += dx; g.ty += dy; }
+  for (const w of next.walls ?? []) if (on(wallTile(w))) { w.qx += dx * QUARTER; w.qy += dy * QUARTER; }
   const left = cityTileSet(l);
   left.delete(tileKey(from.tx, from.ty));
   for (const v of next.ballistas) {
@@ -698,9 +723,129 @@ export function moveKeep(l: Layout, tx: number, ty: number): Layout | null {
   return fitLayout(next).ok ? next : null;
 }
 
-export function placedCount(l: Layout, kind: PlacedKind | "cityTile" | "cityGate" | "wallSpikes" | "wallBallista"): number {
+export function placedCount(l: Layout, kind: PlacedKind | "cityTile" | "cityGate" | "wallSpikes" | "wallBallista" | "wallBlock"): number {
+  if (kind === "wallBlock") return l.walls?.length ?? 0;
   if (kind === "cityGate") return l.gates.length;
   if (kind === "wallSpikes") return l.spikes.length;
   if (kind === "wallBallista") return l.ballistas.length;
   return kind === "cityTile" ? l.cityTiles.length : l.structures.filter((s) => s.kind === kind).length;
+}
+
+// ── Wall sections ────────────────────────────────────────────────────────
+
+/** Quarter tiles to a tile, each way: wall sections are placed on a grid
+ * four times finer than the tiles'. */
+export const QUARTER = 4;
+export const QUARTERS_W = TILES_W * QUARTER;
+export const QUARTERS_H = TILES_H * QUARTER;
+/** A wall section is `WALL_PIECE` cells square, as thick as the city wall. */
+export const WALL_PIECE = 2;
+/** Where each quarter's section starts within its tile, in cells: a tile's
+ * 7 cells hold four 2-cell sections, the middle two sharing a cell. */
+const QUARTER_AT = [0, 2, 3, 5];
+
+export const wallKey = (w: WallSpot) => `${w.qx},${w.qy}`;
+export const sameWall = (a: WallSpot, b: WallSpot) => a.qx === b.qx && a.qy === b.qy;
+export function parseWallKey(key: string): WallSpot {
+  const [qx, qy] = key.split(",").map(Number);
+  return { qx, qy };
+}
+/** The tile a wall section stands on. */
+export const wallTile = (w: WallSpot): TilePos => ({ tx: Math.floor(w.qx / QUARTER), ty: Math.floor(w.qy / QUARTER) });
+/** Whether a wall section may stand at `w` at all: on the board, off the
+ * spawn row. */
+export const wallSpotOk = (w: WallSpot) => w.qx >= 0 && w.qy >= 0 && w.qx < QUARTERS_W && w.qy < QUARTERS_H && wallTile(w).ty !== SPAWN_ROW;
+
+/** The cells a wall section takes. */
+export function wallPieceRect(w: WallSpot): Rect {
+  const { tx, ty } = wallTile(w);
+  return { x: tx * SUB + QUARTER_AT[w.qx - tx * QUARTER], y: ty * SUB + QUARTER_AT[w.qy - ty * QUARTER], w: WALL_PIECE, h: WALL_PIECE };
+}
+/** The quarter of its tile `w` names, in (fractional) cells: what the
+ * placing grid frames. */
+export const quarterRect = (w: WallSpot): Rect => ({ x: (w.qx * SUB) / QUARTER, y: (w.qy * SUB) / QUARTER, w: SUB / QUARTER, h: SUB / QUARTER });
+/** The quarter tile under the point (x, y), in cells. */
+export const quarterAt = (x: number, y: number): WallSpot => ({ qx: Math.floor((x * QUARTER) / SUB), qy: Math.floor((y * QUARTER) / SUB) });
+
+/** The placed wall sections' cells that aren't already the city's wall, or
+ * undefined with none placed; or why they can't stand. */
+function wallPieces(l: Layout, ring: Uint8Array): Uint8Array | undefined | string {
+  if (!l.walls?.length) return undefined;
+  const tiles = cityTileSet(l);
+  const out = new Uint8Array(CELL_COUNT);
+  for (const w of l.walls) {
+    if (!wallSpotOk(w)) return "Nothing can be built on the spawn row.";
+    const t = wallTile(w);
+    if (!l.innerWalls && tiles.has(tileKey(t.tx, t.ty))) return "Walls can stand inside the city only with the Town walls upgrade.";
+    for (const i of rectCells(wallPieceRect(w))) if (!ring[i]) out[i] = 1;
+  }
+  return out;
+}
+
+/** Takes up the wall sections standing inside the city. */
+export function dropInnerWalls(l: Layout) {
+  if (!l.walls) return;
+  const tiles = cityTileSet(l);
+  l.walls = l.walls.filter((w) => {
+    const t = wallTile(w);
+    return !tiles.has(tileKey(t.tx, t.ty));
+  });
+  if (!l.walls.length) delete l.walls;
+}
+
+/** What placing wall sections in `l` is checked against, worked out once
+ * for every spot tried: every cell that is wall already, the structures
+ * standing outside the city, and the city's tiles. */
+export type WallContext = { walled: Uint8Array; outside: Rect[]; tiles: Set<string> };
+export function wallContext(l: Layout): WallContext | null {
+  const fit = fitLayout(l);
+  if (!fit.ok) return null;
+  return { walled: fit.wall, outside: fit.structures.filter((s) => !s.inside).map((s) => s.rect), tiles: cityTileSet(l) };
+}
+
+const overlaps = (a: Rect, b: Rect) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+
+/** Places a wall section at `w`: not where one stands, nor where every cell
+ * of it is wall already, nor over a structure; inside the city only with
+ * `innerWalls`, and only where the city still fits round it. Outside the
+ * city it can't change how anything else fits, so `ctx` (worked out once)
+ * settles it without fitting the city again. */
+export function placeWall(l: Layout, w: WallSpot, ctx = wallContext(l)): Layout | null {
+  if (!ctx || !wallSpotOk(w) || l.walls?.some((o) => sameWall(o, w))) return null;
+  const rect = wallPieceRect(w);
+  if (rectCells(rect).every((i) => ctx.walled[i])) return null;
+  const t = wallTile(w), inside = ctx.tiles.has(tileKey(t.tx, t.ty));
+  if (inside && !l.innerWalls) return null;
+  if (!inside && ctx.outside.some((r) => overlaps(r, rect))) return null;
+  const next = cloneLayout(l);
+  next.walls = [...(next.walls ?? []), { qx: w.qx, qy: w.qy }];
+  return inside && !fitLayout(next).ok ? null : next;
+}
+
+export function removeWall(l: Layout, w: WallSpot): Layout {
+  const next = cloneLayout(l);
+  next.walls = next.walls?.filter((o) => !sameWall(o, w));
+  if (!next.walls?.length) delete next.walls;
+  return next;
+}
+
+/** Moves the wall section at `from` to `to` (or keeps the layout, dropped
+ * where it stood). */
+export function moveWall(l: Layout, from: WallSpot, to: WallSpot, ctx?: WallContext | null): Layout | null {
+  if (sameWall(from, to)) return l;
+  const rest = removeWall(l, from);
+  return placeWall(rest, to, ctx === undefined ? wallContext(rest) : ctx);
+}
+
+/** The wall section a press on cell (cx, cy) picks up: of those covering
+ * it, the one whose middle is nearest. */
+export function wallAtCell(l: Layout, cx: number, cy: number): WallSpot | undefined {
+  let best: WallSpot | undefined, bd = Infinity;
+  for (const w of l.walls ?? []) {
+    const r = wallPieceRect(w);
+    if (cx < r.x || cy < r.y || cx >= r.x + r.w || cy >= r.y + r.h) continue;
+    const d = Math.abs(r.x + r.w / 2 - cx - 0.5) + Math.abs(r.y + r.h / 2 - cy - 0.5);
+    if (d < bd) { bd = d; best = w; }
+  }
+  return best;
 }

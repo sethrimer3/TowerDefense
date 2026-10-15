@@ -188,7 +188,9 @@ export function eventCell(renderer: DefendRenderer, e: PointerEvent) {
 function ghostIcon(drag: Drag) {
   const g = document.createElement("canvas");
   g.width = g.height = 48;
-  g.className = "defend-drag-ghost";
+  // A wall section is small: its icon rides above the pointer, clear of
+  // the quarter tile it would take.
+  g.className = dragIcon(drag) === "wallBlock" ? "defend-drag-ghost small" : "defend-drag-ghost";
   paintIcon(g, dragIcon(drag));
   document.body.appendChild(g);
   return g;

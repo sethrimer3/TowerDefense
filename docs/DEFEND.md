@@ -105,6 +105,20 @@ Recent rows are available as `window.defendPerformance`; they are not saved.
   Boiling oil (every few seconds it scalds every enemy on foot near its
   walls, setting them burning from II). A respec gives every point back for
   5 Copper.
+- **Wall sections** (`layout.ts`'s `walls`, `wall-upgrades.ts`): carried
+  from the palette, the placing grid turns four times finer, and a section
+  takes the quarter tile it is let go over: 2 × 2 cells of wall stone, as
+  thick as the city wall, anywhere outside the city but the spawn row (not
+  where it would be wall already, nor over a structure). Enemies must break
+  through them like the city wall; civilians rebuild them. Pressed, they
+  lift and move; carried off the board they go back to the palette. Every
+  section shares one tree, its branches climbed side by side: Stonework
+  (50% then 120% more HP, then stones that mend 2% a second), Thornwork
+  (every 1.5 s, then every second, enemies on foot touching a section are
+  cut for 12, then 25; at III they are slowed) and Town walls (sections may
+  stand inside the city, then your own troops and townsfolk slip through
+  them). A respec gives every point back for 5 Copper and takes the
+  sections inside the city back to the palette.
 - The **Melee** and **Ranged Guilds**, **barracks**, **archer barracks**, the **Mage Guild**, the **sniper lodge**, the **musket hall**, the **Valkyrie palace** and the **dark wizard keep** must be inside the city. **Archer**, **cannon**, **watch
   and wizard towers** and **monster bait** may stand inside or outside.
 - Every structure takes a **share of its tile** (`size` in `catalog.ts`, in

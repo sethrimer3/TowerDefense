@@ -65,7 +65,8 @@ import { calledFell, castReinforcements, REINFORCE, shieldWall, stepReinforcemen
 import { ageGraves, bury, castNecromancy, NECRO, stepUndead, type Grave, type Raising, type Risen } from "./necromancy.ts";
 import { sheltered, fizzles, stepFloods, type Flood, type Sinking } from "./boats.ts";
 import { baitFell, baitStanding } from "./bait.ts";
-import { stepBallistaBolts, stepSpikes, type BallistaBolt, type SpikeThrust } from "./wall-defenses.ts";
+import { stepBallistaBolts, stepPlacedWalls, stepSpikes, type BallistaBolt, type SpikeThrust } from "./wall-defenses.ts";
+import { STONEWORK, TOWN_WALLS, wallRank } from "../wall-upgrades.ts";
 
 export type Levels = Record<UpgradeId, number>;
 
@@ -290,6 +291,12 @@ export class DefendSim {
    * drawn. Both empty without those Study paths. */
   readonly spikeArm = new Map<number, number>();
   spikeThrusts: SpikeThrust[] = [];
+  /** The stones of the walls the player placed on their own (empty without
+   * any), seconds until their thorns next cut (Thornwork), and whether the
+   * city's own people pass through them (Town walls' posterns). */
+  readonly pieces: Building[];
+  wallThornT = 0;
+  readonly posterns: boolean;
   scorches: Scorch[] = [];
   effects: Effect[] = [];
   /** The war banner the player planted, rallying the troops; null when none
@@ -403,7 +410,9 @@ export class DefendSim {
     }
     // Ponds block movement like buildings do, but belong to no building.
     for (let i = 0; i < CELL_COUNT; i++) if (map.type[i] === CellType.WATER) this.solid[i] = 1;
-    const gates = map.buildings.filter((b) => b.kind === "gate");
+    this.pieces = map.buildings.filter((b) => b.piece);
+    this.posterns = !!this.pieces.length && wallRank(bonuses.walls, "townWalls") >= TOWN_WALLS.posterns;
+    const gates = map.buildings.filter((b) => b.kind === "gate" || (this.posterns && b.piece));
     this.ownSolid = gates.length ? this.solid.slice() : this.solid;
     for (const b of gates) for (const c of b.cells) this.ownSolid[c] = 0;
     this.keepId = map.buildings.find((b) => b.kind === "keep")!.id;
@@ -506,6 +515,7 @@ export class DefendSim {
     stepArrows(this, dt);
     stepBallistaBolts(this, dt);
     stepSpikes(this, dt);
+    stepPlacedWalls(this, dt);
     stepShells(this, dt);
     stepSiegeShots(this, dt);
     this.wizards.step(this, dt);
@@ -904,7 +914,7 @@ export class DefendSim {
     if (id < 0 || this.solid[cell] || icyCell(this, cell)) return;
     const b = this.map.buildings[id];
     this.solid[cell] = 1;
-    if (b.kind !== "gate") this.ownSolid[cell] = 1;
+    if (b.kind !== "gate" && !(b.piece && this.posterns)) this.ownSolid[cell] = 1;
     this.changed.push(cell);
     this.built[id]++;
     this.hp[id] = Math.min(this.maxHp[id], this.hp[id] + this.maxHp[id] / b.cells.length);
@@ -1076,6 +1086,7 @@ export function watchReach(sim: Pick<DefendSim, "levels" | "bonuses">, b?: Build
 }
 
 function maxHpOf(b: Building, levels: Levels, bonuses: Readonly<Bonuses>) {
+  if (b.kind === "wall" && b.piece) return wallHp(levels.wallStrength) * bonuses.wallHp * STONEWORK.hp[wallRank(bonuses.walls, "stonework")];
   if (b.kind === "wall") return wallHp(levels.wallStrength) * bonuses.wallHp;
   if (b.kind === "gate") return wallHp(levels.wallStrength) * bonuses.wallHp * GATE.hpPerCell * b.cells.length;
   if (b.kind === "wallBallista") return wallHp(levels.wallStrength) * bonuses.wallHp * BALLISTA.hpPerCell * b.cells.length;

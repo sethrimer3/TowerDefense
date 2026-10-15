@@ -1,6 +1,6 @@
 import { rootOf, upgradedFrom } from "../specializations.ts";
 import { paintPathIcons } from "./path-badge.ts";
-import { upgradeTreeHtml } from "./specialty.ts";
+import { upgradeTreeHtml, wallTreeHtml } from "./specialty.ts";
 /** The Tiles tab: the player's tiles laid out in a hall of the keep they
  * defend, under its great window. Identical tiles stack, one stack a kind
  * marked with its quantity (`tileStacks`); a tap opens the stack in place,
@@ -15,7 +15,7 @@ import { upgradeTreeHtml } from "./specialty.ts";
  * stacks and spill out of them. */
 import { play } from "../sound.ts";
 import { daylight } from "../library/render.ts";
-import { BALLISTA_DESCRIPTION, BOMB_RADIUS, GATE_DESCRIPTION, ITEM_NAMES, SPIKES_DESCRIPTION, STRUCTURES, footprint, shareName, type PaletteItem } from "../defend/catalog.ts";
+import { BALLISTA_DESCRIPTION, BOMB_RADIUS, GATE_DESCRIPTION, WALL_BLOCK_DESCRIPTION, ITEM_NAMES, SPIKES_DESCRIPTION, STRUCTURES, footprint, shareName, type PaletteItem } from "../defend/catalog.ts";
 import type { PlacedKind } from "../defend/layout.ts";
 import { paintIcon, type IconItem } from "../defend/structure-art.ts";
 import {
@@ -191,7 +191,7 @@ export class TilesPage {
           <div><small>${TILE_TYPE_NAMES[TILE_TYPE[t.id]].toUpperCase()} TILE · ${counts}</small><h3>${name}</h3><p>${this.describe(t.id)}</p></div>
           <button class="tile-close" data-close aria-label="Close">×</button></header>
         ${copies}
-        ${isConsumable(t.id) ? "" : upgradeTreeHtml(s, t.id)}
+        ${isConsumable(t.id) ? "" : t.id === "wallBlock" ? wallTreeHtml() : upgradeTreeHtml(s, t.id)}
         <div class="tile-actions">${buy}${go("smithy")}${go("study")}</div>
         ${tierText ? `<p class="tile-tier"><span aria-hidden="true">♛</span> ${tierText}</p>` : ""}
       </div>`;
@@ -204,6 +204,7 @@ export class TilesPage {
     if (id === "cityGate") return GATE_DESCRIPTION;
     if (id === "wallSpikes") return SPIKES_DESCRIPTION;
     if (id === "wallBallista") return BALLISTA_DESCRIPTION;
+    if (id === "wallBlock") return WALL_BLOCK_DESCRIPTION;
     const d = this.save.defend;
     return `${STRUCTURES[id].description} Takes ${shareName(footprint(id, d.layout.compact.includes(id)).size)}.`;
   }

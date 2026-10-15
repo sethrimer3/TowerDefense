@@ -1,4 +1,5 @@
 import type { KeepRanks } from "../keep-upgrades.ts";
+import type { WallRanks } from "../wall-upgrades.ts";
 import { intPow } from "../exact.ts";
 import { ECONOMY, quadraticCost } from "../economy.ts";
 import type { BattlePaths, PathId } from "../knowledge-paths.ts";
@@ -10,8 +11,8 @@ import type { BattlePaths, PathId } from "../knowledge-paths.ts";
 export type StructureKind = "keep" | "meleeGuild" | "rangedGuild" | "barracks" | "archerBarracks" | "sniperLodge" | "musketHall" | "archerTower" | "cannonTower" | "watchTower" | "wizardTower" | "mageGuild" | "valkyriePalace" | "darkKeep" | "monsterBait";
 /** Everything that appears in the build palette (the keep is placed from the
  * start and can only be moved, so it is not a palette item). */
-export type PaletteItem = "cityTile" | "cityGate" | "wallSpikes" | "wallBallista" | Exclude<StructureKind, "keep">;
-export const PALETTE_ITEMS: PaletteItem[] = ["cityTile", "meleeGuild", "rangedGuild", "barracks", "archerBarracks", "sniperLodge", "musketHall", "watchTower", "archerTower", "cannonTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "cityGate", "wallSpikes", "wallBallista"];
+export type PaletteItem = "cityTile" | "cityGate" | "wallSpikes" | "wallBallista" | "wallBlock" | Exclude<StructureKind, "keep">;
+export const PALETTE_ITEMS: PaletteItem[] = ["cityTile", "meleeGuild", "rangedGuild", "barracks", "archerBarracks", "sniperLodge", "musketHall", "watchTower", "archerTower", "cannonTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "wallBlock", "cityGate", "wallSpikes", "wallBallista"];
 /** The only buildings the shop sells: every other tower or troop building
  * is one of these upgraded, a building at a time, with Knowledge
  * (`building-upgrades.ts`). */
@@ -32,6 +33,7 @@ export const ITEM_CATEGORY: Record<PaletteItem, Exclude<PaletteCategory, "all">>
   cityGate: "city",
   wallSpikes: "city",
   wallBallista: "city",
+  wallBlock: "city",
   monsterBait: "city",
   archerTower: "towers",
   cannonTower: "towers",
@@ -52,6 +54,9 @@ export const inCategory = (item: PaletteItem, category: PaletteCategory) => cate
 /** The city gate: 3 cells along the wall and its 2 cells deep, worth the
  * wall stones it stands in for, and some. */
 export const GATE = { long: 3, deep: 2, hpPerCell: 1.5 };
+/** A wall section, placed on its own. */
+export const WALL_BLOCK_DESCRIPTION =
+  "A section of stone wall a quarter of a tile across, placed on a finer grid anywhere outside the city to funnel and stall the enemy, who must break through it. Its upgrade tree toughens, barbs and opens every wall you place.";
 export const GATE_DESCRIPTION =
   "A gatehouse set into the city wall on the edge of a city tile. It swings open to let your soldiers, archers, mages and townsfolk out and in, and stays barred against the enemy, who must batter it down.";
 
@@ -270,6 +275,7 @@ export const STARTING_OWNED: Record<PaletteItem, number> = {
   cityGate: 0,
   wallSpikes: 0,
   wallBallista: 0,
+  wallBlock: 8,
   meleeGuild: 1,
   rangedGuild: 1,
   barracks: 0,
@@ -298,6 +304,7 @@ export function purchasePrice(item: PaletteItem, owned: number): Price {
     cityGate: { copper: 4 },
     wallSpikes: { copper: 3 },
     wallBallista: { copper: 6 },
+    wallBlock: { copper: 1 },
     meleeGuild: { copper: 4 },
     rangedGuild: { copper: 4 },
     barracks: { copper: 4 },
@@ -313,7 +320,8 @@ export function purchasePrice(item: PaletteItem, owned: number): Price {
     darkKeep: { copper: 25, silver: 8, gold: 2 },
     monsterBait: { copper: 3 },
   };
-  const b = base[item], up = (n = 0) => quadraticCost(n, extra, n * 0.25);
+  // Walls are laid by the dozen, so their price climbs slowly.
+  const b = base[item], up = (n = 0) => quadraticCost(n, extra, n * (item === "wallBlock" ? 0.02 : 0.25));
   const price: Price = { copper: up(b.copper) };
   if (b.silver) price.silver = up(b.silver);
   if (b.gold) price.gold = up(b.gold);
@@ -326,6 +334,7 @@ export const ITEM_NAMES: Record<PaletteItem, string> = {
   cityGate: "City gate",
   wallSpikes: "Wall spikes",
   wallBallista: "Wall ballista",
+  wallBlock: "Wall",
   meleeGuild: STRUCTURES.meleeGuild.name,
   rangedGuild: STRUCTURES.rangedGuild.name,
   barracks: STRUCTURES.barracks.name,
@@ -802,6 +811,8 @@ export type Bonuses = {
   /** The keep's own upgrades (`keep-upgrades.ts`); absent with none, so
    * such a run plays exactly as before. */
   keep?: KeepRanks;
+  /** The placed walls' upgrades (`wall-upgrades.ts`); absent with none. */
+  walls?: WallRanks;
 };
 export const NO_BONUSES: Readonly<Bonuses> = Object.freeze({
   troopHp: 1, troopDamage: 1, drill: 1, towerDamage: 1, towerReload: 1, wallHp: 1, keepHp: 1, rebuild: 1, bombDamage: 1, undeadHp: 1, undeadDamage: 1, meteorDamage: 1, meteorRadius: 1, frostTime: 1, frostRadius: 1, reinforceHp: 1, reinforceDamage: 1, reinforceTime: 1,

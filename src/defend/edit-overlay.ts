@@ -2,17 +2,22 @@
  * gold tile grid, and for a drag, which tiles accept the item, the hovered
  * tile, the item's ghost and an aimed bomb's reach. */
 import { SUB, TILES_H, TILES_W, boardSize, tileKey, type Rect } from "./grid.ts";
+import { QUARTER, QUARTERS_H, QUARTERS_W } from "./layout.ts";
 import type { StructureKind } from "./catalog.ts";
 
 export type Overlay = {
   /** Tile keys that accept the dragged item. */
   legal: Set<string>;
   hover: string | null;
-  ghost: { rect: Rect; kind: StructureKind | "cityTile" | "cityGate" | "wallSpikes" | "wallBallista" } | null;
+  ghost: { rect: Rect; kind: StructureKind | "cityTile" | "cityGate" | "wallSpikes" | "wallBallista" | "wallBlock" } | null;
   /** A piece of the wall being carried (a gate, spikes or a ballista): the
    * stretches or corners of wall that take it, the one under the pointer
    * and whether it fits there. */
   gates?: { legal: Rect[]; hover: Rect | null; fits: boolean };
+  /** A wall section being carried: the quarter tiles (keyed "qx,qy") that
+   * take it, the one under the pointer and whether it fits there. The
+   * placing grid turns four times finer. */
+  walls?: { legal: Set<string>; hover: string | null; fits: boolean };
   /** A bomb being aimed: centre in cells. */
   bomb?: { x: number; y: number; r: number } | null;
   /** The war banner being planted: centre and the reach it rallies to. */
@@ -48,7 +53,8 @@ export function drawGrid(c: CanvasRenderingContext2D, px: number, alpha: number)
 }
 
 export function drawOverlay(c: CanvasRenderingContext2D, px: number, o: Overlay) {
-  if (o.gates) drawGateTargets(c, px, o.gates);
+  if (o.walls) drawWallTargets(c, px, o.walls);
+  else if (o.gates) drawGateTargets(c, px, o.gates);
   else if (o.legal.size || o.ghost || o.hover !== null) drawTargets(c, px, o);
   if (o.ghost) drawGhost(c, px, o.ghost.rect);
   if (o.bomb) drawBombReach(c, px, o.bomb);
@@ -263,4 +269,40 @@ function drawReinforceReach(c: CanvasRenderingContext2D, px: number, at: NonNull
     c.fillStyle = s.look === "archer" ? "#a8e07a" : "#f6c75a";
     for (const [i, j] of chevron) c.fillRect(x + i * k, y + j * k, k, k);
   }
+}
+
+/** For a wall section: the board's grid of quarter tiles, those that won't
+ * take it shaded, the tile lines over the finer ones, and the quarter under
+ * the pointer framed (red where it won't go). */
+function drawWallTargets(c: CanvasRenderingContext2D, px: number, w: NonNullable<Overlay["walls"]>) {
+  const Q = (px * SUB) / QUARTER;
+  const { W, H } = boardSize(px);
+  const at = (q: number) => Math.round(q * Q);
+  for (let qy = 0; qy < QUARTERS_H; qy++)
+    for (let qx = 0; qx < QUARTERS_W; qx++) {
+      const ok = w.legal.has(`${qx},${qy}`);
+      c.fillStyle = ok ? "rgba(242,201,76,0.05)" : "rgba(0,0,0,0.4)";
+      c.fillRect(at(qx), at(qy), at(qx + 1) - at(qx), at(qy + 1) - at(qy));
+    }
+  c.save();
+  c.lineWidth = 1;
+  c.strokeStyle = "rgba(216,181,114,0.22)";
+  c.beginPath();
+  for (let qx = 1; qx < QUARTERS_W; qx++) if (qx % QUARTER) { c.moveTo(at(qx) + 0.5, 0); c.lineTo(at(qx) + 0.5, H); }
+  for (let qy = 1; qy < QUARTERS_H; qy++) if (qy % QUARTER) { c.moveTo(0, at(qy) + 0.5); c.lineTo(W, at(qy) + 0.5); }
+  c.stroke();
+  c.strokeStyle = "rgba(216,181,114,0.5)";
+  c.beginPath();
+  for (let tx = 1; tx < TILES_W; tx++) { c.moveTo(at(tx * QUARTER) + 0.5, 0); c.lineTo(at(tx * QUARTER) + 0.5, H); }
+  for (let ty = 1; ty < TILES_H; ty++) { c.moveTo(0, at(ty * QUARTER) + 0.5); c.lineTo(W, at(ty * QUARTER) + 0.5); }
+  c.stroke();
+  c.restore();
+  if (w.hover === null) return;
+  const [qx, qy] = w.hover.split(",").map(Number);
+  const lw = Math.max(1, px * 0.14), x = at(qx), y = at(qy), s = at(qx + 1) - x;
+  c.fillStyle = w.fits ? "rgba(242,201,76,0.18)" : "rgba(200,40,50,0.22)";
+  c.fillRect(x, y, s, s);
+  c.lineWidth = lw;
+  c.strokeStyle = w.fits ? "rgba(242,201,76,0.95)" : "rgba(230,70,80,0.85)";
+  c.strokeRect(x + lw / 2, y + lw / 2, s - lw, s - lw);
 }
