@@ -2031,3 +2031,5 @@ dialog .away-row .away-note {
 .tile-set b { font-size: 10px; color: #f0d9a8; font-weight: normal; }
 .tile-set .tile-marks { justify-content: flex-start; }
 .tile-set > div > small { font-size: 8px; color: #b3a282; letter-spacing: 0.3px; }
+/* What tapping the picked node again does. */
+.ug-again { flex-basis: 100%; text-align: right; font-size: 8px; color: #a8987a; letter-spacing: 0.3px; }

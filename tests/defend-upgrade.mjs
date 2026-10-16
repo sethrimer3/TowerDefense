@@ -182,6 +182,24 @@ try {
     assert.equal(s.knowledge, before.knowledge, 'every point back');
     assert.equal(s.smithy.copper, before.smithy.copper, 'free');
     assert.deepEqual(await nodes(), ['k:meleeGuild=owned', 'k:barracks=next', 'k:assassinDen=next']);
+    // Tap a picked node again to buy it; tap a picked owned one again to sell everything after it.
+    await page.evaluate(() => { window.__dp.host.game().knowledge += 500; });
+    const k0 = await page.evaluate(() => window.__dp.host.game().knowledge);
+    const twice = async id => { await press(panel.locator(`[data-node="${id}"]`)); await press(panel.locator(`[data-node="${id}"]`)); await settled(); };
+    await twice('k:barracks');
+    assert.equal((await placed(melee.uid)).kind, 'barracks', 'a second tap buys it');
+    await twice('p:crusaders:1');
+    assert.deepEqual([(await placed(melee.uid)).path, (await placed(melee.uid)).rank], ['crusaders', 1]);
+    await press(panel.locator('[data-node="k:barracks"]'));
+    assert.match(await panel.locator('.ug-again').textContent(), /sell everything after it/);
+    await page.waitForTimeout(500); await page.screenshot({ path: `${out}/upgrade-${width}-tap-again.png` });
+    await press(panel.locator('[data-node="k:barracks"]'));
+    await settled();
+    assert.deepEqual([(await placed(melee.uid)).kind, (await placed(melee.uid)).path], ['barracks', undefined], 'sold down to the barracks');
+    await page.screenshot({ path: `${out}/upgrade-${width}-sold-down.png` });
+    await twice('k:meleeGuild');
+    assert.equal((await placed(melee.uid)).kind, 'meleeGuild', 'and down to the Melee Guild');
+    assert.equal((await state(page)).knowledge, k0, 'every point back');
     await press(panel.locator('[data-specialty-close]'));
 
     // The Ranged Guild's four branches.
@@ -266,7 +284,7 @@ try {
 
     // The shop sells only the basic buildings; Tiles shows the tree.
     await page.locator('nav [data-tab="tiles"]').click();
-    await page.locator('.tiles-hall [data-key="watchTower"]').click();
+    await page.locator('.tiles-hall [data-tile="watchTower"]').first().click();
     assert.match(await page.locator('.tile-specialties').textContent(), /Becomes Wizard tower/);
     await page.waitForTimeout(400); await page.screenshot({ path: `${out}/upgrade-${width}-tiles.png` });
     assert.deepEqual(errors, []);

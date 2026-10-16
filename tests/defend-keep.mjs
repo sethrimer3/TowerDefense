@@ -136,6 +136,22 @@ try {
     assert.equal(s.defend.keepRanks, undefined, 'respecced');
     assert.equal(s.knowledge, 100);
     assert.equal(s.smithy.copper, 20, 'free');
+    // Tap a picked rank again to buy it; tap a picked owned one again to sell the ranks above it.
+    await page.evaluate(() => { window.__dp.host.game().knowledge += 10000; });
+    const twice = async id => { await press(panel.locator(`[data-node="${id}"]`)); await press(panel.locator(`[data-node="${id}"]`)); await page.waitForTimeout(150); };
+    await twice('q:bastions:1');
+    await twice('q:bastions:2');
+    assert.deepEqual((await state(page)).defend.keepRanks, { bastions: 2 }, 'a second tap buys');
+    await press(panel.locator('[data-node="q:bastions:1"]'));
+    assert.match(await panel.locator('.ug-again').textContent(), /sell everything after it/);
+    await press(panel.locator('[data-node="q:bastions:1"]'));
+    await page.waitForTimeout(150);
+    assert.deepEqual((await state(page)).defend.keepRanks, { bastions: 1 }, 'a second tap on an owned rank sells the ones above it');
+    await twice('k:keep');
+    s = await state(page);
+    assert.equal(s.defend.keepRanks, undefined, 'and on the keep, every rank');
+    assert.equal(s.knowledge, 10100, 'every point back');
+    await page.evaluate(() => { window.__dp.host.game().knowledge -= 10000; });
     await page.evaluate(() => { window.__dp.host.game().settings.devMode = true; });
     for (const id of ['q:bastions:1', 'q:bastions:2', 'q:arrowLoops:1', 'q:arrowLoops:2', 'q:arrowLoops:3', 'q:boilingOil:1', 'q:boilingOil:2', 'q:boilingOil:3']) await buy(id);
     await page.evaluate(() => { window.__dp.host.game().settings.devMode = false; });

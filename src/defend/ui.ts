@@ -1,6 +1,6 @@
 import { hasTree, respecBuilding, undoUpgrade, rootOf, specialtyLabel, specialtyOf, stepName, targetKind, upgradeBuilding, type SpecialtyTarget } from "../specializations.ts";
 import { pathById, type PathId } from "../knowledge-paths.ts";
-import { keepCardHtml, keepGraph, keepStep, keepUndo, treeAllocated, treeCardHtml, treeGraph, treeStep, wallCardHtml, wallGraph, wallStep, wallUndo } from "../ui/specialty.ts";
+import { keepBeyond, keepCardHtml, keepGraph, keepStep, keepUndo, treeAllocated, treeBeyond, treeCardHtml, treeGraph, treeStep, wallBeyond, wallCardHtml, wallGraph, wallStep, wallUndo } from "../ui/specialty.ts";
 import { keepAllocated, respecKeep, undoKeep, upgradeKeep } from "../keep-upgrades.ts";
 import { respecWalls, undoWalls, upgradeWalls, wallAllocated } from "../wall-upgrades.ts";
 import { UpgradeGraph } from "../ui/upgrade-graph.ts";
@@ -1200,6 +1200,30 @@ export class DefendPage {
     this.wentBack(undoUpgrade(game, sp.target, id), "Undone");
   }
 
+  /** The picked node `id` was tapped again: buy it when it is next, or,
+   * when it is owned, sell everything after it (undo the one grown from
+   * it; on a side tree's root, every rank), staying on it. */
+  private again(id: string) {
+    const sp = this.specialty, game = this.host.game?.();
+    if (!sp || !game || this.phase !== "build") return;
+    if ("keep" in sp.target || "walls" in sp.target) {
+      const keep = "keep" in sp.target;
+      if (keep ? keepStep(this.save.keepRanks, id) : wallStep(this.save.wallRanks, id)) return this.upgrade(id);
+      const beyond = keep ? keepBeyond(this.save.keepRanks, id) : wallBeyond(this.save.wallRanks, id);
+      if (!beyond) return;
+      if ("all" in beyond) return this.respec();
+      const back = keep ? keepUndo(this.save.keepRanks, beyond.undo) : wallUndo(this.save.wallRanks, beyond.undo);
+      if (!back) return;
+      return this.wentBack(keep ? undoKeep(game, back.id as never, back.rank) : undoWalls(game, back.id as never, back.rank), "Sold", id);
+    }
+    const kind = targetKind(this.save, sp.target);
+    if (!kind) return;
+    const wear = specialtyOf(this.save, sp.target);
+    if (treeStep(kind, wear, id)) return this.upgrade(id);
+    const beyond = treeBeyond(kind, wear, id);
+    if (beyond) this.wentBack(undoUpgrade(game, sp.target, beyond), "Sold", id);
+  }
+
   /** After a respec or an undo: save, redraw, and stand on where it went back to. */
   private wentBack(r: { ok: true; kind?: string; waiting?: boolean; copy?: unknown } | { ok: false; reason: string }, what: string, at?: string) {
     const sp = this.specialty!;
@@ -1264,6 +1288,8 @@ export class DefendPage {
         },
         onPick: (id) => {
           if (!this.specialty) return;
+          // A second tap on the picked node buys it, or sells everything after it.
+          if (this.specialty.picked === id) return this.again(id);
           this.specialty.picked = id;
           this.renderSpecialty();
         },
