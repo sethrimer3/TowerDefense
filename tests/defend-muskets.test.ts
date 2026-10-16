@@ -21,16 +21,15 @@ import { PATH_LOOKS, structurePixels } from "../src/defend/tower-art.ts";
 
 type S = ReturnType<typeof defaults>;
 
-/** A Ranged Guild beside the keep made a Musket hall on `path` at `rank`. */
+/** A Musket hall beside the keep climbing `path` to `rank`. */
 function hall(path?: PathId, rank = 3) {
   const s = defaults(); s.settings.devMode = true; s.knowledge = 1e6;
-  s.defend.owned.rangedGuild = 1;
+  s.defend.owned.musketHall = 1;
   let l = defaultLayout();
   for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) l = placeCityTile(l, l.keep.tx + dx, l.keep.ty + dy)!;
-  l = placeStructure(l, "rangedGuild", l.keep.tx, l.keep.ty - 1) ?? assert.fail("placement");
+  l = placeStructure(l, "musketHall", l.keep.tx, l.keep.ty - 1) ?? assert.fail("placement");
   s.defend.layout = l;
-  const uid = l.structures.find((st) => st.kind === "rangedGuild")!.uid;
-  assert.ok(upgradeBuilding(s, { uid }, { type: "become", to: "musketHall", cost: 0 }).ok);
+  const uid = l.structures.find((st) => st.kind === "musketHall")!.uid;
   for (let r = 0; path && r < rank; r++) {
     const step = nextSteps("musketHall", specialtyOf(s.defend.layout, { uid })).find((st) => st.type === "path" && st.path === path)!;
     assert.ok(upgradeBuilding(s, { uid }, step).ok);
