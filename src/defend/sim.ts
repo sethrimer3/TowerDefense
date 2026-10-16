@@ -194,6 +194,9 @@ export type Arrow = {
   /** An explosive ball's burst radius where it hits (sparing your own
    * people); absent otherwise. */
   blast?: number;
+  /** A Grenadier's ball: the ground it leaves burning (for `life` seconds at
+   * `dps`, clinging at III) and the bomblets it throws; absent otherwise. */
+  grenade?: { life: number; dps: number; bomblets: number; cling?: true };
 };
 export type Effect = { kind: "boom" | "dust" | "spark" | "firework" | "steam"; x: number; y: number; t: number; r: number; seed?: number };
 /** A cannon shell in flight: lobbed from the tower to where the target was. */
