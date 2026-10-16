@@ -66,7 +66,7 @@ const C = {
   /** The Stormcalling wizard tower's thundercloud slate, dark to light. */
   cloud: [0x262c46, 0x3a4466, 0x56628a, 0x7e8cb4],
   bolt: 0xffe45a,
-  /** The Crusaders' lead roof and the Assassins' soot-black one. */
+  /** The Crusaders' lead roof and the Assassins' den's soot-black one. */
   lead: 0x6c7886,
   dusk: 0x3a3246,
   /** The Rangers' green-stained shingles and the Skirmishers' tarred ones. */
@@ -110,6 +110,7 @@ const MATERIAL: Record<PlacedKind, { m: Material; ruin: Pick<Ruin, "stone" | "to
   rangedGuild: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: [0x3a3c42, 0x5a5c62, 0x7a7c84], beams: true } },
   sniperLodge: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.canvas.slice(0, 3), beams: true } },
   musketHall: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.char, beams: true } },
+  assassinDen: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: [0x241f2c, C.dusk, 0x544a62], beams: true } },
   barracks: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: [0x6e2a22, C.red, 0xc25a48], beams: true } },
   archerBarracks: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: [0x4a3826, C.timber, 0x8e7048], beams: true } },
   archerTower: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.plank.slice(0, 3), beams: true } },
@@ -132,7 +133,8 @@ const frame = (w: number, h: number) => ({ x0: 1, y0: 1, x1: w - 3, y1: h - 3 })
  * other path keeps the base art. Add a path here and handle it in the kind's
  * painter to give it a sprite. */
 export const PATH_LOOKS: Partial<Record<PlacedKind, readonly string[]>> = {
-  barracks: ["crusaders", "assassins"],
+  barracks: ["crusaders"],
+  assassinDen: ["bloodletters", "shadowcloak", "venom", "headhunters"],
   archerBarracks: ["rangers", "skirmishers"],
   archerTower: ["fireArrows", "sharpshooters"],
   cannonTower: ["gunnery", "siegeShot"],
@@ -163,13 +165,14 @@ export function structureRubblePixels(kind: PlacedKind, cw: number, ch: number, 
   return rubblePixels(w, h, hash(seed, KINDS.indexOf(kind), 3), { ...frame(w, h), ...MATERIAL[kind].ruin });
 }
 
-const KINDS: PlacedKind[] = ["barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "meleeGuild", "rangedGuild", "sniperLodge", "musketHall"];
+const KINDS: PlacedKind[] = ["barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "meleeGuild", "rangedGuild", "sniperLodge", "musketHall", "assassinDen"];
 
 const PAINT: Record<PlacedKind, (p: Pix, look: string) => void> = {
   meleeGuild: paintMeleeGuild,
   rangedGuild: paintRangedGuild,
   sniperLodge: paintSniperLodge,
   musketHall: paintMusketHall,
+  assassinDen: paintAssassinDen,
   barracks: paintBarracks,
   archerBarracks: paintArcherBarracks,
   archerTower: paintArcherTower,
@@ -269,14 +272,14 @@ function hall(p: Pix, x0: number, y0: number, x1: number, y1: number, roof: numb
   return gable(p, x0 + 3, y0 + 3, x1 - 3, y1 - 3, roof);
 }
 
-/** The Assassins' emblem on the ridge: a dagger, point up. */
+/** The Assassins' den's emblem on the ridge: a dagger, point up. */
 const DAGGER = ["..0..", ".030.", ".032.", ".032.", ".032.", "00500", "05450", "00500", ".010.", ".000."];
 
 function paintBarracks(p: Pix, look: string) {
   const { x0, y0, x1, y1 } = frame(p.w, p.h);
-  const crusaders = look === "crusaders", assassins = look === "assassins";
-  // Crusaders hold a lead-roofed hall, the Assassins a soot-black one.
-  const { along, ridge } = hall(p, x0, y0, x1, y1, crusaders ? C.lead : assassins ? C.dusk : C.red);
+  const crusaders = look === "crusaders";
+  // Crusaders hold a lead-roofed hall.
+  const { along, ridge } = hall(p, x0, y0, x1, y1, crusaders ? C.lead : C.red);
   // A chimney near one gable end.
   const [chx, chy] = along ? [x0 + 5, ridge - 2] : [ridge - 2, y0 + 5];
   for (let dy = 0; dy < 4; dy++)
@@ -285,18 +288,6 @@ function paintBarracks(p: Pix, look: string) {
       p.set(chx + dx, chy + dy, rim ? OUTLINE : dx === 1 && dy === 1 ? C.stone[3] : dx === 2 && dy === 2 ? 0x2a221c : C.stone[1]);
     }
   const sx = Math.round((x0 + x1) / 2) - 2, sy = Math.round((y0 + y1) / 2) - 3;
-  if (assassins) {
-    // A dagger in place of the shield: a lit steel blade, a gold guard
-    // round a blood-red stone, a dark grip.
-    DAGGER.forEach((row, j) =>
-      [...row].forEach((ch, i) => {
-        if (ch === ".") return;
-        const c = ch === "0" ? OUTLINE : ch === "1" ? C.iron[1] : ch === "2" ? C.iron[2] : ch === "3" ? C.iron[3] : ch === "4" ? C.ruby[3] : C.gold[1];
-        p.set(sx - 1 + i, sy - 2 + j, c);
-      }),
-    );
-    return;
-  }
   // The shield on the ridge, mid-roof: blue with a lit upper left and a
   // gold boss, pointed at the foot; the Crusaders' white with a red cross.
   const white = [0xa8a49c, 0xdcd8d0, 0xfaf8f2];
@@ -386,6 +377,54 @@ function paintMusketHall(p: Pix) {
     disc(p, y.x0 + dx, y.y0 + dy, 1.9, (x, yy, d, ox, oy) => (d > 1.3 ? OUTLINE : d < 0.6 ? C.char[0] : d > 0.95 ? C.iron[2] : C.crate[1 + Math.min(2, lit(x, yy, ox, oy, d))]));
   const sx = y.x1 - 4, sy = Math.round((y.y0 + y.y1) / 2);
   for (const [ox, oy] of [[0, 0], [1, 0], [-1, 1], [0, 1], [1, 1], [2, 1], [0, 2], [1, -1]]) p.set(sx + ox, sy + oy, ox === 0 && oy === 1 ? C.char[2] : C.char[0]);
+}
+
+/** The Shadowcloak's hood with two eyes glinting in it. */
+const HOOD = ["..000..", ".01110.", "0122210", "0200020", "0204020", "0200020", "0122210", "0011100"];
+/** The Venomblades' green vial, stoppered. */
+const VIAL = ["..0..", ".030.", "00000", "02220", "21112", "21112", "02220", ".000."];
+/** The Headhunters' skull. */
+const SKULL = [".000.", "02220", "20202", "02220", ".202.", ".000."];
+
+/** The Assassins' den: a soot-black hall with a dagger on the ridge over a
+ * yard with a knife-scarred straw dummy and a rack of blades. Its paths
+ * change the roof, the emblem and what lies in the yard. */
+function paintAssassinDen(p: Pix, look: string) {
+  const steel = { 0: OUTLINE, 1: C.iron[1], 2: C.iron[2], 3: C.iron[3], 4: C.ruby[3], 5: C.gold[1] };
+  const blood = { ...steel, 2: C.ruby[2], 3: C.ruby[3], 4: C.ruby[4] };
+  const roof = look === "bloodletters" ? C.wine[1] : look === "shadowcloak" ? C.flag[1] : look === "venom" ? 0x2e4a2a : look === "headhunters" ? C.tar : C.dusk;
+  const y = look === "shadowcloak" ? guild(p, roof, HOOD, { 0: OUTLINE, 1: C.slate[1], 2: C.flag[0], 4: 0xc8f0ff })
+    : look === "venom" ? guild(p, roof, VIAL, { 0: OUTLINE, 1: C.slime[1], 2: C.slime[2], 3: C.bone[1] })
+    : look === "headhunters" ? guild(p, roof, SKULL, { 0: OUTLINE, 2: C.bone[1] })
+    : guild(p, roof, DAGGER, look === "bloodletters" ? blood : steel);
+  // A straw dummy on a post, scored by knives.
+  const dx = y.x0 + 3.5, dy = (y.y0 + y.y1) / 2 + 0.5;
+  disc(p, dx, dy, 2.6, (x, yy, d, ox, oy) => (d > 1.8 ? OUTLINE : C.straw[Math.min(2, lit(x, yy, ox, oy, d))]));
+  p.set(Math.round(dx) - 1, Math.round(dy) - 1, C.plank[0]);
+  p.set(Math.round(dx), Math.round(dy), C.plank[0]);
+  if (look === "bloodletters") {
+    // Blood soaked into the yard round the dummy.
+    for (const [ox, oy] of [[-2, 2], [-1, 3], [2, 2], [3, 1], [1, -3], [-3, -1], [0, 3]]) p.set(Math.round(dx) + ox, Math.round(dy) + oy, C.ruby[ox & 1 ? 1 : 0]);
+  }
+  const rx = y.x1 - 4, ry0 = y.y0 + 1, ry1 = y.y1 - 1;
+  if (look === "venom") {
+    // A bubbling green pot where the blades are dipped.
+    disc(p, rx + 1.5, (ry0 + ry1) / 2 + 0.5, 2.4, (x, yy, d, ox, oy) => (d > 1.7 ? OUTLINE : d < 1 ? C.slime[1 + Math.min(1, lit(x, yy, ox, oy, d))] : C.iron[1]));
+    return;
+  }
+  if (look === "headhunters") {
+    // A bounty board, its notices pinned up.
+    rect(p, rx - 1, ry0, rx + 3, ry1, OUTLINE);
+    rect(p, rx, ry0 + 1, rx + 2, ry1 - 1, C.plank[2]);
+    for (let yy = ry0 + 1; yy < ry1; yy += 2) p.set(rx + 1, yy, C.target[0]);
+    return;
+  }
+  // A rack of blades against the fence; the Shadowcloak's draped in black.
+  for (let yy = ry0; yy <= ry1; yy++) p.set(rx, yy, C.plank[0]);
+  for (let yy = ry0 + 1; yy < ry1; yy += 2) {
+    p.set(rx + 1, yy, look === "shadowcloak" ? C.flag[2] : C.iron[3]);
+    p.set(rx + 2, yy, look === "shadowcloak" ? C.flag[0] : C.iron[2]);
+  }
 }
 
 function paintArcherBarracks(p: Pix, look: string) {

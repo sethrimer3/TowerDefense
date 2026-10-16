@@ -169,7 +169,7 @@ try {
     // A Melee Guild becomes a barracks, then is respecced, free.
     const melee = await place('meleeGuild');
     await tapBuilding(melee.uid);
-    assert.deepEqual(await nodes(), ['k:meleeGuild=owned', 'k:barracks=next']);
+    assert.deepEqual(await nodes(), ['k:meleeGuild=owned', 'k:barracks=next', 'k:assassinDen=next']);
     const before = await state(page);
     await buy('k:barracks');
     await settled();
@@ -181,7 +181,7 @@ try {
     assert.equal((await placed(melee.uid)).kind, 'meleeGuild', 'back to a Melee Guild');
     assert.equal(s.knowledge, before.knowledge, 'every point back');
     assert.equal(s.smithy.copper, before.smithy.copper, 'free');
-    assert.deepEqual(await nodes(), ['k:meleeGuild=owned', 'k:barracks=next']);
+    assert.deepEqual(await nodes(), ['k:meleeGuild=owned', 'k:barracks=next', 'k:assassinDen=next']);
     await press(panel.locator('[data-specialty-close]'));
 
     // The Ranged Guild's four branches.
