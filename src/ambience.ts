@@ -39,7 +39,7 @@ export const QUIET: Scene = { rain: 0, wind: 0, howl: 0, sand: 0, thunder: 0, bi
 
 const rand = stream("effects");
 /** How loud each bed is at level 1. */
-const BED = { rain: 0.82, roar: 1, wind: 1.1, howl: 0.25, sand: 0.12, crickets: 0.16, fire: 0.14 };
+const BED = { rain: 0.65, roar: 0.8, wind: 0.8, howl: 0.1, sand: 0.1, crickets: 0.065, fire: 0.14 };
 /** Seconds a layer takes to ease most of the way to a new level. */
 const EASE = 1.2;
 
@@ -151,7 +151,7 @@ function build(): Graph | null {
   const g: Graph = {
     ctx, bus, room, muffle, hall,
     rain: layer(), roar: layer(), wind: layer(), howl: layer(), sand: layer(), crickets: layer(), fire: layer(room),
-    windBand: filter("bandpass", 420, 0.9), howlBand: filter("bandpass", 900, 9),
+    windBand: filter("bandpass", 420, 0.9), howlBand: filter("bandpass", 900, 2),
   };
   loop(rainBuf, filter("highpass", 380), g.rain);
   const slow = loop(rainBuf, filter("lowpass", 700), g.roar);
@@ -178,12 +178,12 @@ function scatter(g: Graph, s: Scene, t: number) {
     g.howlBand.frequency.setTargetAtTime(650 + rand() * 700, t, 1.1);
   }
   if (s.birds > 0.05 && t >= due.bird) {
-    due.bird = t + (0.5 + rand() * 3) / s.birds;
-    sing(g, t + rand() * 0.2, s.birds);
+    due.bird = t + (3 + rand() * rand() * 12) / s.birds;
+    sing(g, t + rand() * 0.2, s.birds * (1 - Math.min(1, s.rain * 1.5)));
   } else if (s.birds <= 0.05) due.bird = t + rand() * 2;
   if (s.night > 0.3 && t >= due.owl) {
     if (due.owl) hoot(g, t, s.night);
-    due.owl = t + 14 + rand() * 30;
+    due.owl = t + 35 + rand() * 65;
   } else if (s.night <= 0.3) due.owl = t + 6 + rand() * 20;
   if (s.thunder > 0 && t >= due.thunder) {
     if (due.thunder) roll(g, t, rand() * 0.45);
@@ -234,7 +234,8 @@ function sweep(g: Graph, at: number, pitch: [number, number][], env: [number, nu
 /** One bird's phrase: a whistled call, a trill, a warble, or far off, a
  * cuckoo. */
 function sing(g: Graph, at: number, loud: number) {
-  const pan = rand() * 1.6 - 0.8, a = (0.05 + rand() * 0.06) * Math.min(1, loud + 0.3), base = 2600 + rand() * 1600;
+  if (loud <= 0) return;
+  const pan = rand() * 1.6 - 0.8, a = (0.018 + rand() * 0.025) * Math.min(1, loud + 0.3), base = 2600 + rand() * 1600;
   const kind = rand();
   if (kind < 0.35) {
     // Two or three falling whistles: "tee-oo, tee-oo".
@@ -245,19 +246,19 @@ function sing(g: Graph, at: number, loud: number) {
     }
   } else if (kind < 0.65) {
     // A trill of quick chirps, speeding up.
-    const n = 6 + Math.floor(rand() * 8);
+    const n = 4 + Math.floor(rand() * 5);
     let t = at;
     for (let i = 0; i < n; i++) {
       sweep(g, t, [[0, base], [0.035, base * 1.35]], [[0.005, a * 0.8], [0.03, 0]], pan);
-      t += 0.075 - i * 0.003;
+      t += 0.065 + rand() * 0.025 - i * 0.002;
     }
   } else if (kind < 0.93) {
     // A warble: a wandering whistle with a fast flutter.
     const len = 0.35 + rand() * 0.4, osc = g.ctx.createOscillator(), lfo = g.ctx.createOscillator(), depth = g.ctx.createGain();
     osc.frequency.setValueAtTime(base, at);
     osc.frequency.linearRampToValueAtTime(base * (0.8 + rand() * 0.5), at + len);
-    lfo.frequency.value = 18 + rand() * 14;
-    depth.gain.value = base * 0.08;
+    lfo.frequency.value = 5 + rand() * 4;
+    depth.gain.value = base * 0.015;
     lfo.connect(depth).connect(osc.frequency);
     const v = voice(g, at, pan);
     v.gain.linearRampToValueAtTime(a * 0.8, at + 0.04);
@@ -267,7 +268,7 @@ function sing(g: Graph, at: number, loud: number) {
     for (const o of [osc, lfo]) { o.start(at); o.stop(at + len + 0.05); }
   } else {
     // A cuckoo across the fields.
-    const c = 0.07 * Math.min(1, loud + 0.3);
+    const c = 0.025 * Math.min(1, loud + 0.3);
     for (const [dt, f] of [[0, 698], [0.32, 587]] as const)
       sweep(g, at + dt, [[0, f], [0.25, f * 0.98]], [[0.04, c], [0.18, c * 0.7], [0.26, 0]], pan * 0.5, 0, "triangle");
   }
@@ -275,7 +276,7 @@ function sing(g: Graph, at: number, loud: number) {
 
 /** An owl, a soft hollow "hoo… hoo-hoo-hooo" in the dark. */
 function hoot(g: Graph, at: number, loud: number) {
-  const a = 0.1 * loud, pan = rand() * 1.4 - 0.7, f = 330 + rand() * 60;
+  const a = 0.04 * loud, pan = rand() * 1.4 - 0.7, f = 330 + rand() * 60;
   const notes: [number, number][] = [[0, 0.4], [0.75, 0.16], [0.95, 0.16], [1.15, 0.6]];
   for (const [dt, len] of notes)
     sweep(g, at + dt, [[0, f * 1.04], [0.06, f], [len, f * 0.93]], [[0.05, a], [len - 0.08, a * 0.8], [len, 0]], pan, 0.3);
@@ -373,7 +374,7 @@ const whiteLoop = (ctx: AudioContext) => loopBuffer(ctx, "white", 3, (d) => {
 });
 
 /** Brown noise: deep, for wind, thunder and a fire's roar. */
-const brownLoop = (ctx: AudioContext) => loopBuffer(ctx, "brown", 5, (d) => {
+const brownLoop = (ctx: AudioContext) => loopBuffer(ctx, "brown", 13, (d) => {
   let b = 0;
   for (let i = 0; i < d.length; i++) {
     b = (b + 0.02 * (rand() * 2 - 1)) * 0.998;
@@ -381,34 +382,49 @@ const brownLoop = (ctx: AudioContext) => loopBuffer(ctx, "brown", 5, (d) => {
   }
 });
 
-/** Rain: a hush of soft noise sprinkled with thousands of drops, each a tiny
- * ping on a leaf, a stone or a puddle. */
-const rainBed = (ctx: AudioContext) => loopBuffer(ctx, "rain", 6, (d, rate) => {
+/** Rain: a hush of soft noise with short, diffuse impacts on leaves,
+ * stone and puddles. */
+const rainBed = (ctx: AudioContext) => loopBuffer(ctx, "rain", 17, (d, rate) => {
   let lp = 0;
   for (let i = 0; i < d.length; i++) {
     lp += 0.35 * (rand() * 2 - 1 - lp);
     d[i] = lp * 0.35;
   }
-  const drops = Math.floor((d.length / rate) * 260);
+  // Broadband impacts rather than ringing sine pings: rain lands on many
+  // surfaces, with only occasional larger drops in the foreground.
+  const drops = Math.floor((d.length / rate) * 180);
   for (let n = 0; n < drops; n++) {
-    const at = Math.floor(rand() * d.length), f = 1200 + rand() * 4800, len = Math.floor(rate * (0.004 + rand() * 0.012));
-    const amp = 0.05 + rand() * rand() * 0.5, w = (2 * Math.PI * f) / rate;
-    for (let i = 0; i < len && at + i < d.length; i++) d[at + i] += Math.sin(i * w) * amp * Math.exp(-i / (len * 0.3));
+    const at = Math.floor(rand() * d.length), len = Math.floor(rate * (0.008 + rand() * 0.035));
+    const amp = 0.025 + rand() * rand() * 0.22;
+    let body = 0;
+    for (let i = 0; i < len && at + i < d.length; i++) {
+      body += 0.25 * (rand() * 2 - 1 - body);
+      const envelope = (1 - Math.exp(-i / (rate * 0.001))) * Math.exp(-i / (len * 0.22));
+      d[at + i] += body * amp * envelope;
+    }
   }
 });
 
-/** Crickets: several, each chirping its own pulses at its own pitch and
- * pace, every pace dividing the loop so it repeats seamlessly. */
-const cricketBed = (ctx: AudioContext) => loopBuffer(ctx, "crickets", 4, (d, rate, ch) => {
-  const len = d.length - Math.floor(rate * 0.25), count = 3;
-  for (let c = 0; c < count; c++) {
-    const f = 3900 + rand() * 900, w = (2 * Math.PI * f) / rate, amp = (0.3 + rand() * 0.5) * (ch === c % 2 ? 1 : 0.45);
-    const period = len / (5 + Math.floor(rand() * 4)), pulses = 2 + Math.floor(rand() * 3), offset = rand() * period;
-    const pulse = rate * 0.016;
-    for (let start = offset; start < d.length; start += period)
+/** A sparse insect chorus. Long, irregular bouts and small pitch variation
+ * keep individual callers from sounding like synchronized alarm clocks. */
+const cricketBed = (ctx: AudioContext) => loopBuffer(ctx, "crickets", 23, (d, rate, ch) => {
+  for (let c = 0; c < 4; c++) {
+    const f = 3800 + rand() * 1700;
+    const amp = (0.12 + rand() * 0.15) * (ch === c % 2 ? 1 : 0.35);
+    let start = rand() * rate * 3, phase = rand() * Math.PI * 2;
+    while (start < d.length) {
+      const pulses = 2 + Math.floor(rand() * 4), spacing = rate * (0.035 + rand() * 0.018);
       for (let p = 0; p < pulses; p++) {
-        const s0 = Math.floor(start + p * pulse * 2);
-        for (let i = 0; i < pulse && s0 + i < d.length; i++) d[s0 + i] += Math.sin(i * w) * amp * Math.sin((Math.PI * i) / pulse);
+        const at = Math.floor(start + p * spacing), len = Math.floor(rate * (0.012 + rand() * 0.009));
+        const pitch = f * (0.99 + rand() * 0.02);
+        for (let i = 0; i < len && at + i < d.length; i++) {
+          phase += 2 * Math.PI * pitch / rate;
+          const envelope = Math.sin(Math.PI * i / len) ** 2;
+          d[at + i] += (Math.sin(phase) * 0.8 + (rand() * 2 - 1) * 0.2) * amp * envelope;
+        }
       }
+      start += pulses * spacing + rate * (0.18 + rand() * rand() * 2.4);
+      if (rand() < 0.22) start += rate * (1 + rand() * 4);
+    }
   }
 });

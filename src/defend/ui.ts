@@ -1,6 +1,7 @@
+import { MagicCircle } from "../magic-circle/render.ts";
 import { RESPEC_PRICE, hasTree, respecBuilding, rootOf, specialtyLabel, specialtyOf, stepName, targetKind, upgradeBuilding, type SpecialtyTarget } from "../specializations.ts";
 import { pathById, type PathId } from "../knowledge-paths.ts";
-import { keepCardHtml, keepGraph, keepStep, treeAllocated, treeCardHtml, treeGraph, treeStep } from "../ui/specialty.ts";
+import { specialtyCircle, keepCardHtml, keepGraph, keepStep, treeAllocated, treeCardHtml, treeGraph, treeStep } from "../ui/specialty.ts";
 import { keepAllocated, respecKeep, upgradeKeep } from "../keep-upgrades.ts";
 import { UpgradeGraph } from "../ui/upgrade-graph.ts";
 import type { Save } from "../save.ts";
@@ -148,6 +149,7 @@ export class DefendPage {
    * respec waits on a second press. */
   private specialty: { target: TreeTarget; picked: string; respec: boolean } | null = null;
   private tree: UpgradeGraph | null = null;
+  private treeCircle: MagicCircle | null = null;
   private summonHold: { kind: EnemyKind; button: HTMLButtonElement; pointerId: number; next: number } | null = null;
 
   constructor(root: HTMLElement, host: DefendHost) {
@@ -196,6 +198,7 @@ export class DefendPage {
     }
     this.fitView();
     this.placeSpecialty();
+    if (this.specialty && !this.pointers.session?.overlay()) this.treeCircle?.frame(time, this.host.reduceMotion() || matchMedia("(prefers-reduced-motion: reduce)").matches);
     const drawing = performance.now();
     this.draw(false);
     const drawn = performance.now();
@@ -1207,6 +1210,8 @@ export class DefendPage {
     const keep = !!sp && "keep" in sp.target, kind = !sp ? undefined : "keep" in sp.target ? "keep" as const : targetKind(this.save, sp.target);
     if (!sp || !kind || !game || this.phase !== "build") {
       if (sp) this.specialty = null;
+      this.treeCircle?.destroy();
+      this.treeCircle = null;
       this.tree?.destroy();
       this.tree = null;
       el.hidden = true;
@@ -1239,6 +1244,9 @@ export class DefendPage {
       });
       if (!this.host.reduceMotion()) replay(el, "spec-open");
     }
+    this.treeCircle ??= new MagicCircle();
+    this.treeCircle.attach(el.querySelector<HTMLElement>(".ug-host")!);
+    this.treeCircle.set(specialtyCircle(kind, wear, this.save.keepRanks));
     const ranks = this.save.keepRanks;
     const spent = kind === "keep" ? keepAllocated(ranks) : treeAllocated(kind, wear);
     const plain = kind === "keep" ? !ranks : spent === 0 && (kind === "wallSpikes" || rootOf(kind) === kind);

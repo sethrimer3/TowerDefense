@@ -1,3 +1,5 @@
+import { MagicCircle } from "../magic-circle/render.ts";
+import { studyCircle } from "../magic-circle/progression.ts";
 import { TILE_TYPE } from "../tiles.ts";
 import { play } from "../sound.ts";
 import { TRAINING, addSmith, busySmiths, whole, cancelTraining, removeSmith, skillPurchase, skillRank, startTraining, trainingLeft, trainingStep, type TrainingId } from "../progression.ts";
@@ -63,6 +65,8 @@ export class Ledger {
   private subject: SubjectId;
   private topics: Partial<Record<SubjectId, string>> = {};
   private trainingParticles = new TrainingParticles();
+  private circle: MagicCircle | null = null;
+  private circleResearch: string | null = null;
   /** The rank picked in each topic's path tree ("path:index", or "path:crown"). */
   private picked: Record<string, string> = {};
   /** The subject and topic last drawn. */
@@ -74,7 +78,9 @@ export class Ledger {
 
   constructor(private ctx: AppContext, readonly root: HTMLElement, readonly kind: LedgerKind, private up: () => void) {
     this.subjects = ledgerSubjects(kind);
-    this.subject = kind === "study" ? "towers" : this.subjects[0].id;
+    // The Study no longer has a Towers subject (building research is in
+    // Defend). Open the first supported subject rather than a missing one.
+    this.subject = this.subjects[0].id;
   }
 
   private get save() {
@@ -119,6 +125,17 @@ export class Ledger {
         ${this.galleryHtml(subject)}
         ${smithy ? `<p class="ledger-scope">GLOBAL EQUIPMENT · ${topic.item ? `Every ${topic.name}, owned now or bought later` : topic.name}</p>${this.forgeHtml(topic)}` : `<p class="ledger-scope">SHARED RESEARCH · ${topic.name}</p>${this.studyHtml(topic)}`}</section>`;
     const root = this.root;
+    if (!smithy) {
+      this.circle ??= new MagicCircle();
+      this.circle.set(studyCircle(this.save, topic));
+      const job = this.save.researchJob;
+      const relevant = job && (job.kind === "skill" ? topic.skills?.includes(job.id) : pathsOf(topic.id).some(p => p.id === job.id));
+      const research = relevant ? `${job.kind}:${job.id}:${job.rank}` : "";
+      if (research && this.circleResearch !== null && research !== this.circleResearch) this.circle.energize();
+      this.circleResearch = research;
+      this.circle.attach(root);
+      root.classList.add("has-magic-circle");
+    }
     root.querySelectorAll<HTMLButtonElement>("[data-ledger-stack]").forEach(b => b.onclick = () => {
       this.topics[this.subject] = b.dataset.ledgerStack!;
       this.render();
@@ -497,6 +514,9 @@ export class Ledger {
     replay(card, "bought");
     sparksOver(card?.querySelector("button") ?? null, "arcane");
   }
+
+  /** Called by the existing main loop only while the Study is in view. */
+  drawCircle(time: number, reduced: boolean) { this.circle?.frame(time, reduced); }
 
   // ── Each frame and each second ──────────────────────────────────────────
   /** Once a second while the chamber shows: the whole chamber once a rank

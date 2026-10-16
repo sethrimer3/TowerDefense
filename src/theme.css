@@ -1998,3 +1998,21 @@ dialog .away-row .away-note {
   .ug-title b { font-size: 11px; }
   .ug-card { font-size: 9px; }
 }
+
+/* Procedural Knowledge artifact: separate from the vault and torch art.
+   Persistent canvases are reattached after ledger redraws without a new loop. */
+.magic-circle {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: contain; image-rendering: pixelated; pointer-events: none;
+  user-select: none; z-index: 0; opacity: 0.88;
+}
+.chamber-content.has-magic-circle { isolation: isolate; }
+.chamber-content.has-magic-circle > .magic-circle {
+  top: 140px; height: calc(100% - 140px); width: calc(100% - 40px); left: 20px;
+}
+.has-magic-circle > :not(.magic-circle) { position: relative; z-index: 1; }
+.chamber .has-magic-circle .ledger-study { background: linear-gradient(#06060938, #06060960); }
+.has-magic-circle .ledger-skill { background-color: #09080ded; }
+.has-magic-circle .path-detail, .has-magic-circle .path-node { text-shadow: 0 1px 2px #000, 0 0 4px #000; }
+.ug-host > .ug-view { z-index: 1; }
+.ug-host > .magic-circle { opacity: 0.8; }

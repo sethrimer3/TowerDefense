@@ -45,6 +45,10 @@ The city is alive between and during battles: park grass sways in the wind (hard
 
 ## How it's built
 
+The Library's Study and Defend's building Knowledge trees have procedural gold magic circles: clipped Voronoi cells, nested diagrams, concentric sigils, projected 4D tesseracts and lights tracing geometric paths. Completed research and selected spell/building paths deterministically shape each circle; purchases, unlearning and respec morph it over 1.7 seconds. The effect preserves the chamber artwork, uses bounded pixel canvases and cached geometry, and becomes static under Reduce Motion. `src/magic-circle/` contains the renderer and its configuration; `node tests/magic-circle.mjs` checks desktop/mobile integration against the dev server (set `PLAYWRIGHT_EXECUTABLE` to an installed Chromium).
+
+Nature ambience is synthesized locally: rain uses soft noise impacts, wind uses filtered noise, and insects use long loops with irregular pauses. Bird and owl calls are sparse and quiet; no audio downloads are required.
+
 `src/ui/hold-repeat.ts` adds accelerating press-and-hold purchases to Mine hires/building upgrades, Library shelves/hires/lab expansion, Tiles purchases and repeatable Smithy/Study upgrades. Holds start after 450 ms, then speed up from 260 ms between purchases to a minimum of 35 ms. Every purchase keeps its current price, capacity and project checks; release, scrolling, cancellation or leaving the controls stops the hold. `node tests/hold-repeat.mjs` checks mouse/touch behavior and persistence with isolated browser contexts (requires the dev server).
 
 Current upgrade costs, per-rank acquisition estimates, production samples and two-year pacing options are in [docs/UPGRADE_TIMING.md](docs/UPGRADE_TIMING.md). The report and [rank-by-rank CSV](docs/upgrade-estimates.csv) are generated from the catalogs by `tools/estimate-upgrades.ts`; `tools/measure-upgrade-production.ts` samples ordinary Mine and Library simulation without player saves. These are planning estimates, with setup and sampling limits documented in the report.

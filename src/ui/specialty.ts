@@ -1,3 +1,4 @@
+import type { CircleState } from "../magic-circle/formation.ts";
 /** A building's upgrades as the player meets them: what a path does to the
  * kind's numbers (`kindStats`), the read-only tree Tiles shows
  * (`upgradeTreeHtml`), and the living tree Defend shows when a placed
@@ -5,7 +6,7 @@
  * `treeCardHtml`, the card of the node picked in it). The tree comes from
  * `specializations.ts`; paths, ranks, icons and hues from `knowledge-paths.ts`. */
 import type { Save } from "../save.ts";
-import { BECOMES, TROOPS, allocated, buildingPathsOf, buildingTree, type TreeNode, type UpgradeStep, type Wear } from "../specializations.ts";
+import { BECOMES, TROOPS, allocated, rootOf, buildingPathsOf, buildingTree, type TreeNode, type UpgradeStep, type Wear } from "../specializations.ts";
 import type { GraphNode } from "./upgrade-graph.ts";
 import { ARROW_LOOPS, BASTIONS, BOILING_OIL, KEEP_PATHS, keepRank, type KeepPathId, type KeepRanks } from "../keep-upgrades.ts";
 import { pathById, pathTopicOf, UNSPECIALIZED, type PathId, FIRE_ARROWS, SHARP, GUNNERY, SIEGE_SHOT, CRUSADE, ASSASSIN, RANGERS, SKIRMISH, FORTIFY, PYRO, RIME, STORM, PYROCLASM, CINDERS, SPOTTERS, SIGNAL } from "../knowledge-paths.ts";
@@ -178,4 +179,14 @@ export function keepCardHtml(save: Save, ranks: KeepRanks | undefined, id: strin
     : `<span class="ug-locked">Locked: buy the one before it · ${cost.toLocaleString("en")} Knowledge</span>`;
   const at = { ...ranks, [p.id]: rank };
   return `<div class="ug-card-head"><b>${p.name} ${ROMAN[rank]}: ${step.name}</b><small>Level ${rank} / ${p.ranks.length}</small></div><p>${p.motto}. ${step.text}</p><p class="ug-stats">At this rank: ${keepStats(save, at)}</p><div class="ug-card-foot" data-ug-ignore>${state}</div>`;
+}
+
+/** A family keeps its base identity through kind changes and respecs.
+ * Placement UIDs intentionally do not affect the visual identity. */
+export function specialtyCircle(kind: PaletteItem | "wallSpikes" | "keep", wear?: Wear, ranks?: KeepRanks): CircleState {
+  const root = kind === "keep" || kind === "wallSpikes" ? kind : rootOf(kind as never);
+  const upgrades = [{ id: `kind:${kind}`, rank: 1 }];
+  if (wear) upgrades.push({ id: `path:${wear.path}`, rank: wear.rank });
+  if (kind === "keep") for (const p of KEEP_PATHS) upgrades.push({ id: `keep:${p.id}`, rank: keepRank(ranks, p.id) });
+  return { topic: `building:${root}`, upgrades };
 }
