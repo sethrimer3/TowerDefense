@@ -132,7 +132,7 @@ test("saves keep their gates, and older saves have none", () => {
 test("the palette's categories split everything between towers, units and the city", () => {
   const of = (c: "towers" | "units" | "city") => PALETTE_ITEMS.filter((i) => inCategory(i, c));
   assert.deepEqual(of("towers"), ["watchTower", "archerTower", "cannonTower", "wizardTower"]);
-  assert.deepEqual(of("units"), ["meleeGuild", "rangedGuild", "barracks", "archerBarracks", "sniperLodge", "musketHall", "mageGuild", "valkyriePalace", "darkKeep"]);
+  assert.deepEqual(of("units"), ["meleeGuild", "rangedGuild", "barracks", "assassinDen", "archerBarracks", "sniperLodge", "musketHall", "mageGuild", "valkyriePalace", "darkKeep"]);
   assert.deepEqual(of("city"), ["cityTile", "monsterBait", "wallBlock", "cityGate", "wallSpikes", "wallBallista"]);
   assert.deepEqual(PALETTE_ITEMS.filter((i) => inCategory(i, "all")), PALETTE_ITEMS);
 });

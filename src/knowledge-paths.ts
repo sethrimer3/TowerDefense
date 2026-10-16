@@ -6,7 +6,7 @@ import { cloneLayout, type PlacedKind } from "./defend/layout.ts";
 import type { Save } from "./save.ts";
 import { studyPathCost } from "./economy.ts";
 
-export type PathTopic = "wizardTower" | "barracks" | "archerTower" | "cannonTower" | "archerBarracks" | "watchTower" | "mageGuild" | "bait" | "spikes" | SpellId;
+export type PathTopic = "wizardTower" | "barracks" | "assassinDen" | "archerTower" | "cannonTower" | "archerBarracks" | "watchTower" | "mageGuild" | "bait" | "spikes" | SpellId;
 /** Strike spells: cast from the battle's Skills palette rather than built,
  * so a spell has no cards; it casts with the one path `save.spellPaths`
  * names, at its furthest researched rank. */
@@ -14,7 +14,8 @@ export type SpellId = "necromancy" | "meteor" | "frostNova" | "reinforcements";
 export const SPELLS: SpellId[] = ["necromancy", "meteor", "frostNova", "reinforcements"];
 export const isSpell = (topic: string): topic is SpellId => (SPELLS as string[]).includes(topic);
 export type PathId =
-  | "pyromancy" | "rime" | "storm" | "crusaders" | "assassins"
+  | "pyromancy" | "rime" | "storm" | "crusaders"
+  | "bloodletters" | "shadowcloak" | "venom" | "headhunters"
   | "fireArrows" | "sharpshooters" | "gunnery" | "siegeShot" | "rangers" | "skirmishers"
   | "spotters" | "signalFires" | "pyroclasm" | "cinders" | "oilSoaked" | "fortified"
   | "blastStakes" | "springStakes" | "rimeStakes"
@@ -31,7 +32,8 @@ export type PathIcon =
   | "bone" | "scales" | "tombstone" | "hand"
   | "meteor" | "stars" | "crater"
   | "shards" | "whirl" | "frostShield"
-  | "hammer" | "helm" | "oath";
+  | "hammer" | "helm" | "oath"
+  | "hood" | "vial" | "drop";
 /** Each path's colours, as `ui/path-icons.ts` and the page's CSS name them. */
 export type PathHue = "ember" | "frost" | "storm" | "steel" | "shadow" | "verdant" | "grave";
 export type PathRank = { name: string; icon: PathIcon; cost: number; text: string };
@@ -59,10 +61,24 @@ export const RIME = { chill: 1.5, damage: 1.6, reach: 1.5, freeze: 1.2 };
 export const STORM = { links: [0, 3, 5, 7], jump: [0, 2.5, 3, 3.5], damage: 1.2, surge: 1.5 };
 /** Crusaders: heavier (HP by rank, slower), healing from II, harder hitting at III. */
 export const CRUSADE = { hp: [1, 1.5, 1.5, 2.2], speed: 0.85, heal: 3, damage: 1.5 };
-/** Assassins: faster and frailer, every `every[rank]`th strike critical for
- * `crit` times the damage; quicker strokes from II, the whole city their
- * hunting ground at III. */
-export const ASSASSIN = { speed: 1.3, hp: 0.8, every: [0, 4, 3, 2], crit: 3, cooldown: 0.75 };
+/** The Assassins' den's paths (`assassins.ts`). Bloodletters: criticals
+ * hit `crit[rank]` times the damage, every `every[rank]`th strike, and the
+ * assassins have `hp[rank]` of their HP (rank 0 is the plain den's). */
+export const BLOODLETTERS = { crit: [2, 5, 5, 10], every: [4, 4, 3, 2], hp: [1, 0.7, 0.6, 0.5] };
+/** Shadowcloak: no enemy picks out a cloaked assassin; a strike unveils it
+ * for `reveal[rank]` seconds, and a strike from the cloak hits `ambush[rank]`
+ * times as hard; at III a kill cloaks it again at once. */
+export const SHADOWCLOAK = { reveal: [0, 3, 2, 2], ambush: [1, 2, 4, 6] };
+/** Venom: every strike envenoms for `time[rank]` seconds: the enemy takes
+ * `more[rank]` times the damage from everything, and loses `share` of the
+ * striker's damage a second; at III one that dies envenomed passes it to
+ * every enemy within `spread` cells. */
+export const VENOM = { time: [0, 4, 6, 6], more: [1, 1.25, 1.5, 1.5], share: 0.5, spread: 1.5 };
+/** Headhunters: assassins go for the toughest enemy (the most HP) they can
+ * reach, every strike adding `bounty[rank]` of its full HP (at most `cap`
+ * times the strike); from II they range `leash` times as far, and at III
+ * anywhere in the city. */
+export const HEADHUNT = { bounty: [0, 0.01, 0.02, 0.03], cap: 10, leash: 1.5 };
 /** Fire arrows: an archer tower's arrows set what they hit burning for
  * `burn[rank]` seconds at `share[rank]` of the arrow's damage a second; at
  * III it looses `volley` arrows at once, each at another of the nearest. */
@@ -219,11 +235,35 @@ export const PATHS: KnowledgePath[] = [
     evolves: { from: "barracks", item: "valkyriePalace", name: "Valkyrie palace", cost: 100000, text: "This Barracks becomes a Valkyrie palace" },
   },
   {
-    id: "assassins", topic: "barracks", name: "Assassins", motto: "Swift, frail, deadly strikes", hue: "shadow",
+    id: "bloodletters", topic: "assassinDen", name: "Bloodletters", motto: "Enormous criticals, paper-thin guard", hue: "shadow",
     ranks: [
-      { name: "Light feet", icon: "boot", cost: studyPathCost(4, 0), text: "Swordsmen run 30% faster with 20% less HP; every 4th strike is critical, 3× damage" },
-      { name: "Cutthroats", icon: "dagger", cost: studyPathCost(4, 1), text: "Every 3rd strike is critical, and they strike 33% faster" },
-      { name: "Shadows", icon: "skull", cost: studyPathCost(4, 2), text: "Every other strike is critical, and they hunt anywhere in the city" },
+      { name: "Heartseeker", icon: "dagger", cost: studyPathCost(4, 0), text: "Criticals hit 5× instead of 2×, but assassins have 30% less HP" },
+      { name: "Opened veins", icon: "drop", cost: studyPathCost(4, 1), text: "Every 3rd strike is critical; 40% less HP" },
+      { name: "Deathblow", icon: "skull", cost: studyPathCost(4, 2), text: "Every other strike is critical, for 10×; half their HP" },
+    ],
+  },
+  {
+    id: "shadowcloak", topic: "assassinDen", name: "Shadowcloak", motto: "Unseen until the blade falls", hue: "storm",
+    ranks: [
+      { name: "Cloak", icon: "hood", cost: studyPathCost(4, 0), text: "Assassins are cloaked: no enemy picks them out until they strike, and they vanish 3 seconds after. A strike from the cloak hits twice as hard" },
+      { name: "Ambush", icon: "eye", cost: studyPathCost(4, 1), text: "They vanish 2 seconds after a strike, and strikes from the cloak hit 4× as hard" },
+      { name: "Vanish", icon: "whirl", cost: studyPathCost(4, 2), text: "A kill cloaks them again at once, and strikes from the cloak hit 6× as hard" },
+    ],
+  },
+  {
+    id: "venom", topic: "assassinDen", name: "Venomblades", motto: "Poisoned enemies suffer from every blow", hue: "verdant",
+    ranks: [
+      { name: "Venomed blades", icon: "vial", cost: studyPathCost(4, 0), text: "Every strike poisons for 4 seconds: the enemy takes 25% more damage from everything, and the venom bites as it lasts" },
+      { name: "Wolfsbane", icon: "drop", cost: studyPathCost(4, 1), text: "Poisoned enemies take 50% more damage, for 6 seconds" },
+      { name: "Plague", icon: "skull", cost: studyPathCost(4, 2), text: "An enemy that dies poisoned passes the venom to every enemy within 1.5 cells" },
+    ],
+  },
+  {
+    id: "headhunters", topic: "assassinDen", name: "Headhunters", motto: "The toughest prey first", hue: "steel",
+    ranks: [
+      { name: "Quarry", icon: "crosshair", cost: studyPathCost(4, 0), text: "Assassins go for the toughest enemy they can reach, not the nearest; each strike adds 1% of its full HP" },
+      { name: "Bounty", icon: "scales", cost: studyPathCost(4, 1), text: "They range half again as far, and each strike adds 2% of its full HP" },
+      { name: "Kingslayer", icon: "crown", cost: studyPathCost(4, 2), text: "They hunt anywhere in the city, and each strike adds 3% of its full HP" },
     ],
   },
   {
@@ -463,6 +503,7 @@ export const pathFits = (kind: string, path: PathId) => PATHS.some((p) => p.id =
 export const UNSPECIALIZED: Record<PathTopic, string> = {
   wizardTower: "The original mix of fire and ice",
   barracks: "Balanced swordsmen",
+  assassinDen: "Quick, frail assassins: every 4th strike critical",
   archerTower: "Steady single arrows",
   cannonTower: "Standard shells and blasts",
   archerBarracks: "Ordinary archers",

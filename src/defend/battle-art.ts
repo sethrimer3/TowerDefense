@@ -10,7 +10,7 @@ import { boatLights, drawBoat } from "./boat-art.ts";
  * damaged buildings, blast scorches, then the units, projectiles and effects.
  * Every painter takes a `Brush`: the board's context and its pixels per cell. */
 import { hash01 } from "./grid.ts";
-import { ARCHER_UNIT, BRAWLER, CIVILIAN, DARK_WIZARD, ENEMIES, FIRE_MAGE, MUSKETEER, SLINGER, SNIPER, SOLDIER, VALKYRIE, watchRadius, type EnemyDef } from "./catalog.ts";
+import { ARCHER_UNIT, ASSASSIN_UNIT, BRAWLER, CIVILIAN, DARK_WIZARD, ENEMIES, FIRE_MAGE, MUSKETEER, SLINGER, SNIPER, SOLDIER, VALKYRIE, watchRadius, type EnemyDef } from "./catalog.ts";
 import type { Building } from "./citygen.ts";
 import { center } from "./pathing.ts";
 import { paintKeepFlash } from "./structure-art.ts";
@@ -173,9 +173,9 @@ function drawSoldiers(b: Brush, sim: DefendSim, torches: Burning | null) {
       drawCalled(c, px, u);
       continue;
     }
-    if (u.kind === "brawler" || u.kind === "slinger" || u.kind === "sniper" || u.kind === "musketeer") {
+    if (u.kind === "brawler" || u.kind === "slinger" || u.kind === "sniper" || u.kind === "musketeer" || u.kind === "assassin") {
       drawGuildTroop(b, sim, u);
-      if (torches) drawHandTorch(b, { x: u.x + SOLDIER.size * 0.65, y: u.y - SOLDIER.size * 0.45, id: u.id }, sim.time, torches(u.x, u.y, u.id));
+      if (torches && u.cloak !== 0) drawHandTorch(b, { x: u.x + SOLDIER.size * 0.65, y: u.y - SOLDIER.size * 0.45, id: u.id }, sim.time, torches(u.x, u.y, u.id));
       continue;
     }
     const archer = u.kind === "archer";
@@ -201,10 +201,11 @@ function drawSoldiers(b: Brush, sim: DefendSim, torches: Burning | null) {
  * swordsmen's: a brawler in a tan jerkin jabbing a fist at whatever it
  * punches; a stone thrower in sackcloth with a stone in hand; a sniper in
  * green with a long rifle; a musketman in red-brown with a short musket and
- * a glowing match. */
+ * a glowing match; an assassin in black with a dagger it stabs with, a
+ * faint shimmer while cloaked. */
 function drawGuildTroop(b: Brush, sim: DefendSim, u: Soldier) {
   const { c, px } = b;
-  const k = u.kind as "brawler" | "slinger" | "sniper" | "musketeer";
+  const k = u.kind as keyof typeof GUILD_TROOPS;
   const def = GUILD_TROOPS[k], s = Math.max(2, def.size * px), unit = Math.max(1, Math.round(s * 0.22));
   const e = sim.enemies.find((o) => o.id === u.target);
   let fx = 0, fy = -1;
@@ -213,8 +214,10 @@ function drawGuildTroop(b: Brush, sim: DefendSim, u: Soldier) {
     fx = (e.x - u.x) / d;
     fy = (e.y - u.y) / d;
   }
-  // A brawler leans into a punch for a moment after each one lands.
-  const since = def.cooldown - u.cd, punch = k === "brawler" && since >= 0 && since < 0.16 ? Math.sin((since / 0.16) * Math.PI) : 0;
+  // A brawler leans into a punch (an assassin into a stab) for a moment after each one lands.
+  const since = def.cooldown - u.cd, punch = (k === "brawler" || k === "assassin") && since >= 0 && since < 0.16 ? Math.sin((since / 0.16) * Math.PI) : 0;
+  const veiled = u.cloak === 0;
+  if (veiled) c.globalAlpha = 0.3 + 0.1 * Math.sin(sim.time * 4 + u.id);
   const x = (u.x + fx * punch * 0.12) * px, y = (u.y + fy * punch * 0.12) * px;
   c.fillStyle = "#0b0907";
   c.fillRect(Math.round(x - s / 2 - 1), Math.round(y - s / 2 - 1), Math.round(s + 2), Math.round(s + 2));
@@ -223,6 +226,23 @@ function drawGuildTroop(b: Brush, sim: DefendSim, u: Soldier) {
   // A lit upper left, like the city's art.
   c.fillStyle = "rgba(255,255,255,0.22)";
   c.fillRect(Math.round(x - s / 2), Math.round(y - s / 2), Math.round(s), unit);
+  if (k === "assassin") {
+    // A hood's lit rim, and the dagger thrust at the target.
+    c.fillStyle = "#6a5a86";
+    c.fillRect(Math.round(x - s / 2), Math.round(y - s / 2), Math.round(s), unit);
+    const reach = s * (0.5 + punch * 0.6), w = Math.max(1, unit);
+    c.strokeStyle = "#0b0907";
+    c.lineWidth = w + 2;
+    c.beginPath();
+    c.moveTo(x + fx * s * 0.3, y + fy * s * 0.3);
+    c.lineTo(x + fx * (s * 0.3 + reach), y + fy * (s * 0.3 + reach));
+    c.stroke();
+    c.strokeStyle = "#d8dce6";
+    c.lineWidth = w;
+    c.stroke();
+    c.globalAlpha = 1;
+    return;
+  }
   if (k === "brawler") {
     // Fists: one held up, one thrown at the target.
     const reach = s * (0.55 + punch * 0.45);
@@ -265,6 +285,7 @@ function drawGuildTroop(b: Brush, sim: DefendSim, u: Soldier) {
   }
 }
 const GUILD_TROOPS = {
+  assassin: ASSASSIN_UNIT,
   brawler: BRAWLER,
   slinger: SLINGER,
   sniper: SNIPER,
@@ -410,6 +431,17 @@ export function drawEnemyArt(b: Brush, e: Enemy, sim: DefendSim) {
   else drawEnemy(b, e, sim);
 }
 
+/** An assassin's venom on an enemy: green drops oozing off it, one a pixel
+ * of art, timed by battle time. */
+function drawVenom({ c, px }: Brush, e: Enemy, at: { x: number; y: number; s: number }, t: number) {
+  const dot = Math.max(1, Math.round(px / 8));
+  for (let i = 0; i < 3; i++) {
+    const k = (t * 0.9 + i / 3 + e.id * 0.37) % 1;
+    c.fillStyle = k < 0.5 ? "#9be04a" : "#4e8a22";
+    c.fillRect(Math.round(at.x + (at.s * (i + 0.5)) / 3), Math.round(at.y + at.s * 0.3 + k * at.s * 0.9), dot, dot);
+  }
+}
+
 /** Enemies: tiny squares, gold-outlined when marked, with a shadow under
  * fliers; bosses get a dark rim, a crown and a health bar; a Mother and her
  * brood are black with a violet rim, so they show against the night. */
@@ -442,6 +474,7 @@ function drawEnemy(b: Brush, e: Enemy, sim: DefendSim) {
     c.fillRect(x, y, s, s);
   }
   drawHostileMarks(b, e, { x, y, s });
+  if (e.venom) drawVenom(b, e, { x, y, s }, sim.time);
   if (def.boss) drawBossMarks(b, e, { x, y, s });
   if (def.chainLength) {
     c.fillStyle = "#fff2ba";
@@ -530,7 +563,7 @@ export function drawScorches({ c, px }: Brush, sim: DefendSim) {
 export function shadowCasters(sim: DefendSim) {
   const def = (e: Enemy): EnemyDef => ENEMIES[e.kind];
   return [
-    ...sim.soldiers.map((u) => ({ x: u.x, y: u.y, size: u.kind === "archer" ? ARCHER_UNIT.size : u.kind === "mage" ? FIRE_MAGE.size : u.kind === "valkyrie" ? VALKYRIE.size : u.kind === "darkWizard" ? DARK_WIZARD.size : u.kind === "brawler" || u.kind === "slinger" || u.kind === "sniper" || u.kind === "musketeer" ? GUILD_TROOPS[u.kind].size : u.risen ? u.risen.size : u.called ? u.called.size : SOLDIER.size })),
+    ...sim.soldiers.map((u) => ({ x: u.x, y: u.y, size: u.kind === "archer" ? ARCHER_UNIT.size : u.kind === "mage" ? FIRE_MAGE.size : u.kind === "valkyrie" ? VALKYRIE.size : u.kind === "darkWizard" ? DARK_WIZARD.size : u.kind === "brawler" || u.kind === "slinger" || u.kind === "sniper" || u.kind === "musketeer" || u.kind === "assassin" ? GUILD_TROOPS[u.kind].size : u.risen ? u.risen.size : u.called ? u.called.size : SOLDIER.size })),
     ...sim.civilians.map((u) => ({ x: u.x, y: u.y, size: CIVILIAN.size })),
     ...sim.enemies.filter((e) => !def(e).flying).map((e) => ({ x: e.x, y: e.y, size: enemySize(e) })),
   ];

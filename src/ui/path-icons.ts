@@ -195,6 +195,18 @@ const ICONS: Record<PathIcon, string[]> = {
     "...........", "..o.....o..", ".olo...owo.", "..o.....o..", "....o......", "...owo..o..",
     "....o..olo.", ".o......o..", "olo..o.....", ".o..olo....", ".....o.....",
   ],
+  hood: [
+    "...ooooo...", "..ommmmmo..", ".omlllmmdo.", ".olmooomdo.", "olmo...odmo", "olmowowodmo",
+    "olmo...odmo", "ollmo.odmmo", "olmmmmmmmdo", ".olmmmmmdo.", "..ooooooo..",
+  ],
+  vial: [
+    "....ooo....", "....olo....", "....olo....", "...ooooo...", "..olllmdo..", ".olwlmmmdo.",
+    "olwlmmmmmdo", "ollmmmmmmdo", "olmmmmmmddo", ".odmmmmddo.", "..ooooooo..",
+  ],
+  drop: [
+    ".....o.....", ".....o.....", "....olo....", "....olo....", "...olmmo...", "..olwmmmo..",
+    ".olwlmmmdo.", ".ollmmmmdo.", ".olmmmmddo.", "..odmmddo..", "...ooooo...",
+  ],
 };
 
 const OUTLINE = "#140c08";
