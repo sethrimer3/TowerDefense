@@ -6,12 +6,19 @@ import { DefendSim, type Enemy, type Levels } from "../src/defend/sim.ts";
 import { NO_BONUSES, UPGRADES, type Bonuses, type EnemyKind } from "../src/defend/catalog.ts";
 import { dropSpots, LAND_SHOW, REINFORCE } from "../src/defend/reinforcements.ts";
 import { HAMMERFALL, MUSTER, OATH, equipSpell, learnPath, spellPath, unlearnPath } from "../src/knowledge-paths.ts";
-import { bonuses, startTraining } from "../src/progression.ts";
+import { bonuses, settleTraining, startTraining } from "../src/progression.ts";
 import { decode, defaults } from "../src/save.ts";
 import { CONSUMABLES, shopOffer, tileStack, tileTopic } from "../src/tiles.ts";
 import { ledgerSubjects } from "../src/ui/ledger.ts";
 import { cellAt } from "../src/defend/pathing.ts";
 import { chilled } from "../src/defend/wizard.ts";
+
+/** One Smithy rank, worked through to the end by a smith. */
+function train(s: ReturnType<typeof defaults>, id: Parameters<typeof startTraining>[1]) {
+  assert.ok(startTraining(s, id, "Ada"));
+  s.trainingClock = 1;
+  settleTraining(s, 1e15);
+}
 
 const LEVELS = Object.fromEntries(UPGRADES.map((u) => [u.id, 0])) as Levels;
 
@@ -89,9 +96,8 @@ test("the squad drops round where it is cast, holds there, marches off and cools
 test("the Smithy's rows make them tougher, harder hitting and slower to leave", () => {
   const s = defaults();
   s.settings.devMode = true;
-  s.settings.instantResearch = true;
   for (let i = 0; i < 4; i++)
-    for (const id of ["reinforceHp", "reinforceDamage", "reinforceTime"] as const) assert.ok(startTraining(s, id, ""));
+    for (const id of ["reinforceHp", "reinforceDamage", "reinforceTime"] as const) train(s, id);
   const b = bonuses(s);
   assert.equal(b.reinforceHp, 1.2);
   assert.equal(b.reinforceDamage, 1.2);

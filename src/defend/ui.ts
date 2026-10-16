@@ -1,6 +1,7 @@
+import { MagicCircle } from "../magic-circle/render.ts";
 import { hasTree, respecBuilding, undoUpgrade, rootOf, specialtyLabel, specialtyOf, stepName, targetKind, upgradeBuilding, type SpecialtyTarget } from "../specializations.ts";
 import { pathById, type PathId } from "../knowledge-paths.ts";
-import { keepBeyond, keepCardHtml, keepGraph, keepStep, keepUndo, treeAllocated, treeBeyond, treeCardHtml, treeGraph, treeStep, wallBeyond, wallCardHtml, wallGraph, wallStep, wallUndo } from "../ui/specialty.ts";
+import { specialtyCircle, keepBeyond, keepCardHtml, keepGraph, keepStep, keepUndo, treeAllocated, treeBeyond, treeCardHtml, treeGraph, treeStep, wallBeyond, wallCardHtml, wallGraph, wallStep, wallUndo } from "../ui/specialty.ts";
 import { keepAllocated, respecKeep, undoKeep, upgradeKeep } from "../keep-upgrades.ts";
 import { respecWalls, undoWalls, upgradeWalls, wallAllocated } from "../wall-upgrades.ts";
 import { UpgradeGraph } from "../ui/upgrade-graph.ts";
@@ -149,6 +150,7 @@ export class DefendPage {
   /** The upgrade tree's building and the node picked in it. */
   private specialty: { target: TreeTarget; picked: string } | null = null;
   private tree: UpgradeGraph | null = null;
+  private treeCircle: MagicCircle | null = null;
   private summonHold: { kind: EnemyKind; button: HTMLButtonElement; pointerId: number; next: number } | null = null;
 
   constructor(root: HTMLElement, host: DefendHost) {
@@ -197,6 +199,7 @@ export class DefendPage {
     }
     this.fitView();
     this.placeSpecialty();
+    if (this.specialty && !this.pointers.session?.overlay()) this.treeCircle?.frame(time, this.host.reduceMotion() || matchMedia("(prefers-reduced-motion: reduce)").matches);
     const drawing = performance.now();
     this.draw(false);
     const drawn = performance.now();
@@ -1263,6 +1266,8 @@ export class DefendPage {
     const kind = !sp ? undefined : "keep" in sp.target ? "keep" as const : "walls" in sp.target ? "walls" as const : targetKind(this.save, sp.target);
     if (!sp || !kind || !game || this.phase !== "build") {
       if (sp) this.specialty = null;
+      this.treeCircle?.destroy();
+      this.treeCircle = null;
       this.tree?.destroy();
       this.tree = null;
       el.hidden = true;
@@ -1296,6 +1301,9 @@ export class DefendPage {
       });
       if (!this.host.reduceMotion()) replay(el, "spec-open");
     }
+    this.treeCircle ??= new MagicCircle();
+    this.treeCircle.attach(el.querySelector<HTMLElement>(".ug-host")!);
+    this.treeCircle.set(specialtyCircle(kind, wear, this.save.keepRanks, this.save.wallRanks));
     const ranks = this.save.keepRanks, wallRanks = this.save.wallRanks;
     const spent = kind === "keep" ? keepAllocated(ranks) : kind === "walls" ? wallAllocated(wallRanks) : treeAllocated(kind, wear);
     const plain = kind === "keep" ? !ranks : kind === "walls" ? !wallRanks : spent === 0 && (kind === "wallSpikes" || rootOf(kind) === kind);

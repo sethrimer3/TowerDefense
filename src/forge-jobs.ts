@@ -4,17 +4,21 @@ import type { Save } from "./save.ts";
 import { UPGRADES, SPEED3_PRICE, upgradePrice, type Price, type UpgradeId } from "./defend/catalog.ts";
 import { buySpeed3, buyUpgrade, canAfford, pay } from "./defend/progress.ts";
 import { busySmiths, multiplier } from "./progression.ts";
+import { billWork } from "./training-jobs.ts";
 import { METALS } from "./mine/sim.ts";
 
 export type ForgeRequest = { kind: "upgrade"; id: UpgradeId } | { kind: "speed"; id: "speed3" };
 export type ForgeJob = ForgeRequest & { rank: number; left: number; smiths: string[]; paid: Price };
-export const forgeSeconds = (ranks: number) => 120 * (Math.max(0, Math.floor(ranks)) + 1) ** 2;
+/** One smith's seconds of work on a Forge level with `ranks` already bought
+ * and costing `bill`: twice a Smithy row's at the same rank, growing with the
+ * square of the next level and with its most precious metal (`billWork`). */
+export const forgeSeconds = (ranks: number, bill: Price = {}) => 120 * (Math.max(0, Math.floor(ranks)) + 1) ** 2 * billWork(bill);
 
 export function forgeOffer(save: Save, request: ForgeRequest) {
-  if (request.kind === "speed") return { rank: 0, price: SPEED3_PRICE, seconds: forgeSeconds(0), maxed: save.defend.speed3 };
+  if (request.kind === "speed") return { rank: 0, price: SPEED3_PRICE, seconds: forgeSeconds(0, SPEED3_PRICE), maxed: save.defend.speed3 };
   const def = UPGRADES.find(u => u.id === request.id)!;
-  const rank = save.defend.levels[request.id];
-  return { rank, price: (def.price ?? upgradePrice)(rank), seconds: forgeSeconds(rank), maxed: rank >= def.maxLevel };
+  const rank = save.defend.levels[request.id], price = (def.price ?? upgradePrice)(rank);
+  return { rank, price, seconds: forgeSeconds(rank, price), maxed: rank >= def.maxLevel };
 }
 
 function grant(save: Save, job: ForgeJob) {
@@ -25,16 +29,13 @@ function grant(save: Save, job: ForgeJob) {
 
 export function startForge(save: Save, request: ForgeRequest, smith: string, now: number): boolean {
   if (save.forgeJob || !Number.isFinite(now) || now < 0) return false;
-  if (!save.settings.instantResearch && (!smith || busySmiths(save).has(smith))) return false;
+  if (!smith || busySmiths(save).has(smith)) return false;
   const offer = forgeOffer(save, request), wallet = { ...save.smithy, free: save.settings.devMode };
   if (offer.maxed || !canAfford(wallet, offer.price)) return false;
   const paid = save.settings.devMode ? {} : { ...offer.price };
   pay(save.smithy, paid);
-  const job: ForgeJob = { ...request, rank: offer.rank, left: offer.seconds * 1000, smiths: smith ? [smith] : [], paid };
+  save.forgeJob = { ...request, rank: offer.rank, left: offer.seconds * 1000, smiths: [smith], paid };
   save.forgeClock = now;
-  if (save.settings.instantResearch) {
-    if (!grant(save, job)) { for (const k of METALS) save.smithy[k] += paid[k] ?? 0; return false; }
-  } else save.forgeJob = job;
   return true;
 }
 

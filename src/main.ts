@@ -285,7 +285,10 @@ function frame(time: number) {
     smithyRoom.draw(clock(), reduced());
     smithy.drawParticles(time);
   }
-  if (tab === "library" && libraryDown.below) studyRoom.draw(clock(), reduced());
+  if (tab === "library" && libraryDown.below) {
+    studyRoom.draw(clock(), reduced());
+    study.drawCircle(time, reduced());
+  }
   if (tab === "tiles") tilesPage.frame(clock());
   if (mineDirty && time - lastMineSave > 30000) {
     lastMineSave = time;

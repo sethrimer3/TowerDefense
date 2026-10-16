@@ -31,8 +31,8 @@ function ranks(family: string, id: string, name: string, max: number, price: (ra
       price: p, cumulative: { ...cumulative }, prerequisites, smithSeconds, notes });
   }
 }
-for (const u of UPGRADES) ranks("Forge", u.id, u.name, u.maxLevel, rank => cost((u.price ?? upgradePrice)(rank)), zero(), "Named smiths share work with Training", forgeSeconds);
-ranks("Forge", "speed3", "War drums", 1, () => cost(SPEED3_PRICE), zero(), "Named smiths share work with Training", forgeSeconds);
+for (const u of UPGRADES) ranks("Forge", u.id, u.name, u.maxLevel, rank => cost((u.price ?? upgradePrice)(rank)), zero(), "Named smiths share work with Training", rank => forgeSeconds(rank, (u.price ?? upgradePrice)(rank)));
+ranks("Forge", "speed3", "War drums", 1, () => cost(SPEED3_PRICE), zero(), "Named smiths share work with Training", rank => forgeSeconds(rank, SPEED3_PRICE));
 for (const t of TRAINING) ranks("Smithy", t.id, t.name, t.max, rank => cost({ [rankPrice(rank)]: rankCost(rank) }), zero(),
   "All smiths dedicated to this row; instantaneous requeue; production and infrastructure setup excluded", trainingSeconds);
 const skillNodes = Object.fromEntries(TREES.flatMap(t => t.nodes).map(n => [n.id, n]));

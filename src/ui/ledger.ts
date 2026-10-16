@@ -1,3 +1,5 @@
+import { MagicCircle } from "../magic-circle/render.ts";
+import { studyCircle } from "../magic-circle/progression.ts";
 import { TILE_TYPE } from "../tiles.ts";
 import { play } from "../sound.ts";
 import { TRAINING, addSmith, busySmiths, whole, cancelTraining, removeSmith, skillPurchase, skillRank, startTraining, trainingLeft, trainingStep, type TrainingId } from "../progression.ts";
@@ -63,6 +65,8 @@ export class Ledger {
   private subject: SubjectId;
   private topics: Partial<Record<SubjectId, string>> = {};
   private trainingParticles = new TrainingParticles();
+  private circle: MagicCircle | null = null;
+  private circleResearch: string | null = null;
   /** The rank picked in each topic's path tree ("path:index", or "path:crown"). */
   private picked: Record<string, string> = {};
   /** The subject and topic last drawn. */
@@ -74,7 +78,9 @@ export class Ledger {
 
   constructor(private ctx: AppContext, readonly root: HTMLElement, readonly kind: LedgerKind, private up: () => void) {
     this.subjects = ledgerSubjects(kind);
-    this.subject = kind === "study" ? "towers" : this.subjects[0].id;
+    // The Study no longer has a Towers subject (building research is in
+    // Defend). Open the first supported subject rather than a missing one.
+    this.subject = this.subjects[0].id;
   }
 
   private get save() {
@@ -119,6 +125,17 @@ export class Ledger {
         ${this.galleryHtml(subject)}
         ${smithy ? `<p class="ledger-scope">GLOBAL EQUIPMENT · ${topic.item ? `Every ${topic.name}, owned now or bought later` : topic.name}</p>${this.forgeHtml(topic)}` : `<p class="ledger-scope">SHARED RESEARCH · ${topic.name}</p>${this.studyHtml(topic)}`}</section>`;
     const root = this.root;
+    if (!smithy) {
+      this.circle ??= new MagicCircle();
+      this.circle.set(studyCircle(this.save, topic));
+      const job = this.save.researchJob;
+      const relevant = job && (job.kind === "skill" ? topic.skills?.includes(job.id) : pathsOf(topic.id).some(p => p.id === job.id));
+      const research = relevant ? `${job.kind}:${job.id}:${job.rank}` : "";
+      if (research && this.circleResearch !== null && research !== this.circleResearch) this.circle.energize();
+      this.circleResearch = research;
+      this.circle.attach(root);
+      root.classList.add("has-magic-circle");
+    }
     root.querySelectorAll<HTMLButtonElement>("[data-ledger-stack]").forEach(b => b.onclick = () => {
       this.topics[this.subject] = b.dataset.ledgerStack!;
       this.render();
@@ -195,9 +212,9 @@ export class Ledger {
     const s = this.save, w = this.wallet(), smiths = this.ctx.smiths(), free = this.freeSmiths();
     const job = s.forgeJob;
     const name = job ? job.kind === "speed" ? "War drums" : UPGRADES.find(u => u.id === job.id)!.name : "";
-    return `<p class="ledger-note chamber-wallet">${METALS.map((k) => `<b class="metal-${k}">${bal(s, w[k])}</b> ${k}`).join(" · ")}
+    return `<p class="ledger-note chamber-wallet">${METALS.map((k) => `<span class="cost-metal">${metalIcon(k)}<b class="metal-${k}">${bal(s, w[k])}</b> ${k}</span>`).join(" · ")}
       <span>· smiths <b id="training-slots">${smiths.length - free.length} / ${smiths.length}</b> busy</span><small> · a point of a metal from every ${BARS_PER_POINT} bars</small></p>
-      ${job ? `<div class="research-project"><div><b>${name}</b><small data-forge-timer>${this.forgeTimeLeft()}</small></div><div class="smith-count"><button data-less-forge aria-label="One smith fewer on Forge project" ${job.smiths.length <= 1 ? "disabled" : ""}>−</button><b>${job.smiths.length} smiths</b><button data-more-forge aria-label="One more smith on Forge project" ${free.length ? "" : "disabled"}>+</button></div><button data-cancel-forge>Cancel<small>Refund ${priceText(job.paid) || "0 metal"}</small></button></div>` : ""}`;
+      ${job ? `<div class="research-project"><div><b>${name}</b><small data-forge-timer>${this.forgeTimeLeft()}</small></div><div class="smith-count"><button data-less-forge aria-label="One smith fewer on Forge project" ${job.smiths.length <= 1 ? "disabled" : ""}>−</button><b>${job.smiths.length} smiths</b><button data-more-forge aria-label="One more smith on Forge project" ${free.length ? "" : "disabled"}>+</button></div><button data-cancel-forge>Cancel<small>Refund ${costHtml(job.paid) || "0 metal"}</small></button></div>` : ""}`;
   }
 
   private forgeTimeLeft() {
@@ -207,16 +224,16 @@ export class Ledger {
 
   private forgeHtml(t: Topic) {
     const d = this.save.defend, w = this.wallet();
-    const busy = !!this.save.forgeJob, staffed = this.freeSmiths().length > 0 || this.save.settings.instantResearch;
+    const busy = !!this.save.forgeJob, staffed = this.freeSmiths().length > 0;
     const extras = t.extras?.includes("speed3")
       ? [`<article class="card defend-card ledger-card"><div><small>${d.speed3 ? "UNLOCKED" : "ONE-TIME UNLOCK"}</small><h3>War drums</h3><p>Adds 3× to the battle speed button.</p></div>
-      <button data-buy-speed3 ${d.speed3 || busy || !staffed || !canAfford(w, SPEED3_PRICE) ? "disabled" : ""}>${d.speed3 ? "Owned" : `Forge<small>${priceText(SPEED3_PRICE)}</small><small>One smith: ${formatDuration(forgeSeconds(0) * 1000)}</small>`}</button></article>`]
+      <button data-buy-speed3 ${d.speed3 || busy || !staffed || !canAfford(w, SPEED3_PRICE) ? "disabled" : ""}>${d.speed3 ? "Owned" : `Forge<small>${costHtml(SPEED3_PRICE)}</small><small>One smith: ${formatDuration(forgeSeconds(0, SPEED3_PRICE) * 1000)}</small>`}</button></article>`]
       : [];
     const levels = (t.upgrades ?? []).map((id) => {
       const u = UPGRADES.find((u) => u.id === id)!, lvl = d.levels[id], maxed = lvl >= u.maxLevel;
       const p = u.price ? u.price(lvl) : upgradePrice(lvl);
       return `<article class="card defend-card ledger-card ledger-level"><div><small>LEVEL ${lvl} / ${u.maxLevel}</small><h3>${u.name}</h3><p>${u.describe(lvl)}${maxed ? "" : `<b class="ledger-next">Next: ${u.describe(lvl + 1)}</b>`}</p></div>
-        <button data-upgrade="${id}" ${maxed || busy || !staffed || !canAfford(w, p) ? "disabled" : ""}>${maxed ? "Maxed" : `Forge<small>${priceText(p)}</small><small>One smith: ${formatDuration(forgeSeconds(lvl) * 1000)}</small>`}</button></article>`;
+        <button data-upgrade="${id}" ${maxed || busy || !staffed || !canAfford(w, p) ? "disabled" : ""}>${maxed ? "Maxed" : `Forge<small>${costHtml(p)}</small><small>One smith: ${formatDuration(forgeSeconds(lvl, p) * 1000)}</small>`}</button></article>`;
     });
     const smithy = t.training?.length ? this.smithyHtml(t.training) : "";
     const forged = levels.length || extras.length ? `<h4 class="training-group">On the anvil</h4>` : "";
@@ -253,7 +270,7 @@ export class Ledger {
     });
     root.querySelectorAll<HTMLButtonElement>("[data-train]").forEach((b) => (b.onclick = () => {
       const smith = this.freeSmiths()[0];
-      if ((smith || s.settings.instantResearch) && startTraining(s, b.dataset.train as TrainingId, smith ?? "")) {
+      if (smith && startTraining(s, b.dataset.train as TrainingId, smith)) {
         this.ctx.update();
         play("coin");
       }
@@ -303,20 +320,20 @@ export class Ledger {
    * more rank, and the Smithy point it costs; tap the cost to start it with
    * a free smith, and put more smiths on (or take them off) a rank in work. */
   private smithyHtml(ids: TrainingId[]) {
-    const save = this.save, smiths = this.ctx.smiths(), free = this.freeSmiths(), devFree = save.settings.instantResearch;
+    const save = this.save, smiths = this.ctx.smiths(), free = this.freeSmiths();
     const row = (t: (typeof TRAINING)[number]) => {
       const { now, next, affordable, maxed, metal, amount } = trainingStep(save, t.id);
       const price = `${amount} ${metal}`;
       const job = save.trainingJobs.find((j) => j.id === t.id);
       const takes = formatDuration(trainingSeconds(save.training[t.id]) * 1000);
       const shown = (v: number) => `+${v}%`;
-      const why = !affordable ? `Needs ${price}` : !free.length && !devFree ? (smiths.length ? "Every smith is busy" : "Put a miner to the smithy in the Mine") : `One smith takes ${takes}`;
+      const why = !affordable ? `Needs ${price}` : !free.length ? (smiths.length ? "Every smith is busy" : "Put a miner to the smithy in the Mine") : `One smith takes ${takes}`;
       const buy = job
         ? `<span class="training-work"><span class="training-box training-timer" title="Time left at this many smiths"><span data-training-timer="${t.id}">${this.timeLeft(t.id)}</span></span>
            <span class="smith-count" role="group" aria-label="Smiths on ${t.name}"><button class="smith-step" data-less="${t.id}" aria-label="One smith fewer on ${t.name}" title="${job.smiths.length <= 1 ? "Cancel this upgrade" : "One smith fewer"}">−</button><b title="${job.smiths.join(", ") || "No smith"}">⚒ ${job.smiths.length}</b><button class="smith-step" data-more="${t.id}" ${free.length ? "" : "disabled"} aria-label="One more smith on ${t.name}" title="${free.length ? "One more smith shares the work" : "No free smith"}">+</button></span></span>`
         : maxed
         ? `<button class="training-box training-cost" disabled aria-label="${t.name} is fully upgraded">Max</button>`
-        : `<button class="training-box training-cost metal-${metal}" data-train="${t.id}" ${affordable && (free.length || devFree) ? "" : "disabled"} aria-label="Upgrade ${t.name} to ${shown(next)} for ${price}, taking one smith ${takes}" title="${why}">${price}</button>`;
+        : `<button class="training-box training-cost metal-${metal}" data-train="${t.id}" ${affordable && free.length ? "" : "disabled"} aria-label="Upgrade ${t.name} to ${shown(next)} for ${price}, taking one smith ${takes}" title="${why}">${costHtml({ [metal]: amount })}</button>`;
       return `<div class="training-row${job ? " active" : ""}" role="listitem" data-training-row="${t.id}"><span class="training-label">${t.name}<small>+${t.per}% a rank, up to ${t.max * t.per}%${maxed ? "" : ` · one smith takes ${takes}`}</small></span><span class="training-box">${shown(now)}</span><span class="training-arrow" aria-hidden="true">→</span><span class="training-box next">${shown(next)}</span>${buy}</div>`;
     };
     return `<h4 class="training-group">At the smithy</h4><p class="ledger-note"><small>Metal costs and work grow quadratically. Assigned smiths share the time.</small></p>
@@ -498,6 +515,9 @@ export class Ledger {
     sparksOver(card?.querySelector("button") ?? null, "arcane");
   }
 
+  /** Called by the existing main loop only while the Study is in view. */
+  drawCircle(time: number, reduced: boolean) { this.circle?.frame(time, reduced); }
+
   // ── Each frame and each second ──────────────────────────────────────────
   /** Once a second while the chamber shows: the whole chamber once a rank
    * completes, else the countdowns. */
@@ -526,5 +546,9 @@ export class Ledger {
 }
 
 const ROMAN = ["I", "II", "III", "IV", "V"];
-const priceText = (p: Price) => METALS.filter((k) => p[k]).map((k) => `${p[k]} ${k}`).join(" · ");
+/** A small ingot of `metal`, as in the currency bar. */
+const metalIcon = (metal: (typeof METALS)[number]) => `<i class="metal-icon ${metal}" aria-hidden="true"></i>`;
+/** A bill as each of its metals' amounts by its ingot: copper, silver, gold. */
+const costHtml = (p: Price) => METALS.filter((k) => p[k]).map((k) =>
+  `<span class="cost-metal metal-${k}" role="img" aria-label="${p[k]} ${k}" title="${p[k]} ${k}">${metalIcon(k)}${p[k]}</span>`).join(" ");
 const bal = (s: { settings: { devMode: boolean } }, n: number) => (s.settings.devMode ? "∞" : Math.floor(n + 1e-9));

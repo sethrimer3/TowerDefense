@@ -99,17 +99,16 @@ test("skills need Knowledge and their requirements, and each rank costs more", (
   assert.equal(skillPurchase(s, "drillSergeant").maxed, true);
 });
 
-test("dev options: unlimited money spends nothing, instant research needs no smith, all research counts every rank while on", () => {
+test("dev options: unlimited money spends nothing, Smithy work always takes a smith and time, all research counts every rank while on", () => {
   const s = defaults();
-  s.smithy.copper = 0;
-  s.settings.instantResearch = true;
-  assert.equal(startTraining(s, "troopHp", ""), false, "instant research still costs its point");
   s.smithy.copper = 1;
-  assert.ok(startTraining(s, "troopHp", ""), "no smith needed");
-  assert.equal(s.training.troopHp, 1, "done at once");
+  s.settings.instantResearch = true;
+  assert.equal(startTraining(s, "troopHp", ""), false, "a smith is always needed");
+  assert.ok(startTraining(s, "troopHp", "Ada Stone"));
+  assert.equal(s.training.troopHp, 0, "not done at once, even with instant research");
   assert.equal(s.smithy.copper, 0);
   s.settings.devMode = true;
-  assert.ok(startTraining(s, "troopHp", ""));
+  assert.ok(startTraining(s, "keepHp", "Bram Hale"));
   assert.equal(s.smithy.copper, 0, "unlimited money spends no point");
   assert.ok(buySkill(s, "masonry"));
   assert.equal(s.knowledge, 0, "nor Knowledge");

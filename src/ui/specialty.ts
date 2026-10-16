@@ -1,3 +1,4 @@
+import type { CircleState } from "../magic-circle/formation.ts";
 /** A building's upgrades as the player meets them: what a path does to the
  * kind's numbers (`kindStats`), the read-only tree Tiles shows
  * (`upgradeTreeHtml`), and the living tree Defend shows when a placed
@@ -5,7 +6,7 @@
  * `treeCardHtml`, the card of the node picked in it). The tree comes from
  * `specializations.ts`; paths, ranks, icons and hues from `knowledge-paths.ts`. */
 import type { Save } from "../save.ts";
-import { BECOMES, TROOPS, allocated, buildingPathsOf, buildingTree, undoRefund, type TreeNode, type UpgradeStep, type Wear } from "../specializations.ts";
+import { BECOMES, TROOPS, allocated, rootOf, buildingPathsOf, buildingTree, undoRefund, type TreeNode, type UpgradeStep, type Wear } from "../specializations.ts";
 import type { GraphNode } from "./upgrade-graph.ts";
 import { ARROW_LOOPS, BASTIONS, BOILING_OIL, KEEP_PATHS, keepRank, type KeepPathId, type KeepRanks } from "../keep-upgrades.ts";
 import { STONEWORK, THORNWORK, TOWN_WALLS, WALL_PATHS, wallRank, type WallPathId, type WallRanks } from "../wall-upgrades.ts";
@@ -274,4 +275,15 @@ export const wallCardHtml = (save: Save, ranks: WallRanks | undefined, id: strin
 export function wallTreeHtml(): string {
   const rows = WALL_PATHS.map((p) => `<li class="spec-row hue-${p.hue}"><span class="path-medal"><canvas data-path-icon="${p.ranks[0].icon}:${p.hue}"></canvas></span><div><b>${p.name}</b><small>${p.motto}: ${p.ranks.map((r, i) => `${ROMAN[i + 1]} ${r.name} (${r.cost.toLocaleString("en")})`).join(" · ")}</small></div></li>`).join("");
   return `<div class="tile-specialties"><small>UPGRADES · KNOWLEDGE, SHARED BY EVERY WALL: PRESS AND HOLD ONE IN DEFEND WHILE BUILDING</small><ul>${rows}</ul></div>`;
+}
+
+/** A family keeps its base identity through kind changes and respecs.
+ * Placement UIDs intentionally do not affect the visual identity. */
+export function specialtyCircle(kind: PaletteItem | "wallSpikes" | "keep" | "walls", wear?: Wear, ranks?: KeepRanks, wallRanks?: WallRanks): CircleState {
+  const root = kind === "keep" || kind === "walls" || kind === "wallSpikes" ? kind : rootOf(kind as never);
+  const upgrades = [{ id: `kind:${kind}`, rank: 1 }];
+  if (wear) upgrades.push({ id: `path:${wear.path}`, rank: wear.rank });
+  if (kind === "keep") for (const p of KEEP_PATHS) upgrades.push({ id: `keep:${p.id}`, rank: keepRank(ranks, p.id) });
+  if (kind === "walls") for (const p of WALL_PATHS) upgrades.push({ id: `wall:${p.id}`, rank: wallRank(wallRanks, p.id) });
+  return { topic: `building:${root}`, upgrades };
 }
