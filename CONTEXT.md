@@ -48,6 +48,9 @@ Turning one building back into its basic building with no path, free, with every
 **Undo**:
 Taking one upgrade a building has, and every upgrade after it, back off, free, with their Knowledge given back: the building steps back down its tree to the node that upgrade grew from.
 
+**Selling down**:
+Tapping an owned node of an upgrade tree a second time: every upgrade after it is undone, free, and the building stands on that node. A second tap on a node not yet owned buys it.
+
 **Kept copy**:
 A building on a path taken back to the palette: it keeps its path and rank, waits under its own palette entry, and wears them again when placed.
 

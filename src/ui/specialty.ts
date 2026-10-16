@@ -127,11 +127,21 @@ export function treeCardHtml(save: Save, kind: PaletteItem | "wallSpikes", wear:
     if (kind !== "wallSpikes") stats = `At this rank: ${kindStats(save, kind as PaletteItem, p.id, n.rank)}`;
   }
   const back = n.state === "owned" ? undoRefund(kind as never, wear, n.id) : 0;
-  const state = n.state === "owned" ? `<b class="ug-owned">${(n.kind === kind && !wear) || (n.path && n.path === wear?.path && n.rank === wear?.rank) ? "Where it is now" : "Owned"}</b>${n.parent ? undoButton(n.id, back) : ""}`
-    : n.state === "next" ? `<button class="ug-buy" data-ug-buy="${n.id}" ${can ? "" : "disabled"}>Buy · ${free ? "Free" : `${n.cost.toLocaleString("en")} Knowledge`}</button>`
+  const beyond = n.state === "owned" && !!treeBeyond(kind, wear, n.id);
+  const state = n.state === "owned" ? `<b class="ug-owned">${(n.kind === kind && !wear) || (n.path && n.path === wear?.path && n.rank === wear?.rank) ? "Where it is now" : "Owned"}</b>${n.parent ? undoButton(n.id, back) : ""}${beyond ? AGAIN_SELL : ""}`
+    : n.state === "next" ? `<button class="ug-buy" data-ug-buy="${n.id}" ${can ? "" : "disabled"}>Buy · ${free ? "Free" : `${n.cost.toLocaleString("en")} Knowledge`}</button>${can ? AGAIN_BUY : ""}`
     : `<span class="ug-locked">Locked: buy the one before it · ${n.cost.toLocaleString("en")} Knowledge</span>`;
   return `<div class="ug-card-head"><b>${title}</b>${level ? `<small>${level}</small>` : ""}</div><p>${text}</p>${stats ? `<p class="ug-stats">${stats}</p>` : ""}<div class="ug-card-foot" data-ug-ignore>${state}</div>`;
 }
+
+/** What tapping the picked node again does, said on its card. */
+const AGAIN_BUY = `<small class="ug-again">or tap it again to buy</small>`;
+const AGAIN_SELL = `<small class="ug-again">Tap it again to sell everything after it</small>`;
+
+/** The owned node grown from owned node `id`: undoing it sells everything
+ * after `id` (a second tap on a picked node). None when `id` is the tip. */
+export const treeBeyond = (kind: PaletteItem | "wallSpikes", wear: Wear | undefined, id: string): string | undefined =>
+  buildingTree(kind as never, wear).find((o) => o.parent === id && o.state === "owned")?.id;
 
 /** Undo for an owned node: it and everything after it, their Knowledge back. */
 const undoButton = (id: string, back: number) =>
@@ -177,6 +187,14 @@ function sideUndo<Id extends string>(tree: SideTree<Id>, ranks: Ranks<Id>, id: s
   return q === "q" && p && Number(rank) >= 1 && Number(rank) <= sideRank(ranks, p.id) ? { id: p.id, rank: Number(rank) } : undefined;
 }
 
+/** What a second tap on owned node `id` sells: the rank above it on its
+ * branch (`undo` it), or, on the root, every rank (`all`, a respec). */
+function sideBeyond<Id extends string>(tree: SideTree<Id>, ranks: Ranks<Id>, id: string): { undo: string } | { all: true } | undefined {
+  if (id === tree.root) return tree.paths.some((p) => sideRank(ranks, p.id) > 0) ? { all: true } : undefined;
+  const [q, path, rank] = id.split(":"), p = tree.paths.find((o) => o.id === path);
+  return q === "q" && p && Number(rank) >= 1 && Number(rank) < sideRank(ranks, p.id) ? { undo: `q:${p.id}:${Number(rank) + 1}` } : undefined;
+}
+
 /** What node `id` buys, if it can be bought now. */
 function sideStep<Id extends string>(tree: SideTree<Id>, ranks: Ranks<Id>, id: string): Id | undefined {
   const [q, path, rank] = id.split(":");
@@ -189,15 +207,15 @@ function sideStep<Id extends string>(tree: SideTree<Id>, ranks: Ranks<Id>, id: s
 function sideCardHtml<Id extends string>(save: Save, tree: SideTree<Id>, ranks: Ranks<Id>, id: string, name: string, about: string, stats: (ranks: Ranks<Id>) => string): string {
   const free = save.settings.devMode;
   if (id === tree.root)
-    return `<div class="ug-card-head"><b>${name}</b></div><p>${about} Its branches climb side by side: buy a rank of any of them.</p><p class="ug-stats">${stats(ranks)}</p><div class="ug-card-foot" data-ug-ignore><b class="ug-owned">${tree.root === "k:keep" ? "This building" : "Every wall you place"}</b></div>`;
+    return `<div class="ug-card-head"><b>${name}</b></div><p>${about} Its branches climb side by side: buy a rank of any of them.</p><p class="ug-stats">${stats(ranks)}</p><div class="ug-card-foot" data-ug-ignore><b class="ug-owned">${tree.root === "k:keep" ? "This building" : "Every wall you place"}</b>${sideBeyond(tree, ranks, id) ? AGAIN_SELL : ""}</div>`;
   const [, path, r] = id.split(":"), p = tree.paths.find((o) => o.id === path), rank = Number(r);
   const step = p?.ranks[rank - 1];
   if (!p || !step) return `<p class="ug-hint">Tap a node to see what it does.</p>`;
   const have = sideRank(ranks, p.id), cost = step.cost, can = free || save.knowledge >= cost;
   let back = 0;
   for (let i = rank; i <= have; i++) back += p.ranks[i - 1].cost;
-  const state = rank <= have ? `<b class="ug-owned">Owned</b>${undoButton(id, back)}`
-    : rank === have + 1 ? `<button class="ug-buy" data-ug-buy="${id}" ${can ? "" : "disabled"}>Buy · ${free ? "Free" : `${cost.toLocaleString("en")} Knowledge`}</button>`
+  const state = rank <= have ? `<b class="ug-owned">Owned</b>${undoButton(id, back)}${rank < have ? AGAIN_SELL : ""}`
+    : rank === have + 1 ? `<button class="ug-buy" data-ug-buy="${id}" ${can ? "" : "disabled"}>Buy · ${free ? "Free" : `${cost.toLocaleString("en")} Knowledge`}</button>${can ? AGAIN_BUY : ""}`
     : `<span class="ug-locked">Locked: buy the one before it · ${cost.toLocaleString("en")} Knowledge</span>`;
   const at = { ...ranks, [p.id]: rank } as Ranks<Id>;
   return `<div class="ug-card-head"><b>${p.name} ${ROMAN[rank]}: ${step.name}</b><small>Level ${rank} / ${p.ranks.length}</small></div><p>${p.motto}. ${step.text}</p><p class="ug-stats">At this rank: ${stats(at)}</p><div class="ug-card-foot" data-ug-ignore>${state}</div>`;
@@ -212,6 +230,8 @@ export const keepGraph = (ranks: KeepRanks | undefined) => sideGraph(KEEP_TREE, 
 export const keepStep = (ranks: KeepRanks | undefined, id: string) => sideStep(KEEP_TREE, ranks, id);
 /** What undoing node `id` of the keep's tree takes back, if it is owned. */
 export const keepUndo = (ranks: KeepRanks | undefined, id: string) => sideUndo(KEEP_TREE, ranks, id);
+/** What a second tap on owned node `id` of the keep's tree sells. */
+export const keepBeyond = (ranks: KeepRanks | undefined, id: string) => sideBeyond(KEEP_TREE, ranks, id);
 
 /** The keep's numbers with `ranks`, and the shared Smithy and skill bonuses. */
 export function keepStats(save: Save, ranks: KeepRanks | undefined): string {
@@ -233,6 +253,8 @@ export const wallGraph = (ranks: WallRanks | undefined) => sideGraph(WALL_TREE, 
 export const wallStep = (ranks: WallRanks | undefined, id: string) => sideStep(WALL_TREE, ranks, id);
 /** What undoing node `id` of the walls' tree takes back, if it is owned. */
 export const wallUndo = (ranks: WallRanks | undefined, id: string) => sideUndo(WALL_TREE, ranks, id);
+/** What a second tap on owned node `id` of the walls' tree sells. */
+export const wallBeyond = (ranks: WallRanks | undefined, id: string) => sideBeyond(WALL_TREE, ranks, id);
 
 /** A placed wall stone's numbers with `ranks`, and the shared Smithy and
  * skill bonuses. */
