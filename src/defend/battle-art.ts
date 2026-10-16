@@ -25,6 +25,7 @@ import { drawFrostBursts } from "./frost-art.ts";
 import { drawCalled, drawDrops, drawStaggered } from "./reinforce-art.ts";
 import { drawExplosion, drawScorches as drawScorchArt } from "./blast-art.ts";
 import { BUILDING_FLASH, type DefendSim, type Effect, type Enemy, type Soldier } from "./sim.ts";
+import { hallPaths } from "./muskets.ts";
 
 export type Brush = { c: CanvasRenderingContext2D; px: number };
 
@@ -275,6 +276,19 @@ function drawGuildTroop(b: Brush, sim: DefendSim, u: Soldier) {
   c.strokeStyle = k === "sniper" ? "#3a3a40" : "#5a3d22";
   c.lineWidth = w;
   c.stroke();
+  if (k === "musketeer" && hallPaths(sim, u.home).bayonet) {
+    // A fixed bayonet past the muzzle.
+    const tip = len + s * 0.4;
+    c.strokeStyle = "#0b0907";
+    c.lineWidth = Math.max(1, w - 1) + 2;
+    c.beginPath();
+    c.moveTo(ox + fx * len, oy + fy * len);
+    c.lineTo(ox + fx * tip, oy + fy * tip);
+    c.stroke();
+    c.strokeStyle = "#d8dce6";
+    c.lineWidth = Math.max(1, w - 1);
+    c.stroke();
+  }
   if (k === "musketeer") {
     // The slow match, glowing.
     c.fillStyle = (sim.time * 3 + u.id) % 1 < 0.5 ? "#ffd060" : "#ff7a2e";

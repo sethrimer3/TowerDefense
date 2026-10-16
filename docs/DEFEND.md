@@ -293,7 +293,13 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   reach, with a bounty of its HP, at III anywhere in the city); a
   Ranged Guild an archer barracks, a Mage Guild, a **sniper lodge** (snipers:
   long range, heavy, slow single shots) or a **musket hall** (explosive
-  musketmen: balls that burst over a small area, sparing your own). A
+  musketmen: balls that burst over a small area, sparing your own, with
+  three paths: Grenadiers' bursts leaving the ground burning, throwing four
+  smaller bursts round them from II and setting clinging fire at III;
+  Volley fire's extra balls at the next nearest enemies, and at III quicker
+  reloads for each comrade of the hall standing near; Bayonets running
+  through an enemy at close quarters instead of shooting it, hunting
+  anywhere in the city from II and staggering what they stab at III). A
   building can also start one of its kind's paths and climb it rank by
   rank; a crowned path's last step evolves it (Stormcalling's wizard tower
   into a dark wizard keep). A building taken back to the palette keeps its
