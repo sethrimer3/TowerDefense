@@ -20,6 +20,10 @@ import {
 } from "./catalog.ts";
 import { SPAWN_ROW, TILES_H, TILES_W, defendRandom, hash, parseTileKey, tileKey } from "./grid.ts";
 import {
+  QUARTER,
+  QUARTERS_H,
+  QUARTERS_W,
+  settle,
   SIDES,
   cloneLayout,
   cornerOk,
@@ -190,26 +194,25 @@ export const compactKinds = (levels: Record<UpgradeId, number>): PlacedKind[] =>
     return !!up && levels[up] > 0;
   });
 
-/** `layout` with its structures sized for `levels`, shuffled into fresh
- * spots on their tiles if they no longer fit where they were, and failing
- * that with the newest returned to the palette until it fits. */
+/** `layout` with its structures sized for `levels`: those whose size
+ * changed are taken up, back to the palette (the player places them again),
+ * and failing that the newest are until it fits. */
 export function sized(layout: Layout, levels: Record<UpgradeId, number>): Layout {
   const next = cloneLayout(layout);
   next.compact = compactKinds(levels);
+  const was = new Set(layout.compact), now = new Set(next.compact);
+  next.structures = next.structures.filter((s) => was.has(s.kind) === now.has(s.kind));
   return fitted(next);
 }
 
 
-/** `l` if it fits; else its structures reshuffled; else with the newest
- * taken off (back to the palette) until it fits. */
-function fitted(l: Layout): Layout {
-  if (fitLayout(l).ok) return l;
-  const next = cloneLayout(l);
-  for (let r = 1; r <= 8; r++) {
-    next.rolls = l.rolls + r;
-    for (const s of next.structures) s.spot = hash(next.rolls, s.uid, 0x5b07);
-    if (fitLayout(next).ok) return next;
-  }
+/** `l` if it fits; else with the structures `unplaced` (saved before they
+ * had spots) set out on their tiles; else with the newest taken off (back
+ * to the palette) until it fits. */
+function fitted(l: Layout, unplaced: number[] = []): Layout {
+  if (!unplaced.length && fitLayout(l).ok) return l;
+  const next = unplaced.length ? settle(l, unplaced) : cloneLayout(l);
+  if (fitLayout(next).ok) return next;
   next.structures.sort((a, b) => a.uid - b.uid);
   while (next.structures.length && !fitLayout(next).ok) next.structures.pop();
   while (next.gates.length && !fitLayout(next).ok) next.gates.pop();
@@ -308,8 +311,9 @@ function decodeLayout(s: any, owned: Record<PaletteItem, number>, levels: Record
   if (!isObject(s) || !tileOk(s.keep?.tx, s.keep?.ty) || !int(s.nextUid, 1, 1e9)) return null;
   const keep = { tx: s.keep.tx, ty: s.keep.ty };
   const cityTiles = decodeCityTiles(s.cityTiles, tileKey(keep.tx, keep.ty));
-  const structures = decodeStructures(s.structures, s.nextUid);
-  if (!cityTiles || !structures) return null;
+  const decoded = decodeStructures(s.structures, s.nextUid);
+  if (!cityTiles || !decoded) return null;
+  const { structures, unplaced } = decoded;
   // Saves from before city gates, wall spikes and ballistas have none.
   const tiles = new Set([tileKey(keep.tx, keep.ty), ...cityTiles]);
   const gates = s.gates === undefined ? [] : decodeGates(s.gates, tiles);
@@ -319,9 +323,9 @@ function decodeLayout(s: any, owned: Record<PaletteItem, number>, levels: Record
   // Saves from before placed walls have none.
   const walls = s.walls === undefined ? [] : decodeWalls(s.walls);
   if (!walls) return null;
-  const layout: Layout = { keep, cityTiles, structures, nextUid: s.nextUid, rolls: intOr(s.rolls, 0, 1e9, 0), compact: compactKinds(levels), gates, spikes, ballistas, ...(walls.length ? { walls } : {}), ...(inner ? { innerWalls: true as const } : {}) };
+  const layout: Layout = { keep, cityTiles, structures, nextUid: s.nextUid, compact: compactKinds(levels), gates, spikes, ballistas, ...(walls.length ? { walls } : {}), ...(inner ? { innerWalls: true as const } : {}) };
   if (!legal(layout, owned)) return null;
-  const out = fitted(layout);
+  const out = fitted(layout, unplaced);
   return fitLayout(out).ok ? out : null;
 }
 
@@ -344,19 +348,21 @@ function cityTileOk(k: unknown, keepKey: string, listed: string[]): k is string 
 }
 
 /** Placed structures on the board with distinct uids issued before
- * `nextUid`, or null. */
-function decodeStructures(list: unknown, nextUid: number): PlacedStructure[] | null {
+ * `nextUid`, or null; and the uids of those saved before structures were
+ * placed on quarter tiles (`unplaced`), which `fitted` sets out. */
+function decodeStructures(list: unknown, nextUid: number): { structures: PlacedStructure[]; unplaced: number[] } | null {
   if (!Array.isArray(list)) return null;
-  const out: PlacedStructure[] = [];
+  const structures: PlacedStructure[] = [], unplaced: number[] = [];
   const uids = new Set<number>();
   for (const p of list) {
     if (!structureOk(p, nextUid, uids)) return null;
     uids.add(p.uid);
-    // Saves from before random spots have none: draw one from the uid.
+    const placed = int(p.qx, 0, QUARTERS_W - 1) && int(p.qy, 0, QUARTERS_H - 1) && Math.floor(p.qx / QUARTER) === p.tx && Math.floor(p.qy / QUARTER) === p.ty;
+    if (!placed) unplaced.push(p.uid);
     // A path is kept only if it is the structure's own.
-    out.push({ uid: p.uid, kind: p.kind, tx: p.tx, ty: p.ty, spot: int(p.spot, 0, 2 ** 32 - 1) ? p.spot : hash(p.uid, 0x5b07), ...wearOn(p.kind, p) });
+    structures.push({ uid: p.uid, kind: p.kind, tx: p.tx, ty: p.ty, qx: placed ? p.qx : p.tx * QUARTER, qy: placed ? p.qy : p.ty * QUARTER, ...wearOn(p.kind, p) });
   }
-  return out;
+  return { structures, unplaced };
 }
 
 /** Distinct gates, each in the wall of a city tile, or null. */

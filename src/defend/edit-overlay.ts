@@ -18,6 +18,11 @@ export type Overlay = {
    * take it, the one under the pointer and whether it fits there. The
    * placing grid turns four times finer. */
   walls?: { legal: Set<string>; hover: string | null; fits: boolean };
+  /** A structure being carried: the cells its footprint would take under
+   * the pointer, whether it fits there, and whether it keeps a clear
+   * quarter round it (every building but monster bait). The board shows its
+   * grid of quarter tiles. Null before it is over the board. */
+  quarters?: { rect: Rect; fits: boolean; clear: boolean } | null;
   /** A bomb being aimed: centre in cells. */
   bomb?: { x: number; y: number; r: number } | null;
   /** The war banner being planted: centre and the reach it rallies to. */
@@ -53,10 +58,12 @@ export function drawGrid(c: CanvasRenderingContext2D, px: number, alpha: number)
 }
 
 export function drawOverlay(c: CanvasRenderingContext2D, px: number, o: Overlay) {
-  if (o.walls) drawWallTargets(c, px, o.walls);
+  if (o.quarters !== undefined) drawQuarterGrid(c, px);
+  else if (o.walls) drawWallTargets(c, px, o.walls);
   else if (o.gates) drawGateTargets(c, px, o.gates);
   else if (o.legal.size || o.ghost || o.hover !== null) drawTargets(c, px, o);
   if (o.ghost) drawGhost(c, px, o.ghost.rect);
+  if (o.quarters) drawFootprint(c, px, o.quarters);
   if (o.bomb) drawBombReach(c, px, o.bomb);
   if (o.banner) drawRallyReach(c, px, o.banner);
   if (o.spell?.look === "meteor") drawMeteorReach(c, px, o.spell);
@@ -269,6 +276,58 @@ function drawReinforceReach(c: CanvasRenderingContext2D, px: number, at: NonNull
     c.fillStyle = s.look === "archer" ? "#a8e07a" : "#f6c75a";
     for (const [i, j] of chevron) c.fillRect(x + i * k, y + j * k, k, k);
   }
+}
+
+/** The board's grid of quarter tiles, the tile lines over the finer ones. */
+function drawQuarterGrid(c: CanvasRenderingContext2D, px: number) {
+  const Q = (px * SUB) / QUARTER;
+  const { W, H } = boardSize(px);
+  const at = (q: number) => Math.round(q * Q);
+  c.save();
+  c.lineWidth = 1;
+  c.strokeStyle = "rgba(216,181,114,0.22)";
+  c.beginPath();
+  for (let qx = 1; qx < QUARTERS_W; qx++) if (qx % QUARTER) { c.moveTo(at(qx) + 0.5, 0); c.lineTo(at(qx) + 0.5, H); }
+  for (let qy = 1; qy < QUARTERS_H; qy++) if (qy % QUARTER) { c.moveTo(0, at(qy) + 0.5); c.lineTo(W, at(qy) + 0.5); }
+  c.stroke();
+  c.strokeStyle = "rgba(216,181,114,0.5)";
+  c.beginPath();
+  for (let tx = 1; tx < TILES_W; tx++) { c.moveTo(at(tx * QUARTER) + 0.5, 0); c.lineTo(at(tx * QUARTER) + 0.5, H); }
+  for (let ty = 1; ty < TILES_H; ty++) { c.moveTo(0, at(ty * QUARTER) + 0.5); c.lineTo(W, at(ty * QUARTER) + 0.5); }
+  c.stroke();
+  c.restore();
+}
+
+/** For a structure, over its ghost: the quarters its footprint would take
+ * under the pointer, tinted and framed (gold where it fits, red where it
+ * won't), and for a building the clear quarter it keeps round it dashed. */
+function drawFootprint(c: CanvasRenderingContext2D, px: number, q: NonNullable<Overlay["quarters"]>) {
+  const x = Math.round(q.rect.x * px), y = Math.round(q.rect.y * px);
+  const w = Math.round((q.rect.x + q.rect.w) * px) - x, h = Math.round((q.rect.y + q.rect.h) * px) - y;
+  const lw = Math.max(1, px * 0.14);
+  if (q.clear) {
+    const m = Math.round((px * SUB) / QUARTER);
+    c.save();
+    c.lineWidth = Math.max(1, px * 0.08);
+    c.strokeStyle = q.fits ? "rgba(242,201,76,0.75)" : "rgba(230,70,80,0.75)";
+    c.setLineDash([Math.max(2, px * 0.5), Math.max(2, px * 0.35)]);
+    c.strokeRect(x - m + 0.5, y - m + 0.5, w + 2 * m - 1, h + 2 * m - 1);
+    c.restore();
+  }
+  c.fillStyle = q.fits ? "rgba(242,201,76,0.18)" : "rgba(200,40,50,0.38)";
+  c.fillRect(x, y, w, h);
+  c.save();
+  c.strokeStyle = q.fits ? "rgba(242,201,76,0.7)" : "rgba(230,70,80,0.7)";
+  c.lineWidth = 1;
+  c.beginPath();
+  const step = (px * SUB) / QUARTER;
+  for (let k = step; k < w - 1; k += step) { c.moveTo(Math.round(x + k) + 0.5, y); c.lineTo(Math.round(x + k) + 0.5, y + h); }
+  for (let k = step; k < h - 1; k += step) { c.moveTo(x, Math.round(y + k) + 0.5); c.lineTo(x + w, Math.round(y + k) + 0.5); }
+  c.stroke();
+  c.restore();
+  c.lineWidth = lw;
+  c.strokeStyle = q.fits ? "rgba(242,201,76,0.95)" : "rgba(230,70,80,0.9)";
+  c.strokeRect(x + lw / 2, y + lw / 2, w - lw, h - lw);
 }
 
 /** For a wall section: the board's grid of quarter tiles, those that won't

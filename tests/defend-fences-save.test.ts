@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createHash, type Hash } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { random } from "../src/random.ts";
-import { withDefendStream } from "../src/defend/grid.ts";
+import { CELLS_H, CELLS_W, withDefendStream } from "../src/defend/grid.ts";
 
 /** Runs `body` with both Defend streams drawing from `r`. */
 const drawingFrom = <T>(r: () => number, body: () => T): T => withDefendStream("rolls", r, () => withDefendStream("effects", r, body));
@@ -78,7 +78,7 @@ function fenceRun(maps: CityMap[], rnd: () => number): string {
     const intact = fences.sections.filter((s) => !s.broken);
     const near = () => {
       const s = intact[Math.floor(rnd() * intact.length)];
-      return s ? [s.x1 + (s.x2 - s.x1) * rnd() + (rnd() - 0.5) * 0.8, s.y1 + (s.y2 - s.y1) * rnd() + (rnd() - 0.5) * 0.8] : [rnd() * 63, rnd() * 91];
+      return s ? [s.x1 + (s.x2 - s.x1) * rnd() + (rnd() - 0.5) * 0.8, s.y1 + (s.y2 - s.y1) * rnd() + (rnd() - 0.5) * 0.8] : [rnd() * CELLS_W, rnd() * CELLS_H];
     };
     const enemies = [];
     for (let n = Math.floor(rnd() * 4); n > 0; n--) {

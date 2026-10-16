@@ -76,7 +76,7 @@ function scenarios(): Record<string, Scenario> {
     // Self-driving siege engines shelling the wall, the houses in their way
     // and the keep, under fire from towers.
     siege: {
-      layout: city(SQUARE, [["barracks", 1, 1], ["archerTower", -1, -1], ["cannonTower", 0, -2]]),
+      layout: city(SQUARE, [["barracks", 1, 1], ["archerTower", -1, -1], ["cannonTower", 1, -1]]),
       citySeed: 13, levels: maxLevels({ archerRange: 0, archerDamage: 0 }), seed: 6, seconds: 200, wave: 1,
       opening: ['rollingCannon', 'rollingCannon', ...Array<EnemyKind>(6).fill('ballista'), 'fireworkLauncher', 'fireworkLauncher', 'trebuchet', 'bombard', 'rocketBattery'],
     },
@@ -119,7 +119,7 @@ function scenarios(): Record<string, Scenario> {
     },
     // Valkyries charging down the streets, a folded palace beside a whole one.
     valkyries: {
-      layout: city(SQUARE, [["valkyriePalace", -1, 1], ["valkyriePalace", 1, -1], ["valkyriePalace", 1, -1], ["archerTower", 0, -2]], ["valkyriePalace"]),
+      layout: city(SQUARE, [["valkyriePalace", -1, 1], ["valkyriePalace", 1, -1], ["valkyriePalace", 1, 1], ["archerTower", 0, -2]], ["valkyriePalace"]),
       citySeed: 7, levels: levelsAt({ valkyrieReach: 3, palaceCompact: 1, barracksCapacity: 2 }), seed: 3, seconds: 160, wave: 4,
       opening: [...Array<EnemyKind>(30).fill('orc'), ...Array<EnemyKind>(10).fill('bat'), ...Array<EnemyKind>(4).fill('ogre')],
       smash: [[90, "valkyriePalace"]],
@@ -144,7 +144,7 @@ function scenarios(): Record<string, Scenario> {
     // nearest stack first (fliers and a siege engine too); fallen stacks
     // burst and set the ground burning, and civilians restock them.
     bait: {
-      layout: city(SQUARE, [["monsterBait", 0, -2], ["monsterBait", -1, 1], ["archerTower", 1, -1], ["barracks", 1, 1]]),
+      layout: city(SQUARE, [["monsterBait", 0, -2], ["monsterBait", -1, 1], ["archerTower", 1, -1], ["barracks", 1, 1], ["cannonTower", -1, -1]]),
       citySeed: 13, levels: levelsAt({ baitRestock: 2, baitBlast: 3, civilianCount: 3 }), seed: 6, seconds: 160, wave: 2,
       opening: [...Array<EnemyKind>(40).fill('orc'), ...Array<EnemyKind>(10).fill('bat'), ...Array<EnemyKind>(4).fill('ogre'), 'rollingCannon'],
     },

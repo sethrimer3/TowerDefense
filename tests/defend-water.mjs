@@ -55,7 +55,7 @@ try {
     sim.time += 1; const reducedLater = draw('Reduce Motion · later', { reduceMotion: true });
     ageWater(sim, 9); const dried = draw('Meltwater dried');
     const pondMap = { ...map, type: map.type.slice() };
-    for (let py = 10; py < 15; py++) for (let px = 10; px < 15; px++) pondMap.type[py * 63 + px] = CellType.WATER;
+    for (let py = 10; py < 15; py++) for (let px = 10; px < 15; px++) pondMap.type[py * 72 + px] = CellType.WATER;
     const water = new PondWater(); water.sync(pondMap);
     const pondCanvas = document.createElement('canvas'); pondCanvas.width = layer.width; pondCanvas.height = layer.height;
     const pc = pondCanvas.getContext('2d');

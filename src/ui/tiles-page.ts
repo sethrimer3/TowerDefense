@@ -20,7 +20,7 @@ import { upgradeTreeHtml, wallTreeHtml } from "./specialty.ts";
  * stacks and spill out of them. */
 import { play } from "../sound.ts";
 import { daylight } from "../library/render.ts";
-import { BALLISTA_DESCRIPTION, BOMB_RADIUS, GATE_DESCRIPTION, WALL_BLOCK_DESCRIPTION, ITEM_NAMES, SPIKES_DESCRIPTION, STRUCTURES, footprint, shareName, type PaletteItem } from "../defend/catalog.ts";
+import { BALLISTA_DESCRIPTION, BOMB_RADIUS, GATE_DESCRIPTION, WALL_BLOCK_DESCRIPTION, ITEM_NAMES, SPIKES_DESCRIPTION, STRUCTURES, footprint, footprintName, type PaletteItem } from "../defend/catalog.ts";
 import type { PlacedKind } from "../defend/layout.ts";
 import { paintIcon, type IconItem } from "../defend/structure-art.ts";
 import {
@@ -236,7 +236,7 @@ export class TilesPage {
     if (id === "wallBallista") return BALLISTA_DESCRIPTION;
     if (id === "wallBlock") return WALL_BLOCK_DESCRIPTION;
     const d = this.save.defend;
-    return `${STRUCTURES[id].description} Takes ${shareName(footprint(id, d.layout.compact.includes(id)).size)}.`;
+    return `${STRUCTURES[id].description} Takes ${footprintName(footprint(id, d.layout.compact.includes(id)))}.`;
   }
 
   private buy(id: TileId) {

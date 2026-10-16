@@ -10,6 +10,11 @@ import {
   placeCityTile,
   placeGate,
   placeStructure,
+  placeStructureAt,
+  moveStructureTo,
+  arrange,
+  QUARTER,
+  QC,
   removeCityTile,
   type Layout,
 } from '../src/defend/layout.ts';
@@ -25,7 +30,7 @@ import { charge, stepValkyrie } from '../src/defend/valkyries.ts';
 import { chainBolt, stepDarkWizard } from '../src/defend/dark-wizards.ts';
 import { BoltBuffer } from '../src/defend/dark-art.ts';
 import { EditSession } from '../src/defend/edit-session.ts';
-import { UPGRADES, purchasePrice, STARTING_OWNED, STRUCTURES, TILE_ROOM, footprint, stabLength, chainJump, wizardChain, turretChain, turretSpots, DARK_WIZARD } from '../src/defend/catalog.ts';
+import { UPGRADES, purchasePrice, STARTING_OWNED, STRUCTURES, footprint, stabLength, chainJump, wizardChain, turretChain, turretSpots, DARK_WIZARD } from '../src/defend/catalog.ts';
 import { available, buyItem, buyUpgrade, decodeDefendSave, defaultDefendSave, startingWave, unlockWaves, waveReach } from '../src/defend/progress.ts';
 import { difficultyLabel, wavePickerHTML } from '../src/defend/wave-picker.ts';
 
@@ -72,9 +77,9 @@ test('a city tile moves with everything on it, keeping uids, spots and gates', (
   let l = defaultLayout();
   const { tx, ty } = l.keep;
   l = placeCityTile(l, tx, ty - 1)!;
+  l = placeGate(l, { tx, ty: ty - 1, side: 'n' })!;
   l = placeStructure(l, 'barracks', tx, ty - 1)!;
   l = placeStructure(l, 'archerTower', tx, ty - 1)!;
-  l = placeGate(l, { tx, ty: ty - 1, side: 'n' })!;
   assert.ok(l);
   const moved = moveCityTile(l, { tx, ty: ty - 1 }, { tx: tx - 3, ty: ty - 2 });
   assert.ok(moved, 'moves apart from the keep with its buildings');
@@ -284,7 +289,7 @@ test('the war banner rallies every troop to it, and taken down lets them go', ()
   let l = squareCity();
   const { tx, ty } = l.keep;
   l = placeStructure(l, 'barracks', tx - 1, ty - 1)!;
-  l = placeStructure(l, 'archerBarracks', tx - 1, ty - 1)!;
+  l = placeStructure(l, 'archerBarracks', tx + 1, ty - 1)!;
   const sim = new DefendSim(mapOf(l), zeroLevels(), 1);
   for (let i = 0; i < 30 * 12; i++) sim.step(1 / 30);
   assert.ok(sim.soldiers.some((s) => s.kind === 'sword') && sim.soldiers.some((s) => s.kind === 'archer'));
@@ -654,51 +659,74 @@ test('Mothers appear by affordability; broodlings only hatch', () => {
   assert.ok(!buildWave(100, () => .5).includes('broodling'));
 });
 
-test('every building takes a share of its tile, and what shares a tile fits its room', () => {
-  assert.equal(STRUCTURES.archerTower.size, 1, 'the smallest towers take a sixteenth');
-  assert.equal(STRUCTURES.watchTower.size, 1);
-  assert.equal(STRUCTURES.valkyriePalace.size, TILE_ROOM, 'the palace takes a whole tile');
-  assert.equal(footprint('valkyriePalace', true).size, TILE_ROOM / 2, 'or half, with Folded halls');
+test('every structure has a footprint of whole quarter tiles, which upgrades may change', () => {
+  for (const kind of Object.keys(STRUCTURES) as (keyof typeof STRUCTURES)[])
+    for (const compact of [false, true]) {
+      const f = footprint(kind, compact);
+      assert.ok(f.w % 2 === 0 && f.h % 2 === 0, `${kind} is whole quarters`);
+      assert.ok(f.w <= 8 * f.span && f.h <= 8 * f.span, `${kind} fits its tile`);
+    }
+  assert.deepEqual([footprint('meleeGuild', false).w, footprint('meleeGuild', false).h], [4, 4], 'the guilds are 2 × 2 quarters');
+  assert.deepEqual([footprint('rangedGuild', false).w, footprint('rangedGuild', false).h], [4, 4]);
+  assert.deepEqual([footprint('musketHall', false).w, footprint('musketHall', false).h], [6, 4], 'the musket hall is 3 × 2');
+  assert.deepEqual([footprint('mageGuild', false).w, footprint('mageGuild', false).h], [4, 6], 'the mage guild 2 × 3');
+  assert.deepEqual([footprint('watchTower', false).w, footprint('watchTower', false).h], [2, 2], 'a tower one quarter');
   let l = squareCity();
   const { tx, ty } = l.keep;
   l = placeStructure(l, 'valkyriePalace', tx - 1, ty - 1)!;
   assert.ok(l, 'a palace fits a city tile');
-  assert.equal(placeStructure(l, 'archerTower', tx - 1, ty - 1), null, 'and nothing else fits beside it');
+  assert.equal(placeStructure(l, 'archerTower', tx - 1, ty - 1), null, 'and no other building fits beside it');
+  assert.ok(placeStructure(l, 'monsterBait', tx - 1, ty - 1), 'though bait huddles right up to it');
   assert.equal(placeStructure(l, 'valkyriePalace', tx, ty - 3), null, 'it must be inside the city');
   const small = { ...l, compact: ['valkyriePalace' as const] };
   const fit = fitLayout(small);
   assert.ok(fit.ok);
   const palace = fit.structures.find((s) => s.kind === 'valkyriePalace')!;
-  assert.equal(palace.rect.w * palace.rect.h, 15, 'folded, it stands on 3 × 5 cells');
-  let two = placeStructure(small, 'valkyriePalace', tx - 1, ty - 1);
-  assert.ok(two, 'two folded palaces share a tile');
-  assert.equal(placeStructure(two!, 'archerTower', tx - 1, ty - 1), null, 'which they fill');
+  assert.equal(palace.rect.w * palace.rect.h, 24, 'folded, it stands on 2 × 3 quarters');
 });
 
-test('buildings take a random free spot on their tile, and a drop reshuffles the tile', () => {
+test('the player sets each structure on the quarter grid, a clear quarter between buildings', () => {
   let l = squareCity();
   const { tx, ty } = l.keep;
-  const spots = new Set<string>();
-  for (let n = 0; n < 12; n++) {
-    const next = n === 0 ? placeStructure(l, 'archerTower', tx + 1, ty + 1) : moveStructureTo(l, tx + 1, ty + 1);
-    l = next!;
-    const r = fitLayout(l).ok && (fitLayout(l) as any).structures.find((s: any) => s.kind === 'archerTower').rect;
-    spots.add(`${r.x},${r.y}`);
-  }
-  assert.ok(spots.size >= 4, `an archer tower lands in different spots (${spots.size})`);
-  // Four towers fill a tile; every drop shuffles all of them, and they fit.
-  for (const kind of ['watchTower', 'cannonTower', 'wizardTower'] as const) l = placeStructure(l, kind, tx + 1, ty + 1)!;
-  assert.ok(l, 'four towers share a tile');
-  const before = (fitLayout(l) as any).structures.filter((s: any) => s.tx === tx + 1).map((s: any) => `${s.rect.x},${s.rect.y}`).join(' ');
-  const again = moveStructureTo(l, tx + 1, ty + 1)!;
-  const after = (fitLayout(again) as any).structures.filter((s: any) => s.tx === tx + 1).map((s: any) => `${s.rect.x},${s.rect.y}`).join(' ');
-  assert.notEqual(after, before, 'dropping one again rearranges the tile');
+  const q0 = { qx: (tx + 1) * QUARTER, qy: (ty + 1) * QUARTER };
+  l = placeStructureAt(l, 'meleeGuild', q0)!;
+  assert.ok(l, 'a guild in the top left of its tile');
+  const guild = l.structures[0];
+  assert.deepEqual([guild.tx, guild.ty, guild.qx, guild.qy], [tx + 1, ty + 1, q0.qx, q0.qy], 'exactly where it was set');
+  const rect = (fitLayout(l) as any).structures.find((s: any) => s.uid === guild.uid).rect;
+  assert.deepEqual(rect, { x: q0.qx * QC, y: q0.qy * QC, w: 4, h: 4 });
+  assert.equal(placeStructureAt(l, 'watchTower', { qx: q0.qx + 2, qy: q0.qy }), null, 'not right beside it');
+  assert.equal(placeStructureAt(l, 'watchTower', { qx: q0.qx + 2, qy: q0.qy + 2 }), null, 'nor corner to corner');
+  assert.equal(placeStructureAt(l, 'watchTower', { qx: q0.qx + 1, qy: q0.qy + 1 }), null, 'nor on it');
+  assert.ok(placeStructureAt(l, 'watchTower', { qx: q0.qx + 3, qy: q0.qy + 3 }), 'a clear quarter between them is enough');
+  assert.ok(placeStructureAt(l, 'monsterBait', { qx: q0.qx + 2, qy: q0.qy }), 'bait may stand right beside it');
+  assert.equal(placeStructureAt(l, 'musketHall', { qx: q0.qx + 2, qy: q0.qy + 2 }), null, 'a footprint stays inside its tile');
+  // Moving keeps its uid and goes exactly where it is set.
+  const moved = moveStructureTo(l, guild.uid, { qx: q0.qx + 2, qy: q0.qy + 2 })!;
+  assert.ok(moved);
+  assert.deepEqual(moved.structures.map((s) => [s.uid, s.qx, s.qy]), [[guild.uid, q0.qx + 2, q0.qy + 2]]);
+  assert.equal(moveStructureTo(l, guild.uid, { qx: q0.qx + 3, qy: q0.qy }), null, 'not hanging off its tile');
 });
 
-/** Picks up the archer tower and drops it on (tx, ty). */
-const moveStructureTo = (l: Layout, tx: number, ty: number) => moveStructure(l, l.structures.find((s) => s.kind === 'archerTower')!.uid, tx, ty);
+test('a tile takes a structure whenever any arrangement of what is there lets it', () => {
+  // Four towers fill an open tile's corners only if set out just so;
+  // placing them one by one on the tile always finds that arrangement.
+  for (let start = 1; start < 30; start++) {
+    let l = squareCity();
+    l.nextUid = start;
+    const { tx, ty } = l.keep;
+    for (let n = 0; n < 4; n++) {
+      const next = placeStructure(l, 'archerTower', tx, ty - 3);
+      assert.ok(next, `tower ${n + 1} fits (from uid ${start})`);
+      l = next!;
+    }
+    assert.equal(placeStructure(l, 'archerTower', tx, ty - 3), null, 'a fifth never does');
+    const set = arrange(l, l.structures.map((s) => s.uid));
+    assert.ok(set && fitLayout(set).ok, 'and setting them out afresh finds an arrangement');
+  }
+});
 
-test('old saves load with their buildings in valid spots, returning what no longer fits', () => {
+test('old saves load with their buildings set out on their tiles, returning what no longer fits', () => {
   const save = defaultDefendSave();
   let l = squareCity();
   const { tx, ty } = l.keep;
@@ -709,24 +737,27 @@ test('old saves load with their buildings in valid spots, returning what no long
   save.owned.barracks = 1;
   save.owned.archerTower = 1;
   save.owned.valkyriePalace = 1;
-  // A save from before spots and shares: no spot, and a palace sharing a
+  // A save from before quarter spots: a random spot, and a palace sharing a
   // tile with the barracks (now too full).
   const old = JSON.parse(JSON.stringify(save));
-  for (const s of old.layout.structures) delete s.spot;
-  delete old.layout.rolls;
+  for (const s of old.layout.structures) { delete s.qx; delete s.qy; s.spot = 12345; }
+  old.layout.rolls = 3;
   delete old.layout.compact;
-  old.layout.structures.push({ uid: old.layout.nextUid++, kind: 'valkyriePalace', tx: tx - 1, ty: ty - 1 });
+  old.layout.structures.push({ uid: old.layout.nextUid++, kind: 'valkyriePalace', tx: tx - 1, ty: ty - 1, spot: 1 });
   const back = decodeDefendSave(old);
   assert.equal(back.layout.cityTiles.length, 8, 'the city is kept');
   assert.deepEqual(back.layout.structures.map((s) => s.kind), ['barracks', 'archerTower'], 'what no longer fits goes back to the palette');
   assert.ok(fitLayout(back.layout).ok, 'and the rest fits');
+  assert.ok(back.layout.structures.every((s) => Math.floor(s.qx / QUARTER) === s.tx && Math.floor(s.qy / QUARTER) === s.ty), 'each on its own tile');
   assert.equal(available(back, 'valkyriePalace'), 1);
-  // Buying Folded halls shrinks the palaces on the board.
+  // Buying Folded halls shrinks the palaces: those on the board change size,
+  // so they go back to the palette to be placed again.
   const s2 = decodeDefendSave(JSON.parse(JSON.stringify(save)));
   s2.owned.valkyriePalace = 1;
   s2.layout = placeStructure(s2.layout, 'valkyriePalace', tx - 1, ty)!;
   assert.ok(buyUpgrade(s2, { gold: 0, copper: 0, silver: 0, free: true }, 'palaceCompact'));
   assert.deepEqual(s2.layout.compact, ['valkyriePalace']);
+  assert.ok(!s2.layout.structures.some((s) => s.kind === 'valkyriePalace'), 'the palace waits in the palette');
   assert.equal(decodeDefendSave(JSON.parse(JSON.stringify(s2))).layout.compact[0], 'valkyriePalace', 'and stays so on loading');
 });
 
@@ -803,8 +834,12 @@ test('the dark wizard keep fills a 2 × 2 block of city tiles, or one tile folde
   const keep = fit.structures.find((s) => s.kind === 'darkKeep')!;
   assert.deepEqual([keep.rect.w, keep.rect.h], [12, 12], 'a vast 12 × 12 keep');
   assert.ok(keep.rect.x >= (tx - 2) * SUB && keep.rect.x + 12 <= tx * SUB && keep.rect.y >= (ty - 2) * SUB && keep.rect.y + 12 <= ty * SUB, 'inside its block');
-  for (const [x, y] of [[tx - 2, ty - 2], [tx - 1, ty - 2], [tx - 2, ty - 1], [tx - 1, ty - 1]])
-    assert.equal(placeStructure(l, 'archerTower', x, y), null, `nothing else fits on its tile ${x},${y}`);
+  const kq = l.structures.find((s) => s.kind === 'darkKeep')!;
+  for (let qy = (ty - 2) * QUARTER; qy < ty * QUARTER; qy++)
+    for (let qx = (tx - 2) * QUARTER; qx < tx * QUARTER; qx++) {
+      const near = qx >= kq.qx - 1 && qx <= kq.qx + 6 && qy >= kq.qy - 1 && qy <= kq.qy + 6;
+      if (near) assert.equal(placeStructureAt(l, 'archerTower', { qx, qy }), null, `nothing stands on it or right beside it (${qx},${qy})`);
+    }
   assert.equal(moveKeep(l, tx - 1, ty - 1), null, 'the keep can\'t move under it');
   assert.deepEqual(removeCityTile(l, tx - 2, ty - 2)?.returned, ['darkKeep'], 'taking away any tile it stands on returns it');
   // Two blocks that overlap on a tile neither stands on still clash.
@@ -819,24 +854,22 @@ test('the dark wizard keep fills a 2 × 2 block of city tiles, or one tile folde
   const folded = placeStructure({ ...darkCity(), compact: ['darkKeep'] }, 'darkKeep', tx + 1, ty + 1);
   assert.ok(folded, 'folded, a single tile takes it');
   const f2 = fitLayout(folded);
-  assert.ok(f2.ok && f2.structures.find((s) => s.kind === 'darkKeep')!.rect.w === 5);
+  assert.ok(f2.ok && f2.structures.find((s) => s.kind === 'darkKeep')!.rect.w === 6);
 });
 
-test('dragging the dark keep shows the whole 2 × 2 block centred under the pointer', () => {
+test('dragging the dark keep shows its footprint centred under the pointer, inside a 2 × 2 block', () => {
   const l = darkCity();
   const { tx, ty } = l.keep;
   const edit = new EditSession({ from: 'palette', item: 'darkKeep' }, l);
   assert.equal(edit.span, 2);
-  assert.deepEqual([...edit.legal.keys()], [tileKey(tx - 2, ty - 2)], 'the one block of four free city tiles');
-  // The pointer at the corner where the block's four tiles meet picks it.
-  edit.hover({ cellX: (tx - 1) * SUB + 0.4, cellY: (ty - 1) * SUB - 0.4, overBoard: true, overPalette: false });
+  // The pointer at the corner where the block's four tiles meet centres it there.
+  edit.hover({ cellX: (tx - 1) * SUB, cellY: (ty - 1) * SUB, overBoard: true, overPalette: false });
   const o = edit.overlay()!;
-  assert.equal(o.hover, tileKey(tx - 2, ty - 2));
-  assert.equal(o.span, 2, 'the overlay frames a 2 × 2 block');
+  assert.deepEqual(o.quarters, { rect: { x: (tx - 1) * SUB - 6, y: (ty - 1) * SUB - 6, w: 12, h: 12 }, fits: true, clear: true }, 'its 6 × 6 quarters');
   assert.ok(o.ghost && o.ghost.rect.w === 12, 'with the keep\'s outline in it');
   edit.hover({ cellX: (tx + 1) * SUB, cellY: (ty + 1) * SUB, overBoard: true, overPalette: false });
-  assert.equal(edit.overlay()!.ghost, null, 'a block that won\'t take it shows no ghost');
-  assert.match(edit.release({ cellX: (tx + 1) * SUB, cellY: (ty + 1) * SUB, overBoard: true, overPalette: false }).message as string, /2 × 2 block/);
+  assert.equal(edit.overlay()!.ghost, null, 'a spot that won\'t take it shows no ghost');
+  assert.match(edit.release({ cellX: (tx + 1) * SUB, cellY: (ty + 1) * SUB, overBoard: true, overPalette: false }).message as string, /2 × 2 block|standing|clear|wall/);
   const folded = new EditSession({ from: 'palette', item: 'darkKeep' }, { ...l, compact: ['darkKeep'] });
   assert.equal(folded.span, 1, 'folded, it is carried like any one-tile building');
 });
@@ -884,8 +917,11 @@ test('the dark keep\'s corner turrets fire, and it summons one dark wizard who c
   const s = spots[0];
   sim.enemies = Array.from({ length: 12 }, (_, i) => foeAt(i + 1, s.x - 3 - (i % 4) * 0.4, s.y - (i >> 2) * 0.4));
   sim.step(1 / 30);
-  assert.ok(sim.bolts.length >= 1, 'a turret looses a bolt');
-  assert.ok(sim.bolts.every((b) => b.pts.length / 2 - 1 <= turretChain(0)), 'chaining at most five');
+  // (The keep may already have trained its wizard, whose bolts chain
+  // further; a turret's bolt leaves from half a cell over its spot.)
+  const fromTurret = sim.bolts.filter((b) => spots.some((t) => Math.abs(t.x - b.pts[0]) < 0.01 && Math.abs(t.y - 0.5 - b.pts[1]) < 0.01));
+  assert.ok(fromTurret.length >= 1, 'a turret looses a bolt');
+  assert.ok(fromTurret.every((b) => b.pts.length / 2 - 1 <= turretChain(0)), 'chaining at most five');
   assert.ok(sim.enemies.filter((e) => e.hp < 1000).length >= 2, 'through more than one enemy');
   // Clear the board and let the keep summon its wizard: only ever one.
   sim.enemies = [];
@@ -929,7 +965,7 @@ test('the bolt buffer draws a black core in a crimson glow, and clears it after'
 test('monster bait: every enemy goes for the nearest stack before the keep', () => {
   let l = squareCity();
   const { tx, ty } = l.keep;
-  assert.equal(STRUCTURES.monsterBait.size, 1, 'a sixteenth of a tile, like the watch tower');
+  assert.deepEqual([STRUCTURES.monsterBait.w, STRUCTURES.monsterBait.h], [2, 2], 'a quarter of a tile, like the watch tower');
   l = placeStructure(l, 'monsterBait', tx - 3, ty - 3)!;
   assert.ok(l, 'bait may stand outside the walls');
   l = placeStructure(l, 'monsterBait', tx + 3, ty - 3)!;
