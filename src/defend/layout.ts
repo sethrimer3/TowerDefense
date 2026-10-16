@@ -211,8 +211,6 @@ type FitSpace = {
 /** A structure to fit onto its tile (its block of `span` × `span` tiles). */
 type Placement = { uid: number; kind: StructureKind; tx: number; ty: number; inside: boolean; spot: number; w: number; h: number; size: number; span: TileSpan };
 
-/** Tries per tile, each a fresh random arrangement, before it is full. */
-const TRIES = 24;
 /** Fresh arrangements of the whole city tried when one leaves an in-city
  * structure cut off from the streets. */
 const PASSES = 6;
@@ -250,7 +248,7 @@ export function fitLayout(l: Layout): Fit {
     for (const g of gates) for (const i of rectCells(grow(g.inner, g.side))) if (space.city[i]) space.blocked[i]++;
     const fitted: FittedStructure[] = [];
     for (const group of order) {
-      const f = fitTile(group, space, pass * TRIES, spanned.get(tileKey(group[0].tx, group[0].ty)));
+      const f = fitTile(group, space, pass, spanned.get(tileKey(group[0].tx, group[0].ty)));
       if (typeof f === "string") return { ok: false, reason: f };
       fitted.push(...f);
     }
@@ -310,9 +308,11 @@ function spannedTiles(order: Placement[][]): Map<string, { size: number; kind: S
   return out;
 }
 
-/** Fits a tile's structures together, trying fresh arrangements until they
- * all fit, and claims their cells; or says why they can't. `spanned` is the
- * room a structure spanning from another tile takes on this one. */
+/** Fits a tile's structures together and claims their cells; or says why
+ * they can't. Every arrangement is searched (each structure's spots tried in
+ * its random order, backtracking when a later one has no room), so a tile
+ * takes its structures whenever any arrangement of them fits. `spanned` is
+ * the room a structure spanning from another tile takes on this one. */
 function fitTile(group: Placement[], space: FitSpace, salt: number, spanned?: { size: number; kind: StructureKind }): FittedStructure[] | string {
   for (const p of group) {
     if (!tileInBounds(p.tx, p.ty) || p.ty === SPAWN_ROW) return "Nothing can be built on the spawn row.";
@@ -324,26 +324,31 @@ function fitTile(group: Placement[], space: FitSpace, salt: number, spanned?: { 
     const last = STRUCTURES[spanned?.kind ?? group[group.length - 1].kind];
     return `That tile has no room left for the ${last.name.toLowerCase()}.`;
   }
-  let reason = "";
-  for (let t = 0; t < TRIES; t++) {
-    const fitted: FittedStructure[] = [];
-    for (const p of group) {
-      const rect = pickRect(p, space, salt + t);
-      if (!rect) {
-        reason ||= `No room for the ${STRUCTURES[p.kind].name.toLowerCase()} there.`;
-        break;
-      }
+  const fitted: FittedStructure[] = [];
+  let budget = SEARCH;
+  // Places structure `n` onward, claiming as it goes; gives back what it
+  // claimed when no arrangement of the rest fits.
+  const place = (n: number): boolean => {
+    if (n === group.length) return true;
+    const p = group[n];
+    for (const rect of spotsFor(p, space, salt)) {
+      if (budget-- <= 0) return false;
       claim(space, rect, 1);
       fitted.push({ uid: p.uid, kind: p.kind, tx: p.tx, ty: p.ty, rect, inside: p.inside });
+      if (place(n + 1)) return true;
+      fitted.pop();
+      claim(space, rect, -1);
     }
-    if (fitted.length === group.length) return fitted;
-    for (const f of fitted) claim(space, f.rect, -1);
-    // The keep stands in one place, and a lone structure that can't fit
-    // anywhere won't on another try.
-    if (group.length === 1) break;
-  }
-  return reason;
+    return false;
+  };
+  if (place(0)) return fitted;
+  const first = group.find((p) => !spotsFor(p, space, salt).length) ?? group[group.length - 1];
+  return `No room for the ${STRUCTURES[first.kind].name.toLowerCase()} there.`;
 }
+
+/** Spots tried in all, across a tile's whole search, before it counts as
+ * full: far more than any tile's arrangements need. */
+const SEARCH = 20000;
 
 /** Claims a footprint and its ring (`by` 1), or gives them back (-1). */
 function claim(space: FitSpace, rect: Rect, by: 1 | -1) {
@@ -379,27 +384,22 @@ function cutOff(fitted: FittedStructure[], space: FitSpace, l: Layout): FittedSt
   return fitted.find((f) => f.inside && f.uid !== KEEP_UID && !openSides(f.rect, space).some((i) => reach[i]));
 }
 
-/** The keep's place in the middle of its tile; for anything else a free
- * spot on its tile picked at random by its `spot` and the try. */
-function pickRect(p: Placement, space: FitSpace, salt: number): Rect | null {
+/** The keep's place in the middle of its tile; for anything else every free
+ * spot on its tile, in a random order drawn from its `spot` and `salt`. */
+function spotsFor(p: Placement, space: FitSpace, salt: number): Rect[] {
   if (p.kind === "keep") {
     const o = (SUB - p.w) >> 1;
     const r = { x: p.tx * SUB + o, y: p.ty * SUB + o, w: p.w, h: p.h };
-    return rectUsable(r, space, p.inside) ? r : null;
+    return rectUsable(r, space, p.inside) ? [r] : [];
   }
   // In the city, a structure needs at least one open side for a street.
-  let best: Rect | null = null;
-  let bestScore = Infinity;
+  const out: { r: Rect; score: number }[] = [];
   for (const r of candidateRects(p)) {
     if (!rectUsable(r, space, p.inside)) continue;
     if (p.inside && !openSides(r, space).length) continue;
-    const score = hash01(p.spot, salt, r.x, r.y, r.w);
-    if (score < bestScore) {
-      bestScore = score;
-      best = r;
-    }
+    out.push({ r, score: hash01(p.spot, salt, r.x, r.y, r.w) });
   }
-  return best;
+  return out.sort((a, b) => a.score - b.score).map((o) => o.r);
 }
 
 /** Every position of both orientations of the structure on its tile (or
