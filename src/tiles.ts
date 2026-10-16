@@ -2,8 +2,11 @@
  * owns to put into a defense is a tile, a real piece of the realm. City
  * tiles and the wall's pieces, the unit buildings (Barracks), the towers,
  * and the consumables (bombs and the war banner) are all tiles of one of
- * four types. Identical tiles stack (`tileStacks`): one stack per kind, its
- * quantity, and how many of it stand in the city. The shop sells more of a
+ * four types. A kind's tiles (`tileStacks`): its quantity, and how many of
+ * it stand in the city. Each copy carries the Knowledge upgrades it was
+ * given (`tileCopies`, `tileMarks`); copies with the same upgrades stack
+ * (`tileGroups`), and kinds whose upgrades every copy shares (`universal`)
+ * are always one stack. The shop sells more of a
  * kind (`shopOffer`, `buyTile`); a kind's upgrades live where they are made,
  * the Mine's Smithy and the Library's Study (`tileTopic`); a kind's higher
  * tier is its Knowledge path's crown (`higherTier`). Pure functions over the
@@ -11,8 +14,9 @@
 import { metalPriceText } from "./metals.ts";
 import { BASIC_BUILDINGS, BOMB_PRICE, ITEM_CATEGORY, ITEM_NAMES, PALETTE_ITEMS, purchasePrice, type PaletteItem, type Price } from "./defend/catalog.ts";
 import { available, buyBomb, buyItem, canAfford, type Wallet } from "./defend/progress.ts";
-import { evolvedBy, PATHS, type KnowledgePath } from "./knowledge-paths.ts";
-import { rootOf } from "./specializations.ts";
+import { evolvedBy, pathById, PATHS, type KnowledgePath, type PathHue } from "./knowledge-paths.ts";
+import { hasTree, rootOf, upgradedFrom, type Wear } from "./specializations.ts";
+import { WALL_PATHS, wallRank } from "./wall-upgrades.ts";
 import type { PlacedKind } from "./defend/layout.ts";
 import { METALS } from "./mine/sim.ts";
 import type { Save } from "./save.ts";
@@ -75,14 +79,90 @@ export function tileStacks(save: Save, filter: TileFilter, shop = false): TileSt
     .filter((s) => (shop ? !("reason" in shopOffer(save, s.id)) : s.count > 0));
 }
 
-/** One copy of a stack, as the expanded stack or the spread view lays them
- * out: the city's first, then the palette's. Copies are interchangeable:
- * a building's path is chosen where it is placed, in Defend. */
-export type TileCopy = { key: string; id: TileId; index: number; placed: boolean };
-export function tileCopies(stack: TileStack, limit = Infinity): TileCopy[] {
-  const n = Math.min(stack.count, limit);
-  return Array.from({ length: n }, (_, index) => ({ key: `${stack.id}#${index}`, id: stack.id, index, placed: index < stack.placed }));
+/** Kinds whose copies are always alike: their upgrades are shared by every
+ * copy (the Smithy's levels, the walls' one tree) or they have none, so they
+ * always stack. A building with its own Knowledge tree is upgraded one copy
+ * at a time, so its copies are shown apart. */
+export const universal = (id: TileId): boolean => isConsumable(id) || !hasTree(id);
+
+/** One copy of a kind, as the spread view and the opened stack lay them
+ * out: the city's first, then the palette's kept copies, then its plain
+ * ones. `group` names the copies wearing the same upgrades (the kind, or
+ * `kind~path~rank`); `key` is the group and the copy's place in it. */
+export type TileCopy = { key: string; id: TileId; index: number; placed: boolean; wear?: Wear; group: string };
+export function tileCopies(save: Save, stack: TileStack, limit = Infinity): TileCopy[] {
+  const d = save.defend, id = stack.id, wears: (Wear | undefined)[] = [];
+  if (!universal(id)) {
+    const standing = id === "wallSpikes" ? d.layout.spikes : d.layout.structures.filter((o) => o.kind === id);
+    for (let i = 0; i < stack.placed; i++) {
+      const o = standing[i];
+      wears.push(o?.path && o.rank ? { path: o.path, rank: o.rank } : undefined);
+    }
+    for (const k of d.kept) if (k.kind === id && wears.length < stack.count) wears.push({ path: k.path, rank: k.rank });
+  }
+  const n = Math.min(stack.count, limit), seen = new Map<string, number>();
+  return Array.from({ length: n }, (_, index) => {
+    const wear = wears[index], group = wear ? `${id}~${wear.path}~${wear.rank}` : id, nth = seen.get(group) ?? 0;
+    seen.set(group, nth + 1);
+    return { key: `${group}#${nth}`, id, index, placed: index < stack.placed, ...(wear ? { wear } : {}), group };
+  });
 }
+
+/** Copies of a kind wearing the same upgrades, stacked together: plain
+ * copies first, then by how far they were upgraded. */
+export type TileGroup = { key: string; id: TileId; wear?: Wear; count: number; placed: number; marks: TileMark[] };
+export function tileGroups(save: Save, stack: TileStack): TileGroup[] {
+  const groups = new Map<string, TileGroup>();
+  for (const c of tileCopies(save, stack)) {
+    const g = groups.get(c.group) ?? { key: c.group, id: c.id, ...(c.wear ? { wear: c.wear } : {}), count: 0, placed: 0, marks: tileMarks(save, c.id, c.wear) };
+    g.count++;
+    if (c.placed) g.placed++;
+    groups.set(c.group, g);
+  }
+  return [...groups.values()].sort((a, b) => a.marks.length - b.marks.length || a.key.localeCompare(b.key));
+}
+
+/** One Knowledge upgrade a tile carries, in the order it was taken: the
+ * building becoming another kind, or a rank of a path (`name` its path's). */
+export type TileMark = { type: "became"; name: string } | { type: "rank"; name: string; rank: number; hue: PathHue };
+
+/** The Knowledge upgrades a tile of `id` wearing `wear` carries: every kind
+ * it grew through from its basic building (an evolved one's whole crowned
+ * path first), then its own path's ranks. The walls carry their shared
+ * tree's ranks. Empty for a tile with none. */
+export function tileMarks(save: Save, id: TileId, wear?: Wear): TileMark[] {
+  const marks: TileMark[] = [];
+  const ranks = (name: string, hue: PathHue, n: number) => { for (let r = 1; r <= n; r++) marks.push({ type: "rank", name, rank: r, hue }); };
+  if (id === "wallBlock") {
+    for (const p of WALL_PATHS) ranks(p.name, p.hue, wallRank(save.defend.wallRanks, p.id));
+    return marks;
+  }
+  if (universal(id)) return marks;
+  const kinds: PlacedKind[] = [];
+  if (id !== "wallSpikes") for (let k: PlacedKind | undefined = id as PlacedKind; k; k = upgradedFrom(k)) kinds.unshift(k);
+  for (const k of kinds.slice(1)) {
+    const crowned = evolvedBy(k);
+    if (crowned) ranks(crowned.name, crowned.hue, crowned.ranks.length);
+    marks.push({ type: "became", name: ITEM_NAMES[k] });
+  }
+  if (wear) { const p = pathById(wear.path); ranks(p.name, p.hue, wear.rank); }
+  return marks;
+}
+
+/** A tile's upgrades in words: "Watch tower → Archer tower → Fire arrows II". */
+export function marksText(id: TileId, marks: TileMark[]): string {
+  if (!marks.length) return "No Knowledge upgrades";
+  const parts: string[] = [];
+  if (id !== "wallBlock" && id !== "wallSpikes" && !isConsumable(id)) parts.push(ITEM_NAMES[rootOf(id as PlacedKind)]);
+  for (let i = 0; i < marks.length; i++) {
+    const m = marks[i], next = marks[i + 1];
+    if (m.type === "became") parts.push(m.name);
+    else if (!(next?.type === "rank" && next.name === m.name)) parts.push(specialtyLabelOf(m.name, m.rank));
+  }
+  return parts.join(" → ");
+}
+const ROMAN = ["", "I", "II", "III", "IV", "V"];
+const specialtyLabelOf = (name: string, rank: number) => `${name} ${ROMAN[rank]}`;
 
 /** The shop's metal price, or why a kind isn't sold. */
 export type ShopOffer = { price: Price } | { reason: string };

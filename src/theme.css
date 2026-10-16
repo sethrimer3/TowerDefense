@@ -2015,3 +2015,19 @@ dialog .away-row .away-note {
   .ug-title b { font-size: 11px; }
   .ug-card { font-size: 9px; }
 }
+
+/* A tile's Knowledge upgrades, in the order taken: a brass diamond for each
+   building it became, a pip in its path's colour for each rank. */
+.tile-marks { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 2px; min-height: 8px; max-width: 100%; }
+.tile-marks.none { font-size: 7px; color: #a8987a; letter-spacing: 0.3px; }
+.mark { display: inline-block; flex: none; box-sizing: border-box; border: 1px solid #000; }
+.mark.became { width: 7px; height: 7px; margin: 0 1px; transform: rotate(45deg); background: linear-gradient(135deg, #ffe3a0, #b07a2c); }
+.mark.rank { width: 7px; height: 7px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, var(--hue, #dfe5ec), var(--hue-deep, #4b5563) 85%); }
+.tile-legend { white-space: nowrap; color: #c8b48a; }
+.tile-legend .mark { vertical-align: middle; margin-right: 2px; }
+.tile-sets { display: flex; flex-direction: column; gap: 6px; }
+.tile-set { display: flex; align-items: center; gap: 8px; }
+.tile-set > div { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-width: 0; }
+.tile-set b { font-size: 10px; color: #f0d9a8; font-weight: normal; }
+.tile-set .tile-marks { justify-content: flex-start; }
+.tile-set > div > small { font-size: 8px; color: #b3a282; letter-spacing: 0.3px; }
