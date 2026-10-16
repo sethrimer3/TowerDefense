@@ -1,4 +1,4 @@
-import { CIRCLE, CircleTransition, formation, hash, nestedTriangles, tesseract, TESSERACT_EDGES, unit, voronoi, type CircleDNA, type CircleState, type Point, type Quality } from './formation.ts';
+import { CIRCLE, CircleTransition, formation, hash, growingVoronoi, nestedTriangles, tesseract, TESSERACT_EDGES, unit, voronoi, type CircleDNA, type CircleState, type Point, type Quality } from './formation.ts';
 
 /** Positions along a fixed polar graph (four rings, 24 junctions each).
  * History stores graph coordinates, so trails stay attached during deformation. */
@@ -156,7 +156,8 @@ export class MagicCircle {
   private geometry(d: CircleDNA) {
     const quality = CIRCLE.quality[this.quality], path = new Path2D();
     if (d.motifs.voronoi <= 0) return path;
-    const sites = d.sites.slice(0, quality.sites), cells = voronoi(sites);
+    const { sites, cells } = growingVoronoi(d, quality.sites);
+    this.canvas.dataset.cells = String(cells.filter(cell => cell.length >= 3).length);
     cells.forEach((cell, i) => {
       polygon(path, cell);
       if (i % 3 !== 0 || cell.length < 3) return;
@@ -191,8 +192,10 @@ export class MagicCircle {
     c.globalAlpha = blend * 0.7 * d.motifs.voronoi; c.stroke(this.cells); c.restore();
     if (d.motifs.triangles > 0) {
       c.save(); c.rotate(d.offset + orbitTime * 0.025);
-      const triangles = nestedTriangles(d, time), count = 10 + d.detail * 4 + d.recursion * 4;
+      const triangles = nestedTriangles(d, time), count = d.triangleCount;
+      this.canvas.dataset.triangles = String(count);
       triangles.forEach((points, i) => {
+        if (count <= i) return;
         c.globalAlpha = d.motifs.triangles * Math.min(1, Math.max(0, count - i)) * (0.8 + pulse * 0.2);
         c.strokeStyle = gold[i % 3 === 0 ? 3 : 2]; c.lineWidth = (i % 3 === 0 ? 1 : 0.7) / r;
         const path = new Path2D(); polygon(path, points); c.stroke(path);

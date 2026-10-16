@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { boundary, CircleTransition, formation, nestedTriangles, TESSERACT_EDGES, tesseract, voronoi, type CircleState } from '../src/magic-circle/formation.ts';
+import { boundary, CircleTransition, formation, growingVoronoi, mix, nestedTriangles, TESSERACT_EDGES, tesseract, voronoi, type CircleState } from '../src/magic-circle/formation.ts';
 import { studyCircle } from '../src/magic-circle/progression.ts';
 import { specialtyCircle } from '../src/ui/specialty.ts';
 import { defaults, decode } from '../src/save.ts';
@@ -100,7 +100,7 @@ test('city, strike spells, infantry and towers select distinct motif families', 
 test('nested triangles are inscribed on parent edges and stay finite while animated', () => {
   const d = formation({ ...base, motif: 'triangles' });
   for (const time of [0, 1, 35, 5000]) {
-    const triangles = nestedTriangles(d, time); assert.equal(triangles.length, 18);
+    const triangles = nestedTriangles(d, time); assert.equal(triangles.length, d.triangleCount);
     for (let i = 1; i < triangles.length; i++) for (let j = 0; j < 3; j++) {
       const p = triangles[i][j], a = triangles[i-1][j], b = triangles[i-1][(j+1)%3];
       assert.ok(Number.isFinite(p.x + p.y));
@@ -117,4 +117,52 @@ test('motif changes crossfade and can reverse without snapping or retaining the 
   assert.equal(t.current.motifs.voronoi, 0);
   const displayed = t.current; t.retarget(city); assert.deepEqual(t.step(0), displayed);
   assert.deepEqual(t.step(2).motifs, { tesseract: 1, triangles: 0, voronoi: 0 });
+});
+
+const area = (p: {x:number;y:number}[]) => Math.abs(p.reduce((sum, a, i) => {
+  const b = p[(i+1)%p.length]; return sum + a.x*b.y-a.y*b.x;
+}, 0))/2;
+test('Knowledge ranks change Voronoi and triangle counts, shapes, and restore exact targets on undo', () => {
+  const a = formation({ ...base, upgrades: [] });
+  const b = formation({ ...base, upgrades: [{ id: 'path:starfall', rank: 1 }] });
+  const c = formation({ ...base, upgrades: [{ id: 'path:starfall', rank: 2 }] });
+  assert.ok(b.siteCount > a.siteCount && c.siteCount > b.siteCount);
+  assert.ok(b.triangleCount > a.triangleCount && c.triangleCount > b.triangleCount);
+  assert.notDeepEqual(a.triangleCorners, b.triangleCorners);
+  assert.notDeepEqual(a.triangleInsets, b.triangleInsets);
+  assert.notDeepEqual(a.sites, b.sites);
+  assert.notDeepEqual(nestedTriangles(a)[0], nestedTriangles(b)[0]);
+  for (const cap of [19,27,37]) assert.ok(growingVoronoi(b,cap).cells.length > growingVoronoi(a,cap).cells.length);
+  const t = new CircleTransition(a); t.retarget(b); t.step(0.5);
+  assert.ok(t.current.siteCount > a.siteCount && t.current.siteCount < b.siteCount);
+  assert.ok(t.current.triangleCount > a.triangleCount && t.current.triangleCount < b.triangleCount);
+  const displayed = t.current; t.retarget(a); assert.deepEqual(t.step(0), displayed);
+  assert.deepEqual(t.step(2), a);
+});
+test('new Voronoi cells grow continuously from zero area and preserve the tessellated area', () => {
+  const d = formation(base), n = 15;
+  const before = growingVoronoi({ ...d, siteCount: n });
+  const born = growingVoronoi({ ...d, siteCount: n + 0.00001 });
+  assert.ok(area(born.cells[n]) < 1e-6);
+  let previous = 0;
+  for (let i = 1; i <= 100; i++) {
+    const shape = growingVoronoi({ ...d, siteCount: n + i/100 });
+    const size = area(shape.cells[n]); assert.ok(size + 1e-9 >= previous); previous = size;
+    assert.ok(Math.abs(shape.cells.reduce((sum,c)=>sum+area(c),0)-area(boundary())) < 1e-6);
+    for (const cell of shape.cells) for (const p of cell) assert.ok(Number.isFinite(p.x+p.y) && Math.hypot(p.x,p.y)<0.861);
+  }
+  assert.ok(previous > 0.001);
+  assert.deepEqual(growingVoronoi({ ...d, siteCount:n+1 }).cells, voronoi(d.sites.slice(0,n+1)));
+  assert.deepEqual(before.cells, voronoi(d.sites.slice(0,n)));
+});
+test('triangle count changes preserve layer correspondence and their corners remain inscribed during morphs', () => {
+  const a = formation(base), b = formation({ ...base, upgrades:[{id:'path:moltenCore',rank:3}] });
+  for (let i=0;i<=40;i++) {
+    const d = mix(a,b,i/40), triangles = nestedTriangles(d);
+    assert.equal(triangles.length, Math.ceil(d.triangleCount));
+    for(let layer=1;layer<triangles.length;layer++) for(let corner=0;corner<3;corner++) {
+      const p=triangles[layer][corner], x=triangles[layer-1][corner], y=triangles[layer-1][(corner+1)%3];
+      assert.ok(Math.abs((p.x-x.x)*(y.y-x.y)-(p.y-x.y)*(y.x-x.x))<1e-10);
+    }
+  }
 });

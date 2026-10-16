@@ -41,6 +41,7 @@ try {
   await canvas.evaluate(c => window.__originalCircle = c);
   assert.equal(await canvas.getAttribute('data-motif'), 'triangles');
   const original = await canvas.getAttribute('data-formation');
+  const originalTriangles = Number(await canvas.getAttribute('data-triangles'));
   const first = await pixels(page); await page.waitForTimeout(150);
   assert.notEqual(await pixels(page), first, 'idle animation moves');
   await page.screenshot({ path: `test-results/magic-study-${width}.png` });
@@ -53,11 +54,13 @@ try {
   assert.equal(await canvas.evaluate(c => c === window.__originalCircle), true);
   assert.equal(await canvas.count(), 1);
   await page.waitForTimeout(1900);
+  assert.ok(Number(await canvas.getAttribute('data-triangles')) > originalTriangles, 'spell purchases add inscribed layers');
   await page.screenshot({ path: `test-results/magic-upgraded-${width}.png` });
   // The current UI has no unlearn button; exercise its existing handler.
   await page.evaluate(() => window.__circleStudy.unlearn('meteor'));
   await page.waitForTimeout(1900);
   assert.equal(await canvas.getAttribute('data-formation'), original, 'unlearning restores original DNA');
+  assert.equal(Number(await canvas.getAttribute('data-triangles')), originalTriangles, 'unlearning restores the triangle count');
   // Starting timed research pulses now, but grants no visual rank early.
   await page.evaluate(() => {
    const ledger = window.__circleStudy;
@@ -125,9 +128,12 @@ try {
   }), true, 'gold geometry is actually painted in the Defend background');
   await page.screenshot({ path: `test-results/magic-barracks-${width}.png` });
   const beforeUndo = await background.getAttribute('data-formation');
+  const beforeCells = Number(await background.getAttribute('data-cells'));
   await page.locator('#defend-specialty [data-node="p:crusaders:1"]').click();
   await page.locator('#defend-specialty [data-ug-undo]').click();
   assert.notEqual(await background.getAttribute('data-formation'), beforeUndo);
+  await page.waitForTimeout(100);
+  assert.ok(Number(await background.getAttribute('data-cells')) < beforeCells, 'building undo reduces Voronoi cell count');
   await page.locator('[data-specialty-close]').click();
   await page.evaluate(() => window.__circlePage.openSpecialty({ walls: true }));
   const wallCircle = page.locator('#defend-specialty .magic-circle');

@@ -5,6 +5,7 @@ export interface CircleDNA {
   motifs: Record<CircleMotif, number>;
   rings: number; symmetry: number; detail: number; eccentricity: number; offset: number;
   rotation: number; warp: number; recursion: number; energy: number;
+  siteCount: number; triangleCount: number; triangleCorners: number[]; triangleInsets: number[];
   planes: number[]; sites: Point[];
 }
 export interface Point { x: number; y: number }
@@ -12,6 +13,7 @@ export type Quality = 'low' | 'medium' | 'high';
 export const CIRCLE = {
   transition: 1.7, geometryHz: 10, fps: 30, maxHistory: 24, trailLifetime: 0.85,
   background: 0.76, idleSpeed: 0.075, distortion: 0.12, pixelScale: 2,
+  maxTriangles: 20, minSites: 8, maxSites: 37,
   lineWidth: 0.65, ringSpacing: 0.115, ringRadius: 0.28,
   gold: ['#59401a', '#ac7425', '#e5b94f', '#ffe39a', '#fff7d1'],
   quality: {
@@ -41,6 +43,10 @@ export function formation(state: CircleState): CircleDNA {
     detail: unit(identity, 2), eccentricity: 0.04 + unit(identity, 3) * 0.12,
     offset: unit(identity, 4) * Math.PI * 2, rotation: 0.65 + unit(identity, 5) * 0.6,
     warp: 0.15, recursion: 0.35, energy: 0,
+    siteCount: 11 + Math.floor(unit(identity, 20) * 5),
+    triangleCount: 7 + Math.floor(unit(identity, 21) * 3),
+    triangleCorners: Array.from({ length: 3 }, (_, i) => 0.85 + unit(identity, 22 + i) * 0.15),
+    triangleInsets: Array.from({ length: 3 }, (_, i) => 0.1 + unit(identity, 25 + i) * 0.07),
     planes: Array.from({ length: 6 }, (_, i) => 0.3 + unit(identity, i + 6) * 0.7),
     sites: Array.from({ length: 37 }, (_, i) => {
       const a = i * 2.3999632297 + unit(seed, i) * 0.25;
@@ -56,14 +62,24 @@ export function formation(state: CircleState): CircleDNA {
   for (const [id, rank] of [...ranks].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)) {
     const h = hash(id), strength = Math.log2(1 + rank) * 0.15;
     const delta = (i: number) => (unit(h, i) * 2 - 1) * strength;
+    d.siteCount += Math.log2(1 + rank) * (3 + unit(h, 30) * 2);
+    d.triangleCount += Math.log2(1 + rank) * (2 + unit(h, 31) * 1.5);
+    for (let i = 0; i < 3; i++) {
+      d.triangleCorners[i] += delta(32 + i) * 0.7;
+      d.triangleInsets[i] += delta(35 + i) * 0.25;
+    }
     d.rings += delta(0); d.symmetry += delta(1) * 2.5; d.detail += delta(2);
     d.eccentricity += delta(3) * 0.15; d.offset += delta(4); d.rotation += delta(5);
     d.warp += delta(6); d.recursion += strength * 0.3; d.energy += strength * 0.25;
     d.planes.forEach((_, i) => d.planes[i] += delta(i + 10));
     d.sites.forEach((p, i) => {
-      p.x += delta(40 + i * 2) * 0.11; p.y += delta(41 + i * 2) * 0.11;
+      p.x += delta(40 + i * 2) * 0.32; p.y += delta(41 + i * 2) * 0.32;
     });
   }
+  d.siteCount = Math.round(clamp(d.siteCount, CIRCLE.minSites, CIRCLE.maxSites));
+  d.triangleCount = Math.round(clamp(d.triangleCount, 5, CIRCLE.maxTriangles));
+  d.triangleCorners = d.triangleCorners.map(v => clamp(v, 0.62, 1));
+  d.triangleInsets = d.triangleInsets.map(v => clamp(v, 0.065, 0.24));
   d.rings = clamp(d.rings, 3, 7); d.symmetry = clamp(d.symmetry, 4, 12);
   d.detail = clamp(d.detail, 0, 1); d.eccentricity = clamp(d.eccentricity, 0, 0.25);
   d.rotation = clamp(d.rotation, 0.2, 2); d.warp = clamp(d.warp, 0.05, 0.9);
@@ -76,13 +92,15 @@ export function formation(state: CircleState): CircleDNA {
   }
   return d;
 }
-const scalars = ['rings', 'symmetry', 'detail', 'eccentricity', 'offset', 'rotation', 'warp', 'recursion', 'energy'] as const;
+const scalars = ['rings', 'symmetry', 'detail', 'eccentricity', 'offset', 'rotation', 'warp', 'recursion', 'energy', 'siteCount', 'triangleCount'] as const;
 export function mix(a: CircleDNA, b: CircleDNA, t: number): CircleDNA {
   const d = { ...a, motifs: {
     tesseract: a.motifs.tesseract + (b.motifs.tesseract - a.motifs.tesseract) * t,
     triangles: a.motifs.triangles + (b.motifs.triangles - a.motifs.triangles) * t,
     voronoi: a.motifs.voronoi + (b.motifs.voronoi - a.motifs.voronoi) * t,
-  }, planes: a.planes.map((x, i) => x + (b.planes[i] - x) * t),
+  }, triangleCorners: a.triangleCorners.map((x, i) => x + (b.triangleCorners[i] - x) * t),
+    triangleInsets: a.triangleInsets.map((x, i) => x + (b.triangleInsets[i] - x) * t),
+    planes: a.planes.map((x, i) => x + (b.planes[i] - x) * t),
     sites: a.sites.map((p, i) => ({ x: p.x + (b.sites[i].x - p.x) * t, y: p.y + (b.sites[i].y - p.y) * t })) };
   for (const k of scalars) d[k] = a[k] + (b[k] - a[k]) * t;
   return d;
@@ -117,12 +135,12 @@ export function clip(poly: Point[], nx: number, ny: number, limit: number): Poin
 export function boundary(radius = 0.86, sides = 48): Point[] {
   return Array.from({ length: sides }, (_, i) => ({ x: Math.cos(i * Math.PI * 2 / sides) * radius, y: Math.sin(i * Math.PI * 2 / sides) * radius }));
 }
-export function voronoi(sites: Point[], bound = boundary()): Point[][] {
+export function voronoi(sites: Point[], bound = boundary(), weights: number[] = []): Point[][] {
   return sites.map((s, i) => {
     let cell = bound;
     for (let j = 0; j < sites.length && cell.length; j++) if (j !== i) {
       const b = sites[j], nx = b.x - s.x, ny = b.y - s.y;
-      cell = clip(cell, nx, ny, (b.x * b.x + b.y * b.y - s.x * s.x - s.y * s.y) / 2);
+      cell = clip(cell, nx, ny, (b.x * b.x + b.y * b.y - s.x * s.x - s.y * s.y + (weights[i] ?? 0) - (weights[j] ?? 0)) / 2);
     }
     return cell;
   });
@@ -150,16 +168,41 @@ export function tesseract(time: number, dna: CircleDNA, angles?: ReadonlyArray<n
 export function nestedTriangles(dna: CircleDNA, time = 0): Point[][] {
   let triangle = Array.from({ length: 3 }, (_, i) => {
     const a = -Math.PI / 2 + i * Math.PI * 2 / 3;
-    return { x: Math.cos(a) * 0.9, y: Math.sin(a) * 0.9 };
+    return { x: Math.cos(a) * 0.9 * dna.triangleCorners[i], y: Math.sin(a) * 0.9 * dna.triangleCorners[i] };
   });
   const layers = [triangle];
-  for (let depth = 1; depth < 18; depth++) {
-    const fraction = 0.11 + dna.detail * 0.06 + Math.sin(time * 0.16 + depth * 0.35 + dna.offset) * 0.025;
+  for (let depth = 1; depth < Math.ceil(dna.triangleCount); depth++) {
     triangle = triangle.map((p, i) => {
+      const fraction = dna.triangleInsets[i] + Math.sin(time * 0.16 + depth * 0.35 + dna.offset + i * 0.4) * 0.018;
       const next = triangle[(i + 1) % 3];
       return { x: p.x + (next.x - p.x) * fraction, y: p.y + (next.y - p.y) * fraction };
     });
     layers.push(triangle);
   }
   return layers;
+}
+
+/** A fractional site count grows/shrinks one cell at a time. The new site's
+ * power weight starts at the first contact with the existing tessellation,
+ * so it is born at zero area instead of abruptly bisecting a neighbour.
+ * Existing site identities persist through purchases and reversals. */
+export function growingVoronoi(dna: CircleDNA, cap = CIRCLE.maxSites as number) {
+  const count = CIRCLE.minSites + (dna.siteCount - CIRCLE.minSites) * (cap - CIRCLE.minSites) / (CIRCLE.maxSites - CIRCLE.minSites);
+  const whole = Math.floor(count), fraction = count - whole;
+  const sites = dna.sites.slice(0, whole), bound = boundary();
+  const cells = voronoi(sites, bound);
+  if (fraction < 1e-8 || whole >= cap) return { sites, cells, count };
+  const newcomer = dna.sites[whole];
+  let birthWeight = Infinity;
+  cells.forEach((cell, i) => {
+    const owner = sites[i];
+    for (const p of cell) {
+      const diff = (p.x-newcomer.x)**2 + (p.y-newcomer.y)**2 - (p.x-owner.x)**2 - (p.y-owner.y)**2;
+      birthWeight = Math.min(birthWeight, diff);
+    }
+  });
+  sites.push(newcomer);
+  const weights = sites.map(() => 0);
+  weights[whole] = Math.min(0, birthWeight) * (1 - fraction);
+  return { sites, cells: voronoi(sites, bound, weights), count };
 }
