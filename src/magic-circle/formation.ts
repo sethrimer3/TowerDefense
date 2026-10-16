@@ -1,6 +1,8 @@
 /** Pure visual mathematics. No game random streams, clocks, DOM, or saved geometry. */
-export interface CircleState { topic: string; upgrades: ReadonlyArray<{ id: string; rank: number }> }
+export type CircleMotif = 'tesseract' | 'triangles' | 'voronoi';
+export interface CircleState { motif?: CircleMotif; topic: string; upgrades: ReadonlyArray<{ id: string; rank: number }> }
 export interface CircleDNA {
+  motifs: Record<CircleMotif, number>;
   rings: number; symmetry: number; detail: number; eccentricity: number; offset: number;
   rotation: number; warp: number; recursion: number; energy: number;
   planes: number[]; sites: Point[];
@@ -34,6 +36,7 @@ const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 export function formation(state: CircleState): CircleDNA {
   const seed = hash('towerdefense:circle:v1'), identity = hash(state.topic);
   const d: CircleDNA = {
+    motifs: { tesseract: 0, triangles: 0, voronoi: 0 },
     rings: 4 + unit(identity, 0) * 2, symmetry: 5 + unit(identity, 1) * 5,
     detail: unit(identity, 2), eccentricity: 0.04 + unit(identity, 3) * 0.12,
     offset: unit(identity, 4) * Math.PI * 2, rotation: 0.65 + unit(identity, 5) * 0.6,
@@ -45,6 +48,7 @@ export function formation(state: CircleState): CircleDNA {
       return { x: Math.cos(a) * r, y: Math.sin(a) * r };
     }),
   };
+  d.motifs[state.motif ?? 'tesseract'] = 1;
   // Merge duplicates to keep the public interpreter independent of input order.
   const ranks = new Map<string, number>();
   for (const u of state.upgrades) if (Number.isFinite(u.rank) && u.rank > 0)
@@ -74,7 +78,11 @@ export function formation(state: CircleState): CircleDNA {
 }
 const scalars = ['rings', 'symmetry', 'detail', 'eccentricity', 'offset', 'rotation', 'warp', 'recursion', 'energy'] as const;
 export function mix(a: CircleDNA, b: CircleDNA, t: number): CircleDNA {
-  const d = { ...a, planes: a.planes.map((x, i) => x + (b.planes[i] - x) * t),
+  const d = { ...a, motifs: {
+    tesseract: a.motifs.tesseract + (b.motifs.tesseract - a.motifs.tesseract) * t,
+    triangles: a.motifs.triangles + (b.motifs.triangles - a.motifs.triangles) * t,
+    voronoi: a.motifs.voronoi + (b.motifs.voronoi - a.motifs.voronoi) * t,
+  }, planes: a.planes.map((x, i) => x + (b.planes[i] - x) * t),
     sites: a.sites.map((p, i) => ({ x: p.x + (b.sites[i].x - p.x) * t, y: p.y + (b.sites[i].y - p.y) * t })) };
   for (const k of scalars) d[k] = a[k] + (b[k] - a[k]) * t;
   return d;
@@ -135,4 +143,23 @@ export function tesseract(time: number, dna: CircleDNA, angles?: ReadonlyArray<n
     const w = 2.8 / (2.8 - v[3]), z = v[2] * w, scale = w * 3.8 / (3.8 - z) * 0.34;
     return { x: v[0] * scale, y: v[1] * scale };
   });
+}
+
+/** Every child vertex lies on a parent edge: genuinely inscribed triangles,
+ * with a bounded, slow change in the edge fraction creating a living spiral. */
+export function nestedTriangles(dna: CircleDNA, time = 0): Point[][] {
+  let triangle = Array.from({ length: 3 }, (_, i) => {
+    const a = -Math.PI / 2 + i * Math.PI * 2 / 3;
+    return { x: Math.cos(a) * 0.9, y: Math.sin(a) * 0.9 };
+  });
+  const layers = [triangle];
+  for (let depth = 1; depth < 18; depth++) {
+    const fraction = 0.11 + dna.detail * 0.06 + Math.sin(time * 0.16 + depth * 0.35 + dna.offset) * 0.025;
+    triangle = triangle.map((p, i) => {
+      const next = triangle[(i + 1) % 3];
+      return { x: p.x + (next.x - p.x) * fraction, y: p.y + (next.y - p.y) * fraction };
+    });
+    layers.push(triangle);
+  }
+  return layers;
 }

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { boundary, CircleTransition, formation, TESSERACT_EDGES, tesseract, voronoi, type CircleState } from '../src/magic-circle/formation.ts';
+import { boundary, CircleTransition, formation, nestedTriangles, TESSERACT_EDGES, tesseract, voronoi, type CircleState } from '../src/magic-circle/formation.ts';
 import { studyCircle } from '../src/magic-circle/progression.ts';
 import { specialtyCircle } from '../src/ui/specialty.ts';
 import { defaults, decode } from '../src/save.ts';
@@ -82,4 +82,39 @@ test('building and keep identity reflects its own paths, reverses respec, and se
   assert.deepEqual(plain, formation(specialtyCircle('wizardTower', undefined)));
   assert.notDeepEqual(plain, formation(specialtyCircle('barracks')));
   assert.notDeepEqual(formation(specialtyCircle('keep')), formation(specialtyCircle('keep', undefined, { arrowLoops: 2 })));
+});
+
+test('city, strike spells, infantry and towers select distinct motif families', () => {
+  const save = defaults(), topics = SUBJECTS.flatMap(s => s.topics);
+  for (const id of ['meteor', 'necromancy', 'frostNova', 'reinforcements'])
+    assert.equal(studyCircle(save, topics.find(t => t.id === id)!).motif, 'triangles');
+  for (const id of ['walls', 'spikes', 'civilians', 'bait'])
+    assert.equal(studyCircle(save, topics.find(t => t.id === id)!).motif, 'tesseract');
+  for (const id of ['troops', 'towers', 'barracks', 'wizardTower'])
+    assert.equal(studyCircle(save, topics.find(t => t.id === id)!).motif, 'voronoi');
+  for (const kind of ['keep', 'walls', 'wallSpikes', 'monsterBait'] as const)
+    assert.equal(specialtyCircle(kind).motif, 'tesseract');
+  for (const kind of ['meleeGuild', 'barracks', 'assassinDen', 'rangedGuild', 'archerBarracks', 'wizardTower', 'watchTower', 'cannonTower', 'darkKeep'] as const)
+    assert.equal(specialtyCircle(kind).motif, 'voronoi');
+});
+test('nested triangles are inscribed on parent edges and stay finite while animated', () => {
+  const d = formation({ ...base, motif: 'triangles' });
+  for (const time of [0, 1, 35, 5000]) {
+    const triangles = nestedTriangles(d, time); assert.equal(triangles.length, 18);
+    for (let i = 1; i < triangles.length; i++) for (let j = 0; j < 3; j++) {
+      const p = triangles[i][j], a = triangles[i-1][j], b = triangles[i-1][(j+1)%3];
+      assert.ok(Number.isFinite(p.x + p.y));
+      assert.ok(Math.abs((p.x-a.x)*(b.y-a.y)-(p.y-a.y)*(b.x-a.x)) < 1e-10);
+      const dot = (p.x-a.x)*(b.x-a.x)+(p.y-a.y)*(b.y-a.y);
+      assert.ok(dot > 0 && dot < (b.x-a.x)**2+(b.y-a.y)**2);
+    }
+  }
+});
+test('motif changes crossfade and can reverse without snapping or retaining the wrong layer', () => {
+  const city = formation({ ...base, motif: 'tesseract' }), spell = formation({ ...base, motif: 'triangles' });
+  const t = new CircleTransition(city); t.retarget(spell); t.step(0.8);
+  assert.ok(t.current.motifs.tesseract > 0 && t.current.motifs.triangles > 0);
+  assert.equal(t.current.motifs.voronoi, 0);
+  const displayed = t.current; t.retarget(city); assert.deepEqual(t.step(0), displayed);
+  assert.deepEqual(t.step(2).motifs, { tesseract: 1, triangles: 0, voronoi: 0 });
 });

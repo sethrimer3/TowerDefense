@@ -39,6 +39,7 @@ try {
   await page.waitForTimeout(1900);
   assert.equal(await canvas.count(), 1);
   await canvas.evaluate(c => window.__originalCircle = c);
+  assert.equal(await canvas.getAttribute('data-motif'), 'triangles');
   const original = await canvas.getAttribute('data-formation');
   const first = await pixels(page); await page.waitForTimeout(150);
   assert.notEqual(await pixels(page), first, 'idle animation moves');
@@ -100,6 +101,7 @@ try {
   await page.waitForTimeout(250);
   const keep = page.locator('#defend-specialty .magic-circle');
   assert.equal(await keep.count(), 1);
+  assert.equal(await keep.getAttribute('data-motif'), 'tesseract');
   const plain = await keep.getAttribute('data-formation');
   await page.locator('#defend-specialty [data-node="q:arrowLoops:1"]').click();
   await page.locator('[data-ug-buy="q:arrowLoops:1"]').click();
@@ -114,6 +116,7 @@ try {
   await page.waitForTimeout(250);
   const background = page.locator('#defend-specialty .magic-circle');
   assert.equal(await background.count(), 1);
+  assert.equal(await background.getAttribute('data-motif'), 'voronoi');
   assert.equal(await background.evaluate(c => {
    const pixels = c.getContext('2d').getImageData(0,0,c.width,c.height).data;
    let gold = 0;
@@ -129,6 +132,7 @@ try {
   await page.evaluate(() => window.__circlePage.openSpecialty({ walls: true }));
   const wallCircle = page.locator('#defend-specialty .magic-circle');
   await page.waitForTimeout(100);
+  assert.equal(await wallCircle.getAttribute('data-motif'), 'tesseract');
   const bareWalls = await wallCircle.getAttribute('data-formation');
   await page.locator('#defend-specialty [data-node="q:stonework:1"]').click();
   await page.locator('[data-ug-buy="q:stonework:1"]').click();
@@ -148,7 +152,7 @@ try {
   const { CIRCLE } = await import('/src/magic-circle/formation.ts');
   const host = document.createElement('div'); host.style.cssText = 'position:fixed;inset:0;width:800px;height:800px'; document.body.append(host);
   const renderer = new MagicCircle('high'); renderer.attach(host);
-  const state = { topic:'benchmark', upgrades:[] }; renderer.set(state);
+  const state = { topic:'benchmark', motif:'voronoi', upgrades:[] }; renderer.set(state);
   let rafs = 0; const realRAF = window.requestAnimationFrame; window.requestAnimationFrame = () => { rafs++; return 0; };
   const times = [];
   for (let i = 0; i < 300; i++) {
