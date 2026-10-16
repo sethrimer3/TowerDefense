@@ -1,9 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { STRUCTURES } from "../src/defend/catalog.ts";
-import { tileKey } from "../src/defend/grid.ts";
+import { SUB, tileKey } from "../src/defend/grid.ts";
 import { cityTileSet, defaultLayout, placeCityTile, placeStructure, type Layout } from "../src/defend/layout.ts";
-import { dragIcon, dropGhost, legalLayouts, liftsCityTile, refusal, type Drag } from "../src/defend/drag-rules.ts";
+import { dragIcon, dropGhost, legalLayouts, liftsCityTile, refusal, structureKey, structureLayout, type Drag } from "../src/defend/drag-rules.ts";
 
 // A small city: the keep with a tile either side, and a two-tile spur above
 // it whose lower tile holds the upper one on. A barracks stands left of the keep.
@@ -49,10 +49,13 @@ test("dropGhost outlines a city tile, or the fitted structure", () => {
   const tile: Drag = { from: "palette", item: "cityTile" };
   const [key, next] = [...legalLayouts(tile, L)][0];
   const [x, y] = key.split(",").map(Number);
-  assert.deepEqual(dropGhost(tile, next, key), { rect: { x: x * 7, y: y * 7, w: 7, h: 7 }, kind: "cityTile" });
+  assert.deepEqual(dropGhost(tile, next, key), { rect: { x: x * SUB, y: y * SUB, w: SUB, h: SUB }, kind: "cityTile" });
+  // A structure is keyed by its top left quarter, and outlined on its quarters.
   const tower: Drag = { from: "palette", item: "archerTower" };
-  const [tkey, tnext] = [...legalLayouts(tower, L)][0];
-  assert.equal(dropGhost(tower, tnext, tkey)?.kind, "archerTower");
+  const tkey = `${KX * 4},${(KY - 2) * 4}`;
+  const tnext = structureLayout(tower, L, tkey)!;
+  assert.ok(tnext);
+  assert.deepEqual(dropGhost(tower, tnext, tkey), { rect: { x: KX * SUB, y: (KY - 2) * SUB, w: 2, h: 2 }, kind: "archerTower" });
 });
 
 test("refusal explains why a tile turns a drop away", () => {
@@ -62,10 +65,23 @@ test("refusal explains why a tile turns a drop away", () => {
   assert.match(refusal({ from: "palette", item: "cityTile" }, L, tileKey(KX, 0)), /top row/);
   assert.equal(refusal({ from: "cityTile", tile: { tx: KX + 1, ty: KY } }, L, tileKey(KX, KY)), "That tile is already part of the city.");
   assert.equal(refusal({ from: "keep" }, L, far), "What stands on the keep's tile doesn't fit there.");
-  assert.equal(refusal({ from: "palette", item: "barracks" }, L, far), `The ${STRUCTURES.barracks.name.toLowerCase()} must go inside the city limits.`);
-  assert.equal(refusal({ from: "structure", uid: 1, kind: "barracks" }, L, far), `The ${STRUCTURES.barracks.name.toLowerCase()} must go inside the city limits.`);
-  assert.equal(refusal({ from: "palette", item: "archerTower" }, L, far), "There isn't room for that there.");
-  assert.equal(refusal({ from: "palette", item: "barracks" }, L, tileKey(KX, KY - 1)), "There isn't room for that there.");
+  // A structure is refused a spot (keyed by its top left quarter) for the fit's own reason.
+  const farQ = `0,${(KY - 4) * 4}`;
+  assert.equal(refusal({ from: "palette", item: "barracks" }, L, farQ), `${STRUCTURES.barracks.name} must be inside the city limits.`);
+  assert.equal(refusal({ from: "structure", uid: 1, kind: "barracks" }, L, farQ), `${STRUCTURES.barracks.name} must be inside the city limits.`);
+  assert.match(refusal({ from: "palette", item: "archerTower" }, L, "0,0"), /top row/);
+  const b = L.structures[0];
+  assert.equal(refusal({ from: "palette", item: "watchTower" }, L, `${b.qx},${b.qy}`), "There's something standing there already.");
+  assert.equal(refusal({ from: "palette", item: "watchTower" }, L, `${b.qx + 2},${b.qy}`), "Buildings need a clear square between them.");
+  assert.equal(refusal({ from: "palette", item: "barracks" }, L, `${KX * 4 + 3},${(KY - 2) * 4}`), "The barracks must fit inside one tile.");
+});
+
+test("a carried structure is centred on the pointer, on whole quarters", () => {
+  const tower: Drag = { from: "palette", item: "watchTower" };
+  assert.equal(structureKey(tower, L, 10.9, 20.2), "5,10", "a one-quarter tower takes the quarter under the pointer");
+  const guild: Drag = { from: "palette", item: "meleeGuild" };
+  assert.equal(structureKey(guild, L, 10, 20), "4,9", "a 2 × 2 guild is centred on it");
+  assert.equal(structureKey(guild, L, 0, 0), "0,0", "and kept on the board");
 });
 
 test("any city tile but the keep's lifts, with what stands on it", () => {

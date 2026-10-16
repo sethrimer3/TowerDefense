@@ -38,12 +38,13 @@ const keepOf = (l: Layout) => l.keep;
 
 test("a wall section is a quarter of a tile on the finer grid, two cells square", () => {
   const rects = [0, 1, 2, 3].map((ax) => wallPieceRect(q(2, 3, ax, 0)));
-  assert.deepEqual(rects.map((r) => r.x - 2 * SUB), [0, 2, 3, 5], "four to a tile, the middle two sharing a cell");
+  assert.deepEqual(rects.map((r) => r.x - 2 * SUB), [0, 2, 4, 6], "four to a tile, each its own quarter");
   for (const r of rects) assert.deepEqual([r.w, r.h], [2, 2]);
-  // Together they wall the tile's whole width.
-  const cols = new Set(rects.flatMap((r) => [r.x, r.x + 1]));
-  assert.equal(cols.size, SUB);
-  assert.deepEqual(quarterAt(2 * SUB + 6.9, 3 * SUB), q(2, 3, 3, 0));
+  // Together they wall the tile's whole width, without overlapping.
+  const cols = rects.flatMap((r) => [r.x, r.x + 1]);
+  assert.equal(new Set(cols).size, SUB);
+  assert.equal(cols.length, SUB);
+  assert.deepEqual(quarterAt(2 * SUB + 7.9, 3 * SUB), q(2, 3, 3, 0));
   assert.deepEqual(wallTile(q(4, 5, 3, 3)), { tx: 4, ty: 5 });
 });
 

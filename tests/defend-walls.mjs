@@ -61,7 +61,7 @@ try {
 
     const at = (x, y) => page.evaluate(([x, y]) => window.__dp.renderer.toClient(x, y), [x, y]);
     /** The middle of quarter tile (qx, qy), on the page. */
-    const quarter = (qx, qy) => at((qx + 0.5) * 7 / 4, (qy + 0.5) * 7 / 4);
+    const quarter = (qx, qy) => at((qx + 0.5) * 2, (qy + 0.5) * 2);
     const drag = async (a, b, shot) => {
       if (phone) {
         const cdp = await context.newCDPSession(page);

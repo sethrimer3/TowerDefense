@@ -20,7 +20,7 @@
  * (`DefendSave.kept`), placed again from its own palette entry. Battles
  * snapshot every building's path and rank when they start
  * (`placedBattlePaths`). */
-import { ITEM_NAMES, type Bonuses, type PaletteItem } from "./defend/catalog.ts";
+import { ITEM_NAMES, footprint, type Bonuses, type PaletteItem } from "./defend/catalog.ts";
 import { cloneLayout, fitLayout, sameGate, type GateSpot, type Layout, type PlacedKind, type PlacedStructure, type SpikeSpot } from "./defend/layout.ts";
 import { hash } from "./defend/grid.ts";
 import { keptGroups, plainAvailable, type DefendSave } from "./defend/progress.ts";
@@ -168,7 +168,7 @@ export function upgradeBuilding(save: Save, target: SpecialtyTarget, asked: Upgr
   if (!free) save.knowledge -= step.cost;
   d.owned[kind as PlacedKind]--;
   d.owned[step.to]++;
-  d.layout = standing(next, s.uid);
+  d.layout = standing(next, s.uid, kind as PlacedKind);
   return { ok: true, kind: step.to, waiting: !d.layout.structures.some((o) => o.uid === s.uid) };
 }
 
@@ -200,17 +200,14 @@ function unkeep(d: DefendSave, kind: PaletteKind, wear?: Wear) {
   if (i >= 0) d.kept.splice(i, 1);
 }
 
-/** `l` as it is if it fits; else with the tile under structure `uid`
- * reshuffled; else with that structure taken up (back to the palette). */
-function standing(l: Layout, uid: number): Layout {
-  if (fitLayout(l).ok) return l;
+/** `l` as it is if structure `uid`, now `was`'s kind, kept its size and
+ * still fits where it stood; else with it taken up (back to the palette,
+ * where the player places it again). */
+function standing(l: Layout, uid: number, was: PlacedKind): Layout {
   const s = l.structures.find((o) => o.uid === uid)!;
-  for (let r = 1; r <= 8; r++) {
-    const next = cloneLayout(l);
-    next.rolls = l.rolls + r;
-    for (const o of next.structures) if (o.tx === s.tx && o.ty === s.ty) o.spot = hash(next.rolls, o.uid, 0x5b07);
-    if (fitLayout(next).ok) return next;
-  }
+  const size = (k: PlacedKind) => footprint(k, l.compact.includes(k));
+  const a = size(was), b = size(s.kind);
+  if (a.w === b.w && a.h === b.h && a.span === b.span && fitLayout(l).ok) return l;
   const next = cloneLayout(l);
   next.structures = next.structures.filter((o) => o.uid !== uid);
   return next;
@@ -313,8 +310,11 @@ function rewind(save: Save, target: SpecialtyTarget, kind: PaletteKind, wear: We
   const st = p as PlacedStructure;
   st.kind = to.kind as PlacedKind;
   shift();
-  d.layout = standing(next, st.uid);
-  return { ok: true, kind: to.kind, waiting: !d.layout.structures.some((o) => o.uid === st.uid) };
+  d.layout = standing(next, st.uid, kind as PlacedKind);
+  const waiting = !d.layout.structures.some((o) => o.uid === st.uid);
+  // Taken up wearing a path, it waits as a kept copy.
+  if (waiting && to.wear) d.kept.push({ kind: to.kind, path: to.wear.path, rank: to.wear.rank });
+  return { ok: true, kind: to.kind, waiting };
 }
 
 /** One node of a building's upgrade tree: a building it is or can become

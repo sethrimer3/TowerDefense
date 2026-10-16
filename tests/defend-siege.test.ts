@@ -33,7 +33,7 @@ test('siege engines come in cheap and heavy ranks, all self-driving ground units
 });
 
 test('an engine with nothing in range rolls on toward the keep', () => {
-  const s = sim(), e = create(s, 'rollingCannon', 31.5, 1.5);
+  const s = sim(), e = create(s, 'rollingCannon', 36.5, 1.5);
   const keep = center(s.keep.rect), before = rectDist(s.keep.rect, e.x, e.y);
   for (let n = 0; n < 30; n++) stepEnemy(s, e, 1 / 30);
   assert.equal(e.aim, undefined);
@@ -41,9 +41,9 @@ test('an engine with nothing in range rolls on toward the keep', () => {
 });
 
 test('engines bombard what blocks their way, bracing first, and breach it', () => {
-  const s = sim(), e = create(s, 'rollingCannon', 31.5, 1.5);
+  const s = sim(), e = create(s, 'rollingCannon', 36.5, 1.5);
   // Drive until something blocks the way within range.
-  for (let n = 0; n < 30 * 60 && !e.aim; n++) s.step(1 / 30);
+  for (let n = 0; n < 30 * 120 && !e.aim; n++) s.step(1 / 30);
   assert.ok(e.aim && e.aim.building !== undefined, 'found a mark');
   const id = e.aim!.building!, b = s.map.buildings[id];
   assert.ok(rectDist(b.rect, e.x, e.y) <= ENEMIES.rollingCannon.siege!.range);

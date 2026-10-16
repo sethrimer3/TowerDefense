@@ -10,7 +10,7 @@ The domain glossary: the words the game, its code and its docs use. Terms only, 
 The unit the player builds with: the board is 9 × 13 of them. The top row is the spawn lane.
 
 **Cell**:
-The unit the city, the walls, pathfinding and the battle work in: each tile is 7 × 7 cells.
+The unit the city, the walls, pathfinding and the battle work in: each tile is 8 × 8 cells, so a quarter tile is 2 × 2 cells.
 
 **Layout**:
 The player's design: the keep's tile, the city tiles and the placed structures. Saved; the city is regenerated from it.
@@ -40,7 +40,7 @@ A building's own upgrades, opened by tapping it in Defend while building, or by 
 One of the keep's own upgrade lines, **Bastions** (more HP), **Arrow loops** (the keep shoots) and **Boiling oil** (it scalds whatever reaches its walls). Unlike a building's paths, the keep climbs all of them side by side.
 
 **Wall section**:
-A piece of stone wall a quarter of a tile across, placed on its own on the board's grid of quarter tiles (the placing grid turns four times finer while one is carried), anywhere outside the city and, with **Town walls**, inside it. Every wall section shares one upgrade tree, the **wall branches**: **Stonework** (more HP, then mending), **Thornwork** (it cuts and then slows whoever presses against it) and **Town walls** (inside the city, then posterns that let your own people through), climbed side by side like the keep's.
+A piece of stone wall a quarter of a tile across, placed on its own on the board's grid of quarter tiles (the same grid buildings are placed on), anywhere outside the city and, with **Town walls**, inside it. Every wall section shares one upgrade tree, the **wall branches**: **Stonework** (more HP, then mending), **Thornwork** (it cuts and then slows whoever presses against it) and **Town walls** (inside the city, then posterns that let your own people through), climbed side by side like the keep's.
 
 **Respec**:
 Turning one building back into its basic building with no path, free, with every Knowledge point allocated to it given back.
@@ -273,11 +273,8 @@ Which kind of building the build palette shows: All, Towers (they shoot), Units 
 **Restock**:
 Civilians rebuilding fallen monster bait, which only Restocking allows, a set number of times a defense for each stack.
 
-**Tile share**:
-How much of its tile a structure takes, in sixteenths: 1/16 (archer and watch towers), 1/8, 1/4, 1/2 or a whole tile. What shares a tile must add up to no more than a whole tile, and fit.
-
-**Spot**:
-Where on its tile a structure stands, picked at random; every structure on a tile is reshuffled whenever something is dropped there.
+**Quarter tile**:
+A quarter of a tile each way, 2 × 2 cells: the grid buildings and wall sections are placed on. A building takes a fixed block of quarter tiles (its **footprint**, never rotated) and, unless it is monster bait, needs a clear quarter between it and any other building.
 
 **Valkyrie palace**:
 A heavenly marble palace inside the city that takes a whole tile (half with Folded halls) and trains valkyries.

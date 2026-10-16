@@ -24,9 +24,17 @@ import {
   fitLayout,
   moveCityTile,
   moveKeep,
-  moveStructure,
+  moveStructureTo,
   placeCityTile,
-  placeStructure,
+  placeStructureAt,
+  QC,
+  QUARTER,
+  cloneLayout,
+  parseQuarterKey,
+  quarterKey,
+  quarterSize,
+  quarterTile,
+  quarterRectCells,
   spanOf,
   tileMovable,
   QUARTERS_H,
@@ -93,6 +101,52 @@ export const carriesGate = (drag: Drag) => carriesEdge(drag) || carriesCorner(dr
 export const carriesEdge = (drag: Drag) => dragIcon(drag) === "cityGate" || dragIcon(drag) === "wallSpikes";
 /** Whether `drag` carries a wall section, which goes on a quarter tile. */
 export const carriesWall = (drag: Drag) => dragIcon(drag) === "wallBlock";
+/** Whether `drag` carries a structure (a building, tower or bait), which
+ * the player sets on the quarter grid. */
+export const carriesStructure = (drag: Drag): drag is { from: "structure"; uid: number; kind: PlacedKind } | { from: "palette"; item: PlacedKind; wear?: { path: PathId; rank: number } } =>
+  drag.from === "structure" || (drag.from === "palette" && drag.item in STRUCTURES);
+
+/** The kind a structure drag carries. */
+const carriedKind = (drag: Drag) => (drag.from === "structure" ? drag.kind : (drag as { item: PlacedKind }).item);
+
+/** For a structure carried to (x, y) (in cells), its top left quarter with
+ * its footprint centred on the pointer, kept on the board, keyed "qx,qy". */
+export function structureKey(drag: Drag, layout: Layout, x: number, y: number): string {
+  const kind = carriedKind(drag);
+  const { qw, qh } = quarterSize(kind, layout.compact.includes(kind));
+  const qx = Math.round(x / QC - qw / 2), qy = Math.round(y / QC - qh / 2);
+  return quarterKey({ qx: Math.max(0, Math.min(TILES_W * QUARTER - qw, qx)), qy: Math.max(0, Math.min(TILES_H * QUARTER - qh, qy)) });
+}
+
+/** The layout after setting the carried structure down with its top left
+ * quarter at `key`, or null where it can't stand. */
+export function structureLayout(drag: Drag, layout: Layout, key: string): Layout | null {
+  const q = parseQuarterKey(key);
+  if (drag.from === "structure") return moveStructureTo(layout, drag.uid, q);
+  if (drag.from !== "palette") return null;
+  return placeStructureAt(layout, drag.item as PlacedKind, q, drag.wear);
+}
+
+/** The cells the carried structure covers with its top left quarter at
+ * `key`. */
+export function structureRect(drag: Drag, layout: Layout, key: string): Rect {
+  const kind = carriedKind(drag), q = parseQuarterKey(key);
+  const { qw, qh } = quarterSize(kind, layout.compact.includes(kind));
+  return quarterRectCells(q.qx, q.qy, qw, qh);
+}
+
+/** Why the carried structure can't stand with its top left quarter at
+ * `key`: the fit's own reason. */
+function structureRefusal(drag: Drag, layout: Layout, key: string): string {
+  const q = parseQuarterKey(key), kind = carriedKind(drag);
+  const next = cloneLayout(layout);
+  const was = drag.from === "structure" ? next.structures.find((s) => s.uid === drag.uid) : undefined;
+  next.structures = next.structures.filter((s) => s !== was);
+  next.structures.push({ ...(was ?? { uid: next.nextUid++, kind }), ...quarterTile(q), ...q });
+  const fit = fitLayout(next);
+  return fit.ok ? "There isn't room for that there." : fit.reason;
+}
+
 /** Whether `drag` carries a wall ballista, which goes on a wall corner. */
 export const carriesCorner = (drag: Drag) => dragIcon(drag) === "wallBallista";
 
@@ -163,6 +217,8 @@ export function legalLayouts(drag: Drag, layout: Layout): Map<string, Layout> {
         }
     return out;
   }
+  // A structure's spots are worked out as the pointer reaches them.
+  if (carriesStructure(drag)) return out;
   for (let ty = 0; ty < TILES_H; ty++)
     for (let tx = 0; tx < TILES_W; tx++) {
       const next = layoutAfter(drag, layout, tx, ty);
@@ -176,10 +232,7 @@ export function legalLayouts(drag: Drag, layout: Layout): Map<string, Layout> {
 function layoutAfter(drag: Drag, layout: Layout, tx: number, ty: number): Layout | null {
   switch (drag.from) {
     case "palette":
-      if (drag.item === "cityGate" || drag.item === "wallSpikes" || drag.item === "wallBallista" || drag.item === "wallBlock") return null;
-      return drag.item === "cityTile" ? placeCityTile(layout, tx, ty) : placeStructure(layout, drag.item, tx, ty, drag.wear);
-    case "structure":
-      return moveStructure(layout, drag.uid, tx, ty);
+      return drag.item === "cityTile" ? placeCityTile(layout, tx, ty) : null;
     case "cityTile":
       return isTile(drag.tile, tx, ty) ? layout : moveCityTile(layout, drag.tile, { tx, ty });
     case "keep":
@@ -196,11 +249,12 @@ const isTile = (t: TilePos, tx: number, ty: number) => t.tx === tx && t.ty === t
 export function dropGhost(drag: Drag, next: Layout, key: string): Overlay["ghost"] {
   if (carriesGate(drag)) return { rect: wallSpotRect(drag, next, key), kind: dragIcon(drag) as "cityGate" | "wallSpikes" | "wallBallista" };
   if (carriesWall(drag)) return { rect: wallPieceRect(parseWallKey(key)), kind: "wallBlock" };
+  if (carriesStructure(drag)) return { rect: structureRect(drag, next, key), kind: carriedKind(drag) };
   const [tx, ty] = key.split(",").map(Number);
   if (dragIcon(drag) === "cityTile") return { rect: { x: tx * SUB, y: ty * SUB, w: SUB, h: SUB }, kind: "cityTile" };
   const fit = fitLayout(next);
   if (!fit.ok) return null;
-  const uid = drag.from === "structure" ? drag.uid : drag.from === "keep" ? 0 : next.nextUid - 1;
+  const uid = drag.from === "keep" ? 0 : next.nextUid - 1;
   const f = fit.structures.find((s) => s.uid === uid);
   return f ? { rect: f.rect as Rect, kind: f.kind } : null;
 }
@@ -234,6 +288,10 @@ export function refusal(drag: Drag, layout: Layout, key: string): string {
     if (cityTileSet(layout).has(tileKey(t.tx, t.ty)))
       return layout.innerWalls ? "A wall there would leave no room for the city's streets and buildings." : "Walls can stand inside the city once the walls' Town walls upgrade is learned.";
     return "There's a wall or a building there already.";
+  }
+  if (carriesStructure(drag)) {
+    if (quarterTile(parseQuarterKey(key)).ty === SPAWN_ROW) return "Nothing can be built on the top row — that's where the enemy gathers.";
+    return structureRefusal(drag, layout, key);
   }
   const ty = Number(key.split(",")[1]);
   if (ty === 0) return "Nothing can be built on the top row — that's where the enemy gathers.";

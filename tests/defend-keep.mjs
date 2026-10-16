@@ -57,7 +57,7 @@ try {
     await page.waitForTimeout(300);
     await page.screenshot({ path: `${out}/keep-${width}-before.png` });
 
-    const tileAt = (tx, ty) => page.evaluate(([tx, ty]) => window.__dp.renderer.toClient((tx + 0.5) * 7, (ty + 0.5) * 7), [tx, ty]);
+    const tileAt = (tx, ty) => page.evaluate(([tx, ty]) => window.__dp.renderer.toClient((tx + 0.5) * 8, (ty + 0.5) * 8), [tx, ty]);
     const keepAt = () => page.evaluate(() => {
       const dp = window.__dp, b = dp.currentMap().buildings.find(b => b.kind === 'keep');
       return dp.renderer.toClient(b.rect.x + b.rect.w / 2, b.rect.y + b.rect.h / 2);
@@ -92,8 +92,8 @@ try {
     // And back onto a city tile, dragged by its tile's open ground.
     const corner = await page.evaluate(() => {
       const dp = window.__dp, map = dp.currentMap(), k = dp.host.save().layout.keep;
-      for (let cy = k.ty * 7; cy < k.ty * 7 + 7; cy++) for (let cx = k.tx * 7; cx < k.tx * 7 + 7; cx++)
-        if (map.owner[cy * 7 * 9 + cx] < 0 && map.city[cy * 7 * 9 + cx]) return dp.renderer.toClient(cx + 0.5, cy + 0.5);
+      for (let cy = k.ty * 8; cy < k.ty * 8 + 8; cy++) for (let cx = k.tx * 8; cx < k.tx * 8 + 8; cx++)
+        if (map.owner[cy * 8 * 9 + cx] < 0 && map.city[cy * 8 * 9 + cx]) return dp.renderer.toClient(cx + 0.5, cy + 0.5);
       return null;
     });
     assert.ok(corner, 'open ground on the keep\'s tile');

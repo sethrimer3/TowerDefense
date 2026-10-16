@@ -58,7 +58,7 @@ try {
     await page.waitForFunction(() => window.__dp);
     let s = await state(page);
     assert.equal(s.defend.layout.structures.filter(x => x.kind === 'assassinDen').length, 4, 'the dens stand');
-    const zoomKeep = z => page.evaluate(z => { const dp = window.__dp, k = dp.host.save().layout.keep, p = dp.renderer.toClient((k.tx + 0.5) * 7, (k.ty) * 7); dp.renderer.zoomAt(p.x, p.y, z); }, z);
+    const zoomKeep = z => page.evaluate(z => { const dp = window.__dp, k = dp.host.save().layout.keep, p = dp.renderer.toClient((k.tx + 0.5) * 8, (k.ty) * 8); dp.renderer.zoomAt(p.x, p.y, z); }, z);
     await zoomKeep(phone ? 2 : 2.5);
     await page.waitForTimeout(500); await page.screenshot({ path: `${out}/assassins-${width}-dens.png` });
 

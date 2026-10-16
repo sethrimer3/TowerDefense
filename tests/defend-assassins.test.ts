@@ -4,6 +4,7 @@
 // poison that makes an enemy take more from everything, and Headhunters
 // going for the toughest prey. Also the retired Barracks Assassins path,
 // whose Knowledge comes back on load.
+import { CELLS_H, CELLS_W, cellIndex } from "../src/defend/grid.ts";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { defaults, decode } from "../src/save.ts";
@@ -168,6 +169,14 @@ test("Venomblades: poisoned enemies take more damage from everything, and at III
 
 test("Headhunters go for the toughest prey they can reach, with a bounty of its HP", () => {
   const { sim, a } = battle(den("headhunters", 1));
+  // On open street, with room east of it for both.
+  const open = (x: number, y: number) => !sim.solid[cellIndex(x, y)];
+  let best = Infinity;
+  const ax = a.x, ay = a.y;
+  for (let y = 0; y < CELLS_H; y++)
+    for (let x = 0; x + 4 < CELLS_W; x++)
+      if ([0, 1, 2, 3, 4].every((d) => open(x + d, y)) && Math.abs(x - ax) + Math.abs(y - ay) < best)
+        (best = Math.abs(x - ax) + Math.abs(y - ay)), (a.x = x + 0.5), (a.y = y + 0.5);
   const close = enemy(sim, a.x + 1, a.y, 50), tough = enemy(sim, a.x + 3, a.y, 500);
   a.target = -1; a.thinkT = 0;
   stepSwordsman(sim, a, 1 / 30);

@@ -49,17 +49,27 @@ test("a press lifts the keep, a structure, or a city tile with what stands on it
 });
 
 test("the board shows nothing until the pointer moves, then the targets and the ghost", () => {
-  const edit = new EditSession({ from: "palette", item: "archerTower" }, L);
-  assert.deepEqual([...edit.legal.keys()], [...legalLayouts(edit.drag, L).keys()]);
-  assert.equal(edit.overlay(), null);
-  const [key, next] = [...edit.legal][0];
+  const tile = new EditSession({ from: "palette", item: "cityTile" }, L);
+  assert.deepEqual([...tile.legal.keys()], [...legalLayouts(tile.drag, L).keys()]);
+  assert.equal(tile.overlay(), null);
+  const [key, next] = [...tile.legal][0];
   const [tx, ty] = key.split(",").map(Number);
-  edit.hover(on(tx, ty));
-  assert.deepEqual(edit.overlay(), { legal: new Set(edit.legal.keys()), hover: key, ghost: dropGhost(edit.drag, next, key) });
-  edit.hover(on(0, 0));
-  assert.deepEqual(edit.overlay(), { legal: new Set(edit.legal.keys()), hover: tileKey(0, 0), ghost: null }, "a refused tile shows no ghost");
-  edit.hover(OFF);
-  assert.deepEqual(edit.overlay(), { legal: new Set(edit.legal.keys()), hover: null, ghost: null });
+  tile.hover(on(tx, ty));
+  assert.deepEqual(tile.overlay(), { legal: new Set(tile.legal.keys()), hover: key, ghost: dropGhost(tile.drag, next, key) });
+  tile.hover(on(KX, KY));
+  assert.deepEqual(tile.overlay(), { legal: new Set(tile.legal.keys()), hover: tileKey(KX, KY), ghost: null }, "a refused tile shows no ghost");
+  tile.hover(OFF);
+  assert.deepEqual(tile.overlay(), { legal: new Set(tile.legal.keys()), hover: null, ghost: null });
+  // A structure shows the quarters it would take under the pointer.
+  const tower = new EditSession({ from: "palette", item: "archerTower" }, L);
+  assert.equal(tower.overlay(), null);
+  tower.hover({ cellX: KX * SUB + 1, cellY: (KY - 2) * SUB + 1, overBoard: true, overPalette: false });
+  const rect = { x: KX * SUB, y: (KY - 2) * SUB, w: 2, h: 2 };
+  assert.deepEqual(tower.overlay(), { legal: new Set(), hover: null, ghost: { rect, kind: "archerTower" }, quarters: { rect, fits: true, clear: true } });
+  tower.hover({ cellX: 1, cellY: 1, overBoard: true, overPalette: false });
+  assert.deepEqual(tower.overlay(), { legal: new Set(), hover: null, ghost: null, quarters: { rect: { x: 0, y: 0, w: 2, h: 2 }, fits: false, clear: true } }, "red where it won't go");
+  tower.hover(OFF);
+  assert.deepEqual(tower.overlay(), { legal: new Set(), hover: null, ghost: null, quarters: null });
 });
 
 test("a bomb shows its reach over the board and goes off where it is released", () => {
@@ -90,10 +100,11 @@ test("the war banner shows its rally ground and is planted, moved or tapped down
 
 test("releasing a city element takes the tile, goes back to the palette, or says why not", () => {
   const tower = new EditSession({ from: "palette", item: "archerTower" }, L);
-  const [key, next] = [...tower.legal][0];
-  const [tx, ty] = key.split(",").map(Number);
-  assert.deepEqual(tower.release(on(tx, ty)), { kind: "build", layout: next, message: null });
-  assert.deepEqual(tower.release(on(0, 0)), { kind: "build", layout: L, message: refusal(tower.drag, L, tileKey(0, 0)) });
+  const spot = { cellX: KX * SUB + 1, cellY: (KY - 2) * SUB + 1, overBoard: true, overPalette: false };
+  const key = `${KX * 4},${(KY - 2) * 4}`;
+  assert.deepEqual(tower.release(spot), { kind: "build", layout: tower.layoutAt(key)!, message: null }, "set down on the quarter it was let go over");
+  assert.deepEqual(tower.layoutAt(key)!.structures.at(-1)!.qx, KX * 4);
+  assert.deepEqual(tower.release(on(0, 0)), { kind: "build", layout: L, message: refusal(tower.drag, L, "1,1") });
   assert.deepEqual(tower.release(OFF), { kind: "build", layout: L, message: null }, "a palette item just goes back");
 
   const barracks = new EditSession({ from: "structure", uid: BARRACKS.uid, kind: "barracks" }, L);

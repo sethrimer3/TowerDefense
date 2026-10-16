@@ -1165,7 +1165,7 @@ export class DefendPage {
       // Too big for where it stood: it waits in the palette.
       this.closeSpecialty();
       this.picked = null;
-      this.setMessage(`${stepName(step)}: no room where it stood, so it waits in the palette.`, 3);
+      this.setMessage(`${stepName(step)}: its size changed, so it waits in the palette to be placed again.`, 3);
       return;
     }
     this.bought(id);

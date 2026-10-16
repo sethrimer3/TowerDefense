@@ -226,6 +226,17 @@ function goHome(sim: DefendSim, c: Civilian, dt: number) {
         return;
       }
     }
+    // Walled in with no way home (in the last rubble cell of a building
+    // rebuilt round it, say): take up any job there is, that one first.
+    if (pickJob(sim, c) >= 0) return assignNext(sim, c);
+    // Nothing free (others hold it, unable to reach it): the cell underfoot.
+    const here = cellAt(c.x, c.y), b = sim.map.owner[here] >= 0 ? sim.map.buildings[sim.map.owner[here]] : null;
+    if (b && !sim.solid[here] && !sim.intact(b) && (b.kind !== "monsterBait" || restockable(sim, b))) {
+      delete c.jobKind; delete c.cleanupCheck; delete c.stand;
+      c.job = here;
+      c.state = "toJob";
+      return;
+    }
   }
   sim.followPath(c, hx, CIVILIAN.speed, dt);
 }
