@@ -135,6 +135,7 @@ const frame = (w: number, h: number) => ({ x0: 1, y0: 1, x1: w - 3, y1: h - 3 })
 export const PATH_LOOKS: Partial<Record<PlacedKind, readonly string[]>> = {
   barracks: ["crusaders"],
   assassinDen: ["bloodletters", "shadowcloak", "venom", "headhunters"],
+  musketHall: ["grenadiers", "volleyFire", "bayonets"],
   archerBarracks: ["rangers", "skirmishers"],
   archerTower: ["fireArrows", "sharpshooters"],
   cannonTower: ["gunnery", "siegeShot"],
@@ -369,14 +370,50 @@ function paintSniperLodge(p: Pix) {
   disc(p, y.x1 - 1.5, ly + 0.5, 1.7, (_x, _y, d) => (d > 1.1 ? OUTLINE : d > 0.5 ? C.target[0] : C.target[1]));
 }
 
-function paintMusketHall(p: Pix) {
-  const y = guild(p, 0x5a3a2a, BURST, { 0: C.ember, 1: C.fire[2], 2: C.fire[3] });
-  // Powder kegs stacked by the door, iron-banded and black-topped, and the
-  // yard scorched where shot has burst.
+/** The Grenadiers' grenade: a black iron ball with a lit fuse. */
+const GRENADE = ["...4.", "..3..", ".000.", "01220", "01120", "01110", ".000."];
+/** Volley fire's crossed muskets, brass at the locks. */
+const MUSKETS = ["0...0", ".0.0.", "..2..", ".1.1.", "1...1"];
+/** The Bayonets' blade, point up, on a musket's muzzle. */
+const BAYONET_BLADE = ["..0..", ".030.", ".032.", ".032.", ".010.", "00100", ".010."];
+
+/** The Musket hall: a hall with a powder burst on the ridge over a yard of
+ * powder kegs, scorched where shot has burst. Its paths change the roof,
+ * the emblem and the yard: the Grenadiers' a heap of grenades and wider
+ * scorching, Volley fire's a rack of muskets, the Bayonets' a straw dummy. */
+function paintMusketHall(p: Pix, look: string) {
+  const grenade = look === "grenadiers", volley = look === "volleyFire", bayonet = look === "bayonets";
+  const y = grenade ? guild(p, C.kiln[1], GRENADE, { 0: OUTLINE, 1: C.iron[1], 2: C.iron[2], 3: C.straw[1], 4: C.ember })
+    : volley ? guild(p, C.lead, MUSKETS, { 0: C.plank[0], 1: C.plank[2], 2: C.brass[2] })
+    : bayonet ? guild(p, C.moss, BAYONET_BLADE, { 0: OUTLINE, 1: C.plank[1], 2: C.iron[2], 3: C.iron[3] })
+    : guild(p, 0x5a3a2a, BURST, { 0: C.ember, 1: C.fire[2], 2: C.fire[3] });
+  // Powder kegs stacked by the door, iron-banded and black-topped; the
+  // Grenadiers' a heap of black grenades instead.
   for (const [dx, dy] of [[2.5, 2.5], [5.3, 2.5], [3.9, 5]] as const)
-    disc(p, y.x0 + dx, y.y0 + dy, 1.9, (x, yy, d, ox, oy) => (d > 1.3 ? OUTLINE : d < 0.6 ? C.char[0] : d > 0.95 ? C.iron[2] : C.crate[1 + Math.min(2, lit(x, yy, ox, oy, d))]));
+    disc(p, y.x0 + dx, y.y0 + dy, 1.9, (x, yy, d, ox, oy) => (d > 1.3 ? OUTLINE : grenade ? C.iron[1 + Math.min(2, lit(x, yy, ox, oy, d))] : d < 0.6 ? C.char[0] : d > 0.95 ? C.iron[2] : C.crate[1 + Math.min(2, lit(x, yy, ox, oy, d))]));
   const sx = y.x1 - 4, sy = Math.round((y.y0 + y.y1) / 2);
-  for (const [ox, oy] of [[0, 0], [1, 0], [-1, 1], [0, 1], [1, 1], [2, 1], [0, 2], [1, -1]]) p.set(sx + ox, sy + oy, ox === 0 && oy === 1 ? C.char[2] : C.char[0]);
+  if (volley) {
+    // A rack of muskets leaning on a rail, barrels up.
+    for (let x = sx - 1; x <= sx + 3; x++) p.set(x, sy + 1, C.plank[0]);
+    for (let x = sx - 1; x <= sx + 3; x += 2)
+      for (let yy = y.y0 + 1; yy <= y.y1 - 1; yy++) p.set(x, yy, yy < sy ? C.iron[3] : C.plank[2]);
+    return;
+  }
+  if (bayonet) {
+    // A straw dummy on a post, run through.
+    const dx = sx + 1.5, dy = sy + 0.5;
+    disc(p, dx, dy, 2.6, (x, yy, d, ox, oy) => (d > 1.8 ? OUTLINE : C.straw[Math.min(2, lit(x, yy, ox, oy, d))]));
+    p.set(Math.round(dx) - 1, Math.round(dy), C.iron[3]);
+    p.set(Math.round(dx), Math.round(dy), C.iron[3]);
+    p.set(Math.round(dx) + 1, Math.round(dy), C.plank[0]);
+    return;
+  }
+  // The yard scorched where shot has burst; the Grenadiers' burnt wider,
+  // still smouldering.
+  const scorch = [[0, 0], [1, 0], [-1, 1], [0, 1], [1, 1], [2, 1], [0, 2], [1, -1]];
+  if (grenade) scorch.push([-1, 0], [2, 0], [-1, 2], [1, 2], [2, 2], [0, -1], [-2, 1], [3, 1]);
+  for (const [ox, oy] of scorch) p.set(sx + ox, sy + oy, ox === 0 && oy === 1 ? (grenade ? C.ember : C.char[2]) : C.char[0]);
+  if (grenade) p.set(sx + 2, sy + 2, C.fire[1]);
 }
 
 /** The Shadowcloak's hood with two eyes glinting in it. */

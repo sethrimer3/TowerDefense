@@ -6,7 +6,7 @@ import { cloneLayout, type PlacedKind } from "./defend/layout.ts";
 import type { Save } from "./save.ts";
 import { studyPathCost } from "./economy.ts";
 
-export type PathTopic = "wizardTower" | "barracks" | "assassinDen" | "archerTower" | "cannonTower" | "archerBarracks" | "watchTower" | "mageGuild" | "bait" | "spikes" | SpellId;
+export type PathTopic = "wizardTower" | "barracks" | "assassinDen" | "musketHall" | "archerTower" | "cannonTower" | "archerBarracks" | "watchTower" | "mageGuild" | "bait" | "spikes" | SpellId;
 /** Strike spells: cast from the battle's Skills palette rather than built,
  * so a spell has no cards; it casts with the one path `save.spellPaths`
  * names, at its furthest researched rank. */
@@ -16,6 +16,7 @@ export const isSpell = (topic: string): topic is SpellId => (SPELLS as string[])
 export type PathId =
   | "pyromancy" | "rime" | "storm" | "crusaders"
   | "bloodletters" | "shadowcloak" | "venom" | "headhunters"
+  | "grenadiers" | "volleyFire" | "bayonets"
   | "fireArrows" | "sharpshooters" | "gunnery" | "siegeShot" | "rangers" | "skirmishers"
   | "spotters" | "signalFires" | "pyroclasm" | "cinders" | "oilSoaked" | "fortified"
   | "blastStakes" | "springStakes" | "rimeStakes"
@@ -79,6 +80,21 @@ export const VENOM = { time: [0, 4, 6, 6], more: [1, 1.25, 1.5, 1.5], share: 0.5
  * times the strike); from II they range `leash` times as far, and at III
  * anywhere in the city. */
 export const HEADHUNT = { bounty: [0, 0.01, 0.02, 0.03], cap: 10, leash: 1.5 };
+/** The Musket hall's paths (`muskets.ts`). Grenadiers: each burst leaves
+ * burning ground for `burn[rank]` seconds at `share` of the ball's damage a
+ * second; from II it throws `bomblets` smaller bursts round it, each
+ * `bombShare` of the damage and `bombR` of the burst; at III the fire clings. */
+export const GRENADIERS = { burn: [0, 3, 3, 5], share: 0.25, bomblets: [0, 0, 4, 4], bombShare: 0.4, bombR: 0.6 };
+/** Volley fire: each shot also looses `extra[rank]` balls at the next
+ * nearest enemies in reach, each `share` of the damage; at III a musketman
+ * reloads `drill` faster for each comrade of its hall within `reach`
+ * cells, at most `most` of them. */
+export const VOLLEY = { extra: [0, 1, 2, 2], share: 0.5, drill: 0.15, most: 3, reach: 3 };
+/** Bayonets: an enemy within `reach` cells is run through for `damage`
+ * times the shot's damage every `cooldown` seconds instead of shot; from II
+ * they hunt anywhere in the city at `speed` times their pace; at III a
+ * thrust staggers its enemy for `stagger` seconds. */
+export const BAYONET = { reach: 1, damage: 2, cooldown: 1.2, speed: 1.4, stagger: 1 };
 /** Fire arrows: an archer tower's arrows set what they hit burning for
  * `burn[rank]` seconds at `share[rank]` of the arrow's damage a second; at
  * III it looses `volley` arrows at once, each at another of the nearest. */
@@ -264,6 +280,30 @@ export const PATHS: KnowledgePath[] = [
       { name: "Quarry", icon: "crosshair", cost: studyPathCost(4, 0), text: "Assassins go for the toughest enemy they can reach, not the nearest; each strike adds 1% of its full HP" },
       { name: "Bounty", icon: "scales", cost: studyPathCost(4, 1), text: "They range half again as far, and each strike adds 2% of its full HP" },
       { name: "Kingslayer", icon: "crown", cost: studyPathCost(4, 2), text: "They hunt anywhere in the city, and each strike adds 3% of its full HP" },
+    ],
+  },
+  {
+    id: "grenadiers", topic: "musketHall", name: "Grenadiers", motto: "Bursts that burn and scatter", hue: "ember",
+    ranks: [
+      { name: "Fire powder", icon: "fireball", cost: studyPathCost(4, 0), text: "Every burst leaves the ground burning for 3 seconds, at a quarter of the ball's damage a second" },
+      { name: "Grenades", icon: "grape", cost: studyPathCost(4, 1), text: "Every burst throws 4 smaller bursts round it, each 40% of the damage" },
+      { name: "Wildfire", icon: "inferno", cost: studyPathCost(4, 2), text: "The ground burns for 5 seconds, and its fire clings to whatever walks out of it" },
+    ],
+  },
+  {
+    id: "volleyFire", topic: "musketHall", name: "Volley fire", motto: "Many balls, fired together", hue: "steel",
+    ranks: [
+      { name: "Buck and ball", icon: "volley", cost: studyPathCost(4, 0), text: "Every shot also looses a second ball, at half damage, at the next nearest enemy in reach" },
+      { name: "Ranks", icon: "cannonball", cost: studyPathCost(4, 1), text: "Two extra balls a shot, each at another of the nearest" },
+      { name: "Platoon fire", icon: "gear", cost: studyPathCost(4, 2), text: "Each musketman reloads 15% faster for every comrade of its hall within 3 cells, up to 45%" },
+    ],
+  },
+  {
+    id: "bayonets", topic: "musketHall", name: "Bayonets", motto: "Fix bayonets and charge", hue: "verdant",
+    ranks: [
+      { name: "Fix bayonets", icon: "dagger", cost: studyPathCost(4, 0), text: "An enemy within a cell is run through with the bayonet for twice the shot's damage, every 1.2 seconds" },
+      { name: "Charge", icon: "boot", cost: studyPathCost(4, 1), text: "Musketmen hunt enemies anywhere in the city, running 40% faster" },
+      { name: "Shock", icon: "hammer", cost: studyPathCost(4, 2), text: "Every bayonet thrust staggers its enemy for 1 second" },
     ],
   },
   {
@@ -504,6 +544,7 @@ export const UNSPECIALIZED: Record<PathTopic, string> = {
   wizardTower: "The original mix of fire and ice",
   barracks: "Balanced swordsmen",
   assassinDen: "Quick, frail assassins: every 4th strike critical",
+  musketHall: "Explosive musketmen: every ball bursts",
   archerTower: "Steady single arrows",
   cannonTower: "Standard shells and blasts",
   archerBarracks: "Ordinary archers",

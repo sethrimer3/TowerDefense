@@ -10,7 +10,7 @@ import { BECOMES, TROOPS, allocated, rootOf, buildingPathsOf, buildingTree, undo
 import type { GraphNode } from "./upgrade-graph.ts";
 import { ARROW_LOOPS, BASTIONS, BOILING_OIL, KEEP_PATHS, keepRank, type KeepPathId, type KeepRanks } from "../keep-upgrades.ts";
 import { STONEWORK, THORNWORK, TOWN_WALLS, WALL_PATHS, wallRank, type WallPathId, type WallRanks } from "../wall-upgrades.ts";
-import { pathById, pathTopicOf, UNSPECIALIZED, type PathId, FIRE_ARROWS, SHARP, GUNNERY, SIEGE_SHOT, CRUSADE, BLOODLETTERS, SHADOWCLOAK, VENOM, HEADHUNT, RANGERS, SKIRMISH, FORTIFY, PYRO, RIME, STORM, PYROCLASM, CINDERS, SPOTTERS, SIGNAL } from "../knowledge-paths.ts";
+import { pathById, pathTopicOf, UNSPECIALIZED, type PathId, FIRE_ARROWS, SHARP, GUNNERY, SIEGE_SHOT, CRUSADE, BLOODLETTERS, SHADOWCLOAK, VENOM, HEADHUNT, GRENADIERS, VOLLEY, BAYONET, RANGERS, SKIRMISH, FORTIFY, PYRO, RIME, STORM, PYROCLASM, CINDERS, SPOTTERS, SIGNAL } from "../knowledge-paths.ts";
 import { bonuses } from "../progression.ts";
 import { ITEM_NAMES, archerDamage, archerCooldown, archerRange, cannonDamage, cannonCooldown, CANNON_RANGE, SOLDIER, ARCHER_UNIT, soldierScale, STRUCTURES, flameDps, flameRange, iceDamage, ICE_RANGE, iceChill, watchRadius, fireballDamage, fireballSplash, emberDps, emberSeconds, FIRE_MAGE, FIREBALL_RANGE, keepHp, BRAWLER, ASSASSIN_UNIT, SLINGER, SNIPER, MUSKETEER, WALL_BLOCK_DESCRIPTION, wallHp, type PaletteItem } from "../defend/catalog.ts";
 
@@ -63,7 +63,16 @@ export function kindStats(save: Save, kind: PaletteItem, path?: PathId, rank = 0
   if (kind === "meleeGuild" || kind === "rangedGuild" || kind === "sniperLodge" || kind === "musketHall") {
     const u = kind === "meleeGuild" ? BRAWLER : kind === "rangedGuild" ? SLINGER : kind === "sniperLodge" ? SNIPER : MUSKETEER, scale = soldierScale(l.soldierArms);
     const range = "range" in u ? ` · ${u.range} range` : "";
-    return `Recruits: ${n(u.hp * scale * b.troopHp)} HP · ${n(u.damage * scale * b.troopDamage)} damage every ${u.cooldown}s${range}${kind === "musketHall" ? ` · bursts ${MUSKETEER.blast} cells wide` : ""}`;
+    if (kind === "musketHall") {
+      const grenade = at("grenadiers"), volley = at("volleyFire"), bayonet = at("bayonets");
+      const extra = [
+        grenade ? `burning ground ${GRENADIERS.burn[grenade]}s${GRENADIERS.bomblets[grenade] ? ` · ${GRENADIERS.bomblets[grenade]} bomblets` : ""}${grenade >= 3 ? " · clinging fire" : ""}` : "",
+        volley ? `${VOLLEY.extra[volley]} extra ball${VOLLEY.extra[volley] > 1 ? "s" : ""} a shot${volley >= 3 ? ` · up to ${Math.round(VOLLEY.drill * VOLLEY.most * 100)}% quicker reload in ranks` : ""}` : "",
+        bayonet ? `bayonet ${BAYONET.damage}x up close${bayonet >= 2 ? " · hunts the city" : ""}${bayonet >= 3 ? ` · staggers ${BAYONET.stagger}s` : ""}` : "",
+      ].filter(Boolean).map((t) => ` · ${t}`).join("");
+      return `Recruits: ${n(u.hp * scale * b.troopHp)} HP · ${n(u.damage * scale * b.troopDamage)} damage every ${u.cooldown}s${range} · bursts ${MUSKETEER.blast} cells wide${extra}`;
+    }
+    return `Recruits: ${n(u.hp * scale * b.troopHp)} HP · ${n(u.damage * scale * b.troopDamage)} damage every ${u.cooldown}s${range}`;
   }
   if (kind === "monsterBait") return `${STRUCTURES.monsterBait.maxHp * FORTIFY.hp[at("fortified")]} HP`;
   if (kind in STRUCTURES) return `${STRUCTURES[kind as keyof typeof STRUCTURES].maxHp} building HP`;

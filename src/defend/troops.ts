@@ -37,7 +37,8 @@ import { CELL_COUNT, cellX, cellY } from "./grid.ts";
 import { cellAt, cellCenter, center, findPath, nearest, type PathLimits, type Point } from "./pathing.ts";
 import type { DefendSim, Enemy, Soldier } from "./sim.ts";
 import { answerBanner, MARCH_SIGHT } from "./war-banner.ts";
-import { CRUSADE, RANGERS, SKIRMISH, pathRank } from "../knowledge-paths.ts";
+import { CRUSADE, RANGERS, SKIRMISH, VOLLEY, pathRank } from "../knowledge-paths.ts";
+import { bayonetTarget, charges, grenadeOf, musketReload, musketSpeed, thrust, volleyTargets } from "./muskets.ts";
 import { assassinHp, assassinStrike, headhunter, huntReach, recruitState, stepCloak, toughestFirst } from "./assassins.ts";
 
 /** The barracks' Study path and rank (`knowledge-paths.ts`): each 0 unless chosen. */
@@ -250,15 +251,20 @@ export function stepArcher(sim: DefendSim, s: Soldier, dt: number) {
   const { ranger, skirmish } = paths(sim, s.home);
   const own = s.kind === "archer" ? null : RANGED[s.kind as keyof typeof RANGED];
   const range = own ? own.range : archerUnitRange(sim.levels.archerSight ?? 0) + (ranger ? RANGERS.sight : 0);
-  const speed = (own ?? ARCHER_UNIT).speed * (skirmish >= 2 ? SKIRMISH.speed : 1);
+  const speed = s.kind === "musketeer" ? musketSpeed(sim, s) : (own ?? ARCHER_UNIT).speed * (skirmish >= 2 ? SKIRMISH.speed : 1);
+  // Bayonets: an enemy at close quarters is run through, not shot.
+  const close = bayonetTarget(sim, s);
+  if (close) return thrust(sim, s, close, bannerDamage(sim, s));
+  const charge = charges(sim, s);
   const near = nearest(sim.enemiesNear(s.x, s.y, range), s, range * range, true);
   if (near) {
     shoot(sim, s, near, range);
-    // Skirmishers keep walking while they shoot.
-    if (skirmish < 2) return;
+    // Skirmishers keep walking while they shoot, and charging bayonets
+    // close in.
+    if (skirmish < 2 && !charge) return;
   }
   if (sim.warBanner) return answerBanner(sim, sim.warBanner, s, speed, dt);
-  if (!own && (sim.levels.archerHunt ?? 0) > 0 && s.thinkT <= 0) hunt(sim, s);
+  if ((own ? charge : (sim.levels.archerHunt ?? 0) > 0) && s.thinkT <= 0) hunt(sim, s);
   if (idle(s) && sim.streets.length) stroll(sim, s);
   sim.followPath(s, null, speed, dt);
 }
@@ -271,10 +277,13 @@ function shoot(sim: DefendSim, s: Soldier, e: Enemy, range: number) {
   const { ranger, skirmish } = paths(sim, s.home);
   if (s.kind !== "archer") {
     // Stone throwers, snipers and musketmen: one shot of their own.
-    const kind = s.kind as keyof typeof RANGED, own = RANGED[kind];
-    s.cd = own.cooldown;
-    sim.arrows.push({ x: s.x, y: s.y, origin: { x: s.x, y: s.y, attacker: s.id }, target: e.id, damage: bannerDamage(sim, s), tx: e.x, ty: e.y, life: 2, shot: SHOT[kind],
-      ...(kind === "musketeer" ? { blast: MUSKETEER.blast } : {}) });
+    const kind = s.kind as keyof typeof RANGED, own = RANGED[kind], damage = bannerDamage(sim, s);
+    s.cd = kind === "musketeer" ? musketReload(sim, s) : own.cooldown;
+    const fire = (t: Enemy, share = 1) => sim.arrows.push({ x: s.x, y: s.y, origin: { x: s.x, y: s.y, attacker: s.id }, target: t.id, damage: damage * share, tx: t.x, ty: t.y, life: 2, shot: SHOT[kind],
+      ...(kind === "musketeer" ? { blast: MUSKETEER.blast, ...grenadeOf(sim, s.home, damage * share) } : {}) });
+    fire(e);
+    // Volley fire: buck and ball at the next nearest.
+    if (kind === "musketeer") for (const t of volleyTargets(sim, s, e, range)) fire(t, VOLLEY.share);
     return;
   }
   s.cd = ARCHER_UNIT.cooldown * SKIRMISH.reload[skirmish];

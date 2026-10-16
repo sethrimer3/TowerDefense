@@ -18,6 +18,7 @@ import {
 import type { Building } from "./citygen.ts";
 import { center, nearest } from "./pathing.ts";
 import { shootBallista } from "./wall-defenses.ts";
+import { burstBall } from "./muskets.ts";
 import type { DefendSim, Enemy } from "./sim.ts";
 import { FIRE_ARROWS, GUNNERY, SHARP, SIEGE_SHOT, pathRank } from "../knowledge-paths.ts";
 import { ARROW_LOOPS, BOILING_OIL, keepRank } from "../keep-upgrades.ts";
@@ -185,7 +186,7 @@ export function stepArrows(sim: DefendSim, dt: number) {
       continue;
     }
     // An explosive ball bursts where it lands, even if its mark fell.
-    if (a.blast) sim.explode(a.tx, a.ty, { r: a.blast, damage: a.damage, friendlyFire: false, origin: a.origin ?? { x: a.x, y: a.y } });
+    if (a.blast) burstBall(sim, a);
     else if (alive && sim.hurtEnemy(t, a.damage, true, "ranged", a.origin ?? { x: a.x, y: a.y }, true) && a.burn) ignite(t, a.burn, a.burnFor!);
     a.life = 0;
   }
