@@ -118,9 +118,13 @@ test("becoming another building swaps one copy: in place when it fits, else it w
   const r = upgradeBuilding(w, { uid: t }, { type: "evolve", path: "storm", to: "darkKeep", cost: 0 });
   assert.deepEqual(r, { ok: true, kind: "darkKeep", waiting: true });
   assert.deepEqual([w.defend.owned.wizardTower, w.defend.owned.darkKeep, available(w.defend, "darkKeep")], [0, 1, 1]);
-  const g = fixture("rangedGuild", 1), [guild] = uids(g, "rangedGuild");
-  assert.ok(upgradeBuilding(g, { uid: guild }, become("musketHall")).ok);
-  assert.equal(g.defend.layout.structures[0].kind, "musketHall");
+  // The same size, it stays where it stood; another size, and it waits in
+  // the palette to be placed again.
+  const g = fixture("rangedGuild", 2), [guild, other] = uids(g, "rangedGuild");
+  assert.deepEqual(upgradeBuilding(g, { uid: guild }, become("sniperLodge")), { ok: true, kind: "sniperLodge", waiting: false });
+  assert.deepEqual(upgradeBuilding(g, { uid: other }, become("musketHall")), { ok: true, kind: "musketHall", waiting: true });
+  assert.deepEqual(g.defend.layout.structures.map((st) => st.kind), ["sniperLodge"]);
+  assert.equal(available(g.defend, "musketHall"), 1);
 });
 
 test("moving keeps a building's upgrades; taken up, it waits in the palette with them and is placed again", () => {
@@ -205,15 +209,16 @@ test("a respec is free, gives back every point and returns the basic building", 
   const s = fixture("rangedGuild", 2); s.settings.devMode = false; s.knowledge = 100; s.smithy = { copper: 5, silver: 0, gold: 0 };
   const [a, b] = uids(s, "rangedGuild");
   assert.match((respecBuilding(s, { uid: a }) as { reason: string }).reason, /no upgrades/);
-  assert.ok(upgradeBuilding(s, { uid: a }, { type: "become", to: "mageGuild", cost: 0 }).ok);
-  assert.ok(upgradeBuilding(s, { uid: a }, { type: "path", path: "pyroclasm", rank: 1, cost: 0 }).ok);
-  assert.equal(s.knowledge, 100 - 9 - 4);
+  assert.ok(upgradeBuilding(s, { uid: a }, { type: "become", to: "archerBarracks", cost: 0 }).ok);
+  assert.ok(upgradeBuilding(s, { uid: a }, { type: "path", path: "rangers", rank: 1, cost: 0 }).ok);
+  const archers = 5 + pathById("rangers").ranks[0].cost;
+  assert.equal(s.knowledge, 100 - archers);
   assert.ok(upgradeBuilding(s, { uid: b }, { type: "become", to: "sniperLodge", cost: 0 }).ok);
   const r = respecBuilding(s, { uid: a });
   assert.ok(r.ok && r.kind === "rangedGuild");
-  assert.equal(s.knowledge, 100 - 8, "the mage's 13 come back");
+  assert.equal(s.knowledge, 100 - 8, "the archers' Knowledge comes back");
   assert.equal(s.smithy.copper, 5, "free");
-  assert.deepEqual([s.defend.owned.rangedGuild, s.defend.owned.mageGuild, s.defend.owned.sniperLodge], [1, 0, 1]);
+  assert.deepEqual([s.defend.owned.rangedGuild, s.defend.owned.archerBarracks, s.defend.owned.sniperLodge], [1, 0, 1]);
   assert.equal(specialtyOf(s.defend.layout, { uid: a }), undefined);
   assert.equal(s.defend.layout.structures.find((st) => st.uid === b)!.kind, "sniperLodge", "the other building is untouched");
   assert.ok(respecBuilding(s, { uid: b }).ok);

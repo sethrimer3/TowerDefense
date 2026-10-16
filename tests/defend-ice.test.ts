@@ -4,7 +4,7 @@ import { DefendSim } from '../src/defend/sim.ts';
 import { generateCity, CellType } from '../src/defend/citygen.ts';
 import { defaultLayout, fitLayout } from '../src/defend/layout.ts';
 import { ageWater, stepBoat, stepFloods, iceAt, icyCell, meltIce, meltIceCone, wetAt, FLOOD_LIFE, floodRadius } from '../src/defend/boats.ts';
-import { cellIndex } from '../src/defend/grid.ts';
+import { CELLS_W, cellIndex } from '../src/defend/grid.ts';
 import { UPGRADES } from '../src/defend/catalog.ts';
 import { stepFireballs } from '../src/defend/mages.ts';
 import { hostileBurst } from '../src/defend/hostile-attacks.ts';
@@ -51,7 +51,7 @@ test('new winter freezes existing water at its current radius', () => {
 test('ice overlapping any part of rubble blocks rebuilding until thawed', () => {
   const s = fixture(), wall = s.map.buildings.find(b => b.kind === 'wall')!;
   s.damageBuilding(wall.id, 1e9);
-  const cell = wall.cells[0], x = cell % 63, y = Math.floor(cell / 63);
+  const cell = wall.cells[0], x = cell % CELLS_W, y = Math.floor(cell / CELLS_W);
   pool(s, x - .1, y + .5, .2, true);
   assert.ok(icyCell(s, cell));
   s.rebuildCell(cell); assert.equal(s.solid[cell], 0);

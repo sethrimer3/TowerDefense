@@ -1,7 +1,8 @@
 /** Small adapters: completed, relevant Knowledge only. Pending jobs and
  * wallet changes do not change the artifact; no geometry enters a save. */
 import type { Save } from '../save.ts';
-import type { Topic } from '../upgrade-subjects.ts';
+import { SUBJECTS, type Topic } from '../upgrade-subjects.ts';
+const VORONOI_TOPICS = new Set(['troops', 'towers', ...SUBJECTS.filter(s => s.id === 'units' || s.id === 'towers').flatMap(s => s.topics.map(t => t.id))]);
 import { isSpell, pathsOf } from '../knowledge-paths.ts';
 import type { CircleState } from './formation.ts';
 export function studyCircle(save: Save, topic: Topic): CircleState {
@@ -15,5 +16,5 @@ export function studyCircle(save: Save, topic: Topic): CircleState {
     const selected = save.spellPaths[topic.id];
     if (selected) upgrades.push({ id: `equipped:${selected}`, rank: 1 });
   }
-  return { topic: `study:${topic.id}`, upgrades };
+  return { topic: `study:${topic.id}`, upgrades, motif: isSpell(topic.id) ? 'triangles' : VORONOI_TOPICS.has(topic.id) ? 'voronoi' : 'tesseract' };
 }

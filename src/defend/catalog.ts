@@ -54,7 +54,7 @@ export const inCategory = (item: PaletteItem, category: PaletteCategory) => cate
 
 /** The city gate: 3 cells along the wall and its 2 cells deep, worth the
  * wall stones it stands in for, and some. */
-export const GATE = { long: 3, deep: 2, hpPerCell: 1.5 };
+export const GATE = { long: 4, deep: 2, hpPerCell: 1.5 };
 /** A wall section, placed on its own. */
 export const WALL_BLOCK_DESCRIPTION =
   "A section of stone wall a quarter of a tile across, placed on a finer grid anywhere outside the city to funnel and stall the enemy, who must break through it. Its upgrade tree toughens, barbs and opens every wall you place.";
@@ -78,38 +78,31 @@ export const BALLISTA_DESCRIPTION =
 export type StructureDef = {
   kind: StructureKind;
   name: string;
-  /** Footprint in cells (before rotation). */
+  /** Footprint in cells, a whole number of quarter tiles (2 cells) each
+   * way: the player sets it on a tile's 4 × 4 grid of quarters as it is
+   * (structures never turn). */
   w: number;
   h: number;
-  /** How much of its tile it takes, in sixteenths: 1 (the smallest towers),
-   * 2, 4, 8 or 16 (a whole tile, alone). What shares a tile must add up to
-   * no more than 16, and fit. */
-  size: TileShare;
   /** How many tiles across (and down) it spans: 2 for a structure that
    * fills a 2 × 2 block of tiles (taking all of each), else 1 (unset). */
   span?: TileSpan;
   /** The smaller footprint and share a building-specific upgrade gives it. */
-  compact?: { upgrade: UpgradeId; w: number; h: number; size: TileShare; span?: TileSpan };
+  compact?: { upgrade: UpgradeId; w: number; h: number; span?: TileSpan };
   maxHp: number;
   /** Can be placed on ground outside the city limits. */
   outsideOk: boolean;
   description: string;
 };
 
-/** Sixteenths of a tile. */
-export type TileShare = 1 | 2 | 4 | 8 | 16;
 /** Tiles across a structure's block. */
 export type TileSpan = 1 | 2;
-/** A tile's whole room, in sixteenths. */
-export const TILE_ROOM = 16;
 
 export const STRUCTURES: Record<StructureKind, StructureDef> = {
   keep: {
     kind: "keep",
     name: "Keep",
-    w: 3,
-    h: 3,
-    size: 16,
+    w: 4,
+    h: 4,
     maxHp: 600,
     outsideOk: false,
     description: "The heart of the city. Enemies march on it; if it falls, the defense is over.",
@@ -117,9 +110,8 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
   meleeGuild: {
     kind: "meleeGuild",
     name: "Melee Guild",
-    w: 3,
-    h: 3,
-    size: 4,
+    w: 4,
+    h: 4,
     maxHp: 140,
     outsideOk: false,
     description: "Trains brawlers: townsfolk with bare fists who rush out and punch whatever breaches the walls. Upgrade it with Knowledge into a barracks of swordsmen, on to crusaders and at last valkyries, or into an assassins' den.",
@@ -127,9 +119,8 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
   rangedGuild: {
     kind: "rangedGuild",
     name: "Ranged Guild",
-    w: 3,
-    h: 3,
-    size: 4,
+    w: 4,
+    h: 4,
     maxHp: 130,
     outsideOk: false,
     description: "Trains stone throwers who wander the streets lobbing rocks at anything near. Upgrade it with Knowledge into archers, fire mages, snipers or explosive musketmen.",
@@ -137,9 +128,8 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
   assassinDen: {
     kind: "assassinDen",
     name: "Assassins' den",
-    w: 3,
-    h: 3,
-    size: 4,
+    w: 4,
+    h: 4,
     maxHp: 120,
     outsideOk: false,
     description: "Trains assassins: quick, frail killers in black whose every fourth strike is critical. Upgrade it with Knowledge into bloodletters with enormous criticals, cloaked ambushers, poisoners whose venom makes enemies take more damage from everything, or headhunters who go for the toughest enemy they can reach.",
@@ -147,9 +137,8 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
   sniperLodge: {
     kind: "sniperLodge",
     name: "Sniper lodge",
-    w: 3,
-    h: 3,
-    size: 4,
+    w: 4,
+    h: 4,
     maxHp: 140,
     outsideOk: false,
     description: "Trains snipers with long rifles: slow to reload, but they pick off enemies from far across the city with shots that hit very hard.",
@@ -157,9 +146,8 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
   musketHall: {
     kind: "musketHall",
     name: "Musket hall",
-    w: 3,
-    h: 3,
-    size: 4,
+    w: 6,
+    h: 4,
     maxHp: 150,
     outsideOk: false,
     description: "Trains musketmen firing explosive shot: every ball bursts where it hits, hurting everything round it (never your own people).",
@@ -167,9 +155,8 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
   barracks: {
     kind: "barracks",
     name: "Barracks",
-    w: 3,
-    h: 4,
-    size: 4,
+    w: 4,
+    h: 6,
     maxHp: 160,
     outsideOk: false,
     description: "Trains swordsmen who sally out against anything that breaches the walls.",
@@ -177,9 +164,8 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
   archerBarracks: {
     kind: "archerBarracks",
     name: "Archer barracks",
-    w: 3,
-    h: 3,
-    size: 4,
+    w: 4,
+    h: 4,
     maxHp: 150,
     outsideOk: false,
     description: "Trains archers who wander the city streets, loosing arrows at anything that comes near.",
@@ -189,7 +175,6 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     name: "Archer tower",
     w: 2,
     h: 2,
-    size: 1,
     maxHp: 120,
     outsideOk: true,
     description: "Looses arrows at the nearest enemy in range. Can stand inside or outside the walls.",
@@ -199,7 +184,6 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     name: "Cannon tower",
     w: 2,
     h: 2,
-    size: 2,
     maxHp: 150,
     outsideOk: true,
     description: "Slow, heavy guns lobbing explosive shells that burst among the enemy. Careful — the blast hurts your own people too.",
@@ -209,7 +193,6 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     name: "Watch tower",
     w: 2,
     h: 2,
-    size: 1,
     maxHp: 100,
     outsideOk: true,
     description: "Marks every enemy in its radius with a golden outline — marked enemies take double damage.",
@@ -219,7 +202,6 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     name: "Wizard tower",
     w: 2,
     h: 2,
-    size: 2,
     maxHp: 130,
     outsideOk: true,
     description: "Alternates between a roaring flamethrower and a wave of ice shards that chills everything it crosses.",
@@ -227,9 +209,8 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
   mageGuild: {
     kind: "mageGuild",
     name: "Mage Guild",
-    w: 3,
-    h: 3,
-    size: 4,
+    w: 4,
+    h: 6,
     maxHp: 140,
     outsideOk: false,
     description: "Trains red fire mages who roam the streets hurling explosive fireballs. Each blast leaves the ground burning, scorching whatever walks through.",
@@ -237,22 +218,20 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
   valkyriePalace: {
     kind: "valkyriePalace",
     name: "Valkyrie palace",
-    w: 5,
-    h: 5,
-    size: 16,
-    compact: { upgrade: "palaceCompact", w: 3, h: 5, size: 8 },
+    w: 6,
+    h: 6,
+    compact: { upgrade: "palaceCompact", w: 4, h: 6 },
     maxHp: 260,
     outsideOk: false,
-    description: "A heavenly marble palace that fills a whole tile. Trains armoured valkyries whose golden spear charges through every enemy in a line.",
+    description: "A heavenly marble palace, 3 × 3 quarter tiles. Trains armoured valkyries whose golden spear charges through every enemy in a line.",
   },
   darkKeep: {
     kind: "darkKeep",
     name: "Dark wizard keep",
     w: 12,
     h: 12,
-    size: 16,
     span: 2,
-    compact: { upgrade: "darkKeepCompact", w: 5, h: 5, size: 16, span: 1 },
+    compact: { upgrade: "darkKeepCompact", w: 6, h: 6, span: 1 },
     maxHp: 900,
     outsideOk: false,
     description: "A vast keep of black obsidian and rubies filling a 2 × 2 block of tiles. Its four corner turrets hurl black lightning that leaps from foe to foe, and it summons a dark wizard whose bolts chain through whole crowds.",
@@ -262,7 +241,6 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     name: "Monster bait",
     w: 2,
     h: 2,
-    size: 1,
     maxHp: 300,
     outsideOk: true,
     description: "A stack of crates reeking of monster bait. While any stands, every enemy goes for the nearest one before the keep.",
@@ -271,14 +249,14 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
 
 /** A structure's footprint and share of its tile, smaller once its
  * building-specific upgrade is owned (`compact`). */
-export function footprint(kind: StructureKind, compact: boolean): { w: number; h: number; size: TileShare; span: TileSpan } {
+export function footprint(kind: StructureKind, compact: boolean): { w: number; h: number; span: TileSpan } {
   const def = STRUCTURES[kind];
   const f = compact && def.compact ? def.compact : def;
-  return { w: f.w, h: f.h, size: f.size, span: f.span ?? 1 };
+  return { w: f.w, h: f.h, span: f.span ?? 1 };
 }
 
-/** A tile share in words. */
-export const shareName = (size: TileShare) => (size === TILE_ROOM ? "a whole tile" : `1/${TILE_ROOM / size} of a tile`);
+/** A footprint in words, in quarter tiles across by down. */
+export const footprintName = (f: { w: number; h: number }) => `${f.w / 2} × ${f.h / 2} quarter tiles`;
 
 /** Palette items the player owns at the very start. */
 export const STARTING_OWNED: Record<PaletteItem, number> = {
@@ -452,7 +430,7 @@ export const UPGRADES: UpgradeDef[] = [
     group: "Valkyrie palace",
     name: "Folded halls",
     maxLevel: 1,
-    describe: (l) => `The palace takes ${shareName(l ? 8 : 16)}`,
+    describe: (l) => `The palace takes ${footprintName(l ? STRUCTURES.valkyriePalace.compact! : STRUCTURES.valkyriePalace)}`,
     price: () => ({ copper: 10, silver: 3 }),
   },
   { id: "valkyrieReach", group: "Valkyrie palace", name: "Long spears", maxLevel: 5, describe: (l) => `Valkyries charge ${stabLength(l).toFixed(1)} cells` },

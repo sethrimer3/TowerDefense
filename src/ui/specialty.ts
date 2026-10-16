@@ -294,5 +294,6 @@ export function specialtyCircle(kind: PaletteItem | "wallSpikes" | "keep" | "wal
   if (wear) upgrades.push({ id: `path:${wear.path}`, rank: wear.rank });
   if (kind === "keep") for (const p of KEEP_PATHS) upgrades.push({ id: `keep:${p.id}`, rank: keepRank(ranks, p.id) });
   if (kind === "walls") for (const p of WALL_PATHS) upgrades.push({ id: `wall:${p.id}`, rank: wallRank(wallRanks, p.id) });
-  return { topic: `building:${root}`, upgrades };
+  const city = ["keep", "walls", "wallBlock", "wallSpikes", "cityTile", "cityGate", "wallBallista", "monsterBait"].includes(kind);
+  return { topic: `building:${root}`, upgrades, motif: city ? "tesseract" : "voronoi" };
 }

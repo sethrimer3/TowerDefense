@@ -20,7 +20,7 @@ Recent rows are available as `window.defendPerformance`; they are not saved.
 
 ## Board
 
-- 9 × 13 **tiles**, each subdivided into 7 × 7 **cells** (63 × 91 cells).
+- 9 × 13 **tiles**, each subdivided into 8 × 8 **cells** (72 × 104 cells), and into 4 × 4 **quarter tiles** of 2 × 2 cells, the grid buildings and wall sections are placed on.
   Tiles are the unit the player builds with; cells are the unit the
   procedural city, walls, pathfinding and simulation work in.
 - The top tile row is the enemy **spawn lane** — nothing can be built there.
@@ -121,36 +121,33 @@ Recent rows are available as `window.defendPerformance`; they are not saved.
   inside the city back to the palette; any rank can be undone on its own.
 - The **Melee** and **Ranged Guilds**, **barracks**, **archer barracks**, the **Mage Guild**, the **sniper lodge**, the **musket hall**, the **Valkyrie palace** and the **dark wizard keep** must be inside the city. **Archer**, **cannon**, **watch
   and wizard towers** and **monster bait** may stand inside or outside.
-- Every structure takes a **share of its tile** (`size` in `catalog.ts`, in
-  sixteenths): 1/16 the archer and watch towers and monster bait, 1/8 the cannon and wizard
-  towers, 1/4 the guilds, barracks, archer barracks, Mage Guild, sniper lodge and musket hall, and the Valkyrie
-  palace a whole tile (1/2 once Folded halls is bought, which also shrinks
-  it from 5 × 5 cells to 3 × 5). Several structures share a tile while
-  their shares add up to no more than a whole tile and they all fit.
+- Every structure takes a fixed block of **quarter tiles** (`footprint` in
+  `catalog.ts`, never rotated): 1 × 1 the archer, cannon, watch and wizard
+  towers and monster bait; 2 × 2 the Melee and Ranged Guilds, Assassins'
+  den, sniper lodge and archer barracks; 3 × 2 the musket hall; 2 × 3 the
+  barracks and Mage Guild; 3 × 3 the Valkyrie palace (2 × 3 once Folded
+  halls is bought). An upgrade that changes a building's footprint takes
+  it up to the palette, to be placed again.
 - The **dark wizard keep** is the one structure bigger than a tile: it
-  fills a whole 2 × 2 block of city tiles (`span` 2), standing on 12 × 12
-  of their 14 × 14 cells, and nothing else can stand on any of the four.
-  Its saved tile is the block's top left one. While it is dragged, the
-  block centred nearest the pointer is framed whole, gold where it fits
-  and red where it won't, and every tile some legal block covers stays
-  lit. The pricey Folded sanctum folds it onto a single tile (5 × 5
-  cells, the whole tile). Taking away any tile it stands on returns it to
+  stands within a 2 × 2 block of city tiles (`span` 2), 6 × 6 quarter
+  tiles. Its saved tile is the block's top left one. The pricey Folded
+  sanctum folds it onto a single tile (3 × 3 quarter tiles). Taking away any tile it stands on returns it to
   the palette.
-- The game picks each structure's exact cells (`fitLayout`): the keep in
-  the middle of its tile; everything else in a random free **spot** on its
-  tile, never touching another structure (there's always room for a
-  street), and every in-city structure must still reach the keep's
-  streets. The structures on a tile are fitted together, biggest first,
-  rearranged until they all fit, and whenever something is dropped on a
-  tile everything on it is reshuffled into fresh spots (each structure's
-  saved `spot`, drawn from the layout's `rolls`). A save whose buildings
-  no longer fit (from before tile shares, say) is reshuffled, and failing
-  that its newest buildings go back to the palette.
+- The player places each structure on the quarter grid; the game only
+  checks it (`fitLayout`): the keep stands 2 × 2 quarter tiles in the
+  middle of its tile; everything else must lie inside its own tile, keep a
+  clear quarter tile all round from every other building (monster bait,
+  walls and the wall's defenses may touch), and, inside the city, still
+  reach the keep's streets. While a structure is dragged, the quarters it
+  would take are shown, gold where it fits and red where it won't, with
+  its clear ring dashed round it. A save whose buildings no longer fit is
+  arranged afresh (any arrangement that fits will do), and failing that
+  its newest buildings go back to the palette.
 
 ## The procedural city (`citygen.ts`)
 
 - The **wall** is 2 cells thick and sits just *outside* the city tiles, so
-  every city tile keeps its full 7 × 7 interior. The board edge is
+  every city tile keeps its full 8 × 8 interior. The board edge is
   impassable, so no wall is built along it.
 - Wall art is per cell. In Mossbound Ruins each wall cell shows a 16 px
   window of the mossy cap-stone run in `wall-cap.png` (x 38–54, continuing

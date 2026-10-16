@@ -66,21 +66,29 @@ try {
 
     /** Drags palette `item` to the free legal tile nearest the keep that shows on screen. */
     const place = async (item, nth = 0) => {
+      // Loaded first: a press held still too long opens the building's tree.
+      await page.evaluate(async () => { window.__layout = await import('/src/defend/layout.ts'); });
       const from = await page.locator(`#defend-palette [data-item="${item}"]`).boundingBox();
       await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2); await page.mouse.down();
       await page.mouse.move(from.x + from.width / 2 + 4, from.y + from.height / 2 + 4);
-      const to = await page.evaluate(nth => {
-        const dp = window.__dp, r = dp.renderer, box = r.canvas.getBoundingClientRect(), k = dp.host.save().layout.keep;
-        const keys = [...dp.pointers.session.legal.keys()].sort((a, b) => {
-          const [ax, ay] = a.split(',').map(Number), [bx, by] = b.split(',').map(Number);
-          return Math.abs(ax - k.tx) + Math.abs(ay - k.ty) - Math.abs(bx - k.tx) - Math.abs(by - k.ty) || a.localeCompare(b);
-        });
-        const shown = keys.map(key => { const [tx, ty] = key.split(',').map(Number); return r.toClient((tx + 0.5) * 7, (ty + 0.5) * 7); })
+      const to = await page.evaluate(([item, nth]) => {
+        const { quarterSize, QUARTERS_W, QUARTERS_H } = window.__layout;
+        const dp = window.__dp, r = dp.renderer, box = r.canvas.getBoundingClientRect(), session = dp.pointers.session, l = dp.host.save().layout, k = l.keep;
+        const { qw, qh } = quarterSize(item, (l.compact ?? []).includes(item));
+        // Every top left quarter the structure fits at, nearest the keep first.
+        const keys = [];
+        // Only the tiles round the keep, quickly: a press held still too long opens the tree.
+        for (let qy = Math.max(4, (k.ty - 1) * 4); qy + qh <= Math.min(QUARTERS_H, (k.ty + 2) * 4); qy++)
+          for (let qx = Math.max(0, (k.tx - 1) * 4); qx + qw <= Math.min(QUARTERS_W, (k.tx + 2) * 4); qx++) if (session.layoutAt(`${qx},${qy}`)) keys.push([qx, qy]);
+        const d = ([qx, qy]) => Math.abs(qx + qw / 2 - (k.tx + 0.5) * 4) + Math.abs(qy + qh / 2 - (k.ty + 0.5) * 4);
+        keys.sort((a, b) => d(a) - d(b) || a[1] - b[1] || a[0] - b[0]);
+        const shown = keys.map(([qx, qy]) => r.toClient((qx + qw / 2) * 2, (qy + qh / 2) * 2))
           .filter(p => p.x > box.left + 4 && p.x < box.right - 4 && p.y > box.top + 4 && p.y < box.bottom - 4);
         if (!shown.length) throw new Error('No visible legal destination');
         return shown[nth % shown.length];
-      }, nth);
-      await page.mouse.move(to.x, to.y, { steps: 6 }); await page.mouse.up();
+      }, [item, nth]);
+      await page.mouse.move(to.x, to.y, { steps: 6 });
+      await page.mouse.up();
       return (await state(page)).defend.layout.structures.filter(s => s.kind === item).at(-1);
     };
     const panel = page.locator('#defend-specialty');
@@ -166,14 +174,14 @@ try {
     assert.equal(await panel.locator('[data-ug-buy="p:storm:2"]').isDisabled(), true, 'Stormcalling II costs more than is left');
     await press(panel.locator('[data-specialty-close]'));
 
-    // A Melee Guild becomes a barracks, then is respecced, free.
+    // A Melee Guild becomes an Assassins' den (its own size), then is respecced, free.
     const melee = await place('meleeGuild');
     await tapBuilding(melee.uid);
     assert.deepEqual(await nodes(), ['k:meleeGuild=owned', 'k:barracks=next', 'k:assassinDen=next']);
     const before = await state(page);
-    await buy('k:barracks');
+    await buy('k:assassinDen');
     await settled();
-    assert.ok((await nodes()).includes('p:crusaders:1=next'));
+    assert.ok((await nodes()).includes('p:bloodletters:1=next'));
     await page.screenshot({ path: `${out}/upgrade-${width}-barracks.png` });
     await press(panel.locator('.ug-respec'));
     await settled();
@@ -181,21 +189,21 @@ try {
     assert.equal((await placed(melee.uid)).kind, 'meleeGuild', 'back to a Melee Guild');
     assert.equal(s.knowledge, before.knowledge, 'every point back');
     assert.equal(s.smithy.copper, before.smithy.copper, 'free');
-    assert.deepEqual(await nodes(), ['k:meleeGuild=owned', 'k:barracks=next', 'k:assassinDen=next']);
+    assert.deepEqual((await nodes()).sort(), ['k:assassinDen=next', 'k:barracks=next', 'k:meleeGuild=owned']);
     // Tap a picked node again to buy it; tap a picked owned one again to sell everything after it.
     await page.evaluate(() => { window.__dp.host.game().knowledge += 500; });
     const k0 = await page.evaluate(() => window.__dp.host.game().knowledge);
     const twice = async id => { await press(panel.locator(`[data-node="${id}"]`)); await press(panel.locator(`[data-node="${id}"]`)); await settled(); };
-    await twice('k:barracks');
-    assert.equal((await placed(melee.uid)).kind, 'barracks', 'a second tap buys it');
-    await twice('p:crusaders:1');
-    assert.deepEqual([(await placed(melee.uid)).path, (await placed(melee.uid)).rank], ['crusaders', 1]);
-    await press(panel.locator('[data-node="k:barracks"]'));
+    await twice('k:assassinDen');
+    assert.equal((await placed(melee.uid)).kind, 'assassinDen', 'a second tap buys it');
+    await twice('p:bloodletters:1');
+    assert.deepEqual([(await placed(melee.uid)).path, (await placed(melee.uid)).rank], ['bloodletters', 1]);
+    await press(panel.locator('[data-node="k:assassinDen"]'));
     assert.match(await panel.locator('.ug-again').textContent(), /sell everything after it/);
     await page.waitForTimeout(500); await page.screenshot({ path: `${out}/upgrade-${width}-tap-again.png` });
-    await press(panel.locator('[data-node="k:barracks"]'));
+    await press(panel.locator('[data-node="k:assassinDen"]'));
     await settled();
-    assert.deepEqual([(await placed(melee.uid)).kind, (await placed(melee.uid)).path], ['barracks', undefined], 'sold down to the barracks');
+    assert.deepEqual([(await placed(melee.uid)).kind, (await placed(melee.uid)).path], ['assassinDen', undefined], 'sold down to the den');
     await page.screenshot({ path: `${out}/upgrade-${width}-sold-down.png` });
     await twice('k:meleeGuild');
     assert.equal((await placed(melee.uid)).kind, 'meleeGuild', 'and down to the Melee Guild');
@@ -207,10 +215,12 @@ try {
     await tapBuilding(ranged.uid);
     assert.equal(await panel.locator('.ug-node.next').count(), 4);
     await page.waitForTimeout(700); await page.screenshot({ path: `${out}/upgrade-${width}-ranged-guild.png` });
+    // A Musket hall is 3 × 2 quarters, not the guild's 2 × 2: it waits in the palette.
     await buy('k:musketHall');
-    await settled();
-    assert.equal((await placed(ranged.uid))?.kind, 'musketHall');
-    await press(panel.locator('[data-specialty-close]'));
+    await page.waitForSelector('#defend-specialty', { state: 'hidden' });
+    assert.equal(await placed(ranged.uid), undefined, 'taken up');
+    assert.ok((await state(page)).defend.owned.musketHall >= 1);
+    assert.equal((await place('musketHall'))?.kind, 'musketHall', 'and placed again');
     const ranged2 = await place('rangedGuild', 2);
     await tapBuilding(ranged2.uid);
     await buy('k:sniperLodge');
@@ -278,7 +288,7 @@ try {
     await page.evaluate(() => window.defendDebug?.(14));
     const kinds = await page.evaluate(() => [...new Set(window.__dp.sim.soldiers.map(s => s.kind))].sort());
     for (const k of ['brawler', 'musketeer', 'sniper']) assert.ok(kinds.includes(k), `${k} in ${kinds}`);
-    await page.evaluate(() => { const dp = window.__dp, k = dp.host.save().layout.keep, p = dp.renderer.toClient((k.tx + 0.5) * 7, (k.ty) * 7); dp.renderer.zoomAt(p.x, p.y, 3.5); });
+    await page.evaluate(() => { const dp = window.__dp, k = dp.host.save().layout.keep, p = dp.renderer.toClient((k.tx + 0.5) * 8, (k.ty) * 8); dp.renderer.zoomAt(p.x, p.y, 3.5); });
     await page.waitForTimeout(500); await page.screenshot({ path: `${out}/upgrade-${width}-battle.png` });
     await page.locator('#defend-abandon').click(); await page.locator('#defend-abandon').click();
 

@@ -136,7 +136,7 @@ test("Bastions raise the keep's HP", () => {
 test("arrow loops shoot from the keep; boiling oil scalds what reaches its walls", () => {
   const sim = battle({ arrowLoops: 1, boilingOil: 2 });
   const c = center(sim.keep.rect);
-  const far = enemyAt(sim, c.x + 4, c.y), near = enemyAt(sim, sim.keep.rect.x + sim.keep.rect.w + 0.5, c.y);
+  const far = enemyAt(sim, c.x + 5, c.y), near = enemyAt(sim, sim.keep.rect.x + sim.keep.rect.w + 0.5, c.y);
   const hp = near.hp;
   const towers = new Towers();
   towers.step(sim, 0.05);

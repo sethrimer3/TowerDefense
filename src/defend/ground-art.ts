@@ -90,6 +90,14 @@ function bake(map: CityMap): GroundArt {
       if (t === CellType.ROAD) paintStreet(map, px, turf, cx, cy);
       else if (t === CellType.PARK) paintBare(map, px, bare, cx, cy);
     }
+  // Where the edge turns steeply, a bare park pixel can still touch turf
+  // across the cells' boundary: the park keeps its grass there.
+  for (let k = 0; k < W * H; k++) {
+    if (!bare[k]) continue;
+    const x = k % W;
+    if ((x > 0 && turf[k - 1]) || (x < W - 1 && turf[k + 1]) || (k >= W && turf[k - W]) || (k + W < W * H && turf[k + W]))
+      (bare[k] = 0), (px[k] = 0);
+  }
   let canvas: HTMLCanvasElement | null = null;
   if (typeof document !== "undefined") {
     canvas = document.createElement("canvas");

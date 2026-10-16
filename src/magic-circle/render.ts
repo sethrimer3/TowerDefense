@@ -1,4 +1,4 @@
-import { CIRCLE, CircleTransition, formation, hash, tesseract, TESSERACT_EDGES, unit, voronoi, type CircleDNA, type CircleState, type Point, type Quality } from './formation.ts';
+import { CIRCLE, CircleTransition, formation, hash, nestedTriangles, tesseract, TESSERACT_EDGES, unit, voronoi, type CircleDNA, type CircleState, type Point, type Quality } from './formation.ts';
 
 /** Positions along a fixed polar graph (four rings, 24 junctions each).
  * History stores graph coordinates, so trails stay attached during deformation. */
@@ -103,6 +103,7 @@ export class MagicCircle {
     if (!this.transition) this.transition = new CircleTransition(dna); else this.transition.retarget(dna);
     this.geometryDirty = this.dirty = true;
     this.canvas.dataset.formation = hash(key).toString(16);
+    this.canvas.dataset.motif = state.motif ?? 'tesseract';
   }
   /** Timed purchases can stir the artifact without prematurely granting a rank. */
   energize() {
@@ -154,6 +155,7 @@ export class MagicCircle {
   }
   private geometry(d: CircleDNA) {
     const quality = CIRCLE.quality[this.quality], path = new Path2D();
+    if (d.motifs.voronoi <= 0) return path;
     const sites = d.sites.slice(0, quality.sites), cells = voronoi(sites);
     cells.forEach((cell, i) => {
       polygon(path, cell);
@@ -185,8 +187,20 @@ export class MagicCircle {
     // Cached cellular layers dissolve across topology changes at 10 Hz.
     const blend = reduced ? 1 : Math.min(1, (this.clock - this.lastGeometry) * CIRCLE.geometryHz);
     c.save(); c.rotate(time * 0.012); c.strokeStyle = gold[1];
-    c.globalAlpha = (1 - blend) * 0.7; c.stroke(this.previousCells);
-    c.globalAlpha = blend * 0.7; c.stroke(this.cells); c.restore();
+    c.globalAlpha = (1 - blend) * 0.7 * d.motifs.voronoi; c.stroke(this.previousCells);
+    c.globalAlpha = blend * 0.7 * d.motifs.voronoi; c.stroke(this.cells); c.restore();
+    if (d.motifs.triangles > 0) {
+      c.save(); c.rotate(d.offset + orbitTime * 0.025);
+      const triangles = nestedTriangles(d, time), count = 10 + d.detail * 4 + d.recursion * 4;
+      triangles.forEach((points, i) => {
+        c.globalAlpha = d.motifs.triangles * Math.min(1, Math.max(0, count - i)) * (0.8 + pulse * 0.2);
+        c.strokeStyle = gold[i % 3 === 0 ? 3 : 2]; c.lineWidth = (i % 3 === 0 ? 1 : 0.7) / r;
+        const path = new Path2D(); polygon(path, points); c.stroke(path);
+        c.fillStyle = gold[4];
+        for (const p of points) c.fillRect(p.x - 0.004, p.y - 0.004, 0.008, 0.008);
+      });
+      c.restore();
+    }
     // Fractional ring/symmetry changes crossfade rather than popping counts.
     for (let i = 0; i < 7; i++) {
       const alpha = Math.min(1, Math.max(0, d.rings - i)); if (!alpha) continue;
@@ -204,7 +218,7 @@ export class MagicCircle {
       c.stroke(); c.restore();
     }
     for (const symmetry of [Math.floor(d.symmetry), Math.floor(d.symmetry) + 1]) {
-      c.save(); c.globalAlpha = (symmetry === Math.floor(d.symmetry) ? 1 - d.symmetry % 1 : d.symmetry % 1) * 0.75;
+      c.save(); c.globalAlpha = (symmetry === Math.floor(d.symmetry) ? 1 - d.symmetry % 1 : d.symmetry % 1) * 0.75 * (1 - d.motifs.triangles * 0.8);
       c.strokeStyle = gold[2]; c.rotate(d.offset - time * 0.025); c.beginPath();
       for (let i = 0; i < symmetry; i++) {
         const a = i * TAU / symmetry, b = (i + 2) * TAU / symmetry;
@@ -235,13 +249,15 @@ export class MagicCircle {
     }
     c.stroke();
     // Projected 4D wireframe, warped only by a bounded radial envelope.
+    if (d.motifs.tesseract > 0) {
     const vertices = tesseract(0, { ...d, offset: d.offset + pulse * 0.8 }, reduced ? undefined : this.angles);
     const warp = 1 + Math.sin(time * 0.3) * d.warp * CIRCLE.distortion + pulse * 0.18;
-    c.save(); c.scale(warp, warp); c.globalAlpha = 0.8; c.strokeStyle = gold[2]; c.lineWidth = 0.9 / r;
+    c.save(); c.scale(warp, warp); c.globalAlpha = 0.8 * d.motifs.tesseract; c.strokeStyle = gold[2]; c.lineWidth = 0.9 / r;
     c.beginPath(); for (const [a, b] of TESSERACT_EDGES) line(vertices[a], vertices[b]); c.stroke();
     c.fillStyle = gold[4];
     for (const p of vertices) c.fillRect(p.x - 0.004, p.y - 0.004, 0.008, 0.008);
     c.restore();
+    }
     if (!reduced) for (const [index, agent] of this.trails.agents.entries()) {
       const activity = Math.min(1, Math.max(0, this.trails.agents.length * (0.55 + d.energy * 0.35 + pulse * 0.5) - index));
       const fade = activity * Math.min(1, agent.age / 0.4, (agent.life - agent.age) / 0.5);
@@ -256,7 +272,7 @@ export class MagicCircle {
       c.globalAlpha = fade; c.fillStyle = gold[4]; c.fillRect(p.x - 0.005, p.y - 0.005, 0.01, 0.01);
     }
     // Quiet static highlights also make reduced-motion formations complete.
-    c.globalAlpha = 0.9; c.fillStyle = gold[3];
+    c.globalAlpha = 0.9 * d.motifs.voronoi; c.fillStyle = gold[3];
     for (let i = 0; i < d.sites.length; i += 3) { const p = d.sites[i]; c.fillRect(p.x, p.y, 0.007, 0.007); }
     c.globalAlpha = 1;
     this.canvas.dataset.trails = String(this.trails.agents.length);

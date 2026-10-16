@@ -6,7 +6,7 @@
 export const TILES_W = 9;
 export const TILES_H = 13;
 /** Cells per tile edge. */
-export const SUB = 7;
+export const SUB = 8;
 export const CELLS_W = TILES_W * SUB;
 export const CELLS_H = TILES_H * SUB;
 

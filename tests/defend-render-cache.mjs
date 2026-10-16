@@ -54,7 +54,7 @@ try {
       }
       if(n===0)reused=flood.rasters.top.pixels.buffer;
       if(n===1 && reused!==flood.rasters.top.pixels.buffer)throw new Error('water buffer was not reused');
-      for(const raster of Object.values(flood.rasters))if(raster.pixels.length>63*91*64)throw new Error('water capacity exceeds the board');
+      for(const raster of Object.values(flood.rasters))if(raster.pixels.length>72*104*64)throw new Error('water capacity exceeds the board');
     }
     const {BoltBuffer}=await import('/src/defend/dark-art.ts');
     const {BoltBuffer:OriginalBolts}=await import(`${referenceRoot}/dark-art.ts`);
@@ -84,7 +84,7 @@ try {
     console.log('Sparse lightning ms/frame',JSON.stringify({before:bench(OriginalBolts),after:bench(BoltBuffer)}));
     // Exact original compositing order, including clipped lights and fading.
     for(const px of [6,9.23076923076923,18]){
-      const w=Math.round(63*px),h=Math.round(91*px),a=make(w,h),b=make(w,h);
+      const w=Math.round(72*px),h=Math.round(104*px),a=make(w,h),b=make(w,h);
       const old=new ReferenceRelief(),fresh=new GroundRelief();
       old.sync(map,px,w,h);fresh.sync(map,px,w,h);
       const lights=[{x:2.23,y:3.17,r:4.3,k:.77,color:'#e0213b'},{x:30.12,y:32.4,r:6,k:.5,color:'#ffb36b'},{x:63,y:85,r:8,k:.9,color:'#ffc68a'}];
@@ -123,7 +123,7 @@ try {
     const {paintCityLayer}=await import('/src/defend/city-layer.ts');
     const intact=id=>sim.intact(map.buildings[id]);
     for(const px of [6,9.23076923076923,18])for(const [night,rain] of [[1,true],[0.3,false]]){
-      const w=Math.round(63*px),h=Math.round(91*px),shots=[];
+      const w=Math.round(72*px),h=Math.round(104*px),shots=[];
       for(const L of [new ReferenceLighting(),new DefendLighting()]){
         L.setMap(map);L.update(sim.solid,[],intact);L.bakePending(sim.solid,1e4);L.update(sim.solid,[],intact);
         const cv=make(w,h),g=cv.getContext('2d');

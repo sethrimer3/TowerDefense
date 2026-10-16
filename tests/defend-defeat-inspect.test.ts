@@ -31,7 +31,7 @@ const map = (l: Layout, seed = 5) => {
 
 test("a lost run's stats count each wave without changing the battle", () => {
   const sim = new DefendSim(map(city()), defaultDefendSave().levels, 3);
-  for (let t = 0; t < 90; t += 0.25) sim.update(0.25);
+  for (let t = 0; t < 120; t += 0.25) sim.update(0.25);
   const waves = sim.stats.waves.filter((w) => w.wave > 0);
   assert.ok(waves.length >= 1, "a wave began");
   assert.equal(waves[0].wave, 1);
