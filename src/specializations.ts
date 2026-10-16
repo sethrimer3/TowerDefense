@@ -5,7 +5,8 @@
  *
  *  - while a building wears no path it can become one of the buildings its
  *    kind branches into (`BECOMES`: a Watch tower into an archer, cannon or
- *    wizard tower; a Melee Guild into a barracks of swordsmen; a Ranged
+ *    wizard tower; a Melee Guild into a barracks of swordsmen or an
+ *    assassins' den; a Ranged
  *    Guild into archers, fire mages, snipers or musketmen), or set out on
  *    one of its kind's Knowledge paths (`knowledge-paths.ts`);
  *  - a building on a path climbs it rank by rank;
@@ -25,6 +26,7 @@ import { hash } from "./defend/grid.ts";
 import { keptGroups, plainAvailable, type DefendSave } from "./defend/progress.ts";
 import { PATHS, isSpell, pathById, pathFits, pathTopicOf, pathsOf, type BattlePaths, type KnowledgePath, type PathId } from "./knowledge-paths.ts";
 import type { Save } from "./save.ts";
+import { studyPathCost } from "./economy.ts";
 
 export const spikeKey = (g: { tx: number; ty: number; side: string }) => `spikes:${g.tx}:${g.ty}:${g.side}`;
 
@@ -38,7 +40,10 @@ export const BECOMES: Partial<Record<PlacedKind, { to: PlacedKind; cost: number 
     { to: "cannonTower", cost: 6 },
     { to: "wizardTower", cost: 8 },
   ],
-  meleeGuild: [{ to: "barracks", cost: 4 }],
+  meleeGuild: [
+    { to: "barracks", cost: 4 },
+    { to: "assassinDen", cost: 6 },
+  ],
   rangedGuild: [
     { to: "archerBarracks", cost: 5 },
     { to: "mageGuild", cost: 9 },
@@ -49,7 +54,7 @@ export const BECOMES: Partial<Record<PlacedKind, { to: PlacedKind; cost: number 
 
 /** What each kind's troops are called on its upgrade buttons. */
 export const TROOPS: Partial<Record<PlacedKind, string>> = {
-  meleeGuild: "Brawlers", rangedGuild: "Stone throwers", barracks: "Swordsmen", archerBarracks: "Archers", mageGuild: "Fire mages",
+  meleeGuild: "Brawlers", rangedGuild: "Stone throwers", barracks: "Swordsmen", assassinDen: "Assassins", archerBarracks: "Archers", mageGuild: "Fire mages",
   sniperLodge: "Snipers", musketHall: "Explosive musketmen", valkyriePalace: "Valkyries", darkKeep: "Dark wizard",
 };
 
@@ -458,6 +463,28 @@ export function migrateResearch(save: Save) {
     delete save.pathResearch[p.id];
   }
   d.layout = next;
+}
+
+/** The Barracks once had an Assassins path, retired when assassins got a
+ * building of their own (the Assassins' den, from the Melee Guild). Every
+ * Knowledge point it took comes back: the ranks barracks wore (standing or
+ * kept), its Study research from before version 5, and an unfinished
+ * project on it. The barracks themselves stand plain (their decoder drops
+ * the path). Reads the raw saved JSON, so run once, on load. */
+export function refundRetiredAssassins(raw: any, save: Save) {
+  const ranks = (r: unknown) => (Number.isInteger(r) && (r as number) >= 1 && (r as number) <= 3 ? (r as number) : 0);
+  const paid = (rank: number) => Array.from({ length: rank }, (_, i) => studyPathCost(4, i)).reduce((a, b) => a + b, 0);
+  const worn = (list: unknown) => (Array.isArray(list) ? list : []).reduce((n: number, p: any) => n + (p?.kind === "barracks" && p.path === "assassins" ? paid(ranks(p.rank)) : 0), 0);
+  let back = worn(raw?.defend?.layout?.structures) + worn(raw?.defend?.kept);
+  const research = raw?.pathResearch?.assassins?.spent;
+  if (Number.isFinite(research) && research > 0) back += research;
+  // Version 2 chose it for every barracks at once.
+  const legacy = raw?.pathResearch === undefined && raw?.paths?.barracks?.path === "assassins" ? raw.paths.barracks.spent : 0;
+  if (Number.isFinite(legacy) && legacy > 0) back += legacy;
+  const job = raw?.researchJob;
+  if (job?.id === "assassins" && Number.isSafeInteger(job.paid) && job.paid > 0) back += job.paid;
+  save.knowledge += back;
+  return back;
 }
 
 /** Version 3 kept a card per owned copy, each with its own path and the

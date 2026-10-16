@@ -6,7 +6,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { defaults } from "../src/save.ts";
 import { bonuses } from "../src/progression.ts";
-import { PATHS, PATH_TOPICS, RIME, STORM, ASSASSIN, CRUSADE, FIRE_ARROWS, SHARP, GUNNERY, SIEGE_SHOT, SKIRMISH, SPOTTERS, SIGNAL, PYROCLASM, CINDERS, OIL, FORTIFY, decodePaths, evolve, learnPath, pathState } from "../src/knowledge-paths.ts";
+import { PATHS, PATH_TOPICS, RIME, STORM, CRUSADE, FIRE_ARROWS, SHARP, GUNNERY, SIEGE_SHOT, SKIRMISH, SPOTTERS, SIGNAL, PYROCLASM, CINDERS, OIL, FORTIFY, decodePaths, evolve, learnPath, pathState } from "../src/knowledge-paths.ts";
 import { ICON_ROWS, ICON_SIZE } from "../src/ui/path-icons.ts";
 import { defaultLayout, fitLayout, placeCityTile, placeStructure } from "../src/defend/layout.ts";
 import { generateCity } from "../src/defend/citygen.ts";
@@ -55,8 +55,8 @@ test("research alone does not change any building in battle", () => {
   assert.equal(bonuses(s).structurePaths, undefined);
 });
 
-test("every topic offers two or more paths of three ranks, with square icons", () => {
-  for (const t of PATH_TOPICS) assert.ok(PATHS.filter((p) => p.topic === t).length >= 2, t);
+test("every topic offers two or more paths of three ranks (the barracks' one, since assassins have their own den), with square icons", () => {
+  for (const t of PATH_TOPICS) assert.ok(PATHS.filter((p) => p.topic === t).length >= (t === "barracks" ? 1 : 2), t);
   for (const p of PATHS) assert.equal(p.ranks.length, 3, p.id);
   for (const [k, rows] of Object.entries(ICON_ROWS)) {
     assert.equal(rows.length, ICON_SIZE, k);
@@ -146,7 +146,7 @@ test("Rime's deep freeze stops what the ice hits, then lets it go", () => {
   assert.equal(e.freeze, undefined);
 });
 
-test("Crusaders are heartier and heal; Assassins are frailer and strike critically", () => {
+test("Crusaders are heartier and heal", () => {
   const recruit = (paths?: Bonuses["paths"]) => {
     const { sim, b } = battle("barracks", paths);
     new Barracks().step(sim, 1 / 30);
@@ -156,24 +156,11 @@ test("Crusaders are heartier and heal; Assassins are frailer and strike critical
   };
   const base = recruit().s.maxHp;
   assert.equal(recruit({ barracks: { path: "crusaders", rank: 1 } }).s.maxHp, base * CRUSADE.hp[1]);
-  assert.equal(recruit({ barracks: { path: "assassins", rank: 1 } }).s.maxHp, base * ASSASSIN.hp);
 
   const healer = recruit({ barracks: { path: "crusaders", rank: 2 } });
   healer.s.hp = 10;
   stepSwordsman(healer.sim, healer.s, 1);
   assert.equal(healer.s.hp, 10 + CRUSADE.heal);
-
-  const { sim, s } = recruit({ barracks: { path: "assassins", rank: 1 } });
-  const e = orc(sim, s.x + 0.5, s.y);
-  s.target = e.id;
-  const hits: number[] = [];
-  for (let k = 0; k < 4; k++) {
-    const hp = e.hp;
-    s.cd = 0;
-    stepSwordsman(sim, s, 1 / 30);
-    hits.push(hp - e.hp);
-  }
-  assert.deepEqual(hits, [s.damage, s.damage, s.damage, s.damage * ASSASSIN.crit], "every 4th is critical");
 });
 
 /** One volley from a lone tower at whatever stands in reach. */

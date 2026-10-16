@@ -61,9 +61,10 @@ function enemy(sim: DefendSim, x: number, y: number) {
 test("the shop's three basic buildings branch into every other tower and troop building", () => {
   const to = (k: Parameters<typeof nextSteps>[0]) => nextSteps(k).map(stepName);
   assert.deepEqual(to("watchTower"), ["Archer tower", "Cannon tower", "Wizard tower", "Spotters I", "Signal fires I"]);
-  assert.deepEqual(to("meleeGuild"), ["Barracks"]);
+  assert.deepEqual(to("meleeGuild"), ["Barracks", "Assassins' den"]);
   assert.deepEqual(to("rangedGuild"), ["Archer barracks", "Mage Guild", "Sniper lodge", "Musket hall"]);
-  assert.deepEqual(to("barracks"), ["Crusaders I", "Assassins I"]);
+  assert.deepEqual(to("barracks"), ["Crusaders I"]);
+  assert.deepEqual(to("assassinDen"), ["Bloodletters I", "Shadowcloak I", "Venomblades I", "Headhunters I"]);
   assert.deepEqual(to("wizardTower"), ["Pyromancy I", "Rime I", "Stormcalling I"]);
   assert.deepEqual(to("sniperLodge"), [], "a leaf for now");
   assert.deepEqual(nextSteps("wizardTower", { path: "storm", rank: 2 }).map(stepName), ["Stormcalling III"]);
@@ -397,12 +398,12 @@ test("three Wizard towers cast Fire, Ice and Storm together, beside a plain one,
   assert.equal(sim.bonuses.paths, undefined, "no global specialization leaks between copies");
 });
 
-test("Crusader and Assassin barracks recruit with their own health and damage", () => {
-  const s = fixture("barracks", 2), [a, b] = uids(s, "barracks");
-  wear(s, a, "crusaders"); wear(s, b, "assassins");
+test("a Crusader barracks recruits with its own health and damage, a plain one beside it with its own", () => {
+  const s = fixture("barracks", 2), [a] = uids(s, "barracks");
+  wear(s, a, "crusaders");
   const sim = simulation(s); new Barracks().step(sim, 0.01);
   const troops = sim.soldiers.filter(s => s.kind === "sword");
-  assert.equal(troops.length, 2); assert.equal(troops[0].maxHp, 88); assert.equal(troops[1].maxHp, 32);
+  assert.equal(troops.length, 2); assert.equal(troops[0].maxHp, 88); assert.equal(troops[1].maxHp, 40);
   assert.equal(troops[0].damage, 9); assert.equal(troops[1].damage, 6);
 });
 

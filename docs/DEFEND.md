@@ -287,7 +287,13 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   tree's corner shows the Knowledge allocated to that building; a respec
   (free) gives it all back and turns the building back into its basic one. A watch tower becomes an archer,
   cannon or wizard tower; a Melee Guild a barracks (swordsmen, later
-  assassins or crusaders, and by Crusaders' crown a Valkyrie palace); a
+  crusaders, and by Crusaders' crown a Valkyrie palace) or an **assassins'
+  den** (quick, frail assassins whose every fourth strike is critical, with
+  four paths: Bloodletters' huge criticals at the cost of HP, Shadowcloak's
+  cloak that no enemy sees through until they strike, then an ambush;
+  Venomblades' poison, making an enemy take more damage from everything and
+  at III spreading when it dies; Headhunters going for the toughest enemy in
+  reach, with a bounty of its HP, at III anywhere in the city); a
   Ranged Guild an archer barracks, a Mage Guild, a **sniper lodge** (snipers:
   long range, heavy, slow single shots) or a **musket hall** (explosive
   musketmen: balls that burst over a small area, sparing your own). A
