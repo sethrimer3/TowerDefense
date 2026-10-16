@@ -20,7 +20,8 @@ export class DefenderIndex {
     this.units.length = 0;
     for (let team = 0; team < 2; team++) {
       for (const u of team === 0 ? soldiers : civilians) {
-        if (u.hp <= 0) continue;
+        // A cloaked assassin is never picked out.
+        if (u.hp <= 0 || ("cloak" in u && u.cloak === 0)) continue;
         const i = bucket(u.y, H) * W + bucket(u.x, W);
         if (!this.cells[i].length) this.used.push(i);
         this.cells[i].push(this.units.length);

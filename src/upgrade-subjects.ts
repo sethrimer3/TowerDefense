@@ -36,7 +36,7 @@ export const SUBJECTS: Subject[] = [
     topics: [
       // The guilds and their newest branches have no upgrades of their own:
       // the shared troop upgrades are theirs.
-      { id: "troops", name: "All troops", items: ["meleeGuild", "rangedGuild", "sniperLodge", "musketHall"], upgrades: ["barracksCapacity", "barracksTraining", "soldierArms"], training: ["troopHp", "troopDamage", "drill"], skills: ["drillSergeant", "veterans", "bladework"] },
+      { id: "troops", name: "All troops", items: ["meleeGuild", "rangedGuild", "assassinDen", "sniperLodge", "musketHall"], upgrades: ["barracksCapacity", "barracksTraining", "soldierArms"], training: ["troopHp", "troopDamage", "drill"], skills: ["drillSergeant", "veterans", "bladework"] },
       { id: "warBanner", name: "War banner", skills: ["warBanner", "bannerCooldown", "bannerDefense", "bannerReach", "bannerDamage", "bannerMarch", "bannerLife", "bannerRegen"] },
       { id: "towers", name: "All towers", training: ["towerDamage", "towerReload"], skills: ["fletchers", "ballistics"] },
       { id: "battle", name: "Battle", upgrades: ["bombSafe"], training: ["bombDamage"], extras: ["bomb", "speed3"], skills: ["gunpowder"] },
@@ -45,7 +45,7 @@ export const SUBJECTS: Subject[] = [
   {
     id: "city", name: "City", sprite: "defense", blurb: "Its tiles, walls, keep and people.",
     topics: [
-      { id: "walls", name: "Walls & keep", item: "cityTile", items: ["cityGate", "wallBallista"], upgrades: ["wallStrength", "keepStrength"], training: ["wallHp", "keepHp"], skills: ["masonry", "bastions"] },
+      { id: "walls", name: "Walls & keep", item: "cityTile", items: ["wallBlock", "cityGate", "wallBallista"], upgrades: ["wallStrength", "keepStrength"], training: ["wallHp", "keepHp"], skills: ["masonry", "bastions"] },
       { id: "spikes", name: "Wall spikes", item: "wallSpikes", upgrades: ["spikeDamage", "spikeRate"] },
       { id: "civilians", name: "Civilians", upgrades: ["civilianCount", "civilianHealth", "rebuildSpeed"], training: ["rebuild"], skills: ["guilds"] },
       {

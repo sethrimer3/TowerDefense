@@ -6,11 +6,18 @@ import { DefendSim, type Enemy, type Levels } from "../src/defend/sim.ts";
 import { ENEMIES, NO_BONUSES, UPGRADES, type Bonuses, type EnemyKind } from "../src/defend/catalog.ts";
 import { NECRO, gravesNear } from "../src/defend/necromancy.ts";
 import { AMALGAM, SOUL_WEIGHT, equipSpell, learnPath, pathState, spellPath, unlearnPath } from "../src/knowledge-paths.ts";
-import { bonuses, startTraining, trainingStep } from "../src/progression.ts";
+import { bonuses, settleTraining, startTraining, trainingStep } from "../src/progression.ts";
 import { decode, defaults } from "../src/save.ts";
 import { CONSUMABLES, shopOffer, tileStack, tileTopic } from "../src/tiles.ts";
 import { ledgerSubjects } from "../src/ui/ledger.ts";
 import { cellAt } from "../src/defend/pathing.ts";
+
+/** One Smithy rank, worked through to the end by a smith. */
+function train(s: ReturnType<typeof defaults>, id: Parameters<typeof startTraining>[1]) {
+  assert.ok(startTraining(s, id, "Ada"));
+  s.trainingClock = 1;
+  settleTraining(s, 1e15);
+}
 
 const LEVELS = Object.fromEntries(UPGRADES.map((u) => [u.id, 0])) as Levels;
 
@@ -71,10 +78,9 @@ test("a plain cast raises one warrior a fallen enemy in reach, then cools down",
 test("the Smithy's rows make the risen tougher and harder hitting", () => {
   const s = defaults();
   s.settings.devMode = true;
-  s.settings.instantResearch = true;
   for (let i = 0; i < 4; i++) {
-    assert.ok(startTraining(s, "undeadHp", ""));
-    assert.ok(startTraining(s, "undeadDamage", ""));
+    train(s, "undeadHp");
+    train(s, "undeadDamage");
   }
   assert.equal(trainingStep(s, "undeadHp").now, 20);
   const b = bonuses(s);

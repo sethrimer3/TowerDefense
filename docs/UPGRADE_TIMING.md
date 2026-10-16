@@ -1,6 +1,6 @@
 # Upgrade timing and quadratic balance
 
-Current source snapshot: 2026-10-12. Prices and project timers below are implemented in the game.
+Current source snapshot: 2026-10-16. Prices and project timers below are implemented in the game.
 
 ## Pacing target and current forecast
 
@@ -10,8 +10,8 @@ The forecast first funds a starter Library, Mine level 3 with 15 workers, Mine l
 
 | Focused target | Estimated time from modeled start |
 |---|---:|
-| One 50-rank row, e.g. Troop HP | 2.07 yr (757 days) |
-| Conduit of night, including Stormcalling and its evolution | 2.01 yr (735 days) |
+| One 50-rank row, e.g. Troop HP | 2.10 yr (766 days) |
+| Conduit of night, including Stormcalling and its evolution | 2.02 yr (736 days) |
 | Enchanted ink, all ten ranks | 2.00 yr (730 days) |
 
 | Production investment | Modeled completion | Copper / Silver / Gold per hour afterwards | Nominal Knowledge/h |
@@ -48,26 +48,26 @@ From rank zero, ignoring resource/setup/requeue delays:
 
 | Upgrade | Ranks | Copper / Silver / Gold | One smith, no speed research | Six smiths, max research | Final rank with six |
 |---|---:|---:|---:|---:|---:|
-| Troop HP | 50 | 1435 / 23090 / 177650 | 29.8 d | 3.4 d | 4.8 h |
-| Troop damage | 50 | 1435 / 23090 / 177650 | 29.8 d | 3.4 d | 4.8 h |
-| Drill speed | 30 | 1435 / 23090 / 18280 | 6.6 d | 18.1 h | 1.7 h |
-| Tower damage | 50 | 1435 / 23090 / 177650 | 29.8 d | 3.4 d | 4.8 h |
-| Tower reload | 30 | 1435 / 23090 / 18280 | 6.6 d | 18.1 h | 1.7 h |
-| Bomb damage | 40 | 1435 / 23090 / 78215 | 15.4 d | 1.8 d | 3.1 h |
-| Wall HP | 50 | 1435 / 23090 / 177650 | 29.8 d | 3.4 d | 4.8 h |
-| Keep HP | 50 | 1435 / 23090 / 177650 | 29.8 d | 3.4 d | 4.8 h |
-| Rebuild speed | 30 | 1435 / 23090 / 18280 | 6.6 d | 18.1 h | 1.7 h |
-| Risen HP | 40 | 1435 / 23090 / 78215 | 15.4 d | 1.8 d | 3.1 h |
-| Risen damage | 40 | 1435 / 23090 / 78215 | 15.4 d | 1.8 d | 3.1 h |
-| Meteor damage | 40 | 1435 / 23090 / 78215 | 15.4 d | 1.8 d | 3.1 h |
-| Meteor blast radius | 30 | 1435 / 23090 / 18280 | 6.6 d | 18.1 h | 1.7 h |
-| Frost nova duration | 40 | 1435 / 23090 / 78215 | 15.4 d | 1.8 d | 3.1 h |
-| Frost nova radius | 30 | 1435 / 23090 / 18280 | 6.6 d | 18.1 h | 1.7 h |
-| Reinforcement health | 40 | 1435 / 23090 / 78215 | 15.4 d | 1.8 d | 3.1 h |
-| Reinforcement damage | 40 | 1435 / 23090 / 78215 | 15.4 d | 1.8 d | 3.1 h |
-| Reinforcement stay | 40 | 1435 / 23090 / 78215 | 15.4 d | 1.8 d | 3.1 h |
+| Troop HP | 50 | 1435 / 23090 / 177650 | 111.3 d | 12.8 d | 19.2 h |
+| Troop damage | 50 | 1435 / 23090 / 177650 | 111.3 d | 12.8 d | 19.2 h |
+| Drill speed | 30 | 1435 / 23090 / 18280 | 18.3 d | 2.1 d | 6.9 h |
+| Tower damage | 50 | 1435 / 23090 / 177650 | 111.3 d | 12.8 d | 19.2 h |
+| Tower reload | 30 | 1435 / 23090 / 18280 | 18.3 d | 2.1 d | 6.9 h |
+| Bomb damage | 40 | 1435 / 23090 / 78215 | 53.6 d | 6.2 d | 12.3 h |
+| Wall HP | 50 | 1435 / 23090 / 177650 | 111.3 d | 12.8 d | 19.2 h |
+| Keep HP | 50 | 1435 / 23090 / 177650 | 111.3 d | 12.8 d | 19.2 h |
+| Rebuild speed | 30 | 1435 / 23090 / 18280 | 18.3 d | 2.1 d | 6.9 h |
+| Risen HP | 40 | 1435 / 23090 / 78215 | 53.6 d | 6.2 d | 12.3 h |
+| Risen damage | 40 | 1435 / 23090 / 78215 | 53.6 d | 6.2 d | 12.3 h |
+| Meteor damage | 40 | 1435 / 23090 / 78215 | 53.6 d | 6.2 d | 12.3 h |
+| Meteor blast radius | 30 | 1435 / 23090 / 18280 | 18.3 d | 2.1 d | 6.9 h |
+| Frost nova duration | 40 | 1435 / 23090 / 78215 | 53.6 d | 6.2 d | 12.3 h |
+| Frost nova radius | 30 | 1435 / 23090 / 18280 | 18.3 d | 2.1 d | 6.9 h |
+| Reinforcement health | 40 | 1435 / 23090 / 78215 | 53.6 d | 6.2 d | 12.3 h |
+| Reinforcement damage | 40 | 1435 / 23090 / 78215 | 53.6 d | 6.2 d | 12.3 h |
+| Reinforcement stay | 40 | 1435 / 23090 / 78215 | 53.6 d | 6.2 d | 12.3 h |
 
-All 18 rows require **35.0 d** of six-smith work at best. One top 50-rank row requires **3.4 d**. Their resource prices govern the long-term finish; these are processing times after materials have been secured.
+All 18 rows require **123.7 d** of six-smith work at best. One top 50-rank row requires **12.8 d**. Their resource prices govern the long-term finish; these are processing times after materials have been secured.
 
 ## Production scenarios and measurements
 
@@ -92,7 +92,7 @@ All Forge tracks together cost **26151 copper + 1026 silver + 173243 gold**, abo
 
 All Training rows together cost **25830 copper + 415620 silver + 1605370 gold**. Their Gold alone needs **15.27 yr** at the late sampled rate. This balance targets a chosen specialization near two years; it does not promise the entire collection by then.
 
-All Study skills together cost **11717852 Knowledge**. Choosing the most expensive fully evolved path in each topic adds **515159 Knowledge**, giving **12233011 Knowledge** for every compatible Study upgrade: **1.27 yr** at late nominal income. Minimal prerequisite prices in individual rows must not be charged again when summing the complete tree. These budgets exclude setup and income growth.
+All Study skills together cost **11717852 Knowledge**. Choosing the most expensive fully evolved path in each topic adds **535171 Knowledge**, giving **12253023 Knowledge** for every compatible Study upgrade: **1.27 yr** at late nominal income. Minimal prerequisite prices in individual rows must not be charged again when summing the complete tree. These budgets exclude setup and income growth.
 
 DEFEND upgrade points currently have no upgrade purchase route. They accumulate one per new highest cleared wave, so there is no point-priced upgrade completion time to calculate yet.
 
@@ -104,62 +104,62 @@ Each cost below is that upgrade's own cumulative price. Study prerequisite Knowl
 
 | Upgrade | Max | Cumulative cost | Prerequisite Knowledge | Late-profile work or resource floor |
 |---|---:|---|---:|---|
-| Garrison | 4 | 288 copper + 1 silver | — | 6.9 min smith work; resources 1.3 d |
-| Drill yard | 5 | 610 copper + 5 silver | — | 12.6 min smith work; resources 2.7 d |
-| Arms & armour | 6 | 1112 copper + 14 silver + 250 gold | — | 20.9 min smith work; resources 4.8 d |
-| Patrol routes | 4 | 288 copper + 1 silver | — | 6.9 min smith work; resources 1.3 d |
-| Keen eyes | 4 | 288 copper + 1 silver | — | 6.9 min smith work; resources 1.3 d |
-| Hunter's instinct | 1 | 12 copper + 4 silver | — | 0.2 min smith work; resources 1.3 h |
-| Bodkin points | 6 | 1112 copper + 14 silver + 250 gold | — | 20.9 min smith work; resources 4.8 d |
-| Longbows | 4 | 288 copper + 1 silver | — | 6.9 min smith work; resources 1.3 d |
-| Quick nock | 5 | 610 copper + 5 silver | — | 12.6 min smith work; resources 2.7 d |
-| Heavy shot | 5 | 610 copper + 5 silver | — | 12.6 min smith work; resources 2.7 d |
-| Powder monkeys | 4 | 288 copper + 1 silver | — | 6.9 min smith work; resources 1.3 d |
+| Garrison | 4 | 288 copper + 1 silver | — | 10.6 min smith work; resources 1.3 d |
+| Drill yard | 5 | 610 copper + 5 silver | — | 22.1 min smith work; resources 2.7 d |
+| Arms & armour | 6 | 1112 copper + 14 silver + 250 gold | — | 55.2 min smith work; resources 4.8 d |
+| Patrol routes | 4 | 288 copper + 1 silver | — | 10.6 min smith work; resources 1.3 d |
+| Keen eyes | 4 | 288 copper + 1 silver | — | 10.6 min smith work; resources 1.3 d |
+| Hunter's instinct | 1 | 12 copper + 4 silver | — | 0.5 min smith work; resources 1.3 h |
+| Bodkin points | 6 | 1112 copper + 14 silver + 250 gold | — | 55.2 min smith work; resources 4.8 d |
+| Longbows | 4 | 288 copper + 1 silver | — | 10.6 min smith work; resources 1.3 d |
+| Quick nock | 5 | 610 copper + 5 silver | — | 22.1 min smith work; resources 2.7 d |
+| Heavy shot | 5 | 610 copper + 5 silver | — | 22.1 min smith work; resources 2.7 d |
+| Powder monkeys | 4 | 288 copper + 1 silver | — | 10.6 min smith work; resources 1.3 d |
 | Gunnery drills | 1 | 2 copper | — | 0.2 min smith work; resources 12.5 min |
 | Shaped charges | 1 | 2 copper | — | 0.2 min smith work; resources 12.5 min |
-| Lookouts | 4 | 288 copper + 1 silver | — | 6.9 min smith work; resources 1.3 d |
-| Flamethrower | 5 | 610 copper + 5 silver | — | 12.6 min smith work; resources 2.7 d |
-| Ice wave | 5 | 610 copper + 5 silver | — | 12.6 min smith work; resources 2.7 d |
-| Pyroclasm | 5 | 610 copper + 5 silver | — | 12.6 min smith work; resources 2.7 d |
-| Lingering embers | 5 | 610 copper + 5 silver | — | 12.6 min smith work; resources 2.7 d |
-| Folded halls | 1 | 10 copper + 3 silver | — | 0.2 min smith work; resources 1.0 h |
-| Long spears | 5 | 610 copper + 5 silver | — | 12.6 min smith work; resources 2.7 d |
-| Folded sanctum | 1 | 45 copper + 20 silver + 3 gold | — | 0.2 min smith work; resources 4.7 h |
-| Arc span | 5 | 610 copper + 5 silver | — | 12.6 min smith work; resources 2.7 d |
-| Conduit of night | 20 | 9960 copper + 852 silver + 171990 gold | — | 11.0 h smith work; resources 1.64 yr |
-| Restocking | 5 | 610 copper + 5 silver | — | 12.6 min smith work; resources 2.7 d |
-| Powder kegs | 5 | 610 copper + 5 silver | — | 12.6 min smith work; resources 2.7 d |
-| Iron-shod stakes | 6 | 1112 copper + 14 silver + 250 gold | — | 20.9 min smith work; resources 4.8 d |
-| Barbed edges | 4 | 288 copper + 1 silver | — | 6.9 min smith work; resources 1.3 d |
-| Masonry | 6 | 1112 copper + 14 silver + 250 gold | — | 20.9 min smith work; resources 4.8 d |
-| Keep bastions | 6 | 1112 copper + 14 silver + 250 gold | — | 20.9 min smith work; resources 4.8 d |
-| Guild of builders | 5 | 610 copper + 5 silver | — | 12.6 min smith work; resources 2.7 d |
-| Hardy folk | 5 | 610 copper + 5 silver | — | 12.6 min smith work; resources 2.7 d |
-| Master masons | 5 | 610 copper + 5 silver | — | 12.6 min smith work; resources 2.7 d |
+| Lookouts | 4 | 288 copper + 1 silver | — | 10.6 min smith work; resources 1.3 d |
+| Flamethrower | 5 | 610 copper + 5 silver | — | 22.1 min smith work; resources 2.7 d |
+| Ice wave | 5 | 610 copper + 5 silver | — | 22.1 min smith work; resources 2.7 d |
+| Pyroclasm | 5 | 610 copper + 5 silver | — | 22.1 min smith work; resources 2.7 d |
+| Lingering embers | 5 | 610 copper + 5 silver | — | 22.1 min smith work; resources 2.7 d |
+| Folded halls | 1 | 10 copper + 3 silver | — | 0.5 min smith work; resources 1.0 h |
+| Long spears | 5 | 610 copper + 5 silver | — | 22.1 min smith work; resources 2.7 d |
+| Folded sanctum | 1 | 45 copper + 20 silver + 3 gold | — | 0.9 min smith work; resources 4.7 h |
+| Arc span | 5 | 610 copper + 5 silver | — | 22.1 min smith work; resources 2.7 d |
+| Conduit of night | 20 | 9960 copper + 852 silver + 171990 gold | — | 1.8 d smith work; resources 1.64 yr |
+| Restocking | 5 | 610 copper + 5 silver | — | 22.1 min smith work; resources 2.7 d |
+| Powder kegs | 5 | 610 copper + 5 silver | — | 22.1 min smith work; resources 2.7 d |
+| Iron-shod stakes | 6 | 1112 copper + 14 silver + 250 gold | — | 55.2 min smith work; resources 4.8 d |
+| Barbed edges | 4 | 288 copper + 1 silver | — | 10.6 min smith work; resources 1.3 d |
+| Masonry | 6 | 1112 copper + 14 silver + 250 gold | — | 55.2 min smith work; resources 4.8 d |
+| Keep bastions | 6 | 1112 copper + 14 silver + 250 gold | — | 55.2 min smith work; resources 4.8 d |
+| Guild of builders | 5 | 610 copper + 5 silver | — | 22.1 min smith work; resources 2.7 d |
+| Hardy folk | 5 | 610 copper + 5 silver | — | 22.1 min smith work; resources 2.7 d |
+| Master masons | 5 | 610 copper + 5 silver | — | 22.1 min smith work; resources 2.7 d |
 | War drums | 1 | 4 copper | — | 0.2 min smith work; resources 25.0 min |
 
 ### Smithy
 
 | Upgrade | Max | Cumulative cost | Prerequisite Knowledge | Late-profile work or resource floor |
 |---|---:|---|---:|---|
-| Troop HP | 50 | 1435 copper + 23090 silver + 177650 gold | — | 3.4 d smith work; resources 1.69 yr |
-| Troop damage | 50 | 1435 copper + 23090 silver + 177650 gold | — | 3.4 d smith work; resources 1.69 yr |
-| Drill speed | 30 | 1435 copper + 23090 silver + 18280 gold | — | 18.1 h smith work; resources 125.5 d |
-| Tower damage | 50 | 1435 copper + 23090 silver + 177650 gold | — | 3.4 d smith work; resources 1.69 yr |
-| Tower reload | 30 | 1435 copper + 23090 silver + 18280 gold | — | 18.1 h smith work; resources 125.5 d |
-| Bomb damage | 40 | 1435 copper + 23090 silver + 78215 gold | — | 1.8 d smith work; resources 271.6 d |
-| Wall HP | 50 | 1435 copper + 23090 silver + 177650 gold | — | 3.4 d smith work; resources 1.69 yr |
-| Keep HP | 50 | 1435 copper + 23090 silver + 177650 gold | — | 3.4 d smith work; resources 1.69 yr |
-| Rebuild speed | 30 | 1435 copper + 23090 silver + 18280 gold | — | 18.1 h smith work; resources 125.5 d |
-| Risen HP | 40 | 1435 copper + 23090 silver + 78215 gold | — | 1.8 d smith work; resources 271.6 d |
-| Risen damage | 40 | 1435 copper + 23090 silver + 78215 gold | — | 1.8 d smith work; resources 271.6 d |
-| Meteor damage | 40 | 1435 copper + 23090 silver + 78215 gold | — | 1.8 d smith work; resources 271.6 d |
-| Meteor blast radius | 30 | 1435 copper + 23090 silver + 18280 gold | — | 18.1 h smith work; resources 125.5 d |
-| Frost nova duration | 40 | 1435 copper + 23090 silver + 78215 gold | — | 1.8 d smith work; resources 271.6 d |
-| Frost nova radius | 30 | 1435 copper + 23090 silver + 18280 gold | — | 18.1 h smith work; resources 125.5 d |
-| Reinforcement health | 40 | 1435 copper + 23090 silver + 78215 gold | — | 1.8 d smith work; resources 271.6 d |
-| Reinforcement damage | 40 | 1435 copper + 23090 silver + 78215 gold | — | 1.8 d smith work; resources 271.6 d |
-| Reinforcement stay | 40 | 1435 copper + 23090 silver + 78215 gold | — | 1.8 d smith work; resources 271.6 d |
+| Troop HP | 50 | 1435 copper + 23090 silver + 177650 gold | — | 12.8 d smith work; resources 1.69 yr |
+| Troop damage | 50 | 1435 copper + 23090 silver + 177650 gold | — | 12.8 d smith work; resources 1.69 yr |
+| Drill speed | 30 | 1435 copper + 23090 silver + 18280 gold | — | 2.1 d smith work; resources 125.5 d |
+| Tower damage | 50 | 1435 copper + 23090 silver + 177650 gold | — | 12.8 d smith work; resources 1.69 yr |
+| Tower reload | 30 | 1435 copper + 23090 silver + 18280 gold | — | 2.1 d smith work; resources 125.5 d |
+| Bomb damage | 40 | 1435 copper + 23090 silver + 78215 gold | — | 6.2 d smith work; resources 271.6 d |
+| Wall HP | 50 | 1435 copper + 23090 silver + 177650 gold | — | 12.8 d smith work; resources 1.69 yr |
+| Keep HP | 50 | 1435 copper + 23090 silver + 177650 gold | — | 12.8 d smith work; resources 1.69 yr |
+| Rebuild speed | 30 | 1435 copper + 23090 silver + 18280 gold | — | 2.1 d smith work; resources 125.5 d |
+| Risen HP | 40 | 1435 copper + 23090 silver + 78215 gold | — | 6.2 d smith work; resources 271.6 d |
+| Risen damage | 40 | 1435 copper + 23090 silver + 78215 gold | — | 6.2 d smith work; resources 271.6 d |
+| Meteor damage | 40 | 1435 copper + 23090 silver + 78215 gold | — | 6.2 d smith work; resources 271.6 d |
+| Meteor blast radius | 30 | 1435 copper + 23090 silver + 18280 gold | — | 2.1 d smith work; resources 125.5 d |
+| Frost nova duration | 40 | 1435 copper + 23090 silver + 78215 gold | — | 6.2 d smith work; resources 271.6 d |
+| Frost nova radius | 30 | 1435 copper + 23090 silver + 18280 gold | — | 2.1 d smith work; resources 125.5 d |
+| Reinforcement health | 40 | 1435 copper + 23090 silver + 78215 gold | — | 6.2 d smith work; resources 271.6 d |
+| Reinforcement damage | 40 | 1435 copper + 23090 silver + 78215 gold | — | 6.2 d smith work; resources 271.6 d |
+| Reinforcement stay | 40 | 1435 copper + 23090 silver + 78215 gold | — | 6.2 d smith work; resources 271.6 d |
 
 ### Study skill
 
@@ -199,7 +199,10 @@ Each cost below is that upgrade's own cumulative price. Study prerequisite Knowl
 | Rime | 3 | 20012 knowledge | — | 35.0 min research; resources 18.2 h |
 | Stormcalling | 3 | 25015 knowledge | — | 35.0 min research; resources 22.7 h |
 | Crusaders | 3 | 20012 knowledge | — | 35.0 min research; resources 18.2 h |
-| Assassins | 3 | 20012 knowledge | — | 35.0 min research; resources 18.2 h |
+| Bloodletters | 3 | 20012 knowledge | — | 35.0 min research; resources 18.2 h |
+| Shadowcloak | 3 | 20012 knowledge | — | 35.0 min research; resources 18.2 h |
+| Venomblades | 3 | 20012 knowledge | — | 35.0 min research; resources 18.2 h |
+| Headhunters | 3 | 20012 knowledge | — | 35.0 min research; resources 18.2 h |
 | Fire arrows | 3 | 20012 knowledge | — | 35.0 min research; resources 18.2 h |
 | Sharpshooters | 3 | 20012 knowledge | — | 35.0 min research; resources 18.2 h |
 | Gun crews | 3 | 20012 knowledge | — | 35.0 min research; resources 18.2 h |

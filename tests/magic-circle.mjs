@@ -17,7 +17,8 @@ try {
   const fixture = await page.evaluate(async () => {
    const { defaults } = await import('/src/save.ts'); const s = defaults();
    Object.assign(s.settings, { developerMode: true, devMode: true, instantResearch: true, soundOff: true, ambienceOff: true });
-   s.knowledge = 100000; s.smithy.copper = 100; return s;
+   s.knowledge = 100000; s.smithy.copper = 100;
+   s.defend.owned.barracks = 1; s.defend.kept = [{ kind: "barracks", path: "crusaders", rank: 1 }]; return s;
   });
   await context.addInitScript(fixture => {
    if (!sessionStorage.getItem('circle-seed')) { localStorage.setItem('towerdefense.v1', JSON.stringify(fixture)); sessionStorage.setItem('circle-seed', 'yes'); }
@@ -104,10 +105,37 @@ try {
   await page.locator('[data-ug-buy="q:arrowLoops:1"]').click();
   assert.notEqual(await keep.getAttribute('data-formation'), plain);
   await page.screenshot({ path: `test-results/magic-keep-${width}.png` });
-  await page.locator('[data-ug-respec]').click(); await page.locator('[data-ug-respec]').click();
+  await page.locator('[data-ug-respec]').click();
   assert.equal(await keep.getAttribute('data-formation'), plain);
   await page.locator('[data-specialty-close]').click();
   assert.equal(await page.locator('#defend-specialty .magic-circle').count(), 0);
+  // Reproduce the user's Defend Barracks / Crusaders screenshot, not just Study.
+  await page.evaluate(() => window.__circlePage.openSpecialty({ copy: 'barracks', wear: { path: 'crusaders', rank: 1 } }));
+  await page.waitForTimeout(250);
+  const background = page.locator('#defend-specialty .magic-circle');
+  assert.equal(await background.count(), 1);
+  assert.equal(await background.evaluate(c => {
+   const pixels = c.getContext('2d').getImageData(0,0,c.width,c.height).data;
+   let gold = 0;
+   for(let i=0;i<pixels.length;i+=4) if(pixels[i]>130 && pixels[i+1]>70 && pixels[i]>pixels[i+1]*1.1) gold++;
+   return gold>200;
+  }), true, 'gold geometry is actually painted in the Defend background');
+  await page.screenshot({ path: `test-results/magic-barracks-${width}.png` });
+  const beforeUndo = await background.getAttribute('data-formation');
+  await page.locator('#defend-specialty [data-node="p:crusaders:1"]').click();
+  await page.locator('#defend-specialty [data-ug-undo]').click();
+  assert.notEqual(await background.getAttribute('data-formation'), beforeUndo);
+  await page.locator('[data-specialty-close]').click();
+  await page.evaluate(() => window.__circlePage.openSpecialty({ walls: true }));
+  const wallCircle = page.locator('#defend-specialty .magic-circle');
+  await page.waitForTimeout(100);
+  const bareWalls = await wallCircle.getAttribute('data-formation');
+  await page.locator('#defend-specialty [data-node="q:stonework:1"]').click();
+  await page.locator('[data-ug-buy="q:stonework:1"]').click();
+  assert.notEqual(await wallCircle.getAttribute('data-formation'), bareWalls);
+  await page.locator('[data-ug-respec]').click();
+  assert.equal(await wallCircle.getAttribute('data-formation'), bareWalls);
+  await page.locator('[data-specialty-close]').click();
   assert.deepEqual(errors, []);
   console.log(`${width}px: purchases, unlearning, reduced motion, canvas persistence, navigation, keep upgrade/respec and cleanup passed`);
   await context.close();

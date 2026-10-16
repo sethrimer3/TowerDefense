@@ -12,7 +12,7 @@ import { decodeLibrarySave, type LibrarySave } from "./library/sim.ts";
 import { decodeResearchJob, type ResearchJob } from "./research-jobs.ts";
 import { decodeForgeJob, type ForgeJob } from "./forge-jobs.ts";
 
-import { migrateCards, migrateResearch, migrateTopicPaths } from "./specializations.ts";
+import { migrateCards, migrateResearch, migrateTopicPaths, refundRetiredAssassins } from "./specializations.ts";
 
 /** What the retired Outlying districts skill cost, refunded on load. */
 const OUTSKIRTS_KNOWLEDGE = 8;
@@ -143,6 +143,7 @@ export function decode(raw: string | null): Save {
   const job = s.researchJob, path = PATHS.find((p) => p.id === job?.id);
   if ((job?.kind === "path" || job?.kind === "evolution") && path && !isSpell(path.topic) && Number.isSafeInteger(job.paid) && job.paid > 0) d.knowledge += job.paid;
   migrateResearch(d);
+  refundRetiredAssassins(s, d);
   d.researchJob = decodeResearchJob(s.researchJob, d);
   d.researchClock = num(s.researchClock, 0);
   d.forgeJob = decodeForgeJob(s.forgeJob, d);

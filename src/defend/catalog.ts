@@ -1,4 +1,5 @@
 import type { KeepRanks } from "../keep-upgrades.ts";
+import type { WallRanks } from "../wall-upgrades.ts";
 import { intPow } from "../exact.ts";
 import { ECONOMY, quadraticCost } from "../economy.ts";
 import type { BattlePaths, PathId } from "../knowledge-paths.ts";
@@ -7,11 +8,11 @@ import type { BattlePaths, PathId } from "../knowledge-paths.ts";
  * copper, silver and Gold, the universal upgrades, the bonuses the Smithy and the
  * skill trees add, and the enemy roster. */
 
-export type StructureKind = "keep" | "meleeGuild" | "rangedGuild" | "barracks" | "archerBarracks" | "sniperLodge" | "musketHall" | "archerTower" | "cannonTower" | "watchTower" | "wizardTower" | "mageGuild" | "valkyriePalace" | "darkKeep" | "monsterBait";
+export type StructureKind = "keep" | "meleeGuild" | "rangedGuild" | "assassinDen" | "barracks" | "archerBarracks" | "sniperLodge" | "musketHall" | "archerTower" | "cannonTower" | "watchTower" | "wizardTower" | "mageGuild" | "valkyriePalace" | "darkKeep" | "monsterBait";
 /** Everything that appears in the build palette (the keep is placed from the
  * start and can only be moved, so it is not a palette item). */
-export type PaletteItem = "cityTile" | "cityGate" | "wallSpikes" | "wallBallista" | Exclude<StructureKind, "keep">;
-export const PALETTE_ITEMS: PaletteItem[] = ["cityTile", "meleeGuild", "rangedGuild", "barracks", "archerBarracks", "sniperLodge", "musketHall", "watchTower", "archerTower", "cannonTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "cityGate", "wallSpikes", "wallBallista"];
+export type PaletteItem = "cityTile" | "cityGate" | "wallSpikes" | "wallBallista" | "wallBlock" | Exclude<StructureKind, "keep">;
+export const PALETTE_ITEMS: PaletteItem[] = ["cityTile", "meleeGuild", "rangedGuild", "barracks", "assassinDen", "archerBarracks", "sniperLodge", "musketHall", "watchTower", "archerTower", "cannonTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "wallBlock", "cityGate", "wallSpikes", "wallBallista"];
 /** The only buildings the shop sells: every other tower or troop building
  * is one of these upgraded, a building at a time, with Knowledge
  * (`building-upgrades.ts`). */
@@ -32,6 +33,7 @@ export const ITEM_CATEGORY: Record<PaletteItem, Exclude<PaletteCategory, "all">>
   cityGate: "city",
   wallSpikes: "city",
   wallBallista: "city",
+  wallBlock: "city",
   monsterBait: "city",
   archerTower: "towers",
   cannonTower: "towers",
@@ -40,6 +42,7 @@ export const ITEM_CATEGORY: Record<PaletteItem, Exclude<PaletteCategory, "all">>
   meleeGuild: "units",
   rangedGuild: "units",
   barracks: "units",
+  assassinDen: "units",
   archerBarracks: "units",
   sniperLodge: "units",
   musketHall: "units",
@@ -52,6 +55,9 @@ export const inCategory = (item: PaletteItem, category: PaletteCategory) => cate
 /** The city gate: 3 cells along the wall and its 2 cells deep, worth the
  * wall stones it stands in for, and some. */
 export const GATE = { long: 3, deep: 2, hpPerCell: 1.5 };
+/** A wall section, placed on its own. */
+export const WALL_BLOCK_DESCRIPTION =
+  "A section of stone wall a quarter of a tile across, placed on a finer grid anywhere outside the city to funnel and stall the enemy, who must break through it. Its upgrade tree toughens, barbs and opens every wall you place.";
 export const GATE_DESCRIPTION =
   "A gatehouse set into the city wall on the edge of a city tile. It swings open to let your soldiers, archers, mages and townsfolk out and in, and stays barred against the enemy, who must batter it down.";
 
@@ -116,7 +122,7 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     size: 4,
     maxHp: 140,
     outsideOk: false,
-    description: "Trains brawlers: townsfolk with bare fists who rush out and punch whatever breaches the walls. Upgrade it with Knowledge into a barracks of swordsmen, and on to assassins, crusaders and at last valkyries.",
+    description: "Trains brawlers: townsfolk with bare fists who rush out and punch whatever breaches the walls. Upgrade it with Knowledge into a barracks of swordsmen, on to crusaders and at last valkyries, or into an assassins' den.",
   },
   rangedGuild: {
     kind: "rangedGuild",
@@ -127,6 +133,16 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     maxHp: 130,
     outsideOk: false,
     description: "Trains stone throwers who wander the streets lobbing rocks at anything near. Upgrade it with Knowledge into archers, fire mages, snipers or explosive musketmen.",
+  },
+  assassinDen: {
+    kind: "assassinDen",
+    name: "Assassins' den",
+    w: 3,
+    h: 3,
+    size: 4,
+    maxHp: 120,
+    outsideOk: false,
+    description: "Trains assassins: quick, frail killers in black whose every fourth strike is critical. Upgrade it with Knowledge into bloodletters with enormous criticals, cloaked ambushers, poisoners whose venom makes enemies take more damage from everything, or headhunters who go for the toughest enemy they can reach.",
   },
   sniperLodge: {
     kind: "sniperLodge",
@@ -270,9 +286,11 @@ export const STARTING_OWNED: Record<PaletteItem, number> = {
   cityGate: 0,
   wallSpikes: 0,
   wallBallista: 0,
+  wallBlock: 8,
   meleeGuild: 1,
   rangedGuild: 1,
   barracks: 0,
+  assassinDen: 0,
   archerBarracks: 0,
   sniperLodge: 0,
   musketHall: 0,
@@ -298,9 +316,11 @@ export function purchasePrice(item: PaletteItem, owned: number): Price {
     cityGate: { copper: 4 },
     wallSpikes: { copper: 3 },
     wallBallista: { copper: 6 },
+    wallBlock: { copper: 1 },
     meleeGuild: { copper: 4 },
     rangedGuild: { copper: 4 },
     barracks: { copper: 4 },
+    assassinDen: { copper: 5 },
     archerBarracks: { copper: 5 },
     sniperLodge: { copper: 6 },
     musketHall: { copper: 7 },
@@ -313,7 +333,8 @@ export function purchasePrice(item: PaletteItem, owned: number): Price {
     darkKeep: { copper: 25, silver: 8, gold: 2 },
     monsterBait: { copper: 3 },
   };
-  const b = base[item], up = (n = 0) => quadraticCost(n, extra, n * 0.25);
+  // Walls are laid by the dozen, so their price climbs slowly.
+  const b = base[item], up = (n = 0) => quadraticCost(n, extra, n * (item === "wallBlock" ? 0.02 : 0.25));
   const price: Price = { copper: up(b.copper) };
   if (b.silver) price.silver = up(b.silver);
   if (b.gold) price.gold = up(b.gold);
@@ -326,9 +347,11 @@ export const ITEM_NAMES: Record<PaletteItem, string> = {
   cityGate: "City gate",
   wallSpikes: "Wall spikes",
   wallBallista: "Wall ballista",
+  wallBlock: "Wall",
   meleeGuild: STRUCTURES.meleeGuild.name,
   rangedGuild: STRUCTURES.rangedGuild.name,
   barracks: STRUCTURES.barracks.name,
+  assassinDen: STRUCTURES.assassinDen.name,
   archerBarracks: STRUCTURES.archerBarracks.name,
   sniperLodge: STRUCTURES.sniperLodge.name,
   musketHall: STRUCTURES.musketHall.name,
@@ -802,6 +825,8 @@ export type Bonuses = {
   /** The keep's own upgrades (`keep-upgrades.ts`); absent with none, so
    * such a run plays exactly as before. */
   keep?: KeepRanks;
+  /** The placed walls' upgrades (`wall-upgrades.ts`); absent with none. */
+  walls?: WallRanks;
 };
 export const NO_BONUSES: Readonly<Bonuses> = Object.freeze({
   troopHp: 1, troopDamage: 1, drill: 1, towerDamage: 1, towerReload: 1, wallHp: 1, keepHp: 1, rebuild: 1, bombDamage: 1, undeadHp: 1, undeadDamage: 1, meteorDamage: 1, meteorRadius: 1, frostTime: 1, frostRadius: 1, reinforceHp: 1, reinforceDamage: 1, reinforceTime: 1,
@@ -819,6 +844,9 @@ export const BRAWLER = { hp: 30, damage: 3.5, cooldown: 0.7, speed: 2.4, reach: 
 export const SLINGER = { hp: 20, damage: 3, cooldown: 1.2, speed: 2.1, size: 0.34, range: 2.5, color: "#a3906a" };
 export const SNIPER = { hp: 22, damage: 22, cooldown: 3.6, speed: 1.8, size: 0.36, range: 9, color: "#4f6b3a" };
 export const MUSKETEER = { hp: 30, damage: 9, cooldown: 2.6, speed: 2, size: 0.38, range: 4, blast: 0.9, color: "#7a3b2a" };
+/** The Assassins' den's assassins: quick and frail, every `every`th strike
+ * critical for `crit` times the damage (counted, never rolled). */
+export const ASSASSIN_UNIT = { hp: 26, damage: 8, cooldown: 0.7, speed: 2.9, reach: 0.7, size: 0.36, every: 4, crit: 2, color: "#2b2633" };
 export const VALKYRIE = { hp: 50, damage: 16, cooldown: 1.8, speed: 2.3, size: 0.44, color: "#f2e6c4" };
 /** The dark wizard, the keep's one ultimate unit: slow to summon (`drill`
  * times a barracks' drill), casting a bolt of black lightning within

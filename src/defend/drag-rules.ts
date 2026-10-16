@@ -2,7 +2,7 @@
  * functions of the layout: the layout it makes on each tile, the outline it
  * shows there, why a tile refuses it, and which city tiles can be lifted. */
 import { STRUCTURES, type PaletteItem } from "./catalog.ts";
-import { SUB, TILES_H, TILES_W, tileInBounds, tileKey, type Rect, type TilePos } from "./grid.ts";
+import { SPAWN_ROW, SUB, TILES_H, TILES_W, tileInBounds, tileKey, type Rect, type TilePos } from "./grid.ts";
 import {
   SIDES,
   across,
@@ -29,6 +29,17 @@ import {
   placeStructure,
   spanOf,
   tileMovable,
+  QUARTERS_H,
+  QUARTERS_W,
+  moveWall,
+  parseWallKey,
+  placeWall,
+  removeWall,
+  wallContext,
+  wallKey,
+  wallPieceRect,
+  wallTile,
+  type WallSpot,
   type CornerSpot,
   type GateSpot,
   type Layout,
@@ -51,6 +62,8 @@ export type Drag =
   | { from: "spikes"; spikes: GateSpot }
   /** A wall ballista already on a corner of the wall. */
   | { from: "ballista"; corner: CornerSpot }
+  /** A wall section already placed, on its quarter tile. */
+  | { from: "wallBlock"; wall: WallSpot }
   | { from: "bomb" }
   /** The war banner, from the palette or (`placed`) where it stands. */
   | { from: "banner"; placed?: boolean }
@@ -78,6 +91,8 @@ export function dragIcon(drag: Drag): IconItem {
 export const carriesGate = (drag: Drag) => carriesEdge(drag) || carriesCorner(drag);
 /** Whether `drag` carries a city gate or spikes, which go on a tile's edge. */
 export const carriesEdge = (drag: Drag) => dragIcon(drag) === "cityGate" || dragIcon(drag) === "wallSpikes";
+/** Whether `drag` carries a wall section, which goes on a quarter tile. */
+export const carriesWall = (drag: Drag) => dragIcon(drag) === "wallBlock";
 /** Whether `drag` carries a wall ballista, which goes on a wall corner. */
 export const carriesCorner = (drag: Drag) => dragIcon(drag) === "wallBallista";
 
@@ -104,13 +119,26 @@ export function parseGateKey(key: string): GateSpot {
  * structure spanning a 2 × 2 block, else 1. */
 export function dragSpan(drag: Drag, layout: Layout) {
   const kind = dragIcon(drag);
-  return kind === "cityTile" || kind === "cityGate" || kind === "wallSpikes" || kind === "wallBallista" || kind === "keep" || consumable(kind) ? 1 : spanOf(layout, kind);
+  return kind === "cityTile" || kind === "cityGate" || kind === "wallSpikes" || kind === "wallBallista" || kind === "wallBlock" || kind === "keep" || consumable(kind) ? 1 : spanOf(layout, kind);
 }
 
 /** Every layout dropping `drag` could make, keyed by the tile it lands on
  * (the top left tile of the block it would take). */
 export function legalLayouts(drag: Drag, layout: Layout): Map<string, Layout> {
   const out = new Map<string, Layout>();
+  if (carriesWall(drag)) {
+    // Every quarter tile, checked against the city worked out once.
+    const from = drag.from === "wallBlock" ? drag.wall : null;
+    const rest = from ? removeWall(layout, from) : layout;
+    const ctx = wallContext(rest);
+    for (let qy = 0; qy < QUARTERS_H; qy++)
+      for (let qx = 0; qx < QUARTERS_W; qx++) {
+        const w = { qx, qy };
+        const next = from ? moveWall(layout, from, w, ctx) : placeWall(layout, w, ctx);
+        if (next) out.set(wallKey(w), next);
+      }
+    return out;
+  }
   if (carriesCorner(drag)) {
     for (let vy = 1; vy < TILES_H; vy++)
       for (let vx = 1; vx < TILES_W; vx++) {
@@ -148,7 +176,7 @@ export function legalLayouts(drag: Drag, layout: Layout): Map<string, Layout> {
 function layoutAfter(drag: Drag, layout: Layout, tx: number, ty: number): Layout | null {
   switch (drag.from) {
     case "palette":
-      if (drag.item === "cityGate" || drag.item === "wallSpikes" || drag.item === "wallBallista") return null;
+      if (drag.item === "cityGate" || drag.item === "wallSpikes" || drag.item === "wallBallista" || drag.item === "wallBlock") return null;
       return drag.item === "cityTile" ? placeCityTile(layout, tx, ty) : placeStructure(layout, drag.item, tx, ty, drag.wear);
     case "structure":
       return moveStructure(layout, drag.uid, tx, ty);
@@ -167,6 +195,7 @@ const isTile = (t: TilePos, tx: number, ty: number) => t.tx === tx && t.ty === t
  * on tile `key`: the tile itself for a city tile, else the fitted structure. */
 export function dropGhost(drag: Drag, next: Layout, key: string): Overlay["ghost"] {
   if (carriesGate(drag)) return { rect: wallSpotRect(drag, next, key), kind: dragIcon(drag) as "cityGate" | "wallSpikes" | "wallBallista" };
+  if (carriesWall(drag)) return { rect: wallPieceRect(parseWallKey(key)), kind: "wallBlock" };
   const [tx, ty] = key.split(",").map(Number);
   if (dragIcon(drag) === "cityTile") return { rect: { x: tx * SUB, y: ty * SUB, w: SUB, h: SUB }, kind: "cityTile" };
   const fit = fitLayout(next);
@@ -197,6 +226,14 @@ export function refusal(drag: Drag, layout: Layout, key: string): string {
     if (layout.ballistas.some((o) => cornerKey(o) === key)) return "There's already a ballista on that corner.";
     if (cornerOk(cityTileSet(layout), v)) return "There isn't room for a ballista there.";
     return "A wall ballista goes on a corner of the city wall, where it turns at a right angle.";
+  }
+  if (kind === "wallBlock") {
+    const w = parseWallKey(key), t = wallTile(w);
+    if (t.ty === SPAWN_ROW) return "Nothing can be built on the top row — that's where the enemy gathers.";
+    if (layout.walls?.some((o) => wallKey(o) === key)) return "There's already a wall there.";
+    if (cityTileSet(layout).has(tileKey(t.tx, t.ty)))
+      return layout.innerWalls ? "A wall there would leave no room for the city's streets and buildings." : "Walls can stand inside the city once the walls' Town walls upgrade is learned.";
+    return "There's a wall or a building there already.";
   }
   const ty = Number(key.split(",")[1]);
   if (ty === 0) return "Nothing can be built on the top row — that's where the enemy gathers.";

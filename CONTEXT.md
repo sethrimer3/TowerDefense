@@ -31,7 +31,7 @@ A placed building with a job: the keep, the guilds and the troop buildings upgra
 One of the three buildings the shop sells: the **Watch tower**, the **Melee Guild** (training **brawlers**, who fight with their fists) and the **Ranged Guild** (training **stone throwers**). Every other tower and troop building is one of these upgraded.
 
 **Upgrade** (of a building):
-One step a single placed building takes with Knowledge, chosen by tapping it in Defend while building: becoming another building (a Watch tower an archer, cannon or wizard tower; a Melee Guild a barracks; a Ranged Guild an archer barracks, Mage Guild, **sniper lodge** or **musket hall**, whose **explosive musketmen** fire bursting balls), a path's next rank, or its crown's **evolution**. The other buildings of its kind are untouched.
+One step a single placed building takes with Knowledge, chosen by tapping it in Defend while building: becoming another building (a Watch tower an archer, cannon or wizard tower; a Melee Guild a barracks or an **assassins' den**; a Ranged Guild an archer barracks, Mage Guild, **sniper lodge** or **musket hall**, whose **explosive musketmen** fire bursting balls), a path's next rank, or its crown's **evolution**. The other buildings of its kind are untouched.
 
 **Upgrade tree**:
 A building's own upgrades, opened by tapping it in Defend while building, or by pressing and holding it there or its tile in the palette (a copy in the palette is upgraded on its own): the buildings it has been, then every branch still open to it, as nodes on branches that can be dragged about and spring back. Choosing one branch makes the ones beside it wither away and opens the upgrades only that branch leads to. Its corner box shows the Knowledge **allocated** to the building.
@@ -39,8 +39,14 @@ A building's own upgrades, opened by tapping it in Defend while building, or by 
 **Keep branch**:
 One of the keep's own upgrade lines, **Bastions** (more HP), **Arrow loops** (the keep shoots) and **Boiling oil** (it scalds whatever reaches its walls). Unlike a building's paths, the keep climbs all of them side by side.
 
+**Wall section**:
+A piece of stone wall a quarter of a tile across, placed on its own on the board's grid of quarter tiles (the placing grid turns four times finer while one is carried), anywhere outside the city and, with **Town walls**, inside it. Every wall section shares one upgrade tree, the **wall branches**: **Stonework** (more HP, then mending), **Thornwork** (it cuts and then slows whoever presses against it) and **Town walls** (inside the city, then posterns that let your own people through), climbed side by side like the keep's.
+
 **Respec**:
-Turning one building back into its basic building with no path, for 5 Copper, with every Knowledge point allocated to it given back.
+Turning one building back into its basic building with no path, free, with every Knowledge point allocated to it given back.
+
+**Undo**:
+Taking one upgrade a building has, and every upgrade after it, back off, free, with their Knowledge given back: the building steps back down its tree to the node that upgrade grew from.
 
 **Kept copy**:
 A building on a path taken back to the palette: it keeps its path and rank, waits under its own palette entry, and wears them again when placed.
@@ -188,13 +194,16 @@ The way down from the Mine or the Library to the room below it: the scene slides
 Anything owned to put into a defense: a City tile or a piece of the wall (City), a unit building (Units), a tower (Towers), or a **consumable** (a bomb, used up when it goes off, or the war banner, never used up). Shown in the **Tiles tab**, the keep's hall.
 
 **Stack**:
-All the tiles of one kind, shown as one tile marked with its quantity (×4); opened, it shows each copy, whether it stands in the city or waits in the palette.
+Tiles that are alike, shown as one tile marked with its quantity (×4). A **universal** kind (City tiles, the wall's pieces, skills), whose upgrades every copy shares or which has none, is always one stack. A building upgraded one at a time is spread, a tile a copy, unless the player stacks them, when copies with the same upgrades share a stack. Opened, a kind shows its copies and each set of upgrades they carry.
+
+**Upgrade marks**:
+The Knowledge upgrades a tile carries, in the order taken, on its face in the Tiles tab: a brass diamond for each building it became, a pip in its path's colour for each path rank, and its path's badge; the walls' marks are their shared tree's ranks. Written out, they read "Watch tower → Archer tower → Fire arrows II".
 
 **Higher tier**:
 What a building can be upgraded into, and the basic building it grows from: a Wizard tower from a Watch tower, and into a Dark wizard keep by its crown.
 
 **Path**:
-One way a building can grow, in ranks it climbs one at a time with Knowledge: the Wizard tower's Pyromancy (flames only), Rime (ice only, then freezing solid) or Stormcalling (lightning in place of flames), the Barracks' Crusaders (hearty, healing) or Assassins (swift, with critical strikes), the Archer tower's Fire arrows (setting enemies **burning**) or Sharpshooters, the Cannon tower's Gun crews (with **grapeshot**) or Siege shot, the Archer barracks' Rangers or Skirmishers, the Watch tower's Spotters or Signal fires, the Mage Guild's Pyroclasm or Cinders, Monster bait's Oil-soaked or Fortified crates, Wall spikes' Blasting stakes (blowing up on contact), Spring stakes (the whole row shooting out) or Rimed stakes (chilling). Each building climbs its own path (its **specialization**), so different paths and ranks fight together in one city. (A strike spell's paths are still researched in the Study.)
+One way a building can grow, in ranks it climbs one at a time with Knowledge: the Wizard tower's Pyromancy (flames only), Rime (ice only, then freezing solid) or Stormcalling (lightning in place of flames), the Barracks' Crusaders (hearty, healing), the Assassins' den's Bloodletters (huge criticals, frail), Shadowcloak (**cloaked** until they strike, then an **ambush**), Venomblades (**venom**: the enemy takes more damage from everything) or Headhunters (the toughest enemy first, with a **bounty** of its HP), the Archer tower's Fire arrows (setting enemies **burning**) or Sharpshooters, the Cannon tower's Gun crews (with **grapeshot**) or Siege shot, the Archer barracks' Rangers or Skirmishers, the Watch tower's Spotters or Signal fires, the Mage Guild's Pyroclasm or Cinders, Monster bait's Oil-soaked or Fortified crates, Wall spikes' Blasting stakes (blowing up on contact), Spring stakes (the whole row shooting out) or Rimed stakes (chilling). Each building climbs its own path (its **specialization**), so different paths and ranks fight together in one city. (A strike spell's paths are still researched in the Study.)
 
 **Evolution**:
 A path's crown, past its last rank, turns that one building into a greater form (Stormcalling's Wizard tower into the Dark wizard keep, Crusaders' Barracks into the Valkyrie palace), paid with Knowledge. If it no longer fits its tile it goes to the palette.

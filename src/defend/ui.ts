@@ -1,8 +1,9 @@
 import { MagicCircle } from "../magic-circle/render.ts";
-import { RESPEC_PRICE, hasTree, respecBuilding, rootOf, specialtyLabel, specialtyOf, stepName, targetKind, upgradeBuilding, type SpecialtyTarget } from "../specializations.ts";
+import { hasTree, respecBuilding, undoUpgrade, rootOf, specialtyLabel, specialtyOf, stepName, targetKind, upgradeBuilding, type SpecialtyTarget } from "../specializations.ts";
 import { pathById, type PathId } from "../knowledge-paths.ts";
-import { specialtyCircle, keepCardHtml, keepGraph, keepStep, treeAllocated, treeCardHtml, treeGraph, treeStep } from "../ui/specialty.ts";
-import { keepAllocated, respecKeep, upgradeKeep } from "../keep-upgrades.ts";
+import { specialtyCircle, keepCardHtml, keepGraph, keepStep, keepUndo, treeAllocated, treeCardHtml, treeGraph, treeStep, wallCardHtml, wallGraph, wallStep, wallUndo } from "../ui/specialty.ts";
+import { keepAllocated, respecKeep, undoKeep, upgradeKeep } from "../keep-upgrades.ts";
+import { respecWalls, undoWalls, upgradeWalls, wallAllocated } from "../wall-upgrades.ts";
 import { UpgradeGraph } from "../ui/upgrade-graph.ts";
 import type { Save } from "../save.ts";
 import { bannerReach } from "./war-banner.ts";
@@ -89,11 +90,13 @@ export type DefendHost = {
 };
 
 const plural = (name: string) => (name.endsWith("s") ? name : `${name}s`);
-/** A building whose upgrade tree shows: one with paths, or the keep. */
-type TreeTarget = SpecialtyTarget | { keep: true };
+/** A building whose upgrade tree shows: one with paths, the keep, or every
+ * placed wall (which share one tree). */
+type TreeTarget = SpecialtyTarget | { keep: true } | { walls: true };
 /** Whether two specialty targets name the same building. */
 const sameTarget = (a: TreeTarget, b: TreeTarget): boolean =>
   "keep" in a || "keep" in b ? "keep" in a && "keep" in b
+  : "walls" in a || "walls" in b ? "walls" in a && "walls" in b
   : "uid" in a ? "uid" in b && a.uid === b.uid
   : "spikes" in a ? "spikes" in b && sameGate(a.spikes, b.spikes)
   : "copy" in b && a.copy === b.copy && a.wear?.path === b.wear?.path && a.wear?.rank === b.wear?.rank;
@@ -144,10 +147,8 @@ export class DefendPage {
    * open, the battle's items closed so the battle has the whole view. */
   private sideOpen = { build: true, sim: false };
   private testerSelected = false;
-  /** The building whose upgrade panel shows while building. */
-  /** The upgrade tree's building, the node picked in it, and whether its
-   * respec waits on a second press. */
-  private specialty: { target: TreeTarget; picked: string; respec: boolean } | null = null;
+  /** The upgrade tree's building and the node picked in it. */
+  private specialty: { target: TreeTarget; picked: string } | null = null;
   private tree: UpgradeGraph | null = null;
   private treeCircle: MagicCircle | null = null;
   private summonHold: { kind: EnemyKind; button: HTMLButtonElement; pointerId: number; next: number } | null = null;
@@ -1036,7 +1037,7 @@ export class DefendPage {
    * where it stood, is picked out. */
   private pickLifted() {
     const drag = this.pointers.session?.drag, map = this.currentMap();
-    const target: TreeTarget | null = drag?.from === "structure" ? { uid: drag.uid } : drag?.from === "spikes" ? { spikes: drag.spikes } : drag?.from === "keep" ? { keep: true } : null;
+    const target: TreeTarget | null = drag?.from === "structure" ? { uid: drag.uid } : drag?.from === "spikes" ? { spikes: drag.spikes } : drag?.from === "keep" ? { keep: true } : drag?.from === "wallBlock" ? { walls: true } : null;
     const b =
       drag?.from === "structure" ? map.buildings.find((o) => o.structureUid === drag.uid)
       : drag?.from === "ballista" ? map.buildings.find((o) => o.corner?.vx === drag.corner.vx && o.corner.vy === drag.corner.vy)
@@ -1056,8 +1057,8 @@ export class DefendPage {
    * upgrade tree (only while building, and only for kinds that have one). */
   private hold(drag: Drag): boolean {
     if (this.phase !== "build") return false;
-    if (drag.from === "keep") {
-      this.openSpecialty({ keep: true });
+    if (drag.from === "keep" || drag.from === "wallBlock" || (drag.from === "palette" && drag.item === "wallBlock")) {
+      this.openSpecialty(drag.from === "keep" ? { keep: true } : { walls: true });
       play("knock");
       return true;
     }
@@ -1083,14 +1084,20 @@ export class DefendPage {
   private openSpecialty(target: TreeTarget) {
     if ("keep" in target) {
       if (this.phase !== "build") return this.closeSpecialty();
-      this.specialty = { target, picked: "k:keep", respec: false };
+      this.specialty = { target, picked: "k:keep" };
       this.pick(this.currentMap().buildings.find((o) => o.kind === "keep")?.id ?? null);
+      return this.renderSpecialty(true);
+    }
+    if ("walls" in target) {
+      if (this.phase !== "build") return this.closeSpecialty();
+      this.specialty = { target, picked: "k:wallBlock" };
+      this.pick(null);
       return this.renderSpecialty(true);
     }
     const kind = targetKind(this.save, target);
     if (this.phase !== "build" || !kind) return this.closeSpecialty();
     const wear = specialtyOf(this.save, target);
-    this.specialty = { target, picked: wear ? `p:${wear.path}:${wear.rank}` : `k:${kind}`, respec: false };
+    this.specialty = { target, picked: wear ? `p:${wear.path}:${wear.rank}` : `k:${kind}` };
     if ("uid" in target) {
       const b = this.currentMap().buildings.find((o) => o.structureUid === target.uid);
       if (b && inspectable(b)) this.pick(b.id);
@@ -1113,6 +1120,8 @@ export class DefendPage {
       if (t.closest("[data-specialty-close]")) return this.closeSpecialty();
       const buy = t.closest<HTMLButtonElement>("[data-ug-buy]");
       if (buy && !buy.disabled) return this.upgrade(buy.dataset.ugBuy!);
+      const undo = t.closest<HTMLButtonElement>("[data-ug-undo]");
+      if (undo && !undo.disabled) return this.undo(undo.dataset.ugUndo!);
       const respec = t.closest<HTMLButtonElement>("[data-ug-respec]");
       if (respec && !respec.disabled) return this.respec();
     });
@@ -1132,6 +1141,14 @@ export class DefendPage {
       const branch = keepStep(this.save.keepRanks, id);
       if (!branch) return;
       const r = upgradeKeep(game, branch);
+      if (!r.ok) return this.setMessage(r.reason, 2);
+      this.afterChange("chime");
+      return this.bought(id);
+    }
+    if ("walls" in sp.target) {
+      const branch = wallStep(this.save.wallRanks, id);
+      if (!branch) return;
+      const r = upgradeWalls(game, branch);
       if (!r.ok) return this.setMessage(r.reason, 2);
       this.afterChange("chime");
       return this.bought(id);
@@ -1158,23 +1175,37 @@ export class DefendPage {
   private bought(id: string) {
     const sp = this.specialty!;
     sp.picked = id;
-    sp.respec = false;
     this.renderSpecialty();
     const node = this.root.querySelector<HTMLElement>(`#defend-specialty [data-node="${id}"]`);
     replay(node, "bought");
     sparksOver(node, "arcane");
   }
 
-  /** Respec, on a second press: 5 Copper, every Knowledge point back. */
+  /** Respec, free: every Knowledge point back, the building back to its root. */
   private respec() {
     const sp = this.specialty, game = this.host.game?.();
     if (!sp || !game || this.phase !== "build") return;
-    if (!sp.respec) {
-      sp.respec = true;
-      return this.renderSpecialty();
+    const r = "keep" in sp.target ? respecKeep(game) : "walls" in sp.target ? respecWalls(game) : respecBuilding(game, sp.target);
+    this.wentBack(r, "Respecced", "keep" in sp.target ? "k:keep" : "walls" in sp.target ? "k:wallBlock" : undefined);
+  }
+
+  /** Undoes tree node `id` and every upgrade after it, free, their Knowledge back. */
+  private undo(id: string) {
+    const sp = this.specialty, game = this.host.game?.();
+    if (!sp || !game || this.phase !== "build") return;
+    if ("keep" in sp.target || "walls" in sp.target) {
+      const keep = "keep" in sp.target, back = keep ? keepUndo(this.save.keepRanks, id) : wallUndo(this.save.wallRanks, id);
+      if (!back) return;
+      const r = keep ? undoKeep(game, back.id as never, back.rank) : undoWalls(game, back.id as never, back.rank);
+      // Stand on the rank below it, or the root.
+      return this.wentBack(r, "Undone", back.rank > 1 ? `q:${back.id}:${back.rank - 1}` : keep ? "k:keep" : "k:wallBlock");
     }
-    const r = "keep" in sp.target ? respecKeep(game) : respecBuilding(game, sp.target);
-    sp.respec = false;
+    this.wentBack(undoUpgrade(game, sp.target, id), "Undone");
+  }
+
+  /** After a respec or an undo: save, redraw, and stand on where it went back to. */
+  private wentBack(r: { ok: true; kind?: string; waiting?: boolean; copy?: unknown } | { ok: false; reason: string }, what: string, at?: string) {
+    const sp = this.specialty!;
     if (!r.ok) {
       this.setMessage(r.reason, 2);
       return this.renderSpecialty();
@@ -1184,10 +1215,11 @@ export class DefendPage {
     if ("waiting" in r && r.waiting) {
       this.closeSpecialty();
       this.picked = null;
-      this.setMessage("Respecced: no room where it stood, so it waits in the palette.", 3);
+      this.setMessage(`${what}: no room where it stood, so it waits in the palette.`, 3);
       return;
     }
-    sp.picked = "kind" in r ? `k:${r.kind}` : "k:keep";
+    const wear = "keep" in sp.target || "walls" in sp.target ? undefined : specialtyOf(this.save, sp.target);
+    sp.picked = at ?? (wear ? `p:${wear.path}:${wear.rank}` : `k:${r.kind}`);
     this.renderSpecialty();
     sparksOver(this.root.querySelector<HTMLElement>("#defend-specialty .ug-alloc"), "gold");
   }
@@ -1207,7 +1239,7 @@ export class DefendPage {
     const el = this.root.querySelector<HTMLElement>("#defend-specialty");
     if (!el) return;
     const sp = this.specialty, game = this.host.game?.();
-    const keep = !!sp && "keep" in sp.target, kind = !sp ? undefined : "keep" in sp.target ? "keep" as const : targetKind(this.save, sp.target);
+    const kind = !sp ? undefined : "keep" in sp.target ? "keep" as const : "walls" in sp.target ? "walls" as const : targetKind(this.save, sp.target);
     if (!sp || !kind || !game || this.phase !== "build") {
       if (sp) this.specialty = null;
       this.treeCircle?.destroy();
@@ -1218,8 +1250,8 @@ export class DefendPage {
       el.innerHTML = "";
       return;
     }
-    const wear = "keep" in sp.target ? undefined : specialtyOf(this.save, sp.target);
-    const name = kind === "keep" ? "Keep" : kind === "wallSpikes" ? "Wall spikes" : ITEM_NAMES[kind];
+    const wear = "keep" in sp.target || "walls" in sp.target ? undefined : specialtyOf(this.save, sp.target);
+    const name = kind === "keep" ? "Keep" : kind === "walls" ? "Walls" : kind === "wallSpikes" ? "Wall spikes" : ITEM_NAMES[kind];
     if (!this.tree) {
       el.className = "defend-specialty upgrade-tree";
       el.innerHTML = `<header class="ug-top">
@@ -1238,7 +1270,6 @@ export class DefendPage {
         onPick: (id) => {
           if (!this.specialty) return;
           this.specialty.picked = id;
-          this.specialty.respec = false;
           this.renderSpecialty();
         },
       });
@@ -1246,21 +1277,20 @@ export class DefendPage {
     }
     this.treeCircle ??= new MagicCircle();
     this.treeCircle.attach(el.querySelector<HTMLElement>(".ug-host")!);
-    this.treeCircle.set(specialtyCircle(kind, wear, this.save.keepRanks));
-    const ranks = this.save.keepRanks;
-    const spent = kind === "keep" ? keepAllocated(ranks) : treeAllocated(kind, wear);
-    const plain = kind === "keep" ? !ranks : spent === 0 && (kind === "wallSpikes" || rootOf(kind) === kind);
+    this.treeCircle.set(specialtyCircle(kind, wear, this.save.keepRanks, this.save.wallRanks));
+    const ranks = this.save.keepRanks, wallRanks = this.save.wallRanks;
+    const spent = kind === "keep" ? keepAllocated(ranks) : kind === "walls" ? wallAllocated(wallRanks) : treeAllocated(kind, wear);
+    const plain = kind === "keep" ? !ranks : kind === "walls" ? !wallRanks : spent === 0 && (kind === "wallSpikes" || rootOf(kind) === kind);
     el.setAttribute("aria-label", `Upgrade tree: ${name}`);
     el.querySelector(".ug-title b")!.textContent = name;
     el.querySelector(".ug-alloc b")!.textContent = `✦ ${spent.toLocaleString("en")}`;
-    el.querySelector(".ug-alloc")!.setAttribute("title", `${spent.toLocaleString("en")} Knowledge spent on this building: all of it comes back with a respec`);
+    el.querySelector(".ug-alloc")!.setAttribute("title", `${spent.toLocaleString("en")} Knowledge spent on ${kind === "walls" ? "the walls" : "this building"}: all of it comes back with a respec`);
     const respec = el.querySelector<HTMLButtonElement>(".ug-respec")!;
     respec.disabled = plain;
-    respec.classList.toggle("confirm", sp.respec);
-    respec.textContent = sp.respec ? `Respec for ${RESPEC_PRICE.copper} Copper?` : `Respec · ${RESPEC_PRICE.copper} Copper`;
-    respec.title = plain ? "Nothing allocated yet" : `Get all ${spent.toLocaleString("en")} Knowledge back and turn it back into a ${kind === "keep" ? "plain keep" : kind === "wallSpikes" ? "plain row of spikes" : ITEM_NAMES[rootOf(kind)]}`;
-    el.querySelector(".ug-card")!.innerHTML = kind === "keep" ? keepCardHtml(game, ranks, sp.picked) : treeCardHtml(game, kind, wear, sp.picked);
-    this.tree.set(kind === "keep" ? keepGraph(ranks) : treeGraph(kind, wear), sp.picked);
+    respec.textContent = "Respec · free";
+    respec.title = plain ? "Nothing allocated yet" : kind === "walls" ? `Get all ${spent.toLocaleString("en")} Knowledge back and turn every wall back into plain stone (walls inside the city go back to the palette)` : `Get all ${spent.toLocaleString("en")} Knowledge back and turn it back into a ${kind === "keep" ? "plain keep" : kind === "wallSpikes" ? "plain row of spikes" : ITEM_NAMES[rootOf(kind)]}`;
+    el.querySelector(".ug-card")!.innerHTML = kind === "keep" ? keepCardHtml(game, ranks, sp.picked) : kind === "walls" ? wallCardHtml(game, wallRanks, sp.picked) : treeCardHtml(game, kind, wear, sp.picked);
+    this.tree.set(kind === "keep" ? keepGraph(ranks) : kind === "walls" ? wallGraph(wallRanks) : treeGraph(kind, wear), sp.picked);
     if (focus) el.querySelector<HTMLElement>(".ug-buy:not(:disabled), [data-specialty-close]")?.focus({ preventScroll: true });
   }
 

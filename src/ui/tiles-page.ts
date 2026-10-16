@@ -1,26 +1,31 @@
 import { rootOf, upgradedFrom } from "../specializations.ts";
-import { paintPathIcons } from "./path-badge.ts";
-import { upgradeTreeHtml } from "./specialty.ts";
+import { pathBadge, pathLook, paintPathIcons } from "./path-badge.ts";
+import { upgradeTreeHtml, wallTreeHtml } from "./specialty.ts";
 /** The Tiles tab: the player's tiles laid out in a hall of the keep they
- * defend, under its great window. Identical tiles stack, one stack a kind
- * marked with its quantity (`tileStacks`); a tap opens the stack in place,
+ * defend, under its great window. Each tile shows the Knowledge upgrades
+ * it carries (`marksHtml`: a diamond for each building it became, a pip in
+ * its path's colour for each rank, and its path's badge on its face).
+ * Buildings upgraded one at a time are spread, a tile a copy, unless
+ * stacked, when copies with the same upgrades share a stack; kinds whose
+ * upgrades every copy shares (city tiles, walls, skills) are always one
+ * stack marked with its quantity (`universal`). A tap opens the kind in place,
  * spilling its copies out (which stand in the city, which wait in the
  * palette), with buying another, the kind's upgrades in the Mine's Smithy
  * and the Library's Study, and its higher tier. The filters show one type
  * at a time; the stacks can be spread into single tiles and gathered again;
- * the Shop shows every kind for sale. Copies of a kind are interchangeable:
- * a kind with Knowledge paths previews them here, and each building's path
- * is chosen as it is placed in Defend. Every change of layout animates
+ * the Shop shows every kind for sale. The opened kind lists each set of
+ * upgrades its copies carry in words and previews its tree; each building
+ * is upgraded where it stands in Defend. Every change of layout animates
  * (`flip`): tiles slide to their new places, copies gather into their
  * stacks and spill out of them. */
 import { play } from "../sound.ts";
 import { daylight } from "../library/render.ts";
-import { BALLISTA_DESCRIPTION, BOMB_RADIUS, GATE_DESCRIPTION, ITEM_NAMES, SPIKES_DESCRIPTION, STRUCTURES, footprint, shareName, type PaletteItem } from "../defend/catalog.ts";
+import { BALLISTA_DESCRIPTION, BOMB_RADIUS, GATE_DESCRIPTION, WALL_BLOCK_DESCRIPTION, ITEM_NAMES, SPIKES_DESCRIPTION, STRUCTURES, footprint, shareName, type PaletteItem } from "../defend/catalog.ts";
 import type { PlacedKind } from "../defend/layout.ts";
 import { paintIcon, type IconItem } from "../defend/structure-art.ts";
 import {
-  CONSUMABLE_TEXT, TILE_FILTERS, TILE_NAMES, TILE_TYPE, TILE_TYPE_NAMES, buyTile, canBuyTile, higherTier, isConsumable, offerText, shopOffer, tileCopies,
-  tileStacks, tileTopic, type TileFilter, type TileId, type TileStack,
+  CONSUMABLE_TEXT, TILE_FILTERS, TILE_NAMES, TILE_TYPE, TILE_TYPE_NAMES, buyTile, canBuyTile, higherTier, isConsumable, marksText, offerText, shopOffer, tileCopies,
+  tileGroups, tileMarks, tileStacks, tileTopic, universal, type TileFilter, type TileId, type TileMark, type TileStack,
 } from "../tiles.ts";
 import { topicHas } from "./ledger.ts";
 import { Chamber } from "./chamber.ts";
@@ -28,6 +33,7 @@ import { flip } from "./flip.ts";
 import { replay, sparksOver } from "./flourish.ts";
 import { holdToRepeat } from "./hold-repeat.ts";
 import type { AppContext } from "./app.ts";
+import type { Wear } from "../specializations.ts";
 
 /** Copies shown at most for one kind (a hoard of bombs stays one row or two). */
 const SHOWN = 12;
@@ -38,7 +44,8 @@ export class TilesPage {
   private chamber: Chamber | null = null;
   private mode: "collection" | "shop" = "collection";
   private filter: TileFilter = "all";
-  private stacked = true;
+  /** Whether copies with the same upgrades share a stack (spread by default). */
+  private stacked = false;
   private open: TileId | null = null;
 
   constructor(private ctx: AppContext, private root: HTMLElement) {}
@@ -65,7 +72,7 @@ export class TilesPage {
           <div class="tiles-modes" role="group" aria-label="View">
             <button data-mode="collection">Collection</button><button data-mode="shop">Shop</button>
           </div>
-          <button class="tiles-stacking" data-stacking aria-pressed="true" title="Gather identical tiles into one stack, or spread them out"></button>
+          <button class="tiles-stacking" data-stacking aria-pressed="false" title="Gather tiles with the same upgrades into one stack, or spread them out"></button>
         </header>
         <div class="tiles-filters" role="group" aria-label="Tile types"></div>
         <div class="tiles-shelf"><div class="tiles-grid"></div><div class="tiles-ghosts" aria-hidden="true"></div></div>
@@ -74,7 +81,6 @@ export class TilesPage {
     const c = this.chamber.content;
     c.querySelectorAll<HTMLButtonElement>("[data-mode]").forEach((b) => (b.onclick = () => this.relayout(() => {
       this.mode = b.dataset.mode as typeof this.mode;
-      if (this.mode === "shop") this.stacked = true;
     })));
     c.querySelector<HTMLButtonElement>("[data-stacking]")!.onclick = () => this.relayout(() => {
       this.stacked = !this.stacked;
@@ -140,34 +146,58 @@ export class TilesPage {
     const all = tileStacks(s, "all"), placed = all.reduce((a, t) => a + t.placed, 0), count = all.reduce((a, t) => a + (t.lasting ? 0 : t.count), 0);
     c.querySelector(".tiles-foot")!.innerHTML = shop
       ? `Paid with Copper, Silver and Gold from the Mine · tap a tile to buy`
-      : `<b>${count}</b> tiles · <b>${placed}</b> standing in the city · tap a stack to open it`;
+      : `<b>${count}</b> tiles · <b>${placed}</b> standing in the city · <span class="tile-legend"><i class="mark became"></i> became <i class="mark rank"></i> path rank</span> · tap a tile to open it`;
   }
 
-  /** A kind's stack (or, spread, each of its copies), and its opened panel. */
+  /** A kind's tiles: one stack when its copies are all alike (or in the
+   * shop), else a stack for each set of upgrades or, spread, every copy;
+   * and its opened panel. */
   private stackHtml(t: TileStack) {
     const shop = this.mode === "shop", open = this.open === t.id, offer = shopOffer(this.save, t.id);
     const name = TILE_NAMES[t.id], type = `type-${t.type}`;
-    const face = (cls = "") => `<span class="tile-face ${cls}"><canvas width="48" height="48" data-icon="${iconOf(t.id)}"></canvas></span>`;
+    const face = (wear?: Wear) => `<span class="tile-face"><canvas width="48" height="48" data-icon="${iconOf(t.id)}"${wear ? pathLook(t.id, wear.path) : ""}></canvas>${pathBadge(wear)}</span>`;
+    const layers = (n: number) => (n > 2 ? " layers-2" : n > 1 ? " layers-1" : "");
+    const where = (placed: number, count: number) => (placed === count ? "In the city" : placed ? `${placed} in the city` : count > 1 ? "In the palette" : "Ready");
     let tiles: string;
-    if (this.stacked || t.lasting || !t.count) {
-      const layers = t.count > 2 ? " layers-2" : t.count > 1 ? " layers-1" : "";
+    if (shop || t.lasting || !t.count || universal(t.id)) {
       const sub = shop ? (offerText(offer) || "Not sold") : t.lasting ? "Never used up" : t.placed ? `${t.placed} in the city` : "In the palette";
-      tiles = `<button class="tile ${type}${layers}${open ? " open" : ""}${shop && !canBuyTile(this.save, t.id) ? " dear" : ""}" data-key="${t.id}" data-tile="${t.id}" aria-expanded="${open}" title="${name}">
-          ${face()}<span class="tile-name">${name}</span>${t.count ? `<b class="tile-count">${t.lasting ? "∞" : `×${t.count}`}</b>` : ""}<small class="tile-sub">${sub}</small></button>`;
+      const marks = shop ? "" : this.marksHtml(t.id, tileMarks(this.save, t.id), false);
+      tiles = `<button class="tile ${type}${layers(t.count)}${open ? " open" : ""}${shop && !canBuyTile(this.save, t.id) ? " dear" : ""}" data-key="${t.id}" data-tile="${t.id}" aria-expanded="${open}" title="${name}">
+          ${face()}<span class="tile-name">${name}</span>${marks}${t.count ? `<b class="tile-count">${t.lasting ? "∞" : `×${t.count}`}</b>` : ""}<small class="tile-sub">${sub}</small></button>`;
+    } else if (this.stacked) {
+      tiles = tileGroups(this.save, t).map((g) => `<button class="tile ${type}${layers(g.count)}${g.placed ? " placed" : ""}${open ? " open" : ""}" data-key="${g.key}" data-tile="${t.id}" aria-expanded="${open}" title="${name}: ${marksText(t.id, g.marks)}">
+          ${face(g.wear)}<span class="tile-name">${name}</span>${this.marksHtml(t.id, g.marks, true)}<b class="tile-count">×${g.count}</b><small class="tile-sub">${where(g.placed, g.count)}</small></button>`).join("");
     } else {
-      tiles = tileCopies(t, isConsumable(t.id) ? SHOWN : Infinity).map((copy) => `<button class="tile single ${type}${copy.placed ? " placed" : ""}${open ? " open" : ""}" data-key="${copy.key}" data-tile="${t.id}" title="${name}${copy.placed ? ", in the city" : ""}">
-          ${face()}<span class="tile-name">${name}</span><small class="tile-sub">${copy.placed ? "In the city" : "Ready"}</small></button>`).join("")
-        + (isConsumable(t.id) && t.count > SHOWN ? `<button class="tile more ${type}" data-key="${t.id}#more" data-tile="${t.id}"><b class="tile-count">+${t.count - SHOWN}</b><small class="tile-sub">more</small></button>` : "");
+      tiles = tileCopies(this.save, t).map((copy) => {
+        const marks = tileMarks(this.save, t.id, copy.wear);
+        return `<button class="tile single ${type}${copy.placed ? " placed" : ""}${open ? " open" : ""}" data-key="${copy.key}" data-tile="${t.id}" title="${name}: ${marksText(t.id, marks)}${copy.placed ? ", in the city" : ""}">
+          ${face(copy.wear)}<span class="tile-name">${name}</span>${this.marksHtml(t.id, marks, true)}<small class="tile-sub">${copy.placed ? "In the city" : "Ready"}</small></button>`;
+      }).join("");
     }
     return tiles + (open ? this.detailHtml(t) : "");
+  }
+
+  /** A tile's Knowledge upgrades as a row of marks, in the order taken: a
+   * diamond for each building it became, a pip in its path's colour for
+   * each rank. `none` says so when it has none (a building that could). */
+  private marksHtml(id: TileId, marks: TileMark[], none: boolean) {
+    if (!marks.length) return none ? `<span class="tile-marks none" title="No Knowledge upgrades yet">No upgrades</span>` : "";
+    return `<span class="tile-marks" title="${marksText(id, marks)}">${marks.map((m) => m.type === "became"
+      ? `<i class="mark became"></i>`
+      : `<i class="mark rank hue-${m.hue}"></i>`).join("")}</span>`;
   }
 
   /** The opened stack: what the tile is, its copies, buying another, where
    * its upgrades are made, and its higher tier. */
   private detailHtml(t: TileStack) {
     const s = this.save, offer = shopOffer(s, t.id), name = TILE_NAMES[t.id], { topic } = tileTopic(t.id);
-    const copies = this.stacked && t.count && !t.lasting
-      ? `<div class="tile-copies" aria-label="Each ${name}">${tileCopies(t, isConsumable(t.id) ? SHOWN : Infinity).map((copy) =>
+    // Each set of upgrades its copies carry, in words, with its copies.
+    const copies = t.count && !t.lasting && !universal(t.id)
+      ? `<div class="tile-sets">${tileGroups(s, t).map((g) => `<div class="tile-set">
+          <span class="tile mini type-${t.type}${g.placed ? " placed" : ""}" data-key="detail:${g.key}"><span class="tile-face"><canvas width="32" height="32" data-icon="${iconOf(t.id)}"${g.wear ? pathLook(t.id, g.wear.path) : ""}></canvas>${pathBadge(g.wear)}</span><small>×${g.count}</small></span>
+          <div><b>${marksText(t.id, g.marks)}</b>${this.marksHtml(t.id, g.marks, false)}<small>${g.placed} in the city · ${g.count - g.placed} ready</small></div></div>`).join("")}</div>`
+      : t.count && !t.lasting
+      ? `<div class="tile-copies" aria-label="Each ${name}">${tileCopies(s, t, isConsumable(t.id) ? SHOWN : Infinity).map((copy) =>
         `<span class="tile mini type-${t.type}${copy.placed ? " placed" : ""}" data-key="${copy.key}" title="${copy.placed ? "Standing in the city" : "Waiting in the palette"}"><span class="tile-face"><canvas width="32" height="32" data-icon="${iconOf(t.id)}"></canvas></span><small>${copy.placed ? "City" : "Ready"}</small></span>`).join("")}${isConsumable(t.id) && t.count > SHOWN ? `<span class="tile-more">+${t.count - SHOWN} more</span>` : ""}</div>`
       : "";
     const buy = "reason" in offer
@@ -191,7 +221,7 @@ export class TilesPage {
           <div><small>${TILE_TYPE_NAMES[TILE_TYPE[t.id]].toUpperCase()} TILE · ${counts}</small><h3>${name}</h3><p>${this.describe(t.id)}</p></div>
           <button class="tile-close" data-close aria-label="Close">×</button></header>
         ${copies}
-        ${isConsumable(t.id) ? "" : upgradeTreeHtml(s, t.id)}
+        ${isConsumable(t.id) ? "" : t.id === "wallBlock" ? wallTreeHtml() : upgradeTreeHtml(s, t.id)}
         <div class="tile-actions">${buy}${go("smithy")}${go("study")}</div>
         ${tierText ? `<p class="tile-tier"><span aria-hidden="true">♛</span> ${tierText}</p>` : ""}
       </div>`;
@@ -204,6 +234,7 @@ export class TilesPage {
     if (id === "cityGate") return GATE_DESCRIPTION;
     if (id === "wallSpikes") return SPIKES_DESCRIPTION;
     if (id === "wallBallista") return BALLISTA_DESCRIPTION;
+    if (id === "wallBlock") return WALL_BLOCK_DESCRIPTION;
     const d = this.save.defend;
     return `${STRUCTURES[id].description} Takes ${shareName(footprint(id, d.layout.compact.includes(id)).size)}.`;
   }

@@ -6,7 +6,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { defaults, decode } from "../src/save.ts";
-import { allocated, buildingTree, hasTree, targetKind, respecBuilding, RESPEC_PRICE, nextSteps, placedBattlePaths, specialtyLabel, specialtyOf, spikeKey, stepName, upgradeBuilding, upgradedFrom, rootOf, type UpgradeStep } from "../src/specializations.ts";
+import { allocated, buildingTree, hasTree, targetKind, respecBuilding, undoTo, undoRefund, undoUpgrade, nextSteps, placedBattlePaths, specialtyLabel, specialtyOf, spikeKey, stepName, upgradeBuilding, upgradedFrom, rootOf, type UpgradeStep } from "../src/specializations.ts";
 import { learnPath, pathById, type PathId } from "../src/knowledge-paths.ts";
 import { bonuses } from "../src/progression.ts";
 import { placeStructure, removeStructure, moveStructure, moveSpikes, placeCityTile, placeSpikes, removeSpikes, defaultLayout, fitLayout } from "../src/defend/layout.ts";
@@ -61,9 +61,10 @@ function enemy(sim: DefendSim, x: number, y: number) {
 test("the shop's three basic buildings branch into every other tower and troop building", () => {
   const to = (k: Parameters<typeof nextSteps>[0]) => nextSteps(k).map(stepName);
   assert.deepEqual(to("watchTower"), ["Archer tower", "Cannon tower", "Wizard tower", "Spotters I", "Signal fires I"]);
-  assert.deepEqual(to("meleeGuild"), ["Barracks"]);
+  assert.deepEqual(to("meleeGuild"), ["Barracks", "Assassins' den"]);
   assert.deepEqual(to("rangedGuild"), ["Archer barracks", "Mage Guild", "Sniper lodge", "Musket hall"]);
-  assert.deepEqual(to("barracks"), ["Crusaders I", "Assassins I"]);
+  assert.deepEqual(to("barracks"), ["Crusaders I"]);
+  assert.deepEqual(to("assassinDen"), ["Bloodletters I", "Shadowcloak I", "Venomblades I", "Headhunters I"]);
   assert.deepEqual(to("wizardTower"), ["Pyromancy I", "Rime I", "Stormcalling I"]);
   assert.deepEqual(to("sniperLodge"), [], "a leaf for now");
   assert.deepEqual(nextSteps("wizardTower", { path: "storm", rank: 2 }).map(stepName), ["Stormcalling III"]);
@@ -101,7 +102,7 @@ test("each building is upgraded on its own, paying Knowledge rank by rank", () =
   s.knowledge = 0;
   assert.match(treeCardHtml(s, "wizardTower", undefined, "p:storm:1"), /data-ug-buy="p:storm:1" disabled/, "unaffordable upgrades show, locked");
   assert.match(treeCardHtml(s, "wizardTower", undefined, "p:storm:2"), /Locked/);
-  assert.match(treeCardHtml(s, "wizardTower", undefined, "k:wizardTower"), /This building/);
+  assert.match(treeCardHtml(s, "wizardTower", undefined, "k:wizardTower"), /Where it is now/);
 });
 
 test("becoming another building swaps one copy: in place when it fits, else it waits in the palette", () => {
@@ -200,7 +201,7 @@ test("allocated Knowledge counts every step from the basic building", () => {
   assert.equal(allocated("wallSpikes", { path: "blastStakes", rank: 1 }), pathById("blastStakes").ranks[0].cost);
 });
 
-test("a respec costs 5 Copper, gives back every point and returns the basic building", () => {
+test("a respec is free, gives back every point and returns the basic building", () => {
   const s = fixture("rangedGuild", 2); s.settings.devMode = false; s.knowledge = 100; s.smithy = { copper: 5, silver: 0, gold: 0 };
   const [a, b] = uids(s, "rangedGuild");
   assert.match((respecBuilding(s, { uid: a }) as { reason: string }).reason, /no upgrades/);
@@ -211,14 +212,48 @@ test("a respec costs 5 Copper, gives back every point and returns the basic buil
   const r = respecBuilding(s, { uid: a });
   assert.ok(r.ok && r.kind === "rangedGuild");
   assert.equal(s.knowledge, 100 - 8, "the mage's 13 come back");
-  assert.deepEqual(RESPEC_PRICE, { copper: 5 });
-  assert.equal(s.smithy.copper, 0);
+  assert.equal(s.smithy.copper, 5, "free");
   assert.deepEqual([s.defend.owned.rangedGuild, s.defend.owned.mageGuild, s.defend.owned.sniperLodge], [1, 0, 1]);
   assert.equal(specialtyOf(s.defend.layout, { uid: a }), undefined);
   assert.equal(s.defend.layout.structures.find((st) => st.uid === b)!.kind, "sniperLodge", "the other building is untouched");
-  assert.match((respecBuilding(s, { uid: b }) as { reason: string }).reason, /5 Copper/, "no copper left");
-  s.settings.devMode = true;
-  assert.ok(respecBuilding(s, { uid: b }).ok, "free with Unlimited money");
+  assert.ok(respecBuilding(s, { uid: b }).ok);
+});
+
+test("undoing a node steps the building back to the one it grew from, its Knowledge back", () => {
+  const s = fixture("watchTower", 1); s.settings.devMode = false; s.knowledge = 1e7;
+  const [a] = uids(s, "watchTower");
+  assert.ok(upgradeBuilding(s, { uid: a }, become("wizardTower")).ok);
+  wear(s, a, "storm", 3);
+  const storm = pathById("storm");
+  // Undo Stormcalling II and III, then the wizard tower itself, standing where it is.
+  const all = 1e7 - s.knowledge;
+  assert.equal(undoRefund("wizardTower", { path: "storm", rank: 3 }, "p:storm:2"), storm.ranks[1].cost + storm.ranks[2].cost);
+  assert.ok(undoUpgrade(s, { uid: a }, "p:storm:2").ok);
+  assert.deepEqual(specialtyOf(s.defend, { uid: a }), { path: "storm", rank: 1 });
+  assert.ok(undoUpgrade(s, { uid: a }, "k:wizardTower").ok);
+  assert.equal(s.defend.layout.structures.find((st) => st.uid === a)?.kind, "watchTower");
+  assert.equal(s.knowledge, 1e7, `every point back (${all} spent)`);
+  assert.equal((undoUpgrade(s, { uid: a }, "k:watchTower") as { reason: string }).reason, "Nothing to undo there.", "the basic building can't be undone");
+  // An evolved copy in the palette: undoing the crown keeps Stormcalling III.
+  s.defend.owned.darkKeep = 1;
+  assert.deepEqual(undoTo("darkKeep", undefined, "k:darkKeep"), { kind: "wizardTower", wear: { path: "storm", rank: 3 } });
+  const r = undoUpgrade(s, { copy: "darkKeep" }, "k:darkKeep");
+  assert.ok(r.ok && r.copy && "copy" in r.copy);
+  assert.deepEqual(r.ok && r.copy, { copy: "wizardTower", wear: { path: "storm", rank: 3 } });
+  assert.equal(s.knowledge, 1e7 + storm.evolves!.cost);
+  assert.deepEqual(keptGroups(s.defend, "wizardTower"), [{ path: "storm", rank: 3, count: 1 }]);
+  assert.equal(s.defend.owned.darkKeep, 0);
+});
+
+test("the tree puts other buildings beside and below, paths above, and counts hidden and closed branches", () => {
+  const plain = buildingTree("watchTower");
+  for (const n of plain.filter((o) => o.step?.type === "become")) assert.ok(n.side && n.hidden! > 0, n.id);
+  assert.ok(plain.filter((o) => o.path).every((o) => !o.side), "paths carry on up");
+  assert.equal(plain.find((o) => o.id === "k:watchTower")!.closed, undefined, "nothing closed off yet");
+  const wizard = buildingTree("wizardTower", { path: "storm", rank: 1 });
+  assert.equal(wizard.find((o) => o.id === "k:watchTower")!.closed, 3 + 2 - 1, "it passed over the archer and cannon towers and its two paths");
+  assert.equal(wizard.find((o) => o.id === "k:wizardTower")!.closed, 2, "Pyromancy and Rime");
+  assert.ok(wizard.find((o) => o.id === "k:darkKeep"), "the crown waits at the top");
 });
 
 // ── Older saves ────────────────────────────────────────────────────────
@@ -250,7 +285,7 @@ test("a copy still in the palette is upgraded and respecced on its own", () => {
   const back = respecBuilding(s, at);
   assert.ok(back.ok);
   assert.equal(s.knowledge, 1e5);
-  assert.equal(s.smithy.copper, 20 - RESPEC_PRICE.copper);
+  assert.equal(s.smithy.copper, 20, "free");
   assert.equal(s.defend.kept.length, 0);
   assert.equal(s.defend.owned.watchTower, 2); assert.equal(s.defend.owned.wizardTower, 0);
   assert.equal(respecBuilding(s, { copy: "watchTower" }).ok, false, "nothing to respec");
@@ -363,12 +398,12 @@ test("three Wizard towers cast Fire, Ice and Storm together, beside a plain one,
   assert.equal(sim.bonuses.paths, undefined, "no global specialization leaks between copies");
 });
 
-test("Crusader and Assassin barracks recruit with their own health and damage", () => {
-  const s = fixture("barracks", 2), [a, b] = uids(s, "barracks");
-  wear(s, a, "crusaders"); wear(s, b, "assassins");
+test("a Crusader barracks recruits with its own health and damage, a plain one beside it with its own", () => {
+  const s = fixture("barracks", 2), [a] = uids(s, "barracks");
+  wear(s, a, "crusaders");
   const sim = simulation(s); new Barracks().step(sim, 0.01);
   const troops = sim.soldiers.filter(s => s.kind === "sword");
-  assert.equal(troops.length, 2); assert.equal(troops[0].maxHp, 88); assert.equal(troops[1].maxHp, 32);
+  assert.equal(troops.length, 2); assert.equal(troops[0].maxHp, 88); assert.equal(troops[1].maxHp, 40);
   assert.equal(troops[0].damage, 9); assert.equal(troops[1].damage, 6);
 });
 

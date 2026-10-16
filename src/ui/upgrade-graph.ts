@@ -1,11 +1,16 @@
 /** A living upgrade tree: nodes on branches that hold their shape loosely.
- * Each node sits on a spring to its place in a tidy tree (the root at the
- * bottom, branches growing up), joined to its parent by another, and nodes
+ * Each node sits on a spring to its place (the root at the bottom; the
+ * branch a building is on carries on upward, while choices that turn it
+ * down another branch sit beside it and below), joined to its parent by
+ * another, and nodes
  * push apart when crowded, so a dragged node pulls its branch along and
  * everything eases back when let go. Nodes that leave the tree (a branch
  * cut off by a choice) shrivel and drop away; new ones sprout from their
- * parent. Drag a node to pull it, drag the background to pan, the wheel to
- * zoom; a tap picks a node and shows its card.
+ * parent. Branches not shown yet trail off from a node as lines that
+ * break into dots and fade away (what buying it would open), and the ones
+ * a choice closed off trail off behind it in withered brown. Drag a node
+ * to pull it, drag the background to pan, the wheel to zoom; a tap picks a
+ * node and shows its card.
  *
  * Presentation only, with no game imports: the page hands it `GraphNode`s
  * (`set`) and hears back which node was picked (`onPick`). */
@@ -25,18 +30,32 @@ export type GraphNode = {
   tag?: string;
   /** A path's colours (`hue-*` class), if any. */
   hue?: string;
+  /** A choice down another branch: placed beside its parent and below,
+   * rather than above it. */
+  side?: boolean;
+  /** Branches beyond it not shown yet: drawn as lines fading off upward. */
+  hidden?: number;
+  /** Branches a later choice closed off: drawn as withered lines fading off
+   * beside and below it. */
+  closed?: number;
 };
 
 type Body = {
   n: GraphNode;
   el: HTMLElement;
   edge?: SVGPathElement;
+  /** The fading lines of its hidden and closed-off branches. */
+  stubs?: SVGGElement;
   x: number; y: number; vx: number; vy: number;
   hx: number; hy: number;
   /** Seconds since it began to wither, or -1 while alive. */
   dying: number;
   spin: number;
 };
+
+const SVG = "http://www.w3.org/2000/svg";
+/** Where a fading line's segments break, solid to dotted, along its length. */
+const STUB_SEGMENTS = [0, 0.38, 0.62, 0.82, 1];
 
 /** Pixels between neighbouring leaves, and between generations. */
 const GAP_X = 66, GAP_Y = 74;
@@ -100,6 +119,8 @@ export class UpgradeGraph {
         b.spin = (rand() - 0.5) * 120;
         b.el.classList.add("withering");
         b.edge?.classList.add("withering");
+        b.stubs?.remove();
+        b.stubs = undefined;
       }
     }
     for (const n of nodes) {
@@ -132,11 +153,35 @@ export class UpgradeGraph {
       }
       b.el.className = `ug-node ${n.state}${n.hue ? ` ${n.hue}` : ""}${b.el.classList.contains("sprouting") ? " sprouting" : ""}`;
       b.el.setAttribute("aria-pressed", String(n.id === picked));
+      this.trail(b);
       if (b.edge) b.edge.setAttribute("class", `ug-edge ${n.state}${n.hue ? ` ${n.hue}` : ""}${b.edge.classList.contains("sprouting") ? " sprouting" : ""}`);
     }
     this.pick(picked);
     this.refit(!this.steered);
     if (still) this.snap();
+  }
+
+  /** The fading lines of `b`'s hidden and closed-off branches, one group
+   * of `STUB_SEGMENTS` segments a line, made again only when they change. */
+  private trail(b: Body) {
+    const want = `${b.n.hidden ?? 0}:${b.n.closed ?? 0}:${b.n.state}`;
+    if (b.stubs?.dataset.want === want) return;
+    b.stubs?.remove();
+    b.stubs = undefined;
+    if (!b.n.hidden && !b.n.closed) return;
+    const g = document.createElementNS(SVG, "g") as SVGGElement;
+    g.dataset.want = want;
+    g.setAttribute("class", `ug-stubs ${b.n.state}`);
+    for (const [kind, n] of [["hidden", b.n.hidden ?? 0], ["closed", b.n.closed ?? 0]] as const)
+      for (let i = 0; i < n; i++)
+        for (let k = 0; k < STUB_SEGMENTS.length - 1; k++) {
+          const seg = document.createElementNS(SVG, "path");
+          seg.setAttribute("class", `ug-stub ${kind} s${k}`);
+          seg.dataset.line = `${kind}:${i}:${n}`;
+          g.append(seg);
+        }
+    this.svg.prepend(g);
+    b.stubs = g;
   }
 
   /** Marks `id` as the picked node. */
@@ -150,8 +195,10 @@ export class UpgradeGraph {
     let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
     for (const b of this.bodies.values()) {
       if (b.dying >= 0) continue;
-      x0 = Math.min(x0, b.hx); x1 = Math.max(x1, b.hx);
-      y0 = Math.min(y0, b.hy); y1 = Math.max(y1, b.hy);
+      // Room for the lines trailing off it too.
+      const r = b.n.hidden || b.n.closed ? 30 : 0;
+      x0 = Math.min(x0, b.hx - r); x1 = Math.max(x1, b.hx + r);
+      y0 = Math.min(y0, b.hy - r); y1 = Math.max(y1, b.hy + r);
     }
     if (x0 > x1) return;
     const w = this.el.clientWidth || 300, h = this.el.clientHeight || 300, pad = 46;
@@ -168,6 +215,7 @@ export class UpgradeGraph {
     if (!b) return;
     b.el.remove();
     b.edge?.remove();
+    b.stubs?.remove();
     this.bodies.delete(id);
   }
 
@@ -215,7 +263,9 @@ export class UpgradeGraph {
         ay += (p.y + ry - b.y) * 16;
       }
       for (const o of live) {
-        if (o === b) continue;
+        // A parent and its child keep apart by their branch, so a sprouting
+        // child doesn't shove its parent out of place.
+        if (o === b || o.n.id === b.n.parent || o.n.parent === b.n.id) continue;
         const dx = b.x - o.x, dy = b.y - o.y, d2 = dx * dx + dy * dy;
         if (d2 > 2500 || d2 < 0.01) continue;
         const d = Math.sqrt(d2), f = (50 - d) * 30;
@@ -258,6 +308,45 @@ export class UpgradeGraph {
         const mx = (p.x + b.x) / 2 + (b.y - p.y) * 0.08, my = (p.y + b.y) / 2 + 6 + w * 30;
         b.edge.setAttribute("d", `M${p.x.toFixed(1)},${p.y.toFixed(1)} Q${mx.toFixed(1)},${my.toFixed(1)} ${b.x.toFixed(1)},${b.y.toFixed(1)}`);
       } else if (b.edge) b.edge.setAttribute("d", "");
+      if (b.stubs) this.drawStubs(b, p);
+    }
+  }
+
+  /** Lays `b`'s fading lines out from it: hidden branches fan away from its
+   * parent, leaning up, closed-off ones out to either side and
+   * down, where the choices that were passed over stood. */
+  private drawStubs(b: Body, p: Body | undefined) {
+    let ux = 0, uy = -1;
+    if (p) {
+      const dx = b.x - p.x, dy = b.y - p.y, d = Math.hypot(dx, dy) || 1;
+      ux = dx / d;
+      uy = dy / d - 0.5;
+      const u = Math.hypot(ux, uy) || 1;
+      ux /= u;
+      uy /= u;
+    }
+    for (const seg of Array.from(b.stubs!.children) as SVGPathElement[]) {
+      const [kind, si, sn] = seg.dataset.line!.split(":"), i = Number(si), n = Number(sn);
+      let dx: number, dy: number, len: number, bend: number;
+      if (kind === "hidden") {
+        const a = (i - (n - 1) / 2) * 0.46;
+        dx = ux * Math.cos(a) - uy * Math.sin(a);
+        dy = ux * Math.sin(a) + uy * Math.cos(a);
+        len = 56;
+        bend = (i - (n - 1) / 2) * 5;
+      } else {
+        const lr = i % 2 ? 1 : -1, a = 0.3 + Math.floor(i / 2) * 0.5;
+        dx = lr * Math.cos(a);
+        dy = Math.sin(a);
+        len = 50;
+        bend = lr * 6;
+      }
+      const k = Number(seg.getAttribute("class")!.match(/s(\d)/)![1]);
+      const at = (t: number) => {
+        const r = 22 + len * t, q = bend * t * t;
+        return `${(b.x + dx * r - dy * q).toFixed(1)},${(b.y + dy * r + dx * q).toFixed(1)}`;
+      };
+      seg.setAttribute("d", `M${at(STUB_SEGMENTS[k])} L${at((STUB_SEGMENTS[k] + STUB_SEGMENTS[k + 1]) / 2)} L${at(STUB_SEGMENTS[k + 1])}`);
     }
   }
 
@@ -339,26 +428,43 @@ export class UpgradeGraph {
   }
 }
 
-/** Each node's place in a tidy tree: leaves side by side, each parent over
- * the middle of its children, the root at the bottom. */
-export function layout(nodes: readonly { id: string; parent?: string }[]): Map<string, [number, number]> {
-  const kids = new Map<string, string[]>(), at = new Map<string, [number, number]>();
+/** Each node's place: branches carrying on from a node grow up from it in
+ * a tidy tree (leaves side by side, each parent over the middle of its
+ * children, the root at the bottom); `side` nodes, choices down another
+ * branch, sit to its left and right a little below it, row under row (the
+ * root's odd one out straight below it). */
+export function layout(nodes: readonly { id: string; parent?: string; side?: boolean }[]): Map<string, [number, number]> {
+  const up = new Map<string, string[]>(), side = new Map<string, string[]>(), at = new Map<string, [number, number]>();
   const ids = new Set(nodes.map((n) => n.id));
   const roots: string[] = [];
   for (const n of nodes) {
-    if (n.parent && ids.has(n.parent)) kids.set(n.parent, [...(kids.get(n.parent) ?? []), n.id]);
-    else roots.push(n.id);
+    if (!n.parent || !ids.has(n.parent)) roots.push(n.id);
+    else {
+      const to = n.side ? side : up;
+      to.set(n.parent, [...(to.get(n.parent) ?? []), n.id]);
+    }
   }
-  let leaf = 0;
-  const place = (id: string, depth: number): number => {
-    const ks = kids.get(id) ?? [];
-    const x = ks.length ? ks.map((k) => place(k, depth + 1)).reduce((a, b) => a + b, 0) / ks.length : leaf++ * GAP_X;
-    at.set(id, [x, -depth * GAP_Y]);
-    return x;
+  /** Leaves across a node's upward tree. */
+  const width = (id: string): number => (up.get(id) ?? []).reduce((w, k) => w + width(k), 0) || 1;
+  const place = (id: string, x: number, y: number, root: boolean) => {
+    at.set(id, [x, y]);
+    let left = x - ((width(id) - 1) / 2) * GAP_X;
+    for (const k of up.get(id) ?? []) {
+      const w = width(k);
+      place(k, left + ((w - 1) / 2) * GAP_X, y - GAP_Y, false);
+      left += w * GAP_X;
+    }
+    const sides = side.get(id) ?? [];
+    sides.forEach((k, i) => {
+      if (root && sides.length % 2 && i === sides.length - 1) return place(k, x, y + GAP_Y, false);
+      const lr = i % 2 ? 1 : -1, row = Math.floor(i / 2);
+      place(k, x + lr * GAP_X * 1.2, y + GAP_Y * (0.35 + row * 0.95), false);
+    });
   };
-  for (const r of roots) place(r, 0);
-  // Centred on the first root.
-  const [ox] = at.get(roots[0]) ?? [0, 0];
-  for (const [id, [x, y]] of at) at.set(id, [x - ox, y]);
+  let x = 0;
+  for (const r of roots) {
+    place(r, x, 0, true);
+    x += (width(r) + 2) * GAP_X;
+  }
   return at;
 }

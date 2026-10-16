@@ -54,6 +54,7 @@ import { blocked, cellAt, cellCenter, center, fillFlowField, nearestOpen, type F
 import { ignite, stepArrows, stepShells, Towers } from "./towers.ts";
 import { FORTIFY, SHATTER, SIGNAL, SPOTTERS, pathRank } from "../knowledge-paths.ts";
 import { Barracks, stepArcher, stepSwordsman } from "./troops.ts";
+import { cloaked, spreadVenom, stepVenom } from "./assassins.ts";
 import { stepBlazes, stepFireballs, stepMage, type Blaze, type Fireball } from "./mages.ts";
 import { stepStabs, stepValkyrie, type Stab } from "./valkyries.ts";
 import { Wizards, stepFlames, stepFrosts, type Flame, type Frost } from "./wizard.ts";
@@ -65,7 +66,8 @@ import { calledFell, castReinforcements, REINFORCE, shieldWall, stepReinforcemen
 import { ageGraves, bury, castNecromancy, NECRO, stepUndead, type Grave, type Raising, type Risen } from "./necromancy.ts";
 import { sheltered, fizzles, stepFloods, type Flood, type Sinking } from "./boats.ts";
 import { baitFell, baitStanding } from "./bait.ts";
-import { stepBallistaBolts, stepSpikes, type BallistaBolt, type SpikeThrust } from "./wall-defenses.ts";
+import { stepBallistaBolts, stepPlacedWalls, stepSpikes, type BallistaBolt, type SpikeThrust } from "./wall-defenses.ts";
+import { STONEWORK, TOWN_WALLS, wallRank } from "../wall-upgrades.ts";
 
 export type Levels = Record<UpgradeId, number>;
 
@@ -117,6 +119,10 @@ export type Enemy = {
   leader?: number;
   shieldHp?: number;
   poisonT?: number;
+  /** An assassin's venom: seconds left, the share more damage it takes,
+   * its bite a second and whether it spreads on death; absent when not
+   * poisoned, so runs without Venomblades keep their state as before. */
+  venom?: { t: number; more: number; dps: number; spread?: true };
   breath?: { dx: number; dy: number; t: number };
   /** What a siege engine is shooting at; absent while it rolls on. */
   aim?: SiegeAim;
@@ -127,7 +133,7 @@ export type Soldier = {
   /** Swordsmen chase and hack; archers roam and shoot; fire mages roam
    * and hurl fireballs; valkyries hunt and charge-stab; the dark wizard
    * hunts and casts chain lightning. */
-  kind: "sword" | "archer" | "mage" | "valkyrie" | "darkWizard" | "undead" | "reinforcement" | "brawler" | "slinger" | "sniper" | "musketeer";
+  kind: "sword" | "archer" | "mage" | "valkyrie" | "darkWizard" | "undead" | "reinforcement" | "brawler" | "slinger" | "sniper" | "musketeer" | "assassin";
   home: number;
   x: number;
   y: number;
@@ -145,6 +151,9 @@ export type Soldier = {
   bannerLife?: number;
   /** Strikes an assassin has made, every few critical; absent for everyone else. */
   strikes?: number;
+  /** A Shadowcloak assassin's seconds until it is cloaked again (0: cloaked,
+   * and no enemy picks it out); absent for everyone else. */
+  cloak?: number;
   /** A warrior the Necromancy spell raised (`home` -1); absent for everyone else. */
   risen?: Risen;
   /** A soldier the Reinforcements spell dropped (`home` -1); absent for everyone else. */
@@ -217,6 +226,7 @@ const STEP_SOLDIER: Record<Soldier["kind"], (sim: DefendSim, s: Soldier, dt: num
   slinger: stepArcher,
   sniper: stepArcher,
   musketeer: stepArcher,
+  assassin: stepSwordsman,
 };
 /** How long a struck building flashes, in seconds. */
 export const BUILDING_FLASH = 0.14;
@@ -290,6 +300,12 @@ export class DefendSim {
    * drawn. Both empty without those Study paths. */
   readonly spikeArm = new Map<number, number>();
   spikeThrusts: SpikeThrust[] = [];
+  /** The stones of the walls the player placed on their own (empty without
+   * any), seconds until their thorns next cut (Thornwork), and whether the
+   * city's own people pass through them (Town walls' posterns). */
+  readonly pieces: Building[];
+  wallThornT = 0;
+  readonly posterns: boolean;
   scorches: Scorch[] = [];
   effects: Effect[] = [];
   /** The war banner the player planted, rallying the troops; null when none
@@ -403,7 +419,9 @@ export class DefendSim {
     }
     // Ponds block movement like buildings do, but belong to no building.
     for (let i = 0; i < CELL_COUNT; i++) if (map.type[i] === CellType.WATER) this.solid[i] = 1;
-    const gates = map.buildings.filter((b) => b.kind === "gate");
+    this.pieces = map.buildings.filter((b) => b.piece);
+    this.posterns = !!this.pieces.length && wallRank(bonuses.walls, "townWalls") >= TOWN_WALLS.posterns;
+    const gates = map.buildings.filter((b) => b.kind === "gate" || (this.posterns && b.piece));
     this.ownSolid = gates.length ? this.solid.slice() : this.solid;
     for (const b of gates) for (const c of b.cells) this.ownSolid[c] = 0;
     this.keepId = map.buildings.find((b) => b.kind === "keep")!.id;
@@ -506,6 +524,7 @@ export class DefendSim {
     stepArrows(this, dt);
     stepBallistaBolts(this, dt);
     stepSpikes(this, dt);
+    stepPlacedWalls(this, dt);
     stepShells(this, dt);
     stepSiegeShots(this, dt);
     this.wizards.step(this, dt);
@@ -581,6 +600,7 @@ export class DefendSim {
         delete e.burnDps;
       }
     }
+    stepVenom(this, dt);
     for (const s of this.soldiers)
       if (s.guard !== undefined && (s.guard -= dt) <= 0) delete s.guard;
     stepStabs(this, dt);
@@ -808,7 +828,7 @@ export class DefendSim {
     for (let team = 0; team < 2; team++) {
       const units = team === 0 ? this.soldiers : this.civilians;
       for (const u of units) {
-        if (u.hp <= 0) continue;
+        if (u.hp <= 0 || cloaked(u)) continue;
         const d = sq(u.x - x) + sq(u.y - y);
         if (d <= bd) { best = u; bd = d; }
       }
@@ -845,12 +865,16 @@ export class DefendSim {
     if (e.kind === "iceGolem" && element !== "physical") amount *= 2;
     amount *= ENEMIES[e.kind].damageScale?.[element] ?? 1;
     if (e.brittle && e.freeze) amount *= SHATTER.brittle[1];
+    if (e.venom) amount *= e.venom.more;
     if (amount <= 0) return false;
     const hit = e.marked ? amount * (e.markDamage ?? SPOTTERS.mark[pathRank(this.bonuses.paths, "watchTower", "spotters")]) : amount;
     this.stats.current.dealt += Math.min(e.hp, hit);
     e.hp -= hit;
     if (flash) e.flash = 0.12;
-    if (e.hp <= 0) this.effects.push({ kind: "spark", x: e.x, y: e.y, t: 0, r: enemySize(e) });
+    if (e.hp <= 0) {
+      this.effects.push({ kind: "spark", x: e.x, y: e.y, t: 0, r: enemySize(e) });
+      if (e.venom) spreadVenom(this, e);
+    }
     return true;
   }
 
@@ -904,7 +928,7 @@ export class DefendSim {
     if (id < 0 || this.solid[cell] || icyCell(this, cell)) return;
     const b = this.map.buildings[id];
     this.solid[cell] = 1;
-    if (b.kind !== "gate") this.ownSolid[cell] = 1;
+    if (b.kind !== "gate" && !(b.piece && this.posterns)) this.ownSolid[cell] = 1;
     this.changed.push(cell);
     this.built[id]++;
     this.hp[id] = Math.min(this.maxHp[id], this.hp[id] + this.maxHp[id] / b.cells.length);
@@ -1076,6 +1100,7 @@ export function watchReach(sim: Pick<DefendSim, "levels" | "bonuses">, b?: Build
 }
 
 function maxHpOf(b: Building, levels: Levels, bonuses: Readonly<Bonuses>) {
+  if (b.kind === "wall" && b.piece) return wallHp(levels.wallStrength) * bonuses.wallHp * STONEWORK.hp[wallRank(bonuses.walls, "stonework")];
   if (b.kind === "wall") return wallHp(levels.wallStrength) * bonuses.wallHp;
   if (b.kind === "gate") return wallHp(levels.wallStrength) * bonuses.wallHp * GATE.hpPerCell * b.cells.length;
   if (b.kind === "wallBallista") return wallHp(levels.wallStrength) * bonuses.wallHp * BALLISTA.hpPerCell * b.cells.length;

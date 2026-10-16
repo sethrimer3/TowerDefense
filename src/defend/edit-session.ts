@@ -11,10 +11,10 @@ import { METEOR } from "./meteor.ts";
 import { FROST_NOVA } from "./frost-nova.ts";
 import { REINFORCE } from "./reinforcements.ts";
 import type { CityMap } from "./citygen.ts";
-import { carriesCorner, carriesGate, dragSpan, dropGhost, legalLayouts, liftsCityTile, nearestCorner, nearestEdge, refusal, wallSpotRect, type Drag } from "./drag-rules.ts";
+import { carriesCorner, carriesGate, carriesWall, dragSpan, dropGhost, legalLayouts, liftsCityTile, nearestCorner, nearestEdge, refusal, wallSpotRect, type Drag } from "./drag-rules.ts";
 import type { Overlay } from "./edit-overlay.ts";
 import { CELLS_W, SUB, tileKey } from "./grid.ts";
-import { removeBallista, removeCityTile, removeGate, removeSpikes, removeStructure, type Layout } from "./layout.ts";
+import { QUARTERS_H, QUARTERS_W, quarterAt, removeBallista, removeCityTile, removeGate, removeSpikes, removeStructure, removeWall, wallAtCell, wallKey, type Layout } from "./layout.ts";
 
 /** Where a drag's pointer is: its board position in cells, and whether it is
  * over the board or the palette. */
@@ -65,6 +65,8 @@ export class EditSession {
     const cell = cy * CELLS_W + cx;
     const row = b?.kind === "wall" ? map.spikes?.find((r) => r.cells.includes(cell)) : undefined;
     if (row) return new EditSession({ from: "spikes", spikes: { tx: row.tx, ty: row.ty, side: row.side } }, layout);
+    const wall = b?.piece ? wallAtCell(layout, cx, cy) : undefined;
+    if (wall) return new EditSession({ from: "wallBlock", wall }, layout);
     const s = b?.structureUid ? layout.structures.find((p) => p.uid === b.structureUid) : undefined;
     if (s) return new EditSession({ from: "structure", uid: s.uid, kind: s.kind }, layout);
     const tile = { tx: Math.floor(cx / SUB), ty: Math.floor(cy / SUB) };
@@ -86,6 +88,11 @@ export class EditSession {
     const at = this.at;
     if (!at?.overBoard) return null;
     if (carriesGate(this.drag)) return this.edge(at);
+    if (carriesWall(this.drag)) {
+      // Wall sections go on the board's grid of quarter tiles.
+      const q = quarterAt(at.cellX, at.cellY);
+      return wallKey({ qx: Math.min(QUARTERS_W - 1, Math.max(0, q.qx)), qy: Math.min(QUARTERS_H - 1, Math.max(0, q.qy)) });
+    }
     const half = (this.span - 1) / 2;
     return tileKey(Math.floor(at.cellX / SUB - half), Math.floor(at.cellY / SUB - half));
   }
@@ -129,6 +136,8 @@ export class EditSession {
       return at.overBoard ? { legal: new Set(), hover: null, ghost: null, spell: { x: at.cellX, y: at.cellY, r: REINFORCE.leash, look: "reinforce" } } : null;
     const hover = this.tile;
     const next = hover ? this.legal.get(hover) : undefined;
+    if (carriesWall(this.drag))
+      return { legal: new Set(), hover: null, ghost: next ? dropGhost(this.drag, next, hover!) : null, walls: { legal: new Set(this.legal.keys()), hover, fits: !!next } };
     if (carriesGate(this.drag))
       return {
         legal: new Set(),
@@ -180,6 +189,7 @@ export class EditSession {
       if (d.from === "gate") return { kind: "build", layout: removeGate(layout, d.gate), message: null };
       if (d.from === "spikes") return { kind: "build", layout: removeSpikes(layout, d.spikes), message: null };
       if (d.from === "ballista") return { kind: "build", layout: removeBallista(layout, d.corner), message: null };
+      if (d.from === "wallBlock") return { kind: "build", layout: removeWall(layout, d.wall), message: null };
       return { kind: "build", layout, message: d.from === "keep" ? "The keep can be moved, but never removed." : null };
     }
     return { kind: "build", layout, message: refusal(d, layout, hover!) };

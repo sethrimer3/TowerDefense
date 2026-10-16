@@ -37,7 +37,7 @@ export const SETTINGS = {
    * turned on; turning it off takes nothing back). */
   devTowers: { kind: "toggle", default: false, page: { id: "dev-towers", label: "All towers unlocked" } },
   /** Dev: Smithy and Knowledge research completes when started, without workers. */
-  instantResearch: { kind: "toggle", default: false, page: { id: "dev-instant", label: "Instantaneous research" } },
+  instantResearch: { kind: "toggle", default: false, page: { id: "dev-instant", label: "Instantaneous research (Study only)" } },
   /** Dev: every rank of the Smithy's rows (or of one skill tree) counts as bought, while on
    * (the ranks actually bought are kept, and count again once off). */
   devSmithy: { kind: "toggle", default: false, page: { id: "dev-smithy", label: "Smithy" } },

@@ -9,7 +9,7 @@ import { NO_BONUSES, type Bonuses } from "./defend/catalog.ts";
 import { SKILLS, SKILL_IDS, TREES, skillAvailable, skillCost, type SkillId, type TreeId } from "./skill-trees.ts";
 import { placedBattlePaths } from "./specializations.ts";
 import { spellPath } from "./knowledge-paths.ts";
-import { trainingJob, trainingSeconds, type TrainingJob } from "./training-jobs.ts";
+import { rankPrice, trainingJob, trainingSeconds, type TrainingJob } from "./training-jobs.ts";
 import type { Metal, Metals } from "./mine/sim.ts";
 import type { Save } from "./save.ts";
 import type { SettingKey } from "./settings.ts";
@@ -17,7 +17,7 @@ import { ECONOMY, quadraticCost } from "./economy.ts";
 
 /** What the Smithy and the skill trees can raise: the battle's `Bonuses`,
  * and how fast the Smithy's upgrades are worked. */
-export type BonusTarget = Exclude<keyof Bonuses, "paths" | "banner" | "structurePaths" | "spikePaths" | "keep" | "necromancy" | "meteor" | "frostNova" | "reinforcements"> | "smithing";
+export type BonusTarget = Exclude<keyof Bonuses, "paths" | "banner" | "structurePaths" | "spikePaths" | "keep" | "walls" | "necromancy" | "meteor" | "frostNova" | "reinforcements"> | "smithing";
 /** Bonuses that shorten a time: their percent divides instead of multiplies. */
 const TIMES = new Set<BonusTarget>(["drill", "towerReload", "rebuild", "smithing"]);
 
@@ -66,9 +66,7 @@ export const skillRank = (save: Save, id: SkillId) => (save.settings[DEV_RESEARC
 /** Every skill's ranks as `skillRank` counts them. */
 const skillRanks = (save: Save) => Object.fromEntries(SKILL_IDS.map((id) => [id, skillRank(save, id)])) as Record<SkillId, number>;
 
-/** The metal tier a row's next rank costs, with `ranks` owned: copper for
- * the first ten, silver to twenty-five, gold after. */
-export const rankPrice = (ranks: number): Metal => (ranks < 10 ? "copper" : ranks < 25 ? "silver" : "gold");
+export { rankPrice };
 /** The next rank's metal amount; the metal tier still changes at 10/25. */
 export const rankCost = (ranks: number) => quadraticCost(1, ranks, ECONOMY.training);
 
@@ -86,17 +84,13 @@ export function trainingStep(save: Save, id: TrainingId) {
 
 /** Starts one rank of `id`, worked by `smith` (a smith with no upgrade): its
  * metal bill is spent at once, the rank counts once its work is done
- * (`settleTraining`). Dev: instantaneous research finishes it at once, smith
- * or none, and unlimited money spends no metal. */
+ * (`settleTraining`). It always takes a smith and time, even under the dev
+ * options; unlimited money spends no metal. */
 export function startTraining(save: Save, id: TrainingId, smith: string): boolean {
   const step = trainingStep(save, id);
   if (step.maxed || trainingJob(save.trainingJobs, id) || !step.affordable) return false;
-  if (!save.settings.instantResearch && busySmiths(save).has(smith)) return false;
+  if (!smith || busySmiths(save).has(smith)) return false;
   if (!save.settings.devMode) save.smithy[step.metal] -= step.amount;
-  if (save.settings.instantResearch) {
-    save.training[id]++;
-    return true;
-  }
   save.trainingJobs.push({ id, left: trainingSeconds(save.training[id]) * 1000, smiths: [smith], paid: save.settings.devMode ? 0 : step.amount });
   return true;
 }
@@ -199,10 +193,11 @@ export function multiplier(save: Save, target: BonusTarget) {
 /** What the next defense fights with. */
 export function bonuses(save: Save): Bonuses {
   const out = { ...NO_BONUSES } as Bonuses;
-  for (const k of Object.keys(out) as Exclude<keyof Bonuses, "paths" | "banner" | "structurePaths" | "spikePaths" | "keep" | "necromancy" | "meteor" | "frostNova" | "reinforcements">[]) out[k] = multiplier(save, k);
+  for (const k of Object.keys(out) as Exclude<keyof Bonuses, "paths" | "banner" | "structurePaths" | "spikePaths" | "keep" | "walls" | "necromancy" | "meteor" | "frostNova" | "reinforcements">[]) out[k] = multiplier(save, k);
   if (SKILL_IDS.some(id => id.startsWith("banner") && skillRank(save, id) > 0)) out.banner = { cooldown: 10 - skillTotal(save, "bannerCooldown"), defense: skillTotal(save, "bannerDefense") / 100, reach: 5 + skillTotal(save, "bannerReach"), damage: 1 + skillTotal(save, "bannerDamage") / 100, march: 1 + skillTotal(save, "bannerMarch") / 100, life: 1 + skillTotal(save, "bannerLife") / 100, regen: skillTotal(save, "bannerRegen") / 100 };
   Object.assign(out, placedBattlePaths(save));
   if (save.defend.keepRanks) out.keep = { ...save.defend.keepRanks };
+  if (save.defend.wallRanks) out.walls = { ...save.defend.wallRanks };
   const necromancy = spellPath(save, "necromancy");
   if (necromancy) out.necromancy = necromancy;
   const meteor = spellPath(save, "meteor");

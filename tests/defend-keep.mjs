@@ -1,7 +1,7 @@
 // The keep as a placeable city tile, and its own upgrade tree, on desktop
 // and phones: the keep is dragged (by the keep or its tile) onto open ground
 // with its tile, tapping or holding it opens its tree, its branches are
-// bought side by side with Knowledge and respecced for Copper, and in
+// bought side by side with Knowledge and respecced or undone for free, and in
 // battle it shoots from its arrow loops and scalds with boiling oil.
 // Isolated browser contexts only: never reads or changes a player's saved
 // game. Needs `npm run dev`. Screenshots go to test-results/ (or SHOTS).
@@ -124,13 +124,18 @@ try {
     await press(panel.locator('[data-node="q:arrowLoops:2"]'));
     await page.waitForTimeout(700);
     await page.screenshot({ path: `${out}/keep-${width}-tree.png` });
-    // Respec: a second press, 5 Copper, every point back.
-    await press(panel.locator('[data-ug-respec]'));
+    // Undo one branch's rank: free, its Knowledge back.
+    await press(panel.locator('[data-node="q:boilingOil:1"]'));
+    await press(panel.locator('[data-ug-undo="q:boilingOil:1"]'));
+    s = await state(page);
+    assert.deepEqual(s.defend.keepRanks, { bastions: 1, arrowLoops: 1 }, 'Boiling oil undone');
+    assert.equal(s.knowledge, 100 - 8);
+    // Respec: one press, free, every point back.
     await press(panel.locator('[data-ug-respec]'));
     s = await state(page);
     assert.equal(s.defend.keepRanks, undefined, 'respecced');
     assert.equal(s.knowledge, 100);
-    assert.equal(s.smithy.copper, 15);
+    assert.equal(s.smithy.copper, 20, 'free');
     await page.evaluate(() => { window.__dp.host.game().settings.devMode = true; });
     for (const id of ['q:bastions:1', 'q:bastions:2', 'q:arrowLoops:1', 'q:arrowLoops:2', 'q:arrowLoops:3', 'q:boilingOil:1', 'q:boilingOil:2', 'q:boilingOil:3']) await buy(id);
     await page.evaluate(() => { window.__dp.host.game().settings.devMode = false; });

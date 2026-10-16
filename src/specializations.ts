@@ -5,7 +5,8 @@
  *
  *  - while a building wears no path it can become one of the buildings its
  *    kind branches into (`BECOMES`: a Watch tower into an archer, cannon or
- *    wizard tower; a Melee Guild into a barracks of swordsmen; a Ranged
+ *    wizard tower; a Melee Guild into a barracks of swordsmen or an
+ *    assassins' den; a Ranged
  *    Guild into archers, fire mages, snipers or musketmen), or set out on
  *    one of its kind's Knowledge paths (`knowledge-paths.ts`);
  *  - a building on a path climbs it rank by rank;
@@ -25,7 +26,7 @@ import { hash } from "./defend/grid.ts";
 import { keptGroups, plainAvailable, type DefendSave } from "./defend/progress.ts";
 import { PATHS, isSpell, pathById, pathFits, pathTopicOf, pathsOf, type BattlePaths, type KnowledgePath, type PathId } from "./knowledge-paths.ts";
 import type { Save } from "./save.ts";
-import { spendMetals } from "./metals.ts";
+import { studyPathCost } from "./economy.ts";
 
 export const spikeKey = (g: { tx: number; ty: number; side: string }) => `spikes:${g.tx}:${g.ty}:${g.side}`;
 
@@ -39,7 +40,10 @@ export const BECOMES: Partial<Record<PlacedKind, { to: PlacedKind; cost: number 
     { to: "cannonTower", cost: 6 },
     { to: "wizardTower", cost: 8 },
   ],
-  meleeGuild: [{ to: "barracks", cost: 4 }],
+  meleeGuild: [
+    { to: "barracks", cost: 4 },
+    { to: "assassinDen", cost: 6 },
+  ],
   rangedGuild: [
     { to: "archerBarracks", cost: 5 },
     { to: "mageGuild", cost: 9 },
@@ -50,7 +54,7 @@ export const BECOMES: Partial<Record<PlacedKind, { to: PlacedKind; cost: number 
 
 /** What each kind's troops are called on its upgrade buttons. */
 export const TROOPS: Partial<Record<PlacedKind, string>> = {
-  meleeGuild: "Brawlers", rangedGuild: "Stone throwers", barracks: "Swordsmen", archerBarracks: "Archers", mageGuild: "Fire mages",
+  meleeGuild: "Brawlers", rangedGuild: "Stone throwers", barracks: "Swordsmen", assassinDen: "Assassins", archerBarracks: "Archers", mageGuild: "Fire mages",
   sniperLodge: "Snipers", musketHall: "Explosive musketmen", valkyriePalace: "Valkyries", darkKeep: "Dark wizard",
 };
 
@@ -235,49 +239,82 @@ export function allocated(kind: PlacedKind | "wallSpikes", wear?: Wear): number 
   return total;
 }
 
-/** What it costs to respec a building: every Knowledge point in it back,
- * the building back to its basic form. */
-export const RESPEC_PRICE = { copper: 5 } as const;
+/** Where a building of `kind` wearing `wear` stands once tree node `id`
+ * and everything after it are undone: at the node it grew from. Undefined
+ * unless `id` is one it has (owned) and not its basic building. */
+export function undoTo(kind: PaletteKind, wear: Wear | undefined, id: string): { kind: PaletteKind; wear?: Wear } | undefined {
+  const tree = buildingTree(kind, wear), n = tree.find((o) => o.id === id);
+  if (!n || n.state !== "owned" || !n.parent) return undefined;
+  const to = tree.find((o) => o.id === n.parent)!;
+  if (to.kind) return { kind: to.kind };
+  // A path rank: the building is the nearest one below it.
+  let k = to;
+  while (!k.kind) k = tree.find((o) => o.id === k.parent)!;
+  return { kind: k.kind, wear: { path: to.path!, rank: to.rank! } };
+}
 
-/** Respecs the building at `target`: pays `RESPEC_PRICE` in metal (free
- * with Unlimited money), gives back its allocated Knowledge, and turns it
- * back into its basic building with no path. Only while building. */
+/** The Knowledge undoing node `id` gives back (0 when it can't be undone). */
+export function undoRefund(kind: PaletteKind, wear: Wear | undefined, id: string): number {
+  const to = undoTo(kind, wear, id);
+  return to ? allocated(kind, wear) - allocated(to.kind, to.wear) : 0;
+}
+
+/** Undoes tree node `id` of the building at `target` and everything after
+ * it, giving back their Knowledge: the building steps back down its tree to
+ * the node `id` grew from. Free. Only while building. */
+export function undoUpgrade(save: Save, target: SpecialtyTarget, id: string): UpgradeResult {
+  const d = save.defend, kind = targetKind(d, target), wear = specialtyOf(d, target);
+  if (!kind) return { ok: false, reason: "That building is no longer there." };
+  const to = undoTo(kind, wear, id);
+  if (!to) return { ok: false, reason: "Nothing to undo there." };
+  return rewind(save, target, kind, wear, to);
+}
+
+/** Respecs the building at `target`: every Knowledge point back, and back
+ * to its basic building with no path. Free. Only while building. */
 export function respecBuilding(save: Save, target: SpecialtyTarget): UpgradeResult {
-  if ("copy" in target) return respecCopy(save, target);
-  const d = save.defend, kind = targetKind(d.layout, target), placed = placementOf(d.layout, target);
-  if (!kind || !placed) return { ok: false, reason: "That building is no longer there." };
-  const root = kind === "wallSpikes" ? kind : rootOf(kind), refund = allocated(kind, wearOf(placed));
-  if (root === kind && !wearOf(placed)) return { ok: false, reason: "Nothing to respec: it has no upgrades." };
-  if (!spendMetals(save.smithy, RESPEC_PRICE, save.settings.devMode)) return { ok: false, reason: `A respec costs ${RESPEC_PRICE.copper} Copper.` };
-  save.knowledge += refund;
+  const d = save.defend, kind = targetKind(d, target), wear = specialtyOf(d, target);
+  if (!kind) return { ok: false, reason: "That building is no longer there." };
+  const root = kind === "wallSpikes" ? kind : rootOf(kind);
+  if (root === kind && !wear) return { ok: false, reason: "Nothing to respec: it has no upgrades." };
+  return rewind(save, target, kind, wear, { kind: root });
+}
+
+/** Steps the building at `target` (a `kind` wearing `wear`) back to `to`,
+ * giving back the Knowledge between them. A placed one that changes kind
+ * stays where it was if it fits (its tile reshuffled if need be), else it
+ * waits in the palette; a palette copy becomes a copy of `to`. */
+function rewind(save: Save, target: SpecialtyTarget, kind: PaletteKind, wear: Wear | undefined, to: { kind: PaletteKind; wear?: Wear }): UpgradeResult {
+  const d = save.defend;
+  save.knowledge += allocated(kind, wear) - allocated(to.kind, to.wear);
+  const shift = () => {
+    if (to.kind === kind) return;
+    d.owned[kind as PlacedKind]--;
+    d.owned[to.kind as PlacedKind]++;
+  };
+  if ("copy" in target) {
+    unkeep(d, kind, wear);
+    shift();
+    if (to.wear) d.kept.push({ kind: to.kind, path: to.wear.path, rank: to.wear.rank });
+    return { ok: true, kind: to.kind, copy: { copy: to.kind, ...(to.wear ? { wear: to.wear } : {}) } };
+  }
   const next = cloneLayout(d.layout), p = placementOf(next, target)!;
-  delete p.path;
-  delete p.rank;
-  if (root === kind || root === "wallSpikes") {
+  if (to.wear) {
+    p.path = to.wear.path;
+    p.rank = to.wear.rank;
+  } else {
+    delete p.path;
+    delete p.rank;
+  }
+  if (to.kind === kind) {
     d.layout = next;
     return { ok: true, kind };
   }
   const st = p as PlacedStructure;
-  st.kind = root;
-  d.owned[kind as PlacedKind]--;
-  d.owned[root]++;
+  st.kind = to.kind as PlacedKind;
+  shift();
   d.layout = standing(next, st.uid);
-  return { ok: true, kind: root, waiting: !d.layout.structures.some((o) => o.uid === st.uid) };
-}
-
-/** Respecs one palette copy: it becomes a plain copy of its basic building. */
-function respecCopy(save: Save, target: { copy: PaletteKind; wear?: Wear }): UpgradeResult {
-  const d = save.defend, kind = target.copy, root = kind === "wallSpikes" ? kind : rootOf(kind);
-  if (!copyWaits(d, kind, target.wear)) return { ok: false, reason: "That copy is no longer in the palette." };
-  if (root === kind && !target.wear) return { ok: false, reason: "Nothing to respec: it has no upgrades." };
-  if (!spendMetals(save.smithy, RESPEC_PRICE, save.settings.devMode)) return { ok: false, reason: `A respec costs ${RESPEC_PRICE.copper} Copper.` };
-  save.knowledge += allocated(kind, target.wear);
-  unkeep(d, kind, target.wear);
-  if (root !== kind) {
-    d.owned[kind as PlacedKind]--;
-    d.owned[root as PlacedKind]++;
-  }
-  return { ok: true, kind: root, copy: { copy: root } };
+  return { ok: true, kind: to.kind, waiting: !d.layout.structures.some((o) => o.uid === st.uid) };
 }
 
 /** One node of a building's upgrade tree: a building it is or can become
@@ -296,7 +333,20 @@ export type TreeNode = {
   path?: PathId;
   rank?: number;
   cost: number;
+  /** A choice that turns the building down another branch (becoming
+   * another building), rather than carrying on up the one it is on. */
+  side?: boolean;
+  /** Branches beyond it not shown until it is bought. */
+  hidden?: number;
+  /** Branches it once had open that the choice after it closed off. */
+  closed?: number;
 };
+
+/** How many branches a plain building of `kind` has open: buildings to
+ * become and paths to climb. */
+const openings = (kind: PlacedKind | "wallSpikes") => (kind === "wallSpikes" ? 0 : BECOMES[kind]?.length ?? 0) + buildingPathsOf(kind).length;
+/** `{ hidden: n }` for a node with branches beyond it, else nothing. */
+const beyond = (kind: PlacedKind | "wallSpikes") => (openings(kind) ? { hidden: openings(kind) } : {});
 
 /** The live upgrade tree of one building of `kind` wearing `wear`: the
  * buildings it has been, then every branch still open to it. A choice cuts
@@ -319,7 +369,7 @@ export function buildingTree(kind: PlacedKind | "wallSpikes", wear?: Wear): Tree
     });
     if (p.evolves && cap) {
       const state = have >= p.ranks.length ? "next" : "locked";
-      nodes.push({ id: kid(p.evolves.item), parent, state, kind: p.evolves.item, cost: p.evolves.cost, step: { type: "evolve", path: p.id, to: p.evolves.item, cost: p.evolves.cost } });
+      nodes.push({ id: kid(p.evolves.item), parent, state, kind: p.evolves.item, cost: p.evolves.cost, step: { type: "evolve", path: p.id, to: p.evolves.item, cost: p.evolves.cost }, ...beyond(p.evolves.item) });
     }
   };
   lineage.forEach((k, i) => {
@@ -331,9 +381,12 @@ export function buildingTree(kind: PlacedKind | "wallSpikes", wear?: Wear): Tree
       climb(evolved, kid(below), evolved.ranks.length, false);
       nodes.push({ id: kid(k), parent: pid(evolved.id, evolved.ranks.length), state: "owned", kind: k, cost: evolved.evolves!.cost, step: { type: "evolve", path: evolved.id, to: k as PlacedKind, cost: evolved.evolves!.cost } });
     } else nodes.push({ id: kid(k), parent: below ? kid(below) : undefined, state: "owned", kind: k, cost: via?.cost ?? 0, ...(via ? { step: { type: "become" as const, ...via } } : {}) });
+    // Moving on from it, up a path or into another building, closed off the rest.
+    const own = nodes[nodes.length - 1];
+    if (own.kind === k && (!cur || wear) && openings(k) > 1) own.closed = openings(k) - 1;
     if (!cur) return;
     if (wear) return climb(pathById(wear.path), kid(k), wear.rank, true);
-    for (const b of k === "wallSpikes" ? [] : BECOMES[k] ?? []) nodes.push({ id: kid(b.to), parent: kid(k), state: "next", kind: b.to, cost: b.cost, step: { type: "become", ...b } });
+    for (const b of k === "wallSpikes" ? [] : BECOMES[k] ?? []) nodes.push({ id: kid(b.to), parent: kid(k), state: "next", kind: b.to, cost: b.cost, step: { type: "become", ...b }, side: true, ...beyond(b.to) });
     for (const p of buildingPathsOf(k)) climb(p, kid(k), 0, true);
   });
   return nodes;
@@ -410,6 +463,28 @@ export function migrateResearch(save: Save) {
     delete save.pathResearch[p.id];
   }
   d.layout = next;
+}
+
+/** The Barracks once had an Assassins path, retired when assassins got a
+ * building of their own (the Assassins' den, from the Melee Guild). Every
+ * Knowledge point it took comes back: the ranks barracks wore (standing or
+ * kept), its Study research from before version 5, and an unfinished
+ * project on it. The barracks themselves stand plain (their decoder drops
+ * the path). Reads the raw saved JSON, so run once, on load. */
+export function refundRetiredAssassins(raw: any, save: Save) {
+  const ranks = (r: unknown) => (Number.isInteger(r) && (r as number) >= 1 && (r as number) <= 3 ? (r as number) : 0);
+  const paid = (rank: number) => Array.from({ length: rank }, (_, i) => studyPathCost(4, i)).reduce((a, b) => a + b, 0);
+  const worn = (list: unknown) => (Array.isArray(list) ? list : []).reduce((n: number, p: any) => n + (p?.kind === "barracks" && p.path === "assassins" ? paid(ranks(p.rank)) : 0), 0);
+  let back = worn(raw?.defend?.layout?.structures) + worn(raw?.defend?.kept);
+  const research = raw?.pathResearch?.assassins?.spent;
+  if (Number.isFinite(research) && research > 0) back += research;
+  // Version 2 chose it for every barracks at once.
+  const legacy = raw?.pathResearch === undefined && raw?.paths?.barracks?.path === "assassins" ? raw.paths.barracks.spent : 0;
+  if (Number.isFinite(legacy) && legacy > 0) back += legacy;
+  const job = raw?.researchJob;
+  if (job?.id === "assassins" && Number.isSafeInteger(job.paid) && job.paid > 0) back += job.paid;
+  save.knowledge += back;
+  return back;
 }
 
 /** Version 3 kept a card per owned copy, each with its own path and the
