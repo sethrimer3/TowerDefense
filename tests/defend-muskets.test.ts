@@ -63,7 +63,7 @@ test("a Musket hall has three paths, climbed and respecced like any building's",
   for (const p of ["grenadiers", "volleyFire", "bayonets"] as const) assert.equal(pathById(p).topic, "musketHall");
   const climbed = buildingTree("musketHall", { path: "bayonets", rank: 1 });
   assert.deepEqual(climbed.map((n) => n.id).slice(-3), ["p:bayonets:1", "p:bayonets:2", "p:bayonets:3"]);
-  assert.equal(climbed.find((n) => n.id === "k:musketHall")!.closed, 2, "the other two paths are closed off");
+  assert.equal(climbed.find((n) => n.id === "k:musketHall")!.closed!.length, 2, "the other two paths are closed off");
   assert.equal(allocated("musketHall", { path: "volleyFire", rank: 2 }) - allocated("musketHall"), studyPathCost(4, 0) + studyPathCost(4, 1));
   assert.match(kindStats(hall(), "musketHall"), /bursts 0.9 cells wide$/);
   assert.match(kindStats(hall(), "musketHall", "grenadiers", 2), /4 bomblets/);

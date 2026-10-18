@@ -7,14 +7,17 @@
  * everything eases back when let go. Nodes that leave the tree (a branch
  * cut off by a choice) shrivel and drop away; new ones sprout from their
  * parent. Branches not shown yet trail off from a node as lines that
- * break into dots and fade away (what buying it would open), and the ones
- * a choice closed off trail off behind it in withered brown. Drag a node
+ * scatter into pixels and fade away (what buying it would open), each
+ * toward where it would stand, and the ones a choice closed off trail off
+ * in withered brown toward where they stood. The branches are pixel art
+ * (`branch-art.ts`), drawn on one canvas under the nodes. Drag a node
  * to pull it, drag the background to pan, the wheel to zoom; a tap picks a
  * node and shows its card.
  *
  * Presentation only, with no game imports: the page hands it `GraphNode`s
  * (`set`) and hears back which node was picked (`onPick`). */
 import { stream } from "../random.ts";
+import { BranchArt, rgb, type Pt, type Stroke, type Tone } from "./branch-art.ts";
 
 const rand = stream("effects");
 
@@ -33,19 +36,23 @@ export type GraphNode = {
   /** A choice down another branch: placed beside its parent and below,
    * rather than above it. */
   side?: boolean;
-  /** Branches beyond it not shown yet: drawn as lines fading off upward. */
-  hidden?: number;
+  /** Branches beyond it not shown yet: drawn as lines fanning away from its
+   * parent and fading off. */
+  hidden?: Slot[];
   /** Branches a later choice closed off: drawn as withered lines fading off
-   * beside and below it. */
-  closed?: number;
+   * toward where each stood... */
+  closed?: Slot[];
+  /** ...beside the one it took. */
+  took?: Slot;
 };
+
+/** Where a branch stands among its node's: one of `n` choices beside it
+ * (`side`) or of `n` branches carrying on up, the `i`th. */
+export type Slot = { side: boolean; i: number; n: number };
 
 type Body = {
   n: GraphNode;
   el: HTMLElement;
-  edge?: SVGPathElement;
-  /** The fading lines of its hidden and closed-off branches. */
-  stubs?: SVGGElement;
   x: number; y: number; vx: number; vy: number;
   hx: number; hy: number;
   /** Seconds since it began to wither, or -1 while alive. */
@@ -53,9 +60,22 @@ type Body = {
   spin: number;
 };
 
-const SVG = "http://www.w3.org/2000/svg";
-/** Where a fading line's segments break, solid to dotted, along its length. */
-const STUB_SEGMENTS = [0, 0.38, 0.62, 0.82, 1];
+/** Board pixels to an art pixel of the branches, at zoom 1. */
+const ART = 2;
+/** How far from a node's middle its trailing lines start (past its frame),
+ * and the longest they run. */
+const TRAIL_FROM = 22, TRAIL_MAX = 80;
+
+const tone = (light: string, base: string, shade: string): Tone => ({ light: rgb(light), base: rgb(base), shade: rgb(shade) });
+const TONES = {
+  owned: tone("#fff1b8", "#f2c95a", "#9a6a1c"),
+  next: tone("#dcfcff", "#57d6e0", "#2a7f8c"),
+  locked: tone("#5d7880", "#3c5459", "#26363a"),
+  withering: tone("#8f6a3c", "#6b4a2b", "#43301c"),
+  hidden: tone("#bff6fb", "#57d6e0", "#2a7f8c"),
+  dim: tone("#7fb0b6", "#4f7d83", "#2c4a4e"),
+  closed: tone("#dcaa6c", "#b07840", "#6e4824"),
+};
 
 /** Pixels between neighbouring leaves, and between generations. */
 const GAP_X = 66, GAP_Y = 74;
@@ -65,7 +85,11 @@ const WITHER = 1.1;
 export class UpgradeGraph {
   readonly el: HTMLElement;
   private readonly view: HTMLElement;
-  private readonly svg: SVGSVGElement;
+  private readonly canvas: HTMLCanvasElement;
+  private readonly art = new BranchArt();
+  private image: ImageData | null = null;
+  /** Each path colour's tones, read from its `hue-*` class. */
+  private hues = new Map<string, Tone>();
   private readonly layer: HTMLElement;
   private bodies = new Map<string, Body>();
   private picked = "";
@@ -84,9 +108,9 @@ export class UpgradeGraph {
   ) {
     this.el = host;
     host.classList.add("ug");
-    host.innerHTML = `<div class="ug-view"><svg class="ug-edges" xmlns="http://www.w3.org/2000/svg"></svg><div class="ug-nodes"></div></div>`;
+    host.innerHTML = `<canvas class="ug-branches"></canvas><div class="ug-view"><div class="ug-nodes"></div></div>`;
     this.view = host.querySelector(".ug-view")!;
-    this.svg = host.querySelector("svg")!;
+    this.canvas = host.querySelector("canvas")!;
     this.layer = host.querySelector(".ug-nodes")!;
     host.addEventListener("pointerdown", this.down);
     host.addEventListener("pointermove", this.move);
@@ -118,9 +142,6 @@ export class UpgradeGraph {
         b.dying = 0;
         b.spin = (rand() - 0.5) * 120;
         b.el.classList.add("withering");
-        b.edge?.classList.add("withering");
-        b.stubs?.remove();
-        b.stubs = undefined;
       }
     }
     for (const n of nodes) {
@@ -133,14 +154,9 @@ export class UpgradeGraph {
         el.type = "button";
         el.className = "ug-node";
         el.dataset.node = n.id;
-        const edge = n.parent ? (document.createElementNS("http://www.w3.org/2000/svg", "path") as SVGPathElement) : undefined;
-        if (edge) this.svg.prepend(edge);
         this.layer.append(el);
-        b = { n, el, edge, x: still || !from ? hx : from.x, y: still || !from ? hy : from.y, vx: 0, vy: 0, hx, hy, dying: -1, spin: 0 };
-        if (!still && from) {
-          el.classList.add("sprouting");
-          edge?.classList.add("sprouting");
-        }
+        b = { n, el, x: still || !from ? hx : from.x, y: still || !from ? hy : from.y, vx: 0, vy: 0, hx, hy, dying: -1, spin: 0 };
+        if (!still && from) el.classList.add("sprouting");
         this.bodies.set(n.id, b);
       }
       const changed = b.n.state !== n.state || b.n.face !== n.face || b.n.tag !== n.tag || !b.el.innerHTML;
@@ -153,35 +169,13 @@ export class UpgradeGraph {
       }
       b.el.className = `ug-node ${n.state}${n.hue ? ` ${n.hue}` : ""}${b.el.classList.contains("sprouting") ? " sprouting" : ""}`;
       b.el.setAttribute("aria-pressed", String(n.id === picked));
-      this.trail(b);
-      if (b.edge) b.edge.setAttribute("class", `ug-edge ${n.state}${n.hue ? ` ${n.hue}` : ""}${b.edge.classList.contains("sprouting") ? " sprouting" : ""}`);
     }
+    // What trails off, for anyone reading the page (tests among them).
+    this.canvas.dataset.hidden = String(nodes.reduce((k, n) => k + (n.hidden?.length ?? 0), 0));
+    this.canvas.dataset.closed = String(nodes.reduce((k, n) => k + (n.closed?.length ?? 0), 0));
     this.pick(picked);
     this.refit(!this.steered);
     if (still) this.snap();
-  }
-
-  /** The fading lines of `b`'s hidden and closed-off branches, one group
-   * of `STUB_SEGMENTS` segments a line, made again only when they change. */
-  private trail(b: Body) {
-    const want = `${b.n.hidden ?? 0}:${b.n.closed ?? 0}:${b.n.state}`;
-    if (b.stubs?.dataset.want === want) return;
-    b.stubs?.remove();
-    b.stubs = undefined;
-    if (!b.n.hidden && !b.n.closed) return;
-    const g = document.createElementNS(SVG, "g") as SVGGElement;
-    g.dataset.want = want;
-    g.setAttribute("class", `ug-stubs ${b.n.state}`);
-    for (const [kind, n] of [["hidden", b.n.hidden ?? 0], ["closed", b.n.closed ?? 0]] as const)
-      for (let i = 0; i < n; i++)
-        for (let k = 0; k < STUB_SEGMENTS.length - 1; k++) {
-          const seg = document.createElementNS(SVG, "path");
-          seg.setAttribute("class", `ug-stub ${kind} s${k}`);
-          seg.dataset.line = `${kind}:${i}:${n}`;
-          g.append(seg);
-        }
-    this.svg.prepend(g);
-    b.stubs = g;
   }
 
   /** Marks `id` as the picked node. */
@@ -196,7 +190,7 @@ export class UpgradeGraph {
     for (const b of this.bodies.values()) {
       if (b.dying >= 0) continue;
       // Room for the lines trailing off it too.
-      const r = b.n.hidden || b.n.closed ? 30 : 0;
+      const r = b.n.hidden?.length || b.n.closed?.length ? TRAIL_FROM + TRAIL_MAX * 0.7 : 0;
       x0 = Math.min(x0, b.hx - r); x1 = Math.max(x1, b.hx + r);
       y0 = Math.min(y0, b.hy - r); y1 = Math.max(y1, b.hy + r);
     }
@@ -214,8 +208,6 @@ export class UpgradeGraph {
     const b = this.bodies.get(id);
     if (!b) return;
     b.el.remove();
-    b.edge?.remove();
-    b.stubs?.remove();
     this.bodies.delete(id);
   }
 
@@ -224,7 +216,6 @@ export class UpgradeGraph {
       b.x = b.hx;
       b.y = b.hy;
       b.el.classList.remove("sprouting");
-      b.edge?.classList.remove("sprouting");
     }
     this.pan = { ...this.fit };
     this.draw();
@@ -289,10 +280,7 @@ export class UpgradeGraph {
       if (b.dying >= WITHER) this.drop(id);
     }
     for (const b of live) {
-      if (b.el.classList.contains("sprouting") && Math.abs(b.x - b.hx) + Math.abs(b.y - b.hy) < 6) {
-        b.el.classList.remove("sprouting");
-        b.edge?.classList.remove("sprouting");
-      }
+      if (b.el.classList.contains("sprouting") && Math.abs(b.x - b.hx) + Math.abs(b.y - b.hy) < 6) b.el.classList.remove("sprouting");
     }
   }
 
@@ -302,52 +290,118 @@ export class UpgradeGraph {
     for (const b of this.bodies.values()) {
       const w = b.dying >= 0 ? Math.min(1, b.dying / WITHER) : 0;
       b.el.style.transform = `translate(${b.x}px, ${b.y}px) translate(-50%, -50%)${w ? ` rotate(${b.spin * w}deg) scale(${1 - 0.75 * w})` : ""}`;
-      const p = b.n.parent ? this.bodies.get(b.n.parent) : undefined;
-      if (b.edge && p) {
-        // A branch: a slight curve, sagging more as it withers.
-        const mx = (p.x + b.x) / 2 + (b.y - p.y) * 0.08, my = (p.y + b.y) / 2 + 6 + w * 30;
-        b.edge.setAttribute("d", `M${p.x.toFixed(1)},${p.y.toFixed(1)} Q${mx.toFixed(1)},${my.toFixed(1)} ${b.x.toFixed(1)},${b.y.toFixed(1)}`);
-      } else if (b.edge) b.edge.setAttribute("d", "");
-      if (b.stubs) this.drawStubs(b, p);
     }
+    this.paintBranches();
   }
 
-  /** Lays `b`'s fading lines out from it: hidden branches fan away from its
-   * parent, leaning up, closed-off ones out to either side and
-   * down, where the choices that were passed over stood. */
-  private drawStubs(b: Body, p: Body | undefined) {
-    let ux = 0, uy = -1;
+  /** The branches and trailing lines, as pixel art a whole number of device
+   * pixels each, under the nodes. */
+  private paintBranches() {
+    const dpr = window.devicePixelRatio || 1, { x: px, y: py, s } = this.pan;
+    const unit = Math.max(1, Math.round(ART * s * dpr));
+    const cw = this.el.clientWidth, ch = this.el.clientHeight;
+    const aw = Math.max(1, Math.ceil((cw * dpr) / unit)), ah = Math.max(1, Math.ceil((ch * dpr) / unit));
+    if (this.canvas.width !== aw || this.canvas.height !== ah) {
+      this.canvas.width = aw;
+      this.canvas.height = ah;
+      this.image = null;
+    }
+    this.canvas.style.width = `${(aw * unit) / dpr}px`;
+    this.canvas.style.height = `${(ah * unit) / dpr}px`;
+    this.art.resize(aw, ah);
+    /** A board point in art pixels. */
+    const at = (x: number, y: number) => ({ x: ((px + x * s) * dpr) / unit, y: ((py + y * s) * dpr) / unit });
+    const still = this.opts.reduceMotion(), now = performance.now() / 1000;
+    const layers: Stroke[][] = [[], [], [], [], []];
+    for (const b of this.bodies.values()) {
+      const p = b.n.parent ? this.bodies.get(b.n.parent) : undefined;
+      if (p) {
+        // A branch: a slight curve, sagging more as it withers.
+        const w = b.dying >= 0 ? Math.min(1, b.dying / WITHER) : 0;
+        const mx = (p.x + b.x) / 2 + (b.y - p.y) * 0.08, my = (p.y + b.y) / 2 + 6 + w * 30;
+        const state = b.dying >= 0 ? "withering" : b.n.state;
+        const lively = state === "owned" || state === "next";
+        const stroke: Stroke = {
+          a: at(p.x, p.y), c: at(mx, my), b: at(b.x, b.y),
+          tone: state === "owned" && b.n.hue ? this.hue(b) : TONES[state],
+          ...(state === "locked" ? { dash: 3 } : {}),
+          ...(state === "withering" ? { alpha: 1 - w, crumble: 0.5, fade: 0 } : {}),
+          ...(lively ? { glow: true } : {}),
+          ...(lively && !still && !b.el.classList.contains("sprouting") ? { mote: (now / (state === "owned" ? 2.4 : 1.6) + seedOf(b.n.id)) % 1 } : {}),
+        };
+        layers[state === "owned" ? 4 : state === "next" ? 3 : state === "withering" ? 2 : 1].push(stroke);
+      }
+      if (b.dying < 0) this.trails(b, at, layers);
+    }
+    this.art.draw(layers.flat());
+    const ctx = this.canvas.getContext("2d");
+    if (!ctx) return;
+    if (!this.image) this.image = ctx.createImageData(aw, ah);
+    new Uint32Array(this.image.data.buffer).set(this.art.pix);
+    ctx.putImageData(this.image, 0, 0);
+  }
+
+  /** `b`'s trailing lines, each fading off toward where its branch would
+   * stand (hidden) or stood (closed): what buying it would open, bright and
+   * straight; what a choice cut off, withered, drooping and crumbling. */
+  private trails(b: Body, at: (x: number, y: number) => Pt, layers: Stroke[][]) {
+    // Hidden branches fan out away from its parent, leaning up, as the tree
+    // grows outward.
+    let ax = 0, ay = -1;
+    const p = b.n.parent ? this.bodies.get(b.n.parent) : undefined;
     if (p) {
       const dx = b.x - p.x, dy = b.y - p.y, d = Math.hypot(dx, dy) || 1;
-      ux = dx / d;
-      uy = dy / d - 0.5;
-      const u = Math.hypot(ux, uy) || 1;
-      ux /= u;
-      uy /= u;
+      ax = dx / d;
+      ay = dy / d - 0.5;
+      const u = Math.hypot(ax, ay) || 1;
+      ax /= u;
+      ay /= u;
     }
-    for (const seg of Array.from(b.stubs!.children) as SVGPathElement[]) {
-      const [kind, si, sn] = seg.dataset.line!.split(":"), i = Number(si), n = Number(sn);
-      let dx: number, dy: number, len: number, bend: number;
-      if (kind === "hidden") {
-        const a = (i - (n - 1) / 2) * 0.46;
-        dx = ux * Math.cos(a) - uy * Math.sin(a);
-        dy = ux * Math.sin(a) + uy * Math.cos(a);
-        len = 56;
-        bend = (i - (n - 1) / 2) * 5;
-      } else {
-        const lr = i % 2 ? 1 : -1, a = 0.3 + Math.floor(i / 2) * 0.5;
-        dx = lr * Math.cos(a);
-        dy = Math.sin(a);
-        len = 50;
-        bend = lr * 6;
+    const hidden = b.n.hidden?.length ?? 0;
+    const lines = [
+      ...(b.n.hidden ?? []).map((slot) => ({ slot, closed: false })),
+      ...(b.n.closed ?? []).map((slot) => ({ slot, closed: true })),
+    ];
+    lines.forEach(({ slot, closed }, i) => {
+      let dx: number, dy: number;
+      if (closed && b.n.took) [dx, dy] = trailAim(slot, b.n.took, !b.n.parent);
+      else {
+        const a = (i - (hidden - 1) / 2) * 0.42, c = Math.cos(a), s = Math.sin(a);
+        [dx, dy] = [(ax * c - ay * s) * GAP_Y, (ax * s + ay * c) * GAP_Y];
       }
-      const k = Number(seg.getAttribute("class")!.match(/s(\d)/)![1]);
-      const at = (t: number) => {
-        const r = 22 + len * t, q = bend * t * t;
-        return `${(b.x + dx * r - dy * q).toFixed(1)},${(b.y + dy * r + dx * q).toFixed(1)}`;
-      };
-      seg.setAttribute("d", `M${at(STUB_SEGMENTS[k])} L${at((STUB_SEGMENTS[k] + STUB_SEGMENTS[k + 1]) / 2)} L${at(STUB_SEGMENTS[k + 1])}`);
+      const d = Math.hypot(dx, dy) || 1, ux = dx / d, uy = dy / d;
+      const len = closed ? Math.min(TRAIL_MAX, Math.max(46, d * 0.6)) : 52;
+      const x0 = b.x + ux * TRAIL_FROM, y0 = b.y + uy * TRAIL_FROM;
+      let x1 = x0 + ux * len, y1 = y0 + uy * len, cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+      if (closed) {
+        // Withered: it droops as it goes.
+        y1 += len * 0.18;
+        cy += len * 0.16;
+      } else {
+        // Alive: a slight bow away from the middle.
+        const bow = (ux >= 0 ? 1 : -1) * 4;
+        cx += -uy * bow;
+        cy += ux * bow;
+      }
+      const tone = closed ? TONES.closed : b.n.state === "locked" ? TONES.dim : TONES.hidden;
+      layers[0].push({
+        a: at(x0, y0), c: at(cx, cy), b: at(x1, y1), tone,
+        fade: closed ? 0.12 : 0.22,
+        ...(closed ? { crumble: 0.45, seed: seedOf(b.n.id) * 9973 + i } : {}),
+      });
+    });
+  }
+
+  /** A path colour's tones, from its `--hue` and `--hue-deep`. */
+  private hue(b: Body): Tone {
+    const key = b.n.hue!;
+    let t = this.hues.get(key);
+    if (!t) {
+      const css = getComputedStyle(b.el), light = css.getPropertyValue("--hue").trim(), deep = css.getPropertyValue("--hue-deep").trim();
+      t = light && deep ? { light: mix(light, "#ffffff", 0.55), base: rgb(light), shade: rgb(deep) } : TONES.owned;
+      this.hues.set(key, t);
     }
+    return t;
   }
 
   // ── Pointers ──────────────────────────────────────────────────────────
@@ -428,6 +482,45 @@ export class UpgradeGraph {
   }
 }
 
+/** A steady fraction, 0 to 1, from a node's id. */
+const seedOf = (id: string) => {
+  let h = 7;
+  for (let i = 0; i < id.length; i++) h = Math.imul(h ^ id.charCodeAt(i), 2654435761);
+  return ((h >>> 0) % 1000) / 1000;
+};
+
+/** `a` taken `t` of the way to `b`, as a packed pixel. */
+const mix = (a: string, b: string, t: number) => {
+  const n = (h: string) => parseInt(h.replace("#", "").slice(0, 6), 16);
+  const p = n(a), q = n(b), ch = (s: number) => Math.round(((p >> s) & 255) * (1 - t) + ((q >> s) & 255) * t);
+  return rgb(`#${((ch(16) << 16) | (ch(8) << 8) | ch(0)).toString(16).padStart(6, "0")}`);
+};
+
+/** Where a choice beside its parent stands, from it: left and right a little
+ * below, row under row (the root's odd one out straight below). */
+function sideSpot(i: number, n: number, root: boolean): [number, number] {
+  if (root && n % 2 && i === n - 1) return [0, GAP_Y];
+  const lr = i % 2 ? 1 : -1, row = Math.floor(i / 2);
+  return [lr * GAP_X * 1.2, GAP_Y * (0.35 + row * 0.95)];
+}
+
+/** Which way, from its node, a closed-off branch's trailing line heads:
+ * toward where the branch in `slot` stood before the node `took` another (the one
+ * taken now carries on straight up, so the ones it passed over keep to its
+ * side: a path to the right of the one taken trails off up and right). */
+export function trailAim(slot: Slot, took: Slot, root: boolean): [number, number] {
+  if (slot.side) return sideSpot(slot.i, slot.n, root);
+  let col: number;
+  if (!took.side) col = slot.i - took.i;
+  else {
+    // It became another building, which now stands straight up: the paths
+    // part round it.
+    const mid = Math.ceil(slot.n / 2);
+    col = (slot.i < mid ? slot.i : slot.i + 1) - mid;
+  }
+  return [col * GAP_X, -GAP_Y];
+}
+
 /** Each node's place: branches carrying on from a node grow up from it in
  * a tidy tree (leaves side by side, each parent over the middle of its
  * children, the root at the bottom); `side` nodes, choices down another
@@ -456,9 +549,8 @@ export function layout(nodes: readonly { id: string; parent?: string; side?: boo
     }
     const sides = side.get(id) ?? [];
     sides.forEach((k, i) => {
-      if (root && sides.length % 2 && i === sides.length - 1) return place(k, x, y + GAP_Y, false);
-      const lr = i % 2 ? 1 : -1, row = Math.floor(i / 2);
-      place(k, x + lr * GAP_X * 1.2, y + GAP_Y * (0.35 + row * 0.95), false);
+      const [dx, dy] = sideSpot(i, sides.length, root);
+      place(k, x + dx, y + dy, false);
     });
   };
   let x = 0;

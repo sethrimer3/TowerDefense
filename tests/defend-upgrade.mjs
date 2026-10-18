@@ -124,8 +124,8 @@ try {
     const rootAt = await centreOf('k:watchTower');
     for (const k of ['k:archerTower', 'k:cannonTower', 'k:wizardTower']) assert.ok((await centreOf(k)).y > rootAt.y, `${k} sits below the Watch tower`);
     assert.ok((await centreOf('p:spotters:1')).y < rootAt.y, 'its own path climbs upward');
-    assert.ok(await panel.locator('.ug-stub.hidden').count() >= 3 * 3, 'what each tower opens trails off');
-    assert.equal(await panel.locator('.ug-stub.closed').count(), 0, 'nothing closed off yet');
+    assert.ok(Number(await panel.locator('.ug-branches').getAttribute('data-hidden')) >= 3 + 2, 'what each tower opens trails off');
+    assert.equal(await panel.locator('.ug-branches').getAttribute('data-closed'), '0', 'nothing closed off yet');
     assert.ok(inside(await panel.boundingBox(), await page.locator('#defend-board').boundingBox()), 'the tree stays inside the board');
     await page.waitForTimeout(700); await page.screenshot({ path: `${out}/upgrade-${width}-watch-tower.png` });
     await buy('k:wizardTower');
@@ -139,7 +139,7 @@ try {
     assert.ok(!tree.some(n => n.startsWith('k:archerTower') || n.startsWith('p:spotters')), `the other branches withered: ${tree}`);
     assert.ok(tree.includes('p:storm:1=next') && tree.includes('p:pyromancy:3=locked'), `the wizard's own paths sprouted: ${tree}`);
     assert.match(await allocatedText(), /✦ 8/);
-    assert.ok(await panel.locator('.ug-stub.closed').count() > 0, 'the Watch tower trails the branches it closed off');
+    assert.ok(Number(await panel.locator('.ug-branches').getAttribute('data-closed')) > 0, 'the Watch tower trails the branches it closed off');
     await buy('p:storm:1');
     await settled();
     assert.deepEqual([(await placed(tower.uid)).path, (await placed(tower.uid)).rank], ['storm', 1]);

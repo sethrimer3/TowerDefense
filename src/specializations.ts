@@ -336,17 +336,30 @@ export type TreeNode = {
   /** A choice that turns the building down another branch (becoming
    * another building), rather than carrying on up the one it is on. */
   side?: boolean;
-  /** Branches beyond it not shown until it is bought. */
-  hidden?: number;
-  /** Branches it once had open that the choice after it closed off. */
-  closed?: number;
+  /** Branches beyond it not shown until it is bought, each where it would
+   * stand. */
+  hidden?: BranchSlot[];
+  /** Branches it once had open that the choice after it closed off, each
+   * where it stood... */
+  closed?: BranchSlot[];
+  /** ...and the branch it took instead. */
+  took?: BranchSlot;
 };
 
-/** How many branches a plain building of `kind` has open: buildings to
- * become and paths to climb. */
-const openings = (kind: PlacedKind | "wallSpikes") => (kind === "wallSpikes" ? 0 : BECOMES[kind]?.length ?? 0) + buildingPathsOf(kind).length;
-/** `{ hidden: n }` for a node with branches beyond it, else nothing. */
-const beyond = (kind: PlacedKind | "wallSpikes") => (openings(kind) ? { hidden: openings(kind) } : {});
+/** Where a branch stands among its node's: one of the `n` choices that turn
+ * the building into another (`side`), or of the `n` paths carrying on up
+ * from it, the `i`th of them in order. */
+export type BranchSlot = { side: boolean; i: number; n: number };
+
+/** The branches a plain building of `kind` has open: buildings to become,
+ * then paths to climb, in the order the tree lists them. */
+const openings = (kind: PlacedKind | "wallSpikes"): BranchSlot[] => {
+  if (kind === "wallSpikes") return [];
+  const becomes = BECOMES[kind] ?? [], paths = buildingPathsOf(kind);
+  return [...becomes.map((_, i) => ({ side: true, i, n: becomes.length })), ...paths.map((_, i) => ({ side: false, i, n: paths.length }))];
+};
+/** `{ hidden }` for a node with branches beyond it, else nothing. */
+const beyond = (kind: PlacedKind | "wallSpikes") => (openings(kind).length ? { hidden: openings(kind) } : {});
 
 /** The live upgrade tree of one building of `kind` wearing `wear`: the
  * buildings it has been, then every branch still open to it. A choice cuts
@@ -382,8 +395,14 @@ export function buildingTree(kind: PlacedKind | "wallSpikes", wear?: Wear): Tree
       nodes.push({ id: kid(k), parent: pid(evolved.id, evolved.ranks.length), state: "owned", kind: k, cost: evolved.evolves!.cost, step: { type: "evolve", path: evolved.id, to: k as PlacedKind, cost: evolved.evolves!.cost } });
     } else nodes.push({ id: kid(k), parent: below ? kid(below) : undefined, state: "owned", kind: k, cost: via?.cost ?? 0, ...(via ? { step: { type: "become" as const, ...via } } : {}) });
     // Moving on from it, up a path or into another building, closed off the rest.
-    const own = nodes[nodes.length - 1];
-    if (own.kind === k && (!cur || wear) && openings(k) > 1) own.closed = openings(k) - 1;
+    const own = nodes[nodes.length - 1], open = openings(k);
+    const next = lineage[i + 1], paths = buildingPathsOf(k);
+    const took = cur ? (wear ? open.find((o) => !o.side && paths[o.i]?.id === wear.path) : undefined)
+      : open.find((o) => (o.side ? BECOMES[k as PlacedKind]?.[o.i]?.to === next : paths[o.i]?.evolves?.item === next));
+    if (own.kind === k && took && open.length > 1) {
+      own.closed = open.filter((o) => o !== took);
+      own.took = took;
+    }
     if (!cur) return;
     if (wear) return climb(pathById(wear.path), kid(k), wear.rank, true);
     for (const b of k === "wallSpikes" ? [] : BECOMES[k] ?? []) nodes.push({ id: kid(b.to), parent: kid(k), state: "next", kind: b.to, cost: b.cost, step: { type: "become", ...b }, side: true, ...beyond(b.to) });
