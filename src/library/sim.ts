@@ -880,6 +880,14 @@ export class LibrarySim {
       return this.planFire(l);
     }
     l.mode = "work";
+    // Anyone left up a ladder or the stair (a save restores where they were,
+    // not what they were doing) climbs down to a floor before going anywhere;
+    // the fire's plans above climb down on their own.
+    if (l.y < FLOOR - 0.01 || (l.y > FLOOR + 0.01 && l.y < LAB_FLOOR - 0.01)) {
+      const down = l.y > FLOOR && l.role === "researcher" ? LAB_FLOOR : FLOOR;
+      l.steps = [{ kind: "climb", y: down }];
+      return;
+    }
     if (inLab) {
       // Researchers work the lab; anyone else goes back up the stair.
       if (l.role === "researcher") l.steps = labErrand(l, this.lab, r, this.night, () => this.time);

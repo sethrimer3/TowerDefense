@@ -480,3 +480,23 @@ test("charred books fall with the shelf burnt away under them rather than hang i
   });
   assert.ok(sim.booksBurnt > 0);
 });
+
+test("librarians loaded up a ladder climb down before walking anywhere", () => {
+  const sim = new LibrarySim(41);
+  sim.furnish(30);
+  for (let i = 0; i < 4; i++) sim.hire();
+  const save = sim.save(0);
+  // Saved mid-climb: a shelf ladder in the nave and the lab's stair.
+  save.crewState![0] = { ...save.crewState![0], x: 60, y: FLOOR - 40 };
+  save.crewState![1] = { ...save.crewState![1], x: STAIR_X, y: FLOOR + 50 };
+  const loaded = new LibrarySim(41, decodeLibrarySave(JSON.parse(JSON.stringify(save)))!);
+  const floors = [FLOOR, LAB_FLOOR];
+  for (let t = 0; t < 600; t++) {
+    const before = loaded.librarians.map((l) => ({ x: l.x, y: l.y }));
+    loaded.step(0.05);
+    loaded.librarians.forEach((l, i) => {
+      const was = before[i];
+      if (l.x !== was.x) assert.ok(floors.includes(was.y) || floors.includes(l.y) || l.away, `${l.name} walked from ${was.x},${was.y} to ${l.x},${l.y} off the floor`);
+    });
+  }
+});
