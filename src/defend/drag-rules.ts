@@ -107,7 +107,7 @@ export const carriesStructure = (drag: Drag): drag is { from: "structure"; uid: 
   drag.from === "structure" || (drag.from === "palette" && drag.item in STRUCTURES);
 
 /** The kind a structure drag carries. */
-const carriedKind = (drag: Drag) => (drag.from === "structure" ? drag.kind : (drag as { item: PlacedKind }).item);
+export const carriedKind = (drag: Drag) => (drag.from === "structure" ? drag.kind : (drag as { item: PlacedKind }).item);
 
 /** For a structure carried to (x, y) (in cells), its top left quarter with
  * its footprint centred on the pointer, kept on the board, keyed "qx,qy". */

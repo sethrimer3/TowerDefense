@@ -3,10 +3,11 @@ import assert from "node:assert/strict";
 import { BOMB_RADIUS } from "../src/defend/catalog.ts";
 import { RALLY_REACH } from "../src/defend/war-banner.ts";
 import { generateCity } from "../src/defend/citygen.ts";
-import { dropGhost, legalLayouts, refusal } from "../src/defend/drag-rules.ts";
+import { dropGhost, legalLayouts, refusal, structureLayout, type Drag } from "../src/defend/drag-rules.ts";
+import { FULL } from "./test-size.ts";
 import { EditSession, type DragAt } from "../src/defend/edit-session.ts";
 import { CELLS_W, SUB, tileKey } from "../src/defend/grid.ts";
-import { defaultLayout, fitLayout, placeCityTile, placeStructure, removeCityTile, removeStructure, type Layout } from "../src/defend/layout.ts";
+import { QUARTERS_H, QUARTERS_W, defaultLayout, fitLayout, placeCityTile, placeStructure, quarterSize, removeCityTile, structureSpots, removeStructure, type Layout, type PlacedKind } from "../src/defend/layout.ts";
 
 // The drag-rules test's city: the keep with a tile either side, a two-tile
 // spur above it, and a barracks left of the keep.
@@ -65,11 +66,60 @@ test("the board shows nothing until the pointer moves, then the targets and the 
   assert.equal(tower.overlay(), null);
   tower.hover({ cellX: KX * SUB + 1, cellY: (KY - 2) * SUB + 1, overBoard: true, overPalette: false });
   const rect = { x: KX * SUB, y: (KY - 2) * SUB, w: 2, h: 2 };
-  assert.deepEqual(tower.overlay(), { legal: new Set(), hover: null, ghost: { rect, kind: "archerTower" }, quarters: { rect, fits: true, clear: true } });
+  const { open, ...shown } = tower.overlay()!;
+  assert.ok(open instanceof Uint8Array, "the quarters it can't cover are shaded");
+  assert.deepEqual(shown, { legal: new Set(), hover: null, ghost: { rect, kind: "archerTower" }, quarters: { rect, fits: true, clear: true } });
   tower.hover({ cellX: 1, cellY: 1, overBoard: true, overPalette: false });
-  assert.deepEqual(tower.overlay(), { legal: new Set(), hover: null, ghost: null, quarters: { rect: { x: 0, y: 0, w: 2, h: 2 }, fits: false, clear: true } }, "red where it won't go");
+  assert.deepEqual(tower.overlay(), { legal: new Set(), hover: null, ghost: null, quarters: { rect: { x: 0, y: 0, w: 2, h: 2 }, fits: false, clear: true }, open }, "red where it won't go");
   tower.hover(OFF);
-  assert.deepEqual(tower.overlay(), { legal: new Set(), hover: null, ghost: null, quarters: null });
+  assert.deepEqual(tower.overlay(), { legal: new Set(), hover: null, ghost: null, quarters: null, open });
+});
+
+test("a carried structure shades every quarter no spot it can take covers", () => {
+  const drags: Drag[] = [
+    { from: "palette", item: "archerTower" },
+    { from: "palette", item: "watchTower" },
+    { from: "palette", item: "monsterBait" },
+    { from: "structure", uid: BARRACKS.uid, kind: BARRACKS.kind },
+  ];
+  for (const drag of drags) {
+    const s = new EditSession(drag, L);
+    s.hover(on(KX, KY));
+    const open = s.overlay()!.open!;
+    // Every top left quarter tried the slow way, each fitted whole.
+    const kind = drag.from === "structure" ? drag.kind : (drag.item as PlacedKind);
+    const { qw, qh } = quarterSize(kind, false);
+    const want = new Uint8Array(QUARTERS_W * QUARTERS_H);
+    for (let qy = 0; qy < QUARTERS_H; qy++)
+      for (let qx = 0; qx < QUARTERS_W; qx++)
+        if (structureLayout(drag, L, `${qx},${qy}`))
+          for (let y = qy; y < qy + qh; y++) for (let x = qx; x < qx + qw; x++) want[y * QUARTERS_W + x] = 1;
+    assert.deepEqual([...open], [...want], JSON.stringify(drag));
+    assert.ok(open.includes(1) && open.includes(0));
+  }
+});
+
+test("a structure's spots are exactly those a whole fit passes", () => {
+  // A crowded city: tiles round the keep, a district apart, watch towers on
+  // every tile and monster bait squeezed in beside them.
+  let l = L;
+  for (const [x, y] of [[KX - 1, KY - 1], [KX + 1, KY - 1], [KX - 1, KY + 1], [KX, KY + 1], [KX + 1, KY + 1], [1, 2], [1, 3]]) l = placeCityTile(l, x, y) ?? l;
+  for (let y = 1; y < 13; y++) for (let x = 0; x < 9; x++) l = placeStructure(l, "watchTower", x, y) ?? l;
+  for (let y = KY - 2; y <= KY + 1; y++) for (let x = KX - 1; x <= KX + 1; x++) l = placeStructure(l, "monsterBait", x, y) ?? l;
+  const moved = l.structures.filter((s, i) => i % (FULL ? 3 : 9) === 0);
+  const drags: Drag[] = [
+    ...(["archerTower", "watchTower", "monsterBait", "barracks"] as PlacedKind[]).map((item): Drag => ({ from: "palette", item })),
+    ...moved.map((s): Drag => ({ from: "structure", uid: s.uid, kind: s.kind })),
+  ];
+  for (const layout of [L, l])
+    for (const drag of drags) {
+      const kind = drag.from === "structure" ? drag.kind : (drag.item as PlacedKind);
+      if (drag.from === "structure" && !layout.structures.some((s) => s.uid === drag.uid)) continue;
+      const want: string[] = [];
+      for (let qy = 0; qy < QUARTERS_H; qy++) for (let qx = 0; qx < QUARTERS_W; qx++) if (structureLayout(drag, layout, `${qx},${qy}`)) want.push(`${qx},${qy}`);
+      const got = structureSpots(layout, kind, drag.from === "structure" ? drag.uid : undefined).map((q) => `${q.qx},${q.qy}`);
+      assert.deepEqual(got, want, JSON.stringify(drag));
+    }
 });
 
 test("a bomb shows its reach over the board and goes off where it is released", () => {
