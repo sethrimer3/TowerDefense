@@ -17,6 +17,10 @@ export const SETTINGS = {
   /** The city's live dressing: wind-blown park grass, and drips, ripples
    * and reflections on the ponds. */
   effectsOff: { kind: "toggle", default: false, page: { id: "effects", label: "Grass and water effects", invert: true } },
+  /** Enemies, and the player's troops, drawn in battle as plain squares
+   * in their colours, quicker to draw than their sprites. */
+  simpleEnemies: { kind: "toggle", default: false, page: { id: "simple-enemies", label: "Simple square enemies" } },
+  simpleTroops: { kind: "toggle", default: false, page: { id: "simple-troops", label: "Simple square troops" } },
   /** The Defend palette lists items the player has none of (greyed); off, only those owned. */
   showEmpty: { kind: "toggle", default: false, page: { id: "show-empty", label: "Show items you have none of" } },
   /** Faint lines round the Defend board's tiles, and how strong, in percent. */

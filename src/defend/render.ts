@@ -57,6 +57,10 @@ export type DrawOptions = {
   /** Draw the live park grass and pond effects. */
   effects?: boolean;
   healthbars?: boolean;
+  /** Enemies as plain squares (the Settings page's Simple enemies). */
+  simpleEnemies?: boolean;
+  /** Your troops as plain squares (Simple troops). */
+  simpleTroops?: boolean;
   /** The run is over: the city's torches go out in a wave from the keep. */
   over?: boolean;
   /** Leave out the planted war banner (while the player carries it). */
@@ -375,7 +379,7 @@ export class DefendRenderer {
     else {
       // Combat art advances on the fixed simulation clock. Keep screen pixels
       // (including artPen's camera snapping), never rescale a cached frame.
-      const key = `${sim.time}:${sim.mapVersion}:${sim.effects.length}:${sim.scorches.length}:${sim.enemies.length}:${sim.soldiers.length}:${sim.civilians.length}:${this.px}:${c.canvas.width}:${c.canvas.height}:${this.cam.s}:${this.cam.x}:${this.cam.y}:${!!torches}:${opts.healthbars === true}`;
+      const key = `${sim.time}:${sim.mapVersion}:${sim.effects.length}:${sim.scorches.length}:${sim.enemies.length}:${sim.soldiers.length}:${sim.civilians.length}:${this.px}:${c.canvas.width}:${c.canvas.height}:${this.cam.s}:${this.cam.x}:${this.cam.y}:${!!torches}:${opts.healthbars === true}:${!!opts.simpleEnemies}:${!!opts.simpleTroops}`;
       this.combatLayer ??= document.createElement('canvas');
       const layer = this.combatLayer;
       if (sim !== this.combatSim || key !== this.combatKey) {
@@ -401,7 +405,7 @@ export class DefendRenderer {
     drawRime(c, this.px, sim);
     drawLandings(c, this.px, sim);
     this.wizard.drawIce(c, this.px, sim.frosts, sim.time * 1000, flameLights(sim).relief);
-    drawUnits(brush, sim, torches, opts.healthbars === true, opts.timings ? this.timings : undefined);
+    drawUnits(brush, sim, torches, opts.healthbars === true, opts.timings ? this.timings : undefined, { enemies: opts.simpleEnemies, troops: opts.simpleTroops });
     this.dark.draw(c, this.px, sim);
   }
 

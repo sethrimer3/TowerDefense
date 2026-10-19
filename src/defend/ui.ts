@@ -80,6 +80,9 @@ export type DefendHost = {
   effects(): boolean;
   devMode(): boolean;
   healthbars?(): boolean;
+  /** Enemies, and your troops, drawn as plain squares. */
+  simpleEnemies?(): boolean;
+  simpleTroops?(): boolean;
   /** The tile grid's opacity while building, 0 when it's hidden. */
   gridLines?(): number;
   setHealthbars?(value: boolean): void;
@@ -893,6 +896,8 @@ export class DefendPage {
       reduceMotion: this.host.reduceMotion(),
       effects: this.host.effects(),
       healthbars: this.host.healthbars?.() ?? true,
+      simpleEnemies: this.host.simpleEnemies?.() ?? false,
+      simpleTroops: this.host.simpleTroops?.() ?? false,
       looks: this.looks(),
       over: this.phase === "over",
       ...(this.picked ? { inspect: { id: this.picked.id, armed: this.sim ?? this.picked.armed } } : {}),

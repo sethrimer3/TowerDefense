@@ -26,6 +26,7 @@ import { drawCalled, drawDrops, drawStaggered } from "./reinforce-art.ts";
 import { drawExplosion, drawScorches as drawScorchArt } from "./blast-art.ts";
 import { BUILDING_FLASH, type DefendSim, type Effect, type Enemy, type Soldier } from "./sim.ts";
 import { hallPaths } from "./muskets.ts";
+import { drawSimpleEnemies, drawSimpleTroops } from "./simple-units.ts";
 
 export type Brush = { c: CanvasRenderingContext2D; px: number };
 
@@ -74,9 +75,12 @@ function healthBar({ c, px }: Brush, bd: Building, frac: number) {
 /** How brightly a torch at (x, y) still burns, 0 (out) to 1. */
 export type Burning = (x: number, y: number, id: number) => number;
 
+/** Draw enemies, or your troops, as plain squares (`simple-units.ts`). */
+export type Simple = { enemies?: boolean; troops?: boolean };
+
 /** Units, projectiles and effects. With `torches`, units carry a torch,
  * lit while it still burns. */
-export function drawUnits(b: Brush, sim: DefendSim, torches: Burning | null, healthbars = false, timing?: { entityMs: number }) {
+export function drawUnits(b: Brush, sim: DefendSim, torches: Burning | null, healthbars = false, timing?: { entityMs: number }, simple: Simple = {}) {
   // Track the wave peak even when the setting is off.
   if (!healthbars) trackHealthbarPeak(sim);
   drawBlackHoles(b, sim);
@@ -84,8 +88,9 @@ export function drawUnits(b: Brush, sim: DefendSim, torches: Burning | null, hea
   drawWatchRadii(b, sim);
   const start = timing ? performance.now() : 0;
   drawCivilians(b, sim, torches);
-  const swords = drawSoldiers(b, sim, torches);
-  for (const e of sim.enemies) drawEnemyArt(b, e, sim);
+  const swords = simple.troops ? (drawSimpleTroops(b, sim.soldiers), []) : drawSoldiers(b, sim, torches);
+  if (simple.enemies) drawSimpleEnemies(b, sim.enemies);
+  else for (const e of sim.enemies) drawEnemyArt(b, e, sim);
   drawSwords(b, swords);
   if (timing) timing.entityMs += performance.now() - start;
   drawArrows(b.c, b.px, sim);

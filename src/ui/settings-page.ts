@@ -7,7 +7,7 @@ import { el } from "./dom.ts";
 /** The settings on the page, in order; each control comes from its row in SETTINGS. */
 /** Gameplay settings, under their own heading first. */
 const GAMEPLAY = ["showEmpty"] as const satisfies readonly SettingKey[];
-const PAGE = ["reduceMotion", "effectsOff", "tileGrid", "soundOff", "ambienceOff", "pixelFont"] as const satisfies readonly SettingKey[];
+const PAGE = ["reduceMotion", "effectsOff", "simpleEnemies", "simpleTroops", "tileGrid", "soundOff", "ambienceOff", "pixelFont"] as const satisfies readonly SettingKey[];
 /** The dev options, under ALL ON. */
 const DEV = ["devMode", "devTowers", "instantResearch"] as const satisfies readonly SettingKey[];
 /** All research unlocked: the Smithy's rows and each skill tree. */
