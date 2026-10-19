@@ -10,7 +10,7 @@ import { BECOMES, TROOPS, allocated, rootOf, buildingPathsOf, buildingTree, undo
 import type { GraphNode } from "./upgrade-graph.ts";
 import { ARROW_LOOPS, BASTIONS, BOILING_OIL, KEEP_PATHS, keepRank, type KeepPathId, type KeepRanks } from "../keep-upgrades.ts";
 import { STONEWORK, THORNWORK, TOWN_WALLS, WALL_PATHS, wallRank, type WallPathId, type WallRanks } from "../wall-upgrades.ts";
-import { pathById, pathTopicOf, UNSPECIALIZED, type PathId, FIRE_ARROWS, SHARP, GUNNERY, SIEGE_SHOT, CRUSADE, BLOODLETTERS, SHADOWCLOAK, VENOM, HEADHUNT, GRENADIERS, VOLLEY, BAYONET, RANGERS, SKIRMISH, FORTIFY, PYRO, RIME, STORM, PYROCLASM, CINDERS, SPOTTERS, SIGNAL } from "../knowledge-paths.ts";
+import { pathById, pathTopicOf, UNSPECIALIZED, type PathId, FIRE_ARROWS, SHARP, GUNNERY, SIEGE_SHOT, CRUSADE, BLOODLETTERS, SHADOWCLOAK, VENOM, HEADHUNT, GRENADIERS, VOLLEY, BAYONET, MARKSMEN, RICOCHET, SUPPRESS, BERSERK, HALBERD, RANGERS, SKIRMISH, FORTIFY, PYRO, RIME, STORM, PYROCLASM, CINDERS, SPOTTERS, SIGNAL } from "../knowledge-paths.ts";
 import { bonuses } from "../progression.ts";
 import { ITEM_NAMES, archerDamage, archerCooldown, archerRange, cannonDamage, cannonCooldown, CANNON_RANGE, SOLDIER, ARCHER_UNIT, soldierScale, STRUCTURES, flameDps, flameRange, iceDamage, ICE_RANGE, iceChill, watchRadius, fireballDamage, fireballSplash, emberDps, emberSeconds, FIRE_MAGE, FIREBALL_RANGE, keepHp, BRAWLER, ASSASSIN_UNIT, SLINGER, SNIPER, MUSKETEER, WALL_BLOCK_DESCRIPTION, wallHp, type PaletteItem } from "../defend/catalog.ts";
 
@@ -31,9 +31,13 @@ export function kindStats(save: Save, kind: PaletteItem, path?: PathId, rank = 0
   }
   if (kind === "barracks" || kind === "archerBarracks") {
     const sword = kind === "barracks", base = sword ? SOLDIER : ARCHER_UNIT;
-    const crusade = at("crusaders"), ranger = at("rangers"), skirmish = at("skirmishers");
+    const crusade = at("crusaders"), berserk = at("berserkers"), halberd = at("halberdiers"), ranger = at("rangers"), skirmish = at("skirmishers");
     const scale = soldierScale(l.soldierArms);
-    return `Recruits: ${n(base.hp * scale * b.troopHp * (sword ? CRUSADE.hp[crusade] : 1))} HP · ${n(base.damage * scale * b.troopDamage * (crusade >= 3 ? CRUSADE.damage : ranger >= 2 ? RANGERS.damage : 1))} damage · ${n(base.speed * (crusade ? CRUSADE.speed : skirmish >= 2 ? SKIRMISH.speed : 1))} speed`;
+    const extra = [
+      berserk ? `strikes every ${n(SOLDIER.cooldown * BERSERK.cooldown)}s${berserk >= 2 ? ` · kills heal ${BERSERK.heal * 100}%` : ""}${berserk >= 3 ? " · cleaving" : ""}` : "",
+      halberd ? `${n(SOLDIER.reach + HALBERD.reach)} reach${halberd >= 2 ? ` · blows slow ${HALBERD.chill}s` : ""}${halberd >= 3 ? ` · ${HALBERD.bigDamage}x on big enemies` : ""}` : "",
+    ].filter(Boolean).map((t) => ` · ${t}`).join("");
+    return `Recruits: ${n(base.hp * scale * b.troopHp * (sword ? CRUSADE.hp[crusade] : 1))} HP · ${n(base.damage * scale * b.troopDamage * (crusade >= 3 ? CRUSADE.damage : halberd ? HALBERD.damage : ranger >= 2 ? RANGERS.damage : 1))} damage · ${n(base.speed * (crusade ? CRUSADE.speed : skirmish >= 2 ? SKIRMISH.speed : 1))} speed${extra}`;
   }
   if (kind === "assassinDen") {
     const blood = at("bloodletters"), cloak = at("shadowcloak"), venom = at("venom"), hunt = at("headhunters");
@@ -71,6 +75,16 @@ export function kindStats(save: Save, kind: PaletteItem, path?: PathId, rank = 0
         bayonet ? `bayonet ${BAYONET.damage}x up close${bayonet >= 2 ? " · hunts the city" : ""}${bayonet >= 3 ? ` · staggers ${BAYONET.stagger}s` : ""}` : "",
       ].filter(Boolean).map((t) => ` · ${t}`).join("");
       return `Recruits: ${n(u.hp * scale * b.troopHp)} HP · ${n(u.damage * scale * b.troopDamage)} damage every ${u.cooldown}s${range} · bursts ${MUSKETEER.blast} cells wide${extra}`;
+    }
+    if (kind === "sniperLodge") {
+      const marks = at("marksmen"), glance = at("ricochet"), supp = at("suppressors");
+      const extra = [
+        marks >= 2 ? "toughest first" : "",
+        marks >= 3 ? `every ${ordinal(MARKSMEN.every)} shot ${MARKSMEN.crit}x` : "",
+        glance ? `glances on ${RICOCHET.bounces[glance]}x at ${RICOCHET.share[glance] * 100}%` : "",
+        supp ? `hits slow ${SUPPRESS.chill}s${supp >= 2 ? ` · stagger ${SUPPRESS.stagger}s` : ""}` : "",
+      ].filter(Boolean).map((t) => ` · ${t}`).join("");
+      return `Recruits: ${n(u.hp * scale * b.troopHp)} HP · ${n(u.damage * scale * b.troopDamage)} damage every ${n(u.cooldown * (supp >= 3 ? SUPPRESS.reload : 1))}s · ${SNIPER.range + (marks ? MARKSMEN.range : 0)} range${extra}`;
     }
     return `Recruits: ${n(u.hp * scale * b.troopHp)} HP · ${n(u.damage * scale * b.troopDamage)} damage every ${u.cooldown}s${range}`;
   }

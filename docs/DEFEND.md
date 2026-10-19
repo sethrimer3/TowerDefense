@@ -292,7 +292,12 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   at III spreading when it dies; Headhunters going for the toughest enemy in
   reach, with a bounty of its HP, at III anywhere in the city); a
   Ranged Guild an archer barracks, a Mage Guild, a **sniper lodge** (snipers:
-  long range, heavy, slow single shots) or a **musket hall** (explosive
+  long range, heavy, slow single shots, with three paths: Marksmen reaching
+  3 cells further, aiming at the toughest enemy in reach from II and
+  landing a 4× headshot every third shot at III; Ricochet bullets glancing
+  on to the nearest enemy not yet struck within 2.5 cells, once, twice,
+  then four times at 80%; Suppressing fire's hits slowing, staggering from
+  II, and reloading 40% faster at III) or a **musket hall** (explosive
   musketmen: balls that burst over a small area, sparing your own, with
   three paths: Grenadiers' bursts leaving the ground burning, throwing four
   smaller bursts round them from II and setting clinging fire at III;
@@ -310,8 +315,11 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   upgrade; troop pathing is plain A* over open cells, so gates only need to
   change what counts as open).
   Their paths: Crusaders (more HP and slower, healing from rank II,
-  harder hitting at III) or Assassins (faster and frailer, every 4th, 3rd,
-  then 2nd strike critical, quicker strokes, the whole city their ground).
+  harder hitting at III, crowned by the Valkyrie palace), Berserkers
+  (strokes a third faster, each kill healing 30% from II, blows cleaving
+  every enemy beside the target at III) or Halberdiers (0.6 cells more
+  reach and 20% more damage, blows slowing from II, 2.5× on big enemies
+  at III). The old Assassins path is retired (its Knowledge refunded).
 - **Archer barracks** train archers (same garrison size, drill speed and
   arms upgrades as the swordsmen's barracks). Archers wander random city
   streets and stop to shoot anything within their short sight (3 cells,

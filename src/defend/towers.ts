@@ -19,6 +19,7 @@ import type { Building } from "./citygen.ts";
 import { center, nearest } from "./pathing.ts";
 import { shootBallista } from "./wall-defenses.ts";
 import { burstBall } from "./muskets.ts";
+import { bulletHit } from "./snipers.ts";
 import type { DefendSim, Enemy } from "./sim.ts";
 import { FIRE_ARROWS, GUNNERY, SHARP, SIEGE_SHOT, pathRank } from "../knowledge-paths.ts";
 import { ARROW_LOOPS, BOILING_OIL, keepRank } from "../keep-upgrades.ts";
@@ -187,7 +188,12 @@ export function stepArrows(sim: DefendSim, dt: number) {
     }
     // An explosive ball bursts where it lands, even if its mark fell.
     if (a.blast) burstBall(sim, a);
-    else if (alive && sim.hurtEnemy(t, a.damage, true, "ranged", a.origin ?? { x: a.x, y: a.y }, true) && a.burn) ignite(t, a.burn, a.burnFor!);
+    else if (alive) {
+      const landed = sim.hurtEnemy(t, a.damage, true, "ranged", a.origin ?? { x: a.x, y: a.y }, true);
+      if (landed && a.burn) ignite(t, a.burn, a.burnFor!);
+      // A sniper's bullet pins what it hits, or glances on.
+      if (a.pin || a.glance) bulletHit(sim, a, t, landed);
+    }
     a.life = 0;
   }
   sim.arrows = sim.arrows.filter((a) => a.life > 0);

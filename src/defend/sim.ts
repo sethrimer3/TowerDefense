@@ -149,7 +149,8 @@ export type Soldier = {
    * absent otherwise, so runs without valkyries keep their state as before. */
   guard?: number;
   bannerLife?: number;
-  /** Strikes an assassin has made, every few critical; absent for everyone else. */
+  /** Strikes an assassin (or a Marksmen sniper, shots) has made, every few
+   * critical; absent for everyone else. */
   strikes?: number;
   /** A Shadowcloak assassin's seconds until it is cloaked again (0: cloaked,
    * and no enemy picks it out); absent for everyone else. */
@@ -197,6 +198,12 @@ export type Arrow = {
   /** A Grenadier's ball: the ground it leaves burning (for `life` seconds at
    * `dps`, clinging at III) and the bomblets it throws; absent otherwise. */
   grenade?: { life: number; dps: number; bomblets: number; cling?: true };
+  /** A Ricochet bullet: the glances it has left, the share of the damage
+   * each keeps and the enemies already struck; absent otherwise. */
+  glance?: { left: number; share: number; struck: number[] };
+  /** Suppressing fire: how long a hit slows (and from II staggers) its
+   * enemy; absent otherwise. */
+  pin?: { chill: number; stagger?: number };
 };
 export type Effect = { kind: "boom" | "dust" | "spark" | "firework" | "steam"; x: number; y: number; t: number; r: number; seed?: number };
 /** A cannon shell in flight: lobbed from the tower to where the target was. */
