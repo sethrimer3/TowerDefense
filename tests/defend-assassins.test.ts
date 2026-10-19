@@ -85,7 +85,7 @@ test("a Melee Guild becomes a barracks or an assassins' den; the den has four pa
   assert.deepEqual(tree, ["k:meleeGuild=owned", "k:barracks=next", "k:assassinDen=next"]);
   const climbed = buildingTree("assassinDen", { path: "venom", rank: 1 });
   assert.deepEqual(climbed.map((n) => n.id), ["k:meleeGuild", "k:assassinDen", "p:venom:1", "p:venom:2", "p:venom:3"]);
-  assert.equal(climbed.find((n) => n.id === "k:assassinDen")!.closed, 3, "the other three paths are closed off");
+  assert.equal(climbed.find((n) => n.id === "k:assassinDen")!.closed!.length, 3, "the other three paths are closed off");
   assert.equal(allocated("assassinDen", { path: "venom", rank: 2 }), 6 + studyPathCost(4, 0) + studyPathCost(4, 1));
 });
 

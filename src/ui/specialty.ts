@@ -113,7 +113,7 @@ export function treeGraph(kind: PaletteItem | "wallSpikes", wear?: Wear): GraphN
     const face = n.kind
       ? `<canvas width="32" height="32" data-icon="${n.kind}"></canvas>`
       : `<canvas data-path-icon="${pathById(n.path!).ranks[n.rank! - 1].icon}:${pathById(n.path!).hue}"></canvas><b>${ROMAN[n.rank!]}</b>`;
-    return { id: n.id, parent: n.parent, state: n.state, face, tag: n.state === "owned" ? undefined : knowledgeTag(n.cost), hue, side: n.side, hidden: n.hidden, closed: n.closed };
+    return { id: n.id, parent: n.parent, state: n.state, face, tag: n.state === "owned" ? undefined : knowledgeTag(n.cost), hue, side: n.side, hidden: n.hidden, closed: n.closed, took: n.took };
   });
 }
 

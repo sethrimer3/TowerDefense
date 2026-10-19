@@ -252,12 +252,12 @@ test("undoing a node steps the building back to the one it grew from, its Knowle
 
 test("the tree puts other buildings beside and below, paths above, and counts hidden and closed branches", () => {
   const plain = buildingTree("watchTower");
-  for (const n of plain.filter((o) => o.step?.type === "become")) assert.ok(n.side && n.hidden! > 0, n.id);
+  for (const n of plain.filter((o) => o.step?.type === "become")) assert.ok(n.side && n.hidden!.length > 0, n.id);
   assert.ok(plain.filter((o) => o.path).every((o) => !o.side), "paths carry on up");
   assert.equal(plain.find((o) => o.id === "k:watchTower")!.closed, undefined, "nothing closed off yet");
   const wizard = buildingTree("wizardTower", { path: "storm", rank: 1 });
-  assert.equal(wizard.find((o) => o.id === "k:watchTower")!.closed, 3 + 2 - 1, "it passed over the archer and cannon towers and its two paths");
-  assert.equal(wizard.find((o) => o.id === "k:wizardTower")!.closed, 2, "Pyromancy and Rime");
+  assert.equal(wizard.find((o) => o.id === "k:watchTower")!.closed!.length, 3 + 2 - 1, "it passed over the archer and cannon towers and its two paths");
+  assert.equal(wizard.find((o) => o.id === "k:wizardTower")!.closed!.length, 2, "Pyromancy and Rime");
   assert.ok(wizard.find((o) => o.id === "k:darkKeep"), "the crown waits at the top");
 });
 
