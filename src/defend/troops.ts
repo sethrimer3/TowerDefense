@@ -37,7 +37,8 @@ import { CELL_COUNT, cellX, cellY } from "./grid.ts";
 import { cellAt, cellCenter, center, findPath, nearest, type PathLimits, type Point } from "./pathing.ts";
 import type { DefendSim, Enemy, Soldier } from "./sim.ts";
 import { answerBanner, MARCH_SIGHT } from "./war-banner.ts";
-import { CRUSADE, RANGERS, SKIRMISH, VOLLEY, pathRank } from "../knowledge-paths.ts";
+import { BERSERK, CRUSADE, HALBERD, RANGERS, SKIRMISH, VOLLEY, pathRank } from "../knowledge-paths.ts";
+import { bigGame, bulletOf, sniperRange, sniperReload } from "./snipers.ts";
 import { bayonetTarget, charges, grenadeOf, musketReload, musketSpeed, thrust, volleyTargets } from "./muskets.ts";
 import { assassinHp, assassinStrike, headhunter, huntReach, recruitState, stepCloak, toughestFirst } from "./assassins.ts";
 
@@ -46,13 +47,14 @@ const paths = (sim: DefendSim, home: number) => {
   const p = buildingPaths(sim, sim.map.buildings[home]);
   return {
     crusade: pathRank(p, "barracks", "crusaders"),
+    berserk: pathRank(p, "barracks", "berserkers"), halberd: pathRank(p, "barracks", "halberdiers"),
     ranger: pathRank(p, "archerBarracks", "rangers"), skirmish: pathRank(p, "archerBarracks", "skirmishers"),
   };
 };
 /** A swordsman's HP and damage, as shares of his own, by his barracks' path. */
 function swordStats(sim: DefendSim, home: number) {
-  const { crusade } = paths(sim, home);
-  return { hp: CRUSADE.hp[crusade], damage: crusade >= 3 ? CRUSADE.damage : 1 };
+  const { crusade, halberd } = paths(sim, home);
+  return { hp: CRUSADE.hp[crusade], damage: crusade >= 3 ? CRUSADE.damage : halberd ? HALBERD.damage : 1 };
 }
 /** How fast a swordsman (or brawler) walks. */
 function swordSpeed(sim: DefendSim, s: Soldier) {
@@ -189,7 +191,7 @@ export function stepSwordsman(sim: DefendSim, s: Soldier, dt: number) {
   const patrol = new Patrol(sim, s);
   let target = sim.enemies.find((e) => e.id === s.target && e.hp > 0) ?? null;
   if (target && !patrol.covers(target)) target = null;
-  if (target && inSwordReach(s, target)) return strike(sim, s, target);
+  if (target && inSwordReach(sim, s, target)) return strike(sim, s, target);
   if (s.thinkT <= 0) target = replan(sim, s, patrol);
   sim.followPath(s, target, swordSpeed(sim, s), dt);
 }
@@ -197,18 +199,33 @@ export function stepSwordsman(sim: DefendSim, s: Soldier, dt: number) {
 /** Answering the war banner: strike whatever is in reach, else close on
  * what is near or march to the banner (no leash while it stands). */
 function rally(sim: DefendSim, s: Soldier, dt: number) {
-  const near = sim.enemiesNear(s.x, s.y, melee(s).reach + 1).find((e) => inSwordReach(s, e));
+  const near = sim.enemiesNear(s.x, s.y, swordReach(sim, s) + 1).find((e) => inSwordReach(sim, s, e));
   if (near) return strike(sim, s, near);
   answerBanner(sim, sim.warBanner!, s, swordSpeed(sim, s), dt, MARCH_SIGHT);
 }
 
-const inSwordReach = (s: Soldier, e: Enemy) => dist(e.x - s.x, e.y - s.y) <= melee(s).reach + enemySize(e) / 2;
+/** How far a melee troop reaches: Halberdiers further. */
+const swordReach = (sim: DefendSim, s: Soldier) => melee(s).reach + (s.kind === "sword" && paths(sim, s.home).halberd ? HALBERD.reach : 0);
+const inSwordReach = (sim: DefendSim, s: Soldier, e: Enemy) => dist(e.x - s.x, e.y - s.y) <= swordReach(sim, s) + enemySize(e) / 2;
 
 function strike(sim: DefendSim, s: Soldier, e: Enemy) {
   if (s.cd > 0) return;
-  s.cd = melee(s).cooldown;
+  const { berserk, halberd } = s.kind === "sword" ? paths(sim, s.home) : { berserk: 0, halberd: 0 };
+  s.cd = melee(s).cooldown * (berserk ? BERSERK.cooldown : 1);
   if (s.kind === "assassin") return assassinStrike(sim, s, e, bannerDamage(sim, s));
-  sim.hurtEnemy(e, bannerDamage(sim, s), true, "melee", s);
+  const damage = bannerDamage(sim, s);
+  if (!berserk && !halberd) return void sim.hurtEnemy(e, damage, true, "melee", s);
+  // Set for the charge: big enemies are hit far harder.
+  sim.hurtEnemy(e, damage * (halberd >= 3 && enemySize(e) >= HALBERD.big ? HALBERD.bigDamage : 1), true, "melee", s);
+  // Hooked blades slow what they strike.
+  if (halberd >= 2 && e.hp > 0) e.chill = Math.max(e.chill ?? 0, HALBERD.chill);
+  let slain = e.hp <= 0 ? 1 : 0;
+  // Cleave: every other enemy beside the target.
+  if (berserk >= 3)
+    for (const o of sim.enemiesNear(e.x, e.y, BERSERK.cleave))
+      if (o !== e && o.hp > 0 && sq(o.x - e.x) + sq(o.y - e.y) <= sq(BERSERK.cleave) && sim.hurtEnemy(o, damage * BERSERK.share, true, "melee", s) && o.hp <= 0) slain++;
+  // Bloodlust: each kill heals the slayer.
+  if (berserk >= 2 && slain) s.hp = Math.min(s.maxHp, s.hp + s.maxHp * BERSERK.heal * slain);
 }
 
 /** Twice a second: path to the nearest of up to three reachable enemies, or
@@ -250,13 +267,14 @@ export function stepArcher(sim: DefendSim, s: Soldier, dt: number) {
   s.thinkT -= dt;
   const { ranger, skirmish } = paths(sim, s.home);
   const own = s.kind === "archer" ? null : RANGED[s.kind as keyof typeof RANGED];
-  const range = own ? own.range : archerUnitRange(sim.levels.archerSight ?? 0) + (ranger ? RANGERS.sight : 0);
+  const range = s.kind === "sniper" ? sniperRange(sim, s) : own ? own.range : archerUnitRange(sim.levels.archerSight ?? 0) + (ranger ? RANGERS.sight : 0);
   const speed = s.kind === "musketeer" ? musketSpeed(sim, s) : (own ?? ARCHER_UNIT).speed * (skirmish >= 2 ? SKIRMISH.speed : 1);
   // Bayonets: an enemy at close quarters is run through, not shot.
   const close = bayonetTarget(sim, s);
   if (close) return thrust(sim, s, close, bannerDamage(sim, s));
   const charge = charges(sim, s);
-  const near = nearest(sim.enemiesNear(s.x, s.y, range), s, range * range, true);
+  // Big game: the toughest in reach rather than the nearest.
+  const near = bigGame(sim, s, range) ?? nearest(sim.enemiesNear(s.x, s.y, range), s, range * range, true);
   if (near) {
     shoot(sim, s, near, range);
     // Skirmishers keep walking while they shoot, and charging bayonets
@@ -278,7 +296,12 @@ function shoot(sim: DefendSim, s: Soldier, e: Enemy, range: number) {
   if (s.kind !== "archer") {
     // Stone throwers, snipers and musketmen: one shot of their own.
     const kind = s.kind as keyof typeof RANGED, own = RANGED[kind], damage = bannerDamage(sim, s);
-    s.cd = kind === "musketeer" ? musketReload(sim, s) : own.cooldown;
+    s.cd = kind === "musketeer" ? musketReload(sim, s) : kind === "sniper" ? sniperReload(sim, s) : own.cooldown;
+    // A sniper's bullet carries its lodge's path.
+    if (kind === "sniper") {
+      const { damage: hit, ...bullet } = bulletOf(sim, s, damage);
+      return void sim.arrows.push({ x: s.x, y: s.y, origin: { x: s.x, y: s.y, attacker: s.id }, target: e.id, damage: hit, tx: e.x, ty: e.y, life: 2, shot: "bullet", ...bullet });
+    }
     const fire = (t: Enemy, share = 1) => sim.arrows.push({ x: s.x, y: s.y, origin: { x: s.x, y: s.y, attacker: s.id }, target: t.id, damage: damage * share, tx: t.x, ty: t.y, life: 2, shot: SHOT[kind],
       ...(kind === "musketeer" ? { blast: MUSKETEER.blast, ...grenadeOf(sim, s.home, damage * share) } : {}) });
     fire(e);

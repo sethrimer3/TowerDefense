@@ -7,23 +7,39 @@ import { spikeKey } from "../specializations.ts";
 import { dist, sq } from "../exact.ts";
 import { BLAST_STAKES, RIME_STAKES, SPRING_STAKES, pathRank } from "../knowledge-paths.ts";
 import { STONEWORK, THORNWORK, wallRank } from "../wall-upgrades.ts";
-import { BALLISTA, ENEMIES, enemySize, spikeDamage, spikeEvery } from "./catalog.ts";
+import { BALLISTA, ENEMIES, ballistaCooldown, ballistaDamage, ballistaRange, enemySize, spikeDamage, spikeEvery } from "./catalog.ts";
+import { FIRE_BOLTS, HEAVY_BOLTS, WINDLASS, ballistaRank } from "../ballista-upgrades.ts";
+import { fizzles } from "./boats.ts";
+import { ignite } from "./towers.ts";
 import type { Building } from "./citygen.ts";
 import { cellX, cellY } from "./grid.ts";
-import { center, nearest } from "./pathing.ts";
+import { center, nearest, type Point } from "./pathing.ts";
 import type { DefendSim, Enemy } from "./sim.ts";
 
 /** A ballista's bolt in flight: where it is, its heading (a unit vector),
- * how far it has left to fly, and whom it has struck. */
+ * how far it flies in all (`range`) and has left to fly, how many enemies
+ * it may pierce and whom it has struck; `building` is the building it came
+ * from and `aim` the key its ballista turns under (its building's id, or a
+ * gate ballista's `gateTowerKey`). The ballistas' Study ranks
+ * (`ballista-upgrades.ts`) add what each strike does; a gate ballista's
+ * bolt is `small`. All absent without them. */
 export type BallistaBolt = {
   x: number;
   y: number;
   dx: number;
   dy: number;
   left: number;
+  range: number;
+  pierce: number;
   damage: number;
   hits: number[];
   building: number;
+  aim: number;
+  small?: true;
+  stagger?: number;
+  burn?: number;
+  blaze?: true;
+  burst?: true;
 };
 
 const SIDE_STEP = { n: [0, -1], e: [1, 0], s: [0, 1], w: [-1, 0] } as const;
@@ -150,18 +166,49 @@ export function stepPlacedWalls(sim: DefendSim, dt: number) {
 
 /** Fliers pass over the stakes, boats sail through the wall and a mole
  * under the ground never touches them. */
-const onFoot = (e: Enemy) => !ENEMIES[e.kind].flying && !ENEMIES[e.kind].boat && !e.burrow;
+export const onFoot = (e: Enemy) => !ENEMIES[e.kind].flying && !ENEMIES[e.kind].boat && !e.burrow;
 
-/** A standing ballista shoots the nearest enemy in range, turning to it. */
+/** How far a wall ballista shoots, with the Smithy's levels and Windlass II. */
+export const wallBallistaRange = (sim: Pick<DefendSim, "levels" | "bonuses">) =>
+  ballistaRange(sim.levels.ballistaRange ?? 0) + WINDLASS.range[ballistaRank(sim.bonuses.ballista, "windlass")];
+
+/** Seconds between a wall ballista's shots. */
+export const wallBallistaReload = (sim: Pick<DefendSim, "levels" | "bonuses">) =>
+  ballistaCooldown(sim.levels.ballistaRate ?? 0) * sim.bonuses.towerReload * WINDLASS.reload[ballistaRank(sim.bonuses.ballista, "windlass")];
+
+/** A standing ballista shoots the nearest enemy in range, turning to it:
+ * one bolt, or with Windlass III a fan of three. */
 export function shootBallista(sim: DefendSim, b: Building): boolean {
-  const c = center(b.rect);
-  const target = nearest(sim.enemiesNear(c.x, c.y, BALLISTA.range), c);
+  const c = center(b.rect), range = wallBallistaRange(sim);
+  const target = nearest(sim.enemiesNear(c.x, c.y, range), c, sq(range));
   if (!target) return false;
-  const d = dist(target.x - c.x, target.y - c.y) || 1;
-  const dx = (target.x - c.x) / d, dy = (target.y - c.y) / d;
-  sim.ballistaAim.set(b.id, { x: dx, y: dy });
-  sim.ballistaBolts.push({ x: c.x, y: c.y, dx, dy, left: BALLISTA.range + 1, damage: BALLISTA.damage * sim.bonuses.towerDamage, hits: [], building: b.id });
+  const ranks = sim.bonuses.ballista;
+  const heavy = ballistaRank(ranks, "heavyBolts"), fire = ballistaRank(ranks, "fireBolts"), fan = ballistaRank(ranks, "windlass") >= 3;
+  const damage = ballistaDamage(sim.levels.ballistaDamage ?? 0) * sim.bonuses.towerDamage * HEAVY_BOLTS.damage[heavy];
+  const extra: Partial<BallistaBolt> = {
+    ...(heavy >= 2 ? { stagger: HEAVY_BOLTS.stagger } : {}),
+    ...(fire ? { burn: damage * FIRE_BOLTS.share } : {}),
+    ...(fire >= 2 ? { blaze: true } : {}),
+    ...(fire >= 3 ? { burst: true } : {}),
+  };
+  fireBolt(sim, c, target, b.id, b.id, { damage, range, pierce: HEAVY_BOLTS.pierce[heavy] || BALLISTA.pierce, extra, fan });
   return true;
+}
+
+/** Looses a bolt from `from` at `target` (or, `fan`, three spread about it),
+ * turning the ballista under `aim` to it. */
+export function fireBolt(sim: DefendSim, from: Point, target: Point, aim: number, building: number,
+  o: { damage: number; range: number; pierce: number; small?: boolean; extra?: Partial<BallistaBolt>; fan?: boolean }) {
+  const d = dist(target.x - from.x, target.y - from.y) || 1;
+  const dx = (target.x - from.x) / d, dy = (target.y - from.y) / d;
+  sim.ballistaAim.set(aim, { x: dx, y: dy });
+  const { cos, sin } = WINDLASS;
+  const heads = o.fan ? [[dx, dy], [dx * cos - dy * sin, dx * sin + dy * cos], [dx * cos + dy * sin, -dx * sin + dy * cos]] : [[dx, dy]];
+  for (const [hx, hy] of heads)
+    sim.ballistaBolts.push({
+      x: from.x, y: from.y, dx: hx, dy: hy, left: o.range + 1, range: o.range + 1, pierce: o.pierce, damage: o.damage, hits: [], building, aim,
+      ...(o.small ? { small: true } : {}), ...o.extra,
+    });
 }
 
 /** Bolts fly straight on, striking every enemy they pass within reach of
@@ -170,6 +217,7 @@ export function shootBallista(sim: DefendSim, b: Building): boolean {
 export function stepBallistaBolts(sim: DefendSim, dt: number) {
   if (!sim.ballistaBolts.length) return;
   for (const bolt of sim.ballistaBolts) {
+    if (bolt.left <= 0) continue;
     const step = Math.min(bolt.left, BALLISTA.speed * dt);
     const x0 = bolt.x, y0 = bolt.y;
     bolt.x += bolt.dx * step;
@@ -189,11 +237,24 @@ export function stepBallistaBolts(sim: DefendSim, dt: number) {
     // Nearest first along the line, so a full bolt stops in the file's front.
     hit.sort((a, b) => (a.x - x0) * bolt.dx + (a.y - y0) * bolt.dy - ((b.x - x0) * bolt.dx + (b.y - y0) * bolt.dy) || a.id - b.id);
     for (const e of hit) {
-      if (bolt.hits.length >= BALLISTA.pierce) break;
+      if (bolt.hits.length >= bolt.pierce) break;
       bolt.hits.push(e.id);
+      if (bolt.burst) {
+        // Thunderbolts: the first strike bursts, sparing your own people.
+        delete bolt.burst;
+        sim.explode(e.x, e.y, { r: FIRE_BOLTS.burst.r, damage: bolt.damage * FIRE_BOLTS.burst.share, friendlyFire: false, origin: { x: x0, y: y0, building: bolt.building } });
+      }
       sim.hurtEnemy(e, bolt.damage, true, "ranged", { x: x0, y: y0, building: bolt.building }, true);
+      if (e.hp <= 0) continue;
+      if (bolt.stagger && !ENEMIES[e.kind].unyielding) e.stagger = Math.max(e.stagger ?? 0, bolt.stagger);
+      if (bolt.burn) ignite(e, bolt.burn, FIRE_BOLTS.burn);
     }
-    if (bolt.hits.length >= BALLISTA.pierce) bolt.left = 0;
+    if (bolt.hits.length >= bolt.pierce) bolt.left = 0;
+    // Firebrands: where the bolt stops, the ground burns (not in water).
+    if (bolt.left <= 0 && bolt.blaze && !fizzles(sim, bolt.x, bolt.y, FIRE_BOLTS.blaze.r)) {
+      const { r, life, dps } = FIRE_BOLTS.blaze;
+      sim.blazes.push({ x: bolt.x, y: bolt.y, r, t: 0, life, dps: dps * sim.bonuses.towerDamage, seed: (bolt.building * 7919 + bolt.hits.length * 31 + Math.floor(bolt.x * 8) * 131 + Math.floor(bolt.y * 8)) >>> 0 });
+    }
   }
   sim.ballistaBolts = sim.ballistaBolts.filter((b) => b.left > 0);
 }

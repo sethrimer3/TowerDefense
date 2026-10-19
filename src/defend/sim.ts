@@ -38,6 +38,7 @@ import {
   STRUCTURES,
   GATE,
   BALLISTA,
+  gateHpScale,
   SPIKES,
   keepHp,
   wallHp,
@@ -66,6 +67,8 @@ import { calledFell, castReinforcements, REINFORCE, shieldWall, stepReinforcemen
 import { ageGraves, bury, castNecromancy, NECRO, stepUndead, type Grave, type Raising, type Risen } from "./necromancy.ts";
 import { sheltered, fizzles, stepFloods, type Flood, type Sinking } from "./boats.ts";
 import { baitFell, baitStanding } from "./bait.ts";
+import { stepGates } from "./gates.ts";
+import { IRONBOUND, gateBarred, gateRank } from "../gate-upgrades.ts";
 import { stepBallistaBolts, stepPlacedWalls, stepSpikes, type BallistaBolt, type SpikeThrust } from "./wall-defenses.ts";
 import { STONEWORK, TOWN_WALLS, wallRank } from "../wall-upgrades.ts";
 
@@ -149,7 +152,8 @@ export type Soldier = {
    * absent otherwise, so runs without valkyries keep their state as before. */
   guard?: number;
   bannerLife?: number;
-  /** Strikes an assassin has made, every few critical; absent for everyone else. */
+  /** Strikes an assassin (or a Marksmen sniper, shots) has made, every few
+   * critical; absent for everyone else. */
   strikes?: number;
   /** A Shadowcloak assassin's seconds until it is cloaked again (0: cloaked,
    * and no enemy picks it out); absent for everyone else. */
@@ -197,6 +201,12 @@ export type Arrow = {
   /** A Grenadier's ball: the ground it leaves burning (for `life` seconds at
    * `dps`, clinging at III) and the bomblets it throws; absent otherwise. */
   grenade?: { life: number; dps: number; bomblets: number; cling?: true };
+  /** A Ricochet bullet: the glances it has left, the share of the damage
+   * each keeps and the enemies already struck; absent otherwise. */
+  glance?: { left: number; share: number; struck: number[] };
+  /** Suppressing fire: how long a hit slows (and from II staggers) its
+   * enemy; absent otherwise. */
+  pin?: { chill: number; stagger?: number };
 };
 export type Effect = { kind: "boom" | "dust" | "spark" | "firework" | "steam"; x: number; y: number; t: number; r: number; seed?: number };
 /** A cannon shell in flight: lobbed from the tower to where the target was. */
@@ -260,6 +270,9 @@ export class DefendSim {
   /** What blocks the city's own people: `solid`, but for the standing city
    * gates, which open for them. The same array when there are no gates. */
   readonly ownSolid: Uint8Array;
+  /** `solid` as the enemy walks it: open gates open. The same array when
+   * there are no gates, or Portcullis bars them all. */
+  readonly foeSolid: Uint8Array;
   readonly hp: Float32Array;
   readonly maxHp: Float32Array;
   /** Built cells per building; == cells.length when intact. */
@@ -308,6 +321,16 @@ export class DefendSim {
    * city's own people pass through them (Town walls' posterns). */
   readonly pieces: Building[];
   wallThornT = 0;
+  /** The city's gates; and while one stands open to the enemy too (until
+   * Portcullis bars it), the seconds until it shuts, by building id. */
+  readonly gates: Building[];
+  readonly gateOpen = new Map<number, number>();
+  /** Gate upgrades (`gates.ts`): seconds until the murder holes next drop,
+   * until each fallen gate rises again (Ironbound III), and until each gate
+   * ballista may shoot again (keyed `gateTower`). All empty without them. */
+  gateHoleT = 0;
+  readonly gateRise = new Map<number, number>();
+  readonly gateTowerT = new Map<number, number>();
   readonly posterns: boolean;
   scorches: Scorch[] = [];
   effects: Effect[] = [];
@@ -427,13 +450,15 @@ export class DefendSim {
     const gates = map.buildings.filter((b) => b.kind === "gate" || (this.posterns && b.piece));
     this.ownSolid = gates.length ? this.solid.slice() : this.solid;
     for (const b of gates) for (const c of b.cells) this.ownSolid[c] = 0;
+    this.gates = map.buildings.filter((b) => b.kind === "gate");
+    this.foeSolid = this.gates.length && !gateBarred(bonuses.gate) ? this.solid.slice() : this.solid;
     this.keepId = map.buildings.find((b) => b.kind === "keep")!.id;
     this.baits = map.buildings.filter((b) => b.kind === "monsterBait");
     this.baitField = new Float64Array(this.baits.length ? CELL_COUNT : 0);
     this.builders = new Builders(levels);
     this.streets = streetCells(map);
     this.terrain = {
-      solid: this.solid,
+      solid: this.foeSolid,
       impassable: (i) => map.type[i] === CellType.WATER,
       cost: (i) => this.enterCost(i),
     };
@@ -528,6 +553,7 @@ export class DefendSim {
     stepBallistaBolts(this, dt);
     stepSpikes(this, dt);
     stepPlacedWalls(this, dt);
+    stepGates(this, dt);
     stepShells(this, dt);
     stepSiegeShots(this, dt);
     this.wizards.step(this, dt);
@@ -741,7 +767,7 @@ export class DefendSim {
   // ── Flow field ────────────────────────────────────────────────────────
   /** Cost of stepping out of a cell for a ground enemy. */
   private enterCost(i: number): number {
-    if (this.solid[i]) {
+    if (this.foeSolid[i]) {
       const b = this.map.owner[i];
       return 3 + this.hp[b] / 6;
     }
@@ -911,7 +937,8 @@ export class DefendSim {
     if (this.built[b.id] > 0) this.stats.current.fell++;
     this.hp[b.id] = 0;
     this.built[b.id] = 0;
-    for (const c of b.cells) this.solid[c] = this.ownSolid[c] = 0;
+    for (const c of b.cells) this.solid[c] = this.ownSolid[c] = this.foeSolid[c] = 0;
+    if (this.gateOpen.delete(b.id)) this.fieldDirty = true;
     this.changed.push(...b.cells);
     const p = center(b.rect);
     if (dust) this.effects.push({ kind: "dust", x: p.x, y: p.y, t: 0, r: Math.max(b.rect.w, b.rect.h) * 0.7 });
@@ -932,6 +959,7 @@ export class DefendSim {
     const b = this.map.buildings[id];
     this.solid[cell] = 1;
     if (b.kind !== "gate" && !(b.piece && this.posterns)) this.ownSolid[cell] = 1;
+    this.foeSolid[cell] = 1;
     this.changed.push(cell);
     this.built[id]++;
     this.hp[id] = Math.min(this.maxHp[id], this.hp[id] + this.maxHp[id] / b.cells.length);
@@ -980,6 +1008,13 @@ export class DefendSim {
 
   // ── Movement ──────────────────────────────────────────────────────────
   /** An open cell beside a building, preferring streets. */
+  /** Opens gate `b` to the enemy as well (or shuts it again), for the
+   * gates' own step (`gates.ts`) to call. */
+  openToFoes(b: Building, open: boolean) {
+    for (const c of b.cells) this.foeSolid[c] = open ? 0 : this.solid[c];
+    this.fieldDirty = true;
+  }
+
   doorOf(b: Building): number {
     const sides = sideCells(b.rect).filter((i) => !this.solid[i]);
     return sides.find((i) => this.map.type[i] === CellType.ROAD) ?? sides[0] ?? -1;
@@ -1105,7 +1140,7 @@ export function watchReach(sim: Pick<DefendSim, "levels" | "bonuses">, b?: Build
 function maxHpOf(b: Building, levels: Levels, bonuses: Readonly<Bonuses>) {
   if (b.kind === "wall" && b.piece) return wallHp(levels.wallStrength) * bonuses.wallHp * STONEWORK.hp[wallRank(bonuses.walls, "stonework")];
   if (b.kind === "wall") return wallHp(levels.wallStrength) * bonuses.wallHp;
-  if (b.kind === "gate") return wallHp(levels.wallStrength) * bonuses.wallHp * GATE.hpPerCell * b.cells.length;
+  if (b.kind === "gate") return wallHp(levels.wallStrength) * bonuses.wallHp * GATE.hpPerCell * b.cells.length * gateHpScale(levels.gateStrength ?? 0) * IRONBOUND.hp[gateRank(bonuses.gate, "ironbound")];
   if (b.kind === "wallBallista") return wallHp(levels.wallStrength) * bonuses.wallHp * BALLISTA.hpPerCell * b.cells.length;
   if (b.kind === "house") return HOUSE_HP_PER_CELL * b.cells.length;
   if (b.kind === "keep") return keepHp(levels.keepStrength) * bonuses.keepHp * BASTIONS.hp[keepRank(bonuses.keep, "bastions")];

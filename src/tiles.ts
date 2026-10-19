@@ -15,6 +15,9 @@ import { metalPriceText } from "./metals.ts";
 import { BASIC_BUILDINGS, BOMB_PRICE, ITEM_CATEGORY, ITEM_NAMES, PALETTE_ITEMS, purchasePrice, type PaletteItem, type Price } from "./defend/catalog.ts";
 import { available, buyBomb, buyItem, canAfford, type Wallet } from "./defend/progress.ts";
 import { evolvedBy, pathById, PATHS, type KnowledgePath, type PathHue } from "./knowledge-paths.ts";
+import { GATE_PATHS } from "./gate-upgrades.ts";
+import { BALLISTA_PATHS } from "./ballista-upgrades.ts";
+import { sideRank } from "./side-ranks.ts";
 import { hasTree, rootOf, upgradedFrom, type Wear } from "./specializations.ts";
 import { WALL_PATHS, wallRank } from "./wall-upgrades.ts";
 import type { PlacedKind } from "./defend/layout.ts";
@@ -128,13 +131,18 @@ export type TileMark = { type: "became"; name: string } | { type: "rank"; name: 
 
 /** The Knowledge upgrades a tile of `id` wearing `wear` carries: every kind
  * it grew through from its basic building (an evolved one's whole crowned
- * path first), then its own path's ranks. The walls carry their shared
- * tree's ranks. Empty for a tile with none. */
+ * path first), then its own path's ranks. The walls, the gates and the
+ * wall ballistas carry their shared trees' ranks. Empty for a tile with none. */
 export function tileMarks(save: Save, id: TileId, wear?: Wear): TileMark[] {
   const marks: TileMark[] = [];
   const ranks = (name: string, hue: PathHue, n: number) => { for (let r = 1; r <= n; r++) marks.push({ type: "rank", name, rank: r, hue }); };
   if (id === "wallBlock") {
     for (const p of WALL_PATHS) ranks(p.name, p.hue, wallRank(save.defend.wallRanks, p.id));
+    return marks;
+  }
+  if (id === "cityGate" || id === "wallBallista") {
+    const have = (id === "cityGate" ? save.defend.gateRanks : save.defend.ballistaRanks) as Partial<Record<string, number>> | undefined;
+    for (const p of id === "cityGate" ? GATE_PATHS : BALLISTA_PATHS) ranks(p.name, p.hue, sideRank(have, p.id));
     return marks;
   }
   if (universal(id)) return marks;
