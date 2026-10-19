@@ -45,7 +45,9 @@ export const SUBJECTS: Subject[] = [
   {
     id: "city", name: "City", sprite: "defense", blurb: "Its tiles, walls, keep and people.",
     topics: [
-      { id: "walls", name: "Walls & keep", item: "cityTile", items: ["wallBlock", "cityGate", "wallBallista"], upgrades: ["wallStrength", "keepStrength"], training: ["wallHp", "keepHp"], skills: ["masonry", "bastions"] },
+      { id: "walls", name: "Walls & keep", item: "cityTile", items: ["wallBlock"], upgrades: ["wallStrength", "keepStrength"], training: ["wallHp", "keepHp"], skills: ["masonry", "bastions"] },
+      { id: "cityGate", name: "City gate", item: "cityGate", upgrades: ["gateStrength", "gateHinges"] },
+      { id: "wallBallista", name: "Wall ballista", item: "wallBallista", upgrades: ["ballistaDamage", "ballistaRate", "ballistaRange"] },
       { id: "spikes", name: "Wall spikes", item: "wallSpikes", upgrades: ["spikeDamage", "spikeRate"] },
       { id: "civilians", name: "Civilians", upgrades: ["civilianCount", "civilianHealth", "rebuildSpeed"], training: ["rebuild"], skills: ["guilds"] },
       {

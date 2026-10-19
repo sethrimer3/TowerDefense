@@ -23,6 +23,10 @@ export type Overlay = {
    * quarter round it (every building but monster bait). The board shows its
    * grid of quarter tiles. Null before it is over the board. */
   quarters?: { rect: Rect; fits: boolean; clear: boolean } | null;
+  /** With `quarters`: one flag a quarter tile of the board (row by row),
+   * set where some spot the structure can take covers it; the rest are
+   * shaded. */
+  open?: Uint8Array;
   /** A bomb being aimed: centre in cells. */
   bomb?: { x: number; y: number; r: number } | null;
   /** The war banner being planted: centre and the reach it rallies to. */
@@ -58,7 +62,7 @@ export function drawGrid(c: CanvasRenderingContext2D, px: number, alpha: number)
 }
 
 export function drawOverlay(c: CanvasRenderingContext2D, px: number, o: Overlay) {
-  if (o.quarters !== undefined) drawQuarterGrid(c, px);
+  if (o.quarters !== undefined) drawQuarterGrid(c, px, o.open);
   else if (o.walls) drawWallTargets(c, px, o.walls);
   else if (o.gates) drawGateTargets(c, px, o.gates);
   else if (o.legal.size || o.ghost || o.hover !== null) drawTargets(c, px, o);
@@ -278,11 +282,24 @@ function drawReinforceReach(c: CanvasRenderingContext2D, px: number, at: NonNull
   }
 }
 
-/** The board's grid of quarter tiles, the tile lines over the finer ones. */
-function drawQuarterGrid(c: CanvasRenderingContext2D, px: number) {
+/** The board's grid of quarter tiles, those no spot covers shaded (`open`),
+ * the tile lines over the finer ones. */
+function drawQuarterGrid(c: CanvasRenderingContext2D, px: number, open?: Uint8Array) {
   const Q = (px * SUB) / QUARTER;
   const { W, H } = boardSize(px);
   const at = (q: number) => Math.round(q * Q);
+  if (open) {
+    c.fillStyle = "rgba(0,0,0,0.4)";
+    for (let qy = 0; qy < QUARTERS_H; qy++)
+      for (let qx = 0; qx < QUARTERS_W; qx++) {
+        if (open[qy * QUARTERS_W + qx]) continue;
+        // Runs of shaded quarters in a row are one rectangle, so no seams.
+        let end = qx + 1;
+        while (end < QUARTERS_W && !open[qy * QUARTERS_W + end]) end++;
+        c.fillRect(at(qx), at(qy), at(end) - at(qx), at(qy + 1) - at(qy));
+        qx = end - 1;
+      }
+  }
   c.save();
   c.lineWidth = 1;
   c.strokeStyle = "rgba(216,181,114,0.22)";

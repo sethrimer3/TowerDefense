@@ -12,6 +12,7 @@ import {
   TILES_H,
   TILES_W,
   WALL_THICKNESS,
+  cellInBounds,
   cellIndex,
   cellX,
   cellY,
@@ -251,32 +252,10 @@ export const quarterRectCells = (qx: number, qy: number, qw: number, qh: number)
  * round it), stands on the wrong side of the city limits, or would be cut
  * off from the keep's streets. */
 export function fitLayout(l: Layout): Fit {
-  const { city, wall } = ring(l);
-  const cityTiles = cityTileSet(l);
-  // The sections placed on their own: each of their cells is wall, and one
-  // inside the city is taken out of it.
-  const pieces = wallPieces(l, wall);
-  if (typeof pieces === "string") return { ok: false, reason: pieces };
-  const gates = l.gates.filter((g) => gateOk(cityTiles, g)).map(fitGate);
-  const spikes = l.spikes.filter((g) => gateOk(cityTiles, g)).map((g): FittedSpikes => ({ ...g, rect: spikesRect(g) }));
-  const ballistas = l.ballistas.filter((v) => cornerOk(cityTiles, v)).map((v): FittedBallista => ({ ...v, rect: ballistaRect(cityTiles, v), out: cornerOutward(cityTiles, v) }));
-  if (pieces) {
-    for (let i = 0; i < CELL_COUNT; i++) if (pieces[i]) { wall[i] = 1; city[i] = 0; }
-    if (gates.some((g) => rectCells(grow(g.inner, g.side)).some((i) => pieces[i]))) return { ok: false, reason: "A wall there would block a city gate." };
-  }
-  // The way in through each gate stays clear for its street.
-  const clear = new Uint8Array(CELL_COUNT);
-  for (const g of gates) for (const i of rectCells(grow(g.inner, g.side))) clear[i] = 1;
-  // `foot`: the uid + 1 of what stands on each cell; `near`: the uid + 1
-  // of the building whose clear quarter round it covers the cell.
-  const foot = new Int32Array(CELL_COUNT), near = new Int32Array(CELL_COUNT);
-  const fitted: FittedStructure[] = [];
-  for (const p of placements(l)) {
-    const f = fitOne(p, cityTiles, { city, wall, clear, foot, near });
-    if (typeof f === "string") return { ok: false, reason: f };
-    fitted.push(f);
-  }
-  const cut = cutOff(fitted, city, foot, l);
+  const base = fitBase(l, placements(l));
+  if (typeof base === "string") return { ok: false, reason: base };
+  const { city, wall, gates, spikes, ballistas, pieces, cells, fitted } = base;
+  const cut = cutOff(fitted, city, cells.foot, l);
   if (cut) return { ok: false, reason: `The ${STRUCTURES[cut.kind].name.toLowerCase()} would be cut off from the streets.` };
   return {
     ok: true,
@@ -288,6 +267,108 @@ export function fitLayout(l: Layout): Fit {
     ...(ballistas.length ? { ballistas } : {}),
     ...(pieces ? { pieces } : {}),
   };
+}
+
+/** Everything `fitLayout` works out before checking the streets reach every
+ * structure: the city and wall masks, the wall's pieces, and the cells the
+ * structures in `ps` claim, fitted in order; or why one can't stand. */
+function fitBase(l: Layout, ps: Placement[]) {
+  const { city, wall } = ring(l);
+  const cityTiles = cityTileSet(l);
+  // The sections placed on their own: each of their cells is wall, and one
+  // inside the city is taken out of it.
+  const pieces = wallPieces(l, wall);
+  if (typeof pieces === "string") return pieces;
+  const gates = l.gates.filter((g) => gateOk(cityTiles, g)).map(fitGate);
+  const spikes = l.spikes.filter((g) => gateOk(cityTiles, g)).map((g): FittedSpikes => ({ ...g, rect: spikesRect(g) }));
+  const ballistas = l.ballistas.filter((v) => cornerOk(cityTiles, v)).map((v): FittedBallista => ({ ...v, rect: ballistaRect(cityTiles, v), out: cornerOutward(cityTiles, v) }));
+  if (pieces) {
+    for (let i = 0; i < CELL_COUNT; i++) if (pieces[i]) { wall[i] = 1; city[i] = 0; }
+    if (gates.some((g) => rectCells(grow(g.inner, g.side)).some((i) => pieces[i]))) return "A wall there would block a city gate.";
+  }
+  // The way in through each gate stays clear for its street.
+  const clear = new Uint8Array(CELL_COUNT);
+  for (const g of gates) for (const i of rectCells(grow(g.inner, g.side))) clear[i] = 1;
+  // `foot`: the uid + 1 of what stands on each cell; `near`: the uid + 1
+  // of the building whose clear quarter round it covers the cell.
+  const cells: FitCells = { city, wall, clear, foot: new Int32Array(CELL_COUNT), near: new Int32Array(CELL_COUNT) };
+  const fitted: FittedStructure[] = [];
+  for (const p of ps) {
+    const f = fitOne(p, cityTiles, cells);
+    if (typeof f === "string") return f;
+    fitted.push(f);
+  }
+  return { cityTiles, city, wall, gates, spikes, ballistas, pieces, cells, fitted };
+}
+
+/** Every top left quarter where a structure of `kind` (the one numbered
+ * `uid` being moved, or a new one) can stand with the rest of `l` as it is:
+ * exactly the spots `fitLayout` would pass, without fitting the whole
+ * layout again for each. */
+export function structureSpots(l: Layout, kind: PlacedKind, uid?: number): QuarterPos[] {
+  const rest = uid === undefined ? l : removeStructure(l, uid);
+  const base = fitBase(rest, placements(rest));
+  if (typeof base === "string") return [];
+  const size = quarterSize(kind, l.compact.includes(kind));
+  const id = uid ?? l.nextUid;
+  // Fitted in uid order, as `placements` would put it.
+  const at = base.fitted.findIndex((f) => f.uid !== KEEP_UID && f.uid > id);
+  const before = at < 0 ? base.fitted : base.fitted.slice(0, at), after = at < 0 ? [] : base.fitted.slice(at);
+  const { city, foot } = base.cells;
+  // The streets as they are: whether everything reaches them, and which
+  // open cells they reach, so most spots need no flood of their own.
+  const reach = new Uint8Array(CELL_COUNT);
+  const sound = !cutOff(base.fitted, city, foot, rest, reach);
+  const groups = tileGroups(rest);
+  const seeded = new Set(before.filter((f) => f.inside).map((f) => groups.get(tileKey(f.tx, f.ty))));
+  const out: QuarterPos[] = [];
+  for (let qy = 0; qy + size.qh <= QUARTERS_H; qy++)
+    for (let qx = 0; qx + size.qw <= QUARTERS_W; qx++) {
+      const q = { qx, qy };
+      const p: Placement = { uid: id, kind, ...quarterTile(q), ...q, ...size };
+      if (refuseOne(p, base.cityTiles, base.cells)) continue;
+      const rect = quarterRectCells(qx, qy, size.qw, size.qh);
+      const inside = blockTiles(p.tx, p.ty, p.span).every((k) => base.cityTiles.has(k));
+      // Outside the city it stands on no street.
+      if (sound && !inside) { out.push(q); continue; }
+      // Where it touches no other structure and the open cells round it
+      // still join up round it, it cuts no street off, and it reaches the
+      // streets if any of them did.
+      const sides = sideCells(rect);
+      if (sound && seeded.has(groups.get(tileKey(p.tx, p.ty))) && !sides.some((i) => foot[i]) && ringJoined(rect, city, foot)) {
+        if (sides.some((i) => reach[i])) out.push(q);
+        continue;
+      }
+      const claimed = foot.slice();
+      for (const i of rectCells(rect)) claimed[i] = id + 1;
+      const f: FittedStructure = { uid: id, kind, tx: p.tx, ty: p.ty, rect, inside };
+      if (!cutOff([...before, f, ...after], city, claimed, rest)) out.push(q);
+    }
+  return out;
+}
+
+/** Whether the open city cells in the ring of cells round `r` (corners
+ * included) join up along the ring itself, so a structure on `r` leaves
+ * every way between them open. */
+function ringJoined(r: Rect, city: Uint8Array, foot: Int32Array): boolean {
+  // The ring, walked round clockwise from its top left corner.
+  const ring: number[] = [];
+  const x0 = r.x - 1, y0 = r.y - 1, x1 = r.x + r.w, y1 = r.y + r.h;
+  for (let x = x0; x < x1; x++) ring.push(x, y0);
+  for (let y = y0; y < y1; y++) ring.push(x1, y);
+  for (let x = x1; x > x0; x--) ring.push(x, y1);
+  for (let y = y1; y > y0; y--) ring.push(x0, y);
+  const n = ring.length / 2;
+  const open = (k: number) => {
+    const x = ring[2 * k], y = ring[2 * k + 1];
+    if (!cellInBounds(x, y)) return false;
+    const i = cellIndex(x, y);
+    return !!city[i] && !foot[i];
+  };
+  // Open runs along the ring: joined while there is at most one.
+  let runs = 0;
+  for (let k = 0; k < n; k++) if (open(k) && !open((k + n - 1) % n)) runs++;
+  return runs <= 1;
 }
 
 /** The keep, then every structure oldest first, as fitted. */
@@ -305,6 +386,19 @@ type FitCells = { city: Uint8Array; wall: Uint8Array; clear: Uint8Array; foot: I
 /** Fits one structure where it stands and claims its cells; or says why it
  * can't stand there. */
 function fitOne(p: Placement, cityTiles: Set<string>, cells: FitCells): FittedStructure | string {
+  const why = refuseOne(p, cityTiles, cells);
+  if (why) return why;
+  const rect = quarterRectCells(p.qx, p.qy, p.qw, p.qh);
+  const free = !huddles(p.kind);
+  const uid = p.uid + 1;
+  for (const i of rectCells(rect)) cells.foot[i] = uid;
+  if (free) for (const i of rectCells({ x: rect.x - QC, y: rect.y - QC, w: rect.w + 2 * QC, h: rect.h + 2 * QC })) cells.near[i] ||= uid;
+  return { uid: p.uid, kind: p.kind, tx: p.tx, ty: p.ty, rect, inside: blockTiles(p.tx, p.ty, p.span).every((k) => cityTiles.has(k)) };
+}
+
+/** Why one structure can't stand where it is, given the cells claimed so
+ * far, or null where it can. */
+function refuseOne(p: Placement, cityTiles: Set<string>, cells: FitCells): string | null {
   const def = STRUCTURES[p.kind], name = def.name.toLowerCase();
   if (!tileInBounds(p.tx, p.ty) || p.ty === SPAWN_ROW) return "Nothing can be built on the spawn row.";
   if (!tileInBounds(p.tx + p.span - 1, p.ty + p.span - 1)) return `The ${name} would hang off the board.`;
@@ -323,10 +417,7 @@ function fitOne(p: Placement, cityTiles: Set<string>, cells: FitCells): FittedSt
     if (cells.clear[i]) return `The ${name} would block a city gate.`;
     if (free && cells.near[i]) return `Buildings need a clear square between them.`;
   }
-  const uid = p.uid + 1;
-  for (const i of rectCells(rect)) cells.foot[i] = uid;
-  if (free) for (const i of rectCells({ x: rect.x - QC, y: rect.y - QC, w: rect.w + 2 * QC, h: rect.h + 2 * QC })) cells.near[i] ||= uid;
-  return { uid: p.uid, kind: p.kind, tx: p.tx, ty: p.ty, rect, inside };
+  return null;
 }
 
 /** The tile keys of the `span` × `span` block whose top left tile is
@@ -343,8 +434,7 @@ const openSides = (r: Rect, city: Uint8Array, foot: Int32Array) => sideCells(r).
 /** The first in-city structure that can't reach the keep through open city
  * cells, if any. In a district apart from the keep's, its first structure
  * stands in for the keep. */
-function cutOff(fitted: FittedStructure[], city: Uint8Array, foot: Int32Array, l: Layout): FittedStructure | undefined {
-  const reach = new Uint8Array(CELL_COUNT);
+function cutOff(fitted: FittedStructure[], city: Uint8Array, foot: Int32Array, l: Layout, reach = new Uint8Array(CELL_COUNT)): FittedStructure | undefined {
   const stack = openSides(fitted[0].rect, city, foot);
   const groups = tileGroups(l), seeded = new Set([0]);
   for (const f of fitted) {
@@ -354,13 +444,19 @@ function cutOff(fitted: FittedStructure[], city: Uint8Array, foot: Int32Array, l
     stack.push(...openSides(f.rect, city, foot));
   }
   for (const i of stack) reach[i] = 1;
+  const visit = (n: number) => {
+    if (city[n] && !foot[n] && !reach[n]) {
+      reach[n] = 1;
+      stack.push(n);
+    }
+  };
   while (stack.length) {
     const i = stack.pop()!;
-    for (const n of openSides({ x: cellX(i), y: cellY(i), w: 1, h: 1 }, city, foot))
-      if (!reach[n]) {
-        reach[n] = 1;
-        stack.push(n);
-      }
+    const x = cellX(i);
+    if (i >= CELLS_W) visit(i - CELLS_W);
+    if (i + CELLS_W < CELL_COUNT) visit(i + CELLS_W);
+    if (x > 0) visit(i - 1);
+    if (x < CELLS_W - 1) visit(i + 1);
   }
   return fitted.find((f) => f.inside && f.uid !== KEEP_UID && !openSides(f.rect, city, foot).some((i) => reach[i]));
 }

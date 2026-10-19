@@ -292,7 +292,12 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   at III spreading when it dies; Headhunters going for the toughest enemy in
   reach, with a bounty of its HP, at III anywhere in the city); a
   Ranged Guild an archer barracks, a Mage Guild, a **sniper lodge** (snipers:
-  long range, heavy, slow single shots) or a **musket hall** (explosive
+  long range, heavy, slow single shots, with three paths: Marksmen reaching
+  3 cells further, aiming at the toughest enemy in reach from II and
+  landing a 4× headshot every third shot at III; Ricochet bullets glancing
+  on to the nearest enemy not yet struck within 2.5 cells, once, twice,
+  then four times at 80%; Suppressing fire's hits slowing, staggering from
+  II, and reloading 40% faster at III) or a **musket hall** (explosive
   musketmen: balls that burst over a small area, sparing your own, with
   three paths: Grenadiers' bursts leaving the ground burning, throwing four
   smaller bursts round them from II and setting clinging fire at III;
@@ -310,8 +315,11 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   upgrade; troop pathing is plain A* over open cells, so gates only need to
   change what counts as open).
   Their paths: Crusaders (more HP and slower, healing from rank II,
-  harder hitting at III) or Assassins (faster and frailer, every 4th, 3rd,
-  then 2nd strike critical, quicker strokes, the whole city their ground).
+  harder hitting at III, crowned by the Valkyrie palace), Berserkers
+  (strokes a third faster, each kill healing 30% from II, blows cleaving
+  every enemy beside the target at III) or Halberdiers (0.6 cells more
+  reach and 20% more damage, blows slowing from II, 2.5× on big enemies
+  at III). The old Assassins path is retired (its Knowledge refunded).
 - **Archer barracks** train archers (same garrison size, drill speed and
   arms upgrades as the swordsmen's barracks). Archers wander random city
   streets and stop to shoot anything within their short sight (3 cells,
@@ -407,8 +415,28 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   bands and studs, painted along the wall and turned to its side, then lit
   from the upper left in screen space; it takes the usual damage stages and
   leaves rubble. The doors swing inward over `GATE_FRAMES` while a soldier
-  or civilian is within 1.6 cells and close behind them (`DefendRenderer`,
-  presentation only).
+  or civilian is within `GATE.reach` cells, or the sim holds the gate open,
+  and close behind them (`DefendRenderer`, presentation only).
+  A gate that opens lets the enemy in too (`gates.ts`, `stepGates`): while
+  any of the city's people are at a standing gate it stands open, and
+  shuts `gateShut` seconds after the last has gone (the Forge's Greased
+  hinges, `gateHinges`, shorten it). The enemy walks `sim.foeSolid`, the
+  `solid` mask with the open gates open (its flow field, `downhill`, its
+  smash-or-walk choice and its steps through `IceMotion.slide`), so an open
+  gate is a way in; an enemy caught in the gateway as it shuts is shoved
+  out to the nearest open cell. Without gates, or with Portcullis I, it is
+  the same array as `solid`. The Forge's Ironbound doors (`gateStrength`,
+  `gateHpScale`) add to its HP. The gates share one tree,
+  `gate-upgrades.ts` (`GATE_PATHS`, ranks in `DefendSave.gateRanks`,
+  `Bonuses.gate`, bought, undone and respecced through `side-ranks.ts`):
+  Portcullis (`PORTCULLIS`: I bars the enemy while the gate is open; II
+  murder holes hurt every enemy on foot at the gatehouse every 1.5 s,
+  `sim.gateHoleT`; III every second, harder, setting them burning), Gate
+  towers (`GATE_TOWERS`: a small ballista on the gatehouse at I, two at II
+  (`gateTowerSpots`), harder, further-piercing bolts at III; each turns
+  and reloads under its `gateTowerKey`, `sim.gateTowerT`, and shoots
+  `small` ballista bolts) and Ironbound (`IRONBOUND`: more HP, then
+  mending, then a fallen gate rising whole after 12 s, `sim.gateRise`).
 - **Wall spikes** (`wall-defenses.ts`, `stepSpikes`) stand on the stones
   `citygen.ts` lists in `map.spikes` (each row's stones that face open
   ground). Every `spikeEvery` seconds (`sim.spikeT`) each enemy on foot
@@ -428,11 +456,21 @@ from its seed; `tests/defend-replay.test.ts` pins it.
 - **Wall ballistas** are buildings (`kind: "wallBallista"`, numbered after
   the gates) with twice the HP of the stones they replace; they are solid,
   battered and rebuilt like the wall. Each shoots (`Towers`,
-  `shootBallista`) the nearest enemy within `BALLISTA.range` every
-  `BALLISTA.cooldown` seconds (Smithy reload and damage apply): a bolt
+  `shootBallista`) the nearest enemy within `wallBallistaRange` every
+  `wallBallistaReload` seconds, for `ballistaDamage` (the Forge's Steel
+  bolts, Torsion skeins and Long stocks, `ballistaDamage`, `ballistaRate`,
+  `ballistaRange`, and the Smithy's tower reload and damage apply): a bolt
   (`sim.ballistaBolts`, `stepBallistaBolts`) flies straight on at
   `BALLISTA.speed`, hurting each enemy it passes within reach of once,
-  nearest first, until it has pierced `BALLISTA.pierce` or flown its range.
+  nearest first, until it has pierced its `pierce` or flown its `range`.
+  The ballistas share one tree, `ballista-upgrades.ts` (`BALLISTA_PATHS`,
+  `DefendSave.ballistaRanks`, `Bonuses.ballista`): Heavy bolts
+  (`HEAVY_BOLTS`: harder, staggering from II, eight pierced at III), Fire
+  bolts (`FIRE_BOLTS`: what a bolt strikes burns, the ground where it stops
+  burns from II, it bursts on its first strike at III) and Windlass
+  (`WINDLASS`: quicker, then further, then a fan of three bolts turned by
+  a fixed cosine and sine, so no trigonometry). Each bolt carries what its
+  ranks add (`stagger`, `burn`, `blaze`, `burst`), all absent without them.
   `sim.ballistaAim` keeps where each last shot. A city without spikes or
   ballistas has no `map.spikes`, bolts or aims, so it replays as before.
   Drawn by `wall-defense-art.ts`: the stakes on an oak beam per stone,

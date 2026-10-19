@@ -6,7 +6,7 @@ import { cloneLayout, type PlacedKind } from "./defend/layout.ts";
 import type { Save } from "./save.ts";
 import { studyPathCost } from "./economy.ts";
 
-export type PathTopic = "wizardTower" | "barracks" | "valkyriePalace" | "assassinDen" | "musketHall" | "archerTower" | "cannonTower" | "archerBarracks" | "watchTower" | "mageGuild" | "bait" | "spikes" | SpellId;
+export type PathTopic = "wizardTower" | "barracks" | "valkyriePalace" | "assassinDen" | "musketHall" | "sniperLodge" | "archerTower" | "cannonTower" | "archerBarracks" | "watchTower" | "mageGuild" | "bait" | "spikes" | SpellId;
 /** Strike spells: cast from the battle's Skills palette rather than built,
  * so a spell has no cards; it casts with the one path `save.spellPaths`
  * names, at its furthest researched rank. */
@@ -14,9 +14,10 @@ export type SpellId = "necromancy" | "meteor" | "frostNova" | "reinforcements";
 export const SPELLS: SpellId[] = ["necromancy", "meteor", "frostNova", "reinforcements"];
 export const isSpell = (topic: string): topic is SpellId => (SPELLS as string[]).includes(topic);
 export type PathId =
-  | "pyromancy" | "rime" | "storm" | "crusaders" | "cloudborne"
+  | "pyromancy" | "rime" | "storm" | "crusaders" | "berserkers" | "halberdiers" | "cloudborne"
   | "bloodletters" | "shadowcloak" | "venom" | "headhunters"
   | "grenadiers" | "volleyFire" | "bayonets"
+  | "marksmen" | "ricochet" | "suppressors"
   | "fireArrows" | "sharpshooters" | "gunnery" | "siegeShot" | "rangers" | "skirmishers"
   | "spotters" | "signalFires" | "pyroclasm" | "cinders" | "oilSoaked" | "fortified"
   | "blastStakes" | "springStakes" | "rimeStakes"
@@ -63,6 +64,14 @@ export const RIME = { chill: 1.5, damage: 1.6, reach: 1.5, freeze: 1.2 };
 export const STORM = { links: [0, 3, 5, 7], jump: [0, 2.5, 3, 3.5], damage: 1.2, surge: 1.5 };
 /** Crusaders: heavier (HP by rank, slower), healing from II, harder hitting at III. */
 export const CRUSADE = { hp: [1, 1.5, 1.5, 2.2], speed: 0.85, heal: 3, damage: 1.5 };
+/** Berserkers: strokes come in `cooldown` of the time; from II every kill
+ * heals the slayer `heal` of its full HP; at III each blow also cuts every
+ * other enemy within `cleave` cells of its target for `share` of it. */
+export const BERSERK = { cooldown: 0.75, heal: 0.3, cleave: 1, share: 0.5 };
+/** Halberdiers: `reach` more cells of reach and `damage` times the damage;
+ * from II every blow slows its enemy for `chill` seconds; at III blows on
+ * an enemy at least `big` cells across hit `bigDamage` times as hard. */
+export const HALBERD = { reach: 0.6, damage: 1.2, chill: 1.5, big: 0.8, bigDamage: 2.5 };
 /** Cloudborne: the Valkyrie palace rises onto clouds and drifts west across
  * the sky at `speed` cells a second, coming round from the east edge at
  * another height; nothing on the ground can reach it, and its valkyries
@@ -103,6 +112,18 @@ export const VOLLEY = { extra: [0, 1, 2, 2], share: 0.5, drill: 0.15, most: 3, r
  * they hunt anywhere in the city at `speed` times their pace; at III a
  * thrust staggers its enemy for `stagger` seconds. */
 export const BAYONET = { reach: 1, damage: 2, cooldown: 1.2, speed: 1.4, stagger: 1 };
+/** The Sniper lodge's paths (`snipers.ts`). Marksmen: `range` more cells;
+ * from II aimed at the toughest enemy in reach; at III every `every`th shot
+ * is a headshot for `crit` times the damage. */
+export const MARKSMEN = { range: 3, every: 3, crit: 4 };
+/** Ricochet: a bullet that hits glances on `bounces[rank]` times, each to
+ * the nearest enemy within `jump` cells of the last it struck and not
+ * struck yet, for `share[rank]` of the damage before. */
+export const RICOCHET = { bounces: [0, 1, 2, 4], share: [0, 0.6, 0.6, 0.8], jump: 2.5 };
+/** Suppressing fire: every hit slows its enemy for `chill` seconds; from II
+ * it staggers it (standing still) for `stagger`; at III snipers reload in
+ * `reload` of the time. */
+export const SUPPRESS = { chill: 2, stagger: 0.6, reload: 0.6 };
 /** Fire arrows: an archer tower's arrows set what they hit burning for
  * `burn[rank]` seconds at `share[rank]` of the arrow's damage a second; at
  * III it looses `volley` arrows at once, each at another of the nearest. */
@@ -259,6 +280,22 @@ export const PATHS: KnowledgePath[] = [
     evolves: { from: "barracks", item: "valkyriePalace", name: "Valkyrie palace", cost: 100000, text: "This Barracks becomes a Valkyrie palace" },
   },
   {
+    id: "berserkers", topic: "barracks", name: "Berserkers", motto: "Fury, and blood for blood", hue: "ember",
+    ranks: [
+      { name: "Battle rage", icon: "dagger", cost: studyPathCost(4, 0), text: "Swordsmen strike 33% faster" },
+      { name: "Bloodlust", icon: "heart", cost: studyPathCost(4, 1), text: "Every enemy one slays heals it 30% of its full HP" },
+      { name: "Cleave", icon: "fork", cost: studyPathCost(4, 2), text: "Each blow also cuts every other enemy within a cell of its target, for half the damage" },
+    ],
+  },
+  {
+    id: "halberdiers", topic: "barracks", name: "Halberdiers", motto: "Long reach, hooking blows", hue: "verdant",
+    ranks: [
+      { name: "Halberds", icon: "stake", cost: studyPathCost(4, 0), text: "Swordsmen reach 0.6 cells further and hit 20% harder" },
+      { name: "Hooked blades", icon: "hand", cost: studyPathCost(4, 1), text: "Every blow slows its enemy for 1.5 seconds" },
+      { name: "Set for the charge", icon: "helm", cost: studyPathCost(4, 2), text: "Blows on big enemies hit 2.5× as hard" },
+    ],
+  },
+  {
     id: "cloudborne", topic: "valkyriePalace", name: "Cloudborne", motto: "A palace adrift on the clouds", hue: "frost",
     ranks: [
       { name: "Cloudborne", icon: "cloud", cost: studyPathCost(10, 0), text: "The palace rises onto clouds and drifts slowly west across the sky, coming round from the east at another height. Nothing on the ground can reach it, and its valkyries drop from wherever it floats" },
@@ -320,6 +357,30 @@ export const PATHS: KnowledgePath[] = [
       { name: "Fix bayonets", icon: "dagger", cost: studyPathCost(4, 0), text: "An enemy within a cell is run through with the bayonet for twice the shot's damage, every 1.2 seconds" },
       { name: "Charge", icon: "boot", cost: studyPathCost(4, 1), text: "Musketmen hunt enemies anywhere in the city, running 40% faster" },
       { name: "Shock", icon: "hammer", cost: studyPathCost(4, 2), text: "Every bayonet thrust staggers its enemy for 1 second" },
+    ],
+  },
+  {
+    id: "marksmen", topic: "sniperLodge", name: "Marksmen", motto: "Farther, and the biggest first", hue: "verdant",
+    ranks: [
+      { name: "Long rifles", icon: "spyglass", cost: studyPathCost(4, 0), text: "Snipers reach 3 cells further" },
+      { name: "Big game", icon: "crosshair", cost: studyPathCost(4, 1), text: "They aim at the toughest enemy in reach, not the nearest" },
+      { name: "Headshot", icon: "skull", cost: studyPathCost(4, 2), text: "Every 3rd shot is a headshot, 4× damage" },
+    ],
+  },
+  {
+    id: "ricochet", topic: "sniperLodge", name: "Ricochet", motto: "One bullet, many marks", hue: "steel",
+    ranks: [
+      { name: "Glancing shot", icon: "fork", cost: studyPathCost(4, 0), text: "A bullet that hits glances on to the nearest enemy within 2.5 cells, for 60% of the damage" },
+      { name: "Hard-cast lead", icon: "cannonball", cost: studyPathCost(4, 1), text: "It glances on twice" },
+      { name: "Pinball", icon: "bolt", cost: studyPathCost(4, 2), text: "It glances on four times, keeping 80% of the damage each time" },
+    ],
+  },
+  {
+    id: "suppressors", topic: "sniperLodge", name: "Suppressing fire", motto: "Pinned where they stand", hue: "frost",
+    ranks: [
+      { name: "Crippling shot", icon: "boot", cost: studyPathCost(4, 0), text: "Every hit slows its enemy for 2 seconds" },
+      { name: "Pinning shot", icon: "stake", cost: studyPathCost(4, 1), text: "Every hit also staggers it, standing still, for 0.6 seconds" },
+      { name: "Quick hands", icon: "gear", cost: studyPathCost(4, 2), text: "Snipers reload 40% faster" },
     ],
   },
   {
@@ -562,6 +623,7 @@ export const UNSPECIALIZED: Record<PathTopic, string> = {
   valkyriePalace: "A marble palace on the ground",
   assassinDen: "Quick, frail assassins: every 4th strike critical",
   musketHall: "Explosive musketmen: every ball bursts",
+  sniperLodge: "Snipers: slow, far, single hard shots",
   archerTower: "Steady single arrows",
   cannonTower: "Standard shells and blasts",
   archerBarracks: "Ordinary archers",

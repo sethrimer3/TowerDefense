@@ -133,10 +133,11 @@ const frame = (w: number, h: number) => ({ x0: 1, y0: 1, x1: w - 3, y1: h - 3 })
  * other path keeps the base art. Add a path here and handle it in the kind's
  * painter to give it a sprite. */
 export const PATH_LOOKS: Partial<Record<PlacedKind, readonly string[]>> = {
-  barracks: ["crusaders"],
+  barracks: ["crusaders", "berserkers", "halberdiers"],
   valkyriePalace: ["cloudborne"],
   assassinDen: ["bloodletters", "shadowcloak", "venom", "headhunters"],
   musketHall: ["grenadiers", "volleyFire", "bayonets"],
+  sniperLodge: ["marksmen", "ricochet", "suppressors"],
   archerBarracks: ["rangers", "skirmishers"],
   archerTower: ["fireArrows", "sharpshooters"],
   cannonTower: ["gunnery", "siegeShot"],
@@ -279,9 +280,10 @@ const DAGGER = ["..0..", ".030.", ".032.", ".032.", ".032.", "00500", "05450", "
 
 function paintBarracks(p: Pix, look: string) {
   const { x0, y0, x1, y1 } = frame(p.w, p.h);
-  const crusaders = look === "crusaders";
-  // Crusaders hold a lead-roofed hall.
-  const { along, ridge } = hall(p, x0, y0, x1, y1, crusaders ? C.lead : C.red);
+  const crusaders = look === "crusaders", berserk = look === "berserkers", halberd = look === "halberdiers";
+  // Crusaders hold a lead-roofed hall, Berserkers a blood-dark one,
+  // Halberdiers a mossy one.
+  const { along, ridge } = hall(p, x0, y0, x1, y1, crusaders ? C.lead : berserk ? C.kiln[1] : halberd ? C.moss : C.red);
   // A chimney near one gable end.
   const [chx, chy] = along ? [x0 + 5, ridge - 2] : [ridge - 2, y0 + 5];
   for (let dy = 0; dy < 4; dy++)
@@ -291,15 +293,20 @@ function paintBarracks(p: Pix, look: string) {
     }
   const sx = Math.round((x0 + x1) / 2) - 2, sy = Math.round((y0 + y1) / 2) - 3;
   // The shield on the ridge, mid-roof: blue with a lit upper left and a
-  // gold boss, pointed at the foot; the Crusaders' white with a red cross.
+  // gold boss, pointed at the foot; the Crusaders' white with a red cross,
+  // the Berserkers' red with crossed axes, the Halberdiers' gold with a
+  // halberd.
   const white = [0xa8a49c, 0xdcd8d0, 0xfaf8f2];
+  const face = crusaders ? white : berserk ? C.banner : halberd ? C.gold : C.shield;
   const shape = ["0000000", "0233110", "0231110", "0114110", "0111110", "0011100", "0001000"];
   shape.forEach((row, j) =>
     [...row].forEach((ch, i) => {
       if (j === 6 && i !== 3) return;
       if (j === 5 && (i < 1 || i > 5)) return;
       const cross = crusaders && ch !== "0" && (i === 3 || j === 2);
-      const c = ch === "0" ? OUTLINE : cross ? (i === 3 && j < 2 ? C.banner[2] : C.banner[1]) : ch === "4" ? C.gold[1] : (crusaders ? white : C.shield)[+ch - 1];
+      const axes = berserk && ch !== "0" && j <= 4 && (i - 1 === j || 5 - i === j);
+      const pole = halberd && ch !== "0" && (i === 3 || (j === 1 && i === 4));
+      const c = ch === "0" ? OUTLINE : cross ? (i === 3 && j < 2 ? C.banner[2] : C.banner[1]) : axes ? C.iron[3] : pole ? (j <= 1 ? C.iron[3] : C.plank[1]) : ch === "4" ? C.gold[1] : face[+ch - 1];
       p.set(sx - 1 + i, sy + j, c);
     }),
   );
@@ -358,17 +365,45 @@ function paintRangedGuild(p: Pix) {
   p.set(Math.round(px) - 1, Math.round(py) - 1, 0x2a1810);
 }
 
-function paintSniperLodge(p: Pix) {
-  const y = guild(p, C.canvas[1], CROSSHAIR, { 0: OUTLINE, 3: C.target[1] });
-  // The firing lane: sandbags across the near end, a trodden lane east to
-  // a small far target.
+/** The Marksmen's brass spyglass, lens to the right. */
+const SPYGLASS = ["0000000", "0122230", "0122230", "0000000"];
+/** Ricochet's bouncing track, a zigzag. */
+const ZIGZAG = ["0...0..", ".0.0.0.", "..0...0"];
+
+/** The Sniper lodge: a canvas-roofed hall with a crosshair on the ridge over
+ * a firing lane, sandbags at the near end and a small far target. Its paths
+ * change the roof, the emblem and the lane: the Marksmen's a second target
+ * further off, Ricochet's iron plates to ring, Suppressing fire's a double
+ * sandbag wall and caltrops. */
+function paintSniperLodge(p: Pix, look: string) {
+  const marks = look === "marksmen", glance = look === "ricochet", supp = look === "suppressors";
+  const y = marks ? guild(p, C.tar, SPYGLASS, { 0: OUTLINE, 1: C.brass[0], 2: C.brass[1], 3: C.ice[3] })
+    : glance ? guild(p, C.lead, ZIGZAG, { 0: C.brass[2] })
+    : supp ? guild(p, C.ice[1], CROSSHAIR, { 0: OUTLINE, 3: C.ice[3] })
+    : guild(p, C.canvas[1], CROSSHAIR, { 0: OUTLINE, 3: C.target[1] });
+  // The firing lane: sandbags across the near end (Suppressing fire's two
+  // deep), a trodden lane east to a small far target.
   for (let yy = y.y0 + 1; yy < y.y1; yy++) {
     p.set(y.x0 + 2, yy, yy % 2 ? C.straw[1] : C.straw[0]);
     p.set(y.x0 + 3, yy, OUTLINE);
+    if (supp) {
+      p.set(y.x0 + 4, yy, yy % 2 ? C.straw[0] : C.straw[1]);
+      p.set(y.x0 + 5, yy, OUTLINE);
+    }
   }
   const ly = Math.round((y.y0 + y.y1) / 2);
-  for (let x = y.x0 + 5; x < y.x1 - 3; x++) if (x % 2) p.set(x, ly, C.dirt[0]);
+  for (let x = y.x0 + (supp ? 7 : 5); x < y.x1 - 3; x++) if (x % 2) p.set(x, ly, C.dirt[0]);
+  if (glance) {
+    // Iron plates hung to ring when struck, one high, one low.
+    for (const [dx, dy] of [[-1.5, -1.5], [-4.5, 1.5]] as const)
+      disc(p, y.x1 + dx, ly + 0.5 + dy, 1.6, (x, yy, d, ox, oy) => (d > 1 ? OUTLINE : C.iron[1 + Math.min(2, lit(x, yy, ox, oy, d))]));
+    return;
+  }
   disc(p, y.x1 - 1.5, ly + 0.5, 1.7, (_x, _y, d) => (d > 1.1 ? OUTLINE : d > 0.5 ? C.target[0] : C.target[1]));
+  // The Marksmen's second target, further and smaller, in the far corner.
+  if (marks) disc(p, y.x1 - 1.5, y.y0 + 1.5, 1.2, (_x, _y, d) => (d > 0.7 ? OUTLINE : C.target[1]));
+  // Suppressing fire's caltrops scattered across the lane.
+  if (supp) for (const [dx, dy] of [[9, -1], [11, 1], [13, -2], [12, 2]] as const) p.set(y.x0 + dx, ly + dy, C.iron[3]);
 }
 
 /** The Grenadiers' grenade: a black iron ball with a lit fuse. */

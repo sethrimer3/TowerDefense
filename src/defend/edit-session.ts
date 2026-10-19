@@ -11,10 +11,10 @@ import { METEOR } from "./meteor.ts";
 import { FROST_NOVA } from "./frost-nova.ts";
 import { REINFORCE } from "./reinforcements.ts";
 import type { CityMap } from "./citygen.ts";
-import { carriesCorner, carriesGate, carriesStructure, carriesWall, dragSpan, dropGhost, legalLayouts, liftsCityTile, nearestCorner, nearestEdge, refusal, structureKey, structureLayout, structureRect, wallSpotRect, type Drag } from "./drag-rules.ts";
+import { carriedKind, carriesCorner, carriesGate, carriesStructure, carriesWall, dragSpan, dropGhost, legalLayouts, liftsCityTile, nearestCorner, nearestEdge, refusal, structureKey, structureLayout, structureRect, wallSpotRect, type Drag } from "./drag-rules.ts";
 import type { Overlay } from "./edit-overlay.ts";
 import { CELLS_W, SUB, tileKey } from "./grid.ts";
-import { QUARTERS_H, QUARTERS_W, huddles, quarterAt, type PlacedKind, removeBallista, removeCityTile, removeGate, removeSpikes, removeStructure, removeWall, wallAtCell, wallKey, type Layout } from "./layout.ts";
+import { QUARTERS_H, QUARTERS_W, huddles, quarterAt, quarterSize, structureSpots, removeBallista, removeCityTile, removeGate, removeSpikes, removeStructure, removeWall, wallAtCell, wallKey, type Layout } from "./layout.ts";
 
 /** Where a drag's pointer is: its board position in cells, and whether it is
  * over the board or the palette. */
@@ -45,6 +45,9 @@ export class EditSession {
   readonly legal: Map<string, Layout>;
   /** A structure's spots tried so far, keyed by top left quarter. */
   private spots = new Map<string, Layout | null>();
+  /** For a structure: one flag a quarter tile of the board, set where some
+   * spot it can take covers it; worked out the first time it is shown. */
+  private open: Uint8Array | null = null;
   /** Tiles across the block the item takes: 2 for a structure spanning a
    * 2 × 2 block of tiles, which is carried by its middle. */
   readonly span: number;
@@ -110,6 +113,18 @@ export class EditSession {
     return this.spots.get(key) ?? undefined;
   }
 
+  /** Which quarter tiles some spot the carried structure can take covers. */
+  private openQuarters(): Uint8Array {
+    if (this.open) return this.open;
+    const kind = carriedKind(this.drag);
+    const open = new Uint8Array(QUARTERS_W * QUARTERS_H);
+    const { qw, qh } = quarterSize(kind, this.layout.compact.includes(kind));
+    for (const q of structureSpots(this.layout, kind, this.drag.from === "structure" ? this.drag.uid : undefined)) {
+      for (let y = q.qy; y < q.qy + qh; y++) open.fill(1, y * QUARTERS_W + q.qx, y * QUARTERS_W + q.qx + qw);
+    }
+    return (this.open = open);
+  }
+
   /** For a piece of the wall: the tile edge (or, for a ballista, corner)
    * nearest the pointer, or failing that one that takes it within reach. */
   private edge(at: DragAt): string {
@@ -150,7 +165,7 @@ export class EditSession {
     const hover = this.tile;
     const next = hover ? this.layoutAt(hover) : undefined;
     if (carriesStructure(this.drag))
-      return { legal: new Set(), hover: null, ghost: next ? dropGhost(this.drag, next, hover!) : null, quarters: hover ? { rect: structureRect(this.drag, this.layout, hover), fits: !!next, clear: !huddles(this.drag.from === "structure" ? this.drag.kind : (this.drag.item as PlacedKind)) } : null };
+      return { legal: new Set(), hover: null, ghost: next ? dropGhost(this.drag, next, hover!) : null, quarters: hover ? { rect: structureRect(this.drag, this.layout, hover), fits: !!next, clear: !huddles(carriedKind(this.drag)) } : null, open: this.openQuarters() };
     if (carriesWall(this.drag))
       return { legal: new Set(), hover: null, ghost: next ? dropGhost(this.drag, next, hover!) : null, walls: { legal: new Set(this.legal.keys()), hover, fits: !!next } };
     if (carriesGate(this.drag))
