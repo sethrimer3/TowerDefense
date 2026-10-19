@@ -63,10 +63,10 @@ test("the shop's three basic buildings branch into every other tower and troop b
   assert.deepEqual(to("watchTower"), ["Archer tower", "Cannon tower", "Wizard tower", "Spotters I", "Signal fires I"]);
   assert.deepEqual(to("meleeGuild"), ["Barracks", "Assassins' den"]);
   assert.deepEqual(to("rangedGuild"), ["Archer barracks", "Mage Guild", "Sniper lodge", "Musket hall"]);
-  assert.deepEqual(to("barracks"), ["Crusaders I"]);
+  assert.deepEqual(to("barracks"), ["Crusaders I", "Berserkers I", "Halberdiers I"]);
   assert.deepEqual(to("assassinDen"), ["Bloodletters I", "Shadowcloak I", "Venomblades I", "Headhunters I"]);
   assert.deepEqual(to("wizardTower"), ["Pyromancy I", "Rime I", "Stormcalling I"]);
-  assert.deepEqual(to("sniperLodge"), [], "a leaf for now");
+  assert.deepEqual(to("sniperLodge"), ["Marksmen I", "Ricochet I", "Suppressing fire I"]);
   assert.deepEqual(nextSteps("wizardTower", { path: "storm", rank: 2 }).map(stepName), ["Stormcalling III"]);
   assert.deepEqual(nextSteps("wizardTower", { path: "storm", rank: 3 }).map(stepName), ["Dark wizard keep"], "its crown evolves it");
   assert.deepEqual(nextSteps("barracks", { path: "crusaders", rank: 3 }).map((s) => s.type === "evolve" && s.to), ["valkyriePalace"]);

@@ -19,8 +19,9 @@ import { Rain, Snow, ambientFor, type Weather } from "./weather.ts";
 import { areaFade, type AreaId } from "./areas.ts";
 import { damageKey, gateSprite, lotSeed, onCityArtLoaded, paintCityLayer, stageOf } from "./city-layer.ts";
 import { GATE_FRAMES } from "./gate-art.ts";
+import { peopleAt } from "./gates.ts";
+import type { GateRanks } from "../gate-upgrades.ts";
 import { drawBallistas, drawSpikeThrusts } from "./wall-defense-art.ts";
-import { rectDist } from "./pathing.ts";
 import { carriedLights, drawDamage, drawScorches, drawUnits, shadowCasters, type Brush, type Burning } from "./battle-art.ts";
 import { drawGrid, drawOverlay, type Overlay } from "./edit-overlay.ts";
 import { drawInspect, type Armed } from "./inspect.ts";
@@ -66,6 +67,9 @@ export type DrawOptions = {
   /** Each structure's path by uid, for the paths with their own look
    * (`PATH_LOOKS`); presentation only. */
   looks?: Readonly<Record<number, string>>;
+  /** The gates' upgrades while building (the battle's own once it runs),
+   * for the small ballistas Gate towers put on the gatehouses. */
+  gate?: GateRanks;
   /** The building the player tapped (its id in the map), outlined with its
    * reach and troops. */
   inspect?: { id: number; armed: Armed };
@@ -296,7 +300,7 @@ export class DefendRenderer {
     }
     ctx.imageSmoothingEnabled = false;
     if (sim) this.drawGates(map, sim, opts, dt);
-    drawBallistas(ctx, this.px, map, sim);
+    drawBallistas(ctx, this.px, map, sim, sim ? sim.bonuses.gate : opts.gate);
     drawSpikeThrusts(ctx, this.px, map, sim);
     this.drawParkLife(map, sim, opts, dt);
     // Park fences sit on the ground layer, under the lighting and units.
@@ -316,7 +320,8 @@ export class DefendRenderer {
         this.gateOpen.delete(b.id);
         continue;
       }
-      const near = [...sim.soldiers, ...sim.civilians].some((u) => u.hp > 0 && rectDist(b.rect, u.x, u.y) < 1.6);
+      // Open while the sim holds it open to the enemy too, or anyone of the city is at it.
+      const near = sim.gateOpen.has(b.id) || peopleAt(sim, b);
       const was = this.gateOpen.get(b.id) ?? 0;
       const open = opts.reduceMotion ? (near ? 1 : 0) : Math.max(0, Math.min(1, was + (near ? 2.5 : -1.5) * Math.min(dt, 0.1)));
       this.gateOpen.set(b.id, open);

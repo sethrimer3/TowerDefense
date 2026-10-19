@@ -206,7 +206,7 @@ The Knowledge upgrades a tile carries, in the order taken, on its face in the Ti
 What a building can be upgraded into, and the basic building it grows from: a Wizard tower from a Watch tower, and into a Dark wizard keep by its crown.
 
 **Path**:
-One way a building can grow, in ranks it climbs one at a time with Knowledge: the Wizard tower's Pyromancy (flames only), Rime (ice only, then freezing solid) or Stormcalling (lightning in place of flames), the Barracks' Crusaders (hearty, healing), the Assassins' den's Bloodletters (huge criticals, frail), Shadowcloak (**cloaked** until they strike, then an **ambush**), Venomblades (**venom**: the enemy takes more damage from everything) or Headhunters (the toughest enemy first, with a **bounty** of its HP), the Musket hall's Grenadiers (bursts leaving **burning ground**, then **bomblets**), Volley fire (extra balls, quicker reloads in ranks) or Bayonets (a **thrust** at close quarters, then a citywide charge), the Archer tower's Fire arrows (setting enemies **burning**) or Sharpshooters, the Cannon tower's Gun crews (with **grapeshot**) or Siege shot, the Archer barracks' Rangers or Skirmishers, the Watch tower's Spotters or Signal fires, the Mage Guild's Pyroclasm or Cinders, Monster bait's Oil-soaked or Fortified crates, Wall spikes' Blasting stakes (blowing up on contact), Spring stakes (the whole row shooting out) or Rimed stakes (chilling). Each building climbs its own path (its **specialization**), so different paths and ranks fight together in one city. (A strike spell's paths are still researched in the Study.)
+One way a building can grow, in ranks it climbs one at a time with Knowledge: the Wizard tower's Pyromancy (flames only), Rime (ice only, then freezing solid) or Stormcalling (lightning in place of flames), the Barracks' Crusaders (hearty, healing), Berserkers (quick strokes, healing kills, **cleave**) or Halberdiers (long reach, hooking blows, heavy on big enemies), the Sniper lodge's Marksmen (further, toughest first, a **headshot**), Ricochet (bullets that **glance** on to the next enemy) or Suppressing fire (hits that slow and **pin**), the Assassins' den's Bloodletters (huge criticals, frail), Shadowcloak (**cloaked** until they strike, then an **ambush**), Venomblades (**venom**: the enemy takes more damage from everything) or Headhunters (the toughest enemy first, with a **bounty** of its HP), the Musket hall's Grenadiers (bursts leaving **burning ground**, then **bomblets**), Volley fire (extra balls, quicker reloads in ranks) or Bayonets (a **thrust** at close quarters, then a citywide charge), the Archer tower's Fire arrows (setting enemies **burning**) or Sharpshooters, the Cannon tower's Gun crews (with **grapeshot**) or Siege shot, the Archer barracks' Rangers or Skirmishers, the Watch tower's Spotters or Signal fires, the Mage Guild's Pyroclasm or Cinders, Monster bait's Oil-soaked or Fortified crates, Wall spikes' Blasting stakes (blowing up on contact), Spring stakes (the whole row shooting out) or Rimed stakes (chilling). Each building climbs its own path (its **specialization**), so different paths and ranks fight together in one city. (A strike spell's paths are still researched in the Study.)
 
 **Evolution**:
 A path's crown, past its last rank, turns that one building into a greater form (Stormcalling's Wizard tower into the Dark wizard keep, Crusaders' Barracks into the Valkyrie palace), paid with Knowledge. If it no longer fits its tile it goes to the palette.
@@ -256,7 +256,13 @@ Burning ground a fireball (or bursting monster bait) leaves, hurting every groun
 A stack of crates of bait, a structure for anywhere: while any stands, every enemy goes for the nearest one before the keep.
 
 **City gate**:
-A gatehouse set into the city wall on the edge of a city tile: it opens for the city's own people (troops and civilians) and stays shut to the enemy, who must batter it down.
+A gatehouse set into the city wall on the edge of a city tile: it opens for the city's own people (troops and civilians) and stays shut to the enemy, who must batter it down; but while it stands open for your people, the enemy can slip through too, until a portcullis bars it.
+
+**Portcullis**:
+The city gates' first upgrade branch: an iron grate that keeps the enemy out while the gate is open for your people, then murder holes and boiling pitch over the way in.
+
+**Gate ballista**:
+A small crossbow on a city gate's gatehouse (the Gate towers branch), one or two to a gate, shooting light bolts.
 
 **Wall spikes**:
 A row of iron-shod stakes along the outside of one city tile's stretch of wall, cutting every enemy on foot that presses against it.

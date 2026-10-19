@@ -108,10 +108,10 @@ function march(t: Turn) {
     }
   }
   if (field === sim.field && rectDist(sim.keep.rect, e.x, e.y) <= reach) return hitBuilding(t, sim.keepId);
-  const best = downhill(field, sim.solid, cx, cy);
+  const best = downhill(field, sim.foeSolid, cx, cy);
   if (best < 0) return;
   const c = cellCenter(best);
-  if (sim.solid[best]) return smashThrough(t, best, c);
+  if (sim.foeSolid[best]) return smashThrough(t, best, c);
   if (field === sim.field) rollForDistraction(t, cx, cy);
   sim.moveToward(e, { x: c.x + e.jx, y: c.y + e.jy }, { speed: enemySpeed(sim, e) * chilled(e), dt });
 }

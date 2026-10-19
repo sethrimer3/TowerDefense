@@ -1,5 +1,7 @@
 import type { KeepRanks } from "../keep-upgrades.ts";
 import type { WallRanks } from "../wall-upgrades.ts";
+import type { GateRanks } from "../gate-upgrades.ts";
+import type { BallistaRanks } from "../ballista-upgrades.ts";
 import { intPow } from "../exact.ts";
 import { ECONOMY, quadraticCost } from "../economy.ts";
 import type { BattlePaths, PathId } from "../knowledge-paths.ts";
@@ -53,8 +55,10 @@ export const ITEM_CATEGORY: Record<PaletteItem, Exclude<PaletteCategory, "all">>
 export const inCategory = (item: PaletteItem, category: PaletteCategory) => category === "all" || ITEM_CATEGORY[item] === category;
 
 /** The city gate: 3 cells along the wall and its 2 cells deep, worth the
- * wall stones it stands in for, and some. */
-export const GATE = { long: 4, deep: 2, hpPerCell: 1.5 };
+ * wall stones it stands in for, and some. It swings open while any of the
+ * city's people are within `reach` cells of it and shuts `shut` seconds
+ * after the last has passed; while open, enemies may slip through too. */
+export const GATE = { long: 4, deep: 2, hpPerCell: 1.5, reach: 1.6, shut: 1.5 };
 /** A wall section, placed on its own. */
 export const WALL_BLOCK_DESCRIPTION =
   "A section of stone wall a quarter of a tile across, placed on a finer grid anywhere outside the city to funnel and stall the enemy, who must break through it. Its upgrade tree toughens, barbs and opens every wall you place.";
@@ -371,6 +375,11 @@ export type UpgradeId =
   | "baitBlast"
   | "spikeDamage"
   | "spikeRate"
+  | "gateStrength"
+  | "gateHinges"
+  | "ballistaDamage"
+  | "ballistaRate"
+  | "ballistaRange"
   | "wallStrength"
   | "keepStrength"
   | "civilianCount"
@@ -469,6 +478,11 @@ export const UPGRADES: UpgradeDef[] = [
   },
   { id: "spikeDamage", group: "Wall spikes", name: "Iron-shod stakes", maxLevel: 6, describe: (l) => `The stakes cut for ${spikeDamage(l)} damage` },
   { id: "spikeRate", group: "Wall spikes", name: "Barbed edges", maxLevel: 4, describe: (l) => `The stakes cut every ${spikeEvery(l).toFixed(2)}s` },
+  { id: "gateStrength", group: "City gate", name: "Ironbound doors", maxLevel: 6, describe: (l) => `The gate has ${Math.round(gateHpScale(l) * 100)}% of its usual HP` },
+  { id: "gateHinges", group: "City gate", name: "Greased hinges", maxLevel: 4, describe: (l) => `The gate swings shut ${gateShut(l).toFixed(2)}s after your people pass` },
+  { id: "ballistaDamage", group: "Wall ballista", name: "Steel bolts", maxLevel: 6, describe: (l) => `${ballistaDamage(l)} damage per bolt` },
+  { id: "ballistaRate", group: "Wall ballista", name: "Torsion skeins", maxLevel: 5, describe: (l) => `A bolt every ${ballistaCooldown(l).toFixed(2)}s` },
+  { id: "ballistaRange", group: "Wall ballista", name: "Long stocks", maxLevel: 4, describe: (l) => `${ballistaRange(l)} cell range` },
   { id: "wallStrength", group: "City", name: "Masonry", maxLevel: 6, describe: (l) => `${wallHp(l)} HP per wall stone` },
   { id: "keepStrength", group: "City", name: "Keep bastions", maxLevel: 6, describe: (l) => `${keepHp(l)} keep HP` },
   { id: "civilianCount", group: "Civilians", name: "Guild of builders", maxLevel: 5, describe: (l) => `${civilianCount(l)} civilians repair the city` },
@@ -506,6 +520,13 @@ export const watchRadius = (l: number) => 8 + l * 2;
 /** What wall spikes cut for, and how often they cut. */
 export const spikeDamage = (l: number) => SPIKES.damage + l * 3;
 export const spikeEvery = (l: number) => SPIKES.every * intPow(0.85, l);
+/** The gate's HP, as a share of its usual, and how soon it swings shut. */
+export const gateHpScale = (l: number) => 1 + l * 0.25;
+export const gateShut = (l: number) => GATE.shut * intPow(0.75, l);
+/** A wall ballista's bolt damage, reload and reach. */
+export const ballistaDamage = (l: number) => BALLISTA.damage + l * 10;
+export const ballistaCooldown = (l: number) => BALLISTA.cooldown * intPow(0.87, l);
+export const ballistaRange = (l: number) => BALLISTA.range + l * 1.5;
 export const archerUnitRange = (l: number) => 3 + l;
 export const cannonDamage = (l: number) => 20 + l * 9;
 export const cannonSplash = (l: number) => 1.7 + l * 0.15;
@@ -805,6 +826,10 @@ export type Bonuses = {
   keep?: KeepRanks;
   /** The placed walls' upgrades (`wall-upgrades.ts`); absent with none. */
   walls?: WallRanks;
+  /** The city gates' upgrades (`gate-upgrades.ts`); absent with none. */
+  gate?: GateRanks;
+  /** The wall ballistas' upgrades (`ballista-upgrades.ts`); absent with none. */
+  ballista?: BallistaRanks;
 };
 export const NO_BONUSES: Readonly<Bonuses> = Object.freeze({
   troopHp: 1, troopDamage: 1, drill: 1, towerDamage: 1, towerReload: 1, wallHp: 1, keepHp: 1, rebuild: 1, bombDamage: 1, undeadHp: 1, undeadDamage: 1, meteorDamage: 1, meteorRadius: 1, frostTime: 1, frostRadius: 1, reinforceHp: 1, reinforceDamage: 1, reinforceTime: 1,

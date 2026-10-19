@@ -2,7 +2,8 @@
  * as faint circles when it shoots and the troops it trained outlined too.
  * Presentation only; it reads the battle (or, while building, the levels
  * and the Study's paths) and never changes it. */
-import { BALLISTA, TURRET, turretSpots } from "./catalog.ts";
+import { TURRET, turretSpots } from "./catalog.ts";
+import { wallBallistaRange } from "./wall-defenses.ts";
 import type { Building, CityMap } from "./citygen.ts";
 import { center } from "./pathing.ts";
 import { watchReach, type DefendSim } from "./sim.ts";
@@ -29,7 +30,7 @@ export function reachOf(b: Building, armed: Armed): Circle[] {
     case "cannonTower": return at(cannonTowerRange(armed, b));
     case "wizardTower": return at(wizardReach(armed, b));
     case "watchTower": return at(watchReach(armed, b));
-    case "wallBallista": return at(BALLISTA.range);
+    case "wallBallista": return at(wallBallistaRange(armed));
     case "keep": {
       // Its arrow loops' reach, and how far out its boiling oil pours.
       const out: Circle[] = [], arrows = keepArrowRange(armed), oil = keepOilReach(armed);
