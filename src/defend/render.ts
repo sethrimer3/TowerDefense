@@ -34,6 +34,7 @@ import { GroundRelief, type ReliefLight } from "./ground-relief.ts";
 import { WizardArt, flameLights } from "./wizard-art.ts";
 import { drawBlazes, mageLights } from "./mage-art.ts";
 import { stabLights } from "./valkyrie-art.ts";
+import { SkyPalaceArt } from "./sky-palace-art.ts";
 import { DarkArt, darkLights } from "./dark-art.ts";
 import { raisingLights } from "./necro-art.ts";
 import { meteorLights } from "./meteor-art.ts";
@@ -97,6 +98,7 @@ export class DefendRenderer {
   readonly floods = new FloodArt();
   readonly smoke = new ChimneySmoke();
   readonly ghosts = new Ghosts();
+  private readonly sky = new SkyPalaceArt();
   readonly atmosphere = new AtmosphereArt();
   /** The battle time the wizard art last advanced to. */
   private wizardTime = 0;
@@ -266,6 +268,8 @@ export class DefendRenderer {
     this.ghosts.watch(sim, opts.now / 1000);
     this.ghosts.draw(this.ctx, this.px, opts.now / 1000, opts.reduceMotion);
     if (opts.effects ?? true) this.drawSmoke(map, sim, opts);
+    // Cloudborne palaces sail over everything on the ground.
+    this.sky.draw(this.ctx, this.px, map, sim, opts.looks, { now: opts.now, dt, reduceMotion: opts.reduceMotion, night: opts.night });
     if (sim?.warBanner && !opts.hideBanner) drawWarBanner(this.ctx, this.px, sim.warBanner, bannerReach(sim), { t: opts.now / 1000, reduceMotion: opts.reduceMotion });
     if (sim) this.wizard.drawFire(this.ctx, this.px);
     if (opts.inspect) drawInspect(this.ctx, this.px, map, sim, opts.inspect.id, opts.inspect.armed, opts.now, opts.reduceMotion);

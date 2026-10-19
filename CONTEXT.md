@@ -285,6 +285,9 @@ A quarter of a tile each way, 2 × 2 cells: the grid buildings and wall sections
 **Valkyrie palace**:
 A heavenly marble palace inside the city that takes a whole tile (half with Folded halls) and trains valkyries.
 
+**Cloudborne**:
+The Valkyrie palace's path: the palace floats on clouds, drifting west across the sky and coming round from the east, out of every enemy's reach, its valkyries dropping from wherever it floats.
+
 **Valkyrie**:
 An armoured angel with a spear who hunts enemies through the city and makes charge stabs.
 

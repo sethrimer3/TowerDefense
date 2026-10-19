@@ -58,6 +58,7 @@ import { Barracks, stepArcher, stepSwordsman } from "./troops.ts";
 import { cloaked, spreadVenom, stepVenom } from "./assassins.ts";
 import { stepBlazes, stepFireballs, stepMage, type Blaze, type Fireball } from "./mages.ts";
 import { stepStabs, stepValkyrie, type Stab } from "./valkyries.ts";
+import { launchPalaces, stepSkyPalaces, type SkyPalace } from "./sky-palace.ts";
 import { Wizards, stepFlames, stepFrosts, type Flame, type Frost } from "./wizard.ts";
 import { DarkKeeps, stepBolts, stepDarkWizard, type Bolt } from "./dark-wizards.ts";
 import { WarBanner, bannerInfluence, stepBannerLife } from "./war-banner.ts";
@@ -303,6 +304,8 @@ export class DefendSim {
   blazes: Blaze[] = [];
   /** Valkyries' charge stabs, fading. */
   stabs: Stab[] = [];
+  /** Cloudborne Valkyrie palaces drifting across the sky (`sky-palace.ts`); empty without any. */
+  skyPalaces: SkyPalace[] = [];
   /** Black lightning from dark keeps' turrets and dark wizards, fading. */
   bolts: Bolt[] = [];
   /** Wall ballistas' bolts in flight, and which way each ballista last
@@ -456,6 +459,7 @@ export class DefendSim {
     this.baits = map.buildings.filter((b) => b.kind === "monsterBait");
     this.baitField = new Float64Array(this.baits.length ? CELL_COUNT : 0);
     this.builders = new Builders(levels);
+    this.skyPalaces = launchPalaces(this);
     this.streets = streetCells(map);
     this.terrain = {
       solid: this.foeSolid,
@@ -472,6 +476,10 @@ export class DefendSim {
   }
   keepMaxHp() {
     return this.maxHp[this.keepId];
+  }
+  /** Whether building `id` is a palace floating in the sky, out of reach. */
+  aloft(id: number) {
+    return this.skyPalaces.length > 0 && this.skyPalaces.some((p) => p.id === id);
   }
   intact(b: Building) {
     return this.built[b.id] === b.cells.length;
@@ -496,6 +504,7 @@ export class DefendSim {
     this.fieldT -= dt;
     if (this.fieldDirty && this.fieldT <= 0) this.computeField();
     this.runWaves(dt);
+    if (this.skyPalaces.length) stepSkyPalaces(this, dt);
     if (!this.atmosphere && groundWeather(areaForWave(this.wave).id)) this.atmosphere = new Atmosphere();
     this.atmosphere?.step(this, dt);
     this.indexEnemies();
@@ -917,7 +926,7 @@ export class DefendSim {
   }
 
   damageBuilding(id: number, amount: number) {
-    if (this.hp[id] <= 0) return;
+    if (this.hp[id] <= 0 || this.aloft(id)) return;
     amount *= wardBuilding(this, id);
     if (Number.isFinite(amount) && amount > 0) this.stats.current[id === this.keepId ? "keep" : "city"] += Math.min(this.hp[id], amount);
     this.hp[id] -= amount;
@@ -928,6 +937,7 @@ export class DefendSim {
   /** A magic boat's water sinks building `id` whole: it goes under and
    * leaves its rubble when the water dries. */
   sink(id: number) {
+    if (this.aloft(id)) return;
     this.sinkings.push({ building: id, t: 0 });
     this.collapse(this.map.buildings[id], false);
   }
@@ -955,7 +965,7 @@ export class DefendSim {
    * function once the last cell is back. */
   rebuildCell(cell: number) {
     const id = this.map.owner[cell];
-    if (id < 0 || this.solid[cell] || icyCell(this, cell)) return;
+    if (id < 0 || this.solid[cell] || icyCell(this, cell) || this.aloft(id)) return;
     const b = this.map.buildings[id];
     this.solid[cell] = 1;
     if (b.kind !== "gate" && !(b.piece && this.posterns)) this.ownSolid[cell] = 1;

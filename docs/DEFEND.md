@@ -347,7 +347,17 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   with Long spears) or until an intact building, the city wall, a pond or
   the board's edge stops her, and her spear hurts every enemy on that line,
   fliers too. For a second after each charge nothing can hurt her
-  (`guard`), blasts included.
+  (`guard`), blasts included. Its one path, **Cloudborne** (`sky-palace.ts`),
+  lifts the palace off its lot onto clouds when the battle starts: it drifts
+  west at 0.3 cells a second and, once its clouds have left the west edge,
+  comes round from the east at another height (hashed from the palace and
+  the lap, no random draws). Aloft, its lot is open ground and nothing can
+  hurt, sink or rebuild it; its valkyries drop onto the nearest open cell
+  under its middle, and none while it is off the board. From II each lands
+  with a charge at the nearest enemy within twice her reach; at III it holds
+  2 more and trains them twice as fast. `sky-palace-art.ts` draws it on its
+  cloud bank with a ground shadow, at a tenth of its opacity over the city,
+  a structure or anyone, and a mooring on its lot.
 - **Dark wizard keeps** (`dark-wizards.ts`), grown from wizard towers by
   the Stormcalling path's crown rather than bought, each summon one **dark
   wizard**, the ultimate unit, on three times a barracks' drill (arms

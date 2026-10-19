@@ -207,6 +207,18 @@ const ICONS: Record<PathIcon, string[]> = {
     ".....o.....", ".....o.....", "....olo....", "....olo....", "...olmmo...", "..olwmmmo..",
     ".olwlmmmdo.", ".ollmmmmdo.", ".olmmmmddo.", "..odmmddo..", "...ooooo...",
   ],
+  cloud: [
+    "...........", "....ooo....", "...owwlo...", ".ooowllmoo.", "owwolllmmlo", "owllllmmmdo",
+    "olllmmmmmdo", "ommmmmmmddo", ".odddddddo.", "..ooooooo..", "...........",
+  ],
+  wing: [
+    "o..........", "ooo........", "owlooo.....", "owllllooo..", ".owlllllloo", ".owllmmmmlo",
+    "..owmmmmddo", "..owmmdddo.", "...omddoo..", "....ooo....", "...........",
+  ],
+  halo: [
+    "...........", "...........", "...ooooo...", ".oowwlllmoo", "owoo...oomo", "olo.....odo",
+    "omoo...oodo", ".oommmddoo.", "...ooooo...", "...........", "...........",
+  ],
 };
 
 const OUTLINE = "#140c08";

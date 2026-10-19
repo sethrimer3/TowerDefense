@@ -134,6 +134,7 @@ const frame = (w: number, h: number) => ({ x0: 1, y0: 1, x1: w - 3, y1: h - 3 })
  * painter to give it a sprite. */
 export const PATH_LOOKS: Partial<Record<PlacedKind, readonly string[]>> = {
   barracks: ["crusaders", "berserkers", "halberdiers"],
+  valkyriePalace: ["cloudborne"],
   assassinDen: ["bloodletters", "shadowcloak", "venom", "headhunters"],
   musketHall: ["grenadiers", "volleyFire", "bayonets"],
   sniperLodge: ["marksmen", "ricochet", "suppressors"],
@@ -778,7 +779,7 @@ function paintMageGuild(p: Pix, look: string) {
 /** Gold wings spread over the palace's south steps: `Y` gold, `y` lit. */
 const WINGS = ["00.......00", "0yY0...0Yy0", ".0yYY0YYy0.", "..00yYy00..", "....000...."];
 
-function paintValkyriePalace(p: Pix) {
+function paintValkyriePalace(p: Pix, look: string) {
   const { x0, y0, x1, y1 } = frame(p.w, p.h);
   const short = Math.min(x1 - x0, y1 - y0) + 1;
   const marble = (x: number, y: number, tone: number) => (hash(x, y, 51) % 13 === 0 ? C.vein : C.marble[tone]);
@@ -840,6 +841,23 @@ function paintValkyriePalace(p: Pix) {
       if (ch !== ".") p.set(wx + i, wy + j, ch === "0" ? OUTLINE : ch === "y" ? C.gold[2] : C.gold[1]);
     }),
   );
+  // Cloudborne: tufts of cloud billowing up round its corners.
+  if (look === "cloudborne") {
+    const r = Math.max(2.5, short * 0.13);
+    const puffs: [number, number, number][] = [];
+    for (const [cx, cy, sx, sy] of [[x0, y0, 1, 1], [x1 + 1, y0, -1, 1], [x0, y1 + 1, 1, -1], [x1 + 1, y1 + 1, -1, -1]])
+      puffs.push([cx + sx * r, cy + sy * r * 1.6, r], [cx + sx * r * 1.7, cy + sy * r, r * 0.85]);
+    cloudPuffs(p, puffs);
+  }
+}
+
+/** Cloud, shaded to the dark lower right (0xRRGGBB). */
+export const CLOUD = [0x7d88a8, 0xaab6d0, 0xd6deee, 0xf6f8fc, 0xffffff];
+/** Puffs of cloud (x, y, radius in pixels) as one billow: their outline
+ * round the whole, each shaded as a ball lit from the upper left. */
+export function cloudPuffs(p: Pix, puffs: readonly (readonly [number, number, number])[]) {
+  for (const [x, y, r] of puffs) disc(p, x, y, r, () => OUTLINE);
+  for (const [x, y, r] of puffs) disc(p, x, y, r - 1, (px, py, d, dx, dy) => CLOUD[Math.min(4, lit(px, py, dx, dy, d) + (d < (r - 1) * 0.4 ? 1 : 0))]);
 }
 
 /** The dark wizard keep. Its parts scale with its size, so the folded keep
