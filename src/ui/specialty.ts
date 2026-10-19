@@ -9,10 +9,13 @@ import type { Save } from "../save.ts";
 import { BECOMES, TROOPS, allocated, rootOf, buildingPathsOf, buildingTree, undoRefund, type TreeNode, type UpgradeStep, type Wear } from "../specializations.ts";
 import type { GraphNode } from "./upgrade-graph.ts";
 import { ARROW_LOOPS, BASTIONS, BOILING_OIL, KEEP_PATHS, keepRank, type KeepPathId, type KeepRanks } from "../keep-upgrades.ts";
-import { STONEWORK, THORNWORK, TOWN_WALLS, WALL_PATHS, wallRank, type WallPathId, type WallRanks } from "../wall-upgrades.ts";
+import { STONEWORK, THORNWORK, TOWN_WALLS, WALL_PATHS, respecWalls, undoWalls, upgradeWalls, wallAllocated, wallRank, type WallPathId, type WallRanks } from "../wall-upgrades.ts";
+import { keepAllocated, respecKeep, undoKeep, upgradeKeep } from "../keep-upgrades.ts";
+import { GATE_PATHS, GATE_TOWERS, IRONBOUND, PORTCULLIS, gateAllocated, gateBarred, gateRank, respecGate, undoGate, upgradeGate, type GatePathId, type GateRanks } from "../gate-upgrades.ts";
+import { BALLISTA_PATHS, FIRE_BOLTS, HEAVY_BOLTS, WINDLASS, ballistaAllocated, ballistaRank, respecBallistas, undoBallistas, upgradeBallistas, type BallistaPathId, type BallistaRanks } from "../ballista-upgrades.ts";
 import { pathById, pathTopicOf, UNSPECIALIZED, type PathId, FIRE_ARROWS, SHARP, GUNNERY, SIEGE_SHOT, CRUSADE, BLOODLETTERS, SHADOWCLOAK, VENOM, HEADHUNT, GRENADIERS, VOLLEY, BAYONET, MARKSMEN, RICOCHET, SUPPRESS, BERSERK, HALBERD, RANGERS, SKIRMISH, FORTIFY, PYRO, RIME, STORM, PYROCLASM, CINDERS, SPOTTERS, SIGNAL } from "../knowledge-paths.ts";
 import { bonuses } from "../progression.ts";
-import { ITEM_NAMES, archerDamage, archerCooldown, archerRange, cannonDamage, cannonCooldown, CANNON_RANGE, SOLDIER, ARCHER_UNIT, soldierScale, STRUCTURES, flameDps, flameRange, iceDamage, ICE_RANGE, iceChill, watchRadius, fireballDamage, fireballSplash, emberDps, emberSeconds, FIRE_MAGE, FIREBALL_RANGE, keepHp, BRAWLER, ASSASSIN_UNIT, SLINGER, SNIPER, MUSKETEER, WALL_BLOCK_DESCRIPTION, wallHp, type PaletteItem } from "../defend/catalog.ts";
+import { ITEM_NAMES, archerDamage, archerCooldown, archerRange, cannonDamage, cannonCooldown, CANNON_RANGE, SOLDIER, ARCHER_UNIT, soldierScale, STRUCTURES, flameDps, flameRange, iceDamage, ICE_RANGE, iceChill, watchRadius, fireballDamage, fireballSplash, emberDps, emberSeconds, FIRE_MAGE, FIREBALL_RANGE, keepHp, BRAWLER, ASSASSIN_UNIT, SLINGER, SNIPER, MUSKETEER, WALL_BLOCK_DESCRIPTION, wallHp, GATE, GATE_DESCRIPTION, BALLISTA, BALLISTA_DESCRIPTION, ballistaCooldown, ballistaDamage, ballistaRange, gateHpScale, gateShut, type PaletteItem } from "../defend/catalog.ts";
 
 /** `kind`'s effective numbers wearing `path` at `rank` (none: plain), with
  * the shared Smithy and skill bonuses. */
@@ -181,7 +184,7 @@ export type { TreeNode };
 // ── Trees climbed side by side: the keep's and the walls' ────────────────
 /** A tree whose branches climb side by side from one root (`keep-upgrades.ts`,
  * `wall-upgrades.ts`), as the graph and the card show it. */
-type SideTree<Id extends string> = { root: string; icon: string; paths: { id: Id; name: string; motto: string; hue: string; ranks: { name: string; icon: string; cost: number; text: string }[] }[] };
+type SideTree<Id extends string> = { root: string; icon: string; every: string; paths: { id: Id; name: string; motto: string; hue: string; ranks: { name: string; icon: string; cost: number; text: string }[] }[] };
 type Ranks<Id extends string> = Partial<Record<Id, number>> | undefined;
 const sideRank = <Id extends string>(ranks: Ranks<Id>, id: Id) => ranks?.[id] ?? 0;
 
@@ -230,7 +233,7 @@ function sideStep<Id extends string>(tree: SideTree<Id>, ranks: Ranks<Id>, id: s
 function sideCardHtml<Id extends string>(save: Save, tree: SideTree<Id>, ranks: Ranks<Id>, id: string, name: string, about: string, stats: (ranks: Ranks<Id>) => string): string {
   const free = save.settings.devMode;
   if (id === tree.root)
-    return `<div class="ug-card-head"><b>${name}</b></div><p>${about} Its branches climb side by side: buy a rank of any of them.</p><p class="ug-stats">${stats(ranks)}</p><div class="ug-card-foot" data-ug-ignore><b class="ug-owned">${tree.root === "k:keep" ? "This building" : "Every wall you place"}</b>${sideBeyond(tree, ranks, id) ? AGAIN_SELL : ""}</div>`;
+    return `<div class="ug-card-head"><b>${name}</b></div><p>${about} Its branches climb side by side: buy a rank of any of them.</p><p class="ug-stats">${stats(ranks)}</p><div class="ug-card-foot" data-ug-ignore><b class="ug-owned">${tree.every}</b>${sideBeyond(tree, ranks, id) ? AGAIN_SELL : ""}</div>`;
   const [, path, r] = id.split(":"), p = tree.paths.find((o) => o.id === path), rank = Number(r);
   const step = p?.ranks[rank - 1];
   if (!p || !step) return `<p class="ug-hint">Tap a node to see what it does.</p>`;
@@ -244,8 +247,10 @@ function sideCardHtml<Id extends string>(save: Save, tree: SideTree<Id>, ranks: 
   return `<div class="ug-card-head"><b>${p.name} ${ROMAN[rank]}: ${step.name}</b><small>Level ${rank} / ${p.ranks.length}</small></div><p>${p.motto}. ${step.text}</p><p class="ug-stats">At this rank: ${stats(at)}</p><div class="ug-card-foot" data-ug-ignore>${state}</div>`;
 }
 
-const KEEP_TREE: SideTree<KeepPathId> = { root: "k:keep", icon: "keep", paths: KEEP_PATHS };
-const WALL_TREE: SideTree<WallPathId> = { root: "k:wallBlock", icon: "wallBlock", paths: WALL_PATHS };
+const KEEP_TREE: SideTree<KeepPathId> = { root: "k:keep", icon: "keep", every: "This building", paths: KEEP_PATHS };
+const WALL_TREE: SideTree<WallPathId> = { root: "k:wallBlock", icon: "wallBlock", every: "Every wall you place", paths: WALL_PATHS };
+const GATE_TREE: SideTree<GatePathId> = { root: "k:cityGate", icon: "cityGate", every: "Every city gate", paths: GATE_PATHS };
+const BALLISTA_TREE: SideTree<BallistaPathId> = { root: "k:wallBallista", icon: "wallBallista", every: "Every wall ballista", paths: BALLISTA_PATHS };
 
 /** The keep's tree as the graph draws it. */
 export const keepGraph = (ranks: KeepRanks | undefined) => sideGraph(KEEP_TREE, ranks);
@@ -294,6 +299,102 @@ export function wallStats(save: Save, ranks: WallRanks | undefined): string {
 export const wallCardHtml = (save: Save, ranks: WallRanks | undefined, id: string) =>
   sideCardHtml(save, WALL_TREE, ranks, id, "Walls", WALL_BLOCK_DESCRIPTION, (r) => wallStats(save, r));
 
+/** A city gate's numbers with `ranks`, and the shared Smithy and skill bonuses. */
+export function gateStats(save: Save, ranks: GateRanks | undefined): string {
+  const l = save.defend.levels, b = bonuses(save), n = (v: number) => Number(v.toFixed(2));
+  const holes = gateRank(ranks, "portcullis"), towers = gateRank(ranks, "gateTowers"), iron = gateRank(ranks, "ironbound");
+  const hp = wallHp(l.wallStrength) * b.wallHp * GATE.hpPerCell * GATE.long * GATE.deep * gateHpScale(l.gateStrength ?? 0) * IRONBOUND.hp[iron];
+  const parts = [`${Math.round(hp).toLocaleString("en")} HP`, `shuts ${n(gateShut(l.gateHinges ?? 0))}s after your people pass`,
+    gateBarred(ranks) ? "enemies can't slip in" : "enemies may slip in while it is open"];
+  if (holes >= 2) parts.push(`murder holes: ${n(PORTCULLIS.damage[holes] * b.towerDamage)} damage every ${PORTCULLIS.every[holes]}s${holes >= 3 ? ` · ${PORTCULLIS.burn}s burn` : ""}`);
+  if (towers) parts.push(`${towers >= GATE_TOWERS.twin ? "2 small ballistas" : "a small ballista"}: ${n(ballistaDamage(l.ballistaDamage ?? 0) * b.towerDamage * GATE_TOWERS.share[towers])} damage every ${n(GATE_TOWERS.cooldown * b.towerReload)}s · ${GATE_TOWERS.range[towers]} range · pierces ${GATE_TOWERS.pierce[towers]}`);
+  if (iron >= 2) parts.push(`mends ${IRONBOUND.mend * 100}% a second`);
+  if (iron >= 3) parts.push(`rises again ${IRONBOUND.rise}s after it falls`);
+  return parts.join(" · ");
+}
+
+/** A wall ballista's numbers with `ranks`, and the shared Smithy and skill bonuses. */
+export function ballistaStats(save: Save, ranks: BallistaRanks | undefined): string {
+  const l = save.defend.levels, b = bonuses(save), n = (v: number) => Number(v.toFixed(2));
+  const heavy = ballistaRank(ranks, "heavyBolts"), fire = ballistaRank(ranks, "fireBolts"), wind = ballistaRank(ranks, "windlass");
+  const damage = ballistaDamage(l.ballistaDamage ?? 0) * b.towerDamage * HEAVY_BOLTS.damage[heavy];
+  const parts = [`${n(damage)} damage`, `${n(ballistaCooldown(l.ballistaRate ?? 0) * b.towerReload * WINDLASS.reload[wind])}s reload`,
+    `${n(ballistaRange(l.ballistaRange ?? 0) + WINDLASS.range[wind])} range`, `pierces ${HEAVY_BOLTS.pierce[heavy] || BALLISTA.pierce}`];
+  if (heavy >= 2) parts.push(`staggers ${HEAVY_BOLTS.stagger}s`);
+  if (fire) parts.push(`${n(damage * FIRE_BOLTS.share)} burn a second for ${FIRE_BOLTS.burn}s`);
+  if (fire >= 2) parts.push(`burning ground ${FIRE_BOLTS.blaze.life}s`);
+  if (fire >= 3) parts.push(`bursts for ${n(damage * FIRE_BOLTS.burst.share)}`);
+  if (wind >= 3) parts.push(`${WINDLASS.fan} bolts a shot`);
+  return parts.join(" · ");
+}
+
+/** The trees climbed side by side, as the Defend page drives them: the
+ * keep's, the walls', the gates' and the ballistas'. */
+export type SideKind = "keep" | "walls" | "gate" | "ballistas";
+type Back = { id: string; rank: number };
+type Done = { ok: true } | { ok: false; reason: string };
+export type SideUi = {
+  /** The root node's id, the panel's title and whom it upgrades. */
+  root: string; name: string; whom: string; plain: string;
+  graph: (save: Save) => GraphNode[];
+  card: (save: Save, id: string) => string;
+  step: (save: Save, id: string) => string | undefined;
+  undo: (save: Save, id: string) => Back | undefined;
+  beyond: (save: Save, id: string) => { undo: string } | { all: true } | undefined;
+  buy: (save: Save, branch: string) => Done;
+  undoRank: (save: Save, back: Back) => Done;
+  respec: (save: Save) => Done;
+  allocated: (save: Save) => number;
+  owned: (save: Save) => boolean;
+};
+
+function sideUi<Id extends string>(tree: SideTree<Id>, ranks: (save: Save) => Ranks<Id>, o: {
+  name: string; whom: string; plain: string; about: string; stats: (save: Save, r: Ranks<Id>) => string;
+  buy: (save: Save, id: Id) => Done; undo: (save: Save, id: Id, rank: number) => Done; respec: (save: Save) => Done; allocated: (r: Ranks<Id>) => number;
+}): SideUi {
+  return {
+    root: tree.root, name: o.name, whom: o.whom, plain: o.plain,
+    graph: (save) => sideGraph(tree, ranks(save)),
+    card: (save, id) => sideCardHtml(save, tree, ranks(save), id, o.name, o.about, (r) => o.stats(save, r)),
+    step: (save, id) => sideStep(tree, ranks(save), id),
+    undo: (save, id) => sideUndo(tree, ranks(save), id),
+    beyond: (save, id) => sideBeyond(tree, ranks(save), id),
+    buy: (save, branch) => o.buy(save, branch as Id),
+    undoRank: (save, back) => o.undo(save, back.id as Id, back.rank),
+    respec: o.respec,
+    allocated: (save) => o.allocated(ranks(save)),
+    owned: (save) => !!ranks(save),
+  };
+}
+
+export const SIDE_UI: Record<SideKind, SideUi> = {
+  keep: sideUi(KEEP_TREE, (s) => s.defend.keepRanks, {
+    name: "Keep", whom: "this building", plain: "turn it back into a plain keep", about: STRUCTURES.keep.description, stats: keepStats,
+    buy: upgradeKeep, undo: undoKeep, respec: respecKeep, allocated: keepAllocated,
+  }),
+  walls: sideUi(WALL_TREE, (s) => s.defend.wallRanks, {
+    name: "Walls", whom: "the walls", plain: "turn every wall back into plain stone (walls inside the city go back to the palette)", about: WALL_BLOCK_DESCRIPTION, stats: wallStats,
+    buy: upgradeWalls, undo: undoWalls, respec: respecWalls, allocated: wallAllocated,
+  }),
+  gate: sideUi(GATE_TREE, (s) => s.defend.gateRanks, {
+    name: "City gate", whom: "the gates", plain: "turn every gate back into a plain one", about: GATE_DESCRIPTION, stats: gateStats,
+    buy: upgradeGate, undo: undoGate, respec: respecGate, allocated: gateAllocated,
+  }),
+  ballistas: sideUi(BALLISTA_TREE, (s) => s.defend.ballistaRanks, {
+    name: "Wall ballista", whom: "the ballistas", plain: "turn every wall ballista back into a plain one", about: BALLISTA_DESCRIPTION, stats: ballistaStats,
+    buy: upgradeBallistas, undo: undoBallistas, respec: respecBallistas, allocated: ballistaAllocated,
+  }),
+};
+
+/** Tiles' read-only list of a side tree's branches, shared by every one of `whose`. */
+function sideTreeHtml(paths: { name: string; motto: string; hue: string; ranks: { name: string; icon: string; cost: number }[] }[], whose: string): string {
+  const rows = paths.map((p) => `<li class="spec-row hue-${p.hue}"><span class="path-medal"><canvas data-path-icon="${p.ranks[0].icon}:${p.hue}"></canvas></span><div><b>${p.name}</b><small>${p.motto}: ${p.ranks.map((r, i) => `${ROMAN[i + 1]} ${r.name} (${r.cost.toLocaleString("en")})`).join(" · ")}</small></div></li>`).join("");
+  return `<div class="tile-specialties"><small>UPGRADES · KNOWLEDGE, SHARED BY EVERY ${whose}: PRESS AND HOLD ONE IN DEFEND WHILE BUILDING</small><ul>${rows}</ul></div>`;
+}
+/** Tiles' read-only lists of the gates' and the ballistas' branches. */
+export const gateTreeHtml = () => sideTreeHtml(GATE_PATHS, "GATE");
+export const ballistaTreeHtml = () => sideTreeHtml(BALLISTA_PATHS, "BALLISTA");
+
 /** Tiles' read-only list of the walls' branches. */
 export function wallTreeHtml(): string {
   const rows = WALL_PATHS.map((p) => `<li class="spec-row hue-${p.hue}"><span class="path-medal"><canvas data-path-icon="${p.ranks[0].icon}:${p.hue}"></canvas></span><div><b>${p.name}</b><small>${p.motto}: ${p.ranks.map((r, i) => `${ROMAN[i + 1]} ${r.name} (${r.cost.toLocaleString("en")})`).join(" · ")}</small></div></li>`).join("");
@@ -302,12 +403,14 @@ export function wallTreeHtml(): string {
 
 /** A family keeps its base identity through kind changes and respecs.
  * Placement UIDs intentionally do not affect the visual identity. */
-export function specialtyCircle(kind: PaletteItem | "wallSpikes" | "keep" | "walls", wear?: Wear, ranks?: KeepRanks, wallRanks?: WallRanks): CircleState {
-  const root = kind === "keep" || kind === "walls" || kind === "wallSpikes" ? kind : rootOf(kind as never);
+export function specialtyCircle(kind: PaletteItem | "wallSpikes" | SideKind, wear?: Wear, ranks?: KeepRanks, wallRanks?: WallRanks, gateRanks?: GateRanks, ballistaRanks?: BallistaRanks): CircleState {
+  const root = kind === "keep" || kind === "walls" || kind === "wallSpikes" || kind === "gate" || kind === "ballistas" ? kind : rootOf(kind as never);
   const upgrades = [{ id: `kind:${kind}`, rank: 1 }];
   if (wear) upgrades.push({ id: `path:${wear.path}`, rank: wear.rank });
   if (kind === "keep") for (const p of KEEP_PATHS) upgrades.push({ id: `keep:${p.id}`, rank: keepRank(ranks, p.id) });
   if (kind === "walls") for (const p of WALL_PATHS) upgrades.push({ id: `wall:${p.id}`, rank: wallRank(wallRanks, p.id) });
-  const city = ["keep", "walls", "wallBlock", "wallSpikes", "cityTile", "cityGate", "wallBallista", "monsterBait"].includes(kind);
+  if (kind === "gate") for (const p of GATE_PATHS) upgrades.push({ id: `gate:${p.id}`, rank: gateRank(gateRanks, p.id) });
+  if (kind === "ballistas") for (const p of BALLISTA_PATHS) upgrades.push({ id: `ballista:${p.id}`, rank: ballistaRank(ballistaRanks, p.id) });
+  const city = ["keep", "walls", "gate", "ballistas", "wallBlock", "wallSpikes", "cityTile", "cityGate", "wallBallista", "monsterBait"].includes(kind);
   return { topic: `building:${root}`, upgrades, motif: city ? "tesseract" : "voronoi" };
 }

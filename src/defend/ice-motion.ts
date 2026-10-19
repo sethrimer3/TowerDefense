@@ -55,7 +55,7 @@ export class IceMotion {
   }
 
   slide(sim: DefendSim, u: Point, dx: number, dy: number, own: boolean) {
-    const solid = own ? sim.ownSolid : sim.solid;
+    const solid = own ? sim.ownSolid : sim.foeSolid;
     const n = this.velocity.has(u) ? Math.max(1, Math.ceil(Math.max(Math.abs(dx), Math.abs(dy)) / .2)) : 1;
     for (let i = 0; i < n; i++) {
       if (!blocked(solid, u.x + dx / n, u.y)) u.x += dx / n;

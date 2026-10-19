@@ -256,7 +256,13 @@ Burning ground a fireball (or bursting monster bait) leaves, hurting every groun
 A stack of crates of bait, a structure for anywhere: while any stands, every enemy goes for the nearest one before the keep.
 
 **City gate**:
-A gatehouse set into the city wall on the edge of a city tile: it opens for the city's own people (troops and civilians) and stays shut to the enemy, who must batter it down.
+A gatehouse set into the city wall on the edge of a city tile: it opens for the city's own people (troops and civilians) and stays shut to the enemy, who must batter it down; but while it stands open for your people, the enemy can slip through too, until a portcullis bars it.
+
+**Portcullis**:
+The city gates' first upgrade branch: an iron grate that keeps the enemy out while the gate is open for your people, then murder holes and boiling pitch over the way in.
+
+**Gate ballista**:
+A small crossbow on a city gate's gatehouse (the Gate towers branch), one or two to a gate, shooting light bolts.
 
 **Wall spikes**:
 A row of iron-shod stakes along the outside of one city tile's stretch of wall, cutting every enemy on foot that presses against it.

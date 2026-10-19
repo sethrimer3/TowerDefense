@@ -8,6 +8,9 @@
  * with a winch at its tail, a bow of iron-banded horn and its string,
  * drawn back with a bolt laid on, or slack once loosed. */
 import { SPRING_STAKES } from "../knowledge-paths.ts";
+import { GATE_TOWERS, gateRank, type GateRanks } from "../gate-upgrades.ts";
+import { gateTowerKey, gateTowerSpots } from "./gates.ts";
+import { center } from "./pathing.ts";
 import { BALLISTA } from "./catalog.ts";
 import type { CityMap } from "./citygen.ts";
 import { CELLS_W, hash } from "./grid.ts";
@@ -256,35 +259,48 @@ export function ballistaDir(x: number, y: number) {
 const RELOAD_LOOK = 0.45;
 
 /** Every standing ballista on its bastion, turned to where it last shot
- * (out of the city before then), slack for a moment after each shot; and
- * the bolts in flight. `c` is in board space, `px` canvas pixels a cell. */
-export function drawBallistas(c: CanvasRenderingContext2D, px: number, map: CityMap, sim: DefendSim | null) {
+ * (out of the city before then), slack for a moment after each shot; the
+ * gates' small ballistas (Gate towers) on their gatehouses; and the bolts
+ * in flight. `c` is in board space, `px` canvas pixels a cell. */
+export function drawBallistas(c: CanvasRenderingContext2D, px: number, map: CityMap, sim: DefendSim | null, gate?: GateRanks) {
   const flown = BALLISTA.speed * RELOAD_LOOK;
-  for (const b of map.buildings) {
-    if (b.kind !== "wallBallista" || !b.corner || (sim && !sim.intact(b))) continue;
-    const aim = sim?.ballistaAim.get(b.id) ?? b.corner.out;
+  const one = (key: number, at: { x: number; y: number }, rest: { x: number; y: number }, scale: number) => {
+    const aim = sim?.ballistaAim.get(key) ?? rest;
     const dir = ballistaDir(aim.x, aim.y);
-    const loaded = !sim?.ballistaBolts.some((t) => t.building === b.id && BALLISTA.range + 1 - t.left < flown);
+    const loaded = !sim?.ballistaBolts.some((t) => t.aim === key && t.range - t.left < flown);
     const art = sprite(`ballista:${dir}:${loaded ? 1 : 0}`, BALLISTA_ART, BALLISTA_ART, () => ballistaPixels(dir, loaded));
-    const size = (BALLISTA_ART / ART) * px;
-    const cx = (b.rect.x + b.rect.w / 2) * px, cy = (b.rect.y + b.rect.h / 2) * px;
-    drawSprite(c, art, Math.round(cx - size / 2), Math.round(cy - size / 2), Math.round(size), Math.round(size));
+    // Whole screen pixels an art pixel, so the small ones stay crisp.
+    const size = Math.max(1, Math.round((px / ART) * scale)) * BALLISTA_ART;
+    drawSprite(c, art, Math.round(at.x * px - size / 2), Math.round(at.y * px - size / 2), size, size);
+  };
+  const towers = gateRank(gate, "gateTowers");
+  for (const b of map.buildings) {
+    if (sim && !sim.intact(b)) continue;
+    if (b.kind === "wallBallista" && b.corner) one(b.id, center(b.rect), b.corner.out, 1);
+    else if (b.kind === "gate" && b.gate && towers) {
+      const [sx, sy] = OUTWARD[b.gate.side];
+      gateTowerSpots(b, towers >= GATE_TOWERS.twin).forEach((at, n) => one(gateTowerKey(b, n), at, { x: sx, y: sy }, 0.5));
+    }
   }
-  if (sim) for (const t of sim.ballistaBolts) drawBolt(c, px, t.x, t.y, t.dx, t.dy);
+  if (sim) for (const t of sim.ballistaBolts) drawBolt(c, px, t.x, t.y, t.dx, t.dy, t.small ? 0.6 : 1, !!t.burn);
 }
 
-/** A bolt in flight: an outlined oak shaft with an iron head and fletching,
- * in art pixels snapped to whole screen pixels. */
-function drawBolt(c: CanvasRenderingContext2D, px: number, x: number, y: number, dx: number, dy: number) {
+/** Which way out of the city each side of a city tile faces. */
+const OUTWARD = { n: [0, -1], e: [1, 0], s: [0, 1], w: [-1, 0] } as const;
+
+/** A bolt in flight: an outlined oak shaft with an iron head and fletching
+ * (a burning one's head aflame), `scale` times the usual length, in art
+ * pixels snapped to whole screen pixels. */
+function drawBolt(c: CanvasRenderingContext2D, px: number, x: number, y: number, dx: number, dy: number, scale: number, burning: boolean) {
   const p = Math.max(1, Math.round(px / ART));
-  const dot = (along: number, col: string, grow = 0) => {
-    const ax = (x + (dx * along) / ART) * px, ay = (y + (dy * along) / ART) * px;
+  const dot = (along: number, grow = 0) => {
+    const ax = (x + (dx * along * scale) / ART) * px, ay = (y + (dy * along * scale) / ART) * px;
     c.fillRect(Math.round(ax / p) * p - grow * p, Math.round(ay / p) * p - grow * p, p * (1 + 2 * grow), p * (1 + 2 * grow));
   };
   c.fillStyle = "#0b0907";
-  for (let a = -9; a <= 4; a++) dot(a, "", 1);
+  for (let a = -9; a <= 4; a++) dot(a, 1);
   for (let a = -9; a <= 4; a++) {
-    c.fillStyle = a >= 2 ? "#9a9aa2" : a <= -7 ? "#d8cfb4" : "#a07a48";
-    dot(a, "");
+    c.fillStyle = a >= 2 ? (burning ? (a >= 4 ? "#ffd36b" : "#f07a28") : "#9a9aa2") : a <= -7 ? "#d8cfb4" : "#a07a48";
+    dot(a);
   }
 }

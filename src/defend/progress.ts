@@ -1,6 +1,8 @@
 /** Persistent DEFEND state: the city layout the player designed, what they
  * own and have upgraded, and their best wave. A run itself is never saved —
  * it always starts fresh from the layout. */
+import { decodeGateRanks, type GateRanks } from "../gate-upgrades.ts";
+import { decodeBallistaRanks, type BallistaRanks } from "../ballista-upgrades.ts";
 import { decodeKeepRanks, type KeepRanks } from "../keep-upgrades.ts";
 import { decodeWallRanks, innerWalls, type WallRanks } from "../wall-upgrades.ts";
 import {
@@ -78,6 +80,10 @@ export type DefendSave = {
   keepRanks?: KeepRanks;
   /** The placed walls' upgrades (`wall-upgrades.ts`); absent while they have none. */
   wallRanks?: WallRanks;
+  /** The city gates' upgrades (`gate-upgrades.ts`); absent while they have none. */
+  gateRanks?: GateRanks;
+  /** The wall ballistas' upgrades (`ballista-upgrades.ts`); absent while they have none. */
+  ballistaRanks?: BallistaRanks;
 };
 
 export function defaultDefendSave(): DefendSave {
@@ -288,6 +294,10 @@ export function decodeDefendSave(s: any): DefendSave {
   trimKept(d);
   const keepRanks = decodeKeepRanks(s.keepRanks);
   if (keepRanks) d.keepRanks = keepRanks;
+  const gateRanks = decodeGateRanks(s.gateRanks);
+  if (gateRanks) d.gateRanks = gateRanks;
+  const ballistaRanks = decodeBallistaRanks(s.ballistaRanks);
+  if (ballistaRanks) d.ballistaRanks = ballistaRanks;
   return d;
 }
 

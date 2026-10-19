@@ -17,7 +17,7 @@ import {
 } from "./catalog.ts";
 import type { Building } from "./citygen.ts";
 import { center, nearest } from "./pathing.ts";
-import { shootBallista } from "./wall-defenses.ts";
+import { shootBallista, wallBallistaReload } from "./wall-defenses.ts";
 import { burstBall } from "./muskets.ts";
 import { bulletHit } from "./snipers.ts";
 import type { DefendSim, Enemy } from "./sim.ts";
@@ -136,7 +136,7 @@ export class Towers {
 
   private stepBallista(sim: DefendSim, b: Building, dt: number) {
     if (!this.ready(b, dt)) return;
-    this.cooldown.set(b.id, shootBallista(sim, b) ? BALLISTA.cooldown * sim.bonuses.towerReload : 0);
+    this.cooldown.set(b.id, shootBallista(sim, b) ? wallBallistaReload(sim) : 0);
   }
 
   private stepCannon(sim: DefendSim, b: Building, dt: number) {
