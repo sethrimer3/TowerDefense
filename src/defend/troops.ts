@@ -39,6 +39,7 @@ import type { DefendSim, Enemy, Soldier } from "./sim.ts";
 import { answerBanner, MARCH_SIGHT } from "./war-banner.ts";
 import { CRUSADE, RANGERS, SKIRMISH, VOLLEY, pathRank } from "../knowledge-paths.ts";
 import { bayonetTarget, charges, grenadeOf, musketReload, musketSpeed, thrust, volleyTargets } from "./muskets.ts";
+import { cloudRank, diveIn, hostDrill, hostGarrison, musterPoint } from "./sky-palace.ts";
 import { assassinHp, assassinStrike, headhunter, huntReach, recruitState, stepCloak, toughestFirst } from "./assassins.ts";
 
 /** The barracks' Study path and rank (`knowledge-paths.ts`): each 0 unless chosen. */
@@ -76,14 +77,14 @@ export class Barracks {
     const cap = soldierCap(sim.levels.barracksCapacity);
     for (const b of sim.map.buildings) {
       if (!isBarracks(b) || !sim.intact(b)) continue;
-      if (this.drilled(sim, b, b.kind === "darkKeep" ? DARK_WIZARD.garrison : cap, dt)) this.recruit(sim, b);
+      if (this.drilled(sim, b, b.kind === "darkKeep" ? DARK_WIZARD.garrison : cap + hostGarrison(sim, b), dt)) this.recruit(sim, b);
     }
   }
 
   /** Counts down the barracks' drill; true when a recruit is ready. A full
    * garrison keeps the clock at a whole drill. */
   private drilled(sim: DefendSim, b: Building, cap: number, dt: number) {
-    const slow = b.kind === "darkKeep" ? DARK_WIZARD.drill : 1;
+    const slow = b.kind === "darkKeep" ? DARK_WIZARD.drill : hostDrill(sim, b);
     const drill = () => trainSeconds(sim.levels.barracksTraining) * sim.bonuses.drill * slow;
     const alive = sim.soldiers.filter((s) => s.home === b.id).length;
     if (alive >= cap) {
@@ -100,13 +101,13 @@ export class Barracks {
   }
 
   private recruit(sim: DefendSim, b: Building) {
-    const door = sim.doorOf(b);
-    if (door < 0) return;
+    // A cloudborne palace's valkyries drop from wherever it floats.
+    const at = musterPoint(sim, b);
+    if (!at) return;
     const kind = TRAINS[b.kind] ?? "sword";
     const scale = soldierScale(sim.levels.soldierArms);
     const stats = kind === "archer" ? ARCHER_UNIT : kind === "mage" ? { ...FIRE_MAGE, damage: fireballDamage(sim.levels.mageFireball ?? 0) } : kind === "valkyrie" ? VALKYRIE : kind === "darkWizard" ? DARK_WIZARD
       : kind === "brawler" ? BRAWLER : kind === "assassin" ? ASSASSIN_UNIT : kind === "slinger" || kind === "sniper" || kind === "musketeer" ? RANGED[kind] : SOLDIER;
-    const at = cellCenter(door);
     const path = kind === "sword" ? swordStats(sim, b.id) : kind === "assassin" ? { hp: assassinHp(sim, b.id), damage: 1 } : { hp: 1, damage: 1 };
     sim.soldiers.push({
       id: sim.newId(),
@@ -124,6 +125,7 @@ export class Barracks {
       flash: 0,
       ...(kind === "assassin" ? recruitState(sim, b.id) : {}),
     });
+    if (kind === "valkyrie" && sim.skyPalaces.length) diveIn(sim, sim.soldiers[sim.soldiers.length - 1], cloudRank(sim, b));
   }
 }
 

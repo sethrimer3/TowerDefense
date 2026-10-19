@@ -13,6 +13,7 @@ import { ROAD, keepStage, paintKeepRubble, paintStructureArt, paintStructureRubb
 import { houseRubbleSprite, roofSeed, roofSprite } from "./roof-art.ts";
 import { ART, parkArt } from "./park-art.ts";
 import { damageStage, drawSprite, sprite, wallDamagePixels, wallRubblePixels } from "./damage-art.ts";
+import { mooringPixels } from "./sky-palace-art.ts";
 import { GRASS, grassPatch, groundArt } from "./ground-art.ts";
 import { heights, shadowCanvas, shadowMask } from "./shadow-art.ts";
 import { gatePixels, gateRubblePixels } from "./gate-art.ts";
@@ -115,17 +116,17 @@ export function paintCityLayer(c: CanvasRenderingContext2D, px: number, scene: C
   paintSpikes(p);
   for (const b of map.buildings) if (b.kind === "wall") paintBuilding(p, b);
   for (const b of map.buildings) if (b.kind !== "wall") paintBuilding(p, b);
-  paintPixelArt(p, cityShadows(map, sim));
+  paintPixelArt(p, cityShadows(map, sim, scene.looks));
   paintLanternBrackets(p, scene.lights);
 }
 
 /** The shadows of what stands, cached for the last city and battle state. */
-let shadows: { map: CityMap; sim: DefendSim | null; version: number; canvas: HTMLCanvasElement | null } | null = null;
-function cityShadows(map: CityMap, sim: DefendSim | null) {
-  const version = sim ? sim.mapVersion : -1;
-  if (shadows?.map !== map || shadows.sim !== sim || shadows.version !== version) {
-    const standing = (b: Building) => !sim || sim.intact(b);
-    shadows = { map, sim, version, canvas: shadowCanvas(shadowMask(heights(map, standing))) };
+let shadows: { map: CityMap; sim: DefendSim | null; version: number; looks: string; canvas: HTMLCanvasElement | null } | null = null;
+function cityShadows(map: CityMap, sim: DefendSim | null, looks?: Readonly<Record<number, string>>) {
+  const version = sim ? sim.mapVersion : -1, key = looks ? Object.entries(looks).join(",") : "";
+  if (shadows?.map !== map || shadows.sim !== sim || shadows.version !== version || shadows.looks !== key) {
+    const standing = (b: Building) => (!sim || sim.intact(b)) && !aloft({ looks }, b);
+    shadows = { map, sim, version, looks: key, canvas: shadowCanvas(shadowMask(heights(map, standing))) };
   }
   return shadows.canvas;
 }
@@ -286,6 +287,8 @@ function paintBuilding(p: Paint, b: Building) {
     else paintStructureRubble(c, b.kind, box, lotSeed(b));
     return paintRebuilding(p, b);
   }
+  // A cloudborne palace floats over its lot (`sky-palace-art.ts`), leaving its mooring.
+  if (aloft(p, b)) return paintArt(p, sprite(`mooring:${r.w}x${r.h}:${lotSeed(b)}`, r.w * ART, r.h * ART, () => mooringPixels(r.w, r.h, lotSeed(b))), box);
   if (b.kind === "house") return paintArt(p, roofSprite(r.w, r.h, b.variant, roofSeed(r.x, r.y, r.w, r.h), stageOf(sim, b)), box);
   paintStructureArt(c, b.kind, box, stageOf(sim, b), lotSeed(b), b.structureUid !== undefined ? p.looks?.[b.structureUid] : undefined);
 }
@@ -295,6 +298,9 @@ function paintBuilding(p: Paint, b: Building) {
 export function paintStanding(c: CanvasRenderingContext2D, px: number, map: CityMap, b: Building, area: AreaId = "moss") {
   paintBuilding({ c, px, map, sim: null, solid: () => true, area }, b);
 }
+
+/** Whether `b` is a palace on the Cloudborne path, off its lot. */
+const aloft = (p: { looks?: Readonly<Record<number, string>> }, b: Building) => b.structureUid !== undefined && p.looks?.[b.structureUid] === "cloudborne";
 
 /** The seed a building's damage and rubble are drawn from: its lot. */
 export const lotSeed = (b: Building) => hash(b.rect.x, b.rect.y, b.rect.w, b.rect.h, 77);

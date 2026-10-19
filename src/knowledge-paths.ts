@@ -6,7 +6,7 @@ import { cloneLayout, type PlacedKind } from "./defend/layout.ts";
 import type { Save } from "./save.ts";
 import { studyPathCost } from "./economy.ts";
 
-export type PathTopic = "wizardTower" | "barracks" | "assassinDen" | "musketHall" | "archerTower" | "cannonTower" | "archerBarracks" | "watchTower" | "mageGuild" | "bait" | "spikes" | SpellId;
+export type PathTopic = "wizardTower" | "barracks" | "valkyriePalace" | "assassinDen" | "musketHall" | "archerTower" | "cannonTower" | "archerBarracks" | "watchTower" | "mageGuild" | "bait" | "spikes" | SpellId;
 /** Strike spells: cast from the battle's Skills palette rather than built,
  * so a spell has no cards; it casts with the one path `save.spellPaths`
  * names, at its furthest researched rank. */
@@ -14,7 +14,7 @@ export type SpellId = "necromancy" | "meteor" | "frostNova" | "reinforcements";
 export const SPELLS: SpellId[] = ["necromancy", "meteor", "frostNova", "reinforcements"];
 export const isSpell = (topic: string): topic is SpellId => (SPELLS as string[]).includes(topic);
 export type PathId =
-  | "pyromancy" | "rime" | "storm" | "crusaders"
+  | "pyromancy" | "rime" | "storm" | "crusaders" | "cloudborne"
   | "bloodletters" | "shadowcloak" | "venom" | "headhunters"
   | "grenadiers" | "volleyFire" | "bayonets"
   | "fireArrows" | "sharpshooters" | "gunnery" | "siegeShot" | "rangers" | "skirmishers"
@@ -34,7 +34,8 @@ export type PathIcon =
   | "meteor" | "stars" | "crater"
   | "shards" | "whirl" | "frostShield"
   | "hammer" | "helm" | "oath"
-  | "hood" | "vial" | "drop";
+  | "hood" | "vial" | "drop"
+  | "cloud" | "wing" | "halo";
 /** Each path's colours, as `ui/path-icons.ts` and the page's CSS name them. */
 export type PathHue = "ember" | "frost" | "storm" | "steel" | "shadow" | "verdant" | "grave";
 export type PathRank = { name: string; icon: PathIcon; cost: number; text: string };
@@ -62,6 +63,13 @@ export const RIME = { chill: 1.5, damage: 1.6, reach: 1.5, freeze: 1.2 };
 export const STORM = { links: [0, 3, 5, 7], jump: [0, 2.5, 3, 3.5], damage: 1.2, surge: 1.5 };
 /** Crusaders: heavier (HP by rank, slower), healing from II, harder hitting at III. */
 export const CRUSADE = { hp: [1, 1.5, 1.5, 2.2], speed: 0.85, heal: 3, damage: 1.5 };
+/** Cloudborne: the Valkyrie palace rises onto clouds and drifts west across
+ * the sky at `speed` cells a second, coming round from the east edge at
+ * another height; nothing on the ground can reach it, and its valkyries
+ * drop from wherever it floats (`sky-palace.ts`). From II each lands with a
+ * charge at the nearest enemy within `dive` times her reach; at III the
+ * palace holds `host` more valkyries and trains them in `drill` of the time. */
+export const CLOUDBORNE = { speed: 0.3, dive: 2, host: 2, drill: 0.5 };
 /** The Assassins' den's paths (`assassins.ts`). Bloodletters: criticals
  * hit `crit[rank]` times the damage, every `every[rank]`th strike, and the
  * assassins have `hp[rank]` of their HP (rank 0 is the plain den's). */
@@ -249,6 +257,14 @@ export const PATHS: KnowledgePath[] = [
       { name: "Templars", icon: "cross", cost: studyPathCost(4, 2), text: "120% more HP in all, and 50% more damage" },
     ],
     evolves: { from: "barracks", item: "valkyriePalace", name: "Valkyrie palace", cost: 100000, text: "This Barracks becomes a Valkyrie palace" },
+  },
+  {
+    id: "cloudborne", topic: "valkyriePalace", name: "Cloudborne", motto: "A palace adrift on the clouds", hue: "frost",
+    ranks: [
+      { name: "Cloudborne", icon: "cloud", cost: studyPathCost(10, 0), text: "The palace rises onto clouds and drifts slowly west across the sky, coming round from the east at another height. Nothing on the ground can reach it, and its valkyries drop from wherever it floats" },
+      { name: "Diving descent", icon: "wing", cost: studyPathCost(10, 1), text: "Each valkyrie lands with a charge at the nearest enemy within twice her reach" },
+      { name: "Heavenly host", icon: "halo", cost: studyPathCost(10, 2), text: "The palace holds 2 more valkyries and trains them twice as fast" },
+    ],
   },
   {
     id: "bloodletters", topic: "assassinDen", name: "Bloodletters", motto: "Enormous criticals, paper-thin guard", hue: "shadow",
@@ -543,6 +559,7 @@ export const pathFits = (kind: string, path: PathId) => PATHS.some((p) => p.id =
 export const UNSPECIALIZED: Record<PathTopic, string> = {
   wizardTower: "The original mix of fire and ice",
   barracks: "Balanced swordsmen",
+  valkyriePalace: "A marble palace on the ground",
   assassinDen: "Quick, frail assassins: every 4th strike critical",
   musketHall: "Explosive musketmen: every ball bursts",
   archerTower: "Steady single arrows",

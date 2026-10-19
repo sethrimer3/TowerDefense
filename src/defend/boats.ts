@@ -158,7 +158,7 @@ export function sinks(boat: BoatDef, b: Building) {
 export function stepBoat(sim: DefendSim, e: Enemy, dt: number) {
   const def = ENEMIES[e.kind], boat = def.boat!;
   for (const b of boat.decorativeWater ? [] : near(sim, e, boat.water))
-    if (sim.built[b.id] > 0 && sinks(boat, b) && rectDist(b.rect, e.x, e.y) <= boat.water) {
+    if (sim.built[b.id] > 0 && !sim.aloft(b.id) && sinks(boat, b) && rectDist(b.rect, e.x, e.y) <= boat.water) {
       // The water swallows the whole of it.
       const r = b.rect;
       addPool(sim, { x: r.x + r.w / 2, y: r.y + r.h / 2, r: dist(r.w, r.h) / 2 + 0.3, t: 0, life: FLOOD_LIFE, boat: e.id });
