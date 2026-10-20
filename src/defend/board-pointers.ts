@@ -12,7 +12,7 @@
  * it (opening what was pressed) and the drag ends without a drop.
  * What a press picks up and what a drop does are the page's and its
  * `EditSession`'s decisions; this only turns pointers into cells. */
-import { consumable, dragIcon, type Drag } from "./drag-rules.ts";
+import { consumable, dragIcon } from "./drag-rules.ts";
 import type { DragAt, Drop, EditSession } from "./edit-session.ts";
 import { CELLS_W, SUB, TILES_H } from "./grid.ts";
 import type { DefendRenderer } from "./render.ts";
@@ -79,7 +79,7 @@ export class BoardPointers {
   /** Starts dragging under `e` in the session `edit`. */
   begin(edit: EditSession, e: PointerEvent) {
     e.preventDefault();
-    this.held = { edit, ghost: ghostIcon(edit.drag) };
+    this.held = { edit, ghost: ghostIcon(edit) };
     this.unhold();
     if (this.host.hold) {
       const timer = window.setTimeout(() => {
@@ -185,12 +185,15 @@ export function eventCell(renderer: DefendRenderer, e: PointerEvent) {
 }
 
 /** The icon that follows the pointer while `drag` is held. */
-function ghostIcon(drag: Drag) {
+function ghostIcon(edit: EditSession) {
+  const drag = edit.drag;
   const g = document.createElement("canvas");
   g.width = g.height = 48;
   // A wall section is small: its icon rides above the pointer, clear of
   // the quarter tile it would take.
   g.className = dragIcon(drag) === "wallBlock" ? "defend-drag-ghost small" : "defend-drag-ghost";
+  g.dataset.icon = dragIcon(drag);
+  if (edit.carriedPath) g.dataset.pixelLook = edit.carriedPath;
   paintIcon(g, dragIcon(drag));
   document.body.appendChild(g);
   return g;

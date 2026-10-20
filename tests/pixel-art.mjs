@@ -33,9 +33,14 @@ try {
       const m = await import('/src/defend/pixel-sprites.ts');
       return { on: m.pixelArtOn(), loaded: m.PIXEL_SPRITES.filter(id => m.pixelSprite(id)).length, total: m.PIXEL_SPRITES.length };
     });
-    await page.evaluate(async () => (await import('/src/defend/pixel-sprites.ts')).preloadPixelArt());
-    for (let tries = 0; (await pixels()).loaded < 35 && tries < 100; tries++) await page.waitForTimeout(100);
-    assert.deepEqual(await pixels(), { on: true, loaded: 35, total: 35 }, 'every sprite loads, Pixel Art on by default');
+    await page.evaluate(async () => {
+      window.__pixelSprites = await import('/src/defend/pixel-sprites.ts');
+      window.__pixelSprites.preloadPixelArt();
+    });
+    await page.waitForFunction(() => window.__pixelSprites.PIXEL_SPRITES.every(id => window.__pixelSprites.pixelSprite(id)));
+    const loaded = await pixels();
+    assert.equal(loaded.on, true, 'Pixel Art on by default');
+    assert.equal(loaded.loaded, loaded.total, 'every registered sprite loads');
     for (let i = 0; i < 3; i++) await frame();
     const board = page.locator('#defend-canvas');
     const shotOn = await board.screenshot({ path: `test-results/pixel-art/${name}-on.png` });

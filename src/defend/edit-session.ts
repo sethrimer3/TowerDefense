@@ -60,6 +60,13 @@ export class EditSession {
     this.span = dragSpan(drag, layout);
   }
 
+  /** Presentation identity for the PNG icon following a carried building. */
+  get carriedPath(): string | undefined {
+    const drag = this.drag;
+    return drag.from === "palette" ? drag.wear?.path
+      : drag.from === "structure" ? this.layout.structures.find(s => s.uid === drag.uid)?.path : undefined;
+  }
+
   /** The session for whatever a press on cell (cx, cy) of `map`, built from
    * `layout`, lifts: the keep, a structure, or a city tile (pressed away from
    * its buildings, which go with it; the keep's tile lifts the keep). Null when the press should move the view. */
