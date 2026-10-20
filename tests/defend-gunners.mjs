@@ -1,6 +1,6 @@
 // The Ranged Guild's gunner line in the browser, on desktop and phones: a
 // Gunner hall's tree offers the Musket hall, Machine-gun nest and Rocket
-// battery; the halls stand in the city and their gunners, Gatling gunners
+// battery and its own two paths; the halls stand, wearing paths, in the city and their gunners, Gatling gunners
 // and rocketeers fight in battle. Isolated browser contexts only: never
 // reads or changes a player's saved game. Needs `npm run dev`. Screenshots
 // go to test-results/ (or SHOTS).
@@ -14,6 +14,8 @@ const base = process.env.TEST_URL || 'http://127.0.0.1:5173/';
 const out = process.env.SHOTS || 'test-results';
 mkdirSync(out, { recursive: true });
 const KINDS = ['gunHall', 'gunNest', 'gatlingNest', 'rocketBattery', 'musketHall'];
+// The halls past the Gunner hall stand wearing a path, in its look.
+const WEAR = { gunNest: { path: 'tripod', rank: 3 }, gatlingNest: { path: 'gunShield', rank: 3 }, rocketBattery: { path: 'clusterRockets', rank: 3 }, musketHall: { path: 'sharpMuskets', rank: 3 } };
 try {
   for (const width of [1280, 390]) {
     const phone = width < 500;
@@ -21,7 +23,7 @@ try {
     const page = await context.newPage(), errors = [];
     page.on('pageerror', e => errors.push(e.message));
     await page.goto(base); await page.waitForSelector('#defend-start');
-    const fixture = await page.evaluate(async kinds => {
+    const fixture = await page.evaluate(async ([kinds, WEAR]) => {
       const { defaults } = await import('/src/save.ts');
       const { placeCityTile, placeStructure } = await import('/src/defend/layout.ts');
       const s = defaults(); s.settings.soundOff = true; s.settings.ambienceOff = true;
@@ -32,10 +34,10 @@ try {
       for (const [dx, dy] of [[0, -1], [-1, 0], [1, 0], [0, 1], [-1, -1], [1, -1]]) l = placeCityTile(l, l.keep.tx + dx, l.keep.ty + dy) ?? l;
       const k = l.keep;
       const spots = [[0, -1], [-1, 0], [1, 0], [-1, -1], [1, -1]];
-      kinds.forEach((kind, i) => { l = placeStructure(l, kind, k.tx + spots[i][0], k.ty + spots[i][1], kind === 'musketHall' ? { path: 'sharpMuskets', rank: 3 } : undefined) ?? l; });
+      kinds.forEach((kind, i) => { l = placeStructure(l, kind, k.tx + spots[i][0], k.ty + spots[i][1], WEAR[kind]) ?? l; });
       s.defend.layout = l;
       return s;
-    }, KINDS);
+    }, [KINDS, WEAR]);
     await context.addInitScript(fixture => {
       if (!sessionStorage.getItem('gunner-fixture-seeded')) {
         localStorage.setItem('towerdefense.v1', JSON.stringify(fixture));
@@ -56,7 +58,7 @@ try {
     });
     await page.waitForFunction(() => window.__dp);
     const s = await page.evaluate(() => JSON.parse(localStorage.getItem('towerdefense.v1')));
-    for (const k of KINDS) assert.ok(s.defend.layout.structures.some(x => x.kind === k), `${k} stands`);
+    for (const k of KINDS) assert.ok(s.defend.layout.structures.some(x => x.kind === k && x.path === WEAR[k]?.path), `${k} stands`);
     const zoomKeep = z => page.evaluate(z => { const dp = window.__dp, k = dp.host.save().layout.keep, p = dp.renderer.toClient((k.tx + 0.5) * 7, (k.ty) * 7); dp.renderer.zoomAt(p.x, p.y, z); }, z);
     await zoomKeep(phone ? 2 : 2.5);
     await page.waitForTimeout(500); await page.screenshot({ path: `${out}/gunners-${width}-halls.png` });
@@ -72,7 +74,7 @@ try {
     if (phone) await page.touchscreen.tap(p.x, p.y); else await page.mouse.click(p.x, p.y);
     await page.waitForSelector('#defend-specialty:not([hidden])');
     const tree = await panel.locator('.ug-node:not(.withering)').evaluateAll(els => els.map(e => `${e.dataset.node}=${['owned', 'next', 'locked'].find(c => e.classList.contains(c))}`));
-    for (const n of ['k:rangedGuild=owned', 'k:gunHall=owned', 'k:musketHall=next', 'k:gunNest=next', 'k:rocketBattery=next']) assert.ok(tree.includes(n), `${n} in ${tree}`);
+    for (const n of ['k:rangedGuild=owned', 'k:gunHall=owned', 'k:musketHall=next', 'k:gunNest=next', 'k:rocketBattery=next', 'p:quickdraw:1=next', 'p:duelists:1=next']) assert.ok(tree.includes(n), `${n} in ${tree}`);
     await press(panel.locator('[data-node="k:gunNest"]'));
     await page.waitForTimeout(900); await page.screenshot({ path: `${out}/gunners-${width}-tree.png` });
     await press(panel.locator('[data-specialty-close]'));
@@ -94,6 +96,9 @@ try {
     await page.evaluate(() => window.defendDebug?.(0.6));
     const hurt = await page.evaluate(() => window.__dp.sim.enemies.filter(e => e.hp < e.maxHp).length + window.__dp.sim.enemies.filter(e => e.hp <= 0).length);
     assert.ok(hurt > 0, 'the gunners hit them');
+    await page.evaluate(() => window.defendDebug?.(8));
+    const clusters = await page.evaluate(() => window.__dp.sim.effects.filter(f => f.kind === 'boom').length + window.__dp.sim.blazes.length);
+    assert.ok(clusters > 0, 'the cluster rockets burst');
     // Close on the city's gunners.
     await page.evaluate(() => {
       const dp = window.__dp, g = dp.sim.soldiers.find(s => s.kind === 'gatlingGunner') ?? dp.sim.soldiers[0];

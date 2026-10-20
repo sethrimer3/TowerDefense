@@ -529,10 +529,10 @@ function paintGunHall(p: Pix, look: string) {
 /** The Machine-gun nest: a canvas-roofed hall with a machine gun on the
  * ridge over a sandbagged yard holding ammunition boxes; on Belt feed the
  * roof is tarred and the yard strewn with spent brass, on Tripod the roof
- * mossed and a gun stands on its tripod in the yard with range stakes. */
+ * shingled in wood and a gun stands on its tripod in the yard with range stakes. */
 function paintGunNest(p: Pix, look: string) {
   const belt = look === "beltFeed", tripod = look === "tripod";
-  const y = guild(p, belt ? C.tar : tripod ? C.moss : C.canvas[1], MACHINE_GUN, { 0: OUTLINE, 2: C.plank[1], 3: belt ? C.brass[1] : C.iron[2] });
+  const y = guild(p, belt ? C.tar : tripod ? C.plank[1] : C.canvas[1], MACHINE_GUN, { 0: OUTLINE, 2: C.plank[1], 3: belt ? C.brass[1] : C.iron[2] });
   sandbags(p, y);
   for (const [dx, dy] of [[2, 2], [5, 2], [2, 4]] as const) {
     rect(p, y.x0 + dx, y.y0 + dy, y.x0 + dx + 2, y.y0 + dy + 1, OUTLINE);
@@ -541,10 +541,13 @@ function paintGunNest(p: Pix, look: string) {
   }
   if (belt) for (const [dx, dy] of [[9, 2], [11, 3], [10, 4], [13, 2], [12, 5], [14, 4]] as const) p.set(y.x0 + dx, y.y0 + dy, C.brass[2]);
   if (tripod) {
-    // The gun on its splayed legs, and white-topped stakes paced out beyond.
-    const gx = y.x0 + 9, gy = y.y0 + 3;
-    for (let x = gx; x <= gx + 4; x++) p.set(x, gy, x === gx + 4 ? C.iron[3] : C.iron[1]);
-    for (const [dx, dy] of [[1, 1], [0, 2], [2, 1], [3, 2]] as const) p.set(gx + dx, gy + dy, C.plank[0]);
+    // The gun on its splayed legs, outlined in black, and white-topped
+    // stakes paced out beyond.
+    const gx = y.x0 + 9, gy = y.y0 + 1;
+    for (let x = gx - 1; x <= gx + 6; x++) { p.set(x, gy - 1, OUTLINE); p.set(x, gy + 1, OUTLINE); }
+    for (let x = gx; x <= gx + 5; x++) p.set(x, gy, x === gx + 5 ? C.iron[3] : x < gx + 2 ? C.iron[2] : C.iron[1]);
+    p.set(gx - 1, gy, OUTLINE); p.set(gx + 6, gy, OUTLINE);
+    for (const [dx, dy] of [[1, 2], [0, 3], [2, 2], [3, 3], [1, 3]] as const) p.set(gx + dx, gy + dy, C.plank[0]);
     for (const dx of [7, 10, 13]) if (y.x0 + dx < y.x1) { p.set(y.x0 + dx, y.y1 - 2, C.target[0]); p.set(y.x0 + dx, y.y1 - 1, C.plank[0]); }
   }
 }
@@ -563,9 +566,12 @@ function paintGatlingNest(p: Pix, look: string) {
   p.set(cx + 8, cy, over ? C.ember : C.iron[3]);
   if (over) for (const [dx, dy] of [[6, -1], [7, 1], [8, -1], [8, 1], [9, 0]] as const) p.set(cx + dx, cy + dy, dx > 7 ? C.fire[2] : C.ember);
   if (shield) {
-    // The shield: an iron plate across the barrels, riveted, a slot to aim through.
-    for (let yy = cy - 3; yy <= cy + 2; yy++) for (const x of [cx + 5, cx + 6]) p.set(x, yy, yy === cy ? OUTLINE : x === cx + 5 ? C.iron[3] : C.iron[2]);
-    for (const yy of [cy - 2, cy + 2]) p.set(cx + 6, yy, C.brass[2]);
+    // The shield: a tall pale steel plate across the barrels in a black
+    // outline, riveted in brass, a slot to aim through.
+    const x0 = cx + 4, x1 = cx + 7, y0 = cy - 4, y1 = cy + 3;
+    for (let yy = y0; yy <= y1; yy++)
+      for (let x = x0; x <= x1; x++) p.set(x, yy, x === x0 || x === x1 || yy === y0 || yy === y1 ? OUTLINE : yy === cy ? OUTLINE : x === x0 + 1 ? C.pale[3] : C.pale[1]);
+    for (const [x, yy] of [[x0 + 1, y0 + 1], [x1 - 1, y0 + 1], [x0 + 1, y1 - 1], [x1 - 1, y1 - 1]]) p.set(x, yy, C.brass[2]);
   }
 }
 

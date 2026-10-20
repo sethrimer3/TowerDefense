@@ -31,7 +31,7 @@ node tests/defend-quarters.mjs # Buildings dragged onto quarter tiles: the footp
 node tests/defend-walls.mjs # Walls dragged onto the quarter-tile grid outside the city, moved, their tree, inner walls and battle, desktop and touch (needs dev server)
 node tests/defend-assassins.mjs # The Melee Guild's tree offering the Assassins' den, its four paths, dens on each path and their assassins in battle, desktop and touch (needs dev server)
 node tests/defend-muskets.mjs # The Musket hall's tree offering Grenadiers, Volley fire and Bayonets, halls on each path and their musketmen in battle, desktop and touch (needs dev server)
-node tests/defend-gunners.mjs # The Gunner hall's tree offering muskets, machine guns and rockets, the line's halls and their gunners in battle, desktop and touch (needs dev server)
+node tests/defend-gunners.mjs # The Gunner hall's tree offering muskets, machine guns, rockets and its own paths, the line's halls wearing paths and their gunners in battle, desktop and touch (needs dev server)
 node --experimental-transform-types --import ./tests/pin-random.ts --test tests/defend-snipers.test.ts tests/defend-barracks-paths.test.ts # The Sniper lodge's and the Barracks' Berserkers/Halberdiers paths: tree, looks and battle
 node tests/defend-gate-ballista.mjs # The city gate's and the wall ballistas' trees opened by a tap, bought, and their ranks in battle, desktop and touch (needs dev server)
 node tests/defend-sky-palace.mjs # A Cloudborne Valkyrie palace hovering while building, drifting, fading over the city and coming round from the east in battle, desktop and touch (needs dev server)
