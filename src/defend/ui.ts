@@ -1,7 +1,7 @@
 import { MagicCircle } from "../magic-circle/render.ts";
 import { buildingTree, foundNodes, hasTree, respecBuilding, undoUpgrade, rootOf, specialtyLabel, specialtyOf, stepName, targetKind, upgradeBuilding, type PaletteKind, type SpecialtyTarget } from "../specializations.ts";
 import { pathById, type PathId } from "../knowledge-paths.ts";
-import { SIDE_UI, mapCardHtml, mapCount, mapGraph, mapWeb, specialtyCircle, treeAllocated, treeBeyond, treeCardHtml, treeGraph, treeStep, type SideKind } from "../ui/specialty.ts";
+import { SIDE_UI, graftedGraph, mapCardHtml, mapCount, mapGraph, mapWeb, sharedBranches, specialtyCircle, treeAllocated, treeBeyond, treeCardHtml, treeStep, type SideKind, type SideUi } from "../ui/specialty.ts";
 import { UpgradeGraph } from "../ui/upgrade-graph.ts";
 import type { Save } from "../save.ts";
 import { bannerReach } from "./war-banner.ts";
@@ -1171,6 +1171,15 @@ export class DefendPage {
       this.afterChange("chime");
       return this.bought(id);
     }
+    const shared = this.shared(id);
+    if (shared) {
+      const branch = shared.step(game, id);
+      if (!branch) return;
+      const r = shared.buy(game, branch);
+      if (!r.ok) return this.setMessage(r.reason, 2);
+      this.afterChange("chime");
+      return this.bought(id);
+    }
     const kind = targetKind(this.save, sp.target);
     const step = kind && treeStep(kind, specialtyOf(this.save, sp.target), id);
     if (!step) return;
@@ -1218,7 +1227,22 @@ export class DefendPage {
       // Stand on the rank below it, or the root.
       return this.wentBack(tree.undoRank(game, back), "Undone", back.rank > 1 ? `q:${back.id}:${back.rank - 1}` : tree.root);
     }
+    const shared = this.shared(id);
+    if (shared) {
+      const back = shared.undo(game, id);
+      if (!back) return;
+      return this.wentBack(shared.undoRank(game, back), "Undone", back.rank > 1 ? `q:${back.id}:${back.rank - 1}` : shared.root);
+    }
     this.wentBack(undoUpgrade(game, sp.target, id), "Undone");
+  }
+
+  /** The shared branches node `id` of the panel's building is on (the
+   * Revolutionary's), if it is one of theirs. */
+  private shared(id: string): SideUi | undefined {
+    const sp = this.specialty;
+    if (!sp || "side" in sp.target || !id.startsWith("q:")) return undefined;
+    const kind = targetKind(this.save, sp.target);
+    return kind ? sharedBranches(kind) : undefined;
   }
 
   /** The picked node `id` was tapped again: buy it when it is next, or,
@@ -1236,6 +1260,13 @@ export class DefendPage {
       const back = tree.undo(game, beyond.undo);
       if (!back) return;
       return this.wentBack(tree.undoRank(game, back), "Sold", id);
+    }
+    const shared = this.shared(id);
+    if (shared) {
+      if (shared.step(game, id)) return this.upgrade(id);
+      const beyond = shared.beyond(game, id), back = beyond && "undo" in beyond ? shared.undo(game, beyond.undo) : undefined;
+      if (back) this.wentBack(shared.undoRank(game, back), "Sold", id);
+      return;
     }
     const kind = targetKind(this.save, sp.target);
     if (!kind) return;
@@ -1349,8 +1380,9 @@ export class DefendPage {
     el.querySelector(".ug-alloc small")!.textContent = sp.map && !side ? "DISCOVERED" : "ALLOCATED";
     respec.hidden = !!sp.map && !side;
     if (sp.map && !side) return this.renderMap(el, plainKind, wear);
-    el.querySelector(".ug-card")!.innerHTML = side ? side.card(game, sp.picked) : treeCardHtml(game, plainKind, wear, sp.picked);
-    this.tree.set(side ? side.graph(game) : treeGraph(plainKind, wear), sp.picked);
+    const shared = side ? undefined : this.shared(sp.picked);
+    el.querySelector(".ug-card")!.innerHTML = side ? side.card(game, sp.picked) : shared ? shared.card(game, sp.picked) : treeCardHtml(game, plainKind, wear, sp.picked);
+    this.tree.set(side ? side.graph(game) : graftedGraph(game, plainKind, wear), sp.picked);
     if (focus) el.querySelector<HTMLElement>(".ug-buy:not(:disabled), [data-specialty-close]")?.focus({ preventScroll: true });
   }
 

@@ -19,7 +19,7 @@
 import { hash01 } from "./grid.ts";
 import { ART } from "./park-art.ts";
 import { artPen, bake, blit, FLAME, OUTLINE, puff, SMOKE } from "./pixel-fx.ts";
-import type { DefendSim, Effect, Enemy } from "./sim.ts";
+import type { Arrow, DefendSim, Effect, Enemy } from "./sim.ts";
 
 type Ctx = CanvasRenderingContext2D;
 
@@ -150,7 +150,7 @@ export function drawArrows(c: Ctx, px: number, sim: DefendSim) {
 /** A shot's pixels: a disc `d` art pixels across in its outline, lit from
  * the upper left (`hi` the glint, `lo` the shaded side), and an optional
  * spark on its top right. Pure, for tests. */
-export function shotPixels(shot: "stone" | "bullet" | "ball"): { px: string[]; size: number } {
+export function shotPixels(shot: Shot): { px: string[]; size: number } {
   const [d, base, lo, hi] = SHOTS[shot];
   const size = d + 2, mid = (size - 1) / 2, r = d / 2;
   const px: string[] = new Array(size * size).fill("");
@@ -162,15 +162,19 @@ export function shotPixels(shot: "stone" | "bullet" | "ball"): { px: string[]; s
     }
   const out = outlined(px, size, size);
   if (shot === "ball") out[size - 1] = "#ffd060";
+  // A rocket's exhaust flaring out behind it, lower left.
+  if (shot === "rocket") (out[(size - 1) * size] = "#ffd060"), (out[(size - 2) * size] = "#ff7a2e"), (out[(size - 1) * size + 1] = "#ff7a2e");
   return { px: out, size };
 }
-const SHOTS: Record<"stone" | "bullet" | "ball", [number, string, string, string]> = {
+const SHOTS: Record<Shot, [number, string, string, string]> = {
   stone: [2, "#8c8577", "#5c574e", "#c9c2b2"],
   bullet: [1, "#e0c070", "#b08a3e", "#fff4c8"],
   ball: [3, "#2c2a2e", "#1b1a1d", "#8c8c96"],
+  rocket: [2, "#b3372f", "#6e1c18", "#e8dcc0"],
 };
+type Shot = NonNullable<Arrow["shot"]>;
 const shotSprites = new Map<string, { cv: HTMLCanvasElement; size: number }>();
-function shotSprite(shot: "stone" | "bullet" | "ball") {
+function shotSprite(shot: Shot) {
   let s = shotSprites.get(shot);
   if (!s) {
     const p = shotPixels(shot);

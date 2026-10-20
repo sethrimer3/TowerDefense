@@ -119,12 +119,13 @@ Recent rows are available as `window.defendPerformance`; they are not saved.
   stand inside the city, then your own troops and townsfolk slip through
   them). A respec gives every point back, free, and takes the sections
   inside the city back to the palette; any rank can be undone on its own.
-- The **Melee** and **Ranged Guilds**, **barracks**, **archer barracks**, the **Mage Guild**, the **sniper lodge**, the **musket hall**, the **Valkyrie palace** and the **dark wizard keep** must be inside the city. **Archer**, **cannon**, **watch
+- The **Melee** and **Ranged Guilds**, **barracks**, **archer barracks**, the **Mage Guild**, the **gunner hall**, **musket hall**, **sniper lodge**, **machine-gun nest**, **Gatling emplacement** and **rocket battery**, the **Valkyrie palace** and the **dark wizard keep** must be inside the city. **Archer**, **cannon**, **watch
   and wizard towers** and **monster bait** may stand inside or outside.
 - Every structure takes a fixed block of **quarter tiles** (`footprint` in
   `catalog.ts`, never rotated): 1 × 1 the archer, cannon, watch and wizard
   towers and monster bait; 2 × 2 the Melee and Ranged Guilds, Assassins'
-  den, sniper lodge and archer barracks; 3 × 2 the musket hall; 2 × 3 the
+  den, gunner hall, sniper lodge, machine-gun nest, Gatling emplacement,
+  rocket battery and archer barracks; 3 × 2 the musket hall; 2 × 3 the
   barracks and Mage Guild; 3 × 3 the Valkyrie palace (2 × 3 once Folded
   halls is bought). An upgrade that changes a building's footprint takes
   it up to the palette, to be placed again.
@@ -291,20 +292,62 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   Venomblades' poison, making an enemy take more damage from everything and
   at III spreading when it dies; Headhunters going for the toughest enemy in
   reach, with a bounty of its HP, at III anywhere in the city); a
-  Ranged Guild an archer barracks, a Mage Guild, a **sniper lodge** (snipers:
-  long range, heavy, slow single shots, with three paths: Marksmen reaching
+  Ranged Guild an archer barracks, a Mage Guild or a **gunner hall**
+  (gunners with pistols: quick, short shots; its Quickdraw path reloads
+  faster, then fires a second pistol at the next nearest, and its Duelists
+  hit harder, reach further and make every 3rd shot hit three times as
+  hard), which becomes a **musket hall**, a **machine-gun nest** (machine
+  gunners spraying light bullets; its Belt feed path reloads faster and
+  hits harder, and its crown makes it a **Gatling emplacement**, whose
+  gunners fire at an enormous rate but barely walk; its Tripod path
+  reaches further and hits harder) or a **rocket battery** (rocketeers:
+  very slow to reload, every rocket bursting 1.5 cells wide, sparing your
+  own; Cluster rockets burst wider, then throw 4 bomblets, then leave the
+  ground burning, and Salvo racks reload faster, then loose two and three
+  rockets a launch). The Gatling emplacement has Gun shield (more life,
+  then a carriage pushed twice as fast), Overdrive (all damage, no push:
+  bullets 40%, then 80% harder, then two and a half times as hard and
+  cranking 15% faster) and Stopping power (all push, little damage: every
+  bullet knocks its enemy straight back from the gun, further each rank,
+  until at III the stream holds back most walkers, at 35%, 30% and 25% of
+  the damage; walls stop the push, and bosses, fortresses and boats aren't
+  moved). The musket
+  hall's Sharpshooters path (further, harder, the toughest in reach at
+  III) is crowned into a **sniper lodge** (snipers: long range, heavy,
+  slow single shots, with three paths: Marksmen reaching
   3 cells further, aiming at the toughest enemy in reach from II and
   landing a 4× headshot every third shot at III; Ricochet bullets glancing
   on to the nearest enemy not yet struck within 2.5 cells, once, twice,
   then four times at 80%; Suppressing fire's hits slowing, staggering from
-  II, and reloading 40% faster at III) or a **musket hall** (explosive
-  musketmen: balls that burst over a small area, sparing your own, with
-  three paths: Grenadiers' bursts leaving the ground burning, throwing four
+  II, and reloading 40% faster at III; Deadeye shooting only an enemy no
+  house, tower or hall hides from them (they shoot over the low city wall,
+  and hold their fire when nothing is in clear sight), hitting 60%, then
+  120%, then three times as hard, reaching 2 cells further at III; Piercing
+  rounds flying straight on to the end of their reach through every enemy
+  in the line, each hit at 40%, 50%, then 60% of the shot, reaching 2
+  cells further at III). A plain sniper lodge becomes the gunner line's
+  ultimate, the **Revolutionary** (100,000 Knowledge): a high-tech hall of
+  laser snipers (60 damage every 3 seconds, 12 cells), whose upgrades are
+  one tree shared by every Revolutionary, its five branches bought side by
+  side from its own node in its upgrade tree: Squad (two, then three
+  snipers), Chain laser (the laser leaps from enemy to enemy within 6
+  cells of each other and the bullet follows it, striking 3, 5, then 7),
+  Overclock (a 1%, 3%, 5%, then 10% chance each hit is critical), Hollow
+  core (a critical does 5×, 10×, 15×, 20×, then 25× damage; 2× before it)
+  and Detonator (where the bullet stops it bursts 1, 2, then 3 cells round
+  its last enemy at half the hit, sparing your own). Every sniper holds a
+  thin laser on its mark, red for a lodge's and cyan for a Revolutionary's
+  (zigzagging through every enemy its bullet will strike), faint as it
+  reloads and brightening as it locks on; the shot flashes along it and
+  each bullet trails a bright streak. The musket hall's musketmen fire
+  slow, heavy single balls, with four paths: Sharpshooters (above);
+  Grenadiers' balls bursting over a small area, sparing your own, and
+  leaving the ground burning, throwing four
   smaller bursts round them from II and setting clinging fire at III;
   Volley fire's extra balls at the next nearest enemies, and at III quicker
   reloads for each comrade of the hall standing near; Bayonets running
   through an enemy at close quarters instead of shooting it, hunting
-  anywhere in the city from II and staggering what they stab at III). A
+  anywhere in the city from II and staggering what they stab at III. A
   building can also start one of its kind's paths and climb it rank by
   rank; a crowned path's last step evolves it (Stormcalling's wizard tower
   into a dark wizard keep). A building taken back to the palette keeps its

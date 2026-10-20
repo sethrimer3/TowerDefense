@@ -12,10 +12,11 @@ import { ARROW_LOOPS, BASTIONS, BOILING_OIL, KEEP_PATHS, keepAllocated, keepRank
 import { STONEWORK, THORNWORK, TOWN_WALLS, WALL_PATHS, respecWalls, undoWalls, upgradeWalls, wallAllocated, wallRank, type WallPathId, type WallRanks } from "../wall-upgrades.ts";
 import { sideRank, type SidePath, type SideRanks } from "../side-ranks.ts";
 import { GATE_PATHS, GATE_TOWERS, IRONBOUND, PORTCULLIS, gateAllocated, gateBarred, gateRank, respecGate, undoGate, upgradeGate, type GatePathId, type GateRanks } from "../gate-upgrades.ts";
+import { CHAIN, CRIT_CHANCE, CRIT_DAMAGE, DETONATOR, REVOLUTIONARY_PATHS, SQUAD, respecRevolutionary, revolutionaryAllocated, revolutionaryRank, undoRevolutionary, upgradeRevolutionary, type RevolutionaryPathId, type RevolutionaryRanks } from "../revolutionary-upgrades.ts";
 import { BALLISTA_PATHS, FIRE_BOLTS, HEAVY_BOLTS, WINDLASS, ballistaAllocated, ballistaRank, respecBallistas, undoBallistas, upgradeBallistas, type BallistaPathId, type BallistaRanks } from "../ballista-upgrades.ts";
-import { pathById, pathTopicOf, UNSPECIALIZED, type PathId, FIRE_ARROWS, SHARP, GUNNERY, SIEGE_SHOT, CRUSADE, BLOODLETTERS, SHADOWCLOAK, VENOM, HEADHUNT, GRENADIERS, VOLLEY, BAYONET, MARKSMEN, RICOCHET, SUPPRESS, BERSERK, HALBERD, RANGERS, SKIRMISH, FORTIFY, PYRO, RIME, STORM, PYROCLASM, CINDERS, SPOTTERS, SIGNAL } from "../knowledge-paths.ts";
+import { pathById, pathTopicOf, UNSPECIALIZED, type PathId, FIRE_ARROWS, SHARP, GUNNERY, SIEGE_SHOT, CRUSADE, BLOODLETTERS, SHADOWCLOAK, VENOM, HEADHUNT, GRENADIERS, VOLLEY, BAYONET, SHARP_MUSKETS, BELT_FEED, TRIPOD, QUICKDRAW, DUELISTS, GUN_SHIELD, OVERDRIVE, STOPPING, DEADEYE, PIERCING, CLUSTER, SALVO, MARKSMEN, RICOCHET, SUPPRESS, BERSERK, HALBERD, RANGERS, SKIRMISH, FORTIFY, PYRO, RIME, STORM, PYROCLASM, CINDERS, SPOTTERS, SIGNAL } from "../knowledge-paths.ts";
 import { bonuses } from "../progression.ts";
-import { ITEM_NAMES, archerDamage, archerCooldown, archerRange, cannonDamage, cannonCooldown, CANNON_RANGE, SOLDIER, ARCHER_UNIT, soldierScale, STRUCTURES, flameDps, flameRange, iceDamage, ICE_RANGE, iceChill, watchRadius, fireballDamage, fireballSplash, emberDps, emberSeconds, FIRE_MAGE, FIREBALL_RANGE, keepHp, BRAWLER, ASSASSIN_UNIT, SLINGER, SNIPER, MUSKETEER, WALL_BLOCK_DESCRIPTION, wallHp, GATE, GATE_DESCRIPTION, BALLISTA, BALLISTA_DESCRIPTION, ballistaCooldown, ballistaDamage, ballistaRange, gateHpScale, gateShut, type PaletteItem } from "../defend/catalog.ts";
+import { ITEM_NAMES, archerDamage, archerCooldown, archerRange, cannonDamage, cannonCooldown, CANNON_RANGE, SOLDIER, ARCHER_UNIT, soldierScale, STRUCTURES, flameDps, flameRange, iceDamage, ICE_RANGE, iceChill, watchRadius, fireballDamage, fireballSplash, emberDps, emberSeconds, FIRE_MAGE, FIREBALL_RANGE, keepHp, BRAWLER, ASSASSIN_UNIT, SLINGER, SNIPER, MUSKETEER, GUNNER, MACHINE_GUNNER, GATLING_GUNNER, RAIL_SNIPER, ROCKETEER, WALL_BLOCK_DESCRIPTION, wallHp, GATE, GATE_DESCRIPTION, BALLISTA, BALLISTA_DESCRIPTION, ballistaCooldown, ballistaDamage, ballistaRange, gateHpScale, gateShut, type PaletteItem } from "../defend/catalog.ts";
 
 /** `kind`'s effective numbers wearing `path` at `rank` (none: plain), with
  * the shared Smithy and skill bonuses. */
@@ -67,27 +68,56 @@ export function kindStats(save: Save, kind: PaletteItem, path?: PathId, rank = 0
     const pyro = at("pyroclasm"), cinders = at("cinders");
     return `Recruits: ${n(FIRE_MAGE.hp * soldierScale(l.soldierArms) * b.troopHp)} HP · ${n(fireballDamage(l.mageFireball) * soldierScale(l.soldierArms) * b.troopDamage * (pyro ? PYROCLASM.damage : 1))} fireball damage · ${n(fireballSplash(l.mageFireball) * (pyro >= 2 ? PYROCLASM.splash : 1))} blast radius · ${n(emberDps(l.mageEmbers) * b.troopDamage * (cinders >= 2 ? CINDERS.dps : 1))} ground damage/s · ${n(emberSeconds(l.mageEmbers) * (cinders ? CINDERS.life : 1))}s burning ground`;
   }
-  if (kind === "meleeGuild" || kind === "rangedGuild" || kind === "sniperLodge" || kind === "musketHall") {
-    const u = kind === "meleeGuild" ? BRAWLER : kind === "rangedGuild" ? SLINGER : kind === "sniperLodge" ? SNIPER : MUSKETEER, scale = soldierScale(l.soldierArms);
-    const range = "range" in u ? ` · ${u.range} range` : "";
-    if (kind === "musketHall") {
-      const grenade = at("grenadiers"), volley = at("volleyFire"), bayonet = at("bayonets");
+  if (kind === "revolutionary") return revolutionaryStats(save, save.defend.revolutionaryRanks);
+  const GUNS = { meleeGuild: BRAWLER, rangedGuild: SLINGER, sniperLodge: SNIPER, musketHall: MUSKETEER, gunHall: GUNNER, gunNest: MACHINE_GUNNER, gatlingNest: GATLING_GUNNER, rocketBattery: ROCKETEER } as const;
+  if (kind in GUNS) {
+    const u: { hp: number; damage: number; cooldown: number; range?: number } = GUNS[kind as keyof typeof GUNS], scale = soldierScale(l.soldierArms);
+    const range = u.range !== undefined ? ` · ${u.range} range` : "";
+    const life = (m = 1) => `Recruits: ${n(u.hp * scale * b.troopHp * m)} HP`;
+    if (kind === "rocketBattery") {
+      const cluster = at("clusterRockets"), salvo = at("salvoRacks");
       const extra = [
-        grenade ? `burning ground ${GRENADIERS.burn[grenade]}s${GRENADIERS.bomblets[grenade] ? ` · ${GRENADIERS.bomblets[grenade]} bomblets` : ""}${grenade >= 3 ? " · clinging fire" : ""}` : "",
+        SALVO.rockets[salvo] > 1 ? `${SALVO.rockets[salvo]} rockets a launch` : "",
+        CLUSTER.bomblets[cluster] ? `${CLUSTER.bomblets[cluster]} bomblets` : "",
+        CLUSTER.burn[cluster] ? `burning ground ${CLUSTER.burn[cluster]}s` : "",
+      ].filter(Boolean).map((t) => ` · ${t}`).join("");
+      return `${life()} · ${n(u.damage * scale * b.troopDamage)} damage every ${n(u.cooldown * SALVO.reload[salvo])}s${range} · bursts ${ROCKETEER.blast + CLUSTER.blast[cluster]} cells wide${extra}`;
+    }
+    if (kind === "gatlingNest") {
+      const shield = at("gunShield"), over = at("overdrive"), stop = at("stoppingPower");
+      return `${life(GUN_SHIELD.hp[shield])} · ${n(u.damage * scale * b.troopDamage * OVERDRIVE.damage[over] * STOPPING.damage[stop])} damage every ${n(u.cooldown * OVERDRIVE.reload[over])}s · ${GATLING_GUNNER.range} range · walks at ${n(GATLING_GUNNER.speed * (shield >= 2 ? GUN_SHIELD.speed : 1))} cells/s${stop ? ` · knocks back ${STOPPING.push[stop]} cells a hit` : ""}`;
+    }
+    if (kind === "gunNest") {
+      const belt = at("beltFeed"), tripod = at("tripod");
+      return `${life()} · ${n(u.damage * scale * b.troopDamage * (belt >= 2 ? BELT_FEED.damage : 1) * TRIPOD.damage[tripod])} damage every ${n(u.cooldown * BELT_FEED.reload[belt])}s · ${MACHINE_GUNNER.range + TRIPOD.range[tripod]} range`;
+    }
+    if (kind === "gunHall") {
+      const quick = at("quickdraw"), duel = at("duelists");
+      const extra = [quick >= 3 ? "second pistol at the next nearest" : "", duel >= 3 ? `every ${ordinal(DUELISTS.every)} shot ${DUELISTS.crit}x` : ""].filter(Boolean).map((t) => ` · ${t}`).join("");
+      return `${life()} · ${n(u.damage * scale * b.troopDamage * DUELISTS.damage[duel])} damage every ${n(u.cooldown * QUICKDRAW.reload[quick])}s · ${GUNNER.range + DUELISTS.range[duel]} range${extra}`;
+    }
+    if (kind === "musketHall") {
+      const grenade = at("grenadiers"), volley = at("volleyFire"), bayonet = at("bayonets"), sharp = at("sharpMuskets");
+      const extra = [
+        grenade ? `bursts ${MUSKETEER.blast} cells wide · burning ground ${GRENADIERS.burn[grenade]}s${GRENADIERS.bomblets[grenade] ? ` · ${GRENADIERS.bomblets[grenade]} bomblets` : ""}${grenade >= 3 ? " · clinging fire" : ""}` : "",
         volley ? `${VOLLEY.extra[volley]} extra ball${VOLLEY.extra[volley] > 1 ? "s" : ""} a shot${volley >= 3 ? ` · up to ${Math.round(VOLLEY.drill * VOLLEY.most * 100)}% quicker reload in ranks` : ""}` : "",
         bayonet ? `bayonet ${BAYONET.damage}x up close${bayonet >= 2 ? " · hunts the city" : ""}${bayonet >= 3 ? ` · staggers ${BAYONET.stagger}s` : ""}` : "",
+        sharp >= 3 ? "toughest first" : "",
       ].filter(Boolean).map((t) => ` · ${t}`).join("");
-      return `Recruits: ${n(u.hp * scale * b.troopHp)} HP · ${n(u.damage * scale * b.troopDamage)} damage every ${u.cooldown}s${range} · bursts ${MUSKETEER.blast} cells wide${extra}`;
+      return `Recruits: ${n(u.hp * scale * b.troopHp)} HP · ${n(u.damage * scale * b.troopDamage * SHARP_MUSKETS.damage[sharp])} damage every ${u.cooldown}s · ${MUSKETEER.range + SHARP_MUSKETS.range[sharp]} range${extra}`;
     }
     if (kind === "sniperLodge") {
-      const marks = at("marksmen"), glance = at("ricochet"), supp = at("suppressors");
+      const marks = at("marksmen"), glance = at("ricochet"), supp = at("suppressors"), deadeye = at("deadeye"), pierce = at("piercing");
       const extra = [
         marks >= 2 ? "toughest first" : "",
         marks >= 3 ? `every ${ordinal(MARKSMEN.every)} shot ${MARKSMEN.crit}x` : "",
         glance ? `glances on ${RICOCHET.bounces[glance]}x at ${RICOCHET.share[glance] * 100}%` : "",
         supp ? `hits slow ${SUPPRESS.chill}s${supp >= 2 ? ` · stagger ${SUPPRESS.stagger}s` : ""}` : "",
+        deadeye ? "clear sight only" : "",
+        pierce ? "pierces every enemy in line" : "",
       ].filter(Boolean).map((t) => ` · ${t}`).join("");
-      return `Recruits: ${n(u.hp * scale * b.troopHp)} HP · ${n(u.damage * scale * b.troopDamage)} damage every ${n(u.cooldown * (supp >= 3 ? SUPPRESS.reload : 1))}s · ${SNIPER.range + (marks ? MARKSMEN.range : 0)} range${extra}`;
+      const reach = SNIPER.range + (marks ? MARKSMEN.range : 0) + (deadeye >= 3 ? DEADEYE.range : 0) + (pierce >= 3 ? PIERCING.range : 0);
+      return `Recruits: ${n(u.hp * scale * b.troopHp)} HP · ${n(u.damage * scale * b.troopDamage * DEADEYE.damage[deadeye] * PIERCING.damage[pierce])} damage every ${n(u.cooldown * (supp >= 3 ? SUPPRESS.reload : 1))}s · ${reach} range${extra}`;
     }
     return `Recruits: ${n(u.hp * scale * b.troopHp)} HP · ${n(u.damage * scale * b.troopDamage)} damage every ${u.cooldown}s${range}`;
   }
@@ -369,6 +399,18 @@ export function ballistaStats(save: Save, ranks: BallistaRanks | undefined): str
   return parts.join(" · ");
 }
 
+/** A Revolutionary's numbers with `ranks`, and the shared Smithy and skill bonuses. */
+export function revolutionaryStats(save: Save, ranks: RevolutionaryRanks | undefined): string {
+  const b = bonuses(save), n = (v: number) => Number(v.toFixed(2)), scale = soldierScale(save.defend.levels.soldierArms), u = RAIL_SNIPER;
+  const squad = SQUAD.snipers[revolutionaryRank(ranks, "squad")], hits = CHAIN.hits[revolutionaryRank(ranks, "chain")];
+  const chance = CRIT_CHANCE.chance[revolutionaryRank(ranks, "critChance")], times = CRIT_DAMAGE.times[revolutionaryRank(ranks, "critDamage")], burst = DETONATOR.radius[revolutionaryRank(ranks, "splash")];
+  const parts = [`${squad} laser sniper${squad > 1 ? "s" : ""}: ${n(u.hp * scale * b.troopHp)} HP`, `${n(u.damage * scale * b.troopDamage)} damage every ${u.cooldown}s`, `${u.range} range`];
+  if (hits > 1) parts.push(`each bullet strikes ${hits} enemies`);
+  parts.push(chance ? `${n(chance * 100)}% critical chance for ${times}x` : `no criticals (${times}x once they come)`);
+  if (burst) parts.push(`bursts ${burst} cell${burst > 1 ? "s" : ""} round the last at ${DETONATOR.share * 100}%`);
+  return parts.join(" · ");
+}
+
 /** The trees climbed side by side, as the Defend page drives them: the
  * keep's, the walls', the gates' and the ballistas'. */
 export type SideKind = "keep" | "walls" | "gate" | "ballistas";
@@ -427,6 +469,21 @@ export const SIDE_UI: Record<SideKind, SideUi> = {
   }),
 };
 
+const REVOLUTIONARY_TREE: SideTree<RevolutionaryPathId> = { root: "k:revolutionary", icon: "revolutionary", every: "Every Revolutionary", paths: REVOLUTIONARY_PATHS };
+/** The Revolutionary's shared tree, whose branches grow off its node in its
+ * own building tree (rank nodes `q:<branch>:<rank>`, its root its node). */
+export const REVOLUTIONARY_UI: SideUi = sideUi(REVOLUTIONARY_TREE, (s) => s.defend.revolutionaryRanks, {
+  name: "Revolutionary", whom: "the Revolutionaries", plain: "take every upgrade off the Revolutionaries", about: STRUCTURES.revolutionary.description, stats: revolutionaryStats,
+  buy: upgradeRevolutionary, undo: undoRevolutionary, respec: respecRevolutionary, allocated: revolutionaryAllocated,
+});
+/** The shared branches growing off a building of `kind`'s own node, if it has any. */
+export const sharedBranches = (kind: string): SideUi | undefined => (kind === "revolutionary" ? REVOLUTIONARY_UI : undefined);
+/** A building's tree with its shared branches grafted onto its node. */
+export function graftedGraph(save: Save, kind: PaletteItem | "wallSpikes", wear?: Wear): GraphNode[] {
+  const own = treeGraph(kind, wear), shared = sharedBranches(kind);
+  return shared ? [...own, ...shared.graph(save).filter((n) => n.id !== shared.root)] : own;
+}
+
 /** Tiles' read-only list of a side tree's branches, shared by every one of `whose`. */
 function sideTreeHtml(paths: { name: string; motto: string; hue: string; ranks: { name: string; icon: string; cost: number }[] }[], whose: string): string {
   const rows = paths.map((p) => `<li class="spec-row hue-${p.hue}"><span class="path-medal"><canvas data-path-icon="${p.ranks[0].icon}:${p.hue}"></canvas></span><div><b>${p.name}</b><small>${p.motto}: ${p.ranks.map((r, i) => `${ROMAN[i + 1]} ${r.name} (${r.cost.toLocaleString("en")})`).join(" · ")}</small></div></li>`).join("");
@@ -435,6 +492,7 @@ function sideTreeHtml(paths: { name: string; motto: string; hue: string; ranks: 
 /** Tiles' read-only lists of the gates' and the ballistas' branches. */
 export const gateTreeHtml = () => sideTreeHtml(GATE_PATHS, "GATE");
 export const ballistaTreeHtml = () => sideTreeHtml(BALLISTA_PATHS, "BALLISTA");
+export const revolutionaryTreeHtml = () => sideTreeHtml(REVOLUTIONARY_PATHS, "REVOLUTIONARY");
 
 /** Tiles' read-only list of the walls' branches. */
 export function wallTreeHtml(): string {

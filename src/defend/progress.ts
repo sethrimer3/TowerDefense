@@ -3,6 +3,7 @@
  * it always starts fresh from the layout. */
 import { decodeGateRanks, type GateRanks } from "../gate-upgrades.ts";
 import { decodeBallistaRanks, type BallistaRanks } from "../ballista-upgrades.ts";
+import { decodeRevolutionaryRanks, type RevolutionaryRanks } from "../revolutionary-upgrades.ts";
 import { decodeKeepRanks, type KeepRanks } from "../keep-upgrades.ts";
 import { decodeWallRanks, innerWalls, type WallRanks } from "../wall-upgrades.ts";
 import {
@@ -84,6 +85,8 @@ export type DefendSave = {
   gateRanks?: GateRanks;
   /** The wall ballistas' upgrades (`ballista-upgrades.ts`); absent while they have none. */
   ballistaRanks?: BallistaRanks;
+  /** The Revolutionaries' upgrades (`revolutionary-upgrades.ts`); absent while they have none. */
+  revolutionaryRanks?: RevolutionaryRanks;
   /** Every building upgrade (`k:<kind>`, `p:<path>:<rank>`) any building has
    * ever reached, shared by its whole line for the upgrade map
    * (`specializations.ts`'s `foundNodes`); absent while none. */
@@ -261,7 +264,7 @@ export function buyBomb(save: DefendSave, wallet: Wallet): boolean {
 
 // ── Decoding untrusted saves ─────────────────────────────────────────────
 const int = (n: unknown, min: number, max: number): n is number => Number.isInteger(n) && (n as number) >= min && (n as number) <= max;
-const PLACED: PlacedKind[] = ["meleeGuild", "rangedGuild", "barracks", "assassinDen", "archerBarracks", "sniperLodge", "musketHall", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait"];
+const PLACED: PlacedKind[] = ["meleeGuild", "rangedGuild", "barracks", "assassinDen", "archerBarracks", "sniperLodge", "gunHall", "musketHall", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait"];
 
 export function decodeDefendSave(s: any): DefendSave {
   const d = defaultDefendSave();
@@ -291,6 +294,8 @@ export function decodeDefendSave(s: any): DefendSave {
   if (gateRanks) d.gateRanks = gateRanks;
   const ballistaRanks = decodeBallistaRanks(s.ballistaRanks);
   if (ballistaRanks) d.ballistaRanks = ballistaRanks;
+  const revolutionaryRanks = decodeRevolutionaryRanks(s.revolutionaryRanks);
+  if (revolutionaryRanks) d.revolutionaryRanks = revolutionaryRanks;
   return d;
 }
 

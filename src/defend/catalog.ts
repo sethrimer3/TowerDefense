@@ -2,6 +2,7 @@ import type { KeepRanks } from "../keep-upgrades.ts";
 import type { WallRanks } from "../wall-upgrades.ts";
 import type { GateRanks } from "../gate-upgrades.ts";
 import type { BallistaRanks } from "../ballista-upgrades.ts";
+import type { RevolutionaryRanks } from "../revolutionary-upgrades.ts";
 import { intPow } from "../exact.ts";
 import { ECONOMY, quadraticCost } from "../economy.ts";
 import type { BattlePaths, PathId } from "../knowledge-paths.ts";
@@ -10,11 +11,11 @@ import type { BattlePaths, PathId } from "../knowledge-paths.ts";
  * copper, silver and Gold, the universal upgrades, the bonuses the Smithy and the
  * skill trees add, and the enemy roster. */
 
-export type StructureKind = "keep" | "meleeGuild" | "rangedGuild" | "assassinDen" | "barracks" | "archerBarracks" | "sniperLodge" | "musketHall" | "archerTower" | "cannonTower" | "watchTower" | "wizardTower" | "mageGuild" | "valkyriePalace" | "darkKeep" | "monsterBait";
+export type StructureKind = "keep" | "meleeGuild" | "rangedGuild" | "assassinDen" | "barracks" | "archerBarracks" | "sniperLodge" | "gunHall" | "musketHall" | "gunNest" | "gatlingNest" | "rocketBattery" | "revolutionary" | "archerTower" | "cannonTower" | "watchTower" | "wizardTower" | "mageGuild" | "valkyriePalace" | "darkKeep" | "monsterBait";
 /** Everything that appears in the build palette (the keep is placed from the
  * start and can only be moved, so it is not a palette item). */
 export type PaletteItem = "cityTile" | "cityGate" | "wallSpikes" | "wallBallista" | "wallBlock" | Exclude<StructureKind, "keep">;
-export const PALETTE_ITEMS: PaletteItem[] = ["cityTile", "meleeGuild", "rangedGuild", "barracks", "assassinDen", "archerBarracks", "sniperLodge", "musketHall", "watchTower", "archerTower", "cannonTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "wallBlock", "cityGate", "wallSpikes", "wallBallista"];
+export const PALETTE_ITEMS: PaletteItem[] = ["cityTile", "meleeGuild", "rangedGuild", "barracks", "assassinDen", "archerBarracks", "gunHall", "musketHall", "sniperLodge", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "watchTower", "archerTower", "cannonTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "wallBlock", "cityGate", "wallSpikes", "wallBallista"];
 /** The only buildings the shop sells: every other tower or troop building
  * is one of these upgraded, a building at a time, with Knowledge
  * (`building-upgrades.ts`). */
@@ -47,7 +48,12 @@ export const ITEM_CATEGORY: Record<PaletteItem, Exclude<PaletteCategory, "all">>
   assassinDen: "units",
   archerBarracks: "units",
   sniperLodge: "units",
+  gunHall: "units",
   musketHall: "units",
+  gunNest: "units",
+  gatlingNest: "units",
+  rocketBattery: "units",
+  revolutionary: "units",
   mageGuild: "units",
   valkyriePalace: "units",
   darkKeep: "units",
@@ -127,7 +133,7 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     h: 4,
     maxHp: 130,
     outsideOk: false,
-    description: "Trains stone throwers who wander the streets lobbing rocks at anything near. Upgrade it with Knowledge into archers, fire mages, snipers or explosive musketmen.",
+    description: "Trains stone throwers who wander the streets lobbing rocks at anything near. Upgrade it with Knowledge into archers, fire mages or a gunner hall, and from there on to muskets, machine guns or rockets.",
   },
   assassinDen: {
     kind: "assassinDen",
@@ -145,7 +151,16 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     h: 4,
     maxHp: 140,
     outsideOk: false,
-    description: "Trains snipers with long rifles: slow to reload, but they pick off enemies from far across the city with shots that hit very hard.",
+    description: "Trains snipers with long rifles: slow to reload, but they pick off enemies from far across the city with shots that hit very hard. A Musket hall's Sharpshooters become them.",
+  },
+  gunHall: {
+    kind: "gunHall",
+    name: "Gunner hall",
+    w: 4,
+    h: 4,
+    maxHp: 140,
+    outsideOk: false,
+    description: "Trains gunners with pistols: quick, short-ranged shots. Upgrade it with Knowledge into a musket hall, a machine-gun nest or a rocket battery.",
   },
   musketHall: {
     kind: "musketHall",
@@ -154,7 +169,43 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     h: 4,
     maxHp: 150,
     outsideOk: false,
-    description: "Trains musketmen firing explosive shot: every ball bursts where it hits, hurting everything round it (never your own people).",
+    description: "Trains musketmen: slow to reload, but their heavy balls hit hard from further off. Its Sharpshooters become snipers.",
+  },
+  gunNest: {
+    kind: "gunNest",
+    name: "Machine-gun nest",
+    w: 4,
+    h: 4,
+    maxHp: 160,
+    outsideOk: false,
+    description: "Trains machine gunners who spray light bullets at a rapid clip. Its Belt feed path becomes a Gatling emplacement.",
+  },
+  gatlingNest: {
+    kind: "gatlingNest",
+    name: "Gatling emplacement",
+    w: 4,
+    h: 4,
+    maxHp: 200,
+    outsideOk: false,
+    description: "Trains Gatling gunners: their guns pour out bullets at an enormous rate, but are so heavy they barely walk.",
+  },
+  revolutionary: {
+    kind: "revolutionary",
+    name: "Revolutionary",
+    w: 4,
+    h: 4,
+    maxHp: 260,
+    outsideOk: false,
+    description: "The gunner line's ultimate: a high-tech hall of laser-sighted snipers. Their thin lasers lock on, brightening, before each shot. Its upgrades climb side by side, shared by every Revolutionary: more snipers, a laser that zigzags from enemy to enemy with the bullet following it, critical hits and what they do, and a burst where the bullet stops. A Sniper lodge becomes one.",
+  },
+  rocketBattery: {
+    kind: "rocketBattery",
+    name: "Rocket battery",
+    w: 4,
+    h: 4,
+    maxHp: 140,
+    outsideOk: false,
+    description: "Trains rocketeers: very slow to reload, but every rocket bursts where it lands, hurting everything round it (never your own people).",
   },
   barracks: {
     kind: "barracks",
@@ -275,7 +326,12 @@ export const STARTING_OWNED: Record<PaletteItem, number> = {
   assassinDen: 0,
   archerBarracks: 0,
   sniperLodge: 0,
+  gunHall: 0,
   musketHall: 0,
+  gunNest: 0,
+  gatlingNest: 0,
+  rocketBattery: 0,
+  revolutionary: 0,
   archerTower: 0,
   cannonTower: 0,
   watchTower: 1,
@@ -305,7 +361,12 @@ export function purchasePrice(item: PaletteItem, owned: number): Price {
     assassinDen: { copper: 5 },
     archerBarracks: { copper: 5 },
     sniperLodge: { copper: 6 },
+    gunHall: { copper: 5 },
     musketHall: { copper: 7 },
+    gunNest: { copper: 7 },
+    gatlingNest: { copper: 10, silver: 1 },
+    rocketBattery: { copper: 8 },
+    revolutionary: { copper: 20, silver: 4, gold: 1 },
     archerTower: { copper: 3 },
     cannonTower: { copper: 6 },
     watchTower: { copper: 3 },
@@ -336,7 +397,12 @@ export const ITEM_NAMES: Record<PaletteItem, string> = {
   assassinDen: STRUCTURES.assassinDen.name,
   archerBarracks: STRUCTURES.archerBarracks.name,
   sniperLodge: STRUCTURES.sniperLodge.name,
+  gunHall: STRUCTURES.gunHall.name,
   musketHall: STRUCTURES.musketHall.name,
+  gunNest: STRUCTURES.gunNest.name,
+  gatlingNest: STRUCTURES.gatlingNest.name,
+  rocketBattery: STRUCTURES.rocketBattery.name,
+  revolutionary: STRUCTURES.revolutionary.name,
   archerTower: STRUCTURES.archerTower.name,
   cannonTower: STRUCTURES.cannonTower.name,
   watchTower: STRUCTURES.watchTower.name,
@@ -830,6 +896,8 @@ export type Bonuses = {
   gate?: GateRanks;
   /** The wall ballistas' upgrades (`ballista-upgrades.ts`); absent with none. */
   ballista?: BallistaRanks;
+  /** The Revolutionaries' upgrades (`revolutionary-upgrades.ts`); absent with none. */
+  revolutionary?: RevolutionaryRanks;
 };
 export const NO_BONUSES: Readonly<Bonuses> = Object.freeze({
   troopHp: 1, troopDamage: 1, drill: 1, towerDamage: 1, towerReload: 1, wallHp: 1, keepHp: 1, rebuild: 1, bombDamage: 1, undeadHp: 1, undeadDamage: 1, meteorDamage: 1, meteorRadius: 1, frostTime: 1, frostRadius: 1, reinforceHp: 1, reinforceDamage: 1, reinforceTime: 1,
@@ -842,11 +910,21 @@ export const ARCHER_UNIT = { hp: 24, damage: 5, cooldown: 1.1, speed: 2.1, size:
 export const BRAWLER = { hp: 30, damage: 3.5, cooldown: 0.7, speed: 2.4, reach: 0.6, size: 0.38, color: "#c99a62" };
 /** The ranged troops: each walks the streets like an archer and shoots
  * within `range` cells (on top of Keen eyes). The Ranged Guild's stone
- * throwers lob rocks a short way; snipers shoot far and slowly with
- * heavy shots; musketmen's balls burst `blast` cells wide where they hit. */
+ * throwers lob rocks a short way; the gunner line's pistols shoot quickly
+ * and close, muskets slowly and harder (a Grenadier's balls bursting
+ * `blast` cells wide), machine guns and Gatlings fast and light (the
+ * Gatling barely walking), rockets very slowly, each bursting `blast`
+ * cells wide; snipers shoot far and slowly with heavy shots. */
 export const SLINGER = { hp: 20, damage: 3, cooldown: 1.2, speed: 2.1, size: 0.34, range: 2.5, color: "#a3906a" };
 export const SNIPER = { hp: 22, damage: 22, cooldown: 3.6, speed: 1.8, size: 0.36, range: 9, color: "#4f6b3a" };
-export const MUSKETEER = { hp: 30, damage: 9, cooldown: 2.6, speed: 2, size: 0.38, range: 4, blast: 0.9, color: "#7a3b2a" };
+export const GUNNER = { hp: 24, damage: 4, cooldown: 0.9, speed: 2.1, size: 0.36, range: 3.5, color: "#5a6478" };
+export const MUSKETEER = { hp: 30, damage: 14, cooldown: 2.6, speed: 2, size: 0.38, range: 5, blast: 0.9, color: "#7a3b2a" };
+export const MACHINE_GUNNER = { hp: 32, damage: 1.6, cooldown: 0.22, speed: 1.8, size: 0.38, range: 4, color: "#3e4a3a" };
+export const GATLING_GUNNER = { hp: 50, damage: 2, cooldown: 0.07, speed: 0.8, size: 0.42, range: 4.5, color: "#5c4a32" };
+/** The Revolutionary's snipers: further, harder and a little quicker than a
+ * lodge's, in a squad of `SQUAD.snipers` (`revolutionary-upgrades.ts`). */
+export const RAIL_SNIPER = { hp: 40, damage: 60, cooldown: 3, speed: 1.9, size: 0.38, range: 12, color: "#26303e" };
+export const ROCKETEER = { hp: 26, damage: 26, cooldown: 6, speed: 1.7, size: 0.38, range: 6, blast: 1.5, color: "#8a3a3a" };
 /** The Assassins' den's assassins: quick and frail, every `every`th strike
  * critical for `crit` times the damage (counted, never rolled). */
 export const ASSASSIN_UNIT = { hp: 26, damage: 8, cooldown: 0.7, speed: 2.9, reach: 0.7, size: 0.36, every: 4, crit: 2, color: "#2b2633" };
