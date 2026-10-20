@@ -32,7 +32,7 @@ At ordinary play size the player should identify an archer tower, watch tower, b
 - Keep Simple square enemies/troops as intentional accessibility/performance overrides. Keep Reduce Motion, grass/water effects, health-bar and grid preferences independent. A pixel-art preference must not force animation or hide gameplay information.
 - Art selection must never change collision, pathfinding, targeting, costs, damage, placement rules, RNG streams, or save compatibility.
 
-**Current state:** [Building batch 01](BUILDING_BATCH_01.md) supplies nine native PNG sheets for the keep, barracks and watch tower, their paths/damage/rubble, rebuilding, flags and matching UI icons. The shared loader also retains the original 35 imported PNGs for other partial Defend coverage/reference. Other families' damage/path variants still fall back to procedural art. Existing baseline UI PNGs are not all controlled by the Pixel Art switch. Each replacement needs an explicit integration review; the toggle's existence does not establish complete coverage.
+**Current state:** [Batch 01](BUILDING_BATCH_01.md) and [batch 02](BUILDING_BATCH_02.md) supply 19 native PNG sheets for eight building families: keep, barracks, watch tower, Melee Guild, Ranged Guild, archer barracks, archer tower and cannon tower. They cover 116 world-state frames and 19 matching UI icons, plus the keep flag and rebuilding module. The shared loader also retains the original 35 imported PNGs for other partial Defend coverage/reference. Other families' damage/path variants still fall back to procedural art. Existing baseline UI PNGs are not all controlled by the Pixel Art switch. Each replacement needs an explicit integration review; the toggle's existence does not establish complete coverage.
 
 ## 3. A single pixel language
 
@@ -117,7 +117,7 @@ Every world asset must declare its native dimensions, content bounds, ground foo
 - Shadows, damaged versions, rubble, selection outlines, build ghosts, path variants and palette thumbnails share the corresponding identity and anchor. A damage or attack frame must not move the building or make it jump between grid squares.
 - Compact and wide footprints get separate authored compositions. Never squash a square building into a wide footprint or stretch its stones to fill the new box.
 
-Example metadata **proposal**, to be implemented with the registry in a later batch:
+Example of the metadata contract (the current building-sheet layouts and frame selectors live in `src/defend/building-sprite-manifest.ts`):
 
 ```json
 {
@@ -140,14 +140,14 @@ Example metadata **proposal**, to be implemented with the registry in a later ba
 - For adjoining tiles, derive both endpoints from the same shared boundary mapping: `left = snap(x)`, `right = snap(x + width)`, width = right − left. Do not separately round a position and scaled width, which opens seams or creates overlaps. Derive a centered pivot from those shared snapped bounds; do not independently round the center again. An odd-width device-pixel rectangle can have a half-device-pixel center without being misaligned—its edges and all related layers still share the same mapping.
 - Use nearest-neighbor sampling at **every** copy/composite stage, not just the final `drawImage`. Reapply `imageSmoothingEnabled = false` after canvas resize. DOM images need `image-rendering: pixelated` and integral display sizes where possible.
 - Prefer integer display magnification. Fractional zoom and fit-to-screen minification cannot promise equal-width source pixels merely by disabling smoothing. Use authored lower-detail PNG tiers or one consistent nearest-neighbor board composite at overview scale. Do not change world footprints or distort individual sprites to compensate.
-- Audit `drawCity()`: it currently enables smoothing when `cam.s / layerScale < 1`. A future crisp-mode path must address that composite explicitly and leave the legacy/off behavior intact. Avoid a late CSS smoothing override as the entire solution.
+- `drawCity()` already disables final city-layer smoothing in Pixel Art mode; only legacy/off enables smoothing when `cam.s / layerScale < 1`. Preserve that behavior and audit each new intermediate composite. Avoid a late CSS smoothing override as the entire solution.
 - Roofs, walls and floor tiles use repeatable modules, caps/corners or nine-slice layouts. One source pixel has the same visual size across a building family. Avoid stretched middle tiles, visible 1-pixel seams and resampled borders.
 
 ## 5. PNG delivery and animation rules
 
 - **Every new sprite and sprite-sheet image is PNG. No SVG sprites, SVG export, JPEG, WebP, or image files disguised by renaming.** Existing legacy SVGs stay available for Pixel Art off.
 - Use transparent PNG for objects/FX; opaque PNG for a genuinely opaque repeating surface. No antialiasing on static silhouettes. Avoid pre-enlarged pixel art: deliver the native file and let the renderer scale it.
-- Proposed replacement namespace: `public/assets/pixel/v2/{defend,ui,mine,library,fx}/`. Keep current imported files as references and preserve fallback paths until the replacement has passed review. Existing `pixel-sprites.ts` currently resolves flat IDs, so versioned paths and metadata require an explicit registry update.
+- Replacement namespace: `public/assets/pixel/v2/{defend,ui,mine,library,fx}/`. The building batches already use `defend/` and `ui/`. Keep current imported files as references and preserve fallback paths. `pixel-sprites.ts` registers the versioned building paths from `BUILDING_ART` alongside its original flat imported IDs; extend that manifest for new building sheets instead of using unregistered URLs.
 - Resolve public URLs using Vite's `BASE_URL`, including UI/CSS assets. The site runs under `/TowerDefense/`; new URLs must not assume `/assets/` at the web root.
 - Use lowercase kebab-case filenames and stable semantic IDs. Suggested path: `defend/keep/base/intact.png`; animated strips use explicit frame dimensions, frame count, direction order, duration and pivot metadata. No filenames like `final-final2.png` or sprites located only in a temporary workspace.
 - Adjacent sprites in an atlas require transparent gutters and explicit source rectangles. Never sample a neighbouring frame. Keep identical padding across an animation; if packed/trimmed, retain original-canvas offsets in metadata.

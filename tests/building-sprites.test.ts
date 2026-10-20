@@ -56,7 +56,7 @@ test("every building path and damage frame retains an exact catalog footprint, p
     assert.equal(buildingArt(art.kind, ...art.footprint), art);
     assert.equal(buildingArt(art.kind, art.footprint[0] + 1, art.footprint[1]), undefined, "never stretch to a different footprint");
     if (name !== "barracksWide") assert.deepEqual(art.footprint, [STRUCTURES[art.kind].w, STRUCTURES[art.kind].h]);
-    if (art.kind !== "keep") assert.deepEqual(art.looks.slice(1), PATH_LOOKS[art.kind]);
+    if (art.kind !== "keep") assert.deepEqual(art.looks.slice(1), PATH_LOOKS[art.kind] ?? []);
     const alpha = (x: number, y: number) => sheet.data[(y * sheet.w + x) * 4 + 3];
     for (let col = 0; col < art.looks.length; col++) {
       let base = 0;
