@@ -34,8 +34,13 @@ Source footprint dimensions are simulation cells. Proposed base footprint pixels
 | [x] | `meleeGuild` — Melee Guild | 4×4 → 32×32 | — | v2 base, all damage/rubble, rebuilding and UI; batch 02 |
 | [x] | `rangedGuild` — Ranged Guild | 4×4 → 32×32 | — | v2 base, all damage/rubble, rebuilding and UI; batch 02 |
 | [x] | `assassinDen` — Assassins' den | 4×4 → 32×32 | — | v2 base + Bloodletters/Shadowcloak/Venomblades/Headhunters, all damage/rubble, rebuilding and UI; batch 03 |
-| [x] | `sniperLodge` — Sniper lodge | 4×4 → 32×32 | — | v2 base + Marksmen/Ricochet/Suppressing fire, all damage/rubble, rebuilding and UI; batch 03 |
-| [x] | `musketHall` — Musket hall | 6×4 → 48×32 | — | v2 base + Grenadiers/Volley fire/Bayonets, all damage/rubble, rebuilding and UI; batch 03 |
+| [x] | `sniperLodge` — Sniper lodge | 4×4 → 32×32 | — | v2 base + Marksmen/Ricochet/Suppressing fire/Deadeye/Piercing rounds, all damage/rubble, rebuilding and UI; batch 03 |
+| [ ] | `gunHall` — Gunner hall | 4×4 → 32×32 | — | Create; gunner line merged during batch 03 |
+| [ ] | `gunNest` — Machine-gun nest | 4×4 → 32×32 | — | Create; gunner line merged during batch 03 |
+| [ ] | `gatlingNest` — Gatling emplacement | 4×4 → 32×32 | — | Create; gunner line merged during batch 03 |
+| [ ] | `rocketBattery` — Rocket battery | 4×4 → 32×32 | — | Create; gunner line merged during batch 03 |
+| [ ] | `revolutionary` — Revolutionary | 4×4 → 32×32 | — | Create; gunner line merged during batch 03 |
+| [x] | `musketHall` — Musket hall | 6×4 → 48×32 | — | v2 base + Grenadiers/Volley fire/Bayonets/Sharpshooters, all damage/rubble, rebuilding and UI; batch 03 |
 | [x] | `barracks` — Barracks | 4×6 → 32×48 | — | v2 normal/wide, base + Crusaders/Berserkers/Halberdiers, all damage/rubble, rebuilding and UI; batch 01 |
 | [x] | `archerBarracks` — Archer barracks | 4×4 → 32×32 | — | v2 base + Rangers/Skirmishers, all damage/rubble, rebuilding and UI; batch 02 |
 | [x] | `archerTower` — Archer tower | 2×2 → 16×16 | — | v2 base + Fire arrows/Sharpshooters, all damage/rubble, rebuilding and UI; batch 02 |
@@ -68,7 +73,7 @@ Areas: **Mossbound Ruins (`moss`), Amber Desert (`desert`), Ember Forge (`ember`
 
 ### B3. Friendly people and summoned units
 
-All twelve `Soldier.kind` values need a consistent sprite family, not just a color swap. Also cover civilian builders. Include movement, facing, attack/cast, hit/death, health/status overlays, weapon origin and shared UI portrait.
+All seventeen `Soldier.kind` values need a consistent sprite family, not just a color swap. Also cover civilian builders. Include movement, facing, attack/cast, hit/death, health/status overlays, weapon origin and shared UI portrait. All remain deferred from the current building-only sprite batches.
 
 | Pending | Unit | Special variants to retain |
 | --- | --- | --- |
@@ -79,6 +84,11 @@ All twelve `Soldier.kind` values need a consistent sprite family, not just a col
 | [ ] | `assassin` | Den paths; critical, cloak/reveal, poison and targeting cues. |
 | [ ] | `sniper` | Lodge path variants, rifle, aim, shots and specialist equipment. |
 | [ ] | `musketeer` | Musket Hall paths, firing/reload, grenades and specialist equipment. |
+| [ ] | `gunner` | Pistol, Quickdraw/Duelists equipment, firing/reload and facing. |
+| [ ] | `machineGunner` | Machine gun, Belt feed/Tripod equipment, firing/reload and facing. |
+| [ ] | `gatlingGunner` | Gatling barrels, Gun shield/Overdrive/Stopping power equipment and recoil. |
+| [ ] | `rocketeer` | Rocket launcher, Cluster rockets/Salvo racks equipment, firing/reload and facing. |
+| [ ] | `railSniper` | Revolutionary equipment, rifle, targeting and laser attachment points. |
 | [ ] | `mage` | Mage Guild paths, staff/robe, casts and persistent fire effects. |
 | [ ] | `valkyrie` | Palace paths, spear, wings, charge and guard states. |
 | [ ] | `darkWizard` | Dark Keep paths, robe/staff and chain-lightning states. |
@@ -159,7 +169,7 @@ Preserve the Library's side-view geometry (`library/geometry.ts`: current nave 1
 
 ## F. Batch tracking
 
-**Implemented: [batch 03](BUILDING_BATCH_03.md)** — Assassins' den, Sniper lodge, Musket hall, Wizard tower, Mage Guild and Monster bait; twelve PNG sheets, 115 world-state frames and 23 matching UI icons. Includes all existing path looks, damage, rebuilding, and material-appropriate rubble. Two shared magic ramps extend the palette to 30 swatches while retaining the 16-color world/12-color UI limits. All nineteen earlier PNGs stay unchanged. Current building coverage: fourteen of sixteen families, 31 native PNG sheets, 231 world-state frames and 42 UI icons. Valkyrie palace, Dark wizard keep, terrain/theme work, units and enemies remain separate work.
+**Implemented: [batch 03](BUILDING_BATCH_03.md)** — Assassins' den, Sniper lodge, Musket hall, Wizard tower, Mage Guild and Monster bait; twelve PNG sheets, 130 world-state frames and 26 matching UI icons. Includes all existing path looks, damage, rebuilding, and material-appropriate rubble. Two shared magic ramps extend the palette to 30 swatches while retaining the 16-color world/12-color UI limits. All nineteen earlier PNGs stay unchanged. Current building coverage: fourteen of twenty-one families, 31 native PNG sheets, 246 world-state frames and 45 UI icons. Valkyrie palace, Dark wizard keep, the five newly merged gunner buildings, terrain/theme work, units and enemies remain separate work.
 
 **Implemented: [batch 02](BUILDING_BATCH_02.md)** — melee/ranged guilds, archer barracks, archer tower and cannon tower; ten PNG sheets, 55 world-state frames and 11 matching UI icons. Uses the existing gated frame/rubble/scaffold/placement/icon routes, with all original batch-01 PNGs unchanged. Its delivery brought building coverage to eight of the sixteen catalog families; 19 native PNG sheets, 116 world-state frames and 19 UI icons.
 
@@ -337,6 +347,18 @@ Every path row requires each rank's icon **and** its actual building/unit/spell 
 | [ ] | `sniperLodge` / `marksmen` | Marksmen | `spyglass`, `crosshair`, `skull` |
 | [ ] | `sniperLodge` / `ricochet` | Ricochet | `fork`, `cannonball`, `bolt` |
 | [ ] | `sniperLodge` / `suppressors` | Suppressing fire | `boot`, `stake`, `gear` |
+| [ ] | `sniperLodge` / `deadeye` | Deadeye | `eye`, `crosshair`, `skull` |
+| [ ] | `sniperLodge` / `piercing` | Piercing rounds | `arrow`, `shard`, `spyglass` |
+| [ ] | `musketHall` / `sharpMuskets` | Sharpshooters | `spyglass`, `crosshair`, `skull`; → `sniperLodge` |
+| [ ] | `gunHall` / `quickdraw` | Quickdraw | `hand`, `volley`, `fork` |
+| [ ] | `gunHall` / `duelists` | Duelists | `blast`, `spyglass`, `crosshair` |
+| [ ] | `gunNest` / `beltFeed` | Belt feed | `gear`, `cannonball`, `volley`; → `gatlingNest` |
+| [ ] | `gunNest` / `tripod` | Tripod | `spyglass`, `crosshair`, `arrow` |
+| [ ] | `gatlingNest` / `gunShield` | Gun shield | `frostShield`, `gear`, `helm` |
+| [ ] | `gatlingNest` / `overdrive` | Overdrive | `cannonball`, `blast`, `inferno` |
+| [ ] | `gatlingNest` / `stoppingPower` | Stopping power | `hammer`, `volley`, `frostShield` |
+| [ ] | `rocketBattery` / `clusterRockets` | Cluster rockets | `blast`, `grape`, `inferno` |
+| [ ] | `rocketBattery` / `salvoRacks` | Salvo racks | `gear`, `volley`, `stars` |
 | [ ] | `archerTower` / `fireArrows` | Fire arrows | `fireArrow`, `flame`, `volley` |
 | [ ] | `archerTower` / `sharpshooters` | Sharpshooters | `eye`, `crosshair`, `skull` |
 | [ ] | `cannonTower` / `gunnery` | Gun crews | `gear`, `grape`, `mail` |

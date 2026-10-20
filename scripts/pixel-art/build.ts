@@ -300,10 +300,15 @@ function specialistRoof(kind: Specialist, look: string): Ramp {
     if (look === "shadowcloak") return ["ink", "steelDark", "steel"];
     return ["steelDark", "steel", "steelLight"];
   }
-  if (kind === "sniperLodge") return look ? ["steelDark", "steel", "steelLight"] : ["greenDark", "green", "greenLight"];
+  if (kind === "sniperLodge") {
+    if (look === "deadeye") return ["redDark", "red", "redLight"];
+    if (look === "piercing") return ["steelDark", "steel", "steelBright"];
+    return look ? ["steelDark", "steel", "steelLight"] : ["greenDark", "green", "greenLight"];
+  }
   if (look === "grenadiers") return ["redDark", "red", "redLight"];
   if (look === "volleyFire") return ["steelDark", "steel", "steelLight"];
   if (look === "bayonets") return ["greenDark", "green", "greenLight"];
+  if (look === "sharpMuskets") return ["greenDark", "green", "greenLight"];
   return ["woodDark", "wood", "woodLight"];
 }
 
@@ -321,7 +326,11 @@ function specialistEmblem(p: Drawing, kind: Specialist, look: string, cx: number
     else p.stamp(["...oo...", "..obbo..", "..obbo..", "..obbo..", ".oooooo.", "..oggo..", "..oggo..", "...oo..."], x, y,
       { o: "ink", b: "steelBright", g: "gold" });
   } else if (kind === "sniperLodge") {
-    if (look === "marksmen") p.stamp(["........", ".oooooo.", "ogggglgo", "ogggglgo", ".oooooo.", "...oo...", "..o..o..", "........"], x, y,
+    if (look === "deadeye") p.stamp(["........", "..oooo..", ".obbbbo.", "obgoogbo", ".obbbbo.", "..oooo..", "........", "........"], x, y,
+      { o: "ink", b: "stoneBright", g: "greenLight" });
+    else if (look === "piercing") p.stamp(["....oo..", "...obbo.", "ggggbbbo", "ggggbbbo", "...obbo.", "....oo..", "........", "........"], x, y,
+      { o: "ink", b: "steelBright", g: "gold" });
+    else if (look === "marksmen") p.stamp(["........", ".oooooo.", "ogggglgo", "ogggglgo", ".oooooo.", "...oo...", "..o..o..", "........"], x, y,
       { o: "ink", g: "gold", l: "goldLight" });
     else if (look === "ricochet") p.stamp(["o......o", ".g....g.", "..g..g..", "...gg...", "..g..g..", ".g....g.", "o......o", "........"], x, y,
       { o: "ink", g: "gold" });
@@ -334,7 +343,9 @@ function specialistEmblem(p: Drawing, kind: Specialist, look: string, cx: number
       p.line(x + 1, y + 1, x + 6, y + 6, "ink"); p.line(x + 6, y + 1, x + 1, y + 6, "ink");
       p.line(x + 1, y + 1, x + 3, y + 3, "steelLight"); p.line(x + 6, y + 1, x + 4, y + 3, "steelLight");
       p.line(x + 3, y + 3, x + 6, y + 6, "woodLight"); p.line(x + 4, y + 3, x + 1, y + 6, "woodLight"); p.rect(x + 3, y + 3, 2, 1, "gold");
-    } else if (look === "bayonets") p.stamp(["...oo...", "..obbo..", "..obbo..", "..obbo..", ".oooooo.", "..owwo..", "..owwo..", "...oo..."], x, y,
+    } else if (look === "sharpMuskets") p.stamp(["...oo...", "..obbo..", ".ob..bo.", "ob.oo.bo", "ob.oo.bo", ".ob..bo.", "..obbo..", "...oo..."], x, y,
+      { o: "ink", b: "gold" });
+    else if (look === "bayonets") p.stamp(["...oo...", "..obbo..", "..obbo..", "..obbo..", ".oooooo.", "..owwo..", "..owwo..", "...oo..."], x, y,
       { o: "ink", b: "steelBright", w: "woodLight" });
     else p.stamp(["...r....", ".r.y..r.", "..ryyr..", "ryyyyyr.", "..ryyr..", ".r.y..r.", "...r....", "........"], x, y,
       { r: "redLight", y: "goldLight" });
@@ -378,6 +389,8 @@ function specialistHall(kind: Specialist, look: string, ui = false) {
     if (look === "suppressors") p.rect(left + 1, y - 2, 5, 1, "woodLight");
     p.rect(right, y - 1, 3, 3, "ink"); p.dot(right + 1, y, look === "ricochet" ? "steelLight" : "stoneBright");
     if (look === "marksmen") { p.rect(right - 4, y, 3, 3, "ink"); p.dot(right - 3, y + 1, "stoneBright"); }
+    if (look === "deadeye") { p.rect(left + 1, y - 2, 3, 1, "woodDark"); p.dot(left + 2, y - 1, "stoneBright"); }
+    if (look === "piercing") { p.rect(left, y - 2, 5, 1, "steelLight"); p.dot(left + 2, y - 1, "steelDark"); }
     if (!ui) { p.rect(cx - 2, y + 2, 2, 1, "stoneDark"); p.rect(cx + 2, y + 2, 2, 1, "stoneDark"); }
   } else {
     for (const x of ui ? [left] : [left, left + 6]) {
@@ -387,6 +400,9 @@ function specialistHall(kind: Specialist, look: string, ui = false) {
     if (look === "volleyFire") {
       p.rect(right - 1, y + 1, 6, 1, "woodLight");
       for (const x of [right, right + 2]) p.rect(x, y - 2, 1, 5, "steelLight");
+    } else if (look === "sharpMuskets") {
+      p.rect(right, y - 1, 4, 4, "ink"); p.rect(right + 1, y, 2, 2, "stoneBright"); p.dot(right + 1, y + 1, "gold");
+      p.rect(left + 1, y - 2, 4, 1, "steelLight");
     } else if (look === "bayonets") {
       p.rect(right + 1, y - 1, 1, 4, "woodLight"); p.rect(right - 1, y, 5, 1, "woodLight"); p.dot(right + 1, y, "steelBright");
     } else {

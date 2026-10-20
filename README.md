@@ -10,7 +10,7 @@ New sprite work follows the [pixel-art style guide](docs/art/PIXEL_ART_GUIDE.md)
 
 The [first building batch](docs/art/BUILDING_BATCH_01.md) implements the keep, barracks and watch tower. [Batch 02](docs/art/BUILDING_BATCH_02.md) adds the Melee Guild, Ranged Guild, archer barracks, archer tower and cannon tower. Both include applicable path/damage/rubble variants and matching UI icons. Rebuild their committed PNGs with `npm run sprites`; verify them with `npm run sprites -- --check`.
 
-[Batch 03](docs/art/BUILDING_BATCH_03.md) adds Assassins' den, Sniper lodge, Musket hall, Wizard tower, Mage Guild and Monster bait, bringing coverage to fourteen of sixteen building families, with their path/damage/rubble variants and matching UI icons.
+[Batch 03](docs/art/BUILDING_BATCH_03.md) adds Assassins' den, Sniper lodge, Musket hall, Wizard tower, Mage Guild and Monster bait, bringing coverage to fourteen of twenty-one building families, with their path/damage/rubble variants and matching UI icons.
 
 ## Run
 
