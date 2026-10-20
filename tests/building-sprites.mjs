@@ -9,6 +9,7 @@ const browser = await chromium.launch(process.env.PLAYWRIGHT_EXECUTABLE
   : { headless: true, channel: process.env.PLAYWRIGHT_CHANNEL || 'msedge' });
 const base = process.env.TEST_URL || 'http://127.0.0.1:5173/';
 const out = 'test-results/building-sprites';
+const focus = (process.env.SPRITE_KINDS || '').split(',').filter(Boolean);
 mkdirSync(out, { recursive: true });
 
 try {
@@ -123,23 +124,26 @@ try {
         expect(on ? rebuilt.some(src => src.includes('/v2/defend/scaffold.png')) : rebuilt.length === 0, 'rebuilding art follows the toggle through the real city layer');
       }
       p.sim.intact = intact; r.lctx.drawImage = layerDraw; px.setPixelArt(true);
-      return { frames };
+      return { frames, expectedFrames: Object.values(BUILDING_ART).reduce((n, art) => n + art.looks.length * (art.stages + 1), 0) };
     });
-    assert.ok(checks.frames > 60, 'all native/path/damage/rubble frames exercised');
+    assert.equal(checks.frames, checks.expectedFrames, 'all registered native/path/damage/rubble frames exercised');
     assert.deepEqual(errors, []);
     console.log(`Building art ${width}px @ DPR ${dpr}: ${checks.frames} frames, exact legacy and icon parity, camera and motion passed`);
 
     if (width === 1100) {
-      await page.evaluate(async () => {
+      await page.evaluate(async focus => {
         const { BUILDING_ART } = await import('/src/defend/building-sprite-manifest.ts');
+        const { STRUCTURES } = await import('/src/defend/catalog.ts');
+        const { PATHS } = await import('/src/knowledge-paths.ts');
         const { paintStructureArt, paintStructureRubble, paintIcon, drawFlag } = await import('/src/defend/structure-art.ts');
-        document.body.innerHTML = '<main id="gallery"><h1>First building sprite batch</h1><p>Keep · Barracks · Watch tower — PNG artwork at 3× native scale</p></main>';
+        document.body.innerHTML = '<main id="gallery"><h1>Building sprite collection</h1><p>Native PNG artwork at 3× scale · matching UI icons at 2× scale</p></main>';
         const style = document.createElement('style'); style.textContent = 'body{margin:0;background:#28251f;color:#eae2c9}#gallery{max-width:none;margin:0;padding:24px;font:14px monospace}h1{font-size:24px}h2{font-size:17px;margin:22px 0 10px}.row{display:flex;align-items:center;gap:16px;flex-wrap:wrap}#gallery figure{margin:0;text-align:center;flex:0 0 auto}figcaption{font:12px monospace;margin-top:6px;color:#cac7b5}#gallery canvas{display:block;margin:auto;width:auto;height:auto;aspect-ratio:auto;image-rendering:pixelated}'; document.head.append(style);
         const gallery = document.querySelector('#gallery');
         for (const [key, art] of Object.entries(BUILDING_ART)) {
-          const title = document.createElement('h2'); title.textContent = key === 'barracksWide' ? 'Barracks — separately composed wide footprint' : key === 'watchTower' ? 'Watch tower' : key === 'keep' ? 'Keep' : 'Barracks'; gallery.append(title);
+          if (focus.length && !focus.includes(art.kind)) continue;
+          const title = document.createElement('h2'); title.textContent = key === 'barracksWide' ? 'Barracks — separately composed wide footprint' : STRUCTURES[art.kind].name; gallery.append(title);
           const row = document.createElement('div'); row.className = 'row'; gallery.append(row);
-          const previews = art.looks.map(look => [look, 0, look || 'Base']);
+          const previews = art.looks.map(look => [look, 0, PATHS.find(path => path.id === look)?.name || 'Base']);
           previews.push(['', art.stages - 1, 'Heavy damage'], ['', art.stages, 'Rubble']);
           for (const [look, stage, label] of previews) {
             const figure = document.createElement('figure'), cv = document.createElement('canvas'), caption = document.createElement('figcaption');
@@ -153,7 +157,7 @@ try {
           for (const look of art.looks) { const cv = document.createElement('canvas'); cv.width = cv.height = 48; cv.dataset.look = look; paintIcon(cv, art.kind); icons.append(cv); }
           const label = document.createElement('figcaption'); label.textContent = 'Matching UI icons'; figure.append(icons, label); row.append(figure);
         }
-      });
+      }, focus);
       await page.screenshot({ path: `${out}/contact-sheet.png`, fullPage: true });
     }
     await context.close();
