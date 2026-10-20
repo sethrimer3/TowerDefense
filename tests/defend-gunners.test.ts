@@ -7,7 +7,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { decode, defaults } from "../src/save.ts";
 import { BECOMES, allocated, buildingTree, nextSteps, rootOf, specialtyOf, stepName, upgradeBuilding, upgradedFrom, migrateGunLine } from "../src/specializations.ts";
-import { BELT_FEED, CLUSTER, DUELISTS, GUN_SHIELD, OVERDRIVE, QUICKDRAW, SALVO, SHARP_MUSKETS, TRIPOD, pathById, type PathId } from "../src/knowledge-paths.ts";
+import { BELT_FEED, CLUSTER, DUELISTS, GUN_SHIELD, OVERDRIVE, QUICKDRAW, SALVO, STOPPING, SHARP_MUSKETS, TRIPOD, pathById, type PathId } from "../src/knowledge-paths.ts";
 import { studyPathCost } from "../src/economy.ts";
 import { bonuses } from "../src/progression.ts";
 import { placeStructure, placeCityTile, defaultLayout, fitLayout, type PlacedKind } from "../src/defend/layout.ts";
@@ -15,7 +15,8 @@ import { DefendSim, type Enemy, type Soldier } from "../src/defend/sim.ts";
 import { generateCity } from "../src/defend/citygen.ts";
 import { Barracks, stepArcher } from "../src/defend/troops.ts";
 import { stepArrows } from "../src/defend/towers.ts";
-import { GATLING_GUNNER, GUNNER, MACHINE_GUNNER, MUSKETEER, ROCKETEER } from "../src/defend/catalog.ts";
+import { ENEMIES, GATLING_GUNNER, GUNNER, MACHINE_GUNNER, MUSKETEER, ROCKETEER } from "../src/defend/catalog.ts";
+import { cellIndex } from "../src/defend/grid.ts";
 import { PATH_LOOKS, structurePixels } from "../src/defend/tower-art.ts";
 
 type S = ReturnType<typeof defaults>;
@@ -61,7 +62,7 @@ test("the Ranged Guild leads to gunners, and gunners to muskets, machine guns an
   assert.deepEqual(BECOMES.rangedGuild!.map((b) => b.to), ["archerBarracks", "mageGuild", "gunHall"]);
   assert.deepEqual(nextSteps("gunHall").map(stepName), ["Musket hall", "Machine-gun nest", "Rocket battery", "Quickdraw I", "Duelists I"]);
   assert.deepEqual(nextSteps("gunNest").map(stepName), ["Belt feed I", "Tripod I"]);
-  assert.deepEqual(nextSteps("gatlingNest").map(stepName), ["Gun shield I", "Overdrive I"]);
+  assert.deepEqual(nextSteps("gatlingNest").map(stepName), ["Gun shield I", "Overdrive I", "Stopping power I"]);
   assert.deepEqual(nextSteps("rocketBattery").map(stepName), ["Cluster rockets I", "Salvo racks I"]);
   assert.equal(upgradedFrom("musketHall"), "gunHall");
   assert.equal(upgradedFrom("sniperLodge"), "musketHall");
@@ -98,7 +99,7 @@ test("a Gunner hall is bought up from a Ranged Guild and a crown makes a Gatling
 test("each new hall and path has its own art", () => {
   assert.deepEqual(PATH_LOOKS.gunHall, ["quickdraw", "duelists"]);
   assert.deepEqual(PATH_LOOKS.gunNest, ["beltFeed", "tripod"]);
-  assert.deepEqual(PATH_LOOKS.gatlingNest, ["gunShield", "overdrive"]);
+  assert.deepEqual(PATH_LOOKS.gatlingNest, ["gunShield", "overdrive", "stoppingPower"]);
   assert.deepEqual(PATH_LOOKS.rocketBattery, ["clusterRockets", "salvoRacks"]);
   assert.ok(PATH_LOOKS.musketHall!.includes("sharpMuskets"));
   const art = (["gunHall", "gunNest", "gatlingNest", "rocketBattery"] as const).flatMap((k) => ["", ...PATH_LOOKS[k]!].map((look) => structurePixels(k, 4, 4, 0, 1, look).join()));
@@ -197,16 +198,45 @@ test("Tripod gives machine gunners reach and harder bullets", () => {
   assert.equal(t.sim.arrows[0].damage, t.m.damage * TRIPOD.damage[3]);
 });
 
-test("Gun shield toughens and speeds Gatling gunners; Overdrive cranks faster and harder", () => {
+test("Gun shield toughens and speeds Gatling gunners; Overdrive cranks faster and harder, with no push", () => {
   const plain = battle(building("gatlingNest").s, "gatlingGunner").m;
   const shield = battle(building("gatlingNest", "gunShield", 3).s, "gatlingGunner").m;
   assert.equal(shield.maxHp, plain.maxHp * GUN_SHIELD.hp[3]);
   const over = battle(building("gatlingNest", "overdrive", 3).s, "gatlingGunner");
-  enemy(over.sim, over.m.x + GATLING_GUNNER.range + OVERDRIVE.range[3] - 0.2, over.m.y);
+  const target = enemy(over.sim, over.m.x + 2, over.m.y), at = target.x;
   over.m.cd = 0;
   stepArcher(over.sim, over.m, 1 / 30);
   assert.equal(over.m.cd, GATLING_GUNNER.cooldown * OVERDRIVE.reload[3]);
   assert.equal(over.sim.arrows[0].damage, over.m.damage * OVERDRIVE.damage[3]);
+  assert.equal(over.sim.arrows[0].knock, undefined, "no push");
+  fire(over.sim, over.m);
+  assert.equal(target.x, at);
+});
+
+test("Stopping power knocks enemies back, hard, for little damage, but not bosses", () => {
+  const stop = battle(building("gatlingNest", "stoppingPower", 3).s, "gatlingGunner");
+  // Open street east of the gun, so nothing stops the push.
+  for (let i = 0; i <= 6; i++) { const c = cellIndex(Math.floor(stop.m.x) + i, Math.floor(stop.m.y)); stop.sim.solid[c] = 0; }
+  const e = enemy(stop.sim, stop.m.x + 2, stop.m.y), x = e.x, hp = e.hp;
+  fire(stop.sim, stop.m);
+  assert.equal(hp - e.hp, stop.m.damage * STOPPING.damage[3]);
+  assert.ok(Math.abs(e.x - (x + STOPPING.push[3])) < 1e-9, `pushed ${e.x - x}`);
+  assert.ok(Math.abs(e.y - stop.m.y) < 1e-9, "straight back");
+  // A boss stands firm.
+  const boss = enemy(stop.sim, stop.m.x + 2, stop.m.y + 0.01);
+  boss.kind = (Object.keys(ENEMIES) as (keyof typeof ENEMIES)[]).find((k) => ENEMIES[k].boss)!;
+  e.hp = 0; (stop.sim as any).indexEnemies();
+  const bx = boss.x;
+  fire(stop.sim, stop.m);
+  assert.equal(boss.x, bx);
+  // A wall stops the push.
+  const w = enemy(stop.sim, stop.m.x + 2, stop.m.y);
+  boss.hp = 0;
+  stop.sim.solid[cellIndex(Math.floor(w.x + 0.3), Math.floor(w.y))] = 1;
+  (stop.sim as any).indexEnemies();
+  const wx = w.x;
+  fire(stop.sim, stop.m);
+  assert.ok(w.x - wx < STOPPING.push[3], "held by the wall");
 });
 
 test("Cluster rockets burst wider with bomblets and fire; Salvo racks loose more rockets", () => {

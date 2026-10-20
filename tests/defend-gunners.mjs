@@ -15,7 +15,7 @@ const out = process.env.SHOTS || 'test-results';
 mkdirSync(out, { recursive: true });
 const KINDS = ['gunHall', 'gunNest', 'gatlingNest', 'rocketBattery', 'musketHall'];
 // The halls past the Gunner hall stand wearing a path, in its look.
-const WEAR = { gunNest: { path: 'tripod', rank: 3 }, gatlingNest: { path: 'gunShield', rank: 3 }, rocketBattery: { path: 'clusterRockets', rank: 3 }, musketHall: { path: 'sharpMuskets', rank: 3 } };
+const WEAR = { gunNest: { path: 'tripod', rank: 3 }, gatlingNest: { path: 'stoppingPower', rank: 3 }, rocketBattery: { path: 'clusterRockets', rank: 3 }, musketHall: { path: 'sharpMuskets', rank: 3 } };
 try {
   for (const width of [1280, 390]) {
     const phone = width < 500;
@@ -96,9 +96,18 @@ try {
     await page.evaluate(() => window.defendDebug?.(0.6));
     const hurt = await page.evaluate(() => window.__dp.sim.enemies.filter(e => e.hp < e.maxHp).length + window.__dp.sim.enemies.filter(e => e.hp <= 0).length);
     assert.ok(hurt > 0, 'the gunners hit them');
-    await page.evaluate(() => window.defendDebug?.(8));
-    const clusters = await page.evaluate(() => window.__dp.sim.effects.filter(f => f.kind === 'boom').length + window.__dp.sim.blazes.length);
-    assert.ok(clusters > 0, 'the cluster rockets burst');
+    // A cluster rocket at an enemy beside its rocketeer leaves the ground burning.
+    const blazes = await page.evaluate(() => {
+      const sim = window.__dp.sim, r = sim.soldiers.find(s => s.kind === 'rocketeer');
+      const proto = sim.enemies.find(e => e.hp > 0) ?? sim.enemies[0];
+      const e = { ...proto, id: sim.newId(), x: r.x + 2.5, y: r.y, hp: 1e6, maxHp: 1e6, cd: 0, flash: 0 };
+      for (const key of ['venom', 'chill', 'freeze', 'burn', 'burnDps', 'fortressPart', 'fortressParts', 'blink', 'aim', 'stagger']) delete e[key];
+      sim.enemies.push(e); r.cd = 0;
+      const before = sim.blazes.length;
+      window.defendDebug(0.5);
+      return sim.blazes.length - before;
+    });
+    assert.ok(blazes > 0, 'the cluster rockets burst and burn');
     // Close on the city's gunners.
     await page.evaluate(() => {
       const dp = window.__dp, g = dp.sim.soldiers.find(s => s.kind === 'gatlingGunner') ?? dp.sim.soldiers[0];

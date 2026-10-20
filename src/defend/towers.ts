@@ -19,8 +19,9 @@ import type { Building } from "./citygen.ts";
 import { center, nearest } from "./pathing.ts";
 import { shootBallista, wallBallistaReload } from "./wall-defenses.ts";
 import { burstBall } from "./muskets.ts";
-import { bulletHit } from "./snipers.ts";
-import type { DefendSim, Enemy } from "./sim.ts";
+import { bulletHit, pierceHits } from "./snipers.ts";
+import { knockBack } from "./gunners.ts";
+import type { Arrow, DefendSim, Enemy } from "./sim.ts";
 import { FIRE_ARROWS, GUNNERY, SHARP, SIEGE_SHOT, pathRank } from "../knowledge-paths.ts";
 import { ARROW_LOOPS, BOILING_OIL, keepRank } from "../keep-upgrades.ts";
 
@@ -171,6 +172,8 @@ export function stepArrows(sim: DefendSim, dt: number) {
   const byId = new Map(sim.enemies.map((e) => [e.id, e]));
   for (const a of sim.arrows) {
     a.life -= dt;
+    // A piercing bullet flies straight on, striking all in its line.
+    if (a.pierce) { flyThrough(sim, a, dt); continue; }
     const t = byId.get(a.target);
     const alive = t !== undefined && t.hp > 0;
     if (alive) {
@@ -193,10 +196,25 @@ export function stepArrows(sim: DefendSim, dt: number) {
       if (landed && a.burn) ignite(t, a.burn, a.burnFor!);
       // A sniper's bullet pins what it hits, or glances on.
       if (a.pin || a.glance) bulletHit(sim, a, t, landed);
+      // A Stopping power bullet knocks it back.
+      if (a.knock && landed) knockBack(sim, a, t);
     }
     a.life = 0;
   }
   sim.arrows = sim.arrows.filter((a) => a.life > 0);
+}
+
+/** A piercing bullet's step: on toward its end, hurting every enemy within
+ * its width of the stretch flown (each once), and gone at the end. */
+function flyThrough(sim: DefendSim, a: Arrow, dt: number) {
+  const x0 = a.x, y0 = a.y, d = dist(a.tx - a.x, a.ty - a.y), step = ARROW_SPEED * SHOT_SPEED.bullet * dt;
+  if (d > step) { a.x += ((a.tx - a.x) / d) * step; a.y += ((a.ty - a.y) / d) * step; }
+  else { a.x = a.tx; a.y = a.ty; a.life = 0; }
+  for (const e of pierceHits(sim, a, x0, y0)) {
+    a.pierce!.hits.push(e.id);
+    const landed = sim.hurtEnemy(e, a.damage, true, "ranged", a.origin ?? { x: x0, y: y0 }, true);
+    if (a.pin) bulletHit(sim, a, e, landed);
+  }
 }
 
 /** Shells fly their arc and burst on landing. */

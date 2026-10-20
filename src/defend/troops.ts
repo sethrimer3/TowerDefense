@@ -43,9 +43,9 @@ import { cellAt, cellCenter, center, findPath, nearest, type PathLimits, type Po
 import type { DefendSim, Enemy, Soldier } from "./sim.ts";
 import { answerBanner, MARCH_SIGHT } from "./war-banner.ts";
 import { BERSERK, CRUSADE, HALBERD, RANGERS, SKIRMISH, VOLLEY, pathRank } from "../knowledge-paths.ts";
-import { bigGame, bulletOf, sniperRange, sniperReload } from "./snipers.ts";
+import { bigGame, bulletOf, clearShot, pierceOf, sniperRange, sniperReload } from "./snipers.ts";
 import { bayonetTarget, charges, grenadeOf, musketDamage, musketRange, musketReload, musketSpeed, thrust, toughestInReach, volleyTargets } from "./muskets.ts";
-import { gunDamage, gunExtras, gunHp, gunRange, gunReload, gunSpeed, isGun, rocketOf, type Gun } from "./gunners.ts";
+import { gunDamage, gunExtras, gunHp, gunRange, gunReload, gunSpeed, isGun, gunShot, rocketOf, type Gun } from "./gunners.ts";
 import { cloudRank, diveIn, hostDrill, hostGarrison, musterPoint } from "./sky-palace.ts";
 import { assassinHp, assassinStrike, headhunter, huntReach, recruitState, stepCloak, toughestFirst } from "./assassins.ts";
 
@@ -285,7 +285,9 @@ export function stepArcher(sim: DefendSim, s: Soldier, dt: number) {
   if (close) return thrust(sim, s, close, bannerDamage(sim, s));
   const charge = charges(sim, s);
   // Big game: the toughest in reach rather than the nearest.
-  const near = bigGame(sim, s, range) ?? toughestInReach(sim, s, range) ?? nearest(sim.enemiesNear(s.x, s.y, range), s, range * range, true);
+  // Deadeye: only an enemy in clear sight, holding fire when none is.
+  const sight = clearShot(sim, s, range);
+  const near = sight !== undefined ? sight : bigGame(sim, s, range) ?? toughestInReach(sim, s, range) ?? nearest(sim.enemiesNear(s.x, s.y, range), s, range * range, true);
   if (near) {
     shoot(sim, s, near, range);
     // Skirmishers keep walking while they shoot, and charging bayonets
@@ -313,10 +315,10 @@ function shoot(sim: DefendSim, s: Soldier, e: Enemy, range: number) {
     // A sniper's bullet carries its lodge's path.
     if (kind === "sniper") {
       const { damage: hit, ...bullet } = bulletOf(sim, s, damage);
-      return void sim.arrows.push({ x: s.x, y: s.y, origin: { x: s.x, y: s.y, attacker: s.id }, target: e.id, damage: hit, tx: e.x, ty: e.y, life: 2, shot: "bullet", ...bullet });
+      return void sim.arrows.push({ x: s.x, y: s.y, origin: { x: s.x, y: s.y, attacker: s.id }, target: e.id, damage: hit, tx: e.x, ty: e.y, life: 2, shot: "bullet", ...bullet, ...pierceOf(sim, s, e, range) });
     }
     const fire = (t: Enemy, share = 1) => sim.arrows.push({ x: s.x, y: s.y, origin: { x: s.x, y: s.y, attacker: s.id }, target: t.id, damage: damage * share, tx: t.x, ty: t.y, life: 2, shot: SHOT[kind],
-      ...(kind === "musketeer" ? grenadeOf(sim, s.home, damage * share) : kind === "rocketeer" ? rocketOf(sim, s.home, damage * share) : {}) });
+      ...(kind === "musketeer" ? grenadeOf(sim, s.home, damage * share) : kind === "rocketeer" ? rocketOf(sim, s.home, damage * share) : gun ? gunShot(sim, gun) : {}) });
     fire(e);
     // Volley fire: buck and ball at the next nearest; Twin pistols and
     // Salvo racks: full shots at the next nearest.

@@ -17,7 +17,7 @@ export type PathId =
   | "pyromancy" | "rime" | "storm" | "crusaders" | "berserkers" | "halberdiers" | "cloudborne"
   | "bloodletters" | "shadowcloak" | "venom" | "headhunters"
   | "grenadiers" | "volleyFire" | "bayonets" | "sharpMuskets" | "beltFeed"
-  | "quickdraw" | "duelists" | "tripod" | "gunShield" | "overdrive" | "clusterRockets" | "salvoRacks"
+  | "quickdraw" | "duelists" | "tripod" | "gunShield" | "overdrive" | "stoppingPower" | "deadeye" | "piercing" | "clusterRockets" | "salvoRacks"
   | "marksmen" | "ricochet" | "suppressors"
   | "fireArrows" | "sharpshooters" | "gunnery" | "siegeShot" | "rangers" | "skirmishers"
   | "spotters" | "signalFires" | "pyroclasm" | "cinders" | "oilSoaked" | "fortified"
@@ -130,9 +130,21 @@ export const DUELISTS = { damage: [1, 1.3, 1.3, 1.3], range: [0, 0, 1.5, 1.5], e
 /** Gun shield: Gatling gunners have `hp[rank]` times the life; from II
  * they push the gun `speed` times as fast. */
 export const GUN_SHIELD = { hp: [1, 1.5, 1.5, 2.5], speed: 2 };
-/** Overdrive: Gatling gunners reach `range[rank]` more cells, hit
- * `damage[rank]` times as hard and reload in `reload[rank]` of the time. */
-export const OVERDRIVE = { range: [0, 1, 1, 1], damage: [1, 1, 1.3, 1.3], reload: [1, 1, 1, 0.7] };
+/** Overdrive: all damage, no push. Gatling gunners hit `damage[rank]`
+ * times as hard and reload in `reload[rank]` of the time. */
+export const OVERDRIVE = { damage: [1, 1.4, 1.8, 2.4], reload: [1, 1, 1, 0.85] };
+/** Stopping power: all push, little damage. Gatling gunners hit
+ * `damage[rank]` times as hard and every bullet knocks its enemy `push[rank]`
+ * cells straight back from the gun (not bosses, fortresses or boats). */
+export const STOPPING = { damage: [1, 0.35, 0.3, 0.25], push: [0, 0.08, 0.14, 0.22] };
+/** Deadeye: snipers shoot only an enemy they see clearly, no house or tower
+ * between (the city wall is low enough to shoot over), and hit
+ * `damage[rank]` times as hard; at III they reach `range` cells further. */
+export const DEADEYE = { damage: [1, 1.6, 2.2, 3], range: 2 };
+/** Piercing rounds: every bullet flies straight on to the end of its reach
+ * through every enemy within `width` of its line, each hit at `damage[rank]`
+ * of the shot; at III they reach `range` cells further. */
+export const PIERCING = { damage: [1, 0.4, 0.5, 0.6], width: 0.4, range: 2 };
 /** Cluster rockets: rockets burst `blast[rank]` cells wider, from II throw
  * `bomblets` round the burst at `share` of the damage, and at III leave the
  * ground burning `burn` seconds at `burnShare` of the damage a second. */
@@ -443,11 +455,19 @@ export const PATHS: KnowledgePath[] = [
     ],
   },
   {
-    id: "overdrive", topic: "gatlingNest", name: "Overdrive", motto: "Crank it until it glows", hue: "ember",
+    id: "overdrive", topic: "gatlingNest", name: "Overdrive", motto: "All damage, no push", hue: "ember",
     ranks: [
-      { name: "Elevated gun", icon: "spyglass", cost: studyPathCost(4, 0), text: "Gatling gunners reach a cell further" },
-      { name: "Hot loads", icon: "cannonball", cost: studyPathCost(4, 1), text: "Their bullets hit 30% harder" },
-      { name: "Overdrive", icon: "inferno", cost: studyPathCost(4, 2), text: "They crank 30% faster" },
+      { name: "Hot loads", icon: "cannonball", cost: studyPathCost(4, 0), text: "Gatling gunners' bullets hit 40% harder" },
+      { name: "Hollow points", icon: "blast", cost: studyPathCost(4, 1), text: "They hit 80% harder than at first" },
+      { name: "Overdrive", icon: "inferno", cost: studyPathCost(4, 2), text: "They hit two and a half times as hard and crank 15% faster" },
+    ],
+  },
+  {
+    id: "stoppingPower", topic: "gatlingNest", name: "Stopping power", motto: "All push, little damage", hue: "frost",
+    ranks: [
+      { name: "Heavy slugs", icon: "hammer", cost: studyPathCost(4, 0), text: "Every bullet knocks its enemy back a little, but hits at only 35% of the damage" },
+      { name: "Hail of lead", icon: "volley", cost: studyPathCost(4, 1), text: "Each knocks it back further, at 30% of the damage" },
+      { name: "Wall of lead", icon: "frostShield", cost: studyPathCost(4, 2), text: "The stream holds back most walkers, at 25% of the damage. Bosses, fortresses and boats are not moved" },
     ],
   },
   {
@@ -488,6 +508,22 @@ export const PATHS: KnowledgePath[] = [
       { name: "Crippling shot", icon: "boot", cost: studyPathCost(4, 0), text: "Every hit slows its enemy for 2 seconds" },
       { name: "Pinning shot", icon: "stake", cost: studyPathCost(4, 1), text: "Every hit also staggers it, standing still, for 0.6 seconds" },
       { name: "Quick hands", icon: "gear", cost: studyPathCost(4, 2), text: "Snipers reload 40% faster" },
+    ],
+  },
+  {
+    id: "deadeye", topic: "sniperLodge", name: "Deadeye", motto: "One clear shot, one kill", hue: "verdant",
+    ranks: [
+      { name: "Clear sight", icon: "eye", cost: studyPathCost(4, 0), text: "Snipers shoot only an enemy no house or tower hides from them (they shoot over the city wall), and hit 60% harder" },
+      { name: "Patient aim", icon: "crosshair", cost: studyPathCost(4, 1), text: "They hit 120% harder" },
+      { name: "Deadeye", icon: "skull", cost: studyPathCost(4, 2), text: "They hit three times as hard and reach 2 cells further" },
+    ],
+  },
+  {
+    id: "piercing", topic: "sniperLodge", name: "Piercing rounds", motto: "Through the whole file", hue: "steel",
+    ranks: [
+      { name: "Piercing rounds", icon: "arrow", cost: studyPathCost(4, 0), text: "Every bullet flies straight on to the end of its reach through every enemy in its line, each hit at 40% of the damage" },
+      { name: "Hardened tips", icon: "shard", cost: studyPathCost(4, 1), text: "Each hit at 50% of the damage" },
+      { name: "Rail rifles", icon: "spyglass", cost: studyPathCost(4, 2), text: "Each hit at 60%, reaching 2 cells further" },
     ],
   },
   {

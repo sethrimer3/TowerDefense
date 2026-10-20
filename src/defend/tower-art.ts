@@ -143,9 +143,9 @@ export const PATH_LOOKS: Partial<Record<PlacedKind, readonly string[]>> = {
   musketHall: ["grenadiers", "volleyFire", "bayonets", "sharpMuskets"],
   gunHall: ["quickdraw", "duelists"],
   gunNest: ["beltFeed", "tripod"],
-  gatlingNest: ["gunShield", "overdrive"],
+  gatlingNest: ["gunShield", "overdrive", "stoppingPower"],
   rocketBattery: ["clusterRockets", "salvoRacks"],
-  sniperLodge: ["marksmen", "ricochet", "suppressors"],
+  sniperLodge: ["marksmen", "ricochet", "suppressors", "deadeye", "piercing"],
   archerBarracks: ["rangers", "skirmishers"],
   archerTower: ["fireArrows", "sharpshooters"],
   cannonTower: ["gunnery", "siegeShot"],
@@ -386,10 +386,13 @@ const ZIGZAG = ["0...0..", ".0.0.0.", "..0...0"];
  * a firing lane, sandbags at the near end and a small far target. Its paths
  * change the roof, the emblem and the lane: the Marksmen's a second target
  * further off, Ricochet's iron plates to ring, Suppressing fire's a double
- * sandbag wall and caltrops. */
+ * sandbag wall and caltrops, Deadeye's an eye and one great target, and
+ * Piercing rounds' a bullet through three marks and three targets in file. */
 function paintSniperLodge(p: Pix, look: string) {
-  const marks = look === "marksmen", glance = look === "ricochet", supp = look === "suppressors";
-  const y = marks ? guild(p, C.tar, SPYGLASS, { 0: OUTLINE, 1: C.brass[0], 2: C.brass[1], 3: C.ice[3] })
+  const marks = look === "marksmen", glance = look === "ricochet", supp = look === "suppressors", deadeye = look === "deadeye", pierce = look === "piercing";
+  const y = deadeye ? guild(p, C.kiln[0], EYE, { 0: OUTLINE, 1: OUTLINE, 3: C.pale[3], 4: C.canvas[2] })
+    : pierce ? guild(p, C.iron[1], SKEWER, { 0: OUTLINE, 3: C.iron[3], 4: C.target[1] })
+    : marks ? guild(p, C.tar, SPYGLASS, { 0: OUTLINE, 1: C.brass[0], 2: C.brass[1], 3: C.ice[3] })
     : glance ? guild(p, C.lead, ZIGZAG, { 0: C.brass[2] })
     : supp ? guild(p, C.ice[1], CROSSHAIR, { 0: OUTLINE, 3: C.ice[3] })
     : guild(p, C.canvas[1], CROSSHAIR, { 0: OUTLINE, 3: C.target[1] });
@@ -405,6 +408,17 @@ function paintSniperLodge(p: Pix, look: string) {
   }
   const ly = Math.round((y.y0 + y.y1) / 2);
   for (let x = y.x0 + (supp ? 7 : 5); x < y.x1 - 3; x++) if (x % 2) p.set(x, ly, C.dirt[0]);
+  if (deadeye) {
+    // One great target at the lane's end, its heart gilded.
+    disc(p, y.x1 - 2, ly + 0.5, 2.4, (_x, _y, d) => (d > 1.8 ? OUTLINE : d > 1.2 ? C.target[0] : d > 0.6 ? C.target[1] : C.target[2]));
+    return;
+  }
+  if (pierce) {
+    // Three small targets in file down the lane, shot through.
+    for (const dx of [-1.5, -4.5, -7.5]) disc(p, y.x1 + dx, ly + 0.5, 1.2, (_x, _y, d) => (d > 0.7 ? OUTLINE : C.target[1]));
+    for (let x = y.x1 - 9; x < y.x1; x++) if (x % 3 === 0) p.set(x, ly, C.iron[3]);
+    return;
+  }
   if (glance) {
     // Iron plates hung to ring when struck, one high, one low.
     for (const [dx, dy] of [[-1.5, -1.5], [-4.5, 1.5]] as const)
@@ -417,6 +431,11 @@ function paintSniperLodge(p: Pix, look: string) {
   // Suppressing fire's caltrops scattered across the lane.
   if (supp) for (const [dx, dy] of [[9, -1], [11, 1], [13, -2], [12, 2]] as const) p.set(y.x0 + dx, ly + dy, C.iron[3]);
 }
+
+/** Deadeye's open eye, a green iris. */
+const EYE = ["..000..", ".03330.", "0334330", "0341430", "0334330", ".03330.", "..000.."];
+/** Piercing rounds' bullet through three marks in file. */
+const SKEWER = [".0.0.0.", ".4.4.4.", "0333333", ".4.4.4.", ".0.0.0."];
 
 /** The Grenadiers' grenade: a black iron ball with a lit fuse. */
 const GRENADE = ["...4.", "..3..", ".000.", "01220", "01120", "01110", ".000."];
@@ -555,16 +574,23 @@ function paintGunNest(p: Pix, look: string) {
 /** The Gatling emplacement: a brass-roofed hall with the gun's barrels on
  * the ridge over a sandbagged yard where the great gun stands on its
  * carriage. Gun shield roofs it in iron and stands a riveted plate before
- * the gun; Overdrive roofs it in red tiles, the barrels' ends glowing hot. */
+ * the gun; Overdrive roofs it in red tiles, the barrels' ends glowing hot;
+ * Stopping power roofs it in pale blue, a flared muzzle over scraped furrows. */
 function paintGatlingNest(p: Pix, look: string) {
-  const shield = look === "gunShield", over = look === "overdrive";
-  const y = guild(p, shield ? C.iron[1] : over ? C.kiln[1] : C.brass[0], BARRELS, { 0: OUTLINE, 2: over ? C.ember : C.brass[2], 3: over ? C.fire[1] : C.iron[2] });
+  const shield = look === "gunShield", over = look === "overdrive", stop = look === "stoppingPower";
+  const y = guild(p, shield ? C.iron[1] : over ? C.kiln[1] : stop ? C.ice[1] : C.brass[0], BARRELS, { 0: OUTLINE, 2: over ? C.ember : C.brass[2], 3: over ? C.fire[1] : C.iron[2] });
   sandbags(p, y);
   const cy = Math.round((y.y0 + y.y1) / 2), cx = Math.round((y.x0 + y.x1) / 2) - 3;
   for (const dx of [-1, 4]) disc(p, cx + dx + 0.5, cy + 1.5, 1.6, (x, yy, d, ox, oy) => (d > 1 ? OUTLINE : C.plank[Math.min(3, lit(x, yy, ox, oy, d))]));
   for (let x = cx; x <= cx + 7; x++) for (let r = -1; r <= 1; r++) p.set(x, cy + r, r === 0 ? OUTLINE : C.iron[x % 2 ? 2 : 3]);
   p.set(cx + 8, cy, over ? C.ember : C.iron[3]);
   if (over) for (const [dx, dy] of [[6, -1], [7, 1], [8, -1], [8, 1], [9, 0]] as const) p.set(cx + dx, cy + dy, dx > 7 ? C.fire[2] : C.ember);
+  if (stop) {
+    // A flared muzzle, and furrows scraped back in the dirt beyond.
+    for (let r = -2; r <= 2; r++) p.set(cx + 9, cy + r, Math.abs(r) === 2 ? OUTLINE : C.iron[3]);
+    for (const r of [-1, 1]) p.set(cx + 10, cy + r * 2, OUTLINE);
+    for (const [dx, dy] of [[12, -2], [13, -2], [14, -2], [12, 2], [13, 2], [15, 0], [16, 0]] as const) if (cx + dx < y.x1) p.set(cx + dx, cy + dy, C.dirt[0]);
+  }
   if (shield) {
     // The shield: a tall pale steel plate across the barrels in a black
     // outline, riveted in brass, a slot to aim through.

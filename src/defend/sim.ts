@@ -202,6 +202,13 @@ export type Arrow = {
   /** A Grenadier's ball: the ground it leaves burning (for `life` seconds at
    * `dps`, clinging at III) and the bomblets it throws; absent otherwise. */
   grenade?: { life: number; dps: number; bomblets: number; cling?: true };
+  /** Stopping power: how far each hit knocks its enemy straight back from
+   * `origin`; absent otherwise. */
+  knock?: number;
+  /** A piercing bullet: it flies straight to (`tx`, `ty`) (its `target` is
+   * -1), striking every enemy within `width` of its line once (`hits`);
+   * absent otherwise. */
+  pierce?: { width: number; hits: number[] };
   /** A Ricochet bullet: the glances it has left, the share of the damage
    * each keeps and the enemies already struck; absent otherwise. */
   glance?: { left: number; share: number; struck: number[] };

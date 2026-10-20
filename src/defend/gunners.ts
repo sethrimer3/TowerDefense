@@ -4,17 +4,20 @@
  * III); the Machine-gun nest's Belt feed (quicker reloads, harder bullets
  * from II, crowned into the Gatling emplacement) and Tripod (further,
  * harder); the Gatling emplacement's Gun shield (more life, a quicker gun
- * from II) and Overdrive (further, harder, then quicker); the Rocket
+ * from II), Overdrive (all damage, no push) and Stopping power (all push,
+ * little damage: each bullet knocks its enemy back, `knockBack`); the Rocket
  * battery's Cluster rockets (wider bursts, bomblets from II, burning
  * ground at III) and Salvo racks (quicker reloads, more rockets a launch).
  * The gunners, Gatling gunners and rocketeers shoot through `troops.ts`,
  * the rockets bursting through `burstBall` (`muskets.ts`). Nothing here
  * draws from the random stream, and off the paths every number is the
  * catalog's. */
-import { BELT_FEED, CLUSTER, DUELISTS, GUN_SHIELD, OVERDRIVE, QUICKDRAW, SALVO, TRIPOD, pathRank, type BattlePaths } from "../knowledge-paths.ts";
+import { BELT_FEED, CLUSTER, DUELISTS, GUN_SHIELD, OVERDRIVE, QUICKDRAW, SALVO, STOPPING, TRIPOD, pathRank, type BattlePaths } from "../knowledge-paths.ts";
 import { buildingPaths } from "../specializations.ts";
-import { sq } from "../exact.ts";
-import { GATLING_GUNNER, GUNNER, MACHINE_GUNNER, ROCKETEER } from "./catalog.ts";
+import { dist, sq } from "../exact.ts";
+import { blocked } from "./pathing.ts";
+import { cellInBounds } from "./grid.ts";
+import { ENEMIES, GATLING_GUNNER, GUNNER, MACHINE_GUNNER, ROCKETEER } from "./catalog.ts";
 import type { Arrow, DefendSim, Enemy, Soldier } from "./sim.ts";
 
 /** The gun line's path ranks of the building `home`: 0 for each it doesn't climb. */
@@ -27,6 +30,7 @@ export function gunPaths(sim: DefendSim, home: number) {
     duel: pathRank(p, "gunHall", "duelists"),
     shield: pathRank(p, "gatlingNest", "gunShield"),
     over: pathRank(p, "gatlingNest", "overdrive"),
+    stop: pathRank(p, "gatlingNest", "stoppingPower"),
     cluster: pathRank(p, "rocketBattery", "clusterRockets"),
     salvo: pathRank(p, "rocketBattery", "salvoRacks"),
   };
@@ -42,7 +46,6 @@ export function gunRange(sim: DefendSim, s: Soldier & { kind: Gun }) {
   const g = gunPaths(sim, s.home), base = BASE[s.kind].range;
   if (s.kind === "gunner") return base + DUELISTS.range[g.duel];
   if (s.kind === "machineGunner") return base + TRIPOD.range[g.tripod];
-  if (s.kind === "gatlingGunner") return base + OVERDRIVE.range[g.over];
   return base;
 }
 
@@ -56,7 +59,7 @@ export function gunDamage(sim: DefendSim, s: Soldier & { kind: Gun }, damage: nu
     return damage * DUELISTS.damage[g.duel] * (s.strikes % DUELISTS.every === 0 ? DUELISTS.crit : 1);
   }
   if (s.kind === "machineGunner") return damage * (g.belt >= 2 ? BELT_FEED.damage : 1) * TRIPOD.damage[g.tripod];
-  if (s.kind === "gatlingGunner") return damage * OVERDRIVE.damage[g.over];
+  if (s.kind === "gatlingGunner") return damage * OVERDRIVE.damage[g.over] * STOPPING.damage[g.stop];
   return damage;
 }
 
@@ -92,4 +95,28 @@ export function rocketOf(sim: DefendSim, home: number, damage: number): Pick<Arr
   const c = gunPaths(sim, home).cluster, blast = ROCKETEER.blast + CLUSTER.blast[c];
   if (c < 2) return { blast };
   return { blast, grenade: { life: CLUSTER.burn[c], dps: damage * CLUSTER.burnShare, bomblets: CLUSTER.bomblets[c] } };
+}
+
+/** What a bullet of `s` carries: Stopping power's knock; nothing otherwise. */
+export function gunShot(sim: DefendSim, s: Soldier & { kind: Gun }): Pick<Arrow, "knock"> {
+  const stop = s.kind === "gatlingGunner" ? gunPaths(sim, s.home).stop : 0;
+  return stop ? { knock: STOPPING.push[stop] } : {};
+}
+
+/** A Stopping power bullet has hit `e`: knock it `a.knock` cells straight
+ * back from where it was fired, in short steps that stop at anything solid
+ * (fliers only at the board's edge). Bosses, fortresses, boats and the
+ * unyielding stand firm. */
+export function knockBack(sim: DefendSim, a: Arrow, e: Enemy) {
+  const def = ENEMIES[e.kind], from = a.origin ?? { x: a.x, y: a.y };
+  if (!a.knock || e.hp <= 0 || def.boss || def.fortress || e.fortressPart || def.boat || def.unyielding) return;
+  const d = dist(e.x - from.x, e.y - from.y);
+  if (d < 0.01) return;
+  const n = Math.max(1, Math.ceil(a.knock / 0.1)), dx = ((e.x - from.x) / d) * a.knock / n, dy = ((e.y - from.y) / d) * a.knock / n;
+  for (let i = 0; i < n; i++) {
+    const x = e.x + dx, y = e.y + dy;
+    if (def.flying ? !cellInBounds(x, y) : blocked(sim.foeSolid, x, y)) break;
+    e.x = x;
+    e.y = y;
+  }
 }

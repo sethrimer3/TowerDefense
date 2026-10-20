@@ -305,8 +305,13 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   own; Cluster rockets burst wider, then throw 4 bomblets, then leave the
   ground burning, and Salvo racks reload faster, then loose two and three
   rockets a launch). The Gatling emplacement has Gun shield (more life,
-  then a carriage pushed twice as fast) and Overdrive (reach, harder
-  bullets, then cranking 30% faster). The musket
+  then a carriage pushed twice as fast), Overdrive (all damage, no push:
+  bullets 40%, then 80% harder, then two and a half times as hard and
+  cranking 15% faster) and Stopping power (all push, little damage: every
+  bullet knocks its enemy straight back from the gun, further each rank,
+  until at III the stream holds back most walkers, at 35%, 30% and 25% of
+  the damage; walls stop the push, and bosses, fortresses and boats aren't
+  moved). The musket
   hall's Sharpshooters path (further, harder, the toughest in reach at
   III) is crowned into a **sniper lodge** (snipers: long range, heavy,
   slow single shots, with three paths: Marksmen reaching
@@ -314,7 +319,13 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   landing a 4× headshot every third shot at III; Ricochet bullets glancing
   on to the nearest enemy not yet struck within 2.5 cells, once, twice,
   then four times at 80%; Suppressing fire's hits slowing, staggering from
-  II, and reloading 40% faster at III). The musket hall's musketmen fire
+  II, and reloading 40% faster at III; Deadeye shooting only an enemy no
+  house, tower or hall hides from them (they shoot over the low city wall,
+  and hold their fire when nothing is in clear sight), hitting 60%, then
+  120%, then three times as hard, reaching 2 cells further at III; Piercing
+  rounds flying straight on to the end of their reach through every enemy
+  in the line, each hit at 40%, 50%, then 60% of the shot, reaching 2
+  cells further at III). The musket hall's musketmen fire
   slow, heavy single balls, with four paths: Sharpshooters (above);
   Grenadiers' balls bursting over a small area, sparing your own, and
   leaving the ground burning, throwing four
