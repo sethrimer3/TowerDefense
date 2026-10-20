@@ -4,12 +4,15 @@
 import { SUB, TILES_H, TILES_W, boardSize, tileKey, type Rect } from "./grid.ts";
 import { QUARTER, QUARTERS_H, QUARTERS_W } from "./layout.ts";
 import type { StructureKind } from "./catalog.ts";
+import { STRUCTURES } from "./catalog.ts";
+import { buildingArt, buildingFrame } from "./building-sprite-manifest.ts";
+import { drawPixelFrame } from "./pixel-sprites.ts";
 
 export type Overlay = {
   /** Tile keys that accept the dragged item. */
   legal: Set<string>;
   hover: string | null;
-  ghost: { rect: Rect; kind: StructureKind | "cityTile" | "cityGate" | "wallSpikes" | "wallBallista" | "wallBlock" } | null;
+  ghost: { rect: Rect; kind: StructureKind | "cityTile" | "cityGate" | "wallSpikes" | "wallBallista" | "wallBlock"; path?: string } | null;
   /** A piece of the wall being carried (a gate, spikes or a ballista): the
    * stretches or corners of wall that take it, the one under the pointer
    * and whether it fits there. */
@@ -66,7 +69,7 @@ export function drawOverlay(c: CanvasRenderingContext2D, px: number, o: Overlay)
   else if (o.walls) drawWallTargets(c, px, o.walls);
   else if (o.gates) drawGateTargets(c, px, o.gates);
   else if (o.legal.size || o.ghost || o.hover !== null) drawTargets(c, px, o);
-  if (o.ghost) drawGhost(c, px, o.ghost.rect);
+  if (o.ghost) drawGhost(c, px, o.ghost);
   if (o.quarters) drawFootprint(c, px, o.quarters);
   if (o.bomb) drawBombReach(c, px, o.bomb);
   if (o.banner) drawRallyReach(c, px, o.banner);
@@ -166,7 +169,16 @@ function drawGateTargets(c: CanvasRenderingContext2D, px: number, g: NonNullable
   if (g.hover && !g.fits) frame(g.hover, "rgba(200,40,50,0.22)", "rgba(230,70,80,0.85)", Math.max(1, px * 0.16));
 }
 
-function drawGhost(c: CanvasRenderingContext2D, px: number, r: Rect) {
+function drawGhost(c: CanvasRenderingContext2D, px: number, ghost: NonNullable<Overlay["ghost"]>) {
+  const r = ghost.rect;
+  const family = ghost.kind in STRUCTURES ? buildingArt(ghost.kind as StructureKind, r.w, r.h) : undefined;
+  if (family) {
+    const x = Math.round(r.x * px), y = Math.round(r.y * px);
+    c.save(); c.globalAlpha = 0.7;
+    const drawn = drawPixelFrame(c, family.sheet, buildingFrame(family, 0, ghost.path), x, y, Math.round((r.x + r.w) * px) - x, Math.round((r.y + r.h) * px) - y);
+    c.restore();
+    if (drawn) return;
+  }
   c.fillStyle = "rgba(242,210,122,0.45)";
   c.fillRect(r.x * px, r.y * px, r.w * px, r.h * px);
   c.strokeStyle = "#f2d27a";

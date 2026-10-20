@@ -8,6 +8,8 @@ Play it on GitHub Pages: <https://sethrimer3.github.io/TowerDefense/>
 
 New sprite work follows the [pixel-art style guide](docs/art/PIXEL_ART_GUIDE.md) and [migration inventory](docs/art/PIXEL_ART_INVENTORY.md). They define the crisp PNG style, shared palette, defense-grid scale/anchors, required variants, and the rule that replacements appear only with **Pixel Art** checked while legacy graphics remain available off.
 
+The [first building batch](docs/art/BUILDING_BATCH_01.md) implements the keep, barracks and watch tower, their damage/rubble/path variants, and matching UI icons. Rebuild their committed PNGs with `npm run sprites`; verify them with `npm run sprites -- --check`.
+
 ## Run
 
 Use Node.js 22.18+ (CI uses 24) and npm:
@@ -51,7 +53,7 @@ The city is alive between and during battles: park grass sways in the wind (hard
 
 The Library's Study and Defend's building Knowledge trees have procedural gold magic circles: projected 4D tesseracts for city Knowledge, inscribed nested triangles for strike spells, and clipped Voronoi diagrams for infantry and tower buildings, all framed by concentric sigils and lights tracing geometric paths. Upgrades reshape the cells and triangles and change their numbers: Voronoi cells grow or collapse continuously, while inscribed triangle layers reshape and fade in or out. Completed research and selected spell/building paths deterministically shape each circle; purchases, unlearning and respec morph it over 1.7 seconds. The effect preserves the chamber artwork, uses bounded pixel canvases and cached geometry, and becomes static under Reduce Motion. `src/magic-circle/` contains the renderer and its configuration; `node tests/magic-circle.mjs` checks desktop/mobile integration against the dev server (set `PLAYWRIGHT_EXECUTABLE` to an installed Chromium).
 
-The Settings page's Pixel Art (on by default) swaps in hand-drawn PNG sprites shared with Tower Delve's Defend for the pieces that have them (the keep, plain barracks and towers, roofs, trees, Mossbound's floor and wall, troops and the first enemies); `src/defend/pixel-sprites.ts` holds them, and with it off every piece keeps its own drawn art.
+The Settings page's Pixel Art (on by default) swaps in PNG sprites for the pieces that have them. The keep, barracks and watch tower use native 8-pixel-per-cell sheets, fixed anchors, path/damage/rubble frames and separate UI icons (`src/defend/building-sprite-manifest.ts`, authored in `scripts/pixel-art/build.ts`). Remaining imported art comes from Tower Delve's Defend: other towers, roofs, trees, Mossbound's floor and wall, troops and the first enemies. `src/defend/pixel-sprites.ts` shares image loading, setting gates and cache revisions. Pixel Art off retains the legacy drawings; missing new building PNGs also fall back to those drawings. New building placement ghosts use the same world frames, and city-layer compositing uses nearest-neighbor sampling in pixel mode.
 
 Nature ambience is synthesized locally: rain uses soft noise impacts, wind uses filtered noise, and insects use long loops with irregular pauses. Bird and owl calls are sparse and quiet; no audio downloads are required.
 

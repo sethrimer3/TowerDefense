@@ -2,6 +2,8 @@
 
 Read the [style guide and setting contract](PIXEL_ART_GUIDE.md) first. This is a source-audited work list, **not a list of approved or completed new sprites**. Snapshot: commit `a4e07e0`, the Pixel Art setting/Tower Delve PNG merge. Refresh the catalog appendices when gameplay adds an element.
 
+Implementation update: [Building batch 01](BUILDING_BATCH_01.md) converts the keep, barracks and watch tower plus their shared UI/placement appearances. The catalog snapshot is unchanged. Units and enemies are deferred at the user's request; their unchecked rows remain future work.
+
 Legend: **Audit/redraw** = PNG exists, but style/density/states still require review; **Create** = no registered PNG replacement for this family; **Integrate** = the setting, scale, cache or cross-screen routing still needs work. Every unchecked item remains pending. Existing legacy artwork stays available when Pixel Art is off.
 
 ## A. Shared foundation and integration
@@ -28,17 +30,17 @@ Source footprint dimensions are simulation cells. Proposed base footprint pixels
 
 | Pending | Catalog ID / element | Normal cells → base pixels | Compact cells | Current PNG coverage |
 | --- | --- | --- | --- | --- |
-| [ ] | `keep` — Keep | 4×4 → 32×32 | — | keep, intact base only |
+| [x] | `keep` — Keep | 4×4 → 32×32 | — | v2: intact + four damage stages, rubble, flag and UI; batch 01 |
 | [ ] | `meleeGuild` — Melee Guild | 4×4 → 32×32 | — | Create |
 | [ ] | `rangedGuild` — Ranged Guild | 4×4 → 32×32 | — | Create |
 | [ ] | `assassinDen` — Assassins' den | 4×4 → 32×32 | — | Create |
 | [ ] | `sniperLodge` — Sniper lodge | 4×4 → 32×32 | — | Create |
 | [ ] | `musketHall` — Musket hall | 6×4 → 48×32 | — | Create |
-| [ ] | `barracks` — Barracks | 4×6 → 32×48 | — | base/wide imports; path/damage forms pending |
+| [x] | `barracks` — Barracks | 4×6 → 32×48 | — | v2 normal/wide, base + Crusaders/Berserkers/Halberdiers, all damage/rubble, rebuilding and UI; batch 01 |
 | [ ] | `archerBarracks` — Archer barracks | 4×4 → 32×32 | — | intact base only |
 | [ ] | `archerTower` — Archer tower | 2×2 → 16×16 | — | intact base only |
 | [ ] | `cannonTower` — Cannon tower | 2×2 → 16×16 | — | intact base only |
-| [ ] | `watchTower` — Watch tower | 2×2 → 16×16 | — | intact base only |
+| [x] | `watchTower` — Watch tower | 2×2 → 16×16 | — | v2 base + Spotters/Signal fires, all damage/rubble, rebuilding and UI; batch 01 |
 | [ ] | `wizardTower` — Wizard tower | 2×2 → 16×16 | — | Create |
 | [ ] | `mageGuild` — Mage Guild | 4×6 → 32×48 | — | Create |
 | [ ] | `valkyriePalace` — Valkyrie palace | 6×6 → 48×48 | 4×6 | Create |
@@ -156,6 +158,8 @@ Preserve the Library's side-view geometry (`library/geometry.ts`: current nave 1
 | [ ] | Library/Study UI | Knowledge, shelf/staff/lab icons, hires, roles, building picker, research project, cost/progress/cancel, catch-up/away countdown and navigation. `library/ui.ts`, `ui/ledger.ts`, `ui/welcome.ts`. |
 
 ## F. Batch tracking
+
+**Implemented: [batch 01](BUILDING_BATCH_01.md)** — keep, barracks and watch tower; nine PNG sheets, 61 world-state frames, eight UI icons, four keep-flag frames and one rebuilding module. Includes exact footprint/pivot metadata, matching board/drag/placement/UI routing, damage/rubble, legacy/missing-asset fallback and nearest-neighbor city compositing. The remaining foundation/UI/world rows stay pending; this batch does not convert the whole game. The historical imported PNG list below is retained as an audit list, including the old building files superseded by this batch.
 
 Start with F01–F09, then a calibrated keep/tower/infantry vertical slice with matching UI. Complete a family across states and screens before marking it done. Next expand Defend, then shared UI/chambers, Mine and Library. A batch record should contain: semantic IDs, PNG paths/native sizes, anchors/footprints, applicable states, owners, reference contact sheet, on/off screenshots, test results, memory/frame-cost notes and remaining fallback cases. Do not use a single checked "Defend done" box to hide missing species or upgrade states.
 

@@ -2,7 +2,8 @@
  * towers from `tower-art.ts` at their damage stages and as rubble (drawn
  * into the city layer and the palette icons), the keep's live banner, and
  * the shared palette. */
-import { drawPixel, structureSprite } from "./pixel-sprites.ts";
+import { drawPixel, drawPixelFrame, pixelSprite, structureSprite } from "./pixel-sprites.ts";
+import { buildingArt, buildingFrame, buildingLook, BUILDING_ICON_SIZE, KEEP_FLAG } from "./building-sprite-manifest.ts";
 import { GATE, STRUCTURES, type StructureKind } from "./catalog.ts";
 import { gatePixels } from "./gate-art.ts";
 import { BALLISTA_ART, BALLISTA_DIRS, ballistaPixels, bastionPixels, spikePixels } from "./wall-defense-art.ts";
@@ -27,11 +28,14 @@ export type ArtBox = { x: number; y: number; w: number; h: number; px: number };
  * lot) so each looks its own, in its path's `look` (`PATH_LOOKS`). */
 export function paintStructureArt(c: CanvasRenderingContext2D, kind: StructureKind, box: ArtBox, stage = 0, seed = 0, path?: string) {
   const x = Math.round(box.x), y = Math.round(box.y), w = Math.round(box.w), h = Math.round(box.h);
-  // Pixel Art's sprite for an undamaged plain building; damage and the paths' looks keep their own art.
-  const pixel = !stage && !artLook(kind, path) ? structureSprite(kind, w > h) : undefined;
+  const cw = Math.max(1, Math.round(box.w / box.px)), ch = Math.max(1, Math.round(box.h / box.px));
+  const family = buildingArt(kind, cw, ch);
+  // A migrated family keeps its PNG identity through paths and damage. The
+  // same bounds are used by ghosts, palette previews and the city layer.
+  if (family && drawPixelFrame(c, family.sheet, buildingFrame(family, stage, path), x, y, Math.round(box.x + box.w) - x, Math.round(box.y + box.h) - y)) return;
+  const pixel = !family && !stage && !artLook(kind, path) ? structureSprite(kind, w > h) : undefined;
   if (pixel && drawPixel(c, pixel, x, y, w, h)) return;
   if (kind === "keep") return paintKeep(c, { x, y, w, h, px: box.px }, stage);
-  const cw = Math.max(1, Math.round(box.w / box.px)), ch = Math.max(1, Math.round(box.h / box.px));
   const look = artLook(kind, path);
   const art = sprite(`${kind}:${cw}x${ch}:${stage}:${seed}${look ? `:${look}` : ""}`, cw * ART, ch * ART, () => structurePixels(kind, cw, ch, stage, seed, look));
   drawSprite(c, art, x, y, w, h);
@@ -41,6 +45,8 @@ export function paintStructureArt(c: CanvasRenderingContext2D, kind: StructureKi
 export function paintStructureRubble(c: CanvasRenderingContext2D, kind: StructureKind, box: ArtBox, seed = 0) {
   if (kind === "keep") return paintKeepRubble(c, box);
   const cw = Math.max(1, Math.round(box.w / box.px)), ch = Math.max(1, Math.round(box.h / box.px));
+  const family = buildingArt(kind, cw, ch), x = Math.round(box.x), y = Math.round(box.y);
+  if (family && drawPixelFrame(c, family.sheet, buildingFrame(family, 0, undefined, true), x, y, Math.round(box.x + box.w) - x, Math.round(box.y + box.h) - y)) return;
   const art = sprite(`${kind}:${cw}x${ch}:rubble:${seed}`, cw * ART, ch * ART, () => structureRubblePixels(kind, cw, ch, seed));
   drawSprite(c, art, Math.round(box.x), Math.round(box.y), Math.round(box.w), Math.round(box.h));
 }
@@ -74,6 +80,12 @@ export function paintIcon(canvas: HTMLCanvasElement, item: IconItem) {
   if (item === "frostNova") return paintFrostIcon(c, n);
   if (item === "reinforcements") return paintReinforceIcon(c, n);
   const def = [STRUCTURES[item].w, STRUCTURES[item].h];
+  const family = buildingArt(item, def[0], def[1]);
+  // Purpose-drawn square icons share the world sprite's palette/emblem.
+  // Integral magnification keeps their pixels even at the standard 48px UI.
+  const size = BUILDING_ICON_SIZE, scale = Math.max(1, Math.floor(n / size));
+  const iconSize = Math.min(n, size * scale), o = Math.round((n - iconSize) / 2);
+  if (family && drawPixelFrame(c, family.icon, { sx: buildingLook(family, canvas.dataset.look ?? canvas.dataset.pixelLook) * size, sy: 0, sw: size, sh: size }, o, o, iconSize, iconSize)) return;
   const px = n / Math.max(def[0], def[1]) / 1.1;
   const w = def[0] * px,
     h = def[1] * px;
@@ -627,10 +639,25 @@ const ORTHO4: readonly Pt[] = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 
 const keepSprites: (HTMLCanvasElement | undefined)[] = [];
 let keepFlashSprite: HTMLCanvasElement | null = null;
+let cleanKeepFlashSprite: HTMLCanvasElement | null = null;
 let rubbleSprite: HTMLCanvasElement | null = null;
 
 /** Pale damage overlay with exactly the keep sprite's silhouette. */
 export function paintKeepFlash(c: CanvasRenderingContext2D, { x, y, w, h }: ArtBox, alpha: number) {
+  const family = buildingArt("keep", 4, 4)!;
+  const image = pixelSprite(family.sheet);
+  if (image) {
+    if (!cleanKeepFlashSprite) {
+      const mask = cleanKeepFlashSprite = document.createElement("canvas");
+      [mask.width, mask.height] = family.size;
+      const mc = mask.getContext("2d")!;
+      mc.drawImage(image, 0, 0, mask.width, mask.height, 0, 0, mask.width, mask.height);
+      mc.globalCompositeOperation = "source-in";
+      mc.fillStyle = "#EAE2C9"; mc.fillRect(0, 0, mask.width, mask.height);
+    }
+    c.save(); c.globalAlpha = alpha; drawSprite(c, cleanKeepFlashSprite, x, y, w, h); c.restore();
+    return;
+  }
   keepFlashSprite ??= spriteCanvas(keepPixels().map(v => v ? rgba(0xfff4dc) : 0), KEEP, KEEP);
   c.save();
   c.imageSmoothingEnabled = false;
@@ -652,6 +679,8 @@ function paintKeep(c: CanvasRenderingContext2D, { x, y, w, h }: ArtBox, stage: n
 
 /** The fallen keep's rubble over its cells (`box`, canvas pixels). */
 export function paintKeepRubble(c: CanvasRenderingContext2D, { x, y, w, h }: ArtBox) {
+  const family = buildingArt("keep", 4, 4)!;
+  if (drawPixelFrame(c, family.sheet, buildingFrame(family, 0, undefined, true), Math.round(x), Math.round(y), Math.round(x + w) - Math.round(x), Math.round(y + h) - Math.round(y))) return;
   if (typeof document === "undefined") return;
   rubbleSprite ??= spriteCanvas(keepRubblePixels(), KEEP, KEEP);
   c.save();
@@ -731,7 +760,11 @@ let flagCanvas: HTMLCanvasElement | null = null;
 
 /** The keep's banner, redrawn every frame from the time so it keeps
  * waving, at the city's art scale. */
-export function drawFlag(c: CanvasRenderingContext2D, px: number, pose: FlagPose) {
+export function drawFlag(c: CanvasRenderingContext2D, px: number, pose: FlagPose, keepSprite = true) {
+  const { size: [w, h], anchor: [ax, ay], frames, seconds, sheet } = KEEP_FLAG;
+  const frame = pose.reduceMotion ? 0 : Math.floor(Math.max(0, pose.t) / seconds) % frames;
+  const scale = px / ART;
+  if (keepSprite && drawPixelFrame(c, sheet, { sx: frame * w, sy: 0, sw: w, sh: h }, Math.round(pose.x - ax * scale), Math.round(pose.y - ay * scale), Math.round(w * scale), Math.round(h * scale))) return;
   flagCanvas = spriteCanvas(flagPixels(pose.t, pose.reduceMotion), FLAG_W, FLAG_H, flagCanvas ?? undefined);
   const s = px / ART;
   c.save();
@@ -762,5 +795,5 @@ export function drawWarBanner(c: CanvasRenderingContext2D, px: number, at: { x: 
   c.arc(x, y, reach * px, 0, Math.PI * 2);
   c.stroke();
   c.restore();
-  drawFlag(c, px, { x, y, t: pose.t, reduceMotion: pose.reduceMotion });
+  drawFlag(c, px, { x, y, t: pose.t, reduceMotion: pose.reduceMotion }, false);
 }

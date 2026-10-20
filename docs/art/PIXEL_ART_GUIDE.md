@@ -32,7 +32,7 @@ At ordinary play size the player should identify an archer tower, watch tower, b
 - Keep Simple square enemies/troops as intentional accessibility/performance overrides. Keep Reduce Motion, grass/water effects, health-bar and grid preferences independent. A pixel-art preference must not force animation or hide gameplay information.
 - Art selection must never change collision, pathfinding, targeting, costs, damage, placement rules, RNG streams, or save compatibility.
 
-**Current state:** 35 PNGs are registered for partial Defend coverage. Damage, path variants and several other renderers still fall back to procedural art. Existing UI PNGs are baseline UI and are not all controlled by the Pixel Art switch. Each replacement needs an explicit integration review; the toggle's existence does not establish complete coverage.
+**Current state:** [Building batch 01](BUILDING_BATCH_01.md) supplies nine native PNG sheets for the keep, barracks and watch tower, their paths/damage/rubble, rebuilding, flags and matching UI icons. The shared loader also retains the original 35 imported PNGs for other partial Defend coverage/reference. Other families' damage/path variants still fall back to procedural art. Existing baseline UI PNGs are not all controlled by the Pixel Art switch. Each replacement needs an explicit integration review; the toggle's existence does not establish complete coverage.
 
 ## 3. A single pixel language
 
@@ -199,4 +199,4 @@ No bulk generation of hundreds of mismatched assets before the calibration set. 
 - [ ] Record art memory and frame cost on the existing crowd/stress fixtures. Cache by visual state/size/revision and bound the caches.
 - [ ] New UI keyboard focus, hit targets, prices and contrast remain readable and usable.
 
-Existing starting checks are `tests/settings.test.ts` and `tests/pixel-art.mjs` (dev server required), plus `test:pointer`, `test:render-cache`, and the affected scene's browser tests. The current pixel-art browser test hard-codes the old 35-file roster; replace that expectation with registry-driven validation when the registry grows. Add on/off checks for UI, Mine, Library, damage and path variants as they are converted. Run repository-required tests and the production build for implementation batches.
+Existing starting checks are `tests/settings.test.ts`, `tests/building-sprites.test.ts`, `tests/pixel-art.mjs` and `tests/building-sprites.mjs` (browser scripts need a dev server), plus `test:pointer`, `test:render-cache`, and the affected scene's browser tests. The pixel-art browser test now validates the full live registry. Add on/off checks for UI, Mine, Library, damage and path variants as they are converted. Run repository-required tests and the production build for implementation batches.

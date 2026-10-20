@@ -10,7 +10,7 @@ import { enemySize } from "./catalog.ts";
  * fallen defenders' ghosts rising (ghosts.ts), the chimneys' smoke (chimney-smoke.ts), the
  * planted war banner, the magic boats' water (flood-art.ts) over the ground, the wizards' fire, the building grid and drag overlay (edit-overlay.ts), then
  * rain in screen space. */
-import { onPixelArt, pixelKey } from "./pixel-sprites.ts";
+import { onPixelArt, pixelArtOn, pixelKey } from "./pixel-sprites.ts";
 import { CELLS_H, CELLS_W, boardSize, hash01 } from "./grid.ts";
 import type { CityMap } from "./citygen.ts";
 import type { DefendSim } from "./sim.ts";
@@ -299,7 +299,7 @@ export class DefendRenderer {
   private drawCity(map: CityMap, sim: DefendSim | null, opts: DrawOptions, dt: number) {
     const ctx = this.ctx;
     ctx.setTransform(this.cam.s, 0, 0, this.cam.s, this.cam.x, this.cam.y);
-    ctx.imageSmoothingEnabled = this.cam.s / this.layerScale < 1;
+    ctx.imageSmoothingEnabled = !pixelArtOn() && this.cam.s / this.layerScale < 1;
     const { W, H } = this.board;
     ctx.drawImage(this.layer, 0, 0, W, H);
     if (this.previousArea && this.previousLayer) {

@@ -1,4 +1,7 @@
-/** Pixel Art: hand-drawn PNG sprites (from Tower Delve's Defend) that stand
+/** Pixel Art: native PNG sheets for the clean building families in
+ * `building-sprite-manifest.ts`, plus imported sprites from Tower Delve's
+ * Defend. Clean families keep their identity through damage, paths, rubble,
+ * reconstruction and UI. The remaining imports stand
  * in for the procedural art of the pieces they cover while the Settings
  * page's Pixel Art is on (`setPixelArt`, on by default): the keep, the plain
  * barracks, archer barracks and towers, the houses' roofs, park trees, pond
@@ -14,6 +17,7 @@
  * the renderer's caches (the city layer, the ground relief, the combat
  * frame, the palette icons) fold into their keys. */
 import type { EnemyKind, StructureKind } from "./catalog.ts";
+import { BUILDING_PNGS } from "./building-sprite-manifest.ts";
 
 const BASE = (import.meta as ImportMeta & { env?: { BASE_URL?: string } }).env?.BASE_URL ?? "/";
 
@@ -23,6 +27,7 @@ export const PIXEL_SPRITES = [
   "roof-terracotta", "roof-brick", "roof-timber", "roof-thatch", "roof-slate", "roof-straw",
   "city-oak", "city-pine", "city-rubble", "city-scaffold", "city-wall-cap", "city-wall-face", "city-lantern", "pond-lily", "pond-reeds",
   "city-tile", "bomb", "floor-1", "floor-2", "floor-3", "floor-4",
+  ...BUILDING_PNGS,
 ] as const;
 export type PixelSprite = (typeof PIXEL_SPRITES)[number];
 
@@ -77,6 +82,17 @@ export function drawPixel(c: CanvasRenderingContext2D, id: PixelSprite, x: numbe
   const smooth = c.imageSmoothingEnabled;
   c.imageSmoothingEnabled = false;
   c.drawImage(image, x, y, w, h);
+  c.imageSmoothingEnabled = smooth;
+  return true;
+}
+
+/** A native frame from a PNG sheet. Keep all copies nearest-neighbour. */
+export function drawPixelFrame(c: CanvasRenderingContext2D, id: PixelSprite, frame: { sx: number; sy: number; sw: number; sh: number }, x: number, y: number, w: number, h: number) {
+  const image = pixelSprite(id);
+  if (!image) return false;
+  const smooth = c.imageSmoothingEnabled;
+  c.imageSmoothingEnabled = false;
+  c.drawImage(image, frame.sx, frame.sy, frame.sw, frame.sh, x, y, w, h);
   c.imageSmoothingEnabled = smooth;
   return true;
 }

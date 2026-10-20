@@ -249,7 +249,11 @@ const isTile = (t: TilePos, tx: number, ty: number) => t.tx === tx && t.ty === t
 export function dropGhost(drag: Drag, next: Layout, key: string): Overlay["ghost"] {
   if (carriesGate(drag)) return { rect: wallSpotRect(drag, next, key), kind: dragIcon(drag) as "cityGate" | "wallSpikes" | "wallBallista" };
   if (carriesWall(drag)) return { rect: wallPieceRect(parseWallKey(key)), kind: "wallBlock" };
-  if (carriesStructure(drag)) return { rect: structureRect(drag, next, key), kind: carriedKind(drag) };
+  if (carriesStructure(drag)) {
+    const uid = drag.from === "structure" ? drag.uid : next.nextUid - 1;
+    const path = next.structures.find(s => s.uid === uid)?.path;
+    return { rect: structureRect(drag, next, key), kind: carriedKind(drag), ...(path ? { path } : {}) };
+  }
   const [tx, ty] = key.split(",").map(Number);
   if (dragIcon(drag) === "cityTile") return { rect: { x: tx * SUB, y: ty * SUB, w: SUB, h: SUB }, kind: "cityTile" };
   const fit = fitLayout(next);

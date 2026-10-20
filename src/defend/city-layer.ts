@@ -22,6 +22,7 @@ import { SPIKE_REACH, bastionPixels, bastionRubblePixels, spikePixels } from "./
 import { AREAS, areaArtId, type AreaId } from "./areas.ts";
 import { hasWallArt, wallCapSprite, wallFaceSprite, wallRubbleTones } from "./area-wall-art.ts";
 import { drawPixel, drawRoof, type PixelSprite } from "./pixel-sprites.ts";
+import { buildingArt } from "./building-sprite-manifest.ts";
 
 export { POND, POND_WATER, hasTree, pondDisc, pondPath, treeCanopy } from "./park-geometry.ts";
 
@@ -287,6 +288,10 @@ function paintBuilding(p: Paint, b: Building) {
   }
   if (sim && !sim.intact(b)) {
     if (b.kind === "keep") return paintKeepRubble(c, box);
+    if (b.kind !== "house" && buildingArt(b.kind, r.w, r.h)) {
+      paintStructureRubble(c, b.kind, box, lotSeed(b));
+      return paintRebuilding(p, b);
+    }
     if (paintPixelRubble(p, b)) return paintRebuilding(p, b);
     if (b.kind === "house") paintArt(p, houseRubbleSprite(r.w, r.h, b.variant, roofSeed(r.x, r.y, r.w, r.h)), box);
     else paintStructureRubble(c, b.kind, box, lotSeed(b));
@@ -330,11 +335,16 @@ export function damageKey(sim: DefendSim) {
 /** Partially rebuilt: finished sections show as fresh timber framing over
  * the rubble. */
 function paintRebuilding({ c, px, solid }: Paint, b: Building) {
+  const clean = b.kind !== "house" && b.kind !== "wall" && b.kind !== "gate" && b.kind !== "wallBallista" && buildingArt(b.kind, b.rect.w, b.rect.h);
   for (const i of b.cells) {
     if (!solid(i)) continue;
     const cx = i % CELLS_W,
       cy = (i - cx) / CELLS_W;
-    if (drawPixel(c, "city-scaffold", Math.round(cx * px), Math.round(cy * px), Math.round((cx + 1) * px) - Math.round(cx * px))) continue;
+    if (clean) {
+      const x = Math.round(cx * px), y = Math.round(cy * px);
+      if (drawPixel(c, "v2/defend/scaffold", x, y, Math.round((cx + 1) * px) - x, Math.round((cy + 1) * px) - y)) continue;
+    }
+    if (!clean && drawPixel(c, "city-scaffold", Math.round(cx * px), Math.round(cy * px), Math.round((cx + 1) * px) - Math.round(cx * px))) continue;
     c.fillStyle = "#9c8356";
     c.fillRect(cx * px + 1, cy * px + 1, px - 2, px - 2);
     c.strokeStyle = "#5b4a2e";
