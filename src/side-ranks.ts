@@ -1,8 +1,8 @@
-/** The bookkeeping shared by the city gate's and the wall ballistas' trees
- * (`gate-upgrades.ts`, `ballista-upgrades.ts`): branches climbed side by
- * side like the keep's and the walls', each rank paid with Knowledge, undone
- * or respecced for free, and saved on the Defend save under `key` (absent
- * while it has none). */
+/** The bookkeeping shared by the trees climbed side by side: the keep's,
+ * the walls', the city gate's and the wall ballistas' (`keep-upgrades.ts`,
+ * `wall-upgrades.ts`, `gate-upgrades.ts`, `ballista-upgrades.ts`): each
+ * rank paid with Knowledge, undone or respecced for free, and saved on the
+ * Defend save under `key` (absent while it has none). */
 import type { PathHue, PathRank } from "./knowledge-paths.ts";
 import type { Save } from "./save.ts";
 
@@ -10,7 +10,7 @@ export type SidePath<Id extends string> = { id: Id; name: string; motto: string;
 export type SideRanks<Id extends string> = Partial<Record<Id, number>>;
 export type SideResult = { ok: true } | { ok: false; reason: string };
 /** Where on the Defend save a tree keeps its ranks. */
-export type SideKey = "gateRanks" | "ballistaRanks";
+export type SideKey = "keepRanks" | "wallRanks" | "gateRanks" | "ballistaRanks";
 
 export const sideRank = <Id extends string>(ranks: SideRanks<Id> | undefined, id: Id) => ranks?.[id] ?? 0;
 
@@ -48,10 +48,11 @@ export function undoSide<Id extends string>(save: Save, key: SideKey, paths: Sid
   return { ok: true };
 }
 
-/** Respecs a tree, free: every Knowledge point in it comes back. */
-export function respecSide<Id extends string>(save: Save, key: SideKey, paths: SidePath<Id>[], what: string): SideResult {
+/** Respecs a tree, free: every Knowledge point in it comes back. `none`
+ * says there is nothing to respec ("the gates have no upgrades"). */
+export function respecSide<Id extends string>(save: Save, key: SideKey, paths: SidePath<Id>[], none: string): SideResult {
   const ranks = ranksOf(save, key) as SideRanks<Id> | undefined;
-  if (!ranks) return { ok: false, reason: `Nothing to respec: ${what} have no upgrades.` };
+  if (!ranks) return { ok: false, reason: `Nothing to respec: ${none}.` };
   save.knowledge += sideAllocated(paths, ranks);
   delete save.defend[key];
   return { ok: true };

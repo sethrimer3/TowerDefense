@@ -7,13 +7,12 @@
  * ever one keep, and it never leaves the city) and snapshotted into
  * `Bonuses.keep` when a battle starts. */
 import { studyPathCost } from "./economy.ts";
-import type { PathHue, PathRank } from "./knowledge-paths.ts";
 import type { Save } from "./save.ts";
+import { buySide, decodeSideRanks, respecSide, sideAllocated, sideRank, undoSide, type SidePath, type SideRanks, type SideResult } from "./side-ranks.ts";
 
 export type KeepPathId = "bastions" | "arrowLoops" | "boilingOil";
 /** How far the keep has climbed each branch (absent: not at all). */
-export type KeepRanks = Partial<Record<KeepPathId, number>>;
-export type KeepPath = { id: KeepPathId; name: string; motto: string; hue: PathHue; ranks: PathRank[] };
+export type KeepRanks = SideRanks<KeepPathId>;
 
 // ── What each rank does in battle ─────────────────────────────────────────
 /** Bastions: the keep's HP times `hp[rank]`. */
@@ -28,7 +27,7 @@ export const ARROW_LOOPS = { range: [0, 5, 6.5, 6.5], reload: [0, 1.6, 1.1, 1.1]
  * from II it keeps burning `burn[rank]` seconds at `dps[rank]` a second. */
 export const BOILING_OIL = { reach: [0, 1.5, 2, 2.5], every: [0, 3, 2.5, 2], damage: [0, 25, 40, 60], burn: [0, 0, 3, 4], dps: [0, 0, 10, 20] };
 
-export const KEEP_PATHS: KeepPath[] = [
+export const KEEP_PATHS: SidePath<KeepPathId>[] = [
   {
     id: "bastions", name: "Bastions", motto: "Thicker walls, a keep that holds", hue: "steel",
     ranks: [
@@ -55,67 +54,15 @@ export const KEEP_PATHS: KeepPath[] = [
   },
 ];
 
-export const keepPathById = (id: KeepPathId) => KEEP_PATHS.find((p) => p.id === id)!;
-export const keepRank = (ranks: KeepRanks | undefined, id: KeepPathId) => ranks?.[id] ?? 0;
-
+export const keepRank = (ranks: KeepRanks | undefined, id: KeepPathId) => sideRank(ranks, id);
 /** The Knowledge allocated to the keep: every rank bought, at today's prices
  * (what a respec gives back). */
-export function keepAllocated(ranks: KeepRanks | undefined): number {
-  let total = 0;
-  for (const p of KEEP_PATHS) for (let r = 0; r < keepRank(ranks, p.id); r++) total += p.ranks[r].cost;
-  return total;
-}
-
-/** The next rank of branch `id` and its price, if there is one. */
-export function nextKeepRank(ranks: KeepRanks | undefined, id: KeepPathId): { rank: number; cost: number } | undefined {
-  const have = keepRank(ranks, id), r = keepPathById(id).ranks[have];
-  return r ? { rank: have + 1, cost: r.cost } : undefined;
-}
-
-export type KeepResult = { ok: true } | { ok: false; reason: string };
-
+export const keepAllocated = (ranks: KeepRanks | undefined) => sideAllocated(KEEP_PATHS, ranks);
 /** Buys the next rank of branch `id` for Knowledge (free with Unlimited money). */
-export function upgradeKeep(save: Save, id: KeepPathId): KeepResult {
-  const next = nextKeepRank(save.defend.keepRanks, id);
-  if (!next) return { ok: false, reason: "That branch is already at its top rank." };
-  const free = save.settings.devMode;
-  if (!free && save.knowledge < next.cost) return { ok: false, reason: `Needs ${next.cost} Knowledge.` };
-  if (!free) save.knowledge -= next.cost;
-  save.defend.keepRanks = { ...save.defend.keepRanks, [id]: next.rank };
-  return { ok: true };
-}
-
-/** Undoes rank `rank` of branch `id` and the ranks above it, free, giving
- * back their Knowledge: the branch steps back to rank `rank - 1`. */
-export function undoKeep(save: Save, id: KeepPathId, rank: number): KeepResult {
-  const have = keepRank(save.defend.keepRanks, id);
-  if (rank < 1 || rank > have) return { ok: false, reason: "Nothing to undo there." };
-  const p = keepPathById(id);
-  for (let r = rank; r <= have; r++) save.knowledge += p.ranks[r - 1].cost;
-  const next = { ...save.defend.keepRanks };
-  if (rank > 1) next[id] = rank - 1;
-  else delete next[id];
-  if (Object.keys(next).length) save.defend.keepRanks = next;
-  else delete save.defend.keepRanks;
-  return { ok: true };
-}
-
+export const upgradeKeep = (save: Save, id: KeepPathId): SideResult => buySide(save, "keepRanks", KEEP_PATHS, id);
+/** Undoes rank `rank` of branch `id` and the ranks above it, free. */
+export const undoKeep = (save: Save, id: KeepPathId, rank: number): SideResult => undoSide(save, "keepRanks", KEEP_PATHS, id, rank);
 /** Respecs the keep, free: every Knowledge point in it comes back. */
-export function respecKeep(save: Save): KeepResult {
-  const spent = keepAllocated(save.defend.keepRanks);
-  if (!save.defend.keepRanks) return { ok: false, reason: "Nothing to respec: it has no upgrades." };
-  save.knowledge += spent;
-  delete save.defend.keepRanks;
-  return { ok: true };
-}
-
+export const respecKeep = (save: Save): SideResult => respecSide(save, "keepRanks", KEEP_PATHS, "it has no upgrades");
 /** Keeps only the keep's own branches at ranks they have; undefined when none. */
-export function decodeKeepRanks(raw: unknown): KeepRanks | undefined {
-  if (!raw || typeof raw !== "object") return undefined;
-  const out: KeepRanks = {};
-  for (const p of KEEP_PATHS) {
-    const r = (raw as Record<string, unknown>)[p.id];
-    if (Number.isInteger(r) && (r as number) >= 1 && (r as number) <= p.ranks.length) out[p.id] = r as number;
-  }
-  return Object.keys(out).length ? out : undefined;
-}
+export const decodeKeepRanks = (raw: unknown): KeepRanks | undefined => decodeSideRanks(KEEP_PATHS, raw);

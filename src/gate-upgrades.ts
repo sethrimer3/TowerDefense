@@ -63,5 +63,5 @@ export const gateBarred = (ranks: GateRanks | undefined) => gateRank(ranks, "por
 export const gateAllocated = (ranks: GateRanks | undefined) => sideAllocated(GATE_PATHS, ranks);
 export const upgradeGate = (save: Save, id: GatePathId): SideResult => buySide(save, "gateRanks", GATE_PATHS, id);
 export const undoGate = (save: Save, id: GatePathId, rank: number): SideResult => undoSide(save, "gateRanks", GATE_PATHS, id, rank);
-export const respecGate = (save: Save): SideResult => respecSide(save, "gateRanks", GATE_PATHS, "the gates");
+export const respecGate = (save: Save): SideResult => respecSide(save, "gateRanks", GATE_PATHS, "the gates have no upgrades");
 export const decodeGateRanks = (raw: unknown): GateRanks | undefined => decodeSideRanks(GATE_PATHS, raw);
