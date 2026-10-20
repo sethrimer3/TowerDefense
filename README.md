@@ -4,6 +4,10 @@ A mobile-first city-defense game. You lay out a walled city on a 9 × 13 board, 
 
 Play it on GitHub Pages: <https://sethrimer3.github.io/TowerDefense/>
 
+## Pixel-art direction
+
+New sprite work follows the [pixel-art style guide](docs/art/PIXEL_ART_GUIDE.md) and [migration inventory](docs/art/PIXEL_ART_INVENTORY.md). They define the crisp PNG style, shared palette, defense-grid scale/anchors, required variants, and the rule that replacements appear only with **Pixel Art** checked while legacy graphics remain available off.
+
 ## Run
 
 Use Node.js 22.18+ (CI uses 24) and npm:
