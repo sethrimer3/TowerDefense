@@ -137,7 +137,7 @@ export type Soldier = {
   /** Swordsmen chase and hack; archers roam and shoot; fire mages roam
    * and hurl fireballs; valkyries hunt and charge-stab; the dark wizard
    * hunts and casts chain lightning. */
-  kind: "sword" | "archer" | "mage" | "valkyrie" | "darkWizard" | "undead" | "reinforcement" | "brawler" | "slinger" | "sniper" | "musketeer" | "gunner" | "machineGunner" | "gatlingGunner" | "rocketeer" | "assassin";
+  kind: "sword" | "archer" | "mage" | "valkyrie" | "darkWizard" | "undead" | "reinforcement" | "brawler" | "slinger" | "sniper" | "musketeer" | "gunner" | "machineGunner" | "gatlingGunner" | "rocketeer" | "railSniper" | "assassin";
   home: number;
   x: number;
   y: number;
@@ -215,6 +215,9 @@ export type Arrow = {
   /** Suppressing fire: how long a hit slows (and from II staggers) its
    * enemy; absent otherwise. */
   pin?: { chill: number; stagger?: number };
+  /** A Revolutionary's bullet: the enemies (by id) it flies on to after this
+   * one, and where this leg of its flight began; absent otherwise. */
+  chain?: { next: number[]; from: Point };
 };
 export type Effect = { kind: "boom" | "dust" | "spark" | "firework" | "steam"; x: number; y: number; t: number; r: number; seed?: number };
 /** A cannon shell in flight: lobbed from the tower to where the target was. */
@@ -250,6 +253,7 @@ const STEP_SOLDIER: Record<Soldier["kind"], (sim: DefendSim, s: Soldier, dt: num
   gunner: stepArcher,
   machineGunner: stepArcher,
   gatlingGunner: stepArcher,
+  railSniper: stepArcher,
   rocketeer: stepArcher,
   assassin: stepSwordsman,
 };

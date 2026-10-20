@@ -22,6 +22,7 @@ import { burstBall } from "./muskets.ts";
 import { bulletHit, pierceHits } from "./snipers.ts";
 import { knockBack } from "./gunners.ts";
 import type { Arrow, DefendSim, Enemy } from "./sim.ts";
+import { railHit, railOn } from "./revolutionary.ts";
 import { FIRE_ARROWS, GUNNERY, SHARP, SIEGE_SHOT, pathRank } from "../knowledge-paths.ts";
 import { ARROW_LOOPS, BOILING_OIL, keepRank } from "../keep-upgrades.ts";
 
@@ -192,13 +193,16 @@ export function stepArrows(sim: DefendSim, dt: number) {
     // An explosive ball bursts where it lands, even if its mark fell.
     if (a.blast) burstBall(sim, a);
     else if (alive) {
-      const landed = sim.hurtEnemy(t, a.damage, true, "ranged", a.origin ?? { x: a.x, y: a.y }, true);
+      // A Revolutionary's hit may be critical.
+      const hit = a.chain ? railHit(sim, a, t) : a.damage;
+      const landed = sim.hurtEnemy(t, hit, true, "ranged", a.origin ?? { x: a.x, y: a.y }, true);
+      if (a.chain) railOn(sim, a, { x: t.x, y: t.y }, hit);
       if (landed && a.burn) ignite(t, a.burn, a.burnFor!);
       // A sniper's bullet pins what it hits, or glances on.
       if (a.pin || a.glance) bulletHit(sim, a, t, landed);
       // A Stopping power bullet knocks it back.
       if (a.knock && landed) knockBack(sim, a, t);
-    }
+    } else if (a.chain) railOn(sim, a, { x: a.x, y: a.y }, a.damage);
     a.life = 0;
   }
   sim.arrows = sim.arrows.filter((a) => a.life > 0);

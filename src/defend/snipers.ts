@@ -16,8 +16,9 @@ import { dist, sq } from "../exact.ts";
 import { DEADEYE, MARKSMEN, PIERCING, RICOCHET, SUPPRESS, pathRank, type BattlePaths } from "../knowledge-paths.ts";
 import { CellType } from "./citygen.ts";
 import { cellIndex } from "./grid.ts";
+import { nearest } from "./pathing.ts";
 import { buildingPaths } from "../specializations.ts";
-import { ENEMIES, SNIPER, enemySize } from "./catalog.ts";
+import { ENEMIES, RAIL_SNIPER, SNIPER, enemySize } from "./catalog.ts";
 import type { Arrow, DefendSim, Enemy, Soldier } from "./sim.ts";
 
 /** A lodge's path ranks: each 0 unless its building climbs it. */
@@ -138,4 +139,16 @@ export function bulletHit(sim: DefendSim, a: Arrow, e: Enemy, landed: boolean) {
     ...(g.left > 1 ? { glance: { left: g.left - 1, share: g.share, struck } } : {}),
     ...(a.pin ? { pin: a.pin } : {}),
   });
+}
+
+/** Whom a sniper or a Revolutionary's laser sniper `s` would shoot now: as
+ * `stepArcher` picks (Deadeye's clear shot, Big game's toughest, else the
+ * nearest in reach). Pure, for the lock-on laser. */
+export function sniperAim(sim: DefendSim, s: Soldier): Enemy | null {
+  const range = s.kind === "railSniper" ? RAIL_SNIPER.range : sniperRange(sim, s);
+  const sight = clearShot(sim, s, range);
+  if (sight !== undefined) return sight;
+  const big = bigGame(sim, s, range);
+  if (big !== undefined) return big;
+  return nearest(sim.enemiesNear(s.x, s.y, range), s, range * range, true);
 }

@@ -20,6 +20,7 @@ import {
   ASSASSIN_UNIT,
   BRAWLER,
   GATLING_GUNNER,
+  RAIL_SNIPER,
   GUNNER,
   MACHINE_GUNNER,
   MUSKETEER,
@@ -44,6 +45,7 @@ import type { DefendSim, Enemy, Soldier } from "./sim.ts";
 import { answerBanner, MARCH_SIGHT } from "./war-banner.ts";
 import { BERSERK, CRUSADE, HALBERD, RANGERS, SKIRMISH, VOLLEY, pathRank } from "../knowledge-paths.ts";
 import { bigGame, bulletOf, clearShot, pierceOf, sniperRange, sniperReload } from "./snipers.ts";
+import { railShot, squadSize } from "./revolutionary.ts";
 import { bayonetTarget, charges, grenadeOf, musketDamage, musketRange, musketReload, musketSpeed, thrust, toughestInReach, volleyTargets } from "./muskets.ts";
 import { gunDamage, gunExtras, gunHp, gunRange, gunReload, gunSpeed, isGun, gunShot, rocketOf, type Gun } from "./gunners.ts";
 import { cloudRank, diveIn, hostDrill, hostGarrison, musterPoint } from "./sky-palace.ts";
@@ -71,9 +73,9 @@ function swordSpeed(sim: DefendSim, s: Soldier) {
  * else a swordsman's blade. */
 const melee = (s: Soldier) => (s.kind === "brawler" ? BRAWLER : s.kind === "assassin" ? ASSASSIN_UNIT : SOLDIER);
 /** A ranged troop's own numbers, besides an archer's. */
-const RANGED = { slinger: SLINGER, sniper: SNIPER, musketeer: MUSKETEER, gunner: GUNNER, machineGunner: MACHINE_GUNNER, gatlingGunner: GATLING_GUNNER, rocketeer: ROCKETEER };
+const RANGED = { slinger: SLINGER, sniper: SNIPER, musketeer: MUSKETEER, gunner: GUNNER, machineGunner: MACHINE_GUNNER, gatlingGunner: GATLING_GUNNER, rocketeer: ROCKETEER, railSniper: RAIL_SNIPER };
 /** What each ranged troop looses: an arrow (none), a stone, a bullet, a ball or a rocket. */
-const SHOT = { slinger: "stone", sniper: "bullet", musketeer: "ball", gunner: "bullet", machineGunner: "bullet", gatlingGunner: "bullet", rocketeer: "rocket" } as const;
+const SHOT = { slinger: "stone", sniper: "bullet", musketeer: "ball", gunner: "bullet", machineGunner: "bullet", gatlingGunner: "bullet", rocketeer: "rocket", railSniper: "bullet" } as const;
 const isRanged = (kind: Soldier["kind"]): kind is keyof typeof RANGED => kind in RANGED;
 
 /** Trains one troop at a time per barracks, while it's standing and below
@@ -86,7 +88,8 @@ export class Barracks {
     const cap = soldierCap(sim.levels.barracksCapacity);
     for (const b of sim.map.buildings) {
       if (!isBarracks(b) || !sim.intact(b)) continue;
-      if (this.drilled(sim, b, b.kind === "darkKeep" ? DARK_WIZARD.garrison : cap + hostGarrison(sim, b), dt)) this.recruit(sim, b);
+      const garrison = b.kind === "darkKeep" ? DARK_WIZARD.garrison : b.kind === "revolutionary" ? squadSize(sim) : cap + hostGarrison(sim, b);
+      if (this.drilled(sim, b, garrison, dt)) this.recruit(sim, b);
     }
   }
 
@@ -142,7 +145,7 @@ export class Barracks {
 const TRAINS: Partial<Record<Building["kind"], Soldier["kind"]>> = {
   barracks: "sword", archerBarracks: "archer", mageGuild: "mage", valkyriePalace: "valkyrie", darkKeep: "darkWizard",
   meleeGuild: "brawler", rangedGuild: "slinger", assassinDen: "assassin", sniperLodge: "sniper", musketHall: "musketeer",
-  gunHall: "gunner", gunNest: "machineGunner", gatlingNest: "gatlingGunner", rocketBattery: "rocketeer",
+  gunHall: "gunner", gunNest: "machineGunner", gatlingNest: "gatlingGunner", rocketBattery: "rocketeer", revolutionary: "railSniper",
 };
 const isBarracks = (b: Building) => b.kind in TRAINS;
 
@@ -312,6 +315,8 @@ function shoot(sim: DefendSim, s: Soldier, e: Enemy, range: number) {
     const gun = isGun(kind) ? (s as Soldier & { kind: Gun }) : null;
     const damage = kind === "musketeer" ? musketDamage(sim, s, base) : gun ? gunDamage(sim, gun, base) : base;
     s.cd = kind === "musketeer" ? musketReload(sim, s) : kind === "sniper" ? sniperReload(sim, s) : gun ? gunReload(sim, gun) : own.cooldown;
+    // A laser sniper's bullet carries its chain.
+    if (kind === "railSniper") return void sim.arrows.push(railShot(sim, s, e, damage));
     // A sniper's bullet carries its lodge's path.
     if (kind === "sniper") {
       const { damage: hit, ...bullet } = bulletOf(sim, s, damage);

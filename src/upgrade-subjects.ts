@@ -36,7 +36,7 @@ export const SUBJECTS: Subject[] = [
     topics: [
       // The guilds and their newest branches have no upgrades of their own:
       // the shared troop upgrades are theirs.
-      { id: "troops", name: "All troops", items: ["meleeGuild", "rangedGuild", "assassinDen", "gunHall", "musketHall", "sniperLodge", "gunNest", "gatlingNest", "rocketBattery"], upgrades: ["barracksCapacity", "barracksTraining", "soldierArms"], training: ["troopHp", "troopDamage", "drill"], skills: ["drillSergeant", "veterans", "bladework"] },
+      { id: "troops", name: "All troops", items: ["meleeGuild", "rangedGuild", "assassinDen", "gunHall", "musketHall", "sniperLodge", "gunNest", "gatlingNest", "rocketBattery", "revolutionary"], upgrades: ["barracksCapacity", "barracksTraining", "soldierArms"], training: ["troopHp", "troopDamage", "drill"], skills: ["drillSergeant", "veterans", "bladework"] },
       { id: "warBanner", name: "War banner", skills: ["warBanner", "bannerCooldown", "bannerDefense", "bannerReach", "bannerDamage", "bannerMarch", "bannerLife", "bannerRegen"] },
       { id: "towers", name: "All towers", training: ["towerDamage", "towerReload"], skills: ["fletchers", "ballistics"] },
       { id: "battle", name: "Battle", upgrades: ["bombSafe"], training: ["bombDamage"], extras: ["bomb", "speed3"], skills: ["gunpowder"] },

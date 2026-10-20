@@ -325,7 +325,21 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   120%, then three times as hard, reaching 2 cells further at III; Piercing
   rounds flying straight on to the end of their reach through every enemy
   in the line, each hit at 40%, 50%, then 60% of the shot, reaching 2
-  cells further at III). The musket hall's musketmen fire
+  cells further at III). A plain sniper lodge becomes the gunner line's
+  ultimate, the **Revolutionary** (100,000 Knowledge): a high-tech hall of
+  laser snipers (60 damage every 3 seconds, 12 cells), whose upgrades are
+  one tree shared by every Revolutionary, its five branches bought side by
+  side from its own node in its upgrade tree: Squad (two, then three
+  snipers), Chain laser (the laser leaps from enemy to enemy within 6
+  cells of each other and the bullet follows it, striking 3, 5, then 7),
+  Overclock (a 1%, 3%, 5%, then 10% chance each hit is critical), Hollow
+  core (a critical does 5×, 10×, 15×, 20×, then 25× damage; 2× before it)
+  and Detonator (where the bullet stops it bursts 1, 2, then 3 cells round
+  its last enemy at half the hit, sparing your own). Every sniper holds a
+  thin laser on its mark, red for a lodge's and cyan for a Revolutionary's
+  (zigzagging through every enemy its bullet will strike), faint as it
+  reloads and brightening as it locks on; the shot flashes along it and
+  each bullet trails a bright streak. The musket hall's musketmen fire
   slow, heavy single balls, with four paths: Sharpshooters (above);
   Grenadiers' balls bursting over a small area, sparing your own, and
   leaving the ground burning, throwing four

@@ -59,11 +59,11 @@ function fire(sim: DefendSim, m: Soldier) {
 
 // ── The tree ───────────────────────────────────────────────────────────
 test("a Sniper lodge has five paths, climbed like any building's", () => {
-  assert.deepEqual(nextSteps("sniperLodge").map(stepName), ["Marksmen I", "Ricochet I", "Suppressing fire I", "Deadeye I", "Piercing rounds I"]);
+  assert.deepEqual(nextSteps("sniperLodge").map(stepName), ["Revolutionary", "Marksmen I", "Ricochet I", "Suppressing fire I", "Deadeye I", "Piercing rounds I"]);
   for (const p of ["marksmen", "ricochet", "suppressors", "deadeye", "piercing"] as const) assert.equal(pathById(p).topic, "sniperLodge");
   const climbed = buildingTree("sniperLodge", { path: "ricochet", rank: 1 });
   assert.deepEqual(climbed.map((n) => n.id).slice(-3), ["p:ricochet:1", "p:ricochet:2", "p:ricochet:3"]);
-  assert.equal(climbed.find((n) => n.id === "k:sniperLodge")!.closed!.length, 4, "the other four paths are closed off");
+  assert.equal(climbed.find((n) => n.id === "k:sniperLodge")!.closed!.length, 5, "the Revolutionary and the other four paths are closed off");
   assert.equal(allocated("sniperLodge", { path: "marksmen", rank: 2 }) - allocated("sniperLodge"), studyPathCost(4, 0) + studyPathCost(4, 1));
   assert.match(kindStats(lodge(), "sniperLodge", "marksmen", 1), new RegExp(`${SNIPER.range + MARKSMEN.range} range$`));
   assert.match(kindStats(lodge(), "sniperLodge", "ricochet", 3), /glances on 4x at 80%/);

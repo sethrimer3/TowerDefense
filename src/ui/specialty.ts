@@ -12,10 +12,11 @@ import { ARROW_LOOPS, BASTIONS, BOILING_OIL, KEEP_PATHS, keepAllocated, keepRank
 import { STONEWORK, THORNWORK, TOWN_WALLS, WALL_PATHS, respecWalls, undoWalls, upgradeWalls, wallAllocated, wallRank, type WallPathId, type WallRanks } from "../wall-upgrades.ts";
 import { sideRank, type SidePath, type SideRanks } from "../side-ranks.ts";
 import { GATE_PATHS, GATE_TOWERS, IRONBOUND, PORTCULLIS, gateAllocated, gateBarred, gateRank, respecGate, undoGate, upgradeGate, type GatePathId, type GateRanks } from "../gate-upgrades.ts";
+import { CHAIN, CRIT_CHANCE, CRIT_DAMAGE, DETONATOR, REVOLUTIONARY_PATHS, SQUAD, respecRevolutionary, revolutionaryAllocated, revolutionaryRank, undoRevolutionary, upgradeRevolutionary, type RevolutionaryPathId, type RevolutionaryRanks } from "../revolutionary-upgrades.ts";
 import { BALLISTA_PATHS, FIRE_BOLTS, HEAVY_BOLTS, WINDLASS, ballistaAllocated, ballistaRank, respecBallistas, undoBallistas, upgradeBallistas, type BallistaPathId, type BallistaRanks } from "../ballista-upgrades.ts";
 import { pathById, pathTopicOf, UNSPECIALIZED, type PathId, FIRE_ARROWS, SHARP, GUNNERY, SIEGE_SHOT, CRUSADE, BLOODLETTERS, SHADOWCLOAK, VENOM, HEADHUNT, GRENADIERS, VOLLEY, BAYONET, SHARP_MUSKETS, BELT_FEED, TRIPOD, QUICKDRAW, DUELISTS, GUN_SHIELD, OVERDRIVE, STOPPING, DEADEYE, PIERCING, CLUSTER, SALVO, MARKSMEN, RICOCHET, SUPPRESS, BERSERK, HALBERD, RANGERS, SKIRMISH, FORTIFY, PYRO, RIME, STORM, PYROCLASM, CINDERS, SPOTTERS, SIGNAL } from "../knowledge-paths.ts";
 import { bonuses } from "../progression.ts";
-import { ITEM_NAMES, archerDamage, archerCooldown, archerRange, cannonDamage, cannonCooldown, CANNON_RANGE, SOLDIER, ARCHER_UNIT, soldierScale, STRUCTURES, flameDps, flameRange, iceDamage, ICE_RANGE, iceChill, watchRadius, fireballDamage, fireballSplash, emberDps, emberSeconds, FIRE_MAGE, FIREBALL_RANGE, keepHp, BRAWLER, ASSASSIN_UNIT, SLINGER, SNIPER, MUSKETEER, GUNNER, MACHINE_GUNNER, GATLING_GUNNER, ROCKETEER, WALL_BLOCK_DESCRIPTION, wallHp, GATE, GATE_DESCRIPTION, BALLISTA, BALLISTA_DESCRIPTION, ballistaCooldown, ballistaDamage, ballistaRange, gateHpScale, gateShut, type PaletteItem } from "../defend/catalog.ts";
+import { ITEM_NAMES, archerDamage, archerCooldown, archerRange, cannonDamage, cannonCooldown, CANNON_RANGE, SOLDIER, ARCHER_UNIT, soldierScale, STRUCTURES, flameDps, flameRange, iceDamage, ICE_RANGE, iceChill, watchRadius, fireballDamage, fireballSplash, emberDps, emberSeconds, FIRE_MAGE, FIREBALL_RANGE, keepHp, BRAWLER, ASSASSIN_UNIT, SLINGER, SNIPER, MUSKETEER, GUNNER, MACHINE_GUNNER, GATLING_GUNNER, RAIL_SNIPER, ROCKETEER, WALL_BLOCK_DESCRIPTION, wallHp, GATE, GATE_DESCRIPTION, BALLISTA, BALLISTA_DESCRIPTION, ballistaCooldown, ballistaDamage, ballistaRange, gateHpScale, gateShut, type PaletteItem } from "../defend/catalog.ts";
 
 /** `kind`'s effective numbers wearing `path` at `rank` (none: plain), with
  * the shared Smithy and skill bonuses. */
@@ -67,6 +68,7 @@ export function kindStats(save: Save, kind: PaletteItem, path?: PathId, rank = 0
     const pyro = at("pyroclasm"), cinders = at("cinders");
     return `Recruits: ${n(FIRE_MAGE.hp * soldierScale(l.soldierArms) * b.troopHp)} HP · ${n(fireballDamage(l.mageFireball) * soldierScale(l.soldierArms) * b.troopDamage * (pyro ? PYROCLASM.damage : 1))} fireball damage · ${n(fireballSplash(l.mageFireball) * (pyro >= 2 ? PYROCLASM.splash : 1))} blast radius · ${n(emberDps(l.mageEmbers) * b.troopDamage * (cinders >= 2 ? CINDERS.dps : 1))} ground damage/s · ${n(emberSeconds(l.mageEmbers) * (cinders ? CINDERS.life : 1))}s burning ground`;
   }
+  if (kind === "revolutionary") return revolutionaryStats(save, save.defend.revolutionaryRanks);
   const GUNS = { meleeGuild: BRAWLER, rangedGuild: SLINGER, sniperLodge: SNIPER, musketHall: MUSKETEER, gunHall: GUNNER, gunNest: MACHINE_GUNNER, gatlingNest: GATLING_GUNNER, rocketBattery: ROCKETEER } as const;
   if (kind in GUNS) {
     const u: { hp: number; damage: number; cooldown: number; range?: number } = GUNS[kind as keyof typeof GUNS], scale = soldierScale(l.soldierArms);
@@ -347,6 +349,18 @@ export function ballistaStats(save: Save, ranks: BallistaRanks | undefined): str
   return parts.join(" · ");
 }
 
+/** A Revolutionary's numbers with `ranks`, and the shared Smithy and skill bonuses. */
+export function revolutionaryStats(save: Save, ranks: RevolutionaryRanks | undefined): string {
+  const b = bonuses(save), n = (v: number) => Number(v.toFixed(2)), scale = soldierScale(save.defend.levels.soldierArms), u = RAIL_SNIPER;
+  const squad = SQUAD.snipers[revolutionaryRank(ranks, "squad")], hits = CHAIN.hits[revolutionaryRank(ranks, "chain")];
+  const chance = CRIT_CHANCE.chance[revolutionaryRank(ranks, "critChance")], times = CRIT_DAMAGE.times[revolutionaryRank(ranks, "critDamage")], burst = DETONATOR.radius[revolutionaryRank(ranks, "splash")];
+  const parts = [`${squad} laser sniper${squad > 1 ? "s" : ""}: ${n(u.hp * scale * b.troopHp)} HP`, `${n(u.damage * scale * b.troopDamage)} damage every ${u.cooldown}s`, `${u.range} range`];
+  if (hits > 1) parts.push(`each bullet strikes ${hits} enemies`);
+  parts.push(chance ? `${n(chance * 100)}% critical chance for ${times}x` : `no criticals (${times}x once they come)`);
+  if (burst) parts.push(`bursts ${burst} cell${burst > 1 ? "s" : ""} round the last at ${DETONATOR.share * 100}%`);
+  return parts.join(" · ");
+}
+
 /** The trees climbed side by side, as the Defend page drives them: the
  * keep's, the walls', the gates' and the ballistas'. */
 export type SideKind = "keep" | "walls" | "gate" | "ballistas";
@@ -405,6 +419,21 @@ export const SIDE_UI: Record<SideKind, SideUi> = {
   }),
 };
 
+const REVOLUTIONARY_TREE: SideTree<RevolutionaryPathId> = { root: "k:revolutionary", icon: "revolutionary", every: "Every Revolutionary", paths: REVOLUTIONARY_PATHS };
+/** The Revolutionary's shared tree, whose branches grow off its node in its
+ * own building tree (rank nodes `q:<branch>:<rank>`, its root its node). */
+export const REVOLUTIONARY_UI: SideUi = sideUi(REVOLUTIONARY_TREE, (s) => s.defend.revolutionaryRanks, {
+  name: "Revolutionary", whom: "the Revolutionaries", plain: "take every upgrade off the Revolutionaries", about: STRUCTURES.revolutionary.description, stats: revolutionaryStats,
+  buy: upgradeRevolutionary, undo: undoRevolutionary, respec: respecRevolutionary, allocated: revolutionaryAllocated,
+});
+/** The shared branches growing off a building of `kind`'s own node, if it has any. */
+export const sharedBranches = (kind: string): SideUi | undefined => (kind === "revolutionary" ? REVOLUTIONARY_UI : undefined);
+/** A building's tree with its shared branches grafted onto its node. */
+export function graftedGraph(save: Save, kind: PaletteItem | "wallSpikes", wear?: Wear): GraphNode[] {
+  const own = treeGraph(kind, wear), shared = sharedBranches(kind);
+  return shared ? [...own, ...shared.graph(save).filter((n) => n.id !== shared.root)] : own;
+}
+
 /** Tiles' read-only list of a side tree's branches, shared by every one of `whose`. */
 function sideTreeHtml(paths: { name: string; motto: string; hue: string; ranks: { name: string; icon: string; cost: number }[] }[], whose: string): string {
   const rows = paths.map((p) => `<li class="spec-row hue-${p.hue}"><span class="path-medal"><canvas data-path-icon="${p.ranks[0].icon}:${p.hue}"></canvas></span><div><b>${p.name}</b><small>${p.motto}: ${p.ranks.map((r, i) => `${ROMAN[i + 1]} ${r.name} (${r.cost.toLocaleString("en")})`).join(" · ")}</small></div></li>`).join("");
@@ -413,6 +442,7 @@ function sideTreeHtml(paths: { name: string; motto: string; hue: string; ranks: 
 /** Tiles' read-only lists of the gates' and the ballistas' branches. */
 export const gateTreeHtml = () => sideTreeHtml(GATE_PATHS, "GATE");
 export const ballistaTreeHtml = () => sideTreeHtml(BALLISTA_PATHS, "BALLISTA");
+export const revolutionaryTreeHtml = () => sideTreeHtml(REVOLUTIONARY_PATHS, "REVOLUTIONARY");
 
 /** Tiles' read-only list of the walls' branches. */
 export function wallTreeHtml(): string {

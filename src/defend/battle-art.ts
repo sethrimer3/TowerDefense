@@ -10,13 +10,14 @@ import { boatLights, drawBoat } from "./boat-art.ts";
  * damaged buildings, blast scorches, then the units, projectiles and effects.
  * Every painter takes a `Brush`: the board's context and its pixels per cell. */
 import { hash01 } from "./grid.ts";
-import { ARCHER_UNIT, ASSASSIN_UNIT, BRAWLER, CIVILIAN, DARK_WIZARD, ENEMIES, FIRE_MAGE, GATLING_GUNNER, GUNNER, MACHINE_GUNNER, MUSKETEER, ROCKETEER, SLINGER, SNIPER, SOLDIER, VALKYRIE, watchRadius, type EnemyDef } from "./catalog.ts";
+import { ARCHER_UNIT, ASSASSIN_UNIT, BRAWLER, CIVILIAN, DARK_WIZARD, ENEMIES, FIRE_MAGE, GATLING_GUNNER, GUNNER, MACHINE_GUNNER, MUSKETEER, RAIL_SNIPER, ROCKETEER, SLINGER, SNIPER, SOLDIER, VALKYRIE, watchRadius, type EnemyDef } from "./catalog.ts";
 import type { Building } from "./citygen.ts";
 import { center } from "./pathing.ts";
 import { paintKeepFlash } from "./structure-art.ts";
 import type { CarriedLight } from "./lighting.ts";
 import { drawFireballs, drawMage } from "./mage-art.ts";
 import { drawArrows, drawBreath, drawShells, drawSparks } from "./projectile-art.ts";
+import { drawLasers } from "./laser-art.ts";
 import { drawStabs, drawValkyrie } from "./valkyrie-art.ts";
 import { drawDarkWizard } from "./dark-art.ts";
 import { drawRaisings, drawRisen } from "./necro-art.ts";
@@ -26,6 +27,7 @@ import { drawCalled, drawDrops, drawStaggered } from "./reinforce-art.ts";
 import { drawExplosion, drawScorches as drawScorchArt } from "./blast-art.ts";
 import { BUILDING_FLASH, type DefendSim, type Effect, type Enemy, type Soldier } from "./sim.ts";
 import { hallPaths } from "./muskets.ts";
+import { sniperAim } from "./snipers.ts";
 import { drawSimpleEnemies, drawSimpleTroops } from "./simple-units.ts";
 import { drawPixel, enemySprite } from "./pixel-sprites.ts";
 
@@ -95,6 +97,7 @@ export function drawUnits(b: Brush, sim: DefendSim, torches: Burning | null, hea
   drawSwords(b, swords);
   if (timing) timing.entityMs += performance.now() - start;
   drawArrows(b.c, b.px, sim);
+  drawLasers(b.c, b.px, sim);
   drawShells(b.c, b.px, sim);
   drawSiegeShots(b, sim);
   drawFireballs(b.c, b.px, sim);
@@ -214,7 +217,7 @@ function drawSoldiers(b: Brush, sim: DefendSim, torches: Burning | null) {
 /** The guilds' troops, square bodies in a black outline like the
  * swordsmen's: a brawler in a tan jerkin jabbing a fist at whatever it
  * punches; a stone thrower in sackcloth with a stone in hand; a sniper in
- * green with a long rifle; a musketman in red-brown with a short musket and
+ * green with a long rifle (a Revolutionary's in navy, its scope glowing); a musketman in red-brown with a short musket and
  * a glowing match; a gunner in slate with a pistol; a machine gunner in
  * olive behind a stocky gun; a Gatling gunner hauling a thick brass gun
  * whose barrels flicker as they turn; a rocketeer with a tube on its
@@ -224,7 +227,8 @@ function drawGuildTroop(b: Brush, sim: DefendSim, u: Soldier) {
   const { c, px } = b;
   const k = u.kind as keyof typeof GUILD_TROOPS;
   const def = GUILD_TROOPS[k], s = Math.max(2, def.size * px), unit = Math.max(1, Math.round(s * 0.22));
-  const e = sim.enemies.find((o) => o.id === u.target);
+  // Snipers turn their rifles along their lasers.
+  const e = k === "sniper" || k === "railSniper" ? sniperAim(sim, u) : sim.enemies.find((o) => o.id === u.target);
   let fx = 0, fy = -1;
   if (e) {
     const d = Math.hypot(e.x - u.x, e.y - u.y) || 1;
@@ -283,7 +287,7 @@ function drawGuildTroop(b: Brush, sim: DefendSim, u: Soldier) {
   // A gun along the facing: a sniper's long, a musket's short and stout,
   // a pistol's stubby, a Gatling's and a rocket tube's thick.
   const GUN = { sniper: [1.5, 0.8, "#3a3a40"], musketeer: [0.95, 1.2, "#5a3d22"], gunner: [0.55, 0.9, "#4a4a52"], machineGunner: [1.05, 1.2, "#2e3430"],
-    gatlingGunner: [1.15, 1.9, "#b08a3e"], rocketeer: [1.05, 1.7, "#4a5a3a"] } as const;
+    gatlingGunner: [1.15, 1.9, "#b08a3e"], rocketeer: [1.05, 1.7, "#4a5a3a"], railSniper: [1.75, 0.9, "#8aa4b8"] } as const;
   const [glen, gw, gcol] = GUN[k as keyof typeof GUN];
   const len = s * glen, w = Math.max(1, Math.round(unit * gw));
   const ox = x - fy * s * 0.35, oy = y + fx * s * 0.35;
@@ -329,7 +333,8 @@ function drawGuildTroop(b: Brush, sim: DefendSim, u: Soldier) {
     c.fillStyle = (sim.time * 3 + u.id) % 1 < 0.5 ? "#ffd060" : "#ff7a2e";
     dot(c, ox - fx * s * 0.2, oy - fy * s * 0.2, unit);
   } else {
-    c.fillStyle = "#e0c070";
+    // The scope: brass, or a Revolutionary's glowing cyan lens.
+    c.fillStyle = k === "railSniper" ? "#6ff2ff" : "#e0c070";
     dot(c, ox + fx * len * 0.3, oy + fy * len * 0.3, unit);
   }
 }
@@ -342,6 +347,7 @@ const GUILD_TROOPS = {
   gunner: GUNNER,
   machineGunner: MACHINE_GUNNER,
   gatlingGunner: GATLING_GUNNER,
+  railSniper: RAIL_SNIPER,
   rocketeer: ROCKETEER,
 };
 const isGuildTroop = (k: string): k is keyof typeof GUILD_TROOPS => k in GUILD_TROOPS;

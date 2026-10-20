@@ -75,6 +75,7 @@ const TINTS: Record<GhostKind, [string, string]> = {
   gunner: ["#d4dae6", "#f4f6fb"],
   machineGunner: ["#cfd8c8", "#f2f6ee"],
   gatlingGunner: ["#e6dcc4", "#fbf6ea"],
+  railSniper: ["#c8f4ff", "#f0fdff"],
   rocketeer: ["#f2c8c8", "#fff0f0"],
   assassin: ["#d6cfe6", "#f6f2ff"],
   civilian: ["#f1ece0", "#ffffff"],

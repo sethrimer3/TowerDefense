@@ -104,6 +104,10 @@ const C = {
   slime: [0x3e6a1c, 0x6aa82a, 0xa8e050],
 };
 
+/** The Revolutionary's blued gunmetal, dark to light, and its laser glow. */
+const TECH = [0x141a24, 0x222c3c, 0x34445a, 0x55708e];
+const GLOW = [0x2ab8d8, 0x6ff2ff, 0xd8fcff];
+
 /** What each structure's damage throws down and its rubble is made of. */
 const MATERIAL: Record<PlacedKind, { m: Material; ruin: Pick<Ruin, "stone" | "top" | "beams" | "round"> }> = {
   meleeGuild: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.straw, beams: true } },
@@ -114,6 +118,7 @@ const MATERIAL: Record<PlacedKind, { m: Material; ruin: Pick<Ruin, "stone" | "to
   gunNest: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.canvas.slice(0, 3), beams: true } },
   gatlingNest: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.brass, beams: true } },
   rocketBattery: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.kiln.slice(0, 3), beams: true } },
+  revolutionary: { m: { tones: TECH.slice(1, 4), roofed: false }, ruin: { stone: TECH.slice(0, 3), top: [TECH[1], TECH[3], GLOW[0]], beams: false } },
   assassinDen: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: [0x241f2c, C.dusk, 0x544a62], beams: true } },
   barracks: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: [0x6e2a22, C.red, 0xc25a48], beams: true } },
   archerBarracks: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: [0x4a3826, C.timber, 0x8e7048], beams: true } },
@@ -176,7 +181,7 @@ export function structureRubblePixels(kind: PlacedKind, cw: number, ch: number, 
   return rubblePixels(w, h, hash(seed, KINDS.indexOf(kind), 3), { ...frame(w, h), ...MATERIAL[kind].ruin });
 }
 
-const KINDS: PlacedKind[] = ["barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "meleeGuild", "rangedGuild", "sniperLodge", "musketHall", "assassinDen", "gunHall", "gunNest", "gatlingNest", "rocketBattery"];
+const KINDS: PlacedKind[] = ["barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "meleeGuild", "rangedGuild", "sniperLodge", "musketHall", "assassinDen", "gunHall", "gunNest", "gatlingNest", "rocketBattery", "revolutionary"];
 
 const PAINT: Record<PlacedKind, (p: Pix, look: string) => void> = {
   meleeGuild: paintMeleeGuild,
@@ -187,6 +192,7 @@ const PAINT: Record<PlacedKind, (p: Pix, look: string) => void> = {
   gunNest: paintGunNest,
   gatlingNest: paintGatlingNest,
   rocketBattery: paintRocketBattery,
+  revolutionary: paintRevolutionary,
   assassinDen: paintAssassinDen,
   barracks: paintBarracks,
   archerBarracks: paintArcherBarracks,
@@ -599,6 +605,47 @@ function paintGatlingNest(p: Pix, look: string) {
       for (let x = x0; x <= x1; x++) p.set(x, yy, x === x0 || x === x1 || yy === y0 || yy === y1 ? OUTLINE : yy === cy ? OUTLINE : x === x0 + 1 ? C.pale[3] : C.pale[1]);
     for (const [x, yy] of [[x0 + 1, y0 + 1], [x1 - 1, y0 + 1], [x0 + 1, y1 - 1], [x1 - 1, y1 - 1]]) p.set(x, yy, C.brass[2]);
   }
+}
+
+/** The Revolutionary: a flat-roofed hall of blued gunmetal panels, a glowing
+ * conduit round its roof, a sensor dome in the middle with a laser lens and
+ * crosshairs, a sniper's perch on three corners, each with its long rail
+ * rifle turned outward, and a mast with a red light on the fourth. */
+function paintRevolutionary(p: Pix) {
+  const { x0, y0, x1, y1 } = frame(p.w, p.h);
+  rect(p, x0, y0, x1, y1, OUTLINE);
+  for (let y = y0 + 1; y < y1; y++)
+    for (let x = x0 + 1; x < x1; x++) {
+      const edge = x === x0 + 1 || y === y0 + 1 ? TECH[3] : x === x1 - 1 || y === y1 - 1 ? TECH[0] : null;
+      // Roof panels: seams every four pixels, every other panel a shade lighter.
+      const seam = (x - x0) % 4 === 0 || (y - y0) % 4 === 0;
+      p.set(x, y, edge ?? (seam ? TECH[0] : ((x - x0) >> 2) % 2 === ((y - y0) >> 2) % 2 ? TECH[2] : TECH[1]));
+    }
+  // The conduit: a dashed glowing line inset round the roof.
+  for (let x = x0 + 3; x <= x1 - 3; x++) for (const y of [y0 + 3, y1 - 3]) p.set(x, y, x % 3 ? GLOW[0] : GLOW[1]);
+  for (let y = y0 + 3; y <= y1 - 3; y++) for (const x of [x0 + 3, x1 - 3]) p.set(x, y, y % 3 ? GLOW[0] : GLOW[1]);
+  // The sensor dome, lit from the upper left, its lens glowing.
+  const cx = (x0 + x1 + 1) / 2, cy = (y0 + y1 + 1) / 2;
+  disc(p, cx, cy, 5.4, (x, y, d, dx, dy) => (d > 4.6 ? OUTLINE : TECH[Math.min(3, lit(x, y, dx, dy, d))]));
+  for (let i = -4; i <= 4; i++) if (Math.abs(i) > 1) { p.set(Math.floor(cx) + i, Math.floor(cy), GLOW[0]); p.set(Math.floor(cx), Math.floor(cy) + i, GLOW[0]); }
+  disc(p, cx, cy, 1.8, (_x, _y, d) => (d > 1.2 ? GLOW[1] : GLOW[2]));
+  // Three perches, each a pad with a rail rifle reaching outward.
+  const perch = (px: number, py: number, ux: number, uy: number) => {
+    rect(p, px - 2, py - 2, px + 2, py + 2, OUTLINE);
+    rect(p, px - 1, py - 1, px + 1, py + 1, TECH[3]);
+    p.set(px, py, GLOW[1]);
+    for (let i = 1; i <= 5; i++) {
+      p.set(px + ux * (i + 1), py + uy * (i + 1), i === 5 ? GLOW[2] : TECH[3]);
+      if (ux && uy) p.set(px + ux * (i + 1) - ux, py + uy * (i + 1), OUTLINE);
+    }
+  };
+  perch(x0 + 6, y0 + 6, -1, -1);
+  perch(x1 - 6, y0 + 6, 1, -1);
+  perch(x1 - 6, y1 - 6, 1, 1);
+  // The mast: a thin pole and its red light.
+  const mx = x0 + 6, my = y1 - 6;
+  for (let y = my - 3; y <= my + 2; y++) { p.set(mx, y, TECH[3]); p.set(mx + 1, y, OUTLINE); }
+  disc(p, mx + 0.5, my - 3.5, 1.5, (_x, _y, d) => (d > 1 ? OUTLINE : 0xff4a3a));
 }
 
 /** The Rocket battery: a red-tiled hall with a rocket on the ridge over a

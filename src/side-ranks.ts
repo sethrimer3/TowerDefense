@@ -1,5 +1,6 @@
 /** The bookkeeping shared by the trees climbed side by side: the keep's,
- * the walls', the city gate's and the wall ballistas' (`keep-upgrades.ts`,
+ * the walls', the city gate's, the wall ballistas' and the Revolutionaries'
+ * (`keep-upgrades.ts`, `revolutionary-upgrades.ts`,
  * `wall-upgrades.ts`, `gate-upgrades.ts`, `ballista-upgrades.ts`): each
  * rank paid with Knowledge, undone or respecced for free, and saved on the
  * Defend save under `key` (absent while it has none). */
@@ -10,7 +11,7 @@ export type SidePath<Id extends string> = { id: Id; name: string; motto: string;
 export type SideRanks<Id extends string> = Partial<Record<Id, number>>;
 export type SideResult = { ok: true } | { ok: false; reason: string };
 /** Where on the Defend save a tree keeps its ranks. */
-export type SideKey = "keepRanks" | "wallRanks" | "gateRanks" | "ballistaRanks";
+export type SideKey = "keepRanks" | "wallRanks" | "gateRanks" | "ballistaRanks" | "revolutionaryRanks";
 
 export const sideRank = <Id extends string>(ranks: SideRanks<Id> | undefined, id: Id) => ranks?.[id] ?? 0;
 

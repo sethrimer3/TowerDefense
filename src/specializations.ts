@@ -55,13 +55,15 @@ export const BECOMES: Partial<Record<PlacedKind, { to: PlacedKind; cost: number 
     { to: "gunNest", cost: 10 },
     { to: "rocketBattery", cost: 12 },
   ],
+  // The gunner line's ultimate.
+  sniperLodge: [{ to: "revolutionary", cost: 100000 }],
 };
 
 /** What each kind's troops are called on its upgrade buttons. */
 export const TROOPS: Partial<Record<PlacedKind, string>> = {
   meleeGuild: "Brawlers", rangedGuild: "Stone throwers", barracks: "Swordsmen", assassinDen: "Assassins", archerBarracks: "Archers", mageGuild: "Fire mages",
   sniperLodge: "Snipers", musketHall: "Musketmen",
-  gunHall: "Gunners", gunNest: "Machine gunners", gatlingNest: "Gatling gunners", rocketBattery: "Rocketeers", valkyriePalace: "Valkyries", darkKeep: "Dark wizard",
+  gunHall: "Gunners", gunNest: "Machine gunners", gatlingNest: "Gatling gunners", rocketBattery: "Rocketeers", revolutionary: "Laser snipers", valkyriePalace: "Valkyries", darkKeep: "Dark wizard",
 };
 
 /** The kind `kind` was upgraded from (its parent in the tree), if any. */

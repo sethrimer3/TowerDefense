@@ -59,7 +59,7 @@ type NewLight = Omit<Light, "id">;
 const TOWER_RADIUS: Partial<Record<Building["kind"], number>> = { archerTower: 7.5, cannonTower: 5.5, watchTower: 6.5, wizardTower: 5, mageGuild: 5.5 };
 
 /** The troop buildings with a lamp over the door. */
-const DOOR_LAMPS = new Set<Building["kind"]>(["meleeGuild", "rangedGuild", "barracks", "archerBarracks", "sniperLodge", "musketHall", "gunHall", "gunNest", "gatlingNest", "rocketBattery", "assassinDen", "valkyriePalace", "darkKeep"]);
+const DOOR_LAMPS = new Set<Building["kind"]>(["meleeGuild", "rangedGuild", "barracks", "archerBarracks", "sniperLodge", "musketHall", "gunHall", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "assassinDen", "valkyriePalace", "darkKeep"]);
 
 /** A building's own lights: a tower's fire (and the Mage Guild's fire
  * well), the keep's braziers, a barracks or palace door lamp. */
