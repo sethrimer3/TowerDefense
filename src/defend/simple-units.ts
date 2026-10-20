@@ -3,7 +3,7 @@
  * left and shaded along the bottom and right, one art pixel each. Squares
  * are batched into one path per colour, so a crowd of thousands costs a
  * handful of fills. Presentation only. */
-import { ARCHER_UNIT, ASSASSIN_UNIT, BRAWLER, DARK_WIZARD, ENEMIES, enemySize, FIRE_MAGE, GATLING_GUNNER, GUNNER, MACHINE_GUNNER, MUSKETEER, RAIL_SNIPER, ROCKETEER, SLINGER, SNIPER, SOLDIER, VALKYRIE } from "./catalog.ts";
+import { HOPLITE, JAVELINEER, LANCER, SPEARMAN, ARCHER_UNIT, ASSASSIN_UNIT, BRAWLER, DARK_WIZARD, ENEMIES, enemySize, FIRE_MAGE, GATLING_GUNNER, GUNNER, MACHINE_GUNNER, MUSKETEER, RAIL_SNIPER, ROCKETEER, SLINGER, SNIPER, SOLDIER, VALKYRIE } from "./catalog.ts";
 import type { Enemy, Soldier } from "./sim.ts";
 
 type Brush = { c: CanvasRenderingContext2D; px: number };
@@ -25,6 +25,10 @@ const TROOPS: Record<Soldier["kind"], { size: number; color: string }> = {
   gatlingGunner: GATLING_GUNNER,
   railSniper: RAIL_SNIPER,
   rocketeer: ROCKETEER,
+  spearman: SPEARMAN,
+  hoplite: HOPLITE,
+  javelineer: JAVELINEER,
+  lancer: LANCER,
   assassin: ASSASSIN_UNIT,
 };
 

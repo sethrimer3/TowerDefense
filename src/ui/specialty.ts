@@ -14,9 +14,9 @@ import { sideRank, type SidePath, type SideRanks } from "../side-ranks.ts";
 import { GATE_PATHS, GATE_TOWERS, IRONBOUND, PORTCULLIS, gateAllocated, gateBarred, gateRank, respecGate, undoGate, upgradeGate, type GatePathId, type GateRanks } from "../gate-upgrades.ts";
 import { CHAIN, CRIT_CHANCE, CRIT_DAMAGE, DETONATOR, REVOLUTIONARY_PATHS, SQUAD, respecRevolutionary, revolutionaryAllocated, revolutionaryRank, undoRevolutionary, upgradeRevolutionary, type RevolutionaryPathId, type RevolutionaryRanks } from "../revolutionary-upgrades.ts";
 import { BALLISTA_PATHS, FIRE_BOLTS, HEAVY_BOLTS, WINDLASS, ballistaAllocated, ballistaRank, respecBallistas, undoBallistas, upgradeBallistas, type BallistaPathId, type BallistaRanks } from "../ballista-upgrades.ts";
-import { pathById, pathTopicOf, UNSPECIALIZED, type PathId, FIRE_ARROWS, SHARP, GUNNERY, SIEGE_SHOT, CRUSADE, BLOODLETTERS, SHADOWCLOAK, VENOM, HEADHUNT, GRENADIERS, VOLLEY, BAYONET, SHARP_MUSKETS, BELT_FEED, TRIPOD, QUICKDRAW, DUELISTS, GUN_SHIELD, OVERDRIVE, STOPPING, DEADEYE, PIERCING, CLUSTER, SALVO, MARKSMEN, RICOCHET, SUPPRESS, BERSERK, HALBERD, RANGERS, SKIRMISH, FORTIFY, PYRO, RIME, STORM, PYROCLASM, CINDERS, SPOTTERS, SIGNAL } from "../knowledge-paths.ts";
+import { pathById, pathTopicOf, UNSPECIALIZED, type PathId, FIRE_ARROWS, SHARP, GUNNERY, SIEGE_SHOT, CRUSADE, BLOODLETTERS, SHADOWCLOAK, VENOM, HEADHUNT, GRENADIERS, VOLLEY, BAYONET, SHARP_MUSKETS, BELT_FEED, LONG_SPEARS, SET_SPEARS, TESTUDO, SPEAR_WALL, BARBED, THROWING, HEAVY_LANCE, WINGED, TRIPOD, QUICKDRAW, DUELISTS, GUN_SHIELD, OVERDRIVE, STOPPING, DEADEYE, PIERCING, CLUSTER, SALVO, MARKSMEN, RICOCHET, SUPPRESS, BERSERK, HALBERD, RANGERS, SKIRMISH, FORTIFY, PYRO, RIME, STORM, PYROCLASM, CINDERS, SPOTTERS, SIGNAL } from "../knowledge-paths.ts";
 import { bonuses } from "../progression.ts";
-import { ITEM_NAMES, archerDamage, archerCooldown, archerRange, cannonDamage, cannonCooldown, CANNON_RANGE, SOLDIER, ARCHER_UNIT, soldierScale, STRUCTURES, flameDps, flameRange, iceDamage, ICE_RANGE, iceChill, watchRadius, fireballDamage, fireballSplash, emberDps, emberSeconds, FIRE_MAGE, FIREBALL_RANGE, keepHp, BRAWLER, ASSASSIN_UNIT, SLINGER, SNIPER, MUSKETEER, GUNNER, MACHINE_GUNNER, GATLING_GUNNER, RAIL_SNIPER, ROCKETEER, WALL_BLOCK_DESCRIPTION, wallHp, GATE, GATE_DESCRIPTION, BALLISTA, BALLISTA_DESCRIPTION, ballistaCooldown, ballistaDamage, ballistaRange, gateHpScale, gateShut, type PaletteItem } from "../defend/catalog.ts";
+import { ITEM_NAMES, archerDamage, archerCooldown, archerRange, cannonDamage, cannonCooldown, CANNON_RANGE, SOLDIER, ARCHER_UNIT, soldierScale, STRUCTURES, flameDps, flameRange, iceDamage, ICE_RANGE, iceChill, watchRadius, fireballDamage, fireballSplash, emberDps, emberSeconds, FIRE_MAGE, FIREBALL_RANGE, keepHp, BRAWLER, ASSASSIN_UNIT, SLINGER, SNIPER, MUSKETEER, GUNNER, MACHINE_GUNNER, GATLING_GUNNER, RAIL_SNIPER, ROCKETEER, SPEARMAN, HOPLITE, LANCER, JAVELINEER, WALL_BLOCK_DESCRIPTION, wallHp, GATE, GATE_DESCRIPTION, BALLISTA, BALLISTA_DESCRIPTION, ballistaCooldown, ballistaDamage, ballistaRange, gateHpScale, gateShut, type PaletteItem } from "../defend/catalog.ts";
 
 /** `kind`'s effective numbers wearing `path` at `rank` (none: plain), with
  * the shared Smithy and skill bonuses. */
@@ -52,6 +52,43 @@ export function kindStats(save: Save, kind: PaletteItem, path?: PathId, rank = 0
       hunt ? `toughest first · +${HEADHUNT.bounty[hunt] * 100}% of its HP a strike` : "",
     ].filter(Boolean).map((t) => ` · ${t}`).join("");
     return `Recruits: ${n(u.hp * scale * b.troopHp * BLOODLETTERS.hp[blood])} HP · ${n(u.damage * scale * b.troopDamage)} damage every ${u.cooldown}s · every ${ordinal(BLOODLETTERS.every[blood])} strike ${BLOODLETTERS.crit[blood]}x${extra}`;
+  }
+  if (kind === "spearHall" || kind === "phalanx" || kind === "lancerStable" || kind === "javelinCamp") {
+    const scale = soldierScale(l.soldierArms), life = (u: { hp: number }) => `Recruits: ${n(u.hp * scale * b.troopHp)} HP`;
+    const hit = (u: { damage: number }, m = 1) => n(u.damage * scale * b.troopDamage * m);
+    const more = (parts: string[]) => parts.filter(Boolean).map((t) => ` · ${t}`).join("");
+    if (kind === "spearHall") {
+      const long = at("longSpears"), set = at("setSpears");
+      return `${life(SPEARMAN)} · ${hit(SPEARMAN, long >= 3 ? LONG_SPEARS.damage : 1)} damage every ${SPEARMAN.cooldown}s · ${n(SPEARMAN.reach + LONG_SPEARS.reach[long])} reach${more([
+        LONG_SPEARS.share[long] ? `runs through for ${LONG_SPEARS.share[long] * 100}%` : "",
+        set ? `${SET_SPEARS.fresh[set]}x on the unhurt` : "",
+        set >= 2 ? `staggers ${SET_SPEARS.stagger}s` : "",
+      ])}`;
+    }
+    if (kind === "phalanx") {
+      const testudo = at("testudo"), wall = at("spearWall");
+      return `${life(HOPLITE)} · takes ${n(HOPLITE.guard * TESTUDO.guard[testudo] * 100)}% of every blow · ${hit(HOPLITE, SPEAR_WALL.damage[wall])} damage every ${HOPLITE.cooldown}s · ${HOPLITE.speed} speed${more([
+        testudo >= 2 ? `${TESTUDO.ally * 100}% less for each comrade beside it` : "",
+        testudo >= 3 ? "slows every enemy in reach" : "",
+        SPEAR_WALL.share[wall] ? `strikes all in reach for ${SPEAR_WALL.share[wall] * 100}%` : "",
+      ])}`;
+    }
+    if (kind === "lancerStable") {
+      const heavy = at("heavyLance"), winged = at("wingedLancers");
+      return `${life(LANCER)} · ${hit(LANCER)} damage every ${LANCER.cooldown}s, ${HEAVY_LANCE.charge[heavy]}x on a charge · ${n(LANCER.speed * WINGED.speed[winged])} speed${more([
+        heavy >= 2 ? `charges stagger ${HEAVY_LANCE.stagger}s` : "",
+        heavy >= 3 ? "charges trample" : "",
+        winged >= 2 ? `ranges ${WINGED.leash[winged]}x as far` : "",
+        winged >= 3 ? `charges heal ${WINGED.heal * 100}%` : "",
+      ])}`;
+    }
+    const barbed = at("barbed"), arms = at("throwingArms");
+    return `${life(JAVELINEER)} · ${hit(JAVELINEER)} damage every ${n(JAVELINEER.cooldown * THROWING.reload[arms])}s · ${JAVELINEER.range + THROWING.range[arms]} range${more([
+      THROWING.extra[arms] ? "a second javelin a throw" : "",
+      barbed ? `hits slow ${BARBED.chill}s` : "",
+      barbed >= 2 ? `stagger ${BARBED.stagger}s` : "",
+      barbed >= 3 ? `${BARBED.bigDamage}x on big enemies` : "",
+    ])}`;
   }
   if (kind === "wizardTower") {
     const pyro = at("pyromancy"), rime = at("rime"), storm = at("storm");

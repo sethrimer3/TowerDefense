@@ -4,6 +4,8 @@
  * - **Arrows** (archers and archer towers): an iron head, an ash shaft and
  *   red-and-white fletching, baked once per one of `ARROW_DIRS` headings
  *   and drawn on the art lattice where the sim says each flies.
+ * - **Javelins** (the javelineers'): a dark ash shaft with no fletching
+ *   and a long iron head, baked per heading like the arrows.
  * - **Shots** (the ranged guilds' troops): a thrown stone, grey and lit
  *   from the upper left; a sniper's bullet, a bright brass fleck; a
  *   musketman's explosive ball, black with a burning fuse spark. Each is
@@ -40,6 +42,13 @@ const ARROW_ART = [
   [".......", ".RF....", ".Fs....", "...S...", "....Sh.", "....hH.", "......."],
 ];
 
+/** A javelin at the same three headings: shaft the whole way, J/j its head. */
+const JAVELIN_ART = [
+  [".......", ".......", ".......", "sSSSSjJ", ".......", ".......", "......."],
+  [".......", ".......", "sS.....", "..SS...", "....Sj.", "......J", "......."],
+  ["s......", ".S.....", "..S....", "...S...", "....j..", ".....J.", "......."],
+];
+
 /** How many puffs make a dragon's breath, and how far it reaches, in cells. */
 const BREATH_PUFFS = 18;
 const BREATH_REACH = 4.6;
@@ -65,9 +74,9 @@ export function arrowDir(dx: number, dy: number) {
 
 /** One arrow's pixels at heading `dir`: a `ARROW_BOX`² grid of palette
  * colours, outline included ("" where clear). Pure, for tests. */
-export function arrowPixels(dir: number): string[] {
+export function arrowPixels(dir: number, javelin = false): string[] {
   const n = ARROW_BOX;
-  const key: Record<string, string> = { H: C.head, h: C.headLo, S: C.shaft, s: C.shaftLo, F: C.fletch, R: C.fletchRed };
+  const key: Record<string, string> = javelin ? { J: C.head, j: C.headLo, S: C.shaftLo, s: "#5a3d22" } : { H: C.head, h: C.headLo, S: C.shaft, s: C.shaftLo, F: C.fletch, R: C.fletchRed };
   // Which hand-drawn heading, and how to turn its (x, y) into this one's.
   let base = dir, turn = (x: number, y: number) => [x, y];
   if (dir > 8) {
@@ -76,7 +85,7 @@ export function arrowPixels(dir: number): string[] {
     turn = (x, y) => { const [tx, ty] = up.turn(x, y); return [tx, 6 - ty]; };
   } else ({ base, turn } = arrowTurn(dir));
   const px: string[] = new Array(n * n).fill("");
-  const art = ARROW_ART[base];
+  const art = (javelin ? JAVELIN_ART : ARROW_ART)[base];
   for (let y = 0; y < 7; y++)
     for (let x = 0; x < 7; x++) {
       const ch = art[y][x];
@@ -122,8 +131,9 @@ function paint(px: string[], w: number, h: number) {
   return cv;
 }
 
-const arrowSprites: HTMLCanvasElement[] = [];
-function arrowSprite(dir: number) {
+const arrowSprites: HTMLCanvasElement[] = [], javelinSprites: HTMLCanvasElement[] = [];
+function arrowSprite(dir: number, javelin = false) {
+  if (javelin) return (javelinSprites[dir] ??= paint(arrowPixels(dir, true), ARROW_BOX, ARROW_BOX));
   return (arrowSprites[dir] ??= paint(arrowPixels(dir), ARROW_BOX, ARROW_BOX));
 }
 
@@ -133,7 +143,7 @@ export function drawArrows(c: Ctx, px: number, sim: DefendSim) {
   if (!sim.arrows.length) return;
   c.imageSmoothingEnabled = false;
   for (const a of sim.arrows) {
-    if (a.shot) {
+    if (a.shot && a.shot !== "javelin") {
       const s = shotSprite(a.shot);
       blit(c, px, s.cv, Math.round(a.x * ART - s.size / 2), Math.round(a.y * ART - s.size / 2));
       continue;
@@ -143,7 +153,7 @@ export function drawArrows(c: Ctx, px: number, sim: DefendSim) {
     const d = Math.hypot(dx, dy) || 1;
     const dir = arrowDir(dx, dy);
     const mx = a.x - (dx / d) * ARROW_BACK, my = a.y - (dy / d) * ARROW_BACK;
-    blit(c, px, arrowSprite(dir), Math.round(mx * ART - ARROW_BOX / 2), Math.round(my * ART - ARROW_BOX / 2));
+    blit(c, px, arrowSprite(dir, a.shot === "javelin"), Math.round(mx * ART - ARROW_BOX / 2), Math.round(my * ART - ARROW_BOX / 2));
   }
 }
 
@@ -172,7 +182,7 @@ const SHOTS: Record<Shot, [number, string, string, string]> = {
   ball: [3, "#2c2a2e", "#1b1a1d", "#8c8c96"],
   rocket: [2, "#b3372f", "#6e1c18", "#e8dcc0"],
 };
-type Shot = NonNullable<Arrow["shot"]>;
+type Shot = Exclude<NonNullable<Arrow["shot"]>, "javelin">;
 const shotSprites = new Map<string, { cv: HTMLCanvasElement; size: number }>();
 function shotSprite(shot: Shot) {
   let s = shotSprites.get(shot);

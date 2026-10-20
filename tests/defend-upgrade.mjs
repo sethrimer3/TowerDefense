@@ -177,7 +177,7 @@ try {
     // A Melee Guild becomes an Assassins' den (its own size), then is respecced, free.
     const melee = await place('meleeGuild');
     await tapBuilding(melee.uid);
-    assert.deepEqual(await nodes(), ['k:meleeGuild=owned', 'k:barracks=next', 'k:assassinDen=next']);
+    assert.deepEqual(await nodes(), ['k:meleeGuild=owned', 'k:barracks=next', 'k:assassinDen=next', 'k:spearHall=next']);
     const before = await state(page);
     await buy('k:assassinDen');
     await settled();
@@ -189,7 +189,7 @@ try {
     assert.equal((await placed(melee.uid)).kind, 'meleeGuild', 'back to a Melee Guild');
     assert.equal(s.knowledge, before.knowledge, 'every point back');
     assert.equal(s.smithy.copper, before.smithy.copper, 'free');
-    assert.deepEqual((await nodes()).sort(), ['k:assassinDen=next', 'k:barracks=next', 'k:meleeGuild=owned']);
+    assert.deepEqual((await nodes()).sort(), ['k:assassinDen=next', 'k:barracks=next', 'k:meleeGuild=owned', 'k:spearHall=next']);
     // Tap a picked node again to buy it; tap a picked owned one again to sell everything after it.
     await page.evaluate(() => { window.__dp.host.game().knowledge += 500; });
     const k0 = await page.evaluate(() => window.__dp.host.game().knowledge);
@@ -210,12 +210,14 @@ try {
     assert.equal((await state(page)).knowledge, k0, 'every point back');
     await press(panel.locator('[data-specialty-close]'));
 
-    // The Ranged Guild's four branches.
+    // The Ranged Guild's three branches.
     const ranged = await place('rangedGuild', 1);
     await tapBuilding(ranged.uid);
-    assert.equal(await panel.locator('.ug-node.next').count(), 4);
+    assert.equal(await panel.locator('.ug-node.next').count(), 3);
     await page.waitForTimeout(700); await page.screenshot({ path: `${out}/upgrade-${width}-ranged-guild.png` });
     // A Musket hall is 3 × 2 quarters, not the guild's 2 × 2: it waits in the palette.
+    await buy('k:gunHall');
+    await settled();
     await buy('k:musketHall');
     await page.waitForSelector('#defend-specialty', { state: 'hidden' });
     assert.equal(await placed(ranged.uid), undefined, 'taken up');
@@ -223,7 +225,7 @@ try {
     assert.equal((await place('musketHall'))?.kind, 'musketHall', 'and placed again');
     const ranged2 = await place('rangedGuild', 2);
     await tapBuilding(ranged2.uid);
-    await buy('k:sniperLodge');
+    await buy('k:gunHall');
     await press(panel.locator('[data-specialty-close]'));
     await place('meleeGuild', 3);
 
@@ -275,7 +277,7 @@ try {
     assert.ok(await page.locator(`#defend-palette [data-item^="archerTower~"]`).count(), 'under its own palette entry');
     await press(panel.locator('[data-specialty-close]'));
     s = await state(page);
-    assert.deepEqual(['wizardTower', 'musketHall', 'sniperLodge', 'meleeGuild'].map(k => s.defend.owned[k] >= 1), [true, true, true, true]);
+    assert.deepEqual(['wizardTower', 'musketHall', 'gunHall', 'meleeGuild'].map(k => s.defend.owned[k] >= 1), [true, true, true, true]);
 
     // Saved, reloaded, and fought with.
     await page.reload(); await page.waitForSelector('#defend-start');
@@ -287,7 +289,7 @@ try {
     assert.deepEqual(paths.filter(Boolean), [{ path: 'storm', rank: 1 }]);
     await page.evaluate(() => window.defendDebug?.(14));
     const kinds = await page.evaluate(() => [...new Set(window.__dp.sim.soldiers.map(s => s.kind))].sort());
-    for (const k of ['brawler', 'musketeer', 'sniper']) assert.ok(kinds.includes(k), `${k} in ${kinds}`);
+    for (const k of ['brawler', 'musketeer', 'gunner']) assert.ok(kinds.includes(k), `${k} in ${kinds}`);
     await page.evaluate(() => { const dp = window.__dp, k = dp.host.save().layout.keep, p = dp.renderer.toClient((k.tx + 0.5) * 8, (k.ty) * 8); dp.renderer.zoomAt(p.x, p.y, 3.5); });
     await page.waitForTimeout(500); await page.screenshot({ path: `${out}/upgrade-${width}-battle.png` });
     await page.locator('#defend-abandon').click(); await page.locator('#defend-abandon').click();

@@ -11,6 +11,14 @@
  *   ridge, its yard a long firing lane past sandbags to a far target.
  * - Musket hall: a hall under a smoke-browned roof with a powder burst on
  *   the ridge, its yard stacked with iron-bound powder kegs and scorched.
+ * - Spearmen hall: a hall under ochre tiles with a spear on the ridge, a
+ *   rack of spears and a straw dummy on a pole in its yard.
+ * - Phalanx: a hall under red tiles with a round bronze shield on the
+ *   ridge, shields stacked against its yard's fence.
+ * - Javelin camp: a hall under olive thatch with crossed javelins on the
+ *   ridge, a straw butt in its yard stuck with javelins.
+ * - Lancer stable: a timber stable under brown shingles with a horse's head
+ *   on the ridge, its yard a tilting run past a quintain, hay and a trough.
  * - Barracks: a stone hall under a red tiled roof, the swordsmen's blue
  *   shield on its ridge.
  * - Archer barracks: a timber hall, and its yard with a straw target butt.
@@ -120,6 +128,10 @@ const MATERIAL: Record<PlacedKind, { m: Material; ruin: Pick<Ruin, "stone" | "to
   rocketBattery: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.kiln.slice(0, 3), beams: true } },
   revolutionary: { m: { tones: TECH.slice(1, 4), roofed: false }, ruin: { stone: TECH.slice(0, 3), top: [TECH[1], TECH[3], GLOW[0]], beams: false } },
   assassinDen: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: [0x241f2c, C.dusk, 0x544a62], beams: true } },
+  spearHall: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.straw, beams: true } },
+  phalanx: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: [0x6e2a22, C.red, 0xc25a48], beams: true } },
+  javelinCamp: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.canvas.slice(0, 3), beams: true } },
+  lancerStable: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.plank.slice(0, 3), beams: true } },
   barracks: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: [0x6e2a22, C.red, 0xc25a48], beams: true } },
   archerBarracks: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: [0x4a3826, C.timber, 0x8e7048], beams: true } },
   archerTower: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.plank.slice(0, 3), beams: true } },
@@ -145,6 +157,10 @@ export const PATH_LOOKS: Partial<Record<PlacedKind, readonly string[]>> = {
   barracks: ["crusaders", "berserkers", "halberdiers"],
   valkyriePalace: ["cloudborne"],
   assassinDen: ["bloodletters", "shadowcloak", "venom", "headhunters"],
+  spearHall: ["longSpears", "setSpears"],
+  phalanx: ["testudo", "spearWall"],
+  javelinCamp: ["barbed", "throwingArms"],
+  lancerStable: ["heavyLance", "wingedLancers"],
   musketHall: ["grenadiers", "volleyFire", "bayonets", "sharpMuskets"],
   gunHall: ["quickdraw", "duelists"],
   gunNest: ["beltFeed", "tripod"],
@@ -181,7 +197,7 @@ export function structureRubblePixels(kind: PlacedKind, cw: number, ch: number, 
   return rubblePixels(w, h, hash(seed, KINDS.indexOf(kind), 3), { ...frame(w, h), ...MATERIAL[kind].ruin });
 }
 
-const KINDS: PlacedKind[] = ["barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "meleeGuild", "rangedGuild", "sniperLodge", "musketHall", "assassinDen", "gunHall", "gunNest", "gatlingNest", "rocketBattery", "revolutionary"];
+const KINDS: PlacedKind[] = ["barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "meleeGuild", "rangedGuild", "sniperLodge", "musketHall", "assassinDen", "gunHall", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "spearHall", "phalanx", "javelinCamp", "lancerStable"];
 
 const PAINT: Record<PlacedKind, (p: Pix, look: string) => void> = {
   meleeGuild: paintMeleeGuild,
@@ -194,6 +210,10 @@ const PAINT: Record<PlacedKind, (p: Pix, look: string) => void> = {
   rocketBattery: paintRocketBattery,
   revolutionary: paintRevolutionary,
   assassinDen: paintAssassinDen,
+  spearHall: paintSpearHall,
+  phalanx: paintPhalanx,
+  javelinCamp: paintJavelinCamp,
+  lancerStable: paintLancerStable,
   barracks: paintBarracks,
   archerBarracks: paintArcherBarracks,
   archerTower: paintArcherTower,
@@ -719,6 +739,128 @@ function paintAssassinDen(p: Pix, look: string) {
     p.set(rx + 1, yy, look === "shadowcloak" ? C.flag[2] : C.iron[3]);
     p.set(rx + 2, yy, look === "shadowcloak" ? C.flag[0] : C.iron[2]);
   }
+}
+
+/** A spear point up, its shaft below. */
+const SPEAR = ["..0..", ".030.", "03330", ".030.", "..0..", ".010.", ".010.", ".010.", ".010.", ".000."];
+/** A round shield with a boss. */
+const ROUND_SHIELD = ["..0000..", ".033330.", "03322220", "03224220", "03222220", "02222220", ".022220.", "..0000.."];
+/** Two javelins crossed. */
+const CROSSED = ["30...3", "01..10", ".0110.", ".0110.", "01..10", "0....0"];
+/** A horse's head, facing right. */
+const HORSE = [
+  "..0.0....",
+  ".02020...",
+  ".0222200.",
+  "0222422200",
+  "02222222220",
+  ".0220002220",
+  "02220...00.",
+  "0220.......",
+];
+/** A white wing. */
+const WING = ["00.......", "0300.....", "033300...", "0333330..", ".03333330", "..0222220", "...00000."];
+
+/** Spears leaning in a rack across `x0`..`x1`, `n` of them, `tall` pixels
+ * long, their iron points up, rising from `y`. */
+function spearRack(p: Pix, x0: number, x1: number, y: number, tall: number) {
+  for (let x = x0; x <= x1; x++) p.set(x, y, OUTLINE);
+  for (let x = x0 + 1; x < x1; x += 2) {
+    for (let yy = y - tall + 1; yy < y; yy++) p.set(x, yy, C.plank[1]);
+    p.set(x, y - tall, C.iron[3]);
+    p.set(x, y - tall - 1, OUTLINE);
+  }
+}
+
+/** The Spearmen hall: ochre tiles and a spear on the ridge, a rack of
+ * spears and a straw dummy on a pole in the yard. Long spears re-roof it
+ * in green and rack spears twice as long across the yard; Set spears roof
+ * it in iron grey and plant a row of braced stakes along the fence. */
+function paintSpearHall(p: Pix, look: string) {
+  const long = look === "longSpears", set = look === "setSpears";
+  const y = guild(p, long ? C.moss : set ? C.iron[2] : 0xb08040, SPEAR, { 0: OUTLINE, 1: C.plank[2], 3: C.iron[3] });
+  const dx = y.x1 - 4.5, dy = (y.y0 + y.y1) / 2 + 0.5;
+  disc(p, dx, dy, 2.4, (x, yy, d, ox, oy) => (d > 1.6 ? OUTLINE : C.straw[Math.min(2, lit(x, yy, ox, oy, d))]));
+  p.set(Math.round(dx) - 1, Math.round(dy), C.plank[0]);
+  if (long) {
+    spearRack(p, y.x0 + 1, y.x0 + 14, y.y1 - 1, 7);
+    return;
+  }
+  spearRack(p, y.x0 + 1, y.x0 + 8, y.y1 - 1, 4);
+  if (set) {
+    // Stakes braced at a slant along the fence, points out.
+    for (let x = y.x0 + 10; x < y.x1 - 7; x += 3) {
+      p.set(x, y.y1 - 1, C.plank[0]);
+      p.set(x + 1, y.y1 - 2, C.plank[1]);
+      p.set(x + 2, y.y1 - 3, C.iron[3]);
+    }
+  }
+}
+
+/** The Phalanx: red tiles and a bronze shield on the ridge, round shields
+ * leaning in a row along its yard. Testudo roofs it in lead and locks the
+ * shields in a tight block, rim to rim; Spear wall roofs it in bronze and
+ * bristles the fence with spear points. */
+function paintPhalanx(p: Pix, look: string) {
+  const testudo = look === "testudo", wall = look === "spearWall";
+  const y = guild(p, testudo ? C.lead : wall ? C.brass[0] : C.red, ROUND_SHIELD, { 0: OUTLINE, 2: C.brass[1], 3: C.gold[1], 4: C.red });
+  const shield = (cx: number, cy: number) => disc(p, cx, cy, 2.1, (x, yy, d, ox, oy) => (d > 1.4 ? OUTLINE : d < 0.6 ? C.red : C.brass[Math.min(2, lit(x, yy, ox, oy, d))]));
+  if (testudo) {
+    for (let r = 0; r < 2; r++) for (let i = 0; i < 4; i++) shield(y.x0 + 3.5 + i * 3.5, y.y0 + 2.5 + r * 3.5);
+  } else for (let i = 0; i < 4; i++) shield(y.x0 + 3.5 + i * 4, (y.y0 + y.y1) / 2 + 0.5);
+  if (wall) {
+    // A hedge of spear points along the fence.
+    for (let x = y.x0 + 1; x < y.x1; x += 2) p.set(x, y.y0, C.iron[3]);
+    for (let x = y.x1 - 9; x < y.x1; x += 2) { p.set(x, y.y1 - 1, C.plank[1]); p.set(x, y.y1 - 2, C.plank[1]); p.set(x, y.y1 - 3, C.iron[3]); }
+  }
+}
+
+/** The Javelin camp: olive thatch and crossed javelins on the ridge, a straw
+ * butt in its yard stuck with javelins. Barbed javelins roof it in wine and
+ * hang a boar's hide with hooks by the butt; Throwing arms roof it in canvas
+ * and pace out a second, further butt. */
+function paintJavelinCamp(p: Pix, look: string) {
+  const barbed = look === "barbed", arms = look === "throwingArms";
+  const y = guild(p, barbed ? C.wine[1] : arms ? C.shield[0] : C.moss, CROSSED, { 0: OUTLINE, 1: C.plank[2], 3: C.iron[3] });
+  const butt = (cx: number, cy: number, stuck: number) => {
+    disc(p, cx, cy, 2.6, (x, yy, d, ox, oy) => (d > 1.8 ? OUTLINE : d < 0.8 ? C.target[1] : C.straw[Math.min(2, lit(x, yy, ox, oy, d))]));
+    for (let i = 0; i < stuck; i++) { p.set(Math.round(cx) - 2 + i * 2, Math.round(cy) - 3, C.plank[1]); p.set(Math.round(cx) - 2 + i * 2, Math.round(cy) - 4, C.plank[2]); }
+  };
+  butt(y.x1 - 4.5, (y.y0 + y.y1) / 2 + 0.5, 3);
+  if (arms) butt(y.x1 - 11.5, (y.y0 + y.y1) / 2 + 1.5, 2);
+  // Javelins waiting in the ground by the door.
+  for (let x = y.x0 + 2; x <= y.x0 + 6; x += 2) for (let yy = y.y0 + 1; yy <= y.y1 - 1; yy++) p.set(x, yy, yy === y.y0 + 1 ? C.iron[3] : C.plank[1]);
+  if (barbed) {
+    // A boar's hide pegged out, red barbs hung beside it.
+    const hx = y.x0 + 9, hy = y.y0 + 2;
+    rect(p, hx, hy, hx + 5, hy + 4, OUTLINE);
+    rect(p, hx + 1, hy + 1, hx + 4, hy + 3, C.plank[0]);
+    for (let i = 0; i < 3; i++) p.set(hx + 7 + i, hy + 1 + (i & 1), C.ruby[2]);
+  }
+}
+
+/** The Lancer stable: a timber stable under brown shingles with a horse's
+ * head on the ridge, its yard a tilting run past a quintain, hay bales and
+ * a trough. Heavy lance roofs it in iron and racks heavy lances, the
+ * quintain shield red; Winged lancers roof it in white marble with a wing
+ * on the ridge and scatter white feathers. */
+function paintLancerStable(p: Pix, look: string) {
+  const heavy = look === "heavyLance", winged = look === "wingedLancers";
+  const y = winged ? guild(p, C.marble[2], WING, { 0: OUTLINE, 2: C.gold[1], 3: C.marble[4] })
+    : guild(p, heavy ? C.iron[1] : C.plank[1], HORSE, { 0: OUTLINE, 2: 0x9c6a3a, 4: OUTLINE });
+  // The tilting run: a rail down the yard, the quintain at its end.
+  const ry = Math.round((y.y0 + y.y1) / 2);
+  for (let x = y.x0 + 1; x < y.x1 - 6; x++) p.set(x, ry, (x & 1) ? C.plank[2] : C.plank[0]);
+  const qx = y.x1 - 4;
+  for (let yy = y.y0 + 1; yy <= y.y1 - 1; yy++) p.set(qx, yy, C.plank[0]);
+  rect(p, qx - 2, y.y0 + 1, qx + 2, y.y0 + 1, C.plank[1]);
+  rect(p, qx + 1, y.y0 + 2, qx + 2, y.y0 + 4, heavy ? C.banner[1] : C.shield[1]);
+  // Hay bales and a trough.
+  rect(p, y.x0 + 1, y.y1 - 2, y.x0 + 3, y.y1 - 1, C.straw[1]);
+  rect(p, y.x0 + 5, y.y1 - 2, y.x0 + 9, y.y1 - 1, OUTLINE);
+  for (let x = y.x0 + 6; x <= y.x0 + 8; x++) p.set(x, y.y1 - 2, C.ice[1]);
+  if (heavy) for (let x = y.x0 + 12; x <= y.x0 + 16; x += 2) for (let yy = y.y1 - 3; yy <= y.y1 - 1; yy++) p.set(x, yy, yy === y.y1 - 3 ? C.iron[3] : C.iron[1]);
+  if (winged) for (const [dx, dy] of [[2, 1], [7, 2], [11, 1], [14, 3], [9, 4]] as const) { p.set(y.x0 + dx, y.y0 + dy, C.marble[4]); p.set(y.x0 + dx + 1, y.y0 + dy, C.marble[2]); }
 }
 
 function paintArcherBarracks(p: Pix, look: string) {

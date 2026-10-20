@@ -56,6 +56,7 @@ import { ignite, stepArrows, stepShells, Towers } from "./towers.ts";
 import { FORTIFY, SHATTER, SIGNAL, SPOTTERS, pathRank } from "../knowledge-paths.ts";
 import { Barracks, stepArcher, stepSwordsman } from "./troops.ts";
 import { cloaked, spreadVenom, stepVenom } from "./assassins.ts";
+import { hopliteGuard } from "./spears.ts";
 import { stepBlazes, stepFireballs, stepMage, type Blaze, type Fireball } from "./mages.ts";
 import { stepStabs, stepValkyrie, type Stab } from "./valkyries.ts";
 import { launchPalaces, stepSkyPalaces, type SkyPalace } from "./sky-palace.ts";
@@ -136,8 +137,11 @@ export type Soldier = {
   id: number;
   /** Swordsmen chase and hack; archers roam and shoot; fire mages roam
    * and hurl fireballs; valkyries hunt and charge-stab; the dark wizard
-   * hunts and casts chain lightning. */
-  kind: "sword" | "archer" | "mage" | "valkyrie" | "darkWizard" | "undead" | "reinforcement" | "brawler" | "slinger" | "sniper" | "musketeer" | "gunner" | "machineGunner" | "gatlingGunner" | "rocketeer" | "railSniper" | "assassin";
+   * hunts and casts chain lightning; the spearmen line's spearmen,
+   * hoplites and lancers chase like swordsmen, its javelineers roam and
+   * throw like archers. */
+  kind: "sword" | "archer" | "mage" | "valkyrie" | "darkWizard" | "undead" | "reinforcement" | "brawler" | "slinger" | "sniper" | "musketeer" | "gunner" | "machineGunner" | "gatlingGunner" | "rocketeer" | "railSniper" | "assassin"
+    | "spearman" | "hoplite" | "javelineer" | "lancer";
   home: number;
   x: number;
   y: number;
@@ -159,6 +163,9 @@ export type Soldier = {
   /** A Shadowcloak assassin's seconds until it is cloaked again (0: cloaked,
    * and no enemy picks it out); absent for everyone else. */
   cloak?: number;
+  /** The enemy a lancer last struck: its next thrust at any other is a
+   * charge; absent for everyone else. */
+  lanced?: number;
   /** A warrior the Necromancy spell raised (`home` -1); absent for everyone else. */
   risen?: Risen;
   /** A soldier the Reinforcements spell dropped (`home` -1); absent for everyone else. */
@@ -195,7 +202,7 @@ export type Arrow = {
   burn?: number; burnFor?: number;
   /** What flies, when not an arrow: a thrown stone, a sniper's bullet or a
    * musketman's ball; absent for arrows. */
-  shot?: "stone" | "bullet" | "ball" | "rocket";
+  shot?: "stone" | "bullet" | "ball" | "rocket" | "javelin";
   /** An explosive ball's burst radius where it hits (sparing your own
    * people); absent otherwise. */
   blast?: number;
@@ -256,6 +263,10 @@ const STEP_SOLDIER: Record<Soldier["kind"], (sim: DefendSim, s: Soldier, dt: num
   railSniper: stepArcher,
   rocketeer: stepArcher,
   assassin: stepSwordsman,
+  spearman: stepSwordsman,
+  hoplite: stepSwordsman,
+  lancer: stepSwordsman,
+  javelineer: stepArcher,
 };
 /** How long a struck building flashes, in seconds. */
 export const BUILDING_FLASH = 0.14;
@@ -934,7 +945,7 @@ export class DefendSim {
   hurtDefender(unit: Soldier | Civilian, amount: number) {
     if (unit.hp <= 0 || ("guard" in unit && unit.guard)) return 0;
     if ("kind" in unit) stepBannerLife(this, unit, 0);
-    const damage = amount * (this.bonuses.banner?.defense && "kind" in unit && bannerInfluence(this, unit) ? 1 - this.bonuses.banner.defense : 1) * wardDefender(this, unit) * shieldWall(this, unit);
+    const damage = amount * (this.bonuses.banner?.defense && "kind" in unit && bannerInfluence(this, unit) ? 1 - this.bonuses.banner.defense : 1) * wardDefender(this, unit) * shieldWall(this, unit) * hopliteGuard(this, unit);
     const dealt = Math.min(unit.hp, damage);
     unit.hp -= damage;
     return dealt;

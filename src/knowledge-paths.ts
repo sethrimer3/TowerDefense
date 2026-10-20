@@ -6,7 +6,7 @@ import { cloneLayout, type PlacedKind } from "./defend/layout.ts";
 import type { Save } from "./save.ts";
 import { studyPathCost } from "./economy.ts";
 
-export type PathTopic = "wizardTower" | "barracks" | "valkyriePalace" | "assassinDen" | "musketHall" | "gunHall" | "gunNest" | "gatlingNest" | "rocketBattery" | "sniperLodge" | "archerTower" | "cannonTower" | "archerBarracks" | "watchTower" | "mageGuild" | "bait" | "spikes" | SpellId;
+export type PathTopic = "wizardTower" | "barracks" | "valkyriePalace" | "assassinDen" | "spearHall" | "phalanx" | "javelinCamp" | "lancerStable" | "musketHall" | "gunHall" | "gunNest" | "gatlingNest" | "rocketBattery" | "sniperLodge" | "archerTower" | "cannonTower" | "archerBarracks" | "watchTower" | "mageGuild" | "bait" | "spikes" | SpellId;
 /** Strike spells: cast from the battle's Skills palette rather than built,
  * so a spell has no cards; it casts with the one path `save.spellPaths`
  * names, at its furthest researched rank. */
@@ -16,6 +16,7 @@ export const isSpell = (topic: string): topic is SpellId => (SPELLS as string[])
 export type PathId =
   | "pyromancy" | "rime" | "storm" | "crusaders" | "berserkers" | "halberdiers" | "cloudborne"
   | "bloodletters" | "shadowcloak" | "venom" | "headhunters"
+  | "longSpears" | "setSpears" | "testudo" | "spearWall" | "barbed" | "throwingArms" | "heavyLance" | "wingedLancers"
   | "grenadiers" | "volleyFire" | "bayonets" | "sharpMuskets" | "beltFeed"
   | "quickdraw" | "duelists" | "tripod" | "gunShield" | "overdrive" | "stoppingPower" | "deadeye" | "piercing" | "clusterRockets" | "salvoRacks"
   | "marksmen" | "ricochet" | "suppressors"
@@ -73,6 +74,42 @@ export const BERSERK = { cooldown: 0.75, heal: 0.3, cleave: 1, share: 0.5 };
  * from II every blow slows its enemy for `chill` seconds; at III blows on
  * an enemy at least `big` cells across hit `bigDamage` times as hard. */
 export const HALBERD = { reach: 0.6, damage: 1.2, chill: 1.5, big: 0.8, bigDamage: 2.5 };
+/** The spearmen line's paths (`defend/spears.ts`). Long spears: spearmen
+ * reach `reach[rank]` more cells; from II each thrust runs on into the
+ * nearest enemy within `through` cells behind its target for `share[rank]`
+ * of it; at III thrusts hit `damage` times as hard. */
+export const LONG_SPEARS = { reach: [0, 0.4, 0.4, 0.8], through: 1.2, share: [0, 0, 0.6, 1], damage: 1.3 };
+/** Set spears: a thrust on an enemy still at full health hits `fresh[rank]`
+ * times as hard; from II every thrust staggers its enemy for `stagger`
+ * seconds. */
+export const SET_SPEARS = { fresh: [1, 2, 2, 3], stagger: 0.5 };
+/** Testudo: hoplites take `guard[rank]` of what they would; from II each
+ * comrade within `near` cells takes `ally` more off, at most `most` of
+ * them; at III every enemy within a hoplite's reach is slowed for `chill`
+ * seconds. */
+export const TESTUDO = { guard: [1, 0.75, 0.75, 0.75], near: 1.5, ally: 0.1, most: 3, chill: 0.6 };
+/** Spear wall: hoplites hit `damage[rank]` times as hard; from II each
+ * thrust also strikes every other enemy within its reach for `share[rank]`
+ * of it. */
+export const SPEAR_WALL = { damage: [1, 1.3, 1.3, 1.3], share: [0, 0, 0.5, 1] };
+/** Barbed javelins: hits slow for `chill` seconds; from II they stagger
+ * for `stagger` seconds; at III a javelin at an enemy at least `big`
+ * cells across hits `bigDamage` times as hard. */
+export const BARBED = { chill: 1.5, stagger: 0.6, big: 0.6, bigDamage: 1.8 };
+/** Throwing arms: javelineers reach `range[rank]` more cells; from II a
+ * second javelin goes at the next nearest enemy in reach; at III they
+ * throw in `reload[rank]` of the time. */
+export const THROWING = { range: [0, 1.5, 1.5, 1.5], extra: [0, 0, 1, 1], reload: [1, 1, 1, 0.7] };
+/** Heavy lance: a lancer's charge hits `charge[rank]` times the damage
+ * (`LANCER.charge` off the path); from II a charge staggers its enemy for
+ * `stagger` seconds; at III it tramples every other enemy within
+ * `trample` cells of its target for `share` of it. */
+export const HEAVY_LANCE = { charge: [2.5, 3.5, 3.5, 3.5], stagger: 1, trample: 0.9, share: 0.5 };
+/** Winged lancers: lancers ride `speed[rank]` times as fast; from II they
+ * range `leash[rank]` times as far from the stable; at III each charge
+ * heals the rider `heal` of its full HP. Its crown makes the stable a
+ * Valkyrie palace, the spearmen's ultimate. */
+export const WINGED = { speed: [1, 1.25, 1.25, 1.25], leash: [1, 1, 1.5, 1.5], heal: 0.15 };
 /** Cloudborne: the Valkyrie palace rises onto clouds and drifts west across
  * the sky at `speed` cells a second, coming round from the east edge at
  * another height; nothing on the ground can reach it, and its valkyries
@@ -322,7 +359,6 @@ export const PATHS: KnowledgePath[] = [
       { name: "Field dressing", icon: "heart", cost: studyPathCost(4, 1), text: "They heal 3 HP a second" },
       { name: "Templars", icon: "cross", cost: studyPathCost(4, 2), text: "120% more HP in all, and 50% more damage" },
     ],
-    evolves: { from: "barracks", item: "valkyriePalace", name: "Valkyrie palace", cost: 100000, text: "This Barracks becomes a Valkyrie palace" },
   },
   {
     id: "berserkers", topic: "barracks", name: "Berserkers", motto: "Fury, and blood for blood", hue: "ember",
@@ -347,6 +383,71 @@ export const PATHS: KnowledgePath[] = [
       { name: "Diving descent", icon: "wing", cost: studyPathCost(10, 1), text: "Each valkyrie lands with a charge at the nearest enemy within twice her reach" },
       { name: "Heavenly host", icon: "halo", cost: studyPathCost(10, 2), text: "The palace holds 2 more valkyries and trains them twice as fast" },
     ],
+  },
+  {
+    id: "longSpears", topic: "spearHall", name: "Long spears", motto: "Further, then two at a thrust", hue: "verdant",
+    ranks: [
+      { name: "Ash shafts", icon: "stake", cost: studyPathCost(4, 0), text: "Spearmen reach 0.4 cells further" },
+      { name: "Run through", icon: "fork", cost: studyPathCost(4, 1), text: "Each thrust runs on into the nearest enemy behind its target, for 60% of the damage" },
+      { name: "Sarissas", icon: "volley", cost: studyPathCost(4, 2), text: "They reach 0.8 cells further, thrust 30% harder, and run through at full damage" },
+    ],
+  },
+  {
+    id: "setSpears", topic: "spearHall", name: "Set spears", motto: "Braced for whatever comes", hue: "steel",
+    ranks: [
+      { name: "Brace", icon: "helm", cost: studyPathCost(4, 0), text: "A thrust at an enemy still at full health hits twice as hard" },
+      { name: "Check", icon: "hand", cost: studyPathCost(4, 1), text: "Every thrust staggers its enemy for half a second" },
+      { name: "Receive the charge", icon: "crosshair", cost: studyPathCost(4, 2), text: "A thrust at an enemy at full health hits 3× as hard" },
+    ],
+  },
+  {
+    id: "testudo", topic: "phalanx", name: "Testudo", motto: "Shields locked, side by side", hue: "steel",
+    ranks: [
+      { name: "Bronze shields", icon: "frostShield", cost: studyPathCost(4, 0), text: "Hoplites take 25% less from every blow" },
+      { name: "Locked shields", icon: "mail", cost: studyPathCost(4, 1), text: "Each comrade within 1.5 cells takes another 10% off, up to 3 of them" },
+      { name: "Hold the line", icon: "boot", cost: studyPathCost(4, 2), text: "Every enemy within a hoplite's reach is slowed" },
+    ],
+  },
+  {
+    id: "spearWall", topic: "phalanx", name: "Spear wall", motto: "A hedge of points", hue: "ember",
+    ranks: [
+      { name: "Drilled thrusts", icon: "stake", cost: studyPathCost(4, 0), text: "Hoplites hit 30% harder" },
+      { name: "Hedge of spears", icon: "fork", cost: studyPathCost(4, 1), text: "Each thrust also strikes every other enemy within its reach, for half the damage" },
+      { name: "Porcupine", icon: "shards", cost: studyPathCost(4, 2), text: "The other enemies in reach take the full damage" },
+    ],
+  },
+  {
+    id: "barbed", topic: "javelinCamp", name: "Barbed javelins", motto: "Hooks that hold fast", hue: "shadow",
+    ranks: [
+      { name: "Barbs", icon: "hand", cost: studyPathCost(4, 0), text: "Javelins slow what they hit for 1.5 seconds" },
+      { name: "Pinning throws", icon: "stake", cost: studyPathCost(4, 1), text: "They stagger what they hit for 0.6 seconds" },
+      { name: "Boar spears", icon: "skull", cost: studyPathCost(4, 2), text: "Javelins at big enemies hit 80% harder" },
+    ],
+  },
+  {
+    id: "throwingArms", topic: "javelinCamp", name: "Throwing arms", motto: "Further, and two at a time", hue: "verdant",
+    ranks: [
+      { name: "Throwing straps", icon: "arrow", cost: studyPathCost(4, 0), text: "Javelineers throw 1.5 cells further" },
+      { name: "Second javelin", icon: "volley", cost: studyPathCost(4, 1), text: "Each throw sends a second javelin at the next nearest enemy" },
+      { name: "Quick hands", icon: "gear", cost: studyPathCost(4, 2), text: "They throw 30% faster" },
+    ],
+  },
+  {
+    id: "heavyLance", topic: "lancerStable", name: "Heavy lance", motto: "Charges that break the line", hue: "ember",
+    ranks: [
+      { name: "Couched lance", icon: "stake", cost: studyPathCost(4, 0), text: "A charge hits 3.5× instead of 2.5×" },
+      { name: "Unhorsing blow", icon: "hammer", cost: studyPathCost(4, 1), text: "A charge staggers its enemy for a second" },
+      { name: "Trample", icon: "boot", cost: studyPathCost(4, 2), text: "A charge tramples every other enemy within a cell of its target, for half the damage" },
+    ],
+  },
+  {
+    id: "wingedLancers", topic: "lancerStable", name: "Winged lancers", motto: "Riders made for the sky", hue: "frost",
+    ranks: [
+      { name: "Swift mounts", icon: "wing", cost: studyPathCost(4, 0), text: "Lancers ride 25% faster" },
+      { name: "Far patrols", icon: "spyglass", cost: studyPathCost(4, 1), text: "They range half again as far from the stable" },
+      { name: "Blessed riders", icon: "halo", cost: studyPathCost(4, 2), text: "Each charge heals its rider 15% of its full HP" },
+    ],
+    evolves: { from: "lancerStable", item: "valkyriePalace", name: "Valkyrie palace", cost: 100000, text: "This Lancer stable becomes a Valkyrie palace" },
   },
   {
     id: "bloodletters", topic: "assassinDen", name: "Bloodletters", motto: "Enormous criticals, paper-thin guard", hue: "shadow",
@@ -765,6 +866,10 @@ export const UNSPECIALIZED: Record<PathTopic, string> = {
   barracks: "Balanced swordsmen",
   valkyriePalace: "A marble palace on the ground",
   assassinDen: "Quick, frail assassins: every 4th strike critical",
+  spearHall: "Spearmen: a long reach",
+  phalanx: "Hoplites: slow, shielded, hard to hurt",
+  javelinCamp: "Javelineers: slow, heavy throws",
+  lancerStable: "Lancers: fast riders, a charge at each new enemy",
   musketHall: "Musketmen: slow, heavy single balls",
   gunHall: "Gunners: quick pistol shots",
   gunNest: "Machine gunners: fast, light bullets",

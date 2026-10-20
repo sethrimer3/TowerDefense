@@ -10,7 +10,7 @@ import { boatLights, drawBoat } from "./boat-art.ts";
  * damaged buildings, blast scorches, then the units, projectiles and effects.
  * Every painter takes a `Brush`: the board's context and its pixels per cell. */
 import { hash01 } from "./grid.ts";
-import { ARCHER_UNIT, ASSASSIN_UNIT, BRAWLER, CIVILIAN, DARK_WIZARD, ENEMIES, FIRE_MAGE, GATLING_GUNNER, GUNNER, MACHINE_GUNNER, MUSKETEER, RAIL_SNIPER, ROCKETEER, SLINGER, SNIPER, SOLDIER, VALKYRIE, watchRadius, type EnemyDef } from "./catalog.ts";
+import { HOPLITE, JAVELINEER, LANCER, SPEARMAN, ARCHER_UNIT, ASSASSIN_UNIT, BRAWLER, CIVILIAN, DARK_WIZARD, ENEMIES, FIRE_MAGE, GATLING_GUNNER, GUNNER, MACHINE_GUNNER, MUSKETEER, RAIL_SNIPER, ROCKETEER, SLINGER, SNIPER, SOLDIER, VALKYRIE, watchRadius, type EnemyDef } from "./catalog.ts";
 import type { Building } from "./citygen.ts";
 import { center } from "./pathing.ts";
 import { paintKeepFlash } from "./structure-art.ts";
@@ -222,7 +222,10 @@ function drawSoldiers(b: Brush, sim: DefendSim, torches: Burning | null) {
  * olive behind a stocky gun; a Gatling gunner hauling a thick brass gun
  * whose barrels flicker as they turn; a rocketeer with a tube on its
  * shoulder, its rocket's red tip showing while loaded; an assassin in black with a dagger it stabs with, a
- * faint shimmer while cloaked. */
+ * faint shimmer while cloaked; a spearman in buff with a long spear it
+ * thrusts; a hoplite in red behind a round bronze shield; a javelineer in
+ * olive with a javelin raised while one is ready; a lancer in blue on a
+ * brown horse, its lance couched along the way it rides. */
 function drawGuildTroop(b: Brush, sim: DefendSim, u: Soldier) {
   const { c, px } = b;
   const k = u.kind as keyof typeof GUILD_TROOPS;
@@ -236,10 +239,12 @@ function drawGuildTroop(b: Brush, sim: DefendSim, u: Soldier) {
     fy = (e.y - u.y) / d;
   }
   // A brawler leans into a punch (an assassin into a stab) for a moment after each one lands.
-  const since = def.cooldown - u.cd, punch = (k === "brawler" || k === "assassin") && since >= 0 && since < 0.16 ? Math.sin((since / 0.16) * Math.PI) : 0;
+  const since = def.cooldown - u.cd, thrusts = k === "brawler" || k === "assassin" || k === "spearman" || k === "hoplite" || k === "lancer";
+  const punch = thrusts && since >= 0 && since < 0.16 ? Math.sin((since / 0.16) * Math.PI) : 0;
   const veiled = u.cloak === 0;
   if (veiled) c.globalAlpha = 0.3 + 0.1 * Math.sin(sim.time * 4 + u.id);
   const x = (u.x + fx * punch * 0.12) * px, y = (u.y + fy * punch * 0.12) * px;
+  if (k === "lancer") horse(c, x, y, fx, fy, s, unit, u.flash > 0);
   c.fillStyle = "#0b0907";
   c.fillRect(Math.round(x - s / 2 - 1), Math.round(y - s / 2 - 1), Math.round(s + 2), Math.round(s + 2));
   c.fillStyle = u.flash > 0 ? "#fff" : def.color;
@@ -262,6 +267,45 @@ function drawGuildTroop(b: Brush, sim: DefendSim, u: Soldier) {
     c.lineWidth = w;
     c.stroke();
     c.globalAlpha = 1;
+    return;
+  }
+  if (k === "spearman" || k === "hoplite" || k === "lancer") {
+    // The spear along the facing, thrust out with each blow: a spearman's
+    // long, a hoplite's short over its shield, a lancer's couched lance.
+    const [slen, tip] = k === "spearman" ? [1.7, "#c9ccd4"] : k === "hoplite" ? [1.15, "#c9a24e"] : [1.9, "#e8e4da"];
+    const w = Math.max(1, Math.round(unit * 0.8)), len = s * (slen + punch * 0.35);
+    const ox = x + fy * s * 0.35 - fx * s * 0.3, oy = y - fx * s * 0.35 - fy * s * 0.3;
+    line(c, ox, oy, ox + fx * len, oy + fy * len, w, k === "lancer" ? "#d8d0bc" : "#8e6238");
+    c.fillStyle = "#0b0907";
+    dot(c, ox + fx * len, oy + fy * len, w + 2);
+    c.fillStyle = tip;
+    dot(c, ox + fx * len, oy + fy * len, w);
+    if (k === "lancer") {
+      // A pennant under the lance's point.
+      c.fillStyle = "#d8553f";
+      dot(c, ox + fx * len * 0.75 - fy * w, oy + fy * len * 0.75 + fx * w, w);
+    }
+    if (k === "hoplite") {
+      // The round bronze shield on its off side, a boss at its heart.
+      const sx = x - fy * s * 0.5 + fx * s * 0.25, sy = y + fx * s * 0.5 + fy * s * 0.25, d = Math.max(3, Math.round(s * 0.62));
+      round(c, sx, sy, d + 2, "#0b0907");
+      round(c, sx, sy, d, "#b08a3e");
+      c.fillStyle = "#e9c46a";
+      c.fillRect(Math.round(sx - d / 2) + 1, Math.round(sy - d / 2) + 1, Math.max(1, Math.round(d / 3)), Math.max(1, Math.round(d / 3)));
+      c.fillStyle = "#7a3a2a";
+      dot(c, sx, sy, Math.max(1, Math.round(d / 4)));
+    }
+    return;
+  }
+  if (k === "javelineer") {
+    // A javelin raised overhead while one is ready to throw.
+    if (u.cd < JAVELINEER.cooldown * 0.5) {
+      const w = Math.max(1, Math.round(unit * 0.8)), len = s * 1.3;
+      const ox = x + s * 0.45 - fx * len * 0.4, oy = y - s * 0.35 - fy * len * 0.4;
+      line(c, ox, oy, ox + fx * len, oy + fy * len, w, "#8e6238");
+      c.fillStyle = "#c9ccd4";
+      dot(c, ox + fx * len, oy + fy * len, w);
+    }
     return;
   }
   if (k === "brawler") {
@@ -338,7 +382,43 @@ function drawGuildTroop(b: Brush, sim: DefendSim, u: Soldier) {
     dot(c, ox + fx * len * 0.3, oy + fy * len * 0.3, unit);
   }
 }
+/** A `d`-pixel square about (x, y) with its corners cut, a pixel-art disc. */
+function round(c: CanvasRenderingContext2D, x: number, y: number, d: number, color: string) {
+  const x0 = Math.round(x - d / 2), y0 = Math.round(y - d / 2), cut = Math.max(1, Math.round(d / 4));
+  c.fillStyle = color;
+  c.fillRect(x0 + cut, y0, d - cut * 2, d);
+  c.fillRect(x0, y0 + cut, d, d - cut * 2);
+  if (d > 4) c.fillRect(x0 + 1, y0 + 1, d - 2, d - 2);
+}
+
+/** A stroke from (x0, y0) to (x1, y1), `w` pixels wide, in the black outline. */
+function line(c: CanvasRenderingContext2D, x0: number, y0: number, x1: number, y1: number, w: number, color: string) {
+  c.strokeStyle = "#0b0907";
+  c.lineWidth = w + 2;
+  c.beginPath();
+  c.moveTo(x0, y0);
+  c.lineTo(x1, y1);
+  c.stroke();
+  c.strokeStyle = color;
+  c.lineWidth = w;
+  c.stroke();
+}
+
+/** A lancer's horse under its rider: a long brown body along the way it
+ * rides, its head out in front and its tail behind. */
+function horse(c: CanvasRenderingContext2D, x: number, y: number, fx: number, fy: number, s: number, unit: number, white: boolean) {
+  const body = "#6e4a26", w = Math.max(2, Math.round(s * 0.9));
+  line(c, x - fx * s, y - fy * s, x + fx * s * 0.7, y + fy * s * 0.7, w, white ? "#fff" : body);
+  line(c, x + fx * s * 0.7, y + fy * s * 0.7, x + fx * s * 1.25, y + fy * s * 1.25, Math.max(1, Math.round(w * 0.55)), white ? "#fff" : "#8c6232");
+  c.fillStyle = "#2a1c10";
+  dot(c, x - fx * s * 1.25, y - fy * s * 1.25, Math.max(1, unit + 1));
+}
+
 const GUILD_TROOPS = {
+  spearman: SPEARMAN,
+  hoplite: HOPLITE,
+  javelineer: JAVELINEER,
+  lancer: LANCER,
   assassin: ASSASSIN_UNIT,
   brawler: BRAWLER,
   slinger: SLINGER,

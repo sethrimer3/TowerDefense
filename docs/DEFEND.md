@@ -119,12 +119,12 @@ Recent rows are available as `window.defendPerformance`; they are not saved.
   stand inside the city, then your own troops and townsfolk slip through
   them). A respec gives every point back, free, and takes the sections
   inside the city back to the palette; any rank can be undone on its own.
-- The **Melee** and **Ranged Guilds**, **barracks**, **archer barracks**, the **Mage Guild**, the **gunner hall**, **musket hall**, **sniper lodge**, **machine-gun nest**, **Gatling emplacement** and **rocket battery**, the **Valkyrie palace** and the **dark wizard keep** must be inside the city. **Archer**, **cannon**, **watch
+- The **Melee** and **Ranged Guilds**, **barracks**, **archer barracks**, the **Mage Guild**, the **spearmen hall**, **phalanx**, **javelin camp**, **lancer stable**, the **gunner hall**, **musket hall**, **sniper lodge**, **machine-gun nest**, **Gatling emplacement** and **rocket battery**, the **Valkyrie palace** and the **dark wizard keep** must be inside the city. **Archer**, **cannon**, **watch
   and wizard towers** and **monster bait** may stand inside or outside.
 - Every structure takes a fixed block of **quarter tiles** (`footprint` in
   `catalog.ts`, never rotated): 1 × 1 the archer, cannon, watch and wizard
   towers and monster bait; 2 × 2 the Melee and Ranged Guilds, Assassins'
-  den, gunner hall, sniper lodge, machine-gun nest, Gatling emplacement,
+  den, spearmen hall, phalanx, javelin camp, lancer stable, gunner hall, sniper lodge, machine-gun nest, Gatling emplacement,
   rocket battery and archer barracks; 3 × 2 the musket hall; 2 × 3 the
   barracks and Mage Guild; 3 × 3 the Valkyrie palace (2 × 3 once Folded
   halls is bought). An upgrade that changes a building's footprint takes
@@ -285,7 +285,7 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   tree's corner shows the Knowledge allocated to that building; a respec
   (free) gives it all back and turns the building back into its basic one. A watch tower becomes an archer,
   cannon or wizard tower; a Melee Guild a barracks (swordsmen, later
-  crusaders, and by Crusaders' crown a Valkyrie palace) or an **assassins'
+  crusaders), a **spearmen hall** (see the spearmen line below) or an **assassins'
   den** (quick, frail assassins whose every fourth strike is critical, with
   four paths: Bloodletters' huge criticals at the cost of HP, Shadowcloak's
   cloak that no enemy sees through until they strike, then an ambush;
@@ -358,7 +358,7 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   upgrade; troop pathing is plain A* over open cells, so gates only need to
   change what counts as open).
   Their paths: Crusaders (more HP and slower, healing from rank II,
-  harder hitting at III, crowned by the Valkyrie palace), Berserkers
+  harder hitting at III), Berserkers
   (strokes a third faster, each kill healing 30% from II, blows cleaving
   every enemy beside the target at III) or Halberdiers (0.6 cells more
   reach and 20% more damage, blows slowing from II, 2.5× on big enemies
@@ -381,8 +381,29 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   the ground burns) in the Forge. Paths: Pyroclasm (heavier, wider
   fireballs, then two more bursting either side) or Cinders (longer, hotter
   blazes, then fire that clings to whoever walks through).
-- **Valkyrie palaces** (`valkyries.ts`), grown from barracks by the
-  Crusaders path's crown rather than bought, train valkyries (same garrison
+- **The spearmen line** (`spears.ts`). A Melee Guild becomes a **spearmen
+  hall**: spearmen chase like swordsmen but strike from 1.1 cells off. Its
+  paths: Long spears (0.4 cells more reach; from II each thrust runs on
+  into the nearest enemy behind its target for 60%; at III 0.8 cells, 30%
+  harder and running through at full) and Set spears (twice the damage on
+  an enemy still at full health, staggering half a second from II, 3× at
+  III). A spearmen hall becomes a **phalanx** (hoplites: slow, 70 HP,
+  taking 60% of every blow; Testudo takes 25% more off, then 10% for each
+  comrade within 1.5 cells, up to 3, then slows every enemy within reach;
+  Spear wall hits 30% harder, then strikes every other enemy in reach for
+  half, then full), a **javelin camp** (javelineers roaming like archers,
+  throwing heavy javelins 4 cells every 2 seconds; Barbed javelins slow,
+  then stagger, then hit big enemies 80% harder; Throwing arms reach 1.5
+  cells further, then throw a second javelin at the next nearest, then
+  throw 30% faster) or a **lancer stable** (lancers riding fast, their
+  first thrust at each new enemy a charge of 2.5×; Heavy lance makes it
+  3.5×, then staggering a second, then trampling everything beside the
+  target for half; Winged lancers ride 25% faster, then range half again
+  as far from the stable, then heal 15% with each charge, and their crown
+  makes the stable a Valkyrie palace).
+- **Valkyrie palaces** (`valkyries.ts`), the spearmen line's ultimate,
+  grown from a lancer stable by the Winged lancers path's crown rather
+  than bought, train valkyries (same garrison
   size, drill speed and arms upgrades as the barracks): armoured angels with
   spears who path toward the nearest enemy in the city, or stroll the
   streets. When an enemy comes within her reach she makes a **charge stab**:

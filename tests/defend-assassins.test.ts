@@ -76,13 +76,13 @@ function strikes(sim: DefendSim, a: Soldier, e: Enemy, n: number, between = 0) {
 }
 
 // ── The tree ───────────────────────────────────────────────────────────
-test("a Melee Guild becomes a barracks or an assassins' den; the den has four paths", () => {
-  assert.deepEqual(nextSteps("meleeGuild").map(stepName), ["Barracks", "Assassins' den"]);
+test("a Melee Guild becomes a barracks, an assassins' den or a spearmen hall; the den has four paths", () => {
+  assert.deepEqual(nextSteps("meleeGuild").map(stepName), ["Barracks", "Assassins' den", "Spearmen hall"]);
   assert.deepEqual(nextSteps("assassinDen").map(stepName), ["Bloodletters I", "Shadowcloak I", "Venomblades I", "Headhunters I"]);
   assert.deepEqual(nextSteps("barracks").map(stepName), ["Crusaders I", "Berserkers I", "Halberdiers I"], "the barracks' old Assassins path is retired");
   assert.equal(rootOf("assassinDen"), "meleeGuild");
   const tree = buildingTree("meleeGuild").map((n) => `${n.id}=${n.state}`);
-  assert.deepEqual(tree, ["k:meleeGuild=owned", "k:barracks=next", "k:assassinDen=next"]);
+  assert.deepEqual(tree, ["k:meleeGuild=owned", "k:barracks=next", "k:assassinDen=next", "k:spearHall=next"]);
   const climbed = buildingTree("assassinDen", { path: "venom", rank: 1 });
   assert.deepEqual(climbed.map((n) => n.id), ["k:meleeGuild", "k:assassinDen", "p:venom:1", "p:venom:2", "p:venom:3"]);
   assert.equal(climbed.find((n) => n.id === "k:assassinDen")!.closed!.length, 3, "the other three paths are closed off");
