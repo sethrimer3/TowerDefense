@@ -2,7 +2,7 @@
 
 Read the [style guide and setting contract](PIXEL_ART_GUIDE.md) first. This is a source-audited work list, **not a list of approved or completed new sprites**. Snapshot: commit `a4e07e0`, the Pixel Art setting/Tower Delve PNG merge. Refresh the catalog appendices when gameplay adds an element.
 
-Implementation update: [Building batch 01](BUILDING_BATCH_01.md) converts the keep, barracks and watch tower plus their shared UI/placement appearances. The catalog snapshot is unchanged. Units and enemies are deferred at the user's request; their unchecked rows remain future work.
+Implementation update: [batch 01](BUILDING_BATCH_01.md) converts the keep, barracks and watch tower; [batch 02](BUILDING_BATCH_02.md) adds the melee/ranged guilds, archer barracks and archer/cannon towers. All include shared UI/placement appearances. The catalog snapshot is unchanged. Units and enemies are deferred at the user's request; their unchecked rows remain future work.
 
 Legend: **Audit/redraw** = PNG exists, but style/density/states still require review; **Create** = no registered PNG replacement for this family; **Integrate** = the setting, scale, cache or cross-screen routing still needs work. Every unchecked item remains pending. Existing legacy artwork stays available when Pixel Art is off.
 
@@ -31,15 +31,15 @@ Source footprint dimensions are simulation cells. Proposed base footprint pixels
 | Pending | Catalog ID / element | Normal cells → base pixels | Compact cells | Current PNG coverage |
 | --- | --- | --- | --- | --- |
 | [x] | `keep` — Keep | 4×4 → 32×32 | — | v2: intact + four damage stages, rubble, flag and UI; batch 01 |
-| [ ] | `meleeGuild` — Melee Guild | 4×4 → 32×32 | — | Create |
-| [ ] | `rangedGuild` — Ranged Guild | 4×4 → 32×32 | — | Create |
+| [x] | `meleeGuild` — Melee Guild | 4×4 → 32×32 | — | v2 base, all damage/rubble, rebuilding and UI; batch 02 |
+| [x] | `rangedGuild` — Ranged Guild | 4×4 → 32×32 | — | v2 base, all damage/rubble, rebuilding and UI; batch 02 |
 | [ ] | `assassinDen` — Assassins' den | 4×4 → 32×32 | — | Create |
 | [ ] | `sniperLodge` — Sniper lodge | 4×4 → 32×32 | — | Create |
 | [ ] | `musketHall` — Musket hall | 6×4 → 48×32 | — | Create |
 | [x] | `barracks` — Barracks | 4×6 → 32×48 | — | v2 normal/wide, base + Crusaders/Berserkers/Halberdiers, all damage/rubble, rebuilding and UI; batch 01 |
-| [ ] | `archerBarracks` — Archer barracks | 4×4 → 32×32 | — | intact base only |
-| [ ] | `archerTower` — Archer tower | 2×2 → 16×16 | — | intact base only |
-| [ ] | `cannonTower` — Cannon tower | 2×2 → 16×16 | — | intact base only |
+| [x] | `archerBarracks` — Archer barracks | 4×4 → 32×32 | — | v2 base + Rangers/Skirmishers, all damage/rubble, rebuilding and UI; batch 02 |
+| [x] | `archerTower` — Archer tower | 2×2 → 16×16 | — | v2 base + Fire arrows/Sharpshooters, all damage/rubble, rebuilding and UI; batch 02 |
+| [x] | `cannonTower` — Cannon tower | 2×2 → 16×16 | — | v2 base + Gun crews/Siege shot, all damage/rubble, rebuilding and UI; batch 02 |
 | [x] | `watchTower` — Watch tower | 2×2 → 16×16 | — | v2 base + Spotters/Signal fires, all damage/rubble, rebuilding and UI; batch 01 |
 | [ ] | `wizardTower` — Wizard tower | 2×2 → 16×16 | — | Create |
 | [ ] | `mageGuild` — Mage Guild | 4×6 → 32×48 | — | Create |
@@ -158,6 +158,8 @@ Preserve the Library's side-view geometry (`library/geometry.ts`: current nave 1
 | [ ] | Library/Study UI | Knowledge, shelf/staff/lab icons, hires, roles, building picker, research project, cost/progress/cancel, catch-up/away countdown and navigation. `library/ui.ts`, `ui/ledger.ts`, `ui/welcome.ts`. |
 
 ## F. Batch tracking
+
+**Implemented: [batch 02](BUILDING_BATCH_02.md)** — melee/ranged guilds, archer barracks, archer tower and cannon tower; ten PNG sheets, 55 world-state frames and 11 matching UI icons. Uses the existing gated frame/rubble/scaffold/placement/icon routes, with all original batch-01 PNGs unchanged. Total migrated building coverage is eight of the sixteen catalog families; 19 native PNG sheets, 116 world-state frames and 19 UI icons. Advanced buildings, terrain/theme work, units and enemies remain tracked separately.
 
 **Implemented: [batch 01](BUILDING_BATCH_01.md)** — keep, barracks and watch tower; nine PNG sheets, 61 world-state frames, eight UI icons, four keep-flag frames and one rebuilding module. Includes exact footprint/pivot metadata, matching board/drag/placement/UI routing, damage/rubble, legacy/missing-asset fallback and nearest-neighbor city compositing. The remaining foundation/UI/world rows stay pending; this batch does not convert the whole game. The historical imported PNG list below is retained as an audit list, including the old building files superseded by this batch.
 
