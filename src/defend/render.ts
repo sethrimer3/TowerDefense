@@ -10,6 +10,7 @@ import { enemySize } from "./catalog.ts";
  * fallen defenders' ghosts rising (ghosts.ts), the chimneys' smoke (chimney-smoke.ts), the
  * planted war banner, the magic boats' water (flood-art.ts) over the ground, the wizards' fire, the building grid and drag overlay (edit-overlay.ts), then
  * rain in screen space. */
+import { onPixelArt, pixelKey } from "./pixel-sprites.ts";
 import { CELLS_H, CELLS_W, boardSize, hash01 } from "./grid.ts";
 import type { CityMap } from "./citygen.ts";
 import type { DefendSim } from "./sim.ts";
@@ -142,6 +143,7 @@ export class DefendRenderer {
     this.layer = document.createElement("canvas");
     this.lctx = this.layer.getContext("2d")!;
     onCityArtLoaded(() => (this.layerKey = ""));
+    onPixelArt(() => (this.layerKey = ""));
   }
 
   /** Matches the canvas to its box, which fills the view. The board's scale
@@ -388,7 +390,7 @@ export class DefendRenderer {
     else {
       // Combat art advances on the fixed simulation clock. Keep screen pixels
       // (including artPen's camera snapping), never rescale a cached frame.
-      const key = `${sim.time}:${sim.mapVersion}:${sim.effects.length}:${sim.scorches.length}:${sim.enemies.length}:${sim.soldiers.length}:${sim.civilians.length}:${this.px}:${c.canvas.width}:${c.canvas.height}:${this.cam.s}:${this.cam.x}:${this.cam.y}:${!!torches}:${opts.healthbars === true}:${!!opts.simpleEnemies}:${!!opts.simpleTroops}`;
+      const key = `${sim.time}:${sim.mapVersion}:${sim.effects.length}:${sim.scorches.length}:${sim.enemies.length}:${sim.soldiers.length}:${sim.civilians.length}:${this.px}:${c.canvas.width}:${c.canvas.height}:${this.cam.s}:${this.cam.x}:${this.cam.y}:${!!torches}:${opts.healthbars === true}:${!!opts.simpleEnemies}:${!!opts.simpleTroops}:${pixelKey()}`;
       this.combatLayer ??= document.createElement('canvas');
       const layer = this.combatLayer;
       if (sim !== this.combatSim || key !== this.combatKey) {
@@ -486,7 +488,7 @@ export class DefendRenderer {
     while (k > 1 && W * H * k * k > 18e6) k--;
     this.layerScale = k;
     // Every building's damage stage is painted into the layer too.
-    const key = `${W}:${k}:${this.area}:${sim ? `${sim.mapVersion}:${damageKey(sim)}` : -1}:${looks ? Object.entries(looks).join(",") : ""}`;
+    const key = `${W}:${k}:${this.area}:${pixelKey()}:${sim ? `${sim.mapVersion}:${damageKey(sim)}` : -1}:${looks ? Object.entries(looks).join(",") : ""}`;
     if (this.previousArea && (key !== this.previousKey || !this.layerKey)) {
       this.previousLayer ??= document.createElement("canvas");
       this.previousLayer.width = W * k;

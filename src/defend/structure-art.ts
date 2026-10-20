@@ -2,6 +2,7 @@
  * towers from `tower-art.ts` at their damage stages and as rubble (drawn
  * into the city layer and the palette icons), the keep's live banner, and
  * the shared palette. */
+import { drawPixel, structureSprite } from "./pixel-sprites.ts";
 import { GATE, STRUCTURES, type StructureKind } from "./catalog.ts";
 import { gatePixels } from "./gate-art.ts";
 import { BALLISTA_ART, BALLISTA_DIRS, ballistaPixels, bastionPixels, spikePixels } from "./wall-defense-art.ts";
@@ -26,6 +27,9 @@ export type ArtBox = { x: number; y: number; w: number; h: number; px: number };
  * lot) so each looks its own, in its path's `look` (`PATH_LOOKS`). */
 export function paintStructureArt(c: CanvasRenderingContext2D, kind: StructureKind, box: ArtBox, stage = 0, seed = 0, path?: string) {
   const x = Math.round(box.x), y = Math.round(box.y), w = Math.round(box.w), h = Math.round(box.h);
+  // Pixel Art's sprite for an undamaged plain building; damage and the paths' looks keep their own art.
+  const pixel = !stage && !artLook(kind, path) ? structureSprite(kind, w > h) : undefined;
+  if (pixel && drawPixel(c, pixel, x, y, w, h)) return;
   if (kind === "keep") return paintKeep(c, { x, y, w, h, px: box.px }, stage);
   const cw = Math.max(1, Math.round(box.w / box.px)), ch = Math.max(1, Math.round(box.h / box.px));
   const look = artLook(kind, path);
@@ -56,6 +60,8 @@ export function paintIcon(canvas: HTMLCanvasElement, item: IconItem) {
   const n = canvas.width;
   c.clearRect(0, 0, n, n);
   c.imageSmoothingEnabled = false;
+  if (item === "cityTile" && drawPixel(c, "city-tile", 0, 0, n)) return;
+  if (item === "bomb" && drawPixel(c, "bomb", 0, 0, n)) return;
   if (item === "cityTile") return paintCityIcon(c, n);
   if (item === "cityGate") return paintGateIcon(c, n);
   if (item === "wallSpikes") return paintSpikesIcon(c, n);

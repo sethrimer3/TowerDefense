@@ -13,7 +13,8 @@ import { buildShell } from "./ui/shell.ts";
 import { Ledger } from "./ui/ledger.ts";
 import { TilesPage } from "./ui/tiles-page.ts";
 import { Chamber, Descent } from "./ui/chamber.ts";
-import { paintIcon } from "./defend/structure-art.ts";
+import { paintIcon, type IconItem } from "./defend/structure-art.ts";
+import { onPixelArt, preloadPixelArt, setPixelArt } from "./defend/pixel-sprites.ts";
 import { renderSettingsPage } from "./ui/settings-page.ts";
 import type { Weather } from "./defend/weather.ts";
 import { play, soundEnabledBy } from "./sound.ts";
@@ -31,6 +32,16 @@ import { unlockAllTowers } from "./defend/progress.ts";
 
 buildShell(document.querySelector<HTMLDivElement>("#app")!);
 document.querySelectorAll<HTMLCanvasElement>("nav canvas[data-icon]").forEach((c) => paintIcon(c, "cityTile"));
+// Pixel Art's sprites arrive (or the setting flips) after icons were drawn: draw them again, once a frame at most.
+let iconsQueued = false;
+onPixelArt(() => {
+  if (iconsQueued) return;
+  iconsQueued = true;
+  requestAnimationFrame(() => {
+    iconsQueued = false;
+    document.querySelectorAll<HTMLCanvasElement>("canvas[data-icon]").forEach((c) => paintIcon(c, (c.closest("nav") ? "cityTile" : c.dataset.icon) as IconItem));
+  });
+});
 let save: Save = load();
 let tab: Tab = "defend";
 const clock = () => Date.now();
@@ -212,6 +223,8 @@ function refreshCurrencies() {
   const dev = save.settings.devMode;
   document.documentElement.classList.toggle("reduce-motion", save.settings.reduceMotion);
   document.documentElement.classList.toggle("pixel-font", save.settings.pixelFont);
+  setPixelArt(save.settings.pixelArt);
+  preloadPixelArt();
   const show = (id: string, n: number) => {
     const value = whole(n), before = shown.get(id);
     el(id).textContent = dev ? "∞" : compact(value);
