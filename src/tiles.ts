@@ -17,6 +17,7 @@ import { available, buyBomb, buyItem, canAfford, type Wallet } from "./defend/pr
 import { evolvedBy, pathById, PATHS, type KnowledgePath, type PathHue } from "./knowledge-paths.ts";
 import { GATE_PATHS } from "./gate-upgrades.ts";
 import { BALLISTA_PATHS } from "./ballista-upgrades.ts";
+import { REVOLUTIONARY_PATHS } from "./revolutionary-upgrades.ts";
 import { sideRank } from "./side-ranks.ts";
 import { hasTree, rootOf, upgradedFrom, type Wear } from "./specializations.ts";
 import { WALL_PATHS, wallRank } from "./wall-upgrades.ts";
@@ -154,6 +155,8 @@ export function tileMarks(save: Save, id: TileId, wear?: Wear): TileMark[] {
     marks.push({ type: "became", name: ITEM_NAMES[k] });
   }
   if (wear) { const p = pathById(wear.path); ranks(p.name, p.hue, wear.rank); }
+  // The Revolutionaries' shared branches.
+  if (id === "revolutionary") for (const p of REVOLUTIONARY_PATHS) ranks(p.name, p.hue, sideRank(save.defend.revolutionaryRanks, p.id));
   return marks;
 }
 

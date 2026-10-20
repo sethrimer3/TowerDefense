@@ -1,5 +1,5 @@
-// The Musket hall's paths (src/defend/muskets.ts): Grenadiers' burning
-// ground, bomblets and clinging fire; Volley fire's extra balls and quicker
+// The Musket hall's paths (src/defend/muskets.ts): Grenadiers' bursting
+// balls, burning ground, bomblets and clinging fire; Volley fire's extra balls and quicker
 // reloads in ranks; Bayonets' thrust at close quarters, citywide charge and
 // stagger.
 import { test } from "node:test";
@@ -58,25 +58,25 @@ function fire(sim: DefendSim, m: Soldier) {
 }
 
 // ── The tree ───────────────────────────────────────────────────────────
-test("a Musket hall has three paths, climbed and respecced like any building's", () => {
-  assert.deepEqual(nextSteps("musketHall").map(stepName), ["Grenadiers I", "Volley fire I", "Bayonets I"]);
+test("a Musket hall has four paths, climbed and respecced like any building's", () => {
+  assert.deepEqual(nextSteps("musketHall").map(stepName), ["Grenadiers I", "Volley fire I", "Bayonets I", "Sharpshooters I"]);
   for (const p of ["grenadiers", "volleyFire", "bayonets"] as const) assert.equal(pathById(p).topic, "musketHall");
   const climbed = buildingTree("musketHall", { path: "bayonets", rank: 1 });
   assert.deepEqual(climbed.map((n) => n.id).slice(-3), ["p:bayonets:1", "p:bayonets:2", "p:bayonets:3"]);
-  assert.equal(climbed.find((n) => n.id === "k:musketHall")!.closed!.length, 2, "the other two paths are closed off");
+  assert.equal(climbed.find((n) => n.id === "k:musketHall")!.closed!.length, 3, "the other three paths are closed off");
   assert.equal(allocated("musketHall", { path: "volleyFire", rank: 2 }) - allocated("musketHall"), studyPathCost(4, 0) + studyPathCost(4, 1));
-  assert.match(kindStats(hall(), "musketHall"), /bursts 0.9 cells wide$/);
-  assert.match(kindStats(hall(), "musketHall", "grenadiers", 2), /4 bomblets/);
+  assert.match(kindStats(hall(), "musketHall"), /5 range$/);
+  assert.match(kindStats(hall(), "musketHall", "grenadiers", 2), /bursts 0.9 cells wide · burning ground 3s · 4 bomblets/);
 });
 
 test("each path has its own look on the board", () => {
-  assert.deepEqual(PATH_LOOKS.musketHall, ["grenadiers", "volleyFire", "bayonets"]);
+  assert.deepEqual(PATH_LOOKS.musketHall, ["grenadiers", "volleyFire", "bayonets", "sharpMuskets"]);
   const art = ["", ...PATH_LOOKS.musketHall!].map((look) => structurePixels("musketHall", 3, 3, 0, 1, look).join());
   assert.equal(new Set(art).size, art.length);
 });
 
 // ── In battle ──────────────────────────────────────────────────────────
-test("a plain musketman's ball bursts and leaves nothing behind", () => {
+test("a plain musketman's ball hits and leaves nothing behind", () => {
   const { sim, m } = battle(hall());
   const e = enemy(sim, m.x + 2, m.y), hp = e.hp;
   fire(sim, m);

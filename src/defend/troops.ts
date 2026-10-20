@@ -7,8 +7,9 @@ import { enemySize } from "./catalog.ts";
  * last Patrol routes level) and head home when there's nothing to fight;
  * archers roam the streets, shooting whatever comes within sight, or with
  * Hunter's instinct path toward the nearest enemy in the city; the Ranged
- * Guild's stone throwers, the snipers and the explosive musketmen roam
- * the same way with shots of their own. A Mage
+ * Guild's stone throwers, the gunner line (pistols, muskets, machine guns,
+ * Gatlings, rockets) and the snipers roam the same way with shots of
+ * their own. A Mage
  * Guild trains fire mages the same way (`mages.ts`), a Valkyrie palace
  * valkyries (`valkyries.ts`), and a dark wizard keep its one dark wizard
  * (`dark-wizards.ts`). */
@@ -18,7 +19,12 @@ import {
   archerUnitRange,
   ASSASSIN_UNIT,
   BRAWLER,
+  GATLING_GUNNER,
+  RAIL_SNIPER,
+  GUNNER,
+  MACHINE_GUNNER,
   MUSKETEER,
+  ROCKETEER,
   SLINGER,
   SNIPER,
   DARK_WIZARD,
@@ -38,8 +44,10 @@ import { cellAt, cellCenter, center, findPath, nearest, type PathLimits, type Po
 import type { DefendSim, Enemy, Soldier } from "./sim.ts";
 import { answerBanner, MARCH_SIGHT } from "./war-banner.ts";
 import { BERSERK, CRUSADE, HALBERD, RANGERS, SKIRMISH, VOLLEY, pathRank } from "../knowledge-paths.ts";
-import { bigGame, bulletOf, sniperRange, sniperReload } from "./snipers.ts";
-import { bayonetTarget, charges, grenadeOf, musketReload, musketSpeed, thrust, volleyTargets } from "./muskets.ts";
+import { bigGame, bulletOf, clearShot, pierceOf, sniperRange, sniperReload } from "./snipers.ts";
+import { railShot, squadSize } from "./revolutionary.ts";
+import { bayonetTarget, charges, grenadeOf, musketDamage, musketRange, musketReload, musketSpeed, thrust, toughestInReach, volleyTargets } from "./muskets.ts";
+import { gunDamage, gunExtras, gunHp, gunRange, gunReload, gunSpeed, isGun, gunShot, rocketOf, type Gun } from "./gunners.ts";
 import { cloudRank, diveIn, hostDrill, hostGarrison, musterPoint } from "./sky-palace.ts";
 import { assassinHp, assassinStrike, headhunter, huntReach, recruitState, stepCloak, toughestFirst } from "./assassins.ts";
 
@@ -65,9 +73,10 @@ function swordSpeed(sim: DefendSim, s: Soldier) {
  * else a swordsman's blade. */
 const melee = (s: Soldier) => (s.kind === "brawler" ? BRAWLER : s.kind === "assassin" ? ASSASSIN_UNIT : SOLDIER);
 /** A ranged troop's own numbers, besides an archer's. */
-const RANGED = { slinger: SLINGER, sniper: SNIPER, musketeer: MUSKETEER };
-/** What each ranged troop looses: an arrow (none), a stone, a bullet or a ball. */
-const SHOT = { slinger: "stone", sniper: "bullet", musketeer: "ball" } as const;
+const RANGED = { slinger: SLINGER, sniper: SNIPER, musketeer: MUSKETEER, gunner: GUNNER, machineGunner: MACHINE_GUNNER, gatlingGunner: GATLING_GUNNER, rocketeer: ROCKETEER, railSniper: RAIL_SNIPER };
+/** What each ranged troop looses: an arrow (none), a stone, a bullet, a ball or a rocket. */
+const SHOT = { slinger: "stone", sniper: "bullet", musketeer: "ball", gunner: "bullet", machineGunner: "bullet", gatlingGunner: "bullet", rocketeer: "rocket", railSniper: "bullet" } as const;
+const isRanged = (kind: Soldier["kind"]): kind is keyof typeof RANGED => kind in RANGED;
 
 /** Trains one troop at a time per barracks, while it's standing and below
  * its garrison cap. */
@@ -79,7 +88,8 @@ export class Barracks {
     const cap = soldierCap(sim.levels.barracksCapacity);
     for (const b of sim.map.buildings) {
       if (!isBarracks(b) || !sim.intact(b)) continue;
-      if (this.drilled(sim, b, b.kind === "darkKeep" ? DARK_WIZARD.garrison : cap + hostGarrison(sim, b), dt)) this.recruit(sim, b);
+      const garrison = b.kind === "darkKeep" ? DARK_WIZARD.garrison : b.kind === "revolutionary" ? squadSize(sim) : cap + hostGarrison(sim, b);
+      if (this.drilled(sim, b, garrison, dt)) this.recruit(sim, b);
     }
   }
 
@@ -109,8 +119,8 @@ export class Barracks {
     const kind = TRAINS[b.kind] ?? "sword";
     const scale = soldierScale(sim.levels.soldierArms);
     const stats = kind === "archer" ? ARCHER_UNIT : kind === "mage" ? { ...FIRE_MAGE, damage: fireballDamage(sim.levels.mageFireball ?? 0) } : kind === "valkyrie" ? VALKYRIE : kind === "darkWizard" ? DARK_WIZARD
-      : kind === "brawler" ? BRAWLER : kind === "assassin" ? ASSASSIN_UNIT : kind === "slinger" || kind === "sniper" || kind === "musketeer" ? RANGED[kind] : SOLDIER;
-    const path = kind === "sword" ? swordStats(sim, b.id) : kind === "assassin" ? { hp: assassinHp(sim, b.id), damage: 1 } : { hp: 1, damage: 1 };
+      : kind === "brawler" ? BRAWLER : kind === "assassin" ? ASSASSIN_UNIT : isRanged(kind) ? RANGED[kind] : SOLDIER;
+    const path = kind === "sword" ? swordStats(sim, b.id) : kind === "assassin" ? { hp: assassinHp(sim, b.id), damage: 1 } : { hp: gunHp(sim, b.id, kind), damage: 1 };
     sim.soldiers.push({
       id: sim.newId(),
       kind,
@@ -135,6 +145,7 @@ export class Barracks {
 const TRAINS: Partial<Record<Building["kind"], Soldier["kind"]>> = {
   barracks: "sword", archerBarracks: "archer", mageGuild: "mage", valkyriePalace: "valkyrie", darkKeep: "darkWizard",
   meleeGuild: "brawler", rangedGuild: "slinger", assassinDen: "assassin", sniperLodge: "sniper", musketHall: "musketeer",
+  gunHall: "gunner", gunNest: "machineGunner", gatlingNest: "gatlingGunner", rocketBattery: "rocketeer", revolutionary: "railSniper",
 };
 const isBarracks = (b: Building) => b.kind in TRAINS;
 
@@ -269,14 +280,17 @@ export function stepArcher(sim: DefendSim, s: Soldier, dt: number) {
   s.thinkT -= dt;
   const { ranger, skirmish } = paths(sim, s.home);
   const own = s.kind === "archer" ? null : RANGED[s.kind as keyof typeof RANGED];
-  const range = s.kind === "sniper" ? sniperRange(sim, s) : own ? own.range : archerUnitRange(sim.levels.archerSight ?? 0) + (ranger ? RANGERS.sight : 0);
-  const speed = s.kind === "musketeer" ? musketSpeed(sim, s) : (own ?? ARCHER_UNIT).speed * (skirmish >= 2 ? SKIRMISH.speed : 1);
+  const gun = isGun(s.kind) ? (s as Soldier & { kind: Gun }) : null;
+  const range = s.kind === "sniper" ? sniperRange(sim, s) : s.kind === "musketeer" ? musketRange(sim, s) : gun ? gunRange(sim, gun) : own ? own.range : archerUnitRange(sim.levels.archerSight ?? 0) + (ranger ? RANGERS.sight : 0);
+  const speed = s.kind === "musketeer" ? musketSpeed(sim, s) : gun ? gunSpeed(sim, gun) : (own ?? ARCHER_UNIT).speed * (skirmish >= 2 ? SKIRMISH.speed : 1);
   // Bayonets: an enemy at close quarters is run through, not shot.
   const close = bayonetTarget(sim, s);
   if (close) return thrust(sim, s, close, bannerDamage(sim, s));
   const charge = charges(sim, s);
   // Big game: the toughest in reach rather than the nearest.
-  const near = bigGame(sim, s, range) ?? nearest(sim.enemiesNear(s.x, s.y, range), s, range * range, true);
+  // Deadeye: only an enemy in clear sight, holding fire when none is.
+  const sight = clearShot(sim, s, range);
+  const near = sight !== undefined ? sight : bigGame(sim, s, range) ?? toughestInReach(sim, s, range) ?? nearest(sim.enemiesNear(s.x, s.y, range), s, range * range, true);
   if (near) {
     shoot(sim, s, near, range);
     // Skirmishers keep walking while they shoot, and charging bayonets
@@ -296,19 +310,25 @@ function shoot(sim: DefendSim, s: Soldier, e: Enemy, range: number) {
   if (s.cd > 0) return;
   const { ranger, skirmish } = paths(sim, s.home);
   if (s.kind !== "archer") {
-    // Stone throwers, snipers and musketmen: one shot of their own.
-    const kind = s.kind as keyof typeof RANGED, own = RANGED[kind], damage = bannerDamage(sim, s);
-    s.cd = kind === "musketeer" ? musketReload(sim, s) : kind === "sniper" ? sniperReload(sim, s) : own.cooldown;
+    // Stone throwers, the gunner line and snipers: one shot of their own.
+    const kind = s.kind as keyof typeof RANGED, own = RANGED[kind], base = bannerDamage(sim, s);
+    const gun = isGun(kind) ? (s as Soldier & { kind: Gun }) : null;
+    const damage = kind === "musketeer" ? musketDamage(sim, s, base) : gun ? gunDamage(sim, gun, base) : base;
+    s.cd = kind === "musketeer" ? musketReload(sim, s) : kind === "sniper" ? sniperReload(sim, s) : gun ? gunReload(sim, gun) : own.cooldown;
+    // A laser sniper's bullet carries its chain.
+    if (kind === "railSniper") return void sim.arrows.push(railShot(sim, s, e, damage));
     // A sniper's bullet carries its lodge's path.
     if (kind === "sniper") {
       const { damage: hit, ...bullet } = bulletOf(sim, s, damage);
-      return void sim.arrows.push({ x: s.x, y: s.y, origin: { x: s.x, y: s.y, attacker: s.id }, target: e.id, damage: hit, tx: e.x, ty: e.y, life: 2, shot: "bullet", ...bullet });
+      return void sim.arrows.push({ x: s.x, y: s.y, origin: { x: s.x, y: s.y, attacker: s.id }, target: e.id, damage: hit, tx: e.x, ty: e.y, life: 2, shot: "bullet", ...bullet, ...pierceOf(sim, s, e, range) });
     }
     const fire = (t: Enemy, share = 1) => sim.arrows.push({ x: s.x, y: s.y, origin: { x: s.x, y: s.y, attacker: s.id }, target: t.id, damage: damage * share, tx: t.x, ty: t.y, life: 2, shot: SHOT[kind],
-      ...(kind === "musketeer" ? { blast: MUSKETEER.blast, ...grenadeOf(sim, s.home, damage * share) } : {}) });
+      ...(kind === "musketeer" ? grenadeOf(sim, s.home, damage * share) : kind === "rocketeer" ? rocketOf(sim, s.home, damage * share) : gun ? gunShot(sim, gun) : {}) });
     fire(e);
-    // Volley fire: buck and ball at the next nearest.
+    // Volley fire: buck and ball at the next nearest; Twin pistols and
+    // Salvo racks: full shots at the next nearest.
     if (kind === "musketeer") for (const t of volleyTargets(sim, s, e, range)) fire(t, VOLLEY.share);
+    if (gun) for (const t of gunExtras(sim, gun, e, range)) fire(t);
     return;
   }
   s.cd = ARCHER_UNIT.cooldown * SKIRMISH.reload[skirmish];

@@ -137,7 +137,7 @@ export type Soldier = {
   /** Swordsmen chase and hack; archers roam and shoot; fire mages roam
    * and hurl fireballs; valkyries hunt and charge-stab; the dark wizard
    * hunts and casts chain lightning. */
-  kind: "sword" | "archer" | "mage" | "valkyrie" | "darkWizard" | "undead" | "reinforcement" | "brawler" | "slinger" | "sniper" | "musketeer" | "assassin";
+  kind: "sword" | "archer" | "mage" | "valkyrie" | "darkWizard" | "undead" | "reinforcement" | "brawler" | "slinger" | "sniper" | "musketeer" | "gunner" | "machineGunner" | "gatlingGunner" | "rocketeer" | "railSniper" | "assassin";
   home: number;
   x: number;
   y: number;
@@ -195,19 +195,29 @@ export type Arrow = {
   burn?: number; burnFor?: number;
   /** What flies, when not an arrow: a thrown stone, a sniper's bullet or a
    * musketman's ball; absent for arrows. */
-  shot?: "stone" | "bullet" | "ball";
+  shot?: "stone" | "bullet" | "ball" | "rocket";
   /** An explosive ball's burst radius where it hits (sparing your own
    * people); absent otherwise. */
   blast?: number;
   /** A Grenadier's ball: the ground it leaves burning (for `life` seconds at
    * `dps`, clinging at III) and the bomblets it throws; absent otherwise. */
   grenade?: { life: number; dps: number; bomblets: number; cling?: true };
+  /** Stopping power: how far each hit knocks its enemy straight back from
+   * `origin`; absent otherwise. */
+  knock?: number;
+  /** A piercing bullet: it flies straight to (`tx`, `ty`) (its `target` is
+   * -1), striking every enemy within `width` of its line once (`hits`);
+   * absent otherwise. */
+  pierce?: { width: number; hits: number[] };
   /** A Ricochet bullet: the glances it has left, the share of the damage
    * each keeps and the enemies already struck; absent otherwise. */
   glance?: { left: number; share: number; struck: number[] };
   /** Suppressing fire: how long a hit slows (and from II staggers) its
    * enemy; absent otherwise. */
   pin?: { chill: number; stagger?: number };
+  /** A Revolutionary's bullet: the enemies (by id) it flies on to after this
+   * one, and where this leg of its flight began; absent otherwise. */
+  chain?: { next: number[]; from: Point };
 };
 export type Effect = { kind: "boom" | "dust" | "spark" | "firework" | "steam"; x: number; y: number; t: number; r: number; seed?: number };
 /** A cannon shell in flight: lobbed from the tower to where the target was. */
@@ -240,6 +250,11 @@ const STEP_SOLDIER: Record<Soldier["kind"], (sim: DefendSim, s: Soldier, dt: num
   slinger: stepArcher,
   sniper: stepArcher,
   musketeer: stepArcher,
+  gunner: stepArcher,
+  machineGunner: stepArcher,
+  gatlingGunner: stepArcher,
+  railSniper: stepArcher,
+  rocketeer: stepArcher,
   assassin: stepSwordsman,
 };
 /** How long a struck building flashes, in seconds. */
