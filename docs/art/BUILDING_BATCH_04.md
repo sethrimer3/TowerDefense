@@ -1,5 +1,7 @@
 # Building sprite batch 04
 
+This records the fourth delivery. [Batch 05](BUILDING_BATCH_05.md) extends coverage and adds special airborne rendering checks; the ten PNG files below remain unchanged.
+
 This batch adds **Gunner hall, Machine-gun nest, Gatling emplacement, Rocket battery and Revolutionary**. It includes all current path looks, three damage stages, rubble and matching UI icons. Units and enemies remain deferred. All 31 earlier PNG files retain their exact bytes.
 
 ![Gunner buildings, their paths, heavy damage, rubble and matching UI icons](building-batch-04.png)

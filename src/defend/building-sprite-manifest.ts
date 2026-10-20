@@ -36,9 +36,20 @@ export const BUILDING_ART = {
   gatlingNest: { kind: "gatlingNest", sheet: "v2/defend/gatling-emplacement", icon: "v2/ui/gatling-emplacement", footprint: [4, 4], size: [32, 32], anchor: [16, 16], contentBounds: [3, 3, 26, 26], overhang: [0, 0, 0, 0], looks: ["", "gunShield", "overdrive", "stoppingPower"], stages: 4 },
   rocketBattery: { kind: "rocketBattery", sheet: "v2/defend/rocket-battery", icon: "v2/ui/rocket-battery", footprint: [4, 4], size: [32, 32], anchor: [16, 16], contentBounds: [3, 3, 26, 26], overhang: [0, 0, 0, 0], looks: ["", "clusterRockets", "salvoRacks"], stages: 4 },
   revolutionary: { kind: "revolutionary", sheet: "v2/defend/revolutionary", icon: "v2/ui/revolutionary", footprint: [4, 4], size: [32, 32], anchor: [16, 16], contentBounds: [3, 3, 26, 26], overhang: [0, 0, 0, 0], looks: [""], stages: 4 },
+  valkyriePalace: { kind: "valkyriePalace", sheet: "v2/defend/valkyrie-palace", icon: "v2/ui/valkyrie-palace", footprint: [6, 6], size: [48, 48], anchor: [24, 24], contentBounds: [3, 3, 42, 42], overhang: [0, 0, 0, 0], looks: ["", "cloudborne"], stages: 4 },
+  valkyriePalaceCompact: { kind: "valkyriePalace", sheet: "v2/defend/valkyrie-palace-compact", icon: "v2/ui/valkyrie-palace", footprint: [4, 6], size: [32, 48], anchor: [16, 24], contentBounds: [3, 3, 26, 42], overhang: [0, 0, 0, 0], looks: ["", "cloudborne"], stages: 4 },
+  darkKeep: { kind: "darkKeep", sheet: "v2/defend/dark-keep", icon: "v2/ui/dark-keep", footprint: [12, 12], size: [96, 96], anchor: [48, 48], contentBounds: [3, 3, 90, 90], overhang: [0, 0, 0, 0], looks: [""], stages: 4 },
+  darkKeepCompact: { kind: "darkKeep", sheet: "v2/defend/dark-keep-compact", icon: "v2/ui/dark-keep", footprint: [6, 6], size: [48, 48], anchor: [24, 24], contentBounds: [3, 3, 42, 42], overhang: [0, 0, 0, 0], looks: [""], stages: 4 },
 } as const;
 
-export const BUILDING_PNGS = [...new Set(Object.values(BUILDING_ART).flatMap(a => [a.sheet, a.icon])), "v2/defend/keep-flag", "v2/defend/scaffold"] as const;
+/** Clouds extend two cells beyond the footprint; the building anchor stays
+ * at the center of its own lot. Moorings have no overhang. */
+export const PALACE_SKY = [
+  { footprint: [6, 6], size: [80, 80], anchor: [40, 40], margin: 2, clouds: "v2/defend/palace-clouds", shadow: "v2/defend/palace-shadow", mooring: "v2/defend/palace-mooring" },
+  { footprint: [4, 6], size: [64, 80], anchor: [32, 40], margin: 2, clouds: "v2/defend/palace-clouds-compact", shadow: "v2/defend/palace-shadow-compact", mooring: "v2/defend/palace-mooring-compact" },
+] as const;
+export const palaceSkyArt = (cw: number, ch: number) => PALACE_SKY.find(a => a.footprint[0] === cw && a.footprint[1] === ch);
+export const BUILDING_PNGS = [...new Set(Object.values(BUILDING_ART).flatMap(a => [a.sheet, a.icon])), "v2/defend/keep-flag", "v2/defend/scaffold", ...PALACE_SKY.flatMap(a => [a.clouds, a.shadow, a.mooring])] as const;
 export type BuildingPng = (typeof BUILDING_PNGS)[number];
 export type BuildingArt = (typeof BUILDING_ART)[keyof typeof BUILDING_ART];
 export const BUILDING_PIXELS_PER_CELL = 8;

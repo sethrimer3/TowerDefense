@@ -22,7 +22,7 @@ import { SPIKE_REACH, bastionPixels, bastionRubblePixels, spikePixels } from "./
 import { AREAS, areaArtId, type AreaId } from "./areas.ts";
 import { hasWallArt, wallCapSprite, wallFaceSprite, wallRubbleTones } from "./area-wall-art.ts";
 import { drawPixel, drawRoof, type PixelSprite } from "./pixel-sprites.ts";
-import { buildingArt } from "./building-sprite-manifest.ts";
+import { buildingArt, palaceSkyArt } from "./building-sprite-manifest.ts";
 
 export { POND, POND_WATER, hasTree, pondDisc, pondPath, treeCanopy } from "./park-geometry.ts";
 
@@ -298,7 +298,11 @@ function paintBuilding(p: Paint, b: Building) {
     return paintRebuilding(p, b);
   }
   // A cloudborne palace floats over its lot (`sky-palace-art.ts`), leaving its mooring.
-  if (aloft(p, b)) return paintArt(p, sprite(`mooring:${r.w}x${r.h}:${lotSeed(b)}`, r.w * ART, r.h * ART, () => mooringPixels(r.w, r.h, lotSeed(b))), box);
+  if (aloft(p, b)) {
+    const sky = palaceSkyArt(r.w, r.h);
+    if (sky && drawPixel(c, sky.mooring, Math.round(box.x), Math.round(box.y), Math.round(box.x + box.w) - Math.round(box.x), Math.round(box.y + box.h) - Math.round(box.y))) return;
+    return paintArt(p, sprite(`mooring:${r.w}x${r.h}:${lotSeed(b)}`, r.w * ART, r.h * ART, () => mooringPixels(r.w, r.h, lotSeed(b))), box);
+  }
   // Pixel Art's roofs on undamaged houses; a damaged one keeps its own, showing the damage.
   if (b.kind === "house" && !stageOf(sim, b) && drawRoof(c, b.variant, box, px)) return;
   if (b.kind === "house") return paintArt(p, roofSprite(r.w, r.h, b.variant, roofSeed(r.x, r.y, r.w, r.h), stageOf(sim, b)), box);

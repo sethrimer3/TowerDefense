@@ -2,7 +2,7 @@
 
 Read the [style guide and setting contract](PIXEL_ART_GUIDE.md) first. This is a source-audited work list, **not a list of approved or completed new sprites**. Snapshot: commit `a4e07e0`, the Pixel Art setting/Tower Delve PNG merge. Refresh the catalog appendices when gameplay adds an element.
 
-Implementation update: [batch 01](BUILDING_BATCH_01.md) converts the keep, barracks and watch tower; [batch 02](BUILDING_BATCH_02.md) adds the melee/ranged guilds, archer barracks and archer/cannon towers; [batch 03](BUILDING_BATCH_03.md) adds Assassins' den, Sniper lodge, Musket hall, Wizard tower, Mage Guild and Monster bait. [Batch 04](BUILDING_BATCH_04.md) adds the five gunner buildings. All include shared UI/placement appearances. The catalog snapshot is unchanged. Units and enemies are deferred at the user's request; their unchecked rows remain future work.
+Implementation update: [batch 01](BUILDING_BATCH_01.md) converts the keep, barracks and watch tower; [batch 02](BUILDING_BATCH_02.md) adds the melee/ranged guilds, archer barracks and archer/cannon towers; [batch 03](BUILDING_BATCH_03.md) adds Assassins' den, Sniper lodge, Musket hall, Wizard tower, Mage Guild and Monster bait. [Batch 04](BUILDING_BATCH_04.md) adds the five gunner buildings. [Batch 05](BUILDING_BATCH_05.md) adds normal/compact palace and Dark wizard keep sprites and Cloudborne layers. All include shared UI/placement appearances. Building, unit and path rows include the newly merged spearmen line; its sprites remain pending. Units and enemies are deferred at the user's request; their unchecked rows remain future work.
 
 Legend: **Audit/redraw** = PNG exists, but style/density/states still require review; **Create** = no registered PNG replacement for this family; **Integrate** = the setting, scale, cache or cross-screen routing still needs work. Every unchecked item remains pending. Existing legacy artwork stays available when Pixel Art is off.
 
@@ -34,6 +34,10 @@ Source footprint dimensions are simulation cells. Proposed base footprint pixels
 | [x] | `meleeGuild` — Melee Guild | 4×4 → 32×32 | — | v2 base, all damage/rubble, rebuilding and UI; batch 02 |
 | [x] | `rangedGuild` — Ranged Guild | 4×4 → 32×32 | — | v2 base, all damage/rubble, rebuilding and UI; batch 02 |
 | [x] | `assassinDen` — Assassins' den | 4×4 → 32×32 | — | v2 base + Bloodletters/Shadowcloak/Venomblades/Headhunters, all damage/rubble, rebuilding and UI; batch 03 |
+| [ ] | `spearHall` — Spearmen hall | 4×4 → 32×32 | — | Create; spearmen line merged during batch 05 |
+| [ ] | `phalanx` — Phalanx | 4×4 → 32×32 | — | Create; spearmen line merged during batch 05 |
+| [ ] | `javelinCamp` — Javelin camp | 4×4 → 32×32 | — | Create; spearmen line merged during batch 05 |
+| [ ] | `lancerStable` — Lancer stable | 4×4 → 32×32 | — | Create; spearmen line merged during batch 05 |
 | [x] | `sniperLodge` — Sniper lodge | 4×4 → 32×32 | — | v2 base + Marksmen/Ricochet/Suppressing fire/Deadeye/Piercing rounds, all damage/rubble, rebuilding and UI; batch 03 |
 | [x] | `gunHall` — Gunner hall | 4×4 → 32×32 | — | v2 base + Quickdraw/Duelists, all damage/rubble, rebuilding and UI; batch 04 |
 | [x] | `gunNest` — Machine-gun nest | 4×4 → 32×32 | — | v2 base + Belt feed/Tripod, all damage/rubble, rebuilding and UI; batch 04 |
@@ -48,8 +52,8 @@ Source footprint dimensions are simulation cells. Proposed base footprint pixels
 | [x] | `watchTower` — Watch tower | 2×2 → 16×16 | — | v2 base + Spotters/Signal fires, all damage/rubble, rebuilding and UI; batch 01 |
 | [x] | `wizardTower` — Wizard tower | 2×2 → 16×16 | — | v2 base + Pyromancy/Rime/Stormcalling, all damage/rubble, rebuilding and UI; batch 03 |
 | [x] | `mageGuild` — Mage Guild | 4×6 → 32×48 | — | v2 base + Pyroclasm/Cinders, all damage/rubble, rebuilding and UI; batch 03 |
-| [ ] | `valkyriePalace` — Valkyrie palace | 6×6 → 48×48 | 4×6 | Create |
-| [ ] | `darkKeep` — Dark wizard keep | 12×12 → 96×96 | 6×6 | Create |
+| [x] | `valkyriePalace` — Valkyrie palace | 6×6 → 48×48 | 4×6 → 32×48 | v2 both sizes; base/Cloudborne, damage/rubble, UI and native airborne clouds/shadow/mooring; batch 05 |
+| [x] | `darkKeep` — Dark wizard keep | 12×12 → 96×96 | 6×6 → 48×48 | v2 both sizes, damage/rubble, rebuilding and UI; batch 05 |
 | [x] | `monsterBait` — Monster bait | 2×2 → 16×16 | — | v2 base + Oil-soaked/Fortified crates, all damage, wooden rubble, rebuilding and UI; batch 03 |
 
 ### B2. City pieces and environment
@@ -73,7 +77,7 @@ Areas: **Mossbound Ruins (`moss`), Amber Desert (`desert`), Ember Forge (`ember`
 
 ### B3. Friendly people and summoned units
 
-All seventeen `Soldier.kind` values need a consistent sprite family, not just a color swap. Also cover civilian builders. Include movement, facing, attack/cast, hit/death, health/status overlays, weapon origin and shared UI portrait. All remain deferred from the current building-only sprite batches.
+All twenty-one `Soldier.kind` values need a consistent sprite family, not just a color swap. Also cover civilian builders. Include movement, facing, attack/cast, hit/death, health/status overlays, weapon origin and shared UI portrait. All remain deferred from the current building-only sprite batches.
 
 | Pending | Unit | Special variants to retain |
 | --- | --- | --- |
@@ -82,6 +86,10 @@ All seventeen `Soldier.kind` values need a consistent sprite family, not just a 
 | [ ] | `brawler` | Fist, stance, impact and distinct guild identity. |
 | [ ] | `slinger` | Sling, wind-up, stone and release direction. |
 | [ ] | `assassin` | Den paths; critical, cloak/reveal, poison and targeting cues. |
+| [ ] | `spearman` | Spear, reach, Long spears/Set spears equipment and stance. |
+| [ ] | `hoplite` | Round shield, Testudo/Spear wall equipment and guard states. |
+| [ ] | `javelineer` | Javelins, Barbed/Throwing arms equipment, wind-up and release. |
+| [ ] | `lancer` | Mount/rider, Heavy lance/Winged lancers equipment and charge. |
 | [ ] | `sniper` | Lodge path variants, rifle, aim, shots and specialist equipment. |
 | [ ] | `musketeer` | Musket Hall paths, firing/reload, grenades and specialist equipment. |
 | [ ] | `gunner` | Pistol, Quickdraw/Duelists equipment, firing/reload and facing. |
@@ -169,7 +177,9 @@ Preserve the Library's side-view geometry (`library/geometry.ts`: current nave 1
 
 ## F. Batch tracking
 
-**Implemented: [batch 04](BUILDING_BATCH_04.md)** — Gunner hall, Machine-gun nest, Gatling emplacement, Rocket battery and Revolutionary; ten PNG sheets, 70 world-state frames and 14 matching UI icons. Includes all current paths, damage, rubble and rebuilding, using the existing 30-color palette and per-frame caps. All 31 earlier PNG files remain unchanged. Current building coverage: nineteen of twenty-one families, 41 native PNG files, 316 world-state frames and 59 UI icons. Valkyrie palace, Dark wizard keep, terrain/theme work, units and enemies remain separate work.
+**Implemented: [batch 05](BUILDING_BATCH_05.md)** — Valkyrie palace and Dark wizard keep in normal and compact sizes, plus Cloudborne cloud banks, shadows and moorings in both palace sizes. Twelve PNG files, 30 world-state frames and three shared UI icons; all 41 earlier PNGs remain unchanged. Current building coverage is twenty-one of twenty-five families: 53 native PNG files, 346 world-state frames and 62 UI icons. The four newly merged spearmen buildings, terrain/theme work, units and enemies remain pending.
+
+**Implemented: [batch 04](BUILDING_BATCH_04.md)** — Gunner hall, Machine-gun nest, Gatling emplacement, Rocket battery and Revolutionary; ten PNG sheets, 70 world-state frames and 14 matching UI icons. Includes all current paths, damage, rubble and rebuilding, using the existing 30-color palette and per-frame caps. All 31 earlier PNG files remain unchanged. That delivery covered nineteen of the then twenty-one families, with 41 native PNG files, 316 world-state frames and 59 UI icons. Palace and Dark wizard keep followed in batch 05.
 
 **Implemented: [batch 03](BUILDING_BATCH_03.md)** — Assassins' den, Sniper lodge, Musket hall, Wizard tower, Mage Guild and Monster bait; twelve PNG sheets, 130 world-state frames and 26 matching UI icons. Includes all existing path looks, damage, rebuilding, and material-appropriate rubble. Two shared magic ramps extend the palette to 30 swatches while retaining the 16-color world/12-color UI limits. All nineteen earlier PNGs stay unchanged. That delivery brought coverage to fourteen of twenty-one families, 31 native PNG sheets, 246 world-state frames and 45 UI icons. The gunner buildings were added in batch 04.
 
@@ -351,6 +361,14 @@ Every path row requires each rank's icon **and** its actual building/unit/spell 
 | [ ] | `sniperLodge` / `suppressors` | Suppressing fire | `boot`, `stake`, `gear` |
 | [ ] | `sniperLodge` / `deadeye` | Deadeye | `eye`, `crosshair`, `skull` |
 | [ ] | `sniperLodge` / `piercing` | Piercing rounds | `arrow`, `shard`, `spyglass` |
+| [ ] | `spearHall` / `longSpears` | Long spears | `stake`, `fork`, `volley` |
+| [ ] | `spearHall` / `setSpears` | Set spears | `helm`, `hand`, `crosshair` |
+| [ ] | `phalanx` / `testudo` | Testudo | `frostShield`, `mail`, `boot` |
+| [ ] | `phalanx` / `spearWall` | Spear wall | `stake`, `fork`, `shards` |
+| [ ] | `javelinCamp` / `barbed` | Barbed javelins | `hand`, `stake`, `skull` |
+| [ ] | `javelinCamp` / `throwingArms` | Throwing arms | `arrow`, `volley`, `gear` |
+| [ ] | `lancerStable` / `heavyLance` | Heavy lance | `stake`, `hammer`, `boot` |
+| [ ] | `lancerStable` / `wingedLancers` | Winged lancers | `wing`, `spyglass`, `halo`; → `valkyriePalace` |
 | [ ] | `musketHall` / `sharpMuskets` | Sharpshooters | `spyglass`, `crosshair`, `skull`; → `sniperLodge` |
 | [ ] | `gunHall` / `quickdraw` | Quickdraw | `hand`, `volley`, `fork` |
 | [ ] | `gunHall` / `duelists` | Duelists | `blast`, `spyglass`, `crosshair` |
