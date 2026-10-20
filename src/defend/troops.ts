@@ -8,8 +8,9 @@ import { enemySize } from "./catalog.ts";
  * archers roam the streets, shooting whatever comes within sight, or with
  * Hunter's instinct path toward the nearest enemy in the city; the Ranged
  * Guild's stone throwers, the gunner line (pistols, muskets, machine guns,
- * Gatlings, rockets) and the snipers roam the same way with shots of
- * their own. A Mage
+ * Gatlings, rockets), the snipers and the javelineers roam the same way
+ * with shots of their own. The spearmen line's spearmen, hoplites and
+ * lancers chase like swordsmen, striking through `spears.ts`. A Mage
  * Guild trains fire mages the same way (`mages.ts`), a Valkyrie palace
  * valkyries (`valkyries.ts`), and a dark wizard keep its one dark wizard
  * (`dark-wizards.ts`). */
@@ -20,6 +21,7 @@ import {
   ASSASSIN_UNIT,
   BRAWLER,
   GATLING_GUNNER,
+  JAVELINEER,
   RAIL_SNIPER,
   GUNNER,
   MACHINE_GUNNER,
@@ -49,6 +51,7 @@ import { railShot, squadSize } from "./revolutionary.ts";
 import { bayonetTarget, charges, grenadeOf, musketDamage, musketRange, musketReload, musketSpeed, thrust, toughestInReach, volleyTargets } from "./muskets.ts";
 import { gunDamage, gunExtras, gunHp, gunRange, gunReload, gunSpeed, isGun, gunShot, rocketOf, type Gun } from "./gunners.ts";
 import { cloudRank, diveIn, hostDrill, hostGarrison, musterPoint } from "./sky-palace.ts";
+import { holdLine, isSpear, javelinExtras, javelinOf, javelinRange, javelinReload, spearLeash, spearReach, spearSpeed, spearStrike, SPEARS } from "./spears.ts";
 import { assassinHp, assassinStrike, headhunter, huntReach, recruitState, stepCloak, toughestFirst } from "./assassins.ts";
 
 /** The barracks' Study path and rank (`knowledge-paths.ts`): each 0 unless chosen. */
@@ -67,15 +70,16 @@ function swordStats(sim: DefendSim, home: number) {
 }
 /** How fast a swordsman (or brawler) walks. */
 function swordSpeed(sim: DefendSim, s: Soldier) {
+  if (isSpear(s.kind)) return spearSpeed(sim, s as Soldier & { kind: typeof s.kind });
   return melee(s).speed * (s.kind === "sword" && paths(sim, s.home).crusade ? CRUSADE.speed : 1);
 }
 /** A melee troop's own numbers: a brawler's fists, an assassin's knives,
- * else a swordsman's blade. */
-const melee = (s: Soldier) => (s.kind === "brawler" ? BRAWLER : s.kind === "assassin" ? ASSASSIN_UNIT : SOLDIER);
+ * the spear line's spears, else a swordsman's blade. */
+const melee = (s: Soldier) => (s.kind === "brawler" ? BRAWLER : s.kind === "assassin" ? ASSASSIN_UNIT : isSpear(s.kind) ? SPEARS[s.kind] : SOLDIER);
 /** A ranged troop's own numbers, besides an archer's. */
-const RANGED = { slinger: SLINGER, sniper: SNIPER, musketeer: MUSKETEER, gunner: GUNNER, machineGunner: MACHINE_GUNNER, gatlingGunner: GATLING_GUNNER, rocketeer: ROCKETEER, railSniper: RAIL_SNIPER };
+const RANGED = { slinger: SLINGER, sniper: SNIPER, musketeer: MUSKETEER, gunner: GUNNER, machineGunner: MACHINE_GUNNER, gatlingGunner: GATLING_GUNNER, rocketeer: ROCKETEER, railSniper: RAIL_SNIPER, javelineer: JAVELINEER };
 /** What each ranged troop looses: an arrow (none), a stone, a bullet, a ball or a rocket. */
-const SHOT = { slinger: "stone", sniper: "bullet", musketeer: "ball", gunner: "bullet", machineGunner: "bullet", gatlingGunner: "bullet", rocketeer: "rocket", railSniper: "bullet" } as const;
+const SHOT = { slinger: "stone", sniper: "bullet", musketeer: "ball", gunner: "bullet", machineGunner: "bullet", gatlingGunner: "bullet", rocketeer: "rocket", railSniper: "bullet", javelineer: "javelin" } as const;
 const isRanged = (kind: Soldier["kind"]): kind is keyof typeof RANGED => kind in RANGED;
 
 /** Trains one troop at a time per barracks, while it's standing and below
@@ -119,7 +123,7 @@ export class Barracks {
     const kind = TRAINS[b.kind] ?? "sword";
     const scale = soldierScale(sim.levels.soldierArms);
     const stats = kind === "archer" ? ARCHER_UNIT : kind === "mage" ? { ...FIRE_MAGE, damage: fireballDamage(sim.levels.mageFireball ?? 0) } : kind === "valkyrie" ? VALKYRIE : kind === "darkWizard" ? DARK_WIZARD
-      : kind === "brawler" ? BRAWLER : kind === "assassin" ? ASSASSIN_UNIT : isRanged(kind) ? RANGED[kind] : SOLDIER;
+      : kind === "brawler" ? BRAWLER : kind === "assassin" ? ASSASSIN_UNIT : isSpear(kind) ? SPEARS[kind] : isRanged(kind) ? RANGED[kind] : SOLDIER;
     const path = kind === "sword" ? swordStats(sim, b.id) : kind === "assassin" ? { hp: assassinHp(sim, b.id), damage: 1 } : { hp: gunHp(sim, b.id, kind), damage: 1 };
     sim.soldiers.push({
       id: sim.newId(),
@@ -145,6 +149,7 @@ export class Barracks {
 const TRAINS: Partial<Record<Building["kind"], Soldier["kind"]>> = {
   barracks: "sword", archerBarracks: "archer", mageGuild: "mage", valkyriePalace: "valkyrie", darkKeep: "darkWizard",
   meleeGuild: "brawler", rangedGuild: "slinger", assassinDen: "assassin", sniperLodge: "sniper", musketHall: "musketeer",
+  spearHall: "spearman", phalanx: "hoplite", javelinCamp: "javelineer", lancerStable: "lancer",
   gunHall: "gunner", gunNest: "machineGunner", gatlingNest: "gatlingGunner", rocketBattery: "rocketeer", revolutionary: "railSniper",
 };
 const isBarracks = (b: Building) => b.kind in TRAINS;
@@ -173,7 +178,8 @@ class Patrol {
     this.home = sim.map.buildings[s.home];
     this.hc = center(this.home.rect);
     // Headhunters range further, and at Kingslayer anywhere in the city.
-    this.leash = soldierLeash(sim.levels.soldierReach ?? 0) * (s.kind === "assassin" ? huntReach(sim, s.home) : 1);
+    // Winged lancers ride further from the stable.
+    this.leash = soldierLeash(sim.levels.soldierReach ?? 0) * (s.kind === "assassin" ? huntReach(sim, s.home) : spearLeash(sim, s));
     this.toughest = headhunter(sim, s);
     this.citywide = !Number.isFinite(this.leash);
   }
@@ -198,6 +204,7 @@ export function stepSwordsman(sim: DefendSim, s: Soldier, dt: number) {
   s.cd -= dt;
   s.thinkT -= dt;
   stepCloak(s, dt);
+  holdLine(sim, s);
   // Crusaders' field dressing.
   if (paths(sim, s.home).crusade >= 2) s.hp = Math.min(s.maxHp, s.hp + CRUSADE.heal * dt);
   if (sim.warBanner) return rally(sim, s, dt);
@@ -218,7 +225,8 @@ function rally(sim: DefendSim, s: Soldier, dt: number) {
 }
 
 /** How far a melee troop reaches: Halberdiers further. */
-const swordReach = (sim: DefendSim, s: Soldier) => melee(s).reach + (s.kind === "sword" && paths(sim, s.home).halberd ? HALBERD.reach : 0);
+const swordReach = (sim: DefendSim, s: Soldier) =>
+  isSpear(s.kind) ? spearReach(sim, s as Soldier & { kind: typeof s.kind }) : melee(s).reach + (s.kind === "sword" && paths(sim, s.home).halberd ? HALBERD.reach : 0);
 const inSwordReach = (sim: DefendSim, s: Soldier, e: Enemy) => dist(e.x - s.x, e.y - s.y) <= swordReach(sim, s) + enemySize(e) / 2;
 
 function strike(sim: DefendSim, s: Soldier, e: Enemy) {
@@ -226,6 +234,7 @@ function strike(sim: DefendSim, s: Soldier, e: Enemy) {
   const { berserk, halberd } = s.kind === "sword" ? paths(sim, s.home) : { berserk: 0, halberd: 0 };
   s.cd = melee(s).cooldown * (berserk ? BERSERK.cooldown : 1);
   if (s.kind === "assassin") return assassinStrike(sim, s, e, bannerDamage(sim, s));
+  if (isSpear(s.kind)) return spearStrike(sim, s as Soldier & { kind: typeof s.kind }, e, bannerDamage(sim, s));
   const damage = bannerDamage(sim, s);
   if (!berserk && !halberd) return void sim.hurtEnemy(e, damage, true, "melee", s);
   // Set for the charge: big enemies are hit far harder.
@@ -281,7 +290,7 @@ export function stepArcher(sim: DefendSim, s: Soldier, dt: number) {
   const { ranger, skirmish } = paths(sim, s.home);
   const own = s.kind === "archer" ? null : RANGED[s.kind as keyof typeof RANGED];
   const gun = isGun(s.kind) ? (s as Soldier & { kind: Gun }) : null;
-  const range = s.kind === "sniper" ? sniperRange(sim, s) : s.kind === "musketeer" ? musketRange(sim, s) : gun ? gunRange(sim, gun) : own ? own.range : archerUnitRange(sim.levels.archerSight ?? 0) + (ranger ? RANGERS.sight : 0);
+  const range = s.kind === "sniper" ? sniperRange(sim, s) : s.kind === "javelineer" ? javelinRange(sim, s) : s.kind === "musketeer" ? musketRange(sim, s) : gun ? gunRange(sim, gun) : own ? own.range : archerUnitRange(sim.levels.archerSight ?? 0) + (ranger ? RANGERS.sight : 0);
   const speed = s.kind === "musketeer" ? musketSpeed(sim, s) : gun ? gunSpeed(sim, gun) : (own ?? ARCHER_UNIT).speed * (skirmish >= 2 ? SKIRMISH.speed : 1);
   // Bayonets: an enemy at close quarters is run through, not shot.
   const close = bayonetTarget(sim, s);
@@ -314,13 +323,19 @@ function shoot(sim: DefendSim, s: Soldier, e: Enemy, range: number) {
     const kind = s.kind as keyof typeof RANGED, own = RANGED[kind], base = bannerDamage(sim, s);
     const gun = isGun(kind) ? (s as Soldier & { kind: Gun }) : null;
     const damage = kind === "musketeer" ? musketDamage(sim, s, base) : gun ? gunDamage(sim, gun, base) : base;
-    s.cd = kind === "musketeer" ? musketReload(sim, s) : kind === "sniper" ? sniperReload(sim, s) : gun ? gunReload(sim, gun) : own.cooldown;
+    s.cd = kind === "musketeer" ? musketReload(sim, s) : kind === "javelineer" ? javelinReload(sim, s) : kind === "sniper" ? sniperReload(sim, s) : gun ? gunReload(sim, gun) : own.cooldown;
     // A laser sniper's bullet carries its chain.
     if (kind === "railSniper") return void sim.arrows.push(railShot(sim, s, e, damage));
     // A sniper's bullet carries its lodge's path.
     if (kind === "sniper") {
       const { damage: hit, ...bullet } = bulletOf(sim, s, damage);
       return void sim.arrows.push({ x: s.x, y: s.y, origin: { x: s.x, y: s.y, attacker: s.id }, target: e.id, damage: hit, tx: e.x, ty: e.y, life: 2, shot: "bullet", ...bullet, ...pierceOf(sim, s, e, range) });
+    }
+    // A javelin carries its camp's barbs; Throwing arms throw a second.
+    if (kind === "javelineer") {
+      for (const t of [e, ...javelinExtras(sim, s, e, range)])
+        sim.arrows.push({ x: s.x, y: s.y, origin: { x: s.x, y: s.y, attacker: s.id }, target: t.id, tx: t.x, ty: t.y, life: 2, shot: "javelin", ...javelinOf(sim, s, t, damage) });
+      return;
     }
     const fire = (t: Enemy, share = 1) => sim.arrows.push({ x: s.x, y: s.y, origin: { x: s.x, y: s.y, attacker: s.id }, target: t.id, damage: damage * share, tx: t.x, ty: t.y, life: 2, shot: SHOT[kind],
       ...(kind === "musketeer" ? grenadeOf(sim, s.home, damage * share) : kind === "rocketeer" ? rocketOf(sim, s.home, damage * share) : gun ? gunShot(sim, gun) : {}) });

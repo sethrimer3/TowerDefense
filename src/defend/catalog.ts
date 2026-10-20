@@ -11,11 +11,11 @@ import type { BattlePaths, PathId } from "../knowledge-paths.ts";
  * copper, silver and Gold, the universal upgrades, the bonuses the Smithy and the
  * skill trees add, and the enemy roster. */
 
-export type StructureKind = "keep" | "meleeGuild" | "rangedGuild" | "assassinDen" | "barracks" | "archerBarracks" | "sniperLodge" | "gunHall" | "musketHall" | "gunNest" | "gatlingNest" | "rocketBattery" | "revolutionary" | "archerTower" | "cannonTower" | "watchTower" | "wizardTower" | "mageGuild" | "valkyriePalace" | "darkKeep" | "monsterBait";
+export type StructureKind = "keep" | "meleeGuild" | "rangedGuild" | "assassinDen" | "spearHall" | "phalanx" | "javelinCamp" | "lancerStable" | "barracks" | "archerBarracks" | "sniperLodge" | "gunHall" | "musketHall" | "gunNest" | "gatlingNest" | "rocketBattery" | "revolutionary" | "archerTower" | "cannonTower" | "watchTower" | "wizardTower" | "mageGuild" | "valkyriePalace" | "darkKeep" | "monsterBait";
 /** Everything that appears in the build palette (the keep is placed from the
  * start and can only be moved, so it is not a palette item). */
 export type PaletteItem = "cityTile" | "cityGate" | "wallSpikes" | "wallBallista" | "wallBlock" | Exclude<StructureKind, "keep">;
-export const PALETTE_ITEMS: PaletteItem[] = ["cityTile", "meleeGuild", "rangedGuild", "barracks", "assassinDen", "archerBarracks", "gunHall", "musketHall", "sniperLodge", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "watchTower", "archerTower", "cannonTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "wallBlock", "cityGate", "wallSpikes", "wallBallista"];
+export const PALETTE_ITEMS: PaletteItem[] = ["cityTile", "meleeGuild", "rangedGuild", "barracks", "assassinDen", "spearHall", "phalanx", "javelinCamp", "lancerStable", "archerBarracks", "gunHall", "musketHall", "sniperLodge", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "watchTower", "archerTower", "cannonTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "wallBlock", "cityGate", "wallSpikes", "wallBallista"];
 /** The only buildings the shop sells: every other tower or troop building
  * is one of these upgraded, a building at a time, with Knowledge
  * (`building-upgrades.ts`). */
@@ -46,6 +46,10 @@ export const ITEM_CATEGORY: Record<PaletteItem, Exclude<PaletteCategory, "all">>
   rangedGuild: "units",
   barracks: "units",
   assassinDen: "units",
+  spearHall: "units",
+  phalanx: "units",
+  javelinCamp: "units",
+  lancerStable: "units",
   archerBarracks: "units",
   sniperLodge: "units",
   gunHall: "units",
@@ -124,7 +128,7 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     h: 4,
     maxHp: 140,
     outsideOk: false,
-    description: "Trains brawlers: townsfolk with bare fists who rush out and punch whatever breaches the walls. Upgrade it with Knowledge into a barracks of swordsmen, on to crusaders and at last valkyries, or into an assassins' den.",
+    description: "Trains brawlers: townsfolk with bare fists who rush out and punch whatever breaches the walls. Upgrade it with Knowledge into a barracks of swordsmen, an assassins' den, or a spearmen hall, and from there on to a phalanx, javelins or lancers, whose winged riders become valkyries.",
   },
   rangedGuild: {
     kind: "rangedGuild",
@@ -134,6 +138,42 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     maxHp: 130,
     outsideOk: false,
     description: "Trains stone throwers who wander the streets lobbing rocks at anything near. Upgrade it with Knowledge into archers, fire mages or a gunner hall, and from there on to muskets, machine guns or rockets.",
+  },
+  spearHall: {
+    kind: "spearHall",
+    name: "Spearmen hall",
+    w: 4,
+    h: 4,
+    maxHp: 150,
+    outsideOk: false,
+    description: "Trains spearmen, who keep enemies at a spear's length. Upgrade it with Knowledge into a phalanx of shielded hoplites, a javelin camp or a lancer stable.",
+  },
+  phalanx: {
+    kind: "phalanx",
+    name: "Phalanx",
+    w: 4,
+    h: 4,
+    maxHp: 190,
+    outsideOk: false,
+    description: "Trains hoplites behind great round shields: slow, but they shrug off much of every blow and hold the streets.",
+  },
+  javelinCamp: {
+    kind: "javelinCamp",
+    name: "Javelin camp",
+    w: 4,
+    h: 4,
+    maxHp: 140,
+    outsideOk: false,
+    description: "Trains javelineers who roam the streets hurling heavy javelins: slow to throw, but each hits hard.",
+  },
+  lancerStable: {
+    kind: "lancerStable",
+    name: "Lancer stable",
+    w: 4,
+    h: 4,
+    maxHp: 170,
+    outsideOk: false,
+    description: "Trains mounted lancers who ride down enemies across the city, their first thrust at each a charge. Its Winged lancers become valkyries.",
   },
   assassinDen: {
     kind: "assassinDen",
@@ -278,7 +318,7 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     compact: { upgrade: "palaceCompact", w: 4, h: 6 },
     maxHp: 260,
     outsideOk: false,
-    description: "A heavenly marble palace, 3 × 3 quarter tiles. Trains armoured valkyries whose golden spear charges through every enemy in a line.",
+    description: "A heavenly marble palace, 3 × 3 quarter tiles. Trains armoured valkyries whose golden spear charges through every enemy in a line: the spearmen's ultimate, a Lancer stable's crowned Winged lancers.",
   },
   darkKeep: {
     kind: "darkKeep",
@@ -324,6 +364,10 @@ export const STARTING_OWNED: Record<PaletteItem, number> = {
   rangedGuild: 1,
   barracks: 0,
   assassinDen: 0,
+  spearHall: 0,
+  phalanx: 0,
+  javelinCamp: 0,
+  lancerStable: 0,
   archerBarracks: 0,
   sniperLodge: 0,
   gunHall: 0,
@@ -359,6 +403,10 @@ export function purchasePrice(item: PaletteItem, owned: number): Price {
     rangedGuild: { copper: 4 },
     barracks: { copper: 4 },
     assassinDen: { copper: 5 },
+    spearHall: { copper: 5 },
+    phalanx: { copper: 7 },
+    javelinCamp: { copper: 6 },
+    lancerStable: { copper: 8 },
     archerBarracks: { copper: 5 },
     sniperLodge: { copper: 6 },
     gunHall: { copper: 5 },
@@ -395,6 +443,10 @@ export const ITEM_NAMES: Record<PaletteItem, string> = {
   rangedGuild: STRUCTURES.rangedGuild.name,
   barracks: STRUCTURES.barracks.name,
   assassinDen: STRUCTURES.assassinDen.name,
+  spearHall: STRUCTURES.spearHall.name,
+  phalanx: STRUCTURES.phalanx.name,
+  javelinCamp: STRUCTURES.javelinCamp.name,
+  lancerStable: STRUCTURES.lancerStable.name,
   archerBarracks: STRUCTURES.archerBarracks.name,
   sniperLodge: STRUCTURES.sniperLodge.name,
   gunHall: STRUCTURES.gunHall.name,
@@ -928,6 +980,14 @@ export const ROCKETEER = { hp: 26, damage: 26, cooldown: 6, speed: 1.7, size: 0.
 /** The Assassins' den's assassins: quick and frail, every `every`th strike
  * critical for `crit` times the damage (counted, never rolled). */
 export const ASSASSIN_UNIT = { hp: 26, damage: 8, cooldown: 0.7, speed: 2.9, reach: 0.7, size: 0.36, every: 4, crit: 2, color: "#2b2633" };
+/** The spearmen line (`spears.ts`), melee troops that chase like
+ * swordsmen: spearmen reach far; hoplites are slow and take `guard` of
+ * every blow; lancers ride fast, their first thrust at each enemy a charge
+ * of `charge` times the damage. Javelineers roam and throw like archers. */
+export const SPEARMAN = { hp: 34, damage: 5, cooldown: 1, speed: 2.2, reach: 1.1, size: 0.38, color: "#8a7650" };
+export const HOPLITE = { hp: 70, damage: 4.5, cooldown: 1.1, speed: 1.7, reach: 1, size: 0.42, guard: 0.6, color: "#9a3a2a" };
+export const LANCER = { hp: 55, damage: 6, cooldown: 1.2, speed: 3.3, reach: 0.9, size: 0.46, charge: 2.5, color: "#3a4a72" };
+export const JAVELINEER = { hp: 28, damage: 9, cooldown: 2, speed: 2.3, size: 0.37, range: 4, color: "#5e6e34" };
 export const VALKYRIE = { hp: 50, damage: 16, cooldown: 1.8, speed: 2.3, size: 0.44, color: "#f2e6c4" };
 /** The dark wizard, the keep's one ultimate unit: slow to summon (`drill`
  * times a barracks' drill), casting a bolt of black lightning within

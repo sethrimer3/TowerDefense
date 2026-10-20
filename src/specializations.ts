@@ -5,13 +5,14 @@
  *
  *  - while a building wears no path it can become one of the buildings its
  *    kind branches into (`BECOMES`: a Watch tower into an archer, cannon or
- *    wizard tower; a Melee Guild into a barracks of swordsmen or an
- *    assassins' den; a Ranged Guild into archers, fire mages or gunners,
+ *    wizard tower; a Melee Guild into a barracks of swordsmen, an
+ *    assassins' den or a spearmen hall, and a Spearmen hall into a phalanx,
+ *    a javelin camp or a lancer stable; a Ranged Guild into archers, fire mages or gunners,
  *    and a Gunner hall into musketmen, machine gunners or rockets), or set out on
  *    one of its kind's Knowledge paths (`knowledge-paths.ts`);
  *  - a building on a path climbs it rank by rank;
  *  - at a path's last rank, a path with a crown evolves the building
- *    (Crusaders: a Valkyrie palace; Stormcalling: a Dark wizard keep;
+ *    (Winged lancers: a Valkyrie palace; Stormcalling: a Dark wizard keep;
  *    Sharpshooters: a Sniper lodge; Belt feed: a Gatling emplacement).
  *
  * The kind is the building's kind in the city and among the copies owned
@@ -44,6 +45,12 @@ export const BECOMES: Partial<Record<PlacedKind, { to: PlacedKind; cost: number 
   meleeGuild: [
     { to: "barracks", cost: 4 },
     { to: "assassinDen", cost: 6 },
+    { to: "spearHall", cost: 5 },
+  ],
+  spearHall: [
+    { to: "phalanx", cost: 7 },
+    { to: "javelinCamp", cost: 8 },
+    { to: "lancerStable", cost: 10 },
   ],
   rangedGuild: [
     { to: "archerBarracks", cost: 5 },
@@ -61,7 +68,7 @@ export const BECOMES: Partial<Record<PlacedKind, { to: PlacedKind; cost: number 
 
 /** What each kind's troops are called on its upgrade buttons. */
 export const TROOPS: Partial<Record<PlacedKind, string>> = {
-  meleeGuild: "Brawlers", rangedGuild: "Stone throwers", barracks: "Swordsmen", assassinDen: "Assassins", archerBarracks: "Archers", mageGuild: "Fire mages",
+  meleeGuild: "Brawlers", rangedGuild: "Stone throwers", barracks: "Swordsmen", assassinDen: "Assassins", spearHall: "Spearmen", phalanx: "Hoplites", javelinCamp: "Javelineers", lancerStable: "Lancers", archerBarracks: "Archers", mageGuild: "Fire mages",
   sniperLodge: "Snipers", musketHall: "Musketmen",
   gunHall: "Gunners", gunNest: "Machine gunners", gatlingNest: "Gatling gunners", rocketBattery: "Rocketeers", revolutionary: "Laser snipers", valkyriePalace: "Valkyries", darkKeep: "Dark wizard",
 };

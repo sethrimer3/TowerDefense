@@ -61,7 +61,7 @@ function enemy(sim: DefendSim, x: number, y: number) {
 test("the shop's three basic buildings branch into every other tower and troop building", () => {
   const to = (k: Parameters<typeof nextSteps>[0]) => nextSteps(k).map(stepName);
   assert.deepEqual(to("watchTower"), ["Archer tower", "Cannon tower", "Wizard tower", "Spotters I", "Signal fires I"]);
-  assert.deepEqual(to("meleeGuild"), ["Barracks", "Assassins' den"]);
+  assert.deepEqual(to("meleeGuild"), ["Barracks", "Assassins' den", "Spearmen hall"]);
   assert.deepEqual(to("rangedGuild"), ["Archer barracks", "Mage Guild", "Gunner hall"]);
   assert.deepEqual(to("gunHall"), ["Musket hall", "Machine-gun nest", "Rocket battery", "Quickdraw I", "Duelists I"]);
   assert.deepEqual(to("barracks"), ["Crusaders I", "Berserkers I", "Halberdiers I"]);
@@ -70,7 +70,8 @@ test("the shop's three basic buildings branch into every other tower and troop b
   assert.deepEqual(to("sniperLodge"), ["Revolutionary", "Marksmen I", "Ricochet I", "Suppressing fire I", "Deadeye I", "Piercing rounds I"]);
   assert.deepEqual(nextSteps("wizardTower", { path: "storm", rank: 2 }).map(stepName), ["Stormcalling III"]);
   assert.deepEqual(nextSteps("wizardTower", { path: "storm", rank: 3 }).map(stepName), ["Dark wizard keep"], "its crown evolves it");
-  assert.deepEqual(nextSteps("barracks", { path: "crusaders", rank: 3 }).map((s) => s.type === "evolve" && s.to), ["valkyriePalace"]);
+  assert.deepEqual(nextSteps("lancerStable", { path: "wingedLancers", rank: 3 }).map((s) => s.type === "evolve" && s.to), ["valkyriePalace"]);
+  assert.deepEqual(nextSteps("barracks", { path: "crusaders", rank: 3 }), [], "the Crusaders lost their crown to the lancers");
   assert.deepEqual(nextSteps("wizardTower", { path: "rime", rank: 3 }), [], "a path without a crown ends at III");
   assert.deepEqual(to("wallSpikes"), ["Blasting stakes I", "Spring stakes I", "Rimed stakes I"]);
   assert.equal(rootOf("darkKeep"), "watchTower");

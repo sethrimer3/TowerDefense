@@ -73,7 +73,7 @@ try {
     if (phone) await page.touchscreen.tap(p.x, p.y); else await page.mouse.click(p.x, p.y);
     await page.waitForSelector('#defend-specialty:not([hidden])');
     const nodes = () => panel.locator('.ug-node:not(.withering)').evaluateAll(els => els.map(e => `${e.dataset.node}=${['owned', 'next', 'locked'].find(c => e.classList.contains(c))}`));
-    assert.deepEqual(await nodes(), ['k:meleeGuild=owned', 'k:barracks=next', 'k:assassinDen=next']);
+    assert.deepEqual(await nodes(), ['k:meleeGuild=owned', 'k:barracks=next', 'k:assassinDen=next', 'k:spearHall=next']);
     await press(panel.locator('[data-node="k:assassinDen"]'));
     await page.waitForTimeout(900); await page.screenshot({ path: `${out}/assassins-${width}-melee-guild.png` });
     await press(panel.locator('[data-ug-buy="k:assassinDen"]'));
