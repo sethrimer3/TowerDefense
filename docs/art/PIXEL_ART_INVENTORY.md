@@ -2,7 +2,7 @@
 
 Read the [style guide and setting contract](PIXEL_ART_GUIDE.md) first. This is a source-audited work list, **not a list of approved or completed new sprites**. Snapshot: commit `a4e07e0`, the Pixel Art setting/Tower Delve PNG merge. Refresh the catalog appendices when gameplay adds an element.
 
-Implementation update: [batch 01](BUILDING_BATCH_01.md) converts the keep, barracks and watch tower; [batch 02](BUILDING_BATCH_02.md) adds the melee/ranged guilds, archer barracks and archer/cannon towers; [batch 03](BUILDING_BATCH_03.md) adds Assassins' den, Sniper lodge, Musket hall, Wizard tower, Mage Guild and Monster bait. [Batch 04](BUILDING_BATCH_04.md) adds the five gunner buildings. [Batch 05](BUILDING_BATCH_05.md) adds normal/compact palace and Dark wizard keep sprites and Cloudborne layers. All include shared UI/placement appearances. Building, unit and path rows include the newly merged spearmen line; its sprites remain pending. Units and enemies are deferred at the user's request; their unchecked rows remain future work.
+Implementation update: [batch 01](BUILDING_BATCH_01.md) converts the keep, barracks and watch tower; [batch 02](BUILDING_BATCH_02.md) adds the melee/ranged guilds, archer barracks and archer/cannon towers; [batch 03](BUILDING_BATCH_03.md) adds Assassins' den, Sniper lodge, Musket hall, Wizard tower, Mage Guild and Monster bait. [Batch 04](BUILDING_BATCH_04.md) adds the five gunner buildings. [Batch 05](BUILDING_BATCH_05.md) adds normal/compact palace and Dark wizard keep sprites and Cloudborne layers. All include shared UI/placement appearances. [Batch 06](BUILDING_BATCH_06.md) adds the spearmen building line, completing the current catalog building rows in B1. City pieces, environment art and other unchecked entries remain pending. Units and enemies are deferred at the user's request; their unchecked rows remain future work.
 
 Legend: **Audit/redraw** = PNG exists, but style/density/states still require review; **Create** = no registered PNG replacement for this family; **Integrate** = the setting, scale, cache or cross-screen routing still needs work. Every unchecked item remains pending. Existing legacy artwork stays available when Pixel Art is off.
 
@@ -34,10 +34,10 @@ Source footprint dimensions are simulation cells. Proposed base footprint pixels
 | [x] | `meleeGuild` — Melee Guild | 4×4 → 32×32 | — | v2 base, all damage/rubble, rebuilding and UI; batch 02 |
 | [x] | `rangedGuild` — Ranged Guild | 4×4 → 32×32 | — | v2 base, all damage/rubble, rebuilding and UI; batch 02 |
 | [x] | `assassinDen` — Assassins' den | 4×4 → 32×32 | — | v2 base + Bloodletters/Shadowcloak/Venomblades/Headhunters, all damage/rubble, rebuilding and UI; batch 03 |
-| [ ] | `spearHall` — Spearmen hall | 4×4 → 32×32 | — | Create; spearmen line merged during batch 05 |
-| [ ] | `phalanx` — Phalanx | 4×4 → 32×32 | — | Create; spearmen line merged during batch 05 |
-| [ ] | `javelinCamp` — Javelin camp | 4×4 → 32×32 | — | Create; spearmen line merged during batch 05 |
-| [ ] | `lancerStable` — Lancer stable | 4×4 → 32×32 | — | Create; spearmen line merged during batch 05 |
+| [x] | `spearHall` — Spearmen hall | 4×4 → 32×32 | — | v2 base + Long spears/Set spears, all damage/rubble, rebuilding and UI; batch 06 |
+| [x] | `phalanx` — Phalanx | 4×4 → 32×32 | — | v2 base + Testudo/Spear wall, all damage/rubble, rebuilding and UI; batch 06 |
+| [x] | `javelinCamp` — Javelin camp | 4×4 → 32×32 | — | v2 base + Barbed javelins/Throwing arms, all damage/rubble, rebuilding and UI; batch 06 |
+| [x] | `lancerStable` — Lancer stable | 4×4 → 32×32 | — | v2 base + Heavy lance/Winged lancers, all damage/rubble, rebuilding and UI; batch 06 |
 | [x] | `sniperLodge` — Sniper lodge | 4×4 → 32×32 | — | v2 base + Marksmen/Ricochet/Suppressing fire/Deadeye/Piercing rounds, all damage/rubble, rebuilding and UI; batch 03 |
 | [x] | `gunHall` — Gunner hall | 4×4 → 32×32 | — | v2 base + Quickdraw/Duelists, all damage/rubble, rebuilding and UI; batch 04 |
 | [x] | `gunNest` — Machine-gun nest | 4×4 → 32×32 | — | v2 base + Belt feed/Tripod, all damage/rubble, rebuilding and UI; batch 04 |
@@ -177,7 +177,9 @@ Preserve the Library's side-view geometry (`library/geometry.ts`: current nave 1
 
 ## F. Batch tracking
 
-**Implemented: [batch 05](BUILDING_BATCH_05.md)** — Valkyrie palace and Dark wizard keep in normal and compact sizes, plus Cloudborne cloud banks, shadows and moorings in both palace sizes. Twelve PNG files, 30 world-state frames and three shared UI icons; all 41 earlier PNGs remain unchanged. Current building coverage is twenty-one of twenty-five families: 53 native PNG files, 346 world-state frames and 62 UI icons. The four newly merged spearmen buildings, terrain/theme work, units and enemies remain pending.
+**Implemented: [batch 06](BUILDING_BATCH_06.md)** — Spearmen hall, Phalanx, Javelin camp and Lancer stable with all eight paths, damage/rubble, rebuilding and matching UI. Eight PNG files add 60 world-state frames and 12 UI icons; all 53 earlier PNGs remain unchanged. All twenty-five current catalog building families are covered: 61 native PNG files, 406 world-state frames and 74 UI icons. City pieces, housing/terrain/theme work and other unchecked rows remain pending; units and enemies remain deferred.
+
+**Implemented: [batch 05](BUILDING_BATCH_05.md)** — Valkyrie palace and Dark wizard keep in normal and compact sizes, plus Cloudborne cloud banks, shadows and moorings in both palace sizes. Twelve PNG files, 30 world-state frames and three shared UI icons; all 41 earlier PNGs remain unchanged. That delivery covered twenty-one of twenty-five families: 53 native PNG files, 346 world-state frames and 62 UI icons. Spearmen buildings followed in batch 06.
 
 **Implemented: [batch 04](BUILDING_BATCH_04.md)** — Gunner hall, Machine-gun nest, Gatling emplacement, Rocket battery and Revolutionary; ten PNG sheets, 70 world-state frames and 14 matching UI icons. Includes all current paths, damage, rubble and rebuilding, using the existing 30-color palette and per-frame caps. All 31 earlier PNG files remain unchanged. That delivery covered nineteen of the then twenty-one families, with 41 native PNG files, 316 world-state frames and 59 UI icons. Palace and Dark wizard keep followed in batch 05.
 

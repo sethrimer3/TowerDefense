@@ -40,6 +40,10 @@ export const BUILDING_ART = {
   valkyriePalaceCompact: { kind: "valkyriePalace", sheet: "v2/defend/valkyrie-palace-compact", icon: "v2/ui/valkyrie-palace", footprint: [4, 6], size: [32, 48], anchor: [16, 24], contentBounds: [3, 3, 26, 42], overhang: [0, 0, 0, 0], looks: ["", "cloudborne"], stages: 4 },
   darkKeep: { kind: "darkKeep", sheet: "v2/defend/dark-keep", icon: "v2/ui/dark-keep", footprint: [12, 12], size: [96, 96], anchor: [48, 48], contentBounds: [3, 3, 90, 90], overhang: [0, 0, 0, 0], looks: [""], stages: 4 },
   darkKeepCompact: { kind: "darkKeep", sheet: "v2/defend/dark-keep-compact", icon: "v2/ui/dark-keep", footprint: [6, 6], size: [48, 48], anchor: [24, 24], contentBounds: [3, 3, 42, 42], overhang: [0, 0, 0, 0], looks: [""], stages: 4 },
+  spearHall: { kind: "spearHall", sheet: "v2/defend/spearmen-hall", icon: "v2/ui/spearmen-hall", footprint: [4, 4], size: [32, 32], anchor: [16, 16], contentBounds: [3, 3, 26, 26], overhang: [0, 0, 0, 0], looks: ["", "longSpears", "setSpears"], stages: 4 },
+  phalanx: { kind: "phalanx", sheet: "v2/defend/phalanx", icon: "v2/ui/phalanx", footprint: [4, 4], size: [32, 32], anchor: [16, 16], contentBounds: [3, 3, 26, 26], overhang: [0, 0, 0, 0], looks: ["", "testudo", "spearWall"], stages: 4 },
+  javelinCamp: { kind: "javelinCamp", sheet: "v2/defend/javelin-camp", icon: "v2/ui/javelin-camp", footprint: [4, 4], size: [32, 32], anchor: [16, 16], contentBounds: [3, 3, 26, 26], overhang: [0, 0, 0, 0], looks: ["", "barbed", "throwingArms"], stages: 4 },
+  lancerStable: { kind: "lancerStable", sheet: "v2/defend/lancer-stable", icon: "v2/ui/lancer-stable", footprint: [4, 4], size: [32, 32], anchor: [16, 16], contentBounds: [3, 3, 26, 26], overhang: [0, 0, 0, 0], looks: ["", "heavyLance", "wingedLancers"], stages: 4 },
 } as const;
 
 /** Clouds extend two cells beyond the footprint; the building anchor stays

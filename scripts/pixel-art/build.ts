@@ -412,6 +412,108 @@ function specialistHall(kind: Specialist, look: string, ui = false) {
   return p;
 }
 
+type SpearBuilding = "spearHall" | "phalanx" | "javelinCamp" | "lancerStable";
+
+function spearRoof(kind: SpearBuilding, look: string): Ramp {
+  if (kind === "spearHall") return look === "longSpears" ? ["greenDark", "green", "greenLight"]
+    : look === "setSpears" ? ["steelDark", "steel", "steelLight"] : ["goldDark", "gold", "goldLight"];
+  if (kind === "phalanx") return look === "testudo" ? ["steelDark", "steel", "steelLight"]
+    : look === "spearWall" ? ["goldDark", "gold", "goldLight"] : ["redDark", "red", "redLight"];
+  if (kind === "javelinCamp") return look === "barbed" ? ["redDark", "red", "redLight"]
+    : look === "throwingArms" ? ["woodDark", "woodLight", "woodBright"] : ["greenDark", "green", "greenLight"];
+  return look === "heavyLance" ? ["steelDark", "steel", "steelLight"] : look === "wingedLancers" ? ["stone", "stoneLight", "stoneBright"] : ["woodDark", "wood", "woodLight"];
+}
+
+function roundShield(p: Drawing, x: number, y: number, small = false) {
+  if (small) p.stamp([".ooo.", "ogggo", "ogogo", "ogggo", ".ooo."], x, y, { o: "ink", g: "gold" });
+  else p.stamp(["..oooo..", ".oggggo.", "ogllllgo", "ogloolgo", "ogloolgo", "ogllllgo", ".oggggo.", "..oooo.."], x, y,
+    { o: "ink", g: "gold", l: "goldLight" });
+}
+
+/** Roof insignia are heraldic equipment signs, not troop/animal sprites. */
+function spearSign(p: Drawing, kind: SpearBuilding, look: string, x: number, y: number) {
+  if (kind === "spearHall") {
+    p.stamp(["...oo...", "..obbo..", "..obbo..", "...oo...", "...ww...", "...ww...", "...ww...", "...oo..."], x, y,
+      { o: "ink", b: "steelBright", w: "woodLight" });
+  } else if (kind === "phalanx") roundShield(p, x, y);
+  else if (kind === "javelinCamp") {
+    p.line(x, y, x + 7, y + 7, "ink"); p.line(x + 7, y, x, y + 7, "ink");
+    p.line(x + 1, y + 1, x + 6, y + 6, "woodLight"); p.line(x + 6, y + 1, x + 1, y + 6, "woodLight");
+    for (const dx of [0, 6]) p.rect(x + dx, y, 2, 2, "steelBright");
+    if (look === "barbed") { p.dot(x + 2, y, "steelBright"); p.dot(x + 5, y, "steelBright"); }
+  } else if (look === "wingedLancers") {
+    p.stamp(["o......o", "ob....bo", "obboobbo", ".obbbbo.", "..obbo..", "...oo...", "...gg...", "........"], x, y,
+      { o: "ink", b: "stoneBright", g: "gold" });
+  } else {
+    p.stamp(["...oo...", "..owwo..", ".owowwo.", "owwwwwo.", "owwwwo..", ".oowwo..", "..owwo..", "..oooo.."], x, y,
+      { o: "ink", w: "woodLight" });
+  }
+}
+
+function nativeSpearRack(p: Drawing, x: number, y: number, count: number, height: number, point: Color = "steelBright") {
+  p.rect(x, y, count * 3, 1, "woodDark");
+  for (let i = 0; i < count; i++) { p.rect(x + i * 3 + 1, y - height + 1, 1, height, "woodLight"); p.dot(x + i * 3 + 1, y - height, point); }
+}
+
+/** Explicit native world/UI layouts: halls, canvas camp and two-bay stable.
+ * Every yard keeps its props inside the building's catalog footprint. */
+function spearBuilding(kind: SpearBuilding, look: string, ui = false) {
+  const p = new Drawing(ui ? 24 : 32, ui ? 24 : 32), e = ui ? 2 : 3, n = p.w - e * 2, roof = spearRoof(kind, look);
+  stoneBox(p, e + 1, e + 3, n - 2, ui ? 13 : 18);
+  const roofH = ui ? 11 : 14;
+  if (kind === "javelinCamp") {
+    // Stepped canvas eaves, a central ridge and short tied corners.
+    for (let y = 0; y < roofH; y++) {
+      const inset = y < 2 || y >= roofH - 2 ? 2 : y < 4 ? 1 : 0;
+      p.rect(e + inset, e + y, n - inset * 2, 1, "ink");
+      if (y > 0 && y < roofH - 1) p.rect(e + inset + 1, e + y, n - inset * 2 - 2, 1, y < roofH / 2 ? roof[2] : roof[0]);
+    }
+    p.rect(e + 3, e + Math.floor(roofH / 2), n - 6, 1, roof[1]);
+  } else {
+    p.rect(e, e, n, roofH, "ink"); p.rect(e + 1, e + 1, n - 2, roofH - 2, roof[0]);
+    p.rect(e + 1, e + 1, n - 2, ui ? 4 : 5, roof[2]); p.rect(e + 1, e + (ui ? 5 : 6), n - 2, 1, roof[1]);
+  }
+  const doorY = ui ? 14 : 18, yardY = ui ? 21 : 28;
+  if (kind === "lancerStable") {
+    p.rect(e + 1, doorY - 1, n - 2, 5, "woodDark"); p.rect(e + 2, doorY - 1, n - 4, 1, "woodLight");
+    for (const x of ui ? [6, 15] : [8, 21]) { p.rect(x, doorY, ui ? 3 : 4, 4, "ink"); p.rect(x, doorY, ui ? 3 : 4, 1, "woodLight"); }
+  } else {
+    p.rect(p.w / 2 - 2, doorY, 4, 4, "ink"); p.rect(p.w / 2 - 1, doorY + 1, 2, 3, "woodLight");
+  }
+  spearSign(p, kind, look, p.w / 2 - 4, ui ? 4 : 6);
+  p.rect(e, yardY, n, 1, "woodDark");
+  if (kind === "spearHall") {
+    nativeSpearRack(p, e + 1, yardY - 1, ui ? 2 : look === "longSpears" ? 4 : 3, look === "longSpears" ? 6 : 3);
+    if (look === "setSpears") for (let x = p.w - e - 8; x < p.w - e - 2; x += 3) {
+      p.line(x, yardY - 1, x + 2, yardY - 3, "woodLight"); p.dot(x + 2, yardY - 3, "steelBright");
+    } else {
+      const x = p.w - e - 6; p.rect(x + 1, yardY - 3, 1, 3, "woodLight"); p.rect(x, yardY - 4, 3, 2, "ink"); p.dot(x + 1, yardY - 4, "gold");
+    }
+  } else if (kind === "phalanx") {
+    if (look === "testudo") {
+      for (let r = 0; r < 2; r++) for (let i = 0; i < (ui ? 3 : 4); i++) roundShield(p, e + 2 + i * 4, yardY - 8 + r * 4, true);
+    } else {
+      for (let i = 0; i < (ui ? 3 : 4); i++) roundShield(p, e + 2 + i * 5, yardY - 5, true);
+      if (look === "spearWall") nativeSpearRack(p, e + 1, yardY - 1, ui ? 5 : 7, 5);
+    }
+  } else if (kind === "javelinCamp") {
+    nativeSpearRack(p, e + 1, yardY - 1, 2, ui ? 3 : 4);
+    const target = (x: number) => { p.rect(x, yardY - 4, 4, 4, "ink"); p.rect(x + 1, yardY - 3, 2, 2, "gold"); p.dot(x + 1, yardY - 3, "steelBright"); };
+    target(p.w - e - 5);
+    if (look === "throwingArms") target(p.w - e - 10);
+    if (look === "barbed") { p.rect(p.w / 2 - 2, yardY - 4, 4, 3, "ink"); p.rect(p.w / 2 - 1, yardY - 3, 2, 1, "woodLight"); }
+  } else {
+    p.rect(e + 1, yardY - 3, n - 3, 1, "woodLight");
+    const x = p.w - e - 5;
+    p.rect(x, yardY - 5, 1, 5, "woodDark"); p.rect(x - 2, yardY - 5, 5, 1, "woodLight");
+    p.rect(x + 1, yardY - 4, 2, 2, look === "heavyLance" ? "steelBright" : "gold");
+    p.rect(e + 2, yardY - 1, 3, 1, "gold");
+    if (look === "heavyLance") nativeSpearRack(p, e + 1, yardY - 1, 2, 5);
+    if (look === "wingedLancers") { p.rect(e + 6, yardY - 2, 2, 1, "stoneBright"); p.rect(e + 10, yardY - 1, 2, 1, "stoneBright"); }
+  }
+  return p;
+}
+
 type GunnerBuilding = "gunHall" | "gunNest" | "gatlingNest" | "rocketBattery" | "revolutionary";
 
 function gunnerRoof(kind: GunnerBuilding, look: string): Ramp {
@@ -844,6 +946,7 @@ function cannonTowerIcon(look: string) {
 
 /** Purpose-drawn 24px UI compositions rather than squashed world frames. */
 function icon(kind: string, look: string) {
+  if (kind === "spearHall" || kind === "phalanx" || kind === "javelinCamp" || kind === "lancerStable") return spearBuilding(kind, look, true);
   if (kind === "valkyriePalace") return palace(false, look, true);
   if (kind === "darkKeep") return darkKeep(false, true);
   if (kind === "gunHall" || kind === "gunNest" || kind === "rocketBattery") return gunnerHall(kind, look, true);
@@ -928,6 +1031,8 @@ const DRAW_BUILDING: Record<keyof typeof BUILDING_ART, (look: string) => Drawing
   rocketBattery: look => gunnerHall("rocketBattery", look), gatlingNest: gatlingEmplacement, revolutionary: () => revolutionary(),
   valkyriePalace: look => palace(false, look), valkyriePalaceCompact: look => palace(true, look),
   darkKeep: () => darkKeep(false), darkKeepCompact: () => darkKeep(true),
+  spearHall: look => spearBuilding("spearHall", look), phalanx: look => spearBuilding("phalanx", look),
+  javelinCamp: look => spearBuilding("javelinCamp", look), lancerStable: look => spearBuilding("lancerStable", look),
 };
 
 function rubbleRoof(kind: string): Color | undefined {
@@ -946,6 +1051,10 @@ function rubbleRoof(kind: string): Color | undefined {
   if (kind === "rocketBattery") return "redDark";
   if (kind === "valkyriePalace") return "goldDark";
   if (kind === "darkKeep") return "arcaneDark";
+  if (kind === "spearHall") return "goldDark";
+  if (kind === "phalanx") return "redDark";
+  if (kind === "javelinCamp") return "greenDark";
+  if (kind === "lancerStable") return "woodDark";
 }
 
 export function buildingPngs() {

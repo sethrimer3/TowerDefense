@@ -1,5 +1,7 @@
 # Building sprite batch 05
 
+This records the fifth delivery. [Batch 06](BUILDING_BATCH_06.md) adds the spearmen buildings; the twelve PNG files below and the airborne renderer remain unchanged.
+
 This batch adds **Valkyrie palace and Dark wizard keep**, each in normal and compact catalog sizes, with damage, rubble and purpose-drawn UI icons. It also converts the palace's separate **Cloudborne flight renderer**, including its cloud bank, shadow and ground mooring. Units and enemies remain deferred. All 41 earlier PNG files retain their exact bytes.
 
 ![Normal and compact buildings, path and damage variants, UI icons and actual Cloudborne flight compositions](building-batch-05.png)
