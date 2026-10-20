@@ -15,6 +15,7 @@
  * ones (flames, ice, blasts, hand torches) are drawn each frame. Only
  * ground outside the city has the masks: inside, the gravel's stones have
  * their own relief (`DefendLighting.drawRelief`). */
+import { pixelKey } from "./pixel-sprites.ts";
 import { CELLS_H, CELLS_W, cellIndex } from "./grid.ts";
 import { CellType, type CityMap } from "./citygen.ts";
 import { floorArtLoaded, paintFloor } from "./city-layer.ts";
@@ -53,7 +54,7 @@ export class GroundRelief {
    * they depend on changed. False until there is a DOM and the floor art. */
   sync(map: CityMap, px: number, W: number, H: number, area: AreaId = "moss") {
     if (typeof document === "undefined") return false;
-    const key = `${W}x${H}:${area}:${floorArtLoaded(area)}`;
+    const key = `${W}x${H}:${area}:${floorArtLoaded(area)}:${area === "moss" ? pixelKey() : ""}`;
     if (map === this.map && key === this.key) return this.masks.length === 4;
     this.map = map;
     this.key = key;

@@ -234,6 +234,9 @@ One skill rank, path rank or evolution being worked in the Study. Knowledge is p
 
 ### Presentation
 
+**Pixel Art**:
+The setting, on by default, that draws the pieces with hand-drawn sprites (shared with Tower Delve) in place of their drawn art; off, every piece looks as it was drawn before.
+
 **Park life**:
 The city's live dressing, never part of the battle: grass swaying and parting around walkers, and on the ponds rain rings, reflections and ducks.
 

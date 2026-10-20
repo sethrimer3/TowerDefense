@@ -11,7 +11,7 @@ import type { Light, Stone } from "./lighting.ts";
 import type { DefendSim } from "./sim.ts";
 import { ROAD, keepStage, paintKeepRubble, paintStructureArt, paintStructureRubble } from "./structure-art.ts";
 import { houseRubbleSprite, roofSeed, roofSprite } from "./roof-art.ts";
-import { ART, parkArt } from "./park-art.ts";
+import { ART, openAt, parkArt } from "./park-art.ts";
 import { damageStage, drawSprite, sprite, wallDamagePixels, wallRubblePixels } from "./damage-art.ts";
 import { mooringPixels } from "./sky-palace-art.ts";
 import { GRASS, grassPatch, groundArt } from "./ground-art.ts";
@@ -21,6 +21,7 @@ import { gateRect, type Side } from "./layout.ts";
 import { SPIKE_REACH, bastionPixels, bastionRubblePixels, spikePixels } from "./wall-defense-art.ts";
 import { AREAS, areaArtId, type AreaId } from "./areas.ts";
 import { hasWallArt, wallCapSprite, wallFaceSprite, wallRubbleTones } from "./area-wall-art.ts";
+import { drawPixel, drawRoof, type PixelSprite } from "./pixel-sprites.ts";
 
 export { POND, POND_WATER, hasTree, pondDisc, pondPath, treeCanopy } from "./park-geometry.ts";
 
@@ -110,6 +111,7 @@ export function paintCityLayer(c: CanvasRenderingContext2D, px: number, scene: C
   paintRoadStones(p, scene.stones);
   // Ponds over the park grass, as pixel art.
   paintPixelArt(p, parkArt(map).canvas);
+  paintPondPlants(p);
   // The spikes' beams lie under the stones, so only the stakes show past
   // the wall. Walls next: a wall's face hangs over the cell below it, and a
   // house or structure standing there is in front of the face, so it covers it.
@@ -161,6 +163,8 @@ export function paintFloor(c: CanvasRenderingContext2D, px: number, area: AreaId
         y = Math.round(ty * T),
         w = Math.round((tx + 1) * T) - x,
         h = Math.round((ty + 1) * T) - y;
+      // Pixel Art's mossy flagstones stand in for Mossbound Ruins' own.
+      if (area === "moss" && drawPixel(c, `floor-${k + 1}` as PixelSprite, x, y, w, h)) continue;
       if (ready(img)) {
         const { x: sx, y: sy } = area === "moss" ? FLOOR_CROP[k] : { x: 0, y: 0 };
         const size = area === "moss" ? FLOOR_SIZE : img.naturalWidth;
@@ -263,7 +267,7 @@ function paintBuilding(p: Paint, b: Building) {
   const box = { x, y, w, h, px };
   if (b.kind === "wall") {
     if (solid(b.cells[0])) paintWall(p, b);
-    else paintArt(p, wallRubbleSprite(lotSeed(b), p.area), box);
+    else if (hasWallArt(p.area) || !paintPixelRubble(p, b)) paintArt(p, wallRubbleSprite(lotSeed(b), p.area), box);
     return;
   }
   if (b.kind === "gate") {
@@ -283,12 +287,15 @@ function paintBuilding(p: Paint, b: Building) {
   }
   if (sim && !sim.intact(b)) {
     if (b.kind === "keep") return paintKeepRubble(c, box);
+    if (paintPixelRubble(p, b)) return paintRebuilding(p, b);
     if (b.kind === "house") paintArt(p, houseRubbleSprite(r.w, r.h, b.variant, roofSeed(r.x, r.y, r.w, r.h)), box);
     else paintStructureRubble(c, b.kind, box, lotSeed(b));
     return paintRebuilding(p, b);
   }
   // A cloudborne palace floats over its lot (`sky-palace-art.ts`), leaving its mooring.
   if (aloft(p, b)) return paintArt(p, sprite(`mooring:${r.w}x${r.h}:${lotSeed(b)}`, r.w * ART, r.h * ART, () => mooringPixels(r.w, r.h, lotSeed(b))), box);
+  // Pixel Art's roofs on undamaged houses; a damaged one keeps its own, showing the damage.
+  if (b.kind === "house" && !stageOf(sim, b) && drawRoof(c, b.variant, box, px)) return;
   if (b.kind === "house") return paintArt(p, roofSprite(r.w, r.h, b.variant, roofSeed(r.x, r.y, r.w, r.h), stageOf(sim, b)), box);
   paintStructureArt(c, b.kind, box, stageOf(sim, b), lotSeed(b), b.structureUid !== undefined ? p.looks?.[b.structureUid] : undefined);
 }
@@ -327,6 +334,7 @@ function paintRebuilding({ c, px, solid }: Paint, b: Building) {
     if (!solid(i)) continue;
     const cx = i % CELLS_W,
       cy = (i - cx) / CELLS_W;
+    if (drawPixel(c, "city-scaffold", Math.round(cx * px), Math.round(cy * px), Math.round((cx + 1) * px) - Math.round(cx * px))) continue;
     c.fillStyle = "#9c8356";
     c.fillRect(cx * px + 1, cy * px + 1, px - 2, px - 2);
     c.strokeStyle = "#5b4a2e";
@@ -395,7 +403,9 @@ function paintWall(p: Paint, b: Building) {
   };
   const cap = wallArt.cap;
   if (hasWallArt(p.area)) drawSprite(c, wallCapSprite(p.area, cx, cy), x, y, Math.round((cx + 1) * px) - x, Math.round((cy + 1) * px) - y);
-  else if (ready(cap)) {
+  else if (drawPixel(c, "city-wall-cap", x, y, Math.round((cx + 1) * px) - x, Math.round((cy + 1) * px) - y)) {
+    // Pixel Art's cap stone; the edges, damage, face and outline still follow the standing wall.
+  } else if (ready(cap)) {
     const sy = CAP.y0 + ((cy * CAP.w + cx * 37) % CAP.span);
     c.drawImage(cap, CAP.x, sy, CAP.w, CAP.w, x, y, Math.round((cx + 1) * px) - x, Math.round((cy + 1) * px) - y);
   } else {
@@ -453,7 +463,9 @@ function paintWallFace({ c, px, area }: Paint, cx: number, { x, y }: { x: number
   const h = px * FACE_HANG;
   const face = wallArt.face;
   if (hasWallArt(area)) drawSprite(c, wallFaceSprite(area, cx), x, y + px, px + 0.5, h);
-  else if (ready(face)) {
+  else if (drawPixel(c, "city-wall-face", x, y + px, px + 0.5, h)) {
+    // Pixel Art's brick face.
+  } else if (ready(face)) {
     const sx = FACE.x0 + ((cx * CAP.w) % FACE.span);
     c.drawImage(face, sx, FACE.y, CAP.w, FACE.h, x, y + px, px + 0.5, h);
   } else {
@@ -470,9 +482,37 @@ function paintLanternBrackets({ c, px, map, sim }: Paint, lights: readonly Light
     if (l.kind !== "lantern" && l.kind !== "door") continue;
     if (sim && !sim.intact(map.buildings[l.owner])) continue;
     const s = Math.max(2, px * 0.28);
+    if (drawPixel(c, "city-lantern", l.x * px - s / 2, l.y * px - s / 2, s)) continue;
     c.fillStyle = "#2b2622";
     c.fillRect(l.x * px - s / 2, l.y * px - s / 2, s, s);
     c.fillStyle = "#8a7045";
     c.fillRect(l.x * px - s / 4, l.y * px - s / 4, s / 2, s / 2);
   }
+}
+
+/** Pixel Art's rubble over a fallen building's cells, a heap a cell; false
+ * (drawing nothing) while Pixel Art isn't drawn. */
+function paintPixelRubble({ c, px }: Paint, b: Building) {
+  for (const i of b.cells) {
+    const cx = i % CELLS_W,
+      cy = (i - cx) / CELLS_W;
+    const x = Math.round(cx * px), y = Math.round(cy * px);
+    if (!drawPixel(c, "city-rubble", x, y, Math.round((cx + 1) * px) - x, Math.round((cy + 1) * px) - y)) return false;
+  }
+  return true;
+}
+
+/** Pixel Art's lily pads and reeds, on about a third of the pond cells,
+ * where the water is open (not under a canopy), as Tower Delve's ponds have
+ * them. Nothing while Pixel Art isn't drawn. */
+function paintPondPlants({ c, px, map }: Paint) {
+  const art = parkArt(map);
+  for (let cy = 0; cy < CELLS_H; cy++)
+    for (let cx = 0; cx < CELLS_W; cx++) {
+      if (map.type[cellIndex(cx, cy)] !== CellType.WATER || hash01(cx, cy, 63) >= 0.35) continue;
+      const lx = cx + 0.25 + hash01(cx, cy, 64) * 0.5, ly = cy + 0.25 + hash01(cx, cy, 65) * 0.5;
+      if (!openAt(art, Math.floor(lx * ART), Math.floor(ly * ART))) continue;
+      const r = Math.max(1.5, px * 0.15);
+      if (!drawPixel(c, hash01(cx, cy, 69) < 0.7 ? "pond-lily" : "pond-reeds", Math.round(lx * px - r), Math.round(ly * px - r), Math.round(r * 2))) return;
+    }
 }
