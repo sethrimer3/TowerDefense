@@ -141,7 +141,10 @@ export const PATH_LOOKS: Partial<Record<PlacedKind, readonly string[]>> = {
   valkyriePalace: ["cloudborne"],
   assassinDen: ["bloodletters", "shadowcloak", "venom", "headhunters"],
   musketHall: ["grenadiers", "volleyFire", "bayonets", "sharpMuskets"],
-  gunNest: ["beltFeed"],
+  gunHall: ["quickdraw", "duelists"],
+  gunNest: ["beltFeed", "tripod"],
+  gatlingNest: ["gunShield", "overdrive"],
+  rocketBattery: ["clusterRockets", "salvoRacks"],
   sniperLodge: ["marksmen", "ricochet", "suppressors"],
   archerBarracks: ["rangers", "skirmishers"],
   archerTower: ["fireArrows", "sharpshooters"],
@@ -476,8 +479,13 @@ const PISTOL = ["0000000", "0333330", "0002000", "..0110.", "..010..", "..000.."
 const MACHINE_GUN = ["00000000", "02333330", "00000000", ".0.0....", "0...0..."];
 /** The Gatling's ring of barrels, end on. */
 const BARRELS = [".000.", "03030", "00200", "03030", ".000."];
-/** A rocket, nose up, on its fins. */
-const ROCKET = ["..0..", ".020.", ".030.", ".030.", ".030.", "03330", "0.4.0"];
+/** A rocket, nose up: a red cone on a fat pale body banded red, wide fins
+ * and a flame under it. */
+const ROCKET = ["...0...", "..020..", ".02220.", ".03330.", ".02220.", ".03330.", "0033300", "00.4.00", "...4..."];
+/** Quickdraw's two pistols, one over the other, barrels to the right. */
+const TWIN_PISTOLS = ["0000000.", "0333330.", "00020...", ".0000000", ".0333330", "..00020."];
+/** Cluster rockets' three small rockets in a bundle. */
+const CLUSTER_ROCKETS = [".0.0.0.", "0202020", "0303030", "0303030", "0000000", ".4.4.4."];
 
 /** Sandbags round the edge of a yard box, two courses on the near side. */
 function sandbags(p: Pix, y: { x0: number; y0: number; x1: number; y1: number }) {
@@ -492,21 +500,39 @@ function sandbags(p: Pix, y: { x0: number; y0: number; x1: number; y1: number })
 }
 
 /** The Gunner hall: an iron-roofed hall with a pistol on the ridge over a
- * yard with a bench of pistols and a row of bottles on a fence to shoot at. */
-function paintGunHall(p: Pix) {
-  const y = guild(p, C.iron[2], PISTOL, { 0: OUTLINE, 1: C.plank[1], 2: C.iron[1], 3: C.iron[3] });
+ * yard with a bench of pistols and a row of bottles on a fence to shoot at.
+ * Quickdraw roofs it in red with two pistols and sets a second row of
+ * bottles; the Duelists roof it in lead with a brass pistol and pace out a
+ * lane between two posts. */
+function paintGunHall(p: Pix, look: string) {
+  const quick = look === "quickdraw", duel = look === "duelists";
+  const y = quick ? guild(p, C.kiln[1], TWIN_PISTOLS, { 0: OUTLINE, 2: C.plank[1], 3: C.iron[3] })
+    : guild(p, duel ? C.lead : C.iron[2], PISTOL, { 0: OUTLINE, 1: C.plank[1], 2: duel ? C.brass[0] : C.iron[1], 3: duel ? C.brass[2] : C.iron[3] });
   for (let x = y.x0 + 1; x <= y.x0 + 6; x++) { p.set(x, y.y0 + 2, C.plank[2]); p.set(x, y.y0 + 3, C.plank[0]); }
   for (const x of [y.x0 + 2, y.x0 + 5]) p.set(x, y.y0 + 1, C.iron[3]);
+  if (duel) {
+    // Two posts at either end of a paced-out lane, its paces scuffed.
+    const ly = y.y1 - 2;
+    for (const x of [y.x1 - 8, y.x1 - 1]) for (let yy = ly - 2; yy <= ly; yy++) p.set(x, yy, yy === ly - 2 ? C.target[1] : C.plank[0]);
+    for (let x = y.x1 - 7; x < y.x1 - 1; x += 2) p.set(x, ly, C.dirt[0]);
+    return;
+  }
   for (let x = y.x1 - 6; x <= y.x1 - 1; x++) p.set(x, y.y1 - 1, C.plank[1]);
   for (let x = y.x1 - 6; x <= y.x1 - 1; x += 2) { p.set(x, y.y1 - 2, C.canvas[2]); p.set(x, y.y1 - 3, C.canvas[1]); }
+  if (quick) {
+    // A second, higher fence of bottles, these brown.
+    for (let x = y.x1 - 6; x <= y.x1 - 1; x++) p.set(x, y.y1 - 4, C.plank[1]);
+    for (let x = y.x1 - 5; x <= y.x1 - 1; x += 2) { p.set(x, y.y1 - 5, C.crate[3]); p.set(x, y.y1 - 6, C.crate[2]); }
+  }
 }
 
 /** The Machine-gun nest: a canvas-roofed hall with a machine gun on the
  * ridge over a sandbagged yard holding ammunition boxes; on Belt feed the
- * roof is tarred and the yard strewn with spent brass. */
+ * roof is tarred and the yard strewn with spent brass, on Tripod the roof
+ * mossed and a gun stands on its tripod in the yard with range stakes. */
 function paintGunNest(p: Pix, look: string) {
-  const belt = look === "beltFeed";
-  const y = guild(p, belt ? C.tar : C.canvas[1], MACHINE_GUN, { 0: OUTLINE, 2: C.plank[1], 3: belt ? C.brass[1] : C.iron[2] });
+  const belt = look === "beltFeed", tripod = look === "tripod";
+  const y = guild(p, belt ? C.tar : tripod ? C.moss : C.canvas[1], MACHINE_GUN, { 0: OUTLINE, 2: C.plank[1], 3: belt ? C.brass[1] : C.iron[2] });
   sandbags(p, y);
   for (const [dx, dy] of [[2, 2], [5, 2], [2, 4]] as const) {
     rect(p, y.x0 + dx, y.y0 + dy, y.x0 + dx + 2, y.y0 + dy + 1, OUTLINE);
@@ -514,33 +540,58 @@ function paintGunNest(p: Pix, look: string) {
     p.set(y.x0 + dx + 1, y.y0 + dy + 1, C.canvas[0]);
   }
   if (belt) for (const [dx, dy] of [[9, 2], [11, 3], [10, 4], [13, 2], [12, 5], [14, 4]] as const) p.set(y.x0 + dx, y.y0 + dy, C.brass[2]);
+  if (tripod) {
+    // The gun on its splayed legs, and white-topped stakes paced out beyond.
+    const gx = y.x0 + 9, gy = y.y0 + 3;
+    for (let x = gx; x <= gx + 4; x++) p.set(x, gy, x === gx + 4 ? C.iron[3] : C.iron[1]);
+    for (const [dx, dy] of [[1, 1], [0, 2], [2, 1], [3, 2]] as const) p.set(gx + dx, gy + dy, C.plank[0]);
+    for (const dx of [7, 10, 13]) if (y.x0 + dx < y.x1) { p.set(y.x0 + dx, y.y1 - 2, C.target[0]); p.set(y.x0 + dx, y.y1 - 1, C.plank[0]); }
+  }
 }
 
 /** The Gatling emplacement: a brass-roofed hall with the gun's barrels on
- * the ridge over a sandbagged yard where the great gun stands on its carriage. */
-function paintGatlingNest(p: Pix) {
-  const y = guild(p, C.brass[0], BARRELS, { 0: OUTLINE, 2: C.brass[2], 3: C.iron[2] });
+ * the ridge over a sandbagged yard where the great gun stands on its
+ * carriage. Gun shield roofs it in iron and stands a riveted plate before
+ * the gun; Overdrive roofs it in red tiles, the barrels' ends glowing hot. */
+function paintGatlingNest(p: Pix, look: string) {
+  const shield = look === "gunShield", over = look === "overdrive";
+  const y = guild(p, shield ? C.iron[1] : over ? C.kiln[1] : C.brass[0], BARRELS, { 0: OUTLINE, 2: over ? C.ember : C.brass[2], 3: over ? C.fire[1] : C.iron[2] });
   sandbags(p, y);
   const cy = Math.round((y.y0 + y.y1) / 2), cx = Math.round((y.x0 + y.x1) / 2) - 3;
   for (const dx of [-1, 4]) disc(p, cx + dx + 0.5, cy + 1.5, 1.6, (x, yy, d, ox, oy) => (d > 1 ? OUTLINE : C.plank[Math.min(3, lit(x, yy, ox, oy, d))]));
   for (let x = cx; x <= cx + 7; x++) for (let r = -1; r <= 1; r++) p.set(x, cy + r, r === 0 ? OUTLINE : C.iron[x % 2 ? 2 : 3]);
-  p.set(cx + 8, cy, C.iron[3]);
+  p.set(cx + 8, cy, over ? C.ember : C.iron[3]);
+  if (over) for (const [dx, dy] of [[6, -1], [7, 1], [8, -1], [8, 1], [9, 0]] as const) p.set(cx + dx, cy + dy, dx > 7 ? C.fire[2] : C.ember);
+  if (shield) {
+    // The shield: an iron plate across the barrels, riveted, a slot to aim through.
+    for (let yy = cy - 3; yy <= cy + 2; yy++) for (const x of [cx + 5, cx + 6]) p.set(x, yy, yy === cy ? OUTLINE : x === cx + 5 ? C.iron[3] : C.iron[2]);
+    for (const yy of [cy - 2, cy + 2]) p.set(cx + 6, yy, C.brass[2]);
+  }
 }
 
 /** The Rocket battery: a red-tiled hall with a rocket on the ridge over a
- * yard with a rack of rockets slanted up and a scorched launch pad. */
-function paintRocketBattery(p: Pix) {
-  const y = guild(p, C.kiln[2], ROCKET, { 0: OUTLINE, 2: C.banner[2], 3: C.pale[2], 4: C.ember });
-  // The rack: a rail with three rockets leaning on it, noses up and right.
-  const ry = y.y1 - 1;
-  for (let x = y.x0 + 1; x <= y.x0 + 8; x++) p.set(x, ry, C.plank[0]);
-  for (let i = 0; i < 3; i++) {
-    const bx = y.x0 + 1 + i * 3;
-    for (let k = 0; k < 4; k++) p.set(bx + k, ry - 1 - k, k === 3 ? C.banner[2] : C.pale[2]);
-  }
-  // Scorched pad.
+ * yard with a rack of rockets slanted up and a scorched launch pad. Cluster
+ * rockets roof it in soot with a bundle of rockets, the pad a crater ringed
+ * by bomblet scorches; Salvo racks roof it in lead and fill a second rack. */
+function paintRocketBattery(p: Pix, look: string) {
+  const cluster = look === "clusterRockets", salvo = look === "salvoRacks";
+  const y = cluster ? guild(p, C.char[2], CLUSTER_ROCKETS, { 0: OUTLINE, 2: C.banner[2], 3: C.pale[2], 4: C.ember })
+    : guild(p, salvo ? C.lead : C.kiln[2], ROCKET, { 0: OUTLINE, 2: C.banner[2], 3: C.pale[2], 4: C.ember });
+  // The rack: a rail with three rockets leaning on it, noses up and right;
+  // Salvo racks' a second rail behind with three more.
+  const rack = (ry: number) => {
+    for (let x = y.x0 + 1; x <= y.x0 + 8; x++) p.set(x, ry, C.plank[0]);
+    for (let i = 0; i < 3; i++) {
+      const bx = y.x0 + 1 + i * 3;
+      for (let k = 0; k < 4; k++) p.set(bx + k, ry - 1 - k, k === 3 ? C.banner[2] : C.pale[2]);
+    }
+  };
+  rack(y.y1 - 1);
+  if (salvo) rack(y.y1 - 5);
+  // Scorched pad; the cluster's crater wider, ringed by bomblets' marks.
   const sx = y.x1 - 4, sy = Math.round((y.y0 + y.y1) / 2);
   for (const [ox, oy] of [[0, 0], [1, 0], [-1, 1], [0, 1], [1, 1], [2, 1], [0, 2], [1, -1], [-1, 0], [2, 0]]) p.set(sx + ox, sy + oy, C.char[ox === 0 && oy === 1 ? 2 : 0]);
+  if (cluster) for (const [ox, oy] of [[-3, 1], [4, 1], [1, -3], [1, 4], [-2, -2], [3, 3]]) p.set(sx + ox, sy + oy, oy === 4 ? C.ember : C.char[0]);
 }
 
 /** The Shadowcloak's hood with two eyes glinting in it. */

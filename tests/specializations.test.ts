@@ -63,7 +63,7 @@ test("the shop's three basic buildings branch into every other tower and troop b
   assert.deepEqual(to("watchTower"), ["Archer tower", "Cannon tower", "Wizard tower", "Spotters I", "Signal fires I"]);
   assert.deepEqual(to("meleeGuild"), ["Barracks", "Assassins' den"]);
   assert.deepEqual(to("rangedGuild"), ["Archer barracks", "Mage Guild", "Gunner hall"]);
-  assert.deepEqual(to("gunHall"), ["Musket hall", "Machine-gun nest", "Rocket battery"]);
+  assert.deepEqual(to("gunHall"), ["Musket hall", "Machine-gun nest", "Rocket battery", "Quickdraw I", "Duelists I"]);
   assert.deepEqual(to("barracks"), ["Crusaders I", "Berserkers I", "Halberdiers I"]);
   assert.deepEqual(to("assassinDen"), ["Bloodletters I", "Shadowcloak I", "Venomblades I", "Headhunters I"]);
   assert.deepEqual(to("wizardTower"), ["Pyromancy I", "Rime I", "Stormcalling I"]);

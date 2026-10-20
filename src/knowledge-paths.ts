@@ -6,7 +6,7 @@ import { cloneLayout, type PlacedKind } from "./defend/layout.ts";
 import type { Save } from "./save.ts";
 import { studyPathCost } from "./economy.ts";
 
-export type PathTopic = "wizardTower" | "barracks" | "valkyriePalace" | "assassinDen" | "musketHall" | "gunNest" | "sniperLodge" | "archerTower" | "cannonTower" | "archerBarracks" | "watchTower" | "mageGuild" | "bait" | "spikes" | SpellId;
+export type PathTopic = "wizardTower" | "barracks" | "valkyriePalace" | "assassinDen" | "musketHall" | "gunHall" | "gunNest" | "gatlingNest" | "rocketBattery" | "sniperLodge" | "archerTower" | "cannonTower" | "archerBarracks" | "watchTower" | "mageGuild" | "bait" | "spikes" | SpellId;
 /** Strike spells: cast from the battle's Skills palette rather than built,
  * so a spell has no cards; it casts with the one path `save.spellPaths`
  * names, at its furthest researched rank. */
@@ -17,6 +17,7 @@ export type PathId =
   | "pyromancy" | "rime" | "storm" | "crusaders" | "berserkers" | "halberdiers" | "cloudborne"
   | "bloodletters" | "shadowcloak" | "venom" | "headhunters"
   | "grenadiers" | "volleyFire" | "bayonets" | "sharpMuskets" | "beltFeed"
+  | "quickdraw" | "duelists" | "tripod" | "gunShield" | "overdrive" | "clusterRockets" | "salvoRacks"
   | "marksmen" | "ricochet" | "suppressors"
   | "fireArrows" | "sharpshooters" | "gunnery" | "siegeShot" | "rangers" | "skirmishers"
   | "spotters" | "signalFires" | "pyroclasm" | "cinders" | "oilSoaked" | "fortified"
@@ -116,6 +117,29 @@ export const SHARP_MUSKETS = { range: [0, 1.5, 1.5, 3], damage: [1, 1, 1.5, 1.8]
  * II their bullets hit `damage` times as hard. Its crown makes the nest a
  * Gatling emplacement. */
 export const BELT_FEED = { reload: [1, 0.8, 0.8, 0.6], damage: 1.4 };
+/** Tripod: machine gunners reach `range[rank]` more cells and hit
+ * `damage[rank]` times as hard. */
+export const TRIPOD = { range: [0, 1, 1, 2], damage: [1, 1, 1.25, 1.25] };
+/** Quickdraw: gunners reload in `reload[rank]` of the time; at III each
+ * shot also fires the second pistol at the next nearest enemy in reach. */
+export const QUICKDRAW = { reload: [1, 0.75, 0.6, 0.6] };
+/** Duelists: gunners hit `damage[rank]` times as hard and reach
+ * `range[rank]` more cells; at III every `every`th shot hits `crit` times
+ * as hard (counted, never rolled). */
+export const DUELISTS = { damage: [1, 1.3, 1.3, 1.3], range: [0, 0, 1.5, 1.5], every: 3, crit: 3 };
+/** Gun shield: Gatling gunners have `hp[rank]` times the life; from II
+ * they push the gun `speed` times as fast. */
+export const GUN_SHIELD = { hp: [1, 1.5, 1.5, 2.5], speed: 2 };
+/** Overdrive: Gatling gunners reach `range[rank]` more cells, hit
+ * `damage[rank]` times as hard and reload in `reload[rank]` of the time. */
+export const OVERDRIVE = { range: [0, 1, 1, 1], damage: [1, 1, 1.3, 1.3], reload: [1, 1, 1, 0.7] };
+/** Cluster rockets: rockets burst `blast[rank]` cells wider, from II throw
+ * `bomblets` round the burst at `share` of the damage, and at III leave the
+ * ground burning `burn` seconds at `burnShare` of the damage a second. */
+export const CLUSTER = { blast: [0, 0.5, 0.5, 0.5], bomblets: [0, 0, 4, 4], burn: [0, 0, 0, 5], burnShare: 0.2 };
+/** Salvo racks: rocketeers reload in `reload[rank]` of the time and loose
+ * `rockets[rank]` a launch, the rest at the next nearest enemies in reach. */
+export const SALVO = { reload: [1, 0.75, 0.75, 0.6], rockets: [1, 1, 2, 3] };
 /** Bayonets: an enemy within `reach` cells is run through for `damage`
  * times the shot's damage every `cooldown` seconds instead of shot; from II
  * they hunt anywhere in the city at `speed` times their pace; at III a
@@ -387,6 +411,62 @@ export const PATHS: KnowledgePath[] = [
     evolves: { from: "gunNest", item: "gatlingNest", name: "Gatling emplacement", cost: 50000, text: "This Machine-gun nest becomes a Gatling emplacement" },
   },
   {
+    id: "tripod", topic: "gunNest", name: "Tripod", motto: "Set down, and reach further", hue: "verdant",
+    ranks: [
+      { name: "Tripod", icon: "spyglass", cost: studyPathCost(4, 0), text: "Machine gunners reach a cell further" },
+      { name: "Traversing mount", icon: "crosshair", cost: studyPathCost(4, 1), text: "Their bullets hit 25% harder" },
+      { name: "Long barrel", icon: "arrow", cost: studyPathCost(4, 2), text: "They reach 2 cells further in all" },
+    ],
+  },
+  {
+    id: "quickdraw", topic: "gunHall", name: "Quickdraw", motto: "Faster hands, then two guns", hue: "ember",
+    ranks: [
+      { name: "Quick hands", icon: "hand", cost: studyPathCost(4, 0), text: "Gunners reload 25% faster" },
+      { name: "Fanning", icon: "volley", cost: studyPathCost(4, 1), text: "They reload 40% faster than at first" },
+      { name: "Twin pistols", icon: "fork", cost: studyPathCost(4, 2), text: "Every shot also fires the second pistol at the next nearest enemy in reach" },
+    ],
+  },
+  {
+    id: "duelists", topic: "gunHall", name: "Duelists", motto: "One careful shot at a time", hue: "steel",
+    ranks: [
+      { name: "Powder charge", icon: "blast", cost: studyPathCost(4, 0), text: "Gunners' bullets hit 30% harder" },
+      { name: "Long barrels", icon: "spyglass", cost: studyPathCost(4, 1), text: "They reach 1.5 cells further" },
+      { name: "Duelist's mark", icon: "crosshair", cost: studyPathCost(4, 2), text: "Every 3rd shot hits three times as hard" },
+    ],
+  },
+  {
+    id: "gunShield", topic: "gatlingNest", name: "Gun shield", motto: "Armour the crew, wheel the gun", hue: "steel",
+    ranks: [
+      { name: "Gun shield", icon: "frostShield", cost: studyPathCost(4, 0), text: "Gatling gunners have 50% more life" },
+      { name: "Wheeled carriage", icon: "gear", cost: studyPathCost(4, 1), text: "They push the gun twice as fast" },
+      { name: "Armoured crew", icon: "helm", cost: studyPathCost(4, 2), text: "They have two and a half times the life" },
+    ],
+  },
+  {
+    id: "overdrive", topic: "gatlingNest", name: "Overdrive", motto: "Crank it until it glows", hue: "ember",
+    ranks: [
+      { name: "Elevated gun", icon: "spyglass", cost: studyPathCost(4, 0), text: "Gatling gunners reach a cell further" },
+      { name: "Hot loads", icon: "cannonball", cost: studyPathCost(4, 1), text: "Their bullets hit 30% harder" },
+      { name: "Overdrive", icon: "inferno", cost: studyPathCost(4, 2), text: "They crank 30% faster" },
+    ],
+  },
+  {
+    id: "clusterRockets", topic: "rocketBattery", name: "Cluster rockets", motto: "A bigger bang, then many", hue: "ember",
+    ranks: [
+      { name: "Big warheads", icon: "blast", cost: studyPathCost(4, 0), text: "Rockets burst half a cell wider" },
+      { name: "Cluster bomblets", icon: "grape", cost: studyPathCost(4, 1), text: "Each burst throws 4 bomblets round it, each at 40% of the damage" },
+      { name: "Firestorm", icon: "inferno", cost: studyPathCost(4, 2), text: "Each burst leaves the ground burning for 5 seconds" },
+    ],
+  },
+  {
+    id: "salvoRacks", topic: "rocketBattery", name: "Salvo racks", motto: "More rockets, sooner", hue: "steel",
+    ranks: [
+      { name: "Quick racks", icon: "gear", cost: studyPathCost(4, 0), text: "Rocketeers reload 25% faster" },
+      { name: "Twin racks", icon: "volley", cost: studyPathCost(4, 1), text: "Each launch looses a second rocket at the next nearest enemy in reach" },
+      { name: "Salvo", icon: "stars", cost: studyPathCost(4, 2), text: "Three rockets a launch, reloading 40% faster than at first" },
+    ],
+  },
+  {
     id: "marksmen", topic: "sniperLodge", name: "Marksmen", motto: "Farther, and the biggest first", hue: "verdant",
     ranks: [
       { name: "Long rifles", icon: "spyglass", cost: studyPathCost(4, 0), text: "Snipers reach 3 cells further" },
@@ -650,7 +730,10 @@ export const UNSPECIALIZED: Record<PathTopic, string> = {
   valkyriePalace: "A marble palace on the ground",
   assassinDen: "Quick, frail assassins: every 4th strike critical",
   musketHall: "Musketmen: slow, heavy single balls",
+  gunHall: "Gunners: quick pistol shots",
   gunNest: "Machine gunners: fast, light bullets",
+  gatlingNest: "Gatling gunners: an enormous rate of fire and a crawl",
+  rocketBattery: "Rocketeers: very slow rockets that burst",
   sniperLodge: "Snipers: slow, far, single hard shots",
   archerTower: "Steady single arrows",
   cannonTower: "Standard shells and blasts",

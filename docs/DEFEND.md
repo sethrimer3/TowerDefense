@@ -293,12 +293,20 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   at III spreading when it dies; Headhunters going for the toughest enemy in
   reach, with a bounty of its HP, at III anywhere in the city); a
   Ranged Guild an archer barracks, a Mage Guild or a **gunner hall**
-  (gunners with pistols: quick, short shots), which becomes a **musket
-  hall**, a **machine-gun nest** (machine gunners spraying light bullets;
-  its Belt feed path reloads faster and hits harder, and its crown makes
-  it a **Gatling emplacement**, whose gunners fire at an enormous rate but
-  barely walk) or a **rocket battery** (rocketeers: very slow to reload,
-  every rocket bursting 1.5 cells wide, sparing your own). The musket
+  (gunners with pistols: quick, short shots; its Quickdraw path reloads
+  faster, then fires a second pistol at the next nearest, and its Duelists
+  hit harder, reach further and make every 3rd shot hit three times as
+  hard), which becomes a **musket hall**, a **machine-gun nest** (machine
+  gunners spraying light bullets; its Belt feed path reloads faster and
+  hits harder, and its crown makes it a **Gatling emplacement**, whose
+  gunners fire at an enormous rate but barely walk; its Tripod path
+  reaches further and hits harder) or a **rocket battery** (rocketeers:
+  very slow to reload, every rocket bursting 1.5 cells wide, sparing your
+  own; Cluster rockets burst wider, then throw 4 bomblets, then leave the
+  ground burning, and Salvo racks reload faster, then loose two and three
+  rockets a launch). The Gatling emplacement has Gun shield (more life,
+  then a carriage pushed twice as fast) and Overdrive (reach, harder
+  bullets, then cranking 30% faster). The musket
   hall's Sharpshooters path (further, harder, the toughest in reach at
   III) is crowned into a **sniper lodge** (snipers: long range, heavy,
   slow single shots, with three paths: Marksmen reaching

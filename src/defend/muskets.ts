@@ -38,8 +38,9 @@ export function grenadeOf(sim: DefendSim, home: number, damage: number): Pick<Ar
   return { blast: MUSKETEER.blast, grenade: { life: GRENADIERS.burn[g], dps: damage * GRENADIERS.share, bomblets: GRENADIERS.bomblets[g], ...(g >= 3 ? { cling: true as const } : {}) } };
 }
 
-/** An explosive ball lands: it bursts, and a Grenadier's throws bomblets
- * round it and leaves the ground burning (none of it in water). */
+/** An explosive ball lands: it bursts, and a Grenadier's (or a cluster
+ * rocket's) throws bomblets round it and leaves the ground burning, when
+ * it burns at all (none of it in water). */
 export function burstBall(sim: DefendSim, a: Arrow) {
   const r = a.blast!, origin = a.origin ?? { x: a.x, y: a.y }, g = a.grenade;
   if (!g) return void sim.explode(a.tx, a.ty, { r, damage: a.damage, friendlyFire: false, origin });
@@ -47,7 +48,7 @@ export function burstBall(sim: DefendSim, a: Arrow) {
   const seed = sim.explode(a.tx, a.ty, { r, damage: a.damage, friendlyFire: false, origin });
   for (const [dx, dy] of BOMBLETS.slice(0, g.bomblets))
     sim.explode(a.tx + dx * r * 0.9, a.ty + dy * r * 0.9, { r: r * GRENADIERS.bombR, damage: a.damage * GRENADIERS.bombShare, friendlyFire: false, origin });
-  sim.blazes.push({ x: a.tx, y: a.ty, r, t: 0, life: g.life, dps: g.dps, seed, ...(g.cling ? { cling: true } : {}) });
+  if (g.life) sim.blazes.push({ x: a.tx, y: a.ty, r, t: 0, life: g.life, dps: g.dps, seed, ...(g.cling ? { cling: true } : {}) });
 }
 /** Where a grenade's bomblets land, as shares of its burst: one each way. */
 const BOMBLETS = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const;

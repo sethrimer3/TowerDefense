@@ -13,7 +13,7 @@ import { STONEWORK, THORNWORK, TOWN_WALLS, WALL_PATHS, respecWalls, undoWalls, u
 import { sideRank, type SidePath, type SideRanks } from "../side-ranks.ts";
 import { GATE_PATHS, GATE_TOWERS, IRONBOUND, PORTCULLIS, gateAllocated, gateBarred, gateRank, respecGate, undoGate, upgradeGate, type GatePathId, type GateRanks } from "../gate-upgrades.ts";
 import { BALLISTA_PATHS, FIRE_BOLTS, HEAVY_BOLTS, WINDLASS, ballistaAllocated, ballistaRank, respecBallistas, undoBallistas, upgradeBallistas, type BallistaPathId, type BallistaRanks } from "../ballista-upgrades.ts";
-import { pathById, pathTopicOf, UNSPECIALIZED, type PathId, FIRE_ARROWS, SHARP, GUNNERY, SIEGE_SHOT, CRUSADE, BLOODLETTERS, SHADOWCLOAK, VENOM, HEADHUNT, GRENADIERS, VOLLEY, BAYONET, SHARP_MUSKETS, BELT_FEED, MARKSMEN, RICOCHET, SUPPRESS, BERSERK, HALBERD, RANGERS, SKIRMISH, FORTIFY, PYRO, RIME, STORM, PYROCLASM, CINDERS, SPOTTERS, SIGNAL } from "../knowledge-paths.ts";
+import { pathById, pathTopicOf, UNSPECIALIZED, type PathId, FIRE_ARROWS, SHARP, GUNNERY, SIEGE_SHOT, CRUSADE, BLOODLETTERS, SHADOWCLOAK, VENOM, HEADHUNT, GRENADIERS, VOLLEY, BAYONET, SHARP_MUSKETS, BELT_FEED, TRIPOD, QUICKDRAW, DUELISTS, GUN_SHIELD, OVERDRIVE, CLUSTER, SALVO, MARKSMEN, RICOCHET, SUPPRESS, BERSERK, HALBERD, RANGERS, SKIRMISH, FORTIFY, PYRO, RIME, STORM, PYROCLASM, CINDERS, SPOTTERS, SIGNAL } from "../knowledge-paths.ts";
 import { bonuses } from "../progression.ts";
 import { ITEM_NAMES, archerDamage, archerCooldown, archerRange, cannonDamage, cannonCooldown, CANNON_RANGE, SOLDIER, ARCHER_UNIT, soldierScale, STRUCTURES, flameDps, flameRange, iceDamage, ICE_RANGE, iceChill, watchRadius, fireballDamage, fireballSplash, emberDps, emberSeconds, FIRE_MAGE, FIREBALL_RANGE, keepHp, BRAWLER, ASSASSIN_UNIT, SLINGER, SNIPER, MUSKETEER, GUNNER, MACHINE_GUNNER, GATLING_GUNNER, ROCKETEER, WALL_BLOCK_DESCRIPTION, wallHp, GATE, GATE_DESCRIPTION, BALLISTA, BALLISTA_DESCRIPTION, ballistaCooldown, ballistaDamage, ballistaRange, gateHpScale, gateShut, type PaletteItem } from "../defend/catalog.ts";
 
@@ -71,11 +71,28 @@ export function kindStats(save: Save, kind: PaletteItem, path?: PathId, rank = 0
   if (kind in GUNS) {
     const u: { hp: number; damage: number; cooldown: number; range?: number } = GUNS[kind as keyof typeof GUNS], scale = soldierScale(l.soldierArms);
     const range = u.range !== undefined ? ` · ${u.range} range` : "";
-    if (kind === "rocketBattery") return `Recruits: ${n(u.hp * scale * b.troopHp)} HP · ${n(u.damage * scale * b.troopDamage)} damage every ${u.cooldown}s${range} · bursts ${ROCKETEER.blast} cells wide`;
-    if (kind === "gatlingNest") return `Recruits: ${n(u.hp * scale * b.troopHp)} HP · ${n(u.damage * scale * b.troopDamage)} damage every ${u.cooldown}s${range} · walks at ${GATLING_GUNNER.speed} cells/s`;
+    const life = (m = 1) => `Recruits: ${n(u.hp * scale * b.troopHp * m)} HP`;
+    if (kind === "rocketBattery") {
+      const cluster = at("clusterRockets"), salvo = at("salvoRacks");
+      const extra = [
+        SALVO.rockets[salvo] > 1 ? `${SALVO.rockets[salvo]} rockets a launch` : "",
+        CLUSTER.bomblets[cluster] ? `${CLUSTER.bomblets[cluster]} bomblets` : "",
+        CLUSTER.burn[cluster] ? `burning ground ${CLUSTER.burn[cluster]}s` : "",
+      ].filter(Boolean).map((t) => ` · ${t}`).join("");
+      return `${life()} · ${n(u.damage * scale * b.troopDamage)} damage every ${n(u.cooldown * SALVO.reload[salvo])}s${range} · bursts ${ROCKETEER.blast + CLUSTER.blast[cluster]} cells wide${extra}`;
+    }
+    if (kind === "gatlingNest") {
+      const shield = at("gunShield"), over = at("overdrive");
+      return `${life(GUN_SHIELD.hp[shield])} · ${n(u.damage * scale * b.troopDamage * OVERDRIVE.damage[over])} damage every ${n(u.cooldown * OVERDRIVE.reload[over])}s · ${GATLING_GUNNER.range + OVERDRIVE.range[over]} range · walks at ${n(GATLING_GUNNER.speed * (shield >= 2 ? GUN_SHIELD.speed : 1))} cells/s`;
+    }
     if (kind === "gunNest") {
-      const belt = at("beltFeed");
-      return `Recruits: ${n(u.hp * scale * b.troopHp)} HP · ${n(u.damage * scale * b.troopDamage * (belt >= 2 ? BELT_FEED.damage : 1))} damage every ${n(u.cooldown * BELT_FEED.reload[belt])}s${range}`;
+      const belt = at("beltFeed"), tripod = at("tripod");
+      return `${life()} · ${n(u.damage * scale * b.troopDamage * (belt >= 2 ? BELT_FEED.damage : 1) * TRIPOD.damage[tripod])} damage every ${n(u.cooldown * BELT_FEED.reload[belt])}s · ${MACHINE_GUNNER.range + TRIPOD.range[tripod]} range`;
+    }
+    if (kind === "gunHall") {
+      const quick = at("quickdraw"), duel = at("duelists");
+      const extra = [quick >= 3 ? "second pistol at the next nearest" : "", duel >= 3 ? `every ${ordinal(DUELISTS.every)} shot ${DUELISTS.crit}x` : ""].filter(Boolean).map((t) => ` · ${t}`).join("");
+      return `${life()} · ${n(u.damage * scale * b.troopDamage * DUELISTS.damage[duel])} damage every ${n(u.cooldown * QUICKDRAW.reload[quick])}s · ${GUNNER.range + DUELISTS.range[duel]} range${extra}`;
     }
     if (kind === "musketHall") {
       const grenade = at("grenadiers"), volley = at("volleyFire"), bayonet = at("bayonets"), sharp = at("sharpMuskets");

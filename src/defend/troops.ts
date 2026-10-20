@@ -45,7 +45,7 @@ import { answerBanner, MARCH_SIGHT } from "./war-banner.ts";
 import { BERSERK, CRUSADE, HALBERD, RANGERS, SKIRMISH, VOLLEY, pathRank } from "../knowledge-paths.ts";
 import { bigGame, bulletOf, sniperRange, sniperReload } from "./snipers.ts";
 import { bayonetTarget, charges, grenadeOf, musketDamage, musketRange, musketReload, musketSpeed, thrust, toughestInReach, volleyTargets } from "./muskets.ts";
-import { beltDamage, beltReload } from "./gunners.ts";
+import { gunDamage, gunExtras, gunHp, gunRange, gunReload, gunSpeed, isGun, rocketOf, type Gun } from "./gunners.ts";
 import { cloudRank, diveIn, hostDrill, hostGarrison, musterPoint } from "./sky-palace.ts";
 import { assassinHp, assassinStrike, headhunter, huntReach, recruitState, stepCloak, toughestFirst } from "./assassins.ts";
 
@@ -117,7 +117,7 @@ export class Barracks {
     const scale = soldierScale(sim.levels.soldierArms);
     const stats = kind === "archer" ? ARCHER_UNIT : kind === "mage" ? { ...FIRE_MAGE, damage: fireballDamage(sim.levels.mageFireball ?? 0) } : kind === "valkyrie" ? VALKYRIE : kind === "darkWizard" ? DARK_WIZARD
       : kind === "brawler" ? BRAWLER : kind === "assassin" ? ASSASSIN_UNIT : isRanged(kind) ? RANGED[kind] : SOLDIER;
-    const path = kind === "sword" ? swordStats(sim, b.id) : kind === "assassin" ? { hp: assassinHp(sim, b.id), damage: 1 } : { hp: 1, damage: 1 };
+    const path = kind === "sword" ? swordStats(sim, b.id) : kind === "assassin" ? { hp: assassinHp(sim, b.id), damage: 1 } : { hp: gunHp(sim, b.id, kind), damage: 1 };
     sim.soldiers.push({
       id: sim.newId(),
       kind,
@@ -277,8 +277,9 @@ export function stepArcher(sim: DefendSim, s: Soldier, dt: number) {
   s.thinkT -= dt;
   const { ranger, skirmish } = paths(sim, s.home);
   const own = s.kind === "archer" ? null : RANGED[s.kind as keyof typeof RANGED];
-  const range = s.kind === "sniper" ? sniperRange(sim, s) : s.kind === "musketeer" ? musketRange(sim, s) : own ? own.range : archerUnitRange(sim.levels.archerSight ?? 0) + (ranger ? RANGERS.sight : 0);
-  const speed = s.kind === "musketeer" ? musketSpeed(sim, s) : (own ?? ARCHER_UNIT).speed * (skirmish >= 2 ? SKIRMISH.speed : 1);
+  const gun = isGun(s.kind) ? (s as Soldier & { kind: Gun }) : null;
+  const range = s.kind === "sniper" ? sniperRange(sim, s) : s.kind === "musketeer" ? musketRange(sim, s) : gun ? gunRange(sim, gun) : own ? own.range : archerUnitRange(sim.levels.archerSight ?? 0) + (ranger ? RANGERS.sight : 0);
+  const speed = s.kind === "musketeer" ? musketSpeed(sim, s) : gun ? gunSpeed(sim, gun) : (own ?? ARCHER_UNIT).speed * (skirmish >= 2 ? SKIRMISH.speed : 1);
   // Bayonets: an enemy at close quarters is run through, not shot.
   const close = bayonetTarget(sim, s);
   if (close) return thrust(sim, s, close, bannerDamage(sim, s));
@@ -306,18 +307,21 @@ function shoot(sim: DefendSim, s: Soldier, e: Enemy, range: number) {
   if (s.kind !== "archer") {
     // Stone throwers, the gunner line and snipers: one shot of their own.
     const kind = s.kind as keyof typeof RANGED, own = RANGED[kind], base = bannerDamage(sim, s);
-    const damage = kind === "musketeer" ? musketDamage(sim, s, base) : kind === "machineGunner" ? beltDamage(sim, s, base) : base;
-    s.cd = kind === "musketeer" ? musketReload(sim, s) : kind === "sniper" ? sniperReload(sim, s) : kind === "machineGunner" ? beltReload(sim, s) : own.cooldown;
+    const gun = isGun(kind) ? (s as Soldier & { kind: Gun }) : null;
+    const damage = kind === "musketeer" ? musketDamage(sim, s, base) : gun ? gunDamage(sim, gun, base) : base;
+    s.cd = kind === "musketeer" ? musketReload(sim, s) : kind === "sniper" ? sniperReload(sim, s) : gun ? gunReload(sim, gun) : own.cooldown;
     // A sniper's bullet carries its lodge's path.
     if (kind === "sniper") {
       const { damage: hit, ...bullet } = bulletOf(sim, s, damage);
       return void sim.arrows.push({ x: s.x, y: s.y, origin: { x: s.x, y: s.y, attacker: s.id }, target: e.id, damage: hit, tx: e.x, ty: e.y, life: 2, shot: "bullet", ...bullet });
     }
     const fire = (t: Enemy, share = 1) => sim.arrows.push({ x: s.x, y: s.y, origin: { x: s.x, y: s.y, attacker: s.id }, target: t.id, damage: damage * share, tx: t.x, ty: t.y, life: 2, shot: SHOT[kind],
-      ...(kind === "musketeer" ? grenadeOf(sim, s.home, damage * share) : kind === "rocketeer" ? { blast: ROCKETEER.blast } : {}) });
+      ...(kind === "musketeer" ? grenadeOf(sim, s.home, damage * share) : kind === "rocketeer" ? rocketOf(sim, s.home, damage * share) : {}) });
     fire(e);
-    // Volley fire: buck and ball at the next nearest.
+    // Volley fire: buck and ball at the next nearest; Twin pistols and
+    // Salvo racks: full shots at the next nearest.
     if (kind === "musketeer") for (const t of volleyTargets(sim, s, e, range)) fire(t, VOLLEY.share);
+    if (gun) for (const t of gunExtras(sim, gun, e, range)) fire(t);
     return;
   }
   s.cd = ARCHER_UNIT.cooldown * SKIRMISH.reload[skirmish];
