@@ -31,6 +31,11 @@ export const BUILDING_ART = {
   wizardTower: { kind: "wizardTower", sheet: "v2/defend/wizard-tower", icon: "v2/ui/wizard-tower", footprint: [2, 2], size: [16, 16], anchor: [8, 8], contentBounds: [1, 1, 14, 14], overhang: [0, 0, 0, 0], looks: ["", "pyromancy", "rime", "storm"], stages: 4 },
   mageGuild: { kind: "mageGuild", sheet: "v2/defend/mage-guild", icon: "v2/ui/mage-guild", footprint: [4, 6], size: [32, 48], anchor: [16, 24], contentBounds: [3, 3, 26, 42], overhang: [0, 0, 0, 0], looks: ["", "pyroclasm", "cinders"], stages: 4 },
   monsterBait: { kind: "monsterBait", sheet: "v2/defend/monster-bait", icon: "v2/ui/monster-bait", footprint: [2, 2], size: [16, 16], anchor: [8, 8], contentBounds: [1, 1, 14, 14], overhang: [0, 0, 0, 0], looks: ["", "oilSoaked", "fortified"], stages: 4 },
+  gunHall: { kind: "gunHall", sheet: "v2/defend/gunner-hall", icon: "v2/ui/gunner-hall", footprint: [4, 4], size: [32, 32], anchor: [16, 16], contentBounds: [3, 3, 26, 26], overhang: [0, 0, 0, 0], looks: ["", "quickdraw", "duelists"], stages: 4 },
+  gunNest: { kind: "gunNest", sheet: "v2/defend/machine-gun-nest", icon: "v2/ui/machine-gun-nest", footprint: [4, 4], size: [32, 32], anchor: [16, 16], contentBounds: [3, 3, 26, 26], overhang: [0, 0, 0, 0], looks: ["", "beltFeed", "tripod"], stages: 4 },
+  gatlingNest: { kind: "gatlingNest", sheet: "v2/defend/gatling-emplacement", icon: "v2/ui/gatling-emplacement", footprint: [4, 4], size: [32, 32], anchor: [16, 16], contentBounds: [3, 3, 26, 26], overhang: [0, 0, 0, 0], looks: ["", "gunShield", "overdrive", "stoppingPower"], stages: 4 },
+  rocketBattery: { kind: "rocketBattery", sheet: "v2/defend/rocket-battery", icon: "v2/ui/rocket-battery", footprint: [4, 4], size: [32, 32], anchor: [16, 16], contentBounds: [3, 3, 26, 26], overhang: [0, 0, 0, 0], looks: ["", "clusterRockets", "salvoRacks"], stages: 4 },
+  revolutionary: { kind: "revolutionary", sheet: "v2/defend/revolutionary", icon: "v2/ui/revolutionary", footprint: [4, 4], size: [32, 32], anchor: [16, 16], contentBounds: [3, 3, 26, 26], overhang: [0, 0, 0, 0], looks: [""], stages: 4 },
 } as const;
 
 export const BUILDING_PNGS = [...new Set(Object.values(BUILDING_ART).flatMap(a => [a.sheet, a.icon])), "v2/defend/keep-flag", "v2/defend/scaffold"] as const;

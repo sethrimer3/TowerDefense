@@ -1,5 +1,7 @@
 # Building sprite batch 03
 
+This records the third delivery. [Batch 04](BUILDING_BATCH_04.md) extends its coverage; the twelve PNG assets below remain unchanged.
+
 This batch adds the **Assassins' den, Sniper lodge, Musket hall, Wizard tower, Mage Guild and Monster bait**, including all their existing path looks, damage, rubble, rebuilding and matching building icons. Units and enemies remain deferred. Earlier sprites retain their original PNG bytes.
 
 ![Six building families with path variants, heavy damage, rubble and matching UI icons](building-batch-03.png)

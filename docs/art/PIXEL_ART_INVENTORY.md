@@ -2,7 +2,7 @@
 
 Read the [style guide and setting contract](PIXEL_ART_GUIDE.md) first. This is a source-audited work list, **not a list of approved or completed new sprites**. Snapshot: commit `a4e07e0`, the Pixel Art setting/Tower Delve PNG merge. Refresh the catalog appendices when gameplay adds an element.
 
-Implementation update: [batch 01](BUILDING_BATCH_01.md) converts the keep, barracks and watch tower; [batch 02](BUILDING_BATCH_02.md) adds the melee/ranged guilds, archer barracks and archer/cannon towers; [batch 03](BUILDING_BATCH_03.md) adds Assassins' den, Sniper lodge, Musket hall, Wizard tower, Mage Guild and Monster bait. All include shared UI/placement appearances. The catalog snapshot is unchanged. Units and enemies are deferred at the user's request; their unchecked rows remain future work.
+Implementation update: [batch 01](BUILDING_BATCH_01.md) converts the keep, barracks and watch tower; [batch 02](BUILDING_BATCH_02.md) adds the melee/ranged guilds, archer barracks and archer/cannon towers; [batch 03](BUILDING_BATCH_03.md) adds Assassins' den, Sniper lodge, Musket hall, Wizard tower, Mage Guild and Monster bait. [Batch 04](BUILDING_BATCH_04.md) adds the five gunner buildings. All include shared UI/placement appearances. The catalog snapshot is unchanged. Units and enemies are deferred at the user's request; their unchecked rows remain future work.
 
 Legend: **Audit/redraw** = PNG exists, but style/density/states still require review; **Create** = no registered PNG replacement for this family; **Integrate** = the setting, scale, cache or cross-screen routing still needs work. Every unchecked item remains pending. Existing legacy artwork stays available when Pixel Art is off.
 
@@ -35,11 +35,11 @@ Source footprint dimensions are simulation cells. Proposed base footprint pixels
 | [x] | `rangedGuild` — Ranged Guild | 4×4 → 32×32 | — | v2 base, all damage/rubble, rebuilding and UI; batch 02 |
 | [x] | `assassinDen` — Assassins' den | 4×4 → 32×32 | — | v2 base + Bloodletters/Shadowcloak/Venomblades/Headhunters, all damage/rubble, rebuilding and UI; batch 03 |
 | [x] | `sniperLodge` — Sniper lodge | 4×4 → 32×32 | — | v2 base + Marksmen/Ricochet/Suppressing fire/Deadeye/Piercing rounds, all damage/rubble, rebuilding and UI; batch 03 |
-| [ ] | `gunHall` — Gunner hall | 4×4 → 32×32 | — | Create; gunner line merged during batch 03 |
-| [ ] | `gunNest` — Machine-gun nest | 4×4 → 32×32 | — | Create; gunner line merged during batch 03 |
-| [ ] | `gatlingNest` — Gatling emplacement | 4×4 → 32×32 | — | Create; gunner line merged during batch 03 |
-| [ ] | `rocketBattery` — Rocket battery | 4×4 → 32×32 | — | Create; gunner line merged during batch 03 |
-| [ ] | `revolutionary` — Revolutionary | 4×4 → 32×32 | — | Create; gunner line merged during batch 03 |
+| [x] | `gunHall` — Gunner hall | 4×4 → 32×32 | — | v2 base + Quickdraw/Duelists, all damage/rubble, rebuilding and UI; batch 04 |
+| [x] | `gunNest` — Machine-gun nest | 4×4 → 32×32 | — | v2 base + Belt feed/Tripod, all damage/rubble, rebuilding and UI; batch 04 |
+| [x] | `gatlingNest` — Gatling emplacement | 4×4 → 32×32 | — | v2 base + Gun shield/Overdrive/Stopping power, all damage/rubble, rebuilding and UI; batch 04 |
+| [x] | `rocketBattery` — Rocket battery | 4×4 → 32×32 | — | v2 base + Cluster rockets/Salvo racks, all damage/rubble, rebuilding and UI; batch 04 |
+| [x] | `revolutionary` — Revolutionary | 4×4 → 32×32 | — | v2 base; shared numerical upgrades retain this look, all damage/rubble, rebuilding and UI; batch 04 |
 | [x] | `musketHall` — Musket hall | 6×4 → 48×32 | — | v2 base + Grenadiers/Volley fire/Bayonets/Sharpshooters, all damage/rubble, rebuilding and UI; batch 03 |
 | [x] | `barracks` — Barracks | 4×6 → 32×48 | — | v2 normal/wide, base + Crusaders/Berserkers/Halberdiers, all damage/rubble, rebuilding and UI; batch 01 |
 | [x] | `archerBarracks` — Archer barracks | 4×4 → 32×32 | — | v2 base + Rangers/Skirmishers, all damage/rubble, rebuilding and UI; batch 02 |
@@ -169,7 +169,9 @@ Preserve the Library's side-view geometry (`library/geometry.ts`: current nave 1
 
 ## F. Batch tracking
 
-**Implemented: [batch 03](BUILDING_BATCH_03.md)** — Assassins' den, Sniper lodge, Musket hall, Wizard tower, Mage Guild and Monster bait; twelve PNG sheets, 130 world-state frames and 26 matching UI icons. Includes all existing path looks, damage, rebuilding, and material-appropriate rubble. Two shared magic ramps extend the palette to 30 swatches while retaining the 16-color world/12-color UI limits. All nineteen earlier PNGs stay unchanged. Current building coverage: fourteen of twenty-one families, 31 native PNG sheets, 246 world-state frames and 45 UI icons. Valkyrie palace, Dark wizard keep, the five newly merged gunner buildings, terrain/theme work, units and enemies remain separate work.
+**Implemented: [batch 04](BUILDING_BATCH_04.md)** — Gunner hall, Machine-gun nest, Gatling emplacement, Rocket battery and Revolutionary; ten PNG sheets, 70 world-state frames and 14 matching UI icons. Includes all current paths, damage, rubble and rebuilding, using the existing 30-color palette and per-frame caps. All 31 earlier PNG files remain unchanged. Current building coverage: nineteen of twenty-one families, 41 native PNG files, 316 world-state frames and 59 UI icons. Valkyrie palace, Dark wizard keep, terrain/theme work, units and enemies remain separate work.
+
+**Implemented: [batch 03](BUILDING_BATCH_03.md)** — Assassins' den, Sniper lodge, Musket hall, Wizard tower, Mage Guild and Monster bait; twelve PNG sheets, 130 world-state frames and 26 matching UI icons. Includes all existing path looks, damage, rebuilding, and material-appropriate rubble. Two shared magic ramps extend the palette to 30 swatches while retaining the 16-color world/12-color UI limits. All nineteen earlier PNGs stay unchanged. That delivery brought coverage to fourteen of twenty-one families, 31 native PNG sheets, 246 world-state frames and 45 UI icons. The gunner buildings were added in batch 04.
 
 **Implemented: [batch 02](BUILDING_BATCH_02.md)** — melee/ranged guilds, archer barracks, archer tower and cannon tower; ten PNG sheets, 55 world-state frames and 11 matching UI icons. Uses the existing gated frame/rubble/scaffold/placement/icon routes, with all original batch-01 PNGs unchanged. Its delivery brought building coverage to eight of the sixteen catalog families; 19 native PNG sheets, 116 world-state frames and 19 UI icons.
 

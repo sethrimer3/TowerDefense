@@ -412,6 +412,133 @@ function specialistHall(kind: Specialist, look: string, ui = false) {
   return p;
 }
 
+type GunnerBuilding = "gunHall" | "gunNest" | "gatlingNest" | "rocketBattery" | "revolutionary";
+
+function gunnerRoof(kind: GunnerBuilding, look: string): Ramp {
+  if (kind === "gunHall") return look === "quickdraw" ? ["redDark", "red", "redLight"] : ["steelDark", "steel", "steelLight"];
+  if (kind === "gunNest") return look === "beltFeed" ? ["steelDark", "steel", "steelLight"]
+    : look === "tripod" ? ["woodDark", "wood", "woodLight"] : ["greenDark", "green", "greenLight"];
+  if (kind === "gatlingNest") return look === "overdrive" ? ["redDark", "red", "redLight"]
+    : look === "stoppingPower" ? ["frostDark", "frost", "frostLight"] : look === "gunShield" ? ["steelDark", "steel", "steelLight"] : ["goldDark", "gold", "goldLight"];
+  return look === "clusterRockets" ? ["steelDark", "steel", "steelLight"] : look === "salvoRacks" ? ["greenDark", "green", "greenLight"] : ["redDark", "red", "redLight"];
+}
+
+/** Small building signs; these are equipment on roofs, never troop art. */
+function gunnerSign(p: Drawing, kind: GunnerBuilding, look: string, x: number, y: number) {
+  if (kind === "gunHall") {
+    p.stamp(["........", ".oooooo.", ".obbbbbo", ".owwooo.", ".owwo...", ".oooo...", "........", "........"], x, y,
+      { o: "ink", b: look === "duelists" ? "gold" : "steelLight", w: "woodLight" });
+    if (look === "quickdraw") {
+      p.rect(x + 5, y + 5, 3, 1, "steelLight"); p.rect(x + 6, y + 6, 2, 1, "woodLight");
+    }
+  } else if (kind === "gunNest") {
+    p.stamp(["........", "...ooo..", ".oobbbbo", "obbbbbbo", ".oowooo.", "...w....", "..w.w...", "........"], x, y,
+      { o: "ink", b: "steelLight", w: "woodLight" });
+    if (look === "beltFeed") { p.rect(x + 1, y + 4, 2, 3, "gold"); p.dot(x + 2, y + 5, "ink"); }
+  } else {
+    const rocket = (rx: number, ry: number) => p.stamp([".o.", "obo", "obo", "ogo", ".o."], rx, ry,
+      { o: "ink", b: "steelLight", g: "gold" });
+    if (look === "clusterRockets") { rocket(x, y + 2); rocket(x + 3, y); rocket(x + 5, y + 2); }
+    else rocket(x + 3, y + 1);
+  }
+}
+
+function sandbagLine(p: Drawing, x: number, y: number, width: number, color: Color = "woodLight") {
+  p.rect(x, y, width, 3, "ink"); p.rect(x + 1, y, width - 2, 1, color); p.rect(x + 1, y + 1, width - 2, 1, "woodDark");
+  for (let xx = x + 4; xx < x + width - 1; xx += 4) p.dot(xx, y, "woodDark");
+}
+
+/** Hall, canvas nest and battery share materials but get distinct roof and
+ * yard compositions at 32px world / 24px UI, without shrinking source art. */
+function gunnerHall(kind: GunnerBuilding, look: string, ui = false) {
+  const p = new Drawing(ui ? 24 : 32, ui ? 24 : 32), edge = ui ? 2 : 3, n = p.w - edge * 2, roof = gunnerRoof(kind, look);
+  stoneBox(p, edge + 1, edge + 4, n - 2, ui ? 13 : 18);
+  p.rect(edge, edge, n, ui ? 11 : 15, "ink");
+  p.rect(edge + 1, edge + 1, n - 2, ui ? 9 : 13, roof[0]);
+  p.rect(edge + 1, edge + 1, n - 2, ui ? 4 : 6, roof[2]);
+  p.rect(edge + 1, edge + (ui ? 5 : 7), n - 2, 1, roof[1]);
+  const doorY = ui ? 14 : 18, yardY = ui ? 20 : 26;
+  p.rect(p.w / 2 - 2, doorY, 4, 4, "ink"); p.rect(p.w / 2 - 1, doorY + 1, 2, 3, "woodLight");
+  gunnerSign(p, kind, look, p.w / 2 - 4, ui ? 4 : 6);
+  if (kind === "gunNest") {
+    // A single tent seam and sandbags, keeping the canvas quiet.
+    p.rect(edge + 2, edge + 2, 1, ui ? 7 : 11, roof[1]);
+    sandbagLine(p, edge, yardY - 1, n);
+    if (look === "tripod") {
+      p.line(edge + 5, yardY - 4, edge + 3, yardY - 1, "woodLight");
+      p.line(edge + 5, yardY - 4, edge + 7, yardY - 1, "woodLight"); p.rect(edge + 3, yardY - 5, 6, 1, "steelLight");
+    } else {
+      p.rect(edge + 3, yardY - 4, 4, 3, "ink"); p.rect(edge + 4, yardY - 3, 2, 1, "woodLight");
+      if (look === "beltFeed") { p.rect(p.w - edge - 7, yardY - 4, 4, 1, "gold"); p.dot(p.w - edge - 5, yardY - 3, "gold"); }
+    }
+  } else if (kind === "rocketBattery") {
+    p.rect(edge + 1, yardY - 4, n - 2, 6, "ink");
+    p.rect(edge + 2, yardY - 3, n - 4, 4, "stoneDark");
+    for (const offset of look === "salvoRacks" ? [0, 5] : [0]) {
+      const x = edge + 3 + offset;
+      p.rect(x, yardY - 2, 4, 2, "woodDark");
+      p.line(x, yardY - 2, x + 3, yardY - 5, "steelLight"); p.dot(x + 3, yardY - 5, "gold");
+    }
+    if (look === "clusterRockets") for (const dx of [0, 3, 6]) p.dot(p.w - edge - 8 + dx, yardY, "gold");
+  } else {
+    p.rect(edge, yardY - 1, n, 2, "woodDark");
+    if (look === "duelists") {
+      for (const x of [edge + 2, p.w - edge - 3]) { p.rect(x, yardY - 3, 1, 3, "woodLight"); p.dot(x, yardY - 3, "gold"); }
+      p.rect(p.w / 2 - 2, yardY - 1, 4, 1, "stoneBright");
+    } else for (let x = edge + 3; x < p.w - edge - 3; x += look === "quickdraw" ? 4 : 8) {
+      p.rect(x, yardY - 3, 2, 2, "steelLight"); p.dot(x, yardY - 3, "stoneBright");
+    }
+  }
+  return p;
+}
+
+/** Open emplacement: broad carriage, a brass base and a multi-barrel gun.
+ * The shield is a plate, Overdrive has hot tips, Stopping power a wide muzzle. */
+function gatlingEmplacement(look: string, ui = false) {
+  const p = new Drawing(ui ? 24 : 32, ui ? 24 : 32), e = ui ? 2 : 3, n = p.w - e * 2, roof = gunnerRoof("gatlingNest", look), cx = p.w / 2, cy = ui ? 11 : 15;
+  stoneBox(p, e, e + 2, n, n - 2);
+  p.rect(e + 2, e + 4, n - 4, n - 7, roof[0]); p.rect(e + 2, e + 4, n - 4, 2, roof[2]);
+  p.rect(e + 2, e + 6, 1, n - 9, roof[1]);
+  sandbagLine(p, e, p.h - e - 3, n);
+  for (const x of [cx - 6, cx + 3]) { p.rect(x, cy + 1, 3, 5, "ink"); p.rect(x + 1, cy + 2, 1, 3, "woodLight"); }
+  p.rect(cx - 5, cy, 10, 4, "ink"); p.rect(cx - 4, cy + 1, 8, 2, "gold");
+  for (const dy of [-2, 0, 2]) {
+    p.rect(cx - 3, cy + dy - 1, ui ? 11 : 13, 2, "ink");
+    p.rect(cx - 2, cy + dy - 1, ui ? 9 : 11, 1, "steelLight");
+    if (look === "overdrive") p.dot(cx + (ui ? 6 : 8), cy + dy - 1, "redLight");
+  }
+  if (look === "gunShield") {
+    p.rect(cx + 1, cy - 5, 4, 11, "ink"); p.rect(cx + 2, cy - 4, 2, 9, "steelLight");
+    p.rect(cx + 2, cy - 1, 2, 2, "ink");
+    for (const y of [cy - 3, cy + 3]) p.dot(cx + 2, y, "gold");
+  }
+  if (look === "stoppingPower") {
+    p.rect(cx + (ui ? 6 : 8), cy - 4, 2, 7, "ink"); p.rect(cx + (ui ? 6 : 8), cy - 3, 1, 5, "steelLight");
+  }
+  return p;
+}
+
+/** Quiet gunmetal roof, inset cyan conduit and sensor with three perches.
+ * No baked lasers: those remain existing gameplay overlay effects. */
+function revolutionary(ui = false) {
+  const p = new Drawing(ui ? 24 : 32, ui ? 24 : 32), e = ui ? 2 : 3, n = p.w - e * 2, cx = p.w / 2, cy = p.h / 2;
+  p.rect(e, e, n, n, "ink"); p.rect(e + 1, e + 1, n - 2, n - 2, "steelDark");
+  p.rect(e + 1, e + 1, n - 2, 2, "steelLight"); p.rect(e + 1, e + 3, 2, n - 4, "steel");
+  const inset = e + 4, span = p.w - inset * 2;
+  p.rect(inset, inset, span, span, "frostDark"); p.rect(inset + 1, inset + 1, span - 2, span - 2, "steelDark");
+  p.rect(inset, inset, span, 1, "frost"); p.rect(inset, inset, 1, span, "frost");
+  for (const [dx, dy] of [[-1, -1], [1, -1], [1, 1]]) {
+    const x = dx < 0 ? e + 3 : p.w - e - 7, y = dy < 0 ? e + 3 : p.h - e - 7;
+    p.rect(x, y, 4, 4, "ink"); p.rect(x + 1, y + 1, 2, 2, "steelLight");
+    p.line(x + 2, y + 2, x + 2 + dx * 3, y + 2 + dy * 3, "frostLight");
+  }
+  p.stamp(["..oooo..", ".olllso.", "olsssddo", "olsffddo", "olsffddo", "osdddddo", ".oddddo.", "..oooo.."], cx - 4, cy - 4,
+    { o: "ink", l: "steelLight", s: "steel", d: "steelDark", f: "frostLight" });
+  p.rect(e + 3, p.h - e - 7, 2, 4, "ink"); p.dot(e + 3, p.h - e - 7, "redLight");
+  p.rect(cx - 3, p.h - e - 3, 6, 2, "ink"); p.rect(cx - 2, p.h - e - 3, 4, 1, "frost");
+  return p;
+}
+
 function wizardRoof(look: string): Ramp {
   return look === "pyromancy" ? ["redDark", "red", "redLight"] : look === "rime" ? ["frostDark", "frost", "frostLight"]
     : look === "storm" ? ["steelDark", "steel", "steelLight"] : ["arcaneDark", "arcane", "arcaneLight"];
@@ -623,6 +750,9 @@ function cannonTowerIcon(look: string) {
 
 /** Purpose-drawn 24px UI compositions rather than squashed world frames. */
 function icon(kind: string, look: string) {
+  if (kind === "gunHall" || kind === "gunNest" || kind === "rocketBattery") return gunnerHall(kind, look, true);
+  if (kind === "gatlingNest") return gatlingEmplacement(look, true);
+  if (kind === "revolutionary") return revolutionary(true);
   if (kind === "assassinDen" || kind === "sniperLodge" || kind === "musketHall") return specialistHall(kind, look, true);
   if (kind === "wizardTower") return wizardTower(look, true);
   if (kind === "mageGuild") return mageGuild(look, true);
@@ -698,6 +828,8 @@ const DRAW_BUILDING: Record<keyof typeof BUILDING_ART, (look: string) => Drawing
   archerBarracks: look => trainingHall("archerBarracks", look), archerTower, cannonTower,
   assassinDen: look => specialistHall("assassinDen", look), sniperLodge: look => specialistHall("sniperLodge", look),
   musketHall: look => specialistHall("musketHall", look), wizardTower, mageGuild, monsterBait,
+  gunHall: look => gunnerHall("gunHall", look), gunNest: look => gunnerHall("gunNest", look),
+  rocketBattery: look => gunnerHall("rocketBattery", look), gatlingNest: gatlingEmplacement, revolutionary: () => revolutionary(),
 };
 
 function rubbleRoof(kind: string): Color | undefined {
@@ -710,6 +842,10 @@ function rubbleRoof(kind: string): Color | undefined {
   if (kind === "musketHall") return "woodDark";
   if (kind === "wizardTower") return "arcaneDark";
   if (kind === "mageGuild") return "redDark";
+  if (kind === "gunHall" || kind === "revolutionary") return "steelDark";
+  if (kind === "gunNest") return "greenDark";
+  if (kind === "gatlingNest") return "goldDark";
+  if (kind === "rocketBattery") return "redDark";
 }
 
 export function buildingPngs() {
