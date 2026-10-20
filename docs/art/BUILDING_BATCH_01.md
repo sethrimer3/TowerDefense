@@ -1,6 +1,6 @@
 # Building sprite batch 01
 
-This records the first delivery. [Batch 02](BUILDING_BATCH_02.md) extends the shared manifest, generator and browser matrix; the original nine PNG assets below are unchanged.
+This records the first delivery. [Batch 02](BUILDING_BATCH_02.md) and [batch 03](BUILDING_BATCH_03.md) extend the shared manifest, generator and browser matrix; the original nine PNG assets below are unchanged.
 
 The keep, barracks and watch tower now share clean outlines, quiet material planes, upper-left lighting and the [common palette](PIXEL_ART_GUIDE.md). All new images are PNG. Pixel Art checked selects them; unchecked retains the legacy procedural graphics. No unit or enemy artwork is changed in this batch.
 

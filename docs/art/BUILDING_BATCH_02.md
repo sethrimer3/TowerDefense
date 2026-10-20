@@ -1,5 +1,7 @@
 # Building sprite batch 02
 
+This records the second delivery. [Batch 03](BUILDING_BATCH_03.md) extends the collection and browser matrix; the original ten PNG assets below are unchanged.
+
 This batch adds the **Melee Guild, Ranged Guild, archer barracks, archer tower and cannon tower**, with matching building icons. They follow the palette, outline, lighting and native pixel scale established in [batch 01](BUILDING_BATCH_01.md). Units and enemies remain deferred.
 
 ![The five new building families with paths, heavy damage, rubble and matching UI icons](building-batch-02.png)

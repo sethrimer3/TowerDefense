@@ -291,6 +291,207 @@ function cannonTower(look: string) {
   return p;
 }
 
+type Specialist = "assassinDen" | "sniperLodge" | "musketHall";
+
+function specialistRoof(kind: Specialist, look: string): Ramp {
+  if (kind === "assassinDen") {
+    if (look === "bloodletters") return ["redDark", "red", "redLight"];
+    if (look === "venom") return ["greenDark", "green", "greenLight"];
+    if (look === "shadowcloak") return ["ink", "steelDark", "steel"];
+    return ["steelDark", "steel", "steelLight"];
+  }
+  if (kind === "sniperLodge") return look ? ["steelDark", "steel", "steelLight"] : ["greenDark", "green", "greenLight"];
+  if (look === "grenadiers") return ["redDark", "red", "redLight"];
+  if (look === "volleyFire") return ["steelDark", "steel", "steelLight"];
+  if (look === "bayonets") return ["greenDark", "green", "greenLight"];
+  return ["woodDark", "wood", "woodLight"];
+}
+
+/** Eight-pixel insignia reused at native resolution on the world hall and
+ * its separately composed square icon. No labels are baked into images. */
+function specialistEmblem(p: Drawing, kind: Specialist, look: string, cx: number, cy: number) {
+  const x = cx - 4, y = cy - 4;
+  if (kind === "assassinDen") {
+    if (look === "shadowcloak") p.stamp(["..oooo..", ".osssso.", "osddddso", "osddddso", "osgddgso", "osddddso", ".osssso.", "..oooo.."], x, y,
+      { o: "ink", s: "steel", d: "steelDark", g: "greenLight" });
+    else if (look === "venom") p.stamp(["..oooo..", "..obbo..", ".ooggoo.", "oggggggo", "oglllggo", "oglllggo", ".oggggo.", "..oooo.."], x, y,
+      { o: "ink", b: "stoneBright", g: "green", l: "greenLight" });
+    else if (look === "headhunters") p.stamp(["..oooo..", ".obbbbo.", "obobbobo", "obobbobo", "obbbbbbo", ".obobbo.", "..obbo..", "..oooo.."], x, y,
+      { o: "ink", b: "stoneBright" });
+    else p.stamp(["...oo...", "..obbo..", "..obbo..", "..obbo..", ".oooooo.", "..oggo..", "..oggo..", "...oo..."], x, y,
+      { o: "ink", b: "steelBright", g: "gold" });
+  } else if (kind === "sniperLodge") {
+    if (look === "marksmen") p.stamp(["........", ".oooooo.", "ogggglgo", "ogggglgo", ".oooooo.", "...oo...", "..o..o..", "........"], x, y,
+      { o: "ink", g: "gold", l: "goldLight" });
+    else if (look === "ricochet") p.stamp(["o......o", ".g....g.", "..g..g..", "...gg...", "..g..g..", ".g....g.", "o......o", "........"], x, y,
+      { o: "ink", g: "gold" });
+    else p.stamp(["...oo...", "..obbo..", ".ob..bo.", "ob.oo.bo", "ob.oo.bo", ".ob..bo.", "..obbo..", "...oo..."], x, y,
+      { o: "ink", b: look === "suppressors" ? "stoneBright" : "gold" });
+  } else {
+    if (look === "grenadiers") p.stamp([".....y..", "....w...", "..oooo..", ".osssso.", "osllllso", "osssssso", ".osssso.", "..oooo.."], x, y,
+      { o: "ink", s: "steelDark", l: "steelLight", y: "goldLight", w: "woodLight" });
+    else if (look === "volleyFire") {
+      p.line(x + 1, y + 1, x + 6, y + 6, "ink"); p.line(x + 6, y + 1, x + 1, y + 6, "ink");
+      p.line(x + 1, y + 1, x + 3, y + 3, "steelLight"); p.line(x + 6, y + 1, x + 4, y + 3, "steelLight");
+      p.line(x + 3, y + 3, x + 6, y + 6, "woodLight"); p.line(x + 4, y + 3, x + 1, y + 6, "woodLight"); p.rect(x + 3, y + 3, 2, 1, "gold");
+    } else if (look === "bayonets") p.stamp(["...oo...", "..obbo..", "..obbo..", "..obbo..", ".oooooo.", "..owwo..", "..owwo..", "...oo..."], x, y,
+      { o: "ink", b: "steelBright", w: "woodLight" });
+    else p.stamp(["...r....", ".r.y..r.", "..ryyr..", "ryyyyyr.", "..ryyr..", ".r.y..r.", "...r....", "........"], x, y,
+      { r: "redLight", y: "goldLight" });
+  }
+}
+
+/** Explicit world and UI layouts retain one-pixel material edges. Wide
+ * musket halls get more yard space rather than stretched square pixels. */
+function specialistHall(kind: Specialist, look: string, ui = false) {
+  const p = new Drawing(ui ? 24 : kind === "musketHall" ? 48 : 32, ui ? 24 : 32), roof = specialistRoof(kind, look);
+  const cx = p.w / 2;
+  if (ui) {
+    stoneBox(p, 3, 9, 18, 9);
+    p.rect(2, 3, 20, 11, "ink"); p.rect(3, 4, 18, 9, roof[0]);
+    p.rect(3, 4, 18, 4, roof[2]); p.rect(3, 8, 18, 1, roof[1]);
+    p.rect(10, 14, 4, 4, "ink"); p.rect(11, 15, 2, 3, "woodLight");
+  } else {
+    stoneBox(p, 4, 5, p.w - 8, 17);
+    p.rect(3, 3, p.w - 6, 14, "ink"); p.rect(4, 4, p.w - 8, 12, roof[0]);
+    p.rect(4, 4, p.w - 8, 5, roof[2]); p.rect(4, 9, p.w - 8, 1, roof[1]);
+    p.rect(cx - 3, 17, 6, 5, "ink"); p.rect(cx - 2, 18, 4, 4, "wood");
+    p.rect(cx - 2, 18, 4, 1, "woodLight"); p.rect(cx, 19, 1, 3, "woodDark");
+    for (const x of [7, p.w - 10]) { p.rect(x, 18, 3, 2, "ink"); p.dot(x + 1, 18, "stoneBright"); }
+    p.rect(3, 22, 2, 7, "woodDark"); p.rect(p.w - 5, 22, 2, 7, "woodDark");
+    p.rect(5, 28, p.w - 10, 1, "woodDark");
+  }
+  specialistEmblem(p, kind, look, cx, ui ? 8 : 10);
+  const y = ui ? 19 : 24, left = ui ? 4 : 6, right = ui ? 18 : p.w - 9;
+  if (kind === "assassinDen") {
+    if (look === "venom") {
+      p.rect(left, y, 5, 3, "ink"); p.rect(left + 1, y, 3, 1, "greenLight"); p.rect(left + 1, y + 1, 3, 1, "green");
+    } else {
+      p.rect(left + 2, y - 1, 1, 4, "woodLight"); p.rect(left, y, 5, 1, "woodLight");
+      p.dot(left + 2, y, look === "bloodletters" ? "redLight" : "stoneBright");
+    }
+    p.rect(right, y - 1, 4, 4, "woodDark");
+    if (look === "headhunters") { p.rect(right + 1, y, 2, 2, "stoneBright"); p.dot(right + 1, y + 1, "ink"); }
+    else { p.rect(right + 1, y, 2, 1, look === "shadowcloak" ? "steel" : "steelBright"); p.rect(right + 1, y + 2, 2, 1, "steelBright"); }
+  } else if (kind === "sniperLodge") {
+    p.rect(left, y, 5, 2, "woodLight"); p.rect(left, y + 1, 5, 1, "woodDark");
+    if (look === "suppressors") p.rect(left + 1, y - 2, 5, 1, "woodLight");
+    p.rect(right, y - 1, 3, 3, "ink"); p.dot(right + 1, y, look === "ricochet" ? "steelLight" : "stoneBright");
+    if (look === "marksmen") { p.rect(right - 4, y, 3, 3, "ink"); p.dot(right - 3, y + 1, "stoneBright"); }
+    if (!ui) { p.rect(cx - 2, y + 2, 2, 1, "stoneDark"); p.rect(cx + 2, y + 2, 2, 1, "stoneDark"); }
+  } else {
+    for (const x of ui ? [left] : [left, left + 6]) {
+      p.rect(x, y - 1, 4, 4, "ink"); p.rect(x + 1, y, 2, 2, look === "grenadiers" ? "steelDark" : "woodLight");
+      p.rect(x + 1, y, 2, 1, look === "grenadiers" ? "steelLight" : "woodDark");
+    }
+    if (look === "volleyFire") {
+      p.rect(right - 1, y + 1, 6, 1, "woodLight");
+      for (const x of [right, right + 2]) p.rect(x, y - 2, 1, 5, "steelLight");
+    } else if (look === "bayonets") {
+      p.rect(right + 1, y - 1, 1, 4, "woodLight"); p.rect(right - 1, y, 5, 1, "woodLight"); p.dot(right + 1, y, "steelBright");
+    } else {
+      p.rect(right, y, 4, 2, "ink"); p.rect(right + 1, y, 2, 1, look === "grenadiers" ? "goldLight" : "stoneDark");
+    }
+  }
+  return p;
+}
+
+function wizardRoof(look: string): Ramp {
+  return look === "pyromancy" ? ["redDark", "red", "redLight"] : look === "rime" ? ["frostDark", "frost", "frostLight"]
+    : look === "storm" ? ["steelDark", "steel", "steelLight"] : ["arcaneDark", "arcane", "arcaneLight"];
+}
+
+function wizardTower(look: string, ui = false) {
+  const p = new Drawing(ui ? 24 : 16, ui ? 24 : 16), roof = wizardRoof(look);
+  gunPlatform(p, ui ? 2 : 1, ui ? 2 : 1, ui ? 20 : 14);
+  const edge = ui ? 4 : 3, size = ui ? 16 : 10, cut = ui ? 4 : 2;
+  for (let y = 0; y < size; y++) {
+    // Rime's diamond, Storm's square and the base octagon are silhouettes,
+    // not arbitrary bitmap rotations or per-frame canvas paths.
+    const inset = look === "pyromancy" ? Math.floor((Math.abs(y + 0.5 - size / 2) + 0.5) / 2)
+      : look === "rime" ? Math.min(size / 2 - 1, Math.abs(y + 0.5 - size / 2) - 0.5)
+      : look === "storm" ? 0 : Math.max(0, cut - Math.min(y, size - 1 - y));
+    const left = Math.max(0, inset), right = size - 1 - left;
+    for (let x = left; x <= right; x++) {
+      const border = x === left || x === right || y === 0 || y === size - 1;
+      p.dot(edge + x, edge + y, border ? "ink" : x + y < size - 2 ? roof[2] : x < size / 2 ? roof[1] : roof[0]);
+    }
+  }
+  const cx = p.w / 2, cy = p.h / 2;
+  if (look === "pyromancy") p.stamp(["..r..", ".rr..", "rryrr", "ryyyr", ".yyy."], cx - 2, cy - 3, { r: "redLight", y: "goldLight" });
+  else if (look === "rime") {
+    p.rect(cx - 1, cy - 3, 2, 6, "frostLight"); p.rect(cx - 3, cy - 1, 6, 2, "frostLight");
+    p.rect(cx - 1, cy - 1, 2, 2, "bright");
+  } else if (look === "storm") p.stamp(["..yy.", ".yy..", "yyyy.", "..yy.", ".yy..", ".y..."], cx - 2, cy - 3, { y: "goldLight" });
+  else { p.rect(cx - 1, cy - 1, 2, 2, "gold"); p.dot(cx - 1, cy - 1, "goldLight"); }
+  p.rect(cx - 1, ui ? 19 : 12, 2, 2, "ink"); p.rect(cx - 1, ui ? 20 : 13, 2, 1, "woodLight");
+  return p;
+}
+
+function fireWell(p: Drawing, cx: number, cy: number, look: string, ui: boolean) {
+  const n = look === "pyroclasm" ? ui ? 10 : 12 : 8, radius = n / 2;
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+    const d = Math.hypot(x + 0.5 - radius, y + 0.5 - radius);
+    if (d > radius) continue;
+    p.dot(cx - radius + x, cy - radius + y, d > radius - 1 ? "ink" : d > radius - 2 ? x + y < n ? "goldLight" : "gold" : "ink");
+  }
+  if (look === "cinders") {
+    for (const [x, y] of [[-2, 0], [1, -1], [0, 2]]) { p.dot(cx + x, cy + y, "redLight"); p.dot(cx + x + 1, cy + y, "goldLight"); }
+  } else p.stamp(["..r..", ".rr..", "rryrr", "ryyyr", ".yyy."], cx - 2, cy - 3, { r: "redLight", y: "goldLight" });
+}
+
+function mageGuild(look: string, ui = false) {
+  const p = new Drawing(ui ? 24 : 32, ui ? 24 : 48), cx = p.w / 2;
+  if (ui) {
+    stoneBox(p, 3, 9, 18, 13); p.rect(2, 3, 20, 13, "ink");
+    p.rect(3, 4, 9, 11, look === "cinders" ? "steel" : look === "pyroclasm" ? "redLight" : "red");
+    p.rect(12, 4, 9, 11, look === "cinders" ? "steelDark" : "redDark");
+    p.rect(10, 17, 4, 5, "ink"); p.rect(11, 18, 2, 4, "woodLight");
+    fireWell(p, 12, 9, look, true);
+  } else {
+    stoneBox(p, 4, 5, 24, 40); p.rect(3, 3, 26, 33, "ink");
+    p.rect(4, 4, 12, 31, look === "cinders" ? "steel" : look === "pyroclasm" ? "redLight" : "red");
+    p.rect(16, 4, 12, 31, look === "cinders" ? "steelDark" : "redDark");
+    p.rect(13, 37, 6, 7, "ink"); p.rect(14, 38, 4, 6, "woodLight"); p.rect(16, 39, 1, 5, "woodDark");
+    fireWell(p, cx, 20, look, false);
+    for (const x of [8, 23]) { p.rect(x, 12, 1, 2, "gold"); p.dot(x + (x < cx ? 1 : -1), 13, "redLight"); }
+  }
+  for (const x of ui ? [5, 17] : [6, 23]) {
+    const y = ui ? 17 : 37;
+    p.rect(x, y, 3, ui ? 5 : 7, "ink"); p.rect(x + 1, y + 1, 1, ui ? 3 : 5, look === "cinders" ? "steelDark" : "red");
+    p.dot(x + 1, y + 2, "goldLight");
+  }
+  return p;
+}
+
+function monsterBait(look: string, ui = false) {
+  const p = new Drawing(ui ? 24 : 16, ui ? 24 : 16), x = ui ? 3 : 2, y = ui ? 6 : 3, w = ui ? 18 : 12, h = ui ? 15 : 11;
+  p.rect(x, y, w, h, "ink"); p.rect(x + 1, y + 1, w - 2, h - 2, "wood");
+  p.rect(x + 1, y + 1, w - 2, 1, "woodBright"); p.rect(x + 1, y + h - 3, w - 2, 2, "woodDark");
+  const cx = p.w / 2;
+  p.stamp([".rrrr.", "rlllrr", "rllrrr", ".rrr.."], cx - 3, ui ? 8 : 5,
+    { r: "redDark", l: "redLight" });
+  p.line(cx + 1, ui ? 11 : 8, cx + 4, ui ? 8 : 5, "stoneBright");
+  if (look === "fortified") {
+    for (const bx of [x + 1, x + w - 3]) { p.rect(bx, y + 1, 2, h - 2, "steelDark"); p.rect(bx, y + 1, 1, h - 3, "steelLight"); }
+    p.rect(x + 1, y + h - 4, w - 2, 1, "steelLight");
+  } else if (look === "oilSoaked") {
+    p.rect(cx, ui ? 13 : 9, ui ? 7 : 5, ui ? 6 : 4, "ink");
+    p.rect(cx + 1, ui ? 14 : 10, ui ? 5 : 3, 2, "steelDark");
+    p.rect(cx + 1, ui ? 14 : 10, ui ? 4 : 2, 1, "steelLight");
+    p.dot(cx + 2, ui ? 12 : 8, "goldLight");
+  } else p.line(x + 2, y + h - 4, x + w - 3, y + h - 4, "woodLight");
+  return p;
+}
+
+function baitRubble() {
+  const p = new Drawing(16, 16);
+  p.line(3, 8, 12, 12, "ink"); p.line(3, 9, 12, 13, "ink"); p.line(3, 8, 12, 12, "woodLight");
+  p.line(6, 13, 10, 6, "ink"); p.line(5, 13, 9, 6, "wood");
+  p.rect(6, 11, 4, 2, "redDark"); p.rect(7, 11, 2, 1, "redLight"); p.rect(10, 11, 2, 1, "stoneBright");
+  return p;
+}
+
 /** Progressive, designed damage marks use the same palette, with fixed
  * footprints. No random soot, photographic noise or new shades per stage. */
 function damaged(base: Drawing, stage: number, keep: boolean) {
@@ -406,6 +607,10 @@ function cannonTowerIcon(look: string) {
 
 /** Purpose-drawn 24px UI compositions rather than squashed world frames. */
 function icon(kind: string, look: string) {
+  if (kind === "assassinDen" || kind === "sniperLodge" || kind === "musketHall") return specialistHall(kind, look, true);
+  if (kind === "wizardTower") return wizardTower(look, true);
+  if (kind === "mageGuild") return mageGuild(look, true);
+  if (kind === "monsterBait") return monsterBait(look, true);
   if (kind === "meleeGuild" || kind === "rangedGuild" || kind === "archerBarracks") return trainingIcon(kind, look);
   if (kind === "archerTower") return archerTowerIcon(look);
   if (kind === "cannonTower") return cannonTowerIcon(look);
@@ -475,6 +680,8 @@ const DRAW_BUILDING: Record<keyof typeof BUILDING_ART, (look: string) => Drawing
   keep: () => keep(), barracks: look => barracks(false, look), barracksWide: look => barracks(true, look), watchTower,
   meleeGuild: look => trainingHall("meleeGuild", look), rangedGuild: look => trainingHall("rangedGuild", look),
   archerBarracks: look => trainingHall("archerBarracks", look), archerTower, cannonTower,
+  assassinDen: look => specialistHall("assassinDen", look), sniperLodge: look => specialistHall("sniperLodge", look),
+  musketHall: look => specialistHall("musketHall", look), wizardTower, mageGuild, monsterBait,
 };
 
 function rubbleRoof(kind: string): Color | undefined {
@@ -482,6 +689,11 @@ function rubbleRoof(kind: string): Color | undefined {
   if (kind === "meleeGuild") return "wood";
   if (kind === "rangedGuild") return "steelDark";
   if (kind === "archerBarracks" || kind === "archerTower") return "woodDark";
+  if (kind === "assassinDen") return "steelDark";
+  if (kind === "sniperLodge") return "greenDark";
+  if (kind === "musketHall") return "woodDark";
+  if (kind === "wizardTower") return "arcaneDark";
+  if (kind === "mageGuild") return "redDark";
 }
 
 export function buildingPngs() {
@@ -492,7 +704,7 @@ export function buildingPngs() {
     art.looks.forEach((look, col) => {
       const base = DRAW_BUILDING[id as keyof typeof BUILDING_ART](look);
       for (let stage = 0; stage < art.stages; stage++) sheet.copy(damaged(base, stage, id === "keep"), col * w, stage * h);
-      sheet.copy(rubble(w, h, rubbleRoof(art.kind)), col * w, art.stages * h);
+      sheet.copy(art.kind === "monsterBait" ? baitRubble() : rubble(w, h, rubbleRoof(art.kind)), col * w, art.stages * h);
       icons.copy(icon(art.kind, look), col * BUILDING_ICON_SIZE, 0);
     });
     files.set(`${art.sheet}.png`, png(sheet));

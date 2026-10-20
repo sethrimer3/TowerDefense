@@ -32,7 +32,7 @@ At ordinary play size the player should identify an archer tower, watch tower, b
 - Keep Simple square enemies/troops as intentional accessibility/performance overrides. Keep Reduce Motion, grass/water effects, health-bar and grid preferences independent. A pixel-art preference must not force animation or hide gameplay information.
 - Art selection must never change collision, pathfinding, targeting, costs, damage, placement rules, RNG streams, or save compatibility.
 
-**Current state:** [Batch 01](BUILDING_BATCH_01.md) and [batch 02](BUILDING_BATCH_02.md) supply 19 native PNG sheets for eight building families: keep, barracks, watch tower, Melee Guild, Ranged Guild, archer barracks, archer tower and cannon tower. They cover 116 world-state frames and 19 matching UI icons, plus the keep flag and rebuilding module. The shared loader also retains the original 35 imported PNGs for other partial Defend coverage/reference. Other families' damage/path variants still fall back to procedural art. Existing baseline UI PNGs are not all controlled by the Pixel Art switch. Each replacement needs an explicit integration review; the toggle's existence does not establish complete coverage.
+**Current state:** [Batch 01](BUILDING_BATCH_01.md), [batch 02](BUILDING_BATCH_02.md) and [batch 03](BUILDING_BATCH_03.md) supply 31 native PNG sheets for fourteen building families. They cover 231 world-state frames and 42 matching UI icons, plus the keep flag and rebuilding module. Valkyrie palace and Dark wizard keep remain in the building inventory. The shared loader also retains the original 35 imported PNGs for other partial Defend coverage/reference. Existing baseline UI PNGs are not all controlled by the Pixel Art switch. Each replacement needs an explicit integration review; the toggle's existence does not establish complete coverage.
 
 ## 3. A single pixel language
 
@@ -56,7 +56,7 @@ At ordinary play size the player should identify an archer tower, watch tower, b
 
 ### Shared starter palette
 
-These are the proposed production swatches, not a claim that current files already use them. Begin with this common 24-color material palette. Do not require every sprite to contain every swatch.
+The building collection uses this shared palette: the original 24 material swatches plus the two controlled three-color arcane/frost ramps introduced in batch 03, for 30 colors total. Each sprite uses only the swatches it needs; the per-frame limits below still apply.
 
 | Ramp | Dark → light |
 | --- | --- |
@@ -68,6 +68,8 @@ These are the proposed production swatches, not a claim that current files alrea
 | Brass/gold | `#6D4A23`, `#BE8D3D`, `#F1D58A` |
 | Foliage | `#253D2A`, `#476044`, `#78955B` |
 | Rare bright accent | `#EAE2C9` |
+| Arcane/violet | `#352943`, `#65567D`, `#A391B3` |
+| Frost/ice | `#325B70`, `#6FA3B8`, `#C2E5E6` |
 
 Small UI icons should normally use at most 12 opaque colors; ordinary building sprites at most 16. Document justified larger palettes for bosses and large scenery. Add shared three-step ramps for flesh, water, frost, poison, magic and biome-specific materials as a family, then reuse them across matching units, spells and UI. Do not invent a separate frost blue or gold ramp for each file. Colored lighting and biome washes are renderer layers; author a neutral daylight base first.
 
