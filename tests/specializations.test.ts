@@ -19,11 +19,11 @@ import { Towers, stepArrows } from "../src/defend/towers.ts";
 import { stepMage, stepFireballs, stepBlazes } from "../src/defend/mages.ts";
 import { baitBitten } from "../src/defend/bait.ts";
 import { center } from "../src/defend/pathing.ts";
-import { BRAWLER, MUSKETEER, SLINGER, SNIPER, STARTING_OWNED, type PaletteItem } from "../src/defend/catalog.ts";
+import { BRAWLER, MUSKETEER, ROCKETEER, SLINGER, SNIPER, STARTING_OWNED, type PaletteItem } from "../src/defend/catalog.ts";
 import { treeCardHtml, treeGraph } from "../src/ui/specialty.ts";
 
 type S = ReturnType<typeof defaults>;
-const INSIDE = new Set<PaletteItem>(["barracks", "mageGuild", "archerBarracks", "meleeGuild", "rangedGuild", "sniperLodge", "musketHall"]);
+const INSIDE = new Set<PaletteItem>(["barracks", "mageGuild", "archerBarracks", "meleeGuild", "rangedGuild", "sniperLodge", "musketHall", "gunHall", "gunNest", "gatlingNest", "rocketBattery"]);
 
 function fixture(kind: PaletteItem, count = 3) {
   const s = defaults(); s.settings.devMode = true; s.knowledge = 1e6;
@@ -62,7 +62,8 @@ test("the shop's three basic buildings branch into every other tower and troop b
   const to = (k: Parameters<typeof nextSteps>[0]) => nextSteps(k).map(stepName);
   assert.deepEqual(to("watchTower"), ["Archer tower", "Cannon tower", "Wizard tower", "Spotters I", "Signal fires I"]);
   assert.deepEqual(to("meleeGuild"), ["Barracks", "Assassins' den"]);
-  assert.deepEqual(to("rangedGuild"), ["Archer barracks", "Mage Guild", "Sniper lodge", "Musket hall"]);
+  assert.deepEqual(to("rangedGuild"), ["Archer barracks", "Mage Guild", "Gunner hall"]);
+  assert.deepEqual(to("gunHall"), ["Musket hall", "Machine-gun nest", "Rocket battery"]);
   assert.deepEqual(to("barracks"), ["Crusaders I", "Berserkers I", "Halberdiers I"]);
   assert.deepEqual(to("assassinDen"), ["Bloodletters I", "Shadowcloak I", "Venomblades I", "Headhunters I"]);
   assert.deepEqual(to("wizardTower"), ["Pyromancy I", "Rime I", "Stormcalling I"]);
@@ -74,7 +75,8 @@ test("the shop's three basic buildings branch into every other tower and troop b
   assert.deepEqual(to("wallSpikes"), ["Blasting stakes I", "Spring stakes I", "Rimed stakes I"]);
   assert.equal(rootOf("darkKeep"), "watchTower");
   assert.equal(rootOf("valkyriePalace"), "meleeGuild");
-  assert.equal(upgradedFrom("musketHall"), "rangedGuild");
+  assert.equal(upgradedFrom("musketHall"), "gunHall");
+  assert.equal(rootOf("sniperLodge"), "rangedGuild");
   assert.equal(upgradedFrom("watchTower"), undefined);
   assert.deepEqual([STARTING_OWNED.watchTower, STARTING_OWNED.meleeGuild, STARTING_OWNED.rangedGuild], [1, 1, 1], "a new game starts with one of each");
 });
@@ -121,9 +123,10 @@ test("becoming another building swaps one copy: in place when it fits, else it w
   // The same size, it stays where it stood; another size, and it waits in
   // the palette to be placed again.
   const g = fixture("rangedGuild", 2), [guild, other] = uids(g, "rangedGuild");
-  assert.deepEqual(upgradeBuilding(g, { uid: guild }, become("sniperLodge")), { ok: true, kind: "sniperLodge", waiting: false });
+  assert.deepEqual(upgradeBuilding(g, { uid: guild }, become("gunHall")), { ok: true, kind: "gunHall", waiting: false });
+  assert.deepEqual(upgradeBuilding(g, { uid: other }, become("gunHall")), { ok: true, kind: "gunHall", waiting: false });
   assert.deepEqual(upgradeBuilding(g, { uid: other }, become("musketHall")), { ok: true, kind: "musketHall", waiting: true });
-  assert.deepEqual(g.defend.layout.structures.map((st) => st.kind), ["sniperLodge"]);
+  assert.deepEqual(g.defend.layout.structures.map((st) => st.kind), ["gunHall"]);
   assert.equal(available(g.defend, "musketHall"), 1);
 });
 
@@ -180,7 +183,7 @@ test("upgrades are snapshotted at battle start", () => {
 test("a choice cuts off the branches beside it and opens its own", () => {
   const ids = (kind: Parameters<typeof buildingTree>[0], wear?: Parameters<typeof buildingTree>[1]) => buildingTree(kind, wear).map((n) => `${n.id}=${n.state}`);
   const plain = ids("rangedGuild");
-  assert.deepEqual(plain, ["k:rangedGuild=owned", "k:archerBarracks=next", "k:mageGuild=next", "k:sniperLodge=next", "k:musketHall=next"]);
+  assert.deepEqual(plain, ["k:rangedGuild=owned", "k:archerBarracks=next", "k:mageGuild=next", "k:gunHall=next"]);
   const mage = ids("mageGuild");
   assert.ok(!mage.some((n) => n.startsWith("k:archerBarracks")), "the archer branch is gone");
   assert.ok(mage.includes("p:pyroclasm:1=next") && mage.includes("p:cinders:1=next") && mage.includes("p:pyroclasm:3=locked"), "the mage's own paths appear");
@@ -213,14 +216,14 @@ test("a respec is free, gives back every point and returns the basic building", 
   assert.ok(upgradeBuilding(s, { uid: a }, { type: "path", path: "rangers", rank: 1, cost: 0 }).ok);
   const archers = 5 + pathById("rangers").ranks[0].cost;
   assert.equal(s.knowledge, 100 - archers);
-  assert.ok(upgradeBuilding(s, { uid: b }, { type: "become", to: "sniperLodge", cost: 0 }).ok);
+  assert.ok(upgradeBuilding(s, { uid: b }, { type: "become", to: "gunHall", cost: 0 }).ok);
   const r = respecBuilding(s, { uid: a });
   assert.ok(r.ok && r.kind === "rangedGuild");
-  assert.equal(s.knowledge, 100 - 8, "the archers' Knowledge comes back");
+  assert.equal(s.knowledge, 100 - 6, "the archers' Knowledge comes back");
   assert.equal(s.smithy.copper, 5, "free");
-  assert.deepEqual([s.defend.owned.rangedGuild, s.defend.owned.archerBarracks, s.defend.owned.sniperLodge], [1, 0, 1]);
+  assert.deepEqual([s.defend.owned.rangedGuild, s.defend.owned.archerBarracks, s.defend.owned.gunHall], [1, 0, 1]);
   assert.equal(specialtyOf(s.defend.layout, { uid: a }), undefined);
-  assert.equal(s.defend.layout.structures.find((st) => st.uid === b)!.kind, "sniperLodge", "the other building is untouched");
+  assert.equal(s.defend.layout.structures.find((st) => st.uid === b)!.kind, "gunHall", "the other building is untouched");
   assert.ok(respecBuilding(s, { uid: b }).ok);
 });
 
@@ -312,7 +315,7 @@ test("version 4: building research all comes back as Knowledge; buildings stand 
   raw.defend.layout.structures[0].path = "pyromancy";
   raw.researchJob = { kind: "path", id: "crusaders", rank: 0, left: 1000, paid: 4 };
   const loaded = decode(JSON.stringify(raw));
-  assert.equal(loaded.version, 5);
+  assert.equal(loaded.version, 6);
   assert.deepEqual(loaded.defend.layout.structures.map((st) => st.path), [undefined, undefined]);
   assert.deepEqual(Object.keys(loaded.pathResearch), ["starfall"]);
   assert.equal(loaded.knowledge, 100 + 4008 + 4 + 175015 + 4, "every building research back, and the research in progress");
@@ -350,7 +353,7 @@ test("malformed paths and ranks are dropped from the saved city", () => {
 });
 
 // ── The guilds' troops ──────────────────────────────────────────────────
-test("the guilds train brawlers and stone throwers; their branches snipers and explosive musketmen", () => {
+test("the guilds train brawlers and stone throwers; their branches snipers and musketmen", () => {
   for (const [kind, troop, def] of [["meleeGuild", "brawler", BRAWLER], ["rangedGuild", "slinger", SLINGER], ["sniperLodge", "sniper", SNIPER], ["musketHall", "musketeer", MUSKETEER]] as const) {
     const s = fixture(kind, 1), sim = simulation(s);
     new Barracks().step(sim, 0.01);
@@ -379,13 +382,13 @@ test("brawlers punch in reach; stone throwers, snipers and musketmen shoot their
     assert.equal(r.arrows[0]?.shot, shot, kind);
     assert.ok(far);
   }
-  const g = fixture("musketHall", 1), gs = simulation(g);
+  const g = fixture("rocketBattery", 1), gs = simulation(g);
   new Barracks().step(gs, 0.01);
   const u = gs.soldiers[0], a = enemy(gs, u.x + 2, u.y), b = enemy(gs, u.x + 2.4, u.y);
   stepArcher(gs, u, 0.01);
-  assert.equal(gs.arrows[0].blast, MUSKETEER.blast);
-  for (let i = 0; i < 30; i++) stepArrows(gs, 1 / 30);
-  assert.ok(a.hp < a.maxHp && b.hp < b.maxHp, "the ball bursts over both");
+  assert.equal(gs.arrows[0].blast, ROCKETEER.blast);
+  for (let i = 0; i < 60; i++) stepArrows(gs, 1 / 30);
+  assert.ok(a.hp < a.maxHp && b.hp < b.maxHp, "the rocket bursts over both");
   assert.ok(u.hp === u.maxHp, "never hurting its own");
 });
 

@@ -6,12 +6,13 @@
  *  - while a building wears no path it can become one of the buildings its
  *    kind branches into (`BECOMES`: a Watch tower into an archer, cannon or
  *    wizard tower; a Melee Guild into a barracks of swordsmen or an
- *    assassins' den; a Ranged
- *    Guild into archers, fire mages, snipers or musketmen), or set out on
+ *    assassins' den; a Ranged Guild into archers, fire mages or gunners,
+ *    and a Gunner hall into musketmen, machine gunners or rockets), or set out on
  *    one of its kind's Knowledge paths (`knowledge-paths.ts`);
  *  - a building on a path climbs it rank by rank;
  *  - at a path's last rank, a path with a crown evolves the building
- *    (Crusaders: a Valkyrie palace; Stormcalling: a Dark wizard keep).
+ *    (Crusaders: a Valkyrie palace; Stormcalling: a Dark wizard keep;
+ *    Sharpshooters: a Sniper lodge; Belt feed: a Gatling emplacement).
  *
  * The kind is the building's kind in the city and among the copies owned
  * (`DefendSave.owned`); its path and rank live on its placement
@@ -47,15 +48,20 @@ export const BECOMES: Partial<Record<PlacedKind, { to: PlacedKind; cost: number 
   rangedGuild: [
     { to: "archerBarracks", cost: 5 },
     { to: "mageGuild", cost: 9 },
-    { to: "sniperLodge", cost: 8 },
-    { to: "musketHall", cost: 10 },
+    { to: "gunHall", cost: 6 },
+  ],
+  gunHall: [
+    { to: "musketHall", cost: 8 },
+    { to: "gunNest", cost: 10 },
+    { to: "rocketBattery", cost: 12 },
   ],
 };
 
 /** What each kind's troops are called on its upgrade buttons. */
 export const TROOPS: Partial<Record<PlacedKind, string>> = {
   meleeGuild: "Brawlers", rangedGuild: "Stone throwers", barracks: "Swordsmen", assassinDen: "Assassins", archerBarracks: "Archers", mageGuild: "Fire mages",
-  sniperLodge: "Snipers", musketHall: "Explosive musketmen", valkyriePalace: "Valkyries", darkKeep: "Dark wizard",
+  sniperLodge: "Snipers", musketHall: "Musketmen",
+  gunHall: "Gunners", gunNest: "Machine gunners", gatlingNest: "Gatling gunners", rocketBattery: "Rocketeers", valkyriePalace: "Valkyries", darkKeep: "Dark wizard",
 };
 
 /** The kind `kind` was upgraded from (its parent in the tree), if any. */
@@ -504,6 +510,29 @@ export function refundRetiredAssassins(raw: any, save: Save) {
   if (job?.id === "assassins" && Number.isSafeInteger(job.paid) && job.paid > 0) back += job.paid;
   save.knowledge += back;
   return back;
+}
+
+/** Before version 6 a Ranged Guild became a Musket hall (10 Knowledge) or a
+ * Sniper lodge (8) at once; now a Musket hall grows from a Gunner hall,
+ * and a Sniper lodge is a Musket hall's crowned Sharpshooters. Every copy
+ * of either turns back into a Ranged Guild, its Knowledge (the change and
+ * every path rank it wore) given back; those standing are taken up, to be
+ * placed and upgraded again. Run on loading a save from before then. */
+export function migrateGunLine(save: Save) {
+  const d = save.defend, was: [PlacedKind, number][] = [["musketHall", 10], ["sniperLodge", 8]];
+  const ranks = (w: { path?: PathId; rank?: number }) => (w.path && w.rank ? allocated("rangedGuild", { path: w.path, rank: w.rank }) : 0);
+  const next = cloneLayout(d.layout);
+  for (const [kind, cost] of was) {
+    let back = d.owned[kind] * cost;
+    for (const s of next.structures) if (s.kind === kind) back += ranks(s);
+    for (const k of d.kept) if (k.kind === kind) back += ranks(k);
+    next.structures = next.structures.filter((s) => s.kind !== kind);
+    d.kept = d.kept.filter((k) => k.kind !== kind);
+    d.owned.rangedGuild += d.owned[kind];
+    d.owned[kind] = 0;
+    save.knowledge += back;
+  }
+  d.layout = next;
 }
 
 /** Version 3 kept a card per owned copy, each with its own path and the

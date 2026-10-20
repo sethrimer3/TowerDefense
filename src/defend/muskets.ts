@@ -1,17 +1,19 @@
 /** The Musket hall's musketmen: they roam and shoot like the other ranged
- * troops (`troops.ts`), every ball bursting where it lands, and the hall's
- * Knowledge paths (`knowledge-paths.ts`) turn them into Grenadiers (bursts
- * that leave the ground burning, throw smaller bursts round them from II,
+ * troops (`troops.ts`), and the hall's Knowledge paths
+ * (`knowledge-paths.ts`) turn them into Grenadiers (balls bursting where
+ * they land, leaving the ground burning, throw smaller bursts round them from II,
  * and set clinging fire at III), Volley fire (extra balls at the next
  * nearest enemies, and at III quicker reloads beside their comrades) or
  * Bayonets (a thrust at close quarters, hunting citywide from II,
- * staggering at III).
+ * staggering at III) or Sharpshooters (further and harder, aiming at the
+ * toughest at III, its crown making the hall a Sniper lodge). The Rocket
+ * battery's rockets burst through `burstBall` too.
  *
  * The state they leave is optional (`Arrow.grenade`) and absent in every
  * run without a hall on those paths, and nothing draws from the random
  * stream that a plain hall wouldn't, so replays are untouched. */
 import { sq } from "../exact.ts";
-import { BAYONET, GRENADIERS, VOLLEY, pathRank, type BattlePaths } from "../knowledge-paths.ts";
+import { BAYONET, GRENADIERS, SHARP_MUSKETS, VOLLEY, pathRank, type BattlePaths } from "../knowledge-paths.ts";
 import { buildingPaths } from "../specializations.ts";
 import { ENEMIES, MUSKETEER } from "./catalog.ts";
 import { fizzles } from "./boats.ts";
@@ -24,15 +26,16 @@ export function hallPaths(sim: DefendSim, home: number) {
     grenade: pathRank(p, "musketHall", "grenadiers"),
     volley: pathRank(p, "musketHall", "volleyFire"),
     bayonet: pathRank(p, "musketHall", "bayonets"),
+    sharp: pathRank(p, "musketHall", "sharpMuskets"),
   };
 }
 
 /** What a musketman's ball carries from its hall for `damage`: a
- * Grenadier's fire and bomblets; nothing otherwise. */
-export function grenadeOf(sim: DefendSim, home: number, damage: number): Pick<Arrow, "grenade"> {
+ * Grenadier's burst, fire and bomblets; nothing otherwise. */
+export function grenadeOf(sim: DefendSim, home: number, damage: number): Pick<Arrow, "grenade" | "blast"> {
   const g = hallPaths(sim, home).grenade;
   if (!g) return {};
-  return { grenade: { life: GRENADIERS.burn[g], dps: damage * GRENADIERS.share, bomblets: GRENADIERS.bomblets[g], ...(g >= 3 ? { cling: true as const } : {}) } };
+  return { blast: MUSKETEER.blast, grenade: { life: GRENADIERS.burn[g], dps: damage * GRENADIERS.share, bomblets: GRENADIERS.bomblets[g], ...(g >= 3 ? { cling: true as const } : {}) } };
 }
 
 /** An explosive ball lands: it bursts, and a Grenadier's throws bomblets
@@ -66,6 +69,24 @@ export function musketReload(sim: DefendSim, s: Soldier) {
   for (const o of sim.soldiers)
     if (o !== s && o.home === s.home && o.kind === "musketeer" && o.hp > 0 && sq(o.x - s.x) + sq(o.y - s.y) <= sq(VOLLEY.reach) && ++near >= VOLLEY.most) break;
   return MUSKETEER.cooldown * (1 - VOLLEY.drill * near);
+}
+
+/** How far a musketman shoots: Sharpshooters further. */
+export const musketRange = (sim: DefendSim, s: Soldier) => MUSKETEER.range + SHARP_MUSKETS.range[hallPaths(sim, s.home).sharp];
+/** How hard a musketman's ball hits, of `damage`: Sharpshooters harder. */
+export const musketDamage = (sim: DefendSim, s: Soldier, damage: number) => damage * SHARP_MUSKETS.damage[hallPaths(sim, s.home).sharp];
+
+/** Sharpshooters III: the toughest enemy within `range` of `s` (the nearest
+ * of equals), or undefined off the path, when the nearest is shot. */
+export function toughestInReach(sim: DefendSim, s: Soldier, range: number): Enemy | null | undefined {
+  if (s.kind !== "musketeer" || hallPaths(sim, s.home).sharp < 3) return undefined;
+  let best: Enemy | null = null, bd = 0;
+  for (const e of sim.enemiesNear(s.x, s.y, range)) {
+    const d = sq(e.x - s.x) + sq(e.y - s.y);
+    if (e.hp <= 0 || d > range * range) continue;
+    if (!best || e.hp > best.hp || (e.hp === best.hp && d < bd)) { best = e; bd = d; }
+  }
+  return best;
 }
 
 /** How fast a musketman walks: Bayonets charge faster from II. */

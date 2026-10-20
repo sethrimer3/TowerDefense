@@ -55,8 +55,8 @@ test("research alone does not change any building in battle", () => {
   assert.equal(bonuses(s).structurePaths, undefined);
 });
 
-test("every topic offers two or more paths of three ranks (the barracks' one, since assassins have their own den), with square icons", () => {
-  for (const t of PATH_TOPICS) assert.ok(PATHS.filter((p) => p.topic === t).length >= (t === "barracks" || t === "valkyriePalace" ? 1 : 2), t);
+test("every topic offers two or more paths of three ranks (the barracks', the palace's and the machine-gun nest's one or more), with square icons", () => {
+  for (const t of PATH_TOPICS) assert.ok(PATHS.filter((p) => p.topic === t).length >= (t === "barracks" || t === "valkyriePalace" || t === "gunNest" ? 1 : 2), t);
   for (const p of PATHS) assert.equal(p.ranks.length, 3, p.id);
   for (const [k, rows] of Object.entries(ICON_ROWS)) {
     assert.equal(rows.length, ICON_SIZE, k);

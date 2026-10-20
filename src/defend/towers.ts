@@ -49,7 +49,7 @@ const CANNON_MIN = 1.5;
 /** Arrow speed, cells per second. */
 const ARROW_SPEED = 16;
 /** How fast each other shot flies, as a share of an arrow's speed. */
-const SHOT_SPEED = { stone: 0.7, bullet: 2.2, ball: 1.4 };
+const SHOT_SPEED = { stone: 0.7, bullet: 2.2, ball: 1.4, rocket: 0.9 };
 
 export class Towers {
   /** Seconds until each tower may fire again. */

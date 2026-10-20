@@ -119,12 +119,13 @@ Recent rows are available as `window.defendPerformance`; they are not saved.
   stand inside the city, then your own troops and townsfolk slip through
   them). A respec gives every point back, free, and takes the sections
   inside the city back to the palette; any rank can be undone on its own.
-- The **Melee** and **Ranged Guilds**, **barracks**, **archer barracks**, the **Mage Guild**, the **sniper lodge**, the **musket hall**, the **Valkyrie palace** and the **dark wizard keep** must be inside the city. **Archer**, **cannon**, **watch
+- The **Melee** and **Ranged Guilds**, **barracks**, **archer barracks**, the **Mage Guild**, the **gunner hall**, **musket hall**, **sniper lodge**, **machine-gun nest**, **Gatling emplacement** and **rocket battery**, the **Valkyrie palace** and the **dark wizard keep** must be inside the city. **Archer**, **cannon**, **watch
   and wizard towers** and **monster bait** may stand inside or outside.
 - Every structure takes a fixed block of **quarter tiles** (`footprint` in
   `catalog.ts`, never rotated): 1 × 1 the archer, cannon, watch and wizard
   towers and monster bait; 2 × 2 the Melee and Ranged Guilds, Assassins'
-  den, sniper lodge and archer barracks; 3 × 2 the musket hall; 2 × 3 the
+  den, gunner hall, sniper lodge, machine-gun nest, Gatling emplacement,
+  rocket battery and archer barracks; 3 × 2 the musket hall; 2 × 3 the
   barracks and Mage Guild; 3 × 3 the Valkyrie palace (2 × 3 once Folded
   halls is bought). An upgrade that changes a building's footprint takes
   it up to the palette, to be placed again.
@@ -291,20 +292,29 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   Venomblades' poison, making an enemy take more damage from everything and
   at III spreading when it dies; Headhunters going for the toughest enemy in
   reach, with a bounty of its HP, at III anywhere in the city); a
-  Ranged Guild an archer barracks, a Mage Guild, a **sniper lodge** (snipers:
-  long range, heavy, slow single shots, with three paths: Marksmen reaching
+  Ranged Guild an archer barracks, a Mage Guild or a **gunner hall**
+  (gunners with pistols: quick, short shots), which becomes a **musket
+  hall**, a **machine-gun nest** (machine gunners spraying light bullets;
+  its Belt feed path reloads faster and hits harder, and its crown makes
+  it a **Gatling emplacement**, whose gunners fire at an enormous rate but
+  barely walk) or a **rocket battery** (rocketeers: very slow to reload,
+  every rocket bursting 1.5 cells wide, sparing your own). The musket
+  hall's Sharpshooters path (further, harder, the toughest in reach at
+  III) is crowned into a **sniper lodge** (snipers: long range, heavy,
+  slow single shots, with three paths: Marksmen reaching
   3 cells further, aiming at the toughest enemy in reach from II and
   landing a 4× headshot every third shot at III; Ricochet bullets glancing
   on to the nearest enemy not yet struck within 2.5 cells, once, twice,
   then four times at 80%; Suppressing fire's hits slowing, staggering from
-  II, and reloading 40% faster at III) or a **musket hall** (explosive
-  musketmen: balls that burst over a small area, sparing your own, with
-  three paths: Grenadiers' bursts leaving the ground burning, throwing four
+  II, and reloading 40% faster at III). The musket hall's musketmen fire
+  slow, heavy single balls, with four paths: Sharpshooters (above);
+  Grenadiers' balls bursting over a small area, sparing your own, and
+  leaving the ground burning, throwing four
   smaller bursts round them from II and setting clinging fire at III;
   Volley fire's extra balls at the next nearest enemies, and at III quicker
   reloads for each comrade of the hall standing near; Bayonets running
   through an enemy at close quarters instead of shooting it, hunting
-  anywhere in the city from II and staggering what they stab at III). A
+  anywhere in the city from II and staggering what they stab at III. A
   building can also start one of its kind's paths and climb it rank by
   rank; a crowned path's last step evolves it (Stormcalling's wizard tower
   into a dark wizard keep). A building taken back to the palette keeps its

@@ -6,7 +6,7 @@ import { cloneLayout, type PlacedKind } from "./defend/layout.ts";
 import type { Save } from "./save.ts";
 import { studyPathCost } from "./economy.ts";
 
-export type PathTopic = "wizardTower" | "barracks" | "valkyriePalace" | "assassinDen" | "musketHall" | "sniperLodge" | "archerTower" | "cannonTower" | "archerBarracks" | "watchTower" | "mageGuild" | "bait" | "spikes" | SpellId;
+export type PathTopic = "wizardTower" | "barracks" | "valkyriePalace" | "assassinDen" | "musketHall" | "gunNest" | "sniperLodge" | "archerTower" | "cannonTower" | "archerBarracks" | "watchTower" | "mageGuild" | "bait" | "spikes" | SpellId;
 /** Strike spells: cast from the battle's Skills palette rather than built,
  * so a spell has no cards; it casts with the one path `save.spellPaths`
  * names, at its furthest researched rank. */
@@ -16,7 +16,7 @@ export const isSpell = (topic: string): topic is SpellId => (SPELLS as string[])
 export type PathId =
   | "pyromancy" | "rime" | "storm" | "crusaders" | "berserkers" | "halberdiers" | "cloudborne"
   | "bloodletters" | "shadowcloak" | "venom" | "headhunters"
-  | "grenadiers" | "volleyFire" | "bayonets"
+  | "grenadiers" | "volleyFire" | "bayonets" | "sharpMuskets" | "beltFeed"
   | "marksmen" | "ricochet" | "suppressors"
   | "fireArrows" | "sharpshooters" | "gunnery" | "siegeShot" | "rangers" | "skirmishers"
   | "spotters" | "signalFires" | "pyroclasm" | "cinders" | "oilSoaked" | "fortified"
@@ -97,7 +97,8 @@ export const VENOM = { time: [0, 4, 6, 6], more: [1, 1.25, 1.5, 1.5], share: 0.5
  * times the strike); from II they range `leash` times as far, and at III
  * anywhere in the city. */
 export const HEADHUNT = { bounty: [0, 0.01, 0.02, 0.03], cap: 10, leash: 1.5 };
-/** The Musket hall's paths (`muskets.ts`). Grenadiers: each burst leaves
+/** The Musket hall's paths (`muskets.ts`). Grenadiers: balls burst where
+ * they hit (`MUSKETEER.blast` cells wide), and each burst leaves
  * burning ground for `burn[rank]` seconds at `share` of the ball's damage a
  * second; from II it throws `bomblets` smaller bursts round it, each
  * `bombShare` of the damage and `bombR` of the burst; at III the fire clings. */
@@ -107,6 +108,14 @@ export const GRENADIERS = { burn: [0, 3, 3, 5], share: 0.25, bomblets: [0, 0, 4,
  * reloads `drill` faster for each comrade of its hall within `reach`
  * cells, at most `most` of them. */
 export const VOLLEY = { extra: [0, 1, 2, 2], share: 0.5, drill: 0.15, most: 3, reach: 3 };
+/** Sharpshooters: musketmen reach `range[rank]` more cells and hit
+ * `damage[rank]` times as hard; at III they aim at the toughest enemy in
+ * reach. Its crown makes the hall a Sniper lodge. */
+export const SHARP_MUSKETS = { range: [0, 1.5, 1.5, 3], damage: [1, 1, 1.5, 1.8] };
+/** Belt feed: machine gunners reload in `reload[rank]` of the time; from
+ * II their bullets hit `damage` times as hard. Its crown makes the nest a
+ * Gatling emplacement. */
+export const BELT_FEED = { reload: [1, 0.8, 0.8, 0.6], damage: 1.4 };
 /** Bayonets: an enemy within `reach` cells is run through for `damage`
  * times the shot's damage every `cooldown` seconds instead of shot; from II
  * they hunt anywhere in the city at `speed` times their pace; at III a
@@ -338,7 +347,7 @@ export const PATHS: KnowledgePath[] = [
   {
     id: "grenadiers", topic: "musketHall", name: "Grenadiers", motto: "Bursts that burn and scatter", hue: "ember",
     ranks: [
-      { name: "Fire powder", icon: "fireball", cost: studyPathCost(4, 0), text: "Every burst leaves the ground burning for 3 seconds, at a quarter of the ball's damage a second" },
+      { name: "Fire powder", icon: "fireball", cost: studyPathCost(4, 0), text: "Balls burst where they hit, and every burst leaves the ground burning for 3 seconds, at a quarter of the ball's damage a second" },
       { name: "Grenades", icon: "grape", cost: studyPathCost(4, 1), text: "Every burst throws 4 smaller bursts round it, each 40% of the damage" },
       { name: "Wildfire", icon: "inferno", cost: studyPathCost(4, 2), text: "The ground burns for 5 seconds, and its fire clings to whatever walks out of it" },
     ],
@@ -358,6 +367,24 @@ export const PATHS: KnowledgePath[] = [
       { name: "Charge", icon: "boot", cost: studyPathCost(4, 1), text: "Musketmen hunt enemies anywhere in the city, running 40% faster" },
       { name: "Shock", icon: "hammer", cost: studyPathCost(4, 2), text: "Every bayonet thrust staggers its enemy for 1 second" },
     ],
+  },
+  {
+    id: "sharpMuskets", topic: "musketHall", name: "Sharpshooters", motto: "Rifled barrels, then long rifles", hue: "verdant",
+    ranks: [
+      { name: "Rifled barrels", icon: "spyglass", cost: studyPathCost(4, 0), text: "Musketmen reach 1.5 cells further" },
+      { name: "Steady aim", icon: "crosshair", cost: studyPathCost(4, 1), text: "Their balls hit 50% harder" },
+      { name: "Sharpshooters", icon: "skull", cost: studyPathCost(4, 2), text: "They reach 3 cells further and hit 80% harder in all, aimed at the toughest enemy in reach" },
+    ],
+    evolves: { from: "musketHall", item: "sniperLodge", name: "Sniper lodge", cost: 50000, text: "This Musket hall becomes a Sniper lodge" },
+  },
+  {
+    id: "beltFeed", topic: "gunNest", name: "Belt feed", motto: "Faster, until it never stops", hue: "steel",
+    ranks: [
+      { name: "Belt feed", icon: "gear", cost: studyPathCost(4, 0), text: "Machine gunners reload 20% faster" },
+      { name: "Heavy rounds", icon: "cannonball", cost: studyPathCost(4, 1), text: "Their bullets hit 40% harder" },
+      { name: "Water jacket", icon: "volley", cost: studyPathCost(4, 2), text: "They reload 40% faster than at first" },
+    ],
+    evolves: { from: "gunNest", item: "gatlingNest", name: "Gatling emplacement", cost: 50000, text: "This Machine-gun nest becomes a Gatling emplacement" },
   },
   {
     id: "marksmen", topic: "sniperLodge", name: "Marksmen", motto: "Farther, and the biggest first", hue: "verdant",
@@ -622,7 +649,8 @@ export const UNSPECIALIZED: Record<PathTopic, string> = {
   barracks: "Balanced swordsmen",
   valkyriePalace: "A marble palace on the ground",
   assassinDen: "Quick, frail assassins: every 4th strike critical",
-  musketHall: "Explosive musketmen: every ball bursts",
+  musketHall: "Musketmen: slow, heavy single balls",
+  gunNest: "Machine gunners: fast, light bullets",
   sniperLodge: "Snipers: slow, far, single hard shots",
   archerTower: "Steady single arrows",
   cannonTower: "Standard shells and blasts",
