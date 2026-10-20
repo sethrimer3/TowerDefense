@@ -57,6 +57,7 @@ import { FORTIFY, SHATTER, SIGNAL, SPOTTERS, pathRank } from "../knowledge-paths
 import { Barracks, stepArcher, stepSwordsman } from "./troops.ts";
 import { cloaked, spreadVenom, stepVenom } from "./assassins.ts";
 import { hopliteGuard } from "./spears.ts";
+import { heroRises, stepHero, stepSwings, type Swing } from "./hero.ts";
 import { stepBlazes, stepFireballs, stepMage, type Blaze, type Fireball } from "./mages.ts";
 import { stepStabs, stepValkyrie, type Stab } from "./valkyries.ts";
 import { launchPalaces, stepSkyPalaces, type SkyPalace } from "./sky-palace.ts";
@@ -139,9 +140,9 @@ export type Soldier = {
    * and hurl fireballs; valkyries hunt and charge-stab; the dark wizard
    * hunts and casts chain lightning; the spearmen line's spearmen,
    * hoplites and lancers chase like swordsmen, its javelineers roam and
-   * throw like archers. */
+   * throw like archers; the Hero hunts the city with its sword combos. */
   kind: "sword" | "archer" | "mage" | "valkyrie" | "darkWizard" | "undead" | "reinforcement" | "brawler" | "slinger" | "sniper" | "musketeer" | "gunner" | "machineGunner" | "gatlingGunner" | "rocketeer" | "railSniper" | "assassin"
-    | "spearman" | "hoplite" | "javelineer" | "lancer";
+    | "spearman" | "hoplite" | "javelineer" | "lancer" | "hero";
   home: number;
   x: number;
   y: number;
@@ -166,6 +167,8 @@ export type Soldier = {
   /** The enemy a lancer last struck: its next thrust at any other is a
    * charge; absent for everyone else. */
   lanced?: number;
+  /** An Undying Hero that has already risen once; absent for everyone else. */
+  rallied?: true;
   /** A warrior the Necromancy spell raised (`home` -1); absent for everyone else. */
   risen?: Risen;
   /** A soldier the Reinforcements spell dropped (`home` -1); absent for everyone else. */
@@ -267,6 +270,7 @@ const STEP_SOLDIER: Record<Soldier["kind"], (sim: DefendSim, s: Soldier, dt: num
   hoplite: stepSwordsman,
   lancer: stepSwordsman,
   javelineer: stepArcher,
+  hero: stepHero,
 };
 /** How long a struck building flashes, in seconds. */
 export const BUILDING_FLASH = 0.14;
@@ -330,6 +334,8 @@ export class DefendSim {
   blazes: Blaze[] = [];
   /** Valkyries' charge stabs, fading. */
   stabs: Stab[] = [];
+  /** The Hero's slashes, spins and dashes, fading (presentation; not replayed). */
+  swings: Swing[] = [];
   /** Cloudborne Valkyrie palaces drifting across the sky (`sky-palace.ts`); empty without any. */
   skyPalaces: SkyPalace[] = [];
   /** Black lightning from dark keeps' turrets and dark wizards, fading. */
@@ -668,6 +674,7 @@ export class DefendSim {
     for (const s of this.soldiers)
       if (s.guard !== undefined && (s.guard -= dt) <= 0) delete s.guard;
     stepStabs(this, dt);
+    stepSwings(this, dt);
     stepBolts(this, dt);
     for (let i = 0; i < this.flash.length; i++) if (this.flash[i] > 0) this.flash[i] = Math.max(0, this.flash[i] - dt);
   }
@@ -948,6 +955,7 @@ export class DefendSim {
     const damage = amount * (this.bonuses.banner?.defense && "kind" in unit && bannerInfluence(this, unit) ? 1 - this.bonuses.banner.defense : 1) * wardDefender(this, unit) * shieldWall(this, unit) * hopliteGuard(this, unit);
     const dealt = Math.min(unit.hp, damage);
     unit.hp -= damage;
+    if (unit.hp <= 0 && "kind" in unit && unit.kind === "hero") heroRises(this, unit);
     return dealt;
   }
 

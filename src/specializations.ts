@@ -7,7 +7,7 @@
  *    kind branches into (`BECOMES`: a Watch tower into an archer, cannon or
  *    wizard tower; a Melee Guild into a barracks of swordsmen, an
  *    assassins' den or a spearmen hall, and a Spearmen hall into a phalanx,
- *    a javelin camp or a lancer stable; a Ranged Guild into archers, fire mages or gunners,
+ *    a javelin camp or a lancer stable, and a Barracks into the Hero; a Ranged Guild into archers, fire mages or gunners,
  *    and a Gunner hall into musketmen, machine gunners or rockets), or set out on
  *    one of its kind's Knowledge paths (`knowledge-paths.ts`);
  *  - a building on a path climbs it rank by rank;
@@ -62,13 +62,15 @@ export const BECOMES: Partial<Record<PlacedKind, { to: PlacedKind; cost: number 
     { to: "gunNest", cost: 10 },
     { to: "rocketBattery", cost: 12 },
   ],
+  // The swordsmen's ultimate.
+  barracks: [{ to: "heroHall", cost: 100000 }],
   // The gunner line's ultimate.
   sniperLodge: [{ to: "revolutionary", cost: 100000 }],
 };
 
 /** What each kind's troops are called on its upgrade buttons. */
 export const TROOPS: Partial<Record<PlacedKind, string>> = {
-  meleeGuild: "Brawlers", rangedGuild: "Stone throwers", barracks: "Swordsmen", assassinDen: "Assassins", spearHall: "Spearmen", phalanx: "Hoplites", javelinCamp: "Javelineers", lancerStable: "Lancers", archerBarracks: "Archers", mageGuild: "Fire mages",
+  meleeGuild: "Brawlers", rangedGuild: "Stone throwers", barracks: "Swordsmen", heroHall: "Hero", assassinDen: "Assassins", spearHall: "Spearmen", phalanx: "Hoplites", javelinCamp: "Javelineers", lancerStable: "Lancers", archerBarracks: "Archers", mageGuild: "Fire mages",
   sniperLodge: "Snipers", musketHall: "Musketmen",
   gunHall: "Gunners", gunNest: "Machine gunners", gatlingNest: "Gatling gunners", rocketBattery: "Rocketeers", revolutionary: "Laser snipers", valkyriePalace: "Valkyries", darkKeep: "Dark wizard",
 };

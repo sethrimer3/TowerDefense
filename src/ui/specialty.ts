@@ -14,9 +14,9 @@ import { sideRank, type SidePath, type SideRanks } from "../side-ranks.ts";
 import { GATE_PATHS, GATE_TOWERS, IRONBOUND, PORTCULLIS, gateAllocated, gateBarred, gateRank, respecGate, undoGate, upgradeGate, type GatePathId, type GateRanks } from "../gate-upgrades.ts";
 import { CHAIN, CRIT_CHANCE, CRIT_DAMAGE, DETONATOR, REVOLUTIONARY_PATHS, SQUAD, respecRevolutionary, revolutionaryAllocated, revolutionaryRank, undoRevolutionary, upgradeRevolutionary, type RevolutionaryPathId, type RevolutionaryRanks } from "../revolutionary-upgrades.ts";
 import { BALLISTA_PATHS, FIRE_BOLTS, HEAVY_BOLTS, WINDLASS, ballistaAllocated, ballistaRank, respecBallistas, undoBallistas, upgradeBallistas, type BallistaPathId, type BallistaRanks } from "../ballista-upgrades.ts";
-import { pathById, pathTopicOf, UNSPECIALIZED, type PathId, FIRE_ARROWS, SHARP, GUNNERY, SIEGE_SHOT, CRUSADE, BLOODLETTERS, SHADOWCLOAK, VENOM, HEADHUNT, GRENADIERS, VOLLEY, BAYONET, SHARP_MUSKETS, BELT_FEED, LONG_SPEARS, SET_SPEARS, TESTUDO, SPEAR_WALL, BARBED, THROWING, HEAVY_LANCE, WINGED, TRIPOD, QUICKDRAW, DUELISTS, GUN_SHIELD, OVERDRIVE, STOPPING, DEADEYE, PIERCING, CLUSTER, SALVO, MARKSMEN, RICOCHET, SUPPRESS, BERSERK, HALBERD, RANGERS, SKIRMISH, FORTIFY, PYRO, RIME, STORM, PYROCLASM, CINDERS, SPOTTERS, SIGNAL } from "../knowledge-paths.ts";
+import { pathById, pathTopicOf, UNSPECIALIZED, type PathId, WHIRLWIND, BLADE_DANCE, LEGEND, FIRE_ARROWS, SHARP, GUNNERY, SIEGE_SHOT, CRUSADE, BLOODLETTERS, SHADOWCLOAK, VENOM, HEADHUNT, GRENADIERS, VOLLEY, BAYONET, SHARP_MUSKETS, BELT_FEED, LONG_SPEARS, SET_SPEARS, TESTUDO, SPEAR_WALL, BARBED, THROWING, HEAVY_LANCE, WINGED, TRIPOD, QUICKDRAW, DUELISTS, GUN_SHIELD, OVERDRIVE, STOPPING, DEADEYE, PIERCING, CLUSTER, SALVO, MARKSMEN, RICOCHET, SUPPRESS, BERSERK, HALBERD, RANGERS, SKIRMISH, FORTIFY, PYRO, RIME, STORM, PYROCLASM, CINDERS, SPOTTERS, SIGNAL } from "../knowledge-paths.ts";
 import { bonuses } from "../progression.ts";
-import { ITEM_NAMES, archerDamage, archerCooldown, archerRange, cannonDamage, cannonCooldown, CANNON_RANGE, SOLDIER, ARCHER_UNIT, soldierScale, STRUCTURES, flameDps, flameRange, iceDamage, ICE_RANGE, iceChill, watchRadius, fireballDamage, fireballSplash, emberDps, emberSeconds, FIRE_MAGE, FIREBALL_RANGE, keepHp, BRAWLER, ASSASSIN_UNIT, SLINGER, SNIPER, MUSKETEER, GUNNER, MACHINE_GUNNER, GATLING_GUNNER, RAIL_SNIPER, ROCKETEER, SPEARMAN, HOPLITE, LANCER, JAVELINEER, WALL_BLOCK_DESCRIPTION, wallHp, GATE, GATE_DESCRIPTION, BALLISTA, BALLISTA_DESCRIPTION, ballistaCooldown, ballistaDamage, ballistaRange, gateHpScale, gateShut, type PaletteItem } from "../defend/catalog.ts";
+import { ITEM_NAMES, archerDamage, archerCooldown, archerRange, cannonDamage, cannonCooldown, CANNON_RANGE, SOLDIER, ARCHER_UNIT, soldierScale, STRUCTURES, flameDps, flameRange, iceDamage, ICE_RANGE, iceChill, watchRadius, fireballDamage, fireballSplash, emberDps, emberSeconds, FIRE_MAGE, FIREBALL_RANGE, keepHp, BRAWLER, ASSASSIN_UNIT, SLINGER, SNIPER, MUSKETEER, GUNNER, MACHINE_GUNNER, GATLING_GUNNER, RAIL_SNIPER, ROCKETEER, SPEARMAN, HOPLITE, LANCER, JAVELINEER, HERO, WALL_BLOCK_DESCRIPTION, wallHp, GATE, GATE_DESCRIPTION, BALLISTA, BALLISTA_DESCRIPTION, ballistaCooldown, ballistaDamage, ballistaRange, gateHpScale, gateShut, type PaletteItem } from "../defend/catalog.ts";
 
 /** `kind`'s effective numbers wearing `path` at `rank` (none: plain), with
  * the shared Smithy and skill bonuses. */
@@ -42,6 +42,17 @@ export function kindStats(save: Save, kind: PaletteItem, path?: PathId, rank = 0
       halberd ? `${n(SOLDIER.reach + HALBERD.reach)} reach${halberd >= 2 ? ` · blows slow ${HALBERD.chill}s` : ""}${halberd >= 3 ? ` · ${HALBERD.bigDamage}x on big enemies` : ""}` : "",
     ].filter(Boolean).map((t) => ` · ${t}`).join("");
     return `Recruits: ${n(base.hp * scale * b.troopHp * (sword ? CRUSADE.hp[crusade] : 1))} HP · ${n(base.damage * scale * b.troopDamage * (crusade >= 3 ? CRUSADE.damage : halberd ? HALBERD.damage : ranger >= 2 ? RANGERS.damage : 1))} damage · ${n(base.speed * (crusade ? CRUSADE.speed : skirmish >= 2 ? SKIRMISH.speed : 1))} speed${extra}`;
+  }
+  if (kind === "heroHall") {
+    const whirl = at("whirlwind"), dance = at("bladeDance"), legend = at("legend"), scale = soldierScale(l.soldierArms);
+    const every = WHIRLWIND.every[whirl], spin = whirl ? WHIRLWIND.radius[whirl] : HERO.spin, times = whirl ? WHIRLWIND.damage[whirl] : HERO.spinDamage;
+    const extra = [
+      BLADE_DANCE.slashes[dance] > 1 ? `slashes in flurries of ${BLADE_DANCE.slashes[dance]}${dance >= 3 ? `, kills adding more up to ${BLADE_DANCE.most}` : ""}` : "",
+      legend >= 2 ? `kills heal ${LEGEND.heal * 100}%` : "",
+      legend >= 3 ? "rises once when it falls" : "",
+    ].filter(Boolean).map((t) => ` · ${t}`).join("");
+    const combo = every === 1 ? `every strike a spin ${spin} cells round, ${times}x` : `every ${ordinal(every)} strike a spin ${spin} cells round, ${times}x`;
+    return `One hero: ${n(HERO.hp * scale * b.troopHp * LEGEND.hp[legend])} HP · ${n(HERO.damage * scale * b.troopDamage)} damage every ${n(HERO.cooldown * BLADE_DANCE.cooldown[dance])}s · slashes cut all within ${HERO.arc} cells in front · ${combo}${extra}`;
   }
   if (kind === "assassinDen") {
     const blood = at("bloodletters"), cloak = at("shadowcloak"), venom = at("venom"), hunt = at("headhunters");

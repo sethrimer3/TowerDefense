@@ -363,6 +363,23 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   every enemy beside the target at III) or Halberdiers (0.6 cells more
   reach and 20% more damage, blows slowing from II, 2.5× on big enemies
   at III). The old Assassins path is retired (its Knowledge refunded).
+  A plain barracks becomes the swordsmen's ultimate, the **Hero**
+  (`hero.ts`, 100,000 Knowledge), a gilded hall the barracks' size that
+  trains one hero (480 HP, 16 damage every 0.42 seconds), slow to rise
+  again (three times a barracks' drill). It hunts the nearest enemies in
+  the city and fights in a combo: two sweeping slashes, each cutting every
+  enemy within 1.3 cells in front of it, then a spin cutting everything
+  within 1.5 cells round it for 1.5×. Its paths: Whirlwind (every other
+  strike a spin reaching 2 cells, then spins at 2.2×, then every strike a
+  spin reaching 2.4 cells), Blade dance (each strike a flurry of 3 slashes,
+  dashing from enemy to enemy within 2.5 cells, stopped by anything solid;
+  then 5 slashes and a third faster; then each kill adding another slash,
+  up to 12) and Legend (twice the HP, then each kill healing 5%, then the
+  first time it falls it rises at once with half its HP, unhurtable for 3
+  seconds). `hero-art.ts` draws the knight with its cape in its path's
+  colours, its longsword swinging through each slash and whirling round
+  through each spin, the slashes' crescents, the spins' rings, the dashes'
+  streaks and after-images, and the rising's pillar of gold.
 - **Archer barracks** train archers (same garrison size, drill speed and
   arms upgrades as the swordsmen's barracks). Archers wander random city
   streets and stop to shoot anything within their short sight (3 cells,

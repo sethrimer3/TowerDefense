@@ -21,6 +21,8 @@
  *   on the ridge, its yard a tilting run past a quintain, hay and a trough.
  * - Barracks: a stone hall under a red tiled roof, the swordsmen's blue
  *   shield on its ridge.
+ * - Hero: a pale stone hall under gilded tiles with a great sword on the
+ *   ridge, its yard a round sand arena ringed by stone and straw dummies.
  * - Archer barracks: a timber hall, and its yard with a straw target butt.
  * - Archer tower: a square crenellated tower over a plank floor, its hatch
  *   and a sheaf of arrows.
@@ -133,6 +135,7 @@ const MATERIAL: Record<PlacedKind, { m: Material; ruin: Pick<Ruin, "stone" | "to
   javelinCamp: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.canvas.slice(0, 3), beams: true } },
   lancerStable: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.plank.slice(0, 3), beams: true } },
   barracks: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: [0x6e2a22, C.red, 0xc25a48], beams: true } },
+  heroHall: { m: { tones: C.pale.slice(1, 4), roofed: true }, ruin: { stone: C.pale.slice(1, 4), top: C.gold, beams: true } },
   archerBarracks: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: [0x4a3826, C.timber, 0x8e7048], beams: true } },
   archerTower: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.plank.slice(0, 3), beams: true } },
   cannonTower: { m: { tones: STONE, roofed: false }, ruin: { stone: STONE, top: C.iron.slice(1), beams: false, round: true } },
@@ -155,6 +158,7 @@ const frame = (w: number, h: number) => ({ x0: 1, y0: 1, x1: w - 3, y1: h - 3 })
  * painter to give it a sprite. */
 export const PATH_LOOKS: Partial<Record<PlacedKind, readonly string[]>> = {
   barracks: ["crusaders", "berserkers", "halberdiers"],
+  heroHall: ["whirlwind", "bladeDance", "legend"],
   valkyriePalace: ["cloudborne"],
   assassinDen: ["bloodletters", "shadowcloak", "venom", "headhunters"],
   spearHall: ["longSpears", "setSpears"],
@@ -197,7 +201,7 @@ export function structureRubblePixels(kind: PlacedKind, cw: number, ch: number, 
   return rubblePixels(w, h, hash(seed, KINDS.indexOf(kind), 3), { ...frame(w, h), ...MATERIAL[kind].ruin });
 }
 
-const KINDS: PlacedKind[] = ["barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "meleeGuild", "rangedGuild", "sniperLodge", "musketHall", "assassinDen", "gunHall", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "spearHall", "phalanx", "javelinCamp", "lancerStable"];
+const KINDS: PlacedKind[] = ["barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "meleeGuild", "rangedGuild", "sniperLodge", "musketHall", "assassinDen", "gunHall", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "spearHall", "phalanx", "javelinCamp", "lancerStable", "heroHall"];
 
 const PAINT: Record<PlacedKind, (p: Pix, look: string) => void> = {
   meleeGuild: paintMeleeGuild,
@@ -215,6 +219,7 @@ const PAINT: Record<PlacedKind, (p: Pix, look: string) => void> = {
   javelinCamp: paintJavelinCamp,
   lancerStable: paintLancerStable,
   barracks: paintBarracks,
+  heroHall: paintHeroHall,
   archerBarracks: paintArcherBarracks,
   archerTower: paintArcherTower,
   cannonTower: paintCannonTower,
@@ -861,6 +866,95 @@ function paintLancerStable(p: Pix, look: string) {
   for (let x = y.x0 + 6; x <= y.x0 + 8; x++) p.set(x, y.y1 - 2, C.ice[1]);
   if (heavy) for (let x = y.x0 + 12; x <= y.x0 + 16; x += 2) for (let yy = y.y1 - 3; yy <= y.y1 - 1; yy++) p.set(x, yy, yy === y.y1 - 3 ? C.iron[3] : C.iron[1]);
   if (winged) for (const [dx, dy] of [[2, 1], [7, 2], [11, 1], [14, 3], [9, 4]] as const) { p.set(y.x0 + dx, y.y0 + dy, C.marble[4]); p.set(y.x0 + dx + 1, y.y0 + dy, C.marble[2]); }
+}
+
+/** A longsword point up: its blade (3 lit, 2 shaded), a gold guard and pommel, a leather grip. */
+const LONGSWORD = ["...0...", "..030..", "..032..", "..032..", "..032..", "..032..", "..032..", "0000000", "0555550", "0000000", "..040..", "..050..", "..000.."];
+/** A laurel wreath round a gold star, Legend's emblem. */
+const LAUREL = [".00.00.", "0300030", "03.5.30", "0355530", "03.5.30", "0300030", ".03030.", "..000.."];
+
+/** Three blades whirling about a gold hub, Whirlwind's emblem, `r` pixels round (cx, cy). */
+function pinwheel(p: Pix, cx: number, cy: number, r: number) {
+  disc(p, cx, cy, r, (x, y, d, dx, dy) => {
+    if (d < 1.4) return d < 0.9 ? C.gold[2] : C.gold[1];
+    // Each arm curls back with distance: steel in a black edge.
+    const a = Math.atan2(dy, dx) - d * 0.7, arm = ((a % (Math.PI * 2 / 3)) + Math.PI * 2) % (Math.PI * 2 / 3);
+    if (arm > 1.25) return null;
+    return arm < 0.25 || arm > 1.0 || d > r - 0.8 ? OUTLINE : arm < 0.55 ? C.marble[4] : C.ice[2];
+  });
+}
+
+/** The Hero's hall: pale stone under gilded tiles, a great sword on the
+ * ridge, its yard a round sand arena ringed by stone, straw dummies round
+ * it. Whirlwind roofs it in storm slate under whirling blades, a double
+ * spiral swept through the sand and its dummies knocked flat round it;
+ * Blade dance roofs it in black-crimson under a red-edged sword, crossed
+ * swords racked by the door and a row of dummies across the arena, each
+ * cut through; Legend roofs it in white marble under a laurel, a gilded
+ * statue of the hero, sword raised, on a plinth in the arena's heart. */
+function paintHeroHall(p: Pix, look: string) {
+  const whirl = look === "whirlwind", dance = look === "bladeDance", legend = look === "legend";
+  const { x0, y0, x1 } = frame(p.w, p.h);
+  const y = whirl ? guild(p, C.cloud[2], ["."], {})
+    : legend ? guild(p, C.marble[2], LAUREL, { 0: OUTLINE, 3: C.moss, 5: C.gold[1] })
+    : guild(p, dance ? 0x4a141c : C.gold[0], LONGSWORD, { 0: OUTLINE, 2: dance ? C.banner[1] : C.iron[2], 3: C.marble[3], 4: C.plank[1], 5: C.gold[1] });
+  if (whirl) pinwheel(p, (x0 + x1 + 1) / 2, (y0 + y.y0) / 2, 5.2);
+  // The arena: sand inside a ring of stone, lit from the upper left.
+  const cx = (y.x0 + y.x1 + 1) / 2, cy = (y.y0 + y.y1 + 1) / 2, r = Math.min(y.x1 - y.x0, y.y1 - y.y0) / 2;
+  const sand = [0x9a7c4c, 0xc8a86e, 0xe0c890];
+  disc(p, cx, cy, r, (x, yy, d, dx, dy) => (d > r - 1 ? OUTLINE : d > r - 2.2 ? C.stone[1 + Math.min(2, lit(x, yy, dx, dy, d))] : sand[hash(x, yy, 61) % 5 === 0 ? 0 : 1 + (hash(x, yy, 62) % 2)]));
+  const dummy = (dx: number, dy: number, down = false) => {
+    const x = Math.round(dx), yy = Math.round(dy);
+    if (down) {
+      // Knocked flat: the straw body lying across, its post snapped.
+      rect(p, x - 2, yy - 1, x + 2, yy + 1, OUTLINE);
+      rect(p, x - 1, yy, x + 1, yy, C.straw[1]);
+      p.set(x + 2, yy, C.plank[0]);
+      return;
+    }
+    rect(p, x - 1, yy - 2, x + 1, yy + 1, OUTLINE);
+    p.set(x, yy - 1, C.straw[2]);
+    p.set(x, yy, C.straw[1]);
+    p.set(x, yy + 2, C.plank[0]);
+  };
+  if (dance) {
+    // A row of dummies across the arena, each cut through with a red gash,
+    // and crossed swords racked either side of the door.
+    for (let i = -1; i <= 1; i++) {
+      const dx = Math.round(cx + i * 4), dy = Math.round(cy);
+      dummy(dx, dy);
+      p.set(dx - 1, dy - 2, C.banner[2]);
+      p.set(dx, dy - 1, C.banner[1]);
+      p.set(dx + 1, dy, C.banner[2]);
+    }
+    glyph(p, y.x0 + 1, y.y0 + 1, CROSSED, { 0: OUTLINE, 1: C.gold[1], 3: C.marble[3] });
+    glyph(p, y.x1 - 6, y.y0 + 1, CROSSED, { 0: OUTLINE, 1: C.gold[1], 3: C.marble[3] });
+    return;
+  }
+  if (whirl) {
+    // A double spiral swept through the sand.
+    for (let t = 0; t < 40; t++)
+      for (const arm of [0, Math.PI]) {
+        const a = t * 0.3 + arm, rr = 0.6 + t * 0.14;
+        if (rr < r - 2.4) p.set(Math.floor(cx + Math.cos(a) * rr), Math.floor(cy + Math.sin(a) * rr), C.dirt[0]);
+      }
+  }
+  if (legend) {
+    // The statue: a gold figure, its sword raised, on a stone plinth.
+    const sx = Math.round(cx), sy = Math.round(cy);
+    rect(p, sx - 4, sy + 1, sx + 3, sy + 4, OUTLINE);
+    rect(p, sx - 3, sy + 2, sx + 2, sy + 3, C.stone[2]);
+    for (let x = sx - 3; x <= sx + 2; x++) p.set(x, sy + 2, C.stone[3]);
+    rect(p, sx - 3, sy - 4, sx + 1, sy + 1, OUTLINE);
+    rect(p, sx - 2, sy - 3, sx, sy, C.gold[1]);
+    p.set(sx - 2, sy - 3, C.gold[2]);
+    p.set(sx - 1, sy - 4, C.gold[1]);
+    // The raised sword, up past its head.
+    for (let i = 0; i <= 5; i++) { p.set(sx + 1, sy - 2 - i, i === 0 ? C.gold[1] : C.marble[4]); p.set(sx + 2, sy - 2 - i, OUTLINE); }
+    p.set(sx + 1, sy - 8, OUTLINE);
+  }
+  // Dummies round the ring (flat for Whirlwind's).
+  for (const [ox, oy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]] as const) dummy(cx + ox * (r + 0.2) * 0.62, cy + oy * (r - 1) * 0.62, whirl);
 }
 
 function paintArcherBarracks(p: Pix, look: string) {
