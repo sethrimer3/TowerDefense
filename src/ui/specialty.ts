@@ -6,7 +6,7 @@ import type { CircleState } from "../magic-circle/formation.ts";
  * `treeCardHtml`, the card of the node picked in it). The tree comes from
  * `specializations.ts`; paths, ranks, icons and hues from `knowledge-paths.ts`. */
 import type { Save } from "../save.ts";
-import { BECOMES, TROOPS, allocated, rootOf, buildingPathsOf, buildingTree, undoRefund, type TreeNode, type UpgradeStep, type Wear } from "../specializations.ts";
+import { BECOMES, TROOPS, allocated, rootOf, buildingPathsOf, buildingTree, fullTree, undoRefund, type TreeNode, type UpgradeStep, type Wear } from "../specializations.ts";
 import type { GraphNode } from "./upgrade-graph.ts";
 import { ARROW_LOOPS, BASTIONS, BOILING_OIL, KEEP_PATHS, keepAllocated, keepRank, respecKeep, undoKeep, upgradeKeep, type KeepPathId, type KeepRanks } from "../keep-upgrades.ts";
 import { STONEWORK, THORNWORK, TOWN_WALLS, WALL_PATHS, respecWalls, undoWalls, upgradeWalls, wallAllocated, wallRank, type WallPathId, type WallRanks } from "../wall-upgrades.ts";
@@ -125,13 +125,63 @@ const knowledgeTag = (n: number) => `${n >= 10000 ? `${Number((n / 1000).toFixed
 
 /** One building's tree as the graph draws it. */
 export function treeGraph(kind: PaletteItem | "wallSpikes", wear?: Wear): GraphNode[] {
-  return buildingTree(kind as never, wear).map((n): GraphNode => {
-    const hue = n.path ? `hue-${pathById(n.path).hue}` : n.step?.type === "evolve" ? "hue-gold" : undefined;
-    const face = n.kind
-      ? `<canvas width="32" height="32" data-icon="${n.kind}"></canvas>`
-      : `<canvas data-path-icon="${pathById(n.path!).ranks[n.rank! - 1].icon}:${pathById(n.path!).hue}"></canvas><b>${ROMAN[n.rank!]}</b>`;
-    return { id: n.id, parent: n.parent, state: n.state, face, tag: n.state === "owned" ? undefined : knowledgeTag(n.cost), hue, side: n.side, hidden: n.hidden, closed: n.closed, took: n.took };
+  return buildingTree(kind as never, wear).map((n): GraphNode => (
+    { id: n.id, parent: n.parent, state: n.state, face: nodeFace(n), tag: n.state === "owned" ? undefined : knowledgeTag(n.cost), hue: nodeHue(n), side: n.side, hidden: n.hidden, closed: n.closed, took: n.took }));
+}
+/** A node's colours: its path's, or gold for a crown. */
+const nodeHue = (n: TreeNode) => (n.path ? `hue-${pathById(n.path).hue}` : n.step?.type === "evolve" ? "hue-gold" : undefined);
+/** A node's face: a building's icon, or a path rank's with its numeral. */
+const nodeFace = (n: TreeNode) => n.kind
+  ? `<canvas width="32" height="32" data-icon="${n.kind}"></canvas>`
+  : `<canvas data-path-icon="${pathById(n.path!).ranks[n.rank! - 1].icon}:${pathById(n.path!).hue}"></canvas><b>${ROMAN[n.rank!]}</b>`;
+
+// ── The upgrade map ───────────────────────────────────────────────────────
+/** The map of `kind`'s whole line (from its basic building) as a web: every
+ * upgrade in `found` (discovered by any building of the line), or every one
+ * with `all` (Developer mode). `here` is what this building has: gold; the
+ * rest discovered: blue; never discovered (shown only with `all`): dim.
+ * A shown node with undiscovered branches beyond it trails them off. */
+export function mapGraph(kind: PaletteItem | "wallSpikes", found: ReadonlySet<string>, here: ReadonlySet<string>, all: boolean): GraphNode[] {
+  const web = fullTree(kind === "wallSpikes" ? kind : rootOf(kind as never));
+  const shown = web.filter((n) => all || found.has(n.id) || here.has(n.id) || !n.parent);
+  const ids = new Set(shown.map((n) => n.id));
+  return shown.map((n): GraphNode => {
+    const unseen = web.filter((o) => o.parent === n.id && !ids.has(o.id)).length;
+    const state = here.has(n.id) ? "owned" : found.has(n.id) ? "next" : "locked";
+    return { id: n.id, parent: n.parent, state, face: nodeFace(n), tag: state === "owned" ? undefined : knowledgeTag(n.cost), hue: nodeHue(n),
+      ...(unseen ? { hidden: Array.from({ length: unseen }, (_, i) => ({ side: false, i, n: unseen })) } : {}) };
   });
+}
+/** The whole web of `kind`'s line, discovered or not: where the map's nodes stand. */
+export const mapWeb = (kind: PaletteItem | "wallSpikes") => fullTree(kind === "wallSpikes" ? kind : rootOf(kind as never));
+/** How many of the line's upgrades are discovered, of how many. */
+export function mapCount(kind: PaletteItem | "wallSpikes", found: ReadonlySet<string>): { found: number; total: number } {
+  const web = fullTree(kind === "wallSpikes" ? kind : rootOf(kind as never));
+  return { found: web.filter((n) => found.has(n.id) || !n.parent).length, total: web.length };
+}
+
+/** The map's card for node `id`: what it is and does, its price, and
+ * whether this building has it, another found it, or none has yet. Read
+ * only: upgrades are bought in the tree. */
+export function mapCardHtml(save: Save, kind: PaletteItem | "wallSpikes", found: ReadonlySet<string>, here: ReadonlySet<string>, id: string): string {
+  const n = fullTree(kind === "wallSpikes" ? kind : rootOf(kind as never)).find((o) => o.id === id);
+  if (!n) return `<p class="ug-hint">Tap an upgrade to see what it does.</p>`;
+  let title: string, text: string, level = "", stats = "";
+  if (n.kind) {
+    title = ITEM_NAMES[n.kind as PaletteItem] ?? "Wall spikes";
+    text = n.step?.type === "evolve" ? pathById(n.step.path).evolves!.text : n.kind === "wallSpikes" ? "Stakes along the wall's outer face." : `${TROOPS[n.kind as keyof typeof TROOPS] ? `${TROOPS[n.kind as keyof typeof TROOPS]} · ` : ""}${STRUCTURES[n.kind as keyof typeof STRUCTURES]?.description ?? ""}`;
+    if (n.kind !== "wallSpikes") stats = kindStats(save, n.kind as PaletteItem);
+  } else {
+    const p = pathById(n.path!), r = p.ranks[n.rank! - 1];
+    title = `${p.name} ${ROMAN[n.rank!]}: ${r.name}`;
+    text = `${p.motto}. ${r.text}`;
+    level = `Level ${n.rank} / ${p.ranks.length}`;
+  }
+  const price = n.parent ? ` · ${n.cost.toLocaleString("en")} Knowledge` : "";
+  const state = here.has(id) ? `<b class="ug-owned">This building has it</b>`
+    : found.has(id) || !n.parent ? `<b class="ug-found">Discovered${price}</b><small class="ug-again">Another building of its line reached it</small>`
+    : `<span class="ug-locked">Not yet discovered${price} · shown in Developer mode</span>`;
+  return `<div class="ug-card-head"><b>${title}</b>${level ? `<small>${level}</small>` : ""}</div><p>${text}</p>${stats ? `<p class="ug-stats">${stats}</p>` : ""}<div class="ug-card-foot" data-ug-ignore>${state}</div>`;
 }
 
 /** The card for node `id` of a building of `kind` wearing `wear`: what it
