@@ -59,5 +59,5 @@ export const ballistaRank = (ranks: BallistaRanks | undefined, id: BallistaPathI
 export const ballistaAllocated = (ranks: BallistaRanks | undefined) => sideAllocated(BALLISTA_PATHS, ranks);
 export const upgradeBallistas = (save: Save, id: BallistaPathId): SideResult => buySide(save, "ballistaRanks", BALLISTA_PATHS, id);
 export const undoBallistas = (save: Save, id: BallistaPathId, rank: number): SideResult => undoSide(save, "ballistaRanks", BALLISTA_PATHS, id, rank);
-export const respecBallistas = (save: Save): SideResult => respecSide(save, "ballistaRanks", BALLISTA_PATHS, "the ballistas");
+export const respecBallistas = (save: Save): SideResult => respecSide(save, "ballistaRanks", BALLISTA_PATHS, "the ballistas have no upgrades");
 export const decodeBallistaRanks = (raw: unknown): BallistaRanks | undefined => decodeSideRanks(BALLISTA_PATHS, raw);

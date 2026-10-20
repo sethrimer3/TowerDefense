@@ -863,15 +863,6 @@ export function moveStructure(l: Layout, uid: number, tx: number, ty: number): L
   return null;
 }
 
-/** The structure whose footprint covers cell (cx, cy) in `l`, if any. */
-export function structureAt(l: Layout, cx: number, cy: number): PlacedStructure | undefined {
-  return l.structures.find((s) => {
-    const { qw, qh } = quarterSize(s.kind, l.compact.includes(s.kind));
-    const r = quarterRectCells(s.qx, s.qy, qw, qh);
-    return cx >= r.x && cy >= r.y && cx < r.x + r.w && cy < r.y + r.h;
-  });
-}
-
 /** The keep's tile is placed like any city tile: onto open ground it
  * carries its tile with everything on it (`carryTile`), and onto another
  * city tile the two tiles swap roles. */
@@ -913,9 +904,6 @@ export const wallSpotOk = (w: WallSpot) => w.qx >= 0 && w.qy >= 0 && w.qx < QUAR
 
 /** The cells a wall section takes: its whole quarter tile. */
 export const wallPieceRect = (w: WallSpot): Rect => quarterRectCells(w.qx, w.qy, 1, 1);
-/** The quarter of its tile `w` names, in cells: what the placing grid
- * frames, the same as its section. */
-export const quarterRect = wallPieceRect;
 /** The quarter tile under the point (x, y), in cells. */
 export const quarterAt = (x: number, y: number): WallSpot => ({ qx: Math.floor(x / QC), qy: Math.floor(y / QC) });
 

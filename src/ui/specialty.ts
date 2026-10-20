@@ -8,9 +8,9 @@ import type { CircleState } from "../magic-circle/formation.ts";
 import type { Save } from "../save.ts";
 import { BECOMES, TROOPS, allocated, rootOf, buildingPathsOf, buildingTree, undoRefund, type TreeNode, type UpgradeStep, type Wear } from "../specializations.ts";
 import type { GraphNode } from "./upgrade-graph.ts";
-import { ARROW_LOOPS, BASTIONS, BOILING_OIL, KEEP_PATHS, keepRank, type KeepPathId, type KeepRanks } from "../keep-upgrades.ts";
+import { ARROW_LOOPS, BASTIONS, BOILING_OIL, KEEP_PATHS, keepAllocated, keepRank, respecKeep, undoKeep, upgradeKeep, type KeepPathId, type KeepRanks } from "../keep-upgrades.ts";
 import { STONEWORK, THORNWORK, TOWN_WALLS, WALL_PATHS, respecWalls, undoWalls, upgradeWalls, wallAllocated, wallRank, type WallPathId, type WallRanks } from "../wall-upgrades.ts";
-import { keepAllocated, respecKeep, undoKeep, upgradeKeep } from "../keep-upgrades.ts";
+import { sideRank, type SidePath, type SideRanks } from "../side-ranks.ts";
 import { GATE_PATHS, GATE_TOWERS, IRONBOUND, PORTCULLIS, gateAllocated, gateBarred, gateRank, respecGate, undoGate, upgradeGate, type GatePathId, type GateRanks } from "../gate-upgrades.ts";
 import { BALLISTA_PATHS, FIRE_BOLTS, HEAVY_BOLTS, WINDLASS, ballistaAllocated, ballistaRank, respecBallistas, undoBallistas, upgradeBallistas, type BallistaPathId, type BallistaRanks } from "../ballista-upgrades.ts";
 import { pathById, pathTopicOf, UNSPECIALIZED, type PathId, FIRE_ARROWS, SHARP, GUNNERY, SIEGE_SHOT, CRUSADE, BLOODLETTERS, SHADOWCLOAK, VENOM, HEADHUNT, GRENADIERS, VOLLEY, BAYONET, MARKSMEN, RICOCHET, SUPPRESS, BERSERK, HALBERD, RANGERS, SKIRMISH, FORTIFY, PYRO, RIME, STORM, PYROCLASM, CINDERS, SPOTTERS, SIGNAL } from "../knowledge-paths.ts";
@@ -181,12 +181,11 @@ export const treeStep = (kind: PaletteItem | "wallSpikes", wear: Wear | undefine
 export const treeAllocated = (kind: PaletteItem | "wallSpikes", wear?: Wear) => allocated(kind as never, wear);
 export type { TreeNode };
 
-// ── Trees climbed side by side: the keep's and the walls' ────────────────
-/** A tree whose branches climb side by side from one root (`keep-upgrades.ts`,
- * `wall-upgrades.ts`), as the graph and the card show it. */
-type SideTree<Id extends string> = { root: string; icon: string; every: string; paths: { id: Id; name: string; motto: string; hue: string; ranks: { name: string; icon: string; cost: number; text: string }[] }[] };
-type Ranks<Id extends string> = Partial<Record<Id, number>> | undefined;
-const sideRank = <Id extends string>(ranks: Ranks<Id>, id: Id) => ranks?.[id] ?? 0;
+// ── Trees climbed side by side: the keep's, walls', gates' and ballistas' ─
+/** A tree whose branches climb side by side from one root (`side-ranks.ts`),
+ * as the graph and the card show it. */
+type SideTree<Id extends string> = { root: string; icon: string; every: string; paths: SidePath<Id>[] };
+type Ranks<Id extends string> = SideRanks<Id> | undefined;
 
 /** The tree as the graph draws it: the root, and each branch climbing from
  * it on its own. Rank nodes are `q:<branch>:<rank>`. */
@@ -256,10 +255,6 @@ const BALLISTA_TREE: SideTree<BallistaPathId> = { root: "k:wallBallista", icon: 
 export const keepGraph = (ranks: KeepRanks | undefined) => sideGraph(KEEP_TREE, ranks);
 /** What node `id` of the keep's tree buys, if it can be bought now. */
 export const keepStep = (ranks: KeepRanks | undefined, id: string) => sideStep(KEEP_TREE, ranks, id);
-/** What undoing node `id` of the keep's tree takes back, if it is owned. */
-export const keepUndo = (ranks: KeepRanks | undefined, id: string) => sideUndo(KEEP_TREE, ranks, id);
-/** What a second tap on owned node `id` of the keep's tree sells. */
-export const keepBeyond = (ranks: KeepRanks | undefined, id: string) => sideBeyond(KEEP_TREE, ranks, id);
 
 /** The keep's numbers with `ranks`, and the shared Smithy and skill bonuses. */
 export function keepStats(save: Save, ranks: KeepRanks | undefined): string {
@@ -279,10 +274,6 @@ export const keepCardHtml = (save: Save, ranks: KeepRanks | undefined, id: strin
 export const wallGraph = (ranks: WallRanks | undefined) => sideGraph(WALL_TREE, ranks);
 /** What node `id` of the walls' tree buys, if it can be bought now. */
 export const wallStep = (ranks: WallRanks | undefined, id: string) => sideStep(WALL_TREE, ranks, id);
-/** What undoing node `id` of the walls' tree takes back, if it is owned. */
-export const wallUndo = (ranks: WallRanks | undefined, id: string) => sideUndo(WALL_TREE, ranks, id);
-/** What a second tap on owned node `id` of the walls' tree sells. */
-export const wallBeyond = (ranks: WallRanks | undefined, id: string) => sideBeyond(WALL_TREE, ranks, id);
 
 /** A placed wall stone's numbers with `ranks`, and the shared Smithy and
  * skill bonuses. */
