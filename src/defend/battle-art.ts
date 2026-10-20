@@ -27,6 +27,7 @@ import { drawExplosion, drawScorches as drawScorchArt } from "./blast-art.ts";
 import { BUILDING_FLASH, type DefendSim, type Effect, type Enemy, type Soldier } from "./sim.ts";
 import { hallPaths } from "./muskets.ts";
 import { drawSimpleEnemies, drawSimpleTroops } from "./simple-units.ts";
+import { drawPixel, enemySprite } from "./pixel-sprites.ts";
 
 export type Brush = { c: CanvasRenderingContext2D; px: number };
 
@@ -126,8 +127,10 @@ function drawCivilians(b: Brush, sim: DefendSim, torches: Burning | null) {
   const { c, px } = b;
   for (const u of sim.civilians) {
     const s = Math.max(2, CIVILIAN.size * px);
-    c.fillStyle = u.flash > 0 ? "#fff" : CIVILIAN.color;
-    c.fillRect(u.x * px - s / 2, u.y * px - s / 2, s, s);
+    if (!(u.flash <= 0 && drawPixel(c, "civilian", u.x * px - s / 2, u.y * px - s / 2, s))) {
+      c.fillStyle = u.flash > 0 ? "#fff" : CIVILIAN.color;
+      c.fillRect(u.x * px - s / 2, u.y * px - s / 2, s, s);
+    }
     if (u.state === "flee") {
       const dot = Math.max(1, px * .07);
       c.fillStyle = "#f2d27a";
@@ -189,6 +192,11 @@ function drawSoldiers(b: Brush, sim: DefendSim, torches: Burning | null) {
     const x = u.x + (swing?.dx ?? 0),
       y = u.y + (swing?.dy ?? 0);
     const s = Math.max(2, (archer ? ARCHER_UNIT.size : SOLDIER.size) * px);
+    if (u.flash <= 0 && drawPixel(c, archer ? "archer" : "swordsman", x * px - s / 2, y * px - s / 2, s)) {
+      if (swing) swords.push({ x, y, swing });
+      if (torches) drawHandTorch(b, { x: x + SOLDIER.size * 0.65, y: y - SOLDIER.size * 0.45, id: u.id }, sim.time, torches(u.x, u.y, u.id));
+      continue;
+    }
     c.fillStyle = archer ? "#1b3324" : "#1c2a40";
     c.fillRect(x * px - s / 2 - 1, y * px - s / 2 - 1, s + 2, s + 2);
     c.fillStyle = u.flash > 0 ? "#fff" : archer ? ARCHER_UNIT.color : SOLDIER.color;
@@ -488,7 +496,8 @@ function drawEnemy(b: Brush, e: Enemy, sim: DefendSim) {
       c.fillRect(x - 1, y - 1, s + 2, s + 2);
     }
   }
-  if (!drawZoneEnemyBody(b, e, x, y, s)) {
+  const pixel = e.flash <= 0 ? enemySprite(e.kind) : undefined;
+  if (!(pixel && drawPixel(c, pixel, x, y, s)) && !drawZoneEnemyBody(b, e, x, y, s)) {
     c.fillStyle = e.flash > 0 ? "#fff" : def.color;
     c.fillRect(x, y, s, s);
   }
