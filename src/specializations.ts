@@ -165,6 +165,7 @@ export function upgradeBuilding(save: Save, target: SpecialtyTarget, asked: Upgr
     p.rank = step.rank;
     d.layout = next;
     if (!free) save.knowledge -= step.cost;
+    recordFound(d);
     return { ok: true, kind };
   }
   // Becoming another building (or evolving): one copy of the old kind
@@ -177,6 +178,8 @@ export function upgradeBuilding(save: Save, target: SpecialtyTarget, asked: Upgr
   d.owned[kind as PlacedKind]--;
   d.owned[step.to]++;
   d.layout = standing(next, s.uid, kind as PlacedKind);
+  // Taken up wearing nothing, it waits as a plain copy, still counted.
+  recordFound(d);
   return { ok: true, kind: step.to, waiting: !d.layout.structures.some((o) => o.uid === s.uid) };
 }
 
@@ -194,10 +197,12 @@ function upgradeCopy(save: Save, target: { copy: PaletteKind; wear?: Wear }, ask
   unkeep(d, kind, target.wear);
   if (step.type === "path") {
     d.kept.push({ kind, path: step.path, rank: step.rank });
+    recordFound(d);
     return { ok: true, kind, copy: { copy: kind, wear: { path: step.path, rank: step.rank } } };
   }
   d.owned[kind as PlacedKind]--;
   d.owned[step.to]++;
+  recordFound(d);
   return { ok: true, kind: step.to, copy: { copy: step.to } };
 }
 
@@ -589,4 +594,68 @@ export function settleKept(d: DefendSave, prev: Layout, next: Layout) {
       if (i >= 0) d.kept.splice(i, 1);
     }
   }
+}
+
+// ── Discoveries ─────────────────────────────────────────────────────────
+/** Every upgrade a basic building's line can ever reach, as one web: the
+ * buildings it can become, each one's paths rank by rank, their crowns and
+ * what those evolve into, and so on. Ids match `buildingTree`'s, so a node
+ * any building of the line has owned is found in it. States are all
+ * `locked`: the map sets its own. */
+export function fullTree(root: PaletteKind): TreeNode[] {
+  const nodes: TreeNode[] = [];
+  const grow = (k: PaletteKind, parent: string | undefined, step: UpgradeStep | undefined, cost: number) => {
+    const id = `k:${k}`;
+    nodes.push({ id, ...(parent ? { parent } : {}), state: "locked", kind: k, cost, ...(step ? { step } : {}) });
+    if (k !== "wallSpikes") for (const b of BECOMES[k] ?? []) grow(b.to, id, { type: "become", ...b }, b.cost);
+    for (const p of buildingPathsOf(k)) {
+      let from = id;
+      p.ranks.forEach((r, i) => {
+        const pid = `p:${p.id}:${i + 1}`;
+        nodes.push({ id: pid, parent: from, state: "locked", path: p.id, rank: i + 1, cost: r.cost, step: { type: "path", path: p.id, rank: i + 1, cost: r.cost } });
+        from = pid;
+      });
+      if (p.evolves) grow(p.evolves.item, from, { type: "evolve", path: p.id, to: p.evolves.item, cost: p.evolves.cost }, p.evolves.cost);
+    }
+  };
+  grow(root, undefined, undefined, 0);
+  return nodes;
+}
+
+/** The basic buildings whose lines have a map: every root with a tree. */
+export const MAP_ROOTS: PaletteKind[] = ["watchTower", "meleeGuild", "rangedGuild", "monsterBait", "wallSpikes"];
+/** Every node id any map can show. */
+const MAP_IDS = () => new Set(MAP_ROOTS.flatMap((r) => fullTree(r).map((n) => n.id)));
+
+/** The nodes the city's buildings and the palette's copies have now: each
+ * one's lineage and the ranks it wears. */
+export function heldNodes(d: DefendSave): Set<string> {
+  const held = new Set<string>();
+  const add = (kind: PaletteKind, wear?: Wear) => {
+    if (!hasTree(kind)) return;
+    for (const n of buildingTree(kind, wear)) if (n.state === "owned") held.add(n.id);
+  };
+  for (const s of d.layout.structures) add(s.kind, wearOf(s));
+  for (const g of d.layout.spikes) add("wallSpikes", wearOf(g));
+  for (const k of d.kept) add(k.kind, { path: k.path, rank: k.rank });
+  for (const [kind, n] of Object.entries(d.owned)) if (n > 0) add(kind as PaletteKind);
+  return held;
+}
+
+/** Every upgrade discovered: those any building ever reached (saved in
+ * `upgradesFound`) and those held now. Shared by every building of a line,
+ * whatever each one's own upgrades. */
+export const foundNodes = (d: DefendSave): Set<string> => new Set([...(d.upgradesFound ?? []), ...heldNodes(d)]);
+
+/** Saves what is held now as discovered (after an upgrade). */
+export function recordFound(d: DefendSave) {
+  const found = [...foundNodes(d)].sort();
+  if (found.length) d.upgradesFound = found;
+}
+
+/** The saved discoveries, keeping only nodes some map has (absent with none). */
+export function decodeFound(raw: unknown): string[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const ids = MAP_IDS(), found = [...new Set(raw.filter((id): id is string => typeof id === "string" && ids.has(id)))].sort();
+  return found.length ? found : undefined;
 }

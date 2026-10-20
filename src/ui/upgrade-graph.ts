@@ -131,9 +131,12 @@ export class UpgradeGraph {
     this.el.innerHTML = "";
   }
 
-  /** The tree as it is now: new nodes sprout, gone ones wither. */
-  set(nodes: GraphNode[], picked: string) {
-    const homes = layout(nodes), still = this.opts.reduceMotion();
+  /** The tree as it is now: new nodes sprout, gone ones wither. `web`, the
+   * whole of what the nodes are part of, spreads them round its root as a
+   * web (the upgrade map), each where it stands in the whole, rather than
+   * growing them up as a tree. */
+  set(nodes: GraphNode[], picked: string, web?: readonly { id: string; parent?: string }[]) {
+    const homes = web ? webLayout(web) : layout(nodes), still = this.opts.reduceMotion();
     const live = new Set(nodes.map((n) => n.id));
     for (const [id, b] of this.bodies) {
       if (live.has(id) || b.dying >= 0) continue;
@@ -474,7 +477,7 @@ export class UpgradeGraph {
   };
 
   private zoom(f: number, cx: number, cy: number) {
-    const r = this.el.getBoundingClientRect(), s = Math.max(0.35, Math.min(2.5, this.pan.s * f));
+    const r = this.el.getBoundingClientRect(), s = Math.max(0.2, Math.min(2.5, this.pan.s * f));
     const k = s / this.pan.s, x = cx - r.left, y = cy - r.top;
     this.pan = { s, x: x - (x - this.pan.x) * k, y: y - (y - this.pan.y) * k };
     this.steered = true;
@@ -557,6 +560,41 @@ export function layout(nodes: readonly { id: string; parent?: string; side?: boo
   for (const r of roots) {
     place(r, x, 0, true);
     x += (width(r) + 2) * GAP_X;
+  }
+  return at;
+}
+
+/** Each node's place in a web round its root: every branch out from the
+ * root along its own spoke, the room round each ring shared out by how many
+ * leaves each branch ends in, each ring a step further out. */
+export function webLayout(nodes: readonly { id: string; parent?: string }[]): Map<string, [number, number]> {
+  const kids = new Map<string, string[]>(), at = new Map<string, [number, number]>();
+  const ids = new Set(nodes.map((n) => n.id));
+  const roots: string[] = [];
+  for (const n of nodes) {
+    if (!n.parent || !ids.has(n.parent)) roots.push(n.id);
+    else kids.set(n.parent, [...(kids.get(n.parent) ?? []), n.id]);
+  }
+  const leaves = (id: string): number => (kids.get(id) ?? []).reduce((w, k) => w + leaves(k), 0) || 1;
+  let x = 0;
+  for (const r of roots) {
+    const total = leaves(r);
+    // Rings far enough apart that leaves two or three rings out sit a gap apart.
+    const ring = Math.max(GAP_Y * 1.15, (total * GAP_X) / (2 * Math.PI * 2.5));
+    const place = (id: string, depth: number, a0: number, a1: number) => {
+      const a = (a0 + a1) / 2;
+      at.set(id, depth ? [x + Math.cos(a) * ring * depth, Math.sin(a) * ring * depth] : [x, 0]);
+      let from = a0;
+      const all = leaves(id);
+      for (const k of kids.get(id) ?? []) {
+        const span = ((a1 - a0) * leaves(k)) / all;
+        place(k, depth + 1, from, from + span);
+        from += span;
+      }
+    };
+    // Starting straight down, so the first branches open up the left.
+    place(r, 0, Math.PI / 2, Math.PI / 2 + 2 * Math.PI);
+    x += ring * 2 * 9;
   }
   return at;
 }

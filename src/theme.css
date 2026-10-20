@@ -1927,6 +1927,23 @@ dialog .away-row .away-note {
 }
 .ug-respec:disabled { opacity: 0.45; cursor: default; }
 .upgrade-tree .spec-close { flex: none; }
+/* The little Map button: the tree swaps for the upgrade map of the whole
+   line, a web round its basic building of everything discovered. */
+.ug-map-toggle {
+  flex: none; min-height: 36px; padding: 0 9px; font-size: 10px; letter-spacing: 1px; cursor: pointer;
+  color: #f6e3b4; border: 2px solid #000; border-radius: 3px;
+  background: linear-gradient(#ffffff10, #00000050), #5a3a1c; box-shadow: inset 0 0 0 1px #c9954a66, 0 2px 0 #000;
+}
+.ug-map-toggle[hidden] { display: none; }
+.upgrade-tree.mapping .ug-map-toggle { color: #08181b; background: linear-gradient(#e9fbff, #57d6e0); box-shadow: 0 0 8px #57d6e080, 0 2px 0 #000; }
+.upgrade-tree.mapping {
+  background: radial-gradient(circle at 50% 50%, #2a6f7a38, transparent 62%), radial-gradient(#ffffff14 1px, transparent 1.5px) 0 0 / 22px 22px, #0b1418f2;
+}
+.upgrade-tree.mapping .ug-node.next { animation: none; }
+.upgrade-tree.mapping .magic-circle { opacity: 0.35; }
+.upgrade-tree.mapping .ug-alloc b { color: #9fe9f0; }
+.ug-respec[hidden] { display: none; }
+.ug-found { color: #9fe9f0; }
 
 .ug-host { position: relative; flex: 1; min-height: 0; overflow: hidden; touch-action: none; cursor: grab; }
 .ug-host:active { cursor: grabbing; }

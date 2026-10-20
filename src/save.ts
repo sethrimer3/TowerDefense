@@ -12,7 +12,7 @@ import { decodeLibrarySave, type LibrarySave } from "./library/sim.ts";
 import { decodeResearchJob, type ResearchJob } from "./research-jobs.ts";
 import { decodeForgeJob, type ForgeJob } from "./forge-jobs.ts";
 
-import { migrateCards, migrateGunLine, migrateResearch, migrateTopicPaths, refundRetiredAssassins } from "./specializations.ts";
+import { decodeFound, migrateCards, migrateGunLine, migrateResearch, migrateTopicPaths, refundRetiredAssassins } from "./specializations.ts";
 
 /** What the retired Outlying districts skill cost, refunded on load. */
 const OUTSKIRTS_KNOWLEDGE = 8;
@@ -125,6 +125,8 @@ export function decode(raw: string | null): Save {
   d.trainingJobs = decodeJobs(s.trainingJobs, d.training);
   d.trainingClock = num(s.trainingClock, 0);
   d.defend = decodeDefendSave(s.defend);
+  const found = decodeFound(s.defend?.upgradesFound);
+  if (found) d.defend.upgradesFound = found;
   // Migrate existing paths, ranks and paid Knowledge exactly once. Crowned
   // copies were already counted among the evolved kinds owned.
   const legacy = s.pathResearch === undefined;

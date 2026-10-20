@@ -87,6 +87,10 @@ export type DefendSave = {
   ballistaRanks?: BallistaRanks;
   /** The Revolutionaries' upgrades (`revolutionary-upgrades.ts`); absent while they have none. */
   revolutionaryRanks?: RevolutionaryRanks;
+  /** Every building upgrade (`k:<kind>`, `p:<path>:<rank>`) any building has
+   * ever reached, shared by its whole line for the upgrade map
+   * (`specializations.ts`'s `foundNodes`); absent while none. */
+  upgradesFound?: string[];
 };
 
 export function defaultDefendSave(): DefendSave {
