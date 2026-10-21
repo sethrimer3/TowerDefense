@@ -7,6 +7,52 @@ import { defaults, decode } from '../src/save.ts';
 import { SUBJECTS } from '../src/upgrade-subjects.ts';
 
 const base: CircleState = { topic: 'study:meteor', upgrades: [] };
+test('completed Knowledge steadily increases every complexity layer across paths', () => {
+  for (const id of ['path:crusaders', 'path:storm', 'keep:arrowLoops', 'path:starfall']) {
+    let previous = formation(base);
+    assert.equal(previous.knowledge, 0);
+    assert.equal(previous.recursion, 0);
+    for (let rank = 1; rank <= 40; rank++) {
+      const next = formation({ ...base, upgrades: [{ id, rank }] });
+      assert.equal(next.knowledge, rank);
+      for (const key of ['rings', 'symmetry', 'detail', 'recursion', 'energy', 'siteCount', 'triangleCount'] as const)
+        assert.ok(next[key] >= previous[key], `${id} rank ${rank} cannot reduce ${key}`);
+      assert.ok(next.detail > previous.detail && next.rings > previous.rings);
+      previous = next;
+    }
+  }
+});
+test('identity and equipped choices shape circles without granting extra Knowledge', () => {
+  const equipped = [{ id: 'equipped:starfall', rank: 1, visualOnly: true }];
+  const changed = formation({ ...base, upgrades: equipped });
+  assert.notDeepEqual(changed, formation(base));
+  assert.equal(changed.knowledge, 0);
+  assert.equal(changed.rings, formation(base).rings);
+  const ranks = [...equipped, { id: 'path:starfall', rank: 2 }, { id: 'path:starfall', rank: 1 }];
+  assert.equal(formation({ ...base, upgrades: ranks }).knowledge, 2);
+  assert.deepEqual(formation({ ...base, upgrades: ranks }), formation({ ...base, upgrades: [...ranks].reverse() }));
+  const save = defaults(), topic = SUBJECTS.flatMap(s => s.topics).find(t => t.id === 'meteor')!;
+  save.pathResearch.starfall = { rank: 2, spent: 10 };
+  const learned = formation(studyCircle(save, topic));
+  save.spellPaths.meteor = 'starfall';
+  assert.equal(formation(studyCircle(save, topic)).knowledge, learned.knowledge);
+});
+test('buildings retain all earlier Knowledge through transformations and crowns', () => {
+  const mage = formation(specialtyCircle('wizardTower', { path: 'storm', rank: 3 }));
+  const crown = formation(specialtyCircle('darkKeep'));
+  assert.equal(mage.knowledge, 4); // Tower transformation and three path ranks.
+  assert.equal(crown.knowledge, mage.knowledge + 1);
+  assert.ok(crown.rings > mage.rings && crown.siteCount >= mage.siteCount);
+  const early = formation(specialtyCircle('meleeGuild'));
+  const barracks = formation(specialtyCircle('barracks'));
+  const trained = formation(specialtyCircle('barracks', { path: 'crusaders', rank: 3 }));
+  assert.equal(early.knowledge, 0); assert.equal(barracks.knowledge, 1); assert.equal(trained.knowledge, 4);
+  const plain = formation(specialtyCircle('revolutionary'));
+  const shared = formation(specialtyCircle('revolutionary', undefined, undefined, undefined, undefined, undefined, { chain: 2, squad: 1 }));
+  assert.equal(shared.knowledge, plain.knowledge + 3);
+  assert.ok(shared.rings > plain.rings);
+  assert.deepEqual(formation(specialtyCircle('meleeGuild')), early);
+});
 test('formations are deterministic, order independent, and undo restores exact geometry', () => {
   const initial = formation(base);
   const upgrades = [{ id: 'starfall', rank: 2 }, { id: 'moltenCore', rank: 1 }];

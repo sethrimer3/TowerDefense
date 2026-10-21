@@ -6,7 +6,7 @@ import type { CircleState } from "../magic-circle/formation.ts";
  * `treeCardHtml`, the card of the node picked in it). The tree comes from
  * `specializations.ts`; paths, ranks, icons and hues from `knowledge-paths.ts`. */
 import type { Save } from "../save.ts";
-import { BECOMES, TROOPS, allocated, rootOf, buildingPathsOf, buildingTree, fullTree, undoRefund, type TreeNode, type UpgradeStep, type Wear } from "../specializations.ts";
+import { BECOMES, TROOPS, allocated, rootOf, hasTree, buildingPathsOf, buildingTree, fullTree, undoRefund, type TreeNode, type UpgradeStep, type Wear } from "../specializations.ts";
 import type { GraphNode } from "./upgrade-graph.ts";
 import { ARROW_LOOPS, BASTIONS, BOILING_OIL, KEEP_PATHS, keepAllocated, keepRank, respecKeep, undoKeep, upgradeKeep, type KeepPathId, type KeepRanks } from "../keep-upgrades.ts";
 import { STONEWORK, THORNWORK, TOWN_WALLS, WALL_PATHS, respecWalls, undoWalls, upgradeWalls, wallAllocated, wallRank, type WallPathId, type WallRanks } from "../wall-upgrades.ts";
@@ -539,14 +539,18 @@ export function wallTreeHtml(): string {
 
 /** A family keeps its base identity through kind changes and respecs.
  * Placement UIDs intentionally do not affect the visual identity. */
-export function specialtyCircle(kind: PaletteItem | "wallSpikes" | SideKind, wear?: Wear, ranks?: KeepRanks, wallRanks?: WallRanks, gateRanks?: GateRanks, ballistaRanks?: BallistaRanks): CircleState {
+export function specialtyCircle(kind: PaletteItem | "wallSpikes" | SideKind, wear?: Wear, ranks?: KeepRanks, wallRanks?: WallRanks, gateRanks?: GateRanks, ballistaRanks?: BallistaRanks, revolutionaryRanks?: RevolutionaryRanks): CircleState {
   const root = kind === "keep" || kind === "walls" || kind === "wallSpikes" || kind === "gate" || kind === "ballistas" ? kind : rootOf(kind as never);
-  const upgrades = [{ id: `kind:${kind}`, rank: 1 }];
-  if (wear) upgrades.push({ id: `path:${wear.path}`, rank: wear.rank });
+  const upgrades: Array<CircleState['upgrades'][number]> = [{ id: `kind:${kind}`, rank: 1, visualOnly: true }];
+  // The actual owned tree includes every earlier transformation and crowned
+  // path. Evolving must retain its learned complexity instead of starting over.
+  if (hasTree(kind)) for (const n of buildingTree(kind, wear))
+    if (n.state === "owned" && n.parent) upgrades.push({ id: `step:${n.id}`, rank: 1 });
   if (kind === "keep") for (const p of KEEP_PATHS) upgrades.push({ id: `keep:${p.id}`, rank: keepRank(ranks, p.id) });
   if (kind === "walls") for (const p of WALL_PATHS) upgrades.push({ id: `wall:${p.id}`, rank: wallRank(wallRanks, p.id) });
   if (kind === "gate") for (const p of GATE_PATHS) upgrades.push({ id: `gate:${p.id}`, rank: gateRank(gateRanks, p.id) });
   if (kind === "ballistas") for (const p of BALLISTA_PATHS) upgrades.push({ id: `ballista:${p.id}`, rank: ballistaRank(ballistaRanks, p.id) });
+  if (kind === "revolutionary") for (const p of REVOLUTIONARY_PATHS) upgrades.push({ id: `revolutionary:${p.id}`, rank: revolutionaryRank(revolutionaryRanks, p.id) });
   const city = ["keep", "walls", "gate", "ballistas", "wallBlock", "wallSpikes", "cityTile", "cityGate", "wallBallista", "monsterBait"].includes(kind);
   return { topic: `building:${root}`, upgrades, motif: city ? "tesseract" : "voronoi" };
 }

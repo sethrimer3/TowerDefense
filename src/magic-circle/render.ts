@@ -5,6 +5,7 @@ import { CIRCLE, CircleTransition, formation, hash, growingVoronoi, nestedTriang
 interface Trace { a: number; b: number; u: number }
 interface Agent { a: number; b: number; u: number; speed: number; hops: number; age: number; life: number; history: Trace[] }
 const TAU = Math.PI * 2, SECTORS = 24;
+const reveal = (value: number) => Math.min(1, Math.max(0, value));
 function node(id: number, d: CircleDNA, time: number): Point {
   const ring = Math.floor(id / SECTORS), sector = id % SECTORS;
   const a = sector * TAU / SECTORS + d.offset + time * CIRCLE.idleSpeed * (ring % 2 ? -1 : 1);
@@ -161,25 +162,33 @@ export class MagicCircle {
     cells.forEach((cell, i) => {
       polygon(path, cell);
       if (i % 3 !== 0 || cell.length < 3) return;
-      // Recursive Voronoi diagrams clipped INSIDE parent polygons.
+      // Insets separate from their parent edges as Knowledge grows. Secondary
+      // diagrams grow from the center, remaining clipped inside the parent.
+      const growth = reveal(d.recursion * 2.5 - 0.25 - unit(i + 71, 0) * 0.35);
+      if (!growth) return;
       let cx = 0, cy = 0;
       for (const p of cell) { cx += p.x / cell.length; cy += p.y / cell.length; }
-      const inset = cell.map(p => ({ x: cx + (p.x - cx) * 0.68, y: cy + (p.y - cy) * 0.68 }));
+      const inset = cell.map(p => ({ x: cx + (p.x - cx) * (1 - growth * 0.32), y: cy + (p.y - cy) * (1 - growth * 0.32) }));
       polygon(path, inset);
-      if (quality.recursion > 1) {
+      if (quality.recursion > 1 && d.recursion > 0.45) {
         const local = inset.filter((_, j) => j % 2 === 0).map(p => ({ x: (p.x + cx) / 2, y: (p.y + cy) / 2 }));
         local.push({ x: cx, y: cy });
-        for (const child of voronoi(local, inset)) polygon(path, child);
+        const subGrowth = reveal((d.recursion - 0.45) / 0.55);
+        for (const child of voronoi(local, inset)) polygon(path, child, subGrowth, cx * (1 - subGrowth), cy * (1 - subGrowth));
       }
-      const r = Math.min(...cell.map(p => Math.hypot(p.x - cx, p.y - cy))) * (0.22 + d.recursion * 0.25);
+      const r = Math.min(...cell.map(p => Math.hypot(p.x - cx, p.y - cy))) * (0.22 + d.recursion * 0.25) * growth;
       path.moveTo(cx + r, cy); path.arc(cx, cy, r, 0, TAU);
-      path.moveTo(cx + r * 0.65, cy); path.arc(cx, cy, r * 0.65, 0, TAU);
+      const inner = r * 0.65 * reveal(d.detail * 2 - 0.3);
+      if (inner > 0) { path.moveTo(cx + inner, cy); path.arc(cx, cy, inner, 0, TAU); }
     });
     return path;
   }
   private paint(d: CircleDNA, time: number, pulse: number, reduced: boolean) {
     const c = this.ctx, size = this.canvas.width, r = size * 0.455, gold = CIRCLE.gold;
     const orbitTime = reduced ? 0 : this.orbitClock;
+    this.canvas.dataset.knowledge = String(d.knowledge);
+    this.canvas.dataset.rings = String(d.rings);
+    this.canvas.dataset.detail = String(d.detail);
     c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, size, size);
     c.fillStyle = `rgba(3,4,6,${CIRCLE.background})`;
     c.beginPath(); c.arc(size / 2, size / 2, r * 1.08, 0, TAU); c.fill();
@@ -206,63 +215,85 @@ export class MagicCircle {
     }
     // Fractional ring/symmetry changes crossfade rather than popping counts.
     for (let i = 0; i < 7; i++) {
-      const alpha = Math.min(1, Math.max(0, d.rings - i)); if (!alpha) continue;
+      const alpha = reveal(d.rings - i); if (!alpha) continue;
       c.save(); c.globalAlpha = alpha * (0.65 + pulse * 0.3); c.strokeStyle = gold[i % 2 ? 2 : 1];
       c.rotate(d.offset + orbitTime * CIRCLE.idleSpeed * (i % 2 ? -1 : 1));
       c.scale(1, 1 - d.eccentricity);
       const radius = CIRCLE.ringRadius + i * CIRCLE.ringSpacing + pulse * 0.025 * Math.sin(i);
       c.beginPath(); c.arc(0, 0, radius, 0, TAU); c.arc(0, 0, radius + 0.012, 0, TAU); c.stroke();
       const n = 48 + i * 8;
-      c.beginPath();
-      for (let j = 0; j < n; j++) {
-        const a = j / n * TAU, len = j % 4 === 0 ? 0.035 : 0.014;
-        line({ x: Math.cos(a) * radius, y: Math.sin(a) * radius }, { x: Math.cos(a) * (radius + len), y: Math.sin(a) * (radius + len) });
+      // Major marks start visible. Fine graduations emerge at stable angles.
+      for (const fine of [false, true]) {
+        c.globalAlpha = alpha * (0.65 + pulse * 0.3) * (fine ? d.detail : 1); c.beginPath();
+        for (let j = 0; j < n; j++) {
+          if ((j % 4 !== 0) !== fine) continue;
+          const a = j / n * TAU, len = fine ? 0.014 : 0.035;
+          line({ x: Math.cos(a) * radius, y: Math.sin(a) * radius }, { x: Math.cos(a) * (radius + len), y: Math.sin(a) * (radius + len) });
+        }
+        c.stroke();
       }
-      c.stroke(); c.restore();
+      c.restore();
     }
     for (const symmetry of [Math.floor(d.symmetry), Math.floor(d.symmetry) + 1]) {
-      c.save(); c.globalAlpha = (symmetry === Math.floor(d.symmetry) ? 1 - d.symmetry % 1 : d.symmetry % 1) * 0.75 * (1 - d.motifs.triangles * 0.8);
+      c.save(); const weight = (symmetry === Math.floor(d.symmetry) ? 1 - d.symmetry % 1 : d.symmetry % 1) * (1 - d.motifs.triangles * 0.8);
+      c.globalAlpha = weight * (0.12 + d.detail * 0.63);
       c.strokeStyle = gold[2]; c.rotate(d.offset - time * 0.025); c.beginPath();
       for (let i = 0; i < symmetry; i++) {
         const a = i * TAU / symmetry, b = (i + 2) * TAU / symmetry;
         const point = { x: Math.cos(a) * 0.77, y: Math.sin(a) * 0.77 };
         line(point, { x: Math.cos(b) * 0.77, y: Math.sin(b) * 0.77 });
-        const rr = 0.05 + d.detail * 0.035;
-        c.moveTo(point.x + rr, point.y); c.arc(point.x, point.y, rr, 0, TAU);
-        c.moveTo(point.x + rr * 0.7, point.y); c.arc(point.x, point.y, rr * 0.7, 0, TAU);
+      }
+      c.stroke();
+      c.globalAlpha = weight * 0.75 * d.detail; c.beginPath();
+      const rr = 0.085 * d.detail;
+      for (let i = 0; i < symmetry; i++) {
+        const a = i * TAU / symmetry, x = Math.cos(a) * 0.77, y = Math.sin(a) * 0.77;
+        c.moveTo(x + rr, y); c.arc(x, y, rr, 0, TAU);
+        c.moveTo(x + rr * 0.7, y); c.arc(x, y, rr * 0.7, 0, TAU);
       }
       c.stroke(); c.restore();
     }
     // A stable junction graph gives lights real paths and branching choices.
-    c.strokeStyle = gold[0]; c.globalAlpha = 0.65; c.beginPath();
+    c.strokeStyle = gold[0]; c.globalAlpha = 0.65 * d.detail; c.beginPath();
     for (let i = 0; i < 96; i++) {
       const p = node(i, d, orbitTime);
       if (i < 72) line(p, node(i + 24, d, orbitTime));
       if (i % 3 === 0) { c.moveTo(p.x + 0.011, p.y); c.arc(p.x, p.y, 0.011, 0, TAU); }
     }
     c.stroke();
-    c.strokeStyle = gold[1]; c.globalAlpha = 0.8; c.beginPath();
+    c.strokeStyle = gold[1];
     for (let ring = 0; ring < 4; ring++) {
+      c.globalAlpha = 0.8 * reveal(1 + d.detail * 3 - ring); c.beginPath();
       const first = node(ring * SECTORS, d, orbitTime); c.moveTo(first.x, first.y);
       for (let i = 0; i < SECTORS; i++) for (let j = 1; j <= 4; j++) {
         const p = location({ a: ring * SECTORS + i, b: ring * SECTORS + (i + 1) % SECTORS, u: j / 4 }, d, orbitTime);
         c.lineTo(p.x, p.y);
       }
       c.closePath();
+      c.stroke();
     }
-    c.stroke();
     // Projected 4D wireframe, warped only by a bounded radial envelope.
     if (d.motifs.tesseract > 0) {
     const vertices = tesseract(0, { ...d, offset: d.offset + pulse * 0.8 }, reduced ? undefined : this.angles);
     const warp = 1 + Math.sin(time * 0.3) * d.warp * CIRCLE.distortion + pulse * 0.18;
     c.save(); c.scale(warp, warp); c.globalAlpha = 0.8 * d.motifs.tesseract; c.strokeStyle = gold[2]; c.lineWidth = 0.9 / r;
-    c.beginPath(); for (const [a, b] of TESSERACT_EDGES) line(vertices[a], vertices[b]); c.stroke();
+    const shells = 1 + d.detail * 2;
+    this.canvas.dataset.projections = String(shells);
+    for (let shell = 0; shell < 3; shell++) {
+      c.globalAlpha = 0.8 * d.motifs.tesseract * reveal(shells - shell);
+      const scale = 1 - shell * 0.22;
+      c.beginPath();
+      for (const [a, b] of TESSERACT_EDGES) line({ x: vertices[a].x * scale, y: vertices[a].y * scale }, { x: vertices[b].x * scale, y: vertices[b].y * scale });
+      if (shell) for (const p of vertices) line({ x: p.x * scale, y: p.y * scale }, { x: p.x * (scale + 0.22), y: p.y * (scale + 0.22) });
+      c.stroke();
+    }
+    c.globalAlpha = 0.8 * d.motifs.tesseract;
     c.fillStyle = gold[4];
     for (const p of vertices) c.fillRect(p.x - 0.004, p.y - 0.004, 0.008, 0.008);
     c.restore();
     }
     if (!reduced) for (const [index, agent] of this.trails.agents.entries()) {
-      const activity = Math.min(1, Math.max(0, this.trails.agents.length * (0.55 + d.energy * 0.35 + pulse * 0.5) - index));
+      const activity = reveal(1 + (this.trails.agents.length - 1) * d.energy + pulse * this.trails.agents.length * 0.5 - index);
       const fade = activity * Math.min(1, agent.age / 0.4, (agent.life - agent.age) / 0.5);
       if (fade <= 0) continue;
       c.lineWidth = 1 / r;
@@ -275,8 +306,9 @@ export class MagicCircle {
       c.globalAlpha = fade; c.fillStyle = gold[4]; c.fillRect(p.x - 0.005, p.y - 0.005, 0.01, 0.01);
     }
     // Quiet static highlights also make reduced-motion formations complete.
-    c.globalAlpha = 0.9 * d.motifs.voronoi; c.fillStyle = gold[3];
-    for (let i = 0; i < d.sites.length; i += 3) { const p = d.sites[i]; c.fillRect(p.x, p.y, 0.007, 0.007); }
+    c.globalAlpha = 0.9 * d.motifs.voronoi * (0.25 + d.detail * 0.75); c.fillStyle = gold[3];
+    const sites = CIRCLE.minSites + (d.siteCount - CIRCLE.minSites) * (CIRCLE.quality[this.quality].sites - CIRCLE.minSites) / (CIRCLE.maxSites - CIRCLE.minSites);
+    for (let i = 0; i < sites; i += 3) { const p = d.sites[i]; c.fillRect(p.x, p.y, 0.007, 0.007); }
     c.globalAlpha = 1;
     this.canvas.dataset.trails = String(this.trails.agents.length);
   }
