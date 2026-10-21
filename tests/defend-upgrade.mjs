@@ -295,10 +295,10 @@ try {
     await page.waitForTimeout(500); await page.screenshot({ path: `${out}/upgrade-${width}-battle.png` });
     await page.locator('#defend-abandon').click(); await page.locator('#defend-abandon').click();
 
-    // The shop sells only the basic buildings; Tiles shows the tree.
+    // The shop sells only the basic buildings; Tiles shows the stats.
     await page.locator('nav [data-tab="tiles"]').click();
     await page.locator('.tiles-hall [data-tile="watchTower"]').first().click();
-    assert.match(await page.locator('.tile-specialties').textContent(), /Becomes Wizard tower/);
+    assert.match(await page.locator('.tile-detail .tile-stats').textContent(), /marking range/);
     await page.waitForTimeout(400); await page.screenshot({ path: `${out}/upgrade-${width}-tiles.png` });
     assert.deepEqual(errors, []);
     console.log(`${width}px: palette, upgrade panel, becoming, paths, guild branches, reload, battle and Tiles passed`);

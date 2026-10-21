@@ -1,12 +1,12 @@
 import type { CircleState } from "../magic-circle/formation.ts";
 /** A building's upgrades as the player meets them: what a path does to the
- * kind's numbers (`kindStats`), the read-only tree Tiles shows
- * (`upgradeTreeHtml`), and the living tree Defend shows when a placed
+ * kind's numbers (`kindStats`), the stats and abilities Tiles shows
+ * (`buildingSheet`), and the living tree Defend shows when a placed
  * building is tapped (`treeGraph`, its nodes for `upgrade-graph.ts`, and
  * `treeCardHtml`, the card of the node picked in it). The tree comes from
  * `specializations.ts`; paths, ranks, icons and hues from `knowledge-paths.ts`. */
 import type { Save } from "../save.ts";
-import { BECOMES, TROOPS, allocated, attunedOf, mergePartners, placeOf, rootOf, hasTree, buildingPathsOf, buildingTree, fullTree, undoRefund, undoTo, type Partner, type TreeNode, type UpgradeStep, type Wear } from "../specializations.ts";
+import { TROOPS, allocated, attunedOf, mergePartners, rootOf, hasTree, buildingTree, fullTree, undoRefund, undoTo, type Partner, type TreeNode, type UpgradeStep, type Wear } from "../specializations.ts";
 import type { GraphNode } from "./upgrade-graph.ts";
 import { ARROW_LOOPS, BASTIONS, BOILING_OIL, KEEP_PATHS, keepAllocated, keepRank, respecKeep, undoKeep, upgradeKeep, type KeepPathId, type KeepRanks } from "../keep-upgrades.ts";
 import { STONEWORK, THORNWORK, TOWN_WALLS, WALL_PATHS, respecWalls, undoWalls, upgradeWalls, wallAllocated, wallRank, type WallPathId, type WallRanks } from "../wall-upgrades.ts";
@@ -15,9 +15,9 @@ import { GATE_PATHS, GATE_TOWERS, IRONBOUND, PORTCULLIS, gateAllocated, gateBarr
 import { SHADOW_BLEED, SHADOW_EDGE, SHADOW_KNIVES, SHADOW_PATHS, SHADOW_PIERCE, respecShadow, shadowAllocated, shadowRank, undoShadow, upgradeShadow, type ShadowPathId, type ShadowRanks } from "../shadow-upgrades.ts";
 import { CHAIN, CRIT_CHANCE, CRIT_DAMAGE, DETONATOR, REVOLUTIONARY_PATHS, SQUAD, respecRevolutionary, revolutionaryAllocated, revolutionaryRank, undoRevolutionary, upgradeRevolutionary, type RevolutionaryPathId, type RevolutionaryRanks } from "../revolutionary-upgrades.ts";
 import { BALLISTA_PATHS, FIRE_BOLTS, HEAVY_BOLTS, WINDLASS, ballistaAllocated, ballistaRank, respecBallistas, undoBallistas, upgradeBallistas, type BallistaPathId, type BallistaRanks } from "../ballista-upgrades.ts";
-import { pathById, pathTopicOf, UNSPECIALIZED, type PathId, WHIRLWIND, BLADE_DANCE, LEGEND, FIRE_ARROWS, SHARP, GUNNERY, SIEGE_SHOT, CRUSADE, BLOODLETTERS, SHADOWCLOAK, VENOM, HEADHUNT, GRENADIERS, VOLLEY, BAYONET, SHARP_MUSKETS, BELT_FEED, LONG_SPEARS, SET_SPEARS, TESTUDO, SPEAR_WALL, BARBED, THROWING, HEAVY_LANCE, WINGED, TRIPOD, QUICKDRAW, DUELISTS, GUN_SHIELD, OVERDRIVE, STOPPING, DEADEYE, PIERCING, CLUSTER, SALVO, MARKSMEN, RICOCHET, SUPPRESS, BERSERK, HALBERD, RANGERS, SKIRMISH, FORTIFY, PYRO, RIME, STORM, PYROCLASM, CINDERS, SPOTTERS, SIGNAL } from "../knowledge-paths.ts";
+import { pathById, type PathId, WHIRLWIND, BLADE_DANCE, LEGEND, FIRE_ARROWS, SHARP, GUNNERY, SIEGE_SHOT, CRUSADE, BLOODLETTERS, SHADOWCLOAK, VENOM, HEADHUNT, GRENADIERS, VOLLEY, BAYONET, SHARP_MUSKETS, BELT_FEED, LONG_SPEARS, SET_SPEARS, TESTUDO, SPEAR_WALL, BARBED, THROWING, HEAVY_LANCE, WINGED, TRIPOD, QUICKDRAW, DUELISTS, GUN_SHIELD, OVERDRIVE, STOPPING, DEADEYE, PIERCING, CLUSTER, SALVO, MARKSMEN, RICOCHET, SUPPRESS, BERSERK, HALBERD, RANGERS, SKIRMISH, FORTIFY, PYRO, RIME, STORM, PYROCLASM, CINDERS, SPOTTERS, SIGNAL } from "../knowledge-paths.ts";
 import { bonuses } from "../progression.ts";
-import { ITEM_NAMES, archerDamage, archerCooldown, archerRange, cannonDamage, cannonCooldown, CANNON_RANGE, SOLDIER, ARCHER_UNIT, soldierScale, STRUCTURES, flameDps, flameRange, iceDamage, ICE_RANGE, iceChill, watchRadius, fireballDamage, fireballSplash, emberDps, emberSeconds, FIRE_MAGE, FIREBALL_RANGE, keepHp, BRAWLER, ASSASSIN_UNIT, SLINGER, SNIPER, MUSKETEER, GUNNER, MACHINE_GUNNER, GATLING_GUNNER, RAIL_SNIPER, ROCKETEER, SPEARMAN, HOPLITE, LANCER, JAVELINEER, HERO, SHADE, WALL_BLOCK_DESCRIPTION, wallHp, GATE, GATE_DESCRIPTION, BALLISTA, BALLISTA_DESCRIPTION, ballistaCooldown, ballistaDamage, ballistaRange, gateHpScale, gateShut, type PaletteItem } from "../defend/catalog.ts";
+import { ITEM_NAMES, archerDamage, archerCooldown, archerRange, cannonDamage, cannonCooldown, CANNON_RANGE, SOLDIER, ARCHER_UNIT, soldierScale, STRUCTURES, flameDps, flameRange, iceDamage, ICE_RANGE, iceChill, watchRadius, fireballDamage, fireballSplash, emberDps, emberSeconds, FIRE_MAGE, FIREBALL_RANGE, keepHp, BRAWLER, ASSASSIN_UNIT, SLINGER, SNIPER, MUSKETEER, GUNNER, MACHINE_GUNNER, GATLING_GUNNER, RAIL_SNIPER, ROCKETEER, SPEARMAN, HOPLITE, LANCER, JAVELINEER, HERO, SHADE, WALL_BLOCK_DESCRIPTION, wallHp, GATE, GATE_DESCRIPTION, BALLISTA, BALLISTA_DESCRIPTION, ballistaCooldown, ballistaDamage, ballistaRange, gateHpScale, gateShut, spikeDamage, spikeEvery, type PaletteItem } from "../defend/catalog.ts";
 
 /** `kind`'s effective numbers wearing `path` at `rank` (none: plain), with
  * the shared Smithy and skill bonuses. */
@@ -175,37 +175,39 @@ export function kindStats(save: Save, kind: PaletteItem, path?: PathId, rank = 0
   return "Uses the shared city upgrades.";
 }
 
+/** A tile's numbers and what its Knowledge upgrades let it do, as Tiles
+ * shows them: the basic stats (the kind's own numbers, with its path's and
+ * the Smithy's bonuses), then each rank it carries in its path's colour. */
+export type Ability = { text: string; hue: string };
+export type StatSheet = { stats: string[]; abilities: Ability[] };
+/** The ranks `have` holds of shared `paths`, each as an ability. */
+const sharedAbilities = <Id extends string>(paths: SidePath<Id>[], have: SideRanks<Id> | undefined): Ability[] =>
+  paths.flatMap((p) => p.ranks.slice(0, sideRank(have, p.id)).map((r) => ({ text: r.text, hue: p.hue })));
+/** The first `core` parts of a stats line: the numbers every copy has, before what upgrades add. */
+const coreStats = (line: string, core: number) => line.split(" · ").slice(0, core);
+
+/** A building of `kind` wearing `wear`: its basic stats and its upgrades' abilities. */
+export function buildingSheet(save: Save, kind: PaletteItem | "wallSpikes", wear?: Wear): StatSheet {
+  const d = save.defend;
+  if (kind === "revolutionary") return { stats: coreStats(revolutionaryStats(save, d.revolutionaryRanks), 3), abilities: sharedAbilities(REVOLUTIONARY_PATHS, d.revolutionaryRanks) };
+  if (kind === "shadow") return { stats: coreStats(shadowStats(save, d.shadowRanks), 4), abilities: sharedAbilities(SHADOW_PATHS, d.shadowRanks) };
+  if (kind === "wallBlock") return { stats: coreStats(wallStats(save, d.wallRanks), 1), abilities: sharedAbilities(WALL_PATHS, d.wallRanks) };
+  if (kind === "cityGate") return { stats: coreStats(gateStats(save, d.gateRanks), 2), abilities: sharedAbilities(GATE_PATHS, d.gateRanks) };
+  if (kind === "wallBallista") return { stats: coreStats(ballistaStats(save, d.ballistaRanks), 4), abilities: sharedAbilities(BALLISTA_PATHS, d.ballistaRanks) };
+  if (kind === "wallSpikes") {
+    const l = d.levels, p = wear && pathById(wear.path);
+    return { stats: [`${spikeDamage(l.spikeDamage ?? 0)} damage`, `cuts every ${Number(spikeEvery(l.spikeRate ?? 0).toFixed(2))}s`], abilities: p ? p.ranks.slice(0, wear.rank).map((r) => ({ text: r.text, hue: p.hue })) : [] };
+  }
+  // Whatever a path adds is listed after the numbers a plain one has.
+  const item = kind as PaletteItem, plain = kindStats(save, item).split(" · ").length;
+  const stats = coreStats(kindStats(save, item, wear?.path, wear?.rank ?? 0), plain);
+  const p = wear && pathById(wear.path);
+  return { stats, abilities: p ? p.ranks.slice(0, wear.rank).map((r) => ({ text: r.text, hue: p.hue })) : [] };
+}
+
 const ROMAN = ["", "I", "II", "III", "IV", "V"];
 const ordinal = (n: number) => (n === 2 ? "other" : n === 3 ? "3rd" : `${n}th`);
 
-/** A path rank's medallion: its icon in the path's colours, its numeral beneath. */
-const medal = (path: PathId, rank: number) => {
-  const p = pathById(path), r = p.ranks[Math.max(0, rank - 1)];
-  return `<span class="path-medal"><canvas data-path-icon="${r.icon}:${p.hue}"></canvas>${rank ? `<b>${ROMAN[rank]}</b>` : ""}</span>`;
-};
-/** A building's medallion: its own icon. */
-const buildingMedal = (kind: string) => `<span class="path-medal base"><canvas width="32" height="32" data-icon="${kind}"></canvas></span>`;
-
-/** Tiles' read-only tree for `kind`: what a plain one can become, the
- * branches it can climb (or the one it is on), each rank with what it
- * does, and the ultimate its line merges into (empty for a kind with
- * none of these). Upgrades are bought on each building in Defend. */
-export function upgradeTreeHtml(save: Save, kind: PaletteItem): string {
-  const becomes = BECOMES[kind as keyof typeof BECOMES] ?? [], place = placeOf(kind as never);
-  const line = place.tier === "attuned" || place.tier === "via" ? place.a : undefined;
-  const branches = place.tier === "attuned" ? place.a.branches : buildingPathsOf(kind).map((p) => ({ path: p.id, via: undefined }));
-  if (!becomes.length && !branches.length && !line) return "";
-  const topic = pathTopicOf(kind);
-  const base = `<li class="spec-row base">${buildingMedal(kind)}<div><b>${ITEM_NAMES[kind]}</b><small>${topic ? UNSPECIALIZED[topic] : TROOPS[kind as keyof typeof TROOPS] ?? ""}</small><small class="spec-stats">${kindStats(save, kind)}</small></div></li>`;
-  const grow = becomes.map((b) => `<li class="spec-row">${buildingMedal(b.to)}<div><b>Becomes ${ITEM_NAMES[b.to]}</b><small>${b.cost} Knowledge · ${TROOPS[b.to] ?? "a tower"}</small></div></li>`).join("");
-  const climb = branches.map(({ path, via }) => {
-    const p = pathById(path);
-    return `<li class="spec-row hue-${p.hue}">${via ? buildingMedal(via.kind) : medal(p.id, 1)}<div><b>${via ? `${ITEM_NAMES[via.kind]}: ` : ""}${p.name}</b><small>${via ? `Becomes a ${ITEM_NAMES[via.kind]} (${TROOPS[via.kind] ?? "a tower"}, ${via.cost} Knowledge more at I) · ` : ""}${p.motto}: ${p.ranks.map((r, i) => `${ROMAN[i + 1]} ${r.name} (${r.cost.toLocaleString("en")})`).join(" · ")}</small></div></li>`;
-  }).join("");
-  const pick = place.tier === "attuned" ? `<li class="spec-row"><div><small>One branch a building: taking one closes the others.</small></div></li>` : "";
-  const top = line ? `<li class="spec-row hue-gold">${line.ultimate ? buildingMedal(line.ultimate) : ""}<div><b>${line.ultimate ? `Ultimate: ${ITEM_NAMES[line.ultimate]}` : "Ultimate: still to come"}</b><small>${mergeText(line.kind, line.ultimate)}</small></div></li>` : "";
-  return `<div class="tile-specialties"><small>UPGRADES · KNOWLEDGE, ONE BUILDING AT A TIME: TAP IT IN DEFEND WHILE BUILDING</small><ul>${base}${grow}${pick}${climb}${top}</ul></div>`;
-}
 
 /** How a line's ultimate is made, in words. */
 const mergeText = (attuned: PaletteItem, ultimate?: PaletteItem) => ultimate
@@ -587,23 +589,6 @@ export const sharedBranches = (kind: string): SideUi | undefined => (kind === "r
 export function graftedGraph(save: Save, kind: PaletteItem | "wallSpikes", wear?: Wear): GraphNode[] {
   const own = treeGraph(kind, wear), shared = sharedBranches(kind);
   return shared ? [...own, ...shared.graph(save).filter((n) => n.id !== shared.root)] : own;
-}
-
-/** Tiles' read-only list of a side tree's branches, shared by every one of `whose`. */
-function sideTreeHtml(paths: { name: string; motto: string; hue: string; ranks: { name: string; icon: string; cost: number }[] }[], whose: string): string {
-  const rows = paths.map((p) => `<li class="spec-row hue-${p.hue}"><span class="path-medal"><canvas data-path-icon="${p.ranks[0].icon}:${p.hue}"></canvas></span><div><b>${p.name}</b><small>${p.motto}: ${p.ranks.map((r, i) => `${ROMAN[i + 1]} ${r.name} (${r.cost.toLocaleString("en")})`).join(" · ")}</small></div></li>`).join("");
-  return `<div class="tile-specialties"><small>UPGRADES · KNOWLEDGE, SHARED BY EVERY ${whose}: PRESS AND HOLD ONE IN DEFEND WHILE BUILDING</small><ul>${rows}</ul></div>`;
-}
-/** Tiles' read-only lists of the gates' and the ballistas' branches. */
-export const gateTreeHtml = () => sideTreeHtml(GATE_PATHS, "GATE");
-export const ballistaTreeHtml = () => sideTreeHtml(BALLISTA_PATHS, "BALLISTA");
-export const revolutionaryTreeHtml = () => sideTreeHtml(REVOLUTIONARY_PATHS, "REVOLUTIONARY");
-export const shadowTreeHtml = () => sideTreeHtml(SHADOW_PATHS, "SHADOW");
-
-/** Tiles' read-only list of the walls' branches. */
-export function wallTreeHtml(): string {
-  const rows = WALL_PATHS.map((p) => `<li class="spec-row hue-${p.hue}"><span class="path-medal"><canvas data-path-icon="${p.ranks[0].icon}:${p.hue}"></canvas></span><div><b>${p.name}</b><small>${p.motto}: ${p.ranks.map((r, i) => `${ROMAN[i + 1]} ${r.name} (${r.cost.toLocaleString("en")})`).join(" · ")}</small></div></li>`).join("");
-  return `<div class="tile-specialties"><small>UPGRADES · KNOWLEDGE, SHARED BY EVERY WALL: PRESS AND HOLD ONE IN DEFEND WHILE BUILDING</small><ul>${rows}</ul></div>`;
 }
 
 /** A family keeps its base identity through kind changes and respecs.

@@ -6,7 +6,8 @@ import assert from "node:assert/strict";
 import { defaults } from "../src/save.ts";
 import { BOMB_PRICE, PALETTE_ITEMS, purchasePrice } from "../src/defend/catalog.ts";
 import { placeCityTile, placeStructure } from "../src/defend/layout.ts";
-import { CONSUMABLES, TILE_FILTERS, TILE_IDS, TILE_TYPE, buyTile, canBuyTile, higherTier, marksText, shopOffer, tileCopies, tileGroups, tileMarks, tileStack, tileStacks, tileTopic, universal } from "../src/tiles.ts";
+import { CONSUMABLES, TILE_FILTERS, TILE_IDS, TILE_TYPE, buyTile, canBuyTile, higherTier, marksText, shopOffer, tileCopies, tileGroups, tileMarks, tileStack, tileStacks, tileTopic, tileTree, tileCopyAt, universal } from "../src/tiles.ts";
+import { buildingSheet } from "../src/ui/specialty.ts";
 import { topicHas } from "../src/ui/ledger.ts";
 
 test("every palette item and consumable is a tile of one type, filed in one topic", () => {
@@ -120,4 +121,45 @@ test("each copy carries its own Knowledge upgrades; copies alike stack, and shar
   // A universal kind's copies are all plain: one stack.
   d.owned.cityTile = 3;
   assert.deepEqual(new Set(tileCopies(s, tileStack(s, "cityTile")).map((c) => c.group)), new Set(["cityTile"]));
+});
+
+test("a held tile opens its own copy's tree: where it stands, else its palette copy; shared trees for the wall's pieces", () => {
+  const s = defaults(), d = s.defend;
+  d.owned.barracks = 3;
+  const l = placeCityTile(d.layout, d.layout.keep.tx, d.layout.keep.ty - 1) ?? assert.fail("tile");
+  d.layout = placeStructure(l, "barracks", d.layout.keep.tx, d.layout.keep.ty - 1) ?? assert.fail("barracks");
+  d.kept = [{ kind: "barracks", path: "crusaders", rank: 2 }];
+  const uid = d.layout.structures.find((o) => o.kind === "barracks")!.uid;
+  assert.deepEqual(tileTree(s, "barracks", "barracks#0"), { uid });
+  assert.deepEqual(tileTree(s, "barracks", "barracks~crusaders~2#0"), { copy: "barracks", wear: { path: "crusaders", rank: 2 } });
+  assert.deepEqual(tileTree(s, "barracks", "barracks~crusaders~2"), { copy: "barracks", wear: { path: "crusaders", rank: 2 } }, "a stack's group");
+  assert.deepEqual(tileTree(s, "barracks", "barracks#1"), { copy: "barracks" });
+  assert.deepEqual(tileCopyAt(s, tileStack(s, "barracks"), "barracks~crusaders~2")?.wear, { path: "crusaders", rank: 2 });
+  assert.deepEqual(tileTree(s, "wallBlock"), { side: "walls" });
+  assert.deepEqual(tileTree(s, "cityGate"), { side: "gate" });
+  assert.deepEqual(tileTree(s, "wallBallista"), { side: "ballistas" });
+  assert.equal(tileTree(s, "cityTile"), null);
+  assert.equal(tileTree(s, "bomb"), null);
+});
+
+test("an opened tile shows its basic stats, then each upgrade it carries as an ability in its path's colour", () => {
+  const s = defaults();
+  const plain = buildingSheet(s, "wizardTower");
+  assert.equal(plain.stats.length, 5);
+  assert.match(plain.stats[0], /fire damage\/s/);
+  assert.deepEqual(plain.abilities, []);
+  const storm = buildingSheet(s, "wizardTower", { path: "storm", rank: 2 });
+  assert.match(storm.stats.join(" "), /5 targets/);
+  assert.deepEqual(storm.abilities.map((a) => a.hue), ["storm", "storm"]);
+  assert.match(storm.abilities[0].text, /leaping through 3 enemies/);
+  // What a path adds isn't repeated among the numbers.
+  const fire = buildingSheet(s, "archerTower", { path: "fireArrows", rank: 3 });
+  assert.equal(fire.stats.length, buildingSheet(s, "archerTower").stats.length);
+  assert.equal(fire.abilities.length, 3);
+  // Shared trees list every rank bought.
+  s.defend.wallRanks = { stonework: 2, thornwork: 1 };
+  const walls = buildingSheet(s, "wallBlock");
+  assert.equal(walls.stats.length, 1);
+  assert.equal(walls.abilities.length, 3);
+  for (const id of TILE_IDS) if (!CONSUMABLES.includes(id as never) && id !== "cityTile") assert.ok(buildingSheet(s, id as never).stats.length, id);
 });

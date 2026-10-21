@@ -95,7 +95,7 @@ const plural = (name: string) => (name.endsWith("s") ? name : `${name}s`);
 /** A building whose upgrade tree shows: one with paths, or one of the
  * trees climbed side by side (`SIDE_UI`): the keep's, or the one every
  * placed wall, every gate or every wall ballista shares. */
-type TreeTarget = SpecialtyTarget | { side: SideKind };
+export type TreeTarget = SpecialtyTarget | { side: SideKind };
 /** Whether two specialty targets name the same building. */
 const sameTarget = (a: TreeTarget, b: TreeTarget): boolean =>
   "side" in a || "side" in b ? "side" in a && "side" in b && a.side === b.side
@@ -1094,6 +1094,17 @@ export class DefendPage {
     this.openSpecialty(target);
     play("knock");
     return true;
+  }
+
+  /** Whether a building's upgrade tree can be opened from another tab
+   * (Tiles' press and hold): only between battles, while building. */
+  canOpenTree() {
+    return this.phase === "build";
+  }
+  /** Opens `target`'s upgrade tree, as a press held on it here would
+   * (Tiles' press and hold, once the tab has turned to Defend). */
+  openTree(target: TreeTarget) {
+    if (this.phase === "build") this.openSpecialty(target);
   }
 
   private pick(id: number | null) {

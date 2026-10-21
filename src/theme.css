@@ -1764,10 +1764,11 @@ dialog .away-row .away-note {
 .tile-detail small { color: #c79f5c; }
 .tile-detail h3 { color: #f6dca4; text-shadow: 0 1px 0 #000; }
 .tile-detail p { color: #cdbd9c; }
-.tile-detail .tile-face.big canvas { width: 44px; height: 44px; }
+.tile-detail .tile-face.big > canvas { width: 44px; height: 44px; }
 .tile-reason, .tile-more { color: #b3a282; }
-.tile-tier { color: #e6c98a; }
-.tile-tier b { color: #ffe1a0; }
+.tile-stats li { color: #f4d999; border: 1px solid #120d09; border-radius: 2px; background: #00000070; box-shadow: inset 0 0 0 1px #8a6a3a50; }
+.tile-abilities li { color: var(--hue, #ead8b8); text-shadow: 0 1px 0 #000; }
+.tile-go.go-tree { color: #ffe1a0; }
 .tile-go.go-smithy { color: #ffe1b0; }
 .tile-go.go-study { color: #eadcff; }
 
@@ -1894,7 +1895,6 @@ dialog .away-row .away-note {
 .spec-cost { color: #f2c95a; }
 .spec-choice.locked .spec-cost { color: #8a7a6a; }
 .spec-note { color: #9c8b6b; }
-.tile-specialties { color: #d9bd87; border-top: 1px solid #79603980; }
 .ledger-scope { color: #d9bd87; border-bottom: 1px solid #79603980; }
 
 /* ── A building's upgrade tree (ui/upgrade-graph.ts) ────────────────────────
