@@ -5,7 +5,9 @@
  *   from the upper left: a gold helm with a plume, a steel cuirass, and a
  *   cape thrown out either side in its hall's colours (royal red; storm
  *   blue for Whirlwind, black under a red plume for Blade dance, white and gold
- *   for Legend). Its longsword, a bright blade on a gold guard, points
+ *   for Legend), its long cape (`hero-cape.ts`) streaming out behind it as
+ *   it runs, rippling in the breeze and flung round it through a spin, cut
+ *   swallowtail with a trimmed hem, folds lit from the upper left. Its longsword, a bright blade on a gold guard, points
  *   where it last struck and whirls right round it through a spin. While
  *   nothing can hurt it (an Undying Hero just risen) a gold halo shimmers.
  * - **A slash:** a crescent of steel light sweeping across the Hero's front
@@ -26,6 +28,7 @@ import type { CarriedLight } from "./lighting.ts";
 import type { ReliefLight } from "./ground-relief.ts";
 import type { DefendSim, Soldier } from "./sim.ts";
 import { heroPaths, type Swing } from "./hero.ts";
+import { CAPE_EDGE, capePixels, newCape, stepCape, type Cape } from "./hero-cape.ts";
 
 type Ctx = CanvasRenderingContext2D;
 
@@ -113,11 +116,65 @@ export function drawHero(c: Ctx, px: number, u: Soldier, sim: DefendSim) {
   } else if (w?.kind === "spin") face += w.turn * Math.PI * 2 * ease(Math.min(1, w.t / (w.life * 0.7)));
   const p = heroPaths(sim, u.home), cape = p.legend ? "legend" : p.dance ? "bladeDance" : p.whirl ? "whirlwind" : "";
   if (u.guard) drawHalo(c, px, u, u.guard, sim.time);
+  drawCape(c, k, u, sim, cape, w?.kind === "spin" && w.t < w.life * 0.7 ? w.turn : 0, u.flash > 0);
   // The sword behind the figure while held up, in front while it sweeps low.
   const behind = Math.sin(face) < 0;
   if (behind) drawSword(c, k, u.x * px, u.y * px, face);
   c.drawImage(sprite({ cape, mode: u.flash > 0 ? "struck" : "plain" }), u.x * px - (W / 2) * k, u.y * px - (HERO_ART.length / 2) * k, W * k, HERO_ART.length * k);
   if (!behind) drawSword(c, k, u.x * px, u.y * px, face);
+}
+
+// ── The cape ───────────────────────────────────────────────────────────────
+
+type Flowing = { cape: Cape; canvas: HTMLCanvasElement };
+const capes = new WeakMap<Soldier, Flowing>();
+
+/** The Hero's cape, stepped to the battle's time and rasterized on the
+ * sprite's own pixel grid: base, lit folds, shaded folds, the shaded
+ * underside, the trimmed hem, inside a black outline. */
+function drawCape(c: Ctx, k: number, u: Soldier, sim: DefendSim, look: string, spin: number, struck: boolean) {
+  let f = capes.get(u);
+  if (!f) capes.set(u, (f = { cape: newCape(u.x, u.y, sim.time, u.id * 1.7), canvas: document.createElement("canvas") }));
+  const cape = stepCape(f.cape, u.x, u.y, sim.time, spin);
+  const per = W / (HERO.size * 2), H = HERO_ART.length;
+  const { x0, y0, w, h, tone } = capePixels(cape, u.x - W / 2 / per, u.y - (H / 2 - 0.5) / per, per, sim.time);
+  const [base, shade, plume] = CAPES[look] ?? CAPES[""];
+  const colors = [base, base, mix(base, "#ffffff", 0.3), shade, mix(shade, "#000000", 0.35), look ? plume : GOLD[1], OUTLINE].map((col, i) => rgb(struck && i !== CAPE_EDGE ? pale(col) : col));
+  const cv = f.canvas;
+  if (cv.width !== w || cv.height !== h) {
+    cv.width = w;
+    cv.height = h;
+  }
+  const cc = cv.getContext("2d")!, img = cc.createImageData(w, h);
+  for (let p = 0; p < tone.length; p++) {
+    if (!tone[p]) continue;
+    const [r, g, b] = colors[tone[p]];
+    img.data[p * 4] = r;
+    img.data[p * 4 + 1] = g;
+    img.data[p * 4 + 2] = b;
+    img.data[p * 4 + 3] = 255;
+  }
+  cc.putImageData(img, 0, 0);
+  c.save();
+  c.imageSmoothingEnabled = false;
+  c.drawImage(cv, u.x * k * per - (W / 2) * k + x0 * k, u.y * k * per - (H / 2) * k + y0 * k, w * k, h * k);
+  c.restore();
+}
+
+/** `a` mixed `t` of the way to `b`, as hex. */
+function mix(a: string, b: string, t: number) {
+  const [r, g, bl] = rgb(a), [r2, g2, b2] = rgb(b), m = (x: number, y: number) => Math.round(x + (y - x) * t);
+  return `#${((1 << 24) | (m(r, r2) << 16) | (m(g, g2) << 8) | m(bl, b2)).toString(16).slice(1)}`;
+}
+
+/** A colour as red, green and blue, from hex or `rgb(...)`. */
+function rgb(col: string): [number, number, number] {
+  if (col.startsWith("rgb")) {
+    const [r, g, b] = col.slice(4, -1).split(",").map(Number);
+    return [r, g, b];
+  }
+  const n = parseInt(col.slice(1), 16);
+  return [n >> 16, (n >> 8) & 255, n & 255];
 }
 
 /** `hex` two thirds of the way to white. */

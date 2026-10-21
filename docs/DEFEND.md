@@ -376,8 +376,11 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   then 5 slashes and a third faster; then each kill adding another slash,
   up to 12) and Legend (twice the HP, then each kill healing 5%, then the
   first time it falls it rises at once with half its HP, unhurtable for 3
-  seconds). `hero-art.ts` draws the knight with its cape in its path's
-  colours, its longsword swinging through each slash and whirling round
+  seconds). `hero-art.ts` draws the knight with its long swallowtail cape
+  in its path's colours, streaming out behind it as it runs, rippling in
+  the breeze and flung round it through a spin (`hero-cape.ts`: a chain of
+  points with momentum, kept a link apart, rasterized on the sprite's own
+  pixels), its longsword swinging through each slash and whirling round
   through each spin, the slashes' crescents, the spins' rings, the dashes'
   streaks and after-images, and the rising's pillar of gold.
 - **Archer barracks** train archers (same garrison size, drill speed and

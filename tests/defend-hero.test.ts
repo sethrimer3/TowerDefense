@@ -12,6 +12,7 @@ import { generateCity } from "../src/defend/citygen.ts";
 import { Barracks } from "../src/defend/troops.ts";
 import { HERO, STRUCTURES, type EnemyKind } from "../src/defend/catalog.ts";
 import { combo, stepHero } from "../src/defend/hero.ts";
+import { CAPE, newCape, stepCape, type Cape } from "../src/defend/hero-cape.ts";
 import { PATH_LOOKS, structurePixels } from "../src/defend/tower-art.ts";
 import { kindStats } from "../src/ui/specialty.ts";
 
@@ -209,4 +210,31 @@ test("Legend: twice the HP, kills heal it, and at III it rises once when it fall
   plain.sim.hurtDefender(plain.h, plain.h.maxHp * 10);
   assert.ok(plain.h.hp <= 0);
   assert.equal(plain.h.rallied, undefined);
+});
+
+test("the Hero's cape hangs, streams out behind it as it runs and whirls round it in a spin", () => {
+  const links = (c: Cape) => {
+    const out: number[] = [];
+    for (let i = 1; i < CAPE.points; i++) out.push(Math.sqrt((c.x[i] - c.x[i - 1]) ** 2 + (c.y[i] - c.y[i - 1]) ** 2));
+    return out;
+  };
+  const tip = CAPE.points - 1;
+  // At rest it hangs below the shoulders.
+  const still = newCape(10, 10, 0);
+  for (let t = 1; t <= 120; t++) stepCape(still, 10, 10, t / 60);
+  assert.ok(still.y[tip] > 10 + CAPE.link * 3, `hangs down, tip at ${still.y[tip]}`);
+  // Running right, it streams out to the left of the Hero.
+  const run = newCape(10, 10, 0);
+  for (let t = 1; t <= 60; t++) stepCape(run, 10 + (t / 60) * 3, 10, t / 60);
+  assert.ok(run.x[tip] < 13 - CAPE.link * 3, `trails behind, tip at ${run.x[tip]}`);
+  // A dash and a spin never stretch it.
+  stepCape(run, 15.5, 10, 61 / 60);
+  for (const d of links(run)) assert.ok(Math.abs(d - CAPE.link) < 1e-9);
+  const spun = newCape(10, 10, 0);
+  for (let t = 1; t <= 60; t++) stepCape(spun, 10, 10, t / 60);
+  const before = Math.atan2(spun.y[tip] - 10, spun.x[tip] - 10);
+  for (let t = 61; t <= 70; t++) stepCape(spun, 10, 10, t / 60, 1);
+  const after = Math.atan2(spun.y[tip] - 10, spun.x[tip] - 10);
+  assert.ok(after - before > 0.5, `whirled round, ${before} to ${after}`);
+  for (const d of links(spun)) assert.ok(Math.abs(d - CAPE.link) < 1e-9);
 });
