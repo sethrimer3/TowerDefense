@@ -41,6 +41,7 @@ try {
   await canvas.evaluate(c => window.__originalCircle = c);
   assert.equal(await canvas.getAttribute('data-motif'), 'triangles');
   const original = await canvas.getAttribute('data-formation');
+  const originalRings = Number(await canvas.getAttribute('data-rings'));
   const originalTriangles = Number(await canvas.getAttribute('data-triangles'));
   const first = await pixels(page); await page.waitForTimeout(150);
   assert.notEqual(await pixels(page), first, 'idle animation moves');
@@ -55,6 +56,8 @@ try {
   assert.equal(await canvas.count(), 1);
   await page.waitForTimeout(1900);
   assert.ok(Number(await canvas.getAttribute('data-triangles')) > originalTriangles, 'spell purchases add inscribed layers');
+  assert.ok(Number(await canvas.getAttribute('data-rings')) > originalRings, 'completed spell Knowledge adds framing rings');
+  assert.equal(Number(await canvas.getAttribute('data-knowledge')), 2, 'equipping the spell grants no extra visual rank');
   await page.screenshot({ path: `test-results/magic-upgraded-${width}.png` });
   // The current UI has no unlearn button; exercise its existing handler.
   await page.evaluate(() => window.__circleStudy.unlearn('meteor'));
@@ -100,18 +103,24 @@ try {
    }
   });
   await page.waitForFunction(() => window.__circlePage);
-  await page.evaluate(() => window.__circlePage.openSpecialty({ keep: true }));
+  await page.evaluate(() => window.__circlePage.openSpecialty({ side: 'keep' }));
   await page.waitForTimeout(250);
   const keep = page.locator('#defend-specialty .magic-circle');
   assert.equal(await keep.count(), 1);
   assert.equal(await keep.getAttribute('data-motif'), 'tesseract');
   const plain = await keep.getAttribute('data-formation');
+  const keepRings = Number(await keep.getAttribute('data-rings'));
   await page.locator('#defend-specialty [data-node="q:arrowLoops:1"]').click();
   await page.locator('[data-ug-buy="q:arrowLoops:1"]').click();
   assert.notEqual(await keep.getAttribute('data-formation'), plain);
+  await page.waitForFunction(before => Number(document.querySelector('#defend-specialty .magic-circle').dataset.rings) > before, keepRings);
+  assert.ok(Number(await keep.getAttribute('data-rings')) > keepRings, 'keep Knowledge adds rings');
+  assert.ok(Number(await keep.getAttribute('data-projections')) > 1, 'keep Knowledge reveals nested tesseract projections');
   await page.screenshot({ path: `test-results/magic-keep-${width}.png` });
   await page.locator('[data-ug-respec]').click();
   assert.equal(await keep.getAttribute('data-formation'), plain);
+  await page.waitForFunction(before => Number(document.querySelector('#defend-specialty .magic-circle').dataset.rings) === before, keepRings);
+  assert.equal(Number(await keep.getAttribute('data-rings')), keepRings, 'respec restores the original ring complexity');
   await page.locator('[data-specialty-close]').click();
   assert.equal(await page.locator('#defend-specialty .magic-circle').count(), 0);
   // Reproduce the user's Defend Barracks / Crusaders screenshot, not just Study.
@@ -129,13 +138,15 @@ try {
   await page.screenshot({ path: `test-results/magic-barracks-${width}.png` });
   const beforeUndo = await background.getAttribute('data-formation');
   const beforeCells = Number(await background.getAttribute('data-cells'));
+  const beforeRings = Number(await background.getAttribute('data-rings'));
   await page.locator('#defend-specialty [data-node="p:crusaders:1"]').click();
   await page.locator('#defend-specialty [data-ug-undo]').click();
   assert.notEqual(await background.getAttribute('data-formation'), beforeUndo);
   await page.waitForTimeout(100);
   assert.ok(Number(await background.getAttribute('data-cells')) < beforeCells, 'building undo reduces Voronoi cell count');
+  assert.ok(Number(await background.getAttribute('data-rings')) < beforeRings, 'building undo reduces ring complexity');
   await page.locator('[data-specialty-close]').click();
-  await page.evaluate(() => window.__circlePage.openSpecialty({ walls: true }));
+  await page.evaluate(() => window.__circlePage.openSpecialty({ side: 'walls' }));
   const wallCircle = page.locator('#defend-specialty .magic-circle');
   await page.waitForTimeout(100);
   assert.equal(await wallCircle.getAttribute('data-motif'), 'tesseract');
@@ -150,6 +161,27 @@ try {
   console.log(`${width}px: purchases, unlearning, reduced motion, canvas persistence, navigation, keep upgrade/respec and cleanup passed`);
   await context.close();
  }
+ // A static review sheet uses the real renderer at identical scale and quality.
+ const gallery = await browser.newPage({ viewport: { width: 1080, height: 1200 } }); await gallery.goto(base);
+ await gallery.evaluate(async () => {
+  const { MagicCircle } = await import('/src/magic-circle/render.ts');
+  document.body.innerHTML = '<main id="circle-gallery"><h1>Knowledge grows the magic circle</h1><p>0, 3 and 12 completed Knowledge steps · same camera, scale and quality · Reduce Motion</p></main>';
+  const style = document.createElement('style'); style.textContent = 'body{margin:0;background:#111719;color:#f1d58a;font:15px monospace}#circle-gallery{padding:24px}h1{font-size:23px}h2{font-size:17px;margin:18px 0 4px}.circle-row{display:flex;gap:12px}.circle-frame{position:relative;flex:0 0 320px;text-align:center}.circle-frame canvas.magic-circle{position:static;display:block;width:320px;height:320px;inset:auto;transform:none;opacity:1;mix-blend-mode:normal;image-rendering:pixelated}'; document.head.append(style);
+  const host = document.querySelector('#circle-gallery'), renderers = [];
+  for (const [steps, title] of [[0,'New — 0 Knowledge steps'],[3,'Developing — 3 Knowledge steps'],[12,'Advanced — 12 Knowledge steps']]) {
+   const label = document.createElement('h2'); label.textContent = title; host.append(label);
+   const row = document.createElement('div'); row.className = 'circle-row'; host.append(row);
+   for (const [motif, name] of [['tesseract','City · projected tesseracts'],['triangles','Strike spells · inscribed triangles'],['voronoi','Buildings · Voronoi cells']]) {
+    const frame = document.createElement('div'); frame.className = 'circle-frame'; row.append(frame);
+    const renderer = new MagicCircle('medium'); renderer.attach(frame);
+    renderer.set({ topic:`reference:${motif}`, motif, upgrades:Array.from({length:steps},(_,i)=>({id:`step:${i}`,rank:1})) }); renderer.frame(0,true);
+    const cap = document.createElement('div'); cap.textContent = name; frame.append(cap); renderers.push(renderer);
+   }
+  }
+  window.__referenceCircles = renderers;
+ });
+ await gallery.screenshot({ path:'test-results/magic-progression.png',fullPage:true });
+ await gallery.evaluate(() => window.__referenceCircles.forEach(r=>r.destroy())); await gallery.close();
  // Isolated renderer: bounded trails, no RAF registration, static redraw,
  // interruption/resize, and representative paint cost (not a phone benchmark).
  const page = await browser.newPage(); await page.goto(base);
@@ -162,7 +194,7 @@ try {
   let rafs = 0; const realRAF = window.requestAnimationFrame; window.requestAnimationFrame = () => { rafs++; return 0; };
   const times = [];
   for (let i = 0; i < 300; i++) {
-   if(i % 47 === 0) renderer.set({...state, upgrades:[{id:'path:starfall',rank:i % 3}]});
+   if(i % 47 === 0) renderer.set({...state, upgrades:[{id:'path:starfall',rank:[0,6,24][Math.floor(i / 47) % 3]}]});
    const t = performance.now(); renderer.frame(i * 40, false); times.push(performance.now()-t);
   }
   const bounded = renderer.trails.agents.every(a=>a.history.length<=CIRCLE.maxHistory);

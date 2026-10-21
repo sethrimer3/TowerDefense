@@ -1359,7 +1359,7 @@ export class DefendPage {
     }
     this.treeCircle ??= new MagicCircle();
     this.treeCircle.attach(el.querySelector<HTMLElement>(".ug-host")!);
-    this.treeCircle.set(specialtyCircle(kind, wear, this.save.keepRanks, this.save.wallRanks, this.save.gateRanks, this.save.ballistaRanks));
+    this.treeCircle.set(specialtyCircle(kind, wear, this.save.keepRanks, this.save.wallRanks, this.save.gateRanks, this.save.ballistaRanks, this.save.revolutionaryRanks));
     const plainKind = kind as PaletteKind;
     const spent = side ? side.allocated(game) : treeAllocated(plainKind, wear);
     const plain = side ? !side.owned(game) : spent === 0 && (plainKind === "wallSpikes" || rootOf(plainKind) === plainKind);

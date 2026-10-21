@@ -1,9 +1,9 @@
 /** Pure visual mathematics. No game random streams, clocks, DOM, or saved geometry. */
 export type CircleMotif = 'tesseract' | 'triangles' | 'voronoi';
-export interface CircleState { motif?: CircleMotif; topic: string; upgrades: ReadonlyArray<{ id: string; rank: number }> }
+export interface CircleState { motif?: CircleMotif; topic: string; upgrades: ReadonlyArray<{ id: string; rank: number; visualOnly?: boolean }> }
 export interface CircleDNA {
   motifs: Record<CircleMotif, number>;
-  rings: number; symmetry: number; detail: number; eccentricity: number; offset: number;
+  knowledge: number; rings: number; symmetry: number; detail: number; eccentricity: number; offset: number;
   rotation: number; warp: number; recursion: number; energy: number;
   siteCount: number; triangleCount: number; triangleCorners: number[]; triangleInsets: number[];
   planes: number[]; sites: Point[];
@@ -39,12 +39,12 @@ export function formation(state: CircleState): CircleDNA {
   const seed = hash('towerdefense:circle:v1'), identity = hash(state.topic);
   const d: CircleDNA = {
     motifs: { tesseract: 0, triangles: 0, voronoi: 0 },
-    rings: 4 + unit(identity, 0) * 2, symmetry: 5 + unit(identity, 1) * 5,
-    detail: unit(identity, 2), eccentricity: 0.04 + unit(identity, 3) * 0.12,
+    knowledge: 0, rings: 2, symmetry: 4,
+    detail: 0, eccentricity: 0.04 + unit(identity, 3) * 0.12,
     offset: unit(identity, 4) * Math.PI * 2, rotation: 0.65 + unit(identity, 5) * 0.6,
-    warp: 0.15, recursion: 0.35, energy: 0,
-    siteCount: 11 + Math.floor(unit(identity, 20) * 5),
-    triangleCount: 7 + Math.floor(unit(identity, 21) * 3),
+    warp: 0.15, recursion: 0, energy: 0,
+    siteCount: CIRCLE.minSites,
+    triangleCount: 4,
     triangleCorners: Array.from({ length: 3 }, (_, i) => 0.85 + unit(identity, 22 + i) * 0.15),
     triangleInsets: Array.from({ length: 3 }, (_, i) => 0.1 + unit(identity, 25 + i) * 0.07),
     planes: Array.from({ length: 6 }, (_, i) => 0.3 + unit(identity, i + 6) * 0.7),
@@ -56,31 +56,36 @@ export function formation(state: CircleState): CircleDNA {
   };
   d.motifs[state.motif ?? 'tesseract'] = 1;
   // Merge duplicates to keep the public interpreter independent of input order.
-  const ranks = new Map<string, number>();
-  for (const u of state.upgrades) if (Number.isFinite(u.rank) && u.rank > 0)
-    ranks.set(u.id, Math.max(ranks.get(u.id) ?? 0, clamp(u.rank, 0, 1000)));
+  const ranks = new Map<string, number>(), learned = new Map<string, number>();
+  for (const u of state.upgrades) if (Number.isFinite(u.rank) && u.rank > 0) {
+    const rank = clamp(u.rank, 0, 1000);
+    ranks.set(u.id, Math.max(ranks.get(u.id) ?? 0, rank));
+    if (!u.visualOnly) learned.set(u.id, Math.max(learned.get(u.id) ?? 0, rank));
+  }
   for (const [id, rank] of [...ranks].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)) {
     const h = hash(id), strength = Math.log2(1 + rank) * 0.15;
     const delta = (i: number) => (unit(h, i) * 2 - 1) * strength;
-    d.siteCount += Math.log2(1 + rank) * (3 + unit(h, 30) * 2);
-    d.triangleCount += Math.log2(1 + rank) * (2 + unit(h, 31) * 1.5);
     for (let i = 0; i < 3; i++) {
       d.triangleCorners[i] += delta(32 + i) * 0.7;
       d.triangleInsets[i] += delta(35 + i) * 0.25;
     }
-    d.rings += delta(0); d.symmetry += delta(1) * 2.5; d.detail += delta(2);
     d.eccentricity += delta(3) * 0.15; d.offset += delta(4); d.rotation += delta(5);
-    d.warp += delta(6); d.recursion += strength * 0.3; d.energy += strength * 0.25;
+    d.warp += delta(6);
     d.planes.forEach((_, i) => d.planes[i] += delta(i + 10));
     d.sites.forEach((p, i) => {
       p.x += delta(40 + i * 2) * 0.32; p.y += delta(41 + i * 2) * 0.32;
     });
   }
-  d.siteCount = Math.round(clamp(d.siteCount, CIRCLE.minSites, CIRCLE.maxSites));
-  d.triangleCount = Math.round(clamp(d.triangleCount, 5, CIRCLE.maxTriangles));
+  // Completed ranks add complexity; path identity only changes shape. The
+  // bounded curve keeps early purchases visible and leaves room for deep trees.
+  d.knowledge = [...learned].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).reduce((n, [, rank]) => n + rank, 0);
+  const growth = d.knowledge / (d.knowledge + 6);
+  d.rings = 2 + growth * 5; d.symmetry = 4 + growth * 8;
+  d.detail = d.recursion = d.energy = growth;
+  d.siteCount = CIRCLE.minSites + Math.round(growth * (CIRCLE.maxSites - CIRCLE.minSites));
+  d.triangleCount = 4 + Math.round(growth * (CIRCLE.maxTriangles - 4));
   d.triangleCorners = d.triangleCorners.map(v => clamp(v, 0.62, 1));
   d.triangleInsets = d.triangleInsets.map(v => clamp(v, 0.065, 0.24));
-  d.rings = clamp(d.rings, 3, 7); d.symmetry = clamp(d.symmetry, 4, 12);
   d.detail = clamp(d.detail, 0, 1); d.eccentricity = clamp(d.eccentricity, 0, 0.25);
   d.rotation = clamp(d.rotation, 0.2, 2); d.warp = clamp(d.warp, 0.05, 0.9);
   d.recursion = clamp(d.recursion, 0, 1); d.energy = clamp(d.energy, 0, 1);
@@ -92,7 +97,7 @@ export function formation(state: CircleState): CircleDNA {
   }
   return d;
 }
-const scalars = ['rings', 'symmetry', 'detail', 'eccentricity', 'offset', 'rotation', 'warp', 'recursion', 'energy', 'siteCount', 'triangleCount'] as const;
+const scalars = ['knowledge', 'rings', 'symmetry', 'detail', 'eccentricity', 'offset', 'rotation', 'warp', 'recursion', 'energy', 'siteCount', 'triangleCount'] as const;
 export function mix(a: CircleDNA, b: CircleDNA, t: number): CircleDNA {
   const d = { ...a, motifs: {
     tesseract: a.motifs.tesseract + (b.motifs.tesseract - a.motifs.tesseract) * t,
