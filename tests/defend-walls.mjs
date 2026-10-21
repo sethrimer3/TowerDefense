@@ -6,6 +6,7 @@
 // game. Needs `npm run dev`. Screenshots go to test-results/ (or SHOTS).
 import { chromium } from '@playwright/test';
 import assert from 'node:assert/strict';
+import { dropAt } from './drag-raise.mjs';
 import { mkdirSync } from 'node:fs';
 const browser = await chromium.launch(process.env.PLAYWRIGHT_EXECUTABLE
   ? { headless: true, executablePath: process.env.PLAYWRIGHT_EXECUTABLE }
@@ -62,6 +63,8 @@ try {
     const at = (x, y) => page.evaluate(([x, y]) => window.__dp.renderer.toClient(x, y), [x, y]);
     /** The middle of quarter tile (qx, qy), on the page. */
     const quarter = (qx, qy) => at((qx + 0.5) * 2, (qy + 0.5) * 2);
+    /** Where to let go for a section to land on quarter (qx, qy). */
+    const drop = (qx, qy) => dropAt(page, (qx + 0.5) * 2, (qy + 0.5) * 2);
     const drag = async (a, b, shot) => {
       if (phone) {
         const cdp = await context.newCDPSession(page);
@@ -85,18 +88,18 @@ try {
     const spot = { qx: (k.tx - 2) * 4 + 1, qy: k.ty * 4 + 2 };
     const tile = page.locator('#defend-palette [data-item="wallBlock"]');
     assert.ok(await tile.count(), 'walls are in the palette');
-    await drag(centre(await tile.boundingBox()), await quarter(spot.qx, spot.qy), `${out}/walls-${width}-dragging.png`);
+    await drag(centre(await tile.boundingBox()), await drop(spot.qx, spot.qy), `${out}/walls-${width}-dragging.png`);
     s = await state(page);
     assert.equal(s.defend.layout.walls.length, placed + 1, 'one more wall stands');
     assert.deepEqual(s.defend.layout.walls.at(-1), spot, 'on the quarter it was let go over');
     // Carried three quarters along.
     if (phone && await page.locator('#defend-side-toggle[aria-pressed="true"]').count()) await page.locator('#defend-side-toggle').click();
     await page.waitForTimeout(700);
-    await drag(await quarter(spot.qx, spot.qy), await quarter(spot.qx - 3, spot.qy));
+    await drag(await quarter(spot.qx, spot.qy), await drop(spot.qx - 3, spot.qy));
     s = await state(page);
     assert.deepEqual(s.defend.layout.walls.at(-1), { qx: spot.qx - 3, qy: spot.qy }, 'moved three quarters along');
     // Inside the city it is refused, for now.
-    await drag(await quarter(spot.qx - 3, spot.qy), await quarter(k.tx * 4 + 3, k.ty * 4 + 3));
+    await drag(await quarter(spot.qx - 3, spot.qy), await drop(k.tx * 4 + 3, k.ty * 4 + 3));
     s = await state(page);
     assert.deepEqual(s.defend.layout.walls.at(-1), { qx: spot.qx - 3, qy: spot.qy }, 'not inside the city without Town walls');
 
@@ -126,7 +129,7 @@ try {
 
     // Now one goes inside the city.
     const inside = { qx: (k.tx - 1) * 4 + 1, qy: k.ty * 4 + 3 };
-    await drag(await quarter(spot.qx - 3, spot.qy), await quarter(inside.qx, inside.qy), `${out}/walls-${width}-inside-dragging.png`);
+    await drag(await quarter(spot.qx - 3, spot.qy), await drop(inside.qx, inside.qy), `${out}/walls-${width}-inside-dragging.png`);
     s = await state(page);
     assert.deepEqual(s.defend.layout.walls.at(-1), inside, 'inside the city with Town walls');
     await page.waitForTimeout(300);

@@ -18,6 +18,7 @@
 import { consumable, dragIcon } from "./drag-rules.ts";
 import type { DragAt, Drop, EditSession } from "./edit-session.ts";
 import { CELLS_W, SUB, TILES_H, type TilePos } from "./grid.ts";
+import { QC } from "./layout.ts";
 import type { DefendRenderer } from "./render.ts";
 import { paintIcon } from "./structure-art.ts";
 
@@ -40,6 +41,9 @@ const TAP_SLOP = 8;
 export const HOLD_MS = 450;
 /** How long (ms) a press on a city tile must stay put to lift it. */
 export const LIFT_MS = 500;
+/** How far (in cells) above the pointer a held item rides, so the finger
+ * doesn't hide where it goes: four quarter tiles of the board's grid. */
+export const RAISE = 4 * QC;
 
 type Point = { x: number; y: number };
 
@@ -146,11 +150,16 @@ export class BoardPointers {
     const renderer = this.host.renderer();
     if (!this.held || !renderer) return null;
     const c = eventCell(renderer, e);
+    // The item rides `RAISE` cells above the pointer, kept on the board so
+    // its top rows stay in reach; the pointer still says whether it is over
+    // the board or the palette.
+    const fy = c.inside ? Math.max(0, c.fy - RAISE) : c.fy - RAISE;
+    const ghost = renderer.toClient(c.fx, fy);
     this.held.ghost.style.left = `${e.clientX}px`;
-    this.held.ghost.style.top = `${e.clientY}px`;
+    this.held.ghost.style.top = `${e.clientY + ghost.y - renderer.toClient(c.fx, c.fy).y}px`;
     return {
       cellX: c.fx,
-      cellY: c.fy,
+      cellY: fy,
       overBoard: c.inside,
       overPalette: !!(document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null)?.closest?.("#defend-palette"),
     };

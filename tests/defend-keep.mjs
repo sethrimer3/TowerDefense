@@ -7,6 +7,7 @@
 // game. Needs `npm run dev`. Screenshots go to test-results/ (or SHOTS).
 import { chromium } from '@playwright/test';
 import assert from 'node:assert/strict';
+import { dropAt } from './drag-raise.mjs';
 import { mkdirSync } from 'node:fs';
 const browser = await chromium.launch(process.env.PLAYWRIGHT_EXECUTABLE
   ? { headless: true, executablePath: process.env.PLAYWRIGHT_EXECUTABLE }
@@ -58,6 +59,8 @@ try {
     await page.screenshot({ path: `${out}/keep-${width}-before.png` });
 
     const tileAt = (tx, ty) => page.evaluate(([tx, ty]) => window.__dp.renderer.toClient((tx + 0.5) * 8, (ty + 0.5) * 8), [tx, ty]);
+    /** Where to let go for a carried tile to land on (tx, ty). */
+    const dropTile = (tx, ty) => dropAt(page, (tx + 0.5) * 8, (ty + 0.5) * 8);
     const keepAt = () => page.evaluate(() => {
       const dp = window.__dp, b = dp.currentMap().buildings.find(b => b.kind === 'keep');
       return dp.renderer.toClient(b.rect.x + b.rect.w / 2, b.rect.y + b.rect.h / 2);
@@ -85,7 +88,7 @@ try {
     // The keep onto open ground, two tiles left of its city: its tile goes with it.
     let s = await state(page);
     const k0 = s.defend.layout.keep, to = { tx: k0.tx - 2, ty: k0.ty - 1 };
-    await drag(await keepAt(), await tileAt(to.tx, to.ty), `${out}/keep-${width}-dragging.png`);
+    await drag(await keepAt(), await dropTile(to.tx, to.ty), `${out}/keep-${width}-dragging.png`);
     s = await state(page);
     assert.deepEqual(s.defend.layout.keep, to, 'the keep stands on open ground');
     assert.ok(!s.defend.layout.cityTiles.includes(`${to.tx},${to.ty}`), 'on its own tile');
@@ -100,7 +103,7 @@ try {
       return null;
     });
     assert.ok(corner, 'open ground on the keep\'s tile');
-    await drag(corner, await tileAt(k0.tx, k0.ty), undefined, true);
+    await drag(corner, await dropTile(k0.tx, k0.ty), undefined, true);
     s = await state(page);
     assert.deepEqual(s.defend.layout.keep, k0, 'pressed by its tile, the keep moves back');
 

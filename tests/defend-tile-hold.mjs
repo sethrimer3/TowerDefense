@@ -7,6 +7,7 @@
 // game. Needs `npm run dev`. Screenshots go to test-results/ (or SHOTS).
 import { chromium } from '@playwright/test';
 import assert from 'node:assert/strict';
+import { dropAt } from './drag-raise.mjs';
 import { mkdirSync } from 'node:fs';
 const browser = await chromium.launch(process.env.PLAYWRIGHT_EXECUTABLE
   ? { headless: true, executablePath: process.env.PLAYWRIGHT_EXECUTABLE }
@@ -55,6 +56,8 @@ try {
     await page.waitForTimeout(300);
 
     const tileAt = (tx, ty) => page.evaluate(([tx, ty]) => window.__dp.renderer.toClient((tx + 0.5) * 8, (ty + 0.5) * 8), [tx, ty]);
+    /** Where to let go for a carried tile to land on (tx, ty). */
+    const dropTile = (tx, ty) => dropAt(page, (tx + 0.5) * 8, (ty + 0.5) * 8);
     const cam = () => page.evaluate(() => ({ ...window.__dp.renderer.cam }));
     const session = () => page.evaluate(() => window.__dp.pointers.session?.drag ?? null);
     const lift = () => page.evaluate(() => window.__dp.pointers.liftProgress());
@@ -73,6 +76,8 @@ try {
     await page.evaluate(() => {
       const r = window.__dp.renderer, box = r.canvas.getBoundingClientRect();
       r.zoomAt(box.left + box.width / 2, box.top + box.height / 2, 2);
+      // Up a little, so the drop point below the carried tile is in view.
+      r.panBy(0, -box.height / 6);
     });
     await page.waitForTimeout(100);
     const k = (await state(page)).defend.layout.keep;
@@ -116,7 +121,7 @@ try {
     after = await cam();
     assert.deepEqual([after.x, after.y], [before.x, before.y], 'holding never panned');
     const to = { tx: k.tx + 3, ty: k.ty };
-    await moveTo({ x: a.x + 3, y: a.y - 2 }, await tileAt(to.tx, to.ty));
+    await moveTo({ x: a.x + 3, y: a.y - 2 }, await dropTile(to.tx, to.ty));
     await page.screenshot({ path: `${out}/tile-hold-${width}-dragging.png` });
     await release();
     s = await state(page);
