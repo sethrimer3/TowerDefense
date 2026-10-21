@@ -29,6 +29,7 @@ import type { ReliefLight } from "./ground-relief.ts";
 import type { DefendSim, Soldier } from "./sim.ts";
 import { heroPaths, type Swing } from "./hero.ts";
 import { CAPE_EDGE, capePixels, newCape, stepCape, type Cape } from "./hero-cape.ts";
+import { liveSprite } from "./unit-outline.ts";
 
 type Ctx = CanvasRenderingContext2D;
 
@@ -134,7 +135,10 @@ const capes = new WeakMap<Soldier, Flowing>();
  * underside, the trimmed hem, inside a black outline. */
 function drawCape(c: Ctx, k: number, u: Soldier, sim: DefendSim, look: string, spin: number, struck: boolean) {
   let f = capes.get(u);
-  if (!f) capes.set(u, (f = { cape: newCape(u.x, u.y, sim.time, u.id * 1.7), canvas: document.createElement("canvas") }));
+  if (!f) {
+    capes.set(u, (f = { cape: newCape(u.x, u.y, sim.time, u.id * 1.7), canvas: document.createElement("canvas") }));
+    liveSprite(f.canvas);
+  }
   const cape = stepCape(f.cape, u.x, u.y, sim.time, spin);
   const per = W / (HERO.size * 2), H = HERO_ART.length;
   const { x0, y0, w, h, tone } = capePixels(cape, u.x - W / 2 / per, u.y - (H / 2 - 0.5) / per, per, sim.time);

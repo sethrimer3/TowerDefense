@@ -18,7 +18,7 @@ try {
     // Release previous renderers and their canvases between samples.
     await page.reload();
     await cdp.send('HeapProfiler.collectGarbage');
-    const row = await page.evaluate(async ({ wave, scene, realtime, mixed, frames }) => {
+    const row = await page.evaluate(async ({ wave, scene, realtime, mixed, frames, outlines }) => {
       const { DefendSim } = await import('/src/defend/sim.ts');
       const { DefendRenderer } = await import('/src/defend/render.ts');
       const { defaultLayout, fitLayout, placeCityTile, placeStructure } = await import('/src/defend/layout.ts');
@@ -59,15 +59,15 @@ try {
         const start = performance.now();
         sim.update(realtime && last ? (now - last) / 1000 : 1 / 60);
         const mid = performance.now();
-        renderer.draw(map, sim, null, { grid: 0, weather: { rain: true }, night: 1, now, reduceMotion: false, effects: true });
+        renderer.draw(map, sim, null, { grid: 0, weather: { rain: true }, night: 1, now, reduceMotion: false, effects: true, mergedOutlines: outlines });
         const end = performance.now();
         if (i >= 30) { step.push(mid-start); draw.push(end-mid); frame.push(now-last); population.push(sim.enemies.length); }
         last = now;
       }
       const mean = a => +(a.reduce((s,v)=>s+v,0)/a.length).toFixed(2);
       const p95 = a => +a.toSorted((a,b)=>a-b)[Math.floor(a.length*.95)].toFixed(2);
-      return { wave, scene, realtime, mixed, initialEnemies: wave * 500, enemies: sim.enemies.length, averageEnemies: mean(population), updateMs: mean(step), drawMs: mean(draw), frameP95Ms: p95(frame), fps: +(1000/mean(frame)).toFixed(1) };
-    }, { wave, scene: process.env.PERF_SCENE || 'spawn', realtime: process.env.PERF_REALTIME === '1', mixed: process.env.PERF_MIX === '1', frames: Math.max(31, Number(process.env.PERF_FRAMES || 150)) });
+      return { wave, scene, realtime, mixed, outlines, initialEnemies: wave * 500, enemies: sim.enemies.length, averageEnemies: mean(population), updateMs: mean(step), drawMs: mean(draw), frameP95Ms: p95(frame), fps: +(1000/mean(frame)).toFixed(1) };
+    }, { wave, scene: process.env.PERF_SCENE || 'spawn', realtime: process.env.PERF_REALTIME === '1', mixed: process.env.PERF_MIX === '1', frames: Math.max(31, Number(process.env.PERF_FRAMES || 150)), outlines: process.env.PERF_OUTLINES !== '0' });
     rows.push(row);
     console.log(JSON.stringify(row));
   }
