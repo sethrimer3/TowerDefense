@@ -13,7 +13,8 @@ import { enemySize } from "./catalog.ts";
  * lancers chase like swordsmen, striking through `spears.ts`. A Mage
  * Guild trains fire mages the same way (`mages.ts`), a Valkyrie palace
  * valkyries (`valkyries.ts`), a dark wizard keep its one dark wizard
- * (`dark-wizards.ts`), and the Hero's hall its one Hero (`hero.ts`). */
+ * (`dark-wizards.ts`), the Hero's hall its one Hero (`hero.ts`) and the
+ * Shadow its one shade (`shadow.ts`). */
 import { dist, sq } from "../exact.ts";
 import {
   ARCHER_UNIT,
@@ -34,6 +35,7 @@ import {
   FIRE_MAGE,
   fireballDamage,
   HERO,
+  SHADE,
   SOLDIER,
   soldierCap,
   soldierLeash,
@@ -94,7 +96,7 @@ export class Barracks {
     const cap = soldierCap(sim.levels.barracksCapacity);
     for (const b of sim.map.buildings) {
       if (!isBarracks(b) || !sim.intact(b)) continue;
-      const garrison = b.kind === "darkKeep" ? DARK_WIZARD.garrison : b.kind === "heroHall" ? HERO.garrison : b.kind === "revolutionary" ? squadSize(sim) : cap + hostGarrison(sim, b);
+      const garrison = b.kind === "darkKeep" ? DARK_WIZARD.garrison : b.kind === "heroHall" ? HERO.garrison : b.kind === "shadow" ? SHADE.garrison : b.kind === "revolutionary" ? squadSize(sim) : cap + hostGarrison(sim, b);
       if (this.drilled(sim, b, garrison, dt)) this.recruit(sim, b);
     }
   }
@@ -102,7 +104,7 @@ export class Barracks {
   /** Counts down the barracks' drill; true when a recruit is ready. A full
    * garrison keeps the clock at a whole drill. */
   private drilled(sim: DefendSim, b: Building, cap: number, dt: number) {
-    const slow = b.kind === "darkKeep" ? DARK_WIZARD.drill : b.kind === "heroHall" ? HERO.drill : hostDrill(sim, b);
+    const slow = b.kind === "darkKeep" ? DARK_WIZARD.drill : b.kind === "heroHall" ? HERO.drill : b.kind === "shadow" ? SHADE.drill : hostDrill(sim, b);
     const drill = () => trainSeconds(sim.levels.barracksTraining) * sim.bonuses.drill * slow;
     const alive = sim.soldiers.filter((s) => s.home === b.id).length;
     if (alive >= cap) {
@@ -124,9 +126,9 @@ export class Barracks {
     if (!at) return;
     const kind = TRAINS[b.kind] ?? "sword";
     const scale = soldierScale(sim.levels.soldierArms);
-    const stats = kind === "archer" ? ARCHER_UNIT : kind === "mage" ? { ...FIRE_MAGE, damage: fireballDamage(sim.levels.mageFireball ?? 0) } : kind === "valkyrie" ? VALKYRIE : kind === "darkWizard" ? DARK_WIZARD : kind === "hero" ? HERO
+    const stats = kind === "archer" ? ARCHER_UNIT : kind === "mage" ? { ...FIRE_MAGE, damage: fireballDamage(sim.levels.mageFireball ?? 0) } : kind === "valkyrie" ? VALKYRIE : kind === "darkWizard" ? DARK_WIZARD : kind === "hero" ? HERO : kind === "shade" ? SHADE
       : kind === "brawler" ? BRAWLER : kind === "assassin" ? ASSASSIN_UNIT : isSpear(kind) ? SPEARS[kind] : isRanged(kind) ? RANGED[kind] : SOLDIER;
-    const path = kind === "sword" ? swordStats(sim, b.id) : kind === "assassin" ? { hp: assassinHp(sim, b.id), damage: 1 } : kind === "hero" ? { hp: heroHp(sim, b.id), damage: 1 } : { hp: gunHp(sim, b.id, kind), damage: 1 };
+    const path = kind === "sword" ? swordStats(sim, b.id) : kind === "assassin" ? { hp: assassinHp(sim, b.id), damage: 1 } : kind === "hero" ? { hp: heroHp(sim, b.id), damage: 1 } : kind === "shade" ? { hp: 1, damage: 1 } : { hp: gunHp(sim, b.id, kind), damage: 1 };
     sim.soldiers.push({
       id: sim.newId(),
       kind,
@@ -149,7 +151,7 @@ export class Barracks {
 
 /** What each troop building trains. */
 const TRAINS: Partial<Record<Building["kind"], Soldier["kind"]>> = {
-  barracks: "sword", heroHall: "hero", archerBarracks: "archer", mageGuild: "mage", valkyriePalace: "valkyrie", darkKeep: "darkWizard",
+  barracks: "sword", heroHall: "hero", shadow: "shade", archerBarracks: "archer", mageGuild: "mage", valkyriePalace: "valkyrie", darkKeep: "darkWizard",
   meleeGuild: "brawler", rangedGuild: "slinger", assassinDen: "assassin", sniperLodge: "sniper", musketHall: "musketeer",
   spearHall: "spearman", phalanx: "hoplite", javelinCamp: "javelineer", lancerStable: "lancer",
   gunHall: "gunner", gunNest: "machineGunner", gatlingNest: "gatlingGunner", rocketBattery: "rocketeer", revolutionary: "railSniper",

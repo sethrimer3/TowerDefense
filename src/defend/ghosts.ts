@@ -82,6 +82,7 @@ const TINTS: Record<GhostKind, [string, string]> = {
   javelineer: ["#dce6c4", "#f6fbea"],
   lancer: ["#ccd4ec", "#f0f4ff"],
   hero: ["#f6e4b0", "#fffaea"],
+  shade: ["#8a7aa8", "#d8d0ec"],
   assassin: ["#d6cfe6", "#f6f2ff"],
   civilian: ["#f1ece0", "#ffffff"],
 };

@@ -58,6 +58,7 @@ import { Barracks, stepArcher, stepSwordsman } from "./troops.ts";
 import { cloaked, spreadVenom, stepVenom } from "./assassins.ts";
 import { hopliteGuard } from "./spears.ts";
 import { heroRises, stepHero, stepSwings, type Swing } from "./hero.ts";
+import { stepBlades, stepBleed, stepShade, type Blade } from "./shadow.ts";
 import { stepBlazes, stepFireballs, stepMage, type Blaze, type Fireball } from "./mages.ts";
 import { stepStabs, stepValkyrie, type Stab } from "./valkyries.ts";
 import { launchPalaces, stepSkyPalaces, type SkyPalace } from "./sky-palace.ts";
@@ -129,6 +130,9 @@ export type Enemy = {
    * its bite a second and whether it spreads on death; absent when not
    * poisoned, so runs without Venomblades keep their state as before. */
   venom?: { t: number; more: number; dps: number; spread?: true };
+  /** A Hemorrhage knife's cut: damage a second and seconds left; absent
+   * when not bleeding (`shadow.ts`). */
+  bleed?: { dps: number; t: number };
   breath?: { dx: number; dy: number; t: number };
   /** What a siege engine is shooting at; absent while it rolls on. */
   aim?: SiegeAim;
@@ -140,9 +144,10 @@ export type Soldier = {
    * and hurl fireballs; valkyries hunt and charge-stab; the dark wizard
    * hunts and casts chain lightning; the spearmen line's spearmen,
    * hoplites and lancers chase like swordsmen, its javelineers roam and
-   * throw like archers; the Hero hunts the city with its sword combos. */
+   * throw like archers; the Hero hunts the city with its sword combos; the Shadow's shade
+   * hunts it with knives that loop out through crowds. */
   kind: "sword" | "archer" | "mage" | "valkyrie" | "darkWizard" | "undead" | "reinforcement" | "brawler" | "slinger" | "sniper" | "musketeer" | "gunner" | "machineGunner" | "gatlingGunner" | "rocketeer" | "railSniper" | "assassin"
-    | "spearman" | "hoplite" | "javelineer" | "lancer" | "hero";
+    | "spearman" | "hoplite" | "javelineer" | "lancer" | "hero" | "shade";
   home: number;
   x: number;
   y: number;
@@ -169,6 +174,9 @@ export type Soldier = {
   lanced?: number;
   /** An Undying Hero that has already risen once; absent for everyone else. */
   rallied?: true;
+  /** What a shade's next knife multiplies its damage by, gathered hit by
+   * hit (`shadow.ts`); absent for everyone else. */
+  edge?: number;
   /** A warrior the Necromancy spell raised (`home` -1); absent for everyone else. */
   risen?: Risen;
   /** A soldier the Reinforcements spell dropped (`home` -1); absent for everyone else. */
@@ -271,6 +279,7 @@ const STEP_SOLDIER: Record<Soldier["kind"], (sim: DefendSim, s: Soldier, dt: num
   lancer: stepSwordsman,
   javelineer: stepArcher,
   hero: stepHero,
+  shade: stepShade,
 };
 /** How long a struck building flashes, in seconds. */
 export const BUILDING_FLASH = 0.14;
@@ -336,6 +345,8 @@ export class DefendSim {
   stabs: Stab[] = [];
   /** The Hero's slashes, spins and dashes, fading (presentation; not replayed). */
   swings: Swing[] = [];
+  /** The shades' knives looping out and back (presentation; not replayed). */
+  blades: Blade[] = [];
   /** Cloudborne Valkyrie palaces drifting across the sky (`sky-palace.ts`); empty without any. */
   skyPalaces: SkyPalace[] = [];
   /** Black lightning from dark keeps' turrets and dark wizards, fading. */
@@ -671,10 +682,12 @@ export class DefendSim {
       }
     }
     stepVenom(this, dt);
+    stepBleed(this, dt);
     for (const s of this.soldiers)
       if (s.guard !== undefined && (s.guard -= dt) <= 0) delete s.guard;
     stepStabs(this, dt);
     stepSwings(this, dt);
+    stepBlades(this, dt);
     stepBolts(this, dt);
     for (let i = 0; i < this.flash.length; i++) if (this.flash[i] > 0) this.flash[i] = Math.max(0, this.flash[i] - dt);
   }
@@ -910,7 +923,7 @@ export class DefendSim {
   // ── Damage and rebuilding ─────────────────────────────────────────────
   /** Hurts `e` (double when marked); a steady burn hurts it without the
    * flash of a blow. */
-  hurtEnemy(e: Enemy, amount: number, flash = true, source: "ranged" | "melee" = "ranged", origin?: Point & { attacker?: number; building?: number }, projectile = false, element: "physical" | "fire" | "explosion" = "physical") {
+  hurtEnemy(e: Enemy, amount: number, flash = true, source: "ranged" | "melee" = "ranged", origin?: Point & { attacker?: number; building?: number }, projectile = false, element: "physical" | "fire" | "explosion" = "physical", pierce = 0) {
     if (e.hp <= 0 || !Number.isFinite(amount) || amount <= 0) return false;
     if (source === "ranged") {
       let shield: Enemy | undefined;
@@ -932,9 +945,13 @@ export class DefendSim {
         if (shooter && !shooter.guard) { this.hurtDefender(shooter, reflected); shooter.flash = .12; }
       } else if (origin.building !== undefined) this.damageBuilding(origin.building, reflected);
     }
-    amount *= damageModifier(this, e, origin, source, projectile);
+    // Armor piercing cuts through `pierce` of whatever armor holds a blow
+    // back (never a burrowed mole's ground).
+    const through = (m: number) => (pierce && m < 1 ? m + (1 - m) * pierce : m);
+    const guard = damageModifier(this, e, origin, source, projectile);
+    amount *= e.kind === "burrowingMole" ? guard : through(guard);
     if (e.kind === "iceGolem" && element !== "physical") amount *= 2;
-    amount *= ENEMIES[e.kind].damageScale?.[element] ?? 1;
+    amount *= through(ENEMIES[e.kind].damageScale?.[element] ?? 1);
     if (e.brittle && e.freeze) amount *= SHATTER.brittle[1];
     if (e.venom) amount *= e.venom.more;
     if (amount <= 0) return false;

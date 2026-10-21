@@ -80,7 +80,7 @@ try {
     await page.waitForFunction(() => !document.querySelector('#defend-specialty .ug-node.withering'), null, { timeout: 5000 });
     const tree = await nodes();
     for (const path of ['bloodletters', 'shadowcloak', 'venom']) assert.ok(tree.includes(`p:${path}:1=next`), `${path} in ${tree}`);
-    assert.ok(tree.includes('u:assassinDen=locked'), 'its ultimate is still to come');
+    assert.ok(tree.includes('k:shadow=locked'), 'the Shadow merged at its top');
     assert.ok(!tree.some(n => n.startsWith('k:barracks')), 'the barracks withered');
     await press(panel.locator('[data-node="p:venom:1"]'));
     await page.waitForTimeout(1200); await page.screenshot({ path: `${out}/assassins-${width}-den-tree.png` });

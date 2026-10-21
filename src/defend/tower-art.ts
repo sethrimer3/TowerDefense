@@ -23,6 +23,9 @@
  *   shield on its ridge.
  * - Hero: a pale stone hall under gilded tiles with a great sword on the
  *   ridge, its yard a round sand arena ringed by stone and straw dummies.
+ * - Shadow: a black shrine under a violet-black roof with a hooded shade's
+ *   pale eyes on the ridge, its yard a ring of six knives stuck point down
+ *   round a pool of darkness.
  * - Archer barracks: a timber hall, and its yard with a straw target butt.
  * - Archer tower: a square crenellated tower over a plank floor, its hatch
  *   and a sheaf of arrows.
@@ -136,6 +139,7 @@ const MATERIAL: Record<PlacedKind, { m: Material; ruin: Pick<Ruin, "stone" | "to
   lancerStable: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.plank.slice(0, 3), beams: true } },
   barracks: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: [0x6e2a22, C.red, 0xc25a48], beams: true } },
   heroHall: { m: { tones: C.pale.slice(1, 4), roofed: true }, ruin: { stone: C.pale.slice(1, 4), top: C.gold, beams: true } },
+  shadow: { m: { tones: C.char, roofed: true }, ruin: { stone: C.char, top: [C.flag[0], C.dusk, C.slate[1]], beams: true } },
   archerBarracks: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: [0x4a3826, C.timber, 0x8e7048], beams: true } },
   archerTower: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.plank.slice(0, 3), beams: true } },
   cannonTower: { m: { tones: STONE, roofed: false }, ruin: { stone: STONE, top: C.iron.slice(1), beams: false, round: true } },
@@ -201,7 +205,7 @@ export function structureRubblePixels(kind: PlacedKind, cw: number, ch: number, 
   return rubblePixels(w, h, hash(seed, KINDS.indexOf(kind), 3), { ...frame(w, h), ...MATERIAL[kind].ruin });
 }
 
-const KINDS: PlacedKind[] = ["barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "meleeGuild", "rangedGuild", "sniperLodge", "musketHall", "assassinDen", "gunHall", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "spearHall", "phalanx", "javelinCamp", "lancerStable", "heroHall"];
+const KINDS: PlacedKind[] = ["barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "meleeGuild", "rangedGuild", "sniperLodge", "musketHall", "assassinDen", "gunHall", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "spearHall", "phalanx", "javelinCamp", "lancerStable", "heroHall", "shadow"];
 
 const PAINT: Record<PlacedKind, (p: Pix, look: string) => void> = {
   meleeGuild: paintMeleeGuild,
@@ -220,6 +224,7 @@ const PAINT: Record<PlacedKind, (p: Pix, look: string) => void> = {
   lancerStable: paintLancerStable,
   barracks: paintBarracks,
   heroHall: paintHeroHall,
+  shadow: paintShadow,
   archerBarracks: paintArcherBarracks,
   archerTower: paintArcherTower,
   cannonTower: paintCannonTower,
@@ -955,6 +960,29 @@ function paintHeroHall(p: Pix, look: string) {
   }
   // Dummies round the ring (flat for Whirlwind's).
   for (const [ox, oy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]] as const) dummy(cx + ox * (r + 0.2) * 0.62, cy + oy * (r - 1) * 0.62, whirl);
+}
+
+/** A hooded shade's face: a black cowl round pale eyes. */
+const SHADE_FACE = ["..000..", ".01110.", "0122210", "0244420", "0214120", "0122210", ".01110.", "0.0.0.0"];
+
+/** The Shadow: a black shrine, and in its yard six knives stuck point down
+ * in a ring round a pool of darkness, wisps rising off it. */
+function paintShadow(p: Pix) {
+  const y = guild(p, C.flag[1], SHADE_FACE, { 0: OUTLINE, 1: C.flag[2], 2: C.dusk, 4: 0xd8e4ff });
+  for (let yy = y.y0; yy <= y.y1; yy++)
+    for (let x = y.x0; x <= y.x1; x++) p.set(x, yy, C.char[hash(x, yy, 71) % 6 === 0 ? 0 : hash(x, yy, 72) % 5 === 0 ? 2 : 1]);
+  const cx = (y.x0 + y.x1 + 1) / 2, cy = (y.y0 + y.y1 + 1) / 2, r = Math.min(y.x1 - y.x0, y.y1 - y.y0) / 2;
+  // The pool: black at its heart, a violet sheen at its lit edge.
+  disc(p, cx, cy, r * 0.55, (x, yy, d, dx, dy) => (d > r * 0.55 - 0.8 ? OUTLINE : lit(x, yy, dx, dy, d) > 1 ? C.slate[1] : d < r * 0.3 ? 0x07060a : C.flag[0]));
+  // Six knives round it, each a little steel triangle pointing in.
+  for (let k = 0; k < 6; k++) {
+    const a = (k / 6) * Math.PI * 2 + 0.3, kx = Math.round(cx + Math.cos(a) * (r - 1.2)), ky = Math.round(cy + Math.sin(a) * (r - 1.2));
+    p.set(kx, ky, C.iron[3]);
+    p.set(kx + (Math.cos(a) > 0 ? 1 : -1), ky, OUTLINE);
+    p.set(kx, ky + (Math.sin(a) > 0 ? 1 : -1), C.iron[2]);
+  }
+  // Wisps of darkness rising off the pool.
+  for (const [ox, oy] of [[-1, -2], [1, -3], [0, -4]]) p.set(Math.round(cx) + ox, Math.round(cy) + oy, C.slate[2]);
 }
 
 function paintArcherBarracks(p: Pix, look: string) {

@@ -223,6 +223,9 @@ One way a building can grow, in ranks it climbs one at a time with Knowledge: th
 **Evolution**:
 A path's crown, past its last rank, turns that one building into a greater form (Stormcalling's Wizard tower into the Dark wizard keep, Winged lancers' Lancer stable into the Valkyrie palace, the spearmen's ultimate, Sharpshooters' Musket hall into the Sniper lodge, Belt feed's Machine-gun nest into the Gatling emplacement), paid with Knowledge. If it no longer fits its tile it goes to the palette.
 
+**Shadow**:
+The assassins' ultimate building, merged from three Assassins' dens: a shrine for one **shade**, a see-through cloaked figure whose **knives** loop out through crowds. Every enemy a knife hits makes its later hits harder (its **edge**, compounding). Its upgrades are a **shared tree**: more knives, armor piercing, **bleeding** (only enemies with blood in them) and faster compounding.
+
 **Revolutionary**:
 What a plain Sniper lodge (the archer barracks' ultimate) can still become: a high-tech hall of **laser snipers**. Its upgrades are not a path but a **shared tree** of five branches climbed side by side by every Revolutionary at once: the squad (one, two, then three snipers), the **chain laser** (the laser leaps from enemy to enemy, impossibly, and the bullet follows it through 3, 5, then 7), a **critical** chance, what a critical multiplies, and a burst round the last enemy the bullet strikes.
 

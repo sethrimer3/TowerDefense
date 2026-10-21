@@ -18,6 +18,7 @@ import { pathById, type PathHue } from "./knowledge-paths.ts";
 import { GATE_PATHS } from "./gate-upgrades.ts";
 import { BALLISTA_PATHS } from "./ballista-upgrades.ts";
 import { REVOLUTIONARY_PATHS } from "./revolutionary-upgrades.ts";
+import { SHADOW_PATHS } from "./shadow-upgrades.ts";
 import { sideRank } from "./side-ranks.ts";
 import { hasTree, placeOf, rootOf, upgradedFrom, type Wear } from "./specializations.ts";
 import { WALL_PATHS, wallRank } from "./wall-upgrades.ts";
@@ -153,6 +154,7 @@ export function tileMarks(save: Save, id: TileId, wear?: Wear): TileMark[] {
   if (wear) { const p = pathById(wear.path); ranks(p.name, p.hue, wear.rank); }
   // The Revolutionaries' shared branches.
   if (id === "revolutionary") for (const p of REVOLUTIONARY_PATHS) ranks(p.name, p.hue, sideRank(save.defend.revolutionaryRanks, p.id));
+  if (id === "shadow") for (const p of SHADOW_PATHS) ranks(p.name, p.hue, sideRank(save.defend.shadowRanks, p.id));
   return marks;
 }
 

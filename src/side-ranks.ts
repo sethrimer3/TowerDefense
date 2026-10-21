@@ -11,7 +11,7 @@ export type SidePath<Id extends string> = { id: Id; name: string; motto: string;
 export type SideRanks<Id extends string> = Partial<Record<Id, number>>;
 export type SideResult = { ok: true } | { ok: false; reason: string };
 /** Where on the Defend save a tree keeps its ranks. */
-export type SideKey = "keepRanks" | "wallRanks" | "gateRanks" | "ballistaRanks" | "revolutionaryRanks";
+export type SideKey = "keepRanks" | "wallRanks" | "gateRanks" | "ballistaRanks" | "revolutionaryRanks" | "shadowRanks";
 
 export const sideRank = <Id extends string>(ranks: SideRanks<Id> | undefined, id: Id) => ranks?.[id] ?? 0;
 

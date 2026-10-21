@@ -1,6 +1,6 @@
 import { rootOf, upgradedFrom } from "../specializations.ts";
 import { pathBadge, pathLook, paintPathIcons } from "./path-badge.ts";
-import { ballistaTreeHtml, gateTreeHtml, revolutionaryTreeHtml, upgradeTreeHtml, wallTreeHtml } from "./specialty.ts";
+import { ballistaTreeHtml, gateTreeHtml, revolutionaryTreeHtml, shadowTreeHtml, upgradeTreeHtml, wallTreeHtml } from "./specialty.ts";
 /** The Tiles tab: the player's tiles laid out in a hall of the keep they
  * defend, under its great window. Each tile shows the Knowledge upgrades
  * it carries (`marksHtml`: a diamond for each building it became, a pip in
@@ -222,7 +222,7 @@ export class TilesPage {
           <div><small>${TILE_TYPE_NAMES[TILE_TYPE[t.id]].toUpperCase()} TILE · ${counts}</small><h3>${name}</h3><p>${this.describe(t.id)}</p></div>
           <button class="tile-close" data-close aria-label="Close">×</button></header>
         ${copies}
-        ${isConsumable(t.id) ? "" : t.id === "wallBlock" ? wallTreeHtml() : t.id === "cityGate" ? gateTreeHtml() : t.id === "wallBallista" ? ballistaTreeHtml() : t.id === "revolutionary" ? revolutionaryTreeHtml() : upgradeTreeHtml(s, t.id)}
+        ${isConsumable(t.id) ? "" : t.id === "wallBlock" ? wallTreeHtml() : t.id === "cityGate" ? gateTreeHtml() : t.id === "wallBallista" ? ballistaTreeHtml() : t.id === "revolutionary" ? revolutionaryTreeHtml() : t.id === "shadow" ? shadowTreeHtml() : upgradeTreeHtml(s, t.id)}
         <div class="tile-actions">${buy}${go("smithy")}${go("study")}</div>
         ${tierText ? `<p class="tile-tier"><span aria-hidden="true">♛</span> ${tierText}</p>` : ""}
       </div>`;
