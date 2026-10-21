@@ -33,6 +33,60 @@ export function weatherNoise(x: number, y: number) {
   return a * (1 - sy) + b * sy;
 }
 
+/** Cells across one repeat of the dune field, which tiles in both directions. */
+export const DUNE_PERIOD = 96;
+/** Cells a second the dunes creep downwind: a dune takes minutes to pass. */
+export const DUNE_SPEED = .05;
+const wrap = (v: number, n: number) => ((v % n) + n) % n;
+/** Value noise whose lattice repeats every `px` by `py` lattice cells. */
+function periodicNoise(x: number, y: number, px: number, py: number, salt: number) {
+  const ix = Math.floor(x), iy = Math.floor(y), dx = x - ix, dy = y - iy;
+  const sx = dx * dx * (3 - 2 * dx), sy = dy * dy * (3 - 2 * dy);
+  const value = (x: number, y: number) => (hash(wrap(x, px), wrap(y, py), salt) % 1000) / 1000;
+  const a = value(ix, iy) * (1 - sx) + value(ix + 1, iy) * sx;
+  const b = value(ix, iy + 1) * (1 - sx) + value(ix + 1, iy + 1) * sx;
+  return a * (1 - sy) + b * sy;
+}
+/** Cells from one dune crest to the next, across the field's grain. */
+export const DUNE_WAVE = 24;
+/** Where along a dune's wave its crest stands: a long windward rise, then the
+ * short slip face down to the next trough. */
+export const DUNE_CREST = .78;
+/** The field's two smooth inputs, sampled once a cell over one period: how
+ * far each crest is bent (in waves) and how tall the dunes stand there. */
+let duneTables: { bend: Float32Array; amp: Float32Array } | null = null;
+function tables() {
+  if (duneTables) return duneTables;
+  const n = DUNE_PERIOD, bend = new Float32Array(n * n), amp = new Float32Array(n * n);
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+    bend[y * n + x] = periodicNoise(x / 24, y / 24, 4, 4, 821) * 1.4 + periodicNoise(x / 12, y / 12, 8, 8, 822) * .35;
+    amp[y * n + x] = clamp((periodicNoise(x / 32, y / 32, 3, 3, 823) - .06) / .45, 0, 1);
+  }
+  return duneTables = { bend, amp };
+}
+/** A table's value at (x, y) cells, bilinear between cell samples, wrapping. */
+function lerpTable(t: Float32Array, x: number, y: number) {
+  const fx = wrap(x, DUNE_PERIOD), fy = wrap(y, DUNE_PERIOD);
+  const ix = Math.floor(fx), iy = Math.floor(fy), u = fx - ix, v = fy - iy;
+  const x1 = (ix + 1) % DUNE_PERIOD, r0 = iy * DUNE_PERIOD, r1 = ((iy + 1) % DUNE_PERIOD) * DUNE_PERIOD;
+  const top = t[r0 + ix] + (t[r0 + x1] - t[r0 + ix]) * u;
+  const bottom = t[r1 + ix] + (t[r1 + x1] - t[r1 + ix]) * u;
+  return top + (bottom - top) * v;
+}
+/** The dune field at (x, y) cells, which repeats every `DUNE_PERIOD`: `wave`
+ * is how far along its dune's wave the point stands (0 in a trough rising to
+ * `DUNE_CREST` at the crest, then down the slip face), `amp` how tall the
+ * dunes are there (0 is bare floor) and `height` the sand's surface, 0 to 1.
+ * Transverse dunes: crests run across the board, bent into sinuous lines. */
+export function duneAt(x: number, y: number) {
+  const t = tables(), phase = y / DUNE_WAVE + lerpTable(t.bend, x, y);
+  const wave = phase - Math.floor(phase), amp = lerpTable(t.amp, x, y);
+  const rise = wave < DUNE_CREST ? wave / DUNE_CREST : (1 - wave) / (1 - DUNE_CREST);
+  return { wave, amp, height: amp * (.3 + .7 * rise) };
+}
+/** Sand a cell's centre holds under the field drifted by (dx, dy) cells. */
+export function duneSand(x: number, y: number) { return duneAt(x, y).height * 1.2; }
+
 export class Atmosphere {
   readonly air = new Float32Array(CELL_COUNT);
   readonly sand = new Float32Array(CELL_COUNT);
@@ -44,6 +98,8 @@ export class Atmosphere {
   readonly weeds: WindParticle[] = [];
   mode: GroundWeather = null;
   wind = { x: 1, y: .25 };
+  /** How far, in cells, the dune field has crept downwind, kept within a period. */
+  readonly drift = { x: 0, y: 0 };
   version = 0;
   time = 0;
   private deltaAir = new Float32Array(CELL_COUNT);
@@ -69,7 +125,7 @@ export class Atmosphere {
         const noise = weatherNoise((i % CELLS_W) / 6, Math.floor(i / CELLS_W) / 6);
         this.source[i] = .35 + noise * .5;
         if (next) this.air[i] = this.source[i];
-        if (next === "sand" && !this.sandSeeded) this.sand[i] = .04 + noise * .9;
+        if (next === "sand" && !this.sandSeeded) this.sand[i] = this.duneAt(i);
       }
       if (next === "sand") {
         this.sandSeeded = true;
@@ -84,6 +140,10 @@ export class Atmosphere {
       this.time += STEP;
       this.wind = windAt(this.time);
       if (!this.mode) return;
+      if (this.mode === "sand") {
+        this.drift.x = wrap(this.drift.x + this.wind.x * DUNE_SPEED * STEP, DUNE_PERIOD);
+        this.drift.y = wrap(this.drift.y + this.wind.y * DUNE_SPEED * STEP, DUNE_PERIOD);
+      }
       this.syncWalls(sim);
       this.wakes = 0;
       this.stirUnits(sim);
@@ -123,7 +183,7 @@ export class Atmosphere {
       const flow = clamp((a[i] - a[j]) * .13 + (drift > 0 ? a[i] : a[j]) * drift, -a[j] * .22, a[i] * .22) * gate;
       da[i] -= flow; da[j] += flow;
       if (this.mode !== "sand") return;
-      const saltation = wind * .28 + swirl * .35;
+      const saltation = wind * .06 + swirl * .35;
       const ground = clamp((s[i] - s[j]) * .018 + (saltation > 0 ? s[i] : s[j]) * saltation, -s[j] * .15, s[i] * .15);
       ds[i] -= ground; ds[j] += ground;
     };
@@ -139,6 +199,8 @@ export class Atmosphere {
       a[i] = clamp(a[i] + da[i] + feed, 0, 1.2);
       if (this.mode === "sand") {
         s[i] = clamp(s[i] + ds[i] + (this.passage[i] ? a[i] * .0006 : 0), 0, 3);
+        // Outside the city the sand settles back into the creeping dunes.
+        if (!sim.map.city[i] && this.passage[i]) s[i] += (this.duneAt(i) - s[i]) * .02;
         if (sim.map.city[i] && sim.map.owner[i] < 0 && s[i] >= CLEANUP_DEPTH) this.cleanup.add(i);
         else this.cleanup.delete(i);
       }
@@ -215,6 +277,9 @@ export class Atmosphere {
       }
     }
   }
+
+  /** The drifted dune field's sand over cell `i`. */
+  duneAt(i: number) { return duneSand(i % CELLS_W + .5 - this.drift.x, Math.floor(i / CELLS_W) + .5 - this.drift.y); }
 
   private particle(sim: DefendSim, seed: number): WindParticle {
     let i = hash(seed, 921) % CELL_COUNT;
