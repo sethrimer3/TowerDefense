@@ -10,7 +10,67 @@ const browser = await chromium.launch(process.env.PLAYWRIGHT_EXECUTABLE
 const base = process.env.TEST_URL || 'http://127.0.0.1:5173/';
 const out = 'test-results/building-sprites';
 const focus = (process.env.SPRITE_KINDS || '').split(',').filter(Boolean);
+const compareDir = process.env.SPRITE_COMPARE_DIR || '';
 mkdirSync(out, { recursive: true });
+
+// Exercise the special renderer itself: grounded sprites alone cannot
+// prove that a flying palace has migrated or that its fallback still works.
+async function checkSky({ fallback = false } = {}) {
+  const { PALACE_SKY, buildingArt, buildingFrame } = await import('/src/defend/building-sprite-manifest.ts');
+  const { SkyPalaceArt, skyPalacePixels, skyShadowPixels, MARGIN } = await import('/src/defend/sky-palace-art.ts');
+  const { hash } = await import('/src/defend/grid.ts');
+  const px = await import('/src/defend/pixel-sprites.ts');
+  const make = (w, h) => { const cv = document.createElement('canvas'); cv.width = w; cv.height = h; return cv; };
+  const expect = (ok, message) => { if (!ok) throw new Error(message); };
+  const pixels = (w, h, data) => { const cv = make(w, h), c = cv.getContext('2d'), im = c.createImageData(w, h); new Uint32Array(im.data.buffer).set(data); c.putImageData(im, 0, 0); return cv; };
+  for (const sky of PALACE_SKY) {
+    const [cw, ch] = sky.footprint, [w, h] = sky.size, family = buildingArt('valkyriePalace', cw, ch);
+    const b = { ...window.stressPage.sim.map.buildings[0], kind: 'valkyriePalace', id: 999, structureUid: 999, rect: { x: 4, y: 5, w: cw, h: ch } };
+    const map = { ...window.stressPage.sim.map, buildings: [b] }, cv = make(180, 180), c = cv.getContext('2d'), renderer = new SkyPalaceArt();
+    const draw = on => { px.setPixelArt(on); c.clearRect(0, 0, 180, 180); renderer.draw(c, 8, map, null, { 999: 'cloudborne' }, { now: 0, dt: 1, night: 0, reduceMotion: true }); return cv.toDataURL(); };
+    const off = draw(false), reference = make(180, 180), rc = reference.getContext('2d'), seed = hash(4, 5, 0xc10d);
+    rc.imageSmoothingEnabled = false; rc.globalAlpha = 0.22;
+    rc.drawImage(pixels(w, h, skyShadowPixels(cw, ch, seed)), Math.round((4 + 1.2 - MARGIN) * 8), Math.round((5 + 1.8 - MARGIN) * 8));
+    rc.globalAlpha = 1; rc.drawImage(pixels(w, h, skyPalacePixels(cw, ch, seed)), 16, Math.round((5 - MARGIN - 0.6) * 8));
+    expect(off === reference.toDataURL(), 'airborne off matches independent legacy composition');
+    const on = draw(true);
+    if (fallback) expect(on === off, 'missing sky layer keeps the entire legacy flight composition');
+    else {
+      expect(on !== off, 'native airborne palace differs from legacy');
+      rc.clearRect(0, 0, 180, 180); rc.globalAlpha = 0.22;
+      rc.drawImage(px.pixelSprite(sky.shadow), Math.round((4 + 1.2 - MARGIN) * 8), Math.round((5 + 1.8 - MARGIN) * 8));
+      rc.globalAlpha = 1; rc.drawImage(px.pixelSprite(sky.clouds), 16, Math.round((5 - MARGIN - 0.6) * 8));
+      const f = buildingFrame(family, 0, 'cloudborne');
+      rc.drawImage(px.pixelSprite(family.sheet), f.sx, f.sy, f.sw, f.sh, 32, Math.round((5 - MARGIN - 0.6) * 8) + 16, cw * 8, ch * 8);
+      expect(on === reference.toDataURL(), 'airborne PNG roof/cloud/shadow stay exactly aligned');
+      expect(draw(false) === off && draw(true) === on, 'airborne repeat toggle restores exact pixels');
+      // Above people, fade the complete roof/cloud image once. Separate
+      // translucent draws would accumulate opacity over their overlap.
+      const body = make(w, h), bc = body.getContext('2d'); bc.drawImage(px.pixelSprite(sky.clouds), 0, 0);
+      bc.drawImage(px.pixelSprite(family.sheet), f.sx, f.sy, f.sw, f.sh, 16, 16, cw * 8, ch * 8);
+      rc.clearRect(0, 0, 180, 180); rc.globalAlpha = 0.11;
+      rc.drawImage(px.pixelSprite(sky.shadow), Math.round((4 + 1.2 - MARGIN) * 8), Math.round((5 + 1.8 - MARGIN) * 8));
+      rc.globalAlpha = 0.1; rc.drawImage(body, 16, Math.round((5 - MARGIN - 0.6) * 8));
+      c.clearRect(0, 0, 180, 180);
+      const sim = { skyPalaces: [{ id: 0, x: 4, y: 5 }], enemies: [{ hp: 1, x: 5, y: 6 }], soldiers: [], civilians: [] };
+      renderer.draw(c, 8, map, sim, undefined, { now: 0, dt: 1, night: 0, reduceMotion: true });
+      expect(cv.toDataURL() === reference.toDataURL(), 'faded flight applies opacity once to overlapping roof/cloud pixels');
+    }
+  }
+  if (!fallback) {
+    const { paintCityLayer } = await import('/src/defend/city-layer.ts');
+    const map = window.stressPage.sim.map, b = map.buildings.find(b => b.kind === 'valkyriePalace');
+    expect(b && b.structureUid !== undefined, 'fixture has a placed compact palace');
+    const cv = make(720, 840), c = cv.getContext('2d'), original = c.drawImage, images = [];
+    c.drawImage = function(image, ...args) { if (image instanceof HTMLImageElement) images.push(image.src); return original.call(this, image, ...args); };
+    for (const on of [true, false, true]) {
+      images.length = 0; px.setPixelArt(on);
+      paintCityLayer(c, 8, { map, sim: null, lights: [], stones: [], looks: { [b.structureUid]: 'cloudborne' } });
+      expect(images.some(src => src.includes('/palace-mooring-compact.png')) === on, 'real city layer routes the native mooring through Pixel Art');
+    }
+  }
+  px.setPixelArt(true);
+}
 
 try {
   for (const [width, dpr] of [[1100, 1], [390, 2], [360, 3]]) {
@@ -24,6 +84,7 @@ try {
       window.__pixelSprites.preloadPixelArt();
     });
     await page.waitForFunction(() => window.__pixelSprites.PIXEL_SPRITES.every(id => window.__pixelSprites.pixelSprite(id)));
+    await page.evaluate(checkSky, {});
 
     const checks = await page.evaluate(async () => {
       const { BUILDING_ART, buildingFrame, BUILDING_ICON_SIZE, buildingLook } = await import('/src/defend/building-sprite-manifest.ts');
@@ -41,7 +102,7 @@ try {
         for (let stage = 0; stage <= art.stages; stage++) {
           const rubble = stage === art.stages, a = make(w, h), b = make(w, h), box = { x: 0, y: 0, w, h, px: 8 };
           px.setPixelArt(true);
-          if (rubble) paintStructureRubble(a.getContext('2d'), art.kind, box, 17);
+          if (rubble) paintStructureRubble(a.getContext('2d'), art.kind, box, 17, look);
           else paintStructureArt(a.getContext('2d'), art.kind, box, stage, 17, look);
           const frame = buildingFrame(art, stage, look, rubble);
           b.getContext('2d').drawImage(px.pixelSprite(art.sheet), frame.sx, frame.sy, frame.sw, frame.sh, 0, 0, w, h);
@@ -49,7 +110,7 @@ try {
           const on = a.toDataURL();
           px.setPixelArt(false);
           a.getContext('2d').clearRect(0, 0, w, h);
-          if (rubble) paintStructureRubble(a.getContext('2d'), art.kind, box, 17);
+          if (rubble) paintStructureRubble(a.getContext('2d'), art.kind, box, 17, look);
           else paintStructureArt(a.getContext('2d'), art.kind, box, stage, 17, look);
           // Direct legacy pixels provide an independent off/fallback reference.
           const legacySize = art.kind === 'keep' ? [24, 24] : [w, h], native = make(...legacySize);
@@ -62,7 +123,7 @@ try {
           expect(same(a, b), `${art.kind}/${look}/${stage}: unchanged legacy graphics`);
           expect(on !== a.toDataURL(), 'new and legacy are distinct');
           px.setPixelArt(true); a.getContext('2d').clearRect(0, 0, w, h);
-          if (rubble) paintStructureRubble(a.getContext('2d'), art.kind, box, 17);
+          if (rubble) paintStructureRubble(a.getContext('2d'), art.kind, box, 17, look);
           else paintStructureArt(a.getContext('2d'), art.kind, box, stage, 17, look);
           expect(on === a.toDataURL(), 'toggle restores exact frame'); frames++;
         }
@@ -131,7 +192,7 @@ try {
     console.log(`Building art ${width}px @ DPR ${dpr}: ${checks.frames} frames, exact legacy and icon parity, camera and motion passed`);
 
     if (width === 1100) {
-      await page.evaluate(async focus => {
+      await page.evaluate(async ({ focus, compareDir }) => {
         const { BUILDING_ART } = await import('/src/defend/building-sprite-manifest.ts');
         const { STRUCTURES } = await import('/src/defend/catalog.ts');
         const { PATHS } = await import('/src/knowledge-paths.ts');
@@ -141,10 +202,24 @@ try {
         const gallery = document.querySelector('#gallery');
         for (const [key, art] of Object.entries(BUILDING_ART)) {
           if (focus.length && !focus.includes(art.kind)) continue;
-          const title = document.createElement('h2'); title.textContent = key === 'barracksWide' ? 'Barracks — separately composed wide footprint' : STRUCTURES[art.kind].name; gallery.append(title);
+          const title = document.createElement('h2'); title.textContent = key === 'barracksWide' ? 'Barracks — separately composed wide footprint' : STRUCTURES[art.kind].name + (key.endsWith('Compact') ? ' — compact footprint' : ''); gallery.append(title);
+          if (compareDir) {
+            const load = async id => { const image = new Image(); image.src = `/${compareDir}/${id.replace(/^v2\//, '')}.png`; await image.decode(); return image; };
+            const old = await load(art.sheet), oldIcon = await load(art.icon), previous = document.createElement('div'); previous.className = 'row'; gallery.append(previous);
+            for (const [stage, label] of [[0, 'Previous — intact'], [art.stages - 1, 'Previous — heavy damage'], [art.stages, 'Previous — rubble']]) {
+              const fig = document.createElement('figure'), cv = document.createElement('canvas'), cap = document.createElement('figcaption');
+              cv.width = art.size[0] * 3; cv.height = art.size[1] * 3; const c = cv.getContext('2d'); c.imageSmoothingEnabled = false;
+              c.drawImage(old, 0, stage * art.size[1], ...art.size, 0, 0, cv.width, cv.height); cap.textContent = label; fig.append(cv, cap); previous.append(fig);
+            }
+            const fig = document.createElement('figure'), cv = document.createElement('canvas'), cap = document.createElement('figcaption'); cv.width = cv.height = 48;
+            const c = cv.getContext('2d'); c.imageSmoothingEnabled = false; c.drawImage(oldIcon, 0, 0, 24, 24, 0, 0, 48, 48); cap.textContent = 'Previous UI'; fig.append(cv, cap); previous.append(fig);
+            const label = document.createElement('p'); label.textContent = 'Revised overhead architecture and structural collapse'; gallery.append(label);
+          }
           const row = document.createElement('div'); row.className = 'row'; gallery.append(row);
           const previews = art.looks.map(look => [look, 0, PATHS.find(path => path.id === look)?.name || 'Base']);
-          previews.push(['', art.stages - 1, 'Heavy damage'], ['', art.stages, 'Rubble']);
+          if (art.damageModel === 'structural') previews.push(['', 1, 'Roof damage'], ['', 2, 'Partial collapse'], ['', art.stages - 1, 'Heavy collapse']);
+          else previews.push(['', art.stages - 1, 'Heavy damage']);
+          previews.push(['', art.stages, 'Rubble']);
           for (const [look, stage, label] of previews) {
             const figure = document.createElement('figure'), cv = document.createElement('canvas'), caption = document.createElement('figcaption');
             cv.width = art.size[0] * 3; cv.height = art.size[1] * 3;
@@ -157,7 +232,19 @@ try {
           for (const look of art.looks) { const cv = document.createElement('canvas'); cv.width = cv.height = 48; cv.dataset.look = look; paintIcon(cv, art.kind); icons.append(cv); }
           const label = document.createElement('figcaption'); label.textContent = 'Matching UI icons'; figure.append(icons, label); row.append(figure);
         }
-      }, focus);
+        if (!focus.length || focus.includes('valkyriePalace')) {
+          const { PALACE_SKY } = await import('/src/defend/building-sprite-manifest.ts');
+          const { SkyPalaceArt } = await import('/src/defend/sky-palace-art.ts');
+          const heading = document.createElement('h2'); heading.textContent = 'Cloudborne flight — native building, cloud bank and shadow'; gallery.append(heading);
+          const row = document.createElement('div'); row.className = 'row'; gallery.append(row);
+          for (const sky of PALACE_SKY) {
+            const [w, h] = sky.footprint, cv = document.createElement('canvas'); cv.width = (w + 7) * 24; cv.height = (h + 8) * 24;
+            const b = { id: 0, kind: 'valkyriePalace', structureUid: 0, rect: { x: 3, y: 3, w, h } };
+            new SkyPalaceArt().draw(cv.getContext('2d'), 24, { buildings: [b] }, null, { 0: 'cloudborne' }, { now: 0, dt: 1, night: 0, reduceMotion: true });
+            const fig = document.createElement('figure'), cap = document.createElement('figcaption'); cap.textContent = `${w}×${h} cells, unchanged flight anchor`; fig.append(cv, cap); row.append(fig);
+          }
+        }
+      }, { focus, compareDir });
       await page.screenshot({ path: `${out}/contact-sheet.png`, fullPage: true });
     }
     await context.close();
@@ -175,12 +262,23 @@ try {
     for (const art of Object.values(BUILDING_ART)) for (const look of art.looks) for (let stage = 0; stage <= art.stages; stage++) {
       const cv = document.createElement('canvas'); [cv.width, cv.height] = art.size;
       const c = cv.getContext('2d'), box = { x: 0, y: 0, w: cv.width, h: cv.height, px: 8 };
-      const draw = () => { c.clearRect(0, 0, cv.width, cv.height); if (stage === art.stages) paintStructureRubble(c, art.kind, box, 17); else paintStructureArt(c, art.kind, box, stage, 17, look); return cv.toDataURL(); };
+      const draw = () => { c.clearRect(0, 0, cv.width, cv.height); if (stage === art.stages) paintStructureRubble(c, art.kind, box, 17, look); else paintStructureArt(c, art.kind, box, stage, 17, look); return cv.toDataURL(); };
       setPixelArt(false); const legacy = draw(); setPixelArt(true); if (draw() !== legacy) return false;
     }
     return true;
   });
   assert.ok(fallback, 'missing new assets use the exact legacy fallback');
+  await page.evaluate(checkSky, { fallback: true });
   await context.close();
+  // A missing cloud layer with the palace roof already loaded must also
+  // fall back, rather than mixing half a native composition with legacy.
+  const partial = await browser.newContext(), partialPage = await partial.newPage();
+  await partialPage.route('**/assets/pixel/v2/defend/palace-clouds*.png', route => route.abort());
+  await partialPage.goto(base + 'tests/defend-stress.html?manual&enemies=100');
+  await partialPage.waitForFunction(() => window.stressPage);
+  await partialPage.evaluate(async () => { window.__pixelSprites = await import('/src/defend/pixel-sprites.ts'); window.__pixelSprites.preloadPixelArt(); });
+  await partialPage.waitForFunction(() => window.__pixelSprites.PIXEL_SPRITES.filter(id => !id.includes('palace-clouds')).every(id => window.__pixelSprites.pixelSprite(id)));
+  await partialPage.evaluate(checkSky, { fallback: true });
+  await partial.close();
   console.log('Building sprite checks passed, including missing PNG fallback');
 } finally { await browser.close(); }

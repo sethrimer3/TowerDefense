@@ -9,6 +9,7 @@ export const BUILDING_PALETTE = {
   steelDark: "#252D36", steel: "#465260", steelLight: "#7B8995", steelBright: "#C2CCD0",
   woodDark: "#34271E", wood: "#60432B", woodLight: "#91643C", woodBright: "#BD925B",
   redDark: "#581F22", red: "#96372E", redLight: "#D85A3C",
+  tileShade: "#78312B", tileClay: "#B54A35", tileSun: "#C65A3E", tileWorn: "#C77650",
   goldDark: "#6D4A23", gold: "#BE8D3D", goldLight: "#F1D58A",
   greenDark: "#253D2A", green: "#476044", greenLight: "#78955B", bright: "#EAE2C9",
   arcaneDark: "#352943", arcane: "#65567D", arcaneLight: "#A391B3",
@@ -17,10 +18,10 @@ export const BUILDING_PALETTE = {
 
 export const BUILDING_ART = {
   keep: { kind: "keep", sheet: "v2/defend/keep", icon: "v2/ui/keep", footprint: [4, 4], size: [32, 32], anchor: [16, 16], contentBounds: [1, 1, 30, 30], overhang: [0, 0, 0, 0], looks: [""], stages: 5 },
-  barracks: { kind: "barracks", sheet: "v2/defend/barracks", icon: "v2/ui/barracks", footprint: [4, 6], size: [32, 48], anchor: [16, 24], contentBounds: [3, 3, 26, 42], overhang: [0, 0, 0, 0], looks: ["", "crusaders", "berserkers", "halberdiers"], stages: 4 },
-  barracksWide: { kind: "barracks", sheet: "v2/defend/barracks-wide", icon: "v2/ui/barracks", footprint: [6, 4], size: [48, 32], anchor: [24, 16], contentBounds: [3, 3, 42, 26], overhang: [0, 0, 0, 0], looks: ["", "crusaders", "berserkers", "halberdiers"], stages: 4 },
-  watchTower: { kind: "watchTower", sheet: "v2/defend/watch-tower", icon: "v2/ui/watch-tower", footprint: [2, 2], size: [16, 16], anchor: [8, 8], contentBounds: [1, 1, 14, 14], overhang: [0, 0, 0, 0], looks: ["", "spotters", "signalFires"], stages: 4 },
-  meleeGuild: { kind: "meleeGuild", sheet: "v2/defend/melee-guild", icon: "v2/ui/melee-guild", footprint: [4, 4], size: [32, 32], anchor: [16, 16], contentBounds: [3, 3, 26, 26], overhang: [0, 0, 0, 0], looks: [""], stages: 4 },
+  barracks: { kind: "barracks", sheet: "v2/defend/barracks", icon: "v2/ui/barracks", footprint: [4, 6], size: [32, 48], anchor: [16, 24], contentBounds: [3, 3, 26, 42], overhang: [0, 0, 0, 0], looks: ["", "crusaders", "berserkers", "halberdiers"], stages: 4, damageModel: "structural" },
+  barracksWide: { kind: "barracks", sheet: "v2/defend/barracks-wide", icon: "v2/ui/barracks", footprint: [6, 4], size: [48, 32], anchor: [24, 16], contentBounds: [3, 3, 42, 26], overhang: [0, 0, 0, 0], looks: ["", "crusaders", "berserkers", "halberdiers"], stages: 4, damageModel: "structural" },
+  watchTower: { kind: "watchTower", sheet: "v2/defend/watch-tower", icon: "v2/ui/watch-tower", footprint: [2, 2], size: [16, 16], anchor: [8, 8], contentBounds: [1, 1, 14, 14], overhang: [0, 0, 0, 0], looks: ["", "spotters", "signalFires"], stages: 4, damageModel: "structural" },
+  meleeGuild: { kind: "meleeGuild", sheet: "v2/defend/melee-guild", icon: "v2/ui/melee-guild", footprint: [4, 4], size: [32, 32], anchor: [16, 16], contentBounds: [3, 3, 26, 26], overhang: [0, 0, 0, 0], looks: [""], stages: 4, damageModel: "structural" },
   rangedGuild: { kind: "rangedGuild", sheet: "v2/defend/ranged-guild", icon: "v2/ui/ranged-guild", footprint: [4, 4], size: [32, 32], anchor: [16, 16], contentBounds: [3, 3, 26, 26], overhang: [0, 0, 0, 0], looks: [""], stages: 4 },
   archerBarracks: { kind: "archerBarracks", sheet: "v2/defend/archer-barracks", icon: "v2/ui/archer-barracks", footprint: [4, 4], size: [32, 32], anchor: [16, 16], contentBounds: [3, 3, 26, 26], overhang: [0, 0, 0, 0], looks: ["", "rangers", "skirmishers"], stages: 4 },
   archerTower: { kind: "archerTower", sheet: "v2/defend/archer-tower", icon: "v2/ui/archer-tower", footprint: [2, 2], size: [16, 16], anchor: [8, 8], contentBounds: [1, 1, 14, 14], overhang: [0, 0, 0, 0], looks: ["", "fireArrows", "sharpshooters"], stages: 4 },
@@ -36,9 +37,24 @@ export const BUILDING_ART = {
   gatlingNest: { kind: "gatlingNest", sheet: "v2/defend/gatling-emplacement", icon: "v2/ui/gatling-emplacement", footprint: [4, 4], size: [32, 32], anchor: [16, 16], contentBounds: [3, 3, 26, 26], overhang: [0, 0, 0, 0], looks: ["", "gunShield", "overdrive", "stoppingPower"], stages: 4 },
   rocketBattery: { kind: "rocketBattery", sheet: "v2/defend/rocket-battery", icon: "v2/ui/rocket-battery", footprint: [4, 4], size: [32, 32], anchor: [16, 16], contentBounds: [3, 3, 26, 26], overhang: [0, 0, 0, 0], looks: ["", "clusterRockets", "salvoRacks"], stages: 4 },
   revolutionary: { kind: "revolutionary", sheet: "v2/defend/revolutionary", icon: "v2/ui/revolutionary", footprint: [4, 4], size: [32, 32], anchor: [16, 16], contentBounds: [3, 3, 26, 26], overhang: [0, 0, 0, 0], looks: [""], stages: 4 },
+  valkyriePalace: { kind: "valkyriePalace", sheet: "v2/defend/valkyrie-palace", icon: "v2/ui/valkyrie-palace", footprint: [6, 6], size: [48, 48], anchor: [24, 24], contentBounds: [3, 3, 42, 42], overhang: [0, 0, 0, 0], looks: ["", "cloudborne"], stages: 4 },
+  valkyriePalaceCompact: { kind: "valkyriePalace", sheet: "v2/defend/valkyrie-palace-compact", icon: "v2/ui/valkyrie-palace", footprint: [4, 6], size: [32, 48], anchor: [16, 24], contentBounds: [3, 3, 26, 42], overhang: [0, 0, 0, 0], looks: ["", "cloudborne"], stages: 4 },
+  darkKeep: { kind: "darkKeep", sheet: "v2/defend/dark-keep", icon: "v2/ui/dark-keep", footprint: [12, 12], size: [96, 96], anchor: [48, 48], contentBounds: [3, 3, 90, 90], overhang: [0, 0, 0, 0], looks: [""], stages: 4 },
+  darkKeepCompact: { kind: "darkKeep", sheet: "v2/defend/dark-keep-compact", icon: "v2/ui/dark-keep", footprint: [6, 6], size: [48, 48], anchor: [24, 24], contentBounds: [3, 3, 42, 42], overhang: [0, 0, 0, 0], looks: [""], stages: 4 },
+  spearHall: { kind: "spearHall", sheet: "v2/defend/spearmen-hall", icon: "v2/ui/spearmen-hall", footprint: [4, 4], size: [32, 32], anchor: [16, 16], contentBounds: [3, 3, 26, 26], overhang: [0, 0, 0, 0], looks: ["", "longSpears", "setSpears"], stages: 4 },
+  phalanx: { kind: "phalanx", sheet: "v2/defend/phalanx", icon: "v2/ui/phalanx", footprint: [4, 4], size: [32, 32], anchor: [16, 16], contentBounds: [3, 3, 26, 26], overhang: [0, 0, 0, 0], looks: ["", "testudo", "spearWall"], stages: 4 },
+  javelinCamp: { kind: "javelinCamp", sheet: "v2/defend/javelin-camp", icon: "v2/ui/javelin-camp", footprint: [4, 4], size: [32, 32], anchor: [16, 16], contentBounds: [3, 3, 26, 26], overhang: [0, 0, 0, 0], looks: ["", "barbed", "throwingArms"], stages: 4 },
+  lancerStable: { kind: "lancerStable", sheet: "v2/defend/lancer-stable", icon: "v2/ui/lancer-stable", footprint: [4, 4], size: [32, 32], anchor: [16, 16], contentBounds: [3, 3, 26, 26], overhang: [0, 0, 0, 0], looks: ["", "heavyLance", "wingedLancers"], stages: 4 },
 } as const;
 
-export const BUILDING_PNGS = [...new Set(Object.values(BUILDING_ART).flatMap(a => [a.sheet, a.icon])), "v2/defend/keep-flag", "v2/defend/scaffold"] as const;
+/** Clouds extend two cells beyond the footprint; the building anchor stays
+ * at the center of its own lot. Moorings have no overhang. */
+export const PALACE_SKY = [
+  { footprint: [6, 6], size: [80, 80], anchor: [40, 40], margin: 2, clouds: "v2/defend/palace-clouds", shadow: "v2/defend/palace-shadow", mooring: "v2/defend/palace-mooring" },
+  { footprint: [4, 6], size: [64, 80], anchor: [32, 40], margin: 2, clouds: "v2/defend/palace-clouds-compact", shadow: "v2/defend/palace-shadow-compact", mooring: "v2/defend/palace-mooring-compact" },
+] as const;
+export const palaceSkyArt = (cw: number, ch: number) => PALACE_SKY.find(a => a.footprint[0] === cw && a.footprint[1] === ch);
+export const BUILDING_PNGS = [...new Set(Object.values(BUILDING_ART).flatMap(a => [a.sheet, a.icon])), "v2/defend/keep-flag", "v2/defend/scaffold", ...PALACE_SKY.flatMap(a => [a.clouds, a.shadow, a.mooring])] as const;
 export type BuildingPng = (typeof BUILDING_PNGS)[number];
 export type BuildingArt = (typeof BUILDING_ART)[keyof typeof BUILDING_ART];
 export const BUILDING_PIXELS_PER_CELL = 8;

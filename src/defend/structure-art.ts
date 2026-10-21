@@ -42,11 +42,11 @@ export function paintStructureArt(c: CanvasRenderingContext2D, kind: StructureKi
 }
 
 /** A fallen structure's rubble over its cells (`box`, canvas pixels). */
-export function paintStructureRubble(c: CanvasRenderingContext2D, kind: StructureKind, box: ArtBox, seed = 0) {
+export function paintStructureRubble(c: CanvasRenderingContext2D, kind: StructureKind, box: ArtBox, seed = 0, path?: string) {
   if (kind === "keep") return paintKeepRubble(c, box);
   const cw = Math.max(1, Math.round(box.w / box.px)), ch = Math.max(1, Math.round(box.h / box.px));
   const family = buildingArt(kind, cw, ch), x = Math.round(box.x), y = Math.round(box.y);
-  if (family && drawPixelFrame(c, family.sheet, buildingFrame(family, 0, undefined, true), x, y, Math.round(box.x + box.w) - x, Math.round(box.y + box.h) - y)) return;
+  if (family && drawPixelFrame(c, family.sheet, buildingFrame(family, 0, path, true), x, y, Math.round(box.x + box.w) - x, Math.round(box.y + box.h) - y)) return;
   const art = sprite(`${kind}:${cw}x${ch}:rubble:${seed}`, cw * ART, ch * ART, () => structureRubblePixels(kind, cw, ch, seed));
   drawSprite(c, art, Math.round(box.x), Math.round(box.y), Math.round(box.w), Math.round(box.h));
 }

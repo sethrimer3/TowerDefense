@@ -4,7 +4,9 @@ This is the art direction and implementation contract for the sprite migration. 
 
 ## 1. The intended look
 
-**Clean silhouettes, deliberate pixel clusters, restrained detail, and one coherent medieval-fantasy style.** A building, a soldier, a spell icon, and a button should look like they belong to the same game.
+**Crisp, consistent pixels, believable materials, readable silhouettes, and one coherent medieval-fantasy style.** A building, a soldier, a spell icon, and a button should look like they belong to the same game.
+
+The user's clarification: **clean means consistent pixel size and crisp pixel construction**. Realism, surface texture, color variation, aging and architectural detail are welcome. Build those details on the same native pixel grid, with coherent light and materials. Flat expanses of one color are not a style requirement. [Roof materials](ROOF_MATERIALS.md) applies this to the revised Barracks and Melee Guild.
 
 ![User-provided keep style reference](reference-keep.png)
 
@@ -19,6 +21,17 @@ Priorities, in order:
 
 At ordinary play size the player should identify an archer tower, watch tower, barracks, and keep immediately, without zooming in. A higher rank earns a meaningful emblem, weapon, silhouette or roof change, not a coating of random highlights.
 
+### Architecture and destruction correction
+
+The first six batches establish PNG integration coverage; they do **not** establish visual approval. The user identified repeated box silhouettes, facade-heavy views and unnatural destruction. [Art direction 01](ART_DIRECTION_01.md) starts correcting those issues with the Barracks, Melee Guild and Watch tower. The other twenty-two families still require this review.
+
+- Design the building's plan and use first: sleeping wings around a drill yard, a roofed training court, or a lookout deck. Distinguish families by massing and negative space before roof color or heraldry.
+- Use the Defend overhead camera. Show roofs, courtyards, parapet tops and hatches; keep visible wall depth short. Front-facing doors, windows and signs must not dominate the world sprite. UI should depict the same architecture at its own native size.
+- Give large material planes believable construction: overlapping tile courses, staggered joints, ridge caps, grain and coherent weathering. Preserve their overall light/shadow relationship as detail increases. Courtyard paving belongs to a compound; surrounding biome terrain does not belong in the sprite.
+- Author collapse for that building. A damaged roof exposes its floor and rafters; a failed wall changes the silhouette. Later states enlarge the same breach and retain surviving sections. Ruins retain the original foundations, fallen roof panels, masonry and timber near their source. Stone platforms must not collapse into the same timber pile as halls.
+- Preserve frame bounds and anchors through collapse, **not every opaque pixel**. Enforcing an identical alpha silhouette on every damage frame prevents walls and roof edges from falling away. `damageModel: "structural"` identifies families that use this authored progression.
+- Review intact, damaged and destroyed art side by side at play scale, on the actual board and beside older families. A technically complete sheet is not an approved art direction.
+
 ## 2. Non-negotiable graphics-setting contract
 
 - **All new or revised sprite artwork, including UI, appears only when `save.settings.pixelArt === true`.** The existing Settings checkbox is `#pixel-art`. It currently defaults to checked; this plan does not change that default.
@@ -32,7 +45,7 @@ At ordinary play size the player should identify an archer tower, watch tower, b
 - Keep Simple square enemies/troops as intentional accessibility/performance overrides. Keep Reduce Motion, grass/water effects, health-bar and grid preferences independent. A pixel-art preference must not force animation or hide gameplay information.
 - Art selection must never change collision, pathfinding, targeting, costs, damage, placement rules, RNG streams, or save compatibility.
 
-**Current state:** [Batch 01](BUILDING_BATCH_01.md), [batch 02](BUILDING_BATCH_02.md), [batch 03](BUILDING_BATCH_03.md) and [batch 04](BUILDING_BATCH_04.md) supply 41 native PNG files for nineteen of twenty-one building families. They cover 316 world-state frames and 59 matching UI icons, plus the keep flag and rebuilding module. Valkyrie palace and Dark wizard keep remain pending. The shared loader also retains the original 35 imported PNGs for other partial Defend coverage/reference. Existing baseline UI PNGs are not all controlled by the Pixel Art switch. Each replacement needs an explicit integration review; the toggle's existence does not establish complete coverage.
+**Current state:** [Batches 01](BUILDING_BATCH_01.md), [02](BUILDING_BATCH_02.md), [03](BUILDING_BATCH_03.md), [04](BUILDING_BATCH_04.md), [05](BUILDING_BATCH_05.md) and [06](BUILDING_BATCH_06.md) supply 61 native PNG files for all twenty-five current catalog building families, covering 406 world-state frames and 74 matching UI icons, plus flag/scaffold and normal/compact palace cloud/shadow/mooring layers. All current building paths and catalog compact forms are included. City pieces, environment art and the other unchecked inventory entries remain pending; units and enemies remain deferred. The shared loader retains the original 35 imported PNGs for other partial Defend coverage/reference. Existing baseline UI PNGs are not all controlled by the Pixel Art switch. Each replacement needs an explicit integration review; the toggle's existence does not establish complete coverage.
 
 ## 3. A single pixel language
 
@@ -47,8 +60,8 @@ At ordinary play size the player should identify an archer tower, watch tower, b
 ### Outlines, clusters and texture
 
 - Use a **one-native-pixel outer outline** for normal sprites. A large building may use a two-pixel structural border when all equivalent buildings do. Inside lines are darker material shades, not another black outline around every stone.
-- Prefer contiguous two-to-six-pixel clusters and large quiet surfaces. Do not scatter isolated contrast pixels over roofs, stone or dirt. Isolated pixels are reserved for eyes, sparks, small fasteners and equally intentional features.
-- Use three or four shades per material, normally two on small objects. No airbrushing, smudges, photographic textures, automatic gradients, bevel filters, AI-like pseudo-detail or heavy dithering.
+- Build material texture from intentional pixel clusters that follow construction and perspective. Individual tiles may vary in hue/value; their joints, grain and wear should make physical sense. One-pixel details can describe seams, chips and fasteners. Every detail still uses the same underlying pixel size; larger clusters are shapes, not a second sprite resolution.
+- Use enough controlled shades to describe the material: normally three or four, up to seven shared clay shades for richer roofs, with fewer at small UI sizes. Preserve the per-frame limits below. Use discrete pixel shading, crisp edges and fully opaque material pixels; avoid smudges, photographic overlays, filtered gradients and heavy dithering.
 - Follow a deliberate staircase on diagonals and arcs. Mirror pixel runs when the feature is meant to be symmetrical. Avoid random alternating edge thickness, accidental double pixels and asymmetrical corner caps.
 - Static sprite silhouette alpha is **0 or 255**. Do not bake antialiased fringes, soft halos or a rectangular background into an object sprite.
 - Ground is quieter and lower contrast than units, weapons and structures. Decorative terrain must not camouflage entrances, hazards, living units or placement boundaries.
@@ -56,7 +69,7 @@ At ordinary play size the player should identify an archer tower, watch tower, b
 
 ### Shared starter palette
 
-The building collection uses this shared palette: the original 24 material swatches plus the two controlled three-color arcane/frost ramps introduced in batch 03, for 30 colors total. Each sprite uses only the swatches it needs; the per-frame limits below still apply.
+The building collection uses 34 shared swatches: the original 24, two three-color arcane/frost ramps introduced in batch 03, and four clay shades from the roof-material revision. Each sprite uses only the swatches it needs; the per-frame limits below still apply. The extra clay shades bridge existing red values and add a weathered warm tone without changing older artwork.
 
 | Ramp | Dark → light |
 | --- | --- |
@@ -65,6 +78,7 @@ The building collection uses this shared palette: the original 24 material swatc
 | Steel | `#252D36`, `#465260`, `#7B8995`, `#C2CCD0` |
 | Wood/leather | `#34271E`, `#60432B`, `#91643C`, `#BD925B` |
 | Red cloth | `#581F22`, `#96372E`, `#D85A3C` |
+| Terracotta roofing | `#581F22`, `#78312B`, `#96372E`, `#B54A35`, `#C65A3E`, `#D85A3C`, weathered `#C77650` |
 | Brass/gold | `#6D4A23`, `#BE8D3D`, `#F1D58A` |
 | Foliage | `#253D2A`, `#476044`, `#78955B` |
 | Rare bright accent | `#EAE2C9` |

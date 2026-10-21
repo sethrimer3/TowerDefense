@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { inflateSync } from "node:zlib";
 import { buildingPngs } from "../scripts/pixel-art/build.ts";
-import { BUILDING_ART, BUILDING_ICON_SIZE, BUILDING_PALETTE, BUILDING_PIXELS_PER_CELL, BUILDING_PNGS, KEEP_FLAG, buildingArt, buildingFrame } from "../src/defend/building-sprite-manifest.ts";
+import { BUILDING_ART, BUILDING_ICON_SIZE, BUILDING_PALETTE, BUILDING_PIXELS_PER_CELL, BUILDING_PNGS, KEEP_FLAG, PALACE_SKY, buildingArt, buildingFrame } from "../src/defend/building-sprite-manifest.ts";
 import { ART } from "../src/defend/park-art.ts";
 import { STRUCTURES } from "../src/defend/catalog.ts";
 import { PATH_LOOKS } from "../src/defend/tower-art.ts";
@@ -44,6 +44,27 @@ test("building PNG deliveries reproduce their editable art and use only the shar
   }
 });
 
+test("airborne PNGs keep two-cell cloud margins, centered anchors and matching shadow silhouettes", () => {
+  for (const art of PALACE_SKY) {
+    const cloud = decode(readFileSync(new URL(`../public/assets/pixel/${art.clouds}.png`, import.meta.url)));
+    const shadow = decode(readFileSync(new URL(`../public/assets/pixel/${art.shadow}.png`, import.meta.url)));
+    const mooring = decode(readFileSync(new URL(`../public/assets/pixel/${art.mooring}.png`, import.meta.url)));
+    assert.deepEqual([cloud.w, cloud.h], art.size);
+    assert.deepEqual([shadow.w, shadow.h], art.size);
+    assert.deepEqual(art.anchor, art.size.map(n => n / 2));
+    assert.deepEqual(art.size, art.footprint.map(n => (n + art.margin * 2) * ART));
+    assert.deepEqual([mooring.w, mooring.h], art.footprint.map(n => n * ART));
+    let overhang = 0;
+    for (let y = 0; y < cloud.h; y++) for (let x = 0; x < cloud.w; x++) {
+      const a = cloud.data[(y * cloud.w + x) * 4 + 3], sa = shadow.data[(y * cloud.w + x) * 4 + 3];
+      assert.equal(sa, a && (x + y) % 2 === 0 ? 255 : 0);
+      if (a && (x < art.margin * ART || y < art.margin * ART || x >= cloud.w - art.margin * ART || y >= cloud.h - art.margin * ART)) overhang++;
+    }
+    assert.ok(overhang > 0, "cloud bank extends beyond the building footprint");
+    assert.ok(buildingArt("valkyriePalace", ...art.footprint), "flight uses an authored footprint");
+  }
+});
+
 test("every building path and damage frame retains an exact catalog footprint, pivot and bounds", () => {
   assert.equal(BUILDING_PIXELS_PER_CELL, ART);
   for (const [name, art] of Object.entries(BUILDING_ART)) {
@@ -55,7 +76,10 @@ test("every building path and damage frame retains an exact catalog footprint, p
     assert.deepEqual(art.overhang, [0, 0, 0, 0]);
     assert.equal(buildingArt(art.kind, ...art.footprint), art);
     assert.equal(buildingArt(art.kind, art.footprint[0] + 1, art.footprint[1]), undefined, "never stretch to a different footprint");
-    if (name !== "barracksWide") assert.deepEqual(art.footprint, [STRUCTURES[art.kind].w, STRUCTURES[art.kind].h]);
+    if (name !== "barracksWide") {
+      const def = STRUCTURES[art.kind], compact = name.endsWith("Compact") ? def.compact : undefined;
+      assert.deepEqual(art.footprint, compact ? [compact.w, compact.h] : [def.w, def.h]);
+    }
     if (art.kind !== "keep") assert.deepEqual(art.looks.slice(1), PATH_LOOKS[art.kind] ?? []);
     const alpha = (x: number, y: number) => sheet.data[(y * sheet.w + x) * 4 + 3];
     for (let col = 0; col < art.looks.length; col++) {
@@ -66,7 +90,9 @@ test("every building path and damage frame retains an exact catalog footprint, p
         const colors = new Set<string>();
         assert.deepEqual(buildingFrame(art, stage, art.looks[col]), { sx: col * w, sy: stage * h, sw: w, sh: h });
         for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-          assert.equal(alpha(col * w + x, stage * h + y), alpha(col * w + x, y), `${name}: damage cannot shift silhouette`);
+          // A fixed frame/pivot does not require an intact silhouette:
+          // structural art must be allowed to lose roof and wall pieces.
+          if (!("damageModel" in art)) assert.equal(alpha(col * w + x, stage * h + y), alpha(col * w + x, y), `${name}: original damage mask remains unchanged`);
           if (alpha(col * w + x, stage * h + y)) {
             const offset = ((stage * h + y) * sheet.w + col * w + x) * 4;
             colors.add(sheet.data.subarray(offset, offset + 3).toString("hex"));
@@ -78,6 +104,15 @@ test("every building path and damage frame retains an exact catalog footprint, p
       }
       const frame = buildingFrame(art, 0, art.looks[col], true);
       assert.equal(frame.sy + frame.sh, sheet.h, "rubble stays inside its native frame");
+      if ("damageModel" in art) {
+        let lost = 0, upperRuin = 0;
+        for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+          if (alpha(col * w + x, y) && !alpha(col * w + x, (art.stages - 1) * h + y)) lost++;
+          if (y < h / 3 && alpha(col * w + x, art.stages * h + y)) upperRuin++;
+        }
+        assert.ok(lost > 0, `${name}: collapsed walls remove part of the standing silhouette`);
+        assert.ok(upperRuin > 3, `${name}: rubble retains the building's northern foundations rather than moving to the bottom`);
+      }
     }
     const icon = decode(readFileSync(new URL(`../public/assets/pixel/${art.icon}.png`, import.meta.url)));
     assert.deepEqual([icon.w, icon.h], [BUILDING_ICON_SIZE * art.looks.length, BUILDING_ICON_SIZE]);

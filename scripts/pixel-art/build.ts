@@ -6,46 +6,12 @@ import { deflateSync } from "node:zlib";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { BUILDING_ART, BUILDING_ICON_SIZE, BUILDING_PALETTE, KEEP_FLAG } from "../../src/defend/building-sprite-manifest.ts";
+import { BUILDING_ART, BUILDING_ICON_SIZE, BUILDING_PALETTE, KEEP_FLAG, PALACE_SKY } from "../../src/defend/building-sprite-manifest.ts";
+
+import { Drawing, type Color, type Ramp } from "./drawing.ts";
+import { architecturalArt, architecturalIcon } from "./architecture.ts";
 
 const P = BUILDING_PALETTE;
-type Color = keyof typeof P;
-
-class Drawing {
-  data: Uint8Array;
-  constructor(readonly w: number, readonly h: number, data?: Uint8Array) {
-    this.data = data ?? new Uint8Array(w * h * 4);
-  }
-  dot(x: number, y: number, color: Color) {
-    if (x < 0 || y < 0 || x >= this.w || y >= this.h) return;
-    const i = (y * this.w + x) * 4, rgb = Number.parseInt(P[color].slice(1), 16);
-    this.data.set([rgb >> 16, (rgb >> 8) & 255, rgb & 255, 255], i);
-  }
-  rect(x: number, y: number, w: number, h: number, color: Color) {
-    for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) this.dot(xx, yy, color);
-  }
-  line(x: number, y: number, x1: number, y1: number, color: Color) {
-    const dx = Math.abs(x1 - x), sx = x < x1 ? 1 : -1, dy = -Math.abs(y1 - y), sy = y < y1 ? 1 : -1;
-    let err = dx + dy;
-    for (;;) {
-      this.dot(x, y, color);
-      if (x === x1 && y === y1) break;
-      const e = err * 2;
-      if (e >= dy) { err += dy; x += sx; }
-      if (e <= dx) { err += dx; y += sy; }
-    }
-  }
-  stamp(rows: readonly string[], x: number, y: number, colors: Record<string, Color>) {
-    rows.forEach((row, yy) => [...row].forEach((ch, xx) => { if (ch !== ".") this.dot(x + xx, y + yy, colors[ch]); }));
-  }
-  copy(source: Drawing, x: number, y: number) {
-    for (let yy = 0; yy < source.h; yy++) for (let xx = 0; xx < source.w; xx++) {
-      const i = (yy * source.w + xx) * 4;
-      this.data.set(source.data.subarray(i, i + 4), ((yy + y) * this.w + xx + x) * 4);
-    }
-  }
-}
-
 /** One-pixel silhouette; large quiet stone planes, lit consistently NW. */
 function stoneBox(p: Drawing, x: number, y: number, w: number, h: number) {
   p.rect(x, y, w, h, "ink");
@@ -167,7 +133,6 @@ function watchTower(look: string) {
 }
 
 type HallKind = "meleeGuild" | "rangedGuild" | "archerBarracks";
-type Ramp = readonly [Color, Color, Color];
 
 function hallRoof(kind: HallKind, look: string): Ramp {
   if (kind === "meleeGuild") return ["wood", "woodLight", "woodBright"];
@@ -412,6 +377,108 @@ function specialistHall(kind: Specialist, look: string, ui = false) {
   return p;
 }
 
+type SpearBuilding = "spearHall" | "phalanx" | "javelinCamp" | "lancerStable";
+
+function spearRoof(kind: SpearBuilding, look: string): Ramp {
+  if (kind === "spearHall") return look === "longSpears" ? ["greenDark", "green", "greenLight"]
+    : look === "setSpears" ? ["steelDark", "steel", "steelLight"] : ["goldDark", "gold", "goldLight"];
+  if (kind === "phalanx") return look === "testudo" ? ["steelDark", "steel", "steelLight"]
+    : look === "spearWall" ? ["goldDark", "gold", "goldLight"] : ["redDark", "red", "redLight"];
+  if (kind === "javelinCamp") return look === "barbed" ? ["redDark", "red", "redLight"]
+    : look === "throwingArms" ? ["woodDark", "woodLight", "woodBright"] : ["greenDark", "green", "greenLight"];
+  return look === "heavyLance" ? ["steelDark", "steel", "steelLight"] : look === "wingedLancers" ? ["stone", "stoneLight", "stoneBright"] : ["woodDark", "wood", "woodLight"];
+}
+
+function roundShield(p: Drawing, x: number, y: number, small = false) {
+  if (small) p.stamp([".ooo.", "ogggo", "ogogo", "ogggo", ".ooo."], x, y, { o: "ink", g: "gold" });
+  else p.stamp(["..oooo..", ".oggggo.", "ogllllgo", "ogloolgo", "ogloolgo", "ogllllgo", ".oggggo.", "..oooo.."], x, y,
+    { o: "ink", g: "gold", l: "goldLight" });
+}
+
+/** Roof insignia are heraldic equipment signs, not troop/animal sprites. */
+function spearSign(p: Drawing, kind: SpearBuilding, look: string, x: number, y: number) {
+  if (kind === "spearHall") {
+    p.stamp(["...oo...", "..obbo..", "..obbo..", "...oo...", "...ww...", "...ww...", "...ww...", "...oo..."], x, y,
+      { o: "ink", b: "steelBright", w: "woodLight" });
+  } else if (kind === "phalanx") roundShield(p, x, y);
+  else if (kind === "javelinCamp") {
+    p.line(x, y, x + 7, y + 7, "ink"); p.line(x + 7, y, x, y + 7, "ink");
+    p.line(x + 1, y + 1, x + 6, y + 6, "woodLight"); p.line(x + 6, y + 1, x + 1, y + 6, "woodLight");
+    for (const dx of [0, 6]) p.rect(x + dx, y, 2, 2, "steelBright");
+    if (look === "barbed") { p.dot(x + 2, y, "steelBright"); p.dot(x + 5, y, "steelBright"); }
+  } else if (look === "wingedLancers") {
+    p.stamp(["o......o", "ob....bo", "obboobbo", ".obbbbo.", "..obbo..", "...oo...", "...gg...", "........"], x, y,
+      { o: "ink", b: "stoneBright", g: "gold" });
+  } else {
+    p.stamp(["...oo...", "..owwo..", ".owowwo.", "owwwwwo.", "owwwwo..", ".oowwo..", "..owwo..", "..oooo.."], x, y,
+      { o: "ink", w: "woodLight" });
+  }
+}
+
+function nativeSpearRack(p: Drawing, x: number, y: number, count: number, height: number, point: Color = "steelBright") {
+  p.rect(x, y, count * 3, 1, "woodDark");
+  for (let i = 0; i < count; i++) { p.rect(x + i * 3 + 1, y - height + 1, 1, height, "woodLight"); p.dot(x + i * 3 + 1, y - height, point); }
+}
+
+/** Explicit native world/UI layouts: halls, canvas camp and two-bay stable.
+ * Every yard keeps its props inside the building's catalog footprint. */
+function spearBuilding(kind: SpearBuilding, look: string, ui = false) {
+  const p = new Drawing(ui ? 24 : 32, ui ? 24 : 32), e = ui ? 2 : 3, n = p.w - e * 2, roof = spearRoof(kind, look);
+  stoneBox(p, e + 1, e + 3, n - 2, ui ? 13 : 18);
+  const roofH = ui ? 11 : 14;
+  if (kind === "javelinCamp") {
+    // Stepped canvas eaves, a central ridge and short tied corners.
+    for (let y = 0; y < roofH; y++) {
+      const inset = y < 2 || y >= roofH - 2 ? 2 : y < 4 ? 1 : 0;
+      p.rect(e + inset, e + y, n - inset * 2, 1, "ink");
+      if (y > 0 && y < roofH - 1) p.rect(e + inset + 1, e + y, n - inset * 2 - 2, 1, y < roofH / 2 ? roof[2] : roof[0]);
+    }
+    p.rect(e + 3, e + Math.floor(roofH / 2), n - 6, 1, roof[1]);
+  } else {
+    p.rect(e, e, n, roofH, "ink"); p.rect(e + 1, e + 1, n - 2, roofH - 2, roof[0]);
+    p.rect(e + 1, e + 1, n - 2, ui ? 4 : 5, roof[2]); p.rect(e + 1, e + (ui ? 5 : 6), n - 2, 1, roof[1]);
+  }
+  const doorY = ui ? 14 : 18, yardY = ui ? 21 : 28;
+  if (kind === "lancerStable") {
+    p.rect(e + 1, doorY - 1, n - 2, 5, "woodDark"); p.rect(e + 2, doorY - 1, n - 4, 1, "woodLight");
+    for (const x of ui ? [6, 15] : [8, 21]) { p.rect(x, doorY, ui ? 3 : 4, 4, "ink"); p.rect(x, doorY, ui ? 3 : 4, 1, "woodLight"); }
+  } else {
+    p.rect(p.w / 2 - 2, doorY, 4, 4, "ink"); p.rect(p.w / 2 - 1, doorY + 1, 2, 3, "woodLight");
+  }
+  spearSign(p, kind, look, p.w / 2 - 4, ui ? 4 : 6);
+  p.rect(e, yardY, n, 1, "woodDark");
+  if (kind === "spearHall") {
+    nativeSpearRack(p, e + 1, yardY - 1, ui ? 2 : look === "longSpears" ? 4 : 3, look === "longSpears" ? 6 : 3);
+    if (look === "setSpears") for (let x = p.w - e - 8; x < p.w - e - 2; x += 3) {
+      p.line(x, yardY - 1, x + 2, yardY - 3, "woodLight"); p.dot(x + 2, yardY - 3, "steelBright");
+    } else {
+      const x = p.w - e - 6; p.rect(x + 1, yardY - 3, 1, 3, "woodLight"); p.rect(x, yardY - 4, 3, 2, "ink"); p.dot(x + 1, yardY - 4, "gold");
+    }
+  } else if (kind === "phalanx") {
+    if (look === "testudo") {
+      for (let r = 0; r < 2; r++) for (let i = 0; i < (ui ? 3 : 4); i++) roundShield(p, e + 2 + i * 4, yardY - 8 + r * 4, true);
+    } else {
+      for (let i = 0; i < (ui ? 3 : 4); i++) roundShield(p, e + 2 + i * 5, yardY - 5, true);
+      if (look === "spearWall") nativeSpearRack(p, e + 1, yardY - 1, ui ? 5 : 7, 5);
+    }
+  } else if (kind === "javelinCamp") {
+    nativeSpearRack(p, e + 1, yardY - 1, 2, ui ? 3 : 4);
+    const target = (x: number) => { p.rect(x, yardY - 4, 4, 4, "ink"); p.rect(x + 1, yardY - 3, 2, 2, "gold"); p.dot(x + 1, yardY - 3, "steelBright"); };
+    target(p.w - e - 5);
+    if (look === "throwingArms") target(p.w - e - 10);
+    if (look === "barbed") { p.rect(p.w / 2 - 2, yardY - 4, 4, 3, "ink"); p.rect(p.w / 2 - 1, yardY - 3, 2, 1, "woodLight"); }
+  } else {
+    p.rect(e + 1, yardY - 3, n - 3, 1, "woodLight");
+    const x = p.w - e - 5;
+    p.rect(x, yardY - 5, 1, 5, "woodDark"); p.rect(x - 2, yardY - 5, 5, 1, "woodLight");
+    p.rect(x + 1, yardY - 4, 2, 2, look === "heavyLance" ? "steelBright" : "gold");
+    p.rect(e + 2, yardY - 1, 3, 1, "gold");
+    if (look === "heavyLance") nativeSpearRack(p, e + 1, yardY - 1, 2, 5);
+    if (look === "wingedLancers") { p.rect(e + 6, yardY - 2, 2, 1, "stoneBright"); p.rect(e + 10, yardY - 1, 2, 1, "stoneBright"); }
+  }
+  return p;
+}
+
 type GunnerBuilding = "gunHall" | "gunNest" | "gatlingNest" | "rocketBattery" | "revolutionary";
 
 function gunnerRoof(kind: GunnerBuilding, look: string): Ramp {
@@ -536,6 +603,100 @@ function revolutionary(ui = false) {
     { o: "ink", l: "steelLight", s: "steel", d: "steelDark", f: "frostLight" });
   p.rect(e + 3, p.h - e - 7, 2, 4, "ink"); p.dot(e + 3, p.h - e - 7, "redLight");
   p.rect(cx - 3, p.h - e - 3, 6, 2, "ink"); p.rect(cx - 2, p.h - e - 3, 4, 1, "frost");
+  return p;
+}
+
+/** Flat, discrete bands and a one-pixel rim keep rounded masonry clean. */
+function oval(p: Drawing, cx: number, cy: number, rx: number, ry: number, ramp: Ramp) {
+  for (let y = Math.floor(cy - ry); y < cy + ry; y++) for (let x = Math.floor(cx - rx); x < cx + rx; x++) {
+    const dx = x + 0.5 - cx, dy = y + 0.5 - cy;
+    if (dx * dx / (rx * rx) + dy * dy / (ry * ry) > 1) continue;
+    const rim = dx * dx / ((rx - 1) ** 2) + dy * dy / ((ry - 1) ** 2) > 1;
+    p.dot(x, y, rim ? "ink" : dx / rx + dy / ry < -0.35 ? ramp[2] : dx / rx + dy / ry > 0.5 ? ramp[0] : ramp[1]);
+  }
+}
+
+function palace(compact: boolean, look: string, ui = false) {
+  const p = new Drawing(ui ? 24 : compact ? 32 : 48, ui ? 24 : 48), e = ui ? 2 : 3, n = p.w - e * 2;
+  stoneBox(p, e, e, n, p.h - e * 2);
+  const inner = ui ? 4 : 7;
+  p.rect(inner, inner, p.w - inner * 2, p.h - inner * 2, "ink");
+  p.rect(inner + 1, inner + 1, p.w - inner * 2 - 2, p.h - inner * 2 - 2, "stoneBright");
+  p.rect(inner + 1, inner + 1, p.w - inner * 2 - 2, 1, "goldLight");
+  p.rect(p.w - inner - 2, inner + 2, 1, p.h - inner * 2 - 3, "goldDark");
+  // Regular columns with quiet gaps; compact has fewer, at the same density.
+  if (!ui) for (let y = 10; y < p.h - 9; y += 6) for (const x of [5, p.w - 7]) {
+    p.rect(x, y, 2, 3, "stoneDark"); p.rect(x, y, 1, 2, "stoneBright");
+  }
+  const cx = p.w / 2, cy = ui ? 10 : 21, radius = ui ? 6 : compact ? 9 : 13;
+  if (compact && !ui) {
+    p.rect(cx - 5, 10, 10, 26, "goldDark"); p.rect(cx - 4, 11, 8, 24, "stoneLight");
+    p.rect(cx - 1, 11, 1, 24, "goldLight");
+  }
+  oval(p, cx, cy, radius, radius, ["stone", "stoneLight", "stoneBright"]);
+  p.rect(cx - 1, cy - radius + 2, 1, radius * 2 - 4, "gold");
+  p.rect(cx - 1, cy - 1, 2, 2, "goldLight");
+  const stepY = ui ? 18 : 38;
+  p.rect(cx - (ui ? 5 : 9), stepY, ui ? 10 : 18, ui ? 3 : 5, "stoneLight");
+  p.rect(cx - (ui ? 5 : 9), stepY + 1, ui ? 10 : 18, 1, "stoneBright");
+  p.stamp(["o.......o", "og.....go", ".oggoggo.", "..ogggo..", "...ooo..."], cx - 4, stepY - 2,
+    { o: "ink", g: "gold" });
+  const cloudInset = e + (ui ? 3 : 5);
+  if (look === "cloudborne") for (const [x, y] of [[cloudInset, e + 4], [p.w - cloudInset, e + 4], [cloudInset, p.h - e - 4], [p.w - cloudInset, p.h - e - 4]]) {
+    oval(p, x, y, ui ? 3 : 5, ui ? 3 : 4, ["frost", "frostLight", "bright"]);
+  }
+  return p;
+}
+
+function darkTurret(p: Drawing, x: number, y: number, n: number) {
+  p.rect(x, y, n, n, "ink"); p.rect(x + 1, y + 1, n - 2, n - 2, "steelDark");
+  p.rect(x + 1, y + 1, n - 2, 1, "steelLight"); p.rect(x + 1, y + 2, 1, n - 3, "steel");
+  const c = Math.floor(n / 2);
+  p.rect(x + c - 1, y + c - 1, 3, 3, "redDark"); p.dot(x + c, y + c - 1, "redLight"); p.dot(x + c, y + c, "red");
+}
+
+function darkKeep(compact: boolean, ui = false) {
+  const n = ui ? 24 : compact ? 48 : 96, p = new Drawing(n, n), e = ui ? 2 : 3, wall = ui ? 3 : compact ? 5 : 8;
+  p.rect(e, e, n - e * 2, n - e * 2, "ink");
+  p.rect(e + 1, e + 1, n - e * 2 - 2, n - e * 2 - 2, "steelDark");
+  p.rect(e + 1, e + 1, n - e * 2 - 2, 2, "steelLight"); p.rect(e + 1, e + 3, 2, n - e * 2 - 4, "steel");
+  p.rect(e + wall, e + wall, n - (e + wall) * 2, n - (e + wall) * 2, "ink");
+  p.rect(e + wall + 1, e + wall + 1, n - (e + wall) * 2 - 2, n - (e + wall) * 2 - 2, "arcaneDark");
+  const c = n / 2, r = ui ? 5 : compact ? 11 : 25;
+  // Four cardinal ruby marks and a quiet octagonal rune enclosure.
+  const corners = [[c - r, c - r / 2], [c - r / 2, c - r], [c + r / 2, c - r], [c + r, c - r / 2], [c + r, c + r / 2], [c + r / 2, c + r], [c - r / 2, c + r], [c - r, c + r / 2]].map(([x, y]) => [Math.round(x), Math.round(y)]);
+  for (let i = 0; i < corners.length; i++) { const a = corners[i], b = corners[(i + 1) % corners.length]; p.line(a[0], a[1], b[0], b[1], "redDark"); }
+  if (!ui) for (const [dx, dy] of [[0, -r], [r, 0], [0, r], [-r, 0]]) p.rect(c + dx - 1, c + dy - 1, 2, 2, "redLight");
+  const spire = ui ? 4 : compact ? 8 : 17;
+  for (let y = -spire; y <= spire; y++) for (let x = -spire; x <= spire; x++) {
+    const d = Math.abs(x) + Math.abs(y);
+    if (d <= spire) p.dot(c + x, c + y, d === spire ? "ink" : x < 0 && y < 0 ? "arcaneLight" : x < 0 ? "arcane" : "steelDark");
+  }
+  p.rect(c - 1, c - 2, 3, 4, "ink"); p.rect(c, c - 1, 1, 2, "redLight");
+  const t = ui ? 5 : compact ? 10 : 18;
+  for (const [x, y] of [[e, e], [n - e - t, e], [e, n - e - t], [n - e - t, n - e - t]]) darkTurret(p, x, y, t);
+  p.rect(c - (ui ? 2 : 4), n - e - wall, ui ? 4 : 8, wall, "ink");
+  p.rect(c - (ui ? 1 : 3), n - e - wall + 1, ui ? 2 : 6, wall - 1, "redDark");
+  if (!ui) p.rect(c - 2, n - e - wall + 1, 4, 1, "red");
+  return p;
+}
+
+/** Native clouds share the palace's center; silhouette is fixed across
+ * lots, with sparse bands and no procedural speckle. */
+function palaceClouds(w: number, h: number) {
+  const p = new Drawing(w, h), ramp: Ramp = ["frost", "frostLight", "bright"];
+  oval(p, w / 2, h / 2, w / 2 - 5, h / 2 - 5, ramp);
+  for (const [x, y, rx, ry] of [[w / 2 - 13, 18, 12, 11], [w / 2 + 13, 18, 12, 11], [15, h / 2, 11, 14], [w - 15, h / 2, 11, 14], [w / 2 - 12, h - 18, 14, 12], [w / 2 + 12, h - 18, 14, 12]]) oval(p, x, y, rx, ry, ramp);
+  return p;
+}
+
+function palaceMooring(w: number, h: number) {
+  const p = new Drawing(w, h), cx = w / 2, cy = h / 2;
+  p.rect(3, 3, w - 6, h - 6, "woodDark"); p.rect(4, 4, w - 8, h - 8, "wood");
+  oval(p, cx, cy, w / 2 - 5, h / 2 - 5, ["stone", "stoneLight", "stoneBright"]);
+  oval(p, cx, cy, w / 2 - 8, h / 2 - 8, ["woodDark", "wood", "woodLight"]);
+  for (let i = -5; i <= 5; i++) { p.dot(cx + i, cy, "gold"); p.dot(cx, cy + i, "gold"); }
+  p.rect(cx - 1, cy - 1, 3, 3, "goldLight");
   return p;
 }
 
@@ -750,6 +911,11 @@ function cannonTowerIcon(look: string) {
 
 /** Purpose-drawn 24px UI compositions rather than squashed world frames. */
 function icon(kind: string, look: string) {
+  const architecture = architecturalIcon(kind, look);
+  if (architecture) return architecture;
+  if (kind === "spearHall" || kind === "phalanx" || kind === "javelinCamp" || kind === "lancerStable") return spearBuilding(kind, look, true);
+  if (kind === "valkyriePalace") return palace(false, look, true);
+  if (kind === "darkKeep") return darkKeep(false, true);
   if (kind === "gunHall" || kind === "gunNest" || kind === "rocketBattery") return gunnerHall(kind, look, true);
   if (kind === "gatlingNest") return gatlingEmplacement(look, true);
   if (kind === "revolutionary") return revolutionary(true);
@@ -830,6 +996,10 @@ const DRAW_BUILDING: Record<keyof typeof BUILDING_ART, (look: string) => Drawing
   musketHall: look => specialistHall("musketHall", look), wizardTower, mageGuild, monsterBait,
   gunHall: look => gunnerHall("gunHall", look), gunNest: look => gunnerHall("gunNest", look),
   rocketBattery: look => gunnerHall("rocketBattery", look), gatlingNest: gatlingEmplacement, revolutionary: () => revolutionary(),
+  valkyriePalace: look => palace(false, look), valkyriePalaceCompact: look => palace(true, look),
+  darkKeep: () => darkKeep(false), darkKeepCompact: () => darkKeep(true),
+  spearHall: look => spearBuilding("spearHall", look), phalanx: look => spearBuilding("phalanx", look),
+  javelinCamp: look => spearBuilding("javelinCamp", look), lancerStable: look => spearBuilding("lancerStable", look),
 };
 
 function rubbleRoof(kind: string): Color | undefined {
@@ -846,6 +1016,12 @@ function rubbleRoof(kind: string): Color | undefined {
   if (kind === "gunNest") return "greenDark";
   if (kind === "gatlingNest") return "goldDark";
   if (kind === "rocketBattery") return "redDark";
+  if (kind === "valkyriePalace") return "goldDark";
+  if (kind === "darkKeep") return "arcaneDark";
+  if (kind === "spearHall") return "goldDark";
+  if (kind === "phalanx") return "redDark";
+  if (kind === "javelinCamp") return "greenDark";
+  if (kind === "lancerStable") return "woodDark";
 }
 
 export function buildingPngs() {
@@ -855,12 +1031,18 @@ export function buildingPngs() {
     const icons = new Drawing(BUILDING_ICON_SIZE * art.looks.length, BUILDING_ICON_SIZE);
     art.looks.forEach((look, col) => {
       const base = DRAW_BUILDING[id as keyof typeof BUILDING_ART](look);
-      for (let stage = 0; stage < art.stages; stage++) sheet.copy(damaged(base, stage, id === "keep"), col * w, stage * h);
-      sheet.copy(art.kind === "monsterBait" ? baitRubble() : rubble(w, h, rubbleRoof(art.kind)), col * w, art.stages * h);
+      for (let stage = 0; stage < art.stages; stage++) sheet.copy(architecturalArt(id, look, stage) ?? damaged(base, stage, id === "keep"), col * w, stage * h);
+      sheet.copy(architecturalArt(id, look, 3, true) ?? (art.kind === "monsterBait" ? baitRubble() : rubble(w, h, rubbleRoof(art.kind))), col * w, art.stages * h);
       icons.copy(icon(art.kind, look), col * BUILDING_ICON_SIZE, 0);
     });
     files.set(`${art.sheet}.png`, png(sheet));
-    if (id !== "barracksWide") files.set(`${art.icon}.png`, png(icons));
+    if (!files.has(`${art.icon}.png`)) files.set(`${art.icon}.png`, png(icons));
+  }
+  for (const art of PALACE_SKY) {
+    const clouds = palaceClouds(...art.size), shadow = new Drawing(...art.size);
+    for (let y = 0; y < shadow.h; y++) for (let x = 0; x < shadow.w; x++) if (clouds.data[(y * shadow.w + x) * 4 + 3] && (x + y) % 2 === 0) shadow.dot(x, y, "ink");
+    files.set(`${art.clouds}.png`, png(clouds)); files.set(`${art.shadow}.png`, png(shadow));
+    files.set(`${art.mooring}.png`, png(palaceMooring(art.footprint[0] * 8, art.footprint[1] * 8)));
   }
   const flags = new Drawing(KEEP_FLAG.size[0] * KEEP_FLAG.frames, KEEP_FLAG.size[1]);
   for (let i = 0; i < KEEP_FLAG.frames; i++) flags.copy(flag(i), i * KEEP_FLAG.size[0], 0);
