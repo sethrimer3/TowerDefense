@@ -191,9 +191,9 @@ export const OVERDRIVE = { damage: [1, 1.4, 1.8, 2.4], reload: [1, 1, 1, 0.85] }
  * `damage[rank]` times as hard and every bullet knocks its enemy `push[rank]`
  * cells straight back from the gun (not bosses, fortresses or boats). */
 export const STOPPING = { damage: [1, 0.35, 0.3, 0.25], push: [0, 0.08, 0.14, 0.22] };
-/** Deadeye: snipers shoot only an enemy they see clearly, no house or tower
- * between (the city wall is low enough to shoot over), and hit
- * `damage[rank]` times as hard; at III they reach `range` cells further. */
+/** Deadeye: snipers (who, like the whole gunner line, shoot only an enemy
+ * in clear sight, `gun-sight.ts`) hit `damage[rank]` times as hard; at III
+ * they reach `range` cells further. */
 export const DEADEYE = { damage: [1, 1.6, 2.2, 3], range: 2 };
 /** Piercing rounds: every bullet flies straight on to the end of its reach
  * through every enemy within `width` of its line, each hit at `damage[rank]`
@@ -655,7 +655,7 @@ export const PATHS: KnowledgePath[] = [
   {
     id: "deadeye", topic: "sniperLodge", name: "Deadeye", motto: "One clear shot, one kill", hue: "verdant",
     ranks: [
-      { name: "Clear sight", icon: "eye", cost: studyPathCost(4, 0), text: "Snipers shoot only an enemy no house or tower hides from them (they shoot over the city wall), and hit 60% harder" },
+      { name: "Clear sight", icon: "eye", cost: studyPathCost(4, 0), text: "Snipers take their time over every clear shot and hit 60% harder" },
       { name: "Patient aim", icon: "crosshair", cost: studyPathCost(4, 1), text: "They hit 120% harder" },
       { name: "Deadeye", icon: "skull", cost: studyPathCost(4, 2), text: "They hit three times as hard and reach 2 cells further" },
     ],

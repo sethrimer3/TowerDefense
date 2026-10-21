@@ -203,7 +203,7 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     h: 4,
     maxHp: 140,
     outsideOk: false,
-    description: "Trains gunners with pistols: quick, short-ranged shots. Upgrade it with Knowledge into a musket hall, a machine-gun nest or a rocket battery.",
+    description: "Trains gunners with pistols: quick, short-ranged shots. Guns shoot flat, so gunners need a clear line of sight (no wall or building in the way) unless they climb a watch tower. Upgrade it with Knowledge into a musket hall, a machine-gun nest or a rocket battery.",
   },
   musketHall: {
     kind: "musketHall",
@@ -311,7 +311,7 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     h: 2,
     maxHp: 100,
     outsideOk: true,
-    description: "Marks every enemy in its radius with a golden outline — marked enemies take double damage.",
+    description: "Marks every enemy in its radius with a golden outline — marked enemies take double damage. Up to two gunners can climb in and shoot over every wall and building from the top.",
   },
   wizardTower: {
     kind: "wizardTower",

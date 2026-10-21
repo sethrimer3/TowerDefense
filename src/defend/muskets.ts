@@ -55,11 +55,11 @@ const BOMBLETS = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const;
 
 /** Volley fire: the next nearest enemies within `range` of `s` besides `e`
  * that its extra balls go for (none off the path). */
-export function volleyTargets(sim: DefendSim, s: Soldier, e: Enemy, range: number): Enemy[] {
+export function volleyTargets(sim: DefendSim, s: Soldier, e: Enemy, range: number, pool?: Enemy[]): Enemy[] {
   const extra = VOLLEY.extra[hallPaths(sim, s.home).volley];
   if (!extra) return [];
   const d = (o: Enemy) => sq(o.x - s.x) + sq(o.y - s.y);
-  return sim.enemiesNear(s.x, s.y, range).filter((o) => o !== e && o.hp > 0 && d(o) <= range * range).sort((a, b) => d(a) - d(b)).slice(0, extra);
+  return (pool ?? sim.enemiesNear(s.x, s.y, range)).filter((o) => o !== e && o.hp > 0 && d(o) <= range * range).sort((a, b) => d(a) - d(b)).slice(0, extra);
 }
 
 /** A musketman's reload: Platoon fire's is quicker for each comrade of
@@ -79,10 +79,10 @@ export const musketDamage = (sim: DefendSim, s: Soldier, damage: number) => dama
 
 /** Sharpshooters III: the toughest enemy within `range` of `s` (the nearest
  * of equals), or undefined off the path, when the nearest is shot. */
-export function toughestInReach(sim: DefendSim, s: Soldier, range: number): Enemy | null | undefined {
+export function toughestInReach(sim: DefendSim, s: Soldier, range: number, pool?: Enemy[]): Enemy | null | undefined {
   if (s.kind !== "musketeer" || hallPaths(sim, s.home).sharp < 3) return undefined;
   let best: Enemy | null = null, bd = 0;
-  for (const e of sim.enemiesNear(s.x, s.y, range)) {
+  for (const e of pool ?? sim.enemiesNear(s.x, s.y, range)) {
     const d = sq(e.x - s.x) + sq(e.y - s.y);
     if (e.hp <= 0 || d > range * range) continue;
     if (!best || e.hp > best.hp || (e.hp === best.hp && d < bd)) { best = e; bd = d; }

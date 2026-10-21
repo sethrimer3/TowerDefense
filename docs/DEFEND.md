@@ -319,9 +319,7 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   landing a 4× headshot every third shot at III; Ricochet bullets glancing
   on to the nearest enemy not yet struck within 2.5 cells, once, twice,
   then four times at 80%; Suppressing fire's hits slowing, staggering from
-  II, and reloading 40% faster at III; Deadeye shooting only an enemy no
-  house, tower or hall hides from them (they shoot over the low city wall,
-  and hold their fire when nothing is in clear sight), hitting 60%, then
+  II, and reloading 40% faster at III; Deadeye hitting 60%, then
   120%, then three times as hard, reaching 2 cells further at III; Piercing
   rounds flying straight on to the end of their reach through every enemy
   in the line, each hit at 40%, 50%, then 60% of the shot, reaching 2
@@ -485,7 +483,16 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   arrow critical, then aimed at the strongest). **Watch towers** mark
   enemies in their radius with a gold outline; marked enemies take ×2 damage.
   Paths: Spotters (marks hit harder, wider radius) or Signal fires
-  (marked enemies slowed, more at rank II, and set burning at III).
+  (marked enemies slowed, more at rank II, and set burning at III). Up to
+  two gunners climb into each watch tower and shoot from the top.
+- **Gun sight** (`gun-sight.ts`): the gunner line (gunners, musketmen,
+  machine and Gatling gunners, rocketeers, snipers, laser snipers) shoots
+  flat, only at an enemy with no wall stone or building on the line
+  between (ponds don't block); archers, stone throwers and javelineers arc
+  over. A gunner looks only when it could fire, keeps on the enemy it saw
+  while reloading, and with nothing in sight walks for the nearest watch
+  tower with room and climbs to its top: from there it sees everyone in
+  reach, no enemy picks it out, and it drops out when the tower falls.
 - **City gates** are buildings (`kind: "gate"`, numbered after the wall
   stones) with the HP of the stones they stand in for, half again: enemies
   find them solid and batter them down like the wall, and civilians rebuild

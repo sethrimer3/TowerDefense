@@ -3,6 +3,7 @@
 // reloads in ranks; Bayonets' thrust at close quarters, citywide charge and
 // stagger.
 import { test } from "node:test";
+import { openSight } from "./open-sight.ts";
 import assert from "node:assert/strict";
 import { defaults } from "../src/save.ts";
 import { allocated, buildingTree, nextSteps, specialtyOf, stepName, upgradeBuilding } from "../src/specializations.ts";
@@ -39,7 +40,7 @@ function hall(path?: PathId, rank = 3) {
 function battle(s: S) {
   const fit = fitLayout(s.defend.layout);
   assert.ok(fit.ok);
-  const sim = new DefendSim(generateCity(fit, 4), { ...s.defend.levels }, 1, battleBonuses(s));
+  const sim = openSight(new DefendSim(generateCity(fit, 4), { ...s.defend.levels }, 1, battleBonuses(s)));
   new Barracks().step(sim, 0.01);
   const m = sim.soldiers.find((u) => u.kind === "musketeer") ?? assert.fail("a musketman");
   return { sim, m };

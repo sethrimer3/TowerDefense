@@ -3,6 +3,7 @@
 // squad, the chain laser, critical chance and damage, and the burst at the
 // last enemy; and the lasers it and every sniper draw.
 import { test } from "node:test";
+import { openSight } from "./open-sight.ts";
 import assert from "node:assert/strict";
 import { defaults } from "../src/save.ts";
 import { allocated, buildingTree, nextSteps, stepName, upgradeBuilding } from "../src/specializations.ts";
@@ -37,7 +38,7 @@ function revolutionary(ranks: Partial<Record<RevolutionaryPathId, number>> = {})
 function battle(s: S) {
   const fit = fitLayout(s.defend.layout);
   assert.ok(fit.ok);
-  const sim = new DefendSim(generateCity(fit, 4), { ...s.defend.levels }, 1, bonuses(s));
+  const sim = openSight(new DefendSim(generateCity(fit, 4), { ...s.defend.levels }, 1, bonuses(s)));
   const b = new Barracks();
   for (let i = 0; i < 400; i++) b.step(sim, 0.5);
   const m = sim.soldiers.find((u) => u.kind === "railSniper") ?? assert.fail("a laser sniper");
@@ -119,9 +120,10 @@ test("the chain laser's bullet zigzags on through 3, 5, then 7 enemies, in the o
   for (const chain of [1, 2, 3]) {
     const { sim, m } = battle(revolutionary({ chain }));
     const es = file(sim, m, 9);
+    fire(sim, m);
+    // The laser stays on the enemy it shot, showing the same zigzag.
     const shown = chainTargets(sim, sniperAim(sim, m)!).map((e) => e.id);
     assert.equal(shown.length, CHAIN.hits[chain]);
-    fire(sim, m);
     const struck = es.filter((e) => e.hp < e.maxHp).map((e) => e.id);
     assert.deepEqual(struck, shown, `rank ${chain}`);
   }

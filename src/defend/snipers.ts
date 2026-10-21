@@ -4,7 +4,7 @@
  * aiming at the toughest from II, a headshot every few shots at III),
  * Ricochet (bullets that glance on to the next enemies) or Suppressing fire
  * (hits that slow, stagger from II, and quicker reloads at III), Deadeye
- * (only an enemy in clear sight, `clearShot`, but much harder) or Piercing
+ * (much harder, further at III) or Piercing
  * rounds (`Arrow.pierce`: straight through every enemy in line, each hit
  * softer, `pierceHits`).
  *
@@ -14,9 +14,7 @@
  * untouched. */
 import { dist, sq } from "../exact.ts";
 import { DEADEYE, MARKSMEN, PIERCING, RICOCHET, SUPPRESS, pathRank, type BattlePaths } from "../knowledge-paths.ts";
-import { CellType } from "./citygen.ts";
-import { cellIndex } from "./grid.ts";
-import { nearest } from "./pathing.ts";
+import { held } from "./gun-sight.ts";
 import { buildingPaths } from "../specializations.ts";
 import { ENEMIES, RAIL_SNIPER, SNIPER, enemySize } from "./catalog.ts";
 import type { Arrow, DefendSim, Enemy, Soldier } from "./sim.ts";
@@ -44,36 +42,15 @@ export const sniperReload = (sim: DefendSim, s: Soldier) => SNIPER.cooldown * (l
 
 /** Big game: the toughest enemy within `range` of `s` (the nearest of
  * equals), or undefined off the path, when the nearest is shot. */
-export function bigGame(sim: DefendSim, s: Soldier, range: number): Enemy | null | undefined {
+export function bigGame(sim: DefendSim, s: Soldier, range: number, pool?: Enemy[]): Enemy | null | undefined {
   if (s.kind !== "sniper" || lodgePaths(sim, s.home).marks < 2) return undefined;
   let best: Enemy | null = null, bd = 0;
-  for (const e of sim.enemiesNear(s.x, s.y, range)) {
+  for (const e of pool ?? sim.enemiesNear(s.x, s.y, range)) {
     const d = sq(e.x - s.x) + sq(e.y - s.y);
     if (e.hp <= 0 || d > range * range) continue;
     if (!best || e.hp > best.hp || (e.hp === best.hp && d < bd)) { best = e; bd = d; }
   }
   return best;
-}
-
-/** Whether nothing but open ground, water or the low city wall lies between
- * (x0, y0) and (x1, y1): every cell the line crosses, sampled a quarter of
- * a cell apart, is open (houses, towers, halls and gates stand in the way). */
-export function inSight(sim: DefendSim, x0: number, y0: number, x1: number, y1: number) {
-  const d = dist(x1 - x0, y1 - y0), n = Math.floor(d * 4);
-  for (let i = 1; i < n; i++) {
-    const c = cellIndex(Math.floor(x0 + ((x1 - x0) * i) / n), Math.floor(y0 + ((y1 - y0) * i) / n)), t = sim.map.type[c];
-    if (sim.solid[c] && t !== CellType.WALL && t !== CellType.WATER) return false;
-  }
-  return true;
-}
-
-/** Deadeye: the nearest enemy within `range` of `s` it sees clearly, or null
- * when every one is hidden (it holds its fire); undefined off the path. */
-export function clearShot(sim: DefendSim, s: Soldier, range: number): Enemy | null | undefined {
-  if (s.kind !== "sniper" || !lodgePaths(sim, s.home).deadeye) return undefined;
-  const d = (e: Enemy) => sq(e.x - s.x) + sq(e.y - s.y);
-  const seen = sim.enemiesNear(s.x, s.y, range).filter((e) => e.hp > 0 && d(e) <= range * range).sort((a, b) => d(a) - d(b) || a.id - b.id);
-  return seen.find((e) => inSight(sim, s.x, s.y, e.x, e.y)) ?? null;
 }
 
 /** Piercing rounds: where a bullet from `s` at `e` flies (the end of its
@@ -141,14 +118,9 @@ export function bulletHit(sim: DefendSim, a: Arrow, e: Enemy, landed: boolean) {
   });
 }
 
-/** Whom a sniper or a Revolutionary's laser sniper `s` would shoot now: as
- * `stepArcher` picks (Deadeye's clear shot, Big game's toughest, else the
- * nearest in reach). Pure, for the lock-on laser. */
+/** Whom a sniper or a Revolutionary's laser sniper `s` is aiming at: the
+ * enemy it last saw (`gun-sight.ts`), alive and within reach. Pure, for the
+ * lock-on laser. */
 export function sniperAim(sim: DefendSim, s: Soldier): Enemy | null {
-  const range = s.kind === "railSniper" ? RAIL_SNIPER.range : sniperRange(sim, s);
-  const sight = clearShot(sim, s, range);
-  if (sight !== undefined) return sight;
-  const big = bigGame(sim, s, range);
-  if (big !== undefined) return big;
-  return nearest(sim.enemiesNear(s.x, s.y, range), s, range * range, true);
+  return held(sim, s, s.kind === "railSniper" ? RAIL_SNIPER.range : sniperRange(sim, s));
 }

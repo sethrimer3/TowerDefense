@@ -3,6 +3,7 @@
 import { CELLS_W, CELLS_H } from "./grid.ts";
 import { sq } from "../exact.ts";
 import type { Soldier, Civilian } from "./sim.ts";
+import { perched } from "./gun-sight.ts";
 
 type Defender = Soldier | Civilian;
 const CELL = 4;
@@ -20,8 +21,8 @@ export class DefenderIndex {
     this.units.length = 0;
     for (let team = 0; team < 2; team++) {
       for (const u of team === 0 ? soldiers : civilians) {
-        // A cloaked assassin is never picked out.
-        if (u.hp <= 0 || ("cloak" in u && u.cloak === 0)) continue;
+        // A cloaked assassin, or a gunner up in a watch tower, is never picked out.
+        if (u.hp <= 0 || ("cloak" in u && u.cloak === 0) || perched(u)) continue;
         const i = bucket(u.y, H) * W + bucket(u.x, W);
         if (!this.cells[i].length) this.used.push(i);
         this.cells[i].push(this.units.length);
