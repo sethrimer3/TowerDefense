@@ -10,11 +10,14 @@
  * lasts every pointer steers it and the first one lifted drops it.
  * A drag whose pointer stays put for `HOLD_MS` is a hold: the page may take
  * it (opening what was pressed) and the drag ends without a drop.
+ * - lifting: a press on a city tile (`pend`) moves the view like any other
+ *   until it has stayed put for `LIFT_MS`; only then does the tile lift and
+ *   the drag start. Moving first pans, letting go first taps.
  * What a press picks up and what a drop does are the page's and its
  * `EditSession`'s decisions; this only turns pointers into cells. */
 import { consumable, dragIcon } from "./drag-rules.ts";
 import type { DragAt, Drop, EditSession } from "./edit-session.ts";
-import { CELLS_W, SUB, TILES_H } from "./grid.ts";
+import { CELLS_W, SUB, TILES_H, type TilePos } from "./grid.ts";
 import type { DefendRenderer } from "./render.ts";
 import { paintIcon } from "./structure-art.ts";
 
@@ -35,6 +38,8 @@ export type PointerHost = {
 const TAP_SLOP = 8;
 /** How long (ms) a press must stay put to be a hold. */
 export const HOLD_MS = 450;
+/** How long (ms) a press on a city tile must stay put to lift it. */
+export const LIFT_MS = 500;
 
 type Point = { x: number; y: number };
 
@@ -47,6 +52,10 @@ export class BoardPointers {
   private tapping: { id: number; x: number; y: number } | null = null;
   /** A drag that may yet be a hold: its pointer, where it went down, and the timer. */
   private holding: { id: number; x: number; y: number; timer: number } | null = null;
+  /** A city tile pressed and not yet held long enough to lift: its session,
+   * its tile, the pointer, where and when it went down, its latest event and
+   * the timer. */
+  private lifting: { edit: EditSession; tile: TilePos; id: number; x: number; y: number; since: number; e: PointerEvent; timer: number } | null = null;
 
   constructor(private host: PointerHost) {
     window.addEventListener("pointermove", (e) => this.move(e));
@@ -57,6 +66,12 @@ export class BoardPointers {
   /** The drag in progress, if any. */
   get session(): EditSession | null {
     return this.held?.edit ?? null;
+  }
+
+  /** The city tile being held to lift, and how far the hold has come (0–1). */
+  liftProgress(now = performance.now()): { tile: TilePos; t: number } | null {
+    const l = this.lifting;
+    return l && { tile: l.tile, t: Math.max(0, Math.min(1, (now - l.since) / LIFT_MS)) };
   }
 
   /** A press on the board. */
@@ -72,16 +87,34 @@ export class BoardPointers {
   private join(e: PointerEvent) {
     this.tapping = null;
     this.unhold();
+    this.unlift();
     if (this.held && !consumable(dragIcon(this.held.edit.drag))) this.end();
     this.touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
   }
 
-  /** Starts dragging under `e` in the session `edit`. */
-  begin(edit: EditSession, e: PointerEvent) {
+  /** A press under `e` that lifts city tile `tile` in the session `edit`
+   * once held still for `LIFT_MS`; until then it moves the view (the host's
+   * `pickUp` returns false after calling this). */
+  pend(edit: EditSession, tile: TilePos, e: PointerEvent) {
+    this.unlift();
+    const timer = window.setTimeout(() => {
+      const l = this.lifting;
+      if (l?.edit !== edit) return;
+      this.lifting = null;
+      this.touches.delete(l.id);
+      this.tapping = null;
+      this.begin(edit, l.e, false);
+    }, LIFT_MS);
+    this.lifting = { edit, tile, id: e.pointerId, x: e.clientX, y: e.clientY, since: performance.now(), e, timer };
+  }
+
+  /** Starts dragging under `e` in the session `edit`; `holds` says whether
+   * keeping still then is a hold (a tile lifted by holding is not). */
+  begin(edit: EditSession, e: PointerEvent, holds = true) {
     e.preventDefault();
     this.held = { edit, ghost: ghostIcon(edit) };
     this.unhold();
-    if (this.host.hold) {
+    if (this.host.hold && holds) {
       const timer = window.setTimeout(() => {
         this.holding = null;
         if (this.held?.edit === edit && this.host.hold?.(edit)) this.end();
@@ -97,6 +130,12 @@ export class BoardPointers {
     if (t?.id === e.pointerId && Math.hypot(e.clientX - t.x, e.clientY - t.y) > TAP_SLOP) this.tapping = null;
     const o = this.holding;
     if (o?.id === e.pointerId && Math.hypot(e.clientX - o.x, e.clientY - o.y) > TAP_SLOP) this.unhold();
+    const l = this.lifting;
+    if (l?.id === e.pointerId) {
+      // Held still, the view stays put; moved away, the press pans instead.
+      if (Math.hypot(e.clientX - l.x, e.clientY - l.y) <= TAP_SLOP) return void (l.e = e);
+      this.unlift();
+    }
     if (!h && this.touches.has(e.pointerId)) return this.view(e);
     const at = h && this.at(e);
     if (at) h.edit.hover(at);
@@ -119,6 +158,7 @@ export class BoardPointers {
 
   private up(e: PointerEvent) {
     this.touches.delete(e.pointerId);
+    if (this.lifting?.id === e.pointerId) this.unlift();
     if (this.tapping?.id === e.pointerId) {
       this.tapping = null;
       if (!this.held) this.host.tap?.(e);
@@ -133,6 +173,7 @@ export class BoardPointers {
   private cancel(e: PointerEvent) {
     this.touches.delete(e.pointerId);
     this.tapping = null;
+    this.unlift();
     this.end();
   }
 
@@ -142,9 +183,16 @@ export class BoardPointers {
     this.holding = null;
   }
 
+  /** A city tile no longer lifting. */
+  private unlift() {
+    if (this.lifting) window.clearTimeout(this.lifting.timer);
+    this.lifting = null;
+  }
+
   /** Drops the drag in progress without placing it. */
   end() {
     this.unhold();
+    this.unlift();
     this.held?.ghost.remove();
     this.held = null;
   }

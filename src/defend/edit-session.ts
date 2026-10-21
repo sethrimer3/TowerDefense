@@ -13,7 +13,7 @@ import { REINFORCE } from "./reinforcements.ts";
 import type { CityMap } from "./citygen.ts";
 import { carriedKind, carriesCorner, carriesGate, carriesStructure, carriesWall, dragSpan, dropGhost, legalLayouts, liftsCityTile, nearestCorner, nearestEdge, refusal, structureKey, structureLayout, structureRect, wallSpotRect, type Drag } from "./drag-rules.ts";
 import type { Overlay } from "./edit-overlay.ts";
-import { CELLS_W, SUB, tileKey } from "./grid.ts";
+import { CELLS_W, SUB, tileKey, type TilePos } from "./grid.ts";
 import { QUARTERS_H, QUARTERS_W, huddles, quarterAt, quarterSize, structureSpots, removeBallista, removeCityTile, removeGate, removeSpikes, removeStructure, removeWall, wallAtCell, wallKey, type Layout } from "./layout.ts";
 
 /** Where a drag's pointer is: its board position in cells, and whether it is
@@ -54,6 +54,9 @@ export class EditSession {
   private at: DragAt | null = null;
   /** Where the pointer first was, telling a tap from a drag. */
   private start: DragAt | null = null;
+  /** The city tile a press lifted this session by (a city tile, or the
+   * keep's tile pressed away from the keep), which lifts only once held. */
+  byTile?: TilePos;
 
   constructor(readonly drag: Drag, private layout: Layout, private bannerRadius = RALLY_REACH) {
     this.legal = drag.from === "bomb" || drag.from === "banner" || drag.from === "necromancy" || drag.from === "meteor" || drag.from === "frostNova" || drag.from === "reinforcements" ? new Map() : legalLayouts(drag, layout);
@@ -85,8 +88,12 @@ export class EditSession {
     if (s) return new EditSession({ from: "structure", uid: s.uid, kind: s.kind }, layout);
     const tile = { tx: Math.floor(cx / SUB), ty: Math.floor(cy / SUB) };
     // The keep's tile, pressed away from its buildings, is carried by the keep.
-    if (tile.tx === layout.keep.tx && tile.ty === layout.keep.ty) return new EditSession({ from: "keep" }, layout);
-    return liftsCityTile(layout, tile) ? new EditSession({ from: "cityTile", tile }, layout) : null;
+    const drag: Drag | null = tile.tx === layout.keep.tx && tile.ty === layout.keep.ty ? { from: "keep" }
+      : liftsCityTile(layout, tile) ? { from: "cityTile", tile } : null;
+    if (!drag) return null;
+    const session = new EditSession(drag, layout);
+    session.byTile = tile;
+    return session;
   }
 
   /** The pointer moved to `at`. */

@@ -62,17 +62,20 @@ try {
       const dp = window.__dp, b = dp.currentMap().buildings.find(b => b.kind === 'keep');
       return dp.renderer.toClient(b.rect.x + b.rect.w / 2, b.rect.y + b.rect.h / 2);
     });
-    /** Drags from client point `a` to `b` with the mouse or a finger. */
-    const drag = async (a, b, shot) => {
+    /** Drags from client point `a` to `b` with the mouse or a finger,
+     * first holding still long enough to lift a tile when `hold` is set. */
+    const drag = async (a, b, shot, hold = false) => {
       if (phone) {
         const cdp = await context.newCDPSession(page);
         await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: a.x, y: a.y }] });
+        if (hold) await page.waitForTimeout(650);
         for (let i = 1; i <= 8; i++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: a.x + (b.x - a.x) * i / 8, y: a.y + (b.y - a.y) * i / 8 }] });
         if (shot) await page.screenshot({ path: shot });
         await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
         await cdp.detach();
       } else {
         await page.mouse.move(a.x, a.y); await page.mouse.down();
+        if (hold) await page.waitForTimeout(650);
         await page.mouse.move(b.x, b.y, { steps: 8 });
         if (shot) await page.screenshot({ path: shot });
         await page.mouse.up();
@@ -97,7 +100,7 @@ try {
       return null;
     });
     assert.ok(corner, 'open ground on the keep\'s tile');
-    await drag(corner, await tileAt(k0.tx, k0.ty));
+    await drag(corner, await tileAt(k0.tx, k0.ty), undefined, true);
     s = await state(page);
     assert.deepEqual(s.defend.layout.keep, k0, 'pressed by its tile, the keep moves back');
 
