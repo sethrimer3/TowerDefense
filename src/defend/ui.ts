@@ -81,6 +81,7 @@ export type DefendHost = {
   /** Enemies, and your troops, drawn as plain squares. */
   simpleEnemies?(): boolean;
   simpleTroops?(): boolean;
+  mergedOutlines?(): boolean;
   /** The tile grid's opacity while building, 0 when it's hidden. */
   gridLines?(): number;
   setHealthbars?(value: boolean): void;
@@ -910,6 +911,7 @@ export class DefendPage {
       healthbars: this.host.healthbars?.() ?? true,
       simpleEnemies: this.host.simpleEnemies?.() ?? false,
       simpleTroops: this.host.simpleTroops?.() ?? false,
+      mergedOutlines: this.host.mergedOutlines?.() ?? true,
       looks: this.looks(),
       gate: this.save.gateRanks,
       over: this.phase === "over",

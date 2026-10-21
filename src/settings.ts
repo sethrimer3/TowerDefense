@@ -21,6 +21,9 @@ export const SETTINGS = {
    * in their colours, quicker to draw than their sprites. */
   simpleEnemies: { kind: "toggle", default: false, page: { id: "simple-enemies", label: "Simple square enemies" } },
   simpleTroops: { kind: "toggle", default: false, page: { id: "simple-troops", label: "Simple square troops" } },
+  /** Units in battle outlined together: touching units share one black
+   * outline round their combined shape instead of each its own. */
+  mergedOutlines: { kind: "toggle", default: true, page: { id: "merged-outlines", label: "Merged unit outlines" } },
   /** The Defend palette lists items the player has none of (greyed); off, only those owned. */
   showEmpty: { kind: "toggle", default: false, page: { id: "show-empty", label: "Show items you have none of" } },
   /** Faint lines round the Defend board's tiles, and how strong, in percent. */

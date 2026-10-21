@@ -45,14 +45,15 @@ function add(map: Map<string, number[]>, color: string, x: number, y: number, s:
   list.push(x, y, s);
 }
 
-/** Every queued square: outlines, bodies, then the light and shade edges. */
-function flush(c: CanvasRenderingContext2D, k: number) {
+/** Every queued square: outlines (on `rims`), bodies, then the light and
+ * shade edges. */
+function flush(c: CanvasRenderingContext2D, k: number, rims = c) {
   for (const [color, q] of outlines) {
     if (!q.length) continue;
-    c.fillStyle = color;
-    c.beginPath();
-    for (let i = 0; i < q.length; i += 3) c.rect(q[i] - k, q[i + 1] - k, q[i + 2] + 2 * k, q[i + 2] + 2 * k);
-    c.fill();
+    rims.fillStyle = color;
+    rims.beginPath();
+    for (let i = 0; i < q.length; i += 3) rims.rect(q[i] - k, q[i + 1] - k, q[i + 2] + 2 * k, q[i + 2] + 2 * k);
+    rims.fill();
     q.length = 0;
   }
   const edges: number[] = [];
@@ -96,22 +97,23 @@ function queue(px: number, k: number, x: number, y: number, size: number, color:
   add(fills, color, sx, sy, s);
 }
 
-/** Enemies as squares, gold-outlined while marked, white while struck. */
-export function drawSimpleEnemies({ c, px }: Brush, enemies: readonly Enemy[]) {
+/** Enemies as squares, gold-outlined while marked, white while struck.
+ * With `rims`, the outlines go there (merged outlines, `unit-outline.ts`). */
+export function drawSimpleEnemies({ c, px }: Brush, enemies: readonly Enemy[], rims = c) {
   const k = artPixel(px);
   for (const e of enemies) {
     const def = ENEMIES[e.kind];
     queue(px, k, e.x, e.y, enemySize(e), e.flash > 0 ? "#ffffff" : def.color, e.marked ? "#f2c94c" : def.boss ? "#7a1616" : "#000000");
   }
-  flush(c, k);
+  flush(c, k, rims);
 }
 
-/** Your troops as squares, white while struck. */
-export function drawSimpleTroops({ c, px }: Brush, soldiers: readonly Soldier[]) {
+/** Your troops as squares, white while struck, their outlines on `rims`. */
+export function drawSimpleTroops({ c, px }: Brush, soldiers: readonly Soldier[], rims = c) {
   const k = artPixel(px);
   for (const u of soldiers) {
     const t = TROOPS[u.kind];
     queue(px, k, u.x, u.y, t.size, u.flash > 0 ? "#ffffff" : t.color, "#000000");
   }
-  flush(c, k);
+  flush(c, k, rims);
 }

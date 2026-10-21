@@ -23,6 +23,7 @@ import { GATE_FRAMES } from "./gate-art.ts";
 import { peopleAt } from "./gates.ts";
 import type { GateRanks } from "../gate-upgrades.ts";
 import { drawBallistas, drawSpikeThrusts } from "./wall-defense-art.ts";
+import { UnitOutline } from "./unit-outline.ts";
 import { carriedLights, drawDamage, drawScorches, drawUnits, shadowCasters, type Brush, type Burning } from "./battle-art.ts";
 import { drawGrid, drawOverlay, type Overlay } from "./edit-overlay.ts";
 import { drawInspect, type Armed } from "./inspect.ts";
@@ -65,6 +66,8 @@ export type DrawOptions = {
   simpleEnemies?: boolean;
   /** Your troops as plain squares (Simple troops). */
   simpleTroops?: boolean;
+  /** Units outlined together, round their combined shape (`unit-outline.ts`). */
+  mergedOutlines?: boolean;
   /** The run is over: the city's torches go out in a wave from the keep. */
   over?: boolean;
   /** Leave out the planted war banner (while the player carries it). */
@@ -132,6 +135,7 @@ export class DefendRenderer {
   private combatLayer: HTMLCanvasElement | null = null;
   private combatSim: DefendSim | null = null;
   private combatKey = '';
+  private outline: UnitOutline | null = null;
   px = 8;
 
   constructor(canvas: HTMLCanvasElement) {
@@ -391,7 +395,7 @@ export class DefendRenderer {
     else {
       // Combat art advances on the fixed simulation clock. Keep screen pixels
       // (including artPen's camera snapping), never rescale a cached frame.
-      const key = `${sim.time}:${sim.mapVersion}:${sim.effects.length}:${sim.scorches.length}:${sim.enemies.length}:${sim.soldiers.length}:${sim.civilians.length}:${this.px}:${c.canvas.width}:${c.canvas.height}:${this.cam.s}:${this.cam.x}:${this.cam.y}:${!!torches}:${opts.healthbars === true}:${!!opts.simpleEnemies}:${!!opts.simpleTroops}:${pixelKey()}`;
+      const key = `${sim.time}:${sim.mapVersion}:${sim.effects.length}:${sim.scorches.length}:${sim.enemies.length}:${sim.soldiers.length}:${sim.civilians.length}:${this.px}:${c.canvas.width}:${c.canvas.height}:${this.cam.s}:${this.cam.x}:${this.cam.y}:${!!torches}:${opts.healthbars === true}:${!!opts.simpleEnemies}:${!!opts.simpleTroops}:${!!opts.mergedOutlines}:${pixelKey()}`;
       this.combatLayer ??= document.createElement('canvas');
       const layer = this.combatLayer;
       if (sim !== this.combatSim || key !== this.combatKey) {
@@ -417,7 +421,7 @@ export class DefendRenderer {
     drawRime(c, this.px, sim);
     drawLandings(c, this.px, sim);
     this.wizard.drawIce(c, this.px, sim.frosts, sim.time * 1000, flameLights(sim).relief);
-    drawUnits(brush, sim, torches, opts.healthbars === true, opts.timings ? this.timings : undefined, { enemies: opts.simpleEnemies, troops: opts.simpleTroops });
+    drawUnits(brush, sim, torches, opts.healthbars === true, opts.timings ? this.timings : undefined, { enemies: opts.simpleEnemies, troops: opts.simpleTroops }, opts.mergedOutlines ? (this.outline ??= new UnitOutline()) : undefined);
     this.dark.draw(c, this.px, sim);
   }
 

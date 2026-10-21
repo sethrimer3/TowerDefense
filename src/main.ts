@@ -104,6 +104,7 @@ const defendPage = new DefendPage(el("defend"), {
   healthbars: () => save.settings.showHealthbars,
   simpleEnemies: () => save.settings.simpleEnemies,
   simpleTroops: () => save.settings.simpleTroops,
+  mergedOutlines: () => save.settings.mergedOutlines,
   setHealthbars: (value) => { save.settings.showHealthbars = value; store(); },
   showEmpty: () => save.settings.showEmpty,
   gridLines: () => (save.settings.tileGrid ? save.settings.gridOpacity / 100 : 0),
