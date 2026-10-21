@@ -6,7 +6,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { defaults, decode } from "../src/save.ts";
-import { allocated, buildingTree, hasTree, targetKind, respecBuilding, undoTo, undoRefund, undoUpgrade, nextSteps, placedBattlePaths, specialtyLabel, specialtyOf, spikeKey, stepName, upgradeBuilding, upgradedFrom, rootOf, type UpgradeStep } from "../src/specializations.ts";
+import { ATTUNED, allocated, buildingTree, foundNodes, hasTree, targetKind, respecBuilding, undoTo, undoRefund, undoUpgrade, nextSteps, placedBattlePaths, specialtyLabel, specialtyOf, spikeKey, stepName, upgradeBuilding, upgradedFrom, rootOf, type UpgradeStep } from "../src/specializations.ts";
 import { learnPath, pathById, type PathId } from "../src/knowledge-paths.ts";
 import { bonuses } from "../src/progression.ts";
 import { placeStructure, removeStructure, moveStructure, moveSpikes, placeCityTile, placeSpikes, removeSpikes, defaultLayout, fitLayout } from "../src/defend/layout.ts";
@@ -21,6 +21,7 @@ import { baitBitten } from "../src/defend/bait.ts";
 import { center } from "../src/defend/pathing.ts";
 import { BRAWLER, MUSKETEER, ROCKETEER, SLINGER, SNIPER, STARTING_OWNED, type PaletteItem } from "../src/defend/catalog.ts";
 import { treeCardHtml, treeGraph } from "../src/ui/specialty.ts";
+import { battleBonuses, wear as spare } from "./spare-paths.ts";
 
 type S = ReturnType<typeof defaults>;
 const INSIDE = new Set<PaletteItem>(["barracks", "mageGuild", "archerBarracks", "meleeGuild", "rangedGuild", "sniperLodge", "musketHall", "gunHall", "gunNest", "gatlingNest", "rocketBattery"]);
@@ -58,22 +59,28 @@ function enemy(sim: DefendSim, x: number, y: number) {
 }
 
 // ── The tree ───────────────────────────────────────────────────────────
-test("the shop's three basic buildings branch into every other tower and troop building", () => {
+test("the shop's three basic buildings branch into attuned buildings, each with three branches", () => {
   const to = (k: Parameters<typeof nextSteps>[0]) => nextSteps(k).map(stepName);
-  assert.deepEqual(to("watchTower"), ["Archer tower", "Cannon tower", "Wizard tower", "Spotters I", "Signal fires I"]);
+  assert.deepEqual(to("watchTower"), ["Archer tower", "Cannon tower", "Wizard tower"], "no paths of its own");
   assert.deepEqual(to("meleeGuild"), ["Barracks", "Assassins' den", "Spearmen hall"]);
   assert.deepEqual(to("rangedGuild"), ["Archer barracks", "Mage Guild", "Gunner hall"]);
-  assert.deepEqual(to("gunHall"), ["Musket hall", "Machine-gun nest", "Rocket battery", "Quickdraw I", "Duelists I"]);
-  assert.deepEqual(to("barracks"), ["Hero", "Crusaders I", "Berserkers I", "Halberdiers I"]);
-  assert.deepEqual(to("assassinDen"), ["Bloodletters I", "Shadowcloak I", "Venomblades I", "Headhunters I"]);
+  assert.deepEqual(to("gunHall"), ["Musket hall", "Machine-gun nest", "Rocket battery"]);
+  assert.deepEqual(to("barracks"), ["Crusaders I", "Berserkers I", "Halberdiers I"]);
+  assert.deepEqual(to("assassinDen"), ["Bloodletters I", "Shadowcloak I", "Venomblades I"]);
   assert.deepEqual(to("wizardTower"), ["Pyromancy I", "Rime I", "Stormcalling I"]);
-  assert.deepEqual(to("sniperLodge"), ["Revolutionary", "Marksmen I", "Ricochet I", "Suppressing fire I", "Deadeye I", "Piercing rounds I"]);
+  assert.deepEqual(to("sniperLodge"), ["Revolutionary", "Marksmen I", "Ricochet I", "Suppressing fire I", "Deadeye I", "Piercing rounds I"], "an ultimate keeps its own");
   assert.deepEqual(nextSteps("wizardTower", { path: "storm", rank: 2 }).map(stepName), ["Stormcalling III"]);
-  assert.deepEqual(nextSteps("wizardTower", { path: "storm", rank: 3 }).map(stepName), ["Dark wizard keep"], "its crown evolves it");
-  assert.deepEqual(nextSteps("lancerStable", { path: "wingedLancers", rank: 3 }).map((s) => s.type === "evolve" && s.to), ["valkyriePalace"]);
-  assert.deepEqual(nextSteps("barracks", { path: "crusaders", rank: 3 }), [], "the Crusaders lost their crown to the lancers");
-  assert.deepEqual(nextSteps("wizardTower", { path: "rime", rank: 3 }), [], "a path without a crown ends at III");
+  for (const path of ["pyromancy", "rime", "storm"] as const)
+    assert.deepEqual(nextSteps("wizardTower", { path, rank: 3 }).map((s) => s.type === "merge" && s.to), ["darkKeep"], `${path} III merges`);
+  assert.deepEqual(nextSteps("lancerStable", { path: "wingedLancers", rank: 3 }).map((s) => s.type === "merge" && s.to), ["valkyriePalace"]);
+  assert.deepEqual(nextSteps("archerTower", { path: "fireArrows", rank: 3 }), [], "no ultimate yet");
   assert.deepEqual(to("wallSpikes"), ["Blasting stakes I", "Spring stakes I", "Rimed stakes I"]);
+  // Every attuned building has three branches of three ranks (or, while a
+  // third is still to come, two).
+  for (const a of ATTUNED) {
+    assert.ok(a.branches.length === 3 || (a.branches.length === 2 && ["archerTower", "cannonTower", "archerBarracks", "mageGuild"].includes(a.kind)), a.kind);
+    for (const b of a.branches) assert.equal(pathById(b.path).ranks.length, 3, b.path);
+  }
   assert.equal(rootOf("darkKeep"), "watchTower");
   assert.equal(rootOf("valkyriePalace"), "meleeGuild");
   assert.equal(upgradedFrom("musketHall"), "gunHall");
@@ -114,21 +121,46 @@ test("becoming another building swaps one copy: in place when it fits, else it w
   assert.deepEqual([s.defend.owned.watchTower, s.defend.owned.archerTower], [1, 1]);
   assert.equal(s.defend.layout.structures.find(st => st.uid === a)!.kind, "archerTower", "the same building, same uid");
   assert.ok(fitLayout(s.defend.layout).ok);
-  // A Stormcalling III tower evolving into a keep needs a 2 × 2 block of
-  // tiles: it waits in the palette.
-  const w = fixture("wizardTower", 1), [t] = uids(w, "wizardTower");
-  wear(w, t, "storm");
-  const r = upgradeBuilding(w, { uid: t }, { type: "evolve", path: "storm", to: "darkKeep", cost: 0 });
-  assert.deepEqual(r, { ok: true, kind: "darkKeep", waiting: true });
-  assert.deepEqual([w.defend.owned.wizardTower, w.defend.owned.darkKeep, available(w.defend, "darkKeep")], [0, 1, 1]);
   // The same size, it stays where it stood; another size, and it waits in
-  // the palette to be placed again.
+  // the palette to be placed again, on its branch's first rank.
   const g = fixture("rangedGuild", 2), [guild, other] = uids(g, "rangedGuild");
   assert.deepEqual(upgradeBuilding(g, { uid: guild }, become("gunHall")), { ok: true, kind: "gunHall", waiting: false });
   assert.deepEqual(upgradeBuilding(g, { uid: other }, become("gunHall")), { ok: true, kind: "gunHall", waiting: false });
-  assert.deepEqual(upgradeBuilding(g, { uid: other }, become("musketHall")), { ok: true, kind: "musketHall", waiting: true });
+  assert.deepEqual(upgradeBuilding(g, { uid: other }, { type: "branch", to: "musketHall", path: "volleyFire", cost: 0 }), { ok: true, kind: "musketHall", waiting: true });
   assert.deepEqual(g.defend.layout.structures.map((st) => st.kind), ["gunHall"]);
-  assert.equal(available(g.defend, "musketHall"), 1);
+  assert.deepEqual(keptGroups(g.defend, "musketHall"), [{ path: "volleyFire", rank: 1, count: 1 }]);
+});
+
+test("three buildings maxed on different branches merge into the ultimate; undone, they come apart", () => {
+  const w = fixture("wizardTower", 1), [t] = uids(w, "wizardTower");
+  wear(w, t, "storm");
+  const merge: UpgradeStep = { type: "merge", to: "darkKeep", cost: 0 };
+  assert.deepEqual(upgradeBuilding(w, { uid: t }, merge), { ok: false, reason: "Needs a Wizard tower at Pyromancy III and a Wizard tower at Rime III to merge with." });
+  // One waits in the palette, one stands in the city.
+  w.defend.owned.wizardTower = 3;
+  w.defend.kept.push({ kind: "wizardTower", path: "pyromancy", rank: 3 });
+  let l = w.defend.layout;
+  l = placeStructure(l, "wizardTower", l.keep.tx + 1, l.keep.ty - 3, { path: "rime", rank: 3 })!;
+  w.defend.layout = l;
+  w.settings.devMode = false; w.knowledge = 0;
+  assert.match(treeCardHtml(w, "wizardTower", { path: "storm", rank: 3 }, "k:darkKeep"), /waiting in the palette[\s\S]*standing in the city[\s\S]*data-ug-buy="k:darkKeep" >Merge · Free/);
+  // A keep needs a 2 × 2 block of tiles: it waits in the palette.
+  assert.deepEqual(upgradeBuilding(w, { uid: t }, merge), { ok: true, kind: "darkKeep", waiting: true });
+  assert.deepEqual([w.defend.owned.wizardTower, w.defend.owned.darkKeep, available(w.defend, "darkKeep")], [0, 1, 1]);
+  assert.deepEqual([w.defend.kept, w.defend.layout.structures.length], [[], 0], "the other two are used up");
+  assert.equal(w.knowledge, 0, "merging is free");
+  assert.ok(foundNodes(w.defend).has("k:darkKeep"));
+  // Undoing the merge parts it into the three; a respec into three Watch towers.
+  assert.deepEqual(undoTo("darkKeep", undefined, "k:darkKeep"), { kind: "wizardTower", wear: { path: "rime", rank: 3 }, apart: [{ kind: "wizardTower", wear: { path: "pyromancy", rank: 3 } }, { kind: "wizardTower", wear: { path: "storm", rank: 3 } }] });
+  assert.equal(undoRefund("darkKeep", undefined, "k:darkKeep"), 0);
+  assert.equal(undoTo("darkKeep", undefined, "p:storm:2"), undefined, "below the merge, only the merge undoes");
+  const r = undoUpgrade(w, { copy: "darkKeep" }, "k:darkKeep");
+  assert.deepEqual(r.ok && r.copy, { copy: "wizardTower", wear: { path: "rime", rank: 3 } });
+  assert.deepEqual(keptGroups(w.defend, "wizardTower").map((g) => g.path).sort(), ["pyromancy", "rime", "storm"]);
+  assert.deepEqual([w.defend.owned.wizardTower, w.defend.owned.darkKeep, w.knowledge], [3, 0, 0]);
+  w.defend.kept = []; w.defend.owned.wizardTower = 0; w.defend.owned.darkKeep = 1; w.defend.owned.watchTower = 0;
+  assert.ok(respecBuilding(w, { copy: "darkKeep" }).ok);
+  assert.deepEqual([w.defend.owned.watchTower, w.defend.owned.darkKeep, w.knowledge], [3, 0, allocated("darkKeep")]);
 });
 
 test("moving keeps a building's upgrades; taken up, it waits in the palette with them and is placed again", () => {
@@ -187,25 +219,28 @@ test("a choice cuts off the branches beside it and opens its own", () => {
   assert.deepEqual(plain, ["k:rangedGuild=owned", "k:archerBarracks=next", "k:mageGuild=next", "k:gunHall=next"]);
   const mage = ids("mageGuild");
   assert.ok(!mage.some((n) => n.startsWith("k:archerBarracks")), "the archer branch is gone");
-  assert.ok(mage.includes("p:pyroclasm:1=next") && mage.includes("p:cinders:1=next") && mage.includes("p:pyroclasm:3=locked"), "the mage's own paths appear");
+  assert.ok(mage.includes("p:pyroclasm:1=next") && mage.includes("p:cinders:1=next") && mage.includes("p:pyroclasm:3=locked"), "the mage's own branches appear");
   const pyro = ids("mageGuild", { path: "pyroclasm", rank: 1 });
-  assert.deepEqual(pyro, ["k:rangedGuild=owned", "k:mageGuild=owned", "p:pyroclasm:1=owned", "p:pyroclasm:2=next", "p:pyroclasm:3=locked"], "Cinders is cut off");
+  assert.deepEqual(pyro, ["k:rangedGuild=owned", "k:mageGuild=owned", "p:pyroclasm:1=owned", "p:pyroclasm:2=next", "p:pyroclasm:3=locked", "u:mageGuild=locked"], "Cinders is cut off; the ultimate is to come");
   const storm = buildingTree("wizardTower", { path: "storm", rank: 3 });
-  const crown = pathById("storm").evolves!.cost;
-  assert.deepEqual(storm.at(-1), { id: "k:darkKeep", parent: "p:storm:3", state: "next", kind: "darkKeep", cost: crown, step: { type: "evolve", path: "storm", to: "darkKeep", cost: crown } });
-  assert.deepEqual(ids("darkKeep"), ["k:watchTower=owned", "k:wizardTower=owned", "p:storm:1=owned", "p:storm:2=owned", "p:storm:3=owned", "k:darkKeep=owned"]);
+  assert.deepEqual(storm.at(-1), { id: "k:darkKeep", parent: "p:storm:3", state: "next", kind: "darkKeep", cost: 0, step: { type: "merge", to: "darkKeep", cost: 0 } });
+  const keep = buildingTree("darkKeep");
+  assert.deepEqual(keep.map((n) => n.id), ["k:watchTower", "k:wizardTower", ...["pyromancy", "rime", "storm"].flatMap((p) => [1, 2, 3].map((r) => `p:${p}:${r}`)), "k:darkKeep"]);
+  assert.ok(keep.every((n) => n.state === "owned"));
+  assert.equal(keep.at(-1)!.parent, "p:rime:3", "over the middle branch");
   for (const n of buildingTree("watchTower")) if (n.parent) assert.ok(buildingTree("watchTower").some((o) => o.id === n.parent), n.id);
   // Every buyable node is exactly one of the building's next steps.
-  for (const [k, w] of [["watchTower"], ["wizardTower", { path: "storm", rank: 3 }], ["wallSpikes"], ["barracks", { path: "crusaders", rank: 1 }]] as const)
+  for (const [k, w] of [["watchTower"], ["wizardTower"], ["spearHall"], ["wizardTower", { path: "storm", rank: 3 }], ["wallSpikes"], ["barracks", { path: "crusaders", rank: 1 }]] as const)
     assert.equal(buildingTree(k, w as never).filter((n) => n.state === "next").length, nextSteps(k, w as never).length, k);
 });
 
 test("allocated Knowledge counts every step from the basic building", () => {
+  const full = (p: PathId) => pathById(p).ranks.reduce((n, r) => n + r.cost, 0);
   assert.equal(allocated("watchTower"), 0);
   assert.equal(allocated("wizardTower"), 8);
   assert.equal(allocated("wizardTower", { path: "pyromancy", rank: 2 }), 8 + 4 + 4004);
-  const storm = pathById("storm");
-  assert.equal(allocated("darkKeep"), 8 + storm.ranks.reduce((n, r) => n + r.cost, 0) + storm.evolves!.cost);
+  assert.equal(allocated("phalanx", { path: "testudo", rank: 1 }), 5 + 7 + 4);
+  assert.equal(allocated("darkKeep"), 3 * 8 + full("pyromancy") + full("rime") + full("storm"), "all three towers merged into it");
   assert.equal(allocated("wallSpikes", { path: "blastStakes", rank: 1 }), pathById("blastStakes").ranks[0].cost);
 });
 
@@ -243,29 +278,23 @@ test("undoing a node steps the building back to the one it grew from, its Knowle
   assert.equal(s.defend.layout.structures.find((st) => st.uid === a)?.kind, "watchTower");
   assert.equal(s.knowledge, 1e7, `every point back (${all} spent)`);
   assert.equal((undoUpgrade(s, { uid: a }, "k:watchTower") as { reason: string }).reason, "Nothing to undo there.", "the basic building can't be undone");
-  // An evolved copy in the palette: undoing the crown keeps Stormcalling III.
-  s.defend.owned.darkKeep = 1;
-  assert.deepEqual(undoTo("darkKeep", undefined, "k:darkKeep"), { kind: "wizardTower", wear: { path: "storm", rank: 3 } });
-  const r = undoUpgrade(s, { copy: "darkKeep" }, "k:darkKeep");
-  assert.ok(r.ok && r.copy && "copy" in r.copy);
-  assert.deepEqual(r.ok && r.copy, { copy: "wizardTower", wear: { path: "storm", rank: 3 } });
-  assert.equal(s.knowledge, 1e7 + storm.evolves!.cost);
-  assert.deepEqual(keptGroups(s.defend, "wizardTower"), [{ path: "storm", rank: 3, count: 1 }]);
-  assert.equal(s.defend.owned.darkKeep, 0);
+  // A branch that made the hall a phalanx: undoing its first rank makes it a hall again.
+  assert.deepEqual(undoTo("phalanx", { path: "testudo", rank: 2 }, "p:testudo:2"), { kind: "phalanx", wear: { path: "testudo", rank: 1 } });
+  assert.deepEqual(undoTo("phalanx", { path: "testudo", rank: 2 }, "p:testudo:1"), { kind: "spearHall" });
+  assert.equal(undoRefund("phalanx", { path: "testudo", rank: 1 }, "p:testudo:1"), 7 + 4);
 });
 
-test("the tree puts other buildings beside and below, paths above, and counts hidden and closed branches", () => {
+test("the tree puts other buildings beside and below, branches above, and counts hidden and closed branches", () => {
   const plain = buildingTree("watchTower");
-  for (const n of plain.filter((o) => o.step?.type === "become")) assert.ok(n.side && n.hidden!.length > 0, n.id);
-  assert.ok(plain.filter((o) => o.path).every((o) => !o.side), "paths carry on up");
+  for (const n of plain.filter((o) => o.step?.type === "become")) assert.ok(n.side && n.hidden!.length >= 2, n.id);
   assert.equal(plain.find((o) => o.id === "k:watchTower")!.closed, undefined, "nothing closed off yet");
   const wizard = buildingTree("wizardTower", { path: "storm", rank: 1 });
-  assert.equal(wizard.find((o) => o.id === "k:watchTower")!.closed!.length, 3 + 2 - 1, "it passed over the archer and cannon towers and its two paths");
+  assert.equal(wizard.find((o) => o.id === "k:watchTower")!.closed!.length, 2, "it passed over the archer and cannon towers");
   assert.equal(wizard.find((o) => o.id === "k:wizardTower")!.closed!.length, 2, "Pyromancy and Rime");
-  assert.ok(wizard.find((o) => o.id === "k:darkKeep"), "the crown waits at the top");
+  assert.ok(wizard.filter((o) => o.path).every((o) => !o.side), "branches carry on up");
+  assert.ok(wizard.find((o) => o.id === "k:darkKeep"), "the ultimate waits at the top");
 });
 
-// ── Older saves ────────────────────────────────────────────────────────
 test("a copy still in the palette is upgraded and respecced on its own", () => {
   const s = defaults(); s.knowledge = 1e5; s.smithy.copper = 20;
   s.defend.owned.watchTower = 2;
@@ -316,7 +345,7 @@ test("version 4: building research all comes back as Knowledge; buildings stand 
   raw.defend.layout.structures[0].path = "pyromancy";
   raw.researchJob = { kind: "path", id: "crusaders", rank: 0, left: 1000, paid: 4 };
   const loaded = decode(JSON.stringify(raw));
-  assert.equal(loaded.version, 6);
+  assert.equal(loaded.version, 7);
   assert.deepEqual(loaded.defend.layout.structures.map((st) => st.path), [undefined, undefined]);
   assert.deepEqual(Object.keys(loaded.pathResearch), ["starfall"]);
   assert.equal(loaded.knowledge, 100 + 4008 + 4 + 175015 + 4, "every building research back, and the research in progress");
@@ -442,9 +471,11 @@ test("Pyroclasm and Cinders effects retain their own origin after the caster die
 });
 
 test("overlapping watch towers combine their strongest mark and slow without multiplying duplicates", () => {
+  // Spare paths since every watch tower became a basic building.
   const s = fixture("watchTower", 2), [first, second] = uids(s, "watchTower");
-  wear(s, first, "spotters"); wear(s, second, "signalFires");
-  const sim = simulation(s), b = sim.map.buildings.find(b => b.kind === "watchTower")!, at = center(b.rect);
+  spare(s, first, "spotters", 3); spare(s, second, "signalFires", 3);
+  const fit = fitLayout(s.defend.layout); assert.ok(fit.ok);
+  const sim = new DefendSim(generateCity(fit, 4), { ...s.defend.levels }, 1, battleBonuses(s)), b = sim.map.buildings.find(b => b.kind === "watchTower")!, at = center(b.rect);
   const e = enemy(sim, at.x + 2, at.y); (sim as any).markEnemies();
   assert.equal(e.markDamage, 3); assert.equal(e.slowed, 0.55);
 });
@@ -463,4 +494,26 @@ test("spells are still researched once in the Study", () => {
   const s = defaults(); s.knowledge = 1e6;
   assert.ok(learnPath(s, "starfall"));
   assert.equal(learnPath(s, "pyromancy"), false);
+});
+
+test("version 6: ranks on paths a building can no longer take come back, and ultimates their old price beyond a respec's", () => {
+  const s = fixture("watchTower", 2); s.settings.devMode = false;
+  const [a, b] = uids(s, "watchTower");
+  s.defend.layout.structures.find((st) => st.uid === a)!.path = "spotters";
+  s.defend.layout.structures.find((st) => st.uid === a)!.rank = 2;
+  s.defend.owned.musketHall = 1; s.defend.owned.heroHall = 1;
+  const raw: any = JSON.parse(JSON.stringify(s));
+  raw.version = 6; raw.knowledge = 100;
+  raw.defend.kept = [{ kind: "musketHall", path: "grenadiers", rank: 1 }];
+  const loaded = decode(JSON.stringify(raw));
+  assert.equal(loaded.version, 7);
+  const spotters = pathById("spotters"), grenadiers = pathById("grenadiers");
+  const hero = 100004 - allocated("heroHall");
+  assert.ok(hero > 0);
+  assert.equal(loaded.knowledge, 100 + spotters.ranks[0].cost + spotters.ranks[1].cost + grenadiers.ranks[0].cost + hero);
+  assert.equal(specialtyOf(loaded.defend.layout, { uid: a }), undefined, "the watch tower stands plain");
+  assert.equal(specialtyOf(loaded.defend.layout, { uid: b }), undefined);
+  assert.deepEqual([loaded.defend.kept, loaded.defend.owned.musketHall, loaded.defend.owned.heroHall], [[], 1, 1]);
+  const again = decode(JSON.stringify(loaded));
+  assert.equal(again.knowledge, loaded.knowledge, "migrates once");
 });

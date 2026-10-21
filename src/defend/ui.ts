@@ -1,5 +1,5 @@
 import { MagicCircle } from "../magic-circle/render.ts";
-import { buildingTree, foundNodes, hasTree, respecBuilding, undoUpgrade, rootOf, specialtyLabel, specialtyOf, stepName, targetKind, upgradeBuilding, type PaletteKind, type SpecialtyTarget } from "../specializations.ts";
+import { buildingTree, foundNodes, hasTree, mergedFrom, respecBuilding, undoUpgrade, rootOf, specialtyLabel, specialtyOf, stepName, targetKind, upgradeBuilding, type PaletteKind, type SpecialtyTarget } from "../specializations.ts";
 import { pathById, type PathId } from "../knowledge-paths.ts";
 import { SIDE_UI, graftedGraph, mapCardHtml, mapCount, mapGraph, mapWeb, sharedBranches, specialtyCircle, treeAllocated, treeBeyond, treeCardHtml, treeStep, type SideKind, type SideUi } from "../ui/specialty.ts";
 import { UpgradeGraph } from "../ui/upgrade-graph.ts";
@@ -1195,6 +1195,7 @@ export class DefendPage {
       this.setMessage(`${stepName(step)}: its size changed, so it waits in the palette to be placed again.`, 3);
       return;
     }
+    if (step.type === "merge") this.setMessage(`Merged into a ${stepName(step)}: the other two buildings were used up.`, 3);
     this.bought(id);
   }
 
@@ -1370,7 +1371,7 @@ export class DefendPage {
     const respec = el.querySelector<HTMLButtonElement>(".ug-respec")!;
     respec.disabled = plain;
     respec.textContent = "Respec · free";
-    respec.title = plain ? "Nothing allocated yet" : side ? `Get all ${spent.toLocaleString("en")} Knowledge back and ${side.plain}` : `Get all ${spent.toLocaleString("en")} Knowledge back and turn it back into a ${plainKind === "wallSpikes" ? "plain row of spikes" : ITEM_NAMES[rootOf(plainKind)]}`;
+    respec.title = plain ? "Nothing allocated yet" : side ? `Get all ${spent.toLocaleString("en")} Knowledge back and ${side.plain}` : `Get all ${spent.toLocaleString("en")} Knowledge back and turn it back into ${plainKind === "wallSpikes" ? "a plain row of spikes" : `${mergedFrom(plainKind) ? "three" : "a"} ${ITEM_NAMES[rootOf(plainKind)]}${mergedFrom(plainKind) ? "s, two of them waiting in the palette" : ""}`}`;
     const mapBtn = el.querySelector<HTMLButtonElement>(".ug-map-toggle")!;
     mapBtn.hidden = !!side;
     mapBtn.textContent = sp.map ? "Tree" : "Map";

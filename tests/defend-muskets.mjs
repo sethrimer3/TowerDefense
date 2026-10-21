@@ -1,6 +1,6 @@
-// The Musket hall's paths in the browser, on desktop and phones: a plain
-// hall's tree offers Grenadiers, Volley fire and Bayonets, and halls on each
-// path fight (burning ground, extra balls, bayonets fixed) in battle. Isolated browser contexts only: never
+// The Musket hall in the browser, on desktop and phones: the Gunner hall's
+// Volley fire branch. A plain hall's tree offers Volley fire's ranks and the
+// Gatling emplacement over them, and its musketmen fight in battle. Isolated browser contexts only: never
 // reads or changes a player's saved game. Needs `npm run dev`. Screenshots
 // go to test-results/ (or SHOTS).
 import { chromium } from '@playwright/test';
@@ -61,7 +61,8 @@ try {
     await zoomKeep(phone ? 2 : 2.5);
     await page.waitForTimeout(500); await page.screenshot({ path: `${out}/muskets-${width}-halls.png` });
 
-    // The plain hall's tree: three paths.
+    // The plain hall's tree: its one branch, the ultimate over it. (Halls
+    // saved on the spare paths stand plain.)
     const panel = page.locator('#defend-specialty');
     const press = async locator => phone ? locator.tap() : locator.click();
     const hall = s.defend.layout.structures.find(x => x.kind === 'musketHall' && !x.path);
@@ -73,16 +74,16 @@ try {
     await page.waitForSelector('#defend-specialty:not([hidden])');
     const nodes = () => panel.locator('.ug-node:not(.withering)').evaluateAll(els => els.map(e => `${e.dataset.node}=${['owned', 'next', 'locked'].find(c => e.classList.contains(c))}`));
     const tree = await nodes();
-    for (const path of ['grenadiers', 'volleyFire', 'bayonets']) assert.ok(tree.includes(`p:${path}:1=next`), `${path} in ${tree}`);
-    await press(panel.locator('[data-node="p:grenadiers:1"]'));
+    assert.deepEqual(tree.filter(n => !n.endsWith('=owned')), ['p:volleyFire:1=next', 'p:volleyFire:2=locked', 'p:volleyFire:3=locked', 'k:gatlingNest=locked'], `${tree}`);
+    await press(panel.locator('[data-node="p:volleyFire:1"]'));
     await page.waitForTimeout(900); await page.screenshot({ path: `${out}/muskets-${width}-tree.png` });
-    await press(panel.locator('[data-ug-buy="p:grenadiers:1"]'));
+    await press(panel.locator('[data-ug-buy="p:volleyFire:1"]'));
     await page.waitForFunction(() => !document.querySelector('#defend-specialty .ug-node.withering'), null, { timeout: 5000 });
     const climbed = await nodes();
-    assert.ok(climbed.includes('p:grenadiers:2=next') && !climbed.some(n => n.startsWith('p:bayonets')), `climbed: ${climbed}`);
-    await page.waitForTimeout(1200); await page.screenshot({ path: `${out}/muskets-${width}-grenadiers.png` });
+    assert.ok(climbed.includes('p:volleyFire:2=next'), `climbed: ${climbed}`);
+    await page.waitForTimeout(1200); await page.screenshot({ path: `${out}/muskets-${width}-volley.png` });
     s = await state(page);
-    assert.equal(s.defend.layout.structures.find(x => x.uid === hall.uid).path, 'grenadiers');
+    assert.equal(s.defend.layout.structures.find(x => x.uid === hall.uid).path, 'volleyFire');
     await press(panel.locator('[data-specialty-close]'));
 
     // In battle.
@@ -100,8 +101,7 @@ try {
       window.__dp.inspect = null;
     });
     await page.evaluate(() => window.defendDebug?.(1.2));
-    const seen = await page.evaluate(() => ({ blazes: window.__dp.sim.blazes.length, staggered: window.__dp.sim.enemies.some(e => e.stagger) }));
-    assert.ok(seen.blazes > 0, 'grenadiers leave the ground burning');
+    assert.ok(await page.evaluate(() => window.__dp.sim.enemies.some(e => e.hp < e.maxHp)), 'the musketmen hit them');
     await page.evaluate(z => {
       const dp = window.__dp, k = dp.host.save().layout.keep, r = dp.renderer;
       const p = r.toClient((k.tx + 0.5) * 7, (k.ty) * 7);
@@ -109,7 +109,7 @@ try {
     }, phone ? 2 : 2.5);
     await page.waitForTimeout(400); await page.screenshot({ path: `${out}/muskets-${width}-battle.png` });
     assert.deepEqual(errors, []);
-    console.log(`${width}px: halls, the tree, Grenadiers and battle passed`);
+    console.log(`${width}px: halls, the tree, Volley fire and battle passed`);
     await context.close();
   }
 } finally { await browser.close(); }

@@ -371,8 +371,8 @@ export class Ledger {
     } else {
       const path = pathById(job.id), crown = job.kind === "evolution";
       const rank = path.ranks[job.rank];
-      name = crown ? path.evolves!.name : rank.name;
-      text = crown ? path.evolves!.text : rank.text;
+      name = crown ? path.legacyCrown!.name : rank.name;
+      text = crown ? path.legacyCrown!.text : rank.text;
       hue = crown ? "gold" : path.hue;
       label = `${path.name} · ${crown ? "Crown" : `Rank ${ROMAN[job.rank]}`}`;
       icon = `<canvas data-path-icon="${crown ? "crown" : rank.icon}:${hue}" aria-hidden="true"></canvas>`;
@@ -502,10 +502,10 @@ export class Ledger {
             <span class="path-medal"><canvas data-path-icon="${r.icon}:${p.hue}"></canvas></span><b>${ROMAN[i]}</b><span class="path-name">${r.name}</span></button>`;
       }).join("");
       const cstate = st.crowned ? "learned" : st.maxed && !st.sealed ? "next" : "later";
-      const crown = p.evolves
+      const crown = p.legacyCrown
         ? `<span class="path-link crown-link ${st.crowned ? "lit" : ""}" aria-hidden="true"></span>
-          <button class="path-node crown ${cstate} ${this.picked[t.id] === `${p.id}:crown` ? "picked" : ""}" data-pick="${p.id}:crown" aria-label="Evolution: ${p.evolves.name}${st.crowned ? ", learned" : ""}">
-            <span class="path-medal"><canvas data-path-icon="crown:gold"></canvas></span><b>♛</b><span class="path-name">${p.evolves.name}</span></button>`
+          <button class="path-node crown ${cstate} ${this.picked[t.id] === `${p.id}:crown` ? "picked" : ""}" data-pick="${p.id}:crown" aria-label="Evolution: ${p.legacyCrown.name}${st.crowned ? ", learned" : ""}">
+            <span class="path-medal"><canvas data-path-icon="crown:gold"></canvas></span><b>♛</b><span class="path-name">${p.legacyCrown.name}</span></button>`
         : "";
       return `<div class="path-col hue-${p.hue} ${state}"><header class="path-banner"><h4>${p.name}</h4><small>${st.sealed ? "Sealed" : p.motto}</small></header>${ranks}${crown}</div>`;
     }).join("");
@@ -523,8 +523,8 @@ export class Ledger {
     const p = paths.find((p) => p.id === id);
     if (!p) return `<p class="path-detail path-hint">Tap a rank to research it for your collection. Unlock any number of paths, then mix them across your city: each building wears the one you choose as you place it.</p>`;
     const save = this.save, st = pathState(save, p.id), researchers = this.ctx.researchers();
-    if (at === "crown" && p.evolves) {
-      const e = p.evolves;
+    if (at === "crown" && p.legacyCrown) {
+      const e = p.legacyCrown;
       const active = save.researchJob?.kind === "evolution" && save.researchJob.id === p.id;
       const why = !st.maxed ? "Research all three ranks first" : save.researchJob ? "Researchers are working on the current project" : !researchers && !save.settings.instantResearch ? "Assign a researcher in the lab" : !st.crownAffordable ? `Needs ${e.cost} Knowledge` : "";
       const d = save.defend, base = d.owned[e.from], made = d.owned[e.item];
@@ -555,7 +555,7 @@ export class Ledger {
     this.ctx.update();
     const rank = pathState(this.save, id).rank;
     // Read on to the next rank, so the next tap learns it.
-    this.picked[p.topic] = `${id}:${rank < p.ranks.length ? rank : p.evolves ? "crown" : rank - 1}`;
+    this.picked[p.topic] = `${id}:${rank < p.ranks.length ? rank : p.legacyCrown ? "crown" : rank - 1}`;
     this.render();
     const node = this.root.querySelector(`[data-pick="${id}:${rank - 1}"]`);
     replay(node, "bought");

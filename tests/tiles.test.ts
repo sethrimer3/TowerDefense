@@ -64,9 +64,12 @@ test("the shop sells only the basic buildings and the city's pieces, in metal, i
   assert.ok(buyTile(s, "bomb") && buyTile(s, "meleeGuild"), "unlimited money buys for nothing");
 });
 
-test("an upgraded building's tier: what it grew from, and what its crown evolves it into", () => {
+test("an upgraded building's tier: what it grew from, and the ultimate its line merges into", () => {
   const s = defaults(); s.settings.devMode = true;
-  assert.equal(higherTier("wizardTower").into?.evolves?.item, "darkKeep");
+  assert.deepEqual(higherTier("wizardTower"), { into: "darkKeep" });
+  assert.deepEqual(higherTier("phalanx"), { into: "valkyriePalace" });
+  assert.deepEqual(higherTier("darkKeep"), { from: "wizardTower" });
+  assert.deepEqual(higherTier("archerTower"), {}, "its ultimate is still to come");
   let l = placeCityTile(s.defend.layout, s.defend.layout.keep.tx, s.defend.layout.keep.ty - 1) ?? assert.fail("tile");
   s.defend.layout = placeStructure(l, "watchTower", l.keep.tx, l.keep.ty - 1) ?? assert.fail("tower");
   const uid = s.defend.layout.structures[0].uid;
@@ -108,8 +111,8 @@ test("each copy carries its own Knowledge upgrades; copies alike stack, and shar
   assert.equal(marksText("archerTower", groups[1].marks), "Watch tower → Archer tower → Fire arrows II");
   assert.equal(marksText("archerTower", groups[0].marks), "Watch tower → Archer tower");
   assert.deepEqual(tileMarks(s, "watchTower"), []);
-  // An evolved building carries its whole crowned path before it became.
-  assert.deepEqual(tileMarks(s, "darkKeep").map((m) => m.type), ["became", "rank", "rank", "rank", "became"]);
+  // An ultimate shows the attuned building merged into it.
+  assert.deepEqual(tileMarks(s, "darkKeep").map((m) => m.type), ["became", "became"]);
   // The walls carry their one shared tree.
   assert.deepEqual(tileMarks(s, "wallBlock"), []);
   d.wallRanks = { stonework: 2, townWalls: 1 };

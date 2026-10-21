@@ -6,7 +6,7 @@ import type { CircleState } from "../magic-circle/formation.ts";
  * `treeCardHtml`, the card of the node picked in it). The tree comes from
  * `specializations.ts`; paths, ranks, icons and hues from `knowledge-paths.ts`. */
 import type { Save } from "../save.ts";
-import { BECOMES, TROOPS, allocated, rootOf, hasTree, buildingPathsOf, buildingTree, fullTree, undoRefund, type TreeNode, type UpgradeStep, type Wear } from "../specializations.ts";
+import { BECOMES, TROOPS, allocated, attunedOf, mergePartners, placeOf, rootOf, hasTree, buildingPathsOf, buildingTree, fullTree, undoRefund, undoTo, type Partner, type TreeNode, type UpgradeStep, type Wear } from "../specializations.ts";
 import type { GraphNode } from "./upgrade-graph.ts";
 import { ARROW_LOOPS, BASTIONS, BOILING_OIL, KEEP_PATHS, keepAllocated, keepRank, respecKeep, undoKeep, upgradeKeep, type KeepPathId, type KeepRanks } from "../keep-upgrades.ts";
 import { STONEWORK, THORNWORK, TOWN_WALLS, WALL_PATHS, respecWalls, undoWalls, upgradeWalls, wallAllocated, wallRank, type WallPathId, type WallRanks } from "../wall-upgrades.ts";
@@ -185,17 +185,43 @@ const medal = (path: PathId, rank: number) => {
 /** A building's medallion: its own icon. */
 const buildingMedal = (kind: string) => `<span class="path-medal base"><canvas width="32" height="32" data-icon="${kind}"></canvas></span>`;
 
-/** Tiles' read-only tree for `kind`: what a plain one can become, and the
- * paths it can climb, each rank with what it does (empty for a kind with
- * neither). Upgrades are bought on each building in Defend. */
+/** Tiles' read-only tree for `kind`: what a plain one can become, the
+ * branches it can climb (or the one it is on), each rank with what it
+ * does, and the ultimate its line merges into (empty for a kind with
+ * none of these). Upgrades are bought on each building in Defend. */
 export function upgradeTreeHtml(save: Save, kind: PaletteItem): string {
-  const becomes = BECOMES[kind as keyof typeof BECOMES] ?? [], paths = buildingPathsOf(kind);
-  if (!becomes.length && !paths.length) return "";
+  const becomes = BECOMES[kind as keyof typeof BECOMES] ?? [], place = placeOf(kind as never);
+  const line = place.tier === "attuned" || place.tier === "via" ? place.a : undefined;
+  const branches = place.tier === "attuned" ? place.a.branches : buildingPathsOf(kind).map((p) => ({ path: p.id, via: undefined }));
+  if (!becomes.length && !branches.length && !line) return "";
   const topic = pathTopicOf(kind);
   const base = `<li class="spec-row base">${buildingMedal(kind)}<div><b>${ITEM_NAMES[kind]}</b><small>${topic ? UNSPECIALIZED[topic] : TROOPS[kind as keyof typeof TROOPS] ?? ""}</small><small class="spec-stats">${kindStats(save, kind)}</small></div></li>`;
   const grow = becomes.map((b) => `<li class="spec-row">${buildingMedal(b.to)}<div><b>Becomes ${ITEM_NAMES[b.to]}</b><small>${b.cost} Knowledge · ${TROOPS[b.to] ?? "a tower"}</small></div></li>`).join("");
-  const climb = paths.map((p) => `<li class="spec-row hue-${p.hue}">${medal(p.id, 1)}<div><b>${p.name}</b><small>${p.motto}: ${p.ranks.map((r, i) => `${ROMAN[i + 1]} ${r.name} (${r.cost.toLocaleString("en")})`).join(" · ")}${p.evolves ? ` · then ${p.evolves.name} (${p.evolves.cost.toLocaleString("en")})` : ""}</small></div></li>`).join("");
-  return `<div class="tile-specialties"><small>UPGRADES · KNOWLEDGE, ONE BUILDING AT A TIME: TAP IT IN DEFEND WHILE BUILDING</small><ul>${base}${grow}${climb}</ul></div>`;
+  const climb = branches.map(({ path, via }) => {
+    const p = pathById(path);
+    return `<li class="spec-row hue-${p.hue}">${via ? buildingMedal(via.kind) : medal(p.id, 1)}<div><b>${via ? `${ITEM_NAMES[via.kind]}: ` : ""}${p.name}</b><small>${via ? `Becomes a ${ITEM_NAMES[via.kind]} (${TROOPS[via.kind] ?? "a tower"}, ${via.cost} Knowledge more at I) · ` : ""}${p.motto}: ${p.ranks.map((r, i) => `${ROMAN[i + 1]} ${r.name} (${r.cost.toLocaleString("en")})`).join(" · ")}</small></div></li>`;
+  }).join("");
+  const pick = place.tier === "attuned" ? `<li class="spec-row"><div><small>One branch a building: taking one closes the others.</small></div></li>` : "";
+  const top = line ? `<li class="spec-row hue-gold">${line.ultimate ? buildingMedal(line.ultimate) : ""}<div><b>${line.ultimate ? `Ultimate: ${ITEM_NAMES[line.ultimate]}` : "Ultimate: still to come"}</b><small>${mergeText(line.kind, line.ultimate)}</small></div></li>` : "";
+  return `<div class="tile-specialties"><small>UPGRADES · KNOWLEDGE, ONE BUILDING AT A TIME: TAP IT IN DEFEND WHILE BUILDING</small><ul>${base}${grow}${pick}${climb}${top}</ul></div>`;
+}
+
+/** How a line's ultimate is made, in words. */
+const mergeText = (attuned: PaletteItem, ultimate?: PaletteItem) => ultimate
+  ? `Three ${ITEM_NAMES[attuned]} buildings, each at the last rank of a different branch, merge into one ${ITEM_NAMES[ultimate]}.`
+  : `This line's ultimate is still to come: three ${ITEM_NAMES[attuned]} buildings, each at the last rank of a different branch, will merge into it.`;
+
+/** A merge's partners on its card: each building it uses up, found or not. */
+const partnersHtml = (partners: Partner[]) => `<ul class="ug-partners">${partners.map((p) =>
+  `<li class="${p.found ? "ug-found" : "ug-locked"}">${ITEM_NAMES[p.kind]} · ${pathById(p.branch.path).name} ${ROMAN[pathById(p.branch.path).ranks.length]}: ${!p.found ? "none yet" : "kept" in p.found ? "waiting in the palette" : "standing in the city"}</li>`).join("")}</ul>`;
+
+/** What a building node is and does, for its card's head and text. */
+function nodeText(save: Save, n: TreeNode): { title: string; text: string } {
+  const kind = n.kind as PaletteItem;
+  const about = (k: PaletteItem) => `${TROOPS[k as keyof typeof TROOPS] ? `${TROOPS[k as keyof typeof TROOPS]} · ` : ""}${STRUCTURES[k as keyof typeof STRUCTURES]?.description ?? ""}`;
+  if (n.soon) return { title: "Ultimate", text: mergeText(n.soon) };
+  if (n.step?.type === "merge") return { title: ITEM_NAMES[kind], text: `${mergeText(attunedOf(kind as never)!.kind, kind)} The building whose tree it is bought in becomes it; the other two are used up. ${about(kind)}` };
+  return { title: ITEM_NAMES[kind] ?? "Wall spikes", text: n.kind === "wallSpikes" ? "Stakes along the wall's outer face." : about(kind) };
 }
 
 // ── The living tree ───────────────────────────────────────────────────────
@@ -204,12 +230,14 @@ const knowledgeTag = (n: number) => `${n >= 10000 ? `${Number((n / 1000).toFixed
 /** One building's tree as the graph draws it. */
 export function treeGraph(kind: PaletteItem | "wallSpikes", wear?: Wear): GraphNode[] {
   return buildingTree(kind as never, wear).map((n): GraphNode => (
-    { id: n.id, parent: n.parent, state: n.state, face: nodeFace(n), tag: n.state === "owned" ? undefined : knowledgeTag(n.cost), hue: nodeHue(n), side: n.side, hidden: n.hidden, closed: n.closed, took: n.took }));
+    { id: n.id, parent: n.parent, state: n.state, face: nodeFace(n), tag: n.state === "owned" || n.soon ? undefined : knowledgeTag(n.cost), hue: nodeHue(n), side: n.side, hidden: n.hidden, closed: n.closed, took: n.took }));
 }
-/** A node's colours: its path's, or gold for a crown. */
-const nodeHue = (n: TreeNode) => (n.path ? `hue-${pathById(n.path).hue}` : n.step?.type === "evolve" ? "hue-gold" : undefined);
+/** A node's colours: its path's, or gold for an ultimate. */
+const nodeHue = (n: TreeNode) => (n.path ? `hue-${pathById(n.path).hue}` : n.step?.type === "merge" || n.soon ? "hue-gold" : undefined);
 /** A node's face: a building's icon, or a path rank's with its numeral. */
-const nodeFace = (n: TreeNode) => n.kind
+const nodeFace = (n: TreeNode) => n.soon
+  ? `<b class="ug-soon">?</b>`
+  : n.kind
   ? `<canvas width="32" height="32" data-icon="${n.kind}"></canvas>`
   : `<canvas data-path-icon="${pathById(n.path!).ranks[n.rank! - 1].icon}:${pathById(n.path!).hue}"></canvas><b>${ROMAN[n.rank!]}</b>`;
 
@@ -245,14 +273,13 @@ export function mapCardHtml(save: Save, kind: PaletteItem | "wallSpikes", found:
   const n = fullTree(kind === "wallSpikes" ? kind : rootOf(kind as never)).find((o) => o.id === id);
   if (!n) return `<p class="ug-hint">Tap an upgrade to see what it does.</p>`;
   let title: string, text: string, level = "", stats = "";
-  if (n.kind) {
-    title = ITEM_NAMES[n.kind as PaletteItem] ?? "Wall spikes";
-    text = n.step?.type === "evolve" ? pathById(n.step.path).evolves!.text : n.kind === "wallSpikes" ? "Stakes along the wall's outer face." : `${TROOPS[n.kind as keyof typeof TROOPS] ? `${TROOPS[n.kind as keyof typeof TROOPS]} · ` : ""}${STRUCTURES[n.kind as keyof typeof STRUCTURES]?.description ?? ""}`;
+  if (n.kind && !n.path) {
+    ({ title, text } = nodeText(save, n));
     if (n.kind !== "wallSpikes") stats = kindStats(save, n.kind as PaletteItem);
   } else {
     const p = pathById(n.path!), r = p.ranks[n.rank! - 1];
-    title = `${p.name} ${ROMAN[n.rank!]}: ${r.name}`;
-    text = `${p.motto}. ${r.text}`;
+    title = `${n.kind ? `${ITEM_NAMES[n.kind as PaletteItem]}: ` : ""}${p.name} ${ROMAN[n.rank!]}: ${r.name}`;
+    text = `${n.kind ? `Becomes a ${ITEM_NAMES[n.kind as PaletteItem]} (${TROOPS[n.kind as keyof typeof TROOPS] ?? "a tower"}). ` : ""}${p.motto}. ${r.text}`;
     level = `Level ${n.rank} / ${p.ranks.length}`;
   }
   const price = n.parent ? ` · ${n.cost.toLocaleString("en")} Knowledge` : "";
@@ -267,25 +294,35 @@ export function mapCardHtml(save: Save, kind: PaletteItem | "wallSpikes", found:
 export function treeCardHtml(save: Save, kind: PaletteItem | "wallSpikes", wear: Wear | undefined, id: string): string {
   const n = buildingTree(kind as never, wear).find((o) => o.id === id);
   if (!n) return `<p class="ug-hint">Tap a node to see what it does.</p>`;
-  const free = save.settings.devMode, can = free || save.knowledge >= n.cost;
-  let title: string, text: string, level = "", stats = "";
-  if (n.kind) {
-    title = ITEM_NAMES[n.kind as PaletteItem] ?? "Wall spikes";
-    text = n.step?.type === "evolve" ? pathById(n.step.path).evolves!.text : n.kind === "wallSpikes" ? "Stakes along the wall's outer face." : `${TROOPS[n.kind as keyof typeof TROOPS] ? `${TROOPS[n.kind as keyof typeof TROOPS]} · ` : ""}${STRUCTURES[n.kind as keyof typeof STRUCTURES]?.description ?? ""}`;
-    if (n.kind !== "wallSpikes") stats = kindStats(save, n.kind as PaletteItem, n.kind === kind ? wear?.path : undefined, n.kind === kind ? wear?.rank : 0);
+  const free = save.settings.devMode;
+  let can = free || save.knowledge >= n.cost;
+  let title: string, text: string, level = "", stats = "", partners = "";
+  if (n.kind && !n.path || n.soon) {
+    ({ title, text } = nodeText(save, n));
+    if (n.kind && n.kind !== "wallSpikes") stats = kindStats(save, n.kind as PaletteItem, n.kind === kind ? wear?.path : undefined, n.kind === kind ? wear?.rank : 0);
+    if (n.step?.type === "merge" && n.state !== "owned") {
+      const found = mergePartners(save.defend, kind as never, wear);
+      if (found.length) {
+        partners = partnersHtml(found);
+        can &&= found.every((p) => p.found);
+      }
+    }
   } else {
-    const p = pathById(n.path!), r = p.ranks[n.rank! - 1];
-    title = `${p.name} ${ROMAN[n.rank!]}: ${r.name}`;
-    text = `${p.motto}. ${r.text}`;
+    const p = pathById(n.path!), r = p.ranks[n.rank! - 1], becomes = n.kind && n.kind !== kind ? n.kind as PaletteItem : undefined;
+    title = `${n.kind ? `${ITEM_NAMES[n.kind as PaletteItem]}: ` : ""}${p.name} ${ROMAN[n.rank!]}: ${r.name}`;
+    text = `${becomes ? `Becomes a ${ITEM_NAMES[becomes]} (${TROOPS[becomes as keyof typeof TROOPS] ?? "a tower"}). ` : ""}${p.motto}. ${r.text}`;
     level = `Level ${n.rank} / ${p.ranks.length}`;
-    if (kind !== "wallSpikes") stats = `At this rank: ${kindStats(save, kind as PaletteItem, p.id, n.rank)}`;
+    if (kind !== "wallSpikes") stats = `At this rank: ${kindStats(save, (becomes ?? kind) as PaletteItem, p.id, n.rank)}`;
   }
-  const back = n.state === "owned" ? undoRefund(kind as never, wear, n.id) : 0;
+  const undoable = n.state === "owned" && !!undoTo(kind as never, wear, n.id);
+  const back = undoable ? undoRefund(kind as never, wear, n.id) : 0;
   const beyond = n.state === "owned" && !!treeBeyond(kind, wear, n.id);
-  const state = n.state === "owned" ? `<b class="ug-owned">${(n.kind === kind && !wear) || (n.path && n.path === wear?.path && n.rank === wear?.rank) ? "Where it is now" : "Owned"}</b>${n.parent ? undoButton(n.id, back) : ""}${beyond ? AGAIN_SELL : ""}`
-    : n.state === "next" ? `<button class="ug-buy" data-ug-buy="${n.id}" ${can ? "" : "disabled"}>Buy · ${free ? "Free" : `${n.cost.toLocaleString("en")} Knowledge`}</button>${can ? AGAIN_BUY : ""}`
-    : `<span class="ug-locked">Locked: buy the one before it · ${n.cost.toLocaleString("en")} Knowledge</span>`;
-  return `<div class="ug-card-head"><b>${title}</b>${level ? `<small>${level}</small>` : ""}</div><p>${text}</p>${stats ? `<p class="ug-stats">${stats}</p>` : ""}<div class="ug-card-foot" data-ug-ignore>${state}</div>`;
+  const here = (n.kind === kind && !n.path && !wear) || (n.path && n.path === wear?.path && n.rank === wear?.rank);
+  const state = n.soon ? `<span class="ug-locked">Still to come</span>`
+    : n.state === "owned" ? `<b class="ug-owned">${here ? "Where it is now" : n.merged ? "Merged into it" : "Owned"}</b>${undoable ? undoButton(n.id, back) : ""}${beyond ? AGAIN_SELL : ""}`
+    : n.state === "next" ? `<button class="ug-buy" data-ug-buy="${n.id}" ${can ? "" : "disabled"}>${n.step?.type === "merge" ? "Merge" : "Buy"} · ${free || !n.cost ? "Free" : `${n.cost.toLocaleString("en")} Knowledge`}</button>${can ? AGAIN_BUY : ""}`
+    : `<span class="ug-locked">Locked: ${n.step?.type === "merge" ? "max out this branch first" : "buy the one before it"}${n.cost ? ` · ${n.cost.toLocaleString("en")} Knowledge` : ""}</span>`;
+  return `<div class="ug-card-head"><b>${title}</b>${level ? `<small>${level}</small>` : ""}</div><p>${text}</p>${stats ? `<p class="ug-stats">${stats}</p>` : ""}${partners}<div class="ug-card-foot" data-ug-ignore>${state}</div>`;
 }
 
 /** What tapping the picked node again does, said on its card. */
@@ -294,8 +331,10 @@ const AGAIN_SELL = `<small class="ug-again">Tap it again to sell everything afte
 
 /** The owned node grown from owned node `id`: undoing it sells everything
  * after `id` (a second tap on a picked node). None when `id` is the tip. */
-export const treeBeyond = (kind: PaletteItem | "wallSpikes", wear: Wear | undefined, id: string): string | undefined =>
-  buildingTree(kind as never, wear).find((o) => o.parent === id && o.state === "owned")?.id;
+export const treeBeyond = (kind: PaletteItem | "wallSpikes", wear: Wear | undefined, id: string): string | undefined => {
+  const after = buildingTree(kind as never, wear).find((o) => o.parent === id && o.state === "owned")?.id;
+  return after && undoTo(kind as never, wear, after) ? after : undefined;
+};
 
 /** Undo for an owned node: it and everything after it, their Knowledge back. */
 const undoButton = (id: string, back: number) =>

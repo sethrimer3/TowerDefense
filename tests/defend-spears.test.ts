@@ -8,6 +8,7 @@ import { decode, defaults } from "../src/save.ts";
 import { BECOMES, allocated, buildingTree, nextSteps, rootOf, specialtyOf, stepName, upgradeBuilding, upgradedFrom } from "../src/specializations.ts";
 import { BARBED, HEAVY_LANCE, LONG_SPEARS, SET_SPEARS, SPEAR_WALL, TESTUDO, THROWING, WINGED, pathById, type PathId } from "../src/knowledge-paths.ts";
 import { bonuses } from "../src/progression.ts";
+import { battleBonuses, wear } from "./spare-paths.ts";
 import { placeStructure, placeCityTile, defaultLayout, fitLayout, type PlacedKind } from "../src/defend/layout.ts";
 import { DefendSim, type Enemy, type Soldier } from "../src/defend/sim.ts";
 import { generateCity } from "../src/defend/citygen.ts";
@@ -30,15 +31,14 @@ function building(kind: PlacedKind, path?: PathId, rank = 3) {
   s.defend.layout = l;
   const uid = l.structures.find((st) => st.kind === kind)!.uid;
   for (let r = 0; path && r < rank; r++) {
-    const step = nextSteps(kind, specialtyOf(s.defend.layout, { uid })).find((st) => st.type === "path" && st.path === path)!;
-    assert.ok(upgradeBuilding(s, { uid }, step).ok);
+    wear(s, uid, path, r + 1);
   }
   return { s, uid };
 }
 function battle(s: S, troop: Soldier["kind"]) {
   const fit = fitLayout(s.defend.layout);
   assert.ok(fit.ok);
-  const sim = new DefendSim(generateCity(fit, 4), { ...s.defend.levels }, 1, bonuses(s));
+  const sim = new DefendSim(generateCity(fit, 4), { ...s.defend.levels }, 1, battleBonuses(s));
   new Barracks().step(sim, 0.01);
   const m = sim.soldiers.find((u) => u.kind === troop) ?? assert.fail(`a ${troop}`);
   return { sim, m };
@@ -63,44 +63,42 @@ function fire(sim: DefendSim, m: Soldier) {
 }
 
 // ── The tree ───────────────────────────────────────────────────────────
-test("the Melee Guild leads to spearmen, and spearmen to a phalanx, javelins and lancers", () => {
+test("the Melee Guild leads to spearmen, and spearmen branch into a phalanx, javelins and lancers", () => {
   assert.deepEqual(BECOMES.meleeGuild!.map((b) => b.to), ["barracks", "assassinDen", "spearHall"]);
-  assert.deepEqual(nextSteps("spearHall").map(stepName), ["Phalanx", "Javelin camp", "Lancer stable", "Long spears I", "Set spears I"]);
-  assert.deepEqual(nextSteps("phalanx").map(stepName), ["Testudo I", "Spear wall I"]);
-  assert.deepEqual(nextSteps("javelinCamp").map(stepName), ["Barbed javelins I", "Throwing arms I"]);
-  assert.deepEqual(nextSteps("lancerStable").map(stepName), ["Heavy lance I", "Winged lancers I"]);
+  assert.deepEqual(nextSteps("spearHall").map(stepName), ["Phalanx", "Javelin camp", "Lancer stable"]);
+  assert.deepEqual(nextSteps("spearHall").map((s) => s.type === "branch" && s.path), ["testudo", "barbed", "wingedLancers"]);
+  assert.deepEqual(nextSteps("phalanx", { path: "testudo", rank: 1 }).map(stepName), ["Testudo II"]);
+  assert.deepEqual(nextSteps("javelinCamp", { path: "barbed", rank: 2 }).map(stepName), ["Barbed javelins III"]);
   for (const k of ["phalanx", "javelinCamp", "lancerStable"] as const) assert.equal(upgradedFrom(k), "spearHall");
   for (const k of ["spearHall", "phalanx", "javelinCamp", "lancerStable", "valkyriePalace"] as const) assert.equal(rootOf(k), "meleeGuild");
 });
 
-test("the Valkyrie palace is the spearmen's ultimate: Winged lancers' crown, no longer the Crusaders'", () => {
-  assert.equal(upgradedFrom("valkyriePalace"), "lancerStable");
-  assert.equal(pathById("wingedLancers").evolves?.item, "valkyriePalace");
-  assert.equal(pathById("crusaders").evolves, undefined);
-  assert.deepEqual(nextSteps("barracks", { path: "crusaders", rank: 3 }), []);
+test("the Valkyrie palace is the spearmen's ultimate, merged from a maxed phalanx, javelin camp and lancer stable", () => {
+  assert.equal(upgradedFrom("valkyriePalace"), "spearHall");
+  assert.deepEqual(nextSteps("barracks", { path: "crusaders", rank: 3 }).map(stepName), ["Hero"]);
   assert.deepEqual(nextSteps("lancerStable", { path: "wingedLancers", rank: 3 }).map(stepName), ["Valkyrie palace"]);
-  const winged = pathById("wingedLancers");
-  assert.equal(allocated("valkyriePalace"), 5 + 10 + winged.ranks.reduce((n, r) => n + r.cost, 0) + winged.evolves!.cost);
+  const full = (p: PathId) => pathById(p).ranks.reduce((n, r) => n + r.cost, 0);
+  assert.equal(allocated("valkyriePalace"), 3 * 5 + 7 + 8 + 10 + full("testudo") + full("barbed") + full("wingedLancers"));
   const ids = buildingTree("valkyriePalace").map((n) => n.id);
-  for (const id of ["k:meleeGuild", "k:spearHall", "k:lancerStable", "p:wingedLancers:3", "k:valkyriePalace"]) assert.ok(ids.includes(id), id);
+  for (const id of ["k:meleeGuild", "k:spearHall", "p:testudo:3", "p:barbed:3", "p:wingedLancers:3", "k:valkyriePalace"]) assert.ok(ids.includes(id), id);
   // A save with a palace still loads it.
   const s = defaults(); s.defend.owned.valkyriePalace = 2;
   assert.equal(decode(JSON.stringify(s)).defend.owned.valkyriePalace, 2);
 });
 
-test("a Melee Guild is bought up through spearmen and lancers into a Valkyrie palace", () => {
+test("a Melee Guild is bought up through spearmen and lancers, then merged into a Valkyrie palace", () => {
   const { s, uid } = building("meleeGuild");
   const kind = () => s.defend.layout.structures.find((o) => o.uid === uid)?.kind;
-  const become = (to: PlacedKind) => nextSteps(kind()!, specialtyOf(s.defend.layout, { uid })).find((o) => o.type !== "path" && o.to === to)!;
-  assert.ok(upgradeBuilding(s, { uid }, become("spearHall")).ok);
-  assert.ok(upgradeBuilding(s, { uid }, become("lancerStable")).ok);
-  for (let r = 0; r < 3; r++) {
-    const p = nextSteps("lancerStable", specialtyOf(s.defend.layout, { uid })).find((o) => o.type === "path" && o.path === "wingedLancers")!;
-    assert.ok(upgradeBuilding(s, { uid }, p).ok);
-  }
-  assert.ok(upgradeBuilding(s, { uid }, become("valkyriePalace")).ok);
-  assert.equal(s.defend.owned.valkyriePalace, 1);
-  assert.equal(s.defend.owned.meleeGuild, 0);
+  const steps = () => nextSteps(kind()!, specialtyOf(s.defend.layout, { uid }));
+  assert.ok(upgradeBuilding(s, { uid }, steps().find((o) => o.type === "become" && o.to === "spearHall")!).ok);
+  assert.ok(upgradeBuilding(s, { uid }, steps().find((o) => o.type === "branch" && o.to === "lancerStable")!).ok);
+  for (let r = 1; r < 3; r++) assert.ok(upgradeBuilding(s, { uid }, steps()[0]).ok);
+  assert.deepEqual(specialtyOf(s.defend.layout, { uid }), { path: "wingedLancers", rank: 3 });
+  // The phalanx and the javelin camp wait maxed in the palette.
+  s.defend.owned.phalanx = 1; s.defend.owned.javelinCamp = 1;
+  s.defend.kept.push({ kind: "phalanx", path: "testudo", rank: 3 }, { kind: "javelinCamp", path: "barbed", rank: 3 });
+  assert.ok(upgradeBuilding(s, { uid }, steps()[0]).ok);
+  assert.deepEqual([s.defend.owned.valkyriePalace, s.defend.owned.lancerStable, s.defend.owned.phalanx, s.defend.owned.javelinCamp, s.defend.owned.meleeGuild], [1, 0, 0, 0, 0]);
 });
 
 test("each new hall and path has its own art and stats", () => {

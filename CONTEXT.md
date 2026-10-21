@@ -31,7 +31,16 @@ A placed building with a job: the keep, the guilds and the troop buildings upgra
 One of the three buildings the shop sells: the **Watch tower**, the **Melee Guild** (training **brawlers**, who fight with their fists) and the **Ranged Guild** (training **stone throwers**). Every other tower and troop building is one of these upgraded.
 
 **Upgrade** (of a building):
-One step a single placed building takes with Knowledge, chosen by tapping it in Defend while building: becoming another building (a Watch tower an archer, cannon or wizard tower; a Melee Guild a barracks, an **assassins' den** or a **spearmen hall**, and a spearmen hall a **phalanx** (shielded **hoplites**), a **javelin camp** (**javelineers**) or a **lancer stable** (mounted **lancers**, whose first thrust at each enemy is a **charge**); a Ranged Guild an archer barracks, Mage Guild or **gunner hall** (pistols), and a gunner hall a **musket hall**, **machine-gun nest** or **rocket battery**, whose **rocketeers** fire bursting rockets), a path's next rank, or its crown's **evolution**. The other buildings of its kind are untouched.
+One step a single placed building takes with Knowledge, chosen by tapping it in Defend while building: becoming another building (a Watch tower an archer, cannon or wizard tower; a Melee Guild a barracks, an **assassins' den** or a **spearmen hall**, and a spearmen hall a **phalanx** (shielded **hoplites**), a **javelin camp** (**javelineers**) or a **lancer stable** (mounted **lancers**, whose first thrust at each enemy is a **charge**); a Ranged Guild an archer barracks, Mage Guild or **gunner hall** (pistols), and a gunner hall a **musket hall**, **machine-gun nest** or **rocket battery**, whose **rocketeers** fire bursting rockets), a branch's next rank, or a **merge**. The other buildings of its kind are untouched.
+
+**Attuned building**:
+What a basic building becomes first (an archer, cannon or wizard tower; a barracks, assassins' den or spearmen hall; an archer barracks, Mage Guild or gunner hall). It takes one of three **branches**.
+
+**Branch**:
+One of an attuned building's three exclusive upgrade lines of three ranks; some make it another building at their first rank.
+
+**Ultimate**:
+The building at the top of an attuned line, made by a **merge**: three buildings of the line, each maxed on a different branch, become one.
 
 **Upgrade tree**:
 A building's own upgrades, opened by tapping it in Defend while building, or by pressing and holding it there or its tile in the palette (a copy in the palette is upgraded on its own): the buildings it has been, then every branch still open to it, as nodes on branches that can be dragged about and spring back. Choosing one branch makes the ones beside it wither away and opens the upgrades only that branch leads to. Its corner box shows the Knowledge **allocated** to the building.
@@ -215,7 +224,7 @@ One way a building can grow, in ranks it climbs one at a time with Knowledge: th
 A path's crown, past its last rank, turns that one building into a greater form (Stormcalling's Wizard tower into the Dark wizard keep, Winged lancers' Lancer stable into the Valkyrie palace, the spearmen's ultimate, Sharpshooters' Musket hall into the Sniper lodge, Belt feed's Machine-gun nest into the Gatling emplacement), paid with Knowledge. If it no longer fits its tile it goes to the palette.
 
 **Revolutionary**:
-The gunner line's ultimate building, which a plain Sniper lodge becomes: a high-tech hall of **laser snipers**. Its upgrades are not a path but a **shared tree** of five branches climbed side by side by every Revolutionary at once: the squad (one, two, then three snipers), the **chain laser** (the laser leaps from enemy to enemy, impossibly, and the bullet follows it through 3, 5, then 7), a **critical** chance, what a critical multiplies, and a burst round the last enemy the bullet strikes.
+What a plain Sniper lodge (the archer barracks' ultimate) can still become: a high-tech hall of **laser snipers**. Its upgrades are not a path but a **shared tree** of five branches climbed side by side by every Revolutionary at once: the squad (one, two, then three snipers), the **chain laser** (the laser leaps from enemy to enemy, impossibly, and the bullet follows it through 3, 5, then 7), a **critical** chance, what a critical multiplies, and a burst round the last enemy the bullet strikes.
 
 **Hero**:
 The swordsmen's ultimate building, which a plain Barracks becomes: a gilded hall of one hero, who fights in a **combo** of sweeping slashes and a **spin** that strikes everything round it. Its paths are Whirlwind (more, wider spins), Blade dance (a **flurry** of slashes, **dashing** from enemy to enemy) and Legend (a hero who, at its last rank, rises once when it falls: **Undying**).
@@ -242,7 +251,7 @@ A miner put to the smithy. The smiths are the Smithy's hands: how many ranks can
 Command and Stewardship (for Defend), Mine and Library: ranked skills researched with Knowledge, each needing the skills above it and timed work in the Library's alchemy lab.
 
 **Research project**:
-One skill rank, path rank or evolution being worked in the Study. Knowledge is paid at the start; all researchers share the work. It pauses without researchers, applies its effect on completion, and returns its paid Knowledge when cancelled.
+One skill rank or spell path rank being worked in the Study. Knowledge is paid at the start; all researchers share the work. It pauses without researchers, applies its effect on completion, and returns its paid Knowledge when cancelled.
 
 ### Presentation
 

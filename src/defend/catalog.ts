@@ -192,7 +192,7 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     h: 4,
     maxHp: 140,
     outsideOk: false,
-    description: "Trains snipers with long rifles: slow to reload, but they pick off enemies from far across the city with shots that hit very hard. A Musket hall's Sharpshooters become them.",
+    description: "Trains snipers with long rifles: slow to reload, but they pick off enemies from far across the city with shots that hit very hard. The archers' ultimate, merged from archer barracks maxed on each branch.",
   },
   gunHall: {
     kind: "gunHall",
@@ -210,7 +210,7 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     h: 4,
     maxHp: 150,
     outsideOk: false,
-    description: "Trains musketmen: slow to reload, but their heavy balls hit hard from further off. Its Sharpshooters become snipers.",
+    description: "Trains musketmen: slow to reload, but their heavy balls hit hard from further off. The Gunner hall's Volley fire branch.",
   },
   gunNest: {
     kind: "gunNest",
@@ -219,7 +219,7 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     h: 4,
     maxHp: 160,
     outsideOk: false,
-    description: "Trains machine gunners who spray light bullets at a rapid clip. Its Belt feed path becomes a Gatling emplacement.",
+    description: "Trains machine gunners who spray light bullets at a rapid clip. The Gunner hall's Belt feed branch.",
   },
   gatlingNest: {
     kind: "gatlingNest",
@@ -228,7 +228,7 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     h: 4,
     maxHp: 200,
     outsideOk: false,
-    description: "Trains Gatling gunners: their guns pour out bullets at an enormous rate, but are so heavy they barely walk.",
+    description: "Trains Gatling gunners: their guns pour out bullets at an enormous rate, but are so heavy they barely walk. The gunners' ultimate, merged from a maxed musket hall, machine-gun nest and rocket battery.",
   },
   revolutionary: {
     kind: "revolutionary",
@@ -237,7 +237,7 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     h: 4,
     maxHp: 260,
     outsideOk: false,
-    description: "The gunner line's ultimate: a high-tech hall of laser-sighted snipers. Their thin lasers lock on, brightening, before each shot. Its upgrades climb side by side, shared by every Revolutionary: more snipers, a laser that zigzags from enemy to enemy with the bullet following it, critical hits and what they do, and a burst where the bullet stops. A Sniper lodge becomes one.",
+    description: "Beyond the Sniper lodge: a high-tech hall of laser-sighted snipers. Their thin lasers lock on, brightening, before each shot. Its upgrades climb side by side, shared by every Revolutionary: more snipers, a laser that zigzags from enemy to enemy with the bullet following it, critical hits and what they do, and a burst where the bullet stops. A Sniper lodge becomes one.",
   },
   heroHall: {
     kind: "heroHall",
@@ -246,7 +246,7 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     h: 6,
     maxHp: 280,
     outsideOk: false,
-    description: "The swordsmen's ultimate: a gilded hall for one hero, who hunts the whole city and cuts through crowds of small enemies with sword combos: two sweeping slashes, then a spin that strikes everything round it. Slow to rise again if it falls. Its paths: Whirlwind (more and wider spins), Blade dance (slashes that dash from enemy to enemy) and Legend (a hero who will not stay down). A Barracks becomes one.",
+    description: "The swordsmen's ultimate, merged from three barracks maxed on different branches: a gilded hall for one hero, who hunts the whole city and cuts through crowds of small enemies with sword combos: two sweeping slashes, then a spin that strikes everything round it. Slow to rise again if it falls. Its paths: Whirlwind (more and wider spins), Blade dance (slashes that dash from enemy to enemy) and Legend (a hero who will not stay down). A Barracks becomes one.",
   },
   rocketBattery: {
     kind: "rocketBattery",
@@ -264,7 +264,7 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     h: 6,
     maxHp: 160,
     outsideOk: false,
-    description: "Trains swordsmen who sally out against anything that breaches the walls. With Knowledge it becomes the Hero, the swordsmen's ultimate.",
+    description: "Trains swordsmen who sally out against anything that breaches the walls. Three, each maxed on a different branch, merge into the Hero, the swordsmen's ultimate.",
   },
   archerBarracks: {
     kind: "archerBarracks",
@@ -328,7 +328,7 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     compact: { upgrade: "palaceCompact", w: 4, h: 6 },
     maxHp: 260,
     outsideOk: false,
-    description: "A heavenly marble palace, 3 × 3 quarter tiles. Trains armoured valkyries whose golden spear charges through every enemy in a line: the spearmen's ultimate, a Lancer stable's crowned Winged lancers.",
+    description: "A heavenly marble palace, 3 × 3 quarter tiles. Trains armoured valkyries whose golden spear charges through every enemy in a line: the spearmen's ultimate, merged from a maxed phalanx, javelin camp and lancer stable.",
   },
   darkKeep: {
     kind: "darkKeep",

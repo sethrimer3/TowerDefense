@@ -51,8 +51,10 @@ export type KnowledgePath = {
   motto: string;
   hue: PathHue;
   ranks: PathRank[];
-  /** What a building at this path's last rank can evolve into, and the Knowledge it costs. */
-  evolves?: { from: PlacedKind; item: PlacedKind; name: string; cost: number; text: string };
+  /** Before version 7 a building at this path's last rank could evolve
+   * into `item` for `cost`. Ultimates are merged now (`specializations.ts`'s
+   * `ATTUNED`); kept so older saves' crowns can be undone. */
+  legacyCrown?: { from: PlacedKind; item: PlacedKind; name: string; cost: number; text: string };
 };
 
 // ── What each rank does in battle ─────────────────────────────────────────
@@ -124,8 +126,7 @@ export const THROWING = { range: [0, 1.5, 1.5, 1.5], extra: [0, 0, 1, 1], reload
 export const HEAVY_LANCE = { charge: [2.5, 3.5, 3.5, 3.5], stagger: 1, trample: 0.9, share: 0.5 };
 /** Winged lancers: lancers ride `speed[rank]` times as fast; from II they
  * range `leash[rank]` times as far from the stable; at III each charge
- * heals the rider `heal` of its full HP. Its crown makes the stable a
- * Valkyrie palace, the spearmen's ultimate. */
+ * heals the rider `heal` of its full HP. */
 export const WINGED = { speed: [1, 1.25, 1.25, 1.25], leash: [1, 1, 1.5, 1.5], heal: 0.15 };
 /** Cloudborne: the Valkyrie palace rises onto clouds and drifts west across
  * the sky at `speed` cells a second, coming round from the east edge at
@@ -165,11 +166,10 @@ export const GRENADIERS = { burn: [0, 3, 3, 5], share: 0.25, bomblets: [0, 0, 4,
 export const VOLLEY = { extra: [0, 1, 2, 2], share: 0.5, drill: 0.15, most: 3, reach: 3 };
 /** Sharpshooters: musketmen reach `range[rank]` more cells and hit
  * `damage[rank]` times as hard; at III they aim at the toughest enemy in
- * reach. Its crown makes the hall a Sniper lodge. */
+ * reach. */
 export const SHARP_MUSKETS = { range: [0, 1.5, 1.5, 3], damage: [1, 1, 1.5, 1.8] };
 /** Belt feed: machine gunners reload in `reload[rank]` of the time; from
- * II their bullets hit `damage` times as hard. Its crown makes the nest a
- * Gatling emplacement. */
+ * II their bullets hit `damage` times as hard. */
 export const BELT_FEED = { reload: [1, 0.8, 0.8, 0.6], damage: 1.4 };
 /** Tripod: machine gunners reach `range[rank]` more cells and hit
  * `damage[rank]` times as hard. */
@@ -367,7 +367,7 @@ export const PATHS: KnowledgePath[] = [
       { name: "Forked bolts", icon: "fork", cost: studyPathCost(5, 1), text: "Bolts leap through 5 enemies, further apart" },
       { name: "Thunderhead", icon: "thunderhead", cost: studyPathCost(5, 2), text: "Bolts leap through 7 enemies and strike half again as hard" },
     ],
-    evolves: { from: "wizardTower", item: "darkKeep", name: "Dark wizard keep", cost: 150000, text: "This Wizard tower becomes a Dark wizard keep" },
+    legacyCrown: { from: "wizardTower", item: "darkKeep", name: "Dark wizard keep", cost: 150000, text: "This Wizard tower becomes a Dark wizard keep" },
   },
   {
     id: "crusaders", topic: "barracks", name: "Crusaders", motto: "Immovable, armoured, enduring", hue: "steel",
@@ -488,7 +488,7 @@ export const PATHS: KnowledgePath[] = [
       { name: "Far patrols", icon: "spyglass", cost: studyPathCost(4, 1), text: "They range half again as far from the stable" },
       { name: "Blessed riders", icon: "halo", cost: studyPathCost(4, 2), text: "Each charge heals its rider 15% of its full HP" },
     ],
-    evolves: { from: "lancerStable", item: "valkyriePalace", name: "Valkyrie palace", cost: 100000, text: "This Lancer stable becomes a Valkyrie palace" },
+    legacyCrown: { from: "lancerStable", item: "valkyriePalace", name: "Valkyrie palace", cost: 100000, text: "This Lancer stable becomes a Valkyrie palace" },
   },
   {
     id: "bloodletters", topic: "assassinDen", name: "Bloodletters", motto: "Enormous criticals, paper-thin guard", hue: "shadow",
@@ -553,7 +553,7 @@ export const PATHS: KnowledgePath[] = [
       { name: "Steady aim", icon: "crosshair", cost: studyPathCost(4, 1), text: "Their balls hit 50% harder" },
       { name: "Sharpshooters", icon: "skull", cost: studyPathCost(4, 2), text: "They reach 3 cells further and hit 80% harder in all, aimed at the toughest enemy in reach" },
     ],
-    evolves: { from: "musketHall", item: "sniperLodge", name: "Sniper lodge", cost: 50000, text: "This Musket hall becomes a Sniper lodge" },
+    legacyCrown: { from: "musketHall", item: "sniperLodge", name: "Sniper lodge", cost: 50000, text: "This Musket hall becomes a Sniper lodge" },
   },
   {
     id: "beltFeed", topic: "gunNest", name: "Belt feed", motto: "Faster, until it never stops", hue: "steel",
@@ -562,7 +562,7 @@ export const PATHS: KnowledgePath[] = [
       { name: "Heavy rounds", icon: "cannonball", cost: studyPathCost(4, 1), text: "Their bullets hit 40% harder" },
       { name: "Water jacket", icon: "volley", cost: studyPathCost(4, 2), text: "They reload 40% faster than at first" },
     ],
-    evolves: { from: "gunNest", item: "gatlingNest", name: "Gatling emplacement", cost: 50000, text: "This Machine-gun nest becomes a Gatling emplacement" },
+    legacyCrown: { from: "gunNest", item: "gatlingNest", name: "Gatling emplacement", cost: 50000, text: "This Machine-gun nest becomes a Gatling emplacement" },
   },
   {
     id: "tripod", topic: "gunNest", name: "Tripod", motto: "Set down, and reach further", hue: "verdant",
@@ -949,22 +949,22 @@ export function pathState(save: Save, id: PathId) {
   const p = pathById(id), research = save.pathResearch[id], rank = research?.rank ?? 0;
   const next = p.ranks[rank], affordable = !!next && (save.settings.devMode || save.knowledge >= next.cost);
   const crowned = !!research?.crowned;
-  const crownAffordable = !!p.evolves && (save.settings.devMode || save.knowledge >= p.evolves.cost);
+  const crownAffordable = !!p.legacyCrown && (save.settings.devMode || save.knowledge >= p.legacyCrown.cost);
   // Only the spells are researched: each building is upgraded on its own
   // (`specializations.ts`).
   const sealed = !isSpell(p.topic);
   return { rank, sealed, next, maxed: !next, affordable, canLearn: !!next && affordable && !sealed,
-    crowned, crownAffordable, canEvolve: !!p.evolves && !next && !crowned && crownAffordable && !sealed };
+    crowned, crownAffordable, canEvolve: !!p.legacyCrown && !next && !crowned && crownAffordable && !sealed };
 }
 
 /** The path whose crown makes `item` (base kinds stay for sale after it). */
-export const evolvedBy = (item: PaletteItem): KnowledgePath | undefined => PATHS.find(p => p.evolves?.item === item);
+export const evolvedBy = (item: PaletteItem): KnowledgePath | undefined => PATHS.find(p => p.legacyCrown?.item === item);
 
 /** Unlock a crown. Evolving a copy is a separate, free choice (`evolveOne`). */
 export function evolve(save: Save, id: PathId, prepaid?: number): boolean {
   const st = pathState(save, id), p = pathById(id);
-  if (!p.evolves || !st.maxed || st.crowned || st.sealed || (prepaid === undefined && !st.canEvolve)) return false;
-  const cost = prepaid ?? (save.settings.devMode ? 0 : p.evolves.cost);
+  if (!p.legacyCrown || !st.maxed || st.crowned || st.sealed || (prepaid === undefined && !st.canEvolve)) return false;
+  const cost = prepaid ?? (save.settings.devMode ? 0 : p.legacyCrown.cost);
   if (prepaid === undefined) save.knowledge -= cost;
   const r = save.pathResearch[id]!;
   r.crowned = true; r.spent += cost;
@@ -995,8 +995,8 @@ export function unlearnPath(save: Save, topic: PathTopic): number {
     spent += save.pathResearch[p.id]?.spent ?? 0;
     delete save.pathResearch[p.id];
     for (const placed of [...layout.structures, ...layout.spikes]) if (placed.path === p.id) delete placed.path;
-    if (p.evolves) {
-      const { from, item } = p.evolves;
+    if (p.legacyCrown) {
+      const { from, item } = p.legacyCrown;
       d.owned[from] += d.owned[item];
       d.owned[item] = 0;
       layout.structures = layout.structures.filter((s) => s.kind !== item);
@@ -1015,7 +1015,7 @@ export function decodePathResearch(raw: unknown): PathResearch {
   for (const p of PATHS) {
     const r = (raw as Record<string, any>)[p.id];
     if (!r || !Number.isInteger(r.rank) || r.rank < 1 || r.rank > p.ranks.length || !Number.isFinite(r.spent) || r.spent < 0) continue;
-    out[p.id] = { rank: r.rank, spent: r.spent, ...(r.crowned === true && p.evolves && r.rank === p.ranks.length ? { crowned: true } : {}) };
+    out[p.id] = { rank: r.rank, spent: r.spent, ...(r.crowned === true && p.legacyCrown && r.rank === p.ranks.length ? { crowned: true } : {}) };
   }
   return out;
 }
@@ -1032,7 +1032,7 @@ export function decodePaths(raw: unknown): PathChoices {
     if (!p || !Number.isInteger(c.rank) || c.rank! < 1 || c.rank! > p.ranks.length) continue;
     if (typeof c.spent !== "number" || !Number.isFinite(c.spent) || c.spent < 0) continue;
     out[topic] = { path: p.id, rank: c.rank!, spent: c.spent };
-    if (p.evolves && c.rank === p.ranks.length && Number.isInteger(c.crowned) && c.crowned! >= 0 && c.crowned! <= 999) out[topic]!.crowned = c.crowned;
+    if (p.legacyCrown && c.rank === p.ranks.length && Number.isInteger(c.crowned) && c.crowned! >= 0 && c.crowned! <= 999) out[topic]!.crowned = c.crowned;
   }
   return out;
 }

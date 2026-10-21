@@ -1,7 +1,7 @@
 // The Melee Guild's spearmen line in the browser, on desktop and phones: a
-// Spearmen hall's tree offers the Phalanx, Javelin camp and Lancer stable
-// and its own two paths, and a Lancer stable's the Valkyrie palace past
-// Winged lancers; the halls stand, wearing paths, in the city and their
+// Spearmen hall's tree offers its three branches, each making it a Phalanx,
+// Javelin camp or Lancer stable, and a maxed Lancer stable merges with the
+// maxed phalanx and javelin camp into the Valkyrie palace; the halls stand, wearing paths, in the city and their
 // spearmen, hoplites, javelineers and lancers fight in battle. Isolated browser contexts only: never
 // reads or changes a player's saved game. Needs `npm run dev`. Screenshots
 // go to test-results/ (or SHOTS).
@@ -64,7 +64,7 @@ try {
     await zoomKeep(phone ? 2 : 2.5);
     await page.waitForTimeout(500); await page.screenshot({ path: `${out}/spears-${width}-halls.png` });
 
-    // The Spearmen hall's tree: a phalanx, javelins and lancers.
+    // The Spearmen hall's tree: three branches, a phalanx, javelins and lancers.
     const panel = page.locator('#defend-specialty');
     const press = async locator => phone ? locator.tap() : locator.click();
     const hall = s.defend.layout.structures.find(x => x.kind === 'spearHall');
@@ -75,12 +75,15 @@ try {
     if (phone) await page.touchscreen.tap(p.x, p.y); else await page.mouse.click(p.x, p.y);
     await page.waitForSelector('#defend-specialty:not([hidden])');
     const tree = await panel.locator('.ug-node:not(.withering)').evaluateAll(els => els.map(e => `${e.dataset.node}=${['owned', 'next', 'locked'].find(c => e.classList.contains(c))}`));
-    for (const n of ['k:meleeGuild=owned', 'k:spearHall=owned', 'k:phalanx=next', 'k:javelinCamp=next', 'k:lancerStable=next', 'p:longSpears:1=next', 'p:setSpears:1=next']) assert.ok(tree.includes(n), `${n} in ${tree}`);
-    await press(panel.locator('[data-node="k:lancerStable"]'));
+    for (const n of ['k:meleeGuild=owned', 'k:spearHall=owned', 'p:testudo:1=next', 'p:barbed:1=next', 'p:wingedLancers:1=next', 'k:valkyriePalace=locked']) assert.ok(tree.includes(n), `${n} in ${tree}`);
+    assert.equal(tree.filter(n => n.endsWith('=next')).length, 3, 'only the three branches');
+    await press(panel.locator('[data-node="p:wingedLancers:1"]'));
+    assert.match(await panel.locator('.ug-card').textContent(), /Becomes a Lancer stable/);
     await page.waitForTimeout(900); await page.screenshot({ path: `${out}/spears-${width}-tree.png` });
     await press(panel.locator('[data-specialty-close]'));
     await page.waitForSelector('#defend-specialty', { state: 'hidden' });
-    // A Lancer stable on Winged lancers III is offered the Valkyrie palace.
+    // A Lancer stable on Winged lancers III merges with the maxed phalanx and
+    // javelin camp standing in the city into the Valkyrie palace.
     const stable = s.defend.layout.structures.find(x => x.kind === 'lancerStable');
     const q = await page.evaluate(uid => {
       const dp = window.__dp, b = dp.currentMap().buildings.find(b => b.structureUid === uid);
@@ -92,6 +95,8 @@ try {
     const crown = await panel.locator('.ug-node:not(.withering)').evaluateAll(els => els.map(e => `${e.dataset.node}=${['owned', 'next', 'locked'].find(c => e.classList.contains(c))}`));
     assert.ok(crown.includes('k:valkyriePalace=next'), `the palace in ${crown}`);
     await press(panel.locator('[data-node="k:valkyriePalace"]'));
+    assert.match(await panel.locator('.ug-card').textContent(), /Phalanx · Testudo III: standing in the city[\s\S]*Javelin camp · Barbed javelins III: standing in the city/);
+    assert.equal(await panel.locator('[data-ug-buy="k:valkyriePalace"]').isDisabled(), false, 'it can merge');
     await page.waitForTimeout(900); await page.screenshot({ path: `${out}/spears-${width}-crown.png` });
     await press(panel.locator('[data-specialty-close]'));
 

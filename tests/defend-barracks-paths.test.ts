@@ -48,12 +48,12 @@ function blow(sim: DefendSim, m: { cd: number; target: number }, e: Enemy) {
   stepSwordsman(sim, m as any, 1 / 30);
 }
 
-test("a Barracks has three paths and becomes the Hero; the Crusaders lost their crown", () => {
-  assert.deepEqual(nextSteps("barracks").map(stepName), ["Hero", "Crusaders I", "Berserkers I", "Halberdiers I"]);
+test("a Barracks has three branches, each topping out in the Hero", () => {
+  assert.deepEqual(nextSteps("barracks").map(stepName), ["Crusaders I", "Berserkers I", "Halberdiers I"]);
   for (const p of ["berserkers", "halberdiers"] as const) assert.equal(pathById(p).topic, "barracks");
-  assert.equal(pathById("berserkers").evolves, undefined);
   const climbed = buildingTree("barracks", { path: "halberdiers", rank: 1 });
-  assert.equal(climbed.find((n) => n.id === "k:barracks")!.closed!.length, 3, "the Hero and the other two paths");
+  assert.equal(climbed.find((n) => n.id === "k:barracks")!.closed!.length, 2, "the other two branches");
+  assert.equal(climbed.at(-1)!.id, "k:heroHall");
   assert.match(kindStats(barracks().s, "barracks", "halberdiers", 3), /2.5x on big enemies/);
   assert.deepEqual(PATH_LOOKS.barracks, ["crusaders", "berserkers", "halberdiers"]);
   const art = ["", ...PATH_LOOKS.barracks!].map((look) => structurePixels("barracks", 3, 3, 0, 1, look).join());

@@ -206,15 +206,16 @@ export class TilesPage {
     const go = (where: "smithy" | "study") => topicHas(topic, where)
       ? `<button class="tile-go go-${where}" data-go="${where}" data-topic="${topic.id}">${where === "smithy" ? "⚒ Smithy" : "✦ Study"}<small>${where === "smithy" ? "below the Mine" : "below the Library"}</small></button>`
       : "";
-    // Where it stands in its upgrade tree: what it was upgraded from, and
-    // what its paths' crowns evolve it into.
+    // Where it stands in its upgrade tree: what it was upgraded (or merged)
+    // from, and the ultimate its line merges into.
     const from = isConsumable(t.id) || t.id === "cityTile" ? undefined : upgradedFrom(t.id as PlacedKind);
     const tier = higherTier(t.id);
-    const tierText = from
+    const grown = tier.from
+      ? `Merged from three <b>${ITEM_NAMES[tier.from]}</b> buildings, each at the last rank of a different branch: buy ${ITEM_NAMES[rootOf(tier.from)]}s, place them and tap them in Defend to upgrade them with Knowledge.`
+      : from
       ? `Upgraded from a <b>${ITEM_NAMES[from]}</b>${rootOf(from) !== from ? ` (itself grown from a ${ITEM_NAMES[rootOf(from)]})` : ""}: buy a ${ITEM_NAMES[rootOf(from)]}, place it and tap it in Defend to upgrade it with Knowledge.`
-      : tier.into?.evolves
-      ? `At <b>${tier.into.name} III</b>, one ${name} can evolve into a <b>${tier.into.evolves.name}</b>.`
       : "";
+    const tierText = `${grown}${tier.into ? `${grown ? " " : ""}Three of its line, each maxed on a different branch, merge into a <b>${ITEM_NAMES[tier.into]}</b>.` : ""}`;
     const counts = t.lasting ? "ONE BANNER" : `OWNED ${t.count}${isConsumable(t.id) ? "" : ` · ${t.placed} IN THE CITY · ${t.ready} READY`}`;
     return `<div class="tile-detail type-${t.type}" data-key="detail:${t.id}" data-grow role="region" aria-label="${name}">
         <header><span class="tile-face big"><canvas width="48" height="48" data-icon="${iconOf(t.id)}"></canvas></span>

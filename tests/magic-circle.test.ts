@@ -37,11 +37,11 @@ test('identity and equipped choices shape circles without granting extra Knowled
   save.spellPaths.meteor = 'starfall';
   assert.equal(formation(studyCircle(save, topic)).knowledge, learned.knowledge);
 });
-test('buildings retain all earlier Knowledge through transformations and crowns', () => {
+test('buildings retain all earlier Knowledge through transformations and merges', () => {
   const mage = formation(specialtyCircle('wizardTower', { path: 'storm', rank: 3 }));
   const crown = formation(specialtyCircle('darkKeep'));
   assert.equal(mage.knowledge, 4); // Tower transformation and three path ranks.
-  assert.equal(crown.knowledge, mage.knowledge + 1);
+  assert.equal(crown.knowledge, mage.knowledge + 7); // All three Wizard towers' branches, merged.
   assert.ok(crown.rings > mage.rings && crown.siteCount >= mage.siteCount);
   const early = formation(specialtyCircle('meleeGuild'));
   const barracks = formation(specialtyCircle('barracks'));

@@ -10,6 +10,7 @@ import { BECOMES, allocated, buildingTree, nextSteps, rootOf, specialtyOf, stepN
 import { BELT_FEED, CLUSTER, DUELISTS, GUN_SHIELD, OVERDRIVE, QUICKDRAW, SALVO, STOPPING, SHARP_MUSKETS, TRIPOD, pathById, type PathId } from "../src/knowledge-paths.ts";
 import { studyPathCost } from "../src/economy.ts";
 import { bonuses } from "../src/progression.ts";
+import { battleBonuses, wear } from "./spare-paths.ts";
 import { placeStructure, placeCityTile, defaultLayout, fitLayout, type PlacedKind } from "../src/defend/layout.ts";
 import { DefendSim, type Enemy, type Soldier } from "../src/defend/sim.ts";
 import { generateCity } from "../src/defend/citygen.ts";
@@ -31,15 +32,14 @@ function building(kind: PlacedKind, path?: PathId, rank = 3) {
   s.defend.layout = l;
   const uid = l.structures.find((st) => st.kind === kind)!.uid;
   for (let r = 0; path && r < rank; r++) {
-    const step = nextSteps(kind, specialtyOf(s.defend.layout, { uid })).find((st) => st.type === "path" && st.path === path)!;
-    assert.ok(upgradeBuilding(s, { uid }, step).ok);
+    wear(s, uid, path, r + 1);
   }
   return { s, uid };
 }
 function battle(s: S, troop: Soldier["kind"]) {
   const fit = fitLayout(s.defend.layout);
   assert.ok(fit.ok);
-  const sim = new DefendSim(generateCity(fit, 4), { ...s.defend.levels }, 1, bonuses(s));
+  const sim = new DefendSim(generateCity(fit, 4), { ...s.defend.levels }, 1, battleBonuses(s));
   new Barracks().step(sim, 0.01);
   const m = sim.soldiers.find((u) => u.kind === troop) ?? assert.fail(`a ${troop}`);
   return { sim, m };
@@ -58,44 +58,39 @@ function fire(sim: DefendSim, m: Soldier) {
 }
 
 // ── The tree ───────────────────────────────────────────────────────────
-test("the Ranged Guild leads to gunners, and gunners to muskets, machine guns and rockets", () => {
+test("the Ranged Guild leads to gunners, and gunners branch into muskets, machine guns and rockets", () => {
   assert.deepEqual(BECOMES.rangedGuild!.map((b) => b.to), ["archerBarracks", "mageGuild", "gunHall"]);
-  assert.deepEqual(nextSteps("gunHall").map(stepName), ["Musket hall", "Machine-gun nest", "Rocket battery", "Quickdraw I", "Duelists I"]);
-  assert.deepEqual(nextSteps("gunNest").map(stepName), ["Belt feed I", "Tripod I"]);
+  // Each branch's first rank makes the hall a building of its own.
+  assert.deepEqual(nextSteps("gunHall").map(stepName), ["Musket hall", "Machine-gun nest", "Rocket battery"]);
+  assert.deepEqual(nextSteps("gunHall").map((s) => s.type === "branch" && s.path), ["volleyFire", "beltFeed", "clusterRockets"]);
+  assert.deepEqual(nextSteps("gunNest", { path: "beltFeed", rank: 1 }).map(stepName), ["Belt feed II"]);
+  assert.deepEqual(nextSteps("gunNest", { path: "beltFeed", rank: 3 }).map(stepName), ["Gatling emplacement"], "maxed, it can merge");
   assert.deepEqual(nextSteps("gatlingNest").map(stepName), ["Gun shield I", "Overdrive I", "Stopping power I"]);
-  assert.deepEqual(nextSteps("rocketBattery").map(stepName), ["Cluster rockets I", "Salvo racks I"]);
   assert.equal(upgradedFrom("musketHall"), "gunHall");
-  assert.equal(upgradedFrom("sniperLodge"), "musketHall");
-  assert.equal(upgradedFrom("gatlingNest"), "gunNest");
-  for (const k of ["gunHall", "musketHall", "sniperLodge", "gunNest", "gatlingNest", "rocketBattery"] as const) assert.equal(rootOf(k), "rangedGuild");
-  assert.equal(pathById("sharpMuskets").evolves?.item, "sniperLodge");
-  assert.equal(pathById("beltFeed").evolves?.item, "gatlingNest");
-  // A Sniper lodge's Knowledge is every step there: gunners, muskets, the
-  // whole Sharpshooters path and its crown.
-  const sharp = pathById("sharpMuskets");
-  assert.equal(allocated("sniperLodge"), 6 + 8 + sharp.ranks.reduce((n, r) => n + r.cost, 0) + sharp.evolves!.cost);
-  const ids = buildingTree("sniperLodge").map((n) => n.id);
-  for (const id of ["k:rangedGuild", "k:gunHall", "k:musketHall", "p:sharpMuskets:3", "k:sniperLodge"]) assert.ok(ids.includes(id), id);
-  // A musket hall climbing Sharpshooters is offered its crown at III.
-  const crown = nextSteps("musketHall", { path: "sharpMuskets", rank: 3 });
-  assert.deepEqual(crown.map(stepName), ["Sniper lodge"]);
-  assert.equal(allocated("musketHall", { path: "sharpMuskets", rank: 2 }) - allocated("musketHall"), studyPathCost(4, 0) + studyPathCost(4, 1));
+  assert.equal(upgradedFrom("gatlingNest"), "gunHall", "merged from gunner halls' branches");
+  for (const k of ["gunHall", "musketHall", "gunNest", "gatlingNest", "rocketBattery"] as const) assert.equal(rootOf(k), "rangedGuild");
+  // A Gatling's Knowledge is all three buildings merged into it.
+  const full = (p: "volleyFire" | "beltFeed" | "clusterRockets") => pathById(p).ranks.reduce((n, r) => n + r.cost, 0);
+  assert.equal(allocated("gatlingNest"), 3 * 6 + 8 + 10 + 12 + full("volleyFire") + full("beltFeed") + full("clusterRockets"));
+  const ids = buildingTree("gatlingNest").map((n) => n.id);
+  for (const id of ["k:rangedGuild", "k:gunHall", "p:volleyFire:3", "p:beltFeed:3", "p:clusterRockets:3", "k:gatlingNest"]) assert.ok(ids.includes(id), id);
+  assert.equal(allocated("musketHall", { path: "volleyFire", rank: 2 }) - allocated("musketHall"), studyPathCost(4, 0) + studyPathCost(4, 1));
 });
-
-test("a Gunner hall is bought up from a Ranged Guild and a crown makes a Gatling emplacement", () => {
+test("a Gunner hall is bought up from a Ranged Guild and its Belt feed branch makes a nest", () => {
   const { s, uid } = building("rangedGuild");
-  const step = (to: PlacedKind) => nextSteps(s.defend.layout.structures.find((o) => o.uid === uid)!.kind, specialtyOf(s.defend.layout, { uid })).find((o) => o.type !== "path" && o.to === to)!;
-  assert.ok(upgradeBuilding(s, { uid }, step("gunHall")).ok);
-  assert.ok(upgradeBuilding(s, { uid }, step("gunNest")).ok);
-  for (let r = 0; r < 3; r++) {
-    const p = nextSteps("gunNest", specialtyOf(s.defend.layout, { uid })).find((o) => o.type === "path")!;
-    assert.ok(upgradeBuilding(s, { uid }, p).ok);
-  }
-  assert.ok(upgradeBuilding(s, { uid }, step("gatlingNest")).ok);
-  assert.equal(s.defend.owned.gatlingNest, 1);
+  const kind = () => s.defend.layout.structures.find((o) => o.uid === uid)!.kind;
+  const step = () => nextSteps(kind(), specialtyOf(s.defend.layout, { uid }));
+  assert.ok(upgradeBuilding(s, { uid }, step().find((o) => o.type === "become" && o.to === "gunHall")!).ok);
+  assert.ok(upgradeBuilding(s, { uid }, step().find((o) => o.type === "branch" && o.to === "gunNest")!).ok);
+  assert.deepEqual(specialtyOf(s.defend.layout, { uid }), { path: "beltFeed", rank: 1 });
+  for (let r = 1; r < 3; r++) assert.ok(upgradeBuilding(s, { uid }, step()[0]).ok);
+  assert.deepEqual([kind(), specialtyOf(s.defend.layout, { uid })], ["gunNest", { path: "beltFeed", rank: 3 }]);
+  // Alone it can't merge: the other two branches are missing.
+  const merge = upgradeBuilding(s, { uid }, step()[0]);
+  assert.ok(!merge.ok && /Musket hall at Volley fire III and a Rocket battery at Cluster rockets III/.test(merge.reason));
+  assert.equal(s.defend.owned.gunNest, 1);
   assert.equal(s.defend.owned.rangedGuild, 0);
 });
-
 test("each new hall and path has its own art", () => {
   assert.deepEqual(PATH_LOOKS.gunHall, ["quickdraw", "duelists"]);
   assert.deepEqual(PATH_LOOKS.gunNest, ["beltFeed", "tripod"]);

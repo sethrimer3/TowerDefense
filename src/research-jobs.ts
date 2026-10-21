@@ -18,7 +18,7 @@ export function researchOffer(save: Save, request: ResearchRequest) {
     return { rank: p.level, price: p.price, seconds: researchSeconds(p.level), available: p.canBuy };
   }
   const p = pathById(request.id), st = pathState(save, request.id), evolution = request.kind === "evolution";
-  return { rank: st.rank, price: evolution ? p.evolves?.cost ?? 0 : st.next?.cost ?? 0,
+  return { rank: st.rank, price: evolution ? p.legacyCrown?.cost ?? 0 : st.next?.cost ?? 0,
     seconds: researchSeconds(st.rank, evolution), available: evolution ? st.canEvolve : st.canLearn };
 }
 
@@ -82,7 +82,7 @@ export function decodeResearchJob(raw: unknown, save: Save): ResearchJob | null 
     const p = PATHS.find(p => p.id === j.id);
     if (!p) return null;
     const st = pathState(save, p.id);
-    if (st.sealed || st.rank !== j.rank || (j.kind === "path" ? st.maxed : !p.evolves || !st.maxed || st.crowned)) return null;
+    if (st.sealed || st.rank !== j.rank || (j.kind === "path" ? st.maxed : !p.legacyCrown || !st.maxed || st.crowned)) return null;
   }
   return { kind: j.kind, id: j.id, rank: j.rank, left: j.left, paid: j.paid } as ResearchJob;
 }

@@ -10,6 +10,7 @@ import { ECONOMY } from "../src/economy.ts";
 import { planProgression, sampledRates } from "./plan-upgrade-progression.ts";
 import { SKILLS, TREES, skillCost, type SkillId } from "../src/skill-trees.ts";
 import { PATHS } from "../src/knowledge-paths.ts";
+import { allocated } from "../src/specializations.ts";
 import { BUILDINGS, MAX_LEVEL } from "../src/mine/buildings.ts";
 import { METALS, hirePrice, upgradePrice as minePrice, MAX_MINERS } from "../src/mine/sim.ts";
 import { shelfPrice, librarianPrice, labPrice, MAX_SHELVES, MAX_LIBRARIANS, LAB_MAX_LEVEL } from "../src/library/sim.ts";
@@ -52,11 +53,6 @@ for (const skill of Object.values(SKILLS)) ranks("Study skill", skill.id, skill.
 for (const p of PATHS) {
   ranks("Study path", p.id, p.name, p.ranks.length, rank => cost({}, p.ranks[rank].cost), zero(),
     `Choose one path for ${p.topic}; alternatives are mutually exclusive`);
-  if (p.evolves) {
-    const prerequisites = cost({}, p.ranks.reduce((n, r) => n + r.cost, 0));
-    ranks("Evolution", p.id + "Crown", p.evolves.name, 1, () => cost({}, p.evolves!.cost), prerequisites,
-      `Requires ${p.name}; evolves every owned copy without separate metal payment`);
-  }
 }
 for (const b of BUILDINGS) ranks("Mine building", b, b, MAX_LEVEL, rank => cost(minePrice(b, rank)), zero(),
   "Existing level 1 is free; warehouse progression and rebuilding time excluded", () => 0, 1);
@@ -107,15 +103,15 @@ const totalWork = smiths.reduce((n, r) => n + r.smithSeconds, 0);
 const forgeTotal = sum(finals.filter(r => r.family === "Forge").map(r => r.cumulative));
 const skillsTotal = sum(finals.filter(r => r.family === "Study skill").map(r => r.cumulative));
 const compatiblePathKnowledge = [...new Set(PATHS.map(p => p.topic))].reduce((n, topic) => n + Math.max(...PATHS.filter(p => p.topic === topic)
-  .map(p => p.ranks.reduce((n, r) => n + r.cost, 0) + (p.evolves?.cost ?? 0))), 0);
+  .map(p => p.ranks.reduce((n, r) => n + r.cost, 0))), 0);
 const lateMeasuredKnowledge = samples.filter((s: any) => s.profile.id === "late").map((s: any) => s.library.perHour);
 const baseKnowledgeBudget = late.rates.knowledge * 730 * 24;
 const enchantedMultiplier = samples.filter((s: any) => s.profile.id === "late").reduce((n: number, s: any) => n + s.library.perHour / s.library.nominalPerHour, 0) / 2;
 const plan = planProgression(sampledRates(samples), MAX_SHELVES, enchantedMultiplier);
 const topRow = smiths.find(r => r.rank === 50)!;
 const conduit = finals.find(r => r.id === "chainCount")!;
-const storm = PATHS.find(p => p.id === "storm")!;
-const conduitBill = add(conduit.cumulative, cost({}, storm.ranks.reduce((n, r) => n + r.cost, 0) + storm.evolves!.cost));
+// The Dark wizard keep: three Wizard towers maxed on their branches, merged.
+const conduitBill = add(conduit.cumulative, cost({}, allocated("darkKeep")));
 const forecastTop = plan.focused(topRow.cumulative, topRow.smithSeconds / 3600 / 6 / 1.45);
 const forecastConduit = plan.focused(conduitBill, conduit.smithSeconds / 3600 / 6 / 1.45 + (researchSeconds(3, true) + [0, 1, 2].reduce((n, r) => n + researchSeconds(r), 0)) / 3600 / 2);
 const allTraining = sum(smiths.map(r => r.cumulative));
