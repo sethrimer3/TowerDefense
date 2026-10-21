@@ -8,6 +8,13 @@ import type { DefendSim } from "./sim.ts";
 export type GroundWeather = "sand" | "mist" | null;
 export type WindParticle = { x: number; y: number; turn: number };
 export const CLEANUP_DEPTH = .12;
+/** Sand banked against a building's side crushes it: every open city cell
+ * beside one with more than `depth` of sand presses with the excess; past
+ * `min` in all, the building takes `rate` of its HP a second for each unit
+ * of pressure beyond it, checked once a second. Walls, gates, ballista
+ * bastions and the keep stand firm. */
+export const SAND_PRESS = { depth: .5, min: 2, rate: .01, every: 1 };
+const FIRM = new Set(["wall", "gate", "wallBallista", "keep"]);
 const STEP = .1;
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 const cell = (x: number, y: number) => cellIndex(clamp(Math.floor(x), 0, CELLS_W - 1), clamp(Math.floor(y), 0, CELLS_H - 1));
@@ -110,6 +117,9 @@ export class Atmosphere {
   private accumulator = 0;
   private sandSeeded = false;
   private wakes = 0;
+  private pressClock = 0;
+  /** Each pressed building's pressure, last reckoned. */
+  readonly pressure = new Map<number, number>();
 
   step(sim: DefendSim, dt: number) {
     const next = groundWeather(areaForWave(sim.wave).id);
@@ -150,6 +160,8 @@ export class Atmosphere {
       this.stirProjectiles(sim);
       this.transport(sim);
       if (this.mode === "sand") {
+        this.pressClock += STEP;
+        if (this.pressClock + 1e-8 >= SAND_PRESS.every) { this.pressClock -= SAND_PRESS.every; this.press(sim); }
         this.moveParticles(sim, this.grains, 5);
         this.moveParticles(sim, this.weeds, 2);
       }
@@ -276,6 +288,31 @@ export class Atmosphere {
         }
       }
     }
+  }
+
+  /** Sum the sand banked against each city building and crush those
+   * pressed too hard. Only cells deep in sand are visited, so a city
+   * without a breach costs one pass over the board a second. */
+  press(sim: DefendSim) {
+    const s = this.sand, owner = sim.map.owner, pressure = this.pressure;
+    pressure.clear();
+    for (let i = 0; i < CELL_COUNT; i++) {
+      const excess = s[i] - SAND_PRESS.depth;
+      if (excess <= 0 || !sim.map.city[i] || sim.solid[i]) continue;
+      const x = i % CELLS_W;
+      // One building pressed from a cell once, however many of its sides touch it.
+      let a = -1, b = -1;
+      for (const j of [x > 0 ? i - 1 : -1, x < CELLS_W - 1 ? i + 1 : -1, i - CELLS_W, i + CELLS_W]) {
+        if (j < 0 || j >= CELL_COUNT || !sim.solid[j]) continue;
+        const id = owner[j];
+        if (id < 0 || id === a || id === b || sim.hp[id] <= 0) continue;
+        if (FIRM.has(sim.map.buildings[id].kind) || id === sim.keepId) continue;
+        if (a < 0) a = id; else b = id;
+        pressure.set(id, (pressure.get(id) ?? 0) + excess);
+      }
+    }
+    for (const [id, p] of pressure) if (p > SAND_PRESS.min)
+      sim.damageBuilding(id, sim.maxHp[id] * SAND_PRESS.rate * (p - SAND_PRESS.min) * SAND_PRESS.every);
   }
 
   /** The drifted dune field's sand over cell `i`. */

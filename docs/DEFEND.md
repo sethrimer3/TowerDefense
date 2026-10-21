@@ -746,7 +746,10 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   cells), that creep downwind at `DUNE_SPEED` (a twentieth of a cell a
   second, so a dune takes minutes to pass) and wrap round the board; walking
   units push the sand about, and outside the city it settles back into the
-  dunes. It never passes standing wall, but pours through a breach. The
+  dunes. It never passes standing wall, but pours through a breach,
+  and sand banked deep enough against a house or structure (`SAND_PRESS`)
+  crushes it a little each second until it collapses; walls, gates, ballista
+  bastions and the keep stand firm. The
   dunes are drawn from one baked, black-outlined sprite tiled at the drift,
   recomposed only when it moves a whole pixel.
   Sand in the city at `CLEANUP_DEPTH` or more is a civilian job of the

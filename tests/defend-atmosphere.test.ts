@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Atmosphere, windAt, CLEANUP_DEPTH, DUNE_PERIOD, DUNE_SPEED, DUNE_WAVE, duneAt } from '../src/defend/atmosphere.ts';
+import { Atmosphere, windAt, CLEANUP_DEPTH, SAND_PRESS, DUNE_PERIOD, DUNE_SPEED, DUNE_WAVE, duneAt } from '../src/defend/atmosphere.ts';
 import { DefendSim } from '../src/defend/sim.ts';
 import { defaultLayout, fitLayout, placeCityTile } from '../src/defend/layout.ts';
 import { generateCity } from '../src/defend/citygen.ts';
@@ -191,4 +191,23 @@ test('the dune sprite tiles seamlessly in opaque sand outlined in black', () => 
   for (let y = 0; y < size; y++) for (const x of [0, size - 1]) {
     if (alpha(x, y) && !alpha(x + 1, y)) { const k = (y * size + x) * 4; assert.equal(data[k], r); }
   }
+});
+
+test('sand banked against a building crushes it, but walls and the keep stand firm', () => {
+  const sim = scene(), env = sim.atmosphere!;
+  const beside = (ids: number[]) => [...new Set(ids.flatMap(i => [i - 1, i + 1, i - CELLS_W, i + CELLS_W]))]
+    .filter(j => sim.map.city[j] && !sim.solid[j]);
+  const house = sim.map.buildings.find(b => b.kind === 'house' && sim.hp[b.id] > 0 && beside(b.cells).length >= 3)!;
+  assert.ok(house, 'a house on a street');
+  const banks = beside(house.cells);
+  // A light dusting presses nothing.
+  for (const j of banks) env.sand[j] = SAND_PRESS.depth;
+  env.press(sim); assert.equal(sim.hp[house.id], sim.maxHp[house.id]);
+  for (const j of [...banks, ...beside(sim.map.buildings[sim.keepId].cells)]) env.sand[j] = 3;
+  const keep = sim.hp[sim.keepId];
+  for (let t = 0; t < 120 && sim.hp[house.id] > 0; t++) { for (const j of banks) env.sand[j] = 3; env.press(sim); }
+  assert.ok(sim.hp[house.id] <= 0, 'the house gave way');
+  assert.equal(sim.hp[sim.keepId], keep);
+  const w = wall(sim); for (const j of beside(w.cells)) env.sand[j] = 3;
+  env.press(sim); assert.equal(sim.hp[w.id], sim.maxHp[w.id]);
 });
