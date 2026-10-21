@@ -75,12 +75,12 @@ try {
       return panel.locator('.ug-node:not(.withering)').evaluateAll(els => els.map(e => `${e.dataset.node}=${['owned', 'next', 'locked'].find(c => e.classList.contains(c))}`));
     };
     const close = async () => { await press(panel.locator('[data-specialty-close]')); await page.waitForSelector('#defend-specialty', { state: 'hidden' }); };
-    // The Barracks' tree offers the Hero.
+    // The Barracks' tree: three branches, the Hero merged at their top.
     const tree = await open(s.defend.layout.structures.find(x => x.kind === 'barracks').uid);
-    for (const n of ['k:meleeGuild=owned', 'k:barracks=owned', 'k:heroHall=next', 'p:crusaders:1=next']) assert.ok(tree.includes(n), `${n} in ${tree}`);
+    for (const n of ['k:meleeGuild=owned', 'k:barracks=owned', 'k:heroHall=locked', 'p:crusaders:1=next', 'p:berserkers:1=next', 'p:halberdiers:1=next']) assert.ok(tree.includes(n), `${n} in ${tree}`);
     await press(panel.locator('[data-node="k:heroHall"]'));
     await page.waitForTimeout(900); await page.screenshot({ path: `${out}/hero-${width}-barracks-tree.png` });
-    assert.match(await panel.textContent(), /100,?000/);
+    assert.match(await panel.textContent(), /Three Barracks buildings, each at the last rank of a different branch, merge into one Hero/);
     await close();
     // A plain Hero's hall offers its three paths.
     const own = await open(s.defend.layout.structures.find(x => x.kind === 'heroHall' && !x.path).uid);

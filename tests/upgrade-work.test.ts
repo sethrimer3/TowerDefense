@@ -1,4 +1,5 @@
 import { test } from "node:test";
+import { allocated } from "../src/specializations.ts";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { defaults, decode } from "../src/save.ts";
@@ -196,8 +197,8 @@ test("funded production growth places focused final targets around two years", (
     for (const [metal, amount] of Object.entries((conduit.price ?? upgradePrice)(r))) forge[metal as keyof Budget] += amount!;
     work += forgeSeconds(r, (conduit.price ?? upgradePrice)(r));
   }
-  const storm = PATHS.find(p => p.id === "storm")!;
-  forge.knowledge = storm.ranks.reduce((n, r) => n + r.cost, 0) + storm.evolves!.cost;
+  // The Dark wizard keep: three Wizard towers maxed on their branches, merged.
+  forge.knowledge = allocated("darkKeep");
   const conduitDays = plan.focused(forge, work / 3600 / 6 / 1.45 + (researchSeconds(3, true) + [0, 1, 2].reduce((n, r) => n + researchSeconds(r), 0)) / 3600 / 2) / 24;
   for (const days of [rowDays, conduitDays, plan.enchantedHours / 24]) assert.ok(days >= 650 && days <= 850, `focused finish ${days} days`);
 });

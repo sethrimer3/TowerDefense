@@ -74,7 +74,7 @@ try {
       const to = await page.evaluate(([item, nth]) => {
         const { quarterSize, QUARTERS_W, QUARTERS_H } = window.__layout;
         const dp = window.__dp, r = dp.renderer, box = r.canvas.getBoundingClientRect(), session = dp.pointers.session, l = dp.host.save().layout, k = l.keep;
-        const { qw, qh } = quarterSize(item, (l.compact ?? []).includes(item));
+        const kind = item.split('~')[0], { qw, qh } = quarterSize(kind, (l.compact ?? []).includes(kind));
         // Every top left quarter the structure fits at, nearest the keep first.
         const keys = [];
         // Only the tiles round the keep, quickly: a press held still too long opens the tree.
@@ -89,7 +89,7 @@ try {
       }, [item, nth]);
       await page.mouse.move(to.x, to.y, { steps: 6 });
       await page.mouse.up();
-      return (await state(page)).defend.layout.structures.filter(s => s.kind === item).at(-1);
+      return (await state(page)).defend.layout.structures.filter(s => s.kind === item.split('~')[0]).at(-1);
     };
     const panel = page.locator('#defend-specialty');
     const press = async locator => phone ? locator.tap() : locator.click();
@@ -111,20 +111,19 @@ try {
     const settled = () => page.waitForFunction(() => !document.querySelector('#defend-specialty .ug-node.withering'), null, { timeout: 5000 });
     const allocatedText = () => panel.locator('.ug-alloc b').textContent();
 
-    // A Watch tower: three towers to become, two paths to climb.
+    // A Watch tower: three towers to become, no paths of its own.
     const tower = await place('watchTower');
     await tapBuilding(tower.uid);
     assert.match(await panel.locator('.ug-title').textContent(), /Watch tower/);
-    assert.equal(await panel.locator('.ug-node.next').count(), 5);
+    assert.equal(await panel.locator('.ug-node.next').count(), 3);
     assert.match(await allocatedText(), /✦ 0/);
     assert.equal(await panel.locator('.ug-respec').isDisabled(), true, 'nothing to respec yet');
-    // Becoming another tower sits beside and below; its own paths climb up.
+    // Becoming another tower sits beside and below.
     const centreOf = id => page.evaluate(id => { const r = document.querySelector(`#defend-specialty [data-node="${id}"]`).getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; }, id);
     await page.waitForTimeout(1200);
     const rootAt = await centreOf('k:watchTower');
     for (const k of ['k:archerTower', 'k:cannonTower', 'k:wizardTower']) assert.ok((await centreOf(k)).y > rootAt.y, `${k} sits below the Watch tower`);
-    assert.ok((await centreOf('p:spotters:1')).y < rootAt.y, 'its own path climbs upward');
-    assert.ok(Number(await panel.locator('.ug-branches').getAttribute('data-hidden')) >= 3 + 2, 'what each tower opens trails off');
+    assert.ok(Number(await panel.locator('.ug-branches').getAttribute('data-hidden')) >= 2 + 2 + 3, 'what each tower opens trails off');
     assert.equal(await panel.locator('.ug-branches').getAttribute('data-closed'), '0', 'nothing closed off yet');
     assert.ok(inside(await panel.boundingBox(), await page.locator('#defend-board').boundingBox()), 'the tree stays inside the board');
     await page.waitForTimeout(700); await page.screenshot({ path: `${out}/upgrade-${width}-watch-tower.png` });
@@ -136,7 +135,7 @@ try {
     assert.equal(s.knowledge, 92);
     assert.equal(s.defend.owned.watchTower, 1, 'the other Watch tower is untouched');
     let tree = await nodes();
-    assert.ok(!tree.some(n => n.startsWith('k:archerTower') || n.startsWith('p:spotters')), `the other branches withered: ${tree}`);
+    assert.ok(!tree.some(n => n.startsWith('k:archerTower') || n.startsWith('k:cannonTower')), `the other branches withered: ${tree}`);
     assert.ok(tree.includes('p:storm:1=next') && tree.includes('p:pyromancy:3=locked'), `the wizard's own paths sprouted: ${tree}`);
     assert.match(await allocatedText(), /✦ 8/);
     assert.ok(Number(await panel.locator('.ug-branches').getAttribute('data-closed')) > 0, 'the Watch tower trails the branches it closed off');
@@ -145,7 +144,8 @@ try {
     assert.deepEqual([(await placed(tower.uid)).path, (await placed(tower.uid)).rank], ['storm', 1]);
     tree = await nodes();
     assert.ok(!tree.some(n => n.startsWith('p:pyromancy') || n.startsWith('p:rime')), 'Pyromancy and Rime are cut off');
-    assert.ok(tree.includes('k:darkKeep=locked'), 'the crown waits at the end of Stormcalling');
+    assert.ok(tree.includes('k:darkKeep=locked'), 'the ultimate waits at the end of Stormcalling');
+    assert.ok((await centreOf('p:storm:1')).y < (await centreOf('k:wizardTower')).y, 'its branch climbs upward');
     assert.match(await allocatedText(), new RegExp(`✦ ${100 - (await state(page)).knowledge}`));
     // Drag a node: it follows, then eases back into the tree.
     const node = panel.locator('[data-node="p:storm:2"]'), home = await node.boundingBox();
@@ -215,14 +215,15 @@ try {
     await tapBuilding(ranged.uid);
     assert.equal(await panel.locator('.ug-node.next').count(), 3);
     await page.waitForTimeout(700); await page.screenshot({ path: `${out}/upgrade-${width}-ranged-guild.png` });
-    // A Musket hall is 3 × 2 quarters, not the guild's 2 × 2: it waits in the palette.
+    // A Musket hall is 3 × 2 quarters, not the guild's 2 × 2: it waits in the
+    // palette, on the first rank of Volley fire, the branch that made it.
     await buy('k:gunHall');
     await settled();
-    await buy('k:musketHall');
+    await buy('p:volleyFire:1');
     await page.waitForSelector('#defend-specialty', { state: 'hidden' });
     assert.equal(await placed(ranged.uid), undefined, 'taken up');
     assert.ok((await state(page)).defend.owned.musketHall >= 1);
-    assert.equal((await place('musketHall'))?.kind, 'musketHall', 'and placed again');
+    assert.equal((await place('musketHall~volleyFire~1'))?.kind, 'musketHall', 'and placed again');
     const ranged2 = await place('rangedGuild', 2);
     await tapBuilding(ranged2.uid);
     await buy('k:gunHall');
@@ -260,7 +261,7 @@ try {
     await page.evaluate(() => { window.__dp.host.game().knowledge += 200; });
     await hold(...Object.values(centre(await page.locator('#defend-palette [data-item="watchTower"]').boundingBox())));
     assert.match(await panel.locator('.ug-title').textContent(), /Watch tower/, 'holding a palette tile opens its tree');
-    assert.equal(await panel.locator('.ug-node.next').count(), 5);
+    assert.equal(await panel.locator('.ug-node.next').count(), 3);
     await page.waitForTimeout(500); await page.screenshot({ path: `${out}/upgrade-${width}-hold-palette.png` });
     await buy('k:archerTower');
     await settled();

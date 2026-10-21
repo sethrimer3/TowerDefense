@@ -9,6 +9,7 @@ import { allocated, buildingTree, nextSteps, specialtyOf, stepName, upgradeBuild
 import { BAYONET, GRENADIERS, VOLLEY, pathById, type PathId } from "../src/knowledge-paths.ts";
 import { studyPathCost } from "../src/economy.ts";
 import { bonuses } from "../src/progression.ts";
+import { battleBonuses, wear } from "./spare-paths.ts";
 import { placeStructure, placeCityTile, defaultLayout, fitLayout } from "../src/defend/layout.ts";
 import { DefendSim, type Enemy, type Soldier } from "../src/defend/sim.ts";
 import { generateCity } from "../src/defend/citygen.ts";
@@ -31,15 +32,14 @@ function hall(path?: PathId, rank = 3) {
   s.defend.layout = l;
   const uid = l.structures.find((st) => st.kind === "musketHall")!.uid;
   for (let r = 0; path && r < rank; r++) {
-    const step = nextSteps("musketHall", specialtyOf(s.defend.layout, { uid })).find((st) => st.type === "path" && st.path === path)!;
-    assert.ok(upgradeBuilding(s, { uid }, step).ok);
+    wear(s, uid, path, r + 1);
   }
   return s;
 }
 function battle(s: S) {
   const fit = fitLayout(s.defend.layout);
   assert.ok(fit.ok);
-  const sim = new DefendSim(generateCity(fit, 4), { ...s.defend.levels }, 1, bonuses(s));
+  const sim = new DefendSim(generateCity(fit, 4), { ...s.defend.levels }, 1, battleBonuses(s));
   new Barracks().step(sim, 0.01);
   const m = sim.soldiers.find((u) => u.kind === "musketeer") ?? assert.fail("a musketman");
   return { sim, m };
@@ -58,17 +58,16 @@ function fire(sim: DefendSim, m: Soldier) {
 }
 
 // ── The tree ───────────────────────────────────────────────────────────
-test("a Musket hall has four paths, climbed and respecced like any building's", () => {
-  assert.deepEqual(nextSteps("musketHall").map(stepName), ["Grenadiers I", "Volley fire I", "Bayonets I", "Sharpshooters I"]);
+test("a Musket hall climbs Volley fire, the gunners' musket branch; its other paths are spares", () => {
+  assert.deepEqual(nextSteps("musketHall", { path: "volleyFire", rank: 1 }).map(stepName), ["Volley fire II"]);
   for (const p of ["grenadiers", "volleyFire", "bayonets"] as const) assert.equal(pathById(p).topic, "musketHall");
-  const climbed = buildingTree("musketHall", { path: "bayonets", rank: 1 });
-  assert.deepEqual(climbed.map((n) => n.id).slice(-3), ["p:bayonets:1", "p:bayonets:2", "p:bayonets:3"]);
-  assert.equal(climbed.find((n) => n.id === "k:musketHall")!.closed!.length, 3, "the other three paths are closed off");
+  const climbed = buildingTree("musketHall", { path: "volleyFire", rank: 1 });
+  assert.deepEqual(climbed.map((n) => n.id).slice(-4), ["p:volleyFire:1", "p:volleyFire:2", "p:volleyFire:3", "k:gatlingNest"]);
+  assert.equal(climbed.find((n) => n.id === "k:gunHall")!.closed!.length, 2, "the other two branches are closed off");
   assert.equal(allocated("musketHall", { path: "volleyFire", rank: 2 }) - allocated("musketHall"), studyPathCost(4, 0) + studyPathCost(4, 1));
   assert.match(kindStats(hall(), "musketHall"), /5 range$/);
   assert.match(kindStats(hall(), "musketHall", "grenadiers", 2), /bursts 0.9 cells wide · burning ground 3s · 4 bomblets/);
 });
-
 test("each path has its own look on the board", () => {
   assert.deepEqual(PATH_LOOKS.musketHall, ["grenadiers", "volleyFire", "bayonets", "sharpMuskets"]);
   const art = ["", ...PATH_LOOKS.musketHall!].map((look) => structurePixels("musketHall", 3, 3, 0, 1, look).join());

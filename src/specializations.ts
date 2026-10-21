@@ -1,19 +1,28 @@
 /** Each building's own upgrades. The shop sells only the basic buildings
  * (`BASIC_BUILDINGS`: the Watch tower, the Melee Guild and the Ranged Guild,
  * besides the city's own pieces); everything else is one of those upgraded,
- * one building at a time, with Knowledge, down its own branching path:
+ * one building at a time, with Knowledge. Every line has the same shape
+ * (`ATTUNED`):
  *
- *  - while a building wears no path it can become one of the buildings its
- *    kind branches into (`BECOMES`: a Watch tower into an archer, cannon or
- *    wizard tower; a Melee Guild into a barracks of swordsmen, an
- *    assassins' den or a spearmen hall, and a Spearmen hall into a phalanx,
- *    a javelin camp or a lancer stable, and a Barracks into the Hero; a Ranged Guild into archers, fire mages or gunners,
- *    and a Gunner hall into musketmen, machine gunners or rockets), or set out on
- *    one of its kind's Knowledge paths (`knowledge-paths.ts`);
- *  - a building on a path climbs it rank by rank;
- *  - at a path's last rank, a path with a crown evolves the building
- *    (Winged lancers: a Valkyrie palace; Stormcalling: a Dark wizard keep;
- *    Sharpshooters: a Sniper lodge; Belt feed: a Gatling emplacement).
+ *  - a basic building becomes one of three attuned buildings (a Watch tower
+ *    an archer, cannon or wizard tower; a Melee Guild a barracks of
+ *    swordsmen, an assassins' den or a spearmen hall; a Ranged Guild an
+ *    archer barracks, a Mage Guild or a gunner hall);
+ *  - an attuned building takes one of its three branches, the others closing
+ *    off, and climbs it three ranks. Each branch is one Knowledge path; the
+ *    spearmen's and the gunners' branches first turn the hall into a
+ *    building with troops of its own (`Branch.via`: a phalanx, javelin camp
+ *    or lancer stable; a musket hall, machine-gun nest or rocket battery);
+ *  - three buildings of one attuned kind, each at the last rank of a
+ *    different branch, merge into its ultimate (`Attuned.ultimate`: the Dark
+ *    wizard keep, the Hero, the Valkyrie palace, the Sniper lodge, the
+ *    Gatling emplacement). The one whose tree the merge is bought in becomes
+ *    it; the other two are used up. Lines without an ultimate yet show it
+ *    to come.
+ *
+ * An ultimate keeps the paths of its own it had (the Hero's, the Gatling's,
+ * the Sniper lodge's, Cloudborne), and the Sniper lodge can still become the
+ * Revolutionary (`BEYOND`).
  *
  * The kind is the building's kind in the city and among the copies owned
  * (`DefendSave.owned`); its path and rank live on its placement
@@ -24,7 +33,6 @@
  * (`placedBattlePaths`). */
 import { ITEM_NAMES, footprint, type Bonuses, type PaletteItem } from "./defend/catalog.ts";
 import { cloneLayout, fitLayout, sameGate, type GateSpot, type Layout, type PlacedKind, type PlacedStructure, type SpikeSpot } from "./defend/layout.ts";
-import { hash } from "./defend/grid.ts";
 import { keptGroups, plainAvailable, type DefendSave } from "./defend/progress.ts";
 import { PATHS, isSpell, pathById, pathFits, pathTopicOf, pathsOf, type BattlePaths, type KnowledgePath, type PathId } from "./knowledge-paths.ts";
 import type { Save } from "./save.ts";
@@ -35,50 +43,97 @@ export const spikeKey = (g: { tx: number; ty: number; side: string }) => `spikes
 /** A path a building wears, at the rank it has climbed to. */
 export type Wear = { path: PathId; rank: number };
 
-/** What a plain building of each kind can become, and the Knowledge it costs. */
-export const BECOMES: Partial<Record<PlacedKind, { to: PlacedKind; cost: number }[]>> = {
-  watchTower: [
-    { to: "archerTower", cost: 3 },
-    { to: "cannonTower", cost: 6 },
-    { to: "wizardTower", cost: 8 },
-  ],
-  meleeGuild: [
-    { to: "barracks", cost: 4 },
-    { to: "assassinDen", cost: 6 },
-    { to: "spearHall", cost: 5 },
-  ],
-  spearHall: [
-    { to: "phalanx", cost: 7 },
-    { to: "javelinCamp", cost: 8 },
-    { to: "lancerStable", cost: 10 },
-  ],
-  rangedGuild: [
-    { to: "archerBarracks", cost: 5 },
-    { to: "mageGuild", cost: 9 },
-    { to: "gunHall", cost: 6 },
-  ],
-  gunHall: [
-    { to: "musketHall", cost: 8 },
-    { to: "gunNest", cost: 10 },
-    { to: "rocketBattery", cost: 12 },
-  ],
-  // The swordsmen's ultimate.
-  barracks: [{ to: "heroHall", cost: 100000 }],
-  // The gunner line's ultimate.
+// ── The shape of every line ─────────────────────────────────────────────
+/** One branch of an attuned building: a path climbed rank by rank. With
+ * `via`, its first rank also turns the building into another kind (paying
+ * `via.cost` on top of the rank), which wears the path from then on. */
+export type Branch = { path: PathId; via?: { kind: PlacedKind; cost: number } };
+/** An attuned building: what it grows from and costs, its three branches,
+ * and the ultimate three of it, each maxed on a different branch, merge
+ * into (none yet: still to come). */
+export type Attuned = { kind: PlacedKind; from: PlacedKind; cost: number; branches: Branch[]; ultimate?: PlacedKind };
+
+export const ATTUNED: Attuned[] = [
+  { kind: "archerTower", from: "watchTower", cost: 3, branches: [{ path: "fireArrows" }, { path: "sharpshooters" }] },
+  { kind: "cannonTower", from: "watchTower", cost: 6, branches: [{ path: "gunnery" }, { path: "siegeShot" }] },
+  { kind: "wizardTower", from: "watchTower", cost: 8, branches: [{ path: "pyromancy" }, { path: "rime" }, { path: "storm" }], ultimate: "darkKeep" },
+  { kind: "barracks", from: "meleeGuild", cost: 4, branches: [{ path: "crusaders" }, { path: "berserkers" }, { path: "halberdiers" }], ultimate: "heroHall" },
+  { kind: "assassinDen", from: "meleeGuild", cost: 6, branches: [{ path: "bloodletters" }, { path: "shadowcloak" }, { path: "venom" }], ultimate: "shadow" },
+  { kind: "spearHall", from: "meleeGuild", cost: 5, ultimate: "valkyriePalace", branches: [
+    { path: "testudo", via: { kind: "phalanx", cost: 7 } },
+    { path: "barbed", via: { kind: "javelinCamp", cost: 8 } },
+    { path: "wingedLancers", via: { kind: "lancerStable", cost: 10 } },
+  ] },
+  { kind: "archerBarracks", from: "rangedGuild", cost: 5, branches: [{ path: "rangers" }, { path: "skirmishers" }], ultimate: "sniperLodge" },
+  { kind: "mageGuild", from: "rangedGuild", cost: 9, branches: [{ path: "pyroclasm" }, { path: "cinders" }] },
+  { kind: "gunHall", from: "rangedGuild", cost: 6, ultimate: "gatlingNest", branches: [
+    { path: "volleyFire", via: { kind: "musketHall", cost: 8 } },
+    { path: "beltFeed", via: { kind: "gunNest", cost: 10 } },
+    { path: "clusterRockets", via: { kind: "rocketBattery", cost: 12 } },
+  ] },
+];
+/** Knowledge a merge costs on top of the three buildings it uses up. */
+export const MERGE_COST = 0;
+/** What an ultimate can go on to become. */
+export const BEYOND: Partial<Record<PlacedKind, { to: PlacedKind; cost: number }[]>> = {
   sniperLodge: [{ to: "revolutionary", cost: 100000 }],
 };
+/** What a plain building of each kind can become, and the Knowledge it
+ * costs: a basic building its attuned ones, and `BEYOND`. */
+export const BECOMES: Partial<Record<PlacedKind, { to: PlacedKind; cost: number }[]>> = {
+  ...Object.fromEntries(["watchTower", "meleeGuild", "rangedGuild"].map((b) => [b, ATTUNED.filter((a) => a.from === b).map((a) => ({ to: a.kind, cost: a.cost }))])),
+  ...BEYOND,
+};
+
+/** Where a kind stands in its line. */
+export type Place =
+  | { tier: "basic"; kind: PlacedKind }
+  | { tier: "attuned"; a: Attuned }
+  | { tier: "via"; a: Attuned; branch: number }
+  | { tier: "ultimate"; a: Attuned }
+  | { tier: "beyond"; from: PlacedKind; cost: number }
+  | { tier: "other" };
+export function placeOf(kind: PlacedKind | "wallSpikes"): Place {
+  if (kind === "wallSpikes") return { tier: "other" };
+  if (ATTUNED.some((a) => a.from === kind)) return { tier: "basic", kind };
+  for (const a of ATTUNED) {
+    if (a.kind === kind) return { tier: "attuned", a };
+    const branch = a.branches.findIndex((b) => b.via?.kind === kind);
+    if (branch >= 0) return { tier: "via", a, branch };
+    if (a.ultimate === kind) return { tier: "ultimate", a };
+  }
+  for (const [from, list] of Object.entries(BEYOND)) {
+    const b = list!.find((o) => o.to === kind);
+    if (b) return { tier: "beyond", from: from as PlacedKind, cost: b.cost };
+  }
+  return { tier: "other" };
+}
+/** The attuned building `kind` is, branches from, or was merged from. */
+export function attunedOf(kind: PlacedKind | "wallSpikes"): Attuned | undefined {
+  const p = placeOf(kind);
+  return p.tier === "attuned" || p.tier === "via" || p.tier === "ultimate" ? p.a : p.tier === "beyond" ? attunedOf(p.from) : undefined;
+}
+/** The kind a building on `branch` of `a` is. */
+export const branchKind = (a: Attuned, branch: Branch): PlacedKind => branch.via?.kind ?? a.kind;
+/** The branch of `a` a building of `kind` wearing `wear` is on, if any. */
+const branchOf = (a: Attuned, kind: PlacedKind | "wallSpikes", wear?: Wear) =>
+  a.branches.findIndex((b) => branchKind(a, b) === kind && (b.via ? true : b.path === wear?.path));
+/** The branch the tree stands an ultimate on: the middle one. */
+const MIDDLE = 1;
+const topRank = (path: PathId) => pathById(path).ranks.length;
 
 /** What each kind's troops are called on its upgrade buttons. */
 export const TROOPS: Partial<Record<PlacedKind, string>> = {
-  meleeGuild: "Brawlers", rangedGuild: "Stone throwers", barracks: "Swordsmen", heroHall: "Hero", assassinDen: "Assassins", spearHall: "Spearmen", phalanx: "Hoplites", javelinCamp: "Javelineers", lancerStable: "Lancers", archerBarracks: "Archers", mageGuild: "Fire mages",
+  meleeGuild: "Brawlers", rangedGuild: "Stone throwers", barracks: "Swordsmen", heroHall: "Hero", shadow: "Shade", assassinDen: "Assassins", spearHall: "Spearmen", phalanx: "Hoplites", javelinCamp: "Javelineers", lancerStable: "Lancers", archerBarracks: "Archers", mageGuild: "Fire mages",
   sniperLodge: "Snipers", musketHall: "Musketmen",
   gunHall: "Gunners", gunNest: "Machine gunners", gatlingNest: "Gatling gunners", rocketBattery: "Rocketeers", revolutionary: "Laser snipers", valkyriePalace: "Valkyries", darkKeep: "Dark wizard",
 };
 
-/** The kind `kind` was upgraded from (its parent in the tree), if any. */
+/** The kind `kind` was upgraded from (its parent in the tree), if any: an
+ * ultimate's is its attuned building. */
 export function upgradedFrom(kind: PlacedKind): PlacedKind | undefined {
-  for (const [from, list] of Object.entries(BECOMES)) if (list!.some((b) => b.to === kind)) return from as PlacedKind;
-  return PATHS.find((p) => p.evolves?.item === kind)?.evolves?.from;
+  const p = placeOf(kind);
+  return p.tier === "attuned" ? p.a.from : p.tier === "via" || p.tier === "ultimate" ? p.a.kind : p.tier === "beyond" ? p.from : undefined;
 }
 /** The basic building `kind` grows from (itself for a basic one). */
 export function rootOf(kind: PlacedKind): PlacedKind {
@@ -91,27 +146,41 @@ export function rootOf(kind: PlacedKind): PlacedKind {
 export type UpgradeStep =
   | { type: "become"; to: PlacedKind; cost: number }
   | { type: "path"; path: PathId; rank: number; cost: number }
-  | { type: "evolve"; path: PathId; to: PlacedKind; cost: number };
+  /** A branch whose first rank makes the building another kind. */
+  | { type: "branch"; to: PlacedKind; path: PathId; cost: number }
+  /** Three buildings maxed on different branches made one ultimate. */
+  | { type: "merge"; to: PlacedKind; cost: number };
 
 /** Every upgrade a building of `kind` wearing `wear` can take next. */
 export function nextSteps(kind: PlacedKind | "wallSpikes", wear?: Wear): UpgradeStep[] {
+  const place = placeOf(kind);
   if (wear) {
     const p = pathById(wear.path), next = p.ranks[wear.rank];
     if (next) return [{ type: "path", path: p.id, rank: wear.rank + 1, cost: next.cost }];
-    return p.evolves ? [{ type: "evolve", path: p.id, to: p.evolves.item, cost: p.evolves.cost }] : [];
+    const a = place.tier === "attuned" || place.tier === "via" ? place.a : undefined;
+    return a?.ultimate ? [{ type: "merge", to: a.ultimate, cost: MERGE_COST }] : [];
+  }
+  if (place.tier === "attuned")
+    return place.a.branches.map((b): UpgradeStep => {
+      const first = pathById(b.path).ranks[0].cost;
+      return b.via ? { type: "branch", to: b.via.kind, path: b.path, cost: b.via.cost + first } : { type: "path", path: b.path, rank: 1, cost: first };
+    });
+  if (place.tier === "via") {
+    // Made one before branches were climbed from the first rank: it climbs
+    // from there.
+    const p = pathById(place.a.branches[place.branch].path);
+    return [{ type: "path", path: p.id, rank: 1, cost: p.ranks[0].cost }];
   }
   const becomes = kind === "wallSpikes" ? [] : (BECOMES[kind] ?? []).map((b): UpgradeStep => ({ type: "become", ...b }));
-  const topic = pathTopicOf(kind);
-  const paths = topic ? pathsOf(topic).map((p): UpgradeStep => ({ type: "path", path: p.id, rank: 1, cost: p.ranks[0].cost })) : [];
-  return [...becomes, ...paths];
+  return [...becomes, ...buildingPathsOf(kind).map((p): UpgradeStep => ({ type: "path", path: p.id, rank: 1, cost: p.ranks[0].cost }))];
 }
 export const sameStep = (a: UpgradeStep, b: UpgradeStep) =>
-  a.type === b.type && (a.type === "become" ? a.to === (b as typeof a).to : a.path === (b as { path: PathId }).path && (a.type !== "path" || a.rank === (b as typeof a).rank));
+  a.type === b.type && (a.type === "become" || a.type === "merge" ? a.to === (b as typeof a).to
+    : a.path === (b as { path: PathId }).path && (a.type !== "path" || a.rank === (b as typeof a).rank));
 
 /** A step's name, as its button reads. */
 export function stepName(s: UpgradeStep): string {
-  if (s.type === "become") return ITEM_NAMES[s.to];
-  if (s.type === "evolve") return ITEM_NAMES[s.to];
+  if (s.type === "become" || s.type === "merge" || s.type === "branch") return ITEM_NAMES[s.to];
   return `${pathById(s.path).name} ${ROMAN[s.rank]}`;
 }
 
@@ -150,15 +219,49 @@ const ROMAN = ["", "I", "II", "III", "IV", "V"];
 export const specialtyLabel = (s: Wear | undefined) => (s ? `${pathById(s.path).name} ${ROMAN[s.rank]}` : "Unspecialized");
 /** A well formed wear for `kind`: its own path, at a rank the path has. */
 export const wearFits = (kind: string, path: unknown, rank: unknown): boolean =>
-  typeof path === "string" && pathFits(kind, path as PathId) && Number.isInteger(rank) && (rank as number) >= 1 && (rank as number) <= pathById(path as PathId).ranks.length;
+  typeof path === "string" && buildingPathsOf(kind).some((p) => p.id === path) && Number.isInteger(rank) && (rank as number) >= 1 && (rank as number) <= pathById(path as PathId).ranks.length;
+
 
 // ── Upgrading ──────────────────────────────────────────────────────────
 export type UpgradeResult = { ok: false; reason: string } | { ok: true; kind: PlacedKind | "wallSpikes"; waiting?: boolean; copy?: SpecialtyTarget };
 
+/** One building a merge uses up: where it is, or that none is. */
+export type Partner = { branch: Branch; kind: PlacedKind; found?: { kept: true } | { uid: number } };
+
+/** The buildings a merge into the ultimate would use up beside a building
+ * of `kind` wearing `wear`: one at the last rank of each other branch,
+ * from the palette first, then the city (never `except`, the building
+ * itself). Empty unless it is maxed on a branch of a line with an ultimate. */
+export function mergePartners(d: DefendSave, kind: PaletteKind, wear: Wear | undefined, except?: number): Partner[] {
+  const a = attunedOf(kind), mine = a ? branchOf(a, kind, wear) : -1;
+  if (!a?.ultimate || mine < 0 || !wear || wear.rank < topRank(wear.path)) return [];
+  return a.branches.filter((_, i) => i !== mine).map((branch): Partner => {
+    const k = branchKind(a, branch), top = topRank(branch.path);
+    if (d.kept.some((o) => o.kind === k && o.path === branch.path && o.rank === top)) return { branch, kind: k, found: { kept: true } };
+    const s = d.layout.structures.find((o) => o.uid !== except && o.kind === k && o.path === branch.path && o.rank === top);
+    return { branch, kind: k, ...(s ? { found: { uid: s.uid } } : {}) };
+  });
+}
+/** Why a merge can't happen yet, naming the buildings still missing. */
+const missing = (partners: Partner[]) =>
+  `Needs ${partners.filter((p) => !p.found).map((p) => `a ${ITEM_NAMES[p.kind]} at ${pathById(p.branch.path).name} ${ROMAN[topRank(p.branch.path)]}`).join(" and ")} to merge with.`;
+
+/** Uses up the merge's partners: those in the palette and the city alike. */
+function consume(d: DefendSave, layout: Layout, partners: Partner[]) {
+  for (const p of partners) {
+    if (p.found && "uid" in p.found) {
+      const uid = p.found.uid;
+      layout.structures = layout.structures.filter((s) => s.uid !== uid);
+    } else unkeep(d, p.kind, { path: p.branch.path, rank: topRank(p.branch.path) });
+    d.owned[p.kind]--;
+  }
+}
+
 /** Upgrades the building at `target` by `step`, paying its Knowledge (free
  * with Unlimited money). A building that becomes another stands where it
  * was if the new one fits there (its tile reshuffled if need be), and
- * otherwise waits in the palette. Only while building. */
+ * otherwise waits in the palette. A merge uses up its partners. Only while
+ * building. */
 export function upgradeBuilding(save: Save, target: SpecialtyTarget, asked: UpgradeStep): UpgradeResult {
   if ("copy" in target) return upgradeCopy(save, target, asked);
   const d = save.defend, kind = targetKind(d.layout, target), placed = placementOf(d.layout, target);
@@ -168,6 +271,9 @@ export function upgradeBuilding(save: Save, target: SpecialtyTarget, asked: Upgr
   if (!step) return { ok: false, reason: "That upgrade isn't open to it." };
   const free = save.settings.devMode;
   if (!free && save.knowledge < step.cost) return { ok: false, reason: `Needs ${step.cost} Knowledge.` };
+  const uid = "uid" in target ? target.uid : undefined;
+  const partners = step.type === "merge" ? mergePartners(d, kind, wearOf(placed), uid) : [];
+  if (partners.some((p) => !p.found)) return { ok: false, reason: missing(partners) };
   const next = cloneLayout(d.layout), p = placementOf(next, target)!;
   if (step.type === "path") {
     p.path = step.path;
@@ -177,24 +283,32 @@ export function upgradeBuilding(save: Save, target: SpecialtyTarget, asked: Upgr
     recordFound(d);
     return { ok: true, kind };
   }
-  // Becoming another building (or evolving): one copy of the old kind
-  // turns into one of the new.
+  // Becoming another building (taking a branch that makes it one, or
+  // merging): one copy of the old kind turns into one of the new.
+  consume(d, next, partners);
   const s = p as PlacedStructure;
   s.kind = step.to;
   delete s.path;
   delete s.rank;
+  if (step.type === "branch") {
+    s.path = step.path;
+    s.rank = 1;
+  }
   if (!free) save.knowledge -= step.cost;
   d.owned[kind as PlacedKind]--;
   d.owned[step.to]++;
   d.layout = standing(next, s.uid, kind as PlacedKind);
-  // Taken up wearing nothing, it waits as a plain copy, still counted.
+  const waiting = !d.layout.structures.some((o) => o.uid === s.uid);
+  // Taken up, it waits as a copy: kept on its branch, or plain.
+  if (waiting && step.type === "branch") d.kept.push({ kind: step.to, path: step.path, rank: 1 });
   recordFound(d);
-  return { ok: true, kind: step.to, waiting: !d.layout.structures.some((o) => o.uid === s.uid) };
+  return { ok: true, kind: step.to, waiting };
 }
 
 /** Upgrades one palette copy: a path step keeps it on that path and rank
- * (a kept copy), a change of kind makes it a plain copy of the new kind.
- * `copy` in the result names the copy it became. */
+ * (a kept copy), a change of kind makes it a copy of the new kind (kept on
+ * its branch's first rank for a branch). `copy` in the result names the
+ * copy it became. */
 function upgradeCopy(save: Save, target: { copy: PaletteKind; wear?: Wear }, asked: UpgradeStep): UpgradeResult {
   const d = save.defend, kind = target.copy;
   if (!copyWaits(d, kind, target.wear)) return { ok: false, reason: "That copy is no longer in the palette." };
@@ -202,16 +316,29 @@ function upgradeCopy(save: Save, target: { copy: PaletteKind; wear?: Wear }, ask
   if (!step) return { ok: false, reason: "That upgrade isn't open to it." };
   const free = save.settings.devMode;
   if (!free && save.knowledge < step.cost) return { ok: false, reason: `Needs ${step.cost} Knowledge.` };
-  if (!free) save.knowledge -= step.cost;
+  // The copy itself is a kept one: set it aside before looking for partners.
   unkeep(d, kind, target.wear);
+  const partners = step.type === "merge" ? mergePartners(d, kind, target.wear) : [];
+  if (partners.some((p) => !p.found)) {
+    if (target.wear) d.kept.push({ kind, ...target.wear });
+    return { ok: false, reason: missing(partners) };
+  }
+  if (!free) save.knowledge -= step.cost;
   if (step.type === "path") {
     d.kept.push({ kind, path: step.path, rank: step.rank });
     recordFound(d);
     return { ok: true, kind, copy: { copy: kind, wear: { path: step.path, rank: step.rank } } };
   }
+  const layout = cloneLayout(d.layout);
+  consume(d, layout, partners);
+  d.layout = layout;
   d.owned[kind as PlacedKind]--;
   d.owned[step.to]++;
   recordFound(d);
+  if (step.type === "branch") {
+    d.kept.push({ kind: step.to, path: step.path, rank: 1 });
+    return { ok: true, kind: step.to, copy: { copy: step.to, wear: { path: step.path, rank: 1 } } };
+  }
   return { ok: true, kind: step.to, copy: { copy: step.to } };
 }
 
@@ -236,51 +363,65 @@ function standing(l: Layout, uid: number, was: PlacedKind): Layout {
 }
 
 // ── The tree a building grows ──────────────────────────────────────────
-/** The Knowledge allocated to a building of `kind` wearing `wear`: every
- * step from its basic building to where it stands now, at today's prices
- * (what a respec gives back). */
-export function allocated(kind: PlacedKind | "wallSpikes", wear?: Wear): number {
-  let total = 0;
-  if (wear) {
-    const p = pathById(wear.path);
-    for (let r = 0; r < wear.rank; r++) total += p.ranks[r].cost;
-  }
-  if (kind === "wallSpikes") return total;
-  for (let k = kind, up = upgradedFrom(k); up; k = up, up = upgradedFrom(k)) {
-    const become = BECOMES[up]?.find((b) => b.to === k);
-    if (become) total += become.cost;
-    else {
-      // Evolved: the whole crowned path, then its crown.
-      const p = PATHS.find((o) => o.evolves?.item === k)!;
-      total += p.ranks.reduce((n, r) => n + r.cost, 0) + p.evolves!.cost;
-    }
-  }
-  return total;
+const pathCost = (path: PathId, ranks = topRank(path)) => pathById(path).ranks.slice(0, ranks).reduce((n, r) => n + r.cost, 0);
+
+/** The Knowledge it takes to make a plain building of `kind` from its
+ * basic building: an ultimate's counts all three buildings merged into it. */
+function lineageCost(kind: PlacedKind | "wallSpikes"): number {
+  const p = placeOf(kind);
+  if (p.tier === "attuned") return p.a.cost;
+  if (p.tier === "via") return p.a.cost + p.a.branches[p.branch].via!.cost;
+  if (p.tier === "ultimate") return p.a.branches.reduce((n, b) => n + p.a.cost + (b.via?.cost ?? 0) + pathCost(b.path), MERGE_COST);
+  if (p.tier === "beyond") return lineageCost(p.from) + p.cost;
+  return 0;
 }
 
+/** The Knowledge allocated to a building of `kind` wearing `wear`: every
+ * step from its basic building to where it stands now (for an ultimate,
+ * all three buildings merged into it), at today's prices (what a respec
+ * gives back). */
+export function allocated(kind: PlacedKind | "wallSpikes", wear?: Wear): number {
+  return lineageCost(kind) + (wear ? pathCost(wear.path, wear.rank) : 0);
+}
+
+/** Where a building stands once an undo is done, and, past a merge, the
+ * other buildings it comes apart into (each a kind, maybe on a path). */
+type Undone = { kind: PaletteKind; wear?: Wear; apart?: { kind: PlacedKind; wear?: Wear }[] };
+
 /** Where a building of `kind` wearing `wear` stands once tree node `id`
- * and everything after it are undone: at the node it grew from. Undefined
+ * and everything after it are undone: at the node it grew from. Undoing an
+ * ultimate's merge parts it into the three buildings merged into it; what
+ * lies below a merge can't be undone on its own (respec it). Undefined
  * unless `id` is one it has (owned) and not its basic building. */
-export function undoTo(kind: PaletteKind, wear: Wear | undefined, id: string): { kind: PaletteKind; wear?: Wear } | undefined {
+export function undoTo(kind: PaletteKind, wear: Wear | undefined, id: string): Undone | undefined {
   const tree = buildingTree(kind, wear), n = tree.find((o) => o.id === id);
-  if (!n || n.state !== "owned" || !n.parent) return undefined;
+  if (!n || n.state !== "owned" || !n.parent || n.merged) return undefined;
+  if (n.step?.type === "merge") {
+    const a = attunedOf(n.kind!)!, at = (b: Branch) => ({ kind: branchKind(a, b), wear: { path: b.path, rank: topRank(b.path) } });
+    return { ...at(a.branches[MIDDLE]), apart: a.branches.filter((_, i) => i !== MIDDLE).map(at) };
+  }
   const to = tree.find((o) => o.id === n.parent)!;
-  if (to.kind) return { kind: to.kind };
-  // A path rank: the building is the nearest one below it.
+  if (!to.path) return { kind: to.kind! };
+  // A path rank: the building is the nearest one at or below it.
   let k = to;
   while (!k.kind) k = tree.find((o) => o.id === k.parent)!;
-  return { kind: k.kind, wear: { path: to.path!, rank: to.rank! } };
+  return { kind: k.kind, wear: { path: to.path, rank: to.rank! } };
 }
+
+/** The Knowledge `to` gives back from a building of `kind` wearing `wear`. */
+const refund = (kind: PaletteKind, wear: Wear | undefined, to: Undone) =>
+  allocated(kind, wear) - allocated(to.kind, to.wear) - (to.apart ?? []).reduce((n, o) => n + allocated(o.kind, o.wear), 0);
 
 /** The Knowledge undoing node `id` gives back (0 when it can't be undone). */
 export function undoRefund(kind: PaletteKind, wear: Wear | undefined, id: string): number {
   const to = undoTo(kind, wear, id);
-  return to ? allocated(kind, wear) - allocated(to.kind, to.wear) : 0;
+  return to ? refund(kind, wear, to) : 0;
 }
 
 /** Undoes tree node `id` of the building at `target` and everything after
  * it, giving back their Knowledge: the building steps back down its tree to
- * the node `id` grew from. Free. Only while building. */
+ * the node `id` grew from (an unmerged ultimate's two others wait in the
+ * palette). Free. Only while building. */
 export function undoUpgrade(save: Save, target: SpecialtyTarget, id: string): UpgradeResult {
   const d = save.defend, kind = targetKind(d, target), wear = specialtyOf(d, target);
   if (!kind) return { ok: false, reason: "That building is no longer there." };
@@ -290,22 +431,35 @@ export function undoUpgrade(save: Save, target: SpecialtyTarget, id: string): Up
 }
 
 /** Respecs the building at `target`: every Knowledge point back, and back
- * to its basic building with no path. Free. Only while building. */
+ * to its basic building with no path (an ultimate to the three basic
+ * buildings merged into it, two of them waiting in the palette). Free.
+ * Only while building. */
 export function respecBuilding(save: Save, target: SpecialtyTarget): UpgradeResult {
   const d = save.defend, kind = targetKind(d, target), wear = specialtyOf(d, target);
   if (!kind) return { ok: false, reason: "That building is no longer there." };
   const root = kind === "wallSpikes" ? kind : rootOf(kind);
   if (root === kind && !wear) return { ok: false, reason: "Nothing to respec: it has no upgrades." };
-  return rewind(save, target, kind, wear, { kind: root });
+  const merged = kind !== "wallSpikes" && mergedFrom(kind);
+  return rewind(save, target, kind, wear, { kind: root, ...(merged ? { apart: [{ kind: root as PlacedKind }, { kind: root as PlacedKind }] } : {}) });
 }
+/** Whether `kind` is an ultimate, or grew from one. */
+export const mergedFrom = (kind: PlacedKind): boolean => {
+  const p = placeOf(kind);
+  return p.tier === "ultimate" || (p.tier === "beyond" && mergedFrom(p.from));
+};
 
 /** Steps the building at `target` (a `kind` wearing `wear`) back to `to`,
  * giving back the Knowledge between them. A placed one that changes kind
  * stays where it was if it fits (its tile reshuffled if need be), else it
- * waits in the palette; a palette copy becomes a copy of `to`. */
-function rewind(save: Save, target: SpecialtyTarget, kind: PaletteKind, wear: Wear | undefined, to: { kind: PaletteKind; wear?: Wear }): UpgradeResult {
+ * waits in the palette; a palette copy becomes a copy of `to`. The
+ * buildings it comes apart into wait in the palette. */
+function rewind(save: Save, target: SpecialtyTarget, kind: PaletteKind, wear: Wear | undefined, to: Undone): UpgradeResult {
   const d = save.defend;
-  save.knowledge += allocated(kind, wear) - allocated(to.kind, to.wear);
+  save.knowledge += refund(kind, wear, to);
+  for (const o of to.apart ?? []) {
+    d.owned[o.kind]++;
+    if (o.wear) d.kept.push({ kind: o.kind, ...o.wear });
+  }
   const shift = () => {
     if (to.kind === kind) return;
     d.owned[kind as PlacedKind]--;
@@ -340,7 +494,9 @@ function rewind(save: Save, target: SpecialtyTarget, kind: PaletteKind, wear: We
 }
 
 /** One node of a building's upgrade tree: a building it is or can become
- * (`k:<kind>`), or one rank of a path (`p:<path>:<rank>`). */
+ * (`k:<kind>`), one rank of a path (`p:<path>:<rank>`; a branch's first
+ * rank that makes it another building has that `kind` too), or a line's
+ * ultimate still to come (`u:<attuned kind>`). */
 export type TreeNode = {
   id: string;
   /** The node it grows from (none for the basic building at the root). */
@@ -366,6 +522,10 @@ export type TreeNode = {
   closed?: BranchSlot[];
   /** ...and the branch it took instead. */
   took?: BranchSlot;
+  /** Owned below an ultimate's merge: undone only with the merge. */
+  merged?: boolean;
+  /** The ultimate of attuned kind `soon`, not made yet. */
+  soon?: PlacedKind;
 };
 
 /** Where a branch stands among its node's: one of the `n` choices that turn
@@ -374,62 +534,117 @@ export type TreeNode = {
 export type BranchSlot = { side: boolean; i: number; n: number };
 
 /** The branches a plain building of `kind` has open: buildings to become,
- * then paths to climb, in the order the tree lists them. */
+ * then paths to climb (an attuned building's branches), in the order the
+ * tree lists them. */
 const openings = (kind: PlacedKind | "wallSpikes"): BranchSlot[] => {
-  if (kind === "wallSpikes") return [];
+  if (kind === "wallSpikes") return buildingPathsOf(kind).map((_, i, all) => ({ side: false, i, n: all.length }));
+  const place = placeOf(kind);
+  if (place.tier === "attuned") return place.a.branches.map((_, i, all) => ({ side: false, i, n: all.length }));
+  if (place.tier === "via") return [];
   const becomes = BECOMES[kind] ?? [], paths = buildingPathsOf(kind);
   return [...becomes.map((_, i) => ({ side: true, i, n: becomes.length })), ...paths.map((_, i) => ({ side: false, i, n: paths.length }))];
 };
 /** `{ hidden }` for a node with branches beyond it, else nothing. */
 const beyond = (kind: PlacedKind | "wallSpikes") => (openings(kind).length ? { hidden: openings(kind) } : {});
 
+const kid = (k: string) => `k:${k}`, pid = (p: PathId, r: number) => `p:${p}:${r}`;
+
 /** The live upgrade tree of one building of `kind` wearing `wear`: the
  * buildings it has been, then every branch still open to it. A choice cuts
  * off the branches beside it (a Ranged Guild that becomes a Mage Guild can
  * no longer become an archer barracks, and a Mage Guild on Pyroclasm no
  * longer has Cinders), and opens what only that choice leads to (the Mage
- * Guild's own paths appear once it is one). */
+ * Guild's branches appear once it is one). Every branch tops out in the
+ * line's ultimate, bought by merging. An ultimate's tree shows all three
+ * branches owned under it. */
 export function buildingTree(kind: PlacedKind | "wallSpikes", wear?: Wear): TreeNode[] {
   const nodes: TreeNode[] = [];
-  const lineage: (PlacedKind | "wallSpikes")[] = [kind];
-  if (kind !== "wallSpikes") for (let up = upgradedFrom(kind); up; up = upgradedFrom(up)) lineage.unshift(up);
-  const kid = (k: string) => `k:${k}`, pid = (p: PathId, r: number) => `p:${p}:${r}`;
-  /** A path's ranks from `from`, `have` of them owned, then its crown. */
-  const climb = (p: KnowledgePath, from: string, have: number, cap: boolean) => {
+  const place = placeOf(kind);
+  /** A path's ranks from `from`, `have` of them owned; with `via`, its
+   * first rank is the building it makes. Returns the top node's id. */
+  const climb = (p: KnowledgePath, from: string, have: number, via?: { kind: PlacedKind; cost: number }, made = false, merged = false) => {
     let parent = from;
     p.ranks.forEach((r, i) => {
       const rank = i + 1, state = rank <= have ? "owned" : rank === have + 1 ? "next" : "locked";
-      nodes.push({ id: pid(p.id, rank), parent, state, path: p.id, rank, cost: r.cost, step: { type: "path", path: p.id, rank, cost: r.cost } });
+      const first = rank === 1 && via, cost = first && !made ? via.cost + r.cost : r.cost;
+      const step: UpgradeStep = first && !made ? { type: "branch", to: via.kind, path: p.id, cost } : { type: "path", path: p.id, rank, cost };
+      nodes.push({ id: pid(p.id, rank), parent, state, path: p.id, rank, cost, step, ...(first ? { kind: via.kind } : {}), ...(merged ? { merged } : {}) });
       parent = pid(p.id, rank);
     });
-    if (p.evolves && cap) {
-      const state = have >= p.ranks.length ? "next" : "locked";
-      nodes.push({ id: kid(p.evolves.item), parent, state, kind: p.evolves.item, cost: p.evolves.cost, step: { type: "evolve", path: p.id, to: p.evolves.item, cost: p.evolves.cost }, ...beyond(p.evolves.item) });
-    }
+    return parent;
   };
-  lineage.forEach((k, i) => {
-    const below = lineage[i - 1], cur = i === lineage.length - 1;
-    const via = below && below !== "wallSpikes" ? BECOMES[below]?.find((b) => b.to === k) : undefined;
-    const evolved = below ? PATHS.find((p) => p.evolves?.item === k && p.evolves.from === below) : undefined;
-    if (evolved) {
-      // Its crowned path, all owned, then the crown itself.
-      climb(evolved, kid(below), evolved.ranks.length, false);
-      nodes.push({ id: kid(k), parent: pid(evolved.id, evolved.ranks.length), state: "owned", kind: k, cost: evolved.evolves!.cost, step: { type: "evolve", path: evolved.id, to: k as PlacedKind, cost: evolved.evolves!.cost } });
-    } else nodes.push({ id: kid(k), parent: below ? kid(below) : undefined, state: "owned", kind: k, cost: via?.cost ?? 0, ...(via ? { step: { type: "become" as const, ...via } } : {}) });
-    // Moving on from it, up a path or into another building, closed off the rest.
-    const own = nodes[nodes.length - 1], open = openings(k);
-    const next = lineage[i + 1], paths = buildingPathsOf(k);
-    const took = cur ? (wear ? open.find((o) => !o.side && paths[o.i]?.id === wear.path) : undefined)
-      : open.find((o) => (o.side ? BECOMES[k as PlacedKind]?.[o.i]?.to === next : paths[o.i]?.evolves?.item === next));
-    if (own.kind === k && took && open.length > 1) {
-      own.closed = open.filter((o) => o !== took);
-      own.took = took;
+  /** The line's ultimate over `top`, the end of the branch it is bought from. */
+  const crown = (a: Attuned, top: string, state: TreeNode["state"]) => {
+    if (a.ultimate) nodes.push({ id: kid(a.ultimate), parent: top, state, kind: a.ultimate, cost: MERGE_COST, step: { type: "merge", to: a.ultimate, cost: MERGE_COST }, ...beyond(a.ultimate) });
+    else nodes.push({ id: `u:${a.kind}`, parent: top, state: "locked", cost: 0, soon: a.kind });
+  };
+  /** The basic building and the attuned one it became, owned, the other
+   * attuned ones closed off. */
+  const roots = (a: Attuned, merged: boolean) => {
+    const others = ATTUNED.filter((o) => o.from === a.from), i = others.indexOf(a);
+    nodes.push({ id: kid(a.from), state: "owned", kind: a.from, cost: 0,
+      closed: others.map((_, j) => ({ side: true, i: j, n: others.length })).filter((o) => o.i !== i), took: { side: true, i, n: others.length }, ...(merged ? { merged } : {}) });
+    nodes.push({ id: kid(a.kind), parent: kid(a.from), state: "owned", kind: a.kind, cost: a.cost, step: { type: "become", to: a.kind, cost: a.cost }, ...(merged ? { merged } : {}) });
+  };
+  /** A kind's own paths and what it can become beyond, over node `from`. */
+  const own = (k: PlacedKind | "wallSpikes", from: string) => {
+    const node = nodes.find((n) => n.id === from)!, open = openings(k), paths = buildingPathsOf(k);
+    if (wear) {
+      const took = open.find((o) => !o.side && paths[o.i]?.id === wear.path);
+      if (took && open.length > 1) Object.assign(node, { closed: open.filter((o) => o !== took), took });
+      return climb(pathById(wear.path), from, wear.rank);
     }
-    if (!cur) return;
-    if (wear) return climb(pathById(wear.path), kid(k), wear.rank, true);
-    for (const b of k === "wallSpikes" ? [] : BECOMES[k] ?? []) nodes.push({ id: kid(b.to), parent: kid(k), state: "next", kind: b.to, cost: b.cost, step: { type: "become", ...b }, side: true, ...beyond(b.to) });
-    for (const p of buildingPathsOf(k)) climb(p, kid(k), 0, true);
-  });
+    for (const b of k === "wallSpikes" ? [] : BECOMES[k] ?? []) nodes.push({ id: kid(b.to), parent: from, state: "next", kind: b.to, cost: b.cost, step: { type: "become", ...b }, side: true, ...beyond(b.to) });
+    for (const p of paths) climb(p, from, 0);
+  };
+
+  if (place.tier === "attuned" || place.tier === "via") {
+    const a = place.a, mine = branchOf(a, kind, wear);
+    roots(a, false);
+    const attuned = nodes[nodes.length - 1];
+    if (mine < 0) {
+      // Every branch open; the ultimate over the middle one.
+      a.branches.forEach((b, i) => {
+        const top = climb(pathById(b.path), kid(a.kind), 0, b.via);
+        if (i === Math.min(MIDDLE, a.branches.length - 1)) crown(a, top, "locked");
+      });
+      return nodes;
+    }
+    const b = a.branches[mine], open = openings(a.kind);
+    if (open.length > 1) Object.assign(attuned, { closed: open.filter((o) => o.i !== mine), took: open[mine] });
+    const have = wear?.path === b.path ? wear.rank : 0;
+    const top = climb(pathById(b.path), kid(a.kind), have, b.via, place.tier === "via");
+    crown(a, top, have >= topRank(b.path) ? "next" : "locked");
+    return nodes;
+  }
+  if (place.tier === "ultimate" || (place.tier === "beyond" && mergedFrom(place.from))) {
+    // The lineage up to the ultimate, all owned and merged, then what is beyond.
+    const chain: PlacedKind[] = [kind as PlacedKind];
+    for (let p = placeOf(chain[0]); p.tier === "beyond"; p = placeOf(chain[0])) chain.unshift(p.from);
+    const a = attunedOf(chain[0])!;
+    roots(a, true);
+    let top = kid(a.kind);
+    a.branches.forEach((b, i) => {
+      const end = climb(pathById(b.path), kid(a.kind), topRank(b.path), b.via, !!b.via, true);
+      if (i === MIDDLE) top = end;
+    });
+    nodes.push({ id: kid(chain[0]), parent: top, state: "owned", kind: chain[0], cost: MERGE_COST, step: { type: "merge", to: chain[0], cost: MERGE_COST } });
+    for (let i = 1; i < chain.length; i++) {
+      const b = BECOMES[chain[i - 1]]!.find((o) => o.to === chain[i])!, open = openings(chain[i - 1]), j = BECOMES[chain[i - 1]]!.indexOf(b);
+      const from = nodes.find((n) => n.id === kid(chain[i - 1]))!;
+      if (open.length > 1) Object.assign(from, { closed: open.filter((o) => !(o.side && o.i === j)), took: open.find((o) => o.side && o.i === j) });
+      nodes.push({ id: kid(chain[i]), parent: kid(chain[i - 1]), state: "owned", kind: chain[i], cost: b.cost, step: { type: "become", ...b } });
+    }
+    own(kind, kid(kind));
+    return nodes;
+  }
+  // A basic building, or one outside the lines (bait, spikes).
+  nodes.push({ id: kid(kind), state: "owned", kind, cost: 0 });
+  if (place.tier === "basic") {
+    for (const a of ATTUNED.filter((o) => o.from === kind)) nodes.push({ id: kid(a.kind), parent: kid(kind), state: "next", kind: a.kind, cost: a.cost, step: { type: "become", to: a.kind, cost: a.cost }, side: true, ...beyond(a.kind) });
+    return nodes;
+  }
+  own(kind, kid(kind));
   return nodes;
 }
 
@@ -437,8 +652,9 @@ export function buildingTree(kind: PlacedKind | "wallSpikes", wear?: Wear): Tree
  * grew from, can become, or a path it can climb. */
 export function hasTree(kind: string): kind is PaletteKind {
   if (buildingPathsOf(kind).length) return true;
-  return kind !== "wallSpikes" && (kind in BECOMES || !!upgradedFrom(kind as PlacedKind));
+  return kind !== "wallSpikes" && placeOf(kind as PlacedKind).tier !== "other";
 }
+
 
 // ── In battle ──────────────────────────────────────────────────────────
 /** What the next defense's buildings fight with, keyed by structure uid (or
@@ -469,7 +685,14 @@ export const buildingPaths = (sim: { bonuses: Readonly<Bonuses> }, b?: { structu
 /** Every path a building of `kind` can wear (none for a spell). */
 export const buildingPathsOf = (kind: PaletteItem | string): KnowledgePath[] => {
   const topic = pathTopicOf(kind);
-  return topic ? pathsOf(topic) : [];
+  if (!topic) return [];
+  const place = placeOf(kind as PlacedKind);
+  // Basic buildings have none: they become attuned ones. An attuned one's
+  // are its branches (those that make it another building are that one's).
+  if (place.tier === "basic") return [];
+  if (place.tier === "attuned") return place.a.branches.filter((b) => !b.via).map((b) => pathById(b.path));
+  if (place.tier === "via") return [pathById(place.a.branches[place.branch].path)];
+  return pathsOf(topic);
 };
 
 // ── Older saves ─────────────────────────────────────────────────────────
@@ -493,8 +716,8 @@ export function migrateResearch(save: Save) {
     const r = save.pathResearch[p.id];
     if (!r || isSpell(p.topic)) continue;
     save.knowledge += Math.max(0, r.spent);
-    if (r.crowned && p.evolves) {
-      const { item, from } = p.evolves;
+    if (r.crowned && p.legacyCrown) {
+      const { item, from } = p.legacyCrown;
       // Those standing are taken up: the base building's footprint differs.
       next.structures = next.structures.filter((st) => st.kind !== item);
       d.owned[from] += d.owned[item];
@@ -549,6 +772,38 @@ export function migrateGunLine(save: Save) {
     save.knowledge += back;
   }
   d.layout = next;
+}
+
+/** What each ultimate cost before version 7, when it was a path's crown
+ * (the Hero and the Revolutionary a change of kind): every step from its
+ * basic building, at version 6's prices. */
+const OLD_ULTIMATES: Partial<Record<PlacedKind, number>> = {
+  darkKeep: 175023, heroHall: 100004, valkyriePalace: 120027, sniperLodge: 70026, gatlingNest: 70028, revolutionary: 170026,
+};
+
+/** Version 7 gave every line one shape (`ATTUNED`): basic buildings lost
+ * their paths, each attuned building kept three branches (the spearmen's
+ * and gunners' one path each of the buildings they branch into), and
+ * ultimates are merged rather than crowned. Every rank worn on a path the
+ * building can no longer take comes back as Knowledge (its decoder has
+ * already dropped it, so this reads the raw saved JSON), and each ultimate
+ * owned gets back what it cost then beyond what a respec gives back now.
+ * Run once, on loading a save from before then, after `migrateGunLine`. */
+export function migrateTrees(raw: any, save: Save): number {
+  let back = 0;
+  const worn = (list: unknown) => {
+    for (const p of Array.isArray(list) ? list : []) {
+      const path = PATHS.find((o) => o.id === p?.path), kind = p?.kind;
+      if (!path || typeof kind !== "string" || !Number.isInteger(p.rank) || p.rank < 1 || p.rank > path.ranks.length) continue;
+      if (path.topic !== pathTopicOf(kind) || buildingPathsOf(kind).some((o) => o.id === path.id)) continue;
+      back += pathCost(path.id, p.rank);
+    }
+  };
+  worn(raw?.defend?.layout?.structures);
+  worn(raw?.defend?.kept);
+  for (const [kind, old] of Object.entries(OLD_ULTIMATES)) back += save.defend.owned[kind as PlacedKind] * Math.max(0, old! - lineageCost(kind as PlacedKind));
+  save.knowledge += back;
+  return back;
 }
 
 /** Version 3 kept a card per owned copy, each with its own path and the
@@ -607,25 +862,36 @@ export function settleKept(d: DefendSave, prev: Layout, next: Layout) {
 
 // ── Discoveries ─────────────────────────────────────────────────────────
 /** Every upgrade a basic building's line can ever reach, as one web: the
- * buildings it can become, each one's paths rank by rank, their crowns and
- * what those evolve into, and so on. Ids match `buildingTree`'s, so a node
- * any building of the line has owned is found in it. States are all
- * `locked`: the map sets its own. */
+ * attuned buildings it can become, each one's branches rank by rank, its
+ * ultimate (over the middle branch), and the ultimate's own paths and what
+ * it becomes beyond. Ids match `buildingTree`'s, so a node any building of
+ * the line has owned is found in it. States are all `locked`: the map sets
+ * its own. */
 export function fullTree(root: PaletteKind): TreeNode[] {
   const nodes: TreeNode[] = [];
+  const climb = (p: KnowledgePath, from: string, via?: Branch["via"]) => {
+    p.ranks.forEach((r, i) => {
+      const id = pid(p.id, i + 1), first = i === 0 && via;
+      nodes.push({ id, parent: from, state: "locked", path: p.id, rank: i + 1, cost: first ? via.cost + r.cost : r.cost,
+        step: first ? { type: "branch", to: via.kind, path: p.id, cost: via.cost + r.cost } : { type: "path", path: p.id, rank: i + 1, cost: r.cost }, ...(first ? { kind: via.kind } : {}) });
+      from = id;
+    });
+    return from;
+  };
   const grow = (k: PaletteKind, parent: string | undefined, step: UpgradeStep | undefined, cost: number) => {
-    const id = `k:${k}`;
+    const id = kid(k);
     nodes.push({ id, ...(parent ? { parent } : {}), state: "locked", kind: k, cost, ...(step ? { step } : {}) });
-    if (k !== "wallSpikes") for (const b of BECOMES[k] ?? []) grow(b.to, id, { type: "become", ...b }, b.cost);
-    for (const p of buildingPathsOf(k)) {
-      let from = id;
-      p.ranks.forEach((r, i) => {
-        const pid = `p:${p.id}:${i + 1}`;
-        nodes.push({ id: pid, parent: from, state: "locked", path: p.id, rank: i + 1, cost: r.cost, step: { type: "path", path: p.id, rank: i + 1, cost: r.cost } });
-        from = pid;
+    const place = placeOf(k);
+    if (place.tier === "attuned") {
+      const a = place.a;
+      a.branches.forEach((b, i) => {
+        const top = climb(pathById(b.path), id, b.via);
+        if (i === MIDDLE && a.ultimate) grow(a.ultimate, top, { type: "merge", to: a.ultimate, cost: MERGE_COST }, MERGE_COST);
       });
-      if (p.evolves) grow(p.evolves.item, from, { type: "evolve", path: p.id, to: p.evolves.item, cost: p.evolves.cost }, p.evolves.cost);
+      return;
     }
+    if (k !== "wallSpikes") for (const b of BECOMES[k] ?? []) grow(b.to, id, { type: "become", ...b }, b.cost);
+    for (const p of buildingPathsOf(k)) climb(p, id);
   };
   grow(root, undefined, undefined, 0);
   return nodes;

@@ -4,6 +4,7 @@
 import { decodeGateRanks, type GateRanks } from "../gate-upgrades.ts";
 import { decodeBallistaRanks, type BallistaRanks } from "../ballista-upgrades.ts";
 import { decodeRevolutionaryRanks, type RevolutionaryRanks } from "../revolutionary-upgrades.ts";
+import { decodeShadowRanks, type ShadowRanks } from "../shadow-upgrades.ts";
 import { decodeKeepRanks, type KeepRanks } from "../keep-upgrades.ts";
 import { decodeWallRanks, innerWalls, type WallRanks } from "../wall-upgrades.ts";
 import {
@@ -87,6 +88,8 @@ export type DefendSave = {
   ballistaRanks?: BallistaRanks;
   /** The Revolutionaries' upgrades (`revolutionary-upgrades.ts`); absent while they have none. */
   revolutionaryRanks?: RevolutionaryRanks;
+  /** The Shadows' upgrades (`shadow-upgrades.ts`); absent while they have none. */
+  shadowRanks?: ShadowRanks;
   /** Every building upgrade (`k:<kind>`, `p:<path>:<rank>`) any building has
    * ever reached, shared by its whole line for the upgrade map
    * (`specializations.ts`'s `foundNodes`); absent while none. */
@@ -264,7 +267,7 @@ export function buyBomb(save: DefendSave, wallet: Wallet): boolean {
 
 // ── Decoding untrusted saves ─────────────────────────────────────────────
 const int = (n: unknown, min: number, max: number): n is number => Number.isInteger(n) && (n as number) >= min && (n as number) <= max;
-const PLACED: PlacedKind[] = ["meleeGuild", "rangedGuild", "barracks", "heroHall", "assassinDen", "spearHall", "phalanx", "javelinCamp", "lancerStable", "archerBarracks", "sniperLodge", "gunHall", "musketHall", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait"];
+const PLACED: PlacedKind[] = ["meleeGuild", "rangedGuild", "barracks", "heroHall", "shadow", "assassinDen", "spearHall", "phalanx", "javelinCamp", "lancerStable", "archerBarracks", "sniperLodge", "gunHall", "musketHall", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait"];
 
 export function decodeDefendSave(s: any): DefendSave {
   const d = defaultDefendSave();
@@ -296,6 +299,8 @@ export function decodeDefendSave(s: any): DefendSave {
   if (ballistaRanks) d.ballistaRanks = ballistaRanks;
   const revolutionaryRanks = decodeRevolutionaryRanks(s.revolutionaryRanks);
   if (revolutionaryRanks) d.revolutionaryRanks = revolutionaryRanks;
+  const shadowRanks = decodeShadowRanks(s.shadowRanks);
+  if (shadowRanks) d.shadowRanks = shadowRanks;
   return d;
 }
 

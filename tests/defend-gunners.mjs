@@ -1,6 +1,7 @@
 // The Ranged Guild's gunner line in the browser, on desktop and phones: a
-// Gunner hall's tree offers the Musket hall, Machine-gun nest and Rocket
-// battery and its own two paths; the halls stand, wearing paths, in the city and their gunners, Gatling gunners
+// Gunner hall's tree offers its three branches, making it a Musket hall,
+// Machine-gun nest or Rocket battery, with the Gatling emplacement merged at
+// their top; the halls stand, wearing paths, in the city and their gunners, Gatling gunners
 // and rocketeers fight in battle. Isolated browser contexts only: never
 // reads or changes a player's saved game. Needs `npm run dev`. Screenshots
 // go to test-results/ (or SHOTS).
@@ -15,7 +16,7 @@ const out = process.env.SHOTS || 'test-results';
 mkdirSync(out, { recursive: true });
 const KINDS = ['gunHall', 'gunNest', 'gatlingNest', 'rocketBattery', 'musketHall'];
 // The halls past the Gunner hall stand wearing a path, in its look.
-const WEAR = { gunNest: { path: 'tripod', rank: 3 }, gatlingNest: { path: 'stoppingPower', rank: 3 }, rocketBattery: { path: 'clusterRockets', rank: 3 }, musketHall: { path: 'sharpMuskets', rank: 3 } };
+const WEAR = { gunNest: { path: 'beltFeed', rank: 3 }, gatlingNest: { path: 'stoppingPower', rank: 3 }, rocketBattery: { path: 'clusterRockets', rank: 3 }, musketHall: { path: 'volleyFire', rank: 3 } };
 try {
   for (const width of [1280, 390]) {
     const phone = width < 500;
@@ -63,7 +64,7 @@ try {
     await zoomKeep(phone ? 2 : 2.5);
     await page.waitForTimeout(500); await page.screenshot({ path: `${out}/gunners-${width}-halls.png` });
 
-    // The Gunner hall's tree: muskets, machine guns and rockets.
+    // The Gunner hall's tree: three branches, muskets, machine guns and rockets.
     const panel = page.locator('#defend-specialty');
     const press = async locator => phone ? locator.tap() : locator.click();
     const hall = s.defend.layout.structures.find(x => x.kind === 'gunHall');
@@ -74,8 +75,9 @@ try {
     if (phone) await page.touchscreen.tap(p.x, p.y); else await page.mouse.click(p.x, p.y);
     await page.waitForSelector('#defend-specialty:not([hidden])');
     const tree = await panel.locator('.ug-node:not(.withering)').evaluateAll(els => els.map(e => `${e.dataset.node}=${['owned', 'next', 'locked'].find(c => e.classList.contains(c))}`));
-    for (const n of ['k:rangedGuild=owned', 'k:gunHall=owned', 'k:musketHall=next', 'k:gunNest=next', 'k:rocketBattery=next', 'p:quickdraw:1=next', 'p:duelists:1=next']) assert.ok(tree.includes(n), `${n} in ${tree}`);
-    await press(panel.locator('[data-node="k:gunNest"]'));
+    for (const n of ['k:rangedGuild=owned', 'k:gunHall=owned', 'p:volleyFire:1=next', 'p:beltFeed:1=next', 'p:clusterRockets:1=next', 'k:gatlingNest=locked']) assert.ok(tree.includes(n), `${n} in ${tree}`);
+    assert.equal(tree.filter(n => n.endsWith('=next')).length, 3, 'only the three branches');
+    await press(panel.locator('[data-node="p:beltFeed:1"]'));
     await page.waitForTimeout(900); await page.screenshot({ path: `${out}/gunners-${width}-tree.png` });
     await press(panel.locator('[data-specialty-close]'));
 

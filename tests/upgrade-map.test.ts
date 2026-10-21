@@ -5,7 +5,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { defaults, decode } from "../src/save.ts";
-import { BECOMES, MAP_ROOTS, buildingPathsOf, foundNodes, fullTree, nextSteps, respecBuilding, rootOf, upgradeBuilding, type PaletteKind, type SpecialtyTarget, type UpgradeStep } from "../src/specializations.ts";
+import { ATTUNED, BECOMES, MAP_ROOTS, buildingPathsOf, foundNodes, fullTree, nextSteps, respecBuilding, rootOf, upgradeBuilding, type PaletteKind, type SpecialtyTarget, type UpgradeStep } from "../src/specializations.ts";
 import { mapCount, mapGraph } from "../src/ui/specialty.ts";
 import { webLayout } from "../src/ui/upgrade-graph.ts";
 import { PATHS } from "../src/knowledge-paths.ts";
@@ -23,7 +23,7 @@ const step = (s: ReturnType<typeof defaults>, copy: SpecialtyTarget & { copy: Pa
   return r.copy as SpecialtyTarget & { copy: PaletteKind };
 };
 
-test("every line's web holds each building, path rank and crown once", () => {
+test("every line's web holds each building, branch rank and ultimate once", () => {
   const all = MAP_ROOTS.flatMap((r) => fullTree(r).map((n) => n.id));
   assert.equal(new Set(all).size, all.length, "ids are unique across the maps");
   for (const r of MAP_ROOTS) {
@@ -36,11 +36,12 @@ test("every line's web holds each building, path rank and crown once", () => {
       for (const p of buildingPathsOf(n.kind)) p.ranks.forEach((_, i) => assert.ok(ids.has(`p:${p.id}:${i + 1}`)));
     }
   }
-  // Every building path is on some map, crowns' evolutions too.
+  // Every branch and every path a building can take is on some map, the ultimates too.
   const every = new Set(all);
-  for (const p of PATHS) if (p.topic !== "necromancy" && buildingPathsOf(p.topic === "bait" ? "monsterBait" : p.topic === "spikes" ? "wallSpikes" : p.topic).length) {
-    assert.ok(every.has(`p:${p.id}:1`), p.id);
-    if (p.evolves) assert.ok(every.has(`k:${p.evolves.item}`));
+  for (const p of PATHS) if (buildingPathsOf(p.topic === "bait" ? "monsterBait" : p.topic === "spikes" ? "wallSpikes" : p.topic).some((o) => o.id === p.id)) assert.ok(every.has(`p:${p.id}:1`), p.id);
+  for (const a of ATTUNED) {
+    for (const b of a.branches) assert.ok(every.has(`p:${b.path}:3`), b.path);
+    if (a.ultimate) assert.ok(every.has(`k:${a.ultimate}`), a.ultimate);
   }
 });
 

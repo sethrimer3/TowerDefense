@@ -12,7 +12,7 @@ import { decodeLibrarySave, type LibrarySave } from "./library/sim.ts";
 import { decodeResearchJob, type ResearchJob } from "./research-jobs.ts";
 import { decodeForgeJob, type ForgeJob } from "./forge-jobs.ts";
 
-import { decodeFound, migrateCards, migrateGunLine, migrateResearch, migrateTopicPaths, refundRetiredAssassins } from "./specializations.ts";
+import { decodeFound, migrateCards, migrateGunLine, migrateResearch, migrateTopicPaths, migrateTrees, refundRetiredAssassins } from "./specializations.ts";
 
 /** What the retired Outlying districts skill cost, refunded on load. */
 const OUTSKIRTS_KNOWLEDGE = 8;
@@ -22,8 +22,9 @@ export const SAVE_KEY = "towerdefense.v1";
  * cards. 4: no cards; each placed building keeps its own path in the layout.
  * 5: each building is upgraded on its own, its path's rank kept with it;
  * the Study researches only the spells. 6: the Ranged Guild's musket hall
- * and sniper lodge moved behind the Gunner hall (`migrateGunLine`). */
-export const SAVE_VERSION = 6;
+ * and sniper lodge moved behind the Gunner hall (`migrateGunLine`). 7: every
+ * line one shape, its ultimate merged from three buildings (`migrateTrees`). */
+export const SAVE_VERSION = 7;
 
 export type Save = {
   version: number;
@@ -148,6 +149,7 @@ export function decode(raw: string | null): Save {
   migrateResearch(d);
   refundRetiredAssassins(s, d);
   if (s.version < 6) migrateGunLine(d);
+  if (s.version < 7) migrateTrees(s, d);
   d.researchJob = decodeResearchJob(s.researchJob, d);
   d.researchClock = num(s.researchClock, 0);
   d.forgeJob = decodeForgeJob(s.forgeJob, d);

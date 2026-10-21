@@ -9,17 +9,18 @@
  * are always one stack. The shop sells more of a
  * kind (`shopOffer`, `buyTile`); a kind's upgrades live where they are made,
  * the Mine's Smithy and the Library's Study (`tileTopic`); a kind's higher
- * tier is its Knowledge path's crown (`higherTier`). Pure functions over the
+ * tier is its line's ultimate (`higherTier`). Pure functions over the
  * save, so the page and the tests share them. */
 import { metalPriceText } from "./metals.ts";
 import { BASIC_BUILDINGS, BOMB_PRICE, ITEM_CATEGORY, ITEM_NAMES, PALETTE_ITEMS, purchasePrice, type PaletteItem, type Price } from "./defend/catalog.ts";
 import { available, buyBomb, buyItem, canAfford, type Wallet } from "./defend/progress.ts";
-import { evolvedBy, pathById, PATHS, type KnowledgePath, type PathHue } from "./knowledge-paths.ts";
+import { pathById, type PathHue } from "./knowledge-paths.ts";
 import { GATE_PATHS } from "./gate-upgrades.ts";
 import { BALLISTA_PATHS } from "./ballista-upgrades.ts";
 import { REVOLUTIONARY_PATHS } from "./revolutionary-upgrades.ts";
+import { SHADOW_PATHS } from "./shadow-upgrades.ts";
 import { sideRank } from "./side-ranks.ts";
-import { hasTree, rootOf, upgradedFrom, type Wear } from "./specializations.ts";
+import { hasTree, placeOf, rootOf, upgradedFrom, type Wear } from "./specializations.ts";
 import { WALL_PATHS, wallRank } from "./wall-upgrades.ts";
 import type { PlacedKind } from "./defend/layout.ts";
 import { METALS } from "./mine/sim.ts";
@@ -149,14 +150,11 @@ export function tileMarks(save: Save, id: TileId, wear?: Wear): TileMark[] {
   if (universal(id)) return marks;
   const kinds: PlacedKind[] = [];
   if (id !== "wallSpikes") for (let k: PlacedKind | undefined = id as PlacedKind; k; k = upgradedFrom(k)) kinds.unshift(k);
-  for (const k of kinds.slice(1)) {
-    const crowned = evolvedBy(k);
-    if (crowned) ranks(crowned.name, crowned.hue, crowned.ranks.length);
-    marks.push({ type: "became", name: ITEM_NAMES[k] });
-  }
+  for (const k of kinds.slice(1)) marks.push({ type: "became", name: ITEM_NAMES[k] });
   if (wear) { const p = pathById(wear.path); ranks(p.name, p.hue, wear.rank); }
   // The Revolutionaries' shared branches.
   if (id === "revolutionary") for (const p of REVOLUTIONARY_PATHS) ranks(p.name, p.hue, sideRank(save.defend.revolutionaryRanks, p.id));
+  if (id === "shadow") for (const p of SHADOW_PATHS) ranks(p.name, p.hue, sideRank(save.defend.shadowRanks, p.id));
   return marks;
 }
 
@@ -217,11 +215,14 @@ export function tileTopic(id: TileId): { subject: Subject; topic: Topic } {
   throw new Error(`No topic holds ${id}`);
 }
 
-/** Where a kind stands among the tiers: the path whose crown turns it into
- * a greater building (`into`), or the path whose crown made it (`from`). */
-export function higherTier(id: TileId): { into?: KnowledgePath; from?: KnowledgePath } {
-  if (isConsumable(id)) return {};
-  return { into: PATHS.find((p) => p.evolves?.from === id), from: evolvedBy(id) };
+/** Where a kind stands among the tiers: the ultimate three of its line,
+ * each maxed on a different branch, merge into (`into`), or for an
+ * ultimate the attuned building merged into it (`from`). */
+export function higherTier(id: TileId): { into?: PlacedKind; from?: PlacedKind } {
+  if (isConsumable(id) || id === "wallSpikes" || id === "wallBlock") return {};
+  const place = placeOf(id as PlacedKind);
+  if (place.tier === "attuned" || place.tier === "via") return place.a.ultimate ? { into: place.a.ultimate } : {};
+  return place.tier === "ultimate" ? { from: place.a.kind } : {};
 }
 
 /** A metal price in words, including consumables. */

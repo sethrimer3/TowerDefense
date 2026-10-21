@@ -3,6 +3,7 @@ import type { WallRanks } from "../wall-upgrades.ts";
 import type { GateRanks } from "../gate-upgrades.ts";
 import type { BallistaRanks } from "../ballista-upgrades.ts";
 import type { RevolutionaryRanks } from "../revolutionary-upgrades.ts";
+import type { ShadowRanks } from "../shadow-upgrades.ts";
 import { intPow } from "../exact.ts";
 import { ECONOMY, quadraticCost } from "../economy.ts";
 import type { BattlePaths, PathId } from "../knowledge-paths.ts";
@@ -11,11 +12,11 @@ import type { BattlePaths, PathId } from "../knowledge-paths.ts";
  * copper, silver and Gold, the universal upgrades, the bonuses the Smithy and the
  * skill trees add, and the enemy roster. */
 
-export type StructureKind = "keep" | "meleeGuild" | "rangedGuild" | "assassinDen" | "spearHall" | "phalanx" | "javelinCamp" | "lancerStable" | "barracks" | "heroHall" | "archerBarracks" | "sniperLodge" | "gunHall" | "musketHall" | "gunNest" | "gatlingNest" | "rocketBattery" | "revolutionary" | "archerTower" | "cannonTower" | "watchTower" | "wizardTower" | "mageGuild" | "valkyriePalace" | "darkKeep" | "monsterBait";
+export type StructureKind = "keep" | "meleeGuild" | "rangedGuild" | "assassinDen" | "spearHall" | "phalanx" | "javelinCamp" | "lancerStable" | "barracks" | "heroHall" | "shadow" | "archerBarracks" | "sniperLodge" | "gunHall" | "musketHall" | "gunNest" | "gatlingNest" | "rocketBattery" | "revolutionary" | "archerTower" | "cannonTower" | "watchTower" | "wizardTower" | "mageGuild" | "valkyriePalace" | "darkKeep" | "monsterBait";
 /** Everything that appears in the build palette (the keep is placed from the
  * start and can only be moved, so it is not a palette item). */
 export type PaletteItem = "cityTile" | "cityGate" | "wallSpikes" | "wallBallista" | "wallBlock" | Exclude<StructureKind, "keep">;
-export const PALETTE_ITEMS: PaletteItem[] = ["cityTile", "meleeGuild", "rangedGuild", "barracks", "heroHall", "assassinDen", "spearHall", "phalanx", "javelinCamp", "lancerStable", "archerBarracks", "gunHall", "musketHall", "sniperLodge", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "watchTower", "archerTower", "cannonTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "wallBlock", "cityGate", "wallSpikes", "wallBallista"];
+export const PALETTE_ITEMS: PaletteItem[] = ["cityTile", "meleeGuild", "rangedGuild", "barracks", "heroHall", "assassinDen", "shadow", "spearHall", "phalanx", "javelinCamp", "lancerStable", "archerBarracks", "gunHall", "musketHall", "sniperLodge", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "watchTower", "archerTower", "cannonTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "wallBlock", "cityGate", "wallSpikes", "wallBallista"];
 /** The only buildings the shop sells: every other tower or troop building
  * is one of these upgraded, a building at a time, with Knowledge
  * (`building-upgrades.ts`). */
@@ -46,6 +47,7 @@ export const ITEM_CATEGORY: Record<PaletteItem, Exclude<PaletteCategory, "all">>
   rangedGuild: "units",
   barracks: "units",
   heroHall: "units",
+  shadow: "units",
   assassinDen: "units",
   spearHall: "units",
   phalanx: "units",
@@ -192,7 +194,7 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     h: 4,
     maxHp: 140,
     outsideOk: false,
-    description: "Trains snipers with long rifles: slow to reload, but they pick off enemies from far across the city with shots that hit very hard. A Musket hall's Sharpshooters become them.",
+    description: "Trains snipers with long rifles: slow to reload, but they pick off enemies from far across the city with shots that hit very hard. The archers' ultimate, merged from archer barracks maxed on each branch.",
   },
   gunHall: {
     kind: "gunHall",
@@ -210,7 +212,7 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     h: 4,
     maxHp: 150,
     outsideOk: false,
-    description: "Trains musketmen: slow to reload, but their heavy balls hit hard from further off. Its Sharpshooters become snipers.",
+    description: "Trains musketmen: slow to reload, but their heavy balls hit hard from further off. The Gunner hall's Volley fire branch.",
   },
   gunNest: {
     kind: "gunNest",
@@ -219,7 +221,7 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     h: 4,
     maxHp: 160,
     outsideOk: false,
-    description: "Trains machine gunners who spray light bullets at a rapid clip. Its Belt feed path becomes a Gatling emplacement.",
+    description: "Trains machine gunners who spray light bullets at a rapid clip. The Gunner hall's Belt feed branch.",
   },
   gatlingNest: {
     kind: "gatlingNest",
@@ -228,7 +230,7 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     h: 4,
     maxHp: 200,
     outsideOk: false,
-    description: "Trains Gatling gunners: their guns pour out bullets at an enormous rate, but are so heavy they barely walk.",
+    description: "Trains Gatling gunners: their guns pour out bullets at an enormous rate, but are so heavy they barely walk. The gunners' ultimate, merged from a maxed musket hall, machine-gun nest and rocket battery.",
   },
   revolutionary: {
     kind: "revolutionary",
@@ -237,7 +239,16 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     h: 4,
     maxHp: 260,
     outsideOk: false,
-    description: "The gunner line's ultimate: a high-tech hall of laser-sighted snipers. Their thin lasers lock on, brightening, before each shot. Its upgrades climb side by side, shared by every Revolutionary: more snipers, a laser that zigzags from enemy to enemy with the bullet following it, critical hits and what they do, and a burst where the bullet stops. A Sniper lodge becomes one.",
+    description: "Beyond the Sniper lodge: a high-tech hall of laser-sighted snipers. Their thin lasers lock on, brightening, before each shot. Its upgrades climb side by side, shared by every Revolutionary: more snipers, a laser that zigzags from enemy to enemy with the bullet following it, critical hits and what they do, and a burst where the bullet stops. A Sniper lodge becomes one.",
+  },
+  shadow: {
+    kind: "shadow",
+    name: "Shadow",
+    w: 4,
+    h: 4,
+    maxHp: 200,
+    outsideOk: false,
+    description: "The assassins' ultimate, merged from three dens maxed on different branches: a black shrine for one shade, a see-through figure in a billowing black cloak with knives whirling round it. When enemies come near, the knives fly out in wide arcs and slice through every enemy in their way. Each enemy hit makes every later hit 0.1% harder, compounding. Its upgrades climb side by side, shared by every Shadow: more knives, armor piercing, bleeding and faster compounding.",
   },
   heroHall: {
     kind: "heroHall",
@@ -246,7 +257,7 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     h: 6,
     maxHp: 280,
     outsideOk: false,
-    description: "The swordsmen's ultimate: a gilded hall for one hero, who hunts the whole city and cuts through crowds of small enemies with sword combos: two sweeping slashes, then a spin that strikes everything round it. Slow to rise again if it falls. Its paths: Whirlwind (more and wider spins), Blade dance (slashes that dash from enemy to enemy) and Legend (a hero who will not stay down). A Barracks becomes one.",
+    description: "The swordsmen's ultimate, merged from three barracks maxed on different branches: a gilded hall for one hero, who hunts the whole city and cuts through crowds of small enemies with sword combos: two sweeping slashes, then a spin that strikes everything round it. Slow to rise again if it falls. Its paths: Whirlwind (more and wider spins), Blade dance (slashes that dash from enemy to enemy) and Legend (a hero who will not stay down). A Barracks becomes one.",
   },
   rocketBattery: {
     kind: "rocketBattery",
@@ -264,7 +275,7 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     h: 6,
     maxHp: 160,
     outsideOk: false,
-    description: "Trains swordsmen who sally out against anything that breaches the walls. With Knowledge it becomes the Hero, the swordsmen's ultimate.",
+    description: "Trains swordsmen who sally out against anything that breaches the walls. Three, each maxed on a different branch, merge into the Hero, the swordsmen's ultimate.",
   },
   archerBarracks: {
     kind: "archerBarracks",
@@ -328,7 +339,7 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     compact: { upgrade: "palaceCompact", w: 4, h: 6 },
     maxHp: 260,
     outsideOk: false,
-    description: "A heavenly marble palace, 3 × 3 quarter tiles. Trains armoured valkyries whose golden spear charges through every enemy in a line: the spearmen's ultimate, a Lancer stable's crowned Winged lancers.",
+    description: "A heavenly marble palace, 3 × 3 quarter tiles. Trains armoured valkyries whose golden spear charges through every enemy in a line: the spearmen's ultimate, merged from a maxed phalanx, javelin camp and lancer stable.",
   },
   darkKeep: {
     kind: "darkKeep",
@@ -374,6 +385,7 @@ export const STARTING_OWNED: Record<PaletteItem, number> = {
   rangedGuild: 1,
   barracks: 0,
   heroHall: 0,
+  shadow: 0,
   assassinDen: 0,
   spearHall: 0,
   phalanx: 0,
@@ -414,6 +426,7 @@ export function purchasePrice(item: PaletteItem, owned: number): Price {
     rangedGuild: { copper: 4 },
     barracks: { copper: 4 },
     heroHall: { copper: 20, silver: 4, gold: 1 },
+    shadow: { copper: 20, silver: 4, gold: 1 },
     assassinDen: { copper: 5 },
     spearHall: { copper: 5 },
     phalanx: { copper: 7 },
@@ -455,6 +468,7 @@ export const ITEM_NAMES: Record<PaletteItem, string> = {
   rangedGuild: STRUCTURES.rangedGuild.name,
   barracks: STRUCTURES.barracks.name,
   heroHall: STRUCTURES.heroHall.name,
+  shadow: STRUCTURES.shadow.name,
   assassinDen: STRUCTURES.assassinDen.name,
   spearHall: STRUCTURES.spearHall.name,
   phalanx: STRUCTURES.phalanx.name,
@@ -963,6 +977,8 @@ export type Bonuses = {
   ballista?: BallistaRanks;
   /** The Revolutionaries' upgrades (`revolutionary-upgrades.ts`); absent with none. */
   revolutionary?: RevolutionaryRanks;
+  /** The Shadows' upgrades (`shadow-upgrades.ts`); absent with none. */
+  shadow?: ShadowRanks;
 };
 export const NO_BONUSES: Readonly<Bonuses> = Object.freeze({
   troopHp: 1, troopDamage: 1, drill: 1, towerDamage: 1, towerReload: 1, wallHp: 1, keepHp: 1, rebuild: 1, bombDamage: 1, undeadHp: 1, undeadDamage: 1, meteorDamage: 1, meteorRadius: 1, frostTime: 1, frostRadius: 1, reinforceHp: 1, reinforceDamage: 1, reinforceTime: 1,
@@ -1007,6 +1023,12 @@ export const JAVELINEER = { hp: 28, damage: 9, cooldown: 2, speed: 2.3, size: 0.
  * front of it, then a spin, every enemy within `spin` cells round it for
  * `spinDamage` times the damage. */
 export const HERO = { hp: 480, damage: 16, cooldown: 0.42, speed: 3, reach: 0.9, arc: 1.3, spin: 1.5, spinDamage: 1.5, combo: 3, drill: 3, garrison: 1, size: 0.5, color: "#d8b048" };
+/** The Shadow's one shade: it hunts like the Hero and, with an enemy within
+ * `reach` cells, sends a knife out every `cooldown` seconds divided among its
+ * knives, each flying a loop round past its enemy up to `wide` cells
+ * across, cutting every enemy within `width` of its line once. `cap` bounds
+ * its compounding. */
+export const SHADE = { hp: 260, damage: 14, cooldown: 1, speed: 2.6, reach: 3.5, wide: 1.6, width: 0.45, cap: 1e6, drill: 3, garrison: 1, size: 0.5, color: "#1c1826" };
 export const VALKYRIE = { hp: 50, damage: 16, cooldown: 1.8, speed: 2.3, size: 0.44, color: "#f2e6c4" };
 /** The dark wizard, the keep's one ultimate unit: slow to summon (`drill`
  * times a barracks' drill), casting a bolt of black lightning within

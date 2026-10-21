@@ -4,8 +4,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { decode, defaults } from "../src/save.ts";
 import { BECOMES, allocated, buildingTree, fullTree, nextSteps, rootOf, specialtyOf, stepName, upgradeBuilding, upgradedFrom } from "../src/specializations.ts";
-import { BLADE_DANCE, LEGEND, WHIRLWIND, type PathId } from "../src/knowledge-paths.ts";
+import { BLADE_DANCE, LEGEND, WHIRLWIND, pathById, type PathId } from "../src/knowledge-paths.ts";
 import { bonuses } from "../src/progression.ts";
+import { battleBonuses, wear } from "./spare-paths.ts";
 import { placeStructure, placeCityTile, defaultLayout, fitLayout, type PlacedKind } from "../src/defend/layout.ts";
 import { DefendSim, type Enemy, type Soldier } from "../src/defend/sim.ts";
 import { generateCity } from "../src/defend/citygen.ts";
@@ -28,15 +29,14 @@ function building(kind: PlacedKind, path?: PathId, rank = 3) {
   s.defend.layout = l;
   const uid = l.structures.find((st) => st.kind === kind)!.uid;
   for (let r = 0; path && r < rank; r++) {
-    const step = nextSteps(kind, specialtyOf(s.defend.layout, { uid })).find((st) => st.type === "path" && st.path === path)!;
-    assert.ok(upgradeBuilding(s, { uid }, step).ok);
+    wear(s, uid, path, r + 1);
   }
   return { s, uid };
 }
 function battle(s: S) {
   const fit = fitLayout(s.defend.layout);
   assert.ok(fit.ok);
-  const sim = new DefendSim(generateCity(fit, 4), { ...s.defend.levels }, 1, bonuses(s));
+  const sim = new DefendSim(generateCity(fit, 4), { ...s.defend.levels }, 1, battleBonuses(s));
   new Barracks().step(sim, 0.01);
   const heroes = sim.soldiers.filter((u) => u.kind === "hero");
   assert.equal(heroes.length, 1, "one hero");
@@ -59,33 +59,36 @@ function strike(sim: DefendSim, h: Soldier, e: Enemy) {
 }
 
 // ── The tree ───────────────────────────────────────────────────────────
-test("a plain Barracks becomes the Hero for 100,000 Knowledge, the swordsmen's ultimate", () => {
-  assert.deepEqual(BECOMES.barracks, [{ to: "heroHall", cost: 100000 }]);
-  assert.deepEqual(nextSteps("barracks").map(stepName), ["Hero", "Crusaders I", "Berserkers I", "Halberdiers I"]);
+test("the Hero is the swordsmen's ultimate, merged from three barracks maxed on different branches", () => {
+  assert.equal(BECOMES.barracks, undefined);
+  assert.deepEqual(nextSteps("barracks").map(stepName), ["Crusaders I", "Berserkers I", "Halberdiers I"]);
+  assert.deepEqual(nextSteps("barracks", { path: "halberdiers", rank: 3 }).map(stepName), ["Hero"]);
   assert.deepEqual(nextSteps("heroHall").map(stepName), ["Whirlwind I", "Blade dance I", "Legend I"]);
   assert.equal(upgradedFrom("heroHall"), "barracks");
   assert.equal(rootOf("heroHall"), "meleeGuild");
-  assert.equal(allocated("heroHall"), 4 + 100000);
+  const full = (p: "crusaders" | "berserkers" | "halberdiers") => pathById(p).ranks.reduce((n, r) => n + r.cost, 0);
+  assert.equal(allocated("heroHall"), 3 * 4 + full("crusaders") + full("berserkers") + full("halberdiers"));
   const ids = buildingTree("heroHall").map((n) => n.id);
-  for (const id of ["k:meleeGuild", "k:barracks", "k:heroHall", "p:whirlwind:1", "p:bladeDance:1", "p:legend:1"]) assert.ok(ids.includes(id), id);
-  // It shows on the Melee Guild line's upgrade map, its paths to the crown.
+  for (const id of ["k:meleeGuild", "k:barracks", "p:crusaders:3", "p:berserkers:3", "p:halberdiers:3", "k:heroHall", "p:whirlwind:1", "p:bladeDance:1", "p:legend:1"]) assert.ok(ids.includes(id), id);
+  // It shows on the Melee Guild line's upgrade map, its paths to the top.
   const map = fullTree("meleeGuild").map((n) => n.id);
   for (const id of ["k:heroHall", "p:whirlwind:3", "p:bladeDance:3", "p:legend:3"]) assert.ok(map.includes(id), id);
   assert.equal(STRUCTURES.heroHall.w * STRUCTURES.heroHall.h, STRUCTURES.barracks.w * STRUCTURES.barracks.h, "it stands where its barracks stood");
 });
-
-test("a Barracks is bought up into the Hero and keeps its place; the save keeps it", () => {
-  const { s, uid } = building("barracks");
+test("three maxed Barracks merge into the Hero, which keeps its place; the save keeps it", () => {
+  const { s, uid } = building("barracks", "crusaders", 3);
+  s.defend.owned.barracks = 3;
+  s.defend.kept.push({ kind: "barracks", path: "berserkers", rank: 3 }, { kind: "barracks", path: "halberdiers", rank: 3 });
   const kind = () => s.defend.layout.structures.find((o) => o.uid === uid)?.kind;
-  const become = (to: PlacedKind) => nextSteps(kind()!, specialtyOf(s.defend.layout, { uid })).find((o) => o.type === "become" && o.to === to)!;
-  const r = upgradeBuilding(s, { uid }, become("heroHall"));
+  const merge = nextSteps(kind()!, specialtyOf(s.defend.layout, { uid })).find((o) => o.type === "merge")!;
+  const r = upgradeBuilding(s, { uid }, merge);
   assert.ok(r.ok && !r.waiting, "it stands where the barracks stood");
   assert.equal(kind(), "heroHall");
   assert.equal(s.defend.owned.heroHall, 1);
   assert.equal(s.defend.owned.barracks, 0);
+  assert.deepEqual(s.defend.kept, [], "the other two are used up");
   assert.equal(decode(JSON.stringify(s)).defend.layout.structures.find((o) => o.uid === uid)?.kind, "heroHall");
 });
-
 test("the hall and each path have their own art, and the stats read the combo", () => {
   assert.deepEqual(PATH_LOOKS.heroHall, ["whirlwind", "bladeDance", "legend"]);
   const art = ["", ...PATH_LOOKS.heroHall!].map((look) => structurePixels("heroHall", 4, 6, 0, 1, look).join());

@@ -17,7 +17,7 @@ import { ECONOMY, quadraticCost } from "./economy.ts";
 
 /** What the Smithy and the skill trees can raise: the battle's `Bonuses`,
  * and how fast the Smithy's upgrades are worked. */
-export type BonusTarget = Exclude<keyof Bonuses, "paths" | "banner" | "structurePaths" | "spikePaths" | "keep" | "walls" | "gate" | "ballista" | "revolutionary" | "necromancy" | "meteor" | "frostNova" | "reinforcements"> | "smithing";
+export type BonusTarget = Exclude<keyof Bonuses, "paths" | "banner" | "structurePaths" | "spikePaths" | "keep" | "walls" | "gate" | "ballista" | "revolutionary" | "shadow" | "necromancy" | "meteor" | "frostNova" | "reinforcements"> | "smithing";
 /** Bonuses that shorten a time: their percent divides instead of multiplies. */
 const TIMES = new Set<BonusTarget>(["drill", "towerReload", "rebuild", "smithing"]);
 
@@ -193,7 +193,7 @@ export function multiplier(save: Save, target: BonusTarget) {
 /** What the next defense fights with. */
 export function bonuses(save: Save): Bonuses {
   const out = { ...NO_BONUSES } as Bonuses;
-  for (const k of Object.keys(out) as Exclude<keyof Bonuses, "paths" | "banner" | "structurePaths" | "spikePaths" | "keep" | "walls" | "gate" | "ballista" | "revolutionary" | "necromancy" | "meteor" | "frostNova" | "reinforcements">[]) out[k] = multiplier(save, k);
+  for (const k of Object.keys(out) as Exclude<keyof Bonuses, "paths" | "banner" | "structurePaths" | "spikePaths" | "keep" | "walls" | "gate" | "ballista" | "revolutionary" | "shadow" | "necromancy" | "meteor" | "frostNova" | "reinforcements">[]) out[k] = multiplier(save, k);
   if (SKILL_IDS.some(id => id.startsWith("banner") && skillRank(save, id) > 0)) out.banner = { cooldown: 10 - skillTotal(save, "bannerCooldown"), defense: skillTotal(save, "bannerDefense") / 100, reach: 5 + skillTotal(save, "bannerReach"), damage: 1 + skillTotal(save, "bannerDamage") / 100, march: 1 + skillTotal(save, "bannerMarch") / 100, life: 1 + skillTotal(save, "bannerLife") / 100, regen: skillTotal(save, "bannerRegen") / 100 };
   Object.assign(out, placedBattlePaths(save));
   if (save.defend.keepRanks) out.keep = { ...save.defend.keepRanks };
@@ -201,6 +201,7 @@ export function bonuses(save: Save): Bonuses {
   if (save.defend.gateRanks) out.gate = { ...save.defend.gateRanks };
   if (save.defend.ballistaRanks) out.ballista = { ...save.defend.ballistaRanks };
   if (save.defend.revolutionaryRanks) out.revolutionary = { ...save.defend.revolutionaryRanks };
+  if (save.defend.shadowRanks) out.shadow = { ...save.defend.shadowRanks };
   const necromancy = spellPath(save, "necromancy");
   if (necromancy) out.necromancy = necromancy;
   const meteor = spellPath(save, "meteor");

@@ -12,6 +12,7 @@ import { buildingTree, nextSteps, specialtyOf, stepName, upgradeBuilding, rootOf
 import { BLOODLETTERS, HEADHUNT, SHADOWCLOAK, VENOM, pathById, type PathId } from "../src/knowledge-paths.ts";
 import { studyPathCost } from "../src/economy.ts";
 import { bonuses } from "../src/progression.ts";
+import { battleBonuses, wear } from "./spare-paths.ts";
 import { placeStructure, placeCityTile, defaultLayout, fitLayout } from "../src/defend/layout.ts";
 import { DefendSim, type Enemy, type Soldier } from "../src/defend/sim.ts";
 import { generateCity } from "../src/defend/citygen.ts";
@@ -42,15 +43,14 @@ function den(path?: PathId, rank = 3) {
   const uid = uids(s, "meleeGuild")[0];
   assert.ok(upgradeBuilding(s, { uid }, { type: "become", to: "assassinDen", cost: 0 }).ok);
   for (let r = 0; path && r < rank; r++) {
-    const step = nextSteps("assassinDen", specialtyOf(s.defend.layout, { uid })).find((st) => st.type === "path" && st.path === path)!;
-    assert.ok(upgradeBuilding(s, { uid }, step).ok);
+    wear(s, uid, path, r + 1);
   }
   return s;
 }
 function battle(s: S) {
   const fit = fitLayout(s.defend.layout);
   assert.ok(fit.ok);
-  const sim = new DefendSim(generateCity(fit, 4), { ...s.defend.levels }, 1, bonuses(s));
+  const sim = new DefendSim(generateCity(fit, 4), { ...s.defend.levels }, 1, battleBonuses(s));
   new Barracks().step(sim, 0.01);
   const a = sim.soldiers.find((u) => u.kind === "assassin") ?? assert.fail("an assassin");
   return { sim, a };
@@ -76,19 +76,18 @@ function strikes(sim: DefendSim, a: Soldier, e: Enemy, n: number, between = 0) {
 }
 
 // ── The tree ───────────────────────────────────────────────────────────
-test("a Melee Guild becomes a barracks, an assassins' den or a spearmen hall; the den has four paths", () => {
+test("a Melee Guild becomes a barracks, an assassins' den or a spearmen hall; the den has three branches", () => {
   assert.deepEqual(nextSteps("meleeGuild").map(stepName), ["Barracks", "Assassins' den", "Spearmen hall"]);
-  assert.deepEqual(nextSteps("assassinDen").map(stepName), ["Bloodletters I", "Shadowcloak I", "Venomblades I", "Headhunters I"]);
-  assert.deepEqual(nextSteps("barracks").map(stepName), ["Hero", "Crusaders I", "Berserkers I", "Halberdiers I"], "the barracks' old Assassins path is retired");
+  assert.deepEqual(nextSteps("assassinDen").map(stepName), ["Bloodletters I", "Shadowcloak I", "Venomblades I"], "Headhunters is a spare");
+  assert.deepEqual(nextSteps("barracks").map(stepName), ["Crusaders I", "Berserkers I", "Halberdiers I"], "the barracks' old Assassins path is retired");
   assert.equal(rootOf("assassinDen"), "meleeGuild");
   const tree = buildingTree("meleeGuild").map((n) => `${n.id}=${n.state}`);
   assert.deepEqual(tree, ["k:meleeGuild=owned", "k:barracks=next", "k:assassinDen=next", "k:spearHall=next"]);
   const climbed = buildingTree("assassinDen", { path: "venom", rank: 1 });
-  assert.deepEqual(climbed.map((n) => n.id), ["k:meleeGuild", "k:assassinDen", "p:venom:1", "p:venom:2", "p:venom:3"]);
-  assert.equal(climbed.find((n) => n.id === "k:assassinDen")!.closed!.length, 3, "the other three paths are closed off");
+  assert.deepEqual(climbed.map((n) => n.id), ["k:meleeGuild", "k:assassinDen", "p:venom:1", "p:venom:2", "p:venom:3", "k:shadow"]);
+  assert.equal(climbed.find((n) => n.id === "k:assassinDen")!.closed!.length, 2, "the other two branches are closed off");
   assert.equal(allocated("assassinDen", { path: "venom", rank: 2 }), 6 + studyPathCost(4, 0) + studyPathCost(4, 1));
 });
-
 test("upgrading pays Knowledge, and the den trains assassins", () => {
   const s = fixture("meleeGuild");
   s.settings.devMode = false; s.knowledge = 6;
