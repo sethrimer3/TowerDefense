@@ -19,6 +19,7 @@ import { drawFireballs, drawMage } from "./mage-art.ts";
 import { drawArrows, drawBreath, drawShells, drawSparks } from "./projectile-art.ts";
 import { drawLasers } from "./laser-art.ts";
 import { drawStabs, drawValkyrie } from "./valkyrie-art.ts";
+import { drawHero, drawSwings } from "./hero-art.ts";
 import { drawDarkWizard } from "./dark-art.ts";
 import { drawRaisings, drawRisen } from "./necro-art.ts";
 import { drawImpacts, drawMeteors } from "./meteor-art.ts";
@@ -102,6 +103,7 @@ export function drawUnits(b: Brush, sim: DefendSim, torches: Burning | null, hea
   drawSiegeShots(b, sim);
   drawFireballs(b.c, b.px, sim);
   drawStabs(b.c, b.px, sim);
+  drawSwings(b.c, b.px, sim);
   drawRaisings(b.c, b.px, sim);
   for (const fx of sim.effects) drawEffect(b, fx);
   drawImpacts(b.c, b.px, sim);
@@ -157,8 +159,8 @@ function drawCivilians(b: Brush, sim: DefendSim, torches: Burning | null) {
 
 /** Swordsmen and archers (who carry a little bow on the off side), the
  * fire mages (`mage-art.ts`, lit by the flame in their hand, not a torch)
- * the valkyries (`valkyrie-art.ts`, lit by their own gold) and the dark
- * wizard (`dark-art.ts`, lit by his ruby).
+ * the valkyries (`valkyrie-art.ts`, lit by their own gold), the dark
+ * wizard (`dark-art.ts`, lit by his ruby) and the Hero (`hero-art.ts`).
  * Returns the swordsmen's swings, whose swords and trails draw over the
  * enemies. */
 function drawSoldiers(b: Brush, sim: DefendSim, torches: Burning | null) {
@@ -175,6 +177,10 @@ function drawSoldiers(b: Brush, sim: DefendSim, torches: Burning | null) {
     }
     if (u.kind === "darkWizard") {
       drawDarkWizard(c, px, u, sim);
+      continue;
+    }
+    if (u.kind === "hero") {
+      drawHero(c, px, u, sim);
       continue;
     }
     if (u.risen) {

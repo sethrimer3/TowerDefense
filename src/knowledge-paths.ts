@@ -6,7 +6,7 @@ import { cloneLayout, type PlacedKind } from "./defend/layout.ts";
 import type { Save } from "./save.ts";
 import { studyPathCost } from "./economy.ts";
 
-export type PathTopic = "wizardTower" | "barracks" | "valkyriePalace" | "assassinDen" | "spearHall" | "phalanx" | "javelinCamp" | "lancerStable" | "musketHall" | "gunHall" | "gunNest" | "gatlingNest" | "rocketBattery" | "sniperLodge" | "archerTower" | "cannonTower" | "archerBarracks" | "watchTower" | "mageGuild" | "bait" | "spikes" | SpellId;
+export type PathTopic = "wizardTower" | "barracks" | "heroHall" | "valkyriePalace" | "assassinDen" | "spearHall" | "phalanx" | "javelinCamp" | "lancerStable" | "musketHall" | "gunHall" | "gunNest" | "gatlingNest" | "rocketBattery" | "sniperLodge" | "archerTower" | "cannonTower" | "archerBarracks" | "watchTower" | "mageGuild" | "bait" | "spikes" | SpellId;
 /** Strike spells: cast from the battle's Skills palette rather than built,
  * so a spell has no cards; it casts with the one path `save.spellPaths`
  * names, at its furthest researched rank. */
@@ -15,6 +15,7 @@ export const SPELLS: SpellId[] = ["necromancy", "meteor", "frostNova", "reinforc
 export const isSpell = (topic: string): topic is SpellId => (SPELLS as string[]).includes(topic);
 export type PathId =
   | "pyromancy" | "rime" | "storm" | "crusaders" | "berserkers" | "halberdiers" | "cloudborne"
+  | "whirlwind" | "bladeDance" | "legend"
   | "bloodletters" | "shadowcloak" | "venom" | "headhunters"
   | "longSpears" | "setSpears" | "testudo" | "spearWall" | "barbed" | "throwingArms" | "heavyLance" | "wingedLancers"
   | "grenadiers" | "volleyFire" | "bayonets" | "sharpMuskets" | "beltFeed"
@@ -74,6 +75,22 @@ export const BERSERK = { cooldown: 0.75, heal: 0.3, cleave: 1, share: 0.5 };
  * from II every blow slows its enemy for `chill` seconds; at III blows on
  * an enemy at least `big` cells across hit `bigDamage` times as hard. */
 export const HALBERD = { reach: 0.6, damage: 1.2, chill: 1.5, big: 0.8, bigDamage: 2.5 };
+/** The Hero's paths (`defend/hero.ts`). Whirlwind: every `every[rank]`th
+ * strike of the combo is a spin (the Hero's own every 3rd), reaching
+ * `radius[rank]` cells and hitting `damage[rank]` times as hard; at III
+ * every strike is a spin. */
+export const WHIRLWIND = { every: [3, 2, 2, 1], radius: [1.5, 2, 2, 2.4], damage: [1.5, 1.5, 2.2, 2.2] };
+/** Blade dance: each strike is a flurry of `slashes[rank]`, the Hero
+ * dashing from enemy to enemy within `jump` cells between them (stopped by
+ * anything solid), each a slash of its own; from II it strikes in
+ * `cooldown[rank]` of the time; at III each kill in a flurry adds another
+ * slash, up to `most`. */
+export const BLADE_DANCE = { slashes: [1, 3, 5, 5], jump: 2.5, cooldown: [1, 1, 0.75, 0.75], most: 12 };
+/** Legend: the Hero has `hp[rank]` times its HP; from II each enemy it
+ * slays heals it `heal` of its full HP; at III, the first time it falls it
+ * rises at once with `rise` of its full HP, nothing able to hurt it for
+ * `stand` seconds. */
+export const LEGEND = { hp: [1, 2, 2, 2], heal: 0.05, rise: 0.5, stand: 3 };
 /** The spearmen line's paths (`defend/spears.ts`). Long spears: spearmen
  * reach `reach[rank]` more cells; from II each thrust runs on into the
  * nearest enemy within `through` cells behind its target for `share[rank]`
@@ -374,6 +391,30 @@ export const PATHS: KnowledgePath[] = [
       { name: "Halberds", icon: "stake", cost: studyPathCost(4, 0), text: "Swordsmen reach 0.6 cells further and hit 20% harder" },
       { name: "Hooked blades", icon: "hand", cost: studyPathCost(4, 1), text: "Every blow slows its enemy for 1.5 seconds" },
       { name: "Set for the charge", icon: "helm", cost: studyPathCost(4, 2), text: "Blows on big enemies hit 2.5× as hard" },
+    ],
+  },
+  {
+    id: "whirlwind", topic: "heroHall", name: "Whirlwind", motto: "Spin after spin through the crowd", hue: "storm",
+    ranks: [
+      { name: "Whirling steel", icon: "whirl", cost: studyPathCost(10, 0), text: "Every other strike is a spin, reaching 2 cells" },
+      { name: "Bladed tempest", icon: "shards", cost: studyPathCost(10, 1), text: "Spins hit 2.2× as hard" },
+      { name: "Cyclone", icon: "stars", cost: studyPathCost(10, 2), text: "Every strike is a spin, reaching 2.4 cells" },
+    ],
+  },
+  {
+    id: "bladeDance", topic: "heroHall", name: "Blade dance", motto: "Slash, dash, slash again", hue: "ember",
+    ranks: [
+      { name: "Flurry", icon: "dagger", cost: studyPathCost(10, 0), text: "Each strike is a flurry of 3 slashes, the Hero dashing from enemy to enemy within 2.5 cells" },
+      { name: "Blade dance", icon: "fork", cost: studyPathCost(10, 1), text: "5 slashes a flurry, and it strikes 33% faster" },
+      { name: "Thousand cuts", icon: "volley", cost: studyPathCost(10, 2), text: "Each kill in a flurry adds another slash, up to 12" },
+    ],
+  },
+  {
+    id: "legend", topic: "heroHall", name: "Legend", motto: "A hero who will not stay down", hue: "steel",
+    ranks: [
+      { name: "Legendary arms", icon: "helm", cost: studyPathCost(10, 0), text: "The Hero has twice the HP" },
+      { name: "Bloodied blade", icon: "heart", cost: studyPathCost(10, 1), text: "Every enemy it slays heals it 5% of its full HP" },
+      { name: "Undying", icon: "crown", cost: studyPathCost(10, 2), text: "The first time it falls it rises at once with half its HP, and nothing can hurt it for 3 seconds" },
     ],
   },
   {
@@ -864,6 +905,7 @@ export const pathFits = (kind: string, path: PathId) => PATHS.some((p) => p.id =
 export const UNSPECIALIZED: Record<PathTopic, string> = {
   wizardTower: "The original mix of fire and ice",
   barracks: "Balanced swordsmen",
+  heroHall: "One hero: two slashes, then a spin",
   valkyriePalace: "A marble palace on the ground",
   assassinDen: "Quick, frail assassins: every 4th strike critical",
   spearHall: "Spearmen: a long reach",
