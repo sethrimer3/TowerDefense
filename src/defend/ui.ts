@@ -898,6 +898,7 @@ export class DefendPage {
     if (fit) this.fitView();
     if (!this.renderer.canvas.width) return;
     const map = this.sim ? this.sim.map : this.currentMap();
+    const lifting = this.phase === "build" ? this.pointers.liftProgress() : null;
     this.renderer.draw(map, this.sim, this.overlay(), {
       area: areaForWave(this.sim?.unitTester ? 1 : Math.max(this.sim?.wave ?? 1, startingWave(this.save))).id,
       grid: this.phase === "build" ? (this.host.gridLines?.() ?? 0) : 0,
@@ -913,6 +914,7 @@ export class DefendPage {
       looks: this.looks(),
       gate: this.save.gateRanks,
       over: this.phase === "over",
+      ...(lifting ? { lifting } : {}),
       ...(this.picked ? { inspect: { id: this.picked.id, armed: this.sim ?? this.picked.armed } } : {}),
       hideBanner: this.phase === "over" || (this.pointers.session?.drag.from === "banner" && !!this.pointers.session.drag.placed),
     });
@@ -961,8 +963,14 @@ export class DefendPage {
     if (this.phase !== "build") return false;
     const { cx, cy, inside } = eventCell(this.renderer!, e);
     const edit = inside ? EditSession.lift(this.currentMap(), this.save.layout, cx, cy) : null;
-    if (edit) this.pointers.begin(edit, e);
-    return !!edit;
+    if (!edit) return false;
+    // A city tile lifts only once held; until then the press moves the view.
+    if (edit.byTile) {
+      this.pointers.pend(edit, edit.byTile, e);
+      return false;
+    }
+    this.pointers.begin(edit, e);
+    return true;
   }
 
   /** A press on the planted war banner (its pole or cloth) lifts it. */

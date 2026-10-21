@@ -11,7 +11,7 @@ import { enemySize } from "./catalog.ts";
  * planted war banner, the magic boats' water (flood-art.ts) over the ground, the wizards' fire, the building grid and drag overlay (edit-overlay.ts), then
  * rain in screen space. */
 import { onPixelArt, pixelArtOn, pixelKey } from "./pixel-sprites.ts";
-import { CELLS_H, CELLS_W, boardSize, hash01 } from "./grid.ts";
+import { CELLS_H, CELLS_W, boardSize, hash01, type TilePos } from "./grid.ts";
 import type { CityMap } from "./citygen.ts";
 import type { DefendSim } from "./sim.ts";
 import { DefendLighting, type LightFrame } from "./lighting.ts";
@@ -24,7 +24,7 @@ import { peopleAt } from "./gates.ts";
 import type { GateRanks } from "../gate-upgrades.ts";
 import { drawBallistas, drawSpikeThrusts } from "./wall-defense-art.ts";
 import { carriedLights, drawDamage, drawScorches, drawUnits, shadowCasters, type Brush, type Burning } from "./battle-art.ts";
-import { drawGrid, drawOverlay, type Overlay } from "./edit-overlay.ts";
+import { drawGrid, drawLifting, drawOverlay, type Overlay } from "./edit-overlay.ts";
 import { drawInspect, type Armed } from "./inspect.ts";
 import { drawFlag, drawWarBanner } from "./structure-art.ts";
 import { bannerReach } from "./war-banner.ts";
@@ -80,6 +80,9 @@ export type DrawOptions = {
   /** The building the player tapped (its id in the map), outlined with its
    * reach and troops. */
   inspect?: { id: number; armed: Armed };
+  /** A city tile being held to lift, and how far the hold has come (0–1):
+   * a gold square grows from its middle out to its edges. */
+  lifting?: { tile: TilePos; t: number };
 };
 
 /** The torches going out after a lost run: seconds before the first, then
@@ -277,6 +280,7 @@ export class DefendRenderer {
     if (sim) this.wizard.drawFire(this.ctx, this.px);
     if (opts.inspect) drawInspect(this.ctx, this.px, map, sim, opts.inspect.id, opts.inspect.armed, opts.now, opts.reduceMotion);
     this.drawEditing(overlay, opts.grid);
+    if (opts.lifting) drawLifting(this.ctx, this.px, opts.lifting.tile, opts.lifting.t);
     // Rain falls in screen space, in front of the camera.
     this.ctx.setTransform(1, 0, 0, 1, 0, 0);
     if (sim && !opts.reduceMotion) {

@@ -1,7 +1,7 @@
 /** What DEFEND draws over the board while the player is building: the dim
  * gold tile grid, and for a drag, which tiles accept the item, the hovered
  * tile, the item's ghost and an aimed bomb's reach. */
-import { SUB, TILES_H, TILES_W, boardSize, tileKey, type Rect } from "./grid.ts";
+import { SUB, TILES_H, TILES_W, boardSize, tileKey, type Rect, type TilePos } from "./grid.ts";
 import { QUARTER, QUARTERS_H, QUARTERS_W } from "./layout.ts";
 import type { StructureKind } from "./catalog.ts";
 import { STRUCTURES } from "./catalog.ts";
@@ -77,6 +77,35 @@ export function drawOverlay(c: CanvasRenderingContext2D, px: number, o: Overlay)
   else if (o.spell?.look === "frost") drawFrostReach(c, px, o.spell);
   else if (o.spell?.look === "reinforce") drawReinforceReach(c, px, o.spell);
   else if (o.spell) drawSpellReach(c, px, o.spell);
+}
+
+/** A city tile held to lift: a gold square, black outlined, grown from the
+ * tile's middle out to its edges as the hold comes to `t` (0–1), in pixel
+ * art at 8 pixels a cell. */
+export function drawLifting(c: CanvasRenderingContext2D, px: number, tile: TilePos, t: number) {
+  const a = px / 8, half = (SUB * 8) / 2;
+  const cx = (tile.tx * SUB * 8) + half, cy = (tile.ty * SUB * 8) + half;
+  const r = Math.max(4, Math.round(t * half));
+  const at = (v: number) => Math.round(v * a);
+  /** A square frame `w` art pixels thick whose outer edge is `out` from the middle. */
+  const frame = (out: number, w: number) => {
+    const x0 = at(cx - out), y0 = at(cy - out), x1 = at(cx + out), y1 = at(cy + out);
+    const ix0 = at(cx - out + w), iy0 = at(cy - out + w), ix1 = at(cx + out - w), iy1 = at(cy + out - w);
+    c.fillRect(x0, y0, x1 - x0, iy0 - y0);
+    c.fillRect(x0, iy1, x1 - x0, y1 - iy1);
+    c.fillRect(x0, iy0, ix0 - x0, iy1 - iy0);
+    c.fillRect(ix1, iy0, x1 - ix1, iy1 - iy0);
+  };
+  c.save();
+  c.fillStyle = `rgba(242,201,76,${0.08 + 0.14 * t})`;
+  c.fillRect(at(cx - r), at(cy - r), at(cx + r) - at(cx - r), at(cy + r) - at(cy - r));
+  c.fillStyle = "#000";
+  frame(r, 4);
+  c.fillStyle = "#f2c94c";
+  frame(r - 1, 2);
+  c.fillStyle = "#fff1b0";
+  frame(r - 1, 1);
+  c.restore();
 }
 
 /** Shades the tiles that won't take the item and frames those that will,

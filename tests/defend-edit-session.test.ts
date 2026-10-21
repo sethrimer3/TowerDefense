@@ -49,6 +49,18 @@ test("a press lifts the keep, a structure, or a city tile with what stands on it
   assert.equal(liftTile(0, 1), null, "open ground moves the view");
 });
 
+test("only a press on a city tile waits for a hold to lift", () => {
+  const byTile = (cx: number, cy: number) => EditSession.lift(MAP, L, cx, cy)?.byTile;
+  const keep = cellOf((b) => b.kind === "keep");
+  assert.equal(byTile(keep.cx, keep.cy), undefined, "the keep lifts at once");
+  const barracks = cellOf((b) => b.structureUid === BARRACKS.uid);
+  assert.equal(byTile(barracks.cx, barracks.cy), undefined, "so does a structure");
+  assert.deepEqual(byTile(KX * SUB + 3, (KY - 2) * SUB + 3), { tx: KX, ty: KY - 2 }, "a city tile waits");
+  const ground = Array.from({ length: SUB * SUB }, (_, i) => ({ cx: KX * SUB + (i % SUB), cy: KY * SUB + Math.floor(i / SUB) }))
+    .find(({ cx, cy }) => MAP.owner[cy * CELLS_W + cx] < 0)!;
+  assert.deepEqual(byTile(ground.cx, ground.cy), { tx: KX, ty: KY }, "and so does the keep's tile, pressed away from the keep");
+});
+
 test("the board shows nothing until the pointer moves, then the targets and the ghost", () => {
   const tile = new EditSession({ from: "palette", item: "cityTile" }, L);
   assert.deepEqual([...tile.legal.keys()], [...legalLayouts(tile.drag, L).keys()]);
