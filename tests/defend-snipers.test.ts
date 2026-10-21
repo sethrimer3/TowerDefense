@@ -1,8 +1,9 @@
 // The Sniper lodge's paths (src/defend/snipers.ts): Marksmen's reach,
 // toughest-first aim and headshots; Ricochet's glancing bullets; Suppressing
 // fire's slowing and staggering hits and quicker reloads; Deadeye's
-// clear-sight shots; Piercing rounds through a whole file.
+// harder shots; Piercing rounds through a whole file.
 import { test } from "node:test";
+import { openSight } from "./open-sight.ts";
 import assert from "node:assert/strict";
 import { defaults } from "../src/save.ts";
 import { allocated, buildingTree, nextSteps, specialtyOf, stepName, upgradeBuilding } from "../src/specializations.ts";
@@ -39,7 +40,7 @@ function lodge(path?: PathId, rank = 3) {
 function battle(s: S) {
   const fit = fitLayout(s.defend.layout);
   assert.ok(fit.ok);
-  const sim = new DefendSim(generateCity(fit, 4), { ...s.defend.levels }, 1, bonuses(s));
+  const sim = openSight(new DefendSim(generateCity(fit, 4), { ...s.defend.levels }, 1, bonuses(s)));
   new Barracks().step(sim, 0.01);
   const m = sim.soldiers.find((u) => u.kind === "sniper") ?? assert.fail("a sniper");
   return { sim, m };
@@ -144,7 +145,7 @@ function openRow(sim: DefendSim, m: Soldier, n: number) {
   }
 }
 
-test("Deadeye shoots only what it sees clearly, over the wall but not through a house, and hits much harder", () => {
+test("Deadeye shoots what it sees clearly, never through a house or the wall, and hits much harder", () => {
   const { sim, m } = battle(lodge("deadeye", 3));
   m.x = Math.floor(m.x) + 0.5; m.y = Math.floor(m.y) + 0.5;
   openRow(sim, m, 8);
@@ -159,17 +160,17 @@ test("Deadeye shoots only what it sees clearly, over the wall but not through a 
   assert.equal(sim.arrows.length, 1);
   assert.equal(sim.arrows[0].target, seen.id, "the clear shot, not the nearer hidden one");
   assert.equal(sim.arrows[0].damage, m.damage * DEADEYE.damage[3]);
-  // Hidden alone: it holds its fire.
+  // Hidden alone: it holds its fire, behind a house or the city wall alike.
   seen.hp = 0; sim.arrows.length = 0; (sim as any).indexEnemies();
   m.cd = 0;
   stepArcher(sim, m, 1 / 30);
   assert.equal(sim.arrows.length, 0, "no shot through the house");
-  // The low city wall doesn't hide it.
   sim.map.type[house] = CellType.WALL;
   m.cd = 0;
   stepArcher(sim, m, 1 / 30);
-  assert.equal(sim.arrows[0]?.target, hidden.id);
-  assert.match(kindStats(lodge(), "sniperLodge", "deadeye", 3), new RegExp(`${SNIPER.range + DEADEYE.range} range · clear sight only`));
+  assert.equal(sim.arrows.length, 0, "no shot through the wall");
+  assert.ok(hidden.hp === hidden.maxHp);
+  assert.match(kindStats(lodge(), "sniperLodge", "deadeye", 3), new RegExp(`${SNIPER.range + DEADEYE.range} range`));
 });
 
 test("Piercing rounds fly to the end of their reach through every enemy in line, each hit softer", () => {

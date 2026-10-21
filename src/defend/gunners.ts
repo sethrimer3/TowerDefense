@@ -81,12 +81,12 @@ export const gunHp = (sim: DefendSim, home: number, kind: string) => (kind === "
 
 /** The next nearest enemies within `range` of `s` besides `e` that its
  * extra shots go for: Twin pistols' one, Salvo racks' rockets. */
-export function gunExtras(sim: DefendSim, s: Soldier & { kind: Gun }, e: Enemy, range: number): Enemy[] {
+export function gunExtras(sim: DefendSim, s: Soldier & { kind: Gun }, e: Enemy, range: number, pool?: Enemy[]): Enemy[] {
   const g = gunPaths(sim, s.home);
   const extra = s.kind === "gunner" ? (g.quick >= 3 ? 1 : 0) : s.kind === "rocketeer" ? SALVO.rockets[g.salvo] - 1 : 0;
   if (!extra) return [];
   const d = (o: Enemy) => sq(o.x - s.x) + sq(o.y - s.y);
-  return sim.enemiesNear(s.x, s.y, range).filter((o) => o !== e && o.hp > 0 && d(o) <= range * range).sort((a, b) => d(a) - d(b)).slice(0, extra);
+  return (pool ?? sim.enemiesNear(s.x, s.y, range)).filter((o) => o !== e && o.hp > 0 && d(o) <= range * range).sort((a, b) => d(a) - d(b)).slice(0, extra);
 }
 
 /** What a rocket carries from its battery for `damage`: its burst, wider

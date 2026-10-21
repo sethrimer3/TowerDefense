@@ -56,6 +56,7 @@ import { ignite, stepArrows, stepShells, Towers } from "./towers.ts";
 import { FORTIFY, SHATTER, SIGNAL, SPOTTERS, pathRank } from "../knowledge-paths.ts";
 import { Barracks, stepArcher, stepSwordsman } from "./troops.ts";
 import { cloaked, spreadVenom, stepVenom } from "./assassins.ts";
+import { perched } from "./gun-sight.ts";
 import { hopliteGuard } from "./spears.ts";
 import { heroRises, stepHero, stepSwings, type Swing } from "./hero.ts";
 import { stepBlades, stepBleed, stepShade, type Blade } from "./shadow.ts";
@@ -181,6 +182,9 @@ export type Soldier = {
   risen?: Risen;
   /** A soldier the Reinforcements spell dropped (`home` -1); absent for everyone else. */
   called?: Called;
+  /** A gunner's watch tower (building id): bound for it, or `up` in it
+   * (`gun-sight.ts`); absent for everyone else. */
+  perch?: { tower: number; up?: true };
 };
 
 export type Civilian = {
@@ -912,7 +916,7 @@ export class DefendSim {
     for (let team = 0; team < 2; team++) {
       const units = team === 0 ? this.soldiers : this.civilians;
       for (const u of units) {
-        if (u.hp <= 0 || cloaked(u)) continue;
+        if (u.hp <= 0 || cloaked(u) || perched(u)) continue;
         const d = sq(u.x - x) + sq(u.y - y);
         if (d <= bd) { best = u; bd = d; }
       }

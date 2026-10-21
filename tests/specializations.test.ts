@@ -4,6 +4,7 @@
 // to a crown's evolution. Its path and rank move with it, wait with it in
 // the palette, survive saves and are snapshotted when a battle starts.
 import { test } from "node:test";
+import { openSight } from "./open-sight.ts";
 import assert from "node:assert/strict";
 import { defaults, decode } from "../src/save.ts";
 import { ATTUNED, allocated, buildingTree, foundNodes, hasTree, targetKind, respecBuilding, undoTo, undoRefund, undoUpgrade, nextSteps, placedBattlePaths, specialtyLabel, specialtyOf, spikeKey, stepName, upgradeBuilding, upgradedFrom, rootOf, type UpgradeStep } from "../src/specializations.ts";
@@ -401,7 +402,7 @@ test("brawlers punch in reach; stone throwers, snipers and musketmen shoot their
   assert.equal(e.maxHp - e.hp, BRAWLER.damage);
   assert.equal(brawler.cd, BRAWLER.cooldown);
   for (const [kind, shot, reach] of [["rangedGuild", "stone", SLINGER.range], ["sniperLodge", "bullet", SNIPER.range]] as const) {
-    const s = fixture(kind, 1), r = simulation(s);
+    const s = fixture(kind, 1), r = openSight(simulation(s));
     new Barracks().step(r, 0.01);
     const u = r.soldiers[0];
     const far = enemy(r, u.x + reach + 1, u.y);
@@ -412,7 +413,7 @@ test("brawlers punch in reach; stone throwers, snipers and musketmen shoot their
     assert.equal(r.arrows[0]?.shot, shot, kind);
     assert.ok(far);
   }
-  const g = fixture("rocketBattery", 1), gs = simulation(g);
+  const g = fixture("rocketBattery", 1), gs = openSight(simulation(g));
   new Barracks().step(gs, 0.01);
   const u = gs.soldiers[0], a = enemy(gs, u.x + 2, u.y), b = enemy(gs, u.x + 2.4, u.y);
   stepArcher(gs, u, 0.01);

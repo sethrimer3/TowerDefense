@@ -4,6 +4,7 @@
 // emplacement) and the Rocket battery; their troops in battle; and old
 // saves' musket halls and sniper lodges turned back into Ranged Guilds.
 import { test } from "node:test";
+import { openSight } from "./open-sight.ts";
 import assert from "node:assert/strict";
 import { decode, defaults } from "../src/save.ts";
 import { BECOMES, allocated, buildingTree, nextSteps, rootOf, specialtyOf, stepName, upgradeBuilding, upgradedFrom, migrateGunLine } from "../src/specializations.ts";
@@ -39,7 +40,7 @@ function building(kind: PlacedKind, path?: PathId, rank = 3) {
 function battle(s: S, troop: Soldier["kind"]) {
   const fit = fitLayout(s.defend.layout);
   assert.ok(fit.ok);
-  const sim = new DefendSim(generateCity(fit, 4), { ...s.defend.levels }, 1, battleBonuses(s));
+  const sim = openSight(new DefendSim(generateCity(fit, 4), { ...s.defend.levels }, 1, battleBonuses(s)));
   new Barracks().step(sim, 0.01);
   const m = sim.soldiers.find((u) => u.kind === troop) ?? assert.fail(`a ${troop}`);
   return { sim, m };

@@ -163,7 +163,6 @@ export function kindStats(save: Save, kind: PaletteItem, path?: PathId, rank = 0
         marks >= 3 ? `every ${ordinal(MARKSMEN.every)} shot ${MARKSMEN.crit}x` : "",
         glance ? `glances on ${RICOCHET.bounces[glance]}x at ${RICOCHET.share[glance] * 100}%` : "",
         supp ? `hits slow ${SUPPRESS.chill}s${supp >= 2 ? ` · stagger ${SUPPRESS.stagger}s` : ""}` : "",
-        deadeye ? "clear sight only" : "",
         pierce ? "pierces every enemy in line" : "",
       ].filter(Boolean).map((t) => ` · ${t}`).join("");
       const reach = SNIPER.range + (marks ? MARKSMEN.range : 0) + (deadeye >= 3 ? DEADEYE.range : 0) + (pierce >= 3 ? PIERCING.range : 0);

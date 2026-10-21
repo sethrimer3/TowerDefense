@@ -30,6 +30,12 @@ A placed building with a job: the keep, the guilds and the troop buildings upgra
 **Basic building**:
 One of the three buildings the shop sells: the **Watch tower**, the **Melee Guild** (training **brawlers**, who fight with their fists) and the **Ranged Guild** (training **stone throwers**). Every other tower and troop building is one of these upgraded.
 
+**Line of sight**:
+What the gunner line (pistols, muskets, machine guns, the Gatling, rockets, snipers and laser snipers) needs to shoot: no wall stone or building between it and its enemy, since guns shoot flat. Archers, stone throwers and javelineers arc over and need none.
+
+**Perched**:
+A gunner up in a watch tower: it shoots over every wall and building, and no enemy can pick it out until the tower falls. Two to a tower.
+
 **Upgrade** (of a building):
 One step a single placed building takes with Knowledge, chosen by tapping it in Defend while building: becoming another building (a Watch tower an archer, cannon or wizard tower; a Melee Guild a barracks, an **assassins' den** or a **spearmen hall**, and a spearmen hall a **phalanx** (shielded **hoplites**), a **javelin camp** (**javelineers**) or a **lancer stable** (mounted **lancers**, whose first thrust at each enemy is a **charge**); a Ranged Guild an archer barracks, Mage Guild or **gunner hall** (pistols), and a gunner hall a **musket hall**, **machine-gun nest** or **rocket battery**, whose **rocketeers** fire bursting rockets), a branch's next rank, or a **merge**. The other buildings of its kind are untouched.
 

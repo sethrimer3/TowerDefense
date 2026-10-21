@@ -49,13 +49,14 @@ import { cellAt, cellCenter, center, findPath, nearest, type PathLimits, type Po
 import type { DefendSim, Enemy, Soldier } from "./sim.ts";
 import { answerBanner, MARCH_SIGHT } from "./war-banner.ts";
 import { BERSERK, CRUSADE, HALBERD, RANGERS, SKIRMISH, VOLLEY, pathRank } from "../knowledge-paths.ts";
-import { bigGame, bulletOf, clearShot, pierceOf, sniperRange, sniperReload } from "./snipers.ts";
+import { bigGame, bulletOf, pierceOf, sniperRange, sniperReload } from "./snipers.ts";
 import { railShot, squadSize } from "./revolutionary.ts";
 import { bayonetTarget, charges, grenadeOf, musketDamage, musketRange, musketReload, musketSpeed, thrust, toughestInReach, volleyTargets } from "./muskets.ts";
 import { gunDamage, gunExtras, gunHp, gunRange, gunReload, gunSpeed, isGun, gunShot, rocketOf, type Gun } from "./gunners.ts";
 import { cloudRank, diveIn, hostDrill, hostGarrison, musterPoint } from "./sky-palace.ts";
 import { holdLine, isSpear, javelinExtras, javelinOf, javelinRange, javelinReload, spearLeash, spearReach, spearSpeed, spearStrike, SPEARS } from "./spears.ts";
 import { heroHp } from "./hero.ts";
+import { checkPerch, climb, lookOut, seekTower, shootsFlat } from "./gun-sight.ts";
 import { assassinHp, assassinStrike, headhunter, huntReach, recruitState, stepCloak, toughestFirst } from "./assassins.ts";
 
 /** The barracks' Study path and rank (`knowledge-paths.ts`): each 0 unless chosen. */
@@ -296,21 +297,34 @@ export function stepArcher(sim: DefendSim, s: Soldier, dt: number) {
   const gun = isGun(s.kind) ? (s as Soldier & { kind: Gun }) : null;
   const range = s.kind === "sniper" ? sniperRange(sim, s) : s.kind === "javelineer" ? javelinRange(sim, s) : s.kind === "musketeer" ? musketRange(sim, s) : gun ? gunRange(sim, gun) : own ? own.range : archerUnitRange(sim.levels.archerSight ?? 0) + (ranger ? RANGERS.sight : 0);
   const speed = s.kind === "musketeer" ? musketSpeed(sim, s) : gun ? gunSpeed(sim, gun) : (own ?? ARCHER_UNIT).speed * (skirmish >= 2 ? SKIRMISH.speed : 1);
+  // Up in a watch tower, a gunner stays put and shoots over everything.
+  const up = checkPerch(sim, s);
   // Bayonets: an enemy at close quarters is run through, not shot.
-  const close = bayonetTarget(sim, s);
+  const close = up ? null : bayonetTarget(sim, s);
   if (close) return thrust(sim, s, close, bannerDamage(sim, s));
   const charge = charges(sim, s);
   // Big game: the toughest in reach rather than the nearest.
-  // Deadeye: only an enemy in clear sight, holding fire when none is.
-  const sight = clearShot(sim, s, range);
-  const near = sight !== undefined ? sight : bigGame(sim, s, range) ?? toughestInReach(sim, s, range) ?? nearest(sim.enemiesNear(s.x, s.y, range), s, range * range, true);
+  const pick = (pool?: Enemy[]) => bigGame(sim, s, range, pool) ?? toughestInReach(sim, s, range, pool) ?? nearest(pool ?? sim.enemiesNear(s.x, s.y, range), s, range * range, true);
+  // The gunner line shoots flat: only at an enemy in clear sight.
+  const flat = shootsFlat(s.kind);
+  const { near, pool } = flat ? lookOut(sim, s, range, pick) : { near: pick(), pool: undefined };
   if (near) {
-    shoot(sim, s, near, range);
-    // Skirmishers keep walking while they shoot, and charging bayonets
-    // close in.
-    if (skirmish < 2 && !charge) return;
+    shoot(sim, s, near, range, pool);
+    // Skirmishers keep walking while they shoot, charging bayonets close
+    // in, and gunners bound for a tower keep going.
+    if (up || (skirmish < 2 && !charge && !s.perch)) return;
   }
-  if (sim.warBanner) return answerBanner(sim, sim.warBanner, s, speed, dt);
+  if (up) return;
+  if (sim.warBanner) {
+    s.perch = undefined;
+    return answerBanner(sim, sim.warBanner, s, speed, dt);
+  }
+  if (s.perch) {
+    if (!climb(sim, s)) sim.followPath(s, null, speed, dt);
+    return;
+  }
+  // Nothing in sight: a gunner goes up a watch tower if one has room.
+  if (flat && !near && !charge && seekTower(sim, s)) return sim.followPath(s, null, speed, dt);
   if ((own ? charge : (sim.levels.archerHunt ?? 0) > 0) && s.thinkT <= 0) hunt(sim, s);
   if (idle(s) && sim.streets.length) stroll(sim, s);
   sim.followPath(s, null, speed, dt);
@@ -319,7 +333,7 @@ export function stepArcher(sim: DefendSim, s: Soldier, dt: number) {
 /** No route to walk and done thinking. */
 const idle = (s: Soldier) => !s.path.length && s.thinkT <= 0;
 
-function shoot(sim: DefendSim, s: Soldier, e: Enemy, range: number) {
+function shoot(sim: DefendSim, s: Soldier, e: Enemy, range: number, pool?: Enemy[]) {
   if (s.cd > 0) return;
   const { ranger, skirmish } = paths(sim, s.home);
   if (s.kind !== "archer") {
@@ -346,8 +360,8 @@ function shoot(sim: DefendSim, s: Soldier, e: Enemy, range: number) {
     fire(e);
     // Volley fire: buck and ball at the next nearest; Twin pistols and
     // Salvo racks: full shots at the next nearest.
-    if (kind === "musketeer") for (const t of volleyTargets(sim, s, e, range)) fire(t, VOLLEY.share);
-    if (gun) for (const t of gunExtras(sim, gun, e, range)) fire(t);
+    if (kind === "musketeer") for (const t of volleyTargets(sim, s, e, range, pool)) fire(t, VOLLEY.share);
+    if (gun) for (const t of gunExtras(sim, gun, e, range, pool)) fire(t);
     return;
   }
   s.cd = ARCHER_UNIT.cooldown * SKIRMISH.reload[skirmish];
