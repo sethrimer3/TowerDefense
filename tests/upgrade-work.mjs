@@ -12,6 +12,7 @@ const tab = (page, id) => page.locator(`nav [data-tab="${id}"]`).click();
 async function study(page, subject = 'city', topic = 'walls') {
   await tab(page, 'library');
   if (!await page.locator('#library').evaluate(el => el.classList.contains('descended'))) await page.locator('#library-study').click();
+  if (await page.locator('#library-chamber .research-stage').count()) return;
   await page.locator('#library-chamber [data-subject="' + subject + '"]').click();
   const choice = page.locator('#library-chamber [data-ledger-stack="' + topic + '"]');
   if (await choice.count()) await choice.click();
@@ -55,45 +56,79 @@ try {
       if (adjustment) {
         const { mutate, value } = JSON.parse(adjustment);
         const s = JSON.parse(localStorage.getItem('towerdefense.v1'));
-        s[mutate === 'research' ? 'researchClock' : 'forgeClock'] -= value;
+        if (mutate === 'crew') {
+          if (!value) sessionStorage.setItem('work-researchers', JSON.stringify(s.library.crew.filter(c => c.role === 'researcher').map(c => c.name)));
+          const names = JSON.parse(sessionStorage.getItem('work-researchers'));
+          for (const c of s.library.crew) if (names.includes(c.name)) c.role = value ? 'researcher' : 'shelver';
+        } else s[mutate === 'research' ? 'researchClock' : 'forgeClock'] -= value;
         localStorage.setItem('towerdefense.v1', JSON.stringify(s));
         sessionStorage.removeItem('work-clock-adjustment');
       }
     }, fixture);
     await page.reload(); await page.waitForSelector('#defend-start');
     await study(page);
+    await page.locator('#library-chamber .magic-circle').evaluate(c => window.__workCircle = c);
+    const originalFormation = await page.locator('#library-chamber .magic-circle').getAttribute('data-formation');
     assert.match(await page.locator('[data-learn="masonry"]').textContent(), /1m 40s with 3 researchers/);
     await page.locator('[data-learn="masonry"]').click();
     assert.equal((await state(page)).skills.masonry, 0);
     assert.equal((await state(page)).researchJob.kind, 'skill');
     assert.equal((await state(page)).researchJob.paid, 1);
-    assert.equal(await page.locator('[data-learn="bastions"]').isDisabled(), true);
+    assert.equal(await page.locator('[data-learn="bastions"]').count(), 0, 'the tree is removed during research');
+    assert.equal(await page.locator('#library-chamber .ledger-collection').count(), 0, 'collection is removed during research');
+    assert.equal(await page.locator('#library-chamber .magic-circle').evaluate(c => c === window.__workCircle), true, 'research reuses the live circle');
+    assert.equal(await page.locator('#library-chamber .magic-circle').getAttribute('data-formation'), originalFormation, 'pending research grants no Knowledge early');
+    const centered = await page.locator('.research-orbit').evaluate(el => {
+      const a = el.querySelector('.magic-circle').getBoundingClientRect(), b = el.querySelector('.research-upgrade').getBoundingClientRect();
+      return Math.abs(a.x + a.width / 2 - b.x - b.width / 2) < 1 && Math.abs(a.y + a.height / 2 - b.y - b.height / 2) < 1;
+    });
+    assert.equal(centered, true, 'upgrade is at the circle center');
+    await page.screenshot({ path: `test-results/research-focus-skill-${width}.png` });
+    const progress = await page.locator('[data-research-progress]').evaluate(p => p.value);
     const before = (await state(page)).researchJob.left;
     await page.waitForTimeout(1300);
+    await page.waitForFunction(before => document.querySelector('[data-research-progress]').value > before, progress);
     assert.ok((await page.locator('[data-research-timer]').first().textContent()).includes('remaining'));
     await reloadWith(page, 'research', before / 3 + 10000);
     assert.equal((await state(page)).skills.masonry, 1, 'offline completion once');
     assert.equal((await state(page)).researchJob, null);
     await study(page);
+    assert.equal(await page.locator('.research-stage').count(), 0, 'completion restores the tree');
     assert.equal(await page.locator('[data-learn="bastions"]').isDisabled(), false);
     await page.locator('[data-learn="masonry"]').click();
     const paid = (await state(page)).researchJob.paid;
     assert.equal(paid, 1001);
     await page.locator('[data-cancel-research]').click();
+    assert.equal(await page.locator('.research-stage').count(), 0, 'cancellation restores the tree');
+    assert.equal(await page.locator('[data-learn="masonry"]').evaluate(b => b === document.activeElement), true, 'cancel returns keyboard focus');
     assert.equal((await state(page)).researchJob, null);
     assert.equal((await state(page)).skills.masonry, 1);
 
-    await study(page, 'towers', 'wizardTower');
-    await page.locator('[data-pick="storm:0"]').click();
-    await page.locator('[data-learn-path="storm"]').click();
-    assert.equal((await state(page)).pathResearch.storm, undefined);
+    await study(page, 'spells', 'meteor');
+    await page.locator('[data-pick="starfall:0"]').click();
+    await page.locator('[data-learn-path="starfall"]').click();
+    assert.equal((await state(page)).pathResearch.starfall, undefined);
     assert.equal((await state(page)).researchJob.kind, 'path');
+    assert.equal(await page.locator('.path-tree').count(), 0, 'spell tree disappears');
+    assert.equal(await page.locator('.research-stage').evaluate(el => el.scrollTop), 0, 'research starts at the top of its new view');
+    assert.equal(await page.locator('.research-title h3').textContent(), 'Shattered sky');
+    await reloadWith(page, 'crew', 0); await study(page);
+    await page.waitForFunction(() => document.querySelector('[data-research-timer]').textContent.includes('Paused'));
+    assert.equal(await page.locator('#library-chamber .magic-circle').getAttribute('data-motif'), 'triangles', 'reload restores the project topic');
+    const paused = await page.locator('[data-research-progress]').evaluate(p => p.value);
+    await page.waitForTimeout(1200);
+    assert.equal(await page.locator('[data-research-progress]').evaluate(p => p.value), paused, 'no crew preserves progress');
+    await page.screenshot({ path: `test-results/research-focus-paused-${width}.png` });
+    await reloadWith(page, 'crew', 3); await study(page);
+    await page.waitForFunction(() => document.querySelector('[data-research-timer]').textContent.includes('remaining'));
+    await page.screenshot({ path: `test-results/research-focus-spell-${width}.png` });
     await reloadWith(page, 'research', 200000);
-    assert.equal((await state(page)).pathResearch.storm.rank, 1);
+    assert.equal((await state(page)).pathResearch.starfall.rank, 1);
 
     await smithy(page);
     const high = page.locator('[data-train="troopHp"]');
-    assert.match(await high.textContent(), /12006 gold/);
+    assert.match(await high.textContent(), /12006/);
+    assert.equal(await high.locator('[aria-label="12006 gold"]').count(), 1, 'high rank uses the gold bill');
     await high.click();
     assert.equal((await state(page)).training.troopHp, 49);
     await page.locator('[data-upgrade="soldierArms"]').click();
@@ -111,7 +146,7 @@ try {
     await page.screenshot({ path: `test-results/upgrade-work-smithy-${width}.png` });
     await study(page);
     await page.locator('[data-learn="masonry"]').click();
-    const fit = await page.locator('.research-project').evaluate(el => {
+    const fit = await page.locator('.research-stage').evaluate(el => {
       const r = el.getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth && el.scrollWidth <= el.clientWidth + 1;
     });
     assert.equal(fit, true, 'project controls fit');

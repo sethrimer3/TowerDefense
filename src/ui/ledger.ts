@@ -74,6 +74,8 @@ export class Ledger {
   /** Whether holding a buy button repeats it yet (bound on the first draw). */
   private holding = false;
   private researchCrew = -1;
+  private researchFocus = "";
+  private researchScroll = 0;
   private smithCrew = "";
 
   constructor(private ctx: AppContext, readonly root: HTMLElement, readonly kind: LedgerKind, private up: () => void) {
@@ -104,14 +106,21 @@ export class Ledger {
   }
 
   render() {
+    const wasResearching = this.root.classList.contains("researching");
     const active = document.activeElement instanceof HTMLElement && this.root.contains(document.activeElement) ? document.activeElement : null;
     const focusAttrs = active ? Array.from(active.attributes).filter(a => a.name.startsWith("data-")).map(a => `[${a.name}="${CSS.escape(a.value)}"]`).join("") : "";
     this.researchCrew = this.ctx.researchers();
     this.smithCrew = this.ctx.smiths().join("\n");
-    const subject = this.current(), topic = this.topic(), smithy = this.kind === "smithy", c = CHAMBER[this.kind];
+    const smithy = this.kind === "smithy", job = smithy ? null : this.save.researchJob, c = CHAMBER[this.kind];
+    const projectTopic = job && SUBJECTS.flatMap(s => s.topics).find(t => job.kind === "skill" ? t.skills?.includes(job.id) : t.id === pathById(job.id).topic);
+    // Restored projects reopen on their own topic, including after a reload.
+    if (projectTopic) this.focus(projectTopic.id);
+    const subject = this.current(), topic = projectTopic || this.topic();
     // Redrawn in place (a purchase, a tapped rank): keep where the list was scrolled to.
     const same = this.shown === `${subject.id}:${topic.id}`;
-    const list = this.root.querySelector(".chamber-list"), scroll = same ? (list?.scrollTop ?? 0) : 0;
+    const list = this.root.querySelector(".chamber-list");
+    if (job && !wasResearching) this.researchScroll = list?.scrollTop ?? 0;
+    const scroll = !same ? 0 : job ? wasResearching ? (list?.scrollTop ?? 0) : 0 : wasResearching ? this.researchScroll : (list?.scrollTop ?? 0);
     const strips = Array.from(this.root.querySelectorAll(".ledger-strip")).map((s) => s.scrollLeft);
     this.shown = `${subject.id}:${topic.id}`;
     const subjects = this.subjects.map((s) => `<button data-subject="${s.id}" aria-pressed="${s.id === subject.id}"><span>${uiSprite(s.sprite)}</span>${s.name}</button>`).join("");
@@ -120,11 +129,12 @@ export class Ledger {
         <div class="chamber-title"><h2>${c.title}</h2><small>${c.blurb}</small></div>
       </header>
       ${smithy ? this.walletHtml() : this.knowledgeHtml()}
-      <div class="ledger-strip ledger-subjects" role="group" aria-label="Subjects">${subjects}</div>
+      ${job ? this.researchHtml() : `<div class="ledger-strip ledger-subjects" role="group" aria-label="Subjects">${subjects}</div>
       <section class="chamber-list ledger-half ${smithy ? "ledger-forge" : "ledger-study"}" aria-label="${topic.name}">${smithy ? `<canvas class="training-particles" aria-hidden="true"></canvas>` : ""}
         ${this.galleryHtml(subject)}
-        ${smithy ? `<p class="ledger-scope">GLOBAL EQUIPMENT · ${topic.item ? `Every ${topic.name}, owned now or bought later` : topic.name}</p>${this.forgeHtml(topic)}` : `<p class="ledger-scope">SHARED RESEARCH · ${topic.name}</p>${this.studyHtml(topic)}`}</section>`;
+        ${smithy ? `<p class="ledger-scope">GLOBAL EQUIPMENT · ${topic.item ? `Every ${topic.name}, owned now or bought later` : topic.name}</p>${this.forgeHtml(topic)}` : `<p class="ledger-scope">SHARED RESEARCH · ${topic.name}</p>${this.studyHtml(topic)}`}</section>`}`;
     const root = this.root;
+    root.classList.toggle("researching", !!job);
     if (!smithy) {
       this.circle ??= new MagicCircle();
       this.circle.set(studyCircle(this.save, topic));
@@ -133,7 +143,7 @@ export class Ledger {
       const research = relevant ? `${job.kind}:${job.id}:${job.rank}` : "";
       if (research && this.circleResearch !== null && research !== this.circleResearch) this.circle.energize();
       this.circleResearch = research;
-      this.circle.attach(root);
+      this.circle.attach(root.querySelector<HTMLElement>(".research-orbit") ?? root);
       root.classList.add("has-magic-circle");
     }
     root.querySelectorAll<HTMLButtonElement>("[data-ledger-stack]").forEach(b => b.onclick = () => {
@@ -166,7 +176,11 @@ export class Ledger {
       this.topics[this.subject] = b.dataset.topic;
       this.render();
     }));
-    if (focusAttrs) root.querySelector<HTMLElement>(focusAttrs)?.focus({ preventScroll: true });
+    if (focusAttrs) {
+      const target = root.querySelector<HTMLElement>(focusAttrs)
+        ?? (job ? root.querySelector<HTMLElement>("[data-cancel-research]") : wasResearching ? root.querySelector<HTMLElement>(this.researchFocus) : null);
+      (target?.matches(":disabled") ? root.querySelector<HTMLElement>("[data-up]") : target)?.focus({ preventScroll: true });
+    }
     this.bindForge(root);
     root.querySelectorAll<HTMLButtonElement>("[data-learn]").forEach((b) => (b.onclick = () => this.learn(b.dataset.learn as SkillId)));
     root.querySelectorAll<HTMLButtonElement>("[data-pick]").forEach((b) => (b.onclick = () => {
@@ -343,10 +357,46 @@ export class Ledger {
   // ── The Study ───────────────────────────────────────────────────────────
   private knowledgeHtml() {
     const save = this.save, researchers = this.ctx.researchers();
-    const job = save.researchJob, name = job ? job.kind === "skill" ? SKILLS[job.id].name
-      : job.kind === "evolution" ? pathById(job.id).evolves!.name : pathById(job.id).ranks[job.rank].name : "";
-    return `<p class="ledger-note chamber-wallet">You have <b class="knowledge">${whole(save.knowledge)}</b> Knowledge${researchers ? ` · ${researchers} ${researchers === 1 ? "researcher" : "researchers"} in the lab` : " · put a librarian to the alchemy lab to research"}<small>One project at a time; all researchers share its work.</small></p>
-      ${job ? `<div class="research-project"><div><b>${name}</b><small data-research-timer>${this.researchTimeLeft()}</small></div><button data-cancel-research>Cancel<small>Refund ${job.paid} Knowledge</small></button></div>` : ""}`;
+    return `<p class="ledger-note chamber-wallet">You have <b class="knowledge">${whole(save.knowledge)}</b> Knowledge${researchers ? ` · ${researchers} ${researchers === 1 ? "researcher" : "researchers"} in the lab` : " · put a librarian to the alchemy lab to research"}<small>One project at a time; all researchers share its work.</small></p>`;
+  }
+
+  /** The active upgrade occupies the exact center of the existing circle.
+   * Trees and collection controls return when the project ends. */
+  private researchHtml() {
+    const job = this.save.researchJob!;
+    let name: string, text: string, icon: string, label: string, hue = "storm";
+    if (job.kind === "skill") {
+      const skill = SKILLS[job.id];
+      name = skill.name; text = skill.text; label = `Rank ${job.rank + 1} / ${skill.max}`;
+      icon = `<span class="research-skill-glyph" aria-hidden="true">${skill.icon}</span>`;
+      this.researchFocus = `[data-learn="${job.id}"]`;
+    } else {
+      const path = pathById(job.id), crown = job.kind === "evolution";
+      const rank = path.ranks[job.rank];
+      name = crown ? path.evolves!.name : rank.name;
+      text = crown ? path.evolves!.text : rank.text;
+      hue = crown ? "gold" : path.hue;
+      label = `${path.name} · ${crown ? "Crown" : `Rank ${ROMAN[job.rank]}`}`;
+      icon = `<canvas data-path-icon="${crown ? "crown" : rank.icon}:${hue}" aria-hidden="true"></canvas>`;
+      this.researchFocus = `[data-pick="${job.id}:${crown ? "crown" : job.rank}"]`;
+    }
+    return `<section class="chamber-list research-stage hue-${hue}" aria-label="Research in progress">
+      <div class="research-orbit">
+        <span class="research-caption">RESEARCHING</span>
+        <span class="path-medal research-upgrade" aria-label="${name}">${icon}</span>
+        <div class="research-title"><h3>${name}</h3><small>${label}</small></div>
+      </div>
+      <div class="research-details"><p>${text}.</p>
+        <progress data-research-progress max="100" value="${this.researchProgress()}" aria-label="Research progress"></progress>
+        <p data-research-timer role="status">${this.researchTimeLeft()}</p>
+        <button data-cancel-research>Cancel research<small>Refund ${job.paid} Knowledge</small></button>
+      </div>
+    </section>`;
+  }
+
+  private researchProgress() {
+    const job = this.save.researchJob;
+    return job ? Math.max(0, Math.min(100, 100 * (1 - job.left / (researchSeconds(job.rank, job.kind === "evolution") * 1000)))) : 0;
   }
 
   private researchTimeLeft() {
@@ -522,10 +572,14 @@ export class Ledger {
   /** Once a second while the chamber shows: the whole chamber once a rank
    * completes, else the countdowns. */
   tick(completed: boolean) {
+    const job = this.save.researchJob, research = job ? `${job.kind}:${job.id}:${job.rank}` : "";
     if (completed || (this.kind === "study" && this.researchCrew !== this.ctx.researchers())
+      || (this.kind === "study" && this.circleResearch !== research)
       || (this.kind === "smithy" && this.smithCrew !== this.ctx.smiths().join("\n"))) return this.render();
     this.root.querySelectorAll<HTMLElement>("[data-forge-timer]").forEach(span => { span.textContent = this.forgeTimeLeft(); });
     this.root.querySelectorAll<HTMLElement>("[data-research-timer]").forEach(span => { span.textContent = this.researchTimeLeft(); });
+    const progress = this.root.querySelector<HTMLProgressElement>("[data-research-progress]");
+    if (progress) progress.value = this.researchProgress();
     for (const job of this.save.trainingJobs) {
       const span = this.root.querySelector<HTMLElement>(`[data-training-timer="${job.id}"]`);
       if (span) span.textContent = this.timeLeft(job.id);

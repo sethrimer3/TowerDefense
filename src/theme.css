@@ -2028,6 +2028,13 @@ dialog .away-row .away-note {
 .has-magic-circle .path-detail, .has-magic-circle .path-node { text-shadow: 0 1px 2px #000, 0 0 4px #000; }
 .ug-host > .ug-view { z-index: 1; }
 .ug-host > .magic-circle { opacity: 0.8; }
+.research-orbit > .magic-circle { opacity: 1; }
+.research-caption, .research-title small { color: var(--hue); text-shadow: 0 1px 2px #000, 0 0 5px #000; }
+.research-title h3 { color: #f6dca4; text-shadow: 0 1px 2px #000, 0 0 7px #000; }
+.research-upgrade { border-color: var(--hue-deep); box-shadow: inset 0 0 0 2px #14120f, 0 0 0 1px var(--hue), 0 3px 8px #000; }
+.research-details { color: #cdbd9c; }
+.research-details progress { accent-color: var(--hue); }
+.research-details [data-research-timer] { color: #f1d58a; }
 /* Metal costs: each amount by a small ingot of its metal, as in the
    currency bar. */
 .cost-metal {

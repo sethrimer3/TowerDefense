@@ -1982,6 +1982,21 @@ nav button > .tab-idle[hidden] { display: none; }
   overflow-y: auto;
   margin-bottom: 0;
 }
+.research-stage { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 8px 8px 16px; }
+.research-orbit { position: relative; flex: none; width: min(100%, 420px); aspect-ratio: 1; }
+.research-orbit > .magic-circle { inset: 0; width: 100%; height: 100%; }
+.research-upgrade { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: grid; place-items: center; width: 68px; height: 68px; z-index: 1; }
+.research-upgrade canvas { width: 44px; height: 44px; image-rendering: pixelated; }
+.research-skill-glyph { font-size: 28px; line-height: 1; }
+.research-caption { position: absolute; bottom: calc(50% + 48px); width: 100%; text-align: center; font-size: 10px; letter-spacing: 2px; }
+.research-title { position: absolute; top: calc(50% + 44px); left: 10%; width: 80%; text-align: center; }
+.research-title h3 { margin: 0 0 4px; font-size: 17px; overflow-wrap: anywhere; }
+.research-title small { font-size: 10px; }
+.research-details { flex: none; width: min(100%, 420px); display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; }
+.research-details p { margin: 0; font-size: 11px; line-height: 1.5; }
+.research-details progress { width: min(100%, 280px); height: 8px; }
+.research-details button { font-size: 11px; padding: 7px 15px; }
+.research-details button small { display: block; font-size: 9px; margin-top: 3px; }
 @media (max-width: 480px) {
   .chamber-head { gap: 6px; }
   .chamber-up { padding: 0 7px; font-size: 10px; }

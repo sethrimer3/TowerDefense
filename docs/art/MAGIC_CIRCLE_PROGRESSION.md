@@ -28,6 +28,18 @@ This is a review screenshot from the live renderer, at the same scale and medium
 - New circles start with two framing rings, four inscribed triangles or eight Voronoi sites, and no recursive cell ornament. The existing limits remain: seven framing bands, twenty triangles, up to 37 sites (quality caps: 19/27/37), three tesseract projections, and 6/9/12 trail agents. Actual visible amounts depend on progression and transitions.
 - Purchases and reversals retain the 1.7-second smooth transition. Undo, unlearning and respec restore the simpler target exactly. Reduced Motion shows the full progression-appropriate geometry without animation.
 
+## Research in progress
+
+![A spell upgrade centered on its circle while research runs, with progress and cancellation on a phone](research-focus.png)
+
+A timed Study project replaces the collection, subject controls, tree and skill cards with a focused view of the upgrade. Its icon occupies the exact center of the circle; the name and target rank sit nearby. The description, native progress bar, remaining time and cancellation/refund stay available below it. Instant research completes directly and returns its result without an intermediate waiting view.
+
+The same canvas is moved into the research orbit, retaining its geometry, animation and bounded trail history. Starting work still only pulses the current formation; Knowledge complexity increases on completion. Cancelling or completing the project restores the normal tree, previous scroll position and keyboard target. A restored project reopens on the correct topic after navigation or reload. Assigning no researchers shows a paused countdown while preserving earned progress; resuming staff continues the work.
+
+The layout uses existing skill glyphs and path medallions, with no new sprite assets. It retains the existing main frame loop and one-second timer updates. Timings, prices, research grants, save format and Smithy behavior remain unchanged. `tests/upgrade-work.mjs` exercises live skills and Meteor/Starfall research, centering, tree removal/restoration, persisted jobs, pause/resume, offline completion and cancellation at 1280/390/360 pixels; it also retains shared-smith, Forge and training checks. Screenshots are under ignored `test-results/research-focus-*`.
+
+Research-view validation passed the full **593-test Node suite**, the final TypeScript/Vite production build, the timed-work browser matrix at **1280/390/360 pixels**, and the existing magic-circle integration matrix at those same widths. Browser assertions verify exact icon/canvas centering, persistent canvas ownership, real progress changes, no premature rank grants, zero-crew pause/resume, restored topics after reload, tree/focus restoration, and research entry at scroll zero. The final build retains its existing large-chunk warning. No gameplay golden changed.
+
 ## Implementation and validation
 
 `formation.ts` separates the completed `knowledge` count from deterministic shape contributions; `visualOnly` marks identity choices. `progression.ts` adapts Study data. `ui/specialty.ts` adapts building lineage and shared ranks, and Defend passes the Revolutionary ranks. `render.ts` reveals the layers, keeps clipped cell geometry cached, preserves graph-attached histories and caps work by quality. No saved geometry, new save fields, gameplay random draws, animation loops or listeners are introduced.
