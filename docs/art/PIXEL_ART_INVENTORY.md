@@ -57,6 +57,7 @@ Source footprint dimensions are simulation cells. Proposed base footprint pixels
 | [x] | `wizardTower` — Wizard tower | 2×2 → 16×16 | — | v2 base + Pyromancy/Rime/Stormcalling, all damage/rubble, rebuilding and UI; batch 03 |
 | [x] | `mageGuild` — Mage Guild | 4×6 → 32×48 | — | v2 base + Pyroclasm/Cinders, all damage/rubble, rebuilding and UI; batch 03 |
 | [x] | `valkyriePalace` — Valkyrie palace | 6×6 → 48×48 | 4×6 → 32×48 | v2 both sizes; base/Cloudborne, damage/rubble, UI and native airborne clouds/shadow/mooring; batch 05 |
+| [ ] | `heroHall` — Hero | 4×6 → 32×48 | — | Create (procedural `paintHeroHall` with Whirlwind/Blade dance/Legend looks until then) |
 | [x] | `darkKeep` — Dark wizard keep | 12×12 → 96×96 | 6×6 → 48×48 | v2 both sizes, damage/rubble, rebuilding and UI; batch 05 |
 | [x] | `monsterBait` — Monster bait | 2×2 → 16×16 | — | v2 base + Oil-soaked/Fortified crates, all damage, wooden rubble, rebuilding and UI; batch 03 |
 
@@ -103,6 +104,7 @@ All twenty-one `Soldier.kind` values need a consistent sprite family, not just a
 | [ ] | `railSniper` | Revolutionary equipment, rifle, targeting and laser attachment points. |
 | [ ] | `mage` | Mage Guild paths, staff/robe, casts and persistent fire effects. |
 | [ ] | `valkyrie` | Palace paths, spear, wings, charge and guard states. |
+| [ ] | `hero` | Hall paths' capes, longsword, slash/spin/dash/rise states and guard halo (procedural `hero-art.ts` until then). |
 | [ ] | `darkWizard` | Dark Keep paths, robe/staff and chain-lightning states. |
 | [ ] | `undead` | Necromancy bone archers, soul strength, amalgam scale, rise and crumble. |
 | [ ] | `reinforcement` | Called knights/archers/champion, drop/land, last stand and departure. |
@@ -355,6 +357,9 @@ Every path row requires each rank's icon **and** its actual building/unit/spell 
 | [ ] | `barracks` / `berserkers` | Berserkers | `dagger`, `heart`, `fork` |
 | [ ] | `barracks` / `halberdiers` | Halberdiers | `stake`, `hand`, `helm` |
 | [ ] | `valkyriePalace` / `cloudborne` | Cloudborne | `cloud`, `wing`, `halo` |
+| [ ] | `heroHall` / `whirlwind` | Whirlwind | `whirl`, `shards`, `stars` |
+| [ ] | `heroHall` / `bladeDance` | Blade dance | `dagger`, `fork`, `volley` |
+| [ ] | `heroHall` / `legend` | Legend | `helm`, `heart`, `crown` |
 | [ ] | `assassinDen` / `bloodletters` | Bloodletters | `dagger`, `drop`, `skull` |
 | [ ] | `assassinDen` / `shadowcloak` | Shadowcloak | `hood`, `eye`, `whirl` |
 | [ ] | `assassinDen` / `venom` | Venomblades | `vial`, `drop`, `skull` |

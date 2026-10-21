@@ -12,8 +12,8 @@ import { enemySize } from "./catalog.ts";
  * with shots of their own. The spearmen line's spearmen, hoplites and
  * lancers chase like swordsmen, striking through `spears.ts`. A Mage
  * Guild trains fire mages the same way (`mages.ts`), a Valkyrie palace
- * valkyries (`valkyries.ts`), and a dark wizard keep its one dark wizard
- * (`dark-wizards.ts`). */
+ * valkyries (`valkyries.ts`), a dark wizard keep its one dark wizard
+ * (`dark-wizards.ts`), and the Hero's hall its one Hero (`hero.ts`). */
 import { dist, sq } from "../exact.ts";
 import {
   ARCHER_UNIT,
@@ -33,6 +33,7 @@ import {
   ENEMIES,
   FIRE_MAGE,
   fireballDamage,
+  HERO,
   SOLDIER,
   soldierCap,
   soldierLeash,
@@ -52,6 +53,7 @@ import { bayonetTarget, charges, grenadeOf, musketDamage, musketRange, musketRel
 import { gunDamage, gunExtras, gunHp, gunRange, gunReload, gunSpeed, isGun, gunShot, rocketOf, type Gun } from "./gunners.ts";
 import { cloudRank, diveIn, hostDrill, hostGarrison, musterPoint } from "./sky-palace.ts";
 import { holdLine, isSpear, javelinExtras, javelinOf, javelinRange, javelinReload, spearLeash, spearReach, spearSpeed, spearStrike, SPEARS } from "./spears.ts";
+import { heroHp } from "./hero.ts";
 import { assassinHp, assassinStrike, headhunter, huntReach, recruitState, stepCloak, toughestFirst } from "./assassins.ts";
 
 /** The barracks' Study path and rank (`knowledge-paths.ts`): each 0 unless chosen. */
@@ -92,7 +94,7 @@ export class Barracks {
     const cap = soldierCap(sim.levels.barracksCapacity);
     for (const b of sim.map.buildings) {
       if (!isBarracks(b) || !sim.intact(b)) continue;
-      const garrison = b.kind === "darkKeep" ? DARK_WIZARD.garrison : b.kind === "revolutionary" ? squadSize(sim) : cap + hostGarrison(sim, b);
+      const garrison = b.kind === "darkKeep" ? DARK_WIZARD.garrison : b.kind === "heroHall" ? HERO.garrison : b.kind === "revolutionary" ? squadSize(sim) : cap + hostGarrison(sim, b);
       if (this.drilled(sim, b, garrison, dt)) this.recruit(sim, b);
     }
   }
@@ -100,7 +102,7 @@ export class Barracks {
   /** Counts down the barracks' drill; true when a recruit is ready. A full
    * garrison keeps the clock at a whole drill. */
   private drilled(sim: DefendSim, b: Building, cap: number, dt: number) {
-    const slow = b.kind === "darkKeep" ? DARK_WIZARD.drill : hostDrill(sim, b);
+    const slow = b.kind === "darkKeep" ? DARK_WIZARD.drill : b.kind === "heroHall" ? HERO.drill : hostDrill(sim, b);
     const drill = () => trainSeconds(sim.levels.barracksTraining) * sim.bonuses.drill * slow;
     const alive = sim.soldiers.filter((s) => s.home === b.id).length;
     if (alive >= cap) {
@@ -122,9 +124,9 @@ export class Barracks {
     if (!at) return;
     const kind = TRAINS[b.kind] ?? "sword";
     const scale = soldierScale(sim.levels.soldierArms);
-    const stats = kind === "archer" ? ARCHER_UNIT : kind === "mage" ? { ...FIRE_MAGE, damage: fireballDamage(sim.levels.mageFireball ?? 0) } : kind === "valkyrie" ? VALKYRIE : kind === "darkWizard" ? DARK_WIZARD
+    const stats = kind === "archer" ? ARCHER_UNIT : kind === "mage" ? { ...FIRE_MAGE, damage: fireballDamage(sim.levels.mageFireball ?? 0) } : kind === "valkyrie" ? VALKYRIE : kind === "darkWizard" ? DARK_WIZARD : kind === "hero" ? HERO
       : kind === "brawler" ? BRAWLER : kind === "assassin" ? ASSASSIN_UNIT : isSpear(kind) ? SPEARS[kind] : isRanged(kind) ? RANGED[kind] : SOLDIER;
-    const path = kind === "sword" ? swordStats(sim, b.id) : kind === "assassin" ? { hp: assassinHp(sim, b.id), damage: 1 } : { hp: gunHp(sim, b.id, kind), damage: 1 };
+    const path = kind === "sword" ? swordStats(sim, b.id) : kind === "assassin" ? { hp: assassinHp(sim, b.id), damage: 1 } : kind === "hero" ? { hp: heroHp(sim, b.id), damage: 1 } : { hp: gunHp(sim, b.id, kind), damage: 1 };
     sim.soldiers.push({
       id: sim.newId(),
       kind,
@@ -147,7 +149,7 @@ export class Barracks {
 
 /** What each troop building trains. */
 const TRAINS: Partial<Record<Building["kind"], Soldier["kind"]>> = {
-  barracks: "sword", archerBarracks: "archer", mageGuild: "mage", valkyriePalace: "valkyrie", darkKeep: "darkWizard",
+  barracks: "sword", heroHall: "hero", archerBarracks: "archer", mageGuild: "mage", valkyriePalace: "valkyrie", darkKeep: "darkWizard",
   meleeGuild: "brawler", rangedGuild: "slinger", assassinDen: "assassin", sniperLodge: "sniper", musketHall: "musketeer",
   spearHall: "spearman", phalanx: "hoplite", javelinCamp: "javelineer", lancerStable: "lancer",
   gunHall: "gunner", gunNest: "machineGunner", gatlingNest: "gatlingGunner", rocketBattery: "rocketeer", revolutionary: "railSniper",

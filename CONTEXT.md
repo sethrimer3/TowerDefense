@@ -217,6 +217,9 @@ A path's crown, past its last rank, turns that one building into a greater form 
 **Revolutionary**:
 The gunner line's ultimate building, which a plain Sniper lodge becomes: a high-tech hall of **laser snipers**. Its upgrades are not a path but a **shared tree** of five branches climbed side by side by every Revolutionary at once: the squad (one, two, then three snipers), the **chain laser** (the laser leaps from enemy to enemy, impossibly, and the bullet follows it through 3, 5, then 7), a **critical** chance, what a critical multiplies, and a burst round the last enemy the bullet strikes.
 
+**Hero**:
+The swordsmen's ultimate building, which a plain Barracks becomes: a gilded hall of one hero, who fights in a **combo** of sweeping slashes and a **spin** that strikes everything round it. Its paths are Whirlwind (more, wider spins), Blade dance (a **flurry** of slashes, **dashing** from enemy to enemy) and Legend (a hero who, at its last rank, rises once when it falls: **Undying**).
+
 **Lock-on laser**:
 The thin laser every sniper holds on whom it will shoot, brightening as it reloads and locks on; the shot flashes along it.
 
