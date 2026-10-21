@@ -1997,6 +1997,7 @@ nav button > .tab-idle[hidden] { display: none; }
 .research-details progress { width: min(100%, 280px); height: 8px; }
 .research-details button { font-size: 11px; padding: 7px 15px; }
 .research-details button small { display: block; font-size: 9px; margin-top: 3px; }
+.research-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
 @media (max-width: 480px) {
   .chamber-head { gap: 6px; }
   .chamber-up { padding: 0 7px; font-size: 10px; }

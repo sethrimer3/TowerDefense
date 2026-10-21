@@ -193,9 +193,7 @@ export class Ledger {
     root.querySelectorAll<HTMLButtonElement>("[data-learn-path]").forEach((b) => (b.onclick = () => this.learnPath(b.dataset.learnPath as PathId)));
     root.querySelectorAll<HTMLButtonElement>("[data-evolve]").forEach((b) => (b.onclick = () => this.evolve(b.dataset.evolve as PathId)));
     root.querySelectorAll<HTMLButtonElement>("[data-unlearn]").forEach((b) => (b.onclick = () => this.unlearn(b.dataset.unlearn as PathTopic)));
-    root.querySelector<HTMLButtonElement>("[data-cancel-research]")?.addEventListener("click", () => {
-      if (cancelResearch(this.save)) { this.ctx.update(); this.render(); }
-    });
+    this.bindResearchCancellation(root);
   }
 
   /** How many of the topic's kinds the player owns. */
@@ -389,9 +387,43 @@ export class Ledger {
       <div class="research-details"><p>${text}.</p>
         <progress data-research-progress max="100" value="${this.researchProgress()}" aria-label="Research progress"></progress>
         <p data-research-timer role="status">${this.researchTimeLeft()}</p>
-        <button data-cancel-research>Cancel research<small>Refund ${job.paid} Knowledge</small></button>
+        <p data-cancel-research-note role="status" hidden>Cancel this research? Progress will be lost.</p>
+        <div class="research-actions">
+          <button data-cancel-research><span data-cancel-research-label>Cancel research</span><small>Refund ${job.paid} Knowledge</small></button>
+          <button data-keep-research hidden>Keep researching</button>
+        </div>
       </div>
     </section>`;
+  }
+
+  /** Confirmation belongs only to this displayed project and DOM lifetime.
+   * Timer ticks keep working; redraws/navigation reset the confirmation. */
+  private bindResearchCancellation(root: HTMLElement) {
+    const button = root.querySelector<HTMLButtonElement>("[data-cancel-research]");
+    if (!button) return;
+    const job = this.save.researchJob;
+    const label = root.querySelector<HTMLElement>("[data-cancel-research-label]")!;
+    const keep = root.querySelector<HTMLButtonElement>("[data-keep-research]")!;
+    const note = root.querySelector<HTMLElement>("[data-cancel-research-note]")!;
+    let confirming = false;
+    const setConfirmation = (value: boolean) => {
+      confirming = value;
+      label.textContent = value ? "Confirm cancel" : "Cancel research";
+      keep.hidden = note.hidden = !value;
+      button.classList.toggle("danger", value);
+    };
+    button.addEventListener("click", event => {
+      // A rapid double-click must not turn an accidental first tap into a refund.
+      if (event.detail > 1) return;
+      if (!job || this.save.researchJob !== job) return this.render();
+      if (!confirming) return setConfirmation(true);
+      if (cancelResearch(this.save)) { this.ctx.update(); this.render(); }
+    });
+    const dismiss = () => { setConfirmation(false); button.focus({ preventScroll: true }); };
+    keep.addEventListener("click", dismiss);
+    root.querySelector(".research-details")!.addEventListener("keydown", event => {
+      if ((event as KeyboardEvent).key === "Escape" && confirming) { event.preventDefault(); event.stopPropagation(); dismiss(); }
+    });
   }
 
   private researchProgress() {

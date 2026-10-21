@@ -76,6 +76,9 @@ try {
   assert.equal(await canvas.getAttribute('data-formation'), original);
   assert.equal(await page.evaluate(() => window.__circleStudy.circle.transition.active), true);
   await page.locator('[data-cancel-research]').click();
+  assert.equal(await page.locator('[data-cancel-research-label]').textContent(), 'Confirm cancel');
+  assert.equal(await canvas.getAttribute('data-formation'), original, 'asking to cancel does not change Knowledge');
+  await page.locator('[data-cancel-research]').click();
   await page.evaluate(() => {
    const ledger = window.__circleStudy;
    ledger.ctx.save().settings.instantResearch = true;
