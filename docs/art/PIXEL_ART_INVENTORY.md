@@ -6,6 +6,8 @@ Implementation update: [batch 01](BUILDING_BATCH_01.md) converts the keep, barra
 
 Legend: **Audit/redraw** = PNG exists, but style/density/states still require review; **Create** = no registered PNG replacement for this family; **Integrate** = the setting, scale, cache or cross-screen routing still needs work. Every unchecked item remains pending. Existing legacy artwork stays available when Pixel Art is off.
 
+**Visual quality revision:** B1 checkmarks record implemented PNG/state routing, not user approval of the artwork. [Art direction 01](ART_DIRECTION_01.md) revises Barracks (normal/wide and paths), Melee Guild and Watch tower with distinct overhead architecture and structural collapse. Their seven PNGs are replaced in place; frame counts and catalog footprints stay unchanged. All other twenty-two families await this architectural/destruction review. The three revised families are a calibration pass for review, not a claim that the whole catalog now meets the desired style.
+
 ## A. Shared foundation and integration
 
 | ID | Work item | Current source / acceptance requirement |

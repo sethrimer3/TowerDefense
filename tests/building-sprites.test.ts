@@ -90,7 +90,9 @@ test("every building path and damage frame retains an exact catalog footprint, p
         const colors = new Set<string>();
         assert.deepEqual(buildingFrame(art, stage, art.looks[col]), { sx: col * w, sy: stage * h, sw: w, sh: h });
         for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-          assert.equal(alpha(col * w + x, stage * h + y), alpha(col * w + x, y), `${name}: damage cannot shift silhouette`);
+          // A fixed frame/pivot does not require an intact silhouette:
+          // structural art must be allowed to lose roof and wall pieces.
+          if (!("damageModel" in art)) assert.equal(alpha(col * w + x, stage * h + y), alpha(col * w + x, y), `${name}: original damage mask remains unchanged`);
           if (alpha(col * w + x, stage * h + y)) {
             const offset = ((stage * h + y) * sheet.w + col * w + x) * 4;
             colors.add(sheet.data.subarray(offset, offset + 3).toString("hex"));
@@ -102,6 +104,15 @@ test("every building path and damage frame retains an exact catalog footprint, p
       }
       const frame = buildingFrame(art, 0, art.looks[col], true);
       assert.equal(frame.sy + frame.sh, sheet.h, "rubble stays inside its native frame");
+      if ("damageModel" in art) {
+        let lost = 0, upperRuin = 0;
+        for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+          if (alpha(col * w + x, y) && !alpha(col * w + x, (art.stages - 1) * h + y)) lost++;
+          if (y < h / 3 && alpha(col * w + x, art.stages * h + y)) upperRuin++;
+        }
+        assert.ok(lost > 0, `${name}: collapsed walls remove part of the standing silhouette`);
+        assert.ok(upperRuin > 3, `${name}: rubble retains the building's northern foundations rather than moving to the bottom`);
+      }
     }
     const icon = decode(readFileSync(new URL(`../public/assets/pixel/${art.icon}.png`, import.meta.url)));
     assert.deepEqual([icon.w, icon.h], [BUILDING_ICON_SIZE * art.looks.length, BUILDING_ICON_SIZE]);

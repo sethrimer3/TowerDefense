@@ -289,7 +289,7 @@ function paintBuilding(p: Paint, b: Building) {
   if (sim && !sim.intact(b)) {
     if (b.kind === "keep") return paintKeepRubble(c, box);
     if (b.kind !== "house" && buildingArt(b.kind, r.w, r.h)) {
-      paintStructureRubble(c, b.kind, box, lotSeed(b));
+      paintStructureRubble(c, b.kind, box, lotSeed(b), b.structureUid !== undefined ? p.looks?.[b.structureUid] : undefined);
       return paintRebuilding(p, b);
     }
     if (paintPixelRubble(p, b)) return paintRebuilding(p, b);

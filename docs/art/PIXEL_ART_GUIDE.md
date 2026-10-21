@@ -19,6 +19,17 @@ Priorities, in order:
 
 At ordinary play size the player should identify an archer tower, watch tower, barracks, and keep immediately, without zooming in. A higher rank earns a meaningful emblem, weapon, silhouette or roof change, not a coating of random highlights.
 
+### Architecture and destruction correction
+
+The first six batches establish PNG integration coverage; they do **not** establish visual approval. The user identified repeated box silhouettes, facade-heavy views and unnatural destruction. [Art direction 01](ART_DIRECTION_01.md) starts correcting those issues with the Barracks, Melee Guild and Watch tower. The other twenty-two families still require this review.
+
+- Design the building's plan and use first: sleeping wings around a drill yard, a roofed training court, or a lookout deck. Distinguish families by massing and negative space before roof color or heraldry.
+- Use the Defend overhead camera. Show roofs, courtyards, parapet tops and hatches; keep visible wall depth short. Front-facing doors, windows and signs must not dominate the world sprite. UI should depict the same architecture at its own native size.
+- Keep large material planes quiet. Place a few deliberate seams, dormers or functional objects; do not fill every surface with random speckles. Courtyard paving belongs to a compound; surrounding biome terrain does not belong in the sprite.
+- Author collapse for that building. A damaged roof exposes its floor and rafters; a failed wall changes the silhouette. Later states enlarge the same breach and retain surviving sections. Ruins retain the original foundations, fallen roof panels, masonry and timber near their source. Stone platforms must not collapse into the same timber pile as halls.
+- Preserve frame bounds and anchors through collapse, **not every opaque pixel**. Enforcing an identical alpha silhouette on every damage frame prevents walls and roof edges from falling away. `damageModel: "structural"` identifies families that use this authored progression.
+- Review intact, damaged and destroyed art side by side at play scale, on the actual board and beside older families. A technically complete sheet is not an approved art direction.
+
 ## 2. Non-negotiable graphics-setting contract
 
 - **All new or revised sprite artwork, including UI, appears only when `save.settings.pixelArt === true`.** The existing Settings checkbox is `#pixel-art`. It currently defaults to checked; this plan does not change that default.

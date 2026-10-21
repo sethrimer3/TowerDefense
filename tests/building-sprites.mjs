@@ -10,6 +10,7 @@ const browser = await chromium.launch(process.env.PLAYWRIGHT_EXECUTABLE
 const base = process.env.TEST_URL || 'http://127.0.0.1:5173/';
 const out = 'test-results/building-sprites';
 const focus = (process.env.SPRITE_KINDS || '').split(',').filter(Boolean);
+const compareDir = process.env.SPRITE_COMPARE_DIR || '';
 mkdirSync(out, { recursive: true });
 
 // Exercise the special renderer itself: grounded sprites alone cannot
@@ -101,7 +102,7 @@ try {
         for (let stage = 0; stage <= art.stages; stage++) {
           const rubble = stage === art.stages, a = make(w, h), b = make(w, h), box = { x: 0, y: 0, w, h, px: 8 };
           px.setPixelArt(true);
-          if (rubble) paintStructureRubble(a.getContext('2d'), art.kind, box, 17);
+          if (rubble) paintStructureRubble(a.getContext('2d'), art.kind, box, 17, look);
           else paintStructureArt(a.getContext('2d'), art.kind, box, stage, 17, look);
           const frame = buildingFrame(art, stage, look, rubble);
           b.getContext('2d').drawImage(px.pixelSprite(art.sheet), frame.sx, frame.sy, frame.sw, frame.sh, 0, 0, w, h);
@@ -109,7 +110,7 @@ try {
           const on = a.toDataURL();
           px.setPixelArt(false);
           a.getContext('2d').clearRect(0, 0, w, h);
-          if (rubble) paintStructureRubble(a.getContext('2d'), art.kind, box, 17);
+          if (rubble) paintStructureRubble(a.getContext('2d'), art.kind, box, 17, look);
           else paintStructureArt(a.getContext('2d'), art.kind, box, stage, 17, look);
           // Direct legacy pixels provide an independent off/fallback reference.
           const legacySize = art.kind === 'keep' ? [24, 24] : [w, h], native = make(...legacySize);
@@ -122,7 +123,7 @@ try {
           expect(same(a, b), `${art.kind}/${look}/${stage}: unchanged legacy graphics`);
           expect(on !== a.toDataURL(), 'new and legacy are distinct');
           px.setPixelArt(true); a.getContext('2d').clearRect(0, 0, w, h);
-          if (rubble) paintStructureRubble(a.getContext('2d'), art.kind, box, 17);
+          if (rubble) paintStructureRubble(a.getContext('2d'), art.kind, box, 17, look);
           else paintStructureArt(a.getContext('2d'), art.kind, box, stage, 17, look);
           expect(on === a.toDataURL(), 'toggle restores exact frame'); frames++;
         }
@@ -191,7 +192,7 @@ try {
     console.log(`Building art ${width}px @ DPR ${dpr}: ${checks.frames} frames, exact legacy and icon parity, camera and motion passed`);
 
     if (width === 1100) {
-      await page.evaluate(async focus => {
+      await page.evaluate(async ({ focus, compareDir }) => {
         const { BUILDING_ART } = await import('/src/defend/building-sprite-manifest.ts');
         const { STRUCTURES } = await import('/src/defend/catalog.ts');
         const { PATHS } = await import('/src/knowledge-paths.ts');
@@ -202,9 +203,23 @@ try {
         for (const [key, art] of Object.entries(BUILDING_ART)) {
           if (focus.length && !focus.includes(art.kind)) continue;
           const title = document.createElement('h2'); title.textContent = key === 'barracksWide' ? 'Barracks — separately composed wide footprint' : STRUCTURES[art.kind].name + (key.endsWith('Compact') ? ' — compact footprint' : ''); gallery.append(title);
+          if (compareDir) {
+            const load = async id => { const image = new Image(); image.src = `/${compareDir}/${id.replace(/^v2\//, '')}.png`; await image.decode(); return image; };
+            const old = await load(art.sheet), oldIcon = await load(art.icon), previous = document.createElement('div'); previous.className = 'row'; gallery.append(previous);
+            for (const [stage, label] of [[0, 'Previous — intact'], [art.stages - 1, 'Previous — heavy damage'], [art.stages, 'Previous — rubble']]) {
+              const fig = document.createElement('figure'), cv = document.createElement('canvas'), cap = document.createElement('figcaption');
+              cv.width = art.size[0] * 3; cv.height = art.size[1] * 3; const c = cv.getContext('2d'); c.imageSmoothingEnabled = false;
+              c.drawImage(old, 0, stage * art.size[1], ...art.size, 0, 0, cv.width, cv.height); cap.textContent = label; fig.append(cv, cap); previous.append(fig);
+            }
+            const fig = document.createElement('figure'), cv = document.createElement('canvas'), cap = document.createElement('figcaption'); cv.width = cv.height = 48;
+            const c = cv.getContext('2d'); c.imageSmoothingEnabled = false; c.drawImage(oldIcon, 0, 0, 24, 24, 0, 0, 48, 48); cap.textContent = 'Previous UI'; fig.append(cv, cap); previous.append(fig);
+            const label = document.createElement('p'); label.textContent = 'Revised overhead architecture and structural collapse'; gallery.append(label);
+          }
           const row = document.createElement('div'); row.className = 'row'; gallery.append(row);
           const previews = art.looks.map(look => [look, 0, PATHS.find(path => path.id === look)?.name || 'Base']);
-          previews.push(['', art.stages - 1, 'Heavy damage'], ['', art.stages, 'Rubble']);
+          if (art.damageModel === 'structural') previews.push(['', 1, 'Roof damage'], ['', 2, 'Partial collapse'], ['', art.stages - 1, 'Heavy collapse']);
+          else previews.push(['', art.stages - 1, 'Heavy damage']);
+          previews.push(['', art.stages, 'Rubble']);
           for (const [look, stage, label] of previews) {
             const figure = document.createElement('figure'), cv = document.createElement('canvas'), caption = document.createElement('figcaption');
             cv.width = art.size[0] * 3; cv.height = art.size[1] * 3;
@@ -229,7 +244,7 @@ try {
             const fig = document.createElement('figure'), cap = document.createElement('figcaption'); cap.textContent = `${w}×${h} cells, unchanged flight anchor`; fig.append(cv, cap); row.append(fig);
           }
         }
-      }, focus);
+      }, { focus, compareDir });
       await page.screenshot({ path: `${out}/contact-sheet.png`, fullPage: true });
     }
     await context.close();
@@ -247,7 +262,7 @@ try {
     for (const art of Object.values(BUILDING_ART)) for (const look of art.looks) for (let stage = 0; stage <= art.stages; stage++) {
       const cv = document.createElement('canvas'); [cv.width, cv.height] = art.size;
       const c = cv.getContext('2d'), box = { x: 0, y: 0, w: cv.width, h: cv.height, px: 8 };
-      const draw = () => { c.clearRect(0, 0, cv.width, cv.height); if (stage === art.stages) paintStructureRubble(c, art.kind, box, 17); else paintStructureArt(c, art.kind, box, stage, 17, look); return cv.toDataURL(); };
+      const draw = () => { c.clearRect(0, 0, cv.width, cv.height); if (stage === art.stages) paintStructureRubble(c, art.kind, box, 17, look); else paintStructureArt(c, art.kind, box, stage, 17, look); return cv.toDataURL(); };
       setPixelArt(false); const legacy = draw(); setPixelArt(true); if (draw() !== legacy) return false;
     }
     return true;

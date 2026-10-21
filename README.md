@@ -18,6 +18,8 @@ The [first building batch](docs/art/BUILDING_BATCH_01.md) implements the keep, b
 
 [Batch 06](docs/art/BUILDING_BATCH_06.md) adds Spearmen hall, Phalanx, Javelin camp and Lancer stable with all current path variants. All twenty-five catalog building families now have native PNG world and UI sprites; city pieces, environment art and other unchecked inventory entries remain future work.
 
+[Art direction 01](docs/art/ART_DIRECTION_01.md) begins a quality revision of those sprites: an overhead barracks compound, octagonal Melee Guild training court and stone Watch tower, with building-specific collapse and matching UI. Catalog coverage is separate from visual approval; the remaining twenty-two families still need this review. Editable architecture lives in `scripts/pixel-art/architecture.ts`, using the shared native drawing primitives in `drawing.ts`.
+
 ## Run
 
 Use Node.js 22.18+ (CI uses 24) and npm:
