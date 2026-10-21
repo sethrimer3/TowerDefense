@@ -20,7 +20,7 @@ import { BALLISTA_PATHS } from "./ballista-upgrades.ts";
 import { REVOLUTIONARY_PATHS } from "./revolutionary-upgrades.ts";
 import { SHADOW_PATHS } from "./shadow-upgrades.ts";
 import { sideRank } from "./side-ranks.ts";
-import { hasTree, placeOf, rootOf, upgradedFrom, type Wear } from "./specializations.ts";
+import { hasTree, placeOf, rootOf, upgradedFrom, type SpecialtyTarget, type Wear } from "./specializations.ts";
 import { WALL_PATHS, wallRank } from "./wall-upgrades.ts";
 import type { PlacedKind } from "./defend/layout.ts";
 import { METALS } from "./mine/sim.ts";
@@ -111,6 +111,32 @@ export function tileCopies(save: Save, stack: TileStack, limit = Infinity): Tile
     seen.set(group, nth + 1);
     return { key: `${group}#${nth}`, id, index, placed: index < stack.placed, ...(wear ? { wear } : {}), group };
   });
+}
+
+/** The copy a tile's `key` names (a spread copy's own key, or a stack's
+ * group, whose first copy stands for it), else the kind's first copy. */
+export function tileCopyAt(save: Save, stack: TileStack, key: string | null | undefined): TileCopy | undefined {
+  const copies = tileCopies(save, stack);
+  return copies.find((c) => c.key === key) ?? copies.find((c) => c.group === key) ?? copies[0];
+}
+
+/** The upgrade tree a held tile opens in Defend: the walls', gates' and
+ * wall ballistas' shared trees, or the copy's own (where it stands in the
+ * city, else its palette copy). None for a kind without one. */
+export type TileTree = SpecialtyTarget | { side: "walls" | "gate" | "ballistas" };
+export function tileTree(save: Save, id: TileId, key?: string | null): TileTree | null {
+  if (id === "wallBlock") return { side: "walls" };
+  if (id === "cityGate") return { side: "gate" };
+  if (id === "wallBallista") return { side: "ballistas" };
+  if (universal(id) || !hasTree(id)) return null;
+  const stack = tileStack(save, id), copy = tileCopyAt(save, stack, key);
+  if (!copy) return null;
+  const d = save.defend;
+  if (copy.placed) {
+    if (id === "wallSpikes") { const spot = d.layout.spikes[copy.index]; if (spot) return { spikes: { tx: spot.tx, ty: spot.ty, side: spot.side } }; }
+    else { const o = d.layout.structures.filter((s) => s.kind === id)[copy.index]; if (o) return { uid: o.uid }; }
+  }
+  return { copy: id, ...(copy.wear ? { wear: copy.wear } : {}) };
 }
 
 /** Copies of a kind wearing the same upgrades, stacked together: plain

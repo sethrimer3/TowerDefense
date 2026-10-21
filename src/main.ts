@@ -57,6 +57,12 @@ const ctx: AppContext = {
   researchers: () => libraryPage.sim.count("researcher"),
   researched: () => libraryPage.sim.researched(),
   openChamber,
+  openTree: (target) => {
+    if (!defendPage.canOpenTree()) return false;
+    navigate("defend");
+    defendPage.openTree(target);
+    return true;
+  },
   devChanged: () => {
     if (save.settings.devTowers) unlockAllTowers(save.defend);
     update();

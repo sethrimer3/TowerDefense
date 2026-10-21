@@ -2,7 +2,8 @@
 // their own Knowledge tree spread a tile a copy, each marked with the
 // upgrades it carries (diamonds for buildings it became, pips for path
 // ranks, its path's badge); Stacked gathers copies with the same upgrades;
-// city tiles, walls and skills are always one stack. Uses an isolated
+// city tiles, walls and skills are always one stack. An opened tile shows
+// its stats and its upgrades' abilities; a held one opens its tree in Defend. Uses an isolated
 // fixture, never the player's saved game. Needs `npm run dev`. Screenshots
 // go to test-results/.
 import { chromium } from 'playwright';
@@ -72,13 +73,47 @@ try {
     assert.equal(await page.locator('.tile[data-tile="watchTower"]').count(), 1);
     await page.screenshot({ path: `test-results/tiles-marks-stacked-${width}.png` });
 
-    // Opening the kind lists each set of upgrades in words.
+    // Opening a stack shows its basic stats, then each upgrade it carries
+    // as an ability in its path's colour; no description.
     await archers.last().click();
-    await page.waitForSelector('.tile-set');
-    const sets = await page.locator('.tile-set > div > b').allTextContents();
-    assert.deepEqual(sets, ['Watch tower → Archer tower', 'Watch tower → Archer tower → Fire arrows II']);
+    await page.waitForSelector('.tile-detail .tile-stats');
+    assert.deepEqual((await page.locator('.tile-detail .tile-stats li').allTextContents()).map((t) => t.replace(/[\d.]+/g, 'n')), ['n damage', 'ns reload', 'n range']);
+    assert.equal(await page.locator('.tile-detail .tile-abilities li.hue-ember').count(), 2);
+    assert.equal(await page.locator('.tile-detail p').count(), 0);
+    const ember = await page.locator('.tile-detail .tile-abilities li').first().evaluate((li) => getComputedStyle(li).color);
+    assert.equal(ember, 'rgb(243, 154, 42)', 'in the path\'s colour');
     await page.locator('.tile-detail').scrollIntoViewIfNeeded();
     await page.screenshot({ path: `test-results/tiles-marks-open-${width}.png` });
+    // The plain stack has no abilities.
+    await archers.first().click();
+    await page.waitForTimeout(600);
+    assert.equal(await page.locator('.tile-detail .tile-abilities').count(), 0);
+    assert.equal(await page.locator('.tile-detail .tile-stats li').count(), 3);
+
+    // Press and hold a tile: Defend opens with that copy's upgrade tree.
+    const wizard = page.locator('.tile[data-tile="wizardTower"]').first();
+    await wizard.scrollIntoViewIfNeeded();
+    const box = await wizard.boundingBox();
+    const at = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+    if (phone) {
+      const cdp = await context.newCDPSession(page);
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [at] });
+      await page.waitForTimeout(700);
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    } else {
+      await page.mouse.move(at.x, at.y); await page.mouse.down(); await page.waitForTimeout(700); await page.mouse.up();
+    }
+    await page.waitForSelector('#defend.active');
+    await page.waitForSelector('#defend-specialty:not([hidden]) [data-node]');
+    assert.ok(await page.locator('#defend-specialty [data-node="p:storm:3"]').count(), 'the Stormcalling III copy\'s tree');
+    await page.screenshot({ path: `test-results/tiles-marks-hold-${width}.png` });
+    await page.keyboard.press('Escape');
+    await page.locator('[data-tab="tiles"]').click();
+    await page.waitForTimeout(600);
+    // A short tap still just opens the tile.
+    await page.locator('.tile[data-tile="wizardTower"]').first().click();
+    await page.waitForSelector('.tile-detail .tile-abilities li.hue-storm');
+    assert.ok(await page.locator('#tiles.active').count());
 
     // The walls carry their shared tree's ranks.
     await page.locator('[data-filter="city"]').click();

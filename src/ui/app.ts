@@ -1,5 +1,6 @@
 import type { Save } from "../save.ts";
 import type { Tab } from "./dom.ts";
+import type { TileTree } from "../tiles.ts";
 
 /** What pages need from the app around them. */
 export interface AppContext {
@@ -20,6 +21,9 @@ export interface AppContext {
   researchers(): number;
   /** Goes to the Mine's Smithy or the Library's Study, open at a topic. */
   openChamber(where: "smithy" | "study", topic?: string): void;
+  /** Turns to Defend with `target`'s upgrade tree open (Tiles' press and
+   * hold); false, staying put, while a battle is on. */
+  openTree(target: TileTree): boolean;
   /** Research finished: the Library's lab celebrates. */
   researched(): void;
   /** A dev option changed: applies what it grants, saves and refreshes. */

@@ -1,6 +1,5 @@
-import { rootOf, upgradedFrom } from "../specializations.ts";
 import { pathBadge, pathLook, paintPathIcons } from "./path-badge.ts";
-import { ballistaTreeHtml, gateTreeHtml, revolutionaryTreeHtml, shadowTreeHtml, upgradeTreeHtml, wallTreeHtml } from "./specialty.ts";
+import { buildingSheet, type StatSheet } from "./specialty.ts";
 /** The Tiles tab: the player's tiles laid out in a hall of the keep they
  * defend, under its great window. Each tile shows the Knowledge upgrades
  * it carries (`marksHtml`: a diamond for each building it became, a pip in
@@ -8,24 +7,26 @@ import { ballistaTreeHtml, gateTreeHtml, revolutionaryTreeHtml, shadowTreeHtml, 
  * Buildings upgraded one at a time are spread, a tile a copy, unless
  * stacked, when copies with the same upgrades share a stack; kinds whose
  * upgrades every copy shares (city tiles, walls, skills) are always one
- * stack marked with its quantity (`universal`). A tap opens the kind in place,
- * spilling its copies out (which stand in the city, which wait in the
- * palette), with buying another, the kind's upgrades in the Mine's Smithy
- * and the Library's Study, and its higher tier. The filters show one type
- * at a time; the stacks can be spread into single tiles and gathered again;
- * the Shop shows every kind for sale. The opened kind lists each set of
- * upgrades its copies carry in words and previews its tree; each building
- * is upgraded where it stands in Defend. Every change of layout animates
+ * stack marked with its quantity (`universal`). A tap opens the tile in
+ * place: its basic stats, then each Knowledge upgrade it carries as an
+ * ability in its path's colour (`buildingSheet`), with buying another and
+ * the kind's upgrades in the Mine's Smithy and the Library's Study. A press
+ * held on a tile (`HOLD_MS`, as on the Defend board) turns to Defend with
+ * that copy's upgrade tree open (`tileTree`), where each building is
+ * upgraded. The filters show one type at a time; the stacks can be spread
+ * into single tiles and gathered again; the Shop shows every kind for
+ * sale. Every change of layout animates
  * (`flip`): tiles slide to their new places, copies gather into their
  * stacks and spill out of them. */
 import { play } from "../sound.ts";
 import { daylight } from "../library/render.ts";
-import { BALLISTA_DESCRIPTION, BOMB_RADIUS, GATE_DESCRIPTION, WALL_BLOCK_DESCRIPTION, ITEM_NAMES, SPIKES_DESCRIPTION, STRUCTURES, footprint, footprintName, type PaletteItem } from "../defend/catalog.ts";
-import type { PlacedKind } from "../defend/layout.ts";
+import { BOMB_DAMAGE, BOMB_RADIUS, type PaletteItem } from "../defend/catalog.ts";
+import { HOLD_MS } from "../defend/board-pointers.ts";
+import { bonuses } from "../progression.ts";
 import { paintIcon, type IconItem } from "../defend/structure-art.ts";
 import {
-  CONSUMABLE_TEXT, TILE_FILTERS, TILE_NAMES, TILE_TYPE, TILE_TYPE_NAMES, buyTile, canBuyTile, higherTier, isConsumable, marksText, offerText, shopOffer, tileCopies,
-  tileGroups, tileMarks, tileStacks, tileTopic, universal, type TileFilter, type TileId, type TileMark, type TileStack,
+  CONSUMABLE_TEXT, TILE_FILTERS, TILE_NAMES, TILE_TYPE, TILE_TYPE_NAMES, buyTile, canBuyTile, isConsumable, marksText, offerText, shopOffer, tileCopies, tileCopyAt,
+  tileGroups, tileMarks, tileStacks, tileTopic, tileTree, universal, type TileFilter, type TileId, type TileMark, type TileStack,
 } from "../tiles.ts";
 import { topicHas } from "./ledger.ts";
 import { Chamber } from "./chamber.ts";
@@ -47,6 +48,14 @@ export class TilesPage {
   /** Whether copies with the same upgrades share a stack (spread by default). */
   private stacked = false;
   private open: TileId | null = null;
+  /** The tile tapped to open its kind: a spread copy's key or a stack's group. */
+  private focus: string | null = null;
+  /** A press held on a tile, until it opens the tree or lets go. */
+  private holding: { timer: number; x: number; y: number; pointerId: number } | null = null;
+  /** The held press opened a tree: the click its release makes is not a tap. */
+  private held = false;
+  /** A note shown in the foot for a moment (a tree that can't open mid-battle). */
+  private note: { text: string; until: number } | null = null;
 
   constructor(private ctx: AppContext, private root: HTMLElement) {}
 
@@ -91,7 +100,12 @@ export class TilesPage {
       const b = (e.target as Element).closest<HTMLButtonElement>("[data-filter]");
       if (b) this.relayout(() => (this.filter = b.dataset.filter as TileFilter));
     };
-    c.querySelector<HTMLElement>(".tiles-grid")!.onclick = (e) => this.press(e.target as Element);
+    const grid = c.querySelector<HTMLElement>(".tiles-grid")!;
+    grid.onclick = (e) => {
+      if (this.held) { this.held = false; return; }
+      this.press(e.target as Element);
+    };
+    this.bindHold(grid);
     holdToRepeat(c, ["data-buy-tile"]);
   }
 
@@ -101,12 +115,58 @@ export class TilesPage {
     const go = target.closest<HTMLButtonElement>("[data-go]");
     if (go) return this.ctx.openChamber(go.dataset.go as "smithy" | "study", go.dataset.topic);
     if (target.closest("[data-close]")) return this.relayout(() => (this.open = null));
+    const tree = target.closest<HTMLElement>("[data-tree]");
+    if (tree) return this.openTree(tree.dataset.tree as TileId, tree.dataset.copy);
     const tile = target.closest<HTMLElement>("[data-tile]");
     if (tile) {
-      const id = tile.dataset.tile as TileId;
+      const id = tile.dataset.tile as TileId, key = tile.dataset.key ?? null;
       play("knock");
-      this.relayout(() => { this.open = this.open === id ? null : id; });
+      // A second tap on the tile showing closes it; a tap on another copy shows that one.
+      const same = this.open === id && this.focus === key;
+      this.relayout(() => { this.open = same ? null : id; this.focus = same ? null : key; });
     }
+  }
+
+  /** Press and hold on a tile opens its upgrade tree, as in Defend: held
+   * still for `HOLD_MS`; moving, scrolling or letting go first is a tap. */
+  private bindHold(grid: HTMLElement) {
+    const stop = () => {
+      if (this.holding) clearTimeout(this.holding.timer);
+      this.holding = null;
+    };
+    grid.addEventListener("pointerdown", (e) => {
+      stop();
+      this.held = false;
+      if (e.button !== 0 || this.mode === "shop") return;
+      const tile = (e.target as Element).closest<HTMLElement>("[data-tile]");
+      if (!tile) return;
+      const id = tile.dataset.tile as TileId, key = tile.dataset.key;
+      if (!tileTree(this.save, id, key)) return;
+      const timer = window.setTimeout(() => {
+        this.holding = null;
+        this.held = true;
+        this.openTree(id, key);
+      }, HOLD_MS);
+      this.holding = { timer, x: e.clientX, y: e.clientY, pointerId: e.pointerId };
+    });
+    grid.addEventListener("pointermove", (e) => {
+      const h = this.holding;
+      if (h && h.pointerId === e.pointerId && Math.abs(e.clientX - h.x) + Math.abs(e.clientY - h.y) > 8) stop();
+    });
+    for (const type of ["pointerup", "pointercancel", "pointerleave"]) grid.addEventListener(type, stop);
+    this.chamber!.content.querySelector(".tiles-shelf")!.addEventListener("scroll", stop, { passive: true });
+    // A long touch would otherwise bring up the browser's menu over the tile.
+    grid.addEventListener("contextmenu", (e) => { if ((e.target as Element).closest("[data-tile]")) e.preventDefault(); });
+  }
+
+  /** Turns to Defend with the tree of tile `key` of kind `id` open. */
+  private openTree(id: TileId, key?: string) {
+    const target = tileTree(this.save, id, key);
+    if (!target) return;
+    play("knock");
+    if (this.ctx.openTree(target)) return;
+    this.note = { text: "Upgrade trees open in Defend while building: finish the battle first.", until: performance.now() + 3000 };
+    this.draw();
   }
 
   /** Changes the layout and animates the tiles to it. */
@@ -143,10 +203,13 @@ export class TilesPage {
     shelf.scrollTop = scroll;
     grid.querySelectorAll<HTMLCanvasElement>("canvas[data-icon]").forEach((cv) => paintIcon(cv, cv.dataset.icon as IconItem));
     paintPathIcons(grid);
+    if (this.note && performance.now() > this.note.until) this.note = null;
     const all = tileStacks(s, "all"), placed = all.reduce((a, t) => a + t.placed, 0), count = all.reduce((a, t) => a + (t.lasting ? 0 : t.count), 0);
-    c.querySelector(".tiles-foot")!.innerHTML = shop
+    c.querySelector(".tiles-foot")!.innerHTML = this.note
+      ? `<em>${this.note.text}</em>`
+      : shop
       ? `Paid with Copper, Silver and Gold from the Mine · tap a tile to buy`
-      : `<b>${count}</b> tiles · <b>${placed}</b> standing in the city · <span class="tile-legend"><i class="mark became"></i> became <i class="mark rank"></i> path rank</span> · tap a tile to open it`;
+      : `<b>${count}</b> tiles · <b>${placed}</b> standing in the city · <span class="tile-legend"><i class="mark became"></i> became <i class="mark rank"></i> path rank</span> · tap a tile to open it, hold it for its upgrade tree`;
   }
 
   /** A kind's tiles: one stack when its copies are all alike (or in the
@@ -187,57 +250,49 @@ export class TilesPage {
       : `<i class="mark rank hue-${m.hue}"></i>`).join("")}</span>`;
   }
 
-  /** The opened stack: what the tile is, its copies, buying another, where
-   * its upgrades are made, and its higher tier. */
+  /** The opened tile: its basic stats and the abilities its upgrades give
+   * (the copy tapped, or the stack of alike copies), its copies when they
+   * are all alike, buying another, and where its upgrades are made. */
   private detailHtml(t: TileStack) {
     const s = this.save, offer = shopOffer(s, t.id), name = TILE_NAMES[t.id], { topic } = tileTopic(t.id);
-    // Each set of upgrades its copies carry, in words, with its copies.
-    const copies = t.count && !t.lasting && !universal(t.id)
-      ? `<div class="tile-sets">${tileGroups(s, t).map((g) => `<div class="tile-set">
-          <span class="tile mini type-${t.type}${g.placed ? " placed" : ""}" data-key="detail:${g.key}"><span class="tile-face"><canvas width="32" height="32" data-icon="${iconOf(t.id)}"${g.wear ? pathLook(t.id, g.wear.path) : ""}></canvas>${pathBadge(g.wear)}</span><small>×${g.count}</small></span>
-          <div><b>${marksText(t.id, g.marks)}</b>${this.marksHtml(t.id, g.marks, false)}<small>${g.placed} in the city · ${g.count - g.placed} ready</small></div></div>`).join("")}</div>`
-      : t.count && !t.lasting
-      ? `<div class="tile-copies" aria-label="Each ${name}">${tileCopies(s, t, isConsumable(t.id) ? SHOWN : Infinity).map((copy) =>
-        `<span class="tile mini type-${t.type}${copy.placed ? " placed" : ""}" data-key="${copy.key}" title="${copy.placed ? "Standing in the city" : "Waiting in the palette"}"><span class="tile-face"><canvas width="32" height="32" data-icon="${iconOf(t.id)}"></canvas></span><small>${copy.placed ? "City" : "Ready"}</small></span>`).join("")}${isConsumable(t.id) && t.count > SHOWN ? `<span class="tile-more">+${t.count - SHOWN} more</span>` : ""}</div>`
+    const shop = this.mode === "shop";
+    const copy = shop || universal(t.id) ? undefined : tileCopyAt(s, t, this.focus);
+    const wear = copy?.wear;
+    // Alike copies (a hoard of bombs, the city's pieces) laid out, which stand and which wait.
+    const copies = t.count && !t.lasting && universal(t.id) && !shop
+      ? `<div class="tile-copies" aria-label="Each ${name}">${tileCopies(s, t, isConsumable(t.id) ? SHOWN : Infinity).map((c) =>
+        `<span class="tile mini type-${t.type}${c.placed ? " placed" : ""}" data-key="${c.key}" title="${c.placed ? "Standing in the city" : "Waiting in the palette"}"><span class="tile-face"><canvas width="32" height="32" data-icon="${iconOf(t.id)}"></canvas></span><small>${c.placed ? "City" : "Ready"}</small></span>`).join("")}${isConsumable(t.id) && t.count > SHOWN ? `<span class="tile-more">+${t.count - SHOWN} more</span>` : ""}</div>`
       : "";
     const buy = "reason" in offer
-      ? `<em class="tile-reason">${offer.reason}</em>`
+      ? ""
       : `<button class="tile-buy" data-buy-tile="${t.id}" ${canBuyTile(s, t.id) ? "" : "disabled"}>Buy one<small>${offerText(offer)}</small></button>`;
     const go = (where: "smithy" | "study") => topicHas(topic, where)
       ? `<button class="tile-go go-${where}" data-go="${where}" data-topic="${topic.id}">${where === "smithy" ? "⚒ Smithy" : "✦ Study"}<small>${where === "smithy" ? "below the Mine" : "below the Library"}</small></button>`
       : "";
-    // Where it stands in its upgrade tree: what it was upgraded (or merged)
-    // from, and the ultimate its line merges into.
-    const from = isConsumable(t.id) || t.id === "cityTile" ? undefined : upgradedFrom(t.id as PlacedKind);
-    const tier = higherTier(t.id);
-    const grown = tier.from
-      ? `Merged from three <b>${ITEM_NAMES[tier.from]}</b> buildings, each at the last rank of a different branch: buy ${ITEM_NAMES[rootOf(tier.from)]}s, place them and tap them in Defend to upgrade them with Knowledge.`
-      : from
-      ? `Upgraded from a <b>${ITEM_NAMES[from]}</b>${rootOf(from) !== from ? ` (itself grown from a ${ITEM_NAMES[rootOf(from)]})` : ""}: buy a ${ITEM_NAMES[rootOf(from)]}, place it and tap it in Defend to upgrade it with Knowledge.`
+    const tree = !shop && t.count && tileTree(s, t.id, copy?.key)
+      ? `<button class="tile-go go-tree" data-tree="${t.id}"${copy ? ` data-copy="${copy.key}"` : ""}>♛ Upgrade tree<small>in Defend</small></button>`
       : "";
-    const tierText = `${grown}${tier.into ? `${grown ? " " : ""}Three of its line, each maxed on a different branch, merge into a <b>${ITEM_NAMES[tier.into]}</b>.` : ""}`;
     const counts = t.lasting ? "ONE BANNER" : `OWNED ${t.count}${isConsumable(t.id) ? "" : ` · ${t.placed} IN THE CITY · ${t.ready} READY`}`;
+    const where = copy?.placed ? "IN THE CITY" : "IN THE PALETTE";
+    const sheet = this.sheet(t.id, wear);
     return `<div class="tile-detail type-${t.type}" data-key="detail:${t.id}" data-grow role="region" aria-label="${name}">
-        <header><span class="tile-face big"><canvas width="48" height="48" data-icon="${iconOf(t.id)}"></canvas></span>
-          <div><small>${TILE_TYPE_NAMES[TILE_TYPE[t.id]].toUpperCase()} TILE · ${counts}</small><h3>${name}</h3><p>${this.describe(t.id)}</p></div>
+        <header><span class="tile-face big"><canvas width="48" height="48" data-icon="${iconOf(t.id)}"${wear ? pathLook(t.id, wear.path) : ""}></canvas>${pathBadge(wear)}</span>
+          <div><small>${copy && !this.stacked ? where : `${TILE_TYPE_NAMES[TILE_TYPE[t.id]].toUpperCase()} TILE · ${counts}`}</small><h3>${name}</h3>${sheet.about ? `<p>${sheet.about}</p>` : ""}</div>
           <button class="tile-close" data-close aria-label="Close">×</button></header>
+        ${sheet.stats.length ? `<ul class="tile-stats" aria-label="Stats">${sheet.stats.map((x) => `<li>${x}</li>`).join("")}</ul>` : ""}
+        ${sheet.abilities.length ? `<ul class="tile-abilities" aria-label="Abilities">${sheet.abilities.map((a) => `<li class="hue-${a.hue}">${a.text}.</li>`).join("")}</ul>` : ""}
         ${copies}
-        ${isConsumable(t.id) ? "" : t.id === "wallBlock" ? wallTreeHtml() : t.id === "cityGate" ? gateTreeHtml() : t.id === "wallBallista" ? ballistaTreeHtml() : t.id === "revolutionary" ? revolutionaryTreeHtml() : t.id === "shadow" ? shadowTreeHtml() : upgradeTreeHtml(s, t.id)}
-        <div class="tile-actions">${buy}${go("smithy")}${go("study")}</div>
-        ${tierText ? `<p class="tile-tier"><span aria-hidden="true">♛</span> ${tierText}</p>` : ""}
+        <div class="tile-actions">${buy}${tree}${go("smithy")}${go("study")}</div>
       </div>`;
   }
 
-  private describe(id: TileId) {
-    if (id === "bomb") return CONSUMABLE_TEXT.bomb.replace("around where it lands", `within ${BOMB_RADIUS.toFixed(0)} cells of where it lands`);
-    if (isConsumable(id)) return CONSUMABLE_TEXT[id];
-    if (id === "cityTile") return "Expands the city limits. New tiles must touch the city; the wall moves out to enclose them.";
-    if (id === "cityGate") return GATE_DESCRIPTION;
-    if (id === "wallSpikes") return SPIKES_DESCRIPTION;
-    if (id === "wallBallista") return BALLISTA_DESCRIPTION;
-    if (id === "wallBlock") return WALL_BLOCK_DESCRIPTION;
-    const d = this.save.defend;
-    return `${STRUCTURES[id].description} Takes ${footprintName(footprint(id, d.layout.compact.includes(id)))}.`;
+  /** What tile `id` (wearing `wear`) shows: its basic stats and its
+   * upgrades' abilities; a line saying what it does where it has no numbers. */
+  private sheet(id: TileId, wear?: Wear): StatSheet & { about?: string } {
+    if (id === "bomb") return { stats: [`${Number((BOMB_DAMAGE * bonuses(this.save).bombDamage).toFixed(2))} damage`, `${BOMB_RADIUS.toFixed(1)} cell radius`], abilities: [] };
+    if (isConsumable(id)) return { stats: [], abilities: [], about: CONSUMABLE_TEXT[id] };
+    if (id === "cityTile") return { stats: [], abilities: [], about: "Expands the city limits; the wall moves out to enclose it." };
+    return buildingSheet(this.save, id as PaletteItem | "wallSpikes", wear);
   }
 
   private buy(id: TileId) {
