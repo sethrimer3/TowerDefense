@@ -4,6 +4,30 @@ import { Drawing, type Color, type Ramp } from "./drawing.ts";
 
 type Roof = { x: number; y: number; w: number; h: number; colors: Ramp };
 
+/** Courses follow each roof plane. A whole tile shares its firing/weathering
+ * variation; one-pixel overlaps and staggered joints supply the relief.
+ * Coordinates belong to the intact roof, so damage never reshuffles texture. */
+function roofTile(colors: Ramp, light: number, along: number, slope: number, small = false): Color {
+  const course = Math.floor(slope / 3), offset = (course % 2) * 2;
+  const tile = Math.floor((along + offset) / 4);
+  const variation = (tile * 13 + course * 7 + Math.floor(tile / 3) * 3) % 17;
+  const overlap = slope % 3 === 2;
+  const joint = (along + offset) % 4 === 0 && slope % 3 === 1;
+  if (colors[0] === "redDark") {
+    if (small) return joint ? colors[0] : light > 0 ? variation < 4 ? "tileClay" : colors[2] : variation < 5 ? colors[1] : colors[0];
+    if (light === 0) return overlap || joint ? colors[0] : variation < 5 ? colors[1] : "tileShade";
+    if (overlap || joint) return light === 2 ? "tileClay" : colors[1];
+    if (variation === 2) return "tileWorn";
+    return light === 2 ? variation < 8 ? "tileSun" : colors[2] : variation < 5 ? "tileSun" : "tileClay";
+  }
+  if (colors[0] === "woodDark") {
+    // Split shakes keep their longitudinal grain and staggered end joints.
+    return overlap || joint ? colors[1] : light === 2 ? variation < 4 ? "woodBright" : colors[2] : light === 1 ? variation < 2 ? colors[1] : colors[2] : variation < 2 ? colors[2] : colors[1];
+  }
+  // Pale stone/slate chapel tiles use the same construction at cooler values.
+  return overlap || joint ? "stone" : light > 0 ? variation < 5 ? "stoneLight" : "stoneBright" : variation < 5 ? "stoneLight" : "stone";
+}
+
 function wall(p: Drawing, x: number, y: number, w: number, h: number) {
   p.rect(x, y, w, h, "ink");
   if (w > h) { p.rect(x + 1, y, w - 2, 1, "stoneLight"); p.rect(x + 1, y + 1, w - 2, 1, "stoneDark"); }
@@ -23,7 +47,7 @@ function roofSection(p: Drawing, x: number, y: number, w: number, h: number, col
   for (let yy = 0; yy < h; yy++) {
     const shift = Math.floor(yy / 3), width = w - Math.floor(yy / 4);
     p.rect(x + shift, y + yy, width, 1, "ink");
-    if (yy && yy < h - 1) p.rect(x + shift + 1, y + yy, width - 2, 1, yy < h / 2 ? colors[1] : colors[0]);
+    if (yy && yy < h - 1) for (let xx = 1; xx < width - 1; xx++) p.dot(x + shift + xx, y + yy, roofTile(colors, yy < h / 2 ? 1 : 0, xx, yy));
   }
   p.rect(x + 1, y + 1, Math.max(2, w - 3), 1, colors[2]);
 }
@@ -41,7 +65,7 @@ function breach(x: number, y: number, w: number, h: number, stage: number) {
 
 }
 
-function longhouse(p: Drawing, r: Roof, stage: number, ruin: boolean) {
+function longhouse(p: Drawing, r: Roof, stage: number, ruin: boolean, small = false) {
   const { x, y, w, h, colors } = r, rh = h - 2;
   p.rect(x + 1, y + 1, w - 2, h - 2, "woodDark");
   // Low foundations define the same room after the roof has gone.
@@ -87,14 +111,18 @@ function longhouse(p: Drawing, r: Roof, stage: number, ruin: boolean) {
     const edge = xx === 0 || yy === 0 || xx === w - 1 || yy === rh - 1;
     // Hip planes run from each corner to a short, raised ridge.
     const left = xx < w / 2, hip = Math.min(xx, w - 1 - xx);
-    let color: Color = yy < hip ? colors[2] : rh - 1 - yy < hip ? colors[0] : left ? colors[1] : colors[0];
-    if (!edge && yy > hip && rh - 1 - yy > hip && yy % 6 === 2 && xx >= 2 && xx < Math.min(5, w / 2 - 1)) color = colors[0];
+    const north = yy < hip, south = rh - 1 - yy < hip;
+    const light = north ? 2 : south ? 0 : left ? 1 : 0;
+    const horizontal = north || south || w > rh;
+    const along = horizontal ? xx : yy;
+    const slope = horizontal ? Math.min(yy, rh - 1 - yy) : Math.min(xx, w - 1 - xx);
+    const color = roofTile(colors, light, along, slope, small);
     p.dot(x + xx, y + yy, edge ? "ink" : color);
   }
   if (rh > w) {
-    for (let yy = Math.floor(w / 2); yy < rh - Math.floor(w / 2); yy++) if (!breach(w / 2, yy, w, rh, stage)) p.dot(x + Math.floor(w / 2), y + yy, colors[2]);
+    for (let yy = Math.floor(w / 2); yy < rh - Math.floor(w / 2); yy++) if (!breach(w / 2, yy, w, rh, stage)) p.dot(x + Math.floor(w / 2), y + yy, yy % 3 === 0 ? colors[1] : colors[2]);
   } else {
-    for (let xx = Math.floor(rh / 2); xx < w - Math.floor(rh / 2); xx++) if (!breach(xx, rh / 2, w, rh, stage)) p.dot(x + xx, y + Math.floor(rh / 2), colors[2]);
+    for (let xx = Math.floor(rh / 2); xx < w - Math.floor(rh / 2); xx++) if (!breach(xx, rh / 2, w, rh, stage)) p.dot(x + xx, y + Math.floor(rh / 2), xx % 3 === 0 ? colors[1] : colors[2]);
   }
   if (stage >= 2) {
     // A jagged wall breach opens to the courtyard instead of retaining an
@@ -137,8 +165,8 @@ function barracks(wide: boolean, look: string, stage: number, ruin: boolean, ui:
   const [yx, yy, yw, yh] = yard;
   p.rect(yx, yy, yw, yh, "stoneDark");
   for (let y = yy + 2; y < yy + yh; y += 5) for (let x = yx + 2; x < yx + yw - 1; x += 5) p.rect(x, y, 2, 1, "stone");
-  longhouse(p, main, stage, ruin); longhouse(p, annex, Math.max(0, stage - 1), ruin);
-  longhouse(p, arm, stage < 2 ? 0 : stage - 1, ruin);
+  longhouse(p, main, stage, ruin, ui); longhouse(p, annex, Math.max(0, stage - 1), ruin, ui);
+  longhouse(p, arm, stage < 2 ? 0 : stage - 1, ruin, ui);
   if (wide) {
     wall(p, 14, 27, 7, 2); wall(p, 29, 27, 6, 2);
     p.rect(22, 27, 6, 2, "woodLight");
@@ -191,9 +219,11 @@ function guild(stage: number, ruin: boolean, ui: boolean) {
       if (!outer && (x + y * 2) % 9 === 0) p.dot(e + x, e + y, "woodLight");
       continue;
     }
-    const light = x + y < size - 1;
+    const light = x + y < size - 1 ? 2 : 0;
     const innerEdge = octagon(x - band + 1, y - band + 1, inner + 2, Math.max(2, cut - band) + 1);
-    p.dot(e + x, e + y, outer ? "ink" : rim ? "stoneLight" : innerEdge ? "redDark" : light ? "redLight" : "red");
+    const horizontal = Math.abs(x - (size - 1) / 2) < Math.abs(y - (size - 1) / 2);
+    const along = horizontal ? x : y, slope = horizontal ? Math.min(y, size - 1 - y) : Math.min(x, size - 1 - x);
+    p.dot(e + x, e + y, outer ? "ink" : rim ? "stoneLight" : innerEdge ? "redDark" : roofTile(["redDark", "red", "redLight"], light, along, slope, ui));
     // Eight roof planes read as an arena, instead of another rectangular hall.
     if (!rim && (x === y || x + y === size - 1)) p.dot(e + x, e + y, "redDark");
   }

@@ -8,6 +8,8 @@ Legend: **Audit/redraw** = PNG exists, but style/density/states still require re
 
 **Visual quality revision:** B1 checkmarks record implemented PNG/state routing, not user approval of the artwork. [Art direction 01](ART_DIRECTION_01.md) revises Barracks (normal/wide and paths), Melee Guild and Watch tower with distinct overhead architecture and structural collapse. Their seven PNGs are replaced in place; frame counts and catalog footprints stay unchanged. All other twenty-two families await this architectural/destruction review. The three revised families are a calibration pass for review, not a claim that the whole catalog now meets the desired style.
 
+**Roof-material follow-up:** The user welcomed the revised architecture and clarified that clean pixel art permits realism, texture and color variation. [Roof materials](ROOF_MATERIALS.md) adds clay tile variation, course/joint shading and ridge caps to Barracks normal/wide and Melee Guild, including path materials, damage/ruins and matching UI. Five existing PNGs change; all dimensions/counts stay fixed. The shared palette is now 34 colors, retaining 16-color world and 12-color UI limits. This adds material detail to those two families; the remaining architectural review is unchanged.
+
 ## A. Shared foundation and integration
 
 | ID | Work item | Current source / acceptance requirement |

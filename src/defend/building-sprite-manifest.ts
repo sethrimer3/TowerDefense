@@ -9,6 +9,7 @@ export const BUILDING_PALETTE = {
   steelDark: "#252D36", steel: "#465260", steelLight: "#7B8995", steelBright: "#C2CCD0",
   woodDark: "#34271E", wood: "#60432B", woodLight: "#91643C", woodBright: "#BD925B",
   redDark: "#581F22", red: "#96372E", redLight: "#D85A3C",
+  tileShade: "#78312B", tileClay: "#B54A35", tileSun: "#C65A3E", tileWorn: "#C77650",
   goldDark: "#6D4A23", gold: "#BE8D3D", goldLight: "#F1D58A",
   greenDark: "#253D2A", green: "#476044", greenLight: "#78955B", bright: "#EAE2C9",
   arcaneDark: "#352943", arcane: "#65567D", arcaneLight: "#A391B3",

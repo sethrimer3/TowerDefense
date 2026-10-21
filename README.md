@@ -20,6 +20,8 @@ The [first building batch](docs/art/BUILDING_BATCH_01.md) implements the keep, b
 
 [Art direction 01](docs/art/ART_DIRECTION_01.md) begins a quality revision of those sprites: an overhead barracks compound, octagonal Melee Guild training court and stone Watch tower, with building-specific collapse and matching UI. Catalog coverage is separate from visual approval; the remaining twenty-two families still need this review. Editable architecture lives in `scripts/pixel-art/architecture.ts`, using the shared native drawing primitives in `drawing.ts`.
 
+The [roof-material follow-up](docs/art/ROOF_MATERIALS.md) adds varied clay tiles, overlapping courses and ridge shading to the revised roofed buildings. Clean pixel art means a consistent native pixel grid; believable surface texture and color variation are part of the intended style.
+
 ## Run
 
 Use Node.js 22.18+ (CI uses 24) and npm:
