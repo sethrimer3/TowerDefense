@@ -6,6 +6,7 @@
 // Screenshots go to test-results/ (or SHOTS).
 import { chromium } from '@playwright/test';
 import assert from 'node:assert/strict';
+import { dropAt } from './drag-raise.mjs';
 import { mkdirSync } from 'node:fs';
 const browser = await chromium.launch(process.env.PLAYWRIGHT_EXECUTABLE
   ? { headless: true, executablePath: process.env.PLAYWRIGHT_EXECUTABLE }
@@ -63,6 +64,8 @@ try {
     /** The point in cells at the middle of a footprint `qw` × `qh` quarters
      * with its top left quarter at (qx, qy), on the page. */
     const spot = (qx, qy, qw = 2, qh = 2) => at((qx + qw / 2) * 2, (qy + qh / 2) * 2);
+    /** Where to let go for that footprint to land there. */
+    const drop = (qx, qy, qw = 2, qh = 2) => dropAt(page, (qx + qw / 2) * 2, (qy + qh / 2) * 2);
     const drag = async (a, b, shot) => {
       if (phone) {
         const cdp = await context.newCDPSession(page);
@@ -85,22 +88,22 @@ try {
     const centre = b => ({ x: b.x + b.width / 2, y: b.y + b.height / 2 });
     const tile = page.locator('.defend-item[data-item="meleeGuild"]');
     // Right beside the first guild: refused, shown red.
-    await drag(centre(await tile.boundingBox()), await spot(k.tx * 4 + 2, (k.ty - 1) * 4), `${out}/quarters-${width}-refused.png`);
+    await drag(centre(await tile.boundingBox()), await drop(k.tx * 4 + 2, (k.ty - 1) * 4), `${out}/quarters-${width}-refused.png`);
     let s = await state(page);
     assert.equal(s.defend.layout.structures.filter(o => o.kind === 'meleeGuild').length, 1, 'a guild right beside another is refused');
     // The tile east of the keep, in its bottom right: placed exactly there.
-    await drag(centre(await tile.boundingBox()), await spot((k.tx + 1) * 4 + 2, k.ty * 4 + 2), `${out}/quarters-${width}-dragging.png`);
+    await drag(centre(await tile.boundingBox()), await drop((k.tx + 1) * 4 + 2, k.ty * 4 + 2), `${out}/quarters-${width}-dragging.png`);
     s = await state(page);
     const placed = s.defend.layout.structures.find(o => o.kind === 'meleeGuild' && o.tx === k.tx + 1);
     assert.ok(placed, 'the guild was placed on the tile it was dropped on');
     assert.deepEqual([placed.qx, placed.qy], [(k.tx + 1) * 4 + 2, k.ty * 4 + 2], 'exactly where it was let go');
     // Bait may huddle right beside a building.
-    await drag(centre(await page.locator('.defend-item[data-item="monsterBait"]').boundingBox()), await spot((k.tx + 1) * 4 + 1, k.ty * 4 + 2, 1, 1), `${out}/quarters-${width}-bait.png`);
+    await drag(centre(await page.locator('.defend-item[data-item="monsterBait"]').boundingBox()), await drop((k.tx + 1) * 4 + 1, k.ty * 4 + 2, 1, 1), `${out}/quarters-${width}-bait.png`);
     s = await state(page);
     assert.ok(s.defend.layout.structures.some(o => o.kind === 'monsterBait' && o.qx === (k.tx + 1) * 4 + 1), 'bait stands right beside the guild');
     // The first guild carried to the tile's bottom left.
     const first = s.defend.layout.structures.find(o => o.kind === 'meleeGuild' && o.ty === k.ty - 1);
-    await drag(await spot(first.qx, first.qy), await spot(k.tx * 4, (k.ty - 1) * 4 + 2), `${out}/quarters-${width}-moving.png`);
+    await drag(await spot(first.qx, first.qy), await drop(k.tx * 4, (k.ty - 1) * 4 + 2), `${out}/quarters-${width}-moving.png`);
     s = await state(page);
     const moved = s.defend.layout.structures.find(o => o.uid === first.uid);
     assert.deepEqual([moved.qx, moved.qy], [k.tx * 4, (k.ty - 1) * 4 + 2], 'the placed guild moved to its new spot');
