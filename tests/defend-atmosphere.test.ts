@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Atmosphere, windAt, CLEANUP_DEPTH } from '../src/defend/atmosphere.ts';
+import { Atmosphere, windAt, CLEANUP_DEPTH, SAND_PRESS, DUNE_PERIOD, DUNE_SPEED, DUNE_WAVE, duneAt } from '../src/defend/atmosphere.ts';
 import { DefendSim } from '../src/defend/sim.ts';
 import { defaultLayout, fitLayout, placeCityTile } from '../src/defend/layout.ts';
 import { generateCity } from '../src/defend/citygen.ts';
@@ -8,7 +8,7 @@ import { UPGRADES } from '../src/defend/catalog.ts';
 import { CELLS_W, CELLS_H, CELL_COUNT } from '../src/defend/grid.ts';
 import { SNOW_CAP, STORM_CHANCE, rollWeather, skyLabel, Snow } from '../src/defend/weather.ts';
 import { areaForWave } from '../src/defend/areas.ts';
-import { tumbleweedPixels } from '../src/defend/atmosphere-art.ts';
+import { tumbleweedPixels, dunePixels } from '../src/defend/atmosphere-art.ts';
 import { OUTLINE } from '../src/defend/pixel-fx.ts';
 
 function scene(wave = 21) {
@@ -156,4 +156,58 @@ test('tumbleweeds are twigs in a black outline, turning frame to frame', () => {
     }
   }
   assert.notDeepEqual(a.px, b.px);
+});
+
+test('the dunes are large, creep slowly downwind and leave the sand outside settled into them', () => {
+  const sim = scene(), env = sim.atmosphere!;
+  // Crests stand a whole dune wave apart: several tiles, not a few cells.
+  let crests = 0;
+  for (let y = 0; y < DUNE_PERIOD * 4; y++) if (duneAt(10, y / 4).wave > duneAt(10, (y + 1) / 4).wave) crests++;
+  assert.ok(crests <= DUNE_PERIOD / DUNE_WAVE + 2 && DUNE_WAVE >= 16);
+  for (const [x, y] of [[0, 0], [5.3, 17.1], [40, 90]]) {
+    const a = duneAt(x, y), b = duneAt(x + DUNE_PERIOD, y - DUNE_PERIOD);
+    assert.ok(Math.abs(a.height - b.height) < 1e-6, 'the field tiles');
+  }
+  const before = { ...env.drift };
+  run(sim, 20);
+  const moved = Math.sqrt((env.drift.x - before.x) ** 2 + (env.drift.y - before.y) ** 2);
+  assert.ok(moved > 0 && moved <= DUNE_SPEED * 20 * 1.5 + 1e-9, `drifted ${moved} cells in 20 s`);
+  const i = sim.map.city.findIndex((v, i) => !v && !sim.solid[i]);
+  assert.ok(Math.abs(env.sand[i] - env.duneAt(i)) < .3);
+});
+
+test('the dune sprite tiles seamlessly in opaque sand outlined in black', () => {
+  const { size, data } = dunePixels(), alpha = (x: number, y: number) => data[((y % size) * size + (x % size)) * 4 + 3];
+  let sand = 0, outline = 0;
+  const [r, g, b] = [0x14, 0x0c, 0x0a];
+  for (let i = 0; i < size * size; i++) {
+    assert.ok(data[i * 4 + 3] === 0 || data[i * 4 + 3] === 255);
+    if (!data[i * 4 + 3]) continue;
+    sand++;
+    if (data[i * 4] === r && data[i * 4 + 1] === g && data[i * 4 + 2] === b) outline++;
+  }
+  assert.ok(sand > size * size * .7 && outline > size * 2);
+  // Wherever sand meets the bare floor, across the seam too, the sand pixel is outline.
+  for (let y = 0; y < size; y++) for (const x of [0, size - 1]) {
+    if (alpha(x, y) && !alpha(x + 1, y)) { const k = (y * size + x) * 4; assert.equal(data[k], r); }
+  }
+});
+
+test('sand banked against a building crushes it, but walls and the keep stand firm', () => {
+  const sim = scene(), env = sim.atmosphere!;
+  const beside = (ids: number[]) => [...new Set(ids.flatMap(i => [i - 1, i + 1, i - CELLS_W, i + CELLS_W]))]
+    .filter(j => sim.map.city[j] && !sim.solid[j]);
+  const house = sim.map.buildings.find(b => b.kind === 'house' && sim.hp[b.id] > 0 && beside(b.cells).length >= 3)!;
+  assert.ok(house, 'a house on a street');
+  const banks = beside(house.cells);
+  // A light dusting presses nothing.
+  for (const j of banks) env.sand[j] = SAND_PRESS.depth;
+  env.press(sim); assert.equal(sim.hp[house.id], sim.maxHp[house.id]);
+  for (const j of [...banks, ...beside(sim.map.buildings[sim.keepId].cells)]) env.sand[j] = 3;
+  const keep = sim.hp[sim.keepId];
+  for (let t = 0; t < 120 && sim.hp[house.id] > 0; t++) { for (const j of banks) env.sand[j] = 3; env.press(sim); }
+  assert.ok(sim.hp[house.id] <= 0, 'the house gave way');
+  assert.equal(sim.hp[sim.keepId], keep);
+  const w = wall(sim); for (const j of beside(w.cells)) env.sand[j] = 3;
+  env.press(sim); assert.equal(sim.hp[w.id], sim.maxHp[w.id]);
 });

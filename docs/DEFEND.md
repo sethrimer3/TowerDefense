@@ -748,9 +748,17 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   The wind (`windAt`) holds a compass heading, then eases to the next.
   Mist is fed outside the walls, drifts with the wind, swirls round blasts
   and moving projectiles (blasts also blow holes in it), and seeps through
-  wall stones below 75% HP. Sand lies in dunes that the wind and walking
-  units push about (the board wraps, so dunes march off one edge and in at
-  the other); it never passes standing wall, but pours through a breach.
+  wall stones below 75% HP. Sand lies in great transverse dunes, crests
+  about three tiles apart (`duneAt`, a field tiling every `DUNE_PERIOD`
+  cells), that creep downwind at `DUNE_SPEED` (a twentieth of a cell a
+  second, so a dune takes minutes to pass) and wrap round the board; walking
+  units push the sand about, and outside the city it settles back into the
+  dunes. It never passes standing wall, but pours through a breach,
+  and sand banked deep enough against a house or structure (`SAND_PRESS`)
+  crushes it a little each second until it collapses; walls, gates, ballista
+  bastions and the keep stand firm. The
+  dunes are drawn from one baked, black-outlined sprite tiled at the drift,
+  recomposed only when it moves a whole pixel.
   Sand in the city at `CLEANUP_DEPTH` or more is a civilian job of the
   lowest priority, dropped whenever repairs are waiting. Grains and
   tumbleweeds (black-outlined pixel sprites) blow along the wind. Leaving
