@@ -432,7 +432,7 @@ Every path row requires each rank's icon **and** its actual building/unit/spell 
 | [ ] | `keep` / `arrowLoops` | Arrow loops | `arrow`, `bow`, `volley` |
 | [ ] | `keep` / `boilingOil` | Boiling oil | `flame`, `embers`, `fireball` |
 | [ ] | `walls` / `stonework` | Stonework | `hammer`, `mail`, `heart` |
-| [ ] | `walls` / `thornwork` | Thornwork | `stake`, `shards`, `snowflake` |
+| [ ] | `walls` / `trapped` | Trapped walls | `cannonball`, `fireball`, `flame` |
 | [ ] | `walls` / `townWalls` | Town walls | `crate`, `boot` |
 | [ ] | `gate` / `portcullis` | Portcullis | `mail`, `cannonball`, `flame` |
 | [ ] | `gate` / `gateTowers` | Gate towers | `crosshair`, `volley`, `arrow` |

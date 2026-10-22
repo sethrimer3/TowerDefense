@@ -9,7 +9,7 @@ import type { Save } from "../save.ts";
 import { TROOPS, allocated, attunedOf, mergePartners, rootOf, hasTree, buildingTree, fullTree, undoRefund, undoTo, type Partner, type TreeNode, type UpgradeStep, type Wear } from "../specializations.ts";
 import type { GraphNode } from "./upgrade-graph.ts";
 import { ARROW_LOOPS, BASTIONS, BOILING_OIL, KEEP_PATHS, keepAllocated, keepRank, respecKeep, undoKeep, upgradeKeep, type KeepPathId, type KeepRanks } from "../keep-upgrades.ts";
-import { STONEWORK, THORNWORK, TOWN_WALLS, WALL_PATHS, respecWalls, undoWalls, upgradeWalls, wallAllocated, wallRank, type WallPathId, type WallRanks } from "../wall-upgrades.ts";
+import { STONEWORK, TOWN_WALLS, TRAPPED, WALL_PATHS, respecWalls, undoWalls, upgradeWalls, wallAllocated, wallRank, type WallPathId, type WallRanks } from "../wall-upgrades.ts";
 import { sideRank, type SidePath, type SideRanks } from "../side-ranks.ts";
 import { GATE_PATHS, GATE_TOWERS, IRONBOUND, PORTCULLIS, gateAllocated, gateBarred, gateRank, respecGate, undoGate, upgradeGate, type GatePathId, type GateRanks } from "../gate-upgrades.ts";
 import { SHADOW_BLEED, SHADOW_EDGE, SHADOW_KNIVES, SHADOW_PATHS, SHADOW_PIERCE, respecShadow, shadowAllocated, shadowRank, undoShadow, upgradeShadow, type ShadowPathId, type ShadowRanks } from "../shadow-upgrades.ts";
@@ -448,10 +448,10 @@ export const wallStep = (ranks: WallRanks | undefined, id: string) => sideStep(W
 /** A placed wall stone's numbers with `ranks`, and the shared Smithy and
  * skill bonuses. */
 export function wallStats(save: Save, ranks: WallRanks | undefined): string {
-  const b = bonuses(save), stone = wallRank(ranks, "stonework"), thorns = wallRank(ranks, "thornwork"), town = wallRank(ranks, "townWalls");
+  const b = bonuses(save), stone = wallRank(ranks, "stonework"), trap = wallRank(ranks, "trapped"), town = wallRank(ranks, "townWalls");
   const parts = [`${Math.round(wallHp(save.defend.levels.wallStrength) * b.wallHp * STONEWORK.hp[stone]).toLocaleString("en")} HP a stone`];
   if (stone >= 3) parts.push(`mends ${STONEWORK.mend * 100}% a second`);
-  if (thorns) parts.push(`${THORNWORK.damage[thorns]} thorn damage every ${THORNWORK.every[thorns]}s${thorns >= 3 ? ` · ${THORNWORK.chill}s slow` : ""}`);
+  if (trap) parts.push(`bursts as it breaks: ${TRAPPED.damage[trap]} damage over ${TRAPPED.radius[trap]} cells${trap >= 3 ? ` · burns ${TRAPPED.fire}s` : ""}`);
   parts.push(town >= TOWN_WALLS.posterns ? "inside or outside the city · your people pass through" : town >= TOWN_WALLS.inside ? "inside or outside the city" : "outside the city");
   return parts.join(" · ");
 }

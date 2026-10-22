@@ -157,7 +157,7 @@ test("an opened tile shows its basic stats, then each upgrade it carries as an a
   assert.equal(fire.stats.length, buildingSheet(s, "archerTower").stats.length);
   assert.equal(fire.abilities.length, 3);
   // Shared trees list every rank bought.
-  s.defend.wallRanks = { stonework: 2, thornwork: 1 };
+  s.defend.wallRanks = { stonework: 2, trapped: 1 };
   const walls = buildingSheet(s, "wallBlock");
   assert.equal(walls.stats.length, 1);
   assert.equal(walls.abilities.length, 3);

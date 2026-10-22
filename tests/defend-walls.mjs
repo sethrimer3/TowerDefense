@@ -117,12 +117,12 @@ try {
       await page.waitForTimeout(150);
     };
     await buy('q:stonework:1');
-    await buy('q:thornwork:1');
+    await buy('q:trapped:1');
     await buy('q:townWalls:1');
     await page.waitForTimeout(500);
     await page.screenshot({ path: `${out}/walls-${width}-tree.png` });
     s = await state(page);
-    assert.deepEqual(s.defend.wallRanks, { stonework: 1, thornwork: 1, townWalls: 1 });
+    assert.deepEqual(s.defend.wallRanks, { stonework: 1, trapped: 1, townWalls: 1 });
     assert.equal(s.defend.layout.innerWalls, true);
     await press(panel.locator('[data-specialty-close]'));
     await page.waitForTimeout(200);
@@ -143,7 +143,7 @@ try {
       return { pieces: sim.pieces.length, walls: sim.bonuses.walls };
     });
     assert.ok(fought.pieces >= 40, `the placed walls' stones (${fought.pieces})`);
-    assert.deepEqual(fought.walls, { stonework: 1, thornwork: 1, townWalls: 1 });
+    assert.deepEqual(fought.walls, { stonework: 1, trapped: 1, townWalls: 1 });
     // A band of orcs north of the line of walls, a few seconds on.
     await page.evaluate(() => {
       const sim = window.__dp.sim, k = sim.keep.rect;

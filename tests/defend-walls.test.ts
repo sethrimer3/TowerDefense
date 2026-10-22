@@ -27,7 +27,7 @@ import { generateCity } from "../src/defend/citygen.ts";
 import { DefendSim, type Enemy } from "../src/defend/sim.ts";
 import { bonuses } from "../src/progression.ts";
 import { NO_BONUSES, purchasePrice } from "../src/defend/catalog.ts";
-import { STONEWORK, THORNWORK, WALL_PATHS, respecWalls, upgradeWalls, wallAllocated, withInnerWalls } from "../src/wall-upgrades.ts";
+import { STONEWORK, TRAPPED, WALL_PATHS, decodeWallRanks, respecWalls, upgradeWalls, wallAllocated, withInnerWalls } from "../src/wall-upgrades.ts";
 import { wallCardHtml, wallGraph, wallStep } from "../src/ui/specialty.ts";
 import { available } from "../src/defend/progress.ts";
 
@@ -158,9 +158,9 @@ test("the walls' branches climb side by side, and a respec gives back the Knowle
   const s = defaults();
   s.knowledge = 1e6;
   for (const p of WALL_PATHS) assert.ok(upgradeWalls(s, p.id).ok, p.id);
-  assert.deepEqual(s.defend.wallRanks, { stonework: 1, thornwork: 1, townWalls: 1 });
+  assert.deepEqual(s.defend.wallRanks, { stonework: 1, trapped: 1, townWalls: 1 });
   assert.equal(s.defend.layout.innerWalls, true, "Inner walls opens the city to them");
-  assert.equal(bonuses(s).walls?.thornwork, 1);
+  assert.equal(bonuses(s).walls?.trapped, 1);
   const k = keepOf(s.defend.layout);
   s.defend.layout = placeWall(s.defend.layout, q(k.tx, k.ty, 3, 3))!;
   assert.ok(s.defend.layout);
@@ -203,16 +203,29 @@ test("Stonework hardens and mends placed walls, not the city's", () => {
   assert.ok(stone.hp[piece.id] > stone.maxHp[piece.id] / 2, "it mends");
 });
 
-test("Thornwork cuts enemies touching a placed wall, and slows them at III", () => {
-  const sim = battle({ thornwork: 3 });
+test("Trapped walls burst once as a placed stone breaks, and burn at III", () => {
+  const sim = battle({ trapped: 3 });
   const b = sim.pieces[0], i = b.cells[0];
   const x = (i % CELLS_W) + 0.5, y = Math.floor(i / CELLS_W) + 0.5;
   const e = enemyAt(sim, x - 0.8, y);
   const far = enemyAt(sim, x - 6, y);
-  (sim as any).stepAttacks(0.01);
-  assert.equal(e.hp, 1e6 - THORNWORK.damage[3]);
-  assert.ok((e.chill ?? 0) > 0);
+  sim.update(0.5);
+  assert.equal(e.hp, 1e6, "nothing until it breaks");
+  sim.damageBuilding(b.id, 1e9);
+  assert.ok(1e6 - e.hp >= TRAPPED.damage[3] * 0.4, "the burst");
   assert.equal(far.hp, 1e6);
+  assert.equal(sim.blazes.length, 1, "the ground burns");
+  const after = e.hp;
+  sim.damageBuilding(b.id, 1e9);
+  assert.equal(e.hp, after, "a broken stone bursts only once");
+  const plain = battle();
+  const pe = enemyAt(plain, x - 0.8, y);
+  plain.damageBuilding(plain.pieces[0].id, 1e9);
+  assert.equal(pe.hp, 1e6, "untrapped walls just fall");
+});
+
+test("Thornwork ranks carry over to Trapped walls", () => {
+  assert.deepEqual(decodeWallRanks({ stonework: 2, thornwork: 3 }), { stonework: 2, trapped: 3 });
 });
 
 test("Posterns let the city's own people through placed walls; enemies are still stopped", () => {
