@@ -87,6 +87,8 @@ export type DefendHost = {
   setHealthbars?(value: boolean): void;
   /** Whether the palette lists items the player has none of. */
   showEmpty?(): boolean;
+  /** Whether dragged items ride above the pointer. */
+  raiseDrag?(): boolean;
   /** Opens the Tiles tab, where tiles (buildings and consumables) are bought. */
   openTiles?(): void;
 };
@@ -129,6 +131,7 @@ export class DefendPage {
     drop: (drop) => this.drop(drop),
     tap: (e) => this.tap(e),
     hold: (edit) => this.hold(edit.drag),
+    raise: () => !!this.host.raiseDrag?.(),
   });
   /** The building the player tapped (its id in the map), outlined with its
    * reach and troops, and what its reach is reckoned from before a battle. */

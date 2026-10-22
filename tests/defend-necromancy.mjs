@@ -1,6 +1,6 @@
 import { chromium } from '@playwright/test';
 import assert from 'node:assert/strict';
-import { RAISE } from './drag-raise.mjs';
+import { raiseOf } from './drag-raise.mjs';
 import { mkdirSync } from 'node:fs';
 
 // The Necromancy spell in the browser, on the isolated stress fixture (no
@@ -41,8 +41,8 @@ try {
     const b = await spell.boundingBox();
     await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
     await page.mouse.down();
-    // Let go `RAISE` cells below the graves: the spell rides above the pointer.
-    const aim = await page.evaluate(({ x, y }) => window.stressPage.renderer.toClient(x, y), { x: at.x, y: at.y + RAISE });
+    // Let go below the graves by as far as the spell rides above the pointer.
+    const aim = await page.evaluate(({ x, y }) => window.stressPage.renderer.toClient(x, y), { x: at.x, y: at.y + await raiseOf(page, 'stressPage') });
     await page.mouse.move(aim.x, aim.y, { steps: 8 });
     await page.evaluate(() => window.stressPage.draw(false));
     await page.screenshot({ path: `test-results/defend-necromancy-aim-${width}.png` });

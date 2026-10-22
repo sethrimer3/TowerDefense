@@ -33,6 +33,8 @@ export type PointerHost = {
   tap?(e: PointerEvent): void;
   /** A drag held still for `HOLD_MS`; true when the page took it, ending the drag. */
   hold?(edit: EditSession): boolean;
+  /** Whether a held item rides `RAISE` cells above the pointer. */
+  raise?(): boolean;
 };
 
 /** How far (CSS pixels) a pointer may move and still tap. */
@@ -41,8 +43,9 @@ const TAP_SLOP = 8;
 export const HOLD_MS = 450;
 /** How long (ms) a press on a city tile must stay put to lift it. */
 export const LIFT_MS = 500;
-/** How far (in cells) above the pointer a held item rides, so the finger
- * doesn't hide where it goes: four quarter tiles of the board's grid. */
+/** How far (in cells) above the pointer a held item rides, while the
+ * setting is on, so the finger doesn't hide where it goes: four quarter
+ * tiles of the board's grid. */
 export const RAISE = 4 * QC;
 
 type Point = { x: number; y: number };
@@ -65,6 +68,11 @@ export class BoardPointers {
     window.addEventListener("pointermove", (e) => this.move(e));
     window.addEventListener("pointerup", (e) => this.up(e));
     window.addEventListener("pointercancel", (e) => this.cancel(e));
+  }
+
+  /** How far (in cells) above the pointer a held item rides now. */
+  get raise(): number {
+    return this.host.raise?.() ? RAISE : 0;
   }
 
   /** The drag in progress, if any. */
@@ -150,10 +158,11 @@ export class BoardPointers {
     const renderer = this.host.renderer();
     if (!this.held || !renderer) return null;
     const c = eventCell(renderer, e);
-    // The item rides `RAISE` cells above the pointer, kept on the board so
+    // The item rides `raise` cells above the pointer, kept on the board so
     // its top rows stay in reach; the pointer still says whether it is over
     // the board or the palette.
-    const fy = c.inside ? Math.max(0, c.fy - RAISE) : c.fy - RAISE;
+    const raise = this.raise;
+    const fy = c.inside ? Math.max(0, c.fy - raise) : c.fy - raise;
     const ghost = renderer.toClient(c.fx, fy);
     this.held.ghost.style.left = `${e.clientX}px`;
     this.held.ghost.style.top = `${e.clientY + ghost.y - renderer.toClient(c.fx, c.fy).y}px`;
