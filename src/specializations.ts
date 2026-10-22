@@ -15,8 +15,8 @@
  *    or lancer stable; a musket hall, machine-gun nest or rocket battery);
  *  - three buildings of one attuned kind, each at the last rank of a
  *    different branch, merge into its ultimate (`Attuned.ultimate`: the Dark
- *    wizard keep, the Hero, the Valkyrie palace, the Sniper lodge, the
- *    Gatling emplacement). The one whose tree the merge is bought in becomes
+ *    wizard keep, the Hero, the Shadow, the Valkyrie palace, the Sniper
+ *    lodge, the Gatling emplacement, C4 nanobots). The one whose tree the merge is bought in becomes
  *    it; the other two are used up. Lines without an ultimate yet show it
  *    to come.
  *
@@ -55,7 +55,7 @@ export type Attuned = { kind: PlacedKind; from: PlacedKind; cost: number; branch
 
 export const ATTUNED: Attuned[] = [
   { kind: "archerTower", from: "watchTower", cost: 3, branches: [{ path: "fireArrows" }, { path: "sharpshooters" }] },
-  { kind: "cannonTower", from: "watchTower", cost: 6, branches: [{ path: "gunnery" }, { path: "siegeShot" }] },
+  { kind: "cannonTower", from: "watchTower", cost: 6, branches: [{ path: "gunnery" }, { path: "siegeShot" }], ultimate: "nanoTower" },
   { kind: "wizardTower", from: "watchTower", cost: 8, branches: [{ path: "pyromancy" }, { path: "rime" }, { path: "storm" }], ultimate: "darkKeep" },
   { kind: "barracks", from: "meleeGuild", cost: 4, branches: [{ path: "crusaders" }, { path: "berserkers" }, { path: "halberdiers" }], ultimate: "heroHall" },
   { kind: "assassinDen", from: "meleeGuild", cost: 6, branches: [{ path: "bloodletters" }, { path: "shadowcloak" }, { path: "venom" }], ultimate: "shadow" },

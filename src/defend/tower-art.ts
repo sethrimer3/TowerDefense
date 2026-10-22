@@ -31,6 +31,9 @@
  *   and a sheaf of arrows.
  * - Cannon tower: a round bastion, the gun on its carriage pointing north
  *   and a stack of shot.
+ * - C4 nanobots: a squat bunker of gunmetal plates ringed by hazard
+ *   stripes, a huge mortar in the middle whose bore glows with the green
+ *   swarm, four nanobot tanks at its corners and a blinking red light.
  * - Watch tower: a square tower with a beacon burning in an iron brazier.
  * - Wizard tower: a round tower under an eight-sided violet roof, runes
  *   glowing round the eaves and a gold finial.
@@ -120,6 +123,9 @@ const C = {
 /** The Revolutionary's blued gunmetal, dark to light, and its laser glow. */
 const TECH = [0x141a24, 0x222c3c, 0x34445a, 0x55708e];
 const GLOW = [0x2ab8d8, 0x6ff2ff, 0xd8fcff];
+/** The nanobots' green glow, dark to light, and the hazard stripes' yellow. */
+const NANO = [0x16502c, 0x2fa45a, 0x6ff29a, 0xd4ffe2];
+const HAZARD = 0xe8c03a;
 
 /** What each structure's damage throws down and its rubble is made of. */
 const MATERIAL: Record<PlacedKind, { m: Material; ruin: Pick<Ruin, "stone" | "top" | "beams" | "round"> }> = {
@@ -143,6 +149,7 @@ const MATERIAL: Record<PlacedKind, { m: Material; ruin: Pick<Ruin, "stone" | "to
   archerBarracks: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: [0x4a3826, C.timber, 0x8e7048], beams: true } },
   archerTower: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.plank.slice(0, 3), beams: true } },
   cannonTower: { m: { tones: STONE, roofed: false }, ruin: { stone: STONE, top: C.iron.slice(1), beams: false, round: true } },
+  nanoTower: { m: { tones: TECH.slice(1, 4), roofed: false }, ruin: { stone: TECH.slice(0, 3), top: [TECH[1], HAZARD, NANO[1]], beams: false } },
   watchTower: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.plank.slice(0, 3), beams: true } },
   wizardTower: { m: { tones: C.pale.slice(0, 3), roofed: true }, ruin: { stone: C.pale.slice(0, 3), top: C.slate.slice(0, 3), beams: true, round: true } },
   mageGuild: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.wine.slice(0, 3), beams: true } },
@@ -205,7 +212,7 @@ export function structureRubblePixels(kind: PlacedKind, cw: number, ch: number, 
   return rubblePixels(w, h, hash(seed, KINDS.indexOf(kind), 3), { ...frame(w, h), ...MATERIAL[kind].ruin });
 }
 
-const KINDS: PlacedKind[] = ["barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "meleeGuild", "rangedGuild", "sniperLodge", "musketHall", "assassinDen", "gunHall", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "spearHall", "phalanx", "javelinCamp", "lancerStable", "heroHall", "shadow"];
+const KINDS: PlacedKind[] = ["barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "meleeGuild", "rangedGuild", "sniperLodge", "musketHall", "assassinDen", "gunHall", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "spearHall", "phalanx", "javelinCamp", "lancerStable", "heroHall", "shadow", "nanoTower"];
 
 const PAINT: Record<PlacedKind, (p: Pix, look: string) => void> = {
   meleeGuild: paintMeleeGuild,
@@ -228,6 +235,7 @@ const PAINT: Record<PlacedKind, (p: Pix, look: string) => void> = {
   archerBarracks: paintArcherBarracks,
   archerTower: paintArcherTower,
   cannonTower: paintCannonTower,
+  nanoTower: paintNanoTower,
   watchTower: paintWatchTower,
   wizardTower: paintWizardTower,
   mageGuild: paintMageGuild,
@@ -1075,6 +1083,63 @@ function paintArcherTower(p: Pix, look: string) {
   p.set(f.x1 - 1, f.y0, C.fire[1]);
   for (let y = 0; y < p.h; y++)
     for (let x = 0; x < p.w; x++) if (p.get(x, y) === C.stone[0] && hash(x, y, 47) % 2 === 0) p.set(x, y, C.ember);
+}
+
+/** C4 nanobots: a gunmetal bunker ringed by hazard stripes, a huge mortar
+ * whose bore glows with the swarm, a tank of nanobots at each corner. */
+function paintNanoTower(p: Pix) {
+  const { x0, y0, x1, y1 } = frame(p.w, p.h);
+  // The bunker's chamfered body: plates lit from the upper left.
+  const cut = 5;
+  for (let y = y0; y <= y1; y++)
+    for (let x = x0; x <= x1; x++) {
+      const c = Math.min(x - x0, x1 - x) + Math.min(y - y0, y1 - y);
+      if (c < cut) continue;
+      const ring = Math.min(x - x0, y - y0, x1 - x, y1 - y, c - cut);
+      if (ring === 0) p.set(x, y, OUTLINE);
+      else if (ring <= 2) p.set(x, y, Math.floor((x + y) / 3) % 2 ? HAZARD : OUTLINE);
+      else if (ring === 3) p.set(x, y, OUTLINE);
+      else {
+        const seam = (x - x0) % 6 === 0 || (y - y0) % 6 === 0;
+        const sunny = x - x0 < y1 - y && y - y0 < x1 - x;
+        p.set(x, y, seam ? TECH[0] : sunny ? TECH[2] : TECH[1]);
+      }
+    }
+  const cx = (x0 + x1 + 1) / 2, cy = (y0 + y1 + 1) / 2;
+  // Pipes from each tank to the mortar's ring, two pixels wide.
+  for (let i = 6; i <= 10; i++)
+    for (const [ux, uy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+      const x = Math.floor(cx + ux * i), y = Math.floor(cy + uy * i);
+      p.set(x, y, TECH[3]);
+      p.set(x + 1, y, OUTLINE);
+      p.set(x, y + 1, i % 2 ? NANO[1] : TECH[0]);
+    }
+  // The tanks at the corners: glass cylinders seen from above, swirling green.
+  for (const [ux, uy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+    const tx = cx + ux * 13, ty = cy + uy * 13;
+    disc(p, tx, ty, 4, (x, y, d, dx, dy) => (d > 3.2 ? OUTLINE : d > 2.4 ? TECH[Math.min(3, 1 + lit(x, y, dx, dy, d))] : hash(x, y, 77) % 3 ? NANO[1] : NANO[2]));
+    p.set(Math.floor(tx) - 1, Math.floor(ty) - 1, NANO[3]);
+  }
+  // The mortar: a heavy lit iron ring round a bore glowing with the swarm.
+  disc(p, cx, cy, 8.5, (x, y, d, dx, dy) => {
+    if (d > 7.7) return OUTLINE;
+    if (d > 5.2) return C.iron[1 + Math.min(2, lit(x, y, dx, dy, d))];
+    if (d > 4.4) return OUTLINE;
+    if (d > 3) return NANO[0];
+    return hash(x, y, 91) % 4 === 0 ? NANO[3] : d > 1.6 ? NANO[1] : NANO[2];
+  });
+  // A stack of shells by the south wall: grey canisters with green bands.
+  for (let i = 0; i < 3; i++) {
+    const sx = Math.floor(cx) - 4 + i * 3, sy = y1 - 8;
+    rect(p, sx - 1, sy - 1, sx + 1, sy + 3, OUTLINE);
+    p.set(sx, sy, C.iron[3]);
+    p.set(sx, sy + 1, NANO[2]);
+    p.set(sx, sy + 2, C.iron[2]);
+  }
+  // The blinking red light on its mast, to the north-west of the mortar.
+  const mx = Math.floor(cx) - 7, my = y0 + 6;
+  for (let y = my; y <= my + 3; y++) p.set(mx, y, TECH[3]);
+  disc(p, mx + 0.5, my - 0.5, 1.5, (_x, _y, d) => (d > 1 ? OUTLINE : 0xff4a3a));
 }
 
 function paintCannonTower(p: Pix, look: string) {

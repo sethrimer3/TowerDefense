@@ -7,6 +7,7 @@ import { wallBallistaRange } from "./wall-defenses.ts";
 import type { Building, CityMap } from "./citygen.ts";
 import { center } from "./pathing.ts";
 import { watchReach, type DefendSim } from "./sim.ts";
+import { nanoRange } from "./nanobots.ts";
 import { archerTowerRange, cannonTowerRange, keepArrowRange, keepOilReach } from "./towers.ts";
 import { wizardReach } from "./wizard.ts";
 
@@ -28,6 +29,7 @@ export function reachOf(b: Building, armed: Armed): Circle[] {
   switch (b.kind) {
     case "archerTower": return at(archerTowerRange(armed, b));
     case "cannonTower": return at(cannonTowerRange(armed, b));
+    case "nanoTower": return at(nanoRange());
     case "wizardTower": return at(wizardReach(armed, b));
     case "watchTower": return at(watchReach(armed, b));
     case "wallBallista": return at(wallBallistaRange(armed));

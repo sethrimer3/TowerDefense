@@ -22,6 +22,7 @@ import { drawStabs, drawValkyrie } from "./valkyrie-art.ts";
 import { drawHero, drawSwings } from "./hero-art.ts";
 import { drawMeleeCape } from "./melee-cape.ts";
 import { drawBlades, drawShade } from "./shade-art.ts";
+import { drawNano } from "./nano-art.ts";
 import { drawDarkWizard } from "./dark-art.ts";
 import { drawRaisings, drawRisen } from "./necro-art.ts";
 import { drawImpacts, drawMeteors } from "./meteor-art.ts";
@@ -134,6 +135,7 @@ export function drawUnits(b: Brush, sim: DefendSim, torches: Burning | null, hea
   drawStabs(b.c, b.px, sim);
   drawSwings(b.c, b.px, sim);
   drawBlades(b.c, b.px, sim);
+  drawNano(b.c, b.px, sim);
   drawRaisings(b.c, b.px, sim);
   for (const fx of sim.effects) drawEffect(b, fx);
   drawImpacts(b.c, b.px, sim);

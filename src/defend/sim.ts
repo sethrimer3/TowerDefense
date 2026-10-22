@@ -56,6 +56,7 @@ import { ignite, stepArrows, stepShells, Towers } from "./towers.ts";
 import { FORTIFY, SHATTER, SIGNAL, SPOTTERS, pathRank } from "../knowledge-paths.ts";
 import { Barracks, stepArcher, stepSwordsman } from "./troops.ts";
 import { cloaked, spreadVenom, stepVenom } from "./assassins.ts";
+import { nanoDeath, stepNano, type Infection, type NanoBurst, type NanoCloud, type NanoShell } from "./nanobots.ts";
 import { perched } from "./gun-sight.ts";
 import { hopliteGuard } from "./spears.ts";
 import { heroRises, stepHero, stepSwings, type Swing } from "./hero.ts";
@@ -135,6 +136,9 @@ export type Enemy = {
   /** A Hemorrhage knife's cut: damage a second and seconds left; absent
    * when not bleeding (`shadow.ts`). */
   bleed?: { dps: number; t: number };
+  /** C4 nanobots in it: the blast it makes as it dies (`nanobots.ts`);
+   * absent when not infected. */
+  nano?: Infection;
   breath?: { dx: number; dy: number; t: number };
   /** What a siege engine is shooting at; absent while it rolls on. */
   aim?: SiegeAim;
@@ -352,6 +356,11 @@ export class DefendSim {
   swings: Swing[] = [];
   /** The shades' knives looping out and back (presentation; not replayed). */
   blades: Blade[] = [];
+  /** C4 nanobots' shells in flight, their clouds, and infected enemies just
+   * dead waiting to burst (`nanobots.ts`); empty without the tower. */
+  nanoShells: NanoShell[] = [];
+  nanoClouds: NanoCloud[] = [];
+  nanoBursts: NanoBurst[] = [];
   /** Cloudborne Valkyrie palaces drifting across the sky (`sky-palace.ts`); empty without any. */
   skyPalaces: SkyPalace[] = [];
   /** Black lightning from dark keeps' turrets and dark wizards, fading. */
@@ -611,6 +620,7 @@ export class DefendSim {
     stepPlacedWalls(this, dt);
     stepGates(this, dt);
     stepShells(this, dt);
+    stepNano(this, dt);
     stepSiegeShots(this, dt);
     this.wizards.step(this, dt);
     stepFlames(this, this.wizards, dt);
@@ -645,6 +655,7 @@ export class DefendSim {
       if (e.fortressParts) for (const part of e.fortressParts) part.hp = 0;
       bury(this, e);
       frostDeath(this, e);
+      nanoDeath(this, e);
       if (!e.fortressPart && !ENEMIES[e.kind].fortress && !ENEMIES[e.kind].hatched && e.kind !== "ashPhoenix" && this.corpses.length < MAX_WAVE_ENEMIES) this.corpses.push({ x: e.x, y: e.y, life: 10, hp: Math.max(1, e.maxHp * .4), damage: ENEMIES[e.kind].damage * .4 });
       if (e.kind === "ashPhoenix" && !e.reborn) {
         const egg = this.spawnAuxiliary("phoenixEgg", e.x, e.y);
