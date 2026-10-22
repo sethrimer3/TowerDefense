@@ -1185,13 +1185,26 @@ export class DefendSim {
     if (at && this.bannerRemaining > 0) return false;
     if (at) this.bannerReadyAt = this.time + this.bannerCooldown;
     this.warBanner = at ? new WarBanner(at.x, at.y) : null;
+    this.rethink();
+    return true;
+  }
+
+  /** Plants a rally flag at `at`, free and with no cooldown, in place of the
+   * war banner or any other flag: troops march to it as to the banner, but
+   * it lends them nothing. */
+  plantFlag(at: Point) {
+    this.warBanner = new WarBanner(at.x, at.y, true);
+    this.rethink();
+  }
+
+  /** Every troop rethinks at once, after the banner moves. */
+  private rethink() {
     for (const s of this.soldiers) {
       stepBannerLife(this, s, 0);
       s.thinkT = 0;
       s.path = [];
       s.target = -1;
     }
-    return true;
   }
 }
 

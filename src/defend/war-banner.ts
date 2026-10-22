@@ -5,7 +5,9 @@
  * it, as far as it can get (up to the wall when the banner stands beyond
  * it), and once there closes on the nearest enemy within `RALLY_REACH` of
  * it. Planting it again moves it; taking it down sends the troops back to
- * their usual ways. It draws nothing from the run's random stream, and a
+ * their usual ways. A rally flag (`flag`), planted free by a double tap, is
+ * the same march with none of the banner's influence; either replaces the
+ * other. It draws nothing from the run's random stream, and a
  * run without one plays exactly as before. */
 import { dist, sq } from "../exact.ts";
 import { CELL_COUNT, CELLS_W, cellInBounds, cellIndex } from "./grid.ts";
@@ -27,7 +29,7 @@ const LEG = 8;
 export const MARCH_SIGHT = 2.5;
 
 export const bannerReach = (sim: DefendSim) => sim.bonuses.banner?.reach ?? RALLY_REACH;
-export const bannerInfluence = (sim: DefendSim, at: Point) => !!sim.warBanner && sq(at.x - sim.warBanner.x) + sq(at.y - sim.warBanner.y) <= sq(bannerReach(sim));
+export const bannerInfluence = (sim: DefendSim, at: Point) => !!sim.warBanner && !sim.warBanner.flag && sq(at.x - sim.warBanner.x) + sq(at.y - sim.warBanner.y) <= sq(bannerReach(sim));
 export const bannerDamage = (sim: DefendSim, s: Soldier) => s.damage * (sim.bonuses.banner && sim.bonuses.banner.damage !== 1 && bannerInfluence(sim, s) ? sim.bonuses.banner.damage : 1);
 /** Preserve health percentage on both transitions; moving the banner cannot heal. */
 export function stepBannerLife(sim: DefendSim, s: Soldier, dt: number) {
@@ -45,7 +47,14 @@ export class WarBanner {
   readonly field = new Float64Array(CELL_COUNT);
   private due = -Infinity;
 
-  constructor(readonly x: number, readonly y: number) {}
+  /** `flag`: a rally flag, which lends its troops nothing. */
+  constructor(readonly x: number, readonly y: number, readonly flag = false) {}
+
+  /** How far round it rallied troops seek out enemies: the banner's
+   * researched reach, or a rally flag's plain `RALLY_REACH`. */
+  reach(sim: DefendSim) {
+    return this.flag ? RALLY_REACH : bannerReach(sim);
+  }
 
   /** Refreshes the walking field once a second of battle time. */
   refresh(sim: DefendSim) {
@@ -104,8 +113,9 @@ export class WarBanner {
   foe(sim: DefendSim, s: Soldier, sight: number): Enemy | null {
     const close = sight > 0 ? nearest(sim.enemiesNear(s.x, s.y, sight), s, sight * sight, true) : null;
     if (close) return close;
-    if (sq(s.x - this.x) + sq(s.y - this.y) > sq(bannerReach(sim))) return null;
-    return nearest(sim.enemiesNear(this.x, this.y, bannerReach(sim)), s, Infinity, true);
+    const reach = this.reach(sim);
+    if (sq(s.x - this.x) + sq(s.y - this.y) > sq(reach)) return null;
+    return nearest(sim.enemiesNear(this.x, this.y, reach), s, Infinity, true);
   }
 }
 
@@ -118,7 +128,7 @@ export function answerBanner(sim: DefendSim, banner: WarBanner, s: Soldier, spee
     s.thinkT = 0.5;
     foe = banner.foe(sim, s, sight);
     s.target = foe ? foe.id : -1;
-    s.path = foe ? (findPath(sim.ownSolid, s, foe, { maxCost: bannerReach(sim) * 3, maxNodes: 600 }) ?? []) : banner.reached(s) ? [] : banner.route(sim, s);
+    s.path = foe ? (findPath(sim.ownSolid, s, foe, { maxCost: banner.reach(sim) * 3, maxNodes: 600 }) ?? []) : banner.reached(s) ? [] : banner.route(sim, s);
   }
-  sim.followPath(s, foe, speed * (!foe && !banner.reached(s) ? sim.bonuses.banner?.march ?? 1 : 1), dt);
+  sim.followPath(s, foe, speed * (!foe && !banner.flag && !banner.reached(s) ? sim.bonuses.banner?.march ?? 1 : 1), dt);
 }

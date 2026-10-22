@@ -27,7 +27,7 @@ import { UnitOutline } from "./unit-outline.ts";
 import { carriedLights, drawDamage, drawScorches, drawUnits, shadowCasters, type Brush, type Burning } from "./battle-art.ts";
 import { drawGrid, drawLifting, drawOverlay, type Overlay } from "./edit-overlay.ts";
 import { drawInspect, type Armed } from "./inspect.ts";
-import { drawFlag, drawWarBanner } from "./structure-art.ts";
+import { drawFlag, drawRallyFlag, drawWarBanner } from "./structure-art.ts";
 import { bannerReach } from "./war-banner.ts";
 import { ParkGrass, type Walker } from "./park-grass.ts";
 import { PondWater } from "./pond-water.ts";
@@ -280,7 +280,8 @@ export class DefendRenderer {
     if (opts.effects ?? true) this.drawSmoke(map, sim, opts);
     // Cloudborne palaces sail over everything on the ground.
     this.sky.draw(this.ctx, this.px, map, sim, opts.looks, { now: opts.now, dt, reduceMotion: opts.reduceMotion, night: opts.night });
-    if (sim?.warBanner && !opts.hideBanner) drawWarBanner(this.ctx, this.px, sim.warBanner, bannerReach(sim), { t: opts.now / 1000, reduceMotion: opts.reduceMotion });
+    if (sim?.warBanner?.flag && !opts.hideBanner) drawRallyFlag(this.ctx, this.px, sim.warBanner, { t: opts.now / 1000, reduceMotion: opts.reduceMotion });
+    else if (sim?.warBanner && !opts.hideBanner) drawWarBanner(this.ctx, this.px, sim.warBanner, bannerReach(sim), { t: opts.now / 1000, reduceMotion: opts.reduceMotion });
     if (sim) this.wizard.drawFire(this.ctx, this.px);
     if (opts.inspect) drawInspect(this.ctx, this.px, map, sim, opts.inspect.id, opts.inspect.armed, opts.now, opts.reduceMotion);
     this.drawEditing(overlay, opts.grid);
