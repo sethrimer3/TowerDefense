@@ -30,3 +30,5 @@ TEST_URL=http://127.0.0.1:5200/ PLAYWRIGHT_EXECUTABLE=/usr/bin/chromium node tes
 ```
 
 The tests check exact lengths and long-gap resets, per-building/spell tailoring, ranged exclusions, backward/reversing geometry, trim pixels, movement, reduced motion, repeated toggles, Simple Troops, merged outlines and unchanged unit state. The browser gallery covers desktop and phone sizes and reports a bounded 250-cape timing sample. A comparison against the previous Hero renderer produced identical pixels across 540 moving/spinning frames.
+
+Final validation, after retaining the latest fire/ice, grave and Infantry updates from main: all **641 Node tests** and the TypeScript/Vite build passed. The desktop/phone cape matrix, existing Hero battle/tree matrix and Reinforcements drop/landing/Study checks passed. The final synthetic cape-only 250-unit sample reported p95 20.3ms at desktop size and 22.7ms at phone size in headless Chromium; this is renderer work, not a full-battle FPS measurement. The build retains its existing large-chunk warning. No gameplay golden was re-recorded.
