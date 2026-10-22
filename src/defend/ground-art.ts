@@ -66,6 +66,10 @@ function noise(x: number, y: number, scale: number, salt: number) {
 }
 
 const isGrass = (t: number) => t === CellType.PARK || t === CellType.WATER;
+/** Street dirt: the streets, and the lots of the player's structures, so a
+ * sprite smaller than its lot stands on the street around it rather than
+ * on a square of its own. */
+const isDirt = (t: number) => t === CellType.ROAD || t === CellType.STRUCT;
 
 /** The nearest cell (of the eight round (cx, cy)) passing `want`, from art
  * pixel centre (x, y): its distance in art pixels, and which cell. */
@@ -87,7 +91,7 @@ function bake(map: CityMap): GroundArt {
   for (let cy = 0; cy < CELLS_H; cy++)
     for (let cx = 0; cx < CELLS_W; cx++) {
       const t = map.type[cellIndex(cx, cy)];
-      if (t === CellType.ROAD) paintStreet(map, px, turf, cx, cy);
+      if (isDirt(t)) paintStreet(map, px, turf, cx, cy);
       else if (t === CellType.PARK) paintBare(map, px, bare, cx, cy);
     }
   // Where the edge turns steeply, a bare park pixel can still touch turf
@@ -160,9 +164,9 @@ function dirt(map: CityMap, cx: number, cy: number, mx: number, my: number, x: n
   // Blotches of two browns, their edges dithered.
   const blot = noise(x, y, 6, 421) + (((x + y) & 1) - 0.5) * 0.08;
   let shade = blot > 0.55 ? 3 : 2;
-  // Darker against the kerbs (houses, walls, structures), worn lighter
-  // down the middle of the way.
-  const kerb = nearest(map, cx, cy, mx, my, (t) => t !== CellType.ROAD && !isGrass(t)).d;
+  // Darker against the kerbs (houses and walls), worn lighter down the
+  // middle of the way.
+  const kerb = nearest(map, cx, cy, mx, my, (t) => !isDirt(t) && !isGrass(t)).d;
   if (kerb < 1.2 || (kerb < 2.2 && h < 0.5)) shade = 1;
   else if (kerb > 9 && noise(x, y, 4, 422) > 0.62) shade = 4;
   if (h > 0.94) shade = Math.min(4, shade + 1);
@@ -176,7 +180,7 @@ function paintBare(map: CityMap, px: Uint32Array, bare: Uint8Array, cx: number, 
   for (let j = 0; j < ART; j++)
     for (let i = 0; i < ART; i++) {
       const x = cx * ART + i, y = cy * ART + j;
-      const road = nearest(map, cx, cy, x + 0.5, y + 0.5, (t) => t === CellType.ROAD).d;
+      const road = nearest(map, cx, cy, x + 0.5, y + 0.5, isDirt).d;
       if (road > ART) continue;
       // How far past the edge, on its dirt side (negative: still grass).
       const g = -edge(x, y) - road;

@@ -919,6 +919,7 @@ export class DefendPage {
       looks: this.looks(),
       gate: this.save.gateRanks,
       over: this.phase === "over",
+      shimmer: this.phase === "build" && !this.sim,
       ...(lifting ? { lifting } : {}),
       ...(this.picked ? { inspect: { id: this.picked.id, armed: this.sim ?? this.picked.armed } } : {}),
       hideBanner: this.phase === "over" || (this.pointers.session?.drag.from === "banner" && !!this.pointers.session.drag.placed),
