@@ -118,7 +118,10 @@ export function capePixels(c: Cape, ox: number, oy: number, per: number, time: n
       }
       if (along < 0) continue;
       const half = CUT.shoulder + ((CUT.hem - CUT.shoulder) * along) / length, a = Math.abs(side);
-      if (a > half) continue;
+      // At a folded joint, the nearest point can be a link's endpoint.
+      // Perpendicular distance to its infinite line ignores the overshoot
+      // and paints long spikes; use distance to the finite link instead.
+      if (best > half * half) continue;
       const hem = length - CUT.notch + (CUT.notch * a) / half;
       if (along > hem) continue;
       const l = side / half;

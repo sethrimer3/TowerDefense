@@ -13,7 +13,7 @@ import { generateCity } from "../src/defend/citygen.ts";
 import { Barracks } from "../src/defend/troops.ts";
 import { HERO, STRUCTURES, type EnemyKind } from "../src/defend/catalog.ts";
 import { combo, stepHero } from "../src/defend/hero.ts";
-import { CAPE, newCape, stepCape, type Cape } from "../src/defend/hero-cape.ts";
+import { CAPE, CAPE_EDGE, CUT, capePixels, newCape, stepCape, type Cape } from "../src/defend/hero-cape.ts";
 import { PATH_LOOKS, structurePixels } from "../src/defend/tower-art.ts";
 import { kindStats } from "../src/ui/specialty.ts";
 
@@ -240,4 +240,36 @@ test("the Hero's cape hangs, streams out behind it as it runs and whirls round i
   const after = Math.atan2(spun.y[tip] - 10, spun.x[tip] - 10);
   assert.ok(after - before > 0.5, `whirled round, ${before} to ${after}`);
   for (const d of links(spun)) assert.ok(Math.abs(d - CAPE.link) < 1e-9);
+});
+
+test("the cape's painted cloth stays within its width when the Hero backs into it or reverses", () => {
+  // The sprite renderer uses eleven native pixels per cell for this Hero.
+  const per = 11, start = 10;
+  for (const motion of ["forward", "backward", "reverse", "sideways", "spin"] as const) {
+    const cape = newCape(start, start, 0, 1.7);
+    for (let frame = 1; frame <= 120; frame++) {
+      const time = frame / 60;
+      const x = start + (motion === "sideways" ? 3 * time : 0);
+      const y = start + (motion === "forward" ? -3 * time : motion === "backward" ? 3 * time : motion === "reverse" ? (frame <= 60 ? -3 * time : -3 + 3 * (time - 1)) : 0);
+      stepCape(cape, x, y, time, motion === "spin" ? 1 : 0);
+      const ox = x - 5.5 / per, oy = y - 5 / per;
+      const p = capePixels(cape, ox, oy, per, time);
+      let filled = 0;
+      for (let j = 0; j < p.h; j++) for (let i = 0; i < p.w; i++) {
+        const tone = p.tone[j * p.w + i];
+        if (!tone) continue;
+        filled++;
+        const qx = (p.x0 + i + 0.5) / per + ox, qy = (p.y0 + j + 0.5) / per + oy;
+        let distance = Infinity;
+        for (let k = 1; k < CAPE.points; k++) {
+          const ax = cape.x[k - 1], ay = cape.y[k - 1], dx = cape.x[k] - ax, dy = cape.y[k] - ay;
+          const t = Math.max(0, Math.min(1, ((qx - ax) * dx + (qy - ay) * dy) / (dx * dx + dy * dy)));
+          distance = Math.min(distance, Math.hypot(qx - ax - t * dx, qy - ay - t * dy) * per);
+        }
+        const limit = CUT.hem + (tone === CAPE_EDGE ? 1 : 0);
+        assert.ok(distance <= limit + 1e-8, `${motion} frame ${frame}: painted pixel ${distance.toFixed(2)} from cloth, limit ${limit}`);
+      }
+      assert.ok(filled > 0, `${motion} frame ${frame} still draws the cape`);
+    }
+  }
 });
