@@ -37,6 +37,9 @@ export type Overlay = {
   /** A strike spell being aimed: centre, reach, and (filled in by the page)
    * the fallen it would raise there. */
   spell?: { x: number; y: number; r: number; souls?: { x: number; y: number }[]; look?: "meteor" | "frost" | "reinforce"; spots?: { x: number; y: number; look: string }[] } | null;
+  /** Necromancy being held: every grave on the board, each marked with a
+   * skull wherever the spell is aimed (or before it is over the board). */
+  graves?: { x: number; y: number }[];
   /** Tiles across the block the item takes (unset: 1). A larger item's
    * `legal` and `hover` keys are the top left tiles of its blocks. */
   span?: number;
@@ -76,7 +79,33 @@ export function drawOverlay(c: CanvasRenderingContext2D, px: number, o: Overlay)
   if (o.spell?.look === "meteor") drawMeteorReach(c, px, o.spell);
   else if (o.spell?.look === "frost") drawFrostReach(c, px, o.spell);
   else if (o.spell?.look === "reinforce") drawReinforceReach(c, px, o.spell);
-  else if (o.spell) drawSpellReach(c, px, o.spell);
+  else if (o.spell) drawSpellReach(c, px, o.spell, !!o.graves);
+  if (o.graves?.length) drawSkulls(c, px, o.graves, o.spell?.look ? undefined : o.spell?.souls);
+}
+
+/** A grave's skull, art pixels row by row: 1 bone; the gaps inside are the
+ * outline's black (eyes, nose, between the teeth). */
+const SKULL = ["01110", "11111", "10101", "11011", "01010"];
+const SKULL_BONE = SKULL.flatMap((row, y) => [...row].flatMap((b, x) => (b === "1" ? [[x, y]] : [])));
+
+/** A small black-outlined pixel skull over every grave, bright over those
+ * the aimed spell would raise and paler elsewhere, in two batched fills. */
+function drawSkulls(c: CanvasRenderingContext2D, px: number, graves: { x: number; y: number }[], souls?: { x: number; y: number }[]) {
+  const a = Math.max(2, Math.round(px * 0.13)), raised = new Set(souls);
+  const paths = { outline: new Path2D(), dim: new Path2D(), lit: new Path2D() };
+  for (const g of graves) {
+    const x0 = Math.round(g.x * px) - Math.floor(2.5 * a), y0 = Math.round(g.y * px) - Math.floor(2.5 * a);
+    paths.outline.rect(x0 - a, y0 - a, 7 * a, 6 * a);
+    paths.outline.rect(x0, y0 + 5 * a, 5 * a, a);
+    const bone = raised.has(g) ? paths.lit : paths.dim;
+    for (const [x, y] of SKULL_BONE) bone.rect(x0 + x * a, y0 + y * a, a, a);
+  }
+  c.fillStyle = "#0b0907";
+  c.fill(paths.outline);
+  c.fillStyle = "#d8d0bd";
+  c.fill(paths.dim);
+  c.fillStyle = "#e9ffe8";
+  c.fill(paths.lit);
 }
 
 /** A city tile held to lift: a gold square, black outlined, grown from the
@@ -236,8 +265,8 @@ function drawRallyReach(c: CanvasRenderingContext2D, px: number, at: { x: number
 }
 
 /** The Necromancy spell's reach, in grave green, with a pale mark over each
- * fallen enemy it would raise. */
-function drawSpellReach(c: CanvasRenderingContext2D, px: number, at: NonNullable<Overlay["spell"]>) {
+ * fallen enemy it would raise (unless the skulls of `graves` mark them). */
+function drawSpellReach(c: CanvasRenderingContext2D, px: number, at: NonNullable<Overlay["spell"]>, graved = false) {
   c.strokeStyle = "rgba(141,255,166,0.9)";
   c.fillStyle = "rgba(63,154,92,0.16)";
   c.lineWidth = Math.max(1, px * 0.12);
@@ -245,6 +274,7 @@ function drawSpellReach(c: CanvasRenderingContext2D, px: number, at: NonNullable
   c.arc(at.x * px, at.y * px, at.r * px, 0, Math.PI * 2);
   c.fill();
   c.stroke();
+  if (graved) return;
   const d = Math.max(2, Math.round(px * 0.25));
   for (const s of at.souls ?? []) {
     const x = Math.round(s.x * px - d / 2), y = Math.round(s.y * px - d / 2);
@@ -266,7 +296,7 @@ function drawMeteorReach(c: CanvasRenderingContext2D, px: number, at: { x: numbe
   c.fill();
   c.stroke();
   c.setLineDash([]);
-  const d = Math.max(3, Math.round(px * 0.35)), w = Math.max(1, Math.round(px * 0.1));
+  const d = Math.max(3, Math.round(px * 0.35)), w = Math.max(2, Math.round(px * 0.13));
   const x = Math.round(at.x * px), y = Math.round(at.y * px);
   c.fillStyle = "#140c0a";
   c.fillRect(x - d - 1, y - w - 1, 2 * d + 2, 2 * w + 2);
@@ -288,7 +318,7 @@ function drawFrostReach(c: CanvasRenderingContext2D, px: number, at: { x: number
   c.stroke();
   c.setLineDash([]);
   // A pixel snowflake: a plus and an x, outlined in black.
-  const k = Math.max(1, Math.round(px * 0.1)), x = Math.round(at.x * px), y = Math.round(at.y * px);
+  const k = Math.max(2, Math.round(px * 0.13)), x = Math.round(at.x * px), y = Math.round(at.y * px);
   const arms: [number, number][] = [];
   for (let i = -3; i <= 3; i++) arms.push([i, 0], [0, i]);
   for (let i = -2; i <= 2; i++) if (i) arms.push([i, i], [i, -i]);

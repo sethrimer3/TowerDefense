@@ -1,6 +1,7 @@
 /** DEFEND's Necromancy, a strike spell: cast from the Skills palette onto
  * the board, it raises every enemy that died within `NECRO.radius` cells of
- * where it lands (in the last `NECRO.graveLife` seconds) as a friendly
+ * where it lands (in the last `NECRO.graveLife` seconds, longer with the
+ * Smithy's Grave time, `Bonuses.graveTime`) as a friendly
  * undead warrior, one a fallen enemy, then waits `NECRO.cooldown` seconds of
  * battle time before it can be cast again. The risen hunt the nearest enemy
  * anywhere on the board and crumble after `NECRO.life` seconds.
@@ -26,7 +27,7 @@ import type { DefendSim, Enemy, Soldier } from "./sim.ts";
  * most risen at once, how long one lasts, and a warrior's stats, as strong
  * as an enemy of `difficulty`. */
 export const NECRO = {
-  radius: 3, cooldown: 30, graveLife: 30, maxGraves: 4000, maxRisen: 60, life: 60,
+  radius: 3, cooldown: 30, graveLife: 10, maxGraves: 4000, maxRisen: 60, life: 60,
   hp: 30, damage: 5, attack: 0.9, speed: 1.7, reach: 0.7, size: 0.4, sight: 8, difficulty: 4,
 };
 /** Seconds the cast's flare and rising wisps are drawn. */
@@ -47,7 +48,7 @@ const CITYWIDE: PathLimits = { maxCost: 1e9, maxNodes: CELL_COUNT };
 export function bury(sim: DefendSim, e: Enemy) {
   if (e.fortressPart) return;
   if (sim.graves.length >= NECRO.maxGraves) sim.graves.shift();
-  sim.graves.push({ x: e.x, y: e.y, difficulty: ENEMIES[e.kind].cost, life: NECRO.graveLife });
+  sim.graves.push({ x: e.x, y: e.y, difficulty: ENEMIES[e.kind].cost, life: NECRO.graveLife * sim.bonuses.graveTime });
 }
 
 /** Graves age; the old can no longer be raised. Raisings fade. */

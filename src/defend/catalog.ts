@@ -940,6 +940,8 @@ export type Bonuses = {
   /** HP and damage of the warriors the Necromancy spell raises. */
   undeadHp: number;
   undeadDamage: number;
+  /** How long the fallen can still be raised by Necromancy. */
+  graveTime: number;
   /** The Necromancy spell's Study path and rank; absent when cast plain. */
   necromancy?: { path: PathId; rank: number };
   /** The Meteor strike's damage and blast radius. */
@@ -981,7 +983,7 @@ export type Bonuses = {
   shadow?: ShadowRanks;
 };
 export const NO_BONUSES: Readonly<Bonuses> = Object.freeze({
-  troopHp: 1, troopDamage: 1, drill: 1, towerDamage: 1, towerReload: 1, wallHp: 1, keepHp: 1, rebuild: 1, bombDamage: 1, undeadHp: 1, undeadDamage: 1, meteorDamage: 1, meteorRadius: 1, frostTime: 1, frostRadius: 1, reinforceHp: 1, reinforceDamage: 1, reinforceTime: 1,
+  troopHp: 1, troopDamage: 1, drill: 1, towerDamage: 1, towerReload: 1, wallHp: 1, keepHp: 1, rebuild: 1, bombDamage: 1, undeadHp: 1, undeadDamage: 1, graveTime: 1, meteorDamage: 1, meteorRadius: 1, frostTime: 1, frostRadius: 1, reinforceHp: 1, reinforceDamage: 1, reinforceTime: 1,
 });
 
 export const SOLDIER = { hp: 40, damage: 6, cooldown: 0.8, speed: 2.4, reach: 0.75, leash: 16, size: 0.4, color: "#5b8fd9" };

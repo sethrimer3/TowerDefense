@@ -93,6 +93,21 @@ test("the Smithy's rows make the risen tougher and harder hitting", () => {
   assert.equal(risen(sim)[0].damage, NECRO.damage * 1.2);
 });
 
+test("graves last 10 seconds, and the Smithy's Grave time makes it 20 then 30", () => {
+  const s = defaults();
+  s.settings.devMode = true;
+  const lives: number[] = [];
+  for (let rank = 0; rank <= 2; rank++) {
+    if (rank) train(s, "graveTime");
+    const sim = battle({ graveTime: bonuses(s).graveTime }), at = field(sim);
+    slay(sim, at, ["orc"]);
+    lives.push(sim.graves[0].life);
+  }
+  assert.deepEqual(lives, [10, 20, 30]);
+  assert.equal(NECRO.graveLife, 10);
+  assert.equal(trainingStep(s, "graveTime").maxed, true);
+});
+
 test("risen warriors fight the nearest enemy and crumble when their time is up", () => {
   const sim = battle(), at = field(sim);
   slay(sim, at, ["orc"]);
