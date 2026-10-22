@@ -52,7 +52,7 @@ Recent rows are available as `window.defendPerformance`; they are not saved.
   what is owned but not yet placed; it greys out at `×0`. The button at its
   head (`☰ All`) opens a list of categories, and the palette shows only the
   one picked: **All**, **Towers** (archer, cannon, watch and wizard towers),
-  **Units** (barracks, archer barracks, Mage Guild, Valkyrie palace, dark
+  **Infantry** (barracks, archer barracks, Mage Guild, Valkyrie palace, dark
   wizard keep) or **City** (city tiles, monster bait, city gates, wall
   spikes and wall ballistas;
   `ITEM_CATEGORY` in `catalog.ts`). The city tile's icon is a corner of the

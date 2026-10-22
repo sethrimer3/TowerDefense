@@ -74,7 +74,7 @@ export const SUBJECTS: Subject[] = [
     ],
   },
   {
-    id: "units", name: "Units", sprite: "health", blurb: "The buildings that train your people.",
+    id: "units", name: "Infantry", sprite: "health", blurb: "The buildings that train your people.",
     topics: [
       {
         id: "barracks", name: "Barracks", item: "barracks", upgrades: ["soldierReach"],

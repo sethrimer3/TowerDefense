@@ -27,7 +27,7 @@ export type PaletteCategory = "all" | "towers" | "units" | "city";
 export const PALETTE_CATEGORIES: { id: PaletteCategory; name: string }[] = [
   { id: "all", name: "All" },
   { id: "towers", name: "Towers" },
-  { id: "units", name: "Units" },
+  { id: "units", name: "Infantry" },
   { id: "city", name: "City" },
 ];
 /** Which category each palette item belongs to: towers shoot, unit
