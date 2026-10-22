@@ -13,11 +13,11 @@ import type { BattlePaths, PathId } from "../knowledge-paths.ts";
  * copper, silver and Gold, the universal upgrades, the bonuses the Smithy and the
  * skill trees add, and the enemy roster. */
 
-export type StructureKind = "keep" | "meleeGuild" | "rangedGuild" | "assassinDen" | "spearHall" | "phalanx" | "javelinCamp" | "lancerStable" | "barracks" | "heroHall" | "shadow" | "archerBarracks" | "sniperLodge" | "gunHall" | "musketHall" | "gunNest" | "gatlingNest" | "rocketBattery" | "revolutionary" | "archerTower" | "cannonTower" | "nanoTower" | "watchTower" | "wizardTower" | "mageGuild" | "valkyriePalace" | "darkKeep" | "monsterBait";
+export type StructureKind = "keep" | "meleeGuild" | "rangedGuild" | "assassinDen" | "spearHall" | "phalanx" | "javelinCamp" | "lancerStable" | "barracks" | "heroHall" | "shadow" | "archerBarracks" | "sniperLodge" | "gunHall" | "musketHall" | "gunNest" | "gatlingNest" | "rocketBattery" | "revolutionary" | "archerTower" | "cannonTower" | "nanoTower" | "watchTower" | "wizardTower" | "pyreTower" | "frostTower" | "stormTower" | "mageGuild" | "valkyriePalace" | "darkKeep" | "monsterBait";
 /** Everything that appears in the build palette (the keep is placed from the
  * start and can only be moved, so it is not a palette item). */
 export type PaletteItem = "cityTile" | "cityGate" | "wallSpikes" | "wallBallista" | "wallBlock" | Exclude<StructureKind, "keep">;
-export const PALETTE_ITEMS: PaletteItem[] = ["cityTile", "meleeGuild", "rangedGuild", "barracks", "heroHall", "assassinDen", "shadow", "spearHall", "phalanx", "javelinCamp", "lancerStable", "archerBarracks", "gunHall", "musketHall", "sniperLodge", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "watchTower", "archerTower", "cannonTower", "nanoTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "wallBlock", "cityGate", "wallSpikes", "wallBallista"];
+export const PALETTE_ITEMS: PaletteItem[] = ["cityTile", "meleeGuild", "rangedGuild", "barracks", "heroHall", "assassinDen", "shadow", "spearHall", "phalanx", "javelinCamp", "lancerStable", "archerBarracks", "gunHall", "musketHall", "sniperLodge", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "watchTower", "archerTower", "cannonTower", "nanoTower", "wizardTower", "pyreTower", "frostTower", "stormTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "wallBlock", "cityGate", "wallSpikes", "wallBallista"];
 /** The only buildings the shop sells: every other tower or troop building
  * is one of these upgraded, a building at a time, with Knowledge
  * (`building-upgrades.ts`). */
@@ -45,6 +45,9 @@ export const ITEM_CATEGORY: Record<PaletteItem, Exclude<PaletteCategory, "all">>
   nanoTower: "towers",
   watchTower: "towers",
   wizardTower: "towers",
+  pyreTower: "towers",
+  frostTower: "towers",
+  stormTower: "towers",
   meleeGuild: "units",
   rangedGuild: "units",
   barracks: "units",
@@ -68,6 +71,10 @@ export const ITEM_CATEGORY: Record<PaletteItem, Exclude<PaletteCategory, "all">>
   darkKeep: "units",
 };
 export const inCategory = (item: PaletteItem, category: PaletteCategory) => category === "all" || ITEM_CATEGORY[item] === category;
+/** The wizard tower and the towers its branches make of it, which all cast
+ * through `wizard.ts`. */
+export const WIZARD_TOWERS: readonly StructureKind[] = ["wizardTower", "pyreTower", "frostTower", "stormTower"];
+export const isWizardTower = (kind: string) => (WIZARD_TOWERS as readonly string[]).includes(kind);
 
 /** The city gate: 3 cells along the wall and its 2 cells deep, worth the
  * wall stones it stands in for, and some. It swings open while any of the
@@ -333,6 +340,33 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     outsideOk: true,
     description: "Alternates between a roaring flamethrower and a wave of ice shards that chills everything it crosses.",
   },
+  pyreTower: {
+    kind: "pyreTower",
+    name: "Pyre tower",
+    w: 2,
+    h: 2,
+    maxHp: 130,
+    outsideOk: true,
+    description: "A wizard tower given over to fire: it gives up its ice and only breathes its flamethrower.",
+  },
+  frostTower: {
+    kind: "frostTower",
+    name: "Frost tower",
+    w: 2,
+    h: 2,
+    maxHp: 130,
+    outsideOk: true,
+    description: "A wizard tower given over to ice: it gives up its flames, and its waves of ice shards come twice as often.",
+  },
+  stormTower: {
+    kind: "stormTower",
+    name: "Storm tower",
+    w: 2,
+    h: 2,
+    maxHp: 130,
+    outsideOk: true,
+    description: "A wizard tower that calls lightning in place of flames: each bolt leaps through 2 enemies, alternating with its ice.",
+  },
   mageGuild: {
     kind: "mageGuild",
     name: "Mage Guild",
@@ -415,6 +449,9 @@ export const STARTING_OWNED: Record<PaletteItem, number> = {
   nanoTower: 0,
   watchTower: 1,
   wizardTower: 0,
+  pyreTower: 0,
+  frostTower: 0,
+  stormTower: 0,
   mageGuild: 0,
   valkyriePalace: 0,
   darkKeep: 0,
@@ -457,6 +494,9 @@ export function purchasePrice(item: PaletteItem, owned: number): Price {
     nanoTower: { copper: 25, silver: 6, gold: 2 },
     watchTower: { copper: 3 },
     wizardTower: { copper: 8 },
+    pyreTower: { copper: 9 },
+    frostTower: { copper: 9 },
+    stormTower: { copper: 10 },
     mageGuild: { copper: 9 },
     valkyriePalace: { copper: 12, silver: 2 },
     darkKeep: { copper: 25, silver: 8, gold: 2 },
@@ -500,6 +540,9 @@ export const ITEM_NAMES: Record<PaletteItem, string> = {
   nanoTower: STRUCTURES.nanoTower.name,
   watchTower: STRUCTURES.watchTower.name,
   wizardTower: STRUCTURES.wizardTower.name,
+  pyreTower: STRUCTURES.pyreTower.name,
+  frostTower: STRUCTURES.frostTower.name,
+  stormTower: STRUCTURES.stormTower.name,
   mageGuild: STRUCTURES.mageGuild.name,
   valkyriePalace: STRUCTURES.valkyriePalace.name,
   darkKeep: STRUCTURES.darkKeep.name,

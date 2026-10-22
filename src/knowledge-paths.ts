@@ -6,7 +6,7 @@ import { cloneLayout, type PlacedKind } from "./defend/layout.ts";
 import type { Save } from "./save.ts";
 import { studyPathCost } from "./economy.ts";
 
-export type PathTopic = "wizardTower" | "barracks" | "heroHall" | "valkyriePalace" | "assassinDen" | "spearHall" | "phalanx" | "javelinCamp" | "lancerStable" | "musketHall" | "gunHall" | "gunNest" | "gatlingNest" | "rocketBattery" | "sniperLodge" | "archerTower" | "cannonTower" | "archerBarracks" | "watchTower" | "mageGuild" | "bait" | "spikes" | SpellId;
+export type PathTopic = "pyreTower" | "frostTower" | "stormTower" | "wizardTower" | "barracks" | "heroHall" | "valkyriePalace" | "assassinDen" | "spearHall" | "phalanx" | "javelinCamp" | "lancerStable" | "musketHall" | "gunHall" | "gunNest" | "gatlingNest" | "rocketBattery" | "sniperLodge" | "archerTower" | "cannonTower" | "archerBarracks" | "watchTower" | "mageGuild" | "bait" | "spikes" | SpellId;
 /** Strike spells: cast from the battle's Skills palette rather than built,
  * so a spell has no cards; it casts with the one path `save.spellPaths`
  * names, at its furthest researched rank. */
@@ -58,15 +58,15 @@ export type KnowledgePath = {
 };
 
 // ── What each rank does in battle ─────────────────────────────────────────
-/** Pyromancy: flames only, hotter (by rank), longer from II, burning longer at III. */
+/** Pyromancy, the Pyre tower's path (flames only): hotter (by rank), longer from II, burning longer at III. */
 export const PYRO = { damage: [1, 1.3, 1.3, 1.8], reach: 1.5, burn: 1.5 };
-/** Rime: ice only, chill lasting longer; harder and further from II;
+/** Rime, the Frost tower's path (ice only, twice as often): chill lasting longer; harder and further from II;
  * freezing solid at III for `freeze` seconds. */
 export const RIME = { chill: 1.5, damage: 1.6, reach: 1.5, freeze: 1.2 };
-/** Stormcalling: a chain bolt in place of each flame, striking up to
- * `links[rank]` enemies `jump[rank]` cells apart for `damage` times the
+/** Stormcalling, the Storm tower's path: a chain bolt in place of each
+ * flame (the tower's own at rank 0), striking up to `links[rank]` enemies `jump[rank]` cells apart for `damage` times the
  * flame's damage a second, half again at III. */
-export const STORM = { links: [0, 3, 5, 7], jump: [0, 2.5, 3, 3.5], damage: 1.2, surge: 1.5 };
+export const STORM = { links: [2, 3, 5, 7], jump: [2, 2.5, 3, 3.5], damage: 1.2, surge: 1.5 };
 /** Crusaders: heavier (HP by rank, slower), healing from II, harder hitting at III. */
 export const CRUSADE = { hp: [1, 1.5, 1.5, 2.2], speed: 0.85, heal: 3, damage: 1.5 };
 /** Berserkers: strokes come in `cooldown` of the time; from II every kill
@@ -345,25 +345,25 @@ export const OATH = { wall: 0.1, near: 2, wallMax: 0.3, time: 2, heal: 0.2, stan
 
 export const PATHS: KnowledgePath[] = [
   {
-    id: "pyromancy", topic: "wizardTower", name: "Pyromancy", motto: "Flames only, far hotter", hue: "ember",
+    id: "pyromancy", topic: "pyreTower", name: "Pyromancy", motto: "Flames only, far hotter", hue: "ember",
     ranks: [
-      { name: "Kindling", icon: "flame", cost: studyPathCost(4, 0), text: "The tower gives up its ice and burns 30% hotter" },
+      { name: "Kindling", icon: "flame", cost: studyPathCost(4, 0), text: "Its flames burn 30% hotter" },
       { name: "Long tongues", icon: "tongue", cost: studyPathCost(4, 1), text: "Its flames reach 1.5 cells further" },
       { name: "Inferno", icon: "inferno", cost: studyPathCost(4, 2), text: "Flames burn 80% hotter in all and half again as long" },
     ],
   },
   {
-    id: "rime", topic: "wizardTower", name: "Rime", motto: "Ice only, then frozen solid", hue: "frost",
+    id: "rime", topic: "frostTower", name: "Rime", motto: "Ice only, then frozen solid", hue: "frost",
     ranks: [
-      { name: "Hoarfrost", icon: "snowflake", cost: studyPathCost(4, 0), text: "The tower gives up its flames; ice comes twice as often and chills half again as long" },
+      { name: "Hoarfrost", icon: "snowflake", cost: studyPathCost(4, 0), text: "Its ice chills half again as long" },
       { name: "Black ice", icon: "shard", cost: studyPathCost(4, 1), text: "Ice waves hit 60% harder and run 1.5 cells further" },
       { name: "Deep freeze", icon: "iceBlock", cost: studyPathCost(4, 2), text: "Enemies the ice hits freeze solid for a moment" },
     ],
   },
   {
-    id: "storm", topic: "wizardTower", name: "Stormcalling", motto: "Lightning in place of flames", hue: "storm",
+    id: "storm", topic: "stormTower", name: "Stormcalling", motto: "Lightning in place of flames", hue: "storm",
     ranks: [
-      { name: "Stormcalling", icon: "bolt", cost: studyPathCost(5, 0), text: "Each flame becomes a bolt of lightning leaping through 3 enemies; the ice stays" },
+      { name: "Stormcalling", icon: "bolt", cost: studyPathCost(5, 0), text: "Bolts leap through 3 enemies" },
       { name: "Forked bolts", icon: "fork", cost: studyPathCost(5, 1), text: "Bolts leap through 5 enemies, further apart" },
       { name: "Thunderhead", icon: "thunderhead", cost: studyPathCost(5, 2), text: "Bolts leap through 7 enemies and strike half again as hard" },
     ],
@@ -887,6 +887,8 @@ export const PATHS: KnowledgePath[] = [
 ];
 
 export const PATH_TOPICS = [...new Set(PATHS.map((p) => p.topic))];
+/** The paths a wizard tower wore before each made a tower of its own. */
+const WIZARD_PATHS: PathId[] = ["pyromancy", "rime", "storm"];
 export const pathById = (id: PathId) => PATHS.find((p) => p.id === id)!;
 export const pathsOf = (topic: string) => PATHS.filter((p) => p.topic === topic);
 
@@ -904,6 +906,9 @@ export const pathFits = (kind: string, path: PathId) => PATHS.some((p) => p.id =
  * placement choice reads it. */
 export const UNSPECIALIZED: Record<PathTopic, string> = {
   wizardTower: "The original mix of fire and ice",
+  pyreTower: "Flames only",
+  frostTower: "Ice only, twice as often",
+  stormTower: "Lightning through 2 enemies, alternating with ice",
   barracks: "Balanced swordsmen",
   heroHall: "One hero: two slashes, then a spin",
   valkyriePalace: "A marble palace on the ground",
@@ -1025,10 +1030,12 @@ export function decodePathResearch(raw: unknown): PathResearch {
 export function decodePaths(raw: unknown): PathChoices {
   const out: PathChoices = {};
   if (!raw || typeof raw !== "object") return out;
-  for (const topic of PATH_TOPICS) {
+  // Before each wizard branch made a tower of its own, its paths were the
+  // wizard tower's.
+  for (const topic of [...PATH_TOPICS, "wizardTower" as const]) {
     const c = (raw as Record<string, unknown>)[topic] as Partial<PathChoice> | undefined;
     if (!c || typeof c !== "object") continue;
-    const p = PATHS.find((p) => p.id === c.path && p.topic === topic);
+    const p = PATHS.find((p) => p.id === c.path && (p.topic === topic || (topic === "wizardTower" && WIZARD_PATHS.includes(p.id))));
     if (!p || !Number.isInteger(c.rank) || c.rank! < 1 || c.rank! > p.ranks.length) continue;
     if (typeof c.spent !== "number" || !Number.isFinite(c.spent) || c.spent < 0) continue;
     out[topic] = { path: p.id, rank: c.rank!, spent: c.spent };

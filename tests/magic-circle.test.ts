@@ -38,10 +38,10 @@ test('identity and equipped choices shape circles without granting extra Knowled
   assert.equal(formation(studyCircle(save, topic)).knowledge, learned.knowledge);
 });
 test('buildings retain all earlier Knowledge through transformations and merges', () => {
-  const mage = formation(specialtyCircle('wizardTower', { path: 'storm', rank: 3 }));
+  const mage = formation(specialtyCircle('stormTower', { path: 'storm', rank: 3 }));
   const crown = formation(specialtyCircle('darkKeep'));
-  assert.equal(mage.knowledge, 4); // Tower transformation and three path ranks.
-  assert.equal(crown.knowledge, mage.knowledge + 7); // All three Wizard towers' branches, merged.
+  assert.equal(mage.knowledge, 5); // Two tower transformations and three path ranks.
+  assert.equal(crown.knowledge, mage.knowledge + 9); // All three Wizard towers' branches, merged.
   assert.ok(crown.rings > mage.rings && crown.siteCount >= mage.siteCount);
   const early = formation(specialtyCircle('meleeGuild'));
   const barracks = formation(specialtyCircle('barracks'));
@@ -122,9 +122,9 @@ test('Study adapter uses only displayed completed Knowledge; save format is unch
 });
 test('building and keep identity reflects its own paths, reverses respec, and separates families', () => {
   const plain = formation(specialtyCircle('wizardTower'));
-  const fire = formation(specialtyCircle('wizardTower', { path: 'pyromancy', rank: 2 }));
+  const fire = formation(specialtyCircle('pyreTower', { path: 'pyromancy', rank: 2 }));
   assert.notDeepEqual(plain, fire);
-  assert.notDeepEqual(fire, formation(specialtyCircle('wizardTower', { path: 'rime', rank: 2 })));
+  assert.notDeepEqual(fire, formation(specialtyCircle('frostTower', { path: 'rime', rank: 2 })));
   assert.deepEqual(plain, formation(specialtyCircle('wizardTower', undefined)));
   assert.notDeepEqual(plain, formation(specialtyCircle('barracks')));
   assert.notDeepEqual(formation(specialtyCircle('keep')), formation(specialtyCircle('keep', undefined, { arrowLoops: 2 })));

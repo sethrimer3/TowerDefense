@@ -152,6 +152,9 @@ const MATERIAL: Record<PlacedKind, { m: Material; ruin: Pick<Ruin, "stone" | "to
   nanoTower: { m: { tones: TECH.slice(1, 4), roofed: false }, ruin: { stone: TECH.slice(0, 3), top: [TECH[1], HAZARD, NANO[1]], beams: false } },
   watchTower: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.plank.slice(0, 3), beams: true } },
   wizardTower: { m: { tones: C.pale.slice(0, 3), roofed: true }, ruin: { stone: C.pale.slice(0, 3), top: C.slate.slice(0, 3), beams: true, round: true } },
+  pyreTower: { m: { tones: C.pale.slice(0, 3), roofed: true }, ruin: { stone: C.pale.slice(0, 3), top: C.kiln.slice(0, 3), beams: true, round: true } },
+  frostTower: { m: { tones: C.pale.slice(0, 3), roofed: true }, ruin: { stone: C.pale.slice(0, 3), top: C.ice.slice(0, 3), beams: true, round: true } },
+  stormTower: { m: { tones: C.pale.slice(0, 3), roofed: true }, ruin: { stone: C.pale.slice(0, 3), top: C.cloud.slice(0, 3), beams: true, round: true } },
   mageGuild: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.wine.slice(0, 3), beams: true } },
   valkyriePalace: { m: { tones: C.marble.slice(1, 4), roofed: true }, ruin: { stone: C.marble.slice(1, 4), top: [C.gold[0], C.marble[2], C.marble[3]], beams: false } },
   darkKeep: { m: { tones: C.obsidian.slice(2, 5), roofed: false }, ruin: { stone: C.obsidian.slice(2, 5), top: C.mortar, beams: false } },
@@ -187,6 +190,9 @@ export const PATH_LOOKS: Partial<Record<PlacedKind, readonly string[]>> = {
   cannonTower: ["gunnery", "siegeShot"],
   watchTower: ["spotters", "signalFires"],
   wizardTower: ["pyromancy", "rime", "storm"],
+  pyreTower: ["pyromancy"],
+  frostTower: ["rime"],
+  stormTower: ["storm"],
   mageGuild: ["pyroclasm", "cinders"],
   monsterBait: ["oilSoaked", "fortified"],
 };
@@ -212,7 +218,7 @@ export function structureRubblePixels(kind: PlacedKind, cw: number, ch: number, 
   return rubblePixels(w, h, hash(seed, KINDS.indexOf(kind), 3), { ...frame(w, h), ...MATERIAL[kind].ruin });
 }
 
-const KINDS: PlacedKind[] = ["barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "meleeGuild", "rangedGuild", "sniperLodge", "musketHall", "assassinDen", "gunHall", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "spearHall", "phalanx", "javelinCamp", "lancerStable", "heroHall", "shadow", "nanoTower"];
+const KINDS: PlacedKind[] = ["barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "meleeGuild", "rangedGuild", "sniperLodge", "musketHall", "assassinDen", "gunHall", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "spearHall", "phalanx", "javelinCamp", "lancerStable", "heroHall", "shadow", "nanoTower", "pyreTower", "frostTower", "stormTower"];
 
 const PAINT: Record<PlacedKind, (p: Pix, look: string) => void> = {
   meleeGuild: paintMeleeGuild,
@@ -238,6 +244,9 @@ const PAINT: Record<PlacedKind, (p: Pix, look: string) => void> = {
   nanoTower: paintNanoTower,
   watchTower: paintWatchTower,
   wizardTower: paintWizardTower,
+  pyreTower: paintPyreTower,
+  frostTower: paintFrostTower,
+  stormTower: paintStormTower,
   mageGuild: paintMageGuild,
   valkyriePalace: paintValkyriePalace,
   darkKeep: paintDarkKeep,
@@ -1274,6 +1283,54 @@ function paintWizardTower(p: Pix, look: string) {
   p.set(fx, fy - 1, tip[1]);
   p.set(fx - 1, fy, tip[1]);
   p.set(fx, fy, tip[0]);
+}
+
+/** The wizard tower's branch towers: its roof in the branch's look, and at
+ * each corner of the lot outside the round wall a little piece of what the
+ * tower has given itself to. */
+function paintBranchTower(p: Pix, look: string, corner: (x: number, y: number, right: boolean, low: boolean) => void, worn: boolean) {
+  paintWizardTower(p, look);
+  const { x0, y0, x1, y1 } = frame(p.w, p.h);
+  for (const [x, y] of [[x0, y0], [x1 - 2, y0], [x0, y1 - 2], [x1 - 2, y1 - 2]]) corner(x, y, x > x0, y > y0);
+  // Climbing its path, the tower's rim glows all the way round.
+  if (worn) {
+    const cx = (x0 + x1 + 1) / 2, cy = (y0 + y1 + 1) / 2, r = (x1 - x0 + 1) / 2;
+    const glow = look === "pyromancy" ? C.ember : look === "rime" ? C.ice[3] : C.bolt;
+    disc(p, cx, cy, r - 1, (x, y, d) => (d > r - 2 && (x + y) % 2 === 0 ? glow : null));
+  }
+}
+/** The Pyre tower: a fire bowl burning at each corner. */
+function paintPyreTower(p: Pix, look: string) {
+  paintBranchTower(p, "pyromancy", (x, y) => {
+    rect(p, x, y, x + 2, y + 2, OUTLINE);
+    p.set(x + 1, y + 1, C.fire[0]);
+    p.set(x + 1, y, C.fire[2]);
+    p.set(x, y + 1, C.ember);
+    p.set(x + 2, y + 1, C.kiln[2]);
+    p.set(x + 1, y + 2, C.iron[2]);
+  }, !!look);
+}
+/** The Frost tower: an ice crystal rising from each corner. */
+function paintFrostTower(p: Pix, look: string) {
+  paintBranchTower(p, "rime", (x, y) => {
+    rect(p, x, y, x + 2, y + 2, OUTLINE);
+    p.set(x + 1, y, C.ice[3]);
+    p.set(x + 1, y + 1, C.ice[2]);
+    p.set(x, y + 1, C.ice[1]);
+    p.set(x + 2, y + 1, C.ice[1]);
+    p.set(x + 1, y + 2, C.ice[0]);
+  }, !!look);
+}
+/** The Storm tower: an iron lightning rod at each corner, sparking at the tip. */
+function paintStormTower(p: Pix, look: string) {
+  paintBranchTower(p, "storm", (x, y, right) => {
+    rect(p, x, y, x + 2, y + 2, OUTLINE);
+    const rx = x + 1;
+    p.set(rx, y + 2, C.iron[2]);
+    p.set(rx, y + 1, C.iron[3]);
+    p.set(rx, y, C.bolt);
+    p.set(right ? x : x + 2, y, 0xfffbe0);
+  }, !!look);
 }
 
 function paintMageGuild(p: Pix, look: string) {

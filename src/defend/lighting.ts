@@ -17,6 +17,7 @@ import { LIGHTING_CONFIG, getTorchFlicker, getTorchSway } from "../lighting.ts";
 import { glowColor, lightFalloff } from "../torch-light.ts";
 import { CELL_COUNT, CELLS_H, CELLS_W, ORTHO, boardSize, cellInBounds, cellIndex, hash, hash01, type Rect } from "./grid.ts";
 import { CellType, type Building, type CityMap } from "./citygen.ts";
+import { isWizardTower } from "./catalog.ts";
 import { FIELD_H, FIELD_W, LightField, RES, poolSamples, type PoolSamples } from "./light-field.ts";
 
 export type LightKind = "lantern" | "archerTower" | "cannonTower" | "watchTower" | "wizardTower" | "mageGuild" | "door";
@@ -56,7 +57,7 @@ export function cityLights(map: CityMap): Light[] {
 type NewLight = Omit<Light, "id">;
 
 /** Reach of each tower's fire, in cells. */
-const TOWER_RADIUS: Partial<Record<Building["kind"], number>> = { archerTower: 7.5, cannonTower: 5.5, watchTower: 6.5, wizardTower: 5, mageGuild: 5.5 };
+const TOWER_RADIUS: Partial<Record<Building["kind"], number>> = { archerTower: 7.5, cannonTower: 5.5, watchTower: 6.5, wizardTower: 5, pyreTower: 5, frostTower: 5, stormTower: 5, mageGuild: 5.5 };
 
 /** The troop buildings with a lamp over the door. */
 const DOOR_LAMPS = new Set<Building["kind"]>(["meleeGuild", "rangedGuild", "barracks", "heroHall", "shadow", "archerBarracks", "sniperLodge", "musketHall", "gunHall", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "assassinDen", "spearHall", "phalanx", "javelinCamp", "lancerStable", "valkyriePalace", "darkKeep"]);
@@ -79,7 +80,7 @@ function towerFire(b: Building, radius: number): NewLight {
   const r = b.rect;
   const inset = 0.22;
   return {
-    kind: b.kind as LightKind,
+    kind: (isWizardTower(b.kind) ? "wizardTower" : b.kind) as LightKind,
     x: r.x + r.w / 2,
     y: r.y + r.h / 2,
     radius,

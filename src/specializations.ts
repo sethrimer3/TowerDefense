@@ -58,7 +58,11 @@ export type Attuned = { kind: PlacedKind; from: PlacedKind; cost: number; branch
 export const ATTUNED: Attuned[] = [
   { kind: "archerTower", from: "watchTower", cost: 3, branches: [{ path: "fireArrows" }, { path: "sharpshooters" }] },
   { kind: "cannonTower", from: "watchTower", cost: 6, branches: [{ path: "gunnery" }, { path: "siegeShot" }], ultimate: "nanoTower" },
-  { kind: "wizardTower", from: "watchTower", cost: 8, branches: [{ path: "pyromancy" }, { path: "rime" }, { path: "storm" }], ultimate: "darkKeep" },
+  { kind: "wizardTower", from: "watchTower", cost: 8, ultimate: "darkKeep", branches: [
+    { path: "pyromancy", via: { kind: "pyreTower", cost: 6 } },
+    { path: "rime", via: { kind: "frostTower", cost: 6 } },
+    { path: "storm", via: { kind: "stormTower", cost: 8 } },
+  ] },
   { kind: "barracks", from: "meleeGuild", cost: 4, branches: [{ path: "crusaders" }, { path: "berserkers" }, { path: "halberdiers" }], ultimate: "heroHall" },
   { kind: "assassinDen", from: "meleeGuild", cost: 6, branches: [{ path: "bloodletters" }, { path: "shadowcloak" }, { path: "venom" }], ultimate: "shadow" },
   { kind: "spearHall", from: "meleeGuild", cost: 5, ultimate: "valkyriePalace", branches: [

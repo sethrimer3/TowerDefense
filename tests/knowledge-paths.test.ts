@@ -56,7 +56,7 @@ test("research alone does not change any building in battle", () => {
 });
 
 test("every topic offers two or more paths of three ranks (the barracks' and the palace's one or more), with square icons", () => {
-  for (const t of PATH_TOPICS) assert.ok(PATHS.filter((p) => p.topic === t).length >= (t === "barracks" || t === "valkyriePalace" ? 1 : 2), t);
+  for (const t of PATH_TOPICS) assert.ok(PATHS.filter((p) => p.topic === t).length >= (["barracks", "valkyriePalace", "pyreTower", "frostTower", "stormTower"].includes(t) ? 1 : 2), t);
   for (const p of PATHS) assert.equal(p.ranks.length, 3, p.id);
   for (const [k, rows] of Object.entries(ICON_ROWS)) {
     assert.equal(rows.length, ICON_SIZE, k);
@@ -106,23 +106,23 @@ function cast(sim: DefendSim, seconds: number) {
   return { flames, frosts, bolts };
 }
 
-test("Pyromancy gives up the ice, Rime the flames, and Stormcalling casts bolts for flames", () => {
+test("the Pyre tower gives up the ice, the Frost tower the flames, and the Storm tower casts bolts for flames", () => {
   const plain = battle("wizardTower");
   orc(plain.sim, plain.at.x, plain.at.y - 3);
   const both = cast(plain.sim, 8);
   assert.ok(both.flames > 0 && both.frosts > 0 && !both.bolts);
 
-  const pyro = battle("wizardTower", { wizardTower: { path: "pyromancy", rank: 1 } });
+  const pyro = battle("pyreTower");
   orc(pyro.sim, pyro.at.x, pyro.at.y - 3);
   const fire = cast(pyro.sim, 8);
   assert.ok(fire.flames > both.flames && !fire.frosts);
 
-  const rime = battle("wizardTower", { wizardTower: { path: "rime", rank: 1 } });
+  const rime = battle("frostTower");
   orc(rime.sim, rime.at.x, rime.at.y - 3);
   const ice = cast(rime.sim, 8);
   assert.ok(ice.frosts > both.frosts && !ice.flames);
 
-  const storm = battle("wizardTower", { wizardTower: { path: "storm", rank: 2 } });
+  const storm = battle("stormTower", { stormTower: { path: "storm", rank: 2 } });
   for (let k = 0; k < 6; k++) orc(storm.sim, storm.at.x - 3 + k * 1.2, storm.at.y - 3);
   const wizards = new Wizards();
   wizards.step(storm.sim, 1 / 30);
@@ -133,7 +133,7 @@ test("Pyromancy gives up the ice, Rime the flames, and Stormcalling casts bolts 
 });
 
 test("Rime's deep freeze stops what the ice hits, then lets it go", () => {
-  const { sim, at } = battle("wizardTower", { wizardTower: { path: "rime", rank: 3 } });
+  const { sim, at } = battle("frostTower", { frostTower: { path: "rime", rank: 3 } });
   const e = orc(sim, at.x, at.y - 3);
   const wizards = new Wizards();
   for (let t = 0; t < 1.5 && !e.freeze; t += 1 / 30) {

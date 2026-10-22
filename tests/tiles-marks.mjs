@@ -27,7 +27,7 @@ try {
       const { placeCityTile, placeStructure } = await import('/src/defend/layout.ts');
       const s = defaults(); s.settings.soundOff = true; s.settings.ambienceOff = true;
       const d = s.defend;
-      Object.assign(d.owned, { cityTile: 6, watchTower: 2, archerTower: 3, wizardTower: 1, meleeGuild: 1, barracks: 1 });
+      Object.assign(d.owned, { cityTile: 6, watchTower: 2, archerTower: 3, stormTower: 1, meleeGuild: 1, barracks: 1 });
       d.wallRanks = { stonework: 2, trapped: 1 };
       let l = d.layout;
       for (const [dx, dy] of [[0, -1], [-1, 0], [1, 0]]) l = placeCityTile(l, l.keep.tx + dx, l.keep.ty + dy) ?? l;
@@ -36,7 +36,7 @@ try {
       l = placeStructure(l, 'barracks', l.keep.tx - 1, l.keep.ty) ?? l;
       Object.assign(l.structures.at(-1), { path: 'crusaders', rank: 1 });
       d.layout = l;
-      d.kept = [{ kind: 'archerTower', path: 'fireArrows', rank: 2 }, { kind: 'wizardTower', path: 'storm', rank: 3 }];
+      d.kept = [{ kind: 'archerTower', path: 'fireArrows', rank: 2 }, { kind: 'stormTower', path: 'storm', rank: 3 }];
       return s;
     });
     await context.addInitScript((fixture) => {
@@ -62,8 +62,8 @@ try {
     assert.equal(await page.locator('.tile[data-tile="watchTower"] .tile-marks.none').count(), 2);
     assert.equal(await page.locator('.tile[data-tile="cityTile"]').count(), 1);
     assert.match(await page.locator('.tile[data-tile="cityTile"] .tile-count').textContent(), /^×[2-9]$/);
-    // The Wizard tower kept on Stormcalling III: became, three storm pips.
-    assert.equal(await page.locator('.tile[data-tile="wizardTower"] .mark.rank.hue-storm').count(), 3);
+    // The Storm tower kept on Stormcalling III: became, three storm pips.
+    assert.equal(await page.locator('.tile[data-tile="stormTower"] .mark.rank.hue-storm').count(), 3);
     await page.screenshot({ path: `test-results/tiles-marks-spread-${width}.png` });
 
     // Stacked: copies with the same upgrades share a stack.
@@ -91,7 +91,7 @@ try {
     assert.equal(await page.locator('.tile-detail .tile-stats li').count(), 3);
 
     // Press and hold a tile: Defend opens with that copy's upgrade tree.
-    const wizard = page.locator('.tile[data-tile="wizardTower"]').first();
+    const wizard = page.locator('.tile[data-tile="stormTower"]').first();
     await wizard.scrollIntoViewIfNeeded();
     const box = await wizard.boundingBox();
     const at = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
@@ -111,7 +111,7 @@ try {
     await page.locator('[data-tab="tiles"]').click();
     await page.waitForTimeout(600);
     // A short tap still just opens the tile.
-    await page.locator('.tile[data-tile="wizardTower"]').first().click();
+    await page.locator('.tile[data-tile="stormTower"]').first().click();
     await page.waitForSelector('.tile-detail .tile-abilities li.hue-storm');
     assert.ok(await page.locator('#tiles.active').count());
 
