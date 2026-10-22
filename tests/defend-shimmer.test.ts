@@ -63,3 +63,29 @@ test("the ring hugs a sprite edge to edge, corners cut, clockwise from its top l
   assert.deepEqual(ring.slice(0, 3).map(key), ["1,0", "2,0", "3,1"]);
   assert.equal(key(ring[ring.length - 1]), "0,1", "and ends coming back up the left");
 });
+
+test("placed wall sections touching edge to edge shimmer as one piece, round its outside", () => {
+  const quarter = (id: number, x: number, y: number) =>
+    [[0, 0], [1, 0], [0, 1], [1, 1]].map(([dx, dy], i) => b(id * 4 + i, "wall", x + dx, y + dy, { piece: true }));
+  // An L of three quarters, a ring of eight round a hole, and one touching the L only at a corner.
+  const ring = [[0, 0], [2, 0], [4, 0], [0, 2], [4, 2], [0, 4], [2, 4], [4, 4]].map(([x, y], i) => quarter(10 + i, 40 + x, 40 + y)).flat();
+  const map = { buildings: [
+    b(0, "wall", 5, 5),
+    ...quarter(1, 10, 10), ...quarter(2, 12, 10), ...quarter(3, 12, 12),
+    ...quarter(4, 14, 14),
+    ...ring,
+  ] } as unknown as CityMap;
+  const groups = shimmerTargets(map);
+  assert.deepEqual(groups.map((t) => [t.rect.x, t.rect.y, t.rect.w, t.rect.h]).sort((a, c) => a[0] - c[0] || a[1] - c[1]),
+    [[10, 10, 4, 4], [14, 14, 2, 2], [40, 40, 6, 6]], "the city's own wall stone never shimmers");
+  const l = groups.find((t) => t.rect.x === 10)!;
+  assert.equal(l.cells!.reduce((n, v) => n + v, 0), 12, "the L's missing corner stays open");
+  // The ring's trace goes round its outside only, never into the hole.
+  const loop = groups.find((t) => t.rect.x === 40)!;
+  const w = 6 * 8 + 2, h = w, mask = new Uint8Array(w * h);
+  for (let y = 0; y < 6; y++) for (let x = 0; x < 6; x++) if (loop.cells![y * 6 + x])
+    for (let py = 0; py < 8; py++) for (let px = 0; px < 8; px++) mask[(y * 8 + py + 1) * w + x * 8 + px + 1] = 1;
+  const { xs, ys } = outlineRing(mask, w, h);
+  assert.ok(xs.length > 0);
+  for (let i = 0; i < xs.length; i++) assert.ok(xs[i] === 0 || ys[i] === 0 || xs[i] === w - 1 || ys[i] === h - 1, "only the outer edge");
+});
