@@ -6,6 +6,8 @@ Implementation update: [batch 01](BUILDING_BATCH_01.md) converts the keep, barra
 
 Legend: **Audit/redraw** = PNG exists, but style/density/states still require review; **Create** = no registered PNG replacement for this family; **Integrate** = the setting, scale, cache or cross-screen routing still needs work. Every unchecked item remains pending. Existing legacy artwork stays available when Pixel Art is off.
 
+**Melee cape addition:** The user has now requested [animated capes for every melee troop family](MELEE_CAPES.md), at 60/70/80/90% of the Hero's length with path-specific cloth/edges. These are procedural cloth overlays gated on Pixel Art, including melee summons, with original bodies retained. This does not complete the unit-body PNG rows below; enemy art remains deferred.
+
 **Window presentation update:** [soft sunlight and Tiles glazing](WINDOW_SUNLIGHT.md) refine the existing procedural room renderer. New Tiles tracery/glazing is gated by Pixel Art and preserves the original off window; atmospheric light is shared with the Library. This adds no sprite assets and leaves the room/scenery and nave PNG migration rows unchecked.
 
 **Visual quality revision:** B1 checkmarks record implemented PNG/state routing, not user approval of the artwork. [Art direction 01](ART_DIRECTION_01.md) revises Barracks (normal/wide and paths), Melee Guild and Watch tower with distinct overhead architecture and structural collapse. Their seven PNGs are replaced in place; frame counts and catalog footprints stay unchanged. All other twenty-two families await this architectural/destruction review. The three revised families are a calibration pass for review, not a claim that the whole catalog now meets the desired style.

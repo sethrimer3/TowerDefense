@@ -20,6 +20,7 @@ import { drawArrows, drawBreath, drawShells, drawSparks } from "./projectile-art
 import { drawLasers } from "./laser-art.ts";
 import { drawStabs, drawValkyrie } from "./valkyrie-art.ts";
 import { drawHero, drawSwings } from "./hero-art.ts";
+import { drawMeleeCape } from "./melee-cape.ts";
 import { drawBlades, drawShade } from "./shade-art.ts";
 import { drawDarkWizard } from "./dark-art.ts";
 import { drawRaisings, drawRisen } from "./necro-art.ts";
@@ -95,7 +96,7 @@ function healthBar({ c, px }: Brush, bd: Building, frac: number) {
 export type Burning = (x: number, y: number, id: number) => number;
 
 /** Draw enemies, or your troops, as plain squares (`simple-units.ts`). */
-export type Simple = { enemies?: boolean; troops?: boolean };
+export type Simple = { enemies?: boolean; troops?: boolean; reduceMotion?: boolean };
 
 /** Units, projectiles and effects. With `torches`, units carry a torch,
  * lit while it still burns. */
@@ -114,7 +115,7 @@ export function drawUnits(b: Brush, sim: DefendSim, torches: Burning | null, hea
   rims = layers?.rims ?? null;
   try {
     drawCivilians(u, sim, torches);
-    swords = simple.troops ? (drawSimpleTroops(u, sim.soldiers, layers?.rims), []) : drawSoldiers(u, sim, torches);
+    swords = simple.troops ? (drawSimpleTroops(u, sim.soldiers, layers?.rims), []) : drawSoldiers(u, sim, torches, simple.reduceMotion);
     if (simple.enemies) drawSimpleEnemies(u, sim.enemies, layers?.rims);
     else for (const e of sim.enemies) drawEnemyArt(u, e, sim, layers ? b : undefined);
   } finally {
@@ -137,7 +138,7 @@ export function drawUnits(b: Brush, sim: DefendSim, torches: Burning | null, hea
   drawMeteors(b.c, b.px, sim);
   drawFrostBursts(b.c, b.px, sim);
   drawStaggered(b.c, b.px, sim);
-  drawDrops(b.c, b.px, sim);
+  drawDrops(b.c, b.px, sim, simple.reduceMotion, !simple.troops);
   if (healthbars) drawEnemyHealthbars(b, sim);
 }
 
@@ -191,7 +192,7 @@ function drawCivilians(b: Brush, sim: DefendSim, torches: Burning | null) {
  * shade (`shade-art.ts`).
  * Returns the swordsmen's swings, whose swords and trails draw over the
  * enemies. */
-function drawSoldiers(b: Brush, sim: DefendSim, torches: Burning | null) {
+function drawSoldiers(b: Brush, sim: DefendSim, torches: Burning | null, reduced = false) {
   const { c, px } = b;
   const swords: { x: number; y: number; swing: Swing }[] = [];
   for (const u of sim.soldiers) {
@@ -200,6 +201,7 @@ function drawSoldiers(b: Brush, sim: DefendSim, torches: Burning | null) {
       continue;
     }
     if (u.kind === "valkyrie") {
+      drawMeleeCape(c, px, u, sim, reduced);
       drawValkyrie(c, px, u, sim);
       continue;
     }
@@ -216,15 +218,17 @@ function drawSoldiers(b: Brush, sim: DefendSim, torches: Burning | null) {
       continue;
     }
     if (u.risen) {
+      drawMeleeCape(c, px, u, sim, reduced);
       drawRisen(c, px, u);
       continue;
     }
     if (u.called) {
+      drawMeleeCape(c, px, u, sim, reduced);
       drawCalled(c, px, u);
       continue;
     }
     if (isGuildTroop(u.kind)) {
-      drawGuildTroop(b, sim, u);
+      drawGuildTroop(b, sim, u, reduced);
       if (torches && u.cloak !== 0) drawHandTorch(b, { x: u.x + SOLDIER.size * 0.65, y: u.y - SOLDIER.size * 0.45, id: u.id }, sim.time, torches(u.x, u.y, u.id));
       continue;
     }
@@ -233,6 +237,7 @@ function drawSoldiers(b: Brush, sim: DefendSim, torches: Burning | null) {
     const x = u.x + (swing?.dx ?? 0),
       y = u.y + (swing?.dy ?? 0);
     const s = Math.max(2, (archer ? ARCHER_UNIT.size : SOLDIER.size) * px);
+    if (!archer) drawMeleeCape(c, px, u, sim, reduced, x, y);
     if (u.flash <= 0 && drawPixel(c, archer ? "archer" : "swordsman", x * px - s / 2, y * px - s / 2, s)) {
       if (swing) swords.push({ x, y, swing });
       if (torches) drawHandTorch(b, { x: x + SOLDIER.size * 0.65, y: y - SOLDIER.size * 0.45, id: u.id }, sim.time, torches(u.x, u.y, u.id));
@@ -265,7 +270,7 @@ function drawSoldiers(b: Brush, sim: DefendSim, torches: Burning | null) {
  * thrusts; a hoplite in red behind a round bronze shield; a javelineer in
  * olive with a javelin raised while one is ready; a lancer in blue on a
  * brown horse, its lance couched along the way it rides. */
-function drawGuildTroop(b: Brush, sim: DefendSim, u: Soldier) {
+function drawGuildTroop(b: Brush, sim: DefendSim, u: Soldier, reduced = false) {
   const { c, px } = b;
   const k = u.kind as keyof typeof GUILD_TROOPS;
   const def = GUILD_TROOPS[k], s = Math.max(2, def.size * px), unit = Math.max(1, Math.round(s * 0.22));
@@ -284,6 +289,7 @@ function drawGuildTroop(b: Brush, sim: DefendSim, u: Soldier) {
   if (veiled) c.globalAlpha = 0.3 + 0.1 * Math.sin(sim.time * 4 + u.id);
   const x = (u.x + fx * punch * 0.12) * px, y = (u.y + fy * punch * 0.12) * px;
   if (k === "lancer") horse(c, x, y, fx, fy, s, unit, u.flash > 0);
+  drawMeleeCape(c, px, u, sim, reduced, x / px, y / px);
   const r = rimOf(c);
   r.fillStyle = RIM;
   r.fillRect(Math.round(x - s / 2 - 1), Math.round(y - s / 2 - 1), Math.round(s + 2), Math.round(s + 2));

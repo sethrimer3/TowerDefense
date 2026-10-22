@@ -17,7 +17,8 @@
 import { hash01 } from "./grid.ts";
 import { ART } from "./park-art.ts";
 import { OUTLINE, artPen } from "./pixel-fx.ts";
-import { LAND_SHOW, type CalledLook } from "./reinforcements.ts";
+import { LAND_SHOW, type CalledLook, type Drop } from "./reinforcements.ts";
+import { drawMeleeCape, type CapeWearer } from "./melee-cape.ts";
 import type { ReliefLight } from "./ground-relief.ts";
 import type { DefendSim, Soldier } from "./sim.ts";
 
@@ -117,7 +118,8 @@ export function drawCalled(c: Ctx, px: number, u: Soldier) {
 const HEIGHT = 7;
 
 /** Those coming down: the shaft of light, the shadow, the soldier. */
-export function drawDrops(c: Ctx, px: number, sim: DefendSim) {
+const dropCapes = new WeakMap<Drop, CapeWearer>();
+export function drawDrops(c: Ctx, px: number, sim: DefendSim, reduced = false, capes = true) {
   if (!sim.drops.length) return;
   const dot = artPen(c, px);
   c.save();
@@ -140,6 +142,14 @@ export function drawDrops(c: Ctx, px: number, sim: DefendSim) {
     dot(ax - sw, ay + 1, 2 * sw + 1, 2);
     dot(ax - sw + 1, ay, 2 * sw - 1, 4);
     c.globalAlpha = Math.min(1, 0.4 + k);
+    if (capes && d.called.range === 0) {
+      let wearer = dropCapes.get(d);
+      if (!wearer) {
+        wearer = { id: Math.round(d.x * 31 + d.y * 17), kind: "reinforcement", home: -1, x: d.x, y: d.y - h, flash: 0, called: d.called };
+        dropCapes.set(d, wearer);
+      }
+      drawMeleeCape(c, px, wearer, sim, reduced, d.x, d.y - h);
+    }
     body(c, px, d.called.look, d.called.size, d.x, d.y - h);
   }
   c.restore();
