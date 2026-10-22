@@ -45,8 +45,8 @@ test('buildings retain all earlier Knowledge through transformations and merges'
   assert.ok(crown.rings > mage.rings && crown.siteCount >= mage.siteCount);
   const early = formation(specialtyCircle('meleeGuild'));
   const barracks = formation(specialtyCircle('barracks'));
-  const trained = formation(specialtyCircle('barracks', { path: 'crusaders', rank: 3 }));
-  assert.equal(early.knowledge, 0); assert.equal(barracks.knowledge, 1); assert.equal(trained.knowledge, 4);
+  const trained = formation(specialtyCircle('chapterHouse', { path: 'crusaders', rank: 3 }));
+  assert.equal(early.knowledge, 0); assert.equal(barracks.knowledge, 1); assert.equal(trained.knowledge, 5);
   const plain = formation(specialtyCircle('revolutionary'));
   const shared = formation(specialtyCircle('revolutionary', undefined, undefined, undefined, undefined, undefined, { chain: 2, squad: 1 }));
   assert.equal(shared.knowledge, plain.knowledge + 3);

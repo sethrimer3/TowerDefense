@@ -270,22 +270,26 @@ export function buyBomb(save: DefendSave, wallet: Wallet): boolean {
 
 // ── Decoding untrusted saves ─────────────────────────────────────────────
 const int = (n: unknown, min: number, max: number): n is number => Number.isInteger(n) && (n as number) >= min && (n as number) <= max;
-const PLACED: PlacedKind[] = ["meleeGuild", "rangedGuild", "barracks", "heroHall", "shadow", "assassinDen", "spearHall", "phalanx", "javelinCamp", "lancerStable", "archerBarracks", "sniperLodge", "gunHall", "musketHall", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "archerTower", "cannonTower", "nanoTower", "watchTower", "wizardTower", "pyreTower", "frostTower", "stormTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait"];
+const PLACED: PlacedKind[] = ["meleeGuild", "rangedGuild", "barracks", "chapterHouse", "berserkerLodge", "halberdYard", "heroHall", "shadow", "assassinDen", "spearHall", "phalanx", "javelinCamp", "lancerStable", "archerBarracks", "sniperLodge", "gunHall", "musketHall", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "archerTower", "cannonTower", "nanoTower", "watchTower", "wizardTower", "pyreTower", "frostTower", "stormTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait"];
 
-/** Wizard towers saved wearing a branch's path, from before each branch
- * made a tower of its own: each becomes that tower, keeping its rank. */
-const WIZARD_BRANCHES: Record<string, PlacedKind> = { pyromancy: "pyreTower", rime: "frostTower", storm: "stormTower" };
-function splitWizards(s: any): any {
+/** Wizard towers and barracks saved wearing a branch's path, from before
+ * each branch made a building of its own: each becomes that building,
+ * keeping its rank. */
+const BRANCHES: Record<string, Record<string, PlacedKind>> = {
+  wizardTower: { pyromancy: "pyreTower", rime: "frostTower", storm: "stormTower" },
+  barracks: { crusaders: "chapterHouse", berserkers: "berserkerLodge", halberdiers: "halberdYard" },
+};
+function splitBranches(s: any): any {
   // Paths saved without a rank (before version 5) are refunded and dropped instead.
-  const branch = (o: any) => isObject(o) && o.kind === "wizardTower" && Number.isInteger(o.rank) && o.rank >= 1 ? WIZARD_BRANCHES[o.path] : undefined;
+  const branch = (o: any): PlacedKind | undefined => isObject(o) && Number.isInteger(o.rank) && o.rank >= 1 && Object.hasOwn(BRANCHES, o.kind) && Object.hasOwn(BRANCHES[o.kind], o.path) ? BRANCHES[o.kind][o.path] : undefined;
   const moved = (list: unknown) => (Array.isArray(list) ? list : []).filter(branch);
   const all = [...moved(s.layout?.structures), ...moved(s.kept)];
   if (!all.length) return s;
   const owned = { ...(isObject(s.owned) ? s.owned : {}) };
   const rekind = (o: any) => (branch(o) ? { ...o, kind: branch(o) } : o);
   for (const o of all) {
-    const to = WIZARD_BRANCHES[o.path];
-    owned.wizardTower = Math.max(0, (Number.isInteger(owned.wizardTower) ? owned.wizardTower : 0) - 1);
+    const to = branch(o)!;
+    owned[o.kind] = Math.max(0, (Number.isInteger(owned[o.kind]) ? owned[o.kind] : 0) - 1);
     owned[to] = (Number.isInteger(owned[to]) ? owned[to] : 0) + 1;
   }
   return { ...s, owned, kept: Array.isArray(s.kept) ? s.kept.map(rekind) : s.kept,
@@ -295,7 +299,7 @@ function splitWizards(s: any): any {
 export function decodeDefendSave(raw: any): DefendSave {
   const d = defaultDefendSave();
   if (!isObject(raw)) return d;
-  const s = splitWizards(raw);
+  const s = splitBranches(raw);
   for (const item of PALETTE_ITEMS) d.owned[item] = intOr(s.owned?.[item], STARTING_OWNED[item], 999, d.owned[item]);
   for (const u of UPGRADES) d.levels[u.id] = intOr(s.levels?.[u.id], 0, u.maxLevel, d.levels[u.id]);
   d.bombs = intOr(s.bombs, 0, 9999, d.bombs);

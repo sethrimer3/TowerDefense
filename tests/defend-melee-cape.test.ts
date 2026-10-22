@@ -44,9 +44,9 @@ test("each melee path has matching colour and hem tailoring, with rank trim", ()
 });
 
 test("capes read the soldier's own building or spell, and skip summoned archers", () => {
-  const sim = { bonuses: { structurePaths: { 7: { barracks: { path: "berserkers", rank: 2 } }, 8: { barracks: { path: "crusaders", rank: 1 } } },
+  const sim = { bonuses: { structurePaths: { 7: { berserkerLodge: { path: "berserkers", rank: 2 } }, 8: { chapterHouse: { path: "crusaders", rank: 1 } } },
     necromancy: { path: "soulWeighing", rank: 3 }, reinforcements: { path: "oathsworn", rank: 2 } },
-    map: { buildings: [{ structureUid: 7 }, { structureUid: 8 }] } } as unknown as DefendSim;
+    map: { buildings: [{ structureUid: 7, kind: "berserkerLodge" }, { structureUid: 8, kind: "chapterHouse" }] } } as unknown as DefendSim;
   const u = { kind: "sword", home: 0 } as Soldier;
   assert.equal(meleeCapeStyle(sim, u)!.length, 0.8);
   assert.equal(meleeCapeStyle(sim, { ...u, home: 1 })!.length, 0.7);

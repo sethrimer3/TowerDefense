@@ -63,7 +63,11 @@ export const ATTUNED: Attuned[] = [
     { path: "rime", via: { kind: "frostTower", cost: 6 } },
     { path: "storm", via: { kind: "stormTower", cost: 8 } },
   ] },
-  { kind: "barracks", from: "meleeGuild", cost: 4, branches: [{ path: "crusaders" }, { path: "berserkers" }, { path: "halberdiers" }], ultimate: "heroHall" },
+  { kind: "barracks", from: "meleeGuild", cost: 4, ultimate: "heroHall", branches: [
+    { path: "crusaders", via: { kind: "chapterHouse", cost: 3 } },
+    { path: "berserkers", via: { kind: "berserkerLodge", cost: 3 } },
+    { path: "halberdiers", via: { kind: "halberdYard", cost: 3 } },
+  ] },
   { kind: "assassinDen", from: "meleeGuild", cost: 6, branches: [{ path: "bloodletters" }, { path: "shadowcloak" }, { path: "venom" }], ultimate: "shadow" },
   { kind: "spearHall", from: "meleeGuild", cost: 5, ultimate: "valkyriePalace", branches: [
     { path: "testudo", via: { kind: "phalanx", cost: 7 } },
@@ -130,7 +134,7 @@ const topRank = (path: PathId) => pathById(path).ranks.length;
 
 /** What each kind's troops are called on its upgrade buttons. */
 export const TROOPS: Partial<Record<PlacedKind, string>> = {
-  meleeGuild: "Brawlers", rangedGuild: "Stone throwers", barracks: "Swordsmen", heroHall: "Hero", shadow: "Shade", assassinDen: "Assassins", spearHall: "Spearmen", phalanx: "Hoplites", javelinCamp: "Javelineers", lancerStable: "Lancers", archerBarracks: "Archers", mageGuild: "Fire mages",
+  meleeGuild: "Brawlers", rangedGuild: "Stone throwers", barracks: "Swordsmen", chapterHouse: "Crusaders", berserkerLodge: "Berserkers", halberdYard: "Halberdiers", heroHall: "Hero", shadow: "Shade", assassinDen: "Assassins", spearHall: "Spearmen", phalanx: "Hoplites", javelinCamp: "Javelineers", lancerStable: "Lancers", archerBarracks: "Archers", mageGuild: "Fire mages",
   sniperLodge: "Snipers", musketHall: "Musketmen",
   gunHall: "Gunners", gunNest: "Machine gunners", gatlingNest: "Gatling gunners", rocketBattery: "Rocketeers", revolutionary: "Laser snipers", valkyriePalace: "Valkyries", darkKeep: "Dark wizard",
 };

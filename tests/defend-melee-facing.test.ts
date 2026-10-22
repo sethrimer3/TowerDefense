@@ -72,7 +72,7 @@ test("melee classification includes every melee summon and excludes ranged famil
 
 test("path-extended spears and Halberdiers use their combat reach for facing", () => {
   const sim=scene(6.5,5);sim.map.buildings=[{structureUid:7}] as typeof sim.map.buildings;
-  sim.bonuses={structurePaths:{7:{barracks:{path:"halberdiers",rank:1},spearHall:{path:"longSpears",rank:3}}}};
+  sim.bonuses={structurePaths:{7:{halberdYard:{path:"halberdiers",rank:1},spearHall:{path:"longSpears",rank:3}}}};
   for(const kind of ["sword","spearman"] as const){
     const u={...troop(kind),home:0};
     assert.equal(meleeFacing(sim,u).direction,"east",kind);

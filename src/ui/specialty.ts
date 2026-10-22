@@ -18,7 +18,7 @@ import { CHAIN, CRIT_CHANCE, CRIT_DAMAGE, DETONATOR, REVOLUTIONARY_PATHS, SQUAD,
 import { BALLISTA_PATHS, FIRE_BOLTS, HEAVY_BOLTS, WINDLASS, ballistaAllocated, ballistaRank, respecBallistas, undoBallistas, upgradeBallistas, type BallistaPathId, type BallistaRanks } from "../ballista-upgrades.ts";
 import { pathById, type PathId, WHIRLWIND, BLADE_DANCE, LEGEND, FIRE_ARROWS, SHARP, GUNNERY, SIEGE_SHOT, CRUSADE, BLOODLETTERS, SHADOWCLOAK, VENOM, HEADHUNT, GRENADIERS, VOLLEY, BAYONET, SHARP_MUSKETS, BELT_FEED, LONG_SPEARS, SET_SPEARS, TESTUDO, SPEAR_WALL, BARBED, THROWING, HEAVY_LANCE, WINGED, TRIPOD, QUICKDRAW, DUELISTS, GUN_SHIELD, OVERDRIVE, STOPPING, DEADEYE, PIERCING, CLUSTER, SALVO, MARKSMEN, RICOCHET, SUPPRESS, BERSERK, HALBERD, RANGERS, SKIRMISH, FORTIFY, PYRO, RIME, STORM, PYROCLASM, CINDERS, SPOTTERS, SIGNAL } from "../knowledge-paths.ts";
 import { bonuses } from "../progression.ts";
-import { ITEM_NAMES, archerDamage, archerCooldown, archerRange, cannonDamage, cannonCooldown, CANNON_RANGE, NANO_TOWER, SOLDIER, ARCHER_UNIT, soldierScale, STRUCTURES, flameDps, flameRange, iceDamage, ICE_RANGE, iceChill, watchRadius, fireballDamage, fireballSplash, emberDps, emberSeconds, FIRE_MAGE, FIREBALL_RANGE, keepHp, BRAWLER, ASSASSIN_UNIT, SLINGER, SNIPER, MUSKETEER, GUNNER, MACHINE_GUNNER, GATLING_GUNNER, RAIL_SNIPER, ROCKETEER, SPEARMAN, HOPLITE, LANCER, JAVELINEER, HERO, SHADE, WALL_BLOCK_DESCRIPTION, wallHp, GATE, GATE_DESCRIPTION, BALLISTA, BALLISTA_DESCRIPTION, ballistaCooldown, ballistaDamage, ballistaRange, gateHpScale, gateShut, spikeDamage, spikeEvery, isWizardTower, type PaletteItem } from "../defend/catalog.ts";
+import { ITEM_NAMES, archerDamage, archerCooldown, archerRange, cannonDamage, cannonCooldown, CANNON_RANGE, NANO_TOWER, SOLDIER, ARCHER_UNIT, soldierScale, STRUCTURES, flameDps, flameRange, iceDamage, ICE_RANGE, iceChill, watchRadius, fireballDamage, fireballSplash, emberDps, emberSeconds, FIRE_MAGE, FIREBALL_RANGE, keepHp, BRAWLER, ASSASSIN_UNIT, SLINGER, SNIPER, MUSKETEER, GUNNER, MACHINE_GUNNER, GATLING_GUNNER, RAIL_SNIPER, ROCKETEER, SPEARMAN, HOPLITE, LANCER, JAVELINEER, HERO, SHADE, WALL_BLOCK_DESCRIPTION, wallHp, GATE, GATE_DESCRIPTION, BALLISTA, BALLISTA_DESCRIPTION, ballistaCooldown, ballistaDamage, ballistaRange, gateHpScale, gateShut, spikeDamage, spikeEvery, isWizardTower, isSwordHall, type PaletteItem } from "../defend/catalog.ts";
 
 /** `kind`'s effective numbers wearing `path` at `rank` (none: plain), with
  * the shared Smithy and skill bonuses. */
@@ -35,15 +35,16 @@ export function kindStats(save: Save, kind: PaletteItem, path?: PathId, rank = 0
     const gun = at("gunnery"), siege = at("siegeShot");
     return `${n(cannonDamage(l.cannonDamage) * b.towerDamage * SIEGE_SHOT.damage[siege])} damage · ${n(cannonCooldown(l.cannonRate) * b.towerReload * GUNNERY.reload[gun] * (siege ? SIEGE_SHOT.reload : 1))}s reload · ${CANNON_RANGE + (siege >= 3 ? SIEGE_SHOT.range : 0)} range${gun >= 2 ? " · 4 extra blasts" : ""}`;
   }
-  if (kind === "barracks" || kind === "archerBarracks") {
-    const sword = kind === "barracks", base = sword ? SOLDIER : ARCHER_UNIT;
+  if (isSwordHall(kind) || kind === "archerBarracks") {
+    const sword = isSwordHall(kind), base = sword ? SOLDIER : ARCHER_UNIT;
     const crusade = at("crusaders"), berserk = at("berserkers"), halberd = at("halberdiers"), ranger = at("rangers"), skirmish = at("skirmishers");
+    const crusader = kind === "chapterHouse" || crusade > 0, berserker = kind === "berserkerLodge" || berserk > 0, halberdier = kind === "halberdYard" || halberd > 0;
     const scale = soldierScale(l.soldierArms);
     const extra = [
-      berserk ? `strikes every ${n(SOLDIER.cooldown * BERSERK.cooldown)}s${berserk >= 2 ? ` · kills heal ${BERSERK.heal * 100}%` : ""}${berserk >= 3 ? " · cleaving" : ""}` : "",
-      halberd ? `${n(SOLDIER.reach + HALBERD.reach)} reach${halberd >= 2 ? ` · blows slow ${HALBERD.chill}s` : ""}${halberd >= 3 ? ` · ${HALBERD.bigDamage}x on big enemies` : ""}` : "",
+      berserker ? `strikes every ${n(SOLDIER.cooldown * (berserk ? BERSERK.cooldown : BERSERK.rage))}s${berserk >= 2 ? ` · kills heal ${BERSERK.heal * 100}%` : ""}${berserk >= 3 ? " · cleaving" : ""}` : "",
+      halberdier ? `${n(SOLDIER.reach + (halberd ? HALBERD.reach : HALBERD.drill))} reach${halberd >= 2 ? ` · blows slow ${HALBERD.chill}s` : ""}${halberd >= 3 ? ` · ${HALBERD.bigDamage}x on big enemies` : ""}` : "",
     ].filter(Boolean).map((t) => ` · ${t}`).join("");
-    return `Recruits: ${n(base.hp * scale * b.troopHp * (sword ? CRUSADE.hp[crusade] : 1))} HP · ${n(base.damage * scale * b.troopDamage * (crusade >= 3 ? CRUSADE.damage : halberd ? HALBERD.damage : ranger >= 2 ? RANGERS.damage : 1))} damage · ${n(base.speed * (crusade ? CRUSADE.speed : skirmish >= 2 ? SKIRMISH.speed : 1))} speed${extra}`;
+    return `Recruits: ${n(base.hp * scale * b.troopHp * (crusader ? CRUSADE.hp[crusade] : 1))} HP · ${n(base.damage * scale * b.troopDamage * (crusade >= 3 ? CRUSADE.damage : halberd ? HALBERD.damage : ranger >= 2 ? RANGERS.damage : 1))} damage · ${n(base.speed * (crusader ? CRUSADE.speed : skirmish >= 2 ? SKIRMISH.speed : 1))} speed${extra}`;
   }
   if (kind === "heroHall") {
     const whirl = at("whirlwind"), dance = at("bladeDance"), legend = at("legend"), scale = soldierScale(l.soldierArms);

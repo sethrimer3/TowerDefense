@@ -27,13 +27,13 @@ try {
       const { placeCityTile, placeStructure } = await import('/src/defend/layout.ts');
       const s = defaults(); s.settings.soundOff = true; s.settings.ambienceOff = true;
       const d = s.defend;
-      Object.assign(d.owned, { cityTile: 6, watchTower: 2, archerTower: 3, stormTower: 1, meleeGuild: 1, barracks: 1 });
+      Object.assign(d.owned, { cityTile: 6, watchTower: 2, archerTower: 3, stormTower: 1, meleeGuild: 1, chapterHouse: 1 });
       d.wallRanks = { stonework: 2, trapped: 1 };
       let l = d.layout;
       for (const [dx, dy] of [[0, -1], [-1, 0], [1, 0]]) l = placeCityTile(l, l.keep.tx + dx, l.keep.ty + dy) ?? l;
       l = placeStructure(l, 'archerTower', l.keep.tx, l.keep.ty - 1) ?? l;
       Object.assign(l.structures.at(-1), { path: 'fireArrows', rank: 2 });
-      l = placeStructure(l, 'barracks', l.keep.tx - 1, l.keep.ty) ?? l;
+      l = placeStructure(l, 'chapterHouse', l.keep.tx - 1, l.keep.ty) ?? l;
       Object.assign(l.structures.at(-1), { path: 'crusaders', rank: 1 });
       d.layout = l;
       d.kept = [{ kind: 'archerTower', path: 'fireArrows', rank: 2 }, { kind: 'stormTower', path: 'storm', rank: 3 }];

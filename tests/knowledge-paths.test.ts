@@ -56,7 +56,7 @@ test("research alone does not change any building in battle", () => {
 });
 
 test("every topic offers two or more paths of three ranks (the barracks' and the palace's one or more), with square icons", () => {
-  for (const t of PATH_TOPICS) assert.ok(PATHS.filter((p) => p.topic === t).length >= (["barracks", "valkyriePalace", "pyreTower", "frostTower", "stormTower"].includes(t) ? 1 : 2), t);
+  for (const t of PATH_TOPICS) assert.ok(PATHS.filter((p) => p.topic === t).length >= (["valkyriePalace", "pyreTower", "frostTower", "stormTower", "chapterHouse", "berserkerLodge", "halberdYard"].includes(t) ? 1 : 2), t);
   for (const p of PATHS) assert.equal(p.ranks.length, 3, p.id);
   for (const [k, rows] of Object.entries(ICON_ROWS)) {
     assert.equal(rows.length, ICON_SIZE, k);
@@ -73,7 +73,7 @@ function battle(kind: PaletteItem, paths?: Bonuses["paths"]) {
   let l = defaultLayout();
   const { tx, ty } = l.keep;
   for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) l = placeCityTile(l, tx + dx, ty + dy) ?? assert.fail("tile");
-  const inside = kind === "barracks" || kind === "archerBarracks" || kind === "mageGuild";
+  const inside = kind === "barracks" || kind === "chapterHouse" || kind === "archerBarracks" || kind === "mageGuild";
   l = placeStructure(l, kind, tx, inside ? ty - 1 : ty - 3) ?? assert.fail(kind);
   const fit = fitLayout(l);
   assert.ok(fit.ok);
@@ -147,17 +147,18 @@ test("Rime's deep freeze stops what the ice hits, then lets it go", () => {
 });
 
 test("Crusaders are heartier and heal", () => {
-  const recruit = (paths?: Bonuses["paths"]) => {
-    const { sim, b } = battle("barracks", paths);
+  const recruit = (paths?: Bonuses["paths"], kind: PaletteItem = "chapterHouse") => {
+    const { sim, b } = battle(kind, paths);
     new Barracks().step(sim, 1 / 30);
     const s = sim.soldiers.find((s) => s.home === b.id);
     assert.ok(s);
     return { sim, s };
   };
-  const base = recruit().s.maxHp;
-  assert.equal(recruit({ barracks: { path: "crusaders", rank: 1 } }).s.maxHp, base * CRUSADE.hp[1]);
+  const base = recruit(undefined, "barracks").s.maxHp;
+  assert.equal(recruit().s.maxHp, base * CRUSADE.hp[0], "the Chapterhouse's own");
+  assert.equal(recruit({ chapterHouse: { path: "crusaders", rank: 1 } }).s.maxHp, base * CRUSADE.hp[1]);
 
-  const healer = recruit({ barracks: { path: "crusaders", rank: 2 } });
+  const healer = recruit({ chapterHouse: { path: "crusaders", rank: 2 } });
   healer.s.hp = 10;
   stepSwordsman(healer.sim, healer.s, 1);
   assert.equal(healer.s.hp, 10 + CRUSADE.heal);

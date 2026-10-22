@@ -59,24 +59,29 @@ import { heroHp } from "./hero.ts";
 import { checkPerch, climb, lookOut, seekTower, shootsFlat } from "./gun-sight.ts";
 import { assassinHp, assassinStrike, headhunter, huntReach, recruitState, stepCloak, toughestFirst } from "./assassins.ts";
 
-/** The barracks' Study path and rank (`knowledge-paths.ts`): each 0 unless chosen. */
+/** A troop building's path ranks (`knowledge-paths.ts`, each 0 unless
+ * worn) and, for the barracks' branch halls, which it is: the Chapterhouse
+ * trains crusaders (`crusader`), the Berserker lodge berserkers, the Halberd
+ * yard halberdiers. A plain barracks wearing a path (old fixtures'
+ * `Bonuses.paths`) trains as the hall that path belongs to. */
 const paths = (sim: DefendSim, home: number) => {
-  const p = buildingPaths(sim, sim.map.buildings[home]);
+  const b = sim.map.buildings[home], p = buildingPaths(sim, b), k = b?.kind;
+  const crusade = pathRank(p, "chapterHouse", "crusaders"), berserk = pathRank(p, "berserkerLodge", "berserkers"), halberd = pathRank(p, "halberdYard", "halberdiers");
   return {
-    crusade: pathRank(p, "barracks", "crusaders"),
-    berserk: pathRank(p, "barracks", "berserkers"), halberd: pathRank(p, "barracks", "halberdiers"),
+    crusade, berserk, halberd,
+    crusader: k === "chapterHouse" || crusade > 0, berserker: k === "berserkerLodge" || berserk > 0, halberdier: k === "halberdYard" || halberd > 0,
     ranger: pathRank(p, "archerBarracks", "rangers"), skirmish: pathRank(p, "archerBarracks", "skirmishers"),
   };
 };
 /** A swordsman's HP and damage, as shares of his own, by his barracks' path. */
 function swordStats(sim: DefendSim, home: number) {
-  const { crusade, halberd } = paths(sim, home);
-  return { hp: CRUSADE.hp[crusade], damage: crusade >= 3 ? CRUSADE.damage : halberd ? HALBERD.damage : 1 };
+  const { crusade, crusader, halberd } = paths(sim, home);
+  return { hp: crusader ? CRUSADE.hp[crusade] : 1, damage: crusade >= 3 ? CRUSADE.damage : halberd ? HALBERD.damage : 1 };
 }
 /** How fast a swordsman (or brawler) walks. */
 function swordSpeed(sim: DefendSim, s: Soldier) {
   if (isSpear(s.kind)) return spearSpeed(sim, s as Soldier & { kind: typeof s.kind });
-  return melee(s).speed * (s.kind === "sword" && paths(sim, s.home).crusade ? CRUSADE.speed : 1);
+  return melee(s).speed * (s.kind === "sword" && paths(sim, s.home).crusader ? CRUSADE.speed : 1);
 }
 /** A melee troop's own numbers: a brawler's fists, an assassin's knives,
  * the spear line's spears, else a swordsman's blade. */
@@ -152,7 +157,7 @@ export class Barracks {
 
 /** What each troop building trains. */
 const TRAINS: Partial<Record<Building["kind"], Soldier["kind"]>> = {
-  barracks: "sword", heroHall: "hero", shadow: "shade", archerBarracks: "archer", mageGuild: "mage", valkyriePalace: "valkyrie", darkKeep: "darkWizard",
+  barracks: "sword", chapterHouse: "sword", berserkerLodge: "sword", halberdYard: "sword", heroHall: "hero", shadow: "shade", archerBarracks: "archer", mageGuild: "mage", valkyriePalace: "valkyrie", darkKeep: "darkWizard",
   meleeGuild: "brawler", rangedGuild: "slinger", assassinDen: "assassin", sniperLodge: "sniper", musketHall: "musketeer",
   spearHall: "spearman", phalanx: "hoplite", javelinCamp: "javelineer", lancerStable: "lancer",
   gunHall: "gunner", gunNest: "machineGunner", gatlingNest: "gatlingGunner", rocketBattery: "rocketeer", revolutionary: "railSniper",
@@ -231,13 +236,15 @@ function rally(sim: DefendSim, s: Soldier, dt: number) {
 
 /** How far a melee troop reaches: Halberdiers further. */
 const swordReach = (sim: DefendSim, s: Soldier) =>
-  isSpear(s.kind) ? spearReach(sim, s as Soldier & { kind: typeof s.kind }) : melee(s).reach + (s.kind === "sword" && paths(sim, s.home).halberd ? HALBERD.reach : 0);
+  isSpear(s.kind) ? spearReach(sim, s as Soldier & { kind: typeof s.kind }) : melee(s).reach + (s.kind === "sword" ? halberdReach(paths(sim, s.home)) : 0);
+/** The reach a Halberd yard's drill or Halberdiers add. */
+const halberdReach = ({ halberd, halberdier }: { halberd: number; halberdier: boolean }) => (halberd ? HALBERD.reach : halberdier ? HALBERD.drill : 0);
 const inSwordReach = (sim: DefendSim, s: Soldier, e: Enemy) => dist(e.x - s.x, e.y - s.y) <= swordReach(sim, s) + enemySize(e) / 2;
 
 function strike(sim: DefendSim, s: Soldier, e: Enemy) {
   if (s.cd > 0) return;
-  const { berserk, halberd } = s.kind === "sword" ? paths(sim, s.home) : { berserk: 0, halberd: 0 };
-  s.cd = melee(s).cooldown * (berserk ? BERSERK.cooldown : 1);
+  const { berserk, berserker, halberd } = s.kind === "sword" ? paths(sim, s.home) : { berserk: 0, berserker: false, halberd: 0 };
+  s.cd = melee(s).cooldown * (berserk ? BERSERK.cooldown : berserker ? BERSERK.rage : 1);
   if (s.kind === "assassin") return assassinStrike(sim, s, e, bannerDamage(sim, s));
   if (isSpear(s.kind)) return spearStrike(sim, s as Soldier & { kind: typeof s.kind }, e, bannerDamage(sim, s));
   const damage = bannerDamage(sim, s);

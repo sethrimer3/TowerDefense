@@ -26,8 +26,9 @@ for(let r=0;r<cases.length;r++)for(let rank=0;rank<5;rank++){
  const [kind,path]=cases[r],hero=rank===4;
  const x=(col*(rank+.5))/px,y=(r*row+37)/px;
  const home=sim.map.buildings.length, uid=1000+home;
- sim.map.buildings.push({...sim.map.buildings[0],structureUid:uid,kind:'barracks'});
- const topic=kind==='sword'?'barracks':kind==='assassin'?'assassinDen':kind==='spearman'?'spearHall':kind==='hoplite'?'phalanx':kind==='lancer'?'lancerStable':kind==='valkyrie'?'valkyriePalace':kind==='undead'?'necromancy':'reinforcements';
+ const hall=kind==='sword'?{crusaders:'chapterHouse',berserkers:'berserkerLodge',halberdiers:'halberdYard'}[path]:'barracks';
+ sim.map.buildings.push({...sim.map.buildings[0],structureUid:uid,kind:hall});
+ const topic=kind==='sword'?hall:kind==='assassin'?'assassinDen':kind==='spearman'?'spearHall':kind==='hoplite'?'phalanx':kind==='lancer'?'lancerStable':kind==='valkyrie'?'valkyriePalace':kind==='undead'?'necromancy':'reinforcements';
  if(rank&&path&&!hero)sim.bonuses.structurePaths[uid]={[topic]:{path,rank}};
  const u={id:sim.newId(),kind:hero?'hero':kind,home:hero?-1:home,x,y,hp:100,maxHp:100,damage:5,cd:1,target:-1,path:[],thinkT:0,flash:0};
  // Summoned troops read spell snapshots; the gallery draws each rank alone.

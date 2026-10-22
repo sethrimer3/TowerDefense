@@ -13,8 +13,8 @@ const browser = await chromium.launch(process.env.PLAYWRIGHT_EXECUTABLE
 const base = process.env.TEST_URL || 'http://127.0.0.1:5173/';
 const out = process.env.SHOTS || 'test-results';
 mkdirSync(out, { recursive: true });
-// A barracks, a plain Hero's hall and one on each path, in its look.
-const HALLS = [['barracks'], ['heroHall'], ['heroHall', { path: 'whirlwind', rank: 3 }], ['heroHall', { path: 'bladeDance', rank: 3 }], ['heroHall', { path: 'legend', rank: 3 }]];
+// A Chapterhouse, a plain Hero's hall and one on each path, in its look.
+const HALLS = [['chapterHouse'], ['heroHall'], ['heroHall', { path: 'whirlwind', rank: 3 }], ['heroHall', { path: 'bladeDance', rank: 3 }], ['heroHall', { path: 'legend', rank: 3 }]];
 try {
   for (const width of [1280, 390]) {
     const phone = width < 500;
@@ -27,7 +27,7 @@ try {
       const { placeCityTile, placeStructure } = await import('/src/defend/layout.ts');
       const s = defaults(); s.settings.soundOff = true; s.settings.ambienceOff = true;
       s.knowledge = 100000;
-      s.defend.owned.barracks = 1; s.defend.owned.heroHall = 4;
+      s.defend.owned.chapterHouse = 1; s.defend.owned.heroHall = 4;
       s.defend.owned.cityTile = 8;
       let l = s.defend.layout;
       for (const [dx, dy] of [[0, -1], [-1, 0], [1, 0], [0, 1], [-1, -1], [1, -1]]) l = placeCityTile(l, l.keep.tx + dx, l.keep.ty + dy) ?? l;
@@ -75,9 +75,9 @@ try {
       return panel.locator('.ug-node:not(.withering)').evaluateAll(els => els.map(e => `${e.dataset.node}=${['owned', 'next', 'locked'].find(c => e.classList.contains(c))}`));
     };
     const close = async () => { await press(panel.locator('[data-specialty-close]')); await page.waitForSelector('#defend-specialty', { state: 'hidden' }); };
-    // The Barracks' tree: three branches, the Hero merged at their top.
-    const tree = await open(s.defend.layout.structures.find(x => x.kind === 'barracks').uid);
-    for (const n of ['k:meleeGuild=owned', 'k:barracks=owned', 'k:heroHall=locked', 'p:crusaders:1=next', 'p:berserkers:1=next', 'p:halberdiers:1=next']) assert.ok(tree.includes(n), `${n} in ${tree}`);
+    // A Chapterhouse's tree: the barracks' Crusaders branch, the Hero merged at its top.
+    const tree = await open(s.defend.layout.structures.find(x => x.kind === 'chapterHouse').uid);
+    for (const n of ['k:meleeGuild=owned', 'k:barracks=owned', 'k:chapterHouse=owned', 'k:heroHall=locked', 'p:crusaders:1=next']) assert.ok(tree.includes(n), `${n} in ${tree}`);
     await press(panel.locator('[data-node="k:heroHall"]'));
     await page.waitForTimeout(900); await page.screenshot({ path: `${out}/hero-${width}-barracks-tree.png` });
     assert.match(await panel.textContent(), /Three Barracks buildings, each at the last rank of a different branch, merge into one Hero/);

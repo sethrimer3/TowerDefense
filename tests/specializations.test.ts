@@ -11,7 +11,7 @@ import { ATTUNED, allocated, buildingTree, foundNodes, hasTree, targetKind, resp
 import { learnPath, pathById, type PathId } from "../src/knowledge-paths.ts";
 import { bonuses } from "../src/progression.ts";
 import { placeStructure, removeStructure, moveStructure, moveSpikes, placeCityTile, placeSpikes, removeSpikes, defaultLayout, fitLayout } from "../src/defend/layout.ts";
-import { available, keptGroups, plainAvailable, setLayout } from "../src/defend/progress.ts";
+import { available, decodeDefendSave, keptGroups, plainAvailable, setLayout } from "../src/defend/progress.ts";
 import { DefendSim, type Enemy } from "../src/defend/sim.ts";
 import { generateCity } from "../src/defend/citygen.ts";
 import { Wizards } from "../src/defend/wizard.ts";
@@ -69,7 +69,8 @@ test("the shop's three basic buildings branch into attuned buildings, each with 
   assert.deepEqual(to("meleeGuild"), ["Barracks", "Assassins' den", "Spearmen hall"]);
   assert.deepEqual(to("rangedGuild"), ["Archer barracks", "Mage Guild", "Gunner hall"]);
   assert.deepEqual(to("gunHall"), ["Musket hall", "Machine-gun nest", "Rocket battery"]);
-  assert.deepEqual(to("barracks"), ["Crusaders I", "Berserkers I", "Halberdiers I"]);
+  assert.deepEqual(to("barracks"), ["Chapterhouse", "Berserker lodge", "Halberd yard"]);
+  assert.deepEqual(to("chapterHouse"), ["Crusaders I"]);
   assert.deepEqual(to("assassinDen"), ["Bloodletters I", "Shadowcloak I", "Venomblades I"]);
   assert.deepEqual(to("wizardTower"), ["Pyre tower", "Frost tower", "Storm tower"]);
   assert.deepEqual(to("pyreTower"), ["Pyromancy I"], "attuned to its branch, it climbs it");
@@ -238,7 +239,7 @@ test("a choice cuts off the branches beside it and opens its own", () => {
   assert.equal(keep.at(-1)!.parent, "p:rime:3", "over the middle branch");
   for (const n of buildingTree("watchTower")) if (n.parent) assert.ok(buildingTree("watchTower").some((o) => o.id === n.parent), n.id);
   // Every buyable node is exactly one of the building's next steps.
-  for (const [k, w] of [["watchTower"], ["wizardTower"], ["spearHall"], ["stormTower", { path: "storm", rank: 3 }], ["stormTower"], ["wallSpikes"], ["barracks", { path: "crusaders", rank: 1 }]] as const)
+  for (const [k, w] of [["watchTower"], ["wizardTower"], ["spearHall"], ["stormTower", { path: "storm", rank: 3 }], ["stormTower"], ["wallSpikes"], ["chapterHouse", { path: "crusaders", rank: 1 }], ["barracks"]] as const)
     assert.equal(buildingTree(k, w as never).filter((n) => n.state === "next").length, nextSteps(k, w as never).length, k);
 });
 
@@ -530,4 +531,20 @@ test("version 6: ranks on paths a building can no longer take come back, and ult
   assert.deepEqual([loaded.defend.kept, loaded.defend.owned.musketHall, loaded.defend.owned.heroHall], [[], 1, 1]);
   const again = decode(JSON.stringify(loaded));
   assert.equal(again.knowledge, loaded.knowledge, "migrates once");
+});
+
+test("saved wizard towers and barracks wearing a branch's path become that branch's building", () => {
+  const s = defaults();
+  let l = s.defend.layout;
+  for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1]]) l = placeCityTile(l, l.keep.tx + dx, l.keep.ty + dy)!;
+  l = placeStructure(l, "barracks", l.keep.tx, l.keep.ty - 1) ?? assert.fail("placement");
+  Object.assign(l.structures.at(-1)!, { path: "halberdiers", rank: 2 });
+  Object.assign(s.defend.owned, { barracks: 2, wizardTower: 1 });
+  const raw = JSON.parse(JSON.stringify({ ...s.defend, layout: l, kept: [{ kind: "wizardTower", path: "rime", rank: 1 }, { kind: "barracks", path: "crusaders", rank: 3 }] }));
+  const d = decodeDefendSave(raw);
+  assert.deepEqual(d.layout.structures.map((o) => [o.kind, o.path, o.rank]).at(-1), ["halberdYard", "halberdiers", 2]);
+  assert.deepEqual(d.kept, [{ kind: "frostTower", path: "rime", rank: 1 }, { kind: "chapterHouse", path: "crusaders", rank: 3 }]);
+  assert.deepEqual([d.owned.barracks, d.owned.halberdYard, d.owned.chapterHouse, d.owned.wizardTower, d.owned.frostTower], [0, 1, 1, 0, 1]);
+  // A plain one stays as it was.
+  assert.equal(decodeDefendSave(JSON.parse(JSON.stringify(s.defend))).owned.barracks, s.defend.owned.barracks);
 });

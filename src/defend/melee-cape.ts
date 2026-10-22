@@ -51,7 +51,8 @@ export function meleeCapeLook(kind: Soldier["kind"], path?: { path: PathId; rank
 const styles = new Map<string, MeleeCapeStyle>();
 export function meleeCapeStyle(sim: DefendSim, u: CapeWearer) {
   if (u.risen?.range || u.called?.range) return null;
-  const topic = TOPICS[u.kind];
+  // Swordsmen wear their own hall's path: the barracks' or a branch hall's.
+  const topic = u.kind === "sword" ? (sim.map.buildings[u.home]?.kind as PathTopic | undefined) ?? TOPICS.sword : TOPICS[u.kind];
   if (!topic && u.kind !== "brawler") return null;
   const path = u.risen ? sim.bonuses.necromancy : u.called ? sim.bonuses.reinforcements
     : topic ? buildingPaths(sim, sim.map.buildings[u.home])?.[topic] : undefined;

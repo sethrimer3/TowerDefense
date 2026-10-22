@@ -79,7 +79,7 @@ function strikes(sim: DefendSim, a: Soldier, e: Enemy, n: number, between = 0) {
 test("a Melee Guild becomes a barracks, an assassins' den or a spearmen hall; the den has three branches", () => {
   assert.deepEqual(nextSteps("meleeGuild").map(stepName), ["Barracks", "Assassins' den", "Spearmen hall"]);
   assert.deepEqual(nextSteps("assassinDen").map(stepName), ["Bloodletters I", "Shadowcloak I", "Venomblades I"], "Headhunters is a spare");
-  assert.deepEqual(nextSteps("barracks").map(stepName), ["Crusaders I", "Berserkers I", "Halberdiers I"], "the barracks' old Assassins path is retired");
+  assert.deepEqual(nextSteps("barracks").map(stepName), ["Chapterhouse", "Berserker lodge", "Halberd yard"], "the barracks' old Assassins path is retired");
   assert.equal(rootOf("assassinDen"), "meleeGuild");
   const tree = buildingTree("meleeGuild").map((n) => `${n.id}=${n.state}`);
   assert.deepEqual(tree, ["k:meleeGuild=owned", "k:barracks=next", "k:assassinDen=next", "k:spearHall=next"]);

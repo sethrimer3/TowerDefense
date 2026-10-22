@@ -6,7 +6,7 @@ import { cloneLayout, type PlacedKind } from "./defend/layout.ts";
 import type { Save } from "./save.ts";
 import { studyPathCost } from "./economy.ts";
 
-export type PathTopic = "pyreTower" | "frostTower" | "stormTower" | "wizardTower" | "barracks" | "heroHall" | "valkyriePalace" | "assassinDen" | "spearHall" | "phalanx" | "javelinCamp" | "lancerStable" | "musketHall" | "gunHall" | "gunNest" | "gatlingNest" | "rocketBattery" | "sniperLodge" | "archerTower" | "cannonTower" | "archerBarracks" | "watchTower" | "mageGuild" | "bait" | "spikes" | SpellId;
+export type PathTopic = "pyreTower" | "frostTower" | "stormTower" | "wizardTower" | "chapterHouse" | "berserkerLodge" | "halberdYard" | "barracks" | "heroHall" | "valkyriePalace" | "assassinDen" | "spearHall" | "phalanx" | "javelinCamp" | "lancerStable" | "musketHall" | "gunHall" | "gunNest" | "gatlingNest" | "rocketBattery" | "sniperLodge" | "archerTower" | "cannonTower" | "archerBarracks" | "watchTower" | "mageGuild" | "bait" | "spikes" | SpellId;
 /** Strike spells: cast from the battle's Skills palette rather than built,
  * so a spell has no cards; it casts with the one path `save.spellPaths`
  * names, at its furthest researched rank. */
@@ -67,16 +67,19 @@ export const RIME = { chill: 1.5, damage: 1.6, reach: 1.5, freeze: 1.2 };
  * flame (the tower's own at rank 0), striking up to `links[rank]` enemies `jump[rank]` cells apart for `damage` times the
  * flame's damage a second, half again at III. */
 export const STORM = { links: [2, 3, 5, 7], jump: [2, 2.5, 3, 3.5], damage: 1.2, surge: 1.5 };
-/** Crusaders: heavier (HP by rank, slower), healing from II, harder hitting at III. */
-export const CRUSADE = { hp: [1, 1.5, 1.5, 2.2], speed: 0.85, heal: 3, damage: 1.5 };
-/** Berserkers: strokes come in `cooldown` of the time; from II every kill
+/** Crusaders, the Chapterhouse's path: heavier (HP by rank, the
+ * Chapterhouse's own at rank 0, slower), healing from II, harder hitting at III. */
+export const CRUSADE = { hp: [1.25, 1.5, 1.5, 2.2], speed: 0.85, heal: 3, damage: 1.5 };
+/** Berserkers, the Berserker lodge's path: strokes come in `rage` of the
+ * time at the lodge, `cooldown` from I; from II every kill
  * heals the slayer `heal` of its full HP; at III each blow also cuts every
  * other enemy within `cleave` cells of its target for `share` of it. */
-export const BERSERK = { cooldown: 0.75, heal: 0.3, cleave: 1, share: 0.5 };
-/** Halberdiers: `reach` more cells of reach and `damage` times the damage;
+export const BERSERK = { rage: 0.87, cooldown: 0.75, heal: 0.3, cleave: 1, share: 0.5 };
+/** Halberdiers, the Halberd yard's path: `drill` more cells of reach at
+ * the yard, from I `reach` more and `damage` times the damage;
  * from II every blow slows its enemy for `chill` seconds; at III blows on
  * an enemy at least `big` cells across hit `bigDamage` times as hard. */
-export const HALBERD = { reach: 0.6, damage: 1.2, chill: 1.5, big: 0.8, bigDamage: 2.5 };
+export const HALBERD = { drill: 0.3, reach: 0.6, damage: 1.2, chill: 1.5, big: 0.8, bigDamage: 2.5 };
 /** The Hero's paths (`defend/hero.ts`). Whirlwind: every `every[rank]`th
  * strike of the combo is a spin (the Hero's own every 3rd), reaching
  * `radius[rank]` cells and hitting `damage[rank]` times as hard; at III
@@ -370,25 +373,25 @@ export const PATHS: KnowledgePath[] = [
     legacyCrown: { from: "wizardTower", item: "darkKeep", name: "Dark wizard keep", cost: 150000, text: "This Wizard tower becomes a Dark wizard keep" },
   },
   {
-    id: "crusaders", topic: "barracks", name: "Crusaders", motto: "Immovable, armoured, enduring", hue: "steel",
+    id: "crusaders", topic: "chapterHouse", name: "Crusaders", motto: "Immovable, armoured, enduring", hue: "steel",
     ranks: [
-      { name: "Chain mail", icon: "mail", cost: studyPathCost(4, 0), text: "Swordsmen have 50% more HP, and walk a little slower" },
+      { name: "Chain mail", icon: "mail", cost: studyPathCost(4, 0), text: "Crusaders have 50% more HP in all" },
       { name: "Field dressing", icon: "heart", cost: studyPathCost(4, 1), text: "They heal 3 HP a second" },
       { name: "Templars", icon: "cross", cost: studyPathCost(4, 2), text: "120% more HP in all, and 50% more damage" },
     ],
   },
   {
-    id: "berserkers", topic: "barracks", name: "Berserkers", motto: "Fury, and blood for blood", hue: "ember",
+    id: "berserkers", topic: "berserkerLodge", name: "Berserkers", motto: "Fury, and blood for blood", hue: "ember",
     ranks: [
-      { name: "Battle rage", icon: "dagger", cost: studyPathCost(4, 0), text: "Swordsmen strike 33% faster" },
+      { name: "Battle rage", icon: "dagger", cost: studyPathCost(4, 0), text: "Berserkers strike 33% faster in all" },
       { name: "Bloodlust", icon: "heart", cost: studyPathCost(4, 1), text: "Every enemy one slays heals it 30% of its full HP" },
       { name: "Cleave", icon: "fork", cost: studyPathCost(4, 2), text: "Each blow also cuts every other enemy within a cell of its target, for half the damage" },
     ],
   },
   {
-    id: "halberdiers", topic: "barracks", name: "Halberdiers", motto: "Long reach, hooking blows", hue: "verdant",
+    id: "halberdiers", topic: "halberdYard", name: "Halberdiers", motto: "Long reach, hooking blows", hue: "verdant",
     ranks: [
-      { name: "Halberds", icon: "stake", cost: studyPathCost(4, 0), text: "Swordsmen reach 0.6 cells further and hit 20% harder" },
+      { name: "Halberds", icon: "stake", cost: studyPathCost(4, 0), text: "Halberdiers reach 0.6 cells further in all and hit 20% harder" },
       { name: "Hooked blades", icon: "hand", cost: studyPathCost(4, 1), text: "Every blow slows its enemy for 1.5 seconds" },
       { name: "Set for the charge", icon: "helm", cost: studyPathCost(4, 2), text: "Blows on big enemies hit 2.5× as hard" },
     ],
@@ -887,8 +890,9 @@ export const PATHS: KnowledgePath[] = [
 ];
 
 export const PATH_TOPICS = [...new Set(PATHS.map((p) => p.topic))];
-/** The paths a wizard tower wore before each made a tower of its own. */
-const WIZARD_PATHS: PathId[] = ["pyromancy", "rime", "storm"];
+/** The paths the wizard tower and the barracks wore before each branch
+ * made a building of its own. */
+const LEGACY_TOPICS: Partial<Record<PathTopic, PathId[]>> = { wizardTower: ["pyromancy", "rime", "storm"], barracks: ["crusaders", "berserkers", "halberdiers"] };
 export const pathById = (id: PathId) => PATHS.find((p) => p.id === id)!;
 export const pathsOf = (topic: string) => PATHS.filter((p) => p.topic === topic);
 
@@ -910,6 +914,9 @@ export const UNSPECIALIZED: Record<PathTopic, string> = {
   frostTower: "Ice only, twice as often",
   stormTower: "Lightning through 2 enemies, alternating with ice",
   barracks: "Balanced swordsmen",
+  chapterHouse: "Crusaders: a quarter more HP, a little slower",
+  berserkerLodge: "Berserkers: strokes 15% faster",
+  halberdYard: "Halberdiers: 0.3 cells more reach",
   heroHall: "One hero: two slashes, then a spin",
   valkyriePalace: "A marble palace on the ground",
   assassinDen: "Quick, frail assassins: every 4th strike critical",
@@ -1030,12 +1037,12 @@ export function decodePathResearch(raw: unknown): PathResearch {
 export function decodePaths(raw: unknown): PathChoices {
   const out: PathChoices = {};
   if (!raw || typeof raw !== "object") return out;
-  // Before each wizard branch made a tower of its own, its paths were the
-  // wizard tower's.
-  for (const topic of [...PATH_TOPICS, "wizardTower" as const]) {
+  // Before each branch made a building of its own, its paths were the
+  // wizard tower's or the barracks'.
+  for (const topic of [...PATH_TOPICS, ...(Object.keys(LEGACY_TOPICS) as PathTopic[])]) {
     const c = (raw as Record<string, unknown>)[topic] as Partial<PathChoice> | undefined;
     if (!c || typeof c !== "object") continue;
-    const p = PATHS.find((p) => p.id === c.path && (p.topic === topic || (topic === "wizardTower" && WIZARD_PATHS.includes(p.id))));
+    const p = PATHS.find((p) => p.id === c.path && (p.topic === topic || !!LEGACY_TOPICS[topic]?.includes(p.id)));
     if (!p || !Number.isInteger(c.rank) || c.rank! < 1 || c.rank! > p.ranks.length) continue;
     if (typeof c.spent !== "number" || !Number.isFinite(c.spent) || c.spent < 0) continue;
     out[topic] = { path: p.id, rank: c.rank!, spent: c.spent };

@@ -144,6 +144,9 @@ const MATERIAL: Record<PlacedKind, { m: Material; ruin: Pick<Ruin, "stone" | "to
   javelinCamp: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.canvas.slice(0, 3), beams: true } },
   lancerStable: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.plank.slice(0, 3), beams: true } },
   barracks: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: [0x6e2a22, C.red, 0xc25a48], beams: true } },
+  chapterHouse: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: [0x4a5460, C.lead, 0x93a0ac], beams: true } },
+  berserkerLodge: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.kiln.slice(0, 3), beams: true } },
+  halberdYard: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: [0x2e4a26, C.moss, 0x6a9450], beams: true } },
   heroHall: { m: { tones: C.pale.slice(1, 4), roofed: true }, ruin: { stone: C.pale.slice(1, 4), top: C.gold, beams: true } },
   shadow: { m: { tones: C.char, roofed: true }, ruin: { stone: C.char, top: [C.flag[0], C.dusk, C.slate[1]], beams: true } },
   archerBarracks: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: [0x4a3826, C.timber, 0x8e7048], beams: true } },
@@ -172,6 +175,9 @@ const frame = (w: number, h: number) => ({ x0: 1, y0: 1, x1: w - 3, y1: h - 3 })
  * painter to give it a sprite. */
 export const PATH_LOOKS: Partial<Record<PlacedKind, readonly string[]>> = {
   barracks: ["crusaders", "berserkers", "halberdiers"],
+  chapterHouse: ["crusaders"],
+  berserkerLodge: ["berserkers"],
+  halberdYard: ["halberdiers"],
   heroHall: ["whirlwind", "bladeDance", "legend"],
   valkyriePalace: ["cloudborne"],
   assassinDen: ["bloodletters", "shadowcloak", "venom", "headhunters"],
@@ -218,7 +224,7 @@ export function structureRubblePixels(kind: PlacedKind, cw: number, ch: number, 
   return rubblePixels(w, h, hash(seed, KINDS.indexOf(kind), 3), { ...frame(w, h), ...MATERIAL[kind].ruin });
 }
 
-const KINDS: PlacedKind[] = ["barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "meleeGuild", "rangedGuild", "sniperLodge", "musketHall", "assassinDen", "gunHall", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "spearHall", "phalanx", "javelinCamp", "lancerStable", "heroHall", "shadow", "nanoTower", "pyreTower", "frostTower", "stormTower"];
+const KINDS: PlacedKind[] = ["barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "meleeGuild", "rangedGuild", "sniperLodge", "musketHall", "assassinDen", "gunHall", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "spearHall", "phalanx", "javelinCamp", "lancerStable", "heroHall", "shadow", "nanoTower", "pyreTower", "frostTower", "stormTower", "chapterHouse", "berserkerLodge", "halberdYard"];
 
 const PAINT: Record<PlacedKind, (p: Pix, look: string) => void> = {
   meleeGuild: paintMeleeGuild,
@@ -236,6 +242,9 @@ const PAINT: Record<PlacedKind, (p: Pix, look: string) => void> = {
   javelinCamp: paintJavelinCamp,
   lancerStable: paintLancerStable,
   barracks: paintBarracks,
+  chapterHouse: paintChapterHouse,
+  berserkerLodge: paintBerserkerLodge,
+  halberdYard: paintHalberdYard,
   heroHall: paintHeroHall,
   shadow: paintShadow,
   archerBarracks: paintArcherBarracks,
@@ -375,6 +384,30 @@ function paintBarracks(p: Pix, look: string) {
       p.set(sx - 1 + i, sy + j, c);
     }),
   );
+}
+
+/** The barracks' branch halls: the barracks in its branch's look, with a
+ * pair of the branch's standards planted either side of the door (at the
+ * lot's foot), and, climbing its path, a third over the ridge. */
+function paintBranchHall(p: Pix, look: string, standard: readonly string[], pal: Record<string, number>, worn: boolean) {
+  paintBarracks(p, look);
+  const { x0, y0, x1, y1 } = frame(p.w, p.h);
+  const w = standard[0].length, h = standard.length;
+  glyph(p, x0 + 1, y1 - h, standard, pal);
+  glyph(p, x1 - w, y1 - h, standard, pal);
+  if (worn) glyph(p, Math.round((x0 + x1 - w) / 2), y0 + 1, standard, pal);
+}
+/** The Chapterhouse: white banners with a red cross. */
+function paintChapterHouse(p: Pix, look: string) {
+  paintBranchHall(p, "crusaders", ["0000", "0120", "0220", "0120", "0000", ".03.", ".03."], { 0: OUTLINE, 1: 0xfaf8f2, 2: C.banner[1], 3: C.plank[1] }, !!look);
+}
+/** The Berserker lodge: blood-red banners and an axe. */
+function paintBerserkerLodge(p: Pix, look: string) {
+  paintBranchHall(p, "berserkers", ["000.", "0110", "0210", "0110", "000.", ".03.", ".03."], { 0: OUTLINE, 1: C.banner[0], 2: C.iron[3], 3: C.plank[1] }, !!look);
+}
+/** The Halberd yard: halberds stood on end in a rack. */
+function paintHalberdYard(p: Pix, look: string) {
+  paintBranchHall(p, "halberdiers", [".00.", "0120", ".02.", ".03.", ".03.", ".03.", ".03."], { 0: OUTLINE, 1: C.iron[3], 2: C.iron[2], 3: C.plank[1] }, !!look);
 }
 
 /** A small sprite from rows of keys into `pal` ("." clear), its top left at (x, y). */

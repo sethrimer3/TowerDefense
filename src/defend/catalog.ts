@@ -13,11 +13,11 @@ import type { BattlePaths, PathId } from "../knowledge-paths.ts";
  * copper, silver and Gold, the universal upgrades, the bonuses the Smithy and the
  * skill trees add, and the enemy roster. */
 
-export type StructureKind = "keep" | "meleeGuild" | "rangedGuild" | "assassinDen" | "spearHall" | "phalanx" | "javelinCamp" | "lancerStable" | "barracks" | "heroHall" | "shadow" | "archerBarracks" | "sniperLodge" | "gunHall" | "musketHall" | "gunNest" | "gatlingNest" | "rocketBattery" | "revolutionary" | "archerTower" | "cannonTower" | "nanoTower" | "watchTower" | "wizardTower" | "pyreTower" | "frostTower" | "stormTower" | "mageGuild" | "valkyriePalace" | "darkKeep" | "monsterBait";
+export type StructureKind = "keep" | "meleeGuild" | "rangedGuild" | "assassinDen" | "spearHall" | "phalanx" | "javelinCamp" | "lancerStable" | "barracks" | "chapterHouse" | "berserkerLodge" | "halberdYard" | "heroHall" | "shadow" | "archerBarracks" | "sniperLodge" | "gunHall" | "musketHall" | "gunNest" | "gatlingNest" | "rocketBattery" | "revolutionary" | "archerTower" | "cannonTower" | "nanoTower" | "watchTower" | "wizardTower" | "pyreTower" | "frostTower" | "stormTower" | "mageGuild" | "valkyriePalace" | "darkKeep" | "monsterBait";
 /** Everything that appears in the build palette (the keep is placed from the
  * start and can only be moved, so it is not a palette item). */
 export type PaletteItem = "cityTile" | "cityGate" | "wallSpikes" | "wallBallista" | "wallBlock" | Exclude<StructureKind, "keep">;
-export const PALETTE_ITEMS: PaletteItem[] = ["cityTile", "meleeGuild", "rangedGuild", "barracks", "heroHall", "assassinDen", "shadow", "spearHall", "phalanx", "javelinCamp", "lancerStable", "archerBarracks", "gunHall", "musketHall", "sniperLodge", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "watchTower", "archerTower", "cannonTower", "nanoTower", "wizardTower", "pyreTower", "frostTower", "stormTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "wallBlock", "cityGate", "wallSpikes", "wallBallista"];
+export const PALETTE_ITEMS: PaletteItem[] = ["cityTile", "meleeGuild", "rangedGuild", "barracks", "chapterHouse", "berserkerLodge", "halberdYard", "heroHall", "assassinDen", "shadow", "spearHall", "phalanx", "javelinCamp", "lancerStable", "archerBarracks", "gunHall", "musketHall", "sniperLodge", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "watchTower", "archerTower", "cannonTower", "nanoTower", "wizardTower", "pyreTower", "frostTower", "stormTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "wallBlock", "cityGate", "wallSpikes", "wallBallista"];
 /** The only buildings the shop sells: every other tower or troop building
  * is one of these upgraded, a building at a time, with Knowledge
  * (`building-upgrades.ts`). */
@@ -51,6 +51,9 @@ export const ITEM_CATEGORY: Record<PaletteItem, Exclude<PaletteCategory, "all">>
   meleeGuild: "units",
   rangedGuild: "units",
   barracks: "units",
+  chapterHouse: "units",
+  berserkerLodge: "units",
+  halberdYard: "units",
   heroHall: "units",
   shadow: "units",
   assassinDen: "units",
@@ -75,6 +78,10 @@ export const inCategory = (item: PaletteItem, category: PaletteCategory) => cate
  * through `wizard.ts`. */
 export const WIZARD_TOWERS: readonly StructureKind[] = ["wizardTower", "pyreTower", "frostTower", "stormTower"];
 export const isWizardTower = (kind: string) => (WIZARD_TOWERS as readonly string[]).includes(kind);
+/** The barracks and the halls its branches make of it, which all train
+ * swordsmen. */
+export const SWORD_HALLS: readonly StructureKind[] = ["barracks", "chapterHouse", "berserkerLodge", "halberdYard"];
+export const isSwordHall = (kind: string) => (SWORD_HALLS as readonly string[]).includes(kind);
 
 /** The city gate: 3 cells along the wall and its 2 cells deep, worth the
  * wall stones it stands in for, and some. It swings open while any of the
@@ -286,6 +293,33 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     outsideOk: false,
     description: "Trains swordsmen who sally out against anything that breaches the walls. Three, each maxed on a different branch, merge into the Hero, the swordsmen's ultimate.",
   },
+  chapterHouse: {
+    kind: "chapterHouse",
+    name: "Chapterhouse",
+    w: 4,
+    h: 6,
+    maxHp: 170,
+    outsideOk: false,
+    description: "A barracks sworn to a holy order: its crusaders have a quarter more HP, and walk a little slower.",
+  },
+  berserkerLodge: {
+    kind: "berserkerLodge",
+    name: "Berserker lodge",
+    w: 4,
+    h: 6,
+    maxHp: 160,
+    outsideOk: false,
+    description: "A barracks given over to fury: its berserkers strike 15% faster.",
+  },
+  halberdYard: {
+    kind: "halberdYard",
+    name: "Halberd yard",
+    w: 4,
+    h: 6,
+    maxHp: 160,
+    outsideOk: false,
+    description: "A barracks drilling with the halberd: its halberdiers reach 0.3 cells further.",
+  },
   archerBarracks: {
     kind: "archerBarracks",
     name: "Archer barracks",
@@ -429,6 +463,9 @@ export const STARTING_OWNED: Record<PaletteItem, number> = {
   meleeGuild: 1,
   rangedGuild: 1,
   barracks: 0,
+  chapterHouse: 0,
+  berserkerLodge: 0,
+  halberdYard: 0,
   heroHall: 0,
   shadow: 0,
   assassinDen: 0,
@@ -474,6 +511,9 @@ export function purchasePrice(item: PaletteItem, owned: number): Price {
     meleeGuild: { copper: 4 },
     rangedGuild: { copper: 4 },
     barracks: { copper: 4 },
+    chapterHouse: { copper: 5 },
+    berserkerLodge: { copper: 5 },
+    halberdYard: { copper: 5 },
     heroHall: { copper: 20, silver: 4, gold: 1 },
     shadow: { copper: 20, silver: 4, gold: 1 },
     assassinDen: { copper: 5 },
@@ -520,6 +560,9 @@ export const ITEM_NAMES: Record<PaletteItem, string> = {
   meleeGuild: STRUCTURES.meleeGuild.name,
   rangedGuild: STRUCTURES.rangedGuild.name,
   barracks: STRUCTURES.barracks.name,
+  chapterHouse: STRUCTURES.chapterHouse.name,
+  berserkerLodge: STRUCTURES.berserkerLodge.name,
+  halberdYard: STRUCTURES.halberdYard.name,
   heroHall: STRUCTURES.heroHall.name,
   shadow: STRUCTURES.shadow.name,
   assassinDen: STRUCTURES.assassinDen.name,
