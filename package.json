@@ -14,7 +14,8 @@
     "test:stress-ui": "node tests/defend-stress-ui.mjs",
     "test:render-cache": "node tests/defend-render-cache.mjs",
     "font": "node --experimental-transform-types scripts/pixel-font/build.ts",
-    "sprites": "node --experimental-transform-types scripts/pixel-art/build.ts"
+    "sprites": "node --experimental-transform-types scripts/pixel-art/build.ts",
+    "sprites:melee": "node --experimental-transform-types scripts/pixel-art/melee-facing.ts"
   },
   "devDependencies": {
     "typescript": "~5.9.3",

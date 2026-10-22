@@ -67,6 +67,7 @@ import { Wizards, stepFlames, stepFrosts, type Flame, type Frost } from "./wizar
 import { DarkKeeps, stepBolts, stepDarkWizard, type Bolt } from "./dark-wizards.ts";
 import { WarBanner, bannerInfluence, stepBannerLife } from "./war-banner.ts";
 import { castMeteor, METEOR, stepMeteors, type Impact, type Meteor } from "./meteor.ts";
+import { quench } from "./fire-ice.ts";
 import { castFrostNova, FROST_NOVA, frostDeath, stepFrostNova, wardBuilding, wardDefender, type FrostBurst, type Rime } from "./frost-nova.ts";
 import { calledFell, castReinforcements, REINFORCE, shieldWall, stepReinforcement, stepReinforcements, type Called, type Drop as Descent, type Landing } from "./reinforcements.ts";
 import { ageGraves, bury, castNecromancy, NECRO, stepUndead, type Grave, type Raising, type Risen } from "./necromancy.ts";
@@ -628,6 +629,7 @@ export class DefendSim {
     stepReinforcements(this, dt);
     stepFireballs(this, dt);
     stepBlazes(this, dt);
+    quench(this);
     stepFloods(this, dt);
   }
 

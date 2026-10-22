@@ -21,6 +21,9 @@ import type { CarriedLight } from "./lighting.ts";
 import type { ReliefLight } from "./ground-relief.ts";
 import type { DefendSim, Soldier } from "./sim.ts";
 import type { Stab } from "./valkyries.ts";
+import { meleeFacing, facingOf, type Facing } from "./melee-facing.ts";
+import { meleeBody } from "./melee-body.ts";
+import { VALK_FRONT as VALK } from "./melee-body-data.ts";
 
 type Ctx = CanvasRenderingContext2D;
 
@@ -32,49 +35,8 @@ const GOLD = ["#9a7428", "#e9c46a", "#fff4c8"];
 /** The valkyrie, 11 × 9 sprite pixels: wings (W lit, w shaded), the helm
  * (H gold, h its crest), face (s), cuirass (A lit, a shaded), skirt of
  * gold scales (g) and boots (b). */
-const VALK = [
-  "0W0.0H0.0W0",
-  "0WW0HhH0WW0",
-  "0WWw0s0wWW0",
-  ".0wwAAAaww0",
-  "..00AAAa00.",
-  "...0Aaa0...",
-  "...0ggg0...",
-  "...0g0g0...",
-  "...0b0b0...",
-];
-const VALK_COLORS: Record<string, string> = {
-  "0": OUTLINE, W: "#fbfaf4", w: "#c9cbd8", H: "#e9c46a", h: "#fff4c8", s: "#f0d2ae", A: "#e2e6ee", a: "#9aa2b4", g: "#d2a640", b: "#5a4632",
-};
 type ValkLook = "plain" | "struck" | "ghost";
-let valkSprites: Record<ValkLook, HTMLCanvasElement> | null = null;
-
-function valkSprite(look: ValkLook) {
-  valkSprites ??= { plain: paintValk("plain"), struck: paintValk("struck"), ghost: paintValk("ghost") };
-  return valkSprites[look];
-}
-
-function paintValk(look: ValkLook) {
-  const cv = document.createElement("canvas");
-  cv.width = 11;
-  cv.height = VALK.length;
-  const c = cv.getContext("2d")!;
-  VALK.forEach((row, j) =>
-    [...row].forEach((ch, i) => {
-      if (ch === ".") return;
-      let color = VALK_COLORS[ch];
-      if (look === "struck" && ch !== "0") color = "#fff";
-      // An after-image: the figure in gold, lightest where she is lit.
-      if (look === "ghost") color = ch === "0" ? GOLD[0] : "Wwh".includes(ch) ? GOLD[2] : GOLD[1];
-      c.fillStyle = color;
-      c.fillRect(i, j, 1, 1);
-    }),
-  );
-  return cv;
-}
-
-/** What the renderer remembers of each valkyrie: the way her spear points. */
-const facing = new WeakMap<object, number>();
+const valkSprite = (look:ValkLook,direction:Facing="south") => meleeBody("valkyrie",direction,{struck:look==="struck",ghost:look==="ghost"});
 
 /** Sprite pixels a cell. */
 const scale = (px: number) => (px * VALKYRIE.size * 1.9) / 9;
@@ -82,13 +44,12 @@ const scale = (px: number) => (px * VALKYRIE.size * 1.9) / 9;
 /** A valkyrie at her spot: halo while guarded, the spear, then the figure. */
 export function drawValkyrie(c: Ctx, px: number, u: Soldier, sim: DefendSim) {
   const k = scale(px);
-  const e = sim.enemies.find((e) => e.id === u.target);
-  if (e) facing.set(u, Math.atan2(e.y - u.y, e.x - u.x));
-  for (const st of sim.stabs) if (st.x1 === u.x && st.y1 === u.y) facing.set(u, Math.atan2(st.y1 - st.y0, st.x1 - st.x0));
-  const face = facing.get(u) ?? -Math.PI / 2;
+  let chargeAngle: number | undefined;
+  for (const st of sim.stabs) if (st.x1 === u.x && st.y1 === u.y) chargeAngle = Math.atan2(st.y1-st.y0,st.x1-st.x0);
+  const heading = meleeFacing(sim,u,chargeAngle), face = heading.angle;
   if (u.guard) drawHalo(c, px, u, u.guard, sim.time);
   drawSpear(c, k, u.x * px, u.y * px, face);
-  c.drawImage(valkSprite(u.flash > 0 ? "struck" : "plain"), u.x * px - 5.5 * k, u.y * px - 5 * k, 11 * k, VALK.length * k);
+  c.drawImage(valkSprite(u.flash > 0 ? "struck" : "plain",heading.direction), u.x * px - 5.5 * k, u.y * px - 5 * k, 11 * k, VALK.length * k);
 }
 
 /** The spear: an outlined ash shaft with a gold blade, from her off hand
@@ -167,7 +128,7 @@ function drawStab(c: Ctx, px: number, st: Stab) {
       }
     }
   // Gold after-images of her along the way, the oldest faintest.
-  const k = scale(px), ghost = valkSprite("ghost");
+  const k = scale(px), ghost = valkSprite("ghost", facingOf(Math.atan2(st.y1-st.y0,st.x1-st.x0)));
   for (let n = 1; n <= 4; n++) {
     const f = n / 5;
     c.globalAlpha = Math.max(0, fade * (0.15 + 0.45 * f) - life * 0.3);

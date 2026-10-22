@@ -338,7 +338,7 @@ export class Ledger {
       const price = `${amount} ${metal}`;
       const job = save.trainingJobs.find((j) => j.id === t.id);
       const takes = formatDuration(trainingSeconds(save.training[t.id]) * 1000);
-      const shown = (v: number) => `+${v}%`;
+      const shown = (v: number) => (t.seconds ? `${whole(t.seconds * (1 + v / 100))} s` : `+${v}%`);
       const why = !affordable ? `Needs ${price}` : !free.length ? (smiths.length ? "Every smith is busy" : "Put a miner to the smithy in the Mine") : `One smith takes ${takes}`;
       const buy = job
         ? `<span class="training-work"><span class="training-box training-timer" title="Time left at this many smiths"><span data-training-timer="${t.id}">${this.timeLeft(t.id)}</span></span>
@@ -346,7 +346,7 @@ export class Ledger {
         : maxed
         ? `<button class="training-box training-cost" disabled aria-label="${t.name} is fully upgraded">Max</button>`
         : `<button class="training-box training-cost metal-${metal}" data-train="${t.id}" ${affordable && free.length ? "" : "disabled"} aria-label="Upgrade ${t.name} to ${shown(next)} for ${price}, taking one smith ${takes}" title="${why}">${costHtml({ [metal]: amount })}</button>`;
-      return `<div class="training-row${job ? " active" : ""}" role="listitem" data-training-row="${t.id}"><span class="training-label">${t.name}<small>+${t.per}% a rank, up to ${t.max * t.per}%${maxed ? "" : ` · one smith takes ${takes}`}</small></span><span class="training-box">${shown(now)}</span><span class="training-arrow" aria-hidden="true">→</span><span class="training-box next">${shown(next)}</span>${buy}</div>`;
+      return `<div class="training-row${job ? " active" : ""}" role="listitem" data-training-row="${t.id}"><span class="training-label">${t.name}<small>${t.seconds ? `+${t.seconds} s a rank, up to ${shown(t.max * t.per)}` : `+${t.per}% a rank, up to ${t.max * t.per}%`}${maxed ? "" : ` · one smith takes ${takes}`}</small></span><span class="training-box">${shown(now)}</span><span class="training-arrow" aria-hidden="true">→</span><span class="training-box next">${shown(next)}</span>${buy}</div>`;
     };
     return `<h4 class="training-group">At the smithy</h4><p class="ledger-note"><small>Metal costs and work grow quadratically. Assigned smiths share the time.</small></p>
       <div class="training-table" role="list" aria-label="Smithy upgrades">${ids.map((id) => row(TRAINING.find((t) => t.id === id)!)).join("")}</div>`;

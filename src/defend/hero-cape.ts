@@ -11,14 +11,14 @@
 /** Points in the chain, the length of a link in cells, and the step. */
 export const CAPE = { points: 9, link: 0.16, step: 1 / 60, damping: 0.9, gravity: 3, breeze: 1.6, whirl: 60 };
 
-export type Cape = { x: Float64Array; y: Float64Array; px: Float64Array; py: Float64Array; time: number; phase: number };
+export type Cape = { x: Float64Array; y: Float64Array; px: Float64Array; py: Float64Array; time: number; phase: number; link: number };
 
 /** A cape hanging straight down from (x, y). */
-export function newCape(x: number, y: number, time: number, phase = 0): Cape {
-  const n = CAPE.points, c: Cape = { x: new Float64Array(n), y: new Float64Array(n), px: new Float64Array(n), py: new Float64Array(n), time, phase };
+export function newCape(x: number, y: number, time: number, phase = 0, length = 1): Cape {
+  const n = CAPE.points, c: Cape = { x: new Float64Array(n), y: new Float64Array(n), px: new Float64Array(n), py: new Float64Array(n), time, phase, link: CAPE.link * length };
   for (let i = 0; i < n; i++) {
     c.x[i] = c.px[i] = x;
-    c.y[i] = c.py[i] = y + i * CAPE.link;
+    c.y[i] = c.py[i] = y + i * c.link;
   }
   return c;
 }
@@ -29,7 +29,7 @@ export function newCape(x: number, y: number, time: number, phase = 0): Cape {
 export function stepCape(c: Cape, x: number, y: number, time: number, spin = 0) {
   const gap = time - c.time;
   if (gap < 0 || gap > 0.5) {
-    Object.assign(c, newCape(x, y, time, c.phase));
+    Object.assign(c, newCape(x, y, time, c.phase, c.link / CAPE.link));
     return c;
   }
   const steps = Math.min(8, Math.ceil(gap / CAPE.step - 1e-9));
@@ -66,7 +66,7 @@ export function stepCape(c: Cape, x: number, y: number, time: number, spin = 0) 
     for (let i = 1; i < n; i++) {
       const dx = c.x[i] - c.x[i - 1], dy = c.y[i] - c.y[i - 1], d = Math.sqrt(dx * dx + dy * dy);
       const ux = d > 1e-6 ? dx / d : 0, uy = d > 1e-6 ? dy / d : 1;
-      const nx = c.x[i - 1] + ux * CAPE.link, ny = c.y[i - 1] + uy * CAPE.link;
+      const nx = c.x[i - 1] + ux * c.link, ny = c.y[i - 1] + uy * c.link;
       c.px[i] += (nx - c.x[i]) * 0.6;
       c.py[i] += (ny - c.y[i]) * 0.6;
       c.x[i] = nx;
@@ -80,6 +80,7 @@ export function stepCape(c: Cape, x: number, y: number, time: number, spin = 0) 
 /** The cape's half width in pixels at the shoulders and at the hem, and how
  * far back the swallowtail's notch cuts. */
 export const CUT = { shoulder: 3.5, hem: 6, notch: 2.5 };
+export type CapeCut = { shoulder: number; hem: number; notch: number; fringe?: "square" | "points" | "scallop" | "torn"; bands?: number };
 /** What each pixel of the cape is: 1 its colour, then its lit folds, shaded
  * folds, shaded underside, trimmed hem and outline. */
 export const CAPE_LIT = 2, CAPE_SHADE = 3, CAPE_DEEP = 4, CAPE_TRIM = 5, CAPE_EDGE = 6;
@@ -88,13 +89,21 @@ export const CAPE_LIT = 2, CAPE_SHADE = 3, CAPE_DEEP = 4, CAPE_TRIM = 5, CAPE_ED
  * at (ox, oy) cells: a tone a pixel (0 for none) over the box from (x0, y0)
  * pixels, `w` by `h`. Folds ripple down it with `time`; its edges and folds
  * are lit from the upper left. */
-export function capePixels(c: Cape, ox: number, oy: number, per: number, time: number) {
+export function capePixels(c: Cape, ox: number, oy: number, per: number, time: number, cut: CapeCut = CUT) {
   const n = CAPE.points, xs: number[] = [], ys: number[] = [];
   for (let i = 0; i < n; i++) {
     xs.push((c.x[i] - ox) * per);
     ys.push((c.y[i] - oy) * per);
   }
-  const link = CAPE.link * per, length = link * (n - 1), pad = CUT.hem + 2;
+  // A link's direction/length is shared by every sampled pixel. Computing
+  // it once matters when whole melee garrisons wear these capes.
+  const segments = new Float64Array((n - 1) * 3);
+  for (let s = 0; s < n - 1; s++) {
+    const dx = xs[s + 1] - xs[s], dy = ys[s + 1] - ys[s];
+    segments[s * 3] = dx; segments[s * 3 + 1] = dy;
+    segments[s * 3 + 2] = Math.sqrt(dx * dx + dy * dy) || 1;
+  }
+  const link = c.link * per, length = link * (n - 1), pad = cut.hem + 2;
   const x0 = Math.floor(Math.min(...xs) - pad), y0 = Math.floor(Math.min(...ys) - pad);
   const w = Math.ceil(Math.max(...xs) + pad) - x0, h = Math.ceil(Math.max(...ys) + pad) - y0;
   const tone = new Uint8Array(w * h);
@@ -104,7 +113,7 @@ export function capePixels(c: Cape, ox: number, oy: number, per: number, time: n
       // The nearest link: how far down the cape and how far to one side.
       let best = Infinity, along = 0, side = 0, nx = 0, ny = 0;
       for (let s = 0; s < n - 1; s++) {
-        const dx = xs[s + 1] - xs[s], dy = ys[s + 1] - ys[s], d = Math.sqrt(dx * dx + dy * dy) || 1;
+        const dx = segments[s * 3], dy = segments[s * 3 + 1], d = segments[s * 3 + 2];
         const t = ((qx - xs[s]) * dx + (qy - ys[s]) * dy) / (d * d);
         const tt = Math.max(0, Math.min(1, t)), ex = qx - xs[s] - dx * tt, ey = qy - ys[s] - dy * tt, e = ex * ex + ey * ey;
         if (e < best) {
@@ -117,17 +126,24 @@ export function capePixels(c: Cape, ox: number, oy: number, per: number, time: n
         }
       }
       if (along < 0) continue;
-      const half = CUT.shoulder + ((CUT.hem - CUT.shoulder) * along) / length, a = Math.abs(side);
+      const half = cut.shoulder + ((cut.hem - cut.shoulder) * along) / length, a = Math.abs(side);
       // At a folded joint, the nearest point can be a link's endpoint.
       // Perpendicular distance to its infinite line ignores the overshoot
       // and paints long spikes; use distance to the finite link instead.
       if (best > half * half) continue;
-      const hem = length - CUT.notch + (CUT.notch * a) / half;
+      let hem = length - cut.notch + (cut.notch * a) / half;
+      const across = side / half;
+      // Tailoring stays inside the measured length, never adds extra cloth.
+      if (cut.fringe === "square") hem -= Math.floor((across + 1) * 3) % 2 ? 0.75 : 0;
+      if (cut.fringe === "points") hem -= (1 - Math.abs(Math.sin(across * Math.PI * 2.5))) * 1.1;
+      if (cut.fringe === "scallop") hem -= (1 + Math.cos(across * Math.PI * 3)) * 0.45;
+      if (cut.fringe === "torn") hem -= (1 + Math.sin(across * 13 + c.phase)) * 0.65;
       if (along > hem) continue;
       const l = side / half;
       const fold = Math.sin(l * 4.7 + along * 0.45 - time * 5 + c.phase);
       const toLight = (nx + ny) * Math.sign(side) < 0;
-      tone[j * w + i] = along > hem - 0.9 ? CAPE_TRIM : a > half - 1 ? (toLight ? CAPE_LIT : CAPE_DEEP) : fold > 0.55 ? CAPE_LIT : fold < -0.6 ? CAPE_SHADE : 1;
+      const edging = cut.bands && (a > half - 0.65 || (cut.bands >= 2 && a > half - 1.25 && a < half - 0.95));
+      tone[j * w + i] = along > hem - 0.9 || edging ? CAPE_TRIM : a > half - 1 ? (toLight ? CAPE_LIT : CAPE_DEEP) : fold > 0.55 ? CAPE_LIT : fold < -0.6 ? CAPE_SHADE : 1;
     }
   // The outline round it.
   for (let j = 0; j < h; j++)

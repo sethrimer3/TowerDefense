@@ -18,7 +18,7 @@ import { DefendLighting, type LightFrame } from "./lighting.ts";
 import { Fences } from "./fences.ts";
 import { Rain, Snow, ambientFor, type Weather } from "./weather.ts";
 import { areaFade, type AreaId } from "./areas.ts";
-import { damageKey, gateSprite, lotSeed, onCityArtLoaded, paintCityLayer, stageOf } from "./city-layer.ts";
+import { damageKey, gateSprite, lotSeed, onCityArtLoaded, paintCityLayer, paintStanding, stageOf } from "./city-layer.ts";
 import { GATE_FRAMES } from "./gate-art.ts";
 import { peopleAt } from "./gates.ts";
 import type { GateRanks } from "../gate-upgrades.ts";
@@ -27,6 +27,8 @@ import { UnitOutline } from "./unit-outline.ts";
 import { carriedLights, drawDamage, drawScorches, drawUnits, shadowCasters, type Brush, type Burning } from "./battle-art.ts";
 import { drawGrid, drawLifting, drawOverlay, type Overlay } from "./edit-overlay.ts";
 import { drawInspect, type Armed } from "./inspect.ts";
+import { drawShimmer } from "./placed-shimmer.ts";
+import { ART } from "./park-art.ts";
 import { drawFlag, drawRallyFlag, drawWarBanner } from "./structure-art.ts";
 import { bannerReach } from "./war-banner.ts";
 import { ParkGrass, type Walker } from "./park-grass.ts";
@@ -86,6 +88,9 @@ export type DrawOptions = {
   /** A city tile being held to lift, and how far the hold has come (0–1):
    * a gold square grows from its middle out to its edges. */
   lifting?: { tile: TilePos; t: number };
+  /** Now and then trace a gold line round each piece the player placed
+   * (`placed-shimmer.ts`): on while building. */
+  shimmer?: boolean;
 };
 
 /** The torches going out after a lost run: seconds before the first, then
@@ -283,6 +288,7 @@ export class DefendRenderer {
     if (sim?.warBanner?.flag && !opts.hideBanner) drawRallyFlag(this.ctx, this.px, sim.warBanner, { t: opts.now / 1000, reduceMotion: opts.reduceMotion });
     else if (sim?.warBanner && !opts.hideBanner) drawWarBanner(this.ctx, this.px, sim.warBanner, bannerReach(sim), { t: opts.now / 1000, reduceMotion: opts.reduceMotion });
     if (sim) this.wizard.drawFire(this.ctx, this.px);
+    if (opts.shimmer && !opts.reduceMotion) drawShimmer(this.ctx, this.px, map, opts.now, (c, b) => paintStanding(c, ART, map, b, this.area, opts.looks), opts.looks);
     if (opts.inspect) drawInspect(this.ctx, this.px, map, sim, opts.inspect.id, opts.inspect.armed, opts.now, opts.reduceMotion);
     this.drawEditing(overlay, opts.grid);
     if (opts.lifting) drawLifting(this.ctx, this.px, opts.lifting.tile, opts.lifting.t);
@@ -400,7 +406,7 @@ export class DefendRenderer {
     else {
       // Combat art advances on the fixed simulation clock. Keep screen pixels
       // (including artPen's camera snapping), never rescale a cached frame.
-      const key = `${sim.time}:${sim.mapVersion}:${sim.effects.length}:${sim.scorches.length}:${sim.enemies.length}:${sim.soldiers.length}:${sim.civilians.length}:${this.px}:${c.canvas.width}:${c.canvas.height}:${this.cam.s}:${this.cam.x}:${this.cam.y}:${!!torches}:${opts.healthbars === true}:${!!opts.simpleEnemies}:${!!opts.simpleTroops}:${!!opts.mergedOutlines}:${pixelKey()}`;
+      const key = `${sim.time}:${sim.mapVersion}:${sim.effects.length}:${sim.scorches.length}:${sim.enemies.length}:${sim.soldiers.length}:${sim.civilians.length}:${this.px}:${c.canvas.width}:${c.canvas.height}:${this.cam.s}:${this.cam.x}:${this.cam.y}:${!!torches}:${opts.healthbars === true}:${!!opts.simpleEnemies}:${!!opts.simpleTroops}:${!!opts.mergedOutlines}:${opts.reduceMotion}:${pixelKey()}`;
       this.combatLayer ??= document.createElement('canvas');
       const layer = this.combatLayer;
       if (sim !== this.combatSim || key !== this.combatKey) {
@@ -426,7 +432,7 @@ export class DefendRenderer {
     drawRime(c, this.px, sim);
     drawLandings(c, this.px, sim);
     this.wizard.drawIce(c, this.px, sim.frosts, sim.time * 1000, flameLights(sim).relief);
-    drawUnits(brush, sim, torches, opts.healthbars === true, opts.timings ? this.timings : undefined, { enemies: opts.simpleEnemies, troops: opts.simpleTroops }, opts.mergedOutlines ? (this.outline ??= new UnitOutline()) : undefined);
+    drawUnits(brush, sim, torches, opts.healthbars === true, opts.timings ? this.timings : undefined, { enemies: opts.simpleEnemies, troops: opts.simpleTroops, reduceMotion: opts.reduceMotion }, opts.mergedOutlines ? (this.outline ??= new UnitOutline()) : undefined);
     this.dark.draw(c, this.px, sim);
   }
 

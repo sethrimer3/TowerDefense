@@ -607,9 +607,10 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   it elsewhere moves it. It draws nothing from the run's random stream, so a
   run without one replays exactly as before.
 - **Necromancy** (`necromancy.ts`, `×∞`), a strike spell, is dragged from
-  the same palette; its aim shows a green ring of 3 cells with a mark over
-  each grave inside. Let go on the board, every enemy that died there in
-  the last 30 seconds (on open ground) rises as a friendly bone warrior
+  the same palette; while it is held a small pixel skull marks every grave
+  on the board, and its aim shows a green ring of 3 cells, the skulls inside
+  it brighter. Let go on the board, every enemy that died there in the last
+  10 seconds (20, then 30 with the Smithy's Grave time; on open ground) rises as a friendly bone warrior
   (30 HP, 5 damage, times the Smithy's Risen HP and damage) that hunts the
   nearest enemy anywhere and crumbles after 60 seconds; at most 60 stand
   at once, and the spell is ready again 30 seconds later. Its Study paths:
