@@ -112,7 +112,8 @@ test("each building is upgraded on its own, paying Knowledge rank by rank", () =
   assert.match(treeCardHtml(s, "wizardTower", undefined, "p:storm:1"), /Stormcalling I[\s\S]*data-ug-buy="p:storm:1"/);
   s.knowledge = 0;
   assert.match(treeCardHtml(s, "wizardTower", undefined, "p:storm:1"), /data-ug-buy="p:storm:1" disabled/, "unaffordable upgrades show, locked");
-  assert.match(treeCardHtml(s, "wizardTower", undefined, "p:storm:2"), /Locked/);
+  assert.ok(!treeGraph("wizardTower").some((n) => n.id === "p:storm:2"), "only the attunements show before a branch is taken");
+  assert.match(treeCardHtml(s, "wizardTower", { path: "storm", rank: 1 }, "p:storm:3"), /Locked/);
   assert.match(treeCardHtml(s, "wizardTower", undefined, "k:wizardTower"), /Where it is now/);
 });
 
@@ -123,13 +124,13 @@ test("becoming another building swaps one copy: in place when it fits, else it w
   assert.equal(s.defend.layout.structures.find(st => st.uid === a)!.kind, "archerTower", "the same building, same uid");
   assert.ok(fitLayout(s.defend.layout).ok);
   // The same size, it stays where it stood; another size, and it waits in
-  // the palette to be placed again, on its branch's first rank.
+  // the palette to be placed again, attuned but not yet on its path.
   const g = fixture("rangedGuild", 2), [guild, other] = uids(g, "rangedGuild");
   assert.deepEqual(upgradeBuilding(g, { uid: guild }, become("gunHall")), { ok: true, kind: "gunHall", waiting: false });
   assert.deepEqual(upgradeBuilding(g, { uid: other }, become("gunHall")), { ok: true, kind: "gunHall", waiting: false });
-  assert.deepEqual(upgradeBuilding(g, { uid: other }, { type: "branch", to: "musketHall", path: "volleyFire", cost: 0 }), { ok: true, kind: "musketHall", waiting: true });
+  assert.deepEqual(upgradeBuilding(g, { uid: other }, become("musketHall")), { ok: true, kind: "musketHall", waiting: true });
   assert.deepEqual(g.defend.layout.structures.map((st) => st.kind), ["gunHall"]);
-  assert.deepEqual(keptGroups(g.defend, "musketHall"), [{ path: "volleyFire", rank: 1, count: 1 }]);
+  assert.deepEqual([g.defend.owned.musketHall, keptGroups(g.defend, "musketHall")], [1, []]);
 });
 
 test("three buildings maxed on different branches merge into the ultimate; undone, they come apart", () => {
@@ -220,7 +221,9 @@ test("a choice cuts off the branches beside it and opens its own", () => {
   assert.deepEqual(plain, ["k:rangedGuild=owned", "k:archerBarracks=next", "k:mageGuild=next", "k:gunHall=next"]);
   const mage = ids("mageGuild");
   assert.ok(!mage.some((n) => n.startsWith("k:archerBarracks")), "the archer branch is gone");
-  assert.ok(mage.includes("p:pyroclasm:1=next") && mage.includes("p:cinders:1=next") && mage.includes("p:pyroclasm:3=locked"), "the mage's own branches appear");
+  assert.ok(mage.includes("p:pyroclasm:1=next") && mage.includes("p:cinders:1=next"), "the mage's own branches appear");
+  assert.ok(!mage.some((n) => n.startsWith("p:pyroclasm:2") || n.startsWith("u:")), "only their attunements, until one is taken");
+  assert.deepEqual(ids("gunHall").slice(2), ["k:musketHall=next", "k:gunNest=next", "k:rocketBattery=next"], "a branch that makes another building shows only that building");
   const pyro = ids("mageGuild", { path: "pyroclasm", rank: 1 });
   assert.deepEqual(pyro, ["k:rangedGuild=owned", "k:mageGuild=owned", "p:pyroclasm:1=owned", "p:pyroclasm:2=next", "p:pyroclasm:3=locked", "u:mageGuild=locked"], "Cinders is cut off; the ultimate is to come");
   const storm = buildingTree("wizardTower", { path: "storm", rank: 3 });
@@ -279,10 +282,12 @@ test("undoing a node steps the building back to the one it grew from, its Knowle
   assert.equal(s.defend.layout.structures.find((st) => st.uid === a)?.kind, "watchTower");
   assert.equal(s.knowledge, 1e7, `every point back (${all} spent)`);
   assert.equal((undoUpgrade(s, { uid: a }, "k:watchTower") as { reason: string }).reason, "Nothing to undo there.", "the basic building can't be undone");
-  // A branch that made the hall a phalanx: undoing its first rank makes it a hall again.
+  // A branch's attunement made the hall a phalanx: undoing its first rank leaves a plain phalanx, undoing the attunement a hall again.
   assert.deepEqual(undoTo("phalanx", { path: "testudo", rank: 2 }, "p:testudo:2"), { kind: "phalanx", wear: { path: "testudo", rank: 1 } });
-  assert.deepEqual(undoTo("phalanx", { path: "testudo", rank: 2 }, "p:testudo:1"), { kind: "spearHall" });
-  assert.equal(undoRefund("phalanx", { path: "testudo", rank: 1 }, "p:testudo:1"), 7 + 4);
+  assert.deepEqual(undoTo("phalanx", { path: "testudo", rank: 2 }, "p:testudo:1"), { kind: "phalanx" });
+  assert.deepEqual(undoTo("phalanx", { path: "testudo", rank: 2 }, "k:phalanx"), { kind: "spearHall" });
+  assert.equal(undoRefund("phalanx", { path: "testudo", rank: 1 }, "p:testudo:1"), 4);
+  assert.equal(undoRefund("phalanx", { path: "testudo", rank: 1 }, "k:phalanx"), 7 + 4);
 });
 
 test("the tree puts other buildings beside and below, branches above, and counts hidden and closed branches", () => {

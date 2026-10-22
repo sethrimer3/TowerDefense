@@ -138,7 +138,8 @@ try {
     assert.equal(s.defend.owned.watchTower, 1, 'the other Watch tower is untouched');
     let tree = await nodes();
     assert.ok(!tree.some(n => n.startsWith('k:archerTower') || n.startsWith('k:cannonTower')), `the other branches withered: ${tree}`);
-    assert.ok(tree.includes('p:storm:1=next') && tree.includes('p:pyromancy:3=locked'), `the wizard's own paths sprouted: ${tree}`);
+    assert.ok(tree.includes('p:storm:1=next') && tree.includes('p:pyromancy:1=next'), `the wizard's own paths sprouted: ${tree}`);
+    assert.ok(!tree.some(n => n.startsWith('p:pyromancy:2') || n.startsWith('k:darkKeep')), `only their attunements before one is taken: ${tree}`);
     assert.match(await allocatedText(), /✦ 8/);
     assert.ok(Number(await panel.locator('.ug-branches').getAttribute('data-closed')) > 0, 'the Watch tower trails the branches it closed off');
     await buy('p:storm:1');
@@ -218,14 +219,14 @@ try {
     assert.equal(await panel.locator('.ug-node.next').count(), 3);
     await page.waitForTimeout(700); await page.screenshot({ path: `${out}/upgrade-${width}-ranged-guild.png` });
     // A Musket hall is 3 × 2 quarters, not the guild's 2 × 2: it waits in the
-    // palette, on the first rank of Volley fire, the branch that made it.
+    // palette, attuned to Volley fire but not yet on its first rank.
     await buy('k:gunHall');
     await settled();
-    await buy('p:volleyFire:1');
+    await buy('k:musketHall');
     await page.waitForSelector('#defend-specialty', { state: 'hidden' });
     assert.equal(await placed(ranged.uid), undefined, 'taken up');
     assert.ok((await state(page)).defend.owned.musketHall >= 1);
-    assert.equal((await place('musketHall~volleyFire~1'))?.kind, 'musketHall', 'and placed again');
+    assert.equal((await place('musketHall'))?.kind, 'musketHall', 'and placed again');
     const ranged2 = await place('rangedGuild', 2);
     await tapBuilding(ranged2.uid);
     await buy('k:gunHall');

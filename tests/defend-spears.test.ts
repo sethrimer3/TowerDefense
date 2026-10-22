@@ -66,7 +66,8 @@ function fire(sim: DefendSim, m: Soldier) {
 test("the Melee Guild leads to spearmen, and spearmen branch into a phalanx, javelins and lancers", () => {
   assert.deepEqual(BECOMES.meleeGuild!.map((b) => b.to), ["barracks", "assassinDen", "spearHall"]);
   assert.deepEqual(nextSteps("spearHall").map(stepName), ["Phalanx", "Javelin camp", "Lancer stable"]);
-  assert.deepEqual(nextSteps("spearHall").map((s) => s.type === "branch" && s.path), ["testudo", "barbed", "wingedLancers"]);
+  assert.deepEqual(nextSteps("spearHall").map((s) => s.type), ["become", "become", "become"]);
+  assert.deepEqual(nextSteps("lancerStable").map(stepName), ["Winged lancers I"]);
   assert.deepEqual(nextSteps("phalanx", { path: "testudo", rank: 1 }).map(stepName), ["Testudo II"]);
   assert.deepEqual(nextSteps("javelinCamp", { path: "barbed", rank: 2 }).map(stepName), ["Barbed javelins III"]);
   for (const k of ["phalanx", "javelinCamp", "lancerStable"] as const) assert.equal(upgradedFrom(k), "spearHall");
@@ -91,8 +92,8 @@ test("a Melee Guild is bought up through spearmen and lancers, then merged into 
   const kind = () => s.defend.layout.structures.find((o) => o.uid === uid)?.kind;
   const steps = () => nextSteps(kind()!, specialtyOf(s.defend.layout, { uid }));
   assert.ok(upgradeBuilding(s, { uid }, steps().find((o) => o.type === "become" && o.to === "spearHall")!).ok);
-  assert.ok(upgradeBuilding(s, { uid }, steps().find((o) => o.type === "branch" && o.to === "lancerStable")!).ok);
-  for (let r = 1; r < 3; r++) assert.ok(upgradeBuilding(s, { uid }, steps()[0]).ok);
+  assert.ok(upgradeBuilding(s, { uid }, steps().find((o) => o.type === "become" && o.to === "lancerStable")!).ok);
+  for (let r = 0; r < 3; r++) assert.ok(upgradeBuilding(s, { uid }, steps()[0]).ok);
   assert.deepEqual(specialtyOf(s.defend.layout, { uid }), { path: "wingedLancers", rank: 3 });
   // The phalanx and the javelin camp wait maxed in the palette.
   s.defend.owned.phalanx = 1; s.defend.owned.javelinCamp = 1;
