@@ -4,20 +4,22 @@
  * what can be picked up and moved, unlike the houses and the wall ring the
  * city grows by itself. The line is one layer of art pixels hugging the
  * piece's own sprite, each touching it edge to edge (none only at a
- * corner), so it traces the silhouette exactly. Presentation only, on the
+ * corner), so it traces the silhouette exactly; placed wall sections that
+ * touch are traced as one, round their outer edge. Presentation only, on the
  * wall clock; each piece keeps its own staggered time, so they never all
  * shine at once. */
 import type { Building, CityMap } from "./citygen.ts";
-import { QC } from "./layout.ts";
+import { CELLS_W, cellIndex } from "./grid.ts";
 import { ART } from "./park-art.ts";
 import { artPen } from "./pixel-fx.ts";
 import { pixelKey } from "./pixel-sprites.ts";
 
 type Rect = { x: number; y: number; w: number; h: number };
 /** A placed piece's cells, the building whose sprite it traces (none for a
- * wall section, gate or ballista, which fill their cells), and where in the
- * shared cycle its trace starts (0–1). */
-export type ShimmerTarget = { rect: Rect; phase: number; b?: Building };
+ * gate or ballista, which fill their cells), the cells of `rect` a group of
+ * touching wall sections covers (`cells`, a row at a time), and where in
+ * the shared cycle its trace starts (0–1). */
+export type ShimmerTarget = { rect: Rect; phase: number; b?: Building; cells?: Uint8Array };
 
 export const SHIMMER = {
   /** Seconds between one piece's traces: at least `every`, longer in a big
@@ -42,26 +44,48 @@ const placed = (b: Building) => b.structureUid !== undefined || b.kind === "gate
 
 const cache = new WeakMap<CityMap, ShimmerTarget[]>();
 
-/** Every piece the player placed on `map`, a placed wall section's stones
- * gathered into its quarter, their starts spread round the cycle by the
- * golden ratio so neighbours in the list never trace together. */
+/** Every piece the player placed on `map`, the stones of placed wall
+ * sections that touch edge to edge gathered into one, their starts spread
+ * round the cycle by the golden ratio so neighbours in the list never
+ * trace together. */
 export function shimmerTargets(map: CityMap): ShimmerTarget[] {
   let out = cache.get(map);
   if (out) return out;
   out = [];
-  const quarters = new Set<number>();
+  const stones = new Set<number>();
   for (const b of map.buildings) {
     if (b.structureUid !== undefined) out.push({ rect: b.rect, phase: 0, b });
     else if (placed(b)) out.push({ rect: b.rect, phase: 0 });
-    else if (b.piece) {
-      const qx = Math.floor(b.rect.x / QC), qy = Math.floor(b.rect.y / QC), key = qy * 10000 + qx;
-      if (quarters.has(key)) continue;
-      quarters.add(key);
-      out.push({ rect: { x: qx * QC, y: qy * QC, w: QC, h: QC }, phase: 0 });
-    }
+    else if (b.piece) for (let y = b.rect.y; y < b.rect.y + b.rect.h; y++) for (let x = b.rect.x; x < b.rect.x + b.rect.w; x++) stones.add(cellIndex(x, y));
   }
+  out.push(...wallGroups(stones));
   out.forEach((t, i) => { t.phase = (i * 0.6180339887) % 1; });
   cache.set(map, out);
+  return out;
+}
+
+/** The placed wall stones `stones` (cell indices) in groups that touch edge
+ * to edge, each with its bounding cells and which of them it covers. */
+function wallGroups(stones: Set<number>): ShimmerTarget[] {
+  const out: ShimmerTarget[] = [], seen = new Set<number>();
+  for (const first of [...stones].sort((a, b) => a - b)) {
+    if (seen.has(first)) continue;
+    const group = [first];
+    seen.add(first);
+    for (let i = 0; i < group.length; i++) {
+      const k = group[i], x = k % CELLS_W;
+      for (const n of [x > 0 ? k - 1 : -1, x < CELLS_W - 1 ? k + 1 : -1, k - CELLS_W, k + CELLS_W])
+        if (n >= 0 && stones.has(n) && !seen.has(n)) { seen.add(n); group.push(n); }
+    }
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const k of group) {
+      const x = k % CELLS_W, y = (k / CELLS_W) | 0;
+      x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y);
+    }
+    const rect = { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 }, cells = new Uint8Array(rect.w * rect.h);
+    for (const k of group) cells[(((k / CELLS_W) | 0) - y0) * rect.w + (k % CELLS_W) - x0] = 1;
+    out.push({ rect, phase: 0, cells });
+  }
   return out;
 }
 
@@ -86,17 +110,30 @@ export function shimmerAt(t: ShimmerTarget, seconds: number, period: number): { 
 }
 
 /** The art pixels just outside `mask` (`w` × `h`, 1 where the sprite is
- * solid) that touch it edge to edge, in order clockwise round its middle
- * from its top left: the line a trace lights, as art pixel coordinates in
- * the mask. A mask needs a clear pixel all round for its ring to fit. */
+ * solid) that touch it edge to edge, on its outside (not round any hole in
+ * it), walked clockwise round it from its top left: the line a trace
+ * lights, as art pixel coordinates in the mask. A mask needs a clear pixel
+ * all round for its ring to fit. */
 export function outlineRing(mask: Uint8Array, w: number, h: number): { xs: Int16Array; ys: Int16Array } {
+  // The open pixels reachable from the edge, so holes stay unlit.
+  const outside = new Uint8Array(w * h), stack: number[] = [];
+  const reach = (k: number) => { if (!mask[k] && !outside[k]) { outside[k] = 1; stack.push(k); } };
+  for (let x = 0; x < w; x++) { reach(x); reach((h - 1) * w + x); }
+  for (let y = 0; y < h; y++) { reach(y * w); reach(y * w + w - 1); }
+  while (stack.length) {
+    const k = stack.pop()!, x = k % w;
+    if (x > 0) reach(k - 1);
+    if (x < w - 1) reach(k + 1);
+    if (k >= w) reach(k - w);
+    if (k + w < w * h) reach(k + w);
+  }
+  const solid = (x: number, y: number) => x >= 0 && y >= 0 && x < w && y < h && mask[y * w + x] === 1;
   const at: number[] = [];
   let sx = 0, sy = 0, n = 0;
   for (let y = 0; y < h; y++)
     for (let x = 0; x < w; x++) {
-      const k = y * w + x;
-      if (mask[k]) { sx += x; sy += y; n++; continue; }
-      if ((x > 0 && mask[k - 1]) || (x < w - 1 && mask[k + 1]) || (y > 0 && mask[k - w]) || (y < h - 1 && mask[k + w])) at.push(k);
+      if (mask[y * w + x]) { sx += x; sy += y; n++; continue; }
+      if (outside[y * w + x] && (solid(x - 1, y) || solid(x + 1, y) || solid(x, y - 1) || solid(x, y + 1))) at.push(y * w + x);
     }
   const mx = n ? sx / n + 0.5 : w / 2, my = n ? sy / n + 0.5 : h / 2;
   // Screen angles grow clockwise (y points down); start toward the top left.
@@ -106,7 +143,27 @@ export function outlineRing(mask: Uint8Array, w: number, h: number): { xs: Int16
   };
   const angle = new Map(at.map((k) => [k, turn(k)]));
   at.sort((a, b) => angle.get(a)! - angle.get(b)! || a - b);
-  return { xs: Int16Array.from(at, (k) => k % w), ys: Int16Array.from(at, (k) => (k / w) | 0) };
+  // Walk the ring from the first, a step at a time to an unlit neighbour:
+  // edge to edge before corner to corner, keeping the sprite on the right
+  // (clockwise); whatever the walk misses follows by angle.
+  const ring = new Set(at), order: number[] = [], done = new Set<number>();
+  let cur = at.length ? at[0] : -1;
+  while (cur >= 0) {
+    order.push(cur);
+    done.add(cur);
+    const x = cur % w, y = (cur / w) | 0;
+    let best = -1, score = -1;
+    for (let dy = -1; dy <= 1; dy++)
+      for (let dx = -1; dx <= 1; dx++) {
+        const k = (y + dy) * w + x + dx;
+        if ((!dx && !dy) || x + dx < 0 || x + dx >= w || !ring.has(k) || done.has(k)) continue;
+        const sc = (dx && dy ? 0 : 2) + (solid(x + dx - dy, y + dy + dx) ? 1 : 0);
+        if (sc > score) (score = sc), (best = k);
+      }
+    cur = best;
+  }
+  for (const k of at) if (!done.has(k)) order.push(k);
+  return { xs: Int16Array.from(order, (k) => k % w), ys: Int16Array.from(order, (k) => (k / w) | 0) };
 }
 
 /** A ring in art pixels from its piece's top left corner. */
@@ -122,6 +179,20 @@ function boxRing(r: Rect): Ring {
     for (let y = 1; y < h - 1; y++) mask.fill(1, y * w + 1, y * w + w - 1);
     const o = outlineRing(mask, w, h);
     rings.set(key, (ring = { xs: o.xs.map((x) => x - 1), ys: o.ys.map((y) => y - 1) }));
+  }
+  return ring;
+}
+
+/** The ring round a group of wall sections, once a group (each map makes its own). */
+const groupRings = new WeakMap<ShimmerTarget, Ring>();
+function groupRing(t: ShimmerTarget): Ring {
+  let ring = groupRings.get(t);
+  if (!ring) {
+    const r = t.rect, w = r.w * ART + 2, h = r.h * ART + 2, mask = new Uint8Array(w * h);
+    for (let y = 0; y < r.h * ART; y++)
+      for (let x = 0; x < r.w * ART; x++) mask[(y + 1) * w + x + 1] = t.cells![((y / ART) | 0) * r.w + ((x / ART) | 0)];
+    const o = outlineRing(mask, w, h);
+    groupRings.set(t, (ring = { xs: o.xs.map((x) => x - 1), ys: o.ys.map((y) => y - 1) }));
   }
   return ring;
 }
@@ -164,7 +235,7 @@ export function drawShimmer(c: CanvasRenderingContext2D, px: number, map: CityMa
     const s = shimmerAt(t, seconds, period);
     if (!s) continue;
     if (!pen) { c.save(); pen = artPen(c, px); }
-    const ring = t.b ? spriteRing(t.b, looks?.[t.b.structureUid!], paint) : boxRing(t.rect);
+    const ring = t.b ? spriteRing(t.b, looks?.[t.b.structureUid!], paint) : t.cells ? groupRing(t) : boxRing(t.rect);
     drawTrace(c, pen, t.rect, ring, s.run, s.alpha);
   }
   if (pen) c.restore();

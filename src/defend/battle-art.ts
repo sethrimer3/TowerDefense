@@ -32,7 +32,9 @@ import { BUILDING_FLASH, type DefendSim, type Effect, type Enemy, type Soldier }
 import { hallPaths } from "./muskets.ts";
 import { sniperAim } from "./snipers.ts";
 import { drawSimpleEnemies, drawSimpleTroops } from "./simple-units.ts";
-import { drawPixel, enemySprite } from "./pixel-sprites.ts";
+import { drawPixel, enemySprite, pixelSprite } from "./pixel-sprites.ts";
+import { isMelee, meleeFacing } from "./melee-facing.ts";
+import { meleeBody } from "./melee-body.ts";
 import type { UnitOutline } from "./unit-outline.ts";
 
 export type Brush = { c: CanvasRenderingContext2D; px: number };
@@ -219,12 +221,12 @@ function drawSoldiers(b: Brush, sim: DefendSim, torches: Burning | null, reduced
     }
     if (u.risen) {
       drawMeleeCape(c, px, u, sim, reduced);
-      drawRisen(c, px, u);
+      drawRisen(c, px, u, isMelee(u) ? meleeFacing(sim,u).direction : "south");
       continue;
     }
     if (u.called) {
       drawMeleeCape(c, px, u, sim, reduced);
-      drawCalled(c, px, u);
+      drawCalled(c, px, u, isMelee(u) ? meleeFacing(sim,u).direction : "south");
       continue;
     }
     if (isGuildTroop(u.kind)) {
@@ -233,12 +235,19 @@ function drawSoldiers(b: Brush, sim: DefendSim, torches: Burning | null, reduced
       continue;
     }
     const archer = u.kind === "archer";
+    const heading = archer ? null : meleeFacing(sim,u);
     const swing = archer ? null : swingOf(sim, u);
     const x = u.x + (swing?.dx ?? 0),
       y = u.y + (swing?.dy ?? 0);
     const s = Math.max(2, (archer ? ARCHER_UNIT.size : SOLDIER.size) * px);
     if (!archer) drawMeleeCape(c, px, u, sim, reduced, x, y);
-    if (u.flash <= 0 && drawPixel(c, archer ? "archer" : "swordsman", x * px - s / 2, y * px - s / 2, s)) {
+    const directional = !archer && pixelSprite("v2/units/melee-facing");
+    if (directional) {
+      const img = meleeBody("sword",heading!.direction,{struck:u.flash>0});
+      const w=s*img.width/img.height;
+      c.drawImage(img,x*px-w/2,y*px-s/2,w,s);
+    }
+    if (directional || (u.flash <= 0 && drawPixel(c, archer ? "archer" : "swordsman", x * px - s / 2, y * px - s / 2, s))) {
       if (swing) swords.push({ x, y, swing });
       if (torches) drawHandTorch(b, { x: x + SOLDIER.size * 0.65, y: y - SOLDIER.size * 0.45, id: u.id }, sim.time, torches(u.x, u.y, u.id));
       continue;
@@ -248,6 +257,7 @@ function drawSoldiers(b: Brush, sim: DefendSim, torches: Burning | null, reduced
     r.fillRect(x * px - s / 2 - 1, y * px - s / 2 - 1, s + 2, s + 2);
     c.fillStyle = u.flash > 0 ? "#fff" : archer ? ARCHER_UNIT.color : SOLDIER.color;
     c.fillRect(x * px - s / 2, y * px - s / 2, s, s);
+    if (heading) faceMark(c,x*px,y*px,s,Math.cos(heading.angle),Math.sin(heading.angle),"#c2ccd0");
     if (archer) {
       c.fillStyle = "#b58a4f";
       c.fillRect(x * px - s / 2 - Math.max(1, s * 0.3), y * px - s / 2, Math.max(1, s * 0.2), s);
@@ -270,14 +280,22 @@ function drawSoldiers(b: Brush, sim: DefendSim, torches: Burning | null, reduced
  * thrusts; a hoplite in red behind a round bronze shield; a javelineer in
  * olive with a javelin raised while one is ready; a lancer in blue on a
  * brown horse, its lance couched along the way it rides. */
+function faceMark(c: CanvasRenderingContext2D,x:number,y:number,s:number,fx:number,fy:number,color:string) {
+  const p=Math.max(1,Math.round(s*.23));
+  c.fillStyle=color;
+  c.fillRect(Math.round(x+fx*s*.35-p/2),Math.round(y+fy*s*.35-p/2),p,p);
+}
+
 function drawGuildTroop(b: Brush, sim: DefendSim, u: Soldier, reduced = false) {
   const { c, px } = b;
   const k = u.kind as keyof typeof GUILD_TROOPS;
   const def = GUILD_TROOPS[k], s = Math.max(2, def.size * px), unit = Math.max(1, Math.round(s * 0.22));
   // Snipers turn their rifles along their lasers.
-  const e = k === "sniper" || k === "railSniper" ? sniperAim(sim, u) : sim.enemies.find((o) => o.id === u.target);
+  const heading = isMelee(u) ? meleeFacing(sim,u) : null;
+  const e = heading ? undefined : k === "sniper" || k === "railSniper" ? sniperAim(sim, u) : sim.enemies.find((o) => o.id === u.target);
   let fx = 0, fy = -1;
-  if (e) {
+  if (heading) { fx=Math.cos(heading.angle); fy=Math.sin(heading.angle); }
+  else if (e) {
     const d = Math.hypot(e.x - u.x, e.y - u.y) || 1;
     fx = (e.x - u.x) / d;
     fy = (e.y - u.y) / d;
@@ -298,10 +316,9 @@ function drawGuildTroop(b: Brush, sim: DefendSim, u: Soldier, reduced = false) {
   // A lit upper left, like the city's art.
   c.fillStyle = "rgba(255,255,255,0.22)";
   c.fillRect(Math.round(x - s / 2), Math.round(y - s / 2), Math.round(s), unit);
+  if (heading) faceMark(c,x,y,s,fx,fy,k === "brawler" ? "#e8b88a" : k === "assassin" ? "#a391b3" : "#c2ccd0");
   if (k === "assassin") {
     // A hood's lit rim, and the dagger thrust at the target.
-    c.fillStyle = "#6a5a86";
-    c.fillRect(Math.round(x - s / 2), Math.round(y - s / 2), Math.round(s), unit);
     const reach = s * (0.5 + punch * 0.6), w = Math.max(1, unit);
     line(c, x + fx * s * 0.3, y + fy * s * 0.3, x + fx * (s * 0.3 + reach), y + fy * (s * 0.3 + reach), w, "#d8dce6");
     c.globalAlpha = 1;
@@ -351,9 +368,9 @@ function drawGuildTroop(b: Brush, sim: DefendSim, u: Soldier, reduced = false) {
     rimDot(c, x + fx * reach, y + fy * reach, unit + 2);
     c.fillStyle = "#e8b88a";
     dot(c, x + fx * reach, y + fy * reach, unit);
-    rimDot(c, x - s * 0.55, y - s * 0.1, unit + 2);
+    rimDot(c, x + fy*s*0.55-fx*s*0.1, y - fx*s*0.55-fy*s*0.1, unit + 2);
     c.fillStyle = "#e8b88a";
-    dot(c, x - s * 0.55, y - s * 0.1, unit);
+    dot(c, x + fy*s*0.55-fx*s*0.1, y - fx*s*0.55-fy*s*0.1, unit);
     return;
   }
   if (k === "slinger") {
@@ -499,12 +516,14 @@ type Swing = {
 function swingOf(sim: DefendSim, u: Soldier): Swing {
   let m = swings.get(u);
   if (!m) swings.set(u, (m = { face: REST + Math.PI / 2, t: Infinity, side: 1 }));
-  const e = sim.enemies.find((e) => e.id === u.target);
-  if (e) m.face = Math.atan2(e.y - u.y, e.x - u.x);
+  m.face = meleeFacing(sim,u).angle;
   const t = SOLDIER.cooldown - u.cd;
   if (t < m.t) m.side = m.side === 1 ? -1 : 1;
   m.t = t;
-  if (!(t >= 0 && t < SWING + TRAIL_FADE)) return { dx: 0, dy: 0, blade: REST, from: REST, end: REST, k: 2 };
+  if (!(t >= 0 && t < SWING + TRAIL_FADE)) {
+    const rest=m.face+Math.PI*.3;
+    return { dx: 0, dy: 0, blade: rest, from: rest, end: rest, k: 2 };
+  }
   const k = t / SWING;
   const eased = k >= 1 ? 1 : 1 - (1 - k) * (1 - k);
   const from = m.face - (m.side * Math.PI) / 2;
@@ -512,7 +531,8 @@ function swingOf(sim: DefendSim, u: Soldier): Swing {
   const end = from + m.side * Math.PI * eased;
   // Once the sweep ends, the sword eases back to rest while the trail fades.
   const back = k < 1 ? 0 : (t - SWING) / TRAIL_FADE;
-  const home = end + ((((REST - end) % TAU) + TAU + Math.PI) % TAU) - Math.PI;
+  const rest=m.face+Math.PI*.3;
+  const home = end + ((((rest - end) % TAU) + TAU + Math.PI) % TAU) - Math.PI;
   return { dx: Math.cos(m.face) * lunge, dy: Math.sin(m.face) * lunge, blade: end + (home - end) * back * back, from, end, k };
 }
 

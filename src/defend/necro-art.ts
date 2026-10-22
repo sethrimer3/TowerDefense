@@ -12,60 +12,19 @@ import { ART } from "./park-art.ts";
 import { NECRO, RAISE_SHOW } from "./necromancy.ts";
 import type { DefendSim, Soldier } from "./sim.ts";
 
+import { meleeBody } from "./melee-body.ts";
+import { NECRO_ROWS as SPRITES, NECRO_COLORS as COLORS } from "./melee-body-data.ts";
+import type { Facing } from "./melee-facing.ts";
+
 type Ctx = CanvasRenderingContext2D;
 
 const OUTLINE = "#0b0907";
 const GREEN = ["#1d3326", "#3f9a5c", "#8dffa6", "#e8fff0"];
-const COLORS: Record<string, string> = { o: OUTLINE, w: "#e8e2cf", l: "#a39a82", g: GREEN[2], s: "#a7b0b8", h: "#6b4a2a", b: "#7a5a34" };
-
-/** A bone warrior with a sword, an archer with a bow, and the giant. */
-const SPRITES = {
-  warrior: [
-    "..ooo..o.",
-    ".owwwooso",
-    ".ogwgooso",
-    "..owo.oso",
-    ".owlwooso",
-    "owlwlwhhh",
-    ".owlwo.h.",
-    "..owo....",
-    ".ow.wo...",
-    ".oo.oo...",
-  ],
-  archer: [
-    ".o..ooo..",
-    "ob.owwwo.",
-    "ob.ogwgo.",
-    "ob..owo..",
-    "ob.owlwo.",
-    "obowlwlwo",
-    "ob.owlwo.",
-    "ob..owo..",
-    ".o.ow.wo.",
-    "...oo.oo.",
-  ],
-  amalgam: [
-    "....ooooooo....",
-    "...owwwwwwlo...",
-    "..owwwwwwwwlo..",
-    "..owggwwwggwlo.",
-    "..owgowwwgowlo.",
-    ".ooowwwoowwlooo",
-    "owwwolwlwlwowwo",
-    "owgwolwlwlwogwo",
-    "owwwowlwlwlowwo",
-    ".ooowlwlwlwooo.",
-    "...owlwlwlwo...",
-    "..owwwolowwwo..",
-    ".owlwo...owlwo.",
-    ".owwo.....owwo.",
-    ".ooo.......ooo.",
-  ],
-} as const;
 type Look = keyof typeof SPRITES;
 
 const sprites = new Map<string, HTMLCanvasElement>();
-function sprite(look: Look, struck: boolean) {
+function sprite(look: Look, struck: boolean, direction: Facing = "south") {
+  if (look !== "archer") return meleeBody(look,direction,{struck});
   const key = `${look}:${struck}`;
   let cv = sprites.get(key);
   if (cv) return cv;
@@ -84,8 +43,8 @@ function sprite(look: Look, struck: boolean) {
 }
 
 /** A risen warrior where it stands, sized to its body. */
-export function drawRisen(c: Ctx, px: number, u: Soldier) {
-  const r = u.risen!, img = sprite(r.look, u.flash > 0);
+export function drawRisen(c: Ctx, px: number, u: Soldier, direction: Facing = "south") {
+  const r = u.risen!, img = sprite(r.look, u.flash > 0,direction);
   const k = Math.max(1, Math.round((px * r.size * 1.9) / img.height));
   const w = img.width * k, h = img.height * k;
   const fade = r.life !== undefined && r.life < 1 ? Math.max(0, r.life) : 1;
