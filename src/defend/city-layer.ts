@@ -310,9 +310,10 @@ function paintBuilding(p: Paint, b: Building) {
 }
 
 /** Paints building `b` whole and undamaged onto `c` at `px` per cell (a
- * magic boat's water drawing it down as it sinks). */
-export function paintStanding(c: CanvasRenderingContext2D, px: number, map: CityMap, b: Building, area: AreaId = "moss") {
-  paintBuilding({ c, px, map, sim: null, solid: () => true, area }, b);
+ * magic boat's water drawing it down as it sinks, the shimmer reading its
+ * shape), in `looks`' path look. */
+export function paintStanding(c: CanvasRenderingContext2D, px: number, map: CityMap, b: Building, area: AreaId = "moss", looks?: Readonly<Record<number, string>>) {
+  paintBuilding({ c, px, map, sim: null, solid: () => true, area, looks }, b);
 }
 
 /** Whether `b` is a palace on the Cloudborne path, off its lot. */

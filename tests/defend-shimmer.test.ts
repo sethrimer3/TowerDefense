@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { SHIMMER, shimmerAt, shimmerPeriod, shimmerTargets } from "../src/defend/placed-shimmer.ts";
+import { SHIMMER, outlineRing, shimmerAt, shimmerPeriod, shimmerTargets } from "../src/defend/placed-shimmer.ts";
 import type { Building, CityMap } from "../src/defend/citygen.ts";
 
 const b = (id: number, kind: Building["kind"], x: number, y: number, extra: Partial<Building> = {}): Building =>
@@ -42,4 +42,24 @@ test("a trace brightens round the loop, fades, and pieces take turns", () => {
   let most = 0;
   for (let s = 0; s < 200; s += 0.1) most = Math.max(most, targets.filter((x) => at(x, s)).length);
   assert.ok(most <= 6, `at most ${most} of 12 together`);
+});
+
+test("the ring hugs a sprite edge to edge, corners cut, clockwise from its top left", () => {
+  // A 3 × 2 block with a clear pixel round it, and a notch out of its top right.
+  const w = 5, h = 4, mask = new Uint8Array(w * h);
+  for (const [x, y] of [[1, 1], [2, 1], [1, 2], [2, 2], [3, 2]]) mask[y * w + x] = 1;
+  const { xs, ys } = outlineRing(mask, w, h);
+  const ring = Array.from(xs, (x, i) => [x, ys[i]]);
+  const key = (p: number[]) => p.join(",");
+  // Every ring pixel touches the sprite edge to edge, and none is a corner.
+  for (const [x, y] of ring) {
+    assert.equal(mask[y * w + x], 0);
+    assert.ok([[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => mask[(y + dy) * w + x + dx] === 1));
+  }
+  assert.ok(!ring.some((p) => key(p) === "0,0"), "the corner is cut");
+  assert.ok(ring.some((p) => key(p) === "3,1"), "the notch is traced");
+  assert.equal(ring.length, 9);
+  // It starts at the top left and runs clockwise: along the top first.
+  assert.deepEqual(ring.slice(0, 3).map(key), ["1,0", "2,0", "3,1"]);
+  assert.equal(key(ring[ring.length - 1]), "0,1", "and ends coming back up the left");
 });
