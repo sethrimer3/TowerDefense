@@ -200,7 +200,7 @@ Shelvers filling the burned holes in a purchased bookshelf with new planks, keep
 One for every new best wave held in Defend, shown in the currency bar; banked for what the meta game brings later. (It replaced the Commander level and its experience.)
 
 **Subject** and **topic**:
-How every upgrade is filed: by subject (Realm, City, Towers, Units, Mine, Library) and within it by topic (one tower, one unit building…). The Smithy and the Study each show the topics they have something for. (They were once the Upgrades tab's, each topic with a Forge and a Study.)
+How every upgrade is filed: by subject (Realm, City, Towers, Infantry, Mine, Library) and within it by topic (one tower, one unit building…). The Smithy and the Study each show the topics they have something for. (They were once the Upgrades tab's, each topic with a Forge and a Study.)
 
 **Smithy** (the room):
 The workshop below the Mine, reached by its ⚒ Smithy button: a topic's permanent upgrades paid with the mine's metal, its Armory levels and its Smithy rows.
@@ -212,7 +212,7 @@ The vault beneath the Library, reached by its ✦ Study button: what Knowledge b
 The way down from the Mine or the Library to the room below it: the scene slides up, the earth and a ladder rush past, and the room rises into place.
 
 **Tile**:
-Anything owned to put into a defense: a City tile or a piece of the wall (City), a unit building (Units), a tower (Towers), or a **consumable** (a bomb, used up when it goes off, or the war banner, never used up). Shown in the **Tiles tab**, the keep's hall.
+Anything owned to put into a defense: a City tile or a piece of the wall (City), a unit building (Infantry), a tower (Towers), or a **consumable** (a bomb, used up when it goes off, or the war banner, never used up). Shown in the **Tiles tab**, the keep's hall.
 
 **Stack**:
 Tiles that are alike, shown as one tile marked with its quantity (×4). A **universal** kind (City tiles, the wall's pieces, skills), whose upgrades every copy shares or which has none, is always one stack. A building upgraded one at a time is spread, a tile a copy, unless the player stacks them, when copies with the same upgrades share a stack. Opened, a kind shows its copies and each set of upgrades they carry.
