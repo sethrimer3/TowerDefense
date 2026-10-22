@@ -1,6 +1,6 @@
 import { chromium } from '@playwright/test';
 import assert from 'node:assert/strict';
-import { RAISE } from './drag-raise.mjs';
+import { raiseOf } from './drag-raise.mjs';
 import { mkdirSync } from 'node:fs';
 
 // The Frost nova in the browser, on the isolated stress fixture (no player
@@ -36,7 +36,7 @@ try {
       for (const e of s.enemies) { const n = s.enemies.filter(o => (o.x - e.x) ** 2 + (o.y - e.y) ** 2 < 9).length; if (n > most) { most = n; best = e; } }
       // Let go `raise` cells below it: the spell rides above the pointer.
       return p.renderer.toClient(best.x, best.y + raise);
-    }, RAISE);
+    }, await raiseOf(page, 'stressPage'));
     const b = await spell.boundingBox();
     await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
     await page.mouse.down();

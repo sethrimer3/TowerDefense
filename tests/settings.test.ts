@@ -33,3 +33,17 @@ test("settings on the page have their own control ids", () => {
   const ids = rows.flatMap(([, row]) => (row.page ? [row.page.id] : []));
   assert.equal(new Set(ids).size, ids.length);
 });
+
+test("dragged items ride above the finger by default only on touch screens", () => {
+  const was = (globalThis as any).matchMedia;
+  try {
+    for (const coarse of [true, false]) {
+      (globalThis as any).matchMedia = (q: string) => ({ matches: q === "(pointer: coarse)" && coarse });
+      assert.equal(defaults().settings.raiseDrag, coarse, "a new game");
+      assert.equal(decoded({}).raiseDrag, coarse, "a save from before the setting");
+      assert.equal(decoded({ raiseDrag: !coarse }).raiseDrag, !coarse, "the player's own choice is kept");
+    }
+  } finally {
+    (globalThis as any).matchMedia = was;
+  }
+});

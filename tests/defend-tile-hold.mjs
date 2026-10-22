@@ -7,7 +7,7 @@
 // game. Needs `npm run dev`. Screenshots go to test-results/ (or SHOTS).
 import { chromium } from '@playwright/test';
 import assert from 'node:assert/strict';
-import { dropAt } from './drag-raise.mjs';
+import { dropAt, raiseOf } from './drag-raise.mjs';
 import { mkdirSync } from 'node:fs';
 const browser = await chromium.launch(process.env.PLAYWRIGHT_EXECUTABLE
   ? { headless: true, executablePath: process.env.PLAYWRIGHT_EXECUTABLE }
@@ -60,6 +60,7 @@ try {
     const dropTile = (tx, ty) => dropAt(page, (tx + 0.5) * 8, (ty + 0.5) * 8);
     const cam = () => page.evaluate(() => ({ ...window.__dp.renderer.cam }));
     const session = () => page.evaluate(() => window.__dp.pointers.session?.drag ?? null);
+    assert.equal(await raiseOf(page), phone ? 8 : 0, 'dragged items ride above the finger on touch screens, not under a mouse');
     const lift = () => page.evaluate(() => window.__dp.pointers.liftProgress());
     const cdp = phone ? await context.newCDPSession(page) : null;
     const touch = (type, p) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: p ? [{ x: p.x, y: p.y }] : [] });

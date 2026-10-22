@@ -10,7 +10,7 @@
 // player's saved game. Needs `npm run dev`. Screenshots go to test-results/.
 import { chromium } from '@playwright/test';
 import assert from 'node:assert/strict';
-import { RAISE } from './drag-raise.mjs';
+import { raiseOf } from './drag-raise.mjs';
 import { mkdirSync } from 'node:fs';
 const browser = await chromium.launch(process.env.PLAYWRIGHT_EXECUTABLE
   ? { headless: true, executablePath: process.env.PLAYWRIGHT_EXECUTABLE }
@@ -88,7 +88,7 @@ try {
           .filter(p => p.x > box.left + 4 && p.x < box.right - 4 && p.y > box.top + 4 && p.y < box.bottom - 4);
         if (!shown.length) throw new Error('No visible legal destination');
         return shown[nth % shown.length];
-      }, [item, nth, RAISE]);
+      }, [item, nth, await raiseOf(page)]);
       await page.mouse.move(to.x, to.y, { steps: 6 });
       await page.mouse.up();
       return (await state(page)).defend.layout.structures.filter(s => s.kind === item.split('~')[0]).at(-1);

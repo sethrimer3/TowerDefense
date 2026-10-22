@@ -26,6 +26,10 @@ export const SETTINGS = {
   mergedOutlines: { kind: "toggle", default: true, page: { id: "merged-outlines", label: "Merged unit outlines" } },
   /** The Defend palette lists items the player has none of (greyed); off, only those owned. */
   showEmpty: { kind: "toggle", default: false, page: { id: "show-empty", label: "Show items you have none of" } },
+  /** Items dragged on the Defend board ride a few blocks above the pointer,
+   * clear of the finger. Until the player sets it, on for touch screens and
+   * off for a mouse (`touchFirst`). */
+  raiseDrag: { kind: "toggle", default: false, page: { id: "raise-drag", label: "Carry dragged items above the finger" } },
   /** Faint lines round the Defend board's tiles, and how strong, in percent. */
   tileGrid: { kind: "toggle", default: false, page: { id: "tile-grid", label: "Tile grid lines" } },
   gridOpacity: { kind: "range", default: 15, min: 5, max: 60, step: 1, page: { id: "grid-opacity", label: "Grid line opacity", aria: "Tile grid line opacity, percent" } },
@@ -67,7 +71,14 @@ export type Settings = { -readonly [K in SettingKey]: ValueOf<(typeof SETTINGS)[
 const KEYS = Object.keys(SETTINGS) as SettingKey[];
 
 export function defaultSettings(): Settings {
-  return Object.fromEntries(KEYS.map((k) => [k, SETTINGS[k].default])) as Settings;
+  const out = Object.fromEntries(KEYS.map((k) => [k, SETTINGS[k].default])) as Settings;
+  out.raiseDrag = touchFirst();
+  return out;
+}
+
+/** Whether the device's main pointer is a finger: a phone or tablet. */
+function touchFirst(): boolean {
+  return typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
 }
 
 /** A saved value for `setting` if the save may hold it, otherwise undefined. */
