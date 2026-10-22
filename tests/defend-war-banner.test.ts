@@ -104,3 +104,24 @@ test("banner damage reaches melee, arrows, mage fireballs, valkyrie charges and 
     if (kind === "darkWizard") { stepDarkWizard(sim, unit, .1); assert.equal(enemy.hp, 90); }
   }
 });
+
+test("a rally flag is free, replaces the banner and is replaced by it, and lends nothing", () => {
+  const { sim, unit } = fixture(); unit.hp = 20;
+  sim.plantBanner({ x: 20, y: 20 });
+  assert.equal(unit.maxHp, 50);
+  // No cooldown and no limit: a flag goes down over the banner, and again.
+  sim.plantFlag({ x: 22, y: 20 }); sim.plantFlag({ x: 30, y: 20 });
+  assert.equal(sim.warBanner!.flag, true); assert.equal(sim.warBanner!.x, 30);
+  assert.equal(bannerInfluence(sim, unit), false);
+  assert.equal(unit.maxHp, 40); assert.equal(unit.hp, 20);
+  assert.equal(bannerDamage(sim, unit), 8);
+  // Troops march to it, at their own speed.
+  sim.warBanner!.refresh(sim);
+  let speed = 0; sim.followPath = (_s, _foe, v) => { speed = v; };
+  answerBanner(sim, sim.warBanner!, unit, 2, .1);
+  assert.equal(speed, 2); assert.ok(unit.path.length > 0);
+  // The banner, off cooldown, replaces the flag.
+  sim.time += 10;
+  assert.ok(sim.plantBanner({ x: 20, y: 20 }));
+  assert.equal(sim.warBanner!.flag, false); assert.equal(bannerInfluence(sim, unit), true);
+});

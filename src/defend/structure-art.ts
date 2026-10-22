@@ -711,6 +711,8 @@ const POLE = 12;
 /** The cloth: columns long, rows deep. */
 const CLOTH_L = 11, CLOTH_D = 5;
 const RED = [0x7a2022, 0xa8302a, 0xd2412f], GOLD = [0x9c7a34, 0xd2a84a, 0xf0cf6a];
+/** The rally flag's cloth and stripe: blue with a pale band. */
+const BLUE = [0x1f3f7a, 0x2c5cb0, 0x4682d8], PALE = [0x9fb4cf, 0xcfdcec, 0xf2f6fb];
 
 /** The banner, seen from above, as `FLAG_W × FLAG_H` RGBA pixels at time
  * `t` (seconds): red cloth with a gold stripe and a swallowtail, each
@@ -718,7 +720,8 @@ const RED = [0x7a2022, 0xa8302a, 0xd2412f], GOLD = [0x9c7a34, 0xd2a84a, 0xf0cf6a
  * a one-pixel outline, a shadow on the roof below, and the pole's gold cap.
  * The ripple steps at 12 frames a second, like a sprite; under reduced
  * motion it holds still. */
-export function flagPixels(t: number, reduceMotion: boolean): Uint32Array {
+export function flagPixels(t: number, reduceMotion: boolean, blue = false): Uint32Array {
+  const [field, band] = blue ? [BLUE, PALE] : [RED, GOLD];
   const out = new Uint32Array(FLAG_W * FLAG_H);
   const tick = reduceMotion ? 0 : Math.floor(t * 12) / 12;
   // 0 off the cloth, else 1 + shade index (+ 3 on the stripe).
@@ -743,7 +746,7 @@ export function flagPixels(t: number, reduceMotion: boolean): Uint32Array {
   for (let y = 0; y < FLAG_H; y++)
     for (let x = 0; x < FLAG_W; x++) {
       const v = cloth[y * FLAG_W + x];
-      if (v) out[y * FLAG_W + x] = rgba(v > 3 ? GOLD[v - 4] : RED[v - 1]);
+      if (v) out[y * FLAG_W + x] = rgba(v > 3 ? band[v - 4] : field[v - 1]);
       else if (edge(x, y)) out[y * FLAG_W + x] = rgba(K.outline);
     }
   // The pole's cap: two by two gold pixels in an outline, over the cloth's
@@ -796,4 +799,17 @@ export function drawWarBanner(c: CanvasRenderingContext2D, px: number, at: { x: 
   c.stroke();
   c.restore();
   drawFlag(c, px, { x, y, t: pose.t, reduceMotion: pose.reduceMotion }, false);
+}
+
+let rallyCanvas: HTMLCanvasElement | null = null;
+
+/** The rally flag a double tap plants: the banner's shape in blue, with no
+ * ring, since it lends its troops nothing. */
+export function drawRallyFlag(c: CanvasRenderingContext2D, px: number, at: { x: number; y: number }, pose: { t: number; reduceMotion: boolean }) {
+  rallyCanvas = spriteCanvas(flagPixels(pose.t, pose.reduceMotion, true), FLAG_W, FLAG_H, rallyCanvas ?? undefined);
+  const s = px / ART;
+  c.save();
+  c.imageSmoothingEnabled = false;
+  c.drawImage(rallyCanvas, at.x * px - POLE * s, at.y * px - POLE * s, FLAG_W * s, FLAG_H * s);
+  c.restore();
 }

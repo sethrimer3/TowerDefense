@@ -93,6 +93,8 @@ export type DefendHost = {
   openTiles?(): void;
 };
 
+/** How soon (ms) and how near (CSS pixels) a second tap must come to make a double tap. */
+const DOUBLE_TAP_MS = 350, DOUBLE_TAP_SLOP = 30;
 const plural = (name: string) => (name.endsWith("s") ? name : `${name}s`);
 /** A building whose upgrade tree shows: one with paths, or one of the
  * trees climbed side by side (`SIDE_UI`): the keep's, or the one every
@@ -136,6 +138,9 @@ export class DefendPage {
   /** The building the player tapped (its id in the map), outlined with its
    * reach and troops, and what its reach is reckoned from before a battle. */
   private picked: { id: number; armed: Armed } | null = null;
+  /** The last tap in battle, for telling a double tap: where (client
+   * pixels), when, and what was picked out before it. */
+  private lastTap: { x: number; y: number; at: number; picked: { id: number; armed: Armed } | null } | null = null;
   private lastTime = 0;
   private performance = new BattlePerformance();
   private frameTimes = new FrameTimeOverlay();
@@ -985,7 +990,8 @@ export class DefendPage {
   /** A press on the planted war banner (its pole or cloth) lifts it. */
   private pickUpBanner(e: PointerEvent): boolean {
     const banner = this.sim?.warBanner;
-    if (!banner || this.sim!.bannerRemaining > 0) return false;
+    // A rally flag isn't lifted: a double tap elsewhere moves it.
+    if (!banner || banner.flag || this.sim!.bannerRemaining > 0) return false;
     const { fx, fy } = eventCell(this.renderer!, e);
     // The cloth flies to the right of the pole.
     if (fx < banner.x - 1 || fx > banner.x + 2.2 || fy < banner.y - 1.4 || fy > banner.y + 1) return false;
@@ -1061,11 +1067,28 @@ export class DefendPage {
    * tap, or a tap on anything else, puts it down). */
   private tap(e: PointerEvent) {
     if (this.phase === "over") return;
+    if (this.phase === "sim" && this.rallyTap(e)) return;
     this.closeSpecialty();
     const { cx, cy, inside } = eventCell(this.renderer!, e);
     const map = this.sim ? this.sim.map : this.currentMap();
     const b = inside ? map.buildings[map.owner[cy * CELLS_W + cx]] : undefined;
     this.pick(inspectable(b) && this.picked?.id !== b.id ? b.id : null);
+  }
+
+  /** In battle, a second tap close to the first and soon after it plants a
+   * rally flag there (free, any number of times), putting back whatever the
+   * first tap picked out. True when it did. */
+  private rallyTap(e: PointerEvent): boolean {
+    const last = this.lastTap, now = performance.now();
+    this.lastTap = { x: e.clientX, y: e.clientY, at: now, picked: this.picked };
+    if (!last || now - last.at > DOUBLE_TAP_MS || Math.hypot(e.clientX - last.x, e.clientY - last.y) > DOUBLE_TAP_SLOP) return false;
+    const { fx, fy, inside } = eventCell(this.renderer!, e);
+    if (!inside || !this.sim) return false;
+    this.lastTap = null;
+    this.picked = last.picked;
+    this.sim.plantFlag({ x: fx, y: fy });
+    play("banner");
+    return true;
   }
 
   /** A tapped structure or ballista, lifted in the build phase and let go
