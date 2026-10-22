@@ -31,6 +31,7 @@ export class BattleSound {
     };
     cue("arrow", count(sim.arrows), 0.5);
     cue("cannon", count(sim.shells), 0.55);
+    cue("thunk", count(sim.nanoShells), 0.5);
     cue("cannon", count(sim.siegeShots), 0.5);
     cue("fireball", count(sim.fireballs), 0.55);
     cue("fireball", count(sim.flames), 0.35);

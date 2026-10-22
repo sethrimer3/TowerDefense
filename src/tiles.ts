@@ -19,6 +19,7 @@ import { GATE_PATHS } from "./gate-upgrades.ts";
 import { BALLISTA_PATHS } from "./ballista-upgrades.ts";
 import { REVOLUTIONARY_PATHS } from "./revolutionary-upgrades.ts";
 import { SHADOW_PATHS } from "./shadow-upgrades.ts";
+import { NANO_PATHS } from "./nanobot-upgrades.ts";
 import { sideRank } from "./side-ranks.ts";
 import { hasTree, placeOf, rootOf, upgradedFrom, type SpecialtyTarget, type Wear } from "./specializations.ts";
 import { WALL_PATHS, wallRank } from "./wall-upgrades.ts";
@@ -181,6 +182,7 @@ export function tileMarks(save: Save, id: TileId, wear?: Wear): TileMark[] {
   // The Revolutionaries' shared branches.
   if (id === "revolutionary") for (const p of REVOLUTIONARY_PATHS) ranks(p.name, p.hue, sideRank(save.defend.revolutionaryRanks, p.id));
   if (id === "shadow") for (const p of SHADOW_PATHS) ranks(p.name, p.hue, sideRank(save.defend.shadowRanks, p.id));
+  if (id === "nanoTower") for (const p of NANO_PATHS) ranks(p.name, p.hue, sideRank(save.defend.nanoRanks, p.id));
   return marks;
 }
 

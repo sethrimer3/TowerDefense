@@ -4,6 +4,7 @@ import type { GateRanks } from "../gate-upgrades.ts";
 import type { BallistaRanks } from "../ballista-upgrades.ts";
 import type { RevolutionaryRanks } from "../revolutionary-upgrades.ts";
 import type { ShadowRanks } from "../shadow-upgrades.ts";
+import type { NanoRanks } from "../nanobot-upgrades.ts";
 import { intPow } from "../exact.ts";
 import { ECONOMY, quadraticCost } from "../economy.ts";
 import type { BattlePaths, PathId } from "../knowledge-paths.ts";
@@ -12,11 +13,11 @@ import type { BattlePaths, PathId } from "../knowledge-paths.ts";
  * copper, silver and Gold, the universal upgrades, the bonuses the Smithy and the
  * skill trees add, and the enemy roster. */
 
-export type StructureKind = "keep" | "meleeGuild" | "rangedGuild" | "assassinDen" | "spearHall" | "phalanx" | "javelinCamp" | "lancerStable" | "barracks" | "heroHall" | "shadow" | "archerBarracks" | "sniperLodge" | "gunHall" | "musketHall" | "gunNest" | "gatlingNest" | "rocketBattery" | "revolutionary" | "archerTower" | "cannonTower" | "watchTower" | "wizardTower" | "mageGuild" | "valkyriePalace" | "darkKeep" | "monsterBait";
+export type StructureKind = "keep" | "meleeGuild" | "rangedGuild" | "assassinDen" | "spearHall" | "phalanx" | "javelinCamp" | "lancerStable" | "barracks" | "heroHall" | "shadow" | "archerBarracks" | "sniperLodge" | "gunHall" | "musketHall" | "gunNest" | "gatlingNest" | "rocketBattery" | "revolutionary" | "archerTower" | "cannonTower" | "nanoTower" | "watchTower" | "wizardTower" | "mageGuild" | "valkyriePalace" | "darkKeep" | "monsterBait";
 /** Everything that appears in the build palette (the keep is placed from the
  * start and can only be moved, so it is not a palette item). */
 export type PaletteItem = "cityTile" | "cityGate" | "wallSpikes" | "wallBallista" | "wallBlock" | Exclude<StructureKind, "keep">;
-export const PALETTE_ITEMS: PaletteItem[] = ["cityTile", "meleeGuild", "rangedGuild", "barracks", "heroHall", "assassinDen", "shadow", "spearHall", "phalanx", "javelinCamp", "lancerStable", "archerBarracks", "gunHall", "musketHall", "sniperLodge", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "watchTower", "archerTower", "cannonTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "wallBlock", "cityGate", "wallSpikes", "wallBallista"];
+export const PALETTE_ITEMS: PaletteItem[] = ["cityTile", "meleeGuild", "rangedGuild", "barracks", "heroHall", "assassinDen", "shadow", "spearHall", "phalanx", "javelinCamp", "lancerStable", "archerBarracks", "gunHall", "musketHall", "sniperLodge", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "watchTower", "archerTower", "cannonTower", "nanoTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "wallBlock", "cityGate", "wallSpikes", "wallBallista"];
 /** The only buildings the shop sells: every other tower or troop building
  * is one of these upgraded, a building at a time, with Knowledge
  * (`building-upgrades.ts`). */
@@ -41,6 +42,7 @@ export const ITEM_CATEGORY: Record<PaletteItem, Exclude<PaletteCategory, "all">>
   monsterBait: "city",
   archerTower: "towers",
   cannonTower: "towers",
+  nanoTower: "towers",
   watchTower: "towers",
   wizardTower: "towers",
   meleeGuild: "units",
@@ -304,6 +306,15 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     outsideOk: true,
     description: "Slow, heavy guns lobbing explosive shells that burst among the enemy. Careful — the blast hurts your own people too.",
   },
+  nanoTower: {
+    kind: "nanoTower",
+    name: "C4 nanobots",
+    w: 6,
+    h: 6,
+    maxHp: 320,
+    outsideOk: true,
+    description: "The cannon tower's ultimate, merged from cannon towers maxed on different branches: a squat lab-bunker, 3 × 3 quarter tiles, with one enormous mortar. Very slowly, from very far away, it fires a harmless shell that bursts into a cloud of tiny nanobots. Every enemy in the cloud is infected, and an infected enemy explodes when it dies, hurting everything round it. Its upgrades climb side by side, shared by every C4 nanobots: a bigger blast, a bigger cloud, and a chance that a dying enemy sets free a new cloud.",
+  },
   watchTower: {
     kind: "watchTower",
     name: "Watch tower",
@@ -401,6 +412,7 @@ export const STARTING_OWNED: Record<PaletteItem, number> = {
   revolutionary: 0,
   archerTower: 0,
   cannonTower: 0,
+  nanoTower: 0,
   watchTower: 1,
   wizardTower: 0,
   mageGuild: 0,
@@ -442,6 +454,7 @@ export function purchasePrice(item: PaletteItem, owned: number): Price {
     revolutionary: { copper: 20, silver: 4, gold: 1 },
     archerTower: { copper: 3 },
     cannonTower: { copper: 6 },
+    nanoTower: { copper: 25, silver: 6, gold: 2 },
     watchTower: { copper: 3 },
     wizardTower: { copper: 8 },
     mageGuild: { copper: 9 },
@@ -484,6 +497,7 @@ export const ITEM_NAMES: Record<PaletteItem, string> = {
   revolutionary: STRUCTURES.revolutionary.name,
   archerTower: STRUCTURES.archerTower.name,
   cannonTower: STRUCTURES.cannonTower.name,
+  nanoTower: STRUCTURES.nanoTower.name,
   watchTower: STRUCTURES.watchTower.name,
   wizardTower: STRUCTURES.wizardTower.name,
   mageGuild: STRUCTURES.mageGuild.name,
@@ -677,6 +691,13 @@ export const cannonDamage = (l: number) => 20 + l * 9;
 export const cannonSplash = (l: number) => 1.7 + l * 0.15;
 export const cannonCooldown = (l: number) => 2.8 * intPow(0.86, l);
 export const CANNON_RANGE = 11;
+/** C4 nanobots, the cannon tower's ultimate: a shell every `cooldown`
+ * seconds (sped by the cannon's Powder monkeys like a cannon's) at an enemy
+ * up to `range` cells off and no nearer than `min`, flying at `speed` cells
+ * a second; it does no harm, bursting into a cloud that infects every enemy
+ * in it for `life` seconds. An infected enemy dying blasts for `blast` times
+ * a cannon shell's damage. At most `clouds` hang at once. */
+export const NANO_TOWER = { range: 30, min: 3, cooldown: 16, speed: 9, life: 4, blast: 3, clouds: 24 };
 /** Share of blast damage your own units take when friendly fire is on. */
 export const FRIENDLY_FIRE = 0.6;
 /** The wizard tower's flamethrower: damage a second to everything in its
@@ -981,6 +1002,8 @@ export type Bonuses = {
   revolutionary?: RevolutionaryRanks;
   /** The Shadows' upgrades (`shadow-upgrades.ts`); absent with none. */
   shadow?: ShadowRanks;
+  /** The C4 nanobots' upgrades (`nanobot-upgrades.ts`); absent with none. */
+  nano?: NanoRanks;
 };
 export const NO_BONUSES: Readonly<Bonuses> = Object.freeze({
   troopHp: 1, troopDamage: 1, drill: 1, towerDamage: 1, towerReload: 1, wallHp: 1, keepHp: 1, rebuild: 1, bombDamage: 1, undeadHp: 1, undeadDamage: 1, graveTime: 1, meteorDamage: 1, meteorRadius: 1, frostTime: 1, frostRadius: 1, reinforceHp: 1, reinforceDamage: 1, reinforceTime: 1,

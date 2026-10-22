@@ -235,6 +235,9 @@ A path's crown, past its last rank, turns that one building into a greater form 
 **Shadow**:
 The assassins' ultimate building, merged from three Assassins' dens: a shrine for one **shade**, a see-through cloaked figure whose **knives** loop out through crowds. Every enemy a knife hits makes its later hits harder (its **edge**, compounding). Its upgrades are a **shared tree**: more knives, armor piercing, **bleeding** (only enemies with blood in them) and faster compounding.
 
+**C4 nanobots**:
+The cannon tower's ultimate building, merged from cannon towers maxed on different branches: very slowly, from very far, it fires a harmless shell that bursts into a **nanobot cloud**. Every enemy in the cloud is **infected** and explodes when it dies, hurting the enemies round it, so a crowd can go up in a chain. Its upgrades are a **shared tree**: a bigger blast, a bigger cloud and **replication** (a chance, 1% to 5%, that a dying host sets free a new cloud).
+
 **Revolutionary**:
 What a plain Sniper lodge (the archer barracks' ultimate) can still become: a high-tech hall of **laser snipers**. Its upgrades are not a path but a **shared tree** of five branches climbed side by side by every Revolutionary at once: the squad (one, two, then three snipers), the **chain laser** (the laser leaps from enemy to enemy, impossibly, and the bullet follows it through 3, 5, then 7), a **critical** chance, what a critical multiplies, and a burst round the last enemy the bullet strikes.
 

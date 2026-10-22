@@ -23,6 +23,7 @@ import { bulletHit, pierceHits } from "./snipers.ts";
 import { knockBack } from "./gunners.ts";
 import type { Arrow, DefendSim, Enemy } from "./sim.ts";
 import { railHit, railOn } from "./revolutionary.ts";
+import { fireNanoShell, nanoReload } from "./nanobots.ts";
 import { FIRE_ARROWS, GUNNERY, SHARP, SIEGE_SHOT, pathRank } from "../knowledge-paths.ts";
 import { ARROW_LOOPS, BOILING_OIL, keepRank } from "../keep-upgrades.ts";
 
@@ -63,6 +64,7 @@ export class Towers {
     for (const b of sim.map.buildings) {
       if (!sim.intact(b)) continue;
       if (b.kind === "cannonTower") this.stepCannon(sim, b, dt);
+      else if (b.kind === "nanoTower") this.stepNanoTower(sim, b, dt);
       else if (b.kind === "archerTower") this.stepArcherTower(sim, b, dt);
       else if (b.kind === "wallBallista") this.stepBallista(sim, b, dt);
       else if (b.kind === "keep" && sim.bonuses.keep) this.stepKeep(sim, b, dt);
@@ -139,6 +141,12 @@ export class Towers {
   private stepBallista(sim: DefendSim, b: Building, dt: number) {
     if (!this.ready(b, dt)) return;
     this.cooldown.set(b.id, shootBallista(sim, b) ? wallBallistaReload(sim) : 0);
+  }
+
+  /** C4 nanobots: a harmless shell bursting into a cloud (`nanobots.ts`). */
+  private stepNanoTower(sim: DefendSim, b: Building, dt: number) {
+    if (!this.ready(b, dt)) return;
+    this.cooldown.set(b.id, fireNanoShell(sim, b) ? nanoReload(sim) : 0);
   }
 
   private stepCannon(sim: DefendSim, b: Building, dt: number) {

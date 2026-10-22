@@ -62,7 +62,7 @@ export const SUBJECTS: Subject[] = [
         id: "archerTower", name: "Archer tower", item: "archerTower", upgrades: ["archerDamage", "archerRange", "archerRate"],
       },
       {
-        id: "cannonTower", name: "Cannon tower", item: "cannonTower", upgrades: ["cannonDamage", "cannonRate", "cannonSafe"],
+        id: "cannonTower", name: "Cannon tower", item: "cannonTower", items: ["nanoTower"], upgrades: ["cannonDamage", "cannonRate", "cannonSafe"],
       },
       {
         id: "watchTower", name: "Watch tower", item: "watchTower", upgrades: ["watchRadius"],

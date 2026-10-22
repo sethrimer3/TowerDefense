@@ -13,11 +13,12 @@ import { STONEWORK, TOWN_WALLS, TRAPPED, WALL_PATHS, respecWalls, undoWalls, upg
 import { sideRank, type SidePath, type SideRanks } from "../side-ranks.ts";
 import { GATE_PATHS, GATE_TOWERS, IRONBOUND, PORTCULLIS, gateAllocated, gateBarred, gateRank, respecGate, undoGate, upgradeGate, type GatePathId, type GateRanks } from "../gate-upgrades.ts";
 import { SHADOW_BLEED, SHADOW_EDGE, SHADOW_KNIVES, SHADOW_PATHS, SHADOW_PIERCE, respecShadow, shadowAllocated, shadowRank, undoShadow, upgradeShadow, type ShadowPathId, type ShadowRanks } from "../shadow-upgrades.ts";
+import { NANO_BLAST, NANO_CLOUD, NANO_PATHS, NANO_REPLICATE, nanoAllocated, nanoRank, respecNano, undoNano, upgradeNano, type NanoPathId, type NanoRanks } from "../nanobot-upgrades.ts";
 import { CHAIN, CRIT_CHANCE, CRIT_DAMAGE, DETONATOR, REVOLUTIONARY_PATHS, SQUAD, respecRevolutionary, revolutionaryAllocated, revolutionaryRank, undoRevolutionary, upgradeRevolutionary, type RevolutionaryPathId, type RevolutionaryRanks } from "../revolutionary-upgrades.ts";
 import { BALLISTA_PATHS, FIRE_BOLTS, HEAVY_BOLTS, WINDLASS, ballistaAllocated, ballistaRank, respecBallistas, undoBallistas, upgradeBallistas, type BallistaPathId, type BallistaRanks } from "../ballista-upgrades.ts";
 import { pathById, type PathId, WHIRLWIND, BLADE_DANCE, LEGEND, FIRE_ARROWS, SHARP, GUNNERY, SIEGE_SHOT, CRUSADE, BLOODLETTERS, SHADOWCLOAK, VENOM, HEADHUNT, GRENADIERS, VOLLEY, BAYONET, SHARP_MUSKETS, BELT_FEED, LONG_SPEARS, SET_SPEARS, TESTUDO, SPEAR_WALL, BARBED, THROWING, HEAVY_LANCE, WINGED, TRIPOD, QUICKDRAW, DUELISTS, GUN_SHIELD, OVERDRIVE, STOPPING, DEADEYE, PIERCING, CLUSTER, SALVO, MARKSMEN, RICOCHET, SUPPRESS, BERSERK, HALBERD, RANGERS, SKIRMISH, FORTIFY, PYRO, RIME, STORM, PYROCLASM, CINDERS, SPOTTERS, SIGNAL } from "../knowledge-paths.ts";
 import { bonuses } from "../progression.ts";
-import { ITEM_NAMES, archerDamage, archerCooldown, archerRange, cannonDamage, cannonCooldown, CANNON_RANGE, SOLDIER, ARCHER_UNIT, soldierScale, STRUCTURES, flameDps, flameRange, iceDamage, ICE_RANGE, iceChill, watchRadius, fireballDamage, fireballSplash, emberDps, emberSeconds, FIRE_MAGE, FIREBALL_RANGE, keepHp, BRAWLER, ASSASSIN_UNIT, SLINGER, SNIPER, MUSKETEER, GUNNER, MACHINE_GUNNER, GATLING_GUNNER, RAIL_SNIPER, ROCKETEER, SPEARMAN, HOPLITE, LANCER, JAVELINEER, HERO, SHADE, WALL_BLOCK_DESCRIPTION, wallHp, GATE, GATE_DESCRIPTION, BALLISTA, BALLISTA_DESCRIPTION, ballistaCooldown, ballistaDamage, ballistaRange, gateHpScale, gateShut, spikeDamage, spikeEvery, type PaletteItem } from "../defend/catalog.ts";
+import { ITEM_NAMES, archerDamage, archerCooldown, archerRange, cannonDamage, cannonCooldown, CANNON_RANGE, NANO_TOWER, SOLDIER, ARCHER_UNIT, soldierScale, STRUCTURES, flameDps, flameRange, iceDamage, ICE_RANGE, iceChill, watchRadius, fireballDamage, fireballSplash, emberDps, emberSeconds, FIRE_MAGE, FIREBALL_RANGE, keepHp, BRAWLER, ASSASSIN_UNIT, SLINGER, SNIPER, MUSKETEER, GUNNER, MACHINE_GUNNER, GATLING_GUNNER, RAIL_SNIPER, ROCKETEER, SPEARMAN, HOPLITE, LANCER, JAVELINEER, HERO, SHADE, WALL_BLOCK_DESCRIPTION, wallHp, GATE, GATE_DESCRIPTION, BALLISTA, BALLISTA_DESCRIPTION, ballistaCooldown, ballistaDamage, ballistaRange, gateHpScale, gateShut, spikeDamage, spikeEvery, type PaletteItem } from "../defend/catalog.ts";
 
 /** `kind`'s effective numbers wearing `path` at `rank` (none: plain), with
  * the shared Smithy and skill bonuses. */
@@ -119,6 +120,7 @@ export function kindStats(save: Save, kind: PaletteItem, path?: PathId, rank = 0
   }
   if (kind === "revolutionary") return revolutionaryStats(save, save.defend.revolutionaryRanks);
   if (kind === "shadow") return shadowStats(save, save.defend.shadowRanks);
+  if (kind === "nanoTower") return nanoStats(save, save.defend.nanoRanks);
   const GUNS = { meleeGuild: BRAWLER, rangedGuild: SLINGER, sniperLodge: SNIPER, musketHall: MUSKETEER, gunHall: GUNNER, gunNest: MACHINE_GUNNER, gatlingNest: GATLING_GUNNER, rocketBattery: ROCKETEER } as const;
   if (kind in GUNS) {
     const u: { hp: number; damage: number; cooldown: number; range?: number } = GUNS[kind as keyof typeof GUNS], scale = soldierScale(l.soldierArms);
@@ -191,6 +193,7 @@ export function buildingSheet(save: Save, kind: PaletteItem | "wallSpikes", wear
   const d = save.defend;
   if (kind === "revolutionary") return { stats: coreStats(revolutionaryStats(save, d.revolutionaryRanks), 3), abilities: sharedAbilities(REVOLUTIONARY_PATHS, d.revolutionaryRanks) };
   if (kind === "shadow") return { stats: coreStats(shadowStats(save, d.shadowRanks), 4), abilities: sharedAbilities(SHADOW_PATHS, d.shadowRanks) };
+  if (kind === "nanoTower") return { stats: coreStats(nanoStats(save, d.nanoRanks), 3), abilities: sharedAbilities(NANO_PATHS, d.nanoRanks) };
   if (kind === "wallBlock") return { stats: coreStats(wallStats(save, d.wallRanks), 1), abilities: sharedAbilities(WALL_PATHS, d.wallRanks) };
   if (kind === "cityGate") return { stats: coreStats(gateStats(save, d.gateRanks), 2), abilities: sharedAbilities(GATE_PATHS, d.gateRanks) };
   if (kind === "wallBallista") return { stats: coreStats(ballistaStats(save, d.ballistaRanks), 4), abilities: sharedAbilities(BALLISTA_PATHS, d.ballistaRanks) };
@@ -512,6 +515,17 @@ export function shadowStats(save: Save, ranks: ShadowRanks | undefined): string 
   return parts.join(" · ");
 }
 
+/** C4 nanobots' numbers with `ranks`, and the shared Smithy and skill bonuses. */
+export function nanoStats(save: Save, ranks: NanoRanks | undefined): string {
+  const l = save.defend.levels, b = bonuses(save), n = (v: number) => Number(v.toFixed(2));
+  const chance = NANO_REPLICATE.chance[nanoRank(ranks, "replicate")];
+  const reload = NANO_TOWER.cooldown * (cannonCooldown(l.cannonRate) / cannonCooldown(0)) * b.towerReload;
+  const parts = [`A harmless shell every ${n(reload)}s`, `${NANO_TOWER.range} range`, `infected enemies burst for ${n(cannonDamage(l.cannonDamage) * b.towerDamage * NANO_TOWER.blast)} as they die`,
+    `cloud ${NANO_CLOUD.radius[nanoRank(ranks, "cloud")]} cells round for ${NANO_TOWER.life}s`, `blast ${NANO_BLAST.radius[nanoRank(ranks, "blast")]} cells round`];
+  parts.push(chance ? `${n(chance * 100)}% chance a dying host sets free a new cloud` : "no new clouds from the dying");
+  return parts.join(" · ");
+}
+
 /** The trees climbed side by side, as the Defend page drives them: the
  * keep's, the walls', the gates' and the ballistas'. */
 export type SideKind = "keep" | "walls" | "gate" | "ballistas";
@@ -583,8 +597,14 @@ export const SHADOW_UI: SideUi = sideUi(SHADOW_TREE, (s) => s.defend.shadowRanks
   name: "Shadow", whom: "the Shadows", plain: "take every upgrade off the Shadows", about: STRUCTURES.shadow.description, stats: shadowStats,
   buy: upgradeShadow, undo: undoShadow, respec: respecShadow, allocated: shadowAllocated,
 });
+const NANO_TREE: SideTree<NanoPathId> = { root: "k:nanoTower", icon: "nanoTower", every: "Every C4 nanobots", paths: NANO_PATHS };
+/** C4 nanobots' shared tree, grafted onto its node like the Shadow's. */
+export const NANO_UI: SideUi = sideUi(NANO_TREE, (s) => s.defend.nanoRanks, {
+  name: "C4 nanobots", whom: "the C4 nanobots", plain: "take every upgrade off the C4 nanobots", about: STRUCTURES.nanoTower.description, stats: nanoStats,
+  buy: upgradeNano, undo: undoNano, respec: respecNano, allocated: nanoAllocated,
+});
 /** The shared branches growing off a building of `kind`'s own node, if it has any. */
-export const sharedBranches = (kind: string): SideUi | undefined => (kind === "revolutionary" ? REVOLUTIONARY_UI : kind === "shadow" ? SHADOW_UI : undefined);
+export const sharedBranches = (kind: string): SideUi | undefined => (kind === "revolutionary" ? REVOLUTIONARY_UI : kind === "shadow" ? SHADOW_UI : kind === "nanoTower" ? NANO_UI : undefined);
 /** A building's tree with its shared branches grafted onto its node. */
 export function graftedGraph(save: Save, kind: PaletteItem | "wallSpikes", wear?: Wear): GraphNode[] {
   const own = treeGraph(kind, wear), shared = sharedBranches(kind);
@@ -593,7 +613,7 @@ export function graftedGraph(save: Save, kind: PaletteItem | "wallSpikes", wear?
 
 /** A family keeps its base identity through kind changes and respecs.
  * Placement UIDs intentionally do not affect the visual identity. */
-export function specialtyCircle(kind: PaletteItem | "wallSpikes" | SideKind, wear?: Wear, ranks?: KeepRanks, wallRanks?: WallRanks, gateRanks?: GateRanks, ballistaRanks?: BallistaRanks, revolutionaryRanks?: RevolutionaryRanks, shadowRanks?: ShadowRanks): CircleState {
+export function specialtyCircle(kind: PaletteItem | "wallSpikes" | SideKind, wear?: Wear, ranks?: KeepRanks, wallRanks?: WallRanks, gateRanks?: GateRanks, ballistaRanks?: BallistaRanks, revolutionaryRanks?: RevolutionaryRanks, shadowRanks?: ShadowRanks, nanoRanks?: NanoRanks): CircleState {
   const root = kind === "keep" || kind === "walls" || kind === "wallSpikes" || kind === "gate" || kind === "ballistas" ? kind : rootOf(kind as never);
   const upgrades: Array<CircleState['upgrades'][number]> = [{ id: `kind:${kind}`, rank: 1, visualOnly: true }];
   // The actual owned tree includes every earlier transformation and crowned
@@ -606,6 +626,7 @@ export function specialtyCircle(kind: PaletteItem | "wallSpikes" | SideKind, wea
   if (kind === "ballistas") for (const p of BALLISTA_PATHS) upgrades.push({ id: `ballista:${p.id}`, rank: ballistaRank(ballistaRanks, p.id) });
   if (kind === "revolutionary") for (const p of REVOLUTIONARY_PATHS) upgrades.push({ id: `revolutionary:${p.id}`, rank: revolutionaryRank(revolutionaryRanks, p.id) });
   if (kind === "shadow") for (const p of SHADOW_PATHS) upgrades.push({ id: `shadow:${p.id}`, rank: shadowRank(shadowRanks, p.id) });
+  if (kind === "nanoTower") for (const p of NANO_PATHS) upgrades.push({ id: `nano:${p.id}`, rank: nanoRank(nanoRanks, p.id) });
   const city = ["keep", "walls", "gate", "ballistas", "wallBlock", "wallSpikes", "cityTile", "cityGate", "wallBallista", "monsterBait"].includes(kind);
   return { topic: `building:${root}`, upgrades, motif: city ? "tesseract" : "voronoi" };
 }
