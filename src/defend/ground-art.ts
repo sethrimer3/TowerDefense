@@ -90,7 +90,9 @@ function bake(map: CityMap): GroundArt {
   const px = new Uint32Array(W * H), bare = new Uint8Array(W * H), turf = new Uint8Array(W * H);
   for (let cy = 0; cy < CELLS_H; cy++)
     for (let cx = 0; cx < CELLS_W; cx++) {
-      const t = map.type[cellIndex(cx, cy)];
+      const i = cellIndex(cx, cy), t = map.type[i];
+      // Outside the city a structure stands on the open floor, not a lot of dirt.
+      if (t === CellType.STRUCT && !map.city[i]) continue;
       if (isDirt(t)) paintStreet(map, px, turf, cx, cy);
       else if (t === CellType.PARK) paintBare(map, px, bare, cx, cy);
     }

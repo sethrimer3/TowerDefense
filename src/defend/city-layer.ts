@@ -192,7 +192,8 @@ function paintCityGround(p: Paint) {
     for (let cx = 0; cx < CELLS_W; cx++) {
       const i = cellIndex(cx, cy);
       const t = map.type[i];
-      if (t === CellType.OUT) continue;
+      // A structure placed outside the city stands on the open floor.
+      if (t === CellType.OUT || (t === CellType.STRUCT && !map.city[i])) continue;
       if (t === CellType.PARK || t === CellType.WATER) paintGrass(p, cx, cy);
       else if (t !== CellType.WALL || !solid(i)) paintGravel(p, cx, cy);
     }
