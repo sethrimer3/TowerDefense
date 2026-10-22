@@ -952,6 +952,9 @@ export class DefendPage {
     else if (o?.spell?.look === "frost" && this.sim) o.spell.r = frostReach(this.sim);
     else if (o?.spell?.look === "reinforce" && this.sim) o.spell.spots = dropSpots(this.sim, o.spell);
     else if (o?.spell && this.sim) o.spell.souls = gravesNear(this.sim, o.spell, o.spell.r);
+    // Held Necromancy shows a skull on every grave, over the board or not.
+    if (this.sim?.graves.length && this.pointers.session?.drag.from === "necromancy")
+      return { ...(o ?? { legal: new Set(), hover: null, ghost: null }), graves: this.sim.graves };
     return o;
   }
 

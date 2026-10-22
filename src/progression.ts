@@ -25,8 +25,9 @@ const TIMES = new Set<BonusTarget>(["drill", "towerReload", "rebuild", "smithing
 export const STARTING_METAL: Metals = { copper: 10, silver: 0, gold: 0 };
 
 // ── The Smithy's upgrades (Training) ───────────────────────────────────
-export type TrainingId = "troopHp" | "troopDamage" | "drill" | "towerDamage" | "towerReload" | "wallHp" | "keepHp" | "rebuild" | "bombDamage" | "undeadHp" | "undeadDamage" | "meteorDamage" | "meteorRadius" | "frostTime" | "frostRadius" | "reinforceHp" | "reinforceDamage" | "reinforceTime";
-export type TrainingRow = { id: TrainingId; group: keyof typeof TRAINING_GROUPS; name: string; per: number; max: number };
+export type TrainingId = "troopHp" | "troopDamage" | "drill" | "towerDamage" | "towerReload" | "wallHp" | "keepHp" | "rebuild" | "bombDamage" | "undeadHp" | "undeadDamage" | "graveTime" | "meteorDamage" | "meteorRadius" | "frostTime" | "frostRadius" | "reinforceHp" | "reinforceDamage" | "reinforceTime";
+/** `seconds`, when set, shows the row as a time: that many seconds at no ranks. */
+export type TrainingRow = { id: TrainingId; group: keyof typeof TRAINING_GROUPS; name: string; per: number; max: number; seconds?: number };
 export const TRAINING_GROUPS = { army: "Army", towers: "Towers", city: "City", spells: "Spells" } as const;
 /** Each rank adds `per` percent to its target, with quadratic metal cost
  * (`rankCost`) in its tier (`rankPrice`). */
@@ -42,6 +43,7 @@ export const TRAINING: TrainingRow[] = [
   { id: "rebuild", group: "city", name: "Rebuild speed", per: 4, max: 30 },
   { id: "undeadHp", group: "spells", name: "Risen HP", per: 5, max: 40 },
   { id: "undeadDamage", group: "spells", name: "Risen damage", per: 5, max: 40 },
+  { id: "graveTime", group: "spells", name: "Grave time", per: 100, max: 2, seconds: 10 },
   { id: "meteorDamage", group: "spells", name: "Meteor damage", per: 5, max: 40 },
   { id: "meteorRadius", group: "spells", name: "Meteor blast radius", per: 3, max: 30 },
   { id: "frostTime", group: "spells", name: "Frost nova duration", per: 5, max: 40 },
