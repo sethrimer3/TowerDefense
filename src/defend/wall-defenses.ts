@@ -6,7 +6,7 @@ import { spikeKey } from "../specializations.ts";
  * so such runs replay exactly as before. */
 import { dist, sq } from "../exact.ts";
 import { BLAST_STAKES, RIME_STAKES, SPRING_STAKES, pathRank } from "../knowledge-paths.ts";
-import { STONEWORK, THORNWORK, wallRank } from "../wall-upgrades.ts";
+import { STONEWORK, TRAPPED, wallRank } from "../wall-upgrades.ts";
 import { BALLISTA, ENEMIES, ballistaCooldown, ballistaDamage, ballistaRange, enemySize, spikeDamage, spikeEvery } from "./catalog.ts";
 import { FIRE_BOLTS, HEAVY_BOLTS, WINDLASS, ballistaRank } from "../ballista-upgrades.ts";
 import { fizzles } from "./boats.ts";
@@ -133,35 +133,26 @@ function springRow(sim: DefendSim, r: number, rank: number, cut: number) {
 }
 
 /** The walls the player placed on their own, with the walls' upgrades:
- * standing stones mend (Stonework III), and every `THORNWORK.every`
- * seconds each enemy on foot touching one is cut (Thornwork), and from III
- * slowed. Nothing happens in a run without placed walls or those ranks. */
+ * standing stones mend (Stonework III). Nothing happens in a run without
+ * placed walls or that rank. */
 export function stepPlacedWalls(sim: DefendSim, dt: number) {
   const ranks = sim.bonuses.walls;
   if (!ranks || !sim.pieces.length) return;
   if (wallRank(ranks, "stonework") >= 3)
     for (const b of sim.pieces)
       if (sim.solid[b.cells[0]] && sim.hp[b.id] < sim.maxHp[b.id]) sim.hp[b.id] = Math.min(sim.maxHp[b.id], sim.hp[b.id] + sim.maxHp[b.id] * STONEWORK.mend * dt);
-  const thorns = wallRank(ranks, "thornwork");
-  if (!thorns) return;
-  sim.wallThornT -= dt;
-  if (sim.wallThornT > 0) return;
-  sim.wallThornT += THORNWORK.every[thorns];
-  const struck = new Set<number>();
-  for (const b of sim.pieces) {
-    const cell = b.cells[0];
-    if (!sim.solid[cell]) continue;
-    const cx = cellX(cell) + 0.5, cy = cellY(cell) + 0.5;
-    for (const e of sim.enemiesNear(cx, cy, 1.5)) {
-      if (struck.has(e.id) || !onFoot(e) || e.hp <= 0) continue;
-      // Touching: within a quarter cell of the stone's faces.
-      const reach = 0.75 + enemySize(e) / 2;
-      if (Math.abs(e.x - cx) > reach || Math.abs(e.y - cy) > reach) continue;
-      struck.add(e.id);
-      if (thorns >= 3) e.chill = Math.max(e.chill ?? 0, THORNWORK.chill);
-      sim.hurtEnemy(e, THORNWORK.damage[thorns], true, "melee");
-    }
-  }
+}
+
+/** A placed wall stone has broken (Trapped walls): its charge bursts,
+ * sparing your own people, and from III leaves the ground burning. */
+export function trappedWallFell(sim: DefendSim, b: Building) {
+  const rank = wallRank(sim.bonuses.walls, "trapped");
+  if (!rank) return;
+  const c = center(b.rect), r = TRAPPED.radius[rank];
+  // A charge under a magic boat's water only hisses.
+  if (fizzles(sim, c.x, c.y, r)) return;
+  const seed = sim.explode(c.x, c.y, { r, damage: TRAPPED.damage[rank], friendlyFire: false });
+  if (rank >= 3) sim.blazes.push({ x: c.x, y: c.y, r, t: 0, life: TRAPPED.fire, dps: TRAPPED.dps, seed });
 }
 
 /** Fliers pass over the stakes, boats sail through the wall and a mole

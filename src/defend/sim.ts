@@ -75,7 +75,7 @@ import { sheltered, fizzles, stepFloods, type Flood, type Sinking } from "./boat
 import { baitFell, baitStanding } from "./bait.ts";
 import { stepGates } from "./gates.ts";
 import { IRONBOUND, gateBarred, gateRank } from "../gate-upgrades.ts";
-import { stepBallistaBolts, stepPlacedWalls, stepSpikes, type BallistaBolt, type SpikeThrust } from "./wall-defenses.ts";
+import { stepBallistaBolts, stepPlacedWalls, stepSpikes, trappedWallFell, type BallistaBolt, type SpikeThrust } from "./wall-defenses.ts";
 import { STONEWORK, TOWN_WALLS, wallRank } from "../wall-upgrades.ts";
 
 export type Levels = Record<UpgradeId, number>;
@@ -368,10 +368,9 @@ export class DefendSim {
   readonly spikeArm = new Map<number, number>();
   spikeThrusts: SpikeThrust[] = [];
   /** The stones of the walls the player placed on their own (empty without
-   * any), seconds until their thorns next cut (Thornwork), and whether the
-   * city's own people pass through them (Town walls' posterns). */
+   * any), and whether the city's own people pass through them (Town walls'
+   * posterns). */
   readonly pieces: Building[];
-  wallThornT = 0;
   /** The city's gates; and while one stands open to the enemy too (until
    * Portcullis bars it), the seconds until it shuts, by building id. */
   readonly gates: Building[];
@@ -1016,6 +1015,8 @@ export class DefendSim {
       this.fieldT = 0;
       baitFell(this, b, dust);
     }
+    // A trapped wall stone bursts as it breaks (not as it sinks).
+    if (b.piece && whole && dust) trappedWallFell(this, b);
   }
 
   /** Civilians restore a building one cell at a time; it regains its

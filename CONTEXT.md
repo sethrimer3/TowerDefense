@@ -58,7 +58,7 @@ The web of every upgrade a basic building's whole line can reach, opened by the 
 One of the keep's own upgrade lines, **Bastions** (more HP), **Arrow loops** (the keep shoots) and **Boiling oil** (it scalds whatever reaches its walls). Unlike a building's paths, the keep climbs all of them side by side.
 
 **Wall section**:
-A piece of stone wall a quarter of a tile across, placed on its own on the board's grid of quarter tiles (the same grid buildings are placed on), anywhere outside the city and, with **Town walls**, inside it. Every wall section shares one upgrade tree, the **wall branches**: **Stonework** (more HP, then mending), **Thornwork** (it cuts and then slows whoever presses against it) and **Town walls** (inside the city, then posterns that let your own people through), climbed side by side like the keep's.
+A piece of stone wall a quarter of a tile across, placed on its own on the board's grid of quarter tiles (the same grid buildings are placed on), anywhere outside the city and, with **Town walls**, inside it. Every wall section shares one upgrade tree, the **wall branches**: **Stonework** (more HP, then mending), **Trapped walls** (each stone bursts once as it breaks, then wider and burning) and **Town walls** (inside the city, then posterns that let your own people through), climbed side by side like the keep's.
 
 **Respec**:
 Turning one building back into its basic building with no path, free, with every Knowledge point allocated to it given back.

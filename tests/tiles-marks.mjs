@@ -28,7 +28,7 @@ try {
       const s = defaults(); s.settings.soundOff = true; s.settings.ambienceOff = true;
       const d = s.defend;
       Object.assign(d.owned, { cityTile: 6, watchTower: 2, archerTower: 3, wizardTower: 1, meleeGuild: 1, barracks: 1 });
-      d.wallRanks = { stonework: 2, thornwork: 1 };
+      d.wallRanks = { stonework: 2, trapped: 1 };
       let l = d.layout;
       for (const [dx, dy] of [[0, -1], [-1, 0], [1, 0]]) l = placeCityTile(l, l.keep.tx + dx, l.keep.ty + dy) ?? l;
       l = placeStructure(l, 'archerTower', l.keep.tx, l.keep.ty - 1) ?? l;
@@ -118,7 +118,7 @@ try {
     // The walls carry their shared tree's ranks.
     await page.locator('[data-filter="city"]').click();
     await page.waitForTimeout(600);
-    assert.match(await page.locator('.tile[data-tile="wallBlock"] .tile-marks').getAttribute('title'), /Stonework II → Thornwork I/);
+    assert.match(await page.locator('.tile[data-tile="wallBlock"] .tile-marks').getAttribute('title'), /Stonework II → Trapped walls I/);
     assert.equal(await page.locator('.tile[data-tile="wallBlock"]').count(), 1);
     assert.deepEqual(errors, []);
     await context.close();

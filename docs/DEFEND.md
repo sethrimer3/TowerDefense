@@ -113,9 +113,11 @@ Recent rows are available as `window.defendPerformance`; they are not saved.
   through them like the city wall; civilians rebuild them. Pressed, they
   lift and move; carried off the board they go back to the palette. Every
   section shares one tree, its branches climbed side by side: Stonework
-  (50% then 120% more HP, then stones that mend 2% a second), Thornwork
-  (every 1.5 s, then every second, enemies on foot touching a section are
-  cut for 12, then 25; at III they are slowed) and Town walls (sections may
+  (50% then 120% more HP, then stones that mend 2% a second), Trapped walls
+  (each stone bursts once as it breaks, sparing your own people: 100 damage
+  over 1.5 cells, then 250 over 2, then 2.5 cells out leaving the ground
+  burning 4 s; a stone rebuilt whole is trapped again; Thornwork's ranks
+  carry over) and Town walls (sections may
   stand inside the city, then your own troops and townsfolk slip through
   them). A respec gives every point back, free, and takes the sections
   inside the city back to the palette; any rank can be undone on its own.
