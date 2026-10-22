@@ -10,6 +10,8 @@ import { ashlar, facing, h01 } from "../library/ashlar.ts";
 import { getTorchFlicker, getTorchSway } from "../lighting.ts";
 import { DAY_MS } from "../library/render.ts";
 import { FLAME, OUTLINE, puff } from "../defend/pixel-fx.ts";
+import { pixelArtOn } from "../defend/pixel-sprites.ts";
+import { SoftSunlight, SUNLIGHT } from "../soft-sunlight.ts";
 
 type RGB = [number, number, number];
 /** Screen (CSS) pixels to an art pixel. */
@@ -34,6 +36,9 @@ export class HallBackdrop {
   /** The window: material mask, sky height, and the baked exterior's colours. */
   private part = new Uint8Array(0);
   private scene = new Float32Array(0);
+  private glassTint = new Uint8Array(0);
+  private detailed = false;
+  private sunlight: SoftSunlight | null = null;
   private city = new Float32Array(0);
   private outside: { x: number; y: number; radius: number; seed: number }[] = [];
   private win = { x0: 0, x1: 0, y0: 0, y1: 0 };
@@ -45,7 +50,9 @@ export class HallBackdrop {
   /** Bakes the wall when the canvas's size changed. */
   private fit() {
     const w = Math.max(8, Math.ceil(this.canvas.clientWidth / ART)), h = Math.max(8, Math.ceil(this.canvas.clientHeight / ART));
-    if (w === this.w && h === this.h) return false;
+    const detailed = this.look === "keep" && pixelArtOn();
+    if (w === this.w && h === this.h && this.detailed === detailed) return false;
+    this.detailed = detailed;
     this.w = w;
     this.h = h;
     this.canvas.width = w;
@@ -55,6 +62,7 @@ export class HallBackdrop {
     this.albedo = new Float32Array(n * 3);
     this.part = new Uint8Array(n);
     this.scene = new Float32Array(n);
+    this.glassTint = new Uint8Array(n);
     this.city = new Float32Array(n * 3);
     this.outside = [];
     for (let y = 0; y < h; y++)
@@ -77,9 +85,9 @@ export class HallBackdrop {
     return true;
   }
 
-  /** The keep's window: a tall round-headed opening in a moulded stone
-   * surround and oak frame, with a circular iron flower in clear glass
-   * and the city outside below the sky. */
+  /** A round-headed opening in moulded stone and oak. Pixel Art uses an
+   * eight-petal rose, paired pointed lights and pale glazing; off preserves
+   * the old four-lobed clear window. Both overlook the same living city. */
   private bakeWindow(hgt: Float32Array) {
     const { w, h } = this, ww = Math.round(Math.max(30, Math.min(w * 0.46, 110))), r = ww / 2;
     const cx = w / 2, top = Math.round(h * 0.05), wh = Math.round(Math.max(ww * 1.1, Math.min(h * 0.62, ww * 1.75)));
@@ -122,13 +130,15 @@ export class HallBackdrop {
         const lobe = rose.r * 0.46;
         const iron = ring(rose, rose.r) || ring(rose, rose.r * 0.18)
           || [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => ring({ x: rose.x + a * lobe, y: rose.y + b * lobe }, lobe * 0.98));
-        if (iron) {
+        const pane = this.detailed ? windowPane(px, py, cx, r, rose.y, bottom) : null;
+        if (pane ? pane.lead : iron) {
           this.part[i] = TRACERY;
           hgt[i] = 1;
-          this.albedo.set(h01(x, y, 19) > 0.65 ? [73, 75, 70] : [30, 34, 33], i * 3);
+          this.albedo.set(this.detailed ? [44, 48, 49] : h01(x, y, 19) > 0.65 ? [73, 75, 70] : [30, 34, 33], i * 3);
           continue;
         }
         this.part[i] = GLASS;
+        this.glassTint[i] = pane?.tint ?? 0;
         // Outside: hills, then the city's roofs and its wall under the sky.
         const hill = horizon + Math.sin(px * 0.11) * 2.2 + Math.sin(px * 0.037 + 1) * 3;
         const city = cityPixel(px, py);
@@ -198,7 +208,8 @@ export class HallBackdrop {
     const amb: RGB = this.look === "planks" ? [0.2, 0.15, 0.12] : this.look === "vault" ? [0.25, 0.21, 0.32] : [0.16 + day * 0.14, 0.16 + day * 0.15, 0.2 + day * 0.15];
     const sky = skyColours(day), win = this.win, sun = keep ? day : 0;
     // Same solar heading as the Library. Reduce Motion keeps a steady heading.
-    const tilt = reduced ? 0.2 : Math.sin(((now % DAY_MS) / DAY_MS) * Math.PI * 2 - Math.PI / 2) * 0.55;
+    const tilt = reduced ? 0.2 : Math.sin(((now % DAY_MS) / DAY_MS) * Math.PI * 2 - Math.PI / 2) * 0.55
+      + Math.sin(now / SUNLIGHT.swayMs) * SUNLIGHT.sway;
     const lit = Math.max(0, Math.min(1, (0.55 - day) / 0.35));
     const exterior = this.outside.map((l) => ({ ...l, f: getTorchFlicker({ x: l.seed, y: 9 }, now, reduced) * lit }));
     for (let y = 0; y < h; y++)
@@ -216,7 +227,11 @@ export class HallBackdrop {
             c = [this.city[i * 3] * (ambient + warm * 1.2), this.city[i * 3 + 1] * (ambient + warm * 0.65), this.city[i * 3 + 2] * (ambient + warm * 0.24)];
           }
           // A faint sheen across clear glass, and a star or two at night.
-          const sheen = Math.abs(((x - y * 0.6) % 14 + 14) % 14 - 3) < 1 ? 1.12 : 1;
+          const sheen = this.detailed ? 1 : Math.abs(((x - y * 0.6) % 14 + 14) % 14 - 3) < 1 ? 1.12 : 1;
+          if (this.detailed) {
+            const tint: RGB = this.glassTint[i] === 1 ? [226, 240, 249] : this.glassTint[i] === 2 ? [255, 246, 220] : [245, 247, 242];
+            c = mix(c, tint, 0.06 + day * 0.2);
+          }
           const star = s > 0 && s < 0.7 && night > 0.5 && h01(x, y, 11) > 0.985 ? 120 * night : 0;
           out[o] = Math.min(255, c[0] * sheen + star);
           out[o + 1] = Math.min(255, c[1] * sheen + star);
@@ -234,24 +249,13 @@ export class HallBackdrop {
           lb += l.rgb[2] * f;
         }
         if (sun > 0) {
-          // The sun through the window: its glow on the stone round it, and a
-          // shafts of light turning across the wall with the sun.
+          // Surface light catches the stone relief. Atmospheric shafts are
+          // separate soft density fields, never hard wall-coloured stripes.
           const mx = (win.x0 + win.x1) / 2, my = (win.y0 + win.y1) / 2, dx = mx - x, dy = my - y, d = Math.hypot(dx, dy);
           const glow = Math.max(0, 1 - d / ((win.x1 - win.x0) * 1.3)) ** 2 * 0.55 * sun * facing(sx[i], sy[i], dx, dy, d);
-          let shaft = 0;
-          if (y > win.y1 && p === WALL) {
-            const run = y - win.y1, sourceX = x - run * tilt;
-            // Clear panes project separate shafts; the metal casts narrow shadows.
-            const beamWidth = (win.x1 - win.x0 - 6) / 4;
-            for (let k = 0; k < 4; k++) {
-              const mid = win.x0 + 3 + beamWidth * (k + 0.5);
-              const edge = Math.max(0, 1 - Math.abs(sourceX - mid) / (beamWidth * 0.48 + run * 0.025));
-              shaft += 0.65 * sun * edge * Math.max(0, 1 - run / (h * 0.85));
-            }
-          }
-          lr += (glow + shaft) * 1.0;
-          lg += (glow + shaft) * 0.93;
-          lb += (glow + shaft) * 0.78;
+          lr += glow;
+          lg += glow * 0.93;
+          lb += glow * 0.78;
         }
         out[o] = Math.min(255, albedo[i * 3] * lr * 1.5);
         out[o + 1] = Math.min(255, albedo[i * 3 + 1] * lg * 1.5);
@@ -275,8 +279,57 @@ export class HallBackdrop {
       pen(tx - 1, ty + 1, "#242522", 3, 1);
       if (l.f > 0) torchFlame((x, y, colour, pw, ph) => pen(x, y, colour, pw, ph, lit), tx, ty, now, l.seed, reduced, true);
     }
-    this.canvas.getContext("2d")!.putImageData(this.image!, 0, 0);
+    const ctx = this.canvas.getContext("2d")!;
+    ctx.putImageData(this.image!, 0, 0);
+    if (keep && sun > 0.02) this.drawSunlight(ctx, now, sun, tilt, reduced);
   }
+
+  private drawSunlight(ctx: CanvasRenderingContext2D, now: number, day: number, tilt: number, reduced: boolean) {
+    this.sunlight ??= new SoftSunlight();
+    const { win, h } = this, width = (win.x1 - win.x0 - 6) / 3, top = win.y1 - 4, length = h - top;
+    const clock = reduced ? 0 : now;
+    for (let k = 0; k < 3; k++) {
+      const pulse = 0.9 + Math.sin(clock / (19000 + k * 3000) + k) * 0.1;
+      this.sunlight.draw(ctx, win.x0 + 3 + width * (k + 0.5), top, width, length, tilt, day * pulse, k);
+    }
+    if (reduced) return;
+    // Fixed, wall-clock trajectories: bounded work, no spawning or RNG stream.
+    ctx.save();
+    ctx.fillStyle = "#fff4d9";
+    for (let k = 0; k < SUNLIGHT.dustCount; k++) {
+      const age = (h01(k, 1, 83) + now / (70000 + h01(k, 2, 83) * 90000)) % 1;
+      const run = age * length, across = h01(k, 3, 83);
+      const x = win.x0 + 3 + across * width * 3 + run * tilt + Math.sin(now / 11000 + k) * 2;
+      const fade = Math.sin(age * Math.PI) ** 2;
+      ctx.globalAlpha = day * fade * (0.18 + h01(k, 4, 83) * 0.3);
+      ctx.fillRect(Math.round(x), Math.round(top + run), 1, 1);
+    }
+    ctx.restore();
+  }
+}
+
+/** Symmetric leadwork at native resolution: an eight-petal rose above two
+ * pointed lights, with a quiet diamond lattice. Each pane owns one tint. */
+function windowPane(x: number, y: number, cx: number, r: number, roseY: number, bottom: number) {
+  const dx = x - cx, dy = y - roseY, rr = r * 0.62, dr = Math.hypot(dx, dy);
+  const angle = Math.atan2(dy, dx), sector = angle * 4 / Math.PI;
+  const petal = rr * (0.66 + 0.13 * Math.cos(angle * 8));
+  if (dr < rr + 0.8) {
+    const lead = Math.abs(dr - rr) < 0.75 || Math.abs(dr - rr * 0.23) < 0.75
+      || Math.abs(dr - petal) < 0.8
+      || (dr > rr * 0.23 && dr < petal && Math.abs(sector - Math.round(sector)) * dr * Math.PI / 4 < 0.72);
+    return { lead, tint: dr < rr * 0.23 ? 2 : (Math.floor(sector + 8) % 2) + 1 };
+  }
+  const split = roseY + rr + 2;
+  if (y < split || y > bottom - 3) return { lead: false, tint: 0 };
+  const half = r * 0.43, localX = Math.abs(dx) - r * 0.47;
+  const arch = split + Math.pow(Math.abs(localX) / half, 1.5) * half * 0.85;
+  const u = dx / (r * 0.45), v = (y - split) / (r * 0.5);
+  const lattice = Math.min(Math.abs(u + v - Math.round(u + v)), Math.abs(u - v - Math.round(u - v))) * r * 0.34 < 0.7;
+  const lead = Math.abs(dx) < 0.7 || (Math.abs(localX) < half && Math.abs(y - arch) < 0.8)
+    || (y > arch + 2 && Math.abs(localX) < half && lattice);
+  const tint = ((Math.floor(u + v) + Math.floor(u - v)) % 3 + 3) % 3;
+  return { lead, tint: y > arch ? tint : 0 };
 }
 
 /** Worn oak boards laid in courses, each board its own tone, with grain,

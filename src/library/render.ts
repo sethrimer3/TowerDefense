@@ -31,6 +31,7 @@ import { ELIXIRS } from "./lab.ts";
 import { HATCH_Y, LabRenderer } from "./lab-render.ts";
 import { LAB_TOP } from "./geometry.ts";
 import { ashlar, facing } from "./ashlar.ts";
+import { SoftSunlight, SUNLIGHT } from "../soft-sunlight.ts";
 
 /** Each role's robe. */
 const ROBES: Record<Role, RGB> = { shelver: [240, 236, 228], professor: [104, 124, 200], researcher: [160, 104, 210] };
@@ -126,6 +127,7 @@ export class LibraryRenderer {
   private sceneKey = "";
   private glow: HTMLCanvasElement;
   private motes: Mote[] = [];
+  private sunlight = new SoftSunlight();
   /** The hallways: baked colour, each frame's picture, and how much of each
    * column (door and hallway, from the outer end in) has lately been seen. */
   private hallBase = [new Float32Array(HALL * HALL_ROWS * 3), new Float32Array(HALL * HALL_ROWS * 3)];
@@ -911,26 +913,16 @@ export class LibraryRenderer {
 
   /** Sunbeams from the window, slanting with the hour, and dust in them. */
   private drawRays(now: number, day: number) {
-    const ctx = this.ctx, tilt = Math.sin(((now % DAY_MS) / DAY_MS) * Math.PI * 2 - Math.PI / 2) * 0.55;
+    const ctx = this.ctx, tilt = Math.sin(((now % DAY_MS) / DAY_MS) * Math.PI * 2 - Math.PI / 2) * 0.55
+      + Math.sin(now / SUNLIGHT.swayMs) * SUNLIGHT.sway;
     ctx.save();
-    ctx.globalCompositeOperation = "lighter";
-    const tints = ["255,214,150", "255,170,150", "170,190,255", "255,230,170", "200,255,190"];
     for (let k = 0; k < 5; k++) {
       const a = WINDOW.x0 + 3 + k * 8, b = a + 6, top = HEAD + 6 + (k % 2) * 10, len = FLOOR - top;
       const pulse = 0.75 + 0.25 * Math.sin(now / (3100 + k * 700) + k);
-      const grad = ctx.createLinearGradient(0, top, 0, FLOOR);
-      grad.addColorStop(0, `rgba(${tints[k]},${0.2 * day * pulse})`);
-      grad.addColorStop(1, `rgba(${tints[k]},0)`);
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.moveTo(a, top);
-      ctx.lineTo(b, top);
-      ctx.lineTo(b + 6 + tilt * len, FLOOR);
-      ctx.lineTo(a - 6 + tilt * len, FLOOR);
-      ctx.closePath();
-      ctx.fill();
+      this.sunlight.draw(ctx, (a + b) / 2, top, b - a, len, tilt, day * pulse, k);
     }
     // Motes drifting through the light.
+    ctx.globalCompositeOperation = "lighter";
     while (this.motes.length < 26) {
       const top = HEAD + this.fx() * (FLOOR - HEAD - 20);
       this.motes.push({ x: WINDOW.x0 + this.fx() * (WINDOW.x1 - WINDOW.x0) + tilt * (top - HEAD), y: top, vx: (this.fx() - 0.5) * 0.05, vy: (this.fx() - 0.3) * 0.04, life: 200 + this.fx() * 300 });
