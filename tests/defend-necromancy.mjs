@@ -37,6 +37,8 @@ try {
       const sim = window.stressSim;
       const c = cell;
       for (let i = 0; i < 6; i++) sim.graves.push({ x: c.x + (i % 3) - 1, y: c.y + Math.floor(i / 3) - 0.5, difficulty: 4 + i * 6, life: 30 });
+      // And a few far off, out of the aim's reach, which still show a skull.
+      for (const [dx, dy] of [[-8, -4], [9, 3], [-6, 6], [7, -5]]) sim.graves.push({ x: c.x + dx, y: c.y + dy, difficulty: 4, life: 30 });
     }, at);
     const b = await spell.boundingBox();
     await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
