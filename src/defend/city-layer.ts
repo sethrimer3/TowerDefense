@@ -15,13 +15,13 @@ import { ART, openAt, parkArt } from "./park-art.ts";
 import { damageStage, drawSprite, sprite, wallDamagePixels, wallRubblePixels } from "./damage-art.ts";
 import { mooringPixels } from "./sky-palace-art.ts";
 import { GRASS, grassPatch, groundArt } from "./ground-art.ts";
-import { heights, shadowCanvas, shadowMask } from "./shadow-art.ts";
+import { heights, shadowCanvas, shadowMask, type Footprint } from "./shadow-art.ts";
 import { gatePixels, gateRubblePixels } from "./gate-art.ts";
 import { gateRect, type Side } from "./layout.ts";
 import { SPIKE_REACH, bastionPixels, bastionRubblePixels, spikePixels } from "./wall-defense-art.ts";
 import { AREAS, areaArtId, type AreaId } from "./areas.ts";
 import { hasWallArt, wallCapSprite, wallFaceSprite, wallRubbleTones } from "./area-wall-art.ts";
-import { drawPixel, drawRoof, type PixelSprite } from "./pixel-sprites.ts";
+import { drawPixel, drawRoof, pixelKey, type PixelSprite } from "./pixel-sprites.ts";
 import { buildingArt, palaceSkyArt } from "./building-sprite-manifest.ts";
 
 export { POND, POND_WATER, hasTree, pondDisc, pondPath, treeCanopy } from "./park-geometry.ts";
@@ -126,12 +126,39 @@ export function paintCityLayer(c: CanvasRenderingContext2D, px: number, scene: C
 /** The shadows of what stands, cached for the last city and battle state. */
 let shadows: { map: CityMap; sim: DefendSim | null; version: number; looks: string; canvas: HTMLCanvasElement | null } | null = null;
 function cityShadows(map: CityMap, sim: DefendSim | null, looks?: Readonly<Record<number, string>>) {
-  const version = sim ? sim.mapVersion : -1, key = looks ? Object.entries(looks).join(",") : "";
+  const version = sim ? sim.mapVersion : -1, key = (looks ? Object.entries(looks).join(",") : "") + `|${pixelKey()}`;
   if (shadows?.map !== map || shadows.sim !== sim || shadows.version !== version || shadows.looks !== key) {
     const standing = (b: Building) => (!sim || sim.intact(b)) && !aloft({ looks }, b);
-    shadows = { map, sim, version, looks: key, canvas: shadowCanvas(shadowMask(heights(map, standing))) };
+    const footprint = (b: Building) => spriteFootprint(map, b, b.structureUid !== undefined ? looks?.[b.structureUid] : undefined);
+    shadows = { map, sim, version, looks: key, canvas: shadowCanvas(shadowMask(heights(map, standing, footprint))) };
   }
   return shadows.canvas;
+}
+
+/** The solid pixels of each structure's sprite as it stands undamaged, read
+ * once a kind, size and look, and again as the pixel art loads, with a cell
+ * of room all round for sprites that overhang their lot. */
+const footprints = new Map<string, Omit<Footprint, "x0" | "y0"> | null>();
+function spriteFootprint(map: CityMap, b: Building, look: string | undefined): Footprint | null {
+  if (typeof document === "undefined") return null;
+  const r = b.rect, key = `${b.kind}:${r.w}x${r.h}:${look ?? ""}:${pixelKey()}`;
+  let f = footprints.get(key);
+  if (f === undefined) {
+    const w = (r.w + 2) * ART, h = (r.h + 2) * ART;
+    const cv = document.createElement("canvas");
+    cv.width = w;
+    cv.height = h;
+    const c = cv.getContext("2d", { willReadFrequently: true })!;
+    c.imageSmoothingEnabled = false;
+    c.translate((1 - r.x) * ART, (1 - r.y) * ART);
+    paintStanding(c, ART, map, b, "moss", look === undefined || b.structureUid === undefined ? undefined : { [b.structureUid]: look });
+    const data = c.getImageData(0, 0, w, h).data, mask = new Uint8Array(w * h);
+    for (let k = 0; k < w * h; k++) mask[k] = data[k * 4 + 3] >= 128 ? 1 : 0;
+    // Nothing drawn (art still on its way): its lot stands in.
+    f = mask.includes(1) ? { w, h, mask } : null;
+    footprints.set(key, f);
+  }
+  return f && { ...f, x0: (r.x - 1) * ART, y0: (r.y - 1) * ART };
 }
 
 /** Ground: the mossy flagstones, one tile per board tile, with the spawn

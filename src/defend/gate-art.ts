@@ -35,7 +35,7 @@ const TONE = {
 };
 
 /** The tower width, the passage between, and where the doors stand. */
-const TOWER = 6;
+export const TOWER = 6;
 const DOOR = { v0: 5, v1: 8 };
 
 /** The gate on `side` with its doors at `frame`, at damage `stage`, seeded

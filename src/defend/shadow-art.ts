@@ -6,7 +6,7 @@
  * houses up as gabled roofs (low at the eaves, rising to the ridge), the
  * city wall taller than any house with its hanging face sloping down to the
  * street, the keep's curtain, turrets and great tower, the other
- * structures, and the trees' domed canopies. The sun is to the upper left
+ * structures (a gate only by its two towers), and the trees' domed canopies. The sun is to the upper left
  * and drops one height unit per art pixel stepped down and right, so a
  * house's eaves throw a short shadow, its gable ends a longer pointed one,
  * and the wall's shadow falls across the roofs beside it, shortened where
@@ -18,6 +18,7 @@ import { CELLS_H, CELLS_W, cellInBounds, cellIndex } from "./grid.ts";
 import type { Building, CityMap } from "./citygen.ts";
 import { ART, treePixels } from "./park-art.ts";
 import { hasTree, treeCanopy } from "./park-geometry.ts";
+import { TOWER as GATE_TOWER } from "./gate-art.ts";
 
 const W = CELLS_W * ART, H = CELLS_H * ART;
 
@@ -37,9 +38,15 @@ export const HEIGHT = {
  * it thins out. */
 const DARK = 0.36, TIP = 0.2;
 
+/** Which art pixels a structure's sprite covers, from `x0`, `y0` (art
+ * pixels on the board), `w` × `h` of them, 1 where it is solid. */
+export type Footprint = { x0: number; y0: number; w: number; h: number; mask: Uint8Array };
+
 /** The art-pixel height map of `map`, `standing` saying which buildings
- * still stand. */
-export function heights(map: CityMap, standing: (b: Building) => boolean): Float32Array {
+ * still stand; `footprint`, where it has one, gives a structure's sprite,
+ * so its shadow starts at the sprite's edge and takes its shape rather
+ * than its lot's. */
+export function heights(map: CityMap, standing: (b: Building) => boolean, footprint?: (b: Building) => Footprint | null): Float32Array {
   const h = new Float32Array(W * H);
   const raise = (x: number, y: number, v: number) => {
     if (x >= 0 && y >= 0 && x < W && y < H && v > h[y * W + x]) h[y * W + x] = v;
@@ -49,8 +56,13 @@ export function heights(map: CityMap, standing: (b: Building) => boolean): Float
     if (b.kind === "wall") wall(map, b, raise, standing);
     else if (b.kind === "house") house(b, raise);
     else if (b.kind === "keep") keep(b, raise);
-    else if (b.kind === "gate" || b.kind === "wallBallista") structure(b, HEIGHT.wall, raise);
-    else structure(b, b.kind.endsWith("Tower") ? HEIGHT.tower : HEIGHT.hall, raise);
+    else if (b.kind === "gate") gate(b, raise);
+    else {
+      const v = b.kind === "wallBallista" ? HEIGHT.wall : b.kind.endsWith("Tower") ? HEIGHT.tower : HEIGHT.hall;
+      const f = footprint?.(b);
+      if (f) sprite(f, v, raise);
+      else structure(b, v, raise);
+    }
   }
   for (let cy = 0; cy < CELLS_H; cy++)
     for (let cx = 0; cx < CELLS_W; cx++) {
@@ -115,10 +127,29 @@ function keep(b: Building, raise: Raise) {
     }
 }
 
-/** A tower or hall: a block one art pixel in from its lot. */
+/** A tower or hall without its sprite's shape to hand (in Node, or before
+ * its art loads): a block one art pixel in from its lot. */
 function structure(b: Building, v: number, raise: Raise) {
   const r = b.rect;
   for (let y = r.y * ART + 1; y < (r.y + r.h) * ART - 1; y++) for (let x = r.x * ART + 1; x < (r.x + r.w) * ART - 1; x++) raise(x, y, v);
+}
+
+/** A structure standing as tall as `v` wherever its sprite is solid. */
+function sprite(f: Footprint, v: number, raise: Raise) {
+  for (let y = 0; y < f.h; y++) for (let x = 0; x < f.w; x++) if (f.mask[y * f.w + x]) raise(f.x0 + x, f.y0 + y, v);
+}
+
+/** A gate: only its two towers stand wall high; the passage between them,
+ * its floor and its low doors, casts nothing, so the sun reaches through. */
+function gate(b: Building, raise: Raise) {
+  const r = b.rect, x0 = r.x * ART, y0 = r.y * ART, w = r.w * ART, h = r.h * ART;
+  const across = b.gate?.side === "e" || b.gate?.side === "w";
+  const long = across ? h : w;
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const u = across ? y : x;
+      if (u < GATE_TOWER || u >= long - GATE_TOWER) raise(x0 + x, y0 + y, HEIGHT.wall);
+    }
 }
 
 /** The shadow over each art pixel: 0 in sun, 1 in shadow, 2 at a shadow's

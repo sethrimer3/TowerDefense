@@ -5,7 +5,7 @@
 // the shapes the art is drawn from.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { defaultLayout, fitLayout, placeCityTile, type Layout } from "../src/defend/layout.ts";
+import { defaultLayout, fitLayout, placeCityTile, placeGate, type Layout } from "../src/defend/layout.ts";
 import { CellType, generateCity, type CityMap } from "../src/defend/citygen.ts";
 import { CELLS_H, CELLS_W, cellIndex } from "../src/defend/grid.ts";
 import { ART, parkArt } from "../src/defend/park-art.ts";
@@ -75,6 +75,29 @@ test("houses, walls and trees cast shadows on the city; fallen buildings cast no
   assert.ok(all.some((v) => v > HEIGHT.tree.rim && v <= HEIGHT.tree.rim + HEIGHT.tree.crown), "tree canopies stand up");
   const fallen = heights(map, (b) => b.id !== house.id);
   assert.equal(fallen[(r.y * ART + 3) * W + r.x * ART + 3], 0, "a fallen house is flat");
+});
+
+test("a gate stands wall high only at its two towers; its passage casts nothing", () => {
+  let l: Layout = defaultLayout();
+  const { tx, ty } = l.keep;
+  for (const side of ["n", "s", "e", "w"] as const) l = placeGate(l, { tx, ty, side }) ?? l;
+  assert.equal(l.gates.length, 4);
+  const fit = fitLayout(l);
+  assert.ok(fit.ok);
+  const map = generateCity(fit, 3);
+  const all = heights(map, () => true);
+  const gates = map.buildings.filter((b) => b.kind === "gate");
+  assert.equal(gates.length, 4);
+  for (const g of gates) {
+    const r = g.rect, across = g.gate!.side === "e" || g.gate!.side === "w";
+    const at = (u: number, v: number) => (across ? all[(r.y * ART + u) * W + r.x * ART + v] : all[(r.y * ART + v) * W + r.x * ART + u]);
+    const long = (across ? r.h : r.w) * ART, deep = (across ? r.w : r.h) * ART;
+    for (let v = 0; v < deep; v++) {
+      assert.equal(at(1, v), HEIGHT.wall, `${g.gate!.side} gate's first tower`);
+      assert.equal(at(long - 2, v), HEIGHT.wall, `${g.gate!.side} gate's second tower`);
+      assert.equal(at(long / 2, v), 0, `${g.gate!.side} gate's passage stands open`);
+    }
+  }
 });
 
 test("streets are dirt, with grass growing unevenly over their park edges", () => {
