@@ -30,6 +30,9 @@ import type { DefendSim, Soldier } from "./sim.ts";
 import { heroPaths, type Swing } from "./hero.ts";
 import { CAPE_EDGE, capePixels, newCape, stepCape, type Cape } from "./hero-cape.ts";
 import { liveSprite } from "./unit-outline.ts";
+import { meleeFacing, facingOf, type Facing } from "./melee-facing.ts";
+import { meleeBody } from "./melee-body.ts";
+import { HERO_FRONT as HERO_ART, HERO_CAPES as CAPES } from "./melee-body-data.ts";
 
 type Ctx = CanvasRenderingContext2D;
 
@@ -40,60 +43,12 @@ const STEEL = ["#5a6478", "#c9d2e0", "#ffffff"];
 /** The Hero, 11 × 11 sprite pixels: plume (P), helm (H gold, h lit),
  * visor (v), gold pauldrons (G), cape (C, c its shaded side), cuirass (A
  * lit, a shaded), gold belt (g) and boots (b). */
-const HERO_ART = [
-  "....000....",
-  "...0PPP0...",
-  "...0HhH0...",
-  "..0HHhHH0..",
-  "..0HvvvH0..",
-  "0GGGAAAaGG0",
-  "0CCAAgAacc0",
-  "0CCAgggacc0",
-  "0CC0AAa0cc0",
-  ".0C0A0a0c0.",
-  ".000b0b000.",
-];
 const W = HERO_ART[0].length;
-const BODY: Record<string, string> = { "0": OUTLINE, H: GOLD[1], h: GOLD[2], G: "#c9a24e", v: "#1c1a22", A: "#dfe4ec", a: "#8e98ac", g: "#d2a640", b: "#4a3626" };
-/** Each look's cape, its shaded side and plume. */
-const CAPES: Record<string, [string, string, string]> = {
-  "": ["#b8302e", "#7a1e1e", "#e8483e"],
-  whirlwind: ["#3e64a8", "#26406e", "#9fd8f4"],
-  bladeDance: ["#2a1c24", "#140e12", "#e04a3a"],
-  legend: ["#f4f3f6", "#b8b9c8", "#e9c46a"],
-};
-type Look = { cape: string; mode: "plain" | "struck" | "ghost" };
-const sprites = new Map<string, HTMLCanvasElement>();
-
-function sprite({ cape, mode }: Look) {
-  const key = `${cape}|${mode}`;
-  let cv = sprites.get(key);
-  if (cv) return cv;
-  cv = document.createElement("canvas");
-  cv.width = W;
-  cv.height = HERO_ART.length;
-  const c = cv.getContext("2d")!, [C, lining, plume] = CAPES[cape] ?? CAPES[""];
-  HERO_ART.forEach((row, j) =>
-    [...row].forEach((ch, i) => {
-      if (ch === ".") return;
-      let color = ch === "C" ? C : ch === "c" ? lining : ch === "P" ? plume : BODY[ch];
-      // Struck: washed pale rather than white, so a hero in the thick of a
-      // crowd still reads.
-      if (mode === "struck" && ch !== "0") color = pale(color);
-      // An after-image: the figure in pale steel, lightest where it is lit.
-      if (mode === "ghost") color = ch === "0" ? STEEL[0] : "hAP".includes(ch) ? STEEL[2] : STEEL[1];
-      c.fillStyle = color;
-      c.fillRect(i, j, 1, 1);
-    }),
-  );
-  sprites.set(key, cv);
-  return cv;
-}
+type Look = { cape: string; mode: "plain" | "struck" | "ghost"; direction?: Facing };
+const sprite = ({cape,mode,direction="south"}:Look) => meleeBody("hero",direction,{look:cape,struck:mode==="struck",ghost:mode==="ghost"});
 
 /** Sprite pixels a cell. */
 const scale = (px: number) => (px * HERO.size * 2) / W;
-/** Which way each Hero's sword last pointed, as an angle. */
-const facing = new WeakMap<object, number>();
 
 /** The Hero's latest swing at its spot, if any is still showing. */
 function latest(sim: DefendSim, u: Soldier): Swing | undefined {
@@ -105,15 +60,13 @@ function latest(sim: DefendSim, u: Soldier): Swing | undefined {
 /** A Hero at its spot: halo while guarded, the sword, then the figure. */
 export function drawHero(c: Ctx, px: number, u: Soldier, sim: DefendSim) {
   const k = scale(px);
-  const e = sim.enemies.find((o) => o.id === u.target);
-  if (e) facing.set(u, Math.atan2(e.y - u.y, e.x - u.x));
   const w = latest(sim, u);
-  let face = facing.get(u) ?? -Math.PI / 2;
+  const heading = meleeFacing(sim, u, w?.kind === "slash" ? Math.atan2(w.fy,w.fx) : undefined);
+  let face = heading.angle;
   if (w?.kind === "slash") {
     // The blade sweeps across the slash's arc, then rests at its far end.
     const base = Math.atan2(w.fy, w.fx), p = Math.min(1, w.t / (w.life * 0.6));
     face = base + w.turn * (-1.1 + 2.2 * ease(p));
-    facing.set(u, base + w.turn * 1.1);
   } else if (w?.kind === "spin") face += w.turn * Math.PI * 2 * ease(Math.min(1, w.t / (w.life * 0.7)));
   const p = heroPaths(sim, u.home), cape = p.legend ? "legend" : p.dance ? "bladeDance" : p.whirl ? "whirlwind" : "";
   if (u.guard) drawHalo(c, px, u, u.guard, sim.time);
@@ -121,7 +74,7 @@ export function drawHero(c: Ctx, px: number, u: Soldier, sim: DefendSim) {
   // The sword behind the figure while held up, in front while it sweeps low.
   const behind = Math.sin(face) < 0;
   if (behind) drawSword(c, k, u.x * px, u.y * px, face);
-  c.drawImage(sprite({ cape, mode: u.flash > 0 ? "struck" : "plain" }), u.x * px - (W / 2) * k, u.y * px - (HERO_ART.length / 2) * k, W * k, HERO_ART.length * k);
+  c.drawImage(sprite({ cape, mode: u.flash > 0 ? "struck" : "plain", direction: w?.kind === "spin" ? facingOf(face) : heading.direction }), u.x * px - (W / 2) * k, u.y * px - (HERO_ART.length / 2) * k, W * k, HERO_ART.length * k);
   if (!behind) drawSword(c, k, u.x * px, u.y * px, face);
 }
 
@@ -319,7 +272,7 @@ function drawDash(c: Ctx, px: number, pix: number, w: Swing) {
       dot(c, px, pix, w.x + (w.x1 - w.x) * f - w.fy * off, w.y + (w.y1 - w.y) * f + w.fx * off);
     }
   }
-  const k = scale(px), ghost = sprite({ cape: "", mode: "ghost" });
+  const k = scale(px), ghost = sprite({ cape: "", mode: "ghost", direction: facingOf(Math.atan2(w.y1-w.y,w.x1-w.x)) });
   for (let n = 1; n <= 3; n++) {
     const f = n / 4;
     c.globalAlpha = Math.max(0, fade * (0.15 + 0.4 * f) - life * 0.3);

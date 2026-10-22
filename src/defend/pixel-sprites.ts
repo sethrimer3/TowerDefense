@@ -28,6 +28,7 @@ export const PIXEL_SPRITES = [
   "city-oak", "city-pine", "city-rubble", "city-scaffold", "city-wall-cap", "city-wall-face", "city-lantern", "pond-lily", "pond-reeds",
   "city-tile", "bomb", "floor-1", "floor-2", "floor-3", "floor-4",
   ...BUILDING_PNGS,
+  "v2/units/melee-facing",
 ] as const;
 export type PixelSprite = (typeof PIXEL_SPRITES)[number];
 

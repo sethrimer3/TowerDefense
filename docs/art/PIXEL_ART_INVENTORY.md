@@ -8,6 +8,8 @@ Legend: **Audit/redraw** = PNG exists, but style/density/states still require re
 
 **Melee cape addition:** The user has now requested [animated capes for every melee troop family](MELEE_CAPES.md), at 60/70/80/90% of the Hero's length with path-specific cloth/edges. These are procedural cloth overlays gated on Pixel Art, including melee summons, with original bodies retained. This does not complete the unit-body PNG rows below; enemy art remains deferred.
 
+**Melee facing correction:** The subsequent direction fix adds [four upright body views](MELEE_FACING.md) for Hero, Valkyrie, swordsmen, risen warriors/amalgams and reinforcement knights/champions. One gated native PNG atlas contains 104 direction/state frames, preserving existing special-unit palettes and front views. Other melee bodies retain their procedural style with directional cues/equipment. This is partial unit coverage; equipment, path details, portraits and a unified unit-grid/palette audit remain unfinished. Enemies remain deferred.
+
 **Window presentation update:** [soft sunlight and Tiles glazing](WINDOW_SUNLIGHT.md) refine the existing procedural room renderer. New Tiles tracery/glazing is gated by Pixel Art and preserves the original off window; atmospheric light is shared with the Library. This adds no sprite assets and leaves the room/scenery and nave PNG migration rows unchecked.
 
 **Visual quality revision:** B1 checkmarks record implemented PNG/state routing, not user approval of the artwork. [Art direction 01](ART_DIRECTION_01.md) revises Barracks (normal/wide and paths), Melee Guild and Watch tower with distinct overhead architecture and structural collapse. Their seven PNGs are replaced in place; frame counts and catalog footprints stay unchanged. All other twenty-two families await this architectural/destruction review. The three revised families are a calibration pass for review, not a claim that the whole catalog now meets the desired style.
@@ -90,7 +92,7 @@ All twenty-one `Soldier.kind` values need a consistent sprite family, not just a
 
 | Pending | Unit | Special variants to retain |
 | --- | --- | --- |
-| [ ] | `sword` — swordsman | Base PNG audit; crusader armor/shield/healing, branch equipment and states. |
+| [ ] | `sword` — swordsman | Four-direction base/hit PNGs implemented; crusader armor/shield/healing, branch equipment and UI remain. |
 | [ ] | `archer` — archer | Base PNG audit; bow/arrow directions and path equipment. |
 | [ ] | `brawler` | Fist, stance, impact and distinct guild identity. |
 | [ ] | `slinger` | Sling, wind-up, stone and release direction. |
@@ -108,7 +110,7 @@ All twenty-one `Soldier.kind` values need a consistent sprite family, not just a
 | [ ] | `railSniper` | Revolutionary equipment, rifle, targeting and laser attachment points. |
 | [ ] | `mage` | Mage Guild paths, staff/robe, casts and persistent fire effects. |
 | [ ] | `valkyrie` | Palace paths, spear, wings, charge and guard states. |
-| [ ] | `hero` | Hall paths' capes, longsword, slash/spin/dash/rise states and guard halo (procedural `hero-art.ts` until then). |
+| [ ] | `hero` | Four-direction bodies for all cape looks, hit and ghost states implemented; longsword, slash/spin/dash/rise and guard remain procedural; unified grid/palette and UI pending. |
 | [ ] | `darkWizard` | Dark Keep paths, robe/staff and chain-lightning states. |
 | [ ] | `undead` | Necromancy bone archers, soul strength, amalgam scale, rise and crumble. |
 | [ ] | `reinforcement` | Called knights/archers/champion, drop/land, last stand and departure. |

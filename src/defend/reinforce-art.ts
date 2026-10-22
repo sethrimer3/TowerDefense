@@ -22,62 +22,18 @@ import { drawMeleeCape, type CapeWearer } from "./melee-cape.ts";
 import type { ReliefLight } from "./ground-relief.ts";
 import type { DefendSim, Soldier } from "./sim.ts";
 
+import { meleeBody } from "./melee-body.ts";
+import { CALLED_ROWS as SPRITES, CALLED_COLORS as COLORS } from "./melee-body-data.ts";
+import type { Facing } from "./melee-facing.ts";
+
 type Ctx = CanvasRenderingContext2D;
 
 const GOLD = ["#8a5a1c", "#c8902e", "#f6c75a", "#fff4c8"];
 const DUST = ["#5a4a3a", "#8a7660", "#b8a68a"];
-const COLORS: Record<string, string> = {
-  o: OUTLINE, l: "#d8dee6", s: "#a7b0b8", d: "#4a5466", b: "#3d6fc4", y: GOLD[2], h: "#6b4a2a",
-  g: "#4f8a3a", k: "#e0b48a", w: "#7a5a34", r: "#b8302a",
-};
-
-/** A knight, a levy archer and the champion. */
-const SPRITES: Record<CalledLook, readonly string[]> = {
-  knight: [
-    "..ooo..o.",
-    ".ollloolo",
-    ".odddoolo",
-    "..olo.olo",
-    "oobbbooso",
-    "osbybyhhh",
-    "osbbbo.h.",
-    ".obbbo...",
-    ".os.so...",
-    ".oo.oo...",
-  ],
-  archer: [
-    ".o..ooo..",
-    "ow.ogggo.",
-    "ow.okkko.",
-    "ow..oko..",
-    "ow.ogggo.",
-    "owogggggo",
-    "ow.ogggo.",
-    "ow..ogo..",
-    ".o.os.so.",
-    "...oo.oo.",
-  ],
-  champion: [
-    "....ooooo...ooo",
-    "...oyyyyyo..oso",
-    "...oyldlyo..oso",
-    "...odddddo..ooo",
-    "....oyyyo...oho",
-    ".ooooyyyoooooho",
-    "orrylllllyrroho",
-    "orrylyyylyrroho",
-    "orrylyyylyrroho",
-    ".orylllllyrooho",
-    ".ooylllllyoooho",
-    "...oyyoyyo..oho",
-    "...olloollo.ooo",
-    "...oooooooo....",
-  ],
-};
-
 const sprites = new Map<string, HTMLCanvasElement>();
 /** A soldier's sprite: struck (white), on a last stand (gold outline), or plain. */
-function sprite(look: CalledLook, struck: boolean, stood: boolean) {
+function sprite(look: CalledLook, struck: boolean, stood: boolean, direction: Facing = "south") {
+  if (look !== "archer") return meleeBody(look,direction,{struck,stood});
   const key = `${look}:${struck}:${stood}`;
   let cv = sprites.get(key);
   if (cv) return cv;
@@ -96,21 +52,21 @@ function sprite(look: CalledLook, struck: boolean, stood: boolean) {
 }
 
 /** Draws `look` standing at (x, y), `size` cells tall-ish, `h` cells up off the ground. */
-function body(c: Ctx, px: number, look: CalledLook, size: number, x: number, y: number, struck = false, stood = false) {
-  const img = sprite(look, struck, stood);
+function body(c: Ctx, px: number, look: CalledLook, size: number, x: number, y: number, struck = false, stood = false, direction: Facing = "south") {
+  const img = sprite(look, struck, stood,direction);
   const k = Math.max(1, Math.round((px * size * 1.9) / img.height));
   const w = img.width * k, h = img.height * k;
   c.drawImage(img, Math.round(x * px - w / 2), Math.round(y * px - h * 0.6), w, h);
 }
 
 /** A reinforcement where it stands. */
-export function drawCalled(c: Ctx, px: number, u: Soldier) {
+export function drawCalled(c: Ctx, px: number, u: Soldier, direction: Facing = "south") {
   const r = u.called!;
   const fade = !r.stood && r.life < 1 ? Math.max(0, r.life) : 1;
   c.save();
   if (fade < 1) c.globalAlpha = fade;
   c.imageSmoothingEnabled = false;
-  body(c, px, r.look, r.size, u.x, u.y, u.flash > 0, !!r.stood);
+  body(c, px, r.look, r.size, u.x, u.y, u.flash > 0, !!r.stood,direction);
   c.restore();
 }
 
