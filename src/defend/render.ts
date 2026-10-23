@@ -25,6 +25,7 @@ import { peopleAt } from "./gates.ts";
 import type { GateRanks } from "../gate-upgrades.ts";
 import { drawBallistas, drawSpikeThrusts } from "./wall-defense-art.ts";
 import { UnitOutline } from "./unit-outline.ts";
+import { garrisoned } from "./garrison-icons.ts";
 import { carriedLights, drawDamage, drawScorches, drawUnits, shadowCasters, type Brush, type Burning } from "./battle-art.ts";
 import { drawGrid, drawLifting, drawOverlay, type Overlay } from "./edit-overlay.ts";
 import { drawInspect, type Armed } from "./inspect.ts";
@@ -486,7 +487,7 @@ export class DefendRenderer {
     const moving: ReliefLight[] = [...flames, ...this.wizard.iceLights(sim.frosts, sim.time * 1000)];
     for (const fx of sim.effects) if (fx.kind === "boom") moving.push({ x: fx.x, y: fx.y, r: fx.r * 2.4, k: 1.4 * (1 - fx.t / 0.6), color: "#ffcf8a" });
     const burns = this.burning ?? (() => 1);
-    for (const u of [...sim.soldiers, ...sim.civilians]) {
+    for (const u of [...sim.soldiers.filter((o) => !garrisoned(o)), ...sim.civilians]) {
       const b = burns(u.x, u.y, u.id);
       if (b > 0) moving.push({ x: u.x, y: u.y, r: 2.2, k: 0.45 * b, color: "#ffc68a" });
     }
@@ -611,7 +612,7 @@ function standingKeep(map: CityMap, sim: DefendSim | null) {
 function walkers(sim: DefendSim): Walker[] {
   const out: Walker[] = [];
   for (const e of sim.enemies) if (!ENEMIES[e.kind].flying) out.push({ id: e.id, x: e.x, y: e.y, size: enemySize(e) });
-  for (const s of sim.soldiers) out.push({ id: s.id, x: s.x, y: s.y, size: 0.4 });
+  for (const s of sim.soldiers) if (!garrisoned(s)) out.push({ id: s.id, x: s.x, y: s.y, size: 0.4 });
   for (const c of sim.civilians) out.push({ id: c.id, x: c.x, y: c.y, size: 0.3 });
   return out;
 }
@@ -620,7 +621,7 @@ function walkers(sim: DefendSim): Walker[] {
 function beneath(sim: DefendSim): Under[] {
   const out: Under[] = [];
   for (const e of sim.enemies) out.push({ x: e.x, y: e.y, size: enemySize(e) });
-  for (const s of sim.soldiers) out.push({ x: s.x, y: s.y, size: 0.4 });
+  for (const s of sim.soldiers) if (!garrisoned(s)) out.push({ x: s.x, y: s.y, size: 0.4 });
   for (const c of sim.civilians) out.push({ x: c.x, y: c.y, size: 0.3 });
   return out;
 }
