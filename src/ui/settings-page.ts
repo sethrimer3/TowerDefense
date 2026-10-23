@@ -6,7 +6,7 @@ import { el } from "./dom.ts";
 
 /** The settings on the page, in order; each control comes from its row in SETTINGS. */
 /** Gameplay settings, under their own heading first. */
-const GAMEPLAY = ["showEmpty", "raiseDrag"] as const satisfies readonly SettingKey[];
+const GAMEPLAY = ["showEmpty", "raiseDrag", "magnifier"] as const satisfies readonly SettingKey[];
 const PAGE = ["pixelArt", "reduceMotion", "effectsOff", "simpleEnemies", "simpleTroops", "mergedOutlines", "tileGrid", "soundOff", "ambienceOff", "pixelFont"] as const satisfies readonly SettingKey[];
 /** The dev options, under ALL ON. */
 const DEV = ["devMode", "devTowers", "instantResearch"] as const satisfies readonly SettingKey[];

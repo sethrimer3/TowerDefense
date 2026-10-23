@@ -115,6 +115,7 @@ const defendPage = new DefendPage(el("defend"), {
   setHealthbars: (value) => { save.settings.showHealthbars = value; store(); },
   showEmpty: () => save.settings.showEmpty,
   raiseDrag: () => save.settings.raiseDrag,
+  magnifier: () => save.settings.magnifier,
   gridLines: () => (save.settings.tileGrid ? save.settings.gridOpacity / 100 : 0),
   effects: () => !save.settings.effectsOff,
   devMode: () => save.settings.developerMode,
