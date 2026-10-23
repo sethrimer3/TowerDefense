@@ -24,6 +24,8 @@ import { paintIcon } from "./structure-art.ts";
 
 export type PointerHost = {
   renderer(): DefendRenderer | null;
+  /** A battle-only aiming handle; an additional pointer cancels it and pinches. */
+  aim?(e: PointerEvent): BoardAim | null;
   /** Starts a drag (through `begin`) for whatever a board press lands on,
    * returning false when the press should move the view instead. */
   pickUp(e: PointerEvent): boolean;
@@ -36,6 +38,7 @@ export type PointerHost = {
   /** Whether a held item rides `RAISE` cells above the pointer. */
   raise?(): boolean;
 };
+export type BoardAim = { move(e: PointerEvent): void; end(e: PointerEvent, commit: boolean, moved: boolean): void };
 
 /** How far (CSS pixels) a pointer may move and still tap. */
 const TAP_SLOP = 8;
@@ -53,6 +56,7 @@ type Point = { x: number; y: number };
 export class BoardPointers {
   /** Board pointers moving the view, at their last client points. */
   private touches = new Map<number, Point>();
+  private aiming: { id: number; x: number; y: number; last: PointerEvent; moved: boolean; gesture: BoardAim } | null = null;
   /** The drag in progress, if any, and the icon following its pointer. */
   private held: { edit: EditSession; ghost: HTMLCanvasElement } | null = null;
   /** A lone press that may yet be a tap, where it went down. */
@@ -89,7 +93,20 @@ export class BoardPointers {
   /** A press on the board. */
   down(e: PointerEvent) {
     if (e.button !== 0) return;
+    if (this.aiming) {
+      const a = this.aiming;
+      this.aiming = null;
+      a.gesture.end(a.last, false, a.moved);
+      this.touches.set(a.id, { x: a.last.clientX, y: a.last.clientY });
+      return this.join(e);
+    }
     if (this.touches.size || this.held) return this.join(e);
+    const aim = this.host.aim?.(e);
+    if (aim) {
+      e.preventDefault();
+      this.aiming = { id: e.pointerId, x: e.clientX, y: e.clientY, last: e, moved: false, gesture: aim };
+      return;
+    }
     if (this.host.pickUp(e)) return;
     this.touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
     this.tapping = { id: e.pointerId, x: e.clientX, y: e.clientY };
@@ -137,6 +154,13 @@ export class BoardPointers {
   }
 
   private move(e: PointerEvent) {
+    const a = this.aiming;
+    if (a?.id === e.pointerId) {
+      a.last = e;
+      a.moved ||= Math.hypot(e.clientX - a.x, e.clientY - a.y) > TAP_SLOP;
+      if (a.moved) a.gesture.move(e);
+      return;
+    }
     const h = this.held;
     const t = this.tapping;
     if (t?.id === e.pointerId && Math.hypot(e.clientX - t.x, e.clientY - t.y) > TAP_SLOP) this.tapping = null;
@@ -175,6 +199,12 @@ export class BoardPointers {
   }
 
   private up(e: PointerEvent) {
+    if (this.aiming?.id === e.pointerId) {
+      const a = this.aiming;
+      this.aiming = null;
+      a.gesture.end(e, true, a.moved);
+      return;
+    }
     this.touches.delete(e.pointerId);
     if (this.lifting?.id === e.pointerId) this.unlift();
     if (this.tapping?.id === e.pointerId) {
@@ -209,6 +239,11 @@ export class BoardPointers {
 
   /** Drops the drag in progress without placing it. */
   end() {
+    if (this.aiming) {
+      const a = this.aiming;
+      this.aiming = null;
+      a.gesture.end(a.last, false, a.moved);
+    }
     this.unhold();
     this.unlift();
     this.held?.ghost.remove();

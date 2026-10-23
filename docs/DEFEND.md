@@ -1035,3 +1035,16 @@ bombard player units and buildings every two seconds. Destroyed parts remain
 charred sockets. Core destruction removes surviving parts; only the core counts
 as a kill. The wave budget reserves all 9/15/21/27 components and spawning
 checks room for the complete fortress before releasing it.
+
+
+## Cannon attunements
+
+The Cannon Tower branches into Gun Battery, Mortar Tower and Minelayer, each costing 4 Knowledge to attune and having three path ranks costing 4 / 4,004 / 16,004 Knowledge. These are individual building upgrades; existing cannon Forge/Training bonuses still apply.
+
+- **Gun Battery:** grapeshot immediately: the main shell plus four surrounding blasts, each at 35% damage and half radius. Drilled crews / Powder crews / Master gunners reduce reload time by 15% / 25% / 50% relative to the ordinary cannon.
+- **Mortar Tower:** every impact leaves burning ground for 4 seconds, at 25% of its impact damage per second. Initially ordinary impact damage and 25% longer reload; Incendiary shot increases impact and burning damage by 80% with 50% longer reload; Powder charge enlarges blast and burn radii by 50%; Earthshaker triples both damage values relative to the unupgraded mortar and adds 3 cells of range. Ground fire uses the existing enemy-only, ground-only Blaze system, including water/rime/ice interactions, without receiving Mage Guild research. Impact retains cannon friendly fire unless cannon safety is unlocked.
+- **Minelayer:** fires on the normal cannon cadence even without enemies, placing mines on open dry ground at half range (5.5 simulation cells). Mines arm after 0.5 seconds and explode when a ground enemy comes within 0.75 cells, using ordinary cannon damage/radius and safety rules. Mines persist for the battle. Capacity is per tower and includes shells in flight; the tower waits at capacity. Directed laying unlocks aiming at rank I (15 mines); Expanded magazine raises capacity to 30; Smart charges raises it to 50 and lets mines walk at 0.5 cells/s toward ground enemies detected within 3 cells. They respect obstacles, water and their original laying range.
+
+During battle, select an upgraded Minelayer and drag from its tower or selected crosshair to direct future shots within a 1-cell-radius target disk, clipped to laying range. Drag back onto the tower to restore random full-range coverage; its crosshair expands to the range perimeter. Crosshairs show only while selected. Pointer cancellation or a second finger cancels an uncommitted preview; two fingers still pinch. Build-mode movement and hold-to-open trees remain available. Aiming resets for each battle and is not saved.
+
+C4 Nanobots now requires one fully upgraded building from each of the three attunements. Existing C4 Nanobots and saved Gun Battery/Mortar ranks remain owned. [Accepted specification](upgrades/CANNON_ATTUNEMENTS.md).

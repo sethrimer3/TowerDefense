@@ -60,6 +60,7 @@ export const ATTUNED: Attuned[] = [
   { kind: "cannonTower", from: "watchTower", cost: 6, ultimate: "nanoTower", branches: [
     { path: "gunnery", via: { kind: "batteryTower", cost: 4 } },
     { path: "siegeShot", via: { kind: "mortarTower", cost: 4 } },
+    { path: "minelaying", via: { kind: "minelayerTower", cost: 4 } },
   ] },
   { kind: "wizardTower", from: "watchTower", cost: 8, ultimate: "darkKeep", branches: [
     { path: "pyromancy", via: { kind: "pyreTower", cost: 6 } },

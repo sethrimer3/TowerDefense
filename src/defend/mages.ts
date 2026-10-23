@@ -30,7 +30,7 @@ const paths = (sim: DefendSim, home?: number) => {
 export type Fireball = { x0: number; y0: number; x1: number; y1: number; t: number; dur: number; damage: number; r: number; origin?: Arrow["origin"]; home?: number };
 /** Burning ground a fireball left: its centre and radius, how long it has
  * burned of its `life`, its damage a second, and a seed for how it looks. */
-export type Blaze = { x: number; y: number; r: number; t: number; life: number; dps: number; seed: number; cling?: boolean };
+export type Blaze = { x: number; y: number; r: number; t: number; life: number; dps: number; seed: number; mortar?: boolean; origin?: Arrow["origin"]; cling?: boolean };
 
 /** Mages throw at the nearest enemy in reach; otherwise they stroll to a
  * random street. */
@@ -89,9 +89,9 @@ export function stepBlazes(sim: DefendSim, dt: number) {
     b.t += dt;
     for (const e of sim.enemiesNear(b.x, b.y, b.r)) {
       if (ENEMIES[e.kind].flying || sheltered(sim, e.x, e.y)) continue;
-      sim.hurtEnemy(e, b.dps * dt, false, "ranged", b, false, "fire");
+      sim.hurtEnemy(e, b.dps * dt, false, "ranged", b.origin ?? b, false, "fire");
       // Clinging fire: it keeps burning after it walks out.
-      if (b.cling || legacyCling) ignite(e, b.dps, CINDERS.cling);
+      if (b.cling || (legacyCling && !b.mortar)) ignite(e, b.dps, CINDERS.cling);
     }
   }
   sim.blazes = sim.blazes.filter((b) => b.t < b.life);

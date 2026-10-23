@@ -1,3 +1,5 @@
+import { fireMine, landMine, mineRange } from "./mines.ts";
+import { sheltered } from "./boats.ts";
 import { stepBowJavelin, stepSkyArrow } from "./archer-attunements.ts";
 import { buildingPaths } from "../specializations.ts";
 /** DEFEND towers and their projectiles. Archer towers shoot the nearest
@@ -54,7 +56,7 @@ export const archerTowerRange = (sim: Pick<DefendSim, "levels" | "bonuses">, b?:
   return archerRange(sim.levels.archerRange) + (sharp ? SHARP.range : hawk ? SHARP.hall : 0);
 };
 /** How far a cannon tower lobs its shells. */
-export const cannonTowerRange = (sim: Pick<DefendSim, "bonuses">, b?: Building) => CANNON_RANGE + (paths(sim, b).siege >= 3 ? SIEGE_SHOT.range : 0);
+export const cannonTowerRange = (sim: Pick<DefendSim, "bonuses">, b?: Building) => b?.kind === "minelayerTower" ? mineRange() : CANNON_RANGE + (paths(sim, b).siege >= 3 ? SIEGE_SHOT.range : 0);
 
 /** How far the keep's arrow loops shoot (0 without them). */
 export const keepArrowRange = (sim: Pick<DefendSim, "bonuses">) => ARROW_LOOPS.range[keepRank(sim.bonuses.keep, "arrowLoops")];
@@ -165,6 +167,10 @@ export class Towers {
 
   private stepCannon(sim: DefendSim, b: Building, dt: number) {
     if (!this.ready(b, dt)) return;
+    if (b.kind === "minelayerTower") {
+      this.cooldown.set(b.id, fireMine(sim, b) ? cannonCooldown(sim.levels.cannonRate) * sim.bonuses.towerReload : 0);
+      return;
+    }
     const c = center(b.rect), { gunnery, siege, battery, mortar } = paths(sim, b);
     const range = cannonTowerRange(sim, b);
     const ground = sim.enemiesNear(c.x, c.y, range).filter(
@@ -185,7 +191,8 @@ export class Towers {
       dur: 0.45 + dist * 0.07,
       damage: cannonDamage(sim.levels.cannonDamage) * sim.bonuses.towerDamage * (siege ? SIEGE_SHOT.damage[siege] : mortar ? SIEGE_SHOT.hall.damage : 1),
       r: cannonSplash(sim.levels.cannonDamage) * (siege >= 2 ? SIEGE_SHOT.radius : 1),
-      ...(gunnery >= 2 ? { grape: true } : {}),
+      ...(battery ? { grape: true } : {}),
+      ...(mortar ? { mortar: { life: SIEGE_SHOT.burnLife, dps: cannonDamage(sim.levels.cannonDamage) * sim.bonuses.towerDamage * SIEGE_SHOT.damage[siege] * SIEGE_SHOT.burnShare } } : {}),
     });
   }
 }
@@ -250,8 +257,10 @@ export function stepShells(sim: DefendSim, dt: number) {
   for (const s of sim.shells) {
     s.t += dt;
     if (s.t < s.dur) continue;
+    if (s.mine) { landMine(sim, s); continue; }
     const friendlyFire = !sim.levels.cannonSafe;
-    sim.explode(s.x1, s.y1, { r: s.r, damage: s.damage, friendlyFire, origin: s.origin });
+    const seed = sim.explode(s.x1, s.y1, { r: s.r, damage: s.damage, friendlyFire, origin: s.origin });
+    if (s.mortar && !sheltered(sim, s.x1, s.y1)) sim.blazes.push({ x: s.x1, y: s.y1, r: s.r, t: 0, life: s.mortar.life, dps: s.mortar.dps, seed, mortar: true, origin: s.origin });
     // Grapeshot: smaller bursts round the landing, one each way.
     if (s.grape)
       for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]])

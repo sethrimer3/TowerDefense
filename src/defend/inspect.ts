@@ -1,3 +1,5 @@
+import { mineRange } from "./mines.ts";
+import { MINELAYER } from "../knowledge-paths.ts";
 /** A tapped building on the DEFEND board: outlined in gold, with its reach
  * as faint circles when it shoots and the troops it trained outlined too.
  * Presentation only; it reads the battle (or, while building, the levels
@@ -28,7 +30,7 @@ export function reachOf(b: Building, armed: Armed): Circle[] {
   const at = (r: number) => [{ x: c.x, y: c.y, r }];
   switch (b.kind) {
     case "archerTower": case "brazierTower": case "hawkTower": return at(archerTowerRange(armed, b));
-    case "cannonTower": case "batteryTower": case "mortarTower": return at(cannonTowerRange(armed, b));
+    case "cannonTower": case "batteryTower": case "mortarTower": case "minelayerTower": return at(cannonTowerRange(armed, b));
     case "nanoTower": return at(nanoRange());
     case "wizardTower": case "pyreTower": case "frostTower": case "stormTower": return at(wizardReach(armed, b));
     case "watchTower": return at(watchReach(armed, b));
@@ -53,7 +55,7 @@ export function troopsOf(b: Building, sim: DefendSim | null) {
 const GOLD = "#f2c14e";
 
 /** Draws the pick over the board; `c` is in board space at `px` a cell. */
-export function drawInspect(c: CanvasRenderingContext2D, px: number, map: CityMap, sim: DefendSim | null, id: number, armed: Armed, now: number, reduceMotion: boolean) {
+export function drawInspect(c: CanvasRenderingContext2D, px: number, map: CityMap, sim: DefendSim | null, id: number, armed: Armed, now: number, reduceMotion: boolean, minePreview?: { point?: { x: number; y: number }; since: number }) {
   const b = map.buildings[id];
   if (!b) return;
   const scale = c.getTransform().a || 1;
@@ -75,6 +77,28 @@ export function drawInspect(c: CanvasRenderingContext2D, px: number, map: CityMa
     c.strokeStyle = "rgba(242, 193, 78, 0.55)";
     c.stroke();
     c.setLineDash([]);
+  }
+  if (b.kind === "minelayerTower") {
+    const origin = center(b.rect), point = minePreview ? minePreview.point : sim?.mineAims.get(id);
+    const target = point ?? origin;
+    const t = reduceMotion || !minePreview ? 1 : Math.min(1, Math.max(0, (now - minePreview.since) / 350));
+    const radius = point ? MINELAYER.scatter : MINELAYER.scatter + (mineRange() - MINELAYER.scatter) * (1 - (1 - t) ** 3);
+    c.save();
+    // Clip the target area to actual range, including crosshairs dragged to its edge.
+    c.beginPath(); c.arc(origin.x * px, origin.y * px, mineRange() * px, 0, Math.PI * 2); c.clip();
+    c.strokeStyle = "#ffc96a"; c.lineWidth = line(2);
+    c.beginPath(); c.arc(target.x * px, target.y * px, radius * px, 0, Math.PI * 2); c.stroke();
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      c.beginPath();
+      c.moveTo((target.x + dx * (radius - .45)) * px, (target.y + dy * (radius - .45)) * px);
+      c.lineTo((target.x + dx * radius) * px, (target.y + dy * radius) * px);
+      c.stroke();
+    }
+    if (point) {
+      c.setLineDash([line(3), line(4)]); c.lineWidth = line(1);
+      c.beginPath(); c.moveTo(origin.x * px, origin.y * px); c.lineTo(point.x * px, point.y * px); c.stroke();
+    }
+    c.restore();
   }
   // The building: a black-edged gold frame round its cells.
   const pad = 0.15;

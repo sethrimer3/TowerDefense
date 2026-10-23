@@ -6,7 +6,7 @@ import { cloneLayout, type PlacedKind } from "./defend/layout.ts";
 import type { Save } from "./save.ts";
 import { studyPathCost } from "./economy.ts";
 
-export type PathTopic = "pyreTower" | "frostTower" | "stormTower" | "wizardTower" | "chapterHouse" | "berserkerLodge" | "halberdYard" | "barracks" | "heroHall" | "valkyriePalace" | "assassinDen" | "bloodHall" | "veilHouse" | "poisonDen" | "spearHall" | "phalanx" | "javelinCamp" | "lancerStable" | "musketHall" | "gunHall" | "gunNest" | "gatlingNest" | "rocketBattery" | "sniperLodge" | "archerTower" | "brazierTower" | "hawkTower" | "cannonTower" | "batteryTower" | "mortarTower" | "archerBarracks" | "rangerLodge" | "skirmishCamp" | "skyrangerLodge" | "watchTower" | "mageGuild" | "infernoHall" | "cinderHall" | "bait" | "spikes" | SpellId;
+export type PathTopic = "pyreTower" | "frostTower" | "stormTower" | "wizardTower" | "chapterHouse" | "berserkerLodge" | "halberdYard" | "barracks" | "heroHall" | "valkyriePalace" | "assassinDen" | "bloodHall" | "veilHouse" | "poisonDen" | "spearHall" | "phalanx" | "javelinCamp" | "lancerStable" | "musketHall" | "gunHall" | "gunNest" | "gatlingNest" | "rocketBattery" | "sniperLodge" | "archerTower" | "brazierTower" | "hawkTower" | "cannonTower" | "batteryTower" | "mortarTower" | "minelayerTower" | "archerBarracks" | "rangerLodge" | "skirmishCamp" | "skyrangerLodge" | "watchTower" | "mageGuild" | "infernoHall" | "cinderHall" | "bait" | "spikes" | SpellId;
 /** Strike spells: cast from the battle's Skills palette rather than built,
  * so a spell has no cards; it casts with the one path `save.spellPaths`
  * names, at its furthest researched rank. */
@@ -21,7 +21,7 @@ export type PathId =
   | "grenadiers" | "volleyFire" | "bayonets" | "sharpMuskets" | "beltFeed"
   | "quickdraw" | "duelists" | "tripod" | "gunShield" | "overdrive" | "stoppingPower" | "deadeye" | "piercing" | "clusterRockets" | "salvoRacks"
   | "marksmen" | "ricochet" | "suppressors"
-  | "fireArrows" | "sharpshooters" | "gunnery" | "siegeShot" | "rangers" | "skirmishers" | "skyranger"
+  | "fireArrows" | "sharpshooters" | "gunnery" | "siegeShot" | "minelaying" | "rangers" | "skirmishers" | "skyranger"
   | "spotters" | "signalFires" | "pyroclasm" | "cinders" | "oilSoaked" | "fortified"
   | "blastStakes" | "springStakes" | "rimeStakes"
   | "boneArchers" | "soulWeighing" | "amalgam"
@@ -238,14 +238,12 @@ export const FIRE_ARROWS = { hall: { burn: 2, share: 0.25 }, burn: [0, 3, 4, 4],
  * critical for `crit` times the damage; at III `damage` times the damage,
  * aimed at the strongest enemy in reach. */
 export const SHARP = { hall: 1, range: 2, every: 3, crit: 3, damage: 1.6 };
-/** Gun crews, the Gun battery's path: it reloads in `reload[rank]` of the
- * time (the battery's own, before any rank, `hall`); from II each
- * shell bursts into `grape` bomblets round it (`grapeShare` of the damage,
- * `grapeR` of the radius). */
-export const GUNNERY = { hall: 0.85, reload: [1, 0.75, 0.75, 0.5], grape: 4, grapeShare: 0.35, grapeR: 0.5 };
-/** Siege shot, the Mortar tower's path (its own, before any rank, `hall`): `damage[rank]` times the damage and `reload` times the time
- * between shots; from II `radius` times the blast; at III `range` more cells. */
-export const SIEGE_SHOT = { hall: { damage: 1.4, reload: 1.25 }, damage: [1, 1.8, 1.8, 3], reload: 1.5, radius: 1.5, range: 3 };
+/** Gun Battery: grapeshot at attuning; ranks shorten reload time. */
+export const GUNNERY = { hall: 1, reload: [1, 0.85, 0.75, 0.5], grape: 4, grapeShare: 0.35, grapeR: 0.5 };
+/** Mortar: impact and burning damage share the same multiplier. */
+export const SIEGE_SHOT = { hall: { damage: 1, reload: 1.25 }, damage: [1, 1.8, 1.8, 3], reload: 1.5, radius: 1.5, range: 3, burnShare: 0.25, burnLife: 4 };
+/** Minelayer distances are simulation cells; caps include shells in flight. */
+export const MINELAYER = { range: 0.5, cap: [15, 15, 30, 50], scatter: 1, arm: 0.5, trigger: 0.75, seek: 3, speed: 0.5, attempts: 48 };
 /** Skirmishers, the Skirmish camp's path: archers draw in `reload[rank]`
  * of the time (`camp` before any rank); from II they
  * walk `speed` times as fast and keep walking while they shoot. */
@@ -698,17 +696,25 @@ export const PATHS: KnowledgePath[] = [
   {
     id: "gunnery", topic: "batteryTower", name: "Gun crews", motto: "Fast crews, scattering shot", hue: "steel",
     ranks: [
-      { name: "Drilled crews", icon: "gear", cost: studyPathCost(4, 0), text: "The cannon reloads 25% faster in all" },
-      { name: "Grapeshot", icon: "grape", cost: studyPathCost(4, 1), text: "Each shell bursts into 4 smaller blasts round where it lands" },
-      { name: "Master gunners", icon: "mail", cost: studyPathCost(4, 2), text: "It reloads twice as fast as at first" },
+      { name: "Drilled crews", icon: "gear", cost: studyPathCost(4, 0), text: "Grapeshot retained; reload time is 15% shorter than an ordinary cannon" },
+      { name: "Powder crews", icon: "grape", cost: studyPathCost(4, 1), text: "Grapeshot retained; reload time is 25% shorter than an ordinary cannon" },
+      { name: "Master gunners", icon: "mail", cost: studyPathCost(4, 2), text: "Grapeshot retained; reload time is half that of an ordinary cannon" },
     ],
   },
   {
     id: "siegeShot", topic: "mortarTower", name: "Siege shot", motto: "Slow, enormous blasts", hue: "ember",
     ranks: [
-      { name: "Iron shot", icon: "cannonball", cost: studyPathCost(4, 0), text: "Shells hit 80% harder in all, and the cannon takes half again as long to reload" },
-      { name: "Powder charge", icon: "blast", cost: studyPathCost(4, 1), text: "Blasts are half again as wide" },
-      { name: "Earthshaker", icon: "fork", cost: studyPathCost(4, 2), text: "Shells hit three times as hard in all and the cannon reaches 3 cells further" },
+      { name: "Incendiary shot", icon: "cannonball", cost: studyPathCost(4, 0), text: "Impact and burning damage increase by 80%; reload time is 50% longer than an ordinary cannon" },
+      { name: "Powder charge", icon: "blast", cost: studyPathCost(4, 1), text: "Explosion radius and burning-ground radius both increase by 50%" },
+      { name: "Earthshaker", icon: "fork", cost: studyPathCost(4, 2), text: "Impact and burning damage are tripled; retains larger burning ground and reaches 3 cells further" },
+    ],
+  },
+  {
+    id: "minelaying", topic: "minelayerTower", name: "Minelaying", motto: "Lay the battlefield before they arrive", hue: "steel",
+    ranks: [
+      { name: "Directed laying", icon: "crosshair", cost: studyPathCost(4, 0), text: "In battle, drag from the tower to aim new mines; drag back onto it for random coverage. Up to 15 mines" },
+      { name: "Expanded magazine", icon: "crate", cost: studyPathCost(4, 1), text: "Up to 30 mines at once, including shells in flight" },
+      { name: "Smart charges", icon: "gear", cost: studyPathCost(4, 2), text: "Up to 50 mines; charges detect enemies 3 cells away and slowly walk toward them" },
     ],
   },
   {
@@ -908,7 +914,7 @@ export const PATHS: KnowledgePath[] = [
 export const PATH_TOPICS = [...new Set(PATHS.map((p) => p.topic))];
 /** The paths the wizard tower and the barracks wore before each branch
  * made a building of its own. */
-const LEGACY_TOPICS: Partial<Record<PathTopic, PathId[]>> = { wizardTower: ["pyromancy", "rime", "storm"], barracks: ["crusaders", "berserkers", "halberdiers"], assassinDen: ["bloodletters", "shadowcloak", "venom"], archerTower: ["fireArrows", "sharpshooters"], cannonTower: ["gunnery", "siegeShot"], archerBarracks: ["rangers", "skirmishers"], mageGuild: ["pyroclasm", "cinders"] };
+const LEGACY_TOPICS: Partial<Record<PathTopic, PathId[]>> = { wizardTower: ["pyromancy", "rime", "storm"], barracks: ["crusaders", "berserkers", "halberdiers"], assassinDen: ["bloodletters", "shadowcloak", "venom"], archerTower: ["fireArrows", "sharpshooters"], cannonTower: ["gunnery", "siegeShot", "minelaying"], archerBarracks: ["rangers", "skirmishers"], mageGuild: ["pyroclasm", "cinders"] };
 export const pathById = (id: PathId) => PATHS.find((p) => p.id === id)!;
 export const pathsOf = (topic: string) => PATHS.filter((p) => p.topic === topic);
 
@@ -953,8 +959,9 @@ export const UNSPECIALIZED: Record<PathTopic, string> = {
   brazierTower: "Lit arrows: burns for 2 seconds",
   hawkTower: "A cell more reach",
   cannonTower: "Standard shells and blasts",
-  batteryTower: "Reloads 15% faster",
-  mortarTower: "Shells 40% harder, slower to reload",
+  batteryTower: "Grapeshot: each shell adds four surrounding explosions",
+  mortarTower: "Impacts leave burning ground for 4 seconds; slower reload",
+  minelayerTower: "Random proximity mines; half cannon range; up to 15 mines",
   archerBarracks: "Ordinary archers",
   rangerLodge: "Javelin Bowmen: slow massive arrows; 2 enemies, 3-city-tile push",
   skyrangerLodge: "Skyranger: unlimited range, arrows descend from above",

@@ -49,7 +49,8 @@ import type { Overlay } from "./edit-overlay.ts";
 import { paintIcon, type IconItem } from "./structure-art.ts";
 import { artLook } from "./tower-art.ts";
 import { pathBadge, pathLook, paintPathIcons } from "../ui/path-badge.ts";
-import { BoardPointers, eventCell } from "./board-pointers.ts";
+import { BoardPointers, eventCell, type BoardAim } from "./board-pointers.ts";
+import { mineAim, mineRank } from "./mines.ts";
 import type { Drag } from "./drag-rules.ts";
 import { EditSession, type Drop } from "./edit-session.ts";
 import { BattleSound } from "./battle-sound.ts";
@@ -129,6 +130,7 @@ export class DefendPage {
   private renderer: DefendRenderer | null = null;
   private pointers = new BoardPointers({
     renderer: () => this.renderer,
+    aim: (e) => this.aimMine(e),
     pickUp: (e) => this.pickUp(e),
     drop: (drop) => this.drop(drop),
     tap: (e) => this.tap(e),
@@ -138,6 +140,7 @@ export class DefendPage {
   /** The building the player tapped (its id in the map), outlined with its
    * reach and troops, and what its reach is reckoned from before a battle. */
   private picked: { id: number; armed: Armed } | null = null;
+  private minePreview: { id: number; point?: { x: number; y: number }; since: number } | null = null;
   /** The last tap in battle, for telling a double tap: where (client
    * pixels), when, and what was picked out before it. */
   private lastTap: { x: number; y: number; at: number; picked: { id: number; armed: Armed } | null } | null = null;
@@ -926,7 +929,7 @@ export class DefendPage {
       over: this.phase === "over",
       shimmer: this.phase === "build" && !this.sim,
       ...(lifting ? { lifting } : {}),
-      ...(this.picked ? { inspect: { id: this.picked.id, armed: this.sim ?? this.picked.armed } } : {}),
+      ...(this.picked ? { inspect: { id: this.picked.id, armed: this.sim ?? this.picked.armed, ...(this.minePreview?.id === this.picked.id ? { minePreview: this.minePreview } : {}) } } : {}),
       hideBanner: this.phase === "over" || (this.pointers.session?.drag.from === "banner" && !!this.pointers.session.drag.placed),
     });
   }
@@ -985,6 +988,45 @@ export class DefendPage {
     }
     this.pointers.begin(edit, e);
     return true;
+  }
+
+  /** Battle aiming owns a tower-origin drag; setup keeps normal building movement. */
+  private aimMine(e: PointerEvent): BoardAim | null {
+    const sim = this.phase === "sim" ? this.sim : null;
+    if (!sim || !this.renderer) return null;
+    const p = eventCell(this.renderer, e);
+    if (!p.inside) return null;
+    const banner = sim.warBanner;
+    if (banner && !banner.flag && sim.bannerRemaining <= 0 && p.fx >= banner.x - 1 && p.fx <= banner.x + 2.2 && p.fy >= banner.y - 1.4 && p.fy <= banner.y + 1) return null;
+    let b = sim.map.buildings[sim.map.owner[p.cy * CELLS_W + p.cx]];
+    // The selected crosshair is also a handle, so dragging it home resets aim.
+    const selected = this.picked && sim.map.buildings[this.picked.id];
+    const handle = selected && sim.mineAims.get(selected.id);
+    if (selected?.kind === "minelayerTower" && handle && Math.hypot(p.fx - handle.x, p.fy - handle.y) < .8) b = selected;
+    if (b?.kind !== "minelayerTower" || !sim.intact(b) || mineRank(sim, b) < 1) return null;
+    const wasSelected = this.picked?.id === b.id;
+    this.pick(b.id);
+    this.lastTap = null;
+    const preview = (ev: PointerEvent) => {
+      const p = eventCell(this.renderer!, ev), point = mineAim(b, { x: p.fx, y: p.fy });
+      const old = this.minePreview;
+      this.minePreview = { id: b.id, point, since: old?.id === b.id && !old.point && !point ? old.since : performance.now() };
+    };
+    return {
+      move: preview,
+      end: (ev, commit, moved) => {
+        if (commit && moved && this.sim === sim && sim.intact(b)) {
+          preview(ev);
+          const point = this.minePreview?.point;
+          if (point) sim.mineAims.set(b.id, point);
+          else sim.mineAims.delete(b.id);
+          this.setMessage(point ? "Minelayer aimed. Drag the crosshair back onto its tower for random coverage." : "Minelayer: random coverage across its full range.", 4);
+        } else {
+          this.minePreview = null;
+          if (commit && !moved && wasSelected) this.pick(null);
+        }
+      },
+    };
   }
 
   /** A press on the planted war banner (its pole or cloth) lifts it. */
@@ -1146,6 +1188,7 @@ export class DefendPage {
   }
 
   private pick(id: number | null) {
+    if (id !== this.picked?.id) this.minePreview = null;
     this.picked = id === null ? null : { id, armed: { levels: { ...this.save.levels }, bonuses: this.host.bonuses() } };
   }
 

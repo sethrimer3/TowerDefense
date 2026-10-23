@@ -1,3 +1,4 @@
+import { stepMines, type Mine } from "./mines.ts";
 import { BASTIONS, keepRank } from "../keep-upgrades.ts";
 import { buildingPaths } from "../specializations.ts";
 import { DefenderIndex } from "./defender-index.ts";
@@ -259,6 +260,8 @@ export type Shell = {
   x0: number; y0: number; x1: number; y1: number; t: number; dur: number; damage: number; r: number; origin?: Arrow["origin"];
   /** Gun crews (a Study path): bursting into grapeshot; absent otherwise. */
   grape?: boolean;
+  mortar?: { dps: number; life: number };
+  mine?: { smart: boolean };
 };
 /** Glowing cracks left where something exploded; they cool and fade. */
 export type Scorch = { x: number; y: number; r: number; seed: number; t: number; life: number };
@@ -349,6 +352,9 @@ export class DefendSim {
   civilians: Civilian[] = [];
   arrows: Arrow[] = [];
   shells: Shell[] = [];
+  /** Proximity mines and directed aim, reset with each battle. */
+  mines: Mine[] = [];
+  mineAims = new Map<number, { x: number; y: number }>();
   /** Siege engines' balls, bolts, stones and rockets in flight. */
   siegeShots: SiegeShot[] = [];
   /** Wizard towers' fire and ice. */
@@ -627,6 +633,7 @@ export class DefendSim {
     stepPlacedWalls(this, dt);
     stepGates(this, dt);
     stepShells(this, dt);
+    stepMines(this, dt);
     stepNano(this, dt);
     stepSiegeShots(this, dt);
     this.wizards.step(this, dt);

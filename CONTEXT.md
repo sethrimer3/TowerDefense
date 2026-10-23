@@ -496,3 +496,16 @@ An Archer Barracks attunement with unlimited battlefield range. Arrows rise out 
 ### Arrow rain
 
 A Skyranger's extra volley after a number of ordinary attacks. Early tiers scatter over an area; the last divides its arrows evenly among enemies there. Rain arrows do not trigger further rain.
+
+
+### Grapeshot
+
+The Gun Battery's shell impact plus four smaller surrounding explosions. Present as soon as the Cannon Tower attunes to Gun Battery.
+
+### Minelayer
+
+A Cannon Tower attunement that continually lays proximity mines within half the ordinary cannon's range. Directed laying aims future mines; dragging the crosshair home restores random coverage.
+
+### Smart charges
+
+The Minelayer's final upgrade: fifty mines per tower, with little walking charges that approach nearby ground enemies before detonating.
