@@ -37,8 +37,8 @@ export const SETTINGS = {
   soundOff: { kind: "toggle", default: false, page: { id: "sound", label: "Sound", invert: true } },
   /** The world's background: rain, wind, thunder, birdsong, crickets. */
   ambienceOff: { kind: "toggle", default: false, page: { id: "ambience", label: "Ambient sound", invert: true } },
-  /** Pixel Art: hand-drawn PNG sprites for the pieces that have them
-   * (`defend/pixel-sprites.ts`); off, every piece's own drawn art. */
+  /** Retained visual preference for procedural cloth, glazing and sampling.
+   * The checkbox no longer enables any PNG sprite replacements. */
   pixelArt: { kind: "toggle", default: true, page: { id: "pixel-art", label: "Pixel Art" } },
   /** Alembic, the game's own pixel font, for every word on the page; off, Cinzel. */
   pixelFont: { kind: "toggle", default: true, page: { id: "pixel-font", label: "Use Custom Font" } },

@@ -14,8 +14,6 @@ import type { Building, CityMap } from "./citygen.ts";
 import type { DefendSim } from "./sim.ts";
 import { OUTLINE, pixels, sprite } from "./damage-art.ts";
 import { cloudPuffs, structurePixels } from "./tower-art.ts";
-import { buildingArt, buildingFrame, palaceSkyArt, type BuildingArt } from "./building-sprite-manifest.ts";
-import { pixelKey, pixelSprite } from "./pixel-sprites.ts";
 
 /** Cells of cloud round the palace on each side of its sprite. */
 export const MARGIN = 2;
@@ -135,36 +133,10 @@ function over(map: CityMap, sim: DefendSim, { b, x, y }: Aloft): boolean {
   return sim.enemies.some(inside) || sim.soldiers.some(inside) || sim.civilians.some(inside);
 }
 
-// Only the two authored footprints can enter this cache. Reuse each canvas
-// across image revisions; applying fade to one composition avoids opacity
-// accumulating where the building overlaps its cloud bank.
-const nativeFlights = new Map<string, { key: string; canvas: HTMLCanvasElement }>();
-function nativeFlight(family: BuildingArt, sky: NonNullable<ReturnType<typeof palaceSkyArt>>, roof: HTMLImageElement, clouds: HTMLImageElement) {
-  let entry = nativeFlights.get(sky.clouds);
-  if (!entry) {
-    const canvas = document.createElement("canvas"); [canvas.width, canvas.height] = sky.size;
-    entry = { key: "", canvas }; nativeFlights.set(sky.clouds, entry);
-  }
-  const key = pixelKey();
-  if (entry.key !== key) {
-    const c = entry.canvas.getContext("2d")!, frame = buildingFrame(family, 0, "cloudborne");
-    c.clearRect(0, 0, entry.canvas.width, entry.canvas.height); c.imageSmoothingEnabled = false;
-    c.drawImage(clouds, 0, 0);
-    c.drawImage(roof, frame.sx, frame.sy, frame.sw, frame.sh, sky.margin * ART, sky.margin * ART, frame.sw, frame.sh);
-    entry.key = key;
-  }
-  return entry.canvas;
-}
-
 function drawOne(c: CanvasRenderingContext2D, px: number, { b, x, y }: Aloft, alpha: number, o: { now: number; reduceMotion: boolean; night: number }) {
   const { w: cw, h: ch } = b.rect, seed = hash(b.rect.x, b.rect.y, 0xc10d);
-  const family = buildingArt("valkyriePalace", cw, ch), sky = palaceSkyArt(cw, ch);
-  const roof = family && pixelSprite(family.sheet), clouds = sky && pixelSprite(sky.clouds), shadow = sky && pixelSprite(sky.shadow);
-  // Switch the whole flying composition together. A missing layer keeps
-  // the original composition until all native images are available.
-  const clean = roof && clouds && shadow;
-  const art = clean && family && sky ? nativeFlight(family, sky, roof!, clouds!) : sprite(`sky:${cw}x${ch}:${seed}`, (cw + 2 * MARGIN) * ART, (ch + 2 * MARGIN) * ART, () => skyPalacePixels(cw, ch, seed));
-  const shade = clean ? shadow : sprite(`sky:shadow:${cw}x${ch}:${seed}`, (cw + 2 * MARGIN) * ART, (ch + 2 * MARGIN) * ART, () => skyShadowPixels(cw, ch, seed));
+  const art = sprite(`sky:${cw}x${ch}:${seed}`, (cw + 2 * MARGIN) * ART, (ch + 2 * MARGIN) * ART, () => skyPalacePixels(cw, ch, seed));
+  const shade = sprite(`sky:shadow:${cw}x${ch}:${seed}`, (cw + 2 * MARGIN) * ART, (ch + 2 * MARGIN) * ART, () => skyShadowPixels(cw, ch, seed));
   if (!art || !shade) return;
   // A slow bob, a whole art pixel at a time.
   const bob = o.reduceMotion ? 0 : Math.round(Math.sin(o.now / 900 + b.id) * 1.5) / ART;

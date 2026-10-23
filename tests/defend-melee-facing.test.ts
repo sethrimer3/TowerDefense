@@ -1,10 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
-import { inflateSync } from "node:zlib";
 import { FACINGS, facingOf, isMelee, meleeFacing, updateFacing } from "../src/defend/melee-facing.ts";
-import { BODY_CELL, BODY_DIRECTIONS, BODY_FRAMES, bodyKey } from "../src/defend/melee-body-data.ts";
+import { BODY_FRAMES, bodyKey } from "../src/defend/melee-body-data.ts";
 import { CELLS_W } from "../src/defend/grid.ts";
 import type { DefendSim, Enemy, Soldier } from "../src/defend/sim.ts";
 
@@ -79,33 +76,15 @@ test("path-extended spears and Halberdiers use their combat reach for facing", (
   }
 });
 
-test("directional PNG reproduces its glyph source, with opaque native pixels and padded independent frames", () => {
-  execFileSync(process.execPath,["--experimental-transform-types","scripts/pixel-art/melee-facing.ts","--check"]);
-  const png=readFileSync(new URL("../public/assets/pixel/v2/units/melee-facing.png",import.meta.url));
-  assert.deepEqual([...png.subarray(0,8)],[137,80,78,71,13,10,26,10]);
-  const w=png.readUInt32BE(16),h=png.readUInt32BE(20),chunks:Buffer[]=[];
-  assert.equal(w,4*BODY_CELL);assert.equal(h,BODY_FRAMES.length*BODY_CELL);
-  for(let offset=8;offset<png.length;){const n=png.readUInt32BE(offset);if(png.toString("ascii",offset+4,offset+8)==="IDAT")chunks.push(png.subarray(offset+8,offset+8+n));offset+=n+12;}
-  const data=inflateSync(Buffer.concat(chunks)),stride=w*4+1;
-  assert.equal(new Set(BODY_FRAMES.map(f=>f.key)).size,BODY_FRAMES.length);
-  BODY_FRAMES.forEach((f,row)=>{
-    const front=f.views.south;
-    for(const dir of FACINGS){
-      const rows=f.views[dir],col=BODY_DIRECTIONS.indexOf(dir);
-      assert.equal(rows.length,front.length);assert.ok(rows.length<BODY_CELL-1);
-      for(let y=0;y<BODY_CELL;y++)for(let x=0;x<BODY_CELL;x++){
-        assert.equal(data[(row*BODY_CELL+y)*stride],0);
-        const ch=rows[y-1]?.[x-1]??".",hex=ch==="."?null:f.palette[ch];
-        assert.ok(ch==="."||/^#[0-9a-f]{6}$/i.test(hex),`${f.key}/${dir}/${ch}`);
-        const at=(row*BODY_CELL+y)*stride+1+(col*BODY_CELL+x)*4;
-        assert.equal(data[at+3],hex?255:0);
-        if(hex)assert.deepEqual([...data.subarray(at,at+3)],[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)));
-      }
-      assert.ok(rows.every(r=>r.length===front[0].length));
-    }
-  });
-  for(const kind of ["hero","valkyrie","warrior","amalgam","knight","champion","sword"] as const){
+test("procedural melee views retain complete rectangular drawings and palette entries", () => {
+  for (const f of BODY_FRAMES) for (const dir of FACINGS) {
+    const rows=f.views[dir],front=f.views.south;
+    assert.equal(rows.length,front.length);
+    assert.ok(rows.every(row=>row.length===front[0].length));
+    for (const row of rows) for (const ch of row) if(ch!==".") assert.match(f.palette[ch],/^#[0-9a-f]{6}$/i);
+  }
+  for (const kind of ["hero","valkyrie","warrior","amalgam","knight","champion"] as const) {
     const f=BODY_FRAMES.find(f=>f.key===bodyKey(kind))!;
-    assert.equal(new Set(FACINGS.map(dir=>f.views[dir].join("\n"))).size,4,`${kind}: distinct upright views`);
+    assert.equal(new Set(FACINGS.map(dir=>f.views[dir].join("\n"))).size,4,`${kind}: upright directional views`);
   }
 });

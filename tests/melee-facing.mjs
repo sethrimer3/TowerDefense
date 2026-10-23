@@ -12,21 +12,18 @@ try{
   const context=await browser.newContext({viewport:{width,height:900}}),page=await context.newPage(),errors=[];
   page.on('pageerror',e=>errors.push(e.message));
   await page.goto(new URL('tests/melee-facing.html',base).href);
-  await page.waitForFunction(()=>{
-   const f=window.facingFixture;
-   return f&&f.pixelSprite('v2/units/melee-facing')&&f.pixelSprite('swordsman');
-  });
+  await page.waitForFunction(()=>window.facingFixture);
   await page.evaluate(()=>window.facingFixture.draw());
   await page.locator('canvas').screenshot({path:`test-results/melee-facing-${width}.png`});
   const result=await page.evaluate(async()=>{
    const f=window.facingFixture,{ctx:c,canvas:cv,sim}=f;
    // Use the fixture's module instances, including Vite's HMR timestamps.
-   const {meleeFacing,meleeBody,setPixelArt,BODY_FRAMES,BODY_DIRECTIONS}=f;
+   const {meleeFacing,meleeBody,setPixelArt,BODY_FRAMES}=f;
    const pixels=()=>Array.from(c.getImageData(0,0,cv.width,220).data);
    const equal=(a,b)=>a.length===b.length&&a.every((v,i)=>v===b[i]);
-   // Every cached native PNG crop must match its procedural fallback exactly.
+   // Procedural bodies remain identical across settings.
    let crops=true;
-   for(const frame of BODY_FRAMES)for(const dir of BODY_DIRECTIONS){
+   for(const frame of BODY_FRAMES)for(const dir of ["south","west","north","east"]){
     const [kind,look,struck,ghost,stood]=frame.key.split(':');
     const options={look,struck:struck==='true',ghost:ghost==='true',stood:stood==='true'};
     const dump=()=>{const b=meleeBody(kind,dir,options);return Array.from(b.getContext('2d').getImageData(0,0,b.width,b.height).data);};
@@ -59,19 +56,15 @@ try{
    const toggle=equal(on,pixels())&&!equal(on,off);
    return{crops,failures,simpleStable,toggle,frames:BODY_FRAMES.length*4};
   });
-  assert.deepEqual(result.failures,[]);assert.ok(result.crops,'PNG/fallback parity');assert.ok(result.simpleStable);assert.ok(result.toggle);assert.deepEqual(errors,[]);
-  console.log(`${width}px: all melee families, four walking views, combat/idle, Pixel Art on/off, ${result.frames} PNG frames, toggles and merged/Simple Troops passed`);
+  assert.deepEqual(result.failures,[]);assert.ok(result.crops,'procedural body stability');assert.ok(result.simpleStable);assert.ok(result.toggle);assert.deepEqual(errors,[]);
+  console.log(`${width}px: all melee families, four walking views, combat/idle, Pixel Art on/off, procedural bodies, toggles and merged/Simple Troops passed`);
   await context.close();
  }
- // Failed atlas request retains complete procedural heroes/summons and the
- // previous swordsman PNG, rather than leaving bodies blank.
  const context=await browser.newContext(),page=await context.newPage();
- await page.route('**/v2/units/melee-facing.png',route=>route.abort());
  await page.goto(new URL('tests/melee-facing.html',base).href);await page.waitForFunction(()=>window.facingFixture);
- await page.waitForFunction(()=>!!window.facingFixture.pixelSprite('swordsman'));
  const visible=await page.evaluate(()=>{
   const f=window.facingFixture;
   return f.kinds.every(kind=>{f.ctx.clearRect(0,0,f.canvas.width,f.canvas.height);f.sim.time++;f.paint(f.make(kind,2,2));return f.ctx.getImageData(0,0,f.canvas.width,220).data.some(v=>v!==0);});
  });
- assert.ok(visible,'failed atlas keeps every unit visible');await context.close();
+ assert.ok(visible,'legacy drawing keeps every unit visible');await context.close();
 }finally{await browser.close();}

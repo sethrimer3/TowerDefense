@@ -234,11 +234,9 @@ export const artLook = (kind: string, path?: string): string =>
 /** A structure of `cw × ch` cells at damage `stage` (0 to 3), seeded by its
  * lot, as `(cw·ART) × (ch·ART)` RGBA pixels, in its path's `look` (see
  * `PATH_LOOKS`; "" for the base art). */
-export function structurePixels(kind: PlacedKind, cw: number, ch: number, stage = 0, seed = 0, look = "", attunementPng = false): Uint32Array {
+export function structurePixels(kind: PlacedKind, cw: number, ch: number, stage = 0, seed = 0, look = ""): Uint32Array {
   const w = cw * ART, h = ch * ART, out = new Uint32Array(w * h), p = pixels(out, w, h);
-  if (attunementPng && kind === "rangerLodge") paintBowmanLodge(p, look);
-  else if (attunementPng && kind === "skyrangerLodge") paintSkyLodge(p, look);
-  else PAINT[kind](p, artLook(kind, look));
+  PAINT[kind](p, artLook(kind, look));
   damage(p, stage, hash(seed, KINDS.indexOf(kind)), MATERIAL[kind].m);
   if (kind === "darkKeep") fissures(p, stage, hash(seed, 0xd4));
   return out;
@@ -865,13 +863,6 @@ function paintPoisonDen(p: Pix, look: string) {
 }
 
 /** The Ranger lodge: green hoods on pegs. */
-function paintBowmanLodge(p: Pix, look: string) {
-  paintBranchDen(p, "rangers", ["..2..", "..2..", "..1..", "..1..", "01010"], { 0: OUTLINE, 1: 0x91643c, 2: 0xc2ccd0 }, !!look, paintArcherBarracks);
-}
-function paintSkyLodge(p: Pix, look: string) {
-  paintBranchDen(p, "skyranger", ["..2..", ".222.", "..1..", "01010"], { 0: OUTLINE, 1: 0xbe8d3d, 2: 0xc2e5e6 }, !!look, paintArcherBarracks);
-}
-/** Legacy Ranger art is retained when Pixel Art is disabled/unavailable. */
 function paintRangerLodge(p: Pix, look: string) {
   paintBranchDen(p, "rangers", [".0.", "010", "121", "000"], { 0: OUTLINE, 1: C.slime[1], 2: C.slime[0] }, !!look, paintArcherBarracks);
 }

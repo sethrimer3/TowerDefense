@@ -11,9 +11,6 @@ import { stepArrows } from "../src/defend/towers.ts";
 import { stepEnemy } from "../src/defend/enemies.ts";
 import { SUB, CELLS_W, CELLS_H, cellIndex } from "../src/defend/grid.ts";
 import { looseBowJavelin, looseSkyArrow, skyArrowView } from "../src/defend/archer-attunements.ts";
-import { ARCHER_ART, ARCHER_PNGS } from "../src/defend/archer-art-data.ts";
-import { archerPngs } from "../scripts/pixel-art/archers.ts";
-import { readFileSync } from "node:fs";
 import { ARCHER_UNIT } from "../src/defend/catalog.ts";
 import { kindStats } from "../src/ui/specialty.ts";
 
@@ -37,7 +34,7 @@ function fly(sim:DefendSim,seconds=4,dt=1/60){for(let t=0;t<seconds;t+=dt)stepAr
 
 test("Archer Barracks offers exactly three attunements and retains existing ranks/refunds",()=>{
   assert.deepEqual(nextSteps("archerBarracks").map(s=>s.type==="become"?s.to:""),["rangerLodge","skirmishCamp","skyrangerLodge"]);
-  for(const a of ARCHER_ART){
+  for(const a of [{kind:"rangerLodge",path:"rangers"},{kind:"skirmishCamp",path:"skirmishers"},{kind:"skyrangerLodge",path:"skyranger"}] as const){
     assert.equal(nextSteps(a.kind)[0].type,"path");assert.equal(pathById(a.path).ranks.length,3);
     assert.ok(buildingTree("archerBarracks").some(n=>n.kind===a.kind));
   }
@@ -152,7 +149,7 @@ test("rain triggers every 10/7/5 ordinary shots, never recursively counts rain a
   fly(sim,2);assert.equal(u.skyShots,5);assert.equal(sim.arrows.length,0);assert.equal(outside.hp,10000);
 });
 
-test("sky arrows retain landing points when targets die; new building catalog, training and PNG delivery are complete",()=>{
+test("sky arrows retain landing points when targets die; new building catalog and training remain complete",()=>{
   const {sim,u}=scene("skyrangerLodge",3),e=enemy(sim,40,40);looseSkyArrow(sim,u,e,10,3);
   const a=sim.arrows[0];e.hp=0;fly(sim,2);assert.equal(sim.arrows.length,0);assert.deepEqual([a.x,a.y],[40,40]);
   let l=defaultLayout();l=placeCityTile(l,l.keep.tx,l.keep.ty-1)!;l=placeStructure(l,"skyrangerLodge",l.keep.tx,l.keep.ty-1)!;
@@ -160,7 +157,5 @@ test("sky arrows retain landing points when targets die; new building catalog, t
   const home=battle.map.buildings.find(b=>b.kind==="skyrangerLodge")!;
   assert.ok(battle.soldiers.some(s=>s.home===home.id&&s.kind==="archer"));
   assert.match(kindStats(defaults(),"skyrangerLodge"),/unlimited range/);
-  const pngs=archerPngs();assert.equal(pngs.size,7);
-  assert.deepEqual([...pngs.keys()].sort(),ARCHER_PNGS.map(s=>s+".png").sort());
-  for(const [name,bytes]of pngs)assert.ok(readFileSync(new URL(`../public/assets/pixel/${name}`,import.meta.url)).equals(bytes),name);
+
 });

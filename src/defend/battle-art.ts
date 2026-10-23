@@ -33,9 +33,8 @@ import { BUILDING_FLASH, type DefendSim, type Effect, type Enemy, type Soldier }
 import { hallPaths } from "./muskets.ts";
 import { sniperAim } from "./snipers.ts";
 import { drawSimpleEnemies, drawSimpleTroops } from "./simple-units.ts";
-import { drawPixel, enemySprite, pixelSprite } from "./pixel-sprites.ts";
+import { drawPixel, enemySprite } from "./pixel-sprites.ts";
 import { isMelee, meleeFacing } from "./melee-facing.ts";
-import { meleeBody } from "./melee-body.ts";
 import type { UnitOutline } from "./unit-outline.ts";
 
 export type Brush = { c: CanvasRenderingContext2D; px: number };
@@ -243,13 +242,7 @@ function drawSoldiers(b: Brush, sim: DefendSim, torches: Burning | null, reduced
       y = u.y + (swing?.dy ?? 0);
     const s = Math.max(2, (archer ? ARCHER_UNIT.size : SOLDIER.size) * px);
     if (!archer) drawMeleeCape(c, px, u, sim, reduced, x, y);
-    const directional = !archer && pixelSprite("v2/units/melee-facing");
-    if (directional) {
-      const img = meleeBody("sword",heading!.direction,{struck:u.flash>0});
-      const w=s*img.width/img.height;
-      c.drawImage(img,x*px-w/2,y*px-s/2,w,s);
-    }
-    if (directional || (u.flash <= 0 && drawPixel(c, archer ? "archer" : "swordsman", x * px - s / 2, y * px - s / 2, s))) {
+    if (u.flash <= 0 && drawPixel(c, archer ? "archer" : "swordsman", x * px - s / 2, y * px - s / 2, s)) {
       if (swing) swords.push({ x, y, swing });
       if (torches) drawHandTorch(b, { x: x + SOLDIER.size * 0.65, y: y - SOLDIER.size * 0.45, id: u.id }, sim.time, torches(u.x, u.y, u.id));
       continue;

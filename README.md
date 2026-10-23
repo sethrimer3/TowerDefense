@@ -4,24 +4,6 @@ A mobile-first city-defense game. You lay out a walled city on a 9 × 13 board, 
 
 Play it on GitHub Pages: <https://sethrimer3.github.io/TowerDefense/>
 
-## Pixel-art direction
-
-New sprite work follows the [pixel-art style guide](docs/art/PIXEL_ART_GUIDE.md) and [migration inventory](docs/art/PIXEL_ART_INVENTORY.md). They define the crisp PNG style, shared palette, defense-grid scale/anchors, required variants, and the rule that replacements appear only with **Pixel Art** checked while legacy graphics remain available off.
-
-The [first building batch](docs/art/BUILDING_BATCH_01.md) implements the keep, barracks and watch tower. [Batch 02](docs/art/BUILDING_BATCH_02.md) adds the Melee Guild, Ranged Guild, archer barracks, archer tower and cannon tower. Both include applicable path/damage/rubble variants and matching UI icons. Rebuild their committed PNGs with `npm run sprites`; verify them with `npm run sprites -- --check`.
-
-[Batch 03](docs/art/BUILDING_BATCH_03.md) adds Assassins' den, Sniper lodge, Musket hall, Wizard tower, Mage Guild and Monster bait, with their path/damage/rubble variants and matching UI icons.
-
-[Batch 04](docs/art/BUILDING_BATCH_04.md) adds Gunner hall, Machine-gun nest, Gatling emplacement, Rocket battery and Revolutionary. That delivery covered nineteen of the then twenty-one building families, with their current paths and matching UI icons.
-
-[Batch 05](docs/art/BUILDING_BATCH_05.md) adds the Valkyrie palace and Dark wizard keep in normal and compact sizes, including PNG Cloudborne flight layers. That delivery covered twenty-one of twenty-five building families after the new spearmen line was merged.
-
-[Batch 06](docs/art/BUILDING_BATCH_06.md) adds Spearmen hall, Phalanx, Javelin camp and Lancer stable with all current path variants. All twenty-five catalog building families now have native PNG world and UI sprites; city pieces, environment art and other unchecked inventory entries remain future work.
-
-[Art direction 01](docs/art/ART_DIRECTION_01.md) begins a quality revision of those sprites: an overhead barracks compound, octagonal Melee Guild training court and stone Watch tower, with building-specific collapse and matching UI. Catalog coverage is separate from visual approval; the remaining twenty-two families still need this review. Editable architecture lives in `scripts/pixel-art/architecture.ts`, using the shared native drawing primitives in `drawing.ts`.
-
-The [roof-material follow-up](docs/art/ROOF_MATERIALS.md) adds varied clay tiles, overlapping courses and ridge shading to the revised roofed buildings. Clean pixel art means a consistent native pixel grid; believable surface texture and color variation are part of the intended style.
-
 ## Run
 
 Use Node.js 22.18+ (CI uses 24) and npm:
@@ -67,19 +49,19 @@ The city is alive between and during battles: park grass sways in the wind (hard
 
 ## How it's built
 
-The Archer Barracks has three attunements: Skirmishers fire 1/3/5/7 arrows with faster draws and mobile shooting; Javelin Bowmen fire slow massive arrows that carry a file of enemies, gaining unlimited piercing and growing explosions; Skyranger fires anywhere on the battlefield with vertical launch/descent and 10/7/5-shot arrow rain. Existing Ranger purchases become Javelin Bowmen at the same ranks. [Tiers and tuning](docs/upgrades/ARCHER_ATTUNEMENTS.md). `src/defend/archer-attunements.ts` owns the special projectiles; `npm run sprites:archers` builds their gated PNG buildings/icons and giant javelin atlas. `node tests/archer-attunements.mjs` checks desktop/phone combat art and the live three-branch tree.
+The Archer Barracks has three attunements: Skirmishers fire 1/3/5/7 arrows with faster draws and mobile shooting; Javelin Bowmen fire slow massive arrows that carry a file of enemies, gaining unlimited piercing and growing explosions; Skyranger fires anywhere on the battlefield with vertical launch/descent and 10/7/5-shot arrow rain. Existing Ranger purchases become Javelin Bowmen at the same ranks. [Tiers and tuning](docs/upgrades/ARCHER_ATTUNEMENTS.md). `src/defend/archer-attunements.ts` owns the special projectiles; The effects use the existing procedural artwork. `node tests/archer-attunements.mjs` checks desktop/phone combat art and the live three-branch tree.
 
 The Library and Tiles window light uses cached, feathered density fields with screen blending (`src/soft-sunlight.ts`), preserving crisp scene art while sunlight moves slowly through dust. Tiles' pale stained glass and symmetrical leadwork follow the Pixel Art setting. [Window-light reference and tuning](docs/art/WINDOW_SUNLIGHT.md).
 
 Melee troops wear path-colored flowing capes at 60% of the Hero's length when unattuned and 70/80/90% at tiers I/II/III (`src/defend/melee-cape.ts`, sharing the Hero's cloth simulation). Pixel Art enables them; Simple Troops hides them and Reduce Motion holds them still. [Family coverage and tailoring](docs/art/MELEE_CAPES.md).
 
-Melee bodies and equipment face actual movement while walking, nearby targets in combat, and their last heading while idle (`src/defend/melee-facing.ts`). Upright front/back/profile views preserve the Hero, Valkyrie and melee summons' existing style; swordsmen have directional PNGs while Pixel Art is on. The shared native atlas is authored in `melee-body-data.ts` and rebuilt with `npm run sprites:melee`. Turning leaves cloth physics in world space. [Coverage, settings and verification](docs/art/MELEE_FACING.md).
+Melee bodies and equipment face actual movement while walking, nearby targets in combat, and their last heading while idle (`src/defend/melee-facing.ts`). Upright front/back/profile views preserve the Hero, Valkyrie and melee summons' existing style; swordsmen keep their legacy square body and directional equipment. The procedural views are stored in `melee-body-data.ts`. Turning leaves cloth physics in world space. [Coverage, settings and verification](docs/art/MELEE_FACING.md).
 
 The Library's Study and Defend's building Knowledge trees have procedural gold magic circles: projected 4D tesseracts for city Knowledge, inscribed nested triangles for strike spells, and clipped Voronoi diagrams for infantry and tower buildings. [Their visual layers](docs/art/MAGIC_CIRCLE_PROGRESSION.md) grow with completed Knowledge: more framing rings and fine marks, denser central geometry, satellite sigils, recursive cell patterns, connecting rails and moving lights. Building evolution retains earlier transformations and crowned path ranks; the Revolutionary also counts its shared branches. Path and equipped-spell identity reshape the circle without granting extra visual ranks. Purchases, unlearning and respec morph it over 1.7 seconds; pending research only pulses. The effect preserves the chamber artwork, uses bounded pixel canvases and cached geometry, and becomes static under Reduce Motion. `src/magic-circle/` contains the renderer and its configuration; `node tests/magic-circle.mjs` checks desktop/mobile integration and generates a progression reference sheet against the dev server (set `PLAYWRIGHT_EXECUTABLE` to an installed Chromium).
 
 While a timed Study project runs, the collection and tree give way to the active upgrade at the magic circle's center. Its name, rank, progress, countdown, pause state and cancellation refund stay visible. Completion or cancellation restores the tree; reopening or reloading the Study returns to the active project. The view reuses the existing circle and main loop (`src/ui/ledger.ts`); `node tests/upgrade-work.mjs` checks its desktop/phone layout and research lifecycle.
 
-The Settings page's Pixel Art (on by default) swaps in PNG sprites for the pieces that have them. All twenty-five current catalog building families use native 8-pixel-per-cell sheets, fixed anchors, path/damage/rubble frames and separate UI icons (`src/defend/building-sprite-manifest.ts`, authored in `scripts/pixel-art/build.ts`). Remaining imported art comes from Tower Delve's Defend: roofs, trees, Mossbound's floor and wall, troops and the first enemies. `src/defend/pixel-sprites.ts` shares image loading, setting gates and cache revisions. Pixel Art off retains the legacy drawings; missing new building PNGs also fall back to those drawings. Normal/compact buildings retain their actual footprints; Cloudborne palaces also use gated PNG cloud banks, shadows and moorings with complete legacy fallback. New building placement ghosts use the same world frames, and city-layer compositing uses nearest-neighbor sampling in pixel mode.
+The checkbox-gated PNG sprite collection, sprite generators and art-generation guidelines have been removed. Buildings, units, terrain, icons and effects use their established procedural/legacy drawings. Existing UI/theme images and fonts remain. The Pixel Art setting is retained for procedural cape, stained-glass and sampling preferences; it loads no replacement PNGs.
 
 Nature ambience is synthesized locally: rain uses soft noise impacts, wind uses filtered noise, and insects use long loops with irregular pauses. Bird and owl calls are sparse and quiet; no audio downloads are required.
 

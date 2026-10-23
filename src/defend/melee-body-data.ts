@@ -1,4 +1,4 @@
-/** Native body drawings reused for directional PNGs and their procedural fallback. */
+/** Established procedural body drawings, including their directional views. */
 import type { Facing } from "./melee-facing.ts";
 const mirror = (rows: readonly string[]) => rows.map(row => [...row].reverse().join(""));
 const views = (south: readonly string[], north: readonly string[], east: readonly string[]): Record<Facing, readonly string[]> => ({ south, north, east, west: mirror(east) });
@@ -155,14 +155,7 @@ export const CHAMPION_VIEWS = views(CALLED_ROWS.champion,mirror(CALLED_ROWS.cham
  '...ooooyyyoo.ho','..orryllyyro.ho','..orrylyyroo.ho','..orrylyyroo.ho','...oryllyroo.ho',
  '...ooyllyooo.ho','.....oyoyyo..ho','.....ollollo.oo','.....ooooooo...',
 ]);
-export const SWORD_VIEWS = views([
- '..00000..','.0lllll0.','.0ldddl0.','..0lll0..','.00AAA00.','0lAaaaAl0','.0AagaA0.','..0aaa0..','..0b.b0..','..00.00..',
-],[
- '..00000..','.0lllll0.','.0lllll0.','..0lll0..','.00AAA00.','0lAaaaAl0','.0AaaaA0.','..0aaa0..','..0b.b0..','..00.00..',
-],[
- '...0000..','..0llll0.','..0lldd0.','...0ll0..','..0AAA0..','.0AaaaA0.','..0Aga0..','...0aa0..','...0b0b0.','....0.0..',
-]);
-export type BodyKind = 'hero'|'valkyrie'|'warrior'|'amalgam'|'knight'|'champion'|'sword';
+export type BodyKind = 'hero'|'valkyrie'|'warrior'|'amalgam'|'knight'|'champion';
 export type BodyOptions = {look?:string;struck?:boolean;ghost?:boolean;stood?:boolean};
 export type BodyFrame = {key:string;views:Record<Facing,readonly string[]>;palette:Record<string,string>};
 const blend=(hex:string,t:number,to=255)=>'#'+[1,3,5].map(i=>Math.round(parseInt(hex.slice(i,i+2),16)*(1-t)+to*t).toString(16).padStart(2,'0')).join('');
@@ -185,9 +178,6 @@ frame('hero',HERO_VIEWS,{...HERO_COLORS,C:'#b8302e',c:'#7a1e1e',P:'#e8483e'},{gh
 for(const struck of [false,true]){
  frame('valkyrie',VALK_VIEWS,VALK_COLORS,{struck});
  frame('warrior',WARRIOR_VIEWS,NECRO_COLORS,{struck});frame('amalgam',AMALGAM_VIEWS,NECRO_COLORS,{struck});
- frame('sword',SWORD_VIEWS,{'0':'#1c2a40',l:'#c2ccd0',d:'#252d36',A:'#5b8fd9',a:'#465260',g:'#bd925b',b:'#34271e'},{struck});
  for(const stood of [false,true]){frame('knight',KNIGHT_VIEWS,CALLED_COLORS,{struck,stood});frame('champion',CHAMPION_VIEWS,CALLED_COLORS,{struck,stood});}
 }
 frame('valkyrie',VALK_VIEWS,VALK_COLORS,{ghost:true});
-export const BODY_CELL=18;
-export const BODY_DIRECTIONS:Facing[]=['south','west','north','east'];

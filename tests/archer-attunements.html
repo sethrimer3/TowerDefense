@@ -10,7 +10,7 @@ import {stepArcher} from '../src/defend/troops.ts';
 import {stepArrows} from '../src/defend/towers.ts';
 import {drawUnits} from '../src/defend/battle-art.ts';
 import {paintStructureArt,paintStructureRubble,paintIcon} from '../src/defend/structure-art.ts';
-import {ARCHER_ART,ARCHER_PNGS} from '../src/defend/archer-art-data.ts';
+const ARCHER_ART=[{kind:'rangerLodge',path:'rangers'},{kind:'skirmishCamp',path:'skirmishers'},{kind:'skyrangerLodge',path:'skyranger'}];
 import {pixelSprite,setPixelArt} from '../src/defend/pixel-sprites.ts';
 import {skyArrowView} from '../src/defend/archer-attunements.ts';
 const canvas=document.querySelector('canvas'),c=canvas.getContext('2d');canvas.width=Math.min(1000,innerWidth);canvas.height=950;
@@ -41,6 +41,6 @@ function draw({pixel=true,time=.18,skyTime=.5,reduced=false,destruction=false}={
   drawUnits({c,px},s.sim,null,false,undefined,{reduceMotion:reduced});c.restore();
  });
 }
-ARCHER_PNGS.forEach(pixelSprite);pixelSprite('archer');pixelSprite('enemy-orc');
-window.archerFixture={draw,make,scenes,canvas,c,px,stepArcher,stepArrows,skyArrowView,ARCHER_PNGS,pixelSprite,setPixelArt,paintStructureArt};draw();
+
+window.archerFixture={draw,make,scenes,canvas,c,px,stepArcher,stepArrows,skyArrowView,pixelSprite,setPixelArt,paintStructureArt};draw();
 </script></html>

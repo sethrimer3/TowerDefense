@@ -8,7 +8,7 @@ try{
   const context=await browser.newContext({viewport:{width,height:1000},hasTouch:width<500}),page=await context.newPage(),errors=[];
   page.on('pageerror',e=>errors.push(e.message));
   await page.goto(new URL('tests/archer-attunements.html',base).href);
-  await page.waitForFunction(()=>{const f=window.archerFixture;return f&&f.ARCHER_PNGS.every(f.pixelSprite)&&f.pixelSprite('archer')&&f.pixelSprite('enemy-orc');});
+  await page.waitForFunction(()=>window.archerFixture);
   await page.evaluate(()=>window.archerFixture.draw());await page.locator('canvas').screenshot({path:`test-results/archer-attunements-${width}.png`});
   const checks=await page.evaluate(()=>{
    const f=window.archerFixture,c=f.c,data=()=>Array.from(c.getImageData(0,0,f.canvas.width,f.canvas.height).data),same=(a,b)=>a.every((v,i)=>v===b[i]);
@@ -21,7 +21,7 @@ try{
    f.draw({reduced:true});const reduced=data().some(v=>v!==0);f.draw();
    return{changed:!same(on,off),restored,carried,counts,hidden,falling,reduced};
   });
-  assert.ok(checks.changed&&checks.restored&&checks.carried&&checks.hidden&&checks.falling&&checks.reduced);assert.deepEqual(checks.counts,[14,14]);assert.deepEqual(errors,[]);
+  assert.equal(checks.changed,false,"archer legacy art is unchanged by the setting");assert.ok(checks.restored&&checks.carried&&checks.hidden&&checks.falling&&checks.reduced);assert.deepEqual(checks.counts,[14,14]);assert.deepEqual(errors,[]);
   // Real Defend tree: three sibling attunements and readable rank details.
   await page.goto(base);await page.waitForSelector('#defend-start');
   const save=await page.evaluate(async()=>{
@@ -52,7 +52,7 @@ try{
   await panel.locator('[data-specialty-close]').click();
   await page.locator('#defend-start').click();await page.evaluate(()=>window.defendDebug?.(8));
   assert.ok(await page.evaluate(()=>{const sim=window.__dp.sim;return sim.soldiers.some(u=>u.kind==='archer'&&sim.map.buildings[u.home]?.kind==='skyrangerLodge');}));
-  assert.deepEqual(errors,[]);await context.close();console.log(`${width}px: projectile gallery, carrying, vertical fade/descent, targeted rain, PNG toggle, Reduce Motion and real three-branch tree passed`);
+  assert.deepEqual(errors,[]);await context.close();console.log(`${width}px: projectile gallery, carrying, vertical fade/descent, targeted rain, procedural setting toggle, Reduce Motion and real three-branch tree passed`);
  }
  const context=await browser.newContext(),page=await context.newPage();await page.route('**/assets/pixel/v2/**',route=>route.abort());
  await page.goto(new URL('tests/archer-attunements.html',base).href);await page.waitForFunction(()=>window.archerFixture);

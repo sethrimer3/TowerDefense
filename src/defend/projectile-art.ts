@@ -1,6 +1,4 @@
 import { skyArrowView } from "./archer-attunements.ts";
-import { JAVELIN_SIZE } from "./archer-art-data.ts";
-import { drawPixelFrame } from "./pixel-sprites.ts";
 /** The battle's plain projectiles as pixel art at `ART` pixels a cell inside
  * the city's black outline, like the wizard's fire and the blasts:
  *
@@ -150,10 +148,6 @@ export function drawArrows(c: Ctx, px: number, sim: DefendSim, reduced = false) 
       const v=skyArrowView(a,reduced);if(!v || v.alpha<=0)continue;
       c.save();c.globalAlpha=v.alpha;
       blit(c,px,arrowSprite(v.up?12:4),Math.round(v.x*ART-ARROW_BOX/2),Math.round(v.y*ART-ARROW_BOX/2));c.restore();continue;
-    }
-    if(a.bowJavelin){
-      const j=a.bowJavelin,dir=arrowDir(j.ux,j.uy),size=JAVELIN_SIZE/ART*px;
-      if(drawPixelFrame(c,"v2/effects/bow-javelin",{sx:dir*JAVELIN_SIZE,sy:0,sw:JAVELIN_SIZE,sh:JAVELIN_SIZE},a.x*px-size/2,a.y*px-size/2,size,size))continue;
     }
     if (a.shot && a.shot !== "javelin") {
       const s = shotSprite(a.shot);
