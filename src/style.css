@@ -2253,3 +2253,17 @@ nav button > .tab-idle[hidden] { display: none; }
 .spell-choice { display: flex; flex-direction: column; align-items: center; min-width: 120px; }
 .spell-choice small { font-size: 0.75em; opacity: 0.8; }
 .spell-choice[class*="hue-"][aria-pressed="true"] { box-shadow: 0 0 0 2px var(--hue), 0 0 14px var(--hue-deep); }
+/* The magnifying glass above a drag on the Defend board (`defend/loupe.ts`):
+   the board's pixels zoomed, in a brass rim. */
+.defend-loupe {
+  position: fixed;
+  z-index: 49;
+  pointer-events: none;
+  box-sizing: content-box;
+  border: 3px solid var(--brass, #b98a3e);
+  outline: 2px solid #000;
+  border-radius: 6px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.6), inset 0 0 0 1px #f0cf86;
+  image-rendering: pixelated;
+  background: #14100b;
+}
