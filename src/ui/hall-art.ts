@@ -344,8 +344,9 @@ export class HallBackdrop {
 }
 
 /** The panes' tints: clear, the palest blue, the palest cream. */
-const GLASS_TINTS: RGB[] = [[236, 240, 236], [212, 230, 246], [250, 238, 206]];
-const CLEAR = 0, BLUE = 1, CREAM = 2;
+const GLASS_TINTS: RGB[] = [[236, 240, 236], [212, 230, 246], [250, 238, 206], [255, 212, 118]];
+/** GOLD, a little more yellow than cream, picks out the suns, wings and hilts. */
+const CLEAR = 0, BLUE = 1, CREAM = 2, GOLD = 3;
 /** No pane: inside the frame's came or the central mullion. */
 const CAME = -1;
 
@@ -376,36 +377,36 @@ const ROSE_PANES: Record<Exclude<Rose, "flower">, (X: number, dy: number, dr: nu
   diamonds(X, dy, _dr, rr) {
     const q = Math.max(5, rr / 3.6), u = X / q, v = dy / (q * 1.4);
     const i = Math.round(u + v), j = Math.round(u - v);
-    return { id: 1000 + (i + 50) * 100 + j + 50, tint: (((i + j) % 3) + 3) % 3 };
+    return { id: 1000 + (i + 50) * 100 + j + 50, tint: i === j && i % 2 === 0 ? GOLD : (((i + j) % 3) + 3) % 3 };
   },
   sword(X, dy, dr, rr) {
     const bw = Math.max(1.5, rr * 0.07), tip = -rr * 0.78, guard = rr * 0.18;
     // The blade, narrowing to its point, leaded in lengths.
     if (dy > tip && dy < guard && X < bw * Math.min(1, (dy - tip) / (rr * 0.18)))
       return { id: 2000 + Math.floor((dy - tip) / (rr * 0.24)), tint: CLEAR };
-    if (Math.abs(dy - guard - rr * 0.04) < rr * 0.055 && X < rr * 0.34) return { id: 2050, tint: CREAM };
+    if (Math.abs(dy - guard - rr * 0.04) < rr * 0.055 && X < rr * 0.34) return { id: 2050, tint: GOLD };
     if (dy > guard && dy < rr * 0.5 && X < bw * 0.85) return { id: 2051, tint: BLUE };
-    if (Math.hypot(X, dy - rr * 0.58) < rr * 0.09) return { id: 2052, tint: CREAM };
+    if (Math.hypot(X, dy - rr * 0.58) < rr * 0.09) return { id: 2052, tint: GOLD };
     // The wings, from beside the guard, sweeping up and out in five feathers.
     const wx = X - bw * 1.2, wy = guard - dy, ang = Math.atan2(wy, wx) * 180 / Math.PI, dw = Math.hypot(wx, wy);
     if (wx > 0 && ang > -12 && ang < 70) {
       const k = Math.min(4, Math.floor((ang + 12) / 16.4)), reach = rr * (0.92 - k * 0.07) - Math.abs(((ang + 12) % 16.4) - 8.2) * rr * 0.012;
       if (dw < rr * 0.34) return { id: 2060, tint: CREAM };
-      if (dw < reach) return { id: 2070 + k, tint: k % 2 ? CLEAR : CREAM };
+      if (dw < reach) return { id: 2070 + k, tint: k % 2 ? CREAM : GOLD };
     }
     // The sky behind, in quarters round the disc.
     return { id: 2090 + Math.floor(Math.atan2(X, -dy) / (Math.PI / 4)) + (dr > rr * 0.62 ? 10 : 0), tint: BLUE };
   },
   sky(X, dy, dr, rr) {
     // The sun, its eight rays, a crescent moon either side and the stars.
-    if (dr < rr * 0.2) return { id: 3000, tint: CREAM };
+    if (dr < rr * 0.2) return { id: 3000, tint: GOLD };
     const th = Math.atan2(X, -dy), k = Math.round(th / (Math.PI / 4)), off = Math.abs(th - k * Math.PI / 4);
-    if (dr < rr * 0.44 && off * dr < (rr * 0.44 - dr) * 0.45) return { id: 3010 + k, tint: CREAM };
+    if (dr < rr * 0.44 && off * dr < (rr * 0.44 - dr) * 0.45) return { id: 3010 + k, tint: k % 2 ? CREAM : GOLD };
     const mx = rr * 0.66, my = rr * 0.04, m = rr * 0.24;
     if (Math.hypot(X - mx, dy - my) < m && Math.hypot(X - mx - m * 0.45, dy - my + m * 0.15) > m * 0.85) return { id: 3030, tint: CREAM };
     for (const [n, sx, sy, sr] of STARS) {
       const ax = Math.abs(X - sx * rr), ay = Math.abs(dy - sy * rr), size = sr * rr;
-      if (Math.sqrt(ax) + Math.sqrt(ay) < Math.sqrt(size)) return { id: 3040 + n, tint: CREAM };
+      if (Math.sqrt(ax) + Math.sqrt(ay) < Math.sqrt(size)) return { id: 3040 + n, tint: n % 2 ? GOLD : CREAM };
     }
     return { id: 3100 + Math.floor(th / (Math.PI / 2)) + (dr > rr * 0.86 ? 10 : 0), tint: dr > rr * 0.86 ? CLEAR : BLUE };
   },
@@ -416,12 +417,12 @@ const ROSE_PANES: Record<Exclude<Rose, "flower">, (X: number, dy: number, dr: nu
       const [sx, sy] = CELLS[k], d = (X - sx * rr) ** 2 + (dy - sy * rr) ** 2;
       if (d < best) { best = d; n = k; }
     }
-    return { id: 4000 + n, tint: n % 3 };
+    return { id: 4000 + n, tint: n % 5 === 2 ? GOLD : n % 3 };
   },
   triangles(X, dy, dr, rr) {
     // Two hexagrams, upright and on their sides, and an eye: each pane is
     // tinted by how many of the four triangles overlap there.
-    if (dr < rr * 0.14) return { id: 5000, tint: CREAM };
+    if (dr < rr * 0.14) return { id: 5000, tint: GOLD };
     let mask = 0, inside = 0;
     TRIANGLES.forEach(([R, normals], t) => {
       let all = true;
@@ -431,7 +432,7 @@ const ROSE_PANES: Record<Exclude<Rose, "flower">, (X: number, dy: number, dr: nu
       });
       if (all) inside++;
     });
-    return { id: 5100 + mask, tint: inside % 3 };
+    return { id: 5100 + mask, tint: inside >= 3 ? GOLD : inside % 3 };
   },
 };
 /** The sky's stars: index, x and y as shares of the rose's radius, size. */
@@ -464,7 +465,9 @@ function paneAt(px: number, py: number, cx: number, r: number, archY: number, bo
     return { id: 100 + k, tint: k % 2 ? BLUE : CREAM };
   }
   const rr = r - 8, dy = py - archY, dr = Math.hypot(X, dy);
-  if (dr < rr && rose !== "flower") return ROSE_PANES[rose](X, dy, dr, rr);
+  // Each glazing is drawn the way up it was designed, turned a half turn into
+  // the window; mirrored in x already, so that is only dy's sign.
+  if (dr < rr && rose !== "flower") return ROSE_PANES[rose](X, -dy, dr, rr);
   if (dr < rr) {
     const th = Math.atan2(X, -dy), eye = rr * 0.2, ring = rr * 0.74;
     if (dr < eye) return { id: 200, tint: CREAM };
