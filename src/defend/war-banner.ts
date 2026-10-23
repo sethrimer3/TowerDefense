@@ -132,3 +132,9 @@ export function answerBanner(sim: DefendSim, banner: WarBanner, s: Soldier, spee
   }
   sim.followPath(s, foe, speed * (!foe && !banner.flag && !banner.reached(s) ? sim.bonuses.banner?.march ?? 1 : 1), dt);
 }
+
+/** A double tap at (fx, fy) is on the rally flag when within its cloth and
+ * pole, with a cell to spare round them for a finger. */
+export function onFlag(flag: { x: number; y: number; flag: boolean } | null, fx: number, fy: number): boolean {
+  return !!flag?.flag && fx >= flag.x - 1.5 && fx <= flag.x + 2.7 && fy >= flag.y - 2 && fy <= flag.y + 1.5;
+}

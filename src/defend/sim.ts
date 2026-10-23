@@ -1239,6 +1239,15 @@ export class DefendSim {
     this.rethink();
   }
 
+  /** Takes the rally flag away, leaving troops to their own reach. True
+   * when there was one; the war banner stays where it stands. */
+  liftFlag(): boolean {
+    if (!this.warBanner?.flag) return false;
+    this.warBanner = null;
+    this.rethink();
+    return true;
+  }
+
   /** Every troop rethinks at once, after the banner moves. */
   private rethink() {
     for (const s of this.soldiers) {

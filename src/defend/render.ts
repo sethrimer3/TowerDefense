@@ -30,7 +30,8 @@ import { drawGrid, drawLifting, drawOverlay, type Overlay } from "./edit-overlay
 import { drawInspect, type Armed } from "./inspect.ts";
 import { drawShimmer } from "./placed-shimmer.ts";
 import { ART } from "./park-art.ts";
-import { drawFlag, drawRallyFlag, drawWarBanner } from "./structure-art.ts";
+import { drawFlag, drawWarBanner } from "./structure-art.ts";
+import { RallyFlagArt } from "./rally-flag-art.ts";
 import { bannerReach } from "./war-banner.ts";
 import { ParkGrass, type Walker } from "./park-grass.ts";
 import { PondWater } from "./pond-water.ts";
@@ -112,6 +113,7 @@ export class DefendRenderer {
   readonly floods = new FloodArt();
   readonly smoke = new ChimneySmoke();
   readonly ghosts = new Ghosts();
+  private readonly rallyFlag = new RallyFlagArt();
   private readonly sky = new SkyPalaceArt();
   readonly atmosphere = new AtmosphereArt();
   /** The battle time the wizard art last advanced to. */
@@ -286,8 +288,8 @@ export class DefendRenderer {
     if (opts.effects ?? true) this.drawSmoke(map, sim, opts);
     // Cloudborne palaces sail over everything on the ground.
     this.sky.draw(this.ctx, this.px, map, sim, opts.looks, { now: opts.now, dt, reduceMotion: opts.reduceMotion, night: opts.night });
-    if (sim?.warBanner?.flag && !opts.hideBanner) drawRallyFlag(this.ctx, this.px, sim.warBanner, { t: opts.now / 1000, reduceMotion: opts.reduceMotion });
-    else if (sim?.warBanner && !opts.hideBanner) drawWarBanner(this.ctx, this.px, sim.warBanner, bannerReach(sim), { t: opts.now / 1000, reduceMotion: opts.reduceMotion });
+    this.rallyFlag.draw(this.ctx, this.px, sim, sim?.warBanner?.flag && !opts.hideBanner ? sim.warBanner : null, opts);
+    if (sim?.warBanner && !sim.warBanner.flag && !opts.hideBanner) drawWarBanner(this.ctx, this.px, sim.warBanner, bannerReach(sim), { t: opts.now / 1000, reduceMotion: opts.reduceMotion });
     if (sim) this.wizard.drawFire(this.ctx, this.px);
     if (opts.shimmer && !opts.reduceMotion) drawShimmer(this.ctx, this.px, map, opts.now, (c, b) => paintStanding(c, ART, map, b, this.area, opts.looks), opts.looks);
     if (opts.inspect) drawInspect(this.ctx, this.px, map, sim, opts.inspect.id, opts.inspect.armed, opts.now, opts.reduceMotion, opts.inspect.minePreview);
