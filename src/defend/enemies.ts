@@ -26,6 +26,7 @@ export function stepEnemy(sim: DefendSim, e: Enemy, dt: number) {
   if (e.hp <= 0) return;
   const def = ENEMIES[e.kind];
   e.cd -= dt;
+  if (e.impaled !== undefined) return;
   if (stepAbilities(sim, e, dt)) return;
   if (e.leader !== undefined) {
     const leader = sim.enemies.find(other => other.id === e.leader && other.hp > 0);

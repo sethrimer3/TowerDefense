@@ -80,7 +80,7 @@ export const SUBJECTS: Subject[] = [
         id: "barracks", name: "Barracks", item: "barracks", items: ["chapterHouse", "berserkerLodge", "halberdYard"], upgrades: ["soldierReach"],
       },
       {
-        id: "archerBarracks", name: "Archer barracks", item: "archerBarracks", items: ["rangerLodge", "skirmishCamp"], upgrades: ["archerSight", "archerHunt"],
+        id: "archerBarracks", name: "Archer barracks", item: "archerBarracks", items: ["rangerLodge", "skirmishCamp", "skyrangerLodge"], upgrades: ["archerSight", "archerHunt"],
       },
       {
         id: "mageGuild", name: "Mage Guild", item: "mageGuild", items: ["infernoHall", "cinderHall"], upgrades: ["mageFireball", "mageEmbers"],

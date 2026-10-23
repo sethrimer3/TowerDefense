@@ -153,6 +153,7 @@ const MATERIAL: Record<PlacedKind, { m: Material; ruin: Pick<Ruin, "stone" | "to
   heroHall: { m: { tones: C.pale.slice(1, 4), roofed: true }, ruin: { stone: C.pale.slice(1, 4), top: C.gold, beams: true } },
   shadow: { m: { tones: C.char, roofed: true }, ruin: { stone: C.char, top: [C.flag[0], C.dusk, C.slate[1]], beams: true } },
   archerBarracks: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: [0x4a3826, C.timber, 0x8e7048], beams: true } },
+  skyrangerLodge: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.slime.slice(0, 3), beams: true } },
   rangerLodge: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.slime.slice(0, 3), beams: true } },
   skirmishCamp: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.straw, beams: true } },
   archerTower: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.plank.slice(0, 3), beams: true } },
@@ -207,6 +208,7 @@ export const PATH_LOOKS: Partial<Record<PlacedKind, readonly string[]>> = {
   sniperLodge: ["marksmen", "ricochet", "suppressors", "deadeye", "piercing"],
   archerBarracks: ["rangers", "skirmishers"],
   rangerLodge: ["rangers"],
+  skyrangerLodge: ["skyranger"],
   skirmishCamp: ["skirmishers"],
   archerTower: ["fireArrows", "sharpshooters"],
   cannonTower: ["gunnery", "siegeShot"],
@@ -232,9 +234,11 @@ export const artLook = (kind: string, path?: string): string =>
 /** A structure of `cw × ch` cells at damage `stage` (0 to 3), seeded by its
  * lot, as `(cw·ART) × (ch·ART)` RGBA pixels, in its path's `look` (see
  * `PATH_LOOKS`; "" for the base art). */
-export function structurePixels(kind: PlacedKind, cw: number, ch: number, stage = 0, seed = 0, look = ""): Uint32Array {
+export function structurePixels(kind: PlacedKind, cw: number, ch: number, stage = 0, seed = 0, look = "", attunementPng = false): Uint32Array {
   const w = cw * ART, h = ch * ART, out = new Uint32Array(w * h), p = pixels(out, w, h);
-  PAINT[kind](p, artLook(kind, look));
+  if (attunementPng && kind === "rangerLodge") paintBowmanLodge(p, look);
+  else if (attunementPng && kind === "skyrangerLodge") paintSkyLodge(p, look);
+  else PAINT[kind](p, artLook(kind, look));
   damage(p, stage, hash(seed, KINDS.indexOf(kind)), MATERIAL[kind].m);
   if (kind === "darkKeep") fissures(p, stage, hash(seed, 0xd4));
   return out;
@@ -246,7 +250,7 @@ export function structureRubblePixels(kind: PlacedKind, cw: number, ch: number, 
   return rubblePixels(w, h, hash(seed, KINDS.indexOf(kind), 3), { ...frame(w, h), ...MATERIAL[kind].ruin });
 }
 
-const KINDS: PlacedKind[] = ["barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "meleeGuild", "rangedGuild", "sniperLodge", "musketHall", "assassinDen", "gunHall", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "spearHall", "phalanx", "javelinCamp", "lancerStable", "heroHall", "shadow", "nanoTower", "pyreTower", "frostTower", "stormTower", "chapterHouse", "berserkerLodge", "halberdYard", "bloodHall", "veilHouse", "poisonDen", "brazierTower", "hawkTower", "batteryTower", "mortarTower", "rangerLodge", "skirmishCamp", "infernoHall", "cinderHall"];
+const KINDS: PlacedKind[] = ["barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "meleeGuild", "rangedGuild", "sniperLodge", "musketHall", "assassinDen", "gunHall", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "spearHall", "phalanx", "javelinCamp", "lancerStable", "heroHall", "shadow", "nanoTower", "pyreTower", "frostTower", "stormTower", "chapterHouse", "berserkerLodge", "halberdYard", "bloodHall", "veilHouse", "poisonDen", "brazierTower", "hawkTower", "batteryTower", "mortarTower", "rangerLodge", "skirmishCamp", "infernoHall", "cinderHall", "skyrangerLodge"];
 
 const PAINT: Record<PlacedKind, (p: Pix, look: string) => void> = {
   meleeGuild: paintMeleeGuild,
@@ -274,6 +278,7 @@ const PAINT: Record<PlacedKind, (p: Pix, look: string) => void> = {
   shadow: paintShadow,
   archerBarracks: paintArcherBarracks,
   rangerLodge: paintRangerLodge,
+  skyrangerLodge: paintSkyrangerLodge,
   skirmishCamp: paintSkirmishCamp,
   archerTower: paintArcherTower,
   cannonTower: paintCannonTower,
@@ -860,9 +865,17 @@ function paintPoisonDen(p: Pix, look: string) {
 }
 
 /** The Ranger lodge: green hoods on pegs. */
+function paintBowmanLodge(p: Pix, look: string) {
+  paintBranchDen(p, "rangers", ["..2..", "..2..", "..1..", "..1..", "01010"], { 0: OUTLINE, 1: 0x91643c, 2: 0xc2ccd0 }, !!look, paintArcherBarracks);
+}
+function paintSkyLodge(p: Pix, look: string) {
+  paintBranchDen(p, "skyranger", ["..2..", ".222.", "..1..", "01010"], { 0: OUTLINE, 1: 0xbe8d3d, 2: 0xc2e5e6 }, !!look, paintArcherBarracks);
+}
+/** Legacy Ranger art is retained when Pixel Art is disabled/unavailable. */
 function paintRangerLodge(p: Pix, look: string) {
   paintBranchDen(p, "rangers", [".0.", "010", "121", "000"], { 0: OUTLINE, 1: C.slime[1], 2: C.slime[0] }, !!look, paintArcherBarracks);
 }
+function paintSkyrangerLodge(p: Pix, look: string) { paintArcherBarracks(p, look ? "rangers" : ""); }
 /** The Skirmish camp: quivers full of fletched arrows. */
 function paintSkirmishCamp(p: Pix, look: string) {
   paintBranchDen(p, "skirmishers", ["2.2", "000", "010", "010", "000"], { 0: OUTLINE, 1: C.plank[1], 2: 0xfaf8f2 }, !!look, paintArcherBarracks);

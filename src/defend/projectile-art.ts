@@ -1,3 +1,6 @@
+import { skyArrowView } from "./archer-attunements.ts";
+import { JAVELIN_SIZE } from "./archer-art-data.ts";
+import { drawPixelFrame } from "./pixel-sprites.ts";
 /** The battle's plain projectiles as pixel art at `ART` pixels a cell inside
  * the city's black outline, like the wizard's fire and the blasts:
  *
@@ -139,20 +142,30 @@ function arrowSprite(dir: number, javelin = false) {
 
 /** Arrows in flight, pointing where they fly (from where they were loosed
  * once they reach the target). */
-export function drawArrows(c: Ctx, px: number, sim: DefendSim) {
+export function drawArrows(c: Ctx, px: number, sim: DefendSim, reduced = false) {
   if (!sim.arrows.length) return;
   c.imageSmoothingEnabled = false;
   for (const a of sim.arrows) {
+    if(a.sky){
+      const v=skyArrowView(a,reduced);if(!v || v.alpha<=0)continue;
+      c.save();c.globalAlpha=v.alpha;
+      blit(c,px,arrowSprite(v.up?12:4),Math.round(v.x*ART-ARROW_BOX/2),Math.round(v.y*ART-ARROW_BOX/2));c.restore();continue;
+    }
+    if(a.bowJavelin){
+      const j=a.bowJavelin,dir=arrowDir(j.ux,j.uy),size=JAVELIN_SIZE/ART*px;
+      if(drawPixelFrame(c,"v2/effects/bow-javelin",{sx:dir*JAVELIN_SIZE,sy:0,sw:JAVELIN_SIZE,sh:JAVELIN_SIZE},a.x*px-size/2,a.y*px-size/2,size,size))continue;
+    }
     if (a.shot && a.shot !== "javelin") {
       const s = shotSprite(a.shot);
       blit(c, px, s.cv, Math.round(a.x * ART - s.size / 2), Math.round(a.y * ART - s.size / 2));
       continue;
     }
-    let dx = a.tx - a.x, dy = a.ty - a.y;
+    let dx = a.bowJavelin?.ux ?? a.tx - a.x, dy = a.bowJavelin?.uy ?? a.ty - a.y;
     if (dx * dx + dy * dy < 1e-4 && a.origin) (dx = a.x - a.origin.x), (dy = a.y - a.origin.y);
     const d = Math.hypot(dx, dy) || 1;
     const dir = arrowDir(dx, dy);
-    const mx = a.x - (dx / d) * ARROW_BACK, my = a.y - (dy / d) * ARROW_BACK;
+    const fan=a.volleyIndex===undefined?0:(a.volleyIndex%2?1:-1)*Math.ceil(a.volleyIndex/2)*.12;
+    const mx = a.x - (dx / d) * ARROW_BACK - dy/d*fan, my = a.y - (dy / d) * ARROW_BACK + dx/d*fan;
     blit(c, px, arrowSprite(dir, a.shot === "javelin"), Math.round(mx * ART - ARROW_BOX / 2), Math.round(my * ART - ARROW_BOX / 2));
   }
 }

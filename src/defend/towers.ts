@@ -1,3 +1,4 @@
+import { stepBowJavelin, stepSkyArrow } from "./archer-attunements.ts";
 import { buildingPaths } from "../specializations.ts";
 /** DEFEND towers and their projectiles. Archer towers shoot the nearest
  * enemy in range with homing arrows; cannon towers lob a shell at the
@@ -194,6 +195,8 @@ export function stepArrows(sim: DefendSim, dt: number) {
   const byId = new Map(sim.enemies.map((e) => [e.id, e]));
   for (const a of sim.arrows) {
     a.life -= dt;
+    if (a.bowJavelin) { stepBowJavelin(sim, a, dt); continue; }
+    if (a.sky) { stepSkyArrow(sim, a, dt); continue; }
     // A piercing bullet flies straight on, striking all in its line.
     if (a.pierce) { flyThrough(sim, a, dt); continue; }
     const t = byId.get(a.target);

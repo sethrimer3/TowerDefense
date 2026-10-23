@@ -16,6 +16,7 @@
  * first use, and bump `pixelKey()` as they arrive or the switch flips, which
  * the renderer's caches (the city layer, the ground relief, the combat
  * frame, the palette icons) fold into their keys. */
+import { ARCHER_PNGS } from "./archer-art-data.ts";
 import type { EnemyKind, StructureKind } from "./catalog.ts";
 import { BUILDING_PNGS } from "./building-sprite-manifest.ts";
 
@@ -28,6 +29,7 @@ export const PIXEL_SPRITES = [
   "city-oak", "city-pine", "city-rubble", "city-scaffold", "city-wall-cap", "city-wall-face", "city-lantern", "pond-lily", "pond-reeds",
   "city-tile", "bomb", "floor-1", "floor-2", "floor-3", "floor-4",
   ...BUILDING_PNGS,
+  ...ARCHER_PNGS,
   "v2/units/melee-facing",
 ] as const;
 export type PixelSprite = (typeof PIXEL_SPRITES)[number];

@@ -82,6 +82,8 @@ import { STONEWORK, TOWN_WALLS, wallRank } from "../wall-upgrades.ts";
 export type Levels = Record<UpgradeId, number>;
 
 export type Enemy = {
+  /** Javelin carrying this enemy; absent outside an active impalement. */
+  impaled?: number;
   id: number;
   kind: EnemyKind;
   x: number;
@@ -145,6 +147,8 @@ export type Enemy = {
 };
 
 export type Soldier = {
+  /** Ordinary Skyranger attacks; rain arrows never advance this counter. */
+  skyShots?: number;
   id: number;
   /** Swordsmen chase and hack; archers roam and shoot; fire mages roam
    * and hurl fireballs; valkyries hunt and charge-stab; the dark wizard
@@ -217,6 +221,9 @@ export type Civilian = {
 };
 
 export type Arrow = {
+  bowJavelin?: import("./archer-attunements.ts").BowJavelin;
+  volleyIndex?: number;
+  sky?: import("./archer-attunements.ts").SkyArrow;
   x: number; y: number; target: number; damage: number; tx: number; ty: number; life: number; origin?: Point & { attacker?: number; building?: number };
   /** A fire arrow's burn: damage a second, and for how long; absent otherwise. */
   burn?: number; burnFor?: number;
@@ -889,6 +896,12 @@ export class DefendSim {
       if (!this.grid[i].length) this.gridUsed.push(i);
       this.grid[i].push(e);
     }
+  }
+
+  /** Friendly projectiles that move enemies invalidate the shared blast snapshot. */
+  reindexAfterDisplacement() {
+    this.indexEnemies();
+    this.blastIndexReady = this.stationaryAttacks;
   }
 
   /** Enemies within `r` of a point (uses the cell index). */

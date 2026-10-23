@@ -127,7 +127,7 @@ export function drawUnits(b: Brush, sim: DefendSim, torches: Burning | null, hea
   outline?.end(b.c);
   drawSwords(b, swords);
   if (timing) timing.entityMs += performance.now() - start;
-  drawArrows(b.c, b.px, sim);
+  drawArrows(b.c, b.px, sim, simple.reduceMotion);
   drawLasers(b.c, b.px, sim);
   drawShells(b.c, b.px, sim);
   drawSiegeShots(b, sim);

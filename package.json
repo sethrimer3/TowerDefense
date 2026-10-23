@@ -15,6 +15,7 @@
     "test:render-cache": "node tests/defend-render-cache.mjs",
     "font": "node --experimental-transform-types scripts/pixel-font/build.ts",
     "sprites": "node --experimental-transform-types scripts/pixel-art/build.ts",
+    "sprites:archers": "node --experimental-transform-types scripts/pixel-art/archers.ts",
     "sprites:melee": "node --experimental-transform-types scripts/pixel-art/melee-facing.ts"
   },
   "devDependencies": {

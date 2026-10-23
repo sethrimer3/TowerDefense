@@ -56,7 +56,7 @@ test("research alone does not change any building in battle", () => {
 });
 
 test("every topic offers two or more paths of three ranks (the palace's, the branch buildings' and the den's spare one or more), with square icons", () => {
-  for (const t of PATH_TOPICS) assert.ok(PATHS.filter((p) => p.topic === t).length >= (["valkyriePalace", "assassinDen", "pyreTower", "frostTower", "stormTower", "chapterHouse", "berserkerLodge", "halberdYard", "bloodHall", "veilHouse", "poisonDen", "brazierTower", "hawkTower", "batteryTower", "mortarTower", "rangerLodge", "skirmishCamp", "infernoHall", "cinderHall"].includes(t) ? 1 : 2), t);
+  for (const t of PATH_TOPICS) assert.ok(PATHS.filter((p) => p.topic === t).length >= (["valkyriePalace", "assassinDen", "pyreTower", "frostTower", "stormTower", "chapterHouse", "berserkerLodge", "halberdYard", "bloodHall", "veilHouse", "poisonDen", "brazierTower", "hawkTower", "batteryTower", "mortarTower", "rangerLodge", "skirmishCamp", "skyrangerLodge", "infernoHall", "cinderHall"].includes(t) ? 1 : 2), t);
   for (const p of PATHS) assert.equal(p.ranks.length, 3, p.id);
   for (const [k, rows] of Object.entries(ICON_ROWS)) {
     assert.equal(rows.length, ICON_SIZE, k);
@@ -238,7 +238,7 @@ test("the archer and cannon towers' branch towers each fight their own way befor
   assert.equal(mortar.sim.shells[0].damage, cannon.sim.shells[0].damage * SIEGE_SHOT.hall.damage);
 });
 
-test("Rangers loose twin shots; Skirmishers draw faster", () => {
+test("Javelin Bowmen loose a single massive shaft; Skirmishers draw faster", () => {
   const archer = (paths: Bonuses["paths"]) => {
     const { sim, b } = battle("archerBarracks", paths);
     new Barracks().step(sim, 1 / 30);
@@ -250,7 +250,7 @@ test("Rangers loose twin shots; Skirmishers draw faster", () => {
   };
   const plain = archer(undefined);
   assert.equal(plain.sim.arrows.length, 1);
-  assert.equal(archer({ rangerLodge: { path: "rangers", rank: 3 } }).sim.arrows.length, 2);
+  assert.ok(archer({ rangerLodge: { path: "rangers", rank: 3 } }).sim.arrows[0].bowJavelin);
   const quick = archer({ skirmishCamp: { path: "skirmishers", rank: 1 } });
   assert.ok(Math.abs(quick.s.cd - plain.s.cd * SKIRMISH.reload[1]) < 1e-9);
 });

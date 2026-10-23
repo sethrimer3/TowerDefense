@@ -388,8 +388,26 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   streets and stop to shoot anything within their short sight (3 cells,
   widened by Keen eyes). The pricey one-off Hunter's instinct makes them
   path toward the nearest enemy in the city instead, stopping at bow range.
-  Paths: Rangers (sight, heavier arrows, twin shots) or Skirmishers
-  (faster draws, shooting on the move).
+  Three building attunements each have three Knowledge tiers. **Skirmishers**
+  fire 1/3/5/7 arrows per attack, distributing them among enemies in sight;
+  tiers retain faster draws and, from II, 30% faster movement and shooting
+  while moving. **Javelin Bowmen** (formerly Rangers) fire a massive arrow
+  every 3 seconds for 6× damage. The shaft carries susceptible enemies in a
+  straight line: 2 enemies and 3 city tiles of push at base, 3 enemies and
+  4 tiles at I, unlimited piercing and 5 tiles at II, then 6 tiles at III.
+  From II it explodes once at the end, with radius growing per unique enemy
+  pierced. Walls, board edges, shields and resistant enemies stop it; bosses,
+  boats, fortresses, unyielding and physical resistance cannot be carried.
+  **Skyranger** has battlefield-wide range. Its arrows rise vertically and
+  fade, then reappear above their target and fall. Arrow rain adds 12 arrows
+  every 10 shots at I (2-tile radius), 20 every 7 at II (3-tile radius), and
+  28 every 5 at III. The last tier allocates rain evenly among enemies in
+  the area: one takes all 28, two take 14 each. Earlier tiers scatter and
+  may miss. Rain never advances its own trigger. A city tile is `SUB` = 8
+  simulation cells. Existing Ranger ranks/IDs persist as Javelin Bowmen;
+  Archer Towers and the separate spear-line javelineers are unchanged.
+  The three completed branches merge into the existing Sniper lodge.
+  [Full accepted tuning](upgrades/ARCHER_ATTUNEMENTS.md).
 - **Mage Guilds** (`mages.ts`) train fire mages (same garrison size, drill
   speed and arms upgrades as the barracks). Mages wander the streets like
   archers and, when an enemy comes within 4.5 cells, stop and hurl a

@@ -67,6 +67,8 @@ The city is alive between and during battles: park grass sways in the wind (hard
 
 ## How it's built
 
+The Archer Barracks has three attunements: Skirmishers fire 1/3/5/7 arrows with faster draws and mobile shooting; Javelin Bowmen fire slow massive arrows that carry a file of enemies, gaining unlimited piercing and growing explosions; Skyranger fires anywhere on the battlefield with vertical launch/descent and 10/7/5-shot arrow rain. Existing Ranger purchases become Javelin Bowmen at the same ranks. [Tiers and tuning](docs/upgrades/ARCHER_ATTUNEMENTS.md). `src/defend/archer-attunements.ts` owns the special projectiles; `npm run sprites:archers` builds their gated PNG buildings/icons and giant javelin atlas. `node tests/archer-attunements.mjs` checks desktop/phone combat art and the live three-branch tree.
+
 The Library and Tiles window light uses cached, feathered density fields with screen blending (`src/soft-sunlight.ts`), preserving crisp scene art while sunlight moves slowly through dust. Tiles' pale stained glass and symmetrical leadwork follow the Pixel Art setting. [Window-light reference and tuning](docs/art/WINDOW_SUNLIGHT.md).
 
 Melee troops wear path-colored flowing capes at 60% of the Hero's length when unattuned and 70/80/90% at tiers I/II/III (`src/defend/melee-cape.ts`, sharing the Hero's cloth simulation). Pixel Art enables them; Simple Troops hides them and Reduce Motion holds them still. [Family coverage and tailoring](docs/art/MELEE_CAPES.md).

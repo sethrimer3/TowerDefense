@@ -16,7 +16,7 @@ import { SHADOW_BLEED, SHADOW_EDGE, SHADOW_KNIVES, SHADOW_PATHS, SHADOW_PIERCE, 
 import { NANO_BLAST, NANO_CLOUD, NANO_PATHS, NANO_REPLICATE, nanoAllocated, nanoRank, respecNano, undoNano, upgradeNano, type NanoPathId, type NanoRanks } from "../nanobot-upgrades.ts";
 import { CHAIN, CRIT_CHANCE, CRIT_DAMAGE, DETONATOR, REVOLUTIONARY_PATHS, SQUAD, respecRevolutionary, revolutionaryAllocated, revolutionaryRank, undoRevolutionary, upgradeRevolutionary, type RevolutionaryPathId, type RevolutionaryRanks } from "../revolutionary-upgrades.ts";
 import { BALLISTA_PATHS, FIRE_BOLTS, HEAVY_BOLTS, WINDLASS, ballistaAllocated, ballistaRank, respecBallistas, undoBallistas, upgradeBallistas, type BallistaPathId, type BallistaRanks } from "../ballista-upgrades.ts";
-import { pathById, type PathId, WHIRLWIND, BLADE_DANCE, LEGEND, FIRE_ARROWS, SHARP, GUNNERY, SIEGE_SHOT, CRUSADE, BLOODLETTERS, SHADOWCLOAK, VENOM, HEADHUNT, GRENADIERS, VOLLEY, BAYONET, SHARP_MUSKETS, BELT_FEED, LONG_SPEARS, SET_SPEARS, TESTUDO, SPEAR_WALL, BARBED, THROWING, HEAVY_LANCE, WINGED, TRIPOD, QUICKDRAW, DUELISTS, GUN_SHIELD, OVERDRIVE, STOPPING, DEADEYE, PIERCING, CLUSTER, SALVO, MARKSMEN, RICOCHET, SUPPRESS, BERSERK, HALBERD, RANGERS, SKIRMISH, FORTIFY, PYRO, RIME, STORM, PYROCLASM, CINDERS, SPOTTERS, SIGNAL } from "../knowledge-paths.ts";
+import { pathById, type PathId, WHIRLWIND, BLADE_DANCE, LEGEND, FIRE_ARROWS, SHARP, GUNNERY, SIEGE_SHOT, CRUSADE, BLOODLETTERS, SHADOWCLOAK, VENOM, HEADHUNT, GRENADIERS, VOLLEY, BAYONET, SHARP_MUSKETS, BELT_FEED, LONG_SPEARS, SET_SPEARS, TESTUDO, SPEAR_WALL, BARBED, THROWING, HEAVY_LANCE, WINGED, TRIPOD, QUICKDRAW, DUELISTS, GUN_SHIELD, OVERDRIVE, STOPPING, DEADEYE, PIERCING, CLUSTER, SALVO, MARKSMEN, RICOCHET, SUPPRESS, BERSERK, HALBERD, BOW_JAVELIN, SKYRANGER, SKIRMISH, FORTIFY, PYRO, RIME, STORM, PYROCLASM, CINDERS, SPOTTERS, SIGNAL } from "../knowledge-paths.ts";
 import { bonuses } from "../progression.ts";
 import { denOf } from "../defend/assassins.ts";
 import { ITEM_NAMES, archerDamage, archerCooldown, archerRange, cannonDamage, cannonCooldown, CANNON_RANGE, NANO_TOWER, SOLDIER, ARCHER_UNIT, soldierScale, STRUCTURES, flameDps, flameRange, iceDamage, ICE_RANGE, iceChill, watchRadius, fireballDamage, fireballSplash, emberDps, emberSeconds, FIRE_MAGE, FIREBALL_RANGE, keepHp, BRAWLER, ASSASSIN_UNIT, SLINGER, SNIPER, MUSKETEER, GUNNER, MACHINE_GUNNER, GATLING_GUNNER, RAIL_SNIPER, ROCKETEER, SPEARMAN, HOPLITE, LANCER, JAVELINEER, HERO, SHADE, WALL_BLOCK_DESCRIPTION, wallHp, GATE, GATE_DESCRIPTION, BALLISTA, BALLISTA_DESCRIPTION, ballistaCooldown, ballistaDamage, ballistaRange, gateHpScale, gateShut, spikeDamage, spikeEvery, isWizardTower, isSwordHall, isAssassinDen, isArcherTower, isCannonTower, isArcherHall, isMageHall, type PaletteItem } from "../defend/catalog.ts";
@@ -41,16 +41,18 @@ export function kindStats(save: Save, kind: PaletteItem, path?: PathId, rank = 0
   if (isSwordHall(kind) || isArcherHall(kind)) {
     const sword = isSwordHall(kind), base = sword ? SOLDIER : ARCHER_UNIT;
     const crusade = at("crusaders"), berserk = at("berserkers"), halberd = at("halberdiers"), ranger = at("rangers"), skirmish = at("skirmishers");
+    const skyranger = kind === "skyrangerLodge", sky = at("skyranger");
     const rangerish = kind === "rangerLodge" || ranger > 0, skirmisher = kind === "skirmishCamp" || skirmish > 0;
     const crusader = kind === "chapterHouse" || crusade > 0, berserker = kind === "berserkerLodge" || berserk > 0, halberdier = kind === "halberdYard" || halberd > 0;
     const scale = soldierScale(l.soldierArms);
     const extra = [
       berserker ? `strikes every ${n(SOLDIER.cooldown * (berserk ? BERSERK.cooldown : BERSERK.rage))}s${berserk >= 2 ? ` · kills heal ${BERSERK.heal * 100}%` : ""}${berserk >= 3 ? " · cleaving" : ""}` : "",
-      rangerish ? `+${ranger ? RANGERS.sight : RANGERS.lodge} sight` : "",
-      skirmisher ? `draws ${n(ARCHER_UNIT.cooldown * (skirmish ? SKIRMISH.reload[skirmish] : SKIRMISH.camp))}s${skirmish >= 2 ? " · shoots on the move" : ""}` : "",
+      rangerish ? `massive arrow every ${BOW_JAVELIN.cooldown}s · ${BOW_JAVELIN.hits[ranger] === Infinity ? "unlimited" : BOW_JAVELIN.hits[ranger]} enemies · ${BOW_JAVELIN.push[ranger]}-tile push${ranger >= 2 ? " · growing explosion" : ""}` : "",
+      skyranger ? `unlimited range${sky ? ` · ${SKYRANGER.arrows[sky]} rain arrows every ${SKYRANGER.every[sky]} shots · ${SKYRANGER.radius[sky]}-tile radius${sky === 3 ? " · evenly targeted" : ""}` : ""}` : "",
+      skirmisher ? `${SKIRMISH.arrows[skirmish]} arrows · draws ${n(ARCHER_UNIT.cooldown * (skirmish ? SKIRMISH.reload[skirmish] : SKIRMISH.camp))}s${skirmish >= 2 ? " · shoots on the move" : ""}` : "",
       halberdier ? `${n(SOLDIER.reach + (halberd ? HALBERD.reach : HALBERD.drill))} reach${halberd >= 2 ? ` · blows slow ${HALBERD.chill}s` : ""}${halberd >= 3 ? ` · ${HALBERD.bigDamage}x on big enemies` : ""}` : "",
     ].filter(Boolean).map((t) => ` · ${t}`).join("");
-    return `Recruits: ${n(base.hp * scale * b.troopHp * (crusader ? CRUSADE.hp[crusade] : 1))} HP · ${n(base.damage * scale * b.troopDamage * (crusade >= 3 ? CRUSADE.damage : halberd ? HALBERD.damage : ranger >= 2 ? RANGERS.damage : 1))} damage · ${n(base.speed * (crusader ? CRUSADE.speed : skirmish >= 2 ? SKIRMISH.speed : 1))} speed${extra}`;
+    return `Recruits: ${n(base.hp * scale * b.troopHp * (crusader ? CRUSADE.hp[crusade] : 1))} HP · ${n(base.damage * scale * b.troopDamage * (crusade >= 3 ? CRUSADE.damage : halberd ? HALBERD.damage : rangerish ? BOW_JAVELIN.damage : 1))} damage · ${n(base.speed * (crusader ? CRUSADE.speed : skirmish >= 2 ? SKIRMISH.speed : 1))} speed${extra}`;
   }
   if (kind === "heroHall") {
     const whirl = at("whirlwind"), dance = at("bladeDance"), legend = at("legend"), scale = soldierScale(l.soldierArms);

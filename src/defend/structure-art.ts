@@ -1,3 +1,4 @@
+import { archerBuildingArt } from "./archer-art-data.ts";
 /** DEFEND's structure art, seen from above: the keep, and the barracks and
  * towers from `tower-art.ts` at their damage stages and as rubble (drawn
  * into the city layer and the palette icons), the keep's live banner, and
@@ -29,6 +30,8 @@ export type ArtBox = { x: number; y: number; w: number; h: number; px: number };
 export function paintStructureArt(c: CanvasRenderingContext2D, kind: StructureKind, box: ArtBox, stage = 0, seed = 0, path?: string) {
   const x = Math.round(box.x), y = Math.round(box.y), w = Math.round(box.w), h = Math.round(box.h);
   const cw = Math.max(1, Math.round(box.w / box.px)), ch = Math.max(1, Math.round(box.h / box.px));
+  const archer = archerBuildingArt(kind);
+  if (archer && cw === 4 && ch === 4 && drawPixelFrame(c, `v2/defend/${archer.name}`, { sx: path === archer.path ? 32 : 0, sy: Math.max(0,Math.min(3,stage))*32, sw:32, sh:32 }, x,y,w,h)) return;
   const family = buildingArt(kind, cw, ch);
   // A migrated family keeps its PNG identity through paths and damage. The
   // same bounds are used by ghosts, palette previews and the city layer.
@@ -46,6 +49,8 @@ export function paintStructureRubble(c: CanvasRenderingContext2D, kind: Structur
   if (kind === "keep") return paintKeepRubble(c, box);
   const cw = Math.max(1, Math.round(box.w / box.px)), ch = Math.max(1, Math.round(box.h / box.px));
   const family = buildingArt(kind, cw, ch), x = Math.round(box.x), y = Math.round(box.y);
+  const archer = archerBuildingArt(kind);
+  if (archer && cw === 4 && ch === 4 && drawPixelFrame(c, `v2/defend/${archer.name}`, { sx:path===archer.path?32:0,sy:128,sw:32,sh:32 },x,y,Math.round(box.w),Math.round(box.h))) return;
   if (family && drawPixelFrame(c, family.sheet, buildingFrame(family, 0, path, true), x, y, Math.round(box.x + box.w) - x, Math.round(box.y + box.h) - y)) return;
   const art = sprite(`${kind}:${cw}x${ch}:rubble:${seed}`, cw * ART, ch * ART, () => structureRubblePixels(kind, cw, ch, seed));
   drawSprite(c, art, Math.round(box.x), Math.round(box.y), Math.round(box.w), Math.round(box.h));
@@ -79,6 +84,11 @@ export function paintIcon(canvas: HTMLCanvasElement, item: IconItem) {
   if (item === "meteor") return paintMeteorIcon(c, n);
   if (item === "frostNova") return paintFrostIcon(c, n);
   if (item === "reinforcements") return paintReinforceIcon(c, n);
+  const archer=archerBuildingArt(item);
+  if(archer){
+    const size=Math.min(n,Math.max(1,Math.floor(n/24))*24),o=Math.round((n-size)/2),path=canvas.dataset.look??canvas.dataset.pixelLook;
+    if(drawPixelFrame(c,`v2/ui/${archer.name}`,{sx:path===archer.path?24:0,sy:0,sw:24,sh:24},o,o,size,size))return;
+  }
   const def = [STRUCTURES[item].w, STRUCTURES[item].h];
   const family = buildingArt(item, def[0], def[1]);
   // Purpose-drawn square icons share the world sprite's palette/emblem.

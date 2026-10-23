@@ -6,7 +6,7 @@ import { cloneLayout, type PlacedKind } from "./defend/layout.ts";
 import type { Save } from "./save.ts";
 import { studyPathCost } from "./economy.ts";
 
-export type PathTopic = "pyreTower" | "frostTower" | "stormTower" | "wizardTower" | "chapterHouse" | "berserkerLodge" | "halberdYard" | "barracks" | "heroHall" | "valkyriePalace" | "assassinDen" | "bloodHall" | "veilHouse" | "poisonDen" | "spearHall" | "phalanx" | "javelinCamp" | "lancerStable" | "musketHall" | "gunHall" | "gunNest" | "gatlingNest" | "rocketBattery" | "sniperLodge" | "archerTower" | "brazierTower" | "hawkTower" | "cannonTower" | "batteryTower" | "mortarTower" | "archerBarracks" | "rangerLodge" | "skirmishCamp" | "watchTower" | "mageGuild" | "infernoHall" | "cinderHall" | "bait" | "spikes" | SpellId;
+export type PathTopic = "pyreTower" | "frostTower" | "stormTower" | "wizardTower" | "chapterHouse" | "berserkerLodge" | "halberdYard" | "barracks" | "heroHall" | "valkyriePalace" | "assassinDen" | "bloodHall" | "veilHouse" | "poisonDen" | "spearHall" | "phalanx" | "javelinCamp" | "lancerStable" | "musketHall" | "gunHall" | "gunNest" | "gatlingNest" | "rocketBattery" | "sniperLodge" | "archerTower" | "brazierTower" | "hawkTower" | "cannonTower" | "batteryTower" | "mortarTower" | "archerBarracks" | "rangerLodge" | "skirmishCamp" | "skyrangerLodge" | "watchTower" | "mageGuild" | "infernoHall" | "cinderHall" | "bait" | "spikes" | SpellId;
 /** Strike spells: cast from the battle's Skills palette rather than built,
  * so a spell has no cards; it casts with the one path `save.spellPaths`
  * names, at its furthest researched rank. */
@@ -21,7 +21,7 @@ export type PathId =
   | "grenadiers" | "volleyFire" | "bayonets" | "sharpMuskets" | "beltFeed"
   | "quickdraw" | "duelists" | "tripod" | "gunShield" | "overdrive" | "stoppingPower" | "deadeye" | "piercing" | "clusterRockets" | "salvoRacks"
   | "marksmen" | "ricochet" | "suppressors"
-  | "fireArrows" | "sharpshooters" | "gunnery" | "siegeShot" | "rangers" | "skirmishers"
+  | "fireArrows" | "sharpshooters" | "gunnery" | "siegeShot" | "rangers" | "skirmishers" | "skyranger"
   | "spotters" | "signalFires" | "pyroclasm" | "cinders" | "oilSoaked" | "fortified"
   | "blastStakes" | "springStakes" | "rimeStakes"
   | "boneArchers" | "soulWeighing" | "amalgam"
@@ -246,14 +246,13 @@ export const GUNNERY = { hall: 0.85, reload: [1, 0.75, 0.75, 0.5], grape: 4, gra
 /** Siege shot, the Mortar tower's path (its own, before any rank, `hall`): `damage[rank]` times the damage and `reload` times the time
  * between shots; from II `radius` times the blast; at III `range` more cells. */
 export const SIEGE_SHOT = { hall: { damage: 1.4, reload: 1.25 }, damage: [1, 1.8, 1.8, 3], reload: 1.5, radius: 1.5, range: 3 };
-/** Rangers, the Ranger lodge's path (`lodge` more cells of sight before
- * any rank): archers see `sight` more cells, hit `damage` times as hard from
- * II, and at III loose a second arrow at the next nearest enemy. */
-export const RANGERS = { lodge: 1, sight: 2, damage: 1.5 };
 /** Skirmishers, the Skirmish camp's path: archers draw in `reload[rank]`
  * of the time (`camp` before any rank); from II they
  * walk `speed` times as fast and keep walking while they shoot. */
-export const SKIRMISH = { camp: 0.85, reload: [1, 0.7, 0.7, 0.45], speed: 1.3 };
+export const SKIRMISH = { arrows: [1, 3, 5, 7], camp: 0.85, reload: [1, 0.7, 0.7, 0.45], speed: 1.3 };
+/** Archer Barracks attunements. Distances in tiles are multiplied by grid.SUB. */
+export const BOW_JAVELIN = { cooldown: 3, damage: 6, speed: 24, width: .22, push: [3,4,5,6], hits: [2,3,Infinity,Infinity], blast: [0,0,1,1.5], growth: [0,0,.15,.2], blastDamage: [0,0,1,1.5] };
+export const SKYRANGER = { every: [0,10,7,5], arrows: [0,12,20,28], radius: [0,2,3,3], rise: .22, hidden: .18, fall: .28, height: 3 };
 /** Spotters: marked enemies take `mark[rank]` times the damage (2 without);
  * from II the tower marks `radius` cells further. */
 export const SPOTTERS = { mark: [2, 2.5, 2.5, 3], radius: 2 };
@@ -713,19 +712,27 @@ export const PATHS: KnowledgePath[] = [
     ],
   },
   {
-    id: "rangers", topic: "rangerLodge", name: "Rangers", motto: "Long sight, heavy arrows", hue: "verdant",
+    id: "rangers", topic: "rangerLodge", name: "Javelin Bowmen", motto: "One shaft carries a whole file", hue: "verdant",
     ranks: [
-      { name: "Woodcraft", icon: "leaf", cost: studyPathCost(4, 0), text: "Rangers see 2 cells further in all" },
-      { name: "Broadheads", icon: "arrow", cost: studyPathCost(4, 1), text: "Their arrows hit 50% harder" },
-      { name: "Twin shot", icon: "volley", cost: studyPathCost(4, 2), text: "Each loosing sends a second arrow at the next nearest enemy" },
+      { name: "Driving shafts", icon: "stake", cost: studyPathCost(4, 0), text: "Massive arrows impale up to 3 enemies and carry them back 4 city tiles" },
+      { name: "Explosive javelins", icon: "blast", cost: studyPathCost(4, 1), text: "Unlimited piercing, a 5-tile push, and a final explosion that grows with every enemy pierced; resistance still stops the shaft" },
+      { name: "Siegebreakers", icon: "fork", cost: studyPathCost(4, 2), text: "A 6-tile push and a stronger, larger explosion, growing with every enemy pierced" },
     ],
   },
   {
     id: "skirmishers", topic: "skirmishCamp", name: "Skirmishers", motto: "Quick draws, always moving", hue: "shadow",
     ranks: [
-      { name: "Quick draw", icon: "bow", cost: studyPathCost(4, 0), text: "Skirmishers shoot 30% faster in all" },
-      { name: "Running shots", icon: "boot", cost: studyPathCost(4, 1), text: "They walk 30% faster and keep moving while they shoot" },
-      { name: "Hail of arrows", icon: "bolt", cost: studyPathCost(4, 2), text: "They shoot more than twice as fast as at first" },
+      { name: "Quick draw", icon: "bow", cost: studyPathCost(4, 0), text: "3 arrows each attack and 30% shorter reloads" },
+      { name: "Running shots", icon: "boot", cost: studyPathCost(4, 1), text: "5 arrows each attack; walk 30% faster and keep moving while shooting" },
+      { name: "Hail of arrows", icon: "volley", cost: studyPathCost(4, 2), text: "7 arrows each attack and more than twice the ordinary firing rate" },
+    ],
+  },
+  {
+    id: "skyranger", topic: "skyrangerLodge", name: "Skyranger", motto: "No enemy beyond the sky", hue: "verdant",
+    ranks: [
+      { name: "Arrow rain", icon: "volley", cost: studyPathCost(4, 0), text: "Every 10 shots rains 12 arrows over a 2-city-tile radius" },
+      { name: "Cloudburst", icon: "cloud", cost: studyPathCost(4, 1), text: "Every 7 shots rains 20 arrows over a 3-city-tile radius" },
+      { name: "Unerring rain", icon: "crosshair", cost: studyPathCost(4, 2), text: "Every 5 shots rains 28 arrows, shared evenly among enemies in the area; one enemy takes them all" },
     ],
   },
   {
@@ -949,7 +956,8 @@ export const UNSPECIALIZED: Record<PathTopic, string> = {
   batteryTower: "Reloads 15% faster",
   mortarTower: "Shells 40% harder, slower to reload",
   archerBarracks: "Ordinary archers",
-  rangerLodge: "Rangers: a cell more sight",
+  rangerLodge: "Javelin Bowmen: slow massive arrows; 2 enemies, 3-city-tile push",
+  skyrangerLodge: "Skyranger: unlimited range, arrows descend from above",
   skirmishCamp: "Skirmishers: draw 15% quicker",
   watchTower: "Marked enemies take double damage",
   mageGuild: "Ordinary fire mages",

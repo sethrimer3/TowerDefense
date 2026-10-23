@@ -43,7 +43,7 @@ export class IceMotion {
 
   step(sim: DefendSim, dt: number) {
     for (const [u, v] of this.velocity) {
-      if ((u as Enemy).hp <= 0 || (v.own && !sim.soldiers.includes(u as never) && !sim.civilians.includes(u as never))) { this.velocity.delete(u); continue; }
+      if ((u as Enemy).impaled !== undefined || (u as Enemy).hp <= 0 || (v.own && !sim.soldiers.includes(u as never) && !sim.civilians.includes(u as never))) { this.velocity.delete(u); continue; }
       if (!v.moved) {
         this.slide(sim, u, v.x * dt, v.y * dt, v.own);
         const drag = Math.max(0, 1 - dt * (iceAt(sim, u.x, u.y) ? 1.6 : 18));
