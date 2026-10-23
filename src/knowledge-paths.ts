@@ -6,7 +6,7 @@ import { cloneLayout, type PlacedKind } from "./defend/layout.ts";
 import type { Save } from "./save.ts";
 import { studyPathCost } from "./economy.ts";
 
-export type PathTopic = "pyreTower" | "frostTower" | "stormTower" | "wizardTower" | "chapterHouse" | "berserkerLodge" | "halberdYard" | "barracks" | "heroHall" | "valkyriePalace" | "assassinDen" | "bloodHall" | "veilHouse" | "poisonDen" | "spearHall" | "phalanx" | "javelinCamp" | "lancerStable" | "musketHall" | "gunHall" | "gunNest" | "gatlingNest" | "rocketBattery" | "sniperLodge" | "archerTower" | "brazierTower" | "hawkTower" | "cannonTower" | "batteryTower" | "mortarTower" | "archerBarracks" | "watchTower" | "mageGuild" | "bait" | "spikes" | SpellId;
+export type PathTopic = "pyreTower" | "frostTower" | "stormTower" | "wizardTower" | "chapterHouse" | "berserkerLodge" | "halberdYard" | "barracks" | "heroHall" | "valkyriePalace" | "assassinDen" | "bloodHall" | "veilHouse" | "poisonDen" | "spearHall" | "phalanx" | "javelinCamp" | "lancerStable" | "musketHall" | "gunHall" | "gunNest" | "gatlingNest" | "rocketBattery" | "sniperLodge" | "archerTower" | "brazierTower" | "hawkTower" | "cannonTower" | "batteryTower" | "mortarTower" | "archerBarracks" | "rangerLodge" | "skirmishCamp" | "watchTower" | "mageGuild" | "infernoHall" | "cinderHall" | "bait" | "spikes" | SpellId;
 /** Strike spells: cast from the battle's Skills palette rather than built,
  * so a spell has no cards; it casts with the one path `save.spellPaths`
  * names, at its furthest researched rank. */
@@ -246,12 +246,14 @@ export const GUNNERY = { hall: 0.85, reload: [1, 0.75, 0.75, 0.5], grape: 4, gra
 /** Siege shot, the Mortar tower's path (its own, before any rank, `hall`): `damage[rank]` times the damage and `reload` times the time
  * between shots; from II `radius` times the blast; at III `range` more cells. */
 export const SIEGE_SHOT = { hall: { damage: 1.4, reload: 1.25 }, damage: [1, 1.8, 1.8, 3], reload: 1.5, radius: 1.5, range: 3 };
-/** Rangers: archers see `sight` more cells, hit `damage` times as hard from
+/** Rangers, the Ranger lodge's path (`lodge` more cells of sight before
+ * any rank): archers see `sight` more cells, hit `damage` times as hard from
  * II, and at III loose a second arrow at the next nearest enemy. */
-export const RANGERS = { sight: 2, damage: 1.5 };
-/** Skirmishers: archers draw in `reload[rank]` of the time; from II they
+export const RANGERS = { lodge: 1, sight: 2, damage: 1.5 };
+/** Skirmishers, the Skirmish camp's path: archers draw in `reload[rank]`
+ * of the time (`camp` before any rank); from II they
  * walk `speed` times as fast and keep walking while they shoot. */
-export const SKIRMISH = { reload: [1, 0.7, 0.7, 0.45], speed: 1.3 };
+export const SKIRMISH = { camp: 0.85, reload: [1, 0.7, 0.7, 0.45], speed: 1.3 };
 /** Spotters: marked enemies take `mark[rank]` times the damage (2 without);
  * from II the tower marks `radius` cells further. */
 export const SPOTTERS = { mark: [2, 2.5, 2.5, 3], radius: 2 };
@@ -259,14 +261,16 @@ export const SPOTTERS = { mark: [2, 2.5, 2.5, 3], radius: 2 };
  * the tower marks `radius` cells further; at III marked enemies burn for
  * `burn` a second. */
 export const SIGNAL = { slow: [1, 0.7, 0.55, 0.55], radius: 3, burn: 6 };
-/** Pyroclasm: fireballs hit `damage` times as hard; from II burst `splash`
+/** Pyroclasm, the Inferno hall's path: fireballs hit `damage` times as
+ * hard (`hall` before any rank); from II burst `splash`
  * times as wide; at III each throws `shards` smaller bursts beside it, at
  * `shardShare` of the damage. */
-export const PYROCLASM = { damage: 1.4, splash: 1.4, shards: 2, shardShare: 0.5 };
-/** Cinders: the burning ground lasts `life` times as long; from II burns
+export const PYROCLASM = { hall: 1.2, damage: 1.4, splash: 1.4, shards: 2, shardShare: 0.5 };
+/** Cinders, the Cinder hall's path: the burning ground lasts `life` times
+ * as long (`hall` before any rank); from II burns
  * `dps` times as hot; at III what walks through it keeps burning `cling`
  * seconds after. */
-export const CINDERS = { life: 1.6, dps: 1.8, cling: 2 };
+export const CINDERS = { hall: 1.3, life: 1.6, dps: 1.8, cling: 2 };
 /** Oil-soaked bait: whatever bites a stack catches fire for `burn[rank]`
  * seconds at `dps[rank]` a second. */
 export const OIL = { burn: [0, 3, 4, 6], dps: [0, 8, 20, 50] };
@@ -709,17 +713,17 @@ export const PATHS: KnowledgePath[] = [
     ],
   },
   {
-    id: "rangers", topic: "archerBarracks", name: "Rangers", motto: "Long sight, heavy arrows", hue: "verdant",
+    id: "rangers", topic: "rangerLodge", name: "Rangers", motto: "Long sight, heavy arrows", hue: "verdant",
     ranks: [
-      { name: "Woodcraft", icon: "leaf", cost: studyPathCost(4, 0), text: "Archers see 2 cells further" },
+      { name: "Woodcraft", icon: "leaf", cost: studyPathCost(4, 0), text: "Rangers see 2 cells further in all" },
       { name: "Broadheads", icon: "arrow", cost: studyPathCost(4, 1), text: "Their arrows hit 50% harder" },
       { name: "Twin shot", icon: "volley", cost: studyPathCost(4, 2), text: "Each loosing sends a second arrow at the next nearest enemy" },
     ],
   },
   {
-    id: "skirmishers", topic: "archerBarracks", name: "Skirmishers", motto: "Quick draws, always moving", hue: "shadow",
+    id: "skirmishers", topic: "skirmishCamp", name: "Skirmishers", motto: "Quick draws, always moving", hue: "shadow",
     ranks: [
-      { name: "Quick draw", icon: "bow", cost: studyPathCost(4, 0), text: "Archers shoot 30% faster" },
+      { name: "Quick draw", icon: "bow", cost: studyPathCost(4, 0), text: "Skirmishers shoot 30% faster in all" },
       { name: "Running shots", icon: "boot", cost: studyPathCost(4, 1), text: "They walk 30% faster and keep moving while they shoot" },
       { name: "Hail of arrows", icon: "bolt", cost: studyPathCost(4, 2), text: "They shoot more than twice as fast as at first" },
     ],
@@ -741,17 +745,17 @@ export const PATHS: KnowledgePath[] = [
     ],
   },
   {
-    id: "pyroclasm", topic: "mageGuild", name: "Pyroclasm", motto: "Bigger, harder fireballs", hue: "ember",
+    id: "pyroclasm", topic: "infernoHall", name: "Pyroclasm", motto: "Bigger, harder fireballs", hue: "ember",
     ranks: [
-      { name: "White heat", icon: "fireball", cost: studyPathCost(4, 0), text: "Fireballs hit 40% harder" },
+      { name: "White heat", icon: "fireball", cost: studyPathCost(4, 0), text: "Fireballs hit 40% harder in all" },
       { name: "Wide bursts", icon: "blast", cost: studyPathCost(4, 1), text: "Their bursts are 40% wider" },
       { name: "Meteor shower", icon: "volley", cost: studyPathCost(4, 2), text: "Each fireball throws two smaller bursts beside it" },
     ],
   },
   {
-    id: "cinders", topic: "mageGuild", name: "Cinders", motto: "The ground burns longer and hotter", hue: "shadow",
+    id: "cinders", topic: "cinderHall", name: "Cinders", motto: "The ground burns longer and hotter", hue: "shadow",
     ranks: [
-      { name: "Smoulder", icon: "embers", cost: studyPathCost(4, 0), text: "Burning ground lasts 60% longer" },
+      { name: "Smoulder", icon: "embers", cost: studyPathCost(4, 0), text: "Burning ground lasts 60% longer in all" },
       { name: "Hot coals", icon: "flame", cost: studyPathCost(4, 1), text: "It burns 80% hotter" },
       { name: "Clinging fire", icon: "inferno", cost: studyPathCost(4, 2), text: "Whatever walks through it keeps burning for 2 seconds after" },
     ],
@@ -897,7 +901,7 @@ export const PATHS: KnowledgePath[] = [
 export const PATH_TOPICS = [...new Set(PATHS.map((p) => p.topic))];
 /** The paths the wizard tower and the barracks wore before each branch
  * made a building of its own. */
-const LEGACY_TOPICS: Partial<Record<PathTopic, PathId[]>> = { wizardTower: ["pyromancy", "rime", "storm"], barracks: ["crusaders", "berserkers", "halberdiers"], assassinDen: ["bloodletters", "shadowcloak", "venom"], archerTower: ["fireArrows", "sharpshooters"], cannonTower: ["gunnery", "siegeShot"] };
+const LEGACY_TOPICS: Partial<Record<PathTopic, PathId[]>> = { wizardTower: ["pyromancy", "rime", "storm"], barracks: ["crusaders", "berserkers", "halberdiers"], assassinDen: ["bloodletters", "shadowcloak", "venom"], archerTower: ["fireArrows", "sharpshooters"], cannonTower: ["gunnery", "siegeShot"], archerBarracks: ["rangers", "skirmishers"], mageGuild: ["pyroclasm", "cinders"] };
 export const pathById = (id: PathId) => PATHS.find((p) => p.id === id)!;
 export const pathsOf = (topic: string) => PATHS.filter((p) => p.topic === topic);
 
@@ -945,8 +949,12 @@ export const UNSPECIALIZED: Record<PathTopic, string> = {
   batteryTower: "Reloads 15% faster",
   mortarTower: "Shells 40% harder, slower to reload",
   archerBarracks: "Ordinary archers",
+  rangerLodge: "Rangers: a cell more sight",
+  skirmishCamp: "Skirmishers: draw 15% quicker",
   watchTower: "Marked enemies take double damage",
   mageGuild: "Ordinary fire mages",
+  infernoHall: "Pyromancers: fireballs 20% harder",
+  cinderHall: "Cinder mages: burning ground lasts 30% longer",
   bait: "Plain stacks of bait",
   spikes: "Plain stakes that cut",
   necromancy: "One plain warrior a fallen enemy",

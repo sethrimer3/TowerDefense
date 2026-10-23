@@ -13,11 +13,11 @@ import type { BattlePaths, PathId } from "../knowledge-paths.ts";
  * copper, silver and Gold, the universal upgrades, the bonuses the Smithy and the
  * skill trees add, and the enemy roster. */
 
-export type StructureKind = "keep" | "meleeGuild" | "rangedGuild" | "assassinDen" | "bloodHall" | "veilHouse" | "poisonDen" | "spearHall" | "phalanx" | "javelinCamp" | "lancerStable" | "barracks" | "chapterHouse" | "berserkerLodge" | "halberdYard" | "heroHall" | "shadow" | "archerBarracks" | "sniperLodge" | "gunHall" | "musketHall" | "gunNest" | "gatlingNest" | "rocketBattery" | "revolutionary" | "archerTower" | "brazierTower" | "hawkTower" | "cannonTower" | "batteryTower" | "mortarTower" | "nanoTower" | "watchTower" | "wizardTower" | "pyreTower" | "frostTower" | "stormTower" | "mageGuild" | "valkyriePalace" | "darkKeep" | "monsterBait";
+export type StructureKind = "keep" | "meleeGuild" | "rangedGuild" | "assassinDen" | "bloodHall" | "veilHouse" | "poisonDen" | "spearHall" | "phalanx" | "javelinCamp" | "lancerStable" | "barracks" | "chapterHouse" | "berserkerLodge" | "halberdYard" | "heroHall" | "shadow" | "archerBarracks" | "rangerLodge" | "skirmishCamp" | "sniperLodge" | "gunHall" | "musketHall" | "gunNest" | "gatlingNest" | "rocketBattery" | "revolutionary" | "archerTower" | "brazierTower" | "hawkTower" | "cannonTower" | "batteryTower" | "mortarTower" | "nanoTower" | "watchTower" | "wizardTower" | "pyreTower" | "frostTower" | "stormTower" | "mageGuild" | "infernoHall" | "cinderHall" | "valkyriePalace" | "darkKeep" | "monsterBait";
 /** Everything that appears in the build palette (the keep is placed from the
  * start and can only be moved, so it is not a palette item). */
 export type PaletteItem = "cityTile" | "cityGate" | "wallSpikes" | "wallBallista" | "wallBlock" | Exclude<StructureKind, "keep">;
-export const PALETTE_ITEMS: PaletteItem[] = ["cityTile", "meleeGuild", "rangedGuild", "barracks", "chapterHouse", "berserkerLodge", "halberdYard", "heroHall", "assassinDen", "bloodHall", "veilHouse", "poisonDen", "shadow", "spearHall", "phalanx", "javelinCamp", "lancerStable", "archerBarracks", "gunHall", "musketHall", "sniperLodge", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "watchTower", "archerTower", "brazierTower", "hawkTower", "cannonTower", "batteryTower", "mortarTower", "nanoTower", "wizardTower", "pyreTower", "frostTower", "stormTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "wallBlock", "cityGate", "wallSpikes", "wallBallista"];
+export const PALETTE_ITEMS: PaletteItem[] = ["cityTile", "meleeGuild", "rangedGuild", "barracks", "chapterHouse", "berserkerLodge", "halberdYard", "heroHall", "assassinDen", "bloodHall", "veilHouse", "poisonDen", "shadow", "spearHall", "phalanx", "javelinCamp", "lancerStable", "archerBarracks", "rangerLodge", "skirmishCamp", "gunHall", "musketHall", "sniperLodge", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "watchTower", "archerTower", "brazierTower", "hawkTower", "cannonTower", "batteryTower", "mortarTower", "nanoTower", "wizardTower", "pyreTower", "frostTower", "stormTower", "mageGuild", "infernoHall", "cinderHall", "valkyriePalace", "darkKeep", "monsterBait", "wallBlock", "cityGate", "wallSpikes", "wallBallista"];
 /** The only buildings the shop sells: every other tower or troop building
  * is one of these upgraded, a building at a time, with Knowledge
  * (`building-upgrades.ts`). */
@@ -68,6 +68,8 @@ export const ITEM_CATEGORY: Record<PaletteItem, Exclude<PaletteCategory, "all">>
   phalanx: "units",
   javelinCamp: "units",
   lancerStable: "units",
+  rangerLodge: "units",
+  skirmishCamp: "units",
   archerBarracks: "units",
   sniperLodge: "units",
   gunHall: "units",
@@ -76,6 +78,8 @@ export const ITEM_CATEGORY: Record<PaletteItem, Exclude<PaletteCategory, "all">>
   gatlingNest: "units",
   rocketBattery: "units",
   revolutionary: "units",
+  infernoHall: "units",
+  cinderHall: "units",
   mageGuild: "units",
   valkyriePalace: "units",
   darkKeep: "units",
@@ -99,6 +103,12 @@ export const ARCHER_TOWERS: readonly StructureKind[] = ["archerTower", "brazierT
 export const isArcherTower = (kind: string) => (ARCHER_TOWERS as readonly string[]).includes(kind);
 export const CANNON_TOWERS: readonly StructureKind[] = ["cannonTower", "batteryTower", "mortarTower"];
 export const isCannonTower = (kind: string) => (CANNON_TOWERS as readonly string[]).includes(kind);
+/** The archer barracks and the halls its branches make of it, which all
+ * train archers; the Mage Guild and its likewise, which train fire mages. */
+export const ARCHER_HALLS: readonly StructureKind[] = ["archerBarracks", "rangerLodge", "skirmishCamp"];
+export const isArcherHall = (kind: string) => (ARCHER_HALLS as readonly string[]).includes(kind);
+export const MAGE_HALLS: readonly StructureKind[] = ["mageGuild", "infernoHall", "cinderHall"];
+export const isMageHall = (kind: string) => (MAGE_HALLS as readonly string[]).includes(kind);
 
 /** The city gate: 3 cells along the wall and its 2 cells deep, worth the
  * wall stones it stands in for, and some. It swings open while any of the
@@ -373,6 +383,24 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     outsideOk: false,
     description: "Trains archers who wander the city streets, loosing arrows at anything that comes near.",
   },
+  rangerLodge: {
+    kind: "rangerLodge",
+    name: "Ranger lodge",
+    w: 4,
+    h: 4,
+    maxHp: 150,
+    outsideOk: false,
+    description: "An archer barracks of woodsmen: its rangers see a cell further than archers.",
+  },
+  skirmishCamp: {
+    kind: "skirmishCamp",
+    name: "Skirmish camp",
+    w: 4,
+    h: 4,
+    maxHp: 140,
+    outsideOk: false,
+    description: "An archer barracks drilling quick draws: its skirmishers shoot 15% faster than archers.",
+  },
   archerTower: {
     kind: "archerTower",
     name: "Archer tower",
@@ -490,6 +518,24 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     outsideOk: false,
     description: "Trains red fire mages who roam the streets hurling explosive fireballs. Each blast leaves the ground burning, scorching whatever walks through.",
   },
+  infernoHall: {
+    kind: "infernoHall",
+    name: "Inferno hall",
+    w: 4,
+    h: 6,
+    maxHp: 140,
+    outsideOk: false,
+    description: "A Mage Guild given over to the blaze: its fire mages throw fireballs that hit 20% harder.",
+  },
+  cinderHall: {
+    kind: "cinderHall",
+    name: "Cinder hall",
+    w: 4,
+    h: 6,
+    maxHp: 140,
+    outsideOk: false,
+    description: "A Mage Guild of smoulderers: the ground its fire mages set burning lasts 30% longer.",
+  },
   valkyriePalace: {
     kind: "valkyriePalace",
     name: "Valkyrie palace",
@@ -557,6 +603,8 @@ export const STARTING_OWNED: Record<PaletteItem, number> = {
   javelinCamp: 0,
   lancerStable: 0,
   archerBarracks: 0,
+  rangerLodge: 0,
+  skirmishCamp: 0,
   sniperLodge: 0,
   gunHall: 0,
   musketHall: 0,
@@ -577,6 +625,8 @@ export const STARTING_OWNED: Record<PaletteItem, number> = {
   frostTower: 0,
   stormTower: 0,
   mageGuild: 0,
+  infernoHall: 0,
+  cinderHall: 0,
   valkyriePalace: 0,
   darkKeep: 0,
   monsterBait: 0,
@@ -612,6 +662,8 @@ export function purchasePrice(item: PaletteItem, owned: number): Price {
     javelinCamp: { copper: 6 },
     lancerStable: { copper: 8 },
     archerBarracks: { copper: 5 },
+    rangerLodge: { copper: 6 },
+    skirmishCamp: { copper: 6 },
     sniperLodge: { copper: 6 },
     gunHall: { copper: 5 },
     musketHall: { copper: 7 },
@@ -632,6 +684,8 @@ export function purchasePrice(item: PaletteItem, owned: number): Price {
     frostTower: { copper: 9 },
     stormTower: { copper: 10 },
     mageGuild: { copper: 9 },
+    infernoHall: { copper: 10 },
+    cinderHall: { copper: 10 },
     valkyriePalace: { copper: 12, silver: 2 },
     darkKeep: { copper: 25, silver: 8, gold: 2 },
     monsterBait: { copper: 3 },
@@ -668,6 +722,8 @@ export const ITEM_NAMES: Record<PaletteItem, string> = {
   javelinCamp: STRUCTURES.javelinCamp.name,
   lancerStable: STRUCTURES.lancerStable.name,
   archerBarracks: STRUCTURES.archerBarracks.name,
+  rangerLodge: STRUCTURES.rangerLodge.name,
+  skirmishCamp: STRUCTURES.skirmishCamp.name,
   sniperLodge: STRUCTURES.sniperLodge.name,
   gunHall: STRUCTURES.gunHall.name,
   musketHall: STRUCTURES.musketHall.name,
@@ -688,6 +744,8 @@ export const ITEM_NAMES: Record<PaletteItem, string> = {
   frostTower: STRUCTURES.frostTower.name,
   stormTower: STRUCTURES.stormTower.name,
   mageGuild: STRUCTURES.mageGuild.name,
+  infernoHall: STRUCTURES.infernoHall.name,
+  cinderHall: STRUCTURES.cinderHall.name,
   valkyriePalace: STRUCTURES.valkyriePalace.name,
   darkKeep: STRUCTURES.darkKeep.name,
   monsterBait: STRUCTURES.monsterBait.name,

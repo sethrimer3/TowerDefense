@@ -226,11 +226,11 @@ test("a choice cuts off the branches beside it and opens its own", () => {
   assert.deepEqual(plain, ["k:rangedGuild=owned", "k:archerBarracks=next", "k:mageGuild=next", "k:gunHall=next"]);
   const mage = ids("mageGuild");
   assert.ok(!mage.some((n) => n.startsWith("k:archerBarracks")), "the archer branch is gone");
-  assert.ok(mage.includes("p:pyroclasm:1=next") && mage.includes("p:cinders:1=next"), "the mage's own branches appear");
-  assert.ok(!mage.some((n) => n.startsWith("p:pyroclasm:2") || n.startsWith("u:")), "only their attunements, until one is taken");
+  assert.ok(mage.includes("k:infernoHall=next") && mage.includes("k:cinderHall=next"), "the mage's own branch halls appear");
+  assert.ok(!mage.some((n) => n.startsWith("p:pyroclasm") || n.startsWith("u:")), "only their attunements, until one is taken");
   assert.deepEqual(ids("gunHall").slice(2), ["k:musketHall=next", "k:gunNest=next", "k:rocketBattery=next"], "a branch that makes another building shows only that building");
-  const pyro = ids("mageGuild", { path: "pyroclasm", rank: 1 });
-  assert.deepEqual(pyro, ["k:rangedGuild=owned", "k:mageGuild=owned", "p:pyroclasm:1=owned", "p:pyroclasm:2=next", "p:pyroclasm:3=locked", "u:mageGuild=locked"], "Cinders is cut off; the ultimate is to come");
+  const pyro = ids("infernoHall", { path: "pyroclasm", rank: 1 });
+  assert.deepEqual(pyro, ["k:rangedGuild=owned", "k:mageGuild=owned", "k:infernoHall=owned", "p:pyroclasm:1=owned", "p:pyroclasm:2=next", "p:pyroclasm:3=locked", "u:mageGuild=locked"], "Cinders is cut off; the ultimate is to come");
   const storm = buildingTree("stormTower", { path: "storm", rank: 3 });
   assert.deepEqual(storm.at(-1), { id: "k:darkKeep", parent: "p:storm:3", state: "next", kind: "darkKeep", cost: 0, step: { type: "merge", to: "darkKeep", cost: 0 } });
   const keep = buildingTree("darkKeep");
@@ -258,8 +258,9 @@ test("a respec is free, gives back every point and returns the basic building", 
   const [a, b] = uids(s, "rangedGuild");
   assert.match((respecBuilding(s, { uid: a }) as { reason: string }).reason, /no upgrades/);
   assert.ok(upgradeBuilding(s, { uid: a }, { type: "become", to: "archerBarracks", cost: 0 }).ok);
+  assert.ok(upgradeBuilding(s, { uid: a }, { type: "become", to: "rangerLodge", cost: 0 }).ok);
   assert.ok(upgradeBuilding(s, { uid: a }, { type: "path", path: "rangers", rank: 1, cost: 0 }).ok);
-  const archers = 5 + pathById("rangers").ranks[0].cost;
+  const archers = 5 + 3 + pathById("rangers").ranks[0].cost;
   assert.equal(s.knowledge, 100 - archers);
   assert.ok(upgradeBuilding(s, { uid: b }, { type: "become", to: "gunHall", cost: 0 }).ok);
   const r = respecBuilding(s, { uid: a });
