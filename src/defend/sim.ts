@@ -60,6 +60,7 @@ import { Barracks, stepArcher, stepSwordsman } from "./troops.ts";
 import { cloaked, spreadVenom, stepVenom } from "./assassins.ts";
 import { nanoDeath, stepNano, type Infection, type NanoBurst, type NanoCloud, type NanoShell } from "./nanobots.ts";
 import { perched } from "./gun-sight.ts";
+import { fence, type Rally } from "./deployment.ts";
 import { hopliteGuard } from "./spears.ts";
 import { heroRises, stepHero, stepSwings, type Swing } from "./hero.ts";
 import { stepBlades, stepBleed, stepShade, type Blade } from "./shadow.ts";
@@ -357,6 +358,9 @@ export class DefendSim {
   /** Proximity mines and directed aim, reset with each battle. */
   mines: Mine[] = [];
   mineAims = new Map<number, { x: number; y: number }>();
+  /** Troop buildings' rally points by building id, as the player aimed
+   * them this battle (`deployment.ts`); not part of the replayed state. */
+  readonly rallies = new Map<number, Rally>();
   /** Siege engines' balls, bolts, stones and rockets in flight. */
   siegeShots: SiegeShot[] = [];
   /** Wizard towers' fire and ice. */
@@ -647,7 +651,9 @@ export class DefendSim {
     this.warBanner?.refresh(this);
     for (const s of this.soldiers) {
       stepBannerLife(this, s, dt);
+      const x0 = s.x, y0 = s.y;
       STEP_SOLDIER[s.kind](this, s, dt);
+      fence(this, s, x0, y0);
       stepBannerLife(this, s, 0);
     }
     stepMeteors(this, dt);
@@ -1246,6 +1252,19 @@ export class DefendSim {
     this.warBanner = null;
     this.rethink();
     return true;
+  }
+
+  /** Sets troop building `id`'s rally point (`deployment.ts`'s `rallyAim`),
+   * or with null clears it; its troops rethink at once. */
+  setRally(id: number, at: Rally | null) {
+    if (at) this.rallies.set(id, at);
+    else this.rallies.delete(id);
+    for (const s of this.soldiers) {
+      if (s.home !== id) continue;
+      s.thinkT = 0;
+      s.path = [];
+      s.target = -1;
+    }
   }
 
   /** Every troop rethinks at once, after the banner moves. */

@@ -504,7 +504,19 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   enemies in their radius with a gold outline; marked enemies take ×2 damage.
   Paths: Spotters (marks hit harder, wider radius) or Signal fires
   (marked enemies slowed, more at rank II, and set burning at III). Up to
-  two gunners climb into each watch tower and shoot from the top.
+  two gunners climb into each watch tower and shoot from the top, but only
+  when their building's rally point is snapped onto it.
+- **Deployment and rally points** (`deployment.ts`): troops never go further
+  from their building than its deployment range, 14 cells for brawlers and
+  stone throwers up to 30 for the Hero and the shade (the Smithy's
+  Deployment range adds 5% a rank, up to 150%), and answer the war banner or
+  a rally flag only inside it. In battle, tap a troop building to see its
+  range, then press it again and drag out its rally point, a blue flag at the
+  end of a dotted line (shown while it is selected): its troops go there when
+  they have nothing to fight. Dropped back on the building, it clears; near a
+  watch tower in range, a gunner-line building's flag snaps onto it. A
+  Minelayer's crosshair is aimed the same way. On touch screens the flag and
+  crosshair ride above the finger, like a dragged building.
 - **Gun sight** (`gun-sight.ts`): the gunner line (gunners, musketmen,
   machine and Gatling gunners, rocketeers, snipers, laser snipers) shoots
   flat, only at an enemy with no wall stone or building on the line

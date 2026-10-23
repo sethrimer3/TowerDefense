@@ -40,7 +40,7 @@ function hall(path?: PathId, rank = 3) {
 function battle(s: S) {
   const fit = fitLayout(s.defend.layout);
   assert.ok(fit.ok);
-  const sim = openSight(new DefendSim(generateCity(fit, 4), { ...s.defend.levels }, 1, battleBonuses(s)));
+  const sim = openSight(new DefendSim(generateCity(fit, 4), { ...s.defend.levels }, 1, { ...battleBonuses(s), deployRange: 100 }));
   new Barracks().step(sim, 0.01);
   const m = sim.soldiers.find((u) => u.kind === "musketeer") ?? assert.fail("a musketman");
   return { sim, m };

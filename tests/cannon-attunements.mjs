@@ -70,8 +70,9 @@ try {
     const coords = await page.evaluate(() => {
       const d = window.__dp, b = d.sim.map.buildings.find(b => b.kind === 'minelayerTower');
       window.__mineId = b.id;
-      const x = b.rect.x + b.rect.w / 2, y = b.rect.y + b.rect.h / 2;
-      return { tower: d.renderer.toClient(x, y), target: d.renderer.toClient(x + 3.5, y), other: d.renderer.toClient(x - 3, y), blank: d.renderer.toClient(x + 8, y + 5) };
+      // An aim rides above the finger while dragged items do (touch screens).
+      const x = b.rect.x + b.rect.w / 2, y = b.rect.y + b.rect.h / 2, raise = d.pointers.raise;
+      return { tower: d.renderer.toClient(x, y), home: d.renderer.toClient(x, y + raise), target: d.renderer.toClient(x + 3.5, y + raise), other: d.renderer.toClient(x - 3, y + raise), blank: d.renderer.toClient(x + 8, y + 5) };
     });
     const cdp = width < 500 ? await context.newCDPSession(page) : null;
     async function down(p) {
@@ -88,8 +89,14 @@ try {
     }
     const aim = () => page.evaluate(() => window.__dp.sim.mineAims.get(window.__mineId) ?? null);
     const layoutBefore = await page.evaluate(() => JSON.stringify(window.__dp.host.save().layout));
+    // A tap selects the tower; a second press on it, dragged, aims it.
+    await page.evaluate(() => window.__dp.pick(null));
+    await down(coords.tower); await up();
+    assert.equal(await page.evaluate(() => window.__dp.picked?.id), await page.evaluate(() => window.__mineId), 'a tap selects it');
+    await page.waitForTimeout(400);
     await down(coords.tower); await move(coords.target); await up();
     const directed = await aim(); assert.ok(directed, 'drag directs aim');
+    assert.ok(Math.abs(directed.x - (await page.evaluate(() => { const b = window.__dp.sim.map.buildings[window.__mineId]; return b.rect.x + b.rect.w / 2 + 3.5; }))) < 0.6, 'the crosshair rides above the finger');
     assert.equal(await page.evaluate(() => window.__dp.picked.id), await page.evaluate(() => window.__mineId));
     await page.waitForTimeout(400); await page.screenshot({ path: `test-results/cannon-aim-${width}.png` });
     // Cancel a different preview through the same pointer state machine.
@@ -98,7 +105,8 @@ try {
     else { await page.evaluate(() => window.dispatchEvent(new PointerEvent('pointercancel', { pointerId: 1 }))); await page.mouse.up(); }
     assert.deepEqual(await aim(), directed, 'cancel restores committed aim');
     // Dragging the selected crosshair home switches to full-range random coverage.
-    await down(coords.target); await move(coords.tower); await up();
+    const handle = await page.evaluate(p => window.__dp.renderer.toClient(p.x, p.y), directed);
+    await down(handle); await move(coords.home); await up();
     assert.equal(await aim(), null);
     await page.waitForTimeout(450); await page.screenshot({ path: `test-results/cannon-random-${width}.png` });
     assert.equal(await page.evaluate(() => JSON.stringify(window.__dp.host.save().layout)), layoutBefore, 'aim does not move the building');

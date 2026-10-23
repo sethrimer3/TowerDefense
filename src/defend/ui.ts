@@ -51,6 +51,8 @@ import { artLook } from "./tower-art.ts";
 import { pathBadge, pathLook, paintPathIcons } from "../ui/path-badge.ts";
 import { BoardPointers, eventCell, type BoardAim } from "./board-pointers.ts";
 import { mineAim, mineRank } from "./mines.ts";
+import { bannerFor, climbsTowers, deployCircle, rallyAim, type Rally } from "./deployment.ts";
+import { shootsFlat } from "./gun-sight.ts";
 import type { Drag } from "./drag-rules.ts";
 import { EditSession, type Drop } from "./edit-session.ts";
 import { BattleSound } from "./battle-sound.ts";
@@ -132,7 +134,7 @@ export class DefendPage {
   private renderer: DefendRenderer | null = null;
   private pointers = new BoardPointers({
     renderer: () => this.renderer,
-    aim: (e) => this.aimMine(e),
+    aim: (e) => this.aimBuilding(e),
     pickUp: (e) => this.pickUp(e),
     drop: (drop) => this.drop(drop),
     tap: (e) => this.tap(e),
@@ -142,7 +144,10 @@ export class DefendPage {
   /** The building the player tapped (its id in the map), outlined with its
    * reach and troops, and what its reach is reckoned from before a battle. */
   private picked: { id: number; armed: Armed } | null = null;
-  private minePreview: { id: number; point?: { x: number; y: number }; since: number } | null = null;
+  /** The picked building's aim while it is dragged: a Minelayer's
+   * crosshair or a troop building's rally point (none: back to its own
+   * ways), and when that last changed. */
+  private aimPreview: { id: number; point?: Rally; since: number } | null = null;
   /** The last tap in battle, for telling a double tap: where (client
    * pixels), when, and what was picked out before it. */
   private lastTap: { x: number; y: number; at: number; taps: number; picked: { id: number; armed: Armed } | null } | null = null;
@@ -931,7 +936,7 @@ export class DefendPage {
       over: this.phase === "over",
       shimmer: this.phase === "build" && !this.sim,
       ...(lifting ? { lifting } : {}),
-      ...(this.picked ? { inspect: { id: this.picked.id, armed: this.sim ?? this.picked.armed, ...(this.minePreview?.id === this.picked.id ? { minePreview: this.minePreview } : {}) } } : {}),
+      ...(this.picked ? { inspect: { id: this.picked.id, armed: this.sim ?? this.picked.armed, ...(this.aimPreview?.id === this.picked.id ? { aim: this.aimPreview } : {}) } } : {}),
       hideBanner: this.phase === "over" || (this.pointers.session?.drag.from === "banner" && !!this.pointers.session.drag.placed),
     });
   }
@@ -992,41 +997,55 @@ export class DefendPage {
     return true;
   }
 
-  /** Battle aiming owns a tower-origin drag; setup keeps normal building movement. */
-  private aimMine(e: PointerEvent): BoardAim | null {
+  /** In battle, a press on the picked building (or on its crosshair or
+   * rally flag) aims it: a Minelayer's crosshair, a troop building's rally
+   * point, riding above the finger like a dragged building. Let go without
+   * dragging, it is an ordinary tap. While building, a press on a building
+   * moves it as usual. */
+  private aimBuilding(e: PointerEvent): BoardAim | null {
     const sim = this.phase === "sim" ? this.sim : null;
-    if (!sim || !this.renderer) return null;
+    if (!sim || !this.renderer || !this.picked) return null;
     const p = eventCell(this.renderer, e);
     if (!p.inside) return null;
     const banner = sim.warBanner;
     if (banner && !banner.flag && sim.bannerRemaining <= 0 && p.fx >= banner.x - 1 && p.fx <= banner.x + 2.2 && p.fy >= banner.y - 1.4 && p.fy <= banner.y + 1) return null;
-    let b = sim.map.buildings[sim.map.owner[p.cy * CELLS_W + p.cx]];
-    // The selected crosshair is also a handle, so dragging it home resets aim.
-    const selected = this.picked && sim.map.buildings[this.picked.id];
-    const handle = selected && sim.mineAims.get(selected.id);
-    if (selected?.kind === "minelayerTower" && handle && Math.hypot(p.fx - handle.x, p.fy - handle.y) < .8) b = selected;
-    if (b?.kind !== "minelayerTower" || !sim.intact(b) || mineRank(sim, b) < 1) return null;
-    const wasSelected = this.picked?.id === b.id;
-    this.pick(b.id);
-    this.lastTap = null;
+    const b = sim.map.buildings[this.picked.id];
+    if (!b || !sim.intact(b)) return null;
+    const mine = b.kind === "minelayerTower" && mineRank(sim, b) >= 1;
+    const circle = mine ? null : deployCircle(b, sim.bonuses);
+    if (!mine && !circle) return null;
+    // The crosshair or flag is a handle too, so dragging it home resets the aim.
+    const handle = mine ? sim.mineAims.get(b.id) : sim.rallies.get(b.id);
+    const r = b.rect;
+    const onIt = p.fx >= r.x && p.fy >= r.y && p.fx <= r.x + r.w && p.fy <= r.y + r.h;
+    if (!onIt && !(handle && Math.hypot(p.fx - handle.x, p.fy - handle.y) < (mine ? 0.8 : 1.2))) return null;
+    const towers = circle && climbsTowers(b.kind, shootsFlat) ? sim.map.buildings.filter((t) => t.kind === "watchTower" && sim.intact(t)) : [];
     const preview = (ev: PointerEvent) => {
-      const p = eventCell(this.renderer!, ev), point = mineAim(b, { x: p.fx, y: p.fy });
-      const old = this.minePreview;
-      this.minePreview = { id: b.id, point, since: old?.id === b.id && !old.point && !point ? old.since : performance.now() };
+      const q = eventCell(this.renderer!, ev), at = { x: q.fx, y: Math.max(0, q.fy - this.pointers.raise) };
+      const point = circle ? rallyAim(b, at, circle, towers) : mineAim(b, at);
+      const old = this.aimPreview;
+      this.aimPreview = { id: b.id, point, since: old?.id === b.id && !old.point && !point ? old.since : performance.now() };
     };
     return {
       move: preview,
       end: (ev, commit, moved) => {
-        if (commit && moved && this.sim === sim && sim.intact(b)) {
-          preview(ev);
-          const point = this.minePreview?.point;
-          if (point) sim.mineAims.set(b.id, point);
-          else sim.mineAims.delete(b.id);
-          this.setMessage(point ? "Minelayer aimed. Drag the crosshair back onto its tower for random coverage." : "Minelayer: random coverage across its full range.", 4);
-        } else {
-          this.minePreview = null;
-          if (commit && !moved && wasSelected) this.pick(null);
+        if (!commit || !moved || this.sim !== sim || !sim.intact(b)) {
+          this.aimPreview = null;
+          if (commit && !moved) this.tap(ev);
+          return;
         }
+        preview(ev);
+        const point = this.aimPreview?.point;
+        if (circle) {
+          this.aimPreview = null;
+          sim.setRally(b.id, point ?? null);
+          play("banner");
+          this.setMessage(point?.tower !== undefined ? "Rallied to the watch tower: its gunners climb it while it has room." : point ? "Rally point set. Drag the flag back onto its building to send its troops their own ways." : "Rally point cleared: the troops go their own ways.", 4);
+          return;
+        }
+        if (point) sim.mineAims.set(b.id, point);
+        else sim.mineAims.delete(b.id);
+        this.setMessage(point ? "Minelayer aimed. Drag the crosshair back onto its tower for random coverage." : "Minelayer: random coverage across its full range.", 4);
       },
     };
   }
@@ -1137,6 +1156,9 @@ export class DefendPage {
     if (onFlag(this.sim.warBanner, fx, fy)) this.sim.liftFlag();
     else this.sim.plantFlag({ x: fx, y: fy });
     play("banner");
+    // Troops answer a flag only inside their deployment range.
+    const sim = this.sim, troops = sim.soldiers.filter((s) => s.hp > 0 && s.home >= 0);
+    if (troops.length && !troops.some((s) => bannerFor(sim, s))) this.setMessage("Out of every troop's deployment range: none can answer the flag there.", 3);
     return true;
   }
 
@@ -1195,7 +1217,7 @@ export class DefendPage {
   }
 
   private pick(id: number | null) {
-    if (id !== this.picked?.id) this.minePreview = null;
+    if (id !== this.picked?.id) this.aimPreview = null;
     this.picked = id === null ? null : { id, armed: { levels: { ...this.save.levels }, bonuses: this.host.bonuses() } };
   }
 

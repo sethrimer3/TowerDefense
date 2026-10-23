@@ -1,3 +1,4 @@
+import { bannerFor, deployment, postPath, strollStreets, within } from "./deployment.ts";
 import { bannerDamage } from "./war-banner.ts";
 import { enemySize } from "./catalog.ts";
 /** DEFEND valkyries, trained at the Valkyrie palace: armoured angels with
@@ -35,7 +36,8 @@ export function stepValkyrie(sim: DefendSim, s: Soldier, dt: number) {
     if (s.cd <= 0) charge(sim, s, near, reach);
     return;
   }
-  if (sim.warBanner) return answerBanner(sim, sim.warBanner, s, VALKYRIE.speed, dt);
+  const banner = bannerFor(sim, s);
+  if (banner) return answerBanner(sim, banner, s, VALKYRIE.speed, dt);
   if (s.thinkT <= 0) seek(sim, s);
   sim.followPath(s, null, VALKYRIE.speed, dt);
 }
@@ -78,12 +80,13 @@ function runOut(sim: DefendSim, x: number, y: number, ux: number, uy: number, re
 }
 
 /** Path toward the nearest of up to three enemies in the city, else stroll
- * to a random street. (The dark wizard hunts the same way.) */
+ * to its rally point or a random street within its deployment range. (The
+ * Hero, the shade and the dark wizard hunt the same way.) */
 export function seek(sim: DefendSim, s: Soldier) {
   s.thinkT = 0.5;
-  const inCity = (e: Enemy) => sim.map.city[cellAt(e.x, e.y)] === 1;
+  const inCity = (e: Enemy) => sim.map.city[cellAt(e.x, e.y)] === 1, bounds = deployment(sim, s);
   const prey = sim.enemies
-    .filter((e) => e.hp > 0 && inCity(e))
+    .filter((e) => e.hp > 0 && inCity(e) && within(bounds, e))
     .sort((a, b) => sq(a.x - s.x) + sq(a.y - s.y) - (sq(b.x - s.x) + sq(b.y - s.y)))
     .slice(0, 3);
   for (const e of prey) {
@@ -94,9 +97,12 @@ export function seek(sim: DefendSim, s: Soldier) {
     return;
   }
   s.target = -1;
-  if (!s.path.length && sim.streets.length) {
+  // Nothing to hunt: to its rally point, else a stroll.
+  if (postPath(sim, s)) return;
+  const streets = strollStreets(sim, s);
+  if (!s.path.length && streets.length) {
     s.thinkT = 0.5 + sim.rand() * 1.5;
-    const goal = sim.streets[Math.floor(sim.rand() * sim.streets.length)];
+    const goal = streets[Math.floor(sim.rand() * streets.length)];
     s.path = findPath(sim.ownSolid, s, cellCenter(goal), CITYWIDE) ?? [];
   }
 }

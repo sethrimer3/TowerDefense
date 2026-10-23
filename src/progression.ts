@@ -25,7 +25,7 @@ const TIMES = new Set<BonusTarget>(["drill", "towerReload", "rebuild", "smithing
 export const STARTING_METAL: Metals = { copper: 10, silver: 0, gold: 0 };
 
 // ── The Smithy's upgrades (Training) ───────────────────────────────────
-export type TrainingId = "troopHp" | "troopDamage" | "drill" | "towerDamage" | "towerReload" | "wallHp" | "keepHp" | "rebuild" | "bombDamage" | "undeadHp" | "undeadDamage" | "graveTime" | "meteorDamage" | "meteorRadius" | "frostTime" | "frostRadius" | "reinforceHp" | "reinforceDamage" | "reinforceTime";
+export type TrainingId = "troopHp" | "troopDamage" | "deployRange" | "drill" | "towerDamage" | "towerReload" | "wallHp" | "keepHp" | "rebuild" | "bombDamage" | "undeadHp" | "undeadDamage" | "graveTime" | "meteorDamage" | "meteorRadius" | "frostTime" | "frostRadius" | "reinforceHp" | "reinforceDamage" | "reinforceTime";
 /** `seconds`, when set, shows the row as a time: that many seconds at no ranks. */
 export type TrainingRow = { id: TrainingId; group: keyof typeof TRAINING_GROUPS; name: string; per: number; max: number; seconds?: number };
 export const TRAINING_GROUPS = { army: "Army", towers: "Towers", city: "City", spells: "Spells" } as const;
@@ -35,6 +35,7 @@ export const TRAINING: TrainingRow[] = [
   { id: "troopHp", group: "army", name: "Troop HP", per: 4, max: 50 },
   { id: "troopDamage", group: "army", name: "Troop damage", per: 4, max: 50 },
   { id: "drill", group: "army", name: "Drill speed", per: 3, max: 30 },
+  { id: "deployRange", group: "army", name: "Deployment range", per: 5, max: 30 },
   { id: "towerDamage", group: "towers", name: "Tower damage", per: 4, max: 50 },
   { id: "towerReload", group: "towers", name: "Tower reload", per: 3, max: 30 },
   { id: "bombDamage", group: "towers", name: "Bomb damage", per: 5, max: 40 },

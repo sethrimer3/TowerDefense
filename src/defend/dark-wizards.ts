@@ -1,3 +1,4 @@
+import { bannerFor } from "./deployment.ts";
 import { bannerDamage } from "./war-banner.ts";
 /** DEFEND's dark wizard keep and its black lightning. The keep's four
  * corner turrets (`turretSpots`) each loose a bolt at the nearest enemy in
@@ -67,7 +68,8 @@ export function stepDarkWizard(sim: DefendSim, s: Soldier, dt: number) {
     chainBolt(sim, { x: s.x + STAFF.x, y: s.y + STAFF.y }, near, bannerDamage(sim, s), wizardChain(sim.levels.chainCount ?? 0), chainJump(sim.levels.chainReach ?? 0));
     return;
   }
-  if (sim.warBanner) return answerBanner(sim, sim.warBanner, s, DARK_WIZARD.speed, dt);
+  const banner = bannerFor(sim, s);
+  if (banner) return answerBanner(sim, banner, s, DARK_WIZARD.speed, dt);
   if (s.thinkT <= 0) seek(sim, s);
   sim.followPath(s, null, DARK_WIZARD.speed, dt);
 }

@@ -20,7 +20,9 @@ import {
 } from '../src/defend/layout.ts';
 import { CellType, generateCity } from '../src/defend/citygen.ts';
 import { buildDifficultyWave, waveDifficulty, MAX_WAVE_ENEMIES } from '../src/defend/waves.ts';
-import { ENEMIES } from '../src/defend/catalog.ts';
+import { ENEMIES, NO_BONUSES } from '../src/defend/catalog.ts';
+/** Deployment ranges wide enough to leave the whole board open. */
+const BOUNDLESS = { ...NO_BONUSES, deployRange: 100 };
 import { DefendSim, buildWave } from '../src/defend/sim.ts';
 import { RALLY_REACH } from '../src/defend/war-banner.ts';
 import { stepArcher, stepSwordsman } from '../src/defend/troops.ts';
@@ -290,7 +292,7 @@ test('the war banner rallies every troop to it, and taken down lets them go', ()
   const { tx, ty } = l.keep;
   l = placeStructure(l, 'barracks', tx - 1, ty - 1)!;
   l = placeStructure(l, 'archerBarracks', tx + 1, ty - 1)!;
-  const sim = new DefendSim(mapOf(l), zeroLevels(), 1);
+  const sim = new DefendSim(mapOf(l), zeroLevels(), 1, BOUNDLESS);
   for (let i = 0; i < 30 * 12; i++) sim.step(1 / 30);
   assert.ok(sim.soldiers.some((s) => s.kind === 'sword') && sim.soldiers.some((s) => s.kind === 'archer'));
   // The street farthest from the troops, across the city.
@@ -434,7 +436,7 @@ test('patrol routes: max level sends swordsmen after enemies anywhere in the cit
   const map = mapOf(l);
   const far = (lv: number) => {
     const levels = { ...zeroLevels(), soldierReach: lv };
-    const sim = new DefendSim(map, levels, 1);
+    const sim = new DefendSim(map, levels, 1, BOUNDLESS);
     for (let i = 0; i < 30 * 12; i++) sim.step(1 / 30);
     sim.enemies = [];
     sim.spawnQueue = [];
@@ -574,7 +576,7 @@ test("Hunter's instinct sends archers toward enemies they can't see yet", () => 
   l = placeStructure(l, 'archerBarracks', l.keep.tx - 1, l.keep.ty - 1)!;
   const map = mapOf(l);
   const run = (hunt: number) => {
-    const sim = new DefendSim(map, { ...zeroLevels(), archerHunt: hunt }, 3);
+    const sim = new DefendSim(map, { ...zeroLevels(), archerHunt: hunt }, 3, BOUNDLESS);
     sim.spawnQueue = [];
     sim.breakT = 1e9;
     for (let i = 0; i < 30 * 12; i++) sim.step(1 / 30);

@@ -149,6 +149,12 @@ A reusable Skill: planted anywhere on the board mid-defense, it rallies every mo
 **Rally flag**:
 A free blue flag planted by double-tapping the board mid-defense. Troops march to it as to the war banner, but it lends them nothing; the flag and the war banner replace each other, and a double tap on the flag takes it away (a triple tap with that Gameplay setting on).
 
+**Deployment range**:
+How far a troop building's troops may go from it, a circle round the building: stronger troops deploy further, and the Smithy's Deployment range takes every troop further. Troops never leave it, and answer the war banner or a rally flag only inside it.
+
+**Rally point**:
+Where a troop building's troops go when they have nothing to fight, set in battle by selecting the building and dragging a flag from it; kept inside its deployment range. Snapped onto a watch tower, the gunner line climbs it.
+
 **Strike spell**:
 A reusable Skill cast onto the board mid-defense, with its own Smithy and Study topic under Spells. It casts with one researched path at a time, chosen in the Study.
 

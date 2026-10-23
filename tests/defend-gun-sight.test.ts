@@ -1,7 +1,8 @@
 // Gun sight (src/defend/gun-sight.ts): the gunner line shoots flat, only at
 // an enemy no wall or building hides, while archers arc over; a gunner with
-// nothing in sight climbs a watch tower with room and shoots over
-// everything from the top, unseen by the enemy, until the tower falls.
+// nothing in sight, rallied onto a watch tower, climbs it while it has room
+// and shoots over everything from the top, unseen by the enemy, until the
+// tower falls or the rally point moves; unrallied, nobody climbs.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { defaults } from "../src/save.ts";
@@ -80,7 +81,7 @@ test("an archer shoots over the same house", () => {
   assert.equal(sim.arrows[0]?.target, e.id);
 });
 
-test("gunners with nothing in sight climb a watch tower, two at most, unseen up there, and shoot over everything", () => {
+test("gunners rallied to a watch tower climb it, two at most, unseen up there, and shoot over everything", () => {
   const sim = battle([["gunHall", 0, -1], ["gunHall", 0, 1], ["watchTower", 1, 0]]);
   const tower = sim.map.buildings.find((b) => b.kind === "watchTower")!;
   // Let the halls fill their garrisons and the gunners walk.
@@ -91,11 +92,15 @@ test("gunners with nothing in sight climb a watch tower, two at most, unseen up 
   }
   const guns = sim.soldiers.filter((u) => u.kind === "gunner");
   assert.ok(guns.length > TOWER_ROOM, "more gunners than room");
+  // Unrallied, nobody climbs.
+  for (let t = 0; t < 30 * 20; t++) for (const u of guns) stepArcher(sim, u, 1 / 30);
+  assert.ok(guns.every((u) => !u.perch), "no one climbs unrallied");
+  const c = center(tower.rect);
+  for (const b of sim.map.buildings) if (b.kind === "gunHall") sim.setRally(b.id, { ...c, tower: tower.id });
   for (let t = 0; t < 30 * 40; t++) for (const u of guns) stepArcher(sim, u, 1 / 30);
   const up = guns.filter((u) => u.perch?.up);
   assert.equal(up.length, TOWER_ROOM, "the tower filled");
   assert.equal(guns.filter((u) => u.perch && !u.perch.up).length, 0, "no one else bound for it");
-  const c = center(tower.rect);
   for (const u of up) {
     assert.equal(u.perch!.tower, tower.id);
     assert.deepEqual([u.x, u.y], [c.x, c.y], "at the top of the tower");
@@ -122,9 +127,16 @@ test("gunners with nothing in sight climb a watch tower, two at most, unseen up 
   stepArcher(sim, m, 1 / 30);
   assert.equal(sim.arrows[0]?.target, e.id);
   assert.deepEqual([m.x, m.y], [c.x, c.y], "it stays put");
-  // The tower falls: they drop out.
+  // Rallied elsewhere, they climb down to the door.
+  const hall = sim.map.buildings[m.home];
+  sim.setRally(hall.id, { x: center(hall.rect).x + 3, y: center(hall.rect).y });
+  stepArcher(sim, m, 1 / 30);
+  assert.equal(m.perch, undefined, "it climbs down");
+  assert.ok(!sim.solid[cellIndex(Math.floor(m.x), Math.floor(m.y))], "out on open ground");
+  // The tower falls: the rest drop out.
+  const rest = up.filter((u) => u.perch);
   sim.damageBuilding(tower.id, 1e9);
-  for (const u of up) stepArcher(sim, u, 1 / 30);
-  for (const u of up) assert.equal(u.perch, undefined);
+  for (const u of rest) stepArcher(sim, u, 1 / 30);
+  for (const u of rest) assert.equal(u.perch, undefined);
   assert.equal(garrisons(sim).length, 0, "no badges once it falls");
 });

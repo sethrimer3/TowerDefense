@@ -19,6 +19,8 @@ import { BALLISTA_PATHS, FIRE_BOLTS, HEAVY_BOLTS, WINDLASS, ballistaAllocated, b
 import { pathById, type PathId, WHIRLWIND, BLADE_DANCE, LEGEND, FIRE_ARROWS, SHARP, GUNNERY, SIEGE_SHOT, MINELAYER, CRUSADE, BLOODLETTERS, SHADOWCLOAK, VENOM, HEADHUNT, GRENADIERS, VOLLEY, BAYONET, SHARP_MUSKETS, BELT_FEED, LONG_SPEARS, SET_SPEARS, TESTUDO, SPEAR_WALL, BARBED, THROWING, HEAVY_LANCE, WINGED, TRIPOD, QUICKDRAW, DUELISTS, GUN_SHIELD, OVERDRIVE, STOPPING, DEADEYE, PIERCING, CLUSTER, SALVO, MARKSMEN, RICOCHET, SUPPRESS, BERSERK, HALBERD, BOW_JAVELIN, SKYRANGER, SKIRMISH, FORTIFY, PYRO, RIME, STORM, PYROCLASM, CRYOMANCY, CONDUCTION, SPOTTERS, SIGNAL } from "../knowledge-paths.ts";
 import { bonuses } from "../progression.ts";
 import { denOf } from "../defend/assassins.ts";
+import { deployRangeOf } from "../defend/deployment.ts";
+import type { BuildingKind } from "../defend/citygen.ts";
 import { ITEM_NAMES, archerDamage, archerCooldown, archerRange, cannonDamage, cannonCooldown, CANNON_RANGE, NANO_TOWER, SOLDIER, ARCHER_UNIT, soldierScale, STRUCTURES, flameDps, flameRange, iceDamage, ICE_RANGE, iceChill, watchRadius, fireballDamage, fireballSplash, emberDps, emberSeconds, FIRE_MAGE, FIREBALL_RANGE, keepHp, BRAWLER, ASSASSIN_UNIT, SLINGER, SNIPER, MUSKETEER, GUNNER, MACHINE_GUNNER, GATLING_GUNNER, RAIL_SNIPER, ROCKETEER, SPEARMAN, HOPLITE, LANCER, JAVELINEER, HERO, SHADE, WALL_BLOCK_DESCRIPTION, wallHp, GATE, GATE_DESCRIPTION, BALLISTA, BALLISTA_DESCRIPTION, ballistaCooldown, ballistaDamage, ballistaRange, gateHpScale, gateShut, spikeDamage, spikeEvery, isWizardTower, isSwordHall, isAssassinDen, isArcherTower, isCannonTower, isArcherHall, isMageHall, type PaletteItem } from "../defend/catalog.ts";
 
 /** `kind`'s effective numbers wearing `path` at `rank` (none: plain), with
@@ -204,6 +206,11 @@ const coreStats = (line: string, core: number) => line.split(" · ").slice(0, co
 
 /** A building of `kind` wearing `wear`: its basic stats and its upgrades' abilities. */
 export function buildingSheet(save: Save, kind: PaletteItem | "wallSpikes", wear?: Wear): StatSheet {
+  const sheet = ownSheet(save, kind, wear), deploy = kind === "wallSpikes" ? 0 : deployRangeOf(kind as BuildingKind, bonuses(save));
+  return deploy ? { ...sheet, stats: [...sheet.stats, `deploys within ${Number(deploy.toFixed(1))} cells`] } : sheet;
+}
+
+function ownSheet(save: Save, kind: PaletteItem | "wallSpikes", wear?: Wear): StatSheet {
   const d = save.defend;
   if (kind === "revolutionary") return { stats: coreStats(revolutionaryStats(save, d.revolutionaryRanks), 3), abilities: sharedAbilities(REVOLUTIONARY_PATHS, d.revolutionaryRanks) };
   if (kind === "shadow") return { stats: coreStats(shadowStats(save, d.shadowRanks), 4), abilities: sharedAbilities(SHADOW_PATHS, d.shadowRanks) };

@@ -87,7 +87,7 @@ export type DrawOptions = {
   gate?: GateRanks;
   /** The building the player tapped (its id in the map), outlined with its
    * reach and troops. */
-  inspect?: { id: number; armed: Armed; minePreview?: { point?: { x: number; y: number }; since: number } };
+  inspect?: { id: number; armed: Armed; aim?: { point?: { x: number; y: number; tower?: number }; since: number } };
   /** A city tile being held to lift, and how far the hold has come (0–1):
    * a gold square grows from its middle out to its edges. */
   lifting?: { tile: TilePos; t: number };
@@ -293,7 +293,7 @@ export class DefendRenderer {
     if (sim?.warBanner && !sim.warBanner.flag && !opts.hideBanner) drawWarBanner(this.ctx, this.px, sim.warBanner, bannerReach(sim), { t: opts.now / 1000, reduceMotion: opts.reduceMotion });
     if (sim) this.wizard.drawFire(this.ctx, this.px);
     if (opts.shimmer && !opts.reduceMotion) drawShimmer(this.ctx, this.px, map, opts.now, (c, b) => paintStanding(c, ART, map, b, this.area, opts.looks), opts.looks);
-    if (opts.inspect) drawInspect(this.ctx, this.px, map, sim, opts.inspect.id, opts.inspect.armed, opts.now, opts.reduceMotion, opts.inspect.minePreview);
+    if (opts.inspect) drawInspect(this.ctx, this.px, map, sim, opts.inspect.id, opts.inspect.armed, opts.now, opts.reduceMotion, opts.inspect.aim);
     this.drawEditing(overlay, opts.grid);
     if (opts.lifting) drawLifting(this.ctx, this.px, opts.lifting.tile, opts.lifting.t);
     // Rain falls in screen space, in front of the camera.
