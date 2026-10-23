@@ -7,7 +7,12 @@ export const SUNLIGHT = {
   distanceFade: 1.7,
   sway: 0.025,
   swayMs: 28000,
-  dustCount: 30,
+  /** The Tiles hall: denser shafts, a slower, wider sway and more dust. */
+  hallDensity: 0.5,
+  hallFade: 0.9,
+  hallSway: 0.09,
+  hallSwayMs: 11000,
+  dustCount: 70,
 } as const;
 
 const TINTS = [[255, 244, 222], [226, 239, 255], [255, 238, 202]] as const;
@@ -15,7 +20,9 @@ const TINTS = [[255, 244, 222], [226, 239, 255], [255, 238, 202]] as const;
 export class SoftSunlight {
   private fields: HTMLCanvasElement[];
 
-  constructor() {
+  /** `density` is the field's peak opacity; the Tiles hall's shafts, over its
+   * darker shelf, are denser than the Library's. */
+  constructor(density: number = SUNLIGHT.density, fade: number = SUNLIGHT.distanceFade) {
     // Analytic feathering is baked once, including the halo and both ends.
     // Scaling this small field is cheaper than blurring a room every frame.
     this.fields = TINTS.map(tint => {
@@ -27,11 +34,11 @@ export class SoftSunlight {
         const along = (y + 0.5) / 192, across = (x + 0.5) / 48 - 1;
         const sigma = SUNLIGHT.feather * (1 + along * SUNLIGHT.spread);
         const start = Math.min(1, along / 0.14);
-        const density = Math.exp(-across * across / (2 * sigma * sigma))
-          * start * start * (3 - 2 * start) * (1 - along) ** SUNLIGHT.distanceFade;
+        const field = Math.exp(-across * across / (2 * sigma * sigma))
+          * start * start * (3 - 2 * start) * (1 - along) ** fade;
         const o = (y * 96 + x) * 4;
         image.data[o] = tint[0]; image.data[o + 1] = tint[1]; image.data[o + 2] = tint[2];
-        image.data[o + 3] = Math.round(255 * SUNLIGHT.density * density);
+        image.data[o + 3] = Math.round(255 * density * field);
       }
       ctx.putImageData(image, 0, 0);
       return canvas;
