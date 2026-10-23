@@ -1032,6 +1032,11 @@ export class DefendPage {
     };
     return {
       move: preview,
+      // The magnifying glass centres on where the flag or crosshair rides.
+      focus: (ev) => {
+        const q = eventCell(this.renderer!, ev);
+        return { x: q.fx, y: Math.max(0, q.fy - this.pointers.raise) };
+      },
       end: (ev, commit, moved) => {
         if (!commit || !moved || this.sim !== sim || !sim.intact(b)) {
           this.aimPreview = null;
