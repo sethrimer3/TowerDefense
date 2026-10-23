@@ -766,11 +766,18 @@ let rallyCanvas: HTMLCanvasElement | null = null;
 
 /** The rally flag a double tap plants: the banner's shape in blue, with no
  * ring, since it lends its troops nothing. */
-export function drawRallyFlag(c: CanvasRenderingContext2D, px: number, at: { x: number; y: number }, pose: { t: number; reduceMotion: boolean }) {
+export function drawRallyFlag(
+  c: CanvasRenderingContext2D, px: number, at: { x: number; y: number },
+  pose: { t: number; reduceMotion: boolean; alpha?: number; rise?: number; scale?: number },
+) {
   rallyCanvas = spriteCanvas(flagPixels(pose.t, pose.reduceMotion, true), FLAG_W, FLAG_H, rallyCanvas ?? undefined);
-  const s = px / ART;
+  // `rise` lifts it that many cells off its spot and `scale` grows it about
+  // the pole's foot, as if nearer the eye: for dropping in and flying off.
+  const s = (px / ART) * (pose.scale ?? 1);
+  const x = at.x * px, y = (at.y - (pose.rise ?? 0)) * px;
   c.save();
   c.imageSmoothingEnabled = false;
-  c.drawImage(rallyCanvas, at.x * px - POLE * s, at.y * px - POLE * s, FLAG_W * s, FLAG_H * s);
+  c.globalAlpha = pose.alpha ?? 1;
+  c.drawImage(rallyCanvas, x - POLE * s, y - POLE * s, FLAG_W * s, FLAG_H * s);
   c.restore();
 }
