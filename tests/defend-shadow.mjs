@@ -14,7 +14,7 @@ const base = process.env.TEST_URL || 'http://127.0.0.1:5173/';
 const out = process.env.SHOTS || 'test-results';
 mkdirSync(out, { recursive: true });
 // A den and two Shadows.
-const HALLS = [['assassinDen'], ['shadow'], ['shadow']];
+const HALLS = [['poisonDen'], ['shadow'], ['shadow']];
 try {
   for (const width of [1280, 390]) {
     const phone = width < 500;
@@ -27,7 +27,7 @@ try {
       const { placeCityTile, placeStructure } = await import('/src/defend/layout.ts');
       const s = defaults(); s.settings.soundOff = true; s.settings.ambienceOff = true;
       s.knowledge = 100000;
-      s.defend.owned.assassinDen = 1; s.defend.owned.shadow = 2;
+      s.defend.owned.poisonDen = 1; s.defend.owned.shadow = 2;
       s.defend.shadowRanks = { knives: 2, bleed: 1 };
       s.defend.owned.cityTile = 8;
       let l = s.defend.layout;
@@ -76,9 +76,9 @@ try {
       return panel.locator('.ug-node:not(.withering)').evaluateAll(els => els.map(e => `${e.dataset.node}=${['owned', 'next', 'locked'].find(c => e.classList.contains(c))}`));
     };
     const close = async () => { await press(panel.locator('[data-specialty-close]')); await page.waitForSelector('#defend-specialty', { state: 'hidden' }); };
-    // The den's tree: three branches, the Shadow merged at their top.
-    const tree = await open(s.defend.layout.structures.find(x => x.kind === 'assassinDen').uid);
-    for (const n of ['k:assassinDen=owned', 'k:shadow=locked', 'p:bloodletters:1=next', 'p:shadowcloak:1=next', 'p:venom:1=next']) assert.ok(tree.includes(n), `${n} in ${tree}`);
+    // A Poison den's tree: the den's Venomblades branch, the Shadow merged at its top.
+    const tree = await open(s.defend.layout.structures.find(x => x.kind === 'poisonDen').uid);
+    for (const n of ['k:assassinDen=owned', 'k:poisonDen=owned', 'k:shadow=locked', 'p:venom:1=next']) assert.ok(tree.includes(n), `${n} in ${tree}`);
     await press(panel.locator('[data-node="k:shadow"]'));
     await page.waitForTimeout(900); await page.screenshot({ path: `${out}/shadow-${width}-den-tree.png` });
     await close();

@@ -6,7 +6,7 @@ import { cloneLayout, type PlacedKind } from "./defend/layout.ts";
 import type { Save } from "./save.ts";
 import { studyPathCost } from "./economy.ts";
 
-export type PathTopic = "pyreTower" | "frostTower" | "stormTower" | "wizardTower" | "chapterHouse" | "berserkerLodge" | "halberdYard" | "barracks" | "heroHall" | "valkyriePalace" | "assassinDen" | "spearHall" | "phalanx" | "javelinCamp" | "lancerStable" | "musketHall" | "gunHall" | "gunNest" | "gatlingNest" | "rocketBattery" | "sniperLodge" | "archerTower" | "cannonTower" | "archerBarracks" | "watchTower" | "mageGuild" | "bait" | "spikes" | SpellId;
+export type PathTopic = "pyreTower" | "frostTower" | "stormTower" | "wizardTower" | "chapterHouse" | "berserkerLodge" | "halberdYard" | "barracks" | "heroHall" | "valkyriePalace" | "assassinDen" | "bloodHall" | "veilHouse" | "poisonDen" | "spearHall" | "phalanx" | "javelinCamp" | "lancerStable" | "musketHall" | "gunHall" | "gunNest" | "gatlingNest" | "rocketBattery" | "sniperLodge" | "archerTower" | "cannonTower" | "archerBarracks" | "watchTower" | "mageGuild" | "bait" | "spikes" | SpellId;
 /** Strike spells: cast from the battle's Skills palette rather than built,
  * so a spell has no cards; it casts with the one path `save.spellPaths`
  * names, at its furthest researched rank. */
@@ -140,17 +140,19 @@ export const WINGED = { speed: [1, 1.25, 1.25, 1.25], leash: [1, 1, 1.5, 1.5], h
 export const CLOUDBORNE = { speed: 0.3, dive: 2, host: 2, drill: 0.5 };
 /** The Assassins' den's paths (`assassins.ts`). Bloodletters: criticals
  * hit `crit[rank]` times the damage, every `every[rank]`th strike, and the
- * assassins have `hp[rank]` of their HP (rank 0 is the plain den's). */
-export const BLOODLETTERS = { crit: [2, 5, 5, 10], every: [4, 4, 3, 2], hp: [1, 0.7, 0.6, 0.5] };
-/** Shadowcloak: no enemy picks out a cloaked assassin; a strike unveils it
+ * assassins have `hp[rank]` of their HP (rank 0 is the plain den's; the
+ * Blood hall's own, before any rank, is `hall`). */
+export const BLOODLETTERS = { hall: { crit: 3, hp: 0.85 }, crit: [2, 5, 5, 10], every: [4, 4, 3, 2], hp: [1, 0.7, 0.6, 0.5] };
+/** Shadowcloak, the Veil house's path (its own, before any rank, `hall`):
+ * no enemy picks out a cloaked assassin; a strike unveils it
  * for `reveal[rank]` seconds, and a strike from the cloak hits `ambush[rank]`
  * times as hard; at III a kill cloaks it again at once. */
-export const SHADOWCLOAK = { reveal: [0, 3, 2, 2], ambush: [1, 2, 4, 6] };
-/** Venom: every strike envenoms for `time[rank]` seconds: the enemy takes
+export const SHADOWCLOAK = { hall: { reveal: 4, ambush: 1.5 }, reveal: [0, 3, 2, 2], ambush: [1, 2, 4, 6] };
+/** Venom, the Poison den's path (its own, before any rank, `hall`): every strike envenoms for `time[rank]` seconds: the enemy takes
  * `more[rank]` times the damage from everything, and loses `share` of the
  * striker's damage a second; at III one that dies envenomed passes it to
  * every enemy within `spread` cells. */
-export const VENOM = { time: [0, 4, 6, 6], more: [1, 1.25, 1.5, 1.5], share: 0.5, spread: 1.5 };
+export const VENOM = { hall: { time: 3, more: 1.1 }, time: [0, 4, 6, 6], more: [1, 1.25, 1.5, 1.5], share: 0.5, spread: 1.5 };
 /** Headhunters: assassins go for the toughest enemy (the most HP) they can
  * reach, every strike adding `bounty[rank]` of its full HP (at most `cap`
  * times the strike); from II they range `leash` times as far, and at III
@@ -494,25 +496,25 @@ export const PATHS: KnowledgePath[] = [
     legacyCrown: { from: "lancerStable", item: "valkyriePalace", name: "Valkyrie palace", cost: 100000, text: "This Lancer stable becomes a Valkyrie palace" },
   },
   {
-    id: "bloodletters", topic: "assassinDen", name: "Bloodletters", motto: "Enormous criticals, paper-thin guard", hue: "shadow",
+    id: "bloodletters", topic: "bloodHall", name: "Bloodletters", motto: "Enormous criticals, paper-thin guard", hue: "shadow",
     ranks: [
-      { name: "Heartseeker", icon: "dagger", cost: studyPathCost(4, 0), text: "Criticals hit 5× instead of 2×, but assassins have 30% less HP" },
+      { name: "Heartseeker", icon: "dagger", cost: studyPathCost(4, 0), text: "Criticals hit 5×, but assassins have 30% less HP in all" },
       { name: "Opened veins", icon: "drop", cost: studyPathCost(4, 1), text: "Every 3rd strike is critical; 40% less HP" },
       { name: "Deathblow", icon: "skull", cost: studyPathCost(4, 2), text: "Every other strike is critical, for 10×; half their HP" },
     ],
   },
   {
-    id: "shadowcloak", topic: "assassinDen", name: "Shadowcloak", motto: "Unseen until the blade falls", hue: "storm",
+    id: "shadowcloak", topic: "veilHouse", name: "Shadowcloak", motto: "Unseen until the blade falls", hue: "storm",
     ranks: [
-      { name: "Cloak", icon: "hood", cost: studyPathCost(4, 0), text: "Assassins are cloaked: no enemy picks them out until they strike, and they vanish 3 seconds after. A strike from the cloak hits twice as hard" },
+      { name: "Cloak", icon: "hood", cost: studyPathCost(4, 0), text: "They vanish 3 seconds after a strike, and a strike from the cloak hits twice as hard" },
       { name: "Ambush", icon: "eye", cost: studyPathCost(4, 1), text: "They vanish 2 seconds after a strike, and strikes from the cloak hit 4× as hard" },
       { name: "Vanish", icon: "whirl", cost: studyPathCost(4, 2), text: "A kill cloaks them again at once, and strikes from the cloak hit 6× as hard" },
     ],
   },
   {
-    id: "venom", topic: "assassinDen", name: "Venomblades", motto: "Poisoned enemies suffer from every blow", hue: "verdant",
+    id: "venom", topic: "poisonDen", name: "Venomblades", motto: "Poisoned enemies suffer from every blow", hue: "verdant",
     ranks: [
-      { name: "Venomed blades", icon: "vial", cost: studyPathCost(4, 0), text: "Every strike poisons for 4 seconds: the enemy takes 25% more damage from everything, and the venom bites as it lasts" },
+      { name: "Venomed blades", icon: "vial", cost: studyPathCost(4, 0), text: "Poison lasts 4 seconds, and poisoned enemies take 25% more damage" },
       { name: "Wolfsbane", icon: "drop", cost: studyPathCost(4, 1), text: "Poisoned enemies take 50% more damage, for 6 seconds" },
       { name: "Plague", icon: "skull", cost: studyPathCost(4, 2), text: "An enemy that dies poisoned passes the venom to every enemy within 1.5 cells" },
     ],
@@ -892,7 +894,7 @@ export const PATHS: KnowledgePath[] = [
 export const PATH_TOPICS = [...new Set(PATHS.map((p) => p.topic))];
 /** The paths the wizard tower and the barracks wore before each branch
  * made a building of its own. */
-const LEGACY_TOPICS: Partial<Record<PathTopic, PathId[]>> = { wizardTower: ["pyromancy", "rime", "storm"], barracks: ["crusaders", "berserkers", "halberdiers"] };
+const LEGACY_TOPICS: Partial<Record<PathTopic, PathId[]>> = { wizardTower: ["pyromancy", "rime", "storm"], barracks: ["crusaders", "berserkers", "halberdiers"], assassinDen: ["bloodletters", "shadowcloak", "venom"] };
 export const pathById = (id: PathId) => PATHS.find((p) => p.id === id)!;
 export const pathsOf = (topic: string) => PATHS.filter((p) => p.topic === topic);
 
@@ -920,6 +922,9 @@ export const UNSPECIALIZED: Record<PathTopic, string> = {
   heroHall: "One hero: two slashes, then a spin",
   valkyriePalace: "A marble palace on the ground",
   assassinDen: "Quick, frail assassins: every 4th strike critical",
+  bloodHall: "Bloodletters: criticals 3×, a little frailer",
+  veilHouse: "Cloaked assassins: unseen until they strike",
+  poisonDen: "Poisoners: every strike envenoms for 3 seconds",
   spearHall: "Spearmen: a long reach",
   phalanx: "Hoplites: slow, shielded, hard to hurt",
   javelinCamp: "Javelineers: slow, heavy throws",
@@ -1039,7 +1044,7 @@ export function decodePaths(raw: unknown): PathChoices {
   if (!raw || typeof raw !== "object") return out;
   // Before each branch made a building of its own, its paths were the
   // wizard tower's or the barracks'.
-  for (const topic of [...PATH_TOPICS, ...(Object.keys(LEGACY_TOPICS) as PathTopic[])]) {
+  for (const topic of new Set([...PATH_TOPICS, ...(Object.keys(LEGACY_TOPICS) as PathTopic[])])) {
     const c = (raw as Record<string, unknown>)[topic] as Partial<PathChoice> | undefined;
     if (!c || typeof c !== "object") continue;
     const p = PATHS.find((p) => p.id === c.path && (p.topic === topic || !!LEGACY_TOPICS[topic]?.includes(p.id)));

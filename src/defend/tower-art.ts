@@ -139,6 +139,9 @@ const MATERIAL: Record<PlacedKind, { m: Material; ruin: Pick<Ruin, "stone" | "to
   rocketBattery: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.kiln.slice(0, 3), beams: true } },
   revolutionary: { m: { tones: TECH.slice(1, 4), roofed: false }, ruin: { stone: TECH.slice(0, 3), top: [TECH[1], TECH[3], GLOW[0]], beams: false } },
   assassinDen: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: [0x241f2c, C.dusk, 0x544a62], beams: true } },
+  bloodHall: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.wine.slice(0, 3), beams: true } },
+  veilHouse: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.flag.slice(0, 3), beams: true } },
+  poisonDen: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: [0x1e3220, 0x2e4a2a, 0x46703a], beams: true } },
   spearHall: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.straw, beams: true } },
   phalanx: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: [0x6e2a22, C.red, 0xc25a48], beams: true } },
   javelinCamp: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.canvas.slice(0, 3), beams: true } },
@@ -181,6 +184,9 @@ export const PATH_LOOKS: Partial<Record<PlacedKind, readonly string[]>> = {
   heroHall: ["whirlwind", "bladeDance", "legend"],
   valkyriePalace: ["cloudborne"],
   assassinDen: ["bloodletters", "shadowcloak", "venom", "headhunters"],
+  bloodHall: ["bloodletters"],
+  veilHouse: ["shadowcloak"],
+  poisonDen: ["venom"],
   spearHall: ["longSpears", "setSpears"],
   phalanx: ["testudo", "spearWall"],
   javelinCamp: ["barbed", "throwingArms"],
@@ -224,7 +230,7 @@ export function structureRubblePixels(kind: PlacedKind, cw: number, ch: number, 
   return rubblePixels(w, h, hash(seed, KINDS.indexOf(kind), 3), { ...frame(w, h), ...MATERIAL[kind].ruin });
 }
 
-const KINDS: PlacedKind[] = ["barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "meleeGuild", "rangedGuild", "sniperLodge", "musketHall", "assassinDen", "gunHall", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "spearHall", "phalanx", "javelinCamp", "lancerStable", "heroHall", "shadow", "nanoTower", "pyreTower", "frostTower", "stormTower", "chapterHouse", "berserkerLodge", "halberdYard"];
+const KINDS: PlacedKind[] = ["barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "meleeGuild", "rangedGuild", "sniperLodge", "musketHall", "assassinDen", "gunHall", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "spearHall", "phalanx", "javelinCamp", "lancerStable", "heroHall", "shadow", "nanoTower", "pyreTower", "frostTower", "stormTower", "chapterHouse", "berserkerLodge", "halberdYard", "bloodHall", "veilHouse", "poisonDen"];
 
 const PAINT: Record<PlacedKind, (p: Pix, look: string) => void> = {
   meleeGuild: paintMeleeGuild,
@@ -237,6 +243,9 @@ const PAINT: Record<PlacedKind, (p: Pix, look: string) => void> = {
   rocketBattery: paintRocketBattery,
   revolutionary: paintRevolutionary,
   assassinDen: paintAssassinDen,
+  bloodHall: paintBloodHall,
+  veilHouse: paintVeilHouse,
+  poisonDen: paintPoisonDen,
   spearHall: paintSpearHall,
   phalanx: paintPhalanx,
   javelinCamp: paintJavelinCamp,
@@ -801,6 +810,30 @@ function paintAssassinDen(p: Pix, look: string) {
   }
 }
 
+/** The Assassins' den's branch dens: the den in its branch's look, a pair
+ * of the branch's tokens at the hall's top corners, and, climbing its path,
+ * a third at the yard's foot. */
+function paintBranchDen(p: Pix, look: string, token: readonly string[], pal: Record<string, number>, worn: boolean) {
+  paintAssassinDen(p, look);
+  const { x0, y0, x1, y1 } = frame(p.w, p.h);
+  const w = token[0].length, h = token.length;
+  glyph(p, x0 + 1, y0 + 1, token, pal);
+  glyph(p, x1 - w, y0 + 1, token, pal);
+  if (worn) glyph(p, Math.round((x0 + x1 - w) / 2), y1 - h, token, pal);
+}
+/** The Blood hall: red candles burning. */
+function paintBloodHall(p: Pix, look: string) {
+  paintBranchDen(p, "bloodletters", [".2.", "000", "010", "010", "000"], { 0: OUTLINE, 1: C.ruby[2], 2: C.fire[2] }, !!look);
+}
+/** The Veil house: black veils hung on hooks. */
+function paintVeilHouse(p: Pix, look: string) {
+  paintBranchDen(p, "shadowcloak", ["000", "010", "121", "010", "0.0"], { 0: OUTLINE, 1: C.flag[0], 2: 0xc8f0ff }, !!look);
+}
+/** The Poison den: stoppered green flasks. */
+function paintPoisonDen(p: Pix, look: string) {
+  paintBranchDen(p, "venom", [".0.", "030", "010", "121", "000"], { 0: OUTLINE, 1: C.slime[1], 2: C.slime[2], 3: C.bone[1] }, !!look);
+}
+
 /** A spear point up, its shaft below. */
 const SPEAR = ["..0..", ".030.", "03330", ".030.", "..0..", ".010.", ".010.", ".010.", ".010.", ".000."];
 /** A round shield with a boss. */
@@ -1309,13 +1342,16 @@ function paintWizardTower(p: Pix, look: string) {
     return tiles[Math.max(0, Math.min(3, Math.floor(t + ((x + y) % 2 ? 0.25 : -0.25))))];
   });
   // The finial: gold, lit at its upper left (a flame's colours on Pyromancy,
-  // an ice crystal on Rime, a lightning rod's spark on Stormcalling).
+  // an ice crystal on Rime, a lightning rod's spark on Stormcalling). The
+  // roof is an odd number of pixels across, so the finial is a cross three
+  // pixels wide on its middle pixel, never two that sit half a pixel aside.
   const fx = Math.floor(cx), fy = Math.floor(cy);
   const tip = pyro ? [C.fire[1], C.fire[2], C.fire[3]] : rime ? [C.ice[1], C.ice[2], 0xffffff] : storm ? [C.iron[2], C.bolt, 0xfffbe0] : C.gold;
-  p.set(fx - 1, fy - 1, tip[2]);
-  p.set(fx, fy - 1, tip[1]);
-  p.set(fx - 1, fy, tip[1]);
-  p.set(fx, fy, tip[0]);
+  p.set(fx, fy - 1, tip[2]);
+  p.set(fx - 1, fy, tip[2]);
+  p.set(fx, fy, tip[1]);
+  p.set(fx + 1, fy, tip[0]);
+  p.set(fx, fy + 1, tip[0]);
 }
 
 /** The wizard tower's branch towers: its roof in the branch's look, and at

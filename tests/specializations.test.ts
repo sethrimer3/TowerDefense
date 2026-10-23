@@ -71,7 +71,7 @@ test("the shop's three basic buildings branch into attuned buildings, each with 
   assert.deepEqual(to("gunHall"), ["Musket hall", "Machine-gun nest", "Rocket battery"]);
   assert.deepEqual(to("barracks"), ["Chapterhouse", "Berserker lodge", "Halberd yard"]);
   assert.deepEqual(to("chapterHouse"), ["Crusaders I"]);
-  assert.deepEqual(to("assassinDen"), ["Bloodletters I", "Shadowcloak I", "Venomblades I"]);
+  assert.deepEqual(to("assassinDen"), ["Blood hall", "Veil house", "Poison den"]);
   assert.deepEqual(to("wizardTower"), ["Pyre tower", "Frost tower", "Storm tower"]);
   assert.deepEqual(to("pyreTower"), ["Pyromancy I"], "attuned to its branch, it climbs it");
   assert.deepEqual(to("sniperLodge"), ["Revolutionary", "Marksmen I", "Ricochet I", "Suppressing fire I", "Deadeye I", "Piercing rounds I"], "an ultimate keeps its own");

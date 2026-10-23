@@ -190,7 +190,7 @@ try {
     const before = await state(page);
     await buy('k:assassinDen');
     await settled();
-    assert.ok((await nodes()).includes('p:bloodletters:1=next'));
+    assert.ok((await nodes()).includes('k:bloodHall=next'));
     await page.screenshot({ path: `${out}/upgrade-${width}-barracks.png` });
     await press(panel.locator('.ug-respec'));
     await settled();
@@ -205,8 +205,9 @@ try {
     const twice = async id => { await press(panel.locator(`[data-node="${id}"]`)); await press(panel.locator(`[data-node="${id}"]`)); await settled(); };
     await twice('k:assassinDen');
     assert.equal((await placed(melee.uid)).kind, 'assassinDen', 'a second tap buys it');
+    await twice('k:bloodHall');
     await twice('p:bloodletters:1');
-    assert.deepEqual([(await placed(melee.uid)).path, (await placed(melee.uid)).rank], ['bloodletters', 1]);
+    assert.deepEqual([(await placed(melee.uid)).kind, (await placed(melee.uid)).path, (await placed(melee.uid)).rank], ['bloodHall', 'bloodletters', 1]);
     await press(panel.locator('[data-node="k:assassinDen"]'));
     assert.match(await panel.locator('.ug-again').textContent(), /sell everything after it/);
     await page.waitForTimeout(500); await page.screenshot({ path: `${out}/upgrade-${width}-tap-again.png` });

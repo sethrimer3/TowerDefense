@@ -13,11 +13,11 @@ import type { BattlePaths, PathId } from "../knowledge-paths.ts";
  * copper, silver and Gold, the universal upgrades, the bonuses the Smithy and the
  * skill trees add, and the enemy roster. */
 
-export type StructureKind = "keep" | "meleeGuild" | "rangedGuild" | "assassinDen" | "spearHall" | "phalanx" | "javelinCamp" | "lancerStable" | "barracks" | "chapterHouse" | "berserkerLodge" | "halberdYard" | "heroHall" | "shadow" | "archerBarracks" | "sniperLodge" | "gunHall" | "musketHall" | "gunNest" | "gatlingNest" | "rocketBattery" | "revolutionary" | "archerTower" | "cannonTower" | "nanoTower" | "watchTower" | "wizardTower" | "pyreTower" | "frostTower" | "stormTower" | "mageGuild" | "valkyriePalace" | "darkKeep" | "monsterBait";
+export type StructureKind = "keep" | "meleeGuild" | "rangedGuild" | "assassinDen" | "bloodHall" | "veilHouse" | "poisonDen" | "spearHall" | "phalanx" | "javelinCamp" | "lancerStable" | "barracks" | "chapterHouse" | "berserkerLodge" | "halberdYard" | "heroHall" | "shadow" | "archerBarracks" | "sniperLodge" | "gunHall" | "musketHall" | "gunNest" | "gatlingNest" | "rocketBattery" | "revolutionary" | "archerTower" | "cannonTower" | "nanoTower" | "watchTower" | "wizardTower" | "pyreTower" | "frostTower" | "stormTower" | "mageGuild" | "valkyriePalace" | "darkKeep" | "monsterBait";
 /** Everything that appears in the build palette (the keep is placed from the
  * start and can only be moved, so it is not a palette item). */
 export type PaletteItem = "cityTile" | "cityGate" | "wallSpikes" | "wallBallista" | "wallBlock" | Exclude<StructureKind, "keep">;
-export const PALETTE_ITEMS: PaletteItem[] = ["cityTile", "meleeGuild", "rangedGuild", "barracks", "chapterHouse", "berserkerLodge", "halberdYard", "heroHall", "assassinDen", "shadow", "spearHall", "phalanx", "javelinCamp", "lancerStable", "archerBarracks", "gunHall", "musketHall", "sniperLodge", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "watchTower", "archerTower", "cannonTower", "nanoTower", "wizardTower", "pyreTower", "frostTower", "stormTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "wallBlock", "cityGate", "wallSpikes", "wallBallista"];
+export const PALETTE_ITEMS: PaletteItem[] = ["cityTile", "meleeGuild", "rangedGuild", "barracks", "chapterHouse", "berserkerLodge", "halberdYard", "heroHall", "assassinDen", "bloodHall", "veilHouse", "poisonDen", "shadow", "spearHall", "phalanx", "javelinCamp", "lancerStable", "archerBarracks", "gunHall", "musketHall", "sniperLodge", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "watchTower", "archerTower", "cannonTower", "nanoTower", "wizardTower", "pyreTower", "frostTower", "stormTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "wallBlock", "cityGate", "wallSpikes", "wallBallista"];
 /** The only buildings the shop sells: every other tower or troop building
  * is one of these upgraded, a building at a time, with Knowledge
  * (`building-upgrades.ts`). */
@@ -57,6 +57,9 @@ export const ITEM_CATEGORY: Record<PaletteItem, Exclude<PaletteCategory, "all">>
   heroHall: "units",
   shadow: "units",
   assassinDen: "units",
+  bloodHall: "units",
+  veilHouse: "units",
+  poisonDen: "units",
   spearHall: "units",
   phalanx: "units",
   javelinCamp: "units",
@@ -82,6 +85,10 @@ export const isWizardTower = (kind: string) => (WIZARD_TOWERS as readonly string
  * swordsmen. */
 export const SWORD_HALLS: readonly StructureKind[] = ["barracks", "chapterHouse", "berserkerLodge", "halberdYard"];
 export const isSwordHall = (kind: string) => (SWORD_HALLS as readonly string[]).includes(kind);
+/** The Assassins' den and the dens its branches make of it, which all
+ * train assassins. */
+export const ASSASSIN_DENS: readonly StructureKind[] = ["assassinDen", "bloodHall", "veilHouse", "poisonDen"];
+export const isAssassinDen = (kind: string) => (ASSASSIN_DENS as readonly string[]).includes(kind);
 
 /** The city gate: 3 cells along the wall and its 2 cells deep, worth the
  * wall stones it stands in for, and some. It swings open while any of the
@@ -202,6 +209,33 @@ export const STRUCTURES: Record<StructureKind, StructureDef> = {
     maxHp: 120,
     outsideOk: false,
     description: "Trains assassins: quick, frail killers in black whose every fourth strike is critical. Upgrade it with Knowledge into bloodletters with enormous criticals, cloaked ambushers, poisoners whose venom makes enemies take more damage from everything, or headhunters who go for the toughest enemy they can reach.",
+  },
+  bloodHall: {
+    kind: "bloodHall",
+    name: "Blood hall",
+    w: 4,
+    h: 4,
+    maxHp: 110,
+    outsideOk: false,
+    description: "An Assassins' den sworn to the killing blow: its bloodletters' criticals hit 3× instead of 2×, though they are a little frailer.",
+  },
+  veilHouse: {
+    kind: "veilHouse",
+    name: "Veil house",
+    w: 4,
+    h: 4,
+    maxHp: 120,
+    outsideOk: false,
+    description: "An Assassins' den that trains in the dark: its assassins are cloaked, so no enemy picks them out until they strike, and they vanish 4 seconds after. A strike from the cloak hits half again as hard.",
+  },
+  poisonDen: {
+    kind: "poisonDen",
+    name: "Poison den",
+    w: 4,
+    h: 4,
+    maxHp: 120,
+    outsideOk: false,
+    description: "An Assassins' den of poisoners: every strike envenoms for 3 seconds, and a poisoned enemy takes 10% more damage from everything while the venom bites.",
   },
   sniperLodge: {
     kind: "sniperLodge",
@@ -469,6 +503,9 @@ export const STARTING_OWNED: Record<PaletteItem, number> = {
   heroHall: 0,
   shadow: 0,
   assassinDen: 0,
+  bloodHall: 0,
+  veilHouse: 0,
+  poisonDen: 0,
   spearHall: 0,
   phalanx: 0,
   javelinCamp: 0,
@@ -517,6 +554,9 @@ export function purchasePrice(item: PaletteItem, owned: number): Price {
     heroHall: { copper: 20, silver: 4, gold: 1 },
     shadow: { copper: 20, silver: 4, gold: 1 },
     assassinDen: { copper: 5 },
+    bloodHall: { copper: 6 },
+    veilHouse: { copper: 6 },
+    poisonDen: { copper: 6 },
     spearHall: { copper: 5 },
     phalanx: { copper: 7 },
     javelinCamp: { copper: 6 },
@@ -566,6 +606,9 @@ export const ITEM_NAMES: Record<PaletteItem, string> = {
   heroHall: STRUCTURES.heroHall.name,
   shadow: STRUCTURES.shadow.name,
   assassinDen: STRUCTURES.assassinDen.name,
+  bloodHall: STRUCTURES.bloodHall.name,
+  veilHouse: STRUCTURES.veilHouse.name,
+  poisonDen: STRUCTURES.poisonDen.name,
   spearHall: STRUCTURES.spearHall.name,
   phalanx: STRUCTURES.phalanx.name,
   javelinCamp: STRUCTURES.javelinCamp.name,

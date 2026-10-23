@@ -21,18 +21,18 @@ try {
     const page = await context.newPage(), errors = [];
     page.on('pageerror', e => errors.push(e.message));
     await page.goto(base); await page.waitForSelector('#defend-start');
-    // A city with a plain Melee Guild and a den on each of the four paths.
+    // A city with a plain Melee Guild and each branch's den on its path.
     const fixture = await page.evaluate(async () => {
       const { defaults } = await import('/src/save.ts');
       const { placeCityTile, placeStructure } = await import('/src/defend/layout.ts');
       const s = defaults(); s.settings.soundOff = true; s.settings.ambienceOff = true;
       s.knowledge = 100000;
-      s.defend.owned.meleeGuild = 1; s.defend.owned.assassinDen = 4; s.defend.owned.cityTile = 8;
+      s.defend.owned.meleeGuild = 1; Object.assign(s.defend.owned, { bloodHall: 1, veilHouse: 1, poisonDen: 1 }); s.defend.owned.cityTile = 8;
       let l = s.defend.layout;
       for (const [dx, dy] of [[0, -1], [-1, 0], [1, 0], [0, 1], [-1, -1], [1, -1]]) l = placeCityTile(l, l.keep.tx + dx, l.keep.ty + dy) ?? l;
       const k = l.keep;
       l = placeStructure(l, 'meleeGuild', k.tx, k.ty - 1);
-      for (const [path, dx, dy] of [['bloodletters', -1, 0], ['shadowcloak', 1, 0], ['venom', -1, -1]]) l = placeStructure(l, 'assassinDen', k.tx + dx, k.ty + dy, { path, rank: 3 });
+      for (const [kind, path, dx, dy] of [['bloodHall', 'bloodletters', -1, 0], ['veilHouse', 'shadowcloak', 1, 0], ['poisonDen', 'venom', -1, -1]]) l = placeStructure(l, kind, k.tx + dx, k.ty + dy, { path, rank: 3 });
       s.defend.layout = l;
       return s;
     });
@@ -57,7 +57,7 @@ try {
     await hook();
     await page.waitForFunction(() => window.__dp);
     let s = await state(page);
-    assert.equal(s.defend.layout.structures.filter(x => x.kind === 'assassinDen').length, 3, 'the dens stand');
+    assert.equal(s.defend.layout.structures.filter(x => ['bloodHall', 'veilHouse', 'poisonDen'].includes(x.kind)).length, 3, 'the dens stand');
     const zoomKeep = z => page.evaluate(z => { const dp = window.__dp, k = dp.host.save().layout.keep, p = dp.renderer.toClient((k.tx + 0.5) * 8, (k.ty) * 8); dp.renderer.zoomAt(p.x, p.y, z); }, z);
     await zoomKeep(phone ? 2 : 2.5);
     await page.waitForTimeout(500); await page.screenshot({ path: `${out}/assassins-${width}-dens.png` });
@@ -79,10 +79,10 @@ try {
     await press(panel.locator('[data-ug-buy="k:assassinDen"]'));
     await page.waitForFunction(() => !document.querySelector('#defend-specialty .ug-node.withering'), null, { timeout: 5000 });
     const tree = await nodes();
-    for (const path of ['bloodletters', 'shadowcloak', 'venom']) assert.ok(tree.includes(`p:${path}:1=next`), `${path} in ${tree}`);
-    assert.ok(tree.includes('k:shadow=locked'), 'the Shadow merged at its top');
+    for (const den of ['bloodHall', 'veilHouse', 'poisonDen']) assert.ok(tree.includes(`k:${den}=next`), `${den} in ${tree}`);
+    assert.ok(!tree.some(n => n.startsWith('p:')), 'only the branches\' dens, until one is taken');
     assert.ok(!tree.some(n => n.startsWith('k:barracks')), 'the barracks withered');
-    await press(panel.locator('[data-node="p:venom:1"]'));
+    await press(panel.locator('[data-node="k:poisonDen"]'));
     await page.waitForTimeout(1200); await page.screenshot({ path: `${out}/assassins-${width}-den-tree.png` });
     s = await state(page);
     assert.equal(s.defend.layout.structures.find(x => x.uid === guild.uid).kind, 'assassinDen');

@@ -68,7 +68,11 @@ export const ATTUNED: Attuned[] = [
     { path: "berserkers", via: { kind: "berserkerLodge", cost: 3 } },
     { path: "halberdiers", via: { kind: "halberdYard", cost: 3 } },
   ] },
-  { kind: "assassinDen", from: "meleeGuild", cost: 6, branches: [{ path: "bloodletters" }, { path: "shadowcloak" }, { path: "venom" }], ultimate: "shadow" },
+  { kind: "assassinDen", from: "meleeGuild", cost: 6, ultimate: "shadow", branches: [
+    { path: "bloodletters", via: { kind: "bloodHall", cost: 4 } },
+    { path: "shadowcloak", via: { kind: "veilHouse", cost: 4 } },
+    { path: "venom", via: { kind: "poisonDen", cost: 4 } },
+  ] },
   { kind: "spearHall", from: "meleeGuild", cost: 5, ultimate: "valkyriePalace", branches: [
     { path: "testudo", via: { kind: "phalanx", cost: 7 } },
     { path: "barbed", via: { kind: "javelinCamp", cost: 8 } },
@@ -134,7 +138,7 @@ const topRank = (path: PathId) => pathById(path).ranks.length;
 
 /** What each kind's troops are called on its upgrade buttons. */
 export const TROOPS: Partial<Record<PlacedKind, string>> = {
-  meleeGuild: "Brawlers", rangedGuild: "Stone throwers", barracks: "Swordsmen", chapterHouse: "Crusaders", berserkerLodge: "Berserkers", halberdYard: "Halberdiers", heroHall: "Hero", shadow: "Shade", assassinDen: "Assassins", spearHall: "Spearmen", phalanx: "Hoplites", javelinCamp: "Javelineers", lancerStable: "Lancers", archerBarracks: "Archers", mageGuild: "Fire mages",
+  meleeGuild: "Brawlers", rangedGuild: "Stone throwers", barracks: "Swordsmen", chapterHouse: "Crusaders", berserkerLodge: "Berserkers", halberdYard: "Halberdiers", heroHall: "Hero", shadow: "Shade", assassinDen: "Assassins", bloodHall: "Bloodletters", veilHouse: "Cloaked assassins", poisonDen: "Poisoners", spearHall: "Spearmen", phalanx: "Hoplites", javelinCamp: "Javelineers", lancerStable: "Lancers", archerBarracks: "Archers", mageGuild: "Fire mages",
   sniperLodge: "Snipers", musketHall: "Musketmen",
   gunHall: "Gunners", gunNest: "Machine gunners", gatlingNest: "Gatling gunners", rocketBattery: "Rocketeers", revolutionary: "Laser snipers", valkyriePalace: "Valkyries", darkKeep: "Dark wizard",
 };

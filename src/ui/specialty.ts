@@ -18,7 +18,8 @@ import { CHAIN, CRIT_CHANCE, CRIT_DAMAGE, DETONATOR, REVOLUTIONARY_PATHS, SQUAD,
 import { BALLISTA_PATHS, FIRE_BOLTS, HEAVY_BOLTS, WINDLASS, ballistaAllocated, ballistaRank, respecBallistas, undoBallistas, upgradeBallistas, type BallistaPathId, type BallistaRanks } from "../ballista-upgrades.ts";
 import { pathById, type PathId, WHIRLWIND, BLADE_DANCE, LEGEND, FIRE_ARROWS, SHARP, GUNNERY, SIEGE_SHOT, CRUSADE, BLOODLETTERS, SHADOWCLOAK, VENOM, HEADHUNT, GRENADIERS, VOLLEY, BAYONET, SHARP_MUSKETS, BELT_FEED, LONG_SPEARS, SET_SPEARS, TESTUDO, SPEAR_WALL, BARBED, THROWING, HEAVY_LANCE, WINGED, TRIPOD, QUICKDRAW, DUELISTS, GUN_SHIELD, OVERDRIVE, STOPPING, DEADEYE, PIERCING, CLUSTER, SALVO, MARKSMEN, RICOCHET, SUPPRESS, BERSERK, HALBERD, RANGERS, SKIRMISH, FORTIFY, PYRO, RIME, STORM, PYROCLASM, CINDERS, SPOTTERS, SIGNAL } from "../knowledge-paths.ts";
 import { bonuses } from "../progression.ts";
-import { ITEM_NAMES, archerDamage, archerCooldown, archerRange, cannonDamage, cannonCooldown, CANNON_RANGE, NANO_TOWER, SOLDIER, ARCHER_UNIT, soldierScale, STRUCTURES, flameDps, flameRange, iceDamage, ICE_RANGE, iceChill, watchRadius, fireballDamage, fireballSplash, emberDps, emberSeconds, FIRE_MAGE, FIREBALL_RANGE, keepHp, BRAWLER, ASSASSIN_UNIT, SLINGER, SNIPER, MUSKETEER, GUNNER, MACHINE_GUNNER, GATLING_GUNNER, RAIL_SNIPER, ROCKETEER, SPEARMAN, HOPLITE, LANCER, JAVELINEER, HERO, SHADE, WALL_BLOCK_DESCRIPTION, wallHp, GATE, GATE_DESCRIPTION, BALLISTA, BALLISTA_DESCRIPTION, ballistaCooldown, ballistaDamage, ballistaRange, gateHpScale, gateShut, spikeDamage, spikeEvery, isWizardTower, isSwordHall, type PaletteItem } from "../defend/catalog.ts";
+import { denOf } from "../defend/assassins.ts";
+import { ITEM_NAMES, archerDamage, archerCooldown, archerRange, cannonDamage, cannonCooldown, CANNON_RANGE, NANO_TOWER, SOLDIER, ARCHER_UNIT, soldierScale, STRUCTURES, flameDps, flameRange, iceDamage, ICE_RANGE, iceChill, watchRadius, fireballDamage, fireballSplash, emberDps, emberSeconds, FIRE_MAGE, FIREBALL_RANGE, keepHp, BRAWLER, ASSASSIN_UNIT, SLINGER, SNIPER, MUSKETEER, GUNNER, MACHINE_GUNNER, GATLING_GUNNER, RAIL_SNIPER, ROCKETEER, SPEARMAN, HOPLITE, LANCER, JAVELINEER, HERO, SHADE, WALL_BLOCK_DESCRIPTION, wallHp, GATE, GATE_DESCRIPTION, BALLISTA, BALLISTA_DESCRIPTION, ballistaCooldown, ballistaDamage, ballistaRange, gateHpScale, gateShut, spikeDamage, spikeEvery, isWizardTower, isSwordHall, isAssassinDen, type PaletteItem } from "../defend/catalog.ts";
 
 /** `kind`'s effective numbers wearing `path` at `rank` (none: plain), with
  * the shared Smithy and skill bonuses. */
@@ -57,15 +58,15 @@ export function kindStats(save: Save, kind: PaletteItem, path?: PathId, rank = 0
     const combo = every === 1 ? `every strike a spin ${spin} cells round, ${times}x` : `every ${ordinal(every)} strike a spin ${spin} cells round, ${times}x`;
     return `One hero: ${n(HERO.hp * scale * b.troopHp * LEGEND.hp[legend])} HP · ${n(HERO.damage * scale * b.troopDamage)} damage every ${n(HERO.cooldown * BLADE_DANCE.cooldown[dance])}s · slashes cut all within ${HERO.arc} cells in front · ${combo}${extra}`;
   }
-  if (kind === "assassinDen") {
-    const blood = at("bloodletters"), cloak = at("shadowcloak"), venom = at("venom"), hunt = at("headhunters");
+  if (isAssassinDen(kind)) {
+    const d = denOf(kind, at("bloodletters"), at("shadowcloak"), at("venom"), at("headhunters")), hunt = d.hunt;
     const u = ASSASSIN_UNIT, scale = soldierScale(l.soldierArms);
     const extra = [
-      cloak ? `cloaked · ${SHADOWCLOAK.ambush[cloak]}x from the cloak` : "",
-      venom ? `poison: ${VENOM.more[venom]}x damage taken for ${VENOM.time[venom]}s` : "",
+      d.veiled ? `cloaked · ${d.ambush}x from the cloak` : "",
+      d.poisons ? `poison: ${d.more}x damage taken for ${d.time}s` : "",
       hunt ? `toughest first · +${HEADHUNT.bounty[hunt] * 100}% of its HP a strike` : "",
     ].filter(Boolean).map((t) => ` · ${t}`).join("");
-    return `Recruits: ${n(u.hp * scale * b.troopHp * BLOODLETTERS.hp[blood])} HP · ${n(u.damage * scale * b.troopDamage)} damage every ${u.cooldown}s · every ${ordinal(BLOODLETTERS.every[blood])} strike ${BLOODLETTERS.crit[blood]}x${extra}`;
+    return `Recruits: ${n(u.hp * scale * b.troopHp * d.hp)} HP · ${n(u.damage * scale * b.troopDamage)} damage every ${u.cooldown}s · every ${ordinal(d.every)} strike ${d.crit}x${extra}`;
   }
   if (kind === "spearHall" || kind === "phalanx" || kind === "lancerStable" || kind === "javelinCamp") {
     const scale = soldierScale(l.soldierArms), life = (u: { hp: number }) => `Recruits: ${n(u.hp * scale * b.troopHp)} HP`;
