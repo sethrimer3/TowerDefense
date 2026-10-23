@@ -36,7 +36,7 @@ export const SUBJECTS: Subject[] = [
     topics: [
       // The guilds and their newest branches have no upgrades of their own:
       // the shared troop upgrades are theirs.
-      { id: "troops", name: "All troops", items: ["meleeGuild", "rangedGuild", "heroHall", "shadow", "assassinDen", "spearHall", "phalanx", "javelinCamp", "lancerStable", "gunHall", "musketHall", "sniperLodge", "gunNest", "gatlingNest", "rocketBattery", "revolutionary"], upgrades: ["barracksCapacity", "barracksTraining", "soldierArms"], training: ["troopHp", "troopDamage", "drill"], skills: ["drillSergeant", "veterans", "bladework"] },
+      { id: "troops", name: "All troops", items: ["meleeGuild", "rangedGuild", "heroHall", "shadow", "assassinDen", "bloodHall", "veilHouse", "poisonDen", "spearHall", "phalanx", "javelinCamp", "lancerStable", "gunHall", "musketHall", "sniperLodge", "gunNest", "gatlingNest", "rocketBattery", "revolutionary"], upgrades: ["barracksCapacity", "barracksTraining", "soldierArms"], training: ["troopHp", "troopDamage", "drill"], skills: ["drillSergeant", "veterans", "bladework"] },
       { id: "warBanner", name: "War banner", skills: ["warBanner", "bannerCooldown", "bannerDefense", "bannerReach", "bannerDamage", "bannerMarch", "bannerLife", "bannerRegen"] },
       { id: "towers", name: "All towers", training: ["towerDamage", "towerReload"], skills: ["fletchers", "ballistics"] },
       { id: "battle", name: "Battle", upgrades: ["bombSafe"], training: ["bombDamage"], extras: ["bomb", "speed3"], skills: ["gunpowder"] },
@@ -59,16 +59,16 @@ export const SUBJECTS: Subject[] = [
     id: "towers", name: "Towers", sprite: "attack", blurb: "What stands and shoots.",
     topics: [
       {
-        id: "archerTower", name: "Archer tower", item: "archerTower", upgrades: ["archerDamage", "archerRange", "archerRate"],
+        id: "archerTower", name: "Archer tower", item: "archerTower", items: ["brazierTower", "hawkTower"], upgrades: ["archerDamage", "archerRange", "archerRate"],
       },
       {
-        id: "cannonTower", name: "Cannon tower", item: "cannonTower", items: ["nanoTower"], upgrades: ["cannonDamage", "cannonRate", "cannonSafe"],
+        id: "cannonTower", name: "Cannon tower", item: "cannonTower", items: ["batteryTower", "mortarTower", "nanoTower"], upgrades: ["cannonDamage", "cannonRate", "cannonSafe"],
       },
       {
         id: "watchTower", name: "Watch tower", item: "watchTower", upgrades: ["watchRadius"],
       },
       {
-        id: "wizardTower", name: "Wizard tower", item: "wizardTower", upgrades: ["wizardFlame", "wizardIce"],
+        id: "wizardTower", name: "Wizard tower", item: "wizardTower", items: ["pyreTower", "frostTower", "stormTower"], upgrades: ["wizardFlame", "wizardIce"],
       },
       { id: "darkKeep", name: "Dark wizard keep", item: "darkKeep", upgrades: ["darkKeepCompact", "chainReach", "chainCount"] },
     ],
@@ -77,13 +77,13 @@ export const SUBJECTS: Subject[] = [
     id: "units", name: "Infantry", sprite: "health", blurb: "The buildings that train your people.",
     topics: [
       {
-        id: "barracks", name: "Barracks", item: "barracks", upgrades: ["soldierReach"],
+        id: "barracks", name: "Barracks", item: "barracks", items: ["chapterHouse", "berserkerLodge", "halberdYard"], upgrades: ["soldierReach"],
       },
       {
-        id: "archerBarracks", name: "Archer barracks", item: "archerBarracks", upgrades: ["archerSight", "archerHunt"],
+        id: "archerBarracks", name: "Archer barracks", item: "archerBarracks", items: ["rangerLodge", "skirmishCamp"], upgrades: ["archerSight", "archerHunt"],
       },
       {
-        id: "mageGuild", name: "Mage Guild", item: "mageGuild", upgrades: ["mageFireball", "mageEmbers"],
+        id: "mageGuild", name: "Mage Guild", item: "mageGuild", items: ["infernoHall", "cinderHall"], upgrades: ["mageFireball", "mageEmbers"],
       },
       { id: "valkyriePalace", name: "Valkyrie palace", item: "valkyriePalace", upgrades: ["palaceCompact", "valkyrieReach"] },
     ],

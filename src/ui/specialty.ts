@@ -18,7 +18,8 @@ import { CHAIN, CRIT_CHANCE, CRIT_DAMAGE, DETONATOR, REVOLUTIONARY_PATHS, SQUAD,
 import { BALLISTA_PATHS, FIRE_BOLTS, HEAVY_BOLTS, WINDLASS, ballistaAllocated, ballistaRank, respecBallistas, undoBallistas, upgradeBallistas, type BallistaPathId, type BallistaRanks } from "../ballista-upgrades.ts";
 import { pathById, type PathId, WHIRLWIND, BLADE_DANCE, LEGEND, FIRE_ARROWS, SHARP, GUNNERY, SIEGE_SHOT, CRUSADE, BLOODLETTERS, SHADOWCLOAK, VENOM, HEADHUNT, GRENADIERS, VOLLEY, BAYONET, SHARP_MUSKETS, BELT_FEED, LONG_SPEARS, SET_SPEARS, TESTUDO, SPEAR_WALL, BARBED, THROWING, HEAVY_LANCE, WINGED, TRIPOD, QUICKDRAW, DUELISTS, GUN_SHIELD, OVERDRIVE, STOPPING, DEADEYE, PIERCING, CLUSTER, SALVO, MARKSMEN, RICOCHET, SUPPRESS, BERSERK, HALBERD, RANGERS, SKIRMISH, FORTIFY, PYRO, RIME, STORM, PYROCLASM, CINDERS, SPOTTERS, SIGNAL } from "../knowledge-paths.ts";
 import { bonuses } from "../progression.ts";
-import { ITEM_NAMES, archerDamage, archerCooldown, archerRange, cannonDamage, cannonCooldown, CANNON_RANGE, NANO_TOWER, SOLDIER, ARCHER_UNIT, soldierScale, STRUCTURES, flameDps, flameRange, iceDamage, ICE_RANGE, iceChill, watchRadius, fireballDamage, fireballSplash, emberDps, emberSeconds, FIRE_MAGE, FIREBALL_RANGE, keepHp, BRAWLER, ASSASSIN_UNIT, SLINGER, SNIPER, MUSKETEER, GUNNER, MACHINE_GUNNER, GATLING_GUNNER, RAIL_SNIPER, ROCKETEER, SPEARMAN, HOPLITE, LANCER, JAVELINEER, HERO, SHADE, WALL_BLOCK_DESCRIPTION, wallHp, GATE, GATE_DESCRIPTION, BALLISTA, BALLISTA_DESCRIPTION, ballistaCooldown, ballistaDamage, ballistaRange, gateHpScale, gateShut, spikeDamage, spikeEvery, type PaletteItem } from "../defend/catalog.ts";
+import { denOf } from "../defend/assassins.ts";
+import { ITEM_NAMES, archerDamage, archerCooldown, archerRange, cannonDamage, cannonCooldown, CANNON_RANGE, NANO_TOWER, SOLDIER, ARCHER_UNIT, soldierScale, STRUCTURES, flameDps, flameRange, iceDamage, ICE_RANGE, iceChill, watchRadius, fireballDamage, fireballSplash, emberDps, emberSeconds, FIRE_MAGE, FIREBALL_RANGE, keepHp, BRAWLER, ASSASSIN_UNIT, SLINGER, SNIPER, MUSKETEER, GUNNER, MACHINE_GUNNER, GATLING_GUNNER, RAIL_SNIPER, ROCKETEER, SPEARMAN, HOPLITE, LANCER, JAVELINEER, HERO, SHADE, WALL_BLOCK_DESCRIPTION, wallHp, GATE, GATE_DESCRIPTION, BALLISTA, BALLISTA_DESCRIPTION, ballistaCooldown, ballistaDamage, ballistaRange, gateHpScale, gateShut, spikeDamage, spikeEvery, isWizardTower, isSwordHall, isAssassinDen, isArcherTower, isCannonTower, isArcherHall, isMageHall, type PaletteItem } from "../defend/catalog.ts";
 
 /** `kind`'s effective numbers wearing `path` at `rank` (none: plain), with
  * the shared Smithy and skill bonuses. */
@@ -26,24 +27,30 @@ export function kindStats(save: Save, kind: PaletteItem, path?: PathId, rank = 0
   const l = save.defend.levels, b = bonuses(save);
   const at = (id: string) => path === id ? rank : 0;
   const n = (v: number) => Number(v.toFixed(2));
-  if (kind === "archerTower") {
-    const sharp = at("sharpshooters"), fire = at("fireArrows");
+  if (isArcherTower(kind)) {
+    const sharp = at("sharpshooters"), fire = at("fireArrows"), lit = kind === "brazierTower" || fire > 0, hawk = kind === "hawkTower" || sharp > 0;
     const damage = archerDamage(l.archerDamage) * b.towerDamage * (sharp >= 3 ? SHARP.damage : 1);
-    return `${n(damage)} damage · ${n(archerCooldown(l.archerRate) * b.towerReload)}s reload · ${n(archerRange(l.archerRange) + (sharp ? SHARP.range : 0))} range${fire ? ` · ${FIRE_ARROWS.burn[fire]}s burn` : ""}${fire >= 3 ? " · 3 arrows" : ""}${sharp >= 2 ? " · every third arrow 3x damage" : ""}`;
+    return `${n(damage)} damage · ${n(archerCooldown(l.archerRate) * b.towerReload)}s reload · ${n(archerRange(l.archerRange) + (sharp ? SHARP.range : hawk ? SHARP.hall : 0))} range${lit ? ` · ${fire ? FIRE_ARROWS.burn[fire] : FIRE_ARROWS.hall.burn}s burn` : ""}${fire >= 3 ? " · 3 arrows" : ""}${sharp >= 2 ? " · every third arrow 3x damage" : ""}`;
   }
-  if (kind === "cannonTower") {
-    const gun = at("gunnery"), siege = at("siegeShot");
-    return `${n(cannonDamage(l.cannonDamage) * b.towerDamage * SIEGE_SHOT.damage[siege])} damage · ${n(cannonCooldown(l.cannonRate) * b.towerReload * GUNNERY.reload[gun] * (siege ? SIEGE_SHOT.reload : 1))}s reload · ${CANNON_RANGE + (siege >= 3 ? SIEGE_SHOT.range : 0)} range${gun >= 2 ? " · 4 extra blasts" : ""}`;
+  if (isCannonTower(kind)) {
+    const gun = at("gunnery"), siege = at("siegeShot"), battery = kind === "batteryTower" || gun > 0, mortar = kind === "mortarTower" || siege > 0;
+    const hit = siege ? SIEGE_SHOT.damage[siege] : mortar ? SIEGE_SHOT.hall.damage : 1;
+    const reload = (gun ? GUNNERY.reload[gun] : battery ? GUNNERY.hall : 1) * (siege ? SIEGE_SHOT.reload : mortar ? SIEGE_SHOT.hall.reload : 1);
+    return `${n(cannonDamage(l.cannonDamage) * b.towerDamage * hit)} damage · ${n(cannonCooldown(l.cannonRate) * b.towerReload * reload)}s reload · ${CANNON_RANGE + (siege >= 3 ? SIEGE_SHOT.range : 0)} range${gun >= 2 ? " · 4 extra blasts" : ""}`;
   }
-  if (kind === "barracks" || kind === "archerBarracks") {
-    const sword = kind === "barracks", base = sword ? SOLDIER : ARCHER_UNIT;
+  if (isSwordHall(kind) || isArcherHall(kind)) {
+    const sword = isSwordHall(kind), base = sword ? SOLDIER : ARCHER_UNIT;
     const crusade = at("crusaders"), berserk = at("berserkers"), halberd = at("halberdiers"), ranger = at("rangers"), skirmish = at("skirmishers");
+    const rangerish = kind === "rangerLodge" || ranger > 0, skirmisher = kind === "skirmishCamp" || skirmish > 0;
+    const crusader = kind === "chapterHouse" || crusade > 0, berserker = kind === "berserkerLodge" || berserk > 0, halberdier = kind === "halberdYard" || halberd > 0;
     const scale = soldierScale(l.soldierArms);
     const extra = [
-      berserk ? `strikes every ${n(SOLDIER.cooldown * BERSERK.cooldown)}s${berserk >= 2 ? ` · kills heal ${BERSERK.heal * 100}%` : ""}${berserk >= 3 ? " · cleaving" : ""}` : "",
-      halberd ? `${n(SOLDIER.reach + HALBERD.reach)} reach${halberd >= 2 ? ` · blows slow ${HALBERD.chill}s` : ""}${halberd >= 3 ? ` · ${HALBERD.bigDamage}x on big enemies` : ""}` : "",
+      berserker ? `strikes every ${n(SOLDIER.cooldown * (berserk ? BERSERK.cooldown : BERSERK.rage))}s${berserk >= 2 ? ` · kills heal ${BERSERK.heal * 100}%` : ""}${berserk >= 3 ? " · cleaving" : ""}` : "",
+      rangerish ? `+${ranger ? RANGERS.sight : RANGERS.lodge} sight` : "",
+      skirmisher ? `draws ${n(ARCHER_UNIT.cooldown * (skirmish ? SKIRMISH.reload[skirmish] : SKIRMISH.camp))}s${skirmish >= 2 ? " · shoots on the move" : ""}` : "",
+      halberdier ? `${n(SOLDIER.reach + (halberd ? HALBERD.reach : HALBERD.drill))} reach${halberd >= 2 ? ` · blows slow ${HALBERD.chill}s` : ""}${halberd >= 3 ? ` · ${HALBERD.bigDamage}x on big enemies` : ""}` : "",
     ].filter(Boolean).map((t) => ` · ${t}`).join("");
-    return `Recruits: ${n(base.hp * scale * b.troopHp * (sword ? CRUSADE.hp[crusade] : 1))} HP · ${n(base.damage * scale * b.troopDamage * (crusade >= 3 ? CRUSADE.damage : halberd ? HALBERD.damage : ranger >= 2 ? RANGERS.damage : 1))} damage · ${n(base.speed * (crusade ? CRUSADE.speed : skirmish >= 2 ? SKIRMISH.speed : 1))} speed${extra}`;
+    return `Recruits: ${n(base.hp * scale * b.troopHp * (crusader ? CRUSADE.hp[crusade] : 1))} HP · ${n(base.damage * scale * b.troopDamage * (crusade >= 3 ? CRUSADE.damage : halberd ? HALBERD.damage : ranger >= 2 ? RANGERS.damage : 1))} damage · ${n(base.speed * (crusader ? CRUSADE.speed : skirmish >= 2 ? SKIRMISH.speed : 1))} speed${extra}`;
   }
   if (kind === "heroHall") {
     const whirl = at("whirlwind"), dance = at("bladeDance"), legend = at("legend"), scale = soldierScale(l.soldierArms);
@@ -56,15 +63,15 @@ export function kindStats(save: Save, kind: PaletteItem, path?: PathId, rank = 0
     const combo = every === 1 ? `every strike a spin ${spin} cells round, ${times}x` : `every ${ordinal(every)} strike a spin ${spin} cells round, ${times}x`;
     return `One hero: ${n(HERO.hp * scale * b.troopHp * LEGEND.hp[legend])} HP · ${n(HERO.damage * scale * b.troopDamage)} damage every ${n(HERO.cooldown * BLADE_DANCE.cooldown[dance])}s · slashes cut all within ${HERO.arc} cells in front · ${combo}${extra}`;
   }
-  if (kind === "assassinDen") {
-    const blood = at("bloodletters"), cloak = at("shadowcloak"), venom = at("venom"), hunt = at("headhunters");
+  if (isAssassinDen(kind)) {
+    const d = denOf(kind, at("bloodletters"), at("shadowcloak"), at("venom"), at("headhunters")), hunt = d.hunt;
     const u = ASSASSIN_UNIT, scale = soldierScale(l.soldierArms);
     const extra = [
-      cloak ? `cloaked · ${SHADOWCLOAK.ambush[cloak]}x from the cloak` : "",
-      venom ? `poison: ${VENOM.more[venom]}x damage taken for ${VENOM.time[venom]}s` : "",
+      d.veiled ? `cloaked · ${d.ambush}x from the cloak` : "",
+      d.poisons ? `poison: ${d.more}x damage taken for ${d.time}s` : "",
       hunt ? `toughest first · +${HEADHUNT.bounty[hunt] * 100}% of its HP a strike` : "",
     ].filter(Boolean).map((t) => ` · ${t}`).join("");
-    return `Recruits: ${n(u.hp * scale * b.troopHp * BLOODLETTERS.hp[blood])} HP · ${n(u.damage * scale * b.troopDamage)} damage every ${u.cooldown}s · every ${ordinal(BLOODLETTERS.every[blood])} strike ${BLOODLETTERS.crit[blood]}x${extra}`;
+    return `Recruits: ${n(u.hp * scale * b.troopHp * d.hp)} HP · ${n(u.damage * scale * b.troopDamage)} damage every ${u.cooldown}s · every ${ordinal(d.every)} strike ${d.crit}x${extra}`;
   }
   if (kind === "spearHall" || kind === "phalanx" || kind === "lancerStable" || kind === "javelinCamp") {
     const scale = soldierScale(l.soldierArms), life = (u: { hp: number }) => `Recruits: ${n(u.hp * scale * b.troopHp)} HP`;
@@ -103,20 +110,20 @@ export function kindStats(save: Save, kind: PaletteItem, path?: PathId, rank = 0
       barbed >= 3 ? `${BARBED.bigDamage}x on big enemies` : "",
     ])}`;
   }
-  if (kind === "wizardTower") {
+  if (isWizardTower(kind)) {
     const pyro = at("pyromancy"), rime = at("rime"), storm = at("storm");
-    if (storm) return `${n(flameDps(l.wizardFlame) * b.towerDamage * STORM.damage * (storm >= 3 ? STORM.surge : 1))} bolt damage · ${STORM.links[storm]} targets · ${n(flameRange(l.wizardFlame))} bolt range · alternating with ice`;
+    if (kind === "stormTower") return `${n(flameDps(l.wizardFlame) * b.towerDamage * STORM.damage * (storm >= 3 ? STORM.surge : 1))} bolt damage · ${STORM.links[storm]} targets · ${n(flameRange(l.wizardFlame))} bolt range · alternating with ice`;
     const fire = `${n(flameDps(l.wizardFlame) * b.towerDamage * PYRO.damage[pyro])} fire damage/s · ${n(flameRange(l.wizardFlame) + (pyro >= 2 ? PYRO.reach : 0))} fire range`;
     const ice = `${n(iceDamage(l.wizardIce) * b.towerDamage * (rime >= 2 ? RIME.damage : 1))} ice damage · ${ICE_RANGE + (rime >= 2 ? RIME.reach : 0)} ice range · ${n(iceChill(l.wizardIce) * (rime ? RIME.chill : 1))}s chill`;
-    return rime ? ice : pyro ? fire : `${fire} · ${ice}`;
+    return kind === "frostTower" ? `${ice} · twice as often` : kind === "pyreTower" ? fire : `${fire} · ${ice}`;
   }
   if (kind === "watchTower") {
     const spot = at("spotters"), signal = at("signalFires");
     return `${watchRadius(l.watchRadius) + (spot >= 2 ? SPOTTERS.radius : 0) + (signal >= 2 ? SIGNAL.radius : 0)} marking range · ${SPOTTERS.mark[spot]}x marked damage${signal ? ` · enemies move at ${SIGNAL.slow[signal] * 100}% speed` : ""}`;
   }
-  if (kind === "mageGuild") {
-    const pyro = at("pyroclasm"), cinders = at("cinders");
-    return `Recruits: ${n(FIRE_MAGE.hp * soldierScale(l.soldierArms) * b.troopHp)} HP · ${n(fireballDamage(l.mageFireball) * soldierScale(l.soldierArms) * b.troopDamage * (pyro ? PYROCLASM.damage : 1))} fireball damage · ${n(fireballSplash(l.mageFireball) * (pyro >= 2 ? PYROCLASM.splash : 1))} blast radius · ${n(emberDps(l.mageEmbers) * b.troopDamage * (cinders >= 2 ? CINDERS.dps : 1))} ground damage/s · ${n(emberSeconds(l.mageEmbers) * (cinders ? CINDERS.life : 1))}s burning ground`;
+  if (isMageHall(kind)) {
+    const pyro = at("pyroclasm"), cinders = at("cinders"), hit = pyro ? PYROCLASM.damage : kind === "infernoHall" ? PYROCLASM.hall : 1, lasts = cinders ? CINDERS.life : kind === "cinderHall" ? CINDERS.hall : 1;
+    return `Recruits: ${n(FIRE_MAGE.hp * soldierScale(l.soldierArms) * b.troopHp)} HP · ${n(fireballDamage(l.mageFireball) * soldierScale(l.soldierArms) * b.troopDamage * hit)} fireball damage · ${n(fireballSplash(l.mageFireball) * (pyro >= 2 ? PYROCLASM.splash : 1))} blast radius · ${n(emberDps(l.mageEmbers) * b.troopDamage * (cinders >= 2 ? CINDERS.dps : 1))} ground damage/s · ${n(emberSeconds(l.mageEmbers) * lasts)}s burning ground`;
   }
   if (kind === "revolutionary") return revolutionaryStats(save, save.defend.revolutionaryRanks);
   if (kind === "shadow") return shadowStats(save, save.defend.shadowRanks);

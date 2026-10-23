@@ -138,16 +138,21 @@ try {
     assert.equal(s.defend.owned.watchTower, 1, 'the other Watch tower is untouched');
     let tree = await nodes();
     assert.ok(!tree.some(n => n.startsWith('k:archerTower') || n.startsWith('k:cannonTower')), `the other branches withered: ${tree}`);
-    assert.ok(tree.includes('p:storm:1=next') && tree.includes('p:pyromancy:3=locked'), `the wizard's own paths sprouted: ${tree}`);
+    assert.ok(tree.includes('k:stormTower=next') && tree.includes('k:pyreTower=next') && tree.includes('k:frostTower=next'), `the wizard's own branches sprouted: ${tree}`);
+    assert.ok(!tree.some(n => n.startsWith('p:') || n.startsWith('k:darkKeep')), `only their attunements before one is taken: ${tree}`);
     assert.match(await allocatedText(), /✦ 8/);
     assert.ok(Number(await panel.locator('.ug-branches').getAttribute('data-closed')) > 0, 'the Watch tower trails the branches it closed off');
+    await buy('k:stormTower');
+    await settled();
+    assert.equal((await placed(tower.uid)).kind, 'stormTower', 'attuned to lightning, a tower of its own');
     await buy('p:storm:1');
     await settled();
     assert.deepEqual([(await placed(tower.uid)).path, (await placed(tower.uid)).rank], ['storm', 1]);
     tree = await nodes();
-    assert.ok(!tree.some(n => n.startsWith('p:pyromancy') || n.startsWith('p:rime')), 'Pyromancy and Rime are cut off');
+    assert.ok(!tree.some(n => n.startsWith('k:pyreTower') || n.startsWith('k:frostTower')), 'the Pyre and Frost towers are cut off');
     assert.ok(tree.includes('k:darkKeep=locked'), 'the ultimate waits at the end of Stormcalling');
-    assert.ok((await centreOf('p:storm:1')).y < (await centreOf('k:wizardTower')).y, 'its branch climbs upward');
+    assert.ok((await centreOf('p:storm:1')).y < (await centreOf('k:stormTower')).y, 'its branch climbs upward');
+    assert.ok((await centreOf('k:stormTower')).y < (await centreOf('k:wizardTower')).y, 'over the wizard tower');
     assert.match(await allocatedText(), new RegExp(`✦ ${100 - (await state(page)).knowledge}`));
     // Drag a node: it follows, then eases back into the tree.
     const node = panel.locator('[data-node="p:storm:2"]'), home = await node.boundingBox();
@@ -161,15 +166,17 @@ try {
     const back = await node.boundingBox();
     assert.ok(Math.abs(back.x - home.x) < 6 && Math.abs(back.y - home.y) < 6, `and springs back (${JSON.stringify(back)} vs ${JSON.stringify(home)})`);
     await page.screenshot({ path: `${out}/upgrade-${width}-wizard-tower.png` });
-    // Undo Stormcalling I: free, its Knowledge back, Pyromancy and Rime open again.
+    // Undo the Storm tower: free, its Knowledge back, the Pyre and Frost towers open again.
     const kBefore = (await state(page)).knowledge;
-    await press(panel.locator('[data-node="p:storm:1"]'));
-    await press(panel.locator('[data-ug-undo="p:storm:1"]'));
+    await press(panel.locator('[data-node="k:stormTower"]'));
+    await press(panel.locator('[data-ug-undo="k:stormTower"]'));
     await settled();
-    assert.equal((await placed(tower.uid)).path, undefined, 'back to a plain wizard tower');
-    assert.equal((await state(page)).knowledge, 92, `Stormcalling I's Knowledge back (from ${kBefore})`);
-    assert.ok((await nodes()).includes('p:pyromancy:1=next'), 'Pyromancy opens again');
+    assert.deepEqual([(await placed(tower.uid)).kind, (await placed(tower.uid)).path], ['wizardTower', undefined], 'back to a plain wizard tower');
+    assert.equal((await state(page)).knowledge, 92, `the Storm tower's and Stormcalling I's Knowledge back (from ${kBefore})`);
+    assert.ok((await nodes()).includes('k:pyreTower=next'), 'the Pyre tower opens again');
     await page.waitForTimeout(700); await page.screenshot({ path: `${out}/upgrade-${width}-undone.png` });
+    await buy('k:stormTower');
+    await settled();
     await buy('p:storm:1');
     await settled();
     await press(panel.locator('[data-node="p:storm:2"]'));
@@ -183,7 +190,7 @@ try {
     const before = await state(page);
     await buy('k:assassinDen');
     await settled();
-    assert.ok((await nodes()).includes('p:bloodletters:1=next'));
+    assert.ok((await nodes()).includes('k:bloodHall=next'));
     await page.screenshot({ path: `${out}/upgrade-${width}-barracks.png` });
     await press(panel.locator('.ug-respec'));
     await settled();
@@ -198,8 +205,9 @@ try {
     const twice = async id => { await press(panel.locator(`[data-node="${id}"]`)); await press(panel.locator(`[data-node="${id}"]`)); await settled(); };
     await twice('k:assassinDen');
     assert.equal((await placed(melee.uid)).kind, 'assassinDen', 'a second tap buys it');
+    await twice('k:bloodHall');
     await twice('p:bloodletters:1');
-    assert.deepEqual([(await placed(melee.uid)).path, (await placed(melee.uid)).rank], ['bloodletters', 1]);
+    assert.deepEqual([(await placed(melee.uid)).kind, (await placed(melee.uid)).path, (await placed(melee.uid)).rank], ['bloodHall', 'bloodletters', 1]);
     await press(panel.locator('[data-node="k:assassinDen"]'));
     assert.match(await panel.locator('.ug-again').textContent(), /sell everything after it/);
     await page.waitForTimeout(500); await page.screenshot({ path: `${out}/upgrade-${width}-tap-again.png` });
@@ -218,14 +226,14 @@ try {
     assert.equal(await panel.locator('.ug-node.next').count(), 3);
     await page.waitForTimeout(700); await page.screenshot({ path: `${out}/upgrade-${width}-ranged-guild.png` });
     // A Musket hall is 3 × 2 quarters, not the guild's 2 × 2: it waits in the
-    // palette, on the first rank of Volley fire, the branch that made it.
+    // palette, attuned to Volley fire but not yet on its first rank.
     await buy('k:gunHall');
     await settled();
-    await buy('p:volleyFire:1');
+    await buy('k:musketHall');
     await page.waitForSelector('#defend-specialty', { state: 'hidden' });
     assert.equal(await placed(ranged.uid), undefined, 'taken up');
     assert.ok((await state(page)).defend.owned.musketHall >= 1);
-    assert.equal((await place('musketHall~volleyFire~1'))?.kind, 'musketHall', 'and placed again');
+    assert.equal((await place('musketHall'))?.kind, 'musketHall', 'and placed again');
     const ranged2 = await place('rangedGuild', 2);
     await tapBuilding(ranged2.uid);
     await buy('k:gunHall');
@@ -253,7 +261,7 @@ try {
       return dp.renderer.toClient(b.rect.x + b.rect.w / 2, b.rect.y + b.rect.h / 2);
     }, tower.uid);
     await hold(towerAt.x, towerAt.y);
-    assert.match(await panel.locator('.ug-title').textContent(), /Wizard tower/, 'holding a placed building opens its tree');
+    assert.match(await panel.locator('.ug-title').textContent(), /Storm tower/, 'holding a placed building opens its tree');
     assert.equal(JSON.stringify((await state(page)).defend.layout.structures), layoutBefore, 'and leaves it where it stood');
     await page.waitForTimeout(300);
     assert.equal(await panel.isHidden(), false, 'letting go keeps it open');
@@ -272,15 +280,17 @@ try {
     assert.equal(s.defend.owned.watchTower, 0, 'its Watch tower is used up');
     assert.match(await panel.locator('.ug-title').textContent(), /Archer tower/, 'and its tree goes on from there');
     assert.ok(await page.locator('#defend-palette [data-item="archerTower"]').count(), 'the palette shows it');
-    const path = (await nodes()).find(n => n.startsWith('p:') && n.endsWith(':1=next')).split('=')[0];
-    await buy(path);
+    assert.deepEqual((await nodes()).filter(n => n.endsWith('=next')).sort(), ['k:brazierTower=next', 'k:hawkTower=next'], 'its branches\' towers');
+    await buy('k:brazierTower');
+    await settled();
+    await buy('p:fireArrows:1');
     await settled();
     s = await state(page);
-    assert.equal(s.defend.kept.length, 1, `it waits on ${path} as a kept copy`);
-    assert.ok(await page.locator(`#defend-palette [data-item^="archerTower~"]`).count(), 'under its own palette entry');
+    assert.equal(s.defend.kept.length, 1, 'it waits on Fire arrows as a kept copy');
+    assert.ok(await page.locator(`#defend-palette [data-item^="brazierTower~"]`).count(), 'under its own palette entry');
     await press(panel.locator('[data-specialty-close]'));
     s = await state(page);
-    assert.deepEqual(['wizardTower', 'musketHall', 'gunHall', 'meleeGuild'].map(k => s.defend.owned[k] >= 1), [true, true, true, true]);
+    assert.deepEqual(['stormTower', 'musketHall', 'gunHall', 'meleeGuild'].map(k => s.defend.owned[k] >= 1), [true, true, true, true]);
 
     // Saved, reloaded, and fought with.
     await page.reload(); await page.waitForSelector('#defend-start');
@@ -288,7 +298,7 @@ try {
     assert.deepEqual([(s.defend.layout.structures.find(x => x.uid === tower.uid)).path, s.defend.layout.structures.find(x => x.uid === tower.uid).rank], ['storm', 1]);
     await hook(); await page.waitForFunction(() => window.__dp);
     await page.locator('#defend-start').click();
-    const paths = await page.evaluate(() => Object.values(window.__dp.sim.bonuses.structurePaths).map(p => p.wizardTower));
+    const paths = await page.evaluate(() => Object.values(window.__dp.sim.bonuses.structurePaths).map(p => p.stormTower));
     assert.deepEqual(paths.filter(Boolean), [{ path: 'storm', rank: 1 }]);
     await page.evaluate(() => window.defendDebug?.(14));
     const kinds = await page.evaluate(() => [...new Set(window.__dp.sim.soldiers.map(s => s.kind))].sort());

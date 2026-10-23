@@ -75,10 +75,11 @@ try {
     if (phone) await page.touchscreen.tap(p.x, p.y); else await page.mouse.click(p.x, p.y);
     await page.waitForSelector('#defend-specialty:not([hidden])');
     const tree = await panel.locator('.ug-node:not(.withering)').evaluateAll(els => els.map(e => `${e.dataset.node}=${['owned', 'next', 'locked'].find(c => e.classList.contains(c))}`));
-    for (const n of ['k:meleeGuild=owned', 'k:spearHall=owned', 'p:testudo:1=next', 'p:barbed:1=next', 'p:wingedLancers:1=next', 'k:valkyriePalace=locked']) assert.ok(tree.includes(n), `${n} in ${tree}`);
+    for (const n of ['k:meleeGuild=owned', 'k:spearHall=owned', 'k:phalanx=next', 'k:javelinCamp=next', 'k:lancerStable=next']) assert.ok(tree.includes(n), `${n} in ${tree}`);
     assert.equal(tree.filter(n => n.endsWith('=next')).length, 3, 'only the three branches');
-    await press(panel.locator('[data-node="p:wingedLancers:1"]'));
-    assert.match(await panel.locator('.ug-card').textContent(), /Becomes a Lancer stable/);
+    assert.ok(!tree.some(n => n.startsWith('p:') || n.startsWith('k:valkyriePalace')), `only their attunements before one is taken: ${tree}`);
+    await press(panel.locator('[data-node="k:lancerStable"]'));
+    assert.match(await panel.locator('.ug-card').textContent(), /Lancer stable/);
     await page.waitForTimeout(900); await page.screenshot({ path: `${out}/spears-${width}-tree.png` });
     await press(panel.locator('[data-specialty-close]'));
     await page.waitForSelector('#defend-specialty', { state: 'hidden' });

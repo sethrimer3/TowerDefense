@@ -55,30 +55,30 @@ function knife(sim: DefendSim, h: Soldier, e: Enemy) {
 
 // ── The tree ───────────────────────────────────────────────────────────
 test("the Shadow is the assassins' ultimate, merged from three dens maxed on different branches", () => {
-  assert.deepEqual(nextSteps("assassinDen", { path: "venom", rank: 3 }).map(stepName), ["Shadow"]);
+  assert.deepEqual(nextSteps("poisonDen", { path: "venom", rank: 3 }).map(stepName), ["Shadow"]);
   assert.deepEqual(nextSteps("shadow"), [], "its upgrades are a shared tree, not paths");
   assert.equal(upgradedFrom("shadow"), "assassinDen");
   assert.equal(rootOf("shadow"), "meleeGuild");
   const full = (p: "bloodletters" | "shadowcloak" | "venom") => pathById(p).ranks.reduce((n, r) => n + r.cost, 0);
-  assert.equal(allocated("shadow"), 3 * 6 + full("bloodletters") + full("shadowcloak") + full("venom"));
+  assert.equal(allocated("shadow"), 3 * (6 + 4) + full("bloodletters") + full("shadowcloak") + full("venom"));
   const ids = buildingTree("shadow").map((n) => n.id);
-  for (const id of ["k:meleeGuild", "k:assassinDen", "p:bloodletters:3", "p:shadowcloak:3", "p:venom:3", "k:shadow"]) assert.ok(ids.includes(id), id);
+  for (const id of ["k:meleeGuild", "k:assassinDen", "k:bloodHall", "k:veilHouse", "k:poisonDen", "p:bloodletters:3", "p:shadowcloak:3", "p:venom:3", "k:shadow"]) assert.ok(ids.includes(id), id);
   assert.ok(fullTree("meleeGuild").some((n) => n.id === "k:shadow"), "on the line's upgrade map");
   assert.equal(STRUCTURES.shadow.w * STRUCTURES.shadow.h, STRUCTURES.assassinDen.w * STRUCTURES.assassinDen.h, "it stands where its den stood");
 });
 
 test("three maxed dens merge into the Shadow, which keeps its place; the save keeps it", () => {
   const s = defaults(); s.settings.devMode = true;
-  s.defend.owned.assassinDen = 3;
+  Object.assign(s.defend.owned, { bloodHall: 1, veilHouse: 1, poisonDen: 1 });
   let l = defaultLayout();
   for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) l = placeCityTile(l, l.keep.tx + dx, l.keep.ty + dy)!;
-  l = placeStructure(l, "assassinDen", l.keep.tx, l.keep.ty - 1)!;
-  const uid = l.structures.find((o) => o.kind === "assassinDen")!.uid;
+  l = placeStructure(l, "bloodHall", l.keep.tx, l.keep.ty - 1)!;
+  const uid = l.structures.find((o) => o.kind === "bloodHall")!.uid;
   l.structures.find((o) => o.uid === uid)!.path = "bloodletters";
   l.structures.find((o) => o.uid === uid)!.rank = 3;
   s.defend.layout = l;
-  s.defend.kept.push({ kind: "assassinDen", path: "shadowcloak", rank: 3 }, { kind: "assassinDen", path: "venom", rank: 3 });
-  const merge = nextSteps("assassinDen", specialtyOf(s.defend.layout, { uid })).find((o) => o.type === "merge")!;
+  s.defend.kept.push({ kind: "veilHouse", path: "shadowcloak", rank: 3 }, { kind: "poisonDen", path: "venom", rank: 3 });
+  const merge = nextSteps("bloodHall", specialtyOf(s.defend.layout, { uid })).find((o) => o.type === "merge")!;
   const r = upgradeBuilding(s, { uid }, merge);
   assert.ok(r.ok && !r.waiting);
   assert.equal(s.defend.layout.structures.find((o) => o.uid === uid)?.kind, "shadow");

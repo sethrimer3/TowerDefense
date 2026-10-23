@@ -10,9 +10,11 @@
  *    archer barracks, a Mage Guild or a gunner hall);
  *  - an attuned building takes one of its three branches, the others closing
  *    off, and climbs it three ranks. Each branch is one Knowledge path; the
- *    spearmen's and the gunners' branches first turn the hall into a
- *    building with troops of its own (`Branch.via`: a phalanx, javelin camp
- *    or lancer stable; a musket hall, machine-gun nest or rocket battery);
+ *    spearmen's and the gunners' branches start with an attunement that
+ *    turns the hall into a building with troops of its own (`Branch.via`: a
+ *    phalanx, javelin camp or lancer stable; a musket hall, machine-gun nest
+ *    or rocket battery), which then climbs the path. Until one is taken the
+ *    tree shows only each branch's first step;
  *  - three buildings of one attuned kind, each at the last rank of a
  *    different branch, merge into its ultimate (`Attuned.ultimate`: the Dark
  *    wizard keep, the Hero, the Shadow, the Valkyrie palace, the Sniper
@@ -45,8 +47,8 @@ export type Wear = { path: PathId; rank: number };
 
 // ── The shape of every line ─────────────────────────────────────────────
 /** One branch of an attuned building: a path climbed rank by rank. With
- * `via`, its first rank also turns the building into another kind (paying
- * `via.cost` on top of the rank), which wears the path from then on. */
+ * `via`, an attunement comes first, turning the building into another kind
+ * for `via.cost`, which then climbs the path. */
 export type Branch = { path: PathId; via?: { kind: PlacedKind; cost: number } };
 /** An attuned building: what it grows from and costs, its three branches,
  * and the ultimate three of it, each maxed on a different branch, merge
@@ -54,18 +56,39 @@ export type Branch = { path: PathId; via?: { kind: PlacedKind; cost: number } };
 export type Attuned = { kind: PlacedKind; from: PlacedKind; cost: number; branches: Branch[]; ultimate?: PlacedKind };
 
 export const ATTUNED: Attuned[] = [
-  { kind: "archerTower", from: "watchTower", cost: 3, branches: [{ path: "fireArrows" }, { path: "sharpshooters" }] },
-  { kind: "cannonTower", from: "watchTower", cost: 6, branches: [{ path: "gunnery" }, { path: "siegeShot" }], ultimate: "nanoTower" },
-  { kind: "wizardTower", from: "watchTower", cost: 8, branches: [{ path: "pyromancy" }, { path: "rime" }, { path: "storm" }], ultimate: "darkKeep" },
-  { kind: "barracks", from: "meleeGuild", cost: 4, branches: [{ path: "crusaders" }, { path: "berserkers" }, { path: "halberdiers" }], ultimate: "heroHall" },
-  { kind: "assassinDen", from: "meleeGuild", cost: 6, branches: [{ path: "bloodletters" }, { path: "shadowcloak" }, { path: "venom" }], ultimate: "shadow" },
+  { kind: "archerTower", from: "watchTower", cost: 3, branches: [{ path: "fireArrows", via: { kind: "brazierTower", cost: 3 } }, { path: "sharpshooters", via: { kind: "hawkTower", cost: 3 } }] },
+  { kind: "cannonTower", from: "watchTower", cost: 6, ultimate: "nanoTower", branches: [
+    { path: "gunnery", via: { kind: "batteryTower", cost: 4 } },
+    { path: "siegeShot", via: { kind: "mortarTower", cost: 4 } },
+  ] },
+  { kind: "wizardTower", from: "watchTower", cost: 8, ultimate: "darkKeep", branches: [
+    { path: "pyromancy", via: { kind: "pyreTower", cost: 6 } },
+    { path: "rime", via: { kind: "frostTower", cost: 6 } },
+    { path: "storm", via: { kind: "stormTower", cost: 8 } },
+  ] },
+  { kind: "barracks", from: "meleeGuild", cost: 4, ultimate: "heroHall", branches: [
+    { path: "crusaders", via: { kind: "chapterHouse", cost: 3 } },
+    { path: "berserkers", via: { kind: "berserkerLodge", cost: 3 } },
+    { path: "halberdiers", via: { kind: "halberdYard", cost: 3 } },
+  ] },
+  { kind: "assassinDen", from: "meleeGuild", cost: 6, ultimate: "shadow", branches: [
+    { path: "bloodletters", via: { kind: "bloodHall", cost: 4 } },
+    { path: "shadowcloak", via: { kind: "veilHouse", cost: 4 } },
+    { path: "venom", via: { kind: "poisonDen", cost: 4 } },
+  ] },
   { kind: "spearHall", from: "meleeGuild", cost: 5, ultimate: "valkyriePalace", branches: [
     { path: "testudo", via: { kind: "phalanx", cost: 7 } },
     { path: "barbed", via: { kind: "javelinCamp", cost: 8 } },
     { path: "wingedLancers", via: { kind: "lancerStable", cost: 10 } },
   ] },
-  { kind: "archerBarracks", from: "rangedGuild", cost: 5, branches: [{ path: "rangers" }, { path: "skirmishers" }], ultimate: "sniperLodge" },
-  { kind: "mageGuild", from: "rangedGuild", cost: 9, branches: [{ path: "pyroclasm" }, { path: "cinders" }] },
+  { kind: "archerBarracks", from: "rangedGuild", cost: 5, ultimate: "sniperLodge", branches: [
+    { path: "rangers", via: { kind: "rangerLodge", cost: 3 } },
+    { path: "skirmishers", via: { kind: "skirmishCamp", cost: 3 } },
+  ] },
+  { kind: "mageGuild", from: "rangedGuild", cost: 9, branches: [
+    { path: "pyroclasm", via: { kind: "infernoHall", cost: 5 } },
+    { path: "cinders", via: { kind: "cinderHall", cost: 5 } },
+  ] },
   { kind: "gunHall", from: "rangedGuild", cost: 6, ultimate: "gatlingNest", branches: [
     { path: "volleyFire", via: { kind: "musketHall", cost: 8 } },
     { path: "beltFeed", via: { kind: "gunNest", cost: 10 } },
@@ -124,7 +147,7 @@ const topRank = (path: PathId) => pathById(path).ranks.length;
 
 /** What each kind's troops are called on its upgrade buttons. */
 export const TROOPS: Partial<Record<PlacedKind, string>> = {
-  meleeGuild: "Brawlers", rangedGuild: "Stone throwers", barracks: "Swordsmen", heroHall: "Hero", shadow: "Shade", assassinDen: "Assassins", spearHall: "Spearmen", phalanx: "Hoplites", javelinCamp: "Javelineers", lancerStable: "Lancers", archerBarracks: "Archers", mageGuild: "Fire mages",
+  meleeGuild: "Brawlers", rangedGuild: "Stone throwers", barracks: "Swordsmen", chapterHouse: "Crusaders", berserkerLodge: "Berserkers", halberdYard: "Halberdiers", heroHall: "Hero", shadow: "Shade", assassinDen: "Assassins", bloodHall: "Bloodletters", veilHouse: "Cloaked assassins", poisonDen: "Poisoners", spearHall: "Spearmen", phalanx: "Hoplites", javelinCamp: "Javelineers", lancerStable: "Lancers", archerBarracks: "Archers", rangerLodge: "Rangers", skirmishCamp: "Skirmishers", mageGuild: "Fire mages", infernoHall: "Fire mages", cinderHall: "Fire mages",
   sniperLodge: "Snipers", musketHall: "Musketmen",
   gunHall: "Gunners", gunNest: "Machine gunners", gatlingNest: "Gatling gunners", rocketBattery: "Rocketeers", revolutionary: "Laser snipers", valkyriePalace: "Valkyries", darkKeep: "Dark wizard",
 };
@@ -146,8 +169,6 @@ export function rootOf(kind: PlacedKind): PlacedKind {
 export type UpgradeStep =
   | { type: "become"; to: PlacedKind; cost: number }
   | { type: "path"; path: PathId; rank: number; cost: number }
-  /** A branch whose first rank makes the building another kind. */
-  | { type: "branch"; to: PlacedKind; path: PathId; cost: number }
   /** Three buildings maxed on different branches made one ultimate. */
   | { type: "merge"; to: PlacedKind; cost: number };
 
@@ -161,13 +182,10 @@ export function nextSteps(kind: PlacedKind | "wallSpikes", wear?: Wear): Upgrade
     return a?.ultimate ? [{ type: "merge", to: a.ultimate, cost: MERGE_COST }] : [];
   }
   if (place.tier === "attuned")
-    return place.a.branches.map((b): UpgradeStep => {
-      const first = pathById(b.path).ranks[0].cost;
-      return b.via ? { type: "branch", to: b.via.kind, path: b.path, cost: b.via.cost + first } : { type: "path", path: b.path, rank: 1, cost: first };
-    });
+    return place.a.branches.map((b): UpgradeStep =>
+      b.via ? { type: "become", to: b.via.kind, cost: b.via.cost } : { type: "path", path: b.path, rank: 1, cost: pathById(b.path).ranks[0].cost });
   if (place.tier === "via") {
-    // Made one before branches were climbed from the first rank: it climbs
-    // from there.
+    // The branch's attunement made it: it climbs its path from the first rank.
     const p = pathById(place.a.branches[place.branch].path);
     return [{ type: "path", path: p.id, rank: 1, cost: p.ranks[0].cost }];
   }
@@ -180,7 +198,7 @@ export const sameStep = (a: UpgradeStep, b: UpgradeStep) =>
 
 /** A step's name, as its button reads. */
 export function stepName(s: UpgradeStep): string {
-  if (s.type === "become" || s.type === "merge" || s.type === "branch") return ITEM_NAMES[s.to];
+  if (s.type === "become" || s.type === "merge") return ITEM_NAMES[s.to];
   return `${pathById(s.path).name} ${ROMAN[s.rank]}`;
 }
 
@@ -290,17 +308,11 @@ export function upgradeBuilding(save: Save, target: SpecialtyTarget, asked: Upgr
   s.kind = step.to;
   delete s.path;
   delete s.rank;
-  if (step.type === "branch") {
-    s.path = step.path;
-    s.rank = 1;
-  }
   if (!free) save.knowledge -= step.cost;
   d.owned[kind as PlacedKind]--;
   d.owned[step.to]++;
   d.layout = standing(next, s.uid, kind as PlacedKind);
   const waiting = !d.layout.structures.some((o) => o.uid === s.uid);
-  // Taken up, it waits as a copy: kept on its branch, or plain.
-  if (waiting && step.type === "branch") d.kept.push({ kind: step.to, path: step.path, rank: 1 });
   recordFound(d);
   return { ok: true, kind: step.to, waiting };
 }
@@ -335,10 +347,6 @@ function upgradeCopy(save: Save, target: { copy: PaletteKind; wear?: Wear }, ask
   d.owned[kind as PlacedKind]--;
   d.owned[step.to]++;
   recordFound(d);
-  if (step.type === "branch") {
-    d.kept.push({ kind: step.to, path: step.path, rank: 1 });
-    return { ok: true, kind: step.to, copy: { copy: step.to, wear: { path: step.path, rank: 1 } } };
-  }
   return { ok: true, kind: step.to, copy: { copy: step.to } };
 }
 
@@ -560,15 +568,24 @@ const kid = (k: string) => `k:${k}`, pid = (p: PathId, r: number) => `p:${p}:${r
 export function buildingTree(kind: PlacedKind | "wallSpikes", wear?: Wear): TreeNode[] {
   const nodes: TreeNode[] = [];
   const place = placeOf(kind);
-  /** A path's ranks from `from`, `have` of them owned; with `via`, its
-   * first rank is the building it makes. Returns the top node's id. */
-  const climb = (p: KnowledgePath, from: string, have: number, via?: { kind: PlacedKind; cost: number }, made = false, merged = false) => {
+  /** A path's ranks from `from`, `have` of them owned; with `via`, the
+   * building its attunement makes comes first (`made`: it is that building).
+   * With `peek`, only the branch's first node shows, its ranks hidden
+   * beyond it. Returns the top node's id. */
+  const climb = (p: KnowledgePath, from: string, have: number, via?: { kind: PlacedKind; cost: number }, made = false, merged = false, peek = false) => {
     let parent = from;
+    const more = { hidden: [{ side: false, i: 0, n: 1 }] };
+    if (via) {
+      nodes.push({ id: kid(via.kind), parent, state: made ? "owned" : "next", kind: via.kind, cost: via.cost, step: { type: "become", to: via.kind, cost: via.cost },
+        ...(merged ? { merged } : {}), ...(peek ? more : {}) });
+      if (peek) return kid(via.kind);
+      parent = kid(via.kind);
+    }
     p.ranks.forEach((r, i) => {
-      const rank = i + 1, state = rank <= have ? "owned" : rank === have + 1 ? "next" : "locked";
-      const first = rank === 1 && via, cost = first && !made ? via.cost + r.cost : r.cost;
-      const step: UpgradeStep = first && !made ? { type: "branch", to: via.kind, path: p.id, cost } : { type: "path", path: p.id, rank, cost };
-      nodes.push({ id: pid(p.id, rank), parent, state, path: p.id, rank, cost, step, ...(first ? { kind: via.kind } : {}), ...(merged ? { merged } : {}) });
+      if (peek && i > 0) return;
+      const rank = i + 1, state = rank <= have ? "owned" : rank === have + 1 && (made || !via) ? "next" : "locked";
+      nodes.push({ id: pid(p.id, rank), parent, state, path: p.id, rank, cost: r.cost, step: { type: "path", path: p.id, rank, cost: r.cost },
+        ...(merged ? { merged } : {}), ...(peek ? more : {}) });
       parent = pid(p.id, rank);
     });
     return parent;
@@ -603,11 +620,8 @@ export function buildingTree(kind: PlacedKind | "wallSpikes", wear?: Wear): Tree
     roots(a, false);
     const attuned = nodes[nodes.length - 1];
     if (mine < 0) {
-      // Every branch open; the ultimate over the middle one.
-      a.branches.forEach((b, i) => {
-        const top = climb(pathById(b.path), kid(a.kind), 0, b.via);
-        if (i === Math.min(MIDDLE, a.branches.length - 1)) crown(a, top, "locked");
-      });
+      // Every branch open: only their attunements show until one is taken.
+      for (const b of a.branches) climb(pathById(b.path), kid(a.kind), 0, b.via, false, false, true);
       return nodes;
     }
     const b = a.branches[mine], open = openings(a.kind);
@@ -870,10 +884,13 @@ export function settleKept(d: DefendSave, prev: Layout, next: Layout) {
 export function fullTree(root: PaletteKind): TreeNode[] {
   const nodes: TreeNode[] = [];
   const climb = (p: KnowledgePath, from: string, via?: Branch["via"]) => {
+    if (via) {
+      nodes.push({ id: kid(via.kind), parent: from, state: "locked", kind: via.kind, cost: via.cost, step: { type: "become", to: via.kind, cost: via.cost } });
+      from = kid(via.kind);
+    }
     p.ranks.forEach((r, i) => {
-      const id = pid(p.id, i + 1), first = i === 0 && via;
-      nodes.push({ id, parent: from, state: "locked", path: p.id, rank: i + 1, cost: first ? via.cost + r.cost : r.cost,
-        step: first ? { type: "branch", to: via.kind, path: p.id, cost: via.cost + r.cost } : { type: "path", path: p.id, rank: i + 1, cost: r.cost }, ...(first ? { kind: via.kind } : {}) });
+      const id = pid(p.id, i + 1);
+      nodes.push({ id, parent: from, state: "locked", path: p.id, rank: i + 1, cost: r.cost, step: { type: "path", path: p.id, rank: i + 1, cost: r.cost } });
       from = id;
     });
     return from;

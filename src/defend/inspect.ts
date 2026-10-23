@@ -16,7 +16,7 @@ export type Armed = Pick<DefendSim, "levels" | "bonuses">;
 export type Circle = { x: number; y: number; r: number };
 
 /** Buildings that train troops, whose troops a tap picks out. */
-const TRAINS = new Set(["meleeGuild", "rangedGuild", "barracks", "heroHall", "shadow", "archerBarracks", "sniperLodge", "musketHall", "gunHall", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "assassinDen", "spearHall", "phalanx", "javelinCamp", "lancerStable", "mageGuild", "valkyriePalace", "darkKeep"]);
+const TRAINS = new Set(["meleeGuild", "rangedGuild", "barracks", "chapterHouse", "berserkerLodge", "halberdYard", "heroHall", "shadow", "bloodHall", "veilHouse", "poisonDen", "archerBarracks", "rangerLodge", "skirmishCamp", "sniperLodge", "musketHall", "gunHall", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "assassinDen", "spearHall", "phalanx", "javelinCamp", "lancerStable", "mageGuild", "infernoHall", "cinderHall", "valkyriePalace", "darkKeep"]);
 
 /** Whether a tap on `b` picks it: the keep, the player's structures and the wall's ballistas. */
 export const inspectable = (b: Building | undefined): b is Building =>
@@ -27,10 +27,10 @@ export function reachOf(b: Building, armed: Armed): Circle[] {
   const c = center(b.rect);
   const at = (r: number) => [{ x: c.x, y: c.y, r }];
   switch (b.kind) {
-    case "archerTower": return at(archerTowerRange(armed, b));
-    case "cannonTower": return at(cannonTowerRange(armed, b));
+    case "archerTower": case "brazierTower": case "hawkTower": return at(archerTowerRange(armed, b));
+    case "cannonTower": case "batteryTower": case "mortarTower": return at(cannonTowerRange(armed, b));
     case "nanoTower": return at(nanoRange());
-    case "wizardTower": return at(wizardReach(armed, b));
+    case "wizardTower": case "pyreTower": case "frostTower": case "stormTower": return at(wizardReach(armed, b));
     case "watchTower": return at(watchReach(armed, b));
     case "wallBallista": return at(wallBallistaRange(armed));
     case "keep": {

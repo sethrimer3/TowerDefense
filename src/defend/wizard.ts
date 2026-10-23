@@ -26,6 +26,7 @@ import { ENEMIES,
   flameRange,
   iceChill,
   iceDamage,
+  isWizardTower,
 } from "./catalog.ts";
 import type { Building } from "./citygen.ts";
 import { center, nearest } from "./pathing.ts";
@@ -34,11 +35,15 @@ import { dist } from "../exact.ts";
 import { PYRO, RIME, STORM, pathRank } from "../knowledge-paths.ts";
 import { chainBolt } from "./dark-wizards.ts";
 
-/** The wizard tower's Study path and rank (`knowledge-paths.ts`): each 0
- * unless chosen. */
+/** A wizard tower's path ranks (`knowledge-paths.ts`, each 0 unless worn)
+ * and what it casts: the Pyre tower only flames (`fire`), the Frost tower
+ * only ice (`ice`), the Storm tower bolts for flames (`bolt`). A plain
+ * wizard tower wearing a path (old fixtures' `Bonuses.paths`) casts as the
+ * tower that path belongs to. */
 const paths = (sim: Armed, b?: Building) => {
-  const p = buildingPaths(sim, b);
-  return { pyro: pathRank(p, "wizardTower", "pyromancy"), rime: pathRank(p, "wizardTower", "rime"), storm: pathRank(p, "wizardTower", "storm") };
+  const p = buildingPaths(sim, b), k = b?.kind;
+  const pyro = pathRank(p, "pyreTower", "pyromancy"), rime = pathRank(p, "frostTower", "rime"), storm = pathRank(p, "stormTower", "storm");
+  return { pyro, rime, storm, fire: k === "pyreTower" || pyro > 0, ice: k === "frostTower" || rime > 0, bolt: k === "stormTower" || storm > 0 };
 };
 /** What a tower's reach depends on: the levels and the Study's paths. */
 type Armed = Pick<DefendSim, "levels" | "bonuses">;
@@ -46,11 +51,11 @@ type Armed = Pick<DefendSim, "levels" | "bonuses">;
 export const fireReach = (sim: Armed, b?: Building) => flameRange(sim.levels.wizardFlame ?? 0) + (paths(sim, b).pyro >= 2 ? PYRO.reach : 0);
 /** How far its ice runs. */
 export const iceReach = (sim: Armed, b?: Building) => ICE_RANGE + (paths(sim, b).rime >= 2 ? RIME.reach : 0);
-/** How far a wizard tower reaches with what it casts: Rime casts only ice,
- * Pyromancy only flames, otherwise it alternates. */
+/** How far a wizard tower reaches with what it casts: the Frost tower
+ * casts only ice, the Pyre tower only flames, otherwise it alternates. */
 export const wizardReach = (sim: Armed, b?: Building) => {
-  const { pyro, rime } = paths(sim, b);
-  return rime ? iceReach(sim, b) : pyro ? fireReach(sim, b) : Math.max(fireReach(sim, b), iceReach(sim, b));
+  const { fire, ice } = paths(sim, b);
+  return ice ? iceReach(sim, b) : fire ? fireReach(sim, b) : Math.max(fireReach(sim, b), iceReach(sim, b));
 };
 
 /** A burst of fire from a wizard tower: where it leaves the tower, which
@@ -82,15 +87,15 @@ export class Wizards {
 
   step(sim: DefendSim, dt: number) {
     for (const b of sim.map.buildings) {
-      if (b.kind !== "wizardTower" || !sim.intact(b)) continue;
+      if (!isWizardTower(b.kind) || !sim.intact(b)) continue;
       const rest = (this.rest.get(b.id) ?? 0) - dt;
       this.rest.set(b.id, Math.max(0, rest));
       if (rest > 0 || sim.flames.some((f) => f.tower === b.id)) continue;
-      // Pyromancy gives up the ice, Rime the flames; Stormcalling casts a bolt for each flame.
-      const { pyro, rime, storm } = paths(sim, b);
-      const turn = pyro ? "flame" : rime ? "ice" : (this.next.get(b.id) ?? "flame");
+      // The Pyre tower gives up the ice, the Frost tower the flames; the Storm tower casts a bolt for each flame.
+      const { fire, ice, bolt, storm } = paths(sim, b);
+      const turn = fire ? "flame" : ice ? "ice" : (this.next.get(b.id) ?? "flame");
       if (turn === "ice") this.ice(sim, b);
-      else if (storm) this.bolt(sim, b, storm);
+      else if (bolt) this.bolt(sim, b, storm);
       else this.flame(sim, b);
     }
   }
@@ -126,8 +131,8 @@ export class Wizards {
       r: 0.6, range, t: 0, seed: b.id * 7919 + this.waves++ * 104729, hit: [],
     });
     this.next.set(b.id, "flame");
-    // Rime's ice comes twice as often, with no flames between.
-    this.rest.set(b.id, paths(sim, b).rime ? WIZARD_REST / 2 : WIZARD_REST);
+    // The Frost tower's ice comes twice as often, with no flames between.
+    this.rest.set(b.id, paths(sim, b).ice ? WIZARD_REST / 2 : WIZARD_REST);
   }
 
   /** A flame that has burned out leaves its tower resting. */

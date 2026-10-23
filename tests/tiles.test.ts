@@ -148,10 +148,10 @@ test("an opened tile shows its basic stats, then each upgrade it carries as an a
   assert.equal(plain.stats.length, 5);
   assert.match(plain.stats[0], /fire damage\/s/);
   assert.deepEqual(plain.abilities, []);
-  const storm = buildingSheet(s, "wizardTower", { path: "storm", rank: 2 });
+  const storm = buildingSheet(s, "stormTower", { path: "storm", rank: 2 });
   assert.match(storm.stats.join(" "), /5 targets/);
   assert.deepEqual(storm.abilities.map((a) => a.hue), ["storm", "storm"]);
-  assert.match(storm.abilities[0].text, /leaping through 3 enemies/);
+  assert.match(storm.abilities[0].text, /leap through 3 enemies/);
   // What a path adds isn't repeated among the numbers.
   const fire = buildingSheet(s, "archerTower", { path: "fireArrows", rank: 3 });
   assert.equal(fire.stats.length, buildingSheet(s, "archerTower").stats.length);

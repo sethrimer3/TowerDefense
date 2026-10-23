@@ -15,7 +15,8 @@ import { ENEMIES, SOLDIER } from "../src/defend/catalog.ts";
 import { kindStats } from "../src/ui/specialty.ts";
 import { PATH_LOOKS, structurePixels } from "../src/defend/tower-art.ts";
 
-/** A Barracks beside the keep climbing `path` to `rank`, in battle with its first swordsman. */
+/** A Barracks beside the keep becoming `path`'s hall and climbing it to
+ * `rank` (0: the hall alone), in battle with its first swordsman. */
 function barracks(path?: PathId, rank = 3) {
   const s = defaults(); s.settings.devMode = true; s.knowledge = 1e6;
   s.defend.owned.barracks = 1;
@@ -24,8 +25,10 @@ function barracks(path?: PathId, rank = 3) {
   l = placeStructure(l, "barracks", l.keep.tx, l.keep.ty - 1) ?? assert.fail("placement");
   s.defend.layout = l;
   const uid = l.structures.find((st) => st.kind === "barracks")!.uid;
+  const kind = () => s.defend.layout.structures.find((st) => st.uid === uid)!.kind;
+  if (path) assert.ok(upgradeBuilding(s, { uid }, nextSteps("barracks").find((st) => st.type === "become" && st.to === HALLS[path])!).ok);
   for (let r = 0; path && r < rank; r++) {
-    const step = nextSteps("barracks", specialtyOf(s.defend.layout, { uid })).find((st) => st.type === "path" && st.path === path)!;
+    const step = nextSteps(kind(), specialtyOf(s.defend.layout, { uid })).find((st) => st.type === "path" && st.path === path)!;
     assert.ok(upgradeBuilding(s, { uid }, step).ok);
   }
   const fit = fitLayout(s.defend.layout);
@@ -35,6 +38,7 @@ function barracks(path?: PathId, rank = 3) {
   const m = sim.soldiers.find((u) => u.kind === "sword") ?? assert.fail("a swordsman");
   return { s, sim, m };
 }
+const HALLS: Partial<Record<PathId, string>> = { crusaders: "chapterHouse", berserkers: "berserkerLodge", halberdiers: "halberdYard" };
 function enemy(sim: DefendSim, x: number, y: number, hp = 1e6, kind: EnemyKind = "orc") {
   const e: Enemy = { id: sim.newId(), kind, x, y, hp, maxHp: hp, cd: 0, jx: 0, jy: 0, distract: -1, distractT: 0, rollT: 0, marked: false, flash: 0 };
   sim.enemies.push(e);
@@ -49,14 +53,18 @@ function blow(sim: DefendSim, m: { cd: number; target: number }, e: Enemy) {
 }
 
 test("a Barracks has three branches, each topping out in the Hero", () => {
-  assert.deepEqual(nextSteps("barracks").map(stepName), ["Crusaders I", "Berserkers I", "Halberdiers I"]);
-  for (const p of ["berserkers", "halberdiers"] as const) assert.equal(pathById(p).topic, "barracks");
-  const climbed = buildingTree("barracks", { path: "halberdiers", rank: 1 });
+  assert.deepEqual(nextSteps("barracks").map(stepName), ["Chapterhouse", "Berserker lodge", "Halberd yard"]);
+  for (const p of ["crusaders", "berserkers", "halberdiers"] as const) assert.equal(pathById(p).topic, HALLS[p]);
+  assert.deepEqual(nextSteps("halberdYard").map(stepName), ["Halberdiers I"]);
+  const climbed = buildingTree("halberdYard", { path: "halberdiers", rank: 1 });
   assert.equal(climbed.find((n) => n.id === "k:barracks")!.closed!.length, 2, "the other two branches");
   assert.equal(climbed.at(-1)!.id, "k:heroHall");
-  assert.match(kindStats(barracks().s, "barracks", "halberdiers", 3), /2.5x on big enemies/);
+  assert.match(kindStats(barracks().s, "halberdYard", "halberdiers", 3), /2.5x on big enemies/);
+  assert.match(kindStats(barracks().s, "berserkerLodge"), /strikes every/);
   assert.deepEqual(PATH_LOOKS.barracks, ["crusaders", "berserkers", "halberdiers"]);
   const art = ["", ...PATH_LOOKS.barracks!].map((look) => structurePixels("barracks", 3, 3, 0, 1, look).join());
+  // Each hall is its own building, and climbing its path shows.
+  for (const k of ["chapterHouse", "berserkerLodge", "halberdYard"] as const) art.push(...["", PATH_LOOKS[k]![0]].map((look) => structurePixels(k, 4, 6, 0, 1, look).join()));
   assert.equal(new Set(art).size, art.length);
 });
 
@@ -70,6 +78,10 @@ test("a plain swordsman strikes one enemy at its own pace", () => {
 });
 
 test("Berserkers strike faster, heal on a kill from II and cleave at III", () => {
+  const lodge = barracks("berserkers", 0);
+  blow(lodge.sim, lodge.m, enemy(lodge.sim, lodge.m.x + 0.5, lodge.m.y));
+  assert.equal(lodge.m.cd, SOLDIER.cooldown * BERSERK.rage, "the lodge's own fury");
+
   const rage = barracks("berserkers", 1);
   blow(rage.sim, rage.m, enemy(rage.sim, rage.m.x + 0.5, rage.m.y));
   assert.equal(rage.m.cd, SOLDIER.cooldown * BERSERK.cooldown);
@@ -87,7 +99,8 @@ test("Berserkers strike faster, heal on a kill from II and cleave at III", () =>
 });
 
 test("Halberdiers reach further and hit harder, slow from II and fell big enemies at III", () => {
-  const plain = barracks(), reach = barracks("halberdiers", 1);
+  const plain = barracks(), yard = barracks("halberdiers", 0), reach = barracks("halberdiers", 1);
+  assert.equal(yard.m.damage, plain.m.damage, "the yard's drill reaches further, no harder");
   assert.equal(reach.m.damage, plain.m.damage * HALBERD.damage);
   const out = SOLDIER.reach + ENEMIES.orc.size / 2 + HALBERD.reach / 2;
   const e = enemy(reach.sim, reach.m.x + out, reach.m.y), p = enemy(plain.sim, plain.m.x + out, plain.m.y);

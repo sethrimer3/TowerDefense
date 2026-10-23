@@ -75,9 +75,10 @@ try {
     if (phone) await page.touchscreen.tap(p.x, p.y); else await page.mouse.click(p.x, p.y);
     await page.waitForSelector('#defend-specialty:not([hidden])');
     const tree = await panel.locator('.ug-node:not(.withering)').evaluateAll(els => els.map(e => `${e.dataset.node}=${['owned', 'next', 'locked'].find(c => e.classList.contains(c))}`));
-    for (const n of ['k:rangedGuild=owned', 'k:gunHall=owned', 'p:volleyFire:1=next', 'p:beltFeed:1=next', 'p:clusterRockets:1=next', 'k:gatlingNest=locked']) assert.ok(tree.includes(n), `${n} in ${tree}`);
+    for (const n of ['k:rangedGuild=owned', 'k:gunHall=owned', 'k:musketHall=next', 'k:gunNest=next', 'k:rocketBattery=next']) assert.ok(tree.includes(n), `${n} in ${tree}`);
     assert.equal(tree.filter(n => n.endsWith('=next')).length, 3, 'only the three branches');
-    await press(panel.locator('[data-node="p:beltFeed:1"]'));
+    assert.ok(!tree.some(n => n.startsWith('p:') || n.startsWith('k:gatlingNest')), `only their attunements before one is taken: ${tree}`);
+    await press(panel.locator('[data-node="k:gunNest"]'));
     await page.waitForTimeout(900); await page.screenshot({ path: `${out}/gunners-${width}-tree.png` });
     await press(panel.locator('[data-specialty-close]'));
 

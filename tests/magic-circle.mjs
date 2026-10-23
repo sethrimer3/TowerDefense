@@ -18,7 +18,7 @@ try {
    const { defaults } = await import('/src/save.ts'); const s = defaults();
    Object.assign(s.settings, { developerMode: true, devMode: true, instantResearch: true, soundOff: true, ambienceOff: true });
    s.knowledge = 100000; s.smithy.copper = 100;
-   s.defend.owned.barracks = 1; s.defend.kept = [{ kind: "barracks", path: "crusaders", rank: 1 }]; return s;
+   s.defend.owned.chapterHouse = 1; s.defend.kept = [{ kind: "chapterHouse", path: "crusaders", rank: 2 }]; return s;
   });
   await context.addInitScript(fixture => {
    if (!sessionStorage.getItem('circle-seed')) { localStorage.setItem('towerdefense.v1', JSON.stringify(fixture)); sessionStorage.setItem('circle-seed', 'yes'); }
@@ -127,7 +127,7 @@ try {
   await page.locator('[data-specialty-close]').click();
   assert.equal(await page.locator('#defend-specialty .magic-circle').count(), 0);
   // Reproduce the user's Defend Barracks / Crusaders screenshot, not just Study.
-  await page.evaluate(() => window.__circlePage.openSpecialty({ copy: 'barracks', wear: { path: 'crusaders', rank: 1 } }));
+  await page.evaluate(() => window.__circlePage.openSpecialty({ copy: 'chapterHouse', wear: { path: 'crusaders', rank: 2 } }));
   await page.waitForTimeout(250);
   const background = page.locator('#defend-specialty .magic-circle');
   assert.equal(await background.count(), 1);
@@ -142,7 +142,7 @@ try {
   const beforeUndo = await background.getAttribute('data-formation');
   const beforeCells = Number(await background.getAttribute('data-cells'));
   const beforeRings = Number(await background.getAttribute('data-rings'));
-  await page.locator('#defend-specialty [data-node="p:crusaders:1"]').click();
+  await page.locator('#defend-specialty [data-node="p:crusaders:2"]').click();
   await page.locator('#defend-specialty [data-ug-undo]').click();
   assert.notEqual(await background.getAttribute('data-formation'), beforeUndo);
   await page.waitForTimeout(100);

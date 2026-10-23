@@ -15,7 +15,7 @@ import { NO_BONUSES, UPGRADES, watchRadius, type Bonuses, type PaletteItem } fro
 import { center } from "../src/defend/pathing.ts";
 import { chilled, stepFlames, stepFrosts, Wizards } from "../src/defend/wizard.ts";
 import { Barracks, stepArcher, stepSwordsman } from "../src/defend/troops.ts";
-import { Towers, stepArrows, stepShells } from "../src/defend/towers.ts";
+import { Towers, archerTowerRange, stepArrows, stepShells } from "../src/defend/towers.ts";
 import { stepBlazes, stepFireballs, stepMage } from "../src/defend/mages.ts";
 import { baitBitten } from "../src/defend/bait.ts";
 
@@ -55,8 +55,8 @@ test("research alone does not change any building in battle", () => {
   assert.equal(bonuses(s).structurePaths, undefined);
 });
 
-test("every topic offers two or more paths of three ranks (the barracks' and the palace's one or more), with square icons", () => {
-  for (const t of PATH_TOPICS) assert.ok(PATHS.filter((p) => p.topic === t).length >= (t === "barracks" || t === "valkyriePalace" ? 1 : 2), t);
+test("every topic offers two or more paths of three ranks (the palace's, the branch buildings' and the den's spare one or more), with square icons", () => {
+  for (const t of PATH_TOPICS) assert.ok(PATHS.filter((p) => p.topic === t).length >= (["valkyriePalace", "assassinDen", "pyreTower", "frostTower", "stormTower", "chapterHouse", "berserkerLodge", "halberdYard", "bloodHall", "veilHouse", "poisonDen", "brazierTower", "hawkTower", "batteryTower", "mortarTower", "rangerLodge", "skirmishCamp", "infernoHall", "cinderHall"].includes(t) ? 1 : 2), t);
   for (const p of PATHS) assert.equal(p.ranks.length, 3, p.id);
   for (const [k, rows] of Object.entries(ICON_ROWS)) {
     assert.equal(rows.length, ICON_SIZE, k);
@@ -73,7 +73,7 @@ function battle(kind: PaletteItem, paths?: Bonuses["paths"]) {
   let l = defaultLayout();
   const { tx, ty } = l.keep;
   for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) l = placeCityTile(l, tx + dx, ty + dy) ?? assert.fail("tile");
-  const inside = kind === "barracks" || kind === "archerBarracks" || kind === "mageGuild";
+  const inside = ["barracks", "chapterHouse", "archerBarracks", "skirmishCamp", "mageGuild", "infernoHall", "cinderHall"].includes(kind);
   l = placeStructure(l, kind, tx, inside ? ty - 1 : ty - 3) ?? assert.fail(kind);
   const fit = fitLayout(l);
   assert.ok(fit.ok);
@@ -106,23 +106,23 @@ function cast(sim: DefendSim, seconds: number) {
   return { flames, frosts, bolts };
 }
 
-test("Pyromancy gives up the ice, Rime the flames, and Stormcalling casts bolts for flames", () => {
+test("the Pyre tower gives up the ice, the Frost tower the flames, and the Storm tower casts bolts for flames", () => {
   const plain = battle("wizardTower");
   orc(plain.sim, plain.at.x, plain.at.y - 3);
   const both = cast(plain.sim, 8);
   assert.ok(both.flames > 0 && both.frosts > 0 && !both.bolts);
 
-  const pyro = battle("wizardTower", { wizardTower: { path: "pyromancy", rank: 1 } });
+  const pyro = battle("pyreTower");
   orc(pyro.sim, pyro.at.x, pyro.at.y - 3);
   const fire = cast(pyro.sim, 8);
   assert.ok(fire.flames > both.flames && !fire.frosts);
 
-  const rime = battle("wizardTower", { wizardTower: { path: "rime", rank: 1 } });
+  const rime = battle("frostTower");
   orc(rime.sim, rime.at.x, rime.at.y - 3);
   const ice = cast(rime.sim, 8);
   assert.ok(ice.frosts > both.frosts && !ice.flames);
 
-  const storm = battle("wizardTower", { wizardTower: { path: "storm", rank: 2 } });
+  const storm = battle("stormTower", { stormTower: { path: "storm", rank: 2 } });
   for (let k = 0; k < 6; k++) orc(storm.sim, storm.at.x - 3 + k * 1.2, storm.at.y - 3);
   const wizards = new Wizards();
   wizards.step(storm.sim, 1 / 30);
@@ -133,7 +133,7 @@ test("Pyromancy gives up the ice, Rime the flames, and Stormcalling casts bolts 
 });
 
 test("Rime's deep freeze stops what the ice hits, then lets it go", () => {
-  const { sim, at } = battle("wizardTower", { wizardTower: { path: "rime", rank: 3 } });
+  const { sim, at } = battle("frostTower", { frostTower: { path: "rime", rank: 3 } });
   const e = orc(sim, at.x, at.y - 3);
   const wizards = new Wizards();
   for (let t = 0; t < 1.5 && !e.freeze; t += 1 / 30) {
@@ -147,17 +147,18 @@ test("Rime's deep freeze stops what the ice hits, then lets it go", () => {
 });
 
 test("Crusaders are heartier and heal", () => {
-  const recruit = (paths?: Bonuses["paths"]) => {
-    const { sim, b } = battle("barracks", paths);
+  const recruit = (paths?: Bonuses["paths"], kind: PaletteItem = "chapterHouse") => {
+    const { sim, b } = battle(kind, paths);
     new Barracks().step(sim, 1 / 30);
     const s = sim.soldiers.find((s) => s.home === b.id);
     assert.ok(s);
     return { sim, s };
   };
-  const base = recruit().s.maxHp;
-  assert.equal(recruit({ barracks: { path: "crusaders", rank: 1 } }).s.maxHp, base * CRUSADE.hp[1]);
+  const base = recruit(undefined, "barracks").s.maxHp;
+  assert.equal(recruit().s.maxHp, base * CRUSADE.hp[0], "the Chapterhouse's own");
+  assert.equal(recruit({ chapterHouse: { path: "crusaders", rank: 1 } }).s.maxHp, base * CRUSADE.hp[1]);
 
-  const healer = recruit({ barracks: { path: "crusaders", rank: 2 } });
+  const healer = recruit({ chapterHouse: { path: "crusaders", rank: 2 } });
   healer.s.hp = 10;
   stepSwordsman(healer.sim, healer.s, 1);
   assert.equal(healer.s.hp, 10 + CRUSADE.heal);
@@ -177,7 +178,7 @@ function volley(kind: PaletteItem, paths: Bonuses["paths"], foes: [number, numbe
 }
 
 test("Fire arrows set what they hit burning, and at III loose a volley", () => {
-  const { sim, enemies: [e] } = volley("archerTower", { archerTower: { path: "fireArrows", rank: 1 } }, [[0, -3]]);
+  const { sim, enemies: [e] } = volley("archerTower", { brazierTower: { path: "fireArrows", rank: 1 } }, [[0, -3]]);
   assert.equal(sim.arrows.length, 1);
   const arrow = sim.arrows[0];
   assert.equal(arrow.burn, arrow.damage * FIRE_ARROWS.share[1]);
@@ -191,12 +192,12 @@ test("Fire arrows set what they hit burning, and at III loose a volley", () => {
 
   const plain = volley("archerTower", undefined, [[0, -3]]);
   assert.equal(plain.sim.arrows[0].burn, undefined, "no path, no burn");
-  const three = volley("archerTower", { archerTower: { path: "fireArrows", rank: 3 } }, [[0, -3], [1, -3], [-1, -3], [0, -4]]);
+  const three = volley("archerTower", { brazierTower: { path: "fireArrows", rank: 3 } }, [[0, -3], [1, -3], [-1, -3], [0, -4]]);
   assert.equal(three.sim.arrows.length, FIRE_ARROWS.volley);
 });
 
 test("Sharpshooters crit every 3rd arrow, and at III aim at the strongest", () => {
-  const { sim, b, towers } = volley("archerTower", { archerTower: { path: "sharpshooters", rank: 2 } }, [[0, -3]]);
+  const { sim, b, towers } = volley("archerTower", { hawkTower: { path: "sharpshooters", rank: 2 } }, [[0, -3]]);
   for (let k = 0; k < 2; k++) {
     towers.cooldown.set(b.id, 0);
     towers.step(sim, 1 / 30);
@@ -204,13 +205,13 @@ test("Sharpshooters crit every 3rd arrow, and at III aim at the strongest", () =
   const [a, b2, c] = sim.arrows.map((a) => a.damage);
   assert.equal(a, b2);
   assert.equal(c, a * SHARP.crit);
-  const deadeye = volley("archerTower", { archerTower: { path: "sharpshooters", rank: 3 } }, [[0, -2], [0, -4, 5e6]]);
+  const deadeye = volley("archerTower", { hawkTower: { path: "sharpshooters", rank: 3 } }, [[0, -2], [0, -4, 5e6]]);
   assert.equal(deadeye.sim.arrows[0].target, deadeye.enemies[1].id, "the stronger, further one");
 });
 
 test("Gun crews reload faster and burst into grapeshot; Siege shot hits harder and wider", () => {
   const plain = volley("cannonTower", undefined, [[0, -4]]);
-  const drilled = volley("cannonTower", { cannonTower: { path: "gunnery", rank: 3 } }, [[0, -4]]);
+  const drilled = volley("cannonTower", { batteryTower: { path: "gunnery", rank: 3 } }, [[0, -4]]);
   assert.equal(drilled.towers.cooldown.get(drilled.b.id)!, plain.towers.cooldown.get(plain.b.id)! * GUNNERY.reload[3]);
   assert.equal(plain.sim.shells[0].grape, undefined);
   assert.ok(drilled.sim.shells[0].grape);
@@ -219,11 +220,22 @@ test("Gun crews reload faster and burst into grapeshot; Siege shot hits harder a
   for (const { sim } of [plain, drilled]) for (let t = 0; t < 2; t += 1 / 30) stepShells(sim, 1 / 30);
   assert.ok(near.maxHp - near.hp > lone.maxHp - lone.hp, "grapeshot hits round the landing harder");
 
-  const siege = volley("cannonTower", { cannonTower: { path: "siegeShot", rank: 2 } }, [[0, -4]]);
+  const siege = volley("cannonTower", { mortarTower: { path: "siegeShot", rank: 2 } }, [[0, -4]]);
   const base = volley("cannonTower", undefined, [[0, -4]]);
   assert.equal(siege.sim.shells[0].damage, base.sim.shells[0].damage * SIEGE_SHOT.damage[2]);
   assert.equal(siege.sim.shells[0].r, base.sim.shells[0].r * SIEGE_SHOT.radius);
   assert.equal(siege.towers.cooldown.get(siege.b.id)!, base.towers.cooldown.get(base.b.id)! * SIEGE_SHOT.reload);
+});
+
+test("the archer and cannon towers' branch towers each fight their own way before any rank", () => {
+  const plain = volley("archerTower", undefined, [[0, -3]]), lit = volley("brazierTower", undefined, [[0, -3]]);
+  assert.deepEqual([lit.sim.arrows[0].burn, lit.sim.arrows[0].burnFor], [lit.sim.arrows[0].damage * FIRE_ARROWS.hall.share, FIRE_ARROWS.hall.burn]);
+  assert.equal(archerTowerRange(lit.sim, battle("hawkTower").b), archerTowerRange(plain.sim, plain.b) + SHARP.hall);
+  const cannon = volley("cannonTower", undefined, [[0, -4]]), battery = volley("batteryTower", undefined, [[0, -4]]), mortar = volley("mortarTower", undefined, [[0, -4]]);
+  const cd = (v: typeof cannon) => v.towers.cooldown.get(v.b.id)!;
+  assert.equal(cd(battery), cd(cannon) * GUNNERY.hall);
+  assert.equal(cd(mortar), cd(cannon) * SIEGE_SHOT.hall.reload);
+  assert.equal(mortar.sim.shells[0].damage, cannon.sim.shells[0].damage * SIEGE_SHOT.hall.damage);
 });
 
 test("Rangers loose twin shots; Skirmishers draw faster", () => {
@@ -238,9 +250,35 @@ test("Rangers loose twin shots; Skirmishers draw faster", () => {
   };
   const plain = archer(undefined);
   assert.equal(plain.sim.arrows.length, 1);
-  assert.equal(archer({ archerBarracks: { path: "rangers", rank: 3 } }).sim.arrows.length, 2);
-  const quick = archer({ archerBarracks: { path: "skirmishers", rank: 1 } });
+  assert.equal(archer({ rangerLodge: { path: "rangers", rank: 3 } }).sim.arrows.length, 2);
+  const quick = archer({ skirmishCamp: { path: "skirmishers", rank: 1 } });
   assert.ok(Math.abs(quick.s.cd - plain.s.cd * SKIRMISH.reload[1]) < 1e-9);
+});
+
+test("the archer barracks' and Mage Guild's branch halls work before any rank", () => {
+  const draw = (kind: PaletteItem) => {
+    const { sim, b } = battle(kind);
+    new Barracks().step(sim, 1 / 30);
+    const s = sim.soldiers.find((s) => s.home === b.id)!;
+    orc(sim, s.x + 2, s.y);
+    stepArcher(sim, s, 1 / 30);
+    return s.cd;
+  };
+  assert.ok(Math.abs(draw("skirmishCamp") - draw("archerBarracks") * SKIRMISH.camp) < 1e-9, "the Skirmish camp draws quicker");
+  const throwFrom = (kind: PaletteItem) => {
+    const { sim, b } = battle(kind);
+    new Barracks().step(sim, 1 / 30);
+    const s = sim.soldiers.find((s) => s.home === b.id)!;
+    orc(sim, s.x + 3, s.y); s.cd = 0;
+    stepMage(sim, s, 1 / 30);
+    const f = sim.fireballs[0]; f.t = f.dur;
+    stepFireballs(sim, 1 / 30);
+    return { damage: f.damage, life: sim.blazes[0].life };
+  };
+  const plain = throwFrom("mageGuild"), inferno = throwFrom("infernoHall"), cinder = throwFrom("cinderHall");
+  assert.ok(Math.abs(inferno.damage - plain.damage * PYROCLASM.hall) < 1e-9, "the Inferno hall's fireballs hit harder");
+  assert.ok(Math.abs(cinder.life - plain.life * CINDERS.hall) < 1e-9, "the Cinder hall's ground burns longer");
+  assert.equal(cinder.damage, plain.damage);
 });
 
 /** Marks whatever stands in a lone watch tower's radius, as each step does. */
@@ -294,7 +332,7 @@ function mage(paths?: Bonuses["paths"]) {
 }
 
 test("Pyroclasm throws heavier, wider fireballs, and at III two more burst beside them", () => {
-  const plain = mage(), hot = mage({ mageGuild: { path: "pyroclasm", rank: 2 } });
+  const plain = mage(), hot = mage({ infernoHall: { path: "pyroclasm", rank: 2 } });
   assert.equal(hot.f.damage, plain.f.damage * PYROCLASM.damage);
   assert.ok(Math.abs(hot.f.r - plain.f.r * PYROCLASM.splash) < 1e-9);
 
@@ -304,8 +342,8 @@ test("Pyroclasm throws heavier, wider fireballs, and at III two more burst besid
     stepFireballs(m.sim, 1 / 30);
     return side.maxHp - side.hp;
   };
-  assert.equal(hurtBeside(mage({ mageGuild: { path: "pyroclasm", rank: 2 } })), 0, "beyond the burst");
-  assert.ok(hurtBeside(mage({ mageGuild: { path: "pyroclasm", rank: 3 } })) > 0, "a meteor lands beside it");
+  assert.equal(hurtBeside(mage({ infernoHall: { path: "pyroclasm", rank: 2 } })), 0, "beyond the burst");
+  assert.ok(hurtBeside(mage({ infernoHall: { path: "pyroclasm", rank: 3 } })) > 0, "a meteor lands beside it");
 });
 
 test("Cinders burn longer and hotter, and at III the fire clings to whoever walks through", () => {
@@ -316,11 +354,11 @@ test("Cinders burn longer and hotter, and at III the fire clings to whoever walk
     assert.equal(m.sim.blazes.length, 1);
     return { ...m, b: m.sim.blazes[0] };
   };
-  const plain = blaze(), hot = blaze({ mageGuild: { path: "cinders", rank: 2 } });
+  const plain = blaze(), hot = blaze({ cinderHall: { path: "cinders", rank: 2 } });
   assert.ok(Math.abs(hot.b.life - plain.b.life * CINDERS.life) < 1e-9);
   assert.ok(Math.abs(hot.b.dps - plain.b.dps * CINDERS.dps) < 1e-9);
 
-  const cling = blaze({ mageGuild: { path: "cinders", rank: 3 } });
+  const cling = blaze({ cinderHall: { path: "cinders", rank: 3 } });
   const walker = orc(cling.sim, cling.b.x, cling.b.y);
   stepBlazes(cling.sim, 1 / 30);
   assert.equal(walker.burn, CINDERS.cling);

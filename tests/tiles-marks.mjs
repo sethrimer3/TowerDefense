@@ -27,16 +27,16 @@ try {
       const { placeCityTile, placeStructure } = await import('/src/defend/layout.ts');
       const s = defaults(); s.settings.soundOff = true; s.settings.ambienceOff = true;
       const d = s.defend;
-      Object.assign(d.owned, { cityTile: 6, watchTower: 2, archerTower: 3, wizardTower: 1, meleeGuild: 1, barracks: 1 });
+      Object.assign(d.owned, { cityTile: 6, watchTower: 2, archerTower: 1, brazierTower: 2, stormTower: 1, meleeGuild: 1, chapterHouse: 1 });
       d.wallRanks = { stonework: 2, trapped: 1 };
       let l = d.layout;
       for (const [dx, dy] of [[0, -1], [-1, 0], [1, 0]]) l = placeCityTile(l, l.keep.tx + dx, l.keep.ty + dy) ?? l;
-      l = placeStructure(l, 'archerTower', l.keep.tx, l.keep.ty - 1) ?? l;
+      l = placeStructure(l, 'brazierTower', l.keep.tx, l.keep.ty - 1) ?? l;
       Object.assign(l.structures.at(-1), { path: 'fireArrows', rank: 2 });
-      l = placeStructure(l, 'barracks', l.keep.tx - 1, l.keep.ty) ?? l;
+      l = placeStructure(l, 'chapterHouse', l.keep.tx - 1, l.keep.ty) ?? l;
       Object.assign(l.structures.at(-1), { path: 'crusaders', rank: 1 });
       d.layout = l;
-      d.kept = [{ kind: 'archerTower', path: 'fireArrows', rank: 2 }, { kind: 'wizardTower', path: 'storm', rank: 3 }];
+      d.kept = [{ kind: 'brazierTower', path: 'fireArrows', rank: 2 }, { kind: 'stormTower', path: 'storm', rank: 3 }];
       return s;
     });
     await context.addInitScript((fixture) => {
@@ -50,34 +50,35 @@ try {
     await page.waitForSelector('.tiles-grid .tile');
     await page.waitForTimeout(600);
 
-    // Spread by default: three Archer towers, two on Fire arrows II, one plain.
+    // Spread by default: two Brazier towers on Fire arrows II, a plain Archer tower.
     assert.equal(await page.locator('[data-stacking]').getAttribute('aria-pressed'), 'false');
-    const archers = page.locator('.tile[data-tile="archerTower"]');
-    assert.equal(await archers.count(), 3);
-    const marks = await archers.evaluateAll((ts) => ts.map((t) => [t.querySelectorAll('.mark.became').length, t.querySelectorAll('.mark.rank').length, !!t.querySelector('.path-badge')]));
-    assert.deepEqual(marks.sort(), [[1, 0, false], [1, 2, true], [1, 2, true]]);
-    assert.match(await archers.first().getAttribute('title'), /Watch tower → Archer tower → Fire arrows II/);
+    const archers = page.locator('.tile[data-tile="archerTower"]'), braziers = page.locator('.tile[data-tile="brazierTower"]');
+    assert.equal(await archers.count(), 1);
+    assert.equal(await braziers.count(), 2);
+    const marks = await page.locator('.tile[data-tile="archerTower"], .tile[data-tile="brazierTower"]').evaluateAll((ts) => ts.map((t) => [t.querySelectorAll('.mark.became').length, t.querySelectorAll('.mark.rank').length, !!t.querySelector('.path-badge')]));
+    assert.deepEqual(marks.sort(), [[1, 0, false], [2, 2, true], [2, 2, true]]);
+    assert.match(await braziers.first().getAttribute('title'), /Watch tower → Archer tower → Brazier tower → Fire arrows II/);
     // Plain basic buildings say they have none; universal kinds stay one stack.
     assert.equal(await page.locator('.tile[data-tile="watchTower"]').count(), 2);
     assert.equal(await page.locator('.tile[data-tile="watchTower"] .tile-marks.none').count(), 2);
     assert.equal(await page.locator('.tile[data-tile="cityTile"]').count(), 1);
     assert.match(await page.locator('.tile[data-tile="cityTile"] .tile-count').textContent(), /^×[2-9]$/);
-    // The Wizard tower kept on Stormcalling III: became, three storm pips.
-    assert.equal(await page.locator('.tile[data-tile="wizardTower"] .mark.rank.hue-storm').count(), 3);
+    // The Storm tower kept on Stormcalling III: became, three storm pips.
+    assert.equal(await page.locator('.tile[data-tile="stormTower"] .mark.rank.hue-storm').count(), 3);
     await page.screenshot({ path: `test-results/tiles-marks-spread-${width}.png` });
 
     // Stacked: copies with the same upgrades share a stack.
     await page.locator('[data-stacking]').click();
     await page.waitForTimeout(600);
-    assert.deepEqual(await archers.evaluateAll((ts) => ts.map((t) => t.querySelector('.tile-count')?.textContent)), ['×1', '×2']);
+    assert.deepEqual(await braziers.evaluateAll((ts) => ts.map((t) => t.querySelector('.tile-count')?.textContent)), ['×2']);
     assert.equal(await page.locator('.tile[data-tile="watchTower"]').count(), 1);
     await page.screenshot({ path: `test-results/tiles-marks-stacked-${width}.png` });
 
     // Opening a stack shows its basic stats, then each upgrade it carries
     // as an ability in its path's colour; no description.
-    await archers.last().click();
+    await braziers.last().click();
     await page.waitForSelector('.tile-detail .tile-stats');
-    assert.deepEqual((await page.locator('.tile-detail .tile-stats li').allTextContents()).map((t) => t.replace(/[\d.]+/g, 'n')), ['n damage', 'ns reload', 'n range']);
+    assert.deepEqual((await page.locator('.tile-detail .tile-stats li').allTextContents()).map((t) => t.replace(/[\d.]+/g, 'n')), ['n damage', 'ns reload', 'n range', 'ns burn']);
     assert.equal(await page.locator('.tile-detail .tile-abilities li.hue-ember').count(), 2);
     assert.equal(await page.locator('.tile-detail p').count(), 0);
     const ember = await page.locator('.tile-detail .tile-abilities li').first().evaluate((li) => getComputedStyle(li).color);
@@ -91,7 +92,7 @@ try {
     assert.equal(await page.locator('.tile-detail .tile-stats li').count(), 3);
 
     // Press and hold a tile: Defend opens with that copy's upgrade tree.
-    const wizard = page.locator('.tile[data-tile="wizardTower"]').first();
+    const wizard = page.locator('.tile[data-tile="stormTower"]').first();
     await wizard.scrollIntoViewIfNeeded();
     const box = await wizard.boundingBox();
     const at = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
@@ -111,7 +112,7 @@ try {
     await page.locator('[data-tab="tiles"]').click();
     await page.waitForTimeout(600);
     // A short tap still just opens the tile.
-    await page.locator('.tile[data-tile="wizardTower"]').first().click();
+    await page.locator('.tile[data-tile="stormTower"]').first().click();
     await page.waitForSelector('.tile-detail .tile-abilities li.hue-storm');
     assert.ok(await page.locator('#tiles.active').count());
 

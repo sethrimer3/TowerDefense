@@ -29,15 +29,15 @@ try {
         const s = defaults(); s.settings.soundOff = true; s.settings.ambienceOff = true;
         s.settings.developerMode = dev;
         s.knowledge = 100;
-        s.defend.owned.rangedGuild = 1; s.defend.owned.archerBarracks = 1;
+        s.defend.owned.rangedGuild = 1; s.defend.owned.rangerLodge = 1;
         let l = s.defend.layout;
         for (const [dx, dy] of [[0, -1], [-1, 0], [1, 0]]) l = placeCityTile(l, l.keep.tx + dx, l.keep.ty + dy) ?? l;
         l = placeStructure(l, 'rangedGuild', l.keep.tx, l.keep.ty - 1) ?? l;
         s.defend.layout = l;
         // Another guild of the line once became a Mage Guild and climbed Pyroclasm.
-        s.defend.upgradesFound = ['k:rangedGuild', 'k:mageGuild', 'p:pyroclasm:1', 'p:pyroclasm:2'];
+        s.defend.upgradesFound = ['k:rangedGuild', 'k:mageGuild', 'k:infernoHall', 'p:pyroclasm:1', 'p:pyroclasm:2'];
         // ...and one waits as archers, held now.
-        s.defend.kept = [{ kind: 'archerBarracks', path: 'rangers', rank: 1 }];
+        s.defend.kept = [{ kind: 'rangerLodge', path: 'rangers', rank: 1 }];
         return s;
       }, dev);
       await context.addInitScript(fixture => {
@@ -75,7 +75,7 @@ try {
       const nodes = await panel.locator('.ug-node:not(.withering)').evaluateAll(els => els.map(e => [e.dataset.node, e.classList.contains('owned') ? 'owned' : e.classList.contains('next') ? 'found' : 'unseen']));
       const ids = Object.fromEntries(nodes);
       if (!dev) {
-        assert.deepEqual(Object.keys(ids).sort(), ['k:archerBarracks', 'k:mageGuild', 'k:rangedGuild', 'p:pyroclasm:1', 'p:pyroclasm:2', 'p:rangers:1'].sort());
+        assert.deepEqual(Object.keys(ids).sort(), ['k:archerBarracks', 'k:rangerLodge', 'k:mageGuild', 'k:infernoHall', 'k:rangedGuild', 'p:pyroclasm:1', 'p:pyroclasm:2', 'p:rangers:1'].sort());
         assert.equal(ids['k:rangedGuild'], 'owned');
         assert.equal(ids['p:pyroclasm:2'], 'found');
         assert.ok(Number(await panel.locator('.ug-branches').getAttribute('data-hidden')) > 0, 'undiscovered branches trail off');

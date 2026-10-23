@@ -14,6 +14,8 @@ import {
   cannonDamage,
   cannonSplash,
   ENEMIES,
+  isArcherTower,
+  isCannonTower,
 } from "./catalog.ts";
 import type { Building } from "./citygen.ts";
 import { center, nearest } from "./pathing.ts";
@@ -27,18 +29,29 @@ import { fireNanoShell, nanoReload } from "./nanobots.ts";
 import { FIRE_ARROWS, GUNNERY, SHARP, SIEGE_SHOT, pathRank } from "../knowledge-paths.ts";
 import { ARROW_LOOPS, BOILING_OIL, keepRank } from "../keep-upgrades.ts";
 
-/** The towers' Study paths and ranks (`knowledge-paths.ts`): each 0 unless chosen. */
+/** The towers' path ranks (`knowledge-paths.ts`, each 0 unless worn) and
+ * which branch tower each is: the Brazier tower lights its arrows (`lit`),
+ * the Hawk tower sees further (`hawk`), the Gun battery reloads faster
+ * (`battery`), the Mortar tower hits harder (`mortar`). A plain tower
+ * wearing one of their paths (old fixtures' `Bonuses.paths`) shoots as
+ * that tower. */
 const paths = (sim: Pick<DefendSim, "bonuses">, b?: Building) => {
-  const p = buildingPaths(sim, b);
+  const p = buildingPaths(sim, b), k = b?.kind;
+  const fire = pathRank(p, "brazierTower", "fireArrows"), sharp = pathRank(p, "hawkTower", "sharpshooters");
+  const gunnery = pathRank(p, "batteryTower", "gunnery"), siege = pathRank(p, "mortarTower", "siegeShot");
   return {
-    fire: pathRank(p, "archerTower", "fireArrows"), sharp: pathRank(p, "archerTower", "sharpshooters"),
-    gunnery: pathRank(p, "cannonTower", "gunnery"), siege: pathRank(p, "cannonTower", "siegeShot"),
+    fire, sharp, gunnery, siege,
+    lit: k === "brazierTower" || fire > 0, hawk: k === "hawkTower" || sharp > 0,
+    battery: k === "batteryTower" || gunnery > 0, mortar: k === "mortarTower" || siege > 0,
   };
 };
 const byDistanceFrom = (c: { x: number; y: number }) => (a: Enemy, b: Enemy) => sq(a.x - c.x) + sq(a.y - c.y) - (sq(b.x - c.x) + sq(b.y - c.y));
 
 /** How far an archer tower shoots. */
-export const archerTowerRange = (sim: Pick<DefendSim, "levels" | "bonuses">, b?: Building) => archerRange(sim.levels.archerRange) + (paths(sim, b).sharp ? SHARP.range : 0);
+export const archerTowerRange = (sim: Pick<DefendSim, "levels" | "bonuses">, b?: Building) => {
+  const { sharp, hawk } = paths(sim, b);
+  return archerRange(sim.levels.archerRange) + (sharp ? SHARP.range : hawk ? SHARP.hall : 0);
+};
 /** How far a cannon tower lobs its shells. */
 export const cannonTowerRange = (sim: Pick<DefendSim, "bonuses">, b?: Building) => CANNON_RANGE + (paths(sim, b).siege >= 3 ? SIEGE_SHOT.range : 0);
 
@@ -63,9 +76,9 @@ export class Towers {
   step(sim: DefendSim, dt: number) {
     for (const b of sim.map.buildings) {
       if (!sim.intact(b)) continue;
-      if (b.kind === "cannonTower") this.stepCannon(sim, b, dt);
+      if (isCannonTower(b.kind)) this.stepCannon(sim, b, dt);
       else if (b.kind === "nanoTower") this.stepNanoTower(sim, b, dt);
-      else if (b.kind === "archerTower") this.stepArcherTower(sim, b, dt);
+      else if (isArcherTower(b.kind)) this.stepArcherTower(sim, b, dt);
       else if (b.kind === "wallBallista") this.stepBallista(sim, b, dt);
       else if (b.kind === "keep" && sim.bonuses.keep) this.stepKeep(sim, b, dt);
     }
@@ -117,7 +130,7 @@ export class Towers {
 
   private stepArcherTower(sim: DefendSim, b: Building, dt: number) {
     if (!this.ready(b, dt)) return;
-    const c = center(b.rect), { fire, sharp } = paths(sim, b);
+    const c = center(b.rect), { fire, sharp, lit } = paths(sim, b);
     const range = archerTowerRange(sim, b);
     const near = sim.enemiesNear(c.x, c.y, range);
     const target = sharp >= 3 ? strongest(near, c, range) : nearest(near, c);
@@ -132,10 +145,10 @@ export class Towers {
       if (n % SHARP.every === 0) damage *= SHARP.crit;
     }
     // Fire arrows set what they hit burning; at III the tower looses a volley at the nearest few.
-    const burn = fire ? damage * FIRE_ARROWS.share[fire] : 0;
+    const burn = lit ? damage * (fire ? FIRE_ARROWS.share[fire] : FIRE_ARROWS.hall.share) : 0;
     const targets = fire >= 3 ? near.filter((e) => sq(e.x - c.x) + sq(e.y - c.y) <= range * range).sort(byDistanceFrom(c)).slice(0, FIRE_ARROWS.volley) : [target];
     for (const t of targets)
-      sim.arrows.push({ x: c.x, y: c.y - 0.6, origin: { x: c.x, y: c.y, building: b.id }, target: t.id, damage, tx: t.x, ty: t.y, life: 2, ...(burn ? { burn, burnFor: FIRE_ARROWS.burn[fire] } : {}) });
+      sim.arrows.push({ x: c.x, y: c.y - 0.6, origin: { x: c.x, y: c.y, building: b.id }, target: t.id, damage, tx: t.x, ty: t.y, life: 2, ...(burn ? { burn, burnFor: fire ? FIRE_ARROWS.burn[fire] : FIRE_ARROWS.hall.burn } : {}) });
   }
 
   private stepBallista(sim: DefendSim, b: Building, dt: number) {
@@ -151,14 +164,14 @@ export class Towers {
 
   private stepCannon(sim: DefendSim, b: Building, dt: number) {
     if (!this.ready(b, dt)) return;
-    const c = center(b.rect), { gunnery, siege } = paths(sim, b);
+    const c = center(b.rect), { gunnery, siege, battery, mortar } = paths(sim, b);
     const range = cannonTowerRange(sim, b);
     const ground = sim.enemiesNear(c.x, c.y, range).filter(
       (e) => !ENEMIES[e.kind].flying && sq(e.x - c.x) + sq(e.y - c.y) > CANNON_MIN * CANNON_MIN,
     );
     const target = nearest(ground, c);
     if (!target) return this.cooldown.set(b.id, 0);
-    const reload = GUNNERY.reload[gunnery] * (siege ? SIEGE_SHOT.reload : 1);
+    const reload = (gunnery ? GUNNERY.reload[gunnery] : battery ? GUNNERY.hall : 1) * (siege ? SIEGE_SHOT.reload : mortar ? SIEGE_SHOT.hall.reload : 1);
     this.cooldown.set(b.id, cannonCooldown(sim.levels.cannonRate) * sim.bonuses.towerReload * reload);
     const dist = Math.sqrt(sq(target.x - c.x) + sq(target.y - c.y));
     sim.shells.push({
@@ -169,7 +182,7 @@ export class Towers {
       y1: target.y,
       t: 0,
       dur: 0.45 + dist * 0.07,
-      damage: cannonDamage(sim.levels.cannonDamage) * sim.bonuses.towerDamage * SIEGE_SHOT.damage[siege],
+      damage: cannonDamage(sim.levels.cannonDamage) * sim.bonuses.towerDamage * (siege ? SIEGE_SHOT.damage[siege] : mortar ? SIEGE_SHOT.hall.damage : 1),
       r: cannonSplash(sim.levels.cannonDamage) * (siege >= 2 ? SIEGE_SHOT.radius : 1),
       ...(gunnery >= 2 ? { grape: true } : {}),
     });

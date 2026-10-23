@@ -61,9 +61,10 @@ function fire(sim: DefendSim, m: Soldier) {
 // ── The tree ───────────────────────────────────────────────────────────
 test("the Ranged Guild leads to gunners, and gunners branch into muskets, machine guns and rockets", () => {
   assert.deepEqual(BECOMES.rangedGuild!.map((b) => b.to), ["archerBarracks", "mageGuild", "gunHall"]);
-  // Each branch's first rank makes the hall a building of its own.
+  // Each branch's attunement makes the hall a building of its own, which then climbs its path.
   assert.deepEqual(nextSteps("gunHall").map(stepName), ["Musket hall", "Machine-gun nest", "Rocket battery"]);
-  assert.deepEqual(nextSteps("gunHall").map((s) => s.type === "branch" && s.path), ["volleyFire", "beltFeed", "clusterRockets"]);
+  assert.deepEqual(nextSteps("gunHall").map((s) => s.type), ["become", "become", "become"]);
+  assert.deepEqual(nextSteps("gunNest").map(stepName), ["Belt feed I"]);
   assert.deepEqual(nextSteps("gunNest", { path: "beltFeed", rank: 1 }).map(stepName), ["Belt feed II"]);
   assert.deepEqual(nextSteps("gunNest", { path: "beltFeed", rank: 3 }).map(stepName), ["Gatling emplacement"], "maxed, it can merge");
   assert.deepEqual(nextSteps("gatlingNest").map(stepName), ["Gun shield I", "Overdrive I", "Stopping power I"]);
@@ -82,9 +83,9 @@ test("a Gunner hall is bought up from a Ranged Guild and its Belt feed branch ma
   const kind = () => s.defend.layout.structures.find((o) => o.uid === uid)!.kind;
   const step = () => nextSteps(kind(), specialtyOf(s.defend.layout, { uid }));
   assert.ok(upgradeBuilding(s, { uid }, step().find((o) => o.type === "become" && o.to === "gunHall")!).ok);
-  assert.ok(upgradeBuilding(s, { uid }, step().find((o) => o.type === "branch" && o.to === "gunNest")!).ok);
-  assert.deepEqual(specialtyOf(s.defend.layout, { uid }), { path: "beltFeed", rank: 1 });
-  for (let r = 1; r < 3; r++) assert.ok(upgradeBuilding(s, { uid }, step()[0]).ok);
+  assert.ok(upgradeBuilding(s, { uid }, step().find((o) => o.type === "become" && o.to === "gunNest")!).ok);
+  assert.deepEqual([kind(), specialtyOf(s.defend.layout, { uid })], ["gunNest", undefined], "attuned, not yet on its path");
+  for (let r = 0; r < 3; r++) assert.ok(upgradeBuilding(s, { uid }, step()[0]).ok);
   assert.deepEqual([kind(), specialtyOf(s.defend.layout, { uid })], ["gunNest", { path: "beltFeed", rank: 3 }]);
   // Alone it can't merge: the other two branches are missing.
   const merge = upgradeBuilding(s, { uid }, step()[0]);

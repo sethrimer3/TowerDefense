@@ -16,10 +16,13 @@ import { fizzles, sheltered } from "./boats.ts";
 import { CINDERS, PYROCLASM, pathRank } from "../knowledge-paths.ts";
 import { ignite } from "./towers.ts";
 
-/** The Mage Guild's Study path and rank (`knowledge-paths.ts`): each 0 unless chosen. */
+/** A mage hall's path ranks (`knowledge-paths.ts`, each 0 unless worn) and
+ * which hall it is: the Inferno hall's fireballs hit harder (`inferno`), the
+ * Cinder hall's burning ground lasts longer (`cinder`). */
 const paths = (sim: DefendSim, home?: number) => {
-  const p = buildingPaths(sim, home === undefined ? undefined : sim.map.buildings[home]);
-  return { pyro: pathRank(p, "mageGuild", "pyroclasm"), cinders: pathRank(p, "mageGuild", "cinders") };
+  const b = home === undefined ? undefined : sim.map.buildings[home], p = buildingPaths(sim, b);
+  const pyro = pathRank(p, "infernoHall", "pyroclasm"), cinders = pathRank(p, "cinderHall", "cinders");
+  return { pyro, cinders, inferno: b?.kind === "infernoHall" || pyro > 0, cinder: b?.kind === "cinderHall" || cinders > 0 };
 };
 
 /** A fireball in flight from (x0, y0) to where its target stood (x1, y1):
@@ -46,11 +49,11 @@ export function stepMage(sim: DefendSim, s: Soldier, dt: number) {
 
 function throwFireball(sim: DefendSim, s: Soldier, e: { x: number; y: number }) {
   s.cd = FIRE_MAGE.cooldown;
-  const d = dist(e.x - s.x, e.y - s.y), { pyro } = paths(sim, s.home);
+  const d = dist(e.x - s.x, e.y - s.y), { pyro, inferno, cinder } = paths(sim, s.home);
   sim.fireballs.push({
-    ...(sim.bonuses.structurePaths ? { home: s.home } : {}), origin: { x: s.x, y: s.y, attacker: s.id },
+    ...(sim.bonuses.structurePaths || cinder ? { home: s.home } : {}), origin: { x: s.x, y: s.y, attacker: s.id },
     x0: s.x, y0: s.y - 0.2, x1: e.x, y1: e.y, t: 0, dur: 0.15 + d / FIREBALL_SPEED,
-    damage: pyro ? bannerDamage(sim, s) * PYROCLASM.damage : bannerDamage(sim, s), r: fireballSplash(sim.levels.mageFireball ?? 0) * (pyro >= 2 ? PYROCLASM.splash : 1),
+    damage: bannerDamage(sim, s) * (pyro ? PYROCLASM.damage : inferno ? PYROCLASM.hall : 1), r: fireballSplash(sim.levels.mageFireball ?? 0) * (pyro >= 2 ? PYROCLASM.splash : 1),
   });
 }
 
@@ -69,11 +72,11 @@ export function stepFireballs(sim: DefendSim, dt: number) {
     // A fireball landing in a magic boat's water goes out with a hiss.
     if (fizzles(sim, f.x1, f.y1, f.r)) continue;
     const seed = sim.explode(f.x1, f.y1, { r: f.r, damage: f.damage, friendlyFire: false, origin: f.origin });
-    const level = sim.levels.mageEmbers ?? 0, { pyro, cinders } = paths(sim, f.home);
+    const level = sim.levels.mageEmbers ?? 0, { pyro, cinders, cinder } = paths(sim, f.home);
     // Meteor shower: smaller bursts either side of the landing.
     if (pyro >= 3)
       for (const side of [-1, 1]) sim.explode(f.x1 + side * f.r * 0.9, f.y1, { r: f.r / 2, damage: f.damage * PYROCLASM.shardShare, friendlyFire: false, origin: f.origin });
-    const life = emberSeconds(level) * (cinders ? CINDERS.life : 1), dps = emberDps(level) * sim.bonuses.troopDamage * (cinders >= 2 ? CINDERS.dps : 1);
+    const life = emberSeconds(level) * (cinders ? CINDERS.life : cinder ? CINDERS.hall : 1), dps = emberDps(level) * sim.bonuses.troopDamage * (cinders >= 2 ? CINDERS.dps : 1);
     sim.blazes.push({ x: f.x1, y: f.y1, r: f.r * EMBER_SHARE, t: 0, life, dps, seed, ...(cinders >= 3 ? { cling: true } : {}) });
   }
   sim.fireballs = sim.fireballs.filter((f) => f.t < f.dur);

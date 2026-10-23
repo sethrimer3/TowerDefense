@@ -49,6 +49,7 @@ test("discoveries are shared by the line, survive undoing and the save", () => {
   const s = fixture();
   assert.equal(foundNodes(s.defend).has("k:mageGuild"), false);
   let a = step(s, { copy: "rangedGuild" }, (st) => st.type === "become" && st.to === "mageGuild");
+  a = step(s, a, (st) => st.type === "become" && st.to === "infernoHall");
   a = step(s, a, (st) => st.type === "path");
   const path = a.wear!.path;
   assert.ok(s.defend.upgradesFound?.includes("k:mageGuild"));
@@ -60,7 +61,7 @@ test("discoveries are shared by the line, survive undoing and the save", () => {
   // The other guild, never upgraded, sees them on its map.
   const here = new Set(["k:rangedGuild"]);
   const map = mapGraph("rangedGuild", found, here, false);
-  assert.deepEqual(map.map((n) => n.id).sort(), ["k:mageGuild", "k:rangedGuild", `p:${path}:1`].sort());
+  assert.deepEqual(map.map((n) => n.id).sort(), ["k:mageGuild", "k:infernoHall", "k:rangedGuild", `p:${path}:1`].sort());
   assert.equal(map.find((n) => n.id === "k:rangedGuild")!.state, "owned");
   assert.equal(map.find((n) => n.id === "k:mageGuild")!.state, "next");
   // What lies beyond trails off, unseen.
@@ -68,7 +69,7 @@ test("discoveries are shared by the line, survive undoing and the save", () => {
   // Saved and loaded.
   const back = decode(JSON.stringify(s));
   assert.deepEqual(back.defend.upgradesFound, s.defend.upgradesFound);
-  assert.equal(mapCount("mageGuild", foundNodes(back.defend)).found, 3);
+  assert.equal(mapCount("mageGuild", foundNodes(back.defend)).found, 4);
 });
 
 test("the save keeps only real map nodes, and none when there are none", () => {

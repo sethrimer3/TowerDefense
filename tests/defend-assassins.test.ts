@@ -37,11 +37,15 @@ function fixture(kind: PaletteItem, count = 1) {
   return s;
 }
 const uids = (s: S, kind: PaletteItem) => s.defend.layout.structures.filter((st) => st.kind === kind).map((st) => st.uid);
-/** A den of assassins on `path` at `rank` (plain without one). */
+/** The den each branch makes of an Assassins' den. */
+const DENS: Partial<Record<PathId, PaletteItem>> = { bloodletters: "bloodHall", shadowcloak: "veilHouse", venom: "poisonDen" };
+/** A den of assassins on `path` at `rank` (plain without one): the
+ * branch's den when the path is a branch's, at rank 0 the den alone. */
 function den(path?: PathId, rank = 3) {
   const s = fixture("meleeGuild");
   const uid = uids(s, "meleeGuild")[0];
   assert.ok(upgradeBuilding(s, { uid }, { type: "become", to: "assassinDen", cost: 0 }).ok);
+  if (path && DENS[path]) assert.ok(upgradeBuilding(s, { uid }, { type: "become", to: DENS[path] as never, cost: 0 }).ok);
   for (let r = 0; path && r < rank; r++) {
     wear(s, uid, path, r + 1);
   }
@@ -78,15 +82,16 @@ function strikes(sim: DefendSim, a: Soldier, e: Enemy, n: number, between = 0) {
 // ── The tree ───────────────────────────────────────────────────────────
 test("a Melee Guild becomes a barracks, an assassins' den or a spearmen hall; the den has three branches", () => {
   assert.deepEqual(nextSteps("meleeGuild").map(stepName), ["Barracks", "Assassins' den", "Spearmen hall"]);
-  assert.deepEqual(nextSteps("assassinDen").map(stepName), ["Bloodletters I", "Shadowcloak I", "Venomblades I"], "Headhunters is a spare");
-  assert.deepEqual(nextSteps("barracks").map(stepName), ["Crusaders I", "Berserkers I", "Halberdiers I"], "the barracks' old Assassins path is retired");
+  assert.deepEqual(nextSteps("assassinDen").map(stepName), ["Blood hall", "Veil house", "Poison den"], "Headhunters is a spare");
+  assert.deepEqual(nextSteps("poisonDen").map(stepName), ["Venomblades I"]);
+  assert.deepEqual(nextSteps("barracks").map(stepName), ["Chapterhouse", "Berserker lodge", "Halberd yard"], "the barracks' old Assassins path is retired");
   assert.equal(rootOf("assassinDen"), "meleeGuild");
   const tree = buildingTree("meleeGuild").map((n) => `${n.id}=${n.state}`);
   assert.deepEqual(tree, ["k:meleeGuild=owned", "k:barracks=next", "k:assassinDen=next", "k:spearHall=next"]);
-  const climbed = buildingTree("assassinDen", { path: "venom", rank: 1 });
-  assert.deepEqual(climbed.map((n) => n.id), ["k:meleeGuild", "k:assassinDen", "p:venom:1", "p:venom:2", "p:venom:3", "k:shadow"]);
+  const climbed = buildingTree("poisonDen", { path: "venom", rank: 1 });
+  assert.deepEqual(climbed.map((n) => n.id), ["k:meleeGuild", "k:assassinDen", "k:poisonDen", "p:venom:1", "p:venom:2", "p:venom:3", "k:shadow"]);
   assert.equal(climbed.find((n) => n.id === "k:assassinDen")!.closed!.length, 2, "the other two branches are closed off");
-  assert.equal(allocated("assassinDen", { path: "venom", rank: 2 }), 6 + studyPathCost(4, 0) + studyPathCost(4, 1));
+  assert.equal(allocated("poisonDen", { path: "venom", rank: 2 }), 6 + 4 + studyPathCost(4, 0) + studyPathCost(4, 1));
 });
 test("upgrading pays Knowledge, and the den trains assassins", () => {
   const s = fixture("meleeGuild");
@@ -111,16 +116,23 @@ test("a plain assassin's every 4th strike is critical", () => {
 });
 
 test("Bloodletters trade HP for enormous criticals, more often by rank", () => {
-  for (const rank of [1, 2, 3]) {
+  for (const rank of [0, 1, 2, 3]) {
     const { sim, a } = battle(den("bloodletters", rank));
-    assert.equal(a.maxHp, ASSASSIN_UNIT.hp * BLOODLETTERS.hp[rank], `rank ${rank}`);
+    const hall = rank === 0;
+    assert.equal(a.maxHp, ASSASSIN_UNIT.hp * (hall ? BLOODLETTERS.hall.hp : BLOODLETTERS.hp[rank]), `rank ${rank}`);
     const e = enemy(sim, a.x + 0.5, a.y), every = BLOODLETTERS.every[rank];
     const hits = strikes(sim, a, e, every);
-    assert.deepEqual(hits, [...Array(every - 1).fill(a.damage), a.damage * BLOODLETTERS.crit[rank]], `rank ${rank}`);
+    assert.deepEqual(hits, [...Array(every - 1).fill(a.damage), a.damage * (hall ? BLOODLETTERS.hall.crit : BLOODLETTERS.crit[rank])], `rank ${rank}`);
   }
 });
 
 test("Shadowcloak: unseen until it strikes, ambushing from the cloak", () => {
+  const veil = battle(den("shadowcloak", 0));
+  assert.equal(veil.a.cloak, 0, "the Veil house's own are cloaked");
+  const [first] = strikes(veil.sim, veil.a, enemy(veil.sim, veil.a.x + 0.5, veil.a.y), 1);
+  assert.equal(first, veil.a.damage * SHADOWCLOAK.hall.ambush);
+  assert.equal(veil.a.cloak, SHADOWCLOAK.hall.reveal);
+
   const { sim, a } = battle(den("shadowcloak", 1));
   assert.equal(a.cloak, 0, "recruited cloaked");
   assert.equal(sim.nearestDefender(a.x, a.y, 0.5), null, "no enemy picks it out");
@@ -142,6 +154,11 @@ test("Shadowcloak: unseen until it strikes, ambushing from the cloak", () => {
 });
 
 test("Venomblades: poisoned enemies take more damage from everything, and at III pass it on", () => {
+  const pot = battle(den("venom", 0));
+  const p = enemy(pot.sim, pot.a.x + 0.5, pot.a.y);
+  strikes(pot.sim, pot.a, p, 1);
+  assert.deepEqual(p.venom, { t: VENOM.hall.time, more: VENOM.hall.more, dps: pot.a.damage * VENOM.share }, "the Poison den's own");
+
   const { sim, a } = battle(den("venom", 2));
   const e = enemy(sim, a.x + 0.5, a.y);
   const [first] = strikes(sim, a, e, 1);
@@ -190,8 +207,10 @@ test("Headhunters go for the toughest prey they can reach, with a bounty of its 
 test("each path has its own look on the board", () => {
   assert.deepEqual(PATH_LOOKS.assassinDen, ["bloodletters", "shadowcloak", "venom", "headhunters"]);
   const art = ["", ...PATH_LOOKS.assassinDen!].map((look) => structurePixels("assassinDen", 3, 3, 0, 1, look).join());
+  for (const k of ["bloodHall", "veilHouse", "poisonDen"] as const) art.push(...["", PATH_LOOKS[k]![0]].map((look) => structurePixels(k, 4, 4, 0, 1, look).join()));
   assert.equal(new Set(art).size, art.length);
-  for (const p of ["bloodletters", "shadowcloak", "venom", "headhunters"] as const) assert.equal(pathById(p).topic, "assassinDen");
+  for (const p of ["bloodletters", "shadowcloak", "venom"] as const) assert.equal(pathById(p).topic, DENS[p]);
+  assert.equal(pathById("headhunters").topic, "assassinDen", "the spare stays the den's");
 });
 
 // ── The retired Barracks Assassins path ──────────────────────────────────

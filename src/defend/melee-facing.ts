@@ -59,8 +59,8 @@ function reach(sim: DefendSim, u: Soldier) {
   if (u.kind === "assassin") return ASSASSIN_UNIT.reach;
   if (u.kind === "brawler") return BRAWLER.reach;
   if (isSpear(u.kind)) return spearReach(sim, u as Soldier & { kind: Spear });
-  const halberd = pathRank(buildingPaths(sim, sim.map.buildings[u.home]), "barracks", "halberdiers");
-  return SOLDIER.reach + (halberd ? HALBERD.reach : 0);
+  const home = sim.map.buildings[u.home], halberd = pathRank(buildingPaths(sim, home), "halberdYard", "halberdiers");
+  return SOLDIER.reach + (halberd ? HALBERD.reach : home?.kind === "halberdYard" ? HALBERD.drill : 0);
 }
 
 export function meleeFacing(sim: DefendSim, u: Soldier, attackAngle?: number) {

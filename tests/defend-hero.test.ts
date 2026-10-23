@@ -61,31 +61,31 @@ function strike(sim: DefendSim, h: Soldier, e: Enemy) {
 // ── The tree ───────────────────────────────────────────────────────────
 test("the Hero is the swordsmen's ultimate, merged from three barracks maxed on different branches", () => {
   assert.equal(BECOMES.barracks, undefined);
-  assert.deepEqual(nextSteps("barracks").map(stepName), ["Crusaders I", "Berserkers I", "Halberdiers I"]);
-  assert.deepEqual(nextSteps("barracks", { path: "halberdiers", rank: 3 }).map(stepName), ["Hero"]);
+  assert.deepEqual(nextSteps("barracks").map(stepName), ["Chapterhouse", "Berserker lodge", "Halberd yard"]);
+  assert.deepEqual(nextSteps("halberdYard", { path: "halberdiers", rank: 3 }).map(stepName), ["Hero"]);
   assert.deepEqual(nextSteps("heroHall").map(stepName), ["Whirlwind I", "Blade dance I", "Legend I"]);
   assert.equal(upgradedFrom("heroHall"), "barracks");
   assert.equal(rootOf("heroHall"), "meleeGuild");
   const full = (p: "crusaders" | "berserkers" | "halberdiers") => pathById(p).ranks.reduce((n, r) => n + r.cost, 0);
-  assert.equal(allocated("heroHall"), 3 * 4 + full("crusaders") + full("berserkers") + full("halberdiers"));
+  assert.equal(allocated("heroHall"), 3 * (4 + 3) + full("crusaders") + full("berserkers") + full("halberdiers"));
   const ids = buildingTree("heroHall").map((n) => n.id);
-  for (const id of ["k:meleeGuild", "k:barracks", "p:crusaders:3", "p:berserkers:3", "p:halberdiers:3", "k:heroHall", "p:whirlwind:1", "p:bladeDance:1", "p:legend:1"]) assert.ok(ids.includes(id), id);
+  for (const id of ["k:meleeGuild", "k:barracks", "k:chapterHouse", "k:berserkerLodge", "k:halberdYard", "p:crusaders:3", "p:berserkers:3", "p:halberdiers:3", "k:heroHall", "p:whirlwind:1", "p:bladeDance:1", "p:legend:1"]) assert.ok(ids.includes(id), id);
   // It shows on the Melee Guild line's upgrade map, its paths to the top.
   const map = fullTree("meleeGuild").map((n) => n.id);
   for (const id of ["k:heroHall", "p:whirlwind:3", "p:bladeDance:3", "p:legend:3"]) assert.ok(map.includes(id), id);
   assert.equal(STRUCTURES.heroHall.w * STRUCTURES.heroHall.h, STRUCTURES.barracks.w * STRUCTURES.barracks.h, "it stands where its barracks stood");
 });
 test("three maxed Barracks merge into the Hero, which keeps its place; the save keeps it", () => {
-  const { s, uid } = building("barracks", "crusaders", 3);
-  s.defend.owned.barracks = 3;
-  s.defend.kept.push({ kind: "barracks", path: "berserkers", rank: 3 }, { kind: "barracks", path: "halberdiers", rank: 3 });
+  const { s, uid } = building("chapterHouse", "crusaders", 3);
+  s.defend.owned.berserkerLodge = 1; s.defend.owned.halberdYard = 1;
+  s.defend.kept.push({ kind: "berserkerLodge", path: "berserkers", rank: 3 }, { kind: "halberdYard", path: "halberdiers", rank: 3 });
   const kind = () => s.defend.layout.structures.find((o) => o.uid === uid)?.kind;
   const merge = nextSteps(kind()!, specialtyOf(s.defend.layout, { uid })).find((o) => o.type === "merge")!;
   const r = upgradeBuilding(s, { uid }, merge);
-  assert.ok(r.ok && !r.waiting, "it stands where the barracks stood");
+  assert.ok(r.ok && !r.waiting, "it stands where the chapterhouse stood");
   assert.equal(kind(), "heroHall");
   assert.equal(s.defend.owned.heroHall, 1);
-  assert.equal(s.defend.owned.barracks, 0);
+  assert.deepEqual([s.defend.owned.chapterHouse, s.defend.owned.berserkerLodge, s.defend.owned.halberdYard], [0, 0, 0]);
   assert.deepEqual(s.defend.kept, [], "the other two are used up");
   assert.equal(decode(JSON.stringify(s)).defend.layout.structures.find((o) => o.uid === uid)?.kind, "heroHall");
 });

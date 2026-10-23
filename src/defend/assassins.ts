@@ -15,22 +15,31 @@ import { BLOODLETTERS, HEADHUNT, SHADOWCLOAK, VENOM, pathRank, type BattlePaths 
 import { buildingPaths } from "../specializations.ts";
 import type { DefendSim, Enemy, Soldier } from "./sim.ts";
 
-/** A den's path ranks: each 0 unless its building climbs it. */
-export function denPaths(sim: DefendSim, home: number) {
-  const p: BattlePaths | undefined = buildingPaths(sim, sim.map.buildings[home]);
+/** What a den's assassins do, from its kind and path ranks: the Blood hall,
+ * the Veil house and the Poison den each have their branch's own before
+ * any rank (`hall`), and a plain den wearing one of their paths (old
+ * fixtures' `Bonuses.paths`) fights as that hall. */
+export function denOf(kind: string | undefined, blood: number, cloak: number, venom: number, hunt: number) {
+  const bled = kind === "bloodHall" && !blood, veiled = kind === "veilHouse" || cloak > 0, poisons = kind === "poisonDen" || venom > 0;
   return {
-    blood: pathRank(p, "assassinDen", "bloodletters"),
-    cloak: pathRank(p, "assassinDen", "shadowcloak"),
-    venom: pathRank(p, "assassinDen", "venom"),
-    hunt: pathRank(p, "assassinDen", "headhunters"),
+    hunt,
+    crit: bled ? BLOODLETTERS.hall.crit : BLOODLETTERS.crit[blood], every: BLOODLETTERS.every[blood], hp: bled ? BLOODLETTERS.hall.hp : BLOODLETTERS.hp[blood],
+    veiled, reveal: cloak ? SHADOWCLOAK.reveal[cloak] : SHADOWCLOAK.hall.reveal, ambush: cloak ? SHADOWCLOAK.ambush[cloak] : SHADOWCLOAK.hall.ambush, recloak: cloak >= 3,
+    poisons, time: venom ? VENOM.time[venom] : VENOM.hall.time, more: venom ? VENOM.more[venom] : VENOM.hall.more, spread: venom >= 3,
   };
 }
 
-/** An assassin's HP as a share of its own: Bloodletters give theirs up. */
-export const assassinHp = (sim: DefendSim, home: number) => BLOODLETTERS.hp[denPaths(sim, home).blood];
+/** A den's assassins (`denOf`), from its building's own paths. */
+export function denPaths(sim: DefendSim, home: number) {
+  const b = sim.map.buildings[home], p: BattlePaths | undefined = buildingPaths(sim, b);
+  return denOf(b?.kind, pathRank(p, "bloodHall", "bloodletters"), pathRank(p, "veilHouse", "shadowcloak"), pathRank(p, "poisonDen", "venom"), pathRank(p, "assassinDen", "headhunters"));
+}
 
-/** A fresh recruit's optional state: Shadowcloak's start cloaked. */
-export const recruitState = (sim: DefendSim, home: number): Partial<Soldier> => (denPaths(sim, home).cloak ? { cloak: 0 } : {});
+/** An assassin's HP as a share of its own: Bloodletters give theirs up. */
+export const assassinHp = (sim: DefendSim, home: number) => denPaths(sim, home).hp;
+
+/** A fresh recruit's optional state: the Veil house's start cloaked. */
+export const recruitState = (sim: DefendSim, home: number): Partial<Soldier> => (denPaths(sim, home).veiled ? { cloak: 0 } : {});
 
 /** Whether no enemy can pick `u` out: an assassin in its cloak. */
 export const cloaked = (u: object) => "cloak" in u && (u as Soldier).cloak === 0;
@@ -55,16 +64,16 @@ export const toughestFirst = (from: { x: number; y: number }) => (a: Enemy, b: E
 
 /** One assassin's strike on `e` for `base` damage. */
 export function assassinStrike(sim: DefendSim, s: Soldier, e: Enemy, base: number) {
-  const { blood, cloak, venom, hunt } = denPaths(sim, s.home);
+  const d = denPaths(sim, s.home), hunt = d.hunt;
   s.strikes = (s.strikes ?? 0) + 1;
-  const crit = s.strikes % BLOODLETTERS.every[blood] === 0;
-  const ambush = cloak > 0 && s.cloak === 0;
-  let damage = base * (crit ? BLOODLETTERS.crit[blood] : 1) * (ambush ? SHADOWCLOAK.ambush[cloak] : 1);
+  const crit = s.strikes % d.every === 0;
+  const ambush = d.veiled && s.cloak === 0;
+  let damage = base * (crit ? d.crit : 1) * (ambush ? d.ambush : 1);
   if (hunt) damage += Math.min(e.maxHp * HEADHUNT.bounty[hunt], base * HEADHUNT.cap);
   // Poisoned before the blow lands, so the blow itself bites harder.
-  if (venom) envenom(e, VENOM.time[venom], VENOM.more[venom], base * VENOM.share, venom >= 3);
+  if (d.poisons) envenom(e, d.time, d.more, base * VENOM.share, d.spread);
   sim.hurtEnemy(e, damage, true, "melee", s);
-  if (cloak) s.cloak = cloak >= 3 && e.hp <= 0 ? 0 : SHADOWCLOAK.reveal[cloak];
+  if (d.veiled) s.cloak = d.recloak && e.hp <= 0 ? 0 : d.reveal;
   if (crit || ambush) sim.effects.push({ kind: "spark", x: e.x, y: e.y, t: 0, r: crit && ambush ? 0.8 : 0.5 });
 }
 

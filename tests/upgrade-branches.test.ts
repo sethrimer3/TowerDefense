@@ -7,19 +7,19 @@ import { BranchArt, rgb, type Tone } from "../src/ui/branch-art.ts";
 const node = (tree: ReturnType<typeof buildingTree>, id: string) => tree.find((n) => n.id === id)!;
 
 test("a closed-off path trails off on the side it stood, beside the one taken", () => {
-  // The wizard tower's paths stand Pyromancy, Rime, Stormcalling, left to right.
-  const left = node(buildingTree("wizardTower", { path: "pyromancy", rank: 1 }), "k:wizardTower");
+  // The wizard tower's branches stand the Pyre, Frost and Storm towers, left to right.
+  const left = node(buildingTree("pyreTower", { path: "pyromancy", rank: 1 }), "k:wizardTower");
   assert.deepEqual(left.took, { side: false, i: 0, n: 3 });
   for (const slot of left.closed!) assert.ok(trailAim(slot, left.took!, false)[0] > 0, "taking the left path, the others trail off to the right");
-  const right = node(buildingTree("wizardTower", { path: "storm", rank: 1 }), "k:wizardTower");
+  const right = node(buildingTree("stormTower", { path: "storm", rank: 1 }), "k:wizardTower");
   for (const slot of right.closed!) assert.ok(trailAim(slot, right.took!, false)[0] < 0, "taking the right path, the others trail off to the left");
-  const mid = node(buildingTree("wizardTower", { path: "rime", rank: 1 }), "k:wizardTower");
+  const mid = node(buildingTree("frostTower", { path: "rime", rank: 1 }), "k:wizardTower");
   assert.deepEqual(mid.closed!.map((s) => Math.sign(trailAim(s, mid.took!, false)[0])), [-1, 1], "taking the middle, one each side");
   for (const t of [left, right, mid]) for (const slot of t.closed!) assert.ok(trailAim(slot, t.took!, false)[1] < 0, "paths trail off upward");
 });
 
 test("closed-off buildings trail off beside and below", () => {
-  const tree = buildingTree("wizardTower", { path: "storm", rank: 1 });
+  const tree = buildingTree("stormTower", { path: "storm", rank: 1 });
   const watch = node(tree, "k:watchTower");
   assert.ok(watch.took?.side, "the Watch tower became the wizard tower");
   const aims = watch.closed!.map((s) => [s, trailAim(s, watch.took!, true)] as const);
