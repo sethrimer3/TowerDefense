@@ -23,7 +23,9 @@ try {
     await page.screenshot({ path: `test-results/tiles-sunlight-${width}.png` });
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
     const checks = await page.evaluate(async () => {
-      const { HallBackdrop } = await import('/src/ui/hall-art.ts');
+      const { HallBackdrop, ROSES, setRose, roseOn } = await import('/src/ui/hall-art.ts');
+      // Pin the rose so the timed draws below compare one glazing.
+      setRose('flower');
       const { setPixelArt } = await import('/src/defend/pixel-sprites.ts');
       const { SoftSunlight } = await import('/src/soft-sunlight.ts');
       const canvas = document.createElement('canvas');
@@ -49,10 +51,23 @@ try {
       setPixelArt(false); room.draw(380000, [], 1, true); const legacyAgain = pixels();
       setPixelArt(true); room.draw(140000, [], 1, false);
       // Symmetric native leadwork, including both halves of the rose/lancets.
+      // Every rose glazing too, each its own leadwork, and the nights pick several.
       let asymmetric = 0;
-      for (let y = 0; y < canvas.height; y++) for (let x = 0; x < canvas.width / 2; x++) {
-        if ((room.part[y * canvas.width + x] === 2) !== (room.part[y * canvas.width + canvas.width - x - 1] === 2)) asymmetric++;
+      const roseLead = {};
+      for (const rose of ROSES) {
+        setRose(rose); room.draw(140000, [], 1, false);
+        let lead = 0;
+        for (let y = 0; y < canvas.height; y++) for (let x = 0; x < canvas.width / 2; x++) {
+          const a = room.part[y * canvas.width + x] === 2;
+          if (a !== (room.part[y * canvas.width + canvas.width - x - 1] === 2)) asymmetric++;
+          if (a) lead += x * 7 + y;
+        }
+        roseLead[rose] = lead;
       }
+      setRose(null);
+      const nights = new Set(Array.from({ length: 40 }, (_, n) => roseOn(n * 480000)));
+      setRose('flower'); room.draw(140000, [], 1, false);
+      const distinctRoses = new Set(Object.values(roseLead)).size === ROSES.length && nights.size >= 4;
       const probe = document.createElement('canvas'); probe.width = 240; probe.height = 240;
       const field = new SoftSunlight(), c = probe.getContext('2d');
       field.draw(c, 120, 0, 40, 240, 0, 1);
@@ -64,14 +79,15 @@ try {
       samples.sort((a,b) => a-b);
       const same = (a,b) => a.every((v,i) => v === b[i]);
       const dark = night.every((v, i) => i % 4 !== 3 || v === 0);
-      return { shaft, dark, moved: !same(first,moved), still: same(still,stillLater), night: same(night,nightLater), gated: !same(stillWall,legacy), restored: same(stillWall,restored), legacy: same(legacy,legacyAgain), asymmetric, maxStep, shades: shades.size, p95: samples[Math.floor(samples.length * .95)] };
+      return { shaft, dark, moved: !same(first,moved), still: same(still,stillLater), night: same(night,nightLater), gated: !same(stillWall,legacy), restored: same(stillWall,restored), legacy: same(legacy,legacyAgain), asymmetric, distinctRoses, maxStep, shades: shades.size, p95: samples[Math.floor(samples.length * .95)] };
     });
     assert.equal(checks.moved, true, 'sunlight/dust move over time');
     assert.equal(checks.still, true, 'Reduce Motion freezes decorative movement');
     assert.equal(checks.night && checks.dark, true, 'night has no sunlight or lit dust');
     assert.ok(checks.shaft > 90, `shafts are plainly visible (peak alpha ${checks.shaft})`);
     assert.equal(checks.gated && checks.restored && checks.legacy, true, 'window art toggles/rebakes without resizing');
-    assert.equal(checks.asymmetric, 0, 'leadwork stays symmetric on the native grid');
+    assert.equal(checks.asymmetric, 0, 'leadwork stays symmetric on the native grid, every rose glazing');
+    assert.equal(checks.distinctRoses, true, 'each rose glazing has its own leadwork and the nights change it');
     assert.ok(checks.maxStep <= 4 && checks.shades >= 16, 'light edges feather smoothly to transparent');
     const clip = await page.locator('body > canvas').first().boundingBox();
     await page.screenshot({ path: `test-results/tiles-window-detail-${width}.png`, clip });

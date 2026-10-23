@@ -40,6 +40,8 @@ export class HallBackdrop {
   /** Each pane's own brightness, lighter along its top came and darker along its foot. */
   private glassShade = new Float32Array(0);
   private detailed = false;
+  /** Which glazing fills the rose (`ROSES`), changed at midnight. */
+  private rose: Rose = "flower";
   private sunlight: SoftSunlight | null = null;
   private city = new Float32Array(0);
   private outside: { x: number; y: number; radius: number; seed: number }[] = [];
@@ -50,11 +52,12 @@ export class HallBackdrop {
   constructor(private canvas: HTMLCanvasElement, private look: HallLook) {}
 
   /** Bakes the wall when the canvas's size changed. */
-  private fit() {
+  private fit(now: number) {
     const w = Math.max(8, Math.ceil(this.canvas.clientWidth / ART)), h = Math.max(8, Math.ceil(this.canvas.clientHeight / ART));
-    const detailed = this.look === "keep" && pixelArtOn();
-    if (w === this.w && h === this.h && this.detailed === detailed) return false;
+    const detailed = this.look === "keep" && pixelArtOn(), rose = detailed ? roseOn(now) : this.rose;
+    if (w === this.w && h === this.h && this.detailed === detailed && this.rose === rose) return false;
     this.detailed = detailed;
+    this.rose = rose;
     this.w = w;
     this.h = h;
     this.canvas.width = w;
@@ -135,7 +138,7 @@ export class HallBackdrop {
         const lobe = rose.r * 0.46;
         const iron = ring(rose, rose.r) || ring(rose, rose.r * 0.18)
           || [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => ring({ x: rose.x + a * lobe, y: rose.y + b * lobe }, lobe * 0.98));
-        const pane = this.detailed ? leadedPane(px, py, cx, r, archY, bottom) : null;
+        const pane = this.detailed ? leadedPane(px, py, cx, r, archY, bottom, this.rose) : null;
         if (pane ? pane.lead : iron) {
           this.part[i] = TRACERY;
           hgt[i] = 1;
@@ -200,7 +203,7 @@ export class HallBackdrop {
   /** Lights the wall at most every `FRAME_MS` (every three seconds with
    * Reduce Motion), using wall-clock `now` and daylight in [0, 1]. */
   draw(now: number, torches: TorchSpot[], day: number, reduced: boolean) {
-    const resized = this.fit();
+    const resized = this.fit(now);
     if (!resized && now - this.last < (reduced ? 3000 : FRAME_MS)) return;
     this.last = now;
     const { w, h, albedo, sx, sy, part, scene } = this, out = this.image!.data;
@@ -295,7 +298,7 @@ export class HallBackdrop {
    * Library's beams, with a gentle sway of their own; Reduce Motion holds
    * them still and hides the dust; by night it is empty. */
   drawLight(light: HTMLCanvasElement, now: number, day: number, reduced: boolean) {
-    this.fit();
+    this.fit(now);
     const cw = light.clientWidth, ch = light.clientHeight;
     if (light.width !== cw || light.height !== ch) {
       light.width = cw;
@@ -346,12 +349,109 @@ const CLEAR = 0, BLUE = 1, CREAM = 2;
 /** No pane: inside the frame's came or the central mullion. */
 const CAME = -1;
 
+type Pane = { id: number; tint: number };
+
+/** The rose's glazings. Usually the flower, but now and then, from one
+ * midnight to the next, the glaziers have set another: diamond quarries, a
+ * winged sword, the sun between two moons and the stars, an abstract of
+ * cells, or interlocking triangles. */
+export const ROSES = ["flower", "diamonds", "sword", "sky", "cells", "triangles"] as const;
+export type Rose = (typeof ROSES)[number];
+let roseOverride: Rose | null = null;
+/** Sets the rose's glazing (the console's `tilesRose`), or null for the night's own. */
+export function setRose(rose: Rose | null) {
+  roseOverride = rose;
+}
+/** The glazing for wall-clock `now`: one a day, changed at midnight (a
+ * quarter `DAY_MS` before the day's turn), the flower about half the time. */
+export function roseOn(now: number): Rose {
+  if (roseOverride) return roseOverride;
+  const night = Math.floor((now + DAY_MS / 4) / DAY_MS), roll = h01(night, 3, 97);
+  return roll < 0.45 ? "flower" : ROSES[1 + Math.min(ROSES.length - 2, Math.floor((roll - 0.45) / 0.55 * (ROSES.length - 1)))];
+}
+
+/** Each glazing as panes over the rose's disc of radius `rr`, in `X = |dx|`
+ * and `dy` from its centre (up is negative), so each mirrors exactly. */
+const ROSE_PANES: Record<Exclude<Rose, "flower">, (X: number, dy: number, dr: number, rr: number) => Pane> = {
+  diamonds(X, dy, _dr, rr) {
+    const q = Math.max(5, rr / 3.6), u = X / q, v = dy / (q * 1.4);
+    const i = Math.round(u + v), j = Math.round(u - v);
+    return { id: 1000 + (i + 50) * 100 + j + 50, tint: (((i + j) % 3) + 3) % 3 };
+  },
+  sword(X, dy, dr, rr) {
+    const bw = Math.max(1.5, rr * 0.07), tip = -rr * 0.78, guard = rr * 0.18;
+    // The blade, narrowing to its point, leaded in lengths.
+    if (dy > tip && dy < guard && X < bw * Math.min(1, (dy - tip) / (rr * 0.18)))
+      return { id: 2000 + Math.floor((dy - tip) / (rr * 0.24)), tint: CLEAR };
+    if (Math.abs(dy - guard - rr * 0.04) < rr * 0.055 && X < rr * 0.34) return { id: 2050, tint: CREAM };
+    if (dy > guard && dy < rr * 0.5 && X < bw * 0.85) return { id: 2051, tint: BLUE };
+    if (Math.hypot(X, dy - rr * 0.58) < rr * 0.09) return { id: 2052, tint: CREAM };
+    // The wings, from beside the guard, sweeping up and out in five feathers.
+    const wx = X - bw * 1.2, wy = guard - dy, ang = Math.atan2(wy, wx) * 180 / Math.PI, dw = Math.hypot(wx, wy);
+    if (wx > 0 && ang > -12 && ang < 70) {
+      const k = Math.min(4, Math.floor((ang + 12) / 16.4)), reach = rr * (0.92 - k * 0.07) - Math.abs(((ang + 12) % 16.4) - 8.2) * rr * 0.012;
+      if (dw < rr * 0.34) return { id: 2060, tint: CREAM };
+      if (dw < reach) return { id: 2070 + k, tint: k % 2 ? CLEAR : CREAM };
+    }
+    // The sky behind, in quarters round the disc.
+    return { id: 2090 + Math.floor(Math.atan2(X, -dy) / (Math.PI / 4)) + (dr > rr * 0.62 ? 10 : 0), tint: BLUE };
+  },
+  sky(X, dy, dr, rr) {
+    // The sun, its eight rays, a crescent moon either side and the stars.
+    if (dr < rr * 0.2) return { id: 3000, tint: CREAM };
+    const th = Math.atan2(X, -dy), k = Math.round(th / (Math.PI / 4)), off = Math.abs(th - k * Math.PI / 4);
+    if (dr < rr * 0.44 && off * dr < (rr * 0.44 - dr) * 0.45) return { id: 3010 + k, tint: CREAM };
+    const mx = rr * 0.66, my = rr * 0.04, m = rr * 0.24;
+    if (Math.hypot(X - mx, dy - my) < m && Math.hypot(X - mx - m * 0.45, dy - my + m * 0.15) > m * 0.85) return { id: 3030, tint: CREAM };
+    for (const [n, sx, sy, sr] of STARS) {
+      const ax = Math.abs(X - sx * rr), ay = Math.abs(dy - sy * rr), size = sr * rr;
+      if (Math.sqrt(ax) + Math.sqrt(ay) < Math.sqrt(size)) return { id: 3040 + n, tint: CREAM };
+    }
+    return { id: 3100 + Math.floor(th / (Math.PI / 2)) + (dr > rr * 0.86 ? 10 : 0), tint: dr > rr * 0.86 ? CLEAR : BLUE };
+  },
+  cells(X, dy, _dr, rr) {
+    // An abstract of cells round mirrored seeds, a few on the mullion's line.
+    let best = Infinity, n = 0;
+    for (let k = 0; k < CELLS.length; k++) {
+      const [sx, sy] = CELLS[k], d = (X - sx * rr) ** 2 + (dy - sy * rr) ** 2;
+      if (d < best) { best = d; n = k; }
+    }
+    return { id: 4000 + n, tint: n % 3 };
+  },
+  triangles(X, dy, dr, rr) {
+    // Two hexagrams, upright and on their sides, and an eye: each pane is
+    // tinted by how many of the four triangles overlap there.
+    if (dr < rr * 0.14) return { id: 5000, tint: CREAM };
+    let mask = 0, inside = 0;
+    TRIANGLES.forEach(([R, normals], t) => {
+      let all = true;
+      normals.forEach(([nx, ny], e) => {
+        const out = nx * X + ny * dy >= R * rr * 0.5;
+        if (out) { mask |= 1 << (t * 3 + e); all = false; }
+      });
+      if (all) inside++;
+    });
+    return { id: 5100 + mask, tint: inside % 3 };
+  },
+};
+/** The sky's stars: index, x and y as shares of the rose's radius, size. */
+const STARS: [number, number, number, number][] = [[0, 0, -0.7, 0.13], [1, 0.4, -0.58, 0.1], [2, 0.7, -0.4, 0.08], [3, 0.36, 0.56, 0.1], [4, 0.66, 0.42, 0.08], [5, 0, 0.68, 0.12]];
+/** The cells' seeds as shares of the radius, x never negative (folded). */
+const CELLS: [number, number][] = [[0, -0.8], [0, -0.36], [0, 0.08], [0, 0.5], [0, 0.88], [0.3, -0.62], [0.62, -0.62], [0.24, -0.12], [0.5, -0.3], [0.84, -0.26], [0.36, 0.28], [0.7, 0.08], [0.9, 0.3], [0.3, 0.7], [0.62, 0.56], [0.52, 0.86]];
+/** The triangles: circumradius share and their edges' outward normals. */
+const TRIANGLES: [number, [number, number][]][] = [
+  [0.96, [[0, 1], [0.866, -0.5], [-0.866, -0.5]]],
+  [0.96, [[0, -1], [0.866, 0.5], [-0.866, 0.5]]],
+  [0.56, [[1, 0], [-0.5, 0.866], [-0.5, -0.866]]],
+  [0.56, [[-1, 0], [0.5, 0.866], [0.5, -0.866]]],
+];
+
 /** The window's glazing as panes, each an id and a tint: a border of
  * alternating beads, a rose in the head (a cream eye, eight petals, crescents
  * between them and an outer ring of sixteen segments, each with a roundel),
  * spandrels round it and two pointed lancets of diamond quarries below.
  * Everything reads `|x - cx|`, so the leadwork mirrors exactly. */
-function paneAt(px: number, py: number, cx: number, r: number, archY: number, bottom: number): { id: number; tint: number } {
+function paneAt(px: number, py: number, cx: number, r: number, archY: number, bottom: number, rose: Rose = "flower"): Pane {
   const X = Math.abs(px - cx);
   const d = py < archY ? r - Math.hypot(X, py - archY) : Math.min(r - X, bottom - py);
   if (d < 4) return { id: CAME, tint: CLEAR };
@@ -364,6 +464,7 @@ function paneAt(px: number, py: number, cx: number, r: number, archY: number, bo
     return { id: 100 + k, tint: k % 2 ? BLUE : CREAM };
   }
   const rr = r - 8, dy = py - archY, dr = Math.hypot(X, dy);
+  if (dr < rr && rose !== "flower") return ROSE_PANES[rose](X, dy, dr, rr);
   if (dr < rr) {
     const th = Math.atan2(X, -dy), eye = rr * 0.2, ring = rr * 0.74;
     if (dr < eye) return { id: 200, tint: CREAM };
@@ -398,11 +499,12 @@ function paneAt(px: number, py: number, cx: number, r: number, archY: number, bo
 /** A pixel of leaded glass: lead where its pane meets the next one toward the
  * mullion or below (so each came is one pixel and mirrors exactly), and
  * otherwise its pane's tint and shade. */
-function leadedPane(px: number, py: number, cx: number, r: number, archY: number, bottom: number) {
-  const here = paneAt(px, py, cx, r, archY, bottom);
+function leadedPane(px: number, py: number, cx: number, r: number, archY: number, bottom: number, rose: Rose) {
+  const at = (x: number, y: number) => paneAt(x, y, cx, r, archY, bottom, rose);
+  const here = at(px, py);
   if (here.id === CAME) return { lead: true, tint: CLEAR, shade: 1 };
-  const toward = paneAt(px + (px < cx ? 1 : -1), py, cx, r, archY, bottom).id;
-  const below = paneAt(px, py + 1, cx, r, archY, bottom).id, above = paneAt(px, py - 1, cx, r, archY, bottom).id;
+  const toward = at(px + (px < cx ? 1 : -1), py).id;
+  const below = at(px, py + 1).id, above = at(px, py - 1).id;
   const lead = (toward !== CAME && toward !== here.id) || (below !== CAME && below !== here.id);
   const shade = (0.95 + h01(here.id % 9973, here.id >> 10, 31) * 0.1) * (above !== here.id ? 1.1 : below !== here.id ? 0.92 : 1);
   return { lead, tint: here.tint, shade };

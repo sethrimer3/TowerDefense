@@ -26,6 +26,7 @@ import { LibraryPage } from "./library/ui.ts";
 import { stream } from "./random.ts";
 import { WelcomeBack } from "./ui/welcome.ts";
 import { unlockAllTowers } from "./defend/progress.ts";
+import { ROSES, setRose, type Rose } from "./ui/hall-art.ts";
 
 // Wires the pages together: builds the shell, loads the save, and routes
 // navigation, the currency bar and the frame loop between the pages.
@@ -358,6 +359,11 @@ window.addEventListener("pagehide", store);
 (globalThis as { libraryEnchant?: unknown }).libraryEnchant = (n = 10) => {
   const sim = libraryPage.sim, shelved = [...sim.slots.keys()].filter((s) => sim.slots[s] && !sim.enchanted[s]);
   for (let k = 0; k < n && shelved.length; k++) sim.enchanted[shelved.splice(Math.floor(shelved.length * ((k * 0.618) % 1)), 1)[0]] = 1;
+};
+// Console helper: set the Tiles hall's rose window to one of its glazings (`ROSES`), or none for the night's own.
+(globalThis as { tilesRose?: unknown }).tilesRose = (rose?: Rose) => {
+  setRose(rose && ROSES.includes(rose) ? rose : null);
+  return ROSES;
 };
 // Console helper: look closely at one of the mine's buildings, picked.
 (globalThis as { mineLook?: unknown }).mineLook = (id: "shaft" | "barracks" | "warehouse" | "forge" | "smithy" = "forge", zoom = 4) => minePage.look(id, zoom);
