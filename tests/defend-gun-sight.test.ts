@@ -13,6 +13,8 @@ import { cellIndex } from "../src/defend/grid.ts";
 import { Barracks, stepArcher } from "../src/defend/troops.ts";
 import { FLAT_SHOOTERS, TOWER_ROOM, lineOfSight, perched, shootsFlat } from "../src/defend/gun-sight.ts";
 import { center } from "../src/defend/pathing.ts";
+import { ART } from "../src/defend/park-art.ts";
+import { BADGE, badgeSpots, garrisoned, garrisons } from "../src/defend/garrison-icons.ts";
 
 /** A city of five tiles with `kinds` placed round the keep. */
 function battle(kinds: [PlacedKind, number, number][]) {
@@ -99,6 +101,17 @@ test("gunners with nothing in sight climb a watch tower, two at most, unseen up 
     assert.deepEqual([u.x, u.y], [c.x, c.y], "at the top of the tower");
     assert.ok(perched(u));
   }
+  // Drawn as badges in a row over the tower, not as themselves.
+  assert.ok(up.every(garrisoned));
+  const g = garrisons(sim);
+  assert.equal(g.length, 1);
+  assert.deepEqual(g[0].rect, tower.rect);
+  assert.deepEqual(g[0].units, up);
+  const spots = badgeSpots(tower.rect, up.length);
+  assert.ok(spots.every((p) => p.ay + BADGE.size + 2 <= tower.rect.y * ART), "above the tower");
+  assert.ok(spots[1].ax >= spots[0].ax + BADGE.size, "side by side");
+  const mid = (spots[0].ax + spots[1].ax + BADGE.size) / 2;
+  assert.ok(Math.abs(mid - (tower.rect.x + tower.rect.w / 2) * ART) <= 1, "centred");
   // No enemy picks them out.
   assert.ok(!up.includes(sim.nearestDefender(c.x, c.y, 0.5) as Soldier));
   // An enemy behind the tower's own stones and the houses round it: shot from up there.
@@ -113,4 +126,5 @@ test("gunners with nothing in sight climb a watch tower, two at most, unseen up 
   sim.damageBuilding(tower.id, 1e9);
   for (const u of up) stepArcher(sim, u, 1 / 30);
   for (const u of up) assert.equal(u.perch, undefined);
+  assert.equal(garrisons(sim).length, 0, "no badges once it falls");
 });
