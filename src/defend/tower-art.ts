@@ -171,7 +171,8 @@ const MATERIAL: Record<PlacedKind, { m: Material; ruin: Pick<Ruin, "stone" | "to
   stormTower: { m: { tones: C.pale.slice(0, 3), roofed: true }, ruin: { stone: C.pale.slice(0, 3), top: C.cloud.slice(0, 3), beams: true, round: true } },
   mageGuild: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.wine.slice(0, 3), beams: true } },
   infernoHall: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.kiln.slice(0, 3), beams: true } },
-  cinderHall: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.char.slice(0, 3), beams: true } },
+  cinderHall: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.ice.slice(0, 3), beams: true } },
+  stormHall: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.cloud.slice(0, 3), beams: true } },
   valkyriePalace: { m: { tones: C.marble.slice(1, 4), roofed: true }, ruin: { stone: C.marble.slice(1, 4), top: [C.gold[0], C.marble[2], C.marble[3]], beams: false } },
   darkKeep: { m: { tones: C.obsidian.slice(2, 5), roofed: false }, ruin: { stone: C.obsidian.slice(2, 5), top: C.mortar, beams: false } },
   monsterBait: { m: { tones: [C.crate[0], C.crate[2], C.crate[3]], roofed: false }, ruin: { stone: [C.crate[0], C.crate[1], C.crate[3]], top: [C.meat[0], C.meat[1], C.slime[1]], beams: true } },
@@ -223,9 +224,10 @@ export const PATH_LOOKS: Partial<Record<PlacedKind, readonly string[]>> = {
   pyreTower: ["pyromancy"],
   frostTower: ["rime"],
   stormTower: ["storm"],
-  mageGuild: ["pyroclasm", "cinders"],
+  mageGuild: ["pyroclasm", "cinders", "conduction"],
   infernoHall: ["pyroclasm"],
   cinderHall: ["cinders"],
+  stormHall: ["conduction"],
   monsterBait: ["oilSoaked", "fortified"],
 };
 /** The look `kind` takes on `path`: the path when it has art, else "" (the
@@ -250,7 +252,7 @@ export function structureRubblePixels(kind: PlacedKind, cw: number, ch: number, 
   return rubblePixels(w, h, hash(seed, KINDS.indexOf(kind), 3), { ...frame(w, h), ...MATERIAL[kind].ruin });
 }
 
-const KINDS: PlacedKind[] = ["barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "meleeGuild", "rangedGuild", "sniperLodge", "musketHall", "assassinDen", "gunHall", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "spearHall", "phalanx", "javelinCamp", "lancerStable", "heroHall", "shadow", "nanoTower", "pyreTower", "frostTower", "stormTower", "chapterHouse", "berserkerLodge", "halberdYard", "bloodHall", "veilHouse", "poisonDen", "brazierTower", "hawkTower", "batteryTower", "mortarTower", "rangerLodge", "skirmishCamp", "infernoHall", "cinderHall", "skyrangerLodge", "minelayerTower"];
+const KINDS: PlacedKind[] = ["barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "meleeGuild", "rangedGuild", "sniperLodge", "musketHall", "assassinDen", "gunHall", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "spearHall", "phalanx", "javelinCamp", "lancerStable", "heroHall", "shadow", "nanoTower", "pyreTower", "frostTower", "stormTower", "chapterHouse", "berserkerLodge", "halberdYard", "bloodHall", "veilHouse", "poisonDen", "brazierTower", "hawkTower", "batteryTower", "mortarTower", "rangerLodge", "skirmishCamp", "infernoHall", "cinderHall", "skyrangerLodge", "minelayerTower", "stormHall"];
 
 const PAINT: Record<PlacedKind, (p: Pix, look: string) => void> = {
   meleeGuild: paintMeleeGuild,
@@ -296,6 +298,7 @@ const PAINT: Record<PlacedKind, (p: Pix, look: string) => void> = {
   mageGuild: paintMageGuild,
   infernoHall: paintInfernoHall,
   cinderHall: paintCinderHall,
+  stormHall: paintStormHall,
   valkyriePalace: paintValkyriePalace,
   darkKeep: paintDarkKeep,
   monsterBait: paintMonsterBait,
@@ -878,9 +881,12 @@ function paintSkirmishCamp(p: Pix, look: string) {
 function paintInfernoHall(p: Pix, look: string) {
   paintBranchDen(p, "pyroclasm", [".2.", "212", "000", ".0."], { 0: OUTLINE, 1: C.fire[2], 2: C.fire[1] }, !!look, paintMageGuild);
 }
-/** The Cinder hall: pots of glowing coals. */
+/** Frost Hall retains the saved Cinder Hall ID. */
 function paintCinderHall(p: Pix, look: string) {
-  paintBranchDen(p, "cinders", ["121", "000", "030", "000"], { 0: OUTLINE, 1: C.fire[1], 2: C.char[2], 3: C.char[1] }, !!look, paintMageGuild);
+  paintBranchDen(p, "cinders", ["121", "000", "030", "000"], { 0: OUTLINE, 1: C.ice[3], 2: C.ice[1], 3: C.ice[2] }, !!look, paintMageGuild);
+}
+function paintStormHall(p: Pix, look: string) {
+  paintBranchDen(p, "conduction", [".2.", "020", "010", "000"], { 0: OUTLINE, 1: C.cloud[2], 2: C.bolt }, !!look, paintMageGuild);
 }
 
 /** A spear point up, its shaft below. */
@@ -1489,6 +1495,18 @@ function paintStormTower(p: Pix, look: string) {
 
 function paintMageGuild(p: Pix, look: string) {
   const { x0, y0, x1, y1 } = frame(p.w, p.h);
+  if (look === "cinders" || look === "conduction") {
+    const frost = look === "cinders", tones = frost ? C.ice : C.cloud;
+    hall(p, x0, y0, x1, y1, tones[1]);
+    const cx = Math.floor((x0+x1)/2), cy = Math.floor((y0+y1)/2);
+    disc(p, cx, cy, 4.2, (_x,_y,d) => d > 3.4 ? OUTLINE : d > 2.4 ? tones[2] : frost ? C.ice[3] : C.cloud[0]);
+    if (frost) {
+      for (let i=-3;i<=3;i++) { p.set(cx+i,cy,C.ice[3]);p.set(cx,cy+i,C.ice[3]); }
+      for (const dx of [-2,2]) for (const dy of [-2,2]) p.set(cx+dx,cy+dy,C.ice[2]);
+    } else for (let i=0;i<7;i++) p.set(cx+(i<3?1:-1),cy-3+i,i%2?C.ice[3]:C.bolt);
+    for (const x of [x0+4,x1-4]) for (let y=y1-5;y<y1;y++) p.set(x,y,frost?C.ice[3]:C.bolt);
+    return;
+  }
   // Pyroclasm roofs the hall in scorched orange round a greater fire well;
   // the Cinders' is charcoal over a well of smouldering coals, their
   // banners black.

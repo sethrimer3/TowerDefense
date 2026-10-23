@@ -158,7 +158,7 @@ export class Barracks {
 
 /** What each troop building trains. */
 const TRAINS: Partial<Record<Building["kind"], Soldier["kind"]>> = {
-  barracks: "sword", chapterHouse: "sword", berserkerLodge: "sword", halberdYard: "sword", heroHall: "hero", shadow: "shade", archerBarracks: "archer", rangerLodge: "archer", skirmishCamp: "archer", skyrangerLodge: "archer", mageGuild: "mage", infernoHall: "mage", cinderHall: "mage", valkyriePalace: "valkyrie", darkKeep: "darkWizard",
+  barracks: "sword", chapterHouse: "sword", berserkerLodge: "sword", halberdYard: "sword", heroHall: "hero", shadow: "shade", archerBarracks: "archer", rangerLodge: "archer", skirmishCamp: "archer", skyrangerLodge: "archer", mageGuild: "mage", infernoHall: "mage", cinderHall: "mage", stormHall: "mage", valkyriePalace: "valkyrie", darkKeep: "darkWizard",
   meleeGuild: "brawler", rangedGuild: "slinger", assassinDen: "assassin", bloodHall: "assassin", veilHouse: "assassin", poisonDen: "assassin", sniperLodge: "sniper", musketHall: "musketeer",
   spearHall: "spearman", phalanx: "hoplite", javelinCamp: "javelineer", lancerStable: "lancer",
   gunHall: "gunner", gunNest: "machineGunner", gatlingNest: "gatlingGunner", rocketBattery: "rocketeer", revolutionary: "railSniper",

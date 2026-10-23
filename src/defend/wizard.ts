@@ -1,3 +1,4 @@
+import { mageChillSpeed } from "./mage-attunements.ts";
 import { buildingPaths } from "../specializations.ts";
 /** The wizard tower: it alternates between a flamethrower and an ice wave,
  * resting a moment after each.
@@ -204,4 +205,4 @@ export function stepFrosts(sim: DefendSim, dt: number) {
 }
 
 /** How fast a chilled (or frozen, or signal-slowed) enemy moves, as a share of its pace. */
-export const chilled = (e: Enemy) => (ENEMIES[e.kind].unyielding ? 1 : e.freeze || e.stagger ? 0 : (e.chill ? CHILL_SPEED : 1) * (e.slowed ?? 1));
+export const chilled = (e: Enemy) => (ENEMIES[e.kind].unyielding ? 1 : e.freeze || e.stagger ? 0 : Math.min(e.chill ? CHILL_SPEED : 1, mageChillSpeed(e)) * (e.slowed ?? 1));

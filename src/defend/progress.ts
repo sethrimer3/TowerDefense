@@ -270,7 +270,7 @@ export function buyBomb(save: DefendSave, wallet: Wallet): boolean {
 
 // ── Decoding untrusted saves ─────────────────────────────────────────────
 const int = (n: unknown, min: number, max: number): n is number => Number.isInteger(n) && (n as number) >= min && (n as number) <= max;
-const PLACED: PlacedKind[] = ["meleeGuild", "rangedGuild", "barracks", "chapterHouse", "berserkerLodge", "halberdYard", "heroHall", "shadow", "bloodHall", "veilHouse", "poisonDen", "assassinDen", "spearHall", "phalanx", "javelinCamp", "lancerStable", "archerBarracks", "rangerLodge", "skirmishCamp", "skyrangerLodge", "sniperLodge", "gunHall", "musketHall", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "archerTower", "cannonTower", "nanoTower", "watchTower", "brazierTower", "hawkTower", "batteryTower", "mortarTower", "minelayerTower", "wizardTower", "pyreTower", "frostTower", "stormTower", "mageGuild", "infernoHall", "cinderHall", "valkyriePalace", "darkKeep", "monsterBait"];
+const PLACED: PlacedKind[] = ["meleeGuild", "rangedGuild", "barracks", "chapterHouse", "berserkerLodge", "halberdYard", "heroHall", "shadow", "bloodHall", "veilHouse", "poisonDen", "assassinDen", "spearHall", "phalanx", "javelinCamp", "lancerStable", "archerBarracks", "rangerLodge", "skirmishCamp", "skyrangerLodge", "sniperLodge", "gunHall", "musketHall", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "archerTower", "cannonTower", "nanoTower", "watchTower", "brazierTower", "hawkTower", "batteryTower", "mortarTower", "minelayerTower", "wizardTower", "pyreTower", "frostTower", "stormTower", "mageGuild", "infernoHall", "cinderHall", "stormHall", "valkyriePalace", "darkKeep", "monsterBait"];
 
 /** Attuned buildings saved wearing a branch's path, from before
  * each branch made a building of its own: each becomes that building,
@@ -282,7 +282,7 @@ const BRANCHES: Record<string, Record<string, PlacedKind>> = {
   archerTower: { fireArrows: "brazierTower", sharpshooters: "hawkTower" },
   cannonTower: { gunnery: "batteryTower", siegeShot: "mortarTower", minelaying: "minelayerTower" },
   archerBarracks: { rangers: "rangerLodge", skirmishers: "skirmishCamp" },
-  mageGuild: { pyroclasm: "infernoHall", cinders: "cinderHall" },
+  mageGuild: { pyroclasm: "infernoHall", cinders: "cinderHall", conduction: "stormHall" },
 };
 function splitBranches(s: any): any {
   // Paths saved without a rank (before version 5) are refunded and dropped instead.

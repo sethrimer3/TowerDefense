@@ -15,7 +15,7 @@ import type { Building } from "./citygen.ts";
 import { center } from "./pathing.ts";
 import { paintKeepFlash } from "./structure-art.ts";
 import type { CarriedLight } from "./lighting.ts";
-import { drawFireballs, drawMage } from "./mage-art.ts";
+import { drawFireballs, drawMageBolts, drawMage } from "./mage-art.ts";
 import { drawArrows, drawBreath, drawShells, drawSparks } from "./projectile-art.ts";
 import { drawLasers } from "./laser-art.ts";
 import { drawStabs, drawValkyrie } from "./valkyrie-art.ts";
@@ -130,7 +130,8 @@ export function drawUnits(b: Brush, sim: DefendSim, torches: Burning | null, hea
   drawLasers(b.c, b.px, sim);
   drawShells(b.c, b.px, sim);
   drawSiegeShots(b, sim);
-  drawFireballs(b.c, b.px, sim);
+  drawFireballs(b.c, b.px, sim, simple.reduceMotion);
+  drawMageBolts(b.c, b.px, sim, simple.reduceMotion);
   drawStabs(b.c, b.px, sim);
   drawSwings(b.c, b.px, sim);
   drawBlades(b.c, b.px, sim);
@@ -200,7 +201,7 @@ function drawSoldiers(b: Brush, sim: DefendSim, torches: Burning | null, reduced
   const swords: { x: number; y: number; swing: Swing }[] = [];
   for (const u of sim.soldiers) {
     if (u.kind === "mage") {
-      drawMage(c, px, u, sim.time);
+      drawMage(c, px, u, sim.time, sim, reduced);
       continue;
     }
     if (u.kind === "valkyrie") {

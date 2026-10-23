@@ -6,7 +6,7 @@ import { cloneLayout, type PlacedKind } from "./defend/layout.ts";
 import type { Save } from "./save.ts";
 import { studyPathCost } from "./economy.ts";
 
-export type PathTopic = "pyreTower" | "frostTower" | "stormTower" | "wizardTower" | "chapterHouse" | "berserkerLodge" | "halberdYard" | "barracks" | "heroHall" | "valkyriePalace" | "assassinDen" | "bloodHall" | "veilHouse" | "poisonDen" | "spearHall" | "phalanx" | "javelinCamp" | "lancerStable" | "musketHall" | "gunHall" | "gunNest" | "gatlingNest" | "rocketBattery" | "sniperLodge" | "archerTower" | "brazierTower" | "hawkTower" | "cannonTower" | "batteryTower" | "mortarTower" | "minelayerTower" | "archerBarracks" | "rangerLodge" | "skirmishCamp" | "skyrangerLodge" | "watchTower" | "mageGuild" | "infernoHall" | "cinderHall" | "bait" | "spikes" | SpellId;
+export type PathTopic = "pyreTower" | "frostTower" | "stormTower" | "wizardTower" | "chapterHouse" | "berserkerLodge" | "halberdYard" | "barracks" | "heroHall" | "valkyriePalace" | "assassinDen" | "bloodHall" | "veilHouse" | "poisonDen" | "spearHall" | "phalanx" | "javelinCamp" | "lancerStable" | "musketHall" | "gunHall" | "gunNest" | "gatlingNest" | "rocketBattery" | "sniperLodge" | "archerTower" | "brazierTower" | "hawkTower" | "cannonTower" | "batteryTower" | "mortarTower" | "minelayerTower" | "archerBarracks" | "rangerLodge" | "skirmishCamp" | "skyrangerLodge" | "watchTower" | "mageGuild" | "infernoHall" | "cinderHall" | "stormHall" | "bait" | "spikes" | SpellId;
 /** Strike spells: cast from the battle's Skills palette rather than built,
  * so a spell has no cards; it casts with the one path `save.spellPaths`
  * names, at its furthest researched rank. */
@@ -22,7 +22,7 @@ export type PathId =
   | "quickdraw" | "duelists" | "tripod" | "gunShield" | "overdrive" | "stoppingPower" | "deadeye" | "piercing" | "clusterRockets" | "salvoRacks"
   | "marksmen" | "ricochet" | "suppressors"
   | "fireArrows" | "sharpshooters" | "gunnery" | "siegeShot" | "minelaying" | "rangers" | "skirmishers" | "skyranger"
-  | "spotters" | "signalFires" | "pyroclasm" | "cinders" | "oilSoaked" | "fortified"
+  | "spotters" | "signalFires" | "pyroclasm" | "cinders" | "conduction" | "oilSoaked" | "fortified"
   | "blastStakes" | "springStakes" | "rimeStakes"
   | "boneArchers" | "soulWeighing" | "amalgam"
   | "starfall" | "moltenCore" | "frostComet"
@@ -258,16 +258,11 @@ export const SPOTTERS = { mark: [2, 2.5, 2.5, 3], radius: 2 };
  * the tower marks `radius` cells further; at III marked enemies burn for
  * `burn` a second. */
 export const SIGNAL = { slow: [1, 0.7, 0.55, 0.55], radius: 3, burn: 6 };
-/** Pyroclasm, the Inferno hall's path: fireballs hit `damage` times as
- * hard (`hall` before any rank); from II burst `splash`
- * times as wide; at III each throws `shards` smaller bursts beside it, at
- * `shardShare` of the damage. */
-export const PYROCLASM = { hall: 1.2, damage: 1.4, splash: 1.4, shards: 2, shardShare: 0.5 };
-/** Cinders, the Cinder hall's path: the burning ground lasts `life` times
- * as long (`hall` before any rank); from II burns
- * `dps` times as hot; at III what walks through it keeps burning `cling`
- * seconds after. */
-export const CINDERS = { hall: 1.3, life: 1.6, dps: 1.8, cling: 2 };
+/** Mage Guild attunements. Ranks 0..3, distances in simulation cells. */
+export const PYROCLASM = { damage: [1, 1.4, 1.8, 2.3], radius: [1.25, 1.35, 1.5, 1.8], life: [4/3, 5/3, 6.5/3, 8/3], cling: [2, 2.5, 3, 4] };
+/** `cinderHall`/`cinders` are saved IDs for Frost Hall/Cryomancy. */
+export const CRYOMANCY = { range: [5.5, 6, 6.5, 7], radius: [1, 1.15, 1.3, 1.6], speed: [.5, .45, .4, .35], chill: [2, 3, 3.5, 4], freeze: [.35, .5, .75, 1], damage: .75 };
+export const CONDUCTION = { range: [9, 11, 13, 15], targets: [3, 4, 6, 8], jump: [3, 3.5, 4, 4.5], crit: [.1, .15, .25, .35], critical: 2, retain: .85, life: .32 };
 /** Oil-soaked bait: whatever bites a stack catches fire for `burn[rank]`
  * seconds at `dps[rank]` a second. */
 export const OIL = { burn: [0, 3, 4, 6], dps: [0, 8, 20, 50] };
@@ -758,19 +753,27 @@ export const PATHS: KnowledgePath[] = [
     ],
   },
   {
-    id: "pyroclasm", topic: "infernoHall", name: "Pyroclasm", motto: "Bigger, harder fireballs", hue: "ember",
+    id: "pyroclasm", topic: "infernoHall", name: "Pyromancy", motto: "The fire follows them", hue: "ember",
     ranks: [
-      { name: "White heat", icon: "fireball", cost: studyPathCost(4, 0), text: "Fireballs hit 40% harder in all" },
-      { name: "Wide bursts", icon: "blast", cost: studyPathCost(4, 1), text: "Their bursts are 40% wider" },
-      { name: "Meteor shower", icon: "volley", cost: studyPathCost(4, 2), text: "Each fireball throws two smaller bursts beside it" },
+      { name: "White heat", icon: "fireball", cost: studyPathCost(5, 0), text: "Impact and burn damage +40%; 1.35x blast radius, 5s ground fire before Forge bonuses; 2.5s clinging fire" },
+      { name: "Wildfire", icon: "blast", cost: studyPathCost(5, 1), text: "Impact and burn damage +80%; 1.5x blast radius, 6.5s ground fire before Forge bonuses; 3s clinging fire" },
+      { name: "Inferno", icon: "inferno", cost: studyPathCost(5, 2), text: "Impact and burn damage +130%; 1.8x blast radius, 8s ground fire before Forge bonuses; 4s clinging fire" },
     ],
   },
   {
-    id: "cinders", topic: "cinderHall", name: "Cinders", motto: "The ground burns longer and hotter", hue: "shadow",
+    id: "cinders", topic: "cinderHall", name: "Cryomancy", motto: "Winter holds its ground", hue: "frost",
     ranks: [
-      { name: "Smoulder", icon: "embers", cost: studyPathCost(4, 0), text: "Burning ground lasts 60% longer in all" },
-      { name: "Hot coals", icon: "flame", cost: studyPathCost(4, 1), text: "It burns 80% hotter" },
-      { name: "Clinging fire", icon: "inferno", cost: studyPathCost(4, 2), text: "Whatever walks through it keeps burning for 2 seconds after" },
+      { name: "Deep chill", icon: "snowflake", cost: studyPathCost(5, 0), text: "6-cell casting range; 15% wider frost blasts, 55% slow for 3s and 0.5s freeze" },
+      { name: "Winter's grasp", icon: "shard", cost: studyPathCost(5, 1), text: "6.5-cell casting range; 30% wider frost blasts, 60% slow for 3.5s and 0.75s freeze" },
+      { name: "Absolute zero", icon: "iceBlock", cost: studyPathCost(5, 2), text: "7-cell casting range; 60% wider frost blasts, 65% slow for 4s and 1s freeze" },
+    ],
+  },
+  {
+    id: "conduction", topic: "stormHall", name: "Conduction", motto: "The storm finds another", hue: "storm",
+    ranks: [
+      { name: "Distant thunder", icon: "fork", cost: studyPathCost(5, 0), text: "11-cell casting range; 4 enemies, 3.5-cell jumps and 15% critical chance per hit" },
+      { name: "Arc mastery", icon: "fork", cost: studyPathCost(5, 1), text: "13-cell casting range; 6 enemies, 4-cell jumps and 25% critical chance per hit" },
+      { name: "Tempest circuit", icon: "fork", cost: studyPathCost(5, 2), text: "15-cell casting range; 8 enemies, 4.5-cell jumps and 35% critical chance per hit" },
     ],
   },
   {
@@ -914,7 +917,7 @@ export const PATHS: KnowledgePath[] = [
 export const PATH_TOPICS = [...new Set(PATHS.map((p) => p.topic))];
 /** The paths the wizard tower and the barracks wore before each branch
  * made a building of its own. */
-const LEGACY_TOPICS: Partial<Record<PathTopic, PathId[]>> = { wizardTower: ["pyromancy", "rime", "storm"], barracks: ["crusaders", "berserkers", "halberdiers"], assassinDen: ["bloodletters", "shadowcloak", "venom"], archerTower: ["fireArrows", "sharpshooters"], cannonTower: ["gunnery", "siegeShot", "minelaying"], archerBarracks: ["rangers", "skirmishers"], mageGuild: ["pyroclasm", "cinders"] };
+const LEGACY_TOPICS: Partial<Record<PathTopic, PathId[]>> = { wizardTower: ["pyromancy", "rime", "storm"], barracks: ["crusaders", "berserkers", "halberdiers"], assassinDen: ["bloodletters", "shadowcloak", "venom"], archerTower: ["fireArrows", "sharpshooters"], cannonTower: ["gunnery", "siegeShot", "minelaying"], archerBarracks: ["rangers", "skirmishers"], mageGuild: ["pyroclasm", "cinders", "conduction"] };
 export const pathById = (id: PathId) => PATHS.find((p) => p.id === id)!;
 export const pathsOf = (topic: string) => PATHS.filter((p) => p.topic === topic);
 
@@ -968,8 +971,9 @@ export const UNSPECIALIZED: Record<PathTopic, string> = {
   skirmishCamp: "Skirmishers: draw 15% quicker",
   watchTower: "Marked enemies take double damage",
   mageGuild: "Ordinary fire mages",
-  infernoHall: "Pyromancers: fireballs 20% harder",
-  cinderHall: "Cinder mages: burning ground lasts 30% longer",
+  infernoHall: "Pyromancers: 25% wider blasts, full-area ground fire and clinging burns",
+  cinderHall: "Cryomancers: icy blasts, 50% slow for 2s and 0.35s freeze",
+  stormHall: "Stormcallers: 9-cell range, 3-enemy chain lightning, 10% double-damage criticals",
   bait: "Plain stacks of bait",
   spikes: "Plain stakes that cut",
   necromancy: "One plain warrior a fallen enemy",

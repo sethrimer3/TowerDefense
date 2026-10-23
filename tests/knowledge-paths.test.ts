@@ -6,7 +6,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { defaults } from "../src/save.ts";
 import { bonuses } from "../src/progression.ts";
-import { PATHS, PATH_TOPICS, RIME, STORM, CRUSADE, FIRE_ARROWS, SHARP, GUNNERY, SIEGE_SHOT, SKIRMISH, SPOTTERS, SIGNAL, PYROCLASM, CINDERS, OIL, FORTIFY, decodePaths, evolve, learnPath, pathState } from "../src/knowledge-paths.ts";
+import { PATHS, PATH_TOPICS, RIME, STORM, CRUSADE, FIRE_ARROWS, SHARP, GUNNERY, SIEGE_SHOT, SKIRMISH, SPOTTERS, SIGNAL, PYROCLASM, CRYOMANCY, OIL, FORTIFY, decodePaths, evolve, learnPath, pathState } from "../src/knowledge-paths.ts";
 import { ICON_ROWS, ICON_SIZE } from "../src/ui/path-icons.ts";
 import { defaultLayout, fitLayout, placeCityTile, placeStructure } from "../src/defend/layout.ts";
 import { generateCity } from "../src/defend/citygen.ts";
@@ -56,7 +56,7 @@ test("research alone does not change any building in battle", () => {
 });
 
 test("every topic offers two or more paths of three ranks (the palace's, the branch buildings' and the den's spare one or more), with square icons", () => {
-  for (const t of PATH_TOPICS) assert.ok(PATHS.filter((p) => p.topic === t).length >= (["valkyriePalace", "assassinDen", "pyreTower", "frostTower", "stormTower", "chapterHouse", "berserkerLodge", "halberdYard", "bloodHall", "veilHouse", "poisonDen", "brazierTower", "hawkTower", "batteryTower", "mortarTower", "minelayerTower", "rangerLodge", "skirmishCamp", "skyrangerLodge", "infernoHall", "cinderHall"].includes(t) ? 1 : 2), t);
+  for (const t of PATH_TOPICS) assert.ok(PATHS.filter((p) => p.topic === t).length >= (["valkyriePalace", "assassinDen", "pyreTower", "frostTower", "stormTower", "chapterHouse", "berserkerLodge", "halberdYard", "bloodHall", "veilHouse", "poisonDen", "brazierTower", "hawkTower", "batteryTower", "mortarTower", "minelayerTower", "rangerLodge", "skirmishCamp", "skyrangerLodge", "infernoHall", "cinderHall", "stormHall"].includes(t) ? 1 : 2), t);
   for (const p of PATHS) assert.equal(p.ranks.length, 3, p.id);
   for (const [k, rows] of Object.entries(ICON_ROWS)) {
     assert.equal(rows.length, ICON_SIZE, k);
@@ -73,7 +73,7 @@ function battle(kind: PaletteItem, paths?: Bonuses["paths"]) {
   let l = defaultLayout();
   const { tx, ty } = l.keep;
   for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) l = placeCityTile(l, tx + dx, ty + dy) ?? assert.fail("tile");
-  const inside = ["barracks", "chapterHouse", "archerBarracks", "skirmishCamp", "mageGuild", "infernoHall", "cinderHall"].includes(kind);
+  const inside = ["barracks", "chapterHouse", "archerBarracks", "skirmishCamp", "mageGuild", "infernoHall", "cinderHall", "stormHall"].includes(kind);
   l = placeStructure(l, kind, tx, inside ? ty - 1 : ty - 3) ?? assert.fail(kind);
   const fit = fitLayout(l);
   assert.ok(fit.ok);
@@ -273,12 +273,13 @@ test("the archer barracks' and Mage Guild's branch halls work before any rank", 
     stepMage(sim, s, 1 / 30);
     const f = sim.fireballs[0]; f.t = f.dur;
     stepFireballs(sim, 1 / 30);
-    return { damage: f.damage, life: sim.blazes[0].life };
+    return { damage: f.damage, life: sim.blazes[0]?.life, frost: f.frost };
   };
   const plain = throwFrom("mageGuild"), inferno = throwFrom("infernoHall"), cinder = throwFrom("cinderHall");
-  assert.ok(Math.abs(inferno.damage - plain.damage * PYROCLASM.hall) < 1e-9, "the Inferno hall's fireballs hit harder");
-  assert.ok(Math.abs(cinder.life - plain.life * CINDERS.hall) < 1e-9, "the Cinder hall's ground burns longer");
-  assert.equal(cinder.damage, plain.damage);
+  assert.ok(Math.abs(inferno.damage - plain.damage * PYROCLASM.damage[0]) < 1e-9, "Inferno keeps impact damage while adding area and clinging fire");
+  assert.equal(cinder.life, undefined, "Frost Hall leaves no burning ground");
+  assert.equal(cinder.frost?.freeze, CRYOMANCY.freeze[0]);
+  assert.equal(cinder.damage, plain.damage * CRYOMANCY.damage);
 });
 
 /** Marks whatever stands in a lone watch tower's radius, as each step does. */
@@ -331,40 +332,22 @@ function mage(paths?: Bonuses["paths"]) {
   return { sim, s, e, f: sim.fireballs[0] };
 }
 
-test("Pyroclasm throws heavier, wider fireballs, and at III two more burst beside them", () => {
+test("Pyromancers scale impact and burning area, with clinging fire at every tier", () => {
   const plain = mage(), hot = mage({ infernoHall: { path: "pyroclasm", rank: 2 } });
-  assert.equal(hot.f.damage, plain.f.damage * PYROCLASM.damage);
-  assert.ok(Math.abs(hot.f.r - plain.f.r * PYROCLASM.splash) < 1e-9);
-
-  const hurtBeside = (m: ReturnType<typeof mage>) => {
-    const side = orc(m.sim, m.f.x1 + m.f.r * 1.3, m.f.y1);
-    m.f.t = m.f.dur;
-    stepFireballs(m.sim, 1 / 30);
-    return side.maxHp - side.hp;
-  };
-  assert.equal(hurtBeside(mage({ infernoHall: { path: "pyroclasm", rank: 2 } })), 0, "beyond the burst");
-  assert.ok(hurtBeside(mage({ infernoHall: { path: "pyroclasm", rank: 3 } })) > 0, "a meteor lands beside it");
+  assert.equal(hot.f.damage, plain.f.damage * PYROCLASM.damage[2]);
+  assert.ok(Math.abs(hot.f.r - plain.f.r * PYROCLASM.radius[2]) < 1e-9);
+  const m = mage({ infernoHall: { path: "pyroclasm", rank: 3 } });
+  m.f.t=m.f.dur;stepFireballs(m.sim,1/30);
+  assert.equal(m.sim.blazes.length,1);assert.equal(m.sim.blazes[0].clingFor,4);
+  const walker=orc(m.sim,m.f.x1,m.f.y1);stepBlazes(m.sim,1/30);
+  assert.equal(walker.burn,4);assert.equal(walker.burnDps,m.sim.blazes[0].dps);
 });
 
-test("Cinders burn longer and hotter, and at III the fire clings to whoever walks through", () => {
-  const blaze = (paths?: Bonuses["paths"]) => {
-    const m = mage(paths);
-    m.f.t = m.f.dur;
-    stepFireballs(m.sim, 1 / 30);
-    assert.equal(m.sim.blazes.length, 1);
-    return { ...m, b: m.sim.blazes[0] };
-  };
-  const plain = blaze(), hot = blaze({ cinderHall: { path: "cinders", rank: 2 } });
-  assert.ok(Math.abs(hot.b.life - plain.b.life * CINDERS.life) < 1e-9);
-  assert.ok(Math.abs(hot.b.dps - plain.b.dps * CINDERS.dps) < 1e-9);
-
-  const cling = blaze({ cinderHall: { path: "cinders", rank: 3 } });
-  const walker = orc(cling.sim, cling.b.x, cling.b.y);
-  stepBlazes(cling.sim, 1 / 30);
-  assert.equal(walker.burn, CINDERS.cling);
-  assert.equal(walker.burnDps, cling.b.dps);
-  stepBlazes(hot.sim, 1 / 30);
-  assert.equal(orc(hot.sim, hot.b.x, hot.b.y).burn, undefined);
+test("legacy Cinder Hall ranks now cast freezing blasts without borrowing fire research", () => {
+  const m=mage({cinderHall:{path:"cinders",rank:3}});
+  assert.equal(m.f.frost?.freeze,1);assert.equal(m.f.frost?.speed,.35);
+  m.f.t=m.f.dur;stepFireballs(m.sim,1/30);
+  assert.equal(m.sim.blazes.length,0);assert.equal(m.e.freeze,1);
 });
 
 test("Oil-soaked bait sets its biters alight; fortified crates hold out and, spiked, bite back", () => {

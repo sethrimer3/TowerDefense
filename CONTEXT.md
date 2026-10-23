@@ -509,3 +509,16 @@ A Cannon Tower attunement that continually lays proximity mines within half the 
 ### Smart charges
 
 The Minelayer's final upgrade: fifty mines per tower, with little walking charges that approach nearby ground enemies before detonating.
+
+
+### Stormcallers
+
+The Mage Guild's long-distance chain-lightning troop attunement. Bolts jump between distinct enemies and can critically strike for double damage.
+
+### Pyromancers
+
+The Mage Guild's fire troop attunement, trained at Inferno Hall. Larger area blasts leave burning ground and fire that clings to victims.
+
+### Cryomancers
+
+The Mage Guild's cold troop attunement, trained at Frost Hall. Area impacts briefly freeze enemies, then leave them slowed. Frost Hall replaces the former Cinder Hall while retaining its purchased tiers.

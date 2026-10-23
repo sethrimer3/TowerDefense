@@ -414,7 +414,7 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   fireball at where it stands. It bursts with splash damage (full at the
   centre, 40% at the edge, fliers too) that spares your own people, and
   leaves a **blaze**: burning ground that hurts every ground enemy inside it
-  each second until it dies down (fliers pass over). Upgraded by Pyroclasm
+  each second until it dies down (fliers pass over). Upgraded by Spellpower
   (fireball damage and burst) and Lingering embers (how long and how hot
   the ground burns) in the Forge. Paths: Pyroclasm (heavier, wider
   fireballs, then two more bursting either side) or Cinders (longer, hotter
@@ -1048,3 +1048,18 @@ The Cannon Tower branches into Gun Battery, Mortar Tower and Minelayer, each cos
 During battle, select an upgraded Minelayer and drag from its tower or selected crosshair to direct future shots within a 1-cell-radius target disk, clipped to laying range. Drag back onto the tower to restore random full-range coverage; its crosshair expands to the range perimeter. Crosshairs show only while selected. Pointer cancellation or a second finger cancels an uncommitted preview; two fingers still pinch. Build-mode movement and hold-to-open trees remain available. Aiming resets for each battle and is not saved.
 
 C4 Nanobots now requires one fully upgraded building from each of the three attunements. Existing C4 Nanobots and saved Gun Battery/Mortar ranks remain owned. [Accepted specification](upgrades/CANNON_ATTUNEMENTS.md).
+
+
+## Mage Guild troop attunements
+
+The Mage Guild has three attunements, each costing 5 Knowledge with path ranks costing 5 / 5,005 / 20,005 Knowledge. Each trains a mage troop family with ordinary mage HP, movement and 2.1-second casting cadence. Purchases affect the next battle through each home building's snapshot.
+
+| Attunement | Attuned / I / II / III |
+| --- | --- |
+| **Storm Hall — Stormcallers** | Casting range 9/11/13/15 cells; 3/4/6/8 distinct enemies; jump distance 3/3.5/4/4.5 cells; independent critical chance 10/15/25/35%, dealing double damage. Each link retains 85% of the prior non-critical damage. Lightning replaces fireballs and can hit fliers. |
+| **Inferno Hall — Pyromancers** | Impact and burn DPS multipliers 1/1.4/1.8/2.3; blast and ground-fire radius multipliers 1.25/1.35/1.5/1.8; ground fire lasts 4/5/6.5/8 seconds before Forge bonuses; clinging fire lasts 2/2.5/3/4 seconds. Casting range stays 4.5 cells. Every tier burns the full blast area and ignites victims, including airborne impact victims. |
+| **Frost Hall — Cryomancers** | Casting range 5.5/6/6.5/7 cells; blast radius multipliers 1/1.15/1.3/1.6; 50/55/60/65% slowing for 2/3/3.5/4 seconds and a 0.35/0.5/0.75/1-second freeze starting at impact. Direct damage is 75% of ordinary mage damage. No fire is produced. |
+
+Chills use the strongest active mage slow without multiplying duplicate mage effects. A weaker effect can remain after a stronger one expires; freezes refresh their maximum remaining duration rather than adding time. Existing unyielding immunity, shields, damage protection and fire/ice cancellation remain. Elemental effects spare friendlies. Fire uses existing water extinguishing and ground-fire interactions; clinging burns refresh without stacking duplicate statuses. Mage upgrades do not grant Wizard Tower, Dark Wizard or strike-spell research effects.
+
+Existing `infernoHall`/`pyroclasm` saves retain their purchased ranks with the combined fire abilities. `cinderHall`/`cinders` retain their saved IDs and ranks but display Frost Hall/Cryomancy. `stormHall`/`conduction` is the new third branch. The existing mageFireball Forge upgrade is labeled **Spellpower**, applying direct damage to every family and radius to Fire/Frost. Lingering embers still applies to fire only. The Mage Guild's ultimate is still undefined. [Approved specification](upgrades/MAGE_GUILD_ATTUNEMENTS.md).

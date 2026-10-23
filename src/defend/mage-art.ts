@@ -1,3 +1,5 @@
+import { mageAttunement, type MageFamily } from "./mage-attunements.ts";
+import { artPen } from "./pixel-fx.ts";
 /** The fire mages and their attack as they are drawn, in the pixel art of
  * the city (`ART` pixels a cell, snapped to whole screen pixels):
  *
@@ -42,14 +44,24 @@ const MAGE_COLORS: Record<string, string> = {
 };
 /** Sprites: plain, struck (white), and holding a flame low and high. */
 type MageLook = "plain" | "struck" | "flame" | "blaze";
-let mageSprites: Record<MageLook, HTMLCanvasElement> | null = null;
+const mageSprites = new Map<string, HTMLCanvasElement>();
+const ELEMENT_COLORS: Record<MageFamily, Record<string,string>> = {
+  plain: MAGE_COLORS,
+  fire: {...MAGE_COLORS,H:"#d34c24",h:"#81251a",R:"#f18a3e",r:"#d45a29",d:"#92351d"},
+  frost: {...MAGE_COLORS,H:"#b5e3f2",h:"#456f92",R:"#d7f2fa",r:"#7ab3d0",d:"#416b8b",g:"#edf9ff"},
+  storm: {...MAGE_COLORS,H:"#668ab5",h:"#303f6d",R:"#9ebfd6",r:"#526a9a",d:"#303e67",g:"#e8d58d"},
+};
+const FROST_FLAME = ["#294966","#4e7fa2","#88c6e2","#c5ebf8","#f4fcff"];
 
-function mageSprite(look: MageLook) {
-  mageSprites ??= { plain: paintMage("plain"), struck: paintMage("struck"), flame: paintMage("flame"), blaze: paintMage("blaze") };
-  return mageSprites[look];
+function mageSprite(look: MageLook, family: MageFamily) {
+  const key = `${family}:${look}`;
+  let cv = mageSprites.get(key);
+  if (!cv) { cv=paintMage(look,family);mageSprites.set(key,cv); }
+  return cv;
 }
 
-function paintMage(look: MageLook) {
+function paintMage(look: MageLook, family: MageFamily) {
+  const colors = ELEMENT_COLORS[family], flame = family === "frost" ? FROST_FLAME : family === "storm" ? ["#486e9b","#7eacd0","#badceb","#f1df9f","#fffbed"] : FLAME;
   const cv = document.createElement("canvas");
   cv.width = 7;
   cv.height = MAGE.length;
@@ -57,25 +69,30 @@ function paintMage(look: MageLook) {
   MAGE.forEach((row, j) =>
     [...row].forEach((ch, i) => {
       if (ch === ".") return;
-      let color = MAGE_COLORS[ch];
+      let color = colors[ch];
       if ("fFT".includes(ch)) {
         if (look === "plain" || look === "struck" || (ch === "T" && look === "flame")) return;
-        color = ch === "f" ? FLAME[1] : ch === "F" ? FLAME[look === "blaze" ? 3 : 2] : FLAME[4];
+        color = ch === "f" ? flame[1] : ch === "F" ? flame[look === "blaze" ? 3 : 2] : flame[4];
       } else if (look === "struck" && ch !== "0") color = "#fff";
       c.fillStyle = color;
       c.fillRect(i, j, 1, 1);
     }),
   );
+  if (family !== "plain") {
+    c.fillStyle = "#171c25";c.fillRect(6,4,1,3);
+    c.fillStyle = family === "frost" ? "#d7f2fa" : family === "storm" ? "#e8d58d" : "#f4b359";c.fillRect(6,4,1,1);
+  }
   return cv;
 }
 
 /** A fire mage at its spot, `now` seconds into the battle: the sprite drawn
  * up crisp (the board draws with smoothing off). */
-export function drawMage(c: Ctx, px: number, u: Soldier, now: number) {
+export function drawMage(c: Ctx, px: number, u: Soldier, now: number, sim?: DefendSim, reduced = false) {
+  const family = sim ? mageAttunement(sim,u.home).family : "plain";
   const k = (px * FIRE_MAGE.size * 1.5) / 6;
   const ready = u.cd <= 0.4;
-  const look: MageLook = u.flash > 0 ? "struck" : ready ? (flicker(now, u.id) > 0.5 ? "blaze" : "flame") : "plain";
-  c.drawImage(mageSprite(look), u.x * px - 3 * k, u.y * px - 5 * k, 7 * k, MAGE.length * k);
+  const look: MageLook = u.flash > 0 ? "struck" : ready ? ((reduced && family !== "plain" ? .5 : flicker(now, u.id)) > 0.5 ? "blaze" : "flame") : "plain";
+  c.drawImage(mageSprite(look,family), u.x * px - 3 * k, u.y * px - 5 * k, 7 * k, MAGE.length * k);
 }
 
 /** 0 to 1, a quick unsteady flicker for flame `id`. */
@@ -94,10 +111,11 @@ function fireballAt(f: Fireball, t: number) {
 }
 
 /** Every fireball in flight: its shadow, its trail, then the ball. */
-export function drawFireballs(c: Ctx, px: number, sim: DefendSim) {
+export function drawFireballs(c: Ctx, px: number, sim: DefendSim, reduced = false) {
   const g = Math.max(1, Math.round(px / ART));
   const snap = (v: number) => Math.round((v * px) / g) * g;
   for (const f of sim.fireballs) {
+    const flame = f.frost ? FROST_FLAME : FLAME;
     const id = Math.floor(f.x0 * 97 + f.y0 * 31 + f.x1 * 13);
     const { gx, gy, lift } = fireballAt(f, f.t);
     c.fillStyle = "rgba(0,0,0,0.3)";
@@ -107,25 +125,25 @@ export function drawFireballs(c: Ctx, px: number, sim: DefendSim) {
       const back = f.t - i * 0.025;
       if (back < 0) break;
       const p = fireballAt(f, back);
-      const tick = Math.floor((sim.time - back) * 40);
+      const tick = reduced && f.frost ? 0 : Math.floor((sim.time - back) * 40);
       const jx = (hash01(id, i, tick) - 0.5) * 0.25, jy = (hash01(id, i, tick, 1) - 0.5) * 0.25 - i * 0.02;
-      c.fillStyle = i > 6 ? SMOKE : FLAME[Math.max(0, 3 - Math.floor(i / 2))];
+      c.fillStyle = i > 6 ? SMOKE : flame[Math.max(0, 3 - Math.floor(i / 2))];
       const s = i < 3 ? 2 * g : g;
       c.fillRect(snap(p.gx + jx), snap(p.gy - p.lift + jy), s, s);
     }
     // The ball: a dark rim (corners cut), orange body, a hot heart and a
     // glint at its upper left.
     const bx = snap(gx) - 2 * g, by = snap(gy - lift) - 2 * g;
-    c.fillStyle = OUTLINE;
+    c.fillStyle = f.frost ? "#10283c" : OUTLINE;
     c.fillRect(bx + g, by, 3 * g, 5 * g);
     c.fillRect(bx, by + g, 5 * g, 3 * g);
-    c.fillStyle = FLAME[2];
+    c.fillStyle = flame[2];
     c.fillRect(bx + g, by + g, 3 * g, 3 * g);
-    c.fillStyle = FLAME[3];
+    c.fillStyle = flame[3];
     c.fillRect(bx + g, by + g, 2 * g, 2 * g);
-    c.fillStyle = FLAME[4];
+    c.fillStyle = flame[4];
     c.fillRect(bx + g, by + g, g, g);
-    c.fillStyle = FLAME[1];
+    c.fillStyle = flame[1];
     c.fillRect(bx + 3 * g, by + 3 * g, g, g);
   }
 }
@@ -252,7 +270,29 @@ export function mageLights(sim: DefendSim): { carried: CarriedLight[]; relief: R
   for (const f of sim.fireballs) {
     const { gx, gy } = fireballAt(f, f.t);
     carried.push({ x: gx, y: gy, id: Math.floor(f.x0 * 97 + f.y0 * 31), r: 2.2, k: 1 });
-    relief.push({ x: gx, y: gy, r: 2.6, k: 0.9, color: "#ffb36b" });
+    relief.push({ x: gx, y: gy, r: 2.6, k: 0.9, color: f.frost ? "#a5def5" : "#ffb36b" });
   }
   return { carried, relief };
+}
+
+
+/** Pale-blue, gold-tipped chain lightning, drawn on the native art lattice. */
+export function drawMageBolts(c: Ctx, px: number, sim: DefendSim, reduced = false) {
+  if (!sim.mageBolts.length) return;
+  const dot = artPen(c,px);
+  c.save();
+  for (const b of sim.mageBolts) {
+    c.globalAlpha = Math.max(0,1-b.t/b.life);
+    for (let i=1;i<b.pts.length;i++) {
+      const a=b.pts[i-1],z=b.pts[i],dx=(z.x-a.x)*ART,dy=(z.y-a.y)*ART,n=Math.max(1,Math.ceil(Math.sqrt(dx*dx+dy*dy))),critical=b.critical[i-1];
+      for(let j=0;j<=n;j++) {
+        const t=j/n,jitter=reduced?0:(hash01(b.seed,i,Math.floor(j/3))-.5)*3*Math.sin(t*Math.PI);
+        const x=Math.round(a.x*ART+dx*t+(Math.abs(dy)>Math.abs(dx)?jitter:0)),y=Math.round(a.y*ART+dy*t+(Math.abs(dx)>=Math.abs(dy)?jitter:0));
+        c.fillStyle=critical?"#e7d693":"#395c83";dot(x-1,y-1,3,3);
+        c.fillStyle=critical?"#fffbe1":"#d1f0ff";dot(x,y);
+      }
+      if(critical){const x=Math.round(z.x*ART),y=Math.round(z.y*ART);c.fillStyle="#fffbe1";dot(x-2,y,5,1);dot(x,y-2,1,5);}
+    }
+  }
+  c.restore();
 }

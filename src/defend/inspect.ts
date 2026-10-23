@@ -18,7 +18,7 @@ export type Armed = Pick<DefendSim, "levels" | "bonuses">;
 export type Circle = { x: number; y: number; r: number };
 
 /** Buildings that train troops, whose troops a tap picks out. */
-const TRAINS = new Set(["meleeGuild", "rangedGuild", "barracks", "chapterHouse", "berserkerLodge", "halberdYard", "heroHall", "shadow", "bloodHall", "veilHouse", "poisonDen", "archerBarracks", "rangerLodge", "skirmishCamp", "skyrangerLodge", "sniperLodge", "musketHall", "gunHall", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "assassinDen", "spearHall", "phalanx", "javelinCamp", "lancerStable", "mageGuild", "infernoHall", "cinderHall", "valkyriePalace", "darkKeep"]);
+const TRAINS = new Set(["meleeGuild", "rangedGuild", "barracks", "chapterHouse", "berserkerLodge", "halberdYard", "heroHall", "shadow", "bloodHall", "veilHouse", "poisonDen", "archerBarracks", "rangerLodge", "skirmishCamp", "skyrangerLodge", "sniperLodge", "musketHall", "gunHall", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "assassinDen", "spearHall", "phalanx", "javelinCamp", "lancerStable", "mageGuild", "infernoHall", "cinderHall", "stormHall", "valkyriePalace", "darkKeep"]);
 
 /** Whether a tap on `b` picks it: the keep, the player's structures and the wall's ballistas. */
 export const inspectable = (b: Building | undefined): b is Building =>

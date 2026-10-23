@@ -26,12 +26,12 @@ export function quench(sim: DefendSim) {
   if (sim.blazes.length && sim.rime.length) quenchGround(sim);
   for (const b of sim.blazes)
     for (const e of sim.enemiesNear(b.x, b.y, b.r))
-      if ((e.chill !== undefined || e.freeze !== undefined) && !ENEMIES[e.kind].flying && dist(e.x - b.x, e.y - b.y) <= b.r && !sheltered(sim, e.x, e.y)) thaw(sim, e);
+      if ((e.chill !== undefined || e.freeze !== undefined || e.mageChills !== undefined) && !ENEMIES[e.kind].flying && dist(e.x - b.x, e.y - b.y) <= b.r && !sheltered(sim, e.x, e.y)) thaw(sim, e);
   for (const f of sim.rime)
     for (const e of sim.enemiesNear(f.x, f.y, f.r))
       if (e.burn !== undefined && dist(e.x - f.x, e.y - f.y) <= f.r) douse(sim, e);
   for (const e of sim.enemies)
-    if (e.burn !== undefined && (e.chill !== undefined || e.freeze !== undefined)) {
+    if (e.burn !== undefined && (e.chill !== undefined || e.freeze !== undefined || e.mageChills !== undefined)) {
       douse(sim, e);
       thaw(sim, e, false);
     }
@@ -66,6 +66,7 @@ function quenchGround(sim: DefendSim) {
 /** Melts `e`'s chill and freeze. */
 function thaw(sim: DefendSim, e: Enemy, puff = true) {
   delete e.chill;
+  delete e.mageChills;
   delete e.freeze;
   if (puff) steam(sim, e.x, e.y, 0.5);
 }

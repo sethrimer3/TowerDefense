@@ -1,3 +1,4 @@
+import { ageMageChill, type MageChill, type MageBolt } from "./mage-attunements.ts";
 import { stepMines, type Mine } from "./mines.ts";
 import { BASTIONS, keepRank } from "../keep-upgrades.ts";
 import { buildingPaths } from "../specializations.ts";
@@ -104,6 +105,7 @@ export type Enemy = {
   /** Seconds left chilled by a wizard's ice (slowed); absent when not, so
    * a run without ice keeps its state exactly as before. */
   chill?: number;
+  mageChills?: MageChill[];
   /** Seconds left frozen solid by Rime's deep freeze (stopped); absent when not. */
   freeze?: number;
   /** Frozen by a Frost nova under Shatter: harder hit until it thaws; absent when not. */
@@ -362,6 +364,7 @@ export class DefendSim {
   frosts: Frost[] = [];
   /** Fire mages' fireballs in flight, and the ground they set burning. */
   fireballs: Fireball[] = [];
+  mageBolts: MageBolt[] = [];
   blazes: Blaze[] = [];
   /** Valkyries' charge stabs, fading. */
   stabs: Stab[] = [];
@@ -690,6 +693,11 @@ export class DefendSim {
 
   /** Effects age, scorches cool, hit flashes fade. */
   private tick(dt: number) {
+    if (this.mageBolts.length) {
+      for (const b of this.mageBolts) b.t += dt;
+      this.mageBolts = this.mageBolts.filter(b => b.t < b.life);
+    }
+    for (const e of this.enemies) ageMageChill(e, dt);
     for (const fx of this.effects) fx.t += dt;
     this.effects = this.effects.filter((fx) => fx.t < 0.6);
     for (const s of this.scorches) s.t += dt;
