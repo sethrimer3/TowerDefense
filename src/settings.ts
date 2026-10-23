@@ -33,6 +33,9 @@ export const SETTINGS = {
   /** While dragging on the Defend board (placing, aiming), a box above the
    * finger shows the board zoomed in round where the item would go. */
   magnifier: { kind: "toggle", default: false, page: { id: "magnifier", label: "Magnifying glass while placing" } },
+  /** In battle, the rally flag takes a triple tap rather than a double, for
+   * players who plant it by accident. */
+  tripleTapFlag: { kind: "toggle", default: false, page: { id: "triple-tap-flag", label: "Triple tap to place the rally flag" } },
   /** Faint lines round the Defend board's tiles, and how strong, in percent. */
   tileGrid: { kind: "toggle", default: false, page: { id: "tile-grid", label: "Tile grid lines" } },
   gridOpacity: { kind: "range", default: 15, min: 5, max: 60, step: 1, page: { id: "grid-opacity", label: "Grid line opacity", aria: "Tile grid line opacity, percent" } },

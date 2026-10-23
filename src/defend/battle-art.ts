@@ -36,6 +36,7 @@ import { drawSimpleEnemies, drawSimpleTroops } from "./simple-units.ts";
 import { drawPixel, enemySprite } from "./pixel-sprites.ts";
 import { isMelee, meleeFacing } from "./melee-facing.ts";
 import type { UnitOutline } from "./unit-outline.ts";
+import { drawGarrisons, garrisoned } from "./garrison-icons.ts";
 
 export type Brush = { c: CanvasRenderingContext2D; px: number };
 
@@ -117,7 +118,7 @@ export function drawUnits(b: Brush, sim: DefendSim, torches: Burning | null, hea
   rims = layers?.rims ?? null;
   try {
     drawCivilians(u, sim, torches);
-    swords = simple.troops ? (drawSimpleTroops(u, sim.soldiers, layers?.rims), []) : drawSoldiers(u, sim, torches, simple.reduceMotion);
+    swords = simple.troops ? (drawSimpleTroops(u, sim.soldiers.filter((o) => !garrisoned(o)), layers?.rims), []) : drawSoldiers(u, sim, torches, simple.reduceMotion);
     if (simple.enemies) drawSimpleEnemies(u, sim.enemies, layers?.rims);
     else for (const e of sim.enemies) drawEnemyArt(u, e, sim, layers ? b : undefined);
   } finally {
@@ -125,6 +126,7 @@ export function drawUnits(b: Brush, sim: DefendSim, torches: Burning | null, hea
   }
   outline?.end(b.c);
   drawSwords(b, swords);
+  drawGarrisons(b, sim);
   if (timing) timing.entityMs += performance.now() - start;
   drawArrows(b.c, b.px, sim, simple.reduceMotion);
   drawLasers(b.c, b.px, sim);
@@ -200,6 +202,8 @@ function drawSoldiers(b: Brush, sim: DefendSim, torches: Burning | null, reduced
   const { c, px } = b;
   const swords: { x: number; y: number; swing: Swing }[] = [];
   for (const u of sim.soldiers) {
+    // Up in a watch tower: a badge over it instead (`garrison-icons.ts`).
+    if (garrisoned(u)) continue;
     if (u.kind === "mage") {
       drawMage(c, px, u, sim.time, sim, reduced);
       continue;
@@ -757,7 +761,7 @@ export function drawScorches({ c, px }: Brush, sim: DefendSim) {
 export function shadowCasters(sim: DefendSim) {
   const def = (e: Enemy): EnemyDef => ENEMIES[e.kind];
   return [
-    ...sim.soldiers.map((u) => ({ x: u.x, y: u.y, size: u.kind === "archer" ? ARCHER_UNIT.size : u.kind === "mage" ? FIRE_MAGE.size : u.kind === "valkyrie" ? VALKYRIE.size : u.kind === "darkWizard" ? DARK_WIZARD.size : isGuildTroop(u.kind) ? GUILD_TROOPS[u.kind].size : u.risen ? u.risen.size : u.called ? u.called.size : SOLDIER.size })),
+    ...sim.soldiers.filter((u) => !garrisoned(u)).map((u) => ({ x: u.x, y: u.y, size: u.kind === "archer" ? ARCHER_UNIT.size : u.kind === "mage" ? FIRE_MAGE.size : u.kind === "valkyrie" ? VALKYRIE.size : u.kind === "darkWizard" ? DARK_WIZARD.size : isGuildTroop(u.kind) ? GUILD_TROOPS[u.kind].size : u.risen ? u.risen.size : u.called ? u.called.size : SOLDIER.size })),
     ...sim.civilians.map((u) => ({ x: u.x, y: u.y, size: CIVILIAN.size })),
     ...sim.enemies.filter((e) => !def(e).flying).map((e) => ({ x: e.x, y: e.y, size: enemySize(e) })),
   ];
@@ -766,7 +770,7 @@ export function shadowCasters(sim: DefendSim) {
 /** Light that moves with the battle: every unit's hand torch, and each
  * blast's brief flash (wider and brighter, fading as it burns out). */
 export function carriedLights(sim: DefendSim): CarriedLight[] {
-  const torches: CarriedLight[] = [...sim.soldiers, ...sim.civilians].map((u) => ({ x: u.x, y: u.y, id: u.id }));
+  const torches: CarriedLight[] = [...sim.soldiers.filter((u) => !garrisoned(u)), ...sim.civilians].map((u) => ({ x: u.x, y: u.y, id: u.id }));
   for (const fx of sim.effects)
     if (fx.kind === "boom") torches.push({ x: fx.x, y: fx.y, id: fx.seed ?? 0, r: fx.r * 2.4, k: 1.6 * (1 - fx.t / 0.6) });
   torches.push(...siegeLights(sim), ...boatLights(sim));

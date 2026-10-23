@@ -116,6 +116,7 @@ const defendPage = new DefendPage(el("defend"), {
   showEmpty: () => save.settings.showEmpty,
   raiseDrag: () => save.settings.raiseDrag,
   magnifier: () => save.settings.magnifier,
+  tripleTapFlag: () => save.settings.tripleTapFlag,
   gridLines: () => (save.settings.tileGrid ? save.settings.gridOpacity / 100 : 0),
   effects: () => !save.settings.effectsOff,
   devMode: () => save.settings.developerMode,

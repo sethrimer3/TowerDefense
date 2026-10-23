@@ -8,7 +8,8 @@ import type { Enemy, Soldier } from "./sim.ts";
 
 type Brush = { c: CanvasRenderingContext2D; px: number };
 
-const TROOPS: Record<Soldier["kind"], { size: number; color: string }> = {
+/** Each troop kind's size and colour, shared with the garrison badges. */
+export const TROOPS: Record<Soldier["kind"], { size: number; color: string }> = {
   sword: SOLDIER,
   archer: ARCHER_UNIT,
   mage: FIRE_MAGE,

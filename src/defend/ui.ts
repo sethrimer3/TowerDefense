@@ -4,7 +4,7 @@ import { pathById, type PathId } from "../knowledge-paths.ts";
 import { SIDE_UI, graftedGraph, mapCardHtml, mapCount, mapGraph, mapWeb, sharedBranches, specialtyCircle, treeAllocated, treeBeyond, treeCardHtml, treeStep, type SideKind, type SideUi } from "../ui/specialty.ts";
 import { UpgradeGraph } from "../ui/upgrade-graph.ts";
 import type { Save } from "../save.ts";
-import { bannerReach } from "./war-banner.ts";
+import { bannerReach, onFlag } from "./war-banner.ts";
 import { gravesNear } from "./necromancy.ts";
 import { meteorReach } from "./meteor.ts";
 import { frostReach } from "./frost-nova.ts";
@@ -92,6 +92,8 @@ export type DefendHost = {
   raiseDrag?(): boolean;
   /** Whether a magnifying glass shows the board zoomed in above a drag. */
   magnifier?(): boolean;
+  /** Whether the rally flag takes a triple tap rather than a double. */
+  tripleTapFlag?(): boolean;
   /** Opens the Tiles tab, where tiles (buildings and consumables) are bought. */
   openTiles?(): void;
 };
@@ -146,7 +148,7 @@ export class DefendPage {
   private minePreview: { id: number; point?: { x: number; y: number }; since: number } | null = null;
   /** The last tap in battle, for telling a double tap: where (client
    * pixels), when, and what was picked out before it. */
-  private lastTap: { x: number; y: number; at: number; picked: { id: number; armed: Armed } | null } | null = null;
+  private lastTap: { x: number; y: number; at: number; taps: number; picked: { id: number; armed: Armed } | null } | null = null;
   private lastTime = 0;
   private performance = new BattlePerformance();
   private frameTimes = new FrameTimeOverlay();
@@ -1121,18 +1123,23 @@ export class DefendPage {
     this.pick(inspectable(b) && this.picked?.id !== b.id ? b.id : null);
   }
 
-  /** In battle, a second tap close to the first and soon after it plants a
-   * rally flag there (free, any number of times), putting back whatever the
-   * first tap picked out. True when it did. */
+  /** In battle, a second tap (a third with the triple tap setting) close to
+   * the one before and soon after it plants a rally flag there (free, any
+   * number of times), or takes the flag away when made on it, putting back
+   * whatever the first tap picked out. True when it did. */
   private rallyTap(e: PointerEvent): boolean {
     const last = this.lastTap, now = performance.now();
-    this.lastTap = { x: e.clientX, y: e.clientY, at: now, picked: this.picked };
-    if (!last || now - last.at > DOUBLE_TAP_MS || Math.hypot(e.clientX - last.x, e.clientY - last.y) > DOUBLE_TAP_SLOP) return false;
+    const chained = !!last && now - last.at <= DOUBLE_TAP_MS && Math.hypot(e.clientX - last.x, e.clientY - last.y) <= DOUBLE_TAP_SLOP;
+    // Each tap of a run is measured from the one before, and keeps what the
+    // run's first tap found picked out.
+    this.lastTap = { x: e.clientX, y: e.clientY, at: now, taps: chained ? last.taps + 1 : 1, picked: chained ? last.picked : this.picked };
+    if (this.lastTap.taps < (this.host.tripleTapFlag?.() ? 3 : 2)) return false;
     const { fx, fy, inside } = eventCell(this.renderer!, e);
     if (!inside || !this.sim) return false;
+    this.picked = this.lastTap.picked;
     this.lastTap = null;
-    this.picked = last.picked;
-    this.sim.plantFlag({ x: fx, y: fy });
+    if (onFlag(this.sim.warBanner, fx, fy)) this.sim.liftFlag();
+    else this.sim.plantFlag({ x: fx, y: fy });
     play("banner");
     return true;
   }
