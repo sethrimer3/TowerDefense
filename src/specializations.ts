@@ -56,8 +56,11 @@ export type Branch = { path: PathId; via?: { kind: PlacedKind; cost: number } };
 export type Attuned = { kind: PlacedKind; from: PlacedKind; cost: number; branches: Branch[]; ultimate?: PlacedKind };
 
 export const ATTUNED: Attuned[] = [
-  { kind: "archerTower", from: "watchTower", cost: 3, branches: [{ path: "fireArrows" }, { path: "sharpshooters" }] },
-  { kind: "cannonTower", from: "watchTower", cost: 6, branches: [{ path: "gunnery" }, { path: "siegeShot" }], ultimate: "nanoTower" },
+  { kind: "archerTower", from: "watchTower", cost: 3, branches: [{ path: "fireArrows", via: { kind: "brazierTower", cost: 3 } }, { path: "sharpshooters", via: { kind: "hawkTower", cost: 3 } }] },
+  { kind: "cannonTower", from: "watchTower", cost: 6, ultimate: "nanoTower", branches: [
+    { path: "gunnery", via: { kind: "batteryTower", cost: 4 } },
+    { path: "siegeShot", via: { kind: "mortarTower", cost: 4 } },
+  ] },
   { kind: "wizardTower", from: "watchTower", cost: 8, ultimate: "darkKeep", branches: [
     { path: "pyromancy", via: { kind: "pyreTower", cost: 6 } },
     { path: "rime", via: { kind: "frostTower", cost: 6 } },

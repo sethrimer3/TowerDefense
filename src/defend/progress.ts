@@ -270,15 +270,17 @@ export function buyBomb(save: DefendSave, wallet: Wallet): boolean {
 
 // ── Decoding untrusted saves ─────────────────────────────────────────────
 const int = (n: unknown, min: number, max: number): n is number => Number.isInteger(n) && (n as number) >= min && (n as number) <= max;
-const PLACED: PlacedKind[] = ["meleeGuild", "rangedGuild", "barracks", "chapterHouse", "berserkerLodge", "halberdYard", "heroHall", "shadow", "bloodHall", "veilHouse", "poisonDen", "assassinDen", "spearHall", "phalanx", "javelinCamp", "lancerStable", "archerBarracks", "sniperLodge", "gunHall", "musketHall", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "archerTower", "cannonTower", "nanoTower", "watchTower", "wizardTower", "pyreTower", "frostTower", "stormTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait"];
+const PLACED: PlacedKind[] = ["meleeGuild", "rangedGuild", "barracks", "chapterHouse", "berserkerLodge", "halberdYard", "heroHall", "shadow", "bloodHall", "veilHouse", "poisonDen", "assassinDen", "spearHall", "phalanx", "javelinCamp", "lancerStable", "archerBarracks", "sniperLodge", "gunHall", "musketHall", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "archerTower", "cannonTower", "nanoTower", "watchTower", "brazierTower", "hawkTower", "batteryTower", "mortarTower", "wizardTower", "pyreTower", "frostTower", "stormTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait"];
 
-/** Wizard towers, barracks and Assassins' dens saved wearing a branch's path, from before
+/** Attuned buildings saved wearing a branch's path, from before
  * each branch made a building of its own: each becomes that building,
  * keeping its rank. */
 const BRANCHES: Record<string, Record<string, PlacedKind>> = {
   wizardTower: { pyromancy: "pyreTower", rime: "frostTower", storm: "stormTower" },
   barracks: { crusaders: "chapterHouse", berserkers: "berserkerLodge", halberdiers: "halberdYard" },
   assassinDen: { bloodletters: "bloodHall", shadowcloak: "veilHouse", venom: "poisonDen" },
+  archerTower: { fireArrows: "brazierTower", sharpshooters: "hawkTower" },
+  cannonTower: { gunnery: "batteryTower", siegeShot: "mortarTower" },
 };
 function splitBranches(s: any): any {
   // Paths saved without a rank (before version 5) are refunded and dropped instead.

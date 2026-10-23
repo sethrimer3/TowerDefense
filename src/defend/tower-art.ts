@@ -154,7 +154,11 @@ const MATERIAL: Record<PlacedKind, { m: Material; ruin: Pick<Ruin, "stone" | "to
   shadow: { m: { tones: C.char, roofed: true }, ruin: { stone: C.char, top: [C.flag[0], C.dusk, C.slate[1]], beams: true } },
   archerBarracks: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: [0x4a3826, C.timber, 0x8e7048], beams: true } },
   archerTower: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.plank.slice(0, 3), beams: true } },
+  brazierTower: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.kiln.slice(0, 3), beams: true } },
+  hawkTower: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.slime.slice(0, 3), beams: true } },
   cannonTower: { m: { tones: STONE, roofed: false }, ruin: { stone: STONE, top: C.iron.slice(1), beams: false, round: true } },
+  batteryTower: { m: { tones: STONE, roofed: false }, ruin: { stone: STONE, top: C.iron.slice(1), beams: false, round: true } },
+  mortarTower: { m: { tones: STONE, roofed: false }, ruin: { stone: STONE, top: C.kiln.slice(0, 3), beams: false, round: true } },
   nanoTower: { m: { tones: TECH.slice(1, 4), roofed: false }, ruin: { stone: TECH.slice(0, 3), top: [TECH[1], HAZARD, NANO[1]], beams: false } },
   watchTower: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.plank.slice(0, 3), beams: true } },
   wizardTower: { m: { tones: C.pale.slice(0, 3), roofed: true }, ruin: { stone: C.pale.slice(0, 3), top: C.slate.slice(0, 3), beams: true, round: true } },
@@ -200,6 +204,10 @@ export const PATH_LOOKS: Partial<Record<PlacedKind, readonly string[]>> = {
   archerBarracks: ["rangers", "skirmishers"],
   archerTower: ["fireArrows", "sharpshooters"],
   cannonTower: ["gunnery", "siegeShot"],
+  brazierTower: ["fireArrows"],
+  hawkTower: ["sharpshooters"],
+  batteryTower: ["gunnery"],
+  mortarTower: ["siegeShot"],
   watchTower: ["spotters", "signalFires"],
   wizardTower: ["pyromancy", "rime", "storm"],
   pyreTower: ["pyromancy"],
@@ -230,7 +238,7 @@ export function structureRubblePixels(kind: PlacedKind, cw: number, ch: number, 
   return rubblePixels(w, h, hash(seed, KINDS.indexOf(kind), 3), { ...frame(w, h), ...MATERIAL[kind].ruin });
 }
 
-const KINDS: PlacedKind[] = ["barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "meleeGuild", "rangedGuild", "sniperLodge", "musketHall", "assassinDen", "gunHall", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "spearHall", "phalanx", "javelinCamp", "lancerStable", "heroHall", "shadow", "nanoTower", "pyreTower", "frostTower", "stormTower", "chapterHouse", "berserkerLodge", "halberdYard", "bloodHall", "veilHouse", "poisonDen"];
+const KINDS: PlacedKind[] = ["barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "meleeGuild", "rangedGuild", "sniperLodge", "musketHall", "assassinDen", "gunHall", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "spearHall", "phalanx", "javelinCamp", "lancerStable", "heroHall", "shadow", "nanoTower", "pyreTower", "frostTower", "stormTower", "chapterHouse", "berserkerLodge", "halberdYard", "bloodHall", "veilHouse", "poisonDen", "brazierTower", "hawkTower", "batteryTower", "mortarTower"];
 
 const PAINT: Record<PlacedKind, (p: Pix, look: string) => void> = {
   meleeGuild: paintMeleeGuild,
@@ -259,6 +267,10 @@ const PAINT: Record<PlacedKind, (p: Pix, look: string) => void> = {
   archerBarracks: paintArcherBarracks,
   archerTower: paintArcherTower,
   cannonTower: paintCannonTower,
+  brazierTower: paintBrazierTower,
+  hawkTower: paintHawkTower,
+  batteryTower: paintBatteryTower,
+  mortarTower: paintMortarTower,
   nanoTower: paintNanoTower,
   watchTower: paintWatchTower,
   wizardTower: paintWizardTower,
@@ -1357,16 +1369,35 @@ function paintWizardTower(p: Pix, look: string) {
 /** The wizard tower's branch towers: its roof in the branch's look, and at
  * each corner of the lot outside the round wall a little piece of what the
  * tower has given itself to. */
-function paintBranchTower(p: Pix, look: string, corner: (x: number, y: number, right: boolean, low: boolean) => void, worn: boolean) {
-  paintWizardTower(p, look);
+function paintBranchTower(p: Pix, look: string, corner: (x: number, y: number, right: boolean, low: boolean) => void, worn: boolean, base = paintWizardTower) {
+  base(p, look);
   const { x0, y0, x1, y1 } = frame(p.w, p.h);
   for (const [x, y] of [[x0, y0], [x1 - 2, y0], [x0, y1 - 2], [x1 - 2, y1 - 2]]) corner(x, y, x > x0, y > y0);
   // Climbing its path, the tower's rim glows all the way round.
   if (worn) {
     const cx = (x0 + x1 + 1) / 2, cy = (y0 + y1 + 1) / 2, r = (x1 - x0 + 1) / 2;
-    const glow = look === "pyromancy" ? C.ember : look === "rime" ? C.ice[3] : C.bolt;
+    const glow = look === "pyromancy" || look === "fireArrows" ? C.ember : look === "rime" ? C.ice[3] : look === "sharpshooters" ? C.slime[2] : look === "gunnery" ? C.iron[3] : look === "siegeShot" ? C.fire[2] : C.bolt;
     disc(p, cx, cy, r - 1, (x, y, d) => (d > r - 2 && (x + y) % 2 === 0 ? glow : null));
   }
+}
+/** The archer and cannon towers' branch towers, the wizard tower's way:
+ * each corner a 3 × 3 token of the branch, from rows of keys into `pal`. */
+const cornerToken = (p: Pix, rows: readonly string[], pal: Record<string, number>) => (x: number, y: number) => glyph(p, x, y, rows, pal);
+/** The Brazier tower: a brazier burning at each corner. */
+function paintBrazierTower(p: Pix, look: string) {
+  paintBranchTower(p, "fireArrows", cornerToken(p, ["121", "010", "000"], { 0: OUTLINE, 1: C.fire[2], 2: C.fire[3] }), !!look, paintArcherTower);
+}
+/** The Hawk tower: a hawk's perch at each corner, green pennants flying. */
+function paintHawkTower(p: Pix, look: string) {
+  paintBranchTower(p, "sharpshooters", cornerToken(p, ["000", "021", "010"], { 0: OUTLINE, 1: C.plank[1], 2: C.slime[1] }), !!look, paintArcherTower);
+}
+/** The Gun battery: stacked shot at each corner. */
+function paintBatteryTower(p: Pix, look: string) {
+  paintBranchTower(p, "gunnery", cornerToken(p, ["000", "121", "000"], { 0: OUTLINE, 1: C.iron[1], 2: C.iron[3] }), !!look, paintCannonTower);
+}
+/** The Mortar tower: powder kegs at each corner. */
+function paintMortarTower(p: Pix, look: string) {
+  paintBranchTower(p, "siegeShot", cornerToken(p, ["000", "121", "010"], { 0: OUTLINE, 1: C.plank[1], 2: C.fire[1] }), !!look, paintCannonTower);
 }
 /** The Pyre tower: a fire bowl burning at each corner. */
 function paintPyreTower(p: Pix, look: string) {

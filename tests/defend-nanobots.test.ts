@@ -66,22 +66,22 @@ test("C4 nanobots is the cannon tower's ultimate, merged from cannon towers maxe
 
 test("maxed cannon towers merge into C4 nanobots; the save keeps it", () => {
   const s = defaults(); s.settings.devMode = true;
-  s.defend.owned.cannonTower = 2;
+  Object.assign(s.defend.owned, { batteryTower: 1, mortarTower: 1 });
   let l = defaultLayout();
   for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) l = placeCityTile(l, l.keep.tx + dx, l.keep.ty + dy)!;
-  l = placeStructure(l, "cannonTower", l.keep.tx, l.keep.ty - 1)!;
-  const placed = l.structures.find((o) => o.kind === "cannonTower")!, uid = placed.uid;
+  l = placeStructure(l, "batteryTower", l.keep.tx, l.keep.ty - 1)!;
+  const placed = l.structures.find((o) => o.kind === "batteryTower")!, uid = placed.uid;
   placed.path = "gunnery";
   placed.rank = 3;
   s.defend.layout = l;
-  s.defend.kept.push({ kind: "cannonTower", path: "siegeShot", rank: 3 });
-  const merge = nextSteps("cannonTower", specialtyOf(s.defend.layout, { uid })).find((o) => o.type === "merge")!;
+  s.defend.kept.push({ kind: "mortarTower", path: "siegeShot", rank: 3 });
+  const merge = nextSteps("batteryTower", specialtyOf(s.defend.layout, { uid })).find((o) => o.type === "merge")!;
   const r = upgradeBuilding(s, { uid }, merge);
   assert.ok(r.ok, r.ok ? "" : r.reason);
   assert.equal(s.defend.owned.nanoTower, 1);
-  assert.equal(s.defend.owned.cannonTower, 0);
+  assert.deepEqual([s.defend.owned.batteryTower, s.defend.owned.mortarTower], [0, 0]);
   assert.deepEqual(s.defend.kept, [], "the other is used up");
-  assert.ok(!s.defend.layout.structures.some((o) => o.kind === "cannonTower"));
+  assert.ok(!s.defend.layout.structures.some((o) => o.kind === "batteryTower"));
   assert.equal(decode(JSON.stringify(s)).defend.owned.nanoTower, 1);
 });
 

@@ -27,8 +27,8 @@ export function reachOf(b: Building, armed: Armed): Circle[] {
   const c = center(b.rect);
   const at = (r: number) => [{ x: c.x, y: c.y, r }];
   switch (b.kind) {
-    case "archerTower": return at(archerTowerRange(armed, b));
-    case "cannonTower": return at(cannonTowerRange(armed, b));
+    case "archerTower": case "brazierTower": case "hawkTower": return at(archerTowerRange(armed, b));
+    case "cannonTower": case "batteryTower": case "mortarTower": return at(cannonTowerRange(armed, b));
     case "nanoTower": return at(nanoRange());
     case "wizardTower": case "pyreTower": case "frostTower": case "stormTower": return at(wizardReach(armed, b));
     case "watchTower": return at(watchReach(armed, b));

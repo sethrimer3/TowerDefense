@@ -59,10 +59,10 @@ export const SUBJECTS: Subject[] = [
     id: "towers", name: "Towers", sprite: "attack", blurb: "What stands and shoots.",
     topics: [
       {
-        id: "archerTower", name: "Archer tower", item: "archerTower", upgrades: ["archerDamage", "archerRange", "archerRate"],
+        id: "archerTower", name: "Archer tower", item: "archerTower", items: ["brazierTower", "hawkTower"], upgrades: ["archerDamage", "archerRange", "archerRate"],
       },
       {
-        id: "cannonTower", name: "Cannon tower", item: "cannonTower", items: ["nanoTower"], upgrades: ["cannonDamage", "cannonRate", "cannonSafe"],
+        id: "cannonTower", name: "Cannon tower", item: "cannonTower", items: ["batteryTower", "mortarTower", "nanoTower"], upgrades: ["cannonDamage", "cannonRate", "cannonSafe"],
       },
       {
         id: "watchTower", name: "Watch tower", item: "watchTower", upgrades: ["watchRadius"],

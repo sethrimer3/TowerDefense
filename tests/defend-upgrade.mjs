@@ -280,12 +280,14 @@ try {
     assert.equal(s.defend.owned.watchTower, 0, 'its Watch tower is used up');
     assert.match(await panel.locator('.ug-title').textContent(), /Archer tower/, 'and its tree goes on from there');
     assert.ok(await page.locator('#defend-palette [data-item="archerTower"]').count(), 'the palette shows it');
-    const path = (await nodes()).find(n => n.startsWith('p:') && n.endsWith(':1=next')).split('=')[0];
-    await buy(path);
+    assert.deepEqual((await nodes()).filter(n => n.endsWith('=next')).sort(), ['k:brazierTower=next', 'k:hawkTower=next'], 'its branches\' towers');
+    await buy('k:brazierTower');
+    await settled();
+    await buy('p:fireArrows:1');
     await settled();
     s = await state(page);
-    assert.equal(s.defend.kept.length, 1, `it waits on ${path} as a kept copy`);
-    assert.ok(await page.locator(`#defend-palette [data-item^="archerTower~"]`).count(), 'under its own palette entry');
+    assert.equal(s.defend.kept.length, 1, 'it waits on Fire arrows as a kept copy');
+    assert.ok(await page.locator(`#defend-palette [data-item^="brazierTower~"]`).count(), 'under its own palette entry');
     await press(panel.locator('[data-specialty-close]'));
     s = await state(page);
     assert.deepEqual(['stormTower', 'musketHall', 'gunHall', 'meleeGuild'].map(k => s.defend.owned[k] >= 1), [true, true, true, true]);

@@ -463,7 +463,8 @@ test("a Crusader barracks recruits with its own health and damage, a plain one b
 test("Fire arrows and Sharpshooters on separate towers keep their own projectiles", () => {
   const s = fixture("archerTower", 2), [a, b2] = uids(s, "archerTower");
   wear(s, a, "fireArrows"); wear(s, b2, "sharpshooters");
-  const sim = simulation(s), b = sim.map.buildings.filter(b => b.kind === "archerTower");
+  const sim = simulation(s), b = sim.map.buildings.filter(b => b.kind === "brazierTower" || b.kind === "hawkTower");
+  assert.deepEqual(b.map((t) => t.kind), ["brazierTower", "hawkTower"], "each made its branch's tower on load");
   for (const tower of b) { const at = center(tower.rect); enemy(sim, at.x, at.y - 2); }
   new Towers().step(sim, 0.01);
   const fire = sim.arrows.filter(a => a.origin?.building === b[0].id), sharp = sim.arrows.filter(a => a.origin?.building === b[1].id);
