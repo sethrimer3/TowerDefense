@@ -4,10 +4,12 @@
  * stone or building on the line between them (`lineOfSight`). Archers,
  * stone throwers and javelineers arc their shots over, as before.
  *
- * A gunner with nothing in sight climbs into a watch tower with room
- * (`TOWER_ROOM` a tower), and from up there sees over every wall and
- * building; no enemy picks it out while the tower stands (`perched`), and it
- * drops out onto the rubble when the tower falls.
+ * A gunner whose building's rally point the player snapped onto a watch
+ * tower (`deployment.ts`) climbs into it while it has room (`TOWER_ROOM` a
+ * tower), and from up there sees over every wall and building; no enemy
+ * picks it out while the tower stands (`perched`), and it drops out onto the
+ * rubble when the tower falls, or at the door when the rally point moves.
+ * Nobody climbs a tower unrallied.
  *
  * Looking is the costly part, so a gunner looks only when it could fire
  * (`lookOut`): between shots it keeps on the enemy it last saw (its
@@ -19,6 +21,7 @@ import { CellType, type Building } from "./citygen.ts";
 import { cellIndex } from "./grid.ts";
 import { cellAt, cellCenter, center, findPath, rectDist } from "./pathing.ts";
 import type { DefendSim, Enemy, Soldier } from "./sim.ts";
+import { postOf } from "./deployment.ts";
 
 /** The troops that shoot flat and need a clear line. */
 export const FLAT_SHOOTERS: readonly Soldier["kind"][] = ["gunner", "machineGunner", "gatlingGunner", "rocketeer", "musketeer", "sniper", "railSniper"];
@@ -28,8 +31,6 @@ export const shootsFlat = (kind: Soldier["kind"]) => FLAT_SHOOTERS.includes(kind
 export const TOWER_ROOM = 2;
 /** Seconds before a gunner that saw nothing looks again. */
 export const SIGHT_RETRY = 0.25;
-/** Seconds before a gunner with nothing in sight and no tower thinks again. */
-const TOWER_RETHINK = 1;
 /** How far, in cells walked, a gunner goes for a tower. */
 const TOWER_WALK = { maxCost: 80, maxNodes: 4000 };
 
@@ -83,12 +84,19 @@ export function held(sim: DefendSim, s: Soldier, range: number): Enemy | null {
 }
 
 /** Keeps a gunner's tower in order: one bound for a tower that fell or
- * filled gives it up, and one up in a tower that fell drops out. Returns
- * whether it is up in one. */
+ * filled gives it up, one up in a tower that fell drops out, and one no
+ * longer rallied to its tower climbs down to its door. Returns whether it
+ * is up in one. */
 export function checkPerch(sim: DefendSim, s: Soldier): boolean {
   const p = s.perch;
   if (!p) return false;
   const b = sim.map.buildings[p.tower];
+  if (b && postOf(sim, s)?.tower !== p.tower) {
+    const door = sim.doorOf(b);
+    if (p.up && door >= 0) Object.assign(s, cellCenter(door));
+    s.perch = undefined;
+    return false;
+  }
   if (!b || !sim.intact(b) || (!p.up && room(sim, b, s) <= 0)) {
     s.perch = undefined;
     return false;
@@ -99,26 +107,20 @@ export function checkPerch(sim: DefendSim, s: Soldier): boolean {
 /** Gunners up in or bound for `b`, besides `s`. */
 const room = (sim: DefendSim, b: Building, s?: Soldier) => TOWER_ROOM - sim.soldiers.filter((o) => o !== s && o.hp > 0 && o.perch?.tower === b.id).length;
 
-/** A gunner with nothing in sight and nowhere else to be: walks for the
- * nearest standing watch tower with room it can reach. Returns whether it
- * set off (its `path` set). */
-export function seekTower(sim: DefendSim, s: Soldier): boolean {
+/** A gunner rallied to watch tower `tower` with nothing in sight: walks for
+ * it while it stands with room and can be reached. Returns whether it set
+ * off (its `path` set). */
+export function seekTower(sim: DefendSim, s: Soldier, tower: number): boolean {
   if (s.perch || s.thinkT > 0) return false;
-  const towers = sim.map.buildings.filter((b) => b.kind === "watchTower" && sim.intact(b) && !sim.aloft(b.id) && room(sim, b) > 0);
-  const d = (b: Building) => rectDist(b.rect, s.x, s.y);
-  if (!towers.length) return false;
-  for (const b of towers.sort((p, q) => d(p) - d(q) || p.id - q.id)) {
-    const door = sim.doorOf(b);
-    if (door < 0) continue;
-    const path = findPath(sim.ownSolid, s, cellCenter(door), TOWER_WALK);
-    if (!path) continue;
-    s.path = path;
-    s.target = -1;
-    s.perch = { tower: b.id };
-    return true;
-  }
-  s.thinkT = TOWER_RETHINK;
-  return false;
+  const b = sim.map.buildings[tower];
+  if (b?.kind !== "watchTower" || !sim.intact(b) || sim.aloft(b.id) || room(sim, b) <= 0) return false;
+  const door = sim.doorOf(b);
+  const path = door < 0 ? null : findPath(sim.ownSolid, s, cellCenter(door), TOWER_WALK);
+  if (!path) return false;
+  s.path = path;
+  s.target = -1;
+  s.perch = { tower: b.id };
+  return true;
 }
 
 /** A gunner bound for a tower, at its door with its walk done: climbs in, to

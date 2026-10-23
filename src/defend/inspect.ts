@@ -1,7 +1,8 @@
 import { mineRange } from "./mines.ts";
 import { MINELAYER } from "../knowledge-paths.ts";
 /** A tapped building on the DEFEND board: outlined in gold, with its reach
- * as faint circles when it shoots and the troops it trained outlined too.
+ * as faint circles when it shoots and the troops it trained outlined too;
+ * a troop building also shows its deployment range and rally point.
  * Presentation only; it reads the battle (or, while building, the levels
  * and the Study's paths) and never changes it. */
 import { TURRET, turretSpots } from "./catalog.ts";
@@ -12,6 +13,8 @@ import { watchReach, type DefendSim } from "./sim.ts";
 import { nanoRange } from "./nanobots.ts";
 import { archerTowerRange, cannonTowerRange, keepArrowRange, keepOilReach } from "./towers.ts";
 import { wizardReach } from "./wizard.ts";
+import { deployCircle, type Rally } from "./deployment.ts";
+import { drawRallyFlag } from "./structure-art.ts";
 
 /** What a reach depends on: the battle, or the levels and paths before it. */
 export type Armed = Pick<DefendSim, "levels" | "bonuses">;
@@ -55,7 +58,7 @@ export function troopsOf(b: Building, sim: DefendSim | null) {
 const GOLD = "#f2c14e";
 
 /** Draws the pick over the board; `c` is in board space at `px` a cell. */
-export function drawInspect(c: CanvasRenderingContext2D, px: number, map: CityMap, sim: DefendSim | null, id: number, armed: Armed, now: number, reduceMotion: boolean, minePreview?: { point?: { x: number; y: number }; since: number }) {
+export function drawInspect(c: CanvasRenderingContext2D, px: number, map: CityMap, sim: DefendSim | null, id: number, armed: Armed, now: number, reduceMotion: boolean, aim?: { point?: Rally; since: number }) {
   const b = map.buildings[id];
   if (!b) return;
   const scale = c.getTransform().a || 1;
@@ -78,10 +81,39 @@ export function drawInspect(c: CanvasRenderingContext2D, px: number, map: CityMa
     c.stroke();
     c.setLineDash([]);
   }
+  // A troop building's deployment range, in dashed pale blue, and its
+  // rally point: a blue flag at the end of a dotted line from it.
+  const deploy = deployCircle(b, armed.bonuses);
+  if (deploy) {
+    c.beginPath();
+    c.arc(deploy.x * px, deploy.y * px, deploy.r * px, 0, Math.PI * 2);
+    c.fillStyle = "rgba(140, 190, 255, 0.06)";
+    c.fill();
+    c.setLineDash([line(4), line(5)]);
+    c.lineWidth = line(1.5);
+    c.strokeStyle = "rgba(160, 205, 255, 0.6)";
+    c.stroke();
+    c.setLineDash([]);
+    const rally = aim ? aim.point : sim?.rallies.get(id);
+    if (rally) {
+      const o = center(b.rect);
+      c.setLineDash([line(2), line(4)]);
+      c.lineWidth = line(1.5);
+      c.strokeStyle = "rgba(0, 0, 0, 0.6)";
+      c.beginPath(); c.moveTo(o.x * px, o.y * px); c.lineTo(rally.x * px, rally.y * px); c.stroke();
+      c.lineWidth = line(1);
+      c.strokeStyle = "#cfe3ff";
+      c.stroke();
+      c.setLineDash([]);
+      const tower = rally.tower !== undefined ? map.buildings[rally.tower] : undefined;
+      if (tower) frame(c, (tower.rect.x - 0.15) * px, (tower.rect.y - 0.15) * px, (tower.rect.w + 0.3) * px, (tower.rect.h + 0.3) * px, line, pulse, "#9cc8ff");
+      drawRallyFlag(c, px, rally, { t: now / 1000, reduceMotion });
+    }
+  }
   if (b.kind === "minelayerTower") {
-    const origin = center(b.rect), point = minePreview ? minePreview.point : sim?.mineAims.get(id);
+    const origin = center(b.rect), point = aim ? aim.point : sim?.mineAims.get(id);
     const target = point ?? origin;
-    const t = reduceMotion || !minePreview ? 1 : Math.min(1, Math.max(0, (now - minePreview.since) / 350));
+    const t = reduceMotion || !aim ? 1 : Math.min(1, Math.max(0, (now - aim.since) / 350));
     const radius = point ? MINELAYER.scatter : MINELAYER.scatter + (mineRange() - MINELAYER.scatter) * (1 - (1 - t) ** 3);
     c.save();
     // Clip the target area to actual range, including crosshairs dragged to its edge.
@@ -112,13 +144,13 @@ export function drawInspect(c: CanvasRenderingContext2D, px: number, map: CityMa
 }
 
 /** A gold outline inside a black one, crisp at any zoom. */
-function frame(c: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, line: (n: number) => number, alpha: number) {
+function frame(c: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, line: (n: number) => number, alpha: number, colour = GOLD) {
   c.globalAlpha = alpha;
   c.lineWidth = line(4);
   c.strokeStyle = "#000";
   c.strokeRect(x, y, w, h);
   c.lineWidth = line(2);
-  c.strokeStyle = GOLD;
+  c.strokeStyle = colour;
   c.strokeRect(x, y, w, h);
   c.globalAlpha = 1;
 }

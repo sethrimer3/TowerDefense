@@ -1,3 +1,4 @@
+import { bannerFor, postPath, strollStreets } from "./deployment.ts";
 import { castStorm, chillByMage, mageAttunement } from "./mage-attunements.ts";
 import { bannerDamage } from "./war-banner.ts";
 /** DEFEND mages: ordinary fireballs, Pyromancer burning blasts and Cryomancer
@@ -39,8 +40,12 @@ export function stepMage(sim: DefendSim, s: Soldier, dt: number) {
     }
     return;
   }
-  if (sim.warBanner) return answerBanner(sim, sim.warBanner, s, FIRE_MAGE.speed, dt);
-  if (!s.path.length && s.thinkT <= 0 && sim.streets.length) stroll(sim, s);
+  const banner = bannerFor(sim, s);
+  if (banner) return answerBanner(sim, banner, s, FIRE_MAGE.speed, dt);
+  if (!s.path.length && s.thinkT <= 0) {
+    if (postPath(sim, s)) s.thinkT = 0.5;
+    else stroll(sim, s);
+  }
   sim.followPath(s, null, FIRE_MAGE.speed, dt);
 }
 
@@ -60,9 +65,11 @@ function throwFireball(sim: DefendSim, s: Soldier, e: { x: number; y: number }) 
 }
 
 function stroll(sim: DefendSim, s: Soldier) {
+  const streets = strollStreets(sim, s);
+  if (!streets.length) return;
   s.thinkT = 0.5 + sim.rand() * 1.5;
   s.target = -1;
-  const goal = sim.streets[Math.floor(sim.rand() * sim.streets.length)];
+  const goal = streets[Math.floor(sim.rand() * streets.length)];
   s.path = findPath(sim.ownSolid, s, cellCenter(goal), { maxCost: 1e9, maxNodes: CELL_COUNT }) ?? [];
 }
 

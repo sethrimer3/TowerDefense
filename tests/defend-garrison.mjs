@@ -53,6 +53,17 @@ try {
     });
     await page.waitForFunction(() => window.__dp);
     await page.locator('#defend-start').click();
+    await page.waitForFunction(() => window.__dp.sim);
+    // Gunners climb only a tower their hall is rallied to: each hall to its nearest tower.
+    await page.evaluate(() => {
+      const sim = window.__dp.sim, mid = (b) => ({ x: b.rect.x + b.rect.w / 2, y: b.rect.y + b.rect.h / 2 });
+      const towers = sim.map.buildings.filter(b => b.kind === 'watchTower');
+      for (const b of sim.map.buildings) {
+        if (!['gunHall', 'gunNest', 'gatlingNest', 'rocketBattery', 'musketHall', 'sniperLodge', 'revolutionary'].includes(b.kind) || !towers.length) continue;
+        const h = mid(b), t = towers.reduce((a, c) => Math.hypot(mid(c).x - h.x, mid(c).y - h.y) < Math.hypot(mid(a).x - h.x, mid(a).y - h.y) ? c : a);
+        sim.setRally(b.id, { ...mid(t), tower: t.id });
+      }
+    });
     // Until the towers fill.
     for (let i = 0; i < 20; i++) {
       const up = await page.evaluate(() => window.__dp.sim.soldiers.filter(s => s.perch?.up).length);

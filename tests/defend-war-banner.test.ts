@@ -18,7 +18,7 @@ function fixture(upgraded = true) {
   const save = defaults();
   if (upgraded) for (const id of ["bannerDefense", "bannerReach", "bannerDamage", "bannerMarch", "bannerLife", "bannerRegen"] as const) save.skills[id] = 1;
   const fit = fitLayout(defaultLayout()); assert.ok(fit.ok);
-  const sim = new DefendSim(generateCity(fit, 3), Object.fromEntries(UPGRADES.map(u => [u.id, 0])) as DefendSim["levels"], 1, upgraded ? bonuses(save) : NO_BONUSES);
+  const sim = new DefendSim(generateCity(fit, 3), Object.fromEntries(UPGRADES.map(u => [u.id, 0])) as DefendSim["levels"], 1, { ...(upgraded ? bonuses(save) : NO_BONUSES), deployRange: 100 });
   // Open isolated ground so tests exercise combat without unrelated structures.
   sim.ownSolid.fill(0);
   const unit: Soldier = { id: 1, home: sim.keepId, kind: "sword", x: 20, y: 20, hp: 40, maxHp: 40, damage: 8, cd: 0, target: -1, path: [], thinkT: 0, flash: 0 };
