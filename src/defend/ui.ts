@@ -92,6 +92,8 @@ export type DefendHost = {
   showEmpty?(): boolean;
   /** Whether dragged items ride above the pointer. */
   raiseDrag?(): boolean;
+  /** Whether a magnifying glass shows the board zoomed in above a drag. */
+  magnifier?(): boolean;
   /** Whether the rally flag takes a triple tap rather than a double. */
   tripleTapFlag?(): boolean;
   /** Opens the Tiles tab, where tiles (buildings and consumables) are bought. */
@@ -140,6 +142,7 @@ export class DefendPage {
     tap: (e) => this.tap(e),
     hold: (edit) => this.hold(edit.drag),
     raise: () => !!this.host.raiseDrag?.(),
+    magnify: () => !!this.host.magnifier?.(),
   });
   /** The building the player tapped (its id in the map), outlined with its
    * reach and troops, and what its reach is reckoned from before a battle. */
@@ -236,6 +239,7 @@ export class DefendPage {
     if (this.specialty && !this.pointers.session?.overlay()) this.treeCircle?.frame(time, this.host.reduceMotion() || matchMedia("(prefers-reduced-motion: reduce)").matches);
     const drawing = performance.now();
     this.draw(false);
+    if (this.renderer) this.pointers.drawLoupe(this.renderer);
     const drawn = performance.now();
     if (measuring && this.sim && !document.hidden) {
       this.performance.sample(this.sim.wave, this.sim.enemies.length, dt * 1000, updated - start, drawn - drawing);

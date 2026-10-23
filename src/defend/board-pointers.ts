@@ -14,11 +14,14 @@
  *   until it has stayed put for `LIFT_MS`; only then does the tile lift and
  *   the drag start. Moving first pans, letting go first taps.
  * What a press picks up and what a drop does are the page's and its
- * `EditSession`'s decisions; this only turns pointers into cells. */
+ * `EditSession`'s decisions; this only turns pointers into cells.
+ * While the host's `magnify` is on, a `Loupe` above the finger shows the
+ * board zoomed in round the point a drag or aim would land on. */
 import { consumable, dragIcon } from "./drag-rules.ts";
 import type { DragAt, Drop, EditSession } from "./edit-session.ts";
 import { CELLS_W, SUB, TILES_H, type TilePos } from "./grid.ts";
 import { QC } from "./layout.ts";
+import { Loupe } from "./loupe.ts";
 import type { DefendRenderer } from "./render.ts";
 import { paintIcon } from "./structure-art.ts";
 
@@ -37,8 +40,17 @@ export type PointerHost = {
   hold?(edit: EditSession): boolean;
   /** Whether a held item rides `RAISE` cells above the pointer. */
   raise?(): boolean;
+  /** Whether the magnifying glass shows above drags and aims. */
+  magnify?(): boolean;
 };
-export type BoardAim = { move(e: PointerEvent): void; end(e: PointerEvent, commit: boolean, moved: boolean): void };
+/** A battle aiming gesture. `focus` is the board point (in cells) it aims
+ * at for the pointer `e`, which the magnifying glass centres on; without
+ * it, the glass centres on the pointer. */
+export type BoardAim = {
+  move(e: PointerEvent): void;
+  end(e: PointerEvent, commit: boolean, moved: boolean): void;
+  focus?(e: PointerEvent): { x: number; y: number } | null;
+};
 
 /** How far (CSS pixels) a pointer may move and still tap. */
 const TAP_SLOP = 8;
@@ -68,6 +80,12 @@ export class BoardPointers {
    * the timer. */
   private lifting: { edit: EditSession; tile: TilePos; id: number; x: number; y: number; since: number; e: PointerEvent; timer: number } | null = null;
 
+  /** The magnifying glass; any gesture may point it with `magnify`. */
+  readonly loupe = new Loupe();
+  /** Where the glass looks now: the pointer (client pixels) and the board
+   * point (cells) it magnifies. */
+  private looking: { pointer: { x: number; y: number }; cell: { x: number; y: number } } | null = null;
+
   constructor(private host: PointerHost) {
     window.addEventListener("pointermove", (e) => this.move(e));
     window.addEventListener("pointerup", (e) => this.up(e));
@@ -77,6 +95,22 @@ export class BoardPointers {
   /** How far (in cells) above the pointer a held item rides now. */
   get raise(): number {
     return this.host.raise?.() ? RAISE : 0;
+  }
+
+  /** Points the magnifying glass, while the setting is on, at board point
+   * `cell` (in cells) for a pointer at client point `pointer`; null hides
+   * it. Drags and aims call it themselves; other gestures may too. */
+  magnify(pointer: { x: number; y: number } | null, cell?: { x: number; y: number } | null) {
+    this.looking = pointer && cell && this.host.magnify?.() ? { pointer, cell } : null;
+    if (!this.looking) this.loupe.hide();
+  }
+
+  /** Draws the magnifying glass from the board just drawn; once a frame. */
+  drawLoupe(renderer: DefendRenderer) {
+    const l = this.looking;
+    if (!l || !this.host.magnify?.()) return this.loupe.hide();
+    this.loupe.show(l.pointer, renderer.toClient(l.cell.x, l.cell.y));
+    this.loupe.draw(renderer.canvas);
   }
 
   /** The drag in progress, if any. */
@@ -96,6 +130,7 @@ export class BoardPointers {
     if (this.aiming) {
       const a = this.aiming;
       this.aiming = null;
+      this.magnify(null);
       a.gesture.end(a.last, false, a.moved);
       this.touches.set(a.id, { x: a.last.clientX, y: a.last.clientY });
       return this.join(e);
@@ -158,7 +193,10 @@ export class BoardPointers {
     if (a?.id === e.pointerId) {
       a.last = e;
       a.moved ||= Math.hypot(e.clientX - a.x, e.clientY - a.y) > TAP_SLOP;
-      if (a.moved) a.gesture.move(e);
+      if (a.moved) {
+        a.gesture.move(e);
+        this.lookAim(a.gesture, e);
+      }
       return;
     }
     const h = this.held;
@@ -177,6 +215,14 @@ export class BoardPointers {
     if (at) h.edit.hover(at);
   }
 
+  /** Points the glass at what `aim` aims at for `e`. */
+  private lookAim(aim: BoardAim, e: PointerEvent) {
+    const renderer = this.host.renderer();
+    if (!renderer) return;
+    const c = eventCell(renderer, e);
+    this.magnify({ x: e.clientX, y: e.clientY }, aim.focus ? aim.focus(e) : { x: c.fx, y: c.fy });
+  }
+
   /** Where `e` is for the drag, moving its ghost there; null without a board. */
   private at(e: PointerEvent): DragAt | null {
     const renderer = this.host.renderer();
@@ -190,6 +236,7 @@ export class BoardPointers {
     const ghost = renderer.toClient(c.fx, fy);
     this.held.ghost.style.left = `${e.clientX}px`;
     this.held.ghost.style.top = `${e.clientY + ghost.y - renderer.toClient(c.fx, c.fy).y}px`;
+    this.magnify({ x: e.clientX, y: e.clientY }, c.inside ? { x: c.fx, y: fy } : null);
     return {
       cellX: c.fx,
       cellY: fy,
@@ -202,6 +249,7 @@ export class BoardPointers {
     if (this.aiming?.id === e.pointerId) {
       const a = this.aiming;
       this.aiming = null;
+      this.magnify(null);
       a.gesture.end(e, true, a.moved);
       return;
     }
@@ -246,6 +294,7 @@ export class BoardPointers {
     }
     this.unhold();
     this.unlift();
+    this.magnify(null);
     this.held?.ghost.remove();
     this.held = null;
   }

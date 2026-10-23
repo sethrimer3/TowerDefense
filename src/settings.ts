@@ -30,6 +30,9 @@ export const SETTINGS = {
    * clear of the finger. Until the player sets it, on for touch screens and
    * off for a mouse (`touchFirst`). */
   raiseDrag: { kind: "toggle", default: false, page: { id: "raise-drag", label: "Carry dragged items above the finger" } },
+  /** While dragging on the Defend board (placing, aiming), a box above the
+   * finger shows the board zoomed in round where the item would go. */
+  magnifier: { kind: "toggle", default: false, page: { id: "magnifier", label: "Magnifying glass while placing" } },
   /** In battle, the rally flag takes a triple tap rather than a double, for
    * players who plant it by accident. */
   tripleTapFlag: { kind: "toggle", default: false, page: { id: "triple-tap-flag", label: "Triple tap to place the rally flag" } },
