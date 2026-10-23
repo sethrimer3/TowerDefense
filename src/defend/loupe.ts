@@ -6,8 +6,9 @@
  * Any gesture can use it: `BoardPointers` points it at held drags and at
  * `BoardAim` gestures (through their optional `focus`). Presentation only. */
 
-/** The box's side, in CSS pixels, before it is fitted to small screens. */
-const SIZE = 132;
+/** The box's side, in CSS pixels, before it is fitted to small screens:
+ * half again the area of the first 132-pixel box (side times √1.5). */
+const SIZE = 162;
 /** How many times larger the glass shows the board than the board shows itself. */
 export const LOUPE_ZOOM = 3;
 /** The gap (CSS pixels) kept between the box and the point it magnifies. */
@@ -41,7 +42,7 @@ export class Loupe {
   draw(board: HTMLCanvasElement) {
     const at = this.at;
     if (!at || !board.width) return this.box && (this.box.hidden = true);
-    const size = Math.round(Math.min(SIZE, window.innerWidth * 0.36, window.innerHeight * 0.3));
+    const size = Math.round(Math.min(SIZE, window.innerWidth * 0.44, window.innerHeight * 0.37));
     const box = this.box ??= makeBox();
     const dpr = window.devicePixelRatio || 1, px = Math.round(size * dpr);
     if (box.width !== px) box.width = box.height = px;
