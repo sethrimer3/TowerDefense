@@ -15,7 +15,7 @@ import { ART, openAt, parkArt } from "./park-art.ts";
 import { damageStage, drawSprite, sprite, wallDamagePixels, wallRubblePixels } from "./damage-art.ts";
 import { mooringPixels } from "./sky-palace-art.ts";
 import { GRASS, grassPatch, groundArt } from "./ground-art.ts";
-import { heights, shadowCanvas, shadowMask, type Footprint } from "./shadow-art.ts";
+import { heights, paintShadows, shadowMask, type Footprint } from "./shadow-art.ts";
 import { gatePixels, gateRubblePixels } from "./gate-art.ts";
 import { gateRect, type Side } from "./layout.ts";
 import { SPIKE_REACH, bastionPixels, bastionRubblePixels, spikePixels } from "./wall-defense-art.ts";
@@ -119,20 +119,20 @@ export function paintCityLayer(c: CanvasRenderingContext2D, px: number, scene: C
   paintSpikes(p);
   for (const b of map.buildings) if (b.kind === "wall") paintBuilding(p, b);
   for (const b of map.buildings) if (b.kind !== "wall") paintBuilding(p, b);
-  paintPixelArt(p, cityShadows(map, sim, scene.looks));
+  paintShadows(c, cityShadows(map, sim, scene.looks), px);
   paintLanternBrackets(p, scene.lights);
 }
 
 /** The shadows of what stands, cached for the last city and battle state. */
-let shadows: { map: CityMap; sim: DefendSim | null; version: number; looks: string; canvas: HTMLCanvasElement | null } | null = null;
+let shadows: { map: CityMap; sim: DefendSim | null; version: number; looks: string; mask: Uint8Array } | null = null;
 function cityShadows(map: CityMap, sim: DefendSim | null, looks?: Readonly<Record<number, string>>) {
   const version = sim ? sim.mapVersion : -1, key = (looks ? Object.entries(looks).join(",") : "") + `|${pixelKey()}`;
   if (shadows?.map !== map || shadows.sim !== sim || shadows.version !== version || shadows.looks !== key) {
     const standing = (b: Building) => (!sim || sim.intact(b)) && !aloft({ looks }, b);
     const footprint = (b: Building) => spriteFootprint(map, b, b.structureUid !== undefined ? looks?.[b.structureUid] : undefined);
-    shadows = { map, sim, version, looks: key, canvas: shadowCanvas(shadowMask(heights(map, standing, footprint))) };
+    shadows = { map, sim, version, looks: key, mask: shadowMask(heights(map, standing, footprint)) };
   }
-  return shadows.canvas;
+  return shadows.mask;
 }
 
 /** The solid pixels of each structure's sprite as it stands undamaged, read
@@ -275,7 +275,7 @@ function paintGrass({ c, px }: Paint, cx: number, cy: number) {
   }
 }
 
-/** Pixel art baked at `ART` pixels a cell (streets, ponds, shadows), drawn
+/** Pixel art baked at `ART` pixels a cell (streets, ponds), drawn
  * up to size with smoothing off. */
 function paintPixelArt({ c }: Paint, art: HTMLCanvasElement | null) {
   if (!art) return;
@@ -485,6 +485,13 @@ function paintWallOutline(
     if (!faced(1)) c.fillRect(x + w - o, y + h, o, foot - y - h);
   }
   if (!standing(0, 1)) c.fillRect(x, foot - o, w, o);
+  // Where the top meets the hanging face, the same line as the edges.
+  if (face) c.fillRect(x, y + h, w, o);
+  // Inside corners: where both neighbours stand but the stone between them
+  // diagonally doesn't, their edge lines meet only at a point; fill it so
+  // the line turns the corner unbroken.
+  for (const dx of [-1, 1])
+    if (standing(dx, 0) && standing(0, -1) && !standing(dx, -1)) c.fillRect(dx < 0 ? x : x + w - o, y, o, o);
 }
 
 /** Shaded sides and a lit top edge wherever the stone at `at` (canvas
