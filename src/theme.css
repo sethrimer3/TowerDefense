@@ -1841,8 +1841,8 @@ dialog .away-row .away-note {
 .defend-item.skill-loading:disabled { opacity: 1; filter: none; }
 .defend-item.skill-loading::after { content: ""; position: absolute; inset: 0; background: #000b; clip-path: inset(0 0 var(--skill-fill) 0); pointer-events: none; border-radius: inherit; }
 
- .banner-research h4 { color: #e7ba52; }
-.banner-research-branches, .banner-research-branches section { border-top: 2px solid #a48040; }
+.banner-research > h3 { color: #e7ba52; }
+.banner-tree-detail { border-top: 2px solid #a48040; }
 
 .research-project { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: .35rem .6rem; border-bottom: 2px solid var(--brass); }
 .research-project > div { min-width: 0; overflow-wrap: anywhere; }

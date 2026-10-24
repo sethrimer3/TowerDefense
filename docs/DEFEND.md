@@ -646,6 +646,14 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   it stands takes it down, as does carrying it off the board, and dragging
   it elsewhere moves it. It draws nothing from the run's random stream, so a
   run without one replays exactly as before.
+  Its Knowledge tree is in **Study → Spells → War banner**, independent of
+  tower research. Select nodes on the connected tree to inspect and research
+  the existing ranks: War banner, Rapid deployment (all three ranks),
+  Sheltering standard, Broad standard, then independent damage, marching speed,
+  and life branches; regeneration follows life. Timed research replaces the
+  tree with the centered upgrade until completion or confirmed cancellation.
+  Realm’s former Battle topic is labeled **Bombs** and retains Gunpowder,
+  bomb damage, bomb safety and War drums.
 - **Necromancy** (`necromancy.ts`, `×∞`), a strike spell, is dragged from
   the same palette; while it is held a small pixel skull marks every grave
   on the board, and its aim shows a green ring of 3 cells, the skulls inside

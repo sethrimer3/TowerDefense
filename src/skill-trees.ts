@@ -60,7 +60,7 @@ export const TREES: SkillTree[] = [
     { id: "fletchers", requires: ["bladework"] },
     { id: "gunpowder", requires: ["veterans"] },
     { id: "ballistics", requires: ["fletchers", "gunpowder"] },
-    { id: "warBanner", requires: ["ballistics"] },
+    { id: "warBanner", requires: [] },
     { id: "bannerCooldown", requires: ["warBanner"] },
     { id: "bannerDefense", requires: ["bannerCooldown"], full: ["bannerCooldown"] },
     { id: "bannerReach", requires: ["bannerDefense"] },

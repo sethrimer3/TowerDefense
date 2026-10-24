@@ -4,6 +4,9 @@ import { PALETTE_ITEMS, UPGRADES } from "../src/defend/catalog.ts";
 import { TRAINING_IDS } from "../src/progression.ts";
 import { SKILL_IDS, TREES } from "../src/skill-trees.ts";
 import { SUBJECTS, topicItems } from "../src/upgrade-subjects.ts";
+import { defaults } from "../src/save.ts";
+import { bannerTree } from "../src/ui/banner-tree.ts";
+import { buySkill, skillPurchase } from "../src/progression.ts";
 
 const topics = SUBJECTS.flatMap((s) => s.topics);
 
@@ -34,4 +37,34 @@ test("a skill's requirements are shown in the same subject", () => {
   const subjectOf = new Map(SUBJECTS.flatMap((s) => s.topics.flatMap((t) => (t.skills ?? []).map((id) => [id, s.id] as const))));
   for (const node of TREES.flatMap((t) => t.nodes))
     for (const r of node.requires) assert.equal(subjectOf.get(r), subjectOf.get(node.id), `${node.id} needs ${r}`);
+});
+
+test("War banner has a standalone Knowledge tree under Spells; useful Battle upgrades remain under Bombs", () => {
+  const realm = SUBJECTS.find(s => s.id === "realm")!, spells = SUBJECTS.find(s => s.id === "spells")!;
+  assert.equal(realm.topics.some(t => t.id === "warBanner"), false);
+  assert.ok(spells.topics.some(t => t.id === "warBanner" && t.icon === "banner"));
+  assert.equal(realm.topics.some(t => t.name === "Battle"), false);
+  const bombs = realm.topics.find(t => t.id === "battle")!;
+  assert.equal(bombs.name, "Bombs");
+  assert.deepEqual(bombs.skills, ["gunpowder"]);
+  assert.deepEqual(bombs.upgrades, ["bombSafe"]);
+  assert.deepEqual(bombs.training, ["bombDamage"]);
+  assert.ok(bombs.extras?.includes("speed3"));
+  const save = defaults(); save.knowledge = 100000;
+  assert.equal(skillPurchase(save, "warBanner").available, true, "no unrelated tower prerequisite");
+  let graph = bannerTree(save);
+  assert.equal(graph.length, 8);
+  assert.deepEqual(graph.filter(n => !n.parent).map(n => n.id), ["warBanner"]);
+  assert.equal(graph.find(n => n.id === "warBanner")!.state, "next");
+  assert.equal(graph.find(n => n.id === "bannerDefense")!.state, "locked");
+  assert.ok(buySkill(save, "warBanner"));
+  for (let i = 0; i < 3; i++) assert.ok(buySkill(save, "bannerCooldown"));
+  assert.ok(buySkill(save, "bannerDefense")); assert.ok(buySkill(save, "bannerReach"));
+  graph = bannerTree(save);
+  assert.deepEqual(graph.filter(n => n.parent === "bannerReach").map(n => n.id), ["bannerDamage", "bannerMarch", "bannerLife"]);
+  for (const id of ["bannerDamage", "bannerMarch", "bannerLife"]) assert.equal(graph.find(n => n.id === id)!.state, "next");
+  assert.equal(graph.find(n => n.id === "bannerRegen")!.parent, "bannerLife");
+  assert.equal(graph.find(n => n.id === "bannerRegen")!.state, "locked");
+  save.settings.devCommand = true;
+  assert.ok(bannerTree(save).every(n => n.state === "owned"), "developer research matches the displayed ranks");
 });

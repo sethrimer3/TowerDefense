@@ -20,6 +20,8 @@ import { replay, sparksOver } from "./flourish.ts";
 import type { AppContext } from "./app.ts";
 import { uiSprite } from "./dom.ts";
 import { holdToRepeat } from "./hold-repeat.ts";
+import { UpgradeGraph } from "./upgrade-graph.ts";
+import { bannerTree } from "./banner-tree.ts";
 
 /** Hours, minutes and seconds left, as the timers show them. */
 export function formatDuration(ms: number) {
@@ -67,6 +69,7 @@ export class Ledger {
   private trainingParticles = new TrainingParticles();
   private circle: MagicCircle | null = null;
   private circleResearch: string | null = null;
+  private bannerGraph: UpgradeGraph | null = null;
   /** The rank picked in each topic's path tree ("path:index", or "path:crown"). */
   private picked: Record<string, string> = {};
   /** The subject and topic last drawn. */
@@ -143,7 +146,7 @@ export class Ledger {
       const research = relevant ? `${job.kind}:${job.id}:${job.rank}` : "";
       if (research && this.circleResearch !== null && research !== this.circleResearch) this.circle.energize();
       this.circleResearch = research;
-      this.circle.attach(root.querySelector<HTMLElement>(".research-orbit") ?? root);
+      this.circle.attach(root.querySelector<HTMLElement>(".research-orbit") ?? root.querySelector<HTMLElement>("[data-banner-tree]") ?? root);
       root.classList.add("has-magic-circle");
     }
     root.querySelectorAll<HTMLButtonElement>("[data-ledger-stack]").forEach(b => b.onclick = () => {
@@ -167,6 +170,7 @@ export class Ledger {
     }
     root.querySelectorAll<HTMLCanvasElement>("canvas[data-icon]").forEach((c) => paintIcon(c, c.dataset.icon as IconItem));
     paintPathIcons(root);
+    this.renderBannerTree();
     root.querySelector<HTMLButtonElement>("[data-up]")!.onclick = () => this.up();
     root.querySelectorAll<HTMLButtonElement>("[data-subject]").forEach((b) => (b.onclick = () => {
       this.subject = b.dataset.subject as SubjectId;
@@ -206,7 +210,7 @@ export class Ledger {
     const stacks = subject.topics.map(t => {
       const count = this.owned(t), type = t.item ? TILE_TYPE[t.item] : "consumables", on = t.id === current.id;
       const layers = count > 2 ? "layers-2" : count > 1 ? "layers-1" : "";
-      const sub = study ? pathsOf(t.id).length ? "Spell paths" : "Shared research" : "Upgrades all";
+      const sub = study ? t.id === "warBanner" ? "Knowledge tree" : pathsOf(t.id).length ? "Spell paths" : "Shared research" : "Upgrades all";
       return `<button class="tile type-${type} ${layers} ${on ? "open" : ""}" data-key="${t.id}" data-ledger-stack="${t.id}" aria-pressed="${on}" aria-label="${t.name}${t.item ? `, ${count} owned` : ""}">
         <span class="tile-face">${t.item ?? t.icon ? `<canvas width="48" height="48" data-icon="${t.item ?? t.icon}"></canvas>` : uiSprite(subject.sprite)}</span><span class="tile-name">${t.name}</span>${t.item ? `<b class="tile-count">×${count}</b>` : ""}<small class="tile-sub">${sub}</small></button>`;
     }).join("");
@@ -455,18 +459,35 @@ export class Ledger {
         <button data-learn="${id}" ${maxed || !canBuy || busy || (!researchers && !save.settings.instantResearch) ? "disabled" : ""}>${maxed ? "Mastered" : active ? `Researching<small data-research-timer>${this.researchTimeLeft()}</small>` : `Learn<small>${price} Knowledge</small><small>${this.researchHint(level)}</small>`}</button></article>`;
     };
     if (t.id === "warBanner") {
-      const shared: SkillId[] = ["warBanner", "bannerCooldown", "bannerDefense", "bannerReach"];
-      const branches: { name: string; ids: SkillId[] }[] = [
-        { name: "Damage", ids: ["bannerDamage"] },
-        { name: "Marching speed", ids: ["bannerMarch"] },
-        { name: "Life & regeneration", ids: ["bannerLife", "bannerRegen"] },
-      ];
-      return `<div class="banner-research"><div class="banner-research-shared"><h4>Shared upgrades</h4>${shared.map(skillCard).join("")}</div><p class="ledger-note">Master Rapid deployment, then learn Sheltering standard and Broad standard to open the three branches. Each branch can be researched.</p><div class="banner-research-branches">${branches.map(branch => `<section><h4>${branch.name}</h4>${branch.ids.map(skillCard).join("")}</section>`).join("")}</div></div>`;
+      const selected = t.skills!.find(id => id === this.picked.warBanner) ?? "warBanner";
+      return `<div class="banner-research"><h3>War banner · Knowledge tree</h3><p class="ledger-note">Master Rapid deployment, then learn Sheltering standard and Broad standard. The tree branches into damage, marching speed, and life with regeneration. You can research every branch.</p><div data-banner-tree></div><div class="banner-tree-detail" aria-live="polite">${skillCard(selected)}</div></div>`;
     }
     const skills = (t.skills ?? []).map(skillCard);
     const tree = isSpell(t.id) && pathsOf(t.id).length ? this.spellSetupHtml(t.id) + this.treeHtml(t) : "";
     if (!skills.length && !tree) return `<p class="ledger-empty">Nothing to study here yet.</p>`;
     return tree + skills.join("");
+  }
+
+  /** Reattach the same living graph on selection/purchase; stop it during
+   * research or when leaving this topic. */
+  private renderBannerTree() {
+    const host = this.root.querySelector<HTMLElement>("[data-banner-tree]");
+    if (!host) { this.bannerGraph?.destroy(); this.bannerGraph = null; return; }
+    this.bannerGraph ??= new UpgradeGraph(document.createElement("div"), {
+      reduceMotion: () => this.save.settings.reduceMotion || matchMedia("(prefers-reduced-motion: reduce)").matches,
+      onPick: id => { this.picked.warBanner = id; this.render(); },
+      paint: el => {
+        const id = el.dataset.node as SkillId, skill = SKILLS[id];
+        el.setAttribute("aria-label", `${skill.name}, ${skillRank(this.save, id)} of ${skill.max} ranks`);
+        el.title = skill.name;
+        el.onclick = event => { if (event.detail === 0) { this.picked.warBanner = id; this.render(); } };
+      },
+    });
+    this.bannerGraph.el.classList.add("ug-host", "banner-tree");
+    this.bannerGraph.el.setAttribute("role", "group");
+    this.bannerGraph.el.setAttribute("aria-label", "War banner Knowledge tree");
+    host.append(this.bannerGraph.el);
+    this.bannerGraph.set(bannerTree(this.save), this.picked.warBanner ?? "warBanner");
   }
 
   /** A strike spell is never placed: it casts with one researched path (or
