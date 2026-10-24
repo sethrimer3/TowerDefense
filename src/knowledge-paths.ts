@@ -236,8 +236,10 @@ export const FIRE_ARROWS = { hall: { burn: 2, share: 0.25 }, burn: [0, 3, 4, 4],
 /** Hawk focus: range relative to the ordinary tower, additive shot damage,
  * and a speed multiplier applied to the half-rate cadence. */
 export const SHARP = { range: [0.7, 0.7, 4.3, 4.3], reload: 2, perShot: 0.02, bonusCap: 10, speedCap: 10 };
-/** Wisp arrow tuning: all distances are simulation cells. */
-export const WISP = { duration: 0.4, width: 1, orbit: 0.65, tendrils: 6, segments: 12, idleLength: 1, sliceLength: 3, fade: 0.35, samples: 48 };
+/** Wisp flight speeds/radius are shares of tower range; trail distances are cells. */
+export const WISP = { width: 1, orbit: 0.65, turnRadius: .24, speed: 2.5, idleSpeed: .4,
+  tassels: 6, segments: 12, idleLength: 1, sliceLength: 3, linger: 1, extend: .08, shorten: 1.5,
+  fade: .35, spacing: .08, capacity: [1,3], hits: 30, refill: 3, sparkLife: .55, sparks: 18 };
 /** Gun Battery: grapeshot at attuning; ranks shorten reload time. */
 export const GUNNERY = { hall: 1, reload: [1, 0.85, 0.75, 0.5], grape: 4, grapeShare: 0.35, grapeR: 0.5 };
 /** Mortar: impact and burning damage share the same multiplier. */
@@ -688,7 +690,11 @@ export const PATHS: KnowledgePath[] = [
       { name: "Gathering storm", icon: "volley", cost: studyPathCost(4, 2), text: "Each further shot speeds the half-rate cadence by another 1x, up to 10x. A new enemy resets both damage and speed" },
     ],
   },
-  { id: "wispArrow", topic: "wispTower", name: "Wisp Arrow", motto: "A living arrow, six flowing trails; later upgrades to come", hue: "frost", ranks: [] },
+  { id: "wispArrow", topic: "wispTower", name: "Wisp Arrow", motto: "Living blue arrows, thirty cuts before sparks", hue: "frost",
+    ranks: [
+      { name: "Triple arrows", icon: "volley", cost: studyPathCost(4, 0), text: "Stores up to 3 living blue arrows instead of 1. Each has 30 hits before bursting into blue sparks; the tower regenerates one arrow every 3 seconds while below capacity" },
+    ],
+  },
   {
     id: "gunnery", topic: "batteryTower", name: "Gun crews", motto: "Fast crews, scattering shot", hue: "steel",
     ranks: [
@@ -962,7 +968,7 @@ export const UNSPECIALIZED: Record<PathTopic, string> = {
   archerTower: "Steady single arrows",
   brazierTower: "Lit arrows: burns for 2 seconds",
   hawkTower: "Strongest-enemy focus, 30% shorter range",
-  wispTower: "One orbiting arrow slices every enemy along its arc",
+  wispTower: "One living arrow slices in broad arcs for 30 hits, then blue sparks; regenerates every 3 seconds",
   cannonTower: "Standard shells and blasts",
   batteryTower: "Grapeshot: each shell adds four surrounding explosions",
   mortarTower: "Impacts leave burning ground for 4 seconds; slower reload",

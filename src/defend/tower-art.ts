@@ -217,7 +217,7 @@ export const PATH_LOOKS: Partial<Record<PlacedKind, readonly string[]>> = {
   cannonTower: ["gunnery", "siegeShot", "minelaying"],
   brazierTower: ["fireArrows"],
   hawkTower: ["sharpshooters"],
-  wispTower: [],
+  wispTower: ["wispArrow"],
   batteryTower: ["gunnery"],
   mortarTower: ["siegeShot"],
   minelayerTower: ["minelaying"],

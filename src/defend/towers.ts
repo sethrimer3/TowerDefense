@@ -90,7 +90,7 @@ export class Towers {
       else if (b.kind === "wallBallista") this.stepBallista(sim, b, dt);
       else if (b.kind === "keep" && sim.bonuses.keep) this.stepKeep(sim, b, dt);
     }
-    if (sim.wisps.length) finishWisps(sim, dt);
+    if (sim.wisps.length || sim.wispOwners.size) finishWisps(sim, dt);
   }
 
   /** Seconds until the keep pours its boiling oil again. */

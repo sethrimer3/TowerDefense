@@ -513,13 +513,19 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   at +1000% (11× total); II replaces the range penalty with 4.3× ordinary
   range; III accelerates the half-rate cadence from 1× to 10× as shots build.
   A lost or changed lock resets both ramps. Existing Hawk IDs/ranks are retained.
-  Wisp attunement creates one persistent blue arrow that wanders near its tower
-  and sweeps through enemies in a wide parabola: ordinary arrow damage once per
-  enemy per slice, ordinary range/cadence, a 0.4-second sweep and a one-cell hit
-  band. It has six finite-link pixel tendrils extending with inertia during
-  attacks; idle movement and trails do no damage. Later Wisp upgrades remain
-  unavailable. Source destruction ends damage and fades the arrow; rebuilding
-  starts a new one. **Watch towers** mark
+  Wisp attunement starts with one living blue arrow that wanders near its tower
+  and constantly sweeps through enemies in broad arcs: ordinary arrow damage
+  once per enemy per pass, within normal range, with a one-cell hit band. Turns
+  have a minimum radius of 24% of range, preserving heading between passes;
+  reload bonuses increase flight speed. Six quiet pixel tassels trace its actual
+  route, lengthen during attacks, hold for one second afterward and slowly
+  shorten. Idle flight and tassels do no damage. Each arrow has 30 enemy hits,
+  then dissolves into harmless blue sparks. Triple arrows (rank I, 4 Knowledge)
+  raises capacity from one to three simultaneous arrows. A shared timer restores
+  one fresh arrow every 3 battle seconds below capacity, without banking time
+  while full. Shields consume hits; missed/dead/out-of-range targets do not.
+  Defenses and rebuilt towers start full. Source destruction cancels refills
+  and fades active arrows. Further Wisp ranks remain unavailable. **Watch towers** mark
   enemies in their radius with a gold outline; marked enemies take ×2 damage.
   Paths: Spotters (marks hit harder, wider radius) or Signal fires
   (marked enemies slowed, more at rank II, and set burning at III). Up to
