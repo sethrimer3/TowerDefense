@@ -31,8 +31,10 @@ export function kindStats(save: Save, kind: PaletteItem, path?: PathId, rank = 0
   const n = (v: number) => Number(v.toFixed(2));
   if (isArcherTower(kind)) {
     const sharp = at("sharpshooters"), fire = at("fireArrows"), lit = kind === "brazierTower" || fire > 0, hawk = kind === "hawkTower" || sharp > 0;
-    const damage = archerDamage(l.archerDamage) * b.towerDamage * (sharp >= 3 ? SHARP.damage : 1);
-    return `${n(damage)} damage · ${n(archerCooldown(l.archerRate) * b.towerReload)}s reload · ${n(archerRange(l.archerRange) + (sharp ? SHARP.range : hawk ? SHARP.hall : 0))} range${lit ? ` · ${fire ? FIRE_ARROWS.burn[fire] : FIRE_ARROWS.hall.burn}s burn` : ""}${fire >= 3 ? " · 3 arrows" : ""}${sharp >= 2 ? " · every third arrow 3x damage" : ""}`;
+    const damage = archerDamage(l.archerDamage) * b.towerDamage;
+    if (kind === "wispTower") return `${n(damage)} per enemy per slice · ${n(archerCooldown(l.archerRate) * b.towerReload)}s between slices · ${n(archerRange(l.archerRange))} range · one living arrow with six tendrils · later upgrades still to come`;
+    if (hawk) return `${n(damage)} starting damage · ${n(archerCooldown(l.archerRate) * b.towerReload * (sharp ? SHARP.reload : 1))}s initial reload · ${n(archerRange(l.archerRange) * SHARP.range[sharp])} range · locks the highest current HP${sharp ? " · +2% per consecutive shot, up to +1000%" : ""}${sharp >= 3 ? " · cadence builds to 10x the half-rate base; new lock resets damage and speed" : ""}`;
+    return `${n(damage)} damage · ${n(archerCooldown(l.archerRate) * b.towerReload)}s reload · ${n(archerRange(l.archerRange))} range${lit ? ` · ${fire ? FIRE_ARROWS.burn[fire] : FIRE_ARROWS.hall.burn}s burn` : ""}${fire >= 3 ? " · 3 arrows" : ""}`;
   }
   if (isCannonTower(kind)) {
     const gun = at("gunnery"), siege = at("siegeShot"), mines = at("minelaying"), battery = kind === "batteryTower" || gun > 0, mortar = kind === "mortarTower" || siege > 0;

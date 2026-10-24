@@ -55,6 +55,7 @@ import { atHome, escaped, Builders } from "./civilians.ts";
 import { stepEnemy } from "./enemies.ts";
 import { blocked, cellAt, cellCenter, center, fillFlowField, nearestOpen, type FieldTerrain, type Point } from "./pathing.ts";
 import { ignite, stepArrows, stepShells, Towers } from "./towers.ts";
+import type { WispArrow } from "./wisp-arrow.ts";
 import { FORTIFY, SHATTER, SIGNAL, SPOTTERS, pathRank } from "../knowledge-paths.ts";
 import { Barracks, stepArcher, stepSwordsman } from "./troops.ts";
 import { cloaked, spreadVenom, stepVenom } from "./assassins.ts";
@@ -354,6 +355,8 @@ export class DefendSim {
   soldiers: Soldier[] = [];
   civilians: Civilian[] = [];
   arrows: Arrow[] = [];
+  wisps: WispArrow[] = [];
+  readonly wispOwners = new Map<number, WispArrow>();
   shells: Shell[] = [];
   /** Proximity mines and directed aim, reset with each battle. */
   mines: Mine[] = [];

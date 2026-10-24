@@ -507,8 +507,19 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   Neither draws from the run's random stream; how they look is the
   renderer's (`wizard-art.ts`).
 - **Archer towers** shoot the nearest enemy in range. Paths: Fire arrows (what
-  they hit burns, then a volley of three) or Sharpshooters (reach, every 3rd
-  arrow critical, then aimed at the strongest). **Watch towers** mark
+  they hit burns, then a volley of three), Hawk focus, or Wisp Arrow. Hawk
+  attunement locks the highest-current-HP enemy at 70% ordinary range. Rank I
+  halves fire rate and adds 2% damage per further shot at that enemy, capped
+  at +1000% (11× total); II replaces the range penalty with 4.3× ordinary
+  range; III accelerates the half-rate cadence from 1× to 10× as shots build.
+  A lost or changed lock resets both ramps. Existing Hawk IDs/ranks are retained.
+  Wisp attunement creates one persistent blue arrow that wanders near its tower
+  and sweeps through enemies in a wide parabola: ordinary arrow damage once per
+  enemy per slice, ordinary range/cadence, a 0.4-second sweep and a one-cell hit
+  band. It has six finite-link pixel tendrils extending with inertia during
+  attacks; idle movement and trails do no damage. Later Wisp upgrades remain
+  unavailable. Source destruction ends damage and fades the arrow; rebuilding
+  starts a new one. **Watch towers** mark
   enemies in their radius with a gold outline; marked enemies take ×2 damage.
   Paths: Spotters (marks hit harder, wider radius) or Signal fires
   (marked enemies slowed, more at rank II, and set burning at III). Up to

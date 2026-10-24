@@ -56,7 +56,7 @@ export type Branch = { path: PathId; via?: { kind: PlacedKind; cost: number } };
 export type Attuned = { kind: PlacedKind; from: PlacedKind; cost: number; branches: Branch[]; ultimate?: PlacedKind };
 
 export const ATTUNED: Attuned[] = [
-  { kind: "archerTower", from: "watchTower", cost: 3, branches: [{ path: "fireArrows", via: { kind: "brazierTower", cost: 3 } }, { path: "sharpshooters", via: { kind: "hawkTower", cost: 3 } }] },
+  { kind: "archerTower", from: "watchTower", cost: 3, branches: [{ path: "fireArrows", via: { kind: "brazierTower", cost: 3 } }, { path: "sharpshooters", via: { kind: "hawkTower", cost: 3 } }, { path: "wispArrow", via: { kind: "wispTower", cost: 3 } }] },
   { kind: "cannonTower", from: "watchTower", cost: 6, ultimate: "nanoTower", branches: [
     { path: "gunnery", via: { kind: "batteryTower", cost: 4 } },
     { path: "siegeShot", via: { kind: "mortarTower", cost: 4 } },
@@ -182,7 +182,7 @@ export function nextSteps(kind: PlacedKind | "wallSpikes", wear?: Wear): Upgrade
     const p = pathById(wear.path), next = p.ranks[wear.rank];
     if (next) return [{ type: "path", path: p.id, rank: wear.rank + 1, cost: next.cost }];
     const a = place.tier === "attuned" || place.tier === "via" ? place.a : undefined;
-    return a?.ultimate ? [{ type: "merge", to: a.ultimate, cost: MERGE_COST }] : [];
+    return a?.ultimate && a.branches.every(b => topRank(b.path) > 0) ? [{ type: "merge", to: a.ultimate, cost: MERGE_COST }] : [];
   }
   if (place.tier === "attuned")
     return place.a.branches.map((b): UpgradeStep =>
@@ -190,7 +190,7 @@ export function nextSteps(kind: PlacedKind | "wallSpikes", wear?: Wear): Upgrade
   if (place.tier === "via") {
     // The branch's attunement made it: it climbs its path from the first rank.
     const p = pathById(place.a.branches[place.branch].path);
-    return [{ type: "path", path: p.id, rank: 1, cost: p.ranks[0].cost }];
+    return p.ranks.length ? [{ type: "path", path: p.id, rank: 1, cost: p.ranks[0].cost }] : [];
   }
   const becomes = kind === "wallSpikes" ? [] : (BECOMES[kind] ?? []).map((b): UpgradeStep => ({ type: "become", ...b }));
   return [...becomes, ...buildingPathsOf(kind).map((p): UpgradeStep => ({ type: "path", path: p.id, rank: 1, cost: p.ranks[0].cost }))];
@@ -255,7 +255,7 @@ export type Partner = { branch: Branch; kind: PlacedKind; found?: { kept: true }
  * itself). Empty unless it is maxed on a branch of a line with an ultimate. */
 export function mergePartners(d: DefendSave, kind: PaletteKind, wear: Wear | undefined, except?: number): Partner[] {
   const a = attunedOf(kind), mine = a ? branchOf(a, kind, wear) : -1;
-  if (!a?.ultimate || mine < 0 || !wear || wear.rank < topRank(wear.path)) return [];
+  if (!a?.ultimate || a.branches.some(b => topRank(b.path) === 0) || mine < 0 || !wear || wear.rank < topRank(wear.path)) return [];
   return a.branches.filter((_, i) => i !== mine).map((branch): Partner => {
     const k = branchKind(a, branch), top = topRank(branch.path);
     if (d.kept.some((o) => o.kind === k && o.path === branch.path && o.rank === top)) return { branch, kind: k, found: { kept: true } };
@@ -577,7 +577,7 @@ export function buildingTree(kind: PlacedKind | "wallSpikes", wear?: Wear): Tree
    * beyond it. Returns the top node's id. */
   const climb = (p: KnowledgePath, from: string, have: number, via?: { kind: PlacedKind; cost: number }, made = false, merged = false, peek = false) => {
     let parent = from;
-    const more = { hidden: [{ side: false, i: 0, n: 1 }] };
+    const more = p.ranks.length ? { hidden: [{ side: false, i: 0, n: 1 }] } : {};
     if (via) {
       nodes.push({ id: kid(via.kind), parent, state: made ? "owned" : "next", kind: via.kind, cost: via.cost, step: { type: "become", to: via.kind, cost: via.cost },
         ...(merged ? { merged } : {}), ...(peek ? more : {}) });
@@ -595,7 +595,7 @@ export function buildingTree(kind: PlacedKind | "wallSpikes", wear?: Wear): Tree
   };
   /** The line's ultimate over `top`, the end of the branch it is bought from. */
   const crown = (a: Attuned, top: string, state: TreeNode["state"]) => {
-    if (a.ultimate) nodes.push({ id: kid(a.ultimate), parent: top, state, kind: a.ultimate, cost: MERGE_COST, step: { type: "merge", to: a.ultimate, cost: MERGE_COST }, ...beyond(a.ultimate) });
+    if (a.ultimate) nodes.push({ id: kid(a.ultimate), parent: top, state: a.branches.some(b => topRank(b.path) === 0) ? "locked" : state, kind: a.ultimate, cost: MERGE_COST, step: { type: "merge", to: a.ultimate, cost: MERGE_COST }, ...beyond(a.ultimate) });
     else nodes.push({ id: `u:${a.kind}`, parent: top, state: "locked", cost: 0, soon: a.kind });
   };
   /** The basic building and the attuned one it became, owned, the other

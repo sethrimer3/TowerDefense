@@ -6,7 +6,7 @@ import { cloneLayout, type PlacedKind } from "./defend/layout.ts";
 import type { Save } from "./save.ts";
 import { studyPathCost } from "./economy.ts";
 
-export type PathTopic = "pyreTower" | "frostTower" | "stormTower" | "wizardTower" | "chapterHouse" | "berserkerLodge" | "halberdYard" | "barracks" | "heroHall" | "valkyriePalace" | "assassinDen" | "bloodHall" | "veilHouse" | "poisonDen" | "spearHall" | "phalanx" | "javelinCamp" | "lancerStable" | "musketHall" | "gunHall" | "gunNest" | "gatlingNest" | "rocketBattery" | "sniperLodge" | "archerTower" | "brazierTower" | "hawkTower" | "cannonTower" | "batteryTower" | "mortarTower" | "minelayerTower" | "archerBarracks" | "rangerLodge" | "skirmishCamp" | "skyrangerLodge" | "watchTower" | "mageGuild" | "infernoHall" | "cinderHall" | "stormHall" | "bait" | "spikes" | SpellId;
+export type PathTopic = "pyreTower" | "frostTower" | "stormTower" | "wizardTower" | "chapterHouse" | "berserkerLodge" | "halberdYard" | "barracks" | "heroHall" | "valkyriePalace" | "assassinDen" | "bloodHall" | "veilHouse" | "poisonDen" | "spearHall" | "phalanx" | "javelinCamp" | "lancerStable" | "musketHall" | "gunHall" | "gunNest" | "gatlingNest" | "rocketBattery" | "sniperLodge" | "archerTower" | "brazierTower" | "hawkTower" | "wispTower" | "cannonTower" | "batteryTower" | "mortarTower" | "minelayerTower" | "archerBarracks" | "rangerLodge" | "skirmishCamp" | "skyrangerLodge" | "watchTower" | "mageGuild" | "infernoHall" | "cinderHall" | "stormHall" | "bait" | "spikes" | SpellId;
 /** Strike spells: cast from the battle's Skills palette rather than built,
  * so a spell has no cards; it casts with the one path `save.spellPaths`
  * names, at its furthest researched rank. */
@@ -21,7 +21,7 @@ export type PathId =
   | "grenadiers" | "volleyFire" | "bayonets" | "sharpMuskets" | "beltFeed"
   | "quickdraw" | "duelists" | "tripod" | "gunShield" | "overdrive" | "stoppingPower" | "deadeye" | "piercing" | "clusterRockets" | "salvoRacks"
   | "marksmen" | "ricochet" | "suppressors"
-  | "fireArrows" | "sharpshooters" | "gunnery" | "siegeShot" | "minelaying" | "rangers" | "skirmishers" | "skyranger"
+  | "fireArrows" | "sharpshooters" | "wispArrow" | "gunnery" | "siegeShot" | "minelaying" | "rangers" | "skirmishers" | "skyranger"
   | "spotters" | "signalFires" | "pyroclasm" | "cinders" | "conduction" | "oilSoaked" | "fortified"
   | "blastStakes" | "springStakes" | "rimeStakes"
   | "boneArchers" | "soulWeighing" | "amalgam"
@@ -233,11 +233,11 @@ export const SUPPRESS = { chill: 2, stagger: 0.6, reload: 0.6 };
  * `burn[rank]` seconds at `share[rank]` of the arrow's damage a second; at
  * III it looses `volley` arrows at once, each at another of the nearest. */
 export const FIRE_ARROWS = { hall: { burn: 2, share: 0.25 }, burn: [0, 3, 4, 4], share: [0, 0.4, 0.8, 0.8], volley: 3 };
-/** Sharpshooters, the Hawk tower's path: `hall` more cells at the tower,
- * `range` from I; from II every `every`th arrow is
- * critical for `crit` times the damage; at III `damage` times the damage,
- * aimed at the strongest enemy in reach. */
-export const SHARP = { hall: 1, range: 2, every: 3, crit: 3, damage: 1.6 };
+/** Hawk focus: range relative to the ordinary tower, additive shot damage,
+ * and a speed multiplier applied to the half-rate cadence. */
+export const SHARP = { range: [0.7, 0.7, 4.3, 4.3], reload: 2, perShot: 0.02, bonusCap: 10, speedCap: 10 };
+/** Wisp arrow tuning: all distances are simulation cells. */
+export const WISP = { duration: 0.4, width: 1, orbit: 0.65, tendrils: 6, segments: 12, idleLength: 1, sliceLength: 3, fade: 0.35, samples: 48 };
 /** Gun Battery: grapeshot at attuning; ranks shorten reload time. */
 export const GUNNERY = { hall: 1, reload: [1, 0.85, 0.75, 0.5], grape: 4, grapeShare: 0.35, grapeR: 0.5 };
 /** Mortar: impact and burning damage share the same multiplier. */
@@ -681,13 +681,14 @@ export const PATHS: KnowledgePath[] = [
     ],
   },
   {
-    id: "sharpshooters", topic: "hawkTower", name: "Sharpshooters", motto: "Far sight, deadly aim", hue: "verdant",
+    id: "sharpshooters", topic: "hawkTower", name: "Focused fire", motto: "One enemy, relentless aim", hue: "verdant",
     ranks: [
-      { name: "Hawk eyes", icon: "eye", cost: studyPathCost(4, 0), text: "The tower reaches 2 cells further in all" },
-      { name: "Called shots", icon: "crosshair", cost: studyPathCost(4, 1), text: "Every 3rd arrow is critical, 3× damage" },
-      { name: "Deadeye", icon: "skull", cost: studyPathCost(4, 2), text: "Arrows hit 60% harder, aimed at the strongest enemy in reach" },
+      { name: "Relentless aim", icon: "crosshair", cost: studyPathCost(4, 0), text: "Half fire rate. Each further shot at the same enemy adds 2% damage, up to +1000%; a new lock resets the bonus" },
+      { name: "Far horizon", icon: "eye", cost: studyPathCost(4, 1), text: "Range becomes 4.3 times an ordinary Archer Tower's range, replacing the earlier penalty. Damage ramp and half-rate cadence retained" },
+      { name: "Gathering storm", icon: "volley", cost: studyPathCost(4, 2), text: "Each further shot speeds the half-rate cadence by another 1x, up to 10x. A new enemy resets both damage and speed" },
     ],
   },
+  { id: "wispArrow", topic: "wispTower", name: "Wisp Arrow", motto: "A living arrow, six flowing trails; later upgrades to come", hue: "frost", ranks: [] },
   {
     id: "gunnery", topic: "batteryTower", name: "Gun crews", motto: "Fast crews, scattering shot", hue: "steel",
     ranks: [
@@ -917,7 +918,7 @@ export const PATHS: KnowledgePath[] = [
 export const PATH_TOPICS = [...new Set(PATHS.map((p) => p.topic))];
 /** The paths the wizard tower and the barracks wore before each branch
  * made a building of its own. */
-const LEGACY_TOPICS: Partial<Record<PathTopic, PathId[]>> = { wizardTower: ["pyromancy", "rime", "storm"], barracks: ["crusaders", "berserkers", "halberdiers"], assassinDen: ["bloodletters", "shadowcloak", "venom"], archerTower: ["fireArrows", "sharpshooters"], cannonTower: ["gunnery", "siegeShot", "minelaying"], archerBarracks: ["rangers", "skirmishers"], mageGuild: ["pyroclasm", "cinders", "conduction"] };
+const LEGACY_TOPICS: Partial<Record<PathTopic, PathId[]>> = { wizardTower: ["pyromancy", "rime", "storm"], barracks: ["crusaders", "berserkers", "halberdiers"], assassinDen: ["bloodletters", "shadowcloak", "venom"], archerTower: ["fireArrows", "sharpshooters", "wispArrow"], cannonTower: ["gunnery", "siegeShot", "minelaying"], archerBarracks: ["rangers", "skirmishers"], mageGuild: ["pyroclasm", "cinders", "conduction"] };
 export const pathById = (id: PathId) => PATHS.find((p) => p.id === id)!;
 export const pathsOf = (topic: string) => PATHS.filter((p) => p.topic === topic);
 
@@ -960,7 +961,8 @@ export const UNSPECIALIZED: Record<PathTopic, string> = {
   sniperLodge: "Snipers: slow, far, single hard shots",
   archerTower: "Steady single arrows",
   brazierTower: "Lit arrows: burns for 2 seconds",
-  hawkTower: "A cell more reach",
+  hawkTower: "Strongest-enemy focus, 30% shorter range",
+  wispTower: "One orbiting arrow slices every enemy along its arc",
   cannonTower: "Standard shells and blasts",
   batteryTower: "Grapeshot: each shell adds four surrounding explosions",
   mortarTower: "Impacts leave burning ground for 4 seconds; slower reload",
