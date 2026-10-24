@@ -8,7 +8,7 @@ try{
   const context=await browser.newContext({viewport:{width,height:width<500?844:1000},hasTouch:width<500}),page=await context.newPage(),errors=[];
   page.on('pageerror',e=>errors.push(e.message));
   await page.goto(base);await page.waitForSelector('#defend-start');
-  const save=await page.evaluate(async()=>{const {defaults}=await import('/src/save.ts');const s=defaults();s.settings.soundOff=s.settings.ambienceOff=true;s.defend.bestWave=9;s.defend.furthestWave=10;s.defend.startWave=9;return s;});
+  const save=await page.evaluate(async()=>{const {defaults}=await import('/src/save.ts');const s=defaults();s.settings.soundOff=s.settings.ambienceOff=true;s.defend.bestWave=9;delete s.defend.furthestWave;s.defend.startWave=1;return s;});
   await context.addInitScript(save=>{if(!sessionStorage.getItem('waves-seeded')){localStorage.setItem('towerdefense.v1',JSON.stringify(save));sessionStorage.setItem('waves-seeded','1');}},save);
   async function reload(){
    await page.reload();await page.waitForSelector('#defend-start');
@@ -20,15 +20,29 @@ try{
   const stored=()=>page.evaluate(()=>{const s=JSON.parse(localStorage.getItem('towerdefense.v1'));return {furthest:s.defend.furthestWave,start:s.defend.startWave,best:s.defend.bestWave,points:s.upgradePoints};});
   const selected=()=>page.locator('#defend-wave b').textContent();
   async function choose(wave){await page.locator('#defend-wave').click();await page.locator(`.defend-wave-dialog [data-wave="${wave}"]`).click();}
+  async function startAndSpawn(wave){
+   await page.locator('#defend-start').click();
+   const first=await page.evaluate(()=>{
+    const p=window.__dp,sim=p.sim;sim.speed=1;const events=[];
+    for(let i=0;i<90&&!sim.enemies.length;i++){sim.update(1/30);events.push(...sim.events);p.handleEvents();}
+    sim.speed=0;return {wave:sim.wave,enemies:sim.enemies.length,events};
+   });
+   assert.equal(first.wave,wave,'the actual battle starts at the selected wave');
+   assert.ok(first.enemies>0,'enemies actually spawn');
+   assert.deepEqual(first.events,[{type:'waveStart',wave}],'no earlier waves spawn or receive clear rewards');
+  }
   async function events(list){await page.evaluate(list=>{const p=window.__dp;p.sim.events.splice(0);p.sim.wave=list.at(-1).wave;p.sim.events.push(...list);p.handleEvents();},list);}
   await reload();assert.equal(await selected(),'9');
+  await startAndSpawn(9);
+  await page.locator('#defend-abandon').click();await page.locator('#defend-abandon').click();
+  await page.locator('.defeat-actions button').click();
   await page.locator('#defend-wave').click();
+  assert.match(await page.locator('.defend-wave-dialog').textContent(),/Your next defense starts on Wave 9/);
   assert.equal(await page.locator('.defend-wave-dialog [data-wave="9"]').getAttribute('aria-pressed'),'true');
   assert.equal(await page.locator('.defend-wave-dialog [data-wave="10"]').count(),0,'highest entered wave itself is not a starting wave');
   await page.locator('.defend-wave-dialog [data-wave="3"]').click();assert.equal(await selected(),'3');
   await reload();assert.equal(await selected(),'3','manual choice survives reload');
-  await page.locator('#defend-start').click();
-  await page.evaluate(()=>{const p=window.__dp;p.sim.speed=0;});
+  await startAndSpawn(3);
   await events([{type:'waveStart',wave:3},{type:'waveStart',wave:10}]);
   assert.deepEqual(await stored(),{furthest:10,start:3,best:9,points:0},'replay and equal record preserve manual selection');
   await events([{type:'waveStart',wave:11}]);
@@ -49,6 +63,9 @@ try{
   await page.screenshot({path:`test-results/wave-progress-${width}.png`});
   await page.locator('[data-wave-close]').click();
   await reload();assert.equal(await selected(),'10');
+  await startAndSpawn(10);
+  await page.locator('#defend-abandon').click();await page.locator('#defend-abandon').click();
+  await page.locator('.defeat-actions button').click();
   await choose(4);await page.locator('#defend-start').click();await page.evaluate(()=>{window.__dp.sim.speed=0;});
   await events([{type:'waveCleared',wave:9},{type:'waveStart',wave:11}]);
   assert.deepEqual(await stored(),{furthest:11,start:4,best:9,points:0});

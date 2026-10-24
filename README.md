@@ -51,7 +51,7 @@ The Cannon Tower has three behavior-changing attunements: **Gun Battery** adds g
 
 The **Mage Guild** trains three attunements of troops: **Stormcallers** cast chain lightning from 9–15 simulation cells away, striking 3/4/6/8 enemies with 10/15/25/35% double-damage critical chance; **Pyromancers** combine larger fire blasts with full-area burning ground and clinging fire; **Cryomancers** freeze and slow an area, with three upgrades strengthening their reach, area and control. Existing Cinder Hall copies become Frost Hall/Cryomancers at their saved ranks. [Mage Guild attunement details](docs/upgrades/MAGE_GUILD_ATTUNEMENTS.md).
 
-Each new furthest wave reached automatically selects the preceding wave for your next defense: reaching wave 10 selects wave 9, with a minimum of wave 1. Use the starting-wave picker to replay earlier waves; that choice stays selected until you reach a new record. Reached-wave progress is saved separately from cleared waves and upgrade-point rewards.
+Each new furthest wave reached automatically selects the preceding wave for your next defense: reaching wave 10 starts your next run on wave 9, with a minimum of wave 1. Old saves with the former wave-1 default move to this starting wave when migrated. Use the starting-wave picker to replay earlier waves; that choice stays selected until you reach a new record. Reached-wave progress is saved separately from cleared waves and upgrade-point rewards.
 
 ## How it's built
 

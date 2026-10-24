@@ -34,8 +34,8 @@ export function wavePickerHTML(save: DefendSave, developerMode = false, testerSe
       `<span class="wave-difficulty" title="Difficulty ${difficulty.toLocaleString("en-US")}"><small>Difficulty</small>${difficultyLabel(difficulty)}</span></button>`);
   }
   return `<small>THE WATCH AWAITS ITS ORDERS</small><h2 id="defend-wave-title">Starting wave</h2>
-    <p>Begin the next defense on any wave up to <b>${reach}</b>. Each wave's difficulty is how much the enemy brings against the city.</p>
-    <p>Furthest wave reached: <b>${furthestWave(save)}</b>. Reaching a new record selects the previous wave for your next defense. You can choose an earlier wave here.</p>
+    <p>Your next defense starts on <b>Wave ${chosen}</b>. Choose an earlier wave below.</p>
+    <p>Furthest wave reached: <b>${furthestWave(save)}</b>. New records set your starting wave to this number minus one (minimum Wave 1).</p>
     <div class="wave-list">${developerMode ? `<button class="wave-row" data-unit-tester aria-pressed="${testerSelected}"><span class="wave-name">Unit tester</span><span>Summon enemies manually</span></button>` : ""}${rows.join("")}</div>
     <div class="dialog-actions"><button data-wave-close>Close</button></div>`;
 }

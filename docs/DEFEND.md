@@ -36,7 +36,7 @@ The game records the highest wave **entered**, separately from the highest wave 
 
 The starting-wave selection screen still offers every earlier wave through that limit. A manual earlier selection persists across retries and reloads, until a new reached record selects its preceding wave. Developer-unlocked starts remain available, while unlocking waves or using Unit tester does not count as reaching them. Upgrade points still require clearing a new highest wave; entering one grants no reward.
 
-Old saves infer entered progress from the cleared record plus one, preserving their existing selectable range. Explicit saved starting-wave choices remain intact; missing/invalid choices use the previous reached wave. New games start on wave 1.
+Old saves infer entered progress from the cleared record plus one, preserving their existing selectable range. The old wave-1 default moves to the previous reached wave on migration. Other saved choices remain intact, including a deliberate wave-1 selection in current saves; missing/invalid choices use the previous reached wave. The next battle spawns its first enemies at the selected wave, skipping earlier waves. New games start on wave 1.
 
 ## Layout of the page
 

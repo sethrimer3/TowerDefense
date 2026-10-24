@@ -59,7 +59,9 @@ test("old saves retain unlocked progress and manual selections; missing selectio
   assert.equal(old.furthestWave, 13);
   assert.equal(waveReach(old), 12);
   assert.equal(startingWave(old), 12);
+  assert.equal(startingWave(decodeDefendSave({ bestWave: 12, startWave: 1 })), 12, "old wave-one default advances on migration");
   assert.equal(startingWave(decodeDefendSave({ bestWave: 12, startWave: 3 })), 3);
+  assert.equal(startingWave(decodeDefendSave({ bestWave: 9, furthestWave: 10, startWave: 1 })), 1, "current deliberate wave-one choice stays selected");
   const current = decodeDefendSave({ bestWave: 8, furthestWave: 12, startWave: 11 });
   assert.equal(current.furthestWave, 12);
   assert.equal(startingWave(current), 11);

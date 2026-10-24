@@ -328,7 +328,11 @@ export function decodeDefendSave(raw: any): DefendSave {
   const legacyReached = d.bestWave > 0 ? d.bestWave + 1 : 0;
   d.furthestWave = Math.max(d.bestWave, intOr(s.furthestWave, 0, MAX_START_WAVE + 1, legacyReached));
   d.unlockedWave = intOr(s.unlockedWave, 0, MAX_START_WAVE, d.unlockedWave);
-  d.startWave = intOr(s.startWave, 1, MAX_START_WAVE, Math.max(1, d.furthestWave - 1));
+  // Before reached-wave tracking, every save kept wave 1 as its default even
+  // after progressing. Move that old default forward once; current saves and
+  // other explicit earlier choices keep the player's selection.
+  const oldDefault = s.furthestWave === undefined && s.startWave === 1;
+  d.startWave = intOr(oldDefault ? undefined : s.startWave, 1, MAX_START_WAVE, Math.max(1, d.furthestWave - 1));
   d.paletteSide = s.paletteSide === "right" ? "right" : "left";
   d.speed3 = s.speed3 === true;
   d.battleSpeed = intOr(s.battleSpeed, 1, d.speed3 ? 3 : 2, 1) as 1 | 2 | 3;
