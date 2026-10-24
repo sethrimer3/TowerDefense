@@ -6,6 +6,9 @@ import { SKILL_IDS, TREES } from "../src/skill-trees.ts";
 import { SUBJECTS, topicItems } from "../src/upgrade-subjects.ts";
 import { defaults } from "../src/save.ts";
 import { bannerTree } from "../src/ui/banner-tree.ts";
+import { bombTree } from "../src/ui/bomb-tree.ts";
+import { decode } from "../src/save.ts";
+import { studyCircle } from "../src/magic-circle/progression.ts";
 import { buySkill, skillPurchase } from "../src/progression.ts";
 
 const topics = SUBJECTS.flatMap((s) => s.topics);
@@ -39,17 +42,18 @@ test("a skill's requirements are shown in the same subject", () => {
     for (const r of node.requires) assert.equal(subjectOf.get(r), subjectOf.get(node.id), `${node.id} needs ${r}`);
 });
 
-test("War banner has a standalone Knowledge tree under Spells; useful Battle upgrades remain under Bombs", () => {
+test("War banner and Bombs have standalone Knowledge trees under Spells", () => {
   const realm = SUBJECTS.find(s => s.id === "realm")!, spells = SUBJECTS.find(s => s.id === "spells")!;
   assert.equal(realm.topics.some(t => t.id === "warBanner"), false);
   assert.ok(spells.topics.some(t => t.id === "warBanner" && t.icon === "banner"));
   assert.equal(realm.topics.some(t => t.name === "Battle"), false);
-  const bombs = realm.topics.find(t => t.id === "battle")!;
+  assert.equal(realm.topics.some(t => t.id === "battle"), false);
+  const bombs = spells.topics.find(t => t.id === "battle")!;
   assert.equal(bombs.name, "Bombs");
   assert.deepEqual(bombs.skills, ["gunpowder"]);
   assert.deepEqual(bombs.upgrades, ["bombSafe"]);
   assert.deepEqual(bombs.training, ["bombDamage"]);
-  assert.ok(bombs.extras?.includes("speed3"));
+  assert.ok(realm.topics.find(t => t.id === "troops")!.extras?.includes("speed3"));
   const save = defaults(); save.knowledge = 100000;
   assert.equal(skillPurchase(save, "warBanner").available, true, "no unrelated tower prerequisite");
   let graph = bannerTree(save);
@@ -67,4 +71,25 @@ test("War banner has a standalone Knowledge tree under Spells; useful Battle upg
   assert.equal(graph.find(n => n.id === "bannerRegen")!.state, "locked");
   save.settings.devCommand = true;
   assert.ok(bannerTree(save).every(n => n.state === "owned"), "developer research matches the displayed ranks");
+});
+
+test("Bomb Knowledge nodes preserve Gunpowder ranks, gate them in order and leave tower research independent", () => {
+  const save = defaults(); save.knowledge = 100000;
+  assert.equal(skillPurchase(save, "gunpowder").available, true);
+  assert.deepEqual(bombTree(save).map(n => [n.id, n.parent, n.state]), [
+    ["bomb", undefined, "owned"], ["gunpowder:0", "bomb", "next"],
+    ["gunpowder:1", "gunpowder:0", "locked"], ["gunpowder:2", "gunpowder:1", "locked"],
+  ]);
+  assert.ok(buySkill(save, "gunpowder"));
+  const restored = decode(JSON.stringify(save));
+  assert.deepEqual(bombTree(restored).map(n => n.state), ["owned", "owned", "next", "locked"]);
+  assert.ok(buySkill(restored, "gunpowder")); assert.ok(buySkill(restored, "gunpowder"));
+  assert.ok(bombTree(restored).every(n => n.state === "owned"));
+  assert.equal(buySkill(restored, "gunpowder"), false);
+  save.skills.fletchers = 1; save.skills.gunpowder = 0;
+  assert.equal(skillPurchase(save, "ballistics").available, true, "towers do not need bomb research");
+  save.settings.devCommand = true;
+  assert.ok(bombTree(save).every(n => n.state === "owned"));
+  const topic = SUBJECTS.flatMap(s => s.topics).find(t => t.id === "battle")!;
+  assert.equal(studyCircle(restored, topic).motif, "triangles");
 });

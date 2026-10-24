@@ -81,6 +81,8 @@ try {
     await page.locator('[data-subject="realm"]').click();
     assert.equal(await page.locator('[data-ledger-stack="warBanner"]').count(), 0);
     assert.equal(await page.getByRole('button', {name: 'Battle', exact: true}).count(), 0);
+    assert.equal(await page.locator('[data-ledger-stack="battle"]').count(), 0);
+    await page.locator('[data-subject="spells"]').click();
     await page.locator('[data-ledger-stack="battle"]').click();
     assert.equal(await page.locator('[data-learn="gunpowder"]').count(), 1, 'important bomb research stays accessible');
     assert.equal(await page.locator('.banner-tree').count(), 0);

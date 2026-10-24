@@ -36,9 +36,8 @@ export const SUBJECTS: Subject[] = [
     topics: [
       // The guilds and their newest branches have no upgrades of their own:
       // the shared troop upgrades are theirs.
-      { id: "troops", name: "All troops", items: ["meleeGuild", "rangedGuild", "heroHall", "shadow", "assassinDen", "bloodHall", "veilHouse", "poisonDen", "spearHall", "phalanx", "javelinCamp", "lancerStable", "gunHall", "musketHall", "sniperLodge", "gunNest", "gatlingNest", "rocketBattery", "revolutionary"], upgrades: ["barracksCapacity", "barracksTraining", "soldierArms"], training: ["troopHp", "troopDamage", "drill", "deployRange"], skills: ["drillSergeant", "veterans", "bladework"] },
+      { id: "troops", name: "All troops", items: ["meleeGuild", "rangedGuild", "heroHall", "shadow", "assassinDen", "bloodHall", "veilHouse", "poisonDen", "spearHall", "phalanx", "javelinCamp", "lancerStable", "gunHall", "musketHall", "sniperLodge", "gunNest", "gatlingNest", "rocketBattery", "revolutionary"], upgrades: ["barracksCapacity", "barracksTraining", "soldierArms"], extras: ["speed3"], training: ["troopHp", "troopDamage", "drill", "deployRange"], skills: ["drillSergeant", "veterans", "bladework"] },
       { id: "towers", name: "All towers", training: ["towerDamage", "towerReload"], skills: ["fletchers", "ballistics"] },
-      { id: "battle", name: "Bombs", icon: "bomb", upgrades: ["bombSafe"], training: ["bombDamage"], extras: ["bomb", "speed3"], skills: ["gunpowder"] },
     ],
   },
   {
@@ -88,8 +87,9 @@ export const SUBJECTS: Subject[] = [
     ],
   },
   {
-    id: "spells", name: "Spells", sprite: "knowledge", blurb: "The War banner and strike spells used from the Skills palette in battle.",
+    id: "spells", name: "Spells", sprite: "knowledge", blurb: "Bombs, the War banner and strike spells used from the Skills palette in battle.",
     topics: [
+      { id: "battle", name: "Bombs", icon: "bomb", upgrades: ["bombSafe"], training: ["bombDamage"], extras: ["bomb"], skills: ["gunpowder"] },
       { id: "warBanner", name: "War banner", icon: "banner", skills: ["warBanner", "bannerCooldown", "bannerDefense", "bannerReach", "bannerDamage", "bannerMarch", "bannerLife", "bannerRegen"] },
       { id: "necromancy", name: "Necromancy", icon: "necromancy", training: ["undeadHp", "undeadDamage", "graveTime"] },
       { id: "meteor", name: "Meteor strike", icon: "meteor", training: ["meteorDamage", "meteorRadius"] },

@@ -2189,8 +2189,8 @@ nav button > .tab-idle[hidden] { display: none; }
 
 .banner-research { max-width: 720px; margin: auto; }
 .banner-research h3 { text-align: center; }
-.banner-research [data-banner-tree] { position: relative; }
-.banner-research .banner-tree { height: 420px; min-height: 300px; }
+.banner-research [data-banner-tree], .banner-research [data-bomb-tree] { position: relative; }
+.banner-research .banner-tree, .banner-research .bomb-tree { height: 420px; min-height: 300px; }
 .banner-node-glyph { font-size: 23px; }
 .banner-tree-detail { margin-top: 12px; }
 .banner-tree-detail .ledger-skill { flex-wrap: wrap; }

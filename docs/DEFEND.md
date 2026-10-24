@@ -632,6 +632,13 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   it (a corner will do).
 - During a run the palette becomes the **consumables** palette. A **bomb**
   can be dragged onto the field to blast everything nearby.
+  The bomb’s Knowledge tree is **Study → Spells → Bombs**: the bomb root
+  leads through Gunpowder I, II and III, adding 20% damage per rank. No troop
+  or tower research is required. Existing Gunpowder ranks, costs and research
+  times are retained; later ranks remain locked until the prior rank completes.
+  Its nested-triangle magic circle grows only with completed research.
+  Smithy → Spells → Bombs still holds damage training and Shaped charges;
+  War drums is in the Smithy under Realm → All troops.
 - The **war banner** (`war-banner.ts`, `×∞`: never used up, never bought)
   is dragged from the same palette and planted anywhere on the board as the
   keep's waving banner over a faint gold ring. While it stands every mobile
@@ -652,8 +659,6 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   Sheltering standard, Broad standard, then independent damage, marching speed,
   and life branches; regeneration follows life. Timed research replaces the
   tree with the centered upgrade until completion or confirmed cancellation.
-  Realm’s former Battle topic is labeled **Bombs** and retains Gunpowder,
-  bomb damage, bomb safety and War drums.
 - **Necromancy** (`necromancy.ts`, `×∞`), a strike spell, is dragged from
   the same palette; while it is held a small pixel skull marks every grave
   on the board, and its aim shows a green ring of 3 cells, the skulls inside

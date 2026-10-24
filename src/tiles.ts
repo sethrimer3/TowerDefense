@@ -233,7 +233,7 @@ export function buyTile(save: Save, id: TileId): boolean {
   return true;
 }
 
-/** Consumables' upgrades live with the battle's and the troops' topics. */
+/** Consumables' upgrades live in their Spells topics. */
 const CONSUMABLE_TOPIC: Record<Consumable, string> = { bomb: "battle", warBanner: "warBanner", necromancy: "necromancy", meteor: "meteor", frostNova: "frostNova", reinforcements: "reinforcements" };
 /** The topic a kind's upgrades are filed in, and its subject. */
 export function tileTopic(id: TileId): { subject: Subject; topic: Topic } {
