@@ -1044,6 +1044,7 @@ test('the starting wave: within reach, opened 100 at a time by the dev option, s
   save.startWave = 40;
   assert.equal(startingWave(save), 1, 'a wave out of reach starts on the furthest in reach');
   save.bestWave = 12;
+  save.furthestWave = 13;
   assert.equal(startingWave(save), 12);
   assert.equal(unlockWaves(save), 112, '100 waves past the best');
   assert.equal(unlockWaves(save), 212, 'and 100 more past those');
@@ -1051,7 +1052,7 @@ test('the starting wave: within reach, opened 100 at a time by the dev option, s
   const back = decodeDefendSave(JSON.parse(JSON.stringify(save)));
   assert.equal(back.unlockedWave, 212);
   assert.equal(back.startWave, 40);
-  assert.equal(decodeDefendSave({ ...save, startWave: 0, unlockedWave: -3 }).startWave, 1);
+  assert.equal(decodeDefendSave({ ...save, startWave: 0, unlockedWave: -3 }).startWave, 12);
   assert.equal(decodeDefendSave({ startWave: 'x' }).unlockedWave, 0);
 
   const html = wavePickerHTML(save);

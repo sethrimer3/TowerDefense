@@ -528,3 +528,8 @@ The Mage Guild's fire troop attunement, trained at Inferno Hall. Larger area bla
 ### Cryomancers
 
 The Mage Guild's cold troop attunement, trained at Frost Hall. Area impacts briefly freeze enemies, then leave them slowed. Frost Hall replaces the former Cinder Hall while retaining its purchased tiers.
+
+
+### Furthest wave reached
+
+The highest wave the player has entered, whether or not they cleared it. A new reached record selects the preceding wave as the next starting wave, with a minimum of wave 1. Separate from the highest cleared wave used for rewards.

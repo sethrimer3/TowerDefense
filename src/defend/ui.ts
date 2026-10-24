@@ -60,7 +60,7 @@ import { QUIET, type Scene } from "../ambience.ts";
 import { NIGHT_FADE_SECONDS, isBossWave, rollWeather, type Weather } from "./weather.ts";
 import { play } from "../sound.ts";
 import { replay, sparksOver } from "../ui/flourish.ts";
-import { available, keptGroups, plainAvailable, setLayout, startingWave, type DefendSave } from "./progress.ts";
+import { available, keptGroups, plainAvailable, recordWaveReached, setLayout, startingWave, type DefendSave } from "./progress.ts";
 import { ageWater } from "./boats.ts";
 import { defeatHTML } from "./defeat.ts";
 import { inspectable, type Armed } from "./inspect.ts";
@@ -900,6 +900,7 @@ export class DefendPage {
           play("wave");
         }
       } else if (ev.type === "waveStart") {
+        if (!sim.unitTester && recordWaveReached(this.save, ev.wave)) this.host.persist();
         if (areaForWave(ev.wave).id !== this.weatherArea) {
           const area = areaForWave(ev.wave);
           this.weatherArea = area.id;
