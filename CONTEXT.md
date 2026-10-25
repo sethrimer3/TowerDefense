@@ -279,6 +279,9 @@ One skill rank or spell path rank being worked in the Study. Knowledge is paid a
 **Pixel Art**:
 The setting, on by default, that draws the pieces with hand-drawn sprites (shared with Tower Delve) in place of their drawn art; off, every piece looks as it was drawn before.
 
+**Forest**:
+The trees, rocks and dirt pads filling the open ground outside Mossbound Ruins' walls, never part of the battle: the trees sway in the wind, and blasts and the strongest charges blow them up, leaving a crater of dirt and a stump until the next run.
+
 **Park life**:
 The city's live dressing, never part of the battle: grass swaying and parting around walkers, and on the ponds rain rings, reflections and ducks.
 

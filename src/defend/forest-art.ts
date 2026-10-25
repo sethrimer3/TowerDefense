@@ -1,0 +1,641 @@
+/** The forest outside the walls (`forest.ts`) as pixel art at `ART` pixels a
+ * cell, inside crisp black outlines like the parks' trees:
+ *
+ * - **Ground:** dirt pads, mossy rocks, every standing tree's shadow (cast
+ *   from the upper left) and the craters with stumps that felled trees
+ *   leave, all baked into one board-sized canvas, repainted only when a
+ *   tree falls. It lies under the units and the battle's lighting.
+ * - **Trees:** oaks of leaf clumps, star-shaped pines in whorls, and low
+ *   bushes (some berried or flowering), each variant baked in five lean
+ *   frames; on the wall clock each tree leans with its own sway and gusts
+ *   rolling across the board, stronger under cloud and rain. They stand
+ *   over the units, fading while anyone is under them, composed into one
+ *   board-sized canvas at most every `REDRAW_MS`, then darkened with the
+ *   city below them.
+ * - **Debris:** a tree blown up bursts into leaves, clumps and splinters
+ *   flung from the blast, falling and fading on battle time.
+ *
+ * Presentation only; its randomness comes from `defendRandom("effects")`. */
+import { CELL_COUNT, CELLS_H, CELLS_W, cellIndex, defendRandom, hash, hash01 } from "./grid.ts";
+import type { CityMap } from "./citygen.ts";
+import type { DefendSim } from "./sim.ts";
+import { ForestDamage, VARIANTS, canopyRadius, forestPlan, type Felled, type ForestPlan, type ForestTree, type TreeKind } from "./forest.ts";
+import { ART } from "./park-art.ts";
+import { artPen } from "./pixel-fx.ts";
+
+const W = CELLS_W * ART, H = CELLS_H * ART;
+/** The most a canopy leans, in art pixels, either way. */
+export const LEAN = 2;
+/** A tree's opacity while someone is under it. */
+export const UNDER_ALPHA = 0.4;
+/** How fast a tree fades, in opacity a second. */
+const FADE = 3;
+/** The wind's time is held this long, so a tree's lean is the same in
+ * every band composed meanwhile. */
+const REDRAW_MS = 60;
+/** The bands of rows the trees' canvas is composed in, one a frame. */
+const BANDS = 4;
+/** The most debris pieces in the air at once. */
+const MAX_DEBRIS = 1600;
+const OUTLINE = 0x0b0907;
+
+const fx = defendRandom("effects");
+
+/** Opaque little-endian RGBA for 0xRRGGBB. */
+const rgba = (c: number, a = 255) => ((a << 24) | ((c & 0xff) << 16) | (c & 0xff00) | ((c >> 16) & 0xff)) >>> 0;
+
+/** Leaf shades, darkest first, a few per kind for variety. */
+const LEAVES: Record<TreeKind, number[][]> = {
+  oak: [
+    [0x1f3619, 0x2d5122, 0x44702f, 0x6a9d4c],
+    [0x223a1a, 0x335a26, 0x4f7f33, 0x7aab55],
+    [0x26361a, 0x3a5124, 0x587534, 0x8aa257],
+  ],
+  pine: [
+    [0x13261d, 0x1c3a2a, 0x29523a, 0x3f6f4c],
+    [0x15281f, 0x203f2e, 0x2f5b40, 0x4a7d55],
+  ],
+  bush: [
+    [0x223a1a, 0x335a26, 0x4c7a35, 0x74a653],
+    [0x283b1b, 0x3d5a27, 0x5a7d38, 0x86ad5b],
+  ],
+};
+const BARK = [0x3e2a1c, 0x5e4129];
+const BERRY = [0xb8343a, 0xe8e2c8, 0xe8c64a];
+const DIRT = [0x463a2e, 0x55483a, 0x62523f, 0x6a5944];
+const TURNED = [0x46372a, 0x5a4634, 0x6c5640, 0x7e664c];
+const PEBBLE = [0x8a7a62, 0x3a3026];
+const STONE = [0x3c3f3d, 0x575a55, 0x777a72, 0x979a90];
+const MOSS = [0x4f6a32, 0x6f8f44];
+const STUMP = [0x5e4129, 0x7a5232, 0xb08a5a];
+
+/** A sprite: its pixels, its size and where the canopy's middle sits in it. */
+export type Sprite = { px: Uint32Array; w: number; h: number; ox: number; oy: number; runs?: Int16Array };
+
+/** A sprite's rows as runs of solid pixels: row, first and past-last
+ * column, three numbers a run. */
+function runsOf(s: Sprite) {
+  if (s.runs) return s.runs;
+  const out: number[] = [];
+  for (let y = 0; y < s.h; y++)
+    for (let x = 0; x < s.w; x++) {
+      if (!s.px[y * s.w + x]) continue;
+      let e = x;
+      while (e < s.w && s.px[y * s.w + e]) e++;
+      out.push(y, x, e);
+      x = e;
+    }
+  return (s.runs = Int16Array.from(out));
+}
+
+/** Shade band (0 darkest to 3 lightest) for a light value, the boundaries
+ * dithered on a checker. */
+const band = (v: number, x: number, y: number) => {
+  const d = v + (((x + y) & 1) * 0.12 - 0.06);
+  return d > 0.5 ? 3 : d > 0.1 ? 2 : d > -0.32 ? 1 : 0;
+};
+
+/** The canopy of kind `kind`, variant `v`, unleant: shade band per pixel
+ * (-1 empty, 0..3, or 4 + berry index) over a square `2 × half + 1` wide,
+ * its middle at (half, half). */
+function canopy(kind: TreeKind, v: number) {
+  const R = canopyRadius(kind, v) * ART, half = Math.ceil(R * 1.2) + 1, n = 2 * half + 1;
+  const grid = new Int8Array(n * n).fill(-1);
+  const h = (k: number) => hash01(v, kind.length, k);
+  if (kind === "pine") {
+    const spikes = 8 + (hash(v, 431) % 4), ph = h(432);
+    const tri = (u: number) => 1 - 2 * Math.abs(u - Math.floor(u) - 0.5);
+    for (let y = 0; y < n; y++)
+      for (let x = 0; x < n; x++) {
+        const dx = x + 0.5 - half, dy = y + 0.5 - half, d = Math.sqrt(dx * dx + dy * dy), a = Math.atan2(dy, dx) / (Math.PI * 2);
+        const rim = R * (0.72 + 0.28 * tri(a * spikes + ph));
+        if (d >= rim) continue;
+        // Whorls of branches, each tier's rim spiked between the tier below's spikes.
+        const inner = R * 0.6 * (0.75 + 0.25 * tri(a * spikes + ph + 0.5)), top = R * 0.28 * (0.8 + 0.2 * tri(a * spikes + ph));
+        const tier = d < top ? 2 : d < inner ? 1 : 0;
+        const light = (-0.6 * dx - 0.8 * dy) / R;
+        let val = light * 0.75 + tier * 0.28 - 0.22;
+        // A dark line just outside each upper tier's rim, on the shaded side.
+        const lip = (tier === 0 && d < inner + 1.2) || (tier === 1 && d < top + 1.1);
+        if (lip && 0.6 * dx + 0.8 * dy > -0.2 * R) val -= 0.6;
+        if (d < 1.2) val = 1;
+        grid[y * n + x] = band(val, x, y);
+      }
+    return { R, half, n, grid };
+  }
+  const bush = kind === "bush";
+  const clumps = [{ x: 0, y: -0.05 * R, r: (bush ? 0.55 : 0.6) * R, lift: 0.25 * R }];
+  const k = (bush ? 3 : 5) + (hash(v, 433) % 3);
+  for (let i = 0; i < k; i++) {
+    const a = ((i + h(434 + i) * 0.5) / k) * Math.PI * 2, dist = R * (0.42 + h(440 + i) * 0.14);
+    clumps.push({ x: Math.cos(a) * dist, y: Math.sin(a) * dist, r: R * (0.38 + h(450 + i) * 0.14), lift: 0 });
+  }
+  const berries = bush && v % 3 !== 2 ? v % 3 : -1;
+  for (let y = 0; y < n; y++)
+    for (let x = 0; x < n; x++) {
+      const px = x + 0.5 - half, py = y + 0.5 - half;
+      let best = -Infinity, c = clumps[0];
+      for (const q of clumps) {
+        const dx = px - q.x, dy = py - q.y, d2 = dx * dx + dy * dy;
+        if (d2 >= q.r * q.r) continue;
+        const ht = Math.sqrt(q.r * q.r - d2) + q.lift;
+        if (ht > best) best = ht, c = q;
+      }
+      if (best === -Infinity) continue;
+      const nx = (px - c.x) / c.r, ny = (py - c.y) / c.r;
+      let val = 0.5 * (-0.6 * nx - 0.8 * ny) + 0.5 * ((-0.6 * px - 0.8 * py) / R);
+      // Each clump's shaded rim reads against the clump below it.
+      const edge = Math.sqrt((px - c.x) ** 2 + (py - c.y) ** 2) > c.r - 1.1;
+      if (edge && 0.6 * nx + 0.8 * ny > 0.25) val -= 0.55;
+      // Leaf speckle.
+      if (hash(x, y, v, 435) % 13 === 0) val += 0.4;
+      const b = band(val, x, y);
+      grid[y * n + x] = berries >= 0 && b >= 2 && hash(x, y, v, 436) % 11 === 0 ? 4 + berries : b;
+    }
+  return { R, half, n, grid };
+}
+
+/** Baked tree sprites by kind, variant and lean. */
+const sprites: Sprite[] = [];
+const KIND_INDEX: Record<TreeKind, number> = { oak: 0, pine: 1, bush: 2 };
+
+/** Tree `kind`, variant `v`, leaning `lean` art pixels (its top furthest,
+ * its foot not at all), with its trunk and outline. */
+export function treeSprite(kind: TreeKind, v: number, lean: number): Sprite {
+  const key = (KIND_INDEX[kind] * VARIANTS + v) * (2 * LEAN + 1) + lean + LEAN;
+  let s = sprites[key];
+  if (s) return s;
+  const { R, half, n, grid } = canopy(kind, v);
+  const pad = LEAN + 2, w = n + pad * 2, h = n + 5, ox = half + pad, oy = half + 1;
+  const fill = new Int8Array(w * h).fill(-1);
+  const colour = new Uint32Array(w * h);
+  // The trunk first, its foot poking out under the canopy.
+  if (kind !== "bush")
+    for (let y = Math.round(oy + R * 0.5); y <= Math.round(oy + R) + 1; y++)
+      for (const [x, c] of [[ox - 1, BARK[1]], [ox, BARK[0]]] as const) if (y < h) colour[y * w + x] = rgba(c), fill[y * w + x] = 9;
+  const shift = (y: number) => Math.round(lean * Math.max(0, Math.min(1, (R * 0.6 - (y - half)) / (R * 1.6))));
+  const palettes = LEAVES[kind], pal = palettes[v % palettes.length];
+  for (let y = 0; y < n; y++) {
+    const dx = shift(y);
+    for (let x = 0; x < n; x++) {
+      const b = grid[y * n + x];
+      if (b < 0) continue;
+      const i = (y + 1) * w + x + pad + dx;
+      fill[i] = 1;
+      colour[i] = rgba(b >= 4 ? BERRY[b - 4] : pal[b]);
+    }
+  }
+  // A one-pixel outline round canopy and trunk alike.
+  const px = new Uint32Array(w * h);
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const i = y * w + x;
+      if (fill[i] >= 0) { px[i] = colour[i]; continue; }
+      const near = (x > 0 && fill[i - 1] >= 0) || (x < w - 1 && fill[i + 1] >= 0) || (y > 0 && fill[i - w] >= 0) || (y < h - 1 && fill[i + w] >= 0);
+      if (near) px[i] = rgba(OUTLINE);
+    }
+  s = { px, w, h, ox, oy };
+  sprites[key] = s;
+  return s;
+}
+
+/** A rock `size` cells across: a lumpy boulder lit from the upper left,
+ * moss on its crown, outlined. */
+export function rockSprite(size: number, seed: number): Sprite {
+  const key = `${size}:${seed}`;
+  let s = rocks.get(key);
+  if (!s) rocks.set(key, (s = rock(size, seed)));
+  return s;
+}
+const rocks = new Map<string, Sprite>();
+
+function rock(size: number, seed: number): Sprite {
+  const R = Math.max(1.6, size * ART * 0.5), half = Math.ceil(R * 1.25) + 1, w = 2 * half + 2, h = 2 * half + 2;
+  const inside = new Uint8Array(w * h), px = new Uint32Array(w * h);
+  const ph = hash01(seed, 461) * 6.28, lumps = 3 + (seed % 3), squash = 0.75 + hash01(seed, 462) * 0.2;
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const dx = x + 0.5 - half, dy = (y + 0.5 - half) / squash, d = Math.sqrt(dx * dx + dy * dy);
+      const rim = R * (1 + 0.16 * Math.sin(Math.atan2(dy, dx) * lumps + ph));
+      if (d >= rim) continue;
+      inside[y * w + x] = 1;
+      const light = (-0.6 * dx - 0.8 * dy) / R;
+      const b = band(light * 0.9, x, y);
+      const mossy = seed % 3 !== 0 && light > 0.35 && hash(x, y, seed, 463) % 3 !== 0;
+      px[y * w + x] = rgba(mossy ? MOSS[b > 2 ? 1 : 0] : STONE[b]);
+    }
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const i = y * w + x;
+      if (inside[i]) continue;
+      if ((x > 0 && inside[i - 1]) || (x < w - 1 && inside[i + 1]) || (y > 0 && inside[i - w]) || (y < h - 1 && inside[i + w])) px[i] = rgba(OUTLINE);
+    }
+  return { px, w, h, ox: half, oy: half };
+}
+
+/** Which floor pixels a tree's shadow has darkened already. */
+const shaded = new Uint8Array(W * H);
+/** A box of art pixels, `x1`/`y1` exclusive. */
+export type Box = { x0: number; y0: number; x1: number; y1: number };
+const WHOLE: Box = { x0: 0, y0: 0, x1: W, y1: H };
+/** The box being painted: every pixel written lies in it. */
+let clip: Box = WHOLE;
+const inClip = (X: number, Y: number) => X >= clip.x0 && Y >= clip.y0 && X < clip.x1 && Y < clip.y1;
+/** Whether something `reach` cells round (x, y) may touch the clip. */
+const nearClip = (x: number, y: number, reach: number) =>
+  (x + reach) * ART >= clip.x0 && (x - reach) * ART < clip.x1 && (y + reach) * ART >= clip.y0 && (y - reach) * ART < clip.y1;
+
+/** The forest's ground, `W × H` art pixels: dirt pads, craters with
+ * stumps, rocks and the standing trees' shadows. */
+export function floorPixels(plan: ForestPlan, damage: ForestDamage | null): Uint32Array {
+  const out = new Uint32Array(W * H);
+  paintFloor(out, plan, damage, WHOLE);
+  return out;
+}
+
+/** Paints the forest's ground into `out` afresh within `box` only. */
+export function paintFloor(out: Uint32Array, plan: ForestPlan, damage: ForestDamage | null, box: Box) {
+  clip = { x0: Math.max(0, box.x0), y0: Math.max(0, box.y0), x1: Math.min(W, box.x1), y1: Math.min(H, box.y1) };
+  for (let Y = clip.y0; Y < clip.y1; Y++) out.fill(0, Y * W + clip.x0, Y * W + clip.x1);
+  for (const p of plan.pads) if (nearClip(p.x, p.y, p.r * 1.3 + 0.2)) blob(out, p.x, p.y, p.r, p.seed, DIRT, false);
+  for (const c of damage?.craters ?? []) {
+    if (!nearClip(c.x, c.y, c.r * 1.3 + 0.5)) continue;
+    blob(out, c.x, c.y, c.r, c.seed, TURNED, true);
+    stump(out, Math.round(c.x * ART), Math.round(c.y * ART), c.seed);
+  }
+  for (const r of plan.rocks) {
+    if (!nearClip(r.x, r.y, r.size + 0.5)) continue;
+    const s = rockSprite(r.size, r.seed), x0 = Math.round(r.x * ART) - s.ox, y0 = Math.round(r.y * ART) - s.oy;
+    // Its shadow, a pixel down and right.
+    stamp(out, s, x0 + 1, y0 + 1, true);
+    stamp(out, s, x0, y0, false);
+  }
+  for (let Y = clip.y0; Y < clip.y1; Y++) shaded.fill(0, Y * W + clip.x0, Y * W + clip.x1);
+  for (const t of plan.trees) {
+    if ((damage && !damage.standing(t)) || !nearClip(t.x, t.y, t.r * 2 + 1)) continue;
+    const s = treeSprite(t.kind, t.variant, 0), R = t.r * ART, runs = runsOf(s);
+    const x0 = Math.round(t.x * ART) - s.ox + Math.round(R * 0.35) + 1, y0 = Math.round(t.y * ART) - s.oy + Math.round(R * 0.5) + 1;
+    for (let k = 0; k < runs.length; k += 3) {
+      const Y = y0 + runs[k];
+      if (Y < clip.y0 || Y >= clip.y1) continue;
+      for (let X = Math.max(clip.x0, x0 + runs[k + 1]), e = Math.min(clip.x1, x0 + runs[k + 2]); X < e; X++) {
+        const i = Y * W + X;
+        if (shaded[i]) continue;
+        shaded[i] = 1;
+        out[i] = darken(out[i]);
+      }
+    }
+  }
+  clip = WHOLE;
+}
+
+/** A pixel in shadow: a solid one darkened, a clear one made a dim shade. */
+function darken(p: number) {
+  if (!(p >>> 24)) return rgba(0x060a05, 92);
+  const r = (p & 0xff) * 0.6, g = ((p >> 8) & 0xff) * 0.6, b = ((p >> 16) & 0xff) * 0.6;
+  return ((255 << 24) | (Math.round(b) << 16) | (Math.round(g) << 8) | Math.round(r)) >>> 0;
+}
+
+/** Copies a sprite's pixels in, or (`shadow`) shades where they would go. */
+function stamp(out: Uint32Array, s: Sprite, x0: number, y0: number, shadow: boolean) {
+  for (let y = 0; y < s.h; y++)
+    for (let x = 0; x < s.w; x++) {
+      const p = s.px[y * s.w + x], X = x0 + x, Y = y0 + y;
+      if (!p || !inClip(X, Y)) continue;
+      out[Y * W + X] = shadow ? darken(out[Y * W + X]) : p;
+    }
+}
+
+/** A patch of earth `r` cells across at (x, y): a ragged disc of `tones`,
+ * dithered out into the ground at its edge, with pebbles; a crater's (`thrown`)
+ * rim heaped lighter with clods. */
+function blob(out: Uint32Array, x: number, y: number, r: number, seed: number, tones: number[], thrown: boolean) {
+  const R = r * ART, cx = x * ART, cy = y * ART, ph = hash01(seed, 471) * 6.28, ph2 = hash01(seed, 472) * 6.28;
+  const x0 = Math.max(clip.x0, Math.floor(cx - R * 1.3)), x1 = Math.min(clip.x1 - 1, Math.ceil(cx + R * 1.3));
+  const y0 = Math.max(clip.y0, Math.floor(cy - R * 1.3)), y1 = Math.min(clip.y1 - 1, Math.ceil(cy + R * 1.3));
+  const outer = R * 1.02 * R * 1.02;
+  for (let Y = y0; Y <= y1; Y++)
+    for (let X = x0; X <= x1; X++) {
+      const dx = X + 0.5 - cx, dy = Y + 0.5 - cy, d2 = dx * dx + dy * dy;
+      if (d2 >= outer) continue;
+      const d = Math.sqrt(d2);
+      // Only the ragged edge needs its angle: deep inside, the rim is far.
+      const rim = d < R * 0.62 - 2 ? R : R * (0.82 + 0.12 * Math.sin(Math.atan2(dy, dx) * 3 + ph) + 0.08 * Math.sin(Math.atan2(dy, dx) * 7 + ph2));
+      if (d >= rim) continue;
+      const odd = (X + Y) & 1;
+      // The outermost pixel, every other one, lets the ground through.
+      if (d > rim - 1 && odd) continue;
+      const hsh = hash(X, Y, seed, 473);
+      let tone = (hsh % 7 < 3 ? 1 : hsh % 7 < 5 ? 2 : 0) + (!thrown && d > rim - 2 && odd ? -1 : 0);
+      if (thrown && d > rim * 0.7) tone += 1;
+      if (thrown && d < rim * 0.4) tone -= 1;
+      let c = tones[Math.max(0, Math.min(tones.length - 1, tone))];
+      if (hsh % 29 === 0) c = PEBBLE[0];
+      else if (hsh % 29 === 1) c = PEBBLE[1];
+      out[Y * W + X] = rgba(c);
+    }
+}
+
+/** A splintered stump at art pixel (x, y): rings round a pale heart, outlined. */
+function stump(out: Uint32Array, x: number, y: number, seed: number) {
+  const put = (X: number, Y: number, c: number) => {
+    if (inClip(X, Y)) out[Y * W + X] = rgba(c);
+  };
+  for (let dy = -2; dy <= 2; dy++)
+    for (let dx = -2; dx <= 2; dx++) if (Math.abs(dx) + Math.abs(dy) <= 3) put(x + dx, y + dy, OUTLINE);
+  for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) put(x + dx, y + dy, dx < 0 || dy < 0 ? STUMP[1] : STUMP[0]);
+  put(x, y, STUMP[2]);
+  // A jagged splinter left standing.
+  const sx = x + (seed % 3) - 1;
+  put(sx, y - 2, STUMP[2]);
+  put(sx, y - 3, OUTLINE);
+}
+
+type Debris = { x: number; y: number; z: number; vx: number; vy: number; vz: number; age: number; life: number; colour: string; size: number; leaf: boolean; spin: number };
+
+/** What the trees stand over: anyone's position and size, in cells. */
+export type Beneath = { x: number; y: number; size: number };
+
+/** Draws the forest outside the walls, kept by the renderer. */
+export class ForestArt {
+  private map: CityMap | null = null;
+  private plan: ForestPlan | null = null;
+  private sim: DefendSim | null | undefined = undefined;
+  damage: ForestDamage | null = null;
+  private seen = new WeakSet<object>();
+  private debris: Debris[] = [];
+  private lastTime = -1;
+  private alpha = new Float32Array(0);
+  /** The ground's pixels and canvas, and the box of it to paint again
+   * (null when it is up to date). */
+  private floor: { px: Uint32Array; img: ImageData; cv: HTMLCanvasElement } | null = null;
+  private floorStale: Box | null = WHOLE;
+  /** The trees' pixels, composed afresh at most every `REDRAW_MS`. */
+  private crowns: { px: Uint32Array; img: ImageData; cv: HTMLCanvasElement } | null = null;
+  /** The next band of rows to compose, and whether all are due, or a fade
+   * needs them in still air. */
+  private band = 0;
+  private dirty = true;
+  private fading = false;
+  /** Bucketed beneath-the-trees lists, reused each frame. */
+  private head = new Int32Array(CELL_COUNT);
+  private next = new Int32Array(0);
+
+  /** Plans the forest for `map`, and gives each new run a forest whole again. */
+  sync(map: CityMap, sim: DefendSim | null) {
+    if (map !== this.map) {
+      this.map = map;
+      this.plan = forestPlan(map);
+      this.alpha = new Float32Array(this.plan.trees.length).fill(1);
+      this.sim = undefined;
+    }
+    if (sim !== this.sim) {
+      this.sim = sim;
+      this.damage = new ForestDamage(this.plan!);
+      this.debris = [];
+      this.lastTime = -1;
+      this.dirty = true;
+      this.floorStale = WHOLE;
+    }
+  }
+
+  /** Blows up the trees the battle's blasts and charges reached, moves the
+   * debris on battle time and fades the trees over anyone under them. */
+  update(sim: DefendSim | null, beneath: readonly Beneath[], dt: number, reduceMotion: boolean) {
+    if (sim && this.damage) {
+      const step = this.lastTime < 0 ? 0 : Math.max(0, Math.min(0.25, sim.time - this.lastTime));
+      this.lastTime = sim.time;
+      const felled: Felled[] = [];
+      for (const e of sim.effects) if (e.kind === "boom" && this.first(e)) felled.push(...this.damage.blast(e.x, e.y, e.r, 1 + Math.min(1.5, e.r * 0.4)));
+      for (const s of sim.swings) {
+        if (!this.first(s)) continue;
+        if (s.kind === "spin") felled.push(...this.damage.blast(s.x, s.y, s.r, 0.7));
+        else if (s.kind === "dash") felled.push(...this.damage.cut(s.x, s.y, s.x1, s.y1, 0.35));
+      }
+      for (const s of sim.stabs) if (this.first(s)) felled.push(...this.damage.cut(s.x0, s.y0, s.x1, s.y1, 0.3));
+      for (const f of felled) {
+        this.dirty = true;
+        // Its crater and the shadow it no longer casts.
+        const t = f.tree, reach = t.r * 2 + 1;
+        this.stale({ x0: Math.floor((t.x - reach) * ART), y0: Math.floor((t.y - reach) * ART), x1: Math.ceil((t.x + reach) * ART), y1: Math.ceil((t.y + reach) * ART) });
+        if (!reduceMotion) this.burst(f);
+      }
+      this.drift(step);
+    }
+    this.fade(beneath, dt, reduceMotion);
+  }
+
+  /** Marks `box` of the ground to paint again. */
+  private stale(box: Box) {
+    const b = this.floorStale;
+    this.floorStale = b ? { x0: Math.min(b.x0, box.x0), y0: Math.min(b.y0, box.y0), x1: Math.max(b.x1, box.x1), y1: Math.max(b.y1, box.y1) } : box;
+  }
+
+  /** True the first time `o` is seen. */
+  private first(o: object) {
+    if (this.seen.has(o)) return false;
+    this.seen.add(o);
+    return true;
+  }
+
+  /** A felled tree's leaves, clumps and splinters, flung from the cause. */
+  private burst({ tree: t, fromX, fromY, force }: Felled) {
+    const pal = LEAVES[t.kind][t.variant % LEAVES[t.kind].length];
+    const n = Math.round(14 + t.r * 30);
+    const d = Math.sqrt((t.x - fromX) ** 2 + (t.y - fromY) ** 2) || 1, ax = (t.x - fromX) / d, ay = (t.y - fromY) / d;
+    for (let i = 0; i < n && this.debris.length < MAX_DEBRIS; i++) {
+      const leaf = i % 7 !== 0, a = fx() * Math.PI * 2, sp = (0.6 + fx() * 1.8) * force;
+      this.debris.push({
+        x: t.x + Math.cos(a) * t.r * 0.6 * fx(), y: t.y + Math.sin(a) * t.r * 0.6 * fx(), z: 0.3 + fx() * 0.4,
+        vx: Math.cos(a) * sp * 0.6 + ax * sp, vy: Math.sin(a) * sp * 0.6 + ay * sp, vz: 1 + fx() * 2.2 * force,
+        age: 0, life: leaf ? 2.5 + fx() * 2.5 : 1.6 + fx() * 1.6,
+        colour: hex(leaf ? pal[1 + Math.floor(fx() * 3)] : BARK[Math.floor(fx() * 2)]),
+        size: leaf ? (i % 7 === 1 ? 2 : 1) : 2, leaf, spin: fx() * 6.28,
+      });
+    }
+  }
+
+  /** Debris flies, falls (leaves flutter down slowly) and settles, fading. */
+  private drift(dt: number) {
+    if (!dt || !this.debris.length) return;
+    for (const p of this.debris) {
+      p.age += dt;
+      const drag = Math.max(0, 1 - (p.leaf ? 2.2 : 1.2) * dt);
+      p.vx *= drag;
+      p.vy *= drag;
+      if (p.z > 0) {
+        p.vz -= (p.leaf ? 2.2 : 7) * dt;
+        if (p.leaf) p.vz = Math.max(p.vz, -0.45);
+        p.z = Math.max(0, p.z + p.vz * dt);
+        p.spin += dt * 7;
+        p.x += p.vx * dt + (p.leaf ? Math.sin(p.spin) * 0.25 * dt : 0);
+        p.y += p.vy * dt;
+      } else {
+        p.vx = p.vy = 0;
+      }
+    }
+    this.debris = this.debris.filter((p) => p.age < p.life);
+  }
+
+  /** Each tree eases toward `UNDER_ALPHA` while anyone stands under it. */
+  private fade(beneath: readonly Beneath[], dt: number, reduceMotion: boolean) {
+    const plan = this.plan;
+    if (!plan) return;
+    const head = this.head;
+    head.fill(-1);
+    if (this.next.length < beneath.length) this.next = new Int32Array(beneath.length * 2);
+    beneath.forEach((u, i) => {
+      const cx = Math.floor(u.x), cy = Math.floor(u.y);
+      if (cx < 0 || cy < 0 || cx >= CELLS_W || cy >= CELLS_H) return;
+      const k = cellIndex(cx, cy);
+      this.next[i] = head[k];
+      head[k] = i;
+    });
+    const step = reduceMotion ? 1 : Math.min(1, dt * FADE);
+    for (const t of plan.trees) {
+      let covered = false;
+      if (beneath.length) {
+        const x0 = Math.max(0, Math.floor(t.x - t.r - 2)), x1 = Math.min(CELLS_W - 1, Math.floor(t.x + t.r + 2));
+        const y0 = Math.max(0, Math.floor(t.y - t.r - 2)), y1 = Math.min(CELLS_H - 1, Math.floor(t.y + t.r + 2));
+        for (let cy = y0; cy <= y1 && !covered; cy++)
+          for (let cx = x0; cx <= x1 && !covered; cx++)
+            for (let i = head[cellIndex(cx, cy)]; i >= 0; i = this.next[i]) {
+              const u = beneath[i], r = t.r + u.size / 2, dx = u.x - t.x, dy = u.y - t.y;
+              if (dx * dx + dy * dy < r * r) { covered = true; break; }
+            }
+      }
+      const goal = covered ? UNDER_ALPHA : 1, a = this.alpha[t.id];
+      if (a === goal) continue;
+      this.alpha[t.id] = a < goal ? Math.min(goal, a + step) : Math.max(goal, a - step);
+      this.fading = true;
+    }
+  }
+
+  /** The forest's ground, at `alpha` (its area's share of a crossfade). */
+  drawFloor(c: CanvasRenderingContext2D, px: number, alpha: number) {
+    if (!this.plan || alpha <= 0 || typeof document === "undefined") return;
+    this.floor ??= surface();
+    const box = this.floorStale;
+    if (box) {
+      this.floorStale = null;
+      paintFloor(this.floor.px, this.plan, this.damage, box);
+      const x0 = Math.max(0, box.x0), y0 = Math.max(0, box.y0);
+      this.floor.cv.getContext("2d")!.putImageData(this.floor.img, 0, 0, x0, y0, Math.min(W, box.x1) - x0, Math.min(H, box.y1) - y0);
+    }
+    c.save();
+    c.imageSmoothingEnabled = false;
+    c.globalAlpha = alpha;
+    c.drawImage(this.floor.cv, 0, 0, CELLS_W * px, CELLS_H * px);
+    c.restore();
+  }
+
+  /** The standing trees over everyone, leaning in the wind (`wind`: 0 for
+   * still air, about 1 calm, 2 in rain), then the flying debris. `shade`
+   * darkens them with the city below, drawn in board pixels. */
+  drawTrees(c: CanvasRenderingContext2D, px: number, o: { now: number; alpha: number; wind: number; shade?: (o: CanvasRenderingContext2D) => void }) {
+    const plan = this.plan;
+    if (!plan || o.alpha <= 0 || typeof document === "undefined") return;
+    this.crowns ??= surface();
+    // Swaying, one band of rows is composed afresh a frame, round and round;
+    // a felled tree, or a fade in still air, has them all composed at once.
+    const t = Math.floor(o.now / REDRAW_MS) * REDRAW_MS / 1000;
+    const all = this.dirty || (!o.wind && this.fading);
+    const bands = all ? Array.from({ length: BANDS }, (_, k) => k) : o.wind ? [this.band] : [];
+    this.dirty = this.fading = false;
+    this.band = (this.band + 1) % BANDS;
+    const cc = this.crowns.cv.getContext("2d")!;
+    for (const k of bands) {
+      const y0 = Math.floor((k * H) / BANDS), y1 = Math.floor(((k + 1) * H) / BANDS);
+      composeCrowns(this.crowns.px, plan, this.damage, this.alpha, t, o.wind, y0, y1);
+      cc.putImageData(this.crowns.img, 0, 0, 0, y0, W, y1 - y0);
+      if (o.shade) {
+        cc.save();
+        cc.beginPath();
+        cc.rect(0, y0, W, y1 - y0);
+        cc.clip();
+        cc.setTransform(ART / px, 0, 0, ART / px, 0, 0);
+        cc.globalCompositeOperation = "source-atop";
+        o.shade(cc);
+        cc.restore();
+      }
+    }
+    c.save();
+    c.imageSmoothingEnabled = false;
+    c.globalAlpha = o.alpha;
+    c.drawImage(this.crowns.cv, 0, 0, CELLS_W * px, CELLS_H * px);
+    this.drawDebris(c, px);
+    c.restore();
+  }
+
+  /** Leaves and splinters, each lifted by its height above the ground. */
+  private drawDebris(c: CanvasRenderingContext2D, px: number) {
+    if (!this.debris.length) return;
+    const dot = artPen(c, px), base = c.globalAlpha;
+    for (const p of this.debris) {
+      c.globalAlpha = base * Math.min(1, (p.life - p.age) / 0.8);
+      const ax = Math.round(p.x * ART), ay = Math.round((p.y - p.z) * ART);
+      if (!p.leaf) {
+        c.fillStyle = "#0b0907";
+        dot(ax - 1, ay - 1, 4, 3);
+      }
+      c.fillStyle = p.colour;
+      // A leaf turning over shows edge on, now and then.
+      const flat = !p.leaf || Math.sin(p.spin) > -0.5;
+      dot(ax, ay, flat ? p.size : 1, 1);
+    }
+    c.globalAlpha = base;
+  }
+
+  /** How many trees are standing, and how many debris pieces fly (tests). */
+  get counts() {
+    const trees = this.plan?.trees ?? [];
+    return { trees: trees.length, standing: trees.filter((t) => this.damage?.standing(t) ?? true).length, debris: this.debris.length };
+  }
+}
+
+/** A board-sized canvas at one pixel an art pixel, with pixels to write. */
+function surface() {
+  const cv = document.createElement("canvas");
+  cv.width = W;
+  cv.height = H;
+  const img = cv.getContext("2d")!.createImageData(W, H);
+  return { cv, img, px: new Uint32Array(img.data.buffer) };
+}
+
+/** Writes every standing tree, back to front, leaning at `time`, into
+ * `out` between art rows `y0` and `y1`: whole where nobody is under it,
+ * blended at its fade otherwise. */
+export function composeCrowns(out: Uint32Array, plan: ForestPlan, damage: ForestDamage | null, alpha: Float32Array, time: number, wind: number, y0 = 0, y1 = H) {
+  out.fill(0, y0 * W, y1 * W);
+  for (const t of plan.trees) {
+    const ty = Math.round(t.y * ART);
+    if (ty + 16 < y0 || ty - 16 >= y1 || (damage && !damage.standing(t))) continue;
+    const s = treeSprite(t.kind, t.variant, leanOf(t, time, wind)), runs = runsOf(s), px = s.px;
+    const sx = Math.round(t.x * ART) - s.ox, sy = ty - s.oy, a = alpha[t.id] ?? 1;
+    for (let k = 0; k < runs.length; k += 3) {
+      const Y = sy + runs[k];
+      if (Y < y0 || Y >= y1) continue;
+      const row = runs[k] * s.w, xa = Math.max(runs[k + 1], -sx), xb = Math.min(runs[k + 2], W - sx), at = Y * W + sx;
+      if (a >= 1) for (let x = xa; x < xb; x++) out[at + x] = px[row + x];
+      else for (let x = xa; x < xb; x++) out[at + x] = blend(px[row + x], out[at + x], a);
+    }
+  }
+}
+
+/** Opaque pixel `p` at opacity `a` over `under` (either opaque or clear). */
+function blend(p: number, under: number, a: number) {
+  const ua = (under >>> 24) / 255, oa = a + ua * (1 - a), k = a / oa;
+  const ch = (sh: number) => Math.round(((p >>> sh) & 0xff) * k + ((under >>> sh) & 0xff) * (1 - k));
+  return ((Math.round(oa * 255) << 24) | (ch(16) << 16) | (ch(8) << 8) | ch(0)) >>> 0;
+}
+
+/** How far tree `t` leans at `time` seconds in `wind`: its own sway plus a
+ * gust rolling east across the board, in whole art pixels. */
+export function leanOf(t: ForestTree, time: number, wind: number) {
+  if (!wind) return 0;
+  const sway = 0.55 * Math.sin(time * 1.7 + t.phase) + 0.6 * Math.max(0, Math.sin(time * 0.6 - t.x * 0.19 - t.y * 0.06));
+  const k = t.kind === "bush" ? 0.55 : t.kind === "pine" ? 0.8 : 1;
+  return Math.max(-LEAN, Math.min(LEAN, Math.round(sway * wind * k * 1.3)));
+}
+
+const hex = (c: number) => `#${c.toString(16).padStart(6, "0")}`;
