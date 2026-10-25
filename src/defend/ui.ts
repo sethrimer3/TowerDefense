@@ -279,8 +279,9 @@ export class DefendPage {
   }
 
   /** What can be heard over the city: the area's weather and the boss
-   * waves' night outdoors, drips underground, the forge's fires, and the
-   * battle's own blazes. */
+   * waves' night outdoors, each land's own wind, drips and the old
+   * workings' rumbles underground, the forge's fires, and the battle's own
+   * blazes. */
   ambience(): Scene {
     if (!this.built) return QUIET;
     const area = areaForWave(Math.max(this.sim?.wave ?? 1, startingWave(this.save)));
@@ -298,6 +299,8 @@ export class DefendPage {
       drips: under ? 0.8 : area.id === "drowned" ? 0.3 : 0,
       fire: Math.max(area.id === "ember" ? 0.4 : 0, blazes * 0.7),
       muffle: 0,
+      mine: under ? 0.5 : 0,
+      land: green ? "forest" : cold ? "frozen" : area.id === "desert" ? "desert" : undefined,
     };
   }
 

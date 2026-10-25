@@ -1,10 +1,12 @@
 import { stream } from "./random.ts";
 import { audioGraph, soundOn } from "./sound.ts";
+import { bed, type Bed } from "./sound-files.ts";
 
-/** The world's background sound, made in code like every cue (no sound
- * files): looping beds of rain, wind, blowing sand and crickets, and
- * scattered voices over them (birdsong by day, an owl by night, thunder in
- * storms, drips in caves, a fire's crackle). Each page that shows the
+/** The world's background sound: looping beds of rain, wind, blowing sand
+ * and crickets made in code, recorded beds (each land's wind, the old mine's
+ * depths, fires) from `sound-files.ts`, and scattered voices over them
+ * (birdsong by day, an owl by night, thunder in storms, drips in caves, a
+ * fire's crackle). Each page that shows the
  * outdoors says what it hears every frame (`hear`), as levels from 0 to 1,
  * and each layer eases toward its level, so the sound follows the weather
  * and the hour without a seam. Everything waits for the player's first
@@ -32,14 +34,25 @@ export type Scene = {
   fire: number;
   /** Heard from indoors, through walls: 0 out in it, 1 muffled. */
   muffle: number;
+  /** The old workings' creaks and rumbles, deep underground. */
+  mine: number;
+  /** Whose recorded wind carries `wind` (the made wind then only fills in
+   * under it): the green lands', the Frozen Vault's or the desert's;
+   * absent, the made wind alone. */
+  land?: "forest" | "frozen" | "desert";
 };
 
 /** Silence: what a page with no outdoors hears. */
-export const QUIET: Scene = { rain: 0, wind: 0, howl: 0, sand: 0, thunder: 0, birds: 0, night: 0, drips: 0, fire: 0, muffle: 0 };
+export const QUIET: Scene = { rain: 0, wind: 0, howl: 0, sand: 0, thunder: 0, birds: 0, night: 0, drips: 0, fire: 0, muffle: 0, mine: 0 };
 
 const rand = stream("effects");
 /** How loud each bed is at level 1. */
 const BED = { rain: 0.65, roar: 0.8, wind: 0.8, howl: 0.1, sand: 0.1, crickets: 0.065, fire: 0.14 };
+/** How loud each recorded bed is at level 1 (the files are all loudness
+ * matched). */
+const RECORDED: Record<Bed, number> = { windForest: 0.5, windFrozen: 0.55, windDesert: 0.5, mine: 0.6, fireCrackle: 0.6, fireBurning: 0.5 };
+/** Each land's recorded wind. */
+const LAND_WIND = { forest: "windForest", frozen: "windFrozen", desert: "windDesert" } as const satisfies Record<NonNullable<Scene["land"]>, Bed>;
 /** Seconds a layer takes to ease most of the way to a new level. */
 const EASE = 1.2;
 
@@ -57,6 +70,9 @@ type Graph = {
   windBand: BiquadFilterNode; howlBand: BiquadFilterNode;
   /** A small send into the stone-hall echo, for the cave's drips. */
   hall: GainNode;
+  /** The recorded beds' gains, and whether each has started looping (it
+   * starts once its file has loaded, the first time it's wanted). */
+  recorded: Record<Bed, { gain: GainNode; playing: boolean }>;
 };
 
 let graph: Graph | null = null;
@@ -73,13 +89,22 @@ export function hear(next: Scene) {
   const g = graph ?? build();
   if (!g) return;
   const quiet = document.hidden || !soundOn(), t = g.ctx.currentTime, s = quiet ? QUIET : next;
+  const want: Record<Bed, number> = {
+    windForest: 0, windFrozen: 0, windDesert: 0,
+    mine: s.mine,
+    fireCrackle: s.fire,
+    fireBurning: Math.max(0, (s.fire - 0.3) / 0.7),
+  };
+  if (s.land) want[LAND_WIND[s.land]] = s.wind * (0.8 + 0.2 * gust.wind);
+  for (const name of Object.keys(want) as Bed[]) record(g, name, want[name], t);
+  const landWind = !!s.land && g.recorded[LAND_WIND[s.land]].playing, fireRecorded = g.recorded.fireCrackle.playing;
   ease(g.rain.gain, s.rain * BED.rain, t);
   ease(g.roar.gain, Math.max(0, s.rain - 0.5) * 2 * BED.roar, t);
-  ease(g.wind.gain, s.wind * BED.wind * gust.wind, t);
+  ease(g.wind.gain, s.wind * BED.wind * gust.wind * (landWind ? 0.3 : 1), t);
   ease(g.howl.gain, s.howl * BED.howl * gust.howl, t);
-  ease(g.sand.gain, s.sand * BED.sand * gust.sand, t);
+  ease(g.sand.gain, s.sand * BED.sand * gust.sand * (landWind && s.land === "desert" ? 0.4 : 1), t);
   ease(g.crickets.gain, s.night * (1 - Math.min(1, s.rain * 1.6)) * BED.crickets, t);
-  ease(g.fire.gain, s.fire * BED.fire, t);
+  ease(g.fire.gain, fireRecorded ? 0 : s.fire * BED.fire, t);
   ease(g.muffle.frequency, 18000 - s.muffle * 16800, t);
   if (!quiet) scatter(g, s, t);
 }
@@ -97,6 +122,24 @@ export function thunder(near = 0.5) {
   if (t < lastThunder + 2) return;
   lastThunder = t;
   roll(g, t + 0.05 + (1 - near) * 1.5, near);
+}
+
+/** Eases recorded bed `name` toward `level`, starting its loop (at a
+ * random point in it) the first time it's wanted and its file is ready. */
+function record(g: Graph, name: Bed, level: number, t: number) {
+  const r = g.recorded[name];
+  if (!r.playing && level > 0) {
+    const buf = bed(g.ctx, name);
+    if (buf) {
+      const src = g.ctx.createBufferSource();
+      src.buffer = buf;
+      src.loop = true;
+      src.connect(r.gain);
+      src.start(t, rand() * buf.duration);
+      r.playing = true;
+    }
+  }
+  if (r.playing) ease(r.gain.gain, level * RECORDED[name], t);
 }
 
 /** The level each param was last sent toward, so a steady scene schedules
@@ -148,8 +191,13 @@ function build(): Graph | null {
     return f;
   };
   const rainBuf = rainBed(ctx), windBuf = brownLoop(ctx), hissBuf = whiteLoop(ctx);
+  const recorded = (to: AudioNode) => ({ gain: layer(to), playing: false });
   const g: Graph = {
     ctx, bus, room, muffle, hall,
+    recorded: {
+      windForest: recorded(bus), windFrozen: recorded(bus), windDesert: recorded(bus), mine: recorded(bus),
+      fireCrackle: recorded(room), fireBurning: recorded(room),
+    },
     rain: layer(), roar: layer(), wind: layer(), howl: layer(), sand: layer(), crickets: layer(), fire: layer(room),
     windBand: filter("bandpass", 420, 0.9), howlBand: filter("bandpass", 900, 2),
   };
@@ -195,7 +243,7 @@ function scatter(g: Graph, s: Scene, t: number) {
   }
   if (s.fire > 0.05 && t >= due.crackle) {
     due.crackle = t + (0.03 + rand() * 0.25) / s.fire;
-    crackle(g, t, s.fire);
+    crackle(g, t, s.fire * (g.recorded.fireCrackle.playing ? 0.4 : 1));
   }
 }
 
