@@ -525,7 +525,17 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   one fresh arrow every 3 battle seconds below capacity, without banking time
   while full. Shields consume hits; missed/dead/out-of-range targets do not.
   Defenses and rebuilt towers start full. Source destruction cancels refills
-  and fades active arrows. Further Wisp ranks remain unavailable. **Watch towers** mark
+  and fades active arrows. Fire arrows (rank II, 4,004 Knowledge) adds a separate
+  inventory of two fire arrows, regenerating one every 6 seconds below capacity.
+  Their tails are flames, and attack swipes leave one-cell-wide ribbons that
+  last 2 seconds at each point. A fire arrow has 10 direct hits, then explodes
+  for twice its normal damage within 2 cells; direct hits and ribbons deal
+  normal arrow damage and that amount per second respectively, all as fire.
+  Trail/explosion hits do not spend the direct-hit budget. One arrow's crossing
+  trail segments share one damage rate; different fire arrows stack. The
+  suspended ribbons and blasts hit ground and flying enemies, finish their
+  own lifetime after source destruction, and retain tower attribution. Rank III
+  remains unavailable. **Watch towers** mark
   enemies in their radius with a gold outline; marked enemies take ×2 damage.
   Paths: Spotters (marks hit harder, wider radius) or Signal fires
   (marked enemies slowed, more at rank II, and set burning at III). Up to

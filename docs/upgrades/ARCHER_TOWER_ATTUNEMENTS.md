@@ -35,7 +35,7 @@ Let `R`, `D` and `F` denote an ordinary Archer Tower's range, arrow damage and s
 
 ## Wisp Tower: living blue arrows
 
-Attunement implements the flight below with capacity one. The first subsequent rank, **Triple arrows**, raises capacity to three for **4 Knowledge**. Each arrow has **30 hits**, then dissipates into blue sparks; the tower regenerates one arrow every **3 battle seconds** while below capacity. All arrows can attack simultaneously, and each defense/rebuilt tower starts full. Later ranks remain unspecified. See the [approved lifecycle and upgrade specification](WISP_TRIPLE_ARROWS.md).
+Attunement implements the flight below with capacity one. The first subsequent rank, **Triple arrows**, raises capacity to three for **4 Knowledge**. Each arrow has **30 hits**, then dissipates into blue sparks; the tower regenerates one arrow every **3 battle seconds** while below capacity. All arrows can attack simultaneously, and each defense/rebuilt tower starts full. Fire arrows (rank II, 4,004 Knowledge) adds two independent flaming arrows with a six-second refill clock, ten direct contacts, damaging two-second trails and a fiery final explosion. Rank III remains unspecified. See [Triple arrows](WISP_TRIPLE_ARROWS.md) and [Fire arrows](WISP_FIRE_ARROWS.md).
 
 ### Motion and appearance
 
@@ -63,7 +63,7 @@ Use current procedural graphics and settings. Reduce Motion freezes idle wanderi
 ## Costs, availability and compatibility
 
 - Hawk attunement keeps the existing **3 Knowledge** cost. Its three subsequent upgrades keep `studyPathCost(4, index)`: **4 / 4,004 / 16,004 Knowledge**.
-- Wisp attunement costs **3 Knowledge**, matching its sibling attunements (**proposed**). Triple arrows costs **4 Knowledge**; further ranks have no active nodes or prices until specified.
+- Wisp attunement costs **3 Knowledge**, matching its sibling attunements (**proposed**). Triple arrows costs **4 Knowledge**; Fire arrows costs **4,004 Knowledge**. Rank III has no node or price until specified.
 - The Archer Tower's own existing unlock and Fire attunement prices remain unchanged. Availability follows the current building lineage; no new wave gate is added. Knowledge comes from the Library, so affordability depends on research production rather than a promised wave number.
 - Existing Hawk copies retain identity, placement and purchased tier: rank 0 gets the new initial focus; ranks I/II/III get the corresponding new upgrade. Existing Fire copies and purchased ranks retain their current effects.
 - Keep normal undo, respec and refund accounting. No unrequested Archer Tower ultimate is introduced, and an attunement with no later upgrades must not satisfy a future merge by accident.
@@ -71,6 +71,6 @@ Use current procedural graphics and settings. Reduce Motion freezes idle wanderi
 
 ## Implementation and checks after approval
 
-Update the existing Hawk tuning and descriptions; register the new Wisp building, attunement, topic, collection/decoder entries and procedural artwork. Display the single Triple arrows rank without fake later nodes. Add focused tower-attack code for locks/ramps and persistent swept arrows, plus bounded visual trail physics. Update inspection stats, Knowledge descriptions, README, AGENTS.md, CONTEXT.md and docs/DEFEND.md.
+Update the existing Hawk tuning and descriptions; register the new Wisp building, attunement, topic, collection/decoder entries and procedural artwork. Display Triple arrows and Fire arrows without a fake third rank. Add focused tower-attack code for locks/ramps and persistent swept arrows, plus bounded visual trail physics. Update inspection stats, Knowledge descriptions, README, AGENTS.md, CONTEXT.md and docs/DEFEND.md.
 
-Verify current-HP acquisition, stable locks, ties, both resets, every tier's range/cadence/damage, additive +1000% cap, independent towers, in-flight damage capture, source destruction/rebuilding, shared modifiers, save compatibility and undo/refunds. Verify one/three Wisp arrows, independent 30-hit budgets, sequential three-second refills, exhaustion sparks, bounded idle motion, swept multi-hit arcs, once-per-slice hit deduplication, flying enemies, resistance, dead targets, finite trail links, no idle damage and bounded crowd cost. Confirm ordinary and Fire arrows retain their existing behavior. Exercise real desktop/phone tree purchases, both graphics settings and Reduce Motion, then run the full suite and production build before committing.
+Verify current-HP acquisition, stable locks, ties, both resets, every tier's range/cadence/damage, additive +1000% cap, independent towers, in-flight damage capture, source destruction/rebuilding, shared modifiers, save compatibility and undo/refunds. Verify one/three blue Wisp arrows, the added two-fire-arrow inventory, independent 30/10-contact budgets, sequential three/six-second refills, blue sparks/fire blasts, timed ribbons and elemental fire damage, bounded idle motion, swept multi-hit arcs, once-per-slice hit deduplication, flying enemies, resistance, dead targets, finite trail links, no idle damage and bounded crowd cost. Confirm ordinary and Fire arrows retain their existing behavior. Exercise real desktop/phone tree purchases, both graphics settings and Reduce Motion, then run the full suite and production build before committing.

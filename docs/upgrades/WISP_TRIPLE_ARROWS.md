@@ -13,7 +13,7 @@ Status: approved by the user on 2026-10-24. Proposed details below were accepted
 - **What it does:** the tower can hold up to three living blue arrows. Each
   arrow delivers 30 hits, then dissolves into a shower of blue sparks. While
   below capacity, the tower regenerates one arrow every three battle seconds.
-- **Levels:** one new rank; later ranks remain unspecified and unavailable.
+- **Levels:** one new rank in this specification. Rank II is subsequently defined in [Fire arrows](WISP_FIRE_ARROWS.md); rank III remains unspecified.
 - **Cost:** `studyPathCost(4, 0)` = **4 Knowledge** *(proposed, matching the
   first rank of the sibling Archer Tower attunements)*. Existing attunement
   cost remains 3 Knowledge. Use ordinary per-building purchase, save, undo,

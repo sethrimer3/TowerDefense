@@ -1,20 +1,22 @@
 /** Tower-owned living arrows, with broad tangent passes and swept hits.
  * Recorded flight positions also anchor the quiet, purely decorative tassels. */
-import { WISP, pathRank } from "../knowledge-paths.ts";
+import { WISP, WISP_FIRE, pathRank } from "../knowledge-paths.ts";
 import { archerCooldown, archerDamage, archerRange, enemySize } from "./catalog.ts";
 import { center, type Point } from "./pathing.ts";
 import type { Building } from "./citygen.ts";
 import type { DefendSim, Enemy } from "./sim.ts";
 import { buildingPaths } from "../specializations.ts";
+import { leaveWispFire, explodeWispFire, type WispFireTrail } from "./wisp-fire.ts";
 import { wispFlight, flightPosition, type FlightPoint, type WispFlight } from "./wisp-flight.ts";
 
 export type WispSlice = WispFlight & { damage: number; hit: Set<number> };
 export type WispArrow = { building: number; x: number; y: number; vx: number; vy: number; angle: number;
   cx: number; cy: number; range: number; time: number; energy: number; linger: number;
-  slot: number; serial: number; hitsLeft: number; burst?: number;
+  slot: number; serial: number; hitsLeft: number; burst?: number; fire?: true; fireTrail?: WispFireTrail;
   travel: number; trail: FlightPoint[]; lastTarget?: number; flight?: WispFlight; slice?: WispSlice; fade?: number };
 
-export type WispTowerState = { arrows: WispArrow[]; capacity: number; refill: number; serial: number };
+export type WispPool = { arrows: WispArrow[]; capacity: number; refill: number; serial: number };
+export type WispTowerState = WispPool & { fire?: WispPool };
 
 /** First contact with the swept hit band, rather than its nearest point.
  * This orders dense-group hits and makes exhaustion/refill timing independent
@@ -29,13 +31,15 @@ function contact(p: Point, a: Point, b: Point, radius: number) {
   return t>=0&&t<=1?t:Infinity;
 }
 
-function spawnWisp(sim: DefendSim,b: Building,owner: WispTowerState) {
+export const wispHomeAngle=(w:Pick<WispArrow,"slot"|"fire">)=>-Math.PI/2+(w.slot+(w.fire ? .5 : 0))*Math.PI*2/3;
+
+function spawnWisp(sim: DefendSim,b: Building,owner: WispPool,fire=false) {
   const c=center(b.rect),range=archerRange(sim.levels.archerRange);
   let slot=0;while(owner.arrows.some(w=>w.slot===slot))slot++;
-  const angle=-Math.PI/2+slot*Math.PI*2/3;
+  const angle=wispHomeAngle({slot,...(fire?{fire:true}:{})});
   const w: WispArrow={building:b.id,x:c.x+Math.cos(angle)*.8,y:c.y+Math.sin(angle)*.8,
     vx:0,vy:0,angle,cx:c.x,cy:c.y,range,time:0,energy:0,linger:0,
-    slot,serial:owner.serial++,hitsLeft:WISP.hits,travel:0,trail:[]};
+    slot,serial:owner.serial++,hitsLeft:fire?WISP_FIRE.hits:WISP.hits,travel:0,trail:[],...(fire?{fire:true}:{})};
   w.trail.push({x:w.x,y:w.y,angle:w.angle,distance:0});
   owner.arrows.push(w);sim.wisps.push(w);
 }
@@ -47,28 +51,36 @@ export function stepWispTower(sim: DefendSim,b: Building,dt: number) {
   if(!owner) {
     const rank=pathRank(buildingPaths(sim,b),"wispTower","wispArrow");
     owner={arrows:[],capacity:rank?WISP.capacity[1]:WISP.capacity[0],refill:0,serial:0};
+    if(rank>=2)owner.fire={arrows:[],capacity:WISP_FIRE.capacity,refill:0,serial:0};
     sim.wispOwners.set(b.id,owner);
     while(owner.arrows.length<owner.capacity)spawnWisp(sim,b,owner);
+    if(owner.fire)while(owner.fire.arrows.length<owner.fire.capacity)spawnWisp(sim,b,owner.fire,true);
   }
   const c=center(b.rect),range=archerRange(sim.levels.archerRange);
   const candidates=sim.enemiesNear(c.x,c.y,range).filter(e=>e.hp>0&&(e.x-c.x)**2+(e.y-c.y)**2<=range*range);
+  stepWispPool(sim,b,owner,candidates,dt,false);
+  if(owner.fire&&sim.intact(b))stepWispPool(sim,b,owner.fire,candidates,dt,true);
+}
+
+function stepWispPool(sim:DefendSim,b:Building,owner:WispPool,candidates:Enemy[],dt:number,fire:boolean) {
+  const refill=fire?WISP_FIRE.refill:WISP.refill;
   let remaining=dt;
   do {
     const full=owner.arrows.length===owner.capacity;
-    const untilRefill=full?WISP.refill:Math.max(0,WISP.refill-owner.refill);
+    const untilRefill=full?refill:Math.max(0,refill-owner.refill);
     const step=Math.min(remaining,untilRefill);
-    for(const w of sim.wisps)if(w.building===b.id&&w.burst!==undefined)w.burst+=step;
+    for(const w of sim.wisps)if(w.building===b.id&&!!w.fire===fire&&w.burst!==undefined)w.burst+=step;
     let firstLoss=Infinity;
     for(const w of owner.arrows) {
-      const lived=stepWispArrow(sim,b,w,candidates,step);
+      const lived=stepWispArrow(sim,b,w,candidates,step,dt-remaining);
       if(w.hitsLeft===0){firstLoss=Math.min(firstLoss,lived);w.burst=step-lived;}
       if(!sim.intact(b))return;
     }
     owner.arrows=owner.arrows.filter(w=>w.hitsLeft>0);
     if(owner.arrows.length<owner.capacity) {
       owner.refill+=full?Math.max(0,step-firstLoss):step;
-      if(owner.refill>=WISP.refill-1e-9) {
-        spawnWisp(sim,b,owner);owner.refill=0;
+      if(owner.refill>=refill-1e-9) {
+        spawnWisp(sim,b,owner,fire);owner.refill=0;
       }
     } else owner.refill=0;
     remaining=Math.max(0,remaining-step);
@@ -89,7 +101,7 @@ function tasselEnergy(w: WispArrow, attacking: boolean, dt: number) {
 }
 
 /** Returns the time the arrow stayed alive within this interval. */
-function stepWispArrow(sim: DefendSim,b: Building,w: WispArrow,candidates: Enemy[],dt: number): number {
+function stepWispArrow(sim: DefendSim,b: Building,w: WispArrow,candidates: Enemy[],dt: number,offset: number): number {
   const c=center(b.rect),range=w.range;
   let remaining = dt;
   do {
@@ -109,7 +121,7 @@ function stepWispArrow(sim: DefendSim,b: Building,w: WispArrow,candidates: Enemy
       }
     }
     if (!w.slice && !w.flight) {
-      const phase = w.time*.63+b.id*1.731+w.slot*Math.PI*2/3;
+      const phase = w.time*.63+b.id*1.731+(w.slot+(w.fire ? .5 : 0))*Math.PI*2/3;
       const aim = {x:c.x+range*.35*Math.cos(phase),y:c.y+range*.35*Math.sin(phase)};
       w.flight = wispFlight(w,aim,c,range,range*WISP.orbit) ?? wispFlight(w,aim,c,range);
     }
@@ -132,16 +144,22 @@ function stepWispArrow(sim: DefendSim,b: Building,w: WispArrow,candidates: Enemy
           .map(e=>({e,t:contact(e,a,end,WISP.width/2+enemySize(e)/2)})).filter(h=>h.t!==Infinity)
           .sort((a,b)=>a.t-b.t||a.e.id-b.e.id);
         for(const {e,t} of hits) {
+          if(e.hp<=0)continue;
           const hit=flightPosition(s,at+(next-at)*t);
           w.slice!.hit.add(e.id);w.hitsLeft--;
-          sim.hurtEnemy(e,w.slice!.damage,true,"ranged",{x:hit.x,y:hit.y,building:b.id},true);
-          if(!sim.intact(b)){delete w.slice;return dt-remaining+(hit.distance-start)/speed;}
+          sim.hurtEnemy(e,w.slice!.damage,true,"ranged",{x:hit.x,y:hit.y,building:b.id},true,w.fire?"fire":"physical");
           if(w.hitsLeft===0) {
-            until=hit.distance;used=(until-start)/speed;a=hit;w.burst=0;break;
+            until=hit.distance;used=(until-start)/speed;
+            if(w.fire)leaveWispFire(sim,w,a,hit,sim.wispFireTime+offset+dt-remaining+(at-start)/speed,
+              sim.wispFireTime+offset+dt-remaining+(until-start)/speed,w.slice!.damage);
+            a=hit;w.burst=0;break;
           }
+          if(!sim.intact(b)){delete w.slice;return dt-remaining+(hit.distance-start)/speed;}
         }
         if(w.hitsLeft===0)break;
       }
+      if(w.fire&&attacking)leaveWispFire(sim,w,a,end,sim.wispFireTime+offset+dt-remaining+(at-start)/speed,
+        sim.wispFireTime+offset+dt-remaining+(next-start)/speed,w.slice!.damage);
       a=end; at=next;
       // flightPosition leaves the index on an exact boundary; advance here.
       if (s.index<s.points.length-2 && at>=s.points[s.index+1].distance-1e-10) s.index++;
@@ -158,7 +176,10 @@ function stepWispArrow(sim: DefendSim,b: Building,w: WispArrow,candidates: Enemy
     w.x=a.x; w.y=a.y; w.angle=a.angle; w.vx=Math.cos(a.angle)*speed; w.vy=Math.sin(a.angle)*speed;
     s.distance=until; w.time+=used; remaining=Math.max(0,remaining-used);
     tasselEnergy(w,attacking,used);
-    if(w.hitsLeft===0){delete w.slice;delete w.flight;return dt-remaining;}
+    if(w.hitsLeft===0){
+      if(w.fire)explodeWispFire(sim,w,w.slice!.damage);
+      delete w.slice;delete w.flight;return dt-remaining;
+    }
     if (until>=s.length-1e-9) { delete w.slice; delete w.flight; }
     if (used<=1e-10) break;
   } while (remaining>1e-9);
@@ -177,5 +198,5 @@ export function finishWisps(sim: DefendSim,dt: number) {
     if(w.burst!==undefined)w.burst+=dt;
     else {w.fade=(w.fade??0)+dt;delete w.slice;delete w.flight;}
   }
-  sim.wisps=sim.wisps.filter(w=>w.burst!==undefined?w.burst<WISP.sparkLife:w.fade===undefined||w.fade<WISP.fade);
+  sim.wisps=sim.wisps.filter(w=>w.burst!==undefined?w.burst<(w.fire?WISP_FIRE.burstLife:WISP.sparkLife):w.fade===undefined||w.fade<WISP.fade);
 }

@@ -3,7 +3,8 @@
 import { WISP } from "../knowledge-paths.ts";
 import { ART } from "./park-art.ts";
 import { artPen } from "./pixel-fx.ts";
-import type { WispArrow } from "./wisp-arrow.ts";
+import { wispHomeAngle, type WispArrow } from "./wisp-arrow.ts";
+import { drawWispFireArrow, drawWispFireBurst, drawWispFireTrails } from "./wisp-fire-art.ts";
 import type { DefendSim } from "./sim.ts";
 
 type Node = {x:number;y:number};
@@ -53,13 +54,18 @@ export function wispSparks(w: WispArrow,reduced=false) {
 }
 
 export function drawWisps(c: CanvasRenderingContext2D,px:number,sim:DefendSim,reduced=false) {
-  if(!sim.wisps.length)return;
+  if(!sim.wisps.length&&!sim.wispFireTrails.length)return;
+  drawWispFireTrails(c,px,sim,reduced);
   const dot=artPen(c,px), alpha=c.globalAlpha;
   const line=(ax:number,ay:number,bx:number,by:number,size=1)=>{
     const steps=Math.max(1,Math.ceil(Math.max(Math.abs(bx-ax),Math.abs(by-ay))));
     for(let i=0;i<=steps;i++)dot(Math.round(ax+(bx-ax)*i/steps),Math.round(ay+(by-ay)*i/steps),size,size);
   };
   for(const w of sim.wisps) {
+    if(w.fire){
+      if(w.burst!==undefined)drawWispFireBurst(c,px,w,reduced);else drawWispFireArrow(c,px,w,reduced);
+      continue;
+    }
     if(w.burst!==undefined) {
       const sparks=wispSparks(w,reduced);
       for(let i=0;i<sparks.length;i++) {
@@ -70,7 +76,7 @@ export function drawWisps(c: CanvasRenderingContext2D,px:number,sim:DefendSim,re
       continue;
     }
     c.globalAlpha=alpha*(w.fade===undefined?1:Math.max(0,1-w.fade/WISP.fade));
-    const still=reduced&&!w.slice, pose=still?{...w,x:w.cx+Math.cos(-Math.PI/2+w.slot*Math.PI*2/3)*.8,y:w.cy+Math.sin(-Math.PI/2+w.slot*Math.PI*2/3)*.8,angle:-Math.PI/2+w.slot*Math.PI*2/3,trail:[],travel:0}:w;
+    const homeAngle=wispHomeAngle(w),still=reduced&&!w.slice,pose=still?{...w,x:w.cx+Math.cos(homeAngle)*.8,y:w.cy+Math.sin(homeAngle)*.8,angle:homeAngle,trail:[],travel:0}:w;
     const state=wispTassels(pose,reduced?undefined:tassels.get(w),reduced);
     if(!reduced)tassels.set(w,state);else tassels.delete(w);
     for(let j=0;j<state.chains.length;j++) {

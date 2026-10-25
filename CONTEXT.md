@@ -542,3 +542,7 @@ A living blue arrow belonging to one Wisp Tower. It drifts around the tower with
 
 **Triple arrows**:
 The first Wisp Arrow upgrade. Raises the Wisp Tower’s capacity from one living arrow to three; all can attack together.
+
+
+**Wisp Fire arrows**:
+The second Wisp Arrow upgrade. Adds two fire arrows alongside the three blue arrows, restoring one fire arrow every six seconds below capacity. Flaming passes leave a fiery trail for two seconds. Each fire arrow disintegrates after ten direct enemy hits and explodes; direct hits, trails and the explosion all deal fire damage.

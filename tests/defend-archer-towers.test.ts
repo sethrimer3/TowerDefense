@@ -30,10 +30,11 @@ const close=(a:number,b:number)=>assert.ok(Math.abs(a-b)<1e-8,`${a} != ${b}`);
 
 test("Archer Tower offers Triple arrows as Wisp rank I, with saved ranks and exact refunds",()=>{
  assert.deepEqual(nextSteps("archerTower").map(s=>s.type==="become"&&s.to),["brazierTower","hawkTower","wispTower"]);
- assert.equal(pathById("wispArrow").ranks.length,1);
+ assert.equal(pathById("wispArrow").ranks.length,2);
  assert.deepEqual(nextSteps("wispTower"),[{type:"path",path:"wispArrow",rank:1,cost:4}]);
- assert.deepEqual(nextSteps("wispTower",{path:"wispArrow",rank:1}),[]);
- assert.equal(buildingTree("wispTower").filter(n=>n.path==="wispArrow").length,1);
+ assert.deepEqual(nextSteps("wispTower",{path:"wispArrow",rank:1}),[{type:"path",path:"wispArrow",rank:2,cost:4004}]);
+ assert.deepEqual(nextSteps("wispTower",{path:"wispArrow",rank:2}),[]);
+ assert.equal(buildingTree("wispTower").filter(n=>n.path==="wispArrow").length,2);
  const s=defaults();s.knowledge=100;s.defend.owned.archerTower=1;
  assert.ok(upgradeBuilding(s,{copy:"archerTower"},nextSteps("archerTower")[2]).ok);
  let loaded=decode(JSON.stringify(s));assert.equal(loaded.defend.owned.wispTower,1);assert.equal(loaded.knowledge,97);

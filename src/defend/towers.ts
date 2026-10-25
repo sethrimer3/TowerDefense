@@ -33,6 +33,7 @@ import { FIRE_ARROWS, GUNNERY, SHARP, SIEGE_SHOT, pathRank } from "../knowledge-
 import { ARROW_LOOPS, BOILING_OIL, keepRank } from "../keep-upgrades.ts";
 import { hawkDamage, hawkReload, hawkTarget, type HawkFocus } from "./hawk-focus.ts";
 import { stepWispTower, finishWisps } from "./wisp-arrow.ts";
+import { stepWispFire } from "./wisp-fire.ts";
 
 /** The towers' path ranks (`knowledge-paths.ts`, each 0 unless worn) and
  * which branch tower each is: the Brazier tower lights its arrows (`lit`),
@@ -90,6 +91,7 @@ export class Towers {
       else if (b.kind === "wallBallista") this.stepBallista(sim, b, dt);
       else if (b.kind === "keep" && sim.bonuses.keep) this.stepKeep(sim, b, dt);
     }
+    if (sim.wispOwners.size || sim.wispFireTrails.length) stepWispFire(sim, dt);
     if (sim.wisps.length || sim.wispOwners.size) finishWisps(sim, dt);
   }
 

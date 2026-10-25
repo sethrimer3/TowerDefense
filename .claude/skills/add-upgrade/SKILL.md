@@ -1,16 +1,18 @@
 ---
 name: add-upgrade
-description: Define and add a new upgrade the player can unlock in Tower Defense — a Defend Armory upgrade, a Smithy row (Training in code), or a skill-tree node (Command, Stewardship). Writes a spec (panel, name, cost, levels, placement, effect) for approval, then builds it with tests and docs. Use this whenever the user wants a new upgrade, skill, perk, training stat, unlock, tree node or Armory item, even if they only describe the effect ("I want something that makes towers shoot faster").
+description: Define and add a new upgrade the player can unlock in Tower Defense — a Defend Armory upgrade, a Smithy row (Training in code), or a skill-tree node (Command, Stewardship). Records a spec (panel, name, cost, levels, placement, effect), then implements it with tests and docs without requiring advance approval. Use this whenever the user wants a new upgrade, skill, perk, training stat, unlock, tree node or Armory item, even if they only describe the effect ("I want something that makes towers shoot faster").
 ---
 
 # Add an upgrade
 
-An upgrade here is anything the player buys between defenses that lasts: an Armory upgrade, a Smithy row (Training in code), or a skill-tree node. Work in two steps:
+An upgrade here is anything the player buys between defenses that lasts: an Armory upgrade, a Smithy row (Training in code), or a skill-tree node.
 
-1. **Spec.** Turn the request into a filled-in spec, proposing sensible values for everything the user left out, and show it to them.
-2. **Build.** Once they approve (or amend) it, implement, test, document and commit.
+Implement requested upgrades directly. The user explicitly permits implementing first and adjusting the result afterward; a separate spec approval is not required.
 
-Don't start editing code before the user has approved the spec.
+1. **Specify while working.** Record a concise spec and sensible assumptions for unspecified details. Keep the user informed, then continue implementation.
+2. **Build.** Implement, test, document and commit. Incorporate feedback as revisions.
+
+Only pause for a spec review when the user explicitly requests one. Resolve routine tuning and reversible implementation choices using the current request, existing game conventions and your judgment.
 
 ## 1. Read the current state first
 
@@ -44,9 +46,9 @@ Don't start editing code before the user has approved the spec.
 - **Open questions:** <only what you couldn't infer>
 ```
 
-Mark values you chose with *(proposed)*, list what the build will touch, and ask for approval.
+Mark inferred values as assumptions, list what the build touches, and keep the spec current with the implementation. Do not require approval to proceed.
 
-## 4. Build (after approval)
+## 4. Build
 
 - A new battle effect goes through `Bonuses` (default 1 in `NO_BONUSES`, so the replay golden is unchanged) or an Armory level, never by reading the save inside `src/defend/`.
 - Saves need no migration: `defaults()` and the decoders build from the tables.
