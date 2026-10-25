@@ -12,7 +12,7 @@
  * and the wall's shadow falls across the roofs beside it, shortened where
  * they rise toward it and running on past the ridge down the far slope.
  *
- * `shadowMask` is pure; `shadowCanvas` paints it for the city layer. Fallen
+ * `shadowMask` is pure; `paintShadows` paints it into the city layer. Fallen
  * buildings cast nothing. Presentation only. */
 import { CELLS_H, CELLS_W, cellInBounds, cellIndex } from "./grid.ts";
 import type { Building, CityMap } from "./citygen.ts";
@@ -170,17 +170,27 @@ export function shadowMask(h: Float32Array): Uint8Array {
   return out;
 }
 
-/** The mask as a canvas of translucent black, `W × H` art pixels. */
-export function shadowCanvas(mask: Uint8Array): HTMLCanvasElement | null {
-  if (typeof document === "undefined") return null;
-  const cv = document.createElement("canvas");
-  cv.width = W;
-  cv.height = H;
-  const c = cv.getContext("2d")!;
-  const img = c.createImageData(W, H);
-  const px = new Uint32Array(img.data.buffer);
-  const dark = Math.round(DARK * 255) << 24, tip = Math.round(TIP * 255) << 24;
-  for (let i = 0; i < mask.length; i++) if (mask[i]) px[i] = (mask[i] === 1 ? dark : tip) >>> 0;
-  c.putImageData(img, 0, 0);
-  return cv;
+/** Paints the mask in translucent black onto `c` at `px` canvas pixels a
+ * cell, each art pixel's edges rounded to whole canvas pixels the way the
+ * buildings' cells are (`Math.round(cx * px)`), so a shadow starts right
+ * at the edge of what casts it, with no lit sliver between (a scaled
+ * drawImage rounds them its own way). One rectangle a run along a row. */
+export function paintShadows(c: CanvasRenderingContext2D, mask: Uint8Array, px: number) {
+  const s = px / ART;
+  for (const [v, a] of [[1, DARK], [2, TIP]] as const) {
+    c.beginPath();
+    for (let y = 0; y < H; y++) {
+      const y0 = Math.round(y * s), y1 = Math.round((y + 1) * s);
+      if (y1 === y0) continue;
+      for (let x = 0, row = y * W; x < W; ) {
+        if (mask[row + x] !== v) { x++; continue; }
+        const x0 = x;
+        while (x < W && mask[row + x] === v) x++;
+        const l = Math.round(x0 * s);
+        c.rect(l, y0, Math.round(x * s) - l, y1 - y0);
+      }
+    }
+    c.fillStyle = `rgba(0,0,0,${a})`;
+    c.fill();
+  }
 }
