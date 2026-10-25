@@ -3,11 +3,13 @@ import { enemySize } from "./catalog.ts";
 /** Canvas renderer for DEFEND: the camera, and each frame's passes in order.
  * The city (ground, streets, houses, walls; city-layer.ts) is painted once
  * into an offscreen layer and only repainted when a building falls or is
- * rebuilt. Over it each frame: park fences, damage, unit shadows, the
+ * rebuilt. Over it each frame: the forest's ground outside the walls
+ * (forest-art.ts), park fences, damage, unit shadows, the
  * overcast and torchlight (lighting.ts), the keep's banner, scorches, the
  * fire mages' burning ground (mage-art.ts), units and effects
  * (battle-art.ts, with the valkyries' charges from valkyrie-art.ts), the
- * black lightning (dark-art.ts), the trees over them (park-trees.ts), the
+ * black lightning (dark-art.ts), the trees over them (park-trees.ts, then the
+ * forest's), the
  * fallen defenders' ghosts rising (ghosts.ts), the chimneys' smoke (chimney-smoke.ts), the
  * planted war banner, the magic boats' water (flood-art.ts) over the ground, the wizards' fire, the building grid and drag overlay (edit-overlay.ts), then
  * rain in screen space. */
@@ -53,6 +55,8 @@ import { FloodArt } from "./flood-art.ts";
 import { ChimneySmoke } from "./chimney-smoke.ts";
 import { Ghosts } from "./ghosts.ts";
 import { AtmosphereArt } from "./atmosphere-art.ts";
+import { ForestArt } from "./forest-art.ts";
+import { hasForest } from "./forest.ts";
 
 export type DrawOptions = {
   area?: AreaId;
@@ -117,6 +121,7 @@ export class DefendRenderer {
   private readonly rallyFlag = new RallyFlagArt();
   private readonly sky = new SkyPalaceArt();
   readonly atmosphere = new AtmosphereArt();
+  readonly forest = new ForestArt();
   /** The battle time the wizard art last advanced to. */
   private wizardTime = 0;
   private rain = new Rain();
@@ -284,6 +289,7 @@ export class DefendRenderer {
     this.drawKeepFlag(map, sim, opts);
     if (sim) this.drawBattleUnits(sim, opts.weather ? this.burning ?? (() => 1) : null, opts);
     this.drawTrees(map, sim, opts, dt);
+    this.drawForest(sim, opts, dt);
     this.ghosts.watch(sim, opts.now / 1000);
     this.ghosts.draw(this.ctx, this.px, opts.now / 1000, opts.reduceMotion);
     if (opts.effects ?? true) this.drawSmoke(map, sim, opts);
@@ -333,6 +339,10 @@ export class DefendRenderer {
     drawBallistas(ctx, this.px, map, sim, sim ? sim.bonuses.gate : opts.gate);
     drawSpikeThrusts(ctx, this.px, map, sim);
     this.drawParkLife(map, sim, opts, dt);
+    // The forest's dirt, rocks and shadows outside the walls.
+    this.forest.sync(map, sim);
+    this.forest.drawFloor(ctx, this.px, this.forestShare());
+    this.forest.drawWater(ctx, this.px, opts.now, this.forestShare(), opts.reduceMotion);
     // Park fences sit on the ground layer, under the lighting and units.
     this.fences.sync(map);
     if (sim) this.fences.update(sim);
@@ -452,6 +462,29 @@ export class DefendRenderer {
       this.lighting.darken(o);
     } : undefined;
     this.trees.draw(this.ctx, this.px, dim);
+  }
+
+  /** How much of the forest shows: all of it in an area with one, fading
+   * in or out across an area boundary. */
+  private forestShare() {
+    const now = hasForest(this.area) ? this.areaMix : 0;
+    return now + (this.previousArea && hasForest(this.previousArea) ? 1 - this.areaMix : 0);
+  }
+
+  /** The forest's trees over everyone outside the walls, blown up by the
+   * battle's blasts, leaning in the wind and darkened like the parks'. */
+  private drawForest(sim: DefendSim | null, opts: DrawOptions, dt: number) {
+    const alpha = this.forestShare();
+    this.forest.update(sim, sim ? beneath(sim) : [], dt, opts.reduceMotion);
+    if (alpha <= 0) return;
+    const w = sim ? opts.weather : null;
+    const wind = opts.reduceMotion || !(opts.effects ?? true) ? 0 : w?.rain ? 2 : w && !w.clear ? 1.4 : 1;
+    const shade = sim && opts.weather ? (o: CanvasRenderingContext2D) => {
+      o.fillStyle = `rgba(118,118,118,${opts.weather!.rain ? 0.2 : 0.12})`;
+      o.fillRect(0, 0, this.board.W, this.board.H);
+      this.lighting.darken(o);
+    } : undefined;
+    this.forest.drawTrees(this.ctx, this.px, { now: opts.now, alpha, wind, shade });
   }
 
   /** Faint smoke drifting off the houses' chimneys, over the trees. */

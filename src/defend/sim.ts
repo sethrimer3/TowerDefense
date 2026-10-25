@@ -5,6 +5,7 @@ import { buildingPaths } from "../specializations.ts";
 import { DefenderIndex } from "./defender-index.ts";
 import { Atmosphere, groundWeather } from "./atmosphere.ts";
 import { areaForWave } from "./areas.ts";
+import { boulderPlan, hasForest } from "./forest.ts";
 import { IceMotion } from "./ice-motion.ts";
 import { icyCell } from "./boats.ts";
 import { enemySize } from "./catalog.ts";
@@ -351,6 +352,10 @@ export class DefendSim {
   readonly flash: Float32Array;
   /** Cells whose solidity changed since the renderer last drained this. */
   changed: number[] = [];
+  /** 1 on the forest's boulders while the battle is in an area with a
+   * forest (`syncBoulders`): solid like ponds, owned by no building. */
+  readonly rocks = new Uint8Array(CELL_COUNT);
+  private rocky = false;
   enemies: Enemy[] = [];
   soldiers: Soldier[] = [];
   civilians: Civilian[] = [];
@@ -542,7 +547,7 @@ export class DefendSim {
     this.streets = streetCells(map);
     this.terrain = {
       solid: this.foeSolid,
-      impassable: (i) => map.type[i] === CellType.WATER,
+      impassable: (i) => map.type[i] === CellType.WATER || this.rocks[i] === 1,
       cost: (i) => this.enterCost(i),
     };
   }
@@ -581,6 +586,7 @@ export class DefendSim {
     this.time += dt;
     if (this.wave > 0) this.stats.current.seconds += dt;
     this.fieldT -= dt;
+    this.syncBoulders();
     if (this.fieldDirty && this.fieldT <= 0) this.computeField();
     this.runWaves(dt);
     if (this.skyPalaces.length) stepSkyPalaces(this, dt);
@@ -1082,6 +1088,25 @@ export class DefendSim {
     this.pushOut(cell);
     this.fieldDirty = true;
     if (b.kind === "monsterBait" && this.intact(b)) this.fieldT = 0;
+    this.mapVersion++;
+  }
+
+  /** Raises the forest's boulders on entering an area with a forest and
+   * clears them on leaving it: they block everyone on foot, like ponds. */
+  private syncBoulders() {
+    const rocky = hasForest(areaForWave(this.wave).id);
+    if (rocky === this.rocky) return;
+    this.rocky = rocky;
+    for (const b of boulderPlan(this.map))
+      for (const c of b.cells) {
+        if (rocky && this.solid[c]) continue;
+        if (!rocky && !this.rocks[c]) continue;
+        const v = rocky ? 1 : 0;
+        this.rocks[c] = this.solid[c] = this.ownSolid[c] = this.foeSolid[c] = v;
+        if (rocky) this.pushOut(c);
+      }
+    this.fieldDirty = true;
+    this.fieldT = 0;
     this.mapVersion++;
   }
 
