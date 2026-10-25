@@ -614,11 +614,13 @@ export class MinePage {
   private thunderTick = -1;
 
   /** What can be heard at the mine: its sky's rain and wind, birds on fine
-   * days and crickets at night, drips in the workings, any fire; and each
+   * days and crickets at night, wind in the trees, drips and the old
+   * workings' creaks the deeper the view looks, any fire; and each
    * fresh lightning strike's thunder. */
   ambience(): Scene {
     if (!this.sim) return QUIET;
     const sim = this.sim, sky = sim.sky, day = sky.daylight, storm = sky.weather === "storm";
+    const deep = this.renderer?.depthInView(sim) ?? 0;
     for (const n of sim.news)
       if (n.kind === "strike" && n.tick > this.thunderTick) {
         this.thunderTick = n.tick;
@@ -626,7 +628,7 @@ export class MinePage {
       }
     return {
       rain: sky.rain,
-      wind: 0.12 + sky.clouds * 0.2 + (storm ? 0.45 : 0),
+      wind: (0.12 + sky.clouds * 0.2 + (storm ? 0.45 : 0)) * (1 - deep * 0.6),
       howl: 0,
       sand: 0,
       thunder: storm ? 0.6 : 0,
@@ -635,6 +637,8 @@ export class MinePage {
       drips: 0.25,
       fire: Math.min(1, sim.fires / 12),
       muffle: 0,
+      mine: deep,
+      land: "forest",
     };
   }
 

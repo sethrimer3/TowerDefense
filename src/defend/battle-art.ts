@@ -17,6 +17,7 @@ import { paintKeepFlash } from "./structure-art.ts";
 import type { CarriedLight } from "./lighting.ts";
 import { drawFireballs, drawMageBolts, drawMage } from "./mage-art.ts";
 import { drawArrows, drawBreath, drawShells, drawSparks } from "./projectile-art.ts";
+import { drawWisps } from "./wisp-art.ts";
 import { drawLasers } from "./laser-art.ts";
 import { drawStabs, drawValkyrie } from "./valkyrie-art.ts";
 import { drawHero, drawSwings } from "./hero-art.ts";
@@ -129,6 +130,7 @@ export function drawUnits(b: Brush, sim: DefendSim, torches: Burning | null, hea
   drawGarrisons(b, sim);
   if (timing) timing.entityMs += performance.now() - start;
   drawArrows(b.c, b.px, sim, simple.reduceMotion);
+  drawWisps(b.c, b.px, sim, simple.reduceMotion);
   drawLasers(b.c, b.px, sim);
   drawShells(b.c, b.px, sim);
   drawSiegeShots(b, sim);

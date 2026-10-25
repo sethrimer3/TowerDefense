@@ -60,7 +60,7 @@ import { QUIET, type Scene } from "../ambience.ts";
 import { NIGHT_FADE_SECONDS, isBossWave, rollWeather, type Weather } from "./weather.ts";
 import { play } from "../sound.ts";
 import { replay, sparksOver } from "../ui/flourish.ts";
-import { available, keptGroups, plainAvailable, setLayout, startingWave, type DefendSave } from "./progress.ts";
+import { available, keptGroups, plainAvailable, recordWaveReached, setLayout, startingWave, type DefendSave } from "./progress.ts";
 import { ageWater } from "./boats.ts";
 import { defeatHTML } from "./defeat.ts";
 import { inspectable, type Armed } from "./inspect.ts";
@@ -279,8 +279,9 @@ export class DefendPage {
   }
 
   /** What can be heard over the city: the area's weather and the boss
-   * waves' night outdoors, drips underground, the forge's fires, and the
-   * battle's own blazes. */
+   * waves' night outdoors, each land's own wind, drips and the old
+   * workings' rumbles underground, the forge's fires, and the battle's own
+   * blazes. */
   ambience(): Scene {
     if (!this.built) return QUIET;
     const area = areaForWave(Math.max(this.sim?.wave ?? 1, startingWave(this.save)));
@@ -298,6 +299,8 @@ export class DefendPage {
       drips: under ? 0.8 : area.id === "drowned" ? 0.3 : 0,
       fire: Math.max(area.id === "ember" ? 0.4 : 0, blazes * 0.7),
       muffle: 0,
+      mine: under ? 0.5 : 0,
+      land: green ? "forest" : cold ? "frozen" : area.id === "desert" ? "desert" : undefined,
     };
   }
 
@@ -900,6 +903,7 @@ export class DefendPage {
           play("wave");
         }
       } else if (ev.type === "waveStart") {
+        if (!sim.unitTester && recordWaveReached(this.save, ev.wave)) this.host.persist();
         if (areaForWave(ev.wave).id !== this.weatherArea) {
           const area = areaForWave(ev.wave);
           this.weatherArea = area.id;

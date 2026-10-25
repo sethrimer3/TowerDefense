@@ -158,6 +158,7 @@ const MATERIAL: Record<PlacedKind, { m: Material; ruin: Pick<Ruin, "stone" | "to
   skirmishCamp: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.straw, beams: true } },
   archerTower: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.plank.slice(0, 3), beams: true } },
   brazierTower: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.kiln.slice(0, 3), beams: true } },
+  wispTower: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.ice.slice(0, 3), beams: true } },
   hawkTower: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.slime.slice(0, 3), beams: true } },
   cannonTower: { m: { tones: STONE, roofed: false }, ruin: { stone: STONE, top: C.iron.slice(1), beams: false, round: true } },
   batteryTower: { m: { tones: STONE, roofed: false }, ruin: { stone: STONE, top: C.iron.slice(1), beams: false, round: true } },
@@ -216,6 +217,7 @@ export const PATH_LOOKS: Partial<Record<PlacedKind, readonly string[]>> = {
   cannonTower: ["gunnery", "siegeShot", "minelaying"],
   brazierTower: ["fireArrows"],
   hawkTower: ["sharpshooters"],
+  wispTower: [],
   batteryTower: ["gunnery"],
   mortarTower: ["siegeShot"],
   minelayerTower: ["minelaying"],
@@ -252,7 +254,7 @@ export function structureRubblePixels(kind: PlacedKind, cw: number, ch: number, 
   return rubblePixels(w, h, hash(seed, KINDS.indexOf(kind), 3), { ...frame(w, h), ...MATERIAL[kind].ruin });
 }
 
-const KINDS: PlacedKind[] = ["barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "meleeGuild", "rangedGuild", "sniperLodge", "musketHall", "assassinDen", "gunHall", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "spearHall", "phalanx", "javelinCamp", "lancerStable", "heroHall", "shadow", "nanoTower", "pyreTower", "frostTower", "stormTower", "chapterHouse", "berserkerLodge", "halberdYard", "bloodHall", "veilHouse", "poisonDen", "brazierTower", "hawkTower", "batteryTower", "mortarTower", "rangerLodge", "skirmishCamp", "infernoHall", "cinderHall", "skyrangerLodge", "minelayerTower", "stormHall"];
+const KINDS: PlacedKind[] = ["barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "meleeGuild", "rangedGuild", "sniperLodge", "musketHall", "assassinDen", "gunHall", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "spearHall", "phalanx", "javelinCamp", "lancerStable", "heroHall", "shadow", "nanoTower", "pyreTower", "frostTower", "stormTower", "chapterHouse", "berserkerLodge", "halberdYard", "bloodHall", "veilHouse", "poisonDen", "brazierTower", "hawkTower", "batteryTower", "mortarTower", "rangerLodge", "skirmishCamp", "infernoHall", "cinderHall", "skyrangerLodge", "minelayerTower", "stormHall", "wispTower"];
 
 const PAINT: Record<PlacedKind, (p: Pix, look: string) => void> = {
   meleeGuild: paintMeleeGuild,
@@ -286,6 +288,7 @@ const PAINT: Record<PlacedKind, (p: Pix, look: string) => void> = {
   cannonTower: paintCannonTower,
   brazierTower: paintBrazierTower,
   hawkTower: paintHawkTower,
+  wispTower: paintWispTower,
   batteryTower: paintBatteryTower,
   mortarTower: paintMortarTower,
   minelayerTower: paintMinelayerTower,
@@ -1446,6 +1449,10 @@ function paintBrazierTower(p: Pix, look: string) {
 /** The Hawk tower: a hawk's perch at each corner, green pennants flying. */
 function paintHawkTower(p: Pix, look: string) {
   paintBranchTower(p, "sharpshooters", cornerToken(p, ["000", "021", "010"], { 0: OUTLINE, 1: C.plank[1], 2: C.slime[1] }), !!look, paintArcherTower);
+}
+/** Wisp Tower: icy crystal fins anchoring the living blue arrow. */
+function paintWispTower(p: Pix, look: string) {
+  paintBranchTower(p, "wispArrow", cornerToken(p, ["010", "121", "010"], { 0: OUTLINE, 1: C.ice[2], 2: C.ice[3] }), !!look, paintArcherTower);
 }
 /** The Gun battery: stacked shot at each corner. */
 function paintBatteryTower(p: Pix, look: string) {

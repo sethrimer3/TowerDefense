@@ -65,7 +65,7 @@ test("path looks: every building path has its own sprite, distinct from the base
   const topicKind: Record<string, PlacedKind> = { bait: "monsterBait" };
   for (const p of PATHS) {
     // Wall spikes and strike spells are no building.
-    if (p.topic === "spikes" || isSpell(p.topic)) continue;
+    if (p.topic === "spikes" || isSpell(p.topic) || !p.ranks.length) continue;
     const kind = topicKind[p.topic] ?? (p.topic as PlacedKind);
     assert.ok(PATH_LOOKS[kind]?.includes(p.id), `${p.id} has a look on ${kind}`);
   }

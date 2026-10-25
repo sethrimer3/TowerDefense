@@ -65,10 +65,13 @@ export type DefendSave = {
   kept: Kept[];
   levels: Record<UpgradeId, number>;
   bombs: number;
+  /** Highest wave cleared; used only for records and first-clear rewards. */
   bestWave: number;
+  /** Highest wave actually entered, separate from clearing it. */
+  furthestWave: number;
   /** The furthest wave the dev option has opened to start from, past the best (0 when never used). */
   unlockedWave: number;
-  /** The wave the next defense starts on (1 unless the player picked another). */
+  /** Next starting wave; new reached records select furthestWave - 1. */
   startWave: number;
   discovered: EnemyKind[];
   journalRead: EnemyKind[];
@@ -107,6 +110,7 @@ export function defaultDefendSave(): DefendSave {
     levels: Object.fromEntries(UPGRADES.map((u) => [u.id, 0])) as Record<UpgradeId, number>,
     bombs: 0,
     bestWave: 0,
+    furthestWave: 0,
     unlockedWave: 0,
     startWave: 1,
     discovered: [],
@@ -244,9 +248,20 @@ export const MAX_START_WAVE = 1e6;
 /** Waves the dev option opens at a time. */
 export const UNLOCK_WAVES = 100;
 
-/** The furthest wave a defense may start on: the best wave held, or what the dev option opened. */
+/** Highest entered wave, with cleared progress as a consistency floor. */
+export const furthestWave = (save: DefendSave) => Math.max(save.furthestWave, save.bestWave);
+
+/** A new reached record advances the next start; retries preserve manual choices. */
+export function recordWaveReached(save: DefendSave, wave: number): boolean {
+  if (!Number.isInteger(wave) || wave < 1 || wave > MAX_START_WAVE + 1 || wave <= furthestWave(save)) return false;
+  save.furthestWave = wave;
+  save.startWave = Math.max(1, wave - 1);
+  return true;
+}
+
+/** Start up to the previous reached wave, or what the dev option opened. */
 export function waveReach(save: DefendSave): number {
-  return Math.max(1, save.bestWave, save.unlockedWave);
+  return Math.max(1, furthestWave(save) - 1, save.unlockedWave);
 }
 
 /** The wave the next defense starts on, kept within reach. */
@@ -256,7 +271,7 @@ export function startingWave(save: DefendSave): number {
 
 /** Dev: opens `UNLOCK_WAVES` more waves past the furthest the player can start on now. */
 export function unlockWaves(save: DefendSave): number {
-  save.unlockedWave = Math.min(MAX_START_WAVE, Math.max(save.bestWave, save.unlockedWave) + UNLOCK_WAVES);
+  save.unlockedWave = Math.min(MAX_START_WAVE, Math.max(0, furthestWave(save) - 1, save.unlockedWave) + UNLOCK_WAVES);
   return save.unlockedWave;
 }
 
@@ -270,7 +285,7 @@ export function buyBomb(save: DefendSave, wallet: Wallet): boolean {
 
 // ── Decoding untrusted saves ─────────────────────────────────────────────
 const int = (n: unknown, min: number, max: number): n is number => Number.isInteger(n) && (n as number) >= min && (n as number) <= max;
-const PLACED: PlacedKind[] = ["meleeGuild", "rangedGuild", "barracks", "chapterHouse", "berserkerLodge", "halberdYard", "heroHall", "shadow", "bloodHall", "veilHouse", "poisonDen", "assassinDen", "spearHall", "phalanx", "javelinCamp", "lancerStable", "archerBarracks", "rangerLodge", "skirmishCamp", "skyrangerLodge", "sniperLodge", "gunHall", "musketHall", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "archerTower", "cannonTower", "nanoTower", "watchTower", "brazierTower", "hawkTower", "batteryTower", "mortarTower", "minelayerTower", "wizardTower", "pyreTower", "frostTower", "stormTower", "mageGuild", "infernoHall", "cinderHall", "stormHall", "valkyriePalace", "darkKeep", "monsterBait"];
+const PLACED: PlacedKind[] = ["meleeGuild", "rangedGuild", "barracks", "chapterHouse", "berserkerLodge", "halberdYard", "heroHall", "shadow", "bloodHall", "veilHouse", "poisonDen", "assassinDen", "spearHall", "phalanx", "javelinCamp", "lancerStable", "archerBarracks", "rangerLodge", "skirmishCamp", "skyrangerLodge", "sniperLodge", "gunHall", "musketHall", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "archerTower", "cannonTower", "nanoTower", "watchTower", "brazierTower", "hawkTower", "wispTower", "batteryTower", "mortarTower", "minelayerTower", "wizardTower", "pyreTower", "frostTower", "stormTower", "mageGuild", "infernoHall", "cinderHall", "stormHall", "valkyriePalace", "darkKeep", "monsterBait"];
 
 /** Attuned buildings saved wearing a branch's path, from before
  * each branch made a building of its own: each becomes that building,
@@ -279,7 +294,7 @@ const BRANCHES: Record<string, Record<string, PlacedKind>> = {
   wizardTower: { pyromancy: "pyreTower", rime: "frostTower", storm: "stormTower" },
   barracks: { crusaders: "chapterHouse", berserkers: "berserkerLodge", halberdiers: "halberdYard" },
   assassinDen: { bloodletters: "bloodHall", shadowcloak: "veilHouse", venom: "poisonDen" },
-  archerTower: { fireArrows: "brazierTower", sharpshooters: "hawkTower" },
+  archerTower: { fireArrows: "brazierTower", sharpshooters: "hawkTower", wispArrow: "wispTower" },
   cannonTower: { gunnery: "batteryTower", siegeShot: "mortarTower", minelaying: "minelayerTower" },
   archerBarracks: { rangers: "rangerLodge", skirmishers: "skirmishCamp" },
   mageGuild: { pyroclasm: "infernoHall", cinders: "cinderHall", conduction: "stormHall" },
@@ -309,8 +324,15 @@ export function decodeDefendSave(raw: any): DefendSave {
   for (const u of UPGRADES) d.levels[u.id] = intOr(s.levels?.[u.id], 0, u.maxLevel, d.levels[u.id]);
   d.bombs = intOr(s.bombs, 0, 9999, d.bombs);
   d.bestWave = intOr(s.bestWave, 0, 1e6, d.bestWave);
+  // Old saves tracked cleared waves only; keep their existing starting-wave reach.
+  const legacyReached = d.bestWave > 0 ? d.bestWave + 1 : 0;
+  d.furthestWave = Math.max(d.bestWave, intOr(s.furthestWave, 0, MAX_START_WAVE + 1, legacyReached));
   d.unlockedWave = intOr(s.unlockedWave, 0, MAX_START_WAVE, d.unlockedWave);
-  d.startWave = intOr(s.startWave, 1, MAX_START_WAVE, d.startWave);
+  // Before reached-wave tracking, every save kept wave 1 as its default even
+  // after progressing. Move that old default forward once; current saves and
+  // other explicit earlier choices keep the player's selection.
+  const oldDefault = s.furthestWave === undefined && s.startWave === 1;
+  d.startWave = intOr(oldDefault ? undefined : s.startWave, 1, MAX_START_WAVE, Math.max(1, d.furthestWave - 1));
   d.paletteSide = s.paletteSide === "right" ? "right" : "left";
   d.speed3 = s.speed3 === true;
   d.battleSpeed = intOr(s.battleSpeed, 1, d.speed3 ? 3 : 2, 1) as 1 | 2 | 3;

@@ -20,6 +20,9 @@ import { replay, sparksOver } from "./flourish.ts";
 import type { AppContext } from "./app.ts";
 import { uiSprite } from "./dom.ts";
 import { holdToRepeat } from "./hold-repeat.ts";
+import { UpgradeGraph } from "./upgrade-graph.ts";
+import { bannerTree } from "./banner-tree.ts";
+import { bombTree } from "./bomb-tree.ts";
 
 /** Hours, minutes and seconds left, as the timers show them. */
 export function formatDuration(ms: number) {
@@ -67,6 +70,8 @@ export class Ledger {
   private trainingParticles = new TrainingParticles();
   private circle: MagicCircle | null = null;
   private circleResearch: string | null = null;
+  private skillGraph: UpgradeGraph | null = null;
+  private skillGraphTopic = "";
   /** The rank picked in each topic's path tree ("path:index", or "path:crown"). */
   private picked: Record<string, string> = {};
   /** The subject and topic last drawn. */
@@ -143,7 +148,7 @@ export class Ledger {
       const research = relevant ? `${job.kind}:${job.id}:${job.rank}` : "";
       if (research && this.circleResearch !== null && research !== this.circleResearch) this.circle.energize();
       this.circleResearch = research;
-      this.circle.attach(root.querySelector<HTMLElement>(".research-orbit") ?? root);
+      this.circle.attach(root.querySelector<HTMLElement>(".research-orbit") ?? root.querySelector<HTMLElement>("[data-banner-tree], [data-bomb-tree]") ?? root);
       root.classList.add("has-magic-circle");
     }
     root.querySelectorAll<HTMLButtonElement>("[data-ledger-stack]").forEach(b => b.onclick = () => {
@@ -167,6 +172,7 @@ export class Ledger {
     }
     root.querySelectorAll<HTMLCanvasElement>("canvas[data-icon]").forEach((c) => paintIcon(c, c.dataset.icon as IconItem));
     paintPathIcons(root);
+    this.renderSkillTree(topic);
     root.querySelector<HTMLButtonElement>("[data-up]")!.onclick = () => this.up();
     root.querySelectorAll<HTMLButtonElement>("[data-subject]").forEach((b) => (b.onclick = () => {
       this.subject = b.dataset.subject as SubjectId;
@@ -206,7 +212,7 @@ export class Ledger {
     const stacks = subject.topics.map(t => {
       const count = this.owned(t), type = t.item ? TILE_TYPE[t.item] : "consumables", on = t.id === current.id;
       const layers = count > 2 ? "layers-2" : count > 1 ? "layers-1" : "";
-      const sub = study ? pathsOf(t.id).length ? "Spell paths" : "Shared research" : "Upgrades all";
+      const sub = study ? t.id === "warBanner" || t.id === "battle" ? "Knowledge tree" : pathsOf(t.id).length ? "Spell paths" : "Shared research" : "Upgrades all";
       return `<button class="tile type-${type} ${layers} ${on ? "open" : ""}" data-key="${t.id}" data-ledger-stack="${t.id}" aria-pressed="${on}" aria-label="${t.name}${t.item ? `, ${count} owned` : ""}">
         <span class="tile-face">${t.item ?? t.icon ? `<canvas width="48" height="48" data-icon="${t.item ?? t.icon}"></canvas>` : uiSprite(subject.sprite)}</span><span class="tile-name">${t.name}</span>${t.item ? `<b class="tile-count">×${count}</b>` : ""}<small class="tile-sub">${sub}</small></button>`;
     }).join("");
@@ -444,29 +450,62 @@ export class Ledger {
 
   private studyHtml(t: Topic) {
     const save = this.save, researchers = this.ctx.researchers();
-    const skillCard = (id: SkillId) => {
+    const skillCard = (id: SkillId, name = SKILLS[id].name) => {
       const skill = SKILLS[id], { level, price, maxed, available, canBuy } = skillPurchase(save, id);
       const node = TREE_OF[id].nodes.find((n) => n.id === id)!;
       const missing = node.requires.filter((r) => skillRank(save, r) < (node.full?.includes(r) ? SKILLS[r].max : 1)).map((r) => SKILLS[r].name + (node.full?.includes(r) ? " (all ranks)" : ""));
       const active = save.researchJob?.kind === "skill" && save.researchJob.id === id;
       const busy = !!save.researchJob;
       const why = maxed || active ? "" : busy ? "Researchers are working on the current project" : missing.length ? `Needs ${missing.join(" and ")} first` : !available ? "Locked" : !canBuy ? `Needs ${price} Knowledge, have ${whole(save.knowledge)}` : "";
-      return `<article class="ledger-skill ${level ? "owned" : ""} ${available ? "" : "locked"}"><span class="ledger-glyph" aria-hidden="true">${skill.icon}</span><div><small>${level} / ${skill.max} RANKS</small><h3>${skill.name}</h3><p>${skill.text}.${why ? ` <em>${why}.</em>` : ""}</p></div>
+      return `<article class="ledger-skill ${level ? "owned" : ""} ${available ? "" : "locked"}"><span class="ledger-glyph" aria-hidden="true">${skill.icon}</span><div><small>${level} / ${skill.max} RANKS</small><h3>${name}</h3><p>${skill.text}.${why ? ` <em>${why}.</em>` : ""}</p></div>
         <button data-learn="${id}" ${maxed || !canBuy || busy || (!researchers && !save.settings.instantResearch) ? "disabled" : ""}>${maxed ? "Mastered" : active ? `Researching<small data-research-timer>${this.researchTimeLeft()}</small>` : `Learn<small>${price} Knowledge</small><small>${this.researchHint(level)}</small>`}</button></article>`;
     };
     if (t.id === "warBanner") {
-      const shared: SkillId[] = ["warBanner", "bannerCooldown", "bannerDefense", "bannerReach"];
-      const branches: { name: string; ids: SkillId[] }[] = [
-        { name: "Damage", ids: ["bannerDamage"] },
-        { name: "Marching speed", ids: ["bannerMarch"] },
-        { name: "Life & regeneration", ids: ["bannerLife", "bannerRegen"] },
-      ];
-      return `<div class="banner-research"><div class="banner-research-shared"><h4>Shared upgrades</h4>${shared.map(skillCard).join("")}</div><p class="ledger-note">Master Rapid deployment, then learn Sheltering standard and Broad standard to open the three branches. Each branch can be researched.</p><div class="banner-research-branches">${branches.map(branch => `<section><h4>${branch.name}</h4>${branch.ids.map(skillCard).join("")}</section>`).join("")}</div></div>`;
+      const selected = t.skills!.find(id => id === this.picked.warBanner) ?? "warBanner";
+      return `<div class="banner-research"><h3>War banner · Knowledge tree</h3><p class="ledger-note">Master Rapid deployment, then learn Sheltering standard and Broad standard. The tree branches into damage, marching speed, and life with regeneration. You can research every branch.</p><div data-banner-tree></div><div class="banner-tree-detail" aria-live="polite">${skillCard(selected)}</div></div>`;
     }
-    const skills = (t.skills ?? []).map(skillCard);
+    if (t.id === "battle") {
+      const level = skillRank(save, "gunpowder"), key = this.picked.battle ?? `gunpowder:${Math.min(level, 2)}`;
+      const rank = Number(key.split(":")[1]), learned = rank < level;
+      const detail = key === "bomb"
+        ? `<article class="ledger-skill"><div><h3>Bomb</h3><p>Drag bombs from Skills during a defense. Research Gunpowder to strengthen every bomb. Damage training and Shaped charges are in the Smithy's Spells → Bombs.</p></div></article>`
+        : rank === level ? skillCard("gunpowder", `Gunpowder ${ROMAN[rank]}`)
+        : `<article class="ledger-skill ${learned ? "owned" : "locked"}"><span class="ledger-glyph" aria-hidden="true">${SKILLS.gunpowder.icon}</span><div><small>RANK ${ROMAN[rank]}</small><h3>Gunpowder ${ROMAN[rank]}</h3><p>+${SKILLS.gunpowder.effect.per}% bomb damage this rank; +${SKILLS.gunpowder.effect.per * (rank + 1)}% from Gunpowder in total.</p></div><button disabled>${learned ? "Researched" : "Learn the previous rank first"}</button></article>`;
+      return `<div class="banner-research"><h3>Bomb · Knowledge tree</h3><p class="ledger-note">Research Gunpowder I, II and III in order. Each rank adds 20% bomb damage. Select a node to inspect or research it.</p><div data-bomb-tree></div><div class="banner-tree-detail" aria-live="polite">${detail}</div></div>`;
+    }
+    const skills = (t.skills ?? []).map(id => skillCard(id));
     const tree = isSpell(t.id) && pathsOf(t.id).length ? this.spellSetupHtml(t.id) + this.treeHtml(t) : "";
     if (!skills.length && !tree) return `<p class="ledger-empty">Nothing to study here yet.</p>`;
     return tree + skills.join("");
+  }
+
+  /** Reattach the same living graph on selection/purchase; stop it during
+   * research or when leaving this topic. */
+  private renderSkillTree(topic: Topic) {
+    const host = this.root.querySelector<HTMLElement>("[data-banner-tree], [data-bomb-tree]");
+    if (!host || this.skillGraphTopic !== topic.id) { this.skillGraph?.destroy(); this.skillGraph = null; }
+    if (!host) return;
+    this.skillGraphTopic = topic.id;
+    const bomb = topic.id === "battle";
+    const select = (id: string) => { this.picked[topic.id] = id; this.render(); };
+    this.skillGraph ??= new UpgradeGraph(document.createElement("div"), {
+      reduceMotion: () => this.save.settings.reduceMotion || matchMedia("(prefers-reduced-motion: reduce)").matches,
+      onPick: select,
+      paint: el => {
+        const id = el.dataset.node!;
+        const label = bomb ? id === "bomb" ? "Bomb" : `Gunpowder ${ROMAN[Number(id.split(":")[1])]}`
+          : `${SKILLS[id as SkillId].name}, ${skillRank(this.save, id as SkillId)} of ${SKILLS[id as SkillId].max} ranks`;
+        el.setAttribute("aria-label", label);
+        el.title = label;
+        el.onclick = event => { if (event.detail === 0) select(id); };
+        el.querySelectorAll<HTMLCanvasElement>("[data-icon]").forEach(c => paintIcon(c, c.dataset.icon as IconItem));
+      },
+    });
+    this.skillGraph.el.classList.add("ug-host", bomb ? "bomb-tree" : "banner-tree");
+    this.skillGraph.el.setAttribute("role", "group");
+    this.skillGraph.el.setAttribute("aria-label", `${topic.name} Knowledge tree`);
+    host.append(this.skillGraph.el);
+    this.skillGraph.set(bomb ? bombTree(this.save) : bannerTree(this.save), this.picked[topic.id] ?? (bomb ? `gunpowder:${Math.min(skillRank(this.save, "gunpowder"), 2)}` : "warBanner"));
   }
 
   /** A strike spell is never placed: it casts with one researched path (or

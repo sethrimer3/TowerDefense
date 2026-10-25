@@ -148,6 +148,14 @@ export class MineRenderer {
 
   /** Matches the canvas to its box (keeping the middle of the view where
    * it was); returns the cells per screen pixel. */
+  /** How far underground the view looks, from 0 (the middle of the view
+   * at or above the ground by the shaft) to 1 (twenty cells or more below
+   * it). */
+  depthInView(sim: MineSim) {
+    const middle = this.camY + this.size.h / this.size.scale / 2;
+    return Math.max(0, Math.min(1, (middle - sim.strata.surface[sim.shaftX]) / 20));
+  }
+
   resize() {
     const dpr = Math.min(3, window.devicePixelRatio || 1);
     const w = Math.max(1, Math.round(this.canvas.clientWidth * dpr)), h = Math.max(1, Math.round(this.canvas.clientHeight * dpr));

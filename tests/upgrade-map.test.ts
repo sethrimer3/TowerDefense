@@ -8,7 +8,7 @@ import { defaults, decode } from "../src/save.ts";
 import { ATTUNED, BECOMES, MAP_ROOTS, buildingPathsOf, foundNodes, fullTree, nextSteps, respecBuilding, rootOf, upgradeBuilding, type PaletteKind, type SpecialtyTarget, type UpgradeStep } from "../src/specializations.ts";
 import { mapCount, mapGraph } from "../src/ui/specialty.ts";
 import { webLayout } from "../src/ui/upgrade-graph.ts";
-import { PATHS } from "../src/knowledge-paths.ts";
+import { PATHS, pathById } from "../src/knowledge-paths.ts";
 
 function fixture() {
   const s = defaults(); s.knowledge = 1e6;
@@ -38,9 +38,13 @@ test("every line's web holds each building, branch rank and ultimate once", () =
   }
   // Every branch and every path a building can take is on some map, the ultimates too.
   const every = new Set(all);
-  for (const p of PATHS) if (buildingPathsOf(p.topic === "bait" ? "monsterBait" : p.topic === "spikes" ? "wallSpikes" : p.topic).some((o) => o.id === p.id)) assert.ok(every.has(`p:${p.id}:1`), p.id);
+  for (const p of PATHS) if (p.ranks.length && buildingPathsOf(p.topic === "bait" ? "monsterBait" : p.topic === "spikes" ? "wallSpikes" : p.topic).some((o) => o.id === p.id)) assert.ok(every.has(`p:${p.id}:1`), p.id);
   for (const a of ATTUNED) {
-    for (const b of a.branches) assert.ok(every.has(`p:${b.path}:3`), b.path);
+    for (const b of a.branches) {
+      const count = pathById(b.path).ranks.length;
+      assert.ok(every.has(count ? `p:${b.path}:${count}` : `k:${b.via!.kind}`), b.path);
+      if (!count) assert.ok(!every.has(`p:${b.path}:1`), "attunement-only branches have no fake ranks");
+    }
     if (a.ultimate) assert.ok(every.has(`k:${a.ultimate}`), a.ultimate);
   }
 });

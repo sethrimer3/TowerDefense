@@ -30,6 +30,14 @@ Recent rows are available as `window.defendPerformance`; they are not saved.
   rotated (their baked-in lighting looks wrong turned) and grown 15% to close
   the gaps between them.
 
+## Starting waves and reached records
+
+The game records the highest wave **entered**, separately from the highest wave **cleared**. Entering a new furthest wave selects `max(1, furthest reached - 1)` for the next defense. For example, reaching wave 10 selects wave 9, even if wave 10 defeats the keep. This selection is saved immediately.
+
+The starting-wave selection screen still offers every earlier wave through that limit. A manual earlier selection persists across retries and reloads, until a new reached record selects its preceding wave. Developer-unlocked starts remain available, while unlocking waves or using Unit tester does not count as reaching them. Upgrade points still require clearing a new highest wave; entering one grants no reward.
+
+Old saves infer entered progress from the cleared record plus one, preserving their existing selectable range. The old wave-1 default moves to the previous reached wave on migration. Other saved choices remain intact, including a deliberate wave-1 selection in current saves; missing/invalid choices use the previous reached wave. The next battle spawns its first enemies at the selected wave, skipping earlier waves. New games start on wave 1.
+
 ## Layout of the page
 
 - One header row, never two. Building: Upgrades (opens the Upgrades tab) · Start the defense on
@@ -499,8 +507,19 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   Neither draws from the run's random stream; how they look is the
   renderer's (`wizard-art.ts`).
 - **Archer towers** shoot the nearest enemy in range. Paths: Fire arrows (what
-  they hit burns, then a volley of three) or Sharpshooters (reach, every 3rd
-  arrow critical, then aimed at the strongest). **Watch towers** mark
+  they hit burns, then a volley of three), Hawk focus, or Wisp Arrow. Hawk
+  attunement locks the highest-current-HP enemy at 70% ordinary range. Rank I
+  halves fire rate and adds 2% damage per further shot at that enemy, capped
+  at +1000% (11× total); II replaces the range penalty with 4.3× ordinary
+  range; III accelerates the half-rate cadence from 1× to 10× as shots build.
+  A lost or changed lock resets both ramps. Existing Hawk IDs/ranks are retained.
+  Wisp attunement creates one persistent blue arrow that wanders near its tower
+  and sweeps through enemies in a wide parabola: ordinary arrow damage once per
+  enemy per slice, ordinary range/cadence, a 0.4-second sweep and a one-cell hit
+  band. It has six finite-link pixel tendrils extending with inertia during
+  attacks; idle movement and trails do no damage. Later Wisp upgrades remain
+  unavailable. Source destruction ends damage and fades the arrow; rebuilding
+  starts a new one. **Watch towers** mark
   enemies in their radius with a gold outline; marked enemies take ×2 damage.
   Paths: Spotters (marks hit harder, wider radius) or Signal fires
   (marked enemies slowed, more at rank II, and set burning at III). Up to
@@ -624,6 +643,13 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   it (a corner will do).
 - During a run the palette becomes the **consumables** palette. A **bomb**
   can be dragged onto the field to blast everything nearby.
+  The bomb’s Knowledge tree is **Study → Spells → Bombs**: the bomb root
+  leads through Gunpowder I, II and III, adding 20% damage per rank. No troop
+  or tower research is required. Existing Gunpowder ranks, costs and research
+  times are retained; later ranks remain locked until the prior rank completes.
+  Its nested-triangle magic circle grows only with completed research.
+  Smithy → Spells → Bombs still holds damage training and Shaped charges;
+  War drums is in the Smithy under Realm → All troops.
 - The **war banner** (`war-banner.ts`, `×∞`: never used up, never bought)
   is dragged from the same palette and planted anywhere on the board as the
   keep's waving banner over a faint gold ring. While it stands every mobile
@@ -638,6 +664,12 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   it stands takes it down, as does carrying it off the board, and dragging
   it elsewhere moves it. It draws nothing from the run's random stream, so a
   run without one replays exactly as before.
+  Its Knowledge tree is in **Study → Spells → War banner**, independent of
+  tower research. Select nodes on the connected tree to inspect and research
+  the existing ranks: War banner, Rapid deployment (all three ranks),
+  Sheltering standard, Broad standard, then independent damage, marching speed,
+  and life branches; regeneration follows life. Timed research replaces the
+  tree with the centered upgrade until completion or confirmed cancellation.
 - **Necromancy** (`necromancy.ts`, `×∞`), a strike spell, is dragged from
   the same palette; while it is held a small pixel skull marks every grave
   on the board, and its aim shows a green ring of 3 cells, the skulls inside

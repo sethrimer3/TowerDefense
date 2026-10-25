@@ -56,8 +56,8 @@ test("research alone does not change any building in battle", () => {
 });
 
 test("every topic offers two or more paths of three ranks (the palace's, the branch buildings' and the den's spare one or more), with square icons", () => {
-  for (const t of PATH_TOPICS) assert.ok(PATHS.filter((p) => p.topic === t).length >= (["valkyriePalace", "assassinDen", "pyreTower", "frostTower", "stormTower", "chapterHouse", "berserkerLodge", "halberdYard", "bloodHall", "veilHouse", "poisonDen", "brazierTower", "hawkTower", "batteryTower", "mortarTower", "minelayerTower", "rangerLodge", "skirmishCamp", "skyrangerLodge", "infernoHall", "cinderHall", "stormHall"].includes(t) ? 1 : 2), t);
-  for (const p of PATHS) assert.equal(p.ranks.length, 3, p.id);
+  for (const t of PATH_TOPICS) assert.ok(PATHS.filter((p) => p.topic === t).length >= (["valkyriePalace", "assassinDen", "pyreTower", "frostTower", "stormTower", "chapterHouse", "berserkerLodge", "halberdYard", "bloodHall", "veilHouse", "poisonDen", "brazierTower", "hawkTower", "wispTower", "batteryTower", "mortarTower", "minelayerTower", "rangerLodge", "skirmishCamp", "skyrangerLodge", "infernoHall", "cinderHall", "stormHall"].includes(t) ? 1 : 2), t);
+  for (const p of PATHS) assert.equal(p.ranks.length, p.id === "wispArrow" ? 0 : 3, p.id);
   for (const [k, rows] of Object.entries(ICON_ROWS)) {
     assert.equal(rows.length, ICON_SIZE, k);
     for (const r of rows) assert.equal(r.length, ICON_SIZE, k);
@@ -196,15 +196,15 @@ test("Fire arrows set what they hit burning, and at III loose a volley", () => {
   assert.equal(three.sim.arrows.length, FIRE_ARROWS.volley);
 });
 
-test("Sharpshooters crit every 3rd arrow, and at III aim at the strongest", () => {
+test("Hawk focus adds damage each shot and acquires the strongest current HP", () => {
   const { sim, b, towers } = volley("archerTower", { hawkTower: { path: "sharpshooters", rank: 2 } }, [[0, -3]]);
   for (let k = 0; k < 2; k++) {
     towers.cooldown.set(b.id, 0);
     towers.step(sim, 1 / 30);
   }
   const [a, b2, c] = sim.arrows.map((a) => a.damage);
-  assert.equal(a, b2);
-  assert.equal(c, a * SHARP.crit);
+  assert.equal(b2, a * 1.02);
+  assert.equal(c, a * 1.04);
   const deadeye = volley("archerTower", { hawkTower: { path: "sharpshooters", rank: 3 } }, [[0, -2], [0, -4, 5e6]]);
   assert.equal(deadeye.sim.arrows[0].target, deadeye.enemies[1].id, "the stronger, further one");
 });
@@ -230,7 +230,7 @@ test("Gun crews reload faster and burst into grapeshot; Siege shot hits harder a
 test("the archer and cannon towers' branch towers each fight their own way before any rank", () => {
   const plain = volley("archerTower", undefined, [[0, -3]]), lit = volley("brazierTower", undefined, [[0, -3]]);
   assert.deepEqual([lit.sim.arrows[0].burn, lit.sim.arrows[0].burnFor], [lit.sim.arrows[0].damage * FIRE_ARROWS.hall.share, FIRE_ARROWS.hall.burn]);
-  assert.equal(archerTowerRange(lit.sim, battle("hawkTower").b), archerTowerRange(plain.sim, plain.b) + SHARP.hall);
+  assert.equal(archerTowerRange(lit.sim, battle("hawkTower").b), archerTowerRange(plain.sim, plain.b) * SHARP.range[0]);
   const cannon = volley("cannonTower", undefined, [[0, -4]]), battery = volley("batteryTower", undefined, [[0, -4]]), mortar = volley("mortarTower", undefined, [[0, -4]]);
   const cd = (v: typeof cannon) => v.towers.cooldown.get(v.b.id)!;
   assert.equal(cd(battery), cd(cannon) * GUNNERY.hall);
