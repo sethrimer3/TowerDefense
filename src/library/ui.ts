@@ -387,7 +387,7 @@ export class LibraryPage {
    * through the stone, and a fire, when one burns, right there. */
   ambience(): Scene {
     const night = this.sim.night;
-    return { rain: 0, wind: 0.1, howl: 0, sand: 0, thunder: 0, birds: (1 - night) * 0.7, night, drips: 0, fire: this.sim.fire.active ? 1 : 0, muffle: 0.75 };
+    return { rain: 0, wind: 0.1, howl: 0, sand: 0, thunder: 0, birds: (1 - night) * 0.7, night, drips: 0, fire: this.sim.fire.active ? 1 : 0, muffle: 0.75, mine: 0 };
   }
 
   /** Draws the nave (while the tab shows). */
