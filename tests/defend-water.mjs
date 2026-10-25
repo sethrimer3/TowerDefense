@@ -63,10 +63,22 @@ try {
     water.draw(pf); const pondWarm = hash(pondCanvas);
     pc.clearRect(0, 0, pondCanvas.width, pondCanvas.height); water.draw({ ...pf, cold: true });
     const pondCold = hash(pondCanvas);
+    // Only what stands right by the water is mirrored: a block of colour
+    // three cells above the pond leaves it as it was, one on its bank shows.
+    const reflectWith = (top, rows) => {
+      const fake = document.createElement('canvas'); fake.width = layer.width; fake.height = layer.height;
+      const fc = fake.getContext('2d'); fc.fillStyle = '#808080'; fc.fillRect(0, 0, fake.width, fake.height);
+      if (rows) { fc.fillStyle = '#ff00ff'; fc.fillRect(8 * sourcePx, top * sourcePx, 9 * sourcePx, rows * sourcePx); }
+      const probe = new PondWater(); probe.sync(pondMap);
+      pc.clearRect(0, 0, pondCanvas.width, pondCanvas.height);
+      probe.draw({ ...pf, rain: true, layer: fake }); // rain sends the ducks off
+      return hash(pondCanvas);
+    };
+    const pondPlain = reflectWith(0, 0), pondFar = reflectWith(4, 4), pondNear = reflectWith(9, 1);
     return { calm: calm.waterHash, rain: rain.waterHash, noReflection: noReflection.waterHash, moving: moving.waterHash, wakes,
       frozen: frozen.waterHash, frozenLater: frozenLater.waterHash, melted: melted.waterHash,
       reduced: reduced.waterHash, reducedLater: reducedLater.waterHash, dried: dried.waterHash, remaining: sim.floods.length,
-      pondCount: water.pondCount, pondWarm, pondCold };
+      pondCount: water.pondCount, pondWarm, pondCold, pondPlain, pondFar, pondNear };
   });
   assert.notEqual(report.calm, report.rain, 'rain changes water pixels');
   assert.notEqual(report.calm, report.noReflection, 'surroundings are reflected');
@@ -76,6 +88,8 @@ try {
   assert.equal(report.reduced, report.reducedLater, 'Reduce Motion freezes water animation');
   assert.equal(report.remaining, 0, 'meltwater disappears');
   assert.ok(report.pondCount); assert.notEqual(report.pondWarm, report.pondCold, 'ponds freeze visibly');
+  assert.equal(report.pondFar, report.pondPlain, 'ponds do not mirror roofs beyond their bank');
+  assert.notEqual(report.pondNear, report.pondPlain, 'ponds mirror their bank');
   assert.deepEqual(errors, []);
   mkdirSync('test-results', { recursive: true });
   await page.screenshot({ path: 'test-results/defend-water.png', fullPage: true });

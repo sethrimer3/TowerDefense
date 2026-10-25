@@ -1,13 +1,14 @@
 /** Life on the city's ponds, after the dungeon's pools. When it rains,
  * drops fall all over the open water, each a faint pixel ring that spreads
  * and fades; when it doesn't, ducks paddle about (`pond-ducks.ts`), now
- * and then leaving a ring of their own. The bank, its trees and the houses
- * beside it are mirrored into the water, wavering with a faint idle
+ * and then leaving a ring of their own. The bank and the trees right by it
+ * are mirrored into the water, wavering with a faint idle
  * shimmer and pushed about by every ring that passes.
  *
  * Everything keeps to the open water of the pixel-art ponds (`park-art.ts`)
  * and is drawn on their pixel grid. The mirror image is cut from the cached
- * city layer, flipped about each column's shoreline, then copied back in
+ * city layer, flipped about each column's shoreline (only `REFLECTION.reach`
+ * cells of it, fading out, so nothing further off shows), then copied back in
  * thin strips shifted by the ripples, tinted by the water and masked to
  * it: plain image copies, no pixel readback. Presentation only. */
 import { CELLS_W, cellInBounds, cellIndex, defendRandom } from "./grid.ts";
@@ -21,9 +22,10 @@ import { Ducks, type Walker } from "./pond-ducks.ts";
 const RAIN = { life: 0.85, speed: 0.6, rate: 2.6, alpha: 0.5 };
 /** A duck's ring: slower, wider and a little stronger, but rare. */
 const WAKE = { life: 1.6, speed: 0.42, alpha: 0.34 };
-/** Reflection tuning: opacity, how far the water tints it, and how far (in
- * cells) the shimmer and the ripples push its strips around. */
-const REFLECTION = { alpha: 0.55, tint: 0.4, shimmer: 0.03, rippleShift: 0.05, rippleWidth: 0.2 };
+/** Reflection tuning: opacity, how far the water tints it, how far (in
+ * cells) the shimmer and the ripples push its strips around, and how far
+ * up the bank it reaches (cells), fading out over the last `fade` of it. */
+const REFLECTION = { alpha: 0.55, tint: 0.4, shimmer: 0.03, rippleShift: 0.05, rippleWidth: 0.2, reach: 1.5, fade: 0.5 };
 
 /** A ring spreading from (x, y) since `t0` (s): rain's or a duck's. */
 type Ring = { x: number; y: number; t0: number; kind: "rain" | "wake"; k: number };
@@ -246,11 +248,14 @@ export class PondWater {
     m.setTransform(1, 0, 0, 1, 0, 0);
     m.clearRect(0, 0, box.w, box.h);
     m.imageSmoothingEnabled = false;
+    const reach = REFLECTION.reach * px, fade = reachFade(m, reach, REFLECTION.fade);
     for (const pond of this.ponds)
       for (const [cx, top] of pond.shore) {
         // Mirror about the top of the open water in this column.
         const line = (top + 0.5 - POND.open * 0.9) * px;
-        const depth = (pond.y1 + 1) * px - line;
+        // Only what stands right by the water: the bank and its trees,
+        // never the houses across the street.
+        const depth = Math.min((pond.y1 + 1) * px - line, reach);
         const sx = Math.floor(cx * px), sw = Math.ceil((cx + 1) * px) - sx;
         const sy = Math.max(0, line - depth);
         const sh = line - sy;
@@ -260,6 +265,11 @@ export class PondWater {
         // The trees stand apart from the city layer, over the walkers.
         const a = ART / px, trees = this.art?.canopies;
         if (trees) m.drawImage(trees, sx * a, sy * a, sw * a, sh * a, sx, sy, sw, sh);
+        m.translate(0, line);
+        m.globalCompositeOperation = "destination-out";
+        m.fillStyle = fade;
+        m.fillRect(sx, -sh, sw, sh);
+        m.globalCompositeOperation = "source-over";
       }
     m.setTransform(1, 0, 0, 1, 0, 0);
   }
@@ -350,3 +360,17 @@ function ringPixels(x: number, y: number, r: number, put: (x: number, y: number)
   }
 }
 
+/** Erases a reflection toward the far end of its reach, in a few hard steps
+ * so it stays pixel-crisp: drawn with the shoreline at 0 and the far end at
+ * -`reach`, it leaves the near `1 - fade` of it whole. */
+export function reachFade(c: CanvasRenderingContext2D, reach: number, fade: number) {
+  const g = c.createLinearGradient(0, -reach, 0, 0), steps = 3;
+  for (let i = 0; i < steps; i++) {
+    const a = 1 - i / steps, from = (i * fade) / steps, to = ((i + 1) * fade) / steps;
+    g.addColorStop(from, `rgba(0,0,0,${a})`);
+    g.addColorStop(to, `rgba(0,0,0,${a})`);
+  }
+  g.addColorStop(fade, "rgba(0,0,0,0)");
+  g.addColorStop(1, "rgba(0,0,0,0)");
+  return g;
+}
