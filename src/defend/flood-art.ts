@@ -17,6 +17,7 @@ import { HOLD, SINK_SECONDS, floodRadius } from "./boats.ts";
 import type { DefendSim } from "./sim.ts";
 import { ENEMIES } from "./catalog.ts";
 import { parkArt } from "./park-art.ts";
+import { reachFade } from "./pond-water.ts";
 
 /** Art pixels a cell (the ponds' scale). */
 const ART = 8;
@@ -29,7 +30,9 @@ const ICE_EDGE = abgr(0xc2e6ee), ICE = abgr(0x86b9ce), ICE_DARK = abgr(0x72a5bf)
 const CREST = abgr(0x4f8fa8), GLINT = abgr(0x9cc8d6), SPARK = abgr(0xe4f8ff);
 /** Where each band begins, in art pixels from the edge. */
 const BANDS = { bank: .6, shallows: 1.3, open: 3, deep: 9 };
-const REFLECTION = { alpha: 0.5, tint: 0.4 };
+/** Reflection: opacity, water tint, and how far up the bank it reaches
+ * (cells), fading out over the last `fade` of it. */
+const REFLECTION = { alpha: 0.5, tint: 0.4, reach: 1.5, fade: 0.5 };
 
 export type FloodFrame = {
   area?: AreaId;
@@ -273,6 +276,7 @@ export class FloodArt {
     m.setTransform(1, 0, 0, 1, 0, 0);
     m.clearRect(0, 0, box.w, box.h);
     m.imageSmoothingEnabled = false;
+    const reach = Math.round(REFLECTION.reach * ART), fade = reachFade(m, reach, REFLECTION.fade);
     for (let i = 0; i < box.w; i++) {
       const x = box.x + i;
       // Each disconnected span has its own shore: never mirror an upper
@@ -282,12 +286,18 @@ export class FloodArt {
         while (y < box.y + box.h && this.at(x, y) < BANDS.shallows) y++;
         const top = y;
         while (y < box.y + box.h && this.at(x, y) >= BANDS.shallows) y++;
-        const sy = Math.max(0, top - (y - top)), sh = top - sy;
+        // Only what stands right by the water, never the roofs beyond.
+        const sy = Math.max(0, top - Math.min(y - top, reach)), sh = top - sy;
         if (sh <= 0) continue;
         m.setTransform(1, 0, 0, -1, -box.x, 2 * top - box.y);
         m.drawImage(f.layer, x * k, sy * k, k, sh * k, x, sy, 1, sh);
         const trees = parkArt(f.sim.map).canopies;
         if (trees) m.drawImage(trees, x, sy, 1, sh, x, sy, 1, sh);
+        m.translate(0, top);
+        m.globalCompositeOperation = "destination-out";
+        m.fillStyle = fade;
+        m.fillRect(x, -sh, 1, sh);
+        m.globalCompositeOperation = "source-over";
       }
     }
     m.setTransform(1, 0, 0, 1, 0, 0);
