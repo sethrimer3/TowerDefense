@@ -10,7 +10,7 @@ import { generateCity } from '../src/defend/citygen.ts';
 import { drawUnits } from '../src/defend/battle-art.ts';
 import { meleeFacing } from '../src/defend/melee-facing.ts';
 import { meleeBody } from '../src/defend/melee-body.ts';
-import { BODY_FRAMES, BODY_DIRECTIONS } from '../src/defend/melee-body-data.ts';
+import { BODY_FRAMES } from '../src/defend/melee-body-data.ts';
 import { UnitOutline } from '../src/defend/unit-outline.ts';
 import { pixelSprite, setPixelArt } from '../src/defend/pixel-sprites.ts';
 const canvas=document.querySelector('canvas'),ctx=canvas.getContext('2d');
@@ -39,6 +39,6 @@ function draw({pixel=true,simple=false,merged=false}={}){
   ctx.fillStyle='#ece3c9';ctx.font=width<500?'10px monospace':'13px monospace';ctx.fillText(`${kind} ${dir}`,i*col+5,(r+1)*row-8);
  }));
 }
-pixelSprite('v2/units/melee-facing');pixelSprite('swordsman');
-window.facingFixture={draw,make,paint,sim,canvas,ctx,px,kinds,dirs,meleeFacing,meleeBody,setPixelArt,pixelSprite,BODY_FRAMES,BODY_DIRECTIONS};draw();
+
+window.facingFixture={draw,make,paint,sim,canvas,ctx,px,kinds,dirs,meleeFacing,meleeBody,setPixelArt,pixelSprite,BODY_FRAMES};draw();
 </script></html>

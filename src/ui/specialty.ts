@@ -16,9 +16,11 @@ import { SHADOW_BLEED, SHADOW_EDGE, SHADOW_KNIVES, SHADOW_PATHS, SHADOW_PIERCE, 
 import { NANO_BLAST, NANO_CLOUD, NANO_PATHS, NANO_REPLICATE, nanoAllocated, nanoRank, respecNano, undoNano, upgradeNano, type NanoPathId, type NanoRanks } from "../nanobot-upgrades.ts";
 import { CHAIN, CRIT_CHANCE, CRIT_DAMAGE, DETONATOR, REVOLUTIONARY_PATHS, SQUAD, respecRevolutionary, revolutionaryAllocated, revolutionaryRank, undoRevolutionary, upgradeRevolutionary, type RevolutionaryPathId, type RevolutionaryRanks } from "../revolutionary-upgrades.ts";
 import { BALLISTA_PATHS, FIRE_BOLTS, HEAVY_BOLTS, WINDLASS, ballistaAllocated, ballistaRank, respecBallistas, undoBallistas, upgradeBallistas, type BallistaPathId, type BallistaRanks } from "../ballista-upgrades.ts";
-import { pathById, type PathId, WHIRLWIND, BLADE_DANCE, LEGEND, FIRE_ARROWS, SHARP, GUNNERY, SIEGE_SHOT, CRUSADE, BLOODLETTERS, SHADOWCLOAK, VENOM, HEADHUNT, GRENADIERS, VOLLEY, BAYONET, SHARP_MUSKETS, BELT_FEED, LONG_SPEARS, SET_SPEARS, TESTUDO, SPEAR_WALL, BARBED, THROWING, HEAVY_LANCE, WINGED, TRIPOD, QUICKDRAW, DUELISTS, GUN_SHIELD, OVERDRIVE, STOPPING, DEADEYE, PIERCING, CLUSTER, SALVO, MARKSMEN, RICOCHET, SUPPRESS, BERSERK, HALBERD, BOW_JAVELIN, SKYRANGER, SKIRMISH, FORTIFY, PYRO, RIME, STORM, PYROCLASM, CINDERS, SPOTTERS, SIGNAL } from "../knowledge-paths.ts";
+import { pathById, type PathId, WHIRLWIND, BLADE_DANCE, LEGEND, FIRE_ARROWS, SHARP, GUNNERY, SIEGE_SHOT, MINELAYER, CRUSADE, BLOODLETTERS, SHADOWCLOAK, VENOM, HEADHUNT, GRENADIERS, VOLLEY, BAYONET, SHARP_MUSKETS, BELT_FEED, LONG_SPEARS, SET_SPEARS, TESTUDO, SPEAR_WALL, BARBED, THROWING, HEAVY_LANCE, WINGED, TRIPOD, QUICKDRAW, DUELISTS, GUN_SHIELD, OVERDRIVE, STOPPING, DEADEYE, PIERCING, CLUSTER, SALVO, MARKSMEN, RICOCHET, SUPPRESS, BERSERK, HALBERD, BOW_JAVELIN, SKYRANGER, SKIRMISH, FORTIFY, PYRO, RIME, STORM, PYROCLASM, CRYOMANCY, CONDUCTION, SPOTTERS, SIGNAL } from "../knowledge-paths.ts";
 import { bonuses } from "../progression.ts";
 import { denOf } from "../defend/assassins.ts";
+import { deployRangeOf } from "../defend/deployment.ts";
+import type { BuildingKind } from "../defend/citygen.ts";
 import { ITEM_NAMES, archerDamage, archerCooldown, archerRange, cannonDamage, cannonCooldown, CANNON_RANGE, NANO_TOWER, SOLDIER, ARCHER_UNIT, soldierScale, STRUCTURES, flameDps, flameRange, iceDamage, ICE_RANGE, iceChill, watchRadius, fireballDamage, fireballSplash, emberDps, emberSeconds, FIRE_MAGE, FIREBALL_RANGE, keepHp, BRAWLER, ASSASSIN_UNIT, SLINGER, SNIPER, MUSKETEER, GUNNER, MACHINE_GUNNER, GATLING_GUNNER, RAIL_SNIPER, ROCKETEER, SPEARMAN, HOPLITE, LANCER, JAVELINEER, HERO, SHADE, WALL_BLOCK_DESCRIPTION, wallHp, GATE, GATE_DESCRIPTION, BALLISTA, BALLISTA_DESCRIPTION, ballistaCooldown, ballistaDamage, ballistaRange, gateHpScale, gateShut, spikeDamage, spikeEvery, isWizardTower, isSwordHall, isAssassinDen, isArcherTower, isCannonTower, isArcherHall, isMageHall, type PaletteItem } from "../defend/catalog.ts";
 
 /** `kind`'s effective numbers wearing `path` at `rank` (none: plain), with
@@ -29,14 +31,17 @@ export function kindStats(save: Save, kind: PaletteItem, path?: PathId, rank = 0
   const n = (v: number) => Number(v.toFixed(2));
   if (isArcherTower(kind)) {
     const sharp = at("sharpshooters"), fire = at("fireArrows"), lit = kind === "brazierTower" || fire > 0, hawk = kind === "hawkTower" || sharp > 0;
-    const damage = archerDamage(l.archerDamage) * b.towerDamage * (sharp >= 3 ? SHARP.damage : 1);
-    return `${n(damage)} damage · ${n(archerCooldown(l.archerRate) * b.towerReload)}s reload · ${n(archerRange(l.archerRange) + (sharp ? SHARP.range : hawk ? SHARP.hall : 0))} range${lit ? ` · ${fire ? FIRE_ARROWS.burn[fire] : FIRE_ARROWS.hall.burn}s burn` : ""}${fire >= 3 ? " · 3 arrows" : ""}${sharp >= 2 ? " · every third arrow 3x damage" : ""}`;
+    const damage = archerDamage(l.archerDamage) * b.towerDamage;
+    if (kind === "wispTower") return `${n(damage)} per enemy per slice · ${n(archerCooldown(l.archerRate) * b.towerReload)}s between slices · ${n(archerRange(l.archerRange))} range · one living arrow with six tendrils · later upgrades still to come`;
+    if (hawk) return `${n(damage)} starting damage · ${n(archerCooldown(l.archerRate) * b.towerReload * (sharp ? SHARP.reload : 1))}s initial reload · ${n(archerRange(l.archerRange) * SHARP.range[sharp])} range · locks the highest current HP${sharp ? " · +2% per consecutive shot, up to +1000%" : ""}${sharp >= 3 ? " · cadence builds to 10x the half-rate base; new lock resets damage and speed" : ""}`;
+    return `${n(damage)} damage · ${n(archerCooldown(l.archerRate) * b.towerReload)}s reload · ${n(archerRange(l.archerRange))} range${lit ? ` · ${fire ? FIRE_ARROWS.burn[fire] : FIRE_ARROWS.hall.burn}s burn` : ""}${fire >= 3 ? " · 3 arrows" : ""}`;
   }
   if (isCannonTower(kind)) {
-    const gun = at("gunnery"), siege = at("siegeShot"), battery = kind === "batteryTower" || gun > 0, mortar = kind === "mortarTower" || siege > 0;
+    const gun = at("gunnery"), siege = at("siegeShot"), mines = at("minelaying"), battery = kind === "batteryTower" || gun > 0, mortar = kind === "mortarTower" || siege > 0;
+    if (kind === "minelayerTower") return `${n(cannonDamage(l.cannonDamage) * b.towerDamage)} mine damage · ${n(cannonCooldown(l.cannonRate) * b.towerReload)}s laying · ${CANNON_RANGE * MINELAYER.range} range · ${MINELAYER.cap[mines]} mines${mines ? " · drag to aim in battle" : " · random coverage"}${mines >= 3 ? " · walking Smart charges" : ""}`;
     const hit = siege ? SIEGE_SHOT.damage[siege] : mortar ? SIEGE_SHOT.hall.damage : 1;
     const reload = (gun ? GUNNERY.reload[gun] : battery ? GUNNERY.hall : 1) * (siege ? SIEGE_SHOT.reload : mortar ? SIEGE_SHOT.hall.reload : 1);
-    return `${n(cannonDamage(l.cannonDamage) * b.towerDamage * hit)} damage · ${n(cannonCooldown(l.cannonRate) * b.towerReload * reload)}s reload · ${CANNON_RANGE + (siege >= 3 ? SIEGE_SHOT.range : 0)} range${gun >= 2 ? " · 4 extra blasts" : ""}`;
+    return `${n(cannonDamage(l.cannonDamage) * b.towerDamage * hit)} damage · ${n(cannonCooldown(l.cannonRate) * b.towerReload * reload)}s reload · ${CANNON_RANGE + (siege >= 3 ? SIEGE_SHOT.range : 0)} range${battery ? " · 4 extra blasts" : ""}${mortar ? ` · ${n(cannonDamage(l.cannonDamage) * b.towerDamage * hit * SIEGE_SHOT.burnShare)} burn damage/s for ${SIEGE_SHOT.burnLife}s` : ""}`;
   }
   if (isSwordHall(kind) || isArcherHall(kind)) {
     const sword = isSwordHall(kind), base = sword ? SOLDIER : ARCHER_UNIT;
@@ -124,8 +129,12 @@ export function kindStats(save: Save, kind: PaletteItem, path?: PathId, rank = 0
     return `${watchRadius(l.watchRadius) + (spot >= 2 ? SPOTTERS.radius : 0) + (signal >= 2 ? SIGNAL.radius : 0)} marking range · ${SPOTTERS.mark[spot]}x marked damage${signal ? ` · enemies move at ${SIGNAL.slow[signal] * 100}% speed` : ""}`;
   }
   if (isMageHall(kind)) {
-    const pyro = at("pyroclasm"), cinders = at("cinders"), hit = pyro ? PYROCLASM.damage : kind === "infernoHall" ? PYROCLASM.hall : 1, lasts = cinders ? CINDERS.life : kind === "cinderHall" ? CINDERS.hall : 1;
-    return `Recruits: ${n(FIRE_MAGE.hp * soldierScale(l.soldierArms) * b.troopHp)} HP · ${n(fireballDamage(l.mageFireball) * soldierScale(l.soldierArms) * b.troopDamage * hit)} fireball damage · ${n(fireballSplash(l.mageFireball) * (pyro >= 2 ? PYROCLASM.splash : 1))} blast radius · ${n(emberDps(l.mageEmbers) * b.troopDamage * (cinders >= 2 ? CINDERS.dps : 1))} ground damage/s · ${n(emberSeconds(l.mageEmbers) * lasts)}s burning ground`;
+    const pyro = at("pyroclasm"), frost = at("cinders"), storm = at("conduction"), damage = fireballDamage(l.mageFireball) * soldierScale(l.soldierArms) * b.troopDamage;
+    const hp = `Recruits: ${n(FIRE_MAGE.hp * soldierScale(l.soldierArms) * b.troopHp)} HP`;
+    if (kind === "stormHall") return `${hp} · ${n(damage)} first-hit lightning damage · ${CONDUCTION.range[storm]} range · ${CONDUCTION.targets[storm]} enemies · ${CONDUCTION.jump[storm]}-cell jumps · ${CONDUCTION.crit[storm]*100}% double-damage critical chance · 85% damage retained per link`;
+    if (kind === "cinderHall") return `${hp} · ${n(damage * CRYOMANCY.damage)} frost damage · ${CRYOMANCY.range[frost]} range · ${n(fireballSplash(l.mageFireball) * CRYOMANCY.radius[frost])} blast radius · ${Math.round((1-CRYOMANCY.speed[frost])*100)}% slow for ${CRYOMANCY.chill[frost]}s · ${CRYOMANCY.freeze[frost]}s freeze`;
+    const fire = kind === "infernoHall", hit = fire ? PYROCLASM.damage[pyro] : 1;
+    return `${hp} · ${n(damage * hit)} fireball damage · ${n(fireballSplash(l.mageFireball) * (fire ? PYROCLASM.radius[pyro] : 1))} blast radius · ${n(emberDps(l.mageEmbers) * b.troopDamage * hit)} ground damage/s · ${n(emberSeconds(l.mageEmbers) * (fire ? PYROCLASM.life[pyro] : 1))}s burning ground${fire ? ` · full-area flames · ${PYROCLASM.cling[pyro]}s clinging fire` : ""}`;
   }
   if (kind === "revolutionary") return revolutionaryStats(save, save.defend.revolutionaryRanks);
   if (kind === "shadow") return shadowStats(save, save.defend.shadowRanks);
@@ -199,6 +208,11 @@ const coreStats = (line: string, core: number) => line.split(" · ").slice(0, co
 
 /** A building of `kind` wearing `wear`: its basic stats and its upgrades' abilities. */
 export function buildingSheet(save: Save, kind: PaletteItem | "wallSpikes", wear?: Wear): StatSheet {
+  const sheet = ownSheet(save, kind, wear), deploy = kind === "wallSpikes" ? 0 : deployRangeOf(kind as BuildingKind, bonuses(save));
+  return deploy ? { ...sheet, stats: [...sheet.stats, `deploys within ${Number(deploy.toFixed(1))} cells`] } : sheet;
+}
+
+function ownSheet(save: Save, kind: PaletteItem | "wallSpikes", wear?: Wear): StatSheet {
   const d = save.defend;
   if (kind === "revolutionary") return { stats: coreStats(revolutionaryStats(save, d.revolutionaryRanks), 3), abilities: sharedAbilities(REVOLUTIONARY_PATHS, d.revolutionaryRanks) };
   if (kind === "shadow") return { stats: coreStats(shadowStats(save, d.shadowRanks), 4), abilities: sharedAbilities(SHADOW_PATHS, d.shadowRanks) };

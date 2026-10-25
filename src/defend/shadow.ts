@@ -21,6 +21,7 @@
  * `edge`, `bleed` and the blades stay absent or empty without a Shadow, and
  * nothing here draws from the random stream, so runs without one replay
  * unchanged. */
+import { bannerFor } from "./deployment.ts";
 import { dist, sq } from "../exact.ts";
 import { SHADOW_BLEED, SHADOW_EDGE, SHADOW_KNIVES, SHADOW_PIERCE, shadowRank } from "../shadow-upgrades.ts";
 import { ENEMIES, SHADE, enemySize, type EnemyKind } from "./catalog.ts";
@@ -87,7 +88,8 @@ export function stepShade(sim: DefendSim, s: Soldier, dt: number) {
     }
     return;
   }
-  if (sim.warBanner) return answerBanner(sim, sim.warBanner, s, SHADE.speed, dt);
+  const banner = bannerFor(sim, s);
+  if (banner) return answerBanner(sim, banner, s, SHADE.speed, dt);
   if (s.thinkT <= 0) seek(sim, s);
   sim.followPath(s, null, SHADE.speed, dt);
 }

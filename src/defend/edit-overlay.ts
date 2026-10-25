@@ -5,8 +5,6 @@ import { SUB, TILES_H, TILES_W, boardSize, tileKey, type Rect, type TilePos } fr
 import { QUARTER, QUARTERS_H, QUARTERS_W } from "./layout.ts";
 import type { StructureKind } from "./catalog.ts";
 import { STRUCTURES } from "./catalog.ts";
-import { buildingArt, buildingFrame } from "./building-sprite-manifest.ts";
-import { drawPixelFrame } from "./pixel-sprites.ts";
 
 export type Overlay = {
   /** Tile keys that accept the dragged item. */
@@ -229,14 +227,6 @@ function drawGateTargets(c: CanvasRenderingContext2D, px: number, g: NonNullable
 
 function drawGhost(c: CanvasRenderingContext2D, px: number, ghost: NonNullable<Overlay["ghost"]>) {
   const r = ghost.rect;
-  const family = ghost.kind in STRUCTURES ? buildingArt(ghost.kind as StructureKind, r.w, r.h) : undefined;
-  if (family) {
-    const x = Math.round(r.x * px), y = Math.round(r.y * px);
-    c.save(); c.globalAlpha = 0.7;
-    const drawn = drawPixelFrame(c, family.sheet, buildingFrame(family, 0, ghost.path), x, y, Math.round((r.x + r.w) * px) - x, Math.round((r.y + r.h) * px) - y);
-    c.restore();
-    if (drawn) return;
-  }
   c.fillStyle = "rgba(242,210,122,0.45)";
   c.fillRect(r.x * px, r.y * px, r.w * px, r.h * px);
   c.strokeStyle = "#f2d27a";

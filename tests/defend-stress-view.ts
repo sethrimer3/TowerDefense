@@ -11,7 +11,7 @@ const save = { ...defaultDefendSave(), layout, levels: sim.levels };
 const page = new DefendPage(document.querySelector('#stress')!, {
   save: () => save, wallet: () => ({ gold:0,copper:0,silver:0,free:true }), setWallet: () => {},
   bonuses: () => NO_BONUSES, earnWave: () => ({upgrade:0}),
-  persist: () => {}, reduceMotion: () => false, effects: () => true, devMode: () => false,
+  persist: () => {}, reduceMotion: () => false, effects: () => true, devMode: () => false, tripleTapFlag: () => !!(window as any).tripleTapFlag,
 });
 page.show();
 // Private fields are exposed only in this unbundled test fixture.

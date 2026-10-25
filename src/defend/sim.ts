@@ -1,3 +1,5 @@
+import { ageMageChill, type MageChill, type MageBolt } from "./mage-attunements.ts";
+import { stepMines, type Mine } from "./mines.ts";
 import { BASTIONS, keepRank } from "../keep-upgrades.ts";
 import { buildingPaths } from "../specializations.ts";
 import { DefenderIndex } from "./defender-index.ts";
@@ -53,11 +55,13 @@ import { atHome, escaped, Builders } from "./civilians.ts";
 import { stepEnemy } from "./enemies.ts";
 import { blocked, cellAt, cellCenter, center, fillFlowField, nearestOpen, type FieldTerrain, type Point } from "./pathing.ts";
 import { ignite, stepArrows, stepShells, Towers } from "./towers.ts";
+import type { WispArrow } from "./wisp-arrow.ts";
 import { FORTIFY, SHATTER, SIGNAL, SPOTTERS, pathRank } from "../knowledge-paths.ts";
 import { Barracks, stepArcher, stepSwordsman } from "./troops.ts";
 import { cloaked, spreadVenom, stepVenom } from "./assassins.ts";
 import { nanoDeath, stepNano, type Infection, type NanoBurst, type NanoCloud, type NanoShell } from "./nanobots.ts";
 import { perched } from "./gun-sight.ts";
+import { fence, type Rally } from "./deployment.ts";
 import { hopliteGuard } from "./spears.ts";
 import { heroRises, stepHero, stepSwings, type Swing } from "./hero.ts";
 import { stepBlades, stepBleed, stepShade, type Blade } from "./shadow.ts";
@@ -103,6 +107,7 @@ export type Enemy = {
   /** Seconds left chilled by a wizard's ice (slowed); absent when not, so
    * a run without ice keeps its state exactly as before. */
   chill?: number;
+  mageChills?: MageChill[];
   /** Seconds left frozen solid by Rime's deep freeze (stopped); absent when not. */
   freeze?: number;
   /** Frozen by a Frost nova under Shatter: harder hit until it thaws; absent when not. */
@@ -259,6 +264,8 @@ export type Shell = {
   x0: number; y0: number; x1: number; y1: number; t: number; dur: number; damage: number; r: number; origin?: Arrow["origin"];
   /** Gun crews (a Study path): bursting into grapeshot; absent otherwise. */
   grape?: boolean;
+  mortar?: { dps: number; life: number };
+  mine?: { smart: boolean };
 };
 /** Glowing cracks left where something exploded; they cool and fade. */
 export type Scorch = { x: number; y: number; r: number; seed: number; t: number; life: number };
@@ -348,7 +355,15 @@ export class DefendSim {
   soldiers: Soldier[] = [];
   civilians: Civilian[] = [];
   arrows: Arrow[] = [];
+  wisps: WispArrow[] = [];
+  readonly wispOwners = new Map<number, WispArrow>();
   shells: Shell[] = [];
+  /** Proximity mines and directed aim, reset with each battle. */
+  mines: Mine[] = [];
+  mineAims = new Map<number, { x: number; y: number }>();
+  /** Troop buildings' rally points by building id, as the player aimed
+   * them this battle (`deployment.ts`); not part of the replayed state. */
+  readonly rallies = new Map<number, Rally>();
   /** Siege engines' balls, bolts, stones and rockets in flight. */
   siegeShots: SiegeShot[] = [];
   /** Wizard towers' fire and ice. */
@@ -356,6 +371,7 @@ export class DefendSim {
   frosts: Frost[] = [];
   /** Fire mages' fireballs in flight, and the ground they set burning. */
   fireballs: Fireball[] = [];
+  mageBolts: MageBolt[] = [];
   blazes: Blaze[] = [];
   /** Valkyries' charge stabs, fading. */
   stabs: Stab[] = [];
@@ -627,6 +643,7 @@ export class DefendSim {
     stepPlacedWalls(this, dt);
     stepGates(this, dt);
     stepShells(this, dt);
+    stepMines(this, dt);
     stepNano(this, dt);
     stepSiegeShots(this, dt);
     this.wizards.step(this, dt);
@@ -637,7 +654,9 @@ export class DefendSim {
     this.warBanner?.refresh(this);
     for (const s of this.soldiers) {
       stepBannerLife(this, s, dt);
+      const x0 = s.x, y0 = s.y;
       STEP_SOLDIER[s.kind](this, s, dt);
+      fence(this, s, x0, y0);
       stepBannerLife(this, s, 0);
     }
     stepMeteors(this, dt);
@@ -683,6 +702,11 @@ export class DefendSim {
 
   /** Effects age, scorches cool, hit flashes fade. */
   private tick(dt: number) {
+    if (this.mageBolts.length) {
+      for (const b of this.mageBolts) b.t += dt;
+      this.mageBolts = this.mageBolts.filter(b => b.t < b.life);
+    }
+    for (const e of this.enemies) ageMageChill(e, dt);
     for (const fx of this.effects) fx.t += dt;
     this.effects = this.effects.filter((fx) => fx.t < 0.6);
     for (const s of this.scorches) s.t += dt;
@@ -1222,6 +1246,28 @@ export class DefendSim {
   plantFlag(at: Point) {
     this.warBanner = new WarBanner(at.x, at.y, true);
     this.rethink();
+  }
+
+  /** Takes the rally flag away, leaving troops to their own reach. True
+   * when there was one; the war banner stays where it stands. */
+  liftFlag(): boolean {
+    if (!this.warBanner?.flag) return false;
+    this.warBanner = null;
+    this.rethink();
+    return true;
+  }
+
+  /** Sets troop building `id`'s rally point (`deployment.ts`'s `rallyAim`),
+   * or with null clears it; its troops rethink at once. */
+  setRally(id: number, at: Rally | null) {
+    if (at) this.rallies.set(id, at);
+    else this.rallies.delete(id);
+    for (const s of this.soldiers) {
+      if (s.home !== id) continue;
+      s.thinkT = 0;
+      s.path = [];
+      s.target = -1;
+    }
   }
 
   /** Every troop rethinks at once, after the banner moves. */

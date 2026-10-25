@@ -1921,6 +1921,16 @@ nav button > .tab-idle[hidden] { display: none; }
 }
 .sconce.left { left: 0; }
 .sconce.right { right: 0; }
+/* The keep's sunbeams and dust, over the menu too, as light rather than paint. */
+.chamber-light {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  mix-blend-mode: screen;
+}
 .chamber-content {
   position: absolute;
   inset: 0;
@@ -2177,19 +2187,13 @@ nav button > .tab-idle[hidden] { display: none; }
   .tiles-shelf { padding: 10px 4px 14px; }
 }
 
-.banner-research-shared { max-width: 640px; margin: auto; }
-.banner-research h4 { text-align: center; }
-.banner-research-branches { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding-top: 12px; }
-.banner-research-branches section { min-width: 0; }
-.banner-research-branches .ledger-skill { flex-wrap: wrap; }
-@media (max-width: 760px) { .banner-research-branches { grid-template-columns: 1fr; } }
-
-.banner-research-shared { max-width: 640px; margin: auto; }
-.banner-research h4 { text-align: center; }
-.banner-research-branches { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding-top: 12px; }
-.banner-research-branches section { min-width: 0; }
-.banner-research-branches .ledger-skill { flex-wrap: wrap; }
-@media (max-width: 760px) { .banner-research-branches { grid-template-columns: 1fr; } }
+.banner-research { max-width: 720px; margin: auto; }
+.banner-research h3 { text-align: center; }
+.banner-research [data-banner-tree], .banner-research [data-bomb-tree] { position: relative; }
+.banner-research .banner-tree, .banner-research .bomb-tree { height: 420px; min-height: 300px; }
+.banner-node-glyph { font-size: 23px; }
+.banner-tree-detail { margin-top: 12px; }
+.banner-tree-detail .ledger-skill { flex-wrap: wrap; }
 
 /* The Study's stacks use the same grid as Tiles. */
 .ledger-collection { position: relative; padding: 8px 6px 16px; }
@@ -2243,3 +2247,17 @@ nav button > .tab-idle[hidden] { display: none; }
 .spell-choice { display: flex; flex-direction: column; align-items: center; min-width: 120px; }
 .spell-choice small { font-size: 0.75em; opacity: 0.8; }
 .spell-choice[class*="hue-"][aria-pressed="true"] { box-shadow: 0 0 0 2px var(--hue), 0 0 14px var(--hue-deep); }
+/* The magnifying glass above a drag on the Defend board (`defend/loupe.ts`):
+   the board's pixels zoomed, in a brass rim. */
+.defend-loupe {
+  position: fixed;
+  z-index: 49;
+  pointer-events: none;
+  box-sizing: content-box;
+  border: 3px solid var(--brass, #b98a3e);
+  outline: 2px solid #000;
+  border-radius: 6px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.6), inset 0 0 0 1px #f0cf86;
+  image-rendering: pixelated;
+  background: #14100b;
+}

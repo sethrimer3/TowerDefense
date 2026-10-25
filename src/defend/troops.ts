@@ -49,7 +49,8 @@ import type { Building } from "./citygen.ts";
 import { CELLS_W, CELLS_H, CELL_COUNT, cellX, cellY } from "./grid.ts";
 import { cellAt, cellCenter, center, findPath, nearest, type PathLimits, type Point } from "./pathing.ts";
 import type { DefendSim, Enemy, Soldier } from "./sim.ts";
-import { answerBanner, MARCH_SIGHT } from "./war-banner.ts";
+import { answerBanner, MARCH_SIGHT, type WarBanner } from "./war-banner.ts";
+import { bannerFor, deployment, postOf, postPath, strollStreets, TRAINS, within } from "./deployment.ts";
 import { BERSERK, CRUSADE, HALBERD, SKIRMISH, VOLLEY, pathRank } from "../knowledge-paths.ts";
 import { bigGame, bulletOf, pierceOf, sniperRange, sniperReload } from "./snipers.ts";
 import { railShot, squadSize } from "./revolutionary.ts";
@@ -156,13 +157,6 @@ export class Barracks {
   }
 }
 
-/** What each troop building trains. */
-const TRAINS: Partial<Record<Building["kind"], Soldier["kind"]>> = {
-  barracks: "sword", chapterHouse: "sword", berserkerLodge: "sword", halberdYard: "sword", heroHall: "hero", shadow: "shade", archerBarracks: "archer", rangerLodge: "archer", skirmishCamp: "archer", skyrangerLodge: "archer", mageGuild: "mage", infernoHall: "mage", cinderHall: "mage", valkyriePalace: "valkyrie", darkKeep: "darkWizard",
-  meleeGuild: "brawler", rangedGuild: "slinger", assassinDen: "assassin", bloodHall: "assassin", veilHouse: "assassin", poisonDen: "assassin", sniperLodge: "sniper", musketHall: "musketeer",
-  spearHall: "spearman", phalanx: "hoplite", javelinCamp: "javelineer", lancerStable: "lancer",
-  gunHall: "gunner", gunNest: "machineGunner", gatlingNest: "gatlingGunner", rocketBattery: "rocketeer", revolutionary: "railSniper",
-};
 const isBarracks = (b: Building) => b.kind in TRAINS;
 
 const byDistanceFrom = (p: Point) => (a: Enemy, b: Enemy) => sq(a.x - p.x) + sq(a.y - p.y) - (sq(b.x - p.x) + sq(b.y - p.y));
@@ -176,7 +170,10 @@ const CITYWIDE: PathLimits = { maxCost: 1e9, maxNodes: CELL_COUNT };
  * anywhere in the city once patrols go citywide. */
 class Patrol {
   readonly home: Building;
+  /** Where it patrols from: its building's rally point, else the building. */
   readonly hc: Point;
+  /** Its deployment range, which it never hunts past. */
+  readonly bounds: ReturnType<typeof deployment>;
   readonly leash: number;
   readonly citywide: boolean;
   /** Headhunters go for the toughest prey, not the nearest. */
@@ -187,7 +184,8 @@ class Patrol {
     s: Soldier,
   ) {
     this.home = sim.map.buildings[s.home];
-    this.hc = center(this.home.rect);
+    this.hc = postOf(sim, s) ?? center(this.home.rect);
+    this.bounds = deployment(sim, s);
     // Headhunters range further, and at Kingslayer anywhere in the city.
     // Winged lancers ride further from the stable.
     this.leash = soldierLeash(sim.levels.soldierReach ?? 0) * (s.kind === "assassin" ? huntReach(sim, s.home) : spearLeash(sim, s));
@@ -197,12 +195,13 @@ class Patrol {
 
   covers(e: Enemy) {
     const { hc, leash } = this;
-    return this.citywide ? inCity(this.sim, e) : sq(e.x - hc.x) + sq(e.y - hc.y) <= sq(leash);
+    return (this.citywide ? inCity(this.sim, e) : sq(e.x - hc.x) + sq(e.y - hc.y) <= sq(leash)) && within(this.bounds, e, 1);
   }
 
   /** Enemies it may go after, nearest `s` first (a headhunter's toughest first). */
   candidates(s: Soldier) {
-    const all = this.citywide ? this.sim.enemies.filter((e) => this.covers(e)) : this.sim.enemiesNear(this.hc.x, this.hc.y, this.leash);
+    const near = this.citywide ? this.sim.enemies.filter((e) => this.covers(e)) : this.sim.enemiesNear(this.hc.x, this.hc.y, this.leash);
+    const all = this.bounds && !this.citywide ? near.filter((e) => within(this.bounds, e, 1)) : near;
     return all.sort(this.toughest ? toughestFirst(s) : byDistanceFrom(s)).slice(0, 3);
   }
 
@@ -218,7 +217,8 @@ export function stepSwordsman(sim: DefendSim, s: Soldier, dt: number) {
   holdLine(sim, s);
   // Crusaders' field dressing.
   if (paths(sim, s.home).crusade >= 2) s.hp = Math.min(s.maxHp, s.hp + CRUSADE.heal * dt);
-  if (sim.warBanner) return rally(sim, s, dt);
+  const banner = bannerFor(sim, s);
+  if (banner) return rally(sim, s, banner, dt);
   const patrol = new Patrol(sim, s);
   let target = sim.enemies.find((e) => e.id === s.target && e.hp > 0) ?? null;
   if (target && !patrol.covers(target)) target = null;
@@ -229,10 +229,10 @@ export function stepSwordsman(sim: DefendSim, s: Soldier, dt: number) {
 
 /** Answering the war banner: strike whatever is in reach, else close on
  * what is near or march to the banner (no leash while it stands). */
-function rally(sim: DefendSim, s: Soldier, dt: number) {
+function rally(sim: DefendSim, s: Soldier, banner: WarBanner, dt: number) {
   const near = sim.enemiesNear(s.x, s.y, swordReach(sim, s) + 1).find((e) => inSwordReach(sim, s, e));
   if (near) return strike(sim, s, near);
-  answerBanner(sim, sim.warBanner!, s, swordSpeed(sim, s), dt, MARCH_SIGHT);
+  answerBanner(sim, banner, s, swordSpeed(sim, s), dt, MARCH_SIGHT);
 }
 
 /** How far a melee troop reaches: Halberdiers further. */
@@ -264,13 +264,13 @@ function strike(sim: DefendSim, s: Soldier, e: Enemy) {
 }
 
 /** Twice a second: path to the nearest of up to three reachable enemies, or
- * back to the barracks door when there are none. */
+ * back to its rally point or the barracks door when there are none. */
 function replan(sim: DefendSim, s: Soldier, patrol: Patrol): Enemy | null {
   s.thinkT = 0.5;
   s.path = [];
   const target = pathToFirst(sim, s, patrol.candidates(s), patrol.limits);
   s.target = target ? target.id : -1;
-  if (!target) returnToDoor(sim, s, patrol.home);
+  if (!target && !postPath(sim, s)) returnToDoor(sim, s, patrol.home);
   return target;
 }
 
@@ -323,18 +323,24 @@ export function stepArcher(sim: DefendSim, s: Soldier, dt: number) {
     if (up || (skirmish < 2 && !charge && !s.perch)) return;
   }
   if (up) return;
-  if (sim.warBanner) {
+  const banner = bannerFor(sim, s);
+  if (banner) {
     s.perch = undefined;
-    return answerBanner(sim, sim.warBanner, s, speed, dt);
+    return answerBanner(sim, banner, s, speed, dt);
   }
   if (s.perch) {
     if (!climb(sim, s)) sim.followPath(s, null, speed, dt);
     return;
   }
-  // Nothing in sight: a gunner goes up a watch tower if one has room.
-  if (flat && !near && !charge && seekTower(sim, s)) return sim.followPath(s, null, speed, dt);
+  // Rallied onto a watch tower, a gunner goes up it while it has room.
+  const post = postOf(sim, s);
+  if (flat && post?.tower !== undefined && !near && !charge && seekTower(sim, s, post.tower)) return sim.followPath(s, null, speed, dt);
   if ((own ? charge : (sim.levels.archerHunt ?? 0) > 0) && s.thinkT <= 0) hunt(sim, s);
-  if (idle(s) && sim.streets.length) stroll(sim, s);
+  // Nothing to do: to its rally point, else a stroll.
+  if (idle(s)) {
+    if (postPath(sim, s)) s.thinkT = 0.5;
+    else stroll(sim, s);
+  }
   sim.followPath(s, null, speed, dt);
 }
 
@@ -388,15 +394,18 @@ function shoot(sim: DefendSim, s: Soldier, e: Enemy, range: number, pool?: Enemy
 /** Path toward the nearest of up to three enemies in the city. */
 function hunt(sim: DefendSim, s: Soldier) {
   s.thinkT = 0.6;
-  const prey = sim.enemies.filter((e) => e.hp > 0 && inCity(sim, e)).sort(byDistanceFrom(s)).slice(0, 3);
+  const bounds = deployment(sim, s);
+  const prey = sim.enemies.filter((e) => e.hp > 0 && inCity(sim, e) && within(bounds, e)).sort(byDistanceFrom(s)).slice(0, 3);
   const e = pathToFirst(sim, s, prey, CITYWIDE);
   if (e) s.target = e.id;
 }
 
 /** Nothing to hunt (or no instinct): pick a street and stroll to it. */
 function stroll(sim: DefendSim, s: Soldier) {
+  const streets = strollStreets(sim, s);
+  if (!streets.length) return;
   s.thinkT = 0.5 + sim.rand() * 1.5;
   s.target = -1;
-  const goal = sim.streets[Math.floor(sim.rand() * sim.streets.length)];
+  const goal = streets[Math.floor(sim.rand() * streets.length)];
   s.path = findPath(sim.ownSolid, s, cellCenter(goal), CITYWIDE) ?? [];
 }

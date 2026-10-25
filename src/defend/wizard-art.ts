@@ -267,7 +267,7 @@ export class WizardArt {
           dot(fx, y0 - lick, 1, 1 + lick);
         }
       }
-      if (!e.chill) continue;
+      if (!e.chill && !e.freeze && !e.mageChills?.length) continue;
       c.fillStyle = ICE[3];
       c.globalAlpha = 0.55;
       for (let y = 1; y < n; y++) for (let x = (y + e.id) & 1; x < n; x += 2) dot(x0 + x, y0 + y);

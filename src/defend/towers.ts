@@ -1,3 +1,5 @@
+import { fireMine, landMine, mineRange } from "./mines.ts";
+import { sheltered } from "./boats.ts";
 import { stepBowJavelin, stepSkyArrow } from "./archer-attunements.ts";
 import { buildingPaths } from "../specializations.ts";
 /** DEFEND towers and their projectiles. Archer towers shoot the nearest
@@ -29,6 +31,8 @@ import { railHit, railOn } from "./revolutionary.ts";
 import { fireNanoShell, nanoReload } from "./nanobots.ts";
 import { FIRE_ARROWS, GUNNERY, SHARP, SIEGE_SHOT, pathRank } from "../knowledge-paths.ts";
 import { ARROW_LOOPS, BOILING_OIL, keepRank } from "../keep-upgrades.ts";
+import { hawkDamage, hawkReload, hawkTarget, type HawkFocus } from "./hawk-focus.ts";
+import { stepWispTower, finishWisps } from "./wisp-arrow.ts";
 
 /** The towers' path ranks (`knowledge-paths.ts`, each 0 unless worn) and
  * which branch tower each is: the Brazier tower lights its arrows (`lit`),
@@ -51,10 +55,10 @@ const byDistanceFrom = (c: { x: number; y: number }) => (a: Enemy, b: Enemy) => 
 /** How far an archer tower shoots. */
 export const archerTowerRange = (sim: Pick<DefendSim, "levels" | "bonuses">, b?: Building) => {
   const { sharp, hawk } = paths(sim, b);
-  return archerRange(sim.levels.archerRange) + (sharp ? SHARP.range : hawk ? SHARP.hall : 0);
+  return archerRange(sim.levels.archerRange) * (hawk ? SHARP.range[sharp] : 1);
 };
 /** How far a cannon tower lobs its shells. */
-export const cannonTowerRange = (sim: Pick<DefendSim, "bonuses">, b?: Building) => CANNON_RANGE + (paths(sim, b).siege >= 3 ? SIEGE_SHOT.range : 0);
+export const cannonTowerRange = (sim: Pick<DefendSim, "bonuses">, b?: Building) => b?.kind === "minelayerTower" ? mineRange() : CANNON_RANGE + (paths(sim, b).siege >= 3 ? SIEGE_SHOT.range : 0);
 
 /** How far the keep's arrow loops shoot (0 without them). */
 export const keepArrowRange = (sim: Pick<DefendSim, "bonuses">) => ARROW_LOOPS.range[keepRank(sim.bonuses.keep, "arrowLoops")];
@@ -71,18 +75,22 @@ const SHOT_SPEED = { stone: 0.7, bullet: 2.2, ball: 1.4, rocket: 0.9, javelin: 0
 export class Towers {
   /** Seconds until each tower may fire again. */
   readonly cooldown = new Map<number, number>();
-  /** Arrows each Sharpshooters' tower has loosed, every few critical. */
-  readonly shots = new Map<number, number>();
+  readonly focus = new Map<number, HawkFocus>();
 
   step(sim: DefendSim, dt: number) {
     for (const b of sim.map.buildings) {
-      if (!sim.intact(b)) continue;
+      if (!sim.intact(b)) {
+        if (this.focus.delete(b.id)) this.cooldown.delete(b.id);
+        continue;
+      }
       if (isCannonTower(b.kind)) this.stepCannon(sim, b, dt);
       else if (b.kind === "nanoTower") this.stepNanoTower(sim, b, dt);
+      else if (b.kind === "wispTower") stepWispTower(sim, b, dt);
       else if (isArcherTower(b.kind)) this.stepArcherTower(sim, b, dt);
       else if (b.kind === "wallBallista") this.stepBallista(sim, b, dt);
       else if (b.kind === "keep" && sim.bonuses.keep) this.stepKeep(sim, b, dt);
     }
+    if (sim.wisps.length) finishWisps(sim, dt);
   }
 
   /** Seconds until the keep pours its boiling oil again. */
@@ -130,26 +138,39 @@ export class Towers {
   }
 
   private stepArcherTower(sim: DefendSim, b: Building, dt: number) {
+    const info = paths(sim, b);
+    if (info.hawk) return this.stepHawk(sim, b, info.sharp, dt);
     if (!this.ready(b, dt)) return;
-    const c = center(b.rect), { fire, sharp, lit } = paths(sim, b);
+    const c = center(b.rect), { fire, lit } = paths(sim, b);
     const range = archerTowerRange(sim, b);
     const near = sim.enemiesNear(c.x, c.y, range);
-    const target = sharp >= 3 ? strongest(near, c, range) : nearest(near, c);
+    const target = nearest(near, c);
     if (!target) return this.cooldown.set(b.id, 0);
     this.cooldown.set(b.id, archerCooldown(sim.levels.archerRate) * sim.bonuses.towerReload);
     let damage = archerDamage(sim.levels.archerDamage) * sim.bonuses.towerDamage;
-    if (sharp >= 3) damage *= SHARP.damage;
-    if (sharp >= 2) {
-      // Sharpshooters count their arrows: every few is critical (no dice).
-      const n = (this.shots.get(b.id) ?? 0) + 1;
-      this.shots.set(b.id, n);
-      if (n % SHARP.every === 0) damage *= SHARP.crit;
-    }
     // Fire arrows set what they hit burning; at III the tower looses a volley at the nearest few.
     const burn = lit ? damage * (fire ? FIRE_ARROWS.share[fire] : FIRE_ARROWS.hall.share) : 0;
     const targets = fire >= 3 ? near.filter((e) => sq(e.x - c.x) + sq(e.y - c.y) <= range * range).sort(byDistanceFrom(c)).slice(0, FIRE_ARROWS.volley) : [target];
     for (const t of targets)
       sim.arrows.push({ x: c.x, y: c.y - 0.6, origin: { x: c.x, y: c.y, building: b.id }, target: t.id, damage, tx: t.x, ty: t.y, life: 2, ...(burn ? { burn, burnFor: fire ? FIRE_ARROWS.burn[fire] : FIRE_ARROWS.hall.burn } : {}) });
+  }
+
+  private stepHawk(sim: DefendSim, b: Building, rank: number, dt: number) {
+    const c = center(b.rect), range = archerTowerRange(sim, b), old = this.focus.get(b.id);
+    const target = hawkTarget(sim.enemiesNear(c.x, c.y, range), c.x, c.y, range, old);
+    const base = archerCooldown(sim.levels.archerRate) * sim.bonuses.towerReload;
+    if (!target) { this.focus.delete(b.id); this.cooldown.set(b.id, 0); return; }
+    let focus = old;
+    if (!focus || focus.target !== target.id) {
+      focus = { target: target.id, shots: 0 }; this.focus.set(b.id, focus);
+      if (old) this.cooldown.set(b.id, hawkReload(base, rank, 1));
+    }
+    if (!this.ready(b, dt)) return;
+    focus.shots = Math.min(501, focus.shots + 1);
+    const damage = archerDamage(sim.levels.archerDamage) * sim.bonuses.towerDamage * hawkDamage(rank, focus.shots);
+    this.cooldown.set(b.id, hawkReload(base, rank, focus.shots + 1));
+    sim.arrows.push({ x: c.x, y: c.y - 0.6, origin: { x: c.x, y: c.y, building: b.id }, target: target.id,
+      damage, tx: target.x, ty: target.y, life: 2 + range / ARROW_SPEED });
   }
 
   private stepBallista(sim: DefendSim, b: Building, dt: number) {
@@ -165,6 +186,10 @@ export class Towers {
 
   private stepCannon(sim: DefendSim, b: Building, dt: number) {
     if (!this.ready(b, dt)) return;
+    if (b.kind === "minelayerTower") {
+      this.cooldown.set(b.id, fireMine(sim, b) ? cannonCooldown(sim.levels.cannonRate) * sim.bonuses.towerReload : 0);
+      return;
+    }
     const c = center(b.rect), { gunnery, siege, battery, mortar } = paths(sim, b);
     const range = cannonTowerRange(sim, b);
     const ground = sim.enemiesNear(c.x, c.y, range).filter(
@@ -185,7 +210,8 @@ export class Towers {
       dur: 0.45 + dist * 0.07,
       damage: cannonDamage(sim.levels.cannonDamage) * sim.bonuses.towerDamage * (siege ? SIEGE_SHOT.damage[siege] : mortar ? SIEGE_SHOT.hall.damage : 1),
       r: cannonSplash(sim.levels.cannonDamage) * (siege >= 2 ? SIEGE_SHOT.radius : 1),
-      ...(gunnery >= 2 ? { grape: true } : {}),
+      ...(battery ? { grape: true } : {}),
+      ...(mortar ? { mortar: { life: SIEGE_SHOT.burnLife, dps: cannonDamage(sim.levels.cannonDamage) * sim.bonuses.towerDamage * SIEGE_SHOT.damage[siege] * SIEGE_SHOT.burnShare } } : {}),
     });
   }
 }
@@ -250,24 +276,16 @@ export function stepShells(sim: DefendSim, dt: number) {
   for (const s of sim.shells) {
     s.t += dt;
     if (s.t < s.dur) continue;
+    if (s.mine) { landMine(sim, s); continue; }
     const friendlyFire = !sim.levels.cannonSafe;
-    sim.explode(s.x1, s.y1, { r: s.r, damage: s.damage, friendlyFire, origin: s.origin });
+    const seed = sim.explode(s.x1, s.y1, { r: s.r, damage: s.damage, friendlyFire, origin: s.origin });
+    if (s.mortar && !sheltered(sim, s.x1, s.y1)) sim.blazes.push({ x: s.x1, y: s.y1, r: s.r, t: 0, life: s.mortar.life, dps: s.mortar.dps, seed, mortar: true, origin: s.origin });
     // Grapeshot: smaller bursts round the landing, one each way.
     if (s.grape)
       for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]])
         sim.explode(s.x1 + dx * s.r * 0.8, s.y1 + dy * s.r * 0.8, { r: s.r * GUNNERY.grapeR, damage: s.damage * GUNNERY.grapeShare, friendlyFire, origin: s.origin });
   }
   sim.shells = sim.shells.filter((s) => s.t < s.dur);
-}
-
-/** The enemy in reach with the most HP (the nearest of equals). */
-function strongest(enemies: Enemy[], c: { x: number; y: number }, range: number): Enemy | null {
-  let best: Enemy | null = null;
-  for (const e of enemies) {
-    if (e.hp <= 0 || sq(e.x - c.x) + sq(e.y - c.y) > range * range) continue;
-    if (!best || e.hp > best.hp || (e.hp === best.hp && byDistanceFrom(c)(e, best) < 0)) best = e;
-  }
-  return best;
 }
 
 /** Sets `e` burning for `seconds` at `dps`, or keeps the hotter, longer burn it has. */

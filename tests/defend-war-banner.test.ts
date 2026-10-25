@@ -6,7 +6,8 @@ import { defaultLayout, fitLayout } from "../src/defend/layout.ts";
 import { generateCity } from "../src/defend/citygen.ts";
 import { DefendSim, type Soldier } from "../src/defend/sim.ts";
 import { UPGRADES, NO_BONUSES } from "../src/defend/catalog.ts";
-import { answerBanner, bannerDamage, bannerInfluence, stepBannerLife } from "../src/defend/war-banner.ts";
+import { answerBanner, bannerDamage, bannerInfluence, onFlag, stepBannerLife } from "../src/defend/war-banner.ts";
+import { dropPose, liftPose, ringPose, RALLY_ANIM } from "../src/defend/rally-flag-art.ts";
 import { stepSwordsman, stepArcher } from "../src/defend/troops.ts";
 import { stepMage } from "../src/defend/mages.ts";
 import { stepDarkWizard } from "../src/defend/dark-wizards.ts";
@@ -17,7 +18,7 @@ function fixture(upgraded = true) {
   const save = defaults();
   if (upgraded) for (const id of ["bannerDefense", "bannerReach", "bannerDamage", "bannerMarch", "bannerLife", "bannerRegen"] as const) save.skills[id] = 1;
   const fit = fitLayout(defaultLayout()); assert.ok(fit.ok);
-  const sim = new DefendSim(generateCity(fit, 3), Object.fromEntries(UPGRADES.map(u => [u.id, 0])) as DefendSim["levels"], 1, upgraded ? bonuses(save) : NO_BONUSES);
+  const sim = new DefendSim(generateCity(fit, 3), Object.fromEntries(UPGRADES.map(u => [u.id, 0])) as DefendSim["levels"], 1, { ...(upgraded ? bonuses(save) : NO_BONUSES), deployRange: 100 });
   // Open isolated ground so tests exercise combat without unrelated structures.
   sim.ownSolid.fill(0);
   const unit: Soldier = { id: 1, home: sim.keepId, kind: "sword", x: 20, y: 20, hp: 40, maxHp: 40, damage: 8, cd: 0, target: -1, path: [], thinkT: 0, flash: 0 };
@@ -124,4 +125,31 @@ test("a rally flag is free, replaces the banner and is replaced by it, and lends
   sim.time += 10;
   assert.ok(sim.plantBanner({ x: 20, y: 20 }));
   assert.equal(sim.warBanner!.flag, false); assert.equal(bannerInfluence(sim, unit), true);
+});
+
+test("a double tap on the rally flag takes it away, but never the war banner", () => {
+  const { sim, unit } = fixture();
+  sim.plantFlag({ x: 22, y: 20 });
+  unit.path = [{ x: 1, y: 1 }] as typeof unit.path;
+  assert.equal(onFlag(sim.warBanner, 22.5, 19.5), true);
+  assert.equal(onFlag(sim.warBanner, 26, 20), false);
+  assert.ok(sim.liftFlag());
+  assert.equal(sim.warBanner, null); assert.equal(unit.path.length, 0);
+  assert.equal(sim.liftFlag(), false);
+  sim.plantBanner({ x: 20, y: 20 });
+  assert.equal(onFlag(sim.warBanner, 20, 20), false);
+  assert.equal(sim.liftFlag(), false); assert.ok(sim.warBanner);
+});
+
+test("the rally flag drops in, rings its landing and flies off fading", () => {
+  assert.deepEqual(dropPose(0), { alpha: 0, rise: RALLY_ANIM.from, scale: 1.35 });
+  assert.deepEqual(dropPose(RALLY_ANIM.drop), { alpha: 1, rise: 0, scale: 1 });
+  assert.deepEqual(dropPose(1e9), { alpha: 1, rise: 0, scale: 1 });
+  assert.equal(ringPose(RALLY_ANIM.drop - 1), null);
+  const early = ringPose(RALLY_ANIM.drop + 20)!, late = ringPose(RALLY_ANIM.drop + RALLY_ANIM.ring - 20)!;
+  assert.ok(early.r < late.r && early.alpha > late.alpha);
+  assert.equal(ringPose(RALLY_ANIM.drop + RALLY_ANIM.ring), null);
+  const a = liftPose(50)!, b = liftPose(200)!;
+  assert.ok(a.rise < b.rise && a.alpha > b.alpha && b.alpha < 0.2);
+  assert.equal(liftPose(RALLY_ANIM.lift), null);
 });

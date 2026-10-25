@@ -18,15 +18,18 @@ export class Chamber {
   readonly content: HTMLElement;
   private backdrop: HallBackdrop;
   private sconces: HTMLCanvasElement[];
+  /** The sun's shafts and dust, screened over the whole room (the keep's only). */
+  private light: HTMLCanvasElement | null;
 
   constructor(readonly root: HTMLElement, look: HallLook) {
     root.classList.add("chamber", `chamber-${look}`);
     root.innerHTML = `<canvas class="chamber-wall" aria-hidden="true"></canvas><div class="chamber-dim" aria-hidden="true"></div>
       <canvas class="sconce left" aria-hidden="true"></canvas><canvas class="sconce right" aria-hidden="true"></canvas>
-      <div class="chamber-content"></div>`;
+      <div class="chamber-content"></div>${look === "keep" ? `<canvas class="chamber-light" aria-hidden="true"></canvas>` : ""}`;
     this.backdrop = new HallBackdrop(root.querySelector<HTMLCanvasElement>(".chamber-wall")!, look);
     this.sconces = Array.from(root.querySelectorAll<HTMLCanvasElement>(".sconce"));
     this.content = root.querySelector<HTMLElement>(".chamber-content")!;
+    this.light = root.querySelector<HTMLCanvasElement>(".chamber-light");
   }
 
   /** Lights the room for wall-clock `now`; `day` in [0, 1] is the daylight
@@ -40,6 +43,7 @@ export class Chamber {
       return { x: r.left - base.left + r.width / 2, y: r.top - base.top + r.height * 0.3 };
     });
     this.backdrop.draw(now, spots, day, reduced);
+    if (this.light) this.backdrop.drawLight(this.light, now, day, reduced);
   }
 }
 

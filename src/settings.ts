@@ -30,6 +30,12 @@ export const SETTINGS = {
    * clear of the finger. Until the player sets it, on for touch screens and
    * off for a mouse (`touchFirst`). */
   raiseDrag: { kind: "toggle", default: false, page: { id: "raise-drag", label: "Carry dragged items above the finger" } },
+  /** While dragging on the Defend board (placing, aiming), a box above the
+   * finger shows the board zoomed in round where the item would go. */
+  magnifier: { kind: "toggle", default: false, page: { id: "magnifier", label: "Magnifying glass while placing" } },
+  /** In battle, the rally flag takes a triple tap rather than a double, for
+   * players who plant it by accident. */
+  tripleTapFlag: { kind: "toggle", default: false, page: { id: "triple-tap-flag", label: "Triple tap to place the rally flag" } },
   /** Faint lines round the Defend board's tiles, and how strong, in percent. */
   tileGrid: { kind: "toggle", default: false, page: { id: "tile-grid", label: "Tile grid lines" } },
   gridOpacity: { kind: "range", default: 15, min: 5, max: 60, step: 1, page: { id: "grid-opacity", label: "Grid line opacity", aria: "Tile grid line opacity, percent" } },
@@ -37,8 +43,8 @@ export const SETTINGS = {
   soundOff: { kind: "toggle", default: false, page: { id: "sound", label: "Sound", invert: true } },
   /** The world's background: rain, wind, thunder, birdsong, crickets. */
   ambienceOff: { kind: "toggle", default: false, page: { id: "ambience", label: "Ambient sound", invert: true } },
-  /** Pixel Art: hand-drawn PNG sprites for the pieces that have them
-   * (`defend/pixel-sprites.ts`); off, every piece's own drawn art. */
+  /** Retained visual preference for procedural cloth, glazing and sampling.
+   * The checkbox no longer enables any PNG sprite replacements. */
   pixelArt: { kind: "toggle", default: true, page: { id: "pixel-art", label: "Pixel Art" } },
   /** Alembic, the game's own pixel font, for every word on the page; off, Cinzel. */
   pixelFont: { kind: "toggle", default: true, page: { id: "pixel-font", label: "Use Custom Font" } },

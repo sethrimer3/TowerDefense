@@ -57,7 +57,7 @@ export function cityLights(map: CityMap): Light[] {
 type NewLight = Omit<Light, "id">;
 
 /** Reach of each tower's fire, in cells. */
-const TOWER_RADIUS: Partial<Record<Building["kind"], number>> = { archerTower: 7.5, brazierTower: 7.5, hawkTower: 7.5, cannonTower: 5.5, batteryTower: 5.5, mortarTower: 5.5, watchTower: 6.5, wizardTower: 5, pyreTower: 5, frostTower: 5, stormTower: 5, mageGuild: 5.5, infernoHall: 5.5, cinderHall: 5.5 };
+const TOWER_RADIUS: Partial<Record<Building["kind"], number>> = { archerTower: 7.5, brazierTower: 7.5, hawkTower: 7.5, wispTower: 7.5, cannonTower: 5.5, batteryTower: 5.5, mortarTower: 5.5, minelayerTower: 3, watchTower: 6.5, wizardTower: 5, pyreTower: 5, frostTower: 5, stormTower: 5, mageGuild: 5.5, infernoHall: 5.5, cinderHall: 5.5, stormHall: 5.5 };
 
 /** The troop buildings with a lamp over the door. */
 const DOOR_LAMPS = new Set<Building["kind"]>(["meleeGuild", "rangedGuild", "barracks", "chapterHouse", "berserkerLodge", "halberdYard", "heroHall", "shadow", "bloodHall", "veilHouse", "poisonDen", "archerBarracks", "rangerLodge", "skirmishCamp", "skyrangerLodge", "sniperLodge", "musketHall", "gunHall", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "assassinDen", "spearHall", "phalanx", "javelinCamp", "lancerStable", "valkyriePalace", "darkKeep"]);

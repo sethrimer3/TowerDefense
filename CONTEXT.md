@@ -147,7 +147,13 @@ A magic boat's water. The four small boats have decorative water that dries behi
 A reusable Skill: planted anywhere on the board mid-defense, it rallies every mobile troop (swordsmen, archers, fire mages, valkyries, the dark wizard) to fight round it. Planting it again moves it; a tap takes it down.
 
 **Rally flag**:
-A free blue flag planted by double-tapping the board mid-defense. Troops march to it as to the war banner, but it lends them nothing; the flag and the war banner replace each other.
+A free blue flag planted by double-tapping the board mid-defense. Troops march to it as to the war banner, but it lends them nothing; the flag and the war banner replace each other, and a double tap on the flag takes it away (a triple tap with that Gameplay setting on).
+
+**Deployment range**:
+How far a troop building's troops may go from it, a circle round the building: stronger troops deploy further, and the Smithy's Deployment range takes every troop further. Troops never leave it, and answer the war banner or a rally flag only inside it.
+
+**Rally point**:
+Where a troop building's troops go when they have nothing to fight, set in battle by selecting the building and dragging a flag from it; kept inside its deployment range. Snapped onto a watch tower, the gunner line climbs it.
 
 **Strike spell**:
 A reusable Skill cast onto the board mid-defense, with its own Smithy and Study topic under Spells. It casts with one researched path at a time, chosen in the Study.
@@ -227,7 +233,7 @@ The Knowledge upgrades a tile carries, in the order taken, on its face in the Ti
 What a building can be upgraded into, and the basic building it grows from: a Wizard tower from a Watch tower, and into a Dark wizard keep by its crown.
 
 **Path**:
-One way a building can grow, in ranks it climbs one at a time with Knowledge: the Wizard tower's Pyromancy (flames only), Rime (ice only, then freezing solid) or Stormcalling (lightning in place of flames), the Barracks' Crusaders (hearty, healing), Berserkers (quick strokes, healing kills, **cleave**) or Halberdiers (long reach, hooking blows, heavy on big enemies), the Sniper lodge's Marksmen (further, toughest first, a **headshot**), Ricochet (bullets that **glance** on to the next enemy) or Suppressing fire (hits that slow and **pin**), Deadeye (only a **clear sight**) or Piercing rounds (through the whole file), the Assassins' den's Bloodletters (huge criticals, frail), Shadowcloak (**cloaked** until they strike, then an **ambush**), Venomblades (**venom**: the enemy takes more damage from everything) or Headhunters (the toughest enemy first, with a **bounty** of its HP), the Musket hall's Sharpshooters (crowned into a **sniper lodge**), Grenadiers (bursting balls leaving **burning ground**, then **bomblets**), Volley fire (extra balls, quicker reloads in ranks) or Bayonets (a **thrust** at close quarters, then a citywide charge), the Gunner hall's Quickdraw or Duelists, the Machine-gun nest's Belt feed (crowned into a **Gatling emplacement**) or Tripod, the Gatling emplacement's Gun shield, Overdrive or Stopping power (**knockback**), the Rocket battery's Cluster rockets (with **bomblets**) or Salvo racks, the Archer tower's Fire arrows (setting enemies **burning**) or Sharpshooters, the Cannon tower's Gun crews (with **grapeshot**) or Siege shot, the Archer barracks' Javelin Bowmen, Skirmishers or Skyranger, the Watch tower's Spotters or Signal fires, the Mage Guild's Pyroclasm or Cinders, Monster bait's Oil-soaked or Fortified crates, Wall spikes' Blasting stakes (blowing up on contact), Spring stakes (the whole row shooting out) or Rimed stakes (chilling). Each building climbs its own path (its **specialization**), so different paths and ranks fight together in one city. (A strike spell's paths are still researched in the Study.)
+One way a building can grow, in ranks it climbs one at a time with Knowledge: the Wizard tower's Pyromancy (flames only), Rime (ice only, then freezing solid) or Stormcalling (lightning in place of flames), the Barracks' Crusaders (hearty, healing), Berserkers (quick strokes, healing kills, **cleave**) or Halberdiers (long reach, hooking blows, heavy on big enemies), the Sniper lodge's Marksmen (further, toughest first, a **headshot**), Ricochet (bullets that **glance** on to the next enemy) or Suppressing fire (hits that slow and **pin**), Deadeye (only a **clear sight**) or Piercing rounds (through the whole file), the Assassins' den's Bloodletters (huge criticals, frail), Shadowcloak (**cloaked** until they strike, then an **ambush**), Venomblades (**venom**: the enemy takes more damage from everything) or Headhunters (the toughest enemy first, with a **bounty** of its HP), the Musket hall's Sharpshooters (crowned into a **sniper lodge**), Grenadiers (bursting balls leaving **burning ground**, then **bomblets**), Volley fire (extra balls, quicker reloads in ranks) or Bayonets (a **thrust** at close quarters, then a citywide charge), the Gunner hall's Quickdraw or Duelists, the Machine-gun nest's Belt feed (crowned into a **Gatling emplacement**) or Tripod, the Gatling emplacement's Gun shield, Overdrive or Stopping power (**knockback**), the Rocket battery's Cluster rockets (with **bomblets**) or Salvo racks, the Archer tower's Fire arrows (setting enemies **burning**), Hawk focus (sustained shots at the strongest enemy) or Wisp Arrow, the Cannon tower's Gun crews (with **grapeshot**) or Siege shot, the Archer barracks' Javelin Bowmen, Skirmishers or Skyranger, the Watch tower's Spotters or Signal fires, the Mage Guild's Pyroclasm or Cinders, Monster bait's Oil-soaked or Fortified crates, Wall spikes' Blasting stakes (blowing up on contact), Spring stakes (the whole row shooting out) or Rimed stakes (chilling). Each building climbs its own path (its **specialization**), so different paths and ranks fight together in one city. (A strike spell's paths are still researched in the Study.)
 
 **Evolution**:
 A path's crown, past its last rank, turns that one building into a greater form (Stormcalling's Wizard tower into the Dark wizard keep, Winged lancers' Lancer stable into the Valkyrie palace, the spearmen's ultimate, Sharpshooters' Musket hall into the Sniper lodge, Belt feed's Machine-gun nest into the Gatling emplacement), paid with Knowledge. If it no longer fits its tile it goes to the palette.
@@ -496,3 +502,40 @@ An Archer Barracks attunement with unlimited battlefield range. Arrows rise out 
 ### Arrow rain
 
 A Skyranger's extra volley after a number of ordinary attacks. Early tiers scatter over an area; the last divides its arrows evenly among enemies there. Rain arrows do not trigger further rain.
+
+
+### Grapeshot
+
+The Gun Battery's shell impact plus four smaller surrounding explosions. Present as soon as the Cannon Tower attunes to Gun Battery.
+
+### Minelayer
+
+A Cannon Tower attunement that continually lays proximity mines within half the ordinary cannon's range. Directed laying aims future mines; dragging the crosshair home restores random coverage.
+
+### Smart charges
+
+The Minelayer's final upgrade: fifty mines per tower, with little walking charges that approach nearby ground enemies before detonating.
+
+
+### Stormcallers
+
+The Mage Guild's long-distance chain-lightning troop attunement. Bolts jump between distinct enemies and can critically strike for double damage.
+
+### Pyromancers
+
+The Mage Guild's fire troop attunement, trained at Inferno Hall. Larger area blasts leave burning ground and fire that clings to victims.
+
+### Cryomancers
+
+The Mage Guild's cold troop attunement, trained at Frost Hall. Area impacts briefly freeze enemies, then leave them slowed. Frost Hall replaces the former Cinder Hall while retaining its purchased tiers.
+
+
+### Furthest wave reached
+
+The highest wave the player has entered, whether or not they cleared it. A new reached record selects the preceding wave as the next starting wave, with a minimum of wave 1. Separate from the highest cleared wave used for rewards.
+
+**Hawk focus**:
+An Archer Tower attunement that locks the enemy with the most current life. Consecutive shots build damage and, at its final rank, fire rate; a new lock resets both.
+
+**Wisp Arrow**:
+A living blue arrow belonging to one Wisp Tower. It drifts around the tower with six trailing tendrils and slices through groups of enemies in wide arcs.

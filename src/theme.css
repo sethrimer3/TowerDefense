@@ -1636,9 +1636,14 @@ dialog .away-row .away-note {
 /* Inside the keep: a slight darkness over everything, so neither the sun
    through the window nor the torches wash out the tiles. */
 .chamber-keep .chamber-dim {
+  /* Lighter than the other rooms' veils: the window and its sunlight show. */
   background:
-    radial-gradient(ellipse 80% 70% at 50% 40%, transparent 30%, #00000080 100%),
-    linear-gradient(#0000004a, #00000066);
+    radial-gradient(ellipse 80% 70% at 50% 40%, transparent 40%, #00000070 100%),
+    linear-gradient(#00000010, #00000040);
+}
+/* The keep's shelf lets the wall and the window's light show through. */
+.chamber-keep .tiles-shelf {
+  background: linear-gradient(#0a080610, #0a080640 45%, #0a080678);
 }
 .chamber-title h2 {
   color: #f6dca4;
@@ -1836,8 +1841,8 @@ dialog .away-row .away-note {
 .defend-item.skill-loading:disabled { opacity: 1; filter: none; }
 .defend-item.skill-loading::after { content: ""; position: absolute; inset: 0; background: #000b; clip-path: inset(0 0 var(--skill-fill) 0); pointer-events: none; border-radius: inherit; }
 
- .banner-research h4 { color: #e7ba52; }
-.banner-research-branches, .banner-research-branches section { border-top: 2px solid #a48040; }
+.banner-research > h3 { color: #e7ba52; }
+.banner-tree-detail { border-top: 2px solid #a48040; }
 
 .research-project { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: .35rem .6rem; border-bottom: 2px solid var(--brass); }
 .research-project > div { min-width: 0; overflow-wrap: anywhere; }

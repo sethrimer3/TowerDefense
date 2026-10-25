@@ -1,7 +1,5 @@
-// Pixel Art: the Settings page's toggle (on by default, saved), and the
-// Defend board drawn with the PNG sprites while it is on and with its own
-// art once it is off, in the isolated stress scene (no player saves) and
-// the real app's Settings, desktop and phone (needs `npm run dev`).
+// The retained visual setting makes no replacement PNG requests. Legacy
+// board art and Settings persistence work on desktop and phone.
 import { chromium } from '@playwright/test';
 import assert from 'node:assert/strict';
 import { mkdirSync } from 'node:fs';
@@ -14,7 +12,8 @@ try {
   for (const [name, viewport] of [['desktop', { width: 1100, height: 820 }], ['phone', { width: 390, height: 844 }]]) {
     const context = await browser.newContext({ viewport });
     const page = await context.newPage();
-    const errors = [];
+    const errors = [],pngRequests=[];
+    page.on('request',r=>{if(new URL(r.url()).pathname.includes('/assets/pixel/'))pngRequests.push(r.url());});
     page.on('pageerror', e => errors.push(e.message));
     await page.goto(base + 'tests/defend-stress.html?manual&enemies=100');
     await page.waitForFunction(() => window.stressPage);
@@ -40,21 +39,21 @@ try {
     await page.waitForFunction(() => window.__pixelSprites.PIXEL_SPRITES.every(id => window.__pixelSprites.pixelSprite(id)));
     const loaded = await pixels();
     assert.equal(loaded.on, true, 'Pixel Art on by default');
-    assert.equal(loaded.loaded, loaded.total, 'every registered sprite loads');
+    assert.deepEqual([loaded.loaded,loaded.total],[0,0],'no replacement sprites registered');
     for (let i = 0; i < 3; i++) await frame();
     const board = page.locator('#defend-canvas');
     const shotOn = await board.screenshot({ path: `test-results/pixel-art/${name}-on.png` });
     await page.evaluate(async () => (await import('/src/defend/pixel-sprites.ts')).setPixelArt(false));
     for (let i = 0; i < 3; i++) await frame();
     const shotOff = await board.screenshot({ path: `test-results/pixel-art/${name}-off.png` });
-    assert.notDeepEqual(shotOn, shotOff, 'the board looks different with Pixel Art off');
+    assert.ok(shotOn.length>0&&shotOff.length>0,'legacy board renders in either state');
     assert.equal((await pixels()).loaded, 0, 'no sprite is handed out while off');
     // The palette's bomb and city tile icons follow too.
     await page.evaluate(async () => (await import('/src/defend/pixel-sprites.ts')).setPixelArt(true));
     for (let i = 0; i < 3; i++) await frame();
     const again = await board.screenshot();
     assert.deepEqual(again.length > 0, true);
-    assert.deepEqual(errors, []);
+    assert.deepEqual(errors, []);assert.deepEqual(pngRequests,[],'no deleted PNG is requested');
     await context.close();
   }
   // The real Settings page: Pixel Art, on by default, saved when turned off.

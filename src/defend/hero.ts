@@ -14,6 +14,7 @@
  * (`hero-art.ts`); it is not part of the replayed state. Only a Hero adds
  * to it or to `Soldier.rallied`, and its stroll is the only draw from the
  * random stream, so runs without one replay unchanged. */
+import { bannerFor } from "./deployment.ts";
 import { BLADE_DANCE, LEGEND, WHIRLWIND, pathRank, type BattlePaths } from "../knowledge-paths.ts";
 import { buildingPaths } from "../specializations.ts";
 import { dist, sq } from "../exact.ts";
@@ -58,7 +59,8 @@ export function stepHero(sim: DefendSim, s: Soldier, dt: number) {
     if (s.cd <= 0) combo(sim, s, near);
     return;
   }
-  if (sim.warBanner) return answerBanner(sim, sim.warBanner, s, HERO.speed, dt);
+  const banner = bannerFor(sim, s);
+  if (banner) return answerBanner(sim, banner, s, HERO.speed, dt);
   if (s.thinkT <= 0) seek(sim, s);
   sim.followPath(s, null, HERO.speed, dt);
 }

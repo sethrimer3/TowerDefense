@@ -14,7 +14,7 @@ import { Ledger } from "./ui/ledger.ts";
 import { TilesPage } from "./ui/tiles-page.ts";
 import { Chamber, Descent } from "./ui/chamber.ts";
 import { paintIcon, type IconItem } from "./defend/structure-art.ts";
-import { onPixelArt, preloadPixelArt, setPixelArt } from "./defend/pixel-sprites.ts";
+import { onPixelArt, setPixelArt } from "./defend/pixel-sprites.ts";
 import { renderSettingsPage } from "./ui/settings-page.ts";
 import type { Weather } from "./defend/weather.ts";
 import { play, soundEnabledBy } from "./sound.ts";
@@ -26,13 +26,14 @@ import { LibraryPage } from "./library/ui.ts";
 import { stream } from "./random.ts";
 import { WelcomeBack } from "./ui/welcome.ts";
 import { unlockAllTowers } from "./defend/progress.ts";
+import { ROSES, setRose, type Rose } from "./ui/hall-art.ts";
 
 // Wires the pages together: builds the shell, loads the save, and routes
 // navigation, the currency bar and the frame loop between the pages.
 
 buildShell(document.querySelector<HTMLDivElement>("#app")!);
 document.querySelectorAll<HTMLCanvasElement>("nav canvas[data-icon]").forEach((c) => paintIcon(c, "cityTile"));
-// Pixel Art's sprites arrive (or the setting flips) after icons were drawn: draw them again, once a frame at most.
+// Refresh icons after the visual setting changes, once a frame at most.
 let iconsQueued = false;
 onPixelArt(() => {
   if (iconsQueued) return;
@@ -114,6 +115,8 @@ const defendPage = new DefendPage(el("defend"), {
   setHealthbars: (value) => { save.settings.showHealthbars = value; store(); },
   showEmpty: () => save.settings.showEmpty,
   raiseDrag: () => save.settings.raiseDrag,
+  magnifier: () => save.settings.magnifier,
+  tripleTapFlag: () => save.settings.tripleTapFlag,
   gridLines: () => (save.settings.tileGrid ? save.settings.gridOpacity / 100 : 0),
   effects: () => !save.settings.effectsOff,
   devMode: () => save.settings.developerMode,
@@ -232,7 +235,6 @@ function refreshCurrencies() {
   document.documentElement.classList.toggle("reduce-motion", save.settings.reduceMotion);
   document.documentElement.classList.toggle("pixel-font", save.settings.pixelFont);
   setPixelArt(save.settings.pixelArt);
-  preloadPixelArt();
   const show = (id: string, n: number) => {
     const value = whole(n), before = shown.get(id);
     el(id).textContent = dev ? "∞" : compact(value);
@@ -359,6 +361,11 @@ window.addEventListener("pagehide", store);
 (globalThis as { libraryEnchant?: unknown }).libraryEnchant = (n = 10) => {
   const sim = libraryPage.sim, shelved = [...sim.slots.keys()].filter((s) => sim.slots[s] && !sim.enchanted[s]);
   for (let k = 0; k < n && shelved.length; k++) sim.enchanted[shelved.splice(Math.floor(shelved.length * ((k * 0.618) % 1)), 1)[0]] = 1;
+};
+// Console helper: set the Tiles hall's rose window to one of its glazings (`ROSES`), or none for the night's own.
+(globalThis as { tilesRose?: unknown }).tilesRose = (rose?: Rose) => {
+  setRose(rose && ROSES.includes(rose) ? rose : null);
+  return ROSES;
 };
 // Console helper: look closely at one of the mine's buildings, picked.
 (globalThis as { mineLook?: unknown }).mineLook = (id: "shaft" | "barracks" | "warehouse" | "forge" | "smithy" = "forge", zoom = 4) => minePage.look(id, zoom);

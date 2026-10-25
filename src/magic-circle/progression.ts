@@ -16,5 +16,5 @@ export function studyCircle(save: Save, topic: Topic): CircleState {
     const selected = save.spellPaths[topic.id];
     if (selected) upgrades.push({ id: `equipped:${selected}`, rank: 1, visualOnly: true });
   }
-  return { topic: `study:${topic.id}`, upgrades, motif: isSpell(topic.id) ? 'triangles' : VORONOI_TOPICS.has(topic.id) ? 'voronoi' : 'tesseract' };
+  return { topic: `study:${topic.id}`, upgrades, motif: isSpell(topic.id) || topic.id === 'battle' ? 'triangles' : VORONOI_TOPICS.has(topic.id) ? 'voronoi' : 'tesseract' };
 }

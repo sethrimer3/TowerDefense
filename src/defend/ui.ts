@@ -4,7 +4,7 @@ import { pathById, type PathId } from "../knowledge-paths.ts";
 import { SIDE_UI, graftedGraph, mapCardHtml, mapCount, mapGraph, mapWeb, sharedBranches, specialtyCircle, treeAllocated, treeBeyond, treeCardHtml, treeStep, type SideKind, type SideUi } from "../ui/specialty.ts";
 import { UpgradeGraph } from "../ui/upgrade-graph.ts";
 import type { Save } from "../save.ts";
-import { bannerReach } from "./war-banner.ts";
+import { bannerReach, onFlag } from "./war-banner.ts";
 import { gravesNear } from "./necromancy.ts";
 import { meteorReach } from "./meteor.ts";
 import { frostReach } from "./frost-nova.ts";
@@ -49,7 +49,10 @@ import type { Overlay } from "./edit-overlay.ts";
 import { paintIcon, type IconItem } from "./structure-art.ts";
 import { artLook } from "./tower-art.ts";
 import { pathBadge, pathLook, paintPathIcons } from "../ui/path-badge.ts";
-import { BoardPointers, eventCell } from "./board-pointers.ts";
+import { BoardPointers, eventCell, type BoardAim } from "./board-pointers.ts";
+import { mineAim, mineRank } from "./mines.ts";
+import { bannerFor, climbsTowers, deployCircle, rallyAim, type Rally } from "./deployment.ts";
+import { shootsFlat } from "./gun-sight.ts";
 import type { Drag } from "./drag-rules.ts";
 import { EditSession, type Drop } from "./edit-session.ts";
 import { BattleSound } from "./battle-sound.ts";
@@ -57,7 +60,7 @@ import { QUIET, type Scene } from "../ambience.ts";
 import { NIGHT_FADE_SECONDS, isBossWave, rollWeather, type Weather } from "./weather.ts";
 import { play } from "../sound.ts";
 import { replay, sparksOver } from "../ui/flourish.ts";
-import { available, keptGroups, plainAvailable, setLayout, startingWave, type DefendSave } from "./progress.ts";
+import { available, keptGroups, plainAvailable, recordWaveReached, setLayout, startingWave, type DefendSave } from "./progress.ts";
 import { ageWater } from "./boats.ts";
 import { defeatHTML } from "./defeat.ts";
 import { inspectable, type Armed } from "./inspect.ts";
@@ -89,6 +92,10 @@ export type DefendHost = {
   showEmpty?(): boolean;
   /** Whether dragged items ride above the pointer. */
   raiseDrag?(): boolean;
+  /** Whether a magnifying glass shows the board zoomed in above a drag. */
+  magnifier?(): boolean;
+  /** Whether the rally flag takes a triple tap rather than a double. */
+  tripleTapFlag?(): boolean;
   /** Opens the Tiles tab, where tiles (buildings and consumables) are bought. */
   openTiles?(): void;
 };
@@ -129,18 +136,24 @@ export class DefendPage {
   private renderer: DefendRenderer | null = null;
   private pointers = new BoardPointers({
     renderer: () => this.renderer,
+    aim: (e) => this.aimBuilding(e),
     pickUp: (e) => this.pickUp(e),
     drop: (drop) => this.drop(drop),
     tap: (e) => this.tap(e),
     hold: (edit) => this.hold(edit.drag),
     raise: () => !!this.host.raiseDrag?.(),
+    magnify: () => !!this.host.magnifier?.(),
   });
   /** The building the player tapped (its id in the map), outlined with its
    * reach and troops, and what its reach is reckoned from before a battle. */
   private picked: { id: number; armed: Armed } | null = null;
+  /** The picked building's aim while it is dragged: a Minelayer's
+   * crosshair or a troop building's rally point (none: back to its own
+   * ways), and when that last changed. */
+  private aimPreview: { id: number; point?: Rally; since: number } | null = null;
   /** The last tap in battle, for telling a double tap: where (client
    * pixels), when, and what was picked out before it. */
-  private lastTap: { x: number; y: number; at: number; picked: { id: number; armed: Armed } | null } | null = null;
+  private lastTap: { x: number; y: number; at: number; taps: number; picked: { id: number; armed: Armed } | null } | null = null;
   private lastTime = 0;
   private performance = new BattlePerformance();
   private frameTimes = new FrameTimeOverlay();
@@ -226,6 +239,7 @@ export class DefendPage {
     if (this.specialty && !this.pointers.session?.overlay()) this.treeCircle?.frame(time, this.host.reduceMotion() || matchMedia("(prefers-reduced-motion: reduce)").matches);
     const drawing = performance.now();
     this.draw(false);
+    if (this.renderer) this.pointers.drawLoupe(this.renderer);
     const drawn = performance.now();
     if (measuring && this.sim && !document.hidden) {
       this.performance.sample(this.sim.wave, this.sim.enemies.length, dt * 1000, updated - start, drawn - drawing);
@@ -886,6 +900,7 @@ export class DefendPage {
           play("wave");
         }
       } else if (ev.type === "waveStart") {
+        if (!sim.unitTester && recordWaveReached(this.save, ev.wave)) this.host.persist();
         if (areaForWave(ev.wave).id !== this.weatherArea) {
           const area = areaForWave(ev.wave);
           this.weatherArea = area.id;
@@ -926,7 +941,7 @@ export class DefendPage {
       over: this.phase === "over",
       shimmer: this.phase === "build" && !this.sim,
       ...(lifting ? { lifting } : {}),
-      ...(this.picked ? { inspect: { id: this.picked.id, armed: this.sim ?? this.picked.armed } } : {}),
+      ...(this.picked ? { inspect: { id: this.picked.id, armed: this.sim ?? this.picked.armed, ...(this.aimPreview?.id === this.picked.id ? { aim: this.aimPreview } : {}) } } : {}),
       hideBanner: this.phase === "over" || (this.pointers.session?.drag.from === "banner" && !!this.pointers.session.drag.placed),
     });
   }
@@ -985,6 +1000,64 @@ export class DefendPage {
     }
     this.pointers.begin(edit, e);
     return true;
+  }
+
+  /** In battle, a press on the picked building (or on its crosshair or
+   * rally flag) aims it: a Minelayer's crosshair, a troop building's rally
+   * point, riding above the finger like a dragged building. Let go without
+   * dragging, it is an ordinary tap. While building, a press on a building
+   * moves it as usual. */
+  private aimBuilding(e: PointerEvent): BoardAim | null {
+    const sim = this.phase === "sim" ? this.sim : null;
+    if (!sim || !this.renderer || !this.picked) return null;
+    const p = eventCell(this.renderer, e);
+    if (!p.inside) return null;
+    const banner = sim.warBanner;
+    if (banner && !banner.flag && sim.bannerRemaining <= 0 && p.fx >= banner.x - 1 && p.fx <= banner.x + 2.2 && p.fy >= banner.y - 1.4 && p.fy <= banner.y + 1) return null;
+    const b = sim.map.buildings[this.picked.id];
+    if (!b || !sim.intact(b)) return null;
+    const mine = b.kind === "minelayerTower" && mineRank(sim, b) >= 1;
+    const circle = mine ? null : deployCircle(b, sim.bonuses);
+    if (!mine && !circle) return null;
+    // The crosshair or flag is a handle too, so dragging it home resets the aim.
+    const handle = mine ? sim.mineAims.get(b.id) : sim.rallies.get(b.id);
+    const r = b.rect;
+    const onIt = p.fx >= r.x && p.fy >= r.y && p.fx <= r.x + r.w && p.fy <= r.y + r.h;
+    if (!onIt && !(handle && Math.hypot(p.fx - handle.x, p.fy - handle.y) < (mine ? 0.8 : 1.2))) return null;
+    const towers = circle && climbsTowers(b.kind, shootsFlat) ? sim.map.buildings.filter((t) => t.kind === "watchTower" && sim.intact(t)) : [];
+    const preview = (ev: PointerEvent) => {
+      const q = eventCell(this.renderer!, ev), at = { x: q.fx, y: Math.max(0, q.fy - this.pointers.raise) };
+      const point = circle ? rallyAim(b, at, circle, towers) : mineAim(b, at);
+      const old = this.aimPreview;
+      this.aimPreview = { id: b.id, point, since: old?.id === b.id && !old.point && !point ? old.since : performance.now() };
+    };
+    return {
+      move: preview,
+      // The magnifying glass centres on where the flag or crosshair rides.
+      focus: (ev) => {
+        const q = eventCell(this.renderer!, ev);
+        return { x: q.fx, y: Math.max(0, q.fy - this.pointers.raise) };
+      },
+      end: (ev, commit, moved) => {
+        if (!commit || !moved || this.sim !== sim || !sim.intact(b)) {
+          this.aimPreview = null;
+          if (commit && !moved) this.tap(ev);
+          return;
+        }
+        preview(ev);
+        const point = this.aimPreview?.point;
+        if (circle) {
+          this.aimPreview = null;
+          sim.setRally(b.id, point ?? null);
+          play("banner");
+          this.setMessage(point?.tower !== undefined ? "Rallied to the watch tower: its gunners climb it while it has room." : point ? "Rally point set. Drag the flag back onto its building to send its troops their own ways." : "Rally point cleared: the troops go their own ways.", 4);
+          return;
+        }
+        if (point) sim.mineAims.set(b.id, point);
+        else sim.mineAims.delete(b.id);
+        this.setMessage(point ? "Minelayer aimed. Drag the crosshair back onto its tower for random coverage." : "Minelayer: random coverage across its full range.", 4);
+      },
+    };
   }
 
   /** A press on the planted war banner (its pole or cloth) lifts it. */
@@ -1075,19 +1148,27 @@ export class DefendPage {
     this.pick(inspectable(b) && this.picked?.id !== b.id ? b.id : null);
   }
 
-  /** In battle, a second tap close to the first and soon after it plants a
-   * rally flag there (free, any number of times), putting back whatever the
-   * first tap picked out. True when it did. */
+  /** In battle, a second tap (a third with the triple tap setting) close to
+   * the one before and soon after it plants a rally flag there (free, any
+   * number of times), or takes the flag away when made on it, putting back
+   * whatever the first tap picked out. True when it did. */
   private rallyTap(e: PointerEvent): boolean {
     const last = this.lastTap, now = performance.now();
-    this.lastTap = { x: e.clientX, y: e.clientY, at: now, picked: this.picked };
-    if (!last || now - last.at > DOUBLE_TAP_MS || Math.hypot(e.clientX - last.x, e.clientY - last.y) > DOUBLE_TAP_SLOP) return false;
+    const chained = !!last && now - last.at <= DOUBLE_TAP_MS && Math.hypot(e.clientX - last.x, e.clientY - last.y) <= DOUBLE_TAP_SLOP;
+    // Each tap of a run is measured from the one before, and keeps what the
+    // run's first tap found picked out.
+    this.lastTap = { x: e.clientX, y: e.clientY, at: now, taps: chained ? last.taps + 1 : 1, picked: chained ? last.picked : this.picked };
+    if (this.lastTap.taps < (this.host.tripleTapFlag?.() ? 3 : 2)) return false;
     const { fx, fy, inside } = eventCell(this.renderer!, e);
     if (!inside || !this.sim) return false;
+    this.picked = this.lastTap.picked;
     this.lastTap = null;
-    this.picked = last.picked;
-    this.sim.plantFlag({ x: fx, y: fy });
+    if (onFlag(this.sim.warBanner, fx, fy)) this.sim.liftFlag();
+    else this.sim.plantFlag({ x: fx, y: fy });
     play("banner");
+    // Troops answer a flag only inside their deployment range.
+    const sim = this.sim, troops = sim.soldiers.filter((s) => s.hp > 0 && s.home >= 0);
+    if (troops.length && !troops.some((s) => bannerFor(sim, s))) this.setMessage("Out of every troop's deployment range: none can answer the flag there.", 3);
     return true;
   }
 
@@ -1146,6 +1227,7 @@ export class DefendPage {
   }
 
   private pick(id: number | null) {
+    if (id !== this.picked?.id) this.aimPreview = null;
     this.picked = id === null ? null : { id, armed: { levels: { ...this.save.levels }, bonuses: this.host.bonuses() } };
   }
 

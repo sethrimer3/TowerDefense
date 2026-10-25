@@ -85,7 +85,7 @@ test("the shop's three basic buildings branch into attuned buildings, each with 
   // third is still to come, two).
   for (const a of ATTUNED) {
     assert.ok(a.branches.length === 3 || (a.branches.length === 2 && ["archerTower", "cannonTower", "archerBarracks", "mageGuild"].includes(a.kind)), a.kind);
-    for (const b of a.branches) assert.equal(pathById(b.path).ranks.length, 3, b.path);
+    for (const b of a.branches) assert.equal(pathById(b.path).ranks.length, b.path === "wispArrow" ? 0 : 3, b.path);
   }
   assert.equal(rootOf("darkKeep"), "watchTower");
   assert.equal(rootOf("valkyriePalace"), "meleeGuild");
@@ -472,7 +472,7 @@ test("Fire arrows and Sharpshooters on separate towers keep their own projectile
   assert.ok(fire.every(a => a.burn)); assert.equal(sharp.length, 1); assert.equal(sharp[0].burn, undefined);
 });
 
-test("Pyroclasm and Cinders effects retain their own origin after the caster dies", () => {
+test("Pyromancer and Cryomancer effects retain their own tier after the caster dies", () => {
   const s = fixture("mageGuild", 2), [first, second] = uids(s, "mageGuild");
   wear(s, first, "pyroclasm"); wear(s, second, "cinders");
   const sim = simulation(s); new Barracks().step(sim, 0.01);
@@ -481,10 +481,10 @@ test("Pyroclasm and Cinders effects retain their own origin after the caster die
   assert.equal(sim.fireballs.length, 2);
   assert.ok(sim.fireballs[0].damage > sim.fireballs[1].damage);
   sim.soldiers = []; stepFireballs(sim, 10);
-  assert.equal(sim.blazes.length, 2); assert.equal(sim.blazes[0].cling, undefined); assert.equal(sim.blazes[1].cling, true);
+  assert.equal(sim.blazes.length, 1); assert.equal(sim.blazes[0].clingFor, 4); assert.equal(sim.frostBursts.length, 1);
   sim.enemies = [];
   const b = sim.blazes[0], e = enemy(sim, b.x, b.y); stepBlazes(sim, 0.01);
-  assert.equal(e.burn, undefined, "other guild's clinging fire must not leak into this blaze");
+  assert.equal(e.burn, 4, "Pyromancer ground fire keeps its originating clinging tier");
 });
 
 test("overlapping watch towers combine their strongest mark and slow without multiplying duplicates", () => {

@@ -30,6 +30,14 @@ Recent rows are available as `window.defendPerformance`; they are not saved.
   rotated (their baked-in lighting looks wrong turned) and grown 15% to close
   the gaps between them.
 
+## Starting waves and reached records
+
+The game records the highest wave **entered**, separately from the highest wave **cleared**. Entering a new furthest wave selects `max(1, furthest reached - 1)` for the next defense. For example, reaching wave 10 selects wave 9, even if wave 10 defeats the keep. This selection is saved immediately.
+
+The starting-wave selection screen still offers every earlier wave through that limit. A manual earlier selection persists across retries and reloads, until a new reached record selects its preceding wave. Developer-unlocked starts remain available, while unlocking waves or using Unit tester does not count as reaching them. Upgrade points still require clearing a new highest wave; entering one grants no reward.
+
+Old saves infer entered progress from the cleared record plus one, preserving their existing selectable range. The old wave-1 default moves to the previous reached wave on migration. Other saved choices remain intact, including a deliberate wave-1 selection in current saves; missing/invalid choices use the previous reached wave. The next battle spawns its first enemies at the selected wave, skipping earlier waves. New games start on wave 1.
+
 ## Layout of the page
 
 - One header row, never two. Building: Upgrades (opens the Upgrades tab) · Start the defense on
@@ -414,7 +422,7 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   fireball at where it stands. It bursts with splash damage (full at the
   centre, 40% at the edge, fliers too) that spares your own people, and
   leaves a **blaze**: burning ground that hurts every ground enemy inside it
-  each second until it dies down (fliers pass over). Upgraded by Pyroclasm
+  each second until it dies down (fliers pass over). Upgraded by Spellpower
   (fireball damage and burst) and Lingering embers (how long and how hot
   the ground burns) in the Forge. Paths: Pyroclasm (heavier, wider
   fireballs, then two more bursting either side) or Cinders (longer, hotter
@@ -499,12 +507,35 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   Neither draws from the run's random stream; how they look is the
   renderer's (`wizard-art.ts`).
 - **Archer towers** shoot the nearest enemy in range. Paths: Fire arrows (what
-  they hit burns, then a volley of three) or Sharpshooters (reach, every 3rd
-  arrow critical, then aimed at the strongest). **Watch towers** mark
+  they hit burns, then a volley of three), Hawk focus, or Wisp Arrow. Hawk
+  attunement locks the highest-current-HP enemy at 70% ordinary range. Rank I
+  halves fire rate and adds 2% damage per further shot at that enemy, capped
+  at +1000% (11× total); II replaces the range penalty with 4.3× ordinary
+  range; III accelerates the half-rate cadence from 1× to 10× as shots build.
+  A lost or changed lock resets both ramps. Existing Hawk IDs/ranks are retained.
+  Wisp attunement creates one persistent blue arrow that wanders near its tower
+  and sweeps through enemies in a wide parabola: ordinary arrow damage once per
+  enemy per slice, ordinary range/cadence, a 0.4-second sweep and a one-cell hit
+  band. It has six finite-link pixel tendrils extending with inertia during
+  attacks; idle movement and trails do no damage. Later Wisp upgrades remain
+  unavailable. Source destruction ends damage and fades the arrow; rebuilding
+  starts a new one. **Watch towers** mark
   enemies in their radius with a gold outline; marked enemies take ×2 damage.
   Paths: Spotters (marks hit harder, wider radius) or Signal fires
   (marked enemies slowed, more at rank II, and set burning at III). Up to
-  two gunners climb into each watch tower and shoot from the top.
+  two gunners climb into each watch tower and shoot from the top, but only
+  when their building's rally point is snapped onto it.
+- **Deployment and rally points** (`deployment.ts`): troops never go further
+  from their building than its deployment range, 14 cells for brawlers and
+  stone throwers up to 30 for the Hero and the shade (the Smithy's
+  Deployment range adds 5% a rank, up to 150%), and answer the war banner or
+  a rally flag only inside it. In battle, tap a troop building to see its
+  range, then press it again and drag out its rally point, a blue flag at the
+  end of a dotted line (shown while it is selected): its troops go there when
+  they have nothing to fight. Dropped back on the building, it clears; near a
+  watch tower in range, a gunner-line building's flag snaps onto it. A
+  Minelayer's crosshair is aimed the same way. On touch screens the flag and
+  crosshair ride above the finger, like a dragged building.
 - **Gun sight** (`gun-sight.ts`): the gunner line (gunners, musketmen,
   machine and Gatling gunners, rocketeers, snipers, laser snipers) shoots
   flat, only at an enemy with no wall stone or building on the line
@@ -612,6 +643,13 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   it (a corner will do).
 - During a run the palette becomes the **consumables** palette. A **bomb**
   can be dragged onto the field to blast everything nearby.
+  The bomb’s Knowledge tree is **Study → Spells → Bombs**: the bomb root
+  leads through Gunpowder I, II and III, adding 20% damage per rank. No troop
+  or tower research is required. Existing Gunpowder ranks, costs and research
+  times are retained; later ranks remain locked until the prior rank completes.
+  Its nested-triangle magic circle grows only with completed research.
+  Smithy → Spells → Bombs still holds damage training and Shaped charges;
+  War drums is in the Smithy under Realm → All troops.
 - The **war banner** (`war-banner.ts`, `×∞`: never used up, never bought)
   is dragged from the same palette and planted anywhere on the board as the
   keep's waving banner over a faint gold ring. While it stands every mobile
@@ -626,6 +664,12 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   it stands takes it down, as does carrying it off the board, and dragging
   it elsewhere moves it. It draws nothing from the run's random stream, so a
   run without one replays exactly as before.
+  Its Knowledge tree is in **Study → Spells → War banner**, independent of
+  tower research. Select nodes on the connected tree to inspect and research
+  the existing ranks: War banner, Rapid deployment (all three ranks),
+  Sheltering standard, Broad standard, then independent damage, marching speed,
+  and life branches; regeneration follows life. Timed research replaces the
+  tree with the centered upgrade until completion or confirmed cancellation.
 - **Necromancy** (`necromancy.ts`, `×∞`), a strike spell, is dragged from
   the same palette; while it is held a small pixel skull marks every grave
   on the board, and its aim shows a green ring of 3 cells, the skulls inside
@@ -1035,3 +1079,31 @@ bombard player units and buildings every two seconds. Destroyed parts remain
 charred sockets. Core destruction removes surviving parts; only the core counts
 as a kill. The wave budget reserves all 9/15/21/27 components and spawning
 checks room for the complete fortress before releasing it.
+
+
+## Cannon attunements
+
+The Cannon Tower branches into Gun Battery, Mortar Tower and Minelayer, each costing 4 Knowledge to attune and having three path ranks costing 4 / 4,004 / 16,004 Knowledge. These are individual building upgrades; existing cannon Forge/Training bonuses still apply.
+
+- **Gun Battery:** grapeshot immediately: the main shell plus four surrounding blasts, each at 35% damage and half radius. Drilled crews / Powder crews / Master gunners reduce reload time by 15% / 25% / 50% relative to the ordinary cannon.
+- **Mortar Tower:** every impact leaves burning ground for 4 seconds, at 25% of its impact damage per second. Initially ordinary impact damage and 25% longer reload; Incendiary shot increases impact and burning damage by 80% with 50% longer reload; Powder charge enlarges blast and burn radii by 50%; Earthshaker triples both damage values relative to the unupgraded mortar and adds 3 cells of range. Ground fire uses the existing enemy-only, ground-only Blaze system, including water/rime/ice interactions, without receiving Mage Guild research. Impact retains cannon friendly fire unless cannon safety is unlocked.
+- **Minelayer:** fires on the normal cannon cadence even without enemies, placing mines on open dry ground at half range (5.5 simulation cells). Mines arm after 0.5 seconds and explode when a ground enemy comes within 0.75 cells, using ordinary cannon damage/radius and safety rules. Mines persist for the battle. Capacity is per tower and includes shells in flight; the tower waits at capacity. Directed laying unlocks aiming at rank I (15 mines); Expanded magazine raises capacity to 30; Smart charges raises it to 50 and lets mines walk at 0.5 cells/s toward ground enemies detected within 3 cells. They respect obstacles, water and their original laying range.
+
+During battle, select an upgraded Minelayer and drag from its tower or selected crosshair to direct future shots within a 1-cell-radius target disk, clipped to laying range. Drag back onto the tower to restore random full-range coverage; its crosshair expands to the range perimeter. Crosshairs show only while selected. Pointer cancellation or a second finger cancels an uncommitted preview; two fingers still pinch. Build-mode movement and hold-to-open trees remain available. Aiming resets for each battle and is not saved.
+
+C4 Nanobots now requires one fully upgraded building from each of the three attunements. Existing C4 Nanobots and saved Gun Battery/Mortar ranks remain owned. [Accepted specification](upgrades/CANNON_ATTUNEMENTS.md).
+
+
+## Mage Guild troop attunements
+
+The Mage Guild has three attunements, each costing 5 Knowledge with path ranks costing 5 / 5,005 / 20,005 Knowledge. Each trains a mage troop family with ordinary mage HP, movement and 2.1-second casting cadence. Purchases affect the next battle through each home building's snapshot.
+
+| Attunement | Attuned / I / II / III |
+| --- | --- |
+| **Storm Hall — Stormcallers** | Casting range 9/11/13/15 cells; 3/4/6/8 distinct enemies; jump distance 3/3.5/4/4.5 cells; independent critical chance 10/15/25/35%, dealing double damage. Each link retains 85% of the prior non-critical damage. Lightning replaces fireballs and can hit fliers. |
+| **Inferno Hall — Pyromancers** | Impact and burn DPS multipliers 1/1.4/1.8/2.3; blast and ground-fire radius multipliers 1.25/1.35/1.5/1.8; ground fire lasts 4/5/6.5/8 seconds before Forge bonuses; clinging fire lasts 2/2.5/3/4 seconds. Casting range stays 4.5 cells. Every tier burns the full blast area and ignites victims, including airborne impact victims. |
+| **Frost Hall — Cryomancers** | Casting range 5.5/6/6.5/7 cells; blast radius multipliers 1/1.15/1.3/1.6; 50/55/60/65% slowing for 2/3/3.5/4 seconds and a 0.35/0.5/0.75/1-second freeze starting at impact. Direct damage is 75% of ordinary mage damage. No fire is produced. |
+
+Chills use the strongest active mage slow without multiplying duplicate mage effects. A weaker effect can remain after a stronger one expires; freezes refresh their maximum remaining duration rather than adding time. Existing unyielding immunity, shields, damage protection and fire/ice cancellation remain. Elemental effects spare friendlies. Fire uses existing water extinguishing and ground-fire interactions; clinging burns refresh without stacking duplicate statuses. Mage upgrades do not grant Wizard Tower, Dark Wizard or strike-spell research effects.
+
+Existing `infernoHall`/`pyroclasm` saves retain their purchased ranks with the combined fire abilities. `cinderHall`/`cinders` retain their saved IDs and ranks but display Frost Hall/Cryomancy. `stormHall`/`conduction` is the new third branch. The existing mageFireball Forge upgrade is labeled **Spellpower**, applying direct damage to every family and radius to Fire/Frost. Lingering embers still applies to fire only. The Mage Guild's ultimate is still undefined. [Approved specification](upgrades/MAGE_GUILD_ATTUNEMENTS.md).

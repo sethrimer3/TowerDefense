@@ -37,7 +37,11 @@ export class HallBackdrop {
   private part = new Uint8Array(0);
   private scene = new Float32Array(0);
   private glassTint = new Uint8Array(0);
+  /** Each pane's own brightness, lighter along its top came and darker along its foot. */
+  private glassShade = new Float32Array(0);
   private detailed = false;
+  /** Which glazing fills the rose (`ROSES`), changed at midnight. */
+  private rose: Rose = "flower";
   private sunlight: SoftSunlight | null = null;
   private city = new Float32Array(0);
   private outside: { x: number; y: number; radius: number; seed: number }[] = [];
@@ -48,11 +52,12 @@ export class HallBackdrop {
   constructor(private canvas: HTMLCanvasElement, private look: HallLook) {}
 
   /** Bakes the wall when the canvas's size changed. */
-  private fit() {
+  private fit(now: number) {
     const w = Math.max(8, Math.ceil(this.canvas.clientWidth / ART)), h = Math.max(8, Math.ceil(this.canvas.clientHeight / ART));
-    const detailed = this.look === "keep" && pixelArtOn();
-    if (w === this.w && h === this.h && this.detailed === detailed) return false;
+    const detailed = this.look === "keep" && pixelArtOn(), rose = detailed ? roseOn(now) : this.rose;
+    if (w === this.w && h === this.h && this.detailed === detailed && this.rose === rose) return false;
     this.detailed = detailed;
+    this.rose = rose;
     this.w = w;
     this.h = h;
     this.canvas.width = w;
@@ -63,6 +68,7 @@ export class HallBackdrop {
     this.part = new Uint8Array(n);
     this.scene = new Float32Array(n);
     this.glassTint = new Uint8Array(n);
+    this.glassShade = new Float32Array(n);
     this.city = new Float32Array(n * 3);
     this.outside = [];
     for (let y = 0; y < h; y++)
@@ -85,8 +91,10 @@ export class HallBackdrop {
     return true;
   }
 
-  /** A round-headed opening in moulded stone and oak. Pixel Art uses an
-   * eight-petal rose, paired pointed lights and pale glazing; off preserves
+  /** A round-headed opening in moulded stone and oak. Pixel Art glazes it
+   * with one-pixel leadwork (`leadedPane`): a beaded border, an eight-petal
+   * rose ringed with roundels, two pointed lancets of diamond quarries, all
+   * in pale clear, blue and cream glass; off preserves
    * the old four-lobed clear window. Both overlook the same living city. */
   private bakeWindow(hgt: Float32Array) {
     const { w, h } = this, ww = Math.round(Math.max(30, Math.min(w * 0.46, 110))), r = ww / 2;
@@ -130,15 +138,16 @@ export class HallBackdrop {
         const lobe = rose.r * 0.46;
         const iron = ring(rose, rose.r) || ring(rose, rose.r * 0.18)
           || [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => ring({ x: rose.x + a * lobe, y: rose.y + b * lobe }, lobe * 0.98));
-        const pane = this.detailed ? windowPane(px, py, cx, r, rose.y, bottom) : null;
+        const pane = this.detailed ? leadedPane(px, py, cx, r, archY, bottom, this.rose) : null;
         if (pane ? pane.lead : iron) {
           this.part[i] = TRACERY;
           hgt[i] = 1;
-          this.albedo.set(this.detailed ? [44, 48, 49] : h01(x, y, 19) > 0.65 ? [73, 75, 70] : [30, 34, 33], i * 3);
+          this.albedo.set(this.detailed ? [52, 54, 58] : h01(x, y, 19) > 0.65 ? [73, 75, 70] : [30, 34, 33], i * 3);
           continue;
         }
         this.part[i] = GLASS;
         this.glassTint[i] = pane?.tint ?? 0;
+        this.glassShade[i] = pane?.shade ?? 1;
         // Outside: hills, then the city's roofs and its wall under the sky.
         const hill = horizon + Math.sin(px * 0.11) * 2.2 + Math.sin(px * 0.037 + 1) * 3;
         const city = cityPixel(px, py);
@@ -194,7 +203,7 @@ export class HallBackdrop {
   /** Lights the wall at most every `FRAME_MS` (every three seconds with
    * Reduce Motion), using wall-clock `now` and daylight in [0, 1]. */
   draw(now: number, torches: TorchSpot[], day: number, reduced: boolean) {
-    const resized = this.fit();
+    const resized = this.fit(now);
     if (!resized && now - this.last < (reduced ? 3000 : FRAME_MS)) return;
     this.last = now;
     const { w, h, albedo, sx, sy, part, scene } = this, out = this.image!.data;
@@ -207,9 +216,6 @@ export class HallBackdrop {
     });
     const amb: RGB = this.look === "planks" ? [0.2, 0.15, 0.12] : this.look === "vault" ? [0.25, 0.21, 0.32] : [0.16 + day * 0.14, 0.16 + day * 0.15, 0.2 + day * 0.15];
     const sky = skyColours(day), win = this.win, sun = keep ? day : 0;
-    // Same solar heading as the Library. Reduce Motion keeps a steady heading.
-    const tilt = reduced ? 0.2 : Math.sin(((now % DAY_MS) / DAY_MS) * Math.PI * 2 - Math.PI / 2) * 0.55
-      + Math.sin(now / SUNLIGHT.swayMs) * SUNLIGHT.sway;
     const lit = Math.max(0, Math.min(1, (0.55 - day) / 0.35));
     const exterior = this.outside.map((l) => ({ ...l, f: getTorchFlicker({ x: l.seed, y: 9 }, now, reduced) * lit }));
     for (let y = 0; y < h; y++)
@@ -229,8 +235,10 @@ export class HallBackdrop {
           // A faint sheen across clear glass, and a star or two at night.
           const sheen = this.detailed ? 1 : Math.abs(((x - y * 0.6) % 14 + 14) % 14 - 3) < 1 ? 1.12 : 1;
           if (this.detailed) {
-            const tint: RGB = this.glassTint[i] === 1 ? [226, 240, 249] : this.glassTint[i] === 2 ? [255, 246, 220] : [245, 247, 242];
-            c = mix(c, tint, 0.06 + day * 0.2);
+            // Pale cathedral glass: the view softened behind clear, faintly
+            // blue and faintly cream panes, each pane its own brightness.
+            const t = GLASS_TINTS[this.glassTint[i]], lum = (0.16 + day * 0.84) * this.glassShade[i];
+            c = mix(c, [t[0] * lum, t[1] * lum, t[2] * lum], 0.3 + day * 0.25);
           }
           const star = s > 0 && s < 0.7 && night > 0.5 && h01(x, y, 11) > 0.985 ? 120 * night : 0;
           out[o] = Math.min(255, c[0] * sheen + star);
@@ -281,55 +289,228 @@ export class HallBackdrop {
     }
     const ctx = this.canvas.getContext("2d")!;
     ctx.putImageData(this.image!, 0, 0);
-    if (keep && sun > 0.02) this.drawSunlight(ctx, now, sun, tilt, reduced);
   }
 
-  private drawSunlight(ctx: CanvasRenderingContext2D, now: number, day: number, tilt: number, reduced: boolean) {
-    this.sunlight ??= new SoftSunlight();
-    const { win, h } = this, width = (win.x1 - win.x0 - 6) / 3, top = win.y1 - 4, length = h - top;
-    const clock = reduced ? 0 : now;
-    for (let k = 0; k < 3; k++) {
-      const pulse = 0.9 + Math.sin(clock / (19000 + k * 3000) + k) * 0.1;
-      this.sunlight.draw(ctx, win.x0 + 3 + width * (k + 0.5), top, width, length, tilt, day * pulse, k);
+  /** The sun's shafts from the keep's window and the dust turning in them,
+   * every frame onto `light`, a layer over the whole room (the menu too) that
+   * the page screens over it. Coordinates are art pixels, the canvas a CSS
+   * pixel a pixel so the motes stay fine. Same heading and slow pulse as the
+   * Library's beams, with a gentle sway of their own; Reduce Motion holds
+   * them still and hides the dust; by night it is empty. */
+  drawLight(light: HTMLCanvasElement, now: number, day: number, reduced: boolean) {
+    this.fit(now);
+    const cw = light.clientWidth, ch = light.clientHeight;
+    if (light.width !== cw || light.height !== ch) {
+      light.width = cw;
+      light.height = ch;
     }
-    if (reduced) return;
-    // Fixed, wall-clock trajectories: bounded work, no spawning or RNG stream.
+    const ctx = light.getContext("2d")!;
+    ctx.clearRect(0, 0, cw, ch);
+    if (this.look !== "keep" || day <= 0.02 || !cw || !ch) return;
+    this.sunlight ??= new SoftSunlight(SUNLIGHT.hallDensity, SUNLIGHT.hallFade);
+    const { win, h } = this, clock = reduced ? 0 : now, span = win.x1 - win.x0 - 8;
+    const tilt = reduced ? 0.2 : Math.sin(((now % DAY_MS) / DAY_MS) * Math.PI * 2 - Math.PI / 2) * 0.55
+      + Math.sin(now / SUNLIGHT.swayMs) * SUNLIGHT.sway + Math.sin(now / SUNLIGHT.hallSwayMs) * SUNLIGHT.hallSway;
+    const beams = 5, width = span / beams, top = win.y0 + (win.y1 - win.y0) * 0.6, length = h - top;
     ctx.save();
-    ctx.fillStyle = "#fff4d9";
-    for (let k = 0; k < SUNLIGHT.dustCount; k++) {
-      const age = (h01(k, 1, 83) + now / (70000 + h01(k, 2, 83) * 90000)) % 1;
-      const run = age * length, across = h01(k, 3, 83);
-      const x = win.x0 + 3 + across * width * 3 + run * tilt + Math.sin(now / 11000 + k) * 2;
-      const fade = Math.sin(age * Math.PI) ** 2;
-      ctx.globalAlpha = day * fade * (0.18 + h01(k, 4, 83) * 0.3);
-      ctx.fillRect(Math.round(x), Math.round(top + run), 1, 1);
+    ctx.scale(cw / this.w, ch / this.h);
+    for (let k = 0; k < beams; k++) {
+      const pulse = 0.72 + 0.28 * Math.sin(clock / (3100 + k * 700) + k * 1.7);
+      const start = top + (k % 2) * 8;
+      // Narrower than their spacing, so each shaft stands apart and breathes on its own.
+      this.sunlight.draw(ctx, win.x0 + 4 + width * (k + 0.5), start, width * 0.55, h - start, tilt, day * pulse, k);
+    }
+    if (!reduced) {
+      // Motes on fixed wall-clock paths, drifting both ways and wandering;
+      // they glint only inside the light. No spawning, no random stream.
+      ctx.fillStyle = "#fff6dc";
+      const mid = (win.x0 + win.x1) / 2, dot = Math.max(0.5, this.w / cw * 1.6);
+      for (let k = 0; k < SUNLIGHT.dustCount; k++) {
+        const speed = (h01(k, 2, 83) - 0.4) / (60000 + h01(k, 5, 83) * 60000);
+        const age = ((h01(k, 1, 83) + now * speed) % 1 + 1) % 1, run = age * length;
+        const wander = Math.sin(now / (5200 + h01(k, 6, 83) * 6000) + k) * 3 + Math.sin(now / 1900 + k * 2.3) * 0.6;
+        const across = (h01(k, 3, 83) - 0.5) * span * (1 + age * 0.9);
+        const x = mid + across + run * tilt + wander, y = top + run + Math.sin(now / 3700 + k * 1.3) * 1.5;
+        // Brighter toward the shafts' middle and the window, gone at the ends.
+        const off = Math.abs(x - mid - run * tilt) / (span * 0.5 * (1 + age * 0.9));
+        const inBeam = Math.max(0, 1 - off * off), ends = Math.min(1, age * 8) * (1 - age) ** 1.2;
+        const twinkle = 0.65 + 0.35 * Math.sin(now / (700 + h01(k, 7, 83) * 900) + k);
+        ctx.globalAlpha = Math.min(1, day * inBeam * ends * twinkle * (0.6 + h01(k, 4, 83) * 0.4));
+        if (ctx.globalAlpha > 0.02) ctx.fillRect(x, y, dot, dot);
+      }
     }
     ctx.restore();
   }
 }
 
-/** Symmetric leadwork at native resolution: an eight-petal rose above two
- * pointed lights, with a quiet diamond lattice. Each pane owns one tint. */
-function windowPane(x: number, y: number, cx: number, r: number, roseY: number, bottom: number) {
-  const dx = x - cx, dy = y - roseY, rr = r * 0.62, dr = Math.hypot(dx, dy);
-  const angle = Math.atan2(dy, dx), sector = angle * 4 / Math.PI;
-  const petal = rr * (0.66 + 0.13 * Math.cos(angle * 8));
-  if (dr < rr + 0.8) {
-    const lead = Math.abs(dr - rr) < 0.75 || Math.abs(dr - rr * 0.23) < 0.75
-      || Math.abs(dr - petal) < 0.8
-      || (dr > rr * 0.23 && dr < petal && Math.abs(sector - Math.round(sector)) * dr * Math.PI / 4 < 0.72);
-    return { lead, tint: dr < rr * 0.23 ? 2 : (Math.floor(sector + 8) % 2) + 1 };
+/** The panes' tints: clear, the palest blue, the palest cream. */
+const GLASS_TINTS: RGB[] = [[236, 240, 236], [212, 230, 246], [250, 238, 206], [255, 212, 118]];
+/** GOLD, a little more yellow than cream, picks out the suns, wings and hilts. */
+const CLEAR = 0, BLUE = 1, CREAM = 2, GOLD = 3;
+/** No pane: inside the frame's came or the central mullion. */
+const CAME = -1;
+
+type Pane = { id: number; tint: number };
+
+/** The rose's glazings. Usually the flower, but now and then, from one
+ * midnight to the next, the glaziers have set another: diamond quarries, a
+ * winged sword, the sun between two moons and the stars, an abstract of
+ * cells, or interlocking triangles. */
+export const ROSES = ["flower", "diamonds", "sword", "sky", "cells", "triangles"] as const;
+export type Rose = (typeof ROSES)[number];
+let roseOverride: Rose | null = null;
+/** Sets the rose's glazing (the console's `tilesRose`), or null for the night's own. */
+export function setRose(rose: Rose | null) {
+  roseOverride = rose;
+}
+/** The glazing for wall-clock `now`: one a day, changed at midnight (a
+ * quarter `DAY_MS` before the day's turn), the flower about half the time. */
+export function roseOn(now: number): Rose {
+  if (roseOverride) return roseOverride;
+  const night = Math.floor((now + DAY_MS / 4) / DAY_MS), roll = h01(night, 3, 97);
+  return roll < 0.45 ? "flower" : ROSES[1 + Math.min(ROSES.length - 2, Math.floor((roll - 0.45) / 0.55 * (ROSES.length - 1)))];
+}
+
+/** Each glazing as panes over the rose's disc of radius `rr`, in `X = |dx|`
+ * and `dy` from its centre (up is negative), so each mirrors exactly. */
+const ROSE_PANES: Record<Exclude<Rose, "flower">, (X: number, dy: number, dr: number, rr: number) => Pane> = {
+  diamonds(X, dy, _dr, rr) {
+    const q = Math.max(5, rr / 3.6), u = X / q, v = dy / (q * 1.4);
+    const i = Math.round(u + v), j = Math.round(u - v);
+    return { id: 1000 + (i + 50) * 100 + j + 50, tint: i === j && i % 2 === 0 ? GOLD : (((i + j) % 3) + 3) % 3 };
+  },
+  sword(X, dy, dr, rr) {
+    const bw = Math.max(1.5, rr * 0.07), tip = -rr * 0.78, guard = rr * 0.18;
+    // The blade, narrowing to its point, leaded in lengths.
+    if (dy > tip && dy < guard && X < bw * Math.min(1, (dy - tip) / (rr * 0.18)))
+      return { id: 2000 + Math.floor((dy - tip) / (rr * 0.24)), tint: CLEAR };
+    if (Math.abs(dy - guard - rr * 0.04) < rr * 0.055 && X < rr * 0.34) return { id: 2050, tint: GOLD };
+    if (dy > guard && dy < rr * 0.5 && X < bw * 0.85) return { id: 2051, tint: BLUE };
+    if (Math.hypot(X, dy - rr * 0.58) < rr * 0.09) return { id: 2052, tint: GOLD };
+    // The wings, from beside the guard, sweeping up and out in five feathers.
+    const wx = X - bw * 1.2, wy = guard - dy, ang = Math.atan2(wy, wx) * 180 / Math.PI, dw = Math.hypot(wx, wy);
+    if (wx > 0 && ang > -12 && ang < 70) {
+      const k = Math.min(4, Math.floor((ang + 12) / 16.4)), reach = rr * (0.92 - k * 0.07) - Math.abs(((ang + 12) % 16.4) - 8.2) * rr * 0.012;
+      if (dw < rr * 0.34) return { id: 2060, tint: CREAM };
+      if (dw < reach) return { id: 2070 + k, tint: k % 2 ? CREAM : GOLD };
+    }
+    // The sky behind, in quarters round the disc.
+    return { id: 2090 + Math.floor(Math.atan2(X, -dy) / (Math.PI / 4)) + (dr > rr * 0.62 ? 10 : 0), tint: BLUE };
+  },
+  sky(X, dy, dr, rr) {
+    // The sun, its eight rays, a crescent moon either side and the stars.
+    if (dr < rr * 0.2) return { id: 3000, tint: GOLD };
+    const th = Math.atan2(X, -dy), k = Math.round(th / (Math.PI / 4)), off = Math.abs(th - k * Math.PI / 4);
+    if (dr < rr * 0.44 && off * dr < (rr * 0.44 - dr) * 0.45) return { id: 3010 + k, tint: k % 2 ? CREAM : GOLD };
+    const mx = rr * 0.66, my = rr * 0.04, m = rr * 0.24;
+    if (Math.hypot(X - mx, dy - my) < m && Math.hypot(X - mx - m * 0.45, dy - my + m * 0.15) > m * 0.85) return { id: 3030, tint: CREAM };
+    for (const [n, sx, sy, sr] of STARS) {
+      const ax = Math.abs(X - sx * rr), ay = Math.abs(dy - sy * rr), size = sr * rr;
+      if (Math.sqrt(ax) + Math.sqrt(ay) < Math.sqrt(size)) return { id: 3040 + n, tint: n % 2 ? GOLD : CREAM };
+    }
+    return { id: 3100 + Math.floor(th / (Math.PI / 2)) + (dr > rr * 0.86 ? 10 : 0), tint: dr > rr * 0.86 ? CLEAR : BLUE };
+  },
+  cells(X, dy, _dr, rr) {
+    // An abstract of cells round mirrored seeds, a few on the mullion's line.
+    let best = Infinity, n = 0;
+    for (let k = 0; k < CELLS.length; k++) {
+      const [sx, sy] = CELLS[k], d = (X - sx * rr) ** 2 + (dy - sy * rr) ** 2;
+      if (d < best) { best = d; n = k; }
+    }
+    return { id: 4000 + n, tint: n % 5 === 2 ? GOLD : n % 3 };
+  },
+  triangles(X, dy, dr, rr) {
+    // Two hexagrams, upright and on their sides, and an eye: each pane is
+    // tinted by how many of the four triangles overlap there.
+    if (dr < rr * 0.14) return { id: 5000, tint: GOLD };
+    let mask = 0, inside = 0;
+    TRIANGLES.forEach(([R, normals], t) => {
+      let all = true;
+      normals.forEach(([nx, ny], e) => {
+        const out = nx * X + ny * dy >= R * rr * 0.5;
+        if (out) { mask |= 1 << (t * 3 + e); all = false; }
+      });
+      if (all) inside++;
+    });
+    return { id: 5100 + mask, tint: inside >= 3 ? GOLD : inside % 3 };
+  },
+};
+/** The sky's stars: index, x and y as shares of the rose's radius, size. */
+const STARS: [number, number, number, number][] = [[0, 0, -0.7, 0.13], [1, 0.4, -0.58, 0.1], [2, 0.7, -0.4, 0.08], [3, 0.36, 0.56, 0.1], [4, 0.66, 0.42, 0.08], [5, 0, 0.68, 0.12]];
+/** The cells' seeds as shares of the radius, x never negative (folded). */
+const CELLS: [number, number][] = [[0, -0.8], [0, -0.36], [0, 0.08], [0, 0.5], [0, 0.88], [0.3, -0.62], [0.62, -0.62], [0.24, -0.12], [0.5, -0.3], [0.84, -0.26], [0.36, 0.28], [0.7, 0.08], [0.9, 0.3], [0.3, 0.7], [0.62, 0.56], [0.52, 0.86]];
+/** The triangles: circumradius share and their edges' outward normals. */
+const TRIANGLES: [number, [number, number][]][] = [
+  [0.96, [[0, 1], [0.866, -0.5], [-0.866, -0.5]]],
+  [0.96, [[0, -1], [0.866, 0.5], [-0.866, 0.5]]],
+  [0.56, [[1, 0], [-0.5, 0.866], [-0.5, -0.866]]],
+  [0.56, [[-1, 0], [0.5, 0.866], [0.5, -0.866]]],
+];
+
+/** The window's glazing as panes, each an id and a tint: a border of
+ * alternating beads, a rose in the head (a cream eye, eight petals, crescents
+ * between them and an outer ring of sixteen segments, each with a roundel),
+ * spandrels round it and two pointed lancets of diamond quarries below.
+ * Everything reads `|x - cx|`, so the leadwork mirrors exactly. */
+function paneAt(px: number, py: number, cx: number, r: number, archY: number, bottom: number, rose: Rose = "flower"): Pane {
+  const X = Math.abs(px - cx);
+  const d = py < archY ? r - Math.hypot(X, py - archY) : Math.min(r - X, bottom - py);
+  if (d < 4) return { id: CAME, tint: CLEAR };
+  if (d < 8) {
+    // The border, measured round the opening from the head's crown.
+    const side = r - X < bottom - py;
+    const s = py < archY ? Math.atan2(X, archY - py) * (r - 6)
+      : side ? Math.PI / 2 * (r - 6) + (py - archY) : Math.PI / 2 * (r - 6) + (bottom - archY) + (r - X);
+    const k = Math.round(s / 5);
+    return { id: 100 + k, tint: k % 2 ? BLUE : CREAM };
   }
-  const split = roseY + rr + 2;
-  if (y < split || y > bottom - 3) return { lead: false, tint: 0 };
-  const half = r * 0.43, localX = Math.abs(dx) - r * 0.47;
-  const arch = split + Math.pow(Math.abs(localX) / half, 1.5) * half * 0.85;
-  const u = dx / (r * 0.45), v = (y - split) / (r * 0.5);
-  const lattice = Math.min(Math.abs(u + v - Math.round(u + v)), Math.abs(u - v - Math.round(u - v))) * r * 0.34 < 0.7;
-  const lead = Math.abs(dx) < 0.7 || (Math.abs(localX) < half && Math.abs(y - arch) < 0.8)
-    || (y > arch + 2 && Math.abs(localX) < half && lattice);
-  const tint = ((Math.floor(u + v) + Math.floor(u - v)) % 3 + 3) % 3;
-  return { lead, tint: y > arch ? tint : 0 };
+  const rr = r - 8, dy = py - archY, dr = Math.hypot(X, dy);
+  // Each glazing is drawn the way up it was designed, turned a half turn into
+  // the window; mirrored in x already, so that is only dy's sign.
+  if (dr < rr && rose !== "flower") return ROSE_PANES[rose](X, -dy, dr, rr);
+  if (dr < rr) {
+    const th = Math.atan2(X, -dy), eye = rr * 0.2, ring = rr * 0.74;
+    if (dr < eye) return { id: 200, tint: CREAM };
+    if (dr < ring) {
+      const petal = rr * (0.6 + 0.14 * Math.cos(th * 8));
+      if (dr < petal) return { id: 210 + Math.round(th / (Math.PI / 4)), tint: BLUE };
+      return { id: 220 + Math.floor(th / (Math.PI / 4)), tint: CLEAR };
+    }
+    // Sixteen segments in a big rose, eight in a small one so the roundels keep room.
+    const step = rr >= 24 ? Math.PI / 8 : Math.PI / 4, m = Math.round(th / step), a = m * step, mid = (ring + rr) / 2;
+    const bead = Math.max(1.6, (rr - ring) * 0.3);
+    if (Math.hypot(X - Math.sin(a) * mid, dy + Math.cos(a) * mid) < bead) return { id: 260 + m, tint: CREAM };
+    return { id: 240 + m, tint: m % 2 ? BLUE : CLEAR };
+  }
+  // Below the rose: two pointed lancets either side of the mullion.
+  const foot = archY + rr, half = rr / 2, hw = half - 1.5, a = X - half;
+  if (X < 1 && py > foot - 1) return { id: CAME, tint: CLEAR };
+  const springing = foot + 3 + hw * 1.73, reach = (Math.abs(a) + hw);
+  const head = reach < hw * 2 ? springing - Math.sqrt(hw * hw * 4 - reach * reach) : Infinity;
+  if (Math.abs(a) < hw && py > head) {
+    const q = Math.max(5, hw / 1.8), u = a / q, v = (py - springing) / (q * 1.4);
+    const i = Math.round(u + v), j = Math.round(u - v);
+    return { id: 100000 + (i + 500) * 1000 + j + 500, tint: (((i + j) % 3) + 3) % 3 };
+  }
+  // The spandrels: faintly blue, the outer ones round a cream roundel where
+  // the rose meets the lancets, the inner one under the rose's foot.
+  const outer = a > 0, spot = outer ? { x: r - 8 - rr * 0.16, y: foot + 1 } : { x: 0, y: foot + 2 + hw * 0.5 };
+  if (Math.hypot(X - spot.x, py - spot.y) < Math.max(1.6, rr * 0.1)) return { id: 510 + (outer ? 1 : 0), tint: CREAM };
+  return { id: 500 + (outer ? 1 : 0) + (py < foot - rr * 0.35 ? 2 : 0), tint: outer ? BLUE : CLEAR };
+}
+
+/** A pixel of leaded glass: lead where its pane meets the next one toward the
+ * mullion or below (so each came is one pixel and mirrors exactly), and
+ * otherwise its pane's tint and shade. */
+function leadedPane(px: number, py: number, cx: number, r: number, archY: number, bottom: number, rose: Rose) {
+  const at = (x: number, y: number) => paneAt(x, y, cx, r, archY, bottom, rose);
+  const here = at(px, py);
+  if (here.id === CAME) return { lead: true, tint: CLEAR, shade: 1 };
+  const toward = at(px + (px < cx ? 1 : -1), py).id;
+  const below = at(px, py + 1).id, above = at(px, py - 1).id;
+  const lead = (toward !== CAME && toward !== here.id) || (below !== CAME && below !== here.id);
+  const shade = (0.95 + h01(here.id % 9973, here.id >> 10, 31) * 0.1) * (above !== here.id ? 1.1 : below !== here.id ? 0.92 : 1);
+  return { lead, tint: here.tint, shade };
 }
 
 /** Worn oak boards laid in courses, each board its own tone, with grain,
