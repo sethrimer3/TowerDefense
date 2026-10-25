@@ -11,7 +11,7 @@ Status: approved for implementation by the user on 2026-10-24 (America/Denver). 
   Defend, also accessible through Tiles. Requires Triple arrows (rank I).
 - **What it does:** adds living fire arrows with flame tails, damaging fiery
   trails during attack passes, and an explosion after ten direct enemy hits.
-- **Levels:** one new rank; rank III remains unspecified and unavailable.
+- **Levels:** one new rank; final rank III is defined in [Lightning arrow](WISP_LIGHTNING_ARROW.md).
 - **Cost:** `studyPathCost(4, 1)` = **4,004 Knowledge** *(proposed, following
   the existing second-rank price curve)*. Use the ordinary per-building
   purchase, saved rank, undo, respec and refund mechanisms. Apply the purchased
@@ -82,6 +82,8 @@ Let `D` be the normal Archer Tower's damage after shared tower damage bonuses.
 
 ## Flight and appearance
 
+- Fire arrows are 25% larger than blue arrows (subsequent user request); their
+  existing damage hit areas stay unchanged.
 - Fire arrows retain the Wisp's aggressive consecutive passes, normal tower
   range, shared reload scaling and broad minimum turn radius.
 - Use a clearly arrow-shaped warm orange/red core and **fiery flames behind

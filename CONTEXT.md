@@ -545,4 +545,8 @@ The first Wisp Arrow upgrade. Raises the Wisp Tower’s capacity from one living
 
 
 **Wisp Fire arrows**:
-The second Wisp Arrow upgrade. Adds two fire arrows alongside the three blue arrows, restoring one fire arrow every six seconds below capacity. Flaming passes leave a fiery trail for two seconds. Each fire arrow disintegrates after ten direct enemy hits and explodes; direct hits, trails and the explosion all deal fire damage.
+The second Wisp Arrow upgrade. Adds two fire arrows, 25% larger than blue arrows, alongside the three blue arrows, restoring one fire arrow every six seconds below capacity. Flaming passes leave a fiery trail for two seconds. Each fire arrow disintegrates after ten direct enemy hits and explodes; direct hits, trails and the explosion all deal fire damage.
+
+
+**Wisp Lightning arrow**:
+The third and final Wisp Arrow upgrade. Adds one larger purple arrow alongside blue and fire arrows. On locking a nearby enemy, it flies straight through the captured aim to the edge of the map. Its purple lightning trail lasts five seconds at each point, dealing 300% attack per second to all enemies touching it. The tower regenerates the arrow nine seconds after it exits.

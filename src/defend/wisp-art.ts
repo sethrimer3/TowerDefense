@@ -5,6 +5,8 @@ import { ART } from "./park-art.ts";
 import { artPen } from "./pixel-fx.ts";
 import { wispHomeAngle, type WispArrow } from "./wisp-arrow.ts";
 import { drawWispFireArrow, drawWispFireBurst, drawWispFireTrails } from "./wisp-fire-art.ts";
+import { drawWispCore } from "./wisp-core-art.ts";
+import { drawWispLightningArrow, drawWispLightningTrails } from "./wisp-lightning-art.ts";
 import type { DefendSim } from "./sim.ts";
 
 type Node = {x:number;y:number};
@@ -54,14 +56,16 @@ export function wispSparks(w: WispArrow,reduced=false) {
 }
 
 export function drawWisps(c: CanvasRenderingContext2D,px:number,sim:DefendSim,reduced=false) {
-  if(!sim.wisps.length&&!sim.wispFireTrails.length)return;
+  if(!sim.wisps.length&&!sim.wispFireTrails.length&&!sim.wispLightningTrails.length)return;
   drawWispFireTrails(c,px,sim,reduced);
+  drawWispLightningTrails(c,px,sim,reduced);
   const dot=artPen(c,px), alpha=c.globalAlpha;
   const line=(ax:number,ay:number,bx:number,by:number,size=1)=>{
     const steps=Math.max(1,Math.ceil(Math.max(Math.abs(bx-ax),Math.abs(by-ay))));
     for(let i=0;i<=steps;i++)dot(Math.round(ax+(bx-ax)*i/steps),Math.round(ay+(by-ay)*i/steps),size,size);
   };
   for(const w of sim.wisps) {
+    if(w.lightning){drawWispLightningArrow(c,px,w,reduced);continue;}
     if(w.fire){
       if(w.burst!==undefined)drawWispFireBurst(c,px,w,reduced);else drawWispFireArrow(c,px,w,reduced);
       continue;
@@ -88,12 +92,7 @@ export function drawWisps(c: CanvasRenderingContext2D,px:number,sim:DefendSim,re
       }
     }
     c.globalAlpha=alpha*(w.fade===undefined?1:Math.max(0,1-w.fade/WISP.fade));
-    const x=pose.x*ART,y=pose.y*ART,ux=Math.cos(pose.angle),uy=Math.sin(pose.angle),vx=-uy,vy=ux;
-    c.fillStyle="#123954";line(x-ux*4,y-uy*4,x+ux*4,y+uy*4,3);
-    c.fillStyle="#65c4ef";line(x-ux*4,y-uy*4,x+ux*5,y+uy*5);
-    line(x+ux*5,y+uy*5,x+ux-vx*3,y+uy-vy*3);
-    line(x+ux*5,y+uy*5,x+ux+vx*3,y+uy+vy*3);
-    c.fillStyle="#efffff";line(x-ux*2,y-uy*2,x+ux*4,y+uy*4);
+    drawWispCore(c,px,pose,["#123954","#65c4ef","#efffff"]);
   }
   c.globalAlpha=alpha;
 }

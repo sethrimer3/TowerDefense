@@ -3,18 +3,17 @@
 import { WISP, WISP_FIRE } from "../knowledge-paths.ts";
 import { ART } from "./park-art.ts";
 import { artPen, FLAME, puff } from "./pixel-fx.ts";
+import { drawWispCore } from "./wisp-core-art.ts";
 import type { DefendSim } from "./sim.ts";
 import { wispHomeAngle, type WispArrow } from "./wisp-arrow.ts";
-
-type Dot=ReturnType<typeof artPen>;
 
 /** Distance-based tail samples follow flight history, with flame tongues
  * rising from the ribbon rather than independently swinging cloth chains. */
 export function wispFlames(w:WispArrow,reduced=false) {
-  const length=WISP.idleLength+(WISP.sliceLength-WISP.idleLength)*w.energy;
+  const length=(WISP.idleLength+(WISP.sliceLength-WISP.idleLength)*w.energy)*WISP_FIRE.scale;
   const path=[...w.trail,{x:w.x,y:w.y,angle:w.angle,distance:w.travel}];
   return Array.from({length:16},(_,i)=>{
-    const t=i/15,distance=w.travel-.2-length*t;
+    const t=i/15,distance=w.travel-.2*WISP_FIRE.scale-length*t;
     let a=path[0],b=a;
     for(let j=path.length-1;j>0;j--)if(path[j-1].distance<=distance){a=path[j-1];b=path[j];break;}
     const u=a===b?0:(distance-a.distance)/(b.distance-a.distance||1);
@@ -22,7 +21,7 @@ export function wispFlames(w:WispArrow,reduced=false) {
     const flicker=reduced?0:Math.sin(w.time*13+i*1.7+w.serial)*.04;
     return {x:a.x+(b.x-a.x)*u-Math.cos(a.angle)*back,
       y:a.y+(b.y-a.y)*u-Math.sin(a.angle)*back-flicker,
-      size:Math.max(0,Math.round((1-t)*(1.5+w.energy))),alpha:(1-t)*.8};
+      size:Math.max(0,Math.round((1-t)*(1.5+w.energy)*WISP_FIRE.scale)),alpha:(1-t)*.8};
   });
 }
 
@@ -38,16 +37,7 @@ export function drawWispFireArrow(c:CanvasRenderingContext2D,px:number,w:WispArr
     c.fillStyle=FLAME[3];puff(dot,x,y,Math.max(0,f.size-1));
   }
   c.globalAlpha=alpha*fade;
-  const x=pose.x*ART,y=pose.y*ART,ux=Math.cos(pose.angle),uy=Math.sin(pose.angle),vx=-uy,vy=ux;
-  const line=(ax:number,ay:number,bx:number,by:number,size=1)=>{
-    const n=Math.max(1,Math.ceil(Math.max(Math.abs(bx-ax),Math.abs(by-ay))));
-    for(let i=0;i<=n;i++)dot(Math.round(ax+(bx-ax)*i/n),Math.round(ay+(by-ay)*i/n),size,size);
-  };
-  c.fillStyle=FLAME[0];line(x-ux*4,y-uy*4,x+ux*4,y+uy*4,3);
-  c.fillStyle=FLAME[2];line(x-ux*4,y-uy*4,x+ux*5,y+uy*5);
-  line(x+ux*5,y+uy*5,x+ux-vx*3,y+uy-vy*3);
-  line(x+ux*5,y+uy*5,x+ux+vx*3,y+uy+vy*3);
-  c.fillStyle=FLAME[4];line(x-ux*2,y-uy*2,x+ux*4,y+uy*4);
+  drawWispCore(c,px,pose,[FLAME[0],FLAME[2],FLAME[4]]);
   c.globalAlpha=alpha;
 }
 

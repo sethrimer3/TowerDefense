@@ -527,15 +527,27 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   Defenses and rebuilt towers start full. Source destruction cancels refills
   and fades active arrows. Fire arrows (rank II, 4,004 Knowledge) adds a separate
   inventory of two fire arrows, regenerating one every 6 seconds below capacity.
-  Their tails are flames, and attack swipes leave one-cell-wide ribbons that
+  The fire arrows are 25% larger than blue arrows. Their tails are flames, and attack swipes leave one-cell-wide ribbons that
   last 2 seconds at each point. A fire arrow has 10 direct hits, then explodes
   for twice its normal damage within 2 cells; direct hits and ribbons deal
   normal arrow damage and that amount per second respectively, all as fire.
   Trail/explosion hits do not spend the direct-hit budget. One arrow's crossing
   trail segments share one damage rate; different fire arrows stack. The
   suspended ribbons and blasts hit ground and flying enemies, finish their
-  own lifetime after source destruction, and retain tower attribution. Rank III
-  remains unavailable. **Watch towers** mark
+  own lifetime after source destruction, and retain tower attribution.
+  Lightning arrow (final rank III, 16,004 Knowledge) adds one purple arrow at
+  175% blue scale, with a separate nine-second refill after map exit. It picks
+  the nearest living enemy within normal tower range, captures aim/damage, then
+  flies straight through to the actual map boundary, even if the target moves
+  or dies. It pierces every enemy without spending a contact budget and leaves
+  a 1.5-cell-wide purple lightning ribbon lasting 5 seconds at each point. All
+  enemies touching it, ground or flying, take 300% captured tower attack per
+  second, including beyond tower range, through the existing physical-element
+  lightning/shield/armor rules. No extra direct hit or final blast. Shared reload
+  bonuses speed flight; they do not alter the nine-second refill. Source loss
+  stops flight/refill, while deposited lightning finishes its lifetime. Shared
+  `wisp-trail.ts` integrates each arrow's contact-interval union for both fire
+  and lightning. Cosmetic forks are deterministic and stable under Reduce Motion. **Watch towers** mark
   enemies in their radius with a gold outline; marked enemies take ×2 damage.
   Paths: Spotters (marks hit harder, wider radius) or Signal fires
   (marked enemies slowed, more at rank II, and set burning at III). Up to

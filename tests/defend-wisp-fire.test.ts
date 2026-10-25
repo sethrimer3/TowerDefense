@@ -32,7 +32,7 @@ function spendFire(s:ReturnType<typeof scene>) {
  s.t.step(s.sim,.01);assert.equal(s.fire!.arrows.length,0);clear(s);
 }
 
-test("Fire arrows is rank II, costs 4,004 Knowledge and persists/refunds without adding a future rank",()=>{
+test("Fire arrows is rank II, costs 4,004 Knowledge and persists/refunds and leads to Lightning arrow",()=>{
  const save=defaults();save.knowledge=5000;save.defend.owned.wispTower=1;
  save.defend.kept=[{kind:"wispTower",path:"wispArrow",rank:1}];
  const target={copy:"wispTower" as const,wear:{path:"wispArrow" as const,rank:1}};
@@ -40,7 +40,7 @@ test("Fire arrows is rank II, costs 4,004 Knowledge and persists/refunds without
  const loaded=decode(JSON.stringify(save));assert.equal(loaded.knowledge,996);
  assert.deepEqual(loaded.defend.kept,[{kind:"wispTower",path:"wispArrow",rank:2}]);
  assert.equal(allocated("wispTower",{path:"wispArrow",rank:2}),4014);
- assert.deepEqual(nextSteps("wispTower",{path:"wispArrow",rank:2}),[]);
+ assert.deepEqual(nextSteps("wispTower",{path:"wispArrow",rank:2}),[{type:"path",path:"wispArrow",rank:3,cost:16004}]);
  assert.match(kindStats(loaded,"wispTower","wispArrow",2),/2 fire arrows.*10 direct hits.*6s.*2s trails.*fire damage/);
  assert.ok(undoUpgrade(loaded,{copy:"wispTower",wear:{path:"wispArrow",rank:2}},"p:wispArrow:2").ok);
  assert.equal(loaded.knowledge,5000);assert.deepEqual(loaded.defend.kept,save.defend.kept.map(k=>({...k,rank:1})));
