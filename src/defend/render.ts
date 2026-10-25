@@ -342,6 +342,7 @@ export class DefendRenderer {
     // The forest's dirt, rocks and shadows outside the walls.
     this.forest.sync(map, sim);
     this.forest.drawFloor(ctx, this.px, this.forestShare());
+    this.forest.drawWater(ctx, this.px, opts.now, this.forestShare(), opts.reduceMotion);
     // Park fences sit on the ground layer, under the lighting and units.
     this.fences.sync(map);
     if (sim) this.fences.update(sim);

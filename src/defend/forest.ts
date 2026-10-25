@@ -1,11 +1,12 @@
-/** The wilds outside Mossbound Ruins' walls: trees from bushes to huge
- * old oaks and pines, rocks, dirt pads, rare meadows and flower fields and a
- * few lakes filling the open ground round the city, planned from the map
- * alone (each cell's own hashes, so a placed tower only clears what it
+/** The wilds outside Mossbound Ruins' walls: large to huge old oaks and
+ * pines seen from above, rocks, dirt pads, rare meadows and flower fields
+ * and a few lakes filling the open ground round the city, planned from the
+ * map alone (each cell's own hashes, so a placed tower only clears what it
  * stands on), and the trees a battle blows up, each leaving a crater of
  * turned earth and a stump. All of it is presentation only but the
- * boulders (`boulderPlan`): those, alone or in clusters, block ground
- * units in the battle (`DefendSim.syncBoulders`). `forest-art.ts` draws it. */
+ * boulders (`boulderPlan`): those, alone, in clusters or heaped into small
+ * mountains, block ground units in the battle (`DefendSim.syncBoulders`).
+ * `forest-art.ts` draws it. */
 import { CELLS_H, CELLS_W, SUB, cellInBounds, cellIndex, hash, hash01 } from "./grid.ts";
 import { CellType, type CityMap } from "./citygen.ts";
 import type { AreaId } from "./areas.ts";
@@ -15,18 +16,17 @@ export const FOREST_AREAS: readonly AreaId[] = ["moss"];
 export const hasForest = (area: AreaId) => FOREST_AREAS.includes(area);
 
 /** How the forest is planned. `cell` is the coarse noise grid (cells) the
- * thickets and glades follow; a cell holds a tree with `base` + `thick` ×
- * the noise there; rocks and pads are seeded in the cells left over. `big`
- * is each larger size's chance a cell (thickets double it), `lakes` and
- * `meadows` how many of each. */
+ * thickets and glades follow; `big` is each tree size's chance a cell
+ * (thickets raise it, glades lower it); rocks and pads are seeded in the
+ * cells left over; `lakes` and `meadows` how many of each. */
 export const FOREST = {
-  cell: 7, base: 0.22, thick: 0.62, rock: 0.07, pad: 0.035, clear: 0.15,
-  big: [0, 0.03, 0.012, 0.005],
+  cell: 7, rock: 0.04, pad: 0.03, clear: 0.15,
+  big: [0, 0.11, 0.045, 0.018],
   lakes: 3, meadows: 6,
 };
 /** Tree kinds: round broadleaf, star-shaped pine and low bush. */
 export type TreeKind = "oak" | "pine" | "bush";
-/** Tree sizes: ordinary, large, larger and huge. */
+/** Tree sizes: ordinary (no longer planted), large, larger and huge. */
 export type TreeSize = 0 | 1 | 2 | 3;
 /** How many sprite variants each kind and size is baked in. */
 export const VARIANTS = 10;
@@ -82,8 +82,11 @@ export function clearOf(map: CityMap, x: number, y: number, r: number) {
 export type Boulder = { cells: number[]; seed: number };
 /** Boulders: a cell's chance of starting one, how far (cells) they keep
  * from anything but open ground and from each other, and the spawn rows
- * they keep out of. */
-export const BOULDERS = { chance: 0.006, clear: 2, apart: 3, top: SUB };
+ * they keep out of; `mountains` how many small mountains, each `peak`
+ * cells at most. */
+export const BOULDERS = { chance: 0.006, clear: 2, apart: 3, top: SUB, mountains: 5, peak: [20, 40] };
+/** A heap this many cells or more is drawn as a small mountain. */
+export const MOUNTAIN = 9;
 
 const boulderPlans = new WeakMap<CityMap, Boulder[]>();
 
@@ -108,23 +111,72 @@ export function boulderPlan(map: CityMap): Boulder[] {
         if (cellInBounds(x + dx, y + dy) && taken[cellIndex(x + dx, y + dy)]) return false;
     return y >= BOULDERS.top && cellInBounds(x, y);
   };
+  // A heap grows a cell at a time from a cell already in it, toward its
+  // middle more than away, so it stays round; any ground it closes round is
+  // filled, so nothing is walled in.
+  const grow = (cx: number, cy: number, want: number) => {
+    const cells: [number, number][] = [[cx, cy]];
+    const has = (x: number, y: number) => cells.some(([a, b]) => a === x && b === y);
+    // Of a few cells beside it, the one most hemmed in by the heap.
+    const hemmed = (x: number, y: number) => [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]].filter(([dx, dy]) => has(x + dx, y + dy)).length;
+    for (let k = 0; cells.length < want && k < want * 8; k++) {
+      let best: [number, number] | null = null, score = -1;
+      for (let j = 0; j < 4; j++) {
+        const [bx, by] = cells[hash(cx, cy, k, j, 504) % cells.length];
+        const [dx, dy] = [[1, 0], [-1, 0], [0, 1], [0, -1]][hash(cx, cy, k, j, 505) % 4];
+        const nx = bx + dx, ny = by + dy;
+        if (has(nx, ny) || !open(nx, ny)) continue;
+        const v = hemmed(nx, ny);
+        if (v > score) score = v, best = [nx, ny];
+      }
+      if (best) cells.push(best);
+    }
+    let x0 = cx, y0 = cy, x1 = cx, y1 = cy;
+    for (const [x, y] of cells) x0 = Math.min(x0, x), y0 = Math.min(y0, y), x1 = Math.max(x1, x), y1 = Math.max(y1, y);
+    const w = x1 - x0 + 3, h = y1 - y0 + 3, out = new Uint8Array(w * h), todo = [0];
+    for (const [x, y] of cells) out[(y - y0 + 1) * w + x - x0 + 1] = 2;
+    out[0] = 1;
+    while (todo.length) {
+      const i = todo.pop()!, x = i % w, y = (i - x) / w;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = x + dx, ny = y + dy, n = ny * w + nx;
+        if (nx < 0 || ny < 0 || nx >= w || ny >= h || out[n]) continue;
+        out[n] = 1;
+        todo.push(n);
+      }
+    }
+    for (let i = 0; i < out.length; i++) if (!out[i]) cells.push([x0 - 1 + (i % w), y0 - 1 + Math.floor(i / w)]);
+    for (const [x, y] of cells) taken[cellIndex(x, y)] = 1;
+    plan.push({ cells: cells.map(([x, y]) => cellIndex(x, y)), seed: hash(cx, cy, 506) });
+  };
+  // A few small mountains first, at spots tried in a hashed order.
+  const spots: [number, number, number][] = [];
+  for (let cy = BOULDERS.top; cy < CELLS_H; cy++) for (let cx = 0; cx < CELLS_W; cx++) spots.push([cx, cy, hash01(cx, cy, 507)]);
+  spots.sort((a, b) => a[2] - b[2]);
+  let mountains = 0;
+  for (const [cx, cy] of spots) {
+    if (mountains >= BOULDERS.mountains) break;
+    // Room for its heart: a 3 × 3 of open ground.
+    let room = true;
+    for (let dy = -1; dy <= 1 && room; dy++) for (let dx = -1; dx <= 1 && room; dx++) room = open(cx + dx, cy + dy);
+    if (!room) continue;
+    const [lo, hi] = BOULDERS.peak, want = lo + (hash(cx, cy, 508) % (hi - lo + 1));
+    grow(cx, cy, want);
+    mountains++;
+  }
+  // Then lone boulders, 2 × 2 blocks, clusters and rocky heaps.
   for (let cy = BOULDERS.top; cy < CELLS_H; cy++)
     for (let cx = 0; cx < CELLS_W; cx++) {
       if (hash01(cx, cy, 501) >= BOULDERS.chance || !open(cx, cy)) continue;
-      const roll = hash01(cx, cy, 502), want = roll < 0.35 ? 1 : roll < 0.6 ? 4 : 3 + (hash(cx, cy, 503) % 4);
-      const cells: [number, number][] = [[cx, cy]];
-      if (want === 4 && roll < 0.6) {
-        for (const [dx, dy] of [[1, 0], [0, 1], [1, 1]] as const) if (open(cx + dx, cy + dy)) cells.push([cx + dx, cy + dy]);
-      } else
-        // A cluster grows a cell at a time from a cell already in it.
-        for (let k = 0; cells.length < want && k < 24; k++) {
-          const [bx, by] = cells[hash(cx, cy, k, 504) % cells.length];
-          const [dx, dy] = [[1, 0], [-1, 0], [0, 1], [0, -1]][hash(cx, cy, k, 505) % 4];
-          const nx = bx + dx, ny = by + dy;
-          if (!cells.some(([x, y]) => x === nx && y === ny) && open(nx, ny)) cells.push([nx, ny]);
-        }
-      for (const [x, y] of cells) taken[cellIndex(x, y)] = 1;
-      plan.push({ cells: cells.map(([x, y]) => cellIndex(x, y)), seed: hash(cx, cy, 506) });
+      const roll = hash01(cx, cy, 502);
+      if (roll < 0.3) {
+        taken[cellIndex(cx, cy)] = 1;
+        plan.push({ cells: [cellIndex(cx, cy)], seed: hash(cx, cy, 506) });
+      } else if (roll < 0.5) {
+        const cells = [[cx, cy], ...([[1, 0], [0, 1], [1, 1]] as const).map(([dx, dy]) => [cx + dx, cy + dy]).filter(([x, y]) => open(x, y))];
+        for (const [x, y] of cells) taken[cellIndex(x, y)] = 1;
+        plan.push({ cells: cells.map(([x, y]) => cellIndex(x, y)), seed: hash(cx, cy, 506) });
+      } else grow(cx, cy, roll < 0.8 ? 3 + (hash(cx, cy, 503) % 4) : 7 + (hash(cx, cy, 503) % 6));
     }
   boulderPlans.set(map, plan);
   return plan;
@@ -181,32 +233,22 @@ function plan_(map: CityMap): ForestPlan {
     meadows.push({ x, y, r, seed: hash(cx, cy, 432), flowers: hash01(cx, cy, 433) < 0.5 });
     keep.push({ x, y, r: r * 0.85 });
   }
-  // Big trees first, huge to large, each keeping the ground under it.
+  // Trees, huge to large, each keeping the ground under it.
   for (const size of [3, 2, 1] as const)
     each((cx, cy) => {
       if (hash01(cx, cy, 440 + size) >= FOREST.big[size] * (0.4 + thicket(cx + 0.5, cy + 0.5) * 1.6)) return;
       const kind: TreeKind = hash01(cx, cy, 444) < 0.55 ? "oak" : "pine";
       const variant = hash(cx, cy, 445) % VARIANTS, r = canopyRadius(kind, variant, size);
       const x = cx + 0.25 + hash01(cx, cy, 446) * 0.5, y = cy + 0.25 + hash01(cx, cy, 447) * 0.5;
-      if (!clearOf(map, x, y, r * 0.8) || inDiscs(keep, x, y, r * 0.6) || inDiscs(stones, x, y, r * 0.6)) return;
+      if (!clearOf(map, x, y, r) || inDiscs(keep, x, y, r * 0.6) || inDiscs(stones, x, y, r * 0.6)) return;
       trees.push({ id: 0, x, y, r, kind, size, variant, phase: hash01(cx, cy, 448) * Math.PI * 2 });
       keep.push({ x, y, r: r * 0.7 });
     });
+  // Rocks and bare pads in the ground the trees leave.
   each((cx, cy) => {
     const x0 = cx + 0.5, y0 = cy + 0.5;
     if (inDiscs(keep, x0, y0) || inDiscs(stones, x0, y0)) return;
     const dense = thicket(x0, y0);
-    if (hash01(cx, cy, 402) < FOREST.base + FOREST.thick * dense) {
-      // Thickets grow pines and oaks, their edges bushes.
-      const roll = hash01(cx, cy, 403);
-      const kind: TreeKind = roll < 0.18 + (1 - dense) * 0.2 ? "bush" : roll < 0.6 ? "oak" : "pine";
-      const variant = hash(cx, cy, 404) % VARIANTS, r = canopyRadius(kind, variant);
-      const x = cx + 0.25 + hash01(cx, cy, 405) * 0.5, y = cy + 0.25 + hash01(cx, cy, 406) * 0.5;
-      if (clearOf(map, x, y, r)) {
-        trees.push({ id: 0, x, y, r, kind, size: 0, variant, phase: hash01(cx, cy, 407) * Math.PI * 2 });
-        return;
-      }
-    }
     if (hash01(cx, cy, 408) < FOREST.rock) {
       const size = 0.18 + hash01(cx, cy, 409) * 0.3, x = cx + 0.3 + hash01(cx, cy, 410) * 0.4, y = cy + 0.3 + hash01(cx, cy, 412) * 0.4;
       if (clearOf(map, x, y, size)) rocks.push({ x, y, size, seed: hash(cx, cy, 413) });

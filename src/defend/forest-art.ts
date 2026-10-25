@@ -19,7 +19,7 @@
 import { CELL_COUNT, CELLS_H, CELLS_W, cellIndex, defendRandom, hash, hash01 } from "./grid.ts";
 import type { CityMap } from "./citygen.ts";
 import type { DefendSim } from "./sim.ts";
-import { ForestDamage, VARIANTS, canopyRadius, forestPlan, type Boulder, type Felled, type ForestPlan, type ForestTree, type Lake, type Meadow, type TreeKind, type TreeSize } from "./forest.ts";
+import { ForestDamage, MOUNTAIN, VARIANTS, canopyRadius, forestPlan, type Boulder, type Felled, type ForestPlan, type ForestTree, type Lake, type Meadow, type TreeKind, type TreeSize } from "./forest.ts";
 import { ART } from "./park-art.ts";
 import { artPen } from "./pixel-fx.ts";
 
@@ -71,8 +71,14 @@ const STUMP = [0x5e4129, 0x7a5232, 0xb08a5a];
 /** Lakes: the bank's mud, the water from deep to shallow, a glint, lily
  * pads and reeds. */
 const BANK = [0x3d3a26, 0x55503a, 0x6b6448];
-const WATER = [0x1b3a4e, 0x24506a, 0x2f6683, 0x46829a];
-const GLINT = 0xbfe2ea;
+/** Water from the shallows (teal over sand) to the deep, a foam lip, the
+ * sand showing through and the glints. */
+const WATER = [0x5a9e9a, 0x3f8691, 0x2f6d86, 0x25587a, 0x1d4766, 0x173852];
+const FOAM = 0xa8d4d2;
+const SAND = 0x8a8458;
+const GLINT = 0xd8f0f2;
+/** A small mountain's stone, darkest to lightest. */
+const CRAG = [0x24262a, 0x34373a, 0x4a4d4c, 0x63665f, 0x81847a, 0xa2a497];
 const LILY = [0x21401f, 0x3d7a33, 0x63a54b];
 const REED = [0x2c4a22, 0x5b7a34, 0xb7a25a];
 /** Meadows: long grass blades, dark to lit, and flowers (petal, shaded
@@ -192,22 +198,17 @@ function canopy(kind: TreeKind, v: number, size: TreeSize) {
 const sprites: Sprite[] = [];
 const KIND_INDEX: Record<TreeKind, number> = { oak: 0, pine: 1, bush: 2 };
 
-/** Tree `kind`, variant `v`, leaning `lean` art pixels (its top furthest,
- * its foot not at all), with its trunk and outline; `size` 0 to 3, from
- * ordinary to huge. */
+/** Tree `kind`, variant `v`, leaning `lean` art pixels (its crown furthest,
+ * its skirt not at all), seen from straight above, so only its canopy in
+ * its outline; `size` 0 to 3, from ordinary to huge. */
 export function treeSprite(kind: TreeKind, v: number, lean: number, size: TreeSize = 0): Sprite {
   const key = ((size * 3 + KIND_INDEX[kind]) * VARIANTS + v) * (2 * LEAN + 1) + lean + LEAN;
   let s = sprites[key];
   if (s) return s;
   const { R, half, n, grid } = canopy(kind, v, size);
-  const pad = LEAN + 2, w = n + pad * 2, h = n + 5, ox = half + pad, oy = half + 1;
+  const pad = LEAN + 2, w = n + pad * 2, h = n + 2, ox = half + pad, oy = half + 1;
   const fill = new Int8Array(w * h).fill(-1);
   const colour = new Uint32Array(w * h);
-  // The trunk first, its foot poking out under the canopy, thicker on big trees.
-  const trunk: [number, number][] = size >= 2 ? [[-2, BARK[1]], [-1, BARK[1]], [0, BARK[0]], [1, BARK[0]]] : size ? [[-1, BARK[1]], [0, BARK[0]], [1, BARK[0]]] : [[-1, BARK[1]], [0, BARK[0]]];
-  if (kind !== "bush")
-    for (let y = Math.round(oy + R * 0.5); y <= Math.round(oy + R) + 1; y++)
-      for (const [dx, c] of trunk) if (y < h) colour[y * w + ox + dx] = rgba(c), fill[y * w + ox + dx] = 9;
   const shift = (y: number) => Math.round(lean * Math.max(0, Math.min(1, (R * 0.6 - (y - half)) / (R * 1.6))));
   const palettes = LEAVES[kind], pal = palettes[v % palettes.length];
   for (let y = 0; y < n; y++) {
@@ -409,21 +410,34 @@ function stump(out: Uint32Array, x: number, y: number, seed: number, size: numbe
   put(sx, y - r - 2, OUTLINE);
 }
 
-/** A lake's water, its bank and outline, then its shallows, deeps, glints,
- * lily pads and reeds: the union of its discs, depth by how far inside. */
-function lake(out: Uint32Array, l: Lake) {
+/** How far (art pixels) inside lake `l` each point is, wobbled along the
+ * shore, and the lake's bounds in art pixels. */
+export function lakeDepth(l: Lake) {
   let bx0 = Infinity, by0 = Infinity, bx1 = -Infinity, by1 = -Infinity;
   for (const d of l.discs) bx0 = Math.min(bx0, d.x - d.r), by0 = Math.min(by0, d.y - d.r), bx1 = Math.max(bx1, d.x + d.r), by1 = Math.max(by1, d.y + d.r);
-  const x0 = Math.max(clip.x0, Math.floor((bx0 - 0.4) * ART)), x1 = Math.min(clip.x1, Math.ceil((bx1 + 0.4) * ART));
-  const y0 = Math.max(clip.y0, Math.floor((by0 - 0.4) * ART)), y1 = Math.min(clip.y1, Math.ceil((by1 + 0.4) * ART));
-  if (x0 >= x1 || y0 >= y1) return;
   const discs = l.discs.map((d) => ({ x: d.x * ART, y: d.y * ART, r: d.r * ART }));
-  // How far (art pixels) inside the lake a point is, wobbled along the shore.
   const depth = (X: number, Y: number) => {
     let e = -Infinity;
     for (const d of discs) e = Math.max(e, d.r - Math.sqrt((X + 0.5 - d.x) ** 2 + (Y + 0.5 - d.y) ** 2));
     return e + 0.9 * Math.sin(X * 0.37 + l.seed) * Math.cos(Y * 0.29 + l.seed * 0.5);
   };
+  const box = { x0: Math.floor((bx0 - 0.4) * ART), y0: Math.floor((by0 - 0.4) * ART), x1: Math.ceil((bx1 + 0.4) * ART), y1: Math.ceil((by1 + 0.4) * ART) };
+  return { depth, box };
+}
+
+/** A 4 × 4 ordered dither threshold, 0 to 1. */
+const bayer = (X: number, Y: number) => [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5][(Y & 3) * 4 + (X & 3)] / 16 + 1 / 32;
+
+/** A lake: its muddy bank and outline, then water shading smoothly from a
+ * teal shallow over a sandy bottom to the deep, the bank's shadow on the
+ * water from the upper left and a pale lip of light along the far shore,
+ * slow ripple lines across the open water, lily pads and reeds. The
+ * twinkling glints are drawn live (`ForestArt.drawWater`). */
+function lake(out: Uint32Array, l: Lake) {
+  const { depth, box } = lakeDepth(l);
+  const x0 = Math.max(clip.x0, box.x0), x1 = Math.min(clip.x1, box.x1), y0 = Math.max(clip.y0, box.y0), y1 = Math.min(clip.y1, box.y1);
+  if (x0 >= x1 || y0 >= y1) return;
+  const wet = (X: number, Y: number) => depth(X, Y) >= 1.5;
   for (let Y = y0; Y < y1; Y++)
     for (let X = x0; X < x1; X++) {
       const e = depth(X, Y);
@@ -433,30 +447,40 @@ function lake(out: Uint32Array, l: Lake) {
       if (e < -1) { if (odd) continue; c = BANK[0]; }
       else if (e < 0.5) c = BANK[hsh % 3 ? 1 : 2];
       else if (e < 1.5) c = OUTLINE;
-      else if (e < 3) c = WATER[3];
-      else if (e < 5) c = e < 4 && odd ? WATER[3] : WATER[2];
-      else if (e < 9) c = e < 6 && odd ? WATER[2] : WATER[1];
-      else c = e < 10 && odd ? WATER[1] : WATER[0];
-      // Light off the water, short streaks across its open middle.
-      if (e > 3 && hsh % 97 === 0) for (let k = 0; k < 3; k++) if (inClip(X + k, Y)) out[Y * W + X + k] = rgba(GLINT);
+      else {
+        // Depth, 0 at the shore to the last tone in the middle, dithered.
+        const t = Math.min(WATER.length - 1, Math.max(0, (e - 1.5) / 3.2) + 0) + bayer(X, Y) - 0.5;
+        let k = Math.max(0, Math.min(WATER.length - 1, Math.round(t)));
+        // Sand and pebbles showing through the shallows.
+        if (k === 0 && hsh % 9 === 0) { out[Y * W + X] = rgba(SAND); continue; }
+        // The bank's shadow from the upper left; the light it catches opposite.
+        if (!wet(X - 3, Y - 3)) k = Math.min(WATER.length - 1, k + 2);
+        else if (!wet(X + 2, Y + 2) && e < 4) { out[Y * W + X] = rgba(odd ? FOAM : WATER[0]); continue; }
+        // Ripple lines, wavering slowly across the open water.
+        const wave = Math.sin(X * 0.45 + Math.sin(Y * 0.21 + l.seed) * 2.2 + Y * 0.9);
+        if (e > 5 && wave > 0.86 && (X & 1)) k = Math.max(0, k - 1);
+        c = WATER[k];
+      }
       out[Y * W + X] = rgba(c);
-      if (e > 3 && hsh % 97 === 0) out[Y * W + X] = rgba(GLINT);
     }
   // Lily pads out on the water, notched discs, one in a few in flower.
-  for (let k = 0; k < 8; k++) {
-    const X = Math.round(x0 + hash01(l.seed, k, 482) * (x1 - x0)), Y = Math.round(y0 + hash01(l.seed, k, 483) * (y1 - y0));
-    if (depth(X, Y) < 4) continue;
-    for (let dy = -2; dy <= 2; dy++)
-      for (let dx = -2; dx <= 2; dx++) {
+  for (let k = 0; k < 9; k++) {
+    const X = Math.round(box.x0 + hash01(l.seed, k, 482) * (box.x1 - box.x0)), Y = Math.round(box.y0 + hash01(l.seed, k, 483) * (box.y1 - box.y0));
+    if (depth(X, Y) < 5) continue;
+    for (let dy = -3; dy <= 3; dy++)
+      for (let dx = -3; dx <= 3; dx++) {
         const d2 = dx * dx + dy * dy;
-        if (d2 > 5 || !inClip(X + dx, Y + dy) || (dx > 0 && dy === 0)) continue;
-        out[(Y + dy) * W + X + dx] = rgba(d2 > 3 ? LILY[0] : dx + dy < 0 ? LILY[2] : LILY[1]);
+        if (d2 > 9 || !inClip(X + dx, Y + dy) || (dx > 0 && dy === 0)) continue;
+        out[(Y + dy) * W + X + dx] = rgba(d2 > 6 ? LILY[0] : dx + dy < 0 ? LILY[2] : LILY[1]);
       }
-    if (k % 3 === 0 && inClip(X - 1, Y - 1)) out[(Y - 1) * W + X - 1] = rgba(0xe8a6c0);
+    if (k % 3 === 0 && inClip(X - 1, Y - 1)) {
+      out[(Y - 1) * W + X - 1] = rgba(0xf2c4d6);
+      if (inClip(X, Y - 1)) out[(Y - 1) * W + X] = rgba(0xe8a6c0);
+    }
   }
   // Reeds in clumps where the shore is shallow: dark tufts with pale tips.
   for (let k = 0; k < 18; k++) {
-    const X = Math.round(x0 + hash01(l.seed, k, 484) * (x1 - x0)), Y = Math.round(y0 + hash01(l.seed, k, 485) * (y1 - y0)), e = depth(X, Y);
+    const X = Math.round(box.x0 + hash01(l.seed, k, 484) * (box.x1 - box.x0)), Y = Math.round(box.y0 + hash01(l.seed, k, 485) * (box.y1 - box.y0)), e = depth(X, Y);
     if (e < 1.5 || e > 4.5) continue;
     for (let j = 0; j < 7; j++) {
       const rx = X + (hash(l.seed, k, j, 486) % 5) - 2, ry = Y + (hash(l.seed, k, j, 487) % 5) - 2;
@@ -465,6 +489,126 @@ function lake(out: Uint32Array, l: Lake) {
       out[(ry - 1) * W + rx] = rgba(j % 3 ? REED[1] : REED[2]);
     }
   }
+}
+
+/** Where each lake's light glints: short streaks on open water, each with
+ * its own twinkle, in art pixels. */
+export function waterGlints(plan: ForestPlan) {
+  const out: { x: number; y: number; len: number; phase: number; rate: number }[] = [];
+  for (const l of plan.lakes) {
+    const { depth, box } = lakeDepth(l), n = Math.round(((box.x1 - box.x0) * (box.y1 - box.y0)) / 260);
+    for (let k = 0; k < n; k++) {
+      const x = Math.round(box.x0 + hash01(l.seed, k, 488) * (box.x1 - box.x0)), y = Math.round(box.y0 + hash01(l.seed, k, 489) * (box.y1 - box.y0));
+      if (depth(x, y) < 6) continue;
+      out.push({ x, y, len: 1 + (hash(l.seed, k, 490) % 3), phase: hash01(l.seed, k, 491) * 6.28, rate: 0.6 + hash01(l.seed, k, 492) * 1.2 });
+    }
+  }
+  return out;
+}
+
+/** A small mountain: a heap of cells raised into a rocky hill seen from
+ * above, its ridges lit from the upper left, scree at its ragged foot, moss
+ * on its gentler slopes, a long shadow to the lower right. */
+function mountain(out: Uint32Array, b: Boulder) {
+  const rock = new Set(b.cells);
+  let cx0 = Infinity, cy0 = Infinity, cx1 = -Infinity, cy1 = -Infinity;
+  for (const c of b.cells) {
+    const x = c % CELLS_W, y = Math.floor(c / CELLS_W);
+    cx0 = Math.min(cx0, x), cy0 = Math.min(cy0, y), cx1 = Math.max(cx1, x), cy1 = Math.max(cy1, y);
+  }
+  const X0 = (cx0 - 1) * ART, Y0 = (cy0 - 1) * ART, w = (cx1 - cx0 + 3) * ART, h = (cy1 - cy0 + 3) * ART;
+  if (X0 + w + 4 < clip.x0 || X0 >= clip.x1 || Y0 + h + 4 < clip.y0 || Y0 >= clip.y1) return;
+  const seed = b.seed % 1000;
+  // Its outline: the heap's cells blended smoothly between their middles,
+  // so its corners round off, ragged by noise.
+  const isRock = (cx: number, cy: number) => (rock.has(cellIndex(cx, cy)) && cx >= 0 && cx < CELLS_W ? 1 : 0);
+  const inside = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const fx = (X0 + x + 0.5) / ART - 0.5, fy = (Y0 + y + 0.5) / ART - 0.5, ix = Math.floor(fx), iy = Math.floor(fy), u = fx - ix, v = fy - iy;
+      const top = isRock(ix, iy) * (1 - u) + isRock(ix + 1, iy) * u, bottom = isRock(ix, iy + 1) * (1 - u) + isRock(ix + 1, iy + 1) * u;
+      const density = top * (1 - v) + bottom * v;
+      const noise = 0.12 * Math.sin((X0 + x) * 0.55 + seed) * Math.cos((Y0 + y) * 0.47 + seed * 0.3) + ((hash(X0 + x, Y0 + y, 509) % 3) - 1) * 0.03;
+      if (density + noise > 0.42) inside[y * w + x] = 1;
+    }
+  const d = chamfer(inside, w, h);
+  // Height: rising with the distance in, ridged by noise.
+  const H = new Float32Array(w * h);
+  for (let i = 0; i < w * h; i++) {
+    if (!inside[i]) continue;
+    const x = X0 + (i % w), y = Y0 + Math.floor(i / w);
+    H[i] = d[i] * 1.3 + 2.4 * Math.sin(x * 0.31 + y * 0.17 + seed) + 1.6 * Math.sin(y * 0.43 - x * 0.12 + seed * 2);
+  }
+  const put = (x: number, y: number, c: number) => {
+    const X = X0 + x, Y = Y0 + y;
+    if (inClip(X, Y)) out[Y * W + X] = c;
+  };
+  // Its shadow, cast to the lower right.
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      if (!inside[y * w + x]) continue;
+      for (const k of [2, 4]) {
+        const sx = x + k, sy = y + k, X = X0 + sx, Y = Y0 + sy;
+        if ((sx < w && sy < h && inside[sy * w + sx]) || !inClip(X, Y)) continue;
+        if (k === 4 && (X + Y) & 1) continue;
+        out[Y * W + X] = darken(out[Y * W + X]);
+      }
+    }
+  const at = (x: number, y: number) => H[Math.max(0, Math.min(h - 1, y)) * w + Math.max(0, Math.min(w - 1, x))];
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const i = y * w + x;
+      if (!inside[i]) {
+        // The black outline round it.
+        if ((x > 0 && inside[i - 1]) || (x < w - 1 && inside[i + 1]) || (y > 0 && inside[i - w]) || (y < h - 1 && inside[i + w])) put(x, y, rgba(OUTLINE));
+        continue;
+      }
+      const gx = at(x + 1, y) - at(x - 1, y), gy = at(x, y + 1) - at(x, y - 1);
+      // Faces turned to the upper left catch the light.
+      const lit = (0.6 * gx + 0.8 * gy) * 0.4 + 0.05, steep = Math.abs(gx) + Math.abs(gy);
+      let k = lit + bayer(X0 + x, Y0 + y) * 0.5 - 0.25;
+      let c = k > 0.75 ? CRAG[5] : k > 0.35 ? CRAG[4] : k > 0.02 ? CRAG[3] : k > -0.35 ? CRAG[2] : k > -0.8 ? CRAG[1] : CRAG[0];
+      const hsh = hash(X0 + x, Y0 + y, b.seed, 510);
+      // Moss on the gentler slopes, scree at the foot.
+      if (steep < 1.2 && d[i] > 3 && hsh % 5 < 3) c = MOSS[k > 0 ? 1 : 0];
+      else if (d[i] < 3 && hsh % 7 === 0) c = PEBBLE[hsh & 1];
+      put(x, y, rgba(c));
+    }
+  // Crags heaped on its slopes, the biggest toward its heart.
+  const crags = b.cells
+    .map((c, k) => {
+      const x = (c % CELLS_W) + 0.5 + (hash01(b.seed, k, 511) - 0.5) * 0.5, y = Math.floor(c / CELLS_W) + 0.5 + (hash01(b.seed, k, 512) - 0.5) * 0.5;
+      return { x, y, deep: d[Math.round(y * ART - Y0) * w + Math.round(x * ART - X0)] ?? 0, seed: hash(b.seed, k, 513) };
+    })
+    .filter((g) => g.deep > 5 && hash01(g.seed, 514) < 0.55)
+    .sort((a, c) => a.y - c.y);
+  for (const g of crags) {
+    const sp = rockSprite(Math.round((0.9 + Math.min(1.2, g.deep / 14) + hash01(g.seed, 515) * 0.3) * 4) / 4, g.seed % 64);
+    stamp(out, sp, Math.round(g.x * ART) - sp.ox + 2, Math.round(g.y * ART) - sp.oy + 2, true);
+    stamp(out, sp, Math.round(g.x * ART) - sp.ox, Math.round(g.y * ART) - sp.oy, false);
+  }
+}
+
+/** Distance (art pixels, 1 straight and 1.4 diagonal) from each inside
+ * pixel to the nearest outside one; 0 outside. */
+function chamfer(inside: Uint8Array, w: number, h: number) {
+  const d = new Float32Array(w * h);
+  for (let i = 0; i < w * h; i++) d[i] = inside[i] ? 1e9 : 0;
+  const pass = (x: number, y: number, dx: number, dy: number, cost: number) => {
+    const nx = x + dx, ny = y + dy;
+    return nx < 0 || ny < 0 || nx >= w || ny >= h ? cost : d[ny * w + nx] + cost;
+  };
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const i = y * w + x;
+      if (d[i]) d[i] = Math.min(d[i], pass(x, y, -1, 0, 1), pass(x, y, 0, -1, 1), pass(x, y, -1, -1, 1.4), pass(x, y, 1, -1, 1.4));
+    }
+  for (let y = h - 1; y >= 0; y--)
+    for (let x = w - 1; x >= 0; x--) {
+      const i = y * w + x;
+      if (d[i]) d[i] = Math.min(d[i], pass(x, y, 1, 0, 1), pass(x, y, 0, 1, 1), pass(x, y, 1, 1, 1.4), pass(x, y, -1, 1, 1.4));
+    }
+  return d;
 }
 
 /** A meadow: long grass in tufts thinning toward its ragged edge, and in a
@@ -505,8 +649,10 @@ function meadow(out: Uint32Array, m: Meadow) {
 }
 
 /** A boulder or cluster: one great stone over a 2 × 2 block, else a stone
- * a cell, each heaving up a shade on the ground, piled back to front. */
+ * a cell, each heaving up a shade on the ground, piled back to front; a
+ * heap of `MOUNTAIN` cells or more is a small mountain. */
 function boulder(out: Uint32Array, b: Boulder) {
+  if (b.cells.length >= MOUNTAIN) return mountain(out, b);
   const cells = b.cells.map((c) => ({ x: (c % CELLS_W) + 0.5, y: Math.floor(c / CELLS_W) + 0.5 }));
   let stones: { x: number; y: number; size: number; seed: number }[];
   if (cells.length === 4 && cells.every((c) => Math.abs(c.x - cells[0].x) <= 1 && Math.abs(c.y - cells[0].y) <= 1)) {
@@ -564,6 +710,7 @@ export class ForestArt {
     if (map !== this.map) {
       this.map = map;
       this.plan = forestPlan(map);
+      this.glints = null;
       this.alpha = new Float32Array(this.plan.trees.length).fill(1);
       this.sim = undefined;
     }
@@ -706,6 +853,25 @@ export class ForestArt {
     c.drawImage(this.floor.cv, 0, 0, CELLS_W * px, CELLS_H * px);
     c.restore();
   }
+
+  /** The lakes' glints twinkling on the wall clock (`now`, ms), at
+   * `alpha`; held still under Reduce Motion. */
+  drawWater(c: CanvasRenderingContext2D, px: number, now: number, alpha: number, still: boolean) {
+    if (!this.plan || alpha <= 0 || !this.plan.lakes.length) return;
+    this.glints ??= waterGlints(this.plan);
+    const dot = artPen(c, px), t = still ? 0 : now / 1000;
+    c.save();
+    c.fillStyle = hex(GLINT);
+    for (const g of this.glints) {
+      const v = Math.sin(t * g.rate + g.phase);
+      if (v < 0.55) continue;
+      c.globalAlpha = alpha * Math.min(1, (v - 0.55) * 4);
+      // A glint drifts a pixel or two with the swell as it shines.
+      dot(g.x + Math.round(Math.sin(t * 0.5 + g.phase) * 1.5), g.y, v > 0.9 ? g.len + 1 : g.len, 1);
+    }
+    c.restore();
+  }
+  private glints: ReturnType<typeof waterGlints> | null = null;
 
   /** The standing trees over everyone, leaning in the wind (`wind`: 0 for
    * still air, about 1 calm, 2 in rain), then the flying debris. `shade`

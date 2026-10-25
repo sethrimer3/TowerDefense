@@ -26,7 +26,8 @@ test("only Mossbound Ruins has a forest", () => {
 test("the forest fills the open ground outside the walls and keeps off everything else", () => {
   const map = city(), plan = forestPlan(map);
   const open = map.type.filter((t) => t === CellType.OUT).length;
-  assert.ok(plan.trees.length > open * 0.3, `${plan.trees.length} trees on ${open} open cells`);
+  assert.ok(plan.trees.length > open * 0.08, `${plan.trees.length} trees on ${open} open cells`);
+  assert.ok(plan.trees.every((t) => t.size > 0), "only big trees: no bushes or small trees");
   assert.ok(plan.rocks.length > 20 && plan.pads.length > 10);
   for (const t of plan.trees) {
     assert.equal(map.type[cellIndex(Math.floor(t.x), Math.floor(t.y))], CellType.OUT);
@@ -72,12 +73,18 @@ test("tree sprites are outlined pixel art in five lean frames, their trunks stil
         for (const p of s.px) assert.ok(p === 0 || p >>> 24 === 255, "opaque or clear");
       }
       assert.notDeepEqual(frames[0].px, frames[4].px, "leaning moves the canopy");
-      // The bottom row (the trunk's foot, or the bush's own edge) doesn't sway.
+      assert.ok(s0Trunkless(frames[2]), "seen from above: no trunk under the crown");
+      // The bottom row (the canopy's skirt) doesn't sway.
       const last = (s: (typeof frames)[0]) => Array.from(s.px.slice((s.h - 1) * s.w));
       assert.deepEqual(last(frames[0]), last(frames[4]));
     }
   assert.ok(rockSprite(0.4, 9).px.some((p) => p === 0xff07090b));
 });
+
+/** No bark-brown pixels: the trunk is hidden under the crown from above. */
+function s0Trunkless(s: { px: Uint32Array }) {
+  return !s.px.some((p) => p === 0xff1c2a3e || p === 0xff29415e);
+}
 
 test("trees lean with the wind, within their frames, and not at all in still air", () => {
   const t = forestPlan(city()).trees[0];
@@ -94,8 +101,8 @@ test("trees lean with the wind, within their frames, and not at all in still air
 test("the ground shows the standing trees' shadows and the felled trees' craters", () => {
   const plan = forestPlan(city()), damage = new ForestDamage(plan);
   const before = floorPixels(plan, damage);
-  const t = plan.trees.find((o) => o.size === 0)!;
-  damage.blast(t.x, t.y, 0.1);
+  const t = plan.trees.find((o) => o.size === 1)!;
+  damage.blast(t.x, t.y, 0.6);
   const after = floorPixels(plan, damage);
   const i = Math.round(t.y * 8) * CELLS_W * 8 + Math.round(t.x * 8);
   assert.notEqual(before[i], after[i], "a stump where the tree stood");
@@ -105,8 +112,8 @@ test("the ground shows the standing trees' shadows and the felled trees' craters
 test("large, larger and huge trees stand among the rest, and only big blasts fell them", () => {
   const plan = forestPlan(city());
   const count = [0, 1, 2, 3].map((n) => plan.trees.filter((t) => t.size === n).length);
-  assert.ok(count[1] > 40 && count[2] > 15 && count[3] > 8, `sizes ${count}`);
-  for (const n of [1, 2, 3] as const) {
+  assert.ok(count[0] === 0 && count[1] > 100 && count[2] > 50 && count[3] > 30, `sizes ${count}`);
+  for (const n of [2, 3] as const) {
     const big = plan.trees.filter((t) => t.size === n);
     assert.ok(Math.min(...big.map((t) => t.r)) > Math.max(...plan.trees.filter((t) => t.size === n - 1).map((t) => t.r)) - 0.3, "each size bigger than the last");
   }
@@ -184,4 +191,17 @@ test("in the battle, boulders block those on foot in Mossbound Ruins only", () =
   far.startAt(22);
   far.step(1 / 60);
   for (const c of cells) assert.equal(far.solid[c] + far.rocks[c], 0, "boulders outside Mossbound Ruins");
+});
+
+test("small mountains: big heaps, filled solid, drawn as rocky hills", () => {
+  const map = city(), plan = boulderPlan(map);
+  const big = plan.filter((b) => b.cells.length >= 14);
+  assert.ok(big.length >= 3, `${big.length} mountains`);
+  assert.ok(plan.some((b) => b.cells.length >= 7 && b.cells.length < 14), "larger clusters too");
+  const floor = floorPixels(forestPlan(map), null), m = big[0], c = m.cells[Math.floor(m.cells.length / 2)];
+  const grey = m.cells.filter((c) => {
+    const p = floor[(Math.floor(c / CELLS_W) * 8 + 4) * CELLS_W * 8 + (c % CELLS_W) * 8 + 4];
+    return p >>> 24 === 255 && Math.abs((p & 0xff) - ((p >> 16) & 0xff)) < 40;
+  });
+  assert.ok(grey.length > m.cells.length / 2 && c >= 0, "stone over the mountain's cells");
 });
