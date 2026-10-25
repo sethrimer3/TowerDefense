@@ -34,7 +34,7 @@ export const SIGHT_RETRY = 0.25;
 /** How far, in cells walked, a gunner goes for a tower. */
 const TOWER_WALK = { maxCost: 80, maxNodes: 4000 };
 
-/** Whether nothing solid but water lies between (x0, y0) and (x1, y1): every
+/** Whether nothing solid but water and boulders lies between (x0, y0) and (x1, y1): every
  * cell the line crosses, sampled a quarter of a cell apart, besides the two
  * ends' own (a flier over a roof can be seen). */
 export function lineOfSight(sim: DefendSim, x0: number, y0: number, x1: number, y1: number) {
@@ -43,7 +43,8 @@ export function lineOfSight(sim: DefendSim, x0: number, y0: number, x1: number, 
   for (let i = 1; i < n; i++) {
     const c = cellIndex(Math.floor(x0 + ((x1 - x0) * i) / n), Math.floor(y0 + ((y1 - y0) * i) / n));
     if (c === from || c === to) continue;
-    if (sim.solid[c] && sim.map.type[c] !== CellType.WATER) return false;
+    // Shots pass over ponds and the forest's boulders.
+    if (sim.solid[c] && sim.map.type[c] !== CellType.WATER && !sim.rocks[c]) return false;
   }
   return true;
 }

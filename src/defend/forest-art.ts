@@ -19,7 +19,7 @@
 import { CELL_COUNT, CELLS_H, CELLS_W, cellIndex, defendRandom, hash, hash01 } from "./grid.ts";
 import type { CityMap } from "./citygen.ts";
 import type { DefendSim } from "./sim.ts";
-import { ForestDamage, VARIANTS, canopyRadius, forestPlan, type Felled, type ForestPlan, type ForestTree, type TreeKind } from "./forest.ts";
+import { ForestDamage, VARIANTS, canopyRadius, forestPlan, type Boulder, type Felled, type ForestPlan, type ForestTree, type Lake, type Meadow, type TreeKind, type TreeSize } from "./forest.ts";
 import { ART } from "./park-art.ts";
 import { artPen } from "./pixel-fx.ts";
 
@@ -68,6 +68,22 @@ const PEBBLE = [0x8a7a62, 0x3a3026];
 const STONE = [0x3c3f3d, 0x575a55, 0x777a72, 0x979a90];
 const MOSS = [0x4f6a32, 0x6f8f44];
 const STUMP = [0x5e4129, 0x7a5232, 0xb08a5a];
+/** Lakes: the bank's mud, the water from deep to shallow, a glint, lily
+ * pads and reeds. */
+const BANK = [0x3d3a26, 0x55503a, 0x6b6448];
+const WATER = [0x1b3a4e, 0x24506a, 0x2f6683, 0x46829a];
+const GLINT = 0xbfe2ea;
+const LILY = [0x21401f, 0x3d7a33, 0x63a54b];
+const REED = [0x2c4a22, 0x5b7a34, 0xb7a25a];
+/** Meadows: long grass blades, dark to lit, and flowers (petal, shaded
+ * petal, heart): red, yellow, white and purple. */
+const GRASS = [0x355a24, 0x4c7a2e, 0x6a9a3c, 0x9cc25a];
+const FLOWERS = [
+  [0xd8363e, 0x9a1f2a, 0xf0d050],
+  [0xf2d240, 0xc09a22, 0x8a5a1a],
+  [0xf4f0e2, 0xc8c2b0, 0xe8c64a],
+  [0x9a5ad0, 0x6a3a9a, 0xf0e070],
+];
 
 /** A sprite: its pixels, its size and where the canopy's middle sits in it. */
 export type Sprite = { px: Uint32Array; w: number; h: number; ox: number; oy: number; runs?: Int16Array };
@@ -95,15 +111,18 @@ const band = (v: number, x: number, y: number) => {
   return d > 0.5 ? 3 : d > 0.1 ? 2 : d > -0.32 ? 1 : 0;
 };
 
-/** The canopy of kind `kind`, variant `v`, unleant: shade band per pixel
- * (-1 empty, 0..3, or 4 + berry index) over a square `2 × half + 1` wide,
- * its middle at (half, half). */
-function canopy(kind: TreeKind, v: number) {
-  const R = canopyRadius(kind, v) * ART, half = Math.ceil(R * 1.2) + 1, n = 2 * half + 1;
+/** The canopy of kind `kind`, size `size`, variant `v`, unleant: shade
+ * band per pixel (-1 empty, 0..3, or 4 + berry index) over a square
+ * `2 × half + 1` wide, its middle at (half, half). Bigger trees have more
+ * whorls and clumps rather than bigger ones. */
+function canopy(kind: TreeKind, v: number, size: TreeSize) {
+  const R = canopyRadius(kind, v, size) * ART, half = Math.ceil(R * 1.2) + 1, n = 2 * half + 1;
   const grid = new Int8Array(n * n).fill(-1);
-  const h = (k: number) => hash01(v, kind.length, k);
+  const h = (k: number) => hash01(v, kind.length, size, k);
   if (kind === "pine") {
-    const spikes = 8 + (hash(v, 431) % 4), ph = h(432);
+    const spikes = 8 + size * 4 + (hash(v, size, 431) % 4), ph = h(432);
+    // Each whorl's rim as a share of the canopy's, outermost first.
+    const tiers = [1, ...[[0.6, 0.28], [0.68, 0.42, 0.2], [0.74, 0.52, 0.32, 0.15], [0.78, 0.6, 0.43, 0.27, 0.12]][size]];
     const tri = (u: number) => 1 - 2 * Math.abs(u - Math.floor(u) - 0.5);
     for (let y = 0; y < n; y++)
       for (let x = 0; x < n; x++) {
@@ -111,13 +130,16 @@ function canopy(kind: TreeKind, v: number) {
         const rim = R * (0.72 + 0.28 * tri(a * spikes + ph));
         if (d >= rim) continue;
         // Whorls of branches, each tier's rim spiked between the tier below's spikes.
-        const inner = R * 0.6 * (0.75 + 0.25 * tri(a * spikes + ph + 0.5)), top = R * 0.28 * (0.8 + 0.2 * tri(a * spikes + ph));
-        const tier = d < top ? 2 : d < inner ? 1 : 0;
+        let tier = 0, next = -Infinity;
+        for (let k = 1; k < tiers.length; k++) {
+          const r = R * tiers[k] * (0.75 + 0.25 * tri(a * spikes + ph + (k & 1) * 0.5));
+          if (d < r) tier = k;
+          else { next = r; break; }
+        }
         const light = (-0.6 * dx - 0.8 * dy) / R;
-        let val = light * 0.75 + tier * 0.28 - 0.22;
+        let val = light * 0.75 + (tier * 0.56) / (tiers.length - 1) - 0.22;
         // A dark line just outside each upper tier's rim, on the shaded side.
-        const lip = (tier === 0 && d < inner + 1.2) || (tier === 1 && d < top + 1.1);
-        if (lip && 0.6 * dx + 0.8 * dy > -0.2 * R) val -= 0.6;
+        if (d < next + 1.2 && 0.6 * dx + 0.8 * dy > -0.2 * R) val -= 0.6;
         if (d < 1.2) val = 1;
         grid[y * n + x] = band(val, x, y);
       }
@@ -125,11 +147,20 @@ function canopy(kind: TreeKind, v: number) {
   }
   const bush = kind === "bush";
   const clumps = [{ x: 0, y: -0.05 * R, r: (bush ? 0.55 : 0.6) * R, lift: 0.25 * R }];
-  const k = (bush ? 3 : 5) + (hash(v, 433) % 3);
-  for (let i = 0; i < k; i++) {
-    const a = ((i + h(434 + i) * 0.5) / k) * Math.PI * 2, dist = R * (0.42 + h(440 + i) * 0.14);
-    clumps.push({ x: Math.cos(a) * dist, y: Math.sin(a) * dist, r: R * (0.38 + h(450 + i) * 0.14), lift: 0 });
-  }
+  // A ring of clumps round the crown, and for big trees an outer ring of
+  // smaller ones and an inner ring raised between them.
+  const k = (bush ? 3 : 5) + size * 2 + (hash(v, size, 433) % 3);
+  const ring = (count: number, reach: number, r: number, lift: number, seed: number) => {
+    for (let i = 0; i < count; i++) {
+      const a = ((i + h(seed + i) * 0.5) / count) * Math.PI * 2, dist = R * (reach + h(seed + 20 + i) * 0.14);
+      clumps.push({ x: Math.cos(a) * dist, y: Math.sin(a) * dist, r: R * (r + h(seed + 40 + i) * 0.12), lift: R * lift });
+    }
+  };
+  if (size >= 2) {
+    clumps[0].r = 0.42 * R;
+    ring(k + 4, 0.66, 0.26, 0, 600);
+    ring(k - 2, 0.36, 0.3, 0.1, 700);
+  } else ring(k, 0.42, size ? 0.34 : 0.38, 0, 434);
   const berries = bush && v % 3 !== 2 ? v % 3 : -1;
   for (let y = 0; y < n; y++)
     for (let x = 0; x < n; x++) {
@@ -145,34 +176,38 @@ function canopy(kind: TreeKind, v: number) {
       const nx = (px - c.x) / c.r, ny = (py - c.y) / c.r;
       let val = 0.5 * (-0.6 * nx - 0.8 * ny) + 0.5 * ((-0.6 * px - 0.8 * py) / R);
       // Each clump's shaded rim reads against the clump below it.
-      const edge = Math.sqrt((px - c.x) ** 2 + (py - c.y) ** 2) > c.r - 1.1;
+      const edge = Math.sqrt((px - c.x) ** 2 + (py - c.y) ** 2) > c.r - 1.1 - size * 0.45;
       if (edge && 0.6 * nx + 0.8 * ny > 0.25) val -= 0.55;
-      // Leaf speckle.
-      if (hash(x, y, v, 435) % 13 === 0) val += 0.4;
+      // Leaf speckle, and on big crowns dark gaps between the leaves.
+      const sp = hash(x, y, v, 435) % 13;
+      if (sp === 0) val += 0.4;
+      else if (size >= 2 && sp === 1 && val < 0.4) val -= 0.5;
       const b = band(val, x, y);
       grid[y * n + x] = berries >= 0 && b >= 2 && hash(x, y, v, 436) % 11 === 0 ? 4 + berries : b;
     }
   return { R, half, n, grid };
 }
 
-/** Baked tree sprites by kind, variant and lean. */
+/** Baked tree sprites by size, kind, variant and lean. */
 const sprites: Sprite[] = [];
 const KIND_INDEX: Record<TreeKind, number> = { oak: 0, pine: 1, bush: 2 };
 
 /** Tree `kind`, variant `v`, leaning `lean` art pixels (its top furthest,
- * its foot not at all), with its trunk and outline. */
-export function treeSprite(kind: TreeKind, v: number, lean: number): Sprite {
-  const key = (KIND_INDEX[kind] * VARIANTS + v) * (2 * LEAN + 1) + lean + LEAN;
+ * its foot not at all), with its trunk and outline; `size` 0 to 3, from
+ * ordinary to huge. */
+export function treeSprite(kind: TreeKind, v: number, lean: number, size: TreeSize = 0): Sprite {
+  const key = ((size * 3 + KIND_INDEX[kind]) * VARIANTS + v) * (2 * LEAN + 1) + lean + LEAN;
   let s = sprites[key];
   if (s) return s;
-  const { R, half, n, grid } = canopy(kind, v);
+  const { R, half, n, grid } = canopy(kind, v, size);
   const pad = LEAN + 2, w = n + pad * 2, h = n + 5, ox = half + pad, oy = half + 1;
   const fill = new Int8Array(w * h).fill(-1);
   const colour = new Uint32Array(w * h);
-  // The trunk first, its foot poking out under the canopy.
+  // The trunk first, its foot poking out under the canopy, thicker on big trees.
+  const trunk: [number, number][] = size >= 2 ? [[-2, BARK[1]], [-1, BARK[1]], [0, BARK[0]], [1, BARK[0]]] : size ? [[-1, BARK[1]], [0, BARK[0]], [1, BARK[0]]] : [[-1, BARK[1]], [0, BARK[0]]];
   if (kind !== "bush")
     for (let y = Math.round(oy + R * 0.5); y <= Math.round(oy + R) + 1; y++)
-      for (const [x, c] of [[ox - 1, BARK[1]], [ox, BARK[0]]] as const) if (y < h) colour[y * w + x] = rgba(c), fill[y * w + x] = 9;
+      for (const [dx, c] of trunk) if (y < h) colour[y * w + ox + dx] = rgba(c), fill[y * w + ox + dx] = 9;
   const shift = (y: number) => Math.round(lean * Math.max(0, Math.min(1, (R * 0.6 - (y - half)) / (R * 1.6))));
   const palettes = LEAVES[kind], pal = palettes[v % palettes.length];
   for (let y = 0; y < n; y++) {
@@ -224,6 +259,17 @@ function rock(size: number, seed: number): Sprite {
       const mossy = seed % 3 !== 0 && light > 0.35 && hash(x, y, seed, 463) % 3 !== 0;
       px[y * w + x] = rgba(mossy ? MOSS[b > 2 ? 1 : 0] : STONE[b]);
     }
+  // A boulder's crack, a crooked line of dark pixels across its face.
+  if (R >= 4) {
+    let x = half + Math.round((hash01(seed, 464) - 0.5) * R), y = half - Math.round(R * 0.5);
+    for (let k = 0; k < R * 1.1; k++, y++) {
+      x += (hash(seed, k, 465) % 3) - 1;
+      const i = y * w + x;
+      if (x <= 0 || x >= w - 1 || !inside[i] || !inside[i - 1] || !inside[i + 1] || !inside[i + w]) continue;
+      px[i] = rgba(STONE[0]);
+      if (inside[i + 1]) px[i + 1] = rgba(STONE[3]);
+    }
+  }
   for (let y = 0; y < h; y++)
     for (let x = 0; x < w; x++) {
       const i = y * w + x;
@@ -257,11 +303,13 @@ export function floorPixels(plan: ForestPlan, damage: ForestDamage | null): Uint
 export function paintFloor(out: Uint32Array, plan: ForestPlan, damage: ForestDamage | null, box: Box) {
   clip = { x0: Math.max(0, box.x0), y0: Math.max(0, box.y0), x1: Math.min(W, box.x1), y1: Math.min(H, box.y1) };
   for (let Y = clip.y0; Y < clip.y1; Y++) out.fill(0, Y * W + clip.x0, Y * W + clip.x1);
+  for (const m of plan.meadows) if (nearClip(m.x, m.y, m.r * 1.2 + 0.5)) meadow(out, m);
   for (const p of plan.pads) if (nearClip(p.x, p.y, p.r * 1.3 + 0.2)) blob(out, p.x, p.y, p.r, p.seed, DIRT, false);
+  for (const l of plan.lakes) lake(out, l);
   for (const c of damage?.craters ?? []) {
     if (!nearClip(c.x, c.y, c.r * 1.3 + 0.5)) continue;
     blob(out, c.x, c.y, c.r, c.seed, TURNED, true);
-    stump(out, Math.round(c.x * ART), Math.round(c.y * ART), c.seed);
+    stump(out, Math.round(c.x * ART), Math.round(c.y * ART), c.seed, c.size);
   }
   for (const r of plan.rocks) {
     if (!nearClip(r.x, r.y, r.size + 0.5)) continue;
@@ -270,10 +318,11 @@ export function paintFloor(out: Uint32Array, plan: ForestPlan, damage: ForestDam
     stamp(out, s, x0 + 1, y0 + 1, true);
     stamp(out, s, x0, y0, false);
   }
+  for (const b of plan.boulders) boulder(out, b);
   for (let Y = clip.y0; Y < clip.y1; Y++) shaded.fill(0, Y * W + clip.x0, Y * W + clip.x1);
   for (const t of plan.trees) {
     if ((damage && !damage.standing(t)) || !nearClip(t.x, t.y, t.r * 2 + 1)) continue;
-    const s = treeSprite(t.kind, t.variant, 0), R = t.r * ART, runs = runsOf(s);
+    const s = treeSprite(t.kind, t.variant, 0, t.size), R = t.r * ART, runs = runsOf(s);
     const x0 = Math.round(t.x * ART) - s.ox + Math.round(R * 0.35) + 1, y0 = Math.round(t.y * ART) - s.oy + Math.round(R * 0.5) + 1;
     for (let k = 0; k < runs.length; k += 3) {
       const Y = y0 + runs[k];
@@ -336,19 +385,148 @@ function blob(out: Uint32Array, x: number, y: number, r: number, seed: number, t
     }
 }
 
-/** A splintered stump at art pixel (x, y): rings round a pale heart, outlined. */
-function stump(out: Uint32Array, x: number, y: number, seed: number) {
+/** A splintered stump at art pixel (x, y), wider for a bigger tree: rings
+ * round a pale heart, outlined. */
+function stump(out: Uint32Array, x: number, y: number, seed: number, size: number) {
   const put = (X: number, Y: number, c: number) => {
     if (inClip(X, Y)) out[Y * W + X] = rgba(c);
   };
-  for (let dy = -2; dy <= 2; dy++)
-    for (let dx = -2; dx <= 2; dx++) if (Math.abs(dx) + Math.abs(dy) <= 3) put(x + dx, y + dy, OUTLINE);
-  for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) put(x + dx, y + dy, dx < 0 || dy < 0 ? STUMP[1] : STUMP[0]);
+  const r = 1 + Math.ceil(size / 2), r2 = (r + 0.5) * (r + 0.5);
+  for (let dy = -r - 1; dy <= r + 1; dy++)
+    for (let dx = -r - 1; dx <= r + 1; dx++) if (dx * dx + dy * dy <= (r + 1.4) * (r + 1.4)) put(x + dx, y + dy, OUTLINE);
+  for (let dy = -r; dy <= r; dy++)
+    for (let dx = -r; dx <= r; dx++) {
+      const d2 = dx * dx + dy * dy;
+      if (d2 > r2) continue;
+      // Growth rings: every other ring a shade darker.
+      const ring = Math.round(Math.sqrt(d2)) & 1;
+      put(x + dx, y + dy, d2 > (r - 0.5) * (r - 0.5) ? (dx < 0 || dy < 0 ? STUMP[1] : STUMP[0]) : ring ? STUMP[1] : STUMP[2]);
+    }
   put(x, y, STUMP[2]);
   // A jagged splinter left standing.
   const sx = x + (seed % 3) - 1;
-  put(sx, y - 2, STUMP[2]);
-  put(sx, y - 3, OUTLINE);
+  put(sx, y - r - 1, STUMP[2]);
+  put(sx, y - r - 2, OUTLINE);
+}
+
+/** A lake's water, its bank and outline, then its shallows, deeps, glints,
+ * lily pads and reeds: the union of its discs, depth by how far inside. */
+function lake(out: Uint32Array, l: Lake) {
+  let bx0 = Infinity, by0 = Infinity, bx1 = -Infinity, by1 = -Infinity;
+  for (const d of l.discs) bx0 = Math.min(bx0, d.x - d.r), by0 = Math.min(by0, d.y - d.r), bx1 = Math.max(bx1, d.x + d.r), by1 = Math.max(by1, d.y + d.r);
+  const x0 = Math.max(clip.x0, Math.floor((bx0 - 0.4) * ART)), x1 = Math.min(clip.x1, Math.ceil((bx1 + 0.4) * ART));
+  const y0 = Math.max(clip.y0, Math.floor((by0 - 0.4) * ART)), y1 = Math.min(clip.y1, Math.ceil((by1 + 0.4) * ART));
+  if (x0 >= x1 || y0 >= y1) return;
+  const discs = l.discs.map((d) => ({ x: d.x * ART, y: d.y * ART, r: d.r * ART }));
+  // How far (art pixels) inside the lake a point is, wobbled along the shore.
+  const depth = (X: number, Y: number) => {
+    let e = -Infinity;
+    for (const d of discs) e = Math.max(e, d.r - Math.sqrt((X + 0.5 - d.x) ** 2 + (Y + 0.5 - d.y) ** 2));
+    return e + 0.9 * Math.sin(X * 0.37 + l.seed) * Math.cos(Y * 0.29 + l.seed * 0.5);
+  };
+  for (let Y = y0; Y < y1; Y++)
+    for (let X = x0; X < x1; X++) {
+      const e = depth(X, Y);
+      if (e < -2) continue;
+      const odd = (X + Y) & 1, hsh = hash(X, Y, l.seed, 481);
+      let c: number;
+      if (e < -1) { if (odd) continue; c = BANK[0]; }
+      else if (e < 0.5) c = BANK[hsh % 3 ? 1 : 2];
+      else if (e < 1.5) c = OUTLINE;
+      else if (e < 3) c = WATER[3];
+      else if (e < 5) c = e < 4 && odd ? WATER[3] : WATER[2];
+      else if (e < 9) c = e < 6 && odd ? WATER[2] : WATER[1];
+      else c = e < 10 && odd ? WATER[1] : WATER[0];
+      // Light off the water, short streaks across its open middle.
+      if (e > 3 && hsh % 97 === 0) for (let k = 0; k < 3; k++) if (inClip(X + k, Y)) out[Y * W + X + k] = rgba(GLINT);
+      out[Y * W + X] = rgba(c);
+      if (e > 3 && hsh % 97 === 0) out[Y * W + X] = rgba(GLINT);
+    }
+  // Lily pads out on the water, notched discs, one in a few in flower.
+  for (let k = 0; k < 8; k++) {
+    const X = Math.round(x0 + hash01(l.seed, k, 482) * (x1 - x0)), Y = Math.round(y0 + hash01(l.seed, k, 483) * (y1 - y0));
+    if (depth(X, Y) < 4) continue;
+    for (let dy = -2; dy <= 2; dy++)
+      for (let dx = -2; dx <= 2; dx++) {
+        const d2 = dx * dx + dy * dy;
+        if (d2 > 5 || !inClip(X + dx, Y + dy) || (dx > 0 && dy === 0)) continue;
+        out[(Y + dy) * W + X + dx] = rgba(d2 > 3 ? LILY[0] : dx + dy < 0 ? LILY[2] : LILY[1]);
+      }
+    if (k % 3 === 0 && inClip(X - 1, Y - 1)) out[(Y - 1) * W + X - 1] = rgba(0xe8a6c0);
+  }
+  // Reeds in clumps where the shore is shallow: dark tufts with pale tips.
+  for (let k = 0; k < 18; k++) {
+    const X = Math.round(x0 + hash01(l.seed, k, 484) * (x1 - x0)), Y = Math.round(y0 + hash01(l.seed, k, 485) * (y1 - y0)), e = depth(X, Y);
+    if (e < 1.5 || e > 4.5) continue;
+    for (let j = 0; j < 7; j++) {
+      const rx = X + (hash(l.seed, k, j, 486) % 5) - 2, ry = Y + (hash(l.seed, k, j, 487) % 5) - 2;
+      if (!inClip(rx, ry) || !inClip(rx, ry - 1)) continue;
+      out[ry * W + rx] = rgba(REED[0]);
+      out[(ry - 1) * W + rx] = rgba(j % 3 ? REED[1] : REED[2]);
+    }
+  }
+}
+
+/** A meadow: long grass in tufts thinning toward its ragged edge, and in a
+ * flower meadow, drifts of flowers each of one colour. */
+function meadow(out: Uint32Array, m: Meadow) {
+  const R = m.r * ART, cx = m.x * ART, cy = m.y * ART;
+  const x0 = Math.max(clip.x0, Math.floor(cx - R * 1.2)), x1 = Math.min(clip.x1, Math.ceil(cx + R * 1.2));
+  const y0 = Math.max(clip.y0, Math.floor(cy - R * 1.2)), y1 = Math.min(clip.y1, Math.ceil(cy + R * 1.2));
+  const put = (X: number, Y: number, c: number) => {
+    if (inClip(X, Y)) out[Y * W + X] = rgba(c);
+  };
+  for (let Y = y0; Y < y1; Y++)
+    for (let X = x0; X < x1; X++) {
+      const dx = X + 0.5 - cx, dy = Y + 0.5 - cy;
+      // Thick in the middle, a ragged fringe of lone tufts outside.
+      const fall = Math.sqrt(dx * dx + dy * dy) / R + 0.18 * Math.sin(dx * 0.21 + m.seed) * Math.cos(dy * 0.17 + m.seed);
+      if (fall >= 1.15) continue;
+      const hsh = hash(X, Y, m.seed, 491);
+      // A blade of long grass: a dark root, a lit tip a pixel up.
+      if (hsh % 100 < 34 * Math.max(0, 1.15 - fall)) {
+        const shade = hsh % 3;
+        put(X, Y, GRASS[shade]);
+        put(X + ((hsh >> 4) & 1), Y - 1, GRASS[shade + 1]);
+        if (shade === 2) put(X, Y - 2, GRASS[3]);
+      }
+      if (!m.flowers || fall > 0.95) continue;
+      // Flowers in drifts: the drift's colour from a coarse hash.
+      if (hsh % 61 < 4) {
+        const drift = hash(Math.floor((X + m.seed % 13) / 9), Math.floor((Y + m.seed % 7) / 7), m.seed, 492);
+        const petal = FLOWERS[drift % FLOWERS.length];
+        put(X, Y - 1, petal[0]);
+        put(X - 1, Y, petal[0]);
+        put(X + 1, Y, petal[1]);
+        put(X, Y + 1, petal[1]);
+        put(X, Y, petal[2]);
+      }
+    }
+}
+
+/** A boulder or cluster: one great stone over a 2 × 2 block, else a stone
+ * a cell, each heaving up a shade on the ground, piled back to front. */
+function boulder(out: Uint32Array, b: Boulder) {
+  const cells = b.cells.map((c) => ({ x: (c % CELLS_W) + 0.5, y: Math.floor(c / CELLS_W) + 0.5 }));
+  let stones: { x: number; y: number; size: number; seed: number }[];
+  if (cells.length === 4 && cells.every((c) => Math.abs(c.x - cells[0].x) <= 1 && Math.abs(c.y - cells[0].y) <= 1)) {
+    const x = cells.reduce((s, c) => s + c.x, 0) / 4, y = cells.reduce((s, c) => s + c.y, 0) / 4;
+    stones = [{ x, y, size: 2.15, seed: b.seed }];
+  } else
+    stones = cells.map((c, i) => ({
+      x: c.x + (hash01(b.seed, i, 495) - 0.5) * 0.2, y: c.y + (hash01(b.seed, i, 496) - 0.5) * 0.2,
+      size: (cells.length > 1 ? 1.15 : 1.3) + hash01(b.seed, i, 497) * 0.3, seed: hash(b.seed, i, 498),
+    }));
+  if (!stones.some((s) => nearClip(s.x, s.y, s.size + 0.5))) return;
+  stones.sort((a, c) => a.y - c.y);
+  for (const s of stones) {
+    const sp = rockSprite(s.size, s.seed);
+    stamp(out, sp, Math.round(s.x * ART) - sp.ox + 2, Math.round(s.y * ART) - sp.oy + 2, true);
+  }
+  for (const s of stones) {
+    const sp = rockSprite(s.size, s.seed);
+    stamp(out, sp, Math.round(s.x * ART) - sp.ox, Math.round(s.y * ART) - sp.oy, false);
+  }
 }
 
 type Debris = { x: number; y: number; z: number; vx: number; vy: number; vz: number; age: number; life: number; colour: string; size: number; leaf: boolean; spin: number };
@@ -416,7 +594,7 @@ export class ForestArt {
       for (const f of felled) {
         this.dirty = true;
         // Its crater and the shadow it no longer casts.
-        const t = f.tree, reach = t.r * 2 + 1;
+        const t = f.tree, reach = t.r * 2 + 1.5;
         this.stale({ x0: Math.floor((t.x - reach) * ART), y0: Math.floor((t.y - reach) * ART), x1: Math.ceil((t.x + reach) * ART), y1: Math.ceil((t.y + reach) * ART) });
         if (!reduceMotion) this.burst(f);
       }
@@ -441,7 +619,7 @@ export class ForestArt {
   /** A felled tree's leaves, clumps and splinters, flung from the cause. */
   private burst({ tree: t, fromX, fromY, force }: Felled) {
     const pal = LEAVES[t.kind][t.variant % LEAVES[t.kind].length];
-    const n = Math.round(14 + t.r * 30);
+    const n = Math.round(14 + Math.min(t.r, 1.6) * 30);
     const d = Math.sqrt((t.x - fromX) ** 2 + (t.y - fromY) ** 2) || 1, ax = (t.x - fromX) / d, ay = (t.y - fromY) / d;
     for (let i = 0; i < n && this.debris.length < MAX_DEBRIS; i++) {
       const leaf = i % 7 !== 0, a = fx() * Math.PI * 2, sp = (0.6 + fx() * 1.8) * force;
@@ -608,9 +786,9 @@ function surface() {
 export function composeCrowns(out: Uint32Array, plan: ForestPlan, damage: ForestDamage | null, alpha: Float32Array, time: number, wind: number, y0 = 0, y1 = H) {
   out.fill(0, y0 * W, y1 * W);
   for (const t of plan.trees) {
-    const ty = Math.round(t.y * ART);
-    if (ty + 16 < y0 || ty - 16 >= y1 || (damage && !damage.standing(t))) continue;
-    const s = treeSprite(t.kind, t.variant, leanOf(t, time, wind)), runs = runsOf(s), px = s.px;
+    const ty = Math.round(t.y * ART), reach = t.r * ART * 1.3 + 8;
+    if (ty + reach < y0 || ty - reach >= y1 || (damage && !damage.standing(t))) continue;
+    const s = treeSprite(t.kind, t.variant, leanOf(t, time, wind), t.size), runs = runsOf(s), px = s.px;
     const sx = Math.round(t.x * ART) - s.ox, sy = ty - s.oy, a = alpha[t.id] ?? 1;
     for (let k = 0; k < runs.length; k += 3) {
       const Y = sy + runs[k];
@@ -634,7 +812,7 @@ function blend(p: number, under: number, a: number) {
 export function leanOf(t: ForestTree, time: number, wind: number) {
   if (!wind) return 0;
   const sway = 0.55 * Math.sin(time * 1.7 + t.phase) + 0.6 * Math.max(0, Math.sin(time * 0.6 - t.x * 0.19 - t.y * 0.06));
-  const k = t.kind === "bush" ? 0.55 : t.kind === "pine" ? 0.8 : 1;
+  const k = (t.kind === "bush" ? 0.55 : t.kind === "pine" ? 0.8 : 1) * (1 - t.size * 0.12);
   return Math.max(-LEAN, Math.min(LEAN, Math.round(sway * wind * k * 1.3)));
 }
 

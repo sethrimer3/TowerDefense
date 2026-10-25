@@ -1,13 +1,16 @@
 // The forest outside Mossbound Ruins' walls (src/defend/forest.ts,
-// forest-art.ts): where its trees, rocks and pads go, the trees blasts and
-// charges blow up, and its pixel art. Presentation only.
+// forest-art.ts): where its trees of four sizes, rocks, pads, meadows, lakes
+// and boulders go, the trees blasts and charges blow up, its pixel art, and
+// the boulders blocking the way in the battle (the rest is presentation).
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { defaultLayout, fitLayout } from "../src/defend/layout.ts";
 import { CellType, generateCity } from "../src/defend/citygen.ts";
 import { CELLS_H, CELLS_W, cellIndex } from "../src/defend/grid.ts";
-import { ForestDamage, VARIANTS, clearOf, forestPlan, hasForest } from "../src/defend/forest.ts";
+import { BOULDERS, ForestDamage, TOUGH, VARIANTS, boulderPlan, clearOf, forestPlan, hasForest } from "../src/defend/forest.ts";
 import { LEAN, floorPixels, leanOf, rockSprite, treeSprite } from "../src/defend/forest-art.ts";
+import { DefendSim } from "../src/defend/sim.ts";
+import { defaultDefendSave } from "../src/defend/progress.ts";
 
 const city = () => {
   const fit = fitLayout(defaultLayout());
@@ -60,9 +63,10 @@ test("blasts and charges blow up the trees they reach, once, leaving craters", (
 });
 
 test("tree sprites are outlined pixel art in five lean frames, their trunks still", () => {
-  for (const kind of ["oak", "pine", "bush"] as const)
+  for (const size of [0, 1, 2, 3] as const)
+  for (const kind of size ? (["oak", "pine"] as const) : (["oak", "pine", "bush"] as const))
     for (let v = 0; v < VARIANTS; v++) {
-      const frames = [-2, -1, 0, 1, 2].map((l) => treeSprite(kind, v, l));
+      const frames = [-2, -1, 0, 1, 2].map((l) => treeSprite(kind, v, l, size));
       for (const s of frames) {
         assert.ok(s.px.some((p) => p === 0xff07090b), "a black outline");
         for (const p of s.px) assert.ok(p === 0 || p >>> 24 === 255, "opaque or clear");
@@ -90,10 +94,94 @@ test("trees lean with the wind, within their frames, and not at all in still air
 test("the ground shows the standing trees' shadows and the felled trees' craters", () => {
   const plan = forestPlan(city()), damage = new ForestDamage(plan);
   const before = floorPixels(plan, damage);
-  const t = plan.trees[10];
+  const t = plan.trees.find((o) => o.size === 0)!;
   damage.blast(t.x, t.y, 0.1);
   const after = floorPixels(plan, damage);
   const i = Math.round(t.y * 8) * CELLS_W * 8 + Math.round(t.x * 8);
   assert.notEqual(before[i], after[i], "a stump where the tree stood");
   assert.equal(after[i] >>> 24, 255);
+});
+
+test("large, larger and huge trees stand among the rest, and only big blasts fell them", () => {
+  const plan = forestPlan(city());
+  const count = [0, 1, 2, 3].map((n) => plan.trees.filter((t) => t.size === n).length);
+  assert.ok(count[1] > 40 && count[2] > 15 && count[3] > 8, `sizes ${count}`);
+  for (const n of [1, 2, 3] as const) {
+    const big = plan.trees.filter((t) => t.size === n);
+    assert.ok(Math.min(...big.map((t) => t.r)) > Math.max(...plan.trees.filter((t) => t.size === n - 1).map((t) => t.r)) - 0.3, "each size bigger than the last");
+  }
+  const sprite = (n: 0 | 1 | 2 | 3) => treeSprite("oak", 0, 0, n).w;
+  assert.ok(sprite(0) < sprite(1) && sprite(1) < sprite(2) && sprite(2) < sprite(3));
+  const huge = plan.trees.find((t) => t.size === 3)!, damage = new ForestDamage(plan);
+  assert.equal(damage.blast(huge.x, huge.y, TOUGH[3] - 0.1).filter((f) => f.tree === huge).length, 0, "a small blast leaves a huge tree");
+  assert.equal(damage.cut(huge.x - 2, huge.y, huge.x + 2, huge.y, 0.3).filter((f) => f.tree === huge).length, 0, "a charge passes a huge tree");
+  assert.ok(damage.blast(huge.x, huge.y, TOUGH[3]).some((f) => f.tree === huge));
+  assert.ok(damage.craters.at(-1)!.r > 2, "and leaves a great crater");
+});
+
+test("a few lakes and rare meadows lie in the open, spread over the board, kept clear of trees", () => {
+  const map = city(), plan = forestPlan(map);
+  assert.equal(plan.lakes.length, 3);
+  assert.equal(plan.meadows.length, 6);
+  assert.ok(plan.meadows.some((m) => m.flowers) && plan.meadows.some((m) => !m.flowers));
+  const ys = [...plan.lakes.map((l) => l.discs[0].y), ...plan.meadows.map((m) => m.y)];
+  assert.ok(Math.max(...ys) - Math.min(...ys) > CELLS_H / 3, "not all in the top rows");
+  for (const l of plan.lakes)
+    for (const d of l.discs) {
+      assert.ok(clearOf(map, d.x, d.y, d.r), "a lake reaches into the city");
+      for (const t of plan.trees) assert.ok(Math.hypot(t.x - d.x, t.y - d.y) > d.r, "a tree stands in a lake");
+    }
+  // Painted: water's blue where the lake's middle is.
+  const floor = floorPixels(plan, null), d = plan.lakes[0].discs[0];
+  const p = floor[Math.round(d.y * 8) * CELLS_W * 8 + Math.round(d.x * 8)];
+  assert.ok(((p >> 16) & 0xff) > (p & 0xff), "blue water");
+});
+
+test("boulders and clusters keep off the city, the spawn rows and each other, and wall nothing in", () => {
+  const map = city(), plan = boulderPlan(map);
+  assert.ok(plan.length > 10 && plan.some((b) => b.cells.length >= 3) && plan.some((b) => b.cells.length === 1));
+  const rock = new Uint8Array(map.type.length);
+  for (const b of plan)
+    for (const c of b.cells) {
+      const x = c % CELLS_W, y = Math.floor(c / CELLS_W);
+      assert.ok(y >= BOULDERS.top, "in the spawn rows");
+      for (let dy = -BOULDERS.clear; dy <= BOULDERS.clear; dy++)
+        for (let dx = -BOULDERS.clear; dx <= BOULDERS.clear; dx++) {
+          const nx = x + dx, ny = y + dy;
+          if (nx >= 0 && ny >= 0 && nx < CELLS_W && ny < CELLS_H) assert.equal(map.type[cellIndex(nx, ny)], CellType.OUT);
+        }
+      rock[c] = 1;
+    }
+  // Every open cell is still reached from every other, a step at a time.
+  const open = (i: number) => map.type[i] === CellType.OUT && !rock[i];
+  const start = map.type.findIndex((_, i) => open(i)), seen = new Uint8Array(map.type.length), todo = [start];
+  seen[start] = 1;
+  while (todo.length) {
+    const i = todo.pop()!, x = i % CELLS_W, y = Math.floor(i / CELLS_W);
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + dx, ny = y + dy, n = cellIndex(nx, ny);
+      if (nx < 0 || ny < 0 || nx >= CELLS_W || ny >= CELLS_H || seen[n] || !open(n)) continue;
+      seen[n] = 1;
+      todo.push(n);
+    }
+  }
+  map.type.forEach((_, i) => open(i) && assert.ok(seen[i], `open cell ${i} walled in`));
+  const trees = forestPlan(map).trees;
+  for (const b of plan) for (const c of b.cells) for (const t of trees) assert.ok(Math.hypot(t.x - (c % CELLS_W) - 0.5, t.y - Math.floor(c / CELLS_W) - 0.5) > 0.6, "a tree on a boulder");
+});
+
+test("in the battle, boulders block those on foot in Mossbound Ruins only", () => {
+  const map = city(), cells = boulderPlan(map).flatMap((b) => b.cells);
+  const sim = new DefendSim(map, defaultDefendSave().levels, 3);
+  sim.step(1 / 60);
+  for (const c of cells) {
+    assert.equal(sim.solid[c], 1);
+    assert.equal(sim.rocks[c], 1);
+  }
+  sim.computeField();
+  for (const c of cells) assert.equal(sim.field[c], Infinity, "the enemy's way runs through a boulder");
+  const far = new DefendSim(map, defaultDefendSave().levels, 3);
+  far.startAt(22);
+  far.step(1 / 60);
+  for (const c of cells) assert.equal(far.solid[c] + far.rocks[c], 0, "boulders outside Mossbound Ruins");
 });

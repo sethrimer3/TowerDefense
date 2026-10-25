@@ -1,5 +1,6 @@
-// The forest outside Mossbound Ruins' walls: trees, rocks and dirt pads
-// filling the open ground while building and in battle, the trees swaying,
+// The forest outside Mossbound Ruins' walls: trees of four sizes, rocks,
+// dirt pads, meadows, lakes and boulders filling the open ground while
+// building and in battle, the trees swaying,
 // and blasts blowing them up into craters of dirt. Isolated browser
 // contexts only, no player saves. Needs `npm run dev`. Screenshots go to
 // test-results/ (or SHOTS).
@@ -49,6 +50,24 @@ try {
     assert.ok(building.trees > 300, `the open ground is wooded (${building.trees} trees)`);
     assert.equal(building.standing, building.trees);
     await page.screenshot({ path: `${out}/forest-${width}-building.png` });
+    // Close-ups of a huge tree, a lake, a flower meadow and a boulder cluster.
+    const looks = await page.evaluate(() => {
+      const plan = window.__dp.renderer.forest.plan, W = 72;
+      const huge = plan.trees.find(t => t.size === 3), lake = plan.lakes[0].discs[0], m = plan.meadows.find(m => m.flowers);
+      const b = plan.boulders.reduce((a, c) => (c.cells.length > a.cells.length ? c : a)), c = b.cells[0];
+      return { huge: [huge.x, huge.y], lake: [lake.x, lake.y], meadow: [m.x, m.y], boulders: [(c % W) + 0.5, Math.floor(c / W) + 0.5] };
+    });
+    for (const [name, [x, y]] of Object.entries(looks)) {
+      await page.evaluate(([x, y]) => {
+        const r = window.__dp.renderer;
+        Object.assign(r.cam, { s: 1, x: 0, y: 0 });
+        const c = r.toClient(x, y);
+        r.zoomAt(c.x, c.y, 5);
+      }, [x, y]);
+      await page.waitForTimeout(250);
+      await page.screenshot({ path: `${out}/forest-${width}-${name}.png` });
+    }
+    await page.evaluate(() => Object.assign(window.__dp.renderer.cam, { s: 1, x: 0, y: 0 }));
     // Zoomed in on the forest beside the wall, two moments apart: the trees sway.
     const spot = await page.evaluate(() => {
       const r = window.__dp.renderer, map = window.__dp.currentMap(), k = map.buildings.find(b => b.kind === 'keep').rect;

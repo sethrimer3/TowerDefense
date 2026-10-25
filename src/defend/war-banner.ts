@@ -62,7 +62,7 @@ export class WarBanner {
     this.due = sim.time + REFRESH;
     const terrain: FieldTerrain = {
       solid: sim.ownSolid,
-      impassable: (i) => sim.map.type[i] === CellType.WATER,
+      impassable: (i) => sim.map.type[i] === CellType.WATER || sim.rocks[i] === 1,
       cost: (i) => (sim.ownSolid[i] ? SOLID_COST : 1),
     };
     fillFlowField(this.field, [cellAt(this.x, this.y)], terrain);
