@@ -1783,7 +1783,10 @@ nav button { position: relative; }
 
 /* The Study's path tree: the building at the root, a branch fanning to each
    path, each path's ranks down its column, and the tapped rank read out below. */
-.path-tree { display: flex; flex-direction: column; align-items: stretch; margin-top: 2px; }
+.path-tree { position: relative; display: flex; flex-direction: column; align-items: stretch; margin-top: 2px; }
+/* The golden motes (ui/tree-motes.ts) drift under the ranks. */
+.path-motes { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; image-rendering: pixelated; }
+.path-tree > :not(.path-motes) { position: relative; }
 .path-root { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 10px; letter-spacing: 1px; }
 .path-root canvas { width: 34px; height: 34px; image-rendering: pixelated; }
 .path-fan { display: block; width: 100%; height: 30px; margin-top: -2px; }
