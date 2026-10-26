@@ -1,3 +1,4 @@
+import {t} from "../i18n/index.ts";
 import { MagicCircle } from "../magic-circle/render.ts";
 import { buildingTree, foundNodes, hasTree, mergedFrom, respecBuilding, undoUpgrade, rootOf, specialtyLabel, specialtyOf, stepName, targetKind, upgradeBuilding, type PaletteKind, type SpecialtyTarget } from "../specializations.ts";
 import { pathById, type PathId } from "../knowledge-paths.ts";
@@ -402,9 +403,9 @@ export class DefendPage {
     extra.innerHTML = "";
     this.root.querySelector(".defend-head")!.classList.toggle("defend-building", this.phase === "build");
     if (this.phase === "build") {
-      el.innerHTML = `${this.sideToggle("Build")}<button id="defend-upgrades" title="Your tiles: buy more buildings and bombs"><canvas class="ui-sprite" width="48" height="48" aria-hidden="true"></canvas>Tiles</button>
-        <button class="defend-go" id="defend-start">${this.testerSelected ? "Start Tester" : "Start Defense"}</button>
-        <button class="defend-wave" id="defend-wave" style="${areaStyle(areaForWave(startingWave(this.save)))}" title="Choose the starting wave · ${this.testerSelected ? "Unit tester" : areaForWave(startingWave(this.save)).name}" aria-haspopup="dialog"><canvas class="defend-wave-wall" aria-hidden="true" width="64" height="16"></canvas>${uiSprite("stage-select")}<small>Wave </small><b>${this.testerSelected ? "Tester" : startingWave(this.save)}</b></button>`;
+      el.innerHTML = `${this.sideToggle(t("control.build"))}<button id="defend-upgrades" title="Your tiles: buy more buildings and bombs"><canvas class="ui-sprite" width="48" height="48" aria-hidden="true"></canvas>${t("nav.tiles")}</button>
+        <button class="defend-go" id="defend-start">${this.testerSelected ? t("control.startTester") : t("control.start")}</button>
+        <button class="defend-wave" id="defend-wave" style="${areaStyle(areaForWave(startingWave(this.save)))}" title="Choose the starting wave · ${this.testerSelected ? "Unit tester" : areaForWave(startingWave(this.save)).name}" aria-haspopup="dialog"><canvas class="defend-wave-wall" aria-hidden="true" width="64" height="16"></canvas>${uiSprite("stage-select")}<small>${t("control.wave")} </small><b>${this.testerSelected ? t("control.tester") : startingWave(this.save)}</b></button>`;
       el.querySelector<HTMLButtonElement>("#defend-upgrades")!.onclick = () => this.host.openTiles?.();
       paintIcon(el.querySelector<HTMLCanvasElement>("#defend-upgrades canvas")!, "cityTile");
       this.bindSideToggle(el);
@@ -418,7 +419,7 @@ export class DefendPage {
       this.paintWaveWall();
     } else if (this.phase === "sim") {
       const armed = performance.now() < this.abandonArmed;
-      el.innerHTML = `${this.sideToggle(this.sim?.unitTester ? "Enemies" : "Skills")}<button id="defend-abandon" class="defend-danger ${armed ? "armed" : ""}">${armed ? "Confirm?" : "Abandon"}</button>
+      el.innerHTML = `${this.sideToggle(this.sim?.unitTester ? t("control.enemies") : t("control.skills"))}<button id="defend-abandon" class="defend-danger ${armed ? "armed" : ""}">${armed ? t("control.confirm") : t("control.abandon")}</button>
         <button id="defend-speed" title="Battle speed">${this.sim?.speed ?? 1}×</button>`;
       el.querySelector<HTMLButtonElement>("#defend-abandon")!.onclick = () => {
         if (performance.now() < this.abandonArmed) {
@@ -699,7 +700,7 @@ export class DefendPage {
     const hp = Math.max(0, sim.keepHp()),
       max = sim.keepMaxHp();
     const remaining = sim.spawnQueue.length + sim.enemies.reduce((n, e) => n + Number(e.hp > 0 && !e.fortressPart), 0);
-    const html = `<span class="defend-wave-status"><span>${sim.unitTester ? `<b title="Unit tester">Tester</b>` : `<small>Wave </small><b>${sim.wave}</b>`}</span><span class="defend-enemies" title="${remaining} enemies remaining" aria-label="${remaining} enemies remaining"><svg viewBox="0 0 12 12" aria-hidden="true"><path fill="#ce735a" d="M1 0h2v2h6V0h2v5h-1v4H8v2H4V9H2V5H1z"/><path fill="#241915" d="M3 4h2v2H3zm4 0h2v2H7zM5 8h2v2H5z"/></svg><span>${remaining}</span></span></span><span class="defend-keep" title="Keep ${Math.ceil(hp)} / ${max}"><small>Keep</small><span class="defend-keep-meter"><i></i></span></span>`;
+    const html = `<span class="defend-wave-status"><span>${sim.unitTester ? `<b title="Unit tester">Tester</b>` : `<small>${t("control.wave")} </small><b>${sim.wave}</b>`}</span><span class="defend-enemies" title="${remaining} enemies remaining" aria-label="${remaining} enemies remaining"><svg viewBox="0 0 12 12" aria-hidden="true"><path fill="#ce735a" d="M1 0h2v2h6V0h2v5h-1v4H8v2H4V9H2V5H1z"/><path fill="#241915" d="M3 4h2v2H3zm4 0h2v2H7zM5 8h2v2H5z"/></svg><span>${remaining}</span></span></span><span class="defend-keep" title="Keep ${Math.ceil(hp)} / ${max}"><small>${t("control.keep")}</small><span class="defend-keep-meter"><i></i></span></span>`;
     this.keepBricks?.set(hp / max);
     if (el.dataset.html !== html) {
       el.dataset.html = el.innerHTML = html;

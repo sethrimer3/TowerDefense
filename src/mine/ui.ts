@@ -1,3 +1,4 @@
+import {t,getLanguage,translateWithin} from "../i18n/index.ts";
 /** The Mine tab: the mine's view, the crew's tally, hiring miners, the
  * crew's list (each miner by name, dragged between the three trades: the
  * face, the forge, the smithy; tapped to follow), and moving on to a new
@@ -209,11 +210,11 @@ export class MinePage {
         <p id="mine-tally" class="mine-tally"></p>
       </div>
       <div class="mine-tools">
-        <button id="mine-crew-toggle" class="mine-crew-toggle" aria-pressed="false" aria-controls="mine-crew">☰ Crew</button>
-        <button id="mine-buildings-toggle" aria-pressed="false" aria-controls="mine-buildings">☰ Buildings</button>
+        <button id="mine-crew-toggle" class="mine-crew-toggle" aria-pressed="false" aria-controls="mine-crew">☰ <span data-i18n="control.crew">${t("control.crew")}</span></button>
+        <button id="mine-buildings-toggle" aria-pressed="false" aria-controls="mine-buildings">☰ <span data-i18n="control.buildings">${t("control.buildings")}</span></button>
         <p id="mine-prospect" class="mine-prospect"></p>
-        <button id="mine-prospect-new" class="mine-prospect-new">⚑ New Prospect</button>
-        <button id="mine-smithy" class="chamber-door smithy-door" title="Climb down to the Smithy, where the mine's metal makes the realm stronger">⚒ Smithy</button>
+        <button id="mine-prospect-new" class="mine-prospect-new">⚑ <span data-i18n="mine.newProspect">${t("mine.newProspect")}</span></button>
+        <button id="mine-smithy" class="chamber-door smithy-door" title="Climb down to the Smithy, where the mine's metal makes the realm stronger">⚒ <span data-i18n="control.smithy">${t("control.smithy")}</span></button>
       </div>
       <div class="mine-body" id="mine-body">
         <aside class="mine-crew mine-buildings" id="mine-buildings" aria-label="Buildings" aria-hidden="true">
@@ -225,6 +226,7 @@ export class MinePage {
         </aside>
         <div class="mine-view"><canvas id="mine-canvas" aria-label="The mine"></canvas><div id="mine-info" class="mine-info" hidden></div><p id="mine-away" class="mine-away" hidden></p></div>
       </div>`;
+    translateWithin(this.root);
     const canvas = this.root.querySelector<HTMLCanvasElement>("#mine-canvas")!;
     this.renderer = new MineRenderer(canvas);
     this.renderer.refWidth = this.root.querySelector<HTMLElement>("#mine-body")!.clientWidth;
@@ -561,11 +563,11 @@ export class MinePage {
     this.refreshCrew();
     this.refreshInfo();
     const left = Math.min(100, Math.round((100 * sim.oreLeft) / Math.max(1, sim.oreFound)));
-    const tally = `${crew}|${sim.crewCap}|${metalPriceText(price)}|${afford}|${sim.depth}|${ore}|${bars}|${Math.ceil(this.owed / TICK_HZ)}|${hour}|${sky.weather}|${lost}|${news}|${left}|${sim.workedOut}|${sim.canMoveOn}|${sim.prospect}`;
+    const tally = `${getLanguage()}|${crew}|${sim.crewCap}|${metalPriceText(price)}|${afford}|${sim.depth}|${ore}|${bars}|${Math.ceil(this.owed / TICK_HZ)}|${hour}|${sky.weather}|${lost}|${news}|${left}|${sim.workedOut}|${sim.canMoveOn}|${sim.prospect}`;
     if (tally === this.shownTally) return;
     this.shownTally = tally;
     const hire = this.root.querySelector<HTMLButtonElement>("#mine-hire")!;
-    hire.innerHTML = !full ? `⛏ Hire a miner<small>${metalPriceText(price)}</small>` : crew >= MAX_MINERS ? `Crew full<small>${crew} miners</small>` : `Barracks full<small>upgrade it to hire more</small>`;
+    hire.innerHTML = !full ? `⛏ ${t("mine.hire")}<small>${metalPriceText(price)}</small>` : crew >= MAX_MINERS ? `${t("mine.crewFull")}<small>${t("mine.miners",{count:crew})}</small>` : `${t("mine.barracksFull")}<small>${t("mine.upgradeToHire")}</small>`;
     hire.disabled = full || !afford;
     this.root.querySelector("#mine-tally")!.innerHTML =
       `<b>${crew}</b> ${crew === 1 ? "miner" : "miners"} · <b>${sim.depth}</b> ft deep · ${hour}, ${WEATHER_NAME[sky.weather].toLowerCase()}<br>` +
@@ -581,7 +583,7 @@ export class MinePage {
     move.classList.toggle("ready", sim.canMoveOn);
     const away = this.root.querySelector<HTMLElement>("#mine-away")!;
     away.hidden = this.owed < TICK_HZ * 5;
-    away.textContent = `Fast-forwarding · ${countdown(this.owedMs)} idle time remaining`;
+    away.textContent = t("common.idle",{time:countdown(this.owedMs)});
   }
 
   /** The crew's list, rebuilt when the crew, their trades, the lost or the

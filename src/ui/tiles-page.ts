@@ -1,3 +1,4 @@
+import {t as tr,translateWithin,type MessageKey} from "../i18n/index.ts";
 import { pathBadge, pathLook, paintPathIcons } from "./path-badge.ts";
 import { buildingSheet, type StatSheet } from "./specialty.ts";
 /** The Tiles tab: the player's tiles laid out in a hall of the keep they
@@ -79,7 +80,7 @@ export class TilesPage {
     this.chamber.content.innerHTML = `<div class="tiles-hall">
         <header class="tiles-head">
           <div class="tiles-modes" role="group" aria-label="View">
-            <button data-mode="collection">Collection</button><button data-mode="shop">Shop</button>
+            <button data-mode="collection" data-i18n="collection.collection">${tr("collection.collection")}</button><button data-mode="shop" data-i18n="collection.shop">${tr("collection.shop")}</button>
           </div>
           <button class="tiles-stacking" data-stacking aria-pressed="false" title="Gather tiles with the same upgrades into one stack, or spread them out"></button>
         </header>
@@ -184,14 +185,15 @@ export class TilesPage {
   /** Lays out the hall's controls and tiles from the save. */
   private draw() {
     const c = this.chamber!.content, s = this.save, shop = this.mode === "shop";
+    translateWithin(c);
     c.querySelectorAll<HTMLButtonElement>("[data-mode]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.mode === this.mode)));
     const stacking = c.querySelector<HTMLButtonElement>("[data-stacking]")!;
     stacking.setAttribute("aria-pressed", String(this.stacked));
-    stacking.innerHTML = this.stacked ? `<span aria-hidden="true">▣</span> Stacked` : `<span aria-hidden="true">▦</span> Spread`;
+    stacking.innerHTML = this.stacked ? `<span aria-hidden="true">▣</span> ${tr("collection.stacked")}` : `<span aria-hidden="true">▦</span> ${tr("collection.spread")}`;
     stacking.disabled = shop;
     c.querySelector(".tiles-filters")!.innerHTML = TILE_FILTERS.map((f) => {
       const n = tileStacks(s, f.id, shop).reduce((a, t) => a + (shop ? 1 : t.count), 0);
-      return `<button data-filter="${f.id}" class="filter-${f.id}" aria-pressed="${f.id === this.filter}">${f.name}<b>${n}</b></button>`;
+      return `<button data-filter="${f.id}" class="filter-${f.id}" aria-pressed="${f.id === this.filter}">${tr((f.id === "all" ? "filter.all" : f.id === "consumables" ? "control.skills" : f.id === "units" ? "filter.units" : `subject.${f.id}`) as MessageKey)}<b>${n}</b></button>`;
     }).join("");
     const stacks = tileStacks(s, this.filter, shop);
     if (this.open && !stacks.some((t) => t.id === this.open)) this.open = null;
@@ -267,7 +269,7 @@ export class TilesPage {
       ? ""
       : `<button class="tile-buy" data-buy-tile="${t.id}" ${canBuyTile(s, t.id) ? "" : "disabled"}>Buy one<small>${offerText(offer)}</small></button>`;
     const go = (where: "smithy" | "study") => topicHas(topic, where)
-      ? `<button class="tile-go go-${where}" data-go="${where}" data-topic="${topic.id}">${where === "smithy" ? "⚒ Smithy" : "✦ Study"}<small>${where === "smithy" ? "below the Mine" : "below the Library"}</small></button>`
+      ? `<button class="tile-go go-${where}" data-go="${where}" data-topic="${topic.id}">${where === "smithy" ? `⚒ ${tr("control.smithy")}` : `✦ ${tr("control.study")}`}<small>${where === "smithy" ? "below the Mine" : "below the Library"}</small></button>`
       : "";
     const tree = !shop && t.count && tileTree(s, t.id, copy?.key)
       ? `<button class="tile-go go-tree" data-tree="${t.id}"${copy ? ` data-copy="${copy.key}"` : ""}>♛ Upgrade tree<small>in Defend</small></button>`

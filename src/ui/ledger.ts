@@ -1,3 +1,4 @@
+import {t as tr} from "../i18n/index.ts";
 import { MagicCircle } from "../magic-circle/render.ts";
 import { studyCircle } from "../magic-circle/progression.ts";
 import { TILE_TYPE } from "../tiles.ts";
@@ -128,10 +129,10 @@ export class Ledger {
     const scroll = !same ? 0 : job ? wasResearching ? (list?.scrollTop ?? 0) : 0 : wasResearching ? this.researchScroll : (list?.scrollTop ?? 0);
     const strips = Array.from(this.root.querySelectorAll(".ledger-strip")).map((s) => s.scrollLeft);
     this.shown = `${subject.id}:${topic.id}`;
-    const subjects = this.subjects.map((s) => `<button data-subject="${s.id}" aria-pressed="${s.id === subject.id}"><span>${uiSprite(s.sprite)}</span>${s.name}</button>`).join("");
+    const subjects = this.subjects.map((s) => `<button data-subject="${s.id}" aria-pressed="${s.id === subject.id}"><span>${uiSprite(s.sprite)}</span>${tr(s.id === "mine" || s.id === "library" ? `nav.${s.id}` : `subject.${s.id}`)}</button>`).join("");
     this.root.innerHTML = `<header class="chamber-head">
-        <button class="chamber-up" data-up title="${c.up}"><span aria-hidden="true">⤒</span> ${smithy ? "Mine" : "Library"}</button>
-        <div class="chamber-title"><h2>${c.title}</h2><small>${c.blurb}</small></div>
+        <button class="chamber-up" data-up title="${c.up}"><span aria-hidden="true">⤒</span> ${tr(smithy ? "nav.mine" : "nav.library")}</button>
+        <div class="chamber-title"><h2>${tr(smithy ? "chamber.smithy" : "chamber.study")}</h2><small>${c.blurb}</small></div>
       </header>
       ${smithy ? this.walletHtml() : this.knowledgeHtml()}
       ${job ? this.researchHtml() : `<div class="ledger-strip ledger-subjects" role="group" aria-label="Subjects">${subjects}</div>
@@ -393,10 +394,10 @@ export class Ledger {
       <div class="research-details"><p>${text}.</p>
         <progress data-research-progress max="100" value="${this.researchProgress()}" aria-label="Research progress"></progress>
         <p data-research-timer role="status">${this.researchTimeLeft()}</p>
-        <p data-cancel-research-note role="status" hidden>Cancel this research? Progress will be lost.</p>
+        <p data-cancel-research-note role="status" hidden>${tr("research.warning")}</p>
         <div class="research-actions">
-          <button data-cancel-research><span data-cancel-research-label>Cancel research</span><small>Refund ${job.paid} Knowledge</small></button>
-          <button data-keep-research hidden>Keep researching</button>
+          <button data-cancel-research><span data-cancel-research-label>${tr("research.cancel")}</span><small>Refund ${job.paid} Knowledge</small></button>
+          <button data-keep-research hidden>${tr("research.keep")}</button>
         </div>
       </div>
     </section>`;
@@ -414,7 +415,7 @@ export class Ledger {
     let confirming = false;
     const setConfirmation = (value: boolean) => {
       confirming = value;
-      label.textContent = value ? "Confirm cancel" : "Cancel research";
+      label.textContent = tr(value ? "research.confirm" : "research.cancel");
       keep.hidden = note.hidden = !value;
       button.classList.toggle("danger", value);
     };
@@ -458,7 +459,7 @@ export class Ledger {
       const busy = !!save.researchJob;
       const why = maxed || active ? "" : busy ? "Researchers are working on the current project" : missing.length ? `Needs ${missing.join(" and ")} first` : !available ? "Locked" : !canBuy ? `Needs ${price} Knowledge, have ${whole(save.knowledge)}` : "";
       return `<article class="ledger-skill ${level ? "owned" : ""} ${available ? "" : "locked"}"><span class="ledger-glyph" aria-hidden="true">${skill.icon}</span><div><small>${level} / ${skill.max} RANKS</small><h3>${name}</h3><p>${skill.text}.${why ? ` <em>${why}.</em>` : ""}</p></div>
-        <button data-learn="${id}" ${maxed || !canBuy || busy || (!researchers && !save.settings.instantResearch) ? "disabled" : ""}>${maxed ? "Mastered" : active ? `Researching<small data-research-timer>${this.researchTimeLeft()}</small>` : `Learn<small>${price} Knowledge</small><small>${this.researchHint(level)}</small>`}</button></article>`;
+        <button data-learn="${id}" ${maxed || !canBuy || busy || (!researchers && !save.settings.instantResearch) ? "disabled" : ""}>${maxed ? tr("common.mastered") : active ? `Researching<small data-research-timer>${this.researchTimeLeft()}</small>` : `${tr("common.learn")}<small>${price} Knowledge</small><small>${this.researchHint(level)}</small>`}</button></article>`;
     };
     if (t.id === "warBanner") {
       const selected = t.skills!.find(id => id === this.picked.warBanner) ?? "warBanner";
