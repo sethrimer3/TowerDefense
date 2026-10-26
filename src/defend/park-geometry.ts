@@ -18,6 +18,30 @@ export function pondDisc(cx: number, cy: number, scale: number) {
   };
 }
 
+/** How much the ponds' shores round off where the cells' discs meet (cells):
+ * the smooth union fills the notches between them, so a pond reads as one
+ * body of water rather than circles pressed together. */
+export const POND_BLEND = 0.55;
+/** How far (cells) the shore wanders in and out along its length. */
+const POND_WOBBLE = 0.13;
+
+/** How far point (x, y) lies inside the shore of the pond made of `discs`
+ * (each water cell's `pondDisc` at scale 1), in cells: positive inside the
+ * black outline, negative outside it. A smooth union of the discs, so
+ * neighbours melt into one rounded shape. */
+export function pondField(discs: readonly { x: number; y: number; r: number }[], x: number, y: number) {
+  let f = -Infinity;
+  for (const d of discs) {
+    const e = POND.outline * d.r - Math.sqrt((x - d.x) * (x - d.x) + (y - d.y) * (y - d.y));
+    if (f === -Infinity) { f = e; continue; }
+    // Polynomial smooth maximum: the plain maximum away from any seam.
+    const h = Math.max(0, Math.min(1, 0.5 + (0.5 * (e - f)) / POND_BLEND));
+    f = f + (e - f) * h + POND_BLEND * h * (1 - h);
+  }
+  // A slow wobble along the shore, so a long pond isn't a smooth pill.
+  return f + POND_WOBBLE * Math.sin(x * 1.7 + Math.sin(y * 0.9) * 1.3) * Math.cos(y * 1.5 - x * 0.6);
+}
+
 /** The union of the water cells' discs at `scale`, as one path, at `px` a cell. */
 export function pondPath(c: CanvasRenderingContext2D, px: number, cells: readonly (readonly [number, number])[], scale: number) {
   c.beginPath();

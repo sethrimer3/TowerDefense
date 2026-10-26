@@ -3,10 +3,12 @@
  * layer scaled up with smoothing off, so they sit with the blocky roofs,
  * grass and flagstones instead of looking smooth and painterly beside them.
  *
- * - **Ponds:** the union of each water cell's disc (the same shore
- *   `pondDisc` describes), in bands: a black outline, a muddy bank, reedy
- *   shallows, open water and a darker deep heart, the band edges broken
- *   with a checker dither; flat glints and lily pads, some in flower.
+ * - **Ponds:** the smooth union of each water cell's disc (`pondField`,
+ *   over the discs `pondDisc` describes), so a pond is one rounded body of
+ *   water, in bands by the distance in from its shore: a black outline, a
+ *   muddy bank, reedy shallows, open water and a darker deep heart, the
+ *   band edges broken with a checker dither; flat glints and lily pads,
+ *   some in flower.
  * - **Trees:** lumpy round canopies with a one-pixel outline and four
  *   shades lit from the upper left, dithered where shades meet. They stand
  *   over the walkers, so each is baked as its own sprite (`trees`) the
@@ -17,7 +19,7 @@
  * reflections and ducks keep to. Presentation only. */
 import { CELLS_H, CELLS_W, hash, hash01 } from "./grid.ts";
 import { CellType, type CityMap } from "./citygen.ts";
-import { POND, hasTree, pondDisc, treeCanopy } from "./park-geometry.ts";
+import { POND_BLEND, hasTree, pondDisc, pondField, treeCanopy } from "./park-geometry.ts";
 
 /** Art pixels a cell. */
 export const ART = 8;
@@ -54,13 +56,14 @@ export function parkArt(map: CityMap): ParkArt {
   return art;
 }
 
-/** Pond bands, darkest edge first. */
+/** Pond bands, darkest edge first, each from its distance in from the
+ * shore (art pixels; 1 on the shore's own pixels). */
 const BANDS = [
-  { scale: POND.outline, color: 0x354943 },
-  { scale: POND.bank, color: 0x45665e },
-  { scale: POND.shallows, color: 0x397481 },
-  { scale: POND.open, color: 0x2b5d71 },
-  { scale: 0.42, color: 0x244f66 },
+  { from: 0, color: 0x354943 },
+  { from: 1.5, color: 0x45665e },
+  { from: 2.5, color: 0x397481 },
+  { from: 3.5, color: 0x2b5d71 },
+  { from: 6, color: 0x244f66 },
 ];
 const GLINT = 0x9cc8d6, PAD = 0x4f7d3b, PAD_DARK = 0x3a5f2c, BLOSSOM = [0xe9d7e0, 0xf2eecb];
 const TREE = { outline: 0x0b0907, dark: [0x223b1c, 0x284420], mid: [0x2f5224, 0x335a27], light: [0x45702f, 0x4a7a36], top: [0x679c4e, 0x6fa452] };
@@ -95,37 +98,54 @@ function toCanvas(px: Uint32Array, w = W, h = H) {
 }
 
 function paintPonds(map: CityMap, px: Uint32Array, open: Uint8Array) {
-  const discs: { x: number; y: number; f: number }[] = [];
+  const discs: { x: number; y: number; r: number }[] = [];
   for (let i = 0; i < map.type.length; i++) {
     if (map.type[i] !== CellType.WATER) continue;
-    const cx = i % CELLS_W, cy = (i - cx) / CELLS_W, d = pondDisc(cx, cy, 1);
-    // The disc's own size factor, so each band is `scale × f` cells across.
-    discs.push({ x: d.x, y: d.y, f: d.r });
+    const cx = i % CELLS_W, cy = (i - cx) / CELLS_W;
+    discs.push(pondDisc(cx, cy, 1));
   }
   if (!discs.length) return;
-  const done = new Uint8Array(W * H);
+  // The ponds' shape: every art pixel inside the smooth union of the discs.
+  let bx0 = W, by0 = H, bx1 = 0, by1 = 0;
   for (const d of discs) {
-    const reach = POND.outline * d.f + 0.2;
-    const x0 = Math.max(0, Math.floor((d.x - reach) * ART)), x1 = Math.min(W - 1, Math.ceil((d.x + reach) * ART));
-    const y0 = Math.max(0, Math.floor((d.y - reach) * ART)), y1 = Math.min(H - 1, Math.ceil((d.y + reach) * ART));
+    bx0 = Math.min(bx0, Math.floor((d.x - d.r) * ART) - 2), by0 = Math.min(by0, Math.floor((d.y - d.r) * ART) - 2);
+    bx1 = Math.max(bx1, Math.ceil((d.x + d.r) * ART) + 2), by1 = Math.max(by1, Math.ceil((d.y + d.r) * ART) + 2);
+  }
+  bx0 = Math.max(0, bx0), by0 = Math.max(0, by0), bx1 = Math.min(W - 1, bx1), by1 = Math.min(H - 1, by1);
+  const bw = bx1 - bx0 + 1, bh = by1 - by0 + 1, inside = new Uint8Array(bw * bh);
+  for (const d of discs) {
+    const reach = d.r + POND_BLEND;
+    const x0 = Math.max(bx0, Math.floor((d.x - reach) * ART)), x1 = Math.min(bx1, Math.ceil((d.x + reach) * ART));
+    const y0 = Math.max(by0, Math.floor((d.y - reach) * ART)), y1 = Math.min(by1, Math.ceil((d.y + reach) * ART));
+    const near = discs.filter((o) => Math.abs(o.x - d.x) < 2.5 && Math.abs(o.y - d.y) < 2.5);
     for (let y = y0; y <= y1; y++)
       for (let x = x0; x <= x1; x++) {
-        const i = y * W + x;
-        if (done[i]) continue;
-        done[i] = 1;
-        // How deep into the pond this pixel is: the deepest band of any disc.
-        const band = deepest(discs, (x + 0.5) / ART, (y + 0.5) / ART, (x + y) & 1);
-        if (band < 0) continue;
-        px[i] = rgba(BANDS[band].color);
-        open[i] = band >= 3 ? 1 : 0;
+        const k = (y - by0) * bw + x - bx0;
+        if (!inside[k] && pondField(near, (x + 0.5) / ART, (y + 0.5) / ART) > 0) inside[k] = 1;
       }
   }
+  // Bands follow the distance in from the shore, so they run round the
+  // whole pond as one: a black outline, the bank, the shallows, the open
+  // water and the deep, each edge dithered on odd pixels.
+  const depth = shoreDistance(inside, bw, bh);
+  for (let y = by0; y <= by1; y++)
+    for (let x = bx0; x <= bx1; x++) {
+      const k = (y - by0) * bw + x - bx0;
+      if (!inside[k]) continue;
+      const v = depth[k] - ((x + y) & 1) * 0.4;
+      let band = 0;
+      while (band < BANDS.length - 1 && v >= BANDS[band + 1].from) band++;
+      px[y * W + x] = rgba(BANDS[band].color);
+      open[y * W + x] = band >= 3 ? 1 : 0;
+    }
   // Glints and lily pads on the open water.
   for (let i = 0; i < map.type.length; i++) {
     if (map.type[i] !== CellType.WATER) continue;
     const cx = i % CELLS_W, cy = (i - cx) / CELLS_W;
-    const gx = cx * ART + 1 + Math.floor(hash01(cx, cy, 61) * 4), gy = cy * ART + 2 + Math.floor(hash01(cx, cy, 62) * 4);
-    for (let k = 0; k < 2 + (hash(cx, cy, 70) % 2); k++) put(px, open, gx + k, gy, GLINT);
+    // Glints on about half the cells, anywhere in them, so they don't line
+    // up into the cells' grid.
+    const gx = cx * ART + Math.floor(hash01(cx, cy, 61) * 7), gy = cy * ART + Math.floor(hash01(cx, cy, 62) * 8);
+    if (hash01(cx, cy, 72) < 0.55) for (let k = 0; k < 2 + (hash(cx, cy, 70) % 2); k++) put(px, open, gx + k, gy, GLINT);
     if (hash01(cx, cy, 63) >= 0.35) continue;
     const lx = cx * ART + 2 + Math.floor(hash01(cx, cy, 64) * 4), ly = cy * ART + 2 + Math.floor(hash01(cx, cy, 65) * 4);
     // A notched pad: three pixels wide, two tall, a darker underside.
@@ -134,16 +154,23 @@ function paintPonds(map: CityMap, px: Uint32Array, open: Uint8Array) {
   }
 }
 
-/** The deepest pond band at point (x, y) in cells, or -1 off the pond; on
- * odd pixels a band edge is pulled in a little, dithering it. */
-function deepest(discs: { x: number; y: number; f: number }[], x: number, y: number, odd: number) {
-  let best = -1;
-  for (const d of discs) {
-    const dx = x - d.x, dy = y - d.y, r = Math.sqrt(dx * dx + dy * dy) + odd * 0.035;
-    for (let b = BANDS.length - 1; b > best; b--) if (r <= BANDS[b].scale * d.f) { best = b; break; }
-    if (best === BANDS.length - 1) break;
-  }
-  return best;
+/** Each pixel's distance in from the outside of `inside` (art pixels, 1 on
+ * the shore's own pixels), by two chamfer passes. */
+function shoreDistance(inside: Uint8Array, w: number, h: number) {
+  const d = new Float32Array(w * h);
+  for (let i = 0; i < d.length; i++) d[i] = inside[i] ? 1e9 : 0;
+  const at = (x: number, y: number) => (x < 0 || y < 0 || x >= w || y >= h ? 0 : d[y * w + x]);
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const i = y * w + x;
+      if (d[i]) d[i] = Math.min(d[i], at(x - 1, y) + 1, at(x, y - 1) + 1, at(x - 1, y - 1) + 1.4, at(x + 1, y - 1) + 1.4);
+    }
+  for (let y = h - 1; y >= 0; y--)
+    for (let x = w - 1; x >= 0; x--) {
+      const i = y * w + x;
+      if (d[i]) d[i] = Math.min(d[i], at(x + 1, y) + 1, at(x, y + 1) + 1, at(x + 1, y + 1) + 1.4, at(x - 1, y + 1) + 1.4);
+    }
+  return d;
 }
 
 /** Paints over open water only, keeping glints and pads off the bank. */
