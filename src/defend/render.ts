@@ -349,6 +349,7 @@ export class DefendRenderer {
     if ((opts.effects ?? true) && this.forestShare() > 0) {
       this.forestGrass.sync(this.forest.forestPlan!);
       this.forestGrass.draw({
+        damage: this.forest.damage,
         c: ctx, px: this.px, now: opts.now, dt, reduceMotion: opts.reduceMotion, alpha: this.forestShare(),
         wind: sim && opts.weather?.rain ? "rain" : opts.weather ? "cloud" : "calm",
         walkers: feet,
@@ -496,7 +497,7 @@ export class DefendRenderer {
       o.fillRect(0, 0, this.board.W, this.board.H);
       this.lighting.darken(o);
     } : undefined;
-    this.forest.drawTrees(this.ctx, this.px, { now: opts.now, alpha, wind, shade });
+    this.forest.drawTrees(this.ctx, this.px, { now: opts.now, alpha, wind, still: opts.reduceMotion, shade });
   }
 
   /** Faint smoke drifting off the houses' chimneys, over the trees. */
@@ -665,9 +666,9 @@ function walkers(sim: DefendSim): Walker[] {
 }
 
 /** Everyone a tree can stand over. */
-function beneath(sim: DefendSim): Under[] {
-  const out: Under[] = [];
-  for (const e of sim.enemies) out.push({ x: e.x, y: e.y, size: enemySize(e) });
+function beneath(sim: DefendSim): (Under & { foot?: boolean })[] {
+  const out: (Under & { foot?: boolean })[] = [];
+  for (const e of sim.enemies) out.push({ x: e.x, y: e.y, size: enemySize(e), foot: !ENEMIES[e.kind].flying });
   for (const s of sim.soldiers) if (!garrisoned(s)) out.push({ x: s.x, y: s.y, size: 0.4 });
   for (const c of sim.civilians) out.push({ x: c.x, y: c.y, size: 0.3 });
   return out;

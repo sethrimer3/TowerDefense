@@ -22,10 +22,12 @@
 import { CELL_COUNT, CELLS_H, CELLS_W, cellIndex, defendRandom, hash, hash01 } from "./grid.ts";
 import type { CityMap } from "./citygen.ts";
 import type { DefendSim } from "./sim.ts";
-import { ForestDamage, MOUNTAIN, VARIANTS, canopyRadius, forestPlan, type Boulder, type Felled, type ForestPlan, type ForestTree, type Lake, type TreeKind, type TreeSize } from "./forest.ts";
+import { BURN, ForestDamage, MOUNTAIN, VARIANTS, canopyRadius, forestPlan, type Boulder, type Felled, type ForestPlan, type ForestTree, type Lake, type TreeKind, type TreeSize } from "./forest.ts";
 import { ART } from "./park-art.ts";
 import { GRASS } from "./ground-art.ts";
-import { artPen } from "./pixel-fx.ts";
+import { FLAME, SMOKE, artPen } from "./pixel-fx.ts";
+import { ENEMIES } from "./catalog.ts";
+import { isMelee } from "./melee-facing.ts";
 
 const W = CELLS_W * ART, H = CELLS_H * ART;
 /** The most a canopy leans, in art pixels, either way. */
@@ -76,6 +78,11 @@ const PEBBLE = [0x8a7a62, 0x3a3026];
 const STONE = [0x3c3f3d, 0x575a55, 0x777a72, 0x979a90];
 const MOSS = [0x4f6a32, 0x6f8f44];
 const STUMP = [0x5e4129, 0x7a5232, 0xb08a5a];
+/** Scorched earth where a tree burnt down, darkest first. */
+const CHAR = [0x241d18, 0x2f2620, 0x3b3028, 0x4a3c30];
+/** A pile of ash, darkest first: charcoal, then grey to pale ash. */
+const ASH = [0x2a2522, 0x55504a, 0x7d7770, 0xa8a29a, 0xcfcac2];
+const ASH_HEX = ASH.map((c) => `#${c.toString(16).padStart(6, "0")}`);
 /** Lakes: the bank's mud, the water from deep to shallow, a glint, lily
  * pads and reeds. */
 const BANK = [0x3d3a26, 0x55503a, 0x6b6448];
@@ -326,12 +333,18 @@ export function paintFloor(out: Uint32Array, plan: ForestPlan, damage: ForestDam
   for (let Y = clip.y0; Y < clip.y1; Y++) out.fill(0, Y * W + clip.x0, Y * W + clip.x1);
   lawnIn(out, plan.open);
   for (const p of plan.pads) if (nearClip(p.x, p.y, p.r * 1.3 + 0.2)) blob(out, p.x, p.y, p.r, p.seed, DIRT, false);
-  for (const c of damage?.clearings ?? []) if (nearClip(c.x, c.y, c.r * 1.3 + 0.2)) blob(out, c.x, c.y, c.r, c.seed, DIRT, false, plan.open);
+  for (const c of damage?.clearings ?? []) if (nearClip(c.x, c.y, c.r * 1.3 + 0.2)) blob(out, c.x, c.y, c.r, c.seed, c.burnt ? CHAR : DIRT, false, plan.open);
   for (const l of plan.lakes) lake(out, l);
   for (const c of damage?.craters ?? []) {
     if (!nearClip(c.x, c.y, c.r * 1.3 + 0.5)) continue;
     blob(out, c.x, c.y, c.r, c.seed, TURNED, true);
-    stump(out, Math.round(c.x * ART), Math.round(c.y * ART), c.seed, c.size);
+  }
+  for (const st of damage?.stumps ?? []) {
+    if (!nearClip(st.x, st.y, 1.5)) continue;
+    chips(out, st);
+    const sp = stumpSprite(st.size, st.seed, st.cut), x0 = Math.round(st.x * ART) - sp.ox, y0 = Math.round(st.y * ART) - sp.oy;
+    stamp(out, sp, x0 + 1, y0 + 1, true);
+    stamp(out, sp, x0, y0, false);
   }
   for (const r of plan.rocks) {
     if (!nearClip(r.x, r.y, r.size + 0.5)) continue;
@@ -346,7 +359,7 @@ export function paintFloor(out: Uint32Array, plan: ForestPlan, damage: ForestDam
     for (let X = clip.x0, i = Y * W + X; X < clip.x1; X++, i++) turf[i] = out[i] !== 0 && out[i] === lawn[i] ? 1 : 0;
   for (let Y = clip.y0; Y < clip.y1; Y++) shaded.fill(0, Y * W + clip.x0, Y * W + clip.x1);
   for (const t of plan.trees) {
-    if ((damage && !damage.standing(t)) || !nearClip(t.x, t.y, t.r * 2 + 1)) continue;
+    if ((damage && !damage.upright(t)) || !nearClip(t.x, t.y, t.r * 2 + 1)) continue;
     const s = treeSprite(t.kind, t.variant, 0, t.size), R = t.r * ART, runs = runsOf(s);
     const x0 = Math.round(t.x * ART) - s.ox + Math.round(R * 0.35) + 1, y0 = Math.round(t.y * ART) - s.oy + Math.round(R * 0.5) + 1;
     for (let k = 0; k < runs.length; k += 3) {
@@ -430,28 +443,70 @@ function blob(out: Uint32Array, x: number, y: number, r: number, seed: number, t
     }
 }
 
-/** A splintered stump at art pixel (x, y), wider for a bigger tree: rings
- * round a pale heart, outlined. */
-function stump(out: Uint32Array, x: number, y: number, seed: number, size: number) {
-  const put = (X: number, Y: number, c: number) => {
-    if (inClip(X, Y)) out[Y * W + X] = rgba(c);
-  };
-  const r = 1 + Math.ceil(size / 2), r2 = (r + 0.5) * (r + 0.5);
-  for (let dy = -r - 1; dy <= r + 1; dy++)
-    for (let dx = -r - 1; dx <= r + 1; dx++) if (dx * dx + dy * dy <= (r + 1.4) * (r + 1.4)) put(x + dx, y + dy, OUTLINE);
-  for (let dy = -r; dy <= r; dy++)
-    for (let dx = -r; dx <= r; dx++) {
-      const d2 = dx * dx + dy * dy;
-      if (d2 > r2) continue;
-      // Growth rings: every other ring a shade darker.
-      const ring = Math.round(Math.sqrt(d2)) & 1;
-      put(x + dx, y + dy, d2 > (r - 0.5) * (r - 0.5) ? (dx < 0 || dy < 0 ? STUMP[1] : STUMP[0]) : ring ? STUMP[1] : STUMP[2]);
+/** Stumps by size, seed and cut. */
+const stumps = new Map<string, Sprite>();
+
+/** A stump seen from above where an attack struck a tree of `size` apart:
+ * its bark ring and root flares in an outline, and its top either sawn
+ * clean (`cut`: pale growth rings round a dark pith, lit from the upper
+ * left) or splintered (a dark broken heart, pale shards of wood sticking up
+ * and out past the bark). */
+export function stumpSprite(size: TreeSize, seed: number, cut: boolean): Sprite {
+  const key = `${size}:${seed % 8}:${cut}`;
+  let s = stumps.get(key);
+  if (s) return s;
+  const r = [1.3, 2.2, 2.9, 3.6][size], half = Math.ceil(r) + 3, w = 2 * half + 1;
+  const grid = new Int8Array(w * w).fill(-1), v = seed % 8;
+  // Root flares: three or four short arms out of the bark.
+  const roots = 3 + (v & 1);
+  for (let k = 0; k < roots; k++) {
+    const a = ((k + hash01(v, k, 520) * 0.5) / roots) * Math.PI * 2, len = r + 1 + (size ? 1 : 0);
+    for (let d = r - 0.5; d < len; d += 0.5) {
+      const x = Math.round(half + Math.cos(a) * d), y = Math.round(half + Math.sin(a) * d);
+      grid[y * w + x] = 1;
     }
-  put(x, y, STUMP[2]);
-  // A jagged splinter left standing.
-  const sx = x + (seed % 3) - 1;
-  put(sx, y - r - 1, STUMP[2]);
-  put(sx, y - r - 2, OUTLINE);
+  }
+  for (let y = 0; y < w; y++)
+    for (let x = 0; x < w; x++) {
+      const dx = x - half, dy = y - half, d = Math.sqrt(dx * dx + dy * dy);
+      if (d > r + 0.4) continue;
+      // Bark round the rim, the top inside it.
+      if (d > r - 0.8) { grid[y * w + x] = dx + dy < 0 ? 1 : 0; continue; }
+      if (cut) {
+        const ring = Math.round(d * 1.3) & 1;
+        grid[y * w + x] = d < 0.7 ? 5 : dx + dy < -1 ? 4 : ring ? 3 : 4;
+      } else grid[y * w + x] = d < r * 0.5 ? (hash(x, y, v, 521) % 3 ? 2 : 0) : hash(x, y, v, 522) % 3 ? 3 : 2;
+    }
+  if (!cut) {
+    // Shards of wood standing up round the break, a few leaning out.
+    const shards = 3 + size * 2;
+    for (let k = 0; k < shards; k++) {
+      const a = (k / shards) * Math.PI * 2 + hash01(v, k, 523), d = r - 0.6 + hash01(v, k, 524) * 1.6;
+      const x = Math.round(half + Math.cos(a) * d), y = Math.round(half + Math.sin(a) * d);
+      grid[y * w + x] = 4;
+      if (k % 2 === 0) grid[(y + 1) * w + x] = 3;
+    }
+  }
+  const colours = [STUMP[0], 0x6e4a2c, 0x3a2618, STUMP[1], STUMP[2], 0x4a3020];
+  const px = new Uint32Array(w * w);
+  for (let i = 0; i < w * w; i++) {
+    if (grid[i] >= 0) { px[i] = rgba(colours[grid[i]]); continue; }
+    const x = i % w, y = (i - x) / w;
+    if ((x > 0 && grid[i - 1] >= 0) || (x < w - 1 && grid[i + 1] >= 0) || (y > 0 && grid[i - w] >= 0) || (y < w - 1 && grid[i + w] >= 0)) px[i] = rgba(OUTLINE);
+  }
+  s = { px, w, h: w, ox: half, oy: half };
+  stumps.set(key, s);
+  return s;
+}
+
+/** Chips of pale wood and bark strewn round a stump on the ground. */
+function chips(out: Uint32Array, st: { x: number; y: number; size: TreeSize; seed: number }) {
+  const n = 4 + st.size * 4, cx = st.x * ART, cy = st.y * ART;
+  for (let k = 0; k < n; k++) {
+    const a = hash01(st.seed, k, 525) * Math.PI * 2, d = 3 + st.size + hash01(st.seed, k, 526) * (4 + st.size * 3);
+    const X = Math.round(cx + Math.cos(a) * d), Y = Math.round(cy + Math.sin(a) * d);
+    if (inClip(X, Y)) out[Y * W + X] = rgba(k % 3 ? STUMP[2] : STUMP[0]);
+  }
 }
 
 /** How far (art pixels) inside lake `l` each point is, wobbled along the
@@ -682,10 +737,38 @@ function boulder(out: Uint32Array, b: Boulder) {
   }
 }
 
-type Debris = { x: number; y: number; z: number; vx: number; vy: number; vz: number; age: number; life: number; colour: string; size: number; leaf: boolean; spin: number };
+/** A piece flying off a felled or burning tree: a leaf, a splinter, an
+ * ember, a puff of smoke or a flake of ash. */
+type Debris = { x: number; y: number; z: number; vx: number; vy: number; vz: number; age: number; life: number; colour: string; size: number; kind: "leaf" | "chip" | "ember" | "smoke" | "ash"; spin: number };
 
-/** What the trees stand over: anyone's position and size, in cells. */
-export type Beneath = { x: number; y: number; size: number };
+/** What the trees stand over: anyone's position and size, in cells, and
+ * whether they walk (`foot`), to push the ash about. */
+export type Beneath = { x: number; y: number; size: number; foot?: boolean };
+
+/** A pile of ash: its grains' places in art pixels from its middle, pushed
+ * about by those walking through, and their shades. */
+export type AshPile = { x: number; y: number; r: number; gx: Float32Array; gy: Float32Array; shade: Uint8Array };
+
+/** A pile of ash for `a`, heaped toward its middle: grains spread by its
+ * own hashes, charcoal in among the grey, the palest on top. */
+export function ashPile(a: { x: number; y: number; r: number; size: number; seed: number }): AshPile {
+  const n = 22 + a.size * 16, R = 2.5 + a.size * 2;
+  const gx = new Float32Array(n), gy = new Float32Array(n), shade = new Uint8Array(n);
+  for (let k = 0; k < n; k++) {
+    const ang = hash01(a.seed, k, 530) * Math.PI * 2, d = R * Math.sqrt(hash01(a.seed, k, 531)) * (0.5 + 0.5 * hash01(a.seed, k, 532));
+    gx[k] = Math.cos(ang) * d;
+    gy[k] = Math.sin(ang) * d * 0.8;
+    const h = hash(a.seed, k, 533) % 9;
+    shade[k] = h === 0 ? 0 : d < R * 0.35 ? (h < 5 ? 4 : 3) : h < 4 ? 1 : h < 7 ? 2 : 3;
+  }
+  return { x: a.x, y: a.y, r: (R + 3) / ART, gx, gy, shade };
+}
+
+/** Soldiers whose sword or blade saws a tree clean through. */
+const BLADES = new Set(["sword", "hero", "assassin", "valkyrie", "reinforcement"]);
+/** Each frame, how many melee units at most are checked for strokes under
+ * the frail trees. */
+const STROKES = 4000;
 
 /** Draws the forest outside the walls, kept by the renderer. */
 export class ForestArt {
@@ -695,6 +778,8 @@ export class ForestArt {
   damage: ForestDamage | null = null;
   private seen = new WeakSet<object>();
   private debris: Debris[] = [];
+  /** The ash piles burnt trees left, their grains pushed about. */
+  piles: AshPile[] = [];
   private lastTime = -1;
   private alpha = new Float32Array(0);
   /** The ground's pixels and canvas, and the boxes of it to paint again
@@ -711,6 +796,16 @@ export class ForestArt {
   /** Bucketed beneath-the-trees lists, reused each frame. */
   private head = new Int32Array(CELL_COUNT);
   private next = new Int32Array(0);
+  /** Shots and fireballs in flight last frame: where each was, and the
+   * frame it was last seen. */
+  private flying = new Map<object, { x: number; y: number; fire: number; frame: number }>();
+  private frame = 0;
+  /** Each melee unit's cooldown last frame, under the frail trees only: a
+   * jump up is a stroke. */
+  private cooldowns = new Map<object, number>();
+  /** 1 on each cell a frail tree stands over, by the damage's version. */
+  private frail = new Uint8Array(CELL_COUNT);
+  private frailVersion = -1;
 
   /** Plans the forest for `map`, and gives each new run a forest whole again. */
   sync(map: CityMap, sim: DefendSim | null) {
@@ -725,47 +820,111 @@ export class ForestArt {
       this.sim = sim;
       this.damage = new ForestDamage(this.plan!);
       this.debris = [];
+      this.piles = [];
+      this.flying.clear();
+      this.cooldowns.clear();
+      this.frailVersion = -1;
       this.lastTime = -1;
       this.dirty = true;
       this.floorStale = [WHOLE];
     }
   }
 
-  /** Blows up the trees the battle's blasts and charges reached, moves the
-   * debris on battle time and fades the trees over anyone under them. */
+  /** Brings down the trees the battle's attacks reach (struck apart, blown
+   * up or set alight), burns the burning down to ash, moves the debris on
+   * battle time, pushes the ash about and fades the trees over anyone under
+   * them. */
   update(sim: DefendSim | null, beneath: readonly Beneath[], dt: number, reduceMotion: boolean) {
+    this.bucket(beneath);
     if (sim && this.damage) {
-      const step = this.lastTime < 0 ? 0 : Math.max(0, Math.min(0.25, sim.time - this.lastTime));
-      this.lastTime = sim.time;
-      const felled: Felled[] = [];
+      const damage = this.damage, now = sim.time;
+      const step = this.lastTime < 0 ? 0 : Math.max(0, Math.min(0.25, now - this.lastTime));
+      this.lastTime = now;
+      const felled: Felled[] = [], lit: ForestTree[] = [];
+      // Fire first, so a fireball's own blast leaves the trees it lit burning.
+      this.landed(sim, now, felled, lit);
+      for (const b of sim.blazes)
+        if (this.first(b)) {
+          lit.push(...damage.ignite(b.x, b.y, b.r, now));
+          this.bare(b.x, b.y, b.r, true);
+        }
+      for (const f of sim.flames) if (this.first(f)) lit.push(...damage.igniteAlong(f.x, f.y, f.x + f.dx * f.range, f.y + f.dy * f.range, 0.5, now));
       for (const e of sim.effects)
         if (e.kind === "boom" && this.first(e)) {
-          felled.push(...this.damage.blast(e.x, e.y, e.r, 1 + Math.min(1.5, e.r * 0.4)));
+          felled.push(...damage.blast(e.x, e.y, e.r, 1 + Math.min(1.5, e.r * 0.4)));
           this.bare(e.x, e.y, e.r);
         }
-      // Burning ground scorches the grass under it away.
-      for (const b of sim.blazes) if (this.first(b)) this.bare(b.x, b.y, b.r);
       for (const s of sim.swings) {
         if (!this.first(s)) continue;
-        if (s.kind === "spin") felled.push(...this.damage.blast(s.x, s.y, s.r, 0.7)), this.bare(s.x, s.y, s.r);
-        else if (s.kind === "dash") felled.push(...this.damage.cut(s.x, s.y, s.x1, s.y1, 0.35));
+        if (s.kind === "spin") felled.push(...damage.blast(s.x, s.y, s.r, 0.7)), this.bare(s.x, s.y, s.r);
+        else if (s.kind === "dash") felled.push(...damage.cut(s.x, s.y, s.x1, s.y1, 0.35));
       }
-      for (const s of sim.stabs) if (this.first(s)) felled.push(...this.damage.cut(s.x0, s.y0, s.x1, s.y1, 0.3));
+      for (const s of sim.stabs) if (this.first(s)) felled.push(...damage.cut(s.x0, s.y0, s.x1, s.y1, 0.3));
+      for (const b of sim.bolts)
+        if (this.first(b)) for (let k = 0; k + 1 < b.pts.length; k += 2) felled.push(...damage.hit(b.pts[k], b.pts[k + 1]));
+      this.strokes(sim, felled);
+      felled.push(...damage.burnOut(now));
+      if (lit.length) this.dirty = true;
       for (const f of felled) {
         this.dirty = true;
-        // Its crater and the shadow it no longer casts.
+        // Its crater, stump or ash, and the shadow it no longer casts.
         const t = f.tree, reach = t.r * 2 + 1.5;
         this.stale({ x0: Math.floor((t.x - reach) * ART), y0: Math.floor((t.y - reach) * ART), x1: Math.ceil((t.x + reach) * ART), y1: Math.ceil((t.y + reach) * ART) });
+        if (f.fate === "burnt") this.piles.push(ashPile(damage.ash[damage.ash.length - 1]));
         if (!reduceMotion) this.burst(f);
       }
+      if (!reduceMotion) this.smoulder(step);
       this.drift(step);
+      this.trample(beneath);
     }
     this.fade(beneath, dt, reduceMotion);
   }
 
-  /** Clears the grass `r` cells round (x, y) to dirt. */
-  private bare(x: number, y: number, r: number) {
-    if (!this.damage?.clear(x, y, r)) return;
+  /** Arrows, bullets and bolts that landed since last frame strike apart the
+   * frail tree they came down under (a fire arrow sets it alight instead),
+   * and fireballs that landed set alight the trees round where they burst. */
+  private landed(sim: DefendSim, now: number, felled: Felled[], lit: ForestTree[]) {
+    const damage = this.damage!, frame = ++this.frame;
+    const track = (o: object, x: number, y: number, fire: number) => {
+      const was = this.flying.get(o);
+      if (was) was.x = x, was.y = y, was.fire = fire, was.frame = frame;
+      else this.flying.set(o, { x, y, fire, frame });
+    };
+    for (const a of sim.arrows) track(a, a.x, a.y, a.burn ? 0.3 : 0);
+    for (const b of sim.ballistaBolts) track(b, b.x, b.y, 0);
+    for (const f of sim.fireballs) track(f, f.x1, f.y1, f.r);
+    for (const [o, at] of this.flying) {
+      if (at.frame === frame) continue;
+      this.flying.delete(o);
+      if (at.fire) lit.push(...damage.ignite(at.x, at.y, at.fire, now));
+      else felled.push(...damage.hit(at.x, at.y));
+    }
+  }
+
+  /** A melee stroke (a unit's cooldown jumping back up) under a frail tree
+   * strikes it apart: sawn clean by a blade, else splintered. */
+  private strokes(sim: DefendSim, felled: Felled[]) {
+    const damage = this.damage!;
+    if (this.frailVersion !== damage.version) {
+      this.frailVersion = damage.version;
+      for (let k = 0; k < CELL_COUNT; k++) this.frail[k] = damage.frailOver(k % CELLS_W, Math.floor(k / CELLS_W)) ? 1 : 0;
+    }
+    const was = this.cooldowns, now = new Map<object, number>();
+    const look = (u: { x: number; y: number; cd: number }, cut: boolean) => {
+      const cx = Math.floor(u.x), cy = Math.floor(u.y);
+      if (cx < 0 || cy < 0 || cx >= CELLS_W || cy >= CELLS_H || !this.frail[cellIndex(cx, cy)] || now.size >= STROKES) return;
+      const before = was.get(u);
+      now.set(u, u.cd);
+      if (before !== undefined && u.cd > before + 0.05) felled.push(...damage.hit(u.x, u.y, u.x, u.y, cut));
+    };
+    for (const s of sim.soldiers) if (isMelee(s)) look(s, BLADES.has(s.kind));
+    for (const e of sim.enemies) if (!ENEMIES[e.kind].flying) look(e, false);
+    this.cooldowns = now;
+  }
+
+  /** Clears the grass `r` cells round (x, y) to dirt, scorched if `burnt`. */
+  private bare(x: number, y: number, r: number, burnt = false) {
+    if (!this.damage?.clear(x, y, r, burnt)) return;
     const reach = r * 1.3 + 0.5;
     this.stale({ x0: Math.floor((x - reach) * ART), y0: Math.floor((y - reach) * ART), x1: Math.ceil((x + reach) * ART), y1: Math.ceil((y + reach) * ART) });
   }
@@ -791,37 +950,74 @@ export class ForestArt {
     return true;
   }
 
-  /** A felled tree's leaves, clumps and splinters, flung from the cause. */
-  private burst({ tree: t, fromX, fromY, force }: Felled) {
+  /** A felled tree's pieces, flung from the cause: leaves, clumps and
+   * splinters, or for a burnt one its last embers and a puff of ash. */
+  private burst({ tree: t, fromX, fromY, force, fate }: Felled) {
     const pal = LEAVES[t.kind][t.variant % LEAVES[t.kind].length];
-    const n = Math.round(14 + Math.min(t.r, 1.6) * 30);
+    const n = Math.round((fate === "burnt" ? 10 : 14) + Math.min(t.r, 1.6) * 30);
     const d = Math.sqrt((t.x - fromX) ** 2 + (t.y - fromY) ** 2) || 1, ax = (t.x - fromX) / d, ay = (t.y - fromY) / d;
     for (let i = 0; i < n && this.debris.length < MAX_DEBRIS; i++) {
-      const leaf = i % 7 !== 0, a = fx() * Math.PI * 2, sp = (0.6 + fx() * 1.8) * force;
+      const a = fx() * Math.PI * 2, sp = (0.6 + fx() * 1.8) * force;
+      if (fate === "burnt") {
+        const ember = i % 3 === 0;
+        this.debris.push({
+          x: t.x + Math.cos(a) * t.r * 0.7 * fx(), y: t.y + Math.sin(a) * t.r * 0.7 * fx(), z: 0.4 + fx() * 0.6,
+          vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, vz: ember ? 0.6 + fx() : 0.2 + fx() * 0.4,
+          age: 0, life: ember ? 1 + fx() : 1.5 + fx() * 1.5,
+          colour: ember ? FLAME[2 + Math.floor(fx() * 3)] : hex(ASH[1 + Math.floor(fx() * 4)]), size: 1, kind: ember ? "ember" : "ash", spin: fx() * 6.28,
+        });
+        continue;
+      }
+      const leaf = i % 7 !== 0;
       this.debris.push({
         x: t.x + Math.cos(a) * t.r * 0.6 * fx(), y: t.y + Math.sin(a) * t.r * 0.6 * fx(), z: 0.3 + fx() * 0.4,
         vx: Math.cos(a) * sp * 0.6 + ax * sp, vy: Math.sin(a) * sp * 0.6 + ay * sp, vz: 1 + fx() * 2.2 * force,
         age: 0, life: leaf ? 2.5 + fx() * 2.5 : 1.6 + fx() * 1.6,
         colour: hex(leaf ? pal[1 + Math.floor(fx() * 3)] : BARK[Math.floor(fx() * 2)]),
-        size: leaf ? (i % 7 === 1 ? 2 : 1) : 2, leaf, spin: fx() * 6.28,
+        size: leaf ? (i % 7 === 1 ? 2 : 1) : 2, kind: leaf ? "leaf" : "chip", spin: fx() * 6.28,
       });
     }
   }
 
-  /** Debris flies, falls (leaves flutter down slowly) and settles, fading. */
+  /** Burning trees throw up embers and smoke as they burn. */
+  private smoulder(dt: number) {
+    if (!dt) return;
+    for (const b of this.damage?.burning ?? []) {
+      const t = b.tree, rate = (2 + t.r * 5) * dt;
+      for (let k = 0; k < 3 && fx() < rate && this.debris.length < MAX_DEBRIS; k++) {
+        const a = fx() * Math.PI * 2, d = t.r * 0.7 * Math.sqrt(fx()), smoke = fx() < 0.45;
+        this.debris.push({
+          x: t.x + Math.cos(a) * d, y: t.y + Math.sin(a) * d, z: 0.5,
+          vx: (fx() - 0.5) * 0.3 + 0.15, vy: (fx() - 0.5) * 0.2, vz: smoke ? 0.5 + fx() * 0.3 : 0.9 + fx() * 0.8,
+          age: 0, life: smoke ? 1.6 + fx() : 0.6 + fx() * 0.6,
+          colour: smoke ? SMOKE[1 + Math.floor(fx() * 3)] : FLAME[2 + Math.floor(fx() * 3)], size: smoke ? 2 : 1, kind: smoke ? "smoke" : "ember", spin: fx() * 6.28,
+        });
+      }
+    }
+  }
+
+  /** Debris flies, falls (leaves flutter down slowly) and settles, fading;
+   * embers and smoke rise and drift downwind. */
   private drift(dt: number) {
     if (!dt || !this.debris.length) return;
     for (const p of this.debris) {
       p.age += dt;
-      const drag = Math.max(0, 1 - (p.leaf ? 2.2 : 1.2) * dt);
+      if (p.kind === "ember" || p.kind === "smoke") {
+        p.z += p.vz * dt;
+        p.x += p.vx * dt + Math.sin(p.spin + p.age * 3) * 0.1 * dt;
+        p.y += p.vy * dt;
+        continue;
+      }
+      const light = p.kind === "leaf" || p.kind === "ash";
+      const drag = Math.max(0, 1 - (light ? 2.2 : 1.2) * dt);
       p.vx *= drag;
       p.vy *= drag;
       if (p.z > 0) {
-        p.vz -= (p.leaf ? 2.2 : 7) * dt;
-        if (p.leaf) p.vz = Math.max(p.vz, -0.45);
+        p.vz -= (light ? 2.2 : 7) * dt;
+        if (light) p.vz = Math.max(p.vz, -0.45);
         p.z = Math.max(0, p.z + p.vz * dt);
         p.spin += dt * 7;
-        p.x += p.vx * dt + (p.leaf ? Math.sin(p.spin) * 0.25 * dt : 0);
+        p.x += p.vx * dt + (light ? Math.sin(p.spin) * 0.25 * dt : 0);
         p.y += p.vy * dt;
       } else {
         p.vx = p.vy = 0;
@@ -830,10 +1026,32 @@ export class ForestArt {
     this.debris = this.debris.filter((p) => p.age < p.life);
   }
 
-  /** Each tree eases toward `UNDER_ALPHA` while anyone stands under it. */
-  private fade(beneath: readonly Beneath[], dt: number, reduceMotion: boolean) {
-    const plan = this.plan;
-    if (!plan) return;
+  /** Those walking through a pile of ash push its grains out of their way. */
+  private trample(beneath: readonly Beneath[]) {
+    if (!this.piles.length || !beneath.length) return;
+    const head = this.head;
+    for (const pile of this.piles) {
+      const x0 = Math.max(0, Math.floor(pile.x - pile.r - 1)), x1 = Math.min(CELLS_W - 1, Math.floor(pile.x + pile.r + 1));
+      const y0 = Math.max(0, Math.floor(pile.y - pile.r - 1)), y1 = Math.min(CELLS_H - 1, Math.floor(pile.y + pile.r + 1));
+      for (let cy = y0; cy <= y1; cy++)
+        for (let cx = x0; cx <= x1; cx++)
+          for (let i = head[cellIndex(cx, cy)]; i >= 0; i = this.next[i]) {
+            const u = beneath[i];
+            if (u.foot === false) continue;
+            const ux = (u.x - pile.x) * ART, uy = (u.y - pile.y) * ART, reach = u.size * ART * 0.5 + 1;
+            for (let k = 0; k < pile.gx.length; k++) {
+              const dx = pile.gx[k] - ux, dy = pile.gy[k] - uy, d2 = dx * dx + dy * dy;
+              if (d2 >= reach * reach) continue;
+              const d = Math.sqrt(d2) || 0.01;
+              pile.gx[k] = ux + (dx / d) * reach;
+              pile.gy[k] = uy + (dy / d) * reach;
+            }
+          }
+    }
+  }
+
+  /** Everyone under the trees, bucketed by cell. */
+  private bucket(beneath: readonly Beneath[]) {
     const head = this.head;
     head.fill(-1);
     if (this.next.length < beneath.length) this.next = new Int32Array(beneath.length * 2);
@@ -844,6 +1062,13 @@ export class ForestArt {
       this.next[i] = head[k];
       head[k] = i;
     });
+  }
+
+  /** Each tree eases toward `UNDER_ALPHA` while anyone stands under it. */
+  private fade(beneath: readonly Beneath[], dt: number, reduceMotion: boolean) {
+    const plan = this.plan;
+    if (!plan) return;
+    const head = this.head;
     const step = reduceMotion ? 1 : Math.min(1, dt * FADE);
     for (const t of plan.trees) {
       let covered = false;
@@ -864,7 +1089,8 @@ export class ForestArt {
     }
   }
 
-  /** The forest's ground, at `alpha` (its area's share of a crossfade). */
+  /** The forest's ground, then the ash piles on it, at `alpha` (its area's
+   * share of a crossfade). */
   drawFloor(c: CanvasRenderingContext2D, px: number, alpha: number) {
     if (!this.plan || alpha <= 0 || typeof document === "undefined") return;
     this.floor ??= surface();
@@ -879,6 +1105,18 @@ export class ForestArt {
     c.imageSmoothingEnabled = false;
     c.globalAlpha = alpha;
     c.drawImage(this.floor.cv, 0, 0, CELLS_W * px, CELLS_H * px);
+    if (this.piles.length) {
+      const dot = artPen(c, px);
+      for (const p of this.piles) {
+        const ox = p.x * ART, oy = p.y * ART;
+        for (let k = 0; k < p.gx.length; k++) {
+          // Pale ash heaped up in lumps, charcoal and grey grains about it.
+          const sh = p.shade[k], lump = sh >= 3 ? 2 : 1;
+          c.fillStyle = ASH_HEX[sh];
+          dot(Math.round(ox + p.gx[k]), Math.round(oy + p.gy[k]), lump, lump);
+        }
+      }
+    }
     c.restore();
   }
 
@@ -909,7 +1147,7 @@ export class ForestArt {
   /** The standing trees over everyone, leaning in the wind (`wind`: 0 for
    * still air, about 1 calm, 2 in rain), then the flying debris. `shade`
    * darkens them with the city below, drawn in board pixels. */
-  drawTrees(c: CanvasRenderingContext2D, px: number, o: { now: number; alpha: number; wind: number; shade?: (o: CanvasRenderingContext2D) => void }) {
+  drawTrees(c: CanvasRenderingContext2D, px: number, o: { now: number; alpha: number; wind: number; still?: boolean; shade?: (o: CanvasRenderingContext2D) => void }) {
     const plan = this.plan;
     if (!plan || o.alpha <= 0 || typeof document === "undefined") return;
     this.crowns ??= surface();
@@ -940,8 +1178,53 @@ export class ForestArt {
     c.imageSmoothingEnabled = false;
     c.globalAlpha = o.alpha;
     c.drawImage(this.crowns.cv, 0, 0, CELLS_W * px, CELLS_H * px);
+    this.drawBurning(c, px, o.still ? 0 : o.now);
     this.drawDebris(c, px);
     c.restore();
+  }
+
+  /** Trees on fire: the crown charring black as it burns, flames licking
+   * up from it, rising then dying down, over a warm glow. */
+  private drawBurning(c: CanvasRenderingContext2D, px: number, now: number) {
+    const burning = this.damage?.burning;
+    if (!burning?.length) return;
+    const dot = artPen(c, px), base = c.globalAlpha, time = Math.max(0, this.lastTime);
+    for (const b of burning) {
+      const t = b.tree, p = Math.max(0, Math.min(1, (time - b.since) / BURN));
+      const sprite = charSprite(t.kind, t.variant, t.size, Math.min(4, 1 + Math.floor(p * 4)));
+      const x = Math.round(t.x * ART), y = Math.round(t.y * ART), s = treeSprite(t.kind, t.variant, 0, t.size);
+      c.drawImage(sprite, ((x - s.ox) * px) / ART, ((y - s.oy) * px) / ART, (s.w * px) / ART, (s.h * px) / ART);
+      // Flames grow over the first second, roar, then die down at the end.
+      const heat = Math.min(1, p * 4) * (p > 0.75 ? (1 - p) * 4 : 1);
+      if (heat <= 0) continue;
+      const R = t.r * ART;
+      const gx = (x * px) / ART, gy = (y * px) / ART, gr = (R * 1.6 * px) / ART, glow = c.createRadialGradient(gx, gy, 0, gx, gy, gr);
+      glow.addColorStop(0, "rgba(240,138,52,0.35)");
+      glow.addColorStop(1, "rgba(240,138,52,0)");
+      c.globalAlpha = base * heat;
+      c.globalCompositeOperation = "lighter";
+      c.fillStyle = glow;
+      c.fillRect(gx - gr, gy - gr, gr * 2, gr * 2);
+      c.globalCompositeOperation = "source-over";
+      c.globalAlpha = base;
+      const tongues = 2 + t.size * 3;
+      for (let k = 0; k < tongues; k++) {
+        const a = hash01(t.id, k, 540) * Math.PI * 2, d = R * 0.65 * Math.sqrt(hash01(t.id, k, 541));
+        const fx0 = Math.round(x + Math.cos(a) * d), fy0 = Math.round(y + Math.sin(a) * d);
+        const flick = 0.65 + 0.35 * Math.sin(now * 0.011 + k * 2.3 + t.id) * Math.sin(now * 0.017 + k);
+        const h = Math.max(2, Math.round((3 + t.size * 2) * heat * flick)), w = t.size >= 2 ? 3 : 2;
+        // A dark rim, then the tongue hottest at its tip.
+        c.fillStyle = "#2a0c06";
+        dot(fx0 - 1, fy0 - h - 1, w + 2, h + 2);
+        for (let row = 0; row < h; row++) {
+          const f = row / h;
+          c.fillStyle = FLAME[f < 0.3 ? 1 : f < 0.6 ? 2 : f < 0.85 ? 3 : 4];
+          const narrow = row >= h - 1 && w > 1 ? 1 : 0;
+          dot(fx0 + narrow, fy0 - row - 1, w - narrow * (w > 2 ? 2 : 1), 1);
+        }
+      }
+    }
+    c.globalAlpha = base;
   }
 
   /** Leaves and splinters, each lifted by its height above the ground. */
@@ -951,14 +1234,15 @@ export class ForestArt {
     for (const p of this.debris) {
       c.globalAlpha = base * Math.min(1, (p.life - p.age) / 0.8);
       const ax = Math.round(p.x * ART), ay = Math.round((p.y - p.z) * ART);
-      if (!p.leaf) {
+      if (p.kind === "chip") {
         c.fillStyle = "#0b0907";
         dot(ax - 1, ay - 1, 4, 3);
       }
       c.fillStyle = p.colour;
-      // A leaf turning over shows edge on, now and then.
-      const flat = !p.leaf || Math.sin(p.spin) > -0.5;
-      dot(ax, ay, flat ? p.size : 1, 1);
+      // A leaf turning over shows edge on, now and then; smoke swells.
+      const flat = p.kind !== "leaf" || Math.sin(p.spin) > -0.5;
+      const size = p.kind === "smoke" ? p.size + Math.floor((p.age / p.life) * 2) : flat ? p.size : 1;
+      dot(ax, ay, size, p.kind === "smoke" ? size : 1);
     }
     c.globalAlpha = base;
   }
@@ -968,6 +1252,43 @@ export class ForestArt {
     const trees = this.plan?.trees ?? [];
     return { trees: trees.length, standing: trees.filter((t) => this.damage?.standing(t) ?? true).length, debris: this.debris.length };
   }
+}
+
+/** Charred crowns by kind, size, variant and char level. */
+const charred = new Map<string, HTMLCanvasElement>();
+
+/** Tree `kind`, variant `v` of `size` burning, unleant, at char `level` 1
+ * to 4: its leaves scorched toward black, more embers glowing in them the
+ * further it has burnt, its outline kept. */
+export function charPixels(kind: TreeKind, v: number, size: TreeSize, level: number): Uint32Array {
+  const s = treeSprite(kind, v, 0, size), out = new Uint32Array(s.px.length), k = level / 4;
+  const ember = [rgba(0xd8602a), rgba(0xf6b048)];
+  for (let i = 0; i < s.px.length; i++) {
+    const p = s.px[i];
+    if (!p || p === rgba(OUTLINE)) { out[i] = p; continue; }
+    const r = p & 0xff, g = (p >> 8) & 0xff, b = (p >> 16) & 0xff, lum = (r + g + b) / 3;
+    const h = hash(i, v, size, 542);
+    if (level >= 2 && h % (16 - level * 2) === 0) { out[i] = ember[h & 1]; continue; }
+    // Toward a char brown-black, lighter where the leaves were lit.
+    const tr = 0x1a + lum * 0.25, tg = 0x14 + lum * 0.18, tb = 0x10 + lum * 0.12;
+    out[i] = ((255 << 24) | (Math.round(b + (tb - b) * k) << 16) | (Math.round(g + (tg - g) * k) << 8) | Math.round(r + (tr - r) * k)) >>> 0;
+  }
+  return out;
+}
+
+function charSprite(kind: TreeKind, v: number, size: TreeSize, level: number) {
+  const key = `${kind}:${v}:${size}:${level}`;
+  let cv = charred.get(key);
+  if (cv) return cv;
+  const s = treeSprite(kind, v, 0, size);
+  cv = document.createElement("canvas");
+  cv.width = s.w;
+  cv.height = s.h;
+  const g = cv.getContext("2d")!, img = g.createImageData(s.w, s.h);
+  new Uint32Array(img.data.buffer).set(charPixels(kind, v, size, level));
+  g.putImageData(img, 0, 0);
+  charred.set(key, cv);
+  return cv;
 }
 
 /** A board-sized canvas at one pixel an art pixel, with pixels to write. */

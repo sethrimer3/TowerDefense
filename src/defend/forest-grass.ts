@@ -1,7 +1,7 @@
 /** The parks' wind-blown grass (`park-grass.ts`) over the forest floor
  * outside Mossbound Ruins' walls: clumps of pixel blades planned per open
- * cell, kept off the lakes, boulders, rocks and pads and from under the
- * trees' crowns (hidden there anyway), swaying with the wind, parting round
+ * cell, kept off the lakes, boulders, rocks and pads, and under a tree's
+ * crown left out while it stands (it hides them), swaying with the wind, parting round
  * anyone walking through and darkened in the trees' shadows. A blade grows
  * only while its root's floor pixel is still grass (`turfAt` in
  * `forest-art.ts`), so the dirt blasts, burning ground and craters bare
@@ -10,7 +10,7 @@
  * swayed from sines of their own phases baked once (`Swaying`), so tens of
  * thousands cost no trigonometry a frame. Presentation only. */
 import { CELLS_H, CELLS_W, cellIndex, hash01 } from "./grid.ts";
-import type { ForestPlan } from "./forest.ts";
+import type { ForestDamage, ForestPlan } from "./forest.ts";
 import { lakeDepth, shadedAt, turfAt } from "./forest-art.ts";
 import { ART } from "./park-art.ts";
 import { CURVE, PALETTE32, SHADOW, WIND, paintBlade, type Blade, type GrassFrame, type Walker } from "./park-grass.ts";
@@ -19,11 +19,15 @@ const W = CELLS_W * ART, H = CELLS_H * ART;
 /** The most walkers a cell's blades part round; crowds press no harder. */
 const CROWD = 3;
 
+/** A blade, and the tree whose crown hides it while it stands (-1 none). */
+export type ForestBlade = Blade & { under: number };
+
 /** Open cell (cx, cy)'s blades, as the parks' are planned: clumps of two to
- * four fanning out from one root. */
-function planCell(cx: number, cy: number, keep: (x: number, y: number) => boolean): Blade[] {
+ * four fanning out from one root; `keep` says whether a root may grow
+ * there (-1 for no) and under which tree. */
+function planCell(cx: number, cy: number, keep: (x: number, y: number) => number): ForestBlade[] {
   const r = (k: number) => hash01(cx, cy, 600 + k);
-  const out: Blade[] = [];
+  const out: ForestBlade[] = [];
   const clumps = 2 + Math.floor(r(0) * 3);
   for (let k = 1; k <= clumps; k++) {
     const i = 1 + Math.floor(r(k) * 6), j = 3 + Math.floor(r(k + 20) * 5);
@@ -31,8 +35,10 @@ function planCell(cx: number, cy: number, keep: (x: number, y: number) => boolea
     const n = 2 + Math.floor(r(k + 100) * 3);
     for (let q = 0; q < n; q++) {
       const side = q - (n - 1) / 2, bi = i + Math.round(side);
-      if (bi < 0 || bi >= ART || !keep(cx + (bi + 0.5) / ART, cy + (j + 0.5) / ART)) continue;
+      const under = bi < 0 || bi >= ART ? -2 : keep(cx + (bi + 0.5) / ART, cy + (j + 0.5) / ART);
+      if (under < -1) continue;
       out.push({
+        under,
         i: bi, j, h: Math.max(2, tall - Math.abs(Math.round(side * 2))), color: Math.max(0, color - (q % 2)), phase: phase + q * 0.35, splay: side * 0.9,
         flower: 0,
       });
@@ -42,15 +48,20 @@ function planCell(cx: number, cy: number, keep: (x: number, y: number) => boolea
 }
 
 /** The blades of `plan`'s open ground, by cell (null where none grow). */
-export function forestBlades(plan: ForestPlan): (Blade[] | null)[] {
-  const out: (Blade[] | null)[] = new Array(CELLS_W * CELLS_H).fill(null);
+export function forestBlades(plan: ForestPlan): (ForestBlade[] | null)[] {
+  const out: (ForestBlade[] | null)[] = new Array(CELLS_W * CELLS_H).fill(null);
   // What no blade grows on, by the cells it may reach.
   const near: { x: number; y: number; r: number }[][] = Array.from({ length: CELLS_W * CELLS_H }, () => []);
   const add = (x: number, y: number, r: number) => {
     for (let cy = Math.max(0, Math.floor(y - r)); cy <= Math.min(CELLS_H - 1, Math.floor(y + r)); cy++)
       for (let cx = Math.max(0, Math.floor(x - r)); cx <= Math.min(CELLS_W - 1, Math.floor(x + r)); cx++) near[cellIndex(cx, cy)].push({ x, y, r });
   };
-  for (const t of plan.trees) if (t.size) add(t.x, t.y, t.r * 0.8);
+  const crowns: { x: number; y: number; r: number; id: number }[][] = Array.from({ length: CELLS_W * CELLS_H }, () => []);
+  for (const t of plan.trees) {
+    const r = t.r * 0.85;
+    for (let cy = Math.max(0, Math.floor(t.y - r)); cy <= Math.min(CELLS_H - 1, Math.floor(t.y + r)); cy++)
+      for (let cx = Math.max(0, Math.floor(t.x - r)); cx <= Math.min(CELLS_W - 1, Math.floor(t.x + r)); cx++) crowns[cellIndex(cx, cy)].push({ x: t.x, y: t.y, r, id: t.id });
+  }
   for (const r of plan.rocks) add(r.x, r.y, r.size * 0.7);
   for (const p of plan.pads) add(p.x, p.y, p.r);
   for (const b of plan.boulders) for (const c of b.cells) add((c % CELLS_W) + 0.5, Math.floor(c / CELLS_W) + 0.5, 0.9);
@@ -60,16 +71,20 @@ export function forestBlades(plan: ForestPlan): (Blade[] | null)[] {
       const k = cellIndex(cx, cy);
       if (!plan.open[k]) continue;
       const list = planCell(cx, cy, (x, y) => {
-        if (near[k].some((d) => (x - d.x) ** 2 + (y - d.y) ** 2 < d.r * d.r)) return false;
+        if (near[k].some((d) => (x - d.x) ** 2 + (y - d.y) ** 2 < d.r * d.r)) return -2;
         const X = Math.floor(x * ART), Y = Math.floor(y * ART);
-        return !lakes.some(({ depth, box }) => X >= box.x0 && Y >= box.y0 && X < box.x1 && Y < box.y1 && depth(X, Y) > -2.5);
+        if (lakes.some(({ depth, box }) => X >= box.x0 && Y >= box.y0 && X < box.x1 && Y < box.y1 && depth(X, Y) > -2.5)) return -2;
+        // Under the last drawn (the front) crown over it.
+        let under = -1;
+        for (const c of crowns[k]) if ((x - c.x) ** 2 + (y - c.y) ** 2 < c.r * c.r) under = Math.max(under, c.id);
+        return under;
       });
       if (list.length) out[k] = list;
     }
   return out;
 }
 
-export type ForestGrassFrame = GrassFrame & { alpha: number };
+export type ForestGrassFrame = GrassFrame & { alpha: number; damage: ForestDamage | null };
 
 /** Every blade's root (art pixels) and the sines and cosines of the parts of
  * `paintBlade`'s sway and gust angles that don't change with time, so
@@ -95,7 +110,7 @@ function swaying(plans: readonly (Blade[] | null)[]): Swaying {
 /** Draws the forest's grass, kept by the renderer. */
 export class ForestGrass {
   private plan: ForestPlan | null = null;
-  private plans: (Blade[] | null)[] = [];
+  private plans: (ForestBlade[] | null)[] = [];
   private sway: Swaying | null = null;
   /** Up to `CROWD` walkers (indices) by each cell their blades bend in,
    * refilled each paint. */
@@ -178,7 +193,7 @@ export class ForestGrass {
     return filled;
   }
 
-  private paint(px: Uint32Array, f: GrassFrame) {
+  private paint(px: Uint32Array, f: ForestGrassFrame) {
     px.fill(0);
     const put = (color: number, x: number, y: number, h: number) => {
       if (x < 0 || x >= W) return;
@@ -186,7 +201,7 @@ export class ForestGrass {
     };
     const near = this.bucket(f.walkers), slots = this.slots, all = f.walkers;
     const group: Walker[] = [];
-    const t = f.now / 1000, wind = WIND[f.wind], sw = this.sway!;
+    const t = f.now / 1000, wind = WIND[f.wind], sw = this.sway!, trees = this.plan!.trees;
     const S1 = Math.sin(t * 2.1), C1 = Math.cos(t * 2.1), S2 = Math.sin(t * 3.7), C2 = Math.cos(t * 3.7), S3 = Math.sin(-t * 1.6), C3 = Math.cos(-t * 1.6), S4 = Math.sin(t * 12), C4 = Math.cos(t * 12);
     let k = 0;
     for (let i = 0; i < this.plans.length; i++) {
@@ -198,7 +213,7 @@ export class ForestGrass {
       const walkers = crowd ? group : undefined;
       for (const b of list) {
         const gx = sw.gx[k], gy = sw.gy[k], j = k++;
-        if (!turfAt(gx, gy)) continue;
+        if ((b.under >= 0 && (!f.damage || f.damage.upright(trees[b.under]))) || !turfAt(gx, gy)) continue;
         const shade = shadedAt(gx, gy) ? SHADOW : 0;
         // Held still: the parks' own way.
         if (f.reduceMotion) {

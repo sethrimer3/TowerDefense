@@ -97,6 +97,43 @@ try {
     await page.screenshot({ path: `${out}/forest-${width}-blast.png` });
     await page.waitForTimeout(3500);
     await page.screenshot({ path: `${out}/forest-${width}-craters.png` });
+    // Arrows landing under smaller trees strike them apart into stumps;
+    // burning ground sets a huge tree alight, which burns down to ash.
+    const marks = await page.evaluate(() => {
+      const dp = window.__dp, sim = dp.sim, r = dp.renderer, plan = r.forest.plan, damage = r.forest.damage;
+      const k = dp.currentMap().buildings.find(b => b.kind === 'keep').rect, kx = k.x + k.w / 2, ky = k.y + k.h / 2;
+      const near = plan.trees.filter(t => damage.standing(t)).sort((a, b) => Math.hypot(a.x - kx, a.y - ky) - Math.hypot(b.x - kx, b.y - ky));
+      const small = near.filter(t => t.size <= 2).slice(0, 3), big = near.find(t => t.size === 3);
+      for (const t of small) sim.arrows.push({ x: t.x - 3, y: t.y, target: -1, damage: 0, tx: t.x, ty: t.y, life: 5 });
+      sim.blazes.push({ x: big.x, y: big.y, r: 0.6, t: 0, life: 2, dps: 0, seed: 1 });
+      Object.assign(r.cam, { s: 1, x: 0, y: 0 });
+      const c = r.toClient(big.x, big.y);
+      r.zoomAt(c.x, c.y, 6);
+      return { small: small.map(t => t.id), big: big.id };
+    });
+    await page.waitForTimeout(1500);
+    const mid = await page.evaluate(m => {
+      const d = window.__dp.renderer.forest.damage;
+      return { burning: d.burning.map(b => b.tree.id), struck: m.small.filter(id => d.state[id] === 2).length, stumps: d.stumps.length };
+    }, marks);
+    assert.ok(mid.burning.includes(marks.big), 'the burning ground set the huge tree alight');
+    assert.equal(mid.struck, marks.small.length, 'arrows struck the smaller trees apart');
+    await page.screenshot({ path: `${out}/forest-${width}-burning.png` });
+    await page.waitForTimeout(5500);
+    const after = await page.evaluate(m => {
+      const f = window.__dp.renderer.forest;
+      return { down: f.damage.state[m.big] === 2, piles: f.piles.length };
+    }, marks);
+    assert.ok(after.down && after.piles > 0, 'the huge tree burnt down to a pile of ash');
+    await page.screenshot({ path: `${out}/forest-${width}-ash.png` });
+    await page.evaluate(id => {
+      const r = window.__dp.renderer, t = r.forest.plan.trees[id];
+      Object.assign(r.cam, { s: 1, x: 0, y: 0 });
+      const c = r.toClient(t.x, t.y);
+      r.zoomAt(c.x, c.y, 6);
+    }, marks.small[0]);
+    await page.waitForTimeout(250);
+    await page.screenshot({ path: `${out}/forest-${width}-stump.png` });
     assert.deepEqual(errors, []);
     await context.close();
   }
