@@ -16,6 +16,7 @@ import { stream } from "../random.ts";
 import { CART_LOAD, MEAL_TICKS, metalSum, type Cart, type Footprint, type Metals, type Inside, type Miner, type MineSim, type Rebuild, type Sky } from "./sim.ts";
 import { drawFigure, drawSleeper, outfit, type Fine, type Pose } from "./figures.ts";
 import { Particles } from "./particles.ts";
+import { FRAMES, GLINT, sparkleFrame, sparkleSites, sparkleSpot, type Sites } from "./ore-sparkle.ts";
 import { habitAt, habitPose, hammerAt, shovelAt } from "./acts.ts";
 import {
   ASHLAR, GLASS, GRAVE_H, GRAVE_W, HEADFRAME_H, HEADFRAME_W, PLANK, POST, Sprites, WHEEL, chimneyRows, paintBack, paintGrave, paintHeadframe, paintShell, paintWall, roofRows, shellOrigin, windowsOf,
@@ -100,6 +101,10 @@ export class MineRenderer {
   private paintedRows = "";
   private seed = -1;
   private fx2 = new Particles();
+  /** Ore cells near the lit workings that glint, found again as the world changes. */
+  private sparkles: Sites = { cells: new Int32Array(0), near: new Float32Array(0) };
+  private sparkleVersion = -1;
+  private sparkleAt = -1e9;
   /** The last beat each one-off effect played on, by key. */
   private beats = new Map<string, number>();
   /** Until when (ms) the furnace flares from ore just thrown in. */
@@ -488,6 +493,7 @@ export class MineRenderer {
         for (let q = 0; q < 4; q++) this.grain[i * 4 + q] = Math.floor(hash01(2 * x + (q & 1), 2 * y + (q >> 1), sim.seed + 78) * 256);
       }
       this.paintedVersion = -1;
+      this.sparkleVersion = -1;
       this.litAt = -1e9;
     }
     this.resize();
@@ -512,6 +518,11 @@ export class MineRenderer {
     if (relight) {
       this.light(sim);
       this.litAt = time;
+      if (effects && sim.world.version !== this.sparkleVersion && time - this.sparkleAt > 1000) {
+        this.sparkles = sparkleSites(sim.world.cells, this.warm, sim.strata.surface, sim.seed);
+        this.sparkleVersion = sim.world.version;
+        this.sparkleAt = time;
+      }
     }
     const open = this.skyLight(), turned = Math.abs(open - this.paintedOpen) > 0.002 || Math.abs(this.skyNow.daylight - this.paintedDay) > 0.002;
     this.readNews(sim, time, effects);
@@ -549,6 +560,7 @@ export class MineRenderer {
     this.drawHoist(sim);
     const fine = this.fine;
     this.drawFittings(sim, y0, y1, time);
+    if (effects) this.drawSparkles(sim, time, y0, y1);
     for (const c of sim.carts) {
       if (c.y < y0 - 3 || c.y > y1 + 1) continue;
       this.drawCart(sim, c);
@@ -1324,6 +1336,25 @@ export class MineRenderer {
         this.fine(x + 0.5, by, 0.5, 0.5, hex(mix(LANTERN_DIM, LANTERN_HOT, f)));
       }
     }
+  }
+
+  /** Ore near the lit workings catching the light now and then: a pixel
+   * star of its own colour, fainter the further it lies from the light. */
+  private drawSparkles(sim: MineSim, time: number, y0: number, y1: number) {
+    const { cells: sites, near } = this.sparkles, cells = sim.world.cells, ctx = this.ctx, hex = (c: RGB) => `rgb(${c[0]},${c[1]},${c[2]})`;
+    const alpha = ctx.globalAlpha;
+    for (let n = 0; n < sites.length; n++) {
+      const i = sites[n], y = (i / W) | 0;
+      if (y < y0 - 1 || y > y1) continue;
+      const glint = GLINT[cells[i]];
+      if (!glint) continue; // dug out since
+      const x = i % W, f = sparkleFrame(x, y, sim.seed, time);
+      if (f < 0) continue;
+      const at = sparkleSpot(x, y, sim.seed), arm = hex(glint.arm), core = hex(glint.core);
+      ctx.globalAlpha = alpha * (0.3 + 0.5 * near[n]);
+      for (const [dx, dy] of FRAMES[f]) this.fine(at.x + dx * 0.5, at.y + dy * 0.5, 0.5, 0.5, dx || dy ? arm : core);
+    }
+    ctx.globalAlpha = alpha;
   }
 
   private drawGlow(sim: MineSim, time: number, y0: number, y1: number) {
