@@ -17,6 +17,7 @@
  * Presentation only, with no game imports: the page hands it `GraphNode`s
  * (`set`) and hears back which node was picked (`onPick`). */
 import { stream } from "../random.ts";
+import { TreeMotes, type MoteNode } from "./tree-motes.ts";
 import { BranchArt, rgb, type Pt, type Stroke, type Tone } from "./branch-art.ts";
 
 const rand = stream("effects");
@@ -93,6 +94,11 @@ export class UpgradeGraph {
   private readonly layer: HTMLElement;
   private bodies = new Map<string, Body>();
   private picked = "";
+  /** The golden motes riding the tree's currents (`tree-motes.ts`), on
+   * their own canvas between the branches and the nodes. */
+  private readonly motes = new TreeMotes();
+  private readonly moteCanvas: HTMLCanvasElement;
+  private now = 0;
   private raf = 0;
   private last = 0;
   /** The view's pan (px) and zoom, eased toward the fit. */
@@ -108,9 +114,10 @@ export class UpgradeGraph {
   ) {
     this.el = host;
     host.classList.add("ug");
-    host.innerHTML = `<canvas class="ug-branches"></canvas><div class="ug-view"><div class="ug-nodes"></div></div>`;
+    host.innerHTML = `<canvas class="ug-branches"></canvas><canvas class="ug-motes" aria-hidden="true"></canvas><div class="ug-view"><div class="ug-nodes"></div></div>`;
     this.view = host.querySelector(".ug-view")!;
     this.canvas = host.querySelector("canvas")!;
+    this.moteCanvas = host.querySelector(".ug-motes")!;
     this.layer = host.querySelector(".ug-nodes")!;
     host.addEventListener("pointerdown", this.down);
     host.addEventListener("pointermove", this.move);
@@ -229,6 +236,7 @@ export class UpgradeGraph {
     this.raf = requestAnimationFrame(this.tick);
     const dt = Math.min(1 / 30, this.last ? (t - this.last) / 1000 : 0);
     this.last = t;
+    this.now = t;
     if (!this.el.isConnected || this.el.offsetParent === null) return;
     if (this.opts.reduceMotion()) {
       for (const [id, b] of this.bodies) if (b.dying >= 0) this.drop(id);
@@ -295,6 +303,25 @@ export class UpgradeGraph {
       b.el.style.transform = `translate(${b.x}px, ${b.y}px) translate(-50%, -50%)${w ? ` rotate(${b.spin * w}deg) scale(${1 - 0.75 * w})` : ""}`;
     }
     this.paintBranches();
+    this.paintMotes();
+  }
+
+  /** The motes over the branches: every live node a swirl, every branch a
+   * current from parent to child, in the host's CSS pixels. */
+  private paintMotes() {
+    const { x: px, y: py, s } = this.pan, nodes: MoteNode[] = [], edges: [string, string][] = [];
+    for (const b of this.bodies.values()) {
+      if (b.dying >= 0) continue;
+      nodes.push({ id: b.n.id, x: px + b.x * s, y: py + b.y * s });
+      if (b.n.parent && this.bodies.has(b.n.parent)) edges.push([b.n.parent, b.n.id]);
+    }
+    this.motes.draw(this.moteCanvas, this.now || performance.now(), { nodes, edges, picked: this.picked || null, pixel: ART * s, reduced: this.opts.reduceMotion() });
+  }
+
+  /** A purchase at node `id`: the motes round it burst outward. */
+  burst(id: string) {
+    const b = this.bodies.get(id);
+    if (b) this.motes.burst(this.pan.x + b.x * this.pan.s, this.pan.y + b.y * this.pan.s, this.moteCanvas);
   }
 
   /** The branches and trailing lines, as pixel art a whole number of device

@@ -1,3 +1,4 @@
+import {chargeIdle} from "./chrono.ts";
 import { bannerFor } from "./deployment.ts";
 import { bannerDamage } from "./war-banner.ts";
 /** DEFEND's dark wizard keep and its black lightning. The keep's four
@@ -47,7 +48,11 @@ export class DarkKeeps {
       const cd = (this.cooldown.get(key) ?? 0) - dt;
       if (cd > 0) return this.cooldown.set(key, cd);
       const target = nearest(sim.enemiesNear(spot.x, spot.y, TURRET.range), spot);
-      if (!target) return this.cooldown.set(key, 0);
+      if (!target) {
+        const damage=TURRET.damage*sim.bonuses.towerDamage;
+        if(!chargeIdle(sim,spot,TURRET.range,damage,()=>true,()=>this.cooldown.set(key,TURRET.cooldown*sim.bonuses.towerReload)))this.cooldown.set(key,0);
+        return;
+      }
       this.cooldown.set(key, TURRET.cooldown * sim.bonuses.towerReload);
       chainBolt(sim, { x: spot.x, y: spot.y - TURRET_TOP }, target, TURRET.damage * sim.bonuses.towerDamage, links, jump);
     });
@@ -68,6 +73,7 @@ export function stepDarkWizard(sim: DefendSim, s: Soldier, dt: number) {
     chainBolt(sim, { x: s.x + STAFF.x, y: s.y + STAFF.y }, near, bannerDamage(sim, s), wizardChain(sim.levels.chainCount ?? 0), chainJump(sim.levels.chainReach ?? 0));
     return;
   }
+  if(!bannerFor(sim,s)&&chargeIdle(sim,s,DARK_WIZARD.range,bannerDamage(sim,s),()=>s.cd<=0,()=>{s.cd=DARK_WIZARD.cooldown;}))return;
   const banner = bannerFor(sim, s);
   if (banner) return answerBanner(sim, banner, s, DARK_WIZARD.speed, dt);
   if (s.thinkT <= 0) seek(sim, s);

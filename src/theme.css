@@ -1967,6 +1967,8 @@ dialog .away-row .away-note {
 .ug-host:active { cursor: grabbing; }
 .ug-view { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
 .ug-branches { position: absolute; left: 0; top: 0; pointer-events: none; image-rendering: pixelated; image-rendering: crisp-edges; image-rendering: pixelated; }
+/* The golden motes (ui/tree-motes.ts): over the branches, under the nodes. */
+.ug-motes { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; pointer-events: none; image-rendering: pixelated; }
 
 .ug-nodes { position: absolute; left: 0; top: 0; }
 .ug-node {

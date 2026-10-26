@@ -1,3 +1,4 @@
+import {captureShot,shotField,chronoTarget} from "./chrono.ts";
 import { spikeKey } from "../specializations.ts";
 /** The city wall's own defenses. Wall spikes cut every enemy on foot that
  * presses against the stones they stand on, in pulses; wall ballistas on
@@ -24,6 +25,7 @@ import type { DefendSim, Enemy } from "./sim.ts";
  * (`ballista-upgrades.ts`) add what each strike does; a gate ballista's
  * bolt is `small`. All absent without them. */
 export type BallistaBolt = {
+  chronoReleased?: true;
   x: number;
   y: number;
   dx: number;
@@ -171,7 +173,7 @@ export const wallBallistaReload = (sim: Pick<DefendSim, "levels" | "bonuses">) =
  * one bolt, or with Windlass III a fan of three. */
 export function shootBallista(sim: DefendSim, b: Building): boolean {
   const c = center(b.rect), range = wallBallistaRange(sim);
-  const target = nearest(sim.enemiesNear(c.x, c.y, range), c, sq(range));
+  const target = nearest(sim.enemiesNear(c.x, c.y, range), c, sq(range)) ?? chronoTarget(sim,c,range,true,b.id);
   if (!target) return false;
   const ranks = sim.bonuses.ballista;
   const heavy = ballistaRank(ranks, "heavyBolts"), fire = ballistaRank(ranks, "fireBolts"), fan = ballistaRank(ranks, "windlass") >= 3;
@@ -209,11 +211,14 @@ export function stepBallistaBolts(sim: DefendSim, dt: number) {
   if (!sim.ballistaBolts.length) return;
   for (const bolt of sim.ballistaBolts) {
     if (bolt.left <= 0) continue;
-    const step = Math.min(bolt.left, BALLISTA.speed * dt);
+    let step = Math.min(bolt.left, BALLISTA.speed * dt);
     const x0 = bolt.x, y0 = bolt.y;
     bolt.x += bolt.dx * step;
     bolt.y += bolt.dy * step;
     bolt.left -= step;
+    const end={x:bolt.x,y:bolt.y},field=shotField(sim,{kind:"ballista",shot:bolt},{x:x0,y:y0},end);
+    if(field){step*=field.t;bolt.x=x0+bolt.dx*step;bolt.y=y0+bolt.dy*step;}
+
     const mx = (x0 + bolt.x) / 2, my = (y0 + bolt.y) / 2;
     const hit: Enemy[] = [];
     for (const e of sim.enemiesNear(mx, my, step / 2 + 1.5)) {
@@ -241,6 +246,7 @@ export function stepBallistaBolts(sim: DefendSim, dt: number) {
       if (bolt.burn) ignite(e, bolt.burn, FIRE_BOLTS.burn);
     }
     if (bolt.hits.length >= bolt.pierce) bolt.left = 0;
+    if(field&&bolt.hits.length<bolt.pierce&&captureShot(sim,{kind:"ballista",shot:bolt},{x:x0,y:y0},end)){bolt.left=0;continue;}
     // Firebrands: where the bolt stops, the ground burns (not in water).
     if (bolt.left <= 0 && bolt.blaze && !fizzles(sim, bolt.x, bolt.y, FIRE_BOLTS.blaze.r)) {
       const { r, life, dps } = FIRE_BOLTS.blaze;

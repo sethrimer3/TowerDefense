@@ -1342,6 +1342,7 @@ export class DefendPage {
     sp.picked = id;
     this.renderSpecialty();
     const node = this.root.querySelector<HTMLElement>(`#defend-specialty [data-node="${id}"]`);
+    this.tree?.burst(id);
     replay(node, "bought");
     sparksOver(node, "arcane");
   }
@@ -1497,7 +1498,7 @@ export class DefendPage {
     }
     this.treeCircle ??= new MagicCircle();
     this.treeCircle.attach(el.querySelector<HTMLElement>(".ug-host")!);
-    this.treeCircle.set(specialtyCircle(kind, wear, this.save.keepRanks, this.save.wallRanks, this.save.gateRanks, this.save.ballistaRanks, this.save.revolutionaryRanks, this.save.shadowRanks, this.save.nanoRanks));
+    this.treeCircle.set(specialtyCircle(kind, wear, this.save.keepRanks, this.save.wallRanks, this.save.gateRanks, this.save.ballistaRanks, this.save.revolutionaryRanks, this.save.shadowRanks, this.save.nanoRanks, this.save.chronoRanks));
     const plainKind = kind as PaletteKind;
     const spent = side ? side.allocated(game) : treeAllocated(plainKind, wear);
     const plain = side ? !side.owned(game) : spent === 0 && (plainKind === "wallSpikes" || rootOf(plainKind) === plainKind);

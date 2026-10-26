@@ -1,3 +1,4 @@
+import {chargeIdle,chronoTarget} from "./chrono.ts";
 import { archerAttunement, looseBowJavelin, looseSkyArrow, skirmishTargets } from "./archer-attunements.ts";
 import { BOW_JAVELIN } from "../knowledge-paths.ts";
 import { buildingPaths } from "../specializations.ts";
@@ -223,6 +224,12 @@ export function stepSwordsman(sim: DefendSim, s: Soldier, dt: number) {
   let target = sim.enemies.find((e) => e.id === s.target && e.hp > 0) ?? null;
   if (target && !patrol.covers(target)) target = null;
   if (target && inSwordReach(sim, s, target)) return strike(sim, s, target);
+  if(sim.chrono.size){
+    const near=sim.enemiesNear(s.x,s.y,swordReach(sim,s)+1).find(e=>e.hp>0&&inSwordReach(sim,s,e));
+    if(near)return strike(sim,s,near);
+    const cooldown=melee(s).cooldown*(s.kind==="sword"&&paths(sim,s.home).berserk?BERSERK.cooldown:1);
+    if(chargeIdle(sim,s,swordReach(sim,s),bannerDamage(sim,s),()=>s.cd<=0,()=>{s.cd=cooldown;},true))return;
+  }
   if (s.thinkT <= 0) target = replan(sim, s, patrol);
   sim.followPath(s, target, swordSpeed(sim, s), dt);
 }
@@ -300,7 +307,7 @@ function returnToDoor(sim: DefendSim, s: Soldier, home: Building) {
 export function stepArcher(sim: DefendSim, s: Soldier, dt: number) {
   s.cd -= dt;
   s.thinkT -= dt;
-  const { skirmish, skyranger } = archerAttunement(sim, s.home);
+  const { skirmish, skyranger, bowman } = archerAttunement(sim, s.home);
   const own = s.kind === "archer" ? null : RANGED[s.kind as keyof typeof RANGED];
   const gun = isGun(s.kind) ? (s as Soldier & { kind: Gun }) : null;
   const range = s.kind === "sniper" ? sniperRange(sim, s) : s.kind === "javelineer" ? javelinRange(sim, s) : s.kind === "musketeer" ? musketRange(sim, s) : gun ? gunRange(sim, gun) : own ? own.range : skyranger ? Math.hypot(CELLS_W,CELLS_H) : archerUnitRange(sim.levels.archerSight ?? 0);
@@ -321,6 +328,15 @@ export function stepArcher(sim: DefendSim, s: Soldier, dt: number) {
     // Skirmishers keep walking while they shoot, charging bayonets close
     // in, and gunners bound for a tower keep going.
     if (up || (skirmish < 2 && !charge && !s.perch)) return;
+  }
+  if(!near&&sim.chrono.size&&!bannerFor(sim,s)){
+    const incompatible=skyranger||bowman||s.kind==="railSniper";
+    if(incompatible){
+      const cooldown=own?.cooldown??ARCHER_UNIT.cooldown;
+      if(chargeIdle(sim,s,range,bannerDamage(sim,s),()=>s.cd<=0,()=>{s.cd=cooldown;}))return;
+    }else{
+      const idle=chronoTarget(sim,s,range);if(idle){shoot(sim,s,idle,range);return;}
+    }
   }
   if (up) return;
   const banner = bannerFor(sim, s);

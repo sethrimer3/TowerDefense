@@ -1,4 +1,5 @@
 import {t as tr} from "../i18n/index.ts";
+import { TreeMotes, type MoteNode } from "./tree-motes.ts";
 import { MagicCircle } from "../magic-circle/render.ts";
 import { studyCircle } from "../magic-circle/progression.ts";
 import { TILE_TYPE } from "../tiles.ts";
@@ -69,6 +70,9 @@ export class Ledger {
   private subject: SubjectId;
   private topics: Partial<Record<SubjectId, string>> = {};
   private trainingParticles = new TrainingParticles();
+  /** The golden motes round the shown spell's path tree, and its topic. */
+  private pathMotes = new TreeMotes();
+  private pathMotesTopic = "";
   private circle: MagicCircle | null = null;
   private circleResearch: string | null = null;
   private skillGraph: UpgradeGraph | null = null;
@@ -550,7 +554,7 @@ export class Ledger {
       return `<div class="path-col hue-${p.hue} ${state}"><header class="path-banner"><h4>${p.name}</h4><small>${st.sealed ? "Sealed" : p.motto}</small></header>${ranks}${crown}</div>`;
     }).join("");
     const following = `<p class="ledger-scope">${isSpell(t.id) ? "RESEARCH ONCE · then choose above which path the spell casts with." : `RESEARCH ONCE · every ${t.name} can wear what you unlock. Choose a path for each as you place it in Defend.`}</p>`;
-    return `${following}<div class="path-tree" style="--paths:${n}">
+    return `${following}<div class="path-tree" style="--paths:${n}" data-motes="${t.id}"><canvas class="path-motes" aria-hidden="true"></canvas>
         <div class="path-root"><span class="path-medal root"><canvas width="44" height="44" data-icon="${t.item ?? t.icon}"></canvas></span><span>${t.name}</span></div>
         <svg class="path-fan" viewBox="0 0 ${w} 40" preserveAspectRatio="none" aria-hidden="true">${fan}</svg>
         <div class="path-cols">${cols}</div>
@@ -598,6 +602,7 @@ export class Ledger {
     this.picked[p.topic] = `${id}:${rank < p.ranks.length ? rank : p.legacyCrown ? "crown" : rank - 1}`;
     this.render();
     const node = this.root.querySelector(`[data-pick="${id}:${rank - 1}"]`);
+    this.burstPath(`${id}:${rank - 1}`);
     replay(node, "bought");
     sparksOver(node as HTMLElement | null, "arcane");
   }
@@ -610,6 +615,7 @@ export class Ledger {
     this.ctx.update();
     this.render();
     const node = this.root.querySelector(`[data-pick="${id}:crown"]`);
+    this.burstPath(`${id}:crown`);
     replay(node, "bought");
     sparksOver(node as HTMLElement | null, "gold");
   }
@@ -633,12 +639,41 @@ export class Ledger {
     this.ctx.update();
     this.render();
     const card = this.root.querySelector(`[data-learn="${id}"]`)?.closest(".ledger-skill") ?? null;
+    this.skillGraph?.burst(id);
     replay(card, "bought");
     sparksOver(card?.querySelector("button") ?? null, "arcane");
   }
 
   /** Called by the existing main loop only while the Study is in view. */
-  drawCircle(time: number, reduced: boolean) { this.circle?.frame(time, reduced); }
+  drawCircle(time: number, reduced: boolean) {
+    this.circle?.frame(time, reduced);
+    this.drawPathMotes(time, reduced);
+  }
+
+  /** The golden motes round a spell's path tree: each rank, the crown and
+   * the root a swirl, a current from the root to each path's first rank and
+   * on up its ranks to the crown, read from where they stand on the page. */
+  private drawPathMotes(time: number, reduced: boolean) {
+    const tree = this.root.querySelector<HTMLElement>(".path-tree[data-motes]");
+    const canvas = tree?.querySelector<HTMLCanvasElement>(".path-motes");
+    if (!tree || !canvas) return;
+    const topic = tree.dataset.motes!;
+    if (topic !== this.pathMotesTopic) {
+      this.pathMotes = new TreeMotes();
+      this.pathMotesTopic = topic;
+    }
+    const { nodes, edges } = pathMoteScene(tree, canvas);
+    this.pathMotes.draw(canvas, time, { nodes, edges, picked: this.picked[topic] ?? null, pixel: 2, reduced });
+  }
+
+  /** A path rank just learned at `key`: the motes round it burst outward. */
+  private burstPath(key: string) {
+    const canvas = this.root.querySelector<HTMLCanvasElement>(".path-tree .path-motes");
+    const node = canvas && this.root.querySelector<HTMLElement>(`.path-tree [data-pick="${key}"] .path-medal`);
+    if (!canvas || !node) return;
+    const c = canvas.getBoundingClientRect(), r = node.getBoundingClientRect();
+    this.pathMotes.burst(r.left + r.width / 2 - c.left, r.top + r.height / 2 - c.top, canvas);
+  }
 
   // ── Each frame and each second ──────────────────────────────────────────
   /** Once a second while the chamber shows: the whole chamber once a rank
@@ -678,3 +713,26 @@ const metalIcon = (metal: (typeof METALS)[number]) => `<i class="metal-icon ${me
 const costHtml = (p: Price) => METALS.filter((k) => p[k]).map((k) =>
   `<span class="cost-metal metal-${k}" role="img" aria-label="${p[k]} ${k}" title="${p[k]} ${k}">${metalIcon(k)}${p[k]}</span>`).join(" ");
 const bal = (s: { settings: { devMode: boolean } }, n: number) => (s.settings.devMode ? "∞" : Math.floor(n + 1e-9));
+
+/** A spell path tree's upgrades and branches for its motes, in the motes
+ * canvas's CSS pixels: the root, then each path's ranks and crown in order,
+ * a branch from the root to each path's first and on from each to the next. */
+function pathMoteScene(tree: HTMLElement, canvas: HTMLCanvasElement) {
+  const c = canvas.getBoundingClientRect(), nodes: MoteNode[] = [], edges: [string, string][] = [];
+  const centre = (id: string, el: Element | null) => {
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    nodes.push({ id, x: r.left + r.width / 2 - c.left, y: r.top + r.height / 2 - c.top });
+  };
+  centre("root", tree.querySelector(".path-root .path-medal"));
+  tree.querySelectorAll<HTMLElement>(".path-col").forEach((col) => {
+    let from = "root";
+    col.querySelectorAll<HTMLElement>(".path-node[data-pick]").forEach((node) => {
+      const id = node.dataset.pick!;
+      centre(id, node.querySelector(".path-medal") ?? node);
+      edges.push([from, id]);
+      from = id;
+    });
+  });
+  return { nodes, edges };
+}

@@ -280,7 +280,7 @@ try {
     assert.equal(s.defend.owned.watchTower, 0, 'its Watch tower is used up');
     assert.match(await panel.locator('.ug-title').textContent(), /Archer tower/, 'and its tree goes on from there');
     assert.ok(await page.locator('#defend-palette [data-item="archerTower"]').count(), 'the palette shows it');
-    assert.deepEqual((await nodes()).filter(n => n.endsWith('=next')).sort(), ['k:brazierTower=next', 'k:hawkTower=next'], 'its branches\' towers');
+    assert.deepEqual((await nodes()).filter(n => n.endsWith('=next')).sort(), ['k:brazierTower=next', 'k:hawkTower=next', 'k:wispTower=next'], 'all three archer attunements are available');
     await buy('k:brazierTower');
     await settled();
     await buy('p:fireArrows:1');

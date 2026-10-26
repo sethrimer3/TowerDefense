@@ -131,7 +131,7 @@ test("saves keep their gates, and older saves have none", () => {
 
 test("the palette's categories split everything between towers, units and the city", () => {
   const of = (c: "towers" | "units" | "city") => PALETTE_ITEMS.filter((i) => inCategory(i, c));
-  assert.deepEqual(of("towers"), ["watchTower", "archerTower", "brazierTower", "hawkTower", "wispTower", "cannonTower", "batteryTower", "mortarTower", "minelayerTower", "nanoTower", "wizardTower", "pyreTower", "frostTower", "stormTower"]);
+  assert.deepEqual(of("towers"), ["watchTower", "archerTower", "brazierTower", "hawkTower", "wispTower", "chronoTower", "cannonTower", "batteryTower", "mortarTower", "minelayerTower", "nanoTower", "wizardTower", "pyreTower", "frostTower", "stormTower"]);
   assert.deepEqual(of("units"), ["meleeGuild", "rangedGuild", "barracks", "chapterHouse", "berserkerLodge", "halberdYard", "heroHall", "assassinDen", "bloodHall", "veilHouse", "poisonDen", "shadow", "spearHall", "phalanx", "javelinCamp", "lancerStable", "archerBarracks", "rangerLodge", "skirmishCamp", "skyrangerLodge", "gunHall", "musketHall", "sniperLodge", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "mageGuild", "infernoHall", "cinderHall", "stormHall", "valkyriePalace", "darkKeep"]);
   assert.deepEqual(of("city"), ["cityTile", "monsterBait", "wallBlock", "cityGate", "wallSpikes", "wallBallista"]);
   assert.deepEqual(PALETTE_ITEMS.filter((i) => inCategory(i, "all")), PALETTE_ITEMS);

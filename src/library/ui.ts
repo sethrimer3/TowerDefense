@@ -13,6 +13,7 @@ import { countdown, HOUR_MS, IDLE_LEAD, IDLE_SPEED, idleDrain, MAX_AWAY_MS } fro
 import { LAB_MAX_LEVEL, MAX_LIBRARIANS, labPrice, MAX_SHELVES, LibrarySim, ROLES, RETURN_BOOKS, librarianPrice, shelfPrice, type Librarian, type LibrarySave, type Role } from "./sim.ts";
 
 import { LibraryRenderer, daylight } from "./render.ts";
+import { fadeAway } from "../ui/fade-away.ts";
 import { holdToRepeat } from "../ui/hold-repeat.ts";
 
 /** What became of the library over time away, for the welcome-back screen. */
@@ -47,16 +48,6 @@ const ROLE: Record<Role, { name: string; one: string; hint: string }> = {
   researcher: { name: "Researchers", one: "researcher", hint: "Researchers work the alchemy lab below, one a lab level; with none, the Study's Knowledge research can't be bought" },
 };
 const escape = (s: string) => s.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
-/** Fades a notice out quickly, then lets `done` put it away. */
-const FADE_MS = 220;
-const fadeAway = (el: HTMLElement, done: () => void) => {
-  if (el.classList.contains("fading")) return;
-  el.classList.add("fading");
-  setTimeout(() => {
-    done();
-    el.classList.remove("fading");
-  }, FADE_MS);
-};
 const plural = (k: number, one: string) => `${k} ${one}${k === 1 ? "" : "s"}`;
 
 /** Idle time owed (ms) from which the library shows it is fast-forwarding,

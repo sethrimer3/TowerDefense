@@ -1,3 +1,4 @@
+import {chargeIdle,chronoTarget} from "./chrono.ts";
 /** DEFEND's Reinforcements, a strike spell: cast from the Skills palette onto
  * the board, a squad of soldiers drops out of the sky round where it is let
  * go (`REINFORCE.count`, each coming down for `REINFORCE.fall` seconds),
@@ -180,6 +181,10 @@ export function stepReinforcement(sim: DefendSim, s: Soldier, dt: number) {
     s.target = target.id;
     s.path = [];
     return attack(sim, s, target);
+  }
+  if(sim.chrono.size){
+    if(c.range){const aim=chronoTarget(sim,s,reach);if(aim){attack(sim,s,aim);return;}}
+    else if(chargeIdle(sim,s,reach+c.size/2,s.damage,()=>s.cd<=0,()=>{s.cd=REINFORCE.attack*(c.look==="champion"?1.3:1);},true))return;
   }
   if (s.thinkT <= 0) target = seek(sim, s);
   sim.followPath(s, target, REINFORCE.speed * (c.look === "champion" ? 0.85 : 1), dt);

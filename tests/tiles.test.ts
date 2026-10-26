@@ -70,7 +70,7 @@ test("an upgraded building's tier: what it grew from, and the ultimate its line 
   assert.deepEqual(higherTier("wizardTower"), { into: "darkKeep" });
   assert.deepEqual(higherTier("phalanx"), { into: "valkyriePalace" });
   assert.deepEqual(higherTier("darkKeep"), { from: "wizardTower" });
-  assert.deepEqual(higherTier("archerTower"), {}, "its ultimate is still to come");
+  assert.deepEqual(higherTier("archerTower"), {into:"chronoTower"}, "its three attunements merge into the Ultimate Archer Tower");
   let l = placeCityTile(s.defend.layout, s.defend.layout.keep.tx, s.defend.layout.keep.ty - 1) ?? assert.fail("tile");
   s.defend.layout = placeStructure(l, "watchTower", l.keep.tx, l.keep.ty - 1) ?? assert.fail("tower");
   const uid = s.defend.layout.structures[0].uid;

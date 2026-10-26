@@ -1,3 +1,4 @@
+import {drawChrono} from "./chrono-art.ts";
 import { drawFortress } from "./fortress-art.ts";
 import { drawIceEnemy } from "./ice-enemy-art.ts";
 import { enemySize } from "./catalog.ts";
@@ -129,6 +130,7 @@ export function drawUnits(b: Brush, sim: DefendSim, torches: Burning | null, hea
   drawSwords(b, swords);
   drawGarrisons(b, sim);
   if (timing) timing.entityMs += performance.now() - start;
+  drawChrono(b.c,b.px,sim,simple.reduceMotion);
   drawArrows(b.c, b.px, sim, simple.reduceMotion);
   drawWisps(b.c, b.px, sim, simple.reduceMotion);
   drawLasers(b.c, b.px, sim);

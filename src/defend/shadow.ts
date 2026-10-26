@@ -1,3 +1,4 @@
+import {chargeIdle} from "./chrono.ts";
 /** DEFEND's Shadow, the assassins' ultimate: one shade, trained at the
  * Shadow's shrine (three Assassins' dens merged), a see-through figure in a
  * billowing cloak with knives whirling round it. It hunts the city like the
@@ -88,6 +89,7 @@ export function stepShade(sim: DefendSim, s: Soldier, dt: number) {
     }
     return;
   }
+  if(!bannerFor(sim,s)&&chargeIdle(sim,s,SHADE.reach,bannerDamage(sim,s),()=>s.cd<=0,()=>{s.cd=SHADE.cooldown/shadowStats(sim).knives;},true))return;
   const banner = bannerFor(sim, s);
   if (banner) return answerBanner(sim, banner, s, SHADE.speed, dt);
   if (s.thinkT <= 0) seek(sim, s);

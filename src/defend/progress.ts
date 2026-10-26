@@ -1,3 +1,4 @@
+import { decodeChronoRanks, type ChronoRanks } from "../chrono-upgrades.ts";
 /** Persistent DEFEND state: the city layout the player designed, what they
  * own and have upgraded, and their best wave. A run itself is never saved —
  * it always starts fresh from the layout. */
@@ -96,6 +97,7 @@ export type DefendSave = {
   shadowRanks?: ShadowRanks;
   /** The C4 nanobots' upgrades (`nanobot-upgrades.ts`); absent while they have none. */
   nanoRanks?: NanoRanks;
+  chronoRanks?: ChronoRanks;
   /** Every building upgrade (`k:<kind>`, `p:<path>:<rank>`) any building has
    * ever reached, shared by its whole line for the upgrade map
    * (`specializations.ts`'s `foundNodes`); absent while none. */
@@ -285,7 +287,7 @@ export function buyBomb(save: DefendSave, wallet: Wallet): boolean {
 
 // ── Decoding untrusted saves ─────────────────────────────────────────────
 const int = (n: unknown, min: number, max: number): n is number => Number.isInteger(n) && (n as number) >= min && (n as number) <= max;
-const PLACED: PlacedKind[] = ["meleeGuild", "rangedGuild", "barracks", "chapterHouse", "berserkerLodge", "halberdYard", "heroHall", "shadow", "bloodHall", "veilHouse", "poisonDen", "assassinDen", "spearHall", "phalanx", "javelinCamp", "lancerStable", "archerBarracks", "rangerLodge", "skirmishCamp", "skyrangerLodge", "sniperLodge", "gunHall", "musketHall", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "archerTower", "cannonTower", "nanoTower", "watchTower", "brazierTower", "hawkTower", "wispTower", "batteryTower", "mortarTower", "minelayerTower", "wizardTower", "pyreTower", "frostTower", "stormTower", "mageGuild", "infernoHall", "cinderHall", "stormHall", "valkyriePalace", "darkKeep", "monsterBait"];
+const PLACED: PlacedKind[] = ["meleeGuild", "rangedGuild", "barracks", "chapterHouse", "berserkerLodge", "halberdYard", "heroHall", "shadow", "bloodHall", "veilHouse", "poisonDen", "assassinDen", "spearHall", "phalanx", "javelinCamp", "lancerStable", "archerBarracks", "rangerLodge", "skirmishCamp", "skyrangerLodge", "sniperLodge", "gunHall", "musketHall", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "archerTower", "cannonTower", "nanoTower", "watchTower", "brazierTower", "hawkTower", "wispTower", "chronoTower", "batteryTower", "mortarTower", "minelayerTower", "wizardTower", "pyreTower", "frostTower", "stormTower", "mageGuild", "infernoHall", "cinderHall", "stormHall", "valkyriePalace", "darkKeep", "monsterBait"];
 
 /** Attuned buildings saved wearing a branch's path, from before
  * each branch made a building of its own: each becomes that building,
@@ -356,6 +358,8 @@ export function decodeDefendSave(raw: any): DefendSave {
   if (revolutionaryRanks) d.revolutionaryRanks = revolutionaryRanks;
   const shadowRanks = decodeShadowRanks(s.shadowRanks);
   if (shadowRanks) d.shadowRanks = shadowRanks;
+  const chronoRanks = decodeChronoRanks(s.chronoRanks);
+  if (chronoRanks) d.chronoRanks = chronoRanks;
   const nanoRanks = decodeNanoRanks(s.nanoRanks);
   if (nanoRanks) d.nanoRanks = nanoRanks;
   return d;
