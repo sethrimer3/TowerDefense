@@ -1559,6 +1559,17 @@ nav button { position: relative; }
   text-overflow: ellipsis;
 }
 /* A fire's alarm, and afterwards what it cost (tap to put it away). */
+#library-away,
+.library-alert {
+  pointer-events: auto;
+  cursor: pointer;
+  transition: opacity 0.22s ease-out;
+}
+#library-away.fading,
+.library-alert.fading {
+  opacity: 0;
+  pointer-events: none;
+}
 .library-alert {
   top: 10px;
   bottom: auto;

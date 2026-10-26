@@ -711,7 +711,12 @@ export class LabRenderer {
     if (stoking && Math.floor(time * 3) % 2) dot(83, F - 10, "#0b0908", 4, 1);
     // Coals under the alembic, the retort's brew, the receiver filling drop by drop.
     for (let x = BRAZIER.x - 3; x < BRAZIER.x + 3; x++) dot(x, BRAZIER.y - 1, h01(x, tick >> 1, 43) < 0.4 ? "#ffb040" : "#c04018");
-    dot(BRAZIER.x - 2, BRAZIER.y - 5, h01(1, tick >> 2, 47) < 0.5 ? "#7ad0e0" : "#5ab0c8", 4, 2);
+    // The brew fills the round retort's lower half inside a rim of glass,
+    // its surface glinting.
+    const surface = h01(1, tick >> 2, 47) < 0.5;
+    for (let dy = 0; dy <= 2; dy++)
+      for (let dx = -2; dx <= 2; dx++)
+        if (dx * dx + dy * dy <= 6) dot(BRAZIER.x + dx, BRAZIER.y - 5 + dy, dy === 0 ? (surface === ((dx & 1) > 0) ? "#9ae4f0" : "#7ad0e0") : dy === 1 ? "#5ab0c8" : "#3e8aa4");
     const fill = Math.round(lab.still * (RECEIVER.bottom - RECEIVER.top));
     if (fill > 0) dot(RECEIVER.x0 + 1, RECEIVER.bottom - fill + 1, "#70c8f0", RECEIVER.x1 - RECEIVER.x0 - 1, fill);
     const drip = (time * 1.4) % 1;
