@@ -1,7 +1,7 @@
-// The forest outside Mossbound Ruins' walls: trees of four sizes, rocks,
-// dirt pads, meadows, lakes and boulders filling the open ground while
-// building and in battle, the trees swaying,
-// and blasts blowing them up into craters of dirt. Isolated browser
+// The forest outside Mossbound Ruins' walls: trees of four sizes, berry
+// bushes, rocks, dirt pads, lakes and boulders on waving grass filling the
+// open ground while building and in battle, the trees swaying,
+// and blasts blowing them up into craters of dirt and baring the grass. Isolated browser
 // contexts only, no player saves. Needs `npm run dev`. Screenshots go to
 // test-results/ (or SHOTS).
 import { chromium } from '@playwright/test';
@@ -50,13 +50,14 @@ try {
     assert.ok(building.trees > 200, `the open ground is wooded (${building.trees} trees)`);
     assert.equal(building.standing, building.trees);
     await page.screenshot({ path: `${out}/forest-${width}-building.png` });
-    // Close-ups of a huge tree, a lake, a flower meadow and a boulder cluster.
+    assert.ok(await page.evaluate(() => window.__dp.renderer.forestGrass.bladeCount) > 5000, 'grass over the forest floor');
+    // Close-ups of a huge tree, a lake, a berry bush and a boulder cluster.
     const looks = await page.evaluate(() => {
       const plan = window.__dp.renderer.forest.plan, W = 72;
-      const huge = plan.trees.find(t => t.size === 3), lake = plan.lakes.map(l => l.discs[0]).reduce((a, d) => (d.x > a.x ? d : a)), m = plan.meadows.find(m => m.flowers);
+      const huge = plan.trees.find(t => t.size === 3), lake = plan.lakes.map(l => l.discs[0]).reduce((a, d) => (d.x > a.x ? d : a)), m = plan.trees.find(t => t.kind === 'bush');
       const b = plan.boulders.reduce((a, c) => (c.cells.length > a.cells.length ? c : a)), c = b.cells[0];
       const r = plan.boulders.find(b => b.cells.length >= 4 && b.cells.length < 9).cells[0];
-      return { huge: [huge.x, huge.y], lake: [lake.x, lake.y], meadow: [m.x, m.y], mountain: [(c % W) + 0.5, Math.floor(c / W) + 0.5], rocks: [(r % W) + 0.5, Math.floor(r / W) + 0.5] };
+      return { huge: [huge.x, huge.y], lake: [lake.x, lake.y], bush: [m.x, m.y], mountain: [(c % W) + 0.5, Math.floor(c / W) + 0.5], rocks: [(r % W) + 0.5, Math.floor(r / W) + 0.5] };
     });
     for (const [name, [x, y]] of Object.entries(looks)) {
       await page.evaluate(([x, y]) => {
@@ -92,9 +93,47 @@ try {
     });
     assert.ok(blown.standing < blown.trees, 'the blasts felled trees');
     assert.ok(blown.debris > 0, 'felled trees burst into leaves and splinters');
+    assert.ok(await page.evaluate(() => window.__dp.renderer.forest.damage.clearings.length) > 0, 'the blasts bared the grass');
     await page.screenshot({ path: `${out}/forest-${width}-blast.png` });
     await page.waitForTimeout(3500);
     await page.screenshot({ path: `${out}/forest-${width}-craters.png` });
+    // Arrows landing under smaller trees strike them apart into stumps;
+    // burning ground sets a huge tree alight, which burns down to ash.
+    const marks = await page.evaluate(() => {
+      const dp = window.__dp, sim = dp.sim, r = dp.renderer, plan = r.forest.plan, damage = r.forest.damage;
+      const k = dp.currentMap().buildings.find(b => b.kind === 'keep').rect, kx = k.x + k.w / 2, ky = k.y + k.h / 2;
+      const near = plan.trees.filter(t => damage.standing(t)).sort((a, b) => Math.hypot(a.x - kx, a.y - ky) - Math.hypot(b.x - kx, b.y - ky));
+      const small = near.filter(t => t.size <= 2).slice(0, 3), big = near.find(t => t.size === 3);
+      for (const t of small) sim.arrows.push({ x: t.x - 3, y: t.y, target: -1, damage: 0, tx: t.x, ty: t.y, life: 5 });
+      sim.blazes.push({ x: big.x, y: big.y, r: 0.6, t: 0, life: 2, dps: 0, seed: 1 });
+      Object.assign(r.cam, { s: 1, x: 0, y: 0 });
+      const c = r.toClient(big.x, big.y);
+      r.zoomAt(c.x, c.y, 6);
+      return { small: small.map(t => t.id), big: big.id };
+    });
+    await page.waitForTimeout(1500);
+    const mid = await page.evaluate(m => {
+      const d = window.__dp.renderer.forest.damage;
+      return { burning: d.burning.map(b => b.tree.id), struck: m.small.filter(id => d.state[id] === 2).length, stumps: d.stumps.length };
+    }, marks);
+    assert.ok(mid.burning.includes(marks.big), 'the burning ground set the huge tree alight');
+    assert.equal(mid.struck, marks.small.length, 'arrows struck the smaller trees apart');
+    await page.screenshot({ path: `${out}/forest-${width}-burning.png` });
+    await page.waitForTimeout(5500);
+    const after = await page.evaluate(m => {
+      const f = window.__dp.renderer.forest;
+      return { down: f.damage.state[m.big] === 2, piles: f.piles.length };
+    }, marks);
+    assert.ok(after.down && after.piles > 0, 'the huge tree burnt down to a pile of ash');
+    await page.screenshot({ path: `${out}/forest-${width}-ash.png` });
+    await page.evaluate(id => {
+      const r = window.__dp.renderer, t = r.forest.plan.trees[id];
+      Object.assign(r.cam, { s: 1, x: 0, y: 0 });
+      const c = r.toClient(t.x, t.y);
+      r.zoomAt(c.x, c.y, 6);
+    }, marks.small[0]);
+    await page.waitForTimeout(250);
+    await page.screenshot({ path: `${out}/forest-${width}-stump.png` });
     assert.deepEqual(errors, []);
     await context.close();
   }
