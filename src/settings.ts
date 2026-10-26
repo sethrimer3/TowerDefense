@@ -1,3 +1,4 @@
+import { LANGUAGE_CHOICES } from "./i18n/languages.ts";
 /** A setting that is on or off. */
 type Toggle = { kind: "toggle"; default: boolean; page?: { id: string; label: string; invert?: true } };
 /** A setting that is one of a fixed list of values, each with its label. */
@@ -65,6 +66,7 @@ export const SETTINGS = {
   devStewardship: { kind: "toggle", default: false, page: { id: "dev-stewardship", label: "Stewardship" } },
   devMine: { kind: "toggle", default: false, page: { id: "dev-mine", label: "Mine" } },
   devLibrary: { kind: "toggle", default: false, page: { id: "dev-library", label: "Library" } },
+  language: { kind: "choice", default: "en", choices: LANGUAGE_CHOICES, page: { id: "language", label: "Language" } },
 } as const satisfies Record<string, Setting>;
 
 export type SettingKey = keyof typeof SETTINGS;

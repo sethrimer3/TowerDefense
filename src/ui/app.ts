@@ -1,6 +1,7 @@
 import type { Save } from "../save.ts";
 import type { Tab } from "./dom.ts";
 import type { TileTree } from "../tiles.ts";
+import type { Language } from "../i18n/languages.ts";
 
 /** What pages need from the app around them. */
 export interface AppContext {
@@ -28,6 +29,8 @@ export interface AppContext {
   researched(): void;
   /** A dev option changed: applies what it grants, saves and refreshes. */
   devChanged(): void;
+  /** Changes UI language without reloading or ending a defense. */
+  changeLanguage(language: Language): void;
   /** Dev: adds `ms` of idle time, as if the game had been closed that long. */
   addIdle(ms: number): void;
   /** Replaces the save with a fresh one. */

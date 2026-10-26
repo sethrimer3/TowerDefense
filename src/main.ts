@@ -28,10 +28,13 @@ import { WelcomeBack } from "./ui/welcome.ts";
 import { unlockAllTowers } from "./defend/progress.ts";
 import { ROSES, setRose, type Rose } from "./ui/hall-art.ts";
 import { fitViewport } from "./ui/viewport.ts";
+import { setLanguage, translateWithin } from "./i18n/index.ts";
 
 // Wires the pages together: builds the shell, loads the save, and routes
 // navigation, the currency bar and the frame loop between the pages.
 
+let save: Save = load();
+setLanguage(save.settings.language);
 fitViewport();
 buildShell(document.querySelector<HTMLDivElement>("#app")!);
 document.querySelectorAll<HTMLCanvasElement>("nav canvas[data-icon]").forEach((c) => paintIcon(c, "cityTile"));
@@ -45,7 +48,6 @@ onPixelArt(() => {
     document.querySelectorAll<HTMLCanvasElement>("canvas[data-icon]").forEach((c) => paintIcon(c, (c.closest("nav") ? "cityTile" : c.dataset.icon) as IconItem));
   });
 });
-let save: Save = load();
 let tab: Tab = "defend";
 const clock = () => Date.now();
 const modal = el("modal") as HTMLDialogElement;
@@ -70,12 +72,19 @@ const ctx: AppContext = {
     if (save.settings.devTowers) unlockAllTowers(save.defend);
     update();
   },
+  changeLanguage: language => {
+    save.settings.language = language;
+    setLanguage(language);
+    translateWithin(document);
+    update();
+    renderSettingsPage(ctx);
+  },
   addIdle,
   eraseAll: () => {
     save = defaults();
     minePage.load(null, clock());
     libraryPage.load(null, clock());
-    store();
+    update();
   },
 };
 const reduced = () => save.settings.reduceMotion || matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -233,6 +242,7 @@ function compact(n: number) {
 }
 /** The currency bar, from the save. */
 function refreshCurrencies() {
+  if (setLanguage(save.settings.language)) translateWithin(document);
   const dev = save.settings.devMode;
   document.documentElement.classList.toggle("reduce-motion", save.settings.reduceMotion);
   document.documentElement.classList.toggle("pixel-font", save.settings.pixelFont);

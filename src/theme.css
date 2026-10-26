@@ -432,6 +432,18 @@ nav button > span img {
   filter: drop-shadow(0 2px 0 #000);
 }
 
+/* Language choices keep their native script readable in a three-column menu. */
+.language-current, .language-option { font-family: var(--language-font); }
+.language-current { min-width: 110px; min-height: 40px; padding: 7px 12px; }
+dialog.language-dialog { width: min(540px, calc(100vw - 24px)); max-height: calc(var(--app-height) - 24px); padding: 18px;
+  inset: var(--app-offset-top, 0px) 0 calc(100% - var(--app-offset-top, 0px) - var(--app-height)); margin: auto; }
+dialog.language-dialog[open] { display: flex; flex-direction: column; gap: 10px; }
+.language-dialog h2, .language-dialog p { margin: 0; }
+.language-dialog .dialog-actions { margin-top: 2px; flex-shrink: 0; }
+.language-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; overflow-y: auto; min-height: 0; padding: 3px; }
+.language-option { min-width: 0; min-height: 48px; padding: 8px 4px; font-size: 14px; overflow-wrap: anywhere; }
+.language-option[aria-pressed="true"] { border-color: #d8b572; box-shadow: inset 0 0 0 1px #d8b572, 0 0 8px #d8b57260; color: #ffe1a0; }
+
 /* ── Defend: the header, the shelf and the framed board ── */
 .defend-hud {
   color: #cbbb98;

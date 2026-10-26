@@ -1,9 +1,9 @@
+import {t} from "./i18n/index.ts";
 /** The spendable metals made by the Mine's smiths. Prices and wallets share
  * these units across the Mine, Library, Tiles and Smithy. */
 import type { Metals } from "./mine/sim.ts";
 
 export type MetalPrice = Partial<Metals>;
-const NAMES = { copper: "Copper", silver: "Silver", gold: "Gold" } as const;
 const KEYS = ["copper", "silver", "gold"] as const;
 
 export const canAffordMetals = (wallet: Readonly<Metals>, price: MetalPrice, free = false) =>
@@ -17,7 +17,7 @@ export function spendMetals(wallet: Metals, price: MetalPrice, free = false): bo
 }
 
 export const metalPriceText = (price: MetalPrice) =>
-  KEYS.filter(k => price[k]).map(k => `${price[k]} ${NAMES[k]}`).join(" · ") || "Free";
+  KEYS.filter(k => price[k]).map(k => `${price[k]} ${t(`metal.${k}`)}`).join(" · ") || t("common.free");
 
 /** A page reads the shared wallet live, then commits successful purchases. */
 export interface MetalHost {

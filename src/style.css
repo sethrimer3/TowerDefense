@@ -24,6 +24,7 @@
 }
 :root {
   --font: Cinzel, Georgia, serif;
+  --language-font: system-ui, sans-serif;
   --app-height: 100vh;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-right: env(safe-area-inset-right, 0px);
@@ -38,6 +39,9 @@
   -webkit-font-smoothing: none;
   font-smooth: never;
 }
+/* The bundled display fonts do not contain CJK. Use installed fonts, with
+   no remote font requests, while preserving the player's font preference. */
+:root.locale-cjk { --font: system-ui, "Noto Sans CJK JP", "Noto Sans CJK KR", "Noto Sans CJK SC", sans-serif; -webkit-font-smoothing: auto; }
 :root {
   font-family: var(--font);
   color: #cbd0d8;
@@ -412,6 +416,7 @@ nav button > span {
   line-height: 1.1;
   color: #79869b;
 }
+nav button > .tab-label { font: inherit; line-height: 1.2; color: inherit; overflow-wrap: anywhere; }
 nav button.selected {
   border-color: #d6ae68;
   background: radial-gradient(ellipse at bottom, #725b2e50, #1b212c);
