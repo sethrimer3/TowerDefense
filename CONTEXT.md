@@ -544,4 +544,15 @@ The highest wave the player has entered, whether or not they cleared it. A new r
 An Archer Tower attunement that locks the enemy with the most current life. Consecutive shots build damage and, at its final rank, fire rate; a new lock resets both.
 
 **Wisp Arrow**:
-A living blue arrow belonging to one Wisp Tower. It drifts around the tower with six trailing tendrils and slices through groups of enemies in wide arcs.
+A living blue arrow belonging to one Wisp Tower. It drifts around the tower with six quiet tassels tracing its flight path and constantly slices through nearby enemies in broad arcs. The tassels lengthen during attacks, linger for a second afterward, then slowly shorten. Each arrow has 30 enemy hits before dissolving into blue sparks. A tower restores one arrow every three seconds while below capacity.
+
+**Triple arrows**:
+The first Wisp Arrow upgrade. Raises the Wisp Tower’s capacity from one living arrow to three; all can attack together.
+
+
+**Wisp Fire arrows**:
+The second Wisp Arrow upgrade. Adds two fire arrows, 25% larger than blue arrows, alongside the three blue arrows, restoring one fire arrow every six seconds below capacity. Flaming passes leave a fiery trail for two seconds. Each fire arrow disintegrates after ten direct enemy hits and explodes; direct hits, trails and the explosion all deal fire damage.
+
+
+**Wisp Lightning arrow**:
+The third and final Wisp Arrow upgrade. Adds one larger purple arrow alongside blue and fire arrows. On locking a nearby enemy, it flies straight through the captured aim to the edge of the map. Its purple lightning trail lasts five seconds at each point, dealing 300% attack per second to all enemies touching it. The tower regenerates the arrow nine seconds after it exits.

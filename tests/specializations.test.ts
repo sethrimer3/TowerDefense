@@ -85,7 +85,7 @@ test("the shop's three basic buildings branch into attuned buildings, each with 
   // third is still to come, two).
   for (const a of ATTUNED) {
     assert.ok(a.branches.length === 3 || (a.branches.length === 2 && ["archerTower", "cannonTower", "archerBarracks", "mageGuild"].includes(a.kind)), a.kind);
-    for (const b of a.branches) assert.equal(pathById(b.path).ranks.length, b.path === "wispArrow" ? 0 : 3, b.path);
+    for (const b of a.branches) assert.equal(pathById(b.path).ranks.length, 3, b.path);
   }
   assert.equal(rootOf("darkKeep"), "watchTower");
   assert.equal(rootOf("valkyriePalace"), "meleeGuild");
