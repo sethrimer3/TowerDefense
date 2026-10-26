@@ -16,7 +16,7 @@ import { stream } from "../random.ts";
 import { CART_LOAD, MEAL_TICKS, metalSum, type Cart, type Footprint, type Metals, type Inside, type Miner, type MineSim, type Rebuild, type Sky } from "./sim.ts";
 import { drawFigure, drawSleeper, outfit, type Fine, type Pose } from "./figures.ts";
 import { Particles } from "./particles.ts";
-import { FRAMES, GLINT, sparkleFrame, sparkleSites, sparkleSpot, type Sites } from "./ore-sparkle.ts";
+import { drawGlint, heapGlint, sparkleFrame, sparkleSites, sparkleSpot, type Sites } from "./ore-sparkle.ts";
 import { habitAt, habitPose, hammerAt, shovelAt } from "./acts.ts";
 import {
   ASHLAR, GLASS, GRAVE_H, GRAVE_W, HEADFRAME_H, HEADFRAME_W, PLANK, POST, Sprites, WHEEL, chimneyRows, paintBack, paintGrave, paintHeadframe, paintShell, paintWall, roofRows, shellOrigin, windowsOf,
@@ -24,7 +24,7 @@ import {
 } from "./art.ts";
 import { BUILDINGS, along, anvils, pathTicks, type Building, type BuildingId } from "./buildings.ts";
 import {
-  AIR, BEDROCK, CELLS, COPPER, DENSE_STONE, DIRT, GOLD, GRASS, GRAVEL, H, HARD_STONE, LADDER, LAMP, LAVA, LOOSE, RAIL, ROCK, RUBBLE, SILVER, STONE, TIMBER, TORCH, WORK_LAMP, W, hash01, idx, isPassable, isSolid,
+  AIR, BEDROCK, CELLS, COPPER, DENSE_STONE, DIRT, GOLD, GRASS, GRAVEL, H, HARD_STONE, LADDER, LAMP, LAVA, LOOSE, RAIL, ROCK, RUBBLE, SILVER, STONE, TIMBER, TORCH, WORK_LAMP, W, hash01, idx, isOre, isPassable, isSolid,
   type Material,
 } from "./world.ts";
 
@@ -518,7 +518,7 @@ export class MineRenderer {
     if (relight) {
       this.light(sim);
       this.litAt = time;
-      if (effects && sim.world.version !== this.sparkleVersion && time - this.sparkleAt > 1000) {
+      if (effects && sim.oreSense && sim.world.version !== this.sparkleVersion && time - this.sparkleAt > 1000) {
         this.sparkles = sparkleSites(sim.world.cells, this.warm, sim.strata.surface, sim.seed);
         this.sparkleVersion = sim.world.version;
         this.sparkleAt = time;
@@ -557,10 +557,10 @@ export class MineRenderer {
     this.drawSurface(sim, time, effects);
     if (effects && y0 < 60) this.drawRain(sim, time);
     if (effects) this.drawGlow(sim, time, y0, y1);
-    this.drawHoist(sim);
+    this.drawHoist(sim, time);
     const fine = this.fine;
     this.drawFittings(sim, y0, y1, time);
-    if (effects) this.drawSparkles(sim, time, y0, y1);
+    if (effects && sim.oreSense) this.drawSparkles(sim, time, y0, y1);
     for (const c of sim.carts) {
       if (c.y < y0 - 3 || c.y > y1 + 1) continue;
       this.drawCart(sim, c);
@@ -984,7 +984,7 @@ export class MineRenderer {
       if (pump) fill([70, 46, 26], k, x0 + 4, F - 0.5, 1, 0.5);
       fill([80, 52, 30], k, x0 + 4, F, 1, 0.5);
       fill(IRON_DARK, k, x0 + 3.5, F - 0.25, 0.5, 0.25);
-      this.forgeStock(sim, b, k, fill);
+      this.forgeStock(sim, b, k, fill, time);
     } else if (b.id === "smithy") {
       // An anvil for each smith (face, horn, waist and foot on a stump),
       // the rack of bars waiting, the quench trough, tongs on the wall.
@@ -1016,7 +1016,7 @@ export class MineRenderer {
 
   /** The forge's ore, filling a heap by the door, then a low shelf and a
    * high one along the back wall, as it nears what the forge holds. */
-  private forgeStock(sim: MineSim, b: Building, k: number, fill: Fill) {
+  private forgeStock(sim: MineSim, b: Building, k: number, fill: Fill, time: number) {
     const F = b.floor, fine = this.fine, sx0 = b.x0 + 4, sx1 = b.x1 - 1, tone = (c: RGB) => `rgb(${(c[0] * k) | 0},${(c[1] * k) | 0},${(c[2] * k) | 0})`;
     for (const sy of [F - 2, F - 4]) {
       fill(PLANK[0], k * 1.1, sx0, sy + 0.5, sx1 - sx0, 0.25);
@@ -1029,7 +1029,7 @@ export class MineRenderer {
     const slots = Math.max(1, Math.round(((heapSlots + 2 * shelfSlots) * Math.min(total, sim.forgeCap)) / sim.forgeCap));
     const goldShare = sim.ore.gold / total, silverShare = sim.ore.silver / total;
     const heap = Math.min(heapSlots, slots);
-    oreHeap(fine, b.x1 - 1.5, F + 0.5, heapRows, heap, Math.round(heap * goldShare), k, Math.round(heap * silverShare));
+    oreHeap(fine, b.x1 - 1.5, F + 0.5, heapRows, heap, Math.round(heap * goldShare), k, Math.round(heap * silverShare), time);
     let left = slots - heap;
     for (const sy of [F - 2, F - 4]) {
       for (let r = 0; r < 2 && left > 0; r++)
@@ -1254,7 +1254,7 @@ export class MineRenderer {
   /** The hoist: its rope always hangs from the headframe's wheel down the
    * shaft to the bucket, which waits at the top, is let down to a load and
    * wound up with it (eased between the sim's steps). */
-  private drawHoist(sim: MineSim) {
+  private drawHoist(sim: MineSim, time: number) {
     const ctx = this.ctx, fine = this.fine, x = sim.shaftX, wheel = sim.strata.surface[x] - HEADFRAME_H / 2 + WHEEL.y;
     const target = sim.hoist.y;
     this.hoistY = this.hoistY < 0 || Math.abs(target - this.hoistY) > 30 ? target : this.hoistY + (target - this.hoistY) * 0.3;
@@ -1290,7 +1290,7 @@ export class MineRenderer {
     const n = metalSum(sim.yard);
     if (n > 0) {
       const lumps = Math.min(30, Math.ceil(n / 3)), gold = Math.round((lumps * sim.yard.gold) / n), silver = Math.round((lumps * sim.yard.silver) / n), fy = sim.standY(sim.yardX) + 0.5;
-      oreHeap(fine, sim.yardX + 0.5, fy, [6, 5, 4, 3, 2, 1, 1], lumps, gold, 1, silver);
+      oreHeap(fine, sim.yardX + 0.5, fy, [6, 5, 4, 3, 2, 1, 1], lumps, gold, 1, silver, time);
     }
   }
 
@@ -1341,18 +1341,17 @@ export class MineRenderer {
   /** Ore near the lit workings catching the light now and then: a pixel
    * star of its own colour, fainter the further it lies from the light. */
   private drawSparkles(sim: MineSim, time: number, y0: number, y1: number) {
-    const { cells: sites, near } = this.sparkles, cells = sim.world.cells, ctx = this.ctx, hex = (c: RGB) => `rgb(${c[0]},${c[1]},${c[2]})`;
+    const { cells: sites, near } = this.sparkles, cells = sim.world.cells, ctx = this.ctx;
     const alpha = ctx.globalAlpha;
     for (let n = 0; n < sites.length; n++) {
       const i = sites[n], y = (i / W) | 0;
       if (y < y0 - 1 || y > y1) continue;
-      const glint = GLINT[cells[i]];
-      if (!glint) continue; // dug out since
+      if (!isOre(cells[i])) continue; // dug out since
       const x = i % W, f = sparkleFrame(x, y, sim.seed, time);
       if (f < 0) continue;
-      const at = sparkleSpot(x, y, sim.seed), arm = hex(glint.arm), core = hex(glint.core);
+      const at = sparkleSpot(x, y, sim.seed);
       ctx.globalAlpha = alpha * (0.3 + 0.5 * near[n]);
-      for (const [dx, dy] of FRAMES[f]) this.fine(at.x + dx * 0.5, at.y + dy * 0.5, 0.5, 0.5, dx || dy ? arm : core);
+      drawGlint(this.fine, at.x, at.y, cells[i], f);
     }
     ctx.globalAlpha = alpha;
   }
@@ -1416,13 +1415,19 @@ const TIMBER_END: RGB = [168, 116, 62];
 /** A heap of `n` half-cell lumps of ore (`gold` of them gold, then `silver`
  * silver, the rest copper) centred on column `cx`, its bottom row ending at
  * `floor`, `rows` lumps wide from the bottom up, dimmed to `k`. */
-function oreHeap(fine: Fine, cx: number, floor: number, rows: number[], n: number, gold: number, k = 1, silver = 0) {
+function oreHeap(fine: Fine, cx: number, floor: number, rows: number[], n: number, gold: number, k = 1, silver = 0, time = -1) {
   let placed = 0;
+  const glints: [number, number, Material, number][] = [];
   for (let r = 0; r < rows.length && placed < n; r++)
     for (let i = 0; i < rows[r] && placed < n; i++, placed++) {
-      const shades = placed < gold ? SHADES[GOLD] : placed < gold + silver ? SHADES[SILVER] : SHADES[COPPER], c = shades[(i + r) % shades.length];
-      fine(cx - rows[r] / 4 + i * 0.5, floor - 0.5 - r * 0.5, 0.5, 0.5, `rgb(${(c[0] * k) | 0},${(c[1] * k) | 0},${(c[2] * k) | 0})`);
+      const m = placed < gold ? GOLD : placed < gold + silver ? SILVER : COPPER, shades = SHADES[m], c = shades[(i + r) % shades.length];
+      const x = cx - rows[r] / 4 + i * 0.5, y = floor - 0.5 - r * 0.5;
+      fine(x, y, 0.5, 0.5, `rgb(${(c[0] * k) | 0},${(c[1] * k) | 0},${(c[2] * k) | 0})`);
+      // Its lumps glint now and then, drawn over the whole heap.
+      const f = time < 0 ? -1 : heapGlint(placed, cx, time);
+      if (f >= 0) glints.push([x, y, m, f]);
     }
+  for (const [x, y, m, f] of glints) drawGlint(fine, x, y, m, f, Math.min(1, 0.4 + k));
 }
 
 /** A soft warm disc, drawn additively round each torch and lamp. */

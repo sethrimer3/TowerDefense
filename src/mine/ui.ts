@@ -48,9 +48,9 @@ function tell(n: MineNews) {
 export interface MineHost extends MetalHost {
   /** The smithy turned out Smithy points (copper, silver, gold). */
   earn(points: Metals): void;
-  /** Ranks of the skills the mine reads: Coffee, Waterproofing, and Master
-   * smith (room for another smith). */
-  upgrades(): { coffee: number; waterproof: number; smiths: number };
+  /** Ranks of the skills the mine reads: Coffee, Waterproofing, Master
+   * smith (room for another smith), Mine carts and Ore sense. */
+  upgrades(): { coffee: number; waterproof: number; smiths: number; carts?: boolean; oreSense?: boolean };
   /** Names of the smiths working a Smithy upgrade: they stay at the smithy. */
   busySmiths(): ReadonlySet<string>;
   effects(): boolean;
@@ -135,6 +135,8 @@ export class MinePage {
     const up = this.host.upgrades();
     this.sim.coffee = up.coffee;
     this.sim.waterproof = up.waterproof;
+    this.sim.cartTrack = !!up.carts;
+    this.sim.oreSense = !!up.oreSense;
     this.sim.extraSmiths = up.smiths;
     let n = 0, drained = 0;
     // Keep pace with the library's idle time (`keepWith`), never more than

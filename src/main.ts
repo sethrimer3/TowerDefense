@@ -148,7 +148,7 @@ const minePage = new MinePage(el("mine-world"), {
     if (tab === "mine" && mineDown.below) smithy.render();
     if (tab === "tiles") tilesPage.refresh();
   },
-  upgrades: () => ({ coffee: skillRank(save, "coffee"), waterproof: skillRank(save, "waterproofing"), smiths: skillTotal(save, "smiths") }),
+  upgrades: () => ({ coffee: skillRank(save, "coffee"), waterproof: skillRank(save, "waterproofing"), carts: skillRank(save, "mineCarts") > 0, oreSense: skillRank(save, "oreSense") > 0, smiths: skillTotal(save, "smiths") }),
   busySmiths: () => busySmiths(save),
   effects: () => !save.settings.effectsOff,
   newSeed: () => Math.floor(stream("game")() * 4294967296),

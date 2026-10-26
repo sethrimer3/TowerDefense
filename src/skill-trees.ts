@@ -10,7 +10,7 @@ import { ECONOMY, quadraticCost } from "./economy.ts";
 export type SkillId =
   | "drillSergeant" | "veterans" | "bladework" | "fletchers" | "gunpowder" | "ballistics" | "warBanner" | "bannerCooldown" | "bannerDefense" | "bannerReach" | "bannerDamage" | "bannerMarch" | "bannerLife" | "bannerRegen"
   | "masonry" | "bastions" | "guilds" | "scholars" | "tactician"
-  | "fireproofWood" | "fireTraining" | "nightWatch" | "enchantedInk" | "coffee" | "waterproofing";
+  | "fireproofWood" | "fireTraining" | "nightWatch" | "enchantedInk" | "coffee" | "waterproofing" | "mineCarts" | "oreSense";
 export type TreeId = "command" | "stewardship" | "mine" | "library";
 
 /** What one rank of a skill does: `per` added to a target's percent (a
@@ -19,7 +19,7 @@ export type TreeId = "command" | "stewardship" | "mine" | "library";
  * Mine's skills are read as ranks (`library/sim.ts`: `accidentChance`,
  * `fireDrill`; `mine/sim.ts`: `nightShift`, the shaft house's seal,
  * `extraSmiths`). */
-export type SkillEffect = { target: BonusTarget | "smiths" | "fireproof" | "fireTraining" | "nightWatch" | "enchant" | "coffee" | "waterproof" | "bannerCooldown" | "bannerDefense" | "bannerReach" | "bannerDamage" | "bannerMarch" | "bannerLife" | "bannerRegen"; per: number };
+export type SkillEffect = { target: BonusTarget | "smiths" | "fireproof" | "fireTraining" | "nightWatch" | "enchant" | "coffee" | "waterproof" | "carts" | "oreSense" | "bannerCooldown" | "bannerDefense" | "bannerReach" | "bannerDamage" | "bannerMarch" | "bannerLife" | "bannerRegen"; per: number };
 export type Skill = { id: SkillId; name: string; icon: string; max: number; base: number; effect: SkillEffect; text: string };
 export type SkillNode = { id: SkillId; requires: SkillId[]; full?: SkillId[] };
 export type SkillTree = { id: TreeId; name: string; description: string; nodes: SkillNode[] };
@@ -47,6 +47,8 @@ export const SKILLS: Record<SkillId, Skill> = {
   fireproofWood: { id: "fireproofWood", name: "Fireproof wood", icon: "▤", max: 10, base: 5, effect: { target: "fireproof", per: 1 }, text: "The library's tables catch fire 10% less often a rank (1% a minute to start, then 0.9%, 0.81%…)" },
   coffee: { id: "coffee", name: "Coffee", icon: "♨", max: 12, base: 2, effect: { target: "coffee", per: 5 }, text: "5% more of the mine's crew work the night shift a rank (20% to start, up to 80%)" },
   waterproofing: { id: "waterproofing", name: "Waterproofing", icon: "☂", max: 4, base: 4, effect: { target: "waterproof", per: 15 }, text: "The shaft house keeps 15% more of the rain's runoff out of the shaft a rank (20% to start, up to 80%)" },
+  mineCarts: { id: "mineCarts", name: "Mine carts", icon: "⛀", max: 1, base: 6, effect: { target: "carts", per: 1 }, text: "Track along the trunk tunnels of every other level, 48 cells out from the shaft, and carts on it: the crew tip their ore in the nearest cart, or at the shaft's foot if that is nearer" },
+  oreSense: { id: "oreSense", name: "Ore sense", icon: "✧", max: 1, base: 10, effect: { target: "oreSense", per: 1 }, text: "Ore within 30 pixels of the workings glints, and the crew drive stairs, ramps and ladders to every vein they sense, not only ore they bare or glimpse a few cells on" },
   nightWatch: { id: "nightWatch", name: "Night watch", icon: "☾", max: 9, base: 4, effect: { target: "nightWatch", per: 5 }, text: "At night, librarians detect fires sooner and fill, carry and throw buckets 15% faster per rank" },
   enchantedInk: { id: "enchantedInk", name: "Enchanted ink", icon: "✧", max: 10, base: 10, effect: { target: "enchant", per: 1 }, text: "Each book on the library's shelves has a 1 in 10,000 chance a minute a rank of taking on glowing runes along its spine; read, an enchanted book gives one minute of the library's Knowledge at once (at least 1)" },
   fireTraining: { id: "fireTraining", name: "Fire training", icon: "♒", max: 5, base: 8, effect: { target: "fireTraining", per: 1 }, text: "More librarians fight a fire, fetching and throwing water faster and further, and each splash more likely to douse the flames" },
@@ -76,9 +78,11 @@ export const TREES: SkillTree[] = [
     { id: "scholars", requires: [] },
     { id: "tactician", requires: ["scholars"] },
   ] },
-  { id: "mine", name: "Mine", description: "Earn Knowledge in the Library. Mine skills keep the crew working and the shaft dry.", nodes: [
+  { id: "mine", name: "Mine", description: "Earn Knowledge in the Library. Mine skills keep the crew working, the shaft dry and the ore coming.", nodes: [
     { id: "coffee", requires: [] },
     { id: "waterproofing", requires: [] },
+    { id: "mineCarts", requires: [] },
+    { id: "oreSense", requires: [] },
   ] },
   { id: "library", name: "Library", description: "Earn Knowledge in the Library: shelves × librarians an hour. Library skills guard it from fire, while you play and while you are away.", nodes: [
     { id: "fireproofWood", requires: [] },
@@ -93,7 +97,7 @@ export const SKILL_IDS = Object.keys(SKILLS) as SkillId[];
 /** Knowledge the next rank of `id` costs, with `level` ranks owned. */
 export const skillCost = (id: SkillId, level: number) => {
   const growth = id === "enchantedInk" ? ECONOMY.enchantedStudy
-    : ["coffee", "waterproofing", "fireproofWood", "nightWatch", "fireTraining"].includes(id) ? ECONOMY.utilityStudy : ECONOMY.combatStudy;
+    : ["coffee", "waterproofing", "mineCarts", "oreSense", "fireproofWood", "nightWatch", "fireTraining"].includes(id) ? ECONOMY.utilityStudy : ECONOMY.combatStudy;
   return quadraticCost(SKILLS[id].base, level, SKILLS[id].base * growth);
 };
 

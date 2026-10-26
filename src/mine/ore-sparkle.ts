@@ -1,11 +1,13 @@
-/** Ore glinting near the lit workings: copper, silver and gold within
+/** Ore glinting: with the Ore sense skill, copper, silver and gold within
  * `SPARKLE.reach` art pixels (two a cell) of a passage the crew has lit now
- * and then catch the light in a small pixel-art star of their own colour.
+ * and then catch the light in a small pixel-art star of their own colour;
+ * the ore heaped at the surface glints always (`heapGlint`).
  * Presentation only: the sites are found by a chamfer distance over the grid
  * when the world changes (`sparkleSites`), and each glint's moment is hashed
  * from its cell and the wall clock (`sparkleFrame`), so nothing is stepped. */
 import { CELLS, COPPER, GOLD, H, SILVER, W, hash01, isOre, isPassable, type Material } from "./world.ts";
 import type { RGB } from "./art.ts";
+import type { Fine } from "./figures.ts";
 
 export const SPARKLE = {
   /** How far from a lit passage ore may glint, in art pixels (two a cell). */
@@ -96,6 +98,22 @@ export function sparkleFrame(x: number, y: number, seed: number, time: number) {
   const t = (time + hash01(x, y, seed + 93) * period) % period;
   const f = Math.floor(t / SPARKLE.frame);
   return f < FRAMES.length ? f : -1;
+}
+
+/** Draws frame `f` of a glint of ore `m` at art pixel (x, y), its colours
+ * dimmed to `k`. */
+export function drawGlint(fine: Fine, x: number, y: number, m: number, f: number, k = 1) {
+  const glint = GLINT[m];
+  if (!glint) return;
+  const rgb = (c: RGB) => `rgb(${(c[0] * k) | 0},${(c[1] * k) | 0},${(c[2] * k) | 0})`, arm = rgb(glint.arm), core = rgb(glint.core);
+  for (const [dx, dy] of FRAMES[f]) fine(x + dx * 0.5, y + dy * 0.5, 0.5, 0.5, dx || dy ? arm : core);
+}
+
+/** Which frame lump `n` of a heap at column `x` shows at `time`, or -1:
+ * about one lump in three glints now and then. */
+export function heapGlint(n: number, x: number, time: number) {
+  if (hash01(n, Math.floor(x), 95) >= 0.35) return -1;
+  return sparkleFrame(n, Math.floor(x), 96, time);
 }
 
 /** Where in its cell (x, y) glints: one of its four art pixels. */
