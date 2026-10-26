@@ -6,7 +6,11 @@ import { areaForWave, type AreaId } from "./areas.ts";
 import type { DefendSim } from "./sim.ts";
 
 export type GroundWeather = "sand" | "mist" | null;
-export type WindParticle = { x: number; y: number; turn: number };
+/** A tumbleweed: where it is, how far it has turned, its size (0 smallest
+ * to `WEED_SIZES` - 1) and how long it has been pinned in a corner. */
+export type WindParticle = { x: number; y: number; turn: number; size: number; stuck: number };
+/** How many sizes of tumbleweed roll about. */
+export const WEED_SIZES = 4;
 export const CLEANUP_DEPTH = .12;
 /** Sand banked against a building's side crushes it: every open city cell
  * beside one with more than `depth` of sand presses with the excess; past
@@ -20,15 +24,10 @@ const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v
 const cell = (x: number, y: number) => cellIndex(clamp(Math.floor(x), 0, CELLS_W - 1), clamp(Math.floor(y), 0, CELLS_H - 1));
 export const groundWeather = (area: AreaId): GroundWeather => area === "desert" ? "sand" : area === "fungal" ? "mist" : null;
 
-/** Interpolate fixed compass directions over six seconds, with long holds.
- * No trigonometry in battle code, and no abrupt wind reversal at a boundary. */
-export function windAt(time: number) {
-  const headings = [[1,.25],[.4,1],[-.7,.6],[-1,-.2],[-.2,-1],[.8,-.6]];
-  const epoch = Math.floor(time / 22), phase = time / 22 - epoch;
-  const a = headings[hash(epoch, 713) % headings.length], b = headings[hash(epoch + 1, 713) % headings.length];
-  const t = clamp((phase - .72) / .28, 0, 1), smooth = t * t * (3 - 2 * t);
-  return { x: a[0] + (b[0] - a[0]) * smooth, y: a[1] + (b[1] - a[1]) * smooth };
-}
+/** The wind always blows the same way, down the board and to the left, so
+ * the dunes, the drifts and every tumbleweed go with it. */
+export const WIND = { x: -.72, y: .72 };
+export function windAt(_time: number) { return { x: WIND.x, y: WIND.y }; }
 
 /** Low frequency value noise gives dunes and mist broad, continuous patches. */
 export function weatherNoise(x: number, y: number) {
@@ -46,7 +45,7 @@ export const DUNE_PERIOD = 96;
 export const DUNE_SPEED = .05;
 const wrap = (v: number, n: number) => ((v % n) + n) % n;
 /** Value noise whose lattice repeats every `px` by `py` lattice cells. */
-function periodicNoise(x: number, y: number, px: number, py: number, salt: number) {
+export function periodicNoise(x: number, y: number, px: number, py: number, salt: number) {
   const ix = Math.floor(x), iy = Math.floor(y), dx = x - ix, dy = y - iy;
   const sx = dx * dx * (3 - 2 * dx), sy = dy * dy * (3 - 2 * dy);
   const value = (x: number, y: number) => (hash(wrap(x, px), wrap(y, py), salt) % 1000) / 1000;
@@ -59,6 +58,10 @@ export const DUNE_WAVE = 24;
 /** Where along a dune's wave its crest stands: a long windward rise, then the
  * short slip face down to the next trough. */
 export const DUNE_CREST = .78;
+/** Cells the crests lean west per cell down, so each slip face looks down
+ * and to the left, the way the wind blows (a whole number of waves a
+ * period, so the field still tiles). */
+const DUNE_LEAN = .5;
 /** The field's two smooth inputs, sampled once a cell over one period: how
  * far each crest is bent (in waves) and how tall the dunes stand there. */
 let duneTables: { bend: Float32Array; amp: Float32Array } | null = null;
@@ -66,8 +69,10 @@ function tables() {
   if (duneTables) return duneTables;
   const n = DUNE_PERIOD, bend = new Float32Array(n * n), amp = new Float32Array(n * n);
   for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
-    bend[y * n + x] = periodicNoise(x / 24, y / 24, 4, 4, 821) * 1.4 + periodicNoise(x / 12, y / 12, 8, 8, 822) * .35;
-    amp[y * n + x] = clamp((periodicNoise(x / 32, y / 32, 3, 3, 823) - .06) / .45, 0, 1);
+    // Gentle enough that a crest never folds back on itself into a closed ring.
+    bend[y * n + x] = periodicNoise(x / 24, y / 24, 4, 4, 821) * .65 + periodicNoise(x / 12, y / 12, 8, 8, 822) * .14;
+    // Never 0: the dunes cover all the ground, lower in places, never bare.
+    amp[y * n + x] = .45 + .55 * clamp((periodicNoise(x / 32, y / 32, 3, 3, 823) - .1) / .6, 0, 1);
   }
   return duneTables = { bend, amp };
 }
@@ -80,19 +85,23 @@ function lerpTable(t: Float32Array, x: number, y: number) {
   const bottom = t[r1 + ix] + (t[r1 + x1] - t[r1 + ix]) * u;
   return top + (bottom - top) * v;
 }
-/** The dune field at (x, y) cells, which repeats every `DUNE_PERIOD`: `wave`
- * is how far along its dune's wave the point stands (0 in a trough rising to
- * `DUNE_CREST` at the crest, then down the slip face), `amp` how tall the
- * dunes are there (0 is bare floor) and `height` the sand's surface, 0 to 1.
- * Transverse dunes: crests run across the board, bent into sinuous lines. */
+/** The dune field at (x, y) cells, which repeats every `DUNE_PERIOD`: `phase`
+ * counts waves, `wave` is how far along its dune's wave the point stands (0
+ * in a trough rising to `DUNE_CREST` at the crest, then down the slip face),
+ * `amp` how tall the dunes are there and `height` the sand's surface above
+ * the floor's sheet, 0 in the troughs to 1. Transverse dunes: crests run
+ * across the wind, bent into sinuous lines, each a long windward rise
+ * swelling to a sharp brink and a steep slip face easing into the trough. */
 export function duneAt(x: number, y: number) {
-  const t = tables(), phase = y / DUNE_WAVE + lerpTable(t.bend, x, y);
+  const t = tables(), phase = (y - x * DUNE_LEAN) / DUNE_WAVE + lerpTable(t.bend, x, y);
   const wave = phase - Math.floor(phase), amp = lerpTable(t.amp, x, y);
-  const rise = wave < DUNE_CREST ? wave / DUNE_CREST : (1 - wave) / (1 - DUNE_CREST);
-  return { wave, amp, height: amp * (.3 + .7 * rise) };
+  let rise: number;
+  if (wave < DUNE_CREST) { const s = wave / DUNE_CREST; rise = s * s * (3 - 2 * s) * .8 + s * .2; }
+  else { const u = 1 - (wave - DUNE_CREST) / (1 - DUNE_CREST); rise = u * Math.sqrt(u); }
+  return { phase, wave, amp, height: amp * rise };
 }
-/** Sand a cell's centre holds under the field drifted by (dx, dy) cells. */
-export function duneSand(x: number, y: number) { return duneAt(x, y).height * 1.2; }
+/** Sand a cell's centre holds: the floor's thin sheet and the dune over it. */
+export function duneSand(x: number, y: number) { return .2 + duneAt(x, y).height; }
 
 export class Atmosphere {
   readonly air = new Float32Array(CELL_COUNT);
@@ -101,7 +110,6 @@ export class Atmosphere {
   readonly vy = new Float32Array(CELL_COUNT);
   readonly passage = new Float32Array(CELL_COUNT);
   readonly cleanup = new Set<number>();
-  readonly grains: WindParticle[] = [];
   readonly weeds: WindParticle[] = [];
   mode: GroundWeather = null;
   wind = { x: 1, y: .25 };
@@ -112,6 +120,7 @@ export class Atmosphere {
   private deltaAir = new Float32Array(CELL_COUNT);
   private deltaSand = new Float32Array(CELL_COUNT);
   private touched = new Uint8Array(CELL_COUNT);
+  private openGates = new Uint8Array(CELL_COUNT);
   private source = new Float32Array(CELL_COUNT);
   private previous = new WeakMap<object, { x: number; y: number }>();
   private accumulator = 0;
@@ -127,7 +136,7 @@ export class Atmosphere {
       this.mode = next;
       this.air.fill(0);
       this.source.fill(0);
-      this.grains.length = this.weeds.length = 0;
+      this.weeds.length = 0;
       // Dunes belong to the desert: past it, the sand is gone with the wind.
       if (next !== "sand") { this.sand.fill(0); this.cleanup.clear(); this.sandSeeded = false; }
       this.syncWalls(sim);
@@ -139,7 +148,6 @@ export class Atmosphere {
       }
       if (next === "sand") {
         this.sandSeeded = true;
-        for (let i = 0; i < 192; i++) this.grains.push(this.particle(sim, i));
         for (let i = 0; i < 10; i++) this.weeds.push(this.particle(sim, i + 300));
       }
       this.version++;
@@ -156,30 +164,35 @@ export class Atmosphere {
       }
       this.syncWalls(sim);
       this.wakes = 0;
-      this.stirUnits(sim);
+      // Walkers stir the mist; on sand they only print trails in the dunes'
+      // art, never moving the sand itself.
+      if (this.mode === "mist") this.stirUnits(sim);
       this.stirProjectiles(sim);
       this.transport(sim);
       if (this.mode === "sand") {
         this.pressClock += STEP;
         if (this.pressClock + 1e-8 >= SAND_PRESS.every) { this.pressClock -= SAND_PRESS.every; this.press(sim); }
-        this.moveParticles(sim, this.grains, 5);
-        this.moveParticles(sim, this.weeds, 2);
+        this.rollWeeds(sim);
       }
       this.version++;
     }
   }
 
-  /** Read live HP, not mapVersion: a crack changes HP before solidity. */
+  /** Read live HP, not mapVersion: a crack changes HP before solidity. An
+   * open gate lets the sand and mist through its gateway. */
   syncWalls(sim: DefendSim) {
+    const open = this.openGates;
+    open.fill(0);
+    for (const id of sim.gateOpen.keys()) for (const c of sim.map.buildings[id].cells) open[c] = 1;
     for (let i = 0; i < CELL_COUNT; i++) {
-      let p = sim.solid[i] ? 0 : 1;
+      let p = sim.solid[i] && !open[i] ? 0 : 1;
       if (!p && this.mode === "mist" && sim.map.wall[i]) {
         const id = sim.map.owner[i], ratio = id >= 0 ? sim.hp[id] / sim.maxHp[id] : 1;
         if (ratio < .75) p = .08 + .3 * (1 - ratio);
       }
       this.passage[i] = p;
       if (!p) this.air[i] = 0;
-      if (sim.solid[i]) { this.sand[i] = 0; this.cleanup.delete(i); }
+      if (!p) { this.sand[i] = 0; this.cleanup.delete(i); }
     }
   }
 
@@ -196,7 +209,8 @@ export class Atmosphere {
       da[i] -= flow; da[j] += flow;
       if (this.mode !== "sand") return;
       const saltation = wind * .06 + swirl * .35;
-      const ground = clamp((s[i] - s[j]) * .018 + (saltation > 0 ? s[i] : s[j]) * saltation, -s[j] * .15, s[i] * .15);
+      // Sand pours down into any lower ground it can reach: a breach, an open gate.
+      const ground = clamp((s[i] - s[j]) * .04 + (saltation > 0 ? s[i] : s[j]) * saltation, -s[j] * .15, s[i] * .15);
       ds[i] -= ground; ds[j] += ground;
     };
     for (let y = 0; y < CELLS_H; y++) for (let x = 0; x < CELLS_W; x++) {
@@ -255,18 +269,6 @@ export class Atmosphere {
         if (this.touched[i] || Math.abs(dx) + Math.abs(dy) < .015) continue;
         this.touched[i] = 1;
         this.disturb(u.x, u.y, 1, dx * 3, dy * 3);
-        if (this.mode === "sand" && this.sand[i] > .01) {
-          // A footprint pushes grains to an adjacent ridge; never through stone.
-          const x = i % CELLS_W, y = Math.floor(i / CELLS_W);
-          const nx = x + (Math.abs(dx) >= Math.abs(dy) ? Math.sign(dx) : 0);
-          const ny = y + (Math.abs(dx) < Math.abs(dy) ? Math.sign(dy) : 0);
-          if (nx < 0 || nx >= CELLS_W || ny < 0 || ny >= CELLS_H) continue;
-          const j = cellIndex(nx, ny);
-          if (this.passage[i] === 1 && this.passage[j] === 1) {
-            const amount = Math.min(this.sand[i] * .14, Math.max(0, 3 - this.sand[j]));
-            this.sand[i] -= amount; this.sand[j] += amount;
-          }
-        }
       } else this.previous.set(u, { x: u.x, y: u.y });
     }
   }
@@ -321,22 +323,38 @@ export class Atmosphere {
   private particle(sim: DefendSim, seed: number): WindParticle {
     let i = hash(seed, 921) % CELL_COUNT;
     for (let n = 0; n < CELL_COUNT && (!this.source[i] || sim.solid[i]); n++) i = (i + 1) % CELL_COUNT;
-    return { x: i % CELLS_W + .3, y: Math.floor(i / CELLS_W) + .3, turn: (seed % 13) / 13 };
+    return { x: i % CELLS_W + .3, y: Math.floor(i / CELLS_W) + .3, turn: (seed % 13) / 13, size: hash(seed, 922) % WEED_SIZES, stuck: 0 };
   }
 
-  private moveParticles(sim: DefendSim, particles: WindParticle[], speed: number) {
-    for (const p of particles) {
-      const i = cell(p.x, p.y);
-      const dx = (this.wind.x * speed + this.vx[i] * .3) * STEP;
-      const dy = (this.wind.y * speed + this.vy[i] * .3) * STEP;
+  /** The tumbleweeds roll downwind, the big ones slower, sliding along any
+   * wall they meet and so round it; one pinned in a corner rolls along the
+   * wall for a moment, and one still pinned comes back in from the upwind
+   * edge, as the ones blown off the board do. */
+  private rollWeeds(sim: DefendSim) {
+    const open = (x: number, y: number) => this.passage[cell(x, y)] === 1;
+    const wrapX = (x: number) => (x + CELLS_W) % CELLS_W, wrapY = (y: number) => (y + CELLS_H) % CELLS_H;
+    for (const p of this.weeds) {
+      const i = cell(p.x, p.y), speed = 2.2 - p.size * .35;
+      let dx = (this.wind.x * speed + this.vx[i] * .3) * STEP, dy = (this.wind.y * speed + this.vy[i] * .3) * STEP;
+      // Pinned: roll along the wall, across the wind, one way or the other.
+      if (p.stuck > .3) { const side = hash(Math.floor(p.turn), 923) % 2 ? 1 : -1; [dx, dy] = [-this.wind.y * side * speed * STEP, this.wind.x * side * speed * STEP]; }
       const steps = Math.max(1, Math.ceil(Math.max(Math.abs(dx), Math.abs(dy)) / .2));
+      let moved = 0;
       for (let n = 0; n < steps; n++) {
-        const x = (p.x + dx / steps + CELLS_W) % CELLS_W, y = (p.y + dy / steps + CELLS_H) % CELLS_H;
-        if (this.passage[cell(x, p.y)] === 1) p.x = x;
-        if (this.passage[cell(p.x, y)] === 1) p.y = y;
+        const x = wrapX(p.x + dx / steps), y = wrapY(p.y + dy / steps);
+        if (open(x, p.y)) { moved += Math.abs(dx / steps); p.x = x; }
+        if (open(p.x, y)) { moved += Math.abs(dy / steps); p.y = y; }
       }
-      p.turn += (Math.abs(dx) + Math.abs(dy)) * .8;
-      if (sim.solid[cell(p.x, p.y)]) Object.assign(p, this.particle(sim, Math.floor(p.turn * 100)));
+      p.turn += moved * .8;
+      p.stuck = moved < (Math.abs(dx) + Math.abs(dy)) * .25 ? p.stuck + STEP : Math.max(0, p.stuck - STEP * .5);
+      if (sim.solid[cell(p.x, p.y)] || p.stuck > 3) {
+        // In again from the upwind edges, top or right, somewhere clear.
+        const seed = Math.floor(p.turn * 100) + p.size, along = hash(seed, 924);
+        const top = along % 2 === 0;
+        p.x = top ? along % CELLS_W + .5 : CELLS_W - .5; p.y = top ? .5 : (along >> 1) % CELLS_H + .5;
+        p.stuck = 0;
+        if (!open(p.x, p.y)) Object.assign(p, this.particle(sim, seed), { size: p.size });
+      }
     }
   }
 

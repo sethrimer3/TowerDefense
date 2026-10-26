@@ -838,23 +838,36 @@ from its seed; `tests/defend-replay.test.ts` pins it.
   Hollow mist, and the other dry or underground areas no rain.
 - Ground weather (`atmosphere.ts`, drawn by `atmosphere-art.ts`): in the
   desert and the Fungal Hollow a per-cell field steps ten times a second.
-  The wind (`windAt`) holds a compass heading, then eases to the next.
+  The wind (`windAt`, `WIND`) always blows down the board and to the left.
   Mist is fed outside the walls, drifts with the wind, swirls round blasts
   and moving projectiles (blasts also blow holes in it), and seeps through
   wall stones below 75% HP. Sand lies in great transverse dunes, crests
   about three tiles apart (`duneAt`, a field tiling every `DUNE_PERIOD`
   cells), that creep downwind at `DUNE_SPEED` (a twentieth of a cell a
-  second, so a dune takes minutes to pass) and wrap round the board; walking
-  units push the sand about, and outside the city it settles back into the
-  dunes. It never passes standing wall, but pours through a breach,
+  second, so a dune takes minutes to pass) and wrap round the board, every
+  slip face looking downwind; they cover all the ground, their troughs the
+  floor's flat sheet of sand. Walking units no longer push the sand about,
+  and outside the city it settles back into the dunes. It never passes
+  standing wall or a shut gate, but pours through a breach or an open gate,
   and sand banked deep enough against a house or structure (`SAND_PRESS`)
   crushes it a little each second until it collapses; walls, gates, ballista
   bastions and the keep stand firm. The
-  dunes are drawn from one baked, black-outlined sprite tiled at the drift,
-  recomposed only when it moves a whole pixel.
+  dunes are drawn from one baked sprite tiled at the drift, recomposed only
+  when it moves a whole pixel: a height field (`duneHeights`, with wind
+  ripples on the windward sides) lit pixel by pixel by its slope from a low
+  sun in the upper left, where the city's shadows fall from, and dithered
+  between warm sand tones. `SandMarks` (presentation only) keeps what the
+  battle does to them as heights over the board: trails pressed into the
+  raised dunes by whoever walks them (never into the floor's sheet), and
+  craters with thrown-out rims from every blast; the wind fills them back in
+  chunk by chunk, and only the 16-pixel chunks that changed are repainted, a
+  bounded number a frame. Where a dune's tip reaches the city wall it spills
+  sand over the stones and heaps a little pile at the wall's foot inside;
+  that sand is only for the eye, so the builders never sweep it.
   Sand in the city at `CLEANUP_DEPTH` or more is a civilian job of the
-  lowest priority, dropped whenever repairs are waiting. Grains and
-  tumbleweeds (black-outlined pixel sprites) blow along the wind. Leaving
+  lowest priority, dropped whenever repairs are waiting. Tumbleweeds
+  (black-outlined pixel sprites in four sizes, the big ones slower) roll
+  downwind, sliding along any wall they meet and so round it. Leaving
   the desert clears its sand. The field uses only exact arithmetic and no
   battle random draws; it is not saved. Ambient light and precipitation fade with the terrain.
   Reduce Motion snaps the transition and suppresses rain/snow animation.
