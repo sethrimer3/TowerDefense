@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { AIR, BEDROCK, CELLS, DIRT, GOLD, GRASS, GRAVEL, H, HARD_STONE, LAMP, LAVA, LOOSE, COPPER, LADDER, MATERIAL_COUNT, RAIL, ROCK, SILVER, STONE, TORCH, W, WORK_LAMP, World, decodeGrid, encodeGrid, generate, idx, isPassable, strata } from "../src/mine/world.ts";
 import {
   BARS_PER_POINT, BREATH_TICKS, DAY_TICKS, DEATH_GAP, KIT, MineSim, ORE_PER_BAR, STARVE_TICKS, metalSum, TICK_HZ, WEATHER_TICKS, daylight, decodeMineSave,
-  hirePrice, PACE_MINUTES, skyAt, weatherOf,
+  hirePrice, PACE_MINUTES, skyAt, weatherOf, orePath, TRACK_EVERY, TRACK_REACH,
 } from "../src/mine/sim.ts";
 import { MAX_AWAY_MS, span } from "../src/away.ts";
 import { BAY_BUNKS, FIRST_LEVELS, MAX_LEVEL, along, layout, pathTicks } from "../src/mine/buildings.ts";
@@ -78,7 +78,7 @@ test("a grid survives encoding; a damaged one is refused", () => {
   assert.equal(decodeGrid(42, CELLS, MATERIAL_COUNT), null);
 });
 
-test("one miner sinks a shored, laddered shaft and opens a graded tunnel with track and lights", () => {
+test("one miner sinks a shored, laddered shaft and opens a graded tunnel with lights, and no track before Mine carts", () => {
   const sim = new MineSim(12345);
   // Two nights' sleep among it.
   // Stone now takes three times its former rock baseline; allow the crew
@@ -90,14 +90,30 @@ test("one miner sinks a shored, laddered shaft and opens a graded tunnel with tr
   // Where the shaft passes through dirt, its walls are timbered.
   for (let y = surface[x0] + 2; y < stoneTop[x0] - 1; y++)
     for (const side of [-1, 1]) assert.notEqual(sim.world.get(x0 + side, y), DIRT, `shoring at ${side},${y}`);
-  assert.ok(sim.railReach(0, -1) + sim.railReach(0, 1) > 20, "track laid");
+  assert.equal(sim.railReach(0, -1) + sim.railReach(0, 1), 0, "no track without Mine carts");
+  assert.equal(sim.carts.length, 0);
   const lights = sim.world.cells.filter(m => m === LAMP || m === TORCH || m === WORK_LAMP).length;
   assert.ok(lights >= 2, `workings lit (${lights})`);
   assert.ok(metalSum(sim.mined) > 0, "ore found and dug");
 });
 
+test("without carts the crew tip their ore at the shaft's foot for the hoist", () => {
+  const sim = new MineSim(99);
+  sim.setLevel("barracks", 2);
+  for (let i = 0; i < 5; i++) sim.hire();
+  let points = 0;
+  for (let k = 0; k < 60; k++) {
+    minutes(sim, 1);
+    points += metalSum(sim.collect());
+  }
+  assert.ok(sim.mined.copper > 60, `copper mined ${sim.mined.copper}`);
+  assert.ok(points * BARS_PER_POINT + metalSum(sim.worked) + metalSum(sim.bars) > 3, "worked into bars");
+  assert.ok(!sim.world.cells.some((m) => m === RAIL), "no track");
+});
+
 test("the crew's ore comes up by pack, cart and hoist to the forge, is smelted into bars and worked, and nobody ends up inside rock", () => {
   const sim = new MineSim(99);
+  sim.cartTrack = true;
   sim.setLevel("barracks", 2);
   for (let i = 0; i < 5; i++) sim.hire();
   let points = 0;
@@ -113,6 +129,44 @@ test("the crew's ore comes up by pack, cart and hoist to the forge, is smelted i
   assert.ok(sim.mined.copper > 100, `copper mined ${sim.mined.copper}`);
   assert.ok(sim.carts.length >= 2, `carts ${sim.carts.length}`);
   assert.ok(sim.world.cells.some((m) => m === RAIL));
+  // Track only along the trunk: every other level, near the shaft.
+  sim.world.cells.forEach((m, c) => {
+    if (m !== RAIL) return;
+    const x = c % W, y = (c - x) / W, k = sim.levels.findIndex((_, k) => sim.tunnelRows[k][x] === y);
+    assert.ok(k >= 0 && k % TRACK_EVERY === 0 && Math.abs(x - sim.shaftX) <= TRACK_REACH, `rail at ${x},${y}`);
+  });
+});
+
+test("ore paths are one move apart, from the workings to the ore", () => {
+  for (let style = 0; style < 4; style++)
+    for (const [fx, fy, tx, ty] of [[10, 10, 20, 15], [10, 10, 3, 2], [5, 5, 5, 12], [5, 5, 12, 5], [0, 0, 4, 9]]) {
+      const p = orePath(style, fx, fy, tx, ty);
+      assert.deepEqual(p[0], [fx, fy]);
+      assert.deepEqual(p[p.length - 1], [tx, ty]);
+      for (let i = 1; i < p.length; i++) assert.ok(Math.abs(p[i][0] - p[i - 1][0]) <= 1 && Math.abs(p[i][1] - p[i - 1][1]) <= 1 && (p[i][0] !== p[i - 1][0] || p[i][1] !== p[i - 1][1]));
+    }
+});
+
+test("with Ore sense the crew cut ways to ore well past the few cells they glimpse, no deeper than the shaft", () => {
+  const run = (sense: boolean) => {
+    const sim = new MineSim(99);
+    sim.oreSense = sense;
+    sim.setLevel("barracks", 2);
+    for (let i = 0; i < 5; i++) sim.hire();
+    minutes(sim, 40);
+    let planned = 0;
+    sim.plan.forEach((p, c) => {
+      if (p && (sim.world.cells[c] === COPPER || sim.world.cells[c] === SILVER || sim.world.cells[c] === GOLD)) planned++;
+    });
+    return { sim, planned, mined: metalSum(sim.mined) };
+  };
+  const plain = run(false), sensed = run(true);
+  assert.ok(sensed.planned + sensed.mined > (plain.planned + plain.mined) * 1.3, `sensed ${sensed.planned}+${sensed.mined}, plain ${plain.planned}+${plain.mined}`);
+  const ways = (sensed.sim as any).side.reduce((a: number, b: number) => a + b, 0);
+  assert.ok(ways > 40, `ways cut to sensed ore (${ways} cells)`);
+  // None of it below the levels the shaft has opened.
+  (sensed.sim as any).side.forEach((v: number, c: number) => v && assert.ok(Math.floor(c / W) <= sensed.sim.levels[sensed.sim.shaftLevel] + 3, `way at ${c % W},${Math.floor(c / W)}`));
+  for (const m of sensed.sim.miners) assert.ok(isPassable(sensed.sim.world.get(m.x, m.y)) && isPassable(sensed.sim.world.get(m.x, m.y - 1)));
 });
 
 test("the same seed and crew mine the same way", () => {

@@ -131,6 +131,21 @@ const STEP_TICKS = 8, CLIMB_TICKS = 10, FALL_TICKS = 2, CART_STEP = 5, BUCKET_ST
 /** Rows between tunnel levels, and how far a tunnel reaches before the shaft
  * is sunk to the next. */
 const LEVEL_GAP = 14, OPEN_REACH = 28;
+/** With Mine carts, track runs out `TRACK_REACH` cells each way from the
+ * shaft on every `TRACK_EVERY`th level: the trunk where a cart saves the
+ * most carrying. */
+export const TRACK_REACH = 48, TRACK_EVERY = 2;
+/** With Ore sense, how far from the workings (in cells, 30 art pixels) the
+ * crew sense ore and drive a way to it. */
+export const SENSE_REACH = 15;
+/** Cells of rock the crew will cut toward sensed ore, a cell of its vein:
+ * a lone lump only a few cells off, a fat vein from all the way out. */
+const VEIN_WORTH = 1.25;
+/** Extra steps a miner would walk for trunk work sooner than cut rock on the
+ * way to sensed ore. */
+const SIDE_WAIT = 6;
+/** Share of the usual digging time rock on a way to sensed ore takes. */
+const SEAM_CUT = 0.5;
 
 /** One day and night, and how long each spell of weather lasts. */
 export const DAY_TICKS = 12 * 60 * TICK_HZ;
@@ -350,6 +365,35 @@ export class MineSim {
    * shift) and Waterproofing (the shaft house keeps more rain out). */
   coffee = 0;
   waterproof = 0;
+  /** Mine carts: track along the trunk tunnels and carts on it. Without it
+   * the crew carry their ore to the shaft's foot for the hoist. */
+  get cartTrack() {
+    return this.tracked;
+  }
+  set cartTrack(on: boolean) {
+    if (on === this.tracked) return;
+    this.tracked = on;
+    if (on) for (let k = 0; k <= this.shaftLevel; k++) this.layTrack(k);
+  }
+  private tracked = false;
+  /** Ore sense: the crew drive a way to any ore within `SENSE_REACH` of the
+   * workings (and the renderer lets it glint). Without it they follow only
+   * ore they bare or glimpse a few cells on. */
+  get oreSense() {
+    return this.sensing;
+  }
+  set oreSense(on: boolean) {
+    if (on === this.sensing) return;
+    this.sensing = on;
+    this.senseQueue = on ? this.sensedOre() : [];
+  }
+  private sensing = false;
+  /** Ore cells sensed but not yet routed to, nearest the workings first, and
+   * those no way could be found to (not saved: tried again after a reload). */
+  private senseQueue: number[] = [];
+  private unreachable = new Set<number>();
+  /** Cells cut only on the way to sensed ore: the trunk's work comes first. */
+  private side = new Uint8Array(CELLS);
   /** Room for more smiths than the smithy's level gives (Master smith). */
   extraSmiths = 0;
   private idleWork = { forge: 0, smith: 0 };
@@ -496,6 +540,8 @@ export class MineSim {
     const next = new MineSim(seed, { ...rest, carts: [], buckets: [], yard: noMetals(), shaftLevel: 0, mercy: 0, ore, prospect: this.prospect + 1, rebuilds: [] });
     next.coffee = this.coffee;
     next.waterproof = this.waterproof;
+    next.cartTrack = this.cartTrack;
+    next.oreSense = this.oreSense;
     next.extraSmiths = this.extraSmiths;
     next.weatherOverride = this.weatherOverride;
     const owed = this.collect();
@@ -706,7 +752,7 @@ export class MineSim {
         const y = this.tunnelRows[k][x];
         this.mark(x, y - 2, P_DIG);
         this.mark(x, y - 1, P_DIG);
-        this.mark(x, y, P_RAIL);
+        this.mark(x, y, P_DIG);
         // Occasional taller roof pockets, leaving an irregular silhouette.
         if (hash01(Math.floor(x / 3), k, this.seed + 413) < 0.3) this.mark(x, y - 3, P_DIG);
         // Across a cave the track runs on a trestle of beams.
@@ -743,6 +789,27 @@ export class MineSim {
       }
     }
     this.shaftLevel = k;
+    if (this.tracked) this.layTrack(k);
+    // The shaft at the bottom: back for every lump of ore sensed.
+    if (this.sensing && k === this.levels.length - 1) this.senseQueue = this.sensedOre();
+  }
+
+  /** Plans level `k`'s track out from the shaft, when it is a trunk level. */
+  private layTrack(k: number) {
+    if (k % TRACK_EVERY) return;
+    for (const side of [-1, 1])
+      for (let n = 1; n <= TRACK_REACH; n++) {
+        const x = this.shaftX + side * n;
+        if (x < 2 || x > W - 3) break;
+        const c = idx(x, this.tunnelRows[k][x]);
+        if (this.plan[c] === P_DIG || this.plan[c] === P_NONE) this.mark(x, this.tunnelRows[k][x], P_RAIL);
+      }
+  }
+
+  /** Whether (x, y) is the floor of an opened level's tunnel. */
+  private tunnelFloor(x: number, y: number) {
+    for (let k = 0; k <= this.shaftLevel; k++) if (this.tunnelRows[k][x] === y) return true;
+    return false;
   }
 
   /** Cell c is ground a drift shouldn't open: soil, a boulder or loose
@@ -922,6 +989,168 @@ export class MineSim {
         if (!isStone(m)) break;
       }
     }
+    if (this.sensing) this.senseNear(x, y);
+  }
+
+  // ── Ore sense ───────────────────────────────────────────────────────
+
+  /** Every unplanned ore cell within `SENSE_REACH` of the workings (open
+   * cells the crew have planned), nearest first: a chamfer distance over
+   * the grid, two steps a cell across and three diagonally. */
+  private sensedOre() {
+    const far = SENSE_REACH * 2 + 1, dist = new Uint8Array(CELLS).fill(far);
+    for (let c = 0; c < CELLS; c++) if (this.plan[c] && isPassable(this.world.cells[c]) && c >= this.strata.surface[c % W] * W) dist[c] = 0;
+    const relax = (c: number, q: number, w: number) => {
+      if (dist[q] + w < dist[c]) dist[c] = dist[q] + w;
+    };
+    for (let y = 0; y < H; y++)
+      for (let x = 0; x < W; x++) {
+        const c = y * W + x;
+        if (x > 0) relax(c, c - 1, 2);
+        if (y > 0) {
+          relax(c, c - W, 2);
+          if (x > 0) relax(c, c - W - 1, 3);
+          if (x < W - 1) relax(c, c - W + 1, 3);
+        }
+      }
+    for (let y = H - 1; y >= 0; y--)
+      for (let x = W - 1; x >= 0; x--) {
+        const c = y * W + x;
+        if (x < W - 1) relax(c, c + 1, 2);
+        if (y < H - 1) {
+          relax(c, c + W, 2);
+          if (x < W - 1) relax(c, c + W + 1, 3);
+          if (x > 0) relax(c, c + W - 1, 3);
+        }
+      }
+    const found: number[] = [];
+    const floor = this.senseFloor * W + W;
+    for (let c = 0; c < floor; c++) if (dist[c] <= SENSE_REACH * 2 && isOre(this.world.cells[c]) && !this.plan[c]) found.push(c);
+    return found.sort((a, b) => dist[a] - dist[b] || a - b);
+  }
+
+  /** After a dig at (x, y), the sensed ore within reach of it best worth
+   * the way: the most vein for the rock cut. Ore not worth it yet waits for
+   * the workings to come nearer. */
+  private senseNear(x: number, y: number) {
+    let best = -1, bestCost = Infinity;
+    for (let dy = -SENSE_REACH; dy <= SENSE_REACH; dy++)
+      for (let dx = -SENSE_REACH; dx <= SENSE_REACH; dx++) {
+        const d2 = dx * dx + dy * dy, ox = x + dx, oy = y + dy;
+        if (d2 > SENSE_REACH * SENSE_REACH || !inBounds(ox, oy)) continue;
+        const c = idx(ox, oy);
+        if (!isOre(this.world.cells[c]) || this.plan[c] || this.unreachable.has(c) || oy > this.senseFloor) continue;
+        const cost = Math.sqrt(d2) / this.veinSize(c);
+        if (cost <= this.worth && cost < bestCost) {
+          best = c;
+          bestCost = cost;
+        }
+      }
+    if (best >= 0) this.routeToOre(best);
+  }
+
+  /** Rock the crew cut toward sensed ore a cell of its vein: `VEIN_WORTH`,
+   * until the shaft is at the bottom, then whatever it takes. */
+  private get worth() {
+    return this.shaftLevel === this.levels.length - 1 ? Infinity : VEIN_WORTH;
+  }
+
+  /** The deepest row sensed ore is gone after: no lower than the shaft has
+   * been sunk, so the crew don't wander off below the levels they work. */
+  private get senseFloor() {
+    return this.levels[this.shaftLevel] + 2;
+  }
+
+  /** Cells of unplanned ore joined to ore cell c, up to a dozen. */
+  private veinSize(c: number) {
+    const todo = [c], seen = new Set(todo);
+    for (let h = 0; h < todo.length && todo.length < 12; h++) {
+      const q = todo[h], qx = q % W;
+      for (const n of [q - 1, q + 1, q - W, q + W]) {
+        if (n < 0 || n >= CELLS || Math.abs((n % W) - qx) > 1 || seen.has(n) || !isOre(this.world.cells[n]) || this.plan[n]) continue;
+        seen.add(n);
+        todo.push(n);
+      }
+    }
+    return Math.min(12, todo.length);
+  }
+
+  /** Plans a way from the nearest workings to ore cell `t`, and its vein:
+   * by stairs, a ramp, or a ladder down or up before or after a level run,
+   * whichever first fits the ground (the order hashed from the cell, so
+   * the workings grow in all of these). Returns whether one was planned. */
+  private routeToOre(t: number) {
+    const tx = t % W, ty = (t - tx) / W, from = this.workingsNear(tx, ty);
+    if (from < 0) {
+      this.unreachable.add(t);
+      return false;
+    }
+    const fx = from % W, fy = (from - fx) / W;
+    if (Math.hypot(tx - fx, ty - fy) / this.veinSize(t) > this.worth) return false;
+    const first = Math.floor(hash01(tx, ty, this.seed + 431) * 4);
+    for (let n = 0; n < 4; n++) {
+      const feet = orePath((first + n) % 4, fx, fy, tx, ty);
+      const cut = this.carve(feet);
+      if (!cut) continue;
+      for (const [x, y, p] of cut) {
+        const c = idx(x, y);
+        if (!this.plan[c]) this.side[c] = 1;
+        if (!this.plan[c] || (this.plan[c] === P_DIG && p !== P_DIG)) this.plan[c] = p;
+      }
+      this.markVein(tx, ty);
+      return true;
+    }
+    this.unreachable.add(t);
+    return false;
+  }
+
+  /** Feet in the workings nearest cell (x, y), within `SENSE_REACH`, or -1:
+   * planned open ground a miner can stand on, below the ground. */
+  private workingsNear(x: number, y: number) {
+    const r = SENSE_REACH;
+    let best = -1, bestD = Infinity;
+    for (let dy = -r; dy <= r; dy++)
+      for (let dx = -r; dx <= r; dx++) {
+        const nx = x + dx, ny = y + dy, d = dx * dx + dy * dy;
+        if (d > r * r || d >= bestD || !inBounds(nx, ny) || ny <= this.strata.stoneTop[nx] + 1) continue;
+        const c = idx(nx, ny);
+        if (this.plan[c] && this.standable(nx, ny)) {
+          best = c;
+          bestD = d;
+        }
+      }
+    return best;
+  }
+
+  /** The cells a run of feet positions needs opened, with their marks (two
+   * tall, a third over each step of a stair, ladders up and down), or null
+   * where it would cross soil, loose ground, a boulder, bedrock, lava or the
+   * shaft, or come too near the dirt. */
+  private carve(feet: [number, number][]): [number, number, number][] | null {
+    const out: [number, number, number][] = [];
+    const add = (x: number, y: number, p: number) => {
+      if (!inBounds(x, y) || y <= this.strata.stoneTop[x] + 1 || y >= H - 2) return false;
+      const c = idx(x, y), m = this.world.cells[c];
+      if (Math.abs(x - this.shaftX) <= 1 || m === BEDROCK || m === LAVA || this.nearLava(c)) return false;
+      if (isSolid(m) && this.unsound(c)) return false;
+      out.push([x, y, p]);
+      return true;
+    };
+    for (let i = 0; i < feet.length; i++) {
+      const [x, y] = feet[i], prev = feet[i - 1], next = feet[i + 1];
+      // A climb is dug plain: the crew put its ladder up as they first
+      // climb it, or as they dig down it.
+      const climb = (prev && prev[0] === x) || (next && next[0] === x);
+      if (!add(x, y, P_DIG) || !add(x, y - 1, P_DIG)) return null;
+      // A stair's step: room over the lower of the two for the step up.
+      if (prev && prev[0] !== x && prev[1] !== y) {
+        const [lx, ly] = prev[1] > y ? prev : [x, y];
+        if (!add(lx, ly - 2, P_DIG)) return null;
+      }
+      // Now and then a torch on the wall of a level run.
+      if (!climb && i > 2 && i % 9 === 4 && !add(x, y - 1, P_TORCH)) return null;
+    }
+    return out;
   }
 
   // ── Miners ──────────────────────────────────────────────────────────
@@ -1383,7 +1612,7 @@ export class MineSim {
       // Sinking the shaft wants supplies to ladder and shore it (one cut off
       // below digs out regardless).
       if (job === 1 && cx === this.shaftX && cy > this.strata.surface[cx] && kit <= 0 && !cutOff) continue;
-      const score = cutOff && cx === this.shaftX && job <= 2 ? -60 : job === 4 ? -40 : job === 1 && isOre(this.world.cells[c]) ? -30 : job === 3 ? -1 : job === 2 ? -2 : (DIG_TICKS[this.world.cells[c]] ?? 0) / 110;
+      const score = cutOff && cx === this.shaftX && job <= 2 ? -60 : job === 4 ? -40 : job === 1 && isOre(this.world.cells[c]) ? -30 : job === 3 ? -1 : job === 2 ? -2 : (DIG_TICKS[this.world.cells[c]] ?? 0) / 110 + this.side[c] * SIDE_WAIT;
       if (!best || score < best.score) best = { score, cell: c, cart: null };
     }
     for (const [dx, dy] of MineSim.WET_REACH) {
@@ -1476,6 +1705,7 @@ export class MineSim {
   /** Levels whose track is long enough for a cart and that have none yet. */
   private cartJobs() {
     const out: { level: number; side: number }[] = [];
+    if (!this.tracked) return out;
     for (let k = 0; k <= this.shaftLevel; k++)
       for (const side of [-1, 1])
         if (!this.cartClaims.has(`${k}:${side}`) && !this.carts.some((c) => c.level === k && c.side === side) && this.railReach(k, side) >= 16) out.push({ level: k, side });
@@ -1486,8 +1716,10 @@ export class MineSim {
     const top = (x: number) => this.strata.surface[x] + 4, forge = this.yardX;
     const path = this.search(start, (x, y, d) => {
       if (Math.abs(x - forge) <= 1 && y < top(x)) return d;
-      if (m.spoil < PACK_SPOIL || metalSum(m) > 0)
+      if (m.spoil < PACK_SPOIL || metalSum(m) > 0) {
+        if (this.shaftFoot(x, y)) return d;
         for (const c of this.carts) if (c.state === "parked" && c.y === y && Math.abs(c.x - x) <= 1 && metalSum(c) < CART_LOAD) return d;
+      }
       return null;
     });
     if (!path) return false;
@@ -1495,6 +1727,14 @@ export class MineSim {
     m.path = path;
     return true;
   }
+  /** Feet (x, y) are at an opened level's foot of the shaft, below the
+   * ground, where the hoist takes a load up. */
+  private shaftFoot(x: number, y: number) {
+    if (Math.abs(x - this.shaftX) > 1 || y <= this.strata.surface[x] + 4) return false;
+    for (let k = 0; k <= this.shaftLevel; k++) if (this.levels[k] === y) return this.cell(this.shaftX, y) === LADDER;
+    return false;
+  }
+
   /** Off to the yard for a load of ore for the forge. */
   private goFetch(m: Miner, start: number) {
     const path = this.search(start, (x, y, d) => (Math.abs(x - this.yardX) <= 1 && y < this.strata.surface[x] + 4 ? d : null), 0, 8000);
@@ -1659,7 +1899,8 @@ export class MineSim {
       m.work = t.cell;
       m.facing = t.cell % W > m.x ? 1 : t.cell % W < m.x ? -1 : m.facing;
       if (t.kind === "dig" || t.kind === "build") this.workLight(m);
-      m.timer = t.kind === "dig" ? DIG_TICKS[m2] ?? 120 : t.kind === "bail" ? BAIL_TICKS : t.kind === "douse" ? DOUSE_TICKS : BUILD_TICKS[FIXTURE[this.plan[t.cell]]];
+      // A way to sensed ore follows the rock's seams: it cuts quicker.
+      m.timer = t.kind === "dig" ? Math.round((DIG_TICKS[m2] ?? 120) * (this.side[t.cell] ? SEAM_CUT : 1)) : t.kind === "bail" ? BAIL_TICKS : t.kind === "douse" ? DOUSE_TICKS : BUILD_TICKS[FIXTURE[this.plan[t.cell]]];
       m.working = true;
       return;
     }
@@ -1677,6 +1918,13 @@ export class MineSim {
         m.spoil = 0;
         this.release(m);
         return;
+      }
+      if (this.shaftFoot(m.x, m.y)) {
+        // Tipped in a bucket for the hoist, the spoil left by the shaft.
+        this.loadBucket(m.y, m);
+        m.copper = m.silver = m.gold = 0;
+        m.spoil = 0;
+        return this.release(m);
       }
       if (Math.abs(m.x - this.yardX) <= 1 && m.y < this.strata.surface[m.x] + 4) {
         this.toYard(m);
@@ -1769,9 +2017,9 @@ export class MineSim {
         this.afterDig(x, y, m);
         this.discover(x, y);
         if (this.cell(x, y - 1) === RAIL && this.plan[c] === P_DIG) this.mark(x, y, P_BEAM);
-        // Opening up the roof can make room for a lantern over the track below.
-        for (let row = y + 1; row <= y + LANTERN_ROOM && this.passable(x, row); row++)
-          if (this.cell(x, row) === RAIL) { this.planLantern(x, row); break; }
+        // Opening up the roof can make room for a lantern over the tunnel below.
+        for (let row = y; row <= y + LANTERN_ROOM && this.passable(x, row); row++)
+          if (this.cell(x, row) === RAIL || (this.plan[idx(x, row)] === P_DIG && this.tunnelFloor(x, row))) { this.planLantern(x, row); break; }
       }
     } else if (t.kind === "build") {
       const c = t.cell, x = c % W, y = (c - x) / W;
@@ -1839,7 +2087,7 @@ export class MineSim {
         c.y = rows[c.x];
       }
       else {
-        if (metalSum(c) > 0) this.buckets.push({ y: c.y, copper: c.copper, silver: c.silver, gold: c.gold });
+        this.loadBucket(c.y, c);
         c.copper = c.silver = c.gold = 0;
         c.state = "out";
       }
@@ -1869,6 +2117,15 @@ export class MineSim {
       h.copper = h.silver = h.gold = 0;
       h.state = "idle";
     }
+  }
+
+  /** A load left at the shaft's foot at row y for the hoist, added to one
+   * already waiting there. */
+  private loadBucket(y: number, load: Metals) {
+    if (metalSum(load) === 0) return;
+    const b = this.buckets.find((b, i) => b.y === y && (i > 0 || this.hoist.state !== "down"));
+    if (b) for (const k of METALS) b[k] += load[k];
+    else this.buckets.push({ y, copper: load.copper, silver: load.silver, gold: load.gold });
   }
 
   /** Ore brought up is tipped in the yard; the forge's hands carry it in. */
@@ -2045,6 +2302,16 @@ export class MineSim {
 
   // ── The tick ────────────────────────────────────────────────────────
 
+  /** Routes to the ore sensed when Ore sense was learned, a few at a time. */
+  private stepSense() {
+    if (!this.sensing || this.tick % 15) return;
+    while (this.senseQueue.length) {
+      const c = this.senseQueue.shift()!;
+      if (!isOre(this.world.cells[c]) || this.plan[c] || this.unreachable.has(c)) continue;
+      if (this.routeToOre(c)) return;
+    }
+  }
+
   step() {
     this.tick++;
     if (this.mercy > 0) this.mercy--;
@@ -2070,6 +2337,7 @@ export class MineSim {
     for (const c of this.carts) this.stepCart(c);
     this.stepHoist();
     if (this.tick % 30 === 0) this.replan();
+    this.stepSense();
     if (this.tick % 6 === 0 && this.burning.length) this.stepFire(6);
     if (this.tick % 10 === 0 && this.world.waterCount) this.drain();
     if (this.tick % 300 === 0) this.survey();
@@ -2138,6 +2406,22 @@ export class MineSim {
 
 /** Levels for a mine saved before buildings had them: room for the crew
  * and its trades as they were, and a warehouse to match. */
+/** Feet positions from (fx, fy) to (tx, ty), one move apart, in one of four
+ * shapes: 0 stairs (a row a cell, then level or a ladder for the rest), 1 a
+ * ramp (a row every two cells), 2 a ladder first then level, 3 level first
+ * then a ladder. */
+export function orePath(style: number, fx: number, fy: number, tx: number, ty: number): [number, number][] {
+  const out: [number, number][] = [[fx, fy]], sx = Math.sign(tx - fx), sy = Math.sign(ty - fy);
+  let x = fx, y = fy, i = 0;
+  const go = (nx: number, ny: number) => out.push([(x = nx), (y = ny)]);
+  if (style === 0) while (x !== tx && y !== ty) go(x + sx, y + sy);
+  else if (style === 1) while (x !== tx) go(x + sx, y !== ty && ++i % 2 === 0 ? y + sy : y);
+  else if (style === 2) while (y !== ty) go(x, y + sy);
+  while (x !== tx) go(x + sx, y);
+  while (y !== ty) go(x, y + sy);
+  return out;
+}
+
 function migrateLevels(saved: MineSave): Levels {
   const count = (j: Job) => saved.miners.filter((m) => m.job === j).length || (j !== "mine" ? saved.jobs?.[j] ?? 0 : 0);
   const clamp = (n: number) => Math.max(1, Math.min(MAX_LEVEL, Math.ceil(n)));

@@ -99,7 +99,7 @@ export const SUBJECTS: Subject[] = [
   },
   {
     id: "mine", name: "Mine", sprite: "mine", blurb: "The crew, the shaft and the smithy.",
-    topics: [{ id: "mine", name: "Mine", skills: ["coffee", "waterproofing", "scholars", "tactician"] }],
+    topics: [{ id: "mine", name: "Mine", skills: ["coffee", "waterproofing", "mineCarts", "oreSense", "scholars", "tactician"] }],
   },
   {
     id: "library", name: "Library", sprite: "library", blurb: "Its shelves, its staff and its fires.",
