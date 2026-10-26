@@ -13,7 +13,7 @@
  * image copy. The buffer is rebuilt at most 30 times a second. */
 import { CELLS_H, CELLS_W, cellInBounds, cellIndex, hash01 } from "./grid.ts";
 import { CellType, type CityMap } from "./citygen.ts";
-import { POND, hasTree, pondDisc, treeCanopy } from "./park-geometry.ts";
+import { hasTree, pondDisc, pondField, treeCanopy } from "./park-geometry.ts";
 import { bareAt, groundArt, turfAt, type GroundArt } from "./ground-art.ts";
 
 /** Blade pixels per cell. */
@@ -252,7 +252,12 @@ function plan(map: CityMap, cx: number, cy: number): Blade[] | null {
 /** Whether a point (in cells) near (cx, cy) lies under a tree's canopy or
  * on a pond's outlined shore. */
 function covers(map: CityMap, cx: number, cy: number) {
-  const discs: { x: number; y: number; r: number }[] = [];
+  const discs: { x: number; y: number; r: number }[] = [], water: { x: number; y: number; r: number }[] = [];
+  for (let dy = -2; dy <= 2; dy++)
+    for (let dx = -2; dx <= 2; dx++) {
+      const x = cx + dx, y = cy + dy;
+      if (cellInBounds(x, y) && map.type[cellIndex(x, y)] === CellType.WATER) water.push(pondDisc(x, y, 1));
+    }
   for (let dy = -1; dy <= 1; dy++)
     for (let dx = -1; dx <= 1; dx++) {
       const x = cx + dx, y = cy + dy;
@@ -261,7 +266,7 @@ function covers(map: CityMap, cx: number, cy: number) {
         const t = treeCanopy(x, y);
         discs.push({ x: t.x, y: t.y, r: t.r + 0.1 });
       }
-      if (map.type[cellIndex(x, y)] === CellType.WATER) discs.push(pondDisc(x, y, POND.outline + 0.04));
     }
-  return (x: number, y: number) => discs.some((d) => (x - d.x) ** 2 + (y - d.y) ** 2 < d.r * d.r);
+  return (x: number, y: number) =>
+    discs.some((d) => (x - d.x) ** 2 + (y - d.y) ** 2 < d.r * d.r) || (water.length > 0 && pondField(water, x, y) > -0.04);
 }
