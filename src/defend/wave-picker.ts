@@ -1,3 +1,4 @@
+import {t} from "../i18n/index.ts";
 /**
  * The starting wave picker: a parchment list of every wave a defense may
  * start on, each with its difficulty (the wave's enemy budget) and a bar
@@ -29,13 +30,13 @@ export function wavePickerHTML(save: DefendSave, developerMode = false, testerSe
     const difficulty = waveDifficulty(wave), boss = isBossWave(wave);
     const share = top > 0 ? Math.max(4, Math.round((Math.log(difficulty + 1) / top) * 100)) : 100;
     rows.push(`<button class="wave-row${boss ? " boss" : ""}" style="${areaStyle(area)}" title="${area.name}" data-wave="${wave}" aria-pressed="${!testerSelected && wave === chosen}">` +
-      `<span class="wave-name">Wave <b>${wave}</b>${boss ? `<em>Boss</em>` : ""}</span>` +
+      `<span class="wave-name">${t("control.wave")} <b>${wave}</b>${boss ? `<em>Boss</em>` : ""}</span>` +
       `<span class="wave-bar" aria-hidden="true"><i style="width:${share}%"></i></span>` +
       `<span class="wave-difficulty" title="Difficulty ${difficulty.toLocaleString("en-US")}"><small>Difficulty</small>${difficultyLabel(difficulty)}</span></button>`);
   }
-  return `<small>THE WATCH AWAITS ITS ORDERS</small><h2 id="defend-wave-title">Starting wave</h2>
+  return `<small>THE WATCH AWAITS ITS ORDERS</small><h2 id="defend-wave-title">${t("control.startingWave")}</h2>
     <p>Your next defense starts on <b>Wave ${chosen}</b>. Choose an earlier wave below.</p>
     <p>Furthest wave reached: <b>${furthestWave(save)}</b>. New records set your starting wave to this number minus one (minimum Wave 1).</p>
     <div class="wave-list">${developerMode ? `<button class="wave-row" data-unit-tester aria-pressed="${testerSelected}"><span class="wave-name">Unit tester</span><span>Summon enemies manually</span></button>` : ""}${rows.join("")}</div>
-    <div class="dialog-actions"><button data-wave-close>Close</button></div>`;
+    <div class="dialog-actions"><button data-wave-close>${t("common.close")}</button></div>`;
 }

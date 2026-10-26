@@ -1,3 +1,4 @@
+import { MESSAGES } from "../src/i18n/index.ts";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -30,4 +31,10 @@ test("the committed font files match the glyphs (rebuild with scripts/pixel-font
   const glyphs = readGlyphs(), root = new URL("../", import.meta.url);
   assert.deepEqual(new Uint8Array(readFileSync(new URL(FONT_FILES.regular, root))), buildFont(glyphs, false));
   assert.deepEqual(new Uint8Array(readFileSync(new URL(FONT_FILES.bold, root))), buildFont(glyphs, true));
+});
+
+test("Alembic covers every character in the six Latin-language catalogs", () => {
+  const codes = new Set([32, ...readGlyphs().map(g => g.code)]);
+  for (const row of MESSAGES) for (const message of row.slice(1, 7)) for (const char of message)
+    assert.ok(codes.has(char.codePointAt(0)!), `${row[0]} lacks ${char}`);
 });
