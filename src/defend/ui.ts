@@ -1342,6 +1342,7 @@ export class DefendPage {
     sp.picked = id;
     this.renderSpecialty();
     const node = this.root.querySelector<HTMLElement>(`#defend-specialty [data-node="${id}"]`);
+    this.tree?.burst(id);
     replay(node, "bought");
     sparksOver(node, "arcane");
   }
