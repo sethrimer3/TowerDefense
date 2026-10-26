@@ -164,6 +164,7 @@ const MATERIAL: Record<PlacedKind, { m: Material; ruin: Pick<Ruin, "stone" | "to
   batteryTower: { m: { tones: STONE, roofed: false }, ruin: { stone: STONE, top: C.iron.slice(1), beams: false, round: true } },
   minelayerTower: { m: { tones: STONE, roofed: false }, ruin: { stone: STONE, top: C.slime.slice(0, 3), beams: false, round: true } },
   mortarTower: { m: { tones: STONE, roofed: false }, ruin: { stone: STONE, top: C.kiln.slice(0, 3), beams: false, round: true } },
+  chronoTower: { m: { tones: C.pale, roofed: false }, ruin: { stone: C.pale, top: C.brass, beams: false } },
   nanoTower: { m: { tones: TECH.slice(1, 4), roofed: false }, ruin: { stone: TECH.slice(0, 3), top: [TECH[1], HAZARD, NANO[1]], beams: false } },
   watchTower: { m: { tones: STONE, roofed: true }, ruin: { stone: STONE, top: C.plank.slice(0, 3), beams: true } },
   wizardTower: { m: { tones: C.pale.slice(0, 3), roofed: true }, ruin: { stone: C.pale.slice(0, 3), top: C.slate.slice(0, 3), beams: true, round: true } },
@@ -254,7 +255,7 @@ export function structureRubblePixels(kind: PlacedKind, cw: number, ch: number, 
   return rubblePixels(w, h, hash(seed, KINDS.indexOf(kind), 3), { ...frame(w, h), ...MATERIAL[kind].ruin });
 }
 
-const KINDS: PlacedKind[] = ["barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "meleeGuild", "rangedGuild", "sniperLodge", "musketHall", "assassinDen", "gunHall", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "spearHall", "phalanx", "javelinCamp", "lancerStable", "heroHall", "shadow", "nanoTower", "pyreTower", "frostTower", "stormTower", "chapterHouse", "berserkerLodge", "halberdYard", "bloodHall", "veilHouse", "poisonDen", "brazierTower", "hawkTower", "batteryTower", "mortarTower", "rangerLodge", "skirmishCamp", "infernoHall", "cinderHall", "skyrangerLodge", "minelayerTower", "stormHall", "wispTower"];
+const KINDS: PlacedKind[] = ["barracks", "archerBarracks", "archerTower", "cannonTower", "watchTower", "wizardTower", "mageGuild", "valkyriePalace", "darkKeep", "monsterBait", "meleeGuild", "rangedGuild", "sniperLodge", "musketHall", "assassinDen", "gunHall", "gunNest", "gatlingNest", "rocketBattery", "revolutionary", "spearHall", "phalanx", "javelinCamp", "lancerStable", "heroHall", "shadow", "nanoTower", "pyreTower", "frostTower", "stormTower", "chapterHouse", "berserkerLodge", "halberdYard", "bloodHall", "veilHouse", "poisonDen", "brazierTower", "hawkTower", "batteryTower", "mortarTower", "rangerLodge", "skirmishCamp", "infernoHall", "cinderHall", "skyrangerLodge", "minelayerTower", "stormHall", "wispTower", "chronoTower"];
 
 const PAINT: Record<PlacedKind, (p: Pix, look: string) => void> = {
   meleeGuild: paintMeleeGuild,
@@ -289,6 +290,7 @@ const PAINT: Record<PlacedKind, (p: Pix, look: string) => void> = {
   brazierTower: paintBrazierTower,
   hawkTower: paintHawkTower,
   wispTower: paintWispTower,
+  chronoTower: paintChronoTower,
   batteryTower: paintBatteryTower,
   mortarTower: paintMortarTower,
   minelayerTower: paintMinelayerTower,
@@ -1842,4 +1844,15 @@ function paintMonsterBait(p: Pix, look: string) {
   // Slime dribbling down the top crate's side.
   p.set(tx0 + 1, ty1 - 1, ooze[2]);
   p.set(tx0 + 1, ty1, ooze[1]);
+}
+
+/** Marble battlements around a gilded astrolabe, drawn on the existing art lattice. */
+function paintChronoTower(p:Pix,_look:string){
+  paintArcherTower(p,"");
+  const cx=Math.floor(p.w/2),cy=Math.floor(p.h/2),r=Math.max(3,Math.floor(Math.min(p.w,p.h)*.27));
+  for(let y=-r-1;y<=r+1;y++)for(let x=-r-1;x<=r+1;x++){
+    const d=x*x+y*y;if(d<r*r&&d>(r-2)*(r-2))p.set(cx+x,cy+y,x+y<0?C.brass[2]:C.brass[0]);
+    if(Math.abs(x)<=1&&Math.abs(y)<r)p.set(cx+x,cy+y,C.brass[1]);
+  }
+  p.set(cx,cy,C.ice[3]);p.set(cx+1,cy,C.ice[2]);
 }

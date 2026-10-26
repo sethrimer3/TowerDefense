@@ -1,3 +1,4 @@
+import {captureShot,shotField,chronoTarget,stepChrono,sweptEnemies,chargeIdle} from "./chrono.ts";
 import { fireMine, landMine, mineRange } from "./mines.ts";
 import { sheltered } from "./boats.ts";
 import { stepBowJavelin, stepSkyArrow } from "./archer-attunements.ts";
@@ -79,6 +80,7 @@ export class Towers {
   readonly focus = new Map<number, HawkFocus>();
 
   step(sim: DefendSim, dt: number) {
+    stepChrono(sim,dt);
     for (const b of sim.map.buildings) {
       if (!sim.intact(b)) {
         if (this.focus.delete(b.id)) this.cooldown.delete(b.id);
@@ -86,7 +88,13 @@ export class Towers {
       }
       if (isCannonTower(b.kind)) this.stepCannon(sim, b, dt);
       else if (b.kind === "nanoTower") this.stepNanoTower(sim, b, dt);
-      else if (b.kind === "wispTower") stepWispTower(sim, b, dt);
+      else if (b.kind === "wispTower") {
+        stepWispTower(sim,b,dt);
+        if(sim.chrono.size){const c=center(b.rect),range=archerTowerRange(sim,b);
+          if(!sim.enemiesNear(c.x,c.y,range).some(e=>e.hp>0&&(e.x-c.x)**2+(e.y-c.y)**2<=range*range)&&this.ready(b,dt))
+            chargeIdle(sim,c,range,archerDamage(sim.levels.archerDamage)*sim.bonuses.towerDamage,()=>true,()=>this.cooldown.set(b.id,archerCooldown(sim.levels.archerRate)*sim.bonuses.towerReload));
+        }
+      }
       else if (isArcherTower(b.kind)) this.stepArcherTower(sim, b, dt);
       else if (b.kind === "wallBallista") this.stepBallista(sim, b, dt);
       else if (b.kind === "keep" && sim.bonuses.keep) this.stepKeep(sim, b, dt);
@@ -106,11 +114,12 @@ export class Towers {
     if (loops && this.ready(b, dt)) {
       const range = keepArrowRange(sim);
       const near = sim.enemiesNear(c.x, c.y, range).filter((e) => sq(e.x - c.x) + sq(e.y - c.y) <= range * range);
-      if (!near.length) this.cooldown.set(b.id, 0);
+      const idle=near.length?null:chronoTarget(sim,c,range,true,b.id);
+      if (!near.length&&!idle) this.cooldown.set(b.id, 0);
       else {
         this.cooldown.set(b.id, ARROW_LOOPS.reload[loops] * sim.bonuses.towerReload);
         const damage = archerDamage(sim.levels.archerDamage) * sim.bonuses.towerDamage * ARROW_LOOPS.damage[loops];
-        const targets = loops >= 3 ? near.sort(byDistanceFrom(c)).slice(0, ARROW_LOOPS.volley) : [nearest(near, c)!];
+        const targets = loops >= 3 && near.length ? near.sort(byDistanceFrom(c)).slice(0, ARROW_LOOPS.volley) : [idle??nearest(near, c)!];
         for (const t of targets) sim.arrows.push({ x: c.x, y: c.y - 0.8, origin: { x: c.x, y: c.y, building: b.id }, target: t.id, damage, tx: t.x, ty: t.y, life: 2 });
       }
     }
@@ -146,13 +155,13 @@ export class Towers {
     const c = center(b.rect), { fire, lit } = paths(sim, b);
     const range = archerTowerRange(sim, b);
     const near = sim.enemiesNear(c.x, c.y, range);
-    const target = nearest(near, c);
+    const target = nearest(near, c) ?? chronoTarget(sim,c,range,true,b.id);
     if (!target) return this.cooldown.set(b.id, 0);
     this.cooldown.set(b.id, archerCooldown(sim.levels.archerRate) * sim.bonuses.towerReload);
     let damage = archerDamage(sim.levels.archerDamage) * sim.bonuses.towerDamage;
     // Fire arrows set what they hit burning; at III the tower looses a volley at the nearest few.
     const burn = lit ? damage * (fire ? FIRE_ARROWS.share[fire] : FIRE_ARROWS.hall.share) : 0;
-    const targets = fire >= 3 ? near.filter((e) => sq(e.x - c.x) + sq(e.y - c.y) <= range * range).sort(byDistanceFrom(c)).slice(0, FIRE_ARROWS.volley) : [target];
+    const targets = fire >= 3 && near.length ? near.filter((e) => sq(e.x - c.x) + sq(e.y - c.y) <= range * range).sort(byDistanceFrom(c)).slice(0, FIRE_ARROWS.volley) : [target];
     for (const t of targets)
       sim.arrows.push({ x: c.x, y: c.y - 0.6, origin: { x: c.x, y: c.y, building: b.id }, target: t.id, damage, tx: t.x, ty: t.y, life: 2, ...(burn ? { burn, burnFor: fire ? FIRE_ARROWS.burn[fire] : FIRE_ARROWS.hall.burn } : {}) });
   }
@@ -161,7 +170,13 @@ export class Towers {
     const c = center(b.rect), range = archerTowerRange(sim, b), old = this.focus.get(b.id);
     const target = hawkTarget(sim.enemiesNear(c.x, c.y, range), c.x, c.y, range, old);
     const base = archerCooldown(sim.levels.archerRate) * sim.bonuses.towerReload;
-    if (!target) { this.focus.delete(b.id); this.cooldown.set(b.id, 0); return; }
+    if (!target) {
+      this.focus.delete(b.id);
+      const idle=chronoTarget(sim,c,range,true,b.id);
+      if(!idle){this.cooldown.set(b.id,0);return;}
+      if(idle&&this.ready(b,dt)){this.cooldown.set(b.id,archerCooldown(sim.levels.archerRate)*sim.bonuses.towerReload*hawkReload(1,rank,1));sim.arrows.push({x:c.x,y:c.y-.6,target:idle.id,tx:idle.x,ty:idle.y,damage:archerDamage(sim.levels.archerDamage)*sim.bonuses.towerDamage,life:2+range/ARROW_SPEED,origin:{...c,building:b.id}});}
+      return;
+    }
     let focus = old;
     if (!focus || focus.target !== target.id) {
       focus = { target: target.id, shots: 0 }; this.focus.set(b.id, focus);
@@ -197,7 +212,7 @@ export class Towers {
     const ground = sim.enemiesNear(c.x, c.y, range).filter(
       (e) => !ENEMIES[e.kind].flying && sq(e.x - c.x) + sq(e.y - c.y) > CANNON_MIN * CANNON_MIN,
     );
-    const target = nearest(ground, c);
+    const target = nearest(ground, c) ?? chronoTarget(sim,c,range,true,b.id,CANNON_MIN);
     if (!target) return this.cooldown.set(b.id, 0);
     const reload = (gunnery ? GUNNERY.reload[gunnery] : battery ? GUNNERY.hall : 1) * (siege ? SIEGE_SHOT.reload : mortar ? SIEGE_SHOT.hall.reload : 1);
     this.cooldown.set(b.id, cannonCooldown(sim.levels.cannonRate) * sim.bonuses.towerReload * reload);
@@ -208,6 +223,7 @@ export class Towers {
       y0: c.y - 0.4,
       x1: target.x,
       y1: target.y,
+      ...(target.id < -1 ? {chronoAim:-target.id-2}:{}),
       t: 0,
       dur: 0.45 + dist * 0.07,
       damage: cannonDamage(sim.levels.cannonDamage) * sim.bonuses.towerDamage * (siege ? SIEGE_SHOT.damage[siege] : mortar ? SIEGE_SHOT.hall.damage : 1),
@@ -223,8 +239,10 @@ export function stepArrows(sim: DefendSim, dt: number) {
   const byId = new Map(sim.enemies.map((e) => [e.id, e]));
   for (const a of sim.arrows) {
     a.life -= dt;
+    if(a.release){stepReleased(sim,a,dt);continue;}
     if (a.bowJavelin) { stepBowJavelin(sim, a, dt); continue; }
     if (a.sky) { stepSkyArrow(sim, a, dt); continue; }
+    const from={x:a.x,y:a.y};
     // A piercing bullet flies straight on, striking all in its line.
     if (a.pierce) { flyThrough(sim, a, dt); continue; }
     const t = byId.get(a.target);
@@ -237,6 +255,8 @@ export function stepArrows(sim: DefendSim, dt: number) {
       dy = a.ty - a.y;
     const d = dist(dx, dy);
     const step = ARROW_SPEED * (a.shot ? SHOT_SPEED[a.shot] : 1) * dt;
+    const to=d>step?{x:a.x+dx/d*step,y:a.y+dy/d*step}:{x:a.tx,y:a.ty};
+    if(captureShot(sim,{kind:"arrow",shot:a},from,to)){a.life=0;continue;}
     if (d > step) {
       a.x += (dx / d) * step;
       a.y += (dy / d) * step;
@@ -266,18 +286,24 @@ function flyThrough(sim: DefendSim, a: Arrow, dt: number) {
   const x0 = a.x, y0 = a.y, d = dist(a.tx - a.x, a.ty - a.y), step = ARROW_SPEED * SHOT_SPEED.bullet * dt;
   if (d > step) { a.x += ((a.tx - a.x) / d) * step; a.y += ((a.ty - a.y) / d) * step; }
   else { a.x = a.tx; a.y = a.ty; a.life = 0; }
+  const end={x:a.x,y:a.y},field=shotField(sim,{kind:"arrow",shot:a},{x:x0,y:y0},end);
+  if(field){a.x=x0+(end.x-x0)*field.t;a.y=y0+(end.y-y0)*field.t;}
   for (const e of pierceHits(sim, a, x0, y0)) {
     a.pierce!.hits.push(e.id);
     const landed = sim.hurtEnemy(e, a.damage, true, "ranged", a.origin ?? { x: x0, y: y0 }, true);
     if (a.pin) bulletHit(sim, a, e, landed);
   }
+  if(field&&captureShot(sim,{kind:"arrow",shot:a},{x:x0,y:y0},end))a.life=0;
 }
 
 /** Shells fly their arc and burst on landing. */
 export function stepShells(sim: DefendSim, dt: number) {
   for (const s of sim.shells) {
+    const start=Math.min(1,s.t/s.dur),end=Math.min(1,(s.t+dt)/s.dur);
+    if(!s.mine&&captureShot(sim,{kind:"shell",shot:s},{x:s.x0+(s.x1-s.x0)*start,y:s.y0+(s.y1-s.y0)*start},{x:s.x0+(s.x1-s.x0)*end,y:s.y0+(s.y1-s.y0)*end})){s.t=s.dur;continue;}
     s.t += dt;
     if (s.t < s.dur) continue;
+    if(s.chronoAim!==undefined&&!s.chronoReleased)continue;
     if (s.mine) { landMine(sim, s); continue; }
     const friendlyFire = !sim.levels.cannonSafe;
     const seed = sim.explode(s.x1, s.y1, { r: s.r, damage: s.damage, friendlyFire, origin: s.origin });
@@ -294,4 +320,21 @@ export function stepShells(sim: DefendSim, dt: number) {
 export function ignite(e: Enemy, dps: number, seconds: number) {
   e.burn = Math.max(e.burn ?? 0, seconds);
   e.burnDps = Math.max(e.burnDps ?? 0, dps);
+}
+
+/** Released shots keep a committed direction: fan angles never home back together. */
+function stepReleased(sim:DefendSim,a:Arrow,dt:number){
+  const r=a.release!,from={x:a.x,y:a.y},speed=ARROW_SPEED*(a.shot?SHOT_SPEED[a.shot]:1),step=Math.min(r.left,speed*dt);
+  a.x+=r.dx*step;a.y+=r.dy*step;r.left-=step;
+  const hits=sweptEnemies(sim,from,a,a.pierce?.width??.12,r.hit);
+  for(const {e,t}of hits){
+    r.hit.push(e.id);
+    if(a.blast){a.tx=from.x+(a.x-from.x)*t;a.ty=from.y+(a.y-from.y)*t;burstBall(sim,a);a.life=0;break;}
+    const landed=sim.hurtEnemy(e,a.damage,true,"ranged",a.origin,true);
+    if(landed&&a.burn)ignite(e,a.burn,a.burnFor!);
+    if(a.pin||a.glance)bulletHit(sim,a,e,landed);
+    if(a.knock&&landed)knockBack(sim,a,e);
+    if(!a.pierce){a.life=0;break;}
+  }
+  if(r.left<=0){if(a.blast&&a.life>0){a.tx=a.x;a.ty=a.y;burstBall(sim,a);}a.life=0;}
 }

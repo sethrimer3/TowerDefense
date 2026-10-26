@@ -1,3 +1,4 @@
+import type { ChronoState, DivineArrow, ReleasedArrow } from "./chrono.ts";
 import { ageMageChill, type MageChill, type MageBolt } from "./mage-attunements.ts";
 import { stepMines, type Mine } from "./mines.ts";
 import { BASTIONS, keepRank } from "../keep-upgrades.ts";
@@ -229,6 +230,8 @@ export type Civilian = {
 };
 
 export type Arrow = {
+  chronoReleased?: true;
+  release?: ReleasedArrow;
   bowJavelin?: import("./archer-attunements.ts").BowJavelin;
   volleyIndex?: number;
   sky?: import("./archer-attunements.ts").SkyArrow;
@@ -264,6 +267,8 @@ export type Arrow = {
 export type Effect = { kind: "boom" | "dust" | "spark" | "firework" | "steam"; x: number; y: number; t: number; r: number; seed?: number };
 /** A cannon shell in flight: lobbed from the tower to where the target was. */
 export type Shell = {
+  chronoReleased?: true;
+  chronoAim?: number;
   x0: number; y0: number; x1: number; y1: number; t: number; dur: number; damage: number; r: number; origin?: Arrow["origin"];
   /** Gun crews (a Study path): bursting into grapeshot; absent otherwise. */
   grape?: boolean;
@@ -362,6 +367,8 @@ export class DefendSim {
   soldiers: Soldier[] = [];
   civilians: Civilian[] = [];
   arrows: Arrow[] = [];
+  readonly chrono = new Map<number, ChronoState>();
+  divineArrows: DivineArrow[] = [];
   wisps: WispArrow[] = [];
   wispFireTrails: WispFireTrail[] = [];
   wispLightningTrails: WispTrail[] = [];

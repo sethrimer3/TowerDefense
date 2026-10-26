@@ -1,3 +1,4 @@
+import {chargeIdle} from "./chrono.ts";
 import { bannerFor, deployment, postPath, strollStreets, within } from "./deployment.ts";
 import { bannerDamage } from "./war-banner.ts";
 import { enemySize } from "./catalog.ts";
@@ -36,6 +37,7 @@ export function stepValkyrie(sim: DefendSim, s: Soldier, dt: number) {
     if (s.cd <= 0) charge(sim, s, near, reach);
     return;
   }
+  if(!bannerFor(sim,s)&&chargeIdle(sim,s,reach,bannerDamage(sim,s),()=>s.cd<=0,()=>{s.cd=VALKYRIE.cooldown;},true))return;
   const banner = bannerFor(sim, s);
   if (banner) return answerBanner(sim, banner, s, VALKYRIE.speed, dt);
   if (s.thinkT <= 0) seek(sim, s);

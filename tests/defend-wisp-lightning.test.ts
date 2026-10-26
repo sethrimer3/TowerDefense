@@ -43,7 +43,7 @@ test("Lightning arrow is the final rank III, with the normal price, saved tier a
  const loaded=decode(JSON.stringify(save));assert.equal(loaded.knowledge,3996);
  assert.deepEqual(loaded.defend.kept,[{kind:"wispTower",path:"wispArrow",rank:3}]);
  assert.equal(allocated("wispTower",{path:"wispArrow",rank:3}),20018);
- assert.deepEqual(nextSteps("wispTower",{path:"wispArrow",rank:3}),[]);
+ assert.deepEqual(nextSteps("wispTower",{path:"wispArrow",rank:3}),[{type:"merge",to:"chronoTower",cost:0}]);
  assert.match(kindStats(loaded,"wispTower","wispArrow",3),/purple Lightning arrow.*map edge.*5s.*300% attack.*9s/);
  assert.ok(undoUpgrade(loaded,{copy:"wispTower",wear:{path:"wispArrow",rank:3}},"p:wispArrow:3").ok);
  assert.equal(loaded.knowledge,20000);assert.equal(loaded.defend.kept[0].rank,2);

@@ -556,3 +556,9 @@ The second Wisp Arrow upgrade. Adds two fire arrows, 25% larger than blue arrows
 
 **Wisp Lightning arrow**:
 The third and final Wisp Arrow upgrade. Adds one larger purple arrow alongside blue and fire arrows. On locking a nearby enemy, it flies straight through the captured aim to the edge of the map. Its purple lightning trail lasts five seconds at each point, dealing 300% attack per second to all enemies touching it. The tower regenerates the arrow nine seconds after it exits.
+
+**Ultimate Archer Tower**:
+The Archer Tower ultimate formed from its fully upgraded Fire, Hawk and Wisp attunements; holds allied shots outside time and releases them at enemies.
+
+**Divine Arrow**:
+The Ultimate Archer Tower’s piercing golden shot, charged by incompatible incoming attacks and emptied on firing.

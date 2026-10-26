@@ -56,6 +56,8 @@ Each new furthest wave reached automatically selects the preceding wave for your
 
 ## How it's built
 
+The Ultimate Archer Tower merges fully upgraded Fire, Hawk and Wisp towers. Idle allies feed its time field, suspending 30/60/90 physical shots until enemies enter range; it releases them in a rapid 45°/20°/0° spray. Independent branches unlock a 50–250-hit Divine Arrow reserve for incompatible damage and expensive 2×/5×/10× amplification. The golden arrow pierces to the map edge, resetting its damage reserve on launch. [Rules and tuning](docs/upgrades/ULTIMATE_ARCHER_TOWER.md).
+
 Settings includes a saved language picker with nine native-name buttons in three columns: English, Spanish, French, German, Brazilian Portuguese, Italian, Japanese, Korean and Simplified Chinese. This first pass translates Settings, navigation and main controls; longer game descriptions still use English. Changes apply without a reload or ending a defense. [Coverage and translation guide](docs/LOCALIZATION.md).
 
 The layout follows the browser’s visible viewport, including changes from browser controls and the keyboard, and keeps navigation above the device’s safe areas. Portrait and landscape layouts resize without a fixed minimum screen height.

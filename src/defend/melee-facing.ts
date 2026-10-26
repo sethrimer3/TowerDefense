@@ -71,6 +71,10 @@ export function meleeFacing(sim: DefendSim, u: Soldier, attackAngle?: number) {
     const e = sim.enemies.find(e => e.id === u.target && e.hp > 0);
     if (e && (e.x-u.x)**2+(e.y-u.y)**2 <= (reach(sim,u)+enemySize(e)/2)**2)
       attackAngle = Math.atan2(e.y-u.y, e.x-u.x);
+    else if(u.target < -1){
+      const b=sim.map.buildings[-u.target-2];
+      if(b?.kind==="chronoTower")attackAngle=Math.atan2(b.rect.y+b.rect.h/2-u.y,b.rect.x+b.rect.w/2-u.x);
+    }
   }
   return updateFacing(u, sim.time, attackAngle);
 }

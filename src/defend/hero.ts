@@ -1,3 +1,4 @@
+import {chargeIdle} from "./chrono.ts";
 /** DEFEND's Hero, the swordsmen's ultimate, trained one at a time at the
  * Hero's hall (a Barracks become one with Knowledge). It hunts the nearest
  * enemies anywhere in the city and fights with a combo, counted in
@@ -59,6 +60,7 @@ export function stepHero(sim: DefendSim, s: Soldier, dt: number) {
     if (s.cd <= 0) combo(sim, s, near);
     return;
   }
+  if(!bannerFor(sim,s)&&chargeIdle(sim,s,HERO.reach,bannerDamage(sim,s),()=>s.cd<=0,()=>{s.cd=HERO.cooldown*BLADE_DANCE.cooldown[heroPaths(sim,s.home).dance];},true))return;
   const banner = bannerFor(sim, s);
   if (banner) return answerBanner(sim, banner, s, HERO.speed, dt);
   if (s.thinkT <= 0) seek(sim, s);

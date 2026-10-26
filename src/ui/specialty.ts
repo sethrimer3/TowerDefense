@@ -1,3 +1,4 @@
+import {CHRONO,CHRONO_PATHS,chronoAllocated,chronoRank,respecChrono,undoChrono,upgradeChrono,type ChronoRanks,type ChronoPathId} from "../chrono-upgrades.ts";
 import type { CircleState } from "../magic-circle/formation.ts";
 /** A building's upgrades as the player meets them: what a path does to the
  * kind's numbers (`kindStats`), the stats and abilities Tiles shows
@@ -138,6 +139,7 @@ export function kindStats(save: Save, kind: PaletteItem, path?: PathId, rank = 0
   }
   if (kind === "revolutionary") return revolutionaryStats(save, save.defend.revolutionaryRanks);
   if (kind === "shadow") return shadowStats(save, save.defend.shadowRanks);
+  if (kind === "chronoTower") return chronoStats(save,save.defend.chronoRanks);
   if (kind === "nanoTower") return nanoStats(save, save.defend.nanoRanks);
   const GUNS = { meleeGuild: BRAWLER, rangedGuild: SLINGER, sniperLodge: SNIPER, musketHall: MUSKETEER, gunHall: GUNNER, gunNest: MACHINE_GUNNER, gatlingNest: GATLING_GUNNER, rocketBattery: ROCKETEER } as const;
   if (kind in GUNS) {
@@ -216,6 +218,7 @@ function ownSheet(save: Save, kind: PaletteItem | "wallSpikes", wear?: Wear): St
   const d = save.defend;
   if (kind === "revolutionary") return { stats: coreStats(revolutionaryStats(save, d.revolutionaryRanks), 3), abilities: sharedAbilities(REVOLUTIONARY_PATHS, d.revolutionaryRanks) };
   if (kind === "shadow") return { stats: coreStats(shadowStats(save, d.shadowRanks), 4), abilities: sharedAbilities(SHADOW_PATHS, d.shadowRanks) };
+  if (kind === "chronoTower") return {stats:coreStats(chronoStats(save,d.chronoRanks),3),abilities:sharedAbilities(CHRONO_PATHS,d.chronoRanks)};
   if (kind === "nanoTower") return { stats: coreStats(nanoStats(save, d.nanoRanks), 3), abilities: sharedAbilities(NANO_PATHS, d.nanoRanks) };
   if (kind === "wallBlock") return { stats: coreStats(wallStats(save, d.wallRanks), 1), abilities: sharedAbilities(WALL_PATHS, d.wallRanks) };
   if (kind === "cityGate") return { stats: coreStats(gateStats(save, d.gateRanks), 2), abilities: sharedAbilities(GATE_PATHS, d.gateRanks) };
@@ -627,7 +630,7 @@ export const NANO_UI: SideUi = sideUi(NANO_TREE, (s) => s.defend.nanoRanks, {
   buy: upgradeNano, undo: undoNano, respec: respecNano, allocated: nanoAllocated,
 });
 /** The shared branches growing off a building of `kind`'s own node, if it has any. */
-export const sharedBranches = (kind: string): SideUi | undefined => (kind === "revolutionary" ? REVOLUTIONARY_UI : kind === "shadow" ? SHADOW_UI : kind === "nanoTower" ? NANO_UI : undefined);
+export const sharedBranches = (kind: string): SideUi | undefined => (kind === "revolutionary" ? REVOLUTIONARY_UI : kind === "shadow" ? SHADOW_UI : kind === "nanoTower" ? NANO_UI : kind === "chronoTower" ? CHRONO_UI : undefined);
 /** A building's tree with its shared branches grafted onto its node. */
 export function graftedGraph(save: Save, kind: PaletteItem | "wallSpikes", wear?: Wear): GraphNode[] {
   const own = treeGraph(kind, wear), shared = sharedBranches(kind);
@@ -636,7 +639,7 @@ export function graftedGraph(save: Save, kind: PaletteItem | "wallSpikes", wear?
 
 /** A family keeps its base identity through kind changes and respecs.
  * Placement UIDs intentionally do not affect the visual identity. */
-export function specialtyCircle(kind: PaletteItem | "wallSpikes" | SideKind, wear?: Wear, ranks?: KeepRanks, wallRanks?: WallRanks, gateRanks?: GateRanks, ballistaRanks?: BallistaRanks, revolutionaryRanks?: RevolutionaryRanks, shadowRanks?: ShadowRanks, nanoRanks?: NanoRanks): CircleState {
+export function specialtyCircle(kind: PaletteItem | "wallSpikes" | SideKind, wear?: Wear, ranks?: KeepRanks, wallRanks?: WallRanks, gateRanks?: GateRanks, ballistaRanks?: BallistaRanks, revolutionaryRanks?: RevolutionaryRanks, shadowRanks?: ShadowRanks, nanoRanks?: NanoRanks, chronoRanks?: ChronoRanks): CircleState {
   const root = kind === "keep" || kind === "walls" || kind === "wallSpikes" || kind === "gate" || kind === "ballistas" ? kind : rootOf(kind as never);
   const upgrades: Array<CircleState['upgrades'][number]> = [{ id: `kind:${kind}`, rank: 1, visualOnly: true }];
   // The actual owned tree includes every earlier transformation and crowned
@@ -649,7 +652,17 @@ export function specialtyCircle(kind: PaletteItem | "wallSpikes" | SideKind, wea
   if (kind === "ballistas") for (const p of BALLISTA_PATHS) upgrades.push({ id: `ballista:${p.id}`, rank: ballistaRank(ballistaRanks, p.id) });
   if (kind === "revolutionary") for (const p of REVOLUTIONARY_PATHS) upgrades.push({ id: `revolutionary:${p.id}`, rank: revolutionaryRank(revolutionaryRanks, p.id) });
   if (kind === "shadow") for (const p of SHADOW_PATHS) upgrades.push({ id: `shadow:${p.id}`, rank: shadowRank(shadowRanks, p.id) });
+  if (kind === "chronoTower") for(const p of CHRONO_PATHS)upgrades.push({id:`chrono:${p.id}`,rank:chronoRank(chronoRanks,p.id)});
   if (kind === "nanoTower") for (const p of NANO_PATHS) upgrades.push({ id: `nano:${p.id}`, rank: nanoRank(nanoRanks, p.id) });
   const city = ["keep", "walls", "gate", "ballistas", "wallBlock", "wallSpikes", "cityTile", "cityGate", "wallBallista", "monsterBait"].includes(kind);
   return { topic: `building:${root}`, upgrades, motif: city ? "tesseract" : "voronoi" };
 }
+
+export function chronoStats(save:Save,ranks:ChronoRanks|undefined):string{
+ return `${CHRONO.capacity[chronoRank(ranks,"storage")]} stored shots · ${archerRange(save.defend.levels.archerRange)} field/trigger range · ${CHRONO.spread[chronoRank(ranks,"focus")]}° total spray · one shot every ${CHRONO.interval}s · Divine Arrow: ${CHRONO.hits[chronoRank(ranks,"divine")]} stored hits · ${CHRONO.multiplier[chronoRank(ranks,"amplify")]}× stored divine damage · idle allies only`;
+}
+const CHRONO_TREE:SideTree<ChronoPathId>={root:"k:chronoTower",icon:"chronoTower",every:"Every Ultimate Archer Tower",paths:CHRONO_PATHS};
+export const CHRONO_UI:SideUi=sideUi(CHRONO_TREE,s=>s.defend.chronoRanks,{
+ name:"Ultimate Archer Tower",whom:"the Ultimate Archer Towers",plain:"take every upgrade off the Ultimate Archer Towers",about:STRUCTURES.chronoTower.description,stats:chronoStats,
+ buy:upgradeChrono,undo:undoChrono,respec:respecChrono,allocated:chronoAllocated,
+});

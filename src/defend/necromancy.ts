@@ -1,3 +1,4 @@
+import {chargeIdle,chronoTarget} from "./chrono.ts";
 /** DEFEND's Necromancy, a strike spell: cast from the Skills palette onto
  * the board, it raises every enemy that died within `NECRO.radius` cells of
  * where it lands (in the last `NECRO.graveLife` seconds, longer with the
@@ -155,6 +156,10 @@ export function stepUndead(sim: DefendSim, s: Soldier, dt: number) {
     s.target = target.id;
     s.path = [];
     return attack(sim, s, target);
+  }
+  if(sim.chrono.size){
+    if(r.range){const aim=chronoTarget(sim,s,reach);if(aim){attack(sim,s,aim);return;}}
+    else if(chargeIdle(sim,s,reach+r.size/2,s.damage,()=>s.cd<=0,()=>{s.cd=NECRO.attack*(r.look==="amalgam"?1.4:1);},true))return;
   }
   if (s.thinkT <= 0) target = hunt(sim, s);
   sim.followPath(s, target, NECRO.speed * (r.look === "amalgam" ? 0.8 : 1), dt);

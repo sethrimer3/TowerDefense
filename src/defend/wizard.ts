@@ -1,3 +1,4 @@
+import {chargeIdle} from "./chrono.ts";
 import { mageChillSpeed } from "./mage-attunements.ts";
 import { buildingPaths } from "../specializations.ts";
 /** The wizard tower: it alternates between a flamethrower and an ice wave,
@@ -104,7 +105,10 @@ export class Wizards {
   private flame(sim: DefendSim, b: Building) {
     const c = center(b.rect), range = fireReach(sim, b);
     const target = nearest(sim.enemiesNear(c.x, c.y, range), c);
-    if (!target) return;
+    if (!target) {
+      const duration=FLAME_SECONDS*(paths(sim,b).pyro>=3?PYRO.burn:1),damage=flameDps(sim.levels.wizardFlame??0)*sim.bonuses.towerDamage*PYRO.damage[paths(sim,b).pyro]*duration;
+      chargeIdle(sim,c,range,damage,()=>true,()=>{this.rest.set(b.id,WIZARD_REST+duration);this.next.set(b.id,"ice");});return;
+    }
     const dur = paths(sim, b).pyro >= 3 ? FLAME_SECONDS * PYRO.burn : FLAME_SECONDS;
     sim.flames.push({ tower: b.id, x: c.x, y: c.y - 0.4, ...toward(c.x, c.y - 0.4, target.x, target.y), t: 0, dur, range, target: target.id });
     this.next.set(b.id, "ice");
@@ -114,7 +118,8 @@ export class Wizards {
   private bolt(sim: DefendSim, b: Building, rank: number) {
     const c = center(b.rect), range = fireReach(sim, b);
     const target = nearest(sim.enemiesNear(c.x, c.y, range), c);
-    if (!target) return;
+    if (!target) {const damage=flameDps(sim.levels.wizardFlame??0)*STORM.damage*(rank>=3?STORM.surge:1)*sim.bonuses.towerDamage;
+      chargeIdle(sim,c,range,damage,()=>true,()=>{this.rest.set(b.id,WIZARD_REST);this.next.set(b.id,"ice");});return;}
     const surge = rank >= 3 ? STORM.surge : 1;
     const damage = flameDps(sim.levels.wizardFlame ?? 0) * STORM.damage * surge * sim.bonuses.towerDamage;
     chainBolt(sim, { x: c.x, y: c.y - 0.9 }, target, damage, STORM.links[rank], STORM.jump[rank]);
@@ -126,7 +131,8 @@ export class Wizards {
     const c = center(b.rect);
     const range = iceReach(sim, b);
     const target = nearest(sim.enemiesNear(c.x, c.y, range), c);
-    if (!target) return;
+    if (!target) {const rest=paths(sim,b).ice?WIZARD_REST/2:WIZARD_REST;
+      chargeIdle(sim,c,range,iceDamage(sim.levels.wizardIce??0)*sim.bonuses.towerDamage*(paths(sim,b).rime>=2?RIME.damage:1),()=>true,()=>{this.rest.set(b.id,rest);this.next.set(b.id,"flame");});return;}
     sim.frosts.push({
       ...(sim.bonuses.structurePaths ? { tower: b.id } : {}), x: c.x, y: c.y, ...toward(c.x, c.y, target.x, target.y), spread: ICE_SPREAD,
       r: 0.6, range, t: 0, seed: b.id * 7919 + this.waves++ * 104729, hit: [],

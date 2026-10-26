@@ -1,3 +1,4 @@
+import {chargeIdle} from "./chrono.ts";
 import { bannerFor, postPath, strollStreets } from "./deployment.ts";
 import { castStorm, chillByMage, mageAttunement } from "./mage-attunements.ts";
 import { bannerDamage } from "./war-banner.ts";
@@ -40,6 +41,7 @@ export function stepMage(sim: DefendSim, s: Soldier, dt: number) {
     }
     return;
   }
+  if(!bannerFor(sim,s)&&chargeIdle(sim,s,range,bannerDamage(sim,s)*(attuned.family==="fire"?PYROCLASM.damage[attuned.rank]:attuned.family==="frost"?CRYOMANCY.damage:1),()=>s.cd<=0,()=>{s.cd=FIRE_MAGE.cooldown;}))return;
   const banner = bannerFor(sim, s);
   if (banner) return answerBanner(sim, banner, s, FIRE_MAGE.speed, dt);
   if (!s.path.length && s.thinkT <= 0) {

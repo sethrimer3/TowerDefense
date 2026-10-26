@@ -79,7 +79,7 @@ test("the shop's three basic buildings branch into attuned buildings, each with 
   for (const [kind, path] of [["pyreTower", "pyromancy"], ["frostTower", "rime"], ["stormTower", "storm"]] as const)
     assert.deepEqual(nextSteps(kind, { path, rank: 3 }).map((s) => s.type === "merge" && s.to), ["darkKeep"], `${path} III merges`);
   assert.deepEqual(nextSteps("lancerStable", { path: "wingedLancers", rank: 3 }).map((s) => s.type === "merge" && s.to), ["valkyriePalace"]);
-  assert.deepEqual(nextSteps("archerTower", { path: "fireArrows", rank: 3 }), [], "no ultimate yet");
+  assert.deepEqual(nextSteps("archerTower", { path: "fireArrows", rank: 3 }), [{type:"merge",to:"chronoTower",cost:0}], "all three completed Archer attunements merge into their ultimate");
   assert.deepEqual(to("wallSpikes"), ["Blasting stakes I", "Spring stakes I", "Rimed stakes I"]);
   // Every attuned building has three branches of three ranks (or, while a
   // third is still to come, two).
