@@ -1576,14 +1576,17 @@ nav button { position: relative; }
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-/* A fire's alarm, and afterwards what it cost (tap to put it away). */
+/* The fast-forwarding notes and a fire's alarm, and afterwards what it
+   cost: a tap fades them away. */
 #library-away,
+#mine-away,
 .library-alert {
   pointer-events: auto;
   cursor: pointer;
   transition: opacity 0.22s ease-out;
 }
 #library-away.fading,
+#mine-away.fading,
 .library-alert.fading {
   opacity: 0;
   pointer-events: none;
