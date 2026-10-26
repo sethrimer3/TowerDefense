@@ -18,20 +18,22 @@ import { bareAt, groundArt, turfAt, type GroundArt } from "./ground-art.ts";
 
 /** Blade pixels per cell. */
 const ART = 8;
-type Blade = { i: number; j: number; h: number; color: number; phase: number; flower: number; splay: number };
+export type Blade = { i: number; j: number; h: number; color: number; phase: number; flower: number; splay: number };
 /** Dark root to bright tip, matched to the painted park grass. */
 const COLORS = ["#2a4322", "#335226", "#3f652e", "#4d7837", "#5f8e46", "#76a85a"];
 const FLOWERS = ["#e8d57a", "#e6e1d6", "#c96a5a", "#b7a3d6"];
 const PALETTE = [...COLORS, ...FLOWERS];
-/** The palette as little-endian RGBA words for the pixel buffer. */
-const PALETTE32 = Uint32Array.from(PALETTE, (hex) => {
-  const v = parseInt(hex.slice(1), 16);
-  return ((255 << 24) | ((v & 0xff) << 16) | (v & 0xff00) | (v >> 16)) >>> 0;
+/** The palette as little-endian RGBA words for the pixel buffer, then
+ * again in shadow (`SHADOW` on). */
+export const SHADOW = PALETTE.length;
+export const PALETTE32 = Uint32Array.from([...PALETTE.map((hex) => [hex, 1] as const), ...PALETTE.map((hex) => [hex, 0.6] as const)], ([hex, k]) => {
+  const v = parseInt(hex.slice(1), 16), r = Math.round((v >> 16) * k), g = Math.round(((v >> 8) & 0xff) * k), b = Math.round((v & 0xff) * k);
+  return ((255 << 24) | (b << 16) | (g << 8) | r) >>> 0;
 });
 /** Blade bend by height: CURVE[h][k] = (k / h)^1.5. */
-const CURVE = Array.from({ length: 8 }, (_, h) => Float32Array.from({ length: h + 1 }, (_, k) => (h ? Math.pow(k / h, 1.5) : 0)));
+export const CURVE = Array.from({ length: 8 }, (_, h) => Float32Array.from({ length: h + 1 }, (_, k) => (h ? Math.pow(k / h, 1.5) : 0)));
 /** How hard the wind blows, in pixels of lean at a blade's tip. */
-const WIND = { calm: 0.8, cloud: 1.1, rain: 1.7 };
+export const WIND = { calm: 0.8, cloud: 1.1, rain: 1.7 };
 
 /** Someone standing or walking in the parks: position and size in cells. */
 export type Walker = { x: number; y: number; size: number; id?: number };
@@ -128,36 +130,7 @@ export class ParkGrass {
       const stir = this.stir.get(i) ?? 0, walkers = near.get(i);
       for (const b of list) {
         const gx = cx * ART + b.i, gy = cy * ART + b.j;
-        let lean: number;
-        if (f.reduceMotion) lean = b.splay + wind * 0.35;
-        else {
-          // Steady lean, a slow sway, and gusts that sweep across in bands.
-          const sway = Math.sin(t * 2.1 + b.phase + gx * 0.06) * 0.5 + Math.sin(t * 3.7 + b.phase * 2) * 0.2;
-          const band = Math.sin(gx * 0.021 + gy * 0.009 - t * 1.6);
-          const gust = Math.pow(Math.max(0, band), 3) * 1.6;
-          lean = b.splay + wind * (0.35 + sway * 0.45 + gust) + stir * Math.sin(t * 12 + b.phase) * 1.6;
-        }
-        // Parted and pressed down around whoever walks through.
-        let press = 0;
-        for (const w of walkers ?? []) {
-          const dx = gx - w.x * ART, dy = gy - w.y * ART, reach = w.size * ART + 3;
-          const k = Math.max(0, 1 - Math.sqrt(dx * dx + dy * dy * 2.25) / reach);
-          if (k > press) press = k;
-          lean += k * 3 * (dx >= 0 ? 1 : -1);
-        }
-        const height = Math.max(1, Math.round(b.h * (1 - press * 0.5)));
-        // Runs of pixels that share a column, shaded dark at the root and
-        // light at the tip.
-        const curve = CURVE[b.h];
-        let lastX = gx, start = 0;
-        for (let k = 0; k <= height; k++) {
-          const bx = k === height ? NaN : gx + Math.round(lean * curve[k]);
-          if (bx === lastX && k !== height) continue;
-          if (k > start) put(start === 0 ? b.color % 2 : k >= height - 1 ? b.color + 2 : b.color + 1, lastX, gy - k + 1, k - start);
-          start = k;
-          lastX = bx;
-        }
-        if (b.flower) put(COLORS.length + b.flower - 1, gx + Math.round(lean * curve[height - 1]), gy - height, 1);
+        paintBlade(put, b, gx, gy, t, wind, stir, walkers, f.reduceMotion, 0);
       }
     }
   }
@@ -176,6 +149,44 @@ export class ParkGrass {
     }
     return this.buffer;
   }
+}
+
+/** Draws blade `b` rooted at art pixel (gx, gy) at `t` seconds through
+ * `put` (palette index, column, top row, run length): its steady lean, a
+ * slow sway, gusts sweeping across in bands and the wobble of a recent
+ * `stir`, parted and pressed down round `walkers`. `shade` is 0, or
+ * `SHADOW` for a blade in shadow. */
+export function paintBlade(put: (color: number, x: number, y: number, h: number) => void, b: Blade, gx: number, gy: number, t: number, wind: number, stir: number, walkers: readonly Walker[] | undefined, reduceMotion: boolean, shade: number) {
+  let lean: number;
+  if (reduceMotion) lean = b.splay + wind * 0.35;
+  else {
+    // Steady lean, a slow sway, and gusts that sweep across in bands.
+    const sway = Math.sin(t * 2.1 + b.phase + gx * 0.06) * 0.5 + Math.sin(t * 3.7 + b.phase * 2) * 0.2;
+    const band = Math.sin(gx * 0.021 + gy * 0.009 - t * 1.6);
+    const gust = Math.pow(Math.max(0, band), 3) * 1.6;
+    lean = b.splay + wind * (0.35 + sway * 0.45 + gust) + stir * Math.sin(t * 12 + b.phase) * 1.6;
+  }
+  // Parted and pressed down around whoever walks through.
+  let press = 0;
+  for (const w of walkers ?? []) {
+    const dx = gx - w.x * ART, dy = gy - w.y * ART, reach = w.size * ART + 3;
+    const k = Math.max(0, 1 - Math.sqrt(dx * dx + dy * dy * 2.25) / reach);
+    if (k > press) press = k;
+    lean += k * 3 * (dx >= 0 ? 1 : -1);
+  }
+  const height = Math.max(1, Math.round(b.h * (1 - press * 0.5)));
+  // Runs of pixels that share a column, shaded dark at the root and
+  // light at the tip.
+  const curve = CURVE[b.h];
+  let lastX = gx, start = 0;
+  for (let k = 0; k <= height; k++) {
+    const bx = k === height ? NaN : gx + Math.round(lean * curve[k]);
+    if (bx === lastX && k !== height) continue;
+    if (k > start) put(shade + (start === 0 ? b.color % 2 : k >= height - 1 ? b.color + 2 : b.color + 1), lastX, gy - k + 1, k - start);
+    start = k;
+    lastX = bx;
+  }
+  if (b.flower) put(shade + COLORS.length + b.flower - 1, gx + Math.round(lean * curve[height - 1]), gy - height, 1);
 }
 
 /** Walkers by the cells they can bend blades in: their own and the eight around. */

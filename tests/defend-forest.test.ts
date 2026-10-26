@@ -1,14 +1,15 @@
 // The forest outside Mossbound Ruins' walls (src/defend/forest.ts,
-// forest-art.ts): where its trees of four sizes, rocks, pads, meadows, lakes
-// and boulders go, the trees blasts and charges blow up, its pixel art, and
+// forest-art.ts, forest-grass.ts): where its trees of four sizes, berry
+// bushes, rocks, pads, lakes and boulders go, its grass, the trees blasts and charges blow up, its pixel art, and
 // the boulders blocking the way in the battle (the rest is presentation).
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { defaultLayout, fitLayout } from "../src/defend/layout.ts";
 import { CellType, generateCity } from "../src/defend/citygen.ts";
 import { CELLS_H, CELLS_W, cellIndex } from "../src/defend/grid.ts";
-import { BOULDERS, ForestDamage, TOUGH, VARIANTS, boulderPlan, clearOf, forestPlan, hasForest } from "../src/defend/forest.ts";
-import { LEAN, floorPixels, leanOf, rockSprite, treeSprite } from "../src/defend/forest-art.ts";
+import { BOULDERS, FOREST, ForestDamage, TOUGH, VARIANTS, boulderPlan, clearOf, forestPlan, hasForest } from "../src/defend/forest.ts";
+import { LEAN, floorPixels, leanOf, rockSprite, treeSprite, turfAt } from "../src/defend/forest-art.ts";
+import { forestBlades } from "../src/defend/forest-grass.ts";
 import { DefendSim } from "../src/defend/sim.ts";
 import { defaultDefendSave } from "../src/defend/progress.ts";
 
@@ -27,7 +28,9 @@ test("the forest fills the open ground outside the walls and keeps off everythin
   const map = city(), plan = forestPlan(map);
   const open = map.type.filter((t) => t === CellType.OUT).length;
   assert.ok(plan.trees.length > open * 0.08, `${plan.trees.length} trees on ${open} open cells`);
-  assert.ok(plan.trees.every((t) => t.size > 0), "only big trees: no bushes or small trees");
+  const bushes = plan.trees.filter((t) => t.kind === "bush");
+  assert.equal(bushes.length, FOREST.bushes, "a few berry bushes");
+  assert.ok(plan.trees.every((t) => (t.kind === "bush") === (t.size === 0)), "only big trees besides the bushes");
   assert.ok(plan.rocks.length > 20 && plan.pads.length > 10);
   for (const t of plan.trees) {
     assert.equal(map.type[cellIndex(Math.floor(t.x), Math.floor(t.y))], CellType.OUT);
@@ -112,10 +115,11 @@ test("the ground shows the standing trees' shadows and the felled trees' craters
 test("large, larger and huge trees stand among the rest, and only big blasts fell them", () => {
   const plan = forestPlan(city());
   const count = [0, 1, 2, 3].map((n) => plan.trees.filter((t) => t.size === n).length);
-  assert.ok(count[0] === 0 && count[1] > 100 && count[2] > 50 && count[3] > 30, `sizes ${count}`);
+  assert.ok(count[0] === FOREST.bushes && count[1] > 100 && count[2] > 50 && count[3] > 30, `sizes ${count}`);
   for (const n of [2, 3] as const) {
     const big = plan.trees.filter((t) => t.size === n);
     assert.ok(Math.min(...big.map((t) => t.r)) > Math.max(...plan.trees.filter((t) => t.size === n - 1).map((t) => t.r)) - 0.3, "each size bigger than the last");
+    assert.ok(Math.min(...big.map((t) => t.r)) > 0.6);
   }
   const sprite = (n: 0 | 1 | 2 | 3) => treeSprite("oak", 0, 0, n).w;
   assert.ok(sprite(0) < sprite(1) && sprite(1) < sprite(2) && sprite(2) < sprite(3));
@@ -126,12 +130,10 @@ test("large, larger and huge trees stand among the rest, and only big blasts fel
   assert.ok(damage.craters.at(-1)!.r > 2, "and leaves a great crater");
 });
 
-test("a few lakes and rare meadows lie in the open, spread over the board, kept clear of trees", () => {
+test("a few lakes lie in the open, spread over the board, kept clear of trees", () => {
   const map = city(), plan = forestPlan(map);
   assert.equal(plan.lakes.length, 3);
-  assert.equal(plan.meadows.length, 6);
-  assert.ok(plan.meadows.some((m) => m.flowers) && plan.meadows.some((m) => !m.flowers));
-  const ys = [...plan.lakes.map((l) => l.discs[0].y), ...plan.meadows.map((m) => m.y)];
+  const ys = [...plan.lakes.map((l) => l.discs[0].y), ...plan.trees.filter((t) => t.kind === "bush").map((t) => t.y)];
   assert.ok(Math.max(...ys) - Math.min(...ys) > CELLS_H / 3, "not all in the top rows");
   for (const l of plan.lakes)
     for (const d of l.discs) {
@@ -204,4 +206,50 @@ test("small mountains: big heaps, filled solid, drawn as rocky hills", () => {
     return p >>> 24 === 255 && Math.abs((p & 0xff) - ((p >> 16) & 0xff)) < 40;
   });
   assert.ok(grey.length > m.cells.length / 2 && c >= 0, "stone over the mountain's cells");
+});
+
+test("berry bushes are small, red-berried and outlined; the middle of a crown has no square", () => {
+  for (let v = 0; v < VARIANTS; v++) {
+    const s = treeSprite("bush", v, 0, 0);
+    assert.ok(s.px.some((p) => p === 0xff3a30c8), "red berries");
+    assert.ok(s.w < treeSprite("oak", v, 0, 1).w, "smaller than a large tree");
+  }
+  // A pine's middle: no lit dot ringed in dark.
+  for (let v = 0; v < VARIANTS; v++) {
+    const s = treeSprite("pine", v, 0, 3), mid = s.px[s.oy * s.w + s.ox];
+    const ring = [-2, 2].flatMap((d) => [s.px[(s.oy + d) * s.w + s.ox], s.px[s.oy * s.w + s.ox + d]]);
+    const lum = (p: number) => (p & 0xff) + ((p >> 8) & 0xff) + ((p >> 16) & 0xff);
+    assert.ok(!ring.every((p) => lum(p) < lum(mid) - 60), "a bright dot boxed in at the middle");
+  }
+});
+
+test("the open ground is grass with blades, and blasts and burning ground clear it to dirt", () => {
+  const map = city(), plan = forestPlan(map), damage = new ForestDamage(plan);
+  assert.ok(plan.open.length === map.type.length);
+  const before = floorPixels(plan, damage);
+  let grass = 0, open = 0;
+  for (let i = 0; i < plan.open.length; i++) {
+    if (!plan.open[i]) continue;
+    open++;
+    const X = (i % CELLS_W) * 8 + 4, Y = Math.floor(i / CELLS_W) * 8 + 4;
+    if (turfAt(X, Y)) grass++;
+  }
+  assert.ok(grass > open * 0.5, `${grass} of ${open} open cells grassed`);
+  const inside = map.type.findIndex((t) => t !== CellType.OUT);
+  assert.equal(before[Math.floor(inside / CELLS_W) * 8 * CELLS_W * 8 + (inside % CELLS_W) * 8], 0, "no grass in the city");
+  const blades = forestBlades(plan), count = blades.reduce((n, b) => n + (b?.length ?? 0), 0);
+  assert.ok(count > open * 2, `${count} blades`);
+  blades.forEach((b, i) => b && assert.equal(plan.open[i], 1, "a blade off the open ground"));
+  // A blast on open grass bares it, once.
+  let spot = -1;
+  for (let i = 0; i < plan.open.length && spot < 0; i++) {
+    const X = (i % CELLS_W) * 8 + 4, Y = Math.floor(i / CELLS_W) * 8 + 4;
+    if (plan.open[i] && turfAt(X, Y) && Math.floor(i / CELLS_W) > 10) spot = i;
+  }
+  const x = (spot % CELLS_W) + 0.5, y = Math.floor(spot / CELLS_W) + 0.5;
+  assert.ok(damage.clear(x, y, 1.2));
+  assert.ok(!damage.clear(x, y, 1.2), "the same ground again clears nothing");
+  floorPixels(plan, damage);
+  assert.ok(!turfAt(Math.round(x * 8), Math.round(y * 8)), "dirt where the blast fell");
+  assert.ok(!damage.clear(-5, -5, 1), "off the board clears nothing");
 });

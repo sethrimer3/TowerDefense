@@ -56,6 +56,7 @@ import { ChimneySmoke } from "./chimney-smoke.ts";
 import { Ghosts } from "./ghosts.ts";
 import { AtmosphereArt } from "./atmosphere-art.ts";
 import { ForestArt } from "./forest-art.ts";
+import { ForestGrass } from "./forest-grass.ts";
 import { hasForest } from "./forest.ts";
 
 export type DrawOptions = {
@@ -122,6 +123,7 @@ export class DefendRenderer {
   private readonly sky = new SkyPalaceArt();
   readonly atmosphere = new AtmosphereArt();
   readonly forest = new ForestArt();
+  readonly forestGrass = new ForestGrass();
   /** The battle time the wizard art last advanced to. */
   private wizardTime = 0;
   private rain = new Rain();
@@ -338,11 +340,20 @@ export class DefendRenderer {
     if (sim) this.drawGates(map, sim, opts, dt);
     drawBallistas(ctx, this.px, map, sim, sim ? sim.bonuses.gate : opts.gate);
     drawSpikeThrusts(ctx, this.px, map, sim);
-    this.drawParkLife(map, sim, opts, dt);
-    // The forest's dirt, rocks and shadows outside the walls.
+    const feet = this.drawParkLife(map, sim, opts, dt);
+    // The forest's grass, dirt, rocks and shadows outside the walls, and
+    // the grass's live blades.
     this.forest.sync(map, sim);
     this.forest.drawFloor(ctx, this.px, this.forestShare());
     this.forest.drawWater(ctx, this.px, opts.now, this.forestShare(), opts.reduceMotion);
+    if ((opts.effects ?? true) && this.forestShare() > 0) {
+      this.forestGrass.sync(this.forest.forestPlan!);
+      this.forestGrass.draw({
+        c: ctx, px: this.px, now: opts.now, dt, reduceMotion: opts.reduceMotion, alpha: this.forestShare(),
+        wind: sim && opts.weather?.rain ? "rain" : opts.weather ? "cloud" : "calm",
+        walkers: feet,
+      });
+    }
     // Park fences sit on the ground layer, under the lighting and units.
     this.fences.sync(map);
     if (sim) this.fences.update(sim);
@@ -376,18 +387,19 @@ export class DefendRenderer {
 
   /** Pond drips, rings and reflections, then the grass swaying and parting
    * around everyone walking through the parks. */
-  private drawParkLife(map: CityMap, sim: DefendSim | null, opts: DrawOptions, dt: number) {
+  private drawParkLife(map: CityMap, sim: DefendSim | null, opts: DrawOptions, dt: number): Walker[] {
     const rain = !!(sim && opts.weather?.rain);
     this.water.sync(map);
     const feet = sim ? walkers(sim) : [];
     if (sim?.cold || opts.weather?.snow || (opts.effects ?? true)) this.water.draw({ c: this.ctx, px: this.px, now: opts.now, rain, cold: sim?.cold ?? !!opts.weather?.snow, thawedPonds: sim?.thawedPonds, night: opts.night, walkers: feet, reduceMotion: opts.reduceMotion, layer: this.layer, layerScale: this.layerScale });
-    if (!(opts.effects ?? true)) return;
+    if (!(opts.effects ?? true)) return feet;
     this.grass.sync(map);
     this.grass.draw({
       c: this.ctx, px: this.px, now: opts.now, dt, reduceMotion: opts.reduceMotion,
       wind: rain ? "rain" : opts.weather ? "cloud" : "calm",
       walkers: feet,
     });
+    return feet;
   }
 
   /** What a battle lays over the city before its units: damage, and in
@@ -525,7 +537,9 @@ export class DefendRenderer {
       if (b > 0) moving.push({ x: u.x, y: u.y, r: 2.2, k: 0.45 * b, color: "#ffc68a" });
     }
     const out = this.lighting.lights.filter((l) => this.lighting.burn(l) <= 0).length;
-    this.relief.draw(this.ctx, this.px, { version: `${sim.mapVersion}:${out}`, lights: fixed }, moving, 0.6 + opts.night * 0.4);
+    // The forest's grass hides the flagstones.
+    const bare = 1 - Math.min(1, this.forestShare());
+    if (bare > 0) this.relief.draw(this.ctx, this.px, { version: `${sim.mapVersion}:${out}`, lights: fixed }, moving, (0.6 + opts.night * 0.4) * bare);
   }
 
   private drawRain(dt: number) {

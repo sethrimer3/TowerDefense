@@ -280,7 +280,7 @@ One skill rank or spell path rank being worked in the Study. Knowledge is paid a
 The setting, on by default, that draws the pieces with hand-drawn sprites (shared with Tower Delve) in place of their drawn art; off, every piece looks as it was drawn before.
 
 **Forest**:
-The trees (large, larger and huge, seen from above), rocks, dirt pads, meadows and lakes filling the open ground outside Mossbound Ruins' walls, never part of the battle but for its boulders: the trees sway in the wind, and blasts and the strongest charges blow them up, leaving a crater of dirt and a stump until the next run.
+The grass, trees (large, larger and huge, seen from above), small berry bushes, rocks, dirt pads and lakes filling the open ground outside Mossbound Ruins' walls, never part of the battle but for its boulders: the trees and grass sway in the wind, blasts and the strongest charges blow the trees up, leaving a crater of dirt and a stump, and blasts and burning ground bare the grass to dirt, until the next run.
 
 **Boulder**:
 A great stone, alone, in a cluster or heaped into a small mountain, in the forest outside Mossbound Ruins' walls: unlike the rest of the forest it blocks everyone on foot in the battle, though shots fly over it.

@@ -1,9 +1,10 @@
 /** The wilds outside Mossbound Ruins' walls: large to huge old oaks and
- * pines seen from above, rocks, dirt pads, rare meadows and flower fields
- * and a few lakes filling the open ground round the city, planned from the
+ * pines seen from above, a few small berry bushes, rocks, dirt pads and a
+ * few lakes on grass filling the open ground round the city, planned from the
  * map alone (each cell's own hashes, so a placed tower only clears what it
  * stands on), and the trees a battle blows up, each leaving a crater of
- * turned earth and a stump. All of it is presentation only but the
+ * turned earth and a stump, and the grass its blasts and burning ground
+ * clear to dirt (`ForestDamage.clear`). All of it is presentation only but the
  * boulders (`boulderPlan`): those, alone, in clusters or heaped into small
  * mountains, block ground units in the battle (`DefendSim.syncBoulders`).
  * `forest-art.ts` draws it. */
@@ -18,15 +19,17 @@ export const hasForest = (area: AreaId) => FOREST_AREAS.includes(area);
 /** How the forest is planned. `cell` is the coarse noise grid (cells) the
  * thickets and glades follow; `big` is each tree size's chance a cell
  * (thickets raise it, glades lower it); rocks and pads are seeded in the
- * cells left over; `lakes` and `meadows` how many of each. */
+ * cells left over; `lakes` how many lakes and `bushes` how many small berry
+ * bushes. */
 export const FOREST = {
   cell: 7, rock: 0.04, pad: 0.03, clear: 0.15,
   big: [0, 0.11, 0.045, 0.018],
-  lakes: 3, meadows: 6,
+  lakes: 3, bushes: 14,
 };
-/** Tree kinds: round broadleaf, star-shaped pine and low bush. */
+/** Tree kinds: round broadleaf, star-shaped pine and low berry bush. */
 export type TreeKind = "oak" | "pine" | "bush";
-/** Tree sizes: ordinary (no longer planted), large, larger and huge. */
+/** Tree sizes: ordinary (only bushes are planted this small), large,
+ * larger and huge. */
 export type TreeSize = 0 | 1 | 2 | 3;
 /** How many sprite variants each kind and size is baked in. */
 export const VARIANTS = 10;
@@ -41,9 +44,9 @@ export type Rock = { x: number; y: number; size: number; seed: number };
 export type Pad = { x: number; y: number; r: number; seed: number };
 /** A lake: the union of its discs (cells). */
 export type Lake = { discs: { x: number; y: number; r: number }[]; seed: number };
-/** A meadow of long grass, in flower or not. */
-export type Meadow = { x: number; y: number; r: number; seed: number; flowers: boolean };
-export type ForestPlan = { trees: ForestTree[]; rocks: Rock[]; pads: Pad[]; lakes: Lake[]; meadows: Meadow[]; boulders: Boulder[] };
+/** The plan: `open` is 1 on each open-ground cell, which alone the forest
+ * covers. */
+export type ForestPlan = { trees: ForestTree[]; rocks: Rock[]; pads: Pad[]; lakes: Lake[]; boulders: Boulder[]; open: Uint8Array };
 
 /** A canopy radius for each kind, size and variant, in cells. */
 export function canopyRadius(kind: TreeKind, variant: number, size: TreeSize = 0) {
@@ -51,7 +54,7 @@ export function canopyRadius(kind: TreeKind, variant: number, size: TreeSize = 0
   if (size === 3) return (kind === "pine" ? 1.9 : 2.1) + u * 0.5;
   if (size === 2) return (kind === "pine" ? 1.3 : 1.4) + u * 0.3;
   if (size === 1) return (kind === "pine" ? 0.85 : 0.9) + u * 0.25;
-  return kind === "bush" ? 0.28 + u * 0.12 : kind === "pine" ? 0.42 + u * 0.2 : 0.48 + u * 0.26;
+  return kind === "bush" ? 0.5 + u * 0.15 : kind === "pine" ? 0.42 + u * 0.2 : 0.48 + u * 0.26;
 }
 
 /** Smooth value noise on the coarse grid, 0..1. */
@@ -196,9 +199,10 @@ const inDiscs = (discs: readonly { x: number; y: number; r: number }[], x: numbe
   discs.some((d) => (x - d.x) ** 2 + (y - d.y) ** 2 < (d.r + pad) ** 2);
 
 function plan_(map: CityMap): ForestPlan {
-  const trees: ForestTree[] = [], rocks: Rock[] = [], pads: Pad[] = [], lakes: Lake[] = [], meadows: Meadow[] = [];
+  const trees: ForestTree[] = [], rocks: Rock[] = [], pads: Pad[] = [], lakes: Lake[] = [];
+  const open = Uint8Array.from(map.type, (t) => (t === CellType.OUT ? 1 : 0));
   const boulders = boulderPlan(map);
-  // What keeps the rest away: lakes, meadows, big canopies and the boulders.
+  // What keeps the rest away: lakes, big canopies and the boulders.
   const keep: { x: number; y: number; r: number }[] = [];
   const stones: { x: number; y: number; r: number }[] = [];
   for (const b of boulders) for (const c of b.cells) stones.push({ x: (c % CELLS_W) + 0.5, y: Math.floor(c / CELLS_W) + 0.5, r: 0.8 });
@@ -225,14 +229,6 @@ function plan_(map: CityMap): ForestPlan {
     lakes.push({ discs, seed: hash(cx, cy, 425) });
     keep.push(...discs.map((d) => ({ ...d, r: d.r + 0.4 })));
   }
-  // Rare meadows of long grass, half of them in flower.
-  for (const [cx, cy] of spots(430)) {
-    if (meadows.length >= FOREST.meadows) break;
-    const r = 2 + hash01(cx, cy, 431) * 2.5, x = cx + 0.5, y = cy + 0.5;
-    if (!clearOf(map, x, y, r * 0.6) || inDiscs(keep, x, y, r + 4) || inDiscs(stones, x, y, r * 0.5)) continue;
-    meadows.push({ x, y, r, seed: hash(cx, cy, 432), flowers: hash01(cx, cy, 433) < 0.5 });
-    keep.push({ x, y, r: r * 0.85 });
-  }
   // Trees, huge to large, each keeping the ground under it.
   for (const size of [3, 2, 1] as const)
     each((cx, cy) => {
@@ -244,6 +240,17 @@ function plan_(map: CityMap): ForestPlan {
       trees.push({ id: 0, x, y, r, kind, size, variant, phase: hash01(cx, cy, 448) * Math.PI * 2 });
       keep.push({ x, y, r: r * 0.7 });
     });
+  // A few small berry bushes in the open between them, glades first.
+  let bushes = 0;
+  for (const [cx, cy] of spots(450)) {
+    if (bushes >= FOREST.bushes) break;
+    const variant = hash(cx, cy, 451) % VARIANTS, r = canopyRadius("bush", variant);
+    const x = cx + 0.3 + hash01(cx, cy, 452) * 0.4, y = cy + 0.3 + hash01(cx, cy, 453) * 0.4;
+    if (!clearOf(map, x, y, r) || inDiscs(keep, x, y, r + 0.6) || inDiscs(stones, x, y, r + 0.3)) continue;
+    trees.push({ id: 0, x, y, r, kind: "bush", size: 0, variant, phase: hash01(cx, cy, 454) * Math.PI * 2 });
+    keep.push({ x, y, r: r + 1.5 });
+    bushes++;
+  }
   // Rocks and bare pads in the ground the trees leave.
   each((cx, cy) => {
     const x0 = cx + 0.5, y0 = cy + 0.5;
@@ -262,19 +269,27 @@ function plan_(map: CityMap): ForestPlan {
   // Drawn back to front, so a canopy lower on the board stands over the one behind.
   trees.sort((a, b) => a.y - b.y || a.x - b.x);
   trees.forEach((t, i) => (t.id = i));
-  return { trees, rocks, pads, lakes, meadows, boulders };
+  return { trees, rocks, pads, lakes, boulders, open };
 }
 
 /** A tree blown up: where it stood, and the cause, for its debris. */
 export type Felled = { tree: ForestTree; fromX: number; fromY: number; force: number };
 /** The crater a felled tree leaves. */
 export type Crater = { x: number; y: number; r: number; seed: number; size: TreeSize };
+/** A patch of grass a blast or burning ground cleared to dirt. */
+export type Clearing = { x: number; y: number; r: number; seed: number };
+/** The most clearings a run keeps; past it, blasts clear no more grass. */
+export const MAX_CLEARINGS = 1500;
 
 /** The battle's toll on the forest: which trees are down, and the craters
  * they left. A fresh one for every run. */
 export class ForestDamage {
   readonly down: Uint8Array;
   readonly craters: Crater[] = [];
+  readonly clearings: Clearing[] = [];
+  /** 1 on each cell a clearing has bared at its middle, so blasts over
+   * ground already cleared add nothing. */
+  private bare = new Uint8Array(CELLS_W * CELLS_H);
   /** Bumped whenever a tree falls, for the art to repaint the ground. */
   version = 0;
   /** The trees by the cell their middle stands in. */
@@ -290,6 +305,26 @@ export class ForestDamage {
 
   standing(t: ForestTree) {
     return !this.down[t.id];
+  }
+
+  /** A blast or burning ground `r` cells across at (x, y) clears the grass
+   * there to dirt, unless it falls only on ground already bare or off the
+   * open ground; true when it adds a clearing. */
+  clear(x: number, y: number, r: number): boolean {
+    if (r < 0.3 || this.clearings.length >= MAX_CLEARINGS) return false;
+    const reach = r * 0.6;
+    let fresh = false;
+    for (let cy = Math.max(0, Math.floor(y - reach)); cy <= Math.min(CELLS_H - 1, Math.floor(y + reach)); cy++)
+      for (let cx = Math.max(0, Math.floor(x - reach)); cx <= Math.min(CELLS_W - 1, Math.floor(x + reach)); cx++) {
+        const k = cellIndex(cx, cy), dx = cx + 0.5 - x, dy = cy + 0.5 - y;
+        if (dx * dx + dy * dy > reach * reach || !this.plan.open[k] || this.bare[k]) continue;
+        this.bare[k] = 1;
+        fresh = true;
+      }
+    if (!fresh) return false;
+    this.clearings.push({ x, y, r, seed: hash(Math.round(x * 16), Math.round(y * 16), this.clearings.length, 418) });
+    this.version++;
+    return true;
   }
 
   /** A blast of radius `r` at (x, y): every standing tree whose canopy it

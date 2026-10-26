@@ -1,12 +1,15 @@
 /** The forest outside the walls (`forest.ts`) as pixel art at `ART` pixels a
  * cell, inside crisp black outlines like the parks' trees:
  *
- * - **Ground:** dirt pads, mossy rocks, every standing tree's shadow (cast
- *   from the upper left) and the craters with stumps that felled trees
- *   leave, all baked into one board-sized canvas, repainted only when a
- *   tree falls. It lies under the units and the battle's lighting.
- * - **Trees:** oaks of leaf clumps, star-shaped pines in whorls, and low
- *   bushes (some berried or flowering), each variant baked in five lean
+ * - **Ground:** the parks' grass over all the open ground (`turfAt` marks
+ *   it, where `forest-grass.ts` grows its blades), dirt pads, mossy rocks,
+ *   every standing tree's shadow (cast from the upper left), the craters
+ *   with stumps that felled trees leave and the dirt blasts and burning
+ *   ground bare, all baked into one board-sized canvas, repainted only
+ *   where something changes. It lies under the units and the battle's
+ *   lighting.
+ * - **Trees:** oaks of leaf clumps, star-shaped pines in whorls, and small
+ *   bushes with red berries, each variant baked in five lean
  *   frames; on the wall clock each tree leans with its own sway and gusts
  *   rolling across the board, stronger under cloud and rain. They stand
  *   over the units, fading while anyone is under them, composed into one
@@ -19,8 +22,9 @@
 import { CELL_COUNT, CELLS_H, CELLS_W, cellIndex, defendRandom, hash, hash01 } from "./grid.ts";
 import type { CityMap } from "./citygen.ts";
 import type { DefendSim } from "./sim.ts";
-import { ForestDamage, MOUNTAIN, VARIANTS, canopyRadius, forestPlan, type Boulder, type Felled, type ForestPlan, type ForestTree, type Lake, type Meadow, type TreeKind, type TreeSize } from "./forest.ts";
+import { ForestDamage, MOUNTAIN, VARIANTS, canopyRadius, forestPlan, type Boulder, type Felled, type ForestPlan, type ForestTree, type Lake, type TreeKind, type TreeSize } from "./forest.ts";
 import { ART } from "./park-art.ts";
+import { GRASS } from "./ground-art.ts";
 import { artPen } from "./pixel-fx.ts";
 
 const W = CELLS_W * ART, H = CELLS_H * ART;
@@ -61,7 +65,11 @@ const LEAVES: Record<TreeKind, number[][]> = {
   ],
 };
 const BARK = [0x3e2a1c, 0x5e4129];
-const BERRY = [0xb8343a, 0xe8e2c8, 0xe8c64a];
+/** Berries: red, and a pale glint on a few. */
+const BERRY = [0xc8303a, 0xf2a49a];
+/** The parks' grass: its two patch greens and its dark and light tufts. */
+const hexValue = (s: string) => parseInt(s.slice(1), 16);
+const TURF = { patch: GRASS.patch.map(hexValue), dark: hexValue(GRASS.dark), light: hexValue(GRASS.light) };
 const DIRT = [0x463a2e, 0x55483a, 0x62523f, 0x6a5944];
 const TURNED = [0x46372a, 0x5a4634, 0x6c5640, 0x7e664c];
 const PEBBLE = [0x8a7a62, 0x3a3026];
@@ -81,15 +89,6 @@ const GLINT = 0xd8f0f2;
 const CRAG = [0x24262a, 0x34373a, 0x4a4d4c, 0x63665f, 0x81847a, 0xa2a497];
 const LILY = [0x21401f, 0x3d7a33, 0x63a54b];
 const REED = [0x2c4a22, 0x5b7a34, 0xb7a25a];
-/** Meadows: long grass blades, dark to lit, and flowers (petal, shaded
- * petal, heart): red, yellow, white and purple. */
-const GRASS = [0x355a24, 0x4c7a2e, 0x6a9a3c, 0x9cc25a];
-const FLOWERS = [
-  [0xd8363e, 0x9a1f2a, 0xf0d050],
-  [0xf2d240, 0xc09a22, 0x8a5a1a],
-  [0xf4f0e2, 0xc8c2b0, 0xe8c64a],
-  [0x9a5ad0, 0x6a3a9a, 0xf0e070],
-];
 
 /** A sprite: its pixels, its size and where the canopy's middle sits in it. */
 export type Sprite = { px: Uint32Array; w: number; h: number; ox: number; oy: number; runs?: Int16Array };
@@ -144,9 +143,10 @@ function canopy(kind: TreeKind, v: number, size: TreeSize) {
         }
         const light = (-0.6 * dx - 0.8 * dy) / R;
         let val = light * 0.75 + (tier * 0.56) / (tiers.length - 1) - 0.22;
-        // A dark line just outside each upper tier's rim, on the shaded side.
-        if (d < next + 1.2 && 0.6 * dx + 0.8 * dy > -0.2 * R) val -= 0.6;
-        if (d < 1.2) val = 1;
+        // A dark line just outside each upper tier's rim, on the shaded side,
+        // but not round the topmost tier, which would ring the middle in a
+        // hard little square.
+        if (tier < tiers.length - 2 && d < next + 1.2 && 0.6 * dx + 0.8 * dy > -0.2 * R) val -= 0.6;
         grid[y * n + x] = band(val, x, y);
       }
     return { R, half, n, grid };
@@ -167,7 +167,7 @@ function canopy(kind: TreeKind, v: number, size: TreeSize) {
     ring(k + 4, 0.66, 0.26, 0, 600);
     ring(k - 2, 0.36, 0.3, 0.1, 700);
   } else ring(k, 0.42, size ? 0.34 : 0.38, 0, 434);
-  const berries = bush && v % 3 !== 2 ? v % 3 : -1;
+
   for (let y = 0; y < n; y++)
     for (let x = 0; x < n; x++) {
       const px = x + 0.5 - half, py = y + 0.5 - half;
@@ -181,16 +181,26 @@ function canopy(kind: TreeKind, v: number, size: TreeSize) {
       if (best === -Infinity) continue;
       const nx = (px - c.x) / c.r, ny = (py - c.y) / c.r;
       let val = 0.5 * (-0.6 * nx - 0.8 * ny) + 0.5 * ((-0.6 * px - 0.8 * py) / R);
-      // Each clump's shaded rim reads against the clump below it.
-      const edge = Math.sqrt((px - c.x) ** 2 + (py - c.y) ** 2) > c.r - 1.1 - size * 0.45;
+      // Each clump's shaded rim reads against the clump below it; the crown's
+      // middle clump blends in, or its rim boxes the middle in a square.
+      const edge = c !== clumps[0] && Math.sqrt((px - c.x) ** 2 + (py - c.y) ** 2) > c.r - 1.1 - size * 0.45;
       if (edge && 0.6 * nx + 0.8 * ny > 0.25) val -= 0.55;
       // Leaf speckle, and on big crowns dark gaps between the leaves.
       const sp = hash(x, y, v, 435) % 13;
       if (sp === 0) val += 0.4;
       else if (size >= 2 && sp === 1 && val < 0.4) val -= 0.5;
-      const b = band(val, x, y);
-      grid[y * n + x] = berries >= 0 && b >= 2 && hash(x, y, v, 436) % 11 === 0 ? 4 + berries : b;
+      grid[y * n + x] = band(val, x, y);
     }
+  // A bush's red berries, a pixel each, kept off its rim and apart, one in
+  // a few catching the light.
+  if (bush)
+    for (let y = 1; y < n - 1; y++)
+      for (let x = 1; x < n - 1; x++) {
+        const i = y * n + x;
+        if (grid[i] < 1 || grid[i - 1] < 0 || grid[i + 1] < 0 || grid[i - n] < 0 || grid[i + n] < 0) continue;
+        if (grid[i - 1] >= 4 || grid[i - n] >= 4 || grid[i - n - 1] >= 4 || grid[i - n + 1] >= 4 || hash(x, y, v, 436) % 3) continue;
+        grid[i] = 4 + (hash(x, y, v, 437) % 4 === 0 ? 1 : 0);
+      }
   return { R, half, n, grid };
 }
 
@@ -282,6 +292,15 @@ function rock(size: number, seed: number): Sprite {
 
 /** Which floor pixels a tree's shadow has darkened already. */
 const shaded = new Uint8Array(W * H);
+/** Which floor pixels are grass (shadowed or not), where the live blades
+ * may grow. */
+const turf = new Uint8Array(W * H);
+/** The grass each open pixel is painted with before anything over it. */
+const lawn = new Uint32Array(W * H);
+/** Whether art pixel (X, Y) of the forest floor last painted is grass, and
+ * whether a tree's shadow lies on it. */
+export const turfAt = (X: number, Y: number) => X >= 0 && Y >= 0 && X < W && Y < H && turf[Y * W + X] === 1;
+export const shadedAt = (X: number, Y: number) => X >= 0 && Y >= 0 && X < W && Y < H && shaded[Y * W + X] === 1;
 /** A box of art pixels, `x1`/`y1` exclusive. */
 export type Box = { x0: number; y0: number; x1: number; y1: number };
 const WHOLE: Box = { x0: 0, y0: 0, x1: W, y1: H };
@@ -292,8 +311,9 @@ const inClip = (X: number, Y: number) => X >= clip.x0 && Y >= clip.y0 && X < cli
 const nearClip = (x: number, y: number, reach: number) =>
   (x + reach) * ART >= clip.x0 && (x - reach) * ART < clip.x1 && (y + reach) * ART >= clip.y0 && (y - reach) * ART < clip.y1;
 
-/** The forest's ground, `W × H` art pixels: dirt pads, craters with
- * stumps, rocks and the standing trees' shadows. */
+/** The forest's ground, `W × H` art pixels: grass, dirt pads, the dirt
+ * blasts bared, craters with stumps, rocks and the standing trees'
+ * shadows. */
 export function floorPixels(plan: ForestPlan, damage: ForestDamage | null): Uint32Array {
   const out = new Uint32Array(W * H);
   paintFloor(out, plan, damage, WHOLE);
@@ -304,8 +324,9 @@ export function floorPixels(plan: ForestPlan, damage: ForestDamage | null): Uint
 export function paintFloor(out: Uint32Array, plan: ForestPlan, damage: ForestDamage | null, box: Box) {
   clip = { x0: Math.max(0, box.x0), y0: Math.max(0, box.y0), x1: Math.min(W, box.x1), y1: Math.min(H, box.y1) };
   for (let Y = clip.y0; Y < clip.y1; Y++) out.fill(0, Y * W + clip.x0, Y * W + clip.x1);
-  for (const m of plan.meadows) if (nearClip(m.x, m.y, m.r * 1.2 + 0.5)) meadow(out, m);
+  lawnIn(out, plan.open);
   for (const p of plan.pads) if (nearClip(p.x, p.y, p.r * 1.3 + 0.2)) blob(out, p.x, p.y, p.r, p.seed, DIRT, false);
+  for (const c of damage?.clearings ?? []) if (nearClip(c.x, c.y, c.r * 1.3 + 0.2)) blob(out, c.x, c.y, c.r, c.seed, DIRT, false, plan.open);
   for (const l of plan.lakes) lake(out, l);
   for (const c of damage?.craters ?? []) {
     if (!nearClip(c.x, c.y, c.r * 1.3 + 0.5)) continue;
@@ -320,6 +341,9 @@ export function paintFloor(out: Uint32Array, plan: ForestPlan, damage: ForestDam
     stamp(out, s, x0, y0, false);
   }
   for (const b of plan.boulders) boulder(out, b);
+  // What is still grass, before the trees' shadows fall on it.
+  for (let Y = clip.y0; Y < clip.y1; Y++)
+    for (let X = clip.x0, i = Y * W + X; X < clip.x1; X++, i++) turf[i] = out[i] !== 0 && out[i] === lawn[i] ? 1 : 0;
   for (let Y = clip.y0; Y < clip.y1; Y++) shaded.fill(0, Y * W + clip.x0, Y * W + clip.x1);
   for (const t of plan.trees) {
     if ((damage && !damage.standing(t)) || !nearClip(t.x, t.y, t.r * 2 + 1)) continue;
@@ -337,6 +361,26 @@ export function paintFloor(out: Uint32Array, plan: ForestPlan, damage: ForestDam
     }
   }
   clip = WHOLE;
+}
+
+/** The parks' grass over every open cell in the clip: each cell its 2 × 2
+ * patch's green, with a few dark and light tufts. */
+function lawnIn(out: Uint32Array, open: Uint8Array) {
+  for (let cy = Math.floor(clip.y0 / ART); cy * ART < clip.y1; cy++)
+    for (let cx = Math.floor(clip.x0 / ART); cx * ART < clip.x1; cx++) {
+      if (!open[cellIndex(cx, cy)]) continue;
+      const patch = rgba(TURF.patch[hash01(Math.floor(cx / 2), Math.floor(cy / 2), 50) < 0.5 ? 0 : 1]);
+      const put = (X: number, Y: number, c: number) => {
+        if (inClip(X, Y)) out[Y * W + X] = lawn[Y * W + X] = c;
+      };
+      for (let y = 0; y < ART; y++) for (let x = 0; x < ART; x++) put(cx * ART + x, cy * ART + y, patch);
+      for (let k = 0; k < 5; k++) {
+        const hx = cx * ART + Math.floor(hash01(cx, cy, 51, k) * (ART - 1)), hy = cy * ART + Math.floor(hash01(cx, cy, 52, k) * (ART - 2));
+        const c = rgba(k % 2 ? TURF.dark : TURF.light);
+        put(hx, hy, c);
+        put(hx, hy + 1, c);
+      }
+    }
 }
 
 /** A pixel in shadow: a solid one darkened, a clear one made a dim shade. */
@@ -358,8 +402,8 @@ function stamp(out: Uint32Array, s: Sprite, x0: number, y0: number, shadow: bool
 
 /** A patch of earth `r` cells across at (x, y): a ragged disc of `tones`,
  * dithered out into the ground at its edge, with pebbles; a crater's (`thrown`)
- * rim heaped lighter with clods. */
-function blob(out: Uint32Array, x: number, y: number, r: number, seed: number, tones: number[], thrown: boolean) {
+ * rim heaped lighter with clods. With `open`, only on the cells it marks. */
+function blob(out: Uint32Array, x: number, y: number, r: number, seed: number, tones: number[], thrown: boolean, open?: Uint8Array) {
   const R = r * ART, cx = x * ART, cy = y * ART, ph = hash01(seed, 471) * 6.28, ph2 = hash01(seed, 472) * 6.28;
   const x0 = Math.max(clip.x0, Math.floor(cx - R * 1.3)), x1 = Math.min(clip.x1 - 1, Math.ceil(cx + R * 1.3));
   const y0 = Math.max(clip.y0, Math.floor(cy - R * 1.3)), y1 = Math.min(clip.y1 - 1, Math.ceil(cy + R * 1.3));
@@ -371,7 +415,7 @@ function blob(out: Uint32Array, x: number, y: number, r: number, seed: number, t
       const d = Math.sqrt(d2);
       // Only the ragged edge needs its angle: deep inside, the rim is far.
       const rim = d < R * 0.62 - 2 ? R : R * (0.82 + 0.12 * Math.sin(Math.atan2(dy, dx) * 3 + ph) + 0.08 * Math.sin(Math.atan2(dy, dx) * 7 + ph2));
-      if (d >= rim) continue;
+      if (d >= rim || (open && !open[cellIndex(Math.floor(X / ART), Math.floor(Y / ART))])) continue;
       const odd = (X + Y) & 1;
       // The outermost pixel, every other one, lets the ground through.
       if (d > rim - 1 && odd) continue;
@@ -611,43 +655,6 @@ function chamfer(inside: Uint8Array, w: number, h: number) {
   return d;
 }
 
-/** A meadow: long grass in tufts thinning toward its ragged edge, and in a
- * flower meadow, drifts of flowers each of one colour. */
-function meadow(out: Uint32Array, m: Meadow) {
-  const R = m.r * ART, cx = m.x * ART, cy = m.y * ART;
-  const x0 = Math.max(clip.x0, Math.floor(cx - R * 1.2)), x1 = Math.min(clip.x1, Math.ceil(cx + R * 1.2));
-  const y0 = Math.max(clip.y0, Math.floor(cy - R * 1.2)), y1 = Math.min(clip.y1, Math.ceil(cy + R * 1.2));
-  const put = (X: number, Y: number, c: number) => {
-    if (inClip(X, Y)) out[Y * W + X] = rgba(c);
-  };
-  for (let Y = y0; Y < y1; Y++)
-    for (let X = x0; X < x1; X++) {
-      const dx = X + 0.5 - cx, dy = Y + 0.5 - cy;
-      // Thick in the middle, a ragged fringe of lone tufts outside.
-      const fall = Math.sqrt(dx * dx + dy * dy) / R + 0.18 * Math.sin(dx * 0.21 + m.seed) * Math.cos(dy * 0.17 + m.seed);
-      if (fall >= 1.15) continue;
-      const hsh = hash(X, Y, m.seed, 491);
-      // A blade of long grass: a dark root, a lit tip a pixel up.
-      if (hsh % 100 < 34 * Math.max(0, 1.15 - fall)) {
-        const shade = hsh % 3;
-        put(X, Y, GRASS[shade]);
-        put(X + ((hsh >> 4) & 1), Y - 1, GRASS[shade + 1]);
-        if (shade === 2) put(X, Y - 2, GRASS[3]);
-      }
-      if (!m.flowers || fall > 0.95) continue;
-      // Flowers in drifts: the drift's colour from a coarse hash.
-      if (hsh % 61 < 4) {
-        const drift = hash(Math.floor((X + m.seed % 13) / 9), Math.floor((Y + m.seed % 7) / 7), m.seed, 492);
-        const petal = FLOWERS[drift % FLOWERS.length];
-        put(X, Y - 1, petal[0]);
-        put(X - 1, Y, petal[0]);
-        put(X + 1, Y, petal[1]);
-        put(X, Y + 1, petal[1]);
-        put(X, Y, petal[2]);
-      }
-    }
-}
-
 /** A boulder or cluster: one great stone over a 2 × 2 block, else a stone
  * a cell, each heaving up a shade on the ground, piled back to front; a
  * heap of `MOUNTAIN` cells or more is a small mountain. */
@@ -690,10 +697,10 @@ export class ForestArt {
   private debris: Debris[] = [];
   private lastTime = -1;
   private alpha = new Float32Array(0);
-  /** The ground's pixels and canvas, and the box of it to paint again
-   * (null when it is up to date). */
+  /** The ground's pixels and canvas, and the boxes of it to paint again
+   * (none when it is up to date). */
   private floor: { px: Uint32Array; img: ImageData; cv: HTMLCanvasElement } | null = null;
-  private floorStale: Box | null = WHOLE;
+  private floorStale: Box[] = [WHOLE];
   /** The trees' pixels, composed afresh at most every `REDRAW_MS`. */
   private crowns: { px: Uint32Array; img: ImageData; cv: HTMLCanvasElement } | null = null;
   /** The next band of rows to compose, and whether all are due, or a fade
@@ -720,7 +727,7 @@ export class ForestArt {
       this.debris = [];
       this.lastTime = -1;
       this.dirty = true;
-      this.floorStale = WHOLE;
+      this.floorStale = [WHOLE];
     }
   }
 
@@ -731,10 +738,16 @@ export class ForestArt {
       const step = this.lastTime < 0 ? 0 : Math.max(0, Math.min(0.25, sim.time - this.lastTime));
       this.lastTime = sim.time;
       const felled: Felled[] = [];
-      for (const e of sim.effects) if (e.kind === "boom" && this.first(e)) felled.push(...this.damage.blast(e.x, e.y, e.r, 1 + Math.min(1.5, e.r * 0.4)));
+      for (const e of sim.effects)
+        if (e.kind === "boom" && this.first(e)) {
+          felled.push(...this.damage.blast(e.x, e.y, e.r, 1 + Math.min(1.5, e.r * 0.4)));
+          this.bare(e.x, e.y, e.r);
+        }
+      // Burning ground scorches the grass under it away.
+      for (const b of sim.blazes) if (this.first(b)) this.bare(b.x, b.y, b.r);
       for (const s of sim.swings) {
         if (!this.first(s)) continue;
-        if (s.kind === "spin") felled.push(...this.damage.blast(s.x, s.y, s.r, 0.7));
+        if (s.kind === "spin") felled.push(...this.damage.blast(s.x, s.y, s.r, 0.7)), this.bare(s.x, s.y, s.r);
         else if (s.kind === "dash") felled.push(...this.damage.cut(s.x, s.y, s.x1, s.y1, 0.35));
       }
       for (const s of sim.stabs) if (this.first(s)) felled.push(...this.damage.cut(s.x0, s.y0, s.x1, s.y1, 0.3));
@@ -750,10 +763,25 @@ export class ForestArt {
     this.fade(beneath, dt, reduceMotion);
   }
 
-  /** Marks `box` of the ground to paint again. */
-  private stale(box: Box) {
-    const b = this.floorStale;
-    this.floorStale = b ? { x0: Math.min(b.x0, box.x0), y0: Math.min(b.y0, box.y0), x1: Math.max(b.x1, box.x1), y1: Math.max(b.y1, box.y1) } : box;
+  /** Clears the grass `r` cells round (x, y) to dirt. */
+  private bare(x: number, y: number, r: number) {
+    if (!this.damage?.clear(x, y, r)) return;
+    const reach = r * 1.3 + 0.5;
+    this.stale({ x0: Math.floor((x - reach) * ART), y0: Math.floor((y - reach) * ART), x1: Math.ceil((x + reach) * ART), y1: Math.ceil((y + reach) * ART) });
+  }
+
+  /** Marks `box` of the ground to paint again: merged into a box it
+   * overlaps, else kept apart, so blasts all over the board don't repaint
+   * all of it. */
+  private stale(box: Box): void {
+    const list = this.floorStale;
+    for (let k = 0; k < list.length; k++) {
+      const b = list[k];
+      if (b.x0 > box.x1 || box.x0 > b.x1 || b.y0 > box.y1 || box.y0 > b.y1) continue;
+      list.splice(k, 1);
+      return this.stale({ x0: Math.min(b.x0, box.x0), y0: Math.min(b.y0, box.y0), x1: Math.max(b.x1, box.x1), y1: Math.max(b.y1, box.y1) });
+    }
+    list.push(box);
   }
 
   /** True the first time `o` is seen. */
@@ -840,9 +868,9 @@ export class ForestArt {
   drawFloor(c: CanvasRenderingContext2D, px: number, alpha: number) {
     if (!this.plan || alpha <= 0 || typeof document === "undefined") return;
     this.floor ??= surface();
-    const box = this.floorStale;
-    if (box) {
-      this.floorStale = null;
+    const boxes = this.floorStale;
+    this.floorStale = [];
+    for (const box of boxes) {
       paintFloor(this.floor.px, this.plan, this.damage, box);
       const x0 = Math.max(0, box.x0), y0 = Math.max(0, box.y0);
       this.floor.cv.getContext("2d")!.putImageData(this.floor.img, 0, 0, x0, y0, Math.min(W, box.x1) - x0, Math.min(H, box.y1) - y0);
@@ -852,6 +880,11 @@ export class ForestArt {
     c.globalAlpha = alpha;
     c.drawImage(this.floor.cv, 0, 0, CELLS_W * px, CELLS_H * px);
     c.restore();
+  }
+
+  /** The forest's plan, once synced (the grass plans its blades on it). */
+  get forestPlan() {
+    return this.plan;
   }
 
   /** The lakes' glints twinkling on the wall clock (`now`, ms), at
