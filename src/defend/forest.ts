@@ -1,9 +1,11 @@
 /** The wilds outside Mossbound Ruins' walls: large to huge old oaks and
- * pines seen from above, rocks, dirt pads, rare meadows and flower fields
- * and a few lakes filling the open ground round the city, planned from the
+ * pines seen from above, a few small berry bushes, rocks, dirt pads and a
+ * few lakes on grass filling the open ground round the city, planned from the
  * map alone (each cell's own hashes, so a placed tower only clears what it
- * stands on), and the trees a battle blows up, each leaving a crater of
- * turned earth and a stump. All of it is presentation only but the
+ * stands on), and the trees a battle brings down (`ForestDamage`): any
+ * attack strikes the smaller apart into a stump, blasts blow any up into a
+ * crater, fire burns any down to ash, and blasts and burning ground clear
+ * the grass to dirt. All of it is presentation only but the
  * boulders (`boulderPlan`): those, alone, in clusters or heaped into small
  * mountains, block ground units in the battle (`DefendSim.syncBoulders`).
  * `forest-art.ts` draws it. */
@@ -18,21 +20,20 @@ export const hasForest = (area: AreaId) => FOREST_AREAS.includes(area);
 /** How the forest is planned. `cell` is the coarse noise grid (cells) the
  * thickets and glades follow; `big` is each tree size's chance a cell
  * (thickets raise it, glades lower it); rocks and pads are seeded in the
- * cells left over; `lakes` and `meadows` how many of each. */
+ * cells left over; `lakes` how many lakes and `bushes` how many small berry
+ * bushes. */
 export const FOREST = {
   cell: 7, rock: 0.04, pad: 0.03, clear: 0.15,
   big: [0, 0.11, 0.045, 0.018],
-  lakes: 3, meadows: 6,
+  lakes: 3, bushes: 14,
 };
-/** Tree kinds: round broadleaf, star-shaped pine and low bush. */
+/** Tree kinds: round broadleaf, star-shaped pine and low berry bush. */
 export type TreeKind = "oak" | "pine" | "bush";
-/** Tree sizes: ordinary (no longer planted), large, larger and huge. */
+/** Tree sizes: ordinary (only bushes are planted this small), large,
+ * larger and huge. */
 export type TreeSize = 0 | 1 | 2 | 3;
 /** How many sprite variants each kind and size is baked in. */
 export const VARIANTS = 10;
-/** The smallest blast radius (cells) that fells a tree of each size; a
- * cut fells only ordinary and large ones. */
-export const TOUGH = [0, 0.5, 0.9, 1.4];
 
 /** A tree: its canopy's centre and radius in cells, its look, and its own
  * sway phase. `id` is its place in `trees`. */
@@ -41,9 +42,9 @@ export type Rock = { x: number; y: number; size: number; seed: number };
 export type Pad = { x: number; y: number; r: number; seed: number };
 /** A lake: the union of its discs (cells). */
 export type Lake = { discs: { x: number; y: number; r: number }[]; seed: number };
-/** A meadow of long grass, in flower or not. */
-export type Meadow = { x: number; y: number; r: number; seed: number; flowers: boolean };
-export type ForestPlan = { trees: ForestTree[]; rocks: Rock[]; pads: Pad[]; lakes: Lake[]; meadows: Meadow[]; boulders: Boulder[] };
+/** The plan: `open` is 1 on each open-ground cell, which alone the forest
+ * covers. */
+export type ForestPlan = { trees: ForestTree[]; rocks: Rock[]; pads: Pad[]; lakes: Lake[]; boulders: Boulder[]; open: Uint8Array };
 
 /** A canopy radius for each kind, size and variant, in cells. */
 export function canopyRadius(kind: TreeKind, variant: number, size: TreeSize = 0) {
@@ -51,7 +52,7 @@ export function canopyRadius(kind: TreeKind, variant: number, size: TreeSize = 0
   if (size === 3) return (kind === "pine" ? 1.9 : 2.1) + u * 0.5;
   if (size === 2) return (kind === "pine" ? 1.3 : 1.4) + u * 0.3;
   if (size === 1) return (kind === "pine" ? 0.85 : 0.9) + u * 0.25;
-  return kind === "bush" ? 0.28 + u * 0.12 : kind === "pine" ? 0.42 + u * 0.2 : 0.48 + u * 0.26;
+  return kind === "bush" ? 0.5 + u * 0.15 : kind === "pine" ? 0.42 + u * 0.2 : 0.48 + u * 0.26;
 }
 
 /** Smooth value noise on the coarse grid, 0..1. */
@@ -196,9 +197,10 @@ const inDiscs = (discs: readonly { x: number; y: number; r: number }[], x: numbe
   discs.some((d) => (x - d.x) ** 2 + (y - d.y) ** 2 < (d.r + pad) ** 2);
 
 function plan_(map: CityMap): ForestPlan {
-  const trees: ForestTree[] = [], rocks: Rock[] = [], pads: Pad[] = [], lakes: Lake[] = [], meadows: Meadow[] = [];
+  const trees: ForestTree[] = [], rocks: Rock[] = [], pads: Pad[] = [], lakes: Lake[] = [];
+  const open = Uint8Array.from(map.type, (t) => (t === CellType.OUT ? 1 : 0));
   const boulders = boulderPlan(map);
-  // What keeps the rest away: lakes, meadows, big canopies and the boulders.
+  // What keeps the rest away: lakes, big canopies and the boulders.
   const keep: { x: number; y: number; r: number }[] = [];
   const stones: { x: number; y: number; r: number }[] = [];
   for (const b of boulders) for (const c of b.cells) stones.push({ x: (c % CELLS_W) + 0.5, y: Math.floor(c / CELLS_W) + 0.5, r: 0.8 });
@@ -225,14 +227,6 @@ function plan_(map: CityMap): ForestPlan {
     lakes.push({ discs, seed: hash(cx, cy, 425) });
     keep.push(...discs.map((d) => ({ ...d, r: d.r + 0.4 })));
   }
-  // Rare meadows of long grass, half of them in flower.
-  for (const [cx, cy] of spots(430)) {
-    if (meadows.length >= FOREST.meadows) break;
-    const r = 2 + hash01(cx, cy, 431) * 2.5, x = cx + 0.5, y = cy + 0.5;
-    if (!clearOf(map, x, y, r * 0.6) || inDiscs(keep, x, y, r + 4) || inDiscs(stones, x, y, r * 0.5)) continue;
-    meadows.push({ x, y, r, seed: hash(cx, cy, 432), flowers: hash01(cx, cy, 433) < 0.5 });
-    keep.push({ x, y, r: r * 0.85 });
-  }
   // Trees, huge to large, each keeping the ground under it.
   for (const size of [3, 2, 1] as const)
     each((cx, cy) => {
@@ -244,6 +238,17 @@ function plan_(map: CityMap): ForestPlan {
       trees.push({ id: 0, x, y, r, kind, size, variant, phase: hash01(cx, cy, 448) * Math.PI * 2 });
       keep.push({ x, y, r: r * 0.7 });
     });
+  // A few small berry bushes in the open between them, glades first.
+  let bushes = 0;
+  for (const [cx, cy] of spots(450)) {
+    if (bushes >= FOREST.bushes) break;
+    const variant = hash(cx, cy, 451) % VARIANTS, r = canopyRadius("bush", variant);
+    const x = cx + 0.3 + hash01(cx, cy, 452) * 0.4, y = cy + 0.3 + hash01(cx, cy, 453) * 0.4;
+    if (!clearOf(map, x, y, r) || inDiscs(keep, x, y, r + 0.6) || inDiscs(stones, x, y, r + 0.3)) continue;
+    trees.push({ id: 0, x, y, r, kind: "bush", size: 0, variant, phase: hash01(cx, cy, 454) * Math.PI * 2 });
+    keep.push({ x, y, r: r + 1.5 });
+    bushes++;
+  }
   // Rocks and bare pads in the ground the trees leave.
   each((cx, cy) => {
     const x0 = cx + 0.5, y0 = cy + 0.5;
@@ -262,25 +267,55 @@ function plan_(map: CityMap): ForestPlan {
   // Drawn back to front, so a canopy lower on the board stands over the one behind.
   trees.sort((a, b) => a.y - b.y || a.x - b.x);
   trees.forEach((t, i) => (t.id = i));
-  return { trees, rocks, pads, lakes, meadows, boulders };
+  return { trees, rocks, pads, lakes, boulders, open };
 }
 
-/** A tree blown up: where it stood, and the cause, for its debris. */
-export type Felled = { tree: ForestTree; fromX: number; fromY: number; force: number };
-/** The crater a felled tree leaves. */
+/** How a tree came down: struck apart by an attack (a stump left, cleanly
+ * `cut` by a blade or splintered), blown up by a blast (a crater, no
+ * stump), or burnt (`BURN` seconds of flames, then a pile of ash). */
+export type Fate = "struck" | "blasted" | "burnt";
+/** A tree felled: where it stood, how and from where, for its debris. */
+export type Felled = { tree: ForestTree; fromX: number; fromY: number; force: number; fate: Fate };
+/** The crater a blast leaves where a tree stood. */
 export type Crater = { x: number; y: number; r: number; seed: number; size: TreeSize };
+/** A stump where an attack struck a tree apart: sawn clean (`cut`) or
+ * splintered. */
+export type Stump = { x: number; y: number; size: TreeSize; seed: number; cut: boolean };
+/** A pile of ash where a tree burnt down, on scorched ground `r` across. */
+export type Ash = { x: number; y: number; r: number; size: TreeSize; seed: number };
+/** A tree on fire, since battle time `since`. */
+export type Burning = { tree: ForestTree; since: number };
+/** A patch of grass a blast or burning ground cleared to dirt; `burnt`
+ * patches are scorched darker. */
+export type Clearing = { x: number; y: number; r: number; seed: number; burnt?: boolean };
+/** The most clearings a run keeps; past it, blasts clear no more grass. */
+export const MAX_CLEARINGS = 1500;
+/** How long (battle seconds) a tree burns before it falls to ash. */
+export const BURN = 5;
+/** Tree sizes up to this fall to any attack; bigger ones only to blasts and
+ * fire. */
+export const FRAIL = 2;
 
-/** The battle's toll on the forest: which trees are down, and the craters
- * they left. A fresh one for every run. */
+/** The battle's toll on the forest: which trees are down and how, the
+ * stumps, craters and ash they left, those burning, and the grass bared to
+ * dirt. A fresh one for every run. */
 export class ForestDamage {
-  readonly down: Uint8Array;
+  /** 0 standing, 1 burning, 2 down. */
+  readonly state: Uint8Array;
   readonly craters: Crater[] = [];
-  /** Bumped whenever a tree falls, for the art to repaint the ground. */
+  readonly stumps: Stump[] = [];
+  readonly ash: Ash[] = [];
+  readonly burning: Burning[] = [];
+  readonly clearings: Clearing[] = [];
+  /** Bumped whenever the ground changes, for the art to repaint it. */
   version = 0;
   /** The trees by the cell their middle stands in. */
   private byCell = new Map<number, ForestTree[]>();
+  /** 1 on each cell a clearing has bared at its middle, so blasts over
+   * ground already cleared add nothing. */
+  private bare = new Uint8Array(CELLS_W * CELLS_H);
   constructor(readonly plan: ForestPlan) {
-    this.down = new Uint8Array(plan.trees.length);
+    this.state = new Uint8Array(plan.trees.length);
     for (const t of plan.trees) {
       const k = cellIndex(Math.floor(t.x), Math.floor(t.y)), list = this.byCell.get(k);
       if (list) list.push(t);
@@ -288,44 +323,139 @@ export class ForestDamage {
     }
   }
 
+  /** Whether `t` stands unharmed. */
   standing(t: ForestTree) {
-    return !this.down[t.id];
+    return this.state[t.id] === 0;
   }
 
-  /** A blast of radius `r` at (x, y): every standing tree whose canopy it
-   * reaches past halfway is blown up. */
+  /** Whether `t` still stands, whole or burning. */
+  upright(t: ForestTree) {
+    return this.state[t.id] < 2;
+  }
+
+  /** A blast of radius `r` at (x, y): every standing tree, of any size,
+   * whose canopy it reaches past halfway is blown up into a crater. */
   blast(x: number, y: number, r: number, force = 1): Felled[] {
     return this.fell(x - r, y - r, x + r, y + r, (t) => {
       const dx = t.x - x, dy = t.y - y, reach = r + t.r * 0.5;
-      return r >= TOUGH[t.size] && dx * dx + dy * dy < reach * reach;
-    }, x, y, force);
+      return dx * dx + dy * dy < reach * reach;
+    }, x, y, force, "blasted");
+  }
+
+  /** An attack landing at (x, y), from (fromX, fromY): a tree no bigger
+   * than `FRAIL` whose canopy it lands under is struck apart, leaving a
+   * stump, sawn clean when a blade (`cut`) did it. */
+  hit(x: number, y: number, fromX = x, fromY = y, cut = false): Felled[] {
+    return this.fell(x, y, x, y, (t) => {
+      const dx = t.x - x, dy = t.y - y, reach = t.r * 0.85;
+      return t.size <= FRAIL && dx * dx + dy * dy < reach * reach;
+    }, fromX, fromY, 0.6, cut ? "cut" : "struck");
   }
 
   /** A cut along the segment (x0, y0)-(x1, y1), `width` cells either side:
-   * a valkyrie's charge or the Hero's dash. */
+   * a valkyrie's charge or the Hero's dash, sawing through every tree no
+   * bigger than `FRAIL` it crosses. */
   cut(x0: number, y0: number, x1: number, y1: number, width: number): Felled[] {
     const dx = x1 - x0, dy = y1 - y0, len2 = dx * dx + dy * dy || 1;
     return this.fell(Math.min(x0, x1) - width, Math.min(y0, y1) - width, Math.max(x0, x1) + width, Math.max(y0, y1) + width, (t) => {
       const u = Math.max(0, Math.min(1, ((t.x - x0) * dx + (t.y - y0) * dy) / len2));
       const ex = x0 + dx * u - t.x, ey = y0 + dy * u - t.y, reach = width + t.r * 0.5;
-      return t.size <= 1 && ex * ex + ey * ey < reach * reach;
-    }, x0, y0, 0.8);
+      return t.size <= FRAIL && ex * ex + ey * ey < reach * reach;
+    }, x0, y0, 0.8, "cut");
   }
 
-  /** Fells the standing trees `hit` picks among those whose middle lies in
-   * the box (cells), widened by half the largest canopy. */
-  private fell(x0: number, y0: number, x1: number, y1: number, hit: (t: ForestTree) => boolean, fromX: number, fromY: number, force: number): Felled[] {
+  /** Fire `r` cells round (x, y) at battle time `now`: every standing tree,
+   * of any size, whose canopy it reaches catches. The trees it set alight. */
+  ignite(x: number, y: number, r: number, now: number): ForestTree[] {
+    const out: ForestTree[] = [];
+    for (const t of this.near(x - r, y - r, x + r, y + r)) {
+      const dx = t.x - x, dy = t.y - y, reach = r + t.r * 0.6;
+      if (this.state[t.id] || dx * dx + dy * dy >= reach * reach) continue;
+      this.state[t.id] = 1;
+      this.burning.push({ tree: t, since: now });
+      out.push(t);
+    }
+    return out;
+  }
+
+  /** Fire along the segment (x0, y0)-(x1, y1), `width` cells either side: a
+   * wizard's flames. */
+  igniteAlong(x0: number, y0: number, x1: number, y1: number, width: number, now: number): ForestTree[] {
+    const dx = x1 - x0, dy = y1 - y0, len = Math.sqrt(dx * dx + dy * dy), out: ForestTree[] = [];
+    for (let d = 0; d <= len; d += 0.75) out.push(...this.ignite(x0 + (dx * d) / (len || 1), y0 + (dy * d) / (len || 1), width, now));
+    return out;
+  }
+
+  /** Trees that have burnt `BURN` seconds by battle time `now` fall to ash,
+   * scorching the grass under them. */
+  burnOut(now: number): Felled[] {
     const out: Felled[] = [];
-    const cx0 = Math.max(0, Math.floor(x0 - 2)), cy0 = Math.max(0, Math.floor(y0 - 2));
-    const cx1 = Math.min(CELLS_W - 1, Math.floor(x1 + 2)), cy1 = Math.min(CELLS_H - 1, Math.floor(y1 + 2));
+    for (let k = this.burning.length - 1; k >= 0; k--) {
+      const b = this.burning[k], t = b.tree;
+      if (now - b.since < BURN) continue;
+      this.burning.splice(k, 1);
+      this.state[t.id] = 2;
+      this.ash.push({ x: t.x, y: t.y, r: t.r, size: t.size, seed: hash(t.id, 419) });
+      this.clear(t.x, t.y, t.r * 1.1 + 0.2, true);
+      out.push({ tree: t, fromX: t.x, fromY: t.y, force: 0.3, fate: "burnt" });
+    }
+    if (out.length) this.version++;
+    return out;
+  }
+
+  /** A blast or burning ground `r` cells across at (x, y) clears the grass
+   * there to dirt (scorched, `burnt`), unless it falls only on ground
+   * already bare or off the open ground; true when it adds a clearing. */
+  clear(x: number, y: number, r: number, burnt = false): boolean {
+    if (r < 0.3 || this.clearings.length >= MAX_CLEARINGS) return false;
+    const reach = r * 0.6;
+    let fresh = false;
+    for (let cy = Math.max(0, Math.floor(y - reach)); cy <= Math.min(CELLS_H - 1, Math.floor(y + reach)); cy++)
+      for (let cx = Math.max(0, Math.floor(x - reach)); cx <= Math.min(CELLS_W - 1, Math.floor(x + reach)); cx++) {
+        const k = cellIndex(cx, cy), dx = cx + 0.5 - x, dy = cy + 0.5 - y;
+        if (dx * dx + dy * dy > reach * reach || !this.plan.open[k] || (this.bare[k] && !burnt)) continue;
+        this.bare[k] = 1;
+        fresh = true;
+      }
+    if (!fresh) return false;
+    this.clearings.push({ x, y, r, seed: hash(Math.round(x * 16), Math.round(y * 16), this.clearings.length, 418), ...(burnt ? { burnt } : {}) });
+    this.version++;
+    return true;
+  }
+
+  /** Whether any tree no bigger than `FRAIL` stands over cell (cx, cy):
+   * where an attack might strike one apart. */
+  frailOver(cx: number, cy: number) {
+    for (let y = cy - 3; y <= cy + 3; y++)
+      for (let x = cx - 3; x <= cx + 3; x++)
+        for (const t of this.byCell.get(cellIndex(x, y)) ?? [])
+          if (!this.state[t.id] && t.size <= FRAIL && Math.abs(t.x - cx - 0.5) < t.r + 0.5 && Math.abs(t.y - cy - 0.5) < t.r + 0.5) return true;
+    return false;
+  }
+
+  /** The trees whose middle lies in the box (cells), widened by the largest
+   * canopy, in id order. */
+  private near(x0: number, y0: number, x1: number, y1: number) {
+    const cx0 = Math.max(0, Math.floor(x0 - 3)), cy0 = Math.max(0, Math.floor(y0 - 3));
+    const cx1 = Math.min(CELLS_W - 1, Math.floor(x1 + 3)), cy1 = Math.min(CELLS_H - 1, Math.floor(y1 + 3));
     const near: ForestTree[] = [];
     for (let cy = cy0; cy <= cy1; cy++) for (let cx = cx0; cx <= cx1; cx++) near.push(...(this.byCell.get(cellIndex(cx, cy)) ?? []));
-    near.sort((a, b) => a.id - b.id);
-    for (const t of near) {
-      if (this.down[t.id] || !hit(t)) continue;
-      this.down[t.id] = 1;
-      this.craters.push({ x: t.x, y: t.y, r: t.size ? t.r * 1.25 + 0.4 : t.r * 1.8 + 0.3, seed: hash(t.id, 417), size: t.size });
-      out.push({ tree: t, fromX, fromY, force });
+    return near.sort((a, b) => a.id - b.id);
+  }
+
+  /** Fells the standing trees `hit` picks near the box: a blast leaves a
+   * crater and bares the grass round it, an attack a stump. */
+  private fell(x0: number, y0: number, x1: number, y1: number, hit: (t: ForestTree) => boolean, fromX: number, fromY: number, force: number, how: Fate | "cut"): Felled[] {
+    const out: Felled[] = [];
+    for (const t of this.near(x0, y0, x1, y1)) {
+      if (this.state[t.id] || !hit(t)) continue;
+      this.state[t.id] = 2;
+      const seed = hash(t.id, 417);
+      if (how === "blasted") {
+        this.craters.push({ x: t.x, y: t.y, r: t.size ? t.r * 1.25 + 0.4 : t.r * 1.8 + 0.3, seed, size: t.size });
+        this.clear(t.x, t.y, t.r * 1.2 + 0.3);
+      } else this.stumps.push({ x: t.x, y: t.y, size: t.size, seed, cut: how === "cut" });
+      out.push({ tree: t, fromX, fromY, force, fate: how === "cut" ? "struck" : how });
     }
     if (out.length) this.version++;
     return out;
