@@ -14,6 +14,7 @@ import { countdown, IDLE_LEAD, IDLE_SPEED, idleDrain, MAX_AWAY_MS } from "../awa
 import { BARS_PER_POINT, CREW_PER_LEVEL, METALS, metalSum, noMetals, type Metals, DAY_TICKS, FORGE_PER_LEVEL, JOBS, KIT, MAX_MINERS, MineSim, MOVE_ON_SHARE, SEAL_LEVEL, SMITHS_PER_LEVEL, STOCK_PER_LEVEL, STOCK_RATE, TICK_HZ, type Cause, type Job, type Miner, type MineNews, type MineSave, type Weather } from "./sim.ts";
 import { BUILDINGS, MAX_LEVEL, type BuildingId } from "./buildings.ts";
 import { MineRenderer } from "./render.ts";
+import { fadeAway } from "../ui/fade-away.ts";
 import { holdToRepeat } from "../ui/hold-repeat.ts";
 
 /** Longest bank of unused simulation time. */
@@ -87,6 +88,8 @@ export class MinePage {
   private renderer: MineRenderer | null = null;
   /** Ticks owed: real time not yet simulated. */
   private owed = 0;
+  /** The fast-forwarding note tapped away, kept down until caught up. */
+  private awayDismissed = false;
   private last = 0;
   private built = false;
   private shownTally = "";
@@ -233,6 +236,12 @@ export class MinePage {
     this.renderer.resize();
     this.renderer.home(this.sim);
     this.root.querySelector<HTMLButtonElement>("#mine-hire")!.onclick = () => this.hire();
+    // Tapping the fast-forwarding note fades it away until the catching up is done.
+    const away = this.root.querySelector<HTMLElement>("#mine-away")!;
+    away.onclick = () => fadeAway(away, () => {
+      this.awayDismissed = true;
+      this.refresh();
+    });
     holdToRepeat(this.root, ["data-mine-hire", "data-upgrade"]);
     const toggle = this.root.querySelector<HTMLButtonElement>("#mine-crew-toggle")!;
     toggle.onclick = () => {
@@ -582,7 +591,8 @@ export class MinePage {
     move.hidden = !sim.canMoveOn;
     move.classList.toggle("ready", sim.canMoveOn);
     const away = this.root.querySelector<HTMLElement>("#mine-away")!;
-    away.hidden = this.owed < TICK_HZ * 5;
+    if (this.owed < TICK_HZ * 5) this.awayDismissed = false;
+    away.hidden = this.owed < TICK_HZ * 5 || this.awayDismissed;
     away.textContent = t("common.idle",{time:countdown(this.owedMs)});
   }
 
