@@ -387,7 +387,8 @@ dialog > small {
 /* ── The tab row: three stone tablets on a lintel; the chosen one is lit ── */
 nav {
   margin-top: 10px;
-  padding: 6px 6px max(6px, env(safe-area-inset-bottom));
+  /* The shell reserves the safe area once for every tab. */
+  padding: 6px;
   gap: 6px;
   border: 2px solid #0e0a07;
   border-radius: 3px;

@@ -27,10 +27,12 @@ import { stream } from "./random.ts";
 import { WelcomeBack } from "./ui/welcome.ts";
 import { unlockAllTowers } from "./defend/progress.ts";
 import { ROSES, setRose, type Rose } from "./ui/hall-art.ts";
+import { fitViewport } from "./ui/viewport.ts";
 
 // Wires the pages together: builds the shell, loads the save, and routes
 // navigation, the currency bar and the frame loop between the pages.
 
+fitViewport();
 buildShell(document.querySelector<HTMLDivElement>("#app")!);
 document.querySelectorAll<HTMLCanvasElement>("nav canvas[data-icon]").forEach((c) => paintIcon(c, "cityTile"));
 // Refresh icons after the visual setting changes, once a frame at most.
