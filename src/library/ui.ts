@@ -46,6 +46,16 @@ const ROLE: Record<Role, { name: string; one: string; hint: string }> = {
   researcher: { name: "Researchers", one: "researcher", hint: "Researchers work the alchemy lab below, one a lab level; with none, the Study's Knowledge research can't be bought" },
 };
 const escape = (s: string) => s.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
+/** Fades a notice out quickly, then lets `done` put it away. */
+const FADE_MS = 220;
+const fadeAway = (el: HTMLElement, done: () => void) => {
+  if (el.classList.contains("fading")) return;
+  el.classList.add("fading");
+  setTimeout(() => {
+    done();
+    el.classList.remove("fading");
+  }, FADE_MS);
+};
 const plural = (k: number, one: string) => `${k} ${one}${k === 1 ? "" : "s"}`;
 
 /** Idle time owed (ms) from which the library shows it is fast-forwarding,
@@ -59,6 +69,10 @@ export class LibraryPage {
   private renderer: LibraryRenderer | null = null;
   private built = false;
   private shown = "";
+  /** The fire alarm tapped away, kept down until that fire is out. */
+  private alertDismissed: string | null = null;
+  /** The fast-forwarding note tapped away, kept down until caught up. */
+  private awayDismissed = false;
   /** Last frame clock and simulation time still owed. */
   private ranTo = 0;
   private owed = 0;
@@ -181,10 +195,21 @@ export class LibraryPage {
     const canvas = this.root.querySelector<HTMLCanvasElement>("#library-canvas")!;
     this.renderer = new LibraryRenderer(canvas);
     this.root.querySelector<HTMLButtonElement>("#library-shelf")!.onclick = () => this.buy(shelfPrice(this.sim.shelves), () => this.sim.buildShelf());
-    // Tapping the notice of what a fire cost puts it away.
-    this.root.querySelector<HTMLElement>("#library-alert")!.onclick = () => {
-      if (!this.sim.fire.active) this.sim.lost = null;
-    };
+    // Tapping either notice fades it away: what a fire cost is forgotten,
+    // a fire's alarm stays down until that fire is out, and the
+    // fast-forwarding note until the catching up is done.
+    const alert = this.root.querySelector<HTMLElement>("#library-alert")!;
+    alert.onclick = () => fadeAway(alert, () => {
+      if (this.sim.fire.active) this.alertDismissed = alert.textContent;
+      else this.sim.lost = null;
+      this.shown = "";
+      this.refresh();
+    });
+    const away = this.root.querySelector<HTMLElement>("#library-away")!;
+    away.onclick = () => fadeAway(away, () => {
+      this.awayDismissed = true;
+      this.refresh();
+    });
     this.root.querySelector<HTMLButtonElement>("#library-hire")!.onclick = () => this.buy(librarianPrice(this.sim.hired), () => this.sim.hire());
     this.root.querySelector<HTMLButtonElement>("#library-lab-up")!.onclick = () => this.buy(labPrice(this.sim.labLevel), () => this.sim.upgradeLab());
     holdToRepeat(this.root, ["data-library-buy"]);
@@ -339,7 +364,8 @@ export class LibraryPage {
   refresh() {
     if (!this.built) return;
     const idle = this.root.querySelector<HTMLElement>("#library-away")!;
-    idle.hidden = this.owed < FAST_FORWARD;
+    if (this.owed < FAST_FORWARD) this.awayDismissed = false;
+    idle.hidden = this.owed < FAST_FORWARD || this.awayDismissed;
     idle.textContent = `Fast-forwarding · ${countdown(this.owed)} idle time remaining`;
     const sim = this.sim, free = this.host.free(), wallet = this.host.metals();
     const sp = shelfPrice(sim.shelves), lp = librarianPrice(sim.hired), level = sim.labLevel, up = labPrice(level), labFull = level >= LAB_MAX_LEVEL;
@@ -379,7 +405,8 @@ export class LibraryPage {
         ? `The fire is out. Lost: ${losses.join(", ")}. What survived is being rebuilt with new planks.`
         : "The fire is out, and nothing was lost.";
     }
-    alert.hidden = !fire && !lost;
+    if (!fire) this.alertDismissed = null;
+    alert.hidden = (!fire && !lost) || (fire && alert.textContent === this.alertDismissed);
     alert.classList.toggle("burning", fire);
   }
 
