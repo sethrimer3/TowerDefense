@@ -14,18 +14,25 @@ function erase(map:CityMap,b:Building){b.hidden=true;for(const c of b.cells)if(m
 export function ambushField(level:number){
  const data=ambushLevel(level),track=trackFor(data),path=track.points;
  const keep=footprint('keep',track.keep),structures=[fitted(0,'keep',keep)];
- const city=new Uint8Array(CELL_COUNT),wall=new Uint8Array(CELL_COUNT),road=new Set<number>();
- for(const p of [...track.outposts,track.keep])for(const c of rectCells(centered(p,18,18)))city[c]=1;
+ const city=new Uint8Array(CELL_COUNT),wall=new Uint8Array(CELL_COUNT),road=new Set<number>(),outpostRects=track.outposts.map(p=>centered(p,16,16)),castle=centered(track.keep,20,20);
  for(const s of structures)for(const c of rectCells(s.rect))city[c]=1;
  for(let i=1;i<path.length;i++){const a=path[i-1],b=path[i],n=Math.max(Math.abs(b.x-a.x),Math.abs(b.y-a.y));
   for(let t=0;t<=n;t++)for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){const x=Math.round(a.x+(b.x-a.x)*t/n)+dx,y=Math.round(a.y+(b.y-a.y)*t/n)+dy;if(x>=0&&x<CELLS_W&&y>=0&&y<CELLS_H){const c=cellIndex(x,y);road.add(c);city[c]=1;}}
  }
+ for(const [rect,thickness] of [...outpostRects.map(r=>[r,1] as const),[castle,2] as const]){
+  for(const c of rectCells(rect)){const x=c%CELLS_W,y=Math.floor(c/CELLS_W),edge=x<rect.x+thickness||x>=rect.x+rect.w-thickness||y<rect.y+thickness||y>=rect.y+rect.h-thickness;city[c]=edge?0:1;wall[c]=edge?1:0;}
+ }
  for(const c of rectCells(keep))road.delete(c);
  const map=generateCity({structures,city,wall},data.seed);
- const blockedBuildings=new Set([...road].map(c=>map.owner[c]).filter(id=>id>=0));
+ const blockedBuildings=new Set([...road].filter(c=>!wall[c]).map(c=>map.owner[c]).filter(id=>id>=0));
  for(const id of blockedBuildings)if(id!==0)erase(map,map.buildings[id]);
- for(const c of road){map.type[c]=CellType.ROAD;map.owner[c]=-1;map.city[c]=1;}
- return {map,path,road,name:data.name,level:data,track};
+ for(const c of road)if(!wall[c]){map.type[c]=CellType.ROAD;map.owner[c]=-1;map.city[c]=1;}
+ const outposts=outpostRects.map(rect=>{
+  for(const b of map.buildings)if(b.kind==='wall'&&b.rect.x>=rect.x&&b.rect.x<rect.x+rect.w&&b.rect.y>=rect.y&&b.rect.y<rect.y+rect.h){const {x,y}=b.rect;b.fence=y===rect.y||y===rect.y+rect.h-1?{x1:x,y1:y+.5,x2:x+1,y2:y+.5}:{x1:x+.5,y1:y,x2:x+.5,y2:y+1};}
+  const houses=map.buildings.filter(b=>b.kind==='house'&&!b.hidden&&b.rect.x>=rect.x&&b.rect.x+b.rect.w<=rect.x+rect.w&&b.rect.y>=rect.y&&b.rect.y+b.rect.h<=rect.y+rect.h).map(b=>b.id);
+  return {rect,houses};
+ });
+ return {map,path,road,name:data.name,level:data,track,castle,outposts};
 }
 
 export type MusterCopy={kind:StructureKind;uid:number;path?:string;rank?:number};

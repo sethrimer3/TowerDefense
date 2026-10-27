@@ -45,6 +45,8 @@ const FREE = 9;
 
 export type BuildingKind = "house" | "wall" | "gate" | "wallBallista" | StructureKind;
 export type Building = {
+  /** Optional solid wooden scenario fence; ordinary city walls remain stone. */
+  fence?: { x1:number;y1:number;x2:number;y2:number };
   /** Empty scenario deployment lot; excluded from rendering and recruitment. */
   hidden?: boolean;
   id: number;

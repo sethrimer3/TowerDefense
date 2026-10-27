@@ -340,6 +340,7 @@ export type ScenarioRules = {
   routeEnemy?: (enemy: Enemy, dt: number) => boolean;
   died?: (enemy: Enemy) => void;
   soldierDt?: (soldier: Soldier, dt: number) => number;
+  fieldFor?: (enemy: Point) => Float64Array | undefined;
 };
 
 export class DefendSim {
@@ -586,7 +587,7 @@ export class DefendSim {
   }
 
   /** Reconfigure a preallocated scenario lot using native HP, collision and art state. */
-  configureLot(id: number, kind: Exclude<Building["kind"], "house" | "wall" | "gate" | "wallBallista">, rect: Building["rect"], active: boolean) {
+  configureLot(id: number, kind: Exclude<Building["kind"], "wall" | "gate" | "wallBallista">, rect: Building["rect"], active: boolean, health=1) {
     const b = this.map.buildings[id];
     for (const cell of b.cells) if (this.map.owner[cell] === id) {
       this.map.owner[cell] = -1; this.map.type[cell] = CellType.PARK;
@@ -602,14 +603,15 @@ export class DefendSim {
     b.kind = kind; b.rect = { ...rect }; b.hidden = !active;
     b.cells = [];
     for (let y=rect.y;y<rect.y+rect.h;y++) for (let x=rect.x;x<rect.x+rect.w;x++) b.cells.push(cellIndex(x,y));
-    this.hp[id] = this.maxHp[id] = active ? maxHpOf(b,this.levels,this.bonuses) : 0;
-    this.built[id] = active ? b.cells.length : 0;
+    this.maxHp[id] = active ? maxHpOf(b,this.levels,this.bonuses) : 0;
+    this.hp[id] = this.maxHp[id]*health;
+    this.built[id] = active && health>0 ? b.cells.length : 0;
     if (active) for (const cell of b.cells) {
-      this.map.owner[cell]=id; this.map.type[cell]=CellType.STRUCT;
-      this.solid[cell]=this.ownSolid[cell]=this.foeSolid[cell]=1;
+      this.map.owner[cell]=id; this.map.type[cell]=kind==='house'?CellType.HOUSE:CellType.STRUCT;
+      this.solid[cell]=this.ownSolid[cell]=this.foeSolid[cell]=health>0?1:0;
     }
     const structure=this.map.structures.find(s=>s.uid===b.structureUid);
-    if (structure) { structure.kind=kind; structure.rect={...rect}; }
+    if (structure && kind!=='house') { structure.kind=kind; structure.rect={...rect}; }
     const old=this.skyPalaces;
     this.skyPalaces=launchPalaces(this).filter(p=>p.id===id && active || old.some(o=>o.id===p.id)).map(p=>old.find(o=>o.id===p.id)??p);
     this.changed.push(...b.cells); this.mapVersion++; this.fieldDirty=true; this.fieldT=0;
@@ -966,8 +968,13 @@ export class DefendSim {
 
   /** The field enemies on foot walk: toward the nearest standing bait while
    * any stands, else the keep. */
-  marchField(): Float64Array {
+  marchField(enemy?: Point): Float64Array {
+    if(enemy){const field=this.scenario?.fieldFor?.(enemy);if(field)return field;}
     return this.baits.length && baitStanding(this) ? this.baitField : this.field;
+  }
+  /** Native weighted routing toward a scenario's current objective. */
+  targetField(goals: readonly number[]) {
+    const field=new Float64Array(CELL_COUNT);fillFlowField(field,goals,this.terrain);return field;
   }
 
   // ── Enemy index ───────────────────────────────────────────────────────

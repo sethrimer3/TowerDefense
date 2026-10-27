@@ -201,6 +201,9 @@ export class Fences {
 }
 
 /** Rails: a dark outline with a lighter wooden top. */
+export function drawFenceSections(c:CanvasRenderingContext2D,px:number,sections:FenceSection[]) {
+  c.save();const intact=sections.filter(s=>!s.broken);drawRails(c,px,intact);drawPosts(c,px,intact);c.restore();
+}
 function drawRails(c: CanvasRenderingContext2D, px: number, sections: FenceSection[]) {
   c.lineCap = "butt";
   const dark = Math.max(1, Math.round(px * 0.13)),
