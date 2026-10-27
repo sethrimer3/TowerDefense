@@ -1,3 +1,6 @@
+import { botName } from './bot-names.ts';
+import { botFlag } from './bot-identity.ts';
+import { decodeFlag,type Flag } from '../profile/model.ts';
 import { dist,ratioPow,binaryLog } from '../exact.ts';
 import { INITIAL_MMR, RULESET, rating } from './siege-rating.ts';
 export type DefenseKind = 'keep' | 'tower' | 'barricade';
@@ -6,11 +9,9 @@ export type Guards = { count: number; hp: number; damage: number; cooldown: numb
 /** Immutable battle input. Owner identity and defense strength have independent meanings. */
 export type CastleSnapshot = {
   id: string; revision: number; ruleset: typeof RULESET; source: 'bot' | 'player';
-  owner: { id: string; name: string }; seed: number;
+  owner: { id: string; name: string; flag?:Flag }; seed: number;
   defenses: Defense[]; guards: Guards;
 };
-const FIRST = ['Ash','Moss','Iron','Ember','Silver','Night','Oak','Frost','Rune','Storm','Flint','Copper'];
-const LAST = ['Fox','Rook','Warden','Badger','Drake','Fern','Knight','Owl','Wolf','Raven','Forge','Vale'];
 export function seeded(seed: number) {
   let state = seed >>> 0;
   return () => {state = (Math.imul(state, 1664525) + 1013904223) >>> 0; return state / 4294967296;};
@@ -37,13 +38,15 @@ export function estimateCastle(castle: CastleSnapshot) {
 export function generateCastle(seed: number, target: number): CastleSnapshot {
   seed = seed >>> 0;
   const rand = seeded(seed);
-  const name = FIRST[Math.floor(rand() * FIRST.length)] + LAST[Math.floor(rand() * LAST.length)] + (rand() < .6 ? String(10 + Math.floor(rand() * 90)) : '');
+  const name=botName(seed);
+  // Preserve revision-1 castle geometry while identity gets its own hashes.
+  rand();rand();if(rand()<.6)rand();
   const defenses: Defense[] = [{ id: 0, kind: 'keep', x: 8 + rand() * 4, y: 3 + rand() * 3, hp: 100, damage: 3, cooldown: 1.5, range: 6 }];
   const towers = 1 + Math.floor(rand() * 3);
   for (let i = 0; i < towers; i++) defenses.push({ id: defenses.length, kind: 'tower', x: 3 + i * (14 / Math.max(1, towers - 1)), y: 7 + rand() * 4, hp: 45 + rand() * 20, damage: 3 + rand() * 2, cooldown: 1.1 + rand() * .6, range: 5 + rand() * 2 });
   const barriers = 2 + Math.floor(rand() * 4);
   for (let i = 0; i < barriers; i++) defenses.push({ id: defenses.length, kind: 'barricade', x: 3 + i * 14 / (barriers - 1), y: 13 + rand() * 2, hp: 25 + rand() * 20, damage: 0, cooldown: 1, range: 0 });
-  const castle: CastleSnapshot = { id: `bot-${RULESET}-${seed}`, revision: 1, ruleset: RULESET, source: 'bot', owner: {id: `bot-${seed}`, name}, seed, defenses, guards: { count: 3 + Math.floor(rand() * 5), hp: 15, damage: 2, cooldown: 1.2, speed: 1.3 } };
+  const castle: CastleSnapshot = { id: `bot-${RULESET}-${seed}`, revision: 1, ruleset: RULESET, source: 'bot', owner: {id: `bot-${seed}`, name,flag:botFlag(seed)}, seed, defenses, guards: { count: 3 + Math.floor(rand() * 5), hp: 15, damage: 2, cooldown: 1.2, speed: 1.3 } };
   // Solve for the requested strength instead of pretending the target MMR is
   // the castle's measured difficulty. Uniform HP/DPS scaling preserves variety.
   const desiredPower = REFERENCE_POWER * ratioPow(2,rating(target)-INITIAL_MMR,400);
@@ -67,5 +70,6 @@ export function decodeCastle(raw: unknown): CastleSnapshot | null {
   }
   const g = c.guards;
   if (!g || !Number.isInteger(g.count) || !number(g.count,0,64) || !number(g.hp,.01,1e6) || !number(g.damage,0,1e6) || !number(g.cooldown,.1,20) || !number(g.speed,.1,5)) return null;
-  return { id:c.id.slice(0,100),revision:1,ruleset:RULESET,source:'bot',owner:{id:c.owner.id.slice(0,100),name:c.owner.name},seed:c.seed,defenses:c.defenses.map(d=>({...d})),guards:{...g} };
+  const flag=decodeFlag(c.owner.flag);
+  return { id:c.id.slice(0,100),revision:1,ruleset:RULESET,source:'bot',owner:{id:c.owner.id.slice(0,100),name:c.owner.name,...(flag?{flag}:{})},seed:c.seed,defenses:c.defenses.map(d=>({...d})),guards:{...g} };
 }
