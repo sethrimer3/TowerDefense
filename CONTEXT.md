@@ -14,7 +14,7 @@ A fixed-level tower-defense mode: enemies follow a road, while towers and infant
 An assault mode: infantry trained by the player's buildings raid enemy castles and their guards.
 
 **Muster space**:
-A building space where an infantry building trains troops for a Siege assault.
+A space in the lower muster ground where an owned infantry building trains troops for a Siege assault.
 
 ### The board
 

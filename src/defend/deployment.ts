@@ -61,7 +61,7 @@ export function deployCircle(b: Building, bonuses: Pick<Bonuses, "deployRange">)
 /** Where `s` may go: its home's deployment circle, or null when it has no
  * bounds (a spell's troops, a cloudborne palace's). */
 export function deployment(sim: DefendSim, s: Soldier): Circle | null {
-  if (s.home < 0) return null;
+  if (sim.scenario?.unrestricted || s.home < 0) return null;
   const b = sim.map.buildings[s.home], base = DEPLOY_RANGE[s.kind];
   if (!b || !base || sim.aloft(s.home)) return null;
   const c = center(b.rect);

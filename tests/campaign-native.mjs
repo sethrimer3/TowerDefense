@@ -1,0 +1,30 @@
+import {chromium} from '@playwright/test';import assert from 'node:assert/strict';import {mkdirSync} from 'node:fs';
+mkdirSync('work',{recursive:true});
+const browser=await chromium.launch(process.env.PLAYWRIGHT_EXECUTABLE?{executablePath:process.env.PLAYWRIGHT_EXECUTABLE,headless:true}:{channel:process.env.PLAYWRIGHT_CHANNEL||'chrome',headless:true});
+try{for(const width of [1280,390]){
+ const page=await browser.newPage({viewport:{width,height:900},hasTouch:width===390}),errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.goto(new URL('tests/campaign-native.html',process.env.TEST_URL||'http://127.0.0.1:5173/').href);await page.waitForFunction(()=>window.nativeModes);
+ assert.ok(await page.evaluate(()=>window.nativeModes.isNative()));
+ await page.evaluate(()=>{window.nativeModes.ambush.sim.gold=10000;window.nativeModes.ambush.refresh();});
+ await page.locator('#ambush [data-kind="wispTower"]').click();
+ await page.locator('#ambush .campaign-help summary').click();
+ await page.locator('#ambush [data-pad="0"]').click();
+ assert.equal(await page.evaluate(()=>window.nativeModes.ambush.sim.layout[0].kind),'wispTower');
+ await page.locator('#ambush [data-pad="0"]').click();
+ await page.locator('#ambush [data-action="sell"]').click();
+ assert.equal(await page.evaluate(()=>window.nativeModes.ambush.sim.layout.length),0);
+ await page.locator('#ambush .campaign-help summary').click();
+ const data=await page.evaluate(()=>{const f=window.nativeModes,s=f.ambush.sim;s.gold=10000;s.place(0,'brazierTower');s.place(1,'wispTower');s.place(2,'meleeGuild');f.ambush.render();s.start();f.advance(12);return {native:s.engine.constructor.name,buildings:s.map.buildings.length,arrows:s.engine.arrows.length,wisps:s.engine.wisps.length,paths:Object.keys(s.engine.bonuses.structurePaths||{}).length};});
+ assert.equal(data.native,'DefendSim');assert.ok(data.buildings>20);assert.ok(data.paths>0);
+ await page.locator('#ambush .campaign-board').screenshot({path:`work/native-ambush-${width}.png`});
+ await page.screenshot({path:`work/native-ambush-full-${width}.png`});
+ const camera=await page.evaluate(()=>{const r=window.nativeModes.ambush.renderer,c=r.canvas.getBoundingClientRect();r.zoomAt(c.x+c.width/2,c.y+c.height/2,2);return {scale:r.cam.s,point:r.toClient(30,30)};});assert.ok(camera.scale>1);
+ await page.locator('#siege-mode').click();await page.waitForFunction(()=>document.querySelector('#siege').classList.contains('active'));
+ await page.locator('#siege [data-action="start"]').click();
+ assert.equal(await page.evaluate(()=>window.nativeModes.save.siege.raid.state),'started');
+ const raid=await page.evaluate(()=>{const f=window.nativeModes,s=f.siege.sim;f.advance(20);return {attack:s.raid.attack.constructor.name,defense:s.raid.defense.constructor.name,units:s.engine.soldiers.length,foes:s.raid.defense.soldiers.length,walls:s.map.buildings.filter(b=>b.kind==='wall').length,houses:s.map.buildings.filter(b=>b.kind==='house').length,profile:document.querySelector('#siege .siege-profile-name')?.textContent};});
+ assert.equal(raid.attack,'Side');assert.equal(raid.defense,'Side');assert.ok(raid.units>0);assert.ok(raid.foes>0);assert.ok(raid.walls>0);assert.ok(raid.houses>0);assert.equal(raid.profile,'Native Warden');
+ await page.locator('#siege .campaign-board').screenshot({path:`work/native-siege-${width}.png`});
+ await page.screenshot({path:`work/native-siege-full-${width}.png`});
+ assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));assert.deepEqual(errors,[]);await page.close();
+}console.log('Native Defend campaign renderer, specialized upgrades, camera, two-sided Siege and desktop/mobile layouts pass.');}finally{await browser.close();}

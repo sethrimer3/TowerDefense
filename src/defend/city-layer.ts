@@ -285,6 +285,7 @@ function paintPixelArt({ c }: Paint, art: HTMLCanvasElement | null) {
 }
 
 function paintBuilding(p: Paint, b: Building) {
+  if (b.hidden) return;
   const { c, px, sim, solid } = p;
   const r = b.rect;
   // Everything snaps to whole pixels so outlines stay crisp.

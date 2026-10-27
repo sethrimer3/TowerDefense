@@ -22,6 +22,7 @@ export function stepGates(sim: DefendSim, dt: number) {
   if (!ranks) return;
   const iron = gateRank(ranks, "ironbound");
   for (const b of sim.gates) {
+    if (!sim.ownsBuilding(b)) continue;
     if (sim.intact(b)) {
       sim.gateRise.delete(b.id);
       if (iron >= 2 && sim.hp[b.id] < sim.maxHp[b.id]) sim.hp[b.id] = Math.min(sim.maxHp[b.id], sim.hp[b.id] + sim.maxHp[b.id] * IRONBOUND.mend * dt);
@@ -41,6 +42,7 @@ export function stepGates(sim: DefendSim, dt: number) {
 function swingGates(sim: DefendSim, dt: number) {
   const shut = gateShut(sim.levels.gateHinges ?? 0);
   for (const b of sim.gates) {
+    if (!sim.ownsBuilding(b)) continue;
     if (!sim.intact(b)) continue;
     const was = sim.gateOpen.get(b.id);
     const left = peopleAt(sim, b) ? shut : (was ?? 0) - dt;
@@ -92,6 +94,7 @@ function murderHoles(sim: DefendSim, dt: number) {
   sim.gateHoleT += PORTCULLIS.every[rank];
   const damage = PORTCULLIS.damage[rank] * sim.bonuses.towerDamage;
   for (const b of sim.gates) {
+    if (!sim.ownsBuilding(b)) continue;
     if (!sim.intact(b)) continue;
     const c = center(b.rect);
     for (const e of sim.enemiesNear(c.x, c.y, Math.max(b.rect.w, b.rect.h) / 2 + PORTCULLIS.reach + 1)) {
@@ -123,6 +126,7 @@ function gateTowers(sim: DefendSim, dt: number) {
   const range = GATE_TOWERS.range[rank];
   const damage = ballistaDamage(sim.levels.ballistaDamage ?? 0) * sim.bonuses.towerDamage * GATE_TOWERS.share[rank];
   for (const b of sim.gates) {
+    if (!sim.ownsBuilding(b)) continue;
     if (!sim.intact(b)) continue;
     gateTowerSpots(b, rank >= GATE_TOWERS.twin).forEach((at, n) => {
       const key = gateTowerKey(b, n), left = (sim.gateTowerT.get(key) ?? 0) - dt;

@@ -36,7 +36,7 @@ export const cloudRank = (sim: DefendSim, b: Building) =>
 export function launchPalaces(sim: DefendSim): SkyPalace[] {
   const out: SkyPalace[] = [];
   for (const b of sim.map.buildings) {
-    if (!cloudRank(sim, b)) continue;
+    if (b.hidden || !sim.intact(b) || !cloudRank(sim, b)) continue;
     for (const c of b.cells) sim.solid[c] = sim.ownSolid[c] = 0;
     out.push({ id: b.id, x: b.rect.x, y: b.rect.y, lap: 0 });
   }

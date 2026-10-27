@@ -92,6 +92,10 @@ export type Levels = Record<UpgradeId, number>;
 export type Enemy = {
   /** Javelin carrying this enemy; absent outside an active impalement. */
   impaled?: number;
+  /** Target adapter for an opposing native troop/building in a raid. Not a rendered monster. */
+  raidProxy?: boolean;
+  raidBuilding?: boolean;
+  escaped?: boolean;
   id: number;
   kind: EnemyKind;
   x: number;
@@ -156,6 +160,8 @@ export type Enemy = {
 };
 
 export type Soldier = {
+  /** Presentation marker for the opposing native army in Siege. */
+  raidEnemy?: boolean;
   /** Ordinary Skyranger attacks; rain arrows never advance this counter. */
   skyShots?: number;
   id: number;
@@ -323,7 +329,21 @@ const HATCH_SPOTS = [
   { x: 0.866, y: 0.5 },
 ];
 
+/** Optional mode rules. Absent in ordinary Defend, including all replay fixtures. */
+export type ScenarioRules = {
+  manualWaves?: boolean;
+  passiveEnemies?: boolean;
+  noCivilians?: boolean;
+  unrestricted?: boolean;
+  ignoreKeepLoss?: boolean;
+  owns?: (building: Building) => boolean;
+  routeEnemy?: (enemy: Enemy, dt: number) => boolean;
+  died?: (enemy: Enemy) => void;
+  soldierDt?: (soldier: Soldier, dt: number) => number;
+};
+
 export class DefendSim {
+  scenario?: ScenarioRules;
   readonly map: CityMap;
   readonly levels: Levels;
   /** Training and skill-tree multipliers (all 1 without them). */
@@ -526,7 +546,7 @@ export class DefendSim {
   private defenders = new DefenderIndex();
   private defenderIndexActive = false;
 
-  constructor(map: CityMap, levels: Levels, seed = 1, bonuses: Readonly<Bonuses> = NO_BONUSES) {
+  constructor(map: CityMap, levels: Levels, seed = 1, bonuses: Readonly<Bonuses> = NO_BONUSES, keepId?: number) {
     this.map = map;
     this.levels = levels;
     this.bonuses = bonuses;
@@ -538,6 +558,7 @@ export class DefendSim {
     this.built = new Int32Array(n);
     this.flash = new Float32Array(n);
     for (const b of map.buildings) {
+      if (b.hidden) continue;
       this.hp[b.id] = this.maxHp[b.id] = maxHpOf(b, levels, bonuses);
       this.built[b.id] = b.cells.length;
       for (const c of b.cells) this.solid[c] = 1;
@@ -551,7 +572,7 @@ export class DefendSim {
     for (const b of gates) for (const c of b.cells) this.ownSolid[c] = 0;
     this.gates = map.buildings.filter((b) => b.kind === "gate");
     this.foeSolid = this.gates.length && !gateBarred(bonuses.gate) ? this.solid.slice() : this.solid;
-    this.keepId = map.buildings.find((b) => b.kind === "keep")!.id;
+    this.keepId = keepId ?? map.buildings.find((b) => b.kind === "keep")!.id;
     this.baits = map.buildings.filter((b) => b.kind === "monsterBait");
     this.baitField = new Float64Array(this.baits.length ? CELL_COUNT : 0);
     this.builders = new Builders(levels);
@@ -562,6 +583,36 @@ export class DefendSim {
       impassable: (i) => map.type[i] === CellType.WATER || this.rocks[i] === 1,
       cost: (i) => this.enterCost(i),
     };
+  }
+
+  /** Reconfigure a preallocated scenario lot using native HP, collision and art state. */
+  configureLot(id: number, kind: Exclude<Building["kind"], "house" | "wall" | "gate" | "wallBallista">, rect: Building["rect"], active: boolean) {
+    const b = this.map.buildings[id];
+    for (const cell of b.cells) if (this.map.owner[cell] === id) {
+      this.map.owner[cell] = -1; this.map.type[cell] = CellType.PARK;
+      this.solid[cell] = this.ownSolid[cell] = this.foeSolid[cell] = 0;
+    }
+    this.soldiers = this.soldiers.filter(s => s.home !== id);
+    this.skyPalaces = this.skyPalaces.filter(p => p.id !== id);
+    this.towers.cooldown.delete(id); this.towers.focus.delete(id); this.barracks.training.delete(id);
+    this.wizards.next.delete(id); this.wizards.rest.delete(id);
+    for(let corner=0;corner<4;corner++)this.darkKeeps.cooldown.delete(id*4+corner);
+    this.rallies.delete(id);this.mineAims.delete(id);
+    this.chrono.delete(id); this.wispOwners.delete(id);
+    b.kind = kind; b.rect = { ...rect }; b.hidden = !active;
+    b.cells = [];
+    for (let y=rect.y;y<rect.y+rect.h;y++) for (let x=rect.x;x<rect.x+rect.w;x++) b.cells.push(cellIndex(x,y));
+    this.hp[id] = this.maxHp[id] = active ? maxHpOf(b,this.levels,this.bonuses) : 0;
+    this.built[id] = active ? b.cells.length : 0;
+    if (active) for (const cell of b.cells) {
+      this.map.owner[cell]=id; this.map.type[cell]=CellType.STRUCT;
+      this.solid[cell]=this.ownSolid[cell]=this.foeSolid[cell]=1;
+    }
+    const structure=this.map.structures.find(s=>s.uid===b.structureUid);
+    if (structure) { structure.kind=kind; structure.rect={...rect}; }
+    const old=this.skyPalaces;
+    this.skyPalaces=launchPalaces(this).filter(p=>p.id===id && active || old.some(o=>o.id===p.id)).map(p=>old.find(o=>o.id===p.id)??p);
+    this.changed.push(...b.cells); this.mapVersion++; this.fieldDirty=true; this.fieldT=0;
   }
 
   get keep(): Building {
@@ -577,8 +628,9 @@ export class DefendSim {
   aloft(id: number) {
     return this.skyPalaces.length > 0 && this.skyPalaces.some((p) => p.id === id);
   }
+  ownsBuilding(b: Building) { return this.scenario?.owns?.(b) ?? true; }
   intact(b: Building) {
-    return this.built[b.id] === b.cells.length;
+    return !b.hidden && this.ownsBuilding(b) && this.built[b.id] === b.cells.length;
   }
   newId() {
     return this.nextId++;
@@ -611,7 +663,7 @@ export class DefendSim {
     stepPoison(this, dt);
     this.sweepAway();
     this.tick(dt);
-    if (this.hp[this.keepId] <= 0 && !this.lost) {
+    if (!this.scenario?.ignoreKeepLoss && this.hp[this.keepId] <= 0 && !this.lost) {
       this.lost = true;
       this.events.push({ type: "lost", wave: this.wave });
     }
@@ -631,7 +683,7 @@ export class DefendSim {
       this.enemyLookup.clear();
       this.enemyLookupActive = this.enemies.some(e => e.fortressPart);
       if (this.enemyLookupActive) for (const e of this.enemies) this.enemyLookup.set(e.id, e);
-      for (const e of this.enemies) if (e.hp > 0) stepEnemy(this, e, dt);
+      if (!this.scenario?.passiveEnemies) for (const e of this.enemies) if (e.hp > 0) stepEnemy(this, e, dt);
     } finally {
       this.defenderIndexActive = false;
       this.enemyLookupActive = false;
@@ -649,7 +701,7 @@ export class DefendSim {
       this.stationaryAttacks = false;
       this.blastIndexReady = false;
     }
-    this.builders.step(this, dt);
+    if (!this.scenario?.noCivilians) this.builders.step(this, dt);
     this.iceMotion.step(this, dt);
   }
 
@@ -673,7 +725,8 @@ export class DefendSim {
     for (const s of this.soldiers) {
       stepBannerLife(this, s, dt);
       const x0 = s.x, y0 = s.y;
-      STEP_SOLDIER[s.kind](this, s, dt);
+      const soldierDt = this.scenario?.soldierDt?.(s, dt) ?? dt;
+      if (soldierDt > 0) STEP_SOLDIER[s.kind](this, s, soldierDt);
       fence(this, s, x0, y0);
       stepBannerLife(this, s, 0);
     }
@@ -692,6 +745,8 @@ export class DefendSim {
     const hatched: Enemy[] = [];
     for (const e of this.enemies) {
       if (e.hp > 0) continue;
+      if (e.escaped || e.raidBuilding) continue;
+      this.scenario?.died?.(e);
       if (!e.fortressPart) {
         this.slain[e.kind]++;
         this.stats.current.slain++;
@@ -787,6 +842,7 @@ export class DefendSim {
   }
 
   private runWaves(dt: number) {
+    if (this.scenario?.manualWaves) return;
     if (this.tester) { this.waveSpawned = this.enemies.length; return; }
     if (this.spawnQueue.length) {
       this.spawnT -= dt;
@@ -813,13 +869,15 @@ export class DefendSim {
     }
   }
 
-  private spawnEnemy(kind: EnemyKind) {
+  releaseEnemy(kind: EnemyKind, at: Point) { const before=this.enemies.length; this.spawnEnemy(kind,at); return this.enemies.length>before; }
+
+  private spawnEnemy(kind: EnemyKind, at?: Point) {
     const fort = ENEMIES[kind].fortress;
     if (this.waveSpawned + (fort ? 1 + fort.turrets + fort.legs + fort.armor : 1) > MAX_WAVE_ENEMIES) return;
     for (let tries = 0; tries < 20; tries++) {
       const margin = fort ? ENEMIES[kind].size / 2 + 1 : 1;
-      const x = margin + this.rand() * (CELLS_W - 2 * margin);
-      const y = (fort ? fort.height / 2 + .5 : .5) + this.rand() * 2;
+      const x = at?.x ?? margin + this.rand() * (CELLS_W - 2 * margin);
+      const y = at?.y ?? (fort ? fort.height / 2 + .5 : .5) + this.rand() * 2;
       if (blocked(this.solid, x, y)) continue;
       this.enemies.push(this.newEnemy(kind, x, y));
       this.waveSpawned++;

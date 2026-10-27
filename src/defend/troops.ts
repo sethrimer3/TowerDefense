@@ -189,7 +189,7 @@ class Patrol {
     this.bounds = deployment(sim, s);
     // Headhunters range further, and at Kingslayer anywhere in the city.
     // Winged lancers ride further from the stable.
-    this.leash = soldierLeash(sim.levels.soldierReach ?? 0) * (s.kind === "assassin" ? huntReach(sim, s.home) : spearLeash(sim, s));
+    this.leash = sim.scenario?.unrestricted ? Infinity : soldierLeash(sim.levels.soldierReach ?? 0) * (s.kind === "assassin" ? huntReach(sim, s.home) : spearLeash(sim, s));
     this.toughest = headhunter(sim, s);
     this.citywide = !Number.isFinite(this.leash);
   }

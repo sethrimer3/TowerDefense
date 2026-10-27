@@ -45,6 +45,8 @@ const FREE = 9;
 
 export type BuildingKind = "house" | "wall" | "gate" | "wallBallista" | StructureKind;
 export type Building = {
+  /** Empty scenario deployment lot; excluded from rendering and recruitment. */
+  hidden?: boolean;
   id: number;
   kind: BuildingKind;
   cells: number[];

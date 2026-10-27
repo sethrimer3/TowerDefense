@@ -44,6 +44,7 @@ export function stepEnemy(sim: DefendSim, e: Enemy, dt: number) {
   if (e.kind === "dragon" && breathe(sim, e, dt)) return;
   const t: Turn = { sim, e, def, reach: enemySize(e) / 2 + 0.4, dt };
   if (fightDefender(t)) return;
+  if (sim.scenario?.routeEnemy?.(e, dt)) return;
   if (e.kind === "iceCube") return stepIceCube(sim, e, dt);
   if (def.flying) return flyAtKeep(t);
   if (e.distract >= 0 && (sim.baits.length === 0 || !baitStanding(sim)) && chaseDistraction(t)) return;

@@ -119,10 +119,11 @@ export function drawUnits(b: Brush, sim: DefendSim, torches: Burning | null, hea
   let swords: ReturnType<typeof drawSoldiers> = [];
   rims = layers?.rims ?? null;
   try {
+    for(const soldier of sim.soldiers)if(soldier.raidEnemy){u.c.save();u.c.strokeStyle='#d66e58';u.c.lineWidth=Math.max(1,b.px*.12);u.c.beginPath();u.c.ellipse(soldier.x*b.px,soldier.y*b.px,b.px*.5,b.px*.25,0,0,Math.PI*2);u.c.stroke();u.c.restore();}
     drawCivilians(u, sim, torches);
     swords = simple.troops ? (drawSimpleTroops(u, sim.soldiers.filter((o) => !garrisoned(o)), layers?.rims), []) : drawSoldiers(u, sim, torches, simple.reduceMotion);
-    if (simple.enemies) drawSimpleEnemies(u, sim.enemies, layers?.rims);
-    else for (const e of sim.enemies) drawEnemyArt(u, e, sim, layers ? b : undefined);
+    if (simple.enemies) drawSimpleEnemies(u, sim.enemies.filter(e=>!e.raidProxy), layers?.rims);
+    else for (const e of sim.enemies) if (!e.raidProxy) drawEnemyArt(u, e, sim, layers ? b : undefined);
   } finally {
     rims = null;
   }
@@ -767,7 +768,7 @@ export function shadowCasters(sim: DefendSim) {
   return [
     ...sim.soldiers.filter((u) => !garrisoned(u)).map((u) => ({ x: u.x, y: u.y, size: u.kind === "archer" ? ARCHER_UNIT.size : u.kind === "mage" ? FIRE_MAGE.size : u.kind === "valkyrie" ? VALKYRIE.size : u.kind === "darkWizard" ? DARK_WIZARD.size : isGuildTroop(u.kind) ? GUILD_TROOPS[u.kind].size : u.risen ? u.risen.size : u.called ? u.called.size : SOLDIER.size })),
     ...sim.civilians.map((u) => ({ x: u.x, y: u.y, size: CIVILIAN.size })),
-    ...sim.enemies.filter((e) => !def(e).flying).map((e) => ({ x: e.x, y: e.y, size: enemySize(e) })),
+    ...sim.enemies.filter((e) => !e.raidProxy && !def(e).flying).map((e) => ({ x: e.x, y: e.y, size: enemySize(e) })),
   ];
 }
 

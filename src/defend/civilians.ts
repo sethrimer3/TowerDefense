@@ -279,7 +279,7 @@ function* openJobs(sim: DefendSim, skip: number) {
 
 function* openRepairs(sim: DefendSim, skip: number) {
   for (const b of sim.map.buildings) {
-    if (sim.intact(b) || b.kind === "keep") continue;
+    if (!sim.ownsBuilding(b) || b.hidden || sim.intact(b) || b.kind === "keep") continue;
     // Fallen bait waits for Restocking.
     if (b.kind === "monsterBait" && !restockable(sim, b)) continue;
     const tier = b.kind === "house" ? 2 : b.kind === "wall" || b.kind === "gate" ? 1 : 0;

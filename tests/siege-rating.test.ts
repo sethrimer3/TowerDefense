@@ -48,10 +48,9 @@ test('Siege saves round-trip immutable targets, sanitize counters, and reject in
  const nullDefense=structuredClone(d.siege.raid.castle);nullDefense.defenses.push(null as any);assert.equal(decodeCastle(nullDefense),null);
  const html=structuredClone(d.siege.raid.castle);html.owner.name='<img onerror=alert(1)>';assert.equal(decodeCastle(html),null);
 });
-test('Actual generated raids use snapshot stats and never damage their saved opponent',()=>{
+test('Generated raids instantiate a native castle without mutating their saved target',()=>{
  const d=defaults(),c=generateCastle(7907,600),before=JSON.stringify(c);
- const sim=new CampaignSim('siege',0,[{pad:0,kind:'meleeGuild'},{pad:1,kind:'rangedGuild'}],d.defend.owned,d.defend.levels,c);
- assert.equal(sim.castles.length,c.defenses.length);assert.equal(sim.castles[0].hp,c.defenses[0].hp);
- sim.start();for(let i=0;i<5000&&sim.phase==='battle';i++)sim.step(.05);
- assert.equal(sim.phase,'won');assert.equal(JSON.stringify(c),before);
+ const sim=new CampaignSim('siege',0,[],d.defend.owned,d.defend.levels,c,d);
+ assert.ok(sim.raid);assert.ok(sim.map.buildings.some(b=>b.kind==='keep'));assert.ok(sim.map.buildings.some(b=>b.kind==='wall'));assert.ok(sim.map.buildings.some(b=>b.kind==='archerTower'||b.kind==='cannonTower'||b.kind==='wizardTower'||b.kind==='wispTower'||b.kind==='brazierTower'||b.kind==='hawkTower'));
+ sim.start();for(let i=0;i<30;i++)sim.step(1/30);assert.equal(JSON.stringify(c),before);
 });

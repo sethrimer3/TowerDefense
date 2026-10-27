@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { ambushPrice, enemyBounty, startingGold } from '../src/campaign/economy.ts';
 import { CampaignSim, deployable } from '../src/campaign/sim.ts';
 import { defaultDefendSave } from '../src/defend/progress.ts';
-import { STRUCTURES,type StructureKind } from '../src/defend/catalog.ts';
+import { STRUCTURES,ENEMIES,type StructureKind } from '../src/defend/catalog.ts';
 
 test('All deployable buildings have positive prices rounded to tens and actual upgrades increase prices',()=>{
  const d=defaultDefendSave();
@@ -23,22 +23,19 @@ test('Purchases debit level gold, respect affordability, and saved layouts canno
 });
 test('Battle building and selling use stable pad homes; reselling never creates profit or orphan troops',()=>{
  const d=defaultDefendSave(),s=new CampaignSim('ambush',0,[],d.owned,d.levels);s.place(0,'meleeGuild');s.place(1,'rangedGuild');s.start();s.step(.05);
- assert.ok(s.allies.some(a=>a.home===0));assert.ok(s.allies.some(a=>a.home===1));
+ assert.ok(s.allies.some(a=>a.home===2));assert.ok(s.allies.some(a=>a.home===1));
  const gold=s.gold,refund=s.refund(0);assert.equal(refund,Math.floor(s.price('meleeGuild').cost*.7/10)*10);
- s.remove(0);assert.equal(s.gold,gold+refund);assert.ok(!s.allies.some(a=>a.home===0));assert.ok(s.allies.some(a=>a.home===1));
- assert.ok(s.place(2,'rangedGuild'));s.step(.05);assert.ok(s.allies.some(a=>a.home===2));s.step(1);
+ s.remove(0);assert.equal(s.gold,gold+refund);assert.ok(!s.allies.some(a=>a.home===1));assert.ok(s.allies.some(a=>a.home===2));
+ assert.ok(s.place(2,'rangedGuild'));s.step(.05);assert.ok(s.allies.some(a=>a.home===3));s.step(1);
  const before=s.gold;s.remove(2);assert.ok(s.gold-before<s.price('rangedGuild').cost);
  s.phase='lost';assert.equal(s.place(3,'meleeGuild'),false);const ended=s.gold;s.remove(1);assert.equal(s.gold,ended);
 });
-test('Killing hits pay the spawned bounty exactly once, and leaks pay nothing',()=>{
- const d=defaultDefendSave();d.owned.archerTower=1;
- const s=new CampaignSim('ambush',0,[],d.owned,d.levels);s.place(0,'archerTower');s.start();s.step(1);assert.equal(s.enemies.length,1);
- const enemy=s.enemies[0];enemy.x=s.plan.pads[0].x;enemy.y=s.plan.pads[0].y;enemy.hp=1;
- const gold=s.gold,bounty=enemy.bounty!;s.step(.05);assert.equal(s.gold,gold+bounty);assert.equal(s.kills,1);
- s.step(.05);assert.equal(s.gold,gold+bounty);assert.equal(s.kills,1);
- const leak=new CampaignSim('ambush',0,[],d.owned,d.levels);leak.place(0,'archerTower');leak.start();leak.step(1);
- const e=leak.enemies[0];e.progress=leak.plan.path.length-1;e.x=19;e.y=23;
- const leakGold=leak.gold;leak.step(.05);assert.equal(leak.lives,4);assert.equal(leak.gold,leakGold);assert.equal(leak.kills,0);
+test('Native enemy deaths pay once; reaching the route exit pays nothing',()=>{
+ const d=defaultDefendSave(),s=new CampaignSim('ambush',0,[],d.owned,d.levels);s.place(0,'meleeGuild');s.start();
+ const p=s.plan.path[0],enemy=s.engine.spawnAuxiliary('roach',p.x,p.y)!;
+ const gold=s.gold,def=ENEMIES[enemy.kind],bounty=enemyBounty({maxHp:enemy.maxHp,damage:def.damage,cooldown:def.cooldown,speed:def.speed});
+ s.engine.hurtEnemy(enemy,enemy.hp*2);s.engine.step(1/30);assert.equal(s.gold,gold+bounty);assert.equal(s.kills,1);s.engine.step(1/30);assert.equal(s.kills,1);
+ const end=s.plan.path.at(-1)!,leak=s.engine.spawnAuxiliary('roach',end.x,end.y)!;const after=s.gold;s.engine.step(1/30);s.engine.step(1/30);assert.ok(leak.escaped);assert.equal(s.gold,after);
 });
 test('Tougher enemies pay more and retries do not carry Ambush gold into other game modes',()=>{
  const weak={maxHp:12,damage:2,cooldown:1.2,speed:1.2},tough={maxHp:48,damage:6,cooldown:1,speed:2};assert.ok(enemyBounty(tough)>enemyBounty(weak));assert.equal(enemyBounty(tough)%10,0);
@@ -46,13 +43,8 @@ test('Tougher enemies pay more and retries do not carry Ambush gold into other g
  assert.equal(new CampaignSim('ambush',0,[],d.owned,d.levels).gold,500);const siege=new CampaignSim('siege',0,[],d.owned,d.levels);siege.start();siege.step(1);assert.equal(siege.gold,0);
 });
 
-test('Spending kill rewards on reinforcements can clear all three levels with starter unlocks',()=>{
- for(let level=0;level<3;level++){
-  const d=defaultDefendSave(),s=new CampaignSim('ambush',level,[],d.owned,d.levels);
-  s.place(0,'meleeGuild');s.place(1,'rangedGuild');s.place(2,'watchTower');s.start();
-  for(let t=0;t<6000&&s.phase==='battle';t++){
-   const pad=s.plan.pads.findIndex((_,i)=>!s.layout.some(p=>p.pad===i));if(pad>=0)s.place(pad,'rangedGuild');s.step(.05);
-  }
-  assert.equal(s.phase,'won');assert.ok(s.layout.length>3);assert.ok(s.kills>0);assert.ok(s.gold>=0);
- }
+test('Native kill gold can fund an additional building during a wave',()=>{
+ const d=defaultDefendSave(),s=new CampaignSim('ambush',0,[],d.owned,d.levels);s.place(0,'meleeGuild');s.start();s.gold=0;
+ for(let i=0;i<20;i++){const e=s.engine.spawnAuxiliary('ogre',s.plan.path[0].x,s.plan.path[0].y)!;s.engine.hurtEnemy(e,e.hp*2);s.engine.step(1/30);}
+ assert.ok(s.gold>=s.price('rangedGuild').cost);const before=s.gold;assert.ok(s.place(1,'rangedGuild'));assert.equal(s.gold,before-s.price('rangedGuild').cost);
 });

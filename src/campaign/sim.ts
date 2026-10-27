@@ -1,190 +1,108 @@
-import { troopStats, towerStats, type Profile } from "./combat-stats.ts";
-import { ambushPrice, enemyBounty, startingGold } from "./economy.ts";
-import type { CastleSnapshot, DefenseKind } from "./castles.ts";
-/** Small deterministic campaigns. No writes to Defend's layout or combat RNG. */
+/** Mode lifecycle and economy around DefendSim. All combat belongs to Defend. */
+import { DefendSim,type Enemy } from '../defend/sim.ts';
 import * as C from '../defend/catalog.ts';
-import { TRAINS } from '../defend/deployment.ts';
-import type { DefendSave } from '../defend/progress.ts';
-export type Mode = 'ambush' | 'siege';
-export type Point = { x: number; y: number };
-export type Placement = { pad: number; kind: C.StructureKind };
-export type CampaignProgress = { cleared: number; layouts: Placement[][] };
-export type CampaignSave = Record<Mode, CampaignProgress>;
-export const emptyCampaigns = (): CampaignSave => ({ ambush: { cleared: 0, layouts: [] }, siege: { cleared: 0, layouts: [] } });
-export const LEVELS = 3;
-const kinds = Object.keys(C.STRUCTURES) as C.StructureKind[];
-export const infantry = (kind: C.StructureKind) => !!TRAINS[kind];
-export const deployable = (kind: C.StructureKind, mode: Mode) => kind !== 'keep' && (infantry(kind) || mode === 'ambush' && C.ITEM_CATEGORY[kind as C.PaletteItem] === 'towers');
-export function decodeCampaigns(raw: unknown): CampaignSave {
-  const out = emptyCampaigns();
-  if (!raw || typeof raw !== 'object') return out;
-  for (const mode of ['ambush', 'siege'] as const) {
-    const value = (raw as Record<string, any>)[mode];
-    if (!value || typeof value !== 'object') continue;
-    out[mode].cleared = Number.isInteger(value.cleared) ? Math.max(0, Math.min(LEVELS, value.cleared)) : 0;
-    out[mode].layouts = Array.from({ length: LEVELS }, (_, level) => {
-      const pads = new Set<number>();
-      const input = Array.isArray(value.layouts?.[level]) ? value.layouts[level] : [];
-      return input.slice(0, 100).filter((p: any) => {
-        if (!p || !Number.isInteger(p.pad) || p.pad < 0 || p.pad >= levelPlan(mode, level).pads.length || pads.has(p.pad) || !kinds.includes(p.kind) || !deployable(p.kind, mode)) return false;
-        pads.add(p.pad); return true;
-      }).map((p: Placement) => ({ pad: p.pad, kind: p.kind }));
-    });
-  }
-  return out;
+import { buildWave } from '../defend/waves.ts';
+import { enemySpeed } from '../defend/enemy-abilities.ts';
+import { chilled } from '../defend/wizard.ts';
+import { rectCells } from '../defend/grid.ts';
+import { defaultDefendSave,type DefendSave } from '../defend/progress.ts';
+import { bonuses as gameBonuses } from '../progression.ts';
+import { placedBattlePaths,wearFits } from '../specializations.ts';
+import type { PathId } from '../knowledge-paths.ts';
+import type { Save } from '../save.ts';
+import { ambushField,siegeField,footprint,type MusterCopy } from './battlefield.ts';
+import { RaidBattle } from './raid.ts';
+import { ambushPrice,enemyBounty,startingGold } from './economy.ts';
+import { generateCastle,estimateCastle,seeded,type CastleSnapshot } from './castles.ts';
+import { infantry,deployable,validLayout,type Mode,type Placement } from './plans.ts';
+export * from './plans.ts';
+export type Wear={path?:PathId;rank?:number};
+export function infantryCopies(save:DefendSave):MusterCopy[]{
+ const out:MusterCopy[]=[];
+ for(const kind of Object.keys(C.STRUCTURES) as C.StructureKind[])if(infantry(kind)){
+  const worn=[...save.layout.structures,...save.kept].filter(s=>s.kind===kind);
+  for(let i=0;i<(save.owned[kind as C.PaletteItem]||0);i++){const copy=worn[i];out.push({kind,uid:100000+out.length,...(copy?.path?{path:copy.path,rank:copy.rank}:{})});}
+ }
+ return out;
 }
-export function levelPlan(mode: Mode, level: number) {
-  const path: Point[] = level === 0 ? [{x:0,y:5},{x:16,y:5},{x:16,y:12},{x:4,y:12},{x:4,y:20},{x:20,y:20}]
-    : level === 1 ? [{x:0,y:4},{x:7,y:4},{x:7,y:10},{x:16,y:10},{x:16,y:18},{x:3,y:18},{x:3,y:24}]
-    : [{x:0,y:4},{x:16,y:4},{x:16,y:9},{x:4,y:9},{x:4,y:15},{x:16,y:15},{x:16,y:21},{x:0,y:21}];
-  const pads: Point[] = mode === 'siege' ? [3,7,11,15].flatMap(x => [{x,y:20},{x,y:23}])
-    : [{x:4,y:7},{x:9,y:7},{x:13,y:7},{x:18,y:9},{x:13,y:14},{x:8,y:14},{x:2,y:16},{x:7,y:18},{x:12,y:22},{x:17,y:22}].filter(p => distanceToPath(p,path) >= 1.4);
-  return { name: (mode === 'ambush' ? ['Old Road','River Bend','Serpentine Pass'] : ['Border Keep','Twin Bastions','Crown Citadel'])[level], path, pads };
-}
-const distance = (a: Point,b: Point) => Math.hypot(a.x-b.x,a.y-b.y);
-function distanceToPath(p: Point,path: Point[]) {
-  return Math.min(...path.slice(1).map((b,i) => {const a=path[i], dx=b.x-a.x,dy=b.y-a.y,t=Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/(dx*dx+dy*dy)));return distance(p,{x:a.x+t*dx,y:a.y+t*dy});}));
-}
-export function validLayout(mode: Mode, level: number, layout: Placement[], owned: DefendSave['owned']) {
-  const used = new Map<string,number>(), pads = new Set<number>();
-  return layout.filter(p => {
-    const n = used.get(p.kind) || 0;
-    if (!deployable(p.kind,mode) || !levelPlan(mode,level).pads[p.pad] || pads.has(p.pad) || (owned[p.kind as C.PaletteItem]||0)<=0 || mode==='siege'&&n>=(owned[p.kind as C.PaletteItem]||0)) return false;
-    pads.add(p.pad); used.set(p.kind,n+1); return true;
-  }).map(p=>({...p}));
-}
-/** Inventory is the source of truth: include placed and palette copies alike. */
-export function siegeArmy(owned:DefendSave['owned']) {
-  const layout:Placement[]=[];
-  for(const kind of kinds)if(infantry(kind)){
-    const count=owned[kind as C.PaletteItem];
-    if(!Number.isSafeInteger(count)||count<=0)continue;
-    for(let copy=0;copy<count;copy++)layout.push({pad:layout.length,kind});
-  }
-  const count=layout.length;
-  if(count<=8){
-    const columns=Math.min(4,count),rows=Math.ceil(count/4);
-    const pads=layout.map((_,i)=>({x:(i%columns+.5)*20/columns,y:rows===1?21.5:20+Math.floor(i/columns)*3}));
-    return {layout,pads,iconSize:42};
-  }
-  // Fit every copy into the bottom muster ground rather than dropping extras.
-  const columns=Math.ceil(Math.sqrt(count*3)),rows=Math.ceil(count/columns);
-  const cellWidth=18/columns,cellHeight=5/rows;
-  const pads=layout.map((_,i)=>({x:1+cellWidth*(Math.floor(i/rows)+.5),y:18.5+cellHeight*(i%rows+.5)}));
-  return {layout,pads,iconSize:Math.min(42,cellWidth*24,cellHeight*24)};
-}
-export type Unit = Point & { id:number; hp:number; maxHp:number; damage:number; range:number; speed:number; cooldown:number; cd:number; color:string; home:number; progress:number; bounty?:number };
-export type Castle = Point & { hp:number; maxHp:number; cd:number; kind?:DefenseKind; damage?:number; cooldown?:number; range?:number };
-export type Shot = { from:Point; to:Point; life:number; friendly:boolean };
 export class CampaignSim {
-  phase: 'build'|'battle'|'won'|'lost' = 'build';
-  readonly plan;
-  readonly layout: Placement[];
-  readonly musterIconSize:number;
-  allies: Unit[] = []; enemies: Unit[] = []; castles: Castle[] = []; shots: Shot[] = [];
-  gold=0; kills=0; private paid=new Map<number,number>();
-  lives = 5; reserves = 36; elapsed = 0; wave = 0; spawned = 0;
-  private spawnClock=0; private recruit:number[]=[]; private towerCd:number[]=[]; private nextId=0;
-  private pending = 0;
-  constructor(readonly mode: Mode, readonly level: number, layout: Placement[], private owned: DefendSave['owned'], private levels: DefendSave['levels'], readonly opponent?:CastleSnapshot) {
-    if(opponent||mode==='ambush')this.levels={...levels};
-    const army=mode==='siege'?siegeArmy(owned):undefined;
-    this.plan={...levelPlan(mode,level),...(army?{pads:army.pads}:{})};
-    this.layout=army?army.layout:[];
-    if(mode==='ambush'){this.gold=startingGold(level);for(const p of validLayout(mode,level,layout,owned))this.place(p.pad,p.kind);}
-    this.musterIconSize=army?.iconSize??42;
-    if(army)this.reserves=Math.max(36,army.layout.length*C.soldierCap(this.levels.barracksCapacity));
-    if(mode==='siege'&&opponent)this.castles=opponent.defenses.map(d=>({...d,maxHp:d.hp,cd:d.cooldown}));
-    else if(mode==='siege') this.castles=Array.from({length:level+1},(_,i)=>({x:5+i*5,y:4+(i%2)*3,hp:100+level*45,maxHp:100+level*45,cd:2+i}));
+ phase:'build'|'battle'|'won'|'lost'='build';
+ readonly engine:DefendSim;readonly raid?:RaidBattle;readonly plan:{name:string;path:{x:number;y:number}[];pads:{x:number;y:number}[]};
+ readonly layout:Placement[]=[];readonly road?:Set<number>;private lots:number[]=[];
+ gold=0;kills=0;lives=5;elapsed=0;wave=0;spawned=0;
+ private paid=new Map<number,number>();private pending:C.EnemyKind[]=[];private spawnClock=0;private breakClock=0;private acc=0;
+ private route=new WeakMap<Enemy,number>();private rng:()=>number;private bonus:C.Bonuses;private source:DefendSave;
+ constructor(readonly mode:Mode,readonly level:number,layout:Placement[],private owned:DefendSave['owned'],private levels:DefendSave['levels'],readonly opponent?:CastleSnapshot,game?:Save){
+  this.levels={...levels};this.rng=seeded((opponent?.seed??12345)+level);
+  this.source=game?.defend??{...defaultDefendSave(),owned,levels};
+  this.bonus={...(game?gameBonuses(game):C.NO_BONUSES),structurePaths:{}};
+  if(mode==='ambush'){
+   const field=ambushField(level);this.plan=field;this.road=field.road;this.lots=field.lots;this.engine=new DefendSim(field.map,this.levels,12345+level,this.bonus);
+   this.engine.scenario={manualWaves:true,noCivilians:true,ignoreKeepLoss:true,routeEnemy:(e,dt)=>this.followRoad(e,dt),died:e=>{
+    const def=C.ENEMIES[e.kind];this.gold+=enemyBounty({maxHp:e.maxHp,damage:def.damage,cooldown:def.cooldown,speed:def.speed});this.kills++;
+   }};
+   for(const id of this.lots){const b=field.map.buildings[id];this.engine.configureLot(id,'watchTower',b.rect,false);}
+   this.gold=startingGold(level);for(const p of validLayout(mode,level,layout,owned))this.place(p.pad,p.kind,p);
+  }else{
+   const copies=infantryCopies(this.source),field=siegeField(opponent??generateCastle(12345,1000),copies);
+   const nativeStructures=copies.map(c=>({uid:c.uid,kind:c.kind as Exclude<C.StructureKind,'keep'>,tx:0,ty:0,qx:0,qy:0,...(c.path?{path:c.path as PathId,rank:c.rank}:{})}));
+   const adapted={...game,defend:{...this.source,layout:{...this.source.layout,structures:nativeStructures}}} as Save;
+   Object.assign(this.bonus,placedBattlePaths(adapted));
+   const scale=2**(((opponent?estimateCastle(opponent).rating:1000)-1000)/800)*.65;
+   const defense={...C.NO_BONUSES,towerDamage:scale,troopDamage:scale,troopHp:scale,keepHp:scale,wallHp:scale};
+   this.raid=new RaidBattle(field,this.levels,this.bonus,defense,opponent?.seed??12345);this.engine=this.raid.attack;
+   this.plan={name:opponent?.owner.name??'Castle raid',path:[],pads:field.pads};
+   this.layout=copies.map((c,i)=>({pad:i,kind:c.kind,...(c.path?{path:c.path as PathId,rank:c.rank}:{})}));
+   // The native Barracks garrisons replenish just as in Defend; no invented troop reserve.
   }
-  price(kind:C.StructureKind){return ambushPrice(kind,this.levels);}
-  refund(pad:number){const paid=this.paid.get(pad)??0;return this.phase==='build'?paid:Math.floor(paid*.7/10)*10;}
-  place(pad:number,kind:C.StructureKind) {
-    if(this.mode!=='ambush'||!['build','battle'].includes(this.phase))return false;
-    const layout=[...this.layout.filter(p=>p.pad!==pad),{pad,kind}];
-    const valid=validLayout(this.mode,this.level,layout,this.owned);
-    const cost=this.price(kind).cost,refund=this.refund(pad);
-    if(valid.length!==layout.length||cost>this.gold+refund)return false;
-    this.clearHome(pad);this.gold+=refund-cost;this.paid.set(pad,cost);
-    this.layout.splice(0,this.layout.length,...valid);return true;
-  }
-  private clearHome(pad:number){
-    this.allies=this.allies.filter(a=>a.home!==pad);delete this.recruit[pad];delete this.towerCd[pad];
-  }
-  remove(pad:number) {
-    if(this.mode!=='ambush'||!['build','battle'].includes(this.phase))return;
-    this.gold+=this.refund(pad);this.paid.delete(pad);this.clearHome(pad);
-    this.layout.splice(0,this.layout.length,...this.layout.filter(p=>p.pad!==pad));
-  }
-  start() {if(this.phase!=='build'||!this.layout.some(p=>infantry(p.kind)||p.kind!=='watchTower'))return false;this.phase='battle';this.nextWave();return true;}
-  private nextWave() {this.wave++;this.pending=this.mode==='ambush'?5+this.level*2+this.wave*2:this.opponent?.guards.count??3+this.level;this.spawnClock=1;}
-  private unit(p:Point,profile:Profile,home:number,scale=1):Unit {return {...p,id:this.nextId++,hp:profile.hp*scale,maxHp:profile.hp*scale,damage:profile.damage*scale,range:profile.range??profile.reach??3,speed:profile.speed,cooldown:profile.cooldown,cd:0,color:profile.color,home,progress:0};}
-  step(dt:number) {
-    if(this.phase!=='battle'||!Number.isFinite(dt)||dt<=0)return;
-    // Fixed substeps prevent tab stalls or speed changes skipping path corners.
-    let left=Math.min(dt,1);while(left>1e-8&&this.phase==='battle'){const h=Math.min(left,0.05);this.tick(h);left-=h;}
-  }
-  private tick(dt:number) {
-    this.elapsed+=dt;this.shots=this.shots.filter(s=>(s.life-=dt)>0);
-    const garrisons=new Map<number,number>();
-    for(const ally of this.allies)if(ally.hp>0)garrisons.set(ally.home,(garrisons.get(ally.home)??0)+1);
-    this.layout.forEach(p=>{
-      const i=p.pad;
-      const pos=this.plan.pads[p.pad];
-      if(infantry(p.kind)) {
-        this.recruit[i]=(this.recruit[i]??0)-dt;
-        if(this.recruit[i]<=0&&(garrisons.get(i)??0)<C.soldierCap(this.levels.barracksCapacity)&&(this.mode==='ambush'||this.reserves>0)) {
-          const profile=troopStats(p.kind,this.levels);
-          const recruit=this.unit(pos,profile,i);
-          this.allies.push(recruit);
-          this.recruit[i]=C.trainSeconds(this.levels.barracksTraining);if(this.mode==='siege')this.reserves--;
-        }
-      } else {
-        this.towerCd[i]=(this.towerCd[i]??0)-dt;
-        if(p.kind==='watchTower')return;
-        const attack=towerStats(p.kind,this.levels);
-        const target=this.enemies.find(e=>e.hp>0&&distance(e,pos)<=attack.range);
-        if(target&&this.towerCd[i]<=0){
-          for(const enemy of this.enemies)if(enemy.hp>0&&(enemy===target||attack.splash>0&&distance(enemy,target)<=attack.splash))this.hit(pos,enemy,attack.damage,true);
-          this.towerCd[i]=attack.cooldown;
-        }
-      }
-    });
-    this.spawnClock-=dt;
-    if(this.pending>0&&this.spawnClock<=0){
-      const keep=this.castles.find(c=>c.kind==='keep'&&c.hp>0);
-      const p=this.mode==='ambush'?this.plan.path[0]:keep??{x:5+(this.spawned%3)*5,y:5};
-      const profile=this.opponent ? {...this.opponent.guards,reach:.8,color:'#ca715a'} : {hp:9+this.level*5+this.wave*2,damage:2+this.level,cooldown:1.2,speed:1.15+this.level*.1,reach:.8,color:'#ca715a'};
-      if(this.mode==='ambush'||!this.opponent||keep){const enemy=this.unit(p,profile,-1);if(this.mode==='ambush')enemy.bounty=enemyBounty(enemy);this.enemies.push(enemy);}
-      this.spawned++;this.pending--;this.spawnClock=.95;
-    }
-    for(const a of this.allies){
-      if(a.hp<=0)continue;a.cd-=dt;
-      const candidates=this.enemies.filter(e=>e.hp>0&&(this.mode==='siege'||distance(e,this.plan.pads[a.home])<5));
-      const target=candidates.sort((b,c)=>distance(a,b)-distance(a,c))[0] || (this.mode==='siege'?this.castles.filter(c=>c.hp>0).sort((b,c)=>distance(a,b)-distance(a,c))[0]:undefined);
-      if(target){if(distance(a,target)<=a.range+.3){if(a.cd<=0){this.hit(a,target,a.damage,true);a.cd=a.cooldown;}}else this.move(a,target,dt);}
-      else if(this.mode==='ambush')this.move(a,this.plan.pads[a.home],dt);
-    }
-    for(const e of this.enemies){
-      if(e.hp<=0)continue;e.cd-=dt;
-      const target=this.allies.filter(a=>a.hp>0).sort((a,b)=>distance(e,a)-distance(e,b))[0];
-      if(target&&distance(e,target)<1.1){if(e.cd<=0){this.hit(e,target,e.damage,false);e.cd=e.cooldown;}}
-      else if(this.mode==='siege'){if(target)this.move(e,target,dt);}
-      else {const p=this.plan.path[e.progress+1];if(!p){e.hp=0;this.lives=Math.max(0,this.lives-1);continue;}if(distance(e,p)<=e.speed*dt){e.x=p.x;e.y=p.y;e.progress++;}else this.move(e,p,dt);}
-    }
-    if(this.mode==='siege')for(const c of this.castles){if(c.hp<=0)continue;c.cd-=dt;const target=this.allies.find(a=>a.hp>0&&distance(a,c)<(c.range??7));if(target&&c.cd<=0){this.hit(c,target,c.damage??4+this.level,false);c.cd=c.cooldown??1.4;}}
-    this.allies=this.allies.filter(a=>a.hp>0);this.enemies=this.enemies.filter(e=>e.hp>0);
-    if(this.mode==='ambush'){
-      if(this.lives<=0)this.phase='lost';
-      else if(!this.pending&&!this.enemies.length){if(this.wave===3)this.phase='won';else this.nextWave();}
-    }else if(this.castles.filter(c=>!c.kind||c.kind==='keep').every(c=>c.hp<=0))this.phase='won';
-    else if(!this.reserves&&!this.allies.length||this.elapsed>=240)this.phase='lost';
-  }
-  private move(a:Unit,b:Point,dt:number){const d=distance(a,b);if(d<.0001)return;const k=Math.min(1,a.speed*dt/d);a.x+=(b.x-a.x)*k;a.y+=(b.y-a.y)*k;}
-  private hit(from:Point,to:Point&{hp:number},damage:number,friendly:boolean){
-    const marked=friendly&&this.mode==='ambush'&&this.layout.some(p=>p.kind==='watchTower'&&distance(this.plan.pads[p.pad],to)<towerStats('watchTower',this.levels).range);
-    const wasAlive=to.hp>0;to.hp-=damage*(marked?2:1);
-    if(this.mode==='ambush'&&friendly&&wasAlive&&to.hp<=0&&(to as Unit).bounty){this.gold+=(to as Unit).bounty!;this.kills++;}
-   this.shots.push({from:{x:from.x,y:from.y},to:{x:to.x,y:to.y},life:.16,friendly});
-  }
+ }
+
+ get map(){return this.engine.map;}
+ get renderSim(){return this.raid?.prepareRender()??this.engine;}
+ get allies(){return this.engine.soldiers;}
+ get enemies(){return this.engine.enemies;}
+ variants(kind:C.StructureKind):Wear[]{
+  const list:Wear[]=[];
+  for(const source of [...this.source.layout.structures,...this.source.kept])if(source.kind===kind&&source.path&&wearFits(kind,source.path,source.rank)&&!list.some(p=>p.path===source.path&&p.rank===source.rank))list.push({path:source.path,rank:source.rank});
+  return list.length?list:[{}];
+ }
+ price(kind:C.StructureKind,wear:Wear=this.variants(kind)[0]){return ambushPrice(kind,this.levels,wear);}
+ refund(pad:number){const paid=this.paid.get(pad)??0;return this.phase==='build'?paid:Math.floor(paid*.7/10)*10;}
+ place(pad:number,kind:C.StructureKind,wear:Wear=this.variants(kind)[0]){
+  if(this.mode!=='ambush'||!['build','battle'].includes(this.phase)||!this.plan.pads[pad]||!deployable(kind,this.mode)||(this.owned[kind as C.PaletteItem]||0)<=0)return false;
+  if(wear.path&&!this.variants(kind).some(p=>p.path===wear.path&&p.rank===wear.rank))return false;
+  const id=this.lots[pad],rect=footprint(kind,this.plan.pads[pad]);
+  if(rectCells(rect).some(c=>this.road!.has(c)||this.map.owner[c]>=0&&this.map.owner[c]!==id))return false;
+  const cost=this.price(kind,wear).cost,refund=this.refund(pad);if(cost>this.gold+refund)return false;
+  this.bonus.structurePaths??={};
+  const structure={uid:id,kind:kind as Exclude<C.StructureKind,'keep'>,tx:0,ty:0,qx:0,qy:0,...wear};
+  const adapted={defend:{...this.source,layout:{...this.source.layout,structures:[structure]}}} as Save;
+  const paths=placedBattlePaths(adapted).structurePaths?.[id];
+  if(paths)this.bonus.structurePaths[id]=paths;else delete this.bonus.structurePaths[id];
+  this.map.buildings[id].structureUid=id;this.engine.configureLot(id,kind,rect,true);
+  this.gold+=refund-cost;this.paid.set(pad,cost);this.layout.splice(0,this.layout.length,...this.layout.filter(p=>p.pad!==pad),{pad,kind,...wear});return true;
+ }
+ remove(pad:number){if(this.mode!=='ambush'||!['build','battle'].includes(this.phase)||!this.lots[pad])return;this.gold+=this.refund(pad);this.paid.delete(pad);const b=this.map.buildings[this.lots[pad]];this.engine.configureLot(b.id,b.kind as C.StructureKind,b.rect,false);this.layout.splice(0,this.layout.length,...this.layout.filter(p=>p.pad!==pad));}
+ start(){if(this.phase!=='build'||!this.layout.some(p=>p.kind!=='watchTower'))return false;this.phase='battle';if(this.mode==='ambush')this.nextWave();return true;}
+ private nextWave(){this.wave++;this.engine.wave=1+this.level*8+(this.wave-1)*2;this.pending=buildWave(this.engine.wave,this.rng);this.spawnClock=0;this.breakClock=2;}
+ private followRoad(e:Enemy,dt:number){
+  let segment=this.route.get(e);
+  if(segment===undefined){let best=Infinity;segment=1;for(let i=1;i<this.plan.path.length;i++){const a=this.plan.path[i-1],b=this.plan.path[i],dx=b.x-a.x,dy=b.y-a.y,t=Math.max(0,Math.min(1,((e.x-a.x)*dx+(e.y-a.y)*dy)/(dx*dx+dy*dy)));const d=Math.hypot(e.x-a.x-t*dx,e.y-a.y-t*dy);if(d<best){best=d;segment=i;}}}
+  const target=this.plan.path[segment];
+  if(!target){e.escaped=true;e.hp=0;this.lives=Math.max(0,this.lives-1);return true;}
+  const speed=enemySpeed(this.engine,e)*chilled(e);
+  if(Math.hypot(target.x-e.x,target.y-e.y)<=speed*dt+.1){e.x=target.x;e.y=target.y;this.route.set(e,segment+1);}
+  else{this.engine.moveToward(e,target,{speed,dt,flying:true});this.route.set(e,segment);}
+  return true;
+ }
+ step(dt:number){if(this.phase!=='battle'||!Number.isFinite(dt)||dt<=0)return;this.acc+=Math.min(dt,.25);while(this.acc>=1/30&&this.phase==='battle'){this.acc-=1/30;this.tick(1/30);}}
+ private tick(dt:number){
+  this.elapsed+=dt;
+  if(this.raid){this.raid.step(dt);if(this.raid.defense.keepHp()<=0)this.phase='won';else if(this.elapsed>=240)this.phase='lost';return;}
+  this.spawnClock-=dt;
+  if(this.pending.length&&this.spawnClock<=0){const kind=this.pending.shift()!;this.engine.releaseEnemy(kind,this.plan.path[0]);this.spawned++;this.spawnClock=.7;}
+  this.engine.step(dt);
+  if(this.lives<=0)this.phase='lost';
+  else if(!this.pending.length&&!this.engine.enemies.length){if(this.wave>=3)this.phase='won';else if((this.breakClock-=dt)<=0)this.nextWave();}
+ }
 }
