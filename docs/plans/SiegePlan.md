@@ -19,7 +19,7 @@ Follow the architecture guidelines in [AmbushPlan.md](AmbushPlan.md#architecture
 
 1. **Strike spell quick bar** in the board's bottom left, replacing `.campaign-spells`' text buttons. OtherPlans.md §2.
 2. **Fences as walls** at about 10% of a wall stone's HP: the castle's parks get fences that the attackers must break. OtherPlans.md §1.
-3. **Remove the "How to play" box and the mode title** from the page header if Seth confirms the same reading as for Ambush (AmbushPlan.md, Open questions 1).
+3. **Remove the "How to play" box and the mode title** from the page header (Seth confirmed this on 2026-10-27).
 4. **New pixel-art Siege tab icon.** OtherPlans.md §3.
 
 ## Known gaps worth fixing first

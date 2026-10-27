@@ -23,7 +23,7 @@ Almost all of this is replaced. Keep the good parts: Ambush runs the real `Defen
 
 ## Reading of the brief
 
-"Remove the 'how to play' and Ambush": my reading is that this means the campaign page's header text, the **"How to play"** `<details>` and the big **"Ambush"** `<h1>` title above the board (`campaign/ui.ts` line 45), not the Ambush mode itself, since the rest of the brief builds Ambush up. The "Buildings and upgrades" help `<details>` goes too, because free placement makes its numbered space list meaningless. This is still to be confirmed by Seth (see Open questions).
+"Remove the 'how to play' and Ambush": my reading is that this means the campaign page's header text, the **"How to play"** `<details>` and the big **"Ambush"** `<h1>` title above the board (`campaign/ui.ts` line 45), not the Ambush mode itself. Seth confirmed this reading on 2026-10-27, for Siege too. The "Buildings and upgrades" help `<details>` goes as well, because free placement makes its numbered space list meaningless.
 
 ## Target design
 
@@ -58,14 +58,20 @@ Almost all of this is replaced. Keep the good parts: Ambush runs the real `Defen
 
 ### Stars
 
-- A level is won when all 20 waves are cleared and the keep still stands. Stars = 3 minus each outpost destroyed. Keep destroyed = defeat (0 stars, nothing saved but the attempt).
+- A level is won when all 20 waves are cleared and the keep still stands. Stars (confirmed by Seth):
+  - keep standing, both outposts standing: **3/3**;
+  - keep standing, one outpost standing: **2/3**;
+  - keep standing, no outposts: **1/3**;
+  - keep destroyed: **defeat**, 0 stars, nothing saved but the attempt.
 - When Outpost 1 falls, a star visibly cracks off in the HUD, the label moves on to "Outpost 2", and enemies carry on down the track.
 - The end screen shows the stars (with a small flourish and sound), kills, gold earned, and Retry / Next level / Level select.
-- Save each level's best stars.
+- Save each level's best stars and show them on its level select card.
+- Stars are also the currency of the Ambush star tree (below).
 
 ### Buildings and upgrades
 
-- Ambush buildings are **base buildings with no Knowledge and no Smithy upgrades**: the battle is built with `NO_BONUSES` and default (zero) Armory levels, whatever the player has researched in Defend.
+- Ambush buildings are **base buildings with no Knowledge and no Smithy upgrades**: the battle is built with `NO_BONUSES` and default (zero) Armory levels, whatever the player has researched in Defend. The only lasting power comes from Ambush's own **star tree** (below).
+- Strike spells the player owns are usable, cast at **base strength** (no Study paths, no Smithy rows). Confirmed by Seth.
 - The palette sells exactly **Melee Guild, Ranged Guild, Archer Tower, Cannon Tower, Wizard Tower**, available to every player (not gated on Defend ownership).
 - Tapping a placed building turns the build menu into its **building panel**:
   - a **portrait** of the building (the palette icon, drawn larger, in its current look);
@@ -73,6 +79,27 @@ Almost all of this is replaced. Keep the good parts: Ambush runs the real `Defen
   - **upgrade options**: every next step in its Knowledge tree (`nextSteps` in `src/specializations.ts`: attunement, branch attunement, the 3 ranks), each with a **gold** price; buying one changes the building in place, exactly as Defend's tree does, but paid in Ambush gold and only for this level;
   - at the very bottom, **Sell** with the refund shown: **70% of all gold put into the building** (purchase plus every upgrade), rounded down to tens. (Today's "full refund before waves" rule is dropped unless Seth wants it kept; see Open questions.)
   - tapping the board elsewhere or a close button returns to the palette.
+
+### The star tree (Ambush's own upgrade tree)
+
+Seth asked (2026-10-27) for Ambush to have its own upgrade tree, paid for in **stars**.
+
+- **Currency.** The star pool is the sum of each level's best stars (30 levels × 3 = 90 at most), minus stars spent. Improving a level's best from 1 to 3 stars adds 2 to the pool. Stars are never lost by losing a level.
+- **Separate from Defend.** The tree affects Ambush only. It never reads or changes Knowledge, Smithy levels, metals or Defend's trees, and nothing in Defend reads it.
+- **Shape.** It follows the game's tree look (reuse `UpgradeGraph` with `TreeMotes` and the magic circle, like the keep's side-by-side tree in `src/keep-upgrades.ts`/`src/side-ranks.ts`). Suggested branches, climbed side by side, each 3 to 5 ranks with rising star prices (placeholder numbers, tune in balance):
+  - **War chest**: more starting gold (+50 gold a rank).
+  - **Bounty**: more gold per kill (+5% a rank).
+  - **Masons**: the five base buildings cost less (−5% a rank).
+  - **Quartermaster**: better refunds when selling (70% → 75/80/85%).
+  - **Drillmasters**: base troops and towers hit harder (+5% damage a rank) and troops have more HP. These multiply Ambush's base stats; they do not unlock Knowledge paths.
+  - **Palisades**: outpost fences and houses take longer to break (+15% HP a rank).
+  - **Keep walls**: the keep and its castle wall have more HP.
+  - **Battle magic**: shorter strike spell cooldowns in Ambush (−10% a rank).
+  - **Head start**: a free base building placed at the start of every level (rank I one, rank II two).
+- **Respec.** Free and instant, giving every star back, like the keep's tree. Undo on any owned rank takes it and those above it.
+- **Where it lives.** A **Star tree** button on the level select (the page with the stars), showing the pool. It is closed during a level.
+- **Code.** `src/ambush-upgrades.ts` (pure: `AMBUSH_PATHS`, prices, `ambushBonuses(ranks)` returning plain multipliers), ranks saved as `CampaignSave.ambush.ranks` (optional, absent with none, decoded with `decodeSideRanks`). `CampaignSim` reads `ambushBonuses` when building the battle: gold and prices in `economy.ts`, damage/HP through a `Bonuses` built from `NO_BONUSES` with only those fields set, outpost and keep HP in `outposts.ts`, spell cooldowns through the sim's existing cooldown fields.
+- **Tests.** Pool maths (best stars only, spending, respec), each branch's effect in a Node battle, save round trip, a browser check of buying and respeccing at both widths.
 
 ## Architecture guidelines
 
@@ -92,7 +119,7 @@ These matter more than any single feature. Follow them throughout.
 
 ## Implementation order
 
-Each phase is one PR. Earlier phases leave the game playable.
+Each phase is one PR. Earlier phases leave the game playable. Phases 0 to 8 below.
 
 ### Phase 0: Clean up the page (small, do first)
 
@@ -151,9 +178,14 @@ Each phase is one PR. Earlier phases leave the game playable.
 - Upgrading applies the step to the live building: kind change via `configureLot` with the new kind (garrison retrains as Defend does), path ranks through `bonus.structurePaths[id]`. Must work mid-battle.
 - Tests: refund = floor(0.7 × invested / 10) × 10 including upgrades; upgrade changes the building and its attacks; tallies attribute splash and burns correctly; Defend replay unchanged.
 
-### Phase 7: Balance, polish and playtest
+### Phase 7: The star tree
 
-- Tune starting gold, bounties, wave curve and upgrade prices so Mossbound I is easy with two or three towers and Nadir III is hard. Write a headless balance script (`tools/ambush-balance.ts`) that plays each level with a scripted build (e.g. greedy cheapest DPS placements along the track) and reports stars, so a balance change is measured, not guessed.
+- Build the star tree as described under Target design: pure module, save field, the tree panel on the level select, the effects wired into `CampaignSim`. Requires phases 5 (stars) and 6 (base-only battles).
+- Tests as listed there.
+
+### Phase 8: Balance, polish and playtest
+
+- Tune starting gold, bounties, wave curve, upgrade prices and star tree prices so Mossbound I is easy with two or three towers and Nadir III is hard. Write a headless balance script (`tools/ambush-balance.ts`) that plays each level with a scripted build (e.g. greedy cheapest DPS placements along the track) and reports stars, so a balance change is measured, not guessed.
 - Boss waves, the star flourish and sound, the level select's star totals per zone.
 - Performance: 20 waves on the largest level at 3× speed on a phone-sized viewport should hold frame times near Defend's (`npm run test:stress-ui` style check).
 
@@ -167,14 +199,19 @@ Each phase is one PR. Earlier phases leave the game playable.
 - **First-time hints** instead of the removed "How to play": a one-line toast on the first level ("Drag a tower beside the road", "Tap a tower to upgrade or sell it"), shown once and stored in settings.
 - **Star requirements on the select card** (e.g. three small outpost icons) so players know what a lost star means.
 
-## Open questions for Seth
+## Decisions and open questions
 
-Defaults chosen above in brackets; the agent should build the default and change it if Seth answers otherwise.
+Seth confirmed on 2026-10-27:
 
-1. "Remove the how to play and Ambush": the page's "How to play" box and big "Ambush" title, not the mode? [Yes, that reading.] Also in Siege? [Yes.]
-2. Is the keep's own settlement the third star, or is the keep falling simply a defeat? [Keep falling = defeat; stars come from the two outposts plus clearing the level, so 3 stars = both outposts saved.]
-3. Should the Watch tower be buildable too? It is the basic building that becomes the Archer, Cannon and Wizard towers, and your list skips it. [No; the five listed.]
-4. Selling before wave 1: full refund (today) or always 70%? [Always 70%, as written, but undo of the last placement before wave 1 is free.]
-5. Strike spells in Ambush: the player's own researched spells at base strength, or none? [Spells the player owns, cast at base strength without Study paths or Smithy rows, matching "no upgrades".]
-6. Should Ambush buildings keep Defend's one-quarter clear ring round each building? [No ring.]
-7. Do flying enemies have to raze outposts too? [Yes.]
+- The removed items are the page's "How to play" box and big "Ambush" title, not the mode; the same goes for Siege.
+- The keep falling is a defeat; stars are 1/2/3 by outposts surviving with the keep, shown on the level select.
+- The Watch tower is not buildable in Ambush.
+- Strike spells cast at base strength in Ambush.
+- Ambush gets its own star-funded upgrade tree (see The star tree).
+
+Still open (defaults in brackets; build the default and change it if Seth answers otherwise):
+
+1. Selling before wave 1: full refund (today) or always 70%? [Always 70%, with a free undo of the last placement before wave 1.]
+2. Should Ambush buildings keep Defend's one-quarter clear ring round each building? [No ring.]
+3. Do flying enemies have to raze outposts too? [Yes.]
+4. Which star tree branches and prices? [The suggested list above, tuned in phase 8.]

@@ -251,7 +251,7 @@ Window sunlight in the Library and Tiles uses `src/soft-sunlight.ts` (`SoftSunli
 
 ### Mode plans
 
-`docs/plans/` holds the agreed plans for each game mode: `AmbushPlan.md` (phased Ambush rebuild: level select, zone waves, outposts and stars, free build grid, gold upgrades), `SiegePlan.md`, `DefendPlan.md`, and `OtherPlans.md` for work shared by every mode (fences as walls, the strike spell quick bar, tab icons, the currency bar, ropes). Read the relevant plan before working on a mode, and tick its phases as they land.
+`docs/plans/` holds the agreed plans for each game mode: `AmbushPlan.md` (phased Ambush rebuild: level select, zone waves, outposts and stars, free build grid, gold upgrades, the star-funded Ambush tree), `SiegePlan.md`, `DefendPlan.md`, and `OtherPlans.md` for work shared by every mode (fences as walls, the strike spell quick bar, tab icons, the currency bar, ropes). Read the relevant plan before working on a mode, and tick its phases as they land.
 
 ### Issue tracker
 

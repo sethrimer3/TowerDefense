@@ -71,10 +71,9 @@ Suggested order: 1 (fences) and 2 (strike quick bar) first, since Ambush's outpo
 
 **Brief:** "Improve the graphics on the ropes."
 
-**Reading:** the currency sign hangs from two cords drawn in CSS (`.td-currencies::before/::after` in `theme.css`, a 5 px repeating gradient). That is the rope next to the item above, so this is the most likely target. (The Mine's hoist rope in `mine/render.ts` is the other candidate; confirm with Seth.)
+**Reading:** the currency sign hangs from two cords drawn in CSS (`.td-currencies::before/::after` in `theme.css`, a 5 px repeating gradient). That is the rope next to the item above, Seth confirmed this on 2026-10-27.
 
 **Plan:**
 
 - Replace the gradient strips with pixel-art twisted rope: a small tiling image or inline SVG of diagonal strands (two tones of hemp, dark twist lines, black outline), 6 px wide, with a knot or iron ring where it meets the sign, and the top fading into the dark above.
 - Let the ropes swing with the drop-and-bounce of item 4 (rotate the sign a degree or two and settle), off under Reduce Motion.
-- If Seth means the hoist rope: draw it as a two-pixel twisted rope with alternating strand pixels that scroll while the hoist runs, instead of the current two flat tones.
