@@ -9,6 +9,7 @@ import { oneShot, preloadOneShots, type OneShot } from "./sound-files.ts";
  * plays until the player's first press, which is when browsers let a page
  * make sound. */
 export type Cue =
+  | "spellReady"
   /** The Necromancy spell: a low hollow moan rising, and bones rattling. */
   | "raise"
   /** The Meteor strike: a falling roar sweeping down as it comes in. */
@@ -260,6 +261,7 @@ const CUES: Partial<Record<Cue, (t: number) => void>> = {
       noise(t + dt, 0.025, 0.12, 6000, 2, 0.3);
     }
   },
+  spellReady(t) { bell(2637,t,.035,.28); },
   chime(t) {
     const v = vary(20);
     bell(1318 * v, t, 0.12, 1.1);

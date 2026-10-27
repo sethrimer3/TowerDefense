@@ -1,4 +1,5 @@
 /** Siege controls over the native two-sided Defend battle. */
+import { SpellBar,STRIKE_SPELLS,castStrike } from '../ui/spell-bar.ts';
 import type { Save } from '../save.ts';
 import { DefendRenderer } from '../defend/render.ts';
 import { BoardPointers } from '../defend/board-pointers.ts';
@@ -11,19 +12,21 @@ import { CampaignSim } from './sim.ts';
 export type CampaignHost={save:()=>Save;store:()=>void;editProfile?:()=>void;levelSelect?:()=>void};
 export class CampaignPage {
  sim:CampaignSim;private readonly canvas=document.createElement('canvas');private readonly renderer:DefendRenderer;private readonly pointers:BoardPointers;
- private last=0;private now=0;private paused=false;private rewarded=false;private inspection:number|undefined;private spell:string|undefined;private notice='';private freshCamera=true;
+ private last=0;private now=0;private paused=false;private rewarded=false;private inspection:number|undefined;private spellBar?:SpellBar;private notice='';private freshCamera=true;
  constructor(private root:HTMLElement,readonly mode:'siege',private host:CampaignHost){
   if(host.save().siege?.raid.state==='started')settleRaid(host.save().siege!,false);
   this.sim=this.make();this.renderer=new DefendRenderer(this.canvas);
   this.canvas.setAttribute('aria-label','Enemy castle and infantry muster ground');
   this.pointers=new BoardPointers({renderer:()=>this.renderer,pickUp:()=>false,drop:()=>{},tap:e=>this.tap(e)});
-  this.canvas.onpointerdown=e=>this.pointers.down(e);this.canvas.oncontextmenu=e=>e.preventDefault();
+  this.canvas.onpointerdown=e=>this.pointers.down(e);
+  this.canvas.onpointermove=e=>{if(this.spellBar){const p=this.renderer.toCell(e.clientX,e.clientY);this.spellBar.point={x:p.fx,y:p.fy};}};
+  this.root.addEventListener('keydown',e=>{if(e.key==='Escape')this.spellBar?.cancel();});this.canvas.oncontextmenu=e=>e.preventDefault();
   this.canvas.addEventListener('wheel',e=>{e.preventDefault();this.renderer.zoomAt(e.clientX,e.clientY,Math.exp(-e.deltaY*.0015));},{passive:false});
  }
  private make(){const s=this.host.save();s.siege??=newSiege(crypto.getRandomValues(new Uint32Array(1))[0]);return new CampaignSim('siege',0,[],s.defend.owned,s.defend.levels,s.siege.raid.castle,s);}
  show(){this.last=0;if(this.sim.phase==='build')this.sim=this.make();this.render();}
- pause(){this.last=0;this.pointers.end();}
- reset(){this.pause();this.sim=this.make();this.paused=false;this.rewarded=false;this.spell=undefined;this.inspection=undefined;this.notice='';this.freshCamera=true;this.render();}
+ pause(){this.last=0;this.pointers.end();this.spellBar?.cancel();}
+ reset(){this.pause();this.sim=this.make();this.paused=false;this.rewarded=false;this.spellBar?.cancel();this.inspection=undefined;this.notice='';this.freshCamera=true;this.render();}
  private render(){
   this.pointers.end();const s=this.host.save(),siege=s.siege!,raid=siege.raid,profile=s.profile,finished=raid.state==='won'||raid.state==='lost';
   this.root.classList.add('native-campaign');
@@ -47,9 +50,7 @@ export class CampaignPage {
   const kinds=[...new Set(this.sim.layout.map(b=>b.kind))];
   this.root.querySelector('.campaign-roster')!.innerHTML=kinds.map(kind=>'<div class="siege-building"><canvas width="48" height="48" data-kind="'+kind+'"></canvas><span>'+STRUCTURES[kind].name+'</span><small>'+this.sim.layout.filter(b=>b.kind===kind).length+' deployed</small></div>').join('')||'<p>No infantry buildings owned. Buy a Melee Guild or Ranged Guild in Tiles.</p>';
   this.root.querySelectorAll<HTMLCanvasElement>('[data-kind]').forEach(c=>paintIcon(c,c.dataset.kind as PaletteItem));
-  const b=this.sim.engine.bonuses,skills=[['meteor','Meteor',b.meteor],['frost','Frost nova',b.frostNova],['reinforce','Reinforcements',b.reinforcements],['necro','Necromancy',b.necromancy]];
-  this.root.querySelector('.campaign-spells')!.innerHTML=skills.filter(x=>x[2]).map(([id,name])=>'<button data-spell="'+id+'">'+name+'</button>').join('');
-  this.root.querySelectorAll<HTMLButtonElement>('[data-spell]').forEach(button=>button.onclick=()=>this.spell=button.dataset.spell);
+  this.spellBar=new SpellBar(STRIKE_SPELLS.filter(spell=>this.sim.engine.bonuses[spell]));this.root.querySelector('.campaign-spells')!.remove();this.root.querySelector('.campaign-board')!.append(this.spellBar.el);
   this.refresh();this.draw();
  }
  frame(now:number){
@@ -61,12 +62,12 @@ export class CampaignPage {
   const s=this.sim;
   this.root.querySelector('.campaign-status')!.textContent=this.notice||(s.phase==='build'?s.layout.length+' infantry buildings deployed. Start the raid to release their troops.':s.phase==='won'?'Victory! The keep has fallen.':s.phase==='lost'?'Defeat. Rebuild your formation and try again.':(this.paused?'Paused · ':'')+'Keep '+Math.ceil(s.raid.defense.keepHp())+'/'+Math.ceil(s.raid.defense.keepMaxHp())+' · '+s.allies.length+' troops · '+Math.max(0,240-Math.floor(s.elapsed))+'s');
   this.root.querySelector<HTMLButtonElement>('[data-action="start"]')!.disabled=s.phase==='won'||s.phase==='lost';
-  const remaining:Record<string,number>={meteor:s.engine.meteorRemaining,frost:s.engine.frostRemaining,reinforce:s.engine.reinforceRemaining,necro:s.engine.necroRemaining};
-  this.root.querySelectorAll<HTMLButtonElement>('[data-spell]').forEach(b=>{b.disabled=s.phase!=='battle'||remaining[b.dataset.spell!]>0;b.setAttribute('aria-pressed',String(this.spell===b.dataset.spell));});
+  this.spellBar?.update(s.engine,s.phase==='battle',this.host.save().settings.reduceMotion);
+
  }
  private tap(e:PointerEvent){
   const p=this.renderer.toCell(e.clientX,e.clientY),at={x:p.fx,y:p.fy},s=this.sim.engine;
-  if(this.spell&&this.sim.phase==='battle'){const cast=this.spell==='meteor'?s.castMeteor(at):this.spell==='frost'?s.castFrostNova(at):this.spell==='reinforce'?s.castReinforcements(at):s.castNecromancy(at)>=0;if(cast)this.spell=undefined;return;}
+  if(this.spellBar?.armed&&this.sim.phase==='battle'){if(castStrike(s,this.spellBar.armed,at))this.spellBar.cancel();return;}
   this.inspection=this.sim.map.buildings.find(b=>!b.hidden&&p.fx>=b.rect.x&&p.fx<b.rect.x+b.rect.w&&p.fy>=b.rect.y&&p.fy<b.rect.y+b.rect.h)?.id;
  }
  private draw(){
@@ -74,6 +75,6 @@ export class CampaignPage {
   const sim=this.sim.renderSim,settings=this.host.save().settings,looks:Record<number,string>={};
   for(const b of this.sim.map.buildings){const paths=b.structureUid!==undefined?sim.bonuses.structurePaths?.[b.structureUid]:undefined;if(paths){const look=artLook(b.kind,Object.values(paths)[0]?.path);if(look)looks[b.structureUid!]=look;}}
   const owner=this.inspection!==undefined&&this.sim.raid.field.defenderIds.has(this.inspection)?this.sim.raid.defense:this.sim.engine;
-  r.draw(this.sim.map,sim,null,{area:'moss',grid:0,weather:null,night:0,now:this.now,reduceMotion:settings.reduceMotion,effects:!settings.effectsOff,healthbars:settings.showHealthbars,simpleEnemies:settings.simpleEnemies,simpleTroops:settings.simpleTroops,mergedOutlines:settings.mergedOutlines,looks,...(this.inspection!==undefined?{inspect:{id:this.inspection,armed:owner}}:{})});
+  r.draw(this.sim.map,sim,this.spellBar?.overlay(this.sim.engine)??null,{area:'moss',grid:0,weather:null,night:0,now:this.now,reduceMotion:settings.reduceMotion,effects:!settings.effectsOff,healthbars:settings.showHealthbars,simpleEnemies:settings.simpleEnemies,simpleTroops:settings.simpleTroops,mergedOutlines:settings.mergedOutlines,looks,...(this.inspection!==undefined?{inspect:{id:this.inspection,armed:owner}}:{})});
  }
 }

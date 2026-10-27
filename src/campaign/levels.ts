@@ -5,7 +5,7 @@ import { dist } from '../exact.ts';
 export type LevelPoint = { x: number; y: number };
 export type AmbushLevel = { id: string; area: AreaId; zone: number; index: number; name: string; seed: number };
 export type Stars = 0 | 1 | 2 | 3;
-export type AmbushProgress = { stars: Partial<Record<string, Stars>> };
+export type AmbushProgress = { stars: Partial<Record<string, Stars>>; autoSend?: true };
 const names = [
  ['Old Road', 'Mossy Ford', 'Ruin Gate'], ['Sandway', 'Sunken Well', 'Amber Pass'],
  ['Cinder Road', 'Slag Crossing', 'Forge Gate'], ['Tidal Road', 'Coral Crossing', 'Temple Gate'],
@@ -27,12 +27,13 @@ export function recordStars(progress: AmbushProgress, level: AmbushLevel, stars:
 export function decodeAmbush(raw: unknown): AmbushProgress {
  const out: AmbushProgress = { stars: {} };
  if (!raw || typeof raw !== 'object') return out;
- const value = raw as { stars?: Record<string, unknown>; cleared?: number };
+ const value = raw as { stars?: Record<string, unknown>; cleared?: number; autoSend?: unknown };
  if (value.stars && typeof value.stars === 'object') {
   for (const level of AMBUSH_LEVELS) { const n = value.stars[level.id]; if (Number.isInteger(n) && Number(n) >= 1 && Number(n) <= 3) out.stars[level.id] = n as Stars; }
  } else if (Number.isInteger(value.cleared)) {
   for (let i = 0; i < Math.max(0, Math.min(3, value.cleared!)); i++) out.stars[AMBUSH_LEVELS[i].id] = 1;
  }
+ if(value.autoSend===true)out.autoSend=true;
  return out;
 }
 export function pointAlong(points: readonly LevelPoint[], fraction: number): LevelPoint {

@@ -19,7 +19,7 @@ export class AmbushSim {
  readonly field;readonly level;readonly engine:DefendSim;readonly grid:AmbushGrid;readonly outposts:Outposts;readonly waves;
  readonly buildings:AmbushBuilding[]=[];
  phase:'build'|'battle'|'won'|'lost'='build';
- gold:number;goldEarned=0;kills=0;wave=0;elapsed=0;
+ gold:number;goldEarned=0;kills=0;wave=0;elapsed=0;autoSend=false;speed:1|2|3=1;waveStarted=0;
  private lots:number[]=[];private sequence=0;private acc=0;private queue:EnemyKind[]=[];private spawnClock=0;private between=2;
  private bonus:Bonuses;
  constructor(readonly index:number,game:Save){
@@ -40,7 +40,7 @@ export class AmbushSim {
    this.gold+=gold;this.goldEarned+=gold;this.kills++;
   }};
   this.grid=new AmbushGrid(map,this.level.area,this.field.road,this.field.castle,this.field.outposts.map(p=>p.rect),true);
-  this.gold=startingGold(this.level.index);
+  this.gold=startingGold(this.level.index);this.autoSend=game.campaigns.ambush.autoSend===true;this.speed=Math.min(game.defend.battleSpeed,game.defend.speed3?3:2) as 1|2|3;
  }
  get map(){return this.engine.map;}
  get stars(){return this.outposts.stars as Stars;}
@@ -67,20 +67,22 @@ export class AmbushSim {
   const i=this.buildings.findIndex(b=>b.id===id);if(i<0||!['build','battle'].includes(this.phase))return false;
   const b=this.buildings[i];this.gold+=this.refund(id);this.engine.configureLot(id,b.kind,buildingRect(b),false);this.buildings.splice(i,1);this.replan();return true;
  }
- start(){if(this.phase!=='build'||!this.buildings.length)return false;this.phase='battle';this.nextWave();return true;}
+ get canSend(){return ['build','battle'].includes(this.phase)&&!this.queue.length&&this.wave<AMBUSH_WAVES.count;}
+ send(){if(!this.canSend||this.phase==='build'&&!this.buildings.length)return false;this.phase='battle';this.nextWave();return true;}
+ start(){return this.phase==='build'&&this.send();}
  private replan(){for(const rect of this.outposts.replan(this.buildings))this.grid.refreshTown(rect);}
  private nextWave(){
-  this.wave++;const wave=this.waves[this.wave-1];this.queue=[...wave.kinds];this.engine.beginManualWave(this.level.zone*20+this.wave,wave.budget,this.queue.length);this.spawnClock=0;this.between=2;
+  this.wave++;const wave=this.waves[this.wave-1];this.queue=[...wave.kinds];this.engine.beginManualWave(this.level.zone*20+this.wave,wave.budget,this.queue.length);this.spawnClock=0;this.between=AMBUSH_WAVES.breakSeconds;this.waveStarted=this.elapsed;
  }
  step(dt:number){
-  if(this.phase!=='battle'||!Number.isFinite(dt)||dt<=0)return;this.acc+=Math.min(.25,dt);
+  if(this.phase!=='battle'||!Number.isFinite(dt)||dt<=0)return;this.acc+=Math.min(.25,dt)*this.speed;
   while(this.acc>=1/30&&this.phase==='battle'){this.acc-=1/30;this.tick(1/30);}
  }
  private tick(dt:number){
   this.elapsed+=dt;this.spawnClock-=dt;
-  if(this.queue.length&&this.spawnClock<=0){const e=this.field.path[0];this.engine.releaseEnemy(this.queue.shift()!,{x:Math.max(.5,e.x),y:Math.max(.5,e.y)});this.spawnClock=.7;}
+  if(this.queue.length&&this.spawnClock<=0){const e=this.field.path[0];this.engine.releaseEnemy(this.queue.shift()!,{x:Math.max(.5,e.x),y:Math.max(.5,e.y)});this.spawnClock=AMBUSH_WAVES.spawnGap;}
   this.engine.step(dt);this.outposts.update();
   if(this.engine.keepHp()<=0)this.phase='lost';
-  else if(!this.queue.length&&!this.engine.enemies.length){if(this.wave===3)this.phase='won';else if((this.between-=dt)<=0)this.nextWave();}
+  else if(!this.queue.length&&!this.engine.enemies.length){if(this.wave===AMBUSH_WAVES.count)this.phase='won';else if(this.autoSend&&(this.between-=dt)<=0)this.nextWave();}
  }
 }

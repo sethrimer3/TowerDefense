@@ -616,3 +616,6 @@ The Ambush gold paid once for defeating an enemy, based on that enemy's combat d
 
 - **Outpost breach**: the first ground enemy body entering a fenced outpost. Its health then follows the fraction of its original houses still standing.
 - **Flier warning**: a red dotted route from the track entrance to the keep, with a ring and exclamation mark, warning that an upcoming wave includes flying enemies.
+
+- **Auto-send**: an optional Ambush control that sends the next wave after the field is clear and the break ends. Sending early awards no bonus.
+- **Strike quick bar**: round spell icons on the board; choose a spell, then tap its target. Choosing it again cancels.
