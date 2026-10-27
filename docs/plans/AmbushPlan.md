@@ -45,6 +45,12 @@ Almost all of this is replaced. Keep the good parts: Ambush runs the real `Defen
 - Along the track stand **three settlements**: **Outpost 1** about a third of the way along, **Outpost 2** about two thirds along, and the **keep** at the end.
 - **Outposts** are small generated towns (houses, streets, parks, exactly the seamless look of the screenshot) with a **fence round them** that also **crosses the track**. Enemies must break the fence where it crosses, and once inside they **destroy every building of the outpost before moving on** down the track.
 - The **keep** sits at the end of the track inside a **castle wall** (Defend's wall stones) with its surrounding houses. Nothing can be built on that wall or inside it.
+- **Flying enemies** ignore the track and the outposts and fly in a straight line from the level's entry point to the keep (Seth, 2026-10-27). They are the main threat to the keep itself, so anti-air near the keep matters.
+- **Flier warning**: when the next wave contains fliers, show a warning before it starts (during the break, or as soon as the previous wave's spawning ends):
+  - a **pixel-art red dotted line** from the level's opening (the track's edge entry) straight to the keep, its dots marching toward the keep;
+  - a **red circle round the keep** that expands outward and fades, repeating;
+  - a **red exclamation mark** popping in at the start of the line, at the entry point.
+  All of it is board art with black-outlined pixels, drawn in the overlay pass (not the cached city layer), stays up until the fliers have spawned, and under Reduce Motion is drawn still (no marching dots, a single static ring). Put it in `campaign/flier-warning.ts`; the wave table says whether a wave has fliers (`ENEMIES[kind].flying`).
 - Everything else is a free **build grid**, like Defend's quarter-tile grid. Buildings cannot go on **water**, the **track**, **rocks/boulders**, the **keep**, its **castle wall or castle area**. They **can** go over **outpost houses**: the outpost re-plans its houses round the new building (see Outposts below).
 
 ### HUD
@@ -58,7 +64,7 @@ Almost all of this is replaced. Keep the good parts: Ambush runs the real `Defen
 
 ### Stars
 
-- A level is won when all 20 waves are cleared and the keep still stands. Stars (confirmed by Seth):
+- A level is won when all 20 waves are cleared and the keep still stands. If the keep falls the level is over at once: zero stars and no completion, even if outposts are still standing. Stars (confirmed by Seth):
   - keep standing, both outposts standing: **3/3**;
   - keep standing, one outpost standing: **2/3**;
   - keep standing, no outposts: **1/3**;
@@ -77,7 +83,7 @@ Almost all of this is replaced. Keep the good parts: Ambush runs the real `Defen
   - a **portrait** of the building (the palette icon, drawn larger, in its current look);
   - stats: **kills**, **total damage**, **average DPS this wave**;
   - **upgrade options**: every next step in its Knowledge tree (`nextSteps` in `src/specializations.ts`: attunement, branch attunement, the 3 ranks), each with a **gold** price; buying one changes the building in place, exactly as Defend's tree does, but paid in Ambush gold and only for this level;
-  - at the very bottom, **Sell** with the refund shown: **70% of all gold put into the building** (purchase plus every upgrade), rounded down to tens. (Today's "full refund before waves" rule is dropped unless Seth wants it kept; see Open questions.)
+  - at the very bottom, **Sell** with the refund shown: **70% of all gold put into the building** (purchase plus every upgrade), rounded down to tens. **Exception (Seth, 2026-10-27): selling before wave 2 starts (in the build phase or during wave 1) refunds everything put in.**
   - tapping the board elsewhere or a close button returns to the palette.
 
 ### The star tree (Ambush's own upgrade tree)
@@ -143,7 +149,7 @@ Each phase is one PR. Earlier phases leave the game playable. Phases 0 to 8 belo
 
 ### Phase 3: Free build grid
 
-- `campaign/ambush-grid.ts`: a `blocked` mask (water, road, rocks/boulders, keep, castle wall and castle interior, the spawn edge) and `placeAt(kind, qx, qy)` / `moveTo` / `remove` over quarter tiles (2 × 2 cells) using `footprint` from `catalog.ts`. Two player buildings may not overlap. Default: no clear ring between them (Defend's ring exists for its street generation; ask Seth if he wants it).
+- `campaign/ambush-grid.ts`: a `blocked` mask (water, road, rocks/boulders, keep, castle wall and castle interior, the spawn edge) and `placeAt(kind, qx, qy)` / `moveTo` / `remove` over quarter tiles (2 × 2 cells) using `footprint` from `catalog.ts`. Two player buildings may not overlap, and every building keeps **Defend's one-quarter clear ring** round it (Seth, 2026-10-27): reuse `layout.ts`'s ring check and `drawFootprint`'s dashed ring so the rule and its preview match Defend's.
 - Placement over outpost houses is allowed here; the outpost re-plan is phase 4. Until then, refuse outpost cells.
 - Use `BoardPointers` + `EditSession`-style transaction for drags; draw the quarter grid and green/red footprint with `edit-overlay.ts` while dragging.
 - `DefendSim.configureLot` already adds buildings mid-battle; add a matching `removeLot`/reuse `configureLot(…, false)` for selling, and make sure troop garrisons, rally points and timers of a removed building go with it (today's behaviour for lots).
@@ -157,7 +163,8 @@ Each phase is one PR. Earlier phases leave the game playable. Phases 0 to 8 belo
 - **Keep castle**: the keep plus its houses inside a ring of Defend wall stones (`wall` mask in `generateCity`), the track ending at a gate or a breach point in the wall. Its cells are all in `blocked`.
 - **Re-plan on build**: when the player places a building over an outpost, regenerate that outpost's houses with the player's building passed to `generateCity` as a structure, so houses rearrange round it (deterministic for the same layout). Record the outpost's **initial** house count at level start; covered houses simply no longer exist.
 - **Outpost HP**: `breached ? standing / initial : 1`, where `breached` latches true the first time any enemy (or its body cell) is inside the outpost's area. So a player who covers every house still shows 100% until an enemy walks in, then it drops to 0 and the outpost falls at once, as Seth described. `standing` counts houses with HP > 0.
-- **Enemy behaviour** (`routeEnemy` hook): an enemy following the track that reaches a live outpost leaves the track and goes for the nearest standing outpost building (Defend's smash behaviour: attack the building it is next to, use the flow field to reach it); once the outpost has fallen, it returns to the nearest track point and carries on. At the keep, enemies attack the keep (and whatever blocks them) as in Defend. Fliers ignore fences but still raze the outpost first (default, see open question 3). Keep all of this in `campaign/`, calling public sim helpers; do not branch Defend's enemy code on mode.
+- **Enemy behaviour** (`routeEnemy` hook): an enemy following the track that reaches a live outpost leaves the track and goes for the nearest standing outpost building (Defend's smash behaviour: attack the building it is next to, use the flow field to reach it); once the outpost has fallen, it returns to the nearest track point and carries on. At the keep, enemies attack the keep (and whatever blocks them) as in Defend. **Fliers** ignore the track, the fences and the outposts entirely and fly straight from the entry point to the keep (see Flying enemies). Keep all of this in `campaign/`, calling public sim helpers; do not branch Defend's enemy code on mode.
+- **Fliers**: a flier skips `followRoad`'s track and outposts and moves straight at the keep from wherever it spawned (the entry point), attacking the keep (or anything in its way, as Defend's fliers do) on arrival. Build the flier warning (`campaign/flier-warning.ts`, see The board) in this phase, with a Node test that flags exactly the waves containing fliers and a browser screenshot of the line, ring and exclamation mark at both widths.
 - Remove `lives`; leaking past the keep is impossible because the track ends there.
 - Tests: outpost geometry stays on the board and straddles the track; HP formula including the "covered everything" case; enemies raze then move on; keep falls → defeat; outposts never touch the keep's castle.
 
@@ -176,7 +183,7 @@ Each phase is one PR. Earlier phases leave the game playable. Phases 0 to 8 belo
 - Per-building tallies: kills, total damage, damage this wave and its seconds. `hurtEnemy` already receives `origin.building`; add an optional `tally` sink on the sim (set only by Ambush, absent in Defend, not in the replay hash) that adds damage and kills by building id. Damage over time (burns, blazes, venom) must carry the building id too; audit `origin` on each damage source and fill gaps. Average DPS this wave = damage this wave / seconds since the wave started (or since the building was placed, if later).
 - Building panel UI: portrait, three stats (refreshed at most 4 × a second), upgrade buttons with gold prices (disabled when unaffordable), Sell at the bottom showing 70% of gold invested.
 - Upgrading applies the step to the live building: kind change via `configureLot` with the new kind (garrison retrains as Defend does), path ranks through `bonus.structurePaths[id]`. Must work mid-battle.
-- Tests: refund = floor(0.7 × invested / 10) × 10 including upgrades; upgrade changes the building and its attacks; tallies attribute splash and burns correctly; Defend replay unchanged.
+- Tests: refund is the full investment before wave 2 starts and floor(0.7 × invested / 10) × 10 after, including upgrades; upgrade changes the building and its attacks; tallies attribute splash and burns correctly; Defend replay unchanged.
 
 ### Phase 7: The star tree
 
@@ -194,7 +201,6 @@ Each phase is one PR. Earlier phases leave the game playable. Phases 0 to 8 belo
 - **Range preview while dragging** a tower (Defend's `inspect.ts` circles), and on tapping a placed one.
 - **Wave preview**: the next wave's enemy icons beside Send next wave, so the player can prepare (journal portraits are already painted).
 - **Pause** button and pausing when leaving the tab (exists now; keep it).
-- **Undo last placement** during the build phase before wave 1 (full refund then), separate from the 70% sell rule.
 - **Path danger tint**: faintly mark the track cells covered by at least one tower's range, so gaps in coverage are visible.
 - **First-time hints** instead of the removed "How to play": a one-line toast on the first level ("Drag a tower beside the road", "Tap a tower to upgrade or sell it"), shown once and stored in settings.
 - **Star requirements on the select card** (e.g. three small outpost icons) so players know what a lost star means.
@@ -209,9 +215,10 @@ Seth confirmed on 2026-10-27:
 - Strike spells cast at base strength in Ambush.
 - Ambush gets its own star-funded upgrade tree (see The star tree).
 
-Still open (defaults in brackets; build the default and change it if Seth answers otherwise):
+- Selling before wave 2 starts (build phase or wave 1) gives a full refund; after that, 70%.
+- Ambush keeps Defend's one-quarter clear ring round each building.
+- Flying enemies ignore the track and outposts and fly straight for the keep; a keep loss ends the level with zero stars even if outposts stand. A red dotted line, expanding red ring and exclamation mark warn of fliers in the next wave.
 
-1. Selling before wave 1: full refund (today) or always 70%? [Always 70%, with a free undo of the last placement before wave 1.]
-2. Should Ambush buildings keep Defend's one-quarter clear ring round each building? [No ring.]
-3. Do flying enemies have to raze outposts too? [Yes.]
-4. Which star tree branches and prices? [The suggested list above, tuned in phase 8.]
+Still open:
+
+1. Which star tree branches and prices? [The suggested list above, tuned in phase 8.]
