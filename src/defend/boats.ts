@@ -176,7 +176,7 @@ export function stepBoat(sim: DefendSim, e: Enemy, dt: number) {
       if (boat.decorativeWater) decorativePools.set(e, pool);
     }
   }
-  if(sim.scenario?.routeEnemy?.(e,dt))return;
+  if (sim.scenario?.routeEnemy?.(e, dt)) return;
   // Monster bait calls a boat too: the nearest stack while any stands.
   const keep = sim.baits.length ? lureOf(sim, e.x, e.y) : sim.keep, half = def.size / 2;
   if (rectDist(keep.rect, e.x, e.y) <= half + 0.4) return ram(sim, e, keep.id);

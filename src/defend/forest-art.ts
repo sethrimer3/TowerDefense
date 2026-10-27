@@ -833,9 +833,13 @@ export class ForestArt {
   /** A scenario foundation clears trees through the existing forest art state. */
   clearBuilding(rect: Rect) {
     if (!this.damage) return;
-    const x=rect.x+rect.w/2,y=rect.y+rect.h/2,r=Math.sqrt(rect.w*rect.w+rect.h*rect.h)/2+.5;
-    this.damage.blast(x,y,r,0);
-    this.bare(x,y,r);this.dirty=true;this.floorStale=[WHOLE];
+    const x = rect.x + rect.w / 2,
+      y = rect.y + rect.h / 2,
+      r = Math.sqrt(rect.w * rect.w + rect.h * rect.h) / 2 + 0.5;
+    this.damage.blast(x, y, r, 0);
+    this.bare(x, y, r);
+    this.dirty = true;
+    this.floorStale = [WHOLE];
   }
 
   /** Brings down the trees the battle's attacks reach (struck apart, blown

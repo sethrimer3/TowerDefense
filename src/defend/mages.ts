@@ -12,7 +12,7 @@ import { bannerDamage } from "./war-banner.ts";
 import { dist } from "../exact.ts";
 import { EMBER_SHARE, ENEMIES, FIRE_MAGE, FIREBALL_SPEED, emberDps, emberSeconds, fireballSplash } from "./catalog.ts";
 import { cellCenter, findPath, nearest } from "./pathing.ts";
-import type { DefendSim, Soldier, Arrow } from "./sim.ts";
+import type { DamageOrigin, DefendSim, Soldier, Arrow } from "./sim.ts";
 import { answerBanner } from "./war-banner.ts";
 import { CELL_COUNT } from "./grid.ts";
 import { fizzles, sheltered } from "./boats.ts";
@@ -24,7 +24,7 @@ import { ignite } from "./towers.ts";
 export type Fireball = { x0: number; y0: number; x1: number; y1: number; t: number; dur: number; damage: number; r: number; origin?: Arrow["origin"]; home?: number; fire?: { life: number; dps: number; cling: number }; frost?: { speed: number; chill: number; freeze: number } };
 /** Burning ground a fireball left: its centre and radius, how long it has
  * burned of its `life`, its damage a second, and a seed for how it looks. */
-export type Blaze = { x: number; y: number; r: number; t: number; life: number; dps: number; seed: number; mortar?: boolean; origin?: Arrow["origin"]; cling?: boolean; clingFor?: number; credit?:import("./sim.ts").DamageOrigin };
+export type Blaze = { x: number; y: number; r: number; t: number; life: number; dps: number; seed: number; mortar?: boolean; origin?: Arrow["origin"]; cling?: boolean; clingFor?: number; credit?: DamageOrigin };
 
 /** Mages throw at the nearest enemy in reach; otherwise they stroll to a
  * random street. */
@@ -97,9 +97,9 @@ export function stepFireballs(sim: DefendSim, dt: number) {
     const level = sim.levels.mageEmbers ?? 0;
     const life = f.fire?.life ?? emberSeconds(level), dps = f.fire?.dps ?? emberDps(level) * sim.bonuses.troopDamage;
     if (f.fire) for (const e of sim.enemiesNear(f.x1, f.y1, f.r))
-      if (e.hp > 0 && dist(e.x - f.x1, e.y - f.y1) <= f.r && !sheltered(sim, e.x, e.y)) ignite(e, dps, f.fire.cling,sim.tallyOrigin(f.origin));
+      if (e.hp > 0 && dist(e.x - f.x1, e.y - f.y1) <= f.r && !sheltered(sim, e.x, e.y)) ignite(e, dps, f.fire.cling, sim.tallyOrigin(f.origin));
     sim.blazes.push({ x: f.x1, y: f.y1, r: f.r * (f.fire ? 1 : EMBER_SHARE), t: 0, life, dps, seed,
-      ...(f.fire ? { clingFor: f.fire.cling, origin: f.origin } : sim.tally&&f.origin ? {credit:sim.tallyOrigin(f.origin)} : {}) });
+      ...(f.fire ? { clingFor: f.fire.cling, origin: f.origin } : sim.tally && f.origin ? { credit: sim.tallyOrigin(f.origin) } : {}) });
   }
   sim.fireballs = sim.fireballs.filter((f) => f.t < f.dur);
 }
@@ -112,7 +112,7 @@ export function stepBlazes(sim: DefendSim, dt: number) {
       if (ENEMIES[e.kind].flying || sheltered(sim, e.x, e.y)) continue;
       sim.hurtEnemy(e, b.dps * dt, false, "ranged", b.origin ?? b, false, "fire", 0, b.credit);
       // Clinging fire: it keeps burning after it walks out.
-      if (b.clingFor || b.cling) ignite(e, b.dps, b.clingFor ?? 2,sim.tallyOrigin(b.credit??b.origin));
+      if (b.clingFor || b.cling) ignite(e, b.dps, b.clingFor ?? 2, sim.tallyOrigin(b.credit ?? b.origin));
     }
   }
   sim.blazes = sim.blazes.filter((b) => b.t < b.life);

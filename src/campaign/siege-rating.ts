@@ -2,7 +2,7 @@
 export const INITIAL_MMR = 1000;
 export const MIN_MMR = 100;
 export const MAX_MMR = 3000;
-export const RULESET = 'siege-v1';
+export const RULESET = "siege-v1";
 export const rating = (value: number) => Math.max(MIN_MMR, Math.min(MAX_MMR, Math.round(Number.isFinite(value) ? value : INITIAL_MMR)));
 export const expectedWin = (attacker: number, defender: number) => 1 / (1 + 10 ** ((defender - attacker) / 400));
 export function raidRating(attacker: number, defender: number, games: number, won: boolean) {

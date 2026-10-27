@@ -296,7 +296,10 @@ function paintBuilding(p: Paint, b: Building) {
     h = Math.round((r.y + r.h) * px) - y;
   const box = { x, y, w, h, px };
   if (b.kind === "wall") {
-    if(b.fence){if(solid(b.cells[0]))drawFenceSections(c,px,[{...b.fence,broken:false}]);return;}
+    if (b.fence) {
+      if (solid(b.cells[0])) drawFenceSections(c, px, [{ ...b.fence, broken: false }]);
+      return;
+    }
     if (solid(b.cells[0])) paintWall(p, b);
     else if (hasWallArt(p.area) || !paintPixelRubble(p, b)) paintArt(p, wallRubbleSprite(lotSeed(b), p.area), box);
     return;
