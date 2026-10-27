@@ -1,6 +1,8 @@
 import type { TranslationRow } from "./languages.ts";
 /** key, English, Spanish, French, German, Portuguese, Italian, Japanese, Korean, Chinese. */
 export const CORE = [
+ ["nav.ambush","Ambush","Emboscada","Embuscade","Hinterhalt","Emboscada","Imboscata","待ち伏せ","매복","伏击"],
+ ["nav.siege","Siege","Asedio","Siège","Belagerung","Cerco","Assedio","攻城","공성","围攻"],
  ["nav.defend","Defend","Defender","Défense","Verteidigen","Defender","Difendi","防衛","방어","防守"],
  ["nav.mine","Mine","Mina","Mine","Mine","Mina","Miniera","鉱山","광산","矿山"],
  ["nav.library","Library","Biblioteca","Bibliothèque","Bibliothek","Biblioteca","Biblioteca","図書館","도서관","图书馆"],

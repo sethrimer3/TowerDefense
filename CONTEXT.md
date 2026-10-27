@@ -4,6 +4,18 @@ The domain glossary: the words the game, its code and its docs use. Terms only, 
 
 ## Language
 
+**Combat mode**:
+One of Defend, Ambush or Siege, selected through the shared combat tab.
+
+**Ambush**:
+A fixed-level tower-defense mode: enemies follow a road, while towers and infantry buildings occupy spaces alongside it.
+
+**Siege**:
+An assault mode: infantry trained by the player's buildings raid enemy castles and their guards.
+
+**Muster space**:
+A building space where an infantry building trains troops for a Siege assault.
+
 ### The board
 
 **Tile**:
@@ -562,3 +574,21 @@ The Archer Tower ultimate formed from its fully upgraded Fire, Hawk and Wisp att
 
 **Divine Arrow**:
 The Ultimate Archer Tower’s piercing golden shot, charged by incompatible incoming attacks and emptied on firing.
+
+**Attack MMR**:
+The player's Siege rating, based on rated raid wins and losses.
+
+**Castle defense rating**:
+The estimated or learned difficulty of raiding a specific castle revision, separate from its owner's attack rating.
+
+**Castle snapshot**:
+A fixed revision of a castle and its defenses used for a raid.
+
+**Rated raid**:
+A Siege assault that can change attack MMR once. Replaying its completed target is practice.
+
+**Player profile**:
+The player's chosen name and custom flag, displayed in Siege.
+
+**Flag stamp**:
+A colored pixel pattern layered over a flag's background or earlier stamps.

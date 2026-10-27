@@ -1,3 +1,6 @@
+import { decodeProfile, type PlayerProfile } from "./profile/model.ts";
+import { decodeSiege, type SiegeSave } from "./campaign/siege-progress.ts";
+import { decodeCampaigns, type CampaignSave } from "./campaign/sim.ts";
 /** The one save, kept in localStorage under its own key (another game served
  * from the same site never shares it). Loading is defensive: `defaults()`
  * defines every field, and `decode()` keeps only what is well formed. */
@@ -57,6 +60,10 @@ export type Save = {
   forgeJob: ForgeJob | null;
   forgeClock: number;
   defend: DefendSave;
+  /** Optional so existing saves retain their original shape. */
+  campaigns?: CampaignSave;
+  siege?: SiegeSave;
+  profile?: PlayerProfile;
   /** The mine as last saved (null until it first runs). */
   mine: MineSave | null;
   /** The library's shelves, books, ladders and librarians (null until it first shows). */
@@ -126,6 +133,11 @@ export function decode(raw: string | null): Save {
   d.trainingJobs = decodeJobs(s.trainingJobs, d.training);
   d.trainingClock = num(s.trainingClock, 0);
   d.defend = decodeDefendSave(s.defend);
+  const profile = decodeProfile(s.profile);
+  if (profile) d.profile = profile;
+  if (s.campaigns !== undefined) d.campaigns = decodeCampaigns(s.campaigns);
+  const siege = decodeSiege(s.siege);
+  if (siege) d.siege = siege;
   const found = decodeFound(s.defend?.upgradesFound);
   if (found) d.defend.upgradesFound = found;
   // Migrate existing paths, ranks and paid Knowledge exactly once. Crowned

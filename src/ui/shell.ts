@@ -19,5 +19,5 @@ const nav = () => `<nav aria-label="${t("nav.label")}" data-i18n-aria-label="nav
 /** Builds the page skeleton into `app`: currencies, the pages, navigation
  * and the shared dialog. */
 export function buildShell(app: HTMLElement) {
-  app.innerHTML = `<main class="shell">${currencies()}<section id="defend" class="page active"></section><section id="mine" class="page descent-page">${descentHtml("mine")}</section><section id="library" class="page descent-page">${descentHtml("library")}</section><section id="tiles" class="page"></section><section id="settings" class="page"></section>${nav()}</main><dialog id="modal"></dialog>`;
+  app.innerHTML = `<main class="shell">${currencies()}<section id="defend" class="page active"></section><section id="ambush" class="page"></section><section id="siege" class="page"></section><section id="mine" class="page descent-page">${descentHtml("mine")}</section><section id="library" class="page descent-page">${descentHtml("library")}</section><section id="tiles" class="page"></section><section id="settings" class="page"></section>${nav()}</main><dialog id="modal"></dialog>`;
 }

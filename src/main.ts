@@ -1,3 +1,4 @@
+import { ProfileEditor } from "./profile/editor.ts";
 import "./style.css";
 import "./theme.css";
 import { defaults, load, persist, type Save } from "./save.ts";
@@ -10,6 +11,8 @@ import { settleForge } from "./forge-jobs.ts";
 import type { AppContext } from "./ui/app.ts";
 import { el, type Tab } from "./ui/dom.ts";
 import { buildShell } from "./ui/shell.ts";
+import { CampaignPage } from "./campaign/ui.ts";
+import { CombatTab, nextCombatMode, type CombatMode } from "./ui/combat-tab.ts";
 import { Ledger } from "./ui/ledger.ts";
 import { TilesPage } from "./ui/tiles-page.ts";
 import { Chamber, Descent } from "./ui/chamber.ts";
@@ -49,6 +52,7 @@ onPixelArt(() => {
   });
 });
 let tab: Tab = "defend";
+let combatMode: CombatMode = "defend";
 const clock = () => Date.now();
 const modal = el("modal") as HTMLDialogElement;
 const ctx: AppContext = {
@@ -64,6 +68,7 @@ const ctx: AppContext = {
   openChamber,
   openTree: (target) => {
     if (!defendPage.canOpenTree()) return false;
+    combatMode = "defend";
     navigate("defend");
     defendPage.openTree(target);
     return true;
@@ -82,12 +87,17 @@ const ctx: AppContext = {
   addIdle,
   eraseAll: () => {
     save = defaults();
+    awayMs = 0;
     minePage.load(null, clock());
     libraryPage.load(null, clock());
+    ambushPage.reset();
+    siegePage.reset();
     update();
+    chooseProfile();
   },
 };
 const reduced = () => save.settings.reduceMotion || matchMedia("(prefers-reduced-motion: reduce)").matches;
+const combatTab = new CombatTab(document.querySelector<HTMLButtonElement>('nav [data-tab="defend"]')!, reduced);
 const tilesPage = new TilesPage(ctx, el("tiles"));
 /** The rooms below the Mine and the Library, and the way down to each. */
 const smithyRoom = new Chamber(el("mine-chamber"), "planks"), studyRoom = new Chamber(el("library-chamber"), "vault");
@@ -133,6 +143,9 @@ const defendPage = new DefendPage(el("defend"), {
   devMode: () => save.settings.developerMode,
   openTiles: () => navigate("tiles"),
 });
+
+const ambushPage = new CampaignPage(el("ambush"), "ambush", { save: () => save, store });
+const siegePage = new CampaignPage(el("siege"), "siege", { save: () => save, store, editProfile: () => chooseProfile() });
 
 const minePage = new MinePage(el("mine-world"), {
   metals: () => save.smithy,
@@ -197,6 +210,15 @@ const welcome = new WelcomeBack(modal, () => ({
   crew: minePage.sim.miners.length,
   owedMs: minePage.owedMs,
 }));
+
+const profileEditor = new ProfileEditor();
+function chooseProfile() {
+  const first = !save.profile;
+  profileEditor.open(save.profile, profile => { save.profile = profile; update(); }, () => {
+    renderPage();
+    if (first) welcome.show();
+  });
+}
 
 /** Dev: bank idle time for both simulations. Their gains appear as they
  * fast-forward; the welcome screen keeps the running account. */
@@ -264,9 +286,12 @@ function refreshCurrencies() {
 function update() {
   store();
   refreshCurrencies();
+  combatTab.render(combatMode, tab === "defend");
 }
 function renderPage() {
-  if (tab === "defend") defendPage.show();
+  if (tab === "defend" && combatMode === "defend") defendPage.show();
+  if (tab === "defend" && combatMode === "ambush") ambushPage.show();
+  if (tab === "defend" && combatMode === "siege") siegePage.show();
   if (tab === "mine") minePage.show();
   if (tab === "library") libraryPage.show();
   if (tab === "mine" && mineDown.below) smithy.render();
@@ -275,9 +300,11 @@ function renderPage() {
   if (tab === "settings") renderSettingsPage(ctx);
 }
 function navigate(id: Tab) {
-  if (id !== "defend") defendPage.pause();
+  if (id !== "defend" || combatMode !== "defend") defendPage.pause();
+  ambushPage.pause();
+  siegePage.pause();
   tab = id;
-  document.querySelectorAll(".page").forEach((p) => p.classList.toggle("active", p.id === id));
+  document.querySelectorAll(".page").forEach((p) => p.classList.toggle("active", p.id === (id === "defend" ? combatMode : id)));
   document.querySelectorAll<HTMLElement>("[data-tab]").forEach((b) => {
     b.classList.toggle("selected", b.dataset.tab === id);
     b.setAttribute("aria-current", b.dataset.tab === id ? "page" : "false");
@@ -285,7 +312,10 @@ function navigate(id: Tab) {
   renderPage();
   update();
 }
-document.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach((b) => (b.onclick = () => navigate(b.dataset.tab as Tab)));
+document.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach((b) => (b.onclick = () => {
+  if (b.dataset.tab === "defend" && tab === "defend") combatMode = nextCombatMode(combatMode);
+  navigate(b.dataset.tab as Tab);
+}));
 
 /** A golden countdown on the Mine's and the Library's tab buttons while
  * they spend idle time, hidden on the tab that is showing. Both show the
@@ -314,7 +344,9 @@ function frame(time: number) {
   minePage.advance(clock(), libraryPage.owedMs);
   libraryPage.advance(clock(), minePage.owedMs);
   idleTimers();
-  if (tab === "defend") defendPage.frame(time);
+  if (tab === "defend" && combatMode === "defend") defendPage.frame(time);
+  if (tab === "defend" && combatMode === "ambush") ambushPage.frame(time);
+  if (tab === "defend" && combatMode === "siege") siegePage.frame(time);
   // The scene above is drawn only while it is in view, the room below likewise.
   if (tab === "mine" && mineDown.above) minePage.frame(time);
   if (tab === "library" && libraryDown.above) libraryPage.frame(time);
@@ -395,5 +427,6 @@ settleTraining(save, clock(), new Set(smithNames()));
 settleForge(save, clock(), new Set(smithNames()));
 if (settleResearch(save, clock(), libraryPage.sim.count("researcher"))) libraryPage.sim.researched();
 navigate("defend");
-welcome.show();
+if (save.profile) welcome.show();
+else chooseProfile();
 requestAnimationFrame(frame);

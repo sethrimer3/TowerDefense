@@ -1,0 +1,48 @@
+{
+  "ruleset": "siege-v1",
+  "army": "Starter Melee Guild + Ranged Guild, automatic bottom formation, no upgrades",
+  "rows": [
+    {
+      "castleRating": 600,
+      "wins": 30,
+      "raids": 30,
+      "winRate": 1,
+      "averageSeconds": 54
+    },
+    {
+      "castleRating": 800,
+      "wins": 30,
+      "raids": 30,
+      "winRate": 1,
+      "averageSeconds": 80
+    },
+    {
+      "castleRating": 1000,
+      "wins": 7,
+      "raids": 30,
+      "winRate": 0.23333333333333334,
+      "averageSeconds": 116
+    },
+    {
+      "castleRating": 1200,
+      "wins": 0,
+      "raids": 30,
+      "winRate": 0,
+      "averageSeconds": 107
+    },
+    {
+      "castleRating": 1400,
+      "wins": 0,
+      "raids": 30,
+      "winRate": 0,
+      "averageSeconds": 93
+    },
+    {
+      "castleRating": 1600,
+      "wins": 0,
+      "raids": 30,
+      "winRate": 0,
+      "averageSeconds": 88
+    }
+  ]
+}

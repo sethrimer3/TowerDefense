@@ -2296,3 +2296,60 @@ nav button > .tab-idle[hidden] { display: none; }
   image-rendering: pixelated;
   background: #14100b;
 }
+
+/* The shared combat tab clips both icon layers during a mode change. */
+nav button > .combat-tab-icon { display: grid; overflow: hidden; width: 42px; height: 42px; flex: 0 0 auto; }
+.combat-icon-layer { grid-area: 1 / 1; display: grid; place-items: center; width: 100%; height: 100%; }
+nav button .combat-icon-layer > .ui-sprite { width: 100%; height: 100%; object-fit: contain; }
+nav button[data-mode] > .tab-label { min-height: 2.4em; }
+@media (max-width: 480px) { nav button > .combat-tab-icon { width: 32px; height: 32px; } }
+@media (max-width: 360px) { nav button > .combat-tab-icon { width: 26px; height: 26px; } }
+
+.campaign-head h1 { margin: 0 0 8px; }
+.campaign-head p { line-height: 1.5; }
+.campaign-actions, .campaign-roster, .campaign-spaces { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.campaign-board { width: min(100%, 600px); margin: 12px auto; border: 3px solid var(--ink); }
+.campaign-board > canvas { display: block; width: 100%; height: auto; touch-action: manipulation; }
+.campaign-roster button { display: grid; justify-items: center; gap: 4px; width: 130px; }
+.campaign-roster button[aria-pressed="true"] { outline: 2px solid #d6ae68; }
+.campaign-spaces button { font-size: 12px; }
+.campaign-status { min-height: 1.5em; }
+.campaign-actions button[hidden] { display: none; }
+
+#profile-editor { width: min(880px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); overflow-y: auto; box-sizing: border-box; }
+.profile-editor { display: grid; gap: 12px; }
+.profile-editor header h2, .profile-editor p { margin: 0 0 8px; }
+.profile-name-label { display: grid; gap: 6px; }
+.profile-name-label input { width: 100%; box-sizing: border-box; font: inherit; padding: 10px; min-height: 44px; }
+.flag-workbench { display: grid; grid-template-columns: 180px 1fr; gap: 20px; }
+.flag-preview { position: sticky; top: 0; z-index: 2; align-self: start; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 12px; }
+.flag-preview canvas { width: 144px; height: 216px; image-rendering: pixelated; border: 3px solid var(--ink); }
+.flag-tools { display: grid; gap: 10px; min-width: 0; }
+.flag-tools fieldset { min-width: 0; padding: 10px; }
+.flag-colors { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 10px; }
+.flag-colors button { width: 36px; height: 36px; min-height: 36px; padding: 3px; }
+.flag-colors button::after { content: ''; display: block; width: 100%; height: 100%; background: var(--swatch); }
+.flag-patterns { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.flag-patterns button { display: grid; justify-items: center; gap: 4px; padding: 6px 3px; font-size: 11px; }
+.flag-patterns canvas { width: 24px; height: 36px; image-rendering: pixelated; }
+.flag-stamp, .flag-layer-actions, .profile-editor footer { display: flex; flex-wrap: wrap; gap: 8px; }
+.flag-layers { display: grid; gap: 5px; padding: 0; list-style: none; max-height: 200px; overflow-y: auto; }
+.flag-layers button { width: 100%; text-align: left; display: flex; align-items: center; gap: 8px; }
+.flag-layers i { display: inline-block; width: 18px; height: 18px; flex-shrink: 0; background: var(--swatch); border: 1px solid var(--ink); }
+.profile-error { min-height: 1.4em; }
+.siege-profile { display: flex; align-items: center; gap: 14px; margin-block: 14px; flex-wrap: wrap; }
+.siege-profile > div { display: grid; gap: 6px; flex: 1; min-width: 120px; }
+.siege-profile-name { overflow-wrap: anywhere; }
+.profile-flag { display: block; width: 48px; height: 72px; flex-shrink: 0; border: 2px solid var(--ink); image-rendering: pixelated; }
+@media (max-width: 600px) {
+  .flag-workbench { grid-template-columns: 1fr; gap: 10px; }
+  .flag-preview { flex-direction: row; justify-content: center; }
+  .flag-preview canvas { width: 80px; height: 120px; }
+  .flag-patterns { grid-template-columns: repeat(4, 1fr); }
+  .flag-colors button { width: 40px; height: 40px; }
+}
+
+.flag-opacity { display: flex; flex-wrap: wrap; gap: 8px; }
+.flag-opacity button { min-height: 40px; }
+
+.siege-building { display: grid; justify-items: center; gap: 4px; width: 130px; padding: 8px; text-align: center; }

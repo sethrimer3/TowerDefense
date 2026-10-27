@@ -2096,3 +2096,30 @@ button:disabled .metal-icon { filter: saturate(.4) brightness(.8); }
 .tile-set > div > small { font-size: 8px; color: #b3a282; letter-spacing: 0.3px; }
 /* What tapping the picked node again does. */
 .ug-again { flex-basis: 100%; text-align: right; font-size: 8px; color: #a8987a; letter-spacing: 0.3px; }
+
+/* Campaign briefings use the hall's parchment and brass. */
+#ambush > .panel, #siege > .panel {
+  padding: 14px;
+  margin-bottom: 12px;
+  border: 2px solid var(--brass);
+  border-radius: 3px;
+  color: var(--ink);
+  background: var(--brass-nails), var(--parchment), #d9c69c;
+  box-shadow: inset 0 0 18px #68441d35, 0 3px 9px #0008;
+}
+#ambush > .panel p, #siege > .panel p { color: var(--ink-soft); }
+.campaign-status { font-weight: bold; }
+
+#ambush > .panel h1, #ambush > .panel h2, #siege > .panel h1, #siege > .panel h2 { color: var(--ink); }
+.siege-opponent { border-block: 1px solid #8a663b; padding-block: 10px; margin-block: 12px; }
+.siege-opponent p { margin-block: 8px; }
+.siege-bot { color: var(--ink); border: 1px solid currentColor; padding: 1px 5px; margin-left: 6px; }
+#profile-editor { color: var(--ink); background: var(--brass-nails), var(--parchment), #d9c69c; border: 3px solid var(--brass); }
+#profile-editor h2, #profile-editor h3, #profile-editor legend { color: var(--ink); }
+#profile-editor p, #profile-editor small { color: var(--ink-soft); }
+#profile-editor fieldset { border: 1px solid #8a663b; }
+#profile-editor .profile-error { color: #852837; font-weight: bold; }
+#profile-editor button[aria-pressed="true"] { outline: 2px solid var(--ink); outline-offset: 1px; }
+.flag-preview { background: var(--stone), #302d28; border: 2px solid var(--brass); }
+#profile-editor .flag-preview small { color: #f0dfb1; }
+.siege-profile { padding-block: 12px; border-block: 1px solid #8a663b; }
