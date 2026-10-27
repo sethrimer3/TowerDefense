@@ -2,6 +2,8 @@ import type { TranslationRow } from './languages.ts';
 /** Siege labels use explicit English fallback pending catalog translations. */
 const row=<K extends string>(key:K,english:string)=>[key,english,english,english,english,english,english,english,english,english] as const satisfies TranslationRow;
 export const SIEGE_TEXT=[
+ row('siege.rankLabel','{rank} {division}'),
+ row('siege.rank.bronze','Bronze'),row('siege.rank.silver','Silver'),row('siege.rank.gold','Gold'),row('siege.rank.platinum','Platinum'),row('siege.rank.diamond','Diamond'),row('siege.rank.master','Master'),row('siege.rank.grandmaster','Grandmaster'),
  row('siege.board','Enemy castle and infantry muster ground'),row('siege.editProfile','Edit profile'),row('siege.bot','BOT'),
  row('siege.ratings','{defense} defense / {mmr} MMR'),row('siege.record','Your attack MMR: {mmr} · {wins}/{games} wins'),
  row('siege.defense','Castle defense rating: {rating} (estimated).'),row('siege.commit','Starting a ranked raid commits it: defeat, forfeit or reload counts as a loss.'),row('siege.provisional','Defense ratings are provisional; castle layout and army matchups affect results.'),
