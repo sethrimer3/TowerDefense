@@ -456,7 +456,9 @@ export class DefendPage {
     } else {
       const img = new Image();
       img.onload = () => {
-        for (let x = 0; x < 4; x++) c.drawImage(img, 38, 1 + x * 16, 16, 16, x * 16, 0, 16, 16);
+        // The run's top two rows (y 1–2) are nearly transparent, so start
+        // below them: the button's own background showed through as a block.
+        for (let x = 0; x < 4; x++) c.drawImage(img, 38, 3 + x * 15, 16, 16, x * 16, 0, 16, 16);
       };
       img.src = `${(import.meta as ImportMeta & { env?: { BASE_URL?: string } }).env?.BASE_URL ?? "./"}assets/defend/wall-cap.png`;
     }
