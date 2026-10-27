@@ -808,7 +808,7 @@ export class DefendSim {
       if (e.stagger !== undefined && (e.stagger -= dt) <= 0) delete e.stagger;
     for (const e of this.enemies) {
       if (e.burn === undefined) continue;
-      if (e.hp > 0 && !sheltered(this, e.x, e.y)) this.hurtEnemy(e, e.burnDps! * Math.min(dt, e.burn), false, "ranged", e.burnOrigin, false, "fire");
+      if (e.hp > 0 && !sheltered(this, e.x, e.y)) this.hurtEnemy(e, e.burnDps! * Math.min(dt, e.burn), false, "ranged", undefined, false, "fire", 0, e.burnOrigin);
       if ((e.burn -= dt) <= 0) {
         delete e.burn;
         delete e.burnDps;
@@ -1075,8 +1075,9 @@ export class DefendSim {
 
   // ── Damage and rebuilding ─────────────────────────────────────────────
   /** Hurts `e` (double when marked); a steady burn hurts it without the
-   * flash of a blow. */
-  hurtEnemy(e: Enemy, amount: number, flash = true, source: "ranged" | "melee" = "ranged", origin?: DamageOrigin, projectile = false, element: "physical" | "fire" | "explosion" = "physical", pierce = 0) {
+   * flash of a blow. Optional credit is statistics-only; it never changes
+   * the physical origin used for shields, reflection or directional armor. */
+  hurtEnemy(e: Enemy, amount: number, flash = true, source: "ranged" | "melee" = "ranged", origin?: DamageOrigin, projectile = false, element: "physical" | "fire" | "explosion" = "physical", pierce = 0, credit?: DamageOrigin) {
     if (e.hp <= 0 || !Number.isFinite(amount) || amount <= 0) return false;
     if (source === "ranged") {
       let shield: Enemy | undefined;
@@ -1110,7 +1111,7 @@ export class DefendSim {
     if (amount <= 0) return false;
     const hit = e.marked ? amount * (e.markDamage ?? SPOTTERS.mark[pathRank(this.bonuses.paths, "watchTower", "spotters")]) : amount;
     this.stats.current.dealt += Math.min(e.hp, hit);
-    if(this.tally){const from=this.tallyOrigin(origin);if(from?.building!==undefined)this.tally(from.building,Math.min(e.hp,hit),e.hp-hit<=0&&!e.fortressPart);}
+    if(this.tally){const from=this.tallyOrigin(credit??origin);if(from?.building!==undefined)this.tally(from.building,Math.min(e.hp,hit),e.hp-hit<=0&&!e.fortressPart);}
     e.hp -= hit;
     if (flash) e.flash = 0.12;
     if (e.hp <= 0) {

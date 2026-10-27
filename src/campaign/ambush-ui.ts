@@ -23,7 +23,7 @@ export class AmbushPage {
   const progress = this.host.save().campaigns.ambush;
   this.root.innerHTML = `<div class="ambush-select-head"><strong data-i18n="ambush.levelSelect">${t('ambush.levelSelect')}</strong><span>${t('ambush.stars',{stars:totalStars(progress),total:90})}</span><button data-star-tree>${t('ambush.starTree')} (${ambushPool(progress)} ★)</button></div>
    <div class="ambush-level-columns">${['I','II','III'].map(level=>`<span>${t('ambush.levelColumn',{level})}</span>`).join('')}</div>
-   ${AREAS.map(area=>`<section class="ambush-zone" style="${areaStyle(area)}"><h2>${area.name}</h2><div class="ambush-level-cards">${AMBUSH_LEVELS.filter(l=>l.area===area.id).map(l=>{
+   ${AREAS.map(area=>`<section class="ambush-zone" style="${areaStyle(area)}"><h2>${area.name} <small>${t('ambush.stars',{stars:AMBUSH_LEVELS.filter(l=>l.area===area.id).reduce((n,l)=>n+(progress.stars[l.id]??0),0),total:9})}</small></h2><div class="ambush-level-cards">${AMBUSH_LEVELS.filter(l=>l.area===area.id).map(l=>{
     const index=AMBUSH_LEVELS.indexOf(l),stars=progress.stars[l.id]??0,open=levelUnlocked(progress,index);
     return `<button class="ambush-level-card" data-level="${index}" ${open?'':'disabled'} aria-label="${l.name}, ${t('ambush.stars',{stars,total:3})}${open?'':`, ${t('ambush.locked')}`}"><div class="ambush-level-preview" aria-hidden="true"><canvas data-preview="${index}"></canvas></div><strong>${l.name}</strong><span class="ambush-card-stars" data-stars="${stars}" aria-hidden="true">${'★'.repeat(stars)}${'☆'.repeat(3-stars)}</span></button>`;
    }).join('')}</div></section>`).join('')}`;

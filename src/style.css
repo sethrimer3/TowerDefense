@@ -2443,3 +2443,11 @@ nav button[data-mode] > .tab-label { min-height: 2.4em; }
 .ambush-star-dialog { padding-top:40px; }
 .ambush-star-head label { display:flex;gap:6px;align-items:center; }
 @media(max-width:600px) { .ambush-star-body { height:44dvh; }.ambush-star-head label { width:100%; } }
+
+.ambush-zone h2 small { font-size:11px;font-weight:normal;color:var(--ink);margin-left:8px; }
+.ambush-result-stars span { display:inline-block; }
+.star-award { animation:ambush-star .55s both;animation-delay:var(--star-delay,0s); }
+@keyframes ambush-star { 0% { opacity:0;transform:translateY(12px) scale(.3) rotate(-25deg); } 65% { opacity:1;transform:translateY(-3px) scale(1.15); } 100% { opacity:1;transform:none; } }
+.ambush-hud-stars span { position:relative; }
+.ambush-hud-stars .star-lost::after { content:'';position:absolute;left:25%;top:40%;width:55%;height:2px;background:var(--ink);transform:rotate(45deg); }
+@media(prefers-reduced-motion:reduce) { .star-award { animation:none; } }

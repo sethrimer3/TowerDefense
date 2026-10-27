@@ -5,7 +5,7 @@ try{for(const [width,height] of [[1280,800],[390,844]]){
  const page=await browser.newPage({viewport:{width,height},hasTouch:width===390}),errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.addInitScript(()=>{localStorage.setItem('towerdefense.v1',JSON.stringify({version:7,profile:{name:'Level Warden',flag:{base:3,layers:[]}},settings:{reduceMotion:true},campaigns:{ambush:{cleared:2,layouts:[[{pad:0,kind:'watchTower'}]]}}}));});
  await page.goto(process.env.TEST_URL||'http://127.0.0.1:5173/');const tab=page.locator('nav [data-tab="defend"]');await tab.click();
- assert.equal(await page.locator('#ambush .ambush-level-card').count(),30);assert.equal(await page.locator('#ambush .ambush-zone').count(),10);
+ assert.equal(await page.locator('#ambush .ambush-level-card').count(),30);assert.ok((await page.locator('#ambush .ambush-zone h2').first().innerText()).includes('2/9 stars'));assert.equal(await page.locator('#ambush .ambush-zone').count(),10);
  assert.equal(await page.locator('#ambush .ambush-level-card:not([disabled])').count(),3);
  assert.equal(await page.locator('#ambush .ambush-level-card[data-level="0"] .ambush-card-stars').getAttribute('data-stars'),'1');
  await page.screenshot({path:`test-results/ambush-levels-${width}.png`});await page.locator('#ambush [data-level="0"]').click();
