@@ -16,6 +16,12 @@ The marked road that ground enemies follow through an Ambush level.
 **Siege**:
 An assault mode: infantry trained by the player's buildings raid enemy castles and their guards.
 
+**Level select**:
+The Ambush screen of thirty levels, arranged in three columns and ten zone rows, showing their best stars and unlocks.
+
+**Star rating**:
+An Ambush level's best result, from zero to three stars. Improving a best result adds only the difference to the earned total.
+
 **Muster space**:
 A space in the lower muster ground where an owned infantry building trains troops for a Siege assault.
 

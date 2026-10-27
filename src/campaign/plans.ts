@@ -1,3 +1,4 @@
+import { decodeAmbush, type AmbushProgress } from './levels.ts';
 import { dist } from '../exact.ts';
 import { wearFits } from '../specializations.ts';
 import type { PathId } from '../knowledge-paths.ts';
@@ -8,8 +9,8 @@ export type Mode = 'ambush' | 'siege';
 export type Point = { x: number; y: number };
 export type Placement = { pad: number; kind: C.StructureKind; path?:PathId; rank?:number };
 export type CampaignProgress = { cleared: number; layouts: Placement[][] };
-export type CampaignSave = Record<Mode, CampaignProgress>;
-export const emptyCampaigns = (): CampaignSave => ({ ambush: { cleared: 0, layouts: [] }, siege: { cleared: 0, layouts: [] } });
+export type CampaignSave = { ambush: AmbushProgress; siege: CampaignProgress };
+export const emptyCampaigns = (): CampaignSave => ({ ambush: { stars: {} }, siege: { cleared: 0, layouts: [] } });
 export const LEVELS = 3;
 const kinds = Object.keys(C.STRUCTURES) as C.StructureKind[];
 export const infantry = (kind: C.StructureKind) => !!TRAINS[kind];
@@ -17,11 +18,12 @@ export const deployable = (kind: C.StructureKind, mode: Mode) => kind !== 'keep'
 export function decodeCampaigns(raw: unknown): CampaignSave {
   const out = emptyCampaigns();
   if (!raw || typeof raw !== 'object') return out;
-  for (const mode of ['ambush', 'siege'] as const) {
+  out.ambush = decodeAmbush((raw as Record<string, unknown>).ambush);
+  for (const mode of ['siege'] as const) {
     const value = (raw as Record<string, any>)[mode];
     if (!value || typeof value !== 'object') continue;
     out[mode].cleared = Number.isInteger(value.cleared) ? Math.max(0, Math.min(LEVELS, value.cleared)) : 0;
-    out[mode].layouts = Array.from({ length: LEVELS }, (_, level) => {
+    out[mode].layouts = Array.from({ length: Math.min(LEVELS, Array.isArray(value.layouts) ? value.layouts.length : 0) }, (_, level) => {
       const pads = new Set<number>();
       const input = Array.isArray(value.layouts?.[level]) ? value.layouts[level] : [];
       return input.slice(0, 100).filter((p: any) => {

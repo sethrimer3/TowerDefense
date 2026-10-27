@@ -11,6 +11,7 @@ import { settleForge } from "./forge-jobs.ts";
 import type { AppContext } from "./ui/app.ts";
 import { el, type Tab } from "./ui/dom.ts";
 import { buildShell } from "./ui/shell.ts";
+import { AmbushPage } from "./campaign/ambush-ui.ts";
 import { CampaignPage } from "./campaign/ui.ts";
 import { CombatTab, nextCombatMode, type CombatMode } from "./ui/combat-tab.ts";
 import { Ledger } from "./ui/ledger.ts";
@@ -144,7 +145,7 @@ const defendPage = new DefendPage(el("defend"), {
   openTiles: () => navigate("tiles"),
 });
 
-const ambushPage = new CampaignPage(el("ambush"), "ambush", { save: () => save, store, openTree: target => ctx.openTree(target) });
+const ambushPage = new AmbushPage(el("ambush"), { save: () => save, store, openTree: target => ctx.openTree(target) });
 const siegePage = new CampaignPage(el("siege"), "siege", { save: () => save, store, editProfile: () => chooseProfile() });
 
 const minePage = new MinePage(el("mine-world"), {
