@@ -128,8 +128,9 @@ export class Outpost {
 }
 export class Outposts {
   readonly posts: Outpost[];
-  private marks: number[];
-  private routes = new WeakMap<Enemy, { segment: number; raiding?: number; rejoin?: Point }>();
+  /** Each post's place along each lane, or undefined where the lane passes it by. */
+  private marks: (number | undefined)[][];
+  private routes = new WeakMap<Enemy, { lane: number; segment: number; raiding?: number; rejoin?: Point }>();
   private fields = new Map<string, { version: number; until: number; field: Float64Array }>();
   constructor(
     readonly engine: DefendSim,
@@ -137,7 +138,13 @@ export class Outposts {
     palisade = 1,
   ) {
     this.posts = field.outposts.map((p, i) => new Outpost(p.rect, p.houses, engine, field, i, palisade));
-    this.marks = this.posts.map((p) => projection(field.path, center(p.rect)).progress);
+    this.marks = this.posts.map((p) =>
+      field.lanes.map((lane) => {
+        const at = center(p.rect),
+          near = projection(lane, at);
+        return dist(near.point.x - at.x, near.point.y - at.y) <= 8 ? near.progress : undefined;
+      }),
+    );
     for (const post of this.posts)
       for (const id of post.houses) {
         engine.hp[id] *= palisade;
@@ -168,15 +175,35 @@ export class Outposts {
     this.fields.set(key, { version: this.engine.mapVersion, until: this.engine.time + 0.25, field });
     return field;
   }
+  /** Sends `e` down `lane` (otherwise it takes the lane nearest where it is first seen). */
+  assign(e: Enemy, lane: number) {
+    const path = this.field.lanes[lane];
+    if (path) this.routes.set(e, { lane, segment: projection(path, e).segment });
+  }
+  private nearestLane(e: Enemy) {
+    let lane = 0,
+      best = Infinity;
+    this.field.lanes.forEach((path, i) => {
+      const p = projection(path, e).point,
+        d = dist(p.x - e.x, p.y - e.y);
+      if (d < best) {
+        best = d;
+        lane = i;
+      }
+    });
+    return lane;
+  }
   private target(e: Enemy) {
     for (const p of this.posts) p.observe(e);
     let route = this.routes.get(e);
     if (!route) {
-      route = { segment: projection(this.field.path, e).segment };
+      const lane = this.nearestLane(e);
+      route = { lane, segment: projection(this.field.lanes[lane], e).segment };
       this.routes.set(e, route);
     }
+    const path = this.field.lanes[route.lane];
     if (route.raiding !== undefined && this.posts[route.raiding].fallen) {
-      const p = projection(this.field.path, e);
+      const p = projection(path, e);
       route.segment = p.segment;
       route.rejoin = p.point;
       delete route.raiding;
@@ -186,9 +213,11 @@ export class Outposts {
         return { point: route.rejoin, route };
       delete route.rejoin;
     }
-    const progress = projection(this.field.path, e).progress;
-    for (let i = 0; i < this.posts.length; i++)
-      if (!this.posts[i].fallen && progress >= this.marks[i] - 10) {
+    const progress = projection(path, e).progress;
+    for (let i = 0; i < this.posts.length; i++) {
+      const mark = this.marks[i][route.lane];
+      // Once raiding, it keeps at it until the post falls, wherever the crowd jostles it along the lane.
+      if (mark !== undefined && !this.posts[i].fallen && (route.raiding === i || progress >= mark - 10)) {
         route.raiding = i;
         const post = this.posts[i],
           r = post.rect;
@@ -196,13 +225,13 @@ export class Outposts {
         const ids = post.houses.filter((id) => !this.engine.map.buildings[id].hidden && this.engine.hp[id] > 0);
         return { post: i, ids, point: center(post.rect), route };
       }
+    }
     while (
-      route.segment < this.field.path.length &&
-      (cellAt(this.field.path[route.segment].x, this.field.path[route.segment].y) === cellAt(e.x, e.y) ||
-        dist(this.field.path[route.segment].x - e.x, this.field.path[route.segment].y - e.y) < 0.7)
+      route.segment < path.length &&
+      (cellAt(path[route.segment].x, path[route.segment].y) === cellAt(e.x, e.y) || dist(path[route.segment].x - e.x, path[route.segment].y - e.y) < 0.7)
     )
       route.segment++;
-    return { point: this.field.path[route.segment] ?? center(this.engine.keep.rect), keep: route.segment >= this.field.path.length - 1, route };
+    return { point: path[route.segment] ?? center(this.engine.keep.rect), keep: route.segment >= path.length - 1, route };
   }
   fieldFor(point: Point) {
     const e = point as Enemy,

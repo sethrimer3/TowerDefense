@@ -12,9 +12,11 @@ const ARROW = [
   "      ##     ",
 ];
 export function drawEntryArrow(c: CanvasRenderingContext2D, entry: LevelPoint, next: LevelPoint, px: number, now: number, reduceMotion: boolean) {
+  const angle = Math.atan2(next.y - entry.y, next.x - entry.x);
   c.save();
-  c.translate((entry.x + 4) * px, entry.y * px);
-  c.rotate(Math.atan2(next.y - entry.y, next.x - entry.x));
+  // Just inside the board, whichever edge the lane comes in from.
+  c.translate((entry.x + 4 * Math.cos(angle)) * px, (entry.y + 4 * Math.sin(angle)) * px);
+  c.rotate(angle);
   c.globalAlpha = reduceMotion ? 1 : 0.8 + 0.2 * Math.sin(now / 300);
   const s = px * 0.55;
   for (let y = 0; y < ARROW.length; y++)

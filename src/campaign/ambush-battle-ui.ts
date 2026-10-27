@@ -419,8 +419,10 @@ export class AmbushBattlePage {
     const c = this.canvas.getContext("2d")!;
     c.save();
     c.setTransform(r.cam.s, 0, 0, r.cam.s, r.cam.x, r.cam.y);
-    drawEntryArrow(c, s.field.path[0], s.field.path[1], r.px, this.now, reduced);
-    if (s.warning) drawFlierWarning(c, s.field.path[0], s.field.track.keep, r.px, this.now, reduced);
+    for (const lane of s.field.lanes) {
+      drawEntryArrow(c, lane[0], lane[1], r.px, this.now, reduced);
+      if (s.warning) drawFlierWarning(c, lane[0], s.field.track.keep, r.px, this.now, reduced);
+    }
     c.restore();
     this.pointers.drawLoupe(r);
   }

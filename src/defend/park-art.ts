@@ -100,7 +100,8 @@ function toCanvas(px: Uint32Array, w = W, h = H) {
 function paintPonds(map: CityMap, px: Uint32Array, open: Uint8Array) {
   const discs: { x: number; y: number; r: number }[] = [];
   for (let i = 0; i < map.type.length; i++) {
-    if (map.type[i] !== CellType.WATER) continue;
+    // A bridge's water runs on under it.
+    if (map.type[i] !== CellType.WATER && map.bridges?.[i] !== 2) continue;
     const cx = i % CELLS_W, cy = (i - cx) / CELLS_W;
     discs.push(pondDisc(cx, cy, 1));
   }
@@ -137,6 +138,13 @@ function paintPonds(map: CityMap, px: Uint32Array, open: Uint8Array) {
       while (band < BANDS.length - 1 && v >= BANDS[band + 1].from) band++;
       px[y * W + x] = rgba(BANDS[band].color);
       open[y * W + x] = band >= 3 ? 1 : 0;
+    }
+  // Nothing swims or ripples under a bridge.
+  if (map.bridges)
+    for (let i = 0; i < map.bridges.length; i++) {
+      if (!map.bridges[i]) continue;
+      const cx = i % CELLS_W, cy = (i - cx) / CELLS_W;
+      for (let y = cy * ART; y < (cy + 1) * ART; y++) open.fill(0, y * W + cx * ART, y * W + (cx + 1) * ART);
     }
   // Glints and lily pads on the open water.
   for (let i = 0; i < map.type.length; i++) {

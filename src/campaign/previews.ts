@@ -37,7 +37,7 @@ function snapshot(index: number) {
   const c = r.canvas.getContext("2d")!;
   c.save();
   c.setTransform(r.cam.s, 0, 0, r.cam.s, r.cam.x, r.cam.y);
-  drawEntryArrow(c, field.path[0], field.path[1], r.px, 0, true);
+  for (const lane of field.lanes) drawEntryArrow(c, lane[0], lane[1], r.px, 0, true);
   c.restore();
   old = document.createElement("canvas");
   old.width = r.canvas.width;

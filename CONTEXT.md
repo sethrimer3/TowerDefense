@@ -13,6 +13,15 @@ A fixed-level tower-defense mode: enemies follow a track, while towers and infan
 **Track**:
 The marked road that ground enemies follow through an Ambush level.
 
+**Lane**:
+One of an Ambush track's ways in, from its own entry at the board's edge to the keep. Later levels have two or three; lanes may join on the way.
+
+**Bridge**:
+A plank deck where a road crosses water; the only way over a river on foot.
+
+**Crowd wave**:
+An Ambush wave of fifty to five hundred native enemies, their strength scaled to the level and wave.
+
 **Siege**:
 An assault mode: infantry trained by the player's buildings raid enemy castles and their guards.
 

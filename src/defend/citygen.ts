@@ -80,6 +80,8 @@ export type CityMap = {
   structures: FittedStructure[];
   /** The wall spikes (unset when there are none). */
   spikes?: SpikeRow[];
+  /** Road cells bridging water, 2 over the water itself and 1 on its banks (unset when there are none). */
+  bridges?: Uint8Array;
 };
 
 /** House footprints and how often each is tried first: mostly chunky

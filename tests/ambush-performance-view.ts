@@ -55,9 +55,12 @@ async function measure(mode: "native" | "ambush") {
     (s as unknown as { queue: string[] }).queue = [];
     s.phase = "battle";
     s.send();
-    const queue = (s as unknown as { queue: import("../src/defend/catalog.ts").EnemyKind[] }).queue,
-      entry = s.field.path[0];
-    while (queue.length) e.releaseEnemy(queue.shift()!, { x: 0.5, y: entry.y });
+    const queue = (s as unknown as { queue: import("../src/campaign/ambush-waves.ts").WaveEntry[] }).queue;
+    while (queue.length) {
+      const { kind, lane } = queue.shift()!,
+        entry = s.field.lanes[lane][0];
+      e.releaseEnemy(kind, { x: Math.max(0.5, Math.min(71.5, entry.x)), y: Math.max(0.5, entry.y) });
+    }
     peak = Math.max(peak, e.enemies.length);
     for (let frame = 0; frame < 8; frame++) {
       await next();

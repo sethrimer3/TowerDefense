@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { AmbushGrid } from "../src/campaign/ambush-grid.ts";
 import { AmbushSim, AMBUSH_PALETTE } from "../src/campaign/ambush-sim.ts";
 import { generateCity, CellType } from "../src/defend/citygen.ts";
-import { CELL_COUNT, CELLS_W, cellIndex } from "../src/defend/grid.ts";
+import { CELL_COUNT, CELLS_H, CELLS_W, cellIndex } from "../src/defend/grid.ts";
 import { defaults } from "../src/save.ts";
 import { forestPlan } from "../src/defend/forest.ts";
 import { freeSpot, build } from "./ambush-helpers.ts";
@@ -35,7 +35,8 @@ test("Actual Mossbound water and boulder geometry is unbuildable", () => {
     forest = forestPlan(s.map);
   assert.ok(forest.boulders.length > 0);
   for (const b of forest.boulders) assert.ok(b.cells.every((c) => s.grid.blocked[c] === 1));
-  for (const lake of forest.lakes) for (const d of lake.discs) assert.equal(s.grid.blocked[Math.floor(d.y) * CELLS_W + Math.floor(d.x)], 1);
+  for (const lake of forest.lakes)
+    for (const d of lake.discs.filter((d) => d.x < CELLS_W && d.y < CELLS_H)) assert.equal(s.grid.blocked[Math.floor(d.y) * CELLS_W + Math.floor(d.x)], 1);
 });
 test("Free placements, moves and in-wave sales keep native garrisons stable without modifying Defend", () => {
   const save = defaults(),

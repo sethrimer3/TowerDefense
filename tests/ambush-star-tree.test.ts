@@ -65,7 +65,8 @@ test("All economic branches affect only the Ambush battle, including free buildi
   base.engine.hurtEnemy(f, 1e9);
   s.engine.step(1 / 30);
   base.engine.step(1 / 30);
-  assert.equal(s.gold - wallet, (base.gold - plain) * 1.05);
+  assert.ok(Math.abs(base.gold - plain - base.waves[0].bounty) < 1e-9);
+  assert.ok(Math.abs(s.gold - wallet - s.waves[s.wave - 1].bounty * 1.05) < 1e-9);
   assert.equal(JSON.stringify(g), before);
 });
 test("Drillmasters, palisades, keep walls and battle magic change native stats without crossing modes", () => {

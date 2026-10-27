@@ -4,7 +4,7 @@ import { AmbushSim } from "../src/campaign/ambush-sim.ts";
 import { defaults } from "../src/save.ts";
 import { rectDist } from "../src/defend/pathing.ts";
 import { AMBUSH_LEVELS } from "../src/campaign/levels.ts";
-import { ambushWave } from "../src/campaign/ambush-waves.ts";
+import { ambushWave, AMBUSH_WAVES } from "../src/campaign/ambush-waves.ts";
 import { AREA_ENEMIES } from "../src/defend/area-enemies.ts";
 import { ENEMIES } from "../src/defend/catalog.ts";
 test("A ground enemy with a native off-center lane passes every bend, enters both outposts and reaches the keep", () => {
@@ -21,17 +21,15 @@ test("A ground enemy with a native off-center lane passes every bend, enters bot
   assert.ok(s.outposts.posts.every((p) => p.breached && p.fallen));
   assert.ok(rectDist(s.engine.keep.rect, e.x, e.y) <= 1);
 });
-test("Waves 10 and 20 include the toughest affordable native zone boss without overspending", () => {
+test("Waves 10 and 20 bring one native ground boss from the zone, its HP scaled with the crowd", () => {
   for (const l of AMBUSH_LEVELS)
     for (const n of [10, 20]) {
-      const w = ambushWave(l, n),
-        eligible = AREA_ENEMIES[l.area].filter((k) => !ENEMIES[k].hatched && ENEMIES[k].cost <= w.budget);
-      assert.ok(w.boss && w.kinds.includes(w.boss));
-      assert.equal(ENEMIES[w.boss!].cost, Math.max(...eligible.map((k) => ENEMIES[k].cost)));
-      assert.ok(w.kinds.reduce((sum, k) => sum + ENEMIES[k].cost, 0) <= w.budget);
+      const w = ambushWave(l, n);
+      assert.ok(w.boss && w.entries.some((e) => e.kind === w.boss));
+      assert.ok(AREA_ENEMIES[l.area].includes(w.boss!) && !ENEMIES[w.boss!].flying && ENEMIES[w.boss!].hp <= AMBUSH_WAVES.bossHp);
     }
 });
 
 test("Every level has enemies in every wave, including the expensive Astral roster", () => {
-  for (const l of AMBUSH_LEVELS) for (let wave = 1; wave <= 20; wave++) assert.ok(ambushWave(l, wave).kinds.length > 0, l.id + " wave " + wave);
+  for (const l of AMBUSH_LEVELS) for (let wave = 1; wave <= 20; wave++) assert.ok(ambushWave(l, wave).entries.length >= 50, l.id + " wave " + wave);
 });

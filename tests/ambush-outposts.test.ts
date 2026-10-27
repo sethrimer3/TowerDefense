@@ -7,6 +7,7 @@ import { CellType } from "../src/defend/citygen.ts";
 import { rectCells } from "../src/defend/grid.ts";
 import { center, rectDist } from "../src/defend/pathing.ts";
 import { build } from "./ambush-helpers.ts";
+import { AMBUSH_WAVES } from "../src/campaign/ambush-waves.ts";
 test("All thirty native levels have two fenced towns and a separate keep castle", () => {
   for (let i = 0; i < 30; i++) {
     const f = ambushField(i);
@@ -23,7 +24,7 @@ test("All thirty native levels have two fenced towns and a separate keep castle"
   const s = new AmbushSim(0, defaults()),
     fence = s.map.buildings.find((b) => b.fence)!,
     stone = s.map.buildings.find((b) => b.kind === "wall" && !b.fence)!;
-  assert.equal(s.engine.maxHp[fence.id], s.engine.maxHp[stone.id] * 0.1);
+  assert.equal(s.engine.maxHp[fence.id], s.engine.maxHp[stone.id] * 0.1 * AMBUSH_WAVES.outpostHp);
 });
 test("Outpost health waits for a breach, counts standing houses and never resurrects a fallen star", () => {
   const s = new AmbushSim(0, defaults()),

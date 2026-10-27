@@ -2,9 +2,10 @@
 import { STRUCTURES } from "../src/defend/catalog.ts";
 import { AMBUSH_PALETTE } from "../src/campaign/plans.ts";
 import { ambushPrice } from "../src/campaign/economy.ts";
+import { AMBUSH_WAVES } from "../src/campaign/ambush-waves.ts";
 console.log("# Ambush deployment economy\n");
 console.log(
-  "Every zone starts Levels I/II/III with **500/600/700 gold**. This wallet is local to the level and separate from Mine metals. A retry or reload starts a fresh wallet and empty build grid. Old saved pad layouts are discarded; best stars remain saved.\n",
+  "Level 1 starts with **800 gold**, each later level 5% more (rounded to tens). This wallet is local to the level and separate from Mine metals. A retry or reload starts a fresh wallet and empty build grid. Old saved pad layouts are discarded; best stars remain saved.\n",
 );
 console.log(
   "The palette offers **Melee Guild, Ranged Guild, Archer Tower, Cannon Tower and Wizard Tower** to every player. Each uses native Defend combat at base Armory levels. Defend ownership, Knowledge paths and Smithy upgrades do not enter the Ambush battle. Purchases and sales work during waves. Sales before wave 2 starts return the full investment, including local upgrades. From wave 2 onward the refund is 70%, rounded down to tens. Actual native nextSteps upgrades are bought with level gold, including merges that consume two maxed partners; their investments are retained by the resulting building.\n",
@@ -20,7 +21,7 @@ for (const kind of AMBUSH_PALETTE) {
 console.log(
   "\n## Local upgrade fees\n\nAttunement: 55% of the current kind’s catalog price; branch attunement: 70%; path ranks I/II/III: 40/65/100%; merge: 150%; beyond-ultimate: 200%. Each fee rounds to tens, minimum 20 gold. These bounded tier estimates do not use native Knowledge costs, which span six orders of magnitude. The selected native building panel offers every valid next step and displays its total investment refund. No global research enters combat.\n",
 );
-console.log("\n## Kill gold\n\n    difficulty = maxHP / 12 + (damage / cooldown) / 2 + speed / 1.2\n    bounty = round10(4 × difficulty) (minimum 10)\n");
+console.log("\n## Kill gold\n\n    wave gold = " + AMBUSH_WAVES.goldPerHp + " × the wave's total enemy HP\n    bounty = wave gold / the wave's enemies\n");
 console.log(
-  "Native enemy deaths pay once. Escapes and fortress body parts pay nothing; the fortress core earns its bounty. Gold arrives immediately and can fund an in-wave purchase. Siege never uses this wallet. The 30-level scripted balance checks retain these starting budgets, base prices and tier fees. Measurements and reproducible opening/final-level probes are in AMBUSH_BALANCE.md; these remain rough, adjustable estimates.\n\nRegenerate:\n\n    node --experimental-transform-types --import ./tests/pin-random.ts tools/ambush-prices.ts > docs/design/AMBUSH_ECONOMY.md",
+  "Native enemy deaths pay once, at their wave's bounty (the young of the fallen at the current wave's). Escapes and fortress body parts pay nothing. Gold arrives immediately and can fund an in-wave purchase. Siege never uses this wallet. The 30-level scripted balance checks use these opening budgets, base prices and tier fees. Measurements and reproducible opening/final-level probes are in AMBUSH_BALANCE.md; these remain rough, adjustable estimates.\n\nRegenerate:\n\n    node --experimental-transform-types --import ./tests/pin-random.ts tools/ambush-prices.ts > docs/design/AMBUSH_ECONOMY.md",
 );

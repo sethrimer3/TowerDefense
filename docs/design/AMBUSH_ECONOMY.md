@@ -1,6 +1,6 @@
 # Ambush deployment economy
 
-Every zone starts Levels I/II/III with **500/600/700 gold**. This wallet is local to the level and separate from Mine metals. A retry or reload starts a fresh wallet and empty build grid. Old saved pad layouts are discarded; best stars remain saved.
+Level 1 starts with **800 gold**, each later level 5% more (rounded to tens). This wallet is local to the level and separate from Mine metals. A retry or reload starts a fresh wallet and empty build grid. Old saved pad layouts are discarded; best stars remain saved.
 
 The palette offers **Melee Guild, Ranged Guild, Archer Tower, Cannon Tower and Wizard Tower** to every player. Each uses native Defend combat at base Armory levels. Defend ownership, Knowledge paths and Smithy upgrades do not enter the Ambush battle. Purchases and sales work during waves. Sales before wave 2 starts return the full investment, including local upgrades. From wave 2 onward the refund is 70%, rounded down to tens. Actual native nextSteps upgrades are bought with level gold, including merges that consume two maxed partners; their investments are retained by the resulting building.
 
@@ -25,10 +25,10 @@ Attunement: 55% of the current kind’s catalog price; branch attunement: 70%; p
 
 ## Kill gold
 
-    difficulty = maxHP / 12 + (damage / cooldown) / 2 + speed / 1.2
-    bounty = round10(4 × difficulty) (minimum 10)
+    wave gold = 0.2 × the wave's total enemy HP
+    bounty = wave gold / the wave's enemies
 
-Native enemy deaths pay once. Escapes and fortress body parts pay nothing; the fortress core earns its bounty. Gold arrives immediately and can fund an in-wave purchase. Siege never uses this wallet. The 30-level scripted balance checks retain these starting budgets, base prices and tier fees. Measurements and reproducible opening/final-level probes are in AMBUSH_BALANCE.md; these remain rough, adjustable estimates.
+Native enemy deaths pay once, at their wave's bounty (the young of the fallen at the current wave's). Escapes and fortress body parts pay nothing. Gold arrives immediately and can fund an in-wave purchase. Siege never uses this wallet. The 30-level scripted balance checks use these opening budgets, base prices and tier fees. Measurements and reproducible opening/final-level probes are in AMBUSH_BALANCE.md; these remain rough, adjustable estimates.
 
 Regenerate:
 

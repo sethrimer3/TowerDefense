@@ -1,6 +1,5 @@
 /** Scenario geometry assembled by Defend's city generator, on Defend's cell grid. */
-import { ambushLevel, trackFor, pointAlong } from "./levels.ts";
-import { dist } from "../exact.ts";
+import { ambushLevel, trackFor, squareAt } from "./levels.ts";
 import { generateCity, CellType, type CityMap, type Building } from "../defend/citygen.ts";
 import { CELL_COUNT, CELLS_W, CELLS_H, cellIndex, rectCells, type Rect } from "../defend/grid.ts";
 import { STRUCTURES, type StructureKind } from "../defend/catalog.ts";
@@ -36,31 +35,54 @@ function erase(map: CityMap, b: Building) {
 export function ambushField(level: number) {
   const data = ambushLevel(level),
     track = trackFor(data),
-    path = track.points;
+    lanes = track.lanes,
+    path = lanes[0];
   const keep = footprint("keep", track.keep),
     structures = [fitted(0, "keep", keep)];
   const city = new Uint8Array(CELL_COUNT),
     wall = new Uint8Array(CELL_COUNT),
     road = new Set<number>(),
-    outpostRects = track.outposts.map((p) => centered(p, 16, 16)),
-    castle = centered(track.keep, 20, 20);
+    water = new Set<number>(),
+    bridges = new Map<number, number>(),
+    outpostRects = track.outposts.map((p) => squareAt(p, 16)),
+    castle = squareAt(track.keep, 20);
   for (const s of structures) for (const c of rectCells(s.rect)) city[c] = 1;
-  for (let i = 1; i < path.length; i++) {
-    const a = path[i - 1],
-      b = path[i],
-      n = Math.max(Math.abs(b.x - a.x), Math.abs(b.y - a.y));
-    for (let t = 0; t <= n; t++)
-      for (let dy = -1; dy <= 1; dy++)
-        for (let dx = -1; dx <= 1; dx++) {
-          const x = Math.round(a.x + ((b.x - a.x) * t) / n) + dx,
-            y = Math.round(a.y + ((b.y - a.y) * t) / n) + dy;
-          if (x >= 0 && x < CELLS_W && y >= 0 && y < CELLS_H) {
-            const c = cellIndex(x, y);
-            road.add(c);
-            city[c] = 1;
+  for (const lane of lanes)
+    for (let i = 1; i < lane.length; i++) {
+      const a = lane[i - 1],
+        b = lane[i],
+        n = Math.max(1, Math.abs(b.x - a.x), Math.abs(b.y - a.y));
+      for (let t = 0; t <= n; t++)
+        for (let dy = -1; dy <= 1; dy++)
+          for (let dx = -1; dx <= 1; dx++) {
+            const x = Math.round(a.x + ((b.x - a.x) * t) / n) + dx,
+              y = Math.round(a.y + ((b.y - a.y) * t) / n) + dy;
+            if (x >= 0 && x < CELLS_W && y >= 0 && y < CELLS_H) {
+              const c = cellIndex(x, y);
+              road.add(c);
+              city[c] = 1;
+            }
           }
+    }
+  // The river: water where no road crosses, a bridge where one does, its deck reaching a cell onto each bank.
+  if (track.river)
+    for (let x = 0; x < CELLS_W; x++)
+      for (let y = track.river.top[x] - 1; y <= track.river.top[x] + track.river.depth[x]; y++) {
+        const c = cellIndex(x, y),
+          wet = y >= track.river.top[x] && y < track.river.top[x] + track.river.depth[x];
+        if (road.has(c)) bridges.set(c, wet ? 2 : Math.max(1, bridges.get(c) ?? 0));
+        else if (wet) {
+          water.add(c);
+          city[c] = 0;
         }
-  }
+      }
+  // Square the deck off across the road, however the banks wander under it.
+  for (const [c, kind] of [...bridges])
+    for (const dx of [-2, -1, 1, 2]) {
+      const x = (c % CELLS_W) + dx,
+        n = c + dx;
+      if (x >= 0 && x < CELLS_W && road.has(n) && !bridges.has(n)) bridges.set(n, kind === 2 && water.has(n + CELLS_W) ? 2 : 1);
+    }
   for (const [rect, thickness] of [...outpostRects.map((r) => [r, 1] as const), [castle, 2] as const]) {
     for (const c of rectCells(rect)) {
       const x = c % CELLS_W,
@@ -85,6 +107,11 @@ export function ambushField(level: number) {
       map.owner[c] = -1;
       map.city[c] = 1;
     }
+  for (const c of water) {
+    map.type[c] = CellType.WATER;
+    map.owner[c] = -1;
+  }
+  if (bridges.size) map.bridges = Uint8Array.from({ length: CELL_COUNT }, (_, c) => bridges.get(c) ?? 0);
   const outposts = outpostRects.map((rect) => {
     for (const b of map.buildings)
       if (b.kind === "wall" && b.rect.x >= rect.x && b.rect.x < rect.x + rect.w && b.rect.y >= rect.y && b.rect.y < rect.y + rect.h) {
@@ -104,7 +131,7 @@ export function ambushField(level: number) {
       .map((b) => b.id);
     return { rect, houses };
   });
-  return { map, path, road, name: data.name, level: data, track, castle, outposts };
+  return { map, path, lanes, road, name: data.name, level: data, track, castle, outposts };
 }
 
 export type MusterCopy = { kind: StructureKind; uid: number; path?: string; rank?: number };

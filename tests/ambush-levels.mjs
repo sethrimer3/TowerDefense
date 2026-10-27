@@ -32,7 +32,7 @@ try {
     assert.equal(await page.locator('#ambush .ambush-level-card[data-level="0"] .ambush-card-stars').getAttribute("data-stars"), "1");
     await page.screenshot({ path: `test-results/ambush-levels-${width}.png` });
     await page.locator('#ambush [data-level="0"]').click();
-    assert.ok(await page.locator("#ambush .campaign-board canvas").isVisible());
+    assert.ok(await page.locator("#ambush .campaign-board canvas[aria-label]").isVisible());
     await page.locator('#ambush [data-action="level-select"]').click();
     assert.equal(await page.locator("#ambush .ambush-level-card").count(), 30);
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));

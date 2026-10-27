@@ -1,10 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { ambushPrice, enemyBounty, startingGold } from "../src/campaign/economy.ts";
+import { ambushPrice, startingGold } from "../src/campaign/economy.ts";
+import { ambushWave } from "../src/campaign/ambush-waves.ts";
+import { AMBUSH_LEVELS } from "../src/campaign/levels.ts";
 import { AmbushSim, AMBUSH_PALETTE } from "../src/campaign/ambush-sim.ts";
 import { CampaignSim } from "../src/campaign/sim.ts";
 import { defaults } from "../src/save.ts";
-import { ENEMIES } from "../src/defend/catalog.ts";
 import { freeSpot, build } from "./ambush-helpers.ts";
 test("The five native base buildings have finite DPS estimates and prices rounded to tens", () => {
   const s = defaults();
@@ -13,7 +14,11 @@ test("The five native base buildings have finite DPS estimates and prices rounde
     assert.ok(p.cost > 0 && Number.isFinite(p.dps));
     assert.equal(p.cost % 10, 0);
   }
-  assert.deepEqual([0, 1, 2].map(startingGold), [500, 600, 700]);
+  assert.equal(startingGold(0), 800);
+  for (let order = 1; order < 30; order++) {
+    assert.ok(startingGold(order) > startingGold(order - 1));
+    assert.equal(startingGold(order) % 10, 0);
+  }
 });
 test("Purchases debit level gold, refunds cannot create profit and retries start a new wallet", () => {
   const save = defaults(),
@@ -21,16 +26,16 @@ test("Purchases debit level gold, refunds cannot create profit and retries start
     price = s.price("meleeGuild"),
     before = JSON.stringify(save);
   const b = build(s, "meleeGuild");
-  assert.equal(s.gold, 500 - price);
+  assert.equal(s.gold, startingGold(0) - price);
   assert.ok(s.remove(b.id));
-  assert.equal(s.gold, 500);
+  assert.equal(s.gold, startingGold(0));
   assert.equal(s.remove(b.id), false);
-  assert.equal(s.gold, 500);
+  assert.equal(s.gold, startingGold(0));
   s.gold = 0;
   const p = freeSpot(s, "archerTower");
   assert.equal(s.placeAt("archerTower", p.qx, p.qy), false);
   assert.equal(s.buildings.length, 0);
-  assert.equal(new AmbushSim(0, save).gold, 500);
+  assert.equal(new AmbushSim(0, save).gold, startingGold(0));
   assert.equal(JSON.stringify(save), before);
 });
 test("Battle sales withdraw only the sold native home and end states refuse transactions", () => {
@@ -60,9 +65,8 @@ test("Native deaths pay once and damaging the keep pays no bounty", () => {
   s.start();
   const p = s.field.path[0],
     e = s.engine.spawnAuxiliary("roach", p.x + 0.5, p.y)!;
-  const d = ENEMIES[e.kind],
-    gold = s.gold,
-    bounty = enemyBounty({ maxHp: e.maxHp, damage: d.damage, cooldown: d.cooldown, speed: d.speed });
+  const gold = s.gold,
+    bounty = s.waves[0].bounty;
   s.engine.hurtEnemy(e, e.hp * 2);
   s.engine.step(1 / 30);
   assert.equal(s.gold, gold + bounty);
@@ -78,8 +82,15 @@ test("Native deaths pay once and damaging the keep pays no bounty", () => {
   assert.ok(s.engine.keepHp() < keep);
   assert.equal(s.gold, after);
 });
-test("Tougher enemies pay more; Ambush gold never leaks into Siege or the player save", () => {
-  assert.ok(enemyBounty({ maxHp: 48, damage: 6, cooldown: 1, speed: 2 }) > enemyBounty({ maxHp: 12, damage: 2, cooldown: 1.2, speed: 1.2 }));
+test("Later waves and levels pay more; Ambush gold never leaks into Siege or the player save", () => {
+  const paid = (level: number, wave: number) => {
+    const w = ambushWave(AMBUSH_LEVELS[level], wave);
+    return w.bounty * w.entries.length;
+  };
+  for (let level = 0; level < 30; level++) {
+    for (let wave = 2; wave <= 20; wave++) assert.ok(paid(level, wave) >= paid(level, wave - 1));
+    if (level) assert.ok(paid(level, 1) >= paid(level - 1, 1));
+  }
   const save = defaults(),
     before = JSON.stringify(save),
     s = new AmbushSim(0, save);
@@ -96,13 +107,13 @@ test("Native kill gold funds an additional free-grid purchase during a wave", ()
   build(s, "meleeGuild");
   s.start();
   s.gold = 0;
-  for (let i = 0; i < 20; i++) {
-    const e = s.engine.spawnAuxiliary("ogre", 0.5, s.field.path[0].y)!;
+  const price = s.price("archerTower");
+  for (let i = 0; i < 1000 && s.gold < price; i++) {
+    const e = s.engine.spawnAuxiliary("ogre", 30, 5)!;
     s.engine.hurtEnemy(e, e.hp * 2);
     s.engine.step(1 / 30);
   }
-  const price = s.price("archerTower"),
-    before = s.gold;
+  const before = s.gold;
   build(s, "archerTower");
   assert.equal(s.gold, before - price);
 });

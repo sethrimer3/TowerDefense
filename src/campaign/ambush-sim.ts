@@ -7,14 +7,15 @@ import { ambushUpgradePrice } from "./ambush-upgrade-price.ts";
 import { nextSteps, sameStep, mergePartners, placedBattlePaths, type UpgradeStep, type Wear } from "../specializations.ts";
 import { DefendSim, type Enemy } from "../defend/sim.ts";
 import { defaultDefendSave } from "../defend/progress.ts";
-import { NO_BONUSES, ENEMIES, type StructureKind, type Bonuses, type EnemyKind } from "../defend/catalog.ts";
+import { NO_BONUSES, ENEMIES, type StructureKind, type Bonuses } from "../defend/catalog.ts";
 import { Outposts } from "./outposts.ts";
-import { ambushWave, waveHasFliers, AMBUSH_WAVES } from "./ambush-waves.ts";
-import type { Stars } from "./levels.ts";
+import { ambushWave, waveHasFliers, AMBUSH_WAVES, type WaveEntry } from "./ambush-waves.ts";
+import { laneCount, levelOrder, type Stars } from "./levels.ts";
+import { intPow } from "../exact.ts";
 import { ambushField } from "./battlefield.ts";
 import { ambushLevel } from "./levels.ts";
 import { AmbushGrid, buildingRect, type GridBuilding } from "./ambush-grid.ts";
-import { ambushPrice, enemyBounty, startingGold } from "./economy.ts";
+import { ambushPrice, startingGold } from "./economy.ts";
 import { bonuses as ownedBonuses } from "../progression.ts";
 import type { Save } from "../save.ts";
 import { AMBUSH_PALETTE } from "./plans.ts";
@@ -43,18 +44,23 @@ export class AmbushSim {
   private lots: number[] = [];
   private sequence = 0;
   private acc = 0;
-  private queue: EnemyKind[] = [];
+  private queue: WaveEntry[] = [];
+  /** What each enemy pays when killed: its wave's bounty (the young of the fallen pay the current wave's). */
+  private bounties = new WeakMap<Enemy, number>();
   private spawnClock = 0;
   private between = 2;
   private bonus: Bonuses;
+  /** How much sturdier the keep and outposts stand on this level than on the first. */
+  private sturdy: number;
   constructor(
     readonly index: number,
     game: Save,
   ) {
     this.perks = ambushBonuses(game.campaigns.ambush.ranks);
     this.level = ambushLevel(index);
+    this.sturdy = intPow(AMBUSH_WAVES.defenseGrowth, levelOrder(this.level));
     this.field = ambushField(index);
-    this.waves = Array.from({ length: AMBUSH_WAVES.count }, (_, i) => ambushWave(this.level, i + 1));
+    this.waves = Array.from({ length: AMBUSH_WAVES.count }, (_, i) => ambushWave(this.level, i + 1, laneCount(this.level)));
     const map = this.field.map;
     // Reserve native homes before DefendSim allocates its HP/collision arrays.
     for (let n = 0; n < 256; n++) {
@@ -70,8 +76,10 @@ export class AmbushSim {
       towerDamage: this.perks.damage,
       troopDamage: this.perks.damage,
       troopHp: this.perks.troopHp,
-      keepHp: this.perks.keep,
+      keepHp: this.perks.keep * AMBUSH_WAVES.keepHp * this.sturdy,
       wallHp: this.perks.keep,
+      // Arrow loops pick off the odd straggler that slips past the defense.
+      keep: { arrowLoops: 1 },
       meteor: owned.meteor ? { ...owned.meteor, rank: 0 } : undefined,
       frostNova: owned.frostNova ? { ...owned.frostNova, rank: 0 } : undefined,
       reinforcements: owned.reinforcements ? { ...owned.reinforcements, rank: 0 } : undefined,
@@ -80,7 +88,7 @@ export class AmbushSim {
     };
     this.engine = new DefendSim(map, defaultDefendSave().levels, this.level.seed, this.bonus);
     this.engine.wave = 1 + this.level.zone * 20;
-    this.outposts = new Outposts(this.engine, this.field, this.perks.palisade);
+    this.outposts = new Outposts(this.engine, this.field, this.perks.palisade * AMBUSH_WAVES.outpostHp * this.sturdy);
     this.engine.scenario = {
       manualWaves: true,
       noCivilians: true,
@@ -88,8 +96,7 @@ export class AmbushSim {
       fieldFor: (e) => this.outposts.fieldFor(e),
       died: (e) => {
         if (e.fortressPart) return;
-        const d = ENEMIES[e.kind],
-          gold = this.perks.bounty * enemyBounty({ maxHp: e.maxHp, damage: d.damage, cooldown: d.cooldown, speed: d.speed });
+        const gold = this.perks.bounty * (this.bounties.get(e) ?? this.waves[Math.max(0, this.wave - 1)].bounty);
         this.gold += gold;
         this.goldEarned += gold;
         this.kills++;
@@ -105,7 +112,7 @@ export class AmbushSim {
     );
     this.engine.tally = (id, damage, killed) => this.tallies.add(id, damage, killed);
     this.engine.tallyHomes = new Map();
-    this.gold = startingGold(this.level.index) + this.perks.gold;
+    this.gold = startingGold(levelOrder(this.level)) + this.perks.gold;
     this.autoSend = game.campaigns.ambush.autoSend === true;
     this.speed = Math.min(game.defend.battleSpeed, game.defend.speed3 ? 3 : 2) as 1 | 2 | 3;
     this.headStart();
@@ -117,7 +124,9 @@ export class AmbushSim {
     return this.outposts.stars as Stars;
   }
   get warning() {
-    return ["build", "battle"].includes(this.phase) && (waveHasFliers(this.queue) || (!this.queue.length && !!this.waves[this.wave]?.fliers));
+    return (
+      ["build", "battle"].includes(this.phase) && (waveHasFliers(this.queue.map((q) => q.kind)) || (!this.queue.length && !!this.waves[this.wave]?.fliers))
+    );
   }
   /** Every strike spell is always at hand, as in Defend; without a researched path it casts plain. */
   get spells() {
@@ -285,11 +294,26 @@ export class AmbushSim {
   private nextWave() {
     this.wave++;
     const wave = this.waves[this.wave - 1];
-    this.queue = [...wave.kinds];
-    this.engine.beginManualWave(this.level.zone * 20 + this.wave, wave.budget, this.queue.length);
+    this.queue = [...wave.entries];
+    this.engine.beginManualWave(this.level.zone * 20 + this.wave, wave.hp, this.queue.length);
     this.spawnClock = 0;
     this.between = AMBUSH_WAVES.breakSeconds;
     this.waveStarted = this.elapsed;
+  }
+  /** Lets one enemy in at its lane's entry, its HP and bite scaled to the wave. */
+  private release(entry: WaveEntry) {
+    const wave = this.waves[this.wave - 1],
+      at = this.field.lanes[entry.lane][0],
+      before = this.engine.enemies.length;
+    this.engine.releaseEnemy(entry.kind, { x: Math.max(0.5, Math.min(CELLS_W - 0.5, at.x)), y: Math.max(0.5, Math.min(CELLS_H - 0.5, at.y)) });
+    for (let i = before; i < this.engine.enemies.length; i++) {
+      const e = this.engine.enemies[i];
+      e.hp *= wave.scale;
+      e.maxHp *= wave.scale;
+      e.raisedDamage = ENEMIES[e.kind].damage * wave.bite;
+      this.bounties.set(e, wave.bounty);
+      this.outposts.assign(e, entry.lane);
+    }
   }
   step(dt: number) {
     if (this.phase !== "battle" || !Number.isFinite(dt) || dt <= 0) return;
@@ -302,10 +326,9 @@ export class AmbushSim {
   private tick(dt: number) {
     this.elapsed += dt;
     this.spawnClock -= dt;
-    if (this.queue.length && this.spawnClock <= 0) {
-      const e = this.field.path[0];
-      this.engine.releaseEnemy(this.queue.shift()!, { x: Math.max(0.5, e.x), y: Math.max(0.5, e.y) });
-      this.spawnClock = AMBUSH_WAVES.spawnGap;
+    while (this.queue.length && this.spawnClock <= 0) {
+      this.release(this.queue.shift()!);
+      this.spawnClock += this.waves[this.wave - 1].gap;
     }
     for (const u of this.engine.soldiers) this.engine.tallyHomes!.set(u.id, u.home);
     this.engine.step(dt);
