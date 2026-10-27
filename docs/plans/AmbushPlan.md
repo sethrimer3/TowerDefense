@@ -23,7 +23,7 @@ Almost all of this is replaced. Keep the good parts: Ambush runs the real `Defen
 
 ## Reading of the brief
 
-"Remove the 'how to play' and Ambush": my reading is that this means the campaign page's header text, the **"How to play"** `<details>` and the big **"Ambush"** `<h1>` title above the board (`campaign/ui.ts` line 45), not the Ambush mode itself. Seth confirmed this reading on 2026-10-27, for Siege too. The "Buildings and upgrades" help `<details>` goes as well, because free placement makes its numbered space list meaningless.
+"Remove the 'how to play' and Ambush": this means the campaign page's header text, the **"How to play"** `<details>` and the big **"Ambush"** `<h1>` title above the board (`campaign/ui.ts` line 45), not the Ambush mode itself. Seth confirmed this on 2026-10-27, and the same goes for Siege. The "Buildings and upgrades" help `<details>` goes as well, because free placement makes its numbered space list meaningless.
 
 ## Target design
 
@@ -123,7 +123,7 @@ Each phase is one PR. Earlier phases leave the game playable. Phases 0 to 8 belo
 
 ### Phase 0: Clean up the page (small, do first)
 
-- Remove the `<h1>` mode title and the "How to play" `<details>` from the Ambush page (and from Siege if Seth confirms), and the "Buildings and upgrades" help block.
+- Remove the `<h1>` mode title and the "How to play" `<details>` from the Ambush page and the Siege page, and the "Buildings and upgrades" help block.
 - Replace `Math.hypot` in `campaign/sim.ts` and `campaign/battlefield.ts` battle paths with `dist`/`sq`.
 - Tests: update `tests/campaign.mjs` selectors.
 
@@ -157,7 +157,7 @@ Each phase is one PR. Earlier phases leave the game playable. Phases 0 to 8 belo
 - **Keep castle**: the keep plus its houses inside a ring of Defend wall stones (`wall` mask in `generateCity`), the track ending at a gate or a breach point in the wall. Its cells are all in `blocked`.
 - **Re-plan on build**: when the player places a building over an outpost, regenerate that outpost's houses with the player's building passed to `generateCity` as a structure, so houses rearrange round it (deterministic for the same layout). Record the outpost's **initial** house count at level start; covered houses simply no longer exist.
 - **Outpost HP**: `breached ? standing / initial : 1`, where `breached` latches true the first time any enemy (or its body cell) is inside the outpost's area. So a player who covers every house still shows 100% until an enemy walks in, then it drops to 0 and the outpost falls at once, as Seth described. `standing` counts houses with HP > 0.
-- **Enemy behaviour** (`routeEnemy` hook): an enemy following the track that reaches a live outpost leaves the track and goes for the nearest standing outpost building (Defend's smash behaviour: attack the building it is next to, use the flow field to reach it); once the outpost has fallen, it returns to the nearest track point and carries on. At the keep, enemies attack the keep (and whatever blocks them) as in Defend. Fliers ignore fences but still raze the outpost first (default; confirm). Keep all of this in `campaign/`, calling public sim helpers; do not branch Defend's enemy code on mode.
+- **Enemy behaviour** (`routeEnemy` hook): an enemy following the track that reaches a live outpost leaves the track and goes for the nearest standing outpost building (Defend's smash behaviour: attack the building it is next to, use the flow field to reach it); once the outpost has fallen, it returns to the nearest track point and carries on. At the keep, enemies attack the keep (and whatever blocks them) as in Defend. Fliers ignore fences but still raze the outpost first (default, see open question 3). Keep all of this in `campaign/`, calling public sim helpers; do not branch Defend's enemy code on mode.
 - Remove `lives`; leaking past the keep is impossible because the track ends there.
 - Tests: outpost geometry stays on the board and straddles the track; HP formula including the "covered everything" case; enemies raze then move on; keep falls → defeat; outposts never touch the keep's castle.
 

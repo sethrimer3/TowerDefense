@@ -71,7 +71,7 @@ Suggested order: 1 (fences) and 2 (strike quick bar) first, since Ambush's outpo
 
 **Brief:** "Improve the graphics on the ropes."
 
-**Reading:** the currency sign hangs from two cords drawn in CSS (`.td-currencies::before/::after` in `theme.css`, a 5 px repeating gradient). That is the rope next to the item above, Seth confirmed this on 2026-10-27.
+**Target:** the currency sign hangs from two cords drawn in CSS (`.td-currencies::before/::after` in `theme.css`, a 5 px repeating gradient). Seth confirmed on 2026-10-27 that these are the ropes he means.
 
 **Plan:**
 
