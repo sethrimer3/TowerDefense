@@ -37,6 +37,6 @@ test('Native maps use the seeded track, reach the board edge and preserve keep o
   assert.deepEqual(field.path,trackFor(AMBUSH_LEVELS[index]).points);
   assert.equal(field.map.type[cell],CellType.ROAD);assert.ok(field.road.has(cell));
   assert.ok(field.map.buildings[0].cells.every(c=>field.map.owner[c]===0));
-  assert.deepEqual(field.map.type,again.map.type);assert.ok(field.pads.length>=5);
+  assert.deepEqual(field.map.type,again.map.type);assert.ok(!Object.hasOwn(field,'pads'));
  }
 });

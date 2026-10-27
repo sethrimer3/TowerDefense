@@ -1,11 +1,12 @@
 import { observePreviews } from './previews.ts';
 /** Level selection owns navigation; active battles still use the native campaign page. */
 import { AREAS, areaStyle } from '../defend/areas.ts';
-import { CampaignPage, type CampaignHost } from './ui.ts';
+import { type CampaignHost } from './ui.ts';
+import { AmbushBattlePage } from './ambush-battle-ui.ts';
 import { AMBUSH_LEVELS, levelUnlocked, totalStars } from './levels.ts';
 import { t } from '../i18n/index.ts';
 export class AmbushPage {
- private battle?: CampaignPage;
+ private battle?: AmbushBattlePage;
  private running = false;
  private previews?:()=>void;
  constructor(private root: HTMLElement, private host: CampaignHost) {}
@@ -30,7 +31,7 @@ export class AmbushPage {
  private open(index:number) {
   if(!levelUnlocked(this.host.save().campaigns.ambush,index))return;
   this.previews?.();this.root.classList.remove('ambush-select');this.running=true;
-  this.battle??=new CampaignPage(this.root,'ambush',{...this.host,levelSelect:()=>this.select()});
-  this.battle.selectLevel(index);
+  if(this.battle)this.battle.selectLevel(index);
+  else this.battle=new AmbushBattlePage(this.root,index,{...this.host,levelSelect:()=>this.select()});
  }
 }

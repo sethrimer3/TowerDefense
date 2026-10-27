@@ -145,7 +145,7 @@ const defendPage = new DefendPage(el("defend"), {
   openTiles: () => navigate("tiles"),
 });
 
-const ambushPage = new AmbushPage(el("ambush"), { save: () => save, store, openTree: target => ctx.openTree(target) });
+const ambushPage = new AmbushPage(el("ambush"), { save: () => save, store });
 const siegePage = new CampaignPage(el("siege"), "siege", { save: () => save, store, editProfile: () => chooseProfile() });
 
 const minePage = new MinePage(el("mine-world"), {

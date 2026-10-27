@@ -149,12 +149,14 @@ Each phase is one PR. Earlier phases leave the game playable. Phases 0 to 8 belo
 
 ### Phase 3: Free build grid
 
-- `campaign/ambush-grid.ts`: a `blocked` mask (water, road, rocks/boulders, keep, castle wall and castle interior, the spawn edge) and `placeAt(kind, qx, qy)` / `moveTo` / `remove` over quarter tiles (2 × 2 cells) using `footprint` from `catalog.ts`. Two player buildings may not overlap, and every building keeps **Defend's one-quarter clear ring** round it (Seth, 2026-10-27): reuse `layout.ts`'s ring check and `drawFootprint`'s dashed ring so the rule and its preview match Defend's.
-- Placement over outpost houses is allowed here; the outpost re-plan is phase 4. Until then, refuse outpost cells.
-- Use `BoardPointers` + `EditSession`-style transaction for drags; draw the quarter grid and green/red footprint with `edit-overlay.ts` while dragging.
-- `DefendSim.configureLot` already adds buildings mid-battle; add a matching `removeLot`/reuse `configureLot(…, false)` for selling, and make sure troop garrisons, rally points and timers of a removed building go with it (today's behaviour for lots).
-- Remove pads, `campaign-spaces`, the numbered pad drawing and `validLayout`'s pad logic.
-- Tests: mask cases (water, rock, road, keep, wall, edge), overlap, sell, place during battle.
+- [x] `campaign/ambush-grid.ts`: a `blocked` mask (water, road, rocks/boulders, keep, castle wall and castle interior, the spawn edge) and `placeAt(kind, qx, qy)` / `moveTo` / `remove` over quarter tiles (2 × 2 cells) using `footprint` from `catalog.ts`. Two player buildings may not overlap, and every building keeps **Defend's one-quarter clear ring** round it (Seth, 2026-10-27): reuse `layout.ts`'s ring check and `drawFootprint`'s dashed ring so the rule and its preview match Defend's.
+- [x] Placement over outpost houses is allowed here; the outpost re-plan is phase 4. Until then, refuse outpost cells.
+- [x] Use `BoardPointers` + `EditSession`-style transaction for drags; draw the quarter grid and green/red footprint with `edit-overlay.ts` while dragging.
+- [x] `DefendSim.configureLot` already adds buildings mid-battle; add a matching `removeLot`/reuse `configureLot(…, false)` for selling, and make sure troop garrisons, rally points and timers of a removed building go with it (today's behaviour for lots).
+- [x] Remove pads, `campaign-spaces`, the numbered pad drawing and `validLayout`'s pad logic.
+- [x] Tests: mask cases (water, rock, road, keep, wall, edge), overlap, sell, place during battle.
+
+The native base-stat/five-building setup was introduced with the new free-grid battle adapter. Local gold upgrades and detailed building statistics still follow in Phase 6.
 
 ### Phase 4: Outposts and the keep's castle
 
