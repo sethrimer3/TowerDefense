@@ -42,6 +42,12 @@ try {
       return f.ambush.renderer.toClient(r.x + r.w / 2, r.y + r.h / 2);
     });
     await tap(point);
+    assert.equal(await page.evaluate(() => window.nativeModes.ambush.sim.buildings.length), 0, "A tap on open ground never buys a building.");
+    await page.evaluate(() => {
+      const f = window.nativeModes,
+        p = f.spot("archerTower");
+      f.ambush.sim.placeAt("archerTower", p.qx, p.qy);
+    });
     assert.equal(await page.evaluate(() => window.nativeModes.ambush.sim.buildings[0].kind), "archerTower");
     const before = await page.evaluate(() => JSON.stringify(window.nativeModes.ambush.sim.buildings[0]));
     const inspectPoint = await page.evaluate(() => {

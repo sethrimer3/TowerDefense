@@ -31,7 +31,6 @@ export class AmbushBattlePage {
   private last = 0;
   private paused = false;
   private picked: number | undefined;
-  private selected: PlacedKind = "archerTower";
   private notice = "";
   private now = 0;
   private settled = false;
@@ -111,92 +110,50 @@ export class AmbushBattlePage {
     this.pointers.end();
     this.root.classList.add("native-campaign");
     const ended = this.sim.phase === "won" || this.sim.phase === "lost";
-    this.root.innerHTML =
-      '<div class="campaign-head defend-head"><span class="ambush-level-name">' +
-      this.sim.level.name +
-      "</span>" +
-      '<button data-action="level-select">' +
-      t("ambush.levelSelect") +
-      "</button>" +
-      '<div class="campaign-actions"><button data-action="start">' +
-      t("ambush.sendWave") +
-      "</button>" +
-      '<button data-action="pause">' +
-      (this.paused ? t("ambush.resume") : t("ambush.pause")) +
-      "</button>" +
-      '<button data-action="speed">' +
-      this.sim.speed +
-      "×</button>" +
-      '<label><input type="checkbox" data-action="auto" ' +
-      (this.sim.autoSend ? "checked" : "") +
-      ">" +
-      t("ambush.autoSend") +
-      "</label>" +
-      '<button data-action="side" aria-pressed="' +
-      this.sideOpen +
-      '">☰ ' +
-      t("ambush.buildings") +
-      "</button></div>" +
-      '<p class="campaign-status" role="status" aria-live="polite"></p></div>' +
-      '<div class="campaign-stage defend-stage ' +
-      (this.sideOpen ? "side-open" : "") +
-      '"><aside class="defend-side ambush-side">' +
-      '<div class="ambush-side-head"><strong id="ambush-health-label"></strong><div id="ambush-health"></div><span id="ambush-health-number"></span>' +
-      '<p class="ambush-wallet"><i class="metal-icon gold" aria-hidden="true"></i> <b id="ambush-gold"></b> ' +
-      t("ambush.gold") +
-      "</p>" +
-      '<div class="ambush-hud-stars" aria-label="' +
-      t("ambush.stars", { stars: this.sim.stars, total: 3 }) +
-      '">' +
-      [0, 1, 2].map((i) => '<span data-star="' + i + '">★</span>').join("") +
-      "</div></div>" +
-      '<div class="ambush-side-content"><div class="campaign-roster defend-palette" id="ambush-palette"></div>' +
-      '<div id="ambush-inspect" hidden><div class="ambush-building-details"></div><div class="campaign-inspect-actions">' +
-      '<button data-action="close">' +
-      t("ambush.close") +
-      '</button><button data-action="sell"></button></div></div></div></aside>' +
-      '<div class="campaign-board defend-board"><div class="campaign-spells"></div>' +
-      (ended
-        ? '<div class="ambush-result" role="dialog" aria-label="' +
-          t(this.sim.phase === "won" ? "ambush.victory" : "ambush.defeat") +
-          '"><h2>' +
-          t(this.sim.phase === "won" ? "ambush.victory" : "ambush.defeat") +
-          "</h2>" +
-          '<div class="ambush-result-stars">' +
-          [0, 1, 2]
-            .map(
-              (i) =>
-                '<span class="' +
-                (i < this.sim.stars && !this.host.save().settings.reduceMotion ? "star-award" : "") +
-                '" style="--star-delay:' +
-                i * 0.14 +
-                's">' +
-                (i < this.sim.stars ? "★" : "☆") +
-                "</span>",
-            )
-            .join("") +
-          "</div>" +
-          "<p>" +
-          t("ambush.kills") +
-          ": " +
-          this.sim.kills +
-          " · " +
-          t("ambush.goldEarned") +
-          ": " +
-          Math.floor(this.sim.goldEarned) +
-          "</p>" +
-          '<button data-action="retry">' +
-          t("ambush.retry") +
-          '</button><button data-action="next" ' +
-          (this.sim.phase === "won" && this.index < 29 ? "" : "hidden") +
-          ">" +
-          t("ambush.next") +
-          "</button>" +
-          '<button data-action="result-select">' +
-          t("ambush.levelSelect") +
-          "</button></div>"
-        : "") +
-      "</div></div>";
+    const s = this.sim,
+      outcome = t(s.phase === "won" ? "ambush.victory" : "ambush.defeat"),
+      award = !this.host.save().settings.reduceMotion;
+    const result = ended
+      ? `<div class="ambush-result" role="dialog" aria-label="${outcome}"><h2>${outcome}</h2>
+          <div class="ambush-result-stars">${[0, 1, 2]
+            .map((i) => `<span class="${i < s.stars && award ? "star-award" : ""}" style="--star-delay:${i * 0.14}s">${i < s.stars ? "★" : "☆"}</span>`)
+            .join("")}</div>
+          <p>${t("ambush.kills")}: ${s.kills} · ${t("ambush.goldEarned")}: ${Math.floor(s.goldEarned)}</p>
+          <button data-action="retry">${t("ambush.retry")}</button>
+          <button data-action="next" ${s.phase === "won" && this.index < 29 ? "" : "hidden"}>${t("ambush.next")}</button>
+          <button data-action="result-select">${t("ambush.levelSelect")}</button>
+        </div>`
+      : "";
+    this.root.innerHTML = `
+      <div class="campaign-head defend-head">
+        <span class="ambush-level-name">${s.level.name}</span>
+        <button data-action="level-select">${t("ambush.levelSelect")}</button>
+        <div class="campaign-actions">
+          <button data-action="start">${t("ambush.sendWave")}</button>
+          <button data-action="pause">${this.paused ? t("ambush.resume") : t("ambush.pause")}</button>
+          <button data-action="speed">${s.speed}×</button>
+          <label><input type="checkbox" data-action="auto" ${s.autoSend ? "checked" : ""}>${t("ambush.autoSend")}</label>
+          <button data-action="side" aria-pressed="${this.sideOpen}">☰ ${t("ambush.buildings")}</button>
+        </div>
+        <p class="campaign-status" role="status" aria-live="polite"></p>
+      </div>
+      <div class="campaign-stage defend-stage ${this.sideOpen ? "side-open" : ""}">
+        <aside class="defend-side ambush-side">
+          <div class="ambush-side-head">
+            <strong id="ambush-health-label"></strong><div id="ambush-health"></div><span id="ambush-health-number"></span>
+            <p class="ambush-wallet"><i class="metal-icon gold" aria-hidden="true"></i> <b id="ambush-gold"></b> ${t("ambush.gold")}</p>
+            <div class="ambush-hud-stars" aria-label="${t("ambush.stars", { stars: s.stars, total: 3 })}">${[0, 1, 2].map((i) => `<span data-star="${i}">★</span>`).join("")}</div>
+          </div>
+          <div class="ambush-side-content">
+            <div class="campaign-roster defend-palette" id="ambush-palette"></div>
+            <div id="ambush-inspect" hidden>
+              <div class="ambush-building-details"></div>
+              <div class="campaign-inspect-actions"><button data-action="close">${t("ambush.close")}</button><button data-action="sell"></button></div>
+            </div>
+          </div>
+        </aside>
+        <div class="campaign-board defend-board"><div class="campaign-spells"></div>${result}</div>
+      </div>`;
     this.root.querySelector(".campaign-board")!.prepend(this.canvas);
     this.root.querySelector("#ambush-health")!.append(this.health.canvas);
     const button = (action: string) => this.root.querySelector<HTMLButtonElement>('[data-action="' + action + '"]')!;
@@ -262,28 +219,13 @@ export class AmbushBattlePage {
     const roster = this.root.querySelector<HTMLElement>(".campaign-roster")!;
     roster.innerHTML = AMBUSH_PALETTE.map(
       (kind) =>
-        '<button class="defend-item" data-kind="' +
-        kind +
-        '" aria-pressed="' +
-        String(this.selected === kind) +
-        '"><canvas width="48" height="48"></canvas><span>' +
-        STRUCTURES[kind].name +
-        "</span><small>" +
-        this.sim.price(kind) +
-        " gold</small></button>",
+        `<button class="defend-item" data-kind="${kind}"><canvas width="48" height="48"></canvas><span>${STRUCTURES[kind].name}</span><small>${this.sim.price(kind)} ${t("ambush.gold")}</small></button>`,
     ).join("");
     roster.querySelectorAll<HTMLButtonElement>("[data-kind]").forEach((b) => {
       const kind = b.dataset.kind as PlacedKind;
       paintIcon(b.querySelector("canvas")!, kind);
-      b.onclick = () => {
-        this.selected = kind;
-        this.picked = undefined;
-        this.palette();
-        this.refresh();
-      };
       b.onpointerdown = (e) => {
         if (b.disabled || e.button !== 0) return;
-        this.selected = kind;
         this.picked = undefined;
         this.pointers.begin(new AmbushDrag(kind, this.sim.grid, this.sim.buildings), e, false);
       };
@@ -321,14 +263,8 @@ export class AmbushBattlePage {
       this.refresh();
       return;
     }
-    if (b) this.picked = b.id;
-    else if (this.picked !== undefined) this.picked = undefined;
-    else if (["build", "battle"].includes(this.sim.phase)) {
-      const f = STRUCTURES[this.selected];
-      this.notice = this.sim.placeAt(this.selected, Math.round((p.fx - f.w / 2) / 2), Math.round((p.fy - f.h / 2) / 2))
-        ? ""
-        : "Choose open ground beside the road.";
-    }
+    // A tap only picks a building or puts the panel away; buildings are dragged in from the palette, as in Defend.
+    this.picked = b?.id;
     this.refresh();
   }
   frame(now: number) {
