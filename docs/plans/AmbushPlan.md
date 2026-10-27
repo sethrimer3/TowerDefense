@@ -135,10 +135,10 @@ Each phase is one PR. Earlier phases leave the game playable. Phases 0 to 8 belo
 
 ### Phase 1: Level data and the level select
 
-- `campaign/levels.ts`: `AMBUSH_LEVELS` = 30 entries `{ id, area, index, name, seed }`, names per zone (e.g. "Old Road", "Mossy Ford", "Ruin Gate" for Mossbound; placeholder names are fine, Seth renames later).
-- Track generation: `trackFor(level)` makes a polyline from a board edge to the keep end, seeded, with 3 to 6 bends, kept inside the board with room for outposts at 1/3 and 2/3 of its length (measured along the track). Unit-test: starts on an edge cell, ends at the keep, never crosses itself, length within bounds, outpost anchors where expected.
-- Level select UI with three columns and per-zone rows; previews come in phase 2 (use a coloured placeholder card until then).
-- Save format change and migration (guideline 6). Tests in `tests/ambush-levels.test.ts`.
+- [x] `campaign/levels.ts`: `AMBUSH_LEVELS` = 30 entries `{ id, area, index, name, seed }`, names per zone (e.g. "Old Road", "Mossy Ford", "Ruin Gate" for Mossbound; placeholder names are fine, Seth renames later).
+- [x] Track generation: `trackFor(level)` makes a polyline from a board edge to the keep end, seeded, with 3 to 6 bends, kept inside the board with room for outposts at 1/3 and 2/3 of its length (measured along the track). Unit-test: starts on an edge cell, ends at the keep, never crosses itself, length within bounds, outpost anchors where expected.
+- [x] Level select UI with three columns and per-zone rows; previews come in phase 2 (use a coloured placeholder card until then).
+- [x] Save format change and migration (guideline 6). Tests in `tests/ambush-levels.test.ts`.
 
 ### Phase 2: The board: zone ground, track, edge arrow, previews
 

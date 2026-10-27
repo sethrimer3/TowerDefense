@@ -1,4 +1,6 @@
 import { dist } from '../exact.ts';
+import { ambushLevel, recordStars } from './levels.ts';
+import { t } from '../i18n/index.ts';
 import { pathLook, pathBadge, paintPathIcons } from "../ui/path-badge.ts";
 import type { TileTree } from "../tiles.ts";
 import type { Wear } from "./sim.ts";
@@ -12,7 +14,7 @@ import { STRUCTURES, type StructureKind, type PaletteItem } from '../defend/cata
 import { paintIcon } from '../defend/structure-art.ts';
 import type { Save } from '../save.ts';
 
-type Host = { save:()=>Save; store:()=>void; editProfile?:()=>void; openTree?:(target:TileTree)=>boolean };
+export type CampaignHost = { save:()=>Save; store:()=>void; editProfile?:()=>void; openTree?:(target:TileTree)=>boolean; levelSelect?:()=>void };
 /** Canvas and DOM share one simulation, advanced only by the app's frame loop. */
 export class CampaignPage {
   sim: CampaignSim;
@@ -23,29 +25,30 @@ export class CampaignPage {
   private now=0;
   private font='serif';
   private canvas!:HTMLCanvasElement; private status!:HTMLElement; private roster!:HTMLElement;
-  constructor(private root:HTMLElement,readonly mode:Mode,private host:Host) {if(mode==='siege'&&host.save().siege?.raid.state==='started')settleRaid(host.save().siege!,false);this.sim=this.make();}
-  private progress(){return this.host.save().campaigns?.[this.mode];}
+  constructor(private root:HTMLElement,readonly mode:Mode,private host:CampaignHost) {if(mode==='siege'&&host.save().siege?.raid.state==='started')settleRaid(host.save().siege!,false);this.sim=this.make();}
+  selectLevel(index:number){this.level=index;this.reset();}
+  private progress(){return this.host.save().campaigns.siege;}
   private make(){
     const save=this.host.save(),d=save.defend;
     if(this.mode==='siege')save.siege??=newSiege(crypto.getRandomValues(new Uint32Array(1))[0]);
-    return new CampaignSim(this.mode,this.mode==='siege'?0:this.level,this.progress()?.layouts[this.mode==='siege'?0:this.level]||[],d.owned,d.levels,this.mode==='siege'?save.siege!.raid.castle:undefined,save);
+    return new CampaignSim(this.mode,this.mode==='siege'?0:this.level,this.mode==='siege'?this.progress().layouts[0]||[]:[],d.owned,d.levels,this.mode==='siege'?save.siege!.raid.castle:undefined,save);
   }
-  show(){this.last=0;if(this.sim.phase==='build')this.sim=this.make();this.render();}
+  show(){this.last=0;if(this.mode==='siege'&&this.sim.phase==='build')this.sim=this.make();this.render();}
   pause(){this.last=0;this.pointers?.end();}
   reset(){this.spell=undefined;this.inspection=undefined;this.selectedPad=undefined;this.notice='';this.paused=false;this.rewarded=false;this.last=0;this.sim=this.make();this.render();}
-  private saveLayout(){if(this.mode==='siege'){this.host.store();return;}const s=this.host.save();s.campaigns??=emptyCampaigns();s.campaigns[this.mode].layouts[this.level]=this.sim.layout.map(p=>({...p}));this.host.store();}
+  private saveLayout(){this.host.store();}
   private render(){
     const profile=this.host.save().profile;
     const siege=this.mode==='siege'?this.host.save().siege:undefined;
     const raid=siege?.raid;
     const finished=raid?.state==='won'||raid?.state==='lost';
-    const unlocked=Math.min(LEVELS-1,this.progress()?.cleared||0);
+
     this.root.classList.add('native-campaign');
     this.pointers?.end();
     this.root.innerHTML=`<div class="campaign-head defend-head">${siege&&profile?`<div class="siege-profile">${flagSvg(profile.flag)}<div><small>YOUR PROFILE</small><strong class="siege-profile-name">${escapeText(profile.name)}</strong></div><button type="button" data-action="profile">Edit profile</button></div>`:""}
       ${siege&&raid?`<details class="siege-opponent"><summary><strong>${raid.castle.owner.name}</strong> <small class="siege-bot">BOT</small> · ${raid.defender} defense / ${siege.mmr} MMR</summary><p>Your attack MMR: <b>${siege.mmr}</b> · ${siege.wins}/${siege.games} wins${siege.games<10?' · Placement matches':''}</p><p>Castle defense rating: <b>${raid.defender}</b> (estimated)</p><small>Defense ratings are provisional until calibrated against raid results.</small><p>Starting a ranked raid commits it: defeat, forfeit or reload counts as a loss.</p>${finished?`<p>Last rated result: ${raid.state==='won'?'Victory':'Defeat'} · MMR ${raid.delta!>=0?'+':''}${raid.delta??0}. This target is now available for unrated practice.</p>`:''}</details>`:
-      `<label>Level <select class="campaign-level" aria-label="Level">${Array.from({length:LEVELS},(_,i)=>`<option value="${i}" ${i===this.level?'selected':''} ${i>unlocked?'disabled':''}>${i+1}. ${levelPlan(this.mode,i).name}${i>unlocked?' — locked':''}</option>`).join('')}</select></label>`}
-      <div class="campaign-actions"><button data-action="start">${this.sim.phase==='build'?(siege?(finished?'Start practice':'Start ranked raid'):'Start waves'):this.paused?'Resume':'Pause'}</button><button data-action="retry">${siege?(raid?.state==='started'?'Forfeit / rebuild':finished?'Practice again':'Rebuild'):'Rebuild / retry'}</button><button data-action="next" ${(siege?!finished:this.sim.phase!=='won'||this.level===LEVELS-1)?'hidden':''}>${siege?'Find next opponent':'Next level'}</button></div>
+      `<span class="ambush-level-name">${ambushLevel(this.level).name}</span>${this.host.levelSelect?`<button data-action="level-select" data-i18n="ambush.levelSelect">${t('ambush.levelSelect')}</button>`:''}`}
+      <div class="campaign-actions"><button data-action="start">${this.sim.phase==='build'?(siege?(finished?'Start practice':'Start ranked raid'):'Start waves'):this.paused?'Resume':'Pause'}</button><button data-action="retry">${siege?(raid?.state==='started'?'Forfeit / rebuild':finished?'Practice again':'Rebuild'):'Rebuild / retry'}</button><button data-action="next" ${(siege?!finished:this.sim.phase!=='won'||this.level===29)?'hidden':''}>${siege?'Find next opponent':'Next level'}</button></div>
       ${this.mode==='ambush'?'<p class="ambush-wallet" aria-live="polite">Ambush gold: <b id="ambush-gold"></b></p>':''}
       <div class="campaign-spells"></div><div class="campaign-inspect-actions"><button data-action="sell" hidden>Sell selected</button><button data-action="upgrade" hidden>Open building upgrades</button></div>
       <p class="campaign-status" role="status" aria-live="polite"></p></div>
@@ -59,8 +62,7 @@ export class CampaignPage {
     this.canvas.addEventListener('wheel',e=>{e.preventDefault();this.renderer!.zoomAt(e.clientX,e.clientY,Math.exp(-e.deltaY*.0015));},{passive:false});this.font=getComputedStyle(this.canvas).fontFamily;this.status=this.root.querySelector('.campaign-status')!;this.roster=this.root.querySelector('.campaign-roster')!;
     const profileButton=this.root.querySelector<HTMLButtonElement>('[data-action="profile"]');
     if(profileButton)profileButton.onclick=()=>{if(this.sim.phase==='battle'){this.paused=true;this.render();}this.host.editProfile?.();};
-    const levelSelect=this.root.querySelector<HTMLSelectElement>('.campaign-level');
-    if(levelSelect)levelSelect.onchange=e=>{this.level=Number((e.target as HTMLSelectElement).value);this.reset();};
+    const levelSelect=this.root.querySelector<HTMLButtonElement>('[data-action="level-select"]');if(levelSelect)levelSelect.onclick=()=>this.host.levelSelect?.();
     this.root.querySelector<HTMLButtonElement>('[data-action="start"]')!.onclick=()=>{
       if(this.sim.phase==='build'){if(!this.sim.start()){this.status.textContent=this.notice=this.mode==='siege'?'Buy an infantry building in Tiles before starting a raid.':'Place at least one fighting building first.';return;}this.saveLayout();if(raid?.state==='offered'){raid.state='started';this.host.store();}}
       else if(this.sim.phase==='battle')this.paused=!this.paused;
@@ -104,14 +106,14 @@ export class CampaignPage {
     if((this.sim.phase==='won'||this.sim.phase==='lost')&&!this.rewarded){
       this.rewarded=true;const s=this.host.save();
       if(this.mode==='siege'){if(settleRaid(s.siege!,this.sim.phase==='won'))this.host.store();}
-      else if(this.sim.phase==='won'){s.campaigns??=emptyCampaigns();s.campaigns.ambush.cleared=Math.max(s.campaigns.ambush.cleared,this.level+1);this.host.store();}
+      else if(this.sim.phase==='won'){recordStars(s.campaigns.ambush,ambushLevel(this.level),1);this.host.store();}
       this.render();
     }
     this.refresh();this.draw();
   }
   private refresh(){
     const s=this.sim;const summary=this.mode==='ambush'?`Wave ${s.wave}/3 · ${s.lives} lives · ${s.enemies.length} enemies · ${s.kills} kills`:`Keep ${Math.ceil(s.raid!.defense.keepHp())}/${Math.ceil(s.raid!.defense.keepMaxHp())} · ${s.allies.length} troops · ${Math.max(0,240-Math.floor(s.elapsed))}s`;
-    this.status.textContent=s.phase==='build'?(this.notice||(this.mode==='siege'?`${s.layout.length} infantry buildings deployed. Start the raid to release their troops.`:'Place your buildings, then start.')):s.phase==='won'?(this.mode==='siege'?'Victory! The keep has fallen.':(this.level<LEVELS-1?'Victory! Next level unlocked.':'Victory! Campaign complete.')):s.phase==='lost'?'Defeat. Rebuild your formation and try again.':(this.paused?'Paused · ':'')+summary;
+    this.status.textContent=s.phase==='build'?(this.notice||(this.mode==='siege'?`${s.layout.length} infantry buildings deployed. Start the raid to release their troops.`:'Place your buildings, then start.')):s.phase==='won'?(this.mode==='siege'?'Victory! The keep has fallen.':(this.level<29?'Victory! Next level unlocked.':'Victory! Campaign complete.')):s.phase==='lost'?'Defeat. Rebuild your formation and try again.':(this.paused?'Paused · ':'')+summary;
     if(this.mode==='ambush'){
       const gold=this.root.querySelector('#ambush-gold')!;if(gold.textContent!==String(s.gold))gold.textContent=String(s.gold);
       const ended=s.phase==='won'||s.phase==='lost';

@@ -2379,3 +2379,15 @@ nav button[data-mode] > .tab-label { min-height: 2.4em; }
 .native-campaign .siege-opponent { margin: 0; padding: 0; border: 0; font-size: 12px; }
 .native-campaign .campaign-spells, .native-campaign .campaign-inspect-actions { margin: 0; }
 @media(max-width:480px) { .native-campaign .campaign-head button { font-size: 10px; padding: 6px; } }
+/* Ambush level selection: parchment cards in three columns on the keep's wood. */
+.ambush-select-head { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:12px; color:var(--gold); }
+.ambush-level-columns, .ambush-level-cards { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+.ambush-level-columns { text-align:center; padding:0 12px; color:var(--gold); }
+.ambush-zone { margin:12px 0 20px; padding:12px; border:2px solid var(--area-dark); background:var(--wood); }
+.ambush-zone h2 { margin:0 0 10px; color:var(--area-color); font-size:16px; }
+.ambush-level-card { min-width:0; display:flex; flex-direction:column; align-items:stretch; gap:8px; padding:8px; color:var(--ink); background:var(--brass-nails), var(--parchment); border:2px solid var(--brass); font-family:var(--font); }
+.ambush-level-card:disabled { opacity:.45; }
+.ambush-level-preview { height:110px; background:linear-gradient(var(--area-dark),var(--area-color)); display:grid; place-items:center; color:var(--gold); border:2px solid var(--ink); overflow:hidden; }
+.ambush-level-card strong { font-size:13px; overflow-wrap:anywhere; }
+.ambush-card-stars { color:var(--area-dark); letter-spacing:3px; }
+@media(max-width:480px) { .ambush-level-columns,.ambush-level-cards { gap:6px; } .ambush-zone { padding:6px; } .ambush-level-card { padding:5px; gap:5px; } .ambush-level-preview { height:80px; } .ambush-level-card strong { font-size:11px; } }

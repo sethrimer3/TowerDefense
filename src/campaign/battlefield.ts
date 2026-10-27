@@ -12,7 +12,7 @@ const centered=(p:Point,w:number,h:number):Rect=>({x:Math.max(0,Math.min(CELLS_W
 export function footprint(kind:StructureKind,p:Point){const d=STRUCTURES[kind];return centered(p,d.w,d.h);}
 function erase(map:CityMap,b:Building){b.hidden=true;for(const c of b.cells)if(map.owner[c]===b.id){map.owner[c]=-1;map.type[c]=CellType.PARK;}}
 export function ambushField(level:number){
- const plan=levelPlan('ambush',level),path=plan.path.map(nativePoint),pads=plan.pads.map(nativePoint);
+ const plan=levelPlan('ambush',level%3),path=plan.path.map(nativePoint),pads=plan.pads.map(nativePoint);
  for(const p of pads){
   let nearest={x:0,y:0},best=Infinity;
   for(let i=1;i<path.length;i++){const a=path[i-1],b=path[i],dx=b.x-a.x,dy=b.y-a.y,t=Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/(dx*dx+dy*dy))),x=a.x+t*dx,y=a.y+t*dy,d=dist(p.x-x,p.y-y);if(d<best){best=d;nearest={x,y};}}
