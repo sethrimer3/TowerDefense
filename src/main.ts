@@ -12,7 +12,7 @@ import type { AppContext } from "./ui/app.ts";
 import { el, type Tab } from "./ui/dom.ts";
 import { buildShell } from "./ui/shell.ts";
 import { AmbushPage } from "./campaign/ambush-ui.ts";
-import { CampaignPage } from "./campaign/ui.ts";
+import { SiegePage } from "./campaign/siege-ui.ts";
 import { CombatTab, nextCombatMode, type CombatMode } from "./ui/combat-tab.ts";
 import { Ledger } from "./ui/ledger.ts";
 import { TilesPage } from "./ui/tiles-page.ts";
@@ -146,7 +146,7 @@ const defendPage = new DefendPage(el("defend"), {
 });
 
 const ambushPage = new AmbushPage(el("ambush"), { save: () => save, store });
-const siegePage = new CampaignPage(el("siege"), "siege", { save: () => save, store, editProfile: () => chooseProfile() });
+const siegePage = new SiegePage(el("siege"), { save: () => save, store, editProfile: () => chooseProfile() });
 
 const minePage = new MinePage(el("mine-world"), {
   metals: () => save.smithy,
