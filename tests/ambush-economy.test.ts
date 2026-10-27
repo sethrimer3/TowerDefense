@@ -6,7 +6,7 @@ import { defaults } from '../src/save.ts';
 import { ENEMIES } from '../src/defend/catalog.ts';
 import { freeSpot,build } from './ambush-helpers.ts';
 test('The five native base buildings have finite DPS estimates and prices rounded to tens',()=>{
- const s=defaults();for(const kind of AMBUSH_PALETTE){const p=ambushPrice(kind,s.defend.levels);assert.ok(p.cost>0&&Number.isFinite(p.dps));assert.equal(p.cost%10,0);}
+ const s=defaults();for(const kind of AMBUSH_PALETTE){const p=ambushPrice(kind);assert.ok(p.cost>0&&Number.isFinite(p.dps));assert.equal(p.cost%10,0);}
  assert.deepEqual([0,1,2].map(startingGold),[500,600,700]);
 });
 test('Purchases debit level gold, refunds cannot create profit and retries start a new wallet',()=>{
@@ -17,7 +17,7 @@ test('Purchases debit level gold, refunds cannot create profit and retries start
 });
 test('Battle sales withdraw only the sold native home and end states refuse transactions',()=>{
  const s=new AmbushSim(0,defaults());s.gold=10000;const a=build(s,'meleeGuild'),b=build(s,'rangedGuild');s.start();s.step(1/30);
- const gold=s.gold,refund=s.refund(a.id);assert.equal(refund,Math.floor(a.paid*.7/10)*10);assert.ok(s.remove(a.id));assert.equal(s.gold,gold+refund);
+ const gold=s.gold,refund=s.refund(a.id);assert.equal(refund,a.paid);assert.ok(s.remove(a.id));assert.equal(s.gold,gold+refund);
  assert.ok(!s.engine.soldiers.some(u=>u.home===a.id));assert.ok(s.engine.soldiers.some(u=>u.home===b.id));
  const c=build(s,'archerTower');assert.notEqual(c.id,a.id);s.phase='lost';const end=s.gold;assert.equal(s.remove(c.id),false);assert.equal(s.gold,end);
 });

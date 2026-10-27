@@ -2,7 +2,7 @@
 
 Every zone starts Levels I/II/III with **500/600/700 gold**. This wallet is local to the level and separate from Mine metals. A retry or reload starts a fresh wallet and empty build grid. Old saved pad layouts are discarded; best stars remain saved.
 
-The palette offers **Melee Guild, Ranged Guild, Archer Tower, Cannon Tower and Wizard Tower** to every player. Each uses native Defend combat at base Armory levels. Defend ownership, Knowledge paths and Smithy upgrades do not enter the Ambush battle. Purchases and sales work during waves. Before battle, a sale returns the exact investment; the current battle refund is 70%, rounded down to tens. Phase 6 adds local gold upgrades and the full-refund exception until wave 2.
+The palette offers **Melee Guild, Ranged Guild, Archer Tower, Cannon Tower and Wizard Tower** to every player. Each uses native Defend combat at base Armory levels. Defend ownership, Knowledge paths and Smithy upgrades do not enter the Ambush battle. Purchases and sales work during waves. Sales before wave 2 starts return the full investment, including local upgrades. From wave 2 onward the refund is 70%, rounded down to tens. Actual native nextSteps upgrades are bought with level gold, including merges that consume two maxed partners; their investments are retained by the resulting building.
 
 ## Rough base pricing
 
@@ -17,6 +17,11 @@ Infantry assumes a full native base garrison. Cannon splash assumes 2.5 targets;
 | Archer tower | 5.5 | 140 |
 | Cannon tower | 17.9 | 370 |
 | Wizard tower | 20.0 | 330 |
+
+## Local upgrade fees
+
+Attunement: 55% of the current kind’s catalog price; branch attunement: 70%; path ranks I/II/III: 40/65/100%; merge: 150%; beyond-ultimate: 200%. Each fee rounds to tens, minimum 20 gold. These bounded tier estimates do not use native Knowledge costs, which span six orders of magnitude. The selected native building panel offers every valid next step and displays its total investment refund. No global research enters combat.
+
 
 ## Kill gold
 

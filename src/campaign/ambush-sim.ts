@@ -1,3 +1,6 @@
+import { AmbushTallies } from './ambush-tallies.ts';
+import { ambushUpgradePrice } from './ambush-upgrade-price.ts';
+import { nextSteps,sameStep,mergePartners,placedBattlePaths,type UpgradeStep,type Wear } from '../specializations.ts';
 /** Ambush adds placement, routing and a wallet to native Defend combat. */
 import { DefendSim,type Enemy } from '../defend/sim.ts';
 import { defaultDefendSave } from '../defend/progress.ts';
@@ -13,10 +16,10 @@ import { bonuses as ownedBonuses } from '../progression.ts';
 import type { Save } from '../save.ts';
 import { AMBUSH_PALETTE } from './plans.ts';
 export { AMBUSH_PALETTE } from './plans.ts';
-export type AmbushBuilding=GridBuilding&{paid:number;placedAt:number};
+export type AmbushBuilding=GridBuilding&{paid:number;placedAt:number;wear?:Wear};
 export type AmbushSpell='meteor'|'frostNova'|'reinforcements'|'necromancy';
 export class AmbushSim {
- readonly field;readonly level;readonly engine:DefendSim;readonly grid:AmbushGrid;readonly outposts:Outposts;readonly waves;
+ readonly field;readonly level;readonly engine:DefendSim;readonly grid:AmbushGrid;readonly outposts:Outposts;readonly waves;readonly tallies=new AmbushTallies(()=>this);
  readonly buildings:AmbushBuilding[]=[];
  phase:'build'|'battle'|'won'|'lost'='build';
  gold:number;goldEarned=0;kills=0;wave=0;elapsed=0;autoSend=false;speed:1|2|3=1;waveStarted=0;
@@ -32,7 +35,7 @@ export class AmbushSim {
    map.structures.push({uid:id,kind:'watchTower',rect,tx:0,ty:0,inside:false});this.lots.push(id);
   }
   const owned=ownedBonuses(game);
-  this.bonus={...NO_BONUSES,meteor:owned.meteor,frostNova:owned.frostNova,reinforcements:owned.reinforcements,necromancy:owned.necromancy,structurePaths:{}};
+  this.bonus={...NO_BONUSES,meteor:owned.meteor?{...owned.meteor,rank:0}:undefined,frostNova:owned.frostNova?{...owned.frostNova,rank:0}:undefined,reinforcements:owned.reinforcements?{...owned.reinforcements,rank:0}:undefined,necromancy:owned.necromancy?{...owned.necromancy,rank:0}:undefined,structurePaths:{}};
   this.engine=new DefendSim(map,defaultDefendSave().levels,this.level.seed,this.bonus);this.engine.wave=1+this.level.zone*20;
   this.outposts=new Outposts(this.engine,this.field);
   this.engine.scenario={manualWaves:true,noCivilians:true,routeEnemy:(e,dt)=>this.outposts.route(e,dt),fieldFor:e=>this.outposts.fieldFor(e),died:e=>{
@@ -40,6 +43,7 @@ export class AmbushSim {
    this.gold+=gold;this.goldEarned+=gold;this.kills++;
   }};
   this.grid=new AmbushGrid(map,this.level.area,this.field.road,this.field.castle,this.field.outposts.map(p=>p.rect),true);
+  this.engine.tally=(id,damage,killed)=>this.tallies.add(id,damage,killed);this.engine.tallyHomes=new Map();
   this.gold=startingGold(this.level.index);this.autoSend=game.campaigns.ambush.autoSend===true;this.speed=Math.min(game.defend.battleSpeed,game.defend.speed3?3:2) as 1|2|3;
  }
  get map(){return this.engine.map;}
@@ -51,13 +55,13 @@ export class AmbushSim {
   return spell==='meteor'?this.engine.castMeteor(at):spell==='frostNova'?this.engine.castFrostNova(at):spell==='reinforcements'?this.engine.castReinforcements(at):this.engine.castNecromancy(at)>=0;
  }
  get enemiesLeft(){return this.queue.length+this.engine.enemies.filter(e=>!e.fortressPart).length;}
- price(kind:StructureKind){return ambushPrice(kind,this.engine.levels).cost;}
- refund(id:number){const b=this.buildings.find(b=>b.id===id);return b?(this.phase==='build'?b.paid:Math.floor(b.paid*.7/10)*10):0;}
+ price(kind:StructureKind){return ambushPrice(kind).cost;}
+ refund(id:number){const b=this.buildings.find(b=>b.id===id);return b?(this.wave<2?b.paid:Math.floor(b.paid*.7/10)*10):0;}
  placeAt(kind:StructureKind,qx:number,qy:number){
   if(!['build','battle'].includes(this.phase)||!(AMBUSH_PALETTE as readonly string[]).includes(kind)||this.sequence>=this.lots.length||!this.grid.check(kind,qx,qy,this.buildings).fits)return false;
   const cost=this.price(kind);if(cost>this.gold)return false;
   const id=this.lots[this.sequence++],b={id,kind,qx,qy,paid:cost,placedAt:this.elapsed};
-  this.engine.configureLot(id,kind,buildingRect(b),true);this.buildings.push(b);this.gold-=cost;this.replan();return true;
+  this.engine.configureLot(id,kind,buildingRect(b),true);this.buildings.push(b);this.tallies.placed(id);this.gold-=cost;this.replan();return true;
  }
  moveTo(id:number,qx:number,qy:number){
   const b=this.buildings.find(b=>b.id===id);if(!b||this.phase!=='build'||!this.grid.check(b.kind,qx,qy,this.buildings,id).fits)return false;
@@ -69,6 +73,37 @@ export class AmbushSim {
  }
  get canSend(){return ['build','battle'].includes(this.phase)&&!this.queue.length&&this.wave<AMBUSH_WAVES.count;}
  send(){if(!this.canSend||this.phase==='build'&&!this.buildings.length)return false;this.phase='battle';this.nextWave();return true;}
+ private loadout(){
+  const d=defaultDefendSave();
+  d.layout.structures=this.buildings.map(b=>({uid:b.id,kind:b.kind as Exclude<StructureKind,'keep'>,tx:Math.floor(b.qx/4),ty:Math.floor(b.qy/4),qx:b.qx,qy:b.qy,...(b.wear??{})}));
+  return d;
+ }
+ upgrades(id:number){
+  const b=this.buildings.find(b=>b.id===id);if(!b)return [];
+  return nextSteps(b.kind as Exclude<StructureKind,'keep'>,b.wear).map(step=>{
+   const partners=step.type==='merge'?mergePartners(this.loadout(),b.kind as Exclude<StructureKind,'keep'>,b.wear,b.id):[];
+   const consumed=partners.flatMap(p=>p.found&&'uid' in p.found?[p.found.uid]:[]);
+   const kind=step.type==='path'?b.kind:step.to,others=this.buildings.filter(o=>!consumed.includes(o.id));
+   const fits=this.engine.hp[b.id]>0&&this.grid.check(kind,b.qx,b.qy,others,b.id).fits,ready=step.type!=='merge'||partners.length===2&&consumed.length===2;
+   return {step,cost:ambushUpgradePrice(b.kind,step),ready:ready&&fits,reason:!ready?'Needs two other buildings, each maxed on a different branch.':!fits?'Needs more open space around its new footprint.':'',consumed};
+  });
+ }
+ upgrade(id:number,requested:UpgradeStep){
+  if(!['build','battle'].includes(this.phase))return false;
+  const b=this.buildings.find(b=>b.id===id),offer=this.upgrades(id).find(o=>sameStep(o.step,requested));
+  if(!b||!offer?.ready||offer.cost>this.gold)return false;
+  const health=this.engine.hp[id]/Math.max(1,this.engine.maxHp[id]);this.gold-=offer.cost;b.paid+=offer.cost;
+  for(const other of offer.consumed){
+   const i=this.buildings.findIndex(o=>o.id===other),partner=this.buildings[i];b.paid+=partner.paid;
+   this.engine.configureLot(partner.id,partner.kind,buildingRect(partner),false);this.buildings.splice(i,1);
+  }
+  const step=offer.step;
+  if(step.type==='path')b.wear={path:step.path,rank:step.rank};
+  else {b.kind=step.to;delete b.wear;}
+  this.bonus.structurePaths=placedBattlePaths({defend:this.loadout()} as Save).structurePaths??{};
+  if(step.type!=='path')this.engine.configureLot(id,b.kind,buildingRect(b),true,health);
+  this.replan();return true;
+ }
  start(){return this.phase==='build'&&this.send();}
  private replan(){for(const rect of this.outposts.replan(this.buildings))this.grid.refreshTown(rect);}
  private nextWave(){
@@ -81,6 +116,7 @@ export class AmbushSim {
  private tick(dt:number){
   this.elapsed+=dt;this.spawnClock-=dt;
   if(this.queue.length&&this.spawnClock<=0){const e=this.field.path[0];this.engine.releaseEnemy(this.queue.shift()!,{x:Math.max(.5,e.x),y:Math.max(.5,e.y)});this.spawnClock=AMBUSH_WAVES.spawnGap;}
+  for(const u of this.engine.soldiers)this.engine.tallyHomes!.set(u.id,u.home);
   this.engine.step(dt);this.outposts.update();
   if(this.engine.keepHp()<=0)this.phase='lost';
   else if(!this.queue.length&&!this.engine.enemies.length){if(this.wave===AMBUSH_WAVES.count)this.phase='won';else if(this.autoSend&&(this.between-=dt)<=0)this.nextWave();}

@@ -89,6 +89,7 @@ import { STONEWORK, TOWN_WALLS, wallRank } from "../wall-upgrades.ts";
 
 export type Levels = Record<UpgradeId, number>;
 
+export type DamageOrigin=Point&{attacker?:number;building?:number;home?:number};
 export type Enemy = {
   /** Javelin carrying this enemy; absent outside an active impalement. */
   impaled?: number;
@@ -126,6 +127,7 @@ export type Enemy = {
    * second; absent when not burning. */
   burn?: number;
   burnDps?: number;
+  burnOrigin?:DamageOrigin;
   /** The share of its pace a signal fire leaves it while marked; absent otherwise. */
   slowed?: number;
   fortressPart?: { core: number; role: "turret" | "leg" | "armor"; dx: number; dy: number };
@@ -147,10 +149,10 @@ export type Enemy = {
   /** An assassin's venom: seconds left, the share more damage it takes,
    * its bite a second and whether it spreads on death; absent when not
    * poisoned, so runs without Venomblades keep their state as before. */
-  venom?: { t: number; more: number; dps: number; spread?: true };
+  venom?: { t: number; more: number; dps: number; spread?: true; origin?:DamageOrigin };
   /** A Hemorrhage knife's cut: damage a second and seconds left; absent
    * when not bleeding (`shadow.ts`). */
-  bleed?: { dps: number; t: number };
+  bleed?: { dps: number; t: number; origin?:DamageOrigin };
   /** C4 nanobots in it: the blast it makes as it dies (`nanobots.ts`);
    * absent when not infected. */
   nano?: Infection;
@@ -344,6 +346,15 @@ export type ScenarioRules = {
 };
 
 export class DefendSim {
+  /** Optional scenario statistics; ordinary Defend allocates no attribution table. */
+  tally?:(building:number,damage:number,killed:boolean)=>void;
+  tallyHomes?:Map<number,number>;
+  tallyOrigin(origin?:DamageOrigin):DamageOrigin|undefined{
+    if(!this.tally||!origin)return undefined;
+    const building=origin.building??origin.home??(origin.attacker!==undefined?this.tallyHomes?.get(origin.attacker)??this.soldiers.find(s=>s.id===origin.attacker)?.home:undefined);
+    return building===undefined?undefined:{x:origin.x,y:origin.y,building};
+  }
+
   scenario?: ScenarioRules;
   readonly map: CityMap;
   readonly levels: Levels;
@@ -797,10 +808,11 @@ export class DefendSim {
       if (e.stagger !== undefined && (e.stagger -= dt) <= 0) delete e.stagger;
     for (const e of this.enemies) {
       if (e.burn === undefined) continue;
-      if (e.hp > 0 && !sheltered(this, e.x, e.y)) this.hurtEnemy(e, e.burnDps! * Math.min(dt, e.burn), false, "ranged", undefined, false, "fire");
+      if (e.hp > 0 && !sheltered(this, e.x, e.y)) this.hurtEnemy(e, e.burnDps! * Math.min(dt, e.burn), false, "ranged", e.burnOrigin, false, "fire");
       if ((e.burn -= dt) <= 0) {
         delete e.burn;
         delete e.burnDps;
+        if(e.burnOrigin)delete e.burnOrigin;
       }
     }
     stepVenom(this, dt);
@@ -1064,7 +1076,7 @@ export class DefendSim {
   // ── Damage and rebuilding ─────────────────────────────────────────────
   /** Hurts `e` (double when marked); a steady burn hurts it without the
    * flash of a blow. */
-  hurtEnemy(e: Enemy, amount: number, flash = true, source: "ranged" | "melee" = "ranged", origin?: Point & { attacker?: number; building?: number }, projectile = false, element: "physical" | "fire" | "explosion" = "physical", pierce = 0) {
+  hurtEnemy(e: Enemy, amount: number, flash = true, source: "ranged" | "melee" = "ranged", origin?: DamageOrigin, projectile = false, element: "physical" | "fire" | "explosion" = "physical", pierce = 0) {
     if (e.hp <= 0 || !Number.isFinite(amount) || amount <= 0) return false;
     if (source === "ranged") {
       let shield: Enemy | undefined;
@@ -1098,6 +1110,7 @@ export class DefendSim {
     if (amount <= 0) return false;
     const hit = e.marked ? amount * (e.markDamage ?? SPOTTERS.mark[pathRank(this.bonuses.paths, "watchTower", "spotters")]) : amount;
     this.stats.current.dealt += Math.min(e.hp, hit);
+    if(this.tally){const from=this.tallyOrigin(origin);if(from?.building!==undefined)this.tally(from.building,Math.min(e.hp,hit),e.hp-hit<=0&&!e.fortressPart);}
     e.hp -= hit;
     if (flash) e.flash = 0.12;
     if (e.hp <= 0) {

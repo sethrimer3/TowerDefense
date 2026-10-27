@@ -1,3 +1,6 @@
+import { stepName } from '../specializations.ts';
+import { artLook } from '../defend/tower-art.ts';
+import type { AmbushBuilding } from './ambush-sim.ts';
 import { SpellBar } from '../ui/spell-bar.ts';
 import { KeepBricks } from '../defend/keep-bricks.ts';
 import { levelUnlocked } from './levels.ts';
@@ -21,7 +24,7 @@ export class AmbushBattlePage {
  sim:AmbushSim;readonly canvas=document.createElement('canvas');readonly renderer:DefendRenderer;
  private pointers:BoardPointers;private last=0;private paused=false;private picked:number|undefined;private selected:PlacedKind='archerTower';
  private notice='';private now=0;private settled=false;private resetCamera=true;private cleared=new Map<number,string>();
- private spellBar?:SpellBar;private health=new KeepBricks();private sideOpen=true;
+ private spellBar?:SpellBar;private health=new KeepBricks();private sideOpen=true;private panelKey="";private statsAt=0;
  constructor(private root:HTMLElement,private index:number,private host:CampaignHost){
   this.sim=new AmbushSim(index,host.save());this.renderer=new DefendRenderer(this.canvas);
   this.canvas.setAttribute('aria-label','Ambush battlefield');
@@ -39,7 +42,7 @@ export class AmbushBattlePage {
  pause(){this.last=0;this.pointers.end();this.spellBar?.cancel();}
  reset(){this.pause();this.sim=new AmbushSim(this.index,this.host.save());this.paused=false;this.picked=undefined;this.spellBar?.cancel();this.notice='';this.settled=false;this.resetCamera=true;this.cleared.clear();this.render();}
  private render(){
-  this.pointers.end();this.root.classList.add('native-campaign');
+  this.panelKey="";this.pointers.end();this.root.classList.add('native-campaign');
   const ended=this.sim.phase==='won'||this.sim.phase==='lost';
   this.root.innerHTML='<div class="campaign-head defend-head"><span class="ambush-level-name">'+this.sim.level.name+'</span>'+
    '<button data-action="level-select">'+t('ambush.levelSelect')+'</button>'+
@@ -132,7 +135,7 @@ export class AmbushBattlePage {
   this.root.querySelector<HTMLElement>('#ambush-inspect')!.hidden=!b;
   this.root.querySelector<HTMLElement>('#ambush-palette')!.hidden=!!b;
   const sell=this.root.querySelector<HTMLButtonElement>('[data-action="sell"]')!;
-  if(b){sell.textContent=t('ambush.sell',{gold:s.refund(b.id)});sell.disabled=ended;}
+  if(b){this.panel(b);sell.textContent=t('ambush.sell',{gold:s.refund(b.id)});sell.disabled=ended;}
   this.root.querySelectorAll<HTMLButtonElement>('[data-kind]').forEach(button=>button.disabled=ended||s.price(button.dataset.kind as StructureKind)>s.gold);
   this.root.querySelector<HTMLButtonElement>('[data-action="start"]')!.disabled=!s.canSend;
   this.root.querySelector<HTMLButtonElement>('[data-action="pause"]')!.disabled=s.phase!=='battle';
@@ -140,11 +143,30 @@ export class AmbushBattlePage {
   this.spellBar?.update(s.engine,s.phase==='battle',this.host.save().settings.reduceMotion);
 
  }
+ private panel(b:AmbushBuilding){
+  const detail=this.root.querySelector<HTMLElement>('.ambush-building-details')!;
+  const key=this.sim.buildings.map(o=>[o.id,o.kind,o.wear?.path,o.wear?.rank].join(':')).join(',')+'@'+b.id;
+  if(key!==this.panelKey){
+   this.panelKey=key;this.statsAt=-Infinity;
+   detail.innerHTML='<canvas class="ambush-portrait" width="96" height="96"></canvas><strong>'+STRUCTURES[b.kind].name+'</strong>'+
+    '<dl><dt>'+t('ambush.kills')+'</dt><dd data-stat="kills"></dd><dt>'+t('ambush.damage')+'</dt><dd data-stat="damage"></dd><dt>'+t('ambush.dps')+'</dt><dd data-stat="dps"></dd></dl>'+
+    '<div class="ambush-upgrades"></div>';
+   paintIcon(detail.querySelector('canvas')!,b.kind);
+   detail.querySelector('.ambush-upgrades')!.innerHTML=this.sim.upgrades(b.id).map((o,i)=>'<button data-upgrade="'+i+'">'+stepName(o.step)+'<small>'+o.cost+' '+t('ambush.gold')+'</small></button>').join('');
+   detail.querySelectorAll<HTMLButtonElement>('[data-upgrade]').forEach(button=>button.onclick=()=>{const offer=this.sim.upgrades(b.id)[Number(button.dataset.upgrade)];if(offer&&!this.sim.upgrade(b.id,offer.step))this.notice=offer.reason||'Not enough gold.';this.refresh();});
+  }
+  if(this.now-this.statsAt<250)return;this.statsAt=this.now;
+  const stats=this.sim.tallies.get(b.id);
+  for(const stat of ['kills','damage','dps'] as const)detail.querySelector('[data-stat="'+stat+'"]')!.textContent=stat==='kills'?String(stats[stat]):stats[stat].toFixed(1);
+  const offers=this.sim.upgrades(b.id),active=['build','battle'].includes(this.sim.phase);
+  detail.querySelectorAll<HTMLButtonElement>('[data-upgrade]').forEach(button=>{const offer=offers[Number(button.dataset.upgrade)];button.disabled=!active||!offer?.ready||offer.cost>this.sim.gold;button.title=offer?.reason??'';});
+ }
  private draw(){
   const r=this.renderer,box=this.canvas.getBoundingClientRect();r.resize(box.width,box.height);if(this.resetCamera){r.resetCam();this.resetCamera=false;}
   const s=this.sim,settings=this.host.save().settings,reduced=settings.reduceMotion||matchMedia('(prefers-reduced-motion: reduce)').matches;
   if(hasForest(s.level.area)){r.forest.sync(s.map,s.engine);for(const b of s.buildings){const rect=buildingRect(b),key=[rect.x,rect.y,rect.w,rect.h].join(',');if(this.cleared.get(b.id)!==key){r.forest.clearBuilding(rect);this.cleared.set(b.id,key);}}}
-  r.draw(s.map,s.engine,this.pointers.session?.overlay()??this.spellBar?.overlay(s.engine)??null,{area:s.level.area,grid:0,weather:null,night:0,now:this.now,reduceMotion:reduced,effects:!settings.effectsOff,healthbars:settings.showHealthbars,simpleEnemies:settings.simpleEnemies,simpleTroops:settings.simpleTroops,mergedOutlines:settings.mergedOutlines,...(this.picked!==undefined?{inspect:{id:this.picked,armed:s.engine}}:{})});
+  const looks:Record<number,string>={};for(const b of s.buildings){const look=artLook(b.kind,b.wear?.path);if(look)looks[b.id]=look;}
+  r.draw(s.map,s.engine,this.pointers.session?.overlay()??this.spellBar?.overlay(s.engine)??null,{area:s.level.area,grid:0,weather:null,night:0,now:this.now,reduceMotion:reduced,effects:!settings.effectsOff,healthbars:settings.showHealthbars,simpleEnemies:settings.simpleEnemies,simpleTroops:settings.simpleTroops,mergedOutlines:settings.mergedOutlines,looks,...(this.picked!==undefined?{inspect:{id:this.picked,armed:s.engine}}:{})});
   const c=this.canvas.getContext('2d')!;c.save();c.setTransform(r.cam.s,0,0,r.cam.s,r.cam.x,r.cam.y);drawEntryArrow(c,s.field.path[0],s.field.path[1],r.px,this.now,reduced);if(s.warning)drawFlierWarning(c,s.field.path[0],s.field.track.keep,r.px,this.now,reduced);c.restore();this.pointers.drawLoupe(r);
  }
 }
