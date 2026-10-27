@@ -14,14 +14,14 @@ import { enemySize } from "./catalog.ts";
  * planted war banner, the magic boats' water (flood-art.ts) over the ground, the wizards' fire, the building grid and drag overlay (edit-overlay.ts), then
  * rain in screen space. */
 import { onPixelArt, pixelArtOn, pixelKey } from "./pixel-sprites.ts";
-import { CELLS_H, CELLS_W, boardSize, hash01, type TilePos } from "./grid.ts";
+import { CELL_COUNT, CELLS_H, CELLS_W, boardSize, cellIndex, hash01, type TilePos } from "./grid.ts";
 import type { CityMap } from "./citygen.ts";
 import type { DefendSim } from "./sim.ts";
 import { DefendLighting, type LightFrame } from "./lighting.ts";
 import { Fences } from "./fences.ts";
 import { Rain, Snow, ambientFor, type Weather } from "./weather.ts";
 import { areaFade, type AreaId } from "./areas.ts";
-import { damageKey, gateSprite, lotSeed, onCityArtLoaded, paintCityLayer, paintStanding, stageOf } from "./city-layer.ts";
+import { FACE_HANG, damageKey, gateSprite, hangingFaces, lotSeed, onCityArtLoaded, paintCityLayer, paintSpikePoints, paintStanding, stageOf } from "./city-layer.ts";
 import { GATE_FRAMES } from "./gate-art.ts";
 import { peopleAt } from "./gates.ts";
 import type { GateRanks } from "../gate-upgrades.ts";
@@ -140,6 +140,9 @@ export class DefendRenderer {
   /** How far each city gate stands open (0 shut to 1), by building id. */
   private gateOpen = new Map<number, number>();
   private layerScale = 1;
+  /** The open ground the wall's brick faces hang over, as of the layer. */
+  private faces: { y: number; x0: number; x1: number }[] = [];
+  private faced = new Uint8Array(CELL_COUNT);
   /** Camera: zoom `s` and translation (canvas pixels) applied to the whole
    * board. s = 1 fits the board to the stage it sits in; along an edge the
    * view is wider than the board it is centred, elsewhere clamped to it. */
@@ -346,6 +349,10 @@ export class DefendRenderer {
     this.forest.sync(map, sim);
     this.forest.drawFloor(ctx, this.px, this.forestShare());
     this.forest.drawWater(ctx, this.px, opts.now, this.forestShare(), opts.reduceMotion);
+    if (this.forestShare() > 0) {
+      this.drawFaces();
+      paintSpikePoints(ctx, this.px, map, sim);
+    }
     if ((opts.effects ?? true) && this.forestShare() > 0) {
       this.forestGrass.sync(this.forest.forestPlan!);
       this.forestGrass.draw({
@@ -353,6 +360,7 @@ export class DefendRenderer {
         c: ctx, px: this.px, now: opts.now, dt, reduceMotion: opts.reduceMotion, alpha: this.forestShare(),
         wind: sim && opts.weather?.rain ? "rain" : opts.weather ? "cloud" : "calm",
         walkers: feet,
+        faced: this.faced, hangRows: Math.ceil(ART * FACE_HANG),
       });
     }
     // Park fences sit on the ground layer, under the lighting and units.
@@ -361,6 +369,26 @@ export class DefendRenderer {
     this.fences.draw(ctx, this.px);
     // Magic boats' water over the ground, sinking what it reaches.
     if (sim) this.floods.draw({ c: ctx, px: this.px, sim, area: this.area, rain: !!opts.weather?.rain, reduceMotion: opts.reduceMotion, reflections: opts.effects ?? true, layer: this.layer, layerScale: this.layerScale });
+  }
+
+  /** The wall's brick faces hang over the open ground south of it, which
+   * the forest's floor covers: copied back over it from the city layer
+   * (and the fading one), exactly as they were painted. */
+  private drawFaces() {
+    const ctx = this.ctx, k = this.layerScale, P = this.px * k, hang = Math.round(P * FACE_HANG);
+    const copy = (layer: HTMLCanvasElement) => {
+      for (const f of this.faces) {
+        const sx = Math.round(f.x0 * P), sy = Math.round(f.y * P), sw = Math.round(f.x1 * P) - sx;
+        ctx.drawImage(layer, sx, sy, sw, hang, sx / k, sy / k, sw / k, hang / k);
+      }
+    };
+    copy(this.layer);
+    if (this.previousArea && this.previousLayer) {
+      ctx.save();
+      ctx.globalAlpha = 1 - this.areaMix;
+      copy(this.previousLayer);
+      ctx.restore();
+    }
   }
 
   /** The city gates swing open while any of the city's people are at
@@ -573,6 +601,9 @@ export class DefendRenderer {
     this.layer.width = W * k;
     this.layer.height = H * k;
     paintCityLayer(this.lctx, this.px * k, { map, sim, area: this.area, lights: this.lighting.lights, stones: this.lighting.roadStones, looks });
+    this.faces = hangingFaces(map, sim);
+    this.faced.fill(0);
+    for (const f of this.faces) for (let x = f.x0; x < f.x1; x++) this.faced[cellIndex(x, f.y)] = 1;
   }
 
   /** Folds fallen and rebuilt buildings into the lighting, then draws what
