@@ -129,9 +129,9 @@ Each phase is one PR. Earlier phases leave the game playable. Phases 0 to 8 belo
 
 ### Phase 0: Clean up the page (small, do first)
 
-- Remove the `<h1>` mode title and the "How to play" `<details>` from the Ambush page and the Siege page, and the "Buildings and upgrades" help block.
-- Replace `Math.hypot` in `campaign/sim.ts` and `campaign/battlefield.ts` battle paths with `dist`/`sq`.
-- Tests: update `tests/campaign.mjs` selectors.
+- [x] Remove the `<h1>` mode title and the "How to play" `<details>` from the Ambush page and the Siege page, and the "Buildings and upgrades" help block.
+- [x] Replace `Math.hypot` in `campaign/sim.ts` and `campaign/battlefield.ts` battle paths with `dist`/`sq`.
+- [x] Tests: `node tests/campaign.mjs` uses real board clicks/touch taps for placement and selling, checks that the removed panels stay absent, and verifies both modes at 390 × 844 and 1280 × 800.
 
 ### Phase 1: Level data and the level select
 

@@ -1,4 +1,5 @@
 /** Mode lifecycle and economy around DefendSim. All combat belongs to Defend. */
+import { dist } from '../exact.ts';
 import { DefendSim,type Enemy } from '../defend/sim.ts';
 import * as C from '../defend/catalog.ts';
 import { buildWave } from '../defend/waves.ts';
@@ -87,11 +88,11 @@ export class CampaignSim {
  private nextWave(){this.wave++;this.engine.wave=1+this.level*8+(this.wave-1)*2;this.pending=buildWave(this.engine.wave,this.rng);this.spawnClock=0;this.breakClock=2;}
  private followRoad(e:Enemy,dt:number){
   let segment=this.route.get(e);
-  if(segment===undefined){let best=Infinity;segment=1;for(let i=1;i<this.plan.path.length;i++){const a=this.plan.path[i-1],b=this.plan.path[i],dx=b.x-a.x,dy=b.y-a.y,t=Math.max(0,Math.min(1,((e.x-a.x)*dx+(e.y-a.y)*dy)/(dx*dx+dy*dy)));const d=Math.hypot(e.x-a.x-t*dx,e.y-a.y-t*dy);if(d<best){best=d;segment=i;}}}
+  if(segment===undefined){let best=Infinity;segment=1;for(let i=1;i<this.plan.path.length;i++){const a=this.plan.path[i-1],b=this.plan.path[i],dx=b.x-a.x,dy=b.y-a.y,t=Math.max(0,Math.min(1,((e.x-a.x)*dx+(e.y-a.y)*dy)/(dx*dx+dy*dy)));const d=dist(e.x-a.x-t*dx,e.y-a.y-t*dy);if(d<best){best=d;segment=i;}}}
   const target=this.plan.path[segment];
   if(!target){e.escaped=true;e.hp=0;this.lives=Math.max(0,this.lives-1);return true;}
   const speed=enemySpeed(this.engine,e)*chilled(e);
-  if(Math.hypot(target.x-e.x,target.y-e.y)<=speed*dt+.1){e.x=target.x;e.y=target.y;this.route.set(e,segment+1);}
+  if(dist(target.x-e.x,target.y-e.y)<=speed*dt+.1){e.x=target.x;e.y=target.y;this.route.set(e,segment+1);}
   else{this.engine.moveToward(e,target,{speed,dt,flying:true});this.route.set(e,segment);}
   return true;
  }

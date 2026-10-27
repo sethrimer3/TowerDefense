@@ -1,3 +1,4 @@
+import { dist } from '../exact.ts';
 import { pathLook, pathBadge, paintPathIcons } from "../ui/path-badge.ts";
 import type { TileTree } from "../tiles.ts";
 import type { Wear } from "./sim.ts";
@@ -10,7 +11,6 @@ import { CampaignSim, LEVELS, emptyCampaigns, deployable, levelPlan, type Mode }
 import { STRUCTURES, type StructureKind, type PaletteItem } from '../defend/catalog.ts';
 import { paintIcon } from '../defend/structure-art.ts';
 import type { Save } from '../save.ts';
-import { t } from '../i18n/index.ts';
 
 type Host = { save:()=>Save; store:()=>void; editProfile?:()=>void; openTree?:(target:TileTree)=>boolean };
 /** Canvas and DOM share one simulation, advanced only by the app's frame loop. */
@@ -42,15 +42,14 @@ export class CampaignPage {
     const unlocked=Math.min(LEVELS-1,this.progress()?.cleared||0);
     this.root.classList.add('native-campaign');
     this.pointers?.end();
-    this.root.innerHTML=`<div class="campaign-head defend-head"><h1>${t(`nav.${this.mode}`)}</h1>${siege&&profile?`<div class="siege-profile">${flagSvg(profile.flag)}<div><small>YOUR PROFILE</small><strong class="siege-profile-name">${escapeText(profile.name)}</strong></div><button type="button" data-action="profile">Edit profile</button></div>`:""}<details class="campaign-intro"><summary>How to play</summary><p>${this.mode==='ambush'?'Hold the road. Enemies follow the marked path; place towers and infantry buildings on the numbered spaces. Survive all three waves with lives remaining.':`Raid a generated bot castle near your MMR. Infantry fight its guards, towers and fortifications; destroy the keep to win. All your infantry buildings deploy below and release their units when you start. Your buildings train and replenish their own garrisons, as in Defend. You have four minutes. Starting commits the raid: a defeat, forfeit or reload during battle counts as a loss.`}</p></details>
-      ${siege&&raid?`<details class="siege-opponent"><summary><strong>${raid.castle.owner.name}</strong> <small class="siege-bot">BOT</small> · ${raid.defender} defense / ${siege.mmr} MMR</summary><p>Your attack MMR: <b>${siege.mmr}</b> · ${siege.wins}/${siege.games} wins${siege.games<10?' · Placement matches':''}</p><p>Castle defense rating: <b>${raid.defender}</b> (estimated)</p><small>Defense ratings are provisional until calibrated against raid results.</small>${finished?`<p>Last rated result: ${raid.state==='won'?'Victory':'Defeat'} · MMR ${raid.delta!>=0?'+':''}${raid.delta??0}. This target is now available for unrated practice.</p>`:''}</details>`:
+    this.root.innerHTML=`<div class="campaign-head defend-head">${siege&&profile?`<div class="siege-profile">${flagSvg(profile.flag)}<div><small>YOUR PROFILE</small><strong class="siege-profile-name">${escapeText(profile.name)}</strong></div><button type="button" data-action="profile">Edit profile</button></div>`:""}
+      ${siege&&raid?`<details class="siege-opponent"><summary><strong>${raid.castle.owner.name}</strong> <small class="siege-bot">BOT</small> · ${raid.defender} defense / ${siege.mmr} MMR</summary><p>Your attack MMR: <b>${siege.mmr}</b> · ${siege.wins}/${siege.games} wins${siege.games<10?' · Placement matches':''}</p><p>Castle defense rating: <b>${raid.defender}</b> (estimated)</p><small>Defense ratings are provisional until calibrated against raid results.</small><p>Starting a ranked raid commits it: defeat, forfeit or reload counts as a loss.</p>${finished?`<p>Last rated result: ${raid.state==='won'?'Victory':'Defeat'} · MMR ${raid.delta!>=0?'+':''}${raid.delta??0}. This target is now available for unrated practice.</p>`:''}</details>`:
       `<label>Level <select class="campaign-level" aria-label="Level">${Array.from({length:LEVELS},(_,i)=>`<option value="${i}" ${i===this.level?'selected':''} ${i>unlocked?'disabled':''}>${i+1}. ${levelPlan(this.mode,i).name}${i>unlocked?' — locked':''}</option>`).join('')}</select></label>`}
       <div class="campaign-actions"><button data-action="start">${this.sim.phase==='build'?(siege?(finished?'Start practice':'Start ranked raid'):'Start waves'):this.paused?'Resume':'Pause'}</button><button data-action="retry">${siege?(raid?.state==='started'?'Forfeit / rebuild':finished?'Practice again':'Rebuild'):'Rebuild / retry'}</button><button data-action="next" ${(siege?!finished:this.sim.phase!=='won'||this.level===LEVELS-1)?'hidden':''}>${siege?'Find next opponent':'Next level'}</button></div>
       ${this.mode==='ambush'?'<p class="ambush-wallet" aria-live="polite">Ambush gold: <b id="ambush-gold"></b></p>':''}
       <div class="campaign-spells"></div><div class="campaign-inspect-actions"><button data-action="sell" hidden>Sell selected</button><button data-action="upgrade" hidden>Open building upgrades</button></div>
       <p class="campaign-status" role="status" aria-live="polite"></p></div>
-      <div class="campaign-stage defend-stage side-open"><aside class="defend-side"><div class="campaign-roster defend-palette"></div></aside><div class="campaign-board defend-board"><canvas aria-label="${this.mode==='ambush'?'Enemy path and placement spaces':'Enemy castles and infantry muster spaces'}"></canvas></div></div>
-      <details class="campaign-help"><summary>Buildings and upgrades</summary><h2>${this.mode==='ambush'?'Roadside buildings':'Infantry buildings'}</h2><p>${this.mode==='ambush'?'Choose a building, then a numbered space. Tap a building to inspect its range, open its upgrades, or sell it. Unlocked buildings can be bought repeatedly with Ambush gold, including during waves. Selling refunds the full price before waves, or 70% (rounded down to 10) during battle. Costs reflect potential DPS and upgrades. Kill enemies for gold; escaped enemies pay nothing. This gold is only for this level and resets on retry.':'Every infantry building you own is deployed automatically at the bottom, including copies placed in your Defend city. Start the raid to release their troops toward the castle above. Buy more buildings in Tiles.'} ${this.mode==='ambush'?'Layouts and completed levels are saved. Battles restart on reload.':'Your rated results are saved; each new raid uses your current infantry buildings. Reloading a rated battle counts as a loss; the target remains available for practice.'} Towers, troops, projectiles, and worn upgrades use Defend’s combat engine. Scroll or pinch to zoom; drag the battlefield to pan.</p>${this.mode==='ambush'?'<div class="campaign-spaces" aria-label="Placement spaces"></div>':''}</details>`;
+      <div class="campaign-stage defend-stage side-open"><aside class="defend-side"><div class="campaign-roster defend-palette"></div></aside><div class="campaign-board defend-board"><canvas aria-label="${this.mode==='ambush'?'Enemy path and placement spaces':'Enemy castles and infantry muster spaces'}"></canvas></div></div>`;
     this.canvas=this.root.querySelector('.campaign-board canvas')!;
     const camera=this.renderer?{...this.renderer.cam}:undefined;this.renderer=new DefendRenderer(this.canvas);
     const box=this.canvas.getBoundingClientRect();this.renderer.resize(box.width,box.height);this.renderer.resetCam();if(camera)Object.assign(this.renderer.cam,camera);
@@ -94,8 +93,6 @@ export class CampaignPage {
     if(!available.includes(this.selected!))this.selected=available[0]||null;
     this.roster.innerHTML=available.flatMap(k=>this.sim.variants(k).map((wear,variant)=>{const price=this.sim.price(k,wear);return `<button data-kind="${k}" data-variant="${variant}" data-price="${price.cost}" title="Estimated potential DPS: ${price.dps.toFixed(1)}" aria-pressed="${this.selected===k&&this.selectedVariant===variant}"><canvas width="48" height="48" data-icon="${k}"${pathLook(k,wear.path)}></canvas><span>${STRUCTURES[k].name}</span>${wear.path&&wear.rank?pathBadge({path:wear.path,rank:wear.rank}):''}<small>${price.cost} gold</small></button>`;})).join('')||'<p>Unlock a tower or infantry building in Tiles to use it here.</p>';
     this.roster.querySelectorAll<HTMLButtonElement>('[data-kind]').forEach(b=>{paintIcon(b.querySelector('canvas')!,b.dataset.kind as PaletteItem);b.onclick=()=>{this.selected=b.dataset.kind as StructureKind;this.selectedVariant=Number(b.dataset.variant);this.palette();};b.onpointerdown=e=>this.dragPalette(e,b);});paintPathIcons(this.roster);
-    this.root.querySelector('.campaign-spaces')!.innerHTML=this.sim.plan.pads.map((_,i)=>{const placed=this.sim.layout.find(p=>p.pad===i);return `<button data-pad="${i}" ${!['build','battle'].includes(this.sim.phase)?'disabled':''} aria-label="Space ${i+1}: ${placed?STRUCTURES[placed.kind].name:'empty'}">${i+1}: ${placed?`${STRUCTURES[placed.kind].name}`:'Empty'}</button>`;}).join('');
-    this.root.querySelectorAll<HTMLButtonElement>('[data-pad]').forEach(b=>b.onclick=()=>this.place(Number(b.dataset.pad)));
   }
   private place(pad:number){
     if(this.mode!=='ambush'||!['build','battle'].includes(this.sim.phase))return;
@@ -119,10 +116,6 @@ export class CampaignPage {
       const gold=this.root.querySelector('#ambush-gold')!;if(gold.textContent!==String(s.gold))gold.textContent=String(s.gold);
       const ended=s.phase==='won'||s.phase==='lost';
       this.roster.querySelectorAll<HTMLButtonElement>('[data-kind]').forEach(button=>{button.disabled=ended||Number(button.dataset.price)>s.gold;});
-      this.root.querySelectorAll<HTMLButtonElement>('[data-pad]').forEach(button=>{
-        const pad=Number(button.dataset.pad),placed=s.layout.find(p=>p.pad===pad);button.disabled=ended;
-        const text=`${pad+1}: ${placed?`${STRUCTURES[placed.kind].name}`:'Empty'}`;if(button.textContent!==text)button.textContent=text;
-      });
     }
     const selected=s.layout.find(p=>p.pad===this.selectedPad);
     const sell=this.root.querySelector<HTMLButtonElement>('[data-action="sell"]')!,upgrade=this.root.querySelector<HTMLButtonElement>('[data-action="upgrade"]')!;
@@ -137,9 +130,9 @@ export class CampaignPage {
     const kind=button.dataset.kind as StructureKind,variant=Number(button.dataset.variant),x=event.clientX,y=event.clientY;
     let moved=false;const ghost=document.createElement('canvas');ghost.width=48;ghost.height=48;ghost.style.cssText='position:fixed;width:48px;height:48px;pointer-events:none;z-index:10000;image-rendering:pixelated;';
     ghost.getContext('2d')!.drawImage(button.querySelector('canvas')!,0,0);
-    const move=(e:PointerEvent)=>{if(e.pointerId!==event.pointerId)return;if(Math.hypot(e.clientX-x,e.clientY-y)>8&&!moved){moved=true;document.body.append(ghost);}ghost.style.left=`${e.clientX-24}px`;ghost.style.top=`${e.clientY-48}px`;};
+    const move=(e:PointerEvent)=>{if(e.pointerId!==event.pointerId)return;if(dist(e.clientX-x,e.clientY-y)>8&&!moved){moved=true;document.body.append(ghost);}ghost.style.left=`${e.clientX-24}px`;ghost.style.top=`${e.clientY-48}px`;};
     const end=(e:PointerEvent)=>{if(e.pointerId!==event.pointerId)return;window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',end);window.removeEventListener('pointercancel',cancel);ghost.remove();
-      if(moved&&this.renderer){this.selected=kind;this.selectedVariant=variant;const p=this.renderer.toCell(e.clientX,e.clientY),pad=this.sim.plan.pads.findIndex(at=>Math.hypot(at.x-p.fx,at.y-p.fy)<6);if(pad>=0)this.place(pad);}
+      if(moved&&this.renderer){this.selected=kind;this.selectedVariant=variant;const p=this.renderer.toCell(e.clientX,e.clientY),pad=this.sim.plan.pads.findIndex(at=>dist(at.x-p.fx,at.y-p.fy)<6);if(pad>=0)this.place(pad);}
     };
     const cancel=(e:PointerEvent)=>{moved=false;end(e);};window.addEventListener('pointermove',move);window.addEventListener('pointerup',end);window.addEventListener('pointercancel',cancel);
   }
@@ -150,7 +143,7 @@ export class CampaignPage {
       this.inspection=this.sim.map.buildings.find(b=>!b.hidden&&p.fx>=b.rect.x&&p.fx<b.rect.x+b.rect.w&&p.fy>=b.rect.y&&p.fy<b.rect.y+b.rect.h)?.id;
       return;
     }
-    const pad=this.sim.plan.pads.findIndex(at=>Math.hypot(at.x-p.fx,at.y-p.fy)<6);
+    const pad=this.sim.plan.pads.findIndex(at=>dist(at.x-p.fx,at.y-p.fy)<6);
     if(pad>=0)this.place(pad);
   }
   private draw(){

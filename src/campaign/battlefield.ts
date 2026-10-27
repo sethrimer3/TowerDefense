@@ -1,4 +1,5 @@
 /** Scenario geometry assembled by Defend's city generator, on Defend's cell grid. */
+import { dist } from '../exact.ts';
 import { generateCity, CellType, type CityMap, type Building } from '../defend/citygen.ts';
 import { CELL_COUNT,CELLS_W,CELLS_H,cellIndex,rectCells,type Rect } from '../defend/grid.ts';
 import { STRUCTURES,type StructureKind } from '../defend/catalog.ts';
@@ -14,7 +15,7 @@ export function ambushField(level:number){
  const plan=levelPlan('ambush',level),path=plan.path.map(nativePoint),pads=plan.pads.map(nativePoint);
  for(const p of pads){
   let nearest={x:0,y:0},best=Infinity;
-  for(let i=1;i<path.length;i++){const a=path[i-1],b=path[i],dx=b.x-a.x,dy=b.y-a.y,t=Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/(dx*dx+dy*dy))),x=a.x+t*dx,y=a.y+t*dy,d=Math.hypot(p.x-x,p.y-y);if(d<best){best=d;nearest={x,y};}}
+  for(let i=1;i<path.length;i++){const a=path[i-1],b=path[i],dx=b.x-a.x,dy=b.y-a.y,t=Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/(dx*dx+dy*dy))),x=a.x+t*dx,y=a.y+t*dy,d=dist(p.x-x,p.y-y);if(d<best){best=d;nearest={x,y};}}
   if(best<8.5&&best>.01){p.x+=(p.x-nearest.x)/best*(8.5-best);p.y+=(p.y-nearest.y)/best*(8.5-best);}
  }
  const end=path[path.length-1],keep=centered({x:end.x,y:end.y+8},4,4);
@@ -22,7 +23,7 @@ export function ambushField(level:number){
  const city=new Uint8Array(CELL_COUNT),wall=new Uint8Array(CELL_COUNT);
  for(const s of structures)for(const c of rectCells(s.rect))city[c]=1;
  // Native streets, parks and houses surround the road, with native outdoor grass beyond.
- for(let y=1;y<CELLS_H;y++)for(let x=0;x<CELLS_W;x++)if(path.some(p=>Math.hypot(x-p.x,y-p.y)<13))city[cellIndex(x,y)]=1;
+ for(let y=1;y<CELLS_H;y++)for(let x=0;x<CELLS_W;x++)if(path.some(p=>dist(x-p.x,y-p.y)<13))city[cellIndex(x,y)]=1;
  const map=generateCity({structures,city,wall},101+level),road=new Set<number>();
  for(let segment=1;segment<path.length;segment++){
   const a=path[segment-1],b=path[segment],n=Math.max(Math.abs(b.x-a.x),Math.abs(b.y-a.y));
