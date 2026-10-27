@@ -249,6 +249,10 @@ Window sunlight in the Library and Tiles uses `src/soft-sunlight.ts` (`SoftSunli
 
 `.claude/skills/add-upgrade/` defines a new Armory upgrade (shown in the Smithy below the Mine), Smithy row (Training in code) or skill-tree node: it records a spec and implements directly, with tests and docs. The user permits implementing first and revising afterward; do not pause for separate spec approval unless the user requests it. Its `references/panels.md` describes each panel; keep it current when those mechanisms change.
 
+### Mode plans
+
+`docs/plans/` holds the agreed plans for each game mode: `AmbushPlan.md` (phased Ambush rebuild: level select, zone waves, outposts and stars, free build grid, gold upgrades, the star-funded Ambush tree), `SiegePlan.md`, `DefendPlan.md`, and `OtherPlans.md` for work shared by every mode (fences as walls, the strike spell quick bar, tab icons, the currency bar, ropes). Read the relevant plan before working on a mode, and tick its phases as they land.
+
 ### Issue tracker
 
 Issues live in GitHub Issues on `sethrimer3/TowerDefense`. See `docs/agents/issue-tracker.md`.
