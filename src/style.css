@@ -2391,3 +2391,4 @@ nav button[data-mode] > .tab-label { min-height: 2.4em; }
 .ambush-level-card strong { font-size:13px; overflow-wrap:anywhere; }
 .ambush-card-stars { color:var(--area-dark); letter-spacing:3px; }
 @media(max-width:480px) { .ambush-level-columns,.ambush-level-cards { gap:6px; } .ambush-zone { padding:6px; } .ambush-level-card { padding:5px; gap:5px; } .ambush-level-preview { height:80px; } .ambush-level-card strong { font-size:11px; } }
+.ambush-level-preview canvas { width:100%; height:100%; object-fit:contain; image-rendering:pixelated; background:#0b0a09; }

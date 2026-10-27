@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { AMBUSH_LEVELS, trackFor, pointAlong, decodeAmbush, totalStars, levelUnlocked, recordStars } from '../src/campaign/levels.ts';
 import { CELLS_W, CELLS_H } from '../src/defend/grid.ts';
 import { dist } from '../src/exact.ts';
+import { ambushField } from '../src/campaign/battlefield.ts';
+import { CellType } from '../src/defend/citygen.ts';
 test('Thirty seeded levels span all zones and make bounded non-crossing edge-to-keep tracks', () => {
  assert.equal(AMBUSH_LEVELS.length, 30);assert.equal(new Set(AMBUSH_LEVELS.map(l => l.seed)).size, 30);
  for (const level of AMBUSH_LEVELS) {
@@ -28,4 +30,13 @@ test('Best stars preserve improvements, unlock the next level and migrate old cl
  assert.deepEqual(decodeAmbush(p),p);
  assert.deepEqual(decodeAmbush({stars:{'moss-1':3,'moss-2':4,'desert-1':NaN,bogus:3}}),{stars:{'moss-1':3}});
  for(const raw of [null,[],{},false])assert.equal(totalStars(decodeAmbush(raw)),0);
+});
+test('Native maps use the seeded track, reach the board edge and preserve keep ownership',()=>{
+ for(let index=0;index<30;index+=3){
+  const field=ambushField(index),again=ambushField(index),entry=field.path[0],cell=Math.floor(entry.y)*CELLS_W+entry.x;
+  assert.deepEqual(field.path,trackFor(AMBUSH_LEVELS[index]).points);
+  assert.equal(field.map.type[cell],CellType.ROAD);assert.ok(field.road.has(cell));
+  assert.ok(field.map.buildings[0].cells.every(c=>field.map.owner[c]===0));
+  assert.deepEqual(field.map.type,again.map.type);assert.ok(field.pads.length>=5);
+ }
 });

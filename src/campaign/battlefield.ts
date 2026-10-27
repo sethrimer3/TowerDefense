@@ -1,3 +1,4 @@
+import { ambushLevel,trackFor,pointAlong } from './levels.ts';
 /** Scenario geometry assembled by Defend's city generator, on Defend's cell grid. */
 import { dist } from '../exact.ts';
 import { generateCity, CellType, type CityMap, type Building } from '../defend/citygen.ts';
@@ -12,32 +13,30 @@ const centered=(p:Point,w:number,h:number):Rect=>({x:Math.max(0,Math.min(CELLS_W
 export function footprint(kind:StructureKind,p:Point){const d=STRUCTURES[kind];return centered(p,d.w,d.h);}
 function erase(map:CityMap,b:Building){b.hidden=true;for(const c of b.cells)if(map.owner[c]===b.id){map.owner[c]=-1;map.type[c]=CellType.PARK;}}
 export function ambushField(level:number){
- const plan=levelPlan('ambush',level%3),path=plan.path.map(nativePoint),pads=plan.pads.map(nativePoint);
- for(const p of pads){
-  let nearest={x:0,y:0},best=Infinity;
-  for(let i=1;i<path.length;i++){const a=path[i-1],b=path[i],dx=b.x-a.x,dy=b.y-a.y,t=Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/(dx*dx+dy*dy))),x=a.x+t*dx,y=a.y+t*dy,d=dist(p.x-x,p.y-y);if(d<best){best=d;nearest={x,y};}}
-  if(best<8.5&&best>.01){p.x+=(p.x-nearest.x)/best*(8.5-best);p.y+=(p.y-nearest.y)/best*(8.5-best);}
- }
- const end=path[path.length-1],keep=centered({x:end.x,y:end.y+8},4,4);
- const structures=[fitted(0,'keep',keep),...pads.map((p,i)=>fitted(i+1,'watchTower',centered(p,12,12)))];
- const city=new Uint8Array(CELL_COUNT),wall=new Uint8Array(CELL_COUNT);
- for(const s of structures)for(const c of rectCells(s.rect))city[c]=1;
- // Native streets, parks and houses surround the road, with native outdoor grass beyond.
- for(let y=1;y<CELLS_H;y++)for(let x=0;x<CELLS_W;x++)if(path.some(p=>dist(x-p.x,y-p.y)<13))city[cellIndex(x,y)]=1;
- const map=generateCity({structures,city,wall},101+level),road=new Set<number>();
- for(let segment=1;segment<path.length;segment++){
-  const a=path[segment-1],b=path[segment],n=Math.max(Math.abs(b.x-a.x),Math.abs(b.y-a.y));
-  for(let t=0;t<=n;t++)for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
-   const x=Math.round(a.x+(b.x-a.x)*t/n)+dx,y=Math.round(a.y+(b.y-a.y)*t/n)+dy;
-   if(x>=0&&x<CELLS_W&&y>=0&&y<CELLS_H)road.add(cellIndex(x,y));
+ const data=ambushLevel(level),track=trackFor(data),path=track.points,pads:Point[]=[];
+ const along=(p:Point)=>{let best=Infinity;for(let i=1;i<path.length;i++){const a=path[i-1],b=path[i],dx=b.x-a.x,dy=b.y-a.y,t=Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/(dx*dx+dy*dy)));best=Math.min(best,dist(p.x-a.x-t*dx,p.y-a.y-t*dy));}return best;};
+ for(let i=1;i<30&&pads.length<10;i++){
+  const p=pointAlong(path,i/31);
+  for(const [dx,dy] of [[9,0],[-9,0],[0,9],[0,-9]]){const at={x:Math.round((p.x+dx)/2)*2,y:Math.round((p.y+dy)/2)*2};
+   if(at.x<7||at.x>CELLS_W-7||at.y<8||at.y>CELLS_H-8||along(at)<8||dist(at.x-track.keep.x,at.y-track.keep.y)<13||pads.some(q=>Math.abs(q.x-at.x)<13&&Math.abs(q.y-at.y)<13))continue;
+   pads.push(at);if(pads.length===10)break;
   }
  }
- const lots=structures.slice(1).map(s=>map.buildings.find(b=>b.structureUid===s.uid)!.id);
+ const keep=footprint('keep',track.keep),structures=[fitted(0,'keep',keep),...pads.map((p,i)=>fitted(i+1,'watchTower',centered(p,12,12)))];
+ const city=new Uint8Array(CELL_COUNT),wall=new Uint8Array(CELL_COUNT),road=new Set<number>();
+ for(const p of [...track.outposts,track.keep])for(const c of rectCells(centered(p,18,18)))city[c]=1;
+ for(const s of structures)for(const c of rectCells(s.rect))city[c]=1;
+ for(let i=1;i<path.length;i++){const a=path[i-1],b=path[i],n=Math.max(Math.abs(b.x-a.x),Math.abs(b.y-a.y));
+  for(let t=0;t<=n;t++)for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){const x=Math.round(a.x+(b.x-a.x)*t/n)+dx,y=Math.round(a.y+(b.y-a.y)*t/n)+dy;if(x>=0&&x<CELLS_W&&y>=0&&y<CELLS_H){const c=cellIndex(x,y);road.add(c);city[c]=1;}}
+ }
+ for(const c of rectCells(keep))road.delete(c);
+ const map=generateCity({structures,city,wall},data.seed),lots=structures.slice(1).map(s=>map.buildings.find(b=>b.structureUid===s.uid)!.id);
  const blockedBuildings=new Set([...road].map(c=>map.owner[c]).filter(id=>id>=0));
  for(const id of [...lots,...blockedBuildings])if(id!==0)erase(map,map.buildings[id]);
  for(const c of road){map.type[c]=CellType.ROAD;map.owner[c]=-1;map.city[c]=1;}
- return {map,path,pads,lots,road,name:plan.name};
+ return {map,path,pads,lots,road,name:data.name,level:data,track};
 }
+
 export type MusterCopy={kind:StructureKind;uid:number;path?:string;rank?:number};
 export function siegeField(castle:CastleSnapshot,copies:MusterCopy[]){
  const city=new Uint8Array(CELL_COUNT),wall=new Uint8Array(CELL_COUNT);

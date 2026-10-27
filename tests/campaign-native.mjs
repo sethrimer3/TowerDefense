@@ -26,6 +26,7 @@ try{for(const width of [1280,390]){
  await page.locator('#ambush [data-action="start"]').click();
  assert.equal(await page.evaluate(()=>window.nativeModes.ambush.sim.phase),'battle');
  await page.evaluate(()=>window.nativeModes.advance(12));
+ assert.ok(await page.evaluate(()=>{const s=window.nativeModes.ambush.sim;return s.enemies.length+s.kills>0;}),'Edge entry actually releases native enemies.');
  assert.equal(data.native,'DefendSim');assert.ok(data.buildings>20);assert.ok(data.paths>0);
  await page.locator('#ambush .campaign-board').screenshot({path:`test-results/native-ambush-${width}.png`});
  await page.screenshot({path:`test-results/native-ambush-full-${width}.png`});
