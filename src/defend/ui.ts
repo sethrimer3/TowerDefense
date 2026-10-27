@@ -1,6 +1,6 @@
-import { SpellBar,STRIKE_SPELLS,castStrike } from '../ui/spell-bar.ts';
 import {t} from "../i18n/index.ts";
 import { MagicCircle } from "../magic-circle/render.ts";
+import { SpellBar, STRIKE_SPELLS, castStrike } from "../ui/spell-bar.ts";
 import { buildingTree, foundNodes, hasTree, mergedFrom, respecBuilding, undoUpgrade, rootOf, specialtyLabel, specialtyOf, stepName, targetKind, upgradeBuilding, type PaletteKind, type SpecialtyTarget } from "../specializations.ts";
 import { pathById, type PathId } from "../knowledge-paths.ts";
 import { SIDE_UI, graftedGraph, mapCardHtml, mapCount, mapGraph, mapWeb, sharedBranches, specialtyCircle, treeAllocated, treeBeyond, treeCardHtml, treeStep, type SideKind, type SideUi } from "../ui/specialty.ts";
@@ -129,7 +129,7 @@ function sideOfDrag(drag: Drag): SideKind | undefined {
 }
 
 export class DefendPage {
-  private spellBar?:SpellBar;private spellSignature="";
+  private spellBar?: SpellBar;
   private host: DefendHost;
   private root: HTMLElement;
   private phase: "build" | "sim" | "over" = "build";
@@ -350,8 +350,14 @@ export class DefendPage {
     this.bindSpecialty();
     this.renderer = new DefendRenderer(this.root.querySelector("#defend-canvas")!);
     const canvas = this.renderer.canvas;
-    canvas.addEventListener("pointermove",e=>{if(this.spellBar){const p=this.renderer!.toCell(e.clientX,e.clientY);this.spellBar.point={x:p.fx,y:p.fy};}});
-    this.root.addEventListener("keydown",e=>{if(e.key==="Escape")this.spellBar?.cancel();});
+    canvas.addEventListener("pointermove", (e) => {
+      if (!this.spellBar) return;
+      const p = this.renderer!.toCell(e.clientX, e.clientY);
+      this.spellBar.point = { x: p.fx, y: p.fy };
+    });
+    this.root.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") this.spellBar?.cancel();
+    });
     canvas.addEventListener("pointerdown", (e) => this.pointers.down(e));
     canvas.addEventListener("contextmenu", (e) => e.preventDefault());
     canvas.addEventListener(
@@ -631,10 +637,18 @@ export class DefendPage {
   }
 
   private updateSkillCooldowns() {
-    if (this.phase !== "sim" || !this.sim) {this.spellBar?.cancel();if(this.spellBar)this.spellBar.el.hidden=true;return;}
-    const spells=STRIKE_SPELLS.filter(spell=>this.sim!.bonuses[spell]),signature=spells.join(',');
-    if(!this.spellBar||signature!==this.spellSignature){this.spellBar?.el.remove();this.spellBar=new SpellBar(spells);this.spellSignature=signature;this.root.querySelector('#defend-board')!.append(this.spellBar.el);}
-    this.spellBar.el.hidden=false;this.spellBar.update(this.sim,true,this.host.reduceMotion());
+    if (this.phase !== "sim" || !this.sim) {
+      this.spellBar?.cancel();
+      if (this.spellBar) this.spellBar.el.hidden = true;
+      return;
+    }
+    // Every strike spell is always at hand, as in the Skills palette.
+    if (!this.spellBar) {
+      this.spellBar = new SpellBar(STRIKE_SPELLS);
+      this.root.querySelector("#defend-board")!.append(this.spellBar.el);
+    }
+    this.spellBar.el.hidden = false;
+    this.spellBar.update(this.sim, true, this.host.reduceMotion());
     for (const button of Array.from(this.root.querySelectorAll<HTMLButtonElement>("#defend-palette [data-item]"))) {
       const item = button.dataset.item, banner = item === "banner", necro = item === "necromancy", meteor = item === "meteor", frost = item === "frostNova", called = item === "reinforcements", spell = necro || meteor || frost || called;
       const left = banner ? this.sim.bannerRemaining : necro ? this.sim.necroRemaining : meteor ? this.sim.meteorRemaining : frost ? this.sim.frostRemaining : called ? this.sim.reinforceRemaining : 0;
@@ -980,8 +994,8 @@ export class DefendPage {
 
   // ── Dragging ──────────────────────────────────────────────────────────
   private overlay(): Overlay | null {
-    if(this.spellBar)this.spellBar.el.hidden=this.phase!=="sim";
-    const o = this.pointers.session?.overlay() ?? (this.phase==="sim"&&this.sim?this.spellBar?.overlay(this.sim):null) ?? null;
+    if (this.spellBar) this.spellBar.el.hidden = this.phase !== "sim";
+    const o = this.pointers.session?.overlay() ?? (this.phase === "sim" && this.sim ? this.spellBar?.overlay(this.sim) : null) ?? null;
     // An aimed meteor or nova shows its researched reach; Necromancy marks the fallen it would raise.
     if (o?.spell?.look === "meteor" && this.sim) o.spell.r = meteorReach(this.sim);
     else if (o?.spell?.look === "frost" && this.sim) o.spell.r = frostReach(this.sim);
@@ -1002,7 +1016,7 @@ export class DefendPage {
    * build phase picks things up; in battle a press lifts the war banner where
    * it stands (a tap takes it down), and anywhere else moves the view. */
   private pickUp(e: PointerEvent): boolean {
-    if(this.spellBar?.armed)return false;
+    if (this.spellBar?.armed) return false;
     if (this.phase === "sim") return this.pickUpBanner(e);
     if (this.phase !== "build") return false;
     const { cx, cy, inside } = eventCell(this.renderer!, e);
@@ -1155,7 +1169,11 @@ export class DefendPage {
    * tap, or a tap on anything else, puts it down). */
   private tap(e: PointerEvent) {
     if (this.phase === "over") return;
-    if(this.phase==="sim"&&this.sim&&this.spellBar?.armed){const p=this.renderer!.toCell(e.clientX,e.clientY);if(castStrike(this.sim,this.spellBar.armed,{x:p.fx,y:p.fy}))this.spellBar.cancel();return;}
+    if (this.phase === "sim" && this.sim && this.spellBar?.armed) {
+      const p = this.renderer!.toCell(e.clientX, e.clientY);
+      if (castStrike(this.sim, this.spellBar.armed, { x: p.fx, y: p.fy })) this.spellBar.cancel();
+      return;
+    }
     if (this.phase === "sim" && this.rallyTap(e)) return;
     this.closeSpecialty();
     const { cx, cy, inside } = eventCell(this.renderer!, e);

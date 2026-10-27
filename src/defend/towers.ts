@@ -27,7 +27,7 @@ import { shootBallista, wallBallistaReload } from "./wall-defenses.ts";
 import { burstBall } from "./muskets.ts";
 import { bulletHit, pierceHits } from "./snipers.ts";
 import { knockBack } from "./gunners.ts";
-import type { Arrow, DefendSim, Enemy } from "./sim.ts";
+import type { Arrow, DamageOrigin, DefendSim, Enemy } from "./sim.ts";
 import { railHit, railOn } from "./revolutionary.ts";
 import { fireNanoShell, nanoReload } from "./nanobots.ts";
 import { FIRE_ARROWS, GUNNERY, SHARP, SIEGE_SHOT, pathRank } from "../knowledge-paths.ts";
@@ -269,7 +269,7 @@ export function stepArrows(sim: DefendSim, dt: number) {
       const hit = a.chain ? railHit(sim, a, t) : a.damage;
       const landed = sim.hurtEnemy(t, hit, true, "ranged", a.origin ?? { x: a.x, y: a.y }, true);
       if (a.chain) railOn(sim, a, { x: t.x, y: t.y }, hit);
-      if (landed && a.burn) ignite(t, a.burn, a.burnFor!,sim.tallyOrigin(a.origin));
+      if (landed && a.burn) ignite(t, a.burn, a.burnFor!, sim.tallyOrigin(a.origin));
       // A sniper's bullet pins what it hits, or glances on.
       if (a.pin || a.glance) bulletHit(sim, a, t, landed);
       // A Stopping power bullet knocks it back.
@@ -317,8 +317,12 @@ export function stepShells(sim: DefendSim, dt: number) {
 }
 
 /** Sets `e` burning for `seconds` at `dps`, or keeps the hotter, longer burn it has. */
-export function ignite(e: Enemy, dps: number, seconds: number, origin?:import("./sim.ts").DamageOrigin) {
-  if(dps>=(e.burnDps??0)){if(origin)e.burnOrigin=origin;else if(e.burnOrigin)delete e.burnOrigin;}
+export function ignite(e: Enemy, dps: number, seconds: number, origin?: DamageOrigin) {
+  // The hotter burn's source takes the credit (statistics only).
+  if (dps >= (e.burnDps ?? 0)) {
+    if (origin) e.burnOrigin = origin;
+    else delete e.burnOrigin;
+  }
   e.burn = Math.max(e.burn ?? 0, seconds);
   e.burnDps = Math.max(e.burnDps ?? 0, dps);
 }

@@ -1,61 +1,58 @@
 # Ambush balance checks
 
-These deterministic runs use native Defend combat, synthetic saves and the committed policy in tools/ambush-balance.ts. They never read player saves. The 30-level sweep has no star upgrades or spells, starts with two Archers and a Melee Guild, buys native local upgrades and caps itself at 14 buildings. It mixes Archer branches and guards the keep with the third paid building. This measures one deliberately simple strategy, not optimal human play.
+These deterministic runs use native Defend combat, synthetic saves and the committed policy in tools/ambush-balance.ts. They never read player saves. The 30-level sweep has no star upgrades or spells, starts with two Archers and a Melee Guild, places buildings before upgrading until half its cap of 20 stand, then buys native local upgrades. Its first buildings cycle through the lanes' entries. This measures one deliberately simple strategy, not optimal human play.
 
-The script stops after 1800 simulated seconds. A **script cap** below means the battle was still running; Ambush itself has no time limit. All twenty waves contain enemies, and waves 10/20 force the toughest affordable native zone kind without exceeding the budget.
+The script stops after 2400 simulated seconds. A **script cap** below means the battle was still running; Ambush itself has no time limit. The bot only sends a wave once the last is clear, so a crowd still razing an outpost's houses holds it up.
 
-## Tuning
+## The placeholder curve
 
-- Mossbound’s starting wave budget fell from 16 to 8, allowing a small opening army to earn upgrades before tougher species arrive.
-- The zone budget table is 8/18/28/36/46/60/75/90/180/140. Astral starts at 180 because its cheapest native enemy costs 150; the old curve produced empty early waves.
-- Starting gold stays 500/600/700. Base DPS prices, local tier fees, native-stat kill bounties and 2/3/5-star branch prices remain the initial estimates. The measured opening can afford native upgrades without extra starting money.
-- A separate three-building opening, using the first Fire Arrow branches near the entrance, clears Mossbound I: 20 waves, 2 stars, 649 simulated seconds. It uses no star upgrades or spells.
-- Nadir III clears with 85 earned stars (obtainable before its first completion): 20 waves, 3 stars, 1444 simulated seconds. The script uses 14 buildings and no spells. Its ranks are bought through the real star-pool rules, leaving Bounty’s last rank unbought.
-- Balance remains provisional. Placement, anti-air coverage, armor, regeneration, native unit abilities and branch choices matter. The simple mixed policy is intentionally left unchanged across the sweep so failures remain visible.
+The waves are placeholders until tuned by hand (`AMBUSH_WAVES` in src/campaign/ambush-waves.ts):
+
+- Each wave is a crowd: 50 enemies in the first level's first wave up to 500 in the last level's last, drawn from the zone's single-bodied species (no splitters, summoners, chains, fortresses, boats or regenerators). Fliers come from wave 4, at most 15% of a wave; waves 10 and 20 add the zone's toughest ground boss.
+- Every enemy's HP is scaled so the wave's total is 300 × 1.07 a level × 1.11 a wave. Armor counts: a species whose shell halves physical damage counts double toward the total. Ranged shields scale with the HP.
+- Every enemy's damage is scaled so the wave's average enemy deals 2 a second × 1.07 a level × 1.04 a wave, whatever its native damage.
+- The keep (4× Defend's HP, with base Arrow loops), the outposts (2×) and the opening gold (800) grow 1.05 a level: a little slower than the crowds, so each level is a little harder than the last.
+- Kills share 0.2 gold a point of the wave's HP.
 
 ## Thirty-level sweep
 
 | Level | Result | Stars | Wave | Seconds | Kills | Gold earned |
 |---|---|---:|---:|---:|---:|---:|
-| moss-1 | Script cap | 0 | 16 | 1800 | 70 | 2090 |
-| moss-2 | Script cap | 0 | 15 | 1800 | 79 | 2010 |
-| moss-3 | Cleared | 2 | 20 | 640 | 128 | 3530 |
-| desert-1 | Cleared | 1 | 20 | 1095 | 105 | 3890 |
-| desert-2 | Cleared | 1 | 20 | 1547 | 120 | 4650 |
-| desert-3 | Cleared | 1 | 20 | 1307 | 122 | 4990 |
-| ember-1 | Cleared | 1 | 20 | 1537 | 74 | 2990 |
-| ember-2 | Cleared | 1 | 20 | 1612 | 109 | 4010 |
-| ember-3 | Defeat | 0 | 1 | 72 | 1 | 30 |
-| drowned-1 | Cleared | 2 | 20 | 1386 | 127 | 3610 |
-| drowned-2 | Cleared | 2 | 20 | 821 | 144 | 4100 |
-| drowned-3 | Cleared | 1 | 20 | 999 | 93 | 2870 |
-| fungal-1 | Defeat | 0 | 2 | 949 | 15 | 350 |
-| fungal-2 | Script cap | 0 | 17 | 1800 | 202 | 5090 |
-| fungal-3 | Defeat | 0 | 2 | 716 | 14 | 350 |
-| frozen-1 | Script cap | 0 | 8 | 1800 | 49 | 1980 |
-| frozen-2 | Script cap | 0 | 3 | 1800 | 16 | 470 |
-| frozen-3 | Script cap | 0 | 5 | 1800 | 38 | 1290 |
-| crystal-1 | Defeat | 0 | 1 | 49 | 8 | 160 |
-| crystal-2 | Defeat | 0 | 2 | 417 | 16 | 410 |
-| crystal-3 | Cleared | 1 | 20 | 765 | 245 | 6800 |
-| obsidian-1 | Defeat | 0 | 1 | 82 | 6 | 120 |
-| obsidian-2 | Script cap | 0 | 5 | 1800 | 68 | 1370 |
-| obsidian-3 | Script cap | 0 | 16 | 1800 | 180 | 4300 |
-| astral-1 | Defeat | 0 | 6 | 244 | 5 | 350 |
-| astral-2 | Cleared | 2 | 20 | 671 | 35 | 2480 |
-| astral-3 | Script cap | 0 | 10 | 1800 | 16 | 1100 |
-| nadir-1 | Defeat | 0 | 1 | 135 | 2 | 70 |
-| nadir-2 | Defeat | 0 | 1 | 182 | 7 | 210 |
-| nadir-3 | Cleared | 2 | 20 | 765 | 294 | 11990 |
+| moss-1 | Script cap | 0 | 20 | 2400 | 3052 | 3464 |
+| moss-2 | Cleared | 1 | 20 | 2176 | 3398 | 4122 |
+| moss-3 | Script cap | 0 | 19 | 2400 | 3196 | 3907 |
+| desert-1 | Cleared | 1 | 20 | 2335 | 3592 | 4719 |
+| desert-2 | Defeat | 0 | 9 | 1470 | 971 | 1080 |
+| desert-3 | Script cap | 0 | 13 | 2400 | 1705 | 2025 |
+| ember-1 | Script cap | 0 | 11 | 2400 | 1447 | 1760 |
+| ember-2 | Script cap | 0 | 12 | 2400 | 1494 | 1893 |
+| ember-3 | Script cap | 0 | 19 | 2400 | 3729 | 5862 |
+| drowned-1 | Cleared | 2 | 20 | 2272 | 4171 | 7082 |
+| drowned-2 | Cleared | 1 | 20 | 1993 | 4272 | 7578 |
+| drowned-3 | Cleared | 1 | 20 | 2351 | 4364 | 8108 |
+| fungal-1 | Cleared | 1 | 20 | 1887 | 4460 | 8676 |
+| fungal-2 | Cleared | 1 | 20 | 1745 | 4558 | 9283 |
+| fungal-3 | Cleared | 1 | 20 | 1702 | 4654 | 9933 |
+| frozen-1 | Script cap | 0 | 14 | 2400 | 2354 | 4374 |
+| frozen-2 | Defeat | 0 | 6 | 1023 | 727 | 1360 |
+| frozen-3 | Defeat | 0 | 4 | 707 | 406 | 824 |
+| crystal-1 | Script cap | 0 | 19 | 2400 | 4280 | 10403 |
+| crystal-2 | Cleared | 1 | 20 | 2085 | 5137 | 13931 |
+| crystal-3 | Script cap | 0 | 19 | 2400 | 4549 | 12299 |
+| obsidian-1 | Cleared | 1 | 20 | 1523 | 5328 | 15950 |
+| obsidian-2 | Cleared | 1 | 20 | 1470 | 5424 | 17067 |
+| obsidian-3 | Cleared | 1 | 20 | 1526 | 5523 | 18261 |
+| astral-1 | Script cap | 0 | 20 | 2400 | 5613 | 19506 |
+| astral-2 | Defeat | 0 | 19 | 2268 | 5235 | 18494 |
+| astral-3 | Script cap | 0 | 20 | 2400 | 5811 | 22366 |
+| nadir-1 | Cleared | 1 | 20 | 1588 | 5909 | 23936 |
+| nadir-2 | Cleared | 1 | 20 | 1892 | 6005 | 25613 |
+| nadir-3 | Cleared | 1 | 20 | 1527 | 6102 | 27406 |
 
-The mixed policy clears 12 levels, loses 9, and reaches its script cap on 9. The separate three-building and 85-star probes bracket the opening and final level. No difficulty claim is inferred from this policy alone.
-
-The final audit also checks that damage credit cannot change native directional armor. Burn, venom, bleed and ground-fire parity tests compare statistics on/off, and the four levels whose waves can include Siege Beetles were rechecked after that fix.
+The mixed policy clears 15 levels, loses 4 and reaches its script cap on 11, most of those past wave 18. It never keeps an outpost, so its clears are one star. The losses (Amber Desert II, Frozen Vault II and III) haven't been looked into yet. Species still differ in speed, range and abilities that the HP and damage scaling doesn't even out, so a hand-tuned roster per level is the next step.
 
 ## Reproduce
 
-    node --experimental-transform-types --import ./tests/pin-random.ts tools/ambush-balance.ts
-    node --experimental-transform-types --import ./tests/pin-random.ts tools/ambush-balance.ts --levels=0 --buildings=3 --simple --seconds=1800
-    node --experimental-transform-types --import ./tests/pin-random.ts tools/ambush-balance.ts --levels=29 --earned-stars=85 --seconds=1800
+    node --experimental-transform-types --import ./tests/pin-random.ts tools/ambush-balance.ts --levels=0 --seconds=2400
 
-Use --seconds=1800 to match the sweep’s cap (the default is 900). --levels selects comma-separated zero-based indices, --max-stars grants a synthetic 90-star pool, and --earned-stars sets a bounded synthetic pool. The raw deterministic results are in ambush-balance.json. CPU timings printed by the tool are machine-dependent and excluded from the committed data.
+--levels selects comma-separated zero-based indices and --seconds the cap (the default is 2400). --buildings sets the cap, --simple a three-building opening, --max-stars a synthetic 90-star pool and --earned-stars a bounded one. The curve's knobs can be overridden for experiments: --hp, --level-growth, --wave-growth, --gold-per-hp, --release, --release-per, --keep-hp, --outpost-hp, --dps, --defense-growth and --start-gold. --debug adds the bot's buildings and the lanes. The raw deterministic results are in ambush-balance.json; CPU timings printed by the tool are machine-dependent and excluded from it.

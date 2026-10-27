@@ -89,7 +89,7 @@ import { STONEWORK, TOWN_WALLS, wallRank } from "../wall-upgrades.ts";
 
 export type Levels = Record<UpgradeId, number>;
 
-export type DamageOrigin=Point&{attacker?:number;building?:number;home?:number};
+export type DamageOrigin = Point & { attacker?: number; building?: number; home?: number };
 export type Enemy = {
   /** Javelin carrying this enemy; absent outside an active impalement. */
   impaled?: number;
@@ -127,7 +127,7 @@ export type Enemy = {
    * second; absent when not burning. */
   burn?: number;
   burnDps?: number;
-  burnOrigin?:DamageOrigin;
+  burnOrigin?: DamageOrigin;
   /** The share of its pace a signal fire leaves it while marked; absent otherwise. */
   slowed?: number;
   fortressPart?: { core: number; role: "turret" | "leg" | "armor"; dx: number; dy: number };
@@ -149,10 +149,10 @@ export type Enemy = {
   /** An assassin's venom: seconds left, the share more damage it takes,
    * its bite a second and whether it spreads on death; absent when not
    * poisoned, so runs without Venomblades keep their state as before. */
-  venom?: { t: number; more: number; dps: number; spread?: true; origin?:DamageOrigin };
+  venom?: { t: number; more: number; dps: number; spread?: true; origin?: DamageOrigin };
   /** A Hemorrhage knife's cut: damage a second and seconds left; absent
    * when not bleeding (`shadow.ts`). */
-  bleed?: { dps: number; t: number; origin?:DamageOrigin };
+  bleed?: { dps: number; t: number; origin?: DamageOrigin };
   /** C4 nanobots in it: the blast it makes as it dies (`nanobots.ts`);
    * absent when not infected. */
   nano?: Infection;
@@ -347,12 +347,16 @@ export type ScenarioRules = {
 
 export class DefendSim {
   /** Optional scenario statistics; ordinary Defend allocates no attribution table. */
-  tally?:(building:number,damage:number,killed:boolean)=>void;
-  tallyHomes?:Map<number,number>;
-  tallyOrigin(origin?:DamageOrigin):DamageOrigin|undefined{
-    if(!this.tally||!origin)return undefined;
-    const building=origin.building??origin.home??(origin.attacker!==undefined?this.tallyHomes?.get(origin.attacker)??this.soldiers.find(s=>s.id===origin.attacker)?.home:undefined);
-    return building===undefined?undefined:{x:origin.x,y:origin.y,building};
+  tally?: (building: number, damage: number, killed: boolean) => void;
+  tallyHomes?: Map<number, number>;
+  tallyOrigin(origin?: DamageOrigin): DamageOrigin | undefined {
+    if (!this.tally || !origin) return undefined;
+    const attacker = origin.attacker,
+      building =
+        origin.building ??
+        origin.home ??
+        (attacker !== undefined ? (this.tallyHomes?.get(attacker) ?? this.soldiers.find((s) => s.id === attacker)?.home) : undefined);
+    return building === undefined ? undefined : { x: origin.x, y: origin.y, building };
   }
 
   scenario?: ScenarioRules;
@@ -598,7 +602,7 @@ export class DefendSim {
   }
 
   /** Reconfigure a preallocated scenario lot using native HP, collision and art state. */
-  configureLot(id: number, kind: Exclude<Building["kind"], "wall" | "gate" | "wallBallista">, rect: Building["rect"], active: boolean, health=1) {
+  configureLot(id: number, kind: Exclude<Building["kind"], "wall" | "gate" | "wallBallista">, rect: Building["rect"], active: boolean, health = 1) {
     const b = this.map.buildings[id];
     for (const cell of b.cells) if (this.map.owner[cell] === id) {
       this.map.owner[cell] = -1; this.map.type[cell] = CellType.PARK;
@@ -614,15 +618,19 @@ export class DefendSim {
     b.kind = kind; b.rect = { ...rect }; b.hidden = !active;
     b.cells = [];
     for (let y=rect.y;y<rect.y+rect.h;y++) for (let x=rect.x;x<rect.x+rect.w;x++) b.cells.push(cellIndex(x,y));
-    this.maxHp[id] = active ? maxHpOf(b,this.levels,this.bonuses) : 0;
-    this.hp[id] = this.maxHp[id]*health;
-    this.built[id] = active && health>0 ? b.cells.length : 0;
+    this.maxHp[id] = active ? maxHpOf(b, this.levels, this.bonuses) : 0;
+    this.hp[id] = this.maxHp[id] * health;
+    this.built[id] = active && health > 0 ? b.cells.length : 0;
     if (active) for (const cell of b.cells) {
-      this.map.owner[cell]=id; this.map.type[cell]=kind==='house'?CellType.HOUSE:CellType.STRUCT;
-      this.solid[cell]=this.ownSolid[cell]=this.foeSolid[cell]=health>0?1:0;
+      this.map.owner[cell] = id;
+      this.map.type[cell] = kind === "house" ? CellType.HOUSE : CellType.STRUCT;
+      this.solid[cell] = this.ownSolid[cell] = this.foeSolid[cell] = health > 0 ? 1 : 0;
     }
     const structure=this.map.structures.find(s=>s.uid===b.structureUid);
-    if (structure && kind!=='house') { structure.kind=kind; structure.rect={...rect}; }
+    if (structure && kind !== "house") {
+      structure.kind = kind;
+      structure.rect = { ...rect };
+    }
     const old=this.skyPalaces;
     this.skyPalaces=launchPalaces(this).filter(p=>p.id===id && active || old.some(o=>o.id===p.id)).map(p=>old.find(o=>o.id===p.id)??p);
     this.changed.push(...b.cells); this.mapVersion++; this.fieldDirty=true; this.fieldT=0;
@@ -812,7 +820,7 @@ export class DefendSim {
       if ((e.burn -= dt) <= 0) {
         delete e.burn;
         delete e.burnDps;
-        if(e.burnOrigin)delete e.burnOrigin;
+        delete e.burnOrigin;
       }
     }
     stepVenom(this, dt);
@@ -885,7 +893,9 @@ export class DefendSim {
 
   /** A scenario wave shares native spawning limits and battle statistics. */
   beginManualWave(wave: number, budget: number, count: number) {
-    this.wave=wave;this.waveSpawned=0;this.stats.begin(wave,budget,count);
+    this.wave = wave;
+    this.waveSpawned = 0;
+    this.stats.begin(wave, budget, count);
   }
 
   releaseEnemy(kind: EnemyKind, at: Point) { const before=this.enemies.length; this.spawnEnemy(kind,at); return this.enemies.length>before; }
@@ -981,12 +991,15 @@ export class DefendSim {
   /** The field enemies on foot walk: toward the nearest standing bait while
    * any stands, else the keep. */
   marchField(enemy?: Point): Float64Array {
-    if(enemy){const field=this.scenario?.fieldFor?.(enemy);if(field)return field;}
+    const scenario = enemy && this.scenario?.fieldFor?.(enemy);
+    if (scenario) return scenario;
     return this.baits.length && baitStanding(this) ? this.baitField : this.field;
   }
   /** Native weighted routing toward a scenario's current objective. */
   targetField(goals: readonly number[]) {
-    const field=new Float64Array(CELL_COUNT);fillFlowField(field,goals,this.terrain);return field;
+    const field = new Float64Array(CELL_COUNT);
+    fillFlowField(field, goals, this.terrain);
+    return field;
   }
 
   // ── Enemy index ───────────────────────────────────────────────────────
@@ -1111,7 +1124,10 @@ export class DefendSim {
     if (amount <= 0) return false;
     const hit = e.marked ? amount * (e.markDamage ?? SPOTTERS.mark[pathRank(this.bonuses.paths, "watchTower", "spotters")]) : amount;
     this.stats.current.dealt += Math.min(e.hp, hit);
-    if(this.tally){const from=this.tallyOrigin(credit??origin);if(from?.building!==undefined)this.tally(from.building,Math.min(e.hp,hit),e.hp-hit<=0&&!e.fortressPart);}
+    if (this.tally) {
+      const from = this.tallyOrigin(credit ?? origin);
+      if (from?.building !== undefined) this.tally(from.building, Math.min(e.hp, hit), e.hp - hit <= 0 && !e.fortressPart);
+    }
     e.hp -= hit;
     if (flash) e.flash = 0.12;
     if (e.hp <= 0) {

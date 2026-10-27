@@ -261,7 +261,9 @@ const CUES: Partial<Record<Cue, (t: number) => void>> = {
       noise(t + dt, 0.025, 0.12, 6000, 2, 0.3);
     }
   },
-  spellReady(t) { bell(2637,t,.035,.28); },
+  spellReady(t) {
+    bell(2637, t, 0.035, 0.28);
+  },
   chime(t) {
     const v = vary(20);
     bell(1318 * v, t, 0.12, 1.1);

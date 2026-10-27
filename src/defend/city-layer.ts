@@ -13,6 +13,7 @@ import { drawFenceSections } from "./fences.ts";
 import { ROAD, keepStage, paintKeepRubble, paintStructureArt, paintStructureRubble } from "./structure-art.ts";
 import { houseRubbleSprite, roofSeed, roofSprite } from "./roof-art.ts";
 import { ART, openAt, parkArt } from "./park-art.ts";
+import { paintBridges } from "./bridge-art.ts";
 import { damageStage, drawSprite, sprite, wallDamagePixels, wallRubblePixels } from "./damage-art.ts";
 import { mooringPixels } from "./sky-palace-art.ts";
 import { GRASS, grassPatch, groundArt } from "./ground-art.ts";
@@ -113,6 +114,7 @@ export function paintCityLayer(c: CanvasRenderingContext2D, px: number, scene: C
   // Ponds over the park grass, as pixel art.
   paintPixelArt(p, parkArt(map).canvas);
   paintPondPlants(p);
+  paintBridges(c, px, map);
   // The spikes' beams lie under the stones, so only the stakes show past
   // the wall. Walls next: a wall's face hangs over the cell below it, and a
   // house or structure standing there is in front of the face, so it covers it.
@@ -296,7 +298,10 @@ function paintBuilding(p: Paint, b: Building) {
     h = Math.round((r.y + r.h) * px) - y;
   const box = { x, y, w, h, px };
   if (b.kind === "wall") {
-    if(b.fence){if(solid(b.cells[0]))drawFenceSections(c,px,[{...b.fence,broken:false}]);return;}
+    if (b.fence) {
+      if (solid(b.cells[0])) drawFenceSections(c, px, [{ ...b.fence, broken: false }]);
+      return;
+    }
     if (solid(b.cells[0])) paintWall(p, b);
     else if (hasWallArt(p.area) || !paintPixelRubble(p, b)) paintArt(p, wallRubbleSprite(lotSeed(b), p.area), box);
     return;

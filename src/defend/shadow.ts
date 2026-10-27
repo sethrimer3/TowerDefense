@@ -135,7 +135,10 @@ function cut(sim: DefendSim, s: Soldier, e: Enemy, st: ReturnType<typeof shadowS
   s.edge = Math.min(SHADE.cap, (s.edge ?? 1) * (1 + st.rate));
   if (st.bleed && e.hp > 0 && bleeds(e.kind)) {
     const dps = hit * SHADOW_BLEED.share[st.bleed], time = SHADOW_BLEED.time[st.bleed];
-    if (!e.bleed || e.bleed.dps * e.bleed.t < dps * time) e.bleed = { dps, t: time,...(sim.tallyOrigin(s)?{origin:sim.tallyOrigin(s)}:{}) };
+    if (!e.bleed || e.bleed.dps * e.bleed.t < dps * time) {
+      const origin = sim.tallyOrigin(s);
+      e.bleed = { dps, t: time, ...(origin ? { origin } : {}) };
+    }
   }
 }
 

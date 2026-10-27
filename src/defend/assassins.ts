@@ -13,7 +13,7 @@
 import { sq } from "../exact.ts";
 import { BLOODLETTERS, HEADHUNT, SHADOWCLOAK, VENOM, pathRank, type BattlePaths } from "../knowledge-paths.ts";
 import { buildingPaths } from "../specializations.ts";
-import type { DefendSim, Enemy, Soldier } from "./sim.ts";
+import type { DamageOrigin, DefendSim, Enemy, Soldier } from "./sim.ts";
 
 /** What a den's assassins do, from its kind and path ranks: the Blood hall,
  * the Veil house and the Poison den each have their branch's own before
@@ -71,7 +71,7 @@ export function assassinStrike(sim: DefendSim, s: Soldier, e: Enemy, base: numbe
   let damage = base * (crit ? d.crit : 1) * (ambush ? d.ambush : 1);
   if (hunt) damage += Math.min(e.maxHp * HEADHUNT.bounty[hunt], base * HEADHUNT.cap);
   // Poisoned before the blow lands, so the blow itself bites harder.
-  if (d.poisons) envenom(e, d.time, d.more, base * VENOM.share, d.spread,sim.tallyOrigin(s));
+  if (d.poisons) envenom(e, d.time, d.more, base * VENOM.share, d.spread, sim.tallyOrigin(s));
   sim.hurtEnemy(e, damage, true, "melee", s);
   if (d.veiled) s.cloak = d.recloak && e.hp <= 0 ? 0 : d.reveal;
   if (crit || ambush) sim.effects.push({ kind: "spark", x: e.x, y: e.y, t: 0, r: crit && ambush ? 0.8 : 0.5 });
@@ -79,11 +79,11 @@ export function assassinStrike(sim: DefendSim, s: Soldier, e: Enemy, base: numbe
 
 /** Poisons `e` for `t` seconds: `more` times the damage it takes, `dps` a
  * second; a fresh dose renews it, never weakening one already stronger. */
-export function envenom(e: Enemy, t: number, more: number, dps: number, spread: boolean, origin?:import("./sim.ts").DamageOrigin) {
+export function envenom(e: Enemy, t: number, more: number, dps: number, spread: boolean, origin?: DamageOrigin) {
   const v = e.venom;
-  const from=dps>=(v?.dps??0)?origin:v?.origin;
+  const from = dps >= (v?.dps ?? 0) ? origin : v?.origin;
   e.venom = {
-    ...(from?{origin:from}:{}),
+    ...(from ? { origin: from } : {}),
     t: Math.max(t, v?.t ?? 0),
     more: Math.max(more, v?.more ?? 1),
     dps: Math.max(dps, v?.dps ?? 0),
@@ -106,5 +106,5 @@ export function spreadVenom(sim: DefendSim, e: Enemy) {
   const v = e.venom;
   if (!v?.spread) return;
   for (const o of sim.enemiesNear(e.x, e.y, VENOM.spread))
-    if (o !== e && o.hp > 0 && sq(o.x - e.x) + sq(o.y - e.y) <= sq(VENOM.spread)) envenom(o, VENOM.time[3], v.more, v.dps, true,v.origin);
+    if (o !== e && o.hp > 0 && sq(o.x - e.x) + sq(o.y - e.y) <= sq(VENOM.spread)) envenom(o, VENOM.time[3], v.more, v.dps, true, v.origin);
 }

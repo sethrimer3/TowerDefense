@@ -201,8 +201,13 @@ export class Fences {
 }
 
 /** Rails: a dark outline with a lighter wooden top. */
-export function drawFenceSections(c:CanvasRenderingContext2D,px:number,sections:FenceSection[]) {
-  c.save();const intact=sections.filter(s=>!s.broken);drawRails(c,px,intact);drawPosts(c,px,intact);c.restore();
+/** Standing fence sections drawn on their own (a scenario's fence cells). */
+export function drawFenceSections(c: CanvasRenderingContext2D, px: number, sections: FenceSection[]) {
+  const intact = sections.filter((s) => !s.broken);
+  c.save();
+  drawRails(c, px, intact);
+  drawPosts(c, px, intact);
+  c.restore();
 }
 function drawRails(c: CanvasRenderingContext2D, px: number, sections: FenceSection[]) {
   c.lineCap = "butt";
