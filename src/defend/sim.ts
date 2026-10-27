@@ -869,6 +869,11 @@ export class DefendSim {
     }
   }
 
+  /** A scenario wave shares native spawning limits and battle statistics. */
+  beginManualWave(wave: number, budget: number, count: number) {
+    this.wave=wave;this.waveSpawned=0;this.stats.begin(wave,budget,count);
+  }
+
   releaseEnemy(kind: EnemyKind, at: Point) { const before=this.enemies.length; this.spawnEnemy(kind,at); return this.enemies.length>before; }
 
   private spawnEnemy(kind: EnemyKind, at?: Point) {

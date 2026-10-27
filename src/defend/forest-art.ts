@@ -19,7 +19,7 @@
  *   flung from the blast, falling and fading on battle time.
  *
  * Presentation only; its randomness comes from `defendRandom("effects")`. */
-import { CELL_COUNT, CELLS_H, CELLS_W, cellIndex, defendRandom, hash, hash01 } from "./grid.ts";
+import { CELL_COUNT, CELLS_H, CELLS_W, cellIndex, defendRandom, hash, hash01, type Rect } from "./grid.ts";
 import type { CityMap } from "./citygen.ts";
 import type { DefendSim } from "./sim.ts";
 import { BURN, ForestDamage, MOUNTAIN, VARIANTS, canopyRadius, forestPlan, type Boulder, type Felled, type ForestPlan, type ForestTree, type Lake, type TreeKind, type TreeSize } from "./forest.ts";
@@ -828,6 +828,14 @@ export class ForestArt {
       this.dirty = true;
       this.floorStale = [WHOLE];
     }
+  }
+
+  /** A scenario foundation clears trees through the existing forest art state. */
+  clearBuilding(rect: Rect) {
+    if (!this.damage) return;
+    const x=rect.x+rect.w/2,y=rect.y+rect.h/2,r=Math.sqrt(rect.w*rect.w+rect.h*rect.h)/2+.5;
+    this.damage.blast(x,y,r,0);
+    this.bare(x,y,r);this.dirty=true;this.floorStale=[WHOLE];
   }
 
   /** Brings down the trees the battle's attacks reach (struck apart, blown

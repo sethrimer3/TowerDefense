@@ -1,5 +1,6 @@
 import '../src/style.css';import '../src/theme.css';
 import {CampaignPage} from '../src/campaign/ui.ts';
+import {AmbushBattlePage} from '../src/campaign/ambush-battle-ui.ts';
 import {defaults} from '../src/save.ts';
 import {DefendSim} from '../src/defend/sim.ts';
 import {setPixelArt} from '../src/defend/pixel-sprites.ts';
@@ -10,8 +11,8 @@ for(const kind of ['brazierTower','wispTower','wizardTower','cannonTower','phala
 save.defend.owned.meleeGuild=4;save.defend.owned.rangedGuild=4;
 save.defend.layout.structures.push({uid:70,kind:'brazierTower',tx:4,ty:9,qx:16,qy:36,path:'fireArrows',rank:3});
 save.siege=newSiege(45);setPixelArt(true);document.documentElement.classList.add('pixel-font');
-const ambush=new CampaignPage(document.querySelector('#ambush')!,'ambush',{save:()=>save,store:()=>{}}),siege=new CampaignPage(document.querySelector('#siege')!,'siege',{save:()=>save,store:()=>{}});
+const ambush=new AmbushBattlePage(document.querySelector('#ambush')!,0,{save:()=>save,store:()=>{}}),siege=new CampaignPage(document.querySelector('#siege')!,'siege',{save:()=>save,store:()=>{}});
 let active=ambush;ambush.show();
 for(const [mode,page] of [['ambush',ambush],['siege',siege]] as const)document.querySelector<HTMLButtonElement>(`#${mode}-mode`)!.onclick=()=>{active.pause();active=page;document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active',p.id===mode));page.show();};
-Object.assign(window,{nativeModes:{save,ambush,siege,isNative:()=>active.sim.engine instanceof DefendSim,advance:(seconds:number)=>{for(let i=0;i<seconds*30;i++)active.sim.step(1/30);active.frame(performance.now());}}});
+Object.assign(window,{nativeModes:{save,ambush,siege,isNative:()=>active.sim.engine instanceof DefendSim,spot:(kind:import('../src/defend/catalog.ts').StructureKind)=>{for(let qy=1;qy<50;qy++)for(let qx=1;qx<35;qx++)if(ambush.sim.grid.check(kind,qx,qy,ambush.sim.buildings).fits)return {qx,qy};throw new Error('No spot');},advance:(seconds:number)=>{for(let i=0;i<seconds*30;i++)active.sim.step(1/30);active.frame(performance.now());}}});
 function frame(now:number){active.frame(now);requestAnimationFrame(frame);}requestAnimationFrame(frame);

@@ -8,7 +8,7 @@ The domain glossary: the words the game, its code and its docs use. Terms only, 
 One of Defend, Ambush or Siege, selected through the shared combat tab.
 
 **Ambush**:
-A fixed-level tower-defense mode: enemies follow a road, while towers and infantry buildings occupy spaces alongside it.
+A fixed-level tower-defense mode: enemies follow a track, while towers and infantry buildings stand beside it.
 
 **Track**:
 The marked road that ground enemies follow through an Ambush level.
@@ -24,6 +24,9 @@ The Ambush screen of thirty levels, arranged in three columns and ten zone rows,
 
 **Star rating**:
 An Ambush level's best result, from zero to three stars. Improving a best result adds only the difference to the earned total.
+
+**Build grid**:
+The quarter-tile grid used to place Ambush buildings, with a clear quarter between their footprints.
 
 **Muster space**:
 A space in the lower muster ground where an owned infantry building trains troops for a Siege assault.

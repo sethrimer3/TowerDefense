@@ -5,24 +5,15 @@ import { generateCity, CellType, type CityMap, type Building } from '../defend/c
 import { CELL_COUNT,CELLS_W,CELLS_H,cellIndex,rectCells,type Rect } from '../defend/grid.ts';
 import { STRUCTURES,type StructureKind } from '../defend/catalog.ts';
 import type { FittedStructure } from '../defend/layout.ts';
-import { levelPlan, type Point } from './plans.ts';
+import { type Point } from './plans.ts';
 import type { CastleSnapshot } from './castles.ts';
-export const nativePoint=(p:Point):Point=>({x:6+p.x*3,y:8+p.y*3});
 const fitted=(uid:number,kind:StructureKind,rect:Rect):FittedStructure=>({uid,kind,rect,tx:Math.floor(rect.x/8),ty:Math.floor(rect.y/8),inside:true});
 const centered=(p:Point,w:number,h:number):Rect=>({x:Math.max(0,Math.min(CELLS_W-w,Math.round(p.x-w/2))),y:Math.max(1,Math.min(CELLS_H-h,Math.round(p.y-h/2))),w,h});
 export function footprint(kind:StructureKind,p:Point){const d=STRUCTURES[kind];return centered(p,d.w,d.h);}
 function erase(map:CityMap,b:Building){b.hidden=true;for(const c of b.cells)if(map.owner[c]===b.id){map.owner[c]=-1;map.type[c]=CellType.PARK;}}
 export function ambushField(level:number){
- const data=ambushLevel(level),track=trackFor(data),path=track.points,pads:Point[]=[];
- const along=(p:Point)=>{let best=Infinity;for(let i=1;i<path.length;i++){const a=path[i-1],b=path[i],dx=b.x-a.x,dy=b.y-a.y,t=Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/(dx*dx+dy*dy)));best=Math.min(best,dist(p.x-a.x-t*dx,p.y-a.y-t*dy));}return best;};
- for(let i=1;i<30&&pads.length<10;i++){
-  const p=pointAlong(path,i/31);
-  for(const [dx,dy] of [[9,0],[-9,0],[0,9],[0,-9]]){const at={x:Math.round((p.x+dx)/2)*2,y:Math.round((p.y+dy)/2)*2};
-   if(at.x<7||at.x>CELLS_W-7||at.y<8||at.y>CELLS_H-8||along(at)<8||dist(at.x-track.keep.x,at.y-track.keep.y)<13||pads.some(q=>Math.abs(q.x-at.x)<13&&Math.abs(q.y-at.y)<13))continue;
-   pads.push(at);if(pads.length===10)break;
-  }
- }
- const keep=footprint('keep',track.keep),structures=[fitted(0,'keep',keep),...pads.map((p,i)=>fitted(i+1,'watchTower',centered(p,12,12)))];
+ const data=ambushLevel(level),track=trackFor(data),path=track.points;
+ const keep=footprint('keep',track.keep),structures=[fitted(0,'keep',keep)];
  const city=new Uint8Array(CELL_COUNT),wall=new Uint8Array(CELL_COUNT),road=new Set<number>();
  for(const p of [...track.outposts,track.keep])for(const c of rectCells(centered(p,18,18)))city[c]=1;
  for(const s of structures)for(const c of rectCells(s.rect))city[c]=1;
@@ -30,11 +21,11 @@ export function ambushField(level:number){
   for(let t=0;t<=n;t++)for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){const x=Math.round(a.x+(b.x-a.x)*t/n)+dx,y=Math.round(a.y+(b.y-a.y)*t/n)+dy;if(x>=0&&x<CELLS_W&&y>=0&&y<CELLS_H){const c=cellIndex(x,y);road.add(c);city[c]=1;}}
  }
  for(const c of rectCells(keep))road.delete(c);
- const map=generateCity({structures,city,wall},data.seed),lots=structures.slice(1).map(s=>map.buildings.find(b=>b.structureUid===s.uid)!.id);
+ const map=generateCity({structures,city,wall},data.seed);
  const blockedBuildings=new Set([...road].map(c=>map.owner[c]).filter(id=>id>=0));
- for(const id of [...lots,...blockedBuildings])if(id!==0)erase(map,map.buildings[id]);
+ for(const id of blockedBuildings)if(id!==0)erase(map,map.buildings[id]);
  for(const c of road){map.type[c]=CellType.ROAD;map.owner[c]=-1;map.city[c]=1;}
- return {map,path,pads,lots,road,name:data.name,level:data,track};
+ return {map,path,road,name:data.name,level:data,track};
 }
 
 export type MusterCopy={kind:StructureKind;uid:number;path?:string;rank?:number};

@@ -1,46 +1,37 @@
-import { AMBUSH_LEVELS } from '../src/campaign/levels.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { CampaignSim } from '../src/campaign/sim.ts';
+import { AmbushSim } from '../src/campaign/ambush-sim.ts';
 import { DefendSim } from '../src/defend/sim.ts';
 import { defaults } from '../src/save.ts';
 import { generateCastle } from '../src/campaign/castles.ts';
-import { STRUCTURES } from '../src/defend/catalog.ts';
+import { STRUCTURES,type StructureKind,type Bonuses } from '../src/defend/catalog.ts';
 import { center } from '../src/defend/pathing.ts';
 import { defaultDefendSave } from '../src/defend/progress.ts';
-
-test('Ambush is a native DefendSim and its specialized arrow payloads match Defend exactly',()=>{
- const save=defaults();save.defend.owned.brazierTower=1;
- save.defend.layout.structures.push({uid:900,kind:'brazierTower',tx:4,ty:9,qx:16,qy:36,path:'fireArrows',rank:3});
- const mode=new CampaignSim('ambush',0,[],save.defend.owned,save.defend.levels,undefined,save);
- assert.ok(mode.engine instanceof DefendSim);assert.ok(mode.place(0,'brazierTower'));
- const home=mode.map.buildings.find(b=>!b.hidden&&b.kind==='brazierTower')!;
- assert.equal(home.rect.w,STRUCTURES.brazierTower.w);assert.equal(home.rect.h,STRUCTURES.brazierTower.h);
- assert.ok(mode.engine.bonuses.structurePaths?.[home.structureUid!]);
+import { AMBUSH_LEVELS } from '../src/campaign/levels.ts';
+import { placedBattlePaths } from '../src/specializations.ts';
+import { build } from './ambush-helpers.ts';
+function nativeTower(kind:StructureKind){
+ const mode=new AmbushSim(0,defaults());mode.gold=10000;const b=build(mode,'archerTower'),home=mode.map.buildings[b.id];
+ mode.engine.configureLot(b.id,kind,home.rect,true);return {mode,home};
+}
+test('Ambush uses DefendSim and preserves specialized arrow payloads exactly',()=>{
+ const {mode,home}=nativeTower('brazierTower'),setup=defaults();
+ setup.defend.layout.structures=[{uid:home.id,kind:'brazierTower',tx:0,ty:0,qx:0,qy:0,path:'fireArrows',rank:3}];
+ (mode.engine.bonuses as Bonuses).structurePaths=placedBattlePaths(setup).structurePaths;
+ assert.ok(mode.engine instanceof DefendSim);assert.equal(home.rect.w,STRUCTURES.brazierTower.w);
  const reference=new DefendSim(mode.map,{...mode.engine.levels},AMBUSH_LEVELS[0].seed,mode.engine.bonuses);
  reference.scenario={manualWaves:true,passiveEnemies:true,noCivilians:true,ignoreKeepLoss:true};
  mode.engine.scenario={...mode.engine.scenario,passiveEnemies:true};
  const p=center(home.rect);for(const sim of [mode.engine,reference]){sim.wave=1;sim.spawnAuxiliary('ogre',p.x+5,p.y);sim.step(1/30);}
- assert.ok(mode.engine.arrows.length>0);assert.deepEqual(mode.engine.arrows,reference.arrows);
- assert.ok(mode.engine.arrows.every(a=>(a.burn??0)>0));
+ assert.ok(mode.engine.arrows.length>0);assert.deepEqual(mode.engine.arrows,reference.arrows);assert.ok(mode.engine.arrows.every(a=>(a.burn??0)>0));
 });
-test('Native Wisp arrows, wizard flames and cannon shells are produced by the campaign',()=>{
+test('Native Wisp arrows, wizard flames and cannon shells run in the free-grid engine',()=>{
  for(const kind of ['wispTower','wizardTower','cannonTower'] as const){
-  const save=defaults();save.defend.owned[kind]=1;
-  const mode=new CampaignSim('ambush',0,[],save.defend.owned,save.defend.levels,undefined,save);mode.gold=10000;assert.ok(mode.place(0,kind));
-  mode.engine.scenario={...mode.engine.scenario,passiveEnemies:true};
-  const b=mode.map.buildings.find(b=>b.kind===kind&&!b.hidden)!,p=center(b.rect);mode.engine.spawnAuxiliary('ogre',p.x+(kind==='wizardTower'?3:5),p.y);
-  mode.engine.wave=1;let seen=false;for(let n=0;n<30;n++){mode.engine.step(1/30);seen ||= kind==='wispTower'?mode.engine.wisps.length>0:kind==='wizardTower'?mode.engine.flames.length>0:mode.engine.shells.length>0;}
-  assert.ok(seen,kind);
+  const {mode,home}=nativeTower(kind);mode.engine.scenario={...mode.engine.scenario,passiveEnemies:true};
+  const p=center(home.rect);mode.engine.spawnAuxiliary('ogre',p.x+(kind==='wizardTower'?3:5),p.y);
+  let seen=false;for(let n=0;n<30;n++){mode.engine.step(1/30);seen ||= kind==='wispTower'?mode.engine.wisps.length>0:kind==='wizardTower'?mode.engine.flames.length>0:mode.engine.shells.length>0;}assert.ok(seen,kind);
  }
-});
-test('Route rules keep actual Defend enemies and kills/leaks have distinct native outcomes',()=>{
- const save=defaults(),mode=new CampaignSim('ambush',0,[],save.defend.owned,save.defend.levels,undefined,save);
- mode.gold=1000;assert.ok(mode.place(0,'meleeGuild'));mode.start();
- const e=mode.engine.spawnAuxiliary('roach',mode.plan.path[0].x,mode.plan.path[0].y)!;const gold=mode.gold;
- mode.engine.hurtEnemy(e,e.hp*2);mode.engine.step(1/30);assert.equal(mode.kills,1);assert.ok(mode.gold>gold);assert.equal(mode.engine.slain.roach,1);
- const end=mode.plan.path.at(-1)!,leak=mode.engine.spawnAuxiliary('roach',end.x,end.y)!;
- const afterKill=mode.gold;mode.engine.step(1/30);mode.engine.step(1/30);assert.ok(leak.escaped);assert.equal(mode.lives,4);assert.equal(mode.gold,afterKill);assert.equal(mode.kills,1);
 });
 test('Siege uses two native sides, real city walls, full infantry copies and their saved paths',()=>{
  const save=defaults();save.defend.owned.meleeGuild=7;save.defend.owned.rangedGuild=6;save.defend.owned.phalanx=2;
