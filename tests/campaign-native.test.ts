@@ -1,3 +1,4 @@
+import { AMBUSH_LEVELS } from '../src/campaign/levels.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { CampaignSim } from '../src/campaign/sim.ts';
@@ -16,7 +17,7 @@ test('Ambush is a native DefendSim and its specialized arrow payloads match Defe
  const home=mode.map.buildings.find(b=>!b.hidden&&b.kind==='brazierTower')!;
  assert.equal(home.rect.w,STRUCTURES.brazierTower.w);assert.equal(home.rect.h,STRUCTURES.brazierTower.h);
  assert.ok(mode.engine.bonuses.structurePaths?.[home.structureUid!]);
- const reference=new DefendSim(mode.map,{...mode.engine.levels},12345,mode.engine.bonuses);
+ const reference=new DefendSim(mode.map,{...mode.engine.levels},AMBUSH_LEVELS[0].seed,mode.engine.bonuses);
  reference.scenario={manualWaves:true,passiveEnemies:true,noCivilians:true,ignoreKeepLoss:true};
  mode.engine.scenario={...mode.engine.scenario,passiveEnemies:true};
  const p=center(home.rect);for(const sim of [mode.engine,reference]){sim.wave=1;sim.spawnAuxiliary('ogre',p.x+5,p.y);sim.step(1/30);}

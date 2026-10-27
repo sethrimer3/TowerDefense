@@ -16,6 +16,9 @@ The marked road that ground enemies follow through an Ambush level.
 **Siege**:
 An assault mode: infantry trained by the player's buildings raid enemy castles and their guards.
 
+**Entry arrow**:
+The marker at the board edge showing where an Ambush level’s enemies arrive.
+
 **Level select**:
 The Ambush screen of thirty levels, arranged in three columns and ten zone rows, showing their best stars and unlocks.
 

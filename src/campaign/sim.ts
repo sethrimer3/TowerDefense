@@ -1,3 +1,4 @@
+import { ambushLevel } from './levels.ts';
 /** Mode lifecycle and economy around DefendSim. All combat belongs to Defend. */
 import { dist } from '../exact.ts';
 import { DefendSim,type Enemy } from '../defend/sim.ts';
@@ -5,7 +6,7 @@ import * as C from '../defend/catalog.ts';
 import { buildWave } from '../defend/waves.ts';
 import { enemySpeed } from '../defend/enemy-abilities.ts';
 import { chilled } from '../defend/wizard.ts';
-import { rectCells } from '../defend/grid.ts';
+import { CELLS_W,CELLS_H,rectCells } from '../defend/grid.ts';
 import { defaultDefendSave,type DefendSave } from '../defend/progress.ts';
 import { bonuses as gameBonuses } from '../progression.ts';
 import { placedBattlePaths,wearFits } from '../specializations.ts';
@@ -38,7 +39,7 @@ export class CampaignSim {
   this.source=game?.defend??{...defaultDefendSave(),owned,levels};
   this.bonus={...(game?gameBonuses(game):C.NO_BONUSES),structurePaths:{}};
   if(mode==='ambush'){
-   const field=ambushField(level);this.plan=field;this.road=field.road;this.lots=field.lots;this.engine=new DefendSim(field.map,this.levels,12345+level,this.bonus);
+   const data=ambushLevel(level);this.rng=seeded(data.seed);const field=ambushField(level);this.plan=field;this.road=field.road;this.lots=field.lots;this.engine=new DefendSim(field.map,this.levels,data.seed,this.bonus);this.engine.wave=1+data.zone*20;
    this.engine.scenario={manualWaves:true,noCivilians:true,ignoreKeepLoss:true,routeEnemy:(e,dt)=>this.followRoad(e,dt),died:e=>{
     const def=C.ENEMIES[e.kind];this.gold+=enemyBounty({maxHp:e.maxHp,damage:def.damage,cooldown:def.cooldown,speed:def.speed});this.kills++;
    }};
@@ -85,7 +86,7 @@ export class CampaignSim {
  }
  remove(pad:number){if(this.mode!=='ambush'||!['build','battle'].includes(this.phase)||!this.lots[pad])return;this.gold+=this.refund(pad);this.paid.delete(pad);const b=this.map.buildings[this.lots[pad]];this.engine.configureLot(b.id,b.kind as C.StructureKind,b.rect,false);this.layout.splice(0,this.layout.length,...this.layout.filter(p=>p.pad!==pad));}
  start(){if(this.phase!=='build'||!this.layout.some(p=>p.kind!=='watchTower'))return false;this.phase='battle';if(this.mode==='ambush')this.nextWave();return true;}
- private nextWave(){this.wave++;this.engine.wave=1+this.level*8+(this.wave-1)*2;this.pending=buildWave(this.engine.wave,this.rng);this.spawnClock=0;this.breakClock=2;}
+ private nextWave(){this.wave++;this.engine.wave=1+ambushLevel(this.level).zone*20+this.wave-1;this.pending=buildWave(this.engine.wave+ambushLevel(this.level).index*3,this.rng);this.spawnClock=0;this.breakClock=2;}
  private followRoad(e:Enemy,dt:number){
   let segment=this.route.get(e);
   if(segment===undefined){let best=Infinity;segment=1;for(let i=1;i<this.plan.path.length;i++){const a=this.plan.path[i-1],b=this.plan.path[i],dx=b.x-a.x,dy=b.y-a.y,t=Math.max(0,Math.min(1,((e.x-a.x)*dx+(e.y-a.y)*dy)/(dx*dx+dy*dy)));const d=dist(e.x-a.x-t*dx,e.y-a.y-t*dy);if(d<best){best=d;segment=i;}}}
@@ -101,7 +102,7 @@ export class CampaignSim {
   this.elapsed+=dt;
   if(this.raid){this.raid.step(dt);if(this.raid.defense.keepHp()<=0)this.phase='won';else if(this.elapsed>=240)this.phase='lost';return;}
   this.spawnClock-=dt;
-  if(this.pending.length&&this.spawnClock<=0){const kind=this.pending.shift()!;this.engine.releaseEnemy(kind,this.plan.path[0]);this.spawned++;this.spawnClock=.7;}
+  if(this.pending.length&&this.spawnClock<=0){const kind=this.pending.shift()!;const entry=this.plan.path[0];this.engine.releaseEnemy(kind,{x:Math.max(.5,Math.min(CELLS_W-.5,entry.x)),y:Math.max(.5,Math.min(CELLS_H-.5,entry.y))});this.spawned++;this.spawnClock=.7;}
   this.engine.step(dt);
   if(this.lives<=0)this.phase='lost';
   else if(!this.pending.length&&!this.engine.enemies.length){if(this.wave>=3)this.phase='won';else if((this.breakClock-=dt)<=0)this.nextWave();}

@@ -1,3 +1,4 @@
+import { drawEntryArrow } from './entry-arrow.ts';
 import { dist } from '../exact.ts';
 import { ambushLevel, recordStars } from './levels.ts';
 import { t } from '../i18n/index.ts';
@@ -155,9 +156,10 @@ export class CampaignPage {
     const sim=this.sim.renderSim;
     const looks:Record<number,string>={};
     for(const b of this.sim.map.buildings){const paths=b.structureUid!==undefined?sim.bonuses.structurePaths?.[b.structureUid]:undefined;if(paths){const look=artLook(b.kind,Object.values(paths)[0]?.path);if(look)looks[b.structureUid!]=look;}}
-    this.renderer.draw(this.sim.map,sim,null,{area:'moss',grid:0,weather:null,night:0,now:this.now,reduceMotion:settings.reduceMotion||matchMedia('(prefers-reduced-motion: reduce)').matches,effects:!settings.effectsOff,healthbars:settings.showHealthbars,simpleEnemies:settings.simpleEnemies,simpleTroops:settings.simpleTroops,mergedOutlines:settings.mergedOutlines,looks,...(this.inspection!==undefined?{inspect:{id:this.inspection,armed:sim}}:{})});
+    this.renderer.draw(this.sim.map,sim,null,{area:this.mode==='ambush'?ambushLevel(this.level).area:'moss',grid:0,weather:null,night:0,now:this.now,reduceMotion:settings.reduceMotion||matchMedia('(prefers-reduced-motion: reduce)').matches,effects:!settings.effectsOff,healthbars:settings.showHealthbars,simpleEnemies:settings.simpleEnemies,simpleTroops:settings.simpleTroops,mergedOutlines:settings.mergedOutlines,looks,...(this.inspection!==undefined?{inspect:{id:this.inspection,armed:sim}}:{})});
     if(this.mode==='ambush'&&['build','battle'].includes(this.sim.phase)){
       const c=this.canvas.getContext('2d')!,r=this.renderer;c.save();c.setTransform(r.cam.s,0,0,r.cam.s,r.cam.x,r.cam.y);c.strokeStyle='#d6ae68';c.lineWidth=1/r.cam.s;
+      drawEntryArrow(c,this.sim.plan.path[0],this.sim.plan.path[1],r.px,this.now,settings.reduceMotion||matchMedia('(prefers-reduced-motion: reduce)').matches);
       c.fillStyle='#e7c97f';c.font=`${Math.max(r.px,10/r.cam.s)}px ${this.font}`;c.textAlign='center';c.textBaseline='middle';
       this.sim.plan.pads.forEach((p,i)=>{if(this.sim.layout.some(b=>b.pad===i))return;c.strokeRect((p.x-3)*r.px,(p.y-3)*r.px,6*r.px,6*r.px);c.fillText(String(i+1),p.x*r.px,p.y*r.px);});c.restore();
     }

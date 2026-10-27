@@ -142,10 +142,10 @@ Each phase is one PR. Earlier phases leave the game playable. Phases 0 to 8 belo
 
 ### Phase 2: The board: zone ground, track, edge arrow, previews
 
-- `ambushField(level)` builds the map for the level's zone: draw with `area: level.area` so the zone's floor, walls and weather art apply (today it is hard-coded to `moss`). Mossbound levels get the forest outside settlements; desert levels get dunes, etc. Boulders and lakes from the zone's existing generators count as unbuildable.
-- Road: paint the track as `CellType.ROAD` to the board edge. Draw the entry arrow just inside the edge.
-- Previews: render each level's city layer once into a small offscreen canvas (`city-layer.ts`) and cache it per level id (in memory, never in the save). Generate lazily as cards scroll into view so opening the select stays fast on phones.
-- Browser test: the select at both widths, a preview per zone, the arrow visible.
+- [x] `ambushField(level)` builds the map for the level's zone: draw with `area: level.area` so the zone's floor, walls and weather art apply (today it is hard-coded to `moss`). Mossbound levels get the forest outside settlements; desert levels get dunes, etc. Boulders and lakes from the zone's existing generators count as unbuildable.
+- [x] Road: paint the track as `CellType.ROAD` to the board edge. Draw the entry arrow just inside the edge.
+- [x] Previews: render each level's city layer once into a small offscreen canvas (`city-layer.ts`) and cache it per level id (in memory, never in the save). Generate lazily as cards scroll into view so opening the select stays fast on phones.
+- [x] Browser test: the select at both widths, a preview per zone, the arrow visible.
 
 ### Phase 3: Free build grid
 
