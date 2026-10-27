@@ -310,6 +310,7 @@ export class AmbushSim {
       const e = this.engine.enemies[i];
       e.hp *= wave.scale;
       e.maxHp *= wave.scale;
+      if (e.shieldHp !== undefined && Number.isFinite(e.shieldHp)) e.shieldHp *= wave.scale;
       e.raisedDamage = ENEMIES[e.kind].damage * wave.bite;
       this.bounties.set(e, wave.bounty);
       this.outposts.assign(e, entry.lane);

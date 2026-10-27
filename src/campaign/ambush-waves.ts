@@ -78,15 +78,19 @@ export const waveDps = (level: AmbushLevel, wave: number) =>
   AMBUSH_WAVES.dps * intPow(AMBUSH_WAVES.dpsLevel, order(level)) * intPow(AMBUSH_WAVES.dpsWave, Math.max(0, wave - 1));
 
 /** The zone's species small enough to come in crowds, one body each (nothing that splits, summons, chains or
- * walks on legs of parts) and no boats, which sail straight at the keep whatever the lanes. */
+ * walks on legs of parts), no boats, which sail straight at the keep whatever the lanes, and nothing that heals a
+ * fixed amount a second, which would outheal its scaled-down HP. */
 export function crowdRoster(level: AmbushLevel) {
   const roster = AREA_ENEMIES[level.area].filter((k) => {
     const d = ENEMIES[k];
-    return !d.hatched && !d.splits && !d.summonSlots && !d.chainLength && !d.fortress && !d.boat;
+    return !d.hatched && !d.splits && !d.summonSlots && !d.chainLength && !d.fortress && !d.boat && !d.regeneration;
   });
   const small = roster.filter((k) => ENEMIES[k].hp <= AMBUSH_WAVES.crowdHp);
   return small.length >= 3 ? small : [...roster].sort((a, b) => ENEMIES[a].hp - ENEMIES[b].hp).slice(0, 3);
 }
+
+/** Native HP as towers feel it: armor that halves physical damage doubles it. */
+const toughness = (kind: EnemyKind) => ENEMIES[kind].hp / (ENEMIES[kind].damageScale?.physical ?? 1);
 
 export function ambushWave(level: AmbushLevel, wave: number, lanes = 1): AmbushWave {
   const rand = seeded(hash(level.seed, wave, 0xa6b)),
@@ -125,7 +129,7 @@ export function ambushWave(level: AmbushLevel, wave: number, lanes = 1): AmbushW
     if (boss) entries.splice(Math.floor(entries.length / 2), 0, { kind: boss, lane: 0 });
   }
   const hp = waveHp(level, wave),
-    native = entries.reduce((n, e) => n + ENEMIES[e.kind].hp, 0),
+    native = entries.reduce((n, e) => n + toughness(e.kind), 0),
     seconds = AMBUSH_WAVES.release + entries.length * AMBUSH_WAVES.releasePer;
   return {
     entries,

@@ -34,7 +34,7 @@ test("Twenty seeded waves per level stay in their zone, share the lanes and flag
       assert.deepEqual(w, ambushWave(l, n, lanes));
       assert.ok(w.entries.every((e) => AREA_ENEMIES[l.area].includes(e.kind) && !ENEMIES[e.kind].hatched && e.lane >= 0 && e.lane < lanes));
       for (let lane = 0; lane < lanes; lane++) assert.ok(w.entries.some((e) => e.lane === lane));
-      const native = w.entries.reduce((sum, e) => sum + ENEMIES[e.kind].hp, 0);
+      const native = w.entries.reduce((sum, e) => sum + ENEMIES[e.kind].hp / (ENEMIES[e.kind].damageScale?.physical ?? 1), 0);
       assert.ok(Math.abs(native * w.scale - w.hp) < 1e-6 * w.hp);
       assert.ok(w.bounty > 0 && w.gap > 0);
       const fliers = w.entries.filter((e) => !!ENEMIES[e.kind].flying).length;
