@@ -2353,3 +2353,6 @@ nav button[data-mode] > .tab-label { min-height: 2.4em; }
 .flag-opacity button { min-height: 40px; }
 
 .siege-building { display: grid; justify-items: center; gap: 4px; width: 130px; padding: 8px; text-align: center; }
+
+.ambush-wallet { font-weight: bold; font-size: 18px; }
+.ambush-wallet b { font-variant-numeric: tabular-nums; }

@@ -592,3 +592,9 @@ The player's chosen name and custom flag, displayed in Siege.
 
 **Flag stamp**:
 A colored pixel pattern layered over a flag's background or earlier stamps.
+
+**Ambush gold**:
+The level's deployment budget, spent on buildings and earned by killing enemies. Separate from persistent Mine Gold.
+
+**Kill bounty**:
+The Ambush gold paid once for defeating an enemy, based on that enemy's combat difficulty.

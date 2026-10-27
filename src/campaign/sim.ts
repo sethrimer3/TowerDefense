@@ -1,3 +1,5 @@
+import { troopStats, towerStats, type Profile } from "./combat-stats.ts";
+import { ambushPrice, enemyBounty, startingGold } from "./economy.ts";
 import type { CastleSnapshot, DefenseKind } from "./castles.ts";
 /** Small deterministic campaigns. No writes to Defend's layout or combat RNG. */
 import * as C from '../defend/catalog.ts';
@@ -47,7 +49,7 @@ export function validLayout(mode: Mode, level: number, layout: Placement[], owne
   const used = new Map<string,number>(), pads = new Set<number>();
   return layout.filter(p => {
     const n = used.get(p.kind) || 0;
-    if (!deployable(p.kind,mode) || !levelPlan(mode,level).pads[p.pad] || pads.has(p.pad) || n >= (owned[p.kind as C.PaletteItem] || 0)) return false;
+    if (!deployable(p.kind,mode) || !levelPlan(mode,level).pads[p.pad] || pads.has(p.pad) || (owned[p.kind as C.PaletteItem]||0)<=0 || mode==='siege'&&n>=(owned[p.kind as C.PaletteItem]||0)) return false;
     pads.add(p.pad); used.set(p.kind,n+1); return true;
   }).map(p=>({...p}));
 }
@@ -71,10 +73,7 @@ export function siegeArmy(owned:DefendSave['owned']) {
   const pads=layout.map((_,i)=>({x:1+cellWidth*(Math.floor(i/rows)+.5),y:18.5+cellHeight*(i%rows+.5)}));
   return {layout,pads,iconSize:Math.min(42,cellWidth*24,cellHeight*24)};
 }
-type Profile = {hp:number;damage:number;cooldown:number;speed:number;range?:number;reach?:number;color:string};
-const PROFILES: Record<string,Profile> = { brawler:C.BRAWLER,slinger:C.SLINGER,sword:C.SOLDIER,archer:C.ARCHER_UNIT,assassin:C.ASSASSIN_UNIT,spearman:C.SPEARMAN,hoplite:C.HOPLITE,lancer:C.LANCER,javelineer:C.JAVELINEER,sniper:C.SNIPER,musketeer:C.MUSKETEER,gunner:C.GUNNER,machineGunner:C.MACHINE_GUNNER,gatlingGunner:C.GATLING_GUNNER,rocketeer:C.ROCKETEER,railSniper:C.RAIL_SNIPER,hero:C.HERO,shade:C.SHADE,
-  mage:{hp:24,damage:12,cooldown:2,speed:2,range:5,color:'#be7460'},valkyrie:C.VALKYRIE,darkWizard:{hp:100,damage:30,cooldown:2,speed:2,range:6,color:'#956abd'} };
-export type Unit = Point & { id:number; hp:number; maxHp:number; damage:number; range:number; speed:number; cooldown:number; cd:number; color:string; home:number; progress:number };
+export type Unit = Point & { id:number; hp:number; maxHp:number; damage:number; range:number; speed:number; cooldown:number; cd:number; color:string; home:number; progress:number; bounty?:number };
 export type Castle = Point & { hp:number; maxHp:number; cd:number; kind?:DefenseKind; damage?:number; cooldown?:number; range?:number };
 export type Shot = { from:Point; to:Point; life:number; friendly:boolean };
 export class CampaignSim {
@@ -83,27 +82,40 @@ export class CampaignSim {
   readonly layout: Placement[];
   readonly musterIconSize:number;
   allies: Unit[] = []; enemies: Unit[] = []; castles: Castle[] = []; shots: Shot[] = [];
+  gold=0; kills=0; private paid=new Map<number,number>();
   lives = 5; reserves = 36; elapsed = 0; wave = 0; spawned = 0;
   private spawnClock=0; private recruit:number[]=[]; private towerCd:number[]=[]; private nextId=0;
   private pending = 0;
   constructor(readonly mode: Mode, readonly level: number, layout: Placement[], private owned: DefendSave['owned'], private levels: DefendSave['levels'], readonly opponent?:CastleSnapshot) {
-    if(opponent)this.levels={...levels};
+    if(opponent||mode==='ambush')this.levels={...levels};
     const army=mode==='siege'?siegeArmy(owned):undefined;
     this.plan={...levelPlan(mode,level),...(army?{pads:army.pads}:{})};
-    this.layout=army?army.layout:validLayout(mode,level,layout,owned);
+    this.layout=army?army.layout:[];
+    if(mode==='ambush'){this.gold=startingGold(level);for(const p of validLayout(mode,level,layout,owned))this.place(p.pad,p.kind);}
     this.musterIconSize=army?.iconSize??42;
     if(army)this.reserves=Math.max(36,army.layout.length*C.soldierCap(this.levels.barracksCapacity));
     if(mode==='siege'&&opponent)this.castles=opponent.defenses.map(d=>({...d,maxHp:d.hp,cd:d.cooldown}));
     else if(mode==='siege') this.castles=Array.from({length:level+1},(_,i)=>({x:5+i*5,y:4+(i%2)*3,hp:100+level*45,maxHp:100+level*45,cd:2+i}));
   }
+  price(kind:C.StructureKind){return ambushPrice(kind,this.levels);}
+  refund(pad:number){const paid=this.paid.get(pad)??0;return this.phase==='build'?paid:Math.floor(paid*.7/10)*10;}
   place(pad:number,kind:C.StructureKind) {
-    if(this.mode==='siege'||this.phase!=='build') return false;
+    if(this.mode!=='ambush'||!['build','battle'].includes(this.phase))return false;
     const layout=[...this.layout.filter(p=>p.pad!==pad),{pad,kind}];
     const valid=validLayout(this.mode,this.level,layout,this.owned);
-    if(valid.length!==layout.length) return false;
-    this.layout.splice(0,this.layout.length,...valid); return true;
+    const cost=this.price(kind).cost,refund=this.refund(pad);
+    if(valid.length!==layout.length||cost>this.gold+refund)return false;
+    this.clearHome(pad);this.gold+=refund-cost;this.paid.set(pad,cost);
+    this.layout.splice(0,this.layout.length,...valid);return true;
   }
-  remove(pad:number) {if(this.mode==='ambush'&&this.phase==='build') this.layout.splice(0,this.layout.length,...this.layout.filter(p=>p.pad!==pad));}
+  private clearHome(pad:number){
+    this.allies=this.allies.filter(a=>a.home!==pad);delete this.recruit[pad];delete this.towerCd[pad];
+  }
+  remove(pad:number) {
+    if(this.mode!=='ambush'||!['build','battle'].includes(this.phase))return;
+    this.gold+=this.refund(pad);this.paid.delete(pad);this.clearHome(pad);
+    this.layout.splice(0,this.layout.length,...this.layout.filter(p=>p.pad!==pad));
+  }
   start() {if(this.phase!=='build'||!this.layout.some(p=>infantry(p.kind)||p.kind!=='watchTower'))return false;this.phase='battle';this.nextWave();return true;}
   private nextWave() {this.wave++;this.pending=this.mode==='ambush'?5+this.level*2+this.wave*2:this.opponent?.guards.count??3+this.level;this.spawnClock=1;}
   private unit(p:Point,profile:Profile,home:number,scale=1):Unit {return {...p,id:this.nextId++,hp:profile.hp*scale,maxHp:profile.hp*scale,damage:profile.damage*scale,range:profile.range??profile.reach??3,speed:profile.speed,cooldown:profile.cooldown,cd:0,color:profile.color,home,progress:0};}
@@ -116,29 +128,25 @@ export class CampaignSim {
     this.elapsed+=dt;this.shots=this.shots.filter(s=>(s.life-=dt)>0);
     const garrisons=new Map<number,number>();
     for(const ally of this.allies)if(ally.hp>0)garrisons.set(ally.home,(garrisons.get(ally.home)??0)+1);
-    this.layout.forEach((p,i)=>{
+    this.layout.forEach(p=>{
+      const i=p.pad;
       const pos=this.plan.pads[p.pad];
       if(infantry(p.kind)) {
         this.recruit[i]=(this.recruit[i]??0)-dt;
         if(this.recruit[i]<=0&&(garrisons.get(i)??0)<C.soldierCap(this.levels.barracksCapacity)&&(this.mode==='ambush'||this.reserves>0)) {
-          const profile=PROFILES[TRAINS[p.kind]!]||C.SOLDIER;
-          const recruit=this.unit(pos,profile,i,C.soldierScale(this.levels.soldierArms));
-          if(profile.range!==undefined)recruit.range+=this.levels.archerSight;
+          const profile=troopStats(p.kind,this.levels);
+          const recruit=this.unit(pos,profile,i);
           this.allies.push(recruit);
           this.recruit[i]=C.trainSeconds(this.levels.barracksTraining);if(this.mode==='siege')this.reserves--;
         }
       } else {
         this.towerCd[i]=(this.towerCd[i]??0)-dt;
         if(p.kind==='watchTower')return;
-        const cannon=(C.CANNON_TOWERS as readonly string[]).includes(p.kind)||p.kind==='nanoTower';
-        const wizard=C.isWizardTower(p.kind);
-        const range=cannon?C.CANNON_RANGE*.55:wizard?C.flameRange(this.levels.wizardFlame):C.archerRange(this.levels.archerRange)*.55;
-        const target=this.enemies.find(e=>e.hp>0&&distance(e,pos)<=range);
+        const attack=towerStats(p.kind,this.levels);
+        const target=this.enemies.find(e=>e.hp>0&&distance(e,pos)<=attack.range);
         if(target&&this.towerCd[i]<=0){
-          const damage=cannon?C.cannonDamage(this.levels.cannonDamage):wizard?C.flameDps(this.levels.wizardFlame):C.archerDamage(this.levels.archerDamage);
-          const splash=cannon?C.cannonSplash(this.levels.cannonDamage):wizard?1:0;
-          for(const enemy of this.enemies)if(enemy.hp>0&&(enemy===target||splash>0&&distance(enemy,target)<=splash))this.hit(pos,enemy,damage,true);
-          this.towerCd[i]=cannon?C.cannonCooldown(this.levels.cannonRate):wizard?1.6:C.archerCooldown(this.levels.archerRate);
+          for(const enemy of this.enemies)if(enemy.hp>0&&(enemy===target||attack.splash>0&&distance(enemy,target)<=attack.splash))this.hit(pos,enemy,attack.damage,true);
+          this.towerCd[i]=attack.cooldown;
         }
       }
     });
@@ -147,15 +155,15 @@ export class CampaignSim {
       const keep=this.castles.find(c=>c.kind==='keep'&&c.hp>0);
       const p=this.mode==='ambush'?this.plan.path[0]:keep??{x:5+(this.spawned%3)*5,y:5};
       const profile=this.opponent ? {...this.opponent.guards,reach:.8,color:'#ca715a'} : {hp:9+this.level*5+this.wave*2,damage:2+this.level,cooldown:1.2,speed:1.15+this.level*.1,reach:.8,color:'#ca715a'};
-      if(this.mode==='ambush'||!this.opponent||keep)this.enemies.push(this.unit(p,profile,-1));
+      if(this.mode==='ambush'||!this.opponent||keep){const enemy=this.unit(p,profile,-1);if(this.mode==='ambush')enemy.bounty=enemyBounty(enemy);this.enemies.push(enemy);}
       this.spawned++;this.pending--;this.spawnClock=.95;
     }
     for(const a of this.allies){
       if(a.hp<=0)continue;a.cd-=dt;
-      const candidates=this.enemies.filter(e=>e.hp>0&&(this.mode==='siege'||distance(e,this.plan.pads[this.layout[a.home].pad])<5));
+      const candidates=this.enemies.filter(e=>e.hp>0&&(this.mode==='siege'||distance(e,this.plan.pads[a.home])<5));
       const target=candidates.sort((b,c)=>distance(a,b)-distance(a,c))[0] || (this.mode==='siege'?this.castles.filter(c=>c.hp>0).sort((b,c)=>distance(a,b)-distance(a,c))[0]:undefined);
       if(target){if(distance(a,target)<=a.range+.3){if(a.cd<=0){this.hit(a,target,a.damage,true);a.cd=a.cooldown;}}else this.move(a,target,dt);}
-      else if(this.mode==='ambush')this.move(a,this.plan.pads[this.layout[a.home].pad],dt);
+      else if(this.mode==='ambush')this.move(a,this.plan.pads[a.home],dt);
     }
     for(const e of this.enemies){
       if(e.hp<=0)continue;e.cd-=dt;
@@ -174,7 +182,9 @@ export class CampaignSim {
   }
   private move(a:Unit,b:Point,dt:number){const d=distance(a,b);if(d<.0001)return;const k=Math.min(1,a.speed*dt/d);a.x+=(b.x-a.x)*k;a.y+=(b.y-a.y)*k;}
   private hit(from:Point,to:Point&{hp:number},damage:number,friendly:boolean){
-    const marked=friendly&&this.mode==='ambush'&&this.layout.some(p=>p.kind==='watchTower'&&distance(this.plan.pads[p.pad],to)<5);
-    to.hp-=damage*(marked?2:1);this.shots.push({from:{x:from.x,y:from.y},to:{x:to.x,y:to.y},life:.16,friendly});
+    const marked=friendly&&this.mode==='ambush'&&this.layout.some(p=>p.kind==='watchTower'&&distance(this.plan.pads[p.pad],to)<towerStats('watchTower',this.levels).range);
+    const wasAlive=to.hp>0;to.hp-=damage*(marked?2:1);
+    if(this.mode==='ambush'&&friendly&&wasAlive&&to.hp<=0&&(to as Unit).bounty){this.gold+=(to as Unit).bounty!;this.kills++;}
+   this.shots.push({from:{x:from.x,y:from.y},to:{x:to.x,y:to.y},life:.16,friendly});
   }
 }

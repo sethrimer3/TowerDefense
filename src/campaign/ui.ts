@@ -34,9 +34,10 @@ export class CampaignPage {
       ${siege&&raid?`<div class="siege-opponent"><strong>${raid.castle.owner.name}</strong> <small class="siege-bot">BOT</small><p>Your attack MMR: <b>${siege.mmr}</b> · ${siege.wins}/${siege.games} wins${siege.games<10?' · Placement matches':''}</p><p>Castle defense rating: <b>${raid.defender}</b> (estimated)</p><small>Defense ratings are provisional until calibrated against raid results.</small>${finished?`<p>Last rated result: ${raid.state==='won'?'Victory':'Defeat'} · MMR ${raid.delta!>=0?'+':''}${raid.delta??0}. This target is now available for unrated practice.</p>`:''}</div>`:
       `<label>Level <select class="campaign-level" aria-label="Level">${Array.from({length:LEVELS},(_,i)=>`<option value="${i}" ${i===this.level?'selected':''} ${i>unlocked?'disabled':''}>${i+1}. ${levelPlan(this.mode,i).name}${i>unlocked?' — locked':''}</option>`).join('')}</select></label>`}
       <div class="campaign-actions"><button data-action="start">${this.sim.phase==='build'?(siege?(finished?'Start practice':'Start ranked raid'):'Start waves'):this.paused?'Resume':'Pause'}</button><button data-action="retry">${siege?(raid?.state==='started'?'Forfeit / rebuild':finished?'Practice again':'Rebuild'):'Rebuild / retry'}</button><button data-action="next" ${(siege?!finished:this.sim.phase!=='won'||this.level===LEVELS-1)?'hidden':''}>${siege?'Find next opponent':'Next level'}</button></div>
+      ${this.mode==='ambush'?'<p class="ambush-wallet" aria-live="polite">Ambush gold: <b id="ambush-gold"></b></p>':''}
       <p class="campaign-status" role="status" aria-live="polite"></p></div>
       <div class="campaign-board"><canvas width="600" height="720" aria-label="${this.mode==='ambush'?'Enemy path and placement spaces':'Enemy castles and infantry muster spaces'}"></canvas></div>
-      <div class="panel"><h2>${this.mode==='ambush'?'Roadside buildings':'Infantry buildings'}</h2><p>${this.mode==='ambush'?'Choose a building, then a numbered space. Tap an occupied space to remove it. Placement is free and uses copies you own; buy more in Tiles.':'Every infantry building you own is deployed automatically at the bottom, including copies placed in your Defend city. Start the raid to release their troops toward the castle above. Buy more buildings in Tiles.'} ${this.mode==='ambush'?'Layouts and completed levels are saved. Battles restart on reload.':'Your rated results are saved; each new raid uses your current infantry buildings. Reloading a rated battle counts as a loss; the target remains available for practice.'} Buildings use base attacks and Armory combat upgrades; specialty abilities from Defend do not apply here yet.</p><div class="campaign-roster"></div>${this.mode==='ambush'?'<div class="campaign-spaces" aria-label="Placement spaces"></div>':''}</div>`;
+      <div class="panel"><h2>${this.mode==='ambush'?'Roadside buildings':'Infantry buildings'}</h2><p>${this.mode==='ambush'?'Choose a building, then a numbered space. Tap an occupied space to remove it. Unlocked buildings can be bought repeatedly with Ambush gold, including during waves. Tap a placed building to sell it: full refund before waves, 70% (rounded down to 10) during battle. Costs reflect potential DPS and Armory upgrades. Kill enemies for gold; escaped enemies pay nothing. This gold is only for this level and resets on retry.':'Every infantry building you own is deployed automatically at the bottom, including copies placed in your Defend city. Start the raid to release their troops toward the castle above. Buy more buildings in Tiles.'} ${this.mode==='ambush'?'Layouts and completed levels are saved. Battles restart on reload.':'Your rated results are saved; each new raid uses your current infantry buildings. Reloading a rated battle counts as a loss; the target remains available for practice.'} Buildings use base attacks and Armory combat upgrades; specialty abilities from Defend do not apply here yet.</p><div class="campaign-roster"></div>${this.mode==='ambush'?'<div class="campaign-spaces" aria-label="Placement spaces"></div>':''}</div>`;
     this.canvas=this.root.querySelector('canvas')!;this.font=getComputedStyle(this.canvas).fontFamily;this.status=this.root.querySelector('.campaign-status')!;this.roster=this.root.querySelector('.campaign-roster')!;
     const profileButton=this.root.querySelector<HTMLButtonElement>('[data-action="profile"]');
     if(profileButton)profileButton.onclick=()=>{if(this.sim.phase==='battle'){this.paused=true;this.render();}this.host.editProfile?.();};
@@ -61,12 +62,17 @@ export class CampaignPage {
       return;
     }
     if(!available.includes(this.selected!))this.selected=available[0]||null;
-    this.roster.innerHTML=available.map(k=>{const count=owned[k as PaletteItem]-this.sim.layout.filter(p=>p.kind===k).length;return `<button data-kind="${k}" aria-pressed="${this.selected===k}" ${this.sim.phase!=='build'?'disabled':''}><canvas width="48" height="48" data-icon="${k}"></canvas><span>${STRUCTURES[k].name}</span><small>${count} available</small></button>`;}).join('')||'<p>No infantry buildings owned. Buy a Melee Guild or Ranged Guild in Tiles.</p>';
+    this.roster.innerHTML=available.map(k=>{const price=this.sim.price(k);return `<button data-kind="${k}" data-price="${price.cost}" title="${price.support?'Support equivalent':'Potential'} DPS: ${price.dps.toFixed(1)}; range ${price.range.toFixed(1)}" aria-pressed="${this.selected===k}"><canvas width="48" height="48" data-icon="${k}"></canvas><span>${STRUCTURES[k].name}</span><small>${price.cost} gold</small><small>${price.support?'Support':`~${price.dps.toFixed(1)} DPS`}</small></button>`;}).join('')||'<p>Unlock a tower or infantry building in Tiles to use it here.</p>';
     this.roster.querySelectorAll<HTMLButtonElement>('[data-kind]').forEach(b=>{paintIcon(b.querySelector('canvas')!,b.dataset.kind as PaletteItem);b.onclick=()=>{this.selected=b.dataset.kind as StructureKind;this.palette();};});
-    this.root.querySelector('.campaign-spaces')!.innerHTML=this.sim.plan.pads.map((_,i)=>{const placed=this.sim.layout.find(p=>p.pad===i);return `<button data-pad="${i}" ${this.sim.phase!=='build'?'disabled':''} aria-label="Space ${i+1}: ${placed?STRUCTURES[placed.kind].name:'empty'}">${i+1}: ${placed?STRUCTURES[placed.kind].name:'Empty'}</button>`;}).join('');
+    this.root.querySelector('.campaign-spaces')!.innerHTML=this.sim.plan.pads.map((_,i)=>{const placed=this.sim.layout.find(p=>p.pad===i);return `<button data-pad="${i}" ${!['build','battle'].includes(this.sim.phase)?'disabled':''} aria-label="Space ${i+1}: ${placed?STRUCTURES[placed.kind].name:'empty'}">${i+1}: ${placed?`${STRUCTURES[placed.kind].name} (sell ${this.sim.refund(i)} gold)`:'Empty'}</button>`;}).join('');
     this.root.querySelectorAll<HTMLButtonElement>('[data-pad]').forEach(b=>b.onclick=()=>this.place(Number(b.dataset.pad)));
   }
-  private place(pad:number){if(this.sim.phase!=='build')return;if(this.sim.layout.some(p=>p.pad===pad))this.sim.remove(pad);else if(!this.selected||!this.sim.place(pad,this.selected)){this.status.textContent=this.notice='No unused copies of that building. Choose another building or remove one first.';return;}this.notice='';this.saveLayout();this.palette();this.draw();}
+  private place(pad:number){
+    if(this.mode!=='ambush'||!['build','battle'].includes(this.sim.phase))return;
+    if(this.sim.layout.some(p=>p.pad===pad))this.sim.remove(pad);
+    else if(!this.selected||!this.sim.place(pad,this.selected)){this.status.textContent=this.notice=this.selected?`Need ${this.sim.price(this.selected).cost} gold to build this. Choose an unlocked building you can afford.`:'Choose an unlocked building first.';return;}
+    this.notice='';this.saveLayout();this.palette();this.refresh();this.draw();
+  }
   frame(time:number){const dt=this.last?Math.min(.1,(time-this.last)/1000):0;this.last=time;if(!this.paused)this.sim.step(dt);
     if((this.sim.phase==='won'||this.sim.phase==='lost')&&!this.rewarded){
       this.rewarded=true;const s=this.host.save();
@@ -77,8 +83,17 @@ export class CampaignPage {
     this.refresh();this.draw();
   }
   private refresh(){
-    const s=this.sim;const summary=this.mode==='ambush'?`Wave ${s.wave}/3 · ${s.lives} lives · ${s.enemies.length} enemies`:`${s.castles.filter(c=>c.hp>0).length} defenses · ${s.reserves} recruits left · ${Math.max(0,240-Math.floor(s.elapsed))}s`;
+    const s=this.sim;const summary=this.mode==='ambush'?`Wave ${s.wave}/3 · ${s.lives} lives · ${s.enemies.length} enemies · ${s.kills} kills`:`${s.castles.filter(c=>c.hp>0).length} defenses · ${s.reserves} recruits left · ${Math.max(0,240-Math.floor(s.elapsed))}s`;
     this.status.textContent=s.phase==='build'?(this.notice||(this.mode==='siege'?`${s.layout.length} infantry buildings deployed. Start the raid to release their troops.`:'Place your buildings, then start.')):s.phase==='won'?(this.mode==='siege'?'Victory! The keep has fallen.':(this.level<LEVELS-1?'Victory! Next level unlocked.':'Victory! Campaign complete.')):s.phase==='lost'?'Defeat. Rebuild your formation and try again.':(this.paused?'Paused · ':'')+summary;
+    if(this.mode==='ambush'){
+      const gold=this.root.querySelector('#ambush-gold')!;if(gold.textContent!==String(s.gold))gold.textContent=String(s.gold);
+      const ended=s.phase==='won'||s.phase==='lost';
+      this.roster.querySelectorAll<HTMLButtonElement>('[data-kind]').forEach(button=>{button.disabled=ended||Number(button.dataset.price)>s.gold;});
+      this.root.querySelectorAll<HTMLButtonElement>('[data-pad]').forEach(button=>{
+        const pad=Number(button.dataset.pad),placed=s.layout.find(p=>p.pad===pad);button.disabled=ended;
+        const text=`${pad+1}: ${placed?`${STRUCTURES[placed.kind].name} (sell ${s.refund(pad)} gold)`:'Empty'}`;if(button.textContent!==text)button.textContent=text;
+      });
+    }
     const start=this.root.querySelector<HTMLButtonElement>('[data-action="start"]')!;start.disabled=s.phase==='won'||s.phase==='lost';
   }
   private draw(){

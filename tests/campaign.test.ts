@@ -13,7 +13,7 @@ test('Ambush paths finish all levels without stalling at corners; prepared forma
 });
 test('Ambush enemies stay on the fixed path, leaks remove lives, and build phase never runs',()=>{
  const d=defaultDefendSave();d.owned.archerTower=1;
- const s=new CampaignSim('ambush',2,[],d.owned,d.levels);s.step(1);assert.equal(s.elapsed,0);
+ d.levels.archerDamage=-2;const s=new CampaignSim('ambush',2,[],d.owned,d.levels);s.step(1);assert.equal(s.elapsed,0);
  assert.ok(s.place(s.plan.pads.length-1,'archerTower'));s.start();
  // Remove attack damage, testing the entire uninterrupted leak path.
  d.levels.archerDamage=-2;
@@ -35,11 +35,14 @@ test('Siege loses once its army is exhausted; battles cannot start empty',()=>{
  const d=defaultDefendSave(),s=new CampaignSim('siege',0,[],d.owned,d.levels);
  const empty={...d.owned,meleeGuild:0,rangedGuild:0};assert.equal(new CampaignSim('siege',0,[],empty,d.levels).start(),false);s.start();s.reserves=0;s.allies=[];s.step(.05);assert.equal(s.phase,'lost');
 });
-test('Layouts enforce unique pads and inventory, with no mutation on refused placement',()=>{
+test('Ambush allows repeat unlocked buildings but enforces budget, pads and locked types',()=>{
  const d=defaultDefendSave(),s=new CampaignSim('ambush',0,[],d.owned,d.levels);
- s.place(0,'meleeGuild');const before=JSON.stringify(s.layout);assert.equal(s.place(1,'meleeGuild'),false);assert.equal(s.place(-1,'rangedGuild'),false);assert.equal(s.place(500,'rangedGuild'),false);assert.equal(JSON.stringify(s.layout),before);
+ assert.ok(s.place(0,'meleeGuild'));assert.ok(s.place(1,'meleeGuild'));
+ const before=JSON.stringify(s.layout),gold=s.gold;
+ assert.equal(s.place(2,'meleeGuild'),false);assert.equal(s.place(-1,'rangedGuild'),false);assert.equal(s.place(500,'rangedGuild'),false);assert.equal(s.place(2,'archerTower'),false);
+ assert.equal(JSON.stringify(s.layout),before);assert.equal(s.gold,gold);
  assert.equal(validLayout('siege',0,[{pad:0,kind:'watchTower'},{pad:1,kind:'meleeGuild'},{pad:1,kind:'rangedGuild'}],d.owned).length,1);
- s.remove(0);assert.ok(s.place(1,'meleeGuild'));
+ s.remove(0);assert.ok(s.place(2,'meleeGuild'));
 });
 test('Campaign saves round-trip and reject malformed or out-of-bounds progress/layout data',()=>{
  const save=defaults();assert.equal(Object.hasOwn(decode(JSON.stringify(save)),'campaigns'),false);

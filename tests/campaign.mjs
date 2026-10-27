@@ -48,6 +48,20 @@ try {
   const recovered=await page.evaluate(()=>JSON.parse(localStorage.getItem('towerdefense.v1')).siege);
   assert.equal(recovered.raid.castle.id,offeredId);assert.equal(recovered.games,1);
   assert.equal(saved.campaigns.ambush.layouts[0].length,2);assert.equal(saved.campaigns.siege.layouts[0]?.length??0,0);
+  const economy=await page.evaluate(async()=>{
+   const {CampaignPage}=await import('/src/campaign/ui.ts');const {defaults}=await import('/src/save.ts');
+   const save=defaults(),before=JSON.stringify(save.smithy);const root=document.createElement('section');document.body.append(root);
+   const page=new CampaignPage(root,'ambush',{save:()=>save,store:()=>{}});page.show();
+   if(root.querySelector('#ambush-gold').textContent!=='500')throw new Error('Missing starting Ambush gold');
+   root.querySelector('[data-kind="rangedGuild"]').click();for(let pad=0;pad<4;pad++)root.querySelector(`[data-pad="${pad}"]`).click();
+   const beforeKill=page.sim.gold,disabled=root.querySelector('[data-kind="rangedGuild"]').disabled;
+   root.querySelector('[data-action="start"]').click();
+   for(let i=1;i<1000&&page.sim.phase==='battle'&&page.sim.gold<110;i++)page.frame(i*100);
+   const earned=page.sim.gold-beforeKill,enabled=!root.querySelector('[data-kind="rangedGuild"]').disabled;
+   const purchaseGold=page.sim.gold;root.querySelector('[data-kind="rangedGuild"]').click();root.querySelector('[data-pad="4"]').click();
+   const result={beforeKill,disabled,earned,enabled,paid:purchaseGold-page.sim.gold,buildings:page.sim.layout.length,kills:page.sim.kills,wallet:root.querySelector('#ambush-gold').textContent,mineUnchanged:JSON.stringify(save.smithy)===before};root.remove();return result;
+  });
+  assert.equal(economy.beforeKill,60);assert.equal(economy.disabled,true);assert.ok(economy.earned>=50);assert.equal(economy.enabled,true);assert.equal(economy.paid,110);assert.equal(economy.buildings,5);assert.ok(economy.kills>=5);assert.equal(economy.mineUnchanged,true);
   const deployment=await page.evaluate(async()=>{
    const {CampaignPage}=await import('/src/campaign/ui.ts');const {defaults}=await import('/src/save.ts');
    const save=defaults();save.defend.owned.meleeGuild=7;save.defend.owned.rangedGuild=6;save.defend.owned.barracks=2;save.defend.owned.watchTower=4;
