@@ -189,8 +189,8 @@ The native base-stat/five-building setup was introduced with the new free-grid b
 
 ### Phase 7: The star tree
 
-- Build the star tree as described under Target design: pure module, save field, the tree panel on the level select, the effects wired into `CampaignSim`. Requires phases 5 (stars) and 6 (base-only battles).
-- Tests as listed there.
+- [x] Build the star tree as described under Target design: pure module, save field, the tree panel on the level select, the effects wired into `CampaignSim`. Requires phases 5 (stars) and 6 (base-only battles).
+- [x] Tests as listed there.
 
 ### Phase 8: Balance, polish and playtest
 

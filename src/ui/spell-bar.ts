@@ -25,10 +25,10 @@ export class SpellBar {
   this.el.onkeydown=e=>{if(e.key==='Escape')this.cancel();};
  }
  cancel(){this.armed=undefined;this.point=undefined;this.el.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed','false'));}
- update(sim:DefendSim,active:boolean,reduced=false){
+ update(sim:DefendSim,active:boolean,reduced=false,cooldown=1){
   const clocks=spellClocks(sim);
   for(const b of Array.from(this.el.querySelectorAll<HTMLButtonElement>('[data-spell]'))){
-   const spell=b.dataset.spell as StrikeSpell,{left,total}=clocks[spell],old=this.previous.get(spell);
+   const spell=b.dataset.spell as StrikeSpell,{left}=clocks[spell],total=clocks[spell].total*cooldown,old=this.previous.get(spell);
    if(active&&old!==undefined&&old>0&&left===0){if(!reduced){b.classList.remove('strike-ready');void b.offsetWidth;b.classList.add('strike-ready');}play('spellReady');}
    this.previous.set(spell,left);b.disabled=!active||left>0;b.style.setProperty('--fill',(100*(1-left/total))+'%');b.querySelector('small')!.textContent=left>0?String(Math.ceil(left)):'';
    b.setAttribute('aria-pressed',String(this.armed===spell));b.setAttribute('aria-label',names[spell]+(left>0?' · '+Math.ceil(left)+'s':''));

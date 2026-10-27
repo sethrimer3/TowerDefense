@@ -621,3 +621,6 @@ The Ambush gold paid once for defeating an enemy, based on that enemy's combat d
 - **Strike quick bar**: round spell icons on the board; choose a spell, then tap its target. Choosing it again cancels.
 
 - **Ambush investment**: the gold paid for a building and its local upgrades, including buildings consumed by a merge. Selling returns all of it until wave 2 starts, then a fraction rounded down to tens.
+
+- **Ambush star pool**: the sum of best level ratings minus stars invested in the Ambush star tree. Upgrades, undo and respec affect Ambush alone.
+- **Head start**: an Ambush star-tree branch that places one or two free Archer Towers at level start; selling a free tower returns no purchase gold.

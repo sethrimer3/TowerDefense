@@ -1,3 +1,4 @@
+import { decodeAmbushRanks,type AmbushRanks } from '../ambush-upgrades.ts';
 /** Stable Ambush identities, deterministic tracks and best-star progression. */
 import { AREAS, type AreaId } from '../defend/areas.ts';
 import { hash, hash01, CELLS_W, CELLS_H } from '../defend/grid.ts';
@@ -5,7 +6,7 @@ import { dist } from '../exact.ts';
 export type LevelPoint = { x: number; y: number };
 export type AmbushLevel = { id: string; area: AreaId; zone: number; index: number; name: string; seed: number };
 export type Stars = 0 | 1 | 2 | 3;
-export type AmbushProgress = { stars: Partial<Record<string, Stars>>; autoSend?: true };
+export type AmbushProgress = { stars: Partial<Record<string, Stars>>; autoSend?: true; ranks?:AmbushRanks; attempts?:Partial<Record<string,number>> };
 const names = [
  ['Old Road', 'Mossy Ford', 'Ruin Gate'], ['Sandway', 'Sunken Well', 'Amber Pass'],
  ['Cinder Road', 'Slag Crossing', 'Forge Gate'], ['Tidal Road', 'Coral Crossing', 'Temple Gate'],
@@ -27,13 +28,15 @@ export function recordStars(progress: AmbushProgress, level: AmbushLevel, stars:
 export function decodeAmbush(raw: unknown): AmbushProgress {
  const out: AmbushProgress = { stars: {} };
  if (!raw || typeof raw !== 'object') return out;
- const value = raw as { stars?: Record<string, unknown>; cleared?: number; autoSend?: unknown };
+ const value = raw as { stars?: Record<string, unknown>; cleared?: number; autoSend?: unknown; ranks?:unknown; attempts?:Record<string,unknown> };
  if (value.stars && typeof value.stars === 'object') {
   for (const level of AMBUSH_LEVELS) { const n = value.stars[level.id]; if (Number.isInteger(n) && Number(n) >= 1 && Number(n) <= 3) out.stars[level.id] = n as Stars; }
  } else if (Number.isInteger(value.cleared)) {
   for (let i = 0; i < Math.max(0, Math.min(3, value.cleared!)); i++) out.stars[AMBUSH_LEVELS[i].id] = 1;
  }
  if(value.autoSend===true)out.autoSend=true;
+ const ranks=decodeAmbushRanks(value.ranks,totalStars(out));if(ranks)out.ranks=ranks;
+ for(const level of AMBUSH_LEVELS){const n=value.attempts?.[level.id];if(Number.isSafeInteger(n)&&Number(n)>0&&Number(n)<=1e9)(out.attempts??={})[level.id]=Number(n);}
  return out;
 }
 export function pointAlong(points: readonly LevelPoint[], fraction: number): LevelPoint {

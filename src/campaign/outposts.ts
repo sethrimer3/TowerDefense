@@ -18,7 +18,7 @@ function projection(path:Point[],p:Point){
 }
 export class Outpost {
  breached=false;fallen=false;readonly initial:number;private version=-1;private alive=0;private signature='';private fractions:number[];private pristine:House[];private types:Uint8Array;
- constructor(readonly rect:Rect,readonly houses:number[],private engine:DefendSim,private field:Field,private index:number){
+ constructor(readonly rect:Rect,readonly houses:number[],private engine:DefendSim,private field:Field,private index:number,private palisade=1){
   this.initial=houses.length;this.fractions=houses.map(()=>1);this.pristine=houses.map(id=>({rect:{...engine.map.buildings[id].rect},variant:engine.map.buildings[id].variant}));this.types=engine.map.type.slice();
  }
  get standing(){if(this.version!==this.engine.mapVersion){this.version=this.engine.mapVersion;this.alive=this.houses.filter(id=>!this.engine.map.buildings[id].hidden&&this.engine.hp[id]>0).length;}return this.alive;}
@@ -44,16 +44,17 @@ export class Outpost {
    map.owner[c]=-1;map.type[c]=this.field.road.has(c)?CellType.ROAD:types[c]===CellType.HOUSE?CellType.PARK:types[c];
    this.engine.solid[c]=this.engine.ownSolid[c]=this.engine.foeSolid[c]=map.type[c]===CellType.WATER?1:0;
   }
-  for(let i=0;i<this.houses.length;i++){const id=this.houses[i],house=defs[i];if(!house)continue;map.buildings[id].variant=house.variant;this.engine.configureLot(id,'house',house.rect,true,this.fractions[i]);}
+  for(let i=0;i<this.houses.length;i++){const id=this.houses[i],house=defs[i];if(!house)continue;map.buildings[id].variant=house.variant;this.engine.configureLot(id,'house',house.rect,true,this.fractions[i]);this.engine.hp[id]*=this.palisade;this.engine.maxHp[id]*=this.palisade;}
   this.engine.mapVersion++;return true;
  }
 }
 export class Outposts {
  readonly posts:Outpost[];private marks:number[];private routes=new WeakMap<Enemy,{segment:number;raiding?:number;rejoin?:Point}>();
  private fields=new Map<string,{version:number;until:number;field:Float64Array}>();
- constructor(readonly engine:DefendSim,readonly field:Field){
-  this.posts=field.outposts.map((p,i)=>new Outpost(p.rect,p.houses,engine,field,i));this.marks=this.posts.map(p=>projection(field.path,center(p.rect)).progress);
-  for(const b of field.map.buildings)if(b.fence){engine.hp[b.id]*=.1;engine.maxHp[b.id]*=.1;}
+ constructor(readonly engine:DefendSim,readonly field:Field,palisade=1){
+  this.posts=field.outposts.map((p,i)=>new Outpost(p.rect,p.houses,engine,field,i,palisade));this.marks=this.posts.map(p=>projection(field.path,center(p.rect)).progress);
+  for(const post of this.posts)for(const id of post.houses){engine.hp[id]*=palisade;engine.maxHp[id]*=palisade;}
+  for(const b of field.map.buildings)if(b.fence){engine.hp[b.id]*=.1*palisade/engine.bonuses.wallHp;engine.maxHp[b.id]*=.1*palisade/engine.bonuses.wallHp;}
  }
  get stars(){return this.engine.keepHp()>0?1+this.posts.filter(p=>!p.fallen).length:0;}
  update(){for(const post of this.posts)post.update(this.engine.enemies);}
