@@ -2434,3 +2434,12 @@ nav button[data-mode] > .tab-label { min-height: 2.4em; }
 .ambush-upgrades { display:flex;flex-direction:column;gap:6px; }
 .ambush-upgrades button { font-size:10px;padding:5px; }
 .ambush-upgrades small { display:block; }
+.ambush-star-dialog { width:min(860px,94vw);max-height:92dvh;padding:12px;box-sizing:border-box; }
+.ambush-star-head { display:flex;align-items:center;flex-wrap:wrap;gap:8px; }
+.ambush-star-body { position:relative;height:min(56dvh,460px); }
+.ambush-star-graph { height:100%;position:relative;z-index:1; }
+.ambush-star-card { min-height:92px;position:relative; }
+.ambush-star-card p { margin:6px 0; }
+.ambush-star-dialog { padding-top:40px; }
+.ambush-star-head label { display:flex;gap:6px;align-items:center; }
+@media(max-width:600px) { .ambush-star-body { height:44dvh; }.ambush-star-head label { width:100%; } }

@@ -74,7 +74,7 @@ export class AmbushBattlePage {
    button('result-select').onclick=()=>this.host.levelSelect?.();
    button('next').onclick=()=>{if(this.index<29&&levelUnlocked(this.host.save().campaigns.ambush,this.index+1))this.selectLevel(this.index+1);};
   }
-  button('start').onclick=()=>{if(!this.sim.send())this.notice=t('ambush.placeFirst');else this.notice='';this.refresh();};
+  button('start').onclick=()=>{if(!this.sim.send())this.notice=t('ambush.placeFirst');else {this.notice='';if(this.sim.wave===1){const p=this.host.save().campaigns.ambush,id=this.sim.level.id;(p.attempts??={})[id]=Math.min(1e9,(p.attempts?.[id]??0)+1);this.host.store();}}this.refresh();};
   button('pause').onclick=()=>{this.paused=!this.paused;this.render();};
   button('speed').onclick=()=>{const save=this.host.save().defend;this.sim.speed=this.sim.speed>=(save.speed3?3:2)?1:this.sim.speed+1 as 1|2|3;save.battleSpeed=this.sim.speed;this.host.store();this.refresh();};
   button('side').onclick=()=>{this.sideOpen=!this.sideOpen;this.render();};
@@ -140,7 +140,7 @@ export class AmbushBattlePage {
   this.root.querySelector<HTMLButtonElement>('[data-action="start"]')!.disabled=!s.canSend;
   this.root.querySelector<HTMLButtonElement>('[data-action="pause"]')!.disabled=s.phase!=='battle';
   this.root.querySelector<HTMLButtonElement>('[data-action="speed"]')!.textContent=s.speed+'×';
-  this.spellBar?.update(s.engine,s.phase==='battle',this.host.save().settings.reduceMotion);
+  this.spellBar?.update(s.engine,s.phase==='battle',this.host.save().settings.reduceMotion,s.perks.cooldown);
 
  }
  private panel(b:AmbushBuilding){
