@@ -70,7 +70,7 @@ const FLOOR_SIZE = 80;
 const CAP = { x: 38, w: 16, y0: 1, span: 62 };
 const FACE = { x0: 8, span: 64, y: 44, h: 14 };
 /** How far a wall stone's brick face hangs over the cell below, in cells. */
-const FACE_HANG = 0.45;
+export const FACE_HANG = 0.45;
 
 const RUBBLE = "#4a443d";
 const WALL = "#8e897c";
@@ -387,7 +387,7 @@ const SPIKE_OUT: Record<Side, readonly [number, number]> = { n: [0, -1], e: [1, 
 /** The wall spikes on every standing stone they line, painted under the
  * stones, their tips reaching out past the wall's face (on the south, past
  * the brick face hanging below the stone). */
-function paintSpikes({ c, px, map, solid }: Paint) {
+function paintSpikes({ c, px, map, solid }: Paint, outside = false) {
   for (const row of map.spikes ?? []) {
     const [dx, dy] = SPIKE_OUT[row.side];
     for (const i of row.cells) {
@@ -397,9 +397,30 @@ function paintSpikes({ c, px, map, solid }: Paint) {
       const reach = SPIKE_REACH / ART + (hung ? FACE_HANG : 0);
       const x = Math.round((cx + dx * reach) * px), y = Math.round((cy + dy * reach) * px);
       const w = Math.round((cx + dx * reach + 1) * px) - x, h = Math.round((cy + dy * reach + 1) * px) - y;
+      if (outside) {
+        // Only past the stone (and its hanging face), on the ground outside.
+        const x0 = Math.round(cx * px), x1 = Math.round((cx + 1) * px), y0 = Math.round(cy * px);
+        const y1 = Math.round((cy + 1) * px) + (hung ? Math.round(px * FACE_HANG) : 0);
+        const r = row.side === "n" ? [x, y, w, y0 - y] : row.side === "s" ? [x, y1, w, y + h - y1] : row.side === "e" ? [x1, y, x + w - x1, h] : [x, y, x0 - x, h];
+        if (r[2] <= 0 || r[3] <= 0) continue;
+        c.save();
+        c.beginPath();
+        c.rect(r[0], r[1], r[2], r[3]);
+        c.clip();
+      }
       drawSprite(c, sprite(`spikes:${row.side}:${hash(cx, cy, 31) % 8}`, ART, ART, () => spikePixels(row.side, hash(cx, cy, 31) % 8)), x, y, w, h);
+      if (outside) c.restore();
     }
   }
+}
+
+/** The spikes' points reaching out past the wall over the open ground,
+ * painted again (at `px` a cell) over whatever covered that ground after
+ * the city layer: the forest's floor. */
+export function paintSpikePoints(c: CanvasRenderingContext2D, px: number, map: CityMap, sim: DefendSim | null) {
+  if (!map.spikes?.length) return;
+  const solid = (i: number) => (sim ? sim.solid[i] === 1 : map.owner[i] >= 0 && map.type[i] !== CellType.ROAD);
+  paintSpikes({ c, px, map, sim, solid, area: "moss" }, true);
 }
 
 /** A city gate's sprite with its doors at `frame`, and its rubble. */
@@ -449,6 +470,28 @@ function paintWall(p: Paint, b: Building) {
   const face = !standing(0, 1) && cy + 1 < CELLS_H;
   if (face) paintWallFace(p, cx, { x, y });
   paintWallOutline(p, { x, y, w: Math.round((cx + 1) * px) - x, h: Math.round((cy + 1) * px) - y }, standing, face);
+}
+
+/** The open ground cells (outside the city) a standing wall stone's brick
+ * face hangs over, in runs along each row: `y` the row, `x0` to `x1`
+ * (exclusive) the cells. Whatever is drawn on that ground after the city
+ * layer (the forest's floor) must leave the face showing. */
+export function hangingFaces(map: CityMap, sim: DefendSim | null): { y: number; x0: number; x1: number }[] {
+  const standing = (i: number) => map.wall[i] === 1 && (sim ? sim.solid[i] === 1 : map.owner[i] >= 0);
+  const runs: { y: number; x0: number; x1: number }[] = [];
+  for (let cy = 1; cy < CELLS_H; cy++) {
+    let start = -1;
+    for (let cx = 0; cx <= CELLS_W; cx++) {
+      const i = cellIndex(cx, cy);
+      const hung = cx < CELLS_W && map.type[i] === CellType.OUT && standing(i - CELLS_W) && !standing(i);
+      if (hung && start < 0) start = cx;
+      else if (!hung && start >= 0) {
+        runs.push({ y: cy, x0: start, x1: cx });
+        start = -1;
+      }
+    }
+  }
+  return runs;
 }
 
 /** A thin black outline, one art pixel wide like the buildings', round the
