@@ -97,9 +97,9 @@ export function stepFireballs(sim: DefendSim, dt: number) {
     const level = sim.levels.mageEmbers ?? 0;
     const life = f.fire?.life ?? emberSeconds(level), dps = f.fire?.dps ?? emberDps(level) * sim.bonuses.troopDamage;
     if (f.fire) for (const e of sim.enemiesNear(f.x1, f.y1, f.r))
-      if (e.hp > 0 && dist(e.x - f.x1, e.y - f.y1) <= f.r && !sheltered(sim, e.x, e.y)) ignite(e, dps, f.fire.cling);
+      if (e.hp > 0 && dist(e.x - f.x1, e.y - f.y1) <= f.r && !sheltered(sim, e.x, e.y)) ignite(e, dps, f.fire.cling,sim.tallyOrigin(f.origin));
     sim.blazes.push({ x: f.x1, y: f.y1, r: f.r * (f.fire ? 1 : EMBER_SHARE), t: 0, life, dps, seed,
-      ...(f.fire ? { clingFor: f.fire.cling, origin: f.origin } : {}) });
+      ...(f.fire ? { clingFor: f.fire.cling, origin: f.origin } : sim.tally&&f.origin ? {origin:f.origin} : {}) });
   }
   sim.fireballs = sim.fireballs.filter((f) => f.t < f.dur);
 }
@@ -112,7 +112,7 @@ export function stepBlazes(sim: DefendSim, dt: number) {
       if (ENEMIES[e.kind].flying || sheltered(sim, e.x, e.y)) continue;
       sim.hurtEnemy(e, b.dps * dt, false, "ranged", b.origin ?? b, false, "fire");
       // Clinging fire: it keeps burning after it walks out.
-      if (b.clingFor || b.cling) ignite(e, b.dps, b.clingFor ?? 2);
+      if (b.clingFor || b.cling) ignite(e, b.dps, b.clingFor ?? 2,sim.tallyOrigin(b.origin));
     }
   }
   sim.blazes = sim.blazes.filter((b) => b.t < b.life);

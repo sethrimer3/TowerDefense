@@ -269,7 +269,7 @@ export function stepArrows(sim: DefendSim, dt: number) {
       const hit = a.chain ? railHit(sim, a, t) : a.damage;
       const landed = sim.hurtEnemy(t, hit, true, "ranged", a.origin ?? { x: a.x, y: a.y }, true);
       if (a.chain) railOn(sim, a, { x: t.x, y: t.y }, hit);
-      if (landed && a.burn) ignite(t, a.burn, a.burnFor!);
+      if (landed && a.burn) ignite(t, a.burn, a.burnFor!,sim.tallyOrigin(a.origin));
       // A sniper's bullet pins what it hits, or glances on.
       if (a.pin || a.glance) bulletHit(sim, a, t, landed);
       // A Stopping power bullet knocks it back.
@@ -317,7 +317,8 @@ export function stepShells(sim: DefendSim, dt: number) {
 }
 
 /** Sets `e` burning for `seconds` at `dps`, or keeps the hotter, longer burn it has. */
-export function ignite(e: Enemy, dps: number, seconds: number) {
+export function ignite(e: Enemy, dps: number, seconds: number, origin?:import("./sim.ts").DamageOrigin) {
+  if(dps>=(e.burnDps??0)){if(origin)e.burnOrigin=origin;else if(e.burnOrigin)delete e.burnOrigin;}
   e.burn = Math.max(e.burn ?? 0, seconds);
   e.burnDps = Math.max(e.burnDps ?? 0, dps);
 }
@@ -331,7 +332,7 @@ function stepReleased(sim:DefendSim,a:Arrow,dt:number){
     r.hit.push(e.id);
     if(a.blast){a.tx=from.x+(a.x-from.x)*t;a.ty=from.y+(a.y-from.y)*t;burstBall(sim,a);a.life=0;break;}
     const landed=sim.hurtEnemy(e,a.damage,true,"ranged",a.origin,true);
-    if(landed&&a.burn)ignite(e,a.burn,a.burnFor!);
+    if(landed&&a.burn)ignite(e,a.burn,a.burnFor!,sim.tallyOrigin(a.origin));
     if(a.pin||a.glance)bulletHit(sim,a,e,landed);
     if(a.knock&&landed)knockBack(sim,a,e);
     if(!a.pierce){a.life=0;break;}

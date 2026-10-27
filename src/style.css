@@ -2427,3 +2427,10 @@ nav button[data-mode] > .tab-label { min-height: 2.4em; }
 @media (prefers-reduced-motion:reduce) { .ambush-side-head .ambush-hud-stars span { transition:none; }.strike-ready { animation:none; } }
 
 .strike-bar[hidden] { display:none; }
+.ambush-building-details { padding:6px;display:flex;flex-direction:column;gap:6px;font-size:11px; }
+.ambush-building-details .ambush-portrait { width:80px;height:80px;margin:auto;image-rendering:pixelated; }
+.ambush-building-details dl { display:grid;grid-template-columns:1fr auto;gap:4px;margin:0; }
+.ambush-building-details dd { margin:0;color:var(--gold); }
+.ambush-upgrades { display:flex;flex-direction:column;gap:6px; }
+.ambush-upgrades button { font-size:10px;padding:5px; }
+.ambush-upgrades small { display:block; }

@@ -71,7 +71,7 @@ export function assassinStrike(sim: DefendSim, s: Soldier, e: Enemy, base: numbe
   let damage = base * (crit ? d.crit : 1) * (ambush ? d.ambush : 1);
   if (hunt) damage += Math.min(e.maxHp * HEADHUNT.bounty[hunt], base * HEADHUNT.cap);
   // Poisoned before the blow lands, so the blow itself bites harder.
-  if (d.poisons) envenom(e, d.time, d.more, base * VENOM.share, d.spread);
+  if (d.poisons) envenom(e, d.time, d.more, base * VENOM.share, d.spread,sim.tallyOrigin(s));
   sim.hurtEnemy(e, damage, true, "melee", s);
   if (d.veiled) s.cloak = d.recloak && e.hp <= 0 ? 0 : d.reveal;
   if (crit || ambush) sim.effects.push({ kind: "spark", x: e.x, y: e.y, t: 0, r: crit && ambush ? 0.8 : 0.5 });
@@ -79,9 +79,11 @@ export function assassinStrike(sim: DefendSim, s: Soldier, e: Enemy, base: numbe
 
 /** Poisons `e` for `t` seconds: `more` times the damage it takes, `dps` a
  * second; a fresh dose renews it, never weakening one already stronger. */
-export function envenom(e: Enemy, t: number, more: number, dps: number, spread: boolean) {
+export function envenom(e: Enemy, t: number, more: number, dps: number, spread: boolean, origin?:import("./sim.ts").DamageOrigin) {
   const v = e.venom;
+  const from=dps>=(v?.dps??0)?origin:v?.origin;
   e.venom = {
+    ...(from?{origin:from}:{}),
     t: Math.max(t, v?.t ?? 0),
     more: Math.max(more, v?.more ?? 1),
     dps: Math.max(dps, v?.dps ?? 0),
@@ -94,7 +96,7 @@ export function stepVenom(sim: DefendSim, dt: number) {
   for (const e of sim.enemies) {
     const v = e.venom;
     if (!v) continue;
-    if (e.hp > 0) sim.hurtEnemy(e, v.dps * Math.min(dt, v.t), false, "melee");
+    if (e.hp > 0) sim.hurtEnemy(e, v.dps * Math.min(dt, v.t), false, "melee",v.origin);
     if ((v.t -= dt) <= 0) delete e.venom;
   }
 }
@@ -104,5 +106,5 @@ export function spreadVenom(sim: DefendSim, e: Enemy) {
   const v = e.venom;
   if (!v?.spread) return;
   for (const o of sim.enemiesNear(e.x, e.y, VENOM.spread))
-    if (o !== e && o.hp > 0 && sq(o.x - e.x) + sq(o.y - e.y) <= sq(VENOM.spread)) envenom(o, VENOM.time[3], v.more, v.dps, true);
+    if (o !== e && o.hp > 0 && sq(o.x - e.x) + sq(o.y - e.y) <= sq(VENOM.spread)) envenom(o, VENOM.time[3], v.more, v.dps, true,v.origin);
 }

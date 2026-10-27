@@ -619,3 +619,5 @@ The Ambush gold paid once for defeating an enemy, based on that enemy's combat d
 
 - **Auto-send**: an optional Ambush control that sends the next wave after the field is clear and the break ends. Sending early awards no bonus.
 - **Strike quick bar**: round spell icons on the board; choose a spell, then tap its target. Choosing it again cancels.
+
+- **Ambush investment**: the gold paid for a building and its local upgrades, including buildings consumed by a merge. Selling returns all of it until wave 2 starts, then a fraction rounded down to tens.

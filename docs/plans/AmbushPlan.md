@@ -180,12 +180,12 @@ The native base-stat/five-building setup was introduced with the new free-grid b
 
 ### Phase 6: Base-only buildings, building panel, gold upgrades, selling
 
-- Battle built with `NO_BONUSES` and default levels; palette is the five fixed kinds. Remove `variants`/worn paths from Ambush.
-- `ambushPrice(kind)` now prices base buildings only; add `ambushUpgradePrice(kind, step)` for each `nextSteps` step. Suggested rule: proportional to the estimated DPS gain (reuse `price-estimates.ts`) with a floor, or a simple table per tier (attuned, branch attunement, rank I/II/III). Regenerate `docs/design/AMBUSH_ECONOMY.md` with `tools/ambush-prices.ts`.
-- Per-building tallies: kills, total damage, damage this wave and its seconds. `hurtEnemy` already receives `origin.building`; add an optional `tally` sink on the sim (set only by Ambush, absent in Defend, not in the replay hash) that adds damage and kills by building id. Damage over time (burns, blazes, venom) must carry the building id too; audit `origin` on each damage source and fill gaps. Average DPS this wave = damage this wave / seconds since the wave started (or since the building was placed, if later).
-- Building panel UI: portrait, three stats (refreshed at most 4 × a second), upgrade buttons with gold prices (disabled when unaffordable), Sell at the bottom showing 70% of gold invested.
-- Upgrading applies the step to the live building: kind change via `configureLot` with the new kind (garrison retrains as Defend does), path ranks through `bonus.structurePaths[id]`. Must work mid-battle.
-- Tests: refund is the full investment before wave 2 starts and floor(0.7 × invested / 10) × 10 after, including upgrades; upgrade changes the building and its attacks; tallies attribute splash and burns correctly; Defend replay unchanged.
+- [x] Battle built with `NO_BONUSES` and default levels; palette is the five fixed kinds. Remove `variants`/worn paths from Ambush.
+- [x] `ambushPrice(kind)` now prices base buildings only; add `ambushUpgradePrice(kind, step)` for each `nextSteps` step. Suggested rule: proportional to the estimated DPS gain (reuse `price-estimates.ts`) with a floor, or a simple table per tier (attuned, branch attunement, rank I/II/III). Regenerate `docs/design/AMBUSH_ECONOMY.md` with `tools/ambush-prices.ts`.
+- [x] Per-building tallies: kills, total damage, damage this wave and its seconds. `hurtEnemy` already receives `origin.building`; add an optional `tally` sink on the sim (set only by Ambush, absent in Defend, not in the replay hash) that adds damage and kills by building id. Damage over time (burns, blazes, venom) must carry the building id too; audit `origin` on each damage source and fill gaps. Average DPS this wave = damage this wave / seconds since the wave started (or since the building was placed, if later).
+- [x] Building panel UI: portrait, three stats (refreshed at most 4 × a second), upgrade buttons with gold prices (disabled when unaffordable), Sell at the bottom showing 70% of gold invested.
+- [x] Upgrading applies the step to the live building: kind change via `configureLot` with the new kind (garrison retrains as Defend does), path ranks through `bonus.structurePaths[id]`. Must work mid-battle.
+- [x] Tests: refund is the full investment before wave 2 starts and floor(0.7 × invested / 10) × 10 after, including upgrades; upgrade changes the building and its attacks; tallies attribute splash and burns correctly; Defend replay unchanged.
 
 ### Phase 7: The star tree
 
