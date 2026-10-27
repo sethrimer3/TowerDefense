@@ -1,3 +1,4 @@
+import { ratioPow } from '../exact.ts';
 /** Native Siege lifecycle. Ambush geography/economy lives in ambush-sim.ts. */
 import { DefendSim } from '../defend/sim.ts';
 import * as C from '../defend/catalog.ts';
@@ -28,7 +29,7 @@ export class CampaignSim {
   const nativeStructures=copies.map(c=>({uid:c.uid,kind:c.kind as Exclude<C.StructureKind,'keep'>,tx:0,ty:0,qx:0,qy:0,...(c.path?{path:c.path as PathId,rank:c.rank}:{})}));
   const adapted={...game,defend:{...source,layout:{...source.layout,structures:nativeStructures}}} as Save;
   const bonus={...(game?gameBonuses(game):C.NO_BONUSES),...placedBattlePaths(adapted)};
-  const scale=2**(((opponent?estimateCastle(opponent).rating:1000)-1000)/800)*.65;
+  const scale=ratioPow(2,(opponent?estimateCastle(opponent).rating:1000)-1000,800)*.65;
   const defense={...C.NO_BONUSES,towerDamage:scale,troopDamage:scale,troopHp:scale,keepHp:scale,wallHp:scale};
   this.raid=new RaidBattle(field,{...levels},bonus,defense,opponent?.seed??12345);this.engine=this.raid.attack;
   this.layout=copies.map((c,i)=>({pad:i,kind:c.kind,...(c.path?{path:c.path as PathId,rank:c.rank}:{})}));

@@ -1,3 +1,4 @@
+import { dist,ratioPow,binaryLog } from '../exact.ts';
 import { INITIAL_MMR, RULESET, rating } from './siege-rating.ts';
 export type DefenseKind = 'keep' | 'tower' | 'barricade';
 export type Defense = { id: number; kind: DefenseKind; x: number; y: number; hp: number; damage: number; cooldown: number; range: number };
@@ -21,7 +22,7 @@ export function castlePower(castle: CastleSnapshot) {
   const defenses = castle.defenses;
   const structureHp = defenses.reduce((sum, d) => sum + d.hp, 0);
   const firepower = defenses.reduce((sum, d) => sum + d.damage / d.cooldown * Math.min(1.5, d.range / 5), 0);
-  const overlap = defenses.filter(d => d.damage > 0).reduce((sum, d) => sum + defenses.filter(other => other.id !== d.id && other.damage > 0 && Math.hypot(d.x - other.x, d.y - other.y) <= Math.min(d.range, other.range)).length, 0);
+  const overlap = defenses.filter(d => d.damage > 0).reduce((sum, d) => sum + defenses.filter(other => other.id !== d.id && other.damage > 0 && dist(d.x - other.x, d.y - other.y) <= Math.min(d.range, other.range)).length, 0);
   const guards = castle.guards;
   const endurance = structureHp + guards.count * guards.hp;
   const dps = firepower + guards.count * guards.damage / guards.cooldown * 0.6;
@@ -30,7 +31,7 @@ export function castlePower(castle: CastleSnapshot) {
 export const REFERENCE_POWER = 170;
 export function estimateCastle(castle: CastleSnapshot) {
   const power = castlePower(castle);
-  return { power, rating: rating(INITIAL_MMR + 400 * Math.log2(Math.max(0.01, power / REFERENCE_POWER))), confidence: 'provisional' as const };
+  return { power, rating: rating(INITIAL_MMR + 400 * binaryLog(Math.max(0.01, power / REFERENCE_POWER))), confidence: 'provisional' as const };
 }
 /** Seed and requested rating fully determine the opponent. No Defend RNG used. */
 export function generateCastle(seed: number, target: number): CastleSnapshot {
@@ -45,7 +46,7 @@ export function generateCastle(seed: number, target: number): CastleSnapshot {
   const castle: CastleSnapshot = { id: `bot-${RULESET}-${seed}`, revision: 1, ruleset: RULESET, source: 'bot', owner: {id: `bot-${seed}`, name}, seed, defenses, guards: { count: 3 + Math.floor(rand() * 5), hp: 15, damage: 2, cooldown: 1.2, speed: 1.3 } };
   // Solve for the requested strength instead of pretending the target MMR is
   // the castle's measured difficulty. Uniform HP/DPS scaling preserves variety.
-  const desiredPower = REFERENCE_POWER * 2 ** ((rating(target) - INITIAL_MMR) / 400);
+  const desiredPower = REFERENCE_POWER * ratioPow(2,rating(target)-INITIAL_MMR,400);
   const scale = desiredPower / castlePower(castle);
   for (const d of defenses) {d.hp *= scale; d.damage *= scale;}
   castle.guards.hp *= scale; castle.guards.damage *= scale;
