@@ -16,7 +16,7 @@ import { STRUCTURES, type StructureKind } from "../defend/catalog.ts";
 import { hasForest } from "../defend/forest.ts";
 import type { PlacedKind } from "../defend/layout.ts";
 import type { Drop } from "../defend/edit-session.ts";
-import type { CampaignHost } from "./ui.ts";
+import type { CampaignHost } from "./host.ts";
 import { AmbushSim, AMBUSH_PALETTE, type AmbushSpell } from "./ambush-sim.ts";
 import { AmbushDrag } from "./ambush-drag.ts";
 import { buildingRect } from "./ambush-grid.ts";

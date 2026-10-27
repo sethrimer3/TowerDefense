@@ -21,7 +21,7 @@ Read this whole file, [AmbushPlan.md](AmbushPlan.md#architecture-guidelines)'s a
 
 | File | What it does now |
 |---|---|
-| `src/campaign/ui.ts` (`CampaignPage`, Siege only) | Profile header (flag, name, Edit profile), an opponent `<details>` (bot name, a `BOT` tag, defense rating and the player's MMR), the roster, Retry/Next, and the shared strike `SpellBar` (`src/ui/spell-bar.ts`) on cooldowns. |
+| `src/campaign/siege-ui.ts` (`SiegePage`) | Profile header (flag, name, Edit profile), an opponent `<details>` (bot name, a `BOT` tag, defense rating and the player's MMR), the roster, Retry/Next, and the shared strike `SpellBar` (`src/ui/spell-bar.ts`) on cooldowns. |
 | `src/campaign/sim.ts` (`CampaignSim`) | The 240-second limit, win on keep destroyed, and a defense scale `2**((rating-1000)/800)*.65` applied as flat multipliers on tower/troop damage, troop HP and keep/wall HP. Uncalibrated. |
 | `src/campaign/raid.ts` (`RaidBattle`) | Two native `DefendSim` sides on one map. The defense side runs on `defaultDefendSave().levels`, so a castle has no upgrade levels of its own today. |
 | `src/campaign/battlefield.ts` (`siegeField`) | Lays the castle in the upper half: the keep at a fixed spot, towers picked by seed from archer, cannon, wizard, hawk, brazier and wisp, plus a barracks and an archer barracks, and a south gate. Muster rows lie below, with an invisible attacker keep (uid 200000). |
@@ -129,17 +129,18 @@ Two parchment name plates drawn over the board, outside the sim, as DOM over the
 
 One PR per phase. Each lists its tests; run `npm test` and `npm run build` before committing.
 
-### Phase 0: exact maths and cleanup ☐
+### Phase 0: exact maths and cleanup ☑
 - Replace `Math.hypot`, `**` and `Math.log2` in `castles.ts` and `sim.ts` with `src/exact.ts` helpers or tables. (`castles.ts` is rewritten in phase 5, but `sim.ts`'s scale runs today.)
-- Rename `campaign/ui.ts` to `campaign/siege-ui.ts` and update imports.
-- **Tests:** existing campaign tests unchanged; a grep test that `src/campaign/{sim,raid,battlefield,castles}.ts` contain no `hypot`, `**`, `Math.pow`, `Math.log` or trig.
+- Rename `campaign/ui.ts` to `campaign/siege-ui.ts` and update imports. Shared host types live in `campaign/host.ts`; Siege controls use explicit `t()` catalog entries.
+- **Tests:** existing campaign tests unchanged; `tests/siege-math.test.ts` checks exact helper precision, Elo symmetry and a source guard against transcendental battle calls. `tests/siege-targeting.test.ts` covers native breach/flank targeting. Existing native battle, navigation and profile browser scripts cover desktop/phone pages.
+- **Related native cleanup:** a building keeps one shared damage target on a reachable exposed face, refreshed with Defend's flow field after collision changes and on half-second simulation ticks. This fixes flanking infantry aiming behind a wall and avoids additional targets that would multiply splash damage. The current castle budget remains unchanged until phases 4–6 replace it with native pieces/upgrades.
 
-### Phase 1: ranks ☐
+### Phase 1: ranks ☑
 - `siege-ranks.ts`: `RANKS`, `DIVISION_WIDTH`, `rankOf(mmr)`, `rankLabel` (`t()`, for example "Gold III").
 - `src/ui/rank-emblems.ts`: seven procedural pixel emblems plus division numerals, with a gallery fixture.
 - **Tests:** `tests/siege-ranks.test.ts` (every MMR from 100 to 3000 maps to exactly one tier, bands are contiguous, 1000 is Gold III, edges are inclusive at the floor); `node tests/siege-emblems.mjs` gallery screenshot to show Seth.
 
-### Phase 2: bot identities ☐
+### Phase 2: bot identities ☑
 - `bot-names.ts` and `bot-identity.ts` (`botName(seed)`, `botFlag(seed)`).
 - Add `owner.flag` to the snapshot (still revision 1 until phase 5; optional field, so old saves decode).
 - **Tests:** names are deterministic, valid for `decodeCastle` and `cleanName`, and clear of the blocklist across 100,000 seeds; flags are deterministic, decode, and have readable contrast.

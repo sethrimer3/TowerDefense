@@ -1,3 +1,7 @@
+import { botName } from "./bot-names.ts";
+import { botFlag } from "./bot-identity.ts";
+import { decodeFlag, type Flag } from "../profile/model.ts";
+import { dist, ratioPow, binaryLog } from "../exact.ts";
 import { INITIAL_MMR, RULESET, rating } from "./siege-rating.ts";
 export type DefenseKind = "keep" | "tower" | "barricade";
 export type Defense = { id: number; kind: DefenseKind; x: number; y: number; hp: number; damage: number; cooldown: number; range: number };
@@ -8,13 +12,11 @@ export type CastleSnapshot = {
   revision: number;
   ruleset: typeof RULESET;
   source: "bot" | "player";
-  owner: { id: string; name: string };
+  owner: { id: string; name: string; flag?: Flag };
   seed: number;
   defenses: Defense[];
   guards: Guards;
 };
-const FIRST = ["Ash", "Moss", "Iron", "Ember", "Silver", "Night", "Oak", "Frost", "Rune", "Storm", "Flint", "Copper"];
-const LAST = ["Fox", "Rook", "Warden", "Badger", "Drake", "Fern", "Knight", "Owl", "Wolf", "Raven", "Forge", "Vale"];
 export function seeded(seed: number) {
   let state = seed >>> 0;
   return () => {
@@ -33,8 +35,7 @@ export function castlePower(castle: CastleSnapshot) {
     .filter((d) => d.damage > 0)
     .reduce(
       (sum, d) =>
-        sum +
-        defenses.filter((other) => other.id !== d.id && other.damage > 0 && Math.hypot(d.x - other.x, d.y - other.y) <= Math.min(d.range, other.range)).length,
+        sum + defenses.filter((other) => other.id !== d.id && other.damage > 0 && dist(d.x - other.x, d.y - other.y) <= Math.min(d.range, other.range)).length,
       0,
     );
   const guards = castle.guards;
@@ -45,13 +46,17 @@ export function castlePower(castle: CastleSnapshot) {
 export const REFERENCE_POWER = 170;
 export function estimateCastle(castle: CastleSnapshot) {
   const power = castlePower(castle);
-  return { power, rating: rating(INITIAL_MMR + 400 * Math.log2(Math.max(0.01, power / REFERENCE_POWER))), confidence: "provisional" as const };
+  return { power, rating: rating(INITIAL_MMR + 400 * binaryLog(Math.max(0.01, power / REFERENCE_POWER))), confidence: "provisional" as const };
 }
 /** Seed and requested rating fully determine the opponent. No Defend RNG used. */
 export function generateCastle(seed: number, target: number): CastleSnapshot {
   seed = seed >>> 0;
   const rand = seeded(seed);
-  const name = FIRST[Math.floor(rand() * FIRST.length)] + LAST[Math.floor(rand() * LAST.length)] + (rand() < 0.6 ? String(10 + Math.floor(rand() * 90)) : "");
+  const name = botName(seed);
+  // Preserve revision-1 castle geometry while identity gets its own hashes.
+  rand();
+  rand();
+  if (rand() < 0.6) rand();
   const defenses: Defense[] = [{ id: 0, kind: "keep", x: 8 + rand() * 4, y: 3 + rand() * 3, hp: 100, damage: 3, cooldown: 1.5, range: 6 }];
   const towers = 1 + Math.floor(rand() * 3);
   for (let i = 0; i < towers; i++)
@@ -82,14 +87,14 @@ export function generateCastle(seed: number, target: number): CastleSnapshot {
     revision: 1,
     ruleset: RULESET,
     source: "bot",
-    owner: { id: `bot-${seed}`, name },
+    owner: { id: `bot-${seed}`, name, flag: botFlag(seed) },
     seed,
     defenses,
     guards: { count: 3 + Math.floor(rand() * 5), hp: 15, damage: 2, cooldown: 1.2, speed: 1.3 },
   };
   // Solve for the requested strength instead of pretending the target MMR is
   // the castle's measured difficulty. Uniform HP/DPS scaling preserves variety.
-  const desiredPower = REFERENCE_POWER * 2 ** ((rating(target) - INITIAL_MMR) / 400);
+  const desiredPower = REFERENCE_POWER * ratioPow(2, rating(target) - INITIAL_MMR, 400);
   const scale = desiredPower / castlePower(castle);
   for (const d of defenses) {
     d.hp *= scale;
@@ -136,12 +141,13 @@ export function decodeCastle(raw: unknown): CastleSnapshot | null {
     !number(g.speed, 0.1, 5)
   )
     return null;
+  const flag = decodeFlag(c.owner.flag);
   return {
     id: c.id.slice(0, 100),
     revision: 1,
     ruleset: RULESET,
     source: "bot",
-    owner: { id: c.owner.id.slice(0, 100), name: c.owner.name },
+    owner: { id: c.owner.id.slice(0, 100), name: c.owner.name, ...(flag ? { flag } : {}) },
     seed: c.seed,
     defenses: c.defenses.map((d) => ({ ...d })),
     guards: { ...g },

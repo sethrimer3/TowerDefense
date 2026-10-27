@@ -1,6 +1,7 @@
 /** Siege controls over the native two-sided Defend battle. */
+import { t } from "../i18n/index.ts";
 import { SpellBar, STRIKE_SPELLS, castStrike } from "../ui/spell-bar.ts";
-import type { Save } from "../save.ts";
+import type { CampaignHost } from "./host.ts";
 import { DefendRenderer } from "../defend/render.ts";
 import { BoardPointers } from "../defend/board-pointers.ts";
 import { artLook } from "../defend/tower-art.ts";
@@ -9,8 +10,7 @@ import { paintIcon } from "../defend/structure-art.ts";
 import { flagSvg, escapeText } from "../profile/model.ts";
 import { newSiege, nextOpponent, settleRaid } from "./siege-progress.ts";
 import { CampaignSim } from "./sim.ts";
-export type CampaignHost = { save: () => Save; store: () => void; editProfile?: () => void; levelSelect?: () => void };
-export class CampaignPage {
+export class SiegePage {
   sim: CampaignSim;
   private readonly canvas = document.createElement("canvas");
   private readonly renderer: DefendRenderer;
@@ -25,13 +25,12 @@ export class CampaignPage {
   private freshCamera = true;
   constructor(
     private root: HTMLElement,
-    readonly mode: "siege",
     private host: CampaignHost,
   ) {
     if (host.save().siege?.raid.state === "started") settleRaid(host.save().siege!, false);
     this.sim = this.make();
     this.renderer = new DefendRenderer(this.canvas);
-    this.canvas.setAttribute("aria-label", "Enemy castle and infantry muster ground");
+    this.canvas.setAttribute("aria-label", t("siege.board"));
     this.pointers = new BoardPointers({ renderer: () => this.renderer, pickUp: () => false, drop: () => {}, tap: (e) => this.tap(e) });
     this.canvas.onpointerdown = (e) => this.pointers.down(e);
     this.canvas.onpointermove = (e) => {
@@ -94,41 +93,39 @@ export class CampaignPage {
           flagSvg(profile.flag) +
           '<div><strong class="siege-profile-name">' +
           escapeText(profile.name) +
-          '</strong></div><button data-action="profile">Edit profile</button></div>'
+          '</strong></div><button data-action="profile">' +
+          t("siege.editProfile") +
+          "</button></div>"
         : "") +
       '<details class="siege-opponent"><summary><strong>' +
       raid.castle.owner.name +
-      '</strong> <small class="siege-bot">BOT</small> · ' +
-      raid.defender +
-      " defense / " +
-      siege.mmr +
-      " MMR</summary>" +
-      "<p>Your attack MMR: <b>" +
-      siege.mmr +
-      "</b> · " +
-      siege.wins +
-      "/" +
-      siege.games +
-      " wins</p><p>Castle defense rating: " +
-      raid.defender +
-      " (estimated).</p>" +
-      "<p>Starting a ranked raid commits it: defeat, forfeit or reload counts as a loss.</p><small>Defense ratings are provisional until calibrated against raid results.</small>" +
-      (finished
-        ? "<p>Last rated result: " +
-          (raid.state === "won" ? "Victory" : "Defeat") +
-          " · MMR " +
-          (raid.delta ?? 0) +
-          ". This target is available for unrated practice.</p>"
-        : "") +
+      '</strong> <small class="siege-bot">' +
+      t("siege.bot") +
+      "</small> · " +
+      t("siege.ratings", { defense: raid.defender, mmr: siege.mmr }) +
+      "</summary>" +
+      "<p>" +
+      t("siege.record", { mmr: siege.mmr, wins: siege.wins, games: siege.games }) +
+      "</p><p>" +
+      t("siege.defense", { rating: raid.defender }) +
+      "</p>" +
+      "<p>" +
+      t("siege.commit") +
+      "</p><small>" +
+      t("siege.provisional") +
+      "</small>" +
+      (finished ? "<p>" + t("siege.lastResult", { result: t(raid.state === "won" ? "siege.victory" : "siege.defeat"), delta: raid.delta ?? 0 }) + "</p>" : "") +
       "</details>" +
       '<div class="campaign-actions"><button data-action="start">' +
-      (this.sim.phase === "build" ? (finished ? "Start practice" : "Start ranked raid") : this.paused ? "Resume" : "Pause") +
+      (this.sim.phase === "build" ? (finished ? t("siege.practice") : t("siege.ranked")) : this.paused ? t("siege.resume") : t("siege.pause")) +
       "</button>" +
       '<button data-action="retry">' +
-      (raid.state === "started" ? "Forfeit / rebuild" : finished ? "Practice again" : "Rebuild") +
+      (raid.state === "started" ? t("siege.forfeit") : finished ? t("siege.practiceAgain") : t("siege.rebuild")) +
       '</button><button data-action="next" ' +
       (finished ? "" : "hidden") +
-      ">Find next opponent</button></div>" +
+      ">" +
+      t("siege.next") +
+      "</button></div>" +
       '<div class="campaign-spells"></div><p class="campaign-status" role="status" aria-live="polite"></p></div>' +
       '<div class="campaign-stage defend-stage side-open"><aside class="defend-side"><div class="campaign-roster defend-palette"></div></aside><div class="campaign-board defend-board"></div></div>';
     this.root.querySelector(".campaign-board")!.append(this.canvas);
@@ -144,7 +141,7 @@ export class CampaignPage {
     this.root.querySelector<HTMLButtonElement>('[data-action="start"]')!.onclick = () => {
       if (this.sim.phase === "build") {
         if (!this.sim.start()) {
-          this.notice = "Buy an infantry building in Tiles before starting a raid.";
+          this.notice = t("siege.buyInfantry");
           this.refresh();
           return;
         }
@@ -175,10 +172,10 @@ export class CampaignPage {
             '"></canvas><span>' +
             STRUCTURES[kind].name +
             "</span><small>" +
-            this.sim.layout.filter((b) => b.kind === kind).length +
-            " deployed</small></div>",
+            t("siege.deployed", { count: this.sim.layout.filter((b) => b.kind === kind).length }) +
+            "</small></div>",
         )
-        .join("") || "<p>No infantry buildings owned. Buy a Melee Guild or Ranged Guild in Tiles.</p>";
+        .join("") || "<p>" + t("siege.empty") + "</p>";
     this.root.querySelectorAll<HTMLCanvasElement>("[data-kind]").forEach((c) => paintIcon(c, c.dataset.kind as PaletteItem));
     this.spellBar = new SpellBar(STRIKE_SPELLS.filter((spell) => this.sim.engine.bonuses[spell]));
     this.root.querySelector(".campaign-spells")!.remove();
@@ -204,21 +201,18 @@ export class CampaignPage {
     this.root.querySelector(".campaign-status")!.textContent =
       this.notice ||
       (s.phase === "build"
-        ? s.layout.length + " infantry buildings deployed. Start the raid to release their troops."
+        ? t("siege.ready", { count: s.layout.length })
         : s.phase === "won"
-          ? "Victory! The keep has fallen."
+          ? t("siege.won")
           : s.phase === "lost"
-            ? "Defeat. Rebuild your formation and try again."
-            : (this.paused ? "Paused · " : "") +
-              "Keep " +
-              Math.ceil(s.raid.defense.keepHp()) +
-              "/" +
-              Math.ceil(s.raid.defense.keepMaxHp()) +
-              " · " +
-              s.allies.length +
-              " troops · " +
-              Math.max(0, 240 - Math.floor(s.elapsed)) +
-              "s");
+            ? t("siege.lost")
+            : (this.paused ? t("siege.paused") : "") +
+              t("siege.status", {
+                hp: Math.ceil(s.raid.defense.keepHp()),
+                max: Math.ceil(s.raid.defense.keepMaxHp()),
+                troops: s.allies.length,
+                seconds: Math.max(0, 240 - Math.floor(s.elapsed)),
+              }));
     this.root.querySelector<HTMLButtonElement>('[data-action="start"]')!.disabled = s.phase === "won" || s.phase === "lost";
     this.spellBar?.update(s.engine, s.phase === "battle", this.host.save().settings.reduceMotion);
   }

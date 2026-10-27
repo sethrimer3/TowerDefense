@@ -3,7 +3,7 @@ import { AmbushStarTree } from "./ambush-star-tree.ts";
 import { ambushPool } from "../ambush-upgrades.ts";
 import { observePreviews } from "./previews.ts";
 import { AREAS, areaStyle } from "../defend/areas.ts";
-import { type CampaignHost } from "./ui.ts";
+import { type CampaignHost } from "./host.ts";
 import { AmbushBattlePage } from "./ambush-battle-ui.ts";
 import { AMBUSH_LEVELS, levelUnlocked, totalStars } from "./levels.ts";
 import { t } from "../i18n/index.ts";

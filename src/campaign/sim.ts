@@ -1,3 +1,4 @@
+import { ratioPow } from "../exact.ts";
 /** Native Siege lifecycle. Ambush geography/economy lives in ambush-sim.ts. */
 import { DefendSim } from "../defend/sim.ts";
 import * as C from "../defend/catalog.ts";
@@ -54,7 +55,7 @@ export class CampaignSim {
     }));
     const adapted = { ...game, defend: { ...source, layout: { ...source.layout, structures: nativeStructures } } } as Save;
     const bonus = { ...(game ? gameBonuses(game) : C.NO_BONUSES), ...placedBattlePaths(adapted) };
-    const scale = 2 ** (((opponent ? estimateCastle(opponent).rating : 1000) - 1000) / 800) * 0.65;
+    const scale = ratioPow(2, (opponent ? estimateCastle(opponent).rating : 1000) - 1000, 800) * 0.65;
     const defense = { ...C.NO_BONUSES, towerDamage: scale, troopDamage: scale, troopHp: scale, keepHp: scale, wallHp: scale };
     this.raid = new RaidBattle(field, { ...levels }, bonus, defense, opponent?.seed ?? 12345);
     this.engine = this.raid.attack;

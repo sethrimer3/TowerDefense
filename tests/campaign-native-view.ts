@@ -1,6 +1,6 @@
 import "../src/style.css";
 import "../src/theme.css";
-import { CampaignPage } from "../src/campaign/ui.ts";
+import { SiegePage } from "../src/campaign/siege-ui.ts";
 import { AmbushBattlePage } from "../src/campaign/ambush-battle-ui.ts";
 import { defaults } from "../src/save.ts";
 import { DefendSim } from "../src/defend/sim.ts";
@@ -19,7 +19,7 @@ save.siege = newSiege(45);
 setPixelArt(true);
 document.documentElement.classList.add("pixel-font");
 const ambush = new AmbushBattlePage(document.querySelector("#ambush")!, 0, { save: () => save, store: () => {} }),
-  siege = new CampaignPage(document.querySelector("#siege")!, "siege", { save: () => save, store: () => {} });
+  siege = new SiegePage(document.querySelector("#siege")!, { save: () => save, store: () => {} });
 let active = ambush;
 ambush.show();
 for (const [mode, page] of [

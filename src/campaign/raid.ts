@@ -4,8 +4,8 @@ import { DefendSim, type Enemy, type Soldier, type Civilian, type ScenarioRules 
 import type { Building, CityMap } from "../defend/citygen.ts";
 import type { Bonuses } from "../defend/catalog.ts";
 import { defaultDefendSave, type DefendSave } from "../defend/progress.ts";
-import { center, cellCenter } from "../defend/pathing.ts";
-import { sideCells } from "../defend/grid.ts";
+import { center, cellCenter, cellAt, fillFlowField } from "../defend/pathing.ts";
+import { sideCells, CELL_COUNT } from "../defend/grid.ts";
 import { WarBanner } from "../defend/war-banner.ts";
 import { chilled } from "../defend/wizard.ts";
 import type { siegeField } from "./battlefield.ts";
@@ -65,6 +65,10 @@ export class RaidBattle {
   private proxies = [new Map<number, Enemy>(), new Map<number, Enemy>()];
   private cache = new Map<PropertyKey, unknown>();
   private ids = 1;
+  private faces = [
+    { field: new Float64Array(CELL_COUNT), version: -1, tick: -1, revision: 0 },
+    { field: new Float64Array(CELL_COUNT), version: -1, tick: -1, revision: 0 },
+  ];
   constructor(
     readonly field: ReturnType<typeof siegeField>,
     levels: DefendSave["levels"],
@@ -208,17 +212,25 @@ export class RaidBattle {
       const b = building!;
       const spot = () => {
         const candidates = sideCells(b.rect).filter((c) => !owner.solid[c]);
-        const front = viewer === this.attack ? b.rect.y + b.rect.h : b.rect.y;
-        candidates.sort((a, c) => {
-          const p = cellCenter(a),
-            q = cellCenter(c);
-          return Math.abs(p.y - front) - Math.abs(q.y - front) || Math.abs(p.x - (b.rect.x + b.rect.w / 2)) - Math.abs(q.x - (b.rect.x + b.rect.w / 2));
-        });
+        // One target per building avoids multiplying native splash damage.
+        // Prefer a face reachable by the army, including a northern flank.
+        // Straight-line proximity alone can select a face behind a wall.
+        const faces = this.faces[viewer === this.attack ? 0 : 1];
+        candidates.sort((a, c) => faces.field[a] - faces.field[c] || a - c);
         return candidates.length ? cellCenter(candidates[0]) : center(b.rect);
       };
-      const position = spot();
-      Object.defineProperty(proxy, "x", { enumerable: true, get: () => position.x, set: () => {} });
-      Object.defineProperty(proxy, "y", { enumerable: true, get: () => position.y, set: () => {} });
+      let revision = -1,
+        position = center(b.rect);
+      const exposed = () => {
+        const faces = this.approaches(viewer, viewer === this.attack ? 0 : 1);
+        if (revision !== faces.revision) {
+          revision = faces.revision;
+          position = spot();
+        }
+        return position;
+      };
+      Object.defineProperty(proxy, "x", { enumerable: true, get: () => exposed().x, set: () => {} });
+      Object.defineProperty(proxy, "y", { enumerable: true, get: () => exposed().y, set: () => {} });
       Object.defineProperty(proxy, "maxHp", { enumerable: true, get: () => owner.maxHp[b.id] });
       Object.defineProperty(proxy, "hp", {
         enumerable: true,
@@ -234,11 +246,28 @@ export class RaidBattle {
     cache.set(id, proxy);
     return proxy;
   }
+  private approaches(viewer: DefendSim, index: number) {
+    const faces = this.faces[index],
+      tick = Math.floor(viewer.time * 2);
+    if (faces.version !== viewer.mapVersion || faces.tick !== tick) {
+      const goals = viewer.soldiers.filter((s) => s.hp > 0).map((s) => cellAt(s.x, s.y));
+      if (!goals.length) {
+        const door = viewer.doorOf(viewer.keep);
+        if (door >= 0) goals.push(door);
+      }
+      fillFlowField(faces.field, goals, { solid: viewer.ownSolid, impassable: (c) => !!viewer.ownSolid[c], cost: () => 1 });
+      faces.version = viewer.mapVersion;
+      faces.tick = tick;
+      faces.revision++;
+    }
+    return faces;
+  }
   private targets() {
     for (const [index, viewer, owner, buildings] of [
       [0, this.attack, this.defense, this.field.defenderIds],
       [1, this.defense, this.attack, this.field.attackerIds],
     ] as const) {
+      this.approaches(viewer, index);
       const cache = this.proxies[index],
         targets: Enemy[] = [];
       for (const s of [...owner.soldiers, ...owner.civilians])
