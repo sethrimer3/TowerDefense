@@ -144,7 +144,7 @@ export function stepBleed(sim: DefendSim, dt: number) {
   for (const e of sim.enemies) {
     const b = e.bleed;
     if (!b) continue;
-    if (e.hp > 0) sim.hurtEnemy(e, b.dps * Math.min(dt, b.t), false, "melee",b.origin);
+    if (e.hp > 0) sim.hurtEnemy(e, b.dps * Math.min(dt, b.t), false, "melee", undefined, false, "physical", 0, b.origin);
     if ((b.t -= dt) <= 0) delete e.bleed;
   }
 }

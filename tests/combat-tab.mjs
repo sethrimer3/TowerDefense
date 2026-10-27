@@ -29,8 +29,8 @@ try {
       assert.equal(await button.innerText(), name);
       await button.click(); // Return without cycling.
       assert.equal(await page.locator('section.page.active').getAttribute('id'), mode);
-      await button.click();
-      assert.equal(await button.locator('.combat-icon-layer').count(), 2);
+      const layers=await button.evaluate(b=>{b.click();return b.querySelectorAll('.combat-icon-layer').length;});
+      assert.equal(layers,2);
       await page.waitForFunction(() => document.querySelectorAll('.combat-icon-layer').length === 1);
     }
     assert.equal(await button.innerText(), 'Defend --> Ambush');

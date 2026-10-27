@@ -4,7 +4,7 @@ Ambush is the road-defence mode: enemies march a fixed track toward a keep, and 
 
 Related plans: [SiegePlan.md](SiegePlan.md), [DefendPlan.md](DefendPlan.md), and [OtherPlans.md](OtherPlans.md), which holds the work shared by every mode (fences as walls, the strike spell quick bar, tab icons, the currency bar, ropes).
 
-## Where Ambush stands today
+## Starting point before Phase 0
 
 Read these files first. They are small.
 
@@ -194,9 +194,9 @@ The native base-stat/five-building setup was introduced with the new free-grid b
 
 ### Phase 8: Balance, polish and playtest
 
-- Tune starting gold, bounties, wave curve, upgrade prices and star tree prices so Mossbound I is easy with two or three towers and Nadir III is hard. Write a headless balance script (`tools/ambush-balance.ts`) that plays each level with a scripted build (e.g. greedy cheapest DPS placements along the track) and reports stars, so a balance change is measured, not guessed.
-- Boss waves, the star flourish and sound, the level select's star totals per zone.
-- Performance: 20 waves on the largest level at 3× speed on a phone-sized viewport should hold frame times near Defend's (`npm run test:stress-ui` style check).
+- [x] Tune starting gold, bounties, wave curve, upgrade prices and star tree prices so Mossbound I is easy with two or three towers and Nadir III is hard. Write a headless balance script (`tools/ambush-balance.ts`) that plays each level with a scripted build (e.g. greedy cheapest DPS placements along the track) and reports stars, so a balance change is measured, not guessed.
+- [x] Boss waves, the star flourish and sound, the level select's star totals per zone.
+- [x] Performance: 20 waves on the largest level at 3× speed on a phone-sized viewport should hold frame times near Defend's (`npm run test:stress-ui` style check).
 
 ## Useful extras Seth did not mention
 
@@ -221,6 +221,7 @@ Seth confirmed on 2026-10-27:
 - Ambush keeps Defend's one-quarter clear ring round each building.
 - Flying enemies ignore the track and outposts and fly straight for the keep; a keep loss ends the level with zero stars even if outposts stand. A red dotted line, expanding red ring and exclamation mark warn of fliers in the next wave.
 
-Still open:
+Implemented choices:
 
-1. Which star tree branches and prices? [The suggested list above, tuned in phase 8.]
+- All nine suggested star-tree branches are available. Prices are 2/3/5 stars for ranks I/II/III; Head start has two ranks at 3/7 stars. Free undo/respec conserves the 90-star maximum. See [star tree rules](../design/AMBUSH_STAR_TREE.md).
+- Phases 0–8 are complete. The final scripted checks cover all 30 levels, a three-building Mossbound I clear, an 85-star Nadir III clear and 3× phone-viewport performance. See [balance results](../design/AMBUSH_BALANCE.md) and [performance results](../design/AMBUSH_PERFORMANCE.md). Balance estimates remain adjustable; the checked-in policy deliberately reports defeats and capped runs.

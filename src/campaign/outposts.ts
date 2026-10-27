@@ -67,10 +67,10 @@ export class Outposts {
  private target(e:Enemy){
   for(const p of this.posts)p.observe(e);let route=this.routes.get(e);if(!route){route={segment:projection(this.field.path,e).segment};this.routes.set(e,route);}
   if(route.raiding!==undefined&&this.posts[route.raiding].fallen){const p=projection(this.field.path,e);route.segment=p.segment;route.rejoin=p.point;delete route.raiding;}
-  if(route.rejoin){if(dist(route.rejoin.x-e.x,route.rejoin.y-e.y)>.7)return {point:route.rejoin,route};delete route.rejoin;}
+  if(route.rejoin){if(cellAt(route.rejoin.x,route.rejoin.y)!==cellAt(e.x,e.y)&&dist(route.rejoin.x-e.x,route.rejoin.y-e.y)>.7)return {point:route.rejoin,route};delete route.rejoin;}
   const progress=projection(this.field.path,e).progress;
   for(let i=0;i<this.posts.length;i++)if(!this.posts[i].fallen&&progress>=this.marks[i]-10){route.raiding=i;const post=this.posts[i],r=post.rect;if(rectDist({x:r.x+1,y:r.y+1,w:r.w-2,h:r.h-2},e.x,e.y)>0)return {post:i,ids:[],point:center(post.rect),route};const ids=post.houses.filter(id=>!this.engine.map.buildings[id].hidden&&this.engine.hp[id]>0);return {post:i,ids,point:center(post.rect),route};}
-  while(route.segment<this.field.path.length&&dist(this.field.path[route.segment].x-e.x,this.field.path[route.segment].y-e.y)<.7)route.segment++;
+  while(route.segment<this.field.path.length&&(cellAt(this.field.path[route.segment].x,this.field.path[route.segment].y)===cellAt(e.x,e.y)||dist(this.field.path[route.segment].x-e.x,this.field.path[route.segment].y-e.y)<.7))route.segment++;
   return {point:this.field.path[route.segment]??center(this.engine.keep.rect),keep:route.segment>=this.field.path.length-1,route};
  }
  fieldFor(point:Point){const e=point as Enemy,t=this.target(e);return this.targetField(t);}

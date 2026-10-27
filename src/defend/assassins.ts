@@ -96,7 +96,7 @@ export function stepVenom(sim: DefendSim, dt: number) {
   for (const e of sim.enemies) {
     const v = e.venom;
     if (!v) continue;
-    if (e.hp > 0) sim.hurtEnemy(e, v.dps * Math.min(dt, v.t), false, "melee",v.origin);
+    if (e.hp > 0) sim.hurtEnemy(e, v.dps * Math.min(dt, v.t), false, "melee", undefined, false, "physical", 0, v.origin);
     if ((v.t -= dt) <= 0) delete e.venom;
   }
 }

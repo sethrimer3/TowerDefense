@@ -28,7 +28,7 @@ Attunement: 55% of the current kind’s catalog price; branch attunement: 70%; p
     difficulty = maxHP / 12 + (damage / cooldown) / 2 + speed / 1.2
     bounty = round10(4 × difficulty) (minimum 10)
 
-Native enemy deaths pay once. Escapes and fortress body parts pay nothing; the fortress core earns its bounty. Gold arrives immediately and can fund an in-wave purchase. Siege never uses this wallet. Starting budgets, prices and rewards remain provisional until the Phase 8 scripted balance runs.
+Native enemy deaths pay once. Escapes and fortress body parts pay nothing; the fortress core earns its bounty. Gold arrives immediately and can fund an in-wave purchase. Siege never uses this wallet. The 30-level scripted balance checks retain these starting budgets, base prices and tier fees. Measurements and reproducible opening/final-level probes are in AMBUSH_BALANCE.md; these remain rough, adjustable estimates.
 
 Regenerate:
 

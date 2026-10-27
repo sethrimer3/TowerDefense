@@ -4,7 +4,7 @@ const browser=await chromium.launch({executablePath:process.env.PLAYWRIGHT_EXECU
 try{for(const width of [1280,390]){
  const page=await browser.newPage({viewport:{width,height:844}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.addInitScript(()=>localStorage.setItem('towerdefense.v1',JSON.stringify({version:7,profile:{name:'Star Warden',flag:{base:3,layers:[]}},settings:{reduceMotion:true},campaigns:{ambush:{stars:{'moss-1':3,'moss-2':3,'moss-3':3}}}})));
- await page.goto(process.env.TEST_URL||'http://127.0.0.1:5173/');await page.locator('nav [data-tab="defend"]').click();await page.locator('[data-star-tree]').click();
+ await page.goto(process.env.TEST_URL||'http://127.0.0.1:5173/');await page.waitForFunction(()=>document.querySelector('nav [data-tab="defend"]')?.dataset.mode==='defend');await page.locator('nav [data-tab="defend"]').click();await page.locator('[data-star-tree]').click();
  const tree=page.locator('.ambush-star-dialog');assert.ok(await tree.isVisible());await tree.locator('[data-node="warChest:1"]').click();await tree.locator('[data-star-action]').click();assert.equal(await tree.locator('[data-pool]').innerText(),'7 stars available');
  await tree.locator('[data-node="headStart:1"]').click();await tree.locator('[data-star-action]').click();assert.equal(await tree.locator('[data-pool]').innerText(),'4 stars available');
  assert.equal(await tree.locator('.ug-motes').count(),1);assert.equal(await tree.locator('.magic-circle').count(),1);

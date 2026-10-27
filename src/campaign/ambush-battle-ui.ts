@@ -1,3 +1,6 @@
+import { BattleSound } from '../defend/battle-sound.ts';
+import { play } from '../sound.ts';
+import { sparksOver } from '../ui/flourish.ts';
 import { stepName } from '../specializations.ts';
 import { artLook } from '../defend/tower-art.ts';
 import type { AmbushBuilding } from './ambush-sim.ts';
@@ -24,7 +27,7 @@ export class AmbushBattlePage {
  sim:AmbushSim;readonly canvas=document.createElement('canvas');readonly renderer:DefendRenderer;
  private pointers:BoardPointers;private last=0;private paused=false;private picked:number|undefined;private selected:PlacedKind='archerTower';
  private notice='';private now=0;private settled=false;private resetCamera=true;private cleared=new Map<number,string>();
- private spellBar?:SpellBar;private health=new KeepBricks();private sideOpen=true;private panelKey="";private statsAt=0;
+ private sounds=new BattleSound();private spellBar?:SpellBar;private health=new KeepBricks();private sideOpen=true;private panelKey="";private statsAt=0;
  constructor(private root:HTMLElement,private index:number,private host:CampaignHost){
   this.sim=new AmbushSim(index,host.save());this.renderer=new DefendRenderer(this.canvas);
   this.canvas.setAttribute('aria-label','Ambush battlefield');
@@ -54,14 +57,14 @@ export class AmbushBattlePage {
    '<p class="campaign-status" role="status" aria-live="polite"></p></div>'+
    '<div class="campaign-stage defend-stage '+(this.sideOpen?'side-open':'')+'"><aside class="defend-side ambush-side">'+
    '<div class="ambush-side-head"><strong id="ambush-health-label"></strong><div id="ambush-health"></div><span id="ambush-health-number"></span>'+
-   '<p class="ambush-wallet"><span aria-hidden="true">●</span> <b id="ambush-gold"></b> '+t('ambush.gold')+'</p>'+
+   '<p class="ambush-wallet"><i class="metal-icon gold" aria-hidden="true"></i> <b id="ambush-gold"></b> '+t('ambush.gold')+'</p>'+
    '<div class="ambush-hud-stars" aria-label="'+t('ambush.stars',{stars:this.sim.stars,total:3})+'">'+[0,1,2].map(i=>'<span data-star="'+i+'">★</span>').join('')+'</div></div>'+
    '<div class="ambush-side-content"><div class="campaign-roster defend-palette" id="ambush-palette"></div>'+
    '<div id="ambush-inspect" hidden><div class="ambush-building-details"></div><div class="campaign-inspect-actions">'+
    '<button data-action="close">'+t('ambush.close')+'</button><button data-action="sell"></button></div></div></div></aside>'+
    '<div class="campaign-board defend-board"><div class="campaign-spells"></div>'+
    (ended?'<div class="ambush-result" role="dialog" aria-label="'+t(this.sim.phase==='won'?'ambush.victory':'ambush.defeat')+'"><h2>'+t(this.sim.phase==='won'?'ambush.victory':'ambush.defeat')+'</h2>'+
-   '<div class="ambush-result-stars">'+ '★'.repeat(this.sim.stars)+'☆'.repeat(3-this.sim.stars)+'</div>'+
+   '<div class="ambush-result-stars">'+ [0,1,2].map(i=>'<span class="'+(i<this.sim.stars&&!this.host.save().settings.reduceMotion?'star-award':'')+'" style="--star-delay:'+i*.14+'s">'+(i<this.sim.stars?'★':'☆')+'</span>').join('')+'</div>'+
    '<p>'+t('ambush.kills')+': '+this.sim.kills+' · '+t('ambush.goldEarned')+': '+Math.floor(this.sim.goldEarned)+'</p>'+
    '<button data-action="retry">'+t('ambush.retry')+'</button><button data-action="next" '+(this.sim.phase==='won'&&this.index<29?'':'hidden')+'>'+t('ambush.next')+'</button>'+
    '<button data-action="result-select">'+t('ambush.levelSelect')+'</button></div>':'')+'</div></div>';
@@ -118,20 +121,20 @@ export class AmbushBattlePage {
  }
  frame(now:number){
   this.now=now;const dt=this.last?Math.min(.1,(now-this.last)/1000):0;this.last=now;
-  if(!this.paused)this.sim.step(dt);this.health.step(this.host.save().settings.reduceMotion?0:dt);
-  if(!this.settled&&(this.sim.phase==='won'||this.sim.phase==='lost')){this.settled=true;if(this.sim.phase==='won'){recordStars(this.host.save().campaigns.ambush,this.sim.level,this.sim.stars);this.host.store();}this.render();}
+  if(!this.paused){this.sim.step(dt);if(dt>0)this.sounds.hear(this.sim.engine);}this.health.step(this.host.save().settings.reduceMotion?0:dt);
+  if(!this.settled&&(this.sim.phase==='won'||this.sim.phase==='lost')){this.settled=true;if(this.sim.phase==='won'){recordStars(this.host.save().campaigns.ambush,this.sim.level,this.sim.stars);this.host.store();}this.render();play(this.sim.phase==='won'?'record':'fallen');if(this.sim.phase==='won'&&!this.host.save().settings.reduceMotion)sparksOver(this.root.querySelector('.ambush-result-stars'),'gold');}
   this.refresh();this.draw();
  }
  private refresh(){
   const s=this.sim,b=s.buildings.find(b=>b.id===this.picked),ended=s.phase==='won'||s.phase==='lost';
-  this.root.querySelector('#ambush-gold')!.textContent=String(Math.floor(s.gold));
+  const gold=this.root.querySelector('#ambush-gold')!,wallet=String(Math.floor(s.gold));if(gold.textContent!==wallet)gold.textContent=wallet;
   const post=s.outposts.posts.find(p=>!p.fallen),fraction=post?post.health:s.engine.keepHp()/s.engine.keepMaxHp();
   this.root.querySelector('#ambush-health-label')!.textContent=t(post?(s.outposts.posts.indexOf(post)===0?'ambush.outpost1':'ambush.outpost2'):'ambush.keep');
   this.root.querySelector('#ambush-health-number')!.textContent=post?Math.ceil(fraction*100)+'%':Math.ceil(s.engine.keepHp())+'/'+Math.ceil(s.engine.keepMaxHp());
   this.health.set(fraction);
   this.root.querySelectorAll<HTMLElement>('[data-star]').forEach(el=>el.classList.toggle('star-lost',Number(el.dataset.star)>=s.stars));
   this.root.querySelector('.ambush-hud-stars')!.setAttribute('aria-label',t('ambush.stars',{stars:s.stars,total:3}));
-  this.root.querySelector('.campaign-status')!.textContent=this.notice||t('ambush.wave',{wave:s.wave,total:20})+' · '+t('ambush.enemiesLeft',{count:s.enemiesLeft});
+  this.root.querySelector('.campaign-status')!.textContent=this.notice||t('ambush.wave',{wave:s.wave,total:20})+(s.waves[s.wave-1]?.boss?' · '+t('ambush.boss'):'')+' · '+t('ambush.enemiesLeft',{count:s.enemiesLeft});
   this.root.querySelector<HTMLElement>('#ambush-inspect')!.hidden=!b;
   this.root.querySelector<HTMLElement>('#ambush-palette')!.hidden=!!b;
   const sell=this.root.querySelector<HTMLButtonElement>('[data-action="sell"]')!;

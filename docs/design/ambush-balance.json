@@ -1,0 +1,641 @@
+{
+  "waveConfig": {
+    "zoneBudget": [
+      8,
+      18,
+      28,
+      36,
+      46,
+      60,
+      75,
+      90,
+      180,
+      140
+    ],
+    "levelGrowth": 0.2,
+    "waveGrowth": 1.08,
+    "bosses": [
+      10,
+      20
+    ]
+  },
+  "policy": "mixed-guard; no stars, no spells, at most 14 buildings; 1800 simulated seconds per level",
+  "levels": [
+    {
+      "level": "moss-1",
+      "stars": 0,
+      "state": "battle",
+      "wave": 16,
+      "seconds": 1800,
+      "keep": 591,
+      "outposts": [
+        0,
+        0
+      ],
+      "buildings": 6,
+      "kills": 70,
+      "earned": 2090,
+      "gold": 0,
+      "peak": 9,
+      "decisions": 23,
+      "starBuild": 0
+    },
+    {
+      "level": "moss-2",
+      "stars": 0,
+      "state": "battle",
+      "wave": 15,
+      "seconds": 1800,
+      "keep": 588,
+      "outposts": [
+        0,
+        0
+      ],
+      "buildings": 6,
+      "kills": 79,
+      "earned": 2010,
+      "gold": 20,
+      "peak": 10,
+      "decisions": 23,
+      "starBuild": 0
+    },
+    {
+      "level": "moss-3",
+      "stars": 2,
+      "state": "won",
+      "wave": 20,
+      "seconds": 640,
+      "keep": 600,
+      "outposts": [
+        0,
+        100
+      ],
+      "buildings": 8,
+      "kills": 128,
+      "earned": 3530,
+      "gold": 70,
+      "peak": 8,
+      "decisions": 36,
+      "starBuild": 0
+    },
+    {
+      "level": "desert-1",
+      "stars": 1,
+      "state": "won",
+      "wave": 20,
+      "seconds": 1095,
+      "keep": 594,
+      "outposts": [
+        0,
+        0
+      ],
+      "buildings": 8,
+      "kills": 105,
+      "earned": 3890,
+      "gold": 140,
+      "peak": 14,
+      "decisions": 37,
+      "starBuild": 0
+    },
+    {
+      "level": "desert-2",
+      "stars": 1,
+      "state": "won",
+      "wave": 20,
+      "seconds": 1547,
+      "keep": 600,
+      "outposts": [
+        0,
+        0
+      ],
+      "buildings": 10,
+      "kills": 120,
+      "earned": 4650,
+      "gold": 130,
+      "peak": 13,
+      "decisions": 46,
+      "starBuild": 0
+    },
+    {
+      "level": "desert-3",
+      "stars": 1,
+      "state": "won",
+      "wave": 20,
+      "seconds": 1307,
+      "keep": 600,
+      "outposts": [
+        0,
+        0
+      ],
+      "buildings": 10,
+      "kills": 122,
+      "earned": 4990,
+      "gold": 290,
+      "peak": 16,
+      "decisions": 46,
+      "starBuild": 0
+    },
+    {
+      "level": "ember-1",
+      "stars": 1,
+      "state": "won",
+      "wave": 20,
+      "seconds": 1537,
+      "keep": 551,
+      "outposts": [
+        0,
+        0
+      ],
+      "buildings": 7,
+      "kills": 74,
+      "earned": 2990,
+      "gold": 290,
+      "peak": 19,
+      "decisions": 28,
+      "starBuild": 0
+    },
+    {
+      "level": "ember-2",
+      "stars": 1,
+      "state": "won",
+      "wave": 20,
+      "seconds": 1612,
+      "keep": 586,
+      "outposts": [
+        0,
+        0
+      ],
+      "buildings": 9,
+      "kills": 109,
+      "earned": 4010,
+      "gold": 80,
+      "peak": 15,
+      "decisions": 39,
+      "starBuild": 0
+    },
+    {
+      "level": "ember-3",
+      "stars": 0,
+      "state": "lost",
+      "wave": 1,
+      "seconds": 72,
+      "keep": 0,
+      "outposts": [
+        100,
+        100
+      ],
+      "buildings": 3,
+      "kills": 1,
+      "earned": 30,
+      "gold": 30,
+      "peak": 4,
+      "decisions": 3,
+      "starBuild": 0
+    },
+    {
+      "level": "drowned-1",
+      "stars": 2,
+      "state": "won",
+      "wave": 20,
+      "seconds": 1386,
+      "keep": 600,
+      "outposts": [
+        0,
+        100
+      ],
+      "buildings": 8,
+      "kills": 127,
+      "earned": 3610,
+      "gold": 150,
+      "peak": 15,
+      "decisions": 35,
+      "starBuild": 0
+    },
+    {
+      "level": "drowned-2",
+      "stars": 2,
+      "state": "won",
+      "wave": 20,
+      "seconds": 821,
+      "keep": 600,
+      "outposts": [
+        0,
+        100
+      ],
+      "buildings": 9,
+      "kills": 144,
+      "earned": 4100,
+      "gold": 110,
+      "peak": 16,
+      "decisions": 41,
+      "starBuild": 0
+    },
+    {
+      "level": "drowned-3",
+      "stars": 1,
+      "state": "won",
+      "wave": 20,
+      "seconds": 999,
+      "keep": 600,
+      "outposts": [
+        0,
+        0
+      ],
+      "buildings": 7,
+      "kills": 93,
+      "earned": 2870,
+      "gold": 180,
+      "peak": 4,
+      "decisions": 30,
+      "starBuild": 0
+    },
+    {
+      "level": "fungal-1",
+      "stars": 0,
+      "state": "lost",
+      "wave": 2,
+      "seconds": 949,
+      "keep": 0,
+      "outposts": [
+        0,
+        0
+      ],
+      "buildings": 3,
+      "kills": 15,
+      "earned": 350,
+      "gold": 60,
+      "peak": 9,
+      "decisions": 4,
+      "starBuild": 0
+    },
+    {
+      "level": "fungal-2",
+      "stars": 0,
+      "state": "battle",
+      "wave": 17,
+      "seconds": 1800,
+      "keep": 600,
+      "outposts": [
+        0,
+        0
+      ],
+      "buildings": 11,
+      "kills": 202,
+      "earned": 5090,
+      "gold": 110,
+      "peak": 10,
+      "decisions": 50,
+      "starBuild": 0
+    },
+    {
+      "level": "fungal-3",
+      "stars": 0,
+      "state": "lost",
+      "wave": 2,
+      "seconds": 716,
+      "keep": 0,
+      "outposts": [
+        0,
+        0
+      ],
+      "buildings": 3,
+      "kills": 14,
+      "earned": 350,
+      "gold": 10,
+      "peak": 12,
+      "decisions": 7,
+      "starBuild": 0
+    },
+    {
+      "level": "frozen-1",
+      "stars": 0,
+      "state": "battle",
+      "wave": 8,
+      "seconds": 1800,
+      "keep": 600,
+      "outposts": [
+        0,
+        0
+      ],
+      "buildings": 6,
+      "kills": 49,
+      "earned": 1980,
+      "gold": 50,
+      "peak": 12,
+      "decisions": 21,
+      "starBuild": 0
+    },
+    {
+      "level": "frozen-2",
+      "stars": 0,
+      "state": "battle",
+      "wave": 3,
+      "seconds": 1800,
+      "keep": 582,
+      "outposts": [
+        0,
+        0
+      ],
+      "buildings": 3,
+      "kills": 16,
+      "earned": 470,
+      "gold": 30,
+      "peak": 14,
+      "decisions": 7,
+      "starBuild": 0
+    },
+    {
+      "level": "frozen-3",
+      "stars": 0,
+      "state": "battle",
+      "wave": 5,
+      "seconds": 1800,
+      "keep": 579,
+      "outposts": [
+        0,
+        0
+      ],
+      "buildings": 5,
+      "kills": 38,
+      "earned": 1290,
+      "gold": 10,
+      "peak": 17,
+      "decisions": 17,
+      "starBuild": 0
+    },
+    {
+      "level": "crystal-1",
+      "stars": 0,
+      "state": "lost",
+      "wave": 1,
+      "seconds": 49,
+      "keep": 0,
+      "outposts": [
+        88,
+        100
+      ],
+      "buildings": 3,
+      "kills": 8,
+      "earned": 160,
+      "gold": 20,
+      "peak": 18,
+      "decisions": 2,
+      "starBuild": 0
+    },
+    {
+      "level": "crystal-2",
+      "stars": 0,
+      "state": "lost",
+      "wave": 2,
+      "seconds": 417,
+      "keep": 0,
+      "outposts": [
+        0,
+        0
+      ],
+      "buildings": 3,
+      "kills": 16,
+      "earned": 410,
+      "gold": 60,
+      "peak": 7,
+      "decisions": 6,
+      "starBuild": 0
+    },
+    {
+      "level": "crystal-3",
+      "stars": 1,
+      "state": "won",
+      "wave": 20,
+      "seconds": 765,
+      "keep": 555,
+      "outposts": [
+        0,
+        0
+      ],
+      "buildings": 14,
+      "kills": 245,
+      "earned": 6800,
+      "gold": 70,
+      "peak": 7,
+      "decisions": 67,
+      "starBuild": 0,
+      "policy": "mixed-guard"
+    },
+    {
+      "level": "obsidian-1",
+      "stars": 0,
+      "state": "lost",
+      "wave": 1,
+      "seconds": 82,
+      "keep": 0,
+      "outposts": [
+        100,
+        100
+      ],
+      "buildings": 3,
+      "kills": 6,
+      "earned": 120,
+      "gold": 80,
+      "peak": 29,
+      "decisions": 1,
+      "starBuild": 0
+    },
+    {
+      "level": "obsidian-2",
+      "stars": 0,
+      "state": "battle",
+      "wave": 5,
+      "seconds": 1800,
+      "keep": 396,
+      "outposts": [
+        0,
+        0
+      ],
+      "buildings": 5,
+      "kills": 68,
+      "earned": 1370,
+      "gold": 100,
+      "peak": 53,
+      "decisions": 16,
+      "starBuild": 0
+    },
+    {
+      "level": "obsidian-3",
+      "stars": 0,
+      "state": "battle",
+      "wave": 16,
+      "seconds": 1800,
+      "keep": 600,
+      "outposts": [
+        0,
+        100
+      ],
+      "buildings": 11,
+      "kills": 180,
+      "earned": 4300,
+      "gold": 30,
+      "peak": 88,
+      "decisions": 44,
+      "starBuild": 0
+    },
+    {
+      "level": "astral-1",
+      "stars": 0,
+      "state": "lost",
+      "wave": 6,
+      "seconds": 244,
+      "keep": 0,
+      "outposts": [
+        100,
+        100
+      ],
+      "buildings": 3,
+      "kills": 5,
+      "earned": 350,
+      "gold": 60,
+      "peak": 1,
+      "decisions": 4,
+      "starBuild": 0
+    },
+    {
+      "level": "astral-2",
+      "stars": 2,
+      "state": "won",
+      "wave": 20,
+      "seconds": 671,
+      "keep": 210,
+      "outposts": [
+        0,
+        100
+      ],
+      "buildings": 6,
+      "kills": 35,
+      "earned": 2480,
+      "gold": 80,
+      "peak": 4,
+      "decisions": 26,
+      "starBuild": 0
+    },
+    {
+      "level": "astral-3",
+      "stars": 0,
+      "state": "battle",
+      "wave": 10,
+      "seconds": 1800,
+      "keep": 350,
+      "outposts": [
+        4,
+        100
+      ],
+      "buildings": 4,
+      "kills": 16,
+      "earned": 1100,
+      "gold": 10,
+      "peak": 3,
+      "decisions": 14,
+      "starBuild": 0
+    },
+    {
+      "level": "nadir-1",
+      "stars": 0,
+      "state": "lost",
+      "wave": 1,
+      "seconds": 135,
+      "keep": 0,
+      "outposts": [
+        17,
+        100
+      ],
+      "buildings": 3,
+      "kills": 2,
+      "earned": 70,
+      "gold": 30,
+      "peak": 6,
+      "decisions": 1,
+      "starBuild": 0,
+      "policy": "mixed-guard"
+    },
+    {
+      "level": "nadir-2",
+      "stars": 0,
+      "state": "lost",
+      "wave": 1,
+      "seconds": 182,
+      "keep": 0,
+      "outposts": [
+        0,
+        0
+      ],
+      "buildings": 3,
+      "kills": 7,
+      "earned": 210,
+      "gold": 20,
+      "peak": 24,
+      "decisions": 4,
+      "starBuild": 0,
+      "policy": "mixed-guard"
+    },
+    {
+      "level": "nadir-3",
+      "stars": 2,
+      "state": "won",
+      "wave": 20,
+      "seconds": 765,
+      "keep": 600,
+      "outposts": [
+        0,
+        100
+      ],
+      "buildings": 14,
+      "kills": 294,
+      "earned": 11990,
+      "gold": 4540,
+      "peak": 36,
+      "decisions": 71,
+      "starBuild": 0,
+      "policy": "mixed-guard"
+    }
+  ],
+  "probes": [
+    {
+      "level": "moss-1",
+      "stars": 2,
+      "state": "won",
+      "wave": 20,
+      "seconds": 649,
+      "keep": 600,
+      "outposts": [
+        0,
+        100
+      ],
+      "buildings": 3,
+      "kills": 108,
+      "earned": 3220,
+      "gold": 1730,
+      "peak": 9,
+      "decisions": 13,
+      "starBuild": 0,
+      "policy": "entry-fire"
+    },
+    {
+      "level": "nadir-3",
+      "stars": 3,
+      "state": "won",
+      "wave": 20,
+      "seconds": 1444,
+      "keep": 960,
+      "outposts": [
+        95,
+        100
+      ],
+      "buildings": 14,
+      "kills": 294,
+      "earned": 13189,
+      "gold": 6559,
+      "peak": 46,
+      "decisions": 68,
+      "starBuild": 85,
+      "policy": "mixed-guard"
+    }
+  ]
+}
