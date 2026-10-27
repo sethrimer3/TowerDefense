@@ -61,7 +61,7 @@ New-player placement: start at `INITIAL_MMR` (Gold III), as now. Whether the fir
 
 - **Names:** player-like handles, not "First Last": lower-case and camelCase words, joined words, underscores, a few trailing digits or a year, rare `xX_…_Xx` styling. They are generated from the castle seed by hashing (no `Math.random`) and must pass `decodeCastle`'s `/^[A-Za-z0-9_]{1,32}$/` and `cleanName`'s 2–24 characters. Keep a blocklist of word pairs so no combination is offensive. Word lists live in `src/campaign/bot-names.ts`.
 - **Flags:** a seeded `Flag` from `src/profile/model.ts` (a base plus 0–4 layers from `PATTERNS`, `PALETTE` and `OPACITIES`, with contrasting colours) built by `botFlag(seed)` in `src/campaign/bot-identity.ts`. Saved in the snapshot as `owner.flag` and validated with the profile's bounded flag decoder.
-- **Bot tag:** today's opponent details show `BOT`. The brief wants bots to feel like players, so the board plates carry no tag. Whether the details panel keeps a small `BOT` marker is open question 5. The default is to keep it there only, which is honest and invisible during play.
+- **No bot tag (decided 2026-10-27):** the game does not say whether an opponent is a bot, anywhere, for now. Phase 3 removes today's `BOT` tag from the opponent details; plates, match card and results carry none. `source: 'bot'` stays in the snapshot data only, for the future split.
 
 ### Castles built from native pieces at a measured difficulty
 
@@ -106,7 +106,7 @@ Two parchment name plates drawn over the board, outside the sim, as DOM over the
 
 ### Mana for strike spells (Siege only)
 
-- **Rules:** the attacker starts with `SIEGE_MANA.start` mana, gains 1 for each defending **unit** killed (castle soldiers, the hero, summons; not buildings, see open question 3), up to `SIEGE_MANA.cap`. Costs: Frost nova 1, Necromancy 1, Meteor 2, Reinforcements 3 (`SPELL_MANA`). Casting needs enough mana and has no cooldown. Placeholders until Seth decides: start 2, cap 10. Both live in one constant for easy tuning.
+- **Rules:** the attacker starts with `SIEGE_MANA.start` mana, gains 1 for each defending **unit** killed (castle soldiers, the hero, summons; not buildings, see open question 3), up to `SIEGE_MANA.cap`. Costs: Frost nova 1, Necromancy 1, Meteor 2, Reinforcements 3 (`SPELL_MANA`). Casting needs enough mana and has no cooldown. Seth's values (2026-10-27): start 1, cap 8. Both live in one constant for easy tuning.
 - **Where it lives:** a new optional `ScenarioRules` hook, `spellGate`, consulted by each `cast*`. Absent in Defend and Ambush, so cooldowns and replays are untouched. In Siege, `CampaignSim` installs a mana gate on the attack side: `canCast(spell)` checks mana, `spend(spell)` deducts, and cooldown timers are not started. Kills are counted where the defense side's soldiers die from the attack side's damage, through `RaidBattle`'s targeting adapters (a kill credited once, never twice across the proxy), with a `manaFor(unit)` function returning 1 now (Future: by unit level).
 - **Necromancy check:** graves come from deaths on the attack side's enemy list. In a raid the attacker's "enemies" are the defense's soldiers through proxies, so verify graves appear where castle troops fall. If not, add a raid adapter that records graves for proxied deaths.
 - **Spell bar:** `SpellBar.update` takes a small gate interface (`ready`, `fill`, `badge`) instead of reading cooldowns directly. The cooldown gate keeps today's behaviour; the mana gate shows each icon's cost as pips, disables icons the player can't afford, and fills by `mana / cost`. A mana counter (a pixel crystal and number) sits beside the bar. The ready cue plays when a spell becomes affordable.
@@ -147,7 +147,7 @@ One PR per phase. Each lists its tests; run `npm test` and `npm run build` befor
 ### Phase 3: entry screen and board name plates ☐
 - Entry screen with the rank emblem, MMR, progress bar, Find Match, reveal, match card (with castle preview), Attack/Back, and rank-up/down on the result panel.
 - Top and bottom name plates over the board.
-- Remove "defense rating" text from the UI (the bot's MMR is shown instead).
+- Remove "defense rating" text from the UI (the bot's MMR is shown instead) and remove the `BOT` tag from the opponent details.
 - **Tests:** `node tests/siege-entry.mjs` at both sizes: entry, Find Match, reveal (and instant under Reduce Motion), Back doesn't count a loss, Attack starts a raid, plates placed top and bottom and not overlapping the spell bar, rank change after a scripted win and loss, reload mid-raid still counts a loss.
 
 ### Phase 4: defensive DPS estimator and ceiling ☐
@@ -169,7 +169,7 @@ One PR per phase. Each lists its tests; run `npm test` and `npm run build` befor
 
 ### Phase 7: mana experiment ☐
 - `spellGate` scenario hook, `SIEGE_MANA` and `SPELL_MANA`, kill crediting through `RaidBattle`, `manaFor(unit)`, the gate interface on `SpellBar`, and the mana counter.
-- **Tests:** `tests/siege-mana.test.ts`: start and cap respected; each defending unit's death gives exactly 1 (none for buildings or attacker losses, no double credit through proxies); costs 1/1/2/3; an unaffordable cast is refused and spends nothing; no cooldown starts. Defend and Ambush still use cooldowns and their replay golden is untouched. Browser: the counter rises as castle troops fall, icons light as they become affordable, Meteor and Reinforcements cast and spend, at both sizes.
+- **Tests:** `tests/siege-mana.test.ts`: start of 1 and cap of 8 respected; each defending unit's death gives exactly 1 (none for buildings or attacker losses, no double credit through proxies); costs 1/1/2/3; an unaffordable cast is refused and spends nothing; no cooldown starts. Defend and Ambush still use cooldowns and their replay golden is untouched. Browser: the counter rises as castle troops fall, icons light as they become affordable, Meteor and Reinforcements cast and spend, at both sizes.
 
 ### Shared items still open (OtherPlans.md)
 - Fences as walls (§1): castle parks get fences the attackers must break. Lands with that shared PR, not as a Siege phase.
@@ -196,11 +196,11 @@ Decided by the brief: seven ranks × five divisions; one MMR for players and bot
 
 Open, for Seth (defaults in brackets; the agent builds the default and keeps it tunable):
 
-1. **Starting mana and cap.** [Start 2, cap 10. Tuned after phase 7 playtests.]
+1. ~~Starting mana and cap.~~ Decided: start 1, cap 8 (tune after phase 7 playtests if needed).
 2. **Rank bands.** Are equal 80-point divisions with Gold III at the start right? [Yes; retune after calibration.]
 3. **Do destroyed defending buildings give mana** (towers, guilds), or only units? [Units only, as the brief says.]
 4. **Grandmaster anchor.** Should maxed DPS sit at Grandmaster I's floor (2720) or at Grandmaster V's (2400)? [GM I.]
-5. **Show `BOT` anywhere?** [Only in the opponent details, never on the board plates.]
+5. ~~Show `BOT` anywhere?~~ Decided: no, nowhere in game yet.
 6. **Find Match feel.** An instant reveal, or a short "searching" pause for atmosphere? [Instant reveal of about 600 ms; no fake wait.]
 7. **Placement games.** Show "Unranked" for the first ten games? [No.]
-8. **Exact DPS thresholds per division.** [Produced by phase 4's tools and phase 6's calibration, then reviewed with Seth.]
+8. **Exact DPS thresholds per division.** Still unknown (Seth, 2026-10-27): phase 4's tools and phase 6's calibration must work them out and bring the table to Seth for review.
