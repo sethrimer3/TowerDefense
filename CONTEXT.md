@@ -626,3 +626,9 @@ The Ambush gold paid once for defeating an enemy, based on that enemy's combat d
 - **Head start**: an Ambush star-tree branch that places one or two free Archer Towers at level start; selling a free tower returns no purchase gold.
 
 - **Ambush boss wave**: wave 10 or 20, containing the strongest native enemy kind its zone budget can afford.
+
+**Rank**:
+A named Siege skill band, from Bronze through Grandmaster.
+
+**Division**:
+One of five tiers within a Siege rank, V through I.

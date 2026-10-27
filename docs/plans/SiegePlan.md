@@ -135,7 +135,7 @@ One PR per phase. Each lists its tests; run `npm test` and `npm run build` befor
 - **Tests:** existing campaign tests unchanged; `tests/siege-math.test.ts` checks exact helper precision, Elo symmetry and a source guard against transcendental battle calls. `tests/siege-targeting.test.ts` covers native breach/flank targeting. Existing native battle, navigation and profile browser scripts cover desktop/phone pages.
 - **Related native cleanup:** a building keeps one shared damage target on a reachable exposed face, refreshed with Defend's flow field after collision changes and on half-second simulation ticks. This fixes flanking infantry aiming behind a wall and avoids additional targets that would multiply splash damage. The current castle budget remains unchanged until phases 4–6 replace it with native pieces/upgrades.
 
-### Phase 1: ranks ☐
+### Phase 1: ranks ☑
 - `siege-ranks.ts`: `RANKS`, `DIVISION_WIDTH`, `rankOf(mmr)`, `rankLabel` (`t()`, for example "Gold III").
 - `src/ui/rank-emblems.ts`: seven procedural pixel emblems plus division numerals, with a gallery fixture.
 - **Tests:** `tests/siege-ranks.test.ts` (every MMR from 100 to 3000 maps to exactly one tier, bands are contiguous, 1000 is Gold III, edges are inclusive at the floor); `node tests/siege-emblems.mjs` gallery screenshot to show Seth.
