@@ -21,13 +21,18 @@ export function cleanName(raw:unknown):string|null {
   return [...name].length>=2&&[...name].length<=24&&/^[\p{L}\p{N}\p{M} ._'’-]+$/u.test(name)&&/[\p{L}\p{N}]/u.test(name)?name:null;
 }
 const color=(v:unknown):v is number=>Number.isInteger(v)&&Number(v)>=0&&Number(v)<PALETTE.length;
-export function decodeProfile(raw:unknown):PlayerProfile|undefined {
+export function decodeFlag(raw:unknown):Flag|undefined {
   if(!raw||typeof raw!=='object')return undefined;
-  const p=raw as PlayerProfile,name=cleanName(p.name),flag=p.flag;
-  if(!name||!flag||!color(flag.base)||!Array.isArray(flag.layers)||flag.layers.length>MAX_LAYERS)return undefined;
+  const flag=raw as Flag;
+  if(!color(flag.base)||!Array.isArray(flag.layers)||flag.layers.length>MAX_LAYERS)return undefined;
   const layers:FlagLayer[]=[];
   for(const layer of flag.layers){if(!layer||!PATTERNS.includes(layer.pattern)||!color(layer.color)||(layer.opacity!==undefined&&!OPACITIES.includes(layer.opacity)))return undefined;layers.push({pattern:layer.pattern,color:layer.color,...(layer.opacity!==undefined?{opacity:layer.opacity}:{})});}
-  return {name,flag:{base:flag.base,layers}};
+  return {base:flag.base,layers};
+}
+export function decodeProfile(raw:unknown):PlayerProfile|undefined {
+  if(!raw||typeof raw!=='object')return undefined;
+  const p=raw as PlayerProfile,name=cleanName(p.name),flag=decodeFlag(p.flag);
+  return name&&flag?{name,flag}:undefined;
 }
 /** Every mask is defined on the native 16×24 pixel lattice. */
 export function covers(pattern:Pattern,x:number,y:number) {

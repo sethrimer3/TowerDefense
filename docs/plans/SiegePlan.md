@@ -140,7 +140,7 @@ One PR per phase. Each lists its tests; run `npm test` and `npm run build` befor
 - `src/ui/rank-emblems.ts`: seven procedural pixel emblems plus division numerals, with a gallery fixture.
 - **Tests:** `tests/siege-ranks.test.ts` (every MMR from 100 to 3000 maps to exactly one tier, bands are contiguous, 1000 is Gold III, edges are inclusive at the floor); `node tests/siege-emblems.mjs` gallery screenshot to show Seth.
 
-### Phase 2: bot identities ☐
+### Phase 2: bot identities ☑
 - `bot-names.ts` and `bot-identity.ts` (`botName(seed)`, `botFlag(seed)`).
 - Add `owner.flag` to the snapshot (still revision 1 until phase 5; optional field, so old saves decode).
 - **Tests:** names are deterministic, valid for `decodeCastle` and `cleanName`, and clear of the blocklist across 100,000 seeds; flags are deterministic, decode, and have readable contrast.
