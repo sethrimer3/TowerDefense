@@ -172,11 +172,11 @@ The native base-stat/five-building setup was introduced with the new free-grid b
 
 ### Phase 5: HUD, wave controls and stars
 
-- Fixed header in the build menu: the outpost/keep health bar (label + bar + number; reuse `KeepBricks` styling or a sibling bar in the same look) and the gold box. CSS `position: sticky; top: 0` inside the scrolling panel, or a flex column whose list scrolls on its own.
-- Send next wave / Auto-send toggle (remember the toggle in settings or the Ambush save; default off). No early-send reward. The first wave also starts with Send.
-- Battle speed 1×/2×/3× as in Defend (reuse its control and saved speed).
-- Stars in the HUD (three small star icons, one cracking off per fallen outpost) and the end screen. Save best stars per level.
-- Tests: star maths, auto-send timing, early send gives nothing, saved stars, end screen at both widths.
+- [x] Fixed header in the build menu: the outpost/keep health bar (label + bar + number; reuse `KeepBricks` styling or a sibling bar in the same look) and the gold box. CSS `position: sticky; top: 0` inside the scrolling panel, or a flex column whose list scrolls on its own.
+- [x] Send next wave / Auto-send toggle (remember the toggle in settings or the Ambush save; default off). No early-send reward. The first wave also starts with Send.
+- [x] Battle speed 1×/2×/3× as in Defend (reuse its control and saved speed).
+- [x] Stars in the HUD (three small star icons, one cracking off per fallen outpost) and the end screen. Save best stars per level.
+- [x] Tests: star maths, auto-send timing, early send gives nothing, saved stars, end screen at both widths.
 
 ### Phase 6: Base-only buildings, building panel, gold upgrades, selling
 

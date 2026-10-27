@@ -1,3 +1,6 @@
+import { SpellBar } from '../ui/spell-bar.ts';
+import { KeepBricks } from '../defend/keep-bricks.ts';
+import { levelUnlocked } from './levels.ts';
 import { drawFlierWarning } from './flier-warning.ts';
 /** Native board, pointer transactions and controls; rules live in AmbushSim. */
 import { DefendRenderer } from '../defend/render.ts';
@@ -18,41 +21,64 @@ export class AmbushBattlePage {
  sim:AmbushSim;readonly canvas=document.createElement('canvas');readonly renderer:DefendRenderer;
  private pointers:BoardPointers;private last=0;private paused=false;private picked:number|undefined;private selected:PlacedKind='archerTower';
  private notice='';private now=0;private settled=false;private resetCamera=true;private cleared=new Map<number,string>();
- private spell:AmbushSpell|undefined;
+ private spellBar?:SpellBar;private health=new KeepBricks();private sideOpen=true;
  constructor(private root:HTMLElement,private index:number,private host:CampaignHost){
   this.sim=new AmbushSim(index,host.save());this.renderer=new DefendRenderer(this.canvas);
   this.canvas.setAttribute('aria-label','Ambush battlefield');
   this.pointers=new BoardPointers({renderer:()=>this.renderer,paletteSelector:'#ambush-palette',
    raise:()=>host.save().settings.raiseDrag,magnify:()=>host.save().settings.magnifier,
    pickUp:e=>this.lift(e),drop:d=>this.drop(d),tap:e=>this.tap(e)});
-  this.canvas.onpointerdown=e=>this.pointers.down(e);this.canvas.oncontextmenu=e=>e.preventDefault();
+  this.canvas.onpointerdown=e=>this.pointers.down(e);
+  this.canvas.onpointermove=e=>{if(this.spellBar){const p=this.renderer.toCell(e.clientX,e.clientY);this.spellBar.point={x:p.fx,y:p.fy};}};
+  this.root.addEventListener('keydown',e=>{if(e.key==='Escape')this.spellBar?.cancel();});this.canvas.oncontextmenu=e=>e.preventDefault();
   this.canvas.addEventListener('wheel',e=>{e.preventDefault();this.renderer.zoomAt(e.clientX,e.clientY,Math.exp(-e.deltaY*.0015));},{passive:false});
   this.render();
  }
  selectLevel(index:number){this.index=index;this.reset();}
  show(){this.last=0;this.render();}
- pause(){this.last=0;this.pointers.end();}
- reset(){this.pause();this.sim=new AmbushSim(this.index,this.host.save());this.paused=false;this.picked=undefined;this.spell=undefined;this.notice='';this.settled=false;this.resetCamera=true;this.cleared.clear();this.render();}
+ pause(){this.last=0;this.pointers.end();this.spellBar?.cancel();}
+ reset(){this.pause();this.sim=new AmbushSim(this.index,this.host.save());this.paused=false;this.picked=undefined;this.spellBar?.cancel();this.notice='';this.settled=false;this.resetCamera=true;this.cleared.clear();this.render();}
  private render(){
   this.pointers.end();this.root.classList.add('native-campaign');
+  const ended=this.sim.phase==='won'||this.sim.phase==='lost';
   this.root.innerHTML='<div class="campaign-head defend-head"><span class="ambush-level-name">'+this.sim.level.name+'</span>'+
-   '<button data-action="level-select" data-i18n="ambush.levelSelect">'+t('ambush.levelSelect')+'</button>'+
-   '<div class="campaign-actions"><button data-action="start">'+(this.sim.phase==='build'?'Start waves':this.paused?t('ambush.resume'):t('ambush.pause'))+'</button>'+
-   '<button data-action="retry" data-i18n="ambush.retry">'+t('ambush.retry')+'</button></div>'+
-   '<p class="ambush-wallet">Ambush gold: <b id="ambush-gold"></b></p>'+
-   '<div class="campaign-inspect-actions"><button data-action="sell" hidden></button><button data-action="close" hidden>'+t('ambush.close')+'</button></div>'+
-   '<div class="campaign-spells"></div><p class="campaign-status" role="status" aria-live="polite"></p></div>'+
-   '<div class="campaign-stage defend-stage side-open"><aside class="defend-side"><div class="campaign-roster defend-palette" id="ambush-palette"></div></aside>'+
-   '<div class="campaign-board defend-board"></div></div>';
-  this.root.querySelector('.campaign-board')!.append(this.canvas);
-  this.root.querySelector<HTMLButtonElement>('[data-action="level-select"]')!.onclick=()=>this.host.levelSelect?.();
-  this.root.querySelector<HTMLButtonElement>('[data-action="retry"]')!.onclick=()=>this.reset();
-  this.root.querySelector<HTMLButtonElement>('[data-action="start"]')!.onclick=()=>{if(this.sim.phase==='build'){if(!this.sim.start())this.notice='Place a building beside the road first.';}else this.paused=!this.paused;this.render();};
-  this.root.querySelector<HTMLButtonElement>('[data-action="sell"]')!.onclick=()=>{if(this.picked!==undefined)this.sim.remove(this.picked);this.picked=undefined;this.refresh();};
-  this.root.querySelector<HTMLButtonElement>('[data-action="close"]')!.onclick=()=>{this.picked=undefined;this.refresh();};
-  const spellNames={meteor:'Meteor',frostNova:'Frost nova',reinforcements:'Reinforcements',necromancy:'Necromancy'};
-  this.root.querySelector('.campaign-spells')!.innerHTML=this.sim.spells.map(spell=>'<button data-spell="'+spell+'">'+spellNames[spell]+'</button>').join('');
-  this.root.querySelectorAll<HTMLButtonElement>('[data-spell]').forEach(b=>b.onclick=()=>{const spell=b.dataset.spell as AmbushSpell;this.spell=this.spell===spell?undefined:spell;this.refresh();});
+   '<button data-action="level-select">'+t('ambush.levelSelect')+'</button>'+
+   '<div class="campaign-actions"><button data-action="start">'+t('ambush.sendWave')+'</button>'+
+   '<button data-action="pause">'+(this.paused?t('ambush.resume'):t('ambush.pause'))+'</button>'+
+   '<button data-action="speed">'+this.sim.speed+'×</button>'+
+   '<label><input type="checkbox" data-action="auto" '+(this.sim.autoSend?'checked':'')+'>'+t('ambush.autoSend')+'</label>'+
+   '<button data-action="side" aria-pressed="'+this.sideOpen+'">☰ '+t('ambush.buildings')+'</button></div>'+
+   '<p class="campaign-status" role="status" aria-live="polite"></p></div>'+
+   '<div class="campaign-stage defend-stage '+(this.sideOpen?'side-open':'')+'"><aside class="defend-side ambush-side">'+
+   '<div class="ambush-side-head"><strong id="ambush-health-label"></strong><div id="ambush-health"></div><span id="ambush-health-number"></span>'+
+   '<p class="ambush-wallet"><span aria-hidden="true">●</span> <b id="ambush-gold"></b> '+t('ambush.gold')+'</p>'+
+   '<div class="ambush-hud-stars" aria-label="'+t('ambush.stars',{stars:this.sim.stars,total:3})+'">'+[0,1,2].map(i=>'<span data-star="'+i+'">★</span>').join('')+'</div></div>'+
+   '<div class="ambush-side-content"><div class="campaign-roster defend-palette" id="ambush-palette"></div>'+
+   '<div id="ambush-inspect" hidden><div class="ambush-building-details"></div><div class="campaign-inspect-actions">'+
+   '<button data-action="close">'+t('ambush.close')+'</button><button data-action="sell"></button></div></div></div></aside>'+
+   '<div class="campaign-board defend-board"><div class="campaign-spells"></div>'+
+   (ended?'<div class="ambush-result" role="dialog" aria-label="'+t(this.sim.phase==='won'?'ambush.victory':'ambush.defeat')+'"><h2>'+t(this.sim.phase==='won'?'ambush.victory':'ambush.defeat')+'</h2>'+
+   '<div class="ambush-result-stars">'+ '★'.repeat(this.sim.stars)+'☆'.repeat(3-this.sim.stars)+'</div>'+
+   '<p>'+t('ambush.kills')+': '+this.sim.kills+' · '+t('ambush.goldEarned')+': '+Math.floor(this.sim.goldEarned)+'</p>'+
+   '<button data-action="retry">'+t('ambush.retry')+'</button><button data-action="next" '+(this.sim.phase==='won'&&this.index<29?'':'hidden')+'>'+t('ambush.next')+'</button>'+
+   '<button data-action="result-select">'+t('ambush.levelSelect')+'</button></div>':'')+'</div></div>';
+  this.root.querySelector('.campaign-board')!.prepend(this.canvas);
+  this.root.querySelector('#ambush-health')!.append(this.health.canvas);
+  const button=(action:string)=>this.root.querySelector<HTMLButtonElement>('[data-action="'+action+'"]')!;
+  button('level-select').onclick=()=>this.host.levelSelect?.();
+  if(ended){
+   button('retry').onclick=()=>this.reset();
+   button('result-select').onclick=()=>this.host.levelSelect?.();
+   button('next').onclick=()=>{if(this.index<29&&levelUnlocked(this.host.save().campaigns.ambush,this.index+1))this.selectLevel(this.index+1);};
+  }
+  button('start').onclick=()=>{if(!this.sim.send())this.notice=t('ambush.placeFirst');else this.notice='';this.refresh();};
+  button('pause').onclick=()=>{this.paused=!this.paused;this.render();};
+  button('speed').onclick=()=>{const save=this.host.save().defend;this.sim.speed=this.sim.speed>=(save.speed3?3:2)?1:this.sim.speed+1 as 1|2|3;save.battleSpeed=this.sim.speed;this.host.store();this.refresh();};
+  button('side').onclick=()=>{this.sideOpen=!this.sideOpen;this.render();};
+  this.root.querySelector<HTMLInputElement>('[data-action="auto"]')!.onchange=e=>{this.sim.autoSend=(e.target as HTMLInputElement).checked;const progress=this.host.save().campaigns.ambush;if(this.sim.autoSend)progress.autoSend=true;else delete progress.autoSend;this.host.store();};
+  button('sell').onclick=()=>{if(this.picked!==undefined)this.sim.remove(this.picked);this.picked=undefined;this.refresh();};
+  button('close').onclick=()=>{this.picked=undefined;this.refresh();};
+  this.spellBar=new SpellBar(this.sim.spells);this.root.querySelector('.campaign-spells')!.replaceWith(this.spellBar.el);
   this.palette();this.refresh();this.draw();
  }
  private palette(){
@@ -65,7 +91,7 @@ export class AmbushBattlePage {
   });
  }
  private lift(e:PointerEvent){
-  if(this.spell||this.sim.phase!=='build')return false;const p=this.renderer.toCell(e.clientX,e.clientY);
+  if(this.spellBar?.armed||this.sim.phase!=='build')return false;const p=this.renderer.toCell(e.clientX,e.clientY);
   const b=this.at(p.fx,p.fy);if(!b)return false;this.picked=b.id;
   this.pointers.begin(new AmbushDrag(b.kind as PlacedKind,this.sim.grid,this.sim.buildings,b.id),e,false);return true;
  }
@@ -78,7 +104,7 @@ export class AmbushBattlePage {
  private at(x:number,y:number){return this.sim.buildings.find(b=>{const r=buildingRect(b);return x>=r.x&&x<r.x+r.w&&y>=r.y&&y<r.y+r.h;});}
  private tap(e:PointerEvent){
   const p=this.renderer.toCell(e.clientX,e.clientY),b=this.at(p.fx,p.fy);
-  if(this.spell){if(this.sim.cast(this.spell,{x:p.fx,y:p.fy}))this.spell=undefined;this.refresh();return;}
+  if(this.spellBar?.armed){if(this.sim.cast(this.spellBar.armed,{x:p.fx,y:p.fy}))this.spellBar.cancel();this.refresh();return;}
   if(b)this.picked=b.id;
   else if(this.picked!==undefined)this.picked=undefined;
   else if(['build','battle'].includes(this.sim.phase)){
@@ -89,26 +115,36 @@ export class AmbushBattlePage {
  }
  frame(now:number){
   this.now=now;const dt=this.last?Math.min(.1,(now-this.last)/1000):0;this.last=now;
-  if(!this.paused)this.sim.step(dt);
+  if(!this.paused)this.sim.step(dt);this.health.step(this.host.save().settings.reduceMotion?0:dt);
   if(!this.settled&&(this.sim.phase==='won'||this.sim.phase==='lost')){this.settled=true;if(this.sim.phase==='won'){recordStars(this.host.save().campaigns.ambush,this.sim.level,this.sim.stars);this.host.store();}this.render();}
   this.refresh();this.draw();
  }
  private refresh(){
   const s=this.sim,b=s.buildings.find(b=>b.id===this.picked),ended=s.phase==='won'||s.phase==='lost';
   this.root.querySelector('#ambush-gold')!.textContent=String(Math.floor(s.gold));
-  this.root.querySelector('.campaign-status')!.textContent=ended?(s.phase==='won'?t('ambush.victory'):t('ambush.defeat')):this.notice||('Wave '+s.wave+'/3 · Keep '+Math.ceil(s.engine.keepHp())+' · '+s.enemiesLeft+' enemies · '+s.kills+' kills');
-  const sell=this.root.querySelector<HTMLButtonElement>('[data-action="sell"]')!,close=this.root.querySelector<HTMLButtonElement>('[data-action="close"]')!;
-  sell.hidden=close.hidden=!b;if(b){sell.textContent=t('ambush.sell',{gold:s.refund(b.id)});sell.disabled=ended;}
+  const post=s.outposts.posts.find(p=>!p.fallen),fraction=post?post.health:s.engine.keepHp()/s.engine.keepMaxHp();
+  this.root.querySelector('#ambush-health-label')!.textContent=t(post?(s.outposts.posts.indexOf(post)===0?'ambush.outpost1':'ambush.outpost2'):'ambush.keep');
+  this.root.querySelector('#ambush-health-number')!.textContent=post?Math.ceil(fraction*100)+'%':Math.ceil(s.engine.keepHp())+'/'+Math.ceil(s.engine.keepMaxHp());
+  this.health.set(fraction);
+  this.root.querySelectorAll<HTMLElement>('[data-star]').forEach(el=>el.classList.toggle('star-lost',Number(el.dataset.star)>=s.stars));
+  this.root.querySelector('.ambush-hud-stars')!.setAttribute('aria-label',t('ambush.stars',{stars:s.stars,total:3}));
+  this.root.querySelector('.campaign-status')!.textContent=this.notice||t('ambush.wave',{wave:s.wave,total:20})+' · '+t('ambush.enemiesLeft',{count:s.enemiesLeft});
+  this.root.querySelector<HTMLElement>('#ambush-inspect')!.hidden=!b;
+  this.root.querySelector<HTMLElement>('#ambush-palette')!.hidden=!!b;
+  const sell=this.root.querySelector<HTMLButtonElement>('[data-action="sell"]')!;
+  if(b){sell.textContent=t('ambush.sell',{gold:s.refund(b.id)});sell.disabled=ended;}
   this.root.querySelectorAll<HTMLButtonElement>('[data-kind]').forEach(button=>button.disabled=ended||s.price(button.dataset.kind as StructureKind)>s.gold);
-  this.root.querySelector<HTMLButtonElement>('[data-action="start"]')!.disabled=ended;
-  const e=s.engine,remaining={meteor:e.meteorRemaining,frostNova:e.frostRemaining,reinforcements:e.reinforceRemaining,necromancy:e.necroRemaining};
-  this.root.querySelectorAll<HTMLButtonElement>('[data-spell]').forEach(b=>{const spell=b.dataset.spell as AmbushSpell;b.disabled=s.phase!=='battle'||remaining[spell]>0;b.setAttribute('aria-pressed',String(this.spell===spell));});
+  this.root.querySelector<HTMLButtonElement>('[data-action="start"]')!.disabled=!s.canSend;
+  this.root.querySelector<HTMLButtonElement>('[data-action="pause"]')!.disabled=s.phase!=='battle';
+  this.root.querySelector<HTMLButtonElement>('[data-action="speed"]')!.textContent=s.speed+'×';
+  this.spellBar?.update(s.engine,s.phase==='battle',this.host.save().settings.reduceMotion);
+
  }
  private draw(){
   const r=this.renderer,box=this.canvas.getBoundingClientRect();r.resize(box.width,box.height);if(this.resetCamera){r.resetCam();this.resetCamera=false;}
   const s=this.sim,settings=this.host.save().settings,reduced=settings.reduceMotion||matchMedia('(prefers-reduced-motion: reduce)').matches;
   if(hasForest(s.level.area)){r.forest.sync(s.map,s.engine);for(const b of s.buildings){const rect=buildingRect(b),key=[rect.x,rect.y,rect.w,rect.h].join(',');if(this.cleared.get(b.id)!==key){r.forest.clearBuilding(rect);this.cleared.set(b.id,key);}}}
-  r.draw(s.map,s.engine,this.pointers.session?.overlay()??null,{area:s.level.area,grid:0,weather:null,night:0,now:this.now,reduceMotion:reduced,effects:!settings.effectsOff,healthbars:settings.showHealthbars,simpleEnemies:settings.simpleEnemies,simpleTroops:settings.simpleTroops,mergedOutlines:settings.mergedOutlines,...(this.picked!==undefined?{inspect:{id:this.picked,armed:s.engine}}:{})});
+  r.draw(s.map,s.engine,this.pointers.session?.overlay()??this.spellBar?.overlay(s.engine)??null,{area:s.level.area,grid:0,weather:null,night:0,now:this.now,reduceMotion:reduced,effects:!settings.effectsOff,healthbars:settings.showHealthbars,simpleEnemies:settings.simpleEnemies,simpleTroops:settings.simpleTroops,mergedOutlines:settings.mergedOutlines,...(this.picked!==undefined?{inspect:{id:this.picked,armed:s.engine}}:{})});
   const c=this.canvas.getContext('2d')!;c.save();c.setTransform(r.cam.s,0,0,r.cam.s,r.cam.x,r.cam.y);drawEntryArrow(c,s.field.path[0],s.field.path[1],r.px,this.now,reduced);if(s.warning)drawFlierWarning(c,s.field.path[0],s.field.track.keep,r.px,this.now,reduced);c.restore();this.pointers.drawLoupe(r);
  }
 }

@@ -2392,3 +2392,38 @@ nav button[data-mode] > .tab-label { min-height: 2.4em; }
 .ambush-card-stars { color:var(--area-dark); letter-spacing:3px; }
 @media(max-width:480px) { .ambush-level-columns,.ambush-level-cards { gap:6px; } .ambush-zone { padding:6px; } .ambush-level-card { padding:5px; gap:5px; } .ambush-level-preview { height:80px; } .ambush-level-card strong { font-size:11px; } }
 .ambush-level-preview canvas { width:100%; height:100%; object-fit:contain; image-rendering:pixelated; background:#0b0a09; }
+/* Ambush keeps health and gold above a separately scrolling native palette. */
+.native-campaign .ambush-side { flex-direction:column;align-items:stretch;overflow:hidden; }
+.native-campaign .side-open .ambush-side { width:176px; }
+.ambush-side-head { flex:none;text-align:center;padding:6px;background:var(--wood);border:2px solid var(--brass-nails); }
+.ambush-side-head>strong,.ambush-side-head>span { display:block; }
+.ambush-side-head canvas { width:74px;height:36px;display:block;margin:auto;image-rendering:pixelated; }
+.ambush-side-head .ambush-wallet { margin:2px 0;color:var(--gold); }
+.ambush-side-content { overflow:auto;min-height:0; }
+.ambush-side-content .defend-palette { width:100%;max-height:none; }
+.ambush-side-content [hidden] { display:none; }
+.ambush-hud-stars { display:flex;justify-content:center;gap:8px;color:var(--gold);font-size:22px; }
+.ambush-side-head .ambush-hud-stars span { transition:opacity .4s,transform .4s; }
+.ambush-hud-stars .star-lost { opacity:.15;transform:translateY(6px) rotate(22deg);filter:grayscale(1); }
+.ambush-result { position:absolute;z-index:5;left:50%;top:50%;transform:translate(-50%,-50%);width:min(320px,88%);box-sizing:border-box;text-align:center;padding:16px;background:var(--wood);border:3px solid var(--brass-nails);box-shadow:0 5px 30px #000b; }
+.ambush-result button { margin:4px; }
+.ambush-result-stars { color:var(--gold);font-size:32px; }
+.native-campaign .ambush-side .campaign-inspect-actions { display:flex;flex-direction:column;padding:6px; }
+.native-campaign .campaign-actions label { display:flex;align-items:center;gap:3px; }
+.strike-bar { position:absolute;left:8px;bottom:max(8px,env(safe-area-inset-bottom));display:flex;gap:6px;z-index:4; }
+.strike-bar button { position:relative;width:48px;height:48px;padding:2px;border-radius:50%;border:2px solid var(--brass-nails);background:conic-gradient(#caa75c88 var(--fill,100%),#17120de0 0);opacity:.3; }
+.strike-bar button:disabled { opacity:.3; }
+.strike-bar button[aria-pressed="true"] { opacity:1;outline:2px solid var(--gold); }
+.strike-bar canvas { width:40px;height:40px;image-rendering:pixelated; }
+.strike-bar small { position:absolute;inset:12px 0 0;text-shadow:1px 1px #000;font-size:14px; }
+.strike-ready { animation:strike-ready .5s ease-out; }
+@keyframes strike-ready { from { opacity:1;filter:brightness(3); } to { opacity:.3;filter:brightness(1); } }
+@media (max-width:600px) {
+ .native-campaign .side-open .ambush-side { width:116px; }
+ .ambush-side-head { font-size:10px;padding:3px; }
+ .strike-bar button { width:40px;height:40px; }
+ .strike-bar canvas { width:32px;height:32px; }
+}
+@media (prefers-reduced-motion:reduce) { .ambush-side-head .ambush-hud-stars span { transition:none; }.strike-ready { animation:none; } }
+
+.strike-bar[hidden] { display:none; }
