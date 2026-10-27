@@ -52,7 +52,8 @@ export class AmbushSim {
  get map(){return this.engine.map;}
  get stars(){return this.outposts.stars as Stars;}
  get warning(){return ['build','battle'].includes(this.phase)&&(waveHasFliers(this.queue)||!this.queue.length&&!!this.waves[this.wave]?.fliers);}
- get spells(){return (['meteor','frostNova','reinforcements','necromancy'] as const).filter(key=>this.bonus[key]);}
+ /** Every strike spell is always at hand, as in Defend; without a researched path it casts plain. */
+ get spells(){return ['meteor','frostNova','reinforcements','necromancy'] as const;}
  cast(spell:AmbushSpell,at:{x:number;y:number}){
   if(this.phase!=='battle'||!this.spells.includes(spell))return false;
   const ok=spell==='meteor'?this.engine.castMeteor(at):spell==='frostNova'?this.engine.castFrostNova(at):spell==='reinforcements'?this.engine.castReinforcements(at):this.engine.castNecromancy(at)>=0;

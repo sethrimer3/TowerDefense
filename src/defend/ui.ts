@@ -632,7 +632,7 @@ export class DefendPage {
 
   private updateSkillCooldowns() {
     if (this.phase !== "sim" || !this.sim) {this.spellBar?.cancel();if(this.spellBar)this.spellBar.el.hidden=true;return;}
-    const spells=STRIKE_SPELLS.filter(spell=>this.sim!.bonuses[spell]),signature=spells.join(',');
+    const spells=STRIKE_SPELLS,signature=spells.join(',');
     if(!this.spellBar||signature!==this.spellSignature){this.spellBar?.el.remove();this.spellBar=new SpellBar(spells);this.spellSignature=signature;this.root.querySelector('#defend-board')!.append(this.spellBar.el);}
     this.spellBar.el.hidden=false;this.spellBar.update(this.sim,true,this.host.reduceMotion());
     for (const button of Array.from(this.root.querySelectorAll<HTMLButtonElement>("#defend-palette [data-item]"))) {

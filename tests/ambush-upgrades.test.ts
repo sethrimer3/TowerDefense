@@ -48,3 +48,9 @@ test('A native ultimate merge requires real maxed partners and conserves all thr
  const b=buildings[0],merge=s.upgrades(b.id)[0],investment=buildings.reduce((n,o)=>n+o.paid,0);
  assert.equal(merge.step.type,'merge');assert.ok(merge.ready);assert.ok(s.upgrade(b.id,merge.step));assert.equal(s.buildings.length,1);assert.equal(b.kind,'chronoTower');assert.equal(b.paid,investment+merge.cost);assert.equal(s.refund(b.id),b.paid);
 });
+test('Every strike spell is at hand in Ambush without any Study research, cast at base strength',()=>{
+ const s=new AmbushSim(0,defaults());build(s,'archerTower');
+ assert.deepEqual([...s.spells].sort(),['frostNova','meteor','necromancy','reinforcements']);
+ s.start();s.step(1/30);assert.ok(s.cast('meteor',{x:30,y:20}));assert.equal(s.engine.meteors[0].damage,120);
+ assert.ok(s.cast('frostNova',{x:30,y:20}));assert.ok(s.cast('reinforcements',{x:30,y:30}));
+});
