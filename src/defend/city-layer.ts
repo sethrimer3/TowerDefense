@@ -9,6 +9,7 @@ import { CELL_COUNT, CELLS_H, CELLS_W, SPAWN_ROW, SUB, TILES_H, TILES_W, cellInB
 import { CellType, type Building, type CityMap } from "./citygen.ts";
 import type { Light, Stone } from "./lighting.ts";
 import type { DefendSim } from "./sim.ts";
+import { drawFenceSections } from "./fences.ts";
 import { ROAD, keepStage, paintKeepRubble, paintStructureArt, paintStructureRubble } from "./structure-art.ts";
 import { houseRubbleSprite, roofSeed, roofSprite } from "./roof-art.ts";
 import { ART, openAt, parkArt } from "./park-art.ts";
@@ -295,6 +296,7 @@ function paintBuilding(p: Paint, b: Building) {
     h = Math.round((r.y + r.h) * px) - y;
   const box = { x, y, w, h, px };
   if (b.kind === "wall") {
+    if(b.fence){if(solid(b.cells[0]))drawFenceSections(c,px,[{...b.fence,broken:false}]);return;}
     if (solid(b.cells[0])) paintWall(p, b);
     else if (hasWallArt(p.area) || !paintPixelRubble(p, b)) paintArt(p, wallRubbleSprite(lotSeed(b), p.area), box);
     return;
@@ -477,7 +479,7 @@ function paintWall(p: Paint, b: Building) {
  * (exclusive) the cells. Whatever is drawn on that ground after the city
  * layer (the forest's floor) must leave the face showing. */
 export function hangingFaces(map: CityMap, sim: DefendSim | null): { y: number; x0: number; x1: number }[] {
-  const standing = (i: number) => map.wall[i] === 1 && (sim ? sim.solid[i] === 1 : map.owner[i] >= 0);
+  const standing = (i: number) => map.wall[i] === 1 && !map.buildings[map.owner[i]]?.fence && (sim ? sim.solid[i] === 1 : map.owner[i] >= 0);
   const runs: { y: number; x0: number; x1: number }[] = [];
   for (let cy = 1; cy < CELLS_H; cy++) {
     let start = -1;

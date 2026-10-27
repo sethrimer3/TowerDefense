@@ -1,3 +1,4 @@
+import { drawFlierWarning } from './flier-warning.ts';
 /** Native board, pointer transactions and controls; rules live in AmbushSim. */
 import { DefendRenderer } from '../defend/render.ts';
 import { BoardPointers } from '../defend/board-pointers.ts';
@@ -89,13 +90,13 @@ export class AmbushBattlePage {
  frame(now:number){
   this.now=now;const dt=this.last?Math.min(.1,(now-this.last)/1000):0;this.last=now;
   if(!this.paused)this.sim.step(dt);
-  if(!this.settled&&(this.sim.phase==='won'||this.sim.phase==='lost')){this.settled=true;if(this.sim.phase==='won'){recordStars(this.host.save().campaigns.ambush,this.sim.level,1);this.host.store();}this.render();}
+  if(!this.settled&&(this.sim.phase==='won'||this.sim.phase==='lost')){this.settled=true;if(this.sim.phase==='won'){recordStars(this.host.save().campaigns.ambush,this.sim.level,this.sim.stars);this.host.store();}this.render();}
   this.refresh();this.draw();
  }
  private refresh(){
   const s=this.sim,b=s.buildings.find(b=>b.id===this.picked),ended=s.phase==='won'||s.phase==='lost';
   this.root.querySelector('#ambush-gold')!.textContent=String(Math.floor(s.gold));
-  this.root.querySelector('.campaign-status')!.textContent=ended?(s.phase==='won'?t('ambush.victory'):t('ambush.defeat')):this.notice||('Wave '+s.wave+'/3 · '+s.lives+' lives · '+s.enemiesLeft+' enemies · '+s.kills+' kills');
+  this.root.querySelector('.campaign-status')!.textContent=ended?(s.phase==='won'?t('ambush.victory'):t('ambush.defeat')):this.notice||('Wave '+s.wave+'/3 · Keep '+Math.ceil(s.engine.keepHp())+' · '+s.enemiesLeft+' enemies · '+s.kills+' kills');
   const sell=this.root.querySelector<HTMLButtonElement>('[data-action="sell"]')!,close=this.root.querySelector<HTMLButtonElement>('[data-action="close"]')!;
   sell.hidden=close.hidden=!b;if(b){sell.textContent=t('ambush.sell',{gold:s.refund(b.id)});sell.disabled=ended;}
   this.root.querySelectorAll<HTMLButtonElement>('[data-kind]').forEach(button=>button.disabled=ended||s.price(button.dataset.kind as StructureKind)>s.gold);
@@ -108,6 +109,6 @@ export class AmbushBattlePage {
   const s=this.sim,settings=this.host.save().settings,reduced=settings.reduceMotion||matchMedia('(prefers-reduced-motion: reduce)').matches;
   if(hasForest(s.level.area)){r.forest.sync(s.map,s.engine);for(const b of s.buildings){const rect=buildingRect(b),key=[rect.x,rect.y,rect.w,rect.h].join(',');if(this.cleared.get(b.id)!==key){r.forest.clearBuilding(rect);this.cleared.set(b.id,key);}}}
   r.draw(s.map,s.engine,this.pointers.session?.overlay()??null,{area:s.level.area,grid:0,weather:null,night:0,now:this.now,reduceMotion:reduced,effects:!settings.effectsOff,healthbars:settings.showHealthbars,simpleEnemies:settings.simpleEnemies,simpleTroops:settings.simpleTroops,mergedOutlines:settings.mergedOutlines,...(this.picked!==undefined?{inspect:{id:this.picked,armed:s.engine}}:{})});
-  const c=this.canvas.getContext('2d')!;c.save();c.setTransform(r.cam.s,0,0,r.cam.s,r.cam.x,r.cam.y);drawEntryArrow(c,s.field.path[0],s.field.path[1],r.px,this.now,reduced);c.restore();this.pointers.drawLoupe(r);
+  const c=this.canvas.getContext('2d')!;c.save();c.setTransform(r.cam.s,0,0,r.cam.s,r.cam.x,r.cam.y);drawEntryArrow(c,s.field.path[0],s.field.path[1],r.px,this.now,reduced);if(s.warning)drawFlierWarning(c,s.field.path[0],s.field.track.keep,r.px,this.now,reduced);c.restore();this.pointers.drawLoupe(r);
  }
 }

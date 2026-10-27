@@ -613,3 +613,6 @@ The level's deployment budget, spent on buildings and earned by killing enemies.
 
 **Kill bounty**:
 The Ambush gold paid once for defeating an enemy, based on that enemy's combat difficulty.
+
+- **Outpost breach**: the first ground enemy body entering a fenced outpost. Its health then follows the fraction of its original houses still standing.
+- **Flier warning**: a red dotted route from the track entrance to the keep, with a ring and exclamation mark, warning that an upcoming wave includes flying enemies.

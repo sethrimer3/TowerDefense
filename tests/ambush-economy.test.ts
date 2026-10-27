@@ -21,11 +21,11 @@ test('Battle sales withdraw only the sold native home and end states refuse tran
  assert.ok(!s.engine.soldiers.some(u=>u.home===a.id));assert.ok(s.engine.soldiers.some(u=>u.home===b.id));
  const c=build(s,'archerTower');assert.notEqual(c.id,a.id);s.phase='lost';const end=s.gold;assert.equal(s.remove(c.id),false);assert.equal(s.gold,end);
 });
-test('Native deaths pay once and route exits pay nothing',()=>{
+test('Native deaths pay once and damaging the keep pays no bounty',()=>{
  const s=new AmbushSim(0,defaults());build(s,'meleeGuild');s.start();const p=s.field.path[0],e=s.engine.spawnAuxiliary('roach',p.x+.5,p.y)!;
  const d=ENEMIES[e.kind],gold=s.gold,bounty=enemyBounty({maxHp:e.maxHp,damage:d.damage,cooldown:d.cooldown,speed:d.speed});
  s.engine.hurtEnemy(e,e.hp*2);s.engine.step(1/30);assert.equal(s.gold,gold+bounty);assert.equal(s.kills,1);s.engine.step(1/30);assert.equal(s.kills,1);
- const end=s.field.path.at(-1)!,leak=s.engine.spawnAuxiliary('roach',end.x,end.y)!;const after=s.gold;s.engine.step(1/30);s.engine.step(1/30);assert.ok(leak.escaped);assert.equal(s.gold,after);
+ const end=s.field.track.keep,attacker=s.engine.spawnAuxiliary('roach',end.x,end.y)!;const after=s.gold,keep=s.engine.keepHp();s.engine.step(1/30);assert.ok(attacker.hp>0);assert.ok(s.engine.keepHp()<keep);assert.equal(s.gold,after);
 });
 test('Tougher enemies pay more; Ambush gold never leaks into Siege or the player save',()=>{
  assert.ok(enemyBounty({maxHp:48,damage:6,cooldown:1,speed:2})>enemyBounty({maxHp:12,damage:2,cooldown:1.2,speed:1.2}));
