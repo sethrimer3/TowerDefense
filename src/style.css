@@ -2305,14 +2305,12 @@ nav button[data-mode] > .tab-label { min-height: 2.4em; }
 @media (max-width: 480px) { nav button > .combat-tab-icon { width: 32px; height: 32px; } }
 @media (max-width: 360px) { nav button > .combat-tab-icon { width: 26px; height: 26px; } }
 
-.campaign-head h1 { margin: 0 0 8px; }
 .campaign-head p { line-height: 1.5; }
-.campaign-actions, .campaign-roster, .campaign-spaces { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.campaign-actions, .campaign-roster { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .campaign-board { width: min(100%, 600px); margin: 12px auto; border: 3px solid var(--ink); }
 .campaign-board > canvas { display: block; width: 100%; height: auto; touch-action: manipulation; }
 .campaign-roster button { display: grid; justify-items: center; gap: 4px; width: 130px; }
 .campaign-roster button[aria-pressed="true"] { outline: 2px solid #d6ae68; }
-.campaign-spaces button { font-size: 12px; }
 .campaign-status { min-height: 1.5em; }
 .campaign-actions button[hidden] { display: none; }
 
@@ -2365,7 +2363,6 @@ nav button[data-mode] > .tab-label { min-height: 2.4em; }
 
 #ambush.native-campaign.active, #siege.native-campaign.active { display: flex; flex-direction: column; overflow: hidden; gap: 6px; }
 .native-campaign .campaign-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin: 0; }
-.native-campaign .campaign-head h1 { font-size: 20px; margin: 0; }
 .native-campaign .campaign-head p { margin: 0; }
 .native-campaign .campaign-actions { margin: 0; }
 .native-campaign .campaign-status { flex-basis: 100%; font-size: 12px; }
@@ -2380,9 +2377,5 @@ nav button[data-mode] > .tab-label { min-height: 2.4em; }
 .native-campaign .siege-profile > div { min-width: 0; font-size: 12px; }
 .native-campaign .siege-profile small { display: none; }
 .native-campaign .siege-opponent { margin: 0; padding: 0; border: 0; font-size: 12px; }
-.native-campaign .campaign-intro, .native-campaign .campaign-help { font-size: 11px; }
-.native-campaign .campaign-help { flex: 0 0 auto; max-height: 30%; overflow-y: auto; }
-.native-campaign .campaign-help p { margin: 6px; }
 .native-campaign .campaign-spells, .native-campaign .campaign-inspect-actions { margin: 0; }
-.native-campaign .campaign-spaces { margin: 0; }
-@media(max-width:480px) { .native-campaign .campaign-head button { font-size: 10px; padding: 6px; } .native-campaign .campaign-head h1 { font-size: 15px; } }
+@media(max-width:480px) { .native-campaign .campaign-head button { font-size: 10px; padding: 6px; } }

@@ -1,3 +1,4 @@
+import { dist } from '../exact.ts';
 import { wearFits } from '../specializations.ts';
 import type { PathId } from '../knowledge-paths.ts';
 import * as C from "../defend/catalog.ts";
@@ -39,7 +40,7 @@ export function levelPlan(mode: Mode, level: number) {
     : [{x:4,y:7},{x:9,y:7},{x:13,y:7},{x:18,y:9},{x:13,y:14},{x:8,y:14},{x:2,y:16},{x:7,y:18},{x:12,y:22},{x:17,y:22}].filter(p => distanceToPath(p,path) >= 1.4);
   return { name: (mode === 'ambush' ? ['Old Road','River Bend','Serpentine Pass'] : ['Border Keep','Twin Bastions','Crown Citadel'])[level], path, pads };
 }
-const distance = (a: Point,b: Point) => Math.hypot(a.x-b.x,a.y-b.y);
+const distance = (a: Point,b: Point) => dist(a.x-b.x,a.y-b.y);
 function distanceToPath(p: Point,path: Point[]) {
   return Math.min(...path.slice(1).map((b,i) => {const a=path[i], dx=b.x-a.x,dy=b.y-a.y,t=Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/(dx*dx+dy*dy)));return distance(p,{x:a.x+t*dx,y:a.y+t*dy});}));
 }

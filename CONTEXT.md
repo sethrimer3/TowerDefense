@@ -10,6 +10,9 @@ One of Defend, Ambush or Siege, selected through the shared combat tab.
 **Ambush**:
 A fixed-level tower-defense mode: enemies follow a road, while towers and infantry buildings occupy spaces alongside it.
 
+**Track**:
+The marked road that ground enemies follow through an Ambush level.
+
 **Siege**:
 An assault mode: infantry trained by the player's buildings raid enemy castles and their guards.
 
