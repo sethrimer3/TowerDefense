@@ -16,9 +16,11 @@ import { SoftSunlight, SUNLIGHT } from "../soft-sunlight.ts";
 type RGB = [number, number, number];
 /** Screen (CSS) pixels to an art pixel. */
 export const ART = 3;
-/** How wide the vault's piers are, in art pixels: room for a torch
- * (`SCONCE`, 11 across) on each, inside its outline. */
-const PIER = 12;
+/** How wide the vault's piers are, in art pixels: narrower in a phone-wide
+ * room, so its torches keep clear of the menu. Each torch hangs off a pier's
+ * inner side, placed by CSS from the `--pier` width `fit` sets on the room
+ * (style.css's `.chamber-vault .sconce`, loading.css's `.loading-torch`). */
+const pierWidth = (w: number) => (w * ART < 480 ? 6 : 12);
 /** Fewest milliseconds between two lightings (the flicker is slow). */
 const FRAME_MS = 70;
 
@@ -52,7 +54,9 @@ export class HallBackdrop {
   private image: ImageData | null = null;
   private last = -Infinity;
 
-  constructor(private canvas: HTMLCanvasElement, private look: HallLook) {}
+  /** `piers`: which sides of a vault stand a pier (the loading screen has
+   * only the left one, its torch's). */
+  constructor(private canvas: HTMLCanvasElement, private look: HallLook, private piers: "both" | "left" = "both") {}
 
   /** Bakes the wall when the canvas's size changed. */
   private fit(now: number) {
@@ -60,6 +64,8 @@ export class HallBackdrop {
     const detailed = this.look === "keep" && pixelArtOn(), rose = detailed ? roseOn(now) : this.rose;
     if (w === this.w && h === this.h && this.detailed === detailed && this.rose === rose) return false;
     this.detailed = detailed;
+    const pierW = pierWidth(w);
+    if (this.look === "vault") this.canvas.parentElement?.style.setProperty("--pier", `${pierW * ART}px`);
     this.rose = rose;
     this.w = w;
     this.h = h;
@@ -76,10 +82,10 @@ export class HallBackdrop {
     this.outside = [];
     for (let y = 0; y < h; y++)
       for (let x = 0; x < w; x++) {
-        const pier = this.look === "vault" && (x < PIER || x >= w - PIER);
+        const pier = this.look === "vault" && (x < pierW || (this.piers === "both" && x >= w - pierW));
         const i = y * w + x, px = this.look === "planks" ? plank(x, y) : ashlar(x, y, pier);
         // The vault's piers, outlined and shaded round, with a torch on each.
-        const k = pier ? pillarShade(x < PIER ? x : x - (w - PIER), PIER) : 1;
+        const k = pier ? pillarShade(x < pierW ? x : x - (w - pierW), pierW) : 1;
         hgt[i] = k === null ? 0 : px.hgt;
         if (k === null) this.albedo.set(PILLAR_OUTLINE, i * 3);
         else this.albedo.set(this.look === "vault" ? [px.rgb[0] * 0.92 * k, px.rgb[1] * 0.88 * k, px.rgb[2] * 1.02 * k] : px.rgb, i * 3);

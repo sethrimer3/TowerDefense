@@ -1956,9 +1956,10 @@ nav button > .tab-idle[hidden] { display: none; }
 }
 .sconce.left { left: 0; }
 .sconce.right { right: 0; }
-/* The Study's torches hang on its piers (`PIER` art pixels wide in hall-art.ts). */
-.chamber-vault .sconce.left { left: 3px; }
-.chamber-vault .sconce.right { right: 3px; }
+/* The Study's torches hang off its piers' inner sides (`--pier` wide, set by
+   hall-art.ts), the backplate over the pier's outline. */
+.chamber-vault .sconce.left { left: calc(var(--pier, 36px) - 3px); }
+.chamber-vault .sconce.right { right: calc(var(--pier, 36px) - 3px); }
 /* The keep's sunbeams and dust, over the menu too, as light rather than paint. */
 .chamber-light {
   position: absolute;
@@ -1980,8 +1981,8 @@ nav button > .tab-idle[hidden] { display: none; }
 }
 @media (max-width: 480px) {
   .sconce { width: 22px; height: 48px; }
-  .chamber-vault .sconce.left { left: 7px; }
-  .chamber-vault .sconce.right { right: 7px; }
+  .chamber-vault .sconce.left { left: calc(var(--pier, 36px) - 2px); }
+  .chamber-vault .sconce.right { right: calc(var(--pier, 36px) - 2px); }
   .chamber-content { padding: 6px 22px; }
 }
 /* The ledger in its room: a head, two strips that scroll sideways (so the

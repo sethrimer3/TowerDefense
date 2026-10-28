@@ -19,8 +19,9 @@
 }
 .loading-torch {
   position: absolute;
-  /* On the left pier's face (`PIER` art pixels wide in hall-art.ts). */
-  left: max(3px, env(safe-area-inset-left, 0px));
+  /* Off the left pier's inner side (`--pier` wide, set by hall-art.ts),
+     the backplate over the pier's outline. */
+  left: calc(var(--pier, 36px) - 3px);
   /* Put the flame, rather than the foot of its bracket, two thirds up. */
   top: calc(100% / 3 - 22px);
   width: 33px;

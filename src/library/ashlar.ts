@@ -36,11 +36,11 @@ export const facing = (sx: number, sy: number, dx: number, dy: number, d: number
 export const PILLAR_OUTLINE: RGB = [8, 7, 7];
 
 /** How a pillar's stone is shaded at column `col` of the `width` across it:
- * darkening very slightly toward both sides, as a round column turns away
+ * darkening toward both sides, as a round column turns away
  * from the light, so the piers read as round rather than cut off. Its first
  * and last columns are its black outline (null). */
 export function pillarShade(col: number, width: number): number | null {
   if (col <= 0 || col >= width - 1) return null;
   const s = (2 * (col + 0.5)) / width - 1;
-  return 0.7 + 0.3 * Math.sqrt(1 - s * s);
+  return 0.45 + 0.55 * Math.sqrt(1 - s * s);
 }
