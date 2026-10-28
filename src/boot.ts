@@ -10,10 +10,10 @@ try {
   document.documentElement.classList.toggle("pixel-font", settings?.pixelFont !== false);
 } catch { /* Loading the game handles unavailable storage and malformed saves. */ }
 
-const loading = new LoadingScreen(document.querySelector<HTMLElement>("#loading-screen")!,
-  () => document.documentElement.classList.contains("reduce-motion") || matchMedia("(prefers-reduced-motion: reduce)").matches);
-
 async function boot() {
+  // Keep the cached loading artwork local so it can be released after startup.
+  const loading = new LoadingScreen(document.querySelector<HTMLElement>("#loading-screen")!,
+    () => document.documentElement.classList.contains("reduce-motion") || matchMedia("(prefers-reduced-motion: reduce)").matches);
   try {
     // Give the wall a painted frame before evaluating the game's larger modules.
     await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
