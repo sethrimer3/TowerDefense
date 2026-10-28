@@ -38,6 +38,7 @@ import { RallyFlagArt } from "./rally-flag-art.ts";
 import { bannerReach } from "./war-banner.ts";
 import { ParkGrass, type Walker } from "./park-grass.ts";
 import { PondWater } from "./pond-water.ts";
+import { RiverLife } from "./river-art.ts";
 import { ENEMIES } from "./catalog.ts";
 import { GroundRelief, type ReliefLight } from "./ground-relief.ts";
 import { WizardArt, flameLights } from "./wizard-art.ts";
@@ -112,6 +113,8 @@ export class DefendRenderer {
   readonly fences = new Fences();
   readonly grass = new ParkGrass();
   readonly water = new PondWater();
+  /** An Ambush river's current, glints, rain rings and fish. */
+  private readonly river = new RiverLife();
   readonly relief = new GroundRelief();
   readonly wizard = new WizardArt();
   readonly trees = new ParkTrees();
@@ -349,6 +352,11 @@ export class DefendRenderer {
     this.forest.sync(map, sim);
     this.forest.drawFloor(ctx, this.px, this.forestShare());
     this.forest.drawWater(ctx, this.px, opts.now, this.forestShare(), opts.reduceMotion);
+    this.river.sync(map);
+    this.river.draw({
+      c: ctx, px: this.px, now: opts.now, dt, rain: !!(sim && opts.weather?.rain), cold: sim?.cold ?? !!opts.weather?.snow, thawed: sim?.thawedPonds,
+      walkers: feet, reduceMotion: opts.reduceMotion || !(opts.effects ?? true),
+    });
     if (this.forestShare() > 0) {
       this.drawFaces();
       paintSpikePoints(ctx, this.px, map, sim);

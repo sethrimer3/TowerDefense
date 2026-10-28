@@ -24,6 +24,9 @@ import type { CityMap } from "./citygen.ts";
 import type { DefendSim } from "./sim.ts";
 import { BURN, ForestDamage, MOUNTAIN, VARIANTS, canopyRadius, forestPlan, type Boulder, type Felled, type ForestPlan, type ForestTree, type Lake, type TreeKind, type TreeSize } from "./forest.ts";
 import { ART } from "./park-art.ts";
+import { BANK, FOAM, GLINT, LILY, REED, SAND, WATER, bayer } from "./water-palette.ts";
+import { Birds, roosting } from "./forest-birds.ts";
+import { paintRiver, riverBed, riverCanvas, riverShape, type RiverShape } from "./river-art.ts";
 import { GRASS } from "./ground-art.ts";
 import { FLAME, SMOKE, artPen } from "./pixel-fx.ts";
 import { ENEMIES } from "./catalog.ts";
@@ -83,19 +86,8 @@ const CHAR = [0x241d18, 0x2f2620, 0x3b3028, 0x4a3c30];
 /** A pile of ash, darkest first: charcoal, then grey to pale ash. */
 const ASH = [0x2a2522, 0x55504a, 0x7d7770, 0xa8a29a, 0xcfcac2];
 const ASH_HEX = ASH.map((c) => `#${c.toString(16).padStart(6, "0")}`);
-/** Lakes: the bank's mud, the water from deep to shallow, a glint, lily
- * pads and reeds. */
-const BANK = [0x3d3a26, 0x55503a, 0x6b6448];
-/** Water from the shallows (teal over sand) to the deep, a foam lip, the
- * sand showing through and the glints. */
-const WATER = [0x5a9e9a, 0x3f8691, 0x2f6d86, 0x25587a, 0x1d4766, 0x173852];
-const FOAM = 0xa8d4d2;
-const SAND = 0x8a8458;
-const GLINT = 0xd8f0f2;
 /** A small mountain's stone, darkest to lightest. */
 const CRAG = [0x24262a, 0x34373a, 0x4a4d4c, 0x63665f, 0x81847a, 0xa2a497];
-const LILY = [0x21401f, 0x3d7a33, 0x63a54b];
-const REED = [0x2c4a22, 0x5b7a34, 0xb7a25a];
 
 /** A sprite: its pixels, its size and where the canopy's middle sits in it. */
 export type Sprite = { px: Uint32Array; w: number; h: number; ox: number; oy: number; runs?: Int16Array };
@@ -318,17 +310,28 @@ const inClip = (X: number, Y: number) => X >= clip.x0 && Y >= clip.y0 && X < cli
 const nearClip = (x: number, y: number, reach: number) =>
   (x + reach) * ART >= clip.x0 && (x - reach) * ART < clip.x1 && (y + reach) * ART >= clip.y0 && (y - reach) * ART < clip.y1;
 
+/** An Ambush river through the forest: its shores, and the cells its art
+ * may cover (`riverCanvas`, the bridges left to the city layer). */
+export type ForestRiver = { shape: RiverShape; cells: Uint8Array };
+
+/** `map`'s river for the forest floor, if it has one. */
+export function forestRiver(map: CityMap): ForestRiver | null {
+  const bed = riverBed(map);
+  return bed ? { shape: riverShape(bed), cells: riverCanvas(map, false) } : null;
+}
+
 /** The forest's ground, `W × H` art pixels: grass, dirt pads, the dirt
  * blasts bared, craters with stumps, rocks and the standing trees'
  * shadows. */
-export function floorPixels(plan: ForestPlan, damage: ForestDamage | null): Uint32Array {
+export function floorPixels(plan: ForestPlan, damage: ForestDamage | null, river: ForestRiver | null = null): Uint32Array {
   const out = new Uint32Array(W * H);
-  paintFloor(out, plan, damage, WHOLE);
+  paintFloor(out, plan, damage, WHOLE, river);
   return out;
 }
 
-/** Paints the forest's ground into `out` afresh within `box` only. */
-export function paintFloor(out: Uint32Array, plan: ForestPlan, damage: ForestDamage | null, box: Box) {
+/** Paints the forest's ground into `out` afresh within `box` only; a river
+ * as the city layer paints it, so its banks lie on the forest's grass. */
+export function paintFloor(out: Uint32Array, plan: ForestPlan, damage: ForestDamage | null, box: Box, river: ForestRiver | null = null) {
   clip = { x0: Math.max(0, box.x0), y0: Math.max(0, box.y0), x1: Math.min(W, box.x1), y1: Math.min(H, box.y1) };
   for (let Y = clip.y0; Y < clip.y1; Y++) out.fill(0, Y * W + clip.x0, Y * W + clip.x1);
   lawnIn(out, plan.open);
@@ -339,6 +342,7 @@ export function paintFloor(out: Uint32Array, plan: ForestPlan, damage: ForestDam
     if (!nearClip(c.x, c.y, c.r * 1.3 + 0.5)) continue;
     blob(out, c.x, c.y, c.r, c.seed, TURNED, true);
   }
+  if (river) paintRiver(out, river.shape, river.cells, clip);
   for (const st of damage?.stumps ?? []) {
     if (!nearClip(st.x, st.y, 1.5)) continue;
     chips(out, st);
@@ -523,9 +527,6 @@ export function lakeDepth(l: Lake) {
   const box = { x0: Math.floor((bx0 - 0.4) * ART), y0: Math.floor((by0 - 0.4) * ART), x1: Math.ceil((bx1 + 0.4) * ART), y1: Math.ceil((by1 + 0.4) * ART) };
   return { depth, box };
 }
-
-/** A 4 × 4 ordered dither threshold, 0 to 1. */
-const bayer = (X: number, Y: number) => [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5][(Y & 3) * 4 + (X & 3)] / 16 + 1 / 32;
 
 /** A lake: its muddy bank and outline, then water shading smoothly from a
  * teal shallow over a sandy bottom to the deep, the bank's shadow on the
@@ -774,10 +775,14 @@ const STROKES = 4000;
 export class ForestArt {
   private map: CityMap | null = null;
   private plan: ForestPlan | null = null;
+  private river: ForestRiver | null = null;
   private sim: DefendSim | null | undefined = undefined;
   damage: ForestDamage | null = null;
   private seen = new WeakSet<object>();
   private debris: Debris[] = [];
+  /** Birds startled out of the trees, and the trees that have any. */
+  private birds = new Birds();
+  private roosts: ForestTree[] = [];
   /** The ash piles burnt trees left, their grains pushed about. */
   piles: AshPile[] = [];
   private lastTime = -1;
@@ -812,6 +817,8 @@ export class ForestArt {
     if (map !== this.map) {
       this.map = map;
       this.plan = forestPlan(map);
+      this.river = forestRiver(map);
+      this.roosts = this.plan.trees.filter((t) => roosting(t) > 0);
       this.glints = null;
       this.alpha = new Float32Array(this.plan.trees.length).fill(1);
       this.sim = undefined;
@@ -820,6 +827,7 @@ export class ForestArt {
       this.sim = sim;
       this.damage = new ForestDamage(this.plan!);
       this.debris = [];
+      this.birds.reset();
       this.piles = [];
       this.flying.clear();
       this.cooldowns.clear();
@@ -854,7 +862,7 @@ export class ForestArt {
       this.lastTime = now;
       const felled: Felled[] = [], lit: ForestTree[] = [];
       // Fire first, so a fireball's own blast leaves the trees it lit burning.
-      this.landed(sim, now, felled, lit);
+      this.landed(sim, now, felled, lit, reduceMotion);
       for (const b of sim.blazes)
         if (this.first(b)) {
           lit.push(...damage.ignite(b.x, b.y, b.r, now));
@@ -863,6 +871,7 @@ export class ForestArt {
       for (const f of sim.flames) if (this.first(f)) lit.push(...damage.igniteAlong(f.x, f.y, f.x + f.dx * f.range, f.y + f.dy * f.range, 0.5, now));
       for (const e of sim.effects)
         if (e.kind === "boom" && this.first(e)) {
+          if (!reduceMotion) this.spook(e.x, e.y, e.r + 2, now);
           felled.push(...damage.blast(e.x, e.y, e.r, 1 + Math.min(1.5, e.r * 0.4)));
           this.bare(e.x, e.y, e.r);
         }
@@ -883,19 +892,34 @@ export class ForestArt {
         const t = f.tree, reach = t.r * 2 + 1.5;
         this.stale({ x0: Math.floor((t.x - reach) * ART), y0: Math.floor((t.y - reach) * ART), x1: Math.ceil((t.x + reach) * ART), y1: Math.ceil((t.y + reach) * ART) });
         if (f.fate === "burnt") this.piles.push(ashPile(damage.ash[damage.ash.length - 1]));
-        if (!reduceMotion) this.burst(f);
+        if (!reduceMotion) this.burst(f), this.birds.flush(f.tree, f.fromX, f.fromY, now);
+      }
+      if (!reduceMotion) {
+        // Fire sends the birds up whichever way.
+        for (const t of lit) this.birds.flush(t, t.x, t.y, now);
+        this.birds.update(step);
       }
       if (!reduceMotion) this.smoulder(step);
       this.drift(step);
       this.trample(beneath);
     }
-    this.fade(beneath, dt, reduceMotion);
+    this.fade(beneath, dt, reduceMotion, sim && !reduceMotion ? this.lastTime : -1);
+  }
+
+  /** Startles the birds out of the standing trees within `reach` cells of
+   * (x, y) (past their canopy's edge), away from it. */
+  private spook(x: number, y: number, reach: number, now: number) {
+    const damage = this.damage;
+    for (const t of this.roosts) {
+      const r = t.r + reach, dx = t.x - x, dy = t.y - y;
+      if (dx * dx + dy * dy < r * r && damage?.standing(t)) this.birds.flush(t, x, y, now);
+    }
   }
 
   /** Arrows, bullets and bolts that landed since last frame strike apart the
    * frail tree they came down under (a fire arrow sets it alight instead),
    * and fireballs that landed set alight the trees round where they burst. */
-  private landed(sim: DefendSim, now: number, felled: Felled[], lit: ForestTree[]) {
+  private landed(sim: DefendSim, now: number, felled: Felled[], lit: ForestTree[], reduceMotion: boolean) {
     const damage = this.damage!, frame = ++this.frame;
     const track = (o: object, x: number, y: number, fire: number) => {
       const was = this.flying.get(o);
@@ -908,6 +932,7 @@ export class ForestArt {
     for (const [o, at] of this.flying) {
       if (at.frame === frame) continue;
       this.flying.delete(o);
+      if (!reduceMotion) this.spook(at.x, at.y, 0.6, now);
       if (at.fire) lit.push(...damage.ignite(at.x, at.y, at.fire, now));
       else felled.push(...damage.hit(at.x, at.y));
     }
@@ -1077,7 +1102,7 @@ export class ForestArt {
   }
 
   /** Each tree eases toward `UNDER_ALPHA` while anyone stands under it. */
-  private fade(beneath: readonly Beneath[], dt: number, reduceMotion: boolean) {
+  private fade(beneath: readonly Beneath[], dt: number, reduceMotion: boolean, now = -1) {
     const plan = this.plan;
     if (!plan) return;
     const head = this.head;
@@ -1091,7 +1116,12 @@ export class ForestArt {
           for (let cx = x0; cx <= x1 && !covered; cx++)
             for (let i = head[cellIndex(cx, cy)]; i >= 0; i = this.next[i]) {
               const u = beneath[i], r = t.r + u.size / 2, dx = u.x - t.x, dy = u.y - t.y;
-              if (dx * dx + dy * dy < r * r) { covered = true; break; }
+              if (dx * dx + dy * dy < r * r) {
+                covered = true;
+                // Someone passing under a tree startles its birds.
+                if (now >= 0 && this.damage?.standing(t)) this.birds.flush(t, u.x, u.y, now);
+                break;
+              }
             }
       }
       const goal = covered ? UNDER_ALPHA : 1, a = this.alpha[t.id];
@@ -1109,7 +1139,7 @@ export class ForestArt {
     const boxes = this.floorStale;
     this.floorStale = [];
     for (const box of boxes) {
-      paintFloor(this.floor.px, this.plan, this.damage, box);
+      paintFloor(this.floor.px, this.plan, this.damage, box, this.river);
       const x0 = Math.max(0, box.x0), y0 = Math.max(0, box.y0);
       this.floor.cv.getContext("2d")!.putImageData(this.floor.img, 0, 0, x0, y0, Math.min(W, box.x1) - x0, Math.min(H, box.y1) - y0);
     }
@@ -1192,6 +1222,7 @@ export class ForestArt {
     c.drawImage(this.crowns.cv, 0, 0, CELLS_W * px, CELLS_H * px);
     this.drawBurning(c, px, o.still ? 0 : o.now);
     this.drawDebris(c, px);
+    this.birds.draw(c, px);
     c.restore();
   }
 
