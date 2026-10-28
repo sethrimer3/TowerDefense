@@ -12,7 +12,7 @@ import { Outposts } from "./outposts.ts";
 import { ambushWave, waveHasFliers, AMBUSH_WAVES, type WaveEntry } from "./ambush-waves.ts";
 import { laneCount, levelOrder, type Stars } from "./levels.ts";
 import { intPow } from "../exact.ts";
-import { ambushField } from "./battlefield.ts";
+import { ambushField } from "./ambush-field.ts";
 import { ambushLevel } from "./levels.ts";
 import { AmbushGrid, buildingRect, type GridBuilding } from "./ambush-grid.ts";
 import { ambushPrice, startingGold } from "./economy.ts";
@@ -59,7 +59,7 @@ export class AmbushSim {
     this.perks = ambushBonuses(game.campaigns.ambush.ranks);
     this.level = ambushLevel(index);
     this.sturdy = intPow(AMBUSH_WAVES.defenseGrowth, levelOrder(this.level));
-    this.field = ambushField(index);
+    this.field = ambushField(index, { stone: this.perks.stone });
     this.waves = Array.from({ length: AMBUSH_WAVES.count }, (_, i) => ambushWave(this.level, i + 1, laneCount(this.level)));
     const map = this.field.map;
     // Reserve native homes before DefendSim allocates its HP/collision arrays.
@@ -94,6 +94,7 @@ export class AmbushSim {
       noCivilians: true,
       routeEnemy: (e, dt) => this.outposts.route(e, dt),
       fieldFor: (e) => this.outposts.fieldFor(e),
+      toll: this.outposts.toll,
       died: (e) => {
         if (e.fortressPart) return;
         const gold = this.perks.bounty * (this.bounties.get(e) ?? this.waves[Math.max(0, this.wave - 1)].bounty);

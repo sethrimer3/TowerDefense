@@ -89,7 +89,7 @@ export function routeFlier(sim: DefendSim, e: Enemy, dt: number) {
 }
 function routeOnField(t: Turn, field: Float64Array) {
   const { sim, e, dt } = t,
-    best = downhill(field, sim.foeSolid, clampCell(e.x, CELLS_W), clampCell(e.y, CELLS_H));
+    best = downhill(field, sim.foeSolid, clampCell(e.x, CELLS_W), clampCell(e.y, CELLS_H), sim.scenario?.toll);
   if (best < 0) return;
   const p = cellCenter(best);
   if (sim.foeSolid[best] && sim.map.owner[best] >= 0) smashThrough(t, best, p);

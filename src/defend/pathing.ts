@@ -247,7 +247,7 @@ class FlowFill {
 /** The neighbour of cell (cx, cy) with the lowest field value, if any is
  * lower than the cell's own; -1 at a local minimum. Diagonals may not cut a
  * solid corner (but may enter a solid cell, to smash it). */
-export function downhill(field: Float64Array, solid: Uint8Array, cx: number, cy: number): number {
+export function downhill(field: Float64Array, solid: Uint8Array, cx: number, cy: number, toll?: Float32Array): number {
   let best = -1,
     bestV = field[cellIndex(cx, cy)];
   for (const [dx, dy] of NEIGHBOURS) {
@@ -255,8 +255,11 @@ export function downhill(field: Float64Array, solid: Uint8Array, cx: number, cy:
       ny = cy + dy;
     if (!cellInBounds(nx, ny) || cutsCorner(solid, cx, cy, dx, dy)) continue;
     const n = cellIndex(nx, ny);
-    if (field[n] < bestV) {
-      bestV = field[n];
+    // A cell's own toll is priced into the field behind it, not its own
+    // value, so a step into a tolled wall pays it here (`ScenarioRules.toll`).
+    const v = toll && solid[n] ? field[n] + toll[n] : field[n];
+    if (v < bestV) {
+      bestV = v;
       best = n;
     }
   }

@@ -19,6 +19,7 @@ import type { Building, CityMap } from "./citygen.ts";
 import { ART, treePixels } from "./park-art.ts";
 import { hasTree, treeCanopy } from "./park-geometry.ts";
 import { TOWER as GATE_TOWER } from "./gate-art.ts";
+import { WOOD_POST, gateArtRect } from "./wood-gate-art.ts";
 
 const W = CELLS_W * ART, H = CELLS_H * ART;
 
@@ -28,6 +29,8 @@ export const HEIGHT = {
    * the ridge (under one, so a slope never shades itself), up to `ridge`. */
   eave: 2.5, pitch: 0.6, ridge: 4.5,
   wall: 6,
+  /** A wooden fence's rails and posts. */
+  fence: { rail: 1.5, post: 2.5 },
   keep: { curtain: 6, court: 0.5, tower: 9, turret: 8 },
   tower: 7,
   hall: 4.5,
@@ -52,8 +55,9 @@ export function heights(map: CityMap, standing: (b: Building) => boolean, footpr
     if (x >= 0 && y >= 0 && x < W && y < H && v > h[y * W + x]) h[y * W + x] = v;
   };
   for (const b of map.buildings) {
-    if (!standing(b)) continue;
-    if (b.kind === "wall") wall(map, b, raise, standing);
+    if (b.hidden || !standing(b)) continue;
+    if (b.fence) fence(b, raise);
+    else if (b.kind === "wall") wall(map, b, raise, standing);
     else if (b.kind === "house") house(b, raise);
     else if (b.kind === "keep") keep(b, raise);
     else if (b.kind === "gate") gate(b, raise);
@@ -139,16 +143,33 @@ function sprite(f: Footprint, v: number, raise: Raise) {
   for (let y = 0; y < f.h; y++) for (let x = 0; x < f.w; x++) if (f.mask[y * f.w + x]) raise(f.x0 + x, f.y0 + y, v);
 }
 
+/** A wooden fence: its rails stand low and its posts a little higher. */
+function fence(b: Building, raise: Raise) {
+  for (const f of b.rails ?? [b.fence!]) {
+    const n = Math.round(Math.max(Math.abs(f.x2 - f.x1), Math.abs(f.y2 - f.y1)) * ART);
+    for (let k = 0; k <= n; k++) {
+      const t = n ? k / n : 0, x = Math.floor((f.x1 + (f.x2 - f.x1) * t) * ART - 0.5), y = Math.floor((f.y1 + (f.y2 - f.y1) * t) * ART - 0.5);
+      raise(x, y, HEIGHT.fence.rail);
+    }
+    for (const [px, py] of [[f.x1, f.y1], [f.x2, f.y2]])
+      for (let j = -1; j <= 0; j++) for (let i = -1; i <= 0; i++) raise(Math.floor(px * ART) + i, Math.floor(py * ART) + j, HEIGHT.fence.post);
+  }
+}
+
 /** A gate: only its two towers stand wall high; the passage between them,
- * its floor and its low doors, casts nothing, so the sun reaches through. */
+ * its floor and its low doors, casts nothing, so the sun reaches through.
+ * A wooden gate's posts stand as high as a fence's. */
 function gate(b: Building, raise: Raise) {
-  const r = b.rect, x0 = r.x * ART, y0 = r.y * ART, w = r.w * ART, h = r.h * ART;
+  const r = gateArtRect(b), x0 = Math.round(r.x * ART), y0 = Math.round(r.y * ART), w = r.w * ART, h = r.h * ART;
   const across = b.gate?.side === "e" || b.gate?.side === "w";
-  const long = across ? h : w;
+  const long = across ? h : w, deep = across ? w : h;
+  const tower = b.woodGate ? WOOD_POST : GATE_TOWER;
   for (let y = 0; y < h; y++)
     for (let x = 0; x < w; x++) {
-      const u = across ? y : x;
-      if (u < GATE_TOWER || u >= long - GATE_TOWER) raise(x0 + x, y0 + y, HEIGHT.wall);
+      const u = across ? y : x, v = across ? x : y;
+      if (u >= tower && u < long - tower) continue;
+      if (!b.woodGate) raise(x0 + x, y0 + y, HEIGHT.wall);
+      else if (Math.abs(v + 0.5 - deep / 2) < 3) raise(x0 + x, y0 + y, HEIGHT.fence.post);
     }
 }
 

@@ -346,6 +346,9 @@ export type ScenarioRules = {
   died?: (enemy: Enemy) => void;
   soldierDt?: (soldier: Soldier, dt: number) => number;
   fieldFor?: (enemy: Point) => Float64Array | undefined;
+  /** An extra price, a cell, on breaking through in the enemy's weighted
+   * routes (a scenario's walls beside its gates), so they batter the gate. */
+  toll?: Float32Array;
 };
 
 export class DefendSim {
@@ -979,7 +982,7 @@ export class DefendSim {
   private enterCost(i: number): number {
     if (this.foeSolid[i]) {
       const b = this.map.owner[i];
-      return 3 + this.hp[b] / 6;
+      return 3 + this.hp[b] / 6 + (this.scenario?.toll?.[i] ?? 0);
     }
     return this.map.type[i] === CellType.ROAD ? 1 : 1.25;
   }

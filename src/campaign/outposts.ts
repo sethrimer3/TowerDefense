@@ -6,10 +6,21 @@ import type { DefendSim, Enemy } from "../defend/sim.ts";
 import { cellAt, center, rectDist, type Point } from "../defend/pathing.ts";
 import { routeToBuilding, routeToPoint, routeFlier } from "../defend/enemies.ts";
 import { dist } from "../exact.ts";
-import type { ambushField } from "./battlefield.ts";
+import type { ambushField } from "./ambush-field.ts";
 import { buildingRect, type GridBuilding } from "./ambush-grid.ts";
 type Field = ReturnType<typeof ambushField>;
 type House = { rect: Rect; variant: number };
+/** An outpost's walls' HP as a share of a stone city wall's: wooden fences,
+ * and the stone walls Palisades III raises in their place. */
+export const FENCE_SHARE = 0.1, STONE_SHARE = 1;
+/** The extra price of a wall cell over its gate in the enemy's routes: about
+ * a long detour's walk, so the crowd heads for a gate, open or not, unless
+ * there is no reaching one. */
+export const WALL_TOLL = 200;
+const scale = (engine: DefendSim, id: number, f: number) => {
+  engine.hp[id] *= f;
+  engine.maxHp[id] *= f;
+};
 const intersects = (a: Rect, b: Rect) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 function projection(path: Point[], p: Point) {
   let total = 0,
@@ -128,6 +139,9 @@ export class Outpost {
 }
 export class Outposts {
   readonly posts: Outpost[];
+  /** What breaking through each cell of the outposts' and the castle's walls
+   * adds to the enemy's route, beside their gates (`ScenarioRules.toll`). */
+  readonly toll = new Float32Array(CELL_COUNT);
   /** Each post's place along each lane, or undefined where the lane passes it by. */
   private marks: (number | undefined)[][];
   private routes = new WeakMap<Enemy, { lane: number; segment: number; raiding?: number; rejoin?: Point }>();
@@ -150,11 +164,20 @@ export class Outposts {
         engine.hp[id] *= palisade;
         engine.maxHp[id] *= palisade;
       }
-    for (const b of field.map.buildings)
-      if (b.fence) {
-        engine.hp[b.id] *= (0.1 * palisade) / engine.bonuses.wallHp;
-        engine.maxHp[b.id] *= (0.1 * palisade) / engine.bonuses.wallHp;
-      }
+    // A fence stands at a tenth of a stone wall; stone stands whole. Either way
+    // the keep's walls' perk is the castle's, not the outposts'.
+    const share = (field.stone ? STONE_SHARE : FENCE_SHARE) * palisade;
+    for (const post of field.outposts) for (const id of post.walls) scale(engine, id, share / engine.bonuses.wallHp);
+    // A gate stands as long as one stretch of its wall, so the enemy batters
+    // its way in where the road leads rather than through the wall beside it.
+    const ring = (walls: readonly number[], gates: readonly number[]) => {
+      const hp = walls.length ? engine.maxHp[walls[0]] : 0;
+      for (const id of gates) engine.hp[id] = engine.maxHp[id] = hp;
+    };
+    const castle = field.map.buildings.filter((b) => b.kind === "wall" && !b.hidden && rectDist(field.castle, b.rect.x + 0.5, b.rect.y + 0.5) === 0).map((b) => b.id);
+    for (const post of field.outposts) ring(post.walls, post.gates);
+    ring(castle, field.castleGates);
+    for (const id of [...castle, ...field.outposts.flatMap((p) => p.walls)]) for (const c of field.map.buildings[id].cells) this.toll[c] = WALL_TOLL;
   }
   get stars() {
     return this.engine.keepHp() > 0 ? 1 + this.posts.filter((p) => !p.fallen).length : 0;

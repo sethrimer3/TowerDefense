@@ -19,6 +19,7 @@ import { mooringPixels } from "./sky-palace-art.ts";
 import { GRASS, grassPatch, groundArt } from "./ground-art.ts";
 import { heights, paintShadows, shadowMask, type Footprint } from "./shadow-art.ts";
 import { gatePixels, gateRubblePixels } from "./gate-art.ts";
+import { WOOD_GATE, gateArtRect, woodGatePixels, woodGateRubblePixels } from "./wood-gate-art.ts";
 import { gateRect, type Side } from "./layout.ts";
 import { SPIKE_REACH, bastionPixels, bastionRubblePixels, spikePixels } from "./wall-defense-art.ts";
 import { AREAS, areaArtId, type AreaId } from "./areas.ts";
@@ -223,8 +224,9 @@ function paintCityGround(p: Paint) {
       const t = map.type[i];
       // A structure placed outside the city stands on the open floor.
       if (t === CellType.OUT || (t === CellType.STRUCT && !map.city[i])) continue;
-      if (t === CellType.PARK || t === CellType.WATER) paintGrass(p, cx, cy);
-      else if (t !== CellType.WALL || !solid(i)) paintGravel(p, cx, cy);
+      // A wooden fence stands on grass, not on a stone wall's footing.
+      if (t === CellType.PARK || t === CellType.WATER || map.buildings[map.owner[i]]?.fence) paintGrass(p, cx, cy);
+      else if (t !== CellType.WALL || !solid(i) || map.buildings[map.owner[i]]?.woodGate) paintGravel(p, cx, cy);
     }
 }
 
@@ -299,7 +301,7 @@ function paintBuilding(p: Paint, b: Building) {
   const box = { x, y, w, h, px };
   if (b.kind === "wall") {
     if (b.fence) {
-      if (solid(b.cells[0])) drawFenceSections(c, px, [{ ...b.fence, broken: false }]);
+      if (solid(b.cells[0])) drawFenceSections(c, px, (b.rails ?? [b.fence]).map((f) => ({ ...f, broken: false })));
       return;
     }
     if (solid(b.cells[0])) paintWall(p, b);
@@ -307,12 +309,14 @@ function paintBuilding(p: Paint, b: Building) {
     return;
   }
   if (b.kind === "gate") {
-    const side = b.gate!.side;
+    const side = b.gate!.side, a = gateArtRect(b);
+    const ax = Math.round(a.x * px), ay = Math.round(a.y * px);
+    const art = { x: ax, y: ay, w: Math.round((a.x + a.w) * px) - ax, h: Math.round((a.y + a.h) * px) - ay, px };
     if (sim && !sim.intact(b)) {
-      paintArt(p, gateRubbleSprite(side, lotSeed(b)), box);
+      paintArt(p, b.woodGate ? woodGateRubbleSprite(side, lotSeed(b)) : gateRubbleSprite(side, lotSeed(b)), art);
       return paintRebuilding(p, b);
     }
-    return paintArt(p, gateSprite(side, 0, stageOf(sim, b), lotSeed(b)), box);
+    return paintArt(p, gateSpriteOf(b, b.woodGate && sim ? -1 : 0, stageOf(sim, b)), art);
   }
   if (b.kind === "wallBallista") {
     if (sim && !sim.intact(b)) {
@@ -434,6 +438,18 @@ export function paintSpikePoints(c: CanvasRenderingContext2D, px: number, map: C
 export const gateSprite = (side: Side, frame: number, stage: number, seed: number) => {
   const r = gateRect({ tx: 0, ty: 0, side });
   return sprite(`gate:${side}:${frame}:${stage}:${seed}`, r.w * ART, r.h * ART, () => gatePixels(side, frame, stage, seed));
+};
+/** Gate `b`'s sprite, stone or wooden, with its doors at `frame`, drawn over
+ * `gateArtRect(b)`. */
+export const gateSpriteOf = (b: Building, frame: number, stage: number) =>
+  b.woodGate ? woodGateSprite(b.gate!.side, frame, stage, lotSeed(b)) : gateSprite(b.gate!.side, frame, stage, lotSeed(b));
+const woodGateSprite = (side: Side, frame: number, stage: number, seed: number) => {
+  const across = side === "e" || side === "w", u = WOOD_GATE.long * ART, v = WOOD_GATE.deep * ART;
+  return sprite(`woodGate:${side}:${frame}:${stage}:${seed}`, across ? v : u, across ? u : v, () => woodGatePixels(side, frame, stage, seed));
+};
+const woodGateRubbleSprite = (side: Side, seed: number) => {
+  const across = side === "e" || side === "w", u = WOOD_GATE.long * ART, v = WOOD_GATE.deep * ART;
+  return sprite(`woodGate:${side}:rubble:${seed}`, across ? v : u, across ? u : v, () => woodGateRubblePixels(side, seed));
 };
 const gateRubbleSprite = (side: Side, seed: number) => {
   const r = gateRect({ tx: 0, ty: 0, side });
