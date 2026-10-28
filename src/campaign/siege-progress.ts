@@ -1,7 +1,19 @@
 import { decodeCastle, estimateCastle, generateCastle, seeded, type CastleSnapshot } from "./castles.ts";
 import { INITIAL_MMR, rating, raidRating } from "./siege-rating.ts";
-export type Raid = { castle: CastleSnapshot; attacker: number; defender: number; state: "offered" | "started" | "won" | "lost"; delta?: number };
-export type SiegeSave = { mmr: number; games: number; wins: number; sequence: number; raid: Raid };
+export type Raid = {
+  castle: CastleSnapshot;
+  attacker: number;
+  defender: number;
+  state: "offered" | "started" | "won" | "lost";
+  delta?: number;
+};
+export type SiegeSave = {
+  mmr: number;
+  games: number;
+  wins: number;
+  sequence: number;
+  raid: Raid;
+};
 export function newSiege(seed: number): SiegeSave {
   const castle = generateCastle(seed, INITIAL_MMR);
   return {
@@ -9,17 +21,33 @@ export function newSiege(seed: number): SiegeSave {
     games: 0,
     wins: 0,
     sequence: seed >>> 0,
-    raid: { castle, attacker: INITIAL_MMR, defender: estimateCastle(castle).rating, state: "offered" },
+    raid: {
+      castle,
+      attacker: INITIAL_MMR,
+      defender: estimateCastle(castle).rating,
+      state: "offered",
+    },
   };
 }
-export function nextOpponent(save: SiegeSave) {
-  if (save.raid.state !== "won" && save.raid.state !== "lost") return false;
+function rollOpponent(save: SiegeSave) {
   const rand = seeded(save.sequence);
   save.sequence = Math.floor(rand() * 4294967296);
-  const offset = Math.round((rand() - 0.5) * 160);
-  const castle = generateCastle(save.sequence, save.mmr + offset);
-  save.raid = { castle, attacker: save.mmr, defender: estimateCastle(castle).rating, state: "offered" };
+  const offset = Math.round((rand() - 0.5) * 160),
+    castle = generateCastle(save.sequence, save.mmr + offset);
+  save.raid = {
+    castle,
+    attacker: save.mmr,
+    defender: estimateCastle(castle).rating,
+    state: "offered",
+  };
   return true;
+}
+export function nextOpponent(save: SiegeSave) {
+  return save.raid.state === "won" || save.raid.state === "lost" ? rollOpponent(save) : false;
+}
+/** Previewing and backing out never commits a rated raid. */
+export function findMatch(save: SiegeSave) {
+  return save.raid.state === "started" ? false : rollOpponent(save);
 }
 /** Terminal results are idempotent, including replays of a completed target. */
 export function settleRaid(save: SiegeSave, won: boolean) {

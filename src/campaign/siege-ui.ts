@@ -8,13 +8,18 @@ import { artLook } from "../defend/tower-art.ts";
 import { STRUCTURES, type PaletteItem } from "../defend/catalog.ts";
 import { paintIcon } from "../defend/structure-art.ts";
 import { flagSvg, escapeText } from "../profile/model.ts";
-import { newSiege, nextOpponent, settleRaid } from "./siege-progress.ts";
+import { renderSiegeEntry, namePlate, paintRanks } from "./siege-entry.ts";
+import { botFlag } from "./bot-identity.ts";
+import { defaultFlag } from "../profile/model.ts";
+import { newSiege, findMatch, settleRaid } from "./siege-progress.ts";
 import { CampaignSim } from "./sim.ts";
 export class SiegePage {
   sim: CampaignSim;
   private readonly canvas = document.createElement("canvas");
   private readonly renderer: DefendRenderer;
   private readonly pointers: BoardPointers;
+  private view: "entry" | "match" | "battle" = "entry";
+  private disposeEntry?: () => void;
   private last = 0;
   private now = 0;
   private paused = false;
@@ -27,13 +32,23 @@ export class SiegePage {
     private root: HTMLElement,
     private host: CampaignHost,
   ) {
-    if (host.save().siege?.raid.state === "started") settleRaid(host.save().siege!, false);
+    if (host.save().siege?.raid.state === "started" && settleRaid(host.save().siege!, false)) queueMicrotask(() => host.store());
     this.sim = this.make();
     this.renderer = new DefendRenderer(this.canvas);
     this.canvas.setAttribute("aria-label", t("siege.board"));
-    this.pointers = new BoardPointers({ renderer: () => this.renderer, pickUp: () => false, drop: () => {}, tap: (e) => this.tap(e) });
-    this.canvas.onpointerdown = (e) => this.pointers.down(e);
+    this.pointers = new BoardPointers({
+      renderer: () => this.renderer,
+      pickUp: () => false,
+      drop: () => {},
+      tap: (e) => this.tap(e),
+    });
+    this.canvas.onpointerdown = (e) => {
+      this.plateFocus(e);
+      this.pointers.down(e);
+    };
+    this.canvas.onpointerleave = () => this.root.querySelectorAll(".aim-under").forEach((p) => p.classList.remove("aim-under"));
     this.canvas.onpointermove = (e) => {
+      this.plateFocus(e);
       if (this.spellBar) {
         const p = this.renderer.toCell(e.clientX, e.clientY);
         this.spellBar.point = { x: p.fx, y: p.fy };
@@ -66,9 +81,12 @@ export class SiegePage {
     this.last = 0;
     this.pointers.end();
     this.spellBar?.cancel();
+    this.disposeEntry?.();
+    this.disposeEntry = undefined;
   }
   reset() {
     this.pause();
+    this.view = "entry";
     this.sim = this.make();
     this.paused = false;
     this.rewarded = false;
@@ -80,42 +98,75 @@ export class SiegePage {
   }
   private render() {
     this.pointers.end();
+    this.disposeEntry?.();
+    this.disposeEntry = undefined;
+    this.root.dataset.siegeView = this.view;
     const s = this.host.save(),
       siege = s.siege!,
       raid = siege.raid,
       profile = s.profile,
       finished = raid.state === "won" || raid.state === "lost";
     this.root.classList.add("native-campaign");
+    if (this.view !== "battle") {
+      const identity = profile ?? { name: t("siege.you"), flag: defaultFlag() };
+      this.disposeEntry = renderSiegeEntry(this.root, siege, identity, this.view, s.settings.reduceMotion, {
+        find: () => {
+          this.notice = "";
+          this.inspection = undefined;
+          if (findMatch(siege)) {
+            this.host.store();
+            this.sim = this.make();
+            this.freshCamera = true;
+            this.view = "match";
+            this.render();
+          }
+        },
+        attack: () => {
+          this.sim = this.make();
+          if (!this.sim.start()) {
+            this.notice = t("siege.buyInfantry");
+            this.render();
+            return;
+          }
+          if (raid.state === "offered") {
+            raid.state = "started";
+            this.host.store();
+          }
+          this.view = "battle";
+          this.paused = false;
+          this.rewarded = false;
+          this.freshCamera = true;
+          this.last = 0;
+          this.render();
+        },
+        back: () => {
+          this.view = "entry";
+          this.render();
+        },
+        profile: () => this.host.editProfile?.(),
+        practice: () => {
+          this.sim = this.make();
+          this.paused = false;
+          this.rewarded = false;
+          this.freshCamera = true;
+          this.last = 0;
+          this.view = "battle";
+          this.render();
+        },
+      });
+      if (this.notice) {
+        const notice = document.createElement("p");
+        notice.className = "siege-entry-notice";
+        notice.setAttribute("role", "status");
+        notice.textContent = this.notice;
+        this.root.querySelector(".siege-entry")!.append(notice);
+      }
+      return;
+    }
     this.root.innerHTML =
-      '<div class="campaign-head defend-head">' +
-      (profile
-        ? '<div class="siege-profile">' +
-          flagSvg(profile.flag) +
-          '<div><strong class="siege-profile-name">' +
-          escapeText(profile.name) +
-          '</strong></div><button data-action="profile">' +
-          t("siege.editProfile") +
-          "</button></div>"
-        : "") +
-      '<details class="siege-opponent"><summary><strong>' +
-      raid.castle.owner.name +
-      '</strong> <small class="siege-bot">' +
-      t("siege.bot") +
-      "</small> · " +
-      t("siege.ratings", { defense: raid.defender, mmr: siege.mmr }) +
-      "</summary>" +
-      "<p>" +
-      t("siege.record", { mmr: siege.mmr, wins: siege.wins, games: siege.games }) +
-      "</p><p>" +
-      t("siege.defense", { rating: raid.defender }) +
-      "</p>" +
-      "<p>" +
-      t("siege.commit") +
-      "</p><small>" +
-      t("siege.provisional") +
-      "</small>" +
-      (finished ? "<p>" + t("siege.lastResult", { result: t(raid.state === "won" ? "siege.victory" : "siege.defeat"), delta: raid.delta ?? 0 }) + "</p>" : "") +
-      "</details>" +
+      '<div class="campaign-head defend-head"><button data-action="profile">' +
+      t("siege.editProfile") +
+      "</button>" +
       '<div class="campaign-actions"><button data-action="start">' +
       (this.sim.phase === "build" ? (finished ? t("siege.practice") : t("siege.ranked")) : this.paused ? t("siege.resume") : t("siege.pause")) +
       "</button>" +
@@ -129,6 +180,19 @@ export class SiegePage {
       '<div class="campaign-spells"></div><p class="campaign-status" role="status" aria-live="polite"></p></div>' +
       '<div class="campaign-stage defend-stage side-open"><aside class="defend-side"><div class="campaign-roster defend-palette"></div></aside><div class="campaign-board defend-board"></div></div>';
     this.root.querySelector(".campaign-board")!.append(this.canvas);
+    const board = this.root.querySelector(".campaign-board")!;
+    board.insertAdjacentHTML(
+      "beforeend",
+      namePlate(
+        {
+          name: raid.castle.owner.name,
+          flag: raid.castle.owner.flag ?? botFlag(raid.castle.seed),
+        },
+        raid.defender,
+        "top",
+      ) + namePlate(profile ?? { name: t("siege.you"), flag: defaultFlag() }, siege.mmr, "bottom"),
+    );
+    paintRanks(this.root);
     const profileButton = this.root.querySelector<HTMLButtonElement>('[data-action="profile"]');
     if (profileButton)
       profileButton.onclick = () => {
@@ -157,10 +221,8 @@ export class SiegePage {
       this.reset();
     };
     this.root.querySelector<HTMLButtonElement>('[data-action="next"]')!.onclick = () => {
-      if (nextOpponent(siege)) {
-        this.host.store();
-        this.reset();
-      }
+      this.view = "entry";
+      this.render();
     };
     const kinds = [...new Set(this.sim.layout.map((b) => b.kind))];
     this.root.querySelector(".campaign-roster")!.innerHTML =
@@ -172,7 +234,9 @@ export class SiegePage {
             '"></canvas><span>' +
             STRUCTURES[kind].name +
             "</span><small>" +
-            t("siege.deployed", { count: this.sim.layout.filter((b) => b.kind === kind).length }) +
+            t("siege.deployed", {
+              count: this.sim.layout.filter((b) => b.kind === kind).length,
+            }) +
             "</small></div>",
         )
         .join("") || "<p>" + t("siege.empty") + "</p>";
@@ -185,13 +249,19 @@ export class SiegePage {
   }
   frame(now: number) {
     this.now = now;
+    if (this.view !== "battle") {
+      this.last = 0;
+      return;
+    }
     const dt = this.last ? Math.min(0.1, (now - this.last) / 1000) : 0;
     this.last = now;
     if (!this.paused) this.sim.step(dt);
     if (!this.rewarded && (this.sim.phase === "won" || this.sim.phase === "lost")) {
       this.rewarded = true;
       if (settleRaid(this.host.save().siege!, this.sim.phase === "won")) this.host.store();
+      this.view = "entry";
       this.render();
+      return;
     }
     this.refresh();
     this.draw();
@@ -215,6 +285,12 @@ export class SiegePage {
               }));
     this.root.querySelector<HTMLButtonElement>('[data-action="start"]')!.disabled = s.phase === "won" || s.phase === "lost";
     this.spellBar?.update(s.engine, s.phase === "battle", this.host.save().settings.reduceMotion);
+  }
+  private plateFocus(e: PointerEvent) {
+    for (const p of Array.from(this.root.querySelectorAll<HTMLElement>(".siege-name-plate"))) {
+      const b = p.getBoundingClientRect();
+      p.classList.toggle("aim-under", e.clientX >= b.left && e.clientX <= b.right && e.clientY >= b.top && e.clientY <= b.bottom);
+    }
   }
   private tap(e: PointerEvent) {
     const p = this.renderer.toCell(e.clientX, e.clientY),

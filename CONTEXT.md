@@ -641,3 +641,6 @@ A named Siege skill band, from Bronze through Grandmaster.
 
 **Division**:
 One of five tiers within a Siege rank, V through I.
+
+**Find Match**:
+The Siege action that reveals an opponent and castle preview before the player commits to an attack.
