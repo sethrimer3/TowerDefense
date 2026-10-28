@@ -26,7 +26,7 @@ import { BURN, ForestDamage, MOUNTAIN, VARIANTS, canopyRadius, forestPlan, type 
 import { ART } from "./park-art.ts";
 import { BANK, FOAM, GLINT, LILY, REED, SAND, WATER, bayer } from "./water-palette.ts";
 import { Birds, roosting } from "./forest-birds.ts";
-import { paintRiver, riverCanvas, riverShape, type RiverShape } from "./river-art.ts";
+import { paintRiver, riverBed, riverCanvas, riverShape, type RiverShape } from "./river-art.ts";
 import { GRASS } from "./ground-art.ts";
 import { FLAME, SMOKE, artPen } from "./pixel-fx.ts";
 import { ENEMIES } from "./catalog.ts";
@@ -315,7 +315,10 @@ const nearClip = (x: number, y: number, reach: number) =>
 export type ForestRiver = { shape: RiverShape; cells: Uint8Array };
 
 /** `map`'s river for the forest floor, if it has one. */
-export const forestRiver = (map: CityMap): ForestRiver | null => (map.river ? { shape: riverShape(map.river), cells: riverCanvas(map, false) } : null);
+export function forestRiver(map: CityMap): ForestRiver | null {
+  const bed = riverBed(map);
+  return bed ? { shape: riverShape(bed), cells: riverCanvas(map, false) } : null;
+}
 
 /** The forest's ground, `W × H` art pixels: grass, dirt pads, the dirt
  * blasts bared, craters with stumps, rocks and the standing trees'

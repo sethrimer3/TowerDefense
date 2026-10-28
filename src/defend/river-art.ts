@@ -3,7 +3,7 @@
  * along soft, wandering shores, water shading from teal shallows over sand
  * to the deep, the bank's shadow from the upper left, a pale lip of light
  * along the far bank, lily pads in the slack water and reeds in the
- * shallows (`paintRiver`). The river's cells (`CityMap.river`) step a cell
+ * shallows (`paintRiver`). The river's cells (`riverBed`) step a cell
  * at a time; its shores are those steps smoothed (`riverShape`), wobbled
  * along their length.
  *
@@ -82,9 +82,44 @@ export function riverDepth(s: RiverShape, X: number, Y: number) {
   return Math.min(Y + 0.5 - s.top[x], s.bot[x] - Y - 0.5);
 }
 
+const beds = new WeakMap<CityMap, RiverBed | null>();
+
+/** `map`'s river, read once from its cells: the water outside the city
+ * (Defend's ponds are all in its parks) and the bridges over it, in each
+ * column a band (null for a map without one). */
+export function riverBed(map: CityMap): RiverBed | null {
+  let bed = beds.get(map);
+  if (bed !== undefined) return bed;
+  const top: number[] = [], depth: number[] = [];
+  let any = false;
+  for (let x = 0; x < CELLS_W; x++) {
+    let y0 = -1, y1 = -1;
+    for (let y = 0; y < CELLS_H; y++) {
+      const i = cellIndex(x, y);
+      if ((map.type[i] === CellType.WATER && !map.city[i]) || map.bridges?.[i] === 2) {
+        if (y0 < 0) y0 = y;
+        y1 = y;
+      }
+    }
+    top.push(y0), depth.push(y0 < 0 ? 0 : y1 - y0 + 1);
+    any ||= y0 >= 0;
+  }
+  // A column it somehow misses takes the nearest one's.
+  for (let x = 0; any && x < CELLS_W; x++) {
+    if (top[x] >= 0) continue;
+    let k = 1;
+    while (!(top[x - k] >= 0) && !(top[x + k] >= 0)) k++;
+    const from = top[x - k] >= 0 ? x - k : x + k;
+    top[x] = top[from], depth[x] = depth[from];
+  }
+  bed = any ? { top, depth } : null;
+  beds.set(map, bed);
+  return bed;
+}
+
 /** Whether cell `i` of `map` is the river's own water (bridged or not). */
 export function riverCell(map: CityMap, i: number) {
-  const r = map.river;
+  const r = riverBed(map);
   if (!r) return false;
   const x = i % CELLS_W, y = (i - x) / CELLS_W;
   return y >= r.top[x] && y < r.top[x] + r.depth[x];
@@ -228,12 +263,13 @@ export class RiverLife {
     this.map = map;
     this.ice = null;
     this.drops = [];
-    if (!map.river) {
+    const bed = riverBed(map);
+    if (!bed) {
       this.shape = null;
       this.streaks = [], this.glints = [], this.fish = [];
       return;
     }
-    const s = (this.shape = riverShape(map.river)), cells = riverCanvas(map, false);
+    const s = (this.shape = riverShape(bed)), cells = riverCanvas(map, false);
     let lo = Infinity, hi = -Infinity;
     for (let X = 0; X < W; X++) lo = Math.min(lo, s.top[X]), hi = Math.max(hi, s.bot[X]);
     this.band = [lo / ART - FISH.fear * 1.5, hi / ART + FISH.fear * 1.5];

@@ -23,7 +23,7 @@
 import { CELLS_H, CELLS_W, hash, hash01 } from "./grid.ts";
 import { CellType, type CityMap } from "./citygen.ts";
 import { POND_BLEND, hasTree, pondDisc, pondField, treeCanopy } from "./park-geometry.ts";
-import { paintRiver, riverCanvas, riverCell, riverShape } from "./river-art.ts";
+import { paintRiver, riverBed, riverCanvas, riverCell, riverShape } from "./river-art.ts";
 
 /** Art pixels a cell. */
 export const ART = 8;
@@ -104,7 +104,8 @@ function toCanvas(px: Uint32Array, w = W, h = H) {
 function paintPonds(map: CityMap, px: Uint32Array, open: Uint8Array) {
   // An Ambush river, as the forest's lakes are painted, its water running
   // on under the bridges; its live water is `RiverLife`'s, not the ponds'.
-  if (map.river) paintRiver(px, riverShape(map.river), riverCanvas(map, true), { x0: 0, y0: 0, x1: W, y1: H });
+  const bed = riverBed(map);
+  if (bed) paintRiver(px, riverShape(bed), riverCanvas(map, true), { x0: 0, y0: 0, x1: W, y1: H });
   const discs: { x: number; y: number; r: number }[] = [];
   for (let i = 0; i < map.type.length; i++) {
     // A bridge's water runs on under it; a river is painted as the lakes are.

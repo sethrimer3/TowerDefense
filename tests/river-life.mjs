@@ -22,7 +22,7 @@ try {
     // The river's water and bank are painted with the lakes' palette.
     const look = await page.evaluate(() => {
       const r = window.riverLife.ambush.renderer;
-      return { river: !!window.riverLife.ambush.sim.map.river, fish: r.river.shoal.length };
+      return { river: r.river.shoal.length > 0, fish: r.river.shoal.length };
     });
     assert.ok(look.river && look.fish >= 2, "Old Road has a river with fish");
     const before = await page.evaluate(() => window.riverLife.ambush.renderer.river.shoal.map((f) => [f.x, f.y]));

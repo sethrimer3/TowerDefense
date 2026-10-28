@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { ambushField } from "../src/campaign/battlefield.ts";
 import { CELLS_W, CELLS_H, cellIndex } from "../src/defend/grid.ts";
 import { ART } from "../src/defend/park-art.ts";
-import { RIVER_ART, RiverLife, paintRiver, riverCanvas, riverCell, riverDepth, riverShape } from "../src/defend/river-art.ts";
+import { RIVER_ART, RiverLife, riverBed, paintRiver, riverCanvas, riverCell, riverDepth, riverShape } from "../src/defend/river-art.ts";
 import { BANK, WATER, WATER_OUTLINE } from "../src/defend/water-palette.ts";
 import { Birds, roosting } from "../src/defend/forest-birds.ts";
 import type { ForestTree } from "../src/defend/forest.ts";
@@ -11,24 +11,25 @@ import type { ForestTree } from "../src/defend/forest.ts";
 const field = ambushField(0), map = field.map, W = CELLS_W * ART;
 const rgba = (c: number) => ((255 << 24) | ((c & 0xff) << 16) | (c & 0xff00) | ((c >> 16) & 0xff)) >>> 0;
 
-test("the river art shares park-art's scale and the map keeps its river", () => {
+test("the river art shares park-art's scale and reads the level's river back from the map", () => {
   assert.equal(RIVER_ART, ART);
-  assert.ok(map.river, "Old Road has a river");
+  const bed = riverBed(map)!, track = field.track.river!;
+  assert.deepEqual(bed, track, "the river read from the cells is the level's");
   const wet = [...map.type.keys()].filter((i) => riverCell(map, i));
   assert.ok(wet.length > CELLS_W * 2);
 });
 
 test("the shores are smoothed: no step of a whole cell between neighbouring art columns", () => {
-  const s = riverShape(map.river!);
+  const s = riverShape(riverBed(map)!);
   for (let X = 1; X < W; X++) {
     assert.ok(Math.abs(s.top[X] - s.top[X - 1]) < 3, `top at ${X}`);
     assert.ok(Math.abs(s.bot[X] - s.bot[X - 1]) < 3, `bottom at ${X}`);
   }
-  assert.ok(riverShape(map.river!) === s, "made once");
+  assert.ok(riverShape(riverBed(map)!) === s, "made once");
 });
 
 test("the river is painted in the lakes' palette and covers its own cells whole", () => {
-  const s = riverShape(map.river!), out = new Uint32Array(W * CELLS_H * ART), cells = riverCanvas(map, true);
+  const s = riverShape(riverBed(map)!), out = new Uint32Array(W * CELLS_H * ART), cells = riverCanvas(map, true);
   paintRiver(out, s, cells, { x0: 0, y0: 0, x1: W, y1: CELLS_H * ART });
   const water = new Set(WATER.map(rgba)), seen = new Set(out);
   assert.ok([...water].some((c) => seen.has(c)), "lake water tones");
@@ -82,8 +83,9 @@ test("startled birds fly off from a tree, once until they roost again", () => {
 });
 
 test("a map without a river has no river art", () => {
-  const life = new RiverLife(), plain = { ...map, river: undefined };
+  const life = new RiverLife(), plain = { ...map, type: map.type.map((t, i) => (riverCell(map, i) ? 0 : t)), bridges: undefined };
   life.sync(plain);
   assert.equal(life.shoal.length, 0);
-  assert.equal(riverCell(plain, cellIndex(0, 0)), false);
+  assert.equal(riverBed(plain), null);
+  assert.equal(riverCell(plain, cellIndex(0, 30)), false);
 });
