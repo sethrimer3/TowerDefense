@@ -137,8 +137,10 @@ function generateAttempt(seed: number, mmr: number, budget: number, rules: { inf
     peak.layout.structures = peak.layout.structures.filter((s) => s.uid !== remove.uid);
     peakValue = tuneTraining(peak, budget);
   }
-  if (mmr >= 2000 && peak.layout.structures.some((s) => s.kind === "shadow") && !rules.infantryOnly && peakValue <= budget && peakValue >= budget * 0.95)
-    return peak;
+  // The legal maximum witness, trimmed to the budget, stands in only where
+  // the greedy walk below cannot fill it; otherwise every top castle would
+  // be the same blueprint.
+  const peakFits = mmr >= 2000 && peak.layout.structures.some((s) => s.kind === "shadow") && !rules.infantryOnly && peakValue <= budget && peakValue >= budget * 0.95;
   let best: NativeCastle | undefined,
     bestError = Infinity;
   for (let band = Math.min(4, Math.floor(mmr / 600)); band >= 0; band--) {
@@ -152,17 +154,17 @@ function generateAttempt(seed: number, mmr: number, budget: number, rules: { inf
           { key: "basic", kind: "rangedGuild" },
           { key: "basic", kind: "rangedGuild" },
         ]
-      : mmr >= 2000
+      : mmr >= 2400
         ? [
             { key: "core", kind: "heroHall", path: "legend", rank: 3 },
             { key: "core", kind: "revolutionary" },
           ]
-        : mmr >= 800
+        : mmr >= 1600
           ? [
-              { key: "core", kind: "chapterHouse", path: "crusaders", rank: Math.min(3, 1 + Math.floor((mmr - 800) / 400)) },
+              { key: "core", kind: "chapterHouse", path: "crusaders", rank: mmr >= 2000 ? 3 : 2 },
               { key: "core", kind: "archerBarracks" },
             ]
-          : mmr >= 400
+          : mmr >= 1000
             ? [
                 { key: "core", kind: "barracks" },
                 { key: "core", kind: "archerBarracks" },
@@ -202,7 +204,9 @@ function generateAttempt(seed: number, mmr: number, budget: number, rules: { inf
       for (const p of sides.paths) for (let n = 0; n < (sideBest[p.id] ?? 0); n++) buySide(game, sides.key, sides.paths, p.id);
       // Large gaps between shared-rank combinations need an elite first;
       // many weaker copies can otherwise fill the footprint below budget.
-      if (valueBest >= budget * 0.1 && place(game, { key: "elite", kind: "shadow" }, rand, dense)) value = castleDps(castleSnapshot(game, band));
+      // Only troop-minded and balanced builders lead with one; the others
+      // spend the budget on their own favourites.
+      if ((personality === 1 || personality === 4) && valueBest >= budget * 0.1 && place(game, { key: "elite", kind: "shadow" }, rand, dense)) value = castleDps(castleSnapshot(game, band));
     }
     const allowed = profiles.filter((p) => {
       if (rules.infantryOnly && !infantry(p.kind as PlacedKind)) return false;
@@ -295,6 +299,7 @@ function generateAttempt(seed: number, mmr: number, budget: number, rules: { inf
     }
     if (bestError <= 0.045) break;
   }
+  if ((!best || bestError > 0.05) && peakFits) return peak;
   if (!best || bestError > 0.05) throw Error("Unfilled budget " + JSON.stringify({ seed, mmr, budget, bestError, best: best && castleDps(best) }));
   return best;
 }

@@ -1,6 +1,8 @@
 /** Siege controls over the native two-sided Defend battle. */
 import { t } from "../i18n/index.ts";
 import { ManaCounter } from "../ui/mana-counter.ts";
+import { gravesNear } from "../defend/necromancy.ts";
+import { cellAt } from "../defend/pathing.ts";
 import { SIEGE_MANA, SPELL_MANA } from "./siege-mana.ts";
 import { SpellBar, STRIKE_SPELLS, castStrike, type SpellBarGate } from "../ui/spell-bar.ts";
 import type { CampaignHost } from "./host.ts";
@@ -295,6 +297,9 @@ export class SiegePage {
       at = { x: p.fx, y: p.fy },
       s = this.sim.engine;
     if (this.spellBar?.armed && this.sim.phase === "battle") {
+      // Mana is scarce: a Necromancy with no grave in reach would spend it
+      // for nothing, so the spell stays armed instead.
+      if (this.sim.mana && this.spellBar.armed === "necromancy" && !gravesNear(s, at).some((g) => !s.solid[cellAt(g.x, g.y)])) return;
       if (castStrike(s, this.spellBar.armed, at)) this.spellBar.cancel();
       return;
     }

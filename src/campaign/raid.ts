@@ -5,11 +5,29 @@ import type { Building, CityMap } from "../defend/citygen.ts";
 import type { Bonuses } from "../defend/catalog.ts";
 import { defaultDefendSave, type DefendSave } from "../defend/progress.ts";
 import { center, cellCenter, cellAt, fillFlowField } from "../defend/pathing.ts";
-import { sideCells, CELL_COUNT } from "../defend/grid.ts";
+import { sideCells, CELL_COUNT, CELLS_W, CELLS_H } from "../defend/grid.ts";
 import { WarBanner } from "../defend/war-banner.ts";
 import { chilled } from "../defend/wizard.ts";
+import { sq } from "../exact.ts";
 import type { siegeField } from "./battlefield.ts";
 
+/** Cells from a house within which a blocked attacker may break through it. */
+const HOUSE_REACH = 2.5;
+const nearRect = (p: { x: number; y: number }, r: { x: number; y: number; w: number; h: number }, reach: number) =>
+  sq(Math.max(r.x - p.x, 0, p.x - r.x - r.w)) + sq(Math.max(r.y - p.y, 0, p.y - r.y - r.h)) <= reach * reach;
+/** Whether no open neighbour of `at` is nearer the banner by its field: the
+ * march on is through a standing building. */
+function blocked(field: Float64Array, solid: Uint8Array, at: number) {
+  const x = at % CELLS_W,
+    y = (at - x) / CELLS_W;
+  for (let dy = -1; dy <= 1; dy++)
+    for (let dx = -1; dx <= 1; dx++) {
+      if ((!dx && !dy) || x + dx < 0 || y + dy < 0 || x + dx >= CELLS_W || y + dy >= CELLS_H) continue;
+      const n = at + dy * CELLS_W + dx;
+      if (!solid[n] && field[n] < field[at]) return false;
+    }
+  return true;
+}
 class Side extends DefendSim {
   allocate!: () => number;
   override newId() {
@@ -294,8 +312,12 @@ export class RaidBattle {
           if ("kind" in s) s.raidEnemy = owner === this.defense;
           targets.push(this.proxy(viewer, owner, s.id, s, undefined, cache));
         }
+      const stuck = index === 0 ? this.stuck() : [];
       for (const id of buildings) {
         const b = this.field.map.buildings[id];
+        // Houses are no prize: the army razes one only where it stands in the
+        // way of the march, or troops spend the raid on homes builders rebuild.
+        if (b.kind === "house" && index === 0 && !stuck.some((p) => nearRect(p, b.rect, HOUSE_REACH))) continue;
         if (owner.hp[id] > 0 && !b.hidden) targets.push(this.proxy(viewer, owner, 10000000 + id, undefined, b, cache));
       }
       // External spell/DoT damage can kill a proxied unit between native
@@ -306,6 +328,15 @@ export class RaidBattle {
       }
       viewer.enemies = targets;
     }
+  }
+  /** Where attackers stand with the way to the enemy keep blocked by a building. */
+  private stuck() {
+    const banner = this.attack.warBanner,
+      out: { x: number; y: number }[] = [];
+    if (!banner) return out;
+    for (const s of this.attack.soldiers)
+      if (s.hp > 0 && !banner.reached(s) && blocked(banner.field, this.attack.ownSolid, cellAt(s.x, s.y))) out.push(s);
+    return out;
   }
   step(dt: number) {
     this.cache.clear();

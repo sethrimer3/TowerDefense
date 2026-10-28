@@ -7,6 +7,33 @@ import { generateNative } from "../src/campaign/castle-generator.ts";
 import { CampaignSim } from "../src/campaign/sim.ts";
 import { castleDps } from "../src/campaign/castle-dps.ts";
 import { dpsForMmr } from "../src/campaign/siege-budget.ts";
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { siegeDpsInputs } from "./siege-dps-inputs.ts";
+/** Sources whose change makes recorded raids stale: the generator, the
+ * estimate, the armies and both native sides of the battle. */
+const RAID_SOURCES = [
+  "src/campaign/castle-generator.ts",
+  "src/campaign/castle-dps.ts",
+  "src/campaign/siege-dps-table.ts",
+  "src/campaign/siege-ceiling.ts",
+  "src/campaign/siege-army.ts",
+  "src/campaign/castles.ts",
+  "src/campaign/battlefield.ts",
+  "src/campaign/raid.ts",
+  "src/campaign/sim.ts",
+  "tools/siege-calibration.ts",
+  "tools/siege-calibration-worker.ts",
+];
+/** Training brackets: the raids, and the search that picks their budgets. */
+export const TUNING_SOURCES = [...RAID_SOURCES, "tools/tune-siege.ts"];
+/** Held-out validation: the raids at the published division budgets. */
+export const VALIDATION_SOURCES = [...RAID_SOURCES, "src/campaign/siege-budget.ts", "src/campaign/siege-division-dps.ts", "tools/calibrate-siege.ts"];
+export function calibrationHash(sources: readonly string[]) {
+  const h = createHash("sha256").update(siegeDpsInputs().hash);
+  for (const p of sources) h.update(p + "\0").update(readFileSync(new URL("../" + p, import.meta.url)));
+  return h.digest("hex");
+}
 export function calibrateRaid(mmr: number, seed: number, options: { budget?: number; armyBudget?: number; seconds?: number } = {}) {
   const army = calibrationArmy(seed ^ 0x9e3779b9, mmr, options.armyBudget),
     castleSeed = Math.imul(seed, 7907) >>> 0,
