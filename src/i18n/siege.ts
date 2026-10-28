@@ -3,7 +3,7 @@ import type { TranslationRow } from './languages.ts';
 const row=<K extends string>(key:K,english:string)=>[key,english,english,english,english,english,english,english,english,english] as const satisfies TranslationRow;
 export const SIEGE_TEXT=[
  ['siege.mana','Mana','Maná','Mana','Mana','Mana','Mana','マナ','마나','法力'],
- row('siege.manaStatus','{current} / {cap} mana'),row('siege.manaCost','{cost} mana'),
+ row('siege.manaStatus','{current} / {cap} mana'),row('siege.level','Lv. {level}'),row('siege.levelHint','Level {level}: 1 plus every Smithy upgrade it carries'),row('siege.manaCost','{cost} mana'),
  row('siege.mmr','{mmr} MMR'),row('siege.wins','{wins}/{games} wins'),row('siege.divisionProgress','Progress to the next division'),
  row('siege.mmrChange','MMR {delta}'),row('siege.promoted','Promoted to {rank}'),row('siege.demoted','Demoted to {rank}'),
  row('siege.castlePreview','Opponent castle preview'),row('siege.findMatch','Find Match'),row('siege.attack','Attack'),row('siege.back','Back'),row('siege.you','You'),

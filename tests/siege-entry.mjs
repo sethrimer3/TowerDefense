@@ -86,6 +86,22 @@ try {
     await page.screenshot({
       path: "test-results/siege-plates-" + width + ".png",
     });
+    // Tapping an enemy building hangs its level over it.
+    assert.ok(await page.locator(".siege-level").isHidden());
+    const keep = await page.evaluate(() => window.siegeFixture.keepPoint()),
+      castle = await page.evaluate(() => window.siegeFixture.save.siege.raid.castle.castle),
+      expected = 1 + (castle.levels.keepStrength ?? 0) + (castle.training.keepHp ?? 0);
+    if (width === 390) await page.touchscreen.tap(keep.x, keep.y);
+    else await page.mouse.click(keep.x, keep.y);
+    await page.waitForFunction(() => !document.querySelector(".siege-level").hidden);
+    assert.equal(await page.locator(".siege-level").innerText(), "Lv. " + expected);
+    const tag = await page.locator(".siege-level").boundingBox();
+    const now = await page.evaluate(() => window.siegeFixture.keepPoint());
+    assert.ok(Math.abs(tag.x + tag.width / 2 - now.x) < 4 && tag.y + tag.height <= now.top + 1, "the tag hangs over the keep " + JSON.stringify({ tag, now }));
+    assert.equal(await page.locator(".siege-level").evaluate((el) => getComputedStyle(el).pointerEvents), "none");
+    await page.screenshot({
+      path: "test-results/siege-level-" + width + ".png",
+    });
     await page.evaluate(() => window.siegeFixture.win());
     assert.equal(await page.locator(".siege-result h2").innerText(), "Victory");
     assert.match(await page.locator(".siege-rank-change").innerText(), /Promoted to Gold II/);

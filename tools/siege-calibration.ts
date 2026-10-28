@@ -9,13 +9,14 @@ import { castleDps } from "../src/campaign/castle-dps.ts";
 import { dpsForMmr } from "../src/campaign/siege-budget.ts";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { siegeDpsInputs } from "./siege-dps-inputs.ts";
-/** Sources whose change makes recorded raids stale: the generator, the
- * estimate, the armies and both native sides of the battle. */
+/** Siege's own sources whose change makes recorded raids stale: the
+ * generator, the estimate, the armies and the raid. Deliberately not the
+ * buildings' own code: the estimate reads their numbers live, so a tweaked
+ * tower changes the castles without a recalibration, and the published
+ * report stays a record of what was observed. */
 const RAID_SOURCES = [
   "src/campaign/castle-generator.ts",
   "src/campaign/castle-dps.ts",
-  "src/campaign/siege-dps-table.ts",
   "src/campaign/siege-ceiling.ts",
   "src/campaign/siege-army.ts",
   "src/campaign/castles.ts",
@@ -30,7 +31,7 @@ export const TUNING_SOURCES = [...RAID_SOURCES, "tools/tune-siege.ts"];
 /** Held-out validation: the raids at the published division budgets. */
 export const VALIDATION_SOURCES = [...RAID_SOURCES, "src/campaign/siege-budget.ts", "src/campaign/siege-division-dps.ts", "tools/calibrate-siege.ts"];
 export function calibrationHash(sources: readonly string[]) {
-  const h = createHash("sha256").update(siegeDpsInputs().hash);
+  const h = createHash("sha256");
   for (const p of sources) h.update(p + "\0").update(readFileSync(new URL("../" + p, import.meta.url)));
   return h.digest("hex");
 }

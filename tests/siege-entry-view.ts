@@ -49,6 +49,12 @@ Object.assign(window, {
       page.sim.step(1 / 30);
       page.frame(performance.now());
     },
+    /** Where the defense's keep stands on screen, and its expected level. */
+    keepPoint: () => {
+      const b = page.sim.map.buildings[page.sim.raid.field.defenderKeep],
+        p = (page as unknown as { renderer: { toClient(x: number, y: number): { x: number; y: number } } }).renderer.toClient(b.rect.x + b.rect.w / 2, b.rect.y + b.rect.h / 2);
+      return { ...p, top: (page as unknown as { renderer: { toClient(x: number, y: number): { x: number; y: number } } }).renderer.toClient(b.rect.x + b.rect.w / 2, b.rect.y).y };
+    },
     lose: () => {
       page.sim.elapsed = 240;
       page.sim.step(1 / 30);

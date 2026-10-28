@@ -5,8 +5,7 @@ import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { DPS_MIN, DPS_MAX } from "../src/campaign/siege-ceiling.ts";
-export const CURVE_FIT_INPUTS = ["docs/design/siege-calibration-training.json", "src/campaign/siege-ceiling.ts", "tools/fit-siege-curve.ts"];
+export const CURVE_FIT_INPUTS = ["docs/design/siege-calibration-training.json", "tools/fit-siege-curve.ts"];
 export function curveFitHash() {
   const h = createHash("sha256");
   for (const file of CURVE_FIT_INPUTS) h.update(file + "\0").update(readFileSync(new URL("../" + file, import.meta.url)));
@@ -16,6 +15,11 @@ export function fitCurve() {
   const report = JSON.parse(readFileSync(new URL("../docs/design/siege-calibration-training.json", import.meta.url), "utf8"));
   if (report.kind !== "native-crossover-search" || report.split !== "training" || !Array.isArray(report.targets))
     throw Error("Fit requires native training brackets");
+  // The floor and ceiling castles' estimates as the training observed them,
+  // so the fit never shifts when a building is tweaked afterwards.
+  const DPS_MIN: number = report.floor,
+    DPS_MAX: number = report.ceiling;
+  if (!(DPS_MIN > 0 && DPS_MAX > DPS_MIN)) throw Error("Training report lacks its floor and ceiling");
   const points = [
     { mmr: 100, target: DPS_MIN, status: "anchor" },
     ...report.targets.map((p: any) => ({ ...p, target: p.status === "bracketed" ? p.target * 0.8 : p.target })),
@@ -42,7 +46,7 @@ export function fitCurve() {
   return points.map((p: any, i: number) => {
     const value = i === 0 ? DPS_MIN : i === points.length - 1 ? DPS_MAX : Math.round(Math.max(previous * 1.0001, values[i]) * 1e6) / 1e6;
     previous = value;
-    return [p.mmr, i === points.length - 1 ? "ceiling" : value] as const;
+    return [p.mmr, value] as const;
   });
 }
 

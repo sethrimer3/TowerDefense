@@ -127,6 +127,8 @@ const ordered = [...rows.values()].sort((a, b) => a.mmr - b.mmr || a.budget - b.
         }
       : {}),
     split: "training",
+    floor: DPS_MIN,
+    ceiling: DPS_MAX,
     seeds: SEEDS,
     spells: "none",
     targets: targets.sort((a, b) => a.mmr - b.mmr),

@@ -34,14 +34,14 @@ test("Calibration smoke runs both native sides without labeling an incomplete ra
 test("The fitted curve is reproducible from complete training raids and keeps both anchors", async () => {
   const { curveFitHash, fitCurve } = await import("../tools/fit-siege-curve.ts");
   const { CURVE_INPUT_HASH, CURVE_ANCHORS } = await import("../src/campaign/siege-budget-config.ts");
-  const { DPS_MIN, DPS_MAX } = await import("../src/campaign/siege-ceiling.ts");
+  const training = JSON.parse(readFileSync(new URL("../docs/design/siege-calibration-training.json", import.meta.url), "utf8"));
   assert.equal(curveFitHash(), CURVE_INPUT_HASH);
   assert.deepEqual(fitCurve(), [...CURVE_ANCHORS]);
-  assert.equal(CURVE_ANCHORS[0][1], DPS_MIN);
-  assert.equal(CURVE_ANCHORS.at(-1)![1], "ceiling");
-  assert.ok(DPS_MAX > DPS_MIN);
+  assert.equal(CURVE_ANCHORS[0][1], training.floor);
+  assert.equal(CURVE_ANCHORS.at(-1)![1], training.ceiling);
+  assert.ok(training.ceiling > training.floor);
 });
-test("The published raid results were recorded against the current generator, estimate, armies and battle", async () => {
+test("The published raid results were recorded against the current generator, estimate, armies and raid", async () => {
   const { calibrationHash, TUNING_SOURCES, VALIDATION_SOURCES } = await import("../tools/siege-calibration.ts");
   const read = (f: string) => JSON.parse(readFileSync(new URL("../docs/design/" + f, import.meta.url), "utf8"));
   const training = read("siege-calibration-training.json"),

@@ -2123,3 +2123,20 @@ button:disabled .metal-icon { filter: saturate(.4) brightness(.8); }
 .flag-preview { background: var(--stone), #302d28; border: 2px solid var(--brass); }
 #profile-editor .flag-preview small { color: #f0dfb1; }
 .siege-profile { padding-block: 12px; border-block: 1px solid #8a663b; }
+
+/* A tapped building's level in Siege: a small parchment tag over its top
+ * edge, inked with a brass rim. Presentation only; taps pass through. */
+.siege-level {
+  position: absolute;
+  z-index: 3;
+  transform: translate(-50%, calc(-100% - 4px));
+  padding: 1px 6px;
+  background: var(--parchment), #d8c496;
+  color: var(--ink);
+  border: 2px solid var(--ink);
+  box-shadow: 0 0 0 1px #b8892e;
+  font: 12px/1.2 var(--font);
+  white-space: nowrap;
+  pointer-events: none;
+}
+.siege-level[hidden] { display: none; }
