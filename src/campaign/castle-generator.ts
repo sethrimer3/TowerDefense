@@ -42,6 +42,10 @@ export function tuneTraining(castle: NativeCastle, budget: number) {
   castle.training.towerDamage = b;
   return castleDps(castle);
 }
+/** A band whose greedy walk gained less than `gain` of the budget over
+ * `window` steps has stalled: further steps only repeat failing native
+ * arrangement searches, which took Grandmaster offers up to a minute. */
+const STALL = { window: 3, gain: 0.0025 };
 function place(game: Save, p: DpsProfile, rand: () => number, dense = false) {
   const size = quarterSize(p.kind as PlacedKind, game.defend.layout.compact.includes(p.kind as PlacedKind));
   const tiles = game.defend.layout.cityTiles
@@ -207,6 +211,7 @@ function generateAttempt(seed: number, mmr: number, budget: number, rules: { inf
       if (mmr < 300 && place.tier !== "basic") return false;
       return (p.rank ?? 0) <= Math.min(3, 1 + Math.floor(Math.max(0, mmr - 600) / 500));
     });
+    const progress: number[] = [];
     for (let n = 0; n < 60; n++) {
       const c = castleSnapshot(game, band),
         tuned = structuredClone(c),
@@ -217,6 +222,8 @@ function generateAttempt(seed: number, mmr: number, budget: number, rules: { inf
         bestError = error;
       }
       if (error <= 0.045 && (mmr >= 2000 || game.defend.layout.structures.length >= Math.min(10, 2 + Math.floor(mmr / 300)) || value >= budget * 0.85)) break;
+      progress.push(value);
+      if (n >= STALL.window && value - progress[n - STALL.window] < budget * STALL.gain) break;
       const remaining = budget - value,
         ideal = remaining / Math.max(1, targetHomes - game.defend.layout.structures.length);
       const options = allowed
