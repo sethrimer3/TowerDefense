@@ -18,6 +18,6 @@ test('Offers save their identities; legacy and malformed optional flags preserve
 });
 
 test('Revision-1 identity changes preserve the existing castle geometry and combat budgets',async()=>{
- const {createHash}=await import('node:crypto');
- for(const [seed,expected] of [[1,'7e41ed3686a21cb719b2ea7eeedf85241023b3ed820f467022f6476de0f2eefb'],[45,'d7c41908e5a5f85dbcd948283a93ff4ab4708e95557abf528cbf5666936f7fe1'],[7907,'5a24bedd703a276206fb398539285306a112b9da51ce85fca26f82750f3fea18']] as const){const {defenses,guards}=generateCastle(seed,1000);assert.equal(createHash('sha256').update(JSON.stringify({defenses,guards})).digest('hex'),expected);}
+ const {createHash}=await import('node:crypto');const {generateCastle:generateLegacy}=await import('../src/campaign/legacy-castles.ts');
+ for(const [seed,expected] of [[1,'7e41ed3686a21cb719b2ea7eeedf85241023b3ed820f467022f6476de0f2eefb'],[45,'d7c41908e5a5f85dbcd948283a93ff4ab4708e95557abf528cbf5666936f7fe1'],[7907,'5a24bedd703a276206fb398539285306a112b9da51ce85fca26f82750f3fea18']] as const){const {defenses,guards}=generateLegacy(seed,1000);assert.equal(createHash('sha256').update(JSON.stringify({defenses,guards})).digest('hex'),expected);}
 });

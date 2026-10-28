@@ -6,6 +6,7 @@ import type { CastleSnapshot } from "./castles.ts";
 import { ambushField, siegeField } from "./battlefield.ts";
 import { AMBUSH_LEVELS } from "./levels.ts";
 import { drawEntryArrow } from "./entry-arrow.ts";
+import { artLook } from "../defend/tower-art.ts";
 const cache = new Map<string, HTMLCanvasElement>(),
   repaints = new Set<() => void>();
 let renderer: DefendRenderer | undefined, lastArt: boolean | undefined;
@@ -145,6 +146,8 @@ export function observeSiegePreview(canvas: HTMLCanvasElement, castle: CastleSna
         now: 0,
         reduceMotion: true,
         effects: false,
+        looks: Object.fromEntries(castle.castle.layout.structures.map(s => [s.uid, artLook(s.kind, s.path)]).filter(([, look]) => look)),
+        gate: castle.castle.gateRanks,
       });
       image = document.createElement("canvas");
       image.width = image.height = r.canvas.width;

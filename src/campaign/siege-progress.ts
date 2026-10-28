@@ -63,13 +63,14 @@ export function settleRaid(save: SiegeSave, won: boolean) {
 export function decodeSiege(raw: unknown): SiegeSave | undefined {
   if (!raw || typeof raw !== "object") return undefined;
   const s = raw as SiegeSave,
-    c = decodeCastle(s.raid?.castle);
+    legacy = (s.raid?.castle?.revision as number) === 1,
+    c = decodeCastle(s.raid?.castle, rating(s.raid?.defender));
   if (!c || !["offered", "started", "won", "lost"].includes(s.raid.state)) return undefined;
   const count = (n: number) => (Number.isSafeInteger(n) && n >= 0 ? Math.min(1e7, n) : 0);
   const games = count(s.games),
     mmr = rating(s.mmr),
     attacker = rating(s.raid.attacker);
-  return {
+  const decoded: SiegeSave = {
     mmr,
     games,
     wins: Math.min(games, count(s.wins)),
@@ -82,4 +83,8 @@ export function decodeSiege(raw: unknown): SiegeSave | undefined {
       ...(Number.isInteger(s.raid.delta) ? { delta: Math.max(-48, Math.min(48, s.raid.delta!)) } : {}),
     },
   };
+  // Revision-one battles cannot resume against newly generated geometry.
+  // Keep completed records; settle an interrupted legacy raid exactly once.
+  if (legacy && decoded.raid.state === "started") settleRaid(decoded, false);
+  return decoded;
 }

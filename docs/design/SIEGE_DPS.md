@@ -1,6 +1,6 @@
 # Siege defensive damage measurements
 
-The rating estimator uses native Defend attacks. It never sets battle damage, HP, fire rate, or targeting. The current measured floor is **10.2 DPS** (the unupgraded keep and two Ranged Guilds). The bounded-search ceiling is **48,088,475,605.20467 DPS** (24 maximum Shadows, 19 Watch towers, the maximum keep, gate and four corner ballistas). These are capacity estimates under the protocol below, not damage a castle necessarily delivers during a raid or measured success probabilities.
+The rating estimator uses native Defend attacks. It never sets battle damage, HP, fire rate, or targeting. The current measured floor is **10.2 DPS** (the unupgraded keep and two Ranged Guilds). The bounded-search ceiling is **48,088,475,605.20467 DPS** (24 maximum Shadows, 22 Watch towers, the maximum keep, gate and four corner ballistas). These are capacity estimates under the protocol below, not damage a castle necessarily delivers during a raid or measured success probabilities.
 
 ## Reproduce
 

@@ -157,8 +157,8 @@ One PR per phase. Each lists its tests; run `npm test` and `npm run build` befor
 - Post the printed ceiling and floor to Seth as a sanity check.
 - **Tests:** the table covers every attacking kind, path and rank in the catalog; its input hash matches; `castleDps` is monotonic (adding a building or a rank never lowers it); the ceiling castle is legal under `fitLayout` and the upgrade rules.
 
-### Phase 5: native castle generation (`siege-v2`) ☐
-- Snapshot revision 2, `generateCastle(seed, mmr)` as described, `siegeField` from the snapshot, and `RaidBattle`'s defense side wearing the snapshot's levels and paths. Delete `CampaignSim`'s flat scale.
+### Phase 5: native castle generation (`siege-v2`) ☑
+- Snapshot revision 2 (including native Smithy training and Skills so every measured upgrade is reproducible), `generateCastle(seed, mmr)` as described, `siegeField` from the snapshot, and `RaidBattle`'s defense side wearing the snapshot's levels and paths. Delete `CampaignSim`'s flat scale.
 - **Migration:** a saved revision-1 offered raid is regenerated at the same seed and MMR. A started revision-1 raid is settled as a loss (the existing reload rule). Completed raids keep their results.
 - **Tests:** generated castles are legal (every step via `upgradeBuilding`), land within ±5% of budget, differ across seeds at one MMR, and match `tests/fixtures/siege-castles.golden.json`. Higher divisions contain more and higher-tier pieces on average. A revision-1 save decodes and migrates. `tests/campaign-native.test.ts` still passes with native castles. Browser: castles at Bronze, Gold, Diamond and Grandmaster render and fight at both sizes.
 
