@@ -3,16 +3,17 @@ import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { DPS_MIN, DPS_MAX } from "../src/campaign/siege-ceiling.ts";
 import { CURVE_ANCHORS } from "../src/campaign/siege-budget-config.ts";
-export const DIVISION_INPUTS = ["src/campaign/siege-ceiling.ts", "src/campaign/siege-budget-config.ts", "tools/siege-division-dps.ts"];
+export const DIVISION_INPUTS = ["src/campaign/siege-budget-config.ts", "tools/siege-division-dps.ts"];
 export function divisionInputHash() {
   const h = createHash("sha256");
   for (const p of DIVISION_INPUTS) h.update(p + "\0").update(readFileSync(new URL("../" + p, import.meta.url)));
   return h.digest("hex");
 }
 export function divisionTable() {
-  const anchors = CURVE_ANCHORS.map(([mmr, value]) => [mmr, value === "ceiling" ? DPS_MAX : value]);
+  const anchors = CURVE_ANCHORS.map(([mmr, value]) => [mmr, value]),
+    DPS_MIN = anchors[0][1],
+    DPS_MAX = anchors.at(-1)![1];
   return Array.from({ length: 35 }, (_, tier) => {
     const mmr = tier === 1 ? 100 : tier * 80;
     if (!tier) return DPS_MIN * 0.8;

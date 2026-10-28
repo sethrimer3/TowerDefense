@@ -15,6 +15,11 @@ import { botFlag } from "./bot-identity.ts";
 import { defaultFlag } from "../profile/model.ts";
 import { newSiege, findMatch, settleRaid } from "./siege-progress.ts";
 import { CampaignSim } from "./sim.ts";
+import { buildingLevel, type LeveledKind } from "../building-level.ts";
+import { STRUCTURES } from "../defend/catalog.ts";
+import type { Building } from "../defend/citygen.ts";
+/** Which of the board's buildings carry a level: not houses. */
+const leveled = (kind: Building["kind"]): LeveledKind | undefined => (kind in STRUCTURES || kind === "wall" || kind === "gate" || kind === "wallBallista" ? (kind as LeveledKind) : undefined);
 export class SiegePage {
   sim: CampaignSim;
   private readonly canvas = document.createElement("canvas");
@@ -34,6 +39,8 @@ export class SiegePage {
   private freshCamera = true;
   private readonly banners = new Banners();
   private readonly troops = new TroopBox();
+  /** The tapped building's level, hung over it. */
+  private readonly level = document.createElement("div");
   constructor(
     private root: HTMLElement,
     private host: CampaignHost,
@@ -193,6 +200,9 @@ export class SiegePage {
     this.banners.attach(this.root, { top: opponent.flag, bottom: you.flag });
     this.troops.update(this.sim.allies);
     board.append(this.troops.el);
+    this.level.className = "siege-level";
+    this.level.hidden = true;
+    board.append(this.level);
     paintRanks(this.root);
     const profileButton = this.root.querySelector<HTMLButtonElement>('[data-action="profile"]');
     if (profileButton)
@@ -342,5 +352,27 @@ export class SiegePage {
       looks,
       ...(this.inspection !== undefined ? { inspect: { id: this.inspection, armed: owner } } : {}),
     });
+    this.placeLevel();
+  }
+  /** Shows the tapped building's level over its top edge: the castle's own
+   * Smithy upgrades for the defense's buildings, the player's for theirs. */
+  private placeLevel() {
+    const b = this.inspection !== undefined ? this.sim.map.buildings[this.inspection] : undefined,
+      kind = b && !b.hidden ? leveled(b.kind) : undefined,
+      board = this.level.parentElement;
+    if (!b || !kind || !board) return void (this.level.hidden = true);
+    const save = this.host.save(),
+      castle = save.siege!.raid.castle.castle,
+      level = this.sim.raid.field.defenderIds.has(b.id) ? buildingLevel(kind, castle.levels, castle.training) : buildingLevel(kind, save.defend.levels, save.training),
+      text = t("siege.level", { level });
+    if (this.level.textContent !== text) {
+      this.level.textContent = text;
+      this.level.title = t("siege.levelHint", { level });
+    }
+    const at = this.renderer.toClient(b.rect.x + b.rect.w / 2, b.rect.y),
+      box = board.getBoundingClientRect();
+    this.level.style.left = Math.round(at.x - box.left) + "px";
+    this.level.style.top = Math.round(at.y - box.top) + "px";
+    this.level.hidden = false;
   }
 }
