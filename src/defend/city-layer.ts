@@ -23,6 +23,7 @@ import { WOOD_GATE, gateArtRect, woodGatePixels, woodGateRubblePixels } from "./
 import { gateRect, type Side } from "./layout.ts";
 import { SPIKE_REACH, bastionPixels, bastionRubblePixels, spikePixels } from "./wall-defense-art.ts";
 import { AREAS, areaArtId, type AreaId } from "./areas.ts";
+import { hasForest } from "./forest.ts";
 import { hasWallArt, wallCapSprite, wallFaceSprite, wallRubbleTones } from "./area-wall-art.ts";
 import { drawPixel, drawRoof, pixelKey, type PixelSprite } from "./pixel-sprites.ts";
 
@@ -110,7 +111,7 @@ export function paintCityLayer(c: CanvasRenderingContext2D, px: number, scene: C
   c.imageSmoothingEnabled = false;
   paintFlagstones(p);
   paintCityGround(p);
-  paintPixelArt(p, groundArt(map).canvas);
+  paintPixelArt(p, groundArt(map, hasForest(p.area)).canvas);
   paintRoadStones(p, scene.stones);
   // Ponds over the park grass, as pixel art.
   paintPixelArt(p, parkArt(map).canvas);
@@ -121,6 +122,7 @@ export function paintCityLayer(c: CanvasRenderingContext2D, px: number, scene: C
   // house or structure standing there is in front of the face, so it covers it.
   paintSpikes(p);
   for (const b of map.buildings) if (b.kind === "wall") paintBuilding(p, b);
+  paintFences(c, px, map, sim);
   for (const b of map.buildings) if (b.kind !== "wall") paintBuilding(p, b);
   paintShadows(c, cityShadows(map, sim, scene.looks), px);
   paintLanternBrackets(p, scene.lights);
@@ -222,10 +224,11 @@ function paintCityGround(p: Paint) {
     for (let cx = 0; cx < CELLS_W; cx++) {
       const i = cellIndex(cx, cy);
       const t = map.type[i];
-      // A structure placed outside the city stands on the open floor.
-      if (t === CellType.OUT || (t === CellType.STRUCT && !map.city[i])) continue;
-      // A wooden fence stands on grass, not on a stone wall's footing.
-      if (t === CellType.PARK || t === CellType.WATER || map.buildings[map.owner[i]]?.fence) paintGrass(p, cx, cy);
+      // A structure placed outside the city stands on the open floor, and
+      // so does a wooden fence, not on a stone wall's footing (in the
+      // forest, its grass grows under it: `paintFences`).
+      if (t === CellType.OUT || (t === CellType.STRUCT && !map.city[i]) || map.buildings[map.owner[i]]?.fence) continue;
+      if (t === CellType.PARK || t === CellType.WATER) paintGrass(p, cx, cy);
       else if (t !== CellType.WALL || !solid(i) || map.buildings[map.owner[i]]?.woodGate) paintGravel(p, cx, cy);
     }
 }
@@ -300,10 +303,8 @@ function paintBuilding(p: Paint, b: Building) {
     h = Math.round((r.y + r.h) * px) - y;
   const box = { x, y, w, h, px };
   if (b.kind === "wall") {
-    if (b.fence) {
-      if (solid(b.cells[0])) drawFenceSections(c, px, (b.rails ?? [b.fence]).map((f) => ({ ...f, broken: false })));
-      return;
-    }
+    // Wooden fences are drawn together after the walls (`paintFences`).
+    if (b.fence) return;
     if (solid(b.cells[0])) paintWall(p, b);
     else if (hasWallArt(p.area) || !paintPixelRubble(p, b)) paintArt(p, wallRubbleSprite(lotSeed(b), p.area), box);
     return;
@@ -432,6 +433,17 @@ export function paintSpikePoints(c: CanvasRenderingContext2D, px: number, map: C
   if (!map.spikes?.length) return;
   const solid = (i: number) => (sim ? sim.solid[i] === 1 : map.owner[i] >= 0 && map.type[i] !== CellType.ROAD);
   paintSpikes({ c, px, map, sim, solid, area: "moss" }, true);
+}
+
+/** The standing wooden fences, all at once: in the city layer, and again
+ * over the forest's floor and grass, which cover the open ground they
+ * stand on. */
+export function paintFences(c: CanvasRenderingContext2D, px: number, map: CityMap, sim: DefendSim | null, shadow = false) {
+  const sections = [];
+  for (const b of map.buildings)
+    if (b.kind === "wall" && b.fence && !b.hidden && b.cells.length && (sim ? sim.solid[b.cells[0]] === 1 : true))
+      for (const f of b.rails ?? [b.fence]) sections.push({ ...f, broken: false });
+  if (sections.length) drawFenceSections(c, px, sections, shadow);
 }
 
 /** A city gate's sprite with its doors at `frame`, and its rubble. */

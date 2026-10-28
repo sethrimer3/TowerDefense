@@ -22,7 +22,7 @@ import { Fences } from "./fences.ts";
 import { Rain, Snow, ambientFor, type Weather } from "./weather.ts";
 import { areaFade, type AreaId } from "./areas.ts";
 import { gateArtRect } from "./wood-gate-art.ts";
-import { FACE_HANG, damageKey, gateSpriteOf, hangingFaces, onCityArtLoaded, paintCityLayer, paintSpikePoints, paintStanding, stageOf } from "./city-layer.ts";
+import { FACE_HANG, damageKey, gateSpriteOf, hangingFaces, onCityArtLoaded, paintCityLayer, paintFences, paintSpikePoints, paintStanding, stageOf } from "./city-layer.ts";
 import { GATE_FRAMES } from "./gate-art.ts";
 import { peopleAt } from "./gates.ts";
 import type { GateRanks } from "../gate-upgrades.ts";
@@ -344,7 +344,6 @@ export class DefendRenderer {
       ctx.restore();
     }
     ctx.imageSmoothingEnabled = false;
-    if (sim) this.drawGates(map, sim, opts, dt);
     drawBallistas(ctx, this.px, map, sim, sim ? sim.bonuses.gate : opts.gate);
     drawSpikeThrusts(ctx, this.px, map, sim);
     const feet = this.drawParkLife(map, sim, opts, dt);
@@ -372,6 +371,10 @@ export class DefendRenderer {
         faced: this.faced, hangRows: Math.ceil(ART * FACE_HANG),
       });
     }
+    // An outpost's wooden fences stand on the forest's grass, and the gates
+    // swing over it.
+    if (this.forestShare() > 0) paintFences(ctx, this.px, map, sim, true);
+    if (sim) this.drawGates(map, sim, opts, dt);
     // Park fences sit on the ground layer, under the lighting and units.
     this.fences.sync(map);
     if (sim) this.fences.update(sim);
