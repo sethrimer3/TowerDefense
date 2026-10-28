@@ -97,8 +97,10 @@ test("Siege attacks collapse real native walls, synchronize collision and use na
 });
 test("Native infantry can march from muster, breach a generated castle and destroy its keep", () => {
   const d = defaultDefendSave();
-  d.owned.meleeGuild = 4;
-  d.owned.rangedGuild = 4;
+  d.owned.meleeGuild = 0;
+  d.owned.barracks = 4;
+  d.owned.rangedGuild = 0;
+  d.owned.archerBarracks = 4;
   const mode = new CampaignSim("siege", 0, [], d.owned, d.levels, generateCastle(45, 600));
   const walls = mode.map.buildings.filter((b) => b.kind === "wall");
   assert.ok(mode.start());

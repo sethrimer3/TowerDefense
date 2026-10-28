@@ -75,10 +75,11 @@ export class RaidBattle {
     attackBonuses: Bonuses,
     defenseBonuses: Bonuses,
     seed: number,
+    defenseLevels = defaultDefendSave(seed).levels,
   ) {
     const { map, attackerIds, defenderIds, attackerKeep, defenderKeep } = field;
     const attack = new Side(map, { ...levels }, seed, attackBonuses, attackerKeep),
-      defense = new Side(map, { ...defaultDefendSave().levels }, seed ^ 0x62a9, defenseBonuses, defenderKeep);
+      defense = new Side(map, { ...defenseLevels }, seed ^ 0x62a9, defenseBonuses, defenderKeep);
     attack.allocate = defense.allocate = () => this.ids++;
     this.attack = attack;
     this.defense = defense;
@@ -107,7 +108,7 @@ export class RaidBattle {
         if (key === "keep") return map.buildings[defenderKeep];
         if (key === "keepHp") return () => defense.keepHp();
         if (key === "keepMaxHp") return () => defense.keepMaxHp();
-        if (key === "bonuses") return { ...attack.bonuses, structurePaths: { ...attack.bonuses.structurePaths, ...defense.bonuses.structurePaths } };
+        if (key === "bonuses") return { ...attack.bonuses, keep: defense.bonuses.keep, walls: defense.bonuses.walls, gate: defense.bonuses.gate, ballista: defense.bonuses.ballista, structurePaths: { ...attack.bonuses.structurePaths, ...defense.bonuses.structurePaths } };
         if (key === "intact") return (b: Building) => !b.hidden && target.built[b.id] === b.cells.length;
         if (key === "mapVersion") return attack.mapVersion + defense.mapVersion;
         if (key === "changed") return [...attack.changed, ...defense.changed];

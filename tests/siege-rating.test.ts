@@ -16,29 +16,16 @@ test("Generated castles are seeded, varied, bounded, and rate themselves near th
       assert.ok(decodeCastle(c));
       assert.ok(Math.abs(estimateCastle(c).rating - target) <= 1);
       names.add(c.owner.name);
-      layouts.add(JSON.stringify(c.defenses.map((d) => [d.x, d.y])));
+      layouts.add(JSON.stringify(c.castle.layout.structures));
     }
   assert.ok(names.size > 25);
   assert.ok(layouts.size > 40);
 });
-test("Defense difficulty increases with HP, firepower, guards, and supporting coverage", () => {
-  const c = generateCastle(42, 1000),
-    base = castlePower(c);
-  const stronger = structuredClone(c);
-  stronger.defenses[0].hp *= 2;
-  assert.ok(castlePower(stronger) > base);
-  stronger.defenses[0].damage *= 2;
-  assert.ok(estimateCastle(stronger).rating > estimateCastle(c).rating);
-  const guard = structuredClone(c);
-  guard.guards.count++;
-  assert.ok(castlePower(guard) > base);
-  const support = structuredClone(c);
-  const towers = support.defenses.filter((d) => d.kind === "tower");
-  if (towers.length > 1) {
-    towers[1].x = towers[0].x + 2;
-    towers[1].y = towers[0].y;
-    assert.ok(castlePower(support) >= base);
-  }
+test("Native DPS strength rises with added defenders without changing the offered MMR", () => {
+  const c = generateCastle(42,100), base=castlePower(c), stronger=structuredClone(c);
+  stronger.castle.layout.structures.push({uid:3,kind:"archerTower",tx:6,ty:4,qx:25,qy:17});
+  stronger.castle.layout.nextUid=4;
+  assert.ok(castlePower(stronger)>base);assert.equal(estimateCastle(stronger).rating,c.mmr);
 });
 test("Elo results are symmetric, favor upsets, and reduce K after placements", () => {
   assert.equal(expectedWin(1000, 1000), 0.5);
@@ -86,10 +73,10 @@ test("Siege saves round-trip immutable targets, sanitize counters, and reject in
   assert.equal(decodeSiege(corrupt)?.games, 0);
   for (const raw of [null, {}, [], { raid: { castle: null } }]) assert.equal(decodeSiege(raw), undefined);
   const bad = structuredClone(d.siege);
-  bad.raid.castle.defenses[0].hp = NaN;
+  bad.raid.castle.castle.layout.structures[0].qx = NaN;
   assert.equal(decodeSiege(bad), undefined);
   const nullDefense = structuredClone(d.siege.raid.castle);
-  nullDefense.defenses.push(null as any);
+  nullDefense.castle.layout.structures.push(null as any);
   assert.equal(decodeCastle(nullDefense), null);
   const html = structuredClone(d.siege.raid.castle);
   html.owner.name = "<img onerror=alert(1)>";
@@ -103,17 +90,7 @@ test("Generated raids instantiate a native castle without mutating their saved t
   assert.ok(sim.raid);
   assert.ok(sim.map.buildings.some((b) => b.kind === "keep"));
   assert.ok(sim.map.buildings.some((b) => b.kind === "wall"));
-  assert.ok(
-    sim.map.buildings.some(
-      (b) =>
-        b.kind === "archerTower" ||
-        b.kind === "cannonTower" ||
-        b.kind === "wizardTower" ||
-        b.kind === "wispTower" ||
-        b.kind === "brazierTower" ||
-        b.kind === "hawkTower",
-    ),
-  );
+  for(const home of c.castle.layout.structures)assert.ok(sim.map.buildings.some(b=>b.structureUid===home.uid&&b.kind===home.kind));
   sim.start();
   for (let i = 0; i < 30; i++) sim.step(1 / 30);
   assert.equal(JSON.stringify(c), before);

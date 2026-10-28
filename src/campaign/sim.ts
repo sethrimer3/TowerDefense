@@ -1,4 +1,3 @@
-import { ratioPow } from "../exact.ts";
 /** Native Siege lifecycle. Ambush geography/economy lives in ambush-sim.ts. */
 import { DefendSim } from "../defend/sim.ts";
 import * as C from "../defend/catalog.ts";
@@ -9,7 +8,8 @@ import type { PathId } from "../knowledge-paths.ts";
 import type { Save } from "../save.ts";
 import { siegeField, type MusterCopy } from "./battlefield.ts";
 import { RaidBattle } from "./raid.ts";
-import { generateCastle, estimateCastle, type CastleSnapshot } from "./castles.ts";
+import { generateCastle, type CastleSnapshot } from "./castles.ts";
+import { castleGame } from "./castle-model.ts";
 import { infantry, type Placement } from "./plans.ts";
 export * from "./plans.ts";
 export function infantryCopies(save: DefendSave): MusterCopy[] {
@@ -43,7 +43,8 @@ export class CampaignSim {
   ) {
     const source = game?.defend ?? { ...defaultDefendSave(), owned, levels },
       copies = infantryCopies(source),
-      field = siegeField(opponent ?? generateCastle(12345, 1000), copies);
+      castle = opponent ?? generateCastle(12345, 1000),
+      field = siegeField(castle, copies);
     const nativeStructures = copies.map((c) => ({
       uid: c.uid,
       kind: c.kind as Exclude<C.StructureKind, "keep">,
@@ -55,9 +56,8 @@ export class CampaignSim {
     }));
     const adapted = { ...game, defend: { ...source, layout: { ...source.layout, structures: nativeStructures } } } as Save;
     const bonus = { ...(game ? gameBonuses(game) : C.NO_BONUSES), ...placedBattlePaths(adapted) };
-    const scale = ratioPow(2, (opponent ? estimateCastle(opponent).rating : 1000) - 1000, 800) * 0.65;
-    const defense = { ...C.NO_BONUSES, towerDamage: scale, troopDamage: scale, troopHp: scale, keepHp: scale, wallHp: scale };
-    this.raid = new RaidBattle(field, { ...levels }, bonus, defense, opponent?.seed ?? 12345);
+    const defense = gameBonuses(castleGame(castle.seed, castle.castle));
+    this.raid = new RaidBattle(field, { ...levels }, bonus, defense, castle.seed, castle.castle.levels);
     this.engine = this.raid.attack;
     this.layout = copies.map((c, i) => ({ pad: i, kind: c.kind, ...(c.path ? { path: c.path as PathId, rank: c.rank } : {}) }));
   }

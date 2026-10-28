@@ -647,3 +647,6 @@ The Siege action that reveals an opponent and castle preview before the player c
 
 - **Defensive DPS**: estimated sustained castle damage against a weighted single-target/crowd benchmark.
 - **Castle ceiling**: the strongest legal castle found by the bounded footprint search; the Grandmaster generation anchor.
+
+- **Castle blueprint**: the native city layout and upgrades saved with a Siege opponent.
+- **Muster rows**: the player’s infantry buildings arranged below the invaded castle.

@@ -3,7 +3,7 @@ import { ambushLevel, trackFor, squareAt } from "./levels.ts";
 import { generateCity, CellType, type CityMap, type Building } from "../defend/citygen.ts";
 import { CELL_COUNT, CELLS_W, CELLS_H, cellIndex, rectCells, type Rect } from "../defend/grid.ts";
 import { STRUCTURES, type StructureKind } from "../defend/catalog.ts";
-import type { FittedStructure } from "../defend/layout.ts";
+import { fitLayout, type FittedStructure } from "../defend/layout.ts";
 import { type Point } from "./plans.ts";
 import type { CastleSnapshot } from "./castles.ts";
 const fitted = (uid: number, kind: StructureKind, rect: Rect): FittedStructure => ({
@@ -136,19 +136,9 @@ export function ambushField(level: number) {
 
 export type MusterCopy = { kind: StructureKind; uid: number; path?: string; rank?: number };
 export function siegeField(castle: CastleSnapshot, copies: MusterCopy[]) {
-  const city = new Uint8Array(CELL_COUNT),
-    wall = new Uint8Array(CELL_COUNT);
-  // The native castle occupies the upper half; attackers approach from below.
-  for (let y = 10; y < 50; y++) for (let x = 16; x < 56; x++) city[cellIndex(x, y)] = 1;
-  for (let y = 8; y < 52; y++) for (let x = 14; x < 58; x++) if (x < 16 || x >= 56 || y < 10 || y >= 50) wall[cellIndex(x, y)] = 1;
-  const structures: FittedStructure[] = [fitted(0, "keep", { x: 34, y: 20, w: 4, h: 4 })];
-  const towers = castle.defenses.filter((d) => d.kind === "tower");
-  const nativeKinds: StructureKind[] = ["archerTower", "cannonTower", "wizardTower", "hawkTower", "brazierTower", "wispTower"];
-  towers.forEach((t, i) => {
-    const kind = nativeKinds[(castle.seed + i) % nativeKinds.length];
-    structures.push(fitted(10000 + i, kind, footprint(kind, { x: 22 + (i * 26) / Math.max(1, towers.length - 1), y: 38 })));
-  });
-  structures.push(fitted(11000, "barracks", { x: 22, y: 25, w: 4, h: 4 }), fitted(11001, "archerBarracks", { x: 46, y: 25, w: 4, h: 4 }));
+  const fit = fitLayout(castle.castle.layout);
+  if (!fit.ok) throw Error("Invalid native castle: " + fit.reason);
+  const structures = [...fit.structures];
   // Real footprints; additional rows use the open lower half of the native board.
   let row = 100,
     x = 2,
@@ -193,8 +183,7 @@ export function siegeField(castle: CastleSnapshot, copies: MusterCopy[]) {
   }
   // An invisible attacker objective gives the native sim its own keep reference.
   structures.push(fitted(200000, "keep", { x: 34, y: 100, w: 4, h: 4 }));
-  const gate = { tx: 4, ty: 6, side: "s" as const, rect: { x: 34, y: 50, w: 4, h: 2 }, inner: { x: 34, y: 48, w: 4, h: 2 } };
-  const map = generateCity({ structures, city, wall, gates: [gate] }, castle.seed);
+  const map = generateCity({ ...fit, structures }, castle.seed);
   const attackerIds = new Set(map.buildings.filter((b) => b.structureUid !== undefined && copies.some((c) => c.uid === b.structureUid)).map((b) => b.id));
   const attackerKeep = map.buildings.find((b) => b.structureUid === 200000)!.id;
   map.buildings[attackerKeep].hidden = true;

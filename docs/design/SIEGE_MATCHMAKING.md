@@ -1,73 +1,25 @@
 # Siege opponents and ratings
 
-Siege raids a seeded bot-owned native Defend city. The player approaches from below using every owned infantry building, including copies currently placed in Defend, with the same worn paths, global bonuses, garrisons and training logic. The bot castle occupies the upper field and contains native houses, streets, walls, a gate, keep, towers and infantry buildings. Native units fight native units; projectiles, spells, wall collapse, guard mitigation and repairs use Defend's implementations. Destroying the keep wins; the four-minute limit loses. Garrisons replenish as in Defend, with no separate finite recruit reserve.
+Siege uses one visible MMR (100–3000), starting at 1000, Gold III. An offered opponent has a saved MMR and native castle blueprint; its MMR enters Elo settlement. The DPS budget estimates castle capacity, not its owner's separate rating or a measured success probability. Find Match offers a target within ±80; Back does not commit a raid. Attack commits; abandoning/reloading a started rated raid loses. Completed targets can be practiced without settling again.
 
-## Native battle integration
+## Native castle snapshots
 
-`battlefield.ts` uses Defend's city generator and actual building footprints. `raid.ts` runs two DefendSim instances sharing the city geometry, one per owner. Only owned buildings recruit and attack. Opposing native units and buildings appear as targeting adapters to the existing tower/troop modules. Damage is forwarded to the owning simulation's normal defender/building damage functions. These adapters do not render as monsters; DefendRenderer combines actual units and effects from both sides. A small red ground marker identifies castle infantry. Synchronization propagates destroyed/repaired buildings and collision to both sides.
+Revision 2, `siege-v2`, saves identity/flag, seed, MMR, layout, Armory levels, Smithy training, Skills, per-building paths/ranks and optional native side trees. This is the foundation for future real-player castles, which will require server validation. Nothing is uploaded today.
 
-All owned infantry copies retain their native upgrades and deploy automatically in rows below the castle. Very large rosters stack same-kind muster footprints once the available lower field is full; copies are never silently dropped. The battle snapshots the roster without editing inventory or the Defend layout.
+A seeded personality weights towers, troops, magic, gunpowder or balanced choices. Purchases and all building paths/merges use native `nextSteps`/`upgradeBuilding`, including three real maximum partners for an ultimate. Quarter placements use native `arrange`/`fitLayout` on the fixed 5×5-tile footprint. Side trees are bought with native `buySide`. Ultimates open above Diamond (Master and Grandmaster). Bounded native damage-training ranks refine the budget; these are real saved upgrades, never fractional damage modifiers. The legal maximum witness supplies the upper end, with seeded removals where appropriate.
 
-## Two ratings
+`siegeField` passes that blueprint to native city generation and puts every owned infantry copy in bottom muster rows. Two native Defend simulations share geometry and forward damage through native unit/building damage functions. The defense wears its saved levels and native bonus snapshot. The attacker retains the player's upgrades. There is **no flat defense damage/HP scale**. Walls, repairs, projectiles, garrisons and spells remain Defend's. Destroying the enemy keep wins; four minutes loses.
 
-- **Attack MMR** estimates the player's raid success with their available army. New players start at 1000. This includes army/equipment strength as well as decisions.
-- **Castle defense rating** estimates a particular castle revision's difficulty. It is separate from its owner's attack MMR. Current bot ratings are provisional estimates, with no fabricated match history.
+Revision-one offers regenerate at the same seed and saved opponent MMR while preserving identity. Interrupted revision-one raids settle as losses once; completed results/counters remain. Optional malformed flags or side ranks do not erase valid progress.
 
-For attacker rating A and castle rating D:
+## DPS budget and calibration status
 
-`E = 1 / (1 + 10^((D - A) / 400))`
+[Measured native protocol and limitations](SIEGE_DPS.md) documents the weighted single/crowd table, support model, native floor (10.2 DPS) and bounded-search ceiling (48,088,475,605.20467 DPS). Shadow compounding dominates the upper end under immortal crowd conditions. These are capacity estimates rather than a prediction of damage delivered through walls in a raid.
 
-Winning changes attack MMR by `K × (1 - E)`; losing changes it by `K × (0 - E)`. K is 48 for the first ten rated raids, then 24. Ratings are rounded and bounded to 100–3000. Equal ratings express a model target of 50% success, not an empirically measured chance.
+`tools/siege-division-dps.ts` writes 35 increasing division anchors from `siege-budget-config.ts`; runtime generation only interpolates those numbers. Bronze V is unreachable under the 100 minimum; Bronze IV's first reachable point is 100. Grandmaster I's floor, 2720, anchors the ceiling and the top band stays there. The initial native curve bends through low-rank budgets instead of spreading Shadow's extreme range uniformly. Phase 6 replaces the old calibration script with native scripted attacker rosters and records actual matched outcomes before calling the curve calibrated.
 
-## Provisional generation budget
+## Settlement
 
-Saved `CastleSnapshot` offers retain the original seed, bot handle and legacy abstract strength description so existing local offers remain readable. The legacy prior is:
+`E = 1 / (1 + 10^((opponent MMR - player MMR) / 400))`.
 
-```
-H = sum(abstract structure HP) + guard count × guard HP
-F = sum(abstract structure DPS × min(1.5, range / 5))
-    + 0.6 × guard count × guard DPS
-O = count of directed firing-defense pairs within mutual range
-P = sqrt(H × max(0.1, F)) × (1 + min(0.2, 0.025 × O))
-D_prior = clamp(1000 + 400 × log2(P / 170), 100, 3000)
-```
-
-This describes a generation budget, not native battle physics. The generator varies the seeded owner, tower count and strength budget; offers are selected within ±80 of the player's current MMR. The native adapter builds actual native tower types from the seed and tower count, then maps the stored estimate to a fixed defense multiplier:
-
-`scale = 0.65 × 2^((D_prior - 1000) / 800)`
-
-The scale applies through existing Defend bonuses to defender tower damage, troop HP/damage and keep/wall HP. Native tower characteristics, city collision and troops remain authoritative. Difficulty is fixed before battle and never adjusts to the attacker's current army mid-raid.
-
-The inherited budget prior does not yet measure native wall topology, every specialty matchup, native garrison replenishment or every tower type. Therefore this adaptation needs fresh calibration. The old simplified-combat baseline was deleted because its win rates do not describe this engine. Do not display model probabilities as measured native success rates.
-
-## Calibration
-
-Run the actual native simulation, without reading a player save:
-
-```
-SIEGE_SAMPLES=5 node --experimental-transform-types --import ./tests/pin-random.ts tools/calibrate-siege.ts
-```
-
-This samples six rating bands with the starter army. Increase the sample count for a baseline; five seeds is only a smoke check. Native raids are considerably more expensive than the discarded simplified simulation.
-
-Before treating defense ratings as calibrated, use held-out castle seeds, melee/ranged/mixed armies, several equipment tiers and repeat attack seeds. Fit the budget intercept and rating slope against real native win/loss results, then inspect reliability by rating band and army family. Use a new rating-model revision when mechanics or the export format change. Building cost alone cannot establish a defense rating.
-
-## Persistence and rated results
-
-Optional `Save.siege` stores MMR, match count, wins, seed sequence and a frozen opponent offer. The transitions are `offered → started → won/lost`; settlement is idempotent. A completed target can be practiced without further rating changes. A new target is available only after settlement. Forfeit/rebuild during a rated assault records a loss. Reloading a started raid records one loss on recovery; navigating to another tab pauses it. This local policy is not server-side anti-cheat protection.
-
-Legacy Siege placement layouts are ignored; all infantry musters from inventory. Ambush gold and other modes' city layouts remain separate.
-
-## Later player-built castles
-
-The existing `CastleSnapshot` is a legacy budget offer, not a serialized native city. Real player castles require a versioned native export containing layout, structure copies, worn paths, Armory ranks and relevant bonuses. The native ownership/damage bridge can then run those mechanics directly rather than translating them into a simplified combat game.
-
-Before multiplayer:
-
-1. Add authenticated, validated native exports, immutable castle revisions and a versioned battle ruleset. Keep attack MMR separate from each castle revision's defense rating and uncertainty.
-2. Seed each defense estimate with structural features and standardized native simulated attacks. Keep it provisional until there are diverse real raids.
-3. Freeze a server-issued match ID, castle revision, attacking roster/upgrades, ratings and random seed. Validate/replay outcomes server-side and settle each match once.
-4. Update attack MMR from actual results. Update defense rating in the opposite direction: `D += K_defense × (E - result)`, using pre-match ratings and uncertainty. Apply server policies against repeated-pair farming and selective publication.
-5. Evaluate prediction reliability by army tier and matchup, recalibrating changed castles by revision.
-
-Current opponents are clearly labeled bots. No multiplayer service or server-verified rating is implemented.
+The rating change is `K × (outcome - E)`, rounded and bounded; K is 48 for the first ten games, then 24. Each started target settles once. Equal MMR expresses a model target of 50%, not an observed chance. No fake player history, source badge or search delay is shown.
