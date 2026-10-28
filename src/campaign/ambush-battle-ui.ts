@@ -10,7 +10,11 @@ import { KeepBricks } from "../defend/keep-bricks.ts";
 import { levelUnlocked } from "./levels.ts";
 import { drawFlierWarning } from "./flier-warning.ts";
 import { DefendRenderer } from "../defend/render.ts";
-import { BoardPointers } from "../defend/board-pointers.ts";
+import { spriteFootprint } from "../defend/city-layer.ts";
+import { BoardPointers, eventCell, type BoardAim } from "../defend/board-pointers.ts";
+import { bannerFor, climbsTowers, deployCircle, rallyAim, type Rally } from "../defend/deployment.ts";
+import { shootsFlat } from "../defend/gun-sight.ts";
+import { onFlag } from "../defend/war-banner.ts";
 import { paintIcon } from "../defend/structure-art.ts";
 import { STRUCTURES, type StructureKind } from "../defend/catalog.ts";
 import { hasForest } from "../defend/forest.ts";
@@ -23,6 +27,9 @@ import { buildingRect } from "./ambush-grid.ts";
 import { drawEntryArrow } from "./entry-arrow.ts";
 import { recordStars } from "./levels.ts";
 import { t } from "../i18n/index.ts";
+/** How soon (ms) and how close (CSS pixels) a second tap must follow the first to plant the rally flag. */
+const DOUBLE_TAP_MS = 350,
+  DOUBLE_TAP_SLOP = 30;
 export class AmbushBattlePage {
   sim: AmbushSim;
   readonly canvas = document.createElement("canvas");
@@ -44,6 +51,10 @@ export class AmbushBattlePage {
   private sideOpen = true;
   private panelKey = "";
   private statsAt = 0;
+  /** A rally flag being dragged out of the picked building, before it is let go. */
+  private aimPreview: { id: number; point?: Rally; since: number } | null = null;
+  /** The last tap on the board in battle, for a double tap's rally flag. */
+  private lastTap: { x: number; y: number; at: number; taps: number; picked: number | undefined } | null = null;
   constructor(
     private root: HTMLElement,
     private index: number,
@@ -57,6 +68,7 @@ export class AmbushBattlePage {
       paletteSelector: "#ambush-palette",
       raise: () => host.save().settings.raiseDrag,
       magnify: () => host.save().settings.magnifier,
+      aim: (e) => this.aimBuilding(e),
       pickUp: (e) => this.lift(e),
       drop: (d) => this.drop(d),
       tap: (e) => this.tap(e),
@@ -100,6 +112,7 @@ export class AmbushBattlePage {
     this.sim = new AmbushSim(this.index, this.host.save());
     this.paused = false;
     this.picked = undefined;
+    this.aimPreview = this.lastTap = null;
     this.spellBar?.cancel();
     this.notice = "";
     this.settled = false;
@@ -265,9 +278,77 @@ export class AmbushBattlePage {
       this.refresh();
       return;
     }
+    if (this.sim.phase === "battle" && this.rallyTap(e)) return;
     // A tap only picks a building or puts the panel away; buildings are dragged in from the palette, as in Defend.
     this.picked = b?.id;
     this.refresh();
+  }
+  /** In battle, as in Defend: a second tap (a third with the triple tap setting) close to the one
+   * before plants the free rally flag there, or takes it away when made on it. True when it did. */
+  private rallyTap(e: PointerEvent): boolean {
+    const last = this.lastTap,
+      now = performance.now();
+    const chained = !!last && now - last.at <= DOUBLE_TAP_MS && Math.hypot(e.clientX - last.x, e.clientY - last.y) <= DOUBLE_TAP_SLOP;
+    this.lastTap = { x: e.clientX, y: e.clientY, at: now, taps: chained ? last.taps + 1 : 1, picked: chained ? last.picked : this.picked };
+    if (this.lastTap.taps < (this.host.save().settings.tripleTapFlag ? 3 : 2)) return false;
+    const { fx, fy, inside } = eventCell(this.renderer, e);
+    if (!inside) return false;
+    const sim = this.sim.engine;
+    this.picked = this.lastTap.picked;
+    this.lastTap = null;
+    if (onFlag(sim.warBanner, fx, fy)) sim.liftFlag();
+    else sim.plantFlag({ x: fx, y: fy });
+    play("banner");
+    const troops = sim.soldiers.filter((s) => s.hp > 0 && s.home >= 0);
+    this.notice = troops.length && !troops.some((s) => bannerFor(sim, s)) ? "Out of every troop's deployment range: none can answer the flag there." : "";
+    this.refresh();
+    return true;
+  }
+  /** In battle, a press on the picked troop building (or its rally flag) drags out its rally point,
+   * riding above the finger as in Defend; let go without dragging, it is a tap. */
+  private aimBuilding(e: PointerEvent): BoardAim | null {
+    const sim = this.sim.engine,
+      picked = this.picked;
+    if (this.sim.phase !== "battle" || picked === undefined || this.spellBar?.armed) return null;
+    const p = eventCell(this.renderer, e);
+    if (!p.inside) return null;
+    const b = sim.map.buildings[picked];
+    if (!b || !sim.intact(b)) return null;
+    const circle = deployCircle(b, sim.bonuses);
+    if (!circle) return null;
+    const handle = sim.rallies.get(b.id),
+      r = b.rect;
+    const onIt = p.fx >= r.x && p.fy >= r.y && p.fx <= r.x + r.w && p.fy <= r.y + r.h;
+    if (!onIt && !(handle && Math.hypot(p.fx - handle.x, p.fy - handle.y) < 1.2)) return null;
+    const towers = climbsTowers(b.kind, shootsFlat) ? sim.map.buildings.filter((t) => t.kind === "watchTower" && sim.intact(t)) : [];
+    const engine = this.sim;
+    const at = (ev: PointerEvent) => {
+      const q = eventCell(this.renderer, ev);
+      return { x: q.fx, y: Math.max(0, q.fy - this.pointers.raise) };
+    };
+    const preview = (ev: PointerEvent) => {
+      const point = rallyAim(b, at(ev), circle, towers),
+        old = this.aimPreview;
+      this.aimPreview = { id: b.id, point, since: old?.id === b.id && !old.point && !point ? old.since : performance.now() };
+    };
+    return {
+      move: preview,
+      focus: at,
+      end: (ev, commit, moved) => {
+        if (!commit || !moved || this.sim !== engine || !sim.intact(b)) {
+          this.aimPreview = null;
+          if (commit && !moved) this.tap(ev);
+          return;
+        }
+        preview(ev);
+        const point = this.aimPreview?.point;
+        this.aimPreview = null;
+        sim.setRally(b.id, point ?? null);
+        play("banner");
+        this.notice = point ? "" : "Rally point cleared: the troops go their own ways.";
+        this.refresh();
+      },
+    };
   }
   frame(now: number) {
     this.now = now;
@@ -403,6 +484,15 @@ export class AmbushBattlePage {
       const look = artLook(b.kind, b.wear?.path);
       if (look) looks[b.id] = look;
     }
+    if (hasForest(s.level.area))
+      // The forest was planned before these lots were taken: it leaves its floor clear under each
+      // standing sprite's own pixels (its whole lot under rubble), so the building shows on the grass.
+      r.forest.cover(
+        s.buildings.map((b) => {
+          const m = s.map.buildings[b.id];
+          return { rect: m.rect, mask: s.engine.intact(m) ? spriteFootprint(s.map, m, looks[b.id]) : null };
+        }),
+      );
     r.draw(s.map, s.engine, this.pointers.session?.overlay() ?? this.spellBar?.overlay(s.engine) ?? null, {
       area: s.level.area,
       grid: 0,
@@ -416,7 +506,9 @@ export class AmbushBattlePage {
       simpleTroops: settings.simpleTroops,
       mergedOutlines: settings.mergedOutlines,
       looks,
-      ...(this.picked !== undefined ? { inspect: { id: this.picked, armed: s.engine } } : {}),
+      ...(this.picked !== undefined
+        ? { inspect: { id: this.picked, armed: s.engine, ...(this.aimPreview?.id === this.picked ? { aim: this.aimPreview } : {}) } }
+        : {}),
     });
     const c = this.canvas.getContext("2d")!;
     c.save();
