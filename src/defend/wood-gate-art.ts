@@ -133,11 +133,14 @@ function colour(m: Uint8Array, w: number, h: number, seed: number): Uint32Array 
 /** Where gate `b`'s art is drawn, in cells: its own rect, or, for a gate
  * set in a wall a cell deep (an Ambush outpost's), a box centred on that
  * line as deep as its art, so a stone gatehouse straddles the wall and a
- * wooden gate's leaves have room to swing. */
+ * wooden gate's leaves have room to swing; and for a gate shorter than its
+ * art (an Ambush gate, as wide as the road it shuts), centred along it, so
+ * its posts or towers stand on the wall either side of the road. */
 export function gateArtRect(b: Building): Rect {
   const r = b.rect, across = b.gate?.side === "e" || b.gate?.side === "w";
   const depth = across ? r.w : r.h, deep = b.woodGate ? WOOD_GATE.deep : GATE.deep;
-  if (depth === deep) return r;
-  const off = (deep - depth) / 2;
-  return across ? { x: r.x - off, y: r.y, w: deep, h: r.h } : { x: r.x, y: r.y - off, w: r.w, h: deep };
+  const length = across ? r.h : r.w, long = b.woodGate ? WOOD_GATE.long : GATE.long;
+  const off = (deep - depth) / 2, along = length < long ? (long - length) / 2 : 0, l = Math.max(length, long);
+  if (!off && !along) return r;
+  return across ? { x: r.x - off, y: r.y - along, w: deep, h: l } : { x: r.x - along, y: r.y - off, w: l, h: deep };
 }

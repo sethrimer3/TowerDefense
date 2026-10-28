@@ -198,7 +198,9 @@ const inDiscs = (discs: readonly { x: number; y: number; r: number }[], x: numbe
 
 function plan_(map: CityMap): ForestPlan {
   const trees: ForestTree[] = [], rocks: Rock[] = [], pads: Pad[] = [], lakes: Lake[] = [];
-  const open = Uint8Array.from(map.type, (t) => (t === CellType.OUT ? 1 : 0));
+  // Open ground, and the wooden fences standing on it (an Ambush outpost's),
+  // whose grass is the forest's though nothing grows on them.
+  const open = Uint8Array.from(map.type, (t, i) => (t === CellType.OUT || (t === CellType.WALL && map.buildings[map.owner[i]]?.fence) ? 1 : 0));
   const boulders = boulderPlan(map);
   // What keeps the rest away: lakes, big canopies and the boulders.
   const keep: { x: number; y: number; r: number }[] = [];
