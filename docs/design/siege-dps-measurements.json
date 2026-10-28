@@ -1,6 +1,6 @@
 {
   "inputs": {
-    "hash": "ffdf9a1b4c974d3b155779503e17c5caac0072f6cf39d4c8a2d75d9a1101c76c",
+    "hash": "0a8fd0b119dee026081a3cd0ddce31284d06e61f2dc8cf52be8c9d2249f3445d",
     "files": [
       "src/ballista-upgrades.ts",
       "src/campaign/castle-model.ts",

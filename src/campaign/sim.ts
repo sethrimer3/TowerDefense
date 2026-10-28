@@ -7,6 +7,7 @@ import { placedBattlePaths } from "../specializations.ts";
 import type { PathId } from "../knowledge-paths.ts";
 import type { Save } from "../save.ts";
 import { siegeField, type MusterCopy } from "./battlefield.ts";
+import { SiegeMana, SIEGE_MANA, manaFor } from "./siege-mana.ts";
 import { RaidBattle } from "./raid.ts";
 import { generateCastle, type CastleSnapshot } from "./castles.ts";
 import { castleGame } from "./castle-model.ts";
@@ -26,6 +27,7 @@ export function infantryCopies(save: DefendSave): MusterCopy[] {
 }
 export class CampaignSim {
   phase: "build" | "battle" | "won" | "lost" = "build";
+  readonly mana?: SiegeMana;
   readonly engine: DefendSim;
   readonly raid: RaidBattle;
   readonly layout: Placement[];
@@ -59,6 +61,11 @@ export class CampaignSim {
     const defense = gameBonuses(castleGame(castle.seed, castle.castle));
     this.raid = new RaidBattle(field, { ...levels }, bonus, defense, castle.seed, castle.castle.levels);
     this.engine = this.raid.attack;
+    if (SIEGE_MANA.enabled) {
+      this.mana = new SiegeMana();
+      this.engine.scenario = { ...this.engine.scenario, spellGate: this.mana.gate };
+      this.raid.onDefenderDeath = (unit) => this.mana!.gain(manaFor(unit));
+    }
     this.layout = copies.map((c, i) => ({ pad: i, kind: c.kind, ...(c.path ? { path: c.path as PathId, rank: c.rank } : {}) }));
   }
   get map() {

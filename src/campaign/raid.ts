@@ -62,6 +62,9 @@ export class RaidBattle {
   readonly attack: DefendSim;
   readonly defense: DefendSim;
   readonly view: DefendSim;
+  onDefenderDeath?: (unit: Soldier) => void;
+  private credited = new Set<number>();
+  private pendingDeaths = [new Set<number>(), new Set<number>()];
   private proxies = [new Map<number, Enemy>(), new Map<number, Enemy>()];
   private cache = new Map<PropertyKey, unknown>();
   private ids = 1;
@@ -134,6 +137,7 @@ export class RaidBattle {
   private rules(owned: Set<number>, attacking: boolean): ScenarioRules {
     return {
       manualWaves: true,
+      died: (enemy) => this.pendingDeaths[attacking ? 0 : 1].delete(enemy.id),
       passiveEnemies: true,
       noCivilians: attacking,
       unrestricted: attacking,
@@ -211,8 +215,16 @@ export class RaidBattle {
         enumerable: true,
         get: () => unit.hp,
         set: (value) => {
-          if (value < unit.hp) owner.hurtDefender(unit, unit.hp - value);
+          const before = unit.hp;
+          if (value < before) owner.hurtDefender(unit, before - value);
           else unit.hp = value;
+          if (before > 0 && unit.hp <= 0) {
+            this.pendingDeaths[viewer === this.attack ? 0 : 1].add(unit.id);
+            if (owner === this.defense && "kind" in unit && !this.credited.has(unit.id)) {
+              this.credited.add(unit.id);
+              this.onDefenderDeath?.(unit);
+            }
+          }
         },
       });
     } else {
@@ -285,6 +297,12 @@ export class RaidBattle {
       for (const id of buildings) {
         const b = this.field.map.buildings[id];
         if (owner.hp[id] > 0 && !b.hidden) targets.push(this.proxy(viewer, owner, 10000000 + id, undefined, b, cache));
+      }
+      // External spell/DoT damage can kill a proxied unit between native
+      // sweeps. Retain it until native bury/frost/nano death effects run once.
+      for (const id of this.pendingDeaths[index]) {
+        const proxy = cache.get(id);
+        if (proxy && proxy.hp <= 0) targets.push(proxy);
       }
       viewer.enemies = targets;
     }

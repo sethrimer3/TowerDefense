@@ -57,8 +57,14 @@ export function meteorReach(sim: Pick<DefendSim, "bonuses">): number {
 /** Casts the spell at `at`: sends its meteors down and starts the cooldown.
  * Returns how many fall, or 0 while it cools down. */
 export function castMeteor(sim: DefendSim, at: Point): number {
-  if (sim.meteorRemaining > 0) return 0;
-  sim.meteorReadyAt = sim.time + METEOR.cooldown;
+  const gate = sim.scenario?.spellGate;
+  if (gate) {
+    if (!gate.canCast("meteor")) return 0;
+    gate.spend("meteor");
+  } else {
+    if (sim.meteorRemaining > 0) return 0;
+    sim.meteorReadyAt = sim.time + METEOR.cooldown;
+  }
   const { starfall, frost } = ranks(sim);
   const r = METEOR.radius * sim.bonuses.meteorRadius * FROST_COMET.reach[frost];
   const damage = METEOR.damage * sim.bonuses.meteorDamage;

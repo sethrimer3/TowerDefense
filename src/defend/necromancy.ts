@@ -70,8 +70,14 @@ export const gravesNear = (sim: Pick<DefendSim, "graves">, at: Point, r = NECRO.
 /** Casts the spell at `at`: raises the fallen there and starts the
  * cooldown. Returns how many warriors rose, or -1 while it cools down. */
 export function castNecromancy(sim: DefendSim, at: Point): number {
-  if (sim.necroRemaining > 0) return -1;
-  sim.necroReadyAt = sim.time + NECRO.cooldown;
+  const gate = sim.scenario?.spellGate;
+  if (gate) {
+    if (!gate.canCast("necromancy")) return -1;
+    gate.spend("necromancy");
+  } else {
+    if (sim.necroRemaining > 0) return -1;
+    sim.necroReadyAt = sim.time + NECRO.cooldown;
+  }
   const graves = gravesNear(sim, at).filter((g) => !sim.solid[cellAt(g.x, g.y)]);
   const raising: Raising = { x: at.x, y: at.y, r: NECRO.radius, t: 0, risen: [] };
   sim.raisings.push(raising);

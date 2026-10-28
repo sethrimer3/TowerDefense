@@ -85,8 +85,14 @@ export function dropSpots(sim: Pick<DefendSim, "bonuses" | "solid">, at: Point):
 /** Casts the spell at `at`: the squad starts coming down. False while it
  * cools down. */
 export function castReinforcements(sim: DefendSim, at: Point): boolean {
-  if (sim.reinforceRemaining > 0) return false;
-  sim.reinforceReadyAt = sim.time + REINFORCE.cooldown;
+  const gate = sim.scenario?.spellGate;
+  if (gate) {
+    if (!gate.canCast("reinforcements")) return false;
+    gate.spend("reinforcements");
+  } else {
+    if (sim.reinforceRemaining > 0) return false;
+    sim.reinforceReadyAt = sim.time + REINFORCE.cooldown;
+  }
   const squad = ++sim.squads, life = REINFORCE.life * sim.bonuses.reinforceTime;
   let room = REINFORCE.max - calledCount(sim);
   dropSpots(sim, at).forEach((p, i) => {

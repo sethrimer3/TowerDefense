@@ -332,7 +332,10 @@ const HATCH_SPOTS = [
 ];
 
 /** Optional mode rules. Absent in ordinary Defend, including all replay fixtures. */
+export type ScenarioSpell = "meteor" | "frostNova" | "necromancy" | "reinforcements";
+export type ScenarioSpellGate = { canCast: (spell: ScenarioSpell) => boolean; spend: (spell: ScenarioSpell) => void };
 export type ScenarioRules = {
+  spellGate?: ScenarioSpellGate;
   manualWaves?: boolean;
   passiveEnemies?: boolean;
   noCivilians?: boolean;

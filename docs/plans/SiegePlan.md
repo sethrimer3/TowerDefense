@@ -21,7 +21,7 @@ Read this whole file, [AmbushPlan.md](AmbushPlan.md#architecture-guidelines)'s a
 
 | File | What it does now |
 |---|---|
-| `src/campaign/siege-ui.ts`, `siege-entry.ts` | Rank entry screen, Find Match/reveal/preview/Attack/Back, rated results and rank transitions, and native battle controls. Two board plates show names, flags and ranks. The shared strike bar still uses cooldowns until phase 7. |
+| `src/campaign/siege-ui.ts`, `siege-entry.ts` | Rank entry screen, Find Match/reveal/preview/Attack/Back, rated results and rank transitions, and native battle controls. Two board plates show names, flags and ranks. The shared native strike bar uses transient Siege mana; Defend and Ambush keep cooldowns. |
 | `src/campaign/sim.ts` (`CampaignSim`) | Native 240-second raid lifecycle and keep-destruction victory. Castle upgrades determine strength; the old flat defense damage/HP scale is removed. |
 | `src/campaign/raid.ts` (`RaidBattle`) | Two native `DefendSim` sides on one map. The defense wears the castle's saved levels and bonuses; attackers retain the player's upgrades. |
 | `src/campaign/battlefield.ts` (`siegeField`) | Generates the upper native city from the saved blueprint, with every owned infantry copy in bottom muster rows. |
@@ -170,9 +170,11 @@ One PR per phase. Each lists its tests; run `npm test` and `npm run build` befor
 
 Phase 6 validation: 921 Node assertions and the production build pass; native castle and entry/HUD browser checks pass at 390×844 and 1280×800. Independent seeds 1001–1002 won 35/68 matched raids (51.5%). Per-rank outcomes and the fixed-army assumptions are published in `docs/design/SIEGE_MATCHMAKING.md`. Only the Siege castle golden changed; Defend replay, city and fence goldens are untouched.
 
-### Phase 7: mana experiment ☐
+### Phase 7: mana experiment ☑
 - `spellGate` scenario hook, `SIEGE_MANA` and `SPELL_MANA`, kill crediting through `RaidBattle`, `manaFor(unit)`, the gate interface on `SpellBar`, and the mana counter.
 - **Tests:** `tests/siege-mana.test.ts`: start of 1 and cap of 8 respected; each defending unit's death gives exactly 1 (none for buildings or attacker losses, no double credit through proxies); costs 1/1/2/3; an unaffordable cast is refused and spends nothing; no cooldown starts. Defend and Ambush still use cooldowns and their replay golden is untouched. Browser: the counter rises as castle troops fall, icons light as they become affordable, Meteor and Reinforcements cast and spend, at both sizes.
+
+Phase 7 validation: all 927 Node assertions and the production build pass. Desktop/phone browsers cover native melee kill rewards, cost pips, affordability, Meteor/Reinforcements spending and Reduce Motion; entry/HUD and the shared Defend/Ambush spell bar also pass. All 2,885 native damage pairs were regenerated after adding the optional cast hooks; numerical damage and the ceiling are unchanged. No golden files changed. All numbered Siege phases (0–7) are complete; the shared items and future work below retain their separate scope.
 
 ### Shared items still open (OtherPlans.md)
 - Fences as walls (§1): castle parks get fences the attackers must break. Lands with that shared PR, not as a Siege phase.
@@ -206,4 +208,4 @@ Open, for Seth (defaults in brackets; the agent builds the default and keeps it 
 5. ~~Show `BOT` anywhere?~~ Decided: no, nowhere in game yet.
 6. **Find Match feel.** An instant reveal, or a short "searching" pause for atmosphere? [Instant reveal of about 600 ms; no fake wait.]
 7. **Placement games.** Show "Unranked" for the first ten games? [No.]
-8. **Exact DPS thresholds per division.** Still unknown (Seth, 2026-10-27): phase 4's tools and phase 6's calibration must work them out and bring the table to Seth for review.
+8. **Exact DPS thresholds per division.** Initial measured thresholds are published in `docs/design/SIEGE_MATCHMAKING.md`, with the native floor/ceiling and all 35 division anchors. The fixed reference armies won 35/68 independent raids; real-player progression and mana play still need playtesting.

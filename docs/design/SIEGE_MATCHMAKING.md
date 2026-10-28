@@ -96,3 +96,9 @@ The native floor is **10.2 estimated DPS**; the bounded-search ceiling is **48,0
 | Grandmaster I | 2720–3000 | 48,088,452,803.8 |
 
 <!-- native-calibration:end -->
+
+## Siege spell experiment
+
+Siege starts each raid with 1 mana, caps it at 8, and grants 1 per defending soldier's final death, including heroes and summons. Buildings, civilians, attacker deaths and prevented Hero deaths grant none. Frost nova and Necromancy cost 1; Meteor costs 2; Reinforcements costs 3. These native spells have no cooldown in Siege. An unaffordable cast does nothing. Mana resets with each new battle and is never saved or shared with Ambush gold or Mine resources. Defend and Ambush keep their cooldowns.
+
+The 35/68 calibration above is the phase 6 automatic-infantry baseline with no strike casts. It is preserved with its source hash; mana play has not been population-calibrated. The optional native cast hooks were remeasured after integration and leave the no-gate damage table numerically unchanged.
