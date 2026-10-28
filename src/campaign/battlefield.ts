@@ -112,6 +112,7 @@ export function ambushField(level: number) {
     map.owner[c] = -1;
   }
   if (bridges.size) map.bridges = Uint8Array.from({ length: CELL_COUNT }, (_, c) => bridges.get(c) ?? 0);
+  if (track.river) map.river = track.river;
   const outposts = outpostRects.map((rect) => {
     for (const b of map.buildings)
       if (b.kind === "wall" && b.rect.x >= rect.x && b.rect.x < rect.x + rect.w && b.rect.y >= rect.y && b.rect.y < rect.y + rect.h) {

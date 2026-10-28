@@ -82,6 +82,10 @@ export type CityMap = {
   spikes?: SpikeRow[];
   /** Road cells bridging water, 2 over the water itself and 1 on its banks (unset when there are none). */
   bridges?: Uint8Array;
+  /** An Ambush river's cells, a band across the board: in each column its
+   * first row and how many deep (unset without one). Its art follows them
+   * (`river-art.ts`). */
+  river?: { top: number[]; depth: number[] };
 };
 
 /** House footprints and how often each is tried first: mostly chunky
