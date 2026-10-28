@@ -5,10 +5,8 @@ import type { CampaignHost } from "./host.ts";
 import { DefendRenderer } from "../defend/render.ts";
 import { BoardPointers } from "../defend/board-pointers.ts";
 import { artLook } from "../defend/tower-art.ts";
-import { STRUCTURES, type PaletteItem } from "../defend/catalog.ts";
-import { paintIcon } from "../defend/structure-art.ts";
-import { flagSvg, escapeText } from "../profile/model.ts";
-import { renderSiegeEntry, namePlate, paintRanks } from "./siege-entry.ts";
+import { renderSiegeEntry, paintRanks } from "./siege-entry.ts";
+import { bannerPlate, Banners, TroopBox } from "./siege-hud.ts";
 import { botFlag } from "./bot-identity.ts";
 import { defaultFlag } from "../profile/model.ts";
 import { newSiege, findMatch, settleRaid } from "./siege-progress.ts";
@@ -28,6 +26,8 @@ export class SiegePage {
   private spellBar?: SpellBar;
   private notice = "";
   private freshCamera = true;
+  private readonly banners = new Banners();
+  private readonly troops = new TroopBox();
   constructor(
     private root: HTMLElement,
     private host: CampaignHost,
@@ -178,20 +178,15 @@ export class SiegePage {
       t("siege.next") +
       "</button></div>" +
       '<div class="campaign-spells"></div><p class="campaign-status" role="status" aria-live="polite"></p></div>' +
-      '<div class="campaign-stage defend-stage side-open"><aside class="defend-side"><div class="campaign-roster defend-palette"></div></aside><div class="campaign-board defend-board"></div></div>';
+      '<div class="campaign-stage defend-stage"><div class="campaign-board defend-board"></div></div>';
     this.root.querySelector(".campaign-board")!.append(this.canvas);
     const board = this.root.querySelector(".campaign-board")!;
-    board.insertAdjacentHTML(
-      "beforeend",
-      namePlate(
-        {
-          name: raid.castle.owner.name,
-          flag: raid.castle.owner.flag ?? botFlag(raid.castle.seed),
-        },
-        raid.defender,
-        "top",
-      ) + namePlate(profile ?? { name: t("siege.you"), flag: defaultFlag() }, siege.mmr, "bottom"),
-    );
+    const opponent = { name: raid.castle.owner.name, flag: raid.castle.owner.flag ?? botFlag(raid.castle.seed) },
+      you = profile ?? { name: t("siege.you"), flag: defaultFlag() };
+    board.insertAdjacentHTML("beforeend", bannerPlate(opponent, raid.defender, "top") + bannerPlate(you, siege.mmr, "bottom"));
+    this.banners.attach(this.root, { top: opponent.flag, bottom: you.flag });
+    this.troops.update(this.sim.allies);
+    board.append(this.troops.el);
     paintRanks(this.root);
     const profileButton = this.root.querySelector<HTMLButtonElement>('[data-action="profile"]');
     if (profileButton)
@@ -224,23 +219,6 @@ export class SiegePage {
       this.view = "entry";
       this.render();
     };
-    const kinds = [...new Set(this.sim.layout.map((b) => b.kind))];
-    this.root.querySelector(".campaign-roster")!.innerHTML =
-      kinds
-        .map(
-          (kind) =>
-            '<div class="siege-building"><canvas width="48" height="48" data-kind="' +
-            kind +
-            '"></canvas><span>' +
-            STRUCTURES[kind].name +
-            "</span><small>" +
-            t("siege.deployed", {
-              count: this.sim.layout.filter((b) => b.kind === kind).length,
-            }) +
-            "</small></div>",
-        )
-        .join("") || "<p>" + t("siege.empty") + "</p>";
-    this.root.querySelectorAll<HTMLCanvasElement>("[data-kind]").forEach((c) => paintIcon(c, c.dataset.kind as PaletteItem));
     this.spellBar = new SpellBar(STRIKE_SPELLS.filter((spell) => this.sim.engine.bonuses[spell]));
     this.root.querySelector(".campaign-spells")!.remove();
     this.root.querySelector(".campaign-board")!.append(this.spellBar.el);
@@ -285,6 +263,7 @@ export class SiegePage {
               }));
     this.root.querySelector<HTMLButtonElement>('[data-action="start"]')!.disabled = s.phase === "won" || s.phase === "lost";
     this.spellBar?.update(s.engine, s.phase === "battle", this.host.save().settings.reduceMotion);
+    this.troops.update(s.allies);
   }
   private plateFocus(e: PointerEvent) {
     for (const p of Array.from(this.root.querySelectorAll<HTMLElement>(".siege-name-plate"))) {
@@ -305,6 +284,7 @@ export class SiegePage {
     )?.id;
   }
   private draw() {
+    this.banners.draw(this.now, this.host.save().settings.reduceMotion);
     const r = this.renderer,
       box = this.canvas.getBoundingClientRect();
     r.resize(box.width, box.height);

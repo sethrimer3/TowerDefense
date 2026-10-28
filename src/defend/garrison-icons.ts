@@ -69,25 +69,46 @@ export function drawGarrisons({ c, px }: Brush, sim: DefendSim) {
     pen(x, y, w, h);
   };
   for (const { rect, units } of garrisons(sim))
-    badgeSpots(rect, units.length).forEach(({ ax, ay }, i) => drawBadge(fill, ax, ay, units[i]));
+    badgeSpots(rect, units.length).forEach(({ ax, ay }, i) => drawBadge(fill, ax, ay, units[i].kind, units[i].flash > 0));
+}
+
+/** One troop kind's badge, without its notch, on a canvas `BADGE.size`
+ * pixels square: the Siege page's remaining troops use it as their icon. */
+export function paintTroopBadge(canvas: HTMLCanvasElement, kind: Soldier["kind"]) {
+  canvas.width = canvas.height = BADGE.size;
+  const c = canvas.getContext("2d")!;
+  c.clearRect(0, 0, BADGE.size, BADGE.size);
+  drawBadge(
+    (color, x, y, w, h) => {
+      c.fillStyle = color;
+      c.fillRect(x, y, w, h);
+    },
+    0,
+    0,
+    kind,
+    false,
+    false,
+  );
 }
 
 type Fill = (color: string, x: number, y: number, w: number, h: number) => void;
 
-function drawBadge(fill: Fill, x: number, y: number, u: Soldier) {
-  const n = BADGE.size, white = u.flash > 0;
+function drawBadge(fill: Fill, x: number, y: number, kind: Soldier["kind"], white: boolean, notch = true) {
+  const n = BADGE.size;
   // The outline, corners cut, and its notch pointing down at the tower.
   fill(OUTLINE, x + 1, y, n - 2, n);
   fill(OUTLINE, x, y + 1, n, n - 2);
-  fill(OUTLINE, x + (n >> 1) - 1, y + n, 3, 1);
-  fill(OUTLINE, x + (n >> 1), y + n + 1, 1, 1);
+  if (notch) {
+    fill(OUTLINE, x + (n >> 1) - 1, y + n, 3, 1);
+    fill(OUTLINE, x + (n >> 1), y + n + 1, 1, 1);
+  }
   // The brass rim and the dark face inside it.
   fill(RIM, x + 1, y + 1, n - 2, n - 2);
   fill(white ? "#ffffff" : FACE, x + 2, y + 2, n - 4, n - 4);
   if (white) return;
   // The figure: a head, shoulders and body in its colour, legs below, its
   // weapon held across the body out to the rim.
-  const body = TROOPS[u.kind]?.color ?? "#8a8a8a";
+  const body = TROOPS[kind]?.color ?? "#8a8a8a";
   const mx = x + (n >> 1);
   fill(SKIN, mx, y + 2, 1, 1);
   fill(body, mx - 1, y + 3, 3, 1);
@@ -95,5 +116,5 @@ function drawBadge(fill: Fill, x: number, y: number, u: Soldier) {
   fill(body, mx - 1, y + 5, 3, 1);
   fill(BOOTS, mx - 1, y + 6, 1, 1);
   fill(BOOTS, mx + 1, y + 6, 1, 1);
-  fill(WEAPON[u.kind] ?? STEEL, mx + 1, y + 4, 3, 1);
+  fill(WEAPON[kind] ?? STEEL, mx + 1, y + 4, 3, 1);
 }

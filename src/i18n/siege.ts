@@ -12,7 +12,7 @@ export const SIEGE_TEXT=[
  row('siege.lastResult','Last rated result: {result} · MMR {delta}. This target is available for unrated practice.'),
  row('siege.victory','Victory'),row('siege.defeat','Defeat'),row('siege.practice','Start practice'),row('siege.ranked','Start ranked raid'),row('siege.resume','Resume'),row('siege.pause','Pause'),
  row('siege.forfeit','Forfeit / rebuild'),row('siege.practiceAgain','Practice again'),row('siege.rebuild','Rebuild'),row('siege.next','Find Match'),
- row('siege.buyInfantry','Buy an infantry building in Tiles before starting a raid.'),row('siege.deployed','{count} deployed'),row('siege.empty','No infantry buildings owned. Buy a Melee Guild or Ranged Guild in Tiles.'),
+ row('siege.buyInfantry','Buy an infantry building in Tiles before starting a raid.'),row('siege.remaining','Remaining troops'),
  row('siege.ready','{count} infantry buildings deployed. Start the raid to release their troops.'),row('siege.won','Victory! The keep has fallen.'),row('siege.lost','Defeat. Rebuild your formation and try again.'),
  row('siege.paused','Paused · '),row('siege.status','Keep {hp}/{max} · {troops} troops · {seconds}s'),
 ] as const;
