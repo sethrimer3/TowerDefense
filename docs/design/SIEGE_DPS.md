@@ -1,6 +1,6 @@
 # Siege defensive damage measurements
 
-The rating estimator uses native Defend attacks. It never sets battle damage, HP, fire rate, or targeting. The current measured floor is **10.2 DPS** (the unupgraded keep and two Ranged Guilds). The bounded-search ceiling is **48,088,452,803.799706 DPS** (24 maximum Shadows, 19 Watch towers, the maximum keep, gate and four corner ballistas). These are capacity estimates under the protocol below, not damage a castle necessarily delivers during a raid or measured success probabilities.
+The rating estimator uses native Defend attacks. It never sets battle damage, HP, fire rate, or targeting. The current measured floor is **10.2 DPS** (the unupgraded keep and two Ranged Guilds). The bounded-search ceiling is **2,660,425.87 DPS** (24 maximum Shadows and 19 Watch towers with every side tree maxed), after the overkill cap below.
 
 ## Reproduce
 
@@ -23,6 +23,10 @@ Raw measurements are checked in. The rating table uses a nondecreasing envelope 
 `castleDps` sums native defenders, keep, gates, ballistas and every fitted placed wall stone. Automatic city perimeter walls do not carry the placed-wall trap tree and earn no trap DPS. Watch marking never stacks: coverage is sampled at four fronts around each armed footprint, weighted toward the southern approach. Chrono/Nano require nearby armed homes; the common-target-pool model counts the strongest contribution in each family. Fine native damage-training ranks apply their real catalog ratios relative to the nearest measured band. Placement and support interactions remain approximations. Additional buildings and ranks cannot reduce the estimate.
 
 Shadow's native knife compounding reaches extremely high damage during dense, immortal-target encounters. Its all-max weighted measurement is about 1.007 billion DPS per building, making the endgame ceiling many orders above the floor. The measurements preserve this behavior and the finite-target clamp rather than inventing a cap. Ordinary raids have finite units, changing geometry, deaths and walls; phase 6 must measure actual raid outcomes and may bend the MMR curve. No rating estimate is a claim of a 50% win rate.
+
+## Overkill cap
+
+`defenderDps` credits no building with more than `OVERKILL[band]`: the best weighted rate measured at that band by any profile that does not compound (about 942, 3.5k, 13.4k, 27.3k and 51.4k DPS for bands 0–4, from the maximal Inferno hall). The raw table still records the Shadow's 10⁹ against the immortal crowd, but a raid army has finite health, so damage past that is overkill no raid delivers. Before the cap one Shadow was worth more than any other castle, and every Master and Grandmaster castle collapsed to one Shadow and two Ranged Guilds. The cap is monotone, leaves every non-Shadow profile unchanged and keeps a fully ranked Shadow at the top of its band.
 
 ## Legal ceiling witness
 

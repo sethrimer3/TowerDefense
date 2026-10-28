@@ -6,7 +6,9 @@ export class ManaCounter {
   private previous = "";
   constructor() {
     this.el.className = "siege-mana";
-    this.el.setAttribute("aria-live", "polite");
+    // An <output> is a live region; announcing every kill would drown a
+    // screen reader in a crowded fight. The spell buttons carry affordability.
+    this.el.setAttribute("aria-live", "off");
     const c = document.createElement("canvas");
     c.width = 12;
     c.height = 16;

@@ -28,9 +28,22 @@ export function forgeBandOf(levels: NativeCastle["levels"]) {
   }
   return best;
 }
+/** The most any one building can be credited with at each band: the best
+ * measured profile whose damage does not compound. The Shadow's edge grows
+ * without bound against the benchmark's immortal crowd (to 10⁹), while a raid
+ * army has finite health, so anything past this is overkill a raid never
+ * delivers. Without the cap one Shadow outweighs a whole castle and high-rank
+ * castles collapse to a single building. */
+export const OVERKILL = [0, 1, 2, 3, 4].map((band) =>
+  Math.max(...Object.entries(SIEGE_DPS_TABLE).filter(([key]) => !key.startsWith("shadow/")).map(([, row]) => weight(row, band))),
+);
 /** Shared-tree combinations use measured branch effects and their measured
- * all-max interaction anchor. The positive envelope is monotone in each rank. */
+ * all-max interaction anchor. The positive envelope is monotone in each rank.
+ * Every rate is capped at `OVERKILL`. */
 export function defenderDps(kind: DefenderKind, band: number, path?: PathId, rank = 0, side: Record<string, number> = {}) {
+  return Math.min(OVERKILL[band], measuredDps(kind, band, path, rank, side));
+}
+function measuredDps(kind: DefenderKind, band: number, path?: PathId, rank = 0, side: Record<string, number> = {}) {
   const group = SIDE_GROUPS.find((g) => g.kind === kind);
   if (!group) return weight(SIEGE_DPS_TABLE[profileKey(kind, path, rank)] ?? SIEGE_DPS_TABLE[profileKey(kind)], band);
   const normalized = Object.fromEntries(group.paths.map((p) => [p.id, Math.max(0, Math.min(p.ranks.length, Math.floor(side[p.id] ?? 0)))]));

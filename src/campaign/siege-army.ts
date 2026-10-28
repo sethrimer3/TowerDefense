@@ -13,24 +13,29 @@ import { rating } from "./siege-rating.ts";
 import { ratioPow } from "../exact.ts";
 type Choice = [PlacedKind, PathId?, number?];
 export const ARMY_POLICY = {
-  version: 2,
-  bronzeHomes: 8,
-  goldHomes: 4,
-  platinumHomes: 5,
+  version: 3,
+  bronzeHomes: 4,
+  goldHomes: 6,
   diamondHomes: 8,
   masterHomes: 10,
-  grandmasterHomes: 20,
+  grandmasterHomes: 12,
   grandmasterPerDivision: 2,
 } as const;
+/** Every player starts at 1000 MMR (Gold III), so the army assumed there is
+ * a modest one: attuned halls without paths. Paths climb through Platinum and
+ * Diamond; ultimates arrive at Master. */
 function progressionAnchor(value: number) {
   const mmr = rating(value),
-    band = Math.min(4, Math.floor(mmr / 600)),
-    rank = Math.min(3, Math.max(1, Math.floor((mmr - 400) / 400)));
+    band = Math.min(4, Math.floor(mmr / 600));
   let choices: Choice[], count: number;
-  if (mmr < 800) {
-    choices = [["barracks"], ["archerBarracks"]];
+  if (mmr < 1000) {
+    choices = [["meleeGuild"], ["rangedGuild"]];
     count = ARMY_POLICY.bronzeHomes;
-  } else if (mmr < 2000) {
+  } else if (mmr < 1600) {
+    choices = [["barracks"], ["archerBarracks"], ["spearHall"], ["mageGuild"]];
+    count = ARMY_POLICY.goldHomes;
+  } else if (mmr < 2400) {
+    const rank = mmr < 2000 ? 2 : 3;
     choices = [
       ["chapterHouse", "crusaders", rank],
       ["berserkerLodge", "berserkers", rank],
@@ -39,15 +44,12 @@ function progressionAnchor(value: number) {
       ["gunNest", "beltFeed", rank],
       ["phalanx", "testudo", rank],
     ];
-    count = mmr < 1200 ? ARMY_POLICY.goldHomes : mmr < 1600 ? ARMY_POLICY.platinumHomes : ARMY_POLICY.diamondHomes;
+    count = mmr < 2000 ? ARMY_POLICY.diamondHomes : ARMY_POLICY.masterHomes;
   } else {
-    choices =
-      mmr >= 2400
-        ? [["shadow"], ["heroHall", "legend", 3], ["shadow"], ["revolutionary"], ["shadow"]]
-        : [["heroHall", "legend", 3], ["shadow"], ["revolutionary"], ["gatlingNest", "overdrive", 3], ["valkyriePalace", "cloudborne", 3]];
-    count = mmr >= 2400 ? ARMY_POLICY.grandmasterHomes + Math.floor((mmr - 2400) / 80) * ARMY_POLICY.grandmasterPerDivision : ARMY_POLICY.masterHomes;
+    choices = [["heroHall", "legend", 3], ["shadow"], ["revolutionary"], ["gatlingNest", "overdrive", 3], ["valkyriePalace", "cloudborne", 3]];
+    count = ARMY_POLICY.grandmasterHomes + Math.floor((mmr - 2400) / 80) * ARMY_POLICY.grandmasterPerDivision;
   }
-  const fraction = Math.max(0, Math.min(1, (mmr - 2000) / 400)),
+  const fraction = Math.max(0, Math.min(1, (mmr - 2000) / 720)),
     mean =
       choices.reduce((sum, [kind, path, rank]) => {
         const group = SIDE_GROUPS.find((g) => g.kind === kind),
@@ -60,7 +62,7 @@ function progressionAnchor(value: number) {
  * changing the whole assumed army on the tick a shared rank rounds upward. */
 export function typicalArmyBudget(value: number) {
   const mmr = Math.min(2720, rating(value)),
-    points = [100, 800, 1600, 2000, 2400, 2720];
+    points = [100, 1000, 1600, 2000, 2400, 2720];
   let previous = 0;
   const anchors = points.map((m) => {
     const dps = Math.max(progressionAnchor(m), previous * 1.1);

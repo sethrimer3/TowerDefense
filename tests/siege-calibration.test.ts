@@ -4,6 +4,7 @@ import { calibrationArmy, typicalArmyBudget } from "../src/campaign/siege-army.t
 import { infantry } from "../src/campaign/plans.ts";
 import { STRUCTURES } from "../src/defend/catalog.ts";
 import { calibrateRaid } from "../tools/siege-calibration.ts";
+import { readFileSync } from "node:fs";
 test("Reference progression budgets rise smoothly and build real infantry with native support", () => {
   let previous = 0;
   for (let mmr = 100; mmr <= 2720; mmr += 20) {
@@ -39,4 +40,14 @@ test("The fitted curve is reproducible from complete training raids and keeps bo
   assert.equal(CURVE_ANCHORS[0][1], DPS_MIN);
   assert.equal(CURVE_ANCHORS.at(-1)![1], "ceiling");
   assert.ok(DPS_MAX > DPS_MIN);
+});
+test("The published raid results were recorded against the current generator, estimate, armies and battle", async () => {
+  const { calibrationHash, TUNING_SOURCES, VALIDATION_SOURCES } = await import("../tools/siege-calibration.ts");
+  const read = (f: string) => JSON.parse(readFileSync(new URL("../docs/design/" + f, import.meta.url), "utf8"));
+  const training = read("siege-calibration-training.json"),
+    validation = read("siege-calibration.json");
+  // A changed source means rerunning tools/tune-siege.ts and calibrate-siege.ts.
+  assert.equal(training.inputHash, calibrationHash(TUNING_SOURCES));
+  assert.ok(training.rows.every((r: { observedInputHash: string }) => r.observedInputHash === training.inputHash));
+  assert.equal(validation.inputHash, calibrationHash(VALIDATION_SOURCES));
 });

@@ -1,10 +1,8 @@
 /** Native matched-raid calibration. No player saves or battle multipliers.
  * --samples=2 --workers=2 --split=heldout --out=path.json; --smoke never reports a win rate. */
 import { Worker } from "node:worker_threads";
-import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync, existsSync, appendFileSync, mkdirSync } from "node:fs";
-import { calibrateRaid } from "./siege-calibration.ts";
-import { siegeDpsInputs } from "./siege-dps-inputs.ts";
+import { calibrateRaid, calibrationHash, VALIDATION_SOURCES } from "./siege-calibration.ts";
 import { DIVISION_DPS } from "../src/campaign/siege-division-dps.ts";
 import { ARMY_POLICY } from "../src/campaign/siege-army.ts";
 import { rankLabel } from "../src/campaign/siege-ranks.ts";
@@ -16,27 +14,11 @@ const arg = (name: string) =>
     .join("=");
 const split = arg("split") === "training" ? "training" : "heldout",
   samples = Math.max(1, Math.min(32, Math.floor(Number(arg("samples") ?? process.env.SIEGE_SAMPLES) || 2))),
-  workers = Math.max(1, Math.min(2, Math.floor(Number(arg("workers")) || 2))),
+  workers = Math.max(1, Math.min(4, Math.floor(Number(arg("workers")) || 2))),
   out = arg("out"),
   smoke = process.argv.includes("--smoke");
 const seedStart = Math.max(1, Math.min(1e9, Math.floor(Number(arg("seed-start")) || (split === "training" ? 1 : 1001))));
-const sources = [
-  "src/campaign/castle-generator.ts",
-  "src/campaign/castle-dps.ts",
-  "src/campaign/siege-dps-table.ts",
-  "src/campaign/siege-budget.ts",
-  "src/campaign/siege-army.ts",
-  "src/campaign/siege-division-dps.ts",
-  "src/campaign/castles.ts",
-  "src/campaign/raid.ts",
-  "src/campaign/sim.ts",
-  "tools/siege-calibration.ts",
-  "tools/siege-calibration-worker.ts",
-  "tools/calibrate-siege.ts",
-];
-const h = createHash("sha256").update(siegeDpsInputs().hash);
-for (const p of sources) h.update(p + "\0").update(readFileSync(p));
-const inputHash = h.digest("hex");
+const inputHash = calibrationHash(VALIDATION_SOURCES);
 if (smoke) {
   const start = performance.now(),
     rows = [calibrateRaid(600, 101, { seconds: 2 }), calibrateRaid(2160, 102, { seconds: 2 })];
