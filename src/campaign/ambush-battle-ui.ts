@@ -7,6 +7,7 @@ import { artLook } from "../defend/tower-art.ts";
 import type { AmbushBuilding } from "./ambush-sim.ts";
 import { SpellBar } from "../ui/spell-bar.ts";
 import { KeepBricks } from "../defend/keep-bricks.ts";
+import { iconImg, iconUrl } from "./ambush-icons.ts";
 import { levelUnlocked } from "./levels.ts";
 import { drawFlierWarning } from "./flier-warning.ts";
 import { DefendRenderer } from "../defend/render.ts";
@@ -48,6 +49,7 @@ export class AmbushBattlePage {
   private sounds = new BattleSound();
   private spellBar?: SpellBar;
   private health = new KeepBricks();
+  private miniHealth = new KeepBricks();
   private sideOpen = true;
   private panelKey = "";
   private statsAt = 0;
@@ -120,6 +122,15 @@ export class AmbushBattlePage {
     this.cleared.clear();
     this.render();
   }
+  /** Slides the buildings sidebar in or out without rebuilding the page; while
+   * it is out, a small box over the board's top left keeps the health and gold. */
+  private toggleSide(open: boolean) {
+    this.sideOpen = open;
+    this.root.querySelector(".campaign-stage")?.classList.toggle("side-open", open);
+    this.root.querySelector('[data-action="side"]')?.setAttribute("aria-pressed", String(open));
+    const mini = this.root.querySelector<HTMLElement>(".ambush-mini");
+    if (mini) mini.hidden = open;
+  }
   private render() {
     this.panelKey = "";
     this.pointers.end();
@@ -155,9 +166,10 @@ export class AmbushBattlePage {
       <div class="campaign-stage defend-stage ${this.sideOpen ? "side-open" : ""}">
         <aside class="defend-side ambush-side">
           <div class="ambush-side-head">
-            <strong id="ambush-health-label"></strong><div id="ambush-health"></div><span id="ambush-health-number"></span>
-            <p class="ambush-wallet"><i class="metal-icon gold" aria-hidden="true"></i> <b id="ambush-gold"></b> ${t("ambush.gold")}</p>
-            <div class="ambush-hud-stars" aria-label="${t("ambush.stars", { stars: s.stars, total: 3 })}">${[0, 1, 2].map((i) => `<span data-star="${i}">★</span>`).join("")}</div>
+            <button class="ambush-hide" data-action="hide" aria-label="${t("ambush.hide")}" title="${t("ambush.hide")}">&lt;</button>
+            <strong class="ambush-health-label"><span id="ambush-health-label"></span><span id="ambush-health-short"></span></strong><div id="ambush-health"></div>
+            <div class="ambush-hud-stars" aria-label="${t("ambush.stars", { stars: s.stars, total: 3 })}">${[0, 1, 2].map((i) => `<span data-star="${i}">${iconImg("star")}</span>`).join("")}</div>
+            <p class="ambush-wallet">${iconImg("coin")}<b id="ambush-gold"></b></p>
           </div>
           <div class="ambush-side-content">
             <div class="campaign-roster defend-palette" id="ambush-palette"></div>
@@ -167,10 +179,15 @@ export class AmbushBattlePage {
             </div>
           </div>
         </aside>
-        <div class="campaign-board defend-board"><div class="campaign-spells"></div>${result}</div>
+        <div class="campaign-board defend-board"><div class="campaign-spells"></div>
+          <button class="ambush-mini" data-action="show" ${this.sideOpen ? "hidden" : ""} aria-label="${t("ambush.buildings")}">
+            <span class="ambush-mini-hp"><b id="ambush-mini-label"></b><span id="ambush-mini-health"></span></span>
+            <span class="ambush-mini-gold">${iconImg("coin")}<b id="ambush-mini-gold"></b></span>
+          </button>${result}</div>
       </div>`;
     this.root.querySelector(".campaign-board")!.prepend(this.canvas);
     this.root.querySelector("#ambush-health")!.append(this.health.canvas);
+    this.root.querySelector("#ambush-mini-health")!.append(this.miniHealth.canvas);
     const button = (action: string) => this.root.querySelector<HTMLButtonElement>('[data-action="' + action + '"]')!;
     button("level-select").onclick = () => this.host.levelSelect?.();
     if (ended) {
@@ -204,10 +221,9 @@ export class AmbushBattlePage {
       this.host.store();
       this.refresh();
     };
-    button("side").onclick = () => {
-      this.sideOpen = !this.sideOpen;
-      this.render();
-    };
+    button("side").onclick = () => this.toggleSide(!this.sideOpen);
+    button("hide").onclick = () => this.toggleSide(false);
+    button("show").onclick = () => this.toggleSide(true);
     this.root.querySelector<HTMLInputElement>('[data-action="auto"]')!.onchange = (e) => {
       this.sim.autoSend = (e.target as HTMLInputElement).checked;
       const progress = this.host.save().campaigns.ambush;
@@ -234,7 +250,7 @@ export class AmbushBattlePage {
     const roster = this.root.querySelector<HTMLElement>(".campaign-roster")!;
     roster.innerHTML = AMBUSH_PALETTE.map(
       (kind) =>
-        `<button class="defend-item" data-kind="${kind}"><canvas width="48" height="48"></canvas><span>${STRUCTURES[kind].name}</span><small>${this.sim.price(kind)} ${t("ambush.gold")}</small></button>`,
+        `<button class="defend-item" data-kind="${kind}"><canvas width="48" height="48"></canvas><span>${STRUCTURES[kind].name}</span><small>${iconImg("coin", 1)}${this.sim.price(kind)}</small></button>`,
     ).join("");
     roster.querySelectorAll<HTMLButtonElement>("[data-kind]").forEach((b) => {
       const kind = b.dataset.kind as PlacedKind;
@@ -359,6 +375,7 @@ export class AmbushBattlePage {
       if (dt > 0) this.sounds.hear(this.sim.engine);
     }
     this.health.step(this.host.save().settings.reduceMotion ? 0 : dt);
+    this.miniHealth.step(this.host.save().settings.reduceMotion ? 0 : dt);
     if (!this.settled && (this.sim.phase === "won" || this.sim.phase === "lost")) {
       this.settled = true;
       if (this.sim.phase === "won") {
@@ -376,19 +393,26 @@ export class AmbushBattlePage {
     const s = this.sim,
       b = s.buildings.find((b) => b.id === this.picked),
       ended = s.phase === "won" || s.phase === "lost";
-    const gold = this.root.querySelector("#ambush-gold")!,
-      wallet = String(Math.floor(s.gold));
-    if (gold.textContent !== wallet) gold.textContent = wallet;
+    const wallet = String(Math.floor(s.gold));
+    this.root.querySelectorAll("#ambush-gold, #ambush-mini-gold").forEach((gold) => {
+      if (gold.textContent !== wallet) gold.textContent = wallet;
+    });
     const post = s.outposts.posts.find((p) => !p.fallen),
+      index = post ? s.outposts.posts.indexOf(post) : -1,
       fraction = post ? post.health : s.engine.keepHp() / s.engine.keepMaxHp();
-    this.root.querySelector("#ambush-health-label")!.textContent = t(
-      post ? (s.outposts.posts.indexOf(post) === 0 ? "ambush.outpost1" : "ambush.outpost2") : "ambush.keep",
-    );
-    this.root.querySelector("#ambush-health-number")!.textContent = post
-      ? Math.ceil(fraction * 100) + "%"
-      : Math.ceil(s.engine.keepHp()) + "/" + Math.ceil(s.engine.keepMaxHp());
+    this.root.querySelector("#ambush-health-label")!.textContent = t(index === 0 ? "ambush.outpost1" : index === 1 ? "ambush.outpost2" : "ambush.keep");
+    const short = t(index === 0 ? "ambush.op1" : index === 1 ? "ambush.op2" : "ambush.keepShort");
+    this.root.querySelector("#ambush-health-short")!.textContent = short;
+    this.root.querySelector("#ambush-mini-label")!.textContent = short + ":";
     this.health.set(fraction);
-    this.root.querySelectorAll<HTMLElement>("[data-star]").forEach((el) => el.classList.toggle("star-lost", Number(el.dataset.star) >= s.stars));
+    this.miniHealth.set(fraction);
+    this.root.querySelectorAll<HTMLElement>("[data-star]").forEach((el) => {
+      const lost = Number(el.dataset.star) >= s.stars,
+        img = el.querySelector("img")!,
+        src = iconUrl(lost ? "slot" : "star");
+      el.classList.toggle("star-lost", lost);
+      if (img.getAttribute("src") !== src) img.src = src;
+    });
     this.root.querySelector(".ambush-hud-stars")!.setAttribute("aria-label", t("ambush.stars", { stars: s.stars, total: 3 }));
     this.root.querySelector(".campaign-status")!.textContent =
       this.notice ||

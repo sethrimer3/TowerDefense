@@ -38,7 +38,21 @@ try {
     });
     await page.waitForFunction(() => document.querySelector("#ambush-health-label").textContent === "Outpost 2");
     assert.equal(await page.locator(".star-lost").count(), 1);
+    assert.equal(await page.locator(".ambush-side-head").innerText().then((t) => /gold|%/i.test(t)), false);
+    const side = await page.locator("#ambush .ambush-side").boundingBox();
+    assert.ok(side.width <= 80, "sidebar is " + side.width + "px wide");
+    await page.waitForTimeout(400);
     await page.screenshot({ path: "test-results/ambush-hud-" + width + ".png" });
+    await page.locator('#ambush [data-action="hide"]').click();
+    assert.equal(await page.locator("#ambush .side-open").count(), 0);
+    assert.equal(await page.locator(".ambush-mini").isVisible(), true);
+    assert.equal(await page.locator("#ambush-mini-label").innerText(), "OP2:");
+    assert.equal(await page.locator("#ambush-mini-gold").innerText(), await page.locator("#ambush-gold").innerText());
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: "test-results/ambush-hud-hidden-" + width + ".png" });
+    await page.locator(".ambush-mini").click();
+    assert.equal(await page.locator("#ambush .side-open").count(), 1);
+    assert.equal(await page.locator(".ambush-mini").isVisible(), false);
     await page.evaluate(() => {
       const s = window.nativeModes.ambush.sim;
       s.phase = "won";
@@ -62,7 +76,7 @@ try {
     assert.deepEqual(errors, []);
     await page.close();
   }
-  console.log("Twenty-wave HUD, health transition, saved auto/speed and victory/defeat controls pass at both widths.");
+  console.log("Twenty-wave HUD, slim sidebar with hide button and corner box, health transition, saved auto/speed and victory/defeat controls pass at both widths.");
 } finally {
   await browser.close();
 }
