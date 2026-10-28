@@ -1,6 +1,8 @@
 /** Siege controls over the native two-sided Defend battle. */
 import { t } from "../i18n/index.ts";
-import { SpellBar, STRIKE_SPELLS, castStrike } from "../ui/spell-bar.ts";
+import { ManaCounter } from "../ui/mana-counter.ts";
+import { SIEGE_MANA, SPELL_MANA } from "./siege-mana.ts";
+import { SpellBar, STRIKE_SPELLS, castStrike, type SpellBarGate } from "../ui/spell-bar.ts";
 import type { CampaignHost } from "./host.ts";
 import { DefendRenderer } from "../defend/render.ts";
 import { BoardPointers } from "../defend/board-pointers.ts";
@@ -24,6 +26,8 @@ export class SiegePage {
   private rewarded = false;
   private inspection: number | undefined;
   private spellBar?: SpellBar;
+  private spellGate?: SpellBarGate;
+  private manaCounter?: ManaCounter;
   private notice = "";
   private freshCamera = true;
   private readonly banners = new Banners();
@@ -220,6 +224,20 @@ export class SiegePage {
       this.render();
     };
     this.spellBar = new SpellBar(STRIKE_SPELLS.filter((spell) => this.sim.engine.bonuses[spell]));
+    const mana = this.sim.mana;
+    this.spellGate = mana
+      ? {
+          ready: (spell) => mana.canCast(spell),
+          fill: (spell) => mana.value / SPELL_MANA[spell],
+          badge: (spell) => SPELL_MANA[spell],
+          description: (spell) => t("siege.manaCost", { cost: SPELL_MANA[spell] }),
+        }
+      : undefined;
+    this.manaCounter = mana && this.spellBar.el.childElementCount ? new ManaCounter() : undefined;
+    if (this.manaCounter) {
+      this.spellBar.el.classList.add("siege-spells");
+      this.spellBar.el.append(this.manaCounter.el);
+    }
     this.root.querySelector(".campaign-spells")!.remove();
     this.root.querySelector(".campaign-board")!.append(this.spellBar.el);
     this.refresh();
@@ -262,7 +280,8 @@ export class SiegePage {
                 seconds: Math.max(0, 240 - Math.floor(s.elapsed)),
               }));
     this.root.querySelector<HTMLButtonElement>('[data-action="start"]')!.disabled = s.phase === "won" || s.phase === "lost";
-    this.spellBar?.update(s.engine, s.phase === "battle", this.host.save().settings.reduceMotion);
+    this.spellBar?.update(s.engine, s.phase === "battle", this.host.save().settings.reduceMotion, 1, this.spellGate);
+    if (s.mana) this.manaCounter?.update(s.mana.value, SIEGE_MANA.cap);
     this.troops.update(s.allies);
   }
   private plateFocus(e: PointerEvent) {

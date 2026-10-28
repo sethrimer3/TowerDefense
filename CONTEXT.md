@@ -656,3 +656,6 @@ A reproducible infantry roster representing an assumed stage of progression for 
 
 **Matched raid**:
 A difficulty trial in which the reference army and target castle share an MMR.
+
+**Mana**:
+A temporary Siege battle resource earned by defeating enemy troops and spent on strike spells.
