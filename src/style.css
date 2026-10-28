@@ -2400,19 +2400,32 @@ nav button[data-mode] > .tab-label { min-height: 2.4em; }
 .ambush-card-stars { color:var(--area-dark); letter-spacing:3px; }
 @media(max-width:480px) { .ambush-level-columns,.ambush-level-cards { gap:6px; } .ambush-zone { padding:6px; } .ambush-level-card { padding:5px; gap:5px; } .ambush-level-preview { height:80px; } .ambush-level-card strong { font-size:11px; } }
 .ambush-level-preview canvas { width:100%; height:100%; object-fit:contain; image-rendering:pixelated; background:#0b0a09; }
-/* Ambush keeps health and gold above a separately scrolling native palette. */
+/* Ambush keeps health and gold above a separately scrolling native palette,
+   as narrow as Defend's: a small stone plaque over the shelf of buildings. */
 .native-campaign .ambush-side { flex-direction:column;align-items:stretch;overflow:hidden; }
-.native-campaign .side-open .ambush-side { width:176px; }
-.ambush-side-head { flex:none;text-align:center;padding:6px;background:var(--wood);border:2px solid var(--brass-nails); }
-.ambush-side-head>strong,.ambush-side-head>span { display:block; }
-.ambush-side-head canvas { width:74px;height:36px;display:block;margin:auto;image-rendering:pixelated; }
-.ambush-side-head .ambush-wallet { margin:2px 0;color:var(--gold); }
+.native-campaign .side-open .ambush-side { width:80px; }
+.native-campaign .ambush-side,.ambush-side-content,.ambush-side-content .defend-palette { scrollbar-width:none; }
+.native-campaign .ambush-side::-webkit-scrollbar,.ambush-side-content::-webkit-scrollbar,.ambush-side-content .defend-palette::-webkit-scrollbar { display:none; }
+.ambush-side-head { position:relative;flex:none;display:flex;flex-direction:column;align-items:center;gap:2px;margin-bottom:4px;padding:4px 3px 3px;text-align:center;font-size:9px;line-height:1.1;border:2px solid #0c0907;border-radius:3px;background:linear-gradient(#00000060,#00000030),var(--stone),#161412;box-shadow:inset 0 3px 6px #000000c0,inset 0 -1px 0 #ffffff14,0 1px 0 #ffd9a01a; }
+.ambush-side-head>strong { display:block;padding:0 12px;white-space:nowrap;color:#e8dcc4;text-shadow:0 1px 0 #000; }
+#ambush-health-short { display:none; }
+.ambush-side-head canvas { width:37px;height:18px;display:block;margin:auto;image-rendering:pixelated; }
+.ambush-side-head .ambush-hide { position:absolute;top:1px;right:1px;width:14px;height:14px;min-height:0;padding:0;font-size:10px;line-height:1;border-width:1px; }
+.ambush-icon { display:inline-block;image-rendering:pixelated;vertical-align:middle;flex:none; }
+.ambush-wallet { display:flex;align-items:center;justify-content:center;gap:3px;margin:0;color:var(--gold);font-weight:bold;font-size:11px; }
+.ambush-wallet b,.ambush-mini b { font-variant-numeric:tabular-nums; }
 .ambush-side-content { overflow:auto;min-height:0; }
 .ambush-side-content .defend-palette { width:100%;max-height:none; }
 .ambush-side-content [hidden] { display:none; }
-.ambush-hud-stars { display:flex;justify-content:center;gap:8px;color:var(--gold);font-size:22px; }
-.ambush-side-head .ambush-hud-stars span { transition:opacity .4s,transform .4s; }
-.ambush-hud-stars .star-lost { opacity:.15;transform:translateY(6px) rotate(22deg);filter:grayscale(1); }
+.ambush-side-content .defend-item small { display:flex;align-items:center;justify-content:center;gap:2px; }
+.ambush-hud-stars { display:flex;justify-content:center;gap:2px; }
+.ambush-hud-stars span { display:block;line-height:0;transition:transform .4s; }
+.ambush-hud-stars .star-lost { transform:translateY(1px); }
+.ambush-mini { position:absolute;z-index:3;top:6px;left:6px;display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-height:0;padding:3px 5px;font-size:10px;line-height:1.1;color:#e8dcc4;background:#000000a0;border:1px solid var(--gold);border-radius:2px;box-shadow:none;text-shadow:0 1px 0 #000; }
+.ambush-mini[hidden] { display:none; }
+.ambush-mini-hp,.ambush-mini-gold { display:flex;align-items:center;gap:3px; }
+.ambush-mini-gold { color:var(--gold); }
+.ambush-mini canvas { width:37px;height:18px;image-rendering:pixelated; }
 .ambush-result { position:absolute;z-index:5;left:50%;top:50%;transform:translate(-50%,-50%);width:min(320px,88%);box-sizing:border-box;text-align:center;padding:16px;background:var(--wood);border:3px solid var(--brass-nails);box-shadow:0 5px 30px #000b; }
 .ambush-result button { margin:4px; }
 .ambush-result-stars { color:var(--gold);font-size:32px; }
@@ -2427,12 +2440,14 @@ nav button[data-mode] > .tab-label { min-height: 2.4em; }
 .strike-ready { animation:strike-ready .5s ease-out; }
 @keyframes strike-ready { from { opacity:1;filter:brightness(3); } to { opacity:.3;filter:brightness(1); } }
 @media (max-width:600px) {
- .native-campaign .side-open .ambush-side { width:116px; }
- .ambush-side-head { font-size:10px;padding:3px; }
+ .native-campaign .side-open .ambush-side { width:60px; }
+ .ambush-side-head { font-size:8px;padding:3px 2px 2px; }
+ #ambush-health-label { display:none; }
+ #ambush-health-short { display:inline; }
  .strike-bar button { width:40px;height:40px; }
  .strike-bar canvas { width:32px;height:32px; }
 }
-@media (prefers-reduced-motion:reduce) { .ambush-side-head .ambush-hud-stars span { transition:none; }.strike-ready { animation:none; } }
+@media (prefers-reduced-motion:reduce) { .ambush-hud-stars span { transition:none; }.strike-ready { animation:none; } }
 
 .strike-bar[hidden] { display:none; }
 .ambush-building-details { padding:6px;display:flex;flex-direction:column;gap:6px;font-size:11px; }
@@ -2456,8 +2471,6 @@ nav button[data-mode] > .tab-label { min-height: 2.4em; }
 .ambush-result-stars span { display:inline-block; }
 .star-award { animation:ambush-star .55s both;animation-delay:var(--star-delay,0s); }
 @keyframes ambush-star { 0% { opacity:0;transform:translateY(12px) scale(.3) rotate(-25deg); } 65% { opacity:1;transform:translateY(-3px) scale(1.15); } 100% { opacity:1;transform:none; } }
-.ambush-hud-stars span { position:relative; }
-.ambush-hud-stars .star-lost::after { content:'';position:absolute;left:25%;top:40%;width:55%;height:2px;background:var(--ink);transform:rotate(45deg); }
 @media(prefers-reduced-motion:reduce) { .star-award { animation:none; } }
 
 /* Siege's entry cards and board portraits use the shared wood/parchment theme. */
