@@ -32,18 +32,11 @@ import { HATCH_Y, LabRenderer } from "./lab-render.ts";
 import { LAB_TOP } from "./geometry.ts";
 import { ashlar, facing } from "./ashlar.ts";
 import { SoftSunlight, SUNLIGHT } from "../soft-sunlight.ts";
+import { DAY_MS, daylight } from "../daylight.ts";
+export { DAY_MS, daylight } from "../daylight.ts";
 
 /** Each role's robe. */
 const ROBES: Record<Role, RGB> = { shelver: [240, 236, 228], professor: [104, 124, 200], researcher: [160, 104, 210] };
-
-/** One day and night, in ms of wall-clock time. */
-export const DAY_MS = 8 * 60 * 1000;
-/** Daylight in [0, 1] at wall-clock time `now`: a long day, a long night, a
- * dawn and a dusk between. */
-export function daylight(now: number) {
-  const s = Math.sin(((now % DAY_MS) / DAY_MS) * Math.PI * 2);
-  return Math.min(1, Math.max(0, 0.5 + s * 1.4));
-}
 
 /** The torches on the nave's walls and piers, and the tables' candles. */
 const TORCHES = [

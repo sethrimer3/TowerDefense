@@ -1,6 +1,4 @@
 import { ProfileEditor } from "./profile/editor.ts";
-import "./style.css";
-import "./theme.css";
 import { defaults, load, persist, type Save } from "./save.ts";
 import { countdown } from "./away.ts";
 import { DefendPage } from "./defend/ui.ts";
@@ -428,6 +426,10 @@ settleTraining(save, clock(), new Set(smithNames()));
 settleForge(save, clock(), new Set(smithNames()));
 if (settleResearch(save, clock(), libraryPage.sim.count("researcher"))) libraryPage.sim.researched();
 navigate("defend");
-if (save.profile) welcome.show();
-else chooseProfile();
-requestAnimationFrame(frame);
+/** Called after boot uncovers the initialized game; native dialogs must open
+ * here so they cannot appear above the loading screen's stone wall. */
+export function startGame() {
+  if (save.profile) welcome.show();
+  else chooseProfile();
+  requestAnimationFrame(frame);
+}

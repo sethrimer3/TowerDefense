@@ -8,7 +8,7 @@
  * outline. Presentation only. */
 import { ashlar, facing, h01 } from "../library/ashlar.ts";
 import { getTorchFlicker, getTorchSway } from "../lighting.ts";
-import { DAY_MS } from "../library/render.ts";
+import { DAY_MS } from "../daylight.ts";
 import { FLAME, OUTLINE, puff } from "../defend/pixel-fx.ts";
 import { pixelArtOn } from "../defend/pixel-sprites.ts";
 import { SoftSunlight, SUNLIGHT } from "../soft-sunlight.ts";
