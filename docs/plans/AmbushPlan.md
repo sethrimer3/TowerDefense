@@ -98,7 +98,7 @@ Seth asked (2026-10-27) for Ambush to have its own upgrade tree, paid for in **s
   - **Masons**: the five base buildings cost less (−5% a rank).
   - **Quartermaster**: better refunds when selling (70% → 75/80/85%).
   - **Drillmasters**: base troops and towers hit harder (+5% damage a rank) and troops have more HP. These multiply Ambush's base stats; they do not unlock Knowledge paths.
-  - **Palisades**: outpost fences and houses take longer to break (+15% HP a rank).
+  - **Palisades**: outpost fences and houses take longer to break (+15% HP a rank); rank III rebuilds the wooden fences and gates in stone.
   - **Keep walls**: the keep and its castle wall have more HP.
   - **Battle magic**: shorter strike spell cooldowns in Ambush (−10% a rank).
   - **Head start**: a free base building placed at the start of every level (rank I one, rank II two).
@@ -161,7 +161,7 @@ The native base-stat/five-building setup was introduced with the new free-grid b
 ### Phase 4: Outposts and the keep's castle
 
 - [x] `campaign/outposts.ts`: for each outpost anchor on the track, an area (rounded rectangle, roughly 2 × 2 Defend tiles) straddling the track. Generate its houses, streets and parks with `generateCity` restricted to that area (city mask), seeded per level and outpost. The track runs through as road.
-- [x] **Fence**: the outpost's outline is a fence (see OtherPlans.md: fences become wall-like buildings with ~10% of a wall stone's HP). Where it crosses the track it blocks the road; enemies must break it to enter. Build this phase on top of the shared fence work, or, if that has not landed, give Ambush's outpost fences their own solid fence cells with the same HP rule and fold them together later.
+- [x] **Fence**: the outpost's outline is a fence (see OtherPlans.md: fences become wall-like buildings with ~10% of a wall stone's HP). Where it crosses the track it blocks the road; enemies must break it to enter. (2026-10-28, Seth: the road now meets a wooden gate there, or a stone gatehouse once Palisades III walls the outposts in stone, and the keep's wall has a gate where the road meets it; units come and go only by the gates.) Build this phase on top of the shared fence work, or, if that has not landed, give Ambush's outpost fences their own solid fence cells with the same HP rule and fold them together later.
 - [x] **Keep castle**: the keep plus its houses inside a ring of Defend wall stones (`wall` mask in `generateCity`), the track ending at a gate or a breach point in the wall. Its cells are all in `blocked`.
 - [x] **Re-plan on build**: when the player places a building over an outpost, regenerate that outpost's houses with the player's building passed to `generateCity` as a structure, so houses rearrange round it (deterministic for the same layout). Record the outpost's **initial** house count at level start; covered houses simply no longer exist.
 - [x] **Outpost HP**: `breached ? standing / initial : 1`, where `breached` latches true the first time any enemy (or its body cell) is inside the outpost's area. So a player who covers every house still shows 100% until an enemy walks in, then it drops to 0 and the outpost falls at once, as Seth described. `standing` counts houses with HP > 0.

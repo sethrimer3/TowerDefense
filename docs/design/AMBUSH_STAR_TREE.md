@@ -10,7 +10,7 @@ Every branch is independent. Initial prices are **2/3/5 stars** for ranks I/II/I
 | Masons | −5% base building prices, rounded to tens |
 | Quartermaster | +5 percentage points to the 70% post-wave-one refund |
 | Drillmasters | +5% tower/troop damage and troop HP |
-| Palisades | +15% outpost house/fence HP, retained through house re-planning |
+| Palisades | +15% outpost house/fence HP, retained through house re-planning; rank III rebuilds the fences and wooden gates as stone walls and gatehouses (a whole stone wall's HP instead of a tenth) |
 | Keep walls | +20% keep and castle-wall HP; outpost fences use Palisades instead |
 | Battle magic | −10% native strike cooldowns; spells retain base damage and paths |
 | Head start | One/two free native Archer Towers, placed deterministically beside the track |

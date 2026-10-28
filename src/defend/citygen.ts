@@ -47,6 +47,11 @@ export type BuildingKind = "house" | "wall" | "gate" | "wallBallista" | Structur
 export type Building = {
   /** Optional solid wooden scenario fence; ordinary city walls remain stone. */
   fence?: { x1: number; y1: number; x2: number; y2: number };
+  /** The rails a scenario fence draws through its cell, where given (two
+   * at a corner, so the ring joins), instead of `fence` alone. */
+  rails?: { x1: number; y1: number; x2: number; y2: number }[];
+  /** Set for a scenario gate in a wooden fence: drawn as a wooden gate. */
+  woodGate?: true;
   /** Empty scenario deployment lot; excluded from rendering and recruitment. */
   hidden?: boolean;
   id: number;

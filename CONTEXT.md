@@ -345,6 +345,9 @@ A stack of crates of bait, a structure for anywhere: while any stands, every ene
 **City gate**:
 A gatehouse set into the city wall on the edge of a city tile: it opens for the city's own people (troops and civilians) and stays shut to the enemy, who must batter it down; but while it stands open for your people, the enemy can slip through too, until a portcullis bars it.
 
+**Outpost gate**:
+In Ambush, the gate where the road meets an outpost's fence (a wooden gate) or, after Palisades III, its stone wall (a stone gatehouse), and where it meets the keep's wall. Units come and go only by the gates; the enemy batters them rather than the wall beside them.
+
 **Portcullis**:
 The city gates' first upgrade branch: an iron grate that keeps the enemy out while the gate is open for your people, then murder holes and boiling pitch over the way in.
 

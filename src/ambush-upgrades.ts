@@ -8,13 +8,19 @@ function branch(id: AmbushPathId, name: string, icon: PathIcon, hue: PathHue, te
   const costs = id === "headStart" ? [3, 7] : [2, 3, 5];
   return { id, name, motto: text(1), hue, ranks: costs.map((cost, i) => ({ name: name + " " + ["I", "II", "III"][i], icon, cost, text: text(i + 1) })) };
 }
+/** The Palisades rank that rebuilds the outposts' fences in stone. */
+export const STONE_RANK = 3;
 export const AMBUSH_PATHS: SidePath<AmbushPathId>[] = [
   branch("warChest", "War chest", "oath", "verdant", (r) => "Start each level with " + r * 50 + " more gold."),
   branch("bounty", "Bounty", "arrow", "verdant", (r) => "Earn " + r * 5 + "% more gold per kill."),
   branch("masons", "Masons", "mail", "steel", (r) => "Base buildings cost " + r * 5 + "% less, rounded to tens."),
   branch("quartermaster", "Quartermaster", "helm", "steel", (r) => "After wave 1, selling refunds " + (70 + r * 5) + "% of all investment."),
   branch("drillmasters", "Drillmasters", "dagger", "ember", (r) => "Troops and towers deal " + r * 5 + "% more damage; troops have " + r * 5 + "% more HP."),
-  branch("palisades", "Palisades", "mail", "verdant", (r) => "Outpost houses and fences have " + r * 15 + "% more HP."),
+  branch("palisades", "Palisades", "mail", "verdant", (r) =>
+    r < STONE_RANK
+      ? "Outpost houses and fences have " + r * 15 + "% more HP."
+      : "Outposts' wooden fences and gates become stone walls and gatehouses, ten times as strong; houses and walls have " + r * 15 + "% more HP.",
+  ),
   branch("keepWalls", "Keep walls", "helm", "steel", (r) => "Keep and castle walls have " + r * 20 + "% more HP."),
   branch("battleMagic", "Battle magic", "bolt", "storm", (r) => "Strike spells recharge " + r * 10 + "% sooner."),
   branch("headStart", "Head start", "bow", "verdant", (r) => r + " free Archer Tower" + (r === 1 ? "" : "s") + " beside the track at level start."),
@@ -62,6 +68,7 @@ export function ambushBonuses(ranks?: AmbushRanks) {
     damage: 1 + 0.05 * r("drillmasters"),
     troopHp: 1 + 0.05 * r("drillmasters"),
     palisade: 1 + 0.15 * r("palisades"),
+    stone: r("palisades") >= STONE_RANK,
     keep: 1 + 0.2 * r("keepWalls"),
     cooldown: 1 - 0.1 * r("battleMagic"),
     free: r("headStart"),

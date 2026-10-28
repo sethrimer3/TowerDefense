@@ -21,7 +21,8 @@ import { DefendLighting, type LightFrame } from "./lighting.ts";
 import { Fences } from "./fences.ts";
 import { Rain, Snow, ambientFor, type Weather } from "./weather.ts";
 import { areaFade, type AreaId } from "./areas.ts";
-import { FACE_HANG, damageKey, gateSprite, hangingFaces, lotSeed, onCityArtLoaded, paintCityLayer, paintSpikePoints, paintStanding, stageOf } from "./city-layer.ts";
+import { gateArtRect } from "./wood-gate-art.ts";
+import { FACE_HANG, damageKey, gateSpriteOf, hangingFaces, onCityArtLoaded, paintCityLayer, paintSpikePoints, paintStanding, stageOf } from "./city-layer.ts";
 import { GATE_FRAMES } from "./gate-art.ts";
 import { peopleAt } from "./gates.ts";
 import type { GateRanks } from "../gate-upgrades.ts";
@@ -392,7 +393,8 @@ export class DefendRenderer {
   }
 
   /** The city gates swing open while any of the city's people are at
-   * them, and shut behind them; the layer shows them shut. */
+   * them, and shut behind them; the layer shows them shut (a wooden
+   * gate's leaves, shut or not, are drawn here over its posts). */
   private drawGates(map: CityMap, sim: DefendSim, opts: DrawOptions, dt: number) {
     for (const b of map.buildings) {
       if (b.kind !== "gate" || !b.gate) continue;
@@ -406,10 +408,10 @@ export class DefendRenderer {
       const open = opts.reduceMotion ? (near ? 1 : 0) : Math.max(0, Math.min(1, was + (near ? 2.5 : -1.5) * Math.min(dt, 0.1)));
       this.gateOpen.set(b.id, open);
       const frame = Math.round(open * (GATE_FRAMES - 1));
-      if (!frame) continue;
-      const r = b.rect, px = this.px;
+      if (!frame && !b.woodGate) continue;
+      const r = gateArtRect(b), px = this.px;
       const x = Math.round(r.x * px), y = Math.round(r.y * px);
-      const art = gateSprite(b.gate.side, frame, stageOf(sim, b), lotSeed(b));
+      const art = gateSpriteOf(b, frame, stageOf(sim, b));
       if (art) this.ctx.drawImage(art, x, y, Math.round((r.x + r.w) * px) - x, Math.round((r.y + r.h) * px) - y);
     }
   }

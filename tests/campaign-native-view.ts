@@ -16,6 +16,8 @@ save.defend.owned.meleeGuild = 4;
 save.defend.owned.rangedGuild = 4;
 save.defend.layout.structures.push({ uid: 70, kind: "brazierTower", tx: 4, ty: 9, qx: 16, qy: 36, path: "fireArrows", rank: 3 });
 save.siege = newSiege(45);
+// ?stone: the outposts walled in stone (Palisades III).
+if (new URLSearchParams(location.search).has("stone")) save.campaigns.ambush.ranks = { palisades: 3 };
 setPixelArt(true);
 document.documentElement.classList.add("pixel-font");
 const ambush = new AmbushBattlePage(document.querySelector("#ambush")!, 0, { save: () => save, store: () => {} }),

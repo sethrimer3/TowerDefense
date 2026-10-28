@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { AMBUSH_LEVELS, trackFor, squareAt, laneCount, decodeAmbush, totalStars, levelUnlocked, recordStars } from "../src/campaign/levels.ts";
 import { CELLS_W, CELLS_H, cellIndex } from "../src/defend/grid.ts";
 import { dist } from "../src/exact.ts";
-import { ambushField } from "../src/campaign/battlefield.ts";
+import { ambushField } from "../src/campaign/ambush-field.ts";
 import { CellType } from "../src/defend/citygen.ts";
 test("Thirty seeded levels wind their lanes from the board's edges to the keep, more lanes later on", () => {
   assert.equal(AMBUSH_LEVELS.length, 30);
