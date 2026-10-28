@@ -31,3 +31,16 @@ export function ashlar(x: number, y: number, pier: boolean): { rgb: RGB; hgt: nu
  * takes from a light (dx, dy) away from it at distance d: the face toward
  * the light brightens, the face away darkens. */
 export const facing = (sx: number, sy: number, dx: number, dy: number, d: number) => (d > 0.5 ? Math.max(0.15, 1 + 2.6 * ((sx * dx + sy * dy) / d)) : 1);
+
+/** The black outline round a pillar's sides. */
+export const PILLAR_OUTLINE: RGB = [8, 7, 7];
+
+/** How a pillar's stone is shaded at column `col` of the `width` across it:
+ * darkening toward both sides, as a round column turns away
+ * from the light, so the piers read as round rather than cut off. Its first
+ * and last columns are its black outline (null). */
+export function pillarShade(col: number, width: number): number | null {
+  if (col <= 0 || col >= width - 1) return null;
+  const s = (2 * (col + 0.5)) / width - 1;
+  return 0.45 + 0.55 * Math.sqrt(1 - s * s);
+}

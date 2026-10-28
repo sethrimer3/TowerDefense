@@ -30,7 +30,7 @@ import { CELL, FW } from "./fire.ts";
 import { ELIXIRS } from "./lab.ts";
 import { HATCH_Y, LabRenderer } from "./lab-render.ts";
 import { LAB_TOP } from "./geometry.ts";
-import { ashlar, facing } from "./ashlar.ts";
+import { PILLAR_OUTLINE, ashlar, facing, pillarShade } from "./ashlar.ts";
 import { SoftSunlight, SUNLIGHT } from "../soft-sunlight.ts";
 import { DAY_MS, daylight } from "../daylight.ts";
 export { DAY_MS, daylight } from "../daylight.ts";
@@ -208,10 +208,17 @@ export class LibraryRenderer {
             rgb = lead ? [20, 18, 16] : clear ? [150, 170, 190] : GLASS[Math.floor(h01(col, row, 3) * GLASS.length)];
           }
         } else {
-          // Ashlar: courses of blocks, bigger on the piers at either side.
-          const stone = ashlar(x, y, x < BAYS_EDGE || x >= W - BAYS_EDGE);
+          // Ashlar: courses of blocks, bigger on the piers at either side,
+          // which are outlined and shaded round.
+          const pier = x < BAYS_EDGE || x >= W - BAYS_EDGE;
+          const stone = ashlar(x, y, pier);
           rgb = stone.rgb;
           hgt = stone.hgt;
+          if (pier) {
+            const k = pillarShade(x < BAYS_EDGE ? x : x - (W - BAYS_EDGE), BAYS_EDGE);
+            rgb = k === null ? PILLAR_OUTLINE : [rgb[0] * k, rgb[1] * k, rgb[2] * k];
+            if (k === null) hgt = 0;
+          }
         }
         // A carved rib along the vault's edge.
         if (kind === Kind.Wall && y - vaultY(x) < 3) {

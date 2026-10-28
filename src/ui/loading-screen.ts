@@ -18,7 +18,7 @@ export class LoadingScreen {
   private finish: (() => void) | null = null;
 
   constructor(private root: HTMLElement, private reduced: () => boolean) {
-    this.wall = new HallBackdrop(root.querySelector<HTMLCanvasElement>(".loading-stones")!, "vault");
+    this.wall = new HallBackdrop(root.querySelector<HTMLCanvasElement>(".loading-stones")!, "vault", "left");
     this.torch = root.querySelector<HTMLCanvasElement>(".loading-torch")!;
     this.bricks = root.querySelector<HTMLCanvasElement>(".loading-bricks")!;
     this.bricks.width = W;
