@@ -21,7 +21,7 @@ Read this whole file, [AmbushPlan.md](AmbushPlan.md#architecture-guidelines)'s a
 
 | File | What it does now |
 |---|---|
-| `src/campaign/siege-ui.ts` (`SiegePage`) | Profile header (flag, name, Edit profile), an opponent `<details>` (bot name, a `BOT` tag, defense rating and the player's MMR), the roster, Retry/Next, and the shared strike `SpellBar` (`src/ui/spell-bar.ts`) on cooldowns. |
+| `src/campaign/siege-ui.ts`, `siege-entry.ts` | Rank entry screen, Find Match/reveal/preview/Attack/Back, rated results and rank transitions, and native battle controls. Two board plates show names, flags and ranks. The shared strike bar still uses cooldowns until phase 7. |
 | `src/campaign/sim.ts` (`CampaignSim`) | The 240-second limit, win on keep destroyed, and a defense scale `2**((rating-1000)/800)*.65` applied as flat multipliers on tower/troop damage, troop HP and keep/wall HP. Uncalibrated. |
 | `src/campaign/raid.ts` (`RaidBattle`) | Two native `DefendSim` sides on one map. The defense side runs on `defaultDefendSave().levels`, so a castle has no upgrade levels of its own today. |
 | `src/campaign/battlefield.ts` (`siegeField`) | Lays the castle in the upper half: the keep at a fixed spot, towers picked by seed from archer, cannon, wizard, hawk, brazier and wisp, plus a barracks and an archer barracks, and a south gate. Muster rows lie below, with an invisible attacker keep (uid 200000). |
@@ -145,7 +145,7 @@ One PR per phase. Each lists its tests; run `npm test` and `npm run build` befor
 - Add `owner.flag` to the snapshot (still revision 1 until phase 5; optional field, so old saves decode).
 - **Tests:** names are deterministic, valid for `decodeCastle` and `cleanName`, and clear of the blocklist across 100,000 seeds; flags are deterministic, decode, and have readable contrast.
 
-### Phase 3: entry screen and board name plates ☐
+### Phase 3: entry screen and board name plates ☑
 - Entry screen with the rank emblem, MMR, progress bar, Find Match, reveal, match card (with castle preview), Attack/Back, and rank-up/down on the result panel.
 - Top and bottom name plates over the board.
 - Remove "defense rating" text from the UI (the bot's MMR is shown instead) and remove the `BOT` tag from the opponent details.

@@ -127,8 +127,9 @@ try {
     });
     assert.ok(scale > 1);
     await page.locator("#siege-mode").click();
+    await page.locator('#siege [data-action="find"]').click();
+    await page.locator('#siege [data-action="attack"]').click();
     await cleanPage("siege");
-    await page.locator('#siege [data-action="start"]').click();
     const raid = await page.evaluate(() => {
       const f = window.nativeModes,
         s = f.siege.sim;
