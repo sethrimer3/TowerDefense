@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { SIZES, TreeMotes, type MoteScene } from "../src/ui/tree-motes.ts";
+import { clampAxis, panArea } from "../src/ui/upgrade-graph.ts";
 
 /** A canvas standing in for the browser's, counting what is drawn. */
 function fakeCanvas(w = 400, h = 300) {
@@ -8,7 +9,8 @@ function fakeCanvas(w = 400, h = 300) {
   return { canvas: { clientWidth: w, clientHeight: h, width: 0, height: 0, getContext: () => ctx } as unknown as HTMLCanvasElement, ctx };
 }
 const scene = (over: Partial<MoteScene> = {}): MoteScene => ({
-  nodes: [{ id: "a", x: 60, y: 150 }, { id: "b", x: 340, y: 150 }], edges: [["a", "b"]], picked: null, pixel: 2, reduced: false, ...over,
+  nodes: [{ id: "a", x: 60, y: 150 }, { id: "b", x: 340, y: 150 }], edges: [["a", "b"]], picked: null,
+  area: { x: 0, y: 0, w: 400, h: 300 }, view: { x: 0, y: 0, s: 1 }, pixel: 2, reduced: false, ...over,
 });
 type Mote = { x: number; y: number; vx: number; vy: number; size: 0 | 1 | 2 };
 const motesOf = (m: TreeMotes) => (m as unknown as { motes: Mote[] }).motes;
@@ -71,7 +73,39 @@ test("a purchase bursts the motes outward from its upgrade", () => {
   for (const m of motesOf(motes)) Object.assign(m, { vx: 0, vy: 0 });
   const m = motesOf(motes)[0];
   Object.assign(m, { x: 0.55, y: 0.5 });
-  motes.burst(200, 150, canvas);
+  motes.burst(200, 150);
   for (let t = 16; t < 200; t += 16) motes.draw(canvas, t, quiet);
   assert.ok(m.vx > 0.01, `pushed away to the right: ${m.vx}`);
+});
+
+test("the motes live in the tree's space: they pan and zoom with its view", () => {
+  const { canvas, ctx } = fakeCanvas();
+  const motes = new TreeMotes();
+  // A frame drawn, then the same moment again through a view panned 40 pixels right.
+  motes.draw(canvas, 0, scene({ reduced: false }));
+  const before = ctx.fills.map(([x, y]) => [x, y]);
+  const moved = new TreeMotes();
+  Object.assign(moved, { motes: motesOf(motes).map((m) => ({ ...m })) });
+  moved.draw(canvas, 0, scene({ view: { x: 40, y: 0, s: 1 } }));
+  const after = ctx.fills.map(([x, y]) => [x, y]);
+  const shifted = before.filter(([x]) => x + 40 < 400).length;
+  assert.ok(after.length >= shifted - 2, "the motes still on screen");
+  for (let i = 0; i < 10; i++) assert.ok(after.some(([x, y]) => x === before[i][0] + 40 && y === before[i][1]) || before[i][0] + 40 >= 400);
+  // The area they fill is the tree's own, wherever the view looks: a wide area seeds more motes.
+  const wide = new TreeMotes();
+  wide.draw(canvas, 0, scene({ area: { x: -200, y: -100, w: 1600, h: 900 } }));
+  assert.ok(wide.count > motes.count, `${wide.count} > ${motes.count}`);
+});
+
+test("the view pans round the tree and a fifth of its size beyond, no further", () => {
+  const a = panArea(0, 0, 1000, 500);
+  assert.deepEqual(a, { x: -200, y: -100, w: 1400, h: 700 });
+  // A small tree keeps a little room round it.
+  assert.deepEqual(panArea(0, 0, 100, 100), { x: -60, y: -60, w: 220, h: 220 });
+  // At zoom 1 in a 400-wide view: the area's left edge (-200) can't come in past the view's.
+  assert.equal(clampAxis(1000, a.x, a.w, 400, 1), 200);
+  assert.equal(clampAxis(-5000, a.x, a.w, 400, 1), 400 - 1200);
+  assert.equal(clampAxis(0, a.x, a.w, 400, 1), 0);
+  // Zoomed out so the area fits, it sits centred.
+  assert.equal(clampAxis(123, a.x, a.w, 400, 0.2), 400 / 2 - (a.x + a.w / 2) * 0.2);
 });
