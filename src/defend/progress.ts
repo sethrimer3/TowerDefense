@@ -104,7 +104,7 @@ export type DefendSave = {
   upgradesFound?: string[];
 };
 
-export function defaultDefendSave(): DefendSave {
+export function defaultDefendSave(seed?: number): DefendSave {
   return {
     layout: defaultLayout(),
     owned: { ...STARTING_OWNED },
@@ -120,7 +120,7 @@ export function defaultDefendSave(): DefendSave {
     paletteSide: "left",
     speed3: false,
     battleSpeed: 1,
-    seed: 1 + Math.floor(defendRandom("rolls")() * 1e9),
+    seed: seed ?? (1 + Math.floor(defendRandom("rolls")() * 1e9)),
   };
 }
 

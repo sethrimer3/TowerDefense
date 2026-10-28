@@ -644,3 +644,6 @@ One of five tiers within a Siege rank, V through I.
 
 **Find Match**:
 The Siege action that reveals an opponent and castle preview before the player commits to an attack.
+
+- **Defensive DPS**: estimated sustained castle damage against a weighted single-target/crowd benchmark.
+- **Castle ceiling**: the strongest legal castle found by the bounded footprint search; the Grandmaster generation anchor.

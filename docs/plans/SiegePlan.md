@@ -151,7 +151,7 @@ One PR per phase. Each lists its tests; run `npm test` and `npm run build` befor
 - Remove "defense rating" text from the UI (the bot's MMR is shown instead) and remove the `BOT` tag from the opponent details.
 - **Tests:** `node tests/siege-entry.mjs` at both sizes: entry, Find Match, reveal (and instant under Reduce Motion), Back doesn't count a loss, Attack starts a raid, plates placed top and bottom and not overlapping the spell bar, rank change after a scripted win and loss, reload mid-raid still counts a loss.
 
-### Phase 4: defensive DPS estimator and ceiling ☐
+### Phase 4: defensive DPS estimator and ceiling ☑
 - `tools/measure-siege-dps.ts` → `src/campaign/siege-dps-table.ts`; `castle-dps.ts` (`castleDps`).
 - `tools/siege-dps-ceiling.ts` → `src/campaign/siege-ceiling.ts` (`DPS_MAX`, the ceiling castle), and `DPS_MIN`.
 - Post the printed ceiling and floor to Seth as a sanity check.
