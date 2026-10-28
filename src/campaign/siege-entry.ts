@@ -18,21 +18,6 @@ export const rankBadge = (mmr: number) => '<canvas class="siege-rank-emblem" dat
 export function paintRanks(root: HTMLElement) {
   root.querySelectorAll<HTMLCanvasElement>("[data-rank-mmr]").forEach((c) => paintRankEmblem(c, Number(c.dataset.rankMmr)));
 }
-export function namePlate(profile: PlayerProfile, mmr: number, position: "top" | "bottom") {
-  return (
-    '<div class="siege-name-plate siege-name-plate-' +
-    position +
-    '">' +
-    flagSvg(profile.flag) +
-    '<strong class="' +
-    (position === "bottom" ? "siege-profile-name" : "siege-opponent-name") +
-    '">' +
-    text(profile.name) +
-    "</strong>" +
-    rankBadge(mmr) +
-    "</div>"
-  );
-}
 export function renderSiegeEntry(
   root: HTMLElement,
   siege: SiegeSave,

@@ -2469,18 +2469,28 @@ nav button[data-mode] > .tab-label { min-height: 2.4em; }
 .siege-match-identity strong { overflow-wrap:anywhere; }
 .siege-entry-actions { display:flex;gap:12px; }
 .siege-castle-preview { width:176px;height:176px;border:2px solid var(--ink);image-rendering:pixelated; }
-.siege-name-plate { line-height:1.3;width:max-content;position:absolute;left:50%;transform:translateX(-50%);z-index:3;display:flex;align-items:center;gap:6px;padding:3px 8px;box-sizing:border-box;max-width:calc(100% - 14px);min-height:40px;opacity:.85;pointer-events:none;transition:opacity .12s;background:var(--parchment);border:2px solid var(--brass-nails);color:var(--ink); }
+.siege-name-plate { line-height:1.3;position:absolute;z-index:3;display:flex;align-items:flex-start;gap:2px;max-width:calc(100% - 14px);opacity:.92;pointer-events:none;transition:opacity .12s;color:var(--ink); }
+.siege-name-plate-top { top:6px;left:6px; }
+.siege-name-plate-bottom { bottom:max(6px,env(safe-area-inset-bottom,0px));right:6px;flex-direction:row-reverse; }
+.siege-name-plate .siege-banner { position:static;inset:auto;width:56px;height:92px;flex-shrink:0;image-rendering:pixelated;touch-action:auto; }
+.siege-plate-text { display:flex;align-items:center;gap:6px;margin-top:8px;padding:3px 8px;min-height:36px;box-sizing:border-box;min-width:0;background:var(--parchment);border:2px solid var(--ink);box-shadow:inset 0 0 0 1px var(--brass); }
 .siege-name-plate strong { font-size:12px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
-.siege-name-plate .profile-flag { width:19px;height:28px;flex-shrink:0; }
-.siege-name-plate .siege-rank-emblem { width:30px;height:30px; }
-.siege-name-plate-top { top:6px; }
-.siege-name-plate-bottom { bottom:calc(66px + env(safe-area-inset-bottom,0px)); }
+.siege-name-plate .siege-rank-emblem { position:static;width:30px;height:30px;flex-shrink:0; }
+.siege-plate-text { flex-shrink:1; }
+.siege-units { position:absolute;left:8px;bottom:max(8px,env(safe-area-inset-bottom,0px));z-index:3;display:grid;gap:2px;max-height:45%;overflow:hidden;pointer-events:none;background:var(--nails),var(--wood);border:2px solid var(--ink);box-shadow:inset 0 0 0 1px var(--brass);padding:7px 10px;color:#f3e3c0;text-shadow:1px 1px #000;font-size:12px; }
+.siege-units[hidden] { display:none; }
+.siege-unit { display:grid;grid-template-columns:18px 2.2em auto;align-items:center;gap:5px; }
+.siege-unit canvas { position:static;width:18px;height:18px;image-rendering:pixelated; }
+.siege-unit span { text-align:right;font-variant-numeric:tabular-nums; }
+@media(max-width:600px) { .campaign-board:has(.strike-bar button) .siege-name-plate-bottom { bottom:calc(max(8px,env(safe-area-inset-bottom,0px)) + 50px); } }
+.campaign-board:has(.strike-bar button) .siege-units { bottom:calc(max(8px,env(safe-area-inset-bottom,0px)) + 58px); }
+@media(min-width:900px) { .siege-name-plate .siege-banner { width:84px;height:138px; }.siege-plate-text { margin-top:14px; }.siege-units { font-size:14px; }.siege-unit { grid-template-columns:27px 2.2em auto; }.siege-unit canvas { width:27px;height:27px; } }
 .siege-name-plate.aim-under { opacity:.4; }
 @keyframes siege-flag-reveal { from { transform:translateY(-22px);opacity:0; } to { transform:translateY(0);opacity:1; } }
 @keyframes siege-name-reveal { from { clip-path:inset(0 100% 0 0); } to { clip-path:inset(0); } }
 .siege-reveal .profile-flag { animation:siege-flag-reveal .6s ease-out; }
 .siege-reveal .siege-opponent-name { animation:siege-name-reveal .6s steps(16,end); }
-@media(max-width:480px) { .siege-entry { padding:8px;gap:12px; }.siege-match-card { padding:10px; }.siege-name-plate strong { max-width:120px;font-size:10px; } }
+@media(max-width:480px) { .siege-entry { padding:8px;gap:12px; }.siege-match-card { padding:10px; }.siege-name-plate strong { max-width:110px;font-size:10px; } }
 @media(prefers-reduced-motion:reduce) { .siege-reveal .profile-flag,.siege-reveal .siege-opponent-name { animation:none; }.siege-name-plate { transition:none; } }
 
 #siege.native-campaign[data-siege-view="entry"],#siege.native-campaign[data-siege-view="match"] { overflow-y:auto; }

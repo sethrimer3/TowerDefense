@@ -60,6 +60,24 @@ try {
       board = await page.locator(".campaign-board").boundingBox(),
       bar = await page.locator(".strike-bar").boundingBox();
     assert.ok(top.y >= board.y && top.y + top.height < board.y + board.height / 2);
+    // The opponent's banner hangs top left, the player's bottom right; no buildings sidebar.
+    assert.equal(await page.locator("#siege .defend-side, #siege .campaign-roster").count(), 0);
+    assert.equal(await page.locator(".siege-banner").count(), 2);
+    assert.ok(top.x - board.x < 20 && bottom.x + bottom.width > board.x + board.width - 20);
+    const bannerX = await page.locator(".siege-name-plate-bottom .siege-banner").boundingBox();
+    assert.ok(bannerX.x + bannerX.width > board.x + board.width - 20);
+    const waving = () => page.locator(".siege-name-plate-top .siege-banner").evaluate((c) => c.toDataURL());
+    const before = await waving();
+    await page.waitForTimeout(600);
+    assert.notEqual(await waving(), before, "the flag waves");
+    // Remaining troops bottom left, above the strike bar: icon, initials, count.
+    await page.waitForFunction(() => document.querySelectorAll(".siege-unit").length > 0, null, { timeout: 15000 });
+    const units = await page.locator(".siege-units").boundingBox();
+    assert.ok(units.x - board.x < 20 && units.y + units.height > board.y + board.height / 2);
+    assert.ok(units.y + units.height <= bar.y + 1 || bar.width === 0);
+    assert.match(await page.locator(".siege-unit b").first().innerText(), /^[A-Z]{2}$/);
+    assert.ok(Number(await page.locator(".siege-unit span").first().innerText()) > 0);
+    assert.equal(await page.locator(".siege-unit canvas").first().evaluate((c) => c.width), 9);
     assert.ok(bottom.y > board.y + board.height / 2 && bottom.y + bottom.height <= board.y + board.height);
     assert.ok(bottom.y + bottom.height <= bar.y || bottom.x >= bar.x + bar.width || bottom.x + bottom.width <= bar.x);
     await page.mouse.move(top.x + top.width / 2, top.y + top.height / 2);
