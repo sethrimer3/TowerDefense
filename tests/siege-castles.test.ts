@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { generateCastle } from "../src/campaign/castles.ts";
+import { generateNative } from "../src/campaign/castle-generator.ts";
 import { generateCastle as legacyCastle } from "../src/campaign/legacy-castles.ts";
 import { castleDps } from "../src/campaign/castle-dps.ts";
 import { dpsForMmr } from "../src/campaign/siege-budget.ts";
@@ -42,6 +43,20 @@ test("Crowded castles and progression boundaries still fill their legal native b
       assert.ok(fitLayout(castle.castle.layout).ok, `${seed}:${mmr}`);
       assert.ok(Math.abs(castleDps(castle) / dpsForMmr(mmr) - 1) <= 0.05, `${seed}:${mmr}`);
     }
+});
+test("Grandmaster offers whose greedy walk stalls stop searching instead of freezing Find Match", () => {
+  // Each took 9 to 45 seconds of failing arrangement searches on the main thread.
+  for (const [seed, mmr] of [
+    [229283573, 2400],
+    [2518522002, 2480],
+    [3430460382, 2520],
+  ]) {
+    const start = performance.now(),
+      castle = generateNative(seed, mmr, dpsForMmr(mmr));
+    assert.ok(performance.now() - start < 5000, `${seed}:${mmr}`);
+    assert.ok(fitLayout(castle.layout).ok);
+    assert.ok(Math.abs(castleDps(castle) / dpsForMmr(mmr) - 1) <= 0.05, `${seed}:${mmr}`);
+  }
 });
 test("Revision-one offers migrate at their seed/MMR, interrupted raids lose once, and completed records survive", () => {
   const old = { ...newSiege(45), raid: { castle: legacyCastle(45, 600), attacker: 600, defender: 600, state: "offered" } };
