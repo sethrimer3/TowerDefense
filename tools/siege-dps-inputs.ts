@@ -12,6 +12,7 @@ const ENTRIES = [
   "src/campaign/siege-dps-catalog.ts",
   "tools/siege-dps-bench.ts",
   "tools/measure-siege-dps.ts",
+  "tools/measure-siege-dps-worker.ts",
   "tools/siege-dps-inputs.ts",
 ];
 const EXCLUDE = /^src\/(ui|i18n|profile|mine|library)\//;
@@ -41,4 +42,26 @@ export function siegeDpsInputs() {
       .update(readFileSync(resolve(ROOT, file)))
       .update("\0");
   return { hash: digest.digest("hex"), files };
+}
+
+/** Raw native measurements can be reused when only profile enumeration or
+ * output formatting changes. The full hash above still guards published data.
+ * Keep every runtime fixture and native combat input in this smaller hash. */
+export function measurementInputHash() {
+  const files = siegeDpsInputs().files,
+    digest = createHash("sha256");
+  for (const file of files) {
+    if (["tools/measure-siege-dps.ts", "tools/siege-dps-inputs.ts"].includes(file)) continue;
+    let source = readFileSync(resolve(ROOT, file), "utf8");
+    if (file === "src/campaign/siege-dps-catalog.ts") {
+      const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
+      const node = ast.statements.find((n) => ts.isFunctionDeclaration(n) && n.name?.text === "dpsProfiles")!;
+      source = source.slice(0, node.pos) + source.slice(node.end);
+    }
+    digest
+      .update(file + "\0")
+      .update(source)
+      .update("\0");
+  }
+  return digest.digest("hex");
 }

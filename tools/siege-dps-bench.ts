@@ -3,7 +3,8 @@
 import { generateCity, CellType } from "../src/defend/citygen.ts";
 import { DefendSim, type Enemy } from "../src/defend/sim.ts";
 import { CELL_COUNT, CELLS_W, cellIndex, type Rect } from "../src/defend/grid.ts";
-import { STRUCTURES } from "../src/defend/catalog.ts";
+import { STRUCTURES, footprint } from "../src/defend/catalog.ts";
+import { compactKinds } from "../src/defend/progress.ts";
 import { bonuses } from "../src/progression.ts";
 import { castleAtForge } from "../src/campaign/castle-model.ts";
 import type { DpsProfile } from "../src/campaign/siege-dps-catalog.ts";
@@ -32,7 +33,13 @@ function run(profile: DpsProfile, band: number, target: TargetSet, withoutChrono
   const game = castleAtForge(DPS_BENCH.seed, band),
     kind = profile.kind,
     keep = kind === "keep";
-  const d = kind in STRUCTURES ? STRUCTURES[kind as keyof typeof STRUCTURES] : { w: kind === "wall" ? 1 : 2, h: kind === "gate" ? 4 : kind === "wall" ? 1 : 2 };
+  const d =
+    kind in STRUCTURES
+      ? footprint(
+          kind as keyof typeof STRUCTURES,
+          compactKinds(game.defend.levels).some((k) => k === kind),
+        )
+      : { w: kind === "wall" ? 1 : 2, h: kind === "gate" ? 4 : kind === "wall" ? 1 : 2 };
   const rect = { x: 30, y: 44, w: d.w, h: d.h };
   if (profile.sideKey) (game.defend as unknown as Record<string, unknown>)[profile.sideKey] = profile.side;
   if (profile.path)

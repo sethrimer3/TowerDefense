@@ -22,14 +22,14 @@ Read this whole file, [AmbushPlan.md](AmbushPlan.md#architecture-guidelines)'s a
 | File | What it does now |
 |---|---|
 | `src/campaign/siege-ui.ts`, `siege-entry.ts` | Rank entry screen, Find Match/reveal/preview/Attack/Back, rated results and rank transitions, and native battle controls. Two board plates show names, flags and ranks. The shared strike bar still uses cooldowns until phase 7. |
-| `src/campaign/sim.ts` (`CampaignSim`) | The 240-second limit, win on keep destroyed, and a defense scale `2**((rating-1000)/800)*.65` applied as flat multipliers on tower/troop damage, troop HP and keep/wall HP. Uncalibrated. |
-| `src/campaign/raid.ts` (`RaidBattle`) | Two native `DefendSim` sides on one map. The defense side runs on `defaultDefendSave().levels`, so a castle has no upgrade levels of its own today. |
-| `src/campaign/battlefield.ts` (`siegeField`) | Lays the castle in the upper half: the keep at a fixed spot, towers picked by seed from archer, cannon, wizard, hawk, brazier and wisp, plus a barracks and an archer barracks, and a south gate. Muster rows lie below, with an invisible attacker keep (uid 200000). |
-| `src/campaign/castles.ts` | `CastleSnapshot` revision 1, ruleset `siege-v1`: an abstract `Defense[]` list (keep/tower/barricade with HP, damage, range) and guards. `castlePower` = sqrt(endurance × DPS) × overlap. The rating is `1000 + 400·log2(power/170)`. Bot names come from FIRST/LAST lists plus digits. There is no bot flag. |
-| `src/campaign/siege-rating.ts` | Elo: `INITIAL_MMR` 1000, `MIN_MMR` 100, `MAX_MMR` 3000, K 48 for the first 10 games, then 24. |
-| `src/campaign/siege-progress.ts` | `SiegeSave {mmr, games, wins, sequence, raid}`. `nextOpponent` picks a castle at MMR ± 80. `settleRaid` is idempotent. A started raid found on reload counts as a loss. |
-| `src/campaign/economy.ts`, `price-estimates.ts` | Ambush's rough native DPS per **base** kind (`ambushPrice`: full garrison, cannon splash × 2.5, flame × 2). A useful seed for Siege's estimator, but it covers no attuned, branch or ultimate kinds and no path ranks. |
-| `docs/design/SIEGE_MATCHMAKING.md` | Two ratings (attack MMR and castle defense rating), the calibration command and the multiplayer roadmap. |
+| `src/campaign/sim.ts` (`CampaignSim`) | Native 240-second raid lifecycle and keep-destruction victory. Castle upgrades determine strength; the old flat defense damage/HP scale is removed. |
+| `src/campaign/raid.ts` (`RaidBattle`) | Two native `DefendSim` sides on one map. The defense wears the castle's saved levels and bonuses; attackers retain the player's upgrades. |
+| `src/campaign/battlefield.ts` (`siegeField`) | Generates the upper native city from the saved blueprint, with every owned infantry copy in bottom muster rows. |
+| `src/campaign/castles.ts`, `castle-generator.ts` | Revision-2 `siege-v2` snapshots hold native layouts, Armory levels, training, Skills and side ranks. Seeded purchases, upgrades, merges and placement target an estimated DPS budget. |
+| `src/campaign/siege-rating.ts` | One Elo MMR: initial 1000, minimum 100, maximum 3000; K 48 for the first ten games, then 24. |
+| `src/campaign/siege-progress.ts` | `SiegeSave {mmr, games, wins, sequence, raid}`. Opponents are offered at MMR ±80. Settlement is idempotent; started raids found on reload lose once. Legacy offers migrate at the same seed/MMR. |
+| `src/campaign/castle-dps.ts`, `siege-dps-table.ts` | Native sustained-damage measurements across five upgrade bands, direct Shadow shared-rank combinations, contextual support estimates and source-hash freshness checks. |
+| `docs/design/SIEGE_MATCHMAKING.md` | One visible MMR, native castle snapshots, calibration assumptions, generated division budgets and the future player-castle boundary. |
 
 Already done from the first brief: the quick bar replaced `.campaign-spells` (OtherPlans.md §2), and the How to play box and mode title are gone. Still shared and open: fences as walls (OtherPlans.md §1) and the new Siege tab icon (OtherPlans.md §3).
 
@@ -162,11 +162,13 @@ One PR per phase. Each lists its tests; run `npm test` and `npm run build` befor
 - **Migration:** a saved revision-1 offered raid is regenerated at the same seed and MMR. A started revision-1 raid is settled as a loss (the existing reload rule). Completed raids keep their results.
 - **Tests:** generated castles are legal (every step via `upgradeBuilding`), land within ±5% of budget, differ across seeds at one MMR, and match `tests/fixtures/siege-castles.golden.json`. Higher divisions contain more and higher-tier pieces on average. A revision-1 save decodes and migrates. `tests/campaign-native.test.ts` still passes with native castles. Browser: castles at Bronze, Gold, Diamond and Grandmaster render and fight at both sizes.
 
-### Phase 6: rank scaling and calibration ☐
+### Phase 6: rank scaling and calibration ☑
 - `dpsForMmr` via the generated `DIVISION_DPS` table, with `GM_ANCHOR` and the floor/ceiling anchors.
 - Replace `tools/calibrate-siege.ts` with a version for native castles: scripted attacker rosters per rank (built with the same greedy walk on the attack side's budget), N raids per division, reporting the win rate against matched castles. Adjust the curve until matched raids land near 50%.
 - Rewrite `docs/design/SIEGE_MATCHMAKING.md` for one MMR, the rank table, the anchors and the measured DPS per division.
 - **Tests:** the division table is strictly increasing and ends at `DPS_MAX`; a generated Grandmaster I castle's DPS is within 5% of the ceiling; the calibration tool runs a smoke sample in CI under a time budget (full runs are manual).
+
+Phase 6 validation: 921 Node assertions and the production build pass; native castle and entry/HUD browser checks pass at 390×844 and 1280×800. Independent seeds 1001–1002 won 35/68 matched raids (51.5%). Per-rank outcomes and the fixed-army assumptions are published in `docs/design/SIEGE_MATCHMAKING.md`. Only the Siege castle golden changed; Defend replay, city and fence goldens are untouched.
 
 ### Phase 7: mana experiment ☐
 - `spellGate` scenario hook, `SIEGE_MANA` and `SPELL_MANA`, kill crediting through `RaidBattle`, `manaFor(unit)`, the gate interface on `SpellBar`, and the mana counter.

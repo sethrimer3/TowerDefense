@@ -33,6 +33,9 @@ export function forgeBandOf(levels: NativeCastle["levels"]) {
 export function defenderDps(kind: DefenderKind, band: number, path?: PathId, rank = 0, side: Record<string, number> = {}) {
   const group = SIDE_GROUPS.find((g) => g.kind === kind);
   if (!group) return weight(SIEGE_DPS_TABLE[profileKey(kind, path, rank)] ?? SIEGE_DPS_TABLE[profileKey(kind)], band);
+  const normalized = Object.fromEntries(group.paths.map((p) => [p.id, Math.max(0, Math.min(p.ranks.length, Math.floor(side[p.id] ?? 0)))]));
+  const measured = SIEGE_DPS_TABLE[profileKey(kind, undefined, 0, normalized)];
+  if (measured) return weight(measured, band);
   const base = weight(SIEGE_DPS_TABLE[profileKey(kind)], band),
     allMax = Object.fromEntries(group.paths.map((p) => [p.id, p.ranks.length]));
   const joint = weight(SIEGE_DPS_TABLE[profileKey(kind, undefined, 0, allMax)], band);
@@ -87,9 +90,9 @@ export function castleDpsBreakdown(input: NativeCastle | { castle: NativeCastle 
   for (const gate of fit.gates ?? []) direct.push({ kind: "gate", dps: rate("gate"), rect: gate.rect });
   for (const ballista of fit.ballistas ?? []) direct.push({ kind: "wallBallista", dps: rate("wallBallista"), rect: ballista.rect });
   const wallDps = rate("wall");
-  if (wallDps > 0)
-    for (let c = 0; c < fit.wall.length; c++)
-      if (fit.wall[c]) direct.push({ kind: "wall", dps: wallDps, rect: { x: c % CELLS_W, y: Math.floor(c / CELLS_W), w: 1, h: 1 } });
+  if (wallDps > 0 && fit.pieces)
+    for (let c = 0; c < fit.pieces.length; c++)
+      if (fit.pieces[c]) direct.push({ kind: "wall", dps: wallDps, rect: { x: c % CELLS_W, y: Math.floor(c / CELLS_W), w: 1, h: 1 } });
   const armed = direct.filter((c) => c.dps > 0),
     center = (c: Component) => ({ x: c.rect.x + c.rect.w / 2, y: c.rect.y + c.rect.h / 2 });
   const watchers = supports.filter((c) => c.kind === "watchTower");

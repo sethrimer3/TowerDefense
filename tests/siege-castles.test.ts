@@ -22,7 +22,7 @@ test("Every division generates native legal upgrades within five percent of its 
         c = generateCastle(seed, mmr),
         budget = dpsForMmr(mmr);
       assert.ok(fitLayout(c.castle.layout).ok);
-      if(mmr<2000)assert.ok(c.castle.forgeBand<=Math.floor(mmr/600));
+      if (mmr < 2000) assert.ok(c.castle.forgeBand <= Math.floor(mmr / 600));
       assert.ok(Math.abs(castleDps(c) / budget - 1) <= 0.05, JSON.stringify({ seed, mmr, budget, dps: castleDps(c) }));
       const scratch = castleAtForge(seed, c.castle.forgeBand);
       for (const s of c.castle.layout.structures)
@@ -34,6 +34,14 @@ test("Every division generates native legal upgrades within five percent of its 
   if (process.env.UPDATE_GOLDEN) writeFileSync(file, JSON.stringify(result, null, 2) + "\n");
   assert.deepEqual(result, JSON.parse(readFileSync(file, "utf8")));
   assert.ok(totals[6] > totals[0] * 2);
+});
+test("Crowded castles and progression boundaries still fill their legal native budget", () => {
+  for (const seed of [3672052678, 7954442, 1007])
+    for (const mmr of [599, 1199, 1799, 1920, 1999, 2000, 2399, 2719]) {
+      const castle = generateCastle(seed, mmr);
+      assert.ok(fitLayout(castle.castle.layout).ok, `${seed}:${mmr}`);
+      assert.ok(Math.abs(castleDps(castle) / dpsForMmr(mmr) - 1) <= 0.05, `${seed}:${mmr}`);
+    }
 });
 test("Revision-one offers migrate at their seed/MMR, interrupted raids lose once, and completed records survive", () => {
   const old = { ...newSiege(45), raid: { castle: legacyCastle(45, 600), attacker: 600, defender: 600, state: "offered" } };
@@ -73,4 +81,12 @@ test("Native defense snapshots wear real levels and bonuses; malformed optional 
   assert.equal(save.siege!.raid.castle.castle.shadowRanks?.bleed, 1);
 });
 
-test('Generated division budgets stay fresh, contiguous and bounded at the native ceiling',async()=>{const {divisionInputHash,divisionTable}=await import('../tools/siege-division-dps.ts');const {DIVISION_INPUT_HASH,DIVISION_DPS}=await import('../src/campaign/siege-division-dps.ts');assert.equal(divisionInputHash(),DIVISION_INPUT_HASH);assert.deepEqual(divisionTable(),[...DIVISION_DPS]);for(let i=1;i<35;i++)assert.ok(DIVISION_DPS[i]>DIVISION_DPS[i-1]);assert.equal(dpsForMmr(100),DIVISION_DPS[1]);assert.equal(dpsForMmr(3000),DIVISION_DPS[34]);});
+test("Generated division budgets stay fresh, contiguous and bounded at the native ceiling", async () => {
+  const { divisionInputHash, divisionTable } = await import("../tools/siege-division-dps.ts");
+  const { DIVISION_INPUT_HASH, DIVISION_DPS } = await import("../src/campaign/siege-division-dps.ts");
+  assert.equal(divisionInputHash(), DIVISION_INPUT_HASH);
+  assert.deepEqual(divisionTable(), [...DIVISION_DPS]);
+  for (let i = 1; i < 35; i++) assert.ok(DIVISION_DPS[i] > DIVISION_DPS[i - 1]);
+  assert.equal(dpsForMmr(100), DIVISION_DPS[1]);
+  assert.equal(dpsForMmr(3000), DIVISION_DPS[34]);
+});

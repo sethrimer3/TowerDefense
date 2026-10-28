@@ -1,19 +1,114 @@
-/** Reproducible offline baseline; never reads player saves. */
-import { CampaignSim } from '../src/campaign/sim.ts';
-import { generateCastle } from '../src/campaign/castles.ts';
-import { defaultDefendSave } from '../src/defend/progress.ts';
-const samples=Math.max(1,Math.min(100,Number(process.env.SIEGE_SAMPLES)||5));
-const rows = [];
-for (const mmr of [600,800,1000,1200,1400,1600]) {
-  let wins=0, seconds=0;
-  for(let seed=1;seed<=samples;seed++) {
-    const d=defaultDefendSave();
-    const castle=generateCastle(seed*7907,mmr);
-    const sim=new CampaignSim('siege',0,[],d.owned,d.levels,castle);
-    sim.start();
-    for(let n=0;n<5000&&sim.phase==='battle';n++)sim.step(.05);
-    wins+=Number(sim.phase==='won');seconds+=sim.elapsed;
-  }
-  rows.push({castleRating:mmr,wins,raids:samples,winRate:wins/samples,averageSeconds:Math.round(seconds/samples)});
+/** Native matched-raid calibration. No player saves or battle multipliers.
+ * --samples=2 --workers=2 --split=heldout --out=path.json; --smoke never reports a win rate. */
+import { Worker } from "node:worker_threads";
+import { createHash } from "node:crypto";
+import { readFileSync, writeFileSync, existsSync, appendFileSync, mkdirSync } from "node:fs";
+import { calibrateRaid } from "./siege-calibration.ts";
+import { siegeDpsInputs } from "./siege-dps-inputs.ts";
+import { DIVISION_DPS } from "../src/campaign/siege-division-dps.ts";
+import { ARMY_POLICY } from "../src/campaign/siege-army.ts";
+import { rankLabel } from "../src/campaign/siege-ranks.ts";
+const arg = (name: string) =>
+  process.argv
+    .find((a) => a.startsWith("--" + name + "="))
+    ?.split("=")
+    .slice(1)
+    .join("=");
+const split = arg("split") === "training" ? "training" : "heldout",
+  samples = Math.max(1, Math.min(32, Math.floor(Number(arg("samples") ?? process.env.SIEGE_SAMPLES) || 2))),
+  workers = Math.max(1, Math.min(2, Math.floor(Number(arg("workers")) || 2))),
+  out = arg("out"),
+  smoke = process.argv.includes("--smoke");
+const seedStart = Math.max(1, Math.min(1e9, Math.floor(Number(arg("seed-start")) || (split === "training" ? 1 : 1001))));
+const sources = [
+  "src/campaign/castle-generator.ts",
+  "src/campaign/castle-dps.ts",
+  "src/campaign/siege-dps-table.ts",
+  "src/campaign/siege-budget.ts",
+  "src/campaign/siege-army.ts",
+  "src/campaign/siege-division-dps.ts",
+  "src/campaign/castles.ts",
+  "src/campaign/raid.ts",
+  "src/campaign/sim.ts",
+  "tools/siege-calibration.ts",
+  "tools/siege-calibration-worker.ts",
+  "tools/calibrate-siege.ts",
+];
+const h = createHash("sha256").update(siegeDpsInputs().hash);
+for (const p of sources) h.update(p + "\0").update(readFileSync(p));
+const inputHash = h.digest("hex");
+if (smoke) {
+  const start = performance.now(),
+    rows = [calibrateRaid(600, 101, { seconds: 2 }), calibrateRaid(2160, 102, { seconds: 2 })];
+  console.log(JSON.stringify({ inputHash, smoke: true, complete: false, elapsedMs: performance.now() - start, rows }, null, 2));
+} else {
+  mkdirSync("work", { recursive: true });
+  const cache = "work/siege-calibration-" + inputHash.slice(0, 16) + "-" + split + ".jsonl",
+    rows = new Map<string, ReturnType<typeof calibrateRaid>>();
+  if (existsSync(cache))
+    for (const line of readFileSync(cache, "utf8").split("\n")) {
+      try {
+        const row = JSON.parse(line);
+        if (Number.isInteger(row.seed) && row.phase !== "battle") rows.set(row.mmr + ":" + row.seed, row);
+      } catch {}
+    }
+  const jobs = Array.from({ length: 35 }, (_, tier) => Math.max(100, tier * 80))
+    .flatMap((mmr) => Array.from({ length: samples }, (_, n) => ({ mmr, seed: seedStart + n })))
+    .filter((job, i, list) => list.findIndex((j) => j.mmr === job.mmr && j.seed === job.seed) === i && !rows.has(job.mmr + ":" + job.seed));
+  let next = 0,
+    done = 0;
+  console.error(JSON.stringify({ inputHash, split, samples, cached: rows.size, jobs: jobs.length, workers }));
+  await Promise.all(
+    Array.from({ length: workers }, async () => {
+      const worker = new Worker(new URL("./siege-calibration-worker.ts", import.meta.url), { execArgv: process.execArgv });
+      try {
+        for (;;) {
+          const i = next++;
+          if (i >= jobs.length) break;
+          const result: any = await new Promise((resolve, reject) => {
+            worker.once("message", resolve);
+            worker.once("error", reject);
+            worker.postMessage(jobs[i]);
+          });
+          worker.removeAllListeners("error");
+          if (result.error) throw Error(result.error);
+          const row = result.row;
+          rows.set(row.mmr + ":" + row.seed, row);
+          appendFileSync(cache, JSON.stringify(row) + "\n");
+          console.error(++done + "/" + jobs.length + " " + row.mmr + " " + row.phase + " " + row.seconds + "s");
+        }
+      } finally {
+        await worker.terminate();
+      }
+    }),
+  );
+  const ordered = [...rows.values()].filter((r) => r.seed >= seedStart && r.seed < seedStart + samples).sort((a, b) => a.mmr - b.mmr || a.seed - b.seed),
+    bands = Array.from(new Set(ordered.map((r) => r.mmr))).map((mmr) => {
+      const band = ordered.filter((r) => r.mmr === mmr);
+      return {
+        mmr,
+        rank: rankLabel(mmr),
+        wins: band.filter((r) => r.phase === "won").length,
+        raids: band.length,
+        winRate: band.filter((r) => r.phase === "won").length / band.length,
+        averageSeconds: band.reduce((n, r) => n + r.seconds, 0) / band.length,
+      };
+    }),
+    report = {
+      inputHash,
+      split,
+      samples,
+      seedStart,
+      spells: "none; native automatic infantry only",
+      assumption: "Fixed progression budgets generated by the same native greedy walk; not observed player equipment",
+      armyPolicy: ARMY_POLICY,
+      divisionDps: DIVISION_DPS,
+      wins: ordered.filter((r) => r.phase === "won").length,
+      raids: ordered.length,
+      winRate: ordered.filter((r) => r.phase === "won").length / ordered.length,
+      bands,
+      rows: ordered,
+    };
+  if (out) writeFileSync(out, JSON.stringify(report, null, 2) + "\n");
+  console.log(JSON.stringify(report, null, 2));
 }
-console.log(JSON.stringify({ruleset:'native-defend-siege', model:'provisional legacy prior → native defense budget',army:'Starter Melee Guild + Ranged Guild, automatic bottom formation, no upgrades',rows},null,2));

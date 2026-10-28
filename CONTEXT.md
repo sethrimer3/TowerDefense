@@ -650,3 +650,9 @@ The Siege action that reveals an opponent and castle preview before the player c
 
 - **Castle blueprint**: the native city layout and upgrades saved with a Siege opponent.
 - **Muster rows**: the player’s infantry buildings arranged below the invaded castle.
+
+**Reference army**:
+A reproducible infantry roster representing an assumed stage of progression for offline Siege difficulty trials.
+
+**Matched raid**:
+A difficulty trial in which the reference army and target castle share an MMR.

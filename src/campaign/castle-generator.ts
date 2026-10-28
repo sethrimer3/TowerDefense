@@ -1,15 +1,16 @@
-import { castleAtForge, castleSnapshot, type NativeCastle } from "./castle-model.ts";
+import { CASTLE_KEEP, castleAtForge, castleSnapshot, type NativeCastle } from "./castle-model.ts";
 import { castleDps, defenderDps } from "./castle-dps.ts";
 import { dpsProfiles, SIDE_GROUPS, type DpsProfile } from "./siege-dps-catalog.ts";
 import { CEILING_CASTLE } from "./siege-ceiling.ts";
 import { buildNativeCopy } from "./native-build.ts";
 import { compactKinds } from "../defend/progress.ts";
-import { arrange, type PlacedKind } from "../defend/layout.ts";
+import { arrange, quarterSize, type PlacedKind } from "../defend/layout.ts";
 import { buySide } from "../side-ranks.ts";
 import { placeOf, nextSteps, upgradeBuilding } from "../specializations.ts";
 import { bonuses } from "../progression.ts";
 import { ITEM_CATEGORY } from "../defend/catalog.ts";
 import type { Save } from "../save.ts";
+import { infantry } from "./plans.ts";
 function random(seed: number) {
   return () => {
     seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
@@ -41,11 +42,44 @@ export function tuneTraining(castle: NativeCastle, budget: number) {
   castle.training.towerDamage = b;
   return castleDps(castle);
 }
-function place(game: Save, p: DpsProfile, rand: () => number) {
+function place(game: Save, p: DpsProfile, rand: () => number, dense = false) {
+  const size = quarterSize(p.kind as PlacedKind, game.defend.layout.compact.includes(p.kind as PlacedKind));
   const tiles = game.defend.layout.cityTiles
-    .map((key) => ({ key, tie: rand(), count: game.defend.layout.structures.filter((s) => s.tx + "," + s.ty === key).length }))
-    .sort((a, b) => a.count - b.count || a.tie - b.tie);
+    .map((key) => {
+      const homes = game.defend.layout.structures.filter((s) => s.tx + "," + s.ty === key);
+      return {
+        key,
+        tie: rand(),
+        count: homes.length,
+        hall: homes.some((s) => {
+          const q = quarterSize(s.kind, game.defend.layout.compact.includes(s.kind));
+          return q.qw >= 2 && q.qh >= 2;
+        }),
+      };
+    })
+    .sort((a, b) => {
+      const priority = (key: string) => {
+        const [x, y] = key.split(",").map(Number);
+        return Math.abs(x - CASTLE_KEEP.tx) + Math.abs(y - CASTLE_KEEP.ty) + (y < CASTLE_KEEP.ty ? 2 : y > CASTLE_KEEP.ty ? -0.25 : 0);
+      };
+      const packing = dense && size.span === 1 && size.qw === 1 && size.qh === 1 ? Number(b.hall) - Number(a.hall) : 0;
+      return packing || a.count - b.count || priority(a.key) - priority(b.key) || a.tie - b.tie;
+    });
   for (const tile of tiles) {
+    // Two buildings at least 2×2 quarters cannot share a 4×4-quarter tile
+    // with the native clear quarter between them. Bait has no such ring.
+    if (
+      p.kind !== "monsterBait" &&
+      size.span === 1 &&
+      size.qw >= 2 &&
+      size.qh >= 2 &&
+      game.defend.layout.structures.some((s) => {
+        if (s.kind === "monsterBait" || s.tx + "," + s.ty !== tile.key) return false;
+        const q = quarterSize(s.kind, game.defend.layout.compact.includes(s.kind));
+        return q.span === 1 && q.qw >= 2 && q.qh >= 2;
+      })
+    )
+      continue;
     const [tx, ty] = tile.key.split(",").map(Number),
       old = game.defend.layout,
       uid = old.nextUid,
@@ -66,12 +100,32 @@ function place(game: Save, p: DpsProfile, rand: () => number) {
   }
   return false;
 }
-const profiles = dpsProfiles().filter((p) => !["keep", "wall", "gate", "wallBallista"].includes(p.kind) && !p.side?.[Object.keys(p.side)[0]]);
-export function generateNative(seed: number, mmr: number, budget: number): NativeCastle {
+const profiles = dpsProfiles().filter(
+  (p) => !["keep", "wall", "gate", "wallBallista"].includes(p.kind) && (!p.side || Object.values(p.side).every((n) => n === 0)),
+);
+export function generateNative(seed: number, mmr: number, budget: number, rules: { infantryOnly?: boolean } = {}): NativeCastle {
+  let failure: unknown;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      return generateAttempt((seed ^ Math.imul(attempt, 0x9e3779b9)) >>> 0, mmr, budget, rules, attempt === 3);
+    } catch (error) {
+      if (!(error instanceof Error) || !error.message.startsWith("Unfilled budget ")) throw error;
+      failure = error;
+    }
+  }
+  throw failure;
+}
+function generateAttempt(seed: number, mmr: number, budget: number, rules: { infantryOnly?: boolean }, dense: boolean): NativeCastle {
   const rand = random(seed),
-    personality = Math.floor(rand() * 5),
-    targetHomes = 4 + Math.floor(rand() * 7) + Math.floor(mmr / 400);
+    personalityRoll = Math.floor(rand() * 5),
+    homesRoll = 4 + Math.floor(rand() * 7) + Math.floor(mmr / 400),
+    personality = dense ? 4 : personalityRoll,
+    targetHomes = dense ? 24 : homesRoll;
   const peak = structuredClone(CEILING_CASTLE);
+  if (rules.infantryOnly) {
+    peak.layout.structures = peak.layout.structures.filter((s) => infantry(s.kind));
+    for (const group of SIDE_GROUPS) if (!infantry(group.kind as PlacedKind)) delete peak[group.key];
+  }
   let peakValue = tuneTraining(peak, budget);
   while (peakValue > budget && peak.layout.structures.some((s) => s.kind === "shadow")) {
     const shadows = peak.layout.structures.filter((s) => s.kind === "shadow"),
@@ -79,7 +133,8 @@ export function generateNative(seed: number, mmr: number, budget: number): Nativ
     peak.layout.structures = peak.layout.structures.filter((s) => s.uid !== remove.uid);
     peakValue = tuneTraining(peak, budget);
   }
-  if (mmr >= 2000 && peak.layout.structures.some(s => s.kind === "shadow") && peakValue <= budget && peakValue >= budget * 0.95) return peak;
+  if (mmr >= 2000 && peak.layout.structures.some((s) => s.kind === "shadow") && !rules.infantryOnly && peakValue <= budget && peakValue >= budget * 0.95)
+    return peak;
   let best: NativeCastle | undefined,
     bestError = Infinity;
   for (let band = Math.min(4, Math.floor(mmr / 600)); band >= 0; band--) {
@@ -88,28 +143,34 @@ export function generateNative(seed: number, mmr: number, budget: number): Nativ
     game.training.troopDamage = game.training.towerDamage = 0;
     const reference = bonuses(castleAtForge(seed, band)),
       current = bonuses(game);
-    const sides = SIDE_GROUPS.find((g) => g.kind === "shadow")!;
-    if (mmr >= 2000) {
-      let sideBest: Record<string, number> = {},
-        valueBest = 0;
-      for (let k = 0; k <= 4; k++)
-        for (let p = 0; p <= 3; p++)
-          for (let b = 0; b <= 3; b++)
-            for (let e = 0; e <= 3; e++) {
-              const ranks = { knives: k, pierce: p, bleed: b, edge: e },
-                value = (defenderDps("shadow", band, undefined, 0, ranks) * current.troopDamage) / reference.troopDamage;
-              if (value <= budget / Math.max(2, targetHomes / 2) && value > valueBest) {
-                sideBest = ranks;
-                valueBest = value;
-              }
-            }
-      for (const p of sides.paths) for (let n = 0; n < (sideBest[p.id] ?? 0); n++) buySide(game, sides.key, sides.paths, p.id);
-    }
-    place(game, { key: "basic", kind: "rangedGuild" }, rand);
-    place(game, { key: "basic", kind: "rangedGuild" }, rand);
+    const core: DpsProfile[] = !rules.infantryOnly
+      ? [
+          { key: "basic", kind: "rangedGuild" },
+          { key: "basic", kind: "rangedGuild" },
+        ]
+      : mmr >= 2000
+        ? [
+            { key: "core", kind: "heroHall", path: "legend", rank: 3 },
+            { key: "core", kind: "revolutionary" },
+          ]
+        : mmr >= 800
+          ? [
+              { key: "core", kind: "chapterHouse", path: "crusaders", rank: Math.min(3, 1 + Math.floor((mmr - 800) / 400)) },
+              { key: "core", kind: "archerBarracks" },
+            ]
+          : mmr >= 400
+            ? [
+                { key: "core", kind: "barracks" },
+                { key: "core", kind: "archerBarracks" },
+              ]
+            : [
+                { key: "basic", kind: "meleeGuild" },
+                { key: "basic", kind: "rangedGuild" },
+              ];
+    for (const p of core) place(game, p, rand, dense);
     let value = castleDps(castleSnapshot(game, band));
     if (value > budget) continue;
-    for (const group of SIDE_GROUPS.filter((g) => g.kind !== "shadow"))
+    for (const group of SIDE_GROUPS.filter((g) => g.kind !== "shadow" && (!rules.infantryOnly || infantry(g.kind as PlacedKind))))
       for (const path of [...group.paths].sort((a, b) => (a.id < b.id ? -1 : 1)))
         for (let n = 0; n < Math.min(path.ranks.length, Math.floor(mmr / 800)); n++) {
           const trial = structuredClone(game);
@@ -119,7 +180,28 @@ export function generateNative(seed: number, mmr: number, budget: number): Nativ
           game.defend = trial.defend;
           value = next;
         }
+    const sides = SIDE_GROUPS.find((g) => g.kind === "shadow")!;
+    if (mmr >= 2000) {
+      let sideBest: Record<string, number> = {},
+        valueBest = 0;
+      for (let k = 0; k <= 4; k++)
+        for (let p = 0; p <= 3; p++)
+          for (let b = 0; b <= 3; b++)
+            for (let e = 0; e <= 3; e++) {
+              const ranks = { knives: k, pierce: p, bleed: b, edge: e },
+                rate = (defenderDps("shadow", band, undefined, 0, ranks) * current.troopDamage) / reference.troopDamage;
+              if (rate <= budget - value && rate > valueBest) {
+                sideBest = ranks;
+                valueBest = rate;
+              }
+            }
+      for (const p of sides.paths) for (let n = 0; n < (sideBest[p.id] ?? 0); n++) buySide(game, sides.key, sides.paths, p.id);
+      // Large gaps between shared-rank combinations need an elite first;
+      // many weaker copies can otherwise fill the footprint below budget.
+      if (valueBest >= budget * 0.1 && place(game, { key: "elite", kind: "shadow" }, rand, dense)) value = castleDps(castleSnapshot(game, band));
+    }
     const allowed = profiles.filter((p) => {
+      if (rules.infantryOnly && !infantry(p.kind as PlacedKind)) return false;
       const place = placeOf(p.kind as PlacedKind);
       if ((place.tier === "ultimate" || place.tier === "beyond") && mmr < 2000) return false;
       if (mmr < 300 && place.tier !== "basic") return false;
@@ -160,12 +242,12 @@ export function generateNative(seed: number, mmr: number, budget: number): Nativ
         .filter((o) => o.rate > 0 && o.rate <= remaining)
         .sort((a, b) => a.score - b.score);
       // Native Watch marking can fill capacity without inventing a multiplier.
-      if (n % 3 === 2 && game.defend.layout.structures.some((s) => s.kind !== "watchTower"))
+      if (!rules.infantryOnly && n % 3 === 2 && game.defend.layout.structures.some((s) => s.kind !== "watchTower"))
         options.unshift({ p: { key: "watch", kind: "watchTower" }, rate: 0, score: 0 });
       let accepted = false;
       for (const o of options.slice(0, 12)) {
         const candidate = structuredClone(game);
-        if (!place(candidate, o.p, rand)) continue;
+        if (!place(candidate, o.p, rand, dense)) continue;
         const next = castleDps(castleSnapshot(candidate, band));
         if (next > budget || next <= value + 1e-6) continue;
         game.defend = candidate.defend;
@@ -178,11 +260,14 @@ export function generateNative(seed: number, mmr: number, budget: number): Nativ
           .flatMap((home) => nextSteps(home.kind, home.path ? { path: home.path, rank: home.rank! } : undefined).map((step) => ({ home, step, tie: rand() })))
           .sort((a, b) => a.tie - b.tie);
         for (const { home, step } of moves) {
+          if (step.type === "merge" && mmr < 2000) continue;
+          if (step.type === "path" && step.rank > Math.min(3, 1 + Math.floor(Math.max(0, mmr - 600) / 500))) continue;
+          if (step.type === "become" && mmr < 2000 && ["ultimate", "beyond"].includes(placeOf(step.to).tier)) continue;
           const trial = structuredClone(game),
             result = upgradeBuilding(trial, { uid: home.uid }, step);
           if (!result.ok) continue;
           if (result.waiting) {
-            const {path: _path, rank: _rank, ...bare} = home;
+            const { path: _path, rank: _rank, ...bare } = home;
             const proposed = {
               ...trial.defend.layout,
               structures: [...trial.defend.layout.structures, { ...bare, kind: result.kind as PlacedKind }],

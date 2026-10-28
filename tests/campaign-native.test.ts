@@ -63,6 +63,9 @@ test("Siege uses two native sides, real city walls, full infantry copies and the
     mode = new CampaignSim("siege", 0, [], save.defend.owned, save.defend.levels, generateCastle(45, 600), save);
   assert.ok(mode.raid!.attack instanceof DefendSim);
   assert.ok(mode.raid!.defense instanceof DefendSim);
+  assert.equal(mode.raid.defense.warBanner, null);
+  assert.equal(mode.raid.defense.scenario?.unrestricted, false);
+  assert.equal(mode.raid.attack.scenario?.unrestricted, true);
   assert.equal(mode.layout.length, 15);
   assert.ok(mode.map.buildings.some((b) => b.kind === "wall"));
   assert.ok(mode.map.buildings.some((b) => b.kind === "gate"));
@@ -101,7 +104,7 @@ test("Native infantry can march from muster, breach a generated castle and destr
   d.owned.barracks = 4;
   d.owned.rangedGuild = 0;
   d.owned.archerBarracks = 4;
-  const mode = new CampaignSim("siege", 0, [], d.owned, d.levels, generateCastle(45, 600));
+  const mode = new CampaignSim("siege", 0, [], d.owned, d.levels, generateCastle(45, 100));
   const walls = mode.map.buildings.filter((b) => b.kind === "wall");
   assert.ok(mode.start());
   for (let n = 0; n < 7500 && mode.phase === "battle"; n++) mode.step(1 / 30);
