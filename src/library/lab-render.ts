@@ -719,8 +719,10 @@ export class LabRenderer {
         if (dx * dx + dy * dy <= 6) dot(BRAZIER.x + dx, BRAZIER.y - 5 + dy, dy === 0 ? (surface === ((dx & 1) > 0) ? "#9ae4f0" : "#7ad0e0") : dy === 1 ? "#5ab0c8" : "#3e8aa4");
     const fill = Math.round(lab.still * (RECEIVER.bottom - RECEIVER.top));
     if (fill > 0) dot(RECEIVER.x0 + 1, RECEIVER.bottom - fill + 1, "#70c8f0", RECEIVER.x1 - RECEIVER.x0 - 1, fill);
-    const drip = (time * 1.4) % 1;
-    if (lab.furnace > 0.25) dot(RECEIVER.x0 + 2, RECEIVER.top - 3 + Math.round(drip * 4), "#a0e0ff");
+    // A drop leaves the tube's mouth at the receiver's rim and falls inside the
+    // glass to the distillate's surface.
+    const drip = (time * 1.4) % 1, level = RECEIVER.bottom - fill + 1;
+    if (lab.furnace > 0.25) dot(RECEIVER.x0 + 2, RECEIVER.top + Math.round(drip * Math.max(0, level - 1 - RECEIVER.top)), "#a0e0ff");
     // The cauldron: its fire, its brew bubbling, steam off it.
     for (let x = CAULDRON.x0 + 4; x < CAULDRON.x0 + 11; x++) {
       const h = 1 + Math.round(h01(x, tick, 49) * 3);
