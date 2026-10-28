@@ -200,15 +200,64 @@ export class Fences {
   }
 }
 
-/** Rails: a dark outline with a lighter wooden top. */
-/** Standing fence sections drawn on their own (a scenario's fence cells). */
-export function drawFenceSections(c: CanvasRenderingContext2D, px: number, sections: FenceSection[]) {
+/** An outpost's wooden fence at `ART` art pixels a cell, as stout as its
+ * wooden gate: a rail `RAIL` art pixels thick along the ring's middle
+ * line, and a post (`POST`, the gate's own) at every corner, at every
+ * other cell and wherever the fence stops (a gate, a breach). */
+const STOUT = { rail: 4, post: 5, tones: { rail: ["#6e4a2a", "#8a6038", "#a37446"], post: ["#4a2f19", "#5e3d22", "#76502e"], cap: "#87613a" } };
+
+/** Standing fence sections drawn on their own (an Ambush outpost's fence
+ * cells), all of them at once so the posts know where the fence stops. */
+export function drawFenceSections(c: CanvasRenderingContext2D, px: number, sections: FenceSection[], shadow = false) {
   const intact = sections.filter((s) => !s.broken);
+  const a = px / 8, snap = (v: number) => Math.round(v * a);
+  // Fills art pixels [u0, u1) × [v0, v1), measured from cell point (x, y).
+  const fill = (x: number, y: number, u0: number, v0: number, u1: number, v1: number, colour: string) => {
+    const X0 = snap(x * 8 + u0), Y0 = snap(y * 8 + v0);
+    c.fillStyle = colour;
+    c.fillRect(X0, Y0, snap(x * 8 + u1) - X0, snap(y * 8 + v1) - Y0);
+  };
+  const { rail, post, tones } = STOUT, half = rail / 2;
   c.save();
-  drawRails(c, px, intact);
-  drawPosts(c, px, intact);
+  // With `shadow`, a shadow cast to the lower right first (where nothing
+  // else casts the fence's).
+  if (shadow)
+    for (const s of intact) {
+      const flat = s.y1 === s.y2, x = Math.min(s.x1, s.x2), y = Math.min(s.y1, s.y2), len = (flat ? Math.abs(s.x2 - s.x1) : Math.abs(s.y2 - s.y1)) * 8;
+      if (flat) fill(x, y, -half + 2, half, len + half + 2, half + 2, "rgba(6,10,5,0.36)");
+      else fill(x, y, half, -half + 2, half + 2, len + half + 2, "rgba(6,10,5,0.36)");
+    }
+  // The rails: outlined, lit along the top (or the left), shaded below.
+  for (const s of intact) {
+    const flat = s.y1 === s.y2, x = Math.min(s.x1, s.x2), y = Math.min(s.y1, s.y2), len = (flat ? Math.abs(s.x2 - s.x1) : Math.abs(s.y2 - s.y1)) * 8;
+    const box = (o0: number, o1: number, l0: number, l1: number, colour: string) =>
+      flat ? fill(x, y, l0, o0, l1, o1, colour) : fill(x, y, o0, l0, o1, l1, colour);
+    box(-half, half, -half, len + half, OUTLINE);
+    box(-half + 1, -half + 2, -half + 1, len + half - 1, tones.rail[2]);
+    box(-half + 2, half - 1, -half + 1, len + half - 1, tones.rail[1]);
+    for (let l = 3; l < len; l += 4) box(-half + 2, half - 1, l, l + 1, tones.rail[0]);
+  }
+  // The posts.
+  const ends = new Map<string, { x: number; y: number; n: number }>();
+  for (const s of intact)
+    for (const [x, y] of [[s.x1, s.y1], [s.x2, s.y2]]) {
+      const k = `${x * 2},${y * 2}`, e = ends.get(k);
+      if (e) e.n++;
+      else ends.set(k, { x, y, n: 1 });
+    }
+  const p0 = -Math.floor(post / 2), p1 = p0 + post;
+  for (const { x, y, n } of ends.values()) {
+    const corner = x % 1 !== 0 && y % 1 !== 0, along = x % 1 === 0 ? x : y;
+    if (!corner && n > 1 && along % 2 !== 0) continue;
+    fill(x, y, p0, p0, p1, p1, OUTLINE);
+    fill(x, y, p0 + 1, p0 + 1, p1 - 1, p1 - 1, tones.post[1]);
+    fill(x, y, p0 + 1, p0 + 1, p1 - 1, p0 + 3, tones.cap);
+    fill(x, y, p0 + 1, p0 + 1, p0 + 2, p1 - 1, tones.post[2]);
+    fill(x, y, p1 - 2, p0 + 3, p1 - 1, p1 - 1, tones.post[0]);
+  }
   c.restore();
 }
+/** Rails: a dark outline with a lighter wooden top. */
 function drawRails(c: CanvasRenderingContext2D, px: number, sections: FenceSection[]) {
   c.lineCap = "butt";
   const dark = Math.max(1, Math.round(px * 0.13)),

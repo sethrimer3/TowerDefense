@@ -14,10 +14,14 @@ import type { Side } from "../defend/layout.ts";
 const onRing = (rect: Rect, thickness: number, x: number, y: number) =>
   x >= rect.x && y >= rect.y && x < rect.x + rect.w && y < rect.y + rect.h && (x < rect.x + thickness || x >= rect.x + rect.w - thickness || y < rect.y + thickness || y >= rect.y + rect.h - thickness);
 
+/** How wide the roads run, and so the gates that shut them: the wooden
+ * gate's way between its posts. */
+export const ROAD_WIDTH = 3;
+
 /** Where the roads cross `rect`'s ring of walls `thickness` deep: a gate
- * `GATE.long` cells along each side the road crosses, centred on the
- * crossing and kept off the corners, one a crossing. */
-export function gateSpots(rect: Rect, thickness: number, road: ReadonlySet<number>): { side: Side; rect: Rect }[] {
+ * `long` cells along each side the road crosses, centred on the crossing
+ * and kept off the corners, one a crossing. */
+export function gateSpots(rect: Rect, thickness: number, road: ReadonlySet<number>, long: number = GATE.long): { side: Side; rect: Rect }[] {
   const out: { side: Side; rect: Rect }[] = [];
   for (const side of ["n", "s", "w", "e"] as const) {
     const across = side === "w" || side === "e",
@@ -42,11 +46,11 @@ export function gateSpots(rect: Rect, thickness: number, road: ReadonlySet<numbe
       if (!crossed(k)) continue;
       let end = k;
       while (end + 1 < length && crossed(end + 1)) end++;
-      const from = Math.max(thickness, Math.min(length - thickness - GATE.long, Math.round((k + end + 1) / 2 - GATE.long / 2)));
+      const from = Math.max(thickness, Math.min(length - thickness - long, Math.round((k + end + 1) / 2 - long / 2)));
       if (from >= placedTo) {
         const along = start + from;
-        out.push({ side, rect: across ? { x: band, y: along, w: thickness, h: GATE.long } : { x: along, y: band, w: GATE.long, h: thickness } });
-        placedTo = from + GATE.long;
+        out.push({ side, rect: across ? { x: band, y: along, w: thickness, h: long } : { x: along, y: band, w: long, h: thickness } });
+        placedTo = from + long;
       }
       k = end;
     }
@@ -133,8 +137,8 @@ export function ambushField(level: number, { stone = false }: { stone?: boolean 
     { map, road, castle } = field;
   // Gates where the roads meet the castle's and the outposts' walls: the only
   // ways in and out. The road widens to each gate's passage either side of it.
-  const castleSpots = gateSpots(castle, 2, road),
-    outpostSpots = field.outposts.map((p) => gateSpots(p.rect, 1, road));
+  const castleSpots = gateSpots(castle, 2, road, ROAD_WIDTH),
+    outpostSpots = field.outposts.map((p) => gateSpots(p.rect, 1, road, ROAD_WIDTH));
   for (const g of [...castleSpots, ...outpostSpots.flat()]) widen(map, road, g);
   const castleGates = castleSpots.map((g) => setGate(map, g.side, g.rect, false));
   const outposts = field.outposts.map((p, i) => {
