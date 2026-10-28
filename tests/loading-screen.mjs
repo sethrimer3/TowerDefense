@@ -7,6 +7,7 @@ const browser = await chromium.launch(process.env.PLAYWRIGHT_EXECUTABLE
   ? { headless: true, executablePath: process.env.PLAYWRIGHT_EXECUTABLE }
   : { headless: true, channel: process.env.PLAYWRIGHT_CHANNEL || 'chrome' });
 const base = process.env.TEST_URL || 'http://127.0.0.1:5173/';
+const mainModule = /\/(?:src\/main\.ts|assets\/main-[^/]+\.js)(?:\?.*)?$/;
 mkdirSync('test-results', { recursive: true });
 
 try {
@@ -18,12 +19,17 @@ try {
     ['saved-reduced', { width: 390, height: 844 }, 'saved'],
   ]) {
     const page = await browser.newPage({ viewport, reducedMotion: reduced === 'system' ? 'reduce' : 'no-preference' });
+    // Control animation frames so concurrent CPU-heavy game tests cannot let
+    // the bar finish before the first pair of samples is taken.
+    const time = new Date('2026-10-28T12:00:00Z');
+    await page.clock.install({ time });
+    await page.clock.pauseAt(new Date(time.getTime() + 60_000));
     const errors = [];
     page.on('pageerror', e => errors.push(e.message));
     if (reduced === 'saved') await page.addInitScript(() => localStorage.setItem('towerdefense.v1', JSON.stringify({ version: 2, settings: { reduceMotion: true } })));
     let release;
     const gate = new Promise(resolve => { release = resolve; });
-    await page.route('**/src/main.ts', async route => { await gate; await route.continue(); });
+    await page.route(mainModule, async route => { await gate; await route.continue(); });
     await page.goto(base, { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => document.querySelector('.loading-stones').width > 300 / 3);
     assert.equal(await page.locator('#app').evaluate(el => el.inert), true);
@@ -40,7 +46,7 @@ try {
     assert.ok(layout.labelRight < layout.barX, `${name}: label before brick bar`);
     const pixels = () => page.evaluate(() => ['.loading-stones', '.loading-torch', '.loading-bricks'].map(s => document.querySelector(s).toDataURL()));
     const before = await pixels();
-    await page.waitForTimeout(250);
+    await page.clock.runFor(250);
     const after = await pixels();
     if (reduced) {
       assert.deepEqual(after, before, `${name}: still artwork`);
@@ -56,21 +62,23 @@ try {
         }, time);
         assert.equal(count, expected, `${name}: dots at ${time} ms`);
       }
-      const falling = await page.evaluate(async () => {
-        const canvas = document.querySelector('.loading-bricks'), c = canvas.getContext('2d');
-        for (let frame = 0; frame < 30; frame++) {
-          await new Promise(requestAnimationFrame);
+      let falling = false;
+      for (let frame = 0; frame < 30 && !falling; frame++) {
+        await page.clock.runFor(16);
+        falling = await page.evaluate(() => {
+          const canvas = document.querySelector('.loading-bricks'), c = canvas.getContext('2d');
           const pixels = c.getImageData(0, 0, canvas.width, 19).data;
           for (let p = 0; p < pixels.length; p += 4) if (pixels[p] === 168 && pixels[p + 1] === 69 && pixels[p + 2] === 46 && pixels[p + 3]) return true;
-        }
-        return false;
-      });
+          return false;
+        });
+      }
       assert.ok(falling, `${name}: a brick falls above its resting course`);
     }
-    await page.waitForTimeout(1400);
+    await page.clock.runFor(1400);
     assert.equal(await page.locator('#loading-screen').count(), 1, `${name}: waits for game import`);
     await page.screenshot({ path: `test-results/loading-${name}.png` });
     release();
+    await page.clock.resume();
     await page.locator('#loading-screen').waitFor({ state: 'detached' });
     await page.locator('#profile-editor[open]').waitFor();
     assert.equal(await page.locator('#app').evaluate(el => el.inert), false);
@@ -80,11 +88,11 @@ try {
     console.log(`${name}: loading layout, motion and handoff passed`);
   }
   const page = await browser.newPage();
-  await page.route('**/src/main.ts', route => route.abort());
+  await page.route(mainModule, route => route.abort());
   await page.goto(base);
   await page.locator('.loading-retry').waitFor({ state: 'visible' });
   assert.match(await page.locator('#loading-screen').getAttribute('aria-label'), /Unable to load/);
-  await page.unroute('**/src/main.ts');
+  await page.unroute(mainModule);
   await page.locator('.loading-retry').click();
   await page.locator('#loading-screen').waitFor({ state: 'detached' });
   await page.locator('#profile-editor[open]').waitFor();
