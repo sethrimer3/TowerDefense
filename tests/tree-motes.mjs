@@ -84,6 +84,25 @@ try {
     await page.screenshot({ path: `test-results/tree-motes/${name}-panned.png` });
     const moved = await gold(page, '#defend-specialty .ug-motes');
     assert.ok(moved.count > 20, `motes still fill the panned view: ${moved.count}`);
+    // Zooming far out stops a quarter past fitting the tree, and the motes still fill the view, corners too.
+    if (!touch) {
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      for (let k = 0; k < 30; k++) await page.mouse.wheel(0, 400);
+      await page.waitForTimeout(1200);
+      const out = await page.evaluate(() => { const t = window.__dp.tree; return { s: t.pan.s, fit: t.fit.s }; });
+      assert.ok(Math.abs(out.s - out.fit / 1.25) < 1e-6, `zoom out stops a quarter past the fit: ${JSON.stringify(out)}`);
+      const corners = await page.evaluate(() => {
+        const c = document.querySelector('#defend-specialty .ug-motes'), d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+        const q = [0, 0, 0, 0];
+        for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) {
+          const i = (y * c.width + x) * 4;
+          if (d[i + 3] > 0 && d[i] > 180) q[(y < c.height / 2 ? 0 : 2) + (x < c.width / 2 ? 0 : 1)]++;
+        }
+        return q;
+      });
+      assert.ok(corners.every(n => n > 10), `motes in every quarter of the zoomed-out view: ${corners}`);
+      await page.screenshot({ path: `test-results/tree-motes/${name}-zoomed-out.png` });
+    }
     // A purchase bursts them (the keep's first rank).
     const first = await page.locator('#defend-specialty .ug-node.next').first().getAttribute('data-node');
     await page.evaluate(id => window.__dp.tree.burst(id), first);

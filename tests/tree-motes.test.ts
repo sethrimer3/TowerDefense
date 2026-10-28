@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { SIZES, TreeMotes, type MoteScene } from "../src/ui/tree-motes.ts";
-import { clampAxis, panArea } from "../src/ui/upgrade-graph.ts";
+import { clampAxis, coverView, panArea, ZOOM_OUT } from "../src/ui/upgrade-graph.ts";
 
 /** A canvas standing in for the browser's, counting what is drawn. */
 function fakeCanvas(w = 400, h = 300) {
@@ -108,4 +108,13 @@ test("the view pans round the tree and a fifth of its size beyond, no further", 
   assert.equal(clampAxis(0, a.x, a.w, 400, 1), 0);
   // Zoomed out so the area fits, it sits centred.
   assert.equal(clampAxis(123, a.x, a.w, 400, 0.2), 400 / 2 - (a.x + a.w / 2) * 0.2);
+});
+
+test("the motes' area covers the view even at the furthest zoom out", () => {
+  assert.equal(ZOOM_OUT, 1.25);
+  const a = { x: -200, y: -100, w: 1400, h: 700 };
+  // A tall phone view at zoom 0.25 shows 400 by 3200 tree pixels: only the height grows, about the middle.
+  assert.deepEqual(coverView(a, 100, 800, 0.25), { x: -200, y: -1350, w: 1400, h: 3200 });
+  // Already covering: unchanged.
+  assert.deepEqual(coverView(a, 100, 100, 1), a);
 });
