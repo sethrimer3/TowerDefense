@@ -21,6 +21,7 @@
  * Presentation only; its randomness comes from `defendRandom("effects")`. */
 import { CELL_COUNT, CELLS_H, CELLS_W, cellIndex, defendRandom, hash, hash01, type Rect } from "./grid.ts";
 import type { CityMap } from "./citygen.ts";
+import type { Footprint } from "./shadow-art.ts";
 import type { DefendSim } from "./sim.ts";
 import { BURN, ForestDamage, MOUNTAIN, VARIANTS, canopyRadius, forestPlan, type Boulder, type Felled, type ForestPlan, type ForestTree, type Lake, type TreeKind, type TreeSize } from "./forest.ts";
 import { ART } from "./park-art.ts";
@@ -330,8 +331,10 @@ export function floorPixels(plan: ForestPlan, damage: ForestDamage | null, river
 }
 
 /** Paints the forest's ground into `out` afresh within `box` only; a river
- * as the city layer paints it, so its banks lie on the forest's grass. */
-export function paintFloor(out: Uint32Array, plan: ForestPlan, damage: ForestDamage | null, box: Box, river: ForestRiver | null = null) {
+ * as the city layer paints it, so its banks lie on the forest's grass. Pixels
+ * marked in `covered` (a scenario's buildings, raised after the plan) are left
+ * clear, so the city layer's building shows through. */
+export function paintFloor(out: Uint32Array, plan: ForestPlan, damage: ForestDamage | null, box: Box, river: ForestRiver | null = null, covered?: Uint8Array) {
   clip = { x0: Math.max(0, box.x0), y0: Math.max(0, box.y0), x1: Math.min(W, box.x1), y1: Math.min(H, box.y1) };
   for (let Y = clip.y0; Y < clip.y1; Y++) out.fill(0, Y * W + clip.x0, Y * W + clip.x1);
   lawnIn(out, plan.open);
@@ -358,6 +361,9 @@ export function paintFloor(out: Uint32Array, plan: ForestPlan, damage: ForestDam
     stamp(out, s, x0, y0, false);
   }
   for (const b of plan.boulders) boulder(out, b);
+  if (covered)
+    for (let Y = clip.y0; Y < clip.y1; Y++)
+      for (let X = clip.x0, i = Y * W + X; X < clip.x1; X++, i++) if (covered[i]) out[i] = 0;
   // What is still grass, before the trees' shadows fall on it.
   for (let Y = clip.y0; Y < clip.y1; Y++)
     for (let X = clip.x0, i = Y * W + X; X < clip.x1; X++, i++) turf[i] = out[i] !== 0 && out[i] === lawn[i] ? 1 : 0;
@@ -771,6 +777,11 @@ const BLADES = new Set(["sword", "hero", "assassin", "valkyrie", "reinforcement"
  * the frail trees. */
 const STROKES = 4000;
 
+/** A number for each sprite mask, so a building changing its sprite on the same lot is seen. */
+const maskIds = new WeakMap<Uint8Array, number>();
+let masks = 0;
+const maskId = (m: Uint8Array) => maskIds.get(m) ?? (maskIds.set(m, ++masks), masks);
+
 /** Draws the forest outside the walls, kept by the renderer. */
 export class ForestArt {
   private map: CityMap | null = null;
@@ -821,6 +832,8 @@ export class ForestArt {
       this.roosts = this.plan.trees.filter((t) => roosting(t) > 0);
       this.glints = null;
       this.alpha = new Float32Array(this.plan.trees.length).fill(1);
+      this.covered = undefined;
+      this.coverKey = "";
       this.sim = undefined;
     }
     if (sim !== this.sim) {
@@ -836,6 +849,33 @@ export class ForestArt {
       this.dirty = true;
       this.floorStale = [WHOLE];
     }
+  }
+
+  /** The floor's art pixels a scenario's buildings stand on, left clear,
+   * and what they were made from. */
+  private covered: Uint8Array | undefined;
+  private coverKey = "";
+
+  /** Leaves the floor clear under a scenario's buildings, placed on lots the
+   * plan took for open ground: under each sprite's own solid pixels
+   * (`mask`, art pixels from `x0`, `y0`), so it stands on the forest floor
+   * with no lot round it, or the whole `rect` without one (rubble). */
+  cover(parts: readonly { rect: Rect; mask?: Footprint | null }[]) {
+    const key = parts.map((p) => [p.rect.x, p.rect.y, p.rect.w, p.rect.h, p.mask ? p.mask.x0 + ":" + p.mask.y0 + ":" + maskId(p.mask.mask) : "-"].join(",")).join(";");
+    if (key === this.coverKey) return;
+    this.coverKey = key;
+    const next = parts.length ? new Uint8Array(W * H) : undefined;
+    for (const { rect: r, mask: f } of parts) {
+      if (f)
+        for (let y = 0; y < f.h; y++)
+          for (let x = 0; x < f.w; x++) {
+            const X = f.x0 + x, Y = f.y0 + y;
+            if (f.mask[y * f.w + x] && X >= 0 && Y >= 0 && X < W && Y < H) next![Y * W + X] = 1;
+          }
+      else for (let Y = r.y * ART; Y < (r.y + r.h) * ART; Y++) next!.fill(1, Y * W + r.x * ART, Y * W + (r.x + r.w) * ART);
+    }
+    this.covered = next;
+    this.floorStale = [WHOLE];
   }
 
   /** A scenario foundation clears trees through the existing forest art state. */
@@ -1139,7 +1179,7 @@ export class ForestArt {
     const boxes = this.floorStale;
     this.floorStale = [];
     for (const box of boxes) {
-      paintFloor(this.floor.px, this.plan, this.damage, box, this.river);
+      paintFloor(this.floor.px, this.plan, this.damage, box, this.river, this.covered);
       const x0 = Math.max(0, box.x0), y0 = Math.max(0, box.y0);
       this.floor.cv.getContext("2d")!.putImageData(this.floor.img, 0, 0, x0, y0, Math.min(W, box.x1) - x0, Math.min(H, box.y1) - y0);
     }
