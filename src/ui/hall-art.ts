@@ -6,7 +6,7 @@
  * and, in the keep, by the sun through the window; the torches themselves
  * are small pixel sprites (`paintSconce`) with a flickering flame in a black
  * outline. Presentation only. */
-import { ashlar, facing, h01 } from "../library/ashlar.ts";
+import { PILLAR_OUTLINE, ashlar, facing, h01, pillarShade } from "../library/ashlar.ts";
 import { getTorchFlicker, getTorchSway } from "../lighting.ts";
 import { DAY_MS } from "../daylight.ts";
 import { FLAME, OUTLINE, puff } from "../defend/pixel-fx.ts";
@@ -16,6 +16,9 @@ import { SoftSunlight, SUNLIGHT } from "../soft-sunlight.ts";
 type RGB = [number, number, number];
 /** Screen (CSS) pixels to an art pixel. */
 export const ART = 3;
+/** How wide the vault's piers are, in art pixels: room for a torch
+ * (`SCONCE`, 11 across) on each, inside its outline. */
+const PIER = 12;
 /** Fewest milliseconds between two lightings (the flicker is slow). */
 const FRAME_MS = 70;
 
@@ -73,9 +76,13 @@ export class HallBackdrop {
     this.outside = [];
     for (let y = 0; y < h; y++)
       for (let x = 0; x < w; x++) {
-        const i = y * w + x, px = this.look === "planks" ? plank(x, y) : ashlar(x, y, this.look === "vault" && (x < 6 || x >= w - 6));
-        hgt[i] = px.hgt;
-        this.albedo.set(this.look === "vault" ? [px.rgb[0] * 0.92, px.rgb[1] * 0.88, px.rgb[2] * 1.02] : px.rgb, i * 3);
+        const pier = this.look === "vault" && (x < PIER || x >= w - PIER);
+        const i = y * w + x, px = this.look === "planks" ? plank(x, y) : ashlar(x, y, pier);
+        // The vault's piers, outlined and shaded round, with a torch on each.
+        const k = pier ? pillarShade(x < PIER ? x : x - (w - PIER), PIER) : 1;
+        hgt[i] = k === null ? 0 : px.hgt;
+        if (k === null) this.albedo.set(PILLAR_OUTLINE, i * 3);
+        else this.albedo.set(this.look === "vault" ? [px.rgb[0] * 0.92 * k, px.rgb[1] * 0.88 * k, px.rgb[2] * 1.02 * k] : px.rgb, i * 3);
       }
     if (this.look === "keep") this.bakeWindow(hgt);
     this.sx = new Float32Array(n);
