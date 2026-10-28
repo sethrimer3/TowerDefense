@@ -5,7 +5,7 @@ import { Worker } from "node:worker_threads";
 import { existsSync, mkdirSync, readFileSync, appendFileSync, writeFileSync } from "node:fs";
 import { dpsProfiles, FORGE_BANDS, SIDE_GROUPS, profileKey, type DpsProfile } from "../src/campaign/siege-dps-catalog.ts";
 import { DPS_BENCH } from "./siege-dps-bench.ts";
-import { siegeDpsInputs } from "./siege-dps-inputs.ts";
+import { siegeDpsInputs, measurementInputHash } from "./siege-dps-inputs.ts";
 const arg = (name: string) => process.argv.find((a) => a.startsWith("--" + name + "="))?.split("=")[1];
 const workers = Math.max(1, Math.min(2, Math.floor(Number(arg("workers")) || 2)));
 const limit = Math.max(0, Math.floor(Number(arg("limit")) || 0)),
@@ -17,9 +17,12 @@ type Row = { key: string; band: number; single: number; crowd: number };
 const rows = new Map<string, Row>(),
   id = (key: string, band: number) => key + "#" + band;
 mkdirSync("work", { recursive: true });
-const cache = "work/siege-dps-" + inputs.hash.slice(0, 16) + ".jsonl";
-if (existsSync(cache))
-  for (const line of readFileSync(cache, "utf8").split("\n")) {
+const measurementHash = measurementInputHash(),
+  cache = "work/siege-dps-native-" + measurementHash.slice(0, 16) + ".jsonl";
+if (existsSync(cache)) {
+  const lines = readFileSync(cache, "utf8").split("\n");
+  if (JSON.parse(lines[0]).measurementHash !== measurementHash) throw Error("Mismatched native measurement cache");
+  for (const line of lines.slice(1)) {
     try {
       const r = JSON.parse(line) as Row;
       if (
@@ -35,7 +38,7 @@ if (existsSync(cache))
         rows.set(id(r.key, r.band), r);
     } catch {}
   }
-else writeFileSync(cache, JSON.stringify({ inputs, protocol: DPS_BENCH }) + "\n");
+} else writeFileSync(cache, JSON.stringify({ inputs, measurementHash, protocol: DPS_BENCH }) + "\n");
 let jobs = profiles
   .flatMap((profile) => FORGE_BANDS.map((_, band) => ({ profile, band })))
   .filter((j) => (!only || j.profile.kind === only) && !rows.has(id(j.profile.key, j.band)));
@@ -113,7 +116,9 @@ for (const p of profiles)
           const key = active[0],
             side = { ...p.side, [key]: p.side[key] - 1 };
           parents.push(profileKey(p.kind, undefined, 0, side));
-        } else if (active.length > 1) for (const key of active) parents.push(profileKey(p.kind, undefined, 0, { [key]: p.side[key] }));
+        } else if (active.length > 1)
+          for (const key of active)
+            parents.push(profileKey(p.kind, undefined, 0, p.kind === "shadow" ? { ...p.side, [key]: p.side[key] - 1 } : { [key]: p.side[key] }));
       }
       const old = estimated[p.key][target][band],
         floor = Math.max(band ? estimated[p.key][target][band - 1] : 0, ...parents.map((k) => estimated[k]?.[target][band] ?? 0));

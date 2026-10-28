@@ -45,6 +45,19 @@ export function dpsProfiles(): DpsProfile[] {
   for (const kind of [...Object.keys(STRUCTURES), "wall", "gate", "wallBallista"] as DefenderKind[]) {
     const group = SIDE_GROUPS.find((g) => g.kind === kind);
     if (group) {
+      // Shadow's knife count and hit-by-hit compounding interact too strongly
+      // for branch interpolation. Measure every legal combination directly.
+      if (kind === "shadow") {
+        const cap = (id: string) => group.paths.find((p) => p.id === id)!.ranks.length;
+        for (let knives = 0; knives <= cap("knives"); knives++)
+          for (let pierce = 0; pierce <= cap("pierce"); pierce++)
+            for (let bleed = 0; bleed <= cap("bleed"); bleed++)
+              for (let edge = 0; edge <= cap("edge"); edge++) {
+                const side = { knives, pierce, bleed, edge };
+                profiles.push({ key: profileKey(kind, undefined, 0, side), kind, sideKey: group.key, side });
+              }
+        continue;
+      }
       profiles.push({ key: profileKey(kind), kind, sideKey: group.key, side: {} });
       for (const path of group.paths)
         for (let rank = 1; rank <= path.ranks.length; rank++) {

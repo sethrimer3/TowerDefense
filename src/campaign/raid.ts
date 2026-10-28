@@ -89,8 +89,6 @@ export class RaidBattle {
     defense.skyPalaces = defense.skyPalaces.filter((p) => defenderIds.has(p.id));
     const goal = center(map.buildings[defenderKeep].rect);
     attack.warBanner = new WarBanner(goal.x, goal.y, true);
-    const own = center(map.buildings[defenderKeep].rect);
-    defense.warBanner = new WarBanner(own.x, own.y, true);
     this.synchronize();
     this.targets();
     this.view = new Proxy(attack, {
@@ -108,7 +106,15 @@ export class RaidBattle {
         if (key === "keep") return map.buildings[defenderKeep];
         if (key === "keepHp") return () => defense.keepHp();
         if (key === "keepMaxHp") return () => defense.keepMaxHp();
-        if (key === "bonuses") return { ...attack.bonuses, keep: defense.bonuses.keep, walls: defense.bonuses.walls, gate: defense.bonuses.gate, ballista: defense.bonuses.ballista, structurePaths: { ...attack.bonuses.structurePaths, ...defense.bonuses.structurePaths } };
+        if (key === "bonuses")
+          return {
+            ...attack.bonuses,
+            keep: defense.bonuses.keep,
+            walls: defense.bonuses.walls,
+            gate: defense.bonuses.gate,
+            ballista: defense.bonuses.ballista,
+            structurePaths: { ...attack.bonuses.structurePaths, ...defense.bonuses.structurePaths },
+          };
         if (key === "intact") return (b: Building) => !b.hidden && target.built[b.id] === b.cells.length;
         if (key === "mapVersion") return attack.mapVersion + defense.mapVersion;
         if (key === "changed") return [...attack.changed, ...defense.changed];
@@ -130,7 +136,7 @@ export class RaidBattle {
       manualWaves: true,
       passiveEnemies: true,
       noCivilians: attacking,
-      unrestricted: true,
+      unrestricted: attacking,
       ignoreKeepLoss: attacking,
       owns: (b) => owned.has(b.id),
       soldierDt: (s, dt) => {

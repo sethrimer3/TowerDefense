@@ -1,6 +1,6 @@
 {
   "inputs": {
-    "hash": "c7192b3921aab5836f163470d7edef5a24918766e1325620d6d8ebce106f36ab",
+    "hash": "ffdf9a1b4c974d3b155779503e17c5caac0072f6cf39d4c8a2d75d9a1101c76c",
     "files": [
       "src/ballista-upgrades.ts",
       "src/campaign/castle-model.ts",
@@ -82,6 +82,7 @@
       "src/specializations.ts",
       "src/training-jobs.ts",
       "src/wall-upgrades.ts",
+      "tools/measure-siege-dps-worker.ts",
       "tools/measure-siege-dps.ts",
       "tools/siege-dps-bench.ts",
       "tools/siege-dps-inputs.ts"
@@ -100,8 +101,8 @@
     },
     "hostEvery": 2
   },
-  "profiles": 272,
-  "measurements": 1360,
+  "profiles": 577,
+  "measurements": 2885,
   "monotoneAdjustments": 89,
   "kinds": [
     {
@@ -208,7 +209,7 @@
     },
     {
       "kind": "shadow",
-      "profile": "shadow/plain/0/bleed:3,edge:3,knives:4,pierce:3",
+      "profile": "shadow/plain/0/bleed:3,edge:3,knives:4",
       "base": 353.609597,
       "max": 1006864452.710102
     },
@@ -396,7 +397,7 @@
       "kind": "darkKeep",
       "profile": "darkKeep/plain/0/",
       "base": 154.29,
-      "max": 1708.35075
+      "max": 2467.482751
     },
     {
       "kind": "monsterBait",
