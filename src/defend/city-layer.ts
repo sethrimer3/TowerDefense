@@ -142,7 +142,7 @@ function cityShadows(map: CityMap, sim: DefendSim | null, looks?: Readonly<Recor
  * once a kind, size and look, and again as the pixel art loads, with a cell
  * of room all round for sprites that overhang their lot. */
 const footprints = new Map<string, Omit<Footprint, "x0" | "y0"> | null>();
-function spriteFootprint(map: CityMap, b: Building, look: string | undefined): Footprint | null {
+export function spriteFootprint(map: CityMap, b: Building, look: string | undefined): Footprint | null {
   if (typeof document === "undefined") return null;
   const r = b.rect, key = `${b.kind}:${r.w}x${r.h}:${look ?? ""}:${pixelKey()}`;
   let f = footprints.get(key);
