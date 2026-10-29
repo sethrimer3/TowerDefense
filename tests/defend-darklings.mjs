@@ -19,7 +19,7 @@ try {
     const canvas = document.querySelector('canvas');
     canvas.width = 1100; canvas.height = 900; canvas.style.cssText = 'width:1100px;height:900px';
     const c = canvas.getContext('2d', { willReadFrequently: true });
-    const crowd = n => Array.from({ length: n }, (_, id) => ({ id, kind: id % 7 ? 'miniDarkling' : 'darkling', hp: 1, x: 20, y: 20 }));
+    const crowd = n => Array.from({ length: n }, (_, id) => ({ id, kind: id % 13 === 0 ? 'largeDarkling' : id % 7 ? 'miniDarkling' : 'darkling', hp: 1, x: 20, y: 20 }));
     const sample = (x, y) => Array.from(c.getImageData(x, y, 1, 1).data).slice(0, 3);
     const pixels = [];
     // Actual compositing: a colorful detailed field, identical in each panel.
@@ -36,7 +36,7 @@ try {
       pixels.push({ count: n, center: sample(ox + 200, oy + 200), edge: sample(ox + 290, oy + 200), outside: sample(ox + 400, oy + 200) });
       c.fillStyle = '#eee3c7'; c.font = '20px monospace'; c.fillText(`${n} dark enemies`, 22, 35);
       c.font = '14px monospace'; c.fillText(n < 10 ? 'Below threshold' : n < 60 ? 'Growing radial drain' : 'Grayscale core + 30% less contrast', 22, 58);
-      for (let i = 0; i < Math.min(n, 60); i++) drawEnemyArt({ c, px: 10 }, { ...crowd(1)[0], kind: i % 7 ? 'miniDarkling' : 'darkling', x: 19 + (i % 10) * .25, y: 19 + Math.floor(i / 10) * .25 }, sim);
+      for (let i = 0; i < Math.min(n, 60); i++) drawEnemyArt({ c, px: 10 }, { ...crowd(1)[0], kind: i % 13 === 0 ? 'largeDarkling' : i % 7 ? 'miniDarkling' : 'darkling', x: 19 + (i % 10) * .25, y: 19 + Math.floor(i / 10) * .25 }, sim);
       c.restore();
     }
     // Saturation blend removes all color; the wash is exactly a 30% pull to 128.
@@ -62,7 +62,7 @@ try {
     const frames = [];
     const map = generateCity(fitLayout(defaultLayout()), 3);
     const sim = new DefendSim(map, Object.fromEntries(UPGRADES.map(u => [u.id, 0])), 4);
-    for (let i = 0; i < 60; i++) sim.spawnAuxiliary(i % 7 ? 'miniDarkling' : 'darkling', 20 + (i % 10) * .15, 10 + Math.floor(i / 10) * .15);
+    for (let i = 0; i < 60; i++) sim.spawnAuxiliary(i % 13 === 0 ? 'largeDarkling' : i % 7 ? 'miniDarkling' : 'darkling', 20 + (i % 10) * .15, 10 + Math.floor(i / 10) * .15);
     for (const phone of [false, true]) for (const reduced of [false, true]) for (const simple of [false, true]) for (const pixel of [false, true]) {
       setPixelArt(pixel);
       const cv = document.createElement('canvas'); cv.style.cssText = `width:${phone ? 390 : 800}px;height:${phone ? 700 : 850}px`;
