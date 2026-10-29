@@ -199,6 +199,15 @@ export class DefendLighting {
   private dyn: HTMLCanvasElement | null = null;
   private ground: HTMLCanvasElement | null = null;
   private groundKey = "";
+  /** What stands, painted from the buildings' own art at `MASK` pixels a
+   * cell: `body` their pixels, `rim` their outlines. Null until the city
+   * layer first paints them (then torches clip to open cells). */
+  private masks: { body: HTMLCanvasElement; rim: HTMLCanvasElement; covered: Uint8Array } | null = null;
+  private bodyUp: HTMLCanvasElement | null = null;
+  private rimUp: HTMLCanvasElement | null = null;
+  private tint: HTMLCanvasElement | null = null;
+  private rimLit: HTMLCanvasElement | null = null;
+  private upKey = "";
   /** How brightly each light still burns, 0 (out) to 1; set each frame
    * while the city's lights are going out, else null (all burning). */
   burning: ((l: Light) => number) | null = null;
@@ -218,6 +227,25 @@ export class DefendLighting {
     this.queue = new Set(this.lights.map((l) => l.id));
     this.domDirty = true;
     this.reliefKey = "";
+  }
+
+  /** Takes what stands from the buildings' art (see `masks`). A cell
+   * casts shadows only while its sprite covers most of it, so light runs
+   * on over a lot's open edges up to the building itself. */
+  setMasks(body: HTMLCanvasElement, rim: HTMLCanvasElement) {
+    const covered = coverage(body);
+    const old = this.masks?.covered;
+    this.masks = { body, rim, covered };
+    this.upKey = "";
+    if (!old) {
+      this.bakes.clear();
+      this.queue = new Set(this.lights.map((l) => l.id));
+      this.domDirty = true;
+      return;
+    }
+    const changed: number[] = [];
+    for (let i = 0; i < covered.length; i++) if (covered[i] !== old[i]) changed.push(i);
+    this.invalidate(changed);
   }
 
   get roadStones() {
@@ -242,7 +270,7 @@ export class DefendLighting {
       if (budget-- <= 0) break;
       this.queue.delete(id);
       const l = this.lights[id];
-      const pair: [Bake, Bake] = [bakeLight(l, this.map, solid, -SWAY), bakeLight(l, this.map, solid, SWAY)];
+      const pair: [Bake, Bake] = [bakeLight(l, this.map, solid, -SWAY, this.masks?.covered), bakeLight(l, this.map, solid, SWAY, this.masks?.covered)];
       const pool = { ...poolSamples([pair[0].values, pair[1].values], pair[0].cols, glowColor), cols: pair[0].cols, rows: pair[0].rows, left: pair[0].left, top: pair[0].top };
       this.bakes.set(id, { pair, pool });
       this.domDirty = true;
@@ -383,6 +411,8 @@ export class DefendLighting {
     this.dark = upscale(this.dark, small.dark, frame.px, W, H);
     this.glow = upscale(this.glow, small.glow, frame.px, W, H, doublings);
     this.drawCarried(field, frame, ambient.glow, carried);
+    const up = this.masksAt(W, H);
+    if (up) this.unlightBodies(up.body, ambient);
     c.save();
     c.drawImage(this.dark, 0, 0);
     c.globalCompositeOperation = "soft-light";
@@ -391,6 +421,80 @@ export class DefendLighting {
     c.globalAlpha = LIGHTING_CONFIG.glow.bloom;
     c.drawImage(this.glow, 0, 0);
     c.restore();
+    if (up) this.shine(c, up.rim, (r) => r.drawImage(this.glow!, 0, 0));
+  }
+
+  /** Lights outlines from this frame's glow (from the last `drawLight`),
+   * as if the torchlight caught their edges: `outline` paints them onto
+   * a screen-sized canvas, drawn unmoved; `c`'s transform places the
+   * board. For the units' contours. */
+  shineOutlines(c: CanvasRenderingContext2D, outline: (r: CanvasRenderingContext2D) => void) {
+    const glow = this.glow;
+    if (!glow) return;
+    const m = c.getTransform();
+    const { width, height } = c.canvas;
+    const r = (this.rimLit = sized(this.rimLit, width, height)).getContext("2d")!;
+    r.setTransform(1, 0, 0, 1, 0, 0);
+    r.globalCompositeOperation = "source-over";
+    r.clearRect(0, 0, width, height);
+    outline(r);
+    r.globalCompositeOperation = "source-in";
+    r.setTransform(m);
+    r.drawImage(glow, 0, 0);
+    c.save();
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    shineOnto(c, this.rimLit!);
+    c.restore();
+  }
+
+  /** The masks drawn up to the board at this zoom, or null before any. */
+  private masksAt(W: number, H: number) {
+    const m = this.masks;
+    if (!m) return null;
+    const key = `${W}x${H}`;
+    if (key !== this.upKey || !this.bodyUp || !this.rimUp) {
+      this.upKey = key;
+      this.bodyUp = nearest(this.bodyUp, m.body, W, H);
+      this.rimUp = nearest(this.rimUp, m.rim, W, H);
+    }
+    return { body: this.bodyUp, rim: this.rimUp };
+  }
+
+  /** Buildings' own pixels take no torchlight (flames burn at street
+   * level, never over the roofs): the glow is cut out of them and the
+   * night's full darkness laid back over them. */
+  private unlightBodies(body: HTMLCanvasElement, ambient: Ambient) {
+    const dk = this.dark!.getContext("2d")!,
+      gl = this.glow!.getContext("2d")!;
+    gl.globalCompositeOperation = "destination-out";
+    gl.drawImage(body, 0, 0);
+    gl.globalCompositeOperation = "source-over";
+    const t = (this.tint = sized(this.tint, body.width, body.height)).getContext("2d")!;
+    t.globalCompositeOperation = "source-over";
+    t.clearRect(0, 0, body.width, body.height);
+    t.drawImage(body, 0, 0);
+    t.globalCompositeOperation = "source-in";
+    t.fillStyle = ambient.color;
+    t.fillRect(0, 0, body.width, body.height);
+    dk.globalCompositeOperation = "destination-out";
+    dk.drawImage(body, 0, 0);
+    dk.globalCompositeOperation = "source-over";
+    dk.globalAlpha = ambient.alpha;
+    dk.drawImage(this.tint, 0, 0);
+    dk.globalAlpha = 1;
+  }
+
+  /** The glow kept to `rim` and added over it, so outlines in torchlight
+   * shine warm (board space, like the glow). */
+  private shine(c: CanvasRenderingContext2D, rim: HTMLCanvasElement, glow: (r: CanvasRenderingContext2D) => void) {
+    const r = (this.rimLit = sized(this.rimLit, rim.width, rim.height)).getContext("2d")!;
+    r.setTransform(1, 0, 0, 1, 0, 0);
+    r.globalCompositeOperation = "source-over";
+    r.clearRect(0, 0, rim.width, rim.height);
+    r.drawImage(rim, 0, 0);
+    r.globalCompositeOperation = "source-in";
+    glow(r);
+    shineOnto(c, this.rimLit!);
   }
 
   /** Lays this frame's darkness (from the last `drawLight`) over what is
@@ -431,8 +535,11 @@ export class DefendLighting {
       H = dk.canvas.height;
     this.dyn = upscale(this.dyn, small.torch, px, W, H);
     const d = this.dyn.getContext("2d")!;
-    d.globalCompositeOperation = "destination-in";
-    d.drawImage(this.groundMask(carried, px, W, H), 0, 0);
+    // With the buildings' masks, `unlightBodies` takes it off them after.
+    if (!this.masks) {
+      d.globalCompositeOperation = "destination-in";
+      d.drawImage(this.groundMask(carried, px, W, H), 0, 0);
+    }
     dk.globalCompositeOperation = "destination-out";
     dk.globalAlpha = 0.85;
     dk.drawImage(this.dyn, 0, 0);
@@ -601,6 +708,51 @@ function rgbOf(color: string) {
   return rgb;
 }
 
+/** Pixels a cell in the buildings' masks: two an art pixel, fine enough
+ * for half-art-pixel outlines. */
+export const MASK = 16;
+
+/** Per cell, 1 where the body mask covers at least half of it. */
+function coverage(body: HTMLCanvasElement) {
+  const data = body.getContext("2d", { willReadFrequently: true })!.getImageData(0, 0, body.width, body.height).data;
+  const out = new Uint8Array(CELL_COUNT);
+  const half = (MASK * MASK) / 2;
+  for (let cy = 0; cy < CELLS_H; cy++)
+    for (let cx = 0; cx < CELLS_W; cx++) {
+      let n = 0;
+      for (let y = cy * MASK; y < (cy + 1) * MASK; y++) {
+        let k = (y * body.width + cx * MASK) * 4 + 3;
+        for (let x = 0; x < MASK; x++, k += 4) if (data[k] >= 128) n++;
+      }
+      out[cellIndex(cx, cy)] = n >= half ? 1 : 0;
+    }
+  return out;
+}
+
+/** `src` drawn up to w × h without smoothing. */
+function nearest(cv: HTMLCanvasElement | null, src: HTMLCanvasElement, w: number, h: number) {
+  const out = sized(cv, w, h);
+  const c = out.getContext("2d")!;
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.globalCompositeOperation = "source-over";
+  c.clearRect(0, 0, w, h);
+  c.imageSmoothingEnabled = false;
+  c.drawImage(src, 0, 0, w, h);
+  return out;
+}
+
+/** Lit outlines added onto `c`, a little over full strength: edges catch
+ * more of the light than the ground does. */
+function shineOnto(c: CanvasRenderingContext2D, lit: HTMLCanvasElement) {
+  c.save();
+  c.globalCompositeOperation = "lighter";
+  c.globalAlpha = 1;
+  c.drawImage(lit, 0, 0);
+  c.globalAlpha = LIGHTING_CONFIG.glow.rim - 1;
+  c.drawImage(lit, 0, 0);
+  c.restore();
+}
+
 function sized(cv: HTMLCanvasElement | null, w: number, h: number) {
   const c = cv ?? document.createElement("canvas");
   if (c.width !== w || c.height !== h) {
@@ -627,7 +779,7 @@ function makeFlameSprite() {
 }
 
 /** Bake one light's pool with occlusion (optionally nudged sideways). */
-function bakeLight(l: Light, map: CityMap, solid: Uint8Array, offsetX: number): Bake {
+function bakeLight(l: Light, map: CityMap, solid: Uint8Array, offsetX: number, covered?: Uint8Array): Bake {
   const R = l.radius;
   const left = Math.floor(l.x - R - 1),
     top = Math.floor(l.y - R - 1);
@@ -637,15 +789,16 @@ function bakeLight(l: Light, map: CityMap, solid: Uint8Array, offsetX: number): 
   const src: Source = {
     l,
     o: { x: l.x + offsetX, y: l.y },
-    blocks: (i: number) => solid[i] === 1 && map.owner[i] >= 0 && !(l.inside && map.owner[i] === l.owner),
+    blocks: (i: number) => solid[i] === 1 && map.owner[i] >= 0 && (!covered || covered[i] === 1) && !(l.inside && map.owner[i] === l.owner),
   };
   const raw = new Float32Array(cols * rows);
   for (let sy = 0; sy < rows; sy++) {
     const wy = top + (sy + 0.5) / RES;
     for (let sx = 0; sx < cols; sx++) raw[sy * cols + sx] = lightAt(src, left + (sx + 0.5) / RES, wy);
   }
+  // Buildings' own pixels are kept dark when drawn (`unlightBodies`), so
+  // the light reaches right up to their edges.
   const values = blur({ src: raw, cols, rows });
-  unlightStanding(values, { left, top, cols, rows }, map, solid);
   return { values, cols, rows, left, top };
 }
 
@@ -685,16 +838,6 @@ function rayBlocked({ o, blocks }: Source, wx: number, wy: number, d: number) {
 /** A roof pillar stands between the flame and the sample `d` away. */
 function pillarBlocked({ l, o }: Source, w: Point, d: number) {
   return l.pillars.some(([px, py, pr]) => segmentPointDist(o, w, { x: px, y: py }) < pr && Math.hypot(px - o.x, py - o.y) < d);
-}
-
-/** Light lands on open ground only: standing buildings and wall stones stay
- * unlit, so flames read as street-level, never hovering above the roofs. */
-function unlightStanding(values: Float32Array, f: { left: number; top: number; cols: number; rows: number }, map: CityMap, solid: Uint8Array) {
-  const standing = (cx: number, cy: number) => cellInBounds(cx, cy) && solid[cellIndex(cx, cy)] && map.owner[cellIndex(cx, cy)] >= 0;
-  for (let sy = 0; sy < f.rows; sy++) {
-    const cy = Math.floor(f.top + (sy + 0.5) / RES);
-    for (let sx = 0; sx < f.cols; sx++) if (standing(Math.floor(f.left + (sx + 0.5) / RES), cy)) values[sy * f.cols + sx] = 0;
-  }
 }
 
 /** Distance from `p` to the segment a–b. */

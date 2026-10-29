@@ -15,7 +15,7 @@ import { ROAD, keepStage, paintKeepRubble, paintStructureArt, paintStructureRubb
 import { houseRubbleSprite, roofSeed, roofSprite } from "./roof-art.ts";
 import { ART, openAt, parkArt } from "./park-art.ts";
 import { paintBridges } from "./bridge-art.ts";
-import { damageStage, drawSprite, sprite, wallDamagePixels, wallRubblePixels } from "./damage-art.ts";
+import { damageStage, drawSprite, maskMode, sprite, wallDamagePixels, wallRubblePixels, withMask, type MaskMode } from "./damage-art.ts";
 import { mooringPixels } from "./sky-palace-art.ts";
 import { GRASS, grassPatch, groundArt } from "./ground-art.ts";
 import { heights, paintShadows, shadowMask, type Footprint } from "./shadow-art.ts";
@@ -127,6 +127,29 @@ export function paintCityLayer(c: CanvasRenderingContext2D, px: number, scene: C
   for (const b of map.buildings) if (b.kind !== "wall") paintBuilding(p, b);
   paintShadows(c, cityShadows(map, sim, scene.looks), px);
   paintLanternBrackets(p, scene.lights);
+}
+
+/** A mask of what stands in the city, at `px` per cell: with "body", the
+ * standing buildings' and wall stones' solid art, which the torchlight
+ * leaves dark (a flame lights the street, never the roofs); with "rim",
+ * their outlines alone, which the torchlight catches. Drawn white, read by
+ * its alpha (`lighting.ts`). */
+export function paintBuildingMask(c: CanvasRenderingContext2D, px: number, scene: CityScene, mode: MaskMode) {
+  const { map, sim } = scene;
+  const solid = (i: number) => (sim ? sim.solid[i] === 1 : map.owner[i] >= 0 && map.type[i] !== CellType.ROAD);
+  const p: Paint = { c, px, map, sim, solid, area: scene.area ?? "moss", looks: scene.looks };
+  c.imageSmoothingEnabled = false;
+  withMask(mode, () => {
+    for (const b of map.buildings) {
+      if (b.hidden || b.fence || (sim && !sim.intact(b)) || !b.cells.length || !solid(b.cells[0])) continue;
+      paintBuilding(p, b);
+    }
+  });
+  // Drawn art in any colour: the mask is its coverage.
+  c.globalCompositeOperation = "source-in";
+  c.fillStyle = "#fff";
+  c.fillRect(0, 0, c.canvas.width, c.canvas.height);
+  c.globalCompositeOperation = "source-over";
 }
 
 /** The shadows of what stands, cached for the last city and battle state. */
@@ -489,6 +512,16 @@ function paintWall(p: Paint, b: Building) {
     const i = cellIndex(nx, ny);
     return map.wall[i] === 1 && solid(i);
   };
+  const w = Math.round((cx + 1) * px) - x, h = Math.round((cy + 1) * px) - y;
+  const face = !standing(0, 1) && cy + 1 < CELLS_H;
+  // A mask (`paintBuildingMask`): the stone and its face, or its outline alone.
+  const mode = maskMode();
+  if (mode) {
+    c.fillStyle = "#fff";
+    if (mode === "body") c.fillRect(x, y, w, face ? h + Math.round(px * FACE_HANG) : h);
+    else paintWallOutline(p, { x, y, w, h }, standing, face);
+    return;
+  }
   const cap = wallArt.cap;
   if (hasWallArt(p.area)) drawSprite(c, wallCapSprite(p.area, cx, cy), x, y, Math.round((cx + 1) * px) - x, Math.round((cy + 1) * px) - y);
   else if (drawPixel(c, "city-wall-cap", x, y, Math.round((cx + 1) * px) - x, Math.round((cy + 1) * px) - y)) {
@@ -503,7 +536,6 @@ function paintWall(p: Paint, b: Building) {
   paintWallEdges(p, { x, y }, standing);
   const stage = stageOf(sim, b);
   if (stage) paintArt(p, wallDamageSprite(stage, lotSeed(b)), { x, y, w: Math.round((cx + 1) * px) - x, h: Math.round((cy + 1) * px) - y });
-  const face = !standing(0, 1) && cy + 1 < CELLS_H;
   if (face) paintWallFace(p, cx, { x, y });
   paintWallOutline(p, { x, y, w: Math.round((cx + 1) * px) - x, h: Math.round((cy + 1) * px) - y }, standing, face);
 }
