@@ -150,6 +150,10 @@ export class LibraryRenderer {
    * hide the stone, are lit by. */
   private flat = new Float32Array(W * H * 3);
   private sceneKey = "";
+  /** How much each pixel of the piers darkens as the column turns away
+   * toward its sides (1 elsewhere), applied after the light so a torch on a
+   * pier can't wash its roundness out. */
+  private round = new Float32Array(W * H).fill(1);
   private glow: HTMLCanvasElement;
   private motes: Mote[] = [];
   private sunlight = new SoftSunlight();
@@ -244,9 +248,12 @@ export class LibraryRenderer {
           rgb = stone.rgb;
           hgt = stone.hgt;
           if (pier) {
-            const k = pillarShade(x < BAYS_EDGE ? x : x - (W - BAYS_EDGE), BAYS_EDGE);
-            rgb = k === null ? PILLAR_OUTLINE : [rgb[0] * k, rgb[1] * k, rgb[2] * k];
-            if (k === null) hgt = 0;
+            // Outlined here; shaded round after the light falls on it.
+            const col = x < BAYS_EDGE ? x : x - (W - BAYS_EDGE);
+            if (pillarShade(col, BAYS_EDGE) === null) {
+              rgb = PILLAR_OUTLINE;
+              hgt = 0;
+            } else this.round[i] = roundness(col);
           }
         }
         // A carved rib along the vault's edge.
@@ -637,9 +644,10 @@ export class LibraryRenderer {
         g = S[i * 3 + 1] * lum + (k === Kind.Clear ? sky[1] * 0.5 : 0);
         b = S[i * 3 + 2] * lum + (k === Kind.Clear ? sky[2] * 0.5 : 0);
       } else {
-        r = S[i * 3] * L[i * 3];
-        g = S[i * 3 + 1] * L[i * 3 + 1];
-        b = S[i * 3 + 2] * L[i * 3 + 2];
+        const k = this.round[i];
+        r = S[i * 3] * L[i * 3] * k;
+        g = S[i * 3 + 1] * L[i * 3 + 1] * k;
+        b = S[i * 3 + 2] * L[i * 3 + 2] * k;
       }
       px[i] = 0xff000000 | (c255(b) << 16) | (c255(g) << 8) | c255(r);
     }
@@ -1289,6 +1297,13 @@ function hat(ctx: CanvasRenderingContext2D, l: Librarian, x: number, top: number
 }
 
 const BAYS_EDGE = (W - BAYS * BAY_W) / 2;
+/** A pier's shading at column `col`: full in the middle, darkening toward
+ * both sides like a round column turning away from the eye, deeper than
+ * `pillarShade`'s so it reads under the torches. */
+function roundness(col: number) {
+  const s = (2 * (col + 0.5)) / BAYS_EDGE - 1;
+  return 0.12 + 0.88 * Math.pow(1 - s * s, 0.9);
+}
 const c255 = (v: number) => (v >= 255 ? 255 : v <= 0 ? 0 : v | 0);
 const shade = (c: RGB, k: number) => `rgb(${c255(c[0] * k)},${c255(c[1] * k)},${c255(c[2] * k)})`;
 const hex = (s: string): RGB => [parseInt(s.slice(1, 3), 16), parseInt(s.slice(3, 5), 16), parseInt(s.slice(5, 7), 16)];
