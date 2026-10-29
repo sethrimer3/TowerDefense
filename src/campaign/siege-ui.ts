@@ -1,3 +1,5 @@
+import { SiegeVictory } from "./siege-victory.ts";
+import { play } from "../sound.ts";
 import { SiegeFlags } from "./siege-flags.ts";
 /** Siege controls over the native two-sided Defend battle. */
 import { t } from "../i18n/index.ts";
@@ -23,6 +25,7 @@ import { buildingLevel, type LeveledKind } from "../building-level.ts";
 import { STRUCTURES } from "../defend/catalog.ts";
 import type { Building } from "../defend/citygen.ts";
 /** Which of the board's buildings carry a level: not houses. */
+const NO_COLLAPSE:ReadonlySet<number>=new Set();
 const leveled = (kind: Building["kind"]): LeveledKind | undefined => (kind in STRUCTURES || kind === "wall" || kind === "gate" || kind === "wallBallista" ? (kind as LeveledKind) : undefined);
 export class SiegePage {
   sim: CampaignSim;
@@ -35,6 +38,7 @@ export class SiegePage {
   private now = 0;
   private paused = false;
   private rewarded = false;
+  private victory?: SiegeVictory;
   private inspection: number | undefined;
   private spellBar?: SpellBar;
   private flags?: SiegeFlags;
@@ -74,6 +78,7 @@ export class SiegePage {
       }
     };
     this.root.addEventListener("keydown", (e) => {
+      if (this.victory && (e.key === "Escape" || e.key === "Enter")){this.victory.skip();this.finishVictory();return;}
       if (e.key === "Escape") this.spellBar?.cancel();
     });
     this.canvas.oncontextmenu = (e) => e.preventDefault();
@@ -109,6 +114,8 @@ export class SiegePage {
     this.sim = this.make();
     this.paused = false;
     this.rewarded = false;
+    this.victory = undefined;
+    this.canvas.style.transform="";
     this.spellBar?.cancel();
     this.inspection = undefined;
     this.notice = "";
@@ -154,6 +161,7 @@ export class SiegePage {
           this.view = "battle";
           this.paused = false;
           this.rewarded = false;
+          this.victory = undefined;
           this.freshCamera = true;
           this.last = 0;
           this.render();
@@ -167,6 +175,7 @@ export class SiegePage {
           this.sim = this.make();
           this.paused = false;
           this.rewarded = false;
+          this.victory = undefined;
           this.freshCamera = true;
           this.last = 0;
           this.view = "battle";
@@ -209,6 +218,8 @@ export class SiegePage {
     this.level.className = "siege-level";
     this.level.hidden = true;
     board.append(this.level);
+    const skip=document.createElement('button');skip.type='button';skip.dataset.action='skip-victory';skip.hidden=!this.victory;skip.textContent=t('siege.skipVictory');
+    skip.onclick=()=>{this.victory?.skip();this.finishVictory();};this.root.querySelector('.campaign-actions')!.append(skip);
     paintRanks(this.root);
     const profileButton = this.root.querySelector<HTMLButtonElement>('[data-action="profile"]');
     if (profileButton)
@@ -230,7 +241,7 @@ export class SiegePage {
           raid.state = "started";
           this.host.store();
         }
-      } else if (this.sim.phase === "battle") this.paused = !this.paused;
+      } else if (this.sim.phase === "battle" || this.victory) this.paused = !this.paused;
       this.render();
     };
     this.root.querySelector<HTMLButtonElement>('[data-action="retry"]')!.onclick = () => {
@@ -269,17 +280,24 @@ export class SiegePage {
     }
     const dt = this.last ? Math.min(0.1, (now - this.last) / 1000) : 0;
     this.last = now;
-    if (!this.paused) this.sim.step(dt);
+    if (!this.paused) {
+      this.sim.step(dt);
+      if(this.victory)for(const b of this.victory.advance(dt))play(b.kind==='keep'?'keepFall':b.kind==='house'?'houseFall':'stoneFall');
+    }
     if (!this.rewarded && (this.sim.phase === "won" || this.sim.phase === "lost")) {
       this.rewarded = true;
       if (settleRaid(this.host.save().siege!, this.sim.phase === "won")) this.host.store();
-      this.view = "entry";
-      this.render();
-      return;
+      if(this.sim.phase==='won'){
+        this.victory=new SiegeVictory(this.sim.map,this.sim.raid.defense.hp,this.host.save().siege!.raid.castle.seed,this.host.save().settings.reduceMotion,[...(this.flags?.poles.filter(p=>p.snapped===undefined)??[]),...(this.flags?.dropped??[]),...this.sim.raid.defense.soldiers.filter(u=>u.kind==='flagBearer')]);
+        play('keepFall');this.spellBar?.cancel();
+      }else{this.finishVictory();return;}
     }
+    if(this.victory && this.host.save().settings.reduceMotion)this.victory.skip();
+    if(this.victory?.done){this.finishVictory();return;}
     this.refresh();
     this.draw();
   }
+  private finishVictory(){this.view='entry';this.canvas.style.transform='';this.render();}
   private refresh() {
     const s = this.sim;
     const status = this.root.querySelector('.campaign-status')!, clock = status.querySelector('time')!;
@@ -300,10 +318,12 @@ export class SiegePage {
                 max: Math.ceil(s.raid.defense.keepMaxHp()),
                 troops: s.allies.length,
               }));
-    this.root.querySelector<HTMLButtonElement>('[data-action="start"]')!.disabled = s.phase === "won" || s.phase === "lost";
+    this.root.querySelector<HTMLButtonElement>('[data-action="start"]')!.disabled = (s.phase === "won" || s.phase === "lost") && !this.victory;
+    if(this.victory)this.root.querySelector<HTMLButtonElement>('[data-action="retry"]')!.textContent=t("siege.practiceAgain");
     this.spellBar?.update(s.engine, s.phase === "battle", this.host.save().settings.reduceMotion, 1, this.spellGate);
     if (s.mana) this.manaCounter?.update(s.mana.value, SIEGE_MANA.cap);
     this.troops.update(s.allies);
+    const skip=this.root.querySelector<HTMLButtonElement>('[data-action="skip-victory"]');if(skip)skip.hidden=!this.victory;
   }
   private plateFocus(e: PointerEvent) {
     for (const p of Array.from(this.root.querySelectorAll<HTMLElement>(".siege-name-plate"))) {
@@ -312,6 +332,7 @@ export class SiegePage {
     }
   }
   private tap(e: PointerEvent) {
+    if(this.victory){this.victory.skip();this.finishVictory();return;}
     const p = this.renderer.toCell(e.clientX, e.clientY),
       at = { x: p.fx, y: p.fy },
       s = this.sim.engine;
@@ -352,6 +373,8 @@ export class SiegePage {
     const face=this.host.save().siege!.raid.castle.owner.flag ?? botFlag(this.host.save().siege!.raid.castle.seed);
     if (this.flagsSim !== this.sim) { this.flagsSim=this.sim;this.flags=new SiegeFlags(this.sim.map,this.host.save().siege!.raid.castle.seed,face); }
     this.flags!.update(sim);
+    this.flags!.victory=this.victory?{elapsed:this.victory.elapsed,origin:this.victory.origin,face:this.host.save().profile?.flag??defaultFlag(),reduced:settings.reduceMotion}:undefined;
+    const shake=settings.effectsOff?undefined:this.victory?.shake;this.canvas.style.transform=shake?`translate(${shake.x}px,${shake.y}px)`:'';
     r.draw(this.sim.map, sim, this.spellBar?.overlay(this.sim.engine) ?? null, {
       area: "moss",
       grid: 0,
@@ -359,8 +382,9 @@ export class SiegePage {
       night: sky.night,
       tint: sky.tint,
       sun: sky.sun,
-      keepFlag: face,
-      scenery: (c,px)=>this.flags!.draw(c,px,sim,this.now,settings.reduceMotion),
+      keepFlag: this.victory ? null : face,
+      collapsed: this.victory?.collapsed ?? NO_COLLAPSE,
+      scenery: (c,px)=>{this.flags!.draw(c,px,sim,this.now,settings.reduceMotion,!settings.effectsOff);if(!settings.effectsOff)this.victory?.draw(c,px);},
       sides: siegeSides(this.sim.raid.attack.soldiers, this.sim.raid.defense.soldiers),
       now: this.now,
       reduceMotion: settings.reduceMotion,

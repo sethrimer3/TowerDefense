@@ -668,7 +668,7 @@ function spriteCanvas(px: Uint32Array, w: number, h: number, cv = document.creat
 // ── The keep's banner ─────────────────────────────────────────────────────
 
 /** Where the banner's pole stands (canvas pixels) and the time it waves at. */
-export type FlagPose = { x: number; y: number; t: number; reduceMotion: boolean };
+export type FlagPose = { x: number; y: number; t: number; reduceMotion: boolean; burn?: number; rise?: number; unfurl?: number };
 
 /** The banner's pixel grid: `FLAG_W × FLAG_H` art pixels with the pole at
  * art pixel corner (POLE, POLE). */
@@ -686,7 +686,7 @@ const BLUE = [0x1f3f7a, 0x2c5cb0, 0x4682d8], PALE = [0x9fb4cf, 0xcfdcec, 0xf2f6f
  * a one-pixel outline, a shadow on the roof below, and the pole's gold cap.
  * The ripple steps at 12 frames a second, like a sprite; under reduced
  * motion it holds still. */
-export function flagPixels(t: number, reduceMotion: boolean, blue = false, face?: Flag): Uint32Array {
+export function flagPixels(t: number, reduceMotion: boolean, blue = false, face?: Flag, burn = 0, unfurl = 1): Uint32Array {
   const [field, band] = blue ? [BLUE, PALE] : [RED, GOLD];
   const out = new Uint32Array(FLAG_W * FLAG_H);
   const tick = reduceMotion ? 0 : Math.floor(t * 12) / 12;
@@ -694,11 +694,13 @@ export function flagPixels(t: number, reduceMotion: boolean, blue = false, face?
   const cloth = new Uint8Array(FLAG_W * FLAG_H);
   const colors = face ? profilePixels(face) : undefined, custom = new Uint32Array(FLAG_W * FLAG_H);
   for (let i = 0; i < CLOTH_L; i++) {
+    if (i >= Math.max(1,CLOTH_L*unfurl)) continue;
     const phase = tick * 6 - i * 0.5;
     const lift = Math.round(Math.sin(phase) * 1.6 * ((i + 1) / CLOTH_L));
     const fold = Math.cos(phase);
     const tone = fold > 0.35 ? 2 : fold < -0.35 ? 0 : 1;
     for (let j = 0; j < CLOTH_D; j++) {
+      if (j >= CLOTH_D * (1-Math.max(0,Math.min(1,burn)))) continue;
       // The swallowtail: the last column's middle is cut away.
       if (i === CLOTH_L - 1 && j > 0 && j < CLOTH_D - 1) continue;
       const x = POLE + 1 + i, y = POLE - 2 + j + lift;
@@ -735,11 +737,11 @@ let flagCanvas: HTMLCanvasElement | null = null;
 /** The keep's banner, redrawn every frame from the time so it keeps
  * waving, at the city's art scale. */
 export function drawFlag(c: CanvasRenderingContext2D, px: number, pose: FlagPose, keepSprite = true, face?: Flag) {
-  flagCanvas = spriteCanvas(flagPixels(pose.t, pose.reduceMotion, false, face), FLAG_W, FLAG_H, flagCanvas ?? undefined);
+  flagCanvas = spriteCanvas(flagPixels(pose.t, pose.reduceMotion, false, face, pose.burn, pose.unfurl), FLAG_W, FLAG_H, flagCanvas ?? undefined);
   const s = px / ART;
   c.save();
   c.imageSmoothingEnabled = false;
-  c.drawImage(flagCanvas, pose.x - POLE * s, pose.y - POLE * s, FLAG_W * s, FLAG_H * s);
+  c.drawImage(flagCanvas, pose.x - POLE * s, pose.y - POLE * s + (pose.rise ?? 0)*px, FLAG_W * s, FLAG_H * s);
   c.restore();
 }
 

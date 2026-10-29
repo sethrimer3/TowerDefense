@@ -667,3 +667,5 @@ A temporary Siege battle resource earned by defeating enemy troops and spent on 
 - **Flagpole:** decorative Siege scenery carrying the defender’s banner; one nearby impact snaps it, leaving a stump.
 
 - **Flag-bearer:** one of three non-combat defenders carrying the castle’s banner. Area or passing attacks can kill one for two mana; ordinary troops never aim at one.
+
+- **Collapse wave:** the Siege victory presentation expanding from the fallen keep, turning walls and selected buildings to visual rubble while replacing the defender’s flags.

@@ -1,3 +1,4 @@
+import { CollapseView } from "./collapse-view.ts";
 import type { Flag } from "../profile/model.ts";
 import { drawMines } from "./mine-art.ts";
 import { enemySize } from "./catalog.ts";
@@ -85,7 +86,8 @@ export type DrawOptions = {
   /** Units outlined together, round their combined shape (`unit-outline.ts`). */
   mergedOutlines?: boolean;
   sides?: UnitInks;
-  keepFlag?: Flag;
+  keepFlag?: Flag | null;
+  collapsed?: ReadonlySet<number>;
   /** Optional scenery in board coordinates, below trees. */
   scenery?: (c: CanvasRenderingContext2D, px: number) => void;
   /** The run is over: the city's torches go out in a wave from the keep. */
@@ -117,6 +119,7 @@ export type DrawOptions = {
 const DOUSE = { delay: 1.2, perCell: 0.16, jitter: 0.6, fade: 0.7 };
 
 export class DefendRenderer {
+  private readonly collapse = new CollapseView();
   readonly timings = { entityMs: 0, effectsMs: 0, terrainMs: 0 };
   readonly lighting = new DefendLighting();
   readonly fences = new Fences();
@@ -263,6 +266,7 @@ export class DefendRenderer {
   }
 
   draw(map: CityMap, sim: DefendSim | null, overlay: Overlay | null, opts: DrawOptions) {
+    if (sim && opts.collapsed) sim = this.collapse.view(sim,map,opts.collapsed);
     const start = opts.timings ? performance.now() : 0;
     this.timings.entityMs = this.timings.effectsMs = this.timings.terrainMs = 0;
     const area = opts.area ?? "moss";
@@ -480,7 +484,7 @@ export class DefendRenderer {
   /** The keep's banner, while the keep stands. */
   private drawKeepFlag(map: CityMap, sim: DefendSim | null, opts: DrawOptions) {
     const keep = standingKeep(map, sim);
-    if (!keep) return;
+    if (!keep || opts.keepFlag === null) return;
     drawFlag(this.ctx, this.px, { x: (keep.x + keep.w / 2) * this.px, y: (keep.y + keep.h / 2) * this.px, t: opts.now / 1000, reduceMotion: opts.reduceMotion }, true, opts.keepFlag);
   }
 
@@ -644,7 +648,7 @@ export class DefendRenderer {
     if (weather) this.lighting.update(sim.solid, changed, standing(map, sim));
     else if (changed.length) this.lighting.invalidate(changed);
     drawDamage({ c: this.ctx, px: this.px }, sim);
-    if (sun) {
+    if (sun && sun.strength > 0) {
       const c = this.ctx, px = this.px, length = Math.hypot(sun.x, sun.y), angle = Math.atan2(sun.y, sun.x);
       c.save(); c.globalAlpha = sun.strength; c.fillStyle = '#05060c'; c.beginPath();
       for (const u of shadowCasters(sim)) {
