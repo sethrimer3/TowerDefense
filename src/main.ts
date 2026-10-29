@@ -140,6 +140,7 @@ const defendPage = new DefendPage(el("defend"), {
   magnifier: () => save.settings.magnifier,
   tripleTapFlag: () => save.settings.tripleTapFlag,
   gridLines: () => (save.settings.tileGrid ? save.settings.gridOpacity / 100 : 0),
+  gridColor: () => save.settings.gridColor,
   effects: () => !save.settings.effectsOff,
   devMode: () => save.settings.developerMode,
   allJournal: () => save.settings.developerMode && save.settings.devJournal,

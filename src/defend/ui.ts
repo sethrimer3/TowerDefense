@@ -6,6 +6,7 @@ import { pathById, type PathId } from "../knowledge-paths.ts";
 import { SIDE_UI, graftedGraph, mapCardHtml, mapCount, mapGraph, mapWeb, sharedBranches, specialtyCircle, treeAllocated, treeBeyond, treeCardHtml, treeStep, type SideKind, type SideUi } from "../ui/specialty.ts";
 import { UpgradeGraph } from "../ui/upgrade-graph.ts";
 import type { Save } from "../save.ts";
+import type { GridColor } from "../settings.ts";
 import { bannerReach, onFlag } from "./war-banner.ts";
 import { gravesNear } from "./necromancy.ts";
 import { meteorReach } from "./meteor.ts";
@@ -91,6 +92,7 @@ export type DefendHost = {
   mergedOutlines?(): boolean;
   /** The tile grid's opacity while building, 0 when it's hidden. */
   gridLines?(): number;
+  gridColor?(): GridColor;
   setHealthbars?(value: boolean): void;
   /** Whether the palette lists items the player has none of. */
   showEmpty?(): boolean;
@@ -955,6 +957,7 @@ export class DefendPage {
     this.renderer.draw(map, this.sim, this.overlay(), {
       area: areaForWave(this.sim?.unitTester ? 1 : Math.max(this.sim?.wave ?? 1, startingWave(this.save))).id,
       grid: this.phase === "build" ? (this.host.gridLines?.() ?? 0) : 0,
+      gridColor: this.host.gridColor?.(),
       timings: this.frameTimes.enabled,
       weather: this.weather,
       night: this.night,

@@ -1,10 +1,14 @@
 import { LANGUAGE_CHOICES } from "./i18n/languages.ts";
+
+/** Fixed canvas colours; save files store only the names. */
+export const GRID_COLORS = { white: "#ffffff", brown: "#8b5a2b", black: "#000000", gray: "#808080", gold: "#d8b572" } as const;
+export type GridColor = keyof typeof GRID_COLORS;
 /** A setting that is on or off. */
 type Toggle = { kind: "toggle"; default: boolean; page?: { id: string; label: string; invert?: true } };
 /** A setting that is one of a fixed list of values, each with its label. */
 type Choice = { kind: "choice"; default: string | number; choices: readonly (readonly [string | number, string])[]; page?: { id: string; label: string } };
-/** A number kept within `min`–`max`; out-of-range saved values are clamped
- * and rounded, not rejected. */
+/** A number kept within `min`–`max`; saved values are clamped and snapped
+ * to `step` increments, not rejected. */
 type Range = { kind: "range"; default: number; min: number; max: number; step: number; page?: { id: string; label: string; aria: string } };
 export type Setting = Toggle | Choice | Range;
 
@@ -37,9 +41,10 @@ export const SETTINGS = {
   /** In battle, the rally flag takes a triple tap rather than a double, for
    * players who plant it by accident. */
   tripleTapFlag: { kind: "toggle", default: false, page: { id: "triple-tap-flag", label: "Triple tap to place the rally flag" } },
-  /** Faint lines round the Defend board's tiles, and how strong, in percent. */
+  /** Lines round the Defend board's tiles: strength in percent and colour. */
   tileGrid: { kind: "toggle", default: false, page: { id: "tile-grid", label: "Tile grid lines" } },
-  gridOpacity: { kind: "range", default: 15, min: 5, max: 60, step: 1, page: { id: "grid-opacity", label: "Grid line opacity", aria: "Tile grid line opacity, percent" } },
+  gridOpacity: { kind: "range", default: 30, min: 0, max: 100, step: 5, page: { id: "grid-opacity", label: "Grid line opacity", aria: "Tile grid line opacity, percent" } },
+  gridColor: { kind: "choice", default: "gold", choices: [["white", "White"], ["brown", "Brown"], ["black", "Black"], ["gray", "Gray"], ["gold", "Gold"]], page: { id: "grid-color", label: "Grid line color" } },
   /** The synthesized knocks, chimes, horns and bells. */
   soundOff: { kind: "toggle", default: false, page: { id: "sound", label: "Sound", invert: true } },
   /** The world's background: rain, wind, thunder, birdsong, crickets. */
@@ -99,7 +104,11 @@ export function settingValue(setting: Setting, v: unknown): boolean | string | n
   switch (setting.kind) {
     case "toggle": return typeof v === "boolean" ? v : undefined;
     case "choice": return setting.choices.some(([c]) => c === v) ? v as string | number : undefined;
-    case "range": return typeof v === "number" && Number.isFinite(v) ? Math.round(Math.min(setting.max, Math.max(setting.min, v))) : undefined;
+    case "range": {
+      if (typeof v !== "number" || !Number.isFinite(v)) return undefined;
+      const clamped = Math.min(setting.max, Math.max(setting.min, v));
+      return Math.min(setting.max, setting.min + Math.round((clamped - setting.min) / setting.step) * setting.step);
+    }
   }
 }
 

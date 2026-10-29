@@ -1,5 +1,11 @@
 import type {TranslationRow} from "./languages.ts";
 export const SETTINGS_TEXT = [
+ ["setting.gridColor","Grid line color","Color de la cuadrícula","Couleur de la grille","Rasterlinienfarbe","Cor da grade","Colore della griglia","グリッド線の色","격자선 색상","网格线颜色"],
+ ["settings.gridColor.white","White","Blanco","Blanc","Weiß","Branco","Bianco","白","흰색","白色"],
+ ["settings.gridColor.brown","Brown","Marrón","Marron","Braun","Marrom","Marrone","茶色","갈색","棕色"],
+ ["settings.gridColor.black","Black","Negro","Noir","Schwarz","Preto","Nero","黒","검은색","黑色"],
+ ["settings.gridColor.gray","Gray","Gris","Gris","Grau","Cinza","Grigio","灰色","회색","灰色"],
+ ["settings.gridColor.gold","Gold","Dorado","Or","Gold","Dourado","Oro","金色","금색","金色"],
  ["settings.tagline","THE CITY AWAITS ITS ORDERS","LA CIUDAD ESPERA ÓRDENES","LA CITÉ ATTEND VOS ORDRES","DIE STADT ERWARTET BEFEHLE","A CIDADE AGUARDA ORDENS","LA CITTÀ ATTENDE ORDINI","都市は命令を待っている","도시가 명령을 기다립니다","城市正等待命令"],
  ["settings.gameplay","Gameplay","Jugabilidad","Jouabilité","Spiel","Jogabilidade","Gioco","ゲームプレイ","게임플레이","游戏玩法"],
  ["settings.display","Display and sound","Imagen y sonido","Affichage et son","Anzeige und Ton","Imagem e som","Grafica e audio","表示と音声","화면 및 소리","显示与声音"],

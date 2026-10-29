@@ -1,10 +1,11 @@
-/** What DEFEND draws over the board while the player is building: the dim
- * gold tile grid, and for a drag, which tiles accept the item, the hovered
+/** What DEFEND draws over the board while the player is building: the
+ * optional tile grid, and for a drag, which tiles accept the item, the hovered
  * tile, the item's ghost and an aimed bomb's reach. */
 import { SUB, TILES_H, TILES_W, boardSize, tileKey, type Rect, type TilePos } from "./grid.ts";
 import { QUARTER, QUARTERS_H, QUARTERS_W } from "./layout.ts";
 import type { StructureKind } from "./catalog.ts";
 import { STRUCTURES } from "./catalog.ts";
+import { GRID_COLORS, type GridColor } from "../settings.ts";
 
 export type Overlay = {
   /** Tile keys that accept the dragged item. */
@@ -43,12 +44,13 @@ export type Overlay = {
   span?: number;
 };
 
-/** Dim gold tile lines at `alpha`, `px` canvas pixels per cell. */
-export function drawGrid(c: CanvasRenderingContext2D, px: number, alpha: number) {
+/** Tile lines in the chosen colour at `alpha`, `px` canvas pixels per cell. */
+export function drawGrid(c: CanvasRenderingContext2D, px: number, alpha: number, color: GridColor = "gold") {
   const T = px * SUB;
   const { W: width, H: height } = boardSize(px);
   c.save();
-  c.strokeStyle = `rgba(216,181,114,${alpha})`;
+  c.strokeStyle = GRID_COLORS[color];
+  c.globalAlpha *= alpha;
   c.lineWidth = 1;
   c.beginPath();
   for (let tx = 1; tx < TILES_W; tx++) {
