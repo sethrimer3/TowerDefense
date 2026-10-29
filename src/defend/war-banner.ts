@@ -123,7 +123,7 @@ export class WarBanner {
  * reach: twice a second it picks the enemy to close on (see `foe`), routing
  * to it, or else the next leg toward the banner; between times it walks. */
 export function answerBanner(sim: DefendSim, banner: WarBanner, s: Soldier, speed: number, dt: number, sight = 0) {
-  let foe = sim.enemies.find((e) => e.id === s.target && e.hp > 0) ?? null;
+  let foe = sim.enemies.find((e) => !e.untargetable && e.id === s.target && e.hp > 0) ?? null;
   if (s.thinkT <= 0) {
     s.thinkT = 0.5;
     foe = banner.foe(sim, s, sight);

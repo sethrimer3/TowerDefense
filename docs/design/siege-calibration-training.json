@@ -1,7 +1,7 @@
 {
   "kind": "native-crossover-search",
   "raidSeconds": 120,
-  "inputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297",
+  "inputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799",
   "split": "training",
   "floor": 10,
   "ceiling": 2762799.9257329265,
@@ -88,8 +88,8 @@
       "keepHp": 190.07958984375,
       "keepMax": 600,
       "attackUnits": 6,
-      "defenseUnits": 4,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 7,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 240,
@@ -104,8 +104,8 @@
       "keepHp": 600,
       "keepMax": 600,
       "attackUnits": 6,
-      "defenseUnits": 4,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 7,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 240,
@@ -120,8 +120,8 @@
       "keepHp": 190.07958984375,
       "keepMax": 600,
       "attackUnits": 6,
-      "defenseUnits": 4,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 7,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 240,
@@ -136,8 +136,8 @@
       "keepHp": 600,
       "keepMax": 600,
       "attackUnits": 6,
-      "defenseUnits": 4,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 7,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 240,
@@ -152,8 +152,8 @@
       "keepHp": 600,
       "keepMax": 600,
       "attackUnits": 6,
-      "defenseUnits": 6,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 9,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 240,
@@ -168,8 +168,8 @@
       "keepHp": 600,
       "keepMax": 600,
       "attackUnits": 6,
-      "defenseUnits": 8,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 11,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 560,
@@ -184,8 +184,8 @@
       "keepHp": 600,
       "keepMax": 600,
       "attackUnits": 8,
-      "defenseUnits": 4,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 7,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 560,
@@ -200,8 +200,8 @@
       "keepHp": 0,
       "keepMax": 600,
       "attackUnits": 6,
-      "defenseUnits": 2,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 5,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 560,
@@ -213,11 +213,11 @@
       "homes": 3,
       "phase": "lost",
       "seconds": 120,
-      "keepHp": 60.97573471069336,
+      "keepHp": 16.335737228393555,
       "keepMax": 600,
       "attackUnits": 6,
-      "defenseUnits": 3,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 5,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 560,
@@ -232,8 +232,8 @@
       "keepHp": 600,
       "keepMax": 600,
       "attackUnits": 8,
-      "defenseUnits": 6,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 9,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 560,
@@ -248,8 +248,8 @@
       "keepHp": 208.1599578857422,
       "keepMax": 600,
       "attackUnits": 6,
-      "defenseUnits": 4,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 6,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 560,
@@ -264,8 +264,8 @@
       "keepHp": 600,
       "keepMax": 600,
       "attackUnits": 6,
-      "defenseUnits": 8,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 11,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 560,
@@ -279,9 +279,9 @@
       "seconds": 120,
       "keepHp": 600,
       "keepMax": 600,
-      "attackUnits": 5,
-      "defenseUnits": 6,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "attackUnits": 6,
+      "defenseUnits": 9,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 1000,
@@ -296,8 +296,8 @@
       "keepHp": 2184,
       "keepMax": 2184,
       "attackUnits": 15,
-      "defenseUnits": 6,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 9,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 1000,
@@ -312,8 +312,8 @@
       "keepHp": 0,
       "keepMax": 2184,
       "attackUnits": 15,
-      "defenseUnits": 7,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 8,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 1000,
@@ -324,12 +324,12 @@
       "armyDps": 736.7473431818182,
       "homes": 5,
       "phase": "won",
-      "seconds": 107.9,
+      "seconds": 107.67,
       "keepHp": 0,
       "keepMax": 2184,
       "attackUnits": 15,
-      "defenseUnits": 7,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 9,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 1000,
@@ -344,8 +344,8 @@
       "keepHp": 1262.940185546875,
       "keepMax": 2184,
       "attackUnits": 15,
-      "defenseUnits": 9,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 12,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 1000,
@@ -357,11 +357,11 @@
       "homes": 5,
       "phase": "lost",
       "seconds": 120,
-      "keepHp": 1966.650146484375,
+      "keepHp": 2184,
       "keepMax": 2184,
       "attackUnits": 15,
-      "defenseUnits": 4,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 5,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 1000,
@@ -376,8 +376,8 @@
       "keepHp": 1303.5753173828125,
       "keepMax": 2184,
       "attackUnits": 14,
-      "defenseUnits": 6,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 9,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 1000,
@@ -392,8 +392,8 @@
       "keepHp": 2184,
       "keepMax": 2184,
       "attackUnits": 15,
-      "defenseUnits": 12,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 15,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 1000,
@@ -408,8 +408,8 @@
       "keepHp": 2184,
       "keepMax": 2184,
       "attackUnits": 13,
-      "defenseUnits": 11,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 14,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 1000,
@@ -424,8 +424,8 @@
       "keepHp": 2184,
       "keepMax": 2184,
       "attackUnits": 12,
-      "defenseUnits": 12,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 15,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 1000,
@@ -440,8 +440,8 @@
       "keepHp": 2184,
       "keepMax": 2184,
       "attackUnits": 13,
-      "defenseUnits": 11,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 14,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 1000,
@@ -456,8 +456,8 @@
       "keepHp": 2184,
       "keepMax": 2184,
       "attackUnits": 15,
-      "defenseUnits": 12,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 15,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 1360,
@@ -472,8 +472,8 @@
       "keepHp": 3630.89990234375,
       "keepMax": 3630.89990234375,
       "attackUnits": 28,
-      "defenseUnits": 20,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 23,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 1360,
@@ -488,8 +488,8 @@
       "keepHp": 0,
       "keepMax": 3630.89990234375,
       "attackUnits": 24,
-      "defenseUnits": 7,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 9,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 1360,
@@ -500,12 +500,12 @@
       "armyDps": 3806.458033304923,
       "homes": 6,
       "phase": "won",
-      "seconds": 62.57,
+      "seconds": 61.87,
       "keepHp": 0,
       "keepMax": 3630.89990234375,
       "attackUnits": 24,
-      "defenseUnits": 5,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 7,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 1360,
@@ -519,9 +519,9 @@
       "seconds": 120,
       "keepHp": 3630.89990234375,
       "keepMax": 3630.89990234375,
-      "attackUnits": 27,
-      "defenseUnits": 20,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "attackUnits": 28,
+      "defenseUnits": 23,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 1360,
@@ -537,7 +537,7 @@
       "keepMax": 3630.89990234375,
       "attackUnits": 24,
       "defenseUnits": 5,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 1360,
@@ -552,8 +552,8 @@
       "keepHp": 0,
       "keepMax": 3630.89990234375,
       "attackUnits": 24,
-      "defenseUnits": 8,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 10,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 1360,
@@ -568,8 +568,8 @@
       "keepHp": 3630.89990234375,
       "keepMax": 3630.89990234375,
       "attackUnits": 27,
-      "defenseUnits": 28,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 31,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 1360,
@@ -580,12 +580,12 @@
       "armyDps": 3806.458033304923,
       "homes": 6,
       "phase": "won",
-      "seconds": 62.6,
+      "seconds": 63.57,
       "keepHp": 0,
       "keepMax": 3630.89990234375,
       "attackUnits": 24,
       "defenseUnits": 14,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 1360,
@@ -596,12 +596,12 @@
       "armyDps": 3806.458033304923,
       "homes": 6,
       "phase": "won",
-      "seconds": 61.6,
+      "seconds": 61.17,
       "keepHp": 0,
       "keepMax": 3630.89990234375,
       "attackUnits": 24,
-      "defenseUnits": 20,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 19,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 1360,
@@ -616,8 +616,8 @@
       "keepHp": 3630.89990234375,
       "keepMax": 3630.89990234375,
       "attackUnits": 24,
-      "defenseUnits": 84,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 87,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 1360,
@@ -632,8 +632,8 @@
       "keepHp": 0,
       "keepMax": 3630.89990234375,
       "attackUnits": 24,
-      "defenseUnits": 22,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 24,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 1360,
@@ -644,19 +644,19 @@
       "armyDps": 3806.458033304923,
       "homes": 6,
       "phase": "won",
-      "seconds": 63.03,
+      "seconds": 63.77,
       "keepHp": 0,
       "keepMax": 3630.89990234375,
       "attackUnits": 24,
-      "defenseUnits": 27,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 31,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 1360,
       "budget": 981277.838848,
       "seed": 1,
-      "error": "Error: Unfilled budget {\"seed\":3668341704,\"mmr\":1360,\"budget\":981277.838848,\"bestError\":0.7855582904884842,\"best\":210426.89726833074}\n    at generateAttempt (/workspace/TowerDefense/src/campaign/castle-generator.ts:303:40)\n    at generateNative (/workspace/TowerDefense/src/campaign/castle-generator.ts:114:14)\n    at calibrateRaid (/workspace/TowerDefense/tools/siege-calibration.ts:53:19)\n    at MessagePort.<anonymous> (/workspace/TowerDefense/tools/siege-calibration-worker.ts:5:36)\n    at [nodejs.internal.kHybridDispatch] (node:internal/event_target:856:20)\n    at MessagePort.<anonymous> (node:internal/per_context/messageport:23:28)",
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "error": "Error: Unfilled budget {\"seed\":3668341704,\"mmr\":1360,\"budget\":981277.838848,\"bestError\":0.7855582904884842,\"best\":210426.89726833074}\n    at generateAttempt (/workspace/TowerDefense/src/campaign/castle-generator.ts:303:40)\n    at generateNative (/workspace/TowerDefense/src/campaign/castle-generator.ts:114:14)\n    at calibrateRaid (/workspace/TowerDefense/tools/siege-calibration.ts:54:19)\n    at MessagePort.<anonymous> (/workspace/TowerDefense/tools/siege-calibration-worker.ts:5:36)\n    at [nodejs.internal.kHybridDispatch] (node:internal/event_target:856:20)\n    at MessagePort.<anonymous> (node:internal/per_context/messageport:23:28)",
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 1760,
@@ -667,12 +667,12 @@
       "armyDps": 18291.20183592802,
       "homes": 7,
       "phase": "won",
-      "seconds": 102.2,
+      "seconds": 105.93,
       "keepHp": 0,
       "keepMax": 4748.10009765625,
       "attackUnits": 27,
-      "defenseUnits": 14,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 13,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 1760,
@@ -687,8 +687,8 @@
       "keepHp": 0,
       "keepMax": 4748.10009765625,
       "attackUnits": 28,
-      "defenseUnits": 17,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 19,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 1760,
@@ -703,8 +703,8 @@
       "keepHp": 0,
       "keepMax": 4748.10009765625,
       "attackUnits": 28,
-      "defenseUnits": 12,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 14,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 1760,
@@ -719,8 +719,8 @@
       "keepHp": 0,
       "keepMax": 4748.10009765625,
       "attackUnits": 28,
-      "defenseUnits": 11,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 14,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 1760,
@@ -735,8 +735,8 @@
       "keepHp": 0,
       "keepMax": 4748.10009765625,
       "attackUnits": 28,
-      "defenseUnits": 13,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 15,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 1760,
@@ -751,8 +751,8 @@
       "keepHp": 4748.10009765625,
       "keepMax": 4748.10009765625,
       "attackUnits": 28,
-      "defenseUnits": 12,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 14,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 1760,
@@ -767,8 +767,8 @@
       "keepHp": 0,
       "keepMax": 4748.10009765625,
       "attackUnits": 28,
-      "defenseUnits": 7,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 10,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 1760,
@@ -782,9 +782,9 @@
       "seconds": 120,
       "keepHp": 4748.10009765625,
       "keepMax": 4748.10009765625,
-      "attackUnits": 28,
-      "defenseUnits": 19,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "attackUnits": 27,
+      "defenseUnits": 21,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 1760,
@@ -799,8 +799,8 @@
       "keepHp": 4748.10009765625,
       "keepMax": 4748.10009765625,
       "attackUnits": 27,
-      "defenseUnits": 20,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 21,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 1760,
@@ -815,8 +815,8 @@
       "keepHp": 4748.10009765625,
       "keepMax": 4748.10009765625,
       "attackUnits": 25,
-      "defenseUnits": 24,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 26,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 1760,
@@ -831,8 +831,8 @@
       "keepHp": 4748.10009765625,
       "keepMax": 4748.10009765625,
       "attackUnits": 28,
-      "defenseUnits": 24,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 26,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 1760,
@@ -846,9 +846,9 @@
       "seconds": 120,
       "keepHp": 4748.10009765625,
       "keepMax": 4748.10009765625,
-      "attackUnits": 26,
-      "defenseUnits": 21,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "attackUnits": 27,
+      "defenseUnits": 23,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 1760,
@@ -863,8 +863,8 @@
       "keepHp": 4748.10009765625,
       "keepMax": 4748.10009765625,
       "attackUnits": 26,
-      "defenseUnits": 23,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 24,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 2000,
@@ -875,12 +875,12 @@
       "armyDps": 41449.52121339175,
       "homes": 3,
       "phase": "won",
-      "seconds": 71.87,
+      "seconds": 71.97,
       "keepHp": 0,
       "keepMax": 7905,
       "attackUnits": 11,
-      "defenseUnits": 8,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 9,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 2000,
@@ -895,8 +895,8 @@
       "keepHp": 0,
       "keepMax": 7905,
       "attackUnits": 11,
-      "defenseUnits": 6,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 9,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 2000,
@@ -907,12 +907,12 @@
       "armyDps": 41449.52121339175,
       "homes": 3,
       "phase": "won",
-      "seconds": 112.03,
+      "seconds": 112.6,
       "keepHp": 0,
       "keepMax": 7905,
       "attackUnits": 11,
-      "defenseUnits": 7,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 11,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 2000,
@@ -924,27 +924,27 @@
       "homes": 3,
       "phase": "won",
       "seconds": 65.8,
-      "keepHp": 0,
-      "keepMax": 7905,
-      "attackUnits": 11,
-      "defenseUnits": 7,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
-    },
-    {
-      "mmr": 2000,
-      "seed": 1,
-      "budget": 4405.174141,
-      "castleDps": 4405.038015447945,
-      "armyBudget": 41909.31545220382,
-      "armyDps": 41449.52121339175,
-      "homes": 3,
-      "phase": "won",
-      "seconds": 70.6,
       "keepHp": 0,
       "keepMax": 7905,
       "attackUnits": 11,
       "defenseUnits": 10,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
+    },
+    {
+      "mmr": 2000,
+      "seed": 1,
+      "budget": 4405.174141,
+      "castleDps": 4405.038015447945,
+      "armyBudget": 41909.31545220382,
+      "armyDps": 41449.52121339175,
+      "homes": 3,
+      "phase": "won",
+      "seconds": 70.63,
+      "keepHp": 0,
+      "keepMax": 7905,
+      "attackUnits": 11,
+      "defenseUnits": 13,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 2000,
@@ -959,8 +959,8 @@
       "keepHp": 0,
       "keepMax": 7905,
       "attackUnits": 11,
-      "defenseUnits": 8,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 11,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 2000,
@@ -975,8 +975,8 @@
       "keepHp": 7905,
       "keepMax": 7905,
       "attackUnits": 11,
-      "defenseUnits": 11,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 14,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 2000,
@@ -991,8 +991,8 @@
       "keepHp": 7905,
       "keepMax": 7905,
       "attackUnits": 11,
-      "defenseUnits": 11,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 14,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 2000,
@@ -1007,8 +1007,8 @@
       "keepHp": 7905,
       "keepMax": 7905,
       "attackUnits": 10,
-      "defenseUnits": 11,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 14,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 2000,
@@ -1023,8 +1023,8 @@
       "keepHp": 7905,
       "keepMax": 7905,
       "attackUnits": 11,
-      "defenseUnits": 11,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 14,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 2000,
@@ -1035,12 +1035,12 @@
       "armyDps": 41449.52121339175,
       "homes": 3,
       "phase": "won",
-      "seconds": 65.83,
+      "seconds": 64.6,
       "keepHp": 0,
       "keepMax": 7905,
-      "attackUnits": 10,
-      "defenseUnits": 9,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "attackUnits": 11,
+      "defenseUnits": 11,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 2000,
@@ -1055,8 +1055,8 @@
       "keepHp": 7905,
       "keepMax": 7905,
       "attackUnits": 11,
-      "defenseUnits": 7,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 10,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 2000,
@@ -1071,8 +1071,8 @@
       "keepHp": 7905,
       "keepMax": 7905,
       "attackUnits": 11,
-      "defenseUnits": 30,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 32,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 2160,
@@ -1083,12 +1083,12 @@
       "armyDps": 42921.101848186714,
       "homes": 3,
       "phase": "won",
-      "seconds": 70.8,
+      "seconds": 70.97,
       "keepHp": 0,
       "keepMax": 7905,
       "attackUnits": 11,
-      "defenseUnits": 8,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 10,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 2160,
@@ -1103,8 +1103,8 @@
       "keepHp": 0,
       "keepMax": 7905,
       "attackUnits": 11,
-      "defenseUnits": 7,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 10,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 2160,
@@ -1115,12 +1115,12 @@
       "armyDps": 42921.101848186714,
       "homes": 3,
       "phase": "won",
-      "seconds": 70.8,
+      "seconds": 70.97,
       "keepHp": 0,
       "keepMax": 7905,
       "attackUnits": 11,
-      "defenseUnits": 8,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 10,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 2160,
@@ -1135,8 +1135,8 @@
       "keepHp": 0,
       "keepMax": 7905,
       "attackUnits": 11,
-      "defenseUnits": 7,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 10,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 2160,
@@ -1151,8 +1151,8 @@
       "keepHp": 0,
       "keepMax": 7905,
       "attackUnits": 10,
-      "defenseUnits": 9,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 12,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 2160,
@@ -1167,8 +1167,8 @@
       "keepHp": 0,
       "keepMax": 7905,
       "attackUnits": 11,
-      "defenseUnits": 5,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 8,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 2160,
@@ -1183,8 +1183,8 @@
       "keepHp": 7905,
       "keepMax": 7905,
       "attackUnits": 11,
-      "defenseUnits": 11,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 14,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 2160,
@@ -1199,8 +1199,8 @@
       "keepHp": 7834.125,
       "keepMax": 7905,
       "attackUnits": 10,
-      "defenseUnits": 11,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 14,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 2160,
@@ -1215,8 +1215,8 @@
       "keepHp": 7905,
       "keepMax": 7905,
       "attackUnits": 9,
-      "defenseUnits": 11,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 14,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 2160,
@@ -1231,8 +1231,8 @@
       "keepHp": 7905,
       "keepMax": 7905,
       "attackUnits": 11,
-      "defenseUnits": 10,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 13,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 2160,
@@ -1247,8 +1247,8 @@
       "keepHp": 7905,
       "keepMax": 7905,
       "attackUnits": 11,
-      "defenseUnits": 11,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 14,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 2160,
@@ -1263,8 +1263,8 @@
       "keepHp": 7905,
       "keepMax": 7905,
       "attackUnits": 9,
-      "defenseUnits": 11,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 14,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 2400,
@@ -1278,9 +1278,9 @@
       "seconds": 64.23,
       "keepHp": 0,
       "keepMax": 15321.599609375,
-      "attackUnits": 4,
-      "defenseUnits": 10,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "attackUnits": 2,
+      "defenseUnits": 11,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 2400,
@@ -1295,8 +1295,8 @@
       "keepHp": 0,
       "keepMax": 15321.599609375,
       "attackUnits": 3,
-      "defenseUnits": 8,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 11,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 2400,
@@ -1310,9 +1310,9 @@
       "seconds": 64.23,
       "keepHp": 0,
       "keepMax": 15321.599609375,
-      "attackUnits": 4,
-      "defenseUnits": 10,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "attackUnits": 2,
+      "defenseUnits": 11,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 2400,
@@ -1327,8 +1327,8 @@
       "keepHp": 0,
       "keepMax": 15321.599609375,
       "attackUnits": 5,
-      "defenseUnits": 10,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 13,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 2400,
@@ -1342,9 +1342,9 @@
       "seconds": 64.23,
       "keepHp": 0,
       "keepMax": 15321.599609375,
-      "attackUnits": 4,
-      "defenseUnits": 10,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "attackUnits": 2,
+      "defenseUnits": 11,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 2400,
@@ -1359,8 +1359,8 @@
       "keepHp": 0,
       "keepMax": 15321.599609375,
       "attackUnits": 5,
-      "defenseUnits": 10,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 12,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 2400,
@@ -1374,9 +1374,9 @@
       "seconds": 64.23,
       "keepHp": 0,
       "keepMax": 15321.599609375,
-      "attackUnits": 4,
-      "defenseUnits": 10,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "attackUnits": 2,
+      "defenseUnits": 11,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 2400,
@@ -1388,11 +1388,11 @@
       "homes": 3,
       "phase": "lost",
       "seconds": 120,
-      "keepHp": 1613.3154296875,
+      "keepHp": 1819.5654296875,
       "keepMax": 15321.599609375,
       "attackUnits": 5,
       "defenseUnits": 11,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 2400,
@@ -1407,8 +1407,8 @@
       "keepHp": 15321.599609375,
       "keepMax": 15321.599609375,
       "attackUnits": 5,
-      "defenseUnits": 17,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 20,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 2400,
@@ -1422,9 +1422,9 @@
       "seconds": 64.23,
       "keepHp": 0,
       "keepMax": 15321.599609375,
-      "attackUnits": 4,
-      "defenseUnits": 10,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "attackUnits": 2,
+      "defenseUnits": 11,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 2400,
@@ -1436,11 +1436,11 @@
       "homes": 3,
       "phase": "lost",
       "seconds": 120,
-      "keepHp": 2041.0419921875,
+      "keepHp": 307.05029296875,
       "keepMax": 15321.599609375,
-      "attackUnits": 5,
-      "defenseUnits": 5,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "attackUnits": 4,
+      "defenseUnits": 3,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 2400,
@@ -1455,8 +1455,8 @@
       "keepHp": 15321.599609375,
       "keepMax": 15321.599609375,
       "attackUnits": 5,
-      "defenseUnits": 36,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 39,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 2560,
@@ -1471,8 +1471,8 @@
       "keepHp": 0,
       "keepMax": 15321.599609375,
       "attackUnits": 10,
-      "defenseUnits": 8,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 9,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 2560,
@@ -1487,8 +1487,8 @@
       "keepHp": 0,
       "keepMax": 15321.599609375,
       "attackUnits": 16,
-      "defenseUnits": 5,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 8,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 2560,
@@ -1503,8 +1503,8 @@
       "keepHp": 0,
       "keepMax": 15321.599609375,
       "attackUnits": 24,
-      "defenseUnits": 8,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 10,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 2560,
@@ -1519,8 +1519,8 @@
       "keepHp": 0,
       "keepMax": 15321.599609375,
       "attackUnits": 13,
-      "defenseUnits": 5,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 8,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 2560,
@@ -1535,8 +1535,8 @@
       "keepHp": 0,
       "keepMax": 15321.599609375,
       "attackUnits": 28,
-      "defenseUnits": 9,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 11,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 2560,
@@ -1552,7 +1552,7 @@
       "keepMax": 15321.599609375,
       "attackUnits": 17,
       "defenseUnits": 3,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 2560,
@@ -1564,11 +1564,11 @@
       "homes": 7,
       "phase": "lost",
       "seconds": 120,
-      "keepHp": 14646.599609375,
+      "keepHp": 15321.599609375,
       "keepMax": 15321.599609375,
       "attackUnits": 29,
-      "defenseUnits": 17,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 20,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 2560,
@@ -1583,8 +1583,8 @@
       "keepHp": 11796.599609375,
       "keepMax": 15321.599609375,
       "attackUnits": 17,
-      "defenseUnits": 13,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 21,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 2560,
@@ -1595,12 +1595,12 @@
       "armyDps": 119433.20140296487,
       "homes": 7,
       "phase": "won",
-      "seconds": 88.5,
+      "seconds": 51.2,
       "keepHp": 0,
       "keepMax": 15321.599609375,
       "attackUnits": 27,
-      "defenseUnits": 22,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 24,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 2560,
@@ -1612,11 +1612,11 @@
       "homes": 5,
       "phase": "lost",
       "seconds": 120,
-      "keepHp": 14946.599609375,
+      "keepHp": 9801.572265625,
       "keepMax": 15321.599609375,
       "attackUnits": 17,
       "defenseUnits": 24,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     },
     {
       "mmr": 2560,
@@ -1628,11 +1628,11 @@
       "homes": 5,
       "phase": "lost",
       "seconds": 120,
-      "keepHp": 14554.5595703125,
+      "keepHp": 14282.845703125,
       "keepMax": 15321.599609375,
       "attackUnits": 17,
-      "defenseUnits": 26,
-      "observedInputHash": "ff903f0dae6cac4ee92d9af690ea1eb8ff8ad54238081db5dbcfded0bfa33297"
+      "defenseUnits": 21,
+      "observedInputHash": "b997d984f122113c2380b48f9a97343e6343c01f5a9643cd2b9d77167e941799"
     }
   ]
 }

@@ -132,3 +132,5 @@ DEFEND also indexes nearby defenders during enemy turns, selects only the eight 
 Siege side outlines use optional per-side silhouette layers and cached masks for individual units; `node tests/siege-outlines.mjs` exercises the desktop and phone galleries.
 
 Siege custom keep banners and seeded decorative poles live in `campaign/siege-flags.ts`; pole destruction reads native impacts without adding collision or targets.
+
+Siege flag-bearers use the native Soldier lifecycle and raid proxies: untargetable for primary aim, vulnerable to area and passing hits, and worth two mana. Their dropped banners and crystals stay in the presentation layer.

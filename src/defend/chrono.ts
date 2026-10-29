@@ -85,7 +85,7 @@ export function stepChrono(sim:DefendSim,dt:number) {
   for(const[id,s]of sim.chrono){
     const b=owns(sim,id)!,c=center(b.rect),range=chronoRange(sim);
     let target:Enemy|undefined,best=range*range;
-    for(const e of sim.enemiesNear(c.x,c.y,range)){const d=(e.x-c.x)**2+(e.y-c.y)**2;if(e.hp>0&&(d<best||(d===best&&(!target||e.id<target.id)))){target=e;best=d;}}
+    for(const e of sim.enemiesNear(c.x,c.y,range)){const d=(e.x-c.x)**2+(e.y-c.y)**2;if(!e.untargetable&&e.hp>0&&(d<best||(d===best&&(!target||e.id<target.id)))){target=e;best=d;}}
     if(target){
       const angle=Math.atan2(target.y-c.y,target.x-c.x);
       if(!s.queue.length&&s.shots.length){s.queue=s.shots;s.shots=[];s.aim=angle;s.reach=Math.sqrt(best);s.fan=CHRONO.spread[chronoRank(sim.bonuses.chrono,"focus")]*Math.PI/180;s.total=s.queue.length;s.fired=0;s.timer=0;}

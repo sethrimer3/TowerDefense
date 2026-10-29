@@ -115,10 +115,11 @@ function stepWispArrow(sim: DefendSim,b: Building,w: WispArrow,candidates: Enemy
   const c=center(b.rect),range=w.range;
   let remaining = dt;
   do {
-    if (!w.slice && candidates.some(e => e.hp>0)) {
+    if (!w.slice && candidates.some(e => !e.untargetable&&e.hp>0)) {
       let target, best = Infinity;
-      const alternatives = candidates.some(e => e.hp>0 && e.id!==w.lastTarget);
+      const alternatives = candidates.some(e => !e.untargetable&&e.hp>0 && e.id!==w.lastTarget);
       for (const e of candidates) {
+        if(e.untargetable)continue;
         if (alternatives && e.id===w.lastTarget) continue;
         const d = (e.x-w.x)**2+(e.y-w.y)**2;
         if (e.hp>0 && (d<best || (d===best && e.id<target!.id))) { target=e; best=d; }

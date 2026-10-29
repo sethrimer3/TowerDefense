@@ -34,11 +34,12 @@ export function rectDist(r: Rect, x: number, y: number) {
 
 /** The item nearest `p` strictly within squared distance `within`. Earlier
  * items win ties, or later ones with `lastWins` (then `within` itself counts). */
-export function nearest<T extends Point>(items: Iterable<T>, p: Point, within = Infinity, lastWins = false): T | null {
+export function nearest<T extends Point>(items: Iterable<T>, p: Point, within = Infinity, lastWins = false, secondary = false): T | null {
   const closer = lastWins ? (d: number, bd: number) => d <= bd : (d: number, bd: number) => d < bd;
   let best: T | null = null,
     bd = within;
   for (const it of items) {
+    if (!secondary && "untargetable" in it && it.untargetable) continue;
     const d = sq(it.x - p.x) + sq(it.y - p.y);
     if (closer(d, bd)) {
       bd = d;

@@ -174,12 +174,12 @@ export function stepReinforcement(sim: DefendSim, s: Soldier, dt: number) {
   s.thinkT -= dt;
   const reach = c.range || REINFORCE.reach;
   const inReach = (e: Enemy) => dist(e.x - s.x, e.y - s.y) <= reach + enemySize(e) / 2 + (c.range ? 0 : c.size / 2);
-  let target = sim.enemies.find((e) => e.id === s.target && e.hp > 0) ?? null;
+  let target = sim.enemies.find((e) => !e.untargetable && e.id === s.target && e.hp > 0) ?? null;
   if (!target || !inReach(target)) {
     let best: Enemy | null = null, bd = Infinity;
     for (const e of sim.enemiesNear(s.x, s.y, reach + 1)) {
       const d = sq(e.x - s.x) + sq(e.y - s.y);
-      if (e.hp > 0 && inReach(e) && d < bd) { bd = d; best = e; }
+      if (!e.untargetable && e.hp > 0 && inReach(e) && d < bd) { bd = d; best = e; }
     }
     if (best) target = best;
   }
@@ -231,7 +231,7 @@ function seek(sim: DefendSim, s: Soldier): Enemy | null {
   const c = s.called!;
   s.thinkT = 0.5;
   s.path = [];
-  const prey = sim.enemiesNear(c.post.x, c.post.y, REINFORCE.leash).filter((e) => e.hp > 0);
+  const prey = sim.enemiesNear(c.post.x, c.post.y, REINFORCE.leash).filter((e) => !e.untargetable && e.hp > 0);
   prey.sort((a, b) => sq(a.x - s.x) + sq(a.y - s.y) - (sq(b.x - s.x) + sq(b.y - s.y)) || a.id - b.id);
   for (const e of prey.slice(0, 3)) {
     const path = findPath(sim.ownSolid, s, e, LEASHED);

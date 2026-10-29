@@ -173,7 +173,7 @@ export function stepFlames(sim: DefendSim, wizards: Wizards, dt: number) {
   for (const f of sim.flames) {
     f.t += dt;
     if (!sim.intact(sim.map.buildings[f.tower])) f.t = f.dur;
-    const target = sim.enemies.find((e) => e.id === f.target && e.hp > 0) ?? nearest(sim.enemiesNear(f.x, f.y, f.range), f);
+    const target = sim.enemies.find((e) => !e.untargetable && e.id === f.target && e.hp > 0) ?? nearest(sim.enemiesNear(f.x, f.y, f.range), f);
     if (target) {
       f.target = target.id;
       const aim = toward(f.x, f.y, target.x, target.y);

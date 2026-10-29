@@ -25,7 +25,7 @@ export function archerAttunement(sim: DefendSim, home: number) {
 
 /** Stable order, with full volleys even against one enemy. */
 export function skirmishTargets(sim: DefendSim, s: Soldier, first: Enemy, range: number, rank: number) {
-  const pool = sim.enemiesNear(s.x,s.y,range).filter(e=>e.hp>0 && e!==first)
+  const pool = sim.enemiesNear(s.x,s.y,range).filter(e=>!e.untargetable&&e.hp>0 && e!==first)
     .sort((a,b)=>(a.x-s.x)**2+(a.y-s.y)**2-((b.x-s.x)**2+(b.y-s.y)**2) || a.id-b.id);
   pool.unshift(first);
   return Array.from({length:SKIRMISH.arrows[rank]},(_,i)=>pool[i%pool.length]);
@@ -122,7 +122,7 @@ export function looseSkyArrow(sim:DefendSim,s:Soldier,e:Enemy,damage:number,rank
   s.skyShots=(s.skyShots??0)+1;
   if(s.skyShots%every)return;
   const count=SKYRANGER.arrows[rank],r=SKYRANGER.radius[rank]*SUB;
-  const targets=rank===3?sim.enemiesNear(e.x,e.y,r).filter(o=>o.hp>0).sort((a,b)=>a.id-b.id):[];
+  const targets=rank===3?sim.enemiesNear(e.x,e.y,r).filter(o=>!o.untargetable&&o.hp>0).sort((a,b)=>a.id-b.id):[];
   for(let i=0;i<count;i++){
     const target=targets.length?targets[i%targets.length]:undefined;
     const angle=hash01(s.id,s.skyShots,i,1)*Math.PI*2,rad=Math.sqrt(hash01(s.id,s.skyShots,i,2))*r;

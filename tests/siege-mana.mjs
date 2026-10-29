@@ -41,7 +41,7 @@ try {
         // Keep the render loop, and freeze its simulation while the browser aims.
         fixture.page.paused = true;
         for (let n = 0; n < 4; n++) {
-          const guard = r.defense.soldiers.find((s) => s.hp > 0),
+          const guard = r.defense.soldiers.find((s) => s.kind !== "flagBearer" && s.hp > 0),
             attacker = r.attack.soldiers.find((s) => s.kind === "brawler" && s.hp > 0);
           guard.x = 36.5;
           guard.y = 48.5;

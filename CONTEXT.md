@@ -665,3 +665,5 @@ A difficulty trial in which the reference army and target castle share an MMR.
 A temporary Siege battle resource earned by defeating enemy troops and spent on strike spells.
 
 - **Flagpole:** decorative Siege scenery carrying the defender’s banner; one nearby impact snaps it, leaving a stump.
+
+- **Flag-bearer:** one of three non-combat defenders carrying the castle’s banner. Area or passing attacks can kill one for two mana; ordinary troops never aim at one.

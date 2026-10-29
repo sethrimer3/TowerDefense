@@ -15,6 +15,7 @@ import { readFileSync } from "node:fs";
  * tower changes the castles without a recalibration, and the published
  * report stays a record of what was observed. */
 const RAID_SOURCES = [
+  "src/defend/flag-bearers.ts",
   "src/campaign/castle-generator.ts",
   "src/campaign/castle-dps.ts",
   "src/campaign/siege-ceiling.ts",

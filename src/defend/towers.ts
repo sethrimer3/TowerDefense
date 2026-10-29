@@ -113,7 +113,7 @@ export class Towers {
     const c = center(b.rect);
     if (loops && this.ready(b, dt)) {
       const range = keepArrowRange(sim);
-      const near = sim.enemiesNear(c.x, c.y, range).filter((e) => sq(e.x - c.x) + sq(e.y - c.y) <= range * range);
+      const near = sim.enemiesNear(c.x, c.y, range).filter((e) => !e.untargetable && sq(e.x - c.x) + sq(e.y - c.y) <= range * range);
       const idle=near.length?null:chronoTarget(sim,c,range,true,b.id);
       if (!near.length&&!idle) this.cooldown.set(b.id, 0);
       else {
@@ -161,7 +161,7 @@ export class Towers {
     let damage = archerDamage(sim.levels.archerDamage) * sim.bonuses.towerDamage;
     // Fire arrows set what they hit burning; at III the tower looses a volley at the nearest few.
     const burn = lit ? damage * (fire ? FIRE_ARROWS.share[fire] : FIRE_ARROWS.hall.share) : 0;
-    const targets = fire >= 3 && near.length ? near.filter((e) => sq(e.x - c.x) + sq(e.y - c.y) <= range * range).sort(byDistanceFrom(c)).slice(0, FIRE_ARROWS.volley) : [target];
+    const targets = fire >= 3 && near.length ? near.filter((e) => !e.untargetable && sq(e.x - c.x) + sq(e.y - c.y) <= range * range).sort(byDistanceFrom(c)).slice(0, FIRE_ARROWS.volley) : [target];
     for (const t of targets)
       sim.arrows.push({ x: c.x, y: c.y - 0.6, origin: { x: c.x, y: c.y, building: b.id }, target: t.id, damage, tx: t.x, ty: t.y, life: 2, ...(burn ? { burn, burnFor: fire ? FIRE_ARROWS.burn[fire] : FIRE_ARROWS.hall.burn } : {}) });
   }

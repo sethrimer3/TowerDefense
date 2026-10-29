@@ -1,3 +1,4 @@
+import { bannerFor } from "../defend/deployment.ts";
 /** Two native Defend armies on one native city. This is targeting/ownership glue,
  * not a second implementation of towers, troop attacks, spells or projectiles. */
 import { DefendSim, type Enemy, type Soldier, type Civilian, type ScenarioRules } from "../defend/sim.ts";
@@ -219,6 +220,7 @@ export class RaidBattle {
       marked: false,
       flash: 0,
       raidProxy: true,
+      ...(unit && "kind" in unit && unit.kind === "flagBearer" ? { untargetable: true as const } : {}),
       ...(building ? { raidBuilding: true } : {}),
     };
     if (unit) {
@@ -332,11 +334,11 @@ export class RaidBattle {
   }
   /** Where attackers stand with the way to the enemy keep blocked by a building. */
   private stuck() {
-    const banner = this.attack.warBanner,
-      out: { x: number; y: number }[] = [];
-    if (!banner) return out;
-    for (const s of this.attack.soldiers)
-      if (s.hp > 0 && !banner.reached(s) && blocked(banner.field, this.attack.ownSolid, cellAt(s.x, s.y))) out.push(s);
+    const out: { x: number; y: number }[] = [];
+    for (const s of this.attack.soldiers) {
+      const banner = bannerFor(this.attack,s);
+      if (banner && s.hp > 0 && !banner.reached(s) && blocked(banner.field, this.attack.ownSolid, cellAt(s.x, s.y))) out.push(s);
+    }
     return out;
   }
   step(dt: number) {

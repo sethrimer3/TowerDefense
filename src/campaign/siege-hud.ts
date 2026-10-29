@@ -166,6 +166,7 @@ export const TROOP_NAMES: Record<Soldier["kind"], string> = {
   lancer: "Lancer",
   hero: "Hero",
   shade: "Shade",
+  flagBearer: "Flag-bearer",
   assassin: "Assassin",
 };
 

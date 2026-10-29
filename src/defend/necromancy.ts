@@ -147,10 +147,10 @@ export function stepUndead(sim: DefendSim, s: Soldier, dt: number) {
   s.cd -= dt;
   s.thinkT -= dt;
   const reach = r.range || NECRO.reach;
-  let target = sim.enemies.find((e) => e.id === s.target && e.hp > 0) ?? null;
+  let target = sim.enemies.find((e) => !e.untargetable && e.id === s.target && e.hp > 0) ?? null;
   const inReach = (e: Enemy) => dist(e.x - s.x, e.y - s.y) <= reach + enemySize(e) / 2 + (r.range ? 0 : r.size / 2);
   if (!target || !inReach(target)) {
-    const near = sim.enemiesNear(s.x, s.y, reach + 1).filter((e) => e.hp > 0 && inReach(e));
+    const near = sim.enemiesNear(s.x, s.y, reach + 1).filter((e) => !e.untargetable && e.hp > 0 && inReach(e));
     let best: Enemy | null = null, bd = Infinity;
     for (const e of near) {
       const d = sq(e.x - s.x) + sq(e.y - s.y);
@@ -201,8 +201,8 @@ function attack(sim: DefendSim, s: Soldier, e: Enemy) {
 function hunt(sim: DefendSim, s: Soldier): Enemy | null {
   s.thinkT = 0.5;
   s.path = [];
-  let prey = sim.enemiesNear(s.x, s.y, NECRO.sight).filter((e) => e.hp > 0);
-  if (!prey.length) prey = sim.enemies.filter((e) => e.hp > 0);
+  let prey = sim.enemiesNear(s.x, s.y, NECRO.sight).filter((e) => !e.untargetable && e.hp > 0);
+  if (!prey.length) prey = sim.enemies.filter((e) => !e.untargetable && e.hp > 0);
   const byDistance = (a: Enemy, b: Enemy) => sq(a.x - s.x) + sq(a.y - s.y) - (sq(b.x - s.x) + sq(b.y - s.y));
   for (const e of nearestFew(prey, byDistance)) {
     const path = findPath(sim.ownSolid, s, e, CITYWIDE);

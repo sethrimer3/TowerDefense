@@ -88,7 +88,7 @@ export function combo(sim: DefendSim, s: Soldier, e: Enemy) {
       const k = slash(sim, s, target, base, done + n);
       slain += k;
       if (p.dance >= 3 && k) limit = Math.min(BLADE_DANCE.most, limit + k);
-      target = done + 1 < limit ? nearest(sim.enemiesNear(s.x, s.y, BLADE_DANCE.jump).filter((o) => o.hp > 0 && !struck.has(o.id)), s, sq(BLADE_DANCE.jump)) : null;
+      target = done + 1 < limit ? nearest(sim.enemiesNear(s.x, s.y, BLADE_DANCE.jump).filter((o) => o.hp > 0 && !struck.has(o.id)), s, sq(BLADE_DANCE.jump), false, true) : null;
     }
   }
   // Bloodied blade: each kill heals it.

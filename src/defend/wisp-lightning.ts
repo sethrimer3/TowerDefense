@@ -38,7 +38,7 @@ function leaveLightning(sim:DefendSim,w:WispArrow,a:Point,b:Point,start:number,e
 export function stepWispLightning(sim:DefendSim,b:Building,w:WispArrow,candidates:Enemy[],dt:number,offset:number) {
   if(!w.ray) {
     let target:Enemy|undefined,best=Infinity;
-    for(const e of candidates)if(e.hp>0) {
+    for(const e of candidates)if(!e.untargetable&&e.hp>0) {
       const d=(e.x-w.x)**2+(e.y-w.y)**2;
       if(d<best||(d===best&&e.id<(target?.id??Infinity))){target=e;best=d;}
     }
