@@ -180,10 +180,130 @@ Phase 7 validation: all 927 Node assertions and the production build pass. Deskt
 - Fences as walls (§1): castle parks get fences the attackers must break. Lands with that shared PR, not as a Siege phase.
 - New Siege tab icon (§3).
 
+## Part 2: the living raid (Seth's 2026-10-28 brief)
+
+Phases 0–7 above are done. This part turns Seth's second Siege brief into ordered work. Plan against the code as it stands: `siege-ui.ts` (the battle page), `siege-hud.ts` (the corner banner plates and the remaining-troops box, `TroopBox`), `battlefield.ts` (`siegeField`, which still lays the player's muster rows in the lower half), `raid.ts` (`RaidBattle`), `sim.ts` (`CampaignSim`, the 240-second limit), `siege-mana.ts`, and Defend's renderer (`DrawOptions`, `unit-outline.ts`, `battle-art.ts`'s `rimOf`, `simple-units.ts`, `lighting.ts`, `structure-art.ts`'s `flagPixels`).
+
+### What Seth asked for (verbatim intent)
+
+1. **Side outlines:** enemy units get a red pixel outline, and the player's units get a slightly dark blue one, instead of black.
+2. **The defender's flags:** the invaded player's flag flies from the castle (the keep) and from aesthetic-only poles around the kingdom. Poles can be destroyed, but they never slow units or affect the battle.
+3. **Flag-bearers:** three defender units walk around bearing the defender's flag. Each has 1 HP, drops mana, and is never targeted by units.
+4. **Victory:** on a successful siege, every enemy flag burns away and is replaced by the invader's flag. The keep falls, then the walls fall one by one, along with a few buildings still standing, in a circular wave out from the keep.
+5. **Remaining units box:** a translucent black background with a gold border.
+6. **Directing units:** the player should be able to direct their units. How is undecided: by unit type (ranged, melee, …), only hero and ultimate units, or every unit individually.
+7. **No muster buildings:** remove the invading player's buildings from the bottom of the board.
+8. **Timer:** keep it, at 2 minutes. The light goes from day to sunset to twilight/dusk to night, with night covering the last 20 seconds.
+
+### Rules for this part
+
+Everything in [Architecture guidelines](#architecture-guidelines) still holds. In addition:
+
+- **Presentation stays presentation.** Outlines, flags, poles, the day cycle, the flag burn and the collapse wave never change the battle. They read the sim and draw. Only items 3 (flag-bearers), 6 (directing), 7 (no muster buildings) and the 2-minute limit change gameplay.
+- **Siege-only options.** Each new renderer input is an optional `DrawOptions` field that is absent in Defend and Ambush, so their pixels, `test:render-cache` comparisons and goldens stay unchanged. New sim behaviour goes through `ScenarioRules` hooks or campaign code (`raid.ts`, `sim.ts`), never into Defend's ordinary step.
+- **Time comes from the battle, not the wall clock,** for anything that must line up with the timer (the day cycle, the collapse wave's start). Pausing a raid freezes it. Purely decorative motion (a flag waving, flames) may use the wall clock, as Defend does.
+- **Reduce Motion:** flags hang still, the burn becomes a quick crossfade, the collapse wave swaps everything to rubble at once, and the day cycle still changes (light is not motion) but without flicker.
+- **Calibration.** The 2-minute limit and the removal of muster buildings both change win rates. Re-run `tools/calibrate-siege.ts` once, after phase 8, and update `docs/design/SIEGE_MATCHMAKING.md`. Only the Siege goldens may change.
+
+### Target design
+
+#### Side outlines (item 1)
+
+- Add an optional `DrawOptions.sides`: `{ ink(unit): string | undefined }`, or simply two ids sets, `{ enemy: Set<number>, friend: Set<number> }`, from `RaidBattle` (the defense side's soldiers are the player's enemies; in the attack sim's view they are proxied as `Enemy`, so key by the original soldier id). Colours are constants in `siege-hud.ts` or a new `campaign/siege-colors.ts`: `ENEMY_INK` a clear pixel red (about `#b3202a`) and `FRIEND_INK` a slightly dark blue (about `#1d3f7a`). Both must stay readable on grass, streets and at night. Check them in a gallery screenshot with Seth before finishing.
+- **Merged outlines on:** `UnitOutline` keeps one outline layer per ink (black, red, blue), so touching units of the same side still share one outline, and units of opposite sides keep their own colours where they meet. The silhouettes are already made once per sprite; tinting is done when the layer is filled (`source-in` fill with the ink), not by baking new sprites per colour.
+- **Merged outlines off and Simple squares:** `rimOf` and `simple-units.ts`'s `rims` take the ink from the same option. Sprites drawn with their own baked black rim are drawn `bare` plus a coloured silhouette rim, as merged mode already does, rather than recoloured by pixel scanning each frame.
+- **Who counts as a unit:** soldiers, heroes, summons, risen undead and reinforcements, plus flag-bearers (red). Castle civilians keep black, since they are not units. If Seth wants them red too, it is a one-line change. The defenders' buildings keep their black art outlines.
+- **Tests:** a Node test that the outline layer for each ink receives exactly that side's silhouettes; `test:render-cache` and Defend's pixel checks unchanged; `node tests/siege-outlines.mjs`: close-ups of both sides touching, merged on and off, Simple squares, night, at both sizes.
+
+#### The defender's flags and poles (item 2)
+
+- **Keep flag:** the keep's banner (`flagPixels` in `structure-art.ts`, a fixed design today) gains an optional custom face: a `Flag` from `profile/model.ts` (`flagPixels(flag)` gives the 16 × 24 face), resampled to the banner's cloth and waved by the existing wave. An optional `DrawOptions.keepFlag` passes the castle owner's flag. Defend passes nothing and keeps its banner.
+- **Poles:** a new presentation module `campaign/siege-flags.ts` (`SiegeFlags`, kept by the Siege page). It places 6–10 poles with the castle's seed: corners of the wall ring, beside gates, in parks and on open ground outside the walls, at least 6 cells apart and never on a building cell. Each pole is a 1-art-pixel-wide post (outlined) with the owner's flag at the top, waving on the wall clock. Poles are not buildings and not in the sim: no collision, no targeting, no flow-field cost.
+- **Destroying poles:** like the forest's trees (`forest-art.ts`'s `ForestArt.update`), `SiegeFlags.update(sim)` watches what landed this frame: new `boom` effects and spell impacts within their radius, landed arrows and bolts on the pole's cell, and melee strokes (cooldown jumps) of units standing within a cell. A struck pole snaps: the top half topples away from the hit, the flag drops, and a small splinter burst follows (from `defendRandom("effects")`, none under Reduce Motion). The stump stays. Poles have no HP; one hit fells them. A pole felled during the raid stays down for the victory burn (nothing to burn).
+- **Drawing:** poles draw after the units' shadows and before trees, and fade to half opacity over a unit, like park trees.
+- **Tests:** placement is deterministic per seed and avoids buildings; a seeded blast fells poles in reach and only those; the sim's state hash is identical with and without poles (proving no gameplay effect); browser gallery of standing, snapped and the keep's custom flag.
+
+#### Flag-bearers (item 3)
+
+- **The unit:** a new defender Soldier kind `"flagBearer"` (`FLAG_BEARER` in `catalog.ts` beside the other troop stats: `hp: 1`, no attack, walking speed a little under a swordsman's). Three spawn on the defense side at battle start near the keep, homeless (`home` -1, so no deployment range), and stroll the castle's streets (reuse `strollStreets` or the civilians' street picking). They never fight, never answer the banner and never respawn.
+- **Never targeted:** add `untargetable` to the candidate filter in `raid.ts`'s targeting adapters (the code that exposes defense soldiers to the attack side as enemies), so no attacker's `nearestEnemy`, hunt, patrol, tower target or homing projectile picks a flag-bearer. They still take **area** damage: blasts (`explode`), strike spells, burning ground, chain and piercing hits that pass through, cleaves, and splash. With 1 HP, anything that touches them kills them. This makes them a skill target for spells and splash, which suits mana.
+- **Mana:** a flag-bearer's death credits `manaFor(flagBearer)` (see open question B; default 2) through the existing kill crediting, once, with a small pixel crystal bursting from the body. The mana counter shows the gain. Death by any cause the attacker made counts. They cannot die otherwise.
+- **Look:** a small figure in the defender's colours carrying a pole with the owner's flag (the same face as the keep's, smaller), red-outlined. When one dies its flag falls and stays as a dropped flag (it burns in the victory with the rest).
+- **Tests:** three spawn, stroll and stay inside the castle; no attacker type ever targets one (a fixture with every attacker kind around them for 60 s); a blast, a spell, burning ground and a piercing shot each kill one and credit mana exactly once; no double credit through the proxy; the defense side's stats and the castle DPS estimate ignore them.
+
+#### Victory: flags burn, the castle falls (item 4)
+
+- **Trigger:** `CampaignSim.phase` becomes `"won"` as now. The page starts a `SiegeVictory` presentation (`campaign/siege-victory.ts`) and shows the result panel only when it ends (about 4 s) or when the player taps to skip. The rating is settled at the win as now; the animation never delays or changes it.
+- **Collapse wave:** a ring expands from the keep's centre at a fixed speed (about 14 cells a second). When the ring reaches a building it collapses in this order: the keep first (at t = 0), then every wall stone and gate in order of distance, then a seeded third of the standing houses and structures (by `hash(seed, building id)`), never all. Collapse is drawn by handing the renderer an optional `DrawOptions.collapsed: Set<number>` of buildings to draw as rubble (their existing `rubblePixels`/`wallRubblePixels`/`keepRubblePixels`), plus a puff of dust and a few falling stones per building, the `stoneFall`/`houseFall`/`keepFall` sounds (spaced by the existing cue gaps), and a gentle screen shake that is off under Reduce Motion. The sim is not touched: no damage is dealt, so stats and the defense side stay as the battle left them.
+- **Flags burn:** at the same time, the keep flag, every standing pole's flag, and each flag-bearer's flag (carried or dropped) burn: a pixel burn line eats the cloth from the bottom up with embers (the Library fire's `charPixels` style), then the invader's flag (`Save.profile.flag`) rises up the same pole and unfurls. The keep's new flag flies over the rubble. Flags are timed from the wave: each burns when the ring reaches its pole, so the change sweeps outward with the collapse.
+- **Defeat:** nothing changes on a loss.
+- **Tests:** `tests/siege-victory.test.ts`: collapse order is by distance and deterministic; walls, gates and the keep always collapse; the chosen share of other buildings is stable per seed; nothing in the sim changes. Browser: frames at 0.5 s, 1.5 s, 3 s and the end, skip by tap, Reduce Motion instant, both sizes.
+
+#### Remaining units box (item 5)
+
+- `.siege-units` loses its oak `var(--wood)` background: use a translucent black (about `rgba(0, 0, 0, .55)`) with a gold border (the `--brass` token, 2 px, with a 1 px dark outer line so it reads on bright grass). Keep the existing layout, badges and phone/desktop sizes. If `theme.css` has no gold token suitable for borders, add one there and use it, rather than a raw colour in `style.css`.
+- **Tests:** the existing HUD browser script's screenshot, updated, at both sizes.
+
+#### No muster buildings (item 7)
+
+- **Today:** `siegeField` places one real building per owned infantry copy in rows across the lower half (`row = 100` upward), and each trains and replenishes its native garrison there.
+- **Target:** the player's homes become **hidden staging homes**: the same native structures (so `Soldier.home`, paths, ranks, drill time and replenishment all keep working), marked `hidden` like the invisible attacker keep, laid along the bottom edge rows, with their cells left open (not solid), not drawn, not shown in the inspector and never targeted. Troops leave from the home's point on the bottom edge and march up. The camera's default framing moves up to show the castle and the approach.
+- Check every place that assumes a visible home: `sim.ts`'s hidden-building `continue` (line ~583) must not stop training; deployment range (`deployRangeOf`) is measured from the hidden home and must still reach the castle (give staging homes no range limit, as spells' troops have none); defenders must not aim at them (`raid.ts` targets); `ownSolid` and flow fields must treat their cells as open.
+- **Replenishment** stays native by default (lost troops are retrained at the staging home and march in from the edge), because calibration assumed it. See open question C.
+- **Tests:** no attacker building is drawn or selectable; troops appear at the bottom edge and reach the castle; the garrison refills after losses; defenders never shoot at empty ground where the homes are; `campaign-native.test.ts` still passes.
+
+#### Two minutes, and day to night (item 8)
+
+- **Limit:** replace the literal 240 in `sim.ts` and `siege-ui.ts` with one constant, `SIEGE_SECONDS = 120`, in `sim.ts`. The HUD timer reads it.
+- **Day cycle by time left:** a pure `siegeSky(left)` in `campaign/siege-sky.ts` returns `{ phase, night, tint }`:
+
+  | Time left | Phase | Look |
+  |---|---|---|
+  | 120 → 70 s | Day | full daylight |
+  | 70 → 45 s | Sunset | warm orange tint rising, long shadows, no torches |
+  | 45 → 20 s | Twilight / dusk | violet-blue tint, `night` easing from 0 to about 0.6, torches and windows lighting up |
+  | 20 → 0 s | Night | `night` 1, the castle lit by its torches and the fires of the fight |
+
+  Phase edges blend over about 3 s, so nothing snaps. These boundaries are proposals; the one fixed point is night at 20 s left.
+- **Rendering:** Siege now passes `weather: null` and `night: 0`, which also leaves the lighting pass off. Pass a calm clear-weather `Weather` so `DefendLighting` runs, `night` from `siegeSky`, and a new optional `DrawOptions.tint` (a colour and strength, drawn as one `soft-light` or `multiply` rectangle over the board under the lights). Torches and hand torches already brighten with `night`. The timer box takes the phase's colour (gold by day, orange at sunset, violet at dusk, pale blue at night).
+- **Tests:** `siegeSky` at each boundary and inside each band, monotonic `night`; the sim ends at 120 s; browser frames at 110, 60, 35 and 10 s left at both sizes.
+
+#### Directing units (item 6): options, for Seth to choose
+
+Today the attackers march on the war banner `raid.ts` plants on the enemy keep, and Defend already has two tools that work in a raid's native sim: the per-building rally point (`setRally`, dragged from a selected troop building) and the double-tap rally flag that moves everyone. With the muster buildings gone (item 7), there is nothing on the board to select, so a new control is needed.
+
+| Option | How it plays | Cost to build | Risk |
+|---|---|---|---|
+| **A. By unit type** | A squad bar beside the spell bar: chips for Melee, Ranged, Mounted, Magic (and Heroes when present). Tap a chip, tap the board to plant that group's flag; tap the chip twice to send it back to the keep assault. | Medium: group the staging homes by role (`TRAINS` + catalog kind), call `setRally` for each home in the group, draw one coloured flag per group. | Low. Reads well on a phone, and the counts box already lists units by kind. |
+| **B. Only hero and ultimate units** | Heroes, Shadows, Valkyrie palaces' valkyries and similar each get a portrait button; tap one, tap the board. Everyone else follows the banner. | Low to medium. | Leaves most of the army undirected; weak when the player has no ultimates (most players below Master). |
+| **C. Every unit individually** | Drag a box or tap units to select them, then tap a destination (RTS style). | High: a selection model, a box-select gesture that doesn't fight panning, per-soldier orders the native AI must respect. | Fiddly on a phone, in a 2-minute battle; hard to make deterministic and testable. |
+| **D. By staging home (squads)** | Each owned building's garrison is a squad with its own badge; the box of remaining units becomes the squad list. | Medium: it is exactly the native rally point per home, with no selection model. | Many squads with a large army; long lists on a phone. |
+
+**Recommendation: A, with heroes and ultimates as their own chip.** It covers B's appeal, needs no new AI (every group is a set of native rally points), and stays one tap to choose and one tap to aim on a phone. Implement it as a `SquadBar` sharing the spell bar's armed-then-tap pattern, with an armed squad and an armed spell cancelling each other. A planted group flag uses the blue rally flag art in the group's colour; the war banner on the keep remains the default target. The plan does not start this phase until Seth chooses.
+
+### Implementation order for Part 2
+
+One PR per phase, as before. Tick each here as it lands.
+
+- **Phase 8: two minutes and no muster buildings ☐.** `SIEGE_SECONDS`, hidden staging homes and troops entering from the bottom edge, the camera reframed, recalibration (`tools/calibrate-siege.ts`, `SIEGE_MATCHMAKING.md`), Siege goldens only.
+- **Phase 9: day cycle and the units box ☐.** `siegeSky`, the lighting on in Siege, `DrawOptions.tint`, the timer's colours, and the translucent black and gold units box.
+- **Phase 10: side outlines ☐.** `DrawOptions.sides`, per-ink outline layers, rims and simple squares, with a colour gallery for Seth.
+- **Phase 11: the defender's flags ☐.** Custom keep flag, `SiegeFlags` poles, felling them.
+- **Phase 12: flag-bearers ☐.** The unit, untargetable filtering, mana on death, art.
+- **Phase 13: victory ☐.** `SiegeVictory`: the collapse wave, the burning and raised flags, skip, Reduce Motion.
+- **Phase 14: directing units ☐.** Only after Seth picks an option (default A).
+
+### Open questions for Part 2 (defaults in brackets)
+
+- **A. Directing units:** which option? [A, by unit type, with heroes and ultimates as their own group.]
+- **B. Flag-bearer mana:** how much does each drop, and is it on death only or also while walking? [2 mana each, on death only.]
+- **C. Replenishment without muster buildings:** do lost troops still get retrained and march in from the edge, or is the army fixed at the start, which would make the units box a true countdown? [Retrained, as now; calibration assumed it.]
+- **D. Civilians' outline:** should the castle's civilians get the red outline too? [No, black; they are not units.]
+- **E. Which buildings fall in the victory wave:** walls, gates and the keep always fall. What share of the rest? [A seeded third.]
+- **F. Day cycle edges:** are sunset at 70 s left and dusk at 45 s left right? [Yes; night at 20 s is fixed.]
+
 ## Useful extras (not requested; ask Seth first)
 
-- **Siege HUD** like Ambush's fixed header: the enemy keep's health, the timer and your troops alive.
-- **Deploy control:** choose where each building musters, or release buildings in waves.
 - **Raid stars** (win; win with a minute left; win without losing a building) for practice raids.
 - **Season reset:** a soft MMR squeeze toward Gold each season, with a reward by the peak rank.
 - **Replay of the last raid** at 2× after a defeat.
