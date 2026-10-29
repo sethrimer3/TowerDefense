@@ -1,4 +1,5 @@
 import { ProfileEditor } from "./profile/editor.ts";
+import { loadArtOverrides } from "./defend/art-overrides.ts";
 import { defaults, load, persist, type Save } from "./save.ts";
 import { countdown } from "./away.ts";
 import { DefendPage } from "./defend/ui.ts";
@@ -439,6 +440,8 @@ navigate("defend");
 /** Called after boot uncovers the initialized game; native dialogs must open
  * here so they cannot appear above the loading screen's stone wall. */
 export function startGame() {
+  // The artist's sprites, if any are saved under `art/sprites/`.
+  void import("./defend/art-files.ts").then(({ artFiles }) => loadArtOverrides(artFiles()));
   if (save.profile) welcome.show();
   else chooseProfile();
   requestAnimationFrame(frame);

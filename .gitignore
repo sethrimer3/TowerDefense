@@ -5,3 +5,4 @@ work/
 playwright-report/
 *.local
 dist-snapshot/
+art/export/

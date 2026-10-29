@@ -693,3 +693,6 @@ The world-art unit: one eighth of a board cell, scaled to screen pixels by camer
 
 **Visibility contour**:
 A half-art-pixel perimeter around a combined group of unit bodies, bright crimson for Dark One enemies dark navy for the player's troops and black (gold while marked) for everyone else, without seams through overlapping bodies.
+
+**Artist sprite**:
+A PNG, one pixel an art pixel and without an outline, that replaces the game's own drawn art for one piece of the city; the game still paints its damage, rubble and outline.
