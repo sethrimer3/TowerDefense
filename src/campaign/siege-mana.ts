@@ -2,7 +2,7 @@
 import type { Soldier, ScenarioSpell, ScenarioSpellGate } from "../defend/sim.ts";
 export const SIEGE_MANA = { enabled: true, start: 1, cap: 8 } as const;
 export const SPELL_MANA = { frostNova: 1, necromancy: 1, meteor: 2, reinforcements: 3 } as const;
-export const manaFor = (_unit: Soldier) => 1;
+export const manaFor = (unit: Soldier) => unit.kind === "flagBearer" ? 2 : 1;
 export class SiegeMana {
   private amount: number = SIEGE_MANA.start;
   get value() {

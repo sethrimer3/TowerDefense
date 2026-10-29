@@ -291,7 +291,7 @@ One PR per phase, as before. Tick each here as it lands.
 - **Phase 9: day cycle and the units box ☑.** `siegeSky`, the lighting on in Siege, `DrawOptions.tint`, the timer's colours, and the translucent black and gold units box.
 - **Phase 10: side outlines ☑.** `DrawOptions.sides`, per-ink outline layers, rims and simple squares, with a colour gallery for Seth.
 - **Phase 11: the defender's flags ☑.** Custom keep flag, `SiegeFlags` poles, felling them.
-- **Phase 12: flag-bearers ☐.** The unit, untargetable filtering, mana on death, art.
+- **Phase 12: flag-bearers ☑.** The unit, untargetable filtering, mana on death, art.
 - **Phase 13: victory ☐.** `SiegeVictory`: the collapse wave, the burning and raised flags, skip, Reduce Motion.
 - **Phase 14: directing units ☐.** Option A chosen by Seth: unit types plus separate heroes/ultimates.
 
@@ -339,3 +339,5 @@ Open, for Seth (defaults in brackets; the agent builds the default and keeps it 
 Phase 10 validation: all 125 Node test files, the build and desktop/phone outline galleries pass. Both inks preserve sprite body pixels; Simple squares and merged/individual masks share the same side IDs. The cache fixture now uses the pre-side-color combat artwork with equal Reduce Motion settings and settles light rebuilding after bomb damage; optimization references remain frozen. Defend goldens are unchanged. The prescribed red/blue gallery was shared for optional color feedback.
 
 Phase 11 validation: custom cloth preserves the default flag, waves normally and freezes under Reduce Motion. Eight seeded open sites avoid buildings and one blast snaps only poles in range without changing the sim. Desktop/phone browsers capture standing, snapped and enlarged flag galleries; all 126 Node test files and the build pass.
+
+Phase 12 validation: three native, homeless flag-bearers stroll inside the castle and never respawn or fight. Every trained attacker family plus both summon families ignores them for 60 seconds. Blasts, Meteor, fire and piercing credit exactly two mana once; friendly cannon fire and defense loss statistics exclude them. Hawk/Wisp acquisition and Wisp passing hits have explicit checks. Desktop/phone browsers cover carried/dropped banners, crystals and the existing mana spell UI. Training and curve fitting were rerun; 40/136 held-out raids won (29.4%), including 0/16 Bronze wins at the native floor. Curve values stayed the same, so no golden files changed. All 127 Node test files and the production build pass.

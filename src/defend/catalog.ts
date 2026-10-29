@@ -1352,3 +1352,6 @@ export const CIVILIAN = { speed: 1.9, size: 0.3, color: "#e6d7b4", respawnSecond
 /** Multipart forts share a species, but each part has its own hitbox. */
 export const enemySize = (e: { kind: EnemyKind; fortressPart?: { role: string } }) =>
   e.fortressPart ? (e.fortressPart.role === "leg" ? .4 : .6) * (ENEMIES[e.kind].fortress?.partScale ?? 1) : ENEMIES[e.kind].size;
+
+/** Siege-only walkers; never trained or included in defensive DPS. */
+export const FLAG_BEARER = { hp: 1, damage: 0, speed: SOLDIER.speed * .88, size: .32, color: "#c5a46d" };

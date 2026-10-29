@@ -1,3 +1,4 @@
+import { spawnFlagBearers } from "../defend/flag-bearers.ts";
 /** Native Siege lifecycle. Ambush geography/economy lives in ambush-sim.ts. */
 import { DefendSim } from "../defend/sim.ts";
 import * as C from "../defend/catalog.ts";
@@ -87,6 +88,7 @@ export class CampaignSim {
   remove(_pad: number) {}
   start() {
     if (this.phase !== "build" || !this.layout.length) return false;
+    spawnFlagBearers(this.raid.defense);
     this.phase = "battle";
     return true;
   }

@@ -1,3 +1,4 @@
+import { stepFlagBearer, friendlySafe } from "./flag-bearers.ts";
 import type { ChronoState, DivineArrow, ReleasedArrow } from "./chrono.ts";
 import { ageMageChill, type MageChill, type MageBolt } from "./mage-attunements.ts";
 import { stepMines, type Mine } from "./mines.ts";
@@ -91,6 +92,8 @@ export type Levels = Record<UpgradeId, number>;
 
 export type DamageOrigin = Point & { attacker?: number; building?: number; home?: number };
 export type Enemy = {
+  /** Excluded only from primary aim; area/chain/piercing damage still sees it. */
+  untargetable?: true;
   /** Javelin carrying this enemy; absent outside an active impalement. */
   impaled?: number;
   /** Target adapter for an opposing native troop/building in a raid. Not a rendered monster. */
@@ -174,7 +177,7 @@ export type Soldier = {
    * throw like archers; the Hero hunts the city with its sword combos; the Shadow's shade
    * hunts it with knives that loop out through crowds. */
   kind: "sword" | "archer" | "mage" | "valkyrie" | "darkWizard" | "undead" | "reinforcement" | "brawler" | "slinger" | "sniper" | "musketeer" | "gunner" | "machineGunner" | "gatlingGunner" | "rocketeer" | "railSniper" | "assassin"
-    | "spearman" | "hoplite" | "javelineer" | "lancer" | "hero" | "shade";
+    | "spearman" | "hoplite" | "javelineer" | "lancer" | "hero" | "shade" | "flagBearer";
   home: number;
   x: number;
   y: number;
@@ -319,6 +322,7 @@ const STEP_SOLDIER: Record<Soldier["kind"], (sim: DefendSim, s: Soldier, dt: num
   javelineer: stepArcher,
   hero: stepHero,
   shade: stepShade,
+  flagBearer: stepFlagBearer,
 };
 /** How long a struck building flashes, in seconds. */
 export const BUILDING_FLASH = 0.14;
@@ -796,7 +800,7 @@ export class DefendSim {
     this.shieldGenerators = this.shieldGenerators.filter(e => e.hp > 0);
     this.enemies.push(...hatched);
     for (const s of this.soldiers) if (s.hp <= 0 && s.called) calledFell(this, s);
-    for (const s of this.soldiers) if (s.hp <= 0 && !s.risen && !s.called) this.stats.current.troopsLost++;
+    for (const s of this.soldiers) if (s.hp <= 0 && s.kind !== "flagBearer" && !s.risen && !s.called) this.stats.current.troopsLost++;
     for (const c of this.civilians) if (c.hp <= 0) this.stats.current.civiliansLost++;
     this.soldiers = this.soldiers.filter((s) => s.hp > 0);
     this.civilians = this.civilians.filter((c) => c.hp > 0 && !atHome(this, c) && !escaped(c));
@@ -1256,6 +1260,7 @@ export class DefendSim {
     for (const e of this.enemiesNear(x, y, r)) if (!sheltered(this, e.x, e.y)) this.hurtEnemy(e, hit(dist(e.x - x, e.y - y)), true, "ranged", origin ?? { x, y }, !!origin, "explosion");
     if (friendlyFire)
       for (const u of [...this.soldiers, ...this.civilians]) {
+        if ("kind" in u && friendlySafe(u)) continue;
         const d = dist(u.x - x, u.y - y);
         if (d > r || u.hp <= 0 || ("guard" in u && u.guard) || sheltered(this, u.x, u.y)) continue;
         this.hurtDefender(u, hit(d) * FRIENDLY_FIRE);

@@ -8,7 +8,7 @@ export function hawkTarget(enemies: Enemy[], x: number, y: number, range: number
   let best: Enemy | undefined, distance = Infinity;
   for (const e of enemies) {
     const d = (e.x - x) ** 2 + (e.y - y) ** 2;
-    if (e.hp <= 0 || d > range * range) continue;
+    if (e.untargetable || e.hp <= 0 || d > range * range) continue;
     if (e.id === focus?.target) return e;
     if (!best || e.hp > best.hp || e.hp === best.hp && (d < distance || d === distance && e.id < best.id)) { best = e; distance = d; }
   }

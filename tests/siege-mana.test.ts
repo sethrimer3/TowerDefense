@@ -54,7 +54,7 @@ test("Each defending soldier or summon pays once; buildings, civilians and attac
   const mode = battle(),
     r = mode.raid,
     mana = mode.mana!;
-  const unit = r.defense.soldiers[0],
+  const unit = r.defense.soldiers.find(s=>s.kind!=="flagBearer")!,
     proxy = kill(mode, unit);
   assert.equal(manaFor(unit), 1);
   assert.equal(mana.value, 2);
@@ -147,7 +147,7 @@ test("Mana casts preserve native effects, spend exact costs, and never read or s
 test("Externally killed proxies retain native graves and frost/nano death effects exactly once", () => {
   const mode = battle(),
     sim = mode.engine,
-    unit = mode.raid.defense.soldiers[0],
+    unit = mode.raid.defense.soldiers.find(s=>s.kind!=="flagBearer")!,
     proxy = enemy(mode, unit);
   unit.x = 36.5;
   unit.y = 46.5;

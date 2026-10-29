@@ -88,7 +88,7 @@ export function seek(sim: DefendSim, s: Soldier) {
   s.thinkT = 0.5;
   const inCity = (e: Enemy) => sim.map.city[cellAt(e.x, e.y)] === 1, bounds = deployment(sim, s);
   const prey = sim.enemies
-    .filter((e) => e.hp > 0 && inCity(e) && within(bounds, e))
+    .filter((e) => !e.untargetable && e.hp > 0 && inCity(e) && within(bounds, e))
     .sort((a, b) => sq(a.x - s.x) + sq(a.y - s.y) - (sq(b.x - s.x) + sq(b.y - s.y)))
     .slice(0, 3);
   for (const e of prey) {

@@ -202,7 +202,7 @@ class Patrol {
   /** Enemies it may go after, nearest `s` first (a headhunter's toughest first). */
   candidates(s: Soldier) {
     const near = this.citywide ? this.sim.enemies.filter((e) => this.covers(e)) : this.sim.enemiesNear(this.hc.x, this.hc.y, this.leash);
-    const all = this.bounds && !this.citywide ? near.filter((e) => within(this.bounds, e, 1)) : near;
+    const all = (this.bounds && !this.citywide ? near.filter((e) => within(this.bounds, e, 1)) : near).filter(e=>!e.untargetable);
     return all.sort(this.toughest ? toughestFirst(s) : byDistanceFrom(s)).slice(0, 3);
   }
 
@@ -221,11 +221,11 @@ export function stepSwordsman(sim: DefendSim, s: Soldier, dt: number) {
   const banner = bannerFor(sim, s);
   if (banner) return rally(sim, s, banner, dt);
   const patrol = new Patrol(sim, s);
-  let target = sim.enemies.find((e) => e.id === s.target && e.hp > 0) ?? null;
+  let target = sim.enemies.find((e) => !e.untargetable && e.id === s.target && e.hp > 0) ?? null;
   if (target && !patrol.covers(target)) target = null;
   if (target && inSwordReach(sim, s, target)) return strike(sim, s, target);
   if(sim.chrono.size){
-    const near=sim.enemiesNear(s.x,s.y,swordReach(sim,s)+1).find(e=>e.hp>0&&inSwordReach(sim,s,e));
+    const near=sim.enemiesNear(s.x,s.y,swordReach(sim,s)+1).find(e=>!e.untargetable&&e.hp>0&&inSwordReach(sim,s,e));
     if(near)return strike(sim,s,near);
     const cooldown=melee(s).cooldown*(s.kind==="sword"&&paths(sim,s.home).berserk?BERSERK.cooldown:1);
     if(chargeIdle(sim,s,swordReach(sim,s),bannerDamage(sim,s),()=>s.cd<=0,()=>{s.cd=cooldown;},true))return;
@@ -237,7 +237,7 @@ export function stepSwordsman(sim: DefendSim, s: Soldier, dt: number) {
 /** Answering the war banner: strike whatever is in reach, else close on
  * what is near or march to the banner (no leash while it stands). */
 function rally(sim: DefendSim, s: Soldier, banner: WarBanner, dt: number) {
-  const near = sim.enemiesNear(s.x, s.y, swordReach(sim, s) + 1).find((e) => inSwordReach(sim, s, e));
+  const near = sim.enemiesNear(s.x, s.y, swordReach(sim, s) + 1).find((e) => !e.untargetable && inSwordReach(sim, s, e));
   if (near) return strike(sim, s, near);
   answerBanner(sim, banner, s, swordSpeed(sim, s), dt, MARCH_SIGHT);
 }
@@ -411,7 +411,7 @@ function shoot(sim: DefendSim, s: Soldier, e: Enemy, range: number, pool?: Enemy
 function hunt(sim: DefendSim, s: Soldier) {
   s.thinkT = 0.6;
   const bounds = deployment(sim, s);
-  const prey = sim.enemies.filter((e) => e.hp > 0 && inCity(sim, e) && within(bounds, e)).sort(byDistanceFrom(s)).slice(0, 3);
+  const prey = sim.enemies.filter((e) => !e.untargetable && e.hp > 0 && inCity(sim, e) && within(bounds, e)).sort(byDistanceFrom(s)).slice(0, 3);
   const e = pathToFirst(sim, s, prey, CITYWIDE);
   if (e) s.target = e.id;
 }

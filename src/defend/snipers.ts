@@ -47,7 +47,7 @@ export function bigGame(sim: DefendSim, s: Soldier, range: number, pool?: Enemy[
   let best: Enemy | null = null, bd = 0;
   for (const e of pool ?? sim.enemiesNear(s.x, s.y, range)) {
     const d = sq(e.x - s.x) + sq(e.y - s.y);
-    if (e.hp <= 0 || d > range * range) continue;
+    if (e.untargetable || e.hp <= 0 || d > range * range) continue;
     if (!best || e.hp > best.hp || (e.hp === best.hp && d < bd)) { best = e; bd = d; }
   }
   return best;

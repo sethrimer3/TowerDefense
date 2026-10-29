@@ -54,7 +54,7 @@ export const perched = (u: object) => "perch" in u && !!(u as Soldier).perch?.up
 
 /** The enemies within `range` of `s` it can see: everyone, from a tower. */
 export function inView(sim: DefendSim, s: Soldier, range: number): Enemy[] {
-  const near = sim.enemiesNear(s.x, s.y, range);
+  const near = sim.enemiesNear(s.x, s.y, range).filter(e=>!e.untargetable);
   if (s.perch?.up) return near;
   // Enemies sharing a cell share a line.
   const seen = new Map<number, boolean>();

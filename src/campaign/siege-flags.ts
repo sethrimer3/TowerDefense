@@ -30,6 +30,8 @@ export function flagPoles(map:CityMap, seed:number):Pole[] {
 }
 export class SiegeFlags {
   readonly poles:Pole[];
+  readonly dropped: {id:number;x:number;y:number;time:number}[]=[];
+  private bearers=new Map<number,{id:number;x:number;y:number;hp:number}>();
   private seen=new WeakSet<object>();
   private flying=new Map<object,{x:number;y:number}>();
   private cooldowns=new Map<number,number>();
@@ -38,6 +40,9 @@ export class SiegeFlags {
     for(const p of this.poles)if(p.snapped===undefined&&(p.x-x)**2+(p.y-y)**2<=r*r){const d=Math.hypot(p.x-x,p.y-y)||1;p.snapped=time;p.dx=(p.x-x)/d;p.dy=(p.y-y)/d;}
   }
   update(sim:DefendSim){
+    const live=new Map(sim.soldiers.filter(u=>u.kind==='flagBearer'&&u.hp>0).map(u=>[u.id,u]));
+    for(const [id,u]of this.bearers)if(!live.has(id)&&u.hp<=0&&!this.dropped.some(f=>f.id===id))this.dropped.push({id,x:u.x,y:u.y,time:sim.time});
+    this.bearers=live;
     const first=(o:object)=>{if(this.seen.has(o))return false;this.seen.add(o);return true;};
     for(const e of sim.effects)if(e.kind==='boom'&&first(e))this.hit(e.x,e.y,e.r,sim.time);
     for(const e of sim.impacts)if(first(e))this.hit(e.x,e.y,e.r,sim.time);
@@ -52,6 +57,15 @@ export class SiegeFlags {
     this.cooldowns=cds;
   }
   draw(c:CanvasRenderingContext2D,px:number,sim:DefendSim,now:number,reduced:boolean){
+    for(const u of sim.soldiers)if(u.kind==='flagBearer'&&u.hp>0){
+      c.save();c.strokeStyle='#100f14';c.lineWidth=Math.max(1,px/5);c.beginPath();c.moveTo(u.x*px,u.y*px);c.lineTo((u.x+.3)*px,(u.y-1.7)*px);c.stroke();
+      drawFlag(c,px*.8,{x:(u.x+.3)*px,y:(u.y-1.7)*px,t:now/1000,reduceMotion:reduced},false,this.face);c.restore();
+    }
+    for(const f of this.dropped){
+      c.save();c.translate(f.x*px,f.y*px);c.rotate(1.2);drawFlag(c,px*.8,{x:0,y:0,t:0,reduceMotion:true},false,this.face);c.restore();
+      const age=sim.time-f.time;
+      if(age<.8){c.save();c.globalAlpha=1-age/.8;c.fillStyle='#8be7ff';const a=Math.max(1,px/8),y=(f.y-(reduced?.5:age*2))*px;c.fillRect(f.x*px-a,y-2*a,2*a,4*a);c.fillRect(f.x*px-2*a,y-a,4*a,2*a);c.restore();}
+    }
     for(const p of this.poles){
       c.save();c.globalAlpha=sim.soldiers.some(u=>(u.x-p.x)**2+(u.y-p.y)**2<1.5)?.5:1;
       const a=px/ART, x=p.x*px, y=p.y*px;

@@ -59,7 +59,7 @@ export function volleyTargets(sim: DefendSim, s: Soldier, e: Enemy, range: numbe
   const extra = VOLLEY.extra[hallPaths(sim, s.home).volley];
   if (!extra) return [];
   const d = (o: Enemy) => sq(o.x - s.x) + sq(o.y - s.y);
-  return (pool ?? sim.enemiesNear(s.x, s.y, range)).filter((o) => o !== e && o.hp > 0 && d(o) <= range * range).sort((a, b) => d(a) - d(b)).slice(0, extra);
+  return (pool ?? sim.enemiesNear(s.x, s.y, range)).filter((o) => !o.untargetable && o !== e && o.hp > 0 && d(o) <= range * range).sort((a, b) => d(a) - d(b)).slice(0, extra);
 }
 
 /** A musketman's reload: Platoon fire's is quicker for each comrade of
@@ -84,7 +84,7 @@ export function toughestInReach(sim: DefendSim, s: Soldier, range: number, pool?
   let best: Enemy | null = null, bd = 0;
   for (const e of pool ?? sim.enemiesNear(s.x, s.y, range)) {
     const d = sq(e.x - s.x) + sq(e.y - s.y);
-    if (e.hp <= 0 || d > range * range) continue;
+    if (e.untargetable || e.hp <= 0 || d > range * range) continue;
     if (!best || e.hp > best.hp || (e.hp === best.hp && d < bd)) { best = e; bd = d; }
   }
   return best;
@@ -102,7 +102,7 @@ export function bayonetTarget(sim: DefendSim, s: Soldier): Enemy | null {
   let best: Enemy | null = null, bd = sq(BAYONET.reach);
   for (const e of sim.enemiesNear(s.x, s.y, BAYONET.reach)) {
     const d = sq(e.x - s.x) + sq(e.y - s.y);
-    if (e.hp > 0 && d <= bd) { best = e; bd = d; }
+    if (!e.untargetable && e.hp > 0 && d <= bd) { best = e; bd = d; }
   }
   return best;
 }

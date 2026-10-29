@@ -217,6 +217,13 @@ function drawSoldiers(b: Brush, sim: DefendSim, torches: Burning | null, reduced
     // Up in a watch tower: a badge over it instead (`garrison-icons.ts`).
     if (garrisoned(u)) continue;
     unit?.(u.id);
+    if (u.kind === "flagBearer") {
+      const a=Math.max(1,px/8),r=rimOf(c);r.fillStyle=sides?.ink(u.id)??"#b3202a";
+      r.fillRect(u.x*px-2*a,u.y*px-4*a,4*a,5*a);
+      c.fillStyle="#c5a46d";c.fillRect(u.x*px-a,u.y*px-3*a,2*a,3*a);
+      c.fillStyle="#eed7ac";c.fillRect(u.x*px-a,u.y*px-4*a,2*a,a);
+      continue;
+    }
     if (u.kind === "mage") {
       drawMage(c, px, u, sim.time, sim, reduced);
       continue;
