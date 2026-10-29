@@ -1,3 +1,4 @@
+import { paintTabIcon, tabIconHtml } from "./tab-icons.ts";
 import { uiSprite } from "./dom.ts";
 import { t } from "../i18n/index.ts";
 import { modeIconUrl } from "./mode-icons.ts";
@@ -8,9 +9,9 @@ export const nextCombatMode = (mode: CombatMode): CombatMode => COMBAT_MODES[(CO
 export const combatLabel = (mode: CombatMode, active: boolean) =>
   `${t(`nav.${mode}`)}${active ? ` --> ${t(`nav.${nextCombatMode(mode)}`)}` : ""}`;
 
-/** Distinct silhouettes: the existing shield, a bow drawn from a bush, a
- * trebuchet, the last two pixel art from `mode-icons.ts`. */
-export function combatIcon(mode: CombatMode) {
+/** Current art by default; the chosen legacy set is an explicit preference. */
+export function combatIcon(mode: CombatMode, legacy = false) {
+  if (legacy) return tabIconHtml(mode);
   if (mode === "defend") return uiSprite("defend");
   return `<img class="ui-sprite" src="${modeIconUrl(mode)}" alt="" aria-hidden="true">`;
 }
@@ -20,27 +21,36 @@ export class CombatTab {
   private icon: HTMLElement;
   private label: HTMLElement;
   private shown: CombatMode = "defend";
-  constructor(private button: HTMLButtonElement, private reduced: () => boolean) {
+  private shownLegacy: boolean;
+  constructor(private button: HTMLButtonElement, private reduced: () => boolean, private legacy: () => boolean = () => false) {
     this.icon = button.querySelector<HTMLElement>(":scope > span")!;
     this.icon.classList.add("combat-tab-icon");
     this.label = button.querySelector<HTMLElement>(".tab-label")!;
     this.label.removeAttribute("data-i18n");
-    this.icon.innerHTML = `<span class="combat-icon-layer">${combatIcon(this.shown)}</span>`;
+    this.shownLegacy = legacy();
+    this.icon.replaceChildren(this.layer(this.shown, this.shownLegacy));
+  }
+  private layer(mode: CombatMode, legacy: boolean) {
+    const layer = document.createElement("span");
+    layer.className = "combat-icon-layer";
+    layer.innerHTML = combatIcon(mode, legacy);
+    if (legacy) paintTabIcon(layer.querySelector("canvas")!, mode);
+    return layer;
   }
   render(mode: CombatMode, active: boolean) {
     this.label.textContent = combatLabel(mode, active);
     this.button.dataset.mode = mode;
-    if (mode === this.shown) return;
+    const legacy = this.legacy(), artChanged = legacy !== this.shownLegacy;
+    if (mode === this.shown && !artChanged) return;
     this.shown = mode;
+    this.shownLegacy = legacy;
     // Cancel older transitions on rapid clicks, keeping at most two layers.
     this.icon.getAnimations({ subtree: true }).forEach(animation => animation.cancel());
     const outgoing = this.icon.lastElementChild as HTMLElement;
     this.icon.replaceChildren(outgoing);
-    const incoming = document.createElement("span");
-    incoming.className = "combat-icon-layer";
-    incoming.innerHTML = combatIcon(mode);
+    const incoming = this.layer(mode, legacy);
     this.icon.append(incoming);
-    if (this.reduced()) { outgoing.remove(); return; }
+    if (artChanged || this.reduced()) { outgoing.remove(); return; }
     const timing = { duration: 280, easing: "cubic-bezier(.22,.61,.36,1)", fill: "both" as const };
     outgoing.animate([{ transform: "translateX(0)", opacity: 1 }, { transform: "translateX(-100%)", opacity: 0 }], timing);
     const animation = incoming.animate([{ transform: "translateX(100%)", opacity: 0 }, { transform: "translateX(0)", opacity: 1 }], timing);

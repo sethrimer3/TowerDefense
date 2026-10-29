@@ -47,6 +47,8 @@ export const SETTINGS = {
   /** Retained visual preference for procedural cloth, glazing and sampling.
    * The checkbox no longer enables any PNG sprite replacements. */
   pixelArt: { kind: "toggle", default: true, page: { id: "pixel-art", label: "Pixel Art" } },
+  /** Use the selected legacy tab icons instead of the current navigation art. */
+  legacyGraphics: { kind: "toggle", default: false, page: { id: "legacy-graphics", label: "Show legacy graphics" } },
   /** Alembic, the game's own pixel font, for every word on the page; off, Cinzel. */
   pixelFont: { kind: "toggle", default: true, page: { id: "pixel-font", label: "Use Custom Font" } },
   /** Master switch for developer controls, including the enemy tester. */

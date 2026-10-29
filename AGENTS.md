@@ -60,6 +60,7 @@ node tests/defend-keep.mjs # The keep dragged with its tile, its tree (side-by-s
 node tests/tiles-marks.mjs # Tiles tab upgrade marks, spread-by-default copies, Stacked groups, always-stacked city tiles and walls, an opened tile's stats and coloured abilities, holding a tile to open its tree in Defend, desktop and phone (needs dev server)
 node tests/upgrade-work.mjs # Timed Study/Forge purchases, shared staff, refunds, reload completion and mobile fit
 node tests/hold-repeat.mjs # Accelerating purchase holds, mouse/touch, cancellation and Mine/Library persistence (needs dev server)
+node tests/tab-icons.mjs # Selected procedural combat/Settings icons, review studies, live navigation and visual-setting refresh on desktop/phone (needs dev server)
 node tests/defend-necromancy.mjs # Necromancy palette, aim, cast, risen art, cooldown and Study setup (needs dev server)
 node tests/defend-meteor.mjs # Meteor strike palette, aim, fall, landing, cooldown and Study setup (needs dev server)
 node tests/defend-frost-nova.mjs # Frost nova palette, aim, burst, rime, blizzard and Study setup (needs dev server)
@@ -274,6 +275,8 @@ Window sunlight in the Library and Tiles uses `src/soft-sunlight.ts` (`SoftSunli
 ### Mode plans
 
 `docs/plans/` holds the agreed plans for each game mode: `AmbushPlan.md` (phased Ambush rebuild: level select, zone waves, outposts and stars, free build grid, gold upgrades, the star-funded Ambush tree), `SiegePlan.md` (ranks and divisions, Find Match, bots with player-like names and flags, native castles generated from a defensive-DPS budget anchored to the maxed ceiling, board name plates, the strike-spell mana experiment; Part 2: side outlines, the defender's flags and flag-bearers, the victory collapse, two minutes from day to night, no muster buildings, directing units), `DefendPlan.md`, and `OtherPlans.md` for work shared by every mode (fences as walls, the strike spell quick bar, tab icons, the currency bar, ropes). Read the relevant plan before working on a mode, and tick its phases as they land.
+
+Shared tab icons live in `src/ui/tab-icons.ts`: pure `tabIconPixels(name)` returns the chosen transparent 16×16 art, and `paintTabIcon` paints it at 3×. An optional variant selects an original review study. Seth chose Defend A (tower/shield), Defend C for Ambush (castle gate), Settings B (steel cog) and a new sword for Siege. `settings.legacyGraphics` defaults false and is exposed as Show legacy graphics (translated in all nine catalogs); existing saves keep the current art. `buildShell` accepts the initial preference, `CombatTab` reads it on refresh, and main refreshes the Settings icon when it changes. Both sets keep the slide animation. `data-tab-icon` is separate from the world-art `data-icon`, so Pixel Art changes cannot overwrite UI icons. The existing Defend/Settings PNGs and `mode-icons.ts` remain the default; only the chosen legacy set uses these canvases. `tests/tab-icons.html` / `tab-icons-view.ts` show chosen icons and all 12 studies; `node tests/tab-icons.mjs` checks desktop/phone rendering, both icon sets, immediate switching, saved preference and Pixel Art independence, and writes screenshots. `node tests/combat-tab.mjs` covers cycling, rapid clicks, reload and Reduce Motion.
 
 ### Issue tracker
 

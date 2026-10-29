@@ -8,7 +8,7 @@ import { LANGUAGES, isLanguage, t } from "../i18n/index.ts";
 /** The settings on the page, in order; each control comes from its row in SETTINGS. */
 /** Gameplay settings, under their own heading first. */
 const GAMEPLAY = ["showEmpty", "raiseDrag", "magnifier", "tripleTapFlag"] as const satisfies readonly SettingKey[];
-const PAGE = ["pixelArt", "reduceMotion", "effectsOff", "simpleEnemies", "simpleTroops", "mergedOutlines", "tileGrid", "soundOff", "ambienceOff", "pixelFont"] as const satisfies readonly SettingKey[];
+const PAGE = ["pixelArt", "legacyGraphics", "reduceMotion", "effectsOff", "simpleEnemies", "simpleTroops", "mergedOutlines", "tileGrid", "soundOff", "ambienceOff", "pixelFont"] as const satisfies readonly SettingKey[];
 /** The dev options, under ALL ON. */
 const DEV = ["devMode", "devTowers", "devJournal", "instantResearch"] as const satisfies readonly SettingKey[];
 /** All research unlocked: the Smithy's rows and each skill tree. */

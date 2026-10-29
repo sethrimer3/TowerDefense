@@ -31,7 +31,7 @@ Read this whole file, [AmbushPlan.md](AmbushPlan.md#architecture-guidelines)'s a
 | `src/campaign/castle-dps.ts`, `src/defend/average-dps.ts` | Each building's average DPS from its own catalog numbers, summed over a castle with watch-tower marks. Replaced the measured table on 2026-10-28 (see `docs/design/SIEGE_DPS.md`). |
 | `docs/design/SIEGE_MATCHMAKING.md` | One visible MMR, native castle snapshots, calibration assumptions, generated division budgets and the future player-castle boundary. |
 
-Already done from the first brief: the quick bar replaced `.campaign-spells` (OtherPlans.md §2), and the How to play box and mode title are gone. Still shared and open: fences as walls (OtherPlans.md §1) and the new Siege tab icon (OtherPlans.md §3).
+Already done from the first brief: the quick bar replaced `.campaign-spells` (OtherPlans.md §2), the How to play box and mode title are gone, and the selected legacy sword is available through Show legacy graphics (OtherPlans.md §3). Still shared and open: fences as walls (OtherPlans.md §1).
 
 ## Target design
 
@@ -176,9 +176,11 @@ Phase 6 validation: 921 Node assertions and the production build pass; native ca
 
 Phase 7 validation: all 927 Node assertions and the production build pass. Desktop/phone browsers cover native melee kill rewards, cost pips, affordability, Meteor/Reinforcements spending and Reduce Motion; entry/HUD and the shared Defend/Ambush spell bar also pass. All 2,885 native damage pairs were regenerated after adding the optional cast hooks; numerical damage and the ceiling are unchanged. No golden files changed. All numbered Siege phases (0–7) are complete; the shared items and future work below retain their separate scope.
 
-### Shared items still open (OtherPlans.md)
-- Fences as walls (§1): castle parks get fences the attackers must break. Lands with that shared PR, not as a Siege phase.
-- New Siege tab icon (§3).
+### Shared items (OtherPlans.md)
+- [ ] Fences as walls (§1): castle parks get fences the attackers must break. Lands with that shared PR, not as a Siege phase.
+- [x] New Siege tab icon (§3): the current trebuchet remains the default; Show legacy graphics enables the sword selected by Seth on 2026-10-29.
+
+The shared legacy tab icons are integrated behind Settings → Show legacy graphics (off by default): Defend uses study A (tower and shield), Ambush uses Defend C (castle gate), Settings uses B (steel cog), and Siege uses a new sword. The gallery retains the original studies alongside the chosen designs. `PLAYWRIGHT_EXECUTABLE=/usr/bin/chromium node tests/tab-icons.mjs` checks both icon sets, immediate switching, saved preference and visual-setting refresh at desktop/phone sizes and writes `test-results/tab-icons-selected-{1280,390}.png`. `node tests/combat-tab.mjs` covers mode cycling, rapid clicks and Reduce Motion. No gameplay or golden files changed.
 
 ## Part 2: the living raid (Seth's 2026-10-28 brief)
 

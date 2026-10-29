@@ -38,21 +38,19 @@ Suggested order: 1 (fences) and 2 (strike quick bar) first, since Ambush's outpo
 6. **Wire into all three pages:** `DefendPage` (bombs and the war banner stay in the Skills palette; only strike spells move), `CampaignPage` Ambush and Siege (replace `.campaign-spells`).
 7. **Tests:** Node test of `SpellBar` state (select, cancel, cast on ready only); browser script at desktop and phone width for Defend and Ambush: select, cast, cooldown fill, ready flash, cancel by second tap, setting switches back to the menu.
 
-## 3. New pixel-art tab icons
+## 3. New pixel-art tab icons ☑
 
-**Brief:** pixel-art icons for the Ambush, Siege, Defend and Settings tabs; the old ones are replaced.
+**Current graphics:** Ambush and Siege keep `src/ui/mode-icons.ts` (a bow drawn from a bush, a trebuchet). Defend and Settings keep their existing PNGs. Tiles keeps its city-tile canvas.
 
-**Done:** Ambush and Siege (`src/ui/mode-icons.ts`: a bow drawn from a bush, a trebuchet). Defend and Settings still use their PNGs.
+**Legacy graphics (Seth's 2026-10-29 choice):** Settings → Show legacy graphics enables the selected 16×16 pixel-art icons: Defend A (tower/shield), Defend C for Ambush (castle gate), Settings B (steel cog), and a new sword for Siege. The preference defaults off, is saved through `SETTINGS`, and applies immediately without changing the active combat mode. Pixel Art is independent.
 
-**Today:** Defend and Settings are legacy PNGs (`public/assets/ui/defend.png`, `settings.png`, through `uiSprite` in `src/ui/dom.ts`); Ambush and Siege are inline SVGs in `src/ui/combat-tab.ts` (`combatIcon`). Tiles already uses a canvas painted by the board's own art (`cityTile`).
+- [x] Draw three alternatives per tab in `src/ui/tab-icons.ts` (`tabIconPixels`, `paintTabIcon`), on a transparent 48×48 canvas at 3×, with black outlines and upper-left highlights.
+- [x] Show the gallery to Seth and integrate his chosen designs as legacy graphics.
+- [x] Keep `CombatTab`'s slide animation, rapid-click cancellation and Reduce Motion behavior for both sets.
+- [x] Retain current Defend/Settings PNGs for the default graphics; the legacy set loads no new sprite assets.
+- [x] Add the translated Show legacy graphics control, default off, with persistence and immediate switching.
 
-**Plan:**
-
-- Draw them procedurally like the Tiles icon, as pixel arrays painted to a 48 × 48 canvas (16 × 16 art pixels at 3×), black outlines, lit from the upper left, in the game's palette. Put them in `src/ui/tab-icons.ts` (`tabIconPixels(name)`, `paintTabIcon(canvas, name)`). AGENTS.md says the PNG sprite collection was deliberately removed; do not add new PNG sprite sets for this.
-- Ideas: **Defend** a kite shield on a castle tower; **Ambush** a hooded archer's bow with an arrow over a road; **Siege** a trebuchet or battering ram; **Settings** a brass cog with a gear tooth highlight.
-- `CombatTab` keeps its slide animation, switching canvases instead of SVGs.
-- Make 2 or 3 variants of each in a gallery test (`node tests/tab-icons.mjs`, screenshot in `test-results/`) and post the gallery to Seth to pick from before wiring them in, since icons are taste.
-- Remove `defend.png`/`settings.png` once unused, and any references.
+**Validation:** `tests/tab-icons.html` shows the selected legacy icons and all 12 original studies. `PLAYWRIGHT_EXECUTABLE=/usr/bin/chromium node tests/tab-icons.mjs` checks crisp pixels, transparency, accessible labels, viewport fit, both icon sets in real navigation, toggle persistence and Pixel Art independence. Desktop/phone screenshots go under `test-results/`. `node tests/combat-tab.mjs` checks default-art mode cycling, rapid clicks, reload and Reduce Motion at 1280, 390 and 360 px. `data-tab-icon` is separate from world-art `data-icon`, so world-art refreshes cannot overwrite legacy icons.
 
 ## 4. Currency bar only on Mine, Library and Tiles, dropping in with a bounce
 

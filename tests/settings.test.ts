@@ -34,6 +34,17 @@ test("settings on the page have their own control ids", () => {
   assert.equal(new Set(ids).size, ids.length);
 });
 
+test("legacy graphics is opt-in and round-trips independently of Pixel Art", () => {
+  assert.equal(defaults().settings.legacyGraphics, false);
+  assert.equal(decoded({ pixelArt: true }).legacyGraphics, false);
+  const save = defaults();
+  save.settings.legacyGraphics = true;
+  save.settings.pixelArt = false;
+  const restored = decode(JSON.stringify(save));
+  assert.equal(restored.settings.legacyGraphics, true);
+  assert.equal(restored.settings.pixelArt, false);
+});
+
 test("dragged items ride above the finger by default only on touch screens", () => {
   const was = (globalThis as any).matchMedia;
   try {

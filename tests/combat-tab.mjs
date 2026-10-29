@@ -9,17 +9,14 @@ try {
     const page = await browser.newPage({ viewport: { width, height: 900 } });
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
-  await page.addInitScript(() => {
-    const key='towerdefense.v1', saved=JSON.parse(localStorage.getItem(key)||'null');
-    if(saved&&!saved.profile){saved.profile={name:'Test Warden',flag:{base:12,layers:[{pattern:'cross',color:3}]}};localStorage.setItem(key,JSON.stringify(saved));}
-  });
     await page.goto(process.env.TEST_URL || 'http://127.0.0.1:5173/');
-    if(await page.locator('#profile-editor[open]').count()) {
+    // Each page has a fresh context. Wait for boot to open mandatory setup
+    // before completing it; checking immediately after goto races the loader.
+    await page.locator('#profile-editor[open]').waitFor();
     await page.locator('#profile-editor input').fill('Test Warden');
     await page.locator('#profile-editor [data-action="stamp"]').click();
     await page.locator('#profile-editor button[type="submit"]').click();
-  }
-  const button = page.locator('nav [data-tab="defend"]');
+    const button = page.locator('nav [data-tab="defend"]');
     await button.waitFor();
     for (const [mode, next] of [['defend', 'Ambush'], ['ambush', 'Siege'], ['siege', 'Defend']]) {
       const name = mode[0].toUpperCase() + mode.slice(1);
