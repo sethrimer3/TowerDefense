@@ -1,7 +1,6 @@
 import { paintTabIcon, tabIconHtml } from "./tab-icons.ts";
-import { uiSprite } from "./dom.ts";
 import { t } from "../i18n/index.ts";
-import { modeIconUrl } from "./mode-icons.ts";
+import { modeIconImg } from "./mode-icons.ts";
 
 export const COMBAT_MODES = ["defend", "ambush", "siege"] as const;
 export type CombatMode = typeof COMBAT_MODES[number];
@@ -12,8 +11,7 @@ export const combatLabel = (mode: CombatMode, active: boolean) =>
 /** Current art by default; the chosen legacy set is an explicit preference. */
 export function combatIcon(mode: CombatMode, legacy = false) {
   if (legacy) return tabIconHtml(mode);
-  if (mode === "defend") return uiSprite("defend");
-  return `<img class="ui-sprite" src="${modeIconUrl(mode)}" alt="" aria-hidden="true">`;
+  return modeIconImg(mode);
 }
 
 /** Owns only presentation; navigation decides when a click cycles the mode. */

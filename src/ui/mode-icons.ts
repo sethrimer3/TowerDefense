@@ -1,4 +1,5 @@
-/** Pixel-art icons for the Ambush and Siege combat modes, drawn in code like
+/** Pixel-art icons for the combat modes (Defend, Ambush, Siege) and the
+ * Settings tab, drawn in code like
  * the Tiles tab's city tile: shapes laid on a `N × N` grid of art pixels by
  * material, each material shaded light on its upper left edges and dark on
  * its lower right, then ringed in a black outline. Presentation only. */
@@ -22,6 +23,10 @@ const SPRIG: Material = { tones: [0xa9d877, 0xa9d877, 0xa9d877], flat: true };
 const DUST: Material = { tones: [0xcfc3a6, 0xcfc3a6, 0xcfc3a6], flat: true };
 const EYES: Material = { tones: [0xf2d36b, 0xf2d36b, 0xf2d36b], flat: true };
 const BRASS: Material = { tones: [0xf0d58a, 0xc99a3e, 0x8a6220] };
+const MORTAR: Material = { tones: [0x4a453e, 0x4a453e, 0x4a453e], flat: true };
+const INK: Material = { tones: [OUTLINE, OUTLINE, OUTLINE], flat: true };
+const FIELD: Material = { tones: [0x4f78b8, 0x2f5592, 0x1d3463] };
+const GLOW: Material = { tones: [0xffd27a, 0xffd27a, 0xffd27a], flat: true };
 
 /** A grid of materials, painted with simple shapes. */
 class Grid {
@@ -127,7 +132,57 @@ function siege(g: Grid) {
   g.set(17.5, 20.5, BRASS);
 }
 
-const DRAW = { ambush, siege };
+/** Defend: a crenellated stone tower with a blue heater shield bearing a
+ * brass cross hung on its face. */
+function defend(g: Grid) {
+  // The tower and its merlons.
+  g.rect(4, 5, 16, 18, STONE);
+  for (const [x, w] of [[4, 3], [10, 4], [17, 3]] as const) g.rect(x, 2, w, 3, STONE);
+  // Mortar courses, offset row to row.
+  for (const [y, offset] of [[7, 0], [11, 3], [15, 0], [19, 3]] as const) {
+    g.rect(5, y, 14, 1, MORTAR);
+    for (let x = 7 + offset; x < 19; x += 6) g.set(x, y + 1, MORTAR), g.set(x, y + 2, MORTAR);
+  }
+  // An arrow slit with torchlight in it.
+  g.rect(11, 5, 2, 3, INK);
+  g.rect(11, 6, 2, 1, GLOW);
+  // The shield, ringed in black so it stands off the stone.
+  const shield = (inset: number, m: Material) => {
+    for (let y = 10 + inset; y <= 22 - inset; y++) {
+      const narrow = y < 16 ? 0 : Math.round(((y - 15) * (y - 15)) / 9);
+      g.rect(7 + inset + narrow, y, 10 - 2 * inset - 2 * narrow, 1, m);
+    }
+  };
+  shield(-1, INK);
+  shield(0, IRON);
+  shield(1, FIELD);
+  g.rect(11, 12, 2, 8, BRASS);
+  g.rect(9, 14, 6, 2, BRASS);
+}
+
+/** Settings: an iron cogwheel with a brass collar, meshed with a little
+ * brass one. */
+function settings(g: Grid) {
+  const cog = (cx: number, cy: number, body: number, tip: number, teeth: number, turn: number, m: Material) => {
+    const inside = (x: number, y: number, grow: number) => {
+      const r = Math.hypot(x - cx, y - cy);
+      const tooth = Math.cos(teeth * (Math.atan2(y - cy, x - cx) - turn)) > -0.15;
+      return r <= body + grow || (r <= tip + grow && tooth);
+    };
+    for (let y = 0; y < N; y++)
+      for (let x = 0; x < N; x++) {
+        if (inside(x, y, 0)) g.set(x, y, m);
+        else if (inside(x, y, 1)) g.set(x, y, INK);
+      }
+  };
+  cog(18, 6, 3, 5, 6, 0.5, BRASS);
+  cog(9.5, 14.5, 5.8, 8, 8, Math.PI / 8, IRON);
+  g.disc(9.5, 14.5, 3.4, BRASS);
+  g.disc(9.5, 14.5, 1.8, null);
+  g.disc(18, 6, 0.8, null);
+}
+
+const DRAW = { defend, ambush, siege, settings };
 export type ModeIcon = keyof typeof DRAW;
 
 /** The icon as `N × N` RGB pixels, 0 where empty. */
@@ -145,6 +200,9 @@ export function modeIconPixels(mode: ModeIcon): Uint32Array {
     }
   return out;
 }
+
+/** The icon as an `<img>` for a tab button. */
+export const modeIconImg = (mode: ModeIcon) => `<img class="ui-sprite" src="${modeIconUrl(mode)}" alt="" aria-hidden="true">`;
 
 const urls = new Map<ModeIcon, string>();
 /** The icon as a data URL, `scale` screen pixels an art pixel, made once. */
