@@ -104,7 +104,7 @@ export class Barracks {
   step(sim: DefendSim, dt: number) {
     const cap = soldierCap(sim.levels.barracksCapacity);
     for (const b of sim.map.buildings) {
-      if (!isBarracks(b) || !sim.intact(b)) continue;
+      if (!isBarracks(b) || !(sim.scenario?.recruits?.(b) ?? sim.intact(b))) continue;
       const garrison = b.kind === "darkKeep" ? DARK_WIZARD.garrison : b.kind === "heroHall" ? HERO.garrison : b.kind === "shadow" ? SHADE.garrison : b.kind === "revolutionary" ? squadSize(sim) : cap + hostGarrison(sim, b);
       if (this.drilled(sim, b, garrison, dt)) this.recruit(sim, b);
     }

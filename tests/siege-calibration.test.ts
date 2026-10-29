@@ -4,6 +4,7 @@ import { calibrationArmy, typicalArmyBudget } from "../src/campaign/siege-army.t
 import { infantry } from "../src/campaign/plans.ts";
 import { STRUCTURES } from "../src/defend/catalog.ts";
 import { calibrateRaid } from "../tools/siege-calibration.ts";
+import { SIEGE_SECONDS } from "../src/campaign/sim.ts";
 import { readFileSync } from "node:fs";
 test("Reference progression budgets rise smoothly and build real infantry with native support", () => {
   let previous = 0;
@@ -50,4 +51,7 @@ test("The published raid results were recorded against the current generator, es
   assert.equal(training.inputHash, calibrationHash(TUNING_SOURCES));
   assert.ok(training.rows.every((r: { observedInputHash: string }) => r.observedInputHash === training.inputHash));
   assert.equal(validation.inputHash, calibrationHash(VALIDATION_SOURCES));
+  assert.equal(training.raidSeconds, SIEGE_SECONDS);
+  assert.equal(validation.raidSeconds, SIEGE_SECONDS);
+  assert.ok(validation.rows.every((r: { phase: string; seconds: number }) => ['won', 'lost'].includes(r.phase) && r.seconds <= SIEGE_SECONDS));
 });

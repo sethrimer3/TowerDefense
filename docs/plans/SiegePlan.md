@@ -1,6 +1,6 @@
 # Siege plan
 
-Siege is the attack mode. The player's infantry buildings muster below a generated castle, and their troops storm it. Destroying the keep within four minutes wins, and the result moves the player's MMR.
+Siege is the attack mode. The player's infantry buildings muster below a generated castle, and their troops storm it. Destroying the keep within two minutes wins, and the result moves the player's MMR.
 
 This plan turns Seth's 2026-10-27 Siege brief into ordered work for an AI agent: ranks and an entry screen, bots that look like players, castles generated from native towers, units and upgrades at a difficulty measured in defensive DPS, ranks anchored to the maxed-out DPS ceiling, name plates on the board, and a mana experiment for strike spells. It also keeps the earlier shared items and known gaps.
 
@@ -22,9 +22,9 @@ Read this whole file, [AmbushPlan.md](AmbushPlan.md#architecture-guidelines)'s a
 | File | What it does now |
 |---|---|
 | `src/campaign/siege-ui.ts`, `siege-entry.ts` | Rank entry screen, Find Match/reveal/preview/Attack/Back, rated results and rank transitions, and native battle controls. Two board plates show names, flags and ranks. The shared native strike bar uses transient Siege mana; Defend and Ambush keep cooldowns. |
-| `src/campaign/sim.ts` (`CampaignSim`) | Native 240-second raid lifecycle and keep-destruction victory. Castle upgrades determine strength; the old flat defense damage/HP scale is removed. |
+| `src/campaign/sim.ts` (`CampaignSim`) | Native 120-second raid lifecycle and keep-destruction victory. Castle upgrades determine strength; the old flat defense damage/HP scale is removed. |
 | `src/campaign/raid.ts` (`RaidBattle`) | Two native `DefendSim` sides on one map. The defense wears the castle's saved levels and bonuses; attackers retain the player's upgrades. |
-| `src/campaign/battlefield.ts` (`siegeField`) | Generates the upper native city from the saved blueprint, with every owned infantry copy in bottom muster rows. |
+| `src/campaign/battlefield.ts` (`siegeField`) | Generates the upper native city from the saved blueprint, with every owned infantry copy retained as a hidden staging home at the bottom edge. |
 | `src/campaign/castles.ts`, `castle-generator.ts` | Revision-2 `siege-v2` snapshots hold native layouts, Armory levels, training, Skills and side ranks. Seeded purchases, upgrades, merges and placement target an estimated DPS budget. |
 | `src/campaign/siege-rating.ts` | One Elo MMR: initial 1000, minimum 100, maximum 3000; K 48 for the first ten games, then 24. |
 | `src/campaign/siege-progress.ts` | `SiegeSave {mmr, games, wins, sequence, raid}`. Opponents are offered at MMR ±80. Settlement is idempotent; started raids found on reload lose once. Legacy offers migrate at the same seed/MMR. |
@@ -76,7 +76,7 @@ A castle stops being an abstract `Defense[]` list. It becomes a real Defend layo
    - Stop when the next move would overshoot. A final pass trims or adds one small step to land within ±5% of the budget.
    - Position structures with `fitLayout`/`arrange` on the castle's fixed tile footprint (a constant `CASTLE_TILES`), so placement uses Defend's rules and needs no randomness beyond the seed's choices.
    - Variety: seeded "personalities" (tower-heavy, troop-heavy, magic, gunpowder, balanced) weight the move choices, so two castles at one MMR look different.
-4. **Battlefield from the snapshot.** `siegeField` stops choosing towers itself. It lays out the snapshot's castle (tiles, structures, gates, wall pieces) in the upper half with Defend's `generateCity` pipeline, and keeps the muster rows and invisible attacker keep below.
+4. **Battlefield from the snapshot.** `siegeField` stops choosing towers itself. It lays out the snapshot's castle (tiles, structures, gates, wall pieces) in the upper half with Defend's `generateCity` pipeline, and retains hidden staging homes and the invisible attacker objective below.
 5. **Defense side wears the castle's upgrades.** `RaidBattle` takes the snapshot's `levels` and builds the defense `Bonuses` with the same `placedBattlePaths`/side-rank snapshots Defend uses, instead of `defaultDefendSave().levels`. `CampaignSim`'s flat `2**(…)*.65` multiplier is deleted: difficulty now comes only from what is in the castle.
 
 ### Rank scaling: anchored to the maxed ceiling
@@ -184,7 +184,7 @@ The shared legacy tab icons are integrated behind Settings → Show legacy graph
 
 ## Part 2: the living raid (Seth's 2026-10-28 brief)
 
-Phases 0–7 above are done. This part turns Seth's second Siege brief into ordered work. Plan against the code as it stands: `siege-ui.ts` (the battle page), `siege-hud.ts` (the corner banner plates and the remaining-troops box, `TroopBox`), `battlefield.ts` (`siegeField`, which still lays the player's muster rows in the lower half), `raid.ts` (`RaidBattle`), `sim.ts` (`CampaignSim`, the 240-second limit), `siege-mana.ts`, and Defend's renderer (`DrawOptions`, `unit-outline.ts`, `battle-art.ts`'s `rimOf`, `simple-units.ts`, `lighting.ts`, `structure-art.ts`'s `flagPixels`).
+Phases 0–7 above are done. This part turns Seth's second Siege brief into ordered work. Plan against the code as it stands: `siege-ui.ts` (the battle page), `siege-hud.ts` (the corner banner plates and the remaining-troops box, `TroopBox`), `battlefield.ts` (`siegeField`, now keeping hidden staging homes beyond the bottom edge), `raid.ts` (`RaidBattle`), `sim.ts` (`CampaignSim`, the 120-second limit), `siege-mana.ts`, and Defend's renderer (`DrawOptions`, `unit-outline.ts`, `battle-art.ts`'s `rimOf`, `simple-units.ts`, `lighting.ts`, `structure-art.ts`'s `flagPixels`).
 
 ### What Seth asked for (verbatim intent)
 
@@ -248,7 +248,7 @@ Everything in [Architecture guidelines](#architecture-guidelines) still holds. I
 
 #### No muster buildings (item 7)
 
-- **Today:** `siegeField` places one real building per owned infantry copy in rows across the lower half (`row = 100` upward), and each trains and replenishes its native garrison there.
+- **Before phase 8:** `siegeField` placed one real building per owned infantry copy in rows across the lower half (`row = 100` upward), and each trains and replenishes its native garrison there.
 - **Target:** the player's homes become **hidden staging homes**: the same native structures (so `Soldier.home`, paths, ranks, drill time and replenishment all keep working), marked `hidden` like the invisible attacker keep, laid along the bottom edge rows, with their cells left open (not solid), not drawn, not shown in the inspector and never targeted. Troops leave from the home's point on the bottom edge and march up. The camera's default framing moves up to show the castle and the approach.
 - Check every place that assumes a visible home: `sim.ts`'s hidden-building `continue` (line ~583) must not stop training; deployment range (`deployRangeOf`) is measured from the hidden home and must still reach the castle (give staging homes no range limit, as spells' troops have none); defenders must not aim at them (`raid.ts` targets); `ownSolid` and flow fields must treat their cells as open.
 - **Replenishment** stays native by default (lost troops are retrained at the staging home and march in from the edge), because calibration assumed it. See open question C.
@@ -287,13 +287,15 @@ Today the attackers march on the war banner `raid.ts` plants on the enemy keep, 
 
 One PR per phase, as before. Tick each here as it lands.
 
-- **Phase 8: two minutes and no muster buildings ☐.** `SIEGE_SECONDS`, hidden staging homes and troops entering from the bottom edge, the camera reframed, recalibration (`tools/calibrate-siege.ts`, `SIEGE_MATCHMAKING.md`), Siege goldens only.
+- **Phase 8: two minutes and no muster buildings ☑.** `SIEGE_SECONDS`, hidden staging homes and troops entering from the bottom edge, the camera reframed, recalibration (`tools/calibrate-siege.ts`, `SIEGE_MATCHMAKING.md`), Siege goldens only.
 - **Phase 9: day cycle and the units box ☐.** `siegeSky`, the lighting on in Siege, `DrawOptions.tint`, the timer's colours, and the translucent black and gold units box.
 - **Phase 10: side outlines ☐.** `DrawOptions.sides`, per-ink outline layers, rims and simple squares, with a colour gallery for Seth.
 - **Phase 11: the defender's flags ☐.** Custom keep flag, `SiegeFlags` poles, felling them.
 - **Phase 12: flag-bearers ☐.** The unit, untargetable filtering, mana on death, art.
 - **Phase 13: victory ☐.** `SiegeVictory`: the collapse wave, the burning and raised flags, skip, Reduce Motion.
 - **Phase 14: directing units ☐.** Only after Seth picks an option (default A).
+
+Phase 8 validation: all 123 Node test files, the production build, and native-castle/entry/HUD/staging browser checks pass at 390×844 and 1280×800. Native paths, every infantry family, replenishment, open entry cells, hidden-home targeting/inspection, pause and the exact 120-second cutoff are covered. Training was rerun from scratch and the curve refitted; held-out seeds 1001–1004 won 42/136 raids (30.9%). Bronze lost all 16 trials at the minimum native castle budget; the balance limitation is published in `SIEGE_MATCHMAKING.md`. Only `siege-castles.golden.json` changed, for the new native DPS budgets; Defend replay, city and fence goldens are untouched.
 
 ### Open questions for Part 2 (defaults in brackets)
 
@@ -330,4 +332,4 @@ Open, for Seth (defaults in brackets; the agent builds the default and keeps it 
 5. ~~Show `BOT` anywhere?~~ Decided: no, nowhere in game yet.
 6. **Find Match feel.** An instant reveal, or a short "searching" pause for atmosphere? [Instant reveal of about 600 ms; no fake wait.]
 7. **Placement games.** Show "Unranked" for the first ten games? [No.]
-8. **Exact DPS thresholds per division.** Initial measured thresholds are published in `docs/design/SIEGE_MATCHMAKING.md`, with the native floor/ceiling and all 35 division anchors. The fixed reference armies won 35/68 independent raids; real-player progression and mana play still need playtesting.
+8. **Exact DPS thresholds per division.** Initial measured thresholds are published in `docs/design/SIEGE_MATCHMAKING.md`, with the native floor/ceiling and all 35 division anchors. Under the two-minute staging rules the fixed reference armies won 42/136 independent raids (30.9%); this is not an even-win-share calibration, and real-player progression and mana play still need playtesting.

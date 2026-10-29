@@ -4,6 +4,7 @@ import { SiegePage } from "../src/campaign/siege-ui.ts";
 import { defaults, decode } from "../src/save.ts";
 import { newSiege } from "../src/campaign/siege-progress.ts";
 import { PATHS } from "../src/knowledge-paths.ts";
+import { SIEGE_SECONDS } from "../src/campaign/sim.ts";
 const key = "siege-entry.fixture",
   save = localStorage.getItem(key) ? decode(localStorage.getItem(key)!) : defaults();
 if (!save.profile) {
@@ -38,6 +39,7 @@ Object.assign(window, {
   siegeFixture: {
     save,
     page,
+    seconds: SIEGE_SECONDS,
     setMmr: (mmr: number) => {
       save.siege!.mmr = mmr;
       page.reset();
@@ -56,7 +58,7 @@ Object.assign(window, {
       return { ...p, top: (page as unknown as { renderer: { toClient(x: number, y: number): { x: number; y: number } } }).renderer.toClient(b.rect.x + b.rect.w / 2, b.rect.y).y };
     },
     lose: () => {
-      page.sim.elapsed = 240;
+      page.sim.elapsed = SIEGE_SECONDS;
       page.sim.step(1 / 30);
       page.frame(performance.now());
     },

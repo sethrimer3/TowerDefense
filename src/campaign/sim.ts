@@ -12,6 +12,7 @@ import { RaidBattle } from "./raid.ts";
 import { generateCastle, type CastleSnapshot } from "./castles.ts";
 import { castleGame } from "./castle-model.ts";
 import { infantry, type Placement } from "./plans.ts";
+export const SIEGE_SECONDS = 120;
 export * from "./plans.ts";
 export function infantryCopies(save: DefendSave): MusterCopy[] {
   const out: MusterCopy[] = [];
@@ -94,10 +95,11 @@ export class CampaignSim {
     this.acc += Math.min(dt, 0.25);
     while (this.acc >= 1 / 30 && this.phase === "battle") {
       this.acc -= 1 / 30;
-      this.elapsed += 1 / 30;
+      // The timer advances in whole native ticks, without accumulating drift.
+      this.elapsed = Math.min(SIEGE_SECONDS, (Math.round(this.elapsed * 30) + 1) / 30);
       this.raid.step(1 / 30);
       if (this.raid.defense.keepHp() <= 0) this.phase = "won";
-      else if (this.elapsed >= 240) this.phase = "lost";
+      else if (this.elapsed >= SIEGE_SECONDS) this.phase = "lost";
     }
   }
 }

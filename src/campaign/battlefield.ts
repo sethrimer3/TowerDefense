@@ -138,55 +138,29 @@ export type MusterCopy = { kind: StructureKind; uid: number; path?: string; rank
 export function siegeField(castle: CastleSnapshot, copies: MusterCopy[]) {
   const fit = fitLayout(castle.castle.layout);
   if (!fit.ok) throw Error("Invalid native castle: " + fit.reason);
-  const structures = [...fit.structures];
-  // Real footprints; additional rows use the open lower half of the native board.
-  let row = 100,
-    x = 2,
-    rowDepth = 0;
-  const pads: Point[] = [],
-    placed: MusterCopy[] = [],
-    previous = new Map<StructureKind, Rect>();
-  for (const copy of copies) {
-    const d = STRUCTURES[copy.kind];
-    if (x + d.w > CELLS_W - 2) {
-      x = 2;
-      row -= rowDepth + 2;
-      rowDepth = 0;
-    }
-    const packed = row - d.h < 58;
-    const rect = packed ? (previous.get(copy.kind) ?? { x: 2, y: 58, w: d.w, h: d.h }) : { x, y: row - d.h, w: d.w, h: d.h };
-    previous.set(copy.kind, rect);
-    structures.push(fitted(copy.uid, copy.kind, rect));
-    pads.push({ x: rect.x + d.w / 2, y: rect.y + d.h / 2 });
-    placed.push(copy);
-    x += d.w + 2;
-    rowDepth = Math.max(rowDepth, d.h);
+  // Generate only the castle. Staging homes do not occupy or dress city cells.
+  const map = generateCity(fit, castle.seed),
+    defenderIds = new Set(map.buildings.map(b => b.id)),
+    attackerIds = new Set<number>(),
+    pads: Point[] = [];
+  // Reserve an open grass edge so the forest cannot seal a staging door
+  // behind a boulder when native terrain collision is initialized.
+  for (let x = 0; x < CELLS_W; x++) map.type[cellIndex(x, CELLS_H - 1)] = CellType.PARK;
+  const columns = Math.min(copies.length, CELLS_W - 2);
+  for (const [index, copy] of copies.entries()) {
+    const d = STRUCTURES[copy.kind],
+      x = Math.floor((CELLS_W - d.w) * ((index % columns + 0.5) / columns)),
+      id = map.buildings.length;
+    // The real home is just beyond the bottom edge: its native door opens
+    // onto the last board row. Empty cells make it non-solid and untargetable.
+    map.buildings.push({ id, kind: copy.kind, structureUid: copy.uid,
+      rect: { x, y: CELLS_H, w: d.w, h: d.h }, cells: [], hidden: true, variant: 0 });
+    attackerIds.add(id);
+    pads.push({ x: x + 0.5, y: CELLS_H - 0.5 });
   }
-  // Center each actual-footprint muster row under the castle.
-  const rows = new Map<number, Set<Rect>>();
-  for (const s of structures.filter((s) => s.uid >= 100000)) {
-    const bottom = s.rect.y + s.rect.h;
-    let list = rows.get(bottom);
-    if (!list) rows.set(bottom, (list = new Set()));
-    list.add(s.rect);
-  }
-  for (const list of rows.values()) {
-    const all = [...list],
-      left = Math.min(...all.map((r) => r.x)),
-      right = Math.max(...all.map((r) => r.x + r.w)),
-      shift = Math.floor((CELLS_W - (right - left)) / 2) - left;
-    for (const r of all) r.x += shift;
-  }
-  for (let i = 0; i < placed.length; i++) {
-    const r = structures.find((s) => s.uid === placed[i].uid)!.rect;
-    pads[i] = { x: r.x + r.w / 2, y: r.y + r.h / 2 };
-  }
-  // An invisible attacker objective gives the native sim its own keep reference.
-  structures.push(fitted(200000, "keep", { x: 34, y: 100, w: 4, h: 4 }));
-  const map = generateCity({ ...fit, structures }, castle.seed);
-  const attackerIds = new Set(map.buildings.filter((b) => b.structureUid !== undefined && copies.some((c) => c.uid === b.structureUid)).map((b) => b.id));
-  const attackerKeep = map.buildings.find((b) => b.structureUid === 200000)!.id;
-  map.buildings[attackerKeep].hidden = true;
-  const defenderIds = new Set(map.buildings.filter((b) => !attackerIds.has(b.id) && b.id !== attackerKeep).map((b) => b.id));
+  // The attack sim still needs an objective for its native flow fields.
+  const attackerKeep = map.buildings.length, rect = { x: 34, y: CELLS_H - 4, w: 4, h: 4 };
+  map.buildings.push({ id: attackerKeep, kind: "keep", structureUid: 200000,
+    rect, cells: rectCells(rect), hidden: true, variant: 0 });
   return { map, pads, attackerIds, defenderIds, attackerKeep, defenderKeep: 0 };
 }

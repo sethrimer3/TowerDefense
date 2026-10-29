@@ -161,6 +161,7 @@ export class RaidBattle {
       unrestricted: attacking,
       ignoreKeepLoss: attacking,
       owns: (b) => owned.has(b.id),
+      ...(attacking ? { recruits: (b: Building) => owned.has(b.id) } : {}),
       soldierDt: (s, dt) => {
         const enemyProxy = this.proxies[attacking ? 1 : 0].get(s.id);
         if (enemyProxy?.impaled !== undefined) return 0;

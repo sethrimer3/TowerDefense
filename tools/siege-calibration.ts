@@ -4,7 +4,7 @@ import { generateCastle, type CastleSnapshot } from "../src/campaign/castles.ts"
 import { RULESET } from "../src/campaign/siege-rating.ts";
 import { botName } from "../src/campaign/bot-names.ts";
 import { generateNative } from "../src/campaign/castle-generator.ts";
-import { CampaignSim } from "../src/campaign/sim.ts";
+import { CampaignSim, SIEGE_SECONDS } from "../src/campaign/sim.ts";
 import { castleDps } from "../src/campaign/castle-dps.ts";
 import { dpsForMmr } from "../src/campaign/siege-budget.ts";
 import { createHash } from "node:crypto";
@@ -54,7 +54,7 @@ export function calibrateRaid(mmr: number, seed: number, options: { budget?: num
         };
   const sim = new CampaignSim("siege", 0, [], army.game.defend.owned, army.game.defend.levels, castle, army.game);
   if (!sim.start()) throw Error("Empty calibration army");
-  const max = Math.min(240, options.seconds ?? 240);
+  const max = Math.min(SIEGE_SECONDS, options.seconds ?? SIEGE_SECONDS);
   for (let tick = 0; tick <= max * 30 && sim.phase === "battle"; tick++) sim.step(1 / 30);
   return {
     mmr,
