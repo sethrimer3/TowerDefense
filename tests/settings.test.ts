@@ -34,6 +34,21 @@ test("settings on the page have their own control ids", () => {
   assert.equal(new Set(ids).size, ids.length);
 });
 
+test("grid opacity defaults to 30 percent and preserves every 5-percent step, including zero", () => {
+  assert.equal(defaults().settings.gridOpacity, 30);
+  assert.equal(decoded({}).gridOpacity, 30);
+  for (let value = 0; value <= 100; value += 5) assert.equal(decoded({ gridOpacity: value }).gridOpacity, value);
+  for (const [raw, expected] of [[-10, 0], [104, 100], [17, 15], [27, 25], [28, 30], [97.5, 100]]) {
+    assert.equal(decoded({ gridOpacity: raw }).gridOpacity, expected, `saved opacity ${raw}`);
+  }
+});
+
+test("grid colours persist only the five supported names and keep gold for older saves", () => {
+  assert.equal(decoded({}).gridColor, "gold");
+  for (const value of ["white", "brown", "black", "gray", "gold"]) assert.equal(decoded({ gridColor: value }).gridColor, value);
+  for (const value of ["red", "#ffffff", "", {}, null, 0]) assert.equal(decoded({ gridColor: value }).gridColor, "gold");
+});
+
 test("legacy graphics is opt-in and round-trips independently of Pixel Art", () => {
   assert.equal(defaults().settings.legacyGraphics, false);
   assert.equal(decoded({ pixelArt: true }).legacyGraphics, false);

@@ -858,7 +858,7 @@ span.training-timer {
   gap: 6px;
 }
 /* The tile grid's opacity: a brass slider with its percent beside it. */
-.setting-range[hidden] {
+.setting-grid[hidden] {
   display: none;
 }
 .range-control {

@@ -1,6 +1,6 @@
 import { HOUR_MS } from "../away.ts";
 import { UNLOCK_WAVES, unlockWaves, waveReach } from "../defend/progress.ts";
-import { DEV_OPTIONS, SETTINGS, type SettingKey } from "../settings.ts";
+import { DEV_OPTIONS, SETTINGS, type GridColor, type SettingKey } from "../settings.ts";
 import type { AppContext } from "./app.ts";
 import { el } from "./dom.ts";
 import { LANGUAGES, isLanguage, t } from "../i18n/index.ts";
@@ -25,12 +25,15 @@ function checkbox(key: PageKey, ctx: AppContext): string {
 /** One toggle, labelled. */
 const control = (key: PageKey, ctx: AppContext) => `<label class="setting">${t(`setting.${key}`)}${checkbox(key, ctx)}</label>`;
 
-/** The tile grid's opacity slider, shown only while the grid is on. */
-function gridOpacity(ctx: AppContext): string {
-  const row = SETTINGS.gridOpacity, settings = ctx.save().settings;
-  return `<label class="setting setting-range" id="grid-opacity-row" ${settings.tileGrid ? "" : "hidden"}>${t("setting.gridOpacity")}` +
+/** The tile grid's opacity and colour, shown only while the grid is on. */
+function gridControls(ctx: AppContext): string {
+  const row = SETTINGS.gridOpacity, color = SETTINGS.gridColor, settings = ctx.save().settings;
+  const hidden = settings.tileGrid ? "" : "hidden";
+  return `<label class="setting setting-range setting-grid" id="grid-opacity-row" ${hidden}>${t("setting.gridOpacity")}` +
     `<span class="range-control"><input type="range" id="${row.page.id}" min="${row.min}" max="${row.max}" step="${row.step}" value="${settings.gridOpacity}" aria-label="${t("settings.opacityAria")}">` +
-    `<output id="grid-opacity-value">${settings.gridOpacity}%</output></span></label>`;
+    `<output id="grid-opacity-value">${settings.gridOpacity}%</output></span></label>` +
+    `<label class="setting setting-grid" id="grid-color-row" ${hidden}>${t("setting.gridColor")}<select id="${color.page.id}">` +
+    color.choices.map(([value]) => `<option value="${value}" ${settings.gridColor === value ? "selected" : ""}>${t(`settings.gridColor.${value}`)}</option>`).join("") + `</select></label>`;
 }
 
 /** The Settings page: display and dev options, and erasing progress. */
@@ -42,7 +45,7 @@ export function renderSettingsPage(ctx: AppContext) {
     `<h3 class="settings-group">${t("settings.gameplay")}</h3>` +
     GAMEPLAY.map((key) => control(key, ctx)).join("") +
     `<h3 class="settings-group">${t("settings.display")}</h3>` +
-    PAGE.map((key) => control(key, ctx) + (key === "tileGrid" ? gridOpacity(ctx) : "")).join("") +
+    PAGE.map((key) => control(key, ctx) + (key === "tileGrid" ? gridControls(ctx) : "")).join("") +
     control("developerMode", ctx) +
     (settings.developerMode ? `<h3 class="settings-group">${t("settings.dev")}</h3>` +
     `<label class="setting setting-all">${t("settings.allOn")}<input type="checkbox" id="dev-all" ${allOn ? "checked" : ""}></label>` +
@@ -66,7 +69,10 @@ export function renderSettingsPage(ctx: AppContext) {
       settings[key] = "invert" in row.page ? !input.checked : input.checked;
       if ((ALL_DEV as readonly SettingKey[]).includes(key)) ctx.devChanged();
       else ctx.update();
-      if (key === "tileGrid") el("grid-opacity-row").hidden = !input.checked;
+      if (key === "tileGrid") {
+        el("grid-opacity-row").hidden = !input.checked;
+        el("grid-color-row").hidden = !input.checked;
+      }
       const all = document.getElementById("dev-all") as HTMLInputElement | null;
       if (all) all.checked = ALL_DEV.every((k) => settings[k]);
     };
@@ -77,6 +83,11 @@ export function renderSettingsPage(ctx: AppContext) {
     el("grid-opacity-value").textContent = `${opacity.value}%`;
   };
   opacity.onchange = () => ctx.update();
+  const color = el(SETTINGS.gridColor.page.id) as HTMLSelectElement;
+  color.onchange = () => {
+    settings.gridColor = color.value as GridColor;
+    ctx.update();
+  };
   el("erase").onclick = () => confirmErase(ctx);
   if (!settings.developerMode) return;
   const all = el("dev-all") as HTMLInputElement;

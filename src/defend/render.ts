@@ -1,4 +1,5 @@
 import { CollapseView } from "./collapse-view.ts";
+import type { GridColor } from "../settings.ts";
 import type { Flag } from "../profile/model.ts";
 import { DarkDrain } from "./dark-drain.ts";
 import { drawMines } from "./mine-art.ts";
@@ -69,9 +70,10 @@ export type DrawOptions = {
   sun?: { x: number; y: number; strength: number };
   tint?: { color: string; strength: number };
   area?: AreaId;
-  /** The (dim, gold) tile grid's opacity, 0 to hide it: shown while the
+  /** The tile grid's opacity, 0 to hide it: shown while the
    * player is editing, if they turned it on. */
   grid: number;
+  gridColor?: GridColor;
   weather: Weather | null;
   /** How far night has fallen, 0–1 (boss waves). */
   night: number;
@@ -328,7 +330,7 @@ export class DefendRenderer {
     if (sim) this.wizard.drawFire(this.ctx, this.px);
     if (opts.shimmer && !opts.reduceMotion) drawShimmer(this.ctx, this.px, map, opts.now, (c, b) => paintStanding(c, ART, map, b, this.area, opts.looks), opts.looks);
     if (opts.inspect) drawInspect(this.ctx, this.px, map, sim, opts.inspect.id, opts.inspect.armed, opts.now, opts.reduceMotion, opts.inspect.aim);
-    this.drawEditing(overlay, opts.grid);
+    this.drawEditing(overlay, opts.grid, opts.gridColor);
     if (opts.lifting) drawLifting(this.ctx, this.px, opts.lifting.tile, opts.lifting.t);
     // Rain falls in screen space, in front of the camera.
     this.ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -343,8 +345,8 @@ export class DefendRenderer {
   }
 
   /** The building grid (brighter during a drag) and the drag's overlay. */
-  private drawEditing(overlay: Overlay | null, grid: number) {
-    if (grid > 0) drawGrid(this.ctx, this.px, overlay ? Math.min(1, grid * 1.8) : grid);
+  private drawEditing(overlay: Overlay | null, grid: number, color?: GridColor) {
+    if (grid > 0) drawGrid(this.ctx, this.px, overlay ? Math.min(1, grid * 1.8) : grid, color);
     if (overlay) drawOverlay(this.ctx, this.px, overlay);
   }
 
