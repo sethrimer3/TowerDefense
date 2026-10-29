@@ -1,3 +1,4 @@
+import type { Flag } from "../profile/model.ts";
 import { drawMines } from "./mine-art.ts";
 import { enemySize } from "./catalog.ts";
 /** Canvas renderer for DEFEND: the camera, and each frame's passes in order.
@@ -84,6 +85,9 @@ export type DrawOptions = {
   /** Units outlined together, round their combined shape (`unit-outline.ts`). */
   mergedOutlines?: boolean;
   sides?: UnitInks;
+  keepFlag?: Flag;
+  /** Optional scenery in board coordinates, below trees. */
+  scenery?: (c: CanvasRenderingContext2D, px: number) => void;
   /** The run is over: the city's torches go out in a wave from the keep. */
   over?: boolean;
   /** Leave out the planted war banner (while the player carries it). */
@@ -301,6 +305,7 @@ export class DefendRenderer {
     }
     this.drawKeepFlag(map, sim, opts);
     if (sim) this.drawBattleUnits(sim, opts.weather && !(opts.sun && opts.night === 0) ? this.burning ?? (() => 1) : null, opts);
+    opts.scenery?.(this.ctx, this.px);
     this.drawTrees(map, sim, opts, dt);
     this.drawForest(sim, opts, dt);
     this.ghosts.watch(sim, opts.now / 1000);
@@ -476,7 +481,7 @@ export class DefendRenderer {
   private drawKeepFlag(map: CityMap, sim: DefendSim | null, opts: DrawOptions) {
     const keep = standingKeep(map, sim);
     if (!keep) return;
-    drawFlag(this.ctx, this.px, { x: (keep.x + keep.w / 2) * this.px, y: (keep.y + keep.h / 2) * this.px, t: opts.now / 1000, reduceMotion: opts.reduceMotion });
+    drawFlag(this.ctx, this.px, { x: (keep.x + keep.w / 2) * this.px, y: (keep.y + keep.h / 2) * this.px, t: opts.now / 1000, reduceMotion: opts.reduceMotion }, true, opts.keepFlag);
   }
 
   /** Blast scorches, burning ground and the wizards' ice, then units, projectiles and

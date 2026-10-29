@@ -663,3 +663,5 @@ A difficulty trial in which the reference army and target castle share an MMR.
 
 **Mana**:
 A temporary Siege battle resource earned by defeating enemy troops and spent on strike spells.
+
+- **Flagpole:** decorative Siege scenery carrying the defender’s banner; one nearby impact snaps it, leaving a stump.

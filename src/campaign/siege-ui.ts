@@ -1,3 +1,4 @@
+import { SiegeFlags } from "./siege-flags.ts";
 /** Siege controls over the native two-sided Defend battle. */
 import { t } from "../i18n/index.ts";
 import { ManaCounter } from "../ui/mana-counter.ts";
@@ -36,6 +37,8 @@ export class SiegePage {
   private rewarded = false;
   private inspection: number | undefined;
   private spellBar?: SpellBar;
+  private flags?: SiegeFlags;
+  private flagsSim?: CampaignSim;
   private spellGate?: SpellBarGate;
   private manaCounter?: ManaCounter;
   private notice = "";
@@ -346,6 +349,9 @@ export class SiegePage {
     }
     const owner = this.inspection !== undefined && this.sim.raid.field.defenderIds.has(this.inspection) ? this.sim.raid.defense : this.sim.engine;
     const sky = siegeSky(SIEGE_SECONDS - this.sim.elapsed);
+    const face=this.host.save().siege!.raid.castle.owner.flag ?? botFlag(this.host.save().siege!.raid.castle.seed);
+    if (this.flagsSim !== this.sim) { this.flagsSim=this.sim;this.flags=new SiegeFlags(this.sim.map,this.host.save().siege!.raid.castle.seed,face); }
+    this.flags!.update(sim);
     r.draw(this.sim.map, sim, this.spellBar?.overlay(this.sim.engine) ?? null, {
       area: "moss",
       grid: 0,
@@ -353,6 +359,8 @@ export class SiegePage {
       night: sky.night,
       tint: sky.tint,
       sun: sky.sun,
+      keepFlag: face,
+      scenery: (c,px)=>this.flags!.draw(c,px,sim,this.now,settings.reduceMotion),
       sides: siegeSides(this.sim.raid.attack.soldiers, this.sim.raid.defense.soldiers),
       now: this.now,
       reduceMotion: settings.reduceMotion,
