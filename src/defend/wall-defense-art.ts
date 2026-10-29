@@ -11,6 +11,7 @@ import { SPRING_STAKES } from "../knowledge-paths.ts";
 import { GATE_TOWERS, gateRank, type GateRanks } from "../gate-upgrades.ts";
 import { gateTowerKey, gateTowerSpots } from "./gates.ts";
 import { center } from "./pathing.ts";
+import { ART_NAMES, artOverride } from "./art-overrides.ts";
 import { BALLISTA } from "./catalog.ts";
 import type { CityMap } from "./citygen.ts";
 import { CELLS_W, hash } from "./grid.ts";
@@ -170,6 +171,9 @@ export function bastionPixels(stage = 0, seed = 0): Uint32Array {
       if (k === FLAG && (x === 3 || y === 3)) col = shade(col, 0.72);
       out[y * N + x] = rgba(col);
     }
+  // An artist's bastion stands in for the drawn one (`art-overrides.ts`).
+  const own = artOverride(ART_NAMES.bastion, N, N);
+  if (own) out.set(own);
   damage(pixels(out, N, N), stage, hash(seed, 0xba1), { tones: STONE, roofed: false });
   return out;
 }
@@ -191,6 +195,10 @@ const WOOD = 1, WOOD_D = 2, HORN = 3, IRON = 4, STRING = 5, SHAFT = 6, HEAD = 7,
 /** The ballista facing heading `dir` (0 east, turning clockwise), its
  * string drawn back with a bolt on (`loaded`) or slack. */
 export function ballistaPixels(dir: number, loaded: boolean): Uint32Array {
+  return artOverride(ART_NAMES.ballista(dir, loaded), BALLISTA_ART, BALLISTA_ART) ?? drawnBallista(dir, loaded);
+}
+
+function drawnBallista(dir: number, loaded: boolean): Uint32Array {
   const S = BALLISTA_ART, c = S / 2;
   const a = (dir / BALLISTA_DIRS) * Math.PI * 2;
   const fx = Math.cos(a), fy = Math.sin(a);
@@ -268,7 +276,7 @@ export function drawBallistas(c: CanvasRenderingContext2D, px: number, map: City
     const aim = sim?.ballistaAim.get(key) ?? rest;
     const dir = ballistaDir(aim.x, aim.y);
     const loaded = !sim?.ballistaBolts.some((t) => t.aim === key && t.range - t.left < flown);
-    const art = sprite(`ballista:${dir}:${loaded ? 1 : 0}`, BALLISTA_ART, BALLISTA_ART, () => ballistaPixels(dir, loaded));
+    const art = sprite(`ballista:${dir}:${loaded ? 1 : 0}`, BALLISTA_ART, BALLISTA_ART, () => ballistaPixels(dir, loaded), true);
     // Whole screen pixels an art pixel, so the small ones stay crisp.
     const size = Math.max(1, Math.round((px / ART) * scale)) * BALLISTA_ART;
     drawSprite(c, art, Math.round(at.x * px - size / 2), Math.round(at.y * px - size / 2), size, size);

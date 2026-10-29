@@ -10,6 +10,7 @@ import type { Building } from "./citygen.ts";
 import { hash, type Rect } from "./grid.ts";
 import type { Side } from "./layout.ts";
 import { ART } from "./park-art.ts";
+import { ART_NAMES, artOverride } from "./art-overrides.ts";
 import { OUTLINE, damage, pixels, rgba, rubblePixels } from "./damage-art.ts";
 import { GATE_FRAMES } from "./gate-art.ts";
 
@@ -58,7 +59,7 @@ export function woodGatePixels(side: Side, frame = 0, stage = 0, seed = 0): Uint
     const [x, y] = at(u, v);
     screen[y * w + x] = m[v * U + u];
   }
-  const out = colour(screen, w, h, seed);
+  const out = artOverride(ART_NAMES.woodGate(side, frame), w, h) ?? colour(screen, w, h, seed);
   damage(pixels(out, w, h), stage, hash(seed, 0x70d), { tones: TONE.plank, roofed: false });
   return out;
 }
