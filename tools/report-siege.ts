@@ -49,7 +49,7 @@ const section =
   report.seedStart +
   "–" +
   (report.seedStart + report.samples - 1) +
-  ". These are deterministic offline test-army outcomes, with no strike spells, rather than observed player probabilities. " + report.samples + " cases per reachable division provide an initial calibration of the curve; per-rank results remain uneven, samples are small, and matchups matter.\n\n| Rank | Wins / raids | Observed share |\n| --- | ---: | ---: |\n" +
+  ", with a " + report.raidSeconds + "-second limit and hidden staging homes. These are deterministic offline test-army outcomes, with no strike spells, rather than observed player probabilities. " + report.samples + " cases per reachable division provide an initial calibration of the curve; per-rank results remain uneven, samples are small, and matchups matter.\n\n| Rank | Wins / raids | Observed share |\n| --- | ---: | ---: |\n" +
   rankRows.join("\n") +
   "\n\n| Division | MMR band | Estimated defensive DPS |\n| --- | --- | ---: |\n" +
   rows.join("\n") +

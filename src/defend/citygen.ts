@@ -52,7 +52,8 @@ export type Building = {
   rails?: { x1: number; y1: number; x2: number; y2: number }[];
   /** Set for a scenario gate in a wooden fence: drawn as a wooden gate. */
   woodGate?: true;
-  /** Empty scenario deployment lot; excluded from rendering and recruitment. */
+  /** Hidden scenario lot; no art or ordinary recruitment. A scenario may
+   * retain native recruitment through ScenarioRules.recruits. */
   hidden?: boolean;
   id: number;
   kind: BuildingKind;

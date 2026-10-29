@@ -6,6 +6,7 @@ import { calibrateRaid, calibrationHash, VALIDATION_SOURCES } from "./siege-cali
 import { DIVISION_DPS } from "../src/campaign/siege-division-dps.ts";
 import { ARMY_POLICY } from "../src/campaign/siege-army.ts";
 import { rankLabel } from "../src/campaign/siege-ranks.ts";
+import { SIEGE_SECONDS } from "../src/campaign/sim.ts";
 const arg = (name: string) =>
   process.argv
     .find((a) => a.startsWith("--" + name + "="))
@@ -78,6 +79,7 @@ if (smoke) {
     }),
     report = {
       inputHash,
+      raidSeconds: SIEGE_SECONDS,
       split,
       samples,
       seedStart,

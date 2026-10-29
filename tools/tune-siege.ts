@@ -1,10 +1,12 @@
 /** Find native win/loss crossover budgets at rank representatives. These are
  * training trials only; calibrate-siege runs independent validation seeds. */
 import { Worker } from "node:worker_threads";
-import { readFileSync, writeFileSync, existsSync, appendFileSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, appendFileSync, mkdirSync } from "node:fs";
 import { calibrationHash, TUNING_SOURCES } from "./siege-calibration.ts";
 import { DPS_MIN, DPS_MAX } from "../src/campaign/siege-ceiling.ts";
 import { typicalArmyBudget } from "../src/campaign/siege-army.ts";
+import { SIEGE_SECONDS } from "../src/campaign/sim.ts";
+mkdirSync("work", { recursive: true });
 const inputHash = calibrationHash(TUNING_SOURCES),
   cache = "work/siege-tuning-" + inputHash.slice(0, 16) + ".jsonl",
   rows = new Map<string, any>();
@@ -118,6 +120,7 @@ await Promise.all(
 const ordered = [...rows.values()].sort((a, b) => a.mmr - b.mmr || a.budget - b.budget),
   report = {
     kind: "native-crossover-search",
+    raidSeconds: SIEGE_SECONDS,
     inputHash,
     ...(priorHash
       ? {

@@ -335,6 +335,8 @@ const HATCH_SPOTS = [
 export type ScenarioSpell = "meteor" | "frostNova" | "necromancy" | "reinforcements";
 export type ScenarioSpellGate = { canCast: (spell: ScenarioSpell) => boolean; spend: (spell: ScenarioSpell) => void };
 export type ScenarioRules = {
+  /** Native recruitment eligibility for scenario-only hidden staging homes. */
+  recruits?: (building: Building) => boolean;
   spellGate?: ScenarioSpellGate;
   manualWaves?: boolean;
   passiveEnemies?: boolean;

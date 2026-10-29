@@ -38,7 +38,7 @@ An Ambush level's best result, from zero to three stars. Improving a best result
 The quarter-tile grid used to place Ambush buildings, with a clear quarter between their footprints.
 
 **Muster space**:
-A space in the lower muster ground where an owned infantry building trains troops for a Siege assault.
+An entry point on the bottom edge where an owned infantry squad enters a Siege assault.
 
 ### The board
 
@@ -652,7 +652,8 @@ The Siege action that reveals an opponent and castle preview before the player c
 - **Castle ceiling**: the strongest legal castle found by the bounded footprint search; the Grandmaster generation anchor.
 
 - **Castle blueprint**: the native city layout and upgrades saved with a Siege opponent.
-- **Muster rows**: the player’s infantry buildings arranged below the invaded castle.
+- **Muster rows**: the entry rows below the invaded castle where the player’s troops arrive.
+- **Staging home**: an unseen infantry home that trains and replenishes a squad entering a Siege assault from the bottom edge.
 
 **Reference army**:
 A reproducible infantry roster representing an assumed stage of progression for offline Siege difficulty trials.

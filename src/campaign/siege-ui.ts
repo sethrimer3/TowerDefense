@@ -14,7 +14,8 @@ import { bannerPlate, Banners, TroopBox } from "./siege-hud.ts";
 import { botFlag } from "./bot-identity.ts";
 import { defaultFlag } from "../profile/model.ts";
 import { newSiege, findMatch, settleRaid } from "./siege-progress.ts";
-import { CampaignSim } from "./sim.ts";
+import { CampaignSim, SIEGE_SECONDS } from "./sim.ts";
+import { CELLS_W } from "../defend/grid.ts";
 import { buildingLevel, type LeveledKind } from "../building-level.ts";
 import { STRUCTURES } from "../defend/catalog.ts";
 import type { Building } from "../defend/citygen.ts";
@@ -289,7 +290,7 @@ export class SiegePage {
                 hp: Math.ceil(s.raid.defense.keepHp()),
                 max: Math.ceil(s.raid.defense.keepMaxHp()),
                 troops: s.allies.length,
-                seconds: Math.max(0, 240 - Math.floor(s.elapsed)),
+                seconds: Math.max(0, SIEGE_SECONDS - Math.floor(s.elapsed)),
               }));
     this.root.querySelector<HTMLButtonElement>('[data-action="start"]')!.disabled = s.phase === "won" || s.phase === "lost";
     this.spellBar?.update(s.engine, s.phase === "battle", this.host.save().settings.reduceMotion, 1, this.spellGate);
@@ -324,6 +325,8 @@ export class SiegePage {
     r.resize(box.width, box.height);
     if (this.freshCamera) {
       r.resetCam();
+      const top = r.toClient(CELLS_W / 2, 0);
+      r.zoomAt(top.x, top.y, 1.3);
       this.freshCamera = false;
     }
     const sim = this.sim.renderSim,
