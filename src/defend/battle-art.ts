@@ -1,4 +1,4 @@
-import { ART, UNIT_CONTOUR_ART_PIXELS, DARK_UNIT_INK, PLAYER_UNIT_INK } from "./art-scale.ts";
+import { ART, UNIT_CONTOUR_ART_PIXELS, DARK_UNIT_INK, PLAYER_UNIT_INK, NEUTRAL_UNIT_INK, MARKED_UNIT_INK, BROOD_UNIT_INK } from "./art-scale.ts";
 import {drawChrono} from "./chrono-art.ts";
 import { drawFortress } from "./fortress-art.ts";
 import { drawIceEnemy } from "./ice-enemy-art.ts";
@@ -104,6 +104,15 @@ export type Burning = (x: number, y: number, id: number) => number;
 /** Draw enemies, or your troops, as plain squares (`simple-units.ts`). */
 export type Simple = { enemies?: boolean; troops?: boolean; reduceMotion?: boolean; merged?: boolean };
 
+/** An enemy's contour: crimson for the Dark One's, gold while a watch tower
+ * marks it, violet for the brood, black for the rest. */
+function enemyInk(e: Enemy) {
+  if (ENEMIES[e.kind].faction === "darkOne") return DARK_UNIT_INK;
+  if (e.marked) return MARKED_UNIT_INK;
+  if (e.kind === "mother" || e.kind === "broodling") return BROOD_UNIT_INK;
+  return NEUTRAL_UNIT_INK;
+}
+
 /** Units, projectiles and effects. With `torches`, units carry a torch,
  * lit while it still burns. */
 export function drawUnits(b: Brush, sim: DefendSim, torches: Burning | null, healthbars = false, timing?: { entityMs: number }, simple: Simple = {}, outline?: UnitOutline, sides?: UnitInks, contours?: { defer?: boolean }) {
@@ -124,7 +133,10 @@ export function drawUnits(b: Brush, sim: DefendSim, torches: Burning | null, hea
       if (unit.kind === "shade") minimumAlpha.set(unit.id, .5);
       else if (unit.cloak === 0 || unit.risen || unit.called) minimumAlpha.set(unit.id, .15);
     }
-    for (const enemy of sim.enemies) if (!enemy.raidProxy && ENEMIES[enemy.kind].faction === "darkOne") inks.set(enemy.id, DARK_UNIT_INK);
+    // Every other unit gets a contour too, in the ink its old baked rim had:
+    // no unit keeps a full-art-pixel rim of its own.
+    for (const enemy of sim.enemies) if (!enemy.raidProxy) inks.set(enemy.id, enemyInk(enemy));
+    for (const person of sim.civilians) inks.set(person.id, NEUTRAL_UNIT_INK);
     sides = { ink: id => inks.get(id) };
   }
   const layers = outline?.begin(b.c, !sides || simple.merged !== false, contours ? b.px / ART * UNIT_CONTOUR_ART_PIXELS : undefined);
