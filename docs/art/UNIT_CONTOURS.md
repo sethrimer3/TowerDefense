@@ -12,13 +12,20 @@ The normal renderer always enables these merged visibility contours, including w
 
 There is no per-frame scene readback, per-unit canvas, image filter or pairwise overlap search. Sprite paths share the existing once-per-sprite readback, and each ink uses one reusable screen-sized contour buffer. Crowd work scales with painted geometry, not the number of overlaps.
 
+Contact damage uses `defend/contact.ts`, entirely in world space. A stone wall's black rim occupies the outer half art pixel **inside** its painted box. The enemy's outward half-art-pixel rim touches that box, leaving one art pixel between the two body fills, completely occupied by the two rims. The shared `WALL_FACE_HANG` also accounts for the wall's south-facing masonry below its collision cell. Darkling bodies retain exact fractional art size and positions in both graphics modes; rounding them independently would reintroduce a zoom-dependent gap.
+
+The old enemy-half-size + 0.4-cell allowance still identifies nearby targets, but damage waits until `approachBuildingContact` reaches the perimeter. The final step clamps to contact, bypassing the ordinary movement dead zone and crowd separation only during this approach. Mini Darklings use a suitably smaller approach collider; wooden rails allow entry into their own empty cell margin while other owners still block movement. Existing building rims stay inside their footprints. Native/scenario routes, boat rams and cardinal ice-cube strikes share this gate; ranged attacks and unit-versus-unit weapon reach retain their own rules. Contact changes attack timing, so the Defend battle replays are deliberately re-recorded; city generation, fence and save goldens are unchanged.
+
 Validation:
 
+- Contact geometry for all three Darkling sizes, wall faces/corners, thin rails, zero-time/frozen movement, native routes and specialist attackers; 54 real-renderer contact frames across scales/zooms and both graphics modes.
 - Native canvas pixel samples at 0.5, 1 and 2 screen-pixel outward widths; black body preservation and no overlap seams.
 - Differently colored opposing units, translucent overlaps, baked-rim removal, source cropping and camera transforms.
 - Production rendering under 16 desktop/phone, Simple-unit, Merged outlines and Reduce Motion combinations, including maximum grayscale drain. Phone coverage is compared with a frame without contours rather than requiring fully opaque color samples.
 - Existing troop-family gallery, both sides and Simple/sprite art, on grass and at night.
 - A 5,000-square crowd checks fixed canvas count and zero frame readbacks; timings are recorded in ignored test-results and remain hardware-dependent.
-- Combat-cache reuse, invalidation and fresh-paint pixels; legacy painter compatibility remains independently checked. No gameplay or replay fixtures change.
+- Combat-cache reuse, invalidation and fresh-paint pixels; legacy painter compatibility remains independently checked. The contour-only checks do not change gameplay fixtures.
 
 Run the Vite server, then `PLAYWRIGHT_EXECUTABLE=/usr/bin/chromium node tests/unit-contours.mjs`, `node tests/siege-outlines.mjs` and `npm run test:render-cache` (set the same browser variable as needed). Artifacts are written to `test-results/`.
+
+Contact checks: `node --experimental-transform-types --import ./tests/pin-random.ts --test tests/defend-contact.test.ts`, then `PLAYWRIGHT_EXECUTABLE=/usr/bin/chromium node tests/defend-contact.mjs` with Vite running.

@@ -1,3 +1,4 @@
+import { approachBuildingContact, buildingContactPoint } from "./contact.ts";
 import { ENEMIES } from "./catalog.ts";
 import { cellInBounds, cellIndex } from "./grid.ts";
 import { blocked, cellAt, rectDist } from "./pathing.ts";
@@ -22,7 +23,13 @@ export function stepIceCube(sim: DefendSim, e: Enemy, dt: number) {
   const strike = (id: number) => {
     if (e.cd <= 0) { e.cd = ENEMIES.iceCube.cooldown; sim.damageBuilding(id, enemyDamage(sim, e)); }
   };
-  if (rectDist(sim.keep.rect, e.x, e.y) <= reach) { strike(sim.keepId); return; }
+  if (rectDist(sim.keep.rect, e.x, e.y) <= reach) {
+    const goal = buildingContactPoint(sim, e, sim.keep);
+    if (goal.x === e.x || goal.y === e.y) {
+      if (approachBuildingContact(sim, e, sim.keep, dt, true)) strike(sim.keepId);
+      trail(); return;
+    }
+  }
   // A builder may have relocated it since the previous tick.
   if (e.iceSlide && e.iceSlide.x !== e.x && e.iceSlide.y !== e.y) delete e.iceSlide;
   if (!e.iceSlide) {
@@ -41,7 +48,10 @@ export function stepIceCube(sim: DefendSim, e: Enemy, dt: number) {
   if (!to) return;
   if (sim.solid[to.cell]) {
     const id = sim.map.owner[to.cell];
-    if (rectDist(sim.map.buildings[id].rect, e.x, e.y) <= reach) { strike(id); delete e.iceSlide; return; }
+    if (id >= 0) {
+      if (approachBuildingContact(sim, e, sim.map.buildings[id], dt, true)) { strike(id); delete e.iceSlide; }
+      trail(); return;
+    }
   }
   const dx = to.x - e.x, dy = to.y - e.y;
   const distance = Math.abs(dx) + Math.abs(dy);

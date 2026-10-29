@@ -1,3 +1,4 @@
+import { UNIT_CONTOUR_ART_PIXELS, WALL_FACE_HANG } from "./art-scale.ts";
 /** The static city layer for DEFEND: flagstone ground, the spawn lane,
  * dirt streets (`ground-art.ts`) and their stones, park grass and ponds,
  * walls, houses and structures, rubble, the shadows everything standing
@@ -74,7 +75,7 @@ const FLOOR_SIZE = 80;
 const CAP = { x: 38, w: 16, y0: 1, span: 62 };
 const FACE = { x0: 8, span: 64, y: 44, h: 14 };
 /** How far a wall stone's brick face hangs over the cell below, in cells. */
-export const FACE_HANG = 0.45;
+export const FACE_HANG = WALL_FACE_HANG;
 
 const RUBBLE = "#4a443d";
 const WALL = "#8e897c";
@@ -529,7 +530,7 @@ export function hangingFaces(map: CityMap, sim: DefendSim | null): { y: number; 
   return runs;
 }
 
-/** A thin black outline, one art pixel wide like the buildings', round the
+/** A half-art-pixel black contour inside the painted box of the
  * standing wall: on every side of the stone at `at` with no standing
  * neighbour, carried down the sides and along the foot of its hanging face. */
 function paintWallOutline(
@@ -538,8 +539,8 @@ function paintWallOutline(
   standing: (dx: number, dy: number) => boolean,
   face: boolean,
 ) {
-  const o = Math.max(1, Math.round(px / ART));
-  const foot = face ? y + h + Math.round(px * FACE_HANG) : y + h;
+  const o = px / ART * UNIT_CONTOUR_ART_PIXELS;
+  const foot = face ? y + h + px * FACE_HANG : y + h;
   // A neighbour's face carries this one's on to the side.
   const faced = (dx: number) => standing(dx, 0) && !standing(dx, 1);
   c.fillStyle = "#000";

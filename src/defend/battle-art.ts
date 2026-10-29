@@ -676,9 +676,9 @@ export function drawEnemyArt(b: Brush, e: Enemy, sim: DefendSim, under = b) {
   const def = ENEMIES[e.kind];
   if (def.darkPixels) {
     // No sprite lookup, rims, shading, torch, or animated decoration.
-    const d = Math.max(1, Math.round(b.px / ART)) * def.darkPixels;
+    const d = b.px / ART * def.darkPixels;
     b.c.fillStyle = "#000000";
-    b.c.fillRect(Math.round(e.x * b.px - d / 2), Math.round(e.y * b.px - d / 2), d, d);
+    b.c.fillRect(e.x * b.px - d / 2, e.y * b.px - d / 2, d, d);
   }
   else if (def.siege) drawSiegeEngine(b, e, sim.time);
   else if (def.boat) drawBoat(b, e, sim.time);

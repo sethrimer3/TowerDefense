@@ -1,3 +1,5 @@
+import { approachBuildingContact, buildingContactPoint, CONTACT_OUTLINE } from "./contact.ts";
+import { WALL_FACE_HANG } from "./art-scale.ts";
 /** Magic boats: the Enchanted Skiff, Spellbound Sloop, Arcane Galleon and
  * Deluge Ark (`BoatDef` in `catalog.ts`). A boat sails straight through the
  * ground toward the keep, conjuring a pool of water round its hull that it
@@ -179,7 +181,17 @@ export function stepBoat(sim: DefendSim, e: Enemy, dt: number) {
   if (sim.scenario?.routeEnemy?.(e, dt)) return;
   // Monster bait calls a boat too: the nearest stack while any stands.
   const keep = sim.baits.length ? lureOf(sim, e.x, e.y) : sim.keep, half = def.size / 2;
-  if (rectDist(keep.rect, e.x, e.y) <= half + 0.4) return ram(sim, e, keep.id);
+  if (rectDist(keep.rect, e.x, e.y) <= half + .4) {
+    if (approachBuildingContact(sim, e, keep, dt, true)) ram(sim, e, keep.id);
+    return;
+  }
+  // Keep ramming a hull contact reached on the previous step. A fresh
+  // keepward centre ray can select an adjacent wall segment at a corner.
+  for (const b of near(sim, e, half + 2 * CONTACT_OUTLINE + WALL_FACE_HANG)) {
+    if (!sim.solid[cellAt(b.rect.x, b.rect.y)] || sinks(boat, b)) continue;
+    const p = buildingContactPoint(sim, e, b);
+    if (dist(p.x - e.x, p.y - e.y) <= 1e-9) { ram(sim, e, b.id); return; }
+  }
   const goal = center(keep.rect);
   let dx = goal.x - e.x, dy = goal.y - e.y;
   const len = dist(dx, dy);
@@ -188,10 +200,17 @@ export function stepBoat(sim: DefendSim, e: Enemy, dt: number) {
   dy /= len;
   e.facing = { x: dx, y: dy };
   // The bow meets anything solid first: a wall it can't sink stops it.
-  const bx = e.x + dx * half, by = e.y + dy * half;
-  if (bx > 0 && by > 0 && bx < CELLS_W && by < CELLS_H) {
+  const bowReach = half + 2 * CONTACT_OUTLINE + WALL_FACE_HANG;
+  const probes = Math.ceil((bowReach - half) / .1);
+  for (let n = 0; n <= probes; n++) {
+    const reach = half + (bowReach - half) * n / probes;
+    const bx = e.x + dx * reach, by = e.y + dy * reach;
+    if (bx <= 0 || by <= 0 || bx >= CELLS_W || by >= CELLS_H) continue;
     const cell = cellAt(bx, by), owner = sim.map.owner[cell];
-    if (sim.solid[cell] && owner >= 0 && !sinks(boat, sim.map.buildings[owner])) return ram(sim, e, owner);
+    if (sim.solid[cell] && owner >= 0 && !sinks(boat, sim.map.buildings[owner])) {
+      if (approachBuildingContact(sim, e, sim.map.buildings[owner], dt, true)) ram(sim, e, owner);
+      return;
+    }
   }
   const step = Math.min(len, enemySpeed(sim, e) * chilled(e) * dt);
   e.x += dx * step;

@@ -54,12 +54,12 @@ export class IceMotion {
     }
   }
 
-  slide(sim: DefendSim, u: Point, dx: number, dy: number, own: boolean) {
+  slide(sim: DefendSim, u: Point, dx: number, dy: number, own: boolean, radius = .18) {
     const solid = own ? sim.ownSolid : sim.foeSolid;
     const n = this.velocity.has(u) ? Math.max(1, Math.ceil(Math.max(Math.abs(dx), Math.abs(dy)) / .2)) : 1;
     for (let i = 0; i < n; i++) {
-      if (!blocked(solid, u.x + dx / n, u.y)) u.x += dx / n;
-      if (!blocked(solid, u.x, u.y + dy / n)) u.y += dy / n;
+      if (!blocked(solid, u.x + dx / n, u.y, radius)) u.x += dx / n;
+      if (!blocked(solid, u.x, u.y + dy / n, radius)) u.y += dy / n;
     }
   }
 }

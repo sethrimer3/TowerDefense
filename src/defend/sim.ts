@@ -292,7 +292,7 @@ export type SimEvent = { type: "waveStart" | "waveCleared" | "lost"; wave: numbe
 
 /** How a unit moves this step. Flying units ignore buildings. */
 /** `own`: one of the city's people, whom its gates let through. */
-export type Stride = { speed: number; dt: number; flying?: boolean; own?: boolean };
+export type Stride = { speed: number; dt: number; flying?: boolean; own?: boolean; radius?: number; separate?: boolean };
 /** A blast's radius and centre damage (40% at the edge); with friendly fire
  * it also hurts your own people. */
 export type Blast = { r: number; damage: number; friendlyFire: boolean; origin?: Arrow["origin"] };
@@ -1288,14 +1288,14 @@ export class DefendSim {
 
   /** Steer a unit toward a point with light crowd separation; returns false
    * if it made no headway (stuck against something). */
-  moveToward(u: Point, to: Point, { speed, dt, flying = false, own = false }: Stride): boolean {
+  moveToward(u: Point, to: Point, { speed, dt, flying = false, own = false, radius = .18, separate = true }: Stride): boolean {
     let dx = to.x - u.x,
       dy = to.y - u.y;
     const len = dist(dx, dy);
-    if (len < 0.02) return true;
+    if (len === 0 || separate && len < 0.02) return true;
     dx /= len;
     dy /= len;
-    const [sx, sy] = "kind" in u && ENEMIES[(u as Enemy).kind]?.unyielding ? [0, 0] : this.separation(u);
+    const [sx, sy] = !separate || "kind" in u && ENEMIES[(u as Enemy).kind]?.unyielding ? [0, 0] : this.separation(u);
     if ("kind" in u && ((u as Enemy).kind === "siegeBeetle" || ENEMIES[(u as Enemy).kind]?.siege)) (u as Enemy).facing = { x: dx, y: dy };
     const step = Math.min(len, speed * dt);
     const mx = dx * step + sx * 0.5 * speed * dt * 4;
@@ -1308,7 +1308,7 @@ export class DefendSim {
     const ox = u.x,
       oy = u.y;
     const [ix, iy] = this.iceMotion.move(this, u, mx, my, dt, own);
-    this.iceMotion.slide(this, u, ix, iy, own);
+    this.iceMotion.slide(this, u, ix, iy, own, radius);
     return Math.abs(u.x - ox) + Math.abs(u.y - oy) > step * 0.1;
   }
 

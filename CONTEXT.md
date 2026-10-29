@@ -693,3 +693,7 @@ The world-art unit: one eighth of a board cell, scaled to screen pixels by camer
 
 **Visibility contour**:
 A half-art-pixel perimeter around a combined group of unit bodies, bright crimson for Dark One enemies dark navy for the player's troops and black (gold while marked) for everyone else, without seams through overlapping bodies.
+
+
+**Contact damage**:
+Damage dealt by an enemy pressing against a structure, with its visibility contour touching the structure’s perimeter.
