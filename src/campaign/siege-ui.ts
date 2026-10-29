@@ -16,6 +16,7 @@ import { defaultFlag } from "../profile/model.ts";
 import { newSiege, findMatch, settleRaid } from "./siege-progress.ts";
 import { CampaignSim, SIEGE_SECONDS } from "./sim.ts";
 import { CELLS_W } from "../defend/grid.ts";
+import { siegeSky, SIEGE_CLEAR } from "./siege-sky.ts";
 import { buildingLevel, type LeveledKind } from "../building-level.ts";
 import { STRUCTURES } from "../defend/catalog.ts";
 import type { Building } from "../defend/citygen.ts";
@@ -191,7 +192,7 @@ export class SiegePage {
       ">" +
       t("siege.next") +
       "</button></div>" +
-      '<div class="campaign-spells"></div><p class="campaign-status" role="status" aria-live="polite"></p></div>' +
+      '<div class="campaign-spells"></div><p class="campaign-status" role="status" aria-live="polite"><span></span><time class="siege-timer"></time></p></div>' +
       '<div class="campaign-stage defend-stage"><div class="campaign-board defend-board"></div></div>';
     this.root.querySelector(".campaign-board")!.append(this.canvas);
     const board = this.root.querySelector(".campaign-board")!;
@@ -277,7 +278,11 @@ export class SiegePage {
   }
   private refresh() {
     const s = this.sim;
-    this.root.querySelector(".campaign-status")!.textContent =
+    const status = this.root.querySelector('.campaign-status')!, clock = status.querySelector('time')!;
+    clock.hidden = s.phase !== 'battle' || !!this.notice;
+    clock.textContent = t('siege.timeLeft', { seconds: Math.max(0, SIEGE_SECONDS - Math.floor(s.elapsed)) });
+    clock.dataset.sky = siegeSky(SIEGE_SECONDS - s.elapsed).phase;
+    status.querySelector('span')!.textContent =
       this.notice ||
       (s.phase === "build"
         ? t("siege.ready", { count: s.layout.length })
@@ -286,11 +291,10 @@ export class SiegePage {
           : s.phase === "lost"
             ? t("siege.lost")
             : (this.paused ? t("siege.paused") : "") +
-              t("siege.status", {
+              t("siege.battleStatus", {
                 hp: Math.ceil(s.raid.defense.keepHp()),
                 max: Math.ceil(s.raid.defense.keepMaxHp()),
                 troops: s.allies.length,
-                seconds: Math.max(0, SIEGE_SECONDS - Math.floor(s.elapsed)),
               }));
     this.root.querySelector<HTMLButtonElement>('[data-action="start"]')!.disabled = s.phase === "won" || s.phase === "lost";
     this.spellBar?.update(s.engine, s.phase === "battle", this.host.save().settings.reduceMotion, 1, this.spellGate);
@@ -340,11 +344,14 @@ export class SiegePage {
       }
     }
     const owner = this.inspection !== undefined && this.sim.raid.field.defenderIds.has(this.inspection) ? this.sim.raid.defense : this.sim.engine;
+    const sky = siegeSky(SIEGE_SECONDS - this.sim.elapsed);
     r.draw(this.sim.map, sim, this.spellBar?.overlay(this.sim.engine) ?? null, {
       area: "moss",
       grid: 0,
-      weather: null,
-      night: 0,
+      weather: SIEGE_CLEAR,
+      night: sky.night,
+      tint: sky.tint,
+      sun: sky.sun,
       now: this.now,
       reduceMotion: settings.reduceMotion,
       effects: !settings.effectsOff,

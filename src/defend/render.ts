@@ -62,6 +62,9 @@ import { ForestGrass } from "./forest-grass.ts";
 import { hasForest } from "./forest.ts";
 
 export type DrawOptions = {
+  /** Optional natural daylight and board tint; absent in ordinary modes. */
+  sun?: { x: number; y: number; strength: number };
+  tint?: { color: string; strength: number };
   area?: AreaId;
   /** The (dim, gold) tile grid's opacity, 0 to hide it: shown while the
    * player is editing, if they turned it on. */
@@ -296,7 +299,7 @@ export class DefendRenderer {
       }
     }
     this.drawKeepFlag(map, sim, opts);
-    if (sim) this.drawBattleUnits(sim, opts.weather ? this.burning ?? (() => 1) : null, opts);
+    if (sim) this.drawBattleUnits(sim, opts.weather && !(opts.sun && opts.night === 0) ? this.burning ?? (() => 1) : null, opts);
     this.drawTrees(map, sim, opts, dt);
     this.drawForest(sim, opts, dt);
     this.ghosts.watch(sim, opts.now / 1000);
@@ -449,8 +452,17 @@ export class DefendRenderer {
    * lit) unit shadows, the overcast and the torchlight. */
   private drawBattle(map: CityMap, sim: DefendSim, opts: DrawOptions) {
     const weather = opts.weather;
-    this.drawBattleGround(map, sim, weather, opts.night);
+    this.drawBattleGround(map, sim, weather, opts.night, opts.sun);
+    if (opts.tint?.strength) {
+      this.ctx.save();
+      this.ctx.globalCompositeOperation = 'soft-light';
+      this.ctx.globalAlpha = opts.tint.strength;
+      this.ctx.fillStyle = opts.tint.color;
+      this.ctx.fillRect(0, 0, this.board.W, this.board.H);
+      this.ctx.restore();
+    }
     if (!weather) return;
+    if (opts.sun && opts.night === 0) return;
     const { W, H } = this.board;
     const overcast = (w: Weather) => w.clear ? .04 : w.rain ? .3 : .18;
     const strength = overcast(weather);
@@ -621,12 +633,20 @@ export class DefendRenderer {
 
   /** Folds fallen and rebuilt buildings into the lighting, then draws what
    * lies on the ground: building damage, and (in weather) unit shadows. */
-  private drawBattleGround(map: CityMap, sim: DefendSim, weather: Weather | null, night: number) {
+  private drawBattleGround(map: CityMap, sim: DefendSim, weather: Weather | null, night: number, sun?: DrawOptions['sun']) {
     const changed = sim.changed.splice(0);
     if (weather) this.lighting.update(sim.solid, changed, standing(map, sim));
     else if (changed.length) this.lighting.invalidate(changed);
     drawDamage({ c: this.ctx, px: this.px }, sim);
-    if (weather) this.lighting.drawUnitShadows(this.ctx, this.px, shadowCasters(sim), 0.8 + 0.2 * night, this.burning || this.cam.s !== 1 ? undefined : sim.time);
+    if (sun) {
+      const c = this.ctx, px = this.px, length = Math.hypot(sun.x, sun.y), angle = Math.atan2(sun.y, sun.x);
+      c.save(); c.globalAlpha = sun.strength; c.fillStyle = '#05060c'; c.beginPath();
+      for (const u of shadowCasters(sim)) {
+        const x = (u.x + sun.x / 2) * px, y = (u.y + sun.y / 2) * px;
+        c.moveTo(x, y); c.ellipse(x, y, (u.size + length) * px / 2, u.size * px * 0.3, angle, 0, Math.PI * 2);
+      }
+      c.fill(); c.restore();
+    } else if (weather) this.lighting.drawUnitShadows(this.ctx, this.px, shadowCasters(sim), 0.8 + 0.2 * night, this.burning || this.cam.s !== 1 ? undefined : sim.time);
   }
 
   /** Notes when a run ends (or a new one starts), and from then on tells
@@ -672,7 +692,9 @@ export class DefendRenderer {
   private drawLighting(map: CityMap, sim: DefendSim, weather: Weather, opts: DrawOptions) {
     const frame: LightFrame = { px: this.px, now: opts.now, reduceMotion: opts.reduceMotion, intact: standing(map, sim) };
     const flames = flameLights(sim), mages = mageLights(sim), stabs = stabLights(sim), hero = heroLights(sim), dark = darkLights(sim), meteors = meteorLights(sim);
-    this.lighting.drawLight(this.ctx, frame, ambientFor(weather, opts.night, this.previousArea ? this.previousWeather : null, this.areaMix), {
+    const ambient = ambientFor(weather, opts.night, this.previousArea ? this.previousWeather : null, this.areaMix);
+    if (opts.sun) ambient.alpha *= Math.min(1, opts.night * 3);
+    this.lighting.drawLight(this.ctx, frame, ambient, {
       torches: [...this.carried(sim), ...flames.carried, ...mages.carried, ...stabs.carried, ...hero.carried, ...dark.carried, ...meteors.carried],
       solid: sim.solid,
       version: sim.mapVersion,

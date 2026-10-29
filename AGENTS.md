@@ -25,6 +25,7 @@ node tests/pixel-art.mjs # Legacy art stays visible with no PNG requests, Settin
 node tests/defend-rally-flag.mjs # Double tap in battle plants the free blue rally flag in the war banner's place, a double tap on it takes it away, desktop and touch (needs dev server)
 node tests/defend-rally-aim.mjs # Select a troop building in battle, press it again and drag its rally flag (raised on touch), range edge, clearing, watch tower snapping (needs dev server)
 node tests/tree-motes.mjs # Golden motes in three sizes round the keep's living tree and a spell's path tree, moving, bursting, panning held to the tree and a fifth beyond, zooming out held a quarter past the fit with motes in every corner, none under Reduce Motion, desktop and phone (needs dev server)
+node tests/siege-sky.mjs # Siege day/sunset/dusk/night, pause and translucent troop HUD on desktop/phone (needs dev server)
 node tests/siege-staging.mjs # Two-minute Siege, hidden homes, troop entry, pause, inspection and camera framing on desktop/phone (needs dev server)
 node tests/defend-controls.mjs # Header placement, speed persistence and compact explicit-close defeat reports (needs dev server)
 node tests/defend-small-boats.mjs # Compact boats, visual water and heading sprites (needs dev server)
@@ -290,3 +291,5 @@ Uses the five default labels: `needs-triage`, `needs-info`, `ready-for-agent`, `
 ### Domain docs
 
 Single-context: one `CONTEXT.md` and `docs/adr/` at the repo root, both created only when needed. See `docs/agents/domain.md`.
+
+**Siege sky.** `campaign/siege-sky.ts` derives phase, night, tint and natural shadows from battle time left (day to sunset at 70, dusk at 45, full night for the final 20 seconds). Siege passes calm clear weather and optional `DrawOptions.sun/tint`; these are absent in other modes. Daylight leaves torches off, dusk enables native lighting, and the timer uses phase colors. The troop box is translucent black with a brass border. `tests/siege-sky.test.ts` and `node tests/siege-sky.mjs` cover boundaries, pause and desktop/phone frames.
