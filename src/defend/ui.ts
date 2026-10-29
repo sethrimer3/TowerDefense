@@ -94,6 +94,10 @@ export type DefendHost = {
   gridLines?(): number;
   gridColor?(): GridColor;
   setHealthbars?(value: boolean): void;
+  /** The board zooms in whole device pixels an art pixel (the Settings
+   * page's Crisp pixel zoom, also the board's own checkbox). */
+  crispZoom?(): boolean;
+  setCrispZoom?(value: boolean): void;
   /** Whether the palette lists items the player has none of. */
   showEmpty?(): boolean;
   /** Whether dragged items ride above the pointer. */
@@ -341,7 +345,8 @@ export class DefendPage {
           <div class="defend-board" id="defend-board"><canvas id="defend-canvas" aria-label="City defense board. Scroll or pinch to zoom, drag to pan."></canvas>
             <div class="defend-specialty" id="defend-specialty" role="dialog" aria-label="Specialization" hidden></div>
             <div class="defend-banner" id="defend-banner" role="dialog" aria-label="The keep has fallen" hidden></div>
-            <div class="defend-message" id="defend-message" aria-live="polite"></div></div>
+            <div class="defend-message" id="defend-message" aria-live="polite"></div>
+            <label class="defend-crisp"><input type="checkbox" id="defend-crisp"> Crisp pixels</label></div>
         </div>
       </div>
       <dialog class="defend-journal-dialog" aria-labelledby="defend-journal-title"></dialog>
@@ -353,6 +358,12 @@ export class DefendPage {
     });
     this.bindSpecialty();
     this.renderer = new DefendRenderer(this.root.querySelector("#defend-canvas")!);
+    const crisp = this.root.querySelector<HTMLInputElement>("#defend-crisp")!;
+    crisp.checked = !!this.host.crispZoom?.();
+    crisp.onchange = () => {
+      this.host.setCrispZoom?.(crisp.checked);
+      this.draw();
+    };
     const canvas = this.renderer.canvas;
     canvas.addEventListener("pointermove", (e) => {
       if (!this.spellBar) return;
@@ -950,6 +961,10 @@ export class DefendPage {
 
   private draw(fit = true) {
     if (!this.renderer) return;
+    const crisp = !!this.host.crispZoom?.();
+    this.renderer.crisp = crisp;
+    const box = this.root.querySelector<HTMLInputElement>("#defend-crisp");
+    if (box && box.checked !== crisp) box.checked = crisp;
     if (fit) this.fitView();
     if (!this.renderer.canvas.width) return;
     const map = this.sim ? this.sim.map : this.currentMap();

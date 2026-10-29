@@ -29,6 +29,9 @@ export const SETTINGS = {
   /** Units in battle outlined together: touching units share one black
    * outline round their combined shape instead of each its own. */
   mergedOutlines: { kind: "toggle", default: true, page: { id: "merged-outlines", label: "Merged unit outlines" } },
+  /** The Defend board's zoom steps so every art pixel covers the same
+   * whole number of screen pixels: outlines keep one width at every zoom. */
+  crispZoom: { kind: "toggle", default: true, page: { id: "crisp-zoom", label: "Crisp pixel zoom" } },
   /** The Defend palette lists items the player has none of (greyed); off, only those owned. */
   showEmpty: { kind: "toggle", default: false, page: { id: "show-empty", label: "Show items you have none of" } },
   /** Items dragged on the Defend board ride a few blocks above the pointer,
