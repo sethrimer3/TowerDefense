@@ -43,10 +43,16 @@ function dot(c: Ctx, px: number, pix: number, x: number, y: number) {
 }
 
 /** A shade at its spot: its cloak, the hood over it, then its knives. */
-export function drawShade(c: Ctx, px: number, u: Soldier, sim: DefendSim) {
+export function drawShade(c: Ctx, px: number, u: Soldier, sim: DefendSim, ink?: string, rim?: Ctx) {
   const pix = Math.max(1, Math.round(px / ART)), a = 1 / ART;
   const struck = u.flash > 0, now = sim.time;
   const x0 = u.x - 3.5 * a, y0 = u.y - SHADE.size * 1.2;
+  const edge = (x: number, y: number) => {
+    const r = rim ?? c;
+    r.globalAlpha = c.globalAlpha;
+    r.fillStyle = ink ?? OUTLINE;
+    dot(r, px, pix, x, y);
+  };
   c.save();
   c.globalAlpha = struck ? 0.85 : 0.62;
   // The cloak, from the shoulders down: a bell flaring wider row by row,
@@ -60,19 +66,24 @@ export function drawShade(c: Ctx, px: number, u: Soldier, sim: DefendSim) {
       const hem = j === CLOAK_ROWS - 1, side = i === left || i === right;
       if (hem && (i + Math.round(now * 6 + u.id)) % 3 === 0) continue;
       c.fillStyle = side || hem ? OUTLINE : struck ? CLOAK[2] : i - mid < -half * 0.35 && j < 6 ? CLOAK[2] : i - mid > half * 0.4 ? CLOAK[0] : CLOAK[1];
-      dot(c, px, pix, u.x + (i - 0.5) * a, y0 + (4 + j) * a);
+      if (ink && (side || hem)) edge(u.x + (i - 0.5) * a, y0 + (4 + j) * a);
+      else dot(c, px, pix, u.x + (i - 0.5) * a, y0 + (4 + j) * a);
     }
   }
   // Tatters trailing off the hem.
   c.fillStyle = OUTLINE;
   for (let k = -2; k <= 2; k++) {
     const x = Math.round(stream + k * 1.6), drop = 1 + ((Math.round(now * 5) + k + u.id) & 1);
-    for (let d = 0; d < drop; d++) dot(c, px, pix, u.x + (x - 0.5) * a + stream * d * 0.4 * a, y0 + (4 + CLOAK_ROWS + d) * a);
+    for (let d = 0; d < drop; d++) {
+      const dx = u.x + (x - 0.5) * a + stream * d * 0.4 * a, dy = y0 + (4 + CLOAK_ROWS + d) * a;
+      if (ink) edge(dx, dy); else dot(c, px, pix, dx, dy);
+    }
   }
   HOOD.forEach((row, j) => [...row].forEach((ch, i) => {
     if (ch === ".") return;
     c.fillStyle = ch === "e" ? EYES : ch === "0" ? OUTLINE : ch === "2" ? CLOAK[2] : struck ? CLOAK[2] : CLOAK[0];
-    dot(c, px, pix, x0 + i * a, y0 + j * a);
+    if (ink && ch === "0") edge(x0 + i * a, y0 + j * a);
+    else dot(c, px, pix, x0 + i * a, y0 + j * a);
   }));
   c.restore();
   // The knives circling it: those not out on a loop.

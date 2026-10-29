@@ -37,7 +37,7 @@ import { sniperAim } from "./snipers.ts";
 import { drawSimpleEnemies, drawSimpleTroops } from "./simple-units.ts";
 import { drawPixel, enemySprite } from "./pixel-sprites.ts";
 import { isMelee, meleeFacing } from "./melee-facing.ts";
-import type { UnitOutline } from "./unit-outline.ts";
+import type { UnitOutline, UnitInks } from "./unit-outline.ts";
 import { drawGarrisons, garrisoned } from "./garrison-icons.ts";
 
 export type Brush = { c: CanvasRenderingContext2D; px: number };
@@ -101,11 +101,11 @@ function healthBar({ c, px }: Brush, bd: Building, frac: number) {
 export type Burning = (x: number, y: number, id: number) => number;
 
 /** Draw enemies, or your troops, as plain squares (`simple-units.ts`). */
-export type Simple = { enemies?: boolean; troops?: boolean; reduceMotion?: boolean };
+export type Simple = { enemies?: boolean; troops?: boolean; reduceMotion?: boolean; merged?: boolean };
 
 /** Units, projectiles and effects. With `torches`, units carry a torch,
  * lit while it still burns. */
-export function drawUnits(b: Brush, sim: DefendSim, torches: Burning | null, healthbars = false, timing?: { entityMs: number }, simple: Simple = {}, outline?: UnitOutline) {
+export function drawUnits(b: Brush, sim: DefendSim, torches: Burning | null, healthbars = false, timing?: { entityMs: number }, simple: Simple = {}, outline?: UnitOutline, sides?: UnitInks) {
   // Track the wave peak even when the setting is off.
   if (!healthbars) trackHealthbarPeak(sim);
   drawBlackHoles(b, sim);
@@ -114,22 +114,28 @@ export function drawUnits(b: Brush, sim: DefendSim, torches: Burning | null, hea
   const start = timing ? performance.now() : 0;
   // With `outline`, the units go into its layer and their outlines under
   // them all; fliers' shadows and shields stay on the board beneath.
-  const layers = outline?.begin(b.c);
+  const layers = outline?.begin(b.c, !sides || simple.merged !== false);
   const u: Brush = layers ? { c: layers.units, px: b.px } : b;
   let swords: ReturnType<typeof drawSoldiers> = [];
   rims = layers?.rims ?? null;
+  const unit = sides && outline ? (id: number) => { rims = outline.ink(sides.ink(id)); } : undefined;
+  const rimFor = sides && outline ? (color: string) => outline.ink(color) : undefined;
   try {
-    for(const soldier of sim.soldiers)if(soldier.raidEnemy){u.c.save();u.c.strokeStyle='#d66e58';u.c.lineWidth=Math.max(1,b.px*.12);u.c.beginPath();u.c.ellipse(soldier.x*b.px,soldier.y*b.px,b.px*.5,b.px*.25,0,0,Math.PI*2);u.c.stroke();u.c.restore();}
-    drawCivilians(u, sim, torches);
-    swords = simple.troops ? (drawSimpleTroops(u, sim.soldiers.filter((o) => !garrisoned(o)), layers?.rims), []) : drawSoldiers(u, sim, torches, simple.reduceMotion);
-    if (simple.enemies) drawSimpleEnemies(u, sim.enemies.filter(e=>!e.raidProxy), layers?.rims);
-    else for (const e of sim.enemies) if (!e.raidProxy) drawEnemyArt(u, e, sim, layers ? b : undefined);
+    if (!sides) for(const soldier of sim.soldiers)if(soldier.raidEnemy){u.c.save();u.c.strokeStyle='#d66e58';u.c.lineWidth=Math.max(1,b.px*.12);u.c.beginPath();u.c.ellipse(soldier.x*b.px,soldier.y*b.px,b.px*.5,b.px*.25,0,0,Math.PI*2);u.c.stroke();u.c.restore();}
+    drawCivilians(u, sim, torches, unit);
+    if (simple.troops) {
+      const troops = sim.soldiers.filter(o => !garrisoned(o));
+      if (sides && simple.merged === false) for (const soldier of troops) { unit?.(soldier.id); drawSimpleTroops(u, [soldier], rims ?? undefined, sides); }
+      else drawSimpleTroops(u, troops, layers?.rims, sides, rimFor);
+    } else swords = drawSoldiers(u, sim, torches, simple.reduceMotion, unit, sides);
+    if (simple.enemies) drawSimpleEnemies(u, sim.enemies.filter(e=>!e.raidProxy), layers?.rims, sides, rimFor);
+    else for (const e of sim.enemies) if (!e.raidProxy) { unit?.(e.id); drawEnemyArt(u, e, sim, layers ? b : undefined); }
   } finally {
     rims = null;
   }
   outline?.end(b.c);
   drawSwords(b, swords);
-  drawGarrisons(b, sim);
+  drawGarrisons(b, sim, sides);
   if (timing) timing.entityMs += performance.now() - start;
   drawChrono(b.c,b.px,sim,simple.reduceMotion);
   drawArrows(b.c, b.px, sim, simple.reduceMotion);
@@ -167,9 +173,10 @@ function drawWatchRadii({ c, px }: Brush, sim: DefendSim) {
 }
 
 /** Civilians, with a flicker of gold over those at work. */
-function drawCivilians(b: Brush, sim: DefendSim, torches: Burning | null) {
+function drawCivilians(b: Brush, sim: DefendSim, torches: Burning | null, unit?: (id: number) => void) {
   const { c, px } = b;
   for (const u of sim.civilians) {
+    unit?.(u.id);
     const s = Math.max(2, CIVILIAN.size * px);
     if (!(u.flash <= 0 && drawPixel(c, "civilian", u.x * px - s / 2, u.y * px - s / 2, s))) {
       c.fillStyle = u.flash > 0 ? "#fff" : CIVILIAN.color;
@@ -203,12 +210,13 @@ function drawCivilians(b: Brush, sim: DefendSim, torches: Burning | null) {
  * shade (`shade-art.ts`).
  * Returns the swordsmen's swings, whose swords and trails draw over the
  * enemies. */
-function drawSoldiers(b: Brush, sim: DefendSim, torches: Burning | null, reduced = false) {
+function drawSoldiers(b: Brush, sim: DefendSim, torches: Burning | null, reduced = false, unit?: (id: number) => void, sides?: UnitInks) {
   const { c, px } = b;
-  const swords: { x: number; y: number; swing: Swing }[] = [];
+  const swords: { x: number; y: number; swing: Swing; ink?: string }[] = [];
   for (const u of sim.soldiers) {
     // Up in a watch tower: a badge over it instead (`garrison-icons.ts`).
     if (garrisoned(u)) continue;
+    unit?.(u.id);
     if (u.kind === "mage") {
       drawMage(c, px, u, sim.time, sim, reduced);
       continue;
@@ -227,7 +235,7 @@ function drawSoldiers(b: Brush, sim: DefendSim, torches: Burning | null, reduced
       continue;
     }
     if (u.kind === "shade") {
-      drawShade(c, px, u, sim);
+      drawShade(c, px, u, sim, sides?.ink(u.id), sides ? rimOf(c) : undefined);
       continue;
     }
     if (u.risen) {
@@ -253,7 +261,7 @@ function drawSoldiers(b: Brush, sim: DefendSim, torches: Burning | null, reduced
     const s = Math.max(2, (archer ? ARCHER_UNIT.size : SOLDIER.size) * px);
     if (!archer) drawMeleeCape(c, px, u, sim, reduced, x, y);
     if (u.flash <= 0 && drawPixel(c, archer ? "archer" : "swordsman", x * px - s / 2, y * px - s / 2, s)) {
-      if (swing) swords.push({ x, y, swing });
+      if (swing) swords.push({ x, y, swing, ...(sides ? { ink: sides.ink(u.id) } : {}) });
       if (torches) drawHandTorch(b, { x: x + SOLDIER.size * 0.65, y: y - SOLDIER.size * 0.45, id: u.id }, sim.time, torches(u.x, u.y, u.id));
       continue;
     }
@@ -267,7 +275,7 @@ function drawSoldiers(b: Brush, sim: DefendSim, torches: Burning | null, reduced
       c.fillStyle = "#b58a4f";
       c.fillRect(x * px - s / 2 - Math.max(1, s * 0.3), y * px - s / 2, Math.max(1, s * 0.2), s);
     }
-    if (swing) swords.push({ x, y, swing });
+    if (swing) swords.push({ x, y, swing, ...(sides ? { ink: sides.ink(u.id) } : {}) });
     if (torches) drawHandTorch(b, { x: x + SOLDIER.size * 0.65, y: y - SOLDIER.size * 0.45, id: u.id }, sim.time, torches(u.x, u.y, u.id));
   }
   return swords;
@@ -477,10 +485,10 @@ const GUILD_TROOPS = {
 const isGuildTroop = (k: string): k is keyof typeof GUILD_TROOPS => k in GUILD_TROOPS;
 
 /** Each sword and its swing's trail, over whoever it is cutting. */
-function drawSwords(b: Brush, swords: { x: number; y: number; swing: Swing }[]) {
-  for (const { x, y, swing } of swords) {
+function drawSwords(b: Brush, swords: { x: number; y: number; swing: Swing; ink?: string }[]) {
+  for (const { x, y, swing, ink } of swords) {
     drawSwordTrail(b, x, y, swing);
-    drawSword(b, x, y, swing.blade, swing.k < 1 ? 1 : 0.8);
+    drawSword(b, x, y, swing.blade, swing.k < 1 ? 1 : 0.8, ink);
   }
 }
 
@@ -555,14 +563,14 @@ function dot(c: CanvasRenderingContext2D, x: number, y: number, d: number) {
 }
 
 /** The small sword, hilt at the body's edge, pointing along `angle`. */
-function drawSword({ c, px }: Brush, x: number, y: number, angle: number, reach: number) {
+function drawSword({ c, px }: Brush, x: number, y: number, angle: number, reach: number, ink?: string) {
   const d = Math.max(1, Math.round(px * 0.07));
   const ux = Math.cos(angle),
     uy = Math.sin(angle);
   const r0 = SOLDIER.size * 0.5,
     r1 = r0 + BLADE * reach;
   // The black outline first, a pixel round the blade.
-  c.fillStyle = "#0d0d10";
+  c.fillStyle = ink ?? "#0d0d10";
   for (let r = r0; r <= r1; r += d / px) dot(c, (x + ux * r) * px, (y + uy * r) * px, d + 2);
   c.fillStyle = "#dfe6ee";
   for (let r = r0 + 0.08; r <= r1; r += d / px) dot(c, (x + ux * r) * px, (y + uy * r) * px, d);

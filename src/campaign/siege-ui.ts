@@ -17,6 +17,7 @@ import { newSiege, findMatch, settleRaid } from "./siege-progress.ts";
 import { CampaignSim, SIEGE_SECONDS } from "./sim.ts";
 import { CELLS_W } from "../defend/grid.ts";
 import { siegeSky, SIEGE_CLEAR } from "./siege-sky.ts";
+import { siegeSides } from "./siege-colors.ts";
 import { buildingLevel, type LeveledKind } from "../building-level.ts";
 import { STRUCTURES } from "../defend/catalog.ts";
 import type { Building } from "../defend/citygen.ts";
@@ -352,6 +353,7 @@ export class SiegePage {
       night: sky.night,
       tint: sky.tint,
       sun: sky.sun,
+      sides: siegeSides(this.sim.raid.attack.soldiers, this.sim.raid.defense.soldiers),
       now: this.now,
       reduceMotion: settings.reduceMotion,
       effects: !settings.effectsOff,

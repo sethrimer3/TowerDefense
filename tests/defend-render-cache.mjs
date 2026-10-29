@@ -4,6 +4,8 @@ import assert from 'node:assert/strict';
 import { makeReference } from './defend-render-reference.mjs';
 import { writeFileSync } from 'node:fs';
 const referenceRoot=makeReference();
+// Keep the optimization references, but compare combat to the art before Siege sides.
+const combatRoot=makeReference(process.env.PERF_REF || '0555c7d');
 const browser = await chromium.launch(process.env.PLAYWRIGHT_EXECUTABLE
   ? { headless: true, executablePath: process.env.PLAYWRIGHT_EXECUTABLE }
   : { headless: true, channel: process.env.PLAYWRIGHT_CHANNEL || 'chrome' });
@@ -13,15 +15,16 @@ try {
   await page.addInitScript(()=>{ globalThis.__pinnedSeeds={defend:3182828918,game:3887091088}; });
   await page.goto((process.env.TEST_URL || 'http://127.0.0.1:5173/')+'tests/performance.html');
   page.on('console',msg=>{if(msg.text().startsWith('Sparse lightning'))console.log(msg.text());});
-  const results = await page.evaluate(async referenceRoot => {
+  const results = await page.evaluate(async ({referenceRoot,combatRoot}) => {
     const {GroundRelief}=await import('/src/defend/ground-relief.ts');
     const {GroundRelief:ReferenceRelief}=await import(`${referenceRoot}/ground-relief.ts`);
     const {DefendRenderer}=await import('/src/defend/render.ts');
     const {stressScene}=await import('/tests/defend-stress-scene.ts');
     const {drawBlazes}=await import('/src/defend/mage-art.ts');
     const {drawBlazes:referenceBlazes}=await import(`${referenceRoot}/mage-art.ts`);
-    const referenceBattle=await import(`${referenceRoot}/battle-art.ts`);
-    const {WizardArt:ReferenceWizard}=await import(`${referenceRoot}/wizard-art.ts`);
+    const referenceBattle=await import(`${combatRoot}/battle-art.ts`);
+    const {WizardArt:ReferenceWizard}=await import(`${combatRoot}/wizard-art.ts`);
+    const {drawBlazes:combatBlazes}=await import(`${combatRoot}/mage-art.ts`);
     const {map,sim}=stressScene(100);
     const make=(w=504,h=728)=>{const c=document.createElement('canvas');c.width=w;c.height=h;return c;};
     const compare=(a,b)=>{
@@ -163,12 +166,12 @@ try {
       }
       const g=original.getContext('2d'),brush={c:g,px:r.px};
       referenceBattle.drawScorches(brush,sim);
-      referenceBlazes(g,r.px,sim);
+      combatBlazes(g,r.px,sim);
       const {flameLights}=await import('/src/defend/wizard-art.ts');
       const oldWizard=new ReferenceWizard();
       Object.assign(oldWizard,{clusters:r.wizard.clusters,fire:r.wizard.fire,glints:r.wizard.glints});
       oldWizard.drawIce(g,r.px,sim.frosts,sim.time*1000,flameLights(sim).relief);
-      referenceBattle.drawUnits(brush,sim,()=>1,true);
+      referenceBattle.drawUnits(brush,sim,()=>1,true,undefined,{reduceMotion:opts.reduceMotion});
       r.dark.draw(g,r.px,sim);
       r.paintCombat(fresh.getContext('2d'),sim,()=>1,opts);
       reports.push({check:'original combat pixels',zoom,...compare(original,fresh)});
@@ -184,10 +187,14 @@ try {
     // A dropped bomb changes combat between ticks. It must not leave a cached
     // pre-blast frame on screen while a journal has paused the simulation.
     r.draw(map,sim,null,opts);
-    const time=sim.time;
+    const time=sim.time, key=r.combatKey;
     sim.dropBomb(30,35);
     if(sim.time!==time)throw new Error('bomb advanced battle time');
-    r.draw(map,sim,null,opts);const bomb=capture();
+    r.draw(map,sim,null,opts);
+    if(r.combatKey===key)throw new Error('bomb did not invalidate combat');
+    // Damage opens walls and invalidates staged light fields too.
+    r.lighting.bakePending(sim.solid,1000);r.draw(map,sim,null,opts);
+    const bomb=capture();
     r.combatKey='';r.draw(map,sim,null,opts);
     reports.push({check:'same-tick bomb',...compare(bomb,capture())});
     // Settings and canvas dimensions independently invalidate screen pixels.
@@ -197,7 +204,7 @@ try {
     r.combatKey='';r.draw(map,sim,null,opts);
     reports.push({check:'resize and healthbars',...compare(resized,capture())});
     return reports;
-  },referenceRoot);
+  },{referenceRoot,combatRoot});
   writeFileSync('test-results/render-cache.json',JSON.stringify(results,null,2));
   console.table(results);
   for(const result of results){

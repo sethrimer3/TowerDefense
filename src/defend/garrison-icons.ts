@@ -9,6 +9,7 @@ import { artPen, OUTLINE } from "./pixel-fx.ts";
 import { TROOPS } from "./simple-units.ts";
 import type { Rect } from "./grid.ts";
 import type { DefendSim, Soldier } from "./sim.ts";
+import type { UnitInks } from "./unit-outline.ts";
 
 type Brush = { c: CanvasRenderingContext2D; px: number };
 
@@ -62,14 +63,14 @@ const STEEL = "#aab3bc";
 const RIM = "#c9a24a", FACE = "#2a1f16", SKIN = "#e2b98c", BOOTS = "#1c140e";
 
 /** Every garrison's badges, over the units. */
-export function drawGarrisons({ c, px }: Brush, sim: DefendSim) {
+export function drawGarrisons({ c, px }: Brush, sim: DefendSim, sides?: UnitInks) {
   const pen = artPen(c, px);
   const fill = (color: string, x: number, y: number, w: number, h: number) => {
     c.fillStyle = color;
     pen(x, y, w, h);
   };
   for (const { rect, units } of garrisons(sim))
-    badgeSpots(rect, units.length).forEach(({ ax, ay }, i) => drawBadge(fill, ax, ay, units[i].kind, units[i].flash > 0));
+    badgeSpots(rect, units.length).forEach(({ ax, ay }, i) => drawBadge(fill, ax, ay, units[i].kind, units[i].flash > 0, true, sides?.ink(units[i].id)));
 }
 
 /** One troop kind's badge, without its notch, on a canvas `BADGE.size`
@@ -93,14 +94,14 @@ export function paintTroopBadge(canvas: HTMLCanvasElement, kind: Soldier["kind"]
 
 type Fill = (color: string, x: number, y: number, w: number, h: number) => void;
 
-function drawBadge(fill: Fill, x: number, y: number, kind: Soldier["kind"], white: boolean, notch = true) {
+function drawBadge(fill: Fill, x: number, y: number, kind: Soldier["kind"], white: boolean, notch = true, ink = OUTLINE) {
   const n = BADGE.size;
   // The outline, corners cut, and its notch pointing down at the tower.
-  fill(OUTLINE, x + 1, y, n - 2, n);
-  fill(OUTLINE, x, y + 1, n, n - 2);
+  fill(ink, x + 1, y, n - 2, n);
+  fill(ink, x, y + 1, n, n - 2);
   if (notch) {
-    fill(OUTLINE, x + (n >> 1) - 1, y + n, 3, 1);
-    fill(OUTLINE, x + (n >> 1), y + n + 1, 1, 1);
+    fill(ink, x + (n >> 1) - 1, y + n, 3, 1);
+    fill(ink, x + (n >> 1), y + n + 1, 1, 1);
   }
   // The brass rim and the dark face inside it.
   fill(RIM, x + 1, y + 1, n - 2, n - 2);
