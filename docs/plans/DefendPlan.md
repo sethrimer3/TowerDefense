@@ -20,3 +20,11 @@ Follow the architecture guidelines in [AmbushPlan.md](AmbushPlan.md#architecture
 ## Backlog
 
 Add Defend items here in the form: **What** (one line), **Why**, **Files**, **Tests**, **Status**.
+
+
+## Dark One enemy migration (2026-10-29)
+
+- [x] Inventory all Ambush levels/waves and Defend wave families as outdated; maintain the per-wave [migration tracker](../design/ENEMY_MIGRATION.md).
+- [x] Update only Defend wave 1: 30 one-pixel Mini Darklings and five 2 × 2 Darklings, splitting into two minis each.
+- [x] Add low-cost radial color drain around dense Dark One crowds, starting near ten neighbors, fully grayscale with 30% lower contrast at maximum density.
+- [ ] Migrate later waves toward roughly 90% plain pixel filler; identify medium enemies by equipment and retain complex sprites for rare high-strength threats. Track each composition and story exception in the migration log.

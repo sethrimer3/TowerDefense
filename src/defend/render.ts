@@ -1,5 +1,6 @@
 import { CollapseView } from "./collapse-view.ts";
 import type { Flag } from "../profile/model.ts";
+import { DarkDrain } from "./dark-drain.ts";
 import { drawMines } from "./mine-art.ts";
 import { enemySize } from "./catalog.ts";
 /** Canvas renderer for DEFEND: the camera, and each frame's passes in order.
@@ -139,6 +140,7 @@ export class DefendRenderer {
   private readonly rallyFlag = new RallyFlagArt();
   private readonly sky = new SkyPalaceArt();
   readonly atmosphere = new AtmosphereArt();
+  private readonly darkDrain = new DarkDrain();
   readonly forest = new ForestArt();
   readonly forestGrass = new ForestGrass();
   /** The battle time the wizard art last advanced to. */
@@ -319,6 +321,7 @@ export class DefendRenderer {
     if (opts.effects ?? true) this.drawSmoke(map, sim, opts);
     // Cloudborne palaces sail over everything on the ground.
     this.sky.draw(this.ctx, this.px, map, sim, opts.looks, { now: opts.now, dt, reduceMotion: opts.reduceMotion, night: opts.night });
+    this.darkDrain.draw(this.ctx, this.px, sim, opts.now);
     opts.markers?.(this.ctx,this.px);
     this.rallyFlag.draw(this.ctx, this.px, sim, sim?.warBanner?.flag && !opts.hideBanner ? sim.warBanner : null, opts);
     if (sim?.warBanner && !sim.warBanner.flag && !opts.hideBanner) drawWarBanner(this.ctx, this.px, sim.warBanner, bannerReach(sim), { t: opts.now / 1000, reduceMotion: opts.reduceMotion });
