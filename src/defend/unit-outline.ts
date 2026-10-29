@@ -18,6 +18,7 @@
 import { OUTLINE } from "./pixel-fx.ts";
 
 type Ctx = CanvasRenderingContext2D;
+export type UnitInks = { ink: (id: number) => string | undefined };
 type Sprite = HTMLCanvasElement | HTMLImageElement;
 
 /** Edge pixels this dark (every channel at most) are a sprite's outline. */
@@ -112,32 +113,45 @@ function canvas() {
 export class UnitOutline {
   private layer = canvas();
   private outline = canvas();
+  private colors = new Map<string, ReturnType<typeof canvas>>();
+  private current = this.outline;
+  private under = new Map<Ctx, Draw>([[this.outline.c, drawer(this.outline.c)]]);
+  private currentInk: string | undefined;
+  private merged = true;
+  private solo: { target: Ctx; units: Ctx; rims: Ctx } | undefined;
+  private tint = canvas();
 
   constructor() {
-    const c = this.layer.c, o = this.outline.c, patch = c as unknown as Record<string, unknown>;
+    const c = this.layer.c, patch = c as unknown as Record<string, unknown>;
     // The outline layer follows every change of the units' transform, so
     // silhouettes land where their sprites do.
     for (const name of ["save", "restore", "setTransform", "resetTransform", "transform", "translate", "scale", "rotate"] as const) {
-      const own = (c[name] as (...a: unknown[]) => void).bind(c), other = (o[name] as (...a: unknown[]) => void).bind(o);
-      patch[name] = function (...a: unknown[]) {
+      const own = (c[name] as (...a: unknown[]) => void).bind(c);
+      patch[name] = (...a: unknown[]) => {
         own(...a);
-        other(...a);
+        (this.outline.c[name] as (...v: unknown[]) => void).apply(this.outline.c, a);
+        for (const layer of this.colors.values()) (layer.c[name] as (...v: unknown[]) => void).apply(layer.c, a);
       };
     }
-    const draw = drawer(c), under = drawer(o);
+    const draw = drawer(c);
+    const owner = this;
     patch.drawImage = function (img: CanvasImageSource, a: number, b: number, w?: number, h?: number, dx?: number, dy?: number, dw?: number, dh?: number) {
       const made = isSprite(img) ? copiesOf(img) : null;
       const n = arguments.length;
-      if (made && c.globalAlpha >= SOLID) under(made.shape, a, b, w, h, dx, dy, dw, dh, n);
+      if (made && c.globalAlpha >= SOLID) owner.under.get(owner.current.c)!(made.shape, a, b, w, h, dx, dy, dw, dh, n);
       draw(made?.bare ?? img, a, b, w, h, dx, dy, dw, dh, n);
     };
   }
 
   /** The layer to draw the units into and the one under it for their
    * outlines, both cleared, sized to `c`'s canvas and under its transform. */
-  begin(c: Ctx): { units: Ctx; rims: Ctx } {
+  begin(c: Ctx, merged = true): { units: Ctx; rims: Ctx } {
+    this.merged = merged;
+    this.currentInk = undefined;
+    this.current = this.outline;
+    if (!merged) return this.individual(c);
     const { width, height } = c.canvas, m = c.getTransform();
-    for (const { cv, c: l } of [this.layer, this.outline]) {
+    for (const { cv, c: l } of [this.layer, this.outline, ...this.colors.values()]) {
       if (cv.width !== width || cv.height !== height) {
         cv.width = width;
         cv.height = height;
@@ -152,13 +166,73 @@ export class UnitOutline {
     return { units: this.layer.c, rims: this.outline.c };
   }
 
+  /** Switch only the silhouette channel; all bodies retain their own colors. */
+  ink(color?: string): Ctx {
+    this.currentInk = color;
+    if (!this.merged) return this.solo!.rims;
+    if (!color) this.current = this.outline;
+    else {
+      let layer = this.colors.get(color);
+      if (!layer) {
+        layer = canvas();
+        layer.cv.width = this.layer.cv.width; layer.cv.height = this.layer.cv.height;
+        layer.c.setTransform(this.layer.c.getTransform()); layer.c.imageSmoothingEnabled = false;
+        this.colors.set(color, layer);
+        this.under.set(layer.c, drawer(layer.c));
+      }
+      this.current = layer;
+      layer.c.globalAlpha = this.layer.c.globalAlpha;
+    }
+    return this.current.c;
+  }
+
+  /** Individual outlines use small reusable sprite masks, never a frame copy per unit. */
+  private individual(c: Ctx): { units: Ctx; rims: Ctx } {
+    if (this.solo?.target === c) return this.solo;
+    const owner = this, draw = drawer(c);
+    const image = function (img: CanvasImageSource, a: number, b: number, w?: number, h?: number, dx?: number, dy?: number, dw?: number, dh?: number) {
+      const made = owner.currentInk && isSprite(img) ? copiesOf(img) : null, n = arguments.length;
+      if (made && c.globalAlpha >= SOLID) {
+        const { cv, c: t } = owner.tint;
+        if (cv.width !== made.shape.width || cv.height !== made.shape.height) { cv.width = made.shape.width; cv.height = made.shape.height; }
+        t.clearRect(0, 0, cv.width, cv.height); t.globalCompositeOperation = 'source-over';
+        t.drawImage(made.shape, 0, 0); t.globalCompositeOperation = 'source-in';
+        t.fillStyle = owner.currentInk!; t.fillRect(0, 0, cv.width, cv.height); t.globalCompositeOperation = 'source-over';
+        draw(cv, a, b, w, h, dx, dy, dw, dh, n);
+      }
+      draw(made?.bare ?? img, a, b, w, h, dx, dy, dw, dh, n);
+    };
+    const wrap = (rim: boolean) => {
+      const methods = new Map<PropertyKey, unknown>();
+      return new Proxy(c, {
+        get(target, key) {
+          if (!rim && key === 'drawImage') return image;
+          const value = Reflect.get(target, key, target);
+          if (typeof value !== 'function') return value;
+          if (!methods.has(key)) methods.set(key, value.bind(target));
+          return methods.get(key);
+        },
+        set(target, key, value) { return Reflect.set(target, key, rim && (key === 'fillStyle' || key === 'strokeStyle') ? owner.currentInk ?? value : value, target); },
+      });
+    };
+    this.solo = { target: c, units: wrap(false), rims: wrap(true) };
+    return this.solo;
+  }
+
   /** The outlines, then the units over them, onto `c`. */
   end(c: Ctx) {
+    if (!this.merged) return;
     c.save();
     c.setTransform(1, 0, 0, 1, 0, 0);
     c.globalAlpha = 1;
     c.globalCompositeOperation = "source-over";
     c.drawImage(this.outline.cv, 0, 0);
+    for (const [ink, layer] of this.colors) {
+      const t = layer.c; t.save(); t.setTransform(1, 0, 0, 1, 0, 0);
+      t.globalAlpha = 1; t.globalCompositeOperation = 'source-in'; t.fillStyle = ink;
+      t.fillRect(0, 0, layer.cv.width, layer.cv.height); t.restore();
+      c.drawImage(layer.cv, 0, 0);
+    }
     c.drawImage(this.layer.cv, 0, 0);
     c.restore();
   }
