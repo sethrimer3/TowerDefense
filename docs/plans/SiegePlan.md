@@ -293,7 +293,7 @@ One PR per phase, as before. Tick each here as it lands.
 - **Phase 11: the defender's flags ☑.** Custom keep flag, `SiegeFlags` poles, felling them.
 - **Phase 12: flag-bearers ☑.** The unit, untargetable filtering, mana on death, art.
 - **Phase 13: victory ☑.** `SiegeVictory`: the collapse wave, the burning and raised flags, skip, Reduce Motion.
-- **Phase 14: directing units ☐.** Option A chosen by Seth: unit types plus separate heroes/ultimates.
+- **Phase 14: directing units ☑.** Option A chosen by Seth: unit types plus separate heroes/ultimates.
 
 Phase 8 validation: all 123 Node test files, the production build, and native-castle/entry/HUD/staging browser checks pass at 390×844 and 1280×800. Native paths, every infantry family, replenishment, open entry cells, hidden-home targeting/inspection, pause and the exact 120-second cutoff are covered. Training was rerun from scratch and the curve refitted; held-out seeds 1001–1004 won 42/136 raids (30.9%). Bronze lost all 16 trials at the minimum native castle budget; the balance limitation is published in `SIEGE_MATCHMAKING.md`. Only `siege-castles.golden.json` changed, for the new native DPS budgets; Defend replay, city and fence goldens are untouched.
 
@@ -345,3 +345,7 @@ Phase 12 validation: three native, homeless flag-bearers stroll inside the castl
 Phase 13 validation: the distance-ordered collapse includes every wall/gate and a deterministic third of standing structures. Copied HP/build/solid masks produce native rubble and lighting without changing combat state. The rating settles once at victory; the outward flag burn, rising player flags, bounded dust/stone effects, spaced native sounds and gentle shake finish before results. Pause, tap/keyboard/button skip, Effects Off and instant Reduce Motion are supported. Desktop/phone frames at 0.5, 1.5 and 3 seconds, final results and skip/reduced paths pass; all 128 Node test files and the production build pass. No goldens changed.
 
 The isolated phase 13/14 test copies initially omitted `public/` and `scripts/`; the three resource-dependent test files were rerun successfully after restoring those unchanged inputs. Focused victory checks additionally pin stable render identity and live pre-collapse damage reads, preventing scenery from resetting at the win.
+
+Phase 14 validation: option A groups staging homes by native type, with separate hero/ultimate buttons, stable colors and living counts. One tap arms and a board tap directs; selecting the same button twice clears its order and restores the keep assault. Native rally fields are shared per current destination and breach queries follow each unit’s banner. Spell/squad selection cancels mutually; Escape works after a pan, touch aiming works, and the toolbar fits/scrolls on phones. Markers stay above trees during combat, and the hidden default goal banner leaves custom keep faces visible. All 129 Node test files pass (including the resource reruns noted above); the build and desktop/phone squad, victory, sky and staging checks pass. No goldens changed.
+
+All numbered Siege phases (0–14) are implemented. The unchecked shared fence item and the explicitly deferred future work retain their separate scope. The phase 12 report preserves the outstanding Bronze/two-minute balance limitation.

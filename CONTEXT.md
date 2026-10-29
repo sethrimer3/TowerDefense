@@ -669,3 +669,5 @@ A temporary Siege battle resource earned by defeating enemy troops and spent on 
 - **Flag-bearer:** one of three non-combat defenders carrying the castle’s banner. Area or passing attacks can kill one for two mana; ordinary troops never aim at one.
 
 - **Collapse wave:** the Siege victory presentation expanding from the fallen keep, turning walls and selected buildings to visual rubble while replacing the defender’s flags.
+
+- **Squad:** a Siege command group of staging homes sharing a troop role, or one hero/ultimate family. Its flag redirects those homes’ troops; clearing it resumes the keep assault.

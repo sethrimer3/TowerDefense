@@ -776,9 +776,9 @@ let rallyCanvas: HTMLCanvasElement | null = null;
  * ring, since it lends its troops nothing. */
 export function drawRallyFlag(
   c: CanvasRenderingContext2D, px: number, at: { x: number; y: number },
-  pose: { t: number; reduceMotion: boolean; alpha?: number; rise?: number; scale?: number },
+  pose: { t: number; reduceMotion: boolean; alpha?: number; rise?: number; scale?: number; face?: Flag },
 ) {
-  rallyCanvas = spriteCanvas(flagPixels(pose.t, pose.reduceMotion, true), FLAG_W, FLAG_H, rallyCanvas ?? undefined);
+  rallyCanvas = spriteCanvas(flagPixels(pose.t, pose.reduceMotion, true, pose.face), FLAG_W, FLAG_H, rallyCanvas ?? undefined);
   // `rise` lifts it that many cells off its spot and `scale` grows it about
   // the pole's foot, as if nearer the eye: for dropping in and flying off.
   const s = (px / ART) * (pose.scale ?? 1);

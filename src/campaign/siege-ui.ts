@@ -1,3 +1,5 @@
+import { SquadBar } from "./siege-squad-bar.ts";
+import { SiegeSquads } from "./siege-squads.ts";
 import { SiegeVictory } from "./siege-victory.ts";
 import { play } from "../sound.ts";
 import { SiegeFlags } from "./siege-flags.ts";
@@ -41,6 +43,7 @@ export class SiegePage {
   private victory?: SiegeVictory;
   private inspection: number | undefined;
   private spellBar?: SpellBar;
+  private squadBar?: SquadBar;
   private flags?: SiegeFlags;
   private flagsSim?: CampaignSim;
   private spellGate?: SpellBarGate;
@@ -58,6 +61,7 @@ export class SiegePage {
     if (host.save().siege?.raid.state === "started" && settleRaid(host.save().siege!, false)) queueMicrotask(() => host.store());
     this.sim = this.make();
     this.renderer = new DefendRenderer(this.canvas);
+    this.canvas.tabIndex=0;
     this.canvas.setAttribute("aria-label", t("siege.board"));
     this.pointers = new BoardPointers({
       renderer: () => this.renderer,
@@ -66,6 +70,7 @@ export class SiegePage {
       tap: (e) => this.tap(e),
     });
     this.canvas.onpointerdown = (e) => {
+      this.canvas.focus({preventScroll:true});
       this.plateFocus(e);
       this.pointers.down(e);
     };
@@ -75,11 +80,12 @@ export class SiegePage {
       if (this.spellBar) {
         const p = this.renderer.toCell(e.clientX, e.clientY);
         this.spellBar.point = { x: p.fx, y: p.fy };
+        if(this.squadBar)this.squadBar.point={x:p.fx,y:p.fy};
       }
     };
     this.root.addEventListener("keydown", (e) => {
       if (this.victory && (e.key === "Escape" || e.key === "Enter")){this.victory.skip();this.finishVictory();return;}
-      if (e.key === "Escape") this.spellBar?.cancel();
+      if (e.key === "Escape") {this.spellBar?.cancel();this.squadBar?.cancel();}
     });
     this.canvas.oncontextmenu = (e) => e.preventDefault();
     this.canvas.addEventListener(
@@ -105,6 +111,7 @@ export class SiegePage {
     this.last = 0;
     this.pointers.end();
     this.spellBar?.cancel();
+    this.squadBar?.cancel();
     this.disposeEntry?.();
     this.disposeEntry = undefined;
   }
@@ -253,6 +260,9 @@ export class SiegePage {
       this.render();
     };
     this.spellBar = new SpellBar(STRIKE_SPELLS.filter((spell) => this.sim.engine.bonuses[spell]));
+    this.squadBar=new SquadBar(new SiegeSquads(this.sim.engine,this.sim.raid.field.attackerIds),()=>this.spellBar?.cancel());
+    this.root.querySelector('.campaign-head')!.append(this.squadBar.el);
+    this.spellBar.el.addEventListener('click',()=>{if(this.spellBar?.armed)this.squadBar?.cancel();});
     const mana = this.sim.mana;
     this.spellGate = mana
       ? {
@@ -323,6 +333,7 @@ export class SiegePage {
     this.spellBar?.update(s.engine, s.phase === "battle", this.host.save().settings.reduceMotion, 1, this.spellGate);
     if (s.mana) this.manaCounter?.update(s.mana.value, SIEGE_MANA.cap);
     this.troops.update(s.allies);
+    this.squadBar?.update(s.phase==='battle');
     const skip=this.root.querySelector<HTMLButtonElement>('[data-action="skip-victory"]');if(skip)skip.hidden=!this.victory;
   }
   private plateFocus(e: PointerEvent) {
@@ -336,6 +347,7 @@ export class SiegePage {
     const p = this.renderer.toCell(e.clientX, e.clientY),
       at = { x: p.fx, y: p.fy },
       s = this.sim.engine;
+    if(this.squadBar?.armed && this.sim.phase==='battle'){this.squadBar.plant(at);return;}
     if (this.spellBar?.armed && this.sim.phase === "battle") {
       // Mana is scarce: a Necromancy with no grave in reach would spend it
       // for nothing, so the spell stays armed instead.
@@ -383,7 +395,9 @@ export class SiegePage {
       tint: sky.tint,
       sun: sky.sun,
       keepFlag: this.victory ? null : face,
+      hideBanner: true,
       collapsed: this.victory?.collapsed ?? NO_COLLAPSE,
+      markers:(c,px)=>{if(this.sim.phase==='battle')this.squadBar?.draw(c,px,this.now,settings.reduceMotion);},
       scenery: (c,px)=>{this.flags!.draw(c,px,sim,this.now,settings.reduceMotion,!settings.effectsOff);if(!settings.effectsOff)this.victory?.draw(c,px);},
       sides: siegeSides(this.sim.raid.attack.soldiers, this.sim.raid.defense.soldiers),
       now: this.now,
