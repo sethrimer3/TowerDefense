@@ -23,6 +23,7 @@ export const SETTINGS_TEXT = [
  ["setting.soundOff","Sound","Sonido","Son","Ton","Som","Audio","効果音","소리","音效"],
  ["setting.ambienceOff","Ambient sound","Sonido ambiental","Ambiance sonore","Umgebungsgeräusche","Som ambiente","Suoni ambientali","環境音","환경음","环境音"],
  ["setting.pixelArt","Pixel Art","Arte píxel","Pixel art","Pixelgrafik","Pixel Art","Pixel art","ピクセルアート","픽셀 아트","像素画"],
+ ["setting.legacyGraphics","Show legacy graphics","Mostrar gráficos clásicos","Afficher les graphismes classiques","Klassische Grafik anzeigen","Mostrar gráficos clássicos","Mostra grafica classica","従来のグラフィックを表示","이전 그래픽 표시","显示经典画面"],
  ["setting.pixelFont","Use Custom Font","Usar fuente personalizada","Utiliser la police personnalisée","Eigene Schrift verwenden","Usar fonte personalizada","Usa carattere personalizzato","カスタムフォントを使用","사용자 지정 글꼴 사용","使用自定义字体"],
  ["setting.developerMode","Developer mode","Modo desarrollador","Mode développeur","Entwicklermodus","Modo desenvolvedor","Modalità sviluppatore","開発者モード","개발자 모드","开发者模式"],
  ["setting.devMode","Unlimited money","Dinero ilimitado","Argent illimité","Unbegrenztes Geld","Dinheiro ilimitado","Denaro illimitato","資源無制限","무제한 자원","无限资源"],

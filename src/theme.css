@@ -428,7 +428,7 @@ nav button.selected {
     0 2px 0 #000,
     0 0 14px #ff9a3c30;
 }
-nav button > span img {
+nav button > span img, nav button canvas.tab-icon {
   filter: drop-shadow(0 2px 0 #000);
 }
 

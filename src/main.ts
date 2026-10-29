@@ -7,7 +7,8 @@ import { bonuses, busySmiths, payWave, settleTraining, skillRank, skillTotal, wh
 import { settleResearch } from "./research-jobs.ts";
 import { settleForge } from "./forge-jobs.ts";
 import type { AppContext } from "./ui/app.ts";
-import { el, type Tab } from "./ui/dom.ts";
+import { el, TAB_ICONS, type Tab } from "./ui/dom.ts";
+import { paintTabIcon, tabIconHtml } from "./ui/tab-icons.ts";
 import { buildShell } from "./ui/shell.ts";
 import { AmbushPage } from "./campaign/ambush-ui.ts";
 import { SiegePage } from "./campaign/siege-ui.ts";
@@ -38,7 +39,8 @@ import { setLanguage, translateWithin } from "./i18n/index.ts";
 let save: Save = load();
 setLanguage(save.settings.language);
 fitViewport();
-buildShell(document.querySelector<HTMLDivElement>("#app")!);
+buildShell(document.querySelector<HTMLDivElement>("#app")!, save.settings.legacyGraphics);
+let shownLegacyGraphics = save.settings.legacyGraphics;
 document.querySelectorAll<HTMLCanvasElement>("nav canvas[data-icon]").forEach((c) => paintIcon(c, "cityTile"));
 // Refresh icons after the visual setting changes, once a frame at most.
 let iconsQueued = false;
@@ -96,7 +98,7 @@ const ctx: AppContext = {
   },
 };
 const reduced = () => save.settings.reduceMotion || matchMedia("(prefers-reduced-motion: reduce)").matches;
-const combatTab = new CombatTab(document.querySelector<HTMLButtonElement>('nav [data-tab="defend"]')!, reduced);
+const combatTab = new CombatTab(document.querySelector<HTMLButtonElement>('nav [data-tab="defend"]')!, reduced, () => save.settings.legacyGraphics);
 const tilesPage = new TilesPage(ctx, el("tiles"));
 /** The rooms below the Mine and the Library, and the way down to each. */
 const smithyRoom = new Chamber(el("mine-chamber"), "planks"), studyRoom = new Chamber(el("library-chamber"), "vault");
@@ -287,6 +289,12 @@ function update() {
   store();
   refreshCurrencies();
   combatTab.render(combatMode, tab === "defend");
+  if (shownLegacyGraphics !== save.settings.legacyGraphics) {
+    shownLegacyGraphics = save.settings.legacyGraphics;
+    const icon = document.querySelector<HTMLElement>('nav [data-tab="settings"] > span')!;
+    icon.innerHTML = shownLegacyGraphics ? tabIconHtml("settings") : TAB_ICONS.settings;
+    if (shownLegacyGraphics) paintTabIcon(icon.querySelector("canvas")!, "settings");
+  }
 }
 function renderPage() {
   if (tab === "defend" && combatMode === "defend") defendPage.show();
