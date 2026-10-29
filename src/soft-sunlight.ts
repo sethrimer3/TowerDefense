@@ -17,6 +17,23 @@ export const SUNLIGHT = {
 
 const TINTS = [[255, 244, 222], [226, 239, 255], [255, 238, 202]] as const;
 
+/** The baked field's shape, 0 to 1: `along` the shaft from its top (0 to 1),
+ * `across` its halo (-1 to 1, the drawn field's full width). */
+export function shaftField(along: number, across: number, fade: number = SUNLIGHT.distanceFade) {
+  if (along <= 0 || along >= 1 || across <= -1 || across >= 1) return 0;
+  const sigma = SUNLIGHT.feather * (1 + along * SUNLIGHT.spread);
+  const start = Math.min(1, along / 0.14);
+  return Math.exp(-across * across / (2 * sigma * sigma)) * start * start * (3 - 2 * start) * (1 - along) ** fade;
+}
+
+/** How bright a shaft `draw` would paint with these arguments is at (px, py),
+ * 0 to 1 before its density: the same field, sampled analytically. */
+export function shaftAt(px: number, py: number, x: number, y: number, width: number, length: number, tilt: number, fade: number = SUNLIGHT.distanceFade) {
+  if (width <= 0 || length <= 0) return 0;
+  const v = py - y;
+  return shaftField(v / length, (px - x - tilt * v) / (width * 1.8), fade);
+}
+
 export class SoftSunlight {
   private fields: HTMLCanvasElement[];
 
@@ -31,11 +48,7 @@ export class SoftSunlight {
       canvas.height = 192;
       const ctx = canvas.getContext("2d")!, image = ctx.createImageData(96, 192);
       for (let y = 0; y < 192; y++) for (let x = 0; x < 96; x++) {
-        const along = (y + 0.5) / 192, across = (x + 0.5) / 48 - 1;
-        const sigma = SUNLIGHT.feather * (1 + along * SUNLIGHT.spread);
-        const start = Math.min(1, along / 0.14);
-        const field = Math.exp(-across * across / (2 * sigma * sigma))
-          * start * start * (3 - 2 * start) * (1 - along) ** fade;
+        const field = shaftField((y + 0.5) / 192, (x + 0.5) / 48 - 1, fade);
         const o = (y * 96 + x) * 4;
         image.data[o] = tint[0]; image.data[o + 1] = tint[1]; image.data[o + 2] = tint[2];
         image.data[o + 3] = Math.round(255 * density * field);

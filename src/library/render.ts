@@ -31,7 +31,7 @@ import { ELIXIRS } from "./lab.ts";
 import { HATCH_Y, LabRenderer } from "./lab-render.ts";
 import { LAB_TOP } from "./geometry.ts";
 import { ashlar, facing } from "./ashlar.ts";
-import { SoftSunlight, SUNLIGHT } from "../soft-sunlight.ts";
+import { shaftAt, SoftSunlight, SUNLIGHT } from "../soft-sunlight.ts";
 
 /** Each role's robe. */
 const ROBES: Record<Role, RGB> = { shelver: [240, 236, 228], professor: [104, 124, 200], researcher: [160, 104, 210] };
@@ -93,7 +93,14 @@ function h01(a: number, b: number, c = 0) {
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 }
 
-type Mote = { x: number; y: number; vx: number; vy: number; life: number };
+/** A dust mote: its `alpha` eases toward the light where it floats. */
+type Mote = { x: number; y: number; vx: number; vy: number; alpha: number };
+/** One sunbeam as drawn this frame: its top middle, aperture, length, strength. */
+type Shaft = { x: number; y: number; width: number; length: number; strength: number };
+/** The dust in the sunbeams: how many motes, how fast each brightens toward the
+ * light it is in and dims as it leaves it (a share of the gap a frame), and the
+ * beam's field at which a mote shows fully. */
+const DUST = { count: 34, fadeIn: 0.012, fadeOut: 0.006, full: 0.35 };
 /** Smoke and embers off the flames. */
 /** How far in the view zooms. */
 const MAX_ZOOM = 6;
@@ -916,24 +923,40 @@ export class LibraryRenderer {
     const ctx = this.ctx, tilt = Math.sin(((now % DAY_MS) / DAY_MS) * Math.PI * 2 - Math.PI / 2) * 0.55
       + Math.sin(now / SUNLIGHT.swayMs) * SUNLIGHT.sway;
     ctx.save();
+    const shafts: Shaft[] = [];
     for (let k = 0; k < 5; k++) {
       const a = WINDOW.x0 + 3 + k * 8, b = a + 6, top = HEAD + 6 + (k % 2) * 10, len = FLOOR - top;
       const pulse = 0.75 + 0.25 * Math.sin(now / (3100 + k * 700) + k);
+      shafts.push({ x: (a + b) / 2, y: top, width: b - a, length: len, strength: day * pulse });
       this.sunlight.draw(ctx, (a + b) / 2, top, b - a, len, tilt, day * pulse, k);
     }
-    // Motes drifting through the light.
-    ctx.globalCompositeOperation = "lighter";
-    while (this.motes.length < 26) {
-      const top = HEAD + this.fx() * (FLOOR - HEAD - 20);
-      this.motes.push({ x: WINDOW.x0 + this.fx() * (WINDOW.x1 - WINDOW.x0) + tilt * (top - HEAD), y: top, vx: (this.fx() - 0.5) * 0.05, vy: (this.fx() - 0.3) * 0.04, life: 200 + this.fx() * 300 });
+    // How strongly the sun lights the dust at a point: the brightest beam there.
+    const light = (x: number, y: number) => {
+      let most = 0;
+      for (const s of shafts) most = Math.max(most, s.strength * Math.min(1, shaftAt(x, y, s.x, s.y, s.width, s.length, tilt) / DUST.full));
+      return most;
+    };
+    // New motes come in at a beam's edge, unseen, and brighten as the light takes them.
+    while (day > 0 && this.motes.length < DUST.count) {
+      const s = shafts[Math.floor(this.fx() * shafts.length)], along = 0.1 + this.fx() * 0.6;
+      const side = this.fx() < 0.5 ? -1 : 1, edge = SUNLIGHT.feather * (1 + along * SUNLIGHT.spread) * (1.2 + this.fx() * 0.8);
+      const y = s.y + along * s.length, x = s.x + tilt * (y - s.y) + side * edge * s.width * 1.8;
+      // Most drift inward, a few along the edge or away.
+      const vx = -side * this.fx() * 0.04 + (this.fx() - 0.5) * 0.02;
+      this.motes.push({ x, y, vx, vy: (this.fx() - 0.3) * 0.04, alpha: 0 });
     }
+    // Motes drifting through the light, dimming as they leave it, gone only once unseen.
+    ctx.globalCompositeOperation = "lighter";
     ctx.fillStyle = "#fff4d0";
     this.motes = this.motes.filter((m) => {
       m.x += m.vx;
       m.y += m.vy;
-      ctx.globalAlpha = day * 0.5 * Math.min(1, m.life / 60);
+      const want = light(m.x, m.y);
+      m.alpha += (want - m.alpha) * (want > m.alpha ? DUST.fadeIn : DUST.fadeOut);
+      if (want <= m.alpha && m.alpha < 0.004) return false;
+      ctx.globalAlpha = 0.5 * m.alpha;
       ctx.fillRect(m.x, m.y, 0.6, 0.6);
-      return --m.life > 0;
+      return true;
     });
     ctx.restore();
   }
