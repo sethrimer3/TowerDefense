@@ -130,3 +130,5 @@ DEFEND also indexes nearby defenders during enemy turns, selects only the eight 
 `.github/workflows/static.yml` runs the tests and the build on every push to `main` and deploys `dist/` to GitHub Pages. In the repository's **Settings → Pages**, the source must be set to **GitHub Actions**.
 
 Siege side outlines use optional per-side silhouette layers and cached masks for individual units; `node tests/siege-outlines.mjs` exercises the desktop and phone galleries.
+
+Siege custom keep banners and seeded decorative poles live in `campaign/siege-flags.ts`; pole destruction reads native impacts without adding collision or targets.

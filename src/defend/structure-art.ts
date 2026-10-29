@@ -1,3 +1,4 @@
+import { flagPixels as profilePixels, type Flag } from "../profile/model.ts";
 /** DEFEND's structure art, seen from above: the keep, and the barracks and
  * towers from `tower-art.ts` at their damage stages and as rubble (drawn
  * into the city layer and the palette icons), the keep's live banner, and
@@ -685,12 +686,13 @@ const BLUE = [0x1f3f7a, 0x2c5cb0, 0x4682d8], PALE = [0x9fb4cf, 0xcfdcec, 0xf2f6f
  * a one-pixel outline, a shadow on the roof below, and the pole's gold cap.
  * The ripple steps at 12 frames a second, like a sprite; under reduced
  * motion it holds still. */
-export function flagPixels(t: number, reduceMotion: boolean, blue = false): Uint32Array {
+export function flagPixels(t: number, reduceMotion: boolean, blue = false, face?: Flag): Uint32Array {
   const [field, band] = blue ? [BLUE, PALE] : [RED, GOLD];
   const out = new Uint32Array(FLAG_W * FLAG_H);
   const tick = reduceMotion ? 0 : Math.floor(t * 12) / 12;
   // 0 off the cloth, else 1 + shade index (+ 3 on the stripe).
   const cloth = new Uint8Array(FLAG_W * FLAG_H);
+  const colors = face ? profilePixels(face) : undefined, custom = new Uint32Array(FLAG_W * FLAG_H);
   for (let i = 0; i < CLOTH_L; i++) {
     const phase = tick * 6 - i * 0.5;
     const lift = Math.round(Math.sin(phase) * 1.6 * ((i + 1) / CLOTH_L));
@@ -701,6 +703,10 @@ export function flagPixels(t: number, reduceMotion: boolean, blue = false): Uint
       if (i === CLOTH_L - 1 && j > 0 && j < CLOTH_D - 1) continue;
       const x = POLE + 1 + i, y = POLE - 2 + j + lift;
       cloth[y * FLAG_W + x] = 1 + tone + (j === (CLOTH_D - 1) / 2 ? 3 : 0);
+      if (colors) {
+        const rgb=colors[Math.floor(j*24/CLOTH_D)*16+Math.floor(i*16/CLOTH_L)], shade=[.7,.88,1.08][tone];
+        custom[y*FLAG_W+x]=(Math.min(255,Math.round((rgb>>>16)*shade))<<16)|(Math.min(255,Math.round(((rgb>>>8)&255)*shade))<<8)|Math.min(255,Math.round((rgb&255)*shade));
+      }
     }
   }
   const on = (x: number, y: number) => x >= 0 && y >= 0 && x < FLAG_W && y < FLAG_H && cloth[y * FLAG_W + x] > 0;
@@ -711,7 +717,7 @@ export function flagPixels(t: number, reduceMotion: boolean, blue = false): Uint
   for (let y = 0; y < FLAG_H; y++)
     for (let x = 0; x < FLAG_W; x++) {
       const v = cloth[y * FLAG_W + x];
-      if (v) out[y * FLAG_W + x] = rgba(v > 3 ? band[v - 4] : field[v - 1]);
+      if (v) out[y * FLAG_W + x] = rgba(colors ? custom[y*FLAG_W+x] : v > 3 ? band[v - 4] : field[v - 1]);
       else if (edge(x, y)) out[y * FLAG_W + x] = rgba(K.outline);
     }
   // The pole's cap: two by two gold pixels in an outline, over the cloth's
@@ -728,8 +734,8 @@ let flagCanvas: HTMLCanvasElement | null = null;
 
 /** The keep's banner, redrawn every frame from the time so it keeps
  * waving, at the city's art scale. */
-export function drawFlag(c: CanvasRenderingContext2D, px: number, pose: FlagPose, keepSprite = true) {
-  flagCanvas = spriteCanvas(flagPixels(pose.t, pose.reduceMotion), FLAG_W, FLAG_H, flagCanvas ?? undefined);
+export function drawFlag(c: CanvasRenderingContext2D, px: number, pose: FlagPose, keepSprite = true, face?: Flag) {
+  flagCanvas = spriteCanvas(flagPixels(pose.t, pose.reduceMotion, false, face), FLAG_W, FLAG_H, flagCanvas ?? undefined);
   const s = px / ART;
   c.save();
   c.imageSmoothingEnabled = false;
