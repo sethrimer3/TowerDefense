@@ -1060,9 +1060,15 @@ export const HOUSE_HP_PER_CELL = 22;
 
 export type ZoneReinforcementKind = "fernMantis" | "mossTroll" | "lanternHornet" | "glassJackal" | "duneTortoise" | "dustDjinn" | "cinderImp" | "slagGolem" | "emberMoth" | "kelpStalker" | "capCrawler" | "myceliumHulk" | "rotMite" | "geodeCrab" | "prismMoth" | "shardBrood" | "cryptHound" | "graveWisp" | "novaMoth";
 export type ZoneEnemyKind = ZoneReinforcementKind | "briarling" | "mossBoar" | "rootTreant" | "duneScorpion" | "sunScarab" | "sandVulture" | "brineCrab" | "lanternJelly" | "coralGuardian" | "sporeling" | "fungalBrute" | "sporeMoth" | "shardling" | "crystalSentinel" | "prismRay" | "starWisp" | "cometHound" | "astralWarden";
-export type EnemyKind = ZoneEnemyKind | "iceGolem" | "iceCube" | "roach" | "orc" | "ogre" | "bat" | "warlord" | "mother" | "broodling" | "snake" | "dragon" | "shieldBearer" | "aegis" | "darkKnight" | "bombOrc" | "bombBird" | "voidSparrow" | "shieldLesser" | "shieldGreater" | "poisonLesser" | "poisonBearer" | "poisonGreater" | "poisonSovereign" | "siegeBeetle" | "burrowingMole" | "necromancer" | "skeleton" | "bannerCaptain" | "mirrorKnight" | "leechSwarm" | "ashPhoenix" | "phoenixEgg" | "blinkImp" | "fortressHut" | "fortressOutpost" | "fortressTower" | "fortressKeep" | "fortressLesser" | "fortress" | "fortressGreater" | "fortressSovereign" | "rollingCannon" | "ballista" | "fireworkLauncher" | "trebuchet" | "bombard" | "rocketBattery" | "boatDinghy" | "boatSailboat" | "boatCutter" | "boatCog" | "boatLesser" | "boat" | "boatGreater" | "boatSovereign";
+export type EnemyKind = "miniDarkling" | "darkling" | ZoneEnemyKind | "iceGolem" | "iceCube" | "roach" | "orc" | "ogre" | "bat" | "warlord" | "mother" | "broodling" | "snake" | "dragon" | "shieldBearer" | "aegis" | "darkKnight" | "bombOrc" | "bombBird" | "voidSparrow" | "shieldLesser" | "shieldGreater" | "poisonLesser" | "poisonBearer" | "poisonGreater" | "poisonSovereign" | "siegeBeetle" | "burrowingMole" | "necromancer" | "skeleton" | "bannerCaptain" | "mirrorKnight" | "leechSwarm" | "ashPhoenix" | "phoenixEgg" | "blinkImp" | "fortressHut" | "fortressOutpost" | "fortressTower" | "fortressKeep" | "fortressLesser" | "fortress" | "fortressGreater" | "fortressSovereign" | "rollingCannon" | "ballista" | "fireworkLauncher" | "trebuchet" | "bombard" | "rocketBattery" | "boatDinghy" | "boatSailboat" | "boatCutter" | "boatCog" | "boatLesser" | "boat" | "boatGreater" | "boatSovereign";
 export type EnemyDef = {
   kind: EnemyKind;
+  /** Allegiance controls the crowd color drain, never inferred from sprite color. */
+  faction?: "darkOne";
+  /** Introduced by an authored wave; keep out of legacy procedural rosters. */
+  scriptedOnly?: boolean;
+  /** A solid black body on the eight-art-pixels-per-cell lattice. */
+  darkPixels?: 1 | 2;
   name: string;
   hp: number;
   /** Species-specific behavior and counterplay shown in the journal. */
@@ -1135,8 +1141,8 @@ export const ENEMIES: Record<EnemyKind, EnemyDef> = {
   geodeCrab: { kind: "geodeCrab", name: "Geode Crab", hp: 300, speed: .85, damage: 18, cooldown: 1.3, size: .85, color: "#917da9", distraction: 0, flying: false, cost: 300, damageScale: { physical: .5, explosion: 2 }, description: "Its geode shell halves physical damage, including lightning, but explosions deal double damage. Fire bypasses the shell." },
   prismMoth: { kind: "prismMoth", name: "Prism Moth", hp: 70, speed: 3.1, damage: 9, cooldown: .8, size: .65, color: "#a9b6e6", distraction: 0, flying: true, cost: 100, description: "A swift crystal-winged moth that slips over walls. Intercept it with archers before it reaches the keep." },
   shardBrood: { kind: "shardBrood", name: "Shard Brood", hp: 260, speed: .9, damage: 16, cooldown: 1.3, size: .9, color: "#bc85ce", distraction: 0, flying: false, cost: 450, splits: { into: "shardling", count: 3 }, description: "A crystal cluster that breaks into three swift shardlings when destroyed. Keep an area attack ready for the fragments." },
-  cryptHound: { kind: "cryptHound", name: "Crypt Hound", hp: 240, speed: 2.8, damage: 20, cooldown: .9, size: .75, color: "#877b9c", distraction: 0, flying: false, cost: 350, description: "A fast graveyard hunter. Use layered garrisons and slowing attacks to prevent a rush through breaches." },
-  graveWisp: { kind: "graveWisp", name: "Grave Wisp", hp: 160, speed: 1.8, damage: 12, cooldown: 1.1, size: .65, color: "#9eadc3", distraction: 0, flying: true, cost: 500, regeneration: 4, description: "A floating grave spirit that reforms after scattered hits. Concentrate anti-air damage to extinguish it." },
+  cryptHound: { kind: "cryptHound", faction: "darkOne", name: "Crypt Hound", hp: 240, speed: 2.8, damage: 20, cooldown: .9, size: .75, color: "#877b9c", distraction: 0, flying: false, cost: 350, description: "A fast graveyard hunter. Use layered garrisons and slowing attacks to prevent a rush through breaches." },
+  graveWisp: { kind: "graveWisp", faction: "darkOne", name: "Grave Wisp", hp: 160, speed: 1.8, damage: 12, cooldown: 1.1, size: .65, color: "#9eadc3", distraction: 0, flying: true, cost: 500, regeneration: 4, description: "A floating grave spirit that reforms after scattered hits. Concentrate anti-air damage to extinguish it." },
   novaMoth: { kind: "novaMoth", name: "Nova Moth", hp: 220, speed: 2.2, damage: 18, cooldown: 1, size: .85, color: "#deb5d8", distraction: 0, flying: true, cost: 800, splits: { into: "starWisp", count: 2 }, description: "A luminous sky moth that releases two flying star wisps on death. Keep anti-air coverage ready for the smaller spirits." },
   briarling: { kind: "briarling", name: "Briarling", hp: 16, speed: 2.5, damage: 3, cooldown: .7, size: .4, color: "#74a34d", distraction: .15, flying: false, cost: 2, description: "A quick thorn-covered sprout. Fragile alone; use area attacks when a treant releases a cluster." },
   mossBoar: { kind: "mossBoar", name: "Moss Boar", hp: 65, speed: 2.1, damage: 10, cooldown: 1.2, size: .65, color: "#887343", distraction: .3, flying: false, cost: 6, description: "A sturdy, fast tusked raider. Meet it with soldiers before it reaches the keep." },
@@ -1162,18 +1168,18 @@ export const ENEMIES: Record<EnemyKind, EnemyDef> = {
   orc: { kind: "orc", name: "Orc", hp: 34, speed: 1.6, damage: 6, cooldown: 0.9, size: 0.46, color: "#6fa04a", distraction: 0.6, flying: false, cost: 4 },
   ogre: { kind: "ogre", name: "Ogre", hp: 120, speed: 1.0, damage: 18, cooldown: 1.4, size: 0.62, color: "#a08a6a", distraction: 0.35, flying: false, cost: 8 },
   warlord: { kind: "warlord", name: "Warlord", hp: 700, speed: 0.85, damage: 40, cooldown: 1.6, size: 1.05, color: "#b3372f", distraction: 0.1, flying: false, boss: true, cost: 100 },
-  mother: { kind: "mother", name: "Mother", hp: 70, speed: 1.15, damage: 8, cooldown: 1.1, size: 0.58, color: "#141218", distraction: 0.3, flying: false, splits: { into: "broodling", count: 3 }, cost: 10 },
-  broodling: { kind: "broodling", name: "Broodling", hp: 12, speed: 2.3, damage: 3, cooldown: 0.7, size: 0.3, color: "#1d1a22", distraction: 0.2, flying: false, hatched: true, cost: 1 },
+  mother: { kind: "mother", faction: "darkOne", name: "Mother", hp: 70, speed: 1.15, damage: 8, cooldown: 1.1, size: 0.58, color: "#141218", distraction: 0.3, flying: false, splits: { into: "broodling", count: 3 }, cost: 10 },
+  broodling: { kind: "broodling", faction: "darkOne", name: "Broodling", hp: 12, speed: 2.3, damage: 3, cooldown: 0.7, size: 0.3, color: "#1d1a22", distraction: 0.2, flying: false, hatched: true, cost: 1 },
   bat: { kind: "bat", name: "Bat", hp: 14, speed: 3.2, damage: 3, cooldown: 0.7, size: 0.3, color: "#8a5bb8", distraction: 0, flying: true, cost: 2 },
   snake: { kind: "snake", name: "Snake", hp: 24, speed: 1.8, damage: 5, cooldown: 0.8, size: 0.26, color: "#71ae48", distraction: 0, flying: false, chainLength: 12, cost: 60 },
   dragon: { kind: "dragon", name: "Dragon", hp: 160, speed: 1.3, damage: 30, cooldown: 2, size: 0.4, color: "#be4935", distraction: 0, flying: true, chainLength: 16, cost: 2500 },
   shieldBearer: { kind: "shieldBearer", name: "Shield Generator", hp: 800, speed: 0.7, damage: 16, cooldown: 1.5, size: 5 / 8, bodyPixels: 5, color: "#438dcc", distraction: 0, flying: false, shield: { radius: 4, hp: 3000 }, cost: 10000 },
   aegis: { kind: "aegis", name: "Invincible Shield Generator", hp: 6000, speed: 0.55, damage: 40, cooldown: 1.8, size: 9 / 8, bodyPixels: 9, color: "#a383ef", distraction: 0, flying: false, shield: { radius: 8, hp: Infinity }, cost: 1000000 },
 
-  darkKnight: { kind: "darkKnight", name: "Dark Knight", hp: 450, speed: 1, damage: 35, cooldown: 1.5, size: 0.55, color: "#29243b", distraction: 0, flying: false, unyielding: true, cost: 500 },
+  darkKnight: { kind: "darkKnight", faction: "darkOne", name: "Dark Knight", hp: 450, speed: 1, damage: 35, cooldown: 1.5, size: 0.55, color: "#29243b", distraction: 0, flying: false, unyielding: true, cost: 500 },
   bombOrc: { kind: "bombOrc", name: "Kamikaze Orc", hp: 45, speed: 2, damage: 100, cooldown: 1, size: 0.46, color: "#74a04c", distraction: 0, flying: false, cost: 120 },
   bombBird: { kind: "bombBird", name: "Kamikaze Bird", hp: 25, speed: 3.5, damage: 150, cooldown: 1, size: 0.3, color: "#c47a3e", distraction: 0, flying: true, cost: 350 },
-  voidSparrow: { kind: "voidSparrow", name: "Void Sparrow", hp: 12000, speed: 1.2, damage: 300, cooldown: 15, size: 0.45, color: "#33214f", distraction: 0, flying: true, cost: 5000000 },
+  voidSparrow: { kind: "voidSparrow", faction: "darkOne", name: "Void Sparrow", hp: 12000, speed: 1.2, damage: 300, cooldown: 15, size: 0.45, color: "#33214f", distraction: 0, flying: true, cost: 5000000 },
 
   shieldLesser: { kind: "shieldLesser", name: "Lesser Shield Generator", hp: 200, speed: 0.8, damage: 8, cooldown: 1.5, size: 3 / 8, bodyPixels: 3, color: "#5aacd8", distraction: 0, flying: false, shield: { radius: 2, hp: 600 }, cost: 1000 },
   shieldGreater: { kind: "shieldGreater", name: "Greater Shield Generator", hp: 2400, speed: 0.6, damage: 28, cooldown: 1.5, size: 7 / 8, bodyPixels: 7, color: "#6865d9", distraction: 0, flying: false, shield: { radius: 6, hp: 12000 }, cost: 100000 },
@@ -1184,14 +1190,14 @@ export const ENEMIES: Record<EnemyKind, EnemyDef> = {
 
   siegeBeetle: { kind: "siegeBeetle", name: "Siege Beetle", hp: 600, speed: 0.8, damage: 25, cooldown: 1, size: 0.7, color: "#827c48", distraction: 0, flying: false,  cost: 400 },
   burrowingMole: { kind: "burrowingMole", name: "Burrowing Mole", hp: 100, speed: 1.5, damage: 10, cooldown: 1, size: 0.4, color: "#9c7653", distraction: 0, flying: false,  cost: 200 },
-  necromancer: { kind: "necromancer", name: "Necromancer", hp: 160, speed: 1, damage: 8, cooldown: 1, size: 0.45, color: "#5b447f", distraction: 0, flying: false, summonSlots: 5, cost: 800 },
-  skeleton: { kind: "skeleton", name: "Raised Skeleton", hp: 20, speed: 1.5, damage: 4, cooldown: 1, size: 0.3, color: "#d7ccb2", distraction: 0, flying: false, hatched: true, cost: 1 },
+  necromancer: { kind: "necromancer", faction: "darkOne", name: "Necromancer", hp: 160, speed: 1, damage: 8, cooldown: 1, size: 0.45, color: "#5b447f", distraction: 0, flying: false, summonSlots: 5, cost: 800 },
+  skeleton: { kind: "skeleton", faction: "darkOne", name: "Raised Skeleton", hp: 20, speed: 1.5, damage: 4, cooldown: 1, size: 0.3, color: "#d7ccb2", distraction: 0, flying: false, hatched: true, cost: 1 },
   bannerCaptain: { kind: "bannerCaptain", name: "Banner Captain", hp: 250, speed: 1.2, damage: 15, cooldown: 1, size: 0.5, color: "#984047", distraction: 0, flying: false,  cost: 700 },
   mirrorKnight: { kind: "mirrorKnight", name: "Mirror Knight", hp: 350, speed: 1.1, damage: 20, cooldown: 1, size: 0.55, color: "#9ba8bf", distraction: 0, flying: false,  cost: 600 },
   leechSwarm: { kind: "leechSwarm", name: "Leech Swarm", hp: 90, speed: 2.2, damage: 12, cooldown: 1, size: 0.4, color: "#80456b", distraction: 0, flying: false,  cost: 150 },
   ashPhoenix: { kind: "ashPhoenix", name: "Ash Phoenix", hp: 300, speed: 2, damage: 22, cooldown: 1, size: 0.5, color: "#d97532", distraction: 0, flying: true, summonSlots: 3, cost: 1200 },
   phoenixEgg: { kind: "phoenixEgg", name: "Phoenix Egg", hp: 60, speed: 0, damage: 0, cooldown: 1, size: 0.4, color: "#dfac6e", distraction: 0, flying: false, hatched: true, cost: 1 },
-  blinkImp: { kind: "blinkImp", name: "Blink Imp", hp: 70, speed: 1.7, damage: 9, cooldown: 1, size: 0.3, color: "#9874bf", distraction: 0, flying: false,  cost: 250 },
+  blinkImp: { kind: "blinkImp", faction: "darkOne", name: "Blink Imp", hp: 70, speed: 1.7, damage: 9, cooldown: 1, size: 0.3, color: "#9874bf", distraction: 0, flying: false,  cost: 250 },
 
   fortressHut: { kind: "fortressHut", name: "Walking Watchpost", hp: 16, speed: 1.1, damage: 2, cooldown: 1.6, size: 1, color: "#80634c", distraction: 0, flying: false, fortress: { tier: 1, turrets: 1, legs: 2, armor: 1, height: 1.25, partHp: 3, partScale: .5 }, cost: 5 },
   fortressOutpost: { kind: "fortressOutpost", name: "Walking Outpost", hp: 28, speed: 1, damage: 3, cooldown: 1.6, size: 1.25, color: "#80634c", distraction: 0, flying: false, fortress: { tier: 1, turrets: 1, legs: 2, armor: 1, height: 1.5, partHp: 6, partScale: .625 }, cost: 10 },
@@ -1217,6 +1223,8 @@ export const ENEMIES: Record<EnemyKind, EnemyDef> = {
   boat: { kind: "boat", name: "Spellbound Sloop", hp: 7000, speed: 0.7, damage: 120, cooldown: 1.2, size: 2, color: "#5a3e28", distraction: 0, flying: false, boat: { tier: 2, water: 2.4 }, cost: 10000 },
   boatGreater: { kind: "boatGreater", name: "Arcane Galleon", hp: 35000, speed: 0.62, damage: 300, cooldown: 1.2, size: 2.8, color: "#46302a", distraction: 0, flying: false, boat: { tier: 3, water: 3.3, walls: true }, cost: 100000 },
   boatSovereign: { kind: "boatSovereign", name: "Deluge Ark", hp: 160000, speed: 0.55, damage: 800, cooldown: 1.2, size: 3.8, color: "#2a2230", distraction: 0, flying: false, boat: { tier: 4, water: 4.4, walls: true, keep: true }, cost: 1000000 },
+  miniDarkling: { kind: "miniDarkling", name: "Mini Darkling", faction: "darkOne", scriptedOnly: true, darkPixels: 1, hp: 2, speed: 1.7, damage: 1, cooldown: 1, size: 1 / 8, color: "#000000", distraction: 0, flying: false, cost: 1, description: "One dark pixel of the Dark One's horde. Weak alone; nearby dark enemies drain the world's color." },
+  darkling: { kind: "darkling", name: "Darkling", faction: "darkOne", scriptedOnly: true, darkPixels: 2, hp: 6, speed: 1.3, damage: 2, cooldown: 1, size: 2 / 8, color: "#000000", distraction: 0, flying: false, cost: 2, splits: { into: "miniDarkling", count: 2 }, description: "A black two-by-two pixel square. Defeating it releases two Mini Darklings." },
 };
 
 /** Multipliers the player's Smithy and skill trees lay over a run, on top

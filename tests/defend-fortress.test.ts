@@ -29,7 +29,7 @@ test('small walkers cost exactly 5, 10, 50 and 100, with progressively smaller-t
       assert.ok(def.size > previous.size && def.hp > previous.hp && fort.partScale! > previous.fortress!.partScale!);
     }
     // Select each variant through the actual affordable wave roster.
-    const roster = Object.values(ENEMIES).filter(d => !d.hatched && d.cost <= def.cost);
+    const roster = Object.values(ENEMIES).filter(d => !d.hatched && !d.scriptedOnly && d.cost <= def.cost);
     const roll = (roster.findIndex(d => d.kind === kind) + .5) / roster.length;
     assert.deepEqual(buildDifficultyWave(def.cost, () => roll), [kind]);
     const sim = simulation(); (sim as any).spawnEnemy(kind);

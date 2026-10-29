@@ -636,7 +636,13 @@ function drawHandTorch({ c, px }: Brush, at: { x: number; y: number; id: number 
  * has only `time` and `effects`. */
 export function drawEnemyArt(b: Brush, e: Enemy, sim: DefendSim, under = b) {
   const def = ENEMIES[e.kind];
-  if (def.siege) drawSiegeEngine(b, e, sim.time);
+  if (def.darkPixels) {
+    // No sprite lookup, rims, shading, torch, or animated decoration.
+    const d = Math.max(1, Math.round(b.px / 8)) * def.darkPixels;
+    b.c.fillStyle = "#000000";
+    b.c.fillRect(Math.round(e.x * b.px - d / 2), Math.round(e.y * b.px - d / 2), d, d);
+  }
+  else if (def.siege) drawSiegeEngine(b, e, sim.time);
   else if (def.boat) drawBoat(b, e, sim.time);
   else drawEnemy(b, e, sim, under);
 }

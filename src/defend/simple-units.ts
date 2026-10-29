@@ -107,6 +107,12 @@ export function drawSimpleEnemies({ c, px }: Brush, enemies: readonly Enemy[], r
   const k = artPixel(px);
   for (const e of enemies) {
     const def = ENEMIES[e.kind];
+    if (def.darkPixels) {
+      const s = k * def.darkPixels;
+      c.fillStyle = "#000000";
+      c.fillRect(Math.round(e.x * px - s / 2), Math.round(e.y * px - s / 2), s, s);
+      continue;
+    }
     queue(px, k, e.x, e.y, enemySize(e), e.flash > 0 ? "#ffffff" : def.color, inks?.ink(e.id) ?? (e.marked ? "#f2c94c" : def.boss ? "#7a1616" : "#000000"));
   }
   flush(c, k, rims, rimFor);
