@@ -10,7 +10,7 @@
  * has no outline of its own. A sprite of the wrong size is ignored with a
  * warning, and none of them are used while the Pixel Art setting is off.
  * Presentation only: never in Node, never in a replay. */
-import { clearSprites } from "./damage-art.ts";
+import { clearSprites, rimmed } from "./damage-art.ts";
 import { bumpPixelArt, onPixelArt, pixelArtOn } from "./pixel-sprites.ts";
 
 /** The name each piece of art goes by, in `art/sprites/` and the export. */
@@ -37,7 +37,8 @@ export function artOverride(name: string, w: number, h: number): Uint32Array | n
     warned.add(name);
     return null;
   }
-  return a.data.slice();
+  // Drawn without an outline: given the drawn art's one-art-pixel rim.
+  return rimmed(a.data, w, h);
 }
 
 /** Sets (or, with null, clears) the artist's sprite `name`. For the loader

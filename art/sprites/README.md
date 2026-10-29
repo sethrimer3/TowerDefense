@@ -6,8 +6,8 @@ example `structures/archerTower-2x2.png` or `keep/keep.png`.
 
 - One PNG pixel is one art pixel: 8 art pixels to a board cell. Keep the
   size the export gave you; a sprite of any other size is ignored.
-- Draw no outline. The game draws one half an art pixel wide round the
-  sprite. Near-black pixels (every channel 48 or below) on the sprite's
+- Draw no outline. The game gives the sprite's outer edge pixels a
+  one-art-pixel black rim when it loads it. Near-black pixels (every channel 48 or below) on the sprite's
   outer edge are treated as an old outline and dropped.
 - Draw only the undamaged building. Damage, rubble and the outline are
   painted by the game over your art.

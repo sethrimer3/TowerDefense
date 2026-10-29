@@ -383,64 +383,28 @@ export function bare(px: Uint32Array, w: number, h: number): Uint32Array {
   return out;
 }
 
-/** Pixels this dark (every channel at most) are drawn lines: thinned to
- * half an art pixel by `inked`. */
-const LINE = 16;
-const isLine = (v: number) => v >>> 24 >= 128 && (v & 255) <= LINE && ((v >> 8) & 255) <= LINE && ((v >> 16) & 255) <= LINE;
-
-/** `px` (`w` × `h` art pixels, already bare) at twice the size with a
- * margin of one, ringed by an outline half an art pixel wide: every pixel
- * of the doubled grid off the sprite that touches it, corners too, in
- * `ink`. Lines drawn inside it (a roof's ridge, a hall's beams) are thinned
- * to half an art pixel too: each line pixel keeps its top left quarter and
- * gives its right half or bottom half to the neighbour there when that is
- * no line. `ring` flags the outline's pixels. Pure; `drawSprite` draws it
- * half an art pixel out round its box. */
-export function inked(px: Uint32Array, w: number, h: number, ink = OUTLINE): { data: Uint32Array; w: number; h: number; ring: Uint8Array } {
-  const W = 2 * w + 2, H = 2 * h + 2, data = new Uint32Array(W * H), ring = new Uint8Array(W * H), line = rgba(ink);
-  const at = (x: number, y: number) => (x < 0 || y < 0 || x >= w || y >= h ? 0 : px[y * w + x]);
-  const body = (X: number, Y: number) => {
-    if (X < 1 || Y < 1 || X > 2 * w || Y > 2 * h) return 0;
-    return px[((Y - 1) >> 1) * w + ((X - 1) >> 1)];
-  };
-  // A line pixel's quarter (sx, sy) takes the colour beside it when that
-  // way lies something drawn that is no line.
-  const thin = (x: number, y: number, sx: number, sy: number, v: number) => {
-    const right = at(x + 1, y), below = at(x, y + 1);
-    if (sx && right >>> 24 >= 128 && !isLine(right)) return right;
-    if (sy && below >>> 24 >= 128 && !isLine(below)) return below;
-    return v;
-  };
-  for (let Y = 0; Y < H; Y++)
-    for (let X = 0; X < W; X++) {
-      const v = body(X, Y);
-      if (v >>> 24 >= 128) {
-        data[Y * W + X] = isLine(v) ? thin((X - 1) >> 1, (Y - 1) >> 1, (X - 1) & 1, (Y - 1) & 1, v) : v;
-        continue;
-      }
-      let near = false;
-      for (let dy = -1; dy <= 1 && !near; dy++) for (let dx = -1; dx <= 1; dx++) if (body(X + dx, Y + dy) >>> 24 >= 128) { near = true; break; }
-      if (near) { data[Y * W + X] = line; ring[Y * W + X] = 1; }
-      else data[Y * W + X] = v;
-    }
-  return { data, w: W, h: H, ring };
+/** `px` (`w` × `h` art pixels) with a one-art-pixel outline: every opaque
+ * pixel with a clear pixel or the sprite's edge beside it turned `ink`.
+ * Pure: what an artist's outline-free sprite gets when it is loaded, so it
+ * matches the drawn art's own rims. */
+export function rimmed(px: Uint32Array, w: number, h: number, ink = OUTLINE): Uint32Array {
+  const out = px.slice(), line = rgba(ink);
+  const solid = (x: number, y: number) => x >= 0 && y >= 0 && x < w && y < h && px[y * w + x] >>> 24 >= 128;
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++)
+      if (solid(x, y) && (!solid(x - 1, y) || !solid(x + 1, y) || !solid(x, y - 1) || !solid(x, y + 1))) out[y * w + x] = line;
+  return out;
 }
 
-/** Canvases made by `inked`, with their outline's pixels: drawn half an
- * art pixel out round their box. */
-const ringed = new WeakMap<HTMLCanvasElement, Uint8Array>();
-/** Their body alone and their outline alone, made the first time a mask
- * asks (`withMask`). */
-const parts = new WeakMap<HTMLCanvasElement, { body: HTMLCanvasElement; rim: HTMLCanvasElement }>();
-
-/** What `drawSprite` draws while a mask of the city is painted: a sprite's
- * body or its outline alone (`withMask`), or everything (null). */
+/** What `drawSprite` draws while a mask of the city is painted: sprites'
+ * bodies (their own rims included), or the outlines drawn apart from any
+ * sprite (the standing wall's) alone (`withMask`), or everything (null). */
 export type MaskMode = "body" | "rim";
 let mask: MaskMode | null = null;
 
-/** Runs `paint` with `drawSprite` drawing only the body (outlines left off)
- * or only the outlines of the sprites with one: what the lighting keeps
- * dark under roofs and lights up along their edges. */
+/** Runs `paint` with `drawSprite` drawing sprites (for the body mask) or
+ * leaving them out (for the outline mask): what the lighting keeps dark
+ * under roofs and lights up along their edges. */
 export function withMask(mode: MaskMode, paint: () => void) {
   mask = mode;
   try {
@@ -451,52 +415,25 @@ export function withMask(mode: MaskMode, paint: () => void) {
 }
 export const maskMode = () => mask;
 
-function partsOf(cv: HTMLCanvasElement, ring: Uint8Array) {
-  let made = parts.get(cv);
-  if (made) return made;
-  const w = cv.width, h = cv.height;
-  const src = cv.getContext("2d", { willReadFrequently: true })!.getImageData(0, 0, w, h);
-  const all = new Uint32Array(src.data.buffer);
-  const split = (keep: (i: number) => boolean) => {
-    const out = document.createElement("canvas");
-    out.width = w;
-    out.height = h;
-    const c = out.getContext("2d")!, img = c.createImageData(w, h), d = new Uint32Array(img.data.buffer);
-    for (let i = 0; i < d.length; i++) if (keep(i)) d[i] = all[i];
-    c.putImageData(img, 0, 0);
-    return out;
-  };
-  parts.set(cv, (made = { body: split((i) => !ring[i]), rim: split((i) => !!ring[i]) }));
-  return made;
-}
-
-/** A canvas of `px` (`w` × `h` art pixels): with `outline`, its own rim
- * taken off and a half-art-pixel one drawn round it (`bare`, `inked`). */
-export function spriteCanvas(px: Uint32Array, w: number, h: number, outline = false, cv = document.createElement("canvas")) {
-  const art = outline ? inked(bare(px, w, h), w, h) : { data: px, w, h, ring: null };
-  cv.width = art.w;
-  cv.height = art.h;
+/** A canvas of `px` (`w` × `h` art pixels). */
+export function spriteCanvas(px: Uint32Array, w: number, h: number, cv = document.createElement("canvas")) {
+  cv.width = w;
+  cv.height = h;
   const c = cv.getContext("2d")!;
-  const img = c.createImageData(art.w, art.h);
-  new Uint32Array(img.data.buffer).set(art.data);
+  const img = c.createImageData(w, h);
+  new Uint32Array(img.data.buffer).set(px);
   c.putImageData(img, 0, 0);
-  if (art.ring) ringed.set(cv, art.ring);
-  parts.delete(cv);
   return cv;
 }
 
 /** A cached canvas of `w × h` art pixels made by `make` (null outside a
- * browser), keyed by `key`. With `outline` (whole pieces: buildings, gates,
- * roofs, rubble), the sprite's own one-art-pixel rim is swapped for one half
- * an art pixel wide, drawn outside it. Tiles that join their neighbours
- * (wall stones and faces, spikes, damage overlays) have none. */
-export function sprite(key: string, w: number, h: number, make: () => Uint32Array, outline = false): HTMLCanvasElement | null {
+ * browser), keyed by `key`. */
+export function sprite(key: string, w: number, h: number, make: () => Uint32Array): HTMLCanvasElement | null {
   if (typeof document === "undefined") return null;
-  if (outline) key += ":ring";
   let cv = cache.get(key);
   if (!cv) {
     if (cache.size > 4000) cache.clear();
-    cv = spriteCanvas(make(), w, h, outline);
+    cv = spriteCanvas(make(), w, h);
     cache.set(key, cv);
   }
   return cv;
@@ -504,17 +441,10 @@ export function sprite(key: string, w: number, h: number, make: () => Uint32Arra
 
 /** Draws a sprite up over a box of canvas pixels, smoothing off. */
 export function drawSprite(c: CanvasRenderingContext2D, cv: HTMLCanvasElement | null, x: number, y: number, w: number, h: number) {
-  if (!cv) return;
-  const ring = ringed.get(cv);
-  // A mask of the outlines leaves out what has none.
-  if (mask === "rim" && !ring) return;
+  // A mask of the outlines leaves sprites out: their rims are their own.
+  if (!cv || mask === "rim") return;
   c.save();
   c.imageSmoothingEnabled = false;
-  if (ring) {
-    const art = mask ? partsOf(cv, ring)[mask] : cv;
-    // Half an art pixel out on every side, for the outline.
-    const hx = w / (cv.width - 2), hy = h / (cv.height - 2);
-    c.drawImage(art, x - hx, y - hy, w + 2 * hx, h + 2 * hy);
-  } else c.drawImage(cv, x, y, w, h);
+  c.drawImage(cv, x, y, w, h);
   c.restore();
 }
