@@ -13,6 +13,7 @@
  * cell records its brightest light ("dominant light"). A unit's shadow is
  * then just a few small rects stepped away from that one light — no ray
  * casting per unit per frame. */
+import { ART } from "./art-scale.ts";
 import { LIGHTING_CONFIG, getTorchFlicker, getTorchSway } from "../lighting.ts";
 import { glowColor, lightFalloff } from "../torch-light.ts";
 import { CELL_COUNT, CELLS_H, CELLS_W, ORTHO, boardSize, cellInBounds, cellIndex, hash, hash01, type Rect } from "./grid.ts";
@@ -421,14 +422,15 @@ export class DefendLighting {
     c.globalAlpha = LIGHTING_CONFIG.glow.bloom;
     c.drawImage(this.glow, 0, 0);
     c.restore();
-    if (up) this.shine(c, up.rim, (r) => r.drawImage(this.glow!, 0, 0));
+    if (up) this.shine(c, up.rim, (r) => r.drawImage(this.glow!, 0, 0), { body: up.body, by: frame.px / ART / 4 });
   }
 
   /** Lights outlines from this frame's glow (from the last `drawLight`),
    * as if the torchlight caught their edges: `outline` paints them onto
    * a screen-sized canvas, drawn unmoved; `c`'s transform places the
-   * board. For the units' contours. */
-  shineOutlines(c: CanvasRenderingContext2D, outline: (r: CanvasRenderingContext2D) => void) {
+   * board; only their inner half beside `inner.body` shines (see `hug`).
+   * For the units' contours. */
+  shineOutlines(c: CanvasRenderingContext2D, outline: (r: CanvasRenderingContext2D) => void, inner: Inner) {
     const glow = this.glow;
     if (!glow) return;
     const m = c.getTransform();
@@ -438,6 +440,7 @@ export class DefendLighting {
     r.globalCompositeOperation = "source-over";
     r.clearRect(0, 0, width, height);
     outline(r);
+    this.hug(r, inner);
     r.globalCompositeOperation = "source-in";
     r.setTransform(m);
     r.drawImage(glow, 0, 0);
@@ -446,6 +449,21 @@ export class DefendLighting {
     shineOnto(c, this.rimLit!);
     c.restore();
   }
+
+  /** Keeps what is on `r` to within `by` pixels of `body` (the body grown
+   * by `by` each way): the half of an outline hugging what it rings, so
+   * the shine is half the outline's width. */
+  private hug(r: CanvasRenderingContext2D, { body, by }: Inner) {
+    const { width, height } = r.canvas;
+    const g = (this.grown = sized(this.grown, width, height)).getContext("2d")!;
+    g.globalCompositeOperation = "source-over";
+    g.clearRect(0, 0, width, height);
+    for (const dy of [-by, 0, by]) for (const dx of [-by, 0, by]) g.drawImage(body, dx, dy);
+    r.setTransform(1, 0, 0, 1, 0, 0);
+    r.globalCompositeOperation = "destination-in";
+    r.drawImage(this.grown, 0, 0);
+  }
+  private grown: HTMLCanvasElement | null = null;
 
   /** The masks drawn up to the board at this zoom, or null before any. */
   private masksAt(W: number, H: number) {
@@ -486,12 +504,13 @@ export class DefendLighting {
 
   /** The glow kept to `rim` and added over it, so outlines in torchlight
    * shine warm (board space, like the glow). */
-  private shine(c: CanvasRenderingContext2D, rim: HTMLCanvasElement, glow: (r: CanvasRenderingContext2D) => void) {
+  private shine(c: CanvasRenderingContext2D, rim: HTMLCanvasElement, glow: (r: CanvasRenderingContext2D) => void, inner: Inner) {
     const r = (this.rimLit = sized(this.rimLit, rim.width, rim.height)).getContext("2d")!;
     r.setTransform(1, 0, 0, 1, 0, 0);
     r.globalCompositeOperation = "source-over";
     r.clearRect(0, 0, rim.width, rim.height);
     r.drawImage(rim, 0, 0);
+    this.hug(r, inner);
     r.globalCompositeOperation = "source-in";
     glow(r);
     shineOnto(c, this.rimLit!);
@@ -741,14 +760,16 @@ function nearest(cv: HTMLCanvasElement | null, src: HTMLCanvasElement, w: number
   return out;
 }
 
-/** Lit outlines added onto `c`, a little over full strength: edges catch
- * more of the light than the ground does. */
+/** What an outline rings and how far out its shining half reaches. */
+export type Inner = { body: CanvasImageSource; by: number };
+
+/** Lit outlines added onto `c` at `LIGHTING_CONFIG.glow.rim`. The glow is
+ * summed afresh each frame from every torch's flicker, so they flicker
+ * with the torches. */
 function shineOnto(c: CanvasRenderingContext2D, lit: HTMLCanvasElement) {
   c.save();
   c.globalCompositeOperation = "lighter";
-  c.globalAlpha = 1;
-  c.drawImage(lit, 0, 0);
-  c.globalAlpha = LIGHTING_CONFIG.glow.rim - 1;
+  c.globalAlpha = LIGHTING_CONFIG.glow.rim;
   c.drawImage(lit, 0, 0);
   c.restore();
 }

@@ -10,6 +10,8 @@ export class UnitContours {
   private matrix = new DOMMatrix();
   private pen = new Path2D();
   private radius = 0;
+  /** How far the contour reaches out from the bodies, in screen pixels. */
+  get width() { return this.radius; }
   private scale = 1;
 
   begin(c: Ctx, width: number) {

@@ -70,9 +70,9 @@ export const LIGHTING_CONFIG = {
     softLight: 1,
     /** Additive share: a touch of emitted bloom near the flame. */
     bloom: 0.3,
-    /** Gain (1 to 2) on the glow added over outlines in the light, which
-     * catch it brighter than the ground: edges shining warm. */
-    rim: 1.8,
+    /** Share of the glow added over outlines in the light: edges
+     * catching it faintly warm. */
+    rim: 0.36,
     /** How much of the ambient darkness the light removes at full brightness. */
     carve: 0.95,
     /** The warm glow is this much dimmer at the default brightness than at

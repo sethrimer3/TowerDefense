@@ -279,8 +279,8 @@ export class UnitOutline {
   /** Visibility colors stay above the world color drain, using cached geometry. */
   drawContours(c: Ctx) { if (this.thin) this.contours.draw(c); }
   /** The contours again, lit by the torchlight's glow where it reaches. */
-  shineContours(c: Ctx, lighting: { shineOutlines(c: CanvasRenderingContext2D, outline: (r: CanvasRenderingContext2D) => void): void }) {
-    if (this.thin) lighting.shineOutlines(c, (r) => this.contours.draw(r));
+  shineContours(c: Ctx, lighting: { shineOutlines(c: CanvasRenderingContext2D, outline: (r: CanvasRenderingContext2D) => void, inner: { body: CanvasImageSource; by: number }): void }) {
+    if (this.thin) lighting.shineOutlines(c, (r) => this.contours.draw(r), { body: this.layer.cv, by: this.contours.width / 2 });
   }
 
   /** The outlines, then the units over them, onto `c`. */
