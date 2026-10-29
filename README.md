@@ -56,7 +56,7 @@ Each new furthest wave reached automatically selects the preceding wave for your
 
 ## How it's built
 
-World art uses eight art pixels per board cell (64 per eight-cell tile), scaled by the camera and display density. Dark One units wear bright crimson contours and player units dark blue, extending half an art pixel around their combined outer silhouettes, with no overlap seams. These visibility contours stay colored through the crowd's grayscale wash. [Pixel scale and contour rendering](docs/art/UNIT_CONTOURS.md).
+World art uses eight art pixels per board cell (64 per eight-cell tile), scaled by the camera and display density. Dark One units wear bright crimson contours and player units dark navy (everyone else black), extending half an art pixel around their combined outer silhouettes, with no overlap seams. These visibility contours stay colored through the crowd's grayscale wash. [Pixel scale and contour rendering](docs/art/UNIT_CONTOURS.md).
 
 Defend's first wave introduces 30 one-pixel Mini Darklings and five 2 × 2 Darklings, each splitting into two minis. Waves 2–5 grow the pixel horde and introduce 3 × 3 Large Darklings, each splitting into two Darklings. Dark One crowds gradually drain the world's color and reduce contrast using a small density mask and two canvas blend passes. Later lineups are tracked in [the enemy migration checklist](docs/design/ENEMY_MIGRATION.md).
 

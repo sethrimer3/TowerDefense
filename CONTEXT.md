@@ -692,4 +692,4 @@ A Dark One enemy consisting of a three-by-three black pixel square, splitting in
 The world-art unit: one eighth of a board cell, scaled to screen pixels by camera zoom and display density.
 
 **Visibility contour**:
-A half-art-pixel perimeter around a combined group of unit bodies, bright crimson for Dark One enemies and dark blue for the player's troops, without seams through overlapping bodies.
+A half-art-pixel perimeter around a combined group of unit bodies, bright crimson for Dark One enemies dark navy for the player's troops and black (gold while marked) for everyone else, without seams through overlapping bodies.
