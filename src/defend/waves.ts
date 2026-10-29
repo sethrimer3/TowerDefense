@@ -6,11 +6,25 @@ export const MAX_WAVE_ENEMIES = 5000;
 export const STARTING_DIFFICULTY = 20;
 export const DIFFICULTY_GROWTH = 1.05;
 
+/** Queues pop from the end: each group releases filler before its larger body. */
+const groups = (count: number, larger: EnemyKind, filler: EnemyKind, perGroup: number): EnemyKind[] =>
+  Array.from({ length: count }, (): EnemyKind[] => [larger, ...Array<EnemyKind>(perGroup).fill(filler)]).flat();
+
+/** Absolute waves only; later area cycles and Ambush keep their legacy rosters. */
+const AUTHORED_WAVES: Readonly<Partial<Record<number, readonly EnemyKind[]>>> = {
+  1: groups(5, "darkling", "miniDarkling", 6),
+  2: groups(15, "darkling", "miniDarkling", 3),
+  3: Array<EnemyKind>(50).fill("darkling"),
+  4: groups(5, "largeDarkling", "darkling", 16),
+  5: Array<EnemyKind>(30).fill("largeDarkling"),
+};
+
 /** Bounded arithmetic keeps corrupt or extremely late wave numbers finite.
  * Multiplication, rather than Math.pow, preserves cross-engine replays. */
 export function waveDifficulty(wave: number): number {
   if (!Number.isFinite(wave) || wave < 1) return 0;
-  if (wave === 1) return 40; // Authored opening: 30 one-point minis + 5 two-point Darklings.
+  const authored = AUTHORED_WAVES[wave];
+  if (authored) return authored.reduce((sum, kind) => sum + ENEMIES[kind].cost, 0);
   let budget = STARTING_DIFFICULTY;
   for (let n = 1; n < Math.floor(wave); n++) {
     budget *= DIFFICULTY_GROWTH;
@@ -34,10 +48,8 @@ function slots(def: EnemyDef, seen = new Set<EnemyKind>()): number {
 }
 
 export function buildWave(wave: number, rand: () => number): EnemyKind[] {
-  if (wave === 1) {
-    // Queue is popped from the end: introduce one larger body after each six minis.
-    return Array.from({ length: 5 }, (): EnemyKind[] => ["darkling", ...Array<EnemyKind>(6).fill("miniDarkling")]).flat();
-  }
+  const authored = AUTHORED_WAVES[wave];
+  if (authored) return [...authored];
   return buildDifficultyWave(waveDifficulty(wave), rand, AREA_ENEMIES[areaForWave(wave).id]);
 }
 

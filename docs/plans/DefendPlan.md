@@ -27,4 +27,5 @@ Add Defend items here in the form: **What** (one line), **Why**, **Files**, **Te
 - [x] Inventory all Ambush levels/waves and Defend wave families as outdated; maintain the per-wave [migration tracker](../design/ENEMY_MIGRATION.md).
 - [x] Update only Defend wave 1: 30 one-pixel Mini Darklings and five 2 × 2 Darklings, splitting into two minis each.
 - [x] Add low-cost radial color drain around dense Dark One crowds, starting near ten neighbors, fully grayscale with 30% lower contrast at maximum density.
+- [x] Update Defend waves 2–5 with the requested Darkling counts and 3 × 3 Large Darklings splitting into two Darklings; log exact compositions and both offspring generations.
 - [ ] Migrate later waves toward roughly 90% plain pixel filler; identify medium enemies by equipment and retain complex sprites for rare high-strength threats. Track each composition and story exception in the migration log.

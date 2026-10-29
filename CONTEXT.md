@@ -684,3 +684,6 @@ A Dark One enemy consisting of a two-by-two black pixel square, splitting into t
 
 **Color drain**:
 The gradual loss of color and contrast around a dense group of Dark One enemies, strongest at the group's center and fading toward the edges.
+
+**Large Darkling**:
+A Dark One enemy consisting of a three-by-three black pixel square, splitting into two Darklings when defeated.

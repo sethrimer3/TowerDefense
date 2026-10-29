@@ -1,6 +1,6 @@
 # Enemy migration tracker
 
-Started 2026-10-29. This is the working checklist for replacing the old enemy lineups. **Only absolute Defend wave 1 is updated.** All 30 Ambush levels (600 waves) and Defend waves 2–200 remain **outdated**. Later endless Defend waves remain outdated as well.
+Started 2026-10-29. This is the working checklist for replacing the old enemy lineups. **Absolute Defend waves 1–5 are updated.** All 30 Ambush levels (600 waves) and Defend waves 6–200 remain **outdated**. Later endless Defend waves remain outdated as well.
 
 ## Direction
 
@@ -16,17 +16,29 @@ Started 2026-10-29. This is the working checklist for replacing the old enemy li
 |---|---|---|---:|---|---:|---|
 | Defend 1 | Mini Darkling | 1 × 1 black art pixel | 2 | 1 / 1 second | 1.7 | No split |
 | Defend 1 | Darkling | 2 × 2 black art pixels | 6 | 2 / 1 second | 1.3 | Two Mini Darklings |
+| Defend 4 | Large Darkling | 3 × 3 black art pixels | 18 | 4 / 1 second | 1 | Two Darklings; each then splits into two minis |
 
-An art pixel is 1/8 of a board cell and scales with the camera. Both kinds use solid black square drawing under normal, Pixel Art, Simple enemies and merged-outline settings, without decorative sprites. The stats are initial tuning values.
+An art pixel is 1/8 of a board cell and scales with the camera. All three kinds use solid black square drawing under normal, Pixel Art, Simple enemies and merged-outline settings, without decorative sprites. The stats are initial tuning values.
 
 ## Change log
 
-- **2026-10-29 — [x] Updated Defend wave 1 (Mossbound Ruins).** Starts with exactly **30 Mini Darklings + 5 Darklings**. Six minis then one Darkling, repeated five times over the native release period. The five parents yield ten additional minis: **40 minis encountered / 45 total bodies** if every parent and child is killed. The opening has an explicit 40-point accounting budget; procedural wave 2 onward retains its existing curve and rosters. No new species leaks into old procedural or Ambush lineups.
-- **2026-10-29 — Dark crowd color drain.** Begins at approximately ten nearby living Dark One enemies, including a mix of both sizes; reaches a grayscale core around sixty. Each local patch falls smoothly and radially to untouched color at the edge. At maximum strength, saturation is zero and contrast is reduced 30% toward neutral gray. Full grayscale already exceeds the requested 30% saturation reduction. Removed enemies stop contributing on the next sample (at most about 100 ms while the battle is advancing). Motion settings leave this steady accessibility cue visible.
+- **2026-10-29 — [x] Updated Defend wave 1 (Mossbound Ruins).** Starts with exactly **30 Mini Darklings + 5 Darklings**. Six minis then one Darkling, repeated five times over the native release period. The five parents yield ten additional minis: **40 minis encountered / 45 total bodies** if every parent and child is killed. The opening has an explicit 40-point accounting budget; wave 2 onward initially retained its existing curve and rosters (waves 2–5 are superseded by the entries below). No new species leaks into old procedural or Ambush lineups.
+- **2026-10-29 — Dark crowd color drain.** Begins at approximately ten nearby living Dark One enemies, including a mix of all three sizes; reaches a grayscale core around sixty. Each local patch falls smoothly and radially to untouched color at the edge. At maximum strength, saturation is zero and contrast is reduced 30% toward neutral gray. Full grayscale already exceeds the requested 30% saturation reduction. Removed enemies stop contributing on the next sample (at most about 100 ms while the battle is advancing). Motion settings leave this steady accessibility cue visible.
+
+- **2026-10-29 — [x] Updated Defend waves 2–5 (Mossbound Ruins).** Exact initial compositions and all offspring are listed below. Large Darklings introduce a third plain black pixel size and participate in the existing color drain. The native release period and split/death handling are retained; no larger sprite or per-enemy visual effects were added. Waves 6 onward and all Ambush lineups retain their legacy generators.
+
+| Defend wave | Initial composition | Release grouping | Descendants generated on death | Total bodies encountered |
+|---|---|---|---|---:|
+| 2 | 45 Mini Darklings + 15 Darklings | Three minis, then one Darkling; repeated 15 times | 30 additional minis | 90 |
+| 3 | 50 Darklings | 50 Darklings | 100 minis | 150 |
+| 4 | 80 Darklings + 5 Large Darklings | Sixteen Darklings, then one Large; repeated five times | 10 additional Darklings; 180 minis from all 90 Darklings | 275 |
+| 5 | 30 Large Darklings | 30 Large Darklings | 60 Darklings; then 120 minis | 210 |
+
+Totals assume every parent and child is defeated. Large Darkling stats start at 18 HP, 4 attack each second, and speed 1 cell/second; these are initial tuning values. Authored accounting budgets sum the initial bodies' catalog costs (75/100/180/120 for waves 2/3/4/5), not the entire offspring tree or a monotonic combat-strength estimate. Every size counts as one living enemy for the existing approximate color-drain threshold.
 
 ## Color drain and performance rules
 
-Faction is explicit in the enemy catalog; never infer darkness from a sprite's color. Currently tagged: Mini Darkling, Darkling, Mother, Broodling, Dark Knight, Void Sparrow, Necromancer, Skeleton, Blink Imp, Crypt Hound and Grave Wisp. Future Dark One enemies must carry the same faction tag. Other species' allegiance is still pending their migration/story review. Friendly dark wizards and shades do not contribute; neither do dead enemies, fortress parts or Siege proxy objects.
+Faction is explicit in the enemy catalog; never infer darkness from a sprite's color. Currently tagged: Mini Darkling, Darkling, Large Darkling, Mother, Broodling, Dark Knight, Void Sparrow, Necromancer, Skeleton, Blink Imp, Crypt Hound and Grave Wisp. Future Dark One enemies must carry the same faction tag. Other species' allegiance is still pending their migration/story review. Friendly dark wizards and shades do not contribute; neither do dead enemies, fortress parts or Siege proxy objects.
 
 The estimate uses fixed 4-cell buckets, neighboring buckets for density, and a reusable 144 × 208 alpha field, sampled at most ten times per second while simulation time advances. Each occupied bucket emits one smooth radial patch at its centroid; strongest-patch blending keeps overlapping groups from artificially multiplying their strength. There are no pairwise crowd queries. Two canvas blend passes desaturate and wash out the existing detailed world without scene copies, full-scene CPU pixel reads, blur or per-enemy filters. The field lookup avoids square roots in its inner loop. Mask memory and patch work are bounded by board size. The world-space mask follows pan and zoom; HUD and inspection overlays remain readable. Counts and neighborhood boundaries are intentionally approximate.
 
@@ -38,7 +50,7 @@ Change a wave's checkbox from '[ ] outdated' to '[x] updated' only after its ros
 
 ## Ambush — all 30 levels
 
-Each level currently has 20 waves from the existing procedural placeholder lineups. Every level and wave below is outdated; none was changed in this first Defend pass.
+Each level currently has 20 waves from the existing procedural placeholder lineups. Every level and wave below is outdated; none has been changed by the Defend migration.
 
 ### Mossbound Ruins — Old Road (moss-1)
 
@@ -792,15 +804,15 @@ Each level currently has 20 waves from the existing procedural placeholder lineu
 
 ## Defend — first 200-wave zone cycle
 
-Defend is endless: these are its first ten 20-wave areas, not a finite level list. Only absolute wave 1 uses the new authored lineup. In later cycles, area-local wave 1 (201, 401, …) still uses the legacy generator.
+Defend is endless: these are its first ten 20-wave areas, not a finite level list. Only absolute waves 1–5 use the new authored lineups. In later cycles, area-local wave 1 (201, 401, …) still uses the legacy generator.
 
 ### Mossbound Ruins — waves 1–20
 
 - [x] Wave 1: **updated** — 30 Mini Darklings + 5 Darklings; each Darkling splits into 2 minis.
-- [ ] Wave 2: **outdated**
-- [ ] Wave 3: **outdated**
-- [ ] Wave 4: **outdated**
-- [ ] Wave 5: **outdated**
+- [x] Wave 2: **updated** — 45 Mini Darklings + 15 Darklings.
+- [x] Wave 3: **updated** — 50 Darklings.
+- [x] Wave 4: **updated** — 80 Darklings + 5 Large Darklings.
+- [x] Wave 5: **updated** — 30 Large Darklings.
 - [ ] Wave 6: **outdated**
 - [ ] Wave 7: **outdated**
 - [ ] Wave 8: **outdated**
