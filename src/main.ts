@@ -140,6 +140,7 @@ const defendPage = new DefendPage(el("defend"), {
   gridLines: () => (save.settings.tileGrid ? save.settings.gridOpacity / 100 : 0),
   effects: () => !save.settings.effectsOff,
   devMode: () => save.settings.developerMode,
+  allJournal: () => save.settings.developerMode && save.settings.devJournal,
   openTiles: () => navigate("tiles"),
 });
 
