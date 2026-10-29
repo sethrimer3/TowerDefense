@@ -52,7 +52,7 @@ try {
   for (const row of result) {
     assert.ok(row.ticks < 90); assert.ok(Math.abs(row.gap - 1) < 1e-8, JSON.stringify(row));
     assert.ok(row.below.every(v => v < 100), `wall contour missing ${JSON.stringify(row)}`);
-    if (row.px === 8 && row.zoom === 4) assert.deepEqual(row.above, [255, 36, 84], `red must meet black without an empty row: ${JSON.stringify(row)}`);
+    if (row.px === 8 && row.zoom === 4) assert.deepEqual(row.above, [156, 18, 53], `red must meet black without an empty row: ${JSON.stringify(row)}`);
   }
   assert.deepEqual(errors, []);
   console.log(`Verified ${result.length} native body/contact renders at 8/11/16 px per cell, three zooms and both enemy graphics settings.`);

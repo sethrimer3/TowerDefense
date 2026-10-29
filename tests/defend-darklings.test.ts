@@ -79,7 +79,7 @@ test('dark density starts at ten, grows to full, fades radially and keeps indepe
   const d = new DarkDensity();
   assert.equal(d.update(crowd(9)), false);
   d.update(crowd(10)); const faint = at(d, 20, 20);
-  assert.ok(faint > 0 && faint < .03);
+  assert.ok(faint >= .2 && faint < .3);
   d.update(crowd(35)); const medium = at(d, 20, 20);
   assert.ok(medium > faint && medium < 1);
   d.update(crowd(60));
@@ -162,4 +162,27 @@ test('Large Darklings participate in color drain and journal/save discovery', ()
   assert.deepEqual(decoded.discovered, ['largeDarkling']);
   assert.deepEqual(decoded.journalRead, ['largeDarkling']);
   assert.match(journalHTML(decoded.discovered), /Large Darkling/);
+});
+
+
+test('night heat is present for lone dark enemies and strengthens locally without changing the drain threshold', () => {
+  const d = new DarkDensity(), at = () => d.glow[40 * DRAIN_W + 40];
+  assert.equal(d.update(crowd(1)), false); assert.equal(d.glowing, true);
+  const lone = at(); assert.ok(lone > .1 && lone < .3);
+  d.update(crowd(10)); const group = at(); assert.ok(group > lone);
+  d.update(crowd(60)); assert.equal(at(), 1);
+  assert.equal(d.glow[80 * DRAIN_W + 80], 0);
+  assert.equal(d.update([]), false); assert.equal(d.glowing, false); assert.ok(d.glow.every(v => v === 0));
+});
+
+
+test('a local aura clips blending to its bounded world region and clears both bounds with its last enemy', () => {
+  const d = new DarkDensity(); d.update(crowd(60));
+  assert.ok(d.bounds && d.glowBounds);
+  assert.ok(d.bounds.w < 24 && d.bounds.h < 24);
+  assert.ok(d.glowBounds.w < d.bounds.w);
+  for (const [field, b] of [[d.field, d.bounds], [d.glow, d.glowBounds]] as const)
+    for (let y = 0; y < DRAIN_H; y++) for (let x = 0; x < DRAIN_W; x++)
+      if (field[y * DRAIN_W + x] > 0) assert.ok((x + .5) / 2 >= b.x && (x + .5) / 2 <= b.x + b.w && (y + .5) / 2 >= b.y && (y + .5) / 2 <= b.y + b.h);
+  d.update([]); assert.equal(d.bounds, null); assert.equal(d.glowBounds, null);
 });

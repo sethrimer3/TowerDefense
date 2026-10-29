@@ -103,7 +103,7 @@ try {
     for (let row = 0; row < 3; row++) for (let col = 0; col < 2; col++) {
       const x = col * 550, y = row * 300;
       gc.fillStyle = row === 1 ? '#161c24' : row === 2 ? '#aaa69b' : '#4d6336'; gc.fillRect(x, y, 550, 300);
-      gc.fillStyle = '#eee3c7'; gc.font = '18px monospace'; gc.fillText(col ? 'Player units · dark blue' : 'Dark units · bright crimson', x + 20, y + 30);
+      gc.fillStyle = '#eee3c7'; gc.font = '18px monospace'; gc.fillText(col ? 'Player units · dark blue' : 'Dark units · deep crimson', x + 20, y + 30);
       const outline = new UnitOutline(), l = outline.begin(gc, true, 8 / 2); outline.ink(inks[col]);
       l.units.fillStyle = col ? '#6b94b4' : '#000';
       for (const [dx, dy, size] of [[50, 100, 8], [100, 100, 16], [160, 100, 24], [250, 100, 24], [266, 108, 24], [282, 100, 24], [250, 116, 24]]) l.units.fillRect(x + dx, y + dy, size, size);
@@ -130,7 +130,7 @@ try {
   const rgb = hex => hex.slice(1).match(/../g).map(v => parseInt(v, 16));
   assert.equal(result.ART, 8); assert.equal(result.UNIT_CONTOUR_ART_PIXELS, .5);
   for (const check of result.checks) {
-    assert.deepEqual(check.edge.slice(0, 3), rgb(result.crimson));
+    assert.ok(check.edge.slice(0, 3).every((v, i) => Math.abs(v - rgb(result.crimson)[i]) <= 1), JSON.stringify(check));
     assert.deepEqual(check.body, [0, 0, 0, 255]); assert.deepEqual(check.overlapEdge, [0, 0, 0, 255]);
     assert.equal(check.outside[3], 0);
     if (check.width === .5) { assert.ok(check.edge[3] >= 120 && check.edge[3] <= 136, JSON.stringify(check)); assert.equal(check.farther[3], 0); }

@@ -29,4 +29,5 @@ Add Defend items here in the form: **What** (one line), **Why**, **Files**, **Te
 - [x] Add low-cost radial color drain around dense Dark One crowds, starting near ten neighbors, fully grayscale with 30% lower contrast at maximum density.
 - [x] Update Defend waves 2–5 with the requested Darkling counts and 3 × 3 Large Darklings splitting into two Darklings; log exact compositions and both offspring generations.
 - [x] Close contact attackers to the painted structure perimeter before damage; make stone-wall rims half an art pixel so they meet the enemy rim without empty ground. Share the approach gate with Ambush routes, boat rams and ice-cube strikes.
+- [x] Deepen Darkling crimson; add a shared crowd-strength night halo; strengthen color-drain onset and protect unit bodies/shots while washing surrounding scenery.
 - [ ] Migrate later waves toward roughly 90% plain pixel filler; identify medium enemies by equipment and retain complex sprites for rare high-strength threats. Track each composition and story exception in the migration log.

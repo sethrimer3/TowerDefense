@@ -175,6 +175,8 @@ export class DefendRenderer {
   private lctx: CanvasRenderingContext2D;
   private layerKey = "";
   private map: CityMap | null = null;
+  private protectCombat = false;
+  private actors: HTMLCanvasElement | null = null;
   private combatLayer: HTMLCanvasElement | null = null;
   private combatSim: DefendSim | null = null;
   private combatKey = '';
@@ -287,6 +289,7 @@ export class DefendRenderer {
     if (!sim) { this.areaMix = 1; this.previousArea = null; }
     if (this.areaMix === 1) this.previousArea = null;
     this.lastWeather = opts.weather;
+    this.protectCombat = this.darkDrain.prepare(sim, opts.now, opts.night);
     this.refreshLayer(map, sim, opts.looks);
     if (opts.timings) this.timings.terrainMs = performance.now() - start;
     // Beyond the board's edges: the dark ground the city stands on.
@@ -323,7 +326,18 @@ export class DefendRenderer {
     if (opts.effects ?? true) this.drawSmoke(map, sim, opts);
     // Cloudborne palaces sail over everything on the ground.
     this.sky.draw(this.ctx, this.px, map, sim, opts.looks, { now: opts.now, dt, reduceMotion: opts.reduceMotion, night: opts.night });
-    this.darkDrain.draw(this.ctx, this.px, sim, opts.now);
+    // Rain is world scenery too: wash it before the visibility/UI overlays.
+    this.ctx.save();
+    this.ctx.setTransform(1, 0, 0, 1, 0, 0);
+    if (sim && !opts.reduceMotion) {
+      const old = this.previousArea ? this.previousWeather : null;
+      const rainAlpha = (opts.weather?.rain ? this.areaMix : 0) + (old?.rain ? 1 - this.areaMix : 0);
+      this.ctx.save();
+      if (rainAlpha) { this.ctx.globalAlpha = rainAlpha; this.drawRain(dt); }
+      this.ctx.restore();
+    }
+    this.ctx.restore();
+    this.darkDrain.draw(this.ctx, this.px, sim, opts.now, opts.night, this.protectCombat ? this.actors : null);
     if (sim) this.outline?.drawContours(this.ctx);
     opts.markers?.(this.ctx,this.px);
     this.rallyFlag.draw(this.ctx, this.px, sim, sim?.warBanner?.flag && !opts.hideBanner ? sim.warBanner : null, opts);
@@ -333,15 +347,7 @@ export class DefendRenderer {
     if (opts.inspect) drawInspect(this.ctx, this.px, map, sim, opts.inspect.id, opts.inspect.armed, opts.now, opts.reduceMotion, opts.inspect.aim);
     this.drawEditing(overlay, opts.grid, opts.gridColor);
     if (opts.lifting) drawLifting(this.ctx, this.px, opts.lifting.tile, opts.lifting.t);
-    // Rain falls in screen space, in front of the camera.
     this.ctx.setTransform(1, 0, 0, 1, 0, 0);
-    if (sim && !opts.reduceMotion) {
-      const old = this.previousArea ? this.previousWeather : null;
-      const rainAlpha = (opts.weather?.rain ? this.areaMix : 0) + (old?.rain ? 1 - this.areaMix : 0);
-      this.ctx.save();
-      if (rainAlpha) { this.ctx.globalAlpha = rainAlpha; this.drawRain(dt); }
-      this.ctx.restore();
-    }
     if (opts.timings) this.timings.effectsMs = performance.now() - start - this.timings.terrainMs - this.timings.entityMs;
   }
 
@@ -505,7 +511,7 @@ export class DefendRenderer {
     else {
       // Combat art advances on the fixed simulation clock. Keep screen pixels
       // (including artPen's camera snapping), never rescale a cached frame.
-      const key = `${sim.time}:${sim.mapVersion}:${sim.effects.length}:${sim.scorches.length}:${sim.enemies.length}:${sim.soldiers.length}:${sim.civilians.length}:${this.px}:${c.canvas.width}:${c.canvas.height}:${this.cam.s}:${this.cam.x}:${this.cam.y}:${!!torches}:${opts.healthbars === true}:${!!opts.simpleEnemies}:${!!opts.simpleTroops}:${!!opts.mergedOutlines}:${opts.reduceMotion}:${pixelKey()}${opts.sides ? ":" + sim.soldiers.map(u => `${u.id}=${opts.sides!.ink(u.id) ?? ""}`).join(",") : ""}`;
+      const key = `${sim.time}:${sim.mapVersion}:${sim.effects.length}:${sim.scorches.length}:${sim.enemies.length}:${sim.soldiers.length}:${sim.civilians.length}:${this.px}:${c.canvas.width}:${c.canvas.height}:${this.cam.s}:${this.cam.x}:${this.cam.y}:${!!torches}:${opts.healthbars === true}:${!!opts.simpleEnemies}:${!!opts.simpleTroops}:${!!opts.mergedOutlines}:${opts.reduceMotion}:${this.protectCombat}:${pixelKey()}${opts.sides ? ":" + sim.soldiers.map(u => `${u.id}=${opts.sides!.ink(u.id) ?? ""}`).join(",") : ""}`;
       this.combatLayer ??= document.createElement('canvas');
       const layer = this.combatLayer;
       if (sim !== this.combatSim || key !== this.combatKey) {
@@ -532,8 +538,21 @@ export class DefendRenderer {
     drawRime(c, this.px, sim);
     drawLandings(c, this.px, sim);
     this.wizard.drawIce(c, this.px, sim.frosts, sim.time * 1000, flameLights(sim).relief);
-    drawUnits(brush, sim, torches, opts.healthbars === true, opts.timings ? this.timings : undefined, { enemies: opts.simpleEnemies, troops: opts.simpleTroops, reduceMotion: opts.reduceMotion, merged: !!opts.mergedOutlines }, (this.outline ??= new UnitOutline()), opts.sides, { defer: true });
-    this.dark.draw(c, this.px, sim);
+    let actors = c;
+    if (this.protectCombat) {
+      this.actors ??= document.createElement("canvas");
+      if (this.actors.width !== c.canvas.width || this.actors.height !== c.canvas.height) {
+        this.actors.width = c.canvas.width; this.actors.height = c.canvas.height;
+      }
+      actors = this.actors.getContext("2d")!;
+      actors.setTransform(1, 0, 0, 1, 0, 0); actors.clearRect(0, 0, this.actors.width, this.actors.height);
+      actors.setTransform(c.getTransform()); actors.imageSmoothingEnabled = false;
+    }
+    drawUnits({ c: actors, px: this.px }, sim, torches, opts.healthbars === true, opts.timings ? this.timings : undefined, { enemies: opts.simpleEnemies, troops: opts.simpleTroops, reduceMotion: opts.reduceMotion, merged: !!opts.mergedOutlines }, (this.outline ??= new UnitOutline()), opts.sides, { defer: true });
+    this.dark.draw(actors, this.px, sim);
+    if (actors !== c) {
+      c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.drawImage(this.actors!, 0, 0); c.restore();
+    }
   }
 
   /** The trees over everyone, half faded over anyone under them, and in a
