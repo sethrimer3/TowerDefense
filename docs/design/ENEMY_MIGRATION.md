@@ -38,6 +38,8 @@ Totals assume every parent and child is defeated. Large Darkling stats start at 
 
 - **2026-10-29 — Visibility contours.** Dark One bodies now have a bright crimson half-art-pixel perimeter; player troops use dark blue. Touching/overlapping bodies share outer contours, with no lines through their overlap. The colors remain visible through the grayscale wash. Enemy definitions, wave compositions and migration checkboxes are unchanged.
 
+- **2026-10-29 — Contact spacing.** Native structure bites now close to a world-space contact pose before damage. Darkling body squares retain exact art scale at every zoom; their half-art-pixel crimson rim meets the stone wall’s half-art-pixel black rim. The old 0.4-cell reach allowance only selects the nearby target, never authorizes damage. Boat rams and ice-cube strikes share this gate. No wave compositions or migration checkboxes changed.
+
 ## Color drain and performance rules
 
 Faction is explicit in the enemy catalog; never infer darkness from a sprite's color. Currently tagged: Mini Darkling, Darkling, Large Darkling, Mother, Broodling, Dark Knight, Void Sparrow, Necromancer, Skeleton, Blink Imp, Crypt Hound and Grave Wisp. Future Dark One enemies must carry the same faction tag. Other species' allegiance is still pending their migration/story review. Friendly dark wizards and shades do not contribute; neither do dead enemies, fortress parts or Siege proxy objects.

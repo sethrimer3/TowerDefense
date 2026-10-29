@@ -1,3 +1,5 @@
+import { routeToBuilding } from "../src/defend/enemies.ts";
+import { buildingContactPoint } from "../src/defend/contact.ts";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { ambushPrice, startingGold } from "../src/campaign/economy.ts";
@@ -75,9 +77,11 @@ test("Native deaths pay once and damaging the keep pays no bounty", () => {
   assert.equal(s.kills, 1);
   const end = s.field.track.keep,
     attacker = s.engine.spawnAuxiliary("roach", end.x, end.y)!;
+  Object.assign(attacker, buildingContactPoint(s.engine, attacker, s.engine.keep));
   const after = s.gold,
     keep = s.engine.keepHp();
-  s.engine.step(1 / 30);
+  // Isolate native contact damage from the outpost route and nearby guards.
+  routeToBuilding(s.engine, attacker, s.engine.keepId, 1 / 30, s.engine.field);
   assert.ok(attacker.hp > 0);
   assert.ok(s.engine.keepHp() < keep);
   assert.equal(s.gold, after);

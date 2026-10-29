@@ -1,3 +1,4 @@
+import { buildingContactPoint } from "../src/defend/contact.ts";
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DefendSim, type Enemy, type Soldier } from '../src/defend/sim.ts';
@@ -71,11 +72,12 @@ test('small water reaches buildings without sinking or damaging them and does no
 
 test('small boats ram walls and the keep with normal damage and leave a drying visual trail', () => {
   for (const kind of SMALL_BOATS) {
-    const s = sim(), def = ENEMIES[kind], wall = s.map.buildings.find(b => b.kind === 'wall')!;
-    const at = center(wall.rect), e = create(s, kind, at.x, at.y);
+    const s = sim(), def = ENEMIES[kind], wall = s.map.buildings.find(b => b.kind === 'wall' && !b.fence)!;
+    const e = create(s, kind, wall.rect.x + .5, wall.rect.y - def.size / 2 - .3);
+    Object.assign(e, buildingContactPoint(s, e, wall)); e.facing = { x: 0, y: 1 };
     e.cd = 0; const wallHp = s.hp[wall.id]; stepBoat(s, e, 0);
     assert.equal(s.hp[wall.id], wallHp - def.damage);
-    const k = s.keep.rect; e.x = k.x + k.w / 2; e.y = k.y - def.size / 2 - .2;
+    const k = s.keep.rect; e.x = k.x + k.w / 2; e.y = k.y - def.size / 2 - .3; Object.assign(e, buildingContactPoint(s, e, s.keep));
     e.cd = 0; const keepHp = s.keepHp(); stepBoat(s, e, 0);
     assert.equal(s.keepHp(), keepHp - def.damage);
     assert.equal(s.sinkings.length, 0);

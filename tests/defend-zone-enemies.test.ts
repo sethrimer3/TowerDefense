@@ -97,7 +97,7 @@ test('cubes smash blocking walls instead of sliding through them; frozen-zone sh
   // Use the real keep boundary, independent of generated wall positions.
   const cube = sim.spawnAuxiliary('iceCube', sim.keep.rect.x - .5, sim.keep.rect.y + .5)!;
   const hp = sim.hp[sim.keepId]; stepEnemy(sim, cube, 1/30);
-  assert.ok(sim.hp[sim.keepId] < hp); assert.equal(cube.x, sim.keep.rect.x - .5);
+  assert.ok(sim.hp[sim.keepId] < hp); assert.ok(Math.abs(sim.keep.rect.x - cube.x - ENEMIES.iceCube.size / 2 - .5 / 8) < 1e-8, 'cube closes to its outline contact pose');
   sim.wave = 101;
   const ship = sim.spawnAuxiliary('boatDinghy', 10, 10)!; stepBoat(sim, ship, 0);
   assert.equal(sim.cold, true); assert.ok(iceAt(sim, 10, 10));

@@ -9,3 +9,6 @@ export const PLAYER_UNIT_INK = '#121d42';
 export const NEUTRAL_UNIT_INK = '#140c0a';
 export const MARKED_UNIT_INK = '#f2c94c';
 export const BROOD_UNIT_INK = '#6b3d8f';
+
+/** South-facing wall masonry projects this far beyond its solid cell. */
+export const WALL_FACE_HANG = .45;

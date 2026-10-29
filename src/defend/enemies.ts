@@ -1,3 +1,4 @@
+import { approachBuildingContact, structureContactRect, CONTACT_OUTLINE } from "./contact.ts";
 import { enemySize } from "./catalog.ts";
 import { stepAbilities, enemyDamage, enemySpeed } from "./enemy-abilities.ts";
 import { hostileSpecial } from "./hostile-attacks.ts";
@@ -70,7 +71,7 @@ function fightDefender({ sim, e, def, reach }: Turn) {
 function flyAtKeep(t: Turn) {
   const { sim, e, def, reach, dt } = t;
   const goal = sim.baits.length ? lureOf(sim, e.x, e.y) : sim.keep;
-  if (rectDist(goal.rect, e.x, e.y) <= reach) return hitBuilding(t, goal.id);
+  if (rectDist(goal.rect, e.x, e.y) <= reach) return contactBuilding(t, goal.id);
   sim.moveToward(e, center(goal.rect), { speed: enemySpeed(sim, e) * chilled(e), dt, flying: true });
 }
 
@@ -78,7 +79,7 @@ function flyAtKeep(t: Turn) {
 const turn = (sim: DefendSim, e: Enemy, dt: number): Turn => ({ sim, e, dt, def: ENEMIES[e.kind], reach: enemySize(e) / 2 + 0.4 });
 export function routeToBuilding(sim: DefendSim, e: Enemy, id: number, dt: number, field: Float64Array) {
   const t = turn(sim, e, dt);
-  if (rectDist(sim.map.buildings[id].rect, e.x, e.y) <= t.reach) return hitBuilding(t, id);
+  if (rectDist(structureContactRect(sim, sim.map.buildings[id]), e.x, e.y) <= t.reach + CONTACT_OUTLINE) return contactBuilding(t, id);
   routeOnField(t, field);
 }
 export function routeToPoint(sim: DefendSim, e: Enemy, dt: number, field: Float64Array) {
@@ -90,9 +91,10 @@ export function routeFlier(sim: DefendSim, e: Enemy, dt: number) {
 function routeOnField(t: Turn, field: Float64Array) {
   const { sim, e, dt } = t,
     best = downhill(field, sim.foeSolid, clampCell(e.x, CELLS_W), clampCell(e.y, CELLS_H), sim.scenario?.toll);
+  if (insideFence(t)) return;
   if (best < 0) return;
   const p = cellCenter(best);
-  if (sim.foeSolid[best] && sim.map.owner[best] >= 0) smashThrough(t, best, p);
+  if (sim.foeSolid[best] && sim.map.owner[best] >= 0) smashThrough(t, best);
   else sim.moveToward(e, { x: p.x + e.jx, y: p.y + e.jy }, { speed: enemySpeed(sim, e) * chilled(e), dt });
 }
 
@@ -106,7 +108,7 @@ function chaseDistraction(t: Turn) {
     e.distract = -1;
     return false;
   }
-  if (rectDist(b.rect, e.x, e.y) <= reach) hitBuilding(t, b.id);
+  if (rectDist(b.rect, e.x, e.y) <= reach) contactBuilding(t, b.id);
   else if (!sim.moveToward(e, nearestPoint(b.rect, e.x, e.y), { speed: enemySpeed(sim, e) * chilled(e), dt })) e.distract = -1;
   return true;
 }
@@ -115,12 +117,13 @@ function chaseDistraction(t: Turn) {
  * bait while any stands. */
 function march(t: Turn) {
   const { sim, e, def, reach, dt } = t;
+  if (insideFence(t)) return;
   const cx = clampCell(e.x, CELLS_W),
     cy = clampCell(e.y, CELLS_H);
   let field: Float64Array = sim.field;
   if (sim.baits.length && baitStanding(sim)) {
     const bait = lureOf(sim, e.x, e.y);
-    if (rectDist(bait.rect, e.x, e.y) <= reach) return hitBuilding(t, bait.id);
+    if (rectDist(bait.rect, e.x, e.y) <= reach) return contactBuilding(t, bait.id);
     // Bait it can't walk to at any price doesn't call it.
     const left = sim.baitField[cellIndex(cx, cy)];
     if (left < Infinity) field = sim.baitField;
@@ -131,21 +134,20 @@ function march(t: Turn) {
       if (sim.moveToward(e, { x: p.x + e.jx * 3, y: p.y + e.jy * 3 }, { speed: enemySpeed(sim, e) * chilled(e), dt })) return;
     }
   }
-  if (field === sim.field && rectDist(sim.keep.rect, e.x, e.y) <= reach) return hitBuilding(t, sim.keepId);
+  if (field === sim.field && rectDist(sim.keep.rect, e.x, e.y) <= reach) return contactBuilding(t, sim.keepId);
   const best = downhill(field, sim.foeSolid, cx, cy);
   if (best < 0) return;
   const c = cellCenter(best);
-  if (sim.foeSolid[best]) return smashThrough(t, best, c);
+  if (sim.foeSolid[best]) return smashThrough(t, best);
   if (field === sim.field) rollForDistraction(t, cx, cy);
   sim.moveToward(e, { x: c.x + e.jx, y: c.y + e.jy }, { speed: enemySpeed(sim, e) * chilled(e), dt });
 }
 
 /** The cheapest way on goes through a building: walk up and smash it. */
-function smashThrough(t: Turn, cell: number, c: { x: number; y: number }) {
-  const { sim, e, def, reach, dt } = t;
+function smashThrough(t: Turn, cell: number) {
+  const { sim } = t;
   const bid = sim.map.owner[cell];
-  if (rectDist(sim.map.buildings[bid].rect, e.x, e.y) <= reach) return hitBuilding(t, bid);
-  sim.moveToward(e, c, { speed: enemySpeed(sim, e) * chilled(e), dt });
+  contactBuilding(t, bid);
 }
 
 /** Streets are lined with temptations: twice a second, a chance that a
@@ -166,6 +168,18 @@ const CLOSE_IN = 8;
 
 const isRubble = (sim: DefendSim, id: number) => sim.hp[id] <= 0 || !sim.built[id];
 const isHouse = (sim: DefendSim, bid: number) => bid >= 0 && sim.map.buildings[bid].kind === "house";
+
+/** Native and scenario routes share exactly the same contact gate. */
+function contactBuilding(t: Turn, id: number) {
+  const b = t.sim.map.buildings[id];
+  if (b && t.sim.intact(b) && approachBuildingContact(t.sim, t.e, b, t.dt)) hitBuilding(t, id);
+}
+function insideFence(t: Turn) {
+  const cell = cellIndex(clampCell(t.e.x, CELLS_W), clampCell(t.e.y, CELLS_H));
+  const b = t.sim.map.buildings[t.sim.map.owner[cell]];
+  if (!b?.fence || !t.sim.intact(b)) return false;
+  contactBuilding(t, b.id); return true;
+}
 
 function hitBuilding({ sim, e, def }: Turn, id: number) {
   if (e.cd > 0) return;
