@@ -697,3 +697,6 @@ A half-art-pixel perimeter around a combined group of unit bodies, bright crimso
 
 **Contact damage**:
 Damage dealt by an enemy pressing against a structure, with its visibility contour touching the structure’s perimeter.
+
+**Artist sprite**:
+A PNG, one pixel an art pixel and without an outline, that replaces the game's own drawn art for one piece of the city; the game still paints its damage, rubble and outline.

@@ -358,20 +358,81 @@ export function wallRubblePixels(seed: number, size: number, stone: readonly num
 
 const cache = new Map<string, HTMLCanvasElement>();
 
+/** Forgets every cached sprite (an artist's sprites arrived, or the Pixel
+ * Art setting flipped). */
+export function clearSprites() {
+  cache.clear();
+}
+
+/** Edge pixels this dark (every channel at most) are a sprite's own outline. */
+const DARK = 48;
+
+/** `px` (`w` × `h` art pixels) without its outline: every near-black opaque
+ * pixel with a clear pixel or the sprite's edge beside it, cleared. Inner
+ * lines stay. Pure: what the export hands an artist, and what `inked` draws
+ * a fresh outline round. */
+export function bare(px: Uint32Array, w: number, h: number): Uint32Array {
+  const out = px.slice();
+  const solid = (x: number, y: number) => x >= 0 && y >= 0 && x < w && y < h && px[y * w + x] >>> 24 >= 128;
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const v = px[y * w + x];
+      if (v >>> 24 < 128 || (v & 255) > DARK || ((v >> 8) & 255) > DARK || ((v >> 16) & 255) > DARK) continue;
+      if (!solid(x - 1, y) || !solid(x + 1, y) || !solid(x, y - 1) || !solid(x, y + 1)) out[y * w + x] = 0;
+    }
+  return out;
+}
+
+/** `px` (`w` × `h` art pixels, already bare) at twice the size with a
+ * margin of one, ringed by an outline half an art pixel wide: every pixel
+ * of the doubled grid off the sprite that touches it, corners too, in
+ * `ink`. Pure; `drawSprite` draws it half an art pixel out round its box. */
+export function inked(px: Uint32Array, w: number, h: number, ink = OUTLINE): { data: Uint32Array; w: number; h: number } {
+  const W = 2 * w + 2, H = 2 * h + 2, data = new Uint32Array(W * H), line = rgba(ink);
+  const body = (X: number, Y: number) => {
+    if (X < 1 || Y < 1 || X > 2 * w || Y > 2 * h) return 0;
+    return px[((Y - 1) >> 1) * w + ((X - 1) >> 1)];
+  };
+  for (let Y = 0; Y < H; Y++)
+    for (let X = 0; X < W; X++) {
+      const v = body(X, Y);
+      if (v >>> 24 >= 128) { data[Y * W + X] = v; continue; }
+      let near = false;
+      for (let dy = -1; dy <= 1 && !near; dy++) for (let dx = -1; dx <= 1; dx++) if (body(X + dx, Y + dy) >>> 24 >= 128) { near = true; break; }
+      data[Y * W + X] = near ? line : v;
+    }
+  return { data, w: W, h: H };
+}
+
+/** Canvases made by `inked`: drawn half an art pixel out round their box. */
+const ringed = new WeakSet<HTMLCanvasElement>();
+
+/** A canvas of `px` (`w` × `h` art pixels): with `outline`, its own rim
+ * taken off and a half-art-pixel one drawn round it (`bare`, `inked`). */
+export function spriteCanvas(px: Uint32Array, w: number, h: number, outline = false, cv = document.createElement("canvas")) {
+  const art = outline ? inked(bare(px, w, h), w, h) : { data: px, w, h };
+  cv.width = art.w;
+  cv.height = art.h;
+  const c = cv.getContext("2d")!;
+  const img = c.createImageData(art.w, art.h);
+  new Uint32Array(img.data.buffer).set(art.data);
+  c.putImageData(img, 0, 0);
+  if (outline) ringed.add(cv);
+  return cv;
+}
+
 /** A cached canvas of `w × h` art pixels made by `make` (null outside a
- * browser), keyed by `key`. */
-export function sprite(key: string, w: number, h: number, make: () => Uint32Array): HTMLCanvasElement | null {
+ * browser), keyed by `key`. With `outline` (whole pieces: buildings, gates,
+ * roofs, rubble), the sprite's own one-art-pixel rim is swapped for one half
+ * an art pixel wide, drawn outside it. Tiles that join their neighbours
+ * (wall stones and faces, spikes, damage overlays) have none. */
+export function sprite(key: string, w: number, h: number, make: () => Uint32Array, outline = false): HTMLCanvasElement | null {
   if (typeof document === "undefined") return null;
+  if (outline) key += ":ring";
   let cv = cache.get(key);
   if (!cv) {
     if (cache.size > 4000) cache.clear();
-    cv = document.createElement("canvas");
-    cv.width = w;
-    cv.height = h;
-    const c = cv.getContext("2d")!;
-    const img = c.createImageData(w, h);
-    new Uint32Array(img.data.buffer).set(make());
-    c.putImageData(img, 0, 0);
+    cv = spriteCanvas(make(), w, h, outline);
     cache.set(key, cv);
   }
   return cv;
@@ -382,6 +443,10 @@ export function drawSprite(c: CanvasRenderingContext2D, cv: HTMLCanvasElement | 
   if (!cv) return;
   c.save();
   c.imageSmoothingEnabled = false;
-  c.drawImage(cv, x, y, w, h);
+  if (ringed.has(cv)) {
+    // Half an art pixel out on every side, for the outline.
+    const hx = w / (cv.width - 2), hy = h / (cv.height - 2);
+    c.drawImage(cv, x - hx, y - hy, w + 2 * hx, h + 2 * hy);
+  } else c.drawImage(cv, x, y, w, h);
   c.restore();
 }

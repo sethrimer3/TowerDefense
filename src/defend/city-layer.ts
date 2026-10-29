@@ -322,7 +322,7 @@ function paintBuilding(p: Paint, b: Building) {
   }
   if (b.kind === "wallBallista") {
     if (sim && !sim.intact(b)) {
-      paintArt(p, sprite(`bastion:rubble:${lotSeed(b)}`, r.w * ART, r.h * ART, () => bastionRubblePixels(lotSeed(b))), box);
+      paintArt(p, sprite(`bastion:rubble:${lotSeed(b)}`, r.w * ART, r.h * ART, () => bastionRubblePixels(lotSeed(b)), true), box);
       return paintRebuilding(p, b);
     }
     return paintArt(p, bastionSprite(stageOf(sim, b), lotSeed(b)), box);
@@ -336,7 +336,7 @@ function paintBuilding(p: Paint, b: Building) {
   }
   // A cloudborne palace floats over its lot (`sky-palace-art.ts`), leaving its mooring.
   if (aloft(p, b)) {
-    return paintArt(p, sprite(`mooring:${r.w}x${r.h}:${lotSeed(b)}`, r.w * ART, r.h * ART, () => mooringPixels(r.w, r.h, lotSeed(b))), box);
+    return paintArt(p, sprite(`mooring:${r.w}x${r.h}:${lotSeed(b)}`, r.w * ART, r.h * ART, () => mooringPixels(r.w, r.h, lotSeed(b)), true), box);
   }
   // Pixel Art's roofs on undamaged houses; a damaged one keeps its own, showing the damage.
   if (b.kind === "house" && !stageOf(sim, b) && drawRoof(c, b.variant, box, px)) return;
@@ -393,7 +393,7 @@ function paintArt({ c }: Paint, art: HTMLCanvasElement | null, box: { x: number;
 }
 
 /** A wall ballista's bastion at damage `stage`. */
-export const bastionSprite = (stage: number, seed: number) => sprite(`bastion:${stage}:${seed}`, 2 * ART, 2 * ART, () => bastionPixels(stage, seed));
+export const bastionSprite = (stage: number, seed: number) => sprite(`bastion:${stage}:${seed}`, 2 * ART, 2 * ART, () => bastionPixels(stage, seed), true);
 
 const SPIKE_OUT: Record<Side, readonly [number, number]> = { n: [0, -1], e: [1, 0], s: [0, 1], w: [-1, 0] };
 
@@ -450,7 +450,7 @@ export function paintFences(c: CanvasRenderingContext2D, px: number, map: CityMa
 /** A city gate's sprite with its doors at `frame`, and its rubble. */
 export const gateSprite = (side: Side, frame: number, stage: number, seed: number) => {
   const r = gateRect({ tx: 0, ty: 0, side });
-  return sprite(`gate:${side}:${frame}:${stage}:${seed}`, r.w * ART, r.h * ART, () => gatePixels(side, frame, stage, seed));
+  return sprite(`gate:${side}:${frame}:${stage}:${seed}`, r.w * ART, r.h * ART, () => gatePixels(side, frame, stage, seed), true);
 };
 /** Gate `b`'s sprite, stone or wooden, with its doors at `frame`, drawn over
  * `gateArtRect(b)`. */
@@ -458,15 +458,15 @@ export const gateSpriteOf = (b: Building, frame: number, stage: number) =>
   b.woodGate ? woodGateSprite(b.gate!.side, frame, stage, lotSeed(b)) : gateSprite(b.gate!.side, frame, stage, lotSeed(b));
 const woodGateSprite = (side: Side, frame: number, stage: number, seed: number) => {
   const across = side === "e" || side === "w", u = WOOD_GATE.long * ART, v = WOOD_GATE.deep * ART;
-  return sprite(`woodGate:${side}:${frame}:${stage}:${seed}`, across ? v : u, across ? u : v, () => woodGatePixels(side, frame, stage, seed));
+  return sprite(`woodGate:${side}:${frame}:${stage}:${seed}`, across ? v : u, across ? u : v, () => woodGatePixels(side, frame, stage, seed), true);
 };
 const woodGateRubbleSprite = (side: Side, seed: number) => {
   const across = side === "e" || side === "w", u = WOOD_GATE.long * ART, v = WOOD_GATE.deep * ART;
-  return sprite(`woodGate:${side}:rubble:${seed}`, across ? v : u, across ? u : v, () => woodGateRubblePixels(side, seed));
+  return sprite(`woodGate:${side}:rubble:${seed}`, across ? v : u, across ? u : v, () => woodGateRubblePixels(side, seed), true);
 };
 const gateRubbleSprite = (side: Side, seed: number) => {
   const r = gateRect({ tx: 0, ty: 0, side });
-  return sprite(`gate:${side}:rubble:${seed}`, r.w * ART, r.h * ART, () => gateRubblePixels(side, seed));
+  return sprite(`gate:${side}:rubble:${seed}`, r.w * ART, r.h * ART, () => gateRubblePixels(side, seed), true);
 };
 const wallRubbleSprite = (seed: number, area: AreaId) => {
   const tones = wallRubbleTones(area);

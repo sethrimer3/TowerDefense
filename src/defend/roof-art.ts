@@ -15,6 +15,7 @@
  * with smoothing off. */
 import { hash, hash01 } from "./grid.ts";
 import { ART } from "./park-art.ts";
+import { ART_NAMES, artOverride } from "./art-overrides.ts";
 import { ROOFS } from "./structure-art.ts";
 import { damage, pixels, rubblePixels, sprite } from "./damage-art.ts";
 
@@ -43,6 +44,9 @@ function mix(a: number, b: number, t: number) {
  * filling its cells: a one-pixel gap round the edge and the roof inside its
  * outline. The house's shadow is cast with the city's (`shadow-art.ts`). */
 export function roofPixels(cw: number, ch: number, variant: number, seed: number): Uint32Array {
+  // An artist's roof stands in for the drawn one (`art-overrides.ts`).
+  const own = artOverride(ART_NAMES.roof(variant % ROOFS.length, cw, ch), cw * ART, ch * ART);
+  if (own) return own;
   const W = cw * ART, H = ch * ART, out = new Uint32Array(W * H);
   const set = (x: number, y: number, c: number) => (out[y * W + x] = rgba(c));
   // The house sits one pixel in from its cells (two on the lower right).
@@ -196,12 +200,12 @@ export function houseRubblePixels(cw: number, ch: number, variant: number, seed:
 /** The roof for a house of `cw × ch` cells, seeded by `seed`, at damage
  * `stage`, as a canvas of art pixels (null outside a browser), cached. */
 export function roofSprite(cw: number, ch: number, variant: number, seed: number, stage = 0): HTMLCanvasElement | null {
-  return sprite(`house:${cw},${ch},${variant},${seed}:${stage}`, cw * ART, ch * ART, () => houseDamagePixels(cw, ch, variant, seed, stage));
+  return sprite(`house:${cw},${ch},${variant},${seed}:${stage}`, cw * ART, ch * ART, () => houseDamagePixels(cw, ch, variant, seed, stage), true);
 }
 
 /** A fallen house's rubble as a canvas of art pixels, cached. */
 export function houseRubbleSprite(cw: number, ch: number, variant: number, seed: number): HTMLCanvasElement | null {
-  return sprite(`house:${cw},${ch},${variant},${seed}:rubble`, cw * ART, ch * ART, () => houseRubblePixels(cw, ch, variant, seed));
+  return sprite(`house:${cw},${ch},${variant},${seed}:rubble`, cw * ART, ch * ART, () => houseRubblePixels(cw, ch, variant, seed), true);
 }
 
 /** The seed a house's roof is drawn from: its lot, so it never changes. */

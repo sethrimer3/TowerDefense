@@ -17,6 +17,11 @@ export function setPixelArt(value: boolean) {
   listeners.forEach(f => f());
 }
 export const pixelArtOn = () => on;
+/** Redraws everything cached from sprites (an artist's sprites arrived). */
+export function bumpPixelArt() {
+  revision++;
+  listeners.forEach(f => f());
+}
 export const pixelKey = () => on ? `px${revision}` : "off";
 export const onPixelArt = (f: () => void) => void listeners.add(f);
 

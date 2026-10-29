@@ -10,6 +10,7 @@ import { GATE } from "./catalog.ts";
 import { hash } from "./grid.ts";
 import type { Side } from "./layout.ts";
 import { ART } from "./park-art.ts";
+import { ART_NAMES, artOverride } from "./art-overrides.ts";
 import { OUTLINE, damage, pixels, rubblePixels, rgba, shade, STONE } from "./damage-art.ts";
 
 /** Door frames from shut to wide open. */
@@ -49,7 +50,7 @@ export function gatePixels(side: Side, frame = 0, stage = 0, seed = 0): Uint32Ar
     const [x, y] = at(u, v);
     screen[y * w + x] = m[v * U + u];
   }
-  const out = colour(screen, w, h, seed);
+  const out = artOverride(ART_NAMES.gate(side, frame), w, h) ?? colour(screen, w, h, seed);
   damage(pixels(out, w, h), stage, hash(seed, 0x6a7e), { tones: STONE, roofed: false });
   return out;
 }
