@@ -42,7 +42,8 @@ try {
     await button.click();
     assert.equal(await button.innerText(), 'Siege --> Defend');
     assert.equal(await button.locator('.combat-icon-layer').count(), 1);
-    assert.equal(await button.locator('svg').count(), 1);
+    assert.equal(await button.locator('img.ui-sprite').count(), 1);
+    assert.match(await button.locator('img.ui-sprite').getAttribute('src'), /^data:image\/png/);
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
     // The existing save decoder still loads the city after a mode switch.
     await page.reload();
