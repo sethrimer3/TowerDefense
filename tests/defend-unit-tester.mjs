@@ -23,7 +23,7 @@ try {
     await page.locator('#developer-mode').uncheck();
     assert.equal(await page.locator('#dev-all').count(), 0);
     const disabled = await page.evaluate(() => JSON.parse(localStorage.getItem('towerdefense.v1')).settings);
-    for (const key of ['developerMode', 'devMode', 'devTowers', 'instantResearch', 'devSmithy', 'devCommand', 'devStewardship', 'devMine', 'devLibrary']) assert.equal(disabled[key], false, key);
+    for (const key of ['developerMode', 'devMode', 'devTowers', 'devJournal', 'instantResearch', 'devSmithy', 'devCommand', 'devStewardship', 'devMine', 'devLibrary']) assert.equal(disabled[key], false, key);
     await page.locator('nav [data-tab="defend"]').click();
     await page.locator('#defend-wave').click();
     assert.equal(await page.locator('[data-unit-tester]').count(), 0);

@@ -57,6 +57,9 @@ export const SETTINGS = {
   /** Dev: the palette holds at least one of every structure (granted when
    * turned on; turning it off takes nothing back). */
   devTowers: { kind: "toggle", default: false, page: { id: "dev-towers", label: "All towers unlocked" } },
+  /** Dev: the enemy journal shows every species, discovered or not (the save's
+   * discoveries are untouched, and show alone again once off). */
+  devJournal: { kind: "toggle", default: false, page: { id: "dev-journal", label: "All journal entries unlocked" } },
   /** Dev: Smithy and Knowledge research completes when started, without workers. */
   instantResearch: { kind: "toggle", default: false, page: { id: "dev-instant", label: "Instantaneous research (Study only)" } },
   /** Dev: every rank of the Smithy's rows (or of one skill tree) counts as bought, while on
@@ -70,7 +73,7 @@ export const SETTINGS = {
 } as const satisfies Record<string, Setting>;
 
 export type SettingKey = keyof typeof SETTINGS;
-export const DEV_OPTIONS = ["devMode", "devTowers", "instantResearch", "devSmithy", "devCommand", "devStewardship", "devMine", "devLibrary"] as const satisfies readonly SettingKey[];
+export const DEV_OPTIONS = ["devMode", "devTowers", "devJournal", "instantResearch", "devSmithy", "devCommand", "devStewardship", "devMine", "devLibrary"] as const satisfies readonly SettingKey[];
 type ValueOf<S> = S extends { kind: "toggle" } ? boolean
   : S extends { choices: readonly (readonly [infer V, string])[] } ? V
   : number;

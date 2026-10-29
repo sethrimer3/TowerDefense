@@ -27,6 +27,7 @@ export const SETTINGS_TEXT = [
  ["setting.developerMode","Developer mode","Modo desarrollador","Mode développeur","Entwicklermodus","Modo desenvolvedor","Modalità sviluppatore","開発者モード","개발자 모드","开发者模式"],
  ["setting.devMode","Unlimited money","Dinero ilimitado","Argent illimité","Unbegrenztes Geld","Dinheiro ilimitado","Denaro illimitato","資源無制限","무제한 자원","无限资源"],
  ["setting.devTowers","All towers unlocked","Todas las torres desbloqueadas","Toutes les tours débloquées","Alle Türme freigeschaltet","Todas as torres desbloqueadas","Tutte le torri sbloccate","すべての塔を解放","모든 탑 잠금 해제","解锁全部防御塔"],
+ ["setting.devJournal","All journal entries unlocked","Todas las entradas del diario desbloqueadas","Toutes les entrées du journal débloquées","Alle Tagebucheinträge freigeschaltet","Todas as entradas do diário desbloqueadas","Tutte le voci del diario sbloccate","図鑑の全項目を解放","도감 항목 모두 잠금 해제","解锁全部图鉴条目"],
  ["setting.instantResearch","Instantaneous research (Study only)","Investigación instantánea (solo Estudio)","Recherche instantanée (cabinet uniquement)","Sofortige Forschung (nur Studierzimmer)","Pesquisa instantânea (apenas Estudo)","Ricerca istantanea (solo Studio)","即時研究（書斎のみ）","즉시 연구 (서재 전용)","即时研究（仅限书房）"],
  ["setting.devSmithy","Smithy","Herrería","Forge","Schmiede","Ferraria","Fucina","鍛冶場","대장간","铁匠铺"],
  ["setting.devCommand","Command","Mando","Commandement","Befehl","Comando","Comando","指揮","지휘","指挥"],

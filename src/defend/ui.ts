@@ -11,7 +11,7 @@ import { gravesNear } from "./necromancy.ts";
 import { meteorReach } from "./meteor.ts";
 import { frostReach } from "./frost-nova.ts";
 import { dropSpots } from "./reinforcements.ts";
-import { journalHTML, paintJournal } from "./journal.ts";
+import { allEnemyKinds, journalHTML, paintJournal } from "./journal.ts";
 import { paintPortraits } from "./journal-portrait.ts";
 import { wavePickerHTML } from "./wave-picker.ts";
 import { areaForWave, areaStyle, type AreaId } from "./areas.ts";
@@ -82,6 +82,8 @@ export type DefendHost = {
   /** The park grass and pond effects are on. */
   effects(): boolean;
   devMode(): boolean;
+  /** Dev: the enemy journal shows every species, discovered or not. */
+  allJournal?(): boolean;
   healthbars?(): boolean;
   /** Enemies, and your troops, drawn as plain squares. */
   simpleEnemies?(): boolean;
@@ -371,7 +373,7 @@ export class DefendPage {
     this.journal = this.root.querySelector<HTMLDialogElement>(".defend-journal-dialog")!;
     this.journal.addEventListener("close", () => { this.lastTime = 0; this.root.querySelector<HTMLButtonElement>("#defend-journal")!.focus(); });
     this.root.querySelector<HTMLButtonElement>("#defend-journal")!.onclick = () => {
-      this.journal!.innerHTML = journalHTML(this.save.discovered);
+      this.journal!.innerHTML = journalHTML(this.host.allJournal?.() ? allEnemyKinds() : this.save.discovered);
       paintPortraits(this.journal!);
       this.journal!.querySelector<HTMLButtonElement>("[data-journal-close]")!.onclick = () => this.journal!.close();
       this.journal!.showModal();
