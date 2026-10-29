@@ -42,6 +42,8 @@ Suggested order: 1 (fences) and 2 (strike quick bar) first, since Ambush's outpo
 
 **Brief:** pixel-art icons for the Ambush, Siege, Defend and Settings tabs; the old ones are replaced.
 
+**Done:** Ambush and Siege (`src/ui/mode-icons.ts`: a bow drawn from a bush, a trebuchet). Defend and Settings still use their PNGs.
+
 **Today:** Defend and Settings are legacy PNGs (`public/assets/ui/defend.png`, `settings.png`, through `uiSprite` in `src/ui/dom.ts`); Ambush and Siege are inline SVGs in `src/ui/combat-tab.ts` (`combatIcon`). Tiles already uses a canvas painted by the board's own art (`cityTile`).
 
 **Plan:**
