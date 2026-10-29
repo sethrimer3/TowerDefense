@@ -5,6 +5,8 @@
    on its own. Text is the bundled Alembic pixel font, or Cinzel with Use
    Custom Font off (style.css's --font). */
 :root {
+  --siege-dusk: #c3a1e7;
+  --siege-night: #b8daee;
   color: #d9c9a6;
   background: #0b0a09;
   --gold: #e2b866;

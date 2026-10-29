@@ -281,25 +281,27 @@ Today the attackers march on the war banner `raid.ts` plants on the enemy keep, 
 | **C. Every unit individually** | Drag a box or tap units to select them, then tap a destination (RTS style). | High: a selection model, a box-select gesture that doesn't fight panning, per-soldier orders the native AI must respect. | Fiddly on a phone, in a 2-minute battle; hard to make deterministic and testable. |
 | **D. By staging home (squads)** | Each owned building's garrison is a squad with its own badge; the box of remaining units becomes the squad list. | Medium: it is exactly the native rally point per home, with no selection model. | Many squads with a large army; long lists on a phone. |
 
-**Recommendation: A, with heroes and ultimates as their own chip.** It covers B's appeal, needs no new AI (every group is a set of native rally points), and stays one tap to choose and one tap to aim on a phone. Implement it as a `SquadBar` sharing the spell bar's armed-then-tap pattern, with an armed squad and an armed spell cancelling each other. A planted group flag uses the blue rally flag art in the group's colour; the war banner on the keep remains the default target. The plan does not start this phase until Seth chooses.
+**Recommendation: A, with heroes and ultimates as their own chip.** It covers B's appeal, needs no new AI (every group is a set of native rally points), and stays one tap to choose and one tap to aim on a phone. Implement it as a `SquadBar` sharing the spell bar's armed-then-tap pattern, with an armed squad and an armed spell cancelling each other. A planted group flag uses the blue rally flag art in the group's colour; the war banner on the keep remains the default target. Seth chose option A (unit types plus separate heroes/ultimates) on 2026-10-29; phase 14 may proceed.
 
 ### Implementation order for Part 2
 
 One PR per phase, as before. Tick each here as it lands.
 
 - **Phase 8: two minutes and no muster buildings ☑.** `SIEGE_SECONDS`, hidden staging homes and troops entering from the bottom edge, the camera reframed, recalibration (`tools/calibrate-siege.ts`, `SIEGE_MATCHMAKING.md`), Siege goldens only.
-- **Phase 9: day cycle and the units box ☐.** `siegeSky`, the lighting on in Siege, `DrawOptions.tint`, the timer's colours, and the translucent black and gold units box.
+- **Phase 9: day cycle and the units box ☑.** `siegeSky`, the lighting on in Siege, `DrawOptions.tint`, the timer's colours, and the translucent black and gold units box.
 - **Phase 10: side outlines ☐.** `DrawOptions.sides`, per-ink outline layers, rims and simple squares, with a colour gallery for Seth.
 - **Phase 11: the defender's flags ☐.** Custom keep flag, `SiegeFlags` poles, felling them.
 - **Phase 12: flag-bearers ☐.** The unit, untargetable filtering, mana on death, art.
 - **Phase 13: victory ☐.** `SiegeVictory`: the collapse wave, the burning and raised flags, skip, Reduce Motion.
-- **Phase 14: directing units ☐.** Only after Seth picks an option (default A).
+- **Phase 14: directing units ☐.** Option A chosen by Seth: unit types plus separate heroes/ultimates.
 
 Phase 8 validation: all 123 Node test files, the production build, and native-castle/entry/HUD/staging browser checks pass at 390×844 and 1280×800. Native paths, every infantry family, replenishment, open entry cells, hidden-home targeting/inspection, pause and the exact 120-second cutoff are covered. Training was rerun from scratch and the curve refitted; held-out seeds 1001–1004 won 42/136 raids (30.9%). Bronze lost all 16 trials at the minimum native castle budget; the balance limitation is published in `SIEGE_MATCHMAKING.md`. Only `siege-castles.golden.json` changed, for the new native DPS budgets; Defend replay, city and fence goldens are untouched.
 
+Phase 9 validation: all 124 Node test files and the production build pass. `tests/siege-sky.mjs` captures day, sunset, dusk and night at both sizes, verifies the paused clock, visible night darkening and the translucent black/gold units box. `siegeSky` is pure and continuous at its boundaries; renderer tint/sun inputs are absent in Defend and Ambush. No goldens changed.
+
 ### Open questions for Part 2 (defaults in brackets)
 
-- **A. Directing units:** which option? [A, by unit type, with heroes and ultimates as their own group.]
+- **A. Directing units:** decided 2026-10-29: A, by unit type, with heroes and ultimates as their own group.
 - **B. Flag-bearer mana:** how much does each drop, and is it on death only or also while walking? [2 mana each, on death only.]
 - **C. Replenishment without muster buildings:** do lost troops still get retrained and march in from the edge, or is the army fixed at the start, which would make the units box a true countdown? [Retrained, as now; calibration assumed it.]
 - **D. Civilians' outline:** should the castle's civilians get the red outline too? [No, black; they are not units.]

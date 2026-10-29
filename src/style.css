@@ -2497,7 +2497,7 @@ nav button[data-mode] > .tab-label { min-height: 2.4em; }
 .siege-name-plate strong { font-size:12px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
 .siege-name-plate .siege-rank-emblem { position:static;width:30px;height:30px;flex-shrink:0; }
 .siege-plate-text { flex-shrink:1; }
-.siege-units { position:absolute;left:8px;bottom:max(8px,env(safe-area-inset-bottom,0px));z-index:3;display:grid;gap:2px;max-height:45%;overflow:hidden;pointer-events:none;background:var(--nails),var(--wood);border:2px solid var(--ink);box-shadow:inset 0 0 0 1px var(--brass);padding:7px 10px;color:#f3e3c0;text-shadow:1px 1px #000;font-size:12px; }
+.siege-units { position:absolute;left:8px;bottom:max(8px,env(safe-area-inset-bottom,0px));z-index:3;display:grid;gap:2px;max-height:45%;overflow:hidden;pointer-events:none;background:rgba(0,0,0,.55);border:2px solid var(--brass);box-shadow:0 0 0 1px var(--ink);padding:7px 10px;color:#f3e3c0;text-shadow:1px 1px #000;font-size:12px; }
 .siege-units[hidden] { display:none; }
 .siege-unit { display:grid;grid-template-columns:18px 2.2em auto;align-items:center;gap:5px; }
 .siege-unit canvas { position:static;width:18px;height:18px;image-rendering:pixelated; }
@@ -2527,3 +2527,8 @@ nav button[data-mode] > .tab-label { min-height: 2.4em; }
 .siege-mana { display:flex;align-items:center;gap:3px;height:48px;padding:3px 5px;box-sizing:border-box;white-space:nowrap;background:var(--nails),var(--wood);border:2px solid var(--ink);box-shadow:inset 0 0 0 1px var(--brass);color:#f3e3c0;text-shadow:1px 1px #000;font-size:12px;font-variant-numeric:tabular-nums;line-height:1; }
 .siege-mana canvas { position:static;inset:auto;width:18px;height:24px;image-rendering:pixelated; }
 @media(max-width:600px) { .siege-mana { height:40px;padding:2px 4px; } }
+
+.siege-timer { color:var(--gold); font:inherit; font-variant-numeric:tabular-nums; }
+.siege-timer[data-sky="sunset"] { color:var(--ember); }
+.siege-timer[data-sky="dusk"] { color:var(--siege-dusk); }
+.siege-timer[data-sky="night"] { color:var(--siege-night); }
