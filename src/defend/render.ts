@@ -324,6 +324,7 @@ export class DefendRenderer {
     // Cloudborne palaces sail over everything on the ground.
     this.sky.draw(this.ctx, this.px, map, sim, opts.looks, { now: opts.now, dt, reduceMotion: opts.reduceMotion, night: opts.night });
     this.darkDrain.draw(this.ctx, this.px, sim, opts.now);
+    if (sim) this.outline?.drawContours(this.ctx);
     opts.markers?.(this.ctx,this.px);
     this.rallyFlag.draw(this.ctx, this.px, sim, sim?.warBanner?.flag && !opts.hideBanner ? sim.warBanner : null, opts);
     if (sim?.warBanner && !sim.warBanner.flag && !opts.hideBanner) drawWarBanner(this.ctx, this.px, sim.warBanner, bannerReach(sim), { t: opts.now / 1000, reduceMotion: opts.reduceMotion });
@@ -531,7 +532,7 @@ export class DefendRenderer {
     drawRime(c, this.px, sim);
     drawLandings(c, this.px, sim);
     this.wizard.drawIce(c, this.px, sim.frosts, sim.time * 1000, flameLights(sim).relief);
-    drawUnits(brush, sim, torches, opts.healthbars === true, opts.timings ? this.timings : undefined, { enemies: opts.simpleEnemies, troops: opts.simpleTroops, reduceMotion: opts.reduceMotion, merged: !!opts.mergedOutlines }, opts.mergedOutlines || opts.sides ? (this.outline ??= new UnitOutline()) : undefined, opts.sides);
+    drawUnits(brush, sim, torches, opts.healthbars === true, opts.timings ? this.timings : undefined, { enemies: opts.simpleEnemies, troops: opts.simpleTroops, reduceMotion: opts.reduceMotion, merged: !!opts.mergedOutlines }, (this.outline ??= new UnitOutline()), opts.sides, { defer: true });
     this.dark.draw(c, this.px, sim);
   }
 

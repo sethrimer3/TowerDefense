@@ -1,20 +1,9 @@
-/** Merged unit outlines: the battle's units (civilians, troops, enemies)
- * keep their black outlines on a layer of their own under all of their
- * bodies, so units that touch or overlap read as one shape with one outline
- * round its perimeter, never one unit's outline cut across another.
- *
- * Every unit sprite is a baked canvas or PNG with a one-pixel near-black
- * ring round it. The units are drawn into `layer`, whose `drawImage` is
- * swapped for one that draws `bare(image)`, the sprite with that ring taken
- * off, and puts its silhouette, its solid pixels in black, at the same
- * place on `outline`. A sprite alone looks as before; where sprites overlap,
- * every silhouette is under every body. The black rims the battle art draws
- * by hand (the guilds' troops, the simple squares) go straight onto the
- * outline layer (`battle-art.ts`'s `rimOf`). Both layers are then copied
- * onto the board, two whole-canvas copies a frame however many units there
- * are; each sprite's bare and silhouette copies are made once.
- *
- * Presentation only: the Settings page's Merged unit outlines. */
+import { UnitContours, bodyPath } from "./unit-contours.ts";
+/** Unit bodies share a screen layer, with independent ink channels. Legacy
+ * mode keeps baked sprite rims beneath every body. Thin visibility mode uses
+ * cached body paths and primitive geometry through UnitContours, removes old
+ * colored rims and emits only the half-art-pixel outer union. Its buffers can
+ * be drawn after the world wash without repainting or reading the scene. */
 import { OUTLINE } from "./pixel-fx.ts";
 
 type Ctx = CanvasRenderingContext2D;
@@ -27,7 +16,7 @@ const DARK = 48;
  * silhouette: an outline would read heavier than they are. */
 const SOLID = 0.7;
 
-type Copies = { bare: HTMLCanvasElement; shape: HTMLCanvasElement };
+type Copies = { bare: HTMLCanvasElement; shape: HTMLCanvasElement; data?: Uint8ClampedArray; faded?: boolean; paths?: Map<string, Path2D> };
 const copies = new WeakMap<object, Copies>();
 const live = new WeakSet<object>();
 
@@ -58,6 +47,9 @@ function copiesOf(img: Sprite): Copies | null {
   const image = c.getImageData(0, 0, w, h);
   const solid = silhouette(image.data, w, h);
   stripOutline(image.data, w, h);
+  made.data = image.data; made.paths?.clear();
+  made.faded = false;
+  for (let i = 3; i < image.data.length; i += 4) if (image.data[i] >= 128 && image.data[i] < 255) { made.faded = true; break; }
   c.putImageData(image, 0, 0);
   shape.getContext("2d")!.putImageData(new ImageData(solid, w, h), 0, 0);
   return made;
@@ -111,6 +103,11 @@ function canvas() {
 }
 
 export class UnitOutline {
+  private readonly contours = new UnitContours();
+  private thin = false;
+  private neutralMerged = true;
+  private minimumAlpha = SOLID;
+  private readonly discard = canvas();
   private layer = canvas();
   private outline = canvas();
   private colors = new Map<string, ReturnType<typeof canvas>>();
@@ -122,6 +119,7 @@ export class UnitOutline {
   private tint = canvas();
 
   constructor() {
+    this.discard.cv.width = this.discard.cv.height = 1;
     const c = this.layer.c, patch = c as unknown as Record<string, unknown>;
     // The outline layer follows every change of the units' transform, so
     // silhouettes land where their sprites do.
@@ -129,23 +127,77 @@ export class UnitOutline {
       const own = (c[name] as (...a: unknown[]) => void).bind(c);
       patch[name] = (...a: unknown[]) => {
         own(...a);
+        if (this.thin) this.contours.transform(c);
         (this.outline.c[name] as (...v: unknown[]) => void).apply(this.outline.c, a);
         for (const layer of this.colors.values()) (layer.c[name] as (...v: unknown[]) => void).apply(layer.c, a);
       };
     }
-    const draw = drawer(c);
+    // Track vector geometry alongside normal draws, using the current camera
+    // matrix. Legacy mode keeps its original path and raster behavior.
     const owner = this;
+    for (const name of ["beginPath", "closePath", "moveTo", "lineTo", "rect", "roundRect", "arc", "arcTo", "ellipse", "bezierCurveTo", "quadraticCurveTo"] as const) {
+      const own = (c[name] as (...a: unknown[]) => void).bind(c);
+      patch[name] = (...args: unknown[]) => { own(...args); if (this.thin) this.contours.path(name, args); };
+    }
+    const fillRect = c.fillRect.bind(c), fill = c.fill.bind(c), stroke = c.stroke.bind(c);
+    patch.fillRect = (x: number, y: number, w: number, h: number) => {
+      fillRect(x, y, w, h);
+      if (this.thin && this.capture(c.globalAlpha, c.fillStyle)) this.contours.rect(x, y, w, h);
+    };
+    patch.fill = (...args: unknown[]) => {
+      (fill as (...args: unknown[]) => void)(...args);
+      if (this.thin && this.capture(c.globalAlpha, c.fillStyle)) this.contours.fill(args[0] instanceof Path2D ? args[0] : undefined);
+    };
+    patch.stroke = (...args: unknown[]) => {
+      (stroke as (...args: unknown[]) => void)(...args);
+      if (this.thin && this.capture(c.globalAlpha, c.strokeStyle)) this.contours.stroke(c, args[0] instanceof Path2D ? args[0] : undefined);
+    };
+    const draw = drawer(c);
     patch.drawImage = function (img: CanvasImageSource, a: number, b: number, w?: number, h?: number, dx?: number, dy?: number, dw?: number, dh?: number) {
-      const made = isSprite(img) ? copiesOf(img) : null;
+      const original = owner.thin && !owner.currentInk && !owner.neutralMerged;
+      const made = !original && isSprite(img) ? copiesOf(img) : null;
       const n = arguments.length;
-      if (made && c.globalAlpha >= SOLID) owner.under.get(owner.current.c)!(made.shape, a, b, w, h, dx, dy, dw, dh, n);
+      if (made && c.globalAlpha >= (owner.thin ? owner.minimumAlpha : SOLID)) {
+        if (owner.thin && owner.currentInk) {
+          if (c.globalAlpha < 1 || made.faded) owner.contours.faded();
+          const sx = n > 5 ? a : 0, sy = n > 5 ? b : 0;
+          const sw = n > 5 ? w! : made.bare.width, sh = n > 5 ? h! : made.bare.height;
+          const key = `${sx}:${sy}:${sw}:${sh}`;
+          const paths = made.paths ??= new Map();
+          let path = paths.get(key);
+          if (!path) {
+            path = bodyPath(made.data!, made.bare.width, made.bare.height, sx, sy, sw, sh);
+            if (paths.size >= 16) paths.clear();
+            paths.set(key, path);
+          }
+          owner.contours.image(path, sx, sy, sw, sh, n > 5 ? dx! : a, n > 5 ? dy! : b,
+            n > 5 ? dw! : n > 3 ? w! : sw, n > 5 ? dh! : n > 3 ? h! : sh);
+        } else owner.under.get(owner.current.c)!(made.shape, a, b, w, h, dx, dy, dw, dh, n);
+      }
       draw(made?.bare ?? img, a, b, w, h, dx, dy, dw, dh, n);
     };
   }
 
+  /** Keep faint glows out of the silhouette; preserve genuinely translucent
+   * bodies without paying for opaque geometry erasure in ordinary pixel crowds. */
+  private capture(alpha: number, style: string | CanvasGradient | CanvasPattern) {
+    if (typeof style === "string") {
+      if (style.length === 9 && style[0] === "#") alpha *= Number.parseInt(style.slice(7), 16) / 255;
+      else if (style.startsWith("rgba(")) {
+        const match = /,\s*([\d.]+)\s*\)$/.exec(style);
+        if (match) alpha *= Number(match[1]);
+      }
+    }
+    if (alpha < this.minimumAlpha) return false;
+    if (alpha < 1) this.contours.faded();
+    return true;
+  }
+
   /** The layer to draw the units into and the one under it for their
    * outlines, both cleared, sized to `c`'s canvas and under its transform. */
-  begin(c: Ctx, merged = true): { units: Ctx; rims: Ctx } {
+  begin(c: Ctx, merged = true, contourWidth?: number): { units: Ctx; rims: Ctx } {
+    this.thin = contourWidth !== undefined; this.neutralMerged = merged;
+    if (this.thin) { merged = true; this.contours.begin(c, contourWidth!); }
     this.merged = merged;
     this.currentInk = undefined;
     this.current = this.outline;
@@ -167,8 +219,13 @@ export class UnitOutline {
   }
 
   /** Switch only the silhouette channel; all bodies retain their own colors. */
-  ink(color?: string): Ctx {
-    this.currentInk = color;
+  ink(color?: string, minimumAlpha = SOLID): Ctx {
+    this.currentInk = color; this.minimumAlpha = minimumAlpha;
+    if (this.thin) {
+      this.contours.select(color);
+      this.current = this.outline;
+      return color ? this.discard.c : this.neutralMerged ? this.outline.c : this.layer.c;
+    }
     if (!this.merged) return this.solo!.rims;
     if (!color) this.current = this.outline;
     else {
@@ -219,8 +276,11 @@ export class UnitOutline {
     return this.solo;
   }
 
+  /** Visibility colors stay above the world color drain, using cached geometry. */
+  drawContours(c: Ctx) { if (this.thin) this.contours.draw(c); }
+
   /** The outlines, then the units over them, onto `c`. */
-  end(c: Ctx) {
+  end(c: Ctx, deferContours = false) {
     if (!this.merged) return;
     c.save();
     c.setTransform(1, 0, 0, 1, 0, 0);
@@ -232,6 +292,10 @@ export class UnitOutline {
       t.globalAlpha = 1; t.globalCompositeOperation = 'source-in'; t.fillStyle = ink;
       t.fillRect(0, 0, layer.cv.width, layer.cv.height); t.restore();
       c.drawImage(layer.cv, 0, 0);
+    }
+    if (this.thin) {
+      this.contours.finish(this.layer.cv);
+      if (!deferContours) this.contours.draw(c);
     }
     c.drawImage(this.layer.cv, 0, 0);
     c.restore();

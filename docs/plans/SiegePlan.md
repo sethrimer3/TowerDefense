@@ -211,6 +211,8 @@ Everything in [Architecture guidelines](#architecture-guidelines) still holds. I
 
 #### Side outlines (item 1)
 
+**2026-10-29 update:** the newer shared visibility-contour request supersedes the original thickness and Siege-only scope below: bright crimson and dark blue outlines now extend half an art pixel outside combined bodies in every combat mode, always merging overlap seams. See [shared plan](OtherPlans.md#6-half-art-pixel-visibility-contours-2026-10-29).
+
 - Add an optional `DrawOptions.sides`: `{ ink(unit): string | undefined }`, or simply two ids sets, `{ enemy: Set<number>, friend: Set<number> }`, from `RaidBattle` (the defense side's soldiers are the player's enemies; in the attack sim's view they are proxied as `Enemy`, so key by the original soldier id). Colours are constants in `siege-hud.ts` or a new `campaign/siege-colors.ts`: `ENEMY_INK` a clear pixel red (about `#b3202a`) and `FRIEND_INK` a slightly dark blue (about `#1d3f7a`). Both must stay readable on grass, streets and at night. Check them in a gallery screenshot with Seth before finishing.
 - **Merged outlines on:** `UnitOutline` keeps one outline layer per ink (black, red, blue), so touching units of the same side still share one outline, and units of opposite sides keep their own colours where they meet. The silhouettes are already made once per sprite; tinting is done when the layer is filled (`source-in` fill with the ink), not by baking new sprites per colour.
 - **Merged outlines off and Simple squares:** `rimOf` and `simple-units.ts`'s `rims` take the ink from the same option. Sprites drawn with their own baked black rim are drawn `bare` plus a coloured silhouette rim, as merged mode already does, rather than recoloured by pixel scanning each frame.

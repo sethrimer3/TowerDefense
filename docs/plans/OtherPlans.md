@@ -77,3 +77,11 @@ Suggested order: 1 (fences) and 2 (strike quick bar) first, since Ambush's outpo
 
 - Replace the gradient strips with pixel-art twisted rope: a small tiling image or inline SVG of diagonal strands (two tones of hemp, dark twist lines, black outline), 6 px wide, with a knot or iron ring where it meets the sign, and the top fading into the dark above.
 - Let the ropes swing with the drop-and-bounce of item 4 (rotate the sign a degree or two and settle), off under Reduce Motion.
+
+
+## 6. Half-art-pixel visibility contours (2026-10-29)
+
+- [x] Centralize the eight-art-pixels-per-cell lattice; define half a pixel as 1/16 cell, scaled with camera/DPR and subpixel coverage.
+- [x] Draw bright crimson contours around Dark One units and dark blue around player units in Defend, Ambush and Siege.
+- [x] Use combined outer silhouettes with no overlap seams, including Simple units and translucent cloaks; retain visibility colors through the color-drain wash.
+- [x] Verify native pixels, camera transforms, cropping, all troop families, phone/desktop settings, combat-cache behavior and bounded 5,000-unit crowd work.

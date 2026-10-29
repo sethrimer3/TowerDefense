@@ -2,7 +2,7 @@
  * a cell, like the parks, the keep and the blazes: a pen that fills art
  * pixels snapped to whole screen pixels at any zoom, a blitter for baked
  * sprites, and the palettes the fire and ice draw from. */
-import { ART } from "./park-art.ts";
+import { ART } from "./art-scale.ts";
 
 type Ctx = CanvasRenderingContext2D;
 
