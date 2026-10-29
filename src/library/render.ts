@@ -94,7 +94,29 @@ type Shaft = { x: number; y: number; width: number; length: number; strength: nu
  * light it is in and dims as it leaves it (a share of the gap a frame), and the
  * beam's field at which a mote shows fully. */
 const DUST = { count: 34, fadeIn: 0.012, fadeOut: 0.006, full: 0.35 };
-/** Smoke and embers off the flames. */
+/** The flagstones of the nave's floor and the hallways', in courses
+ * `FLAG_H` tall, each stone `FLAG_W` long, every other course set half a
+ * stone along. */
+const FLAG_W = 12, FLAG_H = 6;
+function flag(x: number, y: number): { rgb: RGB; hgt: number } {
+  const course = Math.floor((y - FLOOR) / FLAG_H), ly = (y - FLOOR) % FLAG_H, along = x + 64 + (course % 2) * (FLAG_W / 2);
+  const lx = along % FLAG_W, t = 0.8 + h01(Math.floor(along / FLAG_W), course, 45) * 0.3;
+  if (lx === 0 || ly === FLAG_H - 1) return { rgb: [26, 24, 22], hgt: 0 };
+  return { rgb: [86 * t, 80 * t, 76 * t], hgt: Math.min(1, Math.min(lx, FLAG_W - 1 - lx, ly, FLAG_H - 2 - ly) / 1.5) };
+}
+/** A librarian's candle in a hallway: how far out from the nave's wall it
+ * takes to come up to full, so it seems lit on the way rather than all at
+ * once, and how bright it is then. */
+const CANDLE_RAMP = 20, CANDLE = 0.75;
+/** How far into the nave a hallway candle's light reaches through the door,
+ * and how far down the hallway it is before none comes in. */
+const DOOR_GLOW = 40, DOOR_REACH = 44;
+/** How far a librarian's candle has come up at x: none in the nave, full
+ * `CANDLE_RAMP` out along a hallway. */
+function candleUp(x: number) {
+  const out = x < 0 ? -x : x > W ? x - W : 0, k = Math.min(1, out / CANDLE_RAMP);
+  return k * k * (3 - 2 * k);
+}
 /** How far in the view zooms. */
 const MAX_ZOOM = 6;
 /** How much of the hallways the view shows at the widest zoom: all the
@@ -124,6 +146,9 @@ export class LibraryRenderer {
   private scene = new Float32Array(W * H * 3);
   private relief = new Uint8Array(W * H);
   private light = new Float32Array(W * H * 3);
+  /** The same light without the stones' bevels: what smoke and ash, which
+   * hide the stone, are lit by. */
+  private flat = new Float32Array(W * H * 3);
   private sceneKey = "";
   private glow: HTMLCanvasElement;
   private motes: Mote[] = [];
@@ -194,10 +219,7 @@ export class LibraryRenderer {
           rgb = [5, 4, 7];
         } else if (y >= FLOOR) {
           kind = Kind.Floor;
-          const tile = Math.floor((x + (y >= FLOOR + 6 ? 7 : 0)) / 14), edge = Math.min((x + (y >= FLOOR + 6 ? 7 : 0)) % 14, 13 - ((x + (y >= FLOOR + 6 ? 7 : 0)) % 14), (y - FLOOR) % 6, 5 - ((y - FLOOR) % 6));
-          const t = 0.8 + h01(tile, y >= FLOOR + 6 ? 1 : 0, 5) * 0.35;
-          rgb = [86 * t, 80 * t, 76 * t];
-          hgt = Math.min(1, edge / 1.5);
+          ({ rgb, hgt } = flag(x, y));
         } else if (inWindow(x, y)) {
           const { x0 } = WINDOW, cx = (WINDOW.x0 + WINDOW.x1) / 2, rose = { x: cx, y: HEAD - 4, r: 13 };
           const dx = x + 0.5 - rose.x, dy = y + 0.5 - rose.y, dr = Math.sqrt(dx * dx + dy * dy);
@@ -309,10 +331,8 @@ export class LibraryRenderer {
             const stone = ashlar(wx, wy, false);
             rgb = stone.rgb;
             hgt = stone.hgt;
-          } else if (wy < FLOOR + 6) {
-            const lx = (wx + 64) % 12, t = 0.8 + h01((wx + 64) >> 4, 3, 45) * 0.3;
-            rgb = lx === 0 || wy === FLOOR + 5 ? [26, 24, 22] : [86 * t, 80 * t, 76 * t];
-            hgt = lx === 0 || wy === FLOOR + 5 ? 0 : Math.min(1, Math.min(lx, 11 - lx, wy - FLOOR, FLOOR + 4 - wy) / 1.5);
+          } else if (wy < FLOOR + FLAG_H) {
+            ({ rgb, hgt } = flag(wx, wy));
           } else {
             rgb = [10, 9, 9];
             relief[i] = 0;
@@ -460,8 +480,8 @@ export class LibraryRenderer {
 
   // ── Light ───────────────────────────────────────────────────────────
 
-  private lightUp(time: number, day: number) {
-    const L = this.light, sx = this.sx, sy = this.sy, relief = this.relief;
+  private lightUp(sim: LibrarySim, day: number) {
+    const L = this.light, F = this.flat, sx = this.sx, sy = this.sy, relief = this.relief;
     const ar = 0.07 + day * 0.12, ag = 0.07 + day * 0.115, ab = 0.11 + day * 0.11;
     const wx = (WINDOW.x0 + WINDOW.x1) / 2, wy = (WINDOW.top + WINDOW.bottom) / 2;
     for (let y = 0; y < H; y++)
@@ -469,9 +489,9 @@ export class LibraryRenderer {
         const i = y * W + x, dx = x - wx, dy = y - wy;
         // Daylight from the window, strongest near it.
         const near = day * 0.34 * Math.max(0, 1 - Math.sqrt(dx * dx * 1.4 + dy * dy) / 230);
-        L[i * 3] = ar + near;
-        L[i * 3 + 1] = ag + near * 0.96;
-        L[i * 3 + 2] = ab + near * 0.9;
+        F[i * 3] = L[i * 3] = ar + near;
+        F[i * 3 + 1] = L[i * 3 + 1] = ag + near * 0.96;
+        F[i * 3 + 2] = L[i * 3 + 2] = ab + near * 0.9;
       }
     const shine = (lx: number, ly: number, r: number, k: number, cr: number, cg: number, cb: number) => {
       const x0 = Math.max(1, Math.floor(lx - r)), x1 = Math.min(W - 2, Math.ceil(lx + r));
@@ -487,11 +507,22 @@ export class LibraryRenderer {
           L[i * 3] += v * cr;
           L[i * 3 + 1] += v * cg;
           L[i * 3 + 2] += v * cb;
+          F[i * 3] += fall * cr;
+          F[i * 3 + 1] += fall * cg;
+          F[i * 3 + 2] += fall * cb;
         }
     };
     TORCHES.forEach((t, n) => shine(t.x, t.y - 3, 70, flicker(this.flame, n) * 1.25, 1, 0.62, 0.3));
     this.blazes.forEach((b, n) => shine(b.x, b.y, 26 + Math.min(44, b.n * 0.9), Math.min(1.9, 0.35 + b.n * 0.03) * flicker(this.flame * 2.3, n + 20), 1, 0.52, 0.22));
     CANDLES.forEach((c, n) => this.candles[n] && shine(c.x, c.y, 28, flicker(this.flame * 1.7, n + 9) * 0.75, 1, 0.75, 0.45));
+    // Librarians out in the hallways: their candles' light comes in through
+    // the doors onto the piers and the nearest shelves, less the further
+    // down the hallway they are.
+    for (const l of sim.librarians) {
+      const up = l.away || l.y > FLOOR ? 0 : candleUp(l.x), out = l.x < 0 ? -l.x : l.x - W;
+      const k = up * Math.max(0, 1 - out / DOOR_REACH);
+      if (k > 0) shine(l.x < 0 ? -1 : W, l.y - 5, DOOR_GLOW, k * flicker(this.flame * 1.3, l.id + 30), 1, 0.84, 0.62);
+    }
   }
 
   // ── A frame ─────────────────────────────────────────────────────────
@@ -593,7 +624,7 @@ export class LibraryRenderer {
       this.sceneKey = key;
       this.paintScene(sim);
     }
-    this.lightUp(time, day);
+    this.lightUp(sim, day);
     const px = this.px, S = this.scene, L = this.light, kind = this.kind;
     const sky: RGB = [8 + day * 120, 14 + day * 150, 40 + day * 170];
     for (let i = 0; i < W * H; i++) {
@@ -664,10 +695,10 @@ export class LibraryRenderer {
       for (let c = 0; c < n; c++) seen[c] = Math.max(0, seen[c] - dt * 0.22);
       for (const l of sim.librarians) {
         if (l.away) continue;
-        const c0 = side ? l.x - (W - BAY_X0) : l.x + HALL;
-        if (c0 < -LANTERN || c0 > n + LANTERN) continue;
+        const c0 = side ? l.x - (W - BAY_X0) : l.x + HALL, up = candleUp(l.x);
+        if (up <= 0 || c0 < -LANTERN || c0 > n + LANTERN) continue;
         for (let c = Math.max(0, Math.floor(c0 - LANTERN)); c < Math.min(n, Math.ceil(c0 + LANTERN)); c++) {
-          const want = Math.pow(1 - Math.abs(c - c0) / LANTERN, 0.7);
+          const want = up * Math.pow(1 - Math.abs(c - c0) / LANTERN, 0.7);
           if (want > seen[c]) seen[c] = Math.min(want, seen[c] + dt * 1.6);
         }
       }
@@ -675,7 +706,7 @@ export class LibraryRenderer {
       const sx = this.hallSx[side], sy = this.hallSy[side], relief = this.hallRelief[side];
       // Whoever walks the hallway lights it close by, the stones' faces
       // turned toward them catching it; further off, only the memory of it.
-      const walkers = sim.librarians.filter((l) => !l.away && l.y <= FLOOR && (side ? l.x > W - BAY_X0 - LANTERN : l.x < BAY_X0 + LANTERN));
+      const walkers = sim.librarians.filter((l) => !l.away && l.y <= FLOOR && candleUp(l.x) > 0 && (side ? l.x > W - LANTERN * 1.2 : l.x < LANTERN * 1.2));
       for (let y = 0; y < HALL_ROWS; y++)
         for (let hx = 0; hx < HALL; hx++) {
           const i = y * HALL + hx, wx = side ? W + hx : hx - HALL, wy = HALL_TOP + y;
@@ -684,7 +715,7 @@ export class LibraryRenderer {
             const dx = wx - l.x, dy = wy - (l.y - 5), d = Math.sqrt(dx * dx + dy * dy);
             if (d >= LANTERN * 1.2) continue;
             const fall = 1 - d / (LANTERN * 1.2);
-            v += fall * fall * 0.75 * (relief[i] ? facing(sx[i], sy[i], dx, dy, d) : 1);
+            v += fall * fall * CANDLE * candleUp(l.x) * flicker(this.flame * 1.3, l.id + 30) * (relief[i] ? facing(sx[i], sy[i], dx, dy, d) : 1);
           }
           px[i] = 0xff000000 | (c255(base[i * 3 + 2] * v * 0.62) << 16) | (c255(base[i * 3 + 1] * v * 0.84) << 8) | c255(base[i * 3] * v);
         }
@@ -713,12 +744,14 @@ export class LibraryRenderer {
   private lum(x: number, y: number) {
     if (y > H) return this.lab.lum(x, y);
     const xi = Math.round(x);
-    if (xi >= BAY_X0 && xi < W - BAY_X0) {
-      const i = Math.min(H - 1, Math.max(0, Math.round(y))) * W + xi;
-      return Math.min(1, 0.45 + (this.light[i * 3] + this.light[i * 3 + 1]) * 0.35);
-    }
+    const yi = Math.min(H - 1, Math.max(0, Math.round(y)));
+    const nave = (x: number) => Math.min(1, 0.45 + (this.flat[(yi * W + x) * 3] + this.flat[(yi * W + x) * 3 + 1]) * 0.35);
+    if (xi >= 0 && xi < W) return nave(xi);
+    // In a hallway: lit by their own candle and the memory of others', and
+    // by the nave's light through the door close to it.
     const side = xi < W / 2 ? 0 : 1, seen = this.seen[side], c = side ? xi - (W - BAY_X0) : xi + HALL;
-    return 0.05 + (seen[Math.max(0, Math.min(seen.length - 1, c))] ?? 0) * 0.85;
+    const out = side ? xi - W + 1 : -xi, door = Math.max(0, 1 - out / 12);
+    return Math.max(0.05 + (seen[Math.max(0, Math.min(seen.length - 1, c))] ?? 0) * 0.85, door * nave(side ? W - 1 : 0));
   }
 
   // ── Carts, the fallen ───────────────────────────────────────────────
@@ -831,7 +864,7 @@ export class LibraryRenderer {
    * the heap darker deeper down, embers winking in it while it is hot;
    * smoke drifts through in uneven greys. All lit like the nave. */
   private drawSoot(sim: LibrarySim, tick: number) {
-    const f = sim.fire, px = this.sootPx, L = this.light;
+    const f = sim.fire, px = this.sootPx, L = this.flat;
     px.fill(0);
     for (let i = 0; i < f.ash.length; i++) {
       const smoke = f.smoke[i], ash = f.ash[i];
@@ -923,6 +956,10 @@ export class LibraryRenderer {
     const ctx = this.ctx, tilt = Math.sin(((now % DAY_MS) / DAY_MS) * Math.PI * 2 - Math.PI / 2) * 0.55
       + Math.sin(now / SUNLIGHT.swayMs) * SUNLIGHT.sway;
     ctx.save();
+    // The light stays in the nave: never out past its walls or under its floor.
+    ctx.beginPath();
+    ctx.rect(0, 0, W, FLOOR);
+    ctx.clip();
     const shafts: Shaft[] = [];
     for (let k = 0; k < 5; k++) {
       const a = WINDOW.x0 + 3 + k * 8, b = a + 6, top = HEAD + 6 + (k % 2) * 10, len = FLOOR - top;
@@ -930,8 +967,10 @@ export class LibraryRenderer {
       shafts.push({ x: (a + b) / 2, y: top, width: b - a, length: len, strength: day * pulse });
       this.sunlight.draw(ctx, (a + b) / 2, top, b - a, len, tilt, day * pulse, k);
     }
-    // How strongly the sun lights the dust at a point: the brightest beam there.
+    // How strongly the sun lights the dust at a point: the brightest beam
+    // there, and none at all outside the nave, where it is dark.
     const light = (x: number, y: number) => {
+      if (!this.inNave(x, y)) return 0;
       let most = 0;
       for (const s of shafts) most = Math.max(most, s.strength * Math.min(1, shaftAt(x, y, s.x, s.y, s.width, s.length, tilt) / DUST.full));
       return most;
@@ -952,6 +991,8 @@ export class LibraryRenderer {
       m.x += m.vx;
       m.y += m.vy;
       const want = light(m.x, m.y);
+      // Past the walls a mote is gone at once, not left to fade in the dark.
+      if (!this.inNave(m.x, m.y)) return false;
       m.alpha += (want - m.alpha) * (want > m.alpha ? DUST.fadeIn : DUST.fadeOut);
       if (want <= m.alpha && m.alpha < 0.004) return false;
       ctx.globalAlpha = 0.5 * m.alpha;
@@ -959,6 +1000,13 @@ export class LibraryRenderer {
       return true;
     });
     ctx.restore();
+  }
+
+  /** Whether (x, y) is in the nave's air: inside its walls, under its
+   * vault and over its floor. */
+  private inNave(x: number, y: number) {
+    if (!(x >= 1 && x < W - 1 && y >= 0 && y < FLOOR - 1)) return false;
+    return this.kind[(y | 0) * W + (x | 0)] !== Kind.Outside;
   }
 
   private drawLibrarian(l: Librarian, time: number) {
