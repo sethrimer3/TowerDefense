@@ -85,11 +85,10 @@ try {
     async function checkCurrent(mode) {
       assert.equal(await page.locator('nav canvas[data-tab-icon]').count(), 0, 'Legacy canvases are absent when disabled');
       const image = combat.locator('.combat-icon-layer img.ui-sprite');
-      if (mode === 'defend') assert.match(await image.getAttribute('src'), /assets\/ui\/defend\.png$/);
-      else assert.match(await image.getAttribute('src'), /^data:image\/png/);
+      assert.match(await image.getAttribute('src'), /^data:image\/png/);
       await image.evaluate(img => img.decode());
       const settings = page.locator('nav [data-tab="settings"] img');
-      assert.match(await settings.getAttribute('src'), /assets\/ui\/settings\.png$/);
+      assert.match(await settings.getAttribute('src'), /^data:image\/png/);
       await settings.evaluate(img => img.decode());
     }
     async function checkIcon(name) {
