@@ -134,3 +134,5 @@ Siege side outlines use optional per-side silhouette layers and cached masks for
 Siege custom keep banners and seeded decorative poles live in `campaign/siege-flags.ts`; pole destruction reads native impacts without adding collision or targets.
 
 Siege flag-bearers use the native Soldier lifecycle and raid proxies: untargetable for primary aim, vulnerable to area and passing hits, and worth two mana. Their dropped banners and crystals stay in the presentation layer.
+
+Siege victory uses a presentation-only collapse wave (`campaign/siege-victory.ts`) and copied rubble/lighting masks (`defend/collapse-view.ts`), while the rating settles immediately. Flags burn and the player’s banner rises over the ruins; pause, skip and Reduce Motion preserve the settled outcome.

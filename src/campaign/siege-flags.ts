@@ -30,6 +30,8 @@ export function flagPoles(map:CityMap, seed:number):Pole[] {
 }
 export class SiegeFlags {
   readonly poles:Pole[];
+  private effects=true;
+  victory?: {elapsed:number;origin:{x:number;y:number};face:Flag;reduced:boolean};
   readonly dropped: {id:number;x:number;y:number;time:number}[]=[];
   private bearers=new Map<number,{id:number;x:number;y:number;hp:number}>();
   private seen=new WeakSet<object>();
@@ -56,28 +58,36 @@ export class SiegeFlags {
     for(const u of sim.soldiers){const before=this.cooldowns.get(u.id);if(isMelee(u)&&before!==undefined&&u.cd>before+.05)this.hit(u.x,u.y,1,sim.time);cds.set(u.id,u.cd);}
     this.cooldowns=cds;
   }
-  draw(c:CanvasRenderingContext2D,px:number,sim:DefendSim,now:number,reduced:boolean){
+  private banner(c:CanvasRenderingContext2D,px:number,x:number,y:number,now:number,reduced:boolean,ground={x:x/px,y:y/px}){
+    const v=this.victory,age=v?v.elapsed-Math.hypot(ground.x-v.origin.x,ground.y-v.origin.y)/14:-1;
+    const changed=!!v&&(v.reduced||age>=.7),burn=v&&!changed&&age>=0?age/.7:0;
+    drawFlag(c,px,{x,y,t:now/1000,reduceMotion:reduced,burn,unfurl:changed&&!reduced?Math.min(1,Math.max(0,(age-.7)/.5)):1,rise:changed&&!reduced?Math.max(0,1-(age-.7)/.5)*1.5:0},false,changed?v!.face:this.face);
+    if(v&&this.effects&&!reduced&&age>=0&&age<.8){c.save();c.fillStyle='#ffb542';for(let k=0;k<4;k++){const h=flagHash(k,Math.floor(age*12));c.globalAlpha=1-age/.8;c.fillRect(x+(k+1)*px/8,y+(1-age)*px/3-(h%5)*px/12,Math.max(1,px/8),Math.max(1,px/8));}c.restore();}
+  }
+  draw(c:CanvasRenderingContext2D,px:number,sim:DefendSim,now:number,reduced:boolean,effects=true){
+    this.effects=effects;
+    if(this.victory){const p=this.victory.origin;this.banner(c,px,p.x*px,p.y*px,now,reduced,p);}
     for(const u of sim.soldiers)if(u.kind==='flagBearer'&&u.hp>0){
       c.save();c.strokeStyle='#100f14';c.lineWidth=Math.max(1,px/5);c.beginPath();c.moveTo(u.x*px,u.y*px);c.lineTo((u.x+.3)*px,(u.y-1.7)*px);c.stroke();
-      drawFlag(c,px*.8,{x:(u.x+.3)*px,y:(u.y-1.7)*px,t:now/1000,reduceMotion:reduced},false,this.face);c.restore();
+      this.banner(c,px*.8,(u.x+.3)*px,(u.y-1.7)*px,now,reduced,u);c.restore();
     }
     for(const f of this.dropped){
-      c.save();c.translate(f.x*px,f.y*px);c.rotate(1.2);drawFlag(c,px*.8,{x:0,y:0,t:0,reduceMotion:true},false,this.face);c.restore();
+      c.save();c.translate(f.x*px,f.y*px);c.rotate(1.2);this.banner(c,px*.8,0,0,now,reduced,f);c.restore();
       const age=sim.time-f.time;
-      if(age<.8){c.save();c.globalAlpha=1-age/.8;c.fillStyle='#8be7ff';const a=Math.max(1,px/8),y=(f.y-(reduced?.5:age*2))*px;c.fillRect(f.x*px-a,y-2*a,2*a,4*a);c.fillRect(f.x*px-2*a,y-a,4*a,2*a);c.restore();}
+      if(this.effects&&age<.8){c.save();c.globalAlpha=1-age/.8;c.fillStyle='#8be7ff';const a=Math.max(1,px/8),y=(f.y-(reduced?.5:age*2))*px;c.fillRect(f.x*px-a,y-2*a,2*a,4*a);c.fillRect(f.x*px-2*a,y-a,4*a,2*a);c.restore();}
     }
     for(const p of this.poles){
       c.save();c.globalAlpha=sim.soldiers.some(u=>(u.x-p.x)**2+(u.y-p.y)**2<1.5)?.5:1;
       const a=px/ART, x=p.x*px, y=p.y*px;
       const height=p.snapped===undefined?14:6;
       c.fillStyle='#100f14';c.fillRect(x-a,y-height*a,3*a,(height+1)*a);c.fillStyle='#ac8255';c.fillRect(x,y-(height-1)*a,a,(height-1)*a);
-      if(p.snapped===undefined)drawFlag(c,px,{x,y:y-13*a,t:now/1000,reduceMotion:reduced},false,this.face);
+      if(p.snapped===undefined)this.banner(c,px,x,y-13*a,now,reduced,p);
       else{
         const t=reduced?1:Math.min(1,(sim.time-p.snapped)/.6);
         c.save();c.translate(x,y-6*a);c.rotate(t*(p.dx!>=0?1:-1)*1.5);
         c.fillStyle='#100f14';c.fillRect(-a,-8*a,3*a,8*a);c.fillStyle='#ac8255';c.fillRect(0,-7*a,a,7*a);
         drawFlag(c,px,{x:0,y:-7*a,t:now/1000,reduceMotion:reduced},false,this.face);c.restore();
-        if(!reduced&&t<1){c.fillStyle='#d2ad70';for(let k=0;k<5;k++)c.fillRect(x+(k-2)*a*t*4,y-6*a+((k%2)*3+t*5)*a,a,a);}
+        if(this.effects&&!reduced&&t<1){c.fillStyle='#d2ad70';for(let k=0;k<5;k++)c.fillRect(x+(k-2)*a*t*4,y-6*a+((k%2)*3+t*5)*a,a,a);}
       }c.restore();
     }
   }
