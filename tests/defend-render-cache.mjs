@@ -6,6 +6,8 @@ import { writeFileSync } from 'node:fs';
 const referenceRoot=makeReference();
 // Keep the optimization references, but compare combat to the art before Siege sides.
 const combatRoot=makeReference(process.env.PERF_REF || '0555c7d');
+// Main deliberately changed torch occlusion and rim lighting in #192.
+const lightingRoot=makeReference('9a9a057');
 const browser = await chromium.launch(process.env.PLAYWRIGHT_EXECUTABLE
   ? { headless: true, executablePath: process.env.PLAYWRIGHT_EXECUTABLE }
   : { headless: true, channel: process.env.PLAYWRIGHT_CHANNEL || 'chrome' });
@@ -15,7 +17,7 @@ try {
   await page.addInitScript(()=>{ globalThis.__pinnedSeeds={defend:3182828918,game:3887091088}; });
   await page.goto((process.env.TEST_URL || 'http://127.0.0.1:5173/')+'tests/performance.html');
   page.on('console',msg=>{if(msg.text().startsWith('Sparse lightning'))console.log(msg.text());});
-  const results = await page.evaluate(async ({referenceRoot,combatRoot}) => {
+  const results = await page.evaluate(async ({referenceRoot,combatRoot,lightingRoot}) => {
     const {GroundRelief}=await import('/src/defend/ground-relief.ts');
     const {GroundRelief:ReferenceRelief}=await import(`${referenceRoot}/ground-relief.ts`);
     const {DefendRenderer}=await import('/src/defend/render.ts');
@@ -117,25 +119,30 @@ try {
         reports.push({check:'scorch',px,time,...compare(a,b)});
       }
     }
-    // The light field sums each pool where the canvas once drew it scaled up:
-    // close to the original, not exact (pools meeting a wall's edge are
-    // multiplied before they are smoothed, not after).
-    const {DefendLighting}=await import('/src/defend/lighting.ts');
-    const {DefendLighting:ReferenceLighting}=await import(`${referenceRoot}/lighting.ts`);
+    // Pin the intentional art-based occlusion/rim-lighting appearance from
+    // main #192, rather than the superseded whole-cell shadow model. Exact
+    // parity is required, including its actual building body/rim masks.
+    const {DefendLighting,MASK}=await import('/src/defend/lighting.ts');
+    const {DefendLighting:ReferenceLighting}=await import(`${lightingRoot}/lighting.ts`);
     const {carriedLights}=await import('/src/defend/battle-art.ts');
     const {ambientFor}=await import('/src/defend/weather.ts');
-    const {paintCityLayer}=await import('/src/defend/city-layer.ts');
+    const {paintCityLayer,paintBuildingMask}=await import('/src/defend/city-layer.ts');
     const intact=id=>sim.intact(map.buildings[id]);
+    const buildingMasks=['body','rim'].map(mode=>{
+      const cv=make(72*MASK,104*MASK);
+      paintBuildingMask(cv.getContext('2d'),MASK,{map,sim,lights:[],stones:[]},mode);
+      return cv;
+    });
     for(const px of [6,9.23076923076923,18])for(const [night,rain] of [[1,true],[0.3,false]]){
       const w=Math.round(72*px),h=Math.round(104*px),shots=[];
       for(const L of [new ReferenceLighting(),new DefendLighting()]){
-        L.setMap(map);L.update(sim.solid,[],intact);L.bakePending(sim.solid,1e4);L.update(sim.solid,[],intact);
+        L.setMap(map);L.setMasks(...buildingMasks);L.update(sim.solid,[],intact);L.bakePending(sim.solid,1e4);L.update(sim.solid,[],intact);
         const cv=make(w,h),g=cv.getContext('2d');
         paintCityLayer(g,px,{map,sim,lights:L.lights,stones:L.roadStones});
         L.drawLight(g,{px,now:1234,reduceMotion:false,intact},ambientFor({rain},night),{torches:carriedLights(sim),solid:sim.solid,version:sim.mapVersion});
         shots.push(cv);
       }
-      reports.push({check:'light field',px,night,...compare(...shots),limit:{max:40,mean:1.2}});
+      reports.push({check:'art-based light field',px,night,...compare(...shots)});
     }
     // Shading only the trees' own box leaves every pixel as it was.
     const {ParkTrees}=await import('/src/defend/park-trees.ts');
@@ -217,7 +224,7 @@ try {
     r.combatKey='';r.draw(map,sim,null,opts);
     reports.push({check:'resize and healthbars',...compare(resized,capture())});
     return reports;
-  },{referenceRoot,combatRoot});
+  },{referenceRoot,combatRoot,lightingRoot});
   writeFileSync('test-results/render-cache.json',JSON.stringify(results,null,2));
   console.table(results);
   for(const result of results){
