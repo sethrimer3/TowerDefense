@@ -27,7 +27,7 @@ test('ten areas follow the requested order, with unrestricted Nadir and repeatin
     assert.equal(areaForWave(n * 20 + 20).id, id);
     assert.equal(areaForWave(n * 20 + 201).id, id);
   });
-  const normal = Object.values(ENEMIES).filter(e => !e.hatched).map(e => e.kind).sort();
+  const normal = Object.values(ENEMIES).filter(e => !e.hatched && !e.scriptedOnly).map(e => e.kind).sort();
   assert.deepEqual([...AREA_ENEMIES.nadir].sort(), normal);
   assert.ok(normal.every(k => AREAS.some(a => a.id !== 'nadir' && AREA_ENEMIES[a.id].includes(k))), 'every species has a themed home');
   for (const e of Object.values(ENEMIES).filter(e => e.boat)) assert.ok(AREA_ENEMIES.frozen.includes(e.kind));
@@ -37,6 +37,7 @@ test('actual waves respect zone membership, affordability and offspring rules', 
   let seed = 19;
   const rand = () => ((seed = seed * 16807 % 2147483647) / 2147483647);
   for (let wave = 1; wave <= 200; wave++) {
+    if (wave === 1) continue; // Authored Darkling opening has its own roster/count checks.
     const mix = buildWave(wave, rand), allowed = AREA_ENEMIES[areaForWave(wave).id];
     assert.ok(mix.length > 0, `wave ${wave} is not empty`);
     assert.ok(mix.every(k => allowed.includes(k) && !ENEMIES[k].hatched));

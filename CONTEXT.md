@@ -671,3 +671,16 @@ A temporary Siege battle resource earned by defeating enemy troops and spent on 
 - **Collapse wave:** the Siege victory presentation expanding from the fallen keep, turning walls and selected buildings to visual rubble while replacing the defender’s flags.
 
 - **Squad:** a Siege command group of staging homes sharing a troop role, or one hero/ultimate family. Its flag redirects those homes’ troops; clearing it resumes the keep assault.
+
+
+**Dark One**:
+The source of the main hostile forces; independent enemy factions are story exceptions.
+
+**Mini Darkling**:
+A weak Dark One enemy consisting of one dark pixel.
+
+**Darkling**:
+A Dark One enemy consisting of a two-by-two black pixel square, splitting into two Mini Darklings when defeated.
+
+**Color drain**:
+The gradual loss of color and contrast around a dense group of Dark One enemies, strongest at the group's center and fading toward the edges.

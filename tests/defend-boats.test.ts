@@ -35,7 +35,7 @@ test('small boats have exact costs, growing hulls and harmless water, and enter 
     assert.ok(def.boat!.decorativeWater && def.boat!.water > def.size / 2);
     assert.ok(def.size < ENEMIES.boatLesser.size && !def.flying && !def.hatched);
     if (n) assert.ok(def.size > ENEMIES[SMALL_BOATS[n - 1]].size);
-    const roster = Object.values(ENEMIES).filter(d => !d.hatched && d.cost <= def.cost);
+    const roster = Object.values(ENEMIES).filter(d => !d.hatched && !d.scriptedOnly && d.cost <= def.cost);
     const roll = (roster.findIndex(d => d.kind === kind) + .5) / roster.length;
     assert.deepEqual(buildDifficultyWave(def.cost, () => roll), [kind]);
   }

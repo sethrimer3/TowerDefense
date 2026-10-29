@@ -10,6 +10,7 @@ export const DIFFICULTY_GROWTH = 1.05;
  * Multiplication, rather than Math.pow, preserves cross-engine replays. */
 export function waveDifficulty(wave: number): number {
   if (!Number.isFinite(wave) || wave < 1) return 0;
+  if (wave === 1) return 40; // Authored opening: 30 one-point minis + 5 two-point Darklings.
   let budget = STARTING_DIFFICULTY;
   for (let n = 1; n < Math.floor(wave); n++) {
     budget *= DIFFICULTY_GROWTH;
@@ -33,6 +34,10 @@ function slots(def: EnemyDef, seen = new Set<EnemyKind>()): number {
 }
 
 export function buildWave(wave: number, rand: () => number): EnemyKind[] {
+  if (wave === 1) {
+    // Queue is popped from the end: introduce one larger body after each six minis.
+    return Array.from({ length: 5 }, (): EnemyKind[] => ["darkling", ...Array<EnemyKind>(6).fill("miniDarkling")]).flat();
+  }
   return buildDifficultyWave(waveDifficulty(wave), rand, AREA_ENEMIES[areaForWave(wave).id]);
 }
 
@@ -43,7 +48,7 @@ export function buildDifficultyWave(budget: number, rand: () => number, kinds?: 
   let remaining = Math.min(Number.MAX_SAFE_INTEGER, Math.floor(budget));
   let room = MAX_WAVE_ENEMIES;
   const roster = (kinds ? kinds.map(k => ENEMIES[k]) : Object.values(ENEMIES))
-    .filter(d => !d.hatched && Number.isSafeInteger(d.cost) && d.cost > 0)
+    .filter(d => !d.hatched && !d.scriptedOnly && Number.isSafeInteger(d.cost) && d.cost > 0)
     .map(def => ({ def, slots: slots(def) }));
   const out: EnemyKind[] = [];
   const efficient = [...roster].sort((a, b) => b.def.cost / b.slots - a.def.cost / a.slots);
