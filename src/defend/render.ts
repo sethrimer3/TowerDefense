@@ -201,21 +201,54 @@ export class DefendRenderer {
    * with no panel open), so it holds still while a panel slides open and the
    * view narrows; the board point in the middle of the view stays there. */
   resize(refW: number, refH: number) {
+    this.ref = { w: refW, h: refH };
     const dpr = window.devicePixelRatio || 1;
     const w = Math.max(1, Math.round(this.canvas.clientWidth * dpr)),
       h = Math.max(1, Math.round(this.canvas.clientHeight * dpr));
-    const px = Math.max(1, Math.min((refW * dpr) / CELLS_W, (refH * dpr) / CELLS_H));
+    const fit = Math.max(1, Math.min((refW * dpr) / CELLS_W, (refH * dpr) / CELLS_H));
+    // Crisp: a whole number of device pixels an art pixel, the board at its
+    // fit or a little past it.
+    const px = this.crisp ? ART * Math.max(1, Math.floor(fit / ART)) : fit;
     const old = { w: this.canvas.width, h: this.canvas.height, px: this.px };
-    if (w === old.w && h === old.h && px === old.px) return;
+    if (w === old.w && h === old.h && px === old.px && !this.rescale) return;
+    this.rescale = false;
     const scale = this.cam.s * old.px,
       cx = (old.w / 2 - this.cam.x) / scale,
       cy = (old.h / 2 - this.cam.y) / scale;
     this.canvas.width = w;
     this.canvas.height = h;
     this.px = px;
+    this.cam.s = this.snap(this.want);
     this.cam.x = w / 2 - cx * this.cam.s * px;
     this.cam.y = h / 2 - cy * this.cam.s * px;
     this.clampCam();
+  }
+  private ref = { w: 0, h: 0 };
+
+  /** Crisp pixels: the board's scale (`px`) a whole number of art pixels'
+   * worth of device pixels and the zoom stepping so every art pixel covers
+   * the same whole number of device pixels, so outlines never change width
+   * as the view zooms (the Mine's rule). Off, the zoom is smooth. */
+  get crisp() {
+    return this.crispOn;
+  }
+  set crisp(on: boolean) {
+    if (on === this.crispOn) return;
+    this.crispOn = on;
+    this.rescale = true;
+    if (this.ref.w) this.resize(this.ref.w, this.ref.h);
+  }
+  private crispOn = false;
+  private rescale = false;
+  /** The zoom asked for, which the crisp zoom steps round. */
+  private want = 1;
+
+  /** The zoom nearest `s` the view may take: with crisp pixels, a whole
+   * number of device pixels an art pixel. */
+  private snap(s: number) {
+    if (!this.crisp) return s;
+    const b = this.px / ART;
+    return Math.max(b, Math.min(Math.floor(DefendRenderer.MAX_ZOOM * b), Math.round(s * b))) / b;
   }
 
   /** The whole board's size in canvas pixels, unzoomed. */
@@ -245,7 +278,8 @@ export class DefendRenderer {
   /** Zoom by `factor`, keeping the board point under the client point fixed. */
   zoomAt(clientX: number, clientY: number, factor: number) {
     const p = this.toCanvas(clientX, clientY);
-    const s = Math.max(1, Math.min(DefendRenderer.MAX_ZOOM, this.cam.s * factor));
+    this.want = Math.max(1, Math.min(DefendRenderer.MAX_ZOOM, this.want * factor));
+    const s = this.snap(this.want);
     const k = s / this.cam.s;
     this.cam.x = p.x - (p.x - this.cam.x) * k;
     this.cam.y = p.y - (p.y - this.cam.y) * k;
@@ -262,7 +296,7 @@ export class DefendRenderer {
   }
 
   resetCam() {
-    this.cam.s = 1;
+    this.cam.s = this.want = 1;
     this.cam.x = this.cam.y = 0;
     this.clampCam();
   }
@@ -271,6 +305,11 @@ export class DefendRenderer {
     const { W, H } = this.board;
     this.cam.x = clampAxis(this.cam.x, this.canvas.width, W * this.cam.s);
     this.cam.y = clampAxis(this.cam.y, this.canvas.height, H * this.cam.s);
+    // Art pixels start on whole device pixels.
+    if (this.crisp) {
+      this.cam.x = Math.round(this.cam.x);
+      this.cam.y = Math.round(this.cam.y);
+    }
   }
 
   draw(map: CityMap, sim: DefendSim | null, overlay: Overlay | null, opts: DrawOptions) {
