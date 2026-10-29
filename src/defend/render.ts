@@ -21,12 +21,12 @@ import { onPixelArt, pixelArtOn, pixelKey } from "./pixel-sprites.ts";
 import { CELL_COUNT, CELLS_H, CELLS_W, boardSize, cellIndex, hash01, type TilePos } from "./grid.ts";
 import type { CityMap } from "./citygen.ts";
 import type { DefendSim } from "./sim.ts";
-import { DefendLighting, type LightFrame } from "./lighting.ts";
+import { DefendLighting, MASK, type LightFrame } from "./lighting.ts";
 import { Fences } from "./fences.ts";
 import { Rain, Snow, ambientFor, type Weather } from "./weather.ts";
 import { areaFade, type AreaId } from "./areas.ts";
 import { gateArtRect } from "./wood-gate-art.ts";
-import { FACE_HANG, damageKey, gateSpriteOf, hangingFaces, onCityArtLoaded, paintCityLayer, paintFences, paintSpikePoints, paintStanding, stageOf } from "./city-layer.ts";
+import { FACE_HANG, damageKey, gateSpriteOf, hangingFaces, onCityArtLoaded, paintBuildingMask, paintCityLayer, paintFences, paintSpikePoints, paintStanding, stageOf } from "./city-layer.ts";
 import { GATE_FRAMES } from "./gate-art.ts";
 import { peopleAt } from "./gates.ts";
 import type { GateRanks } from "../gate-upgrades.ts";
@@ -272,6 +272,7 @@ export class DefendRenderer {
   }
 
   draw(map: CityMap, sim: DefendSim | null, overlay: Overlay | null, opts: DrawOptions) {
+    this.lit = false;
     if (sim && opts.collapsed) sim = this.collapse.view(sim,map,opts.collapsed);
     const start = opts.timings ? performance.now() : 0;
     this.timings.entityMs = this.timings.effectsMs = this.timings.terrainMs = 0;
@@ -325,6 +326,7 @@ export class DefendRenderer {
     this.sky.draw(this.ctx, this.px, map, sim, opts.looks, { now: opts.now, dt, reduceMotion: opts.reduceMotion, night: opts.night });
     this.darkDrain.draw(this.ctx, this.px, sim, opts.now);
     if (sim) this.outline?.drawContours(this.ctx);
+    if (sim && this.lit) this.outline?.shineContours(this.ctx, this.lighting);
     opts.markers?.(this.ctx,this.px);
     this.rallyFlag.draw(this.ctx, this.px, sim, sim?.warBanner?.flag && !opts.hideBanner ? sim.warBanner : null, opts);
     if (sim?.warBanner && !sim.warBanner.flag && !opts.hideBanner) drawWarBanner(this.ctx, this.px, sim.warBanner, bannerReach(sim), { t: opts.now / 1000, reduceMotion: opts.reduceMotion });
@@ -488,6 +490,7 @@ export class DefendRenderer {
     const old = this.previousArea && this.previousWeather ? overcast(this.previousWeather) : strength;
     Rain.overcast(this.ctx, old + (strength - old) * this.areaMix, W, H);
     this.drawLighting(map, sim, weather, opts);
+    this.lit = true;
   }
 
   /** The keep's banner, while the keep stands. */
@@ -645,10 +648,28 @@ export class DefendRenderer {
     this.layer.width = W * k;
     this.layer.height = H * k;
     paintCityLayer(this.lctx, this.px * k, { map, sim, area: this.area, lights: this.lighting.lights, stones: this.lighting.roadStones, looks });
+    this.paintMasks(map, sim, looks);
     this.faces = hangingFaces(map, sim);
     this.faced.fill(0);
     for (const f of this.faces) for (let x = f.x0; x < f.x1; x++) this.faced[cellIndex(x, f.y)] = 1;
   }
+
+  /** The buildings' art as masks for the lighting: their pixels and
+   * their outlines, so light runs up to them and shines on their edges. */
+  private paintMasks(map: CityMap, sim: DefendSim | null, looks?: Readonly<Record<number, string>>) {
+    const { W, H } = boardSize(MASK);
+    const paint = (cv: HTMLCanvasElement, mode: "body" | "rim") => {
+      cv.width = W;
+      cv.height = H;
+      paintBuildingMask(cv.getContext("2d", { willReadFrequently: true })!, MASK, { map, sim, area: this.area, looks, lights: this.lighting.lights, stones: this.lighting.roadStones }, mode);
+      return cv;
+    };
+    this.lighting.setMasks(paint(this.bodyMask, "body"), paint(this.rimMask, "rim"));
+  }
+  /** The lighting was drawn this frame (its glow is current). */
+  private lit = false;
+  private bodyMask = document.createElement("canvas");
+  private rimMask = document.createElement("canvas");
 
   /** Folds fallen and rebuilt buildings into the lighting, then draws what
    * lies on the ground: building damage, and (in weather) unit shadows. */
