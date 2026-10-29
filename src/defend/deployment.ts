@@ -18,7 +18,7 @@ import type { Building, BuildingKind } from "./citygen.ts";
 import { CELLS_H, CELLS_W, cellInBounds, cellIndex } from "./grid.ts";
 import { cellAt, cellCenter, center, findPath, type Point } from "./pathing.ts";
 import type { DefendSim, Soldier } from "./sim.ts";
-import type { WarBanner } from "./war-banner.ts";
+import { WarBanner } from "./war-banner.ts";
 
 /** What each troop building trains. */
 export const TRAINS: Partial<Record<BuildingKind, Soldier["kind"]>> = {
@@ -74,6 +74,16 @@ export const within = (d: Circle | null, p: Point, pad = 0) => !d || sq(p.x - d.
 /** The war banner or rally flag, if `s` may answer it: only one standing
  * inside its deployment range. */
 export function bannerFor(sim: DefendSim, s: Soldier): WarBanner | null {
+  const post=s.home>=0&&sim.scenario?.unrestricted&&sim.map.buildings[s.home]?.hidden?sim.rallies.get(s.home):undefined;
+  if(post){
+    let flags=STAGING_FLAGS.get(sim);if(!flags)STAGING_FLAGS.set(sim,flags=new Map());
+    const key=post.x+','+post.y;let flag=flags.get(key);
+    if(!flag){
+      const used=new Set([...sim.rallies.values()].map(p=>p.x+','+p.y));for(const key of flags.keys())if(!used.has(key))flags.delete(key);
+      flags.set(key,flag=new WarBanner(post.x,post.y,true));
+    }
+    flag.refresh(sim);return flag;
+  }
   const w = sim.warBanner;
   return w && within(deployment(sim, s), w) ? w : null;
 }
@@ -165,3 +175,6 @@ export function rallyAim(b: Building, p: Point, circle: Circle, towers: readonly
   const x = circle.x + (p.x - circle.x) * k, y = circle.y + (p.y - circle.y) * k;
   return { x: Math.max(0.5, Math.min(CELLS_W - 0.5, x)), y: Math.max(0.5, Math.min(CELLS_H - 0.5, y)) };
 }
+
+/** At most one native walking field per current staging-group destination. */
+const STAGING_FLAGS=new WeakMap<DefendSim,Map<string,WarBanner>>();

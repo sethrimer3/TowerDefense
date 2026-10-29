@@ -125,14 +125,12 @@ DEFEND lightning buffers clear and colour only occupied pixels, avoiding scans a
 
 DEFEND also indexes nearby defenders during enemy turns, selects only the eight displayed health bars, and reuses boat-water pixel storage to reduce allocation and copying.
 
+Siege presentation uses optional per-side outline layers, `campaign/siege-sky.ts` for the two-minute day cycle, and `campaign/siege-flags.ts` for custom keep banners and seeded decorative poles. Poles observe native impacts without adding collision or targets. `node tests/siege-outlines.mjs` and `node tests/siege-flags.mjs` provide desktop/phone galleries.
+
+Siege flag-bearers use the native Soldier lifecycle and raid proxies: primary attacks ignore them, area and passing hits can kill them for two mana, and dropped flags/crystals stay in presentation. Troop orders group native staging homes by type with separate hero/ultimate controls (`campaign/siege-squads.ts`, `siege-squad-bar.ts`), using native rally fields, live counts, phone scrolling, clearing and spell cancellation. Orders last only for the raid.
+
+Victory uses a presentation-only collapse wave (`campaign/siege-victory.ts`) and copied rubble/lighting masks (`defend/collapse-view.ts`), while the rating settles immediately. Flags burn and the player’s banner rises over the ruins; pause, skip and Reduce Motion preserve the settled outcome.
+
 ## Deploying
 
 `.github/workflows/static.yml` runs the tests and the build on every push to `main` and deploys `dist/` to GitHub Pages. In the repository's **Settings → Pages**, the source must be set to **GitHub Actions**.
-
-Siege side outlines use optional per-side silhouette layers and cached masks for individual units; `node tests/siege-outlines.mjs` exercises the desktop and phone galleries.
-
-Siege custom keep banners and seeded decorative poles live in `campaign/siege-flags.ts`; pole destruction reads native impacts without adding collision or targets.
-
-Siege flag-bearers use the native Soldier lifecycle and raid proxies: untargetable for primary aim, vulnerable to area and passing hits, and worth two mana. Their dropped banners and crystals stay in the presentation layer.
-
-Siege victory uses a presentation-only collapse wave (`campaign/siege-victory.ts`) and copied rubble/lighting masks (`defend/collapse-view.ts`), while the rating settles immediately. Flags burn and the player’s banner rises over the ruins; pause, skip and Reduce Motion preserve the settled outcome.

@@ -90,6 +90,8 @@ export type DrawOptions = {
   collapsed?: ReadonlySet<number>;
   /** Optional scenery in board coordinates, below trees. */
   scenery?: (c: CanvasRenderingContext2D, px: number) => void;
+  /** Player order markers remain above the trees. */
+  markers?: (c: CanvasRenderingContext2D, px: number) => void;
   /** The run is over: the city's torches go out in a wave from the keep. */
   over?: boolean;
   /** Leave out the planted war banner (while the player carries it). */
@@ -317,6 +319,7 @@ export class DefendRenderer {
     if (opts.effects ?? true) this.drawSmoke(map, sim, opts);
     // Cloudborne palaces sail over everything on the ground.
     this.sky.draw(this.ctx, this.px, map, sim, opts.looks, { now: opts.now, dt, reduceMotion: opts.reduceMotion, night: opts.night });
+    opts.markers?.(this.ctx,this.px);
     this.rallyFlag.draw(this.ctx, this.px, sim, sim?.warBanner?.flag && !opts.hideBanner ? sim.warBanner : null, opts);
     if (sim?.warBanner && !sim.warBanner.flag && !opts.hideBanner) drawWarBanner(this.ctx, this.px, sim.warBanner, bannerReach(sim), { t: opts.now / 1000, reduceMotion: opts.reduceMotion });
     if (sim) this.wizard.drawFire(this.ctx, this.px);

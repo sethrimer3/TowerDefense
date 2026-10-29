@@ -2,6 +2,8 @@ import type { TranslationRow } from './languages.ts';
 /** Siege labels use explicit English fallback pending catalog translations. */
 const row=<K extends string>(key:K,english:string)=>[key,english,english,english,english,english,english,english,english,english] as const satisfies TranslationRow;
 export const SIEGE_TEXT=[
+ row('siege.squads','Troop orders'),row('siege.squadHelp','{name}: choose, then tap a destination. Choose twice to resume the keep assault.'),
+ row('siege.group.melee','Melee'),row('siege.group.ranged','Ranged'),row('siege.group.mounted','Mounted'),row('siege.group.magic','Magic'),row('siege.group.hero','Hero'),row('siege.group.shade','Shadow'),row('siege.group.valkyrie','Valkyries'),row('siege.group.darkWizard','Dark wizard'),row('siege.group.railSniper','Laser snipers'),row('siege.group.gatlingGunner','Gatlings'),
  row('siege.skipVictory','Skip'),
  row('siege.timeLeft','{seconds}s'),row('siege.battleStatus','Keep {hp}/{max} · {troops} troops · '),
  ['siege.mana','Mana','Maná','Mana','Mana','Mana','Mana','マナ','마나','法力'],
