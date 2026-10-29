@@ -1,3 +1,4 @@
+import { ART } from "./art-scale.ts";
 /** The Simple enemies and Simple troops settings: every unit drawn as one
  * crisp square in its colour inside a black outline, lit along the top and
  * left and shaded along the bottom and right, one art pixel each. Squares
@@ -92,7 +93,7 @@ function flush(c: CanvasRenderingContext2D, k: number, rims = c, rimFor?: (color
 }
 
 /** One art pixel in canvas pixels: the outline and edge thickness. */
-const artPixel = (px: number) => Math.max(1, Math.round(px / 8));
+const artPixel = (px: number) => Math.max(1, Math.round(px / ART));
 
 function queue(px: number, k: number, x: number, y: number, size: number, color: string, outline: string) {
   const s = Math.max(2 * k, Math.round(size * px));

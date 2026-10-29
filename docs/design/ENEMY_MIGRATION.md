@@ -36,6 +36,8 @@ An art pixel is 1/8 of a board cell and scales with the camera. All three kinds 
 
 Totals assume every parent and child is defeated. Large Darkling stats start at 18 HP, 4 attack each second, and speed 1 cell/second; these are initial tuning values. Authored accounting budgets sum the initial bodies' catalog costs (75/100/180/120 for waves 2/3/4/5), not the entire offspring tree or a monotonic combat-strength estimate. Every size counts as one living enemy for the existing approximate color-drain threshold.
 
+- **2026-10-29 — Visibility contours.** Dark One bodies now have a bright crimson half-art-pixel perimeter; player troops use dark blue. Touching/overlapping bodies share outer contours, with no lines through their overlap. The colors remain visible through the grayscale wash. Enemy definitions, wave compositions and migration checkboxes are unchanged.
+
 ## Color drain and performance rules
 
 Faction is explicit in the enemy catalog; never infer darkness from a sprite's color. Currently tagged: Mini Darkling, Darkling, Large Darkling, Mother, Broodling, Dark Knight, Void Sparrow, Necromancer, Skeleton, Blink Imp, Crypt Hound and Grave Wisp. Future Dark One enemies must carry the same faction tag. Other species' allegiance is still pending their migration/story review. Friendly dark wizards and shades do not contribute; neither do dead enemies, fortress parts or Siege proxy objects.

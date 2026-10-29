@@ -23,6 +23,7 @@ try {
     const {drawBlazes}=await import('/src/defend/mage-art.ts');
     const {drawBlazes:referenceBlazes}=await import(`${referenceRoot}/mage-art.ts`);
     const referenceBattle=await import(`${combatRoot}/battle-art.ts`);
+    const currentBattle=await import('/src/defend/battle-art.ts');
     const {WizardArt:ReferenceWizard}=await import(`${combatRoot}/wizard-art.ts`);
     const {drawBlazes:combatBlazes}=await import(`${combatRoot}/mage-art.ts`);
     const {map,sim}=stressScene(100);
@@ -173,8 +174,20 @@ try {
       oldWizard.drawIce(g,r.px,sim.frosts,sim.time*1000,flameLights(sim).relief);
       referenceBattle.drawUnits(brush,sim,()=>1,true,undefined,{reduceMotion:opts.reduceMotion});
       r.dark.draw(g,r.px,sim);
-      r.paintCombat(fresh.getContext('2d'),sim,()=>1,opts);
-      reports.push({check:'original combat pixels',zoom,...compare(original,fresh)});
+      // The public legacy painter remains compatible. Production intentionally
+      // has the new half-art-pixel visibility contours, so compare that cache
+      // against a fresh current paint rather than the old artwork.
+      const f=fresh.getContext('2d'),currentBrush={c:f,px:r.px};
+      currentBattle.drawScorches(currentBrush,sim); combatBlazes(f,r.px,sim);
+      r.wizard.drawIce(f,r.px,sim.frosts,sim.time*1000,flameLights(sim).relief);
+      currentBattle.drawUnits(currentBrush,sim,()=>1,true,undefined,{reduceMotion:opts.reduceMotion});
+      r.dark.draw(f,r.px,sim);
+      reports.push({check:'legacy combat pixels',zoom,...compare(original,fresh)});
+      const cached=make(canvas.width,canvas.height),directCombat=make(canvas.width,canvas.height);
+      cached.getContext('2d').drawImage(r.combatLayer,0,0);
+      const dc=directCombat.getContext('2d');dc.setTransform(zoom,0,0,zoom,x,y);dc.imageSmoothingEnabled=false;
+      r.paintCombat(dc,sim,()=>1,opts);
+      reports.push({check:'current combat cache',zoom,...compare(cached,directCombat)});
       r.draw(map,sim,null,opts);const b=capture();
       r.combatKey='';r.draw(map,sim,null,opts);const direct=capture();
       reports.push({check:'combat reuse',zoom,...compare(b,direct)});

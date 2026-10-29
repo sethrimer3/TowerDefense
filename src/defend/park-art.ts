@@ -1,3 +1,4 @@
+import { ART } from "./art-scale.ts";
 /** The parks' ponds and trees as pixel art: painted pixel by pixel at `ART`
  * pixels a cell (as the park grass's blades are), then drawn into the city
  * layer scaled up with smoothing off, so they sit with the blocky roofs,
@@ -26,7 +27,7 @@ import { POND_BLEND, hasTree, pondDisc, pondField, treeCanopy } from "./park-geo
 import { paintRiver, riverBed, riverCanvas, riverCell, riverShape } from "./river-art.ts";
 
 /** Art pixels a cell. */
-export const ART = 8;
+export { ART } from "./art-scale.ts";
 const W = CELLS_W * ART, H = CELLS_H * ART;
 
 /** One tree's sprite: its art-pixel box and canopy, centre and radius in cells. */

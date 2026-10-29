@@ -45,3 +45,12 @@ test("a sprite's silhouette is its solid pixels, ring and all, in the outline's 
   assert.deepEqual(solid, ["..#.", ".###", "..#."]);
   assert.deepEqual([...out.slice(8, 12)], [0x14, 0x0c, 0x0a, 255]);
 });
+
+
+test("world art has eight pixels per cell and visibility rims are half an art pixel", async () => {
+  const { ART, UNIT_CONTOUR_ART_PIXELS, DARK_UNIT_INK, PLAYER_UNIT_INK } = await import('../src/defend/art-scale.ts');
+  const { ART: parkArt } = await import('../src/defend/park-art.ts');
+  assert.equal(ART, 8); assert.equal(parkArt, ART);
+  assert.equal(UNIT_CONTOUR_ART_PIXELS / ART, 1 / 16);
+  assert.notEqual(DARK_UNIT_INK, PLAYER_UNIT_INK);
+});
