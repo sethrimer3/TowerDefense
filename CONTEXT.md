@@ -692,7 +692,7 @@ A Dark One enemy consisting of a three-by-three black pixel square, splitting in
 The world-art unit: one eighth of a board cell, scaled to screen pixels by camera zoom and display density.
 
 **Visibility contour**:
-A half-art-pixel perimeter around a combined group of unit bodies, bright crimson for Dark One enemies dark navy for the player's troops and black (gold while marked) for everyone else, without seams through overlapping bodies.
+A half-art-pixel perimeter around a combined group of unit bodies, deep crimson for Dark One enemies, dark navy for the player's troops and black (gold while marked) for everyone else, without seams through overlapping bodies.
 
 
 **Contact damage**:
@@ -700,3 +700,7 @@ Damage dealt by an enemy pressing against a structure, with its visibility conto
 
 **Artist sprite**:
 A PNG, one pixel an art pixel and without an outline, that replaces the game's own drawn art for one piece of the city; the game still paints its damage, rubble and outline.
+
+
+**Dark crimson glow**:
+The steady night halo around Dark One enemies, brighter and wider where they gather and fading with distance and daylight.

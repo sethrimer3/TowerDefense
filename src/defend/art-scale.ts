@@ -2,7 +2,7 @@
 export const ART = 8;
 /** Visibility contours extend this far outside the union of unit bodies. */
 export const UNIT_CONTOUR_ART_PIXELS = .5;
-export const DARK_UNIT_INK = '#ff2454';
+export const DARK_UNIT_INK = '#9c1235';
 export const PLAYER_UNIT_INK = '#121d42';
 /** Contours for units on neither side: the old rims' black, the watch
  * tower's gold mark and the brood's violet. */
