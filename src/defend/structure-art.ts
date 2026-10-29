@@ -33,7 +33,7 @@ export function paintStructureArt(c: CanvasRenderingContext2D, kind: StructureKi
   const cw = Math.max(1, Math.round(box.w / box.px)), ch = Math.max(1, Math.round(box.h / box.px));
   if (kind === "keep") return paintKeep(c, { x, y, w, h, px: box.px }, stage);
   const look = artLook(kind, path);
-  const art = sprite(`${kind}:${cw}x${ch}:${stage}:${seed}${look ? `:${look}` : ""}`, cw * ART, ch * ART, () => structurePixels(kind, cw, ch, stage, seed, look), true);
+  const art = sprite(`${kind}:${cw}x${ch}:${stage}:${seed}${look ? `:${look}` : ""}`, cw * ART, ch * ART, () => structurePixels(kind, cw, ch, stage, seed, look));
   drawSprite(c, art, x, y, w, h);
 }
 
@@ -41,7 +41,7 @@ export function paintStructureArt(c: CanvasRenderingContext2D, kind: StructureKi
 export function paintStructureRubble(c: CanvasRenderingContext2D, kind: StructureKind, box: ArtBox, seed = 0, path?: string) {
   if (kind === "keep") return paintKeepRubble(c, box);
   const cw = Math.max(1, Math.round(box.w / box.px)), ch = Math.max(1, Math.round(box.h / box.px));
-  const art = sprite(`${kind}:${cw}x${ch}:rubble:${seed}`, cw * ART, ch * ART, () => structureRubblePixels(kind, cw, ch, seed), true);
+  const art = sprite(`${kind}:${cw}x${ch}:rubble:${seed}`, cw * ART, ch * ART, () => structureRubblePixels(kind, cw, ch, seed));
   drawSprite(c, art, Math.round(box.x), Math.round(box.y), Math.round(box.w), Math.round(box.h));
 }
 
@@ -95,7 +95,7 @@ function paintGateIcon(c: CanvasRenderingContext2D, n: number) {
   c.fillStyle = OUTLINE;
   c.fillRect(0, y, n, k);
   c.fillRect(0, y + h * k - k, n, k);
-  drawSprite(c, sprite("icon:cityGate", w, h, () => gatePixels("s"), true), x, y, w * k, h * k);
+  drawSprite(c, sprite("icon:cityGate", w, h, () => gatePixels("s")), x, y, w * k, h * k);
 }
 
 /** A stretch of wall two stones long, its stakes pointing up and out. */
@@ -146,10 +146,10 @@ function paintWallBlockIcon(c: CanvasRenderingContext2D, n: number) {
 function paintBallistaIcon(c: CanvasRenderingContext2D, n: number) {
   const b = 2 * ART, k = Math.max(1, Math.floor(n / BALLISTA_ART));
   const x = Math.round((n - b * k) / 2), y = Math.round((n - b * k) / 2);
-  drawSprite(c, sprite("icon:bastion", b, b, () => bastionPixels(), true), x, y, b * k, b * k);
+  drawSprite(c, sprite("icon:bastion", b, b, () => bastionPixels()), x, y, b * k, b * k);
   const w = BALLISTA_ART * k, o = Math.round((n - w) / 2);
   const dir = Math.round(BALLISTA_DIRS * 7 / 8);
-  drawSprite(c, sprite(`ballista:${dir}:1`, BALLISTA_ART, BALLISTA_ART, () => ballistaPixels(dir, true), true), o, o, w, w);
+  drawSprite(c, sprite(`ballista:${dir}:1`, BALLISTA_ART, BALLISTA_ART, () => ballistaPixels(dir, true)), o, o, w, w);
 }
 
 function paintBombIcon(c: CanvasRenderingContext2D, n: number) {
@@ -649,13 +649,13 @@ export function paintKeepFlash(c: CanvasRenderingContext2D, { x, y, w, h }: ArtB
  * smoothing off. */
 function paintKeep(c: CanvasRenderingContext2D, { x, y, w, h }: ArtBox, stage: number) {
   if (typeof document === "undefined") return;
-  drawSprite(c, (keepSprites[stage] ??= spriteCanvas(keepPixels(stage), KEEP, KEEP, true)), x, y, w, h);
+  drawSprite(c, (keepSprites[stage] ??= spriteCanvas(keepPixels(stage), KEEP, KEEP)), x, y, w, h);
 }
 
 /** The fallen keep's rubble over its cells (`box`, canvas pixels). */
 export function paintKeepRubble(c: CanvasRenderingContext2D, { x, y, w, h }: ArtBox) {
   if (typeof document === "undefined") return;
-  rubbleSprite ??= spriteCanvas(keepRubblePixels(), KEEP, KEEP, true);
+  rubbleSprite ??= spriteCanvas(keepRubblePixels(), KEEP, KEEP);
   drawSprite(c, rubbleSprite, Math.round(x), Math.round(y), Math.round(w), Math.round(h));
 }
 
@@ -732,7 +732,7 @@ let flagCanvas: HTMLCanvasElement | null = null;
 /** The keep's banner, redrawn every frame from the time so it keeps
  * waving, at the city's art scale. */
 export function drawFlag(c: CanvasRenderingContext2D, px: number, pose: FlagPose, keepSprite = true, face?: Flag) {
-  flagCanvas = spriteCanvas(flagPixels(pose.t, pose.reduceMotion, false, face, pose.burn, pose.unfurl), FLAG_W, FLAG_H, false, flagCanvas ?? undefined);
+  flagCanvas = spriteCanvas(flagPixels(pose.t, pose.reduceMotion, false, face, pose.burn, pose.unfurl), FLAG_W, FLAG_H, flagCanvas ?? undefined);
   const s = px / ART;
   c.save();
   c.imageSmoothingEnabled = false;
@@ -773,7 +773,7 @@ export function drawRallyFlag(
   c: CanvasRenderingContext2D, px: number, at: { x: number; y: number },
   pose: { t: number; reduceMotion: boolean; alpha?: number; rise?: number; scale?: number; face?: Flag },
 ) {
-  rallyCanvas = spriteCanvas(flagPixels(pose.t, pose.reduceMotion, true, pose.face), FLAG_W, FLAG_H, false, rallyCanvas ?? undefined);
+  rallyCanvas = spriteCanvas(flagPixels(pose.t, pose.reduceMotion, true, pose.face), FLAG_W, FLAG_H, rallyCanvas ?? undefined);
   // `rise` lifts it that many cells off its spot and `scale` grows it about
   // the pole's foot, as if nearer the eye: for dropping in and flying off.
   const s = (px / ART) * (pose.scale ?? 1);

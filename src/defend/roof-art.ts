@@ -200,12 +200,12 @@ export function houseRubblePixels(cw: number, ch: number, variant: number, seed:
 /** The roof for a house of `cw × ch` cells, seeded by `seed`, at damage
  * `stage`, as a canvas of art pixels (null outside a browser), cached. */
 export function roofSprite(cw: number, ch: number, variant: number, seed: number, stage = 0): HTMLCanvasElement | null {
-  return sprite(`house:${cw},${ch},${variant},${seed}:${stage}`, cw * ART, ch * ART, () => houseDamagePixels(cw, ch, variant, seed, stage), true);
+  return sprite(`house:${cw},${ch},${variant},${seed}:${stage}`, cw * ART, ch * ART, () => houseDamagePixels(cw, ch, variant, seed, stage));
 }
 
 /** A fallen house's rubble as a canvas of art pixels, cached. */
 export function houseRubbleSprite(cw: number, ch: number, variant: number, seed: number): HTMLCanvasElement | null {
-  return sprite(`house:${cw},${ch},${variant},${seed}:rubble`, cw * ART, ch * ART, () => houseRubblePixels(cw, ch, variant, seed), true);
+  return sprite(`house:${cw},${ch},${variant},${seed}:rubble`, cw * ART, ch * ART, () => houseRubblePixels(cw, ch, variant, seed));
 }
 
 /** The seed a house's roof is drawn from: its lot, so it never changes. */

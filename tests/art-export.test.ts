@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { artPieces } from "../src/defend/art-export.ts";
 import { ART_NAMES, artOverride, setArtOverride } from "../src/defend/art-overrides.ts";
-import { bare, inked, rgba, OUTLINE } from "../src/defend/damage-art.ts";
+import { bare, rimmed, rgba, OUTLINE } from "../src/defend/damage-art.ts";
 import { keepPixels } from "../src/defend/structure-art.ts";
 import { structurePixels } from "../src/defend/tower-art.ts";
 import { setPixelArt } from "../src/defend/pixel-sprites.ts";
@@ -18,11 +18,10 @@ test("bare takes the outer outline off and keeps inner lines", () => {
   assert.equal(out[10], DARK, "the inner dark pixel stays");
 });
 
-test("inked doubles the sprite and rings it half an art pixel wide", () => {
-  const { data, w, h } = inked(new Uint32Array([RED]), 1, 1);
-  assert.deepEqual([w, h], [4, 4]);
-  for (let y = 0; y < 4; y++)
-    for (let x = 0; x < 4; x++) assert.equal(data[y * 4 + x], x > 0 && x < 3 && y > 0 && y < 3 ? RED : INK, `(${x}, ${y})`);
+test("rimmed gives an outline-free sprite back its one-art-pixel rim", () => {
+  const px = new Uint32Array(16).fill(RED);
+  const out = rimmed(px, 4, 4);
+  for (let i = 0; i < 16; i++) assert.equal(out[i], [5, 6, 9, 10].includes(i) ? RED : INK, `pixel ${i}`);
 });
 
 test("every exported piece is named once, sized right and drawn", () => {
@@ -42,10 +41,10 @@ test("an artist's sprite stands in for the drawn one, damage still drawn over it
   const own = new Uint32Array(w * h).fill(RED);
   setArtOverride(name, { data: own, w, h });
   try {
-    assert.deepEqual(structurePixels("archerTower", 2, 2, 0, 0), own);
-    assert.notDeepEqual(structurePixels("archerTower", 2, 2, 3, 7), own, "damage is painted over it");
+    assert.deepEqual(structurePixels("archerTower", 2, 2, 0, 0), rimmed(own, w, h), "drawn with its rim");
+    assert.notDeepEqual(structurePixels("archerTower", 2, 2, 3, 7), rimmed(own, w, h), "damage is painted over it");
     setPixelArt(false);
-    assert.notDeepEqual(structurePixels("archerTower", 2, 2, 0, 0), own, "the Pixel Art setting turns it off");
+    assert.notDeepEqual(structurePixels("archerTower", 2, 2, 0, 0), rimmed(own, w, h), "the Pixel Art setting turns it off");
     setPixelArt(true);
     setArtOverride(name, { data: new Uint32Array(4), w: 2, h: 2 });
     assert.equal(artOverride(name, w, h), null, "a sprite of the wrong size is ignored");
